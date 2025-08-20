@@ -1,0 +1,3 @@
+[submodule "external/sp"]
+	path = external/sp
+	url = git@github.com:spaderthomas/sp.git

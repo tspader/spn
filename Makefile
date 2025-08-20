@@ -1,0 +1,41 @@
+SPN_DIR_BUILD:= build
+  SPN_DIR_BUILD_OUTPUT := $(SPN_DIR_BUILD)/bin
+    SPN_OUTPUT := $(SPN_DIR_BUILD_OUTPUT)/sp
+SPN_DIR_SOURCE := source
+SPN_DIR_EXTERNAL := external
+  SPN_DIR_SP := $(SPN_DIR_EXTERNAL)/sp
+SPN_MAKEFILE := Makefile
+SPN_COMPILE_DB := compile_commands.json
+
+BUILD_TYPE ?= debug
+MAKEFLAGS += -j8
+
+CC := gcc
+SPN_FLAG_LANGUAGE := -std=c11
+SPN_FLAG_INCLUDES := -I$(SPN_DIR_EXTERNAL)
+SPN_FLAG_OUTPUT := -o $(SPN_OUTPUT)
+SPN_CC_FLAGS := $(SPN_FLAG_LANGUAGE) $(SPN_FLAG_INCLUDES) $(SPN_FLAG_OUTPUT)
+SPN_SOURCE_FILES := $(SPN_DIR_SOURCE)/main.c
+
+.PHONY: all
+all: build clangd
+
+$(SPN_DIR_BUILD_OUTPUT):
+	@mkdir -p $(SPN_DIR_BUILD_OUTPUT)
+
+$(SPN_OUTPUT): $(SPN_DIR_BUILD_OUTPUT)
+	$(CC) $(SPN_CC_FLAGS) $(SPN_SOURCE_FILES)
+
+$(SPN_COMPILE_DB): $(SPN_MAKEFILE)
+	@make clean
+	@bear -- make build
+
+.PHONY: build clangd clean
+
+build: $(SPN_OUTPUT)
+
+clangd: $(SPN_COMPILE_DB)
+
+clean:
+	@rm -rf $(SPN_DIR_BUILD)
+	@rm -f $(SPN_COMPILE_DB)
