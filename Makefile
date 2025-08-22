@@ -13,6 +13,7 @@ SPN_DIR_EXTERNAL := external
 SPN_MAKEFILE := Makefile
 SPN_COMPILE_DB := compile_commands.json
 SPN_CLANGD := .clangd
+SPN_DIR_CACHE := ~/.cache/spn/repos/spn
 
 BUILD_TYPE ?= debug
 CMAKE_TYPE := Debug
@@ -73,3 +74,8 @@ nuke:
 	@rm -rf $(SPN_DIR_BUILD)
 	@rm -f $(SPN_COMPILE_DB)
 	@rm -f $(SPN_CLANGD)
+
+init: build
+	@rm -rf $(SPN_DIR_CACHE)
+	gdb --args ./$(SPN_OUTPUT) init
+
