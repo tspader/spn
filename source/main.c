@@ -29,12 +29,17 @@ void spn_cli_init(spn_cli_t* cli, u32 num_args, const c8** args);
 void spn_cli_run(spn_cli_t* cli);
 void spn_cli_command_add(spn_cli_t* cli);
 void spn_cli_command_init(spn_cli_t* cli);
+void spn_cli_command_nuke(spn_cli_t* cli);
 
-/////////
-// GIT //
-/////////
-void spn_git_clone(sp_str_t url, sp_str_t target);
-sp_str_t spn_git_find_head(sp_str_t repo);
+///////////
+// SHELL //
+///////////
+#define SPN_SH(...) SDL_CreateProcess((const c8* []) { __VA_ARGS__ }, SP_SDL_PIPE_STDIO)
+
+sp_str_t spn_sh_read_process(SDL_Process* process);
+void spn_sh_git_clone(sp_str_t url, sp_str_t target);
+sp_str_t spn_sh_git_find_head(sp_str_t repo);
+void spn_sh_make(sp_str_t target);
 
 /////////
 // SPN //
@@ -53,6 +58,7 @@ typedef struct {
   sp_str_t     spn;
   sp_str_t       recipes;
   sp_str_t project;
+  sp_str_t   toml;
 } spn_paths_t;
 
 typedef struct {
@@ -156,6 +162,9 @@ void spn_cli_run(spn_cli_t* cli) {
   else if (sp_cstr_equal("init", cli->args[0])) {
     spn_cli_command_init(cli);
   }
+  else if (sp_cstr_equal("nuke", cli->args[0])) {
+    spn_cli_command_nuke(cli);
+  }
 }
 void spn_cli_command_add(spn_cli_t* cli) {
   spn_cli_add_t* add = &cli->add;
@@ -206,13 +215,20 @@ void spn_cli_command_add(spn_cli_t* cli) {
   if (is_url) {
     url = add->package;
 
-    sp_str_t file_name = sp_os_extract_file_name(url);
-    sp_str_t extension = SP_LIT(".git");
-    SP_ASSERT(sp_str_ends_with(file_name, extension));
-    name = SP_REVERSE_SUBSTR(file_name, 0, extension.len);
+    if (!sp_str_ends_with(url, SP_LIT(".git"))) {
+      SP_FATAL("{} is not a URL to a Git repository (it does not end in .git)", SP_FMT_STR(url));
+    }
+    name = sp_os_extract_stem(url);
   }
   else {
     name = add->package;
+
+    sp_dyn_array_for(app.builtins, index) {
+      spn_dependency_t* builtin = &app.builtins[index];
+      if (sp_str_equal(builtin->name, name)) {
+
+      }
+    }
 
     sp_str_builder_t builder = SP_ZERO_INITIALIZE();
     sp_str_builder_append(&builder, SP_LIT("https://github.com/"));
@@ -316,15 +332,19 @@ void spn_cli_command_init(spn_cli_t* cli) {
     .name = sp_os_extract_file_name(app.paths.project)
   };
 
-  sp_str_t toml_path = sp_str_lit("spn.toml");
-  if (!spn_project_write(&app.project, sp_os_join_path(app.paths.project, SP_LIT("spn.toml")))) {
+  if (!spn_project_write(&app.project, app.paths.toml)) {
     SP_FATAL("Failed to write project TOML file");
   }
 
-  SP_LOG("Initialized project {} in spn.toml", SP_FMT_STR(app.project.name));
+  SP_LOG("Initialized project {} in spn.toml", SP_FMT_QUOTED_STR(app.project.name));
 }
 
-void spn_git_clone(sp_str_t url, sp_str_t target) {
+void spn_cli_command_nuke(spn_cli_t* cli) {
+  sp_os_remove_directory(app.paths.cache);
+  sp_os_remove_file(app.paths.toml);
+}
+
+void spn_sh_git_clone(sp_str_t url, sp_str_t target) {
   SDL_Process* process = SDL_CreateProcess(
     (const c8* []) {
       "git",
@@ -345,7 +365,7 @@ void spn_git_clone(sp_str_t url, sp_str_t target) {
   SDL_DestroyProcess(process);
 }
 
-sp_str_t spn_git_find_head(sp_str_t repo) {
+sp_str_t spn_sh_git_find_head(sp_str_t repo) {
   SDL_Process* process = SDL_CreateProcess(
     (const c8* []) {
       "git",
@@ -368,12 +388,28 @@ sp_str_t spn_git_find_head(sp_str_t repo) {
   return sp_str_strip_right(output);
 }
 
+sp_str_t spn_sh_read_process(SDL_Process* process) {
+  sp_str_t output;
+  sp_size_t len;
+  s32 return_code = 0;
+
+  output.data = (c8*)SDL_ReadProcess(process, &len, &return_code);
+  output.len = (u32)len;
+  return output;
+}
+
+void spn_sh_make(sp_str_t target) {
+  SDL_Process* process = SPN_SH("git", "status");
+  sp_str_t output = spn_sh_read_process(process);
+}
+
 void spn_app_init(spn_app_t* app) {
   app->paths.executable = sp_os_get_executable_path();
   app->paths.install = sp_os_parent_path(app->paths.executable);
 
   c8* working_directory = SDL_GetCurrentDirectory();
   app->paths.project = sp_os_canonicalize_path(SP_CSTR(working_directory));
+  app->paths.toml = sp_os_join_path(app->paths.project, SP_LIT("spn.toml"));
   SDL_free(working_directory);
 
   const c8* xdg = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "XDG_CACHE_HOME");
@@ -395,23 +431,24 @@ void spn_app_init(spn_app_t* app) {
   sp_os_create_directory(app->paths.builds);
 
   if (!sp_os_does_path_exist(app->paths.spn)) {
-    spn_git_clone(SP_LIT("https://github.com/spaderthomas/spn.git"), app->paths.spn);
+    spn_sh_git_clone(SP_LIT("https://github.com/spaderthomas/spn.git"), app->paths.spn);
   }
 
-  sp_str_t head = spn_git_find_head(app->paths.spn);
+  sp_str_t head = spn_sh_git_find_head(app->paths.spn);
 
   sp_os_directory_entry_list_t entries = sp_os_scan_directory(app->paths.recipes);
   for (sp_os_directory_entry_t* entry = entries.data; entry < entries.data + entries.count; entry++) {
     spn_dependency_t builtin = {
       .kind = SPN_DEPENDENCY_KIND_BUILTIN,
-      .name = sp_os_path_stem(entry->file_name),
+      .name = sp_os_extract_stem(entry->file_name),
       .url = SP_LIT("")
     };
     sp_dyn_array_push(app->builtins, builtin);
   }
 
+  SP_LOG("scanned {} for builtin dependencies:", SP_FMT_STR(app->paths.recipes));
   sp_dyn_array_for(app->builtins, index) {
-    SP_LOG("{}: {}", app->builtins[index].name, app->builtins[index].url);
+    SP_LOG("builtin {} -> {}", app->builtins[index].name, app->builtins[index].url);
   }
 }
 
