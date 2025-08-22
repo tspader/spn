@@ -1,4 +1,11 @@
 .cache
 compile_commands.json
+.clangd
 
 build
+
+.claude
+CLAUDE.md
+.mcp.json
+
+.spackle/*
