@@ -34,12 +34,17 @@ void spn_cli_command_nuke(spn_cli_t* cli);
 ///////////
 // SHELL //
 ///////////
-#define SPN_SH(...) SDL_CreateProcess((const c8* []) { __VA_ARGS__ }, SP_SDL_PIPE_STDIO)
+typedef struct {
+  sp_str_t output;
+  s32 return_code;
+} spn_sh_process_result_t;
 
-sp_str_t spn_sh_read_process(SDL_Process* process);
+#define SPN_SH(...) SDL_CreateProcess((const c8* []) { __VA_ARGS__, SP_NULLPTR }, SP_SDL_PIPE_STDIO)
+
+spn_sh_process_result_t spn_sh_read_process(SDL_Process* process);
 void spn_sh_git_clone(sp_str_t url, sp_str_t target);
 sp_str_t spn_sh_git_find_head(sp_str_t repo);
-void spn_sh_make(sp_str_t target);
+void spn_sh_make(spn_dependency_t* dependency);
 
 /////////
 // SPN //
@@ -66,6 +71,8 @@ typedef struct {
   sp_str_t name;
   sp_str_t url;
 } spn_dependency_t;
+
+sp_str_t spn_dependency_find_recipe(spn_dependency_t* dependency);
 
 typedef struct {
   sp_str_t name;
@@ -344,6 +351,19 @@ void spn_cli_command_nuke(spn_cli_t* cli) {
   sp_os_remove_file(app.paths.toml);
 }
 
+sp_str_t spn_dependency_find_recipe(spn_dependency_t* dependency) {
+  return sp_fmt(SP_LIT("{}/{}.make"), SP_FMT_STR(app.paths.recipes), SP_FMT_STR(dependency->name));
+}
+
+spn_sh_process_result_t spn_sh_read_process(SDL_Process* process) {
+  spn_sh_process_result_t result;
+  sp_size_t len;
+
+  result.output.data = (c8*)SDL_ReadProcess(process, &len, &result.return_code);
+  result.output.len = (u32)len;
+  return result;
+}
+
 void spn_sh_git_clone(sp_str_t url, sp_str_t target) {
   SDL_Process* process = SDL_CreateProcess(
     (const c8* []) {
@@ -366,41 +386,21 @@ void spn_sh_git_clone(sp_str_t url, sp_str_t target) {
 }
 
 sp_str_t spn_sh_git_find_head(sp_str_t repo) {
-  SDL_Process* process = SDL_CreateProcess(
-    (const c8* []) {
-      "git",
-      "rev-parse",
-      "--abbrev-ref",
-      "HEAD",
-      SP_NULLPTR
-    },
-    SP_SDL_PIPE_STDIO
-  );
-
-  sp_str_t output;
-  sp_size_t len;
-  s32 return_code = 0;
-  output.data = (c8*)SDL_ReadProcess(process, &len, &return_code);
-  output.len = (u32)len;
-
+  SDL_Process* process = SPN_SH("git", "rev-parse", "--abbrev-ref", "HEAD");
+  spn_sh_process_result_t result = spn_sh_read_process(process);
   SDL_DestroyProcess(process);
 
-  return sp_str_strip_right(output);
+  return sp_str_strip_right(result.output);
 }
 
-sp_str_t spn_sh_read_process(SDL_Process* process) {
-  sp_str_t output;
-  sp_size_t len;
-  s32 return_code = 0;
+void spn_sh_make(spn_dependency_t* dependency) {
+  sp_str_t recipe = spn_dependency_find_recipe(dependency);
+  SDL_Process* process = SPN_SH("make", "--directory", sp_str_to_cstr(app.paths.recipes), "--recipe", sp_str_to_cstr(recipe));
 
-  output.data = (c8*)SDL_ReadProcess(process, &len, &return_code);
-  output.len = (u32)len;
-  return output;
-}
-
-void spn_sh_make(sp_str_t target) {
-  SDL_Process* process = SPN_SH("git", "status");
-  sp_str_t output = spn_sh_read_process(process);
+  spn_sh_process_result_t result = spn_sh_read_process(process);
+  if (result.return_code) {
+    SP_FATAL("Recipe for {} failed!", SP_FMT_STR(recipe));
+  }
 }
 
 void spn_app_init(spn_app_t* app) {
