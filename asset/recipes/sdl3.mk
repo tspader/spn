@@ -1,0 +1,26 @@
+SPN_SDL_HEADERS := $(SPN_DIR_BUILD)/include
+SPN_SDL_BINARY := $(SPN_DIR_BUILD)/libSDL3.so
+
+SPN_SDL_FLAG_DEFINES := -DCMAKE_BUILD_TYPE=$(CMAKE_TYPE) -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF -DSDL_EXAMPLES=OFF
+SPN_SDL_CMAKE_FLAGS := $(SDL_FLAG_DEFINES)
+
+.PHONY: build
+
+$(SPN_SDL_BINARY):
+	cmake -S$(SPN_DIR_PROJECT) -B$(SPN_DIR_BUILD) $(SPN_SDL_CMAKE_FLAGS)
+
+$(SPN_SDL_HEADERS):
+	cp -r $(SPN_DIR_PROJECT)/include $(SPN_DIR_INSTALL)
+
+$(SPN_DIR_PROJECT):
+	git clone git@github.com:libsdl-org/sdl.git $(SPN_DIR_PROJECT)
+
+debug:
+	echo $(SPN_DIR_PROJECT)
+	echo $(SPN_DIR_BUILD)
+	echo $(SPN_DIR_INSTALL)
+	echo "jello world"
+
+spn-clone: $(SPN_DIR_PROJECT) debug
+
+spn-build: $(SPN_SDL_BINARY) $(SPN_SDL_HEADERS) debug

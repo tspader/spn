@@ -31,20 +31,6 @@ void spn_cli_command_add(spn_cli_t* cli);
 void spn_cli_command_init(spn_cli_t* cli);
 void spn_cli_command_nuke(spn_cli_t* cli);
 
-///////////
-// SHELL //
-///////////
-typedef struct {
-  sp_str_t output;
-  s32 return_code;
-} spn_sh_process_result_t;
-
-#define SPN_SH(...) SDL_CreateProcess((const c8* []) { __VA_ARGS__, SP_NULLPTR }, SP_SDL_PIPE_STDIO)
-
-spn_sh_process_result_t spn_sh_read_process(SDL_Process* process);
-void spn_sh_git_clone(sp_str_t url, sp_str_t target);
-sp_str_t spn_sh_git_find_head(sp_str_t repo);
-void spn_sh_make(spn_dependency_t* dependency);
 
 /////////
 // SPN //
@@ -58,8 +44,9 @@ typedef struct {
   sp_str_t install;
   sp_str_t   executable;
   sp_str_t cache;
-  sp_str_t   builds;
-  sp_str_t   repos;
+  sp_str_t   work;
+  sp_str_t   build;
+  sp_str_t   repo;
   sp_str_t     spn;
   sp_str_t       recipes;
   sp_str_t project;
@@ -72,7 +59,10 @@ typedef struct {
   sp_str_t url;
 } spn_dependency_t;
 
-sp_str_t spn_dependency_find_recipe(spn_dependency_t* dependency);
+sp_str_t spn_dependency_source_dir(spn_dependency_t* dependency);
+sp_str_t spn_dependency_build_dir(spn_dependency_t* dependency);
+sp_str_t spn_dependency_install_dir(spn_dependency_t* dependency);
+sp_str_t spn_dependency_recipe_file(spn_dependency_t* dependency);
 
 typedef struct {
   sp_str_t name;
@@ -92,6 +82,21 @@ void spn_app_init(spn_app_t* app);
 void spn_bootstrap();
 bool spn_project_write(spn_project_t* project, sp_str_t path);
 bool spn_project_read(spn_project_t* project, sp_str_t path);
+
+///////////
+// SHELL //
+///////////
+typedef struct {
+  sp_str_t output;
+  s32 return_code;
+} spn_sh_process_result_t;
+
+#define SPN_SH(...) SDL_CreateProcess((const c8* []) { __VA_ARGS__, SP_NULLPTR }, SP_SDL_PIPE_STDIO)
+
+spn_sh_process_result_t spn_sh_read_process(SDL_Process* process);
+void spn_sh_git_clone(sp_str_t url, sp_str_t target);
+sp_str_t spn_sh_git_find_head(sp_str_t repo);
+void spn_sh_make(spn_dependency_t* dependency, sp_str_t target);
 
 /////////////////
 // TOML WRITER //
@@ -196,13 +201,12 @@ void spn_cli_command_add(spn_cli_t* cli) {
   }
 
   // Read existing project if it exists
-  sp_str_t toml_path = sp_os_join_path(app.paths.project, SP_LIT("spn.toml"));
-  if (!sp_os_does_path_exist(toml_path)) {
-    SP_FATAL("Expected project TOML file at {}, but it did not exist", SP_FMT_STR(toml_path));
+  if (!sp_os_does_path_exist(app.paths.toml)) {
+    SP_FATAL("Expected project TOML file at {}, but it did not exist", SP_FMT_STR(app.paths.toml));
   }
 
-  if (!spn_project_read(&app.project, toml_path)) {
-    SP_FATAL("Failed to read project TOML file at {}", SP_FMT_STR(toml_path));
+  if (!spn_project_read(&app.project, app.paths.toml)) {
+    SP_FATAL("Failed to read project TOML file at {}", SP_FMT_STR(app.paths.toml));
   }
 
   // Get the repository identifier/URL
@@ -230,33 +234,25 @@ void spn_cli_command_add(spn_cli_t* cli) {
   else {
     name = add->package;
 
+    spn_dependency_t* dependency = SP_NULLPTR;
     sp_dyn_array_for(app.builtins, index) {
       spn_dependency_t* builtin = &app.builtins[index];
       if (sp_str_equal(builtin->name, name)) {
-
+        dependency = builtin;
       }
     }
 
-    sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-    sp_str_builder_append(&builder, SP_LIT("https://github.com/"));
-
-    // Map common packages to their repos
-    if (sp_str_equal(name, SP_LIT("sdl"))) {
-      sp_str_builder_append(&builder, SP_LIT("libsdl-org/SDL"));
-    } else if (sp_str_equal(name, SP_LIT("imgui"))) {
-      sp_str_builder_append(&builder, SP_LIT("ocornut/imgui"));
-    } else {
-      // Default: assume github.com/{name}/{name}
-      sp_str_builder_append(&builder, name);
-      sp_str_builder_append_c8(&builder, '/');
-      sp_str_builder_append(&builder, name);
+    if (!dependency) {
+      SP_FATAL("Could not find {} in available dependencies", SP_FMT_QUOTED_STR(name));
     }
-    sp_str_builder_append(&builder, SP_LIT(".git"));
-    url = sp_str_builder_write(&builder);
+
+    spn_sh_make(dependency, SP_LIT("spn-clone"));
+
   }
 
+
   // Check if repo already exists
-  sp_str_t repo_path = sp_os_join_path(app.paths.repos, name);
+  sp_str_t repo_path = sp_os_join_path(app.paths.repo, name);
 
   if (!sp_os_does_path_exist(repo_path)) {
     SP_LOG("Cloning {} to {}", SP_FMT_STR(url), SP_FMT_STR(repo_path));
@@ -309,7 +305,7 @@ void spn_cli_command_add(spn_cli_t* cli) {
     sp_dyn_array_push(app.project.dependencies, dep);
 
     // Save project
-    if (!spn_project_write(&app.project, toml_path)) {
+    if (!spn_project_write(&app.project, app.paths.toml)) {
       SP_FATAL("Failed to write project TOML file");
     }
 
@@ -351,9 +347,22 @@ void spn_cli_command_nuke(spn_cli_t* cli) {
   sp_os_remove_file(app.paths.toml);
 }
 
-sp_str_t spn_dependency_find_recipe(spn_dependency_t* dependency) {
-  return sp_fmt(SP_LIT("{}/{}.make"), SP_FMT_STR(app.paths.recipes), SP_FMT_STR(dependency->name));
+sp_str_t spn_dependency_source_dir(spn_dependency_t* dependency) {
+  return sp_os_join_path(app.paths.repo, dependency->name);
 }
+
+sp_str_t spn_dependency_build_dir(spn_dependency_t* dependency) {
+  return sp_os_join_path(app.paths.build, dependency->name);
+}
+
+sp_str_t spn_dependency_install_dir(spn_dependency_t* dependency) {
+  return sp_os_join_path(app.paths.build, dependency->name);
+}
+
+sp_str_t spn_dependency_recipe_file(spn_dependency_t* dependency) {
+  return sp_fmt(SP_LIT("{}.mk"), SP_FMT_STR(dependency->name));
+}
+
 
 spn_sh_process_result_t spn_sh_read_process(SDL_Process* process) {
   spn_sh_process_result_t result;
@@ -393,13 +402,42 @@ sp_str_t spn_sh_git_find_head(sp_str_t repo) {
   return sp_str_strip_right(result.output);
 }
 
-void spn_sh_make(spn_dependency_t* dependency) {
-  sp_str_t recipe = spn_dependency_find_recipe(dependency);
-  SDL_Process* process = SPN_SH("make", "--directory", sp_str_to_cstr(app.paths.recipes), "--recipe", sp_str_to_cstr(recipe));
+void spn_sh_make(spn_dependency_t* dependency, sp_str_t target) {
+  sp_str_t source = spn_dependency_source_dir(dependency);
+  sp_str_t build = spn_dependency_build_dir(dependency);
+  sp_str_t install = spn_dependency_install_dir(dependency);
+  sp_str_t recipe = spn_dependency_recipe_file(dependency);
+
+  const c8* args [] = {
+    "make",
+    "--directory", sp_str_to_cstr(app.paths.recipes),
+    "--makefile", sp_str_to_cstr(recipe),
+    sp_str_to_cstr(target),
+    SP_NULLPTR
+  };
+
+  SDL_Environment* environment = SDL_CreateEnvironment(SP_SDL_INHERIT_ENVIRONMENT);
+  SDL_SetEnvironmentVariable(environment, "SPN_DIR_PROJECT", sp_str_to_cstr(source), true);
+  SDL_SetEnvironmentVariable(environment, "SPN_DIR_BUILD", sp_str_to_cstr(build), true);
+  SDL_SetEnvironmentVariable(environment, "SPN_DIR_INSTALL", sp_str_to_cstr(install), true);
+
+  SDL_PropertiesID id = SDL_CreateProperties();
+  SDL_SetPointerProperty(id, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)args);
+  SDL_SetPointerProperty(id, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, environment);
+  SDL_SetNumberProperty(id, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL);
+  SDL_SetNumberProperty(id, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP);
+  SDL_SetNumberProperty(id, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_NULL);
+
+  SDL_Process* process = SDL_CreateProcessWithProperties(id);
+  if (!process) {
+    const c8* sdl = SDL_GetError();
+    SP_FATAL("Failed to create process: {}", SP_FMT_CSTR(sdl));
+  }
+
 
   spn_sh_process_result_t result = spn_sh_read_process(process);
   if (result.return_code) {
-    SP_FATAL("Recipe for {} failed!", SP_FMT_STR(recipe));
+    SP_FATAL("Target {} for {} failed!", SP_FMT_STR(target), SP_FMT_STR(recipe));
   }
 }
 
@@ -421,14 +459,15 @@ void spn_app_init(spn_app_t* app) {
     app->paths.cache = sp_str_join(SP_CSTR(home), SP_LIT(".cache/spn"), SP_LIT("/"));
   }
 
-  app->paths.repos = sp_os_join_path(app->paths.cache, SP_LIT("repos"));
-  app->paths.builds = sp_os_join_path(app->paths.cache, SP_LIT("builds"));
-  app->paths.spn = sp_os_join_path(app->paths.repos, SP_LIT("spn"));
+  app->paths.repo = sp_os_join_path(app->paths.cache, SP_LIT("repo"));
+  app->paths.build = sp_os_join_path(app->paths.cache, SP_LIT("build"));
+  app->paths.work = sp_os_join_path(app->paths.cache, SP_LIT("work"));
+  app->paths.spn = sp_os_join_path(app->paths.repo, SP_LIT("spn"));
   app->paths.recipes = sp_os_join_path(app->paths.spn, SP_LIT("asset/recipes"));
 
   sp_os_create_directory(app->paths.cache);
-  sp_os_create_directory(app->paths.repos);
-  sp_os_create_directory(app->paths.builds);
+  sp_os_create_directory(app->paths.repo);
+  sp_os_create_directory(app->paths.build);
 
   if (!sp_os_does_path_exist(app->paths.spn)) {
     spn_sh_git_clone(SP_LIT("https://github.com/spaderthomas/spn.git"), app->paths.spn);
