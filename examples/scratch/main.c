@@ -9,6 +9,6 @@ void sp_init() {
 
 s32 main(s32 num_args, c8** args) {
   sp_init();
-  SP_LOG("hello, world!");
+  SP_LOG("hello, scratch!");
 }
 

@@ -1,3 +1,8 @@
+# SPN_DIR_PROJECT: Where is the repository cloned?
+# SPN_DIR_BUILD: Where is your working directory for this build?
+# SPN_DIR_INSTALL_INCLUDE: Where should you put headers?
+# SPN_DIR_INSTALL_BIN: Where should you put binaries?
+
 SPN_SDL_HEADERS := $(SPN_DIR_INSTALL_INCLUDE)/SDL3
 SPN_SDL_BINARY := $(SPN_DIR_INSTALL_BIN)/libSDL3.so
 

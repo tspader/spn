@@ -7,6 +7,7 @@ $(SPN_DIR_PROJECT):
 
 $(SP_H):
 	cp $(SPN_DIR_PROJECT)/sp.h $(SP_H)
+	touch $(SPN_DIR_BUILD)/foobar__$(SPN_OPT_FOO_BAR)
 
 spn-clone: $(SPN_DIR_PROJECT)
 
