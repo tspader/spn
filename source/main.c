@@ -27,10 +27,14 @@ typedef struct {
   s32 return_code;
 } spn_sh_process_result_t;
 
+typedef struct {
+  SDL_Process* process;
+  spn_sh_process_result_t result;
+} spn_sh_process_context_t;
+
 #define SPN_SH(...) SDL_CreateProcess((const c8* []) { __VA_ARGS__, SP_NULLPTR }, SP_SDL_PIPE_STDIO)
 
 spn_sh_process_result_t spn_sh_read_process(SDL_Process* process);
-void                    spn_sh_git_clone(sp_str_t url, sp_str_t target);
 sp_str_t                spn_sh_git_find_head(sp_str_t repo);
 
 /////////
@@ -139,6 +143,8 @@ sp_str_t            spn_dependency_kind_to_str(spn_dep_kind_t kind);
 void                spn_dep_context_prepare(spn_dep_context_t* context);
 void                spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* toml);
 spn_dep_context_t   spn_dep_context_from_default_profile(spn_dep_spec_t* dep);
+void                spn_dep_context_set_env_var(spn_dep_context_t* context, sp_str_t name, sp_str_t value);
+void                spn_build_context_prepare(spn_build_context_t* context);
 sp_str_t            spn_build_context_make_flag(spn_build_context_t* context, spn_cli_flag_kind_t flag);
 spn_build_context_t spn_build_context_from_default_profile();
 
@@ -351,6 +357,8 @@ void spn_cli_command_flags(spn_cli_t* cli) {
   }
 
   spn_build_context_t context = spn_build_context_from_default_profile();
+  spn_build_context_prepare(&context);
+
   sp_str_t flag = spn_build_context_make_flag(&context, cli->flags.kind);
   printf("%s", sp_str_to_cstr(flag));
 }
@@ -369,7 +377,10 @@ sp_str_t spn_build_context_make_flag(spn_build_context_t* context, spn_cli_flag_
     }
 
     sp_str_builder_append(&builder, str);
-    sp_str_builder_append_c8(&builder, ' ');
+
+    if (index != SP_SIZE_TO_INDEX(sp_dyn_array_size(context->deps))) {
+      sp_str_builder_append_c8(&builder, ' ');
+    }
   }
 
   return sp_str_builder_write(&builder);
@@ -405,7 +416,6 @@ spn_dep_context_t spn_dep_context_from_default_profile(spn_dep_spec_t* dep) {
   if (!options) return context;
 
   spn_dep_context_add_options(&context, options);
-  spn_dep_context_prepare(&context);
   return context;
 }
 
@@ -507,33 +517,25 @@ spn_sh_process_result_t spn_sh_read_process(SDL_Process* process) {
   return result;
 }
 
-void spn_sh_git_clone(sp_str_t url, sp_str_t target) {
-  SDL_Process* process = SDL_CreateProcess(
-    (const c8* []) {
-      "git",
-      "clone",
-      sp_str_to_cstr(url),
-      sp_str_to_cstr(target),
-      SP_NULLPTR
-    },
-    SP_SDL_PIPE_STDIO
-  );
-
-  sp_str_t output;
-  sp_size_t len;
-  s32 return_code = 0;
-  output.data = (c8*)SDL_ReadProcess(process, &len, &return_code);
-  output.len = (u32)len;
-
-  SDL_DestroyProcess(process);
-}
-
 sp_str_t spn_sh_git_find_head(sp_str_t repo) {
   SDL_Process* process = SPN_SH("git", "-C", sp_str_to_cstr(repo), "rev-parse", "--abbrev-ref", "HEAD");
   spn_sh_process_result_t result = spn_sh_read_process(process);
   SDL_DestroyProcess(process);
 
   return sp_str_strip_right(result.output);
+}
+
+void spn_build_context_prepare(spn_build_context_t* context) {
+  sp_dyn_array_for(context->deps, index) {
+    spn_dep_context_t* dep = context->deps + index;
+    spn_dep_context_prepare(dep);
+  }
+}
+
+void spn_dep_context_set_env_var(spn_dep_context_t* context, sp_str_t name, sp_str_t value) {
+  if (!SDL_SetEnvironmentVariable(context->environment, sp_str_to_cstr(name), sp_str_to_cstr(value), SP_SDL_OVERWRITE_ENV_VAR)) {
+    SP_FATAL("Failed to set {}={} in build context for {}", SP_FMT_STR(name), SP_FMT_STR(value), SP_FMT_STR(context->profile.dep->name));
+  }
 }
 
 void spn_dep_context_prepare(spn_dep_context_t* context) {
@@ -562,14 +564,14 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   context->paths.std_in  = sp_os_join_path(context->paths.build, SP_LIT("build.stdin"));
 
   context->environment = SDL_CreateEnvironment(SP_SDL_INHERIT_ENVIRONMENT);
-  SDL_SetEnvironmentVariable(context->environment, "SPN_DIR_PROJECT",       sp_str_to_cstr(context->paths.source), true);
-  SDL_SetEnvironmentVariable(context->environment, "SPN_DIR_BUILD",         sp_str_to_cstr(context->paths.build), true);
-  SDL_SetEnvironmentVariable(context->environment, "SPN_DIR_STORE_INCLUDE", sp_str_to_cstr(context->paths.include), true);
-  SDL_SetEnvironmentVariable(context->environment, "SPN_DIR_STORE_BIN",     sp_str_to_cstr(context->paths.bin), true);
+  spn_dep_context_set_env_var(context, SP_LIT("SPN_DIR_PROJECT"), context->paths.source);
+  spn_dep_context_set_env_var(context, SP_LIT("SPN_DIR_BUILD"), context->paths.build);
+  spn_dep_context_set_env_var(context, SP_LIT("SPN_DIR_STORE_INCLUDE"), context->paths.include);
+  spn_dep_context_set_env_var(context, SP_LIT("SPN_DIR_STORE_BIN"), context->paths.bin);
   sp_dyn_array_for(context->profile.options, index) {
     spn_dep_option_t* option = &context->profile.options[index];
     sp_str_t key = sp_str_concat(SP_LIT("SPN_OPT_"), option->key);
-    SDL_SetEnvironmentVariable(context->environment, sp_str_to_cstr(key), sp_str_to_cstr(option->value), SP_SDL_OVERWRITE_ENV_VAR);
+    spn_dep_context_set_env_var(context, key, option->value);
   }
 
   context->shell = SDL_CreateProperties();
@@ -600,7 +602,7 @@ void spn_dependency_clone_async(spn_dep_context_t* context) {
 
   spn_sh_process_result_t result = spn_sh_read_process(process);
   if (result.return_code) {
-    SP_FATAL("Failed to clone for {}!", SP_FMT_STR(context->paths.recipe));
+    SP_FATAL("Failed to clone for {}: {}", SP_FMT_STR(context->paths.recipe), SP_FMT_STR(result.output));
   }
 
   SDL_DestroyProcess(process);
@@ -635,7 +637,7 @@ void spn_dependency_build_async(spn_dep_context_t* context) {
 
   spn_sh_process_result_t result = spn_sh_read_process(process);
   if (result.return_code) {
-    SP_FATAL("Target {} for {} failed!", SP_FMT_STR(target), SP_FMT_STR(context->paths.recipe));
+    SP_FATAL("Failed to build {}:\n{}", SP_FMT_STR(context->paths.recipe), SP_FMT_STR(result.output));
   }
 
   SDL_DestroyProcess(process);
@@ -726,8 +728,31 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   sp_os_create_directory(app->paths.build);
 
   // Bootstrap spn
+  const c8* url = "https://github.com/spaderthomas/spn.git";
+  const c8* spn = sp_str_to_cstr(app->paths.spn);
   if (!sp_os_does_path_exist(app->paths.spn)) {
-    spn_sh_git_clone(SP_LIT("https://github.com/spaderthomas/spn.git"), app->paths.spn);
+    SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
+
+    SDL_Process* process = SPN_SH("git", "clone", url, spn);
+    spn_sh_process_result_t result = spn_sh_read_process(process);
+    if (result.return_code) {
+      SP_FATAL("Failed to clone spn recipe sources from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
+    }
+  }
+  else {
+    spn_sh_process_context_t fetch = SP_ZERO_INITIALIZE();
+    fetch.process = SPN_SH("git", "-C", spn, "fetch", "--quiet");
+    fetch.result = spn_sh_read_process(fetch.process);
+
+    spn_sh_process_context_t rev_list = SP_ZERO_INITIALIZE();
+    rev_list.process = SPN_SH("git", "-C", spn, "rev-list", "HEAD..@{u}", "--count");
+
+    SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
+    SDL_Process* process = SPN_SH("git", "-C", spn, "pull");
+    spn_sh_process_result_t result = spn_sh_read_process(process);
+    if (result.return_code) {
+      SP_FATAL("Failed to clone spn recipe sources from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
+    }
   }
 
   // Make a list of all recipes that are available
@@ -851,10 +876,10 @@ bool spn_project_read(spn_project_t* project, sp_str_t path) {
 
 void spn_project_build(spn_project_t* project) {
   spn_build_context_t context = spn_build_context_from_default_profile();
+  spn_build_context_prepare(&context);
+
   sp_dyn_array_for(context.deps, index) {
     spn_dep_context_t* dep = context.deps + index;
-    spn_dep_context_prepare(dep);
-
     if (!spn_dependency_is_cloned(dep->profile.dep)) {
       spn_dependency_clone_async(dep);
     }

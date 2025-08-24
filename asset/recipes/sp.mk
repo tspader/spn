@@ -1,4 +1,4 @@
-SP_H = $(SPN_DIR_INSTALL_INCLUDE)/sp.h
+SP_H = $(SPN_DIR_STORE_INCLUDE)/sp.h
 
 .PHONY: spn-clone spn-build
 
