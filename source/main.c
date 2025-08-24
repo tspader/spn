@@ -37,6 +37,7 @@ typedef struct {
 spn_sh_process_result_t spn_sh_read_process(SDL_Process* process);
 sp_str_t                spn_sh_git_find_head(sp_str_t repo);
 
+
 /////////
 // CLI //
 /////////
@@ -73,9 +74,9 @@ void spn_cli_command_nuke(spn_cli_t* cli);
 void spn_cli_command_flags(spn_cli_t* cli);
 
 
-/////////
-// SPN //
-/////////
+//////////////////
+// DEPENDENCIES //
+//////////////////
 typedef enum {
   SPN_DEPENDENCY_KIND_BUILTIN,
   SPN_DEPENDENCY_KIND_USER,
@@ -148,14 +149,27 @@ void                spn_build_context_prepare(spn_build_context_t* context);
 sp_str_t            spn_build_context_make_flag(spn_build_context_t* context, spn_cli_flag_kind_t flag);
 spn_build_context_t spn_build_context_from_default_profile();
 
+
+/////////
+// APP //
+/////////
+typedef struct {
+  toml_table_t* toml;
+  bool auto_pull_recipes;
+} spn_config_t;
+
+void spn_config_read(spn_config_t* config, sp_str_t path);
+
 typedef struct {
   sp_str_t install;
   sp_str_t   executable;
+  sp_str_t config;
+  sp_str_t   user_toml;
   sp_str_t cache;
   sp_str_t   store;
   sp_str_t   build;
   sp_str_t   source;
-  sp_str_t     spn;
+  sp_str_t     bootstrap;
   sp_str_t       recipes;
   sp_str_t project;
   sp_str_t   toml;
@@ -171,16 +185,17 @@ typedef struct {
   spn_cli_t cli;
   spn_paths_t paths;
   spn_project_t project;
+  spn_config_t config;
   sp_dyn_array(spn_dep_spec_t) builtins;
 } spn_app_t;
 
 spn_app_t app;
 
-void              spn_app_init(spn_app_t* app, u32 num_args, const c8** args);
+void            spn_app_init(spn_app_t* app, u32 num_args, const c8** args);
 spn_dep_spec_t* spn_project_find_dependency(spn_project_t* project, sp_str_t name);
-bool              spn_project_write(spn_project_t* project, sp_str_t path);
-bool              spn_project_read(spn_project_t* project, sp_str_t path);
-void              spn_project_build(spn_project_t* project);
+bool            spn_project_write(spn_project_t* project, sp_str_t path);
+bool            spn_project_read(spn_project_t* project, sp_str_t path);
+void            spn_project_build(spn_project_t* project);
 
 /////////////////
 // TOML WRITER //
@@ -196,7 +211,6 @@ void     sp_toml_writer_add_s32(sp_toml_writer_t* writer, sp_str_t key, s32 valu
 void     sp_toml_writer_add_bool(sp_toml_writer_t* writer, sp_str_t key, bool value);
 void     sp_toml_writer_new_line(sp_toml_writer_t* writer);
 sp_str_t sp_toml_writer_write(sp_toml_writer_t* writer);
-
 
 ////////////////////
 // IMPLEMENTATION //
@@ -698,6 +712,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   app->paths.executable = sp_os_get_executable_path();
   app->paths.install = sp_os_parent_path(app->paths.executable);
 
+  // ./spn.toml
   if (app->cli.project_directory) {
     app->paths.project = sp_str_copy_cstr(app->cli.project_directory);
   }
@@ -708,29 +723,49 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   }
   app->paths.toml = sp_os_join_path(app->paths.project, SP_LIT("spn.toml"));
 
-  const c8* xdg = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "XDG_CACHE_HOME");
+  // ~/.config/spn and ~/.cache/spn
+  const c8* xdg_cache = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "XDG_CACHE_HOME");
+  const c8* xdg_config = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "XDG_CONFIG_HOME");
   const c8* home = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "HOME");
-  if (xdg) {
-    app->paths.cache = sp_str_join(SP_CSTR(xdg), SP_LIT("spn"), SP_LIT("/"));
+
+  if (xdg_config) {
+    app->paths.config = sp_os_join_path(SP_CSTR(xdg_config), SP_LIT("spn"));
+  }
+  else if (home) {
+    app->paths.config = sp_os_join_path(SP_CSTR(home), SP_LIT(".config/spn"));
+  }
+  else {
+    SP_FATAL("No $XDG_CONFIG_HOME? No $HOME? Someone fucked up here and surely it was me.");
+  }
+
+  app->paths.user_toml = sp_os_join_path(app->paths.config, SP_LIT("spn.toml"));
+
+  if (xdg_cache) {
+    app->paths.cache = sp_str_join(SP_CSTR(xdg_cache), SP_LIT("spn"), SP_LIT("/"));
   }
   else if (home) {
     app->paths.cache = sp_str_join(SP_CSTR(home), SP_LIT(".cache/spn"), SP_LIT("/"));
+  }
+  else {
+    SP_FATAL("No $XDG_CACHE_HOME? No $HOME? Someone fucked up here and surely it was me.");
   }
 
   app->paths.source = sp_os_join_path(app->paths.cache, SP_LIT("source"));
   app->paths.build = sp_os_join_path(app->paths.cache, SP_LIT("build"));
   app->paths.store = sp_os_join_path(app->paths.cache, SP_LIT("store"));
-  app->paths.spn = sp_os_join_path(app->paths.source, SP_LIT("spn"));
-  app->paths.recipes = sp_os_join_path(app->paths.spn, SP_LIT("asset/recipes"));
+  app->paths.bootstrap = sp_os_join_path(app->paths.source, SP_LIT("spn"));
+  app->paths.recipes = sp_os_join_path(app->paths.bootstrap, SP_LIT("asset/recipes"));
 
   sp_os_create_directory(app->paths.cache);
   sp_os_create_directory(app->paths.source);
   sp_os_create_directory(app->paths.build);
 
+  spn_config_read(&app->config, app->paths.user_toml);
+
   // Bootstrap spn
   const c8* url = "https://github.com/spaderthomas/spn.git";
-  const c8* spn = sp_str_to_cstr(app->paths.spn);
-  if (!sp_os_does_path_exist(app->paths.spn)) {
+  const c8* spn = sp_str_to_cstr(app->paths.bootstrap);
+  if (!sp_os_does_path_exist(app->paths.bootstrap)) {
     SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
 
     SDL_Process* process = SPN_SH("git", "clone", url, spn);
@@ -746,13 +781,30 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
     spn_sh_process_context_t rev_list = SP_ZERO_INITIALIZE();
     rev_list.process = SPN_SH("git", "-C", spn, "rev-list", "HEAD..@{u}", "--count");
+    rev_list.result = spn_sh_read_process(rev_list.process);
+    rev_list.result.output = sp_str_strip_right(rev_list.result.output);
+    if (sp_parse_u32(rev_list.result.output)) {
+      SP_LOG("spn has updates to recipes; pull? (y)es, (n)o, (a)lways");
 
-    SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
-    SDL_Process* process = SPN_SH("git", "-C", spn, "pull");
-    spn_sh_process_result_t result = spn_sh_read_process(process);
-    if (result.return_code) {
-      SP_FATAL("Failed to clone spn recipe sources from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
+      #if 0
+      c8 response = 0;
+      while (true) {
+        c8 c = (c8)getchar();
+        switch (c) {
+          case EOF: {}
+          default: response = c;
+        }
+      }
+      #endif
+
+      SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
+      SDL_Process* process = SPN_SH("git", "-C", spn, "pull");
+      spn_sh_process_result_t result = spn_sh_read_process(process);
+      if (result.return_code) {
+        SP_FATAL("Failed to clone spn recipe sources from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
+      }
     }
+
   }
 
   // Make a list of all recipes that are available
@@ -765,7 +817,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     sp_dyn_array_push(app->builtins, spec);
   }
 
-  sp_str_t head = spn_sh_git_find_head(app->paths.spn);
+  sp_str_t head = spn_sh_git_find_head(app->paths.bootstrap);
 
   // Load the project
   if (!sp_os_does_path_exist(app->paths.toml)) {
@@ -797,6 +849,36 @@ void spn_app_run(spn_app_t* app) {
   }
   else if (sp_cstr_equal("build", cli->args[0])) {
     spn_project_build(&app->project);
+  }
+}
+
+#define TOML_READ_BOOL(table, var, key) \
+    do { \
+      toml_value_t value = toml_table_bool((table), (key)); \
+      if (value.ok) { \
+        (var) = value.u.b; \
+      } \
+    } while (0)
+
+void spn_config_read(spn_config_t* config, sp_str_t path) {
+  *config = (spn_config_t) {
+    .auto_pull_recipes = false,
+    .toml = SP_NULLPTR
+  };
+
+  size_t file_size;
+  c8* file_data = (c8*)SDL_LoadFile(sp_str_to_cstr(path), &file_size);
+  if (!file_data) return;
+
+  c8 toml_error [256] = SP_ZERO_INITIALIZE();
+  config->toml = toml_parse(file_data, toml_error, sizeof(toml_error));
+  if (!config->toml) {
+    SP_FATAL("Failed to parse {}: {}", SP_FMT_STR(path), SP_FMT_CSTR(toml_error));
+  }
+
+  toml_table_t* options = toml_table_table(config->toml, "options");
+  if (options) {
+    TOML_READ_BOOL(options, config->auto_pull_recipes, "auto_pull_recipes");
   }
 }
 
@@ -843,9 +925,9 @@ bool spn_project_read(spn_project_t* project, sp_str_t path) {
     SP_FATAL("Failed to read project file at {}", SP_FMT_STR(path));
   }
 
-  c8 errbuf[256];
-  project->toml = toml_parse((c8*)file_data, errbuf, sizeof(errbuf));
-  SP_ASSERT_FMT(project->toml, "Failed to read project file at {}: {}", SP_FMT_STR(path), SP_FMT_CSTR(errbuf));
+  c8 toml_error [256] = SP_ZERO_INITIALIZE();
+  project->toml = toml_parse((c8*)file_data, toml_error, sizeof(toml_error));
+  SP_ASSERT_FMT(project->toml, "Failed to read project file at {}: {}", SP_FMT_STR(path), SP_FMT_CSTR(toml_error));
 
   toml_table_t* project_table = toml_table_table(project->toml, "project");
   SP_ASSERT_FMT(project->toml, "Malformed project file: missing [project]");
