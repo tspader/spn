@@ -1,0 +1,8 @@
+[project]
+name = "foobar"
+
+[deps.sp]
+name = "sp"
+options.foo.bar = 420
+options.foo.baz = 69
+options.foo.qux = 9001
