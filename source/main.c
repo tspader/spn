@@ -49,8 +49,9 @@ typedef struct {
 } spn_cli_init_t;
 
 typedef enum {
-  SPN_FLAG_GNU_INCLUDES,
-  SPN_FLAG_GNU_LIBS,
+  SPN_FLAG_GNU_INCLUDE,
+  SPN_FLAG_GNU_LIB_INCLUDE,
+  SPN_FLAG_ALL,
 } spn_cli_flag_kind_t;
 
 typedef struct {
@@ -116,7 +117,7 @@ typedef struct {
 } spn_dep_spec_t;
 
 typedef struct {
-  spn_dep_spec_t* dep;
+  spn_dep_spec_t* spec;
   sp_dyn_array(spn_dep_option_t) options;
 } spn_dep_profile_t;
 
@@ -127,24 +128,29 @@ typedef struct {
   sp_str_t build_id;
   SDL_PropertiesID shell;
   SDL_Environment* environment;
+  bool is_cloned;
+  bool is_built;
 } spn_dep_context_t;
 
 typedef struct {
   sp_dyn_array(spn_dep_context_t) deps;
 } spn_build_context_t;
 
-bool                spn_dependency_is_cloned(spn_dep_spec_t* dependency);
 sp_str_t            spn_dependency_source_dir(spn_dep_spec_t* dependency);
 sp_str_t            spn_dependency_build_dir(spn_dep_spec_t* dependency);
 sp_str_t            spn_dependency_store_dir(spn_dep_spec_t* dependency);
 sp_str_t            spn_dependency_recipe_file(spn_dep_spec_t* dependency);
-void                spn_dependency_build_async(spn_dep_context_t* context);
-void                spn_dependency_clone_async(spn_dep_context_t* context);
-sp_str_t            spn_dependency_kind_to_str(spn_dep_kind_t kind);
+sp_str_t            spn_dep_kind_to_str(spn_dep_kind_t kind);
+spn_dep_spec_t*     spn_dep_spec_find(sp_str_t name);
+sp_str_t            spn_dep_option_env_name(spn_dep_option_t* option);
+void                spn_dep_context_build_async(spn_dep_context_t* context);
+void                spn_dep_context_clone_async(spn_dep_context_t* context);
 void                spn_dep_context_prepare(spn_dep_context_t* context);
 void                spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* toml);
-spn_dep_context_t   spn_dep_context_from_default_profile(spn_dep_spec_t* dep);
+spn_dep_context_t   spn_dep_context_from_default_profile(spn_dep_spec_t* context);
 void                spn_dep_context_set_env_var(spn_dep_context_t* context, sp_str_t name, sp_str_t value);
+bool                spn_dep_context_is_cloned(spn_dep_context_t* context);
+bool                spn_dep_context_is_built(spn_dep_context_t* context);
 void                spn_build_context_prepare(spn_build_context_t* context);
 sp_str_t            spn_build_context_make_flag(spn_build_context_t* context, spn_cli_flag_kind_t flag);
 spn_build_context_t spn_build_context_from_default_profile();
@@ -269,24 +275,8 @@ void spn_cli_command_add(spn_cli_t* cli) {
 
   add->package = SP_CSTR(cli->args[0]);
 
-  // Read spn.toml
-  if (!sp_os_does_path_exist(app.paths.toml)) {
-    SP_FATAL("Expected project TOML file at {}, but it did not exist", SP_FMT_STR(app.paths.toml));
-  }
-
-  if (!spn_project_read(&app.project, app.paths.toml)) {
-    SP_FATAL("Failed to read project TOML file at {}", SP_FMT_STR(app.paths.toml));
-  }
-
-  // Locate the dependency from our recipes
-  spn_dep_spec_t* dependency = SP_NULLPTR;
-  sp_dyn_array_for(app.builtins, index) {
-    spn_dep_spec_t* builtin = &app.builtins[index];
-    if (sp_str_equal(builtin->name, add->package)) {
-      dependency = builtin;
-    }
-  }
-
+  // Find the dependency's recipe, or bail if we can't find it
+  spn_dep_spec_t* dependency = spn_dep_spec_find(add->package);
   if (!dependency) {
     SP_FATAL("Could not find {} in available dependencies", SP_FMT_QUOTED_STR(add->package));
   }
@@ -294,16 +284,16 @@ void spn_cli_command_add(spn_cli_t* cli) {
   // Add the dependency to spn.toml if needed
   if (spn_project_find_dependency(&app.project, dependency->name)) {
     SP_LOG("{} is already in defined in {}", SP_FMT_STR(dependency->name), SP_FMT_STR(app.paths.toml));
+    SP_EXIT_SUCCESS();
   }
-  else {
-    sp_dyn_array_push(app.project.dependencies, *dependency);
 
-    if (!spn_project_write(&app.project, app.paths.toml)) {
-      SP_FATAL("Failed to write project TOML file");
-    }
+  sp_dyn_array_push(app.project.dependencies, *dependency);
 
-    SP_LOG("Added {} to {}", SP_FMT_STR(dependency->name), SP_FMT_STR(app.paths.toml));
+  if (!spn_project_write(&app.project, app.paths.toml)) {
+    SP_FATAL("Failed to write project TOML file");
   }
+
+  SP_LOG("Added {} to {}", SP_FMT_STR(dependency->name), SP_FMT_STR(app.paths.toml));
 }
 
 void spn_cli_command_init(spn_cli_t* cli) {
@@ -359,22 +349,28 @@ void spn_cli_command_flags(spn_cli_t* cli) {
     SP_EXIT_SUCCESS();
   }
 
-  sp_str_t flag_str = SP_CSTR(cli->args[0]);
-  if (sp_str_equal_cstr(flag_str, "include")) {
-    cli->flags.kind = SPN_FLAG_GNU_INCLUDES;
-  }
-  else if (sp_str_equal_cstr(flag_str, "libs")) {
-    cli->flags.kind = SPN_FLAG_GNU_LIBS;
-  }
-  else {
-    SP_FATAL("Unknown flag {}; options are [include, libs]", SP_FMT_QUOTED_STR(flag_str));
-  }
-
   spn_build_context_t context = spn_build_context_from_default_profile();
   spn_build_context_prepare(&context);
 
-  sp_str_t flag = spn_build_context_make_flag(&context, cli->flags.kind);
-  printf("%s", sp_str_to_cstr(flag));
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+
+  if (sp_cstr_equal(cli->args[0], "include")) {
+    sp_str_builder_append(&builder, spn_build_context_make_flag(&context, SPN_FLAG_GNU_INCLUDE));
+  }
+  else if (sp_cstr_equal(cli->args[0], "libs")) {
+    sp_str_builder_append(&builder, spn_build_context_make_flag(&context, SPN_FLAG_GNU_LIB_INCLUDE));
+  }
+  else if (sp_cstr_equal(cli->args[0], "all")) {
+    sp_str_builder_append(&builder, spn_build_context_make_flag(&context, SPN_FLAG_GNU_LIB_INCLUDE));
+    sp_str_builder_append_c8(&builder, ' ');
+    sp_str_builder_append(&builder, spn_build_context_make_flag(&context, SPN_FLAG_GNU_INCLUDE));
+  }
+  else {
+    sp_str_t requested_flag = SP_CSTR(cli->args[0]);
+    SP_FATAL("Unknown flag {}; options are [include, libs]", SP_FMT_QUOTED_STR(requested_flag));
+  }
+
+  printf("%s", sp_str_builder_write_cstr(&builder));
 }
 
 sp_str_t spn_build_context_make_flag(spn_build_context_t* context, spn_cli_flag_kind_t flag) {
@@ -385,8 +381,8 @@ sp_str_t spn_build_context_make_flag(spn_build_context_t* context, spn_cli_flag_
     sp_str_t str;
 
     switch (flag) {
-      case SPN_FLAG_GNU_INCLUDES: { str = sp_fmt_c8("-I{}", SP_FMT_STR(dep->paths.include)); break; }
-      case SPN_FLAG_GNU_LIBS:     { str = sp_fmt_c8("-L{}", SP_FMT_STR(dep->paths.include)); break; }
+      case SPN_FLAG_GNU_INCLUDE:     { str = sp_fmt_c8("-I{}", SP_FMT_STR(dep->paths.include)); break; }
+      case SPN_FLAG_GNU_LIB_INCLUDE: { str = sp_fmt_c8("-L{}", SP_FMT_STR(dep->paths.bin)); break; }
       default:                    { SP_UNREACHABLE_CASE(); }
     }
 
@@ -415,7 +411,7 @@ spn_build_context_t spn_build_context_from_default_profile() {
 spn_dep_context_t spn_dep_context_from_default_profile(spn_dep_spec_t* dep) {
   spn_dep_context_t context = {
     .profile = {
-      .dep = dep,
+      .spec = dep,
       .options = SP_NULLPTR
     },
   };
@@ -483,19 +479,14 @@ void spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* optio
   }
 
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  sp_str_t kind = spn_dependency_kind_to_str(config->dep->kind);
-  sp_str_builder_append_fmt_c8(&builder, "{} ({})", SP_FMT_STR(config->dep->name), SP_FMT_STR(kind));
+  sp_str_t kind = spn_dep_kind_to_str(config->spec->kind);
+  sp_str_builder_append_fmt_c8(&builder, "{} ({})", SP_FMT_STR(config->spec->name), SP_FMT_STR(kind));
   sp_dyn_array_for(config->options, index) {
     spn_dep_option_t* option = &config->options[index];
 
   }
 
 
-}
-
-bool spn_dependency_is_cloned(spn_dep_spec_t* dependency) {
-  sp_str_t source = spn_dependency_source_dir(dependency);
-  return sp_os_does_path_exist(source);
 }
 
 sp_str_t spn_dependency_source_dir(spn_dep_spec_t* dependency) {
@@ -514,12 +505,27 @@ sp_str_t spn_dependency_recipe_file(spn_dep_spec_t* dependency) {
   return sp_fmt_c8("{}.mk", SP_FMT_STR(dependency->name));
 }
 
-sp_str_t spn_dependency_kind_to_str(spn_dep_kind_t kind) {
+sp_str_t spn_dep_kind_to_str(spn_dep_kind_t kind) {
   switch (kind) {
     case SPN_DEPENDENCY_KIND_BUILTIN: return SP_LIT("builtin");
     case SPN_DEPENDENCY_KIND_USER:    return SP_LIT("user");
     default:                          SP_FATAL("Unknown dependency kind ({})", SP_FMT_U32(kind));
   }
+}
+
+spn_dep_spec_t* spn_dep_spec_find(sp_str_t name) {
+  sp_dyn_array_for(app.builtins, index) {
+    spn_dep_spec_t* builtin = &app.builtins[index];
+    if (sp_str_equal(builtin->name, name)) {
+      return builtin;
+    }
+  }
+
+  return SP_NULLPTR;
+}
+
+sp_str_t spn_dep_option_env_name(spn_dep_option_t* option) {
+  return SP_LIT("");
 }
 
 spn_sh_process_result_t spn_sh_read_process(SDL_Process* process) {
@@ -548,8 +554,17 @@ void spn_build_context_prepare(spn_build_context_t* context) {
 
 void spn_dep_context_set_env_var(spn_dep_context_t* context, sp_str_t name, sp_str_t value) {
   if (!SDL_SetEnvironmentVariable(context->environment, sp_str_to_cstr(name), sp_str_to_cstr(value), SP_SDL_OVERWRITE_ENV_VAR)) {
-    SP_FATAL("Failed to set {}={} in build context for {}", SP_FMT_STR(name), SP_FMT_STR(value), SP_FMT_STR(context->profile.dep->name));
+    SP_FATAL("Failed to set {}={} in build context for {}", SP_FMT_STR(name), SP_FMT_STR(value), SP_FMT_STR(context->profile.spec->name));
   }
+}
+
+bool spn_dep_context_is_cloned(spn_dep_context_t* context) {
+  sp_str_t source = spn_dependency_source_dir(context->profile.spec);
+  return sp_os_does_path_exist(source);
+}
+
+bool spn_dep_context_is_built(spn_dep_context_t* context) {
+  return sp_os_does_path_exist(context->paths.build);
 }
 
 void spn_dep_context_prepare(spn_dep_context_t* context) {
@@ -563,16 +578,16 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   }
 
   context->hash = sp_hash_combine(hashes, sp_dyn_array_size(hashes));
-  context->build_id = sp_fmt_c8("{}", SP_FMT_HASH(context->hash));
+  context->build_id = sp_fmt_c8("{}", SP_FMT_SHORT_HASH(context->hash));
 
-  sp_str_t build = spn_dependency_build_dir(context->profile.dep);
-  sp_str_t store = spn_dependency_store_dir(context->profile.dep);
-  context->paths.source = spn_dependency_source_dir(context->profile.dep);
+  sp_str_t build = spn_dependency_build_dir(context->profile.spec);
+  sp_str_t store = spn_dependency_store_dir(context->profile.spec);
+  context->paths.source = spn_dependency_source_dir(context->profile.spec);
   context->paths.build = sp_os_join_path(build, context->build_id);
   context->paths.store = sp_os_join_path(store, context->build_id);
   context->paths.include = sp_os_join_path(context->paths.store, SP_LIT("include"));
   context->paths.bin = sp_os_join_path(context->paths.store, SP_LIT("bin"));
-  context->paths.recipe = spn_dependency_recipe_file(context->profile.dep);
+  context->paths.recipe = spn_dependency_recipe_file(context->profile.spec);
   context->paths.std_out = sp_os_join_path(context->paths.build, SP_LIT("build.stdout"));
   context->paths.std_err = sp_os_join_path(context->paths.build, SP_LIT("build.stderr"));
   context->paths.std_in  = sp_os_join_path(context->paths.build, SP_LIT("build.stdin"));
@@ -593,9 +608,12 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL);
   SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP);
   SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_APP);
+
+  context->is_cloned = spn_dep_context_is_cloned(context);
+  context->is_cloned = spn_dep_context_is_built(context);
 }
 
-void spn_dependency_clone_async(spn_dep_context_t* context) {
+void spn_dep_context_clone_async(spn_dep_context_t* context) {
   const c8* args [] = {
     "make",
     "--directory", sp_str_to_cstr(app.paths.recipes),
@@ -607,6 +625,8 @@ void spn_dependency_clone_async(spn_dep_context_t* context) {
   SDL_PropertiesID shell = SDL_CreateProperties();
   SDL_CopyProperties(context->shell, shell);
   SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)args);
+
+  SP_LOG("Running spn-clone for {}/{}", SP_FMT_STR(app.paths.recipes), SP_FMT_STR(context->paths.recipe));
 
   SDL_Process* process = SDL_CreateProcessWithProperties(shell);
   if (!process) {
@@ -624,7 +644,7 @@ void spn_dependency_clone_async(spn_dep_context_t* context) {
 
 }
 
-void spn_dependency_build_async(spn_dep_context_t* context) {
+void spn_dep_context_build_async(spn_dep_context_t* context) {
   sp_os_create_directory(context->paths.build);
   sp_os_create_directory(context->paths.store);
   sp_os_create_directory(context->paths.include);
@@ -643,6 +663,7 @@ void spn_dependency_build_async(spn_dep_context_t* context) {
   SDL_CopyProperties(context->shell, shell);
   SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)args);
 
+  SP_LOG("Building {}/{}", SP_FMT_STR(app.paths.recipes), SP_FMT_STR(context->paths.recipe));
   SDL_Process* process = SDL_CreateProcessWithProperties(shell);
   if (!process) {
     const c8* sdl = SDL_GetError();
@@ -651,7 +672,7 @@ void spn_dependency_build_async(spn_dep_context_t* context) {
 
   spn_sh_process_result_t result = spn_sh_read_process(process);
   if (result.return_code) {
-    SP_FATAL("Failed to build {}:\n{}", SP_FMT_STR(context->paths.recipe), SP_FMT_STR(result.output));
+    SP_FATAL("Building {} returned with code {}. Error:\n{}", SP_FMT_STR(context->paths.recipe), SP_FMT_S32(result.return_code), SP_FMT_STR(result.output));
   }
 
   SDL_DestroyProcess(process);
@@ -804,7 +825,6 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
         SP_FATAL("Failed to clone spn recipe sources from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
       }
     }
-
   }
 
   // Make a list of all recipes that are available
@@ -870,8 +890,8 @@ void spn_config_read(spn_config_t* config, sp_str_t path) {
   c8* file_data = (c8*)SDL_LoadFile(sp_str_to_cstr(path), &file_size);
   if (!file_data) return;
 
-  c8 toml_error [256] = SP_ZERO_INITIALIZE();
-  config->toml = toml_parse(file_data, toml_error, sizeof(toml_error));
+  c8* toml_error = (c8*)sp_alloc(256);
+  config->toml = toml_parse(file_data, toml_error, 256);
   if (!config->toml) {
     SP_FATAL("Failed to parse {}: {}", SP_FMT_STR(path), SP_FMT_CSTR(toml_error));
   }
@@ -909,7 +929,6 @@ bool spn_project_write(spn_project_t* project, sp_str_t path) {
       spn_dep_spec_t* dep = &project->dependencies[i];
 
       sp_toml_writer_add_header(&writer, sp_fmt_c8("deps.{}", SP_FMT_STR(dep->name)));
-      sp_toml_writer_add_string(&writer, SP_LIT("name"), dep->name);
     }
   }
 
@@ -925,8 +944,8 @@ bool spn_project_read(spn_project_t* project, sp_str_t path) {
     SP_FATAL("Failed to read project file at {}", SP_FMT_STR(path));
   }
 
-  c8 toml_error [256] = SP_ZERO_INITIALIZE();
-  project->toml = toml_parse((c8*)file_data, toml_error, sizeof(toml_error));
+  c8* toml_error = (c8*)sp_alloc(256);
+  project->toml = toml_parse(file_data, toml_error, 256);
   SP_ASSERT_FMT(project->toml, "Failed to read project file at {}: {}", SP_FMT_STR(path), SP_FMT_CSTR(toml_error));
 
   toml_table_t* project_table = toml_table_table(project->toml, "project");
@@ -960,13 +979,50 @@ void spn_project_build(spn_project_t* project) {
   spn_build_context_t context = spn_build_context_from_default_profile();
   spn_build_context_prepare(&context);
 
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+  builder.indent.word = SP_LIT("  ");
+
+  u32 num_deps = sp_dyn_array_size(context.deps);
+  sp_str_builder_append_fmt_c8(&builder, "Total: {} dependencies", SP_FMT_U32(num_deps));
+  sp_str_builder_new_line(&builder);
+
   sp_dyn_array_for(context.deps, index) {
     spn_dep_context_t* dep = context.deps + index;
-    if (!spn_dependency_is_cloned(dep->profile.dep)) {
-      spn_dependency_clone_async(dep);
+
+    sp_str_t status;
+    if (!dep->is_cloned && !dep->is_built) {
+      status = SP_LIT("uninitialized");
+    }
+    else if (dep->is_cloned && !dep->is_built) {
+      status = SP_LIT("cloned");
+    }
+    else if (dep->is_cloned && dep->is_built) {
+      status = SP_LIT("built");
     }
 
-    spn_dependency_build_async(dep);
+    sp_str_builder_append_fmt_c8(&builder, "{} [{}]", SP_FMT_STR(dep->profile.spec->name), SP_FMT_STR(status));
+    sp_str_builder_new_line(&builder);
+
+    sp_str_builder_indent(&builder);
+    sp_dyn_array_for(dep->profile.options, p) {
+      spn_dep_option_t* option = dep->profile.options + p;
+      sp_str_builder_append_fmt_c8(&builder, "{} = {}", SP_FMT_STR(option->key), SP_FMT_STR(option->value));
+      sp_str_builder_new_line(&builder);
+    }
+    sp_str_builder_dedent(&builder);
+  }
+
+  sp_str_t report = sp_str_builder_write(&builder);
+  sp_log(report);
+
+  sp_dyn_array_for(context.deps, index) {
+    spn_dep_context_t* dep = context.deps + index;
+
+    if (!dep->is_cloned) {
+      spn_dep_context_clone_async(dep);
+    }
+
+    spn_dep_context_build_async(dep);
   }
 }
 

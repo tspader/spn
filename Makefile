@@ -2,7 +2,8 @@ SPN_EXAMPLES := hello scratch
 
 SPN_DIR_BUILD:= build
   SPN_DIR_BUILD_EXAMPLES := $(SPN_DIR_BUILD)/examples
-    EXAMPLE_BINARIES := $(addprefix $(SPN_DIR_BUILD_EXAMPLES)/, $(SPN_EXAMPLES))
+  	SPN_EXAMPLE_BINARY_HELLO := $(SPN_DIR_BUILD_EXAMPLES)/hello
+  	SPN_EXAMPLE_BINARY_SDL := $(SPN_DIR_BUILD_EXAMPLES)/sdl
   SPN_DIR_BUILD_OUTPUT := $(SPN_DIR_BUILD)/bin
     SPN_BINARY := $(SPN_DIR_BUILD_OUTPUT)/spn
     SDL_BINARY := $(SPN_DIR_BUILD_OUTPUT)/libSDL3.so
@@ -15,7 +16,8 @@ SPN_DIR_EXTERNAL := external
   SPN_DIR_SDL := $(SPN_DIR_EXTERNAL)/SDL
     SPN_DIR_SDL_INCLUDE := $(SPN_DIR_SDL)/include
 SPN_DIR_EXAMPLES := examples
-  EXAMPLE_DIRS := $(addprefix $(SPN_DIR_EXAMPLES)/, $(SPN_EXAMPLES))
+	SPN_DIR_EXAMPLE_HELLO := $(SPN_DIR_EXAMPLES)/hello
+	SPN_DIR_EXAMPLE_SDL := $(SPN_DIR_EXAMPLES)/sdl
 SPN_MAKEFILE := Makefile
 SPN_COMPILE_DB := compile_commands.json
 SPN_CLANGD := .clangd
@@ -40,11 +42,10 @@ SPN_CLANGD_HEADER_ONLY_BULLSHIT := -DSP_OS_BACKEND_SDL, -DSP_IMPLEMENTATION
 SDL_FLAG_DEFINES := -DCMAKE_BUILD_TYPE=$(CMAKE_TYPE) -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF -DSDL_EXAMPLES=OFF
 SDL_CMAKE_FLAGS := $(SDL_FLAG_DEFINES)
 
+SPN_EXAMPLE_HELLO_SOURCE_FILES := $(SPN_DIR_EXAMPLE_HELLO)/main.c
 EXAMPLE_FLAG_LANGUAGE := -std=c11
 EXAMPLE_FLAG_OPTIMIZATION := -g
-#EXAMPLE_FLAG_SPN := $(shell spn flags include)
-EXAMPLE_FLAG_SPN := -I /home/spader/.cache/spn/repo/sp
-EXAMPLE_CC_FLAGS := $(EXAMPLE_FLAG_LANGUAGE) $(EXAMPLE_FLAG_OPTIMIZATION) $(EXAMPLE_FLAG_SPN)
+EXAMPLE_CC_FLAGS := $(EXAMPLE_FLAG_LANGUAGE) $(EXAMPLE_FLAG_OPTIMIZATION)
 
 .PHONY: all
 all: build examples clangd
@@ -71,18 +72,17 @@ $(SPN_COMPILE_DB): $(SPN_MAKEFILE)
 $(SPN_CLANGD): $(SPN_COMPILE_DB)
 	@printf "CompileFlags:\n  Add: [$(SPN_CLANGD_HEADER_ONLY_BULLSHIT)]\n" > $(SPN_CLANGD)
 
-$(SPN_DIR_BUILD_EXAMPLES)/%: | $(SPN_DIR_BUILD_EXAMPLES)
-	$(CC) $(EXAMPLE_CC_FLAGS) -o $@ $(SPN_DIR_EXAMPLES)/$*/main.c
+$(SPN_EXAMPLE_BINARY_HELLO):
+	$(MAKE) -C $(SPN_DIR_EXAMPLE_HELLO)
 
+$(SPN_EXAMPLE_BINARY_SDL):
+	$(MAKE) -C $(SPN_DIR_EXAMPLE_SDL)
 
-.PHONY: build sdl clangd run debug clean nuke
+.PHONY: build sdl clangd clean nuke
 
 build: $(SPN_BINARY)
 
 sdl: $(SDL_BINARY)
-
-run: build
-	./$(SPN_BINARY)
 
 clangd: $(SPN_COMPILE_DB) $(SPN_CLANGD)
 
@@ -97,16 +97,7 @@ nuke:
 	@rm -f $(SPN_COMPILE_DB)
 	@rm -f $(SPN_CLANGD)
 
-init: build
-	@rm -rf $(SPN_DIR_CACHE)
-	gdb --args ./$(SPN_BINARY) init
+examples: example-hello example-sdl | $(SPN_DIR_BUILD_EXAMPLES)
 
-examples: $(EXAMPLE_BINARIES)
-
-test: build examples
-	@pushd $(SPN_DIR_EXAMPLE_HELLO)
-	$(SDL_BINARY)
-	@popd
-
-debug: build examples
-	gdb --eval-command "cd $(SPN_DIR_EXAMPLE_HELLO)" --args $(SPN_BINARY) add sp
+example-hello: $(SPN_EXAMPLE_BINARY_HELLO)
+example-sdl: $(SPN_EXAMPLE_BINARY_SDL)

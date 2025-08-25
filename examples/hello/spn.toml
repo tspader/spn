@@ -1,6 +1,5 @@
 [project]
-name = "foobar"
+name = "hello"
 
 [deps.sp]
-name = "sp"
-options.backend = "sdl"
+[deps.sdl3]

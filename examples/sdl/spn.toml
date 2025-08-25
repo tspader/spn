@@ -1,0 +1,7 @@
+[project]
+name = "foobar"
+
+[deps.sp]
+options.backend = "sdl"
+
+[deps.sdl3]
