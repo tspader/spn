@@ -4,6 +4,7 @@
 ///////////
 // SHELL //
 ///////////
+#include "sp.h"
 typedef struct {
   sp_str_t output;
   s32 return_code;
@@ -546,7 +547,7 @@ sp_str_t spn_sh_git_find_head(sp_str_t repo) {
   SDL_Process* process = SPN_SH("git", "-C", sp_str_to_cstr(repo), "rev-parse", "--abbrev-ref", "HEAD");
   spn_sh_process_result_t result = spn_sh_read_process(process);
   SDL_DestroyProcess(process);
-  return sp_str_strip_right(result.output);
+  return sp_str_trim_right(result.output);
 }
 
 void spn_build_context_prepare(spn_build_context_t* context) {
@@ -668,7 +669,7 @@ void spn_dep_context_build_async(spn_dep_context_t* context) {
   SDL_CopyProperties(context->shell, shell);
   SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)args);
 
-  SP_LOG("Building {:color cyan}", SP_FMT_STR(context->paths.recipe));
+  SP_LOG("Building {:color cyan} from {}", SP_FMT_STR(context->id), SP_FMT_STR(context->paths.recipe));
   SDL_Process* process = SDL_CreateProcessWithProperties(shell);
   if (!process) {
     const c8* sdl = SDL_GetError();
@@ -783,7 +784,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     spn_sh_process_context_t rev_list = SP_ZERO_INITIALIZE();
     rev_list.process = SPN_SH("git", "-C", spn, "rev-list", "HEAD..@{u}", "--count");
     rev_list.result = spn_sh_read_process(rev_list.process);
-    rev_list.result.output = sp_str_strip_right(rev_list.result.output);
+    rev_list.result.output = sp_str_trim_right(rev_list.result.output);
     if (sp_parse_u32(rev_list.result.output)) {
       SP_LOG("spn has updates to recipes; pull? (y)es, (n)o, (a)lways");
       SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
@@ -1032,15 +1033,15 @@ void spn_project_build(spn_project_t* project) {
   spn_build_context_t context = spn_build_context_from_default_profile();
   spn_build_context_prepare(&context);
 
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  builder.indent.word = SP_LIT("  ");
-
-  u32 num_deps = sp_dyn_array_size(context.deps);
-  sp_str_builder_append_fmt_c8(&builder, "Total: {} dependencies", SP_FMT_U32(num_deps));
-  sp_str_builder_new_line(&builder);
+  u32 width = 0;
+  sp_dyn_array_for(context.deps, index) {
+    spn_dep_context_t* dep = context.deps + index;
+    width = SP_MAX(width, dep->id.len);
+  }
 
   sp_dyn_array_for(context.deps, index) {
     spn_dep_context_t* dep = context.deps + index;
+    sp_str_builder_t builder = SP_ZERO_INITIALIZE();
 
     sp_str_t status;
     if (!dep->is_cloned && !dep->is_built) {
@@ -1053,23 +1054,18 @@ void spn_project_build(spn_project_t* project) {
       status = SP_LIT("built");
     }
 
-    sp_str_builder_append_fmt_c8(&builder, "{} [{}]", SP_FMT_STR(dep->id), SP_FMT_STR(status));
+    sp_str_t name = sp_str_pad(dep->id, width);
+    sp_str_builder_append_fmt_c8(&builder, "> {:color cyan} [{}]", SP_FMT_STR(name), SP_FMT_STR(status));
     sp_str_builder_new_line(&builder);
 
     sp_str_builder_indent(&builder);
     sp_dyn_array_for(dep->options, p) {
       spn_dep_option_t* option = dep->options + p;
-      sp_str_builder_append_fmt_c8(&builder, "{} = {}", SP_FMT_STR(option->key), SP_FMT_STR(option->value));
+      sp_str_builder_append_fmt_c8(&builder, "{:color brightblack} = {}", SP_FMT_STR(option->key), SP_FMT_STR(option->value));
       sp_str_builder_new_line(&builder);
     }
-    sp_str_builder_dedent(&builder);
-  }
-
-  sp_str_t report = sp_str_builder_write(&builder);
-  sp_log(report);
-
-  sp_dyn_array_for(context.deps, index) {
-    spn_dep_context_t* dep = context.deps + index;
+    sp_str_t report = sp_str_builder_write(&builder);
+    sp_log(report);
 
     if (!dep->is_cloned) {
       spn_dep_context_clone_async(dep);
@@ -1077,6 +1073,7 @@ void spn_project_build(spn_project_t* project) {
 
     spn_dep_context_build_async(dep);
   }
+
 }
 
 #endif // SPN_IMPLEMENTATION
