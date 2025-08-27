@@ -305,7 +305,7 @@ void spn_cli_command_init(spn_cli_t* cli) {
 
   // Check if project file already exists
   if (sp_os_does_path_exist(app.paths.toml)) {
-    SP_LOG("Project already initialized at {}", SP_FMT_STR(app.paths.toml));
+    SP_LOG("Project already initialized at {}", SP_FMT_COLOR(SP_ANSI_FORE_CYAN), SP_FMT_STR(app.paths.toml));
     return;
   }
 
@@ -317,7 +317,7 @@ void spn_cli_command_init(spn_cli_t* cli) {
     SP_FATAL("Failed to write project TOML file");
   }
 
-  SP_LOG("Initialized project {} in spn.toml", SP_FMT_QUOTED_STR(app.project.name));
+  SP_LOG("Initialized project {} in spn.toml", SP_FMT_COLOR(SP_ANSI_FORE_CYAN), SP_FMT_QUOTED_STR(app.project.name));
 }
 
 void spn_cli_command_nuke(spn_cli_t* cli) {
@@ -326,10 +326,10 @@ void spn_cli_command_nuke(spn_cli_t* cli) {
 }
 
 void spn_cli_command_clean(spn_cli_t* cli) {
-  SP_LOG("Cleaning build and store directories...");
+  SP_LOG("Cleaning build directories at {:color cyan}", SP_FMT_STR(app.paths.build));
   sp_os_remove_directory(app.paths.build);
+  SP_LOG("Cleaning store directories at {:color cyan}", SP_FMT_STR(app.paths.store));
   sp_os_remove_directory(app.paths.store);
-  SP_LOG("Clean complete. Source directory preserved.");
 }
 
 void spn_cli_command_flags(spn_cli_t* cli) {
@@ -389,7 +389,7 @@ void spn_cli_command_flags(spn_cli_t* cli) {
   }
   else {
     sp_str_t requested_flag = SP_CSTR(cli->args[0]);
-    SP_FATAL("Unknown flag {}; options are [include, libs, all]", SP_FMT_QUOTED_STR(requested_flag));
+    SP_FATAL("Unknown flag {}; options are [include, libs, all]",  SP_FMT_COLOR(SP_ANSI_FORE_YELLOW), SP_FMT_QUOTED_STR(requested_flag));
   }
 
   printf("%s", sp_str_builder_write_cstr(&builder));
@@ -403,8 +403,8 @@ sp_str_t spn_build_context_make_flag(spn_build_context_t* context, spn_cli_flag_
     sp_str_t str;
 
     switch (flag) {
-      case SPN_FLAG_GNU_INCLUDE:     { str = sp_fmt_c8("-I{}", SP_FMT_STR(dep->paths.include)); break; }
-      case SPN_FLAG_GNU_LIB_INCLUDE: { str = sp_fmt_c8("-L{}", SP_FMT_STR(dep->paths.bin)); break; }
+      case SPN_FLAG_GNU_INCLUDE:     { str = sp_format("-I{}", SP_FMT_STR(dep->paths.include)); break; }
+      case SPN_FLAG_GNU_LIB_INCLUDE: { str = sp_format("-L{}", SP_FMT_STR(dep->paths.bin)); break; }
       default:                    { SP_UNREACHABLE_CASE(); }
     }
 
@@ -486,7 +486,6 @@ void spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* optio
         }));
       }
       else if (array) {
-        SP_LOG("array: {}", SP_FMT_STR(full_key));
       }
       else {
         spn_dep_option_t option = SP_ZERO_INITIALIZE();
@@ -519,7 +518,7 @@ sp_str_t spn_dependency_store_dir(sp_str_t name) {
 }
 
 sp_str_t spn_dependency_recipe_file(sp_str_t name) {
-  return sp_fmt_c8("{}.mk", SP_FMT_STR(name));
+  return sp_format("{}.mk", SP_FMT_STR(name));
 }
 
 spn_dep_context_t* spn_dep_find(sp_str_t name) {
@@ -583,7 +582,7 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   }
 
   context->hash = sp_hash_combine(hashes, sp_dyn_array_size(hashes));
-  context->build_id = sp_fmt_c8("{}", SP_FMT_SHORT_HASH(context->hash));
+  context->build_id = sp_format("{}", SP_FMT_SHORT_HASH(context->hash));
 
   sp_str_t build = spn_dependency_build_dir(context->id);
   sp_str_t store = spn_dependency_store_dir(context->id);
@@ -592,7 +591,7 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   context->paths.store = sp_os_join_path(store, context->build_id);
   context->paths.include = sp_os_join_path(context->paths.store, SP_LIT("include"));
   context->paths.bin = sp_os_join_path(context->paths.store, SP_LIT("bin"));
-  context->paths.recipe = spn_dependency_recipe_file(context->id);
+  context->paths.recipe = sp_os_join_path(app.paths.recipes, spn_dependency_recipe_file(context->id));
   context->paths.std_out = sp_os_join_path(context->paths.build, SP_LIT("build.stdout"));
   context->paths.std_err = sp_os_join_path(context->paths.build, SP_LIT("build.stderr"));
   context->paths.std_in  = sp_os_join_path(context->paths.build, SP_LIT("build.stdin"));
@@ -616,6 +615,11 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
 
   context->is_cloned = spn_dep_context_is_cloned(context);
   context->is_cloned = spn_dep_context_is_built(context);
+
+  sp_os_create_directory(context->paths.build);
+  sp_os_create_directory(context->paths.store);
+  sp_os_create_directory(context->paths.include);
+  sp_os_create_directory(context->paths.bin);
 }
 
 void spn_dep_context_clone_async(spn_dep_context_t* context) {
@@ -631,30 +635,26 @@ void spn_dep_context_clone_async(spn_dep_context_t* context) {
   SDL_CopyProperties(context->shell, shell);
   SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)args);
 
-  SP_LOG("Running spn-clone for {}/{}", SP_FMT_STR(app.paths.recipes), SP_FMT_STR(context->paths.recipe));
+  SP_LOG("Running {:color yellow} for {:color cyan}", SP_FMT_CSTR("spn-clone"), SP_FMT_STR(context->paths.recipe));
 
   SDL_Process* process = SDL_CreateProcessWithProperties(shell);
   if (!process) {
     const c8* sdl = SDL_GetError();
-    SP_FATAL("Failed to create process to run clone target for {}: {}", SP_FMT_STR(context->paths.recipe), SP_FMT_CSTR(sdl));
+    SP_FATAL("Failed to create process to run clone target for {:color yellow}: {:color red}", SP_FMT_STR(context->paths.recipe), SP_FMT_CSTR(sdl));
   }
 
   // Wait for process to complete (stdio is inherited so we can't read output)
   s32 return_code;
   SDL_WaitProcess(process, true, &return_code);
   if (return_code) {
-    SP_FATAL("Failed to clone for {}: exited with code {}", SP_FMT_STR(context->paths.recipe), SP_FMT_S32(return_code));
+    SP_FATAL("Failed to clone for {:color cyan}: exited with code {:color red}", SP_FMT_STR(context->paths.recipe), SP_FMT_S32(return_code));
   }
 
+  SP_LOG("OK!");
   SDL_DestroyProcess(process);
 }
 
 void spn_dep_context_build_async(spn_dep_context_t* context) {
-  sp_os_create_directory(context->paths.build);
-  sp_os_create_directory(context->paths.store);
-  sp_os_create_directory(context->paths.include);
-  sp_os_create_directory(context->paths.bin);
-
   sp_str_t target = SP_LIT("spn-build");
   const c8* args [] = {
     "make",
@@ -668,19 +668,21 @@ void spn_dep_context_build_async(spn_dep_context_t* context) {
   SDL_CopyProperties(context->shell, shell);
   SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)args);
 
-  SP_LOG("Building {}/{}", SP_FMT_STR(app.paths.recipes), SP_FMT_STR(context->paths.recipe));
+  SP_LOG("Building {:color cyan}", SP_FMT_STR(context->paths.recipe));
   SDL_Process* process = SDL_CreateProcessWithProperties(shell);
   if (!process) {
     const c8* sdl = SDL_GetError();
-    SP_FATAL("Failed to create process: {}", SP_FMT_CSTR(sdl));
+    SP_FATAL("Failed to create process: {:color red}", SP_FMT_CSTR(sdl));
   }
 
   // Wait for process to complete (stdio is inherited so we can't read output)
   s32 return_code;
   SDL_WaitProcess(process, true, &return_code);
   if (return_code) {
-    SP_FATAL("Building {} returned with code {}", SP_FMT_STR(context->paths.recipe), SP_FMT_S32(return_code));
+    SP_FATAL("Building {:color cyan} returned with code {:color red}", SP_FMT_STR(context->paths.recipe), SP_FMT_S32(return_code));
   }
+
+  SP_LOG("{:color green}", SP_FMT_CSTR("OK!"));
 
   SDL_DestroyProcess(process);
 }
@@ -959,7 +961,7 @@ bool spn_project_write(spn_project_t* project, sp_str_t path) {
       if (deps_table) {
         toml_table_t* dep_config = toml_table_table(deps_table, sp_str_to_cstr(id));
         if (dep_config) {
-          sp_toml_writer_add_header(&writer, sp_fmt_c8("deps.{}", SP_FMT_STR(id)));
+          sp_toml_writer_add_header(&writer, sp_format("deps.{}", SP_FMT_STR(id)));
           // TODO: Write the actual configuration options here
         }
       }
