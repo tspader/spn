@@ -334,7 +334,7 @@ void spn_cli_command_clean(spn_cli_t* cli) {
 
 void spn_cli_command_flags(spn_cli_t* cli) {
   spn_cli_flags_t* flags = &cli->flags;
-  
+
   struct argparse argparse;
   argparse_init(
     &argparse,
@@ -447,7 +447,7 @@ spn_dep_context_t spn_dep_context_from_default_profile(sp_str_t id) {
       }
     }
   }
-  
+
   return context;
 }
 
@@ -492,8 +492,8 @@ void spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* optio
         spn_dep_option_t option = SP_ZERO_INITIALIZE();
         option.key = sp_str_copy(full_key);
         option.key = sp_str_to_upper(option.key);
-        option.key = sp_str_replace(option.key, '.', '_');
-        option.value = sp_str_copy_cstr(toml_table_unparsed(entry.table, key_data));
+        option.key = sp_str_replace_c8(option.key, '.', '_');
+        option.value = sp_str_from_cstr(toml_table_unparsed(entry.table, key_data));
         sp_dyn_array_push(context->options, option);
       }
     }
@@ -621,7 +621,7 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
 void spn_dep_context_clone_async(spn_dep_context_t* context) {
   const c8* args [] = {
     "make",
-    "--directory", sp_str_to_cstr(app.paths.recipes),
+    "-C", sp_str_to_cstr(context->paths.build),
     "--makefile", sp_str_to_cstr(context->paths.recipe),
     "spn-clone",
     SP_NULLPTR
@@ -658,7 +658,7 @@ void spn_dep_context_build_async(spn_dep_context_t* context) {
   sp_str_t target = SP_LIT("spn-build");
   const c8* args [] = {
     "make",
-    "--directory", sp_str_to_cstr(app.paths.recipes),
+    "-C", sp_str_to_cstr(context->paths.build),
     "--makefile", sp_str_to_cstr(context->paths.recipe),
     sp_str_to_cstr(target),
     SP_NULLPTR
@@ -715,7 +715,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   app->paths.install = sp_os_parent_path(app->paths.executable);
 
   if (app->cli.project_directory) {
-    app->paths.project = sp_str_copy_cstr(app->cli.project_directory);
+    app->paths.project = sp_str_from_cstr(app->cli.project_directory);
   }
   else {
     c8* working_directory = SDL_GetCurrentDirectory();
@@ -804,13 +804,13 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   // Check if this is a command that doesn't need a project file
   bool needs_project = true;
   if (cli->num_args > 0) {
-    if (sp_cstr_equal(cli->args[0], "init") || 
+    if (sp_cstr_equal(cli->args[0], "init") ||
         sp_cstr_equal(cli->args[0], "nuke") ||
         sp_cstr_equal(cli->args[0], "clean")) {
       needs_project = false;
     }
   }
-  
+
   if (needs_project) {
     if (!sp_os_does_path_exist(app->paths.toml)) {
       SP_FATAL("Expected project TOML file at {}, but it did not exist", SP_FMT_STR(app->paths.toml));
@@ -874,7 +874,7 @@ void spn_config_read(spn_config_t* config, sp_str_t path) {
 
     toml_value_t cache_override = toml_table_string(options, "cache_override");
     if (cache_override.ok) {
-      config->cache_override = sp_str_copy_cstr(cache_override.u.s);
+      config->cache_override = sp_str_from_cstr(cache_override.u.s);
     }
 
     toml_array_t* recipe_dirs = toml_table_array(options, "additional_recipe_dirs");
@@ -882,7 +882,7 @@ void spn_config_read(spn_config_t* config, sp_str_t path) {
       for (u32 i = 0; i < toml_array_len(recipe_dirs); i++) {
         toml_value_t dir = toml_array_string(recipe_dirs, i);
         if (dir.ok) {
-          sp_dyn_array_push(config->additional_recipe_dirs, sp_str_copy_cstr(dir.u.s));
+          sp_dyn_array_push(config->additional_recipe_dirs, sp_str_from_cstr(dir.u.s));
         }
       }
     }
@@ -911,7 +911,7 @@ void spn_config_read_from_string(spn_config_t* config, sp_str_t toml_content) {
 
     toml_value_t cache_override = toml_table_string(options, "cache_override");
     if (cache_override.ok) {
-      config->cache_override = sp_str_copy_cstr(cache_override.u.s);
+      config->cache_override = sp_str_from_cstr(cache_override.u.s);
     }
 
     toml_array_t* recipe_dirs = toml_table_array(options, "additional_recipe_dirs");
@@ -919,7 +919,7 @@ void spn_config_read_from_string(spn_config_t* config, sp_str_t toml_content) {
       for (u32 i = 0; i < toml_array_len(recipe_dirs); i++) {
         toml_value_t dir = toml_array_string(recipe_dirs, i);
         if (dir.ok) {
-          sp_dyn_array_push(config->additional_recipe_dirs, sp_str_copy_cstr(dir.u.s));
+          sp_dyn_array_push(config->additional_recipe_dirs, sp_str_from_cstr(dir.u.s));
         }
       }
     }
@@ -987,7 +987,7 @@ bool spn_project_read(spn_project_t* project, sp_str_t path) {
 
   toml_value_t name = toml_table_string(project_table, "name");
   SP_ASSERT_FMT(name.ok, "Malformed project file: missing project.name");
-  project->name = sp_str_copy_cstr(name.u.s);
+  project->name = sp_str_from_cstr(name.u.s);
 
   // First read the deps array from [project]
   toml_array_t* deps_array = toml_table_array(project_table, "deps");
@@ -995,12 +995,12 @@ bool spn_project_read(spn_project_t* project, sp_str_t path) {
     for (u32 i = 0; i < toml_array_len(deps_array); i++) {
       toml_value_t dep = toml_array_string(deps_array, i);
       if (dep.ok) {
-        spn_dep_id_t id = sp_str_copy_cstr(dep.u.s);
+        spn_dep_id_t id = sp_str_from_cstr(dep.u.s);
         sp_dyn_array_push(project->dependencies, id);
       }
     }
   }
-  
+
   // Also support legacy format where deps are keys under [deps] table
   toml_table_t* deps_table = toml_table_table(project->toml, "deps");
   if (deps_table && !deps_array) {
@@ -1008,7 +1008,7 @@ bool spn_project_read(spn_project_t* project, sp_str_t path) {
       s32 len;
       const c8* key = toml_table_key(deps_table, index, &len);
 
-      spn_dep_id_t id = sp_str_copy_cstr_n(key, len);
+      spn_dep_id_t id = sp_str_from_cstr_sized(key, len);
       // Only add if not already in the list (from deps array)
       bool found = false;
       sp_dyn_array_for(project->dependencies, j) {
