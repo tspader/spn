@@ -1,7 +1,6 @@
 [project]
 name = "foobar"
+deps = ["sp", "sdl3"]
 
 [deps.sp]
 options.backend = "sdl"
-
-[deps.sdl3]

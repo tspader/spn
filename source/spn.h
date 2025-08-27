@@ -37,6 +37,7 @@ typedef enum {
 
 typedef struct {
   spn_cli_flag_kind_t kind;
+  const c8* package;
 } spn_cli_flags_t;
 
 typedef struct {
@@ -51,16 +52,12 @@ typedef struct {
 void spn_cli_command_add(spn_cli_t* cli);
 void spn_cli_command_init(spn_cli_t* cli);
 void spn_cli_command_nuke(spn_cli_t* cli);
+void spn_cli_command_clean(spn_cli_t* cli);
 void spn_cli_command_flags(spn_cli_t* cli);
 
 //////////////////
 // DEPENDENCIES //
 //////////////////
-typedef enum {
-  SPN_DEPENDENCY_KIND_BUILTIN,
-  SPN_DEPENDENCY_KIND_USER,
-} spn_dep_kind_t;
-
 typedef enum {
   SPN_BUILD_KIND_DEBUG,
   SPN_BUILD_KIND_RELEASE,
@@ -88,19 +85,11 @@ typedef struct {
   sp_str_t value;
 } spn_dep_option_t;
 
-typedef struct {
-  spn_dep_kind_t kind;
-  sp_str_t name;
-  toml_table_t* toml;
-} spn_dep_spec_t;
+typedef sp_str_t spn_dep_id_t;
 
 typedef struct {
-  spn_dep_spec_t* spec;
+  spn_dep_id_t id;
   sp_dyn_array(spn_dep_option_t) options;
-} spn_dep_profile_t;
-
-typedef struct {
-  spn_dep_profile_t profile;
   spn_dep_build_paths_t paths;
   sp_hash_t hash;
   sp_str_t build_id;
@@ -114,18 +103,17 @@ typedef struct {
   sp_dyn_array(spn_dep_context_t) deps;
 } spn_build_context_t;
 
-sp_str_t            spn_dependency_source_dir(spn_dep_spec_t* dependency);
-sp_str_t            spn_dependency_build_dir(spn_dep_spec_t* dependency);
-sp_str_t            spn_dependency_store_dir(spn_dep_spec_t* dependency);
-sp_str_t            spn_dependency_recipe_file(spn_dep_spec_t* dependency);
-sp_str_t            spn_dep_kind_to_str(spn_dep_kind_t kind);
-spn_dep_spec_t*     spn_dep_spec_find(sp_str_t name);
+sp_str_t            spn_dependency_source_dir(sp_str_t name);
+sp_str_t            spn_dependency_build_dir(sp_str_t name);
+sp_str_t            spn_dependency_store_dir(sp_str_t name);
+sp_str_t            spn_dependency_recipe_file(sp_str_t name);
+spn_dep_context_t*  spn_dep_find(sp_str_t name);
 sp_str_t            spn_dep_option_env_name(spn_dep_option_t* option);
 void                spn_dep_context_build_async(spn_dep_context_t* context);
 void                spn_dep_context_clone_async(spn_dep_context_t* context);
 void                spn_dep_context_prepare(spn_dep_context_t* context);
 void                spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* toml);
-spn_dep_context_t   spn_dep_context_from_default_profile(spn_dep_spec_t* context);
+spn_dep_context_t   spn_dep_context_from_default_profile(sp_str_t name);
 void                spn_dep_context_set_env_var(spn_dep_context_t* context, sp_str_t name, sp_str_t value);
 bool                spn_dep_context_is_cloned(spn_dep_context_t* context);
 bool                spn_dep_context_is_built(spn_dep_context_t* context);
@@ -164,7 +152,7 @@ typedef struct {
 
 typedef struct {
   sp_str_t name;
-  sp_dyn_array(spn_dep_spec_t) dependencies;
+  sp_dyn_array(spn_dep_id_t) dependencies;
   toml_table_t* toml;
 } spn_project_t;
 
@@ -173,14 +161,14 @@ typedef struct {
   spn_paths_t paths;
   spn_project_t project;
   spn_config_t config;
-  sp_dyn_array(spn_dep_spec_t) builtins;
+  sp_dyn_array(spn_dep_id_t) builtins;
 } spn_app_t;
 
 extern spn_app_t app;
 
 void            spn_app_init(spn_app_t* app, u32 num_args, const c8** args);
 void            spn_app_run(spn_app_t* app);
-spn_dep_spec_t* spn_project_find_dependency(spn_project_t* project, sp_str_t name);
+spn_dep_context_t* spn_project_find_dependency(spn_project_t* project, sp_str_t name);
 bool            spn_project_write(spn_project_t* project, sp_str_t path);
 bool            spn_project_read(spn_project_t* project, sp_str_t path);
 void            spn_project_build(spn_project_t* project);
@@ -197,6 +185,7 @@ void     sp_toml_writer_add_header(sp_toml_writer_t* writer, sp_str_t name);
 void     sp_toml_writer_add_string(sp_toml_writer_t* writer, sp_str_t key, sp_str_t value);
 void     sp_toml_writer_add_s32(sp_toml_writer_t* writer, sp_str_t key, s32 value);
 void     sp_toml_writer_add_bool(sp_toml_writer_t* writer, sp_str_t key, bool value);
+void     sp_toml_writer_add_string_array(sp_toml_writer_t* writer, sp_str_t key, sp_dyn_array(sp_str_t) values);
 void     sp_toml_writer_new_line(sp_toml_writer_t* writer);
 sp_str_t sp_toml_writer_write(sp_toml_writer_t* writer);
 
@@ -236,6 +225,18 @@ void sp_toml_writer_add_bool(sp_toml_writer_t* writer, sp_str_t key, bool value)
   sp_str_builder_new_line(&writer->builder);
 }
 
+void sp_toml_writer_add_string_array(sp_toml_writer_t* writer, sp_str_t key, sp_dyn_array(sp_str_t) values) {
+  sp_str_builder_append_fmt(&writer->builder, SP_LIT("{} = ["), SP_FMT_STR(key));
+  sp_dyn_array_for(values, i) {
+    sp_str_builder_append_fmt(&writer->builder, SP_LIT("{}"), SP_FMT_QUOTED_STR(values[i]));
+    if (i != SP_SIZE_TO_INDEX(sp_dyn_array_size(values))) {
+      sp_str_builder_append(&writer->builder, SP_LIT(", "));
+    }
+  }
+  sp_str_builder_append(&writer->builder, SP_LIT("]"));
+  sp_str_builder_new_line(&writer->builder);
+}
+
 sp_str_t sp_toml_writer_write(sp_toml_writer_t* writer) {
   return sp_str_builder_write(&writer->builder);
 }
@@ -266,23 +267,24 @@ void spn_cli_command_add(spn_cli_t* cli) {
 
   add->package = SP_CSTR(cli->args[0]);
 
-  spn_dep_spec_t* dependency = spn_dep_spec_find(add->package);
+  spn_dep_context_t* dependency = spn_dep_find(add->package);
   if (!dependency) {
     SP_FATAL("Could not find {} in available dependencies", SP_FMT_QUOTED_STR(add->package));
   }
 
-  if (spn_project_find_dependency(&app.project, dependency->name)) {
-    SP_LOG("{} is already in defined in {}", SP_FMT_STR(dependency->name), SP_FMT_STR(app.paths.toml));
+  if (spn_project_find_dependency(&app.project, add->package)) {
+    SP_LOG("{} is already in defined in {}", SP_FMT_STR(add->package), SP_FMT_STR(app.paths.toml));
     SP_EXIT_SUCCESS();
   }
 
-  sp_dyn_array_push(app.project.dependencies, *dependency);
+  spn_dep_id_t id = sp_str_copy(add->package);
+  sp_dyn_array_push(app.project.dependencies, id);
 
   if (!spn_project_write(&app.project, app.paths.toml)) {
     SP_FATAL("Failed to write project TOML file");
   }
 
-  SP_LOG("Added {} to {}", SP_FMT_STR(dependency->name), SP_FMT_STR(app.paths.toml));
+  SP_LOG("Added {} to {}", SP_FMT_STR(add->package), SP_FMT_STR(app.paths.toml));
 }
 
 void spn_cli_command_init(spn_cli_t* cli) {
@@ -301,6 +303,12 @@ void spn_cli_command_init(spn_cli_t* cli) {
   );
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
+  // Check if project file already exists
+  if (sp_os_does_path_exist(app.paths.toml)) {
+    SP_LOG("Project already initialized at {}", SP_FMT_STR(app.paths.toml));
+    return;
+  }
+
   app.project = (spn_project_t){
     .name = sp_os_extract_file_name(app.paths.project)
   };
@@ -317,16 +325,26 @@ void spn_cli_command_nuke(spn_cli_t* cli) {
   sp_os_remove_file(app.paths.toml);
 }
 
+void spn_cli_command_clean(spn_cli_t* cli) {
+  SP_LOG("Cleaning build and store directories...");
+  sp_os_remove_directory(app.paths.build);
+  sp_os_remove_directory(app.paths.store);
+  SP_LOG("Clean complete. Source directory preserved.");
+}
+
 void spn_cli_command_flags(spn_cli_t* cli) {
+  spn_cli_flags_t* flags = &cli->flags;
+  
   struct argparse argparse;
   argparse_init(
     &argparse,
     (struct argparse_option []) {
       OPT_HELP(),
+      OPT_STRING('p', "package", &flags->package, "only show flags for specified package", SP_NULLPTR),
       OPT_END()
     },
     (const c8* const []) {
-      "spn flags (include, bin)",
+      "spn flags (include, libs, all)",
       SP_NULLPTR
     },
     SP_NULL
@@ -341,6 +359,19 @@ void spn_cli_command_flags(spn_cli_t* cli) {
   spn_build_context_t context = spn_build_context_from_default_profile();
   spn_build_context_prepare(&context);
 
+  // Filter to only specified package if --package flag is set
+  if (flags->package) {
+    sp_str_t package_name = SP_CSTR(flags->package);
+    spn_build_context_t filtered = SP_ZERO_INITIALIZE();
+    sp_dyn_array_for(context.deps, i) {
+      if (sp_str_equal(context.deps[i].id, package_name)) {
+        sp_dyn_array_push(filtered.deps, context.deps[i]);
+        break;
+      }
+    }
+    context = filtered;
+  }
+
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
 
   if (sp_cstr_equal(cli->args[0], "include")) {
@@ -351,12 +382,14 @@ void spn_cli_command_flags(spn_cli_t* cli) {
   }
   else if (sp_cstr_equal(cli->args[0], "all")) {
     sp_str_builder_append(&builder, spn_build_context_make_flag(&context, SPN_FLAG_GNU_LIB_INCLUDE));
-    sp_str_builder_append_c8(&builder, ' ');
+    if (sp_dyn_array_size(context.deps) > 0) {
+      sp_str_builder_append_c8(&builder, ' ');
+    }
     sp_str_builder_append(&builder, spn_build_context_make_flag(&context, SPN_FLAG_GNU_INCLUDE));
   }
   else {
     sp_str_t requested_flag = SP_CSTR(cli->args[0]);
-    SP_FATAL("Unknown flag {}; options are [include, libs]", SP_FMT_QUOTED_STR(requested_flag));
+    SP_FATAL("Unknown flag {}; options are [include, libs, all]", SP_FMT_QUOTED_STR(requested_flag));
   }
 
   printf("%s", sp_str_builder_write_cstr(&builder));
@@ -386,39 +419,39 @@ sp_str_t spn_build_context_make_flag(spn_build_context_t* context, spn_cli_flag_
 }
 
 spn_build_context_t spn_build_context_from_default_profile() {
-  spn_build_context_t context;
+  spn_build_context_t context = SP_ZERO_INITIALIZE();
 
   sp_dyn_array_for(app.project.dependencies, index) {
-    spn_dep_context_t dep = spn_dep_context_from_default_profile(app.project.dependencies + index);
+    spn_dep_id_t id = app.project.dependencies[index];
+    spn_dep_context_t dep = spn_dep_context_from_default_profile(id);
     sp_dyn_array_push(context.deps, dep);
   }
 
   return context;
 }
 
-spn_dep_context_t spn_dep_context_from_default_profile(spn_dep_spec_t* dep) {
+spn_dep_context_t spn_dep_context_from_default_profile(sp_str_t id) {
   spn_dep_context_t context = {
-    .profile = {
-      .spec = dep,
-      .options = SP_NULLPTR
-    },
+    .id = sp_str_copy(id),
+    .options = SP_NULLPTR
   };
 
+  // Check if there's a [deps.id] section with configuration
   toml_table_t* deps = toml_table_table(app.project.toml, "deps");
-  SP_ASSERT_FMT(deps, "Malformed project at {}: Parsing dependency {}, but no [deps] header", SP_FMT_STR(app.paths.toml), SP_FMT_STR(dep->name));
-
-  toml_table_t* toml = toml_table_table(deps, sp_str_to_cstr(dep->name));
-  SP_ASSERT_FMT(toml, "Malformed project at {}: Parsing dependency {}, but no header", SP_FMT_STR(app.paths.toml), SP_FMT_STR(dep->name));
-
-  toml_table_t* options = toml_table_table(toml, "options");
-  if (!options) return context;
-
-  spn_dep_context_add_options(&context, options);
+  if (deps) {
+    toml_table_t* toml = toml_table_table(deps, sp_str_to_cstr(id));
+    if (toml) {
+      toml_table_t* options = toml_table_table(toml, "options");
+      if (options) {
+        spn_dep_context_add_options(&context, options);
+      }
+    }
+  }
+  
   return context;
 }
 
 void spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* options) {
-  spn_dep_profile_t* config = &context->profile;
   sp_dyn_array(spn_dep_spec_parse_entry_T) entries = SP_NULLPTR;
 
   sp_dyn_array_push(entries, ((spn_dep_spec_parse_entry_T) {
@@ -461,48 +494,38 @@ void spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* optio
         option.key = sp_str_to_upper(option.key);
         option.key = sp_str_replace(option.key, '.', '_');
         option.value = sp_str_copy_cstr(toml_table_unparsed(entry.table, key_data));
-        sp_dyn_array_push(config->options, option);
+        sp_dyn_array_push(context->options, option);
       }
     }
   }
 
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  sp_str_t kind = spn_dep_kind_to_str(config->spec->kind);
-  sp_str_builder_append_fmt_c8(&builder, "{} ({})", SP_FMT_STR(config->spec->name), SP_FMT_STR(kind));
-  sp_dyn_array_for(config->options, index) {
-    spn_dep_option_t* option = &config->options[index];
+  sp_str_builder_append_fmt_c8(&builder, "{}", SP_FMT_STR(context->id));
+  sp_dyn_array_for(context->options, index) {
+    spn_dep_option_t* option = &context->options[index];
   }
 }
 
-sp_str_t spn_dependency_source_dir(spn_dep_spec_t* dependency) {
-  return sp_os_join_path(app.paths.source, dependency->name);
+sp_str_t spn_dependency_source_dir(sp_str_t name) {
+  return sp_os_join_path(app.paths.source, name);
 }
 
-sp_str_t spn_dependency_build_dir(spn_dep_spec_t* dependency) {
-  return sp_os_join_path(app.paths.build, dependency->name);
+sp_str_t spn_dependency_build_dir(sp_str_t name) {
+  return sp_os_join_path(app.paths.build, name);
 }
 
-sp_str_t spn_dependency_store_dir(spn_dep_spec_t* dependency) {
-  return sp_os_join_path(app.paths.store, dependency->name);
+sp_str_t spn_dependency_store_dir(sp_str_t name) {
+  return sp_os_join_path(app.paths.store, name);
 }
 
-sp_str_t spn_dependency_recipe_file(spn_dep_spec_t* dependency) {
-  return sp_fmt_c8("{}.mk", SP_FMT_STR(dependency->name));
+sp_str_t spn_dependency_recipe_file(sp_str_t name) {
+  return sp_fmt_c8("{}.mk", SP_FMT_STR(name));
 }
 
-sp_str_t spn_dep_kind_to_str(spn_dep_kind_t kind) {
-  switch (kind) {
-    case SPN_DEPENDENCY_KIND_BUILTIN: return SP_LIT("builtin");
-    case SPN_DEPENDENCY_KIND_USER:    return SP_LIT("user");
-    default:                          SP_FATAL("Unknown dependency kind ({})", SP_FMT_U32(kind));
-  }
-}
-
-spn_dep_spec_t* spn_dep_spec_find(sp_str_t name) {
+spn_dep_context_t* spn_dep_find(sp_str_t name) {
   sp_dyn_array_for(app.builtins, index) {
-    spn_dep_spec_t* builtin = &app.builtins[index];
-    if (sp_str_equal(builtin->name, name)) {
-      return builtin;
+    if (sp_str_equal(app.builtins[index], name)) {
+      return (spn_dep_context_t*)1; // Just return non-null to indicate found
     }
   }
   return SP_NULLPTR;
@@ -536,12 +559,12 @@ void spn_build_context_prepare(spn_build_context_t* context) {
 
 void spn_dep_context_set_env_var(spn_dep_context_t* context, sp_str_t name, sp_str_t value) {
   if (!SDL_SetEnvironmentVariable(context->environment, sp_str_to_cstr(name), sp_str_to_cstr(value), SP_SDL_OVERWRITE_ENV_VAR)) {
-    SP_FATAL("Failed to set {}={} in build context for {}", SP_FMT_STR(name), SP_FMT_STR(value), SP_FMT_STR(context->profile.spec->name));
+    SP_FATAL("Failed to set {}={} in build context for {}", SP_FMT_STR(name), SP_FMT_STR(value), SP_FMT_STR(context->id));
   }
 }
 
 bool spn_dep_context_is_cloned(spn_dep_context_t* context) {
-  sp_str_t source = spn_dependency_source_dir(context->profile.spec);
+  sp_str_t source = spn_dependency_source_dir(context->id);
   return sp_os_does_path_exist(source);
 }
 
@@ -550,11 +573,11 @@ bool spn_dep_context_is_built(spn_dep_context_t* context) {
 }
 
 void spn_dep_context_prepare(spn_dep_context_t* context) {
-  spn_dep_profile_t* config = &context->profile;
-
   sp_dyn_array(sp_hash_t) hashes = SP_NULLPTR;
-  sp_dyn_array_for(config->options, index) {
-    spn_dep_option_t* option = &config->options[index];
+  // Include the dependency ID in the hash
+  sp_dyn_array_push(hashes, sp_hash_str(context->id));
+  sp_dyn_array_for(context->options, index) {
+    spn_dep_option_t* option = &context->options[index];
     sp_dyn_array_push(hashes, sp_hash_str(option->key));
     sp_dyn_array_push(hashes, sp_hash_str(option->value));
   }
@@ -562,14 +585,14 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   context->hash = sp_hash_combine(hashes, sp_dyn_array_size(hashes));
   context->build_id = sp_fmt_c8("{}", SP_FMT_SHORT_HASH(context->hash));
 
-  sp_str_t build = spn_dependency_build_dir(context->profile.spec);
-  sp_str_t store = spn_dependency_store_dir(context->profile.spec);
-  context->paths.source = spn_dependency_source_dir(context->profile.spec);
+  sp_str_t build = spn_dependency_build_dir(context->id);
+  sp_str_t store = spn_dependency_store_dir(context->id);
+  context->paths.source = spn_dependency_source_dir(context->id);
   context->paths.build = sp_os_join_path(build, context->build_id);
   context->paths.store = sp_os_join_path(store, context->build_id);
   context->paths.include = sp_os_join_path(context->paths.store, SP_LIT("include"));
   context->paths.bin = sp_os_join_path(context->paths.store, SP_LIT("bin"));
-  context->paths.recipe = spn_dependency_recipe_file(context->profile.spec);
+  context->paths.recipe = spn_dependency_recipe_file(context->id);
   context->paths.std_out = sp_os_join_path(context->paths.build, SP_LIT("build.stdout"));
   context->paths.std_err = sp_os_join_path(context->paths.build, SP_LIT("build.stderr"));
   context->paths.std_in  = sp_os_join_path(context->paths.build, SP_LIT("build.stdin"));
@@ -579,8 +602,8 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   spn_dep_context_set_env_var(context, SP_LIT("SPN_DIR_BUILD"), context->paths.build);
   spn_dep_context_set_env_var(context, SP_LIT("SPN_DIR_STORE_INCLUDE"), context->paths.include);
   spn_dep_context_set_env_var(context, SP_LIT("SPN_DIR_STORE_BIN"), context->paths.bin);
-  sp_dyn_array_for(context->profile.options, index) {
-    spn_dep_option_t* option = &context->profile.options[index];
+  sp_dyn_array_for(context->options, index) {
+    spn_dep_option_t* option = &context->options[index];
     sp_str_t key = sp_str_concat(SP_LIT("SPN_OPT_"), option->key);
     spn_dep_context_set_env_var(context, key, option->value);
   }
@@ -588,8 +611,8 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   context->shell = SDL_CreateProperties();
   SDL_SetPointerProperty(context->shell, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, context->environment);
   SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL);
-  SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP);
-  SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_APP);
+  SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_INHERITED);
+  SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_INHERITED);
 
   context->is_cloned = spn_dep_context_is_cloned(context);
   context->is_cloned = spn_dep_context_is_built(context);
@@ -616,9 +639,11 @@ void spn_dep_context_clone_async(spn_dep_context_t* context) {
     SP_FATAL("Failed to create process to run clone target for {}: {}", SP_FMT_STR(context->paths.recipe), SP_FMT_CSTR(sdl));
   }
 
-  spn_sh_process_result_t result = spn_sh_read_process(process);
-  if (result.return_code) {
-    SP_FATAL("Failed to clone for {}: {}", SP_FMT_STR(context->paths.recipe), SP_FMT_STR(result.output));
+  // Wait for process to complete (stdio is inherited so we can't read output)
+  s32 return_code;
+  SDL_WaitProcess(process, true, &return_code);
+  if (return_code) {
+    SP_FATAL("Failed to clone for {}: exited with code {}", SP_FMT_STR(context->paths.recipe), SP_FMT_S32(return_code));
   }
 
   SDL_DestroyProcess(process);
@@ -650,9 +675,11 @@ void spn_dep_context_build_async(spn_dep_context_t* context) {
     SP_FATAL("Failed to create process: {}", SP_FMT_CSTR(sdl));
   }
 
-  spn_sh_process_result_t result = spn_sh_read_process(process);
-  if (result.return_code) {
-    SP_FATAL("Building {} returned with code {}. Error:\n{}", SP_FMT_STR(context->paths.recipe), SP_FMT_S32(result.return_code), SP_FMT_STR(result.output));
+  // Wait for process to complete (stdio is inherited so we can't read output)
+  s32 return_code;
+  SDL_WaitProcess(process, true, &return_code);
+  if (return_code) {
+    SP_FATAL("Building {} returned with code {}", SP_FMT_STR(context->paths.recipe), SP_FMT_S32(return_code));
   }
 
   SDL_DestroyProcess(process);
@@ -768,21 +795,30 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   sp_os_directory_entry_list_t entries = sp_os_scan_directory(app->paths.recipes);
   for (sp_os_directory_entry_t* entry = entries.data; entry < entries.data + entries.count; entry++) {
-    spn_dep_spec_t spec = {
-      .kind = SPN_DEPENDENCY_KIND_BUILTIN,
-      .name = sp_os_extract_stem(entry->file_name),
-    };
-    sp_dyn_array_push(app->builtins, spec);
+    spn_dep_id_t id = sp_os_extract_stem(entry->file_name);
+    sp_dyn_array_push(app->builtins, id);
   }
 
   sp_str_t head = spn_sh_git_find_head(app->paths.bootstrap);
 
-  if (!sp_os_does_path_exist(app->paths.toml)) {
-    SP_FATAL("Expected project TOML file at {}, but it did not exist", SP_FMT_STR(app->paths.toml));
+  // Check if this is a command that doesn't need a project file
+  bool needs_project = true;
+  if (cli->num_args > 0) {
+    if (sp_cstr_equal(cli->args[0], "init") || 
+        sp_cstr_equal(cli->args[0], "nuke") ||
+        sp_cstr_equal(cli->args[0], "clean")) {
+      needs_project = false;
+    }
   }
+  
+  if (needs_project) {
+    if (!sp_os_does_path_exist(app->paths.toml)) {
+      SP_FATAL("Expected project TOML file at {}, but it did not exist", SP_FMT_STR(app->paths.toml));
+    }
 
-  if (!spn_project_read(&app->project, app->paths.toml)) {
-    SP_FATAL("Failed to read project TOML file at {}", SP_FMT_STR(app->paths.toml));
+    if (!spn_project_read(&app->project, app->paths.toml)) {
+      SP_FATAL("Failed to read project TOML file at {}", SP_FMT_STR(app->paths.toml));
+    }
   }
 }
 
@@ -800,6 +836,9 @@ void spn_app_run(spn_app_t* app) {
   }
   else if (sp_cstr_equal("nuke", cli->args[0])) {
     spn_cli_command_nuke(cli);
+  }
+  else if (sp_cstr_equal("clean", cli->args[0])) {
+    spn_cli_command_clean(cli);
   }
   else if (sp_cstr_equal("flags", cli->args[0])) {
     spn_cli_command_flags(cli);
@@ -887,14 +926,13 @@ void spn_config_read_from_string(spn_config_t* config, sp_str_t toml_content) {
   }
 }
 
-spn_dep_spec_t* spn_project_find_dependency(spn_project_t* project, sp_str_t name) {
+spn_dep_context_t* spn_project_find_dependency(spn_project_t* project, sp_str_t name) {
   SP_ASSERT(project);
-  if (!project->dependencies) return false;
+  if (!project->dependencies) return SP_NULLPTR;
 
   sp_dyn_array_for(project->dependencies, index) {
-    spn_dep_spec_t* dependency = &project->dependencies[index];
-    if (sp_str_equal(dependency->name, name)) {
-      return dependency;
+    if (sp_str_equal(project->dependencies[index], name)) {
+      return (spn_dep_context_t*)1; // Just return non-null to indicate found
     }
   }
 
@@ -906,13 +944,25 @@ bool spn_project_write(spn_project_t* project, sp_str_t path) {
 
   sp_toml_writer_add_header(&writer, sp_str_lit("project"));
   sp_toml_writer_add_string(&writer, sp_str_lit("name"), project->name);
+  if (project->dependencies) {
+    sp_toml_writer_add_string_array(&writer, sp_str_lit("deps"), project->dependencies);
+  }
 
   sp_toml_writer_new_line(&writer);
 
+  // Add configuration sections for deps that have options
   if (project->dependencies) {
+    toml_table_t* deps_table = project->toml ? toml_table_table(project->toml, "deps") : SP_NULLPTR;
     sp_dyn_array_for(project->dependencies, i) {
-      spn_dep_spec_t* dep = &project->dependencies[i];
-      sp_toml_writer_add_header(&writer, sp_fmt_c8("deps.{}", SP_FMT_STR(dep->name)));
+      spn_dep_id_t id = project->dependencies[i];
+      // Check if this dep has configuration in the original toml
+      if (deps_table) {
+        toml_table_t* dep_config = toml_table_table(deps_table, sp_str_to_cstr(id));
+        if (dep_config) {
+          sp_toml_writer_add_header(&writer, sp_fmt_c8("deps.{}", SP_FMT_STR(id)));
+          // TODO: Write the actual configuration options here
+        }
+      }
     }
   }
 
@@ -939,19 +989,37 @@ bool spn_project_read(spn_project_t* project, sp_str_t path) {
   SP_ASSERT_FMT(name.ok, "Malformed project file: missing project.name");
   project->name = sp_str_copy_cstr(name.u.s);
 
+  // First read the deps array from [project]
+  toml_array_t* deps_array = toml_table_array(project_table, "deps");
+  if (deps_array) {
+    for (u32 i = 0; i < toml_array_len(deps_array); i++) {
+      toml_value_t dep = toml_array_string(deps_array, i);
+      if (dep.ok) {
+        spn_dep_id_t id = sp_str_copy_cstr(dep.u.s);
+        sp_dyn_array_push(project->dependencies, id);
+      }
+    }
+  }
+  
+  // Also support legacy format where deps are keys under [deps] table
   toml_table_t* deps_table = toml_table_table(project->toml, "deps");
-  if (deps_table) {
+  if (deps_table && !deps_array) {
     for (u32 index = 0; index < toml_table_len(deps_table); index++) {
       s32 len;
       const c8* key = toml_table_key(deps_table, index, &len);
 
-      spn_dep_spec_t dependency = {
-        .kind = SPN_DEPENDENCY_KIND_BUILTIN,
-        .name = sp_str_copy_cstr_n(key, len),
-        .toml = toml_table_table(deps_table, key)
-      };
-
-      sp_dyn_array_push(project->dependencies, dependency);
+      spn_dep_id_t id = sp_str_copy_cstr_n(key, len);
+      // Only add if not already in the list (from deps array)
+      bool found = false;
+      sp_dyn_array_for(project->dependencies, j) {
+        if (sp_str_equal(project->dependencies[j], id)) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        sp_dyn_array_push(project->dependencies, id);
+      }
     }
   }
 
@@ -983,12 +1051,12 @@ void spn_project_build(spn_project_t* project) {
       status = SP_LIT("built");
     }
 
-    sp_str_builder_append_fmt_c8(&builder, "{} [{}]", SP_FMT_STR(dep->profile.spec->name), SP_FMT_STR(status));
+    sp_str_builder_append_fmt_c8(&builder, "{} [{}]", SP_FMT_STR(dep->id), SP_FMT_STR(status));
     sp_str_builder_new_line(&builder);
 
     sp_str_builder_indent(&builder);
-    sp_dyn_array_for(dep->profile.options, p) {
-      spn_dep_option_t* option = dep->profile.options + p;
+    sp_dyn_array_for(dep->options, p) {
+      spn_dep_option_t* option = dep->options + p;
       sp_str_builder_append_fmt_c8(&builder, "{} = {}", SP_FMT_STR(option->key), SP_FMT_STR(option->value));
       sp_str_builder_new_line(&builder);
     }

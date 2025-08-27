@@ -1,5 +1,3 @@
 [project]
 name = "hello"
-
-[deps.sp]
-[deps.sdl3]
+deps = ["sp", "sqlite"]
