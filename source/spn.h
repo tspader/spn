@@ -4,7 +4,6 @@
 ///////////
 // SHELL //
 ///////////
-#include "sp.h"
 typedef struct {
   sp_str_t output;
   s32 return_code;
@@ -16,9 +15,47 @@ typedef struct {
 } spn_sh_process_context_t;
 
 #define SPN_SH(...) SDL_CreateProcess((const c8* []) { __VA_ARGS__, SP_NULLPTR }, SP_SDL_PIPE_STDIO)
+#define SP_TUI_PRINT(command) printf("%s", command)
+
+void sp_tui_print(sp_str_t str) {
+  printf("%.*s", str.len, str.data);
+}
+
+void sp_tui_up(u32 n) {
+  sp_str_t command = sp_format("\033[{}A", SP_FMT_U32(n));
+  sp_tui_print(command);
+}
+
+void sp_tui_down(u32 n) {
+  sp_str_t command = sp_format("\033[{}B", SP_FMT_U32(n));
+  sp_tui_print(command);
+}
+
+void sp_tui_clear_line() {
+  SP_TUI_PRINT("\033[K");
+}
+
+void sp_tui_show_cursor() {
+  SP_TUI_PRINT("\033[?25h");
+}
+
+void sp_tui_hide_cursor() {
+  SP_TUI_PRINT("\033[?25l");
+}
+
+void sp_tui_home() {
+  SP_TUI_PRINT("\033[0G");
+}
+
+void sp_tui_flush() {
+  fflush(stdout);
+}
+
 
 spn_sh_process_result_t spn_sh_read_process(SDL_Process* process);
 sp_str_t                spn_sh_git_find_head(sp_str_t repo);
+u32                     spn_git_check_updates(sp_str_t repo_path);
+bool                    spn_git_pull(sp_str_t repo_path);
 
 /////////
 // CLI //
@@ -31,9 +68,9 @@ typedef struct {
 } spn_cli_init_t;
 
 typedef enum {
-  SPN_FLAG_GNU_INCLUDE,
-  SPN_FLAG_GNU_LIB_INCLUDE,
-  SPN_FLAG_ALL,
+  SPN_FLAG_INCLUDE,
+  SPN_FLAG_LIB_INCLUDE,
+  SPN_FLAG_ALL
 } spn_cli_flag_kind_t;
 
 typedef struct {
@@ -64,6 +101,17 @@ typedef enum {
   SPN_BUILD_KIND_RELEASE,
 } spn_dep_build_kind_t;
 
+typedef enum {
+  SPN_DEP_BUILD_STATE_IDLE,
+  SPN_DEP_BUILD_STATE_CLONING,
+  SPN_DEP_BUILD_STATE_FETCHING,
+  SPN_DEP_BUILD_STATE_AWAITING_CONFIRMATION,
+  SPN_DEP_BUILD_STATE_PULLING,
+  SPN_DEP_BUILD_STATE_BUILDING,
+  SPN_DEP_BUILD_STATE_DONE,
+  SPN_DEP_BUILD_STATE_FAILED
+} spn_dep_build_state_t;
+
 typedef struct {
   sp_str_t std_out;
   sp_str_t std_err;
@@ -89,6 +137,11 @@ typedef struct {
 typedef sp_str_t spn_dep_id_t;
 
 typedef struct {
+  sp_str_t commit;
+  u32 num_commits;
+} spn_dep_update_info_t;
+
+typedef struct {
   spn_dep_id_t id;
   sp_dyn_array(spn_dep_option_t) options;
   spn_dep_build_paths_t paths;
@@ -98,6 +151,11 @@ typedef struct {
   SDL_Environment* environment;
   bool is_cloned;
   bool is_built;
+  sp_thread_t thread;
+  sp_mutex_t mutex;
+  spn_dep_build_state_t state;
+  sp_str_t build_error;
+  spn_dep_update_info_t update;
 } spn_dep_context_t;
 
 typedef struct {
@@ -110,16 +168,19 @@ sp_str_t            spn_dependency_store_dir(sp_str_t name);
 sp_str_t            spn_dependency_recipe_file(sp_str_t name);
 spn_dep_context_t*  spn_dep_find(sp_str_t name);
 sp_str_t            spn_dep_option_env_name(spn_dep_option_t* option);
-void                spn_dep_context_build_async(spn_dep_context_t* context);
-void                spn_dep_context_clone_async(spn_dep_context_t* context);
+void                spn_dep_context_build(spn_dep_context_t* context);
+void                spn_dep_context_clone(spn_dep_context_t* context);
 void                spn_dep_context_prepare(spn_dep_context_t* context);
 void                spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* toml);
 spn_dep_context_t   spn_dep_context_from_default_profile(sp_str_t name);
 void                spn_dep_context_set_env_var(spn_dep_context_t* context, sp_str_t name, sp_str_t value);
 bool                spn_dep_context_is_cloned(spn_dep_context_t* context);
 bool                spn_dep_context_is_built(spn_dep_context_t* context);
+void                spn_dep_context_set_build_state(spn_dep_context_t* dep, spn_dep_build_state_t state);
+void                spn_dep_context_set_build_error(spn_dep_context_t* dep, sp_str_t error);
 void                spn_build_context_prepare(spn_build_context_t* context);
-sp_str_t            spn_build_context_make_flag(spn_build_context_t* context, spn_cli_flag_kind_t flag);
+sp_str_t            spn_dep_context_make_flag(spn_dep_context_t* dep, spn_cli_flag_kind_t flag);
+sp_str_t            spn_dep_build_state_to_str(spn_dep_build_state_t state);
 spn_build_context_t spn_build_context_from_default_profile();
 
 /////////
@@ -128,6 +189,7 @@ spn_build_context_t spn_build_context_from_default_profile();
 typedef struct {
   toml_table_t* toml;
   bool auto_pull_recipes;
+  bool auto_pull_deps;
   sp_str_t cache_override;
   sp_dyn_array(sp_str_t) additional_recipe_dirs;
   bool builtin_recipes_enabled;
@@ -360,63 +422,45 @@ void spn_cli_command_flags(spn_cli_t* cli) {
   spn_build_context_t context = spn_build_context_from_default_profile();
   spn_build_context_prepare(&context);
 
-  // Filter to only specified package if --package flag is set
-  if (flags->package) {
-    sp_str_t package_name = SP_CSTR(flags->package);
-    spn_build_context_t filtered = SP_ZERO_INITIALIZE();
-    sp_dyn_array_for(context.deps, i) {
-      if (sp_str_equal(context.deps[i].id, package_name)) {
-        sp_dyn_array_push(filtered.deps, context.deps[i]);
-        break;
-      }
-    }
-    context = filtered;
-  }
-
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-
+  // Determine which flag type we're generating
+  spn_cli_flag_kind_t flag;
+  bool is_all = false;
   if (sp_cstr_equal(cli->args[0], "include")) {
-    sp_str_builder_append(&builder, spn_build_context_make_flag(&context, SPN_FLAG_GNU_INCLUDE));
+    flag = SPN_FLAG_INCLUDE;
   }
   else if (sp_cstr_equal(cli->args[0], "libs")) {
-    sp_str_builder_append(&builder, spn_build_context_make_flag(&context, SPN_FLAG_GNU_LIB_INCLUDE));
+    flag = SPN_FLAG_LIB_INCLUDE;
   }
   else if (sp_cstr_equal(cli->args[0], "all")) {
-    sp_str_builder_append(&builder, spn_build_context_make_flag(&context, SPN_FLAG_GNU_LIB_INCLUDE));
-    if (sp_dyn_array_size(context.deps) > 0) {
-      sp_str_builder_append_c8(&builder, ' ');
-    }
-    sp_str_builder_append(&builder, spn_build_context_make_flag(&context, SPN_FLAG_GNU_INCLUDE));
+    flag = SPN_FLAG_ALL;
   }
   else {
     sp_str_t requested_flag = SP_CSTR(cli->args[0]);
     SP_FATAL("Unknown flag {}; options are [include, libs, all]",  SP_FMT_COLOR(SP_ANSI_FORE_YELLOW), SP_FMT_QUOTED_STR(requested_flag));
   }
 
-  printf("%s", sp_str_builder_write_cstr(&builder));
+  if (flags->package) {
+    sp_str_t package_name = SP_CSTR(flags->package);
+
+    sp_dyn_array_for(context.deps, i) {
+      spn_dep_context_t* dep = context.deps + i;
+
+      if (sp_str_equal(dep->id, package_name)) {
+        printf("%s", sp_str_to_cstr(spn_dep_context_make_flag(dep, flag)));
+        return;
+      }
+    }
+
+    SP_FATAL("Package {:color cyan} not found", SP_FMT_STR(package_name));
+  }
 }
 
-sp_str_t spn_build_context_make_flag(spn_build_context_t* context, spn_cli_flag_kind_t flag) {
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-
-  sp_dyn_array_for(context->deps, index) {
-    spn_dep_context_t* dep = context->deps + index;
-    sp_str_t str;
-
-    switch (flag) {
-      case SPN_FLAG_GNU_INCLUDE:     { str = sp_format("-I{}", SP_FMT_STR(dep->paths.include)); break; }
-      case SPN_FLAG_GNU_LIB_INCLUDE: { str = sp_format("-L{}", SP_FMT_STR(dep->paths.bin)); break; }
-      default:                    { SP_UNREACHABLE_CASE(); }
-    }
-
-    sp_str_builder_append(&builder, str);
-
-    if (index != SP_SIZE_TO_INDEX(sp_dyn_array_size(context->deps))) {
-      sp_str_builder_append_c8(&builder, ' ');
-    }
+sp_str_t spn_dep_context_make_flag(spn_dep_context_t* dep, spn_cli_flag_kind_t flag) {
+  switch (flag) {
+    case SPN_FLAG_INCLUDE:      return dep->paths.include;
+    case SPN_FLAG_LIB_INCLUDE:  return dep->paths.bin;
+    default:                    { SP_UNREACHABLE_CASE(); }
   }
-
-  return sp_str_builder_write(&builder);
 }
 
 spn_build_context_t spn_build_context_from_default_profile() {
@@ -506,6 +550,20 @@ void spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* optio
   }
 }
 
+sp_str_t spn_dep_build_state_to_str(spn_dep_build_state_t state) {
+  switch (state) {
+    case SPN_DEP_BUILD_STATE_IDLE: return SP_LIT("idle");
+    case SPN_DEP_BUILD_STATE_CLONING: return SP_LIT("cloning");
+    case SPN_DEP_BUILD_STATE_FETCHING: return SP_LIT("fetching");
+    case SPN_DEP_BUILD_STATE_AWAITING_CONFIRMATION: return SP_LIT("confirming");
+    case SPN_DEP_BUILD_STATE_PULLING: return SP_LIT("pulling");
+    case SPN_DEP_BUILD_STATE_BUILDING: return SP_LIT("building");
+    case SPN_DEP_BUILD_STATE_DONE: return SP_LIT("done");
+    case SPN_DEP_BUILD_STATE_FAILED: return SP_LIT("failed");
+    default: SP_UNREACHABLE_RETURN(SP_LIT(""));
+  }
+}
+
 sp_str_t spn_dependency_source_dir(sp_str_t name) {
   return sp_os_join_path(app.paths.source, name);
 }
@@ -548,6 +606,28 @@ sp_str_t spn_sh_git_find_head(sp_str_t repo) {
   spn_sh_process_result_t result = spn_sh_read_process(process);
   SDL_DestroyProcess(process);
   return sp_str_trim_right(result.output);
+}
+
+u32 spn_git_check_updates(sp_str_t repo_path) {
+  // Fetch from remote
+  SDL_Process* fetch = SPN_SH("git", "-C", sp_str_to_cstr(repo_path), "fetch", "--quiet");
+  spn_sh_process_result_t fetch_result = spn_sh_read_process(fetch);
+  SDL_DestroyProcess(fetch);
+
+  // Count commits behind upstream
+  SDL_Process* rev_list = SPN_SH("git", "-C", sp_str_to_cstr(repo_path), "rev-list", "HEAD..@{u}", "--count");
+  spn_sh_process_result_t rev_result = spn_sh_read_process(rev_list);
+  SDL_DestroyProcess(rev_list);
+
+  sp_str_t trimmed = sp_str_trim_right(rev_result.output);
+  return sp_parse_u32(trimmed);
+}
+
+bool spn_git_pull(sp_str_t repo_path) {
+  SDL_Process* pull = SPN_SH("git", "-C", sp_str_to_cstr(repo_path), "pull");
+  spn_sh_process_result_t result = spn_sh_read_process(pull);
+  SDL_DestroyProcess(pull);
+  return result.return_code == 0;
 }
 
 void spn_build_context_prepare(spn_build_context_t* context) {
@@ -611,11 +691,13 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   context->shell = SDL_CreateProperties();
   SDL_SetPointerProperty(context->shell, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, context->environment);
   SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL);
-  SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_INHERITED);
-  SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_INHERITED);
+  SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP);
+  SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_APP);
 
   context->is_cloned = spn_dep_context_is_cloned(context);
-  context->is_cloned = spn_dep_context_is_built(context);
+  context->is_built = spn_dep_context_is_built(context);
+  context->state = SPN_DEP_BUILD_STATE_IDLE;
+  sp_mutex_init(&context->mutex, SP_MUTEX_PLAIN);
 
   sp_os_create_directory(context->paths.build);
   sp_os_create_directory(context->paths.store);
@@ -623,67 +705,139 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   sp_os_create_directory(context->paths.bin);
 }
 
-void spn_dep_context_clone_async(spn_dep_context_t* context) {
-  const c8* args [] = {
-    "make",
-    "-C", sp_str_to_cstr(context->paths.build),
-    "--makefile", sp_str_to_cstr(context->paths.recipe),
-    "spn-clone",
-    SP_NULLPTR
-  };
-
-  SDL_PropertiesID shell = SDL_CreateProperties();
-  SDL_CopyProperties(context->shell, shell);
-  SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)args);
-
-  SP_LOG("Running {:color yellow} for {:color cyan}", SP_FMT_CSTR("spn-clone"), SP_FMT_STR(context->paths.recipe));
-
-  SDL_Process* process = SDL_CreateProcessWithProperties(shell);
-  if (!process) {
-    const c8* sdl = SDL_GetError();
-    SP_FATAL("Failed to create process to run clone target for {:color yellow}: {:color red}", SP_FMT_STR(context->paths.recipe), SP_FMT_CSTR(sdl));
-  }
-
-  // Wait for process to complete (stdio is inherited so we can't read output)
-  s32 return_code;
-  SDL_WaitProcess(process, true, &return_code);
-  if (return_code) {
-    SP_FATAL("Failed to clone for {:color cyan}: exited with code {:color red}", SP_FMT_STR(context->paths.recipe), SP_FMT_S32(return_code));
-  }
-
-  SP_LOG("OK!");
-  SDL_DestroyProcess(process);
+s32 spn_dep_context_build_async(void* user_data) {
+  spn_dep_context_t* dep = (spn_dep_context_t*)user_data;
+  spn_dep_context_clone(dep);
+  spn_dep_context_build(dep);
+  return 0;
 }
 
-void spn_dep_context_build_async(spn_dep_context_t* context) {
+void spn_dep_context_set_build_state(spn_dep_context_t* dep, spn_dep_build_state_t state) {
+  sp_mutex_lock(&dep->mutex);
+  dep->state = state;
+  sp_mutex_unlock(&dep->mutex);
+}
+
+void spn_dep_context_set_build_error(spn_dep_context_t* dep, sp_str_t error) {
+  sp_mutex_lock(&dep->mutex);
+  dep->state = SPN_DEP_BUILD_STATE_FAILED;
+  dep->build_error = sp_str_copy(error);
+  sp_mutex_unlock(&dep->mutex);
+}
+
+void spn_dep_context_clone(spn_dep_context_t* dep) {
+  if (!sp_os_does_path_exist(dep->paths.source)) {
+    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
+
+    const c8* args [] = {
+      "make",
+      "-C", sp_str_to_cstr(dep->paths.build),
+      "--makefile", sp_str_to_cstr(dep->paths.recipe),
+      "spn-clone",
+      SP_NULLPTR
+    };
+
+    SDL_PropertiesID shell = SDL_CreateProperties();
+    SDL_CopyProperties(dep->shell, shell);
+    SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)args);
+
+    //SP_LOG("Running {:color yellow} for {:color cyan}", SP_FMT_CSTR("spn-clone"), SP_FMT_STR(dep->paths.recipe));
+
+    SDL_Process* process = SDL_CreateProcessWithProperties(shell);
+    if (!process) {
+      spn_dep_context_set_build_error(dep, sp_format(
+        "Failed to create process to run clone target for {:color yellow}: {:color red}",
+        SP_FMT_STR(dep->paths.recipe),
+        SP_FMT_CSTR(SDL_GetError())
+      ));
+      return;
+    }
+
+    // Wait for process to complete (stdio is inherited so we can't read output)
+    s32 return_code;
+    SDL_WaitProcess(process, true, &return_code);
+    if (return_code) {
+      spn_dep_context_set_build_error(dep, sp_format(
+        "Failed to clone for {:color cyan}: exited with code {:color red}",
+        SP_FMT_STR(dep->paths.recipe),
+        SP_FMT_S32(return_code)
+      ));
+      return;
+    }
+
+    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
+
+    SDL_DestroyProcess(process);
+  }
+  else {
+    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
+    dep->update.num_commits = spn_git_check_updates(dep->paths.source);
+
+    if (!dep->update.num_commits) {
+      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
+      return;
+    }
+
+    if (app.config.auto_pull_deps) {
+      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PULLING);
+      //SP_LOG("Updating {:color cyan} ({} commits behind)...", SP_FMT_STR(dep->id), SP_FMT_U32(num_updates));
+
+    }
+    else {
+      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_AWAITING_CONFIRMATION);
+      while (true) {
+        c8 c = getchar();
+        if (c == EOF) break;
+        if (c == '1') {
+          spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PULLING);
+          break;
+        }
+      }
+    }
+
+    if (!spn_git_pull(dep->paths.source)) {
+      spn_dep_context_set_build_error(dep, sp_format("Failed to update {:color cyan}", SP_FMT_STR(dep->id)));
+      return;
+    }
+
+  }
+}
+
+void spn_dep_context_build(spn_dep_context_t* dep) {
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_BUILDING);
+
   sp_str_t target = SP_LIT("spn-build");
   const c8* args [] = {
     "make",
-    "-C", sp_str_to_cstr(context->paths.build),
-    "--makefile", sp_str_to_cstr(context->paths.recipe),
+    "-C", sp_str_to_cstr(dep->paths.build),
+    "--makefile", sp_str_to_cstr(dep->paths.recipe),
     sp_str_to_cstr(target),
     SP_NULLPTR
   };
 
   SDL_PropertiesID shell = SDL_CreateProperties();
-  SDL_CopyProperties(context->shell, shell);
+  SDL_CopyProperties(dep->shell, shell);
   SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)args);
 
-  SP_LOG("Building {:color cyan} from {}", SP_FMT_STR(context->id), SP_FMT_STR(context->paths.recipe));
+  //SP_LOG("Building {:color cyan} from {}", SP_FMT_STR(dep->id), SP_FMT_STR(dep->paths.recipe));
   SDL_Process* process = SDL_CreateProcessWithProperties(shell);
   if (!process) {
-    const c8* sdl = SDL_GetError();
-    SP_FATAL("Failed to create process: {:color red}", SP_FMT_CSTR(sdl));
+    spn_dep_context_set_build_error(dep, sp_format("Create process failed: {:color red}", SP_FMT_CSTR(SDL_GetError())));
+    return;
   }
 
-  // Wait for process to complete (stdio is inherited so we can't read output)
   s32 return_code;
   SDL_WaitProcess(process, true, &return_code);
   if (return_code) {
-    SP_FATAL("Building {:color cyan} returned with code {:color red}", SP_FMT_STR(context->paths.recipe), SP_FMT_S32(return_code));
+    spn_dep_context_set_build_error(dep, sp_format(
+      "Building {:color cyan} failed with code {:color red}",
+      SP_FMT_STR(dep->paths.recipe),
+      SP_FMT_S32(return_code)
+    ));
+    return;
   }
 
-  SP_LOG("{:color green}", SP_FMT_CSTR("OK!"));
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
 
   SDL_DestroyProcess(process);
 }
@@ -777,21 +931,15 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     }
   }
   else {
-    spn_sh_process_context_t fetch = SP_ZERO_INITIALIZE();
-    fetch.process = SPN_SH("git", "-C", spn, "fetch", "--quiet");
-    fetch.result = spn_sh_read_process(fetch.process);
-
-    spn_sh_process_context_t rev_list = SP_ZERO_INITIALIZE();
-    rev_list.process = SPN_SH("git", "-C", spn, "rev-list", "HEAD..@{u}", "--count");
-    rev_list.result = spn_sh_read_process(rev_list.process);
-    rev_list.result.output = sp_str_trim_right(rev_list.result.output);
-    if (sp_parse_u32(rev_list.result.output)) {
-      SP_LOG("spn has updates to recipes; pull? (y)es, (n)o, (a)lways");
-      SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
-      SDL_Process* process = SPN_SH("git", "-C", spn, "pull");
-      spn_sh_process_result_t result = spn_sh_read_process(process);
-      if (result.return_code) {
-        SP_FATAL("Failed to clone spn recipe sources from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
+    u32 num_updates = spn_git_check_updates(app->paths.bootstrap);
+    if (num_updates > 0) {
+      if (app->config.auto_pull_recipes) {
+        SP_LOG("Updating spn recipes ({} commits behind)...", SP_FMT_U32(num_updates));
+        if (!spn_git_pull(app->paths.bootstrap)) {
+          SP_FATAL("Failed to update spn recipes");
+        }
+      } else {
+        SP_LOG("spn has {} recipe updates available (auto_pull_recipes=false)", SP_FMT_U32(num_updates));
       }
     }
   }
@@ -852,49 +1000,22 @@ void spn_app_run(spn_app_t* app) {
 }
 
 void spn_config_read(spn_config_t* config, sp_str_t path) {
-  *config = (spn_config_t) {
-    .auto_pull_recipes = false,
-    .toml = SP_NULLPTR,
-    .cache_override = SP_ZERO_INITIALIZE(),
-    .additional_recipe_dirs = SP_NULLPTR,
-    .builtin_recipes_enabled = true
-  };
-
   size_t file_size;
   c8* file_data = (c8*)SDL_LoadFile(sp_str_to_cstr(path), &file_size);
-  if (!file_data) return;
-
-  c8* toml_error = (c8*)sp_alloc(256);
-  config->toml = toml_parse(file_data, toml_error, 256);
-  if (!config->toml) {
-    SP_FATAL("Failed to parse {}: {}", SP_FMT_STR(path), SP_FMT_CSTR(toml_error));
+  if (!file_data) {
+    spn_config_read_from_string(config, SP_LIT(""));
+    return;
   }
 
-  toml_table_t* options = toml_table_table(config->toml, "options");
-  if (options) {
-    TOML_READ_BOOL(options, config->auto_pull_recipes, "auto_pull_recipes");
-    TOML_READ_BOOL(options, config->builtin_recipes_enabled, "builtin_recipes_enabled");
-
-    toml_value_t cache_override = toml_table_string(options, "cache_override");
-    if (cache_override.ok) {
-      config->cache_override = sp_str_from_cstr(cache_override.u.s);
-    }
-
-    toml_array_t* recipe_dirs = toml_table_array(options, "additional_recipe_dirs");
-    if (recipe_dirs) {
-      for (u32 i = 0; i < toml_array_len(recipe_dirs); i++) {
-        toml_value_t dir = toml_array_string(recipe_dirs, i);
-        if (dir.ok) {
-          sp_dyn_array_push(config->additional_recipe_dirs, sp_str_from_cstr(dir.u.s));
-        }
-      }
-    }
-  }
+  sp_str_t content = sp_str_from_cstr_sized(file_data, file_size);
+  spn_config_read_from_string(config, content);
+  SDL_free(file_data);
 }
 
 void spn_config_read_from_string(spn_config_t* config, sp_str_t toml_content) {
   *config = (spn_config_t) {
     .auto_pull_recipes = false,
+    .auto_pull_deps = false,
     .toml = SP_NULLPTR,
     .cache_override = SP_ZERO_INITIALIZE(),
     .additional_recipe_dirs = SP_NULLPTR,
@@ -910,6 +1031,7 @@ void spn_config_read_from_string(spn_config_t* config, sp_str_t toml_content) {
   toml_table_t* options = toml_table_table(config->toml, "options");
   if (options) {
     TOML_READ_BOOL(options, config->auto_pull_recipes, "auto_pull_recipes");
+    TOML_READ_BOOL(options, config->auto_pull_deps, "auto_pull_deps");
     TOML_READ_BOOL(options, config->builtin_recipes_enabled, "builtin_recipes_enabled");
 
     toml_value_t cache_override = toml_table_string(options, "cache_override");
@@ -1039,6 +1161,7 @@ void spn_project_build(spn_project_t* project) {
     width = SP_MAX(width, dep->id.len);
   }
 
+  #if 0
   sp_dyn_array_for(context.deps, index) {
     spn_dep_context_t* dep = context.deps + index;
     sp_str_builder_t builder = SP_ZERO_INITIALIZE();
@@ -1066,14 +1189,89 @@ void spn_project_build(spn_project_t* project) {
     }
     sp_str_t report = sp_str_builder_write(&builder);
     sp_log(report);
+  }
+  #endif
 
-    if (!dep->is_cloned) {
-      spn_dep_context_clone_async(dep);
-    }
+  sp_dyn_array_for(context.deps, index) {
+    spn_dep_context_t* dep = context.deps + index;
+    sp_thread_init(&dep->thread, spn_dep_context_build_async, dep);
 
-    spn_dep_context_build_async(dep);
   }
 
+  sp_dyn_array_for(context.deps, index) {
+    sp_tui_print(SP_LIT("\n"));
+  }
+  sp_tui_hide_cursor();
+  sp_tui_flush();
+
+  bool building = true;
+  while (building) {
+    sp_tui_up(sp_dyn_array_size(context.deps));
+
+    building = false;
+
+    sp_dyn_array_for(context.deps, index) {
+      spn_dep_context_t* dep = context.deps + index;
+      sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+
+      sp_mutex_lock(&dep->mutex);
+      switch (dep->state) {
+        case SPN_DEP_BUILD_STATE_FAILED:
+        case SPN_DEP_BUILD_STATE_DONE: {
+          break;
+        }
+        default: {
+          building = true;
+          break;
+        }
+      }
+
+      switch (dep->state) {
+        case SPN_DEP_BUILD_STATE_FAILED: {
+          sp_str_builder_append_fmt_c8(&builder,
+            "{} {:color red} {}",
+            SP_FMT_STR(sp_str_pad(dep->id, width)),
+            SP_FMT_STR(spn_dep_build_state_to_str(dep->state)),
+            SP_FMT_STR(dep->build_error)
+          );
+          break;
+        }
+        case SPN_DEP_BUILD_STATE_AWAITING_CONFIRMATION: {
+          sp_str_builder_append_fmt_c8(&builder,
+            "{} {:color cyan} new commits available; {:color yellow} to pull, {:color yellow} to cancel, {:color yellow} to pull + stop asking",
+            SP_FMT_STR(sp_str_pad(dep->id, width)),
+            SP_FMT_STR(spn_dep_build_state_to_str(dep->state)),
+            SP_FMT_CSTR("1"),
+            SP_FMT_CSTR("2"),
+            SP_FMT_CSTR("3"),
+            SP_FMT_U32(dep->update.num_commits)
+          );
+          break;
+        }
+        default: {
+          sp_str_builder_append_fmt_c8(&builder,
+            "{} {:color cyan}",
+            SP_FMT_STR(sp_str_pad(dep->id, width)),
+            SP_FMT_STR(spn_dep_build_state_to_str(dep->state))
+          );
+          break;
+        }
+      }
+      sp_mutex_unlock(&dep->mutex);
+
+      sp_tui_home();
+      sp_tui_clear_line();
+      sp_tui_print(sp_str_builder_write(&builder));
+      sp_tui_down(1);
+    }
+
+    sp_tui_flush();
+    SDL_Delay(5);
+  }
+
+  sp_tui_show_cursor();
+  sp_tui_home();
+  sp_tui_flush();
 }
 
 #endif // SPN_IMPLEMENTATION

@@ -31,7 +31,7 @@ s32 main(s32 num_args, c8** args) {
   // Read the row back
   const c8* select_sql = "SELECT id, name, age FROM users";
   sqlite3_stmt* stmt;
-  if (sqlite3_prepare_v2(db, select_sql, -1, &stmt, NULL != SQLITE_OK)) {
+  if (sqlite3_prepare_v2(db, select_sql, -1, &stmt, NULL) != SQLITE_OK) {
     SP_FATAL("Failed to prepare statement: {}", SP_FMT_CSTR(sqlite3_errmsg(db)));
   }
 

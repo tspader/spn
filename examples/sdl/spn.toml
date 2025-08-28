@@ -1,5 +1,5 @@
 [project]
-name = "foobar"
+name = "sdl"
 deps = ["sp", "sdl3"]
 
 [deps.sp]
