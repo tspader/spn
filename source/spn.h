@@ -1,6 +1,11 @@
 #ifndef SPN_H
 #define SPN_H
 
+#include "sp.h"
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
+
 ///////////
 // SHELL //
 ///////////
@@ -109,6 +114,7 @@ typedef enum {
   SPN_DEP_BUILD_STATE_PULLING,
   SPN_DEP_BUILD_STATE_BUILDING,
   SPN_DEP_BUILD_STATE_DONE,
+  SPN_DEP_BUILD_STATE_CANCELED,
   SPN_DEP_BUILD_STATE_FAILED
 } spn_dep_build_state_t;
 
@@ -144,18 +150,20 @@ typedef struct {
 typedef struct {
   spn_dep_id_t id;
   sp_dyn_array(spn_dep_option_t) options;
+  spn_dep_build_kind_t kind;
   spn_dep_build_paths_t paths;
   sp_hash_t hash;
   sp_str_t build_id;
   SDL_PropertiesID shell;
   SDL_Environment* environment;
-  bool is_cloned;
-  bool is_built;
+
   sp_thread_t thread;
   sp_mutex_t mutex;
   spn_dep_build_state_t state;
   sp_str_t build_error;
   spn_dep_update_info_t update;
+  c8 confirm_keys[3];  // Keys for: pull, cancel, pull+always
+  c8 user_choice;       // User's input for confirmation
 } spn_dep_context_t;
 
 typedef struct {
@@ -181,6 +189,7 @@ void                spn_dep_context_set_build_error(spn_dep_context_t* dep, sp_s
 void                spn_build_context_prepare(spn_build_context_t* context);
 sp_str_t            spn_dep_context_make_flag(spn_dep_context_t* dep, spn_cli_flag_kind_t flag);
 sp_str_t            spn_dep_build_state_to_str(spn_dep_build_state_t state);
+bool                spn_dep_is_build_state_terminal(spn_dep_context_t* dep);
 spn_build_context_t spn_build_context_from_default_profile();
 
 /////////
@@ -225,6 +234,7 @@ typedef struct {
   spn_project_t project;
   spn_config_t config;
   sp_dyn_array(spn_dep_id_t) builtins;
+  SDL_AtomicInt control;
 } spn_app_t;
 
 extern spn_app_t app;
@@ -559,8 +569,18 @@ sp_str_t spn_dep_build_state_to_str(spn_dep_build_state_t state) {
     case SPN_DEP_BUILD_STATE_PULLING: return SP_LIT("pulling");
     case SPN_DEP_BUILD_STATE_BUILDING: return SP_LIT("building");
     case SPN_DEP_BUILD_STATE_DONE: return SP_LIT("done");
+    case SPN_DEP_BUILD_STATE_CANCELED: return SP_LIT("canceled");
     case SPN_DEP_BUILD_STATE_FAILED: return SP_LIT("failed");
     default: SP_UNREACHABLE_RETURN(SP_LIT(""));
+  }
+}
+
+bool spn_dep_is_build_state_terminal(spn_dep_context_t* dep) {
+  switch (dep->state) {
+    case SPN_DEP_BUILD_STATE_FAILED:
+    case SPN_DEP_BUILD_STATE_DONE:
+    case SPN_DEP_BUILD_STATE_CANCELED: return true;
+    default: return false;
   }
 }
 
@@ -653,9 +673,13 @@ bool spn_dep_context_is_built(spn_dep_context_t* context) {
 }
 
 void spn_dep_context_prepare(spn_dep_context_t* context) {
+  context->kind = SPN_BUILD_KIND_DEBUG;
+
   sp_dyn_array(sp_hash_t) hashes = SP_NULLPTR;
-  // Include the dependency ID in the hash
+
   sp_dyn_array_push(hashes, sp_hash_str(context->id));
+  sp_dyn_array_push(hashes, sp_hash_bytes(&context->kind, sizeof(context->kind), 0));
+
   sp_dyn_array_for(context->options, index) {
     spn_dep_option_t* option = &context->options[index];
     sp_dyn_array_push(hashes, sp_hash_str(option->key));
@@ -694,8 +718,6 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP);
   SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_APP);
 
-  context->is_cloned = spn_dep_context_is_cloned(context);
-  context->is_built = spn_dep_context_is_built(context);
   context->state = SPN_DEP_BUILD_STATE_IDLE;
   sp_mutex_init(&context->mutex, SP_MUTEX_PLAIN);
 
@@ -707,8 +729,20 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
 
 s32 spn_dep_context_build_async(void* user_data) {
   spn_dep_context_t* dep = (spn_dep_context_t*)user_data;
+
+  // Reserve 3 characters for this thread's confirmation keys
+  c8 key_offset = SDL_GetAtomicInt(&app.control);
+  SDL_AddAtomicInt(&app.control, 3);
+  dep->confirm_keys[0] = 'a' + key_offset;
+  dep->confirm_keys[1] = 'a' + key_offset + 1;
+  dep->confirm_keys[2] = 'a' + key_offset + 2;
+
   spn_dep_context_clone(dep);
-  spn_dep_context_build(dep);
+
+  if (dep->state != SPN_DEP_BUILD_STATE_FAILED) {
+    spn_dep_context_build(dep);
+  }
+
   return 0;
 }
 
@@ -774,7 +808,6 @@ void spn_dep_context_clone(spn_dep_context_t* dep) {
     dep->update.num_commits = spn_git_check_updates(dep->paths.source);
 
     if (!dep->update.num_commits) {
-      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
       return;
     }
 
@@ -785,13 +818,33 @@ void spn_dep_context_clone(spn_dep_context_t* dep) {
     }
     else {
       spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_AWAITING_CONFIRMATION);
+      dep->user_choice = 0;  // Reset user choice
+
+      // Wait for user input
       while (true) {
-        c8 c = getchar();
-        if (c == EOF) break;
-        if (c == '1') {
+        sp_mutex_lock(&dep->mutex);
+        c8 choice = dep->user_choice;
+        sp_mutex_unlock(&dep->mutex);
+
+        if (choice == dep->confirm_keys[0]) {
+          // Pull updates
           spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PULLING);
           break;
         }
+        else if (choice == dep->confirm_keys[1]) {
+          // Cancel - skip pulling
+          spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
+          return;
+        }
+        else if (choice == dep->confirm_keys[2]) {
+          // Pull and update config to always pull
+          spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PULLING);
+          app.config.auto_pull_deps = true;
+          // TODO: Save config to file
+          break;
+        }
+
+        SDL_Delay(10);  // Small delay to avoid busy waiting
       }
     }
 
@@ -799,7 +852,6 @@ void spn_dep_context_clone(spn_dep_context_t* dep) {
       spn_dep_context_set_build_error(dep, sp_format("Failed to update {:color cyan}", SP_FMT_STR(dep->id)));
       return;
     }
-
   }
 }
 
@@ -844,6 +896,9 @@ void spn_dep_context_build(spn_dep_context_t* dep) {
 
 void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   spn_cli_t* cli = &app->cli;
+
+  // Initialize atomic control counter for thread key reservation
+  SDL_SetAtomicInt(&app->control, 0);
 
   struct argparse_option options [] = {
     OPT_HELP(),
@@ -1161,37 +1216,6 @@ void spn_project_build(spn_project_t* project) {
     width = SP_MAX(width, dep->id.len);
   }
 
-  #if 0
-  sp_dyn_array_for(context.deps, index) {
-    spn_dep_context_t* dep = context.deps + index;
-    sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-
-    sp_str_t status;
-    if (!dep->is_cloned && !dep->is_built) {
-      status = SP_LIT("uninitialized");
-    }
-    else if (dep->is_cloned && !dep->is_built) {
-      status = SP_LIT("cloned");
-    }
-    else if (dep->is_cloned && dep->is_built) {
-      status = SP_LIT("built");
-    }
-
-    sp_str_t name = sp_str_pad(dep->id, width);
-    sp_str_builder_append_fmt_c8(&builder, "> {:color cyan} [{}]", SP_FMT_STR(name), SP_FMT_STR(status));
-    sp_str_builder_new_line(&builder);
-
-    sp_str_builder_indent(&builder);
-    sp_dyn_array_for(dep->options, p) {
-      spn_dep_option_t* option = dep->options + p;
-      sp_str_builder_append_fmt_c8(&builder, "{:color brightblack} = {}", SP_FMT_STR(option->key), SP_FMT_STR(option->value));
-      sp_str_builder_new_line(&builder);
-    }
-    sp_str_t report = sp_str_builder_write(&builder);
-    sp_log(report);
-  }
-  #endif
-
   sp_dyn_array_for(context.deps, index) {
     spn_dep_context_t* dep = context.deps + index;
     sp_thread_init(&dep->thread, spn_dep_context_build_async, dep);
@@ -1204,11 +1228,37 @@ void spn_project_build(spn_project_t* project) {
   sp_tui_hide_cursor();
   sp_tui_flush();
 
+  // Set terminal to non-blocking mode
+  struct termios orig_termios;
+  tcgetattr(STDIN_FILENO, &orig_termios);
+  struct termios new_termios = orig_termios;
+  new_termios.c_lflag &= ~(ICANON | ECHO);
+  tcsetattr(STDIN_FILENO, TCSANOW, &new_termios);
+  fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
+
   bool building = true;
   while (building) {
     sp_tui_up(sp_dyn_array_size(context.deps));
 
     building = false;
+
+    // Check for user input (non-blocking)
+    c8 input_char;
+    if (read(STDIN_FILENO, &input_char, 1) == 1) {
+      // Distribute input to waiting threads
+      sp_dyn_array_for(context.deps, i) {
+        spn_dep_context_t* check_dep = context.deps + i;
+        sp_mutex_lock(&check_dep->mutex);
+        if (check_dep->state == SPN_DEP_BUILD_STATE_AWAITING_CONFIRMATION) {
+          if (input_char == check_dep->confirm_keys[0] ||
+              input_char == check_dep->confirm_keys[1] ||
+              input_char == check_dep->confirm_keys[2]) {
+            check_dep->user_choice = input_char;
+          }
+        }
+        sp_mutex_unlock(&check_dep->mutex);
+      }
+    }
 
     sp_dyn_array_for(context.deps, index) {
       spn_dep_context_t* dep = context.deps + index;
@@ -1225,34 +1275,38 @@ void spn_project_build(spn_project_t* project) {
           break;
         }
       }
+      sp_str_t name = sp_str_pad(dep->id, width);
+      sp_str_t state = sp_str_pad(spn_dep_build_state_to_str(dep->state), 12);
+      sp_str_t status;
 
       switch (dep->state) {
+        case SPN_DEP_BUILD_STATE_CANCELED:
         case SPN_DEP_BUILD_STATE_FAILED: {
-          sp_str_builder_append_fmt_c8(&builder,
+          status = sp_format(
             "{} {:color red} {}",
-            SP_FMT_STR(sp_str_pad(dep->id, width)),
-            SP_FMT_STR(spn_dep_build_state_to_str(dep->state)),
+            SP_FMT_STR(name),
+            SP_FMT_STR(state),
             SP_FMT_STR(dep->build_error)
           );
           break;
         }
         case SPN_DEP_BUILD_STATE_AWAITING_CONFIRMATION: {
-          sp_str_builder_append_fmt_c8(&builder,
-            "{} {:color cyan} new commits available; {:color yellow} to pull, {:color yellow} to cancel, {:color yellow} to pull + stop asking",
-            SP_FMT_STR(sp_str_pad(dep->id, width)),
-            SP_FMT_STR(spn_dep_build_state_to_str(dep->state)),
-            SP_FMT_CSTR("1"),
-            SP_FMT_CSTR("2"),
-            SP_FMT_CSTR("3"),
-            SP_FMT_U32(dep->update.num_commits)
+          status = sp_format(
+            "{} {:color cyan} {:color green} new commits; {:color yellow} to pull, {:color yellow} to cancel, {:color yellow} to pull + stop asking",
+            SP_FMT_STR(name),
+            SP_FMT_STR(state),
+            SP_FMT_U32(dep->update.num_commits),
+            SP_FMT_C8(dep->confirm_keys[0]),
+            SP_FMT_C8(dep->confirm_keys[1]),
+            SP_FMT_C8(dep->confirm_keys[2])
           );
           break;
         }
         default: {
-          sp_str_builder_append_fmt_c8(&builder,
+          status = sp_format(
             "{} {:color cyan}",
-            SP_FMT_STR(sp_str_pad(dep->id, width)),
-            SP_FMT_STR(spn_dep_build_state_to_str(dep->state))
+            SP_FMT_STR(name),
+            SP_FMT_STR(state)
           );
           break;
         }
@@ -1261,13 +1315,16 @@ void spn_project_build(spn_project_t* project) {
 
       sp_tui_home();
       sp_tui_clear_line();
-      sp_tui_print(sp_str_builder_write(&builder));
+      sp_tui_print(status);
       sp_tui_down(1);
     }
 
     sp_tui_flush();
     SDL_Delay(5);
   }
+
+  // Restore terminal settings
+  tcsetattr(STDIN_FILENO, TCSANOW, &orig_termios);
 
   sp_tui_show_cursor();
   sp_tui_home();

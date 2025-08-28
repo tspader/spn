@@ -18,6 +18,7 @@ $(EX_SDL_DIR_BUILD_EXAMPLES):
 	@mkdir -p $(EX_SDL_DIR_BUILD_EXAMPLES)
 
 $(EX_SDL_BINARY): main.c $(EX_SDL_DIR_BUILD_EXAMPLES)
+	$(SPN) build
 	$(CC) main.c $(EX_SDL_CC_FLAGS) $(EX_SDL_FLAG_LIBS)
 
 .PHONY: all
