@@ -1,7 +1,6 @@
 #ifndef SPN_H
 #define SPN_H
 
-#include "sp.h"
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -199,12 +198,25 @@ typedef struct {
   spn_dep_build_state_t state;
   sp_str_t build_error;
   spn_dep_update_info_t update;
-  c8 confirm_keys[3];  // Keys for: pull, cancel, pull+always
-  c8 user_choice;       // User's input for confirmation
+  c8 confirm_keys[3];
+  c8 user_choice;
 } spn_dep_context_t;
+
+typedef struct {
+  sp_str_t name;
+  sp_str_t git_url;
+  sp_str_t git_commit;
+  sp_str_t build_id;
+} spn_lock_entry_t;
+
+typedef struct {
+  sp_dyn_array(spn_lock_entry_t) packages;
+} spn_lock_file_t;
 
 struct spn_build_context_t {
   sp_dyn_array(spn_dep_context_t) deps;
+  spn_lock_file_t lock;
+  bool lock_exists;
 };
 
 sp_str_t            spn_dependency_source_dir(sp_str_t name);
@@ -267,17 +279,6 @@ typedef struct {
 } spn_project_t;
 
 typedef struct {
-  sp_str_t name;
-  sp_str_t git_url;
-  sp_str_t git_commit;
-  sp_str_t build_id;
-} spn_lock_entry_t;
-
-typedef struct {
-  sp_dyn_array(spn_lock_entry_t) packages;
-} spn_lock_file_t;
-
-typedef struct {
   spn_cli_t cli;
   spn_paths_t paths;
   spn_project_t project;
@@ -297,6 +298,7 @@ bool            spn_project_write(spn_project_t* project, sp_str_t path);
 sp_str_t        spn_git_get_remote_url(sp_str_t repo_path);
 sp_str_t        spn_git_get_commit(sp_str_t repo_path);
 bool            spn_lock_file_write(spn_lock_file_t* lock, sp_str_t path);
+bool            spn_lock_file_read(spn_lock_file_t* lock, sp_str_t path);
 spn_lock_file_t spn_lock_file_generate(spn_build_context_t* context);
 bool            spn_project_read(spn_project_t* project, sp_str_t path);
 
@@ -1093,8 +1095,6 @@ void spn_dep_context_clone(spn_dep_context_t* dep) {
 
     if (app.config.auto_pull_deps) {
       spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PULLING);
-      //SP_LOG("Updating {:color cyan} ({} commits behind)...", SP_FMT_STR(dep->id), SP_FMT_U32(num_updates));
-
     }
     else {
       spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_AWAITING_CONFIRMATION);
@@ -1107,17 +1107,14 @@ void spn_dep_context_clone(spn_dep_context_t* dep) {
         sp_mutex_unlock(&dep->mutex);
 
         if (choice == dep->confirm_keys[0]) {
-          // Pull updates
           spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PULLING);
           break;
         }
         else if (choice == dep->confirm_keys[1]) {
-          // Cancel - skip pulling
           spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
           return;
         }
         else if (choice == dep->confirm_keys[2]) {
-          // Pull and update config to always pull
           spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PULLING);
           app.config.auto_pull_deps = true;
           // TODO: Save config to file
@@ -1151,7 +1148,6 @@ void spn_dep_context_build(spn_dep_context_t* dep) {
   SDL_CopyProperties(dep->shell, shell);
   SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)args);
 
-  //SP_LOG("Building {:color cyan} from {}", SP_FMT_STR(dep->id), SP_FMT_STR(dep->paths.recipe));
   SDL_Process* process = SDL_CreateProcessWithProperties(shell);
   if (!process) {
     spn_dep_context_set_build_error(dep, sp_format("Create process failed: {:color red}", SP_FMT_CSTR(SDL_GetError())));
@@ -1176,9 +1172,6 @@ void spn_dep_context_build(spn_dep_context_t* dep) {
 
 void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   spn_cli_t* cli = &app->cli;
-
-  // Initialize atomic control counter for thread key reservation
-  SDL_SetAtomicInt(&app->control, 0);
 
   struct argparse_option options [] = {
     OPT_HELP(),
@@ -1214,6 +1207,8 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     argparse_usage(&argparse);
     exit(0);
   }
+
+  SDL_SetAtomicInt(&app->control, 0);
 
   app->paths.executable = sp_os_get_executable_path();
   app->paths.install = sp_os_parent_path(app->paths.executable);
@@ -1265,7 +1260,6 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   spn_config_read(&app->config, app->paths.user_toml);
 
-  // Use spn_dir from config if set, otherwise use default
   if (app->config.spn_dir.len > 0) {
     app->paths.bootstrap = sp_str_copy(app->config.spn_dir);
   } else {
@@ -1273,8 +1267,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   }
   app->paths.recipes = sp_os_join_path(app->paths.bootstrap, SP_LIT("asset/recipes"));
 
-  // Only clone/pull if not using a custom spn_dir
-  if (app->config.spn_dir.len == 0) {
+  if (!app->config.spn_dir.len) {
     const c8* url = "https://github.com/spaderthomas/spn.git";
     const c8* spn = sp_str_to_cstr(app->paths.bootstrap);
     if (!sp_os_does_path_exist(app->paths.bootstrap)) {
@@ -1300,7 +1293,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
       }
     }
   } else {
-    // Using custom spn_dir - verify it exists and has proper structure
+    // Sanity check the spn checkout
     if (!sp_os_does_path_exist(app->paths.bootstrap)) {
       SP_FATAL("Custom spn_dir {} does not exist", SP_FMT_STR(app->paths.bootstrap));
     }
@@ -1309,17 +1302,15 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     }
   }
 
+  // Read all the recipe files from disk
   sp_os_directory_entry_list_t entries = sp_os_scan_directory(app->paths.recipes);
   for (sp_os_directory_entry_t* entry = entries.data; entry < entries.data + entries.count; entry++) {
     spn_dep_id_t id = sp_os_extract_stem(entry->file_name);
     sp_dyn_array_push(app->builtins, id);
   }
 
-  sp_str_t head = spn_sh_git_find_head(app->paths.bootstrap);
-
-  // Check if this is a command that doesn't need a project file
   bool needs_project = true;
-  if (cli->num_args > 0) {
+  if (cli->num_args) {
     if (sp_cstr_equal(cli->args[0], "init") ||
         sp_cstr_equal(cli->args[0], "list") ||
         sp_cstr_equal(cli->args[0], "nuke") ||
@@ -1330,11 +1321,11 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   if (needs_project) {
     if (!sp_os_does_path_exist(app->paths.toml)) {
-      SP_FATAL("Expected project TOML file at {}, but it did not exist", SP_FMT_STR(app->paths.toml));
+      SP_FATAL("Expected project TOML file at {:color cyan}, but it did not exist", SP_FMT_STR(app->paths.toml));
     }
 
     if (!spn_project_read(&app->project, app->paths.toml)) {
-      SP_FATAL("Failed to read project TOML file at {}", SP_FMT_STR(app->paths.toml));
+      SP_FATAL("Failed to read project TOML file at {:color cyan}", SP_FMT_STR(app->paths.toml));
     }
   }
 }
@@ -1494,10 +1485,61 @@ bool spn_lock_file_write(spn_lock_file_t* lock, sp_str_t path) {
     sp_str_builder_new_line(&builder);
     sp_str_builder_append_fmt_c8(&builder, "build_id = {}", SP_FMT_QUOTED_STR(entry->build_id));
     sp_str_builder_new_line(&builder);
+    sp_str_builder_new_line(&builder);
   }
 
   sp_str_t content = sp_str_builder_write(&builder);
   return SDL_SaveFile(sp_str_to_cstr(path), content.data, content.len);
+}
+
+bool spn_lock_file_read(spn_lock_file_t* lock, sp_str_t path) {
+  size_t file_size;
+  void* file_data = SDL_LoadFile(sp_str_to_cstr(path), &file_size);
+
+  if (!file_data) {
+    return false;
+  }
+
+  c8 err_buf[256];
+  toml_table_t* toml = toml_parse((c8*)file_data, err_buf, sizeof(err_buf));
+  SDL_free(file_data);
+
+  if (!toml) {
+    SP_LOG("Warning: Failed to parse lock file: {}", SP_FMT_CSTR(err_buf));
+    return false;
+  }
+
+  toml_array_t* packages = toml_table_array(toml, "package");
+  if (!packages) {
+    return false;
+  }
+
+  for (u32 index = 0; index < toml_array_len(packages); index++) {
+    toml_table_t* package = toml_array_table(packages, index);
+
+    spn_lock_entry_t entry = SP_ZERO_INITIALIZE();
+
+    toml_value_t name = toml_table_string(package, "name");
+    SP_ASSERT(name.ok);
+    entry.name = sp_str_from_cstr(name.u.s);
+
+    toml_value_t git_url = toml_table_string(package, "git_url");
+    SP_ASSERT(git_url.ok);
+    entry.git_url = sp_str_from_cstr(git_url.u.s);
+
+    toml_value_t git_commit = toml_table_string(package, "git_commit");
+    SP_ASSERT(git_commit.ok);
+    entry.git_commit = sp_str_from_cstr(git_commit.u.s);
+
+    toml_value_t build_id = toml_table_string(package, "build_id");
+    SP_ASSERT(build_id.ok);
+    entry.build_id = sp_str_from_cstr(build_id.u.s);
+
+    sp_dyn_array_push(lock->packages, entry);
+  }
+
+  toml_free(toml);
+  return true;
 }
 
 bool spn_project_read(spn_project_t* project, sp_str_t path) {
@@ -1558,7 +1600,48 @@ bool spn_project_read(spn_project_t* project, sp_str_t path) {
 
 void spn_cli_command_build(spn_cli_t* cli) {
   app.build = spn_build_context_from_default_profile();
+
+  app.build.lock_exists = spn_lock_file_read(&app.build.lock, app.paths.lock);
+
   spn_build_context_prepare(&app.build);
+
+  if (app.build.lock_exists) {
+    SP_LOG("Lock file comparison (found {} packages):", SP_FMT_U32(sp_dyn_array_size(app.build.lock.packages)));
+    sp_dyn_array_for(app.build.deps, i) {
+      spn_dep_context_t* dep = &app.build.deps[i];
+      sp_str_t current_commit = spn_git_get_commit(dep->paths.source);
+
+      // Find this dependency in the lock file
+      bool found = false;
+      sp_dyn_array_for(app.build.lock.packages, j) {
+        spn_lock_entry_t* entry = &app.build.lock.packages[j];
+        if (sp_str_equal(entry->name, dep->id)) {
+          found = true;
+          if (sp_str_equal(entry->git_commit, current_commit)) {
+            SP_LOG("  {} {:color green} {}",
+              SP_FMT_STR(sp_str_pad(dep->id, 20)),
+              SP_FMT_CSTR("+"),
+              SP_FMT_STR(current_commit));
+          } else {
+            SP_LOG("  {} {:color red} lock: {} != current: {}",
+              SP_FMT_STR(sp_str_pad(dep->id, 20)),
+              SP_FMT_CSTR("x"),
+              SP_FMT_STR(entry->git_commit),
+              SP_FMT_STR(current_commit));
+          }
+          break;
+        }
+      }
+      if (!found) {
+        SP_LOG("  {} {:color yellow} (not in lock file)",
+          SP_FMT_STR(sp_str_pad(dep->id, 20)),
+          SP_FMT_CSTR("?"));
+      }
+    }
+  }
+  else {
+    SP_LOG("No lock file found");
+  }
 
   sp_dyn_array_for(app.build.deps, index) {
     spn_dep_context_t* dep = app.build.deps + index;
@@ -1569,8 +1652,10 @@ void spn_cli_command_build(spn_cli_t* cli) {
 
   while (true) {
     bool building = false;
+
     sp_dyn_array_for(app.build.deps, index) {
       spn_dep_context_t* dep = app.build.deps + index;
+
       sp_mutex_lock(&dep->mutex);
       if (!spn_dep_is_build_state_terminal(dep)) {
         building = true;
@@ -1578,6 +1663,7 @@ void spn_cli_command_build(spn_cli_t* cli) {
       sp_mutex_unlock(&dep->mutex);
     }
 
+    spn_tui_read(&app.tui);
     spn_tui_update(&app.tui);
 
     if (!building) break;
