@@ -15,7 +15,8 @@ SPN_DIR_TEST := test
 SPN_MAKEFILE := Makefile
 SPN_COMPILE_DB := compile_commands.json
 SPN_CLANGD := .clangd
-SPN_DIR_CACHE := ~/.cache/spn/repos/spn
+SPN_DIR_CACHE := ~/.cache/spn
+SPN_INSTALL_PREFIX ?= $(HOME)/.local/bin
 
 BUILD_TYPE ?= debug
 CMAKE_TYPE := Debug
@@ -66,7 +67,7 @@ $(SPN_COMPILE_DB): $(SPN_MAKEFILE)
 $(SPN_CLANGD): $(SPN_COMPILE_DB)
 	@printf "CompileFlags:\n  Add: [$(SPN_CLANGD_HEADER_ONLY_BULLSHIT)]\n" > $(SPN_CLANGD)
 
-.PHONY: build sdl clangd clean nuke test
+.PHONY: build sdl clangd clean nuke test install uninstall
 
 build: $(SPN_BINARY)
 
@@ -76,7 +77,14 @@ test: $(SPN_TEST_BINARY)
 sdl: $(SDL_BINARY)
 
 install: build
-	cp $(SPN_BINARY) ~/.local/bin/
+	@mkdir -p $(SPN_INSTALL_PREFIX)
+	@cp $(SPN_BINARY) $(SPN_INSTALL_PREFIX)/spn
+	@echo "Installed spn to $(SPN_INSTALL_PREFIX)/spn"
+
+uninstall:
+	@rm -f $(SPN_INSTALL_PREFIX)/spn
+	@rm -rf $(SPN_DIR_CACHE)
+	@echo "Uninstalled spn and removed cache at $(SPN_DIR_CACHE)"
 
 clangd: $(SPN_COMPILE_DB) $(SPN_CLANGD)
 
