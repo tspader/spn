@@ -83,8 +83,6 @@ install: build
 
 uninstall:
 	@rm -f $(SPN_INSTALL_PREFIX)/spn
-	@rm -rf $(SPN_DIR_CACHE)
-	@echo "Uninstalled spn and removed cache at $(SPN_DIR_CACHE)"
 
 clangd: $(SPN_COMPILE_DB) $(SPN_CLANGD)
 

@@ -72,6 +72,9 @@ typedef struct {
 typedef struct {
 } spn_cli_init_t;
 
+typedef struct {
+} spn_cli_list_t;
+
 typedef enum {
   SPN_FLAG_INCLUDE,
   SPN_FLAG_LIB_INCLUDE,
@@ -89,11 +92,13 @@ typedef struct {
   const c8* project_directory;
   spn_cli_add_t add;
   spn_cli_init_t init;
+  spn_cli_list_t list;
   spn_cli_flags_t flags;
 } spn_cli_t;
 
 void spn_cli_command_add(spn_cli_t* cli);
 void spn_cli_command_init(spn_cli_t* cli);
+void spn_cli_command_list(spn_cli_t* cli);
 void spn_cli_command_nuke(spn_cli_t* cli);
 void spn_cli_command_clean(spn_cli_t* cli);
 void spn_cli_command_flags(spn_cli_t* cli);
@@ -200,7 +205,7 @@ typedef struct {
   bool auto_pull_recipes;
   bool auto_pull_deps;
   sp_str_t cache_override;
-  sp_dyn_array(sp_str_t) additional_recipe_dirs;
+  sp_str_t spn_dir;  // Override path to spn repo for development
   bool builtin_recipes_enabled;
 } spn_config_t;
 
@@ -326,7 +331,8 @@ void spn_cli_command_add(spn_cli_t* cli) {
       OPT_END()
     },
     (const c8* const []) {
-      "spn add [options] package",
+      "spn add <package>",
+      "Add a package dependency to your project",
       SP_NULLPTR
     },
     SP_NULL
@@ -370,6 +376,7 @@ void spn_cli_command_init(spn_cli_t* cli) {
     },
     (const c8* const []) {
       "spn init",
+      "Initialize a new spn project in the current directory",
       SP_NULLPTR
     },
     SP_NULL
@@ -390,7 +397,40 @@ void spn_cli_command_init(spn_cli_t* cli) {
     SP_FATAL("Failed to write project TOML file");
   }
 
-  SP_LOG("Initialized project {} in spn.toml", SP_FMT_COLOR(SP_ANSI_FORE_CYAN), SP_FMT_QUOTED_STR(app.project.name));
+  SP_LOG("Initialized project {:color cyan} in spn.toml", SP_FMT_QUOTED_STR(app.project.name));
+}
+
+void spn_cli_command_list(spn_cli_t* cli) {
+  struct argparse argparse;
+  argparse_init(
+    &argparse,
+    (struct argparse_option []) {
+      OPT_HELP(),
+      OPT_END()
+    },
+    (const c8* const []) {
+      "spn list",
+      "List all available recipe packages",
+      SP_NULLPTR
+    },
+    SP_NULL
+  );
+  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+
+  // Find the maximum length for padding
+  u32 max_name_len = 0;
+  sp_dyn_array_for(app.builtins, i) {
+    max_name_len = SP_MAX(max_name_len, app.builtins[i].len);
+  }
+
+  SP_LOG("Available packages:");
+  sp_dyn_array_for(app.builtins, i) {
+    sp_str_t name = sp_str_pad(app.builtins[i], max_name_len + 2);
+    sp_str_t recipe_path = sp_os_join_path(app.paths.recipes, spn_dependency_recipe_file(app.builtins[i]));
+    SP_LOG("  {} {:color cyan}", SP_FMT_STR(name), SP_FMT_STR(recipe_path));
+  }
+  SP_LOG("");
+  SP_LOG("Total: {} packages available", SP_FMT_U32(sp_dyn_array_size(app.builtins)));
 }
 
 void spn_cli_command_nuke(spn_cli_t* cli) {
@@ -413,11 +453,12 @@ void spn_cli_command_flags(spn_cli_t* cli) {
     &argparse,
     (struct argparse_option []) {
       OPT_HELP(),
-      OPT_STRING('p', "package", &flags->package, "only show flags for specified package", SP_NULLPTR),
+      OPT_STRING('p', "package", &flags->package, "show flags only for a specific package", SP_NULLPTR),
       OPT_END()
     },
     (const c8* const []) {
-      "spn flags (include, libs, all)",
+      "spn flags <include|libs|all>",
+      "Output compiler flags for dependencies (include paths, library paths, or all flags)",
       SP_NULLPTR
     },
     SP_NULL
@@ -907,7 +948,18 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   };
 
   const c8* const usages [] = {
-    "subcommands [options] [cmd]",
+    "spn <command> [options]\n"
+    "\n"
+    "A modern C/C++ package manager and build tool\n"
+    "\n"
+    "Commands:\n"
+    "  init           Initialize a new spn project in the current directory\n"
+    "  add <pkg>      Add a package dependency to your project\n"
+    "  build          Build all project dependencies\n"
+    "  list           List all available packages\n"
+    "  flags <type>   Output compiler flags for dependencies\n"
+    "  clean          Remove build and store directories\n"
+    "  nuke           Remove all spn data (cache and project file)",
     SP_NULLPTR
   };
 
@@ -918,7 +970,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   cli->num_args = num_args;
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
-  if (!cli->num_args) {
+  if (!cli->num_args || !cli->args[0]) {
     argparse_usage(&argparse);
     exit(0);
   }
@@ -965,8 +1017,6 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   app->paths.source = sp_os_join_path(app->paths.cache, SP_LIT("source"));
   app->paths.build = sp_os_join_path(app->paths.cache, SP_LIT("build"));
   app->paths.store = sp_os_join_path(app->paths.cache, SP_LIT("store"));
-  app->paths.bootstrap = sp_os_join_path(app->paths.source, SP_LIT("spn"));
-  app->paths.recipes = sp_os_join_path(app->paths.bootstrap, SP_LIT("asset/recipes"));
 
   sp_os_create_directory(app->paths.cache);
   sp_os_create_directory(app->paths.source);
@@ -974,28 +1024,47 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   spn_config_read(&app->config, app->paths.user_toml);
 
-  const c8* url = "https://github.com/spaderthomas/spn.git";
-  const c8* spn = sp_str_to_cstr(app->paths.bootstrap);
-  if (!sp_os_does_path_exist(app->paths.bootstrap)) {
-    SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
-
-    SDL_Process* process = SPN_SH("git", "clone", url, spn);
-    spn_sh_process_result_t result = spn_sh_read_process(process);
-    if (result.return_code) {
-      SP_FATAL("Failed to clone spn recipe sources from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
-    }
+  // Use spn_dir from config if set, otherwise use default
+  if (app->config.spn_dir.len > 0) {
+    app->paths.bootstrap = sp_str_copy(app->config.spn_dir);
+  } else {
+    app->paths.bootstrap = sp_os_join_path(app->paths.source, SP_LIT("spn"));
   }
-  else {
-    u32 num_updates = spn_git_check_updates(app->paths.bootstrap);
-    if (num_updates > 0) {
-      if (app->config.auto_pull_recipes) {
-        SP_LOG("Updating spn recipes ({} commits behind)...", SP_FMT_U32(num_updates));
-        if (!spn_git_pull(app->paths.bootstrap)) {
-          SP_FATAL("Failed to update spn recipes");
-        }
-      } else {
-        SP_LOG("spn has {} recipe updates available (auto_pull_recipes=false)", SP_FMT_U32(num_updates));
+  app->paths.recipes = sp_os_join_path(app->paths.bootstrap, SP_LIT("asset/recipes"));
+
+  // Only clone/pull if not using a custom spn_dir
+  if (app->config.spn_dir.len == 0) {
+    const c8* url = "https://github.com/spaderthomas/spn.git";
+    const c8* spn = sp_str_to_cstr(app->paths.bootstrap);
+    if (!sp_os_does_path_exist(app->paths.bootstrap)) {
+      SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
+
+      SDL_Process* process = SPN_SH("git", "clone", url, spn);
+      spn_sh_process_result_t result = spn_sh_read_process(process);
+      if (result.return_code) {
+        SP_FATAL("Failed to clone spn recipe sources from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
       }
+    }
+    else {
+      u32 num_updates = spn_git_check_updates(app->paths.bootstrap);
+      if (num_updates > 0) {
+        if (app->config.auto_pull_recipes) {
+          SP_LOG("Updating spn recipes ({} commits behind)...", SP_FMT_U32(num_updates));
+          if (!spn_git_pull(app->paths.bootstrap)) {
+            SP_FATAL("Failed to update spn recipes");
+          }
+        } else {
+          SP_LOG("spn has {} recipe updates available (auto_pull_recipes=false)", SP_FMT_U32(num_updates));
+        }
+      }
+    }
+  } else {
+    // Using custom spn_dir - verify it exists and has proper structure
+    if (!sp_os_does_path_exist(app->paths.bootstrap)) {
+      SP_FATAL("Custom spn_dir {} does not exist", SP_FMT_STR(app->paths.bootstrap));
+    }
+    if (!sp_os_does_path_exist(app->paths.recipes)) {
+      SP_FATAL("Custom spn_dir {} does not contain asset/recipes folder", SP_FMT_STR(app->paths.bootstrap));
     }
   }
 
@@ -1011,6 +1080,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   bool needs_project = true;
   if (cli->num_args > 0) {
     if (sp_cstr_equal(cli->args[0], "init") ||
+        sp_cstr_equal(cli->args[0], "list") ||
         sp_cstr_equal(cli->args[0], "nuke") ||
         sp_cstr_equal(cli->args[0], "clean")) {
       needs_project = false;
@@ -1031,7 +1101,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 void spn_app_run(spn_app_t* app) {
   spn_cli_t* cli = &app->cli;
 
-  if (!cli->num_args || !cli->args) {
+  if (!cli->num_args || !cli->args || !cli->args[0]) {
     SP_ASSERT(false);
   }
   else if (sp_cstr_equal("add", cli->args[0])) {
@@ -1039,6 +1109,9 @@ void spn_app_run(spn_app_t* app) {
   }
   else if (sp_cstr_equal("init", cli->args[0])) {
     spn_cli_command_init(cli);
+  }
+  else if (sp_cstr_equal("list", cli->args[0])) {
+    spn_cli_command_list(cli);
   }
   else if (sp_cstr_equal("nuke", cli->args[0])) {
     spn_cli_command_nuke(cli);
@@ -1073,7 +1146,7 @@ void spn_config_read_from_string(spn_config_t* config, sp_str_t toml_content) {
     .auto_pull_deps = false,
     .toml = SP_NULLPTR,
     .cache_override = SP_ZERO_INITIALIZE(),
-    .additional_recipe_dirs = SP_NULLPTR,
+    .spn_dir = SP_ZERO_INITIALIZE(),
     .builtin_recipes_enabled = true
   };
 
@@ -1094,14 +1167,9 @@ void spn_config_read_from_string(spn_config_t* config, sp_str_t toml_content) {
       config->cache_override = sp_str_from_cstr(cache_override.u.s);
     }
 
-    toml_array_t* recipe_dirs = toml_table_array(options, "additional_recipe_dirs");
-    if (recipe_dirs) {
-      for (u32 i = 0; i < toml_array_len(recipe_dirs); i++) {
-        toml_value_t dir = toml_array_string(recipe_dirs, i);
-        if (dir.ok) {
-          sp_dyn_array_push(config->additional_recipe_dirs, sp_str_from_cstr(dir.u.s));
-        }
-      }
+    toml_value_t spn_dir = toml_table_string(options, "spn_dir");
+    if (spn_dir.ok) {
+      config->spn_dir = sp_str_from_cstr(spn_dir.u.s);
     }
   }
 }
