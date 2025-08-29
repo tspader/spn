@@ -6,7 +6,7 @@
   <i>spn (noun): the lazy, (non) package manager for c/++ that nobody asked for, inspired by lazy.nvim and uv</i>
 </p>
 
-# quickstart
+# Quickstart
 Install. (Until I publish a binary, this unfortunately has to build SDL and will take a few minutes)
 ```bash
 curl https://raw.githubusercontent.com/tspader/spn/refs/heads/main/install.sh | sh
@@ -22,7 +22,7 @@ Initialize a project, add SDL, and compile a program which calls `SDL_Log()`
 "spn is a simple, stupid package manager for c inspired by uv and lazy.nvim"
 ```
 
-# motivation
+# Motivation
 If every language in the world runs on C libraries under the hood, why isn't it trivial to pull in C libraries in C projects?
 
 I use C as my daily driver to write almost everything. I write CLI tools, games, simulations, quick scripts. I have done so for years, and I have not encountered a situation where my dependency builds were more complex than a couple lines of shell script and putting binaries and headers in the right place. I shipped a game to Steam, and this remained true.
@@ -33,7 +33,7 @@ I use C as my daily driver to write almost everything. I write CLI tools, games,
 - Pin dependencies to exact Git commits, automatically check for updates when you build (like `lazy.nvim`)
 - Produce compiler flags to consume your dependencies with `spn flags`
 
-# goals
+# Goals
 - Build packages eagerly and asynchronously by default; when you build your project, you shouldn't have to wait for dependencies to build unless absolutely necessary.
 - Cache local dependency builds
 - Support all kinds of libraries:
@@ -43,11 +43,11 @@ I use C as my daily driver to write almost everything. I write CLI tools, games,
   - Vendored (e.g. `ImGui`)
 - Be agnostic to *your* build system and that of your dependencies
 
-# non-goals
+# Non-goals
 - No transitive dependencies. This is why `spn` can be so simple; it ignores the problem that real package managers solve. In exchange, you get fast, simple, reliable builds of your dependencies.
 - Binaries are strictly local only; no binaries are served from the network. Everything is built from source.
 
-# how it works
+# How it works
 ## your project is a toml file
 Your project is just a TOML file. List your dependencies in an array, then optionally configure them.
 ```toml
@@ -65,10 +65,11 @@ options.foo.bar = 69
 - `SPN_DIR_STORE_BIN`: The directory to put binaries
 - `SPN_DIR_STORE_INCLUDE`: The directory to put headers
 - `SPN_DIR_BUILD`: The out of source build directory you can use to build inside of
-- `SPN_OPT_FOO_BAR`: The value of `deps.sdl3.options.foo.bar` from your `spn.toml`.
+- `SPN_OPT_FOO_BAR`: The value of, for example, `deps.sdl3.options.foo.bar` from your `spn.toml` when building `sdl3`
 
 Then, they define two targets, `spn-clone` and `spn-build`. All together, it looks like this.
 ```make
+# recipes/sdl3.mk
 HEADERS := $(SPN_DIR_STORE_INCLUDE)/SDL3
 BINARY := $(SPN_DIR_STORE_BIN)/libSDL3.so
 
@@ -104,9 +105,9 @@ In your build system, you just call e.g. `spn flags include` to produce the comp
 Why do builds have to be more complex than this? There are projects for which builds *are* more complicated. But for such projects, `spn` is not the tool for you.
 
 
-# faq
+# FAQ
 ## why wouldn't i just use...
-## conan
+### conan
 Conan is objectively an order of magnitude more robust and sophisticated than `spn`. I have used it, quite extensively. It's a pretty good tool, and I'd recommend it for a lot of uses.
 
 But we're not making corporate software. We don't need all the machinery that Conan provides. Their recipes are a lot more complicated. You can't eject from it without completely remaking your build system. If you need to hack a recipe to do something, it takes a lot more work to understand how everything works. Compare, for example, the recipe for `argparse`, a very small C library for which we both provide recipes:
@@ -115,7 +116,7 @@ But we're not making corporate software. We don't need all the machinery that Co
 
 Note that I am not claiming to be better than Conan. Merely that the tools solve very different problems, and if you have the problems that Conan aims to solve, you are not the target audience.
 
-## cmake squad
+### cmake squad
 There are tools that have very similar goals to `spn` but which use CMake:
 - https://hunter.readthedocs.io/en/latest/
 - https://github.com/cpm-cmake/CPM.cmake
@@ -126,7 +127,7 @@ Several days later I emerge from my fugue state, only to read the incantations n
 
 I shake myself off and promise myself that I will not fall for her siren song again.
 
-## git submodules
+### git submodules
 `spn` isn't much more complicated than this. But why write the same stupid build script for every project?
 
 ## why do you use C?
@@ -134,7 +135,7 @@ C is portable, easy to compile, easy to debug, will compile in a hundred years b
 - [A package manager](https://github.com/tspader/spn)
 - [A standard library](https://github.com/tspader/sp)
 
-# roadmap
+# Roadmap
 `spn` is very much an MVP. It's missing a lot of core features. PRs are very welcome!
 - Robust handling of user recipes (e.g. system-wide recipe repos; specify via git URL and have `spn` keep it up to date; per-project recipe directories)
 - Build profiles (i.e. different sets of options which can be selected with `--profile`
