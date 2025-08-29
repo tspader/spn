@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <i>spn (noun): the lazy, (non) package manager for c/++ that nobody asked for, inspired by lazy.nvim and uv</i>
+  <i>spn: the minimal, (non) package manager for c/++ that nobody asked for. inspired by lazy.nvim and uv</i>
 </p>
 
 # Quickstart
