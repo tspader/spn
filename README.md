@@ -107,7 +107,7 @@ Why do builds have to be more complex than this? There are projects for which bu
 
 # FAQ
 ## why wouldn't i just use...
-### conan
+### ...conan?
 Conan is objectively an order of magnitude more robust and sophisticated than `spn`. I have used it, quite extensively. It's a pretty good tool, and I'd recommend it for a lot of uses.
 
 But we're not making corporate software. We don't need all the machinery that Conan provides. Their recipes are a lot more complicated. You can't eject from it without completely remaking your build system. If you need to hack a recipe to do something, it takes a lot more work to understand how everything works. Compare, for example, the recipe for `argparse`, a very small C library for which we both provide recipes:
@@ -116,7 +116,7 @@ But we're not making corporate software. We don't need all the machinery that Co
 
 Note that I am not claiming to be better than Conan. Merely that the tools solve very different problems, and if you have the problems that Conan aims to solve, you are not the target audience.
 
-### cmake squad
+### ..cmake squad?
 There are tools that have very similar goals to `spn` but which use CMake:
 - https://hunter.readthedocs.io/en/latest/
 - https://github.com/cpm-cmake/CPM.cmake
@@ -127,7 +127,7 @@ Several days later I emerge from my fugue state, only to read the incantations n
 
 I shake myself off and promise myself that I will not fall for her siren song again.
 
-### git submodules
+### ...git submodules?
 `spn` isn't much more complicated than this. But why write the same stupid build script for every project?
 
 ## why do you use C?
