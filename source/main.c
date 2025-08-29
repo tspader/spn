@@ -7,6 +7,10 @@
 
 #include "toml/toml.h"
 
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
+
 #define SPN_IMPLEMENTATION
 #include "spn.h"
 
