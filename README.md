@@ -7,7 +7,7 @@
 </p>
 
 # quickstart
-Install
+Install. (Until I publish a binary, this unfortunately has to build SDL and will take a few minutes)
 ```bash
 curl https://raw.githubusercontent.com/tspader/spn/refs/heads/main/install.sh | sh
 ```
@@ -56,7 +56,7 @@ name = 'demo'
 deps = ['sdl3']
 
 [deps.sdl3]
-options.foo = bar
+options.foo.bar = 69
 ```
 
 ## recipes are makefiles
