@@ -1,23 +1,16 @@
-EX_HELLO_SPN_DIR = ../..
-EX_HELLO_DIR_BUILD_EXAMPLES = $(EX_HELLO_SPN_DIR)/build/examples
-EX_HELLO_BINARY := $(EX_HELLO_DIR_BUILD_EXAMPLES)/hello
-
-SPN := $(EX_HELLO_SPN_DIR)/build/bin/spn
+BIN_DIR = ../../build/examples
+HELLO := $(BIN_DIR)/hello
+SPN := ../../build/bin/spn
 CC := gcc
 
-EX_HELLO_FLAG_LANGUAGE := -std=c11
-EX_HELLO_FLAG_OPTIMIZATION := -g
-EX_HELLO_FLAG_OUTPUT := -o $(EX_HELLO_BINARY)
-EX_HELLO_FLAG_SPN := $(shell $(SPN) flags include)
-EX_HELLO_CC_FLAGS := $(EX_HELLO_FLAG_LANGUAGE) $(EX_HELLO_FLAG_OPTIMIZATION) $(EX_HELLO_FLAG_SPN) $(EX_HELLO_FLAG_OUTPUT)
+all: $(HELLO)
 
-all: $(EX_HELLO_BINARY)
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
 
-$(EX_SDL_DIR_BUILD_EXAMPLES):
-	@mkdir -p $(EX_SDL_DIR_BUILD_EXAMPLES)
-
-$(EX_HELLO_BINARY): main.c
+$(HELLO): main.c | $(BIN_DIR)
 	$(SPN) build
-	$(CC) main.c $(EX_HELLO_CC_FLAGS)
+	$(CC) main.c $(shell $(SPN) flags include) -o $(HELLO) -lSDL3
 
 .PHONY: all
+

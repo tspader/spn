@@ -4,6 +4,7 @@
 ///////////
 // SHELL //
 ///////////
+#include "sp.h"
 typedef struct {
   sp_str_t output;
   s32 return_code;
@@ -107,7 +108,6 @@ typedef struct {
 typedef enum {
   SPN_FLAG_INCLUDE,
   SPN_FLAG_LIB_INCLUDE,
-  SPN_FLAG_ALL
 } spn_cli_flag_kind_t;
 
 typedef struct {
@@ -515,8 +515,8 @@ void spn_cli_command_flags(spn_cli_t* cli) {
       OPT_END()
     },
     (const c8* const []) {
-      "spn flags <include|libs|all>",
-      "Output compiler flags for dependencies (include paths, library paths, or all flags)",
+      "spn flags <include|libs>",
+      "Output compiler flags for dependencies (include paths, library paths)",
       SP_NULLPTR
     },
     SP_NULL
@@ -540,34 +540,40 @@ void spn_cli_command_flags(spn_cli_t* cli) {
   else if (sp_cstr_equal(cli->args[0], "libs")) {
     flag = SPN_FLAG_LIB_INCLUDE;
   }
-  else if (sp_cstr_equal(cli->args[0], "all")) {
-    flag = SPN_FLAG_ALL;
-  }
   else {
     sp_str_t requested_flag = SP_CSTR(cli->args[0]);
     SP_FATAL("Unknown flag {}; options are [include, libs, all]",  SP_FMT_COLOR(SP_ANSI_FORE_YELLOW), SP_FMT_QUOTED_STR(requested_flag));
   }
 
-  if (flags->package) {
-    sp_str_t package_name = SP_CSTR(flags->package);
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+  sp_dyn_array_for(context.deps, i) {
+    spn_dep_context_t* dep = context.deps + i;
 
-    sp_dyn_array_for(context.deps, i) {
-      spn_dep_context_t* dep = context.deps + i;
-
-      if (sp_str_equal(dep->id, package_name)) {
-        printf("%s", sp_str_to_cstr(spn_dep_context_make_flag(dep, flag)));
+    if (flags->package) {
+      if (sp_str_equal_cstr(dep->id, flags->package)) {
+        sp_str_builder_append(&builder, spn_dep_context_make_flag(dep, flag));
+        printf("%s", sp_str_builder_write_cstr(&builder));
         return;
       }
     }
-
-    SP_FATAL("Package {:color cyan} not found", SP_FMT_STR(package_name));
+    else {
+      sp_str_builder_append(&builder, spn_dep_context_make_flag(dep, flag));
+      if (sp_dyn_array_size(context.deps) != i + 1) sp_str_builder_append_c8(&builder, ' ');
+    }
   }
+
+  if (flags->package) {
+    SP_FATAL("Package {:color cyan} not found", SP_FMT_CSTR(flags->package));
+  }
+
+  printf("%s", sp_str_builder_write_cstr(&builder));
+  return;
 }
 
 sp_str_t spn_dep_context_make_flag(spn_dep_context_t* dep, spn_cli_flag_kind_t flag) {
   switch (flag) {
-    case SPN_FLAG_INCLUDE:      return dep->paths.include;
-    case SPN_FLAG_LIB_INCLUDE:  return dep->paths.bin;
+    case SPN_FLAG_INCLUDE:      return sp_format("-I{}", SP_FMT_STR(dep->paths.include));
+    case SPN_FLAG_LIB_INCLUDE:  return sp_format("-I{}", SP_FMT_STR(dep->paths.bin));
     default:                    { SP_UNREACHABLE_CASE(); }
   }
 }
@@ -1052,13 +1058,13 @@ s32 spn_dep_context_build_async(void* user_data) {
         return 1;
       }
 
-      s32 return_code;
-      SDL_WaitProcess(process, true, &return_code);
-      if (return_code) {
+      spn_sh_process_result_t result = spn_sh_read_process(process);
+      if (result.return_code) {
         spn_dep_context_set_build_error(dep, sp_format(
-          "Failed to clone for {:color cyan}: exited with code {:color red}",
+          "cloning {:color cyan} returned {:color red}: {:color brightblack}",
           SP_FMT_STR(dep->paths.recipe),
-          SP_FMT_S32(return_code)
+          SP_FMT_S32(result.return_code),
+          SP_FMT_STR(result.output)
         ));
         return 1;
       }

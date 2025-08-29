@@ -33,8 +33,11 @@ s32 main(s32 num_args, const c8** args) {
 
   if (enable_jerry) {
     SP_LOG(jerry);
+    SP_LOG("And we bid you {:color green}!", SP_FMT_CSTR("goodnight"));
+  }
+  else {
+    argparse_usage(&argparse);
   }
 
-  SP_LOG("And we bid you {:color green}!", SP_FMT_CSTR("goodnight"));
 }
 

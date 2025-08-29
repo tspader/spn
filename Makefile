@@ -1,4 +1,5 @@
 SPN_DIR_BUILD:= build
+  SPN_DIR_BUILD_EXAMPLES := $(SPN_DIR_BUILD)/examples
   SPN_DIR_BUILD_OUTPUT := $(SPN_DIR_BUILD)/bin
     SPN_BINARY := $(SPN_DIR_BUILD_OUTPUT)/spn
     SPN_TEST_BINARY := $(SPN_DIR_BUILD_OUTPUT)/spn-test
@@ -42,8 +43,7 @@ SPN_CLANGD_HEADER_ONLY_BULLSHIT := -DSP_OS_BACKEND_SDL, -DSP_IMPLEMENTATION, -DS
 SDL_FLAG_DEFINES := -DCMAKE_BUILD_TYPE=$(CMAKE_TYPE) -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF -DSDL_EXAMPLES=OFF
 SDL_CMAKE_FLAGS := $(SDL_FLAG_DEFINES)
 
-.PHONY: all
-all: build clangd
+all
 
 $(SPN_DIR_BUILD_OUTPUT):
 	@mkdir -p $(SPN_DIR_BUILD_OUTPUT)
@@ -67,7 +67,7 @@ $(SPN_COMPILE_DB): $(SPN_MAKEFILE)
 $(SPN_CLANGD): $(SPN_COMPILE_DB)
 	@printf "CompileFlags:\n  Add: [$(SPN_CLANGD_HEADER_ONLY_BULLSHIT)]\n" > $(SPN_CLANGD)
 
-.PHONY: build sdl clangd clean nuke test install uninstall
+.PHONY: build sdl clangd clean nuke test install uninstall all
 
 build: $(SPN_BINARY)
 

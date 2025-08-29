@@ -1,15 +1,15 @@
 BIN_DIR = ../../build/examples
-SDL := $(BIN_DIR)/hello
+HELLO := $(BIN_DIR)/hello
 SPN := ../../build/bin/spn
 CC := gcc
 
-all: $(SDL)
+all: $(HELLO)
 
 $(BIN_DIR):
 	@mkdir -p $(BIN_DIR)
 
-$(SDL): main.c
+$(HELLO): main.c
 	$(SPN) build
-	$(CC) main.c $(shell $(SPN) flags include) -o $(SDL) -lSDL3
+	$(CC) main.c $(shell $(SPN) flags include) -o $(HELLO) -lSDL3
 
 .PHONY: all
