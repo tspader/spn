@@ -1,3 +1,7 @@
+include spn.mk
+
+SPN_URL := git@github.com:tspader/sp.git
+
 SP_H = $(SPN_DIR_STORE_INCLUDE)/sp.h
 
 .PHONY: spn-clone spn-build

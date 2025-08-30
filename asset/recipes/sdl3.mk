@@ -1,3 +1,7 @@
+include spn.mk
+
+SPN_URL := git@github.com:libsdl-org/SDL.git
+
 HEADERS := $(SPN_DIR_STORE_INCLUDE)/SDL3
 BINARY := $(SPN_DIR_STORE_BIN)/libSDL3.so
 
@@ -7,7 +11,7 @@ CMAKE_FLAGS := $(CMAKE_FLAG_DEFINES)
 .PHONY: spn-clone spn-build
 
 $(SPN_DIR_PROJECT):
-	git clone git@github.com:libsdl-org/sdl.git $(SPN_DIR_PROJECT)
+	git clone $(SPN_URL) $(SPN_DIR_PROJECT)
 
 $(BINARY):
 	cmake -S$(SPN_DIR_PROJECT) -B$(SPN_DIR_BUILD) $(CMAKE_FLAGS)

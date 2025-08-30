@@ -24,7 +24,7 @@ MAKE := bear --append -- make
 CMAKE := bear --append -- cmake
 
 SPN_FLAG_LANGUAGE := -std=c11
-SPN_FLAG_INCLUDES := -I$(SPN_DIR_EXTERNAL) -I$(SPN_DIR_SP) -I$(SPN_DIR_SDL) -I$(SPN_DIR_SOURCE) $(shell spn flags include)
+SPN_FLAG_INCLUDES := -I$(SPN_DIR_EXTERNAL) -I$(SPN_DIR_SP) -I$(SPN_DIR_SDL) -I$(SPN_DIR_SOURCE) $(shell spn flags include) -I../sp -I../external/SDL -I../argparse
 SPN_FLAG_OUTPUT := -o $(SPN_BINARY)
 SPN_FLAG_OPTIMIZATION := -g
 SPN_FLAG_LIBS := -lSDL3

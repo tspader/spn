@@ -1,9 +1,9 @@
-SPN_PACKAGE_URL := ""
-SPN_PACKAGE_LIBS := ""
+SPN_URL := ""
+SPN_LIBS := ""
 
 spn-package-url:
-	@echo $(SPN_PACKAGE_URL)
+	@echo $(SPN_URL)
 
 spn-package-libs:
-	@echo $(SPN_PACKAGE_LIBS)
+	@echo $(SPN_LIBS)
 

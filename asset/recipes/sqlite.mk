@@ -1,3 +1,7 @@
+include spn.mk
+
+SPN_URL := git@github.com:sqlite/sqlite.git
+
 HEADERS := $(SPN_DIR_STORE_INCLUDE)/sqlite3.h
 BINARY := $(SPN_DIR_STORE_BIN)/libsqlite3.so
 
