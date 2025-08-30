@@ -1,10 +1,26 @@
 #ifndef SPN_H
 #define SPN_H
 
+#define SP_IMPLEMENTATION
+#define SP_OS_BACKEND_SDL
+#include "sp.h"
+
+#define ARGPARSE_IMPLEMENTATION
+#include "argparse.h"
+
+#include "toml/toml.h"
+
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+
 ///////////
 // SHELL //
 ///////////
 #include "sp.h"
+#define SPN_SH(...) SDL_CreateProcess((const c8* []) { __VA_ARGS__, SP_NULLPTR }, SP_SDL_PIPE_STDIO)
+
 typedef struct {
   sp_str_t output;
   s32 return_code;
@@ -15,47 +31,15 @@ typedef struct {
   spn_sh_process_result_t result;
 } spn_sh_process_context_t;
 
-#define SPN_SH(...) SDL_CreateProcess((const c8* []) { __VA_ARGS__, SP_NULLPTR }, SP_SDL_PIPE_STDIO)
-#define SP_TUI_PRINT(command) printf("%s", command)
+SDL_Process* spn_sh_make(sp_str_t file_path, sp_str_t target);
+SDL_Process* spn_sh_make_ex(sp_str_t file_path, sp_str_t target, sp_str_t work_path, SDL_PropertiesID shell);
 
-void sp_tui_print(sp_str_t str) {
-  printf("%.*s", str.len, str.data);
-}
-
-void sp_tui_up(u32 n) {
-  sp_str_t command = sp_format("\033[{}A", SP_FMT_U32(n));
-  sp_tui_print(command);
-}
-
-void sp_tui_down(u32 n) {
-  sp_str_t command = sp_format("\033[{}B", SP_FMT_U32(n));
-  sp_tui_print(command);
-}
-
-void sp_tui_clear_line() {
-  SP_TUI_PRINT("\033[K");
-}
-
-void sp_tui_show_cursor() {
-  SP_TUI_PRINT("\033[?25h");
-}
-
-void sp_tui_hide_cursor() {
-  SP_TUI_PRINT("\033[?25l");
-}
-
-void sp_tui_home() {
-  SP_TUI_PRINT("\033[0G");
-}
-
-void sp_tui_flush() {
-  fflush(stdout);
-}
 
 /////////
 // TUI //
 /////////
 #define SPN_TUI_NUM_OPTIONS 3
+#define SP_TUI_PRINT(command) printf("%s", command)
 
 typedef struct spn_build_context_t spn_build_context_t;
 
@@ -108,6 +92,8 @@ typedef struct {
 typedef enum {
   SPN_FLAG_INCLUDE,
   SPN_FLAG_LIB_INCLUDE,
+  SPN_FLAG_LIBS,
+  SPN_FLAG_COUNT
 } spn_cli_flag_kind_t;
 
 typedef struct {
@@ -175,12 +161,19 @@ typedef struct {
 typedef struct {
   sp_str_t key;
   toml_table_t* table;
-} spn_dep_spec_parse_entry_T;
+} spn_dep_parse_entry_t;
 
 typedef struct {
   sp_str_t key;
   sp_str_t value;
 } spn_dep_option_t;
+
+typedef struct {
+  sp_str_t name;
+  sp_str_t path;
+  sp_str_t url;
+  sp_dyn_array(sp_str_t) libs;
+} spn_dep_info_t;
 
 typedef sp_str_t spn_dep_id_t;
 
@@ -191,6 +184,7 @@ typedef struct {
 
 typedef struct {
   spn_dep_id_t id;
+  spn_dep_info_t* info;
   sp_dyn_array(spn_dep_option_t) options;
   spn_dep_build_kind_t kind;
   spn_dep_build_paths_t paths;
@@ -198,6 +192,9 @@ typedef struct {
   sp_str_t build_id;
   SDL_PropertiesID shell;
   SDL_Environment* environment;
+
+  SDL_IOStream* out;
+  SDL_IOStream* err;
 
   sp_thread_t thread;
   sp_mutex_t mutex;
@@ -228,7 +225,7 @@ sp_str_t            spn_dependency_source_dir(sp_str_t name);
 sp_str_t            spn_dependency_build_dir(sp_str_t name);
 sp_str_t            spn_dependency_store_dir(sp_str_t name);
 sp_str_t            spn_dependency_recipe_file(sp_str_t name);
-spn_dep_context_t*  spn_dep_find(sp_str_t name);
+spn_dep_info_t*     spn_dep_find(sp_str_t name);
 sp_str_t            spn_dep_option_env_name(spn_dep_option_t* option);
 spn_lock_entry_t*   spn_dep_context_get_lock_entry(spn_dep_context_t* dep);
 void                spn_dep_context_build(spn_dep_context_t* context);
@@ -245,6 +242,8 @@ void                spn_build_context_prepare(spn_build_context_t* context);
 sp_str_t            spn_dep_context_make_flag(spn_dep_context_t* dep, spn_cli_flag_kind_t flag);
 sp_str_t            spn_dep_build_state_to_str(spn_dep_build_state_t state);
 bool                spn_dep_is_build_state_terminal(spn_dep_context_t* dep);
+sp_str_t            spn_recipe_read_url(sp_str_t file_path);
+sp_dyn_array(sp_str_t) spn_recipe_read_libs(sp_str_t file_path);
 spn_build_context_t spn_build_context_from_default_profile();
 
 /////////
@@ -279,6 +278,13 @@ typedef struct {
 } spn_paths_t;
 
 typedef struct {
+  sp_str_t build;
+  sp_str_t clone;
+  sp_str_t libs;
+  sp_str_t url;
+} spn_targets_t;
+
+typedef struct {
   sp_str_t name;
   sp_dyn_array(spn_dep_id_t) dependencies;
   toml_table_t* toml;
@@ -287,10 +293,12 @@ typedef struct {
 typedef struct {
   spn_cli_t cli;
   spn_paths_t paths;
+  spn_targets_t targets;
   spn_project_t project;
   spn_config_t config;
   spn_build_context_t build;
   spn_tui_t tui;
+  sp_dyn_array(spn_dep_info_t) builtin_deps;
   sp_dyn_array(spn_dep_id_t) builtins;
   sp_dyn_array(spn_lock_entry_t) lock;
   SDL_AtomicInt control;
@@ -328,6 +336,75 @@ sp_str_t sp_toml_writer_write(sp_toml_writer_t* writer);
 #ifdef SPN_IMPLEMENTATION
 
 spn_app_t app;
+
+SDL_Process* spn_sh_make(sp_str_t makefile, sp_str_t target) {
+  return spn_sh_make_ex(makefile, target, SP_ZERO_STRUCT(sp_str_t), 0);
+}
+
+SDL_Process* spn_sh_make_ex(sp_str_t makefile, sp_str_t target, sp_str_t work_path, SDL_PropertiesID shell) {
+  sp_dyn_array(const c8*) command = SP_NULLPTR;
+  sp_dyn_array_push(command, "make");
+  sp_dyn_array_push(command, "--quiet");
+
+  sp_dyn_array_push(command, "--include-dir");
+  sp_dyn_array_push(command, sp_str_to_cstr(app.paths.recipes));
+
+  sp_dyn_array_push(command, "--makefile");
+  sp_dyn_array_push(command, sp_str_to_cstr(makefile));
+
+  if (sp_str_valid(work_path)) {
+    sp_dyn_array_push(command, "--directory");
+    sp_dyn_array_push(command, sp_str_to_cstr(work_path));
+  }
+
+  sp_dyn_array_push(command, sp_str_to_cstr(target));
+  sp_dyn_array_push(command, SP_NULLPTR);
+
+  SDL_Process* process = SP_NULLPTR;
+  if (shell) {
+    SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)command);
+    process = SDL_CreateProcessWithProperties(shell);
+  }
+  else {
+    process = SDL_CreateProcess(command, SP_SDL_PIPE_STDIO);
+  }
+  return process;
+}
+
+void sp_tui_print(sp_str_t str) {
+  printf("%.*s", str.len, str.data);
+}
+
+void sp_tui_up(u32 n) {
+  sp_str_t command = sp_format("\033[{}A", SP_FMT_U32(n));
+  sp_tui_print(command);
+}
+
+void sp_tui_down(u32 n) {
+  sp_str_t command = sp_format("\033[{}B", SP_FMT_U32(n));
+  sp_tui_print(command);
+}
+
+void sp_tui_clear_line() {
+  SP_TUI_PRINT("\033[K");
+}
+
+void sp_tui_show_cursor() {
+  SP_TUI_PRINT("\033[?25h");
+}
+
+void sp_tui_hide_cursor() {
+  SP_TUI_PRINT("\033[?25l");
+}
+
+void sp_tui_home() {
+  SP_TUI_PRINT("\033[0G");
+}
+
+void sp_tui_flush() {
+  fflush(stdout);
+}
+
 
 #define TOML_READ_BOOL(table, var, key) \
     do { \
@@ -404,8 +481,8 @@ void spn_cli_command_add(spn_cli_t* cli) {
 
   add->package = SP_CSTR(cli->args[0]);
 
-  spn_dep_context_t* dependency = spn_dep_find(add->package);
-  if (!dependency) {
+  spn_dep_info_t* dep = spn_dep_find(add->package);
+  if (!dep) {
     SP_FATAL("Could not find {} in available dependencies", SP_FMT_QUOTED_STR(add->package));
   }
 
@@ -537,12 +614,15 @@ void spn_cli_command_flags(spn_cli_t* cli) {
   if (sp_cstr_equal(cli->args[0], "include")) {
     flag = SPN_FLAG_INCLUDE;
   }
-  else if (sp_cstr_equal(cli->args[0], "libs")) {
+  else if (sp_cstr_equal(cli->args[0], "lib-include")) {
     flag = SPN_FLAG_LIB_INCLUDE;
+  }
+  else if (sp_cstr_equal(cli->args[0], "libs")) {
+    flag = SPN_FLAG_LIBS;
   }
   else {
     sp_str_t requested_flag = SP_CSTR(cli->args[0]);
-    SP_FATAL("Unknown flag {}; options are [include, libs, all]",  SP_FMT_COLOR(SP_ANSI_FORE_YELLOW), SP_FMT_QUOTED_STR(requested_flag));
+    SP_FATAL("Unknown flag {}; options are [include, lib-include, libs]",  SP_FMT_COLOR(SP_ANSI_FORE_YELLOW), SP_FMT_QUOTED_STR(requested_flag));
   }
 
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
@@ -558,7 +638,7 @@ void spn_cli_command_flags(spn_cli_t* cli) {
     }
     else {
       sp_str_builder_append(&builder, spn_dep_context_make_flag(dep, flag));
-      if (sp_dyn_array_size(context.deps) != i + 1) sp_str_builder_append_c8(&builder, ' ');
+      sp_str_builder_append_c8(&builder, ' ');
     }
   }
 
@@ -566,14 +646,25 @@ void spn_cli_command_flags(spn_cli_t* cli) {
     SP_FATAL("Package {:color cyan} not found", SP_FMT_CSTR(flags->package));
   }
 
-  printf("%s", sp_str_builder_write_cstr(&builder));
+  if (builder.buffer.data) {
+    printf("%s", sp_str_builder_write_cstr(&builder));
+  }
+
   return;
 }
 
 sp_str_t spn_dep_context_make_flag(spn_dep_context_t* dep, spn_cli_flag_kind_t flag) {
   switch (flag) {
     case SPN_FLAG_INCLUDE:      return sp_format("-I{}", SP_FMT_STR(dep->paths.include));
-    case SPN_FLAG_LIB_INCLUDE:  return sp_format("-I{}", SP_FMT_STR(dep->paths.bin));
+    case SPN_FLAG_LIB_INCLUDE:  return sp_format("-L{}", SP_FMT_STR(dep->paths.bin));
+    case SPN_FLAG_LIBS: {
+      sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+      sp_dyn_array_for(dep->info->libs, index) {
+        sp_str_builder_append_fmt_c8(&builder, "-l{} ", SP_FMT_STR(dep->info->libs[index]));
+      }
+
+      return sp_str_builder_write(&builder);
+    }
     default:                    { SP_UNREACHABLE_CASE(); }
   }
 }
@@ -593,6 +684,7 @@ spn_build_context_t spn_build_context_from_default_profile() {
 spn_dep_context_t spn_dep_context_from_default_profile(sp_str_t id) {
   spn_dep_context_t context = {
     .id = sp_str_copy(id),
+    .info = spn_dep_find(id),
     .options = SP_NULLPTR
   };
 
@@ -612,15 +704,15 @@ spn_dep_context_t spn_dep_context_from_default_profile(sp_str_t id) {
 }
 
 void spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* options) {
-  sp_dyn_array(spn_dep_spec_parse_entry_T) entries = SP_NULLPTR;
+  sp_dyn_array(spn_dep_parse_entry_t) entries = SP_NULLPTR;
 
-  sp_dyn_array_push(entries, ((spn_dep_spec_parse_entry_T) {
+  sp_dyn_array_push(entries, ((spn_dep_parse_entry_t) {
     .key = SP_LIT(""),
     .table = options
   }));
 
   while (sp_dyn_array_size(entries)) {
-    spn_dep_spec_parse_entry_T entry = *sp_dyn_array_back(entries);
+    spn_dep_parse_entry_t entry = *sp_dyn_array_back(entries);
     sp_dyn_array_pop(entries);
 
     for (u32 index = 0; index < toml_table_len(entry.table); index++) {
@@ -640,7 +732,7 @@ void spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* optio
       toml_array_t* array = toml_table_array(options, key_data);
 
       if (table) {
-        sp_dyn_array_push(entries, ((spn_dep_spec_parse_entry_T) {
+        sp_dyn_array_push(entries, ((spn_dep_parse_entry_t) {
           .key = full_key,
           .table = table
         }));
@@ -689,6 +781,39 @@ bool spn_dep_is_build_state_terminal(spn_dep_context_t* dep) {
   }
 }
 
+sp_str_t spn_recipe_read_url(sp_str_t file_path) {
+  SDL_Process* process = spn_sh_make(file_path, app.targets.url);
+  spn_sh_process_result_t result = spn_sh_read_process(process);
+  if (result.return_code) {
+    SP_FATAL(
+      "{:color cyan} returned {:color red} {:color yellow}",
+      SP_FMT_STR(file_path),
+      SP_FMT_S32(result.return_code),
+      SP_FMT_STR(app.targets.url)
+    );
+    return SP_LIT("");
+  }
+
+  return sp_str_trim(result.output);
+}
+
+sp_dyn_array(sp_str_t) spn_recipe_read_libs(sp_str_t file_path) {
+  SDL_Process* process = spn_sh_make(file_path, app.targets.libs);
+  spn_sh_process_result_t result = spn_sh_read_process(process);
+  if (result.return_code) {
+    SP_FATAL(
+      "{:color cyan} returned {:color red} {:color yellow}",
+      SP_FMT_STR(file_path),
+      SP_FMT_S32(result.return_code),
+      SP_FMT_STR(app.targets.url)
+    );
+    return SP_NULLPTR;
+  }
+
+  return sp_str_split_c8(sp_str_trim(result.output), ' ');
+
+}
+
 sp_str_t spn_dependency_source_dir(sp_str_t name) {
   return sp_os_join_path(app.paths.source, name);
 }
@@ -705,12 +830,14 @@ sp_str_t spn_dependency_recipe_file(sp_str_t name) {
   return sp_format("{}.mk", SP_FMT_STR(name));
 }
 
-spn_dep_context_t* spn_dep_find(sp_str_t name) {
-  sp_dyn_array_for(app.builtins, index) {
-    if (sp_str_equal(app.builtins[index], name)) {
-      return (spn_dep_context_t*)1; // Just return non-null to indicate found
+spn_dep_info_t* spn_dep_find(sp_str_t name) {
+  sp_dyn_array_for(app.builtin_deps, index) {
+    spn_dep_info_t* dep = app.builtin_deps + index;
+    if (sp_str_equal(dep->name, name)) {
+      return dep;
     }
   }
+
   return SP_NULLPTR;
 }
 
@@ -990,6 +1117,9 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   context->paths.std_err = sp_os_join_path(context->paths.build, SP_LIT("build.stderr"));
   context->paths.std_in  = sp_os_join_path(context->paths.build, SP_LIT("build.stdin"));
 
+  context->out = SDL_IOFromFile(sp_str_to_cstr(context->paths.std_out), "w");
+  context->err = SDL_IOFromFile(sp_str_to_cstr(context->paths.std_out), "w");
+
   context->environment = SDL_CreateEnvironment(SP_SDL_INHERIT_ENVIRONMENT);
   spn_dep_context_set_env_var(context, SP_LIT("SPN_DIR_PROJECT"), context->paths.source);
   spn_dep_context_set_env_var(context, SP_LIT("SPN_DIR_BUILD"), context->paths.build);
@@ -1003,9 +1133,14 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
 
   context->shell = SDL_CreateProperties();
   SDL_SetPointerProperty(context->shell, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, context->environment);
+
   SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL);
-  SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP);
-  SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_APP);
+
+  SDL_SetPointerProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDOUT_POINTER, context->out);
+  SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_REDIRECT);
+
+  SDL_SetPointerProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDERR_POINTER, context->err);
+  SDL_SetNumberProperty(context->shell, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_REDIRECT);
 
   context->state = SPN_DEP_BUILD_STATE_IDLE;
   sp_mutex_init(&context->mutex, SP_MUTEX_PLAIN);
@@ -1036,19 +1171,7 @@ s32 spn_dep_context_build_async(void* user_data) {
     case SPN_DEP_REPO_STATE_UNINITIALIZED: {
       spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
 
-      const c8* args [] = {
-        "make",
-        "-C", sp_str_to_cstr(dep->paths.build),
-        "--makefile", sp_str_to_cstr(dep->paths.recipe),
-        "spn-clone",
-        SP_NULLPTR
-      };
-
-      SDL_PropertiesID shell = SDL_CreateProperties();
-      SDL_CopyProperties(dep->shell, shell);
-      SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)args);
-
-      SDL_Process* process = SDL_CreateProcessWithProperties(shell);
+      SDL_Process* process = spn_sh_make_ex(dep->paths.recipe, app.targets.clone, dep->paths.source, dep->shell);
       if (!process) {
         spn_dep_context_set_build_error(dep, sp_format(
           "Failed to clone {:color yellow}: {:color red}",
@@ -1119,33 +1242,27 @@ s32 spn_dep_context_build_async(void* user_data) {
 
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_BUILDING);
 
-  sp_str_t target = SP_LIT("spn-build");
-  const c8* args [] = {
-    "make",
-    "-C", sp_str_to_cstr(dep->paths.build),
-    "--makefile", sp_str_to_cstr(dep->paths.recipe),
-    sp_str_to_cstr(target),
-    SP_NULLPTR
-  };
-
-  SDL_PropertiesID shell = SDL_CreateProperties();
-  SDL_CopyProperties(dep->shell, shell);
-  SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void*)args);
-
-  SDL_Process* process = SDL_CreateProcessWithProperties(shell);
+  SDL_Process* process = spn_sh_make_ex(dep->paths.recipe, app.targets.build, dep->paths.build, dep->shell);
   if (!process) {
     spn_dep_context_set_build_error(dep, sp_format("Create process failed: {:color red}", SP_FMT_CSTR(SDL_GetError())));
     return 1;
   }
 
-  s32 return_code;
-  SDL_WaitProcess(process, true, &return_code);
-  if (return_code) {
+  spn_sh_process_result_t result = spn_sh_read_process(process);
+  if (result.return_code) {
     spn_dep_context_set_build_error(dep, sp_format(
-      "Building {:color cyan} failed with code {:color red}",
+      "{:color yellow} -C {:color cyan} --makefile {:color cyan} {:color yellow} returned {:color red}; check {:color cyan}",
+      SP_FMT_CSTR("make"),
+      SP_FMT_STR(app.paths.recipes),
       SP_FMT_STR(dep->paths.recipe),
-      SP_FMT_S32(return_code)
+      SP_FMT_STR(app.targets.build),
+      SP_FMT_S32(result.return_code),
+      SP_FMT_STR(dep->paths.build)
     ));
+
+    SDL_CloseIO(dep->out);
+    SDL_CloseIO(dep->err);
+
     return 1;
   }
 
@@ -1219,6 +1336,13 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   }
 
   SDL_SetAtomicInt(&app->control, 0);
+
+  app->targets = (spn_targets_t) {
+    .build = SP_LIT("spn-build"),
+    .clone = SP_LIT("spn-clone"),
+    .libs = SP_LIT("spn-package-libs"),
+    .url = SP_LIT("spn-package-url")
+  };
 
   app->paths.executable = sp_os_get_executable_path();
   app->paths.install = sp_os_parent_path(app->paths.executable);
@@ -1314,6 +1438,15 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   // Read all the recipe files from disk
   sp_os_directory_entry_list_t entries = sp_os_scan_directory(app->paths.recipes);
   for (sp_os_directory_entry_t* entry = entries.data; entry < entries.data + entries.count; entry++) {
+
+    spn_dep_info_t dep = {
+      .name = sp_os_extract_stem(entry->file_name),
+      .path = sp_str_copy(entry->file_path),
+      .url = spn_recipe_read_url(entry->file_path),
+      .libs = spn_recipe_read_libs(entry->file_path)
+    };
+    sp_dyn_array_push(app->builtin_deps, dep);
+
     spn_dep_id_t id = sp_os_extract_stem(entry->file_name);
     sp_dyn_array_push(app->builtins, id);
   }

@@ -1,16 +1,3 @@
-#define SP_IMPLEMENTATION
-#define SP_OS_BACKEND_SDL
-#include "sp/sp.h"
-
-#define ARGPARSE_IMPLEMENTATION
-#include "argparse/argparse.h"
-
-#include "toml/toml.h"
-
-#include <termios.h>
-#include <unistd.h>
-#include <fcntl.h>
-
 #define SPN_IMPLEMENTATION
 #include "spn.h"
 
