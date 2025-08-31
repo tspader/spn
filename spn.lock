@@ -1,12 +1,12 @@
 [[package]]
 name = "sp"
-git_url = "git@github.com:tspader/sp.git"
+git_url = "git@github.com:spaderthomas/sp.git"
 git_commit = "24a9a42bb97f286ee5b7675a7d9f324c72a627c1"
 build_id = "dfc2a432"
 
 [[package]]
 name = "argparse"
-git_url = "git@github.com:tspader/argparse.git"
+git_url = "git@github.com:spaderthomas/argparse.git"
 git_commit = "45e0e563c4a79cdda4ed6bcaeaaa234774c6e024"
 build_id = "11e20932"
 
@@ -15,4 +15,22 @@ name = "sdl3"
 git_url = "git@github.com:libsdl-org/SDL.git"
 git_commit = "875653658abcb6091fa6a17bd4859fb66e8a1187"
 build_id = "f99ad78d"
+
+[[package]]
+name = "utest"
+git_url = "git@github.com:sheredom/utest.h.git"
+git_commit = "a91a8404a0abeb34aa8362847fe8a3acd5b5bcbd"
+build_id = "304b9af9"
+
+[[package]]
+name = "toml"
+git_url = "git@github.com:tspader/toml.git"
+git_commit = "73b6aa43835ff9a3aa80577242dccd2ded4b3820"
+build_id = "2c83a82"
+
+[[package]]
+name = "drwav"
+git_url = "git@github.com:mackron/dr_libs.git"
+git_commit = "b962384395249f54168d5f5f175c47bd7b39dc1d"
+build_id = "a2f23ae8"
 

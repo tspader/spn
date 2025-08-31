@@ -1,15 +1,15 @@
-BIN_DIR = ../../build/examples
-HELLO := $(BIN_DIR)/hello
-SPN := ../../build/bin/spn
+BUILD_DIR = $(shell realpath ../../build)
+EXAMPLE_DIR = $(BUILD_DIR)/examples
+HELLO := $(EXAMPLE_DIR)/hello
+SPN := $(BUILD_DIR)/bin/spn
 CC := gcc
 
+.PHONY: all
 all: $(HELLO)
 
-$(BIN_DIR):
-	@mkdir -p $(BIN_DIR)
+$(EXAMPLE_DIR):
+	@mkdir -p $(EXAMPLE_DIR)
 
-$(HELLO): main.c
+$(HELLO): main.c | $(EXAMPLE_DIR)
 	$(SPN) build
-	$(CC) main.c $(shell $(SPN) flags include) -o $(HELLO) -lSDL3
-
-.PHONY: all
+	$(CC) main.c $(shell $(SPN) flags include) -o $(HELLO) $(shell $(SPN) flags lib-include) $(shell $(SPN) flags libs) -lm

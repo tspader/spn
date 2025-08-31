@@ -6,11 +6,10 @@ CC := gcc
 all: $(HELLO)
 
 $(BIN_DIR):
-	mkdir -p $(BIN_DIR)
+	@mkdir -p $(BIN_DIR)
 
-$(HELLO): main.c | $(BIN_DIR)
+$(HELLO): main.c
 	$(SPN) build
 	$(CC) main.c $(shell $(SPN) flags include) -o $(HELLO) -lSDL3
 
 .PHONY: all
-

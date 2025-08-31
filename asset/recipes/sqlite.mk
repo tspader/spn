@@ -1,6 +1,7 @@
 include spn.mk
 
 SPN_URL := git@github.com:sqlite/sqlite.git
+SPN_LIBS := sqlite3
 SQLITE_H := $(SPN_DIR_STORE_INCLUDE)/sqlite3.h
 SQLITE_SO := $(SPN_DIR_STORE_BIN)/libsqlite3.so
 

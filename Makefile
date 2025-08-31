@@ -1,4 +1,4 @@
-SPN_DIR_BUILD:= build
+SPN_DIR_BUILD:= ./build
   SPN_DIR_BUILD_EXAMPLES := $(SPN_DIR_BUILD)/examples
   SPN_DIR_BUILD_OUTPUT := $(SPN_DIR_BUILD)/bin
     SPN_BINARY := $(SPN_DIR_BUILD_OUTPUT)/spn
@@ -20,7 +20,7 @@ CMAKE := bear --append -- cmake
 SPN := $(SPN_BINARY)
 
 FLAG_LANGUAGE := -std=c11
-FLAG_INCLUDES := -I$(SPN_DIR_EXTERNAL) -I$(SPN_DIR_SDL) -I$(SPN_DIR_SOURCE) $(shell spn flags include)
+FLAG_INCLUDES :=  -I$(SPN_DIR_SOURCE) $(shell spn flags include)
 FLAG_OUTPUT := -o $(SPN_BINARY)
 FLAG_OPTIMIZATION := -g
 FLAG_LIBS := $(shell spn flags lib-include) $(shell spn flags libs)
@@ -44,7 +44,7 @@ all: build clangd
 $(SPN_DIR_BUILD_OUTPUT):
 	@mkdir -p $(SPN_DIR_BUILD_OUTPUT)
 
-$(SPN_BINARY): $(SPN_DIR_SOURCE)/main.c $(SPN_DEPS)
+$(SPN_BINARY): $(SPN_DIR_SOURCE)/main.c $(SPN_DEPS) | $(SPN_DIR_BUILD_OUTPUT)
 	$(CC) $(CC_FLAGS) $(SPN_DIR_SOURCE)/main.c
 
 $(SPN_TEST_BINARY): $(SPN_DIR_TEST)/main.c $(SPN_DEPS)
@@ -61,13 +61,39 @@ $(SPN_CLANGD): $(SPN_COMPILE_DB)
 build: $(SPN_BINARY)
 
 test-unit: $(SPN_TEST_BINARY)
-	$(SPN_TEST_BINARY)
+	@$(SPN_TEST_BINARY)
 
-test-examples: build
-	@$(SPN_BINARY) --no-interactive --use-lockfile -C ./examples/hello build
-	@$(SPN_BINARY) --no-interactive --use-lockfile -C ./examples/sdl build
-	@$(SPN_BINARY) --no-interactive --use-lockfile -C ./examples/sqlite build
-	@echo "All example tests passed!"
+EXAMPLES := $(notdir $(wildcard examples/*))
+EXAMPLE_DIRS := $(addprefix ./examples/, $(EXAMPLES))
+$(EXAMPLE_DIRS):
+	@echo "> building $@"
+	$(SPN) --lock -C $@ build
+	$(eval EXAMPLE_DIR := ./$@)
+	$(eval EXAMPLE_INCLUDE     := $(shell $(SPN) -C $(EXAMPLE_DIR) flags include))
+	$(eval EXAMPLE_LIBS        := $(shell $(SPN) -C $(EXAMPLE_DIR) flags libs))
+	$(eval EXAMPLE_LIB_INCLUDE := $(shell $(SPN) -C $(EXAMPLE_DIR) flags lib-include))
+	$(CC) $(EXAMPLE_DIR)/main.c -o $(SPN_DIR_BUILD)/$@ $(EXAMPLE_INCLUDE) $(EXAMPLE_LIB_INCLUDE) $(EXAMPLE_LIBS) -lm
+	@echo
+
+.PHONY: foobar $(EXAMPLE_DIRS)
+
+.NOTPARALLEL: foobar
+
+foobar: $(EXAMPLE_DIRS)
+
+test-examples: build test-unit
+	@echo
+	@echo "> building: hello"
+	@$(SPN_BINARY) --no-interactive --lock -C ./examples/hello build
+	@$(MAKE) -C ./examples/hello
+	@echo
+	@echo "> building: sdl"
+	@$(SPN_BINARY) --no-interactive --lock -C ./examples/sdl build
+	@$(MAKE) -C ./examples/sdl
+	@echo
+	@echo "> building: sqlite"
+	@$(SPN_BINARY) --no-interactive --lock -C ./examples/sqlite build
+	@$(MAKE) -C ./examples/sqlite
 
 test: test-unit test-examples
 

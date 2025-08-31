@@ -1,0 +1,6 @@
+[[package]]
+name = "dr_libs"
+git_url = "git@github.com:mackron/dr_libs.git"
+git_commit = "b962384395249f54168d5f5f175c47bd7b39dc1d"
+build_id = "e9aa6cc4"
+

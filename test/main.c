@@ -1,14 +1,8 @@
-#define SP_IMPLEMENTATION
-#define SP_OS_BACKEND_SDL
-#include "sp.h"
-
-#include "toml/toml.h"
-
 #define SPN_IMPLEMENTATION
 #include "spn.h"
 
+#include "utest.h"
 
-// Define the global utest state
 struct utest_state_s utest_state;
 
 // Test helper functions
@@ -270,13 +264,13 @@ UTEST(spn_integration, cache_override_respected) {
 }
 
 // CLI flag tests
-UTEST(spn_cli, use_lockfile_flag) {
+UTEST(spn_cli, lock_flag) {
   spn_cli_t cli = SP_ZERO_INITIALIZE();
-  cli.use_lockfile = true;
+  cli.lock = true;
 
-  ASSERT_TRUE(cli.use_lockfile);
+  ASSERT_TRUE(cli.lock);
 
-  // When use_lockfile is set, update prompts should be skipped
+  // When lock is set, update prompts should be skipped
   // This would be tested in integration tests with actual dependency updates
 }
 

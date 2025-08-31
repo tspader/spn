@@ -546,7 +546,7 @@ void spn_cli_command_init(spn_cli_t* cli) {
     SP_FATAL("Failed to write project TOML file");
   }
 
-  SP_LOG("Initialized project {:color cyan} in spn.toml", SP_FMT_QUOTED_STR(app.project.name));
+  SP_LOG("Initialized project {:fg brightcyan} in spn.toml", SP_FMT_QUOTED_STR(app.project.name));
 }
 
 void spn_cli_command_list(spn_cli_t* cli) {
@@ -577,7 +577,7 @@ void spn_cli_command_list(spn_cli_t* cli) {
     spn_dep_info_t* dep = app.deps + i;
     sp_str_builder_append_fmt(
       &builder,
-      "{:fg cyan} {}",
+      "{:fg brightcyan} {}",
       SP_FMT_STR(sp_str_pad(dep->name, max_name_len)),
       SP_FMT_STR(dep->url)
     );
@@ -593,9 +593,9 @@ void spn_cli_command_nuke(spn_cli_t* cli) {
 }
 
 void spn_cli_command_clean(spn_cli_t* cli) {
-  SP_LOG("Cleaning build directories at {:color cyan}", SP_FMT_STR(app.paths.build));
+  SP_LOG("Cleaning build directories at {:fg brightcyan}", SP_FMT_STR(app.paths.build));
   sp_os_remove_directory(app.paths.build);
-  SP_LOG("Cleaning store directories at {:color cyan}", SP_FMT_STR(app.paths.store));
+  SP_LOG("Cleaning store directories at {:fg brightcyan}", SP_FMT_STR(app.paths.store));
   sp_os_remove_directory(app.paths.store);
 }
 
@@ -645,27 +645,29 @@ void spn_cli_command_flags(spn_cli_t* cli) {
   }
 
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+  bool found_package = false;
+
   sp_dyn_array_for(context.deps, i) {
     spn_dep_context_t* dep = context.deps + i;
 
     if (flags->package) {
       if (sp_str_equal_cstr(dep->id, flags->package)) {
+        found_package = true;
         sp_str_builder_append(&builder, spn_dep_context_make_flag(dep, flag));
-        printf("%s", sp_str_builder_write_cstr(&builder));
-        return;
+        break;
       }
     }
     else {
       sp_str_t str = spn_dep_context_make_flag(dep, flag);
       if (str.len) {
         sp_str_builder_append(&builder, str);
-        if (dep != sp_dyn_array_back(dep)) sp_str_builder_append_c8(&builder, ' ');
+        sp_str_builder_append_c8(&builder, ' ');
       }
     }
   }
 
-  if (flags->package) {
-    SP_FATAL("Package {:color cyan} not found", SP_FMT_CSTR(flags->package));
+  if (flags->package && !found_package) {
+    SP_FATAL("Package {:fg brightcyan} not found", SP_FMT_CSTR(flags->package));
   }
 
   if (builder.buffer.data) {
@@ -1101,7 +1103,7 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_state_t state) {
         spn_dep_context_t* dep = &app.build.deps[i];
         sp_str_t name = sp_str_pad(dep->id, tui->width);
         sp_str_t state_str = spn_dep_build_state_to_str(dep->state);
-        SP_LOG("{} {:color cyan}", SP_FMT_STR(name), SP_FMT_STR(state_str));
+        SP_LOG("{} {:fg brightcyan}", SP_FMT_STR(name), SP_FMT_STR(state_str));
       }
       break;
     }
@@ -1859,9 +1861,9 @@ void spn_cli_command_build(spn_cli_t* cli) {
   if (all_succeeded) {
     spn_lock_file_from_deps(&app.lock, &app.build);
     if (!spn_lock_file_write(&app.lock, app.paths.lock)) {
-      SP_LOG("Warning: Failed to write lock file to {:color cyan}", SP_FMT_STR(app.paths.lock));
+      SP_LOG("Warning: Failed to write lock file to {:fg brightcyan}", SP_FMT_STR(app.paths.lock));
     } else {
-      SP_LOG("Generated lock file: {:color cyan}", SP_FMT_STR(app.paths.lock));
+      SP_LOG("Generated lock file: {:fg brightcyan}", SP_FMT_STR(app.paths.lock));
     }
   }
 }

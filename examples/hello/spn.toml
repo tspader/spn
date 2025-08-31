@@ -1,3 +1,4 @@
 [project]
 name = "hello"
-deps = ["sp", "argparse"]
+deps = ["sdl3"]
+

@@ -1,0 +1,12 @@
+[[package]]
+name = "sp"
+git_url = "git@github.com:spaderthomas/sp.git"
+git_commit = "24a9a42bb97f286ee5b7675a7d9f324c72a627c1"
+build_id = "dfc2a432"
+
+[[package]]
+name = "argparse"
+git_url = "git@github.com:spaderthomas/argparse.git"
+git_commit = "45e0e563c4a79cdda4ed6bcaeaaa234774c6e024"
+build_id = "11e20932"
+
