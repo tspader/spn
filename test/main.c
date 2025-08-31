@@ -205,12 +205,6 @@ UTEST(spn_paths, build_paths) {
   ASSERT_TRUE(sp_str_equal(store_dir, SP_LIT("/tmp/test-cache/store")));
 }
 
-// Dependency info tests
-UTEST(spn_deps, recipe_names) {
-  sp_str_t recipe = spn_dependency_recipe_file(SP_LIT("test-lib"));
-  ASSERT_TRUE(sp_str_equal(recipe, SP_LIT("test-lib.mk")));
-}
-
 // Process tests
 UTEST(spn_process, read_process_basic) {
   SDL_Init(0);

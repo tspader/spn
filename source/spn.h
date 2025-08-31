@@ -232,13 +232,13 @@ struct spn_build_context_t {
   sp_dyn_array(spn_dep_context_t) deps;
 };
 
-sp_str_t               spn_dependency_source_dir(sp_str_t name);
-sp_str_t               spn_dependency_build_dir(sp_str_t name);
-sp_str_t               spn_dependency_store_dir(sp_str_t name);
-sp_str_t               spn_dependency_recipe_file(sp_str_t name);
 spn_dep_info_t*        spn_dep_find(sp_str_t name);
+bool                   spn_dep_state_is_terminal(spn_dep_context_t* dep);
 s32                    spn_dep_sort_kernel_alphabetical(const void* a, const void* b);
+sp_str_t               spn_dep_read_url(sp_str_t file_path);
+sp_dyn_array(sp_str_t) spn_dep_read_libs(sp_str_t file_path);
 sp_str_t               spn_dep_option_env_name(spn_dep_option_t* option);
+sp_str_t               spn_dep_build_state_to_str(spn_dep_build_state_t state);
 spn_lock_entry_t*      spn_dep_context_get_lock_entry(spn_dep_context_t* dep);
 void                   spn_dep_context_build(spn_dep_context_t* context);
 void                   spn_dep_context_clone(spn_dep_context_t* context);
@@ -246,15 +246,9 @@ void                   spn_dep_context_prepare(spn_dep_context_t* context);
 void                   spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* toml);
 spn_dep_context_t      spn_dep_context_from_default_profile(sp_str_t name);
 void                   spn_dep_context_set_env_var(spn_dep_context_t* context, sp_str_t name, sp_str_t value);
-bool                   spn_dep_context_is_cloned(spn_dep_context_t* context);
-bool                   spn_dep_context_is_built(spn_dep_context_t* context);
 void                   spn_dep_context_set_build_state(spn_dep_context_t* dep, spn_dep_build_state_t state);
 void                   spn_dep_context_set_build_error(spn_dep_context_t* dep, sp_str_t error);
 sp_str_t               spn_dep_context_make_flag(spn_dep_context_t* dep, spn_cli_flag_kind_t flag);
-sp_str_t               spn_dep_build_state_to_str(spn_dep_build_state_t state);
-bool                   spn_dep_is_build_state_terminal(spn_dep_context_t* dep);
-sp_str_t               spn_recipe_read_url(sp_str_t file_path);
-sp_dyn_array(sp_str_t) spn_recipe_read_libs(sp_str_t file_path);
 spn_build_context_t    spn_build_context_from_default_profile();
 void                   spn_build_context_prepare(spn_build_context_t* context);
 
@@ -317,16 +311,16 @@ typedef struct {
 
 extern spn_app_t app;
 
-void            spn_app_init(spn_app_t* app, u32 num_args, const c8** args);
-void            spn_app_run(spn_app_t* app);
+void               spn_app_init(spn_app_t* app, u32 num_args, const c8** args);
+void               spn_app_run(spn_app_t* app);
 spn_dep_context_t* spn_project_find_dependency(spn_project_t* project, sp_str_t name);
-bool            spn_project_write(spn_project_t* project, sp_str_t path);
-sp_str_t        spn_git_get_remote_url(sp_str_t repo_path);
-sp_str_t        spn_git_get_commit(sp_str_t repo_path);
-bool            spn_lock_file_write(spn_lock_file_t* lock, sp_str_t path);
-bool            spn_lock_file_read(spn_lock_file_t* lock, sp_str_t path);
-void            spn_lock_file_from_deps(spn_lock_file_t* lock, spn_build_context_t* context);
-bool            spn_project_read(spn_project_t* project, sp_str_t path);
+bool               spn_project_write(spn_project_t* project, sp_str_t path);
+sp_str_t           spn_git_get_remote_url(sp_str_t repo_path);
+sp_str_t           spn_git_get_commit(sp_str_t repo_path);
+bool               spn_lock_file_write(spn_lock_file_t* lock, sp_str_t path);
+bool               spn_lock_file_read(spn_lock_file_t* lock, sp_str_t path);
+void               spn_lock_file_from_deps(spn_lock_file_t* lock, spn_build_context_t* context);
+bool               spn_project_read(spn_project_t* project, sp_str_t path);
 
 /////////////////
 // TOML WRITER //
@@ -344,10 +338,15 @@ void     sp_toml_writer_add_string_array(sp_toml_writer_t* writer, sp_str_t key,
 void     sp_toml_writer_new_line(sp_toml_writer_t* writer);
 sp_str_t sp_toml_writer_write(sp_toml_writer_t* writer);
 
+
+////////////////////
+// IMPLEMENTATION //
+////////////////////
 #ifdef SPN_IMPLEMENTATION
 
 spn_app_t app;
 
+// SHELL
 void spn_sh_make(spn_sh_make_context_t* make) {
   sp_dyn_array_push(make->args, "make");
   sp_dyn_array_push(make->args, "--quiet");
@@ -383,7 +382,7 @@ sp_str_t spn_sh_build_make_error(spn_sh_make_context_t* make) {
   );
 }
 
-
+// TUI
 void sp_tui_print(sp_str_t str) {
   printf("%.*s", str.len, str.data);
 }
@@ -418,7 +417,7 @@ void sp_tui_flush() {
   fflush(stdout);
 }
 
-
+// TOML
 #define TOML_READ_BOOL(table, var, key) \
     do { \
       toml_value_t value = toml_table_bool((table), (key)); \
@@ -467,6 +466,7 @@ sp_str_t sp_toml_writer_write(sp_toml_writer_t* writer) {
   return sp_str_builder_write(&writer->builder);
 }
 
+// CLI
 void spn_cli_command_add(spn_cli_t* cli) {
   spn_cli_add_t* add = &cli->add;
 
@@ -790,7 +790,7 @@ sp_str_t spn_dep_build_state_to_str(spn_dep_build_state_t state) {
   }
 }
 
-bool spn_dep_is_build_state_terminal(spn_dep_context_t* dep) {
+bool spn_dep_state_is_terminal(spn_dep_context_t* dep) {
   switch (dep->state) {
     case SPN_DEP_BUILD_STATE_FAILED:
     case SPN_DEP_BUILD_STATE_DONE:
@@ -799,7 +799,7 @@ bool spn_dep_is_build_state_terminal(spn_dep_context_t* dep) {
   }
 }
 
-sp_str_t spn_recipe_read_url(sp_str_t makefile) {
+sp_str_t spn_dep_read_url(sp_str_t makefile) {
   spn_sh_make_context_t make = {
     .makefile = makefile,
     .target = app.targets.url,
@@ -818,7 +818,7 @@ sp_str_t spn_recipe_read_url(sp_str_t makefile) {
   return sp_str_trim(make.result.output);
 }
 
-sp_dyn_array(sp_str_t) spn_recipe_read_libs(sp_str_t makefile) {
+sp_dyn_array(sp_str_t) spn_dep_read_libs(sp_str_t makefile) {
   spn_sh_make_context_t make = {
     .makefile = makefile,
     .target = app.targets.libs,
@@ -836,22 +836,6 @@ sp_dyn_array(sp_str_t) spn_recipe_read_libs(sp_str_t makefile) {
 
   return sp_str_split_c8(sp_str_trim(make.result.output), ' ');
 
-}
-
-sp_str_t spn_dependency_source_dir(sp_str_t name) {
-  return sp_os_join_path(app.paths.source, name);
-}
-
-sp_str_t spn_dependency_build_dir(sp_str_t name) {
-  return sp_os_join_path(app.paths.build, name);
-}
-
-sp_str_t spn_dependency_store_dir(sp_str_t name) {
-  return sp_os_join_path(app.paths.store, name);
-}
-
-sp_str_t spn_dependency_recipe_file(sp_str_t name) {
-  return sp_format("{}.mk", SP_FMT_STR(name));
 }
 
 spn_dep_info_t* spn_dep_find(sp_str_t name) {
@@ -944,7 +928,7 @@ void spn_tui_update_noninteractive(spn_tui_t* tui) {
   sp_dyn_array_for(app.build.deps, i) {
     spn_dep_context_t* dep = &app.build.deps[i];
 
-    if (!tui->terminal_reported[i] && spn_dep_is_build_state_terminal(dep)) {
+    if (!tui->terminal_reported[i] && spn_dep_state_is_terminal(dep)) {
       tui->terminal_reported[i] = true;
 
       switch (dep->state) {
@@ -1133,15 +1117,6 @@ void spn_dep_context_set_env_var(spn_dep_context_t* context, sp_str_t name, sp_s
   }
 }
 
-bool spn_dep_context_is_cloned(spn_dep_context_t* context) {
-  sp_str_t source = spn_dependency_source_dir(context->id);
-  return sp_os_does_path_exist(source);
-}
-
-bool spn_dep_context_is_built(spn_dep_context_t* context) {
-  return sp_os_does_path_exist(context->paths.build);
-}
-
 void spn_dep_context_prepare(spn_dep_context_t* context) {
   context->kind = SPN_BUILD_KIND_DEBUG;
 
@@ -1159,14 +1134,14 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   context->hash = sp_hash_combine(hashes, sp_dyn_array_size(hashes));
   context->build_id = sp_format("{}", SP_FMT_SHORT_HASH(context->hash));
 
-  sp_str_t build = spn_dependency_build_dir(context->id);
-  sp_str_t store = spn_dependency_store_dir(context->id);
-  context->paths.source = spn_dependency_source_dir(context->id);
+  sp_str_t build = sp_os_join_path(app.paths.build, context->id);
+  sp_str_t store = sp_os_join_path(app.paths.store, context->id);
+  context->paths.source = sp_os_join_path(app.paths.source, context->id);
   context->paths.build = sp_os_join_path(build, context->build_id);
   context->paths.store = sp_os_join_path(store, context->build_id);
   context->paths.include = sp_os_join_path(context->paths.store, SP_LIT("include"));
   context->paths.bin = sp_os_join_path(context->paths.store, SP_LIT("bin"));
-  context->paths.recipe = sp_os_join_path(app.paths.recipes, spn_dependency_recipe_file(context->id));
+  context->paths.recipe = sp_os_join_path(app.paths.recipes, sp_format("{}.mk", SP_FMT_STR(context->id)));
   context->paths.std_out = sp_os_join_path(context->paths.build, SP_LIT("build.stdout"));
   context->paths.std_err = sp_os_join_path(context->paths.build, SP_LIT("build.stderr"));
   context->paths.std_in  = sp_os_join_path(context->paths.build, SP_LIT("build.stdin"));
@@ -1519,8 +1494,8 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     spn_dep_info_t dep = {
       .name = sp_os_extract_stem(entry->file_name),
       .path = sp_str_copy(entry->file_path),
-      .url = spn_recipe_read_url(entry->file_path),
-      .libs = spn_recipe_read_libs(entry->file_path)
+      .url = spn_dep_read_url(entry->file_path),
+      .libs = spn_dep_read_libs(entry->file_path)
     };
     sp_dyn_array_push(app->deps, dep);
   }
@@ -1838,7 +1813,7 @@ void spn_cli_command_build(spn_cli_t* cli) {
       spn_dep_context_t* dep = app.build.deps + index;
 
       sp_mutex_lock(&dep->mutex);
-      if (!spn_dep_is_build_state_terminal(dep)) {
+      if (!spn_dep_state_is_terminal(dep)) {
         building = true;
       }
       sp_mutex_unlock(&dep->mutex);
