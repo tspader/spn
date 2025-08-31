@@ -3,13 +3,7 @@ SPN_DIR_BUILD:= build
   SPN_DIR_BUILD_OUTPUT := $(SPN_DIR_BUILD)/bin
     SPN_BINARY := $(SPN_DIR_BUILD_OUTPUT)/spn
     SPN_TEST_BINARY := $(SPN_DIR_BUILD_OUTPUT)/spn-test
-    SDL_BINARY := $(SPN_DIR_BUILD_OUTPUT)/libSDL3.so
-  SPN_DIR_BUILD_SDL := $(SPN_DIR_BUILD)/sdl
 SPN_DIR_SOURCE := source
-SPN_DIR_EXTERNAL := external
-  SPN_DIR_SDL := $(SPN_DIR_EXTERNAL)/SDL
-    SPN_DIR_SDL_INCLUDE := $(SPN_DIR_SDL)/include
-  SPN_DIR_SP := $(SPN_DIR_EXTERNAL)/sp
 SPN_DIR_TEST := test
 SPN_MAKEFILE := Makefile
 SPN_COMPILE_DB := compile_commands.json
@@ -50,14 +44,6 @@ all: build clangd
 $(SPN_DIR_BUILD_OUTPUT):
 	@mkdir -p $(SPN_DIR_BUILD_OUTPUT)
 
-$(SPN_DIR_BUILD_SDL):
-	@mkdir -p $(SPN_DIR_BUILD_SDL)
-
-$(SDL_BINARY): $(SPN_DIR_BUILD_SDL) | $(SPN_DIR_BUILD_OUTPUT)
-	$(CMAKE) -S$(SPN_DIR_SDL) -B$(SPN_DIR_BUILD_SDL) $(SDL_CMAKE_FLAGS)
-	$(CMAKE) --build $(SPN_DIR_BUILD_SDL) --parallel
-	cp $(SPN_DIR_BUILD_SDL)/libSDL3.so $(SPN_DIR_BUILD_OUTPUT)/libSDL3.so
-
 $(SPN_BINARY): $(SPN_DIR_SOURCE)/main.c $(SPN_DEPS)
 	$(CC) $(CC_FLAGS) $(SPN_DIR_SOURCE)/main.c
 
@@ -86,8 +72,6 @@ test-examples: build
 test: test-unit test-examples
 
 test-all: clean test
-
-sdl: $(SDL_BINARY)
 
 install: build
 	@mkdir -p $(SPN_INSTALL_PREFIX)

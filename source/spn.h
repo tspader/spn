@@ -9,7 +9,7 @@
 #include "argparse.h"
 
 #define TOML_IMPLEMENTATION
-#include "toml/toml.h"
+#include "toml.h"
 
 #include <termios.h>
 #include <unistd.h>
@@ -166,6 +166,7 @@ typedef struct {
   sp_str_t store;
   sp_str_t include;
   sp_str_t bin;
+  sp_str_t vendor;
   sp_str_t recipe;
 } spn_dep_build_paths_t;
 
@@ -655,8 +656,11 @@ void spn_cli_command_flags(spn_cli_t* cli) {
       }
     }
     else {
-      sp_str_builder_append(&builder, spn_dep_context_make_flag(dep, flag));
-      sp_str_builder_append_c8(&builder, ' ');
+      sp_str_t str = spn_dep_context_make_flag(dep, flag);
+      if (str.len) {
+        sp_str_builder_append(&builder, str);
+        if (dep != sp_dyn_array_back(dep)) sp_str_builder_append_c8(&builder, ' ');
+      }
     }
   }
 
@@ -678,12 +682,16 @@ sp_str_t spn_dep_context_make_flag(spn_dep_context_t* dep, spn_cli_flag_kind_t f
     case SPN_FLAG_LIBS: {
       sp_str_builder_t builder = SP_ZERO_INITIALIZE();
       sp_dyn_array_for(dep->info->libs, index) {
-        sp_str_builder_append_fmt(&builder, "-l{} ", SP_FMT_STR(dep->info->libs[index]));
+        sp_str_t* lib = dep->info->libs + index;
+        sp_str_builder_append_fmt(&builder, "-l{}", SP_FMT_STR(*lib));
+        if (lib != sp_dyn_array_back(dep->info->libs)) sp_str_builder_append_c8(&builder, ' ');
       }
 
       return sp_str_builder_write(&builder);
     }
-    default:                    { SP_UNREACHABLE_CASE(); }
+    default: {
+      SP_UNREACHABLE_CASE();
+    }
   }
 }
 
@@ -700,11 +708,18 @@ spn_build_context_t spn_build_context_from_default_profile() {
 }
 
 spn_dep_context_t spn_dep_context_from_default_profile(sp_str_t id) {
-  spn_dep_context_t context = {
+  spn_dep_context_t dep = {
     .id = sp_str_copy(id),
     .info = spn_dep_find(id),
     .options = SP_NULLPTR
   };
+
+  if (!dep.info) {
+    SP_FATAL(
+      "{:color brightblue} was in your dependencies, but we couldn't find a recipe for it",
+      SP_FMT_STR(dep.id)
+    );
+  }
 
   // Check if there's a [deps.id] section with configuration
   toml_table_t* deps = toml_table_table(app.project.toml, "deps");
@@ -713,12 +728,12 @@ spn_dep_context_t spn_dep_context_from_default_profile(sp_str_t id) {
     if (toml) {
       toml_table_t* options = toml_table_table(toml, "options");
       if (options) {
-        spn_dep_context_add_options(&context, options);
+        spn_dep_context_add_options(&dep, options);
       }
     }
   }
 
-  return context;
+  return dep;
 }
 
 void spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* options) {
@@ -1141,6 +1156,7 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   context->paths.store = sp_os_join_path(store, context->build_id);
   context->paths.include = sp_os_join_path(context->paths.store, SP_LIT("include"));
   context->paths.bin = sp_os_join_path(context->paths.store, SP_LIT("bin"));
+  context->paths.vendor = sp_os_join_path(context->paths.store, SP_LIT("vendor"));
   context->paths.recipe = sp_os_join_path(app.paths.recipes, sp_format("{}.mk", SP_FMT_STR(context->id)));
   context->paths.std_out = sp_os_join_path(context->paths.build, SP_LIT("build.stdout"));
   context->paths.std_err = sp_os_join_path(context->paths.build, SP_LIT("build.stderr"));
@@ -1150,6 +1166,7 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   sp_os_create_directory(context->paths.store);
   sp_os_create_directory(context->paths.include);
   sp_os_create_directory(context->paths.bin);
+  sp_os_create_directory(context->paths.vendor);
   context->out = SDL_IOFromFile(sp_str_to_cstr(context->paths.std_out), "w");
   context->err = SDL_IOFromFile(sp_str_to_cstr(context->paths.std_err), "w");
 
@@ -1158,6 +1175,7 @@ void spn_dep_context_prepare(spn_dep_context_t* context) {
   spn_dep_context_set_env_var(context, SP_LIT("SPN_DIR_BUILD"), context->paths.build);
   spn_dep_context_set_env_var(context, SP_LIT("SPN_DIR_STORE_INCLUDE"), context->paths.include);
   spn_dep_context_set_env_var(context, SP_LIT("SPN_DIR_STORE_BIN"), context->paths.bin);
+  spn_dep_context_set_env_var(context, SP_LIT("SPN_DIR_STORE_VENDOR"), context->paths.vendor);
   sp_dyn_array_for(context->options, index) {
     spn_dep_option_t* option = &context->options[index];
     sp_str_t key = sp_str_concat(SP_LIT("SPN_OPT_"), option->key);
