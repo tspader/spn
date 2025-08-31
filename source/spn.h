@@ -866,10 +866,10 @@ sp_str_t spn_dep_option_env_name(spn_dep_option_t* option) {
 spn_sh_process_result_t spn_sh_read_process(SDL_Process* process) {
   spn_sh_process_result_t result = SP_ZERO_INITIALIZE();
   sp_size_t len = 0;
-  
+
   // Try SDL_ReadProcess first - this works when stdio is piped to app
   void* output_data = SDL_ReadProcess(process, &len, &result.return_code);
-  
+
   if (output_data) {
     result.output.data = (c8*)output_data;
     result.output.len = (u32)len;
@@ -881,7 +881,7 @@ spn_sh_process_result_t spn_sh_read_process(SDL_Process* process) {
   } else {
     result.output = SP_LIT("");
   }
-  
+
   return result;
 }
 
@@ -1108,7 +1108,6 @@ void spn_build_context_prepare(spn_build_context_t* context) {
 }
 
 void spn_dep_context_set_env_var(spn_dep_context_t* context, sp_str_t name, sp_str_t value) {
-  SP_LOG("{}={}", SP_FMT_STR(name), SP_FMT_QUOTED_STR(value));
   if (!SDL_SetEnvironmentVariable(context->environment, sp_str_to_cstr(name), sp_str_to_cstr(value), SP_SDL_OVERWRITE_ENV_VAR)) {
     SP_FATAL("Failed to set {}={} in build context for {}", SP_FMT_STR(name), SP_FMT_STR(value), SP_FMT_STR(context->id));
   }
@@ -1224,7 +1223,7 @@ s32 spn_dep_context_build_async(void* user_data) {
           SP_FMT_CSTR(SDL_GetError())
         );
         spn_dep_context_set_build_error(dep, error_msg);
-        
+
         // Write error to stderr log file
         SDL_IOStream* err_file = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_err), "w");
         if (err_file) {
@@ -1238,11 +1237,11 @@ s32 spn_dep_context_build_async(void* user_data) {
       // Note: When using shell properties with redirected IO, SDL_ReadProcess
       // won't capture output since it's already going to the IOStreams
       make.result = spn_sh_read_process(make.process);
-      
+
       // Flush and close the IO streams to ensure all output is written
       SDL_FlushIO(dep->out);
       SDL_FlushIO(dep->err);
-      
+
       // Check if process failed based on return code
       if (make.result.return_code != 0 && make.result.return_code != -1) {
         // Write error message to stderr file if not already there
@@ -1334,7 +1333,7 @@ s32 spn_dep_context_build_async(void* user_data) {
   if (!make.process) {
     sp_str_t error_msg = sp_format("Failed to spawn process: {}", SP_FMT_CSTR(SDL_GetError()));
     spn_dep_context_set_build_error(dep, error_msg);
-    
+
     // Write error to stderr log file
     SDL_IOStream* err_file = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_err), "w");
     if (err_file) {
@@ -1346,11 +1345,11 @@ s32 spn_dep_context_build_async(void* user_data) {
 
   // Read process output and wait for completion
   make.result = spn_sh_read_process(make.process);
-  
+
   // Flush the IO streams to ensure all output is written
   SDL_FlushIO(dep->out);
   SDL_FlushIO(dep->err);
-  
+
   if (make.result.return_code != 0) {
     // Write error message to stderr file if not already there
     SDL_IOStream* err_append = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_err), "a");

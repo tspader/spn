@@ -1,5 +1,5 @@
-BIN_DIR = ../../build/examples
-SDL := $(BIN_DIR)/hello
+BIN_DIR = $(shell realpath ../../build/examples)
+SDL := $(BIN_DIR)/sdl
 SPN := ../../build/bin/spn
 CC := gcc
 
@@ -10,6 +10,6 @@ $(BIN_DIR):
 
 $(SDL): main.c
 	$(SPN) build
-	$(CC) main.c $(shell $(SPN) flags include) -o $(SDL) -lSDL3
+	$(CC) main.c $(shell $(SPN) flags include) -o $(SDL) $(shell $(SPN) flags lib-include) $(shell $(SPN) flags libs)
 
 .PHONY: all

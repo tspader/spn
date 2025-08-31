@@ -12,19 +12,7 @@
 
 #include "utest/utest.h"
 
-void spn_test_use_malloc() {
-  static sp_allocator_malloc_t malloc_allocator = SP_ZERO_INITIALIZE();
-  static sp_allocator_t allocator = SP_ZERO_INITIALIZE();
-
-  sp_context = &sp_context_stack[0];
-  *sp_context = SP_ZERO_STRUCT(sp_context_t);
-  allocator = sp_allocator_malloc_init(&malloc_allocator);
-  sp_context_push_allocator(&allocator);
-}
-
 UTEST(spn_config, load_basic) {
-  spn_test_use_malloc();
-
   sp_str_t toml_content = SP_LIT(
     "[options]\n"
     "auto_pull_recipes = true\n"
@@ -39,8 +27,6 @@ UTEST(spn_config, load_basic) {
 }
 
 UTEST(spn_config, load_with_overrides) {
-  spn_test_use_malloc();
-
   sp_str_t toml_content = SP_LIT(
     "[options]\n"
     "cache_override = \"/tmp/test-cache\"\n"
@@ -56,4 +42,10 @@ UTEST(spn_config, load_with_overrides) {
   ASSERT_TRUE(sp_str_equal(SP_LIT("/tmp/recipes2"), config.additional_recipe_dirs[1]));
 }
 
-UTEST_MAIN();
+int main(int argc, const char* argv[]) {
+  sp_init((sp_config_t) {
+    .allocator = sp_allocator_default()
+  });
+
+  return utest_main(argc, argv);
+}
