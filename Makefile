@@ -29,25 +29,27 @@ CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_INCLUDES) $(FLAG_OUTPUT) $(FLAG_OPTIMIZATION
 TEST_FLAG_OUTPUT := -o $(SPN_TEST_BINARY)
 SPN_TEST_CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_INCLUDES) $(TEST_FLAG_OUTPUT) $(FLAG_OPTIMIZATION) $(FLAG_LIBS)
 
-SPN_DEPS := $(SPN_DIR_SOURCE)/spn.h $(SDL_BINARY)
-
 SPN_CLANGD_HEADER_ONLY_BULLSHIT := -DSP_OS_BACKEND_SDL, -DSP_IMPLEMENTATION, -DSPN_IMPLEMENTATION, -include, toml/toml.h, -include, sp/sp.h, -include, SDL3/SDL.h, -Wno-macro-redefined, -Wno-unused-includes
 
 SDL_FLAG_DEFINES := -DCMAKE_BUILD_TYPE=$(CMAKE_TYPE) -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF -DSDL_EXAMPLES=OFF
 SDL_CMAKE_FLAGS := $(SDL_FLAG_DEFINES)
 
 
-.PHONY: all
+.PHONY: build sdl clangd clean examples test install uninstall all
+.NOTPARALLEL: examples
 
-all: build clangd
+all: build clangd test examples
 
 $(SPN_DIR_BUILD_OUTPUT):
 	@mkdir -p $(SPN_DIR_BUILD_OUTPUT)
 
-$(SPN_BINARY): $(SPN_DIR_SOURCE)/main.c $(SPN_DEPS) | $(SPN_DIR_BUILD_OUTPUT)
+$(SPN_DIR_BUILD_EXAMPLES):
+	@mkdir -p $(SPN_DIR_BUILD_EXAMPLES)
+
+$(SPN_BINARY): $(SPN_DIR_SOURCE)/main.c $(SPN_DIR_SOURCE)/spn.h  | $(SPN_DIR_BUILD_OUTPUT)
 	$(CC) $(CC_FLAGS) $(SPN_DIR_SOURCE)/main.c
 
-$(SPN_TEST_BINARY): $(SPN_DIR_TEST)/main.c $(SPN_DEPS)
+$(SPN_TEST_BINARY): $(SPN_DIR_TEST)/main.c $(SPN_DIR_SOURCE)/spn.h $(SPN_BINARY)
 	$(CC) $(SPN_TEST_CC_FLAGS) $(SPN_DIR_TEST)/main.c
 
 $(SPN_COMPILE_DB): $(SPN_MAKEFILE)
@@ -55,17 +57,9 @@ $(SPN_COMPILE_DB): $(SPN_MAKEFILE)
 $(SPN_CLANGD): $(SPN_COMPILE_DB)
 	@printf "CompileFlags:\n  Add: [$(SPN_CLANGD_HEADER_ONLY_BULLSHIT)]\n" > $(SPN_CLANGD)
 
-
-.PHONY: build sdl clangd clean nuke test test-unit test-examples test-all install uninstall all
-
-build: $(SPN_BINARY)
-
-test-unit: $(SPN_TEST_BINARY)
-	@$(SPN_TEST_BINARY)
-
 EXAMPLES := $(notdir $(wildcard examples/*))
-EXAMPLE_DIRS := $(addprefix ./examples/, $(EXAMPLES))
-$(EXAMPLE_DIRS):
+EXAMPLE_DIRS := $(addprefix examples/, $(EXAMPLES))
+$(EXAMPLE_DIRS): $(SPN_DIR_BUILD)/$@ | $(SPN_DIR_BUILD_EXAMPLES)
 	@echo "> building $@"
 	$(SPN) --lock -C $@ build
 	$(eval EXAMPLE_DIR := ./$@)
@@ -75,29 +69,14 @@ $(EXAMPLE_DIRS):
 	$(CC) $(EXAMPLE_DIR)/main.c -o $(SPN_DIR_BUILD)/$@ $(EXAMPLE_INCLUDE) $(EXAMPLE_LIB_INCLUDE) $(EXAMPLE_LIBS) -lm
 	@echo
 
-.PHONY: foobar $(EXAMPLE_DIRS)
 
-.NOTPARALLEL: foobar
+build: $(SPN_BINARY)
 
-foobar: $(EXAMPLE_DIRS)
+test: build $(SPN_TEST_BINARY)
+	@$(SPN_TEST_BINARY)
 
-test-examples: build test-unit
-	@echo
-	@echo "> building: hello"
-	@$(SPN_BINARY) --no-interactive --lock -C ./examples/hello build
-	@$(MAKE) -C ./examples/hello
-	@echo
-	@echo "> building: sdl"
-	@$(SPN_BINARY) --no-interactive --lock -C ./examples/sdl build
-	@$(MAKE) -C ./examples/sdl
-	@echo
-	@echo "> building: sqlite"
-	@$(SPN_BINARY) --no-interactive --lock -C ./examples/sqlite build
-	@$(MAKE) -C ./examples/sqlite
 
-test: test-unit test-examples
-
-test-all: clean test
+examples: build $(EXAMPLE_DIRS)
 
 install: build
 	@mkdir -p $(SPN_INSTALL_PREFIX)
@@ -110,12 +89,6 @@ uninstall:
 clangd: $(SPN_COMPILE_DB) $(SPN_CLANGD)
 
 clean:
-	@rm -rf $(SPN_DIR_BUILD_OUTPUT)
-	@rm -rf $(SPN_DIR_BUILD_EXAMPLES)
-	@rm -f $(SPN_COMPILE_DB)
-	@rm -f $(SPN_CLANGD)
-
-nuke:
 	@rm -rf $(SPN_DIR_BUILD)
 	@rm -f $(SPN_COMPILE_DB)
 	@rm -f $(SPN_CLANGD)
