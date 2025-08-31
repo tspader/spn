@@ -431,29 +431,29 @@ void sp_toml_writer_new_line(sp_toml_writer_t* writer) {
 }
 
 void sp_toml_writer_add_header(sp_toml_writer_t* writer, sp_str_t name) {
-  sp_str_builder_append_fmt(&writer->builder, SP_LIT("[{}]"), SP_FMT_STR(name));
+  sp_str_builder_append_fmt(&writer->builder, "[{}]", SP_FMT_STR(name));
   sp_str_builder_new_line(&writer->builder);
 }
 
 void sp_toml_writer_add_string(sp_toml_writer_t* writer, sp_str_t key, sp_str_t value) {
-  sp_str_builder_append_fmt(&writer->builder, SP_LIT("{} = {}"), SP_FMT_STR(key), SP_FMT_QUOTED_STR(value));
+  sp_str_builder_append_fmt(&writer->builder, "{} = {}", SP_FMT_STR(key), SP_FMT_QUOTED_STR(value));
   sp_str_builder_new_line(&writer->builder);
 }
 
 void sp_toml_writer_add_s32(sp_toml_writer_t* writer, sp_str_t key, s32 value) {
-  sp_str_builder_append_fmt(&writer->builder, SP_LIT("{} = {}"), SP_FMT_STR(key), SP_FMT_S32(value));
+  sp_str_builder_append_fmt(&writer->builder, "{} = {}", SP_FMT_STR(key), SP_FMT_S32(value));
   sp_str_builder_new_line(&writer->builder);
 }
 
 void sp_toml_writer_add_bool(sp_toml_writer_t* writer, sp_str_t key, bool value) {
-  sp_str_builder_append_fmt(&writer->builder, SP_LIT("{} = {}"), SP_FMT_STR(key), value ? SP_FMT_CSTR("true") : SP_FMT_CSTR("false"));
+  sp_str_builder_append_fmt(&writer->builder, "{} = {}", SP_FMT_STR(key), value ? SP_FMT_CSTR("true") : SP_FMT_CSTR("false"));
   sp_str_builder_new_line(&writer->builder);
 }
 
 void sp_toml_writer_add_string_array(sp_toml_writer_t* writer, sp_str_t key, sp_dyn_array(sp_str_t) values) {
-  sp_str_builder_append_fmt(&writer->builder, SP_LIT("{} = ["), SP_FMT_STR(key));
+  sp_str_builder_append_fmt(&writer->builder, "{} = [", SP_FMT_STR(key));
   sp_dyn_array_for(values, i) {
-    sp_str_builder_append_fmt(&writer->builder, SP_LIT("{}"), SP_FMT_QUOTED_STR(values[i]));
+    sp_str_builder_append_fmt(&writer->builder, "{}", SP_FMT_QUOTED_STR(values[i]));
     if (i != SP_SIZE_TO_INDEX(sp_dyn_array_size(values))) {
       sp_str_builder_append(&writer->builder, SP_LIT(", "));
     }
@@ -672,7 +672,7 @@ sp_str_t spn_dep_context_make_flag(spn_dep_context_t* dep, spn_cli_flag_kind_t f
     case SPN_FLAG_LIBS: {
       sp_str_builder_t builder = SP_ZERO_INITIALIZE();
       sp_dyn_array_for(dep->info->libs, index) {
-        sp_str_builder_append_fmt_c8(&builder, "-l{} ", SP_FMT_STR(dep->info->libs[index]));
+        sp_str_builder_append_fmt(&builder, "-l{} ", SP_FMT_STR(dep->info->libs[index]));
       }
 
       return sp_str_builder_write(&builder);
@@ -763,7 +763,7 @@ void spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* optio
   }
 
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  sp_str_builder_append_fmt_c8(&builder, "{}", SP_FMT_STR(context->id));
+  sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(context->id));
   sp_dyn_array_for(context->options, index) {
     spn_dep_option_t* option = &context->options[index];
   }
@@ -864,10 +864,24 @@ sp_str_t spn_dep_option_env_name(spn_dep_option_t* option) {
 }
 
 spn_sh_process_result_t spn_sh_read_process(SDL_Process* process) {
-  spn_sh_process_result_t result;
-  sp_size_t len;
-  result.output.data = (c8*)SDL_ReadProcess(process, &len, &result.return_code);
-  result.output.len = (u32)len;
+  spn_sh_process_result_t result = SP_ZERO_INITIALIZE();
+  sp_size_t len = 0;
+  
+  // Try SDL_ReadProcess first - this works when stdio is piped to app
+  void* output_data = SDL_ReadProcess(process, &len, &result.return_code);
+  
+  if (output_data) {
+    result.output.data = (c8*)output_data;
+    result.output.len = (u32)len;
+  } else if (result.return_code == -1) {
+    // SDL_ReadProcess returns -1 when IO is redirected
+    // Use SDL_WaitProcess instead to get the actual exit code
+    SDL_WaitProcess(process, true, &result.return_code);
+    result.output = SP_LIT("");
+  } else {
+    result.output = SP_LIT("");
+  }
+  
   return result;
 }
 
@@ -1192,27 +1206,71 @@ s32 spn_dep_context_build_async(void* user_data) {
     case SPN_DEP_REPO_STATE_UNINITIALIZED: {
       spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
 
+      // Ensure the parent directory exists for cloning
+      sp_str_t parent_dir = sp_os_parent_path(dep->paths.source);
+      sp_os_create_directory(parent_dir);
+
       spn_sh_make_context_t make = {
         .makefile = dep->paths.recipe,
         .target = app.targets.clone,
-        .working_directory = dep->paths.source,
+        // No working_directory - let make run from current dir
         .shell = dep->shell
       };
       spn_sh_make(&make);
 
       if (!make.process) {
-        spn_dep_context_set_build_error(dep, sp_format(
-          "Failed to clone {:color yellow}: {:color red}",
-          SP_FMT_STR(dep->paths.recipe),
+        sp_str_t error_msg = sp_format(
+          "Failed to spawn process: {}",
           SP_FMT_CSTR(SDL_GetError())
-        ));
-        return 1;
+        );
+        spn_dep_context_set_build_error(dep, error_msg);
+        
+        // Write error to stderr log file
+        SDL_IOStream* err_file = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_err), "w");
+        if (err_file) {
+          SDL_WriteIO(err_file, error_msg.data, error_msg.len);
+          SDL_CloseIO(err_file);
+        }
+        return -1;
       }
 
+      // Read process output and wait for completion
+      // Note: When using shell properties with redirected IO, SDL_ReadProcess
+      // won't capture output since it's already going to the IOStreams
       make.result = spn_sh_read_process(make.process);
-      if (make.result.return_code) {
+      
+      // Flush and close the IO streams to ensure all output is written
+      SDL_FlushIO(dep->out);
+      SDL_FlushIO(dep->err);
+      
+      // Check if process failed based on return code
+      if (make.result.return_code != 0 && make.result.return_code != -1) {
+        // Write error message to stderr file if not already there
+        SDL_IOStream* err_append = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_err), "a");
+        if (err_append) {
+          sp_str_t error_msg = sp_format("\nProcess failed with exit code: {}\n", SP_FMT_S32(make.result.return_code));
+          SDL_WriteIO(err_append, error_msg.data, error_msg.len);
+          SDL_CloseIO(err_append);
+        }
         spn_dep_context_set_build_error(dep, spn_sh_build_make_error(&make));
         return make.result.return_code;
+      } else if (make.result.return_code == -1) {
+        // Special case: -1 means SDL couldn't get exit code properly
+        // But if the directory exists, the clone succeeded
+        if (sp_os_does_path_exist(dep->paths.source)) {
+          // Clone succeeded despite the -1 return code
+          // Log this but continue
+          SDL_IOStream* err_append = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_err), "a");
+          if (err_append) {
+            sp_str_t msg = SP_LIT("\nWarning: Process returned -1 but clone appears successful\n");
+            SDL_WriteIO(err_append, msg.data, msg.len);
+            SDL_CloseIO(err_append);
+          }
+          // Don't return error
+        } else {
+          spn_dep_context_set_build_error(dep, sp_format("Failed to clone repository"));
+          return -1;
+        }
       }
 
       spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
@@ -1274,17 +1332,38 @@ s32 spn_dep_context_build_async(void* user_data) {
 
   spn_sh_make(&make);
   if (!make.process) {
-    spn_dep_context_set_build_error(dep, sp_format("Create process failed: {:color red}", SP_FMT_CSTR(SDL_GetError())));
-    return 1;
+    sp_str_t error_msg = sp_format("Failed to spawn process: {}", SP_FMT_CSTR(SDL_GetError()));
+    spn_dep_context_set_build_error(dep, error_msg);
+    
+    // Write error to stderr log file
+    SDL_IOStream* err_file = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_err), "w");
+    if (err_file) {
+      SDL_WriteIO(err_file, error_msg.data, error_msg.len);
+      SDL_CloseIO(err_file);
+    }
+    return -1;
   }
 
+  // Read process output and wait for completion
   make.result = spn_sh_read_process(make.process);
-  if (make.result.return_code) {
+  
+  // Flush the IO streams to ensure all output is written
+  SDL_FlushIO(dep->out);
+  SDL_FlushIO(dep->err);
+  
+  if (make.result.return_code != 0) {
+    // Write error message to stderr file if not already there
+    SDL_IOStream* err_append = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_err), "a");
+    if (err_append) {
+      sp_str_t error_msg = sp_format("\nProcess failed with exit code: {}\n", SP_FMT_S32(make.result.return_code));
+      SDL_WriteIO(err_append, error_msg.data, error_msg.len);
+      SDL_CloseIO(err_append);
+    }
     spn_dep_context_set_build_error(dep, spn_sh_build_make_error(&make));
     SDL_CloseIO(dep->out);
     SDL_CloseIO(dep->err);
 
-    return 1;
+    return make.result.return_code;
   }
 
   SDL_DestroyProcess(make.process);
@@ -1637,13 +1716,13 @@ bool spn_lock_file_write(spn_lock_file_t* lock, sp_str_t path) {
 
     sp_str_builder_append(&builder, SP_LIT("[[package]]"));
     sp_str_builder_new_line(&builder);
-    sp_str_builder_append_fmt_c8(&builder, "name = {}", SP_FMT_QUOTED_STR(entry->name));
+    sp_str_builder_append_fmt(&builder, "name = {}", SP_FMT_QUOTED_STR(entry->name));
     sp_str_builder_new_line(&builder);
-    sp_str_builder_append_fmt_c8(&builder, "git_url = {}", SP_FMT_QUOTED_STR(entry->url));
+    sp_str_builder_append_fmt(&builder, "git_url = {}", SP_FMT_QUOTED_STR(entry->url));
     sp_str_builder_new_line(&builder);
-    sp_str_builder_append_fmt_c8(&builder, "git_commit = {}", SP_FMT_QUOTED_STR(entry->commit));
+    sp_str_builder_append_fmt(&builder, "git_commit = {}", SP_FMT_QUOTED_STR(entry->commit));
     sp_str_builder_new_line(&builder);
-    sp_str_builder_append_fmt_c8(&builder, "build_id = {}", SP_FMT_QUOTED_STR(entry->build_id));
+    sp_str_builder_append_fmt(&builder, "build_id = {}", SP_FMT_QUOTED_STR(entry->build_id));
     sp_str_builder_new_line(&builder);
     sp_str_builder_new_line(&builder);
   }
