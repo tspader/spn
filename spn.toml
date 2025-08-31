@@ -1,4 +1,4 @@
 [project]
 name = "spn"
-deps = ["sp", "argparse", "sdl3"]
+deps = ["sp", "argparse", "sdl3", "utest", "toml"]
 

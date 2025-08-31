@@ -9,6 +9,7 @@ SPN_DIR_SOURCE := source
 SPN_DIR_EXTERNAL := external
   SPN_DIR_SDL := $(SPN_DIR_EXTERNAL)/SDL
     SPN_DIR_SDL_INCLUDE := $(SPN_DIR_SDL)/include
+  SPN_DIR_SP := $(SPN_DIR_EXTERNAL)/sp
 SPN_DIR_TEST := test
 SPN_MAKEFILE := Makefile
 SPN_COMPILE_DB := compile_commands.json
@@ -22,16 +23,17 @@ MAKEFLAGS += -j8
 CC := bear --append -- gcc
 MAKE := bear --append -- make
 CMAKE := bear --append -- cmake
+SPN := $(SPN_BINARY)
 
 FLAG_LANGUAGE := -std=c11
-FLAG_INCLUDES := -I$(SPN_DIR_EXTERNAL) -I$(SPN_DIR_SP) -I$(SPN_DIR_SDL) -I$(SPN_DIR_SOURCE) $(shell spn flags include)
+FLAG_INCLUDES := -I$(SPN_DIR_EXTERNAL) -I$(SPN_DIR_SDL) -I$(SPN_DIR_SOURCE) $(shell spn flags include)
 FLAG_OUTPUT := -o $(SPN_BINARY)
 FLAG_OPTIMIZATION := -g
-FLAG_LIBS := -lSDL3
+FLAG_LIBS := $(shell spn flags lib-include) $(shell spn flags libs)
 CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_INCLUDES) $(FLAG_OUTPUT) $(FLAG_OPTIMIZATION) $(FLAG_LIBS)
 
-SPN_TEST_FLAG_OUTPUT := -o $(SPN_TEST_BINARY)
-SPN_TEST_CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_INCLUDES) $(SPN_TEST_FLAG_OUTPUT) $(FLAG_OPTIMIZATION) $(FLAG_LIBS)
+TEST_FLAG_OUTPUT := -o $(SPN_TEST_BINARY)
+SPN_TEST_CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_INCLUDES) $(TEST_FLAG_OUTPUT) $(FLAG_OPTIMIZATION) $(FLAG_LIBS)
 
 SPN_DEPS := $(SPN_DIR_SOURCE)/spn.h $(SDL_BINARY)
 
@@ -68,12 +70,22 @@ $(SPN_CLANGD): $(SPN_COMPILE_DB)
 	@printf "CompileFlags:\n  Add: [$(SPN_CLANGD_HEADER_ONLY_BULLSHIT)]\n" > $(SPN_CLANGD)
 
 
-.PHONY: build sdl clangd clean nuke test install uninstall all
+.PHONY: build sdl clangd clean nuke test test-unit test-examples test-all install uninstall all
 
 build: $(SPN_BINARY)
 
-test: $(SPN_TEST_BINARY)
+test-unit: $(SPN_TEST_BINARY)
 	$(SPN_TEST_BINARY)
+
+test-examples: build
+	@$(SPN_BINARY) --no-interactive --use-lockfile -C ./examples/hello build
+	@$(SPN_BINARY) --no-interactive --use-lockfile -C ./examples/sdl build
+	@$(SPN_BINARY) --no-interactive --use-lockfile -C ./examples/sqlite build
+	@echo "All example tests passed!"
+
+test: test-unit test-examples
+
+test-all: clean test
 
 sdl: $(SDL_BINARY)
 
