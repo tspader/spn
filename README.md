@@ -17,7 +17,7 @@ Initialize a project, add SDL, and compile a program which calls `SDL_Log()`
 > spn init
 > spn add sdl3
 > spn build
-> gcc main.c $(spn flags include) -lSDL3 -o hello
+> gcc main.c $(spn print --compiler gcc) -o hello
 > ./hello
 "spn is a simple, stupid package manager for c inspired by uv and lazy.nvim"
 ```
@@ -31,7 +31,7 @@ I use C as my daily driver to write almost everything. I write CLI tools, games,
 - List dependencies in `spn.toml`, add them with `spn add $package`, build them in parallel with `spn build`
 - Define package recipes in tiny Makefiles
 - Pin dependencies to exact Git commits, automatically check for updates when you build (like `lazy.nvim`)
-- Produce compiler flags to consume your dependencies with `spn flags`
+- Produce compiler flags to consume your dependencies with `spn print`
 
 # Goals
 - Build packages eagerly and asynchronously by default; when you build your project, you shouldn't have to wait for dependencies to build unless absolutely necessary.
@@ -99,7 +99,7 @@ That's it. Nearly every library I regularly use can be built and packaged with a
 ## spn is build system agnostic
 When you call `spn build`, it builds all your dependencies in parallel by checking out the correct commit and invoking `spn-build`. After you build, a lock file is created, and your dependencies are pinned to an exact commit.
 
-In your build system, you just call e.g. `spn flags include` to produce the compiler flags needed to include all your packages (i.e. `-I/path/to/sdl3/in/store`). Give them to your build system.
+In your build system, you just call `spn print` to produce the flags needed to include all your packages on your compiler (i.e. `spn print include --compiler gcc` -> `-I/path/to/sdl3/in/store`).
 
 ## that's it
 Why do builds have to be more complex than this? There are projects for which builds *are* more complicated. But for such projects, `spn` is not the tool for you.
