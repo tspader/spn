@@ -20,14 +20,13 @@ CMAKE := bear --append -- cmake
 SPN := $(SPN_BINARY)
 
 FLAG_LANGUAGE := -std=c11
-FLAG_INCLUDES :=  -I$(SPN_DIR_SOURCE) $(shell spn flags include)
+FLAG_INCLUDES :=  -I$(SPN_DIR_SOURCE)
 FLAG_OUTPUT := -o $(SPN_BINARY)
 FLAG_OPTIMIZATION := -g
-FLAG_LIBS := $(shell spn flags lib-include) $(shell spn flags libs)
-CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_INCLUDES) $(FLAG_OUTPUT) $(FLAG_OPTIMIZATION) $(FLAG_LIBS)
+CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_INCLUDES) $(FLAG_OUTPUT) $(FLAG_OPTIMIZATION)
 
 TEST_FLAG_OUTPUT := -o $(SPN_TEST_BINARY)
-SPN_TEST_CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_INCLUDES) $(TEST_FLAG_OUTPUT) $(FLAG_OPTIMIZATION) $(FLAG_LIBS)
+SPN_TEST_CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_INCLUDES) $(TEST_FLAG_OUTPUT) $(FLAG_OPTIMIZATION)
 
 SPN_CLANGD_HEADER_ONLY_BULLSHIT := -DSP_OS_BACKEND_SDL, -DSP_IMPLEMENTATION, -DSPN_IMPLEMENTATION, -include, toml/toml.h, -include, sp/sp.h, -include, SDL3/SDL.h, -Wno-macro-redefined, -Wno-unused-includes
 
@@ -47,10 +46,12 @@ $(SPN_DIR_BUILD_EXAMPLES):
 	@mkdir -p $(SPN_DIR_BUILD_EXAMPLES)
 
 $(SPN_BINARY): $(SPN_DIR_SOURCE)/main.c $(SPN_DIR_SOURCE)/spn.h  | $(SPN_DIR_BUILD_OUTPUT)
-	$(CC) $(CC_FLAGS) $(SPN_DIR_SOURCE)/main.c
+	$(eval SPN_FLAGS := $(shell spn print --compiler gcc))
+	$(CC) $(CC_FLAGS) $(SPN_FLAGS) $(SPN_DIR_SOURCE)/main.c
 
 $(SPN_TEST_BINARY): $(SPN_DIR_TEST)/main.c $(SPN_DIR_SOURCE)/spn.h $(SPN_BINARY)
-	$(CC) $(SPN_TEST_CC_FLAGS) $(SPN_DIR_TEST)/main.c
+	$(eval SPN_FLAGS := $(shell spn print --compiler gcc))
+	$(CC) $(SPN_TEST_CC_FLAGS) $(SPN_FLAGS) $(SPN_DIR_TEST)/main.c
 
 $(SPN_COMPILE_DB): $(SPN_MAKEFILE)
 
@@ -60,13 +61,11 @@ $(SPN_CLANGD): $(SPN_COMPILE_DB)
 EXAMPLES := $(notdir $(wildcard examples/*))
 EXAMPLE_DIRS := $(addprefix examples/, $(EXAMPLES))
 $(EXAMPLE_DIRS): $(SPN_DIR_BUILD)/$@ | $(SPN_DIR_BUILD_EXAMPLES)
+	$(eval EXAMPLE_DIR := ./$@)
 	@echo "> building $@"
 	$(SPN) --lock -C $@ build
-	$(eval EXAMPLE_DIR := ./$@)
-	$(eval EXAMPLE_INCLUDE     := $(shell $(SPN) -C $(EXAMPLE_DIR) flags include))
-	$(eval EXAMPLE_LIBS        := $(shell $(SPN) -C $(EXAMPLE_DIR) flags libs))
-	$(eval EXAMPLE_LIB_INCLUDE := $(shell $(SPN) -C $(EXAMPLE_DIR) flags lib-include))
-	$(CC) $(EXAMPLE_DIR)/main.c -o $(SPN_DIR_BUILD)/$@ $(EXAMPLE_INCLUDE) $(EXAMPLE_LIB_INCLUDE) $(EXAMPLE_LIBS) -lm
+	$(eval SPN_FLAGS := $(shell $(SPN) -C $@ print --compiler gcc))
+	$(CC) $(EXAMPLE_DIR)/main.c -o $(SPN_DIR_BUILD)/$@ $(SPN_FLAGS) -lm
 	@echo
 
 

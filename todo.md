@@ -1,0 +1,6 @@
+- add `spn dir {bin, include, vendor} $package` which outputs the respective dir for your project
+- add proper support for shared vs static libraries for packages not from source
+- add:
+    - whisper.cpp
+    - imgui
+    - ffmpeg
