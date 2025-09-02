@@ -1,0 +1,6 @@
+[[package]]
+name = "clay"
+git_url = "git@github.com:nicbarker/clay.git"
+git_commit = "1bc5105272"
+build_id = "5881d332"
+

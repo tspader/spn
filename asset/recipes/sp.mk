@@ -1,5 +1,4 @@
 SPN_URL := git@github.com:tspader/sp.git
-SPN_SINGLE_HEADER := sp.h
-SPN_COPY_VENDOR := test.c doc/README.md
+SPN_COPY_INCLUDE := sp.h
 
-include spn_sfh.mk
+include spn_easy.mk

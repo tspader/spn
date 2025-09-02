@@ -106,6 +106,19 @@ typedef struct {
 } spn_cli_list_t;
 
 typedef enum {
+  SPN_DIR_STORE,
+  SPN_DIR_INCLUDE,
+  SPN_DIR_VENDOR,
+} spn_cli_dir_kind_t;
+
+typedef struct {
+  const c8* package;
+  const c8* kind;
+} spn_cli_dir_t;
+
+spn_cli_dir_kind_t spn_dir_kind_from_cstr(sp_str_t str);
+
+typedef enum {
   SPN_PRINT_NONE,
   SPN_PRINT_INCLUDE,
   SPN_PRINT_LIB_INCLUDE,
@@ -137,6 +150,7 @@ typedef struct {
   spn_cli_init_t init;
   spn_cli_list_t list;
   spn_cli_print_t flags;
+  spn_cli_dir_t dir;
 } spn_cli_t;
 
 void spn_cli_command_add(spn_cli_t* cli);
@@ -146,6 +160,7 @@ void spn_cli_command_nuke(spn_cli_t* cli);
 void spn_cli_command_clean(spn_cli_t* cli);
 void spn_cli_command_print(spn_cli_t* cli);
 void spn_cli_command_build(spn_cli_t* cli);
+void spn_cli_command_dir(spn_cli_t* cli);
 
 //////////////////
 // DEPENDENCIES //
@@ -626,6 +641,15 @@ void spn_cli_command_clean(spn_cli_t* cli) {
   sp_os_remove_directory(app.paths.store);
 }
 
+spn_cli_dir_kind_t spn_dir_kind_from_cstr(sp_str_t str) {
+  if      (sp_str_equal_cstr(str, ""))         return SPN_DIR_STORE;
+  else if (sp_str_equal_cstr(str, "store"))    return SPN_DIR_STORE;
+  else if (sp_str_equal_cstr(str, "include"))  return SPN_DIR_INCLUDE;
+  else if (sp_str_equal_cstr(str, "vendor"))   return SPN_DIR_VENDOR;
+
+  SP_FATAL("Unknown dir kind {}; options are [store, include, vendor]", SP_FMT_COLOR(SP_ANSI_FG_YELLOW), SP_FMT_QUOTED_STR(str));
+}
+
 spn_cli_print_kind_t spn_print_kind_from_cstr(sp_str_t str) {
   if      (sp_str_equal_cstr(str, ""))            return SPN_PRINT_ALL;
   else if (sp_str_equal_cstr(str, "include"))     return SPN_PRINT_INCLUDE;
@@ -763,6 +787,56 @@ void spn_cli_command_print(spn_cli_t* cli) {
   printf("%.*s", result.len, result.data);
 
   return;
+}
+
+void spn_cli_command_dir(spn_cli_t* cli) {
+  spn_cli_dir_t* command = &cli->dir;
+
+  struct argparse argparse;
+  argparse_init(
+    &argparse,
+    (struct argparse_option []) {
+      OPT_HELP(),
+      OPT_END()
+    },
+    (const c8* const []) {
+      "spn dir <package> [store|include|vendor]",
+      "Output the directory path for a package",
+      SP_NULLPTR
+    },
+    SP_NULL
+  );
+  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+
+  if (cli->num_args < 1) {
+    SP_FATAL("Package name required");
+  }
+
+  command->package = cli->args[0];
+  command->kind = cli->num_args > 1 ? cli->args[1] : "";
+
+  sp_str_t package = sp_str_view(command->package);
+  spn_cli_dir_kind_t kind = spn_dir_kind_from_cstr(sp_str_view(command->kind));
+
+  spn_build_context_t build = spn_build_context_from_default_profile();
+  sp_dyn_array_for(build.deps, index) {
+    spn_dep_context_prepare(build.deps + index);
+  }
+
+  spn_dep_context_t* dep = spn_dep_context_find(&build, package);
+  if (!dep) {
+    SP_FATAL("Package {:fg brightcyan} not found", SP_FMT_STR(package));
+  }
+
+  sp_str_t output = SP_ZERO_INITIALIZE();
+  switch (kind) {
+    case SPN_DIR_STORE:   output = dep->paths.store; break;
+    case SPN_DIR_INCLUDE: output = dep->paths.include; break;
+    case SPN_DIR_VENDOR:  output = dep->paths.vendor; break;
+    default: SP_UNREACHABLE_CASE();
+  }
+
+  printf("%.*s", output.len, output.data);
 }
 
 spn_build_context_t spn_build_context_from_default_profile() {
@@ -1363,10 +1437,20 @@ s32 spn_dep_context_build_async(void* user_data) {
     case SPN_DEP_REPO_STATE_UNINITIALIZED: {
       spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
 
+      // We can't set the full environment that we give when we build, because pretty much everything (e.g.
+      // build and store directories) are calculated from the build ID. But since the repo hasn't been
+      // cloned, we do not know what commit we're building, and thus cannot calculate a build ID.
+      //
+      // We *do* know where to clone the repo, since that's independent of build ID, and we need to pass that
+      // to the Makefile when we run the clone target.
+      SDL_Environment* env = SDL_CreateEnvironment(SP_SDL_INHERIT_ENVIRONMENT);
+      SDL_SetEnvironmentVariable(env, "SPN_DIR_PROJECT", sp_str_to_cstr(dep->info->paths.source), SP_SDL_OVERWRITE_ENV_VAR);
+      SDL_PropertiesID shell = SDL_CreateProperties();
+      SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, env);
       spn_sh_make_context_t make = {
         .makefile = dep->info->paths.recipe,
         .target = app.targets.clone,
-        .shell = dep->shell
+        .shell = shell
       };
       spn_sh_make(&make);
 
@@ -1639,7 +1723,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   for (sp_os_directory_entry_t* entry = entries.data; entry < entries.data + entries.count; entry++) {
     sp_str_t name = sp_os_extract_stem(entry->file_name);
     if (sp_str_equal_cstr(name, "spn")) continue;
-    if (sp_str_equal_cstr(name, "spn_sfh")) continue;
+    if (sp_str_equal_cstr(name, "spn_easy")) continue;
 
     spn_dep_info_t dep = {
       .name = name,
@@ -1704,6 +1788,9 @@ void spn_app_run(spn_app_t* app) {
   }
   else if (sp_cstr_equal("build", cli->args[0])) {
     spn_cli_command_build(cli);
+  }
+  else if (sp_cstr_equal("dir", cli->args[0])) {
+    spn_cli_command_dir(cli);
   }
 }
 

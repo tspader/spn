@@ -1,4 +1,4 @@
 SPN_URL := git@github.com:tspader/toml.git
-SPN_SINGLE_HEADER := toml.h
+SPN_COPY_INCLUDE := toml.h
 
-include spn_sfh.mk
+include spn_easy.mk

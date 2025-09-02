@@ -9,7 +9,9 @@
 # Quickstart
 Install. (Until I publish a binary, this unfortunately has to build SDL and will take a few minutes)
 ```bash
-curl https://raw.githubusercontent.com/tspader/spn/refs/heads/main/install.sh | sh
+git clone git@github.com:tspader/spn.git
+make install
+make examples
 ```
 
 Initialize a project, add SDL, and compile a program which calls `SDL_Log()`
@@ -64,14 +66,27 @@ options.foo.bar = 69
 - `SPN_DIR_PROJECT`: The directory where the package is checked out
 - `SPN_DIR_STORE_BIN`: The directory to put binaries
 - `SPN_DIR_STORE_INCLUDE`: The directory to put headers
+- `SPN_DIR_STORE_VENDOR`: The directory to put C files you intend to compile downstream
 - `SPN_DIR_BUILD`: The out of source build directory you can use to build inside of
 - `SPN_OPT_FOO_BAR`: The value of, for example, `deps.sdl3.options.foo.bar` from your `spn.toml` when building `sdl3`
 
-Then, they define two targets, `spn-clone` and `spn-build`. All together, it looks like this.
+Then, they define two targets, `spn-clone` and `spn-build`. Header only or vendored libraries are just a few lines:
 ```make
-# recipes/sdl3.mk
-HEADERS := $(SPN_DIR_STORE_INCLUDE)/SDL3
-BINARY := $(SPN_DIR_STORE_BIN)/libSDL3.so
+SPN_URL := git@github.com:tspader/sp.git
+SPN_COPY_INCLUDE := sp.h
+
+include spn_easy.mk
+```
+
+Even a comparatively heavy library like SDL3 is nearly trivial:
+```make
+SPN_URL := git@github.com:libsdl-org/SDL.git
+SPN_LIBS := SDL3
+
+include spn.mk
+
+SDL3_H := $(SPN_DIR_STORE_INCLUDE)/SDL3
+SDL3_SO := $(SPN_DIR_STORE_BIN)/libSDL3.so
 
 CMAKE_FLAG_DEFINES := -DCMAKE_BUILD_TYPE=Debug -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF -DSDL_EXAMPLES=OFF
 CMAKE_FLAGS := $(CMAKE_FLAG_DEFINES)
@@ -79,19 +94,19 @@ CMAKE_FLAGS := $(CMAKE_FLAG_DEFINES)
 .PHONY: spn-clone spn-build
 
 $(SPN_DIR_PROJECT):
-	git clone git@github.com:libsdl-org/sdl.git $(SPN_DIR_PROJECT)
+	git clone $(SPN_URL) $(SPN_DIR_PROJECT)
 
-$(BINARY):
+$(SDL3_SO):
 	cmake -S$(SPN_DIR_PROJECT) -B$(SPN_DIR_BUILD) $(CMAKE_FLAGS)
 	cmake --build $(SPN_DIR_BUILD) --parallel
 	cp $(SPN_DIR_BUILD)/libSDL3.so $(SPN_DIR_STORE_BIN)
 
-$(HEADERS):
+$(SDL3_H):
 	cp -r $(SPN_DIR_PROJECT)/include/SDL3 $(SPN_DIR_STORE_INCLUDE)
 
 spn-clone: $(SPN_DIR_PROJECT)
 
-spn-build: $(BINARY) $(HEADERS)
+spn-build: $(SDL3_SO) $(SDL3_H)
 ```
 
 That's it. Nearly every library I regularly use can be built and packaged with a recipe no more complex than this.
@@ -103,7 +118,6 @@ In your build system, you just call `spn print` to produce the flags needed to i
 
 ## that's it
 Why do builds have to be more complex than this? There are projects for which builds *are* more complicated. But for such projects, `spn` is not the tool for you.
-
 
 # FAQ
 ## why wouldn't i just use...
@@ -138,8 +152,8 @@ C is portable, easy to compile, easy to debug, will compile in a hundred years b
 # Roadmap
 `spn` is very much an MVP. It's missing a lot of core features. PRs are very welcome!
 - Robust handling of user recipes (e.g. system-wide recipe repos; specify via git URL and have `spn` keep it up to date; per-project recipe directories)
-- Build profiles (i.e. different sets of options which can be selected with `--profile`
-- Windows support
+- Build profiles (i.e. different sets of options which can be selected with `--profile`)
+- Windows + macOS + ARM
 - Lots of recipes
 
 

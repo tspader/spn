@@ -1,4 +1,4 @@
 SPN_URL := git@github.com:tspader/argparse.git
-SPN_SINGLE_HEADER := argparse.h
+SPN_COPY_INCLUDE := argparse.h
 
-include spn_sfh.mk
+include spn_easy.mk

@@ -1,7 +1,8 @@
-include spn.mk
-
 SPN_URL := git@github.com:libsdl-org/SDL.git
 SPN_LIBS := SDL3
+
+include spn.mk
+
 SDL3_H := $(SPN_DIR_STORE_INCLUDE)/SDL3
 SDL3_SO := $(SPN_DIR_STORE_BIN)/libSDL3.so
 

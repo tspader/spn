@@ -1,4 +1,4 @@
 SPN_URL := git@github.com:nicbarker/clay.git
-SPN_SINGLE_HEADER := clay.h
+SPN_COPY_INCLUDE := clay.h examples renderers
 
-include spn_sfh.mk
+include spn_easy.mk

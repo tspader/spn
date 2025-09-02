@@ -34,7 +34,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 
 SDL_AppResult SDL_AppIterate(void *appstate){
     const double now = ((double)SDL_GetTicks()) / 1000.0;
-    SDL_SetRenderDrawColorFloat(renderer, 0.64, 0.32, SDL_SIN(now + SDL_PI_D * 2 / 3), SDL_ALPHA_OPAQUE_FLOAT);
+    SDL_SetRenderDrawColorFloat(renderer, 0.64, 0.32, SDL_sin(now + SDL_PI_D * 2 / 3), SDL_ALPHA_OPAQUE_FLOAT);
     SDL_RenderClear(renderer);
     SDL_RenderPresent(renderer);
 
