@@ -1,12 +1,12 @@
 [[package]]
 name = "sp"
 git_url = "git@github.com:spaderthomas/sp.git"
-git_commit = "24a9a42bb97f286ee5b7675a7d9f324c72a627c1"
-build_id = "dfc2a432"
+git_commit = "0c02db8239"
+build_id = "ec53e611"
 
 [[package]]
 name = "sqlite"
 git_url = "git@github.com:sqlite/sqlite.git"
-git_commit = "20bfeccb65ec7cd53c5ff4b93c93d9b6d47c63a5"
-build_id = "dc223072"
+git_commit = "6f341f499a"
+build_id = "1d9f411b"
 

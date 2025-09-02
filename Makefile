@@ -35,7 +35,7 @@ SDL_CMAKE_FLAGS := $(SDL_FLAG_DEFINES)
 
 
 .PHONY: build sdl clangd clean examples test install uninstall all
-.NOTPARALLEL: examples
+.NOTPARALLEL: examples $(EXAMPLE_BINARIES)
 
 all: build clangd test examples
 
@@ -60,13 +60,17 @@ $(SPN_CLANGD): $(SPN_COMPILE_DB)
 
 EXAMPLES := $(notdir $(wildcard examples/*))
 EXAMPLE_DIRS := $(addprefix examples/, $(EXAMPLES))
-$(EXAMPLE_DIRS): $(SPN_DIR_BUILD)/$@ | $(SPN_DIR_BUILD_EXAMPLES)
-	$(eval EXAMPLE_DIR := ./$@)
-	@echo "> building $@"
-	$(SPN) --lock -C $@ build
-	$(eval SPN_FLAGS := $(shell $(SPN) -C $@ print --compiler gcc))
-	$(CC) $(EXAMPLE_DIR)/main.c -o $(SPN_DIR_BUILD)/$@ $(SPN_FLAGS) -lm
+EXAMPLE_BINARIES := $(addprefix build/examples/, $(EXAMPLES))
+$(EXAMPLE_BINARIES): build/examples/%: examples/%/main.c examples/%/spn.toml | $(SPN_DIR_BUILD_EXAMPLES)
+	$(eval BINARY := $@)
+	$(eval EXAMPLE := $*)
+	$(eval EXAMPLE_DIR := examples/$*)
 	@echo
+	@echo ">> building $(EXAMPLE_DIR)"
+
+	$(SPN) --lock -C $(EXAMPLE_DIR) build
+	$(eval SPN_FLAGS := $(shell $(SPN) -C $(EXAMPLE_DIR) print --compiler gcc))
+	$(CC) $(EXAMPLE_DIR)/main.c -o $(BINARY) $(SPN_FLAGS) -lm
 
 
 build: $(SPN_BINARY)
@@ -75,7 +79,7 @@ test: build $(SPN_TEST_BINARY)
 	@$(SPN_TEST_BINARY)
 
 
-examples: build $(EXAMPLE_DIRS)
+examples: build $(EXAMPLE_BINARIES)
 
 install: build
 	@mkdir -p $(SPN_INSTALL_PREFIX)

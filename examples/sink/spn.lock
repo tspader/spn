@@ -1,18 +1,18 @@
 [[package]]
 name = "sp"
 git_url = "git@github.com:spaderthomas/sp.git"
-git_commit = "24a9a42bb97f286ee5b7675a7d9f324c72a627c1"
-build_id = "dfc2a432"
+git_commit = "0c02db8239"
+build_id = "ec53e611"
 
 [[package]]
 name = "argparse"
 git_url = "git@github.com:spaderthomas/argparse.git"
-git_commit = "45e0e563c4a79cdda4ed6bcaeaaa234774c6e024"
-build_id = "11e20932"
+git_commit = "45e0e563c4"
+build_id = "7475cf26"
 
 [[package]]
 name = "sdl3"
 git_url = "git@github.com:libsdl-org/SDL.git"
-git_commit = "875653658abcb6091fa6a17bd4859fb66e8a1187"
-build_id = "f99ad78d"
+git_commit = "1f007ad5cd"
+build_id = "fececb17"
 

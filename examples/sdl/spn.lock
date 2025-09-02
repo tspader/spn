@@ -1,12 +1,12 @@
 [[package]]
 name = "sp"
 git_url = "git@github.com:spaderthomas/sp.git"
-git_commit = "24a9a42bb97f286ee5b7675a7d9f324c72a627c1"
-build_id = "508ee318"
+git_commit = "0c02db8239"
+build_id = "e65e689"
 
 [[package]]
 name = "sdl3"
 git_url = "git@github.com:libsdl-org/SDL.git"
-git_commit = "875653658abcb6091fa6a17bd4859fb66e8a1187"
-build_id = "f99ad78d"
+git_commit = "1f007ad5cd"
+build_id = "fececb17"
 

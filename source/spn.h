@@ -43,7 +43,7 @@ typedef struct {
 
 void spn_sh_make(spn_sh_make_context_t* make);
 sp_str_t spn_sh_build_make_error(spn_sh_make_context_t* make);
-
+spn_sh_process_result_t spn_sh_read_process(SDL_Process* process);
 
 /////////
 // TUI //
@@ -77,14 +77,20 @@ void spn_tui_read(spn_tui_t* tui);
 void spn_tui_init(spn_tui_t* tui, spn_tui_state_t);
 void spn_tui_cleanup(spn_tui_t* tui);
 
-spn_sh_process_result_t spn_sh_read_process(SDL_Process* process);
-sp_str_t                spn_git_fetch(sp_str_t repo);
-u32                     spn_git_num_updates(sp_str_t repo, sp_str_t from, sp_str_t to);
-void                    spn_git_checkout(sp_str_t repo, sp_str_t commit);
-
+/////////
+// GIT //
+/////////
 #define SPN_GIT_ORIGIN_HEAD SP_LIT("origin/HEAD")
 #define SPN_GIT_HEAD SP_LIT("HEAD")
 #define SPN_GIT_UPSTREAM SP_LIT("@{u}")
+
+sp_str_t spn_git_fetch(sp_str_t repo);
+u32      spn_git_num_updates(sp_str_t repo, sp_str_t from, sp_str_t to);
+void     spn_git_checkout(sp_str_t repo, sp_str_t commit);
+sp_str_t spn_git_get_remote_url(sp_str_t repo_path);
+sp_str_t spn_git_get_commit(sp_str_t repo_path, sp_str_t id);
+sp_str_t spn_git_get_commit_message(sp_str_t repo_path, sp_str_t id);
+sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer);
 
 /////////
 // CLI //
@@ -160,7 +166,8 @@ typedef enum {
   SPN_DEP_BUILD_STATE_CLONING,
   SPN_DEP_BUILD_STATE_FETCHING,
   SPN_DEP_BUILD_STATE_AWAITING_CONFIRMATION,
-  SPN_DEP_BUILD_STATE_PULLING,
+  SPN_DEP_BUILD_STATE_CHECKING_OUT,
+  SPN_DEP_BUILD_STATE_PREPARING,
   SPN_DEP_BUILD_STATE_BUILDING,
   SPN_DEP_BUILD_STATE_DONE,
   SPN_DEP_BUILD_STATE_CANCELED,
@@ -168,16 +175,24 @@ typedef enum {
 } spn_dep_build_state_t;
 
 typedef struct {
+  spn_dep_build_state_t build;
+  spn_dep_repo_state_t repo;
+} spn_dep_state_t;
+
+typedef struct {
+  sp_str_t source;
+  sp_str_t recipe;
+} spn_dep_paths_t;
+
+typedef struct {
   sp_str_t std_out;
   sp_str_t std_err;
   sp_str_t std_in;
-  sp_str_t source;
   sp_str_t build;
   sp_str_t store;
   sp_str_t include;
   sp_str_t bin;
   sp_str_t vendor;
-  sp_str_t recipe;
 } spn_dep_build_paths_t;
 
 typedef struct {
@@ -192,42 +207,45 @@ typedef struct {
 
 typedef struct {
   sp_str_t name;
-  sp_str_t path;
   sp_str_t url;
+  spn_dep_paths_t paths;
   sp_dyn_array(sp_str_t) libs;
 } spn_dep_info_t;
 
 typedef sp_str_t spn_dep_id_t;
 
 typedef struct {
-  sp_str_t commit;
-  u32 num_commits;
+  u32 delta;
 } spn_dep_update_info_t;
 
 typedef struct {
-  spn_dep_id_t id;
   spn_dep_info_t* info;
   sp_dyn_array(spn_dep_option_t) options;
   spn_dep_build_kind_t kind;
   spn_dep_build_paths_t paths;
-  sp_hash_t hash;
   sp_str_t build_id;
+
   SDL_PropertiesID shell;
   SDL_Environment* environment;
-
   SDL_IOStream* out;
   SDL_IOStream* err;
 
+  spn_dep_state_t state;
+
+  struct {
+    sp_str_t current;
+    sp_str_t desired;
+    sp_str_t resolved;
+    sp_str_t message;
+    u32 delta;
+  } commits;
+
   sp_thread_t thread;
   sp_mutex_t mutex;
-  spn_dep_build_state_t state;
-  spn_dep_repo_state_t repo_state;
-  spn_dep_update_info_t update;
   c8 confirm_keys[3];
   c8 user_choice;
-  sp_dyn_array(sp_str_t) output;
-  sp_str_t build_error;
 
+  sp_str_t build_error;
 } spn_dep_context_t;
 
 typedef struct {
@@ -265,7 +283,6 @@ sp_str_t               spn_print(spn_dep_context_t* dep, spn_cli_print_kind_t ki
 sp_str_t               spn_print_one(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_print_compiler_t c);
 sp_str_t               spn_print_all(spn_dep_context_t* dep, spn_cli_print_compiler_t c);
 spn_build_context_t    spn_build_context_from_default_profile();
-void                   spn_build_context_prepare(spn_build_context_t* context);
 
 /////////
 // APP //
@@ -330,8 +347,6 @@ void               spn_app_init(spn_app_t* app, u32 num_args, const c8** args);
 void               spn_app_run(spn_app_t* app);
 spn_dep_context_t* spn_project_find_dependency(spn_project_t* project, sp_str_t name);
 bool               spn_project_write(spn_project_t* project, sp_str_t path);
-sp_str_t           spn_git_get_remote_url(sp_str_t repo_path);
-sp_str_t           spn_git_get_commit(sp_str_t repo_path);
 bool               spn_lock_file_write(spn_lock_file_t* lock, sp_str_t path);
 bool               spn_lock_file_read(spn_lock_file_t* lock, sp_str_t path);
 void               spn_lock_file_from_deps(spn_lock_file_t* lock, spn_build_context_t* context);
@@ -719,7 +734,10 @@ void spn_cli_command_print(spn_cli_t* cli) {
   spn_cli_print_compiler_t compiler = spn_print_compiler_from_cstr(sp_str_view(command->compiler));
 
   spn_build_context_t build = spn_build_context_from_default_profile();
-  spn_build_context_prepare(&build);
+  sp_dyn_array_for(build.deps, index) {
+    spn_dep_context_t* dep = build.deps + index;
+    spn_dep_context_prepare(dep);
+  }
 
   sp_str_t result = SP_ZERO_INITIALIZE();
   if (package.len) {
@@ -762,24 +780,23 @@ spn_build_context_t spn_build_context_from_default_profile() {
   return context;
 }
 
-spn_dep_context_t spn_dep_context_from_default_profile(sp_str_t id) {
+spn_dep_context_t spn_dep_context_from_default_profile(sp_str_t name) {
   spn_dep_context_t dep = {
-    .id = sp_str_copy(id),
-    .info = spn_dep_find(id),
+    .info = spn_dep_find(name),
     .options = SP_NULLPTR
   };
 
   if (!dep.info) {
     SP_FATAL(
       "{:color brightblue} was in your dependencies, but we couldn't find a recipe for it",
-      SP_FMT_STR(dep.id)
+      SP_FMT_STR(dep.info->name)
     );
   }
 
   // Check if there's a [deps.id] section with configuration
   toml_table_t* deps = toml_table_table(app.project.toml, "deps");
   if (deps) {
-    toml_table_t* toml = toml_table_table(deps, sp_str_to_cstr(id));
+    toml_table_t* toml = toml_table_table(deps, sp_str_to_cstr(name));
     if (toml) {
       toml_table_t* options = toml_table_table(toml, "options");
       if (options) {
@@ -791,7 +808,7 @@ spn_dep_context_t spn_dep_context_from_default_profile(sp_str_t id) {
   return dep;
 }
 
-void spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* options) {
+void spn_dep_context_add_options(spn_dep_context_t* dep, toml_table_t* options) {
   sp_dyn_array(spn_dep_parse_entry_t) entries = SP_NULLPTR;
 
   sp_dyn_array_push(entries, ((spn_dep_parse_entry_t) {
@@ -833,15 +850,15 @@ void spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* optio
         option.key = sp_str_to_upper(option.key);
         option.key = sp_str_replace_c8(option.key, '.', '_');
         option.value = sp_str_from_cstr(toml_table_unparsed(entry.table, key_data));
-        sp_dyn_array_push(context->options, option);
+        sp_dyn_array_push(dep->options, option);
       }
     }
   }
 
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(context->id));
-  sp_dyn_array_for(context->options, index) {
-    spn_dep_option_t* option = &context->options[index];
+  sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(dep->info->name));
+  sp_dyn_array_for(dep->options, index) {
+    spn_dep_option_t* option = &dep->options[index];
   }
 }
 
@@ -850,18 +867,19 @@ sp_str_t spn_dep_build_state_to_str(spn_dep_build_state_t state) {
     case SPN_DEP_BUILD_STATE_IDLE: return SP_LIT("idle");
     case SPN_DEP_BUILD_STATE_CLONING: return SP_LIT("cloning");
     case SPN_DEP_BUILD_STATE_FETCHING: return SP_LIT("fetching");
+    case SPN_DEP_BUILD_STATE_PREPARING: return SP_LIT("preparing");
     case SPN_DEP_BUILD_STATE_AWAITING_CONFIRMATION: return SP_LIT("confirming");
-    case SPN_DEP_BUILD_STATE_PULLING: return SP_LIT("pulling");
+    case SPN_DEP_BUILD_STATE_CHECKING_OUT: return SP_LIT("checking out");
     case SPN_DEP_BUILD_STATE_BUILDING: return SP_LIT("building");
     case SPN_DEP_BUILD_STATE_DONE: return SP_LIT("done");
     case SPN_DEP_BUILD_STATE_CANCELED: return SP_LIT("canceled");
     case SPN_DEP_BUILD_STATE_FAILED: return SP_LIT("failed");
-    default: SP_UNREACHABLE_RETURN(SP_LIT(""));
+    default: SP_FATAL("spn_dep_build_state_to_str(): Unknown build state {:fg brightred}", SP_FMT_U32(state));
   }
 }
 
 bool spn_dep_state_is_terminal(spn_dep_context_t* dep) {
-  switch (dep->state) {
+  switch (dep->state.build) {
     case SPN_DEP_BUILD_STATE_FAILED:
     case SPN_DEP_BUILD_STATE_DONE:
     case SPN_DEP_BUILD_STATE_CANCELED: return true;
@@ -982,8 +1000,18 @@ sp_str_t spn_git_get_remote_url(sp_str_t repo_path) {
   return sp_str_trim_right(result.output);
 }
 
-sp_str_t spn_git_get_commit(sp_str_t repo_path) {
-  SDL_Process* process = SPN_SH("git", "-C", sp_str_to_cstr(repo_path), "rev-parse", sp_str_to_cstr(SPN_GIT_HEAD));
+sp_str_t spn_git_get_commit(sp_str_t repo_path, sp_str_t id) {
+  SDL_Process* process = SPN_SH("git", "-C", sp_str_to_cstr(repo_path), "rev-parse", "--short=10", sp_str_to_cstr(id));
+  spn_sh_process_result_t result = spn_sh_read_process(process);
+  SDL_DestroyProcess(process);
+  if (result.return_code != 0) {
+    return SP_LIT("");
+  }
+  return sp_str_trim_right(result.output);
+}
+
+sp_str_t spn_git_get_commit_message(sp_str_t repo_path, sp_str_t id) {
+  SDL_Process* process = SPN_SH("git", "-C", sp_str_to_cstr(repo_path), "log", "--format=%B", "-n", "1", sp_str_to_cstr(id));
   spn_sh_process_result_t result = spn_sh_read_process(process);
   SDL_DestroyProcess(process);
   if (result.return_code != 0) {
@@ -998,6 +1026,15 @@ void spn_git_checkout(sp_str_t repo, sp_str_t commit) {
   SDL_DestroyProcess(process);
 }
 
+sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer) {
+  if (!n) return sp_str_copy(str);
+  if (str.len <= n) return sp_str_copy(str);
+  SP_ASSERT(trailer.len <= n);
+
+  str.len = n - trailer.len;
+  return sp_str_concat(str, trailer);
+}
+
 void spn_tui_update_noninteractive(spn_tui_t* tui) {
   sp_dyn_array_for(app.build.deps, i) {
     spn_dep_context_t* dep = &app.build.deps[i];
@@ -1005,15 +1042,15 @@ void spn_tui_update_noninteractive(spn_tui_t* tui) {
     if (!tui->terminal_reported[i] && spn_dep_state_is_terminal(dep)) {
       tui->terminal_reported[i] = true;
 
-      switch (dep->state) {
+      switch (dep->state.build) {
         case SPN_DEP_BUILD_STATE_DONE:
-          SP_LOG("{} {:color green}", SP_FMT_STR(dep->id), SP_FMT_CSTR("done"));
+          SP_LOG("{} {:color green}", SP_FMT_STR(dep->info->name), SP_FMT_CSTR("done"));
           break;
         case SPN_DEP_BUILD_STATE_FAILED:
-          SP_LOG("{} {:color red}: {}", SP_FMT_STR(dep->id), SP_FMT_CSTR("failed"), SP_FMT_STR(dep->build_error));
+          SP_LOG("{} {:color red}: {}", SP_FMT_STR(dep->info->name), SP_FMT_CSTR("failed"), SP_FMT_STR(dep->build_error));
           break;
         case SPN_DEP_BUILD_STATE_CANCELED:
-          SP_LOG("{} {:color yellow}", SP_FMT_STR(dep->id), SP_FMT_CSTR("canceled"));
+          SP_LOG("{} {:color yellow}", SP_FMT_STR(dep->info->name), SP_FMT_CSTR("canceled"));
           break;
         default:
           break;
@@ -1030,28 +1067,52 @@ void spn_tui_update_interactive(spn_tui_t* tui) {
     sp_str_builder_t builder = SP_ZERO_INITIALIZE();
 
     sp_mutex_lock(&dep->mutex);
-    sp_str_t name = sp_str_pad(dep->id, tui->width);
-    sp_str_t state = sp_str_pad(spn_dep_build_state_to_str(dep->state), 10);
+    sp_str_t name = sp_str_pad(dep->info->name, tui->width);
+    sp_str_t state = sp_str_pad(spn_dep_build_state_to_str(dep->state.build), 10);
     sp_str_t status;
 
-    switch (dep->state) {
-      case SPN_DEP_BUILD_STATE_CANCELED:
+    switch (dep->state.build) {
+      case SPN_DEP_BUILD_STATE_CANCELED: {
+        status = sp_format(
+          "{} {:color brightyellow} {}",
+          SP_FMT_STR(name),
+          SP_FMT_STR(state)
+        );
+        break;
+      }
       case SPN_DEP_BUILD_STATE_FAILED: {
         sp_str_t error = dep->build_error.len ? dep->build_error : SP_LIT("No error reported");
 
         status = sp_format(
-          "{} {:color brightred} {}",
+          "{} {:color brightgreen} {:color brightblack} {} {:color brightcyan} {:color brightred}",
           SP_FMT_STR(name),
           SP_FMT_STR(state),
+          SP_FMT_STR(dep->commits.resolved),
+          SP_FMT_STR(dep->commits.message),
+          SP_FMT_STR(dep->paths.store),
           SP_FMT_STR(error)
         );
         break;
       }
       case SPN_DEP_BUILD_STATE_DONE: {
         status = sp_format(
-          "{} {:color brightgreen}",
+          "{} {:color brightgreen} {:color brightblack} {} {:color brightcyan}",
           SP_FMT_STR(name),
-          SP_FMT_STR(state)
+          SP_FMT_STR(state),
+          SP_FMT_STR(dep->commits.resolved),
+          SP_FMT_STR(dep->commits.message),
+          SP_FMT_STR(dep->paths.store)
+        );
+        break;
+      }
+      case SPN_DEP_BUILD_STATE_BUILDING: {
+        status = sp_format(
+          "{} {:color brightcyan} {:color brightblack} {} {:color brightcyan}",
+          SP_FMT_STR(name),
+          SP_FMT_STR(state),
+          SP_FMT_STR(dep->commits.resolved),
+          SP_FMT_STR(dep->commits.message),
+          SP_FMT_STR(dep->paths.store)
         );
         break;
       }
@@ -1060,7 +1121,7 @@ void spn_tui_update_interactive(spn_tui_t* tui) {
           "{} {:color brightcyan} {} new commits; {:color brightyellow} to pull, {:color brightyellow} to cancel, {:color brightyellow} to pull + stop asking",
           SP_FMT_STR(name),
           SP_FMT_STR(state),
-          SP_FMT_U32(dep->update.num_commits),
+          SP_FMT_U32(dep->commits.delta),
           SP_FMT_C8(dep->confirm_keys[0]),
           SP_FMT_C8(dep->confirm_keys[1]),
           SP_FMT_C8(dep->confirm_keys[2])
@@ -1111,7 +1172,7 @@ void spn_tui_read(spn_tui_t* tui) {
     // Distribute input to waiting threads
     sp_dyn_array_for(app.build.deps, i) {
       spn_dep_context_t* dep = app.build.deps + i;
-      if (dep->state != SPN_DEP_BUILD_STATE_AWAITING_CONFIRMATION) continue;
+      if (dep->state.build != SPN_DEP_BUILD_STATE_AWAITING_CONFIRMATION) continue;
 
       for (u32 j = 0; j < SPN_TUI_NUM_OPTIONS; j++) {
         if (input_char == dep->confirm_keys[j]) {
@@ -1130,7 +1191,7 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_state_t state) {
   tui->width = 0;
   sp_dyn_array_for(app.build.deps, i) {
     spn_dep_context_t* dep = &app.build.deps[i];
-    tui->width = SP_MAX(tui->width, dep->id.len);
+    tui->width = SP_MAX(tui->width, dep->info->name.len);
   }
 
   switch (tui->state) {
@@ -1158,8 +1219,8 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_state_t state) {
       // Print initial state for each dependency
       sp_dyn_array_for(app.build.deps, i) {
         spn_dep_context_t* dep = &app.build.deps[i];
-        sp_str_t name = sp_str_pad(dep->id, tui->width);
-        sp_str_t state_str = spn_dep_build_state_to_str(dep->state);
+        sp_str_t name = sp_str_pad(dep->info->name, tui->width);
+        sp_str_t state_str = spn_dep_build_state_to_str(dep->state.build);
         SP_LOG("{} {:fg brightcyan}", SP_FMT_STR(name), SP_FMT_STR(state_str));
       }
       break;
@@ -1178,17 +1239,10 @@ void spn_tui_update(spn_tui_t* tui) {
   }
 }
 
-void spn_build_context_prepare(spn_build_context_t* context) {
-  sp_dyn_array_for(context->deps, index) {
-    spn_dep_context_t* dep = context->deps + index;
-    spn_dep_context_prepare(dep);
-  }
-}
-
 spn_dep_context_t* spn_dep_context_find(spn_build_context_t* build, sp_str_t name) {
   sp_dyn_array_for(build->deps, index) {
     spn_dep_context_t* dep = build->deps + index;
-    if (sp_str_equal(dep->id, name)) {
+    if (sp_str_equal(dep->info->name, name)) {
       return dep;
     }
   }
@@ -1198,16 +1252,23 @@ spn_dep_context_t* spn_dep_context_find(spn_build_context_t* build, sp_str_t nam
 
 void spn_dep_context_set_env_var(spn_dep_context_t* dep, sp_str_t name, sp_str_t value) {
   if (!SDL_SetEnvironmentVariable(dep->environment, sp_str_to_cstr(name), sp_str_to_cstr(value), SP_SDL_OVERWRITE_ENV_VAR)) {
-    SP_FATAL("Failed to set {}={} in build context for {}", SP_FMT_STR(name), SP_FMT_STR(value), SP_FMT_STR(dep->id));
+    SP_FATAL("Failed to set {}={} in build context for {}", SP_FMT_STR(name), SP_FMT_STR(value), SP_FMT_STR(dep->info->name));
   }
 }
 
 void spn_dep_context_prepare(spn_dep_context_t* dep) {
+  sp_mutex_lock(&dep->mutex);
+  dep->commits.resolved = spn_git_get_commit(dep->info->paths.source, SPN_GIT_HEAD);
+  dep->commits.message = spn_git_get_commit_message(dep->info->paths.source, dep->commits.resolved);
+  dep->commits.message = sp_str_truncate(dep->commits.message, 32, SP_LIT("..."));
+  dep->commits.message = sp_str_pad(dep->commits.message, 32);
+
   dep->kind = SPN_BUILD_KIND_DEBUG;
 
   sp_dyn_array(sp_hash_t) hashes = SP_NULLPTR;
 
-  sp_dyn_array_push(hashes, sp_hash_str(dep->id));
+  sp_dyn_array_push(hashes, sp_hash_str(dep->info->name));
+  sp_dyn_array_push(hashes, sp_hash_str(dep->commits.resolved));
   sp_dyn_array_push(hashes, sp_hash_bytes(&dep->kind, sizeof(dep->kind), 0));
 
   sp_dyn_array_for(dep->options, index) {
@@ -1216,21 +1277,20 @@ void spn_dep_context_prepare(spn_dep_context_t* dep) {
     sp_dyn_array_push(hashes, sp_hash_str(option->value));
   }
 
-  dep->hash = sp_hash_combine(hashes, sp_dyn_array_size(hashes));
-  dep->build_id = sp_format("{}", SP_FMT_SHORT_HASH(dep->hash));
+  sp_hash_t hash = sp_hash_combine(hashes, sp_dyn_array_size(hashes));
+  dep->build_id = sp_format("{}", SP_FMT_SHORT_HASH(hash));
 
-  sp_str_t build = sp_os_join_path(app.paths.build, dep->id);
-  sp_str_t store = sp_os_join_path(app.paths.store, dep->id);
-  dep->paths.source = sp_os_join_path(app.paths.source, dep->id);
+  sp_str_t build = sp_os_join_path(app.paths.build, dep->info->name);
+  sp_str_t store = sp_os_join_path(app.paths.store, dep->info->name);
   dep->paths.build = sp_os_join_path(build, dep->build_id);
   dep->paths.store = sp_os_join_path(store, dep->build_id);
   dep->paths.include = sp_os_join_path(dep->paths.store, SP_LIT("include"));
   dep->paths.bin = sp_os_join_path(dep->paths.store, SP_LIT("bin"));
   dep->paths.vendor = sp_os_join_path(dep->paths.store, SP_LIT("vendor"));
-  dep->paths.recipe = sp_os_join_path(app.paths.recipes, sp_format("{}.mk", SP_FMT_STR(dep->id)));
   dep->paths.std_out = sp_os_join_path(dep->paths.build, SP_LIT("build.stdout"));
   dep->paths.std_err = sp_os_join_path(dep->paths.build, SP_LIT("build.stderr"));
   dep->paths.std_in  = sp_os_join_path(dep->paths.build, SP_LIT("build.stdin"));
+  sp_mutex_unlock(&dep->mutex);
 
   sp_os_create_directory(dep->paths.build);
   sp_os_create_directory(dep->paths.store);
@@ -1241,7 +1301,7 @@ void spn_dep_context_prepare(spn_dep_context_t* dep) {
   dep->err = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_err), "w");
 
   dep->environment = SDL_CreateEnvironment(SP_SDL_INHERIT_ENVIRONMENT);
-  spn_dep_context_set_env_var(dep, SP_LIT("SPN_DIR_PROJECT"), dep->paths.source);
+  spn_dep_context_set_env_var(dep, SP_LIT("SPN_DIR_PROJECT"), dep->info->paths.source);
   spn_dep_context_set_env_var(dep, SP_LIT("SPN_DIR_BUILD"), dep->paths.build);
   spn_dep_context_set_env_var(dep, SP_LIT("SPN_DIR_STORE_INCLUDE"), dep->paths.include);
   spn_dep_context_set_env_var(dep, SP_LIT("SPN_DIR_STORE_BIN"), dep->paths.bin);
@@ -1263,7 +1323,7 @@ void spn_dep_context_prepare(spn_dep_context_t* dep) {
   SDL_SetPointerProperty(dep->shell, SDL_PROP_PROCESS_CREATE_STDERR_POINTER, dep->err);
   SDL_SetNumberProperty(dep->shell, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_REDIRECT);
 
-  dep->state = SPN_DEP_BUILD_STATE_IDLE;
+  dep->state.build = SPN_DEP_BUILD_STATE_IDLE;
   sp_mutex_init(&dep->mutex, SP_MUTEX_PLAIN);
 
 }
@@ -1271,41 +1331,42 @@ void spn_dep_context_prepare(spn_dep_context_t* dep) {
 s32 spn_dep_context_build_async(void* user_data) {
   spn_dep_context_t* dep = (spn_dep_context_t*)user_data;
 
-  if (sp_os_does_path_exist(dep->paths.source)) {
-    // If the repository exists, we just nee
+  if (sp_os_does_path_exist(dep->info->paths.source)) {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
-    spn_git_fetch(dep->paths.source);
+    spn_git_fetch(dep->info->paths.source);
 
+    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
     spn_lock_entry_t* lock = spn_dep_context_get_lock_entry(dep);
-    sp_str_t commit = lock ? lock->commit : SPN_GIT_ORIGIN_HEAD;
-    spn_git_checkout(dep->paths.source, commit);
-    dep->update.num_commits = spn_git_num_updates(dep->paths.source, commit, SPN_GIT_ORIGIN_HEAD);
+    dep->commits.current = lock ? lock->commit : spn_git_get_commit(dep->info->paths.source, SPN_GIT_ORIGIN_HEAD);
+    spn_git_checkout(dep->info->paths.source, dep->commits.current);
 
-    bool is_stale = dep->update.num_commits > 0;
+    dep->commits.delta = spn_git_num_updates(dep->info->paths.source, dep->commits.current, SPN_GIT_ORIGIN_HEAD);
+
+    bool is_stale = dep->commits.delta > 0;
     bool is_locked = app.cli.lock;
 
     if (is_stale) {
       if (is_locked) {
-        dep->repo_state = SPN_DEP_REPO_STATE_CLEAN;
+        dep->state.repo = SPN_DEP_REPO_STATE_CLEAN;
       }
       else {
-        dep->repo_state = SPN_DEP_REPO_STATE_STALE;
+        dep->state.repo = SPN_DEP_REPO_STATE_STALE;
       }
     }
     else {
-      dep->repo_state = SPN_DEP_REPO_STATE_CLEAN;
+      dep->state.repo = SPN_DEP_REPO_STATE_CLEAN;
     }
   }
   else {
-    dep->repo_state = SPN_DEP_REPO_STATE_UNINITIALIZED;
+    dep->state.repo = SPN_DEP_REPO_STATE_UNINITIALIZED;
   }
 
-  switch (dep->repo_state) {
+  switch (dep->state.repo) {
     case SPN_DEP_REPO_STATE_UNINITIALIZED: {
       spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
 
       spn_sh_make_context_t make = {
-        .makefile = dep->paths.recipe,
+        .makefile = dep->info->paths.recipe,
         .target = app.targets.clone,
         .shell = dep->shell
       };
@@ -1326,8 +1387,6 @@ s32 spn_dep_context_build_async(void* user_data) {
         spn_dep_context_set_build_error(dep, spn_sh_build_make_error(&make));
         return make.result.return_code;
       }
-
-      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
 
       SDL_DestroyProcess(make.process);
 
@@ -1352,13 +1411,13 @@ s32 spn_dep_context_build_async(void* user_data) {
           if (choice == dep->confirm_keys[0]) {
             break;
           }
-          else if (choice == dep->confirm_keys[2]) {
-            app.config.auto_pull_deps = true;
-            break;
-          }
           else if (choice == dep->confirm_keys[1]) {
             spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
             return 1;
+          }
+          else if (choice == dep->confirm_keys[2]) {
+            app.config.auto_pull_deps = true;
+            break;
           }
           else {
             SDL_Delay(5);
@@ -1366,18 +1425,20 @@ s32 spn_dep_context_build_async(void* user_data) {
         }
       }
 
-      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PULLING);
-      spn_git_checkout(dep->paths.source, SPN_GIT_ORIGIN_HEAD);
+      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
+      spn_git_checkout(dep->info->paths.source, SPN_GIT_ORIGIN_HEAD);
     }
     case SPN_DEP_REPO_STATE_CLEAN: {
       break;
     }
   }
 
-  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_BUILDING);
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PREPARING);
+  spn_dep_context_prepare(dep);
 
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_BUILDING);
   spn_sh_make_context_t make = {
-    .makefile = dep->paths.recipe,
+    .makefile = dep->info->paths.recipe,
     .target = app.targets.build,
     .working_directory = dep->paths.build,
     .shell = dep->shell
@@ -1410,13 +1471,13 @@ s32 spn_dep_context_build_async(void* user_data) {
 
 void spn_dep_context_set_build_state(spn_dep_context_t* dep, spn_dep_build_state_t state) {
   sp_mutex_lock(&dep->mutex);
-  dep->state = state;
+  dep->state.build = state;
   sp_mutex_unlock(&dep->mutex);
 }
 
 void spn_dep_context_set_build_error(spn_dep_context_t* dep, sp_str_t error) {
   sp_mutex_lock(&dep->mutex);
-  dep->state = SPN_DEP_BUILD_STATE_FAILED;
+  dep->state.build = SPN_DEP_BUILD_STATE_FAILED;
   dep->build_error = sp_str_copy(error);
   sp_mutex_unlock(&dep->mutex);
 }
@@ -1424,7 +1485,7 @@ void spn_dep_context_set_build_error(spn_dep_context_t* dep, sp_str_t error) {
 spn_lock_entry_t* spn_dep_context_get_lock_entry(spn_dep_context_t* dep) {
   sp_dyn_array_for(app.lock, index) {
     spn_lock_entry_t* lock = app.lock + index;
-    if (sp_str_equal(lock->name, dep->id)) {
+    if (sp_str_equal(lock->name, dep->info->name)) {
       return lock;
     }
   }
@@ -1474,10 +1535,10 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   SDL_SetAtomicInt(&app->control, 0);
 
   app->targets = (spn_targets_t) {
-    .build = SP_LIT("spn-build"),
+    .build = SP_LIT("spn-build-internal"),
     .clone = SP_LIT("spn-clone"),
     .libs = SP_LIT("spn-package-libs"),
-    .url = SP_LIT("spn-package-url")
+    .url = SP_LIT("spn-package-url"),
   };
 
   app->paths.executable = sp_os_get_executable_path();
@@ -1578,12 +1639,18 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   // Read all the recipe files from disk
   sp_os_directory_entry_list_t entries = sp_os_scan_directory(app->paths.recipes);
   for (sp_os_directory_entry_t* entry = entries.data; entry < entries.data + entries.count; entry++) {
+    sp_str_t name = sp_os_extract_stem(entry->file_name);
+    if (sp_str_equal_cstr(name, "spn")) continue;
+    if (sp_str_equal_cstr(name, "spn_sfh")) continue;
 
     spn_dep_info_t dep = {
-      .name = sp_os_extract_stem(entry->file_name),
-      .path = sp_str_copy(entry->file_path),
+      .name = name,
       .url = spn_dep_read_url(entry->file_path),
-      .libs = spn_dep_read_libs(entry->file_path)
+      .libs = spn_dep_read_libs(entry->file_path),
+      .paths = {
+        .source = sp_os_join_path(app->paths.source, name),
+        .recipe = sp_os_join_path(app->paths.recipes, sp_format("{}.mk", SP_FMT_STR(name))),
+      }
     };
     sp_dyn_array_push(app->deps, dep);
   }
@@ -1731,16 +1798,16 @@ bool spn_project_write(spn_project_t* project, sp_str_t path) {
   return SDL_SaveFile(sp_str_to_cstr(path), content.data, content.len);
 }
 
-void spn_lock_file_from_deps(spn_lock_file_t* lock, spn_build_context_t* context) {
+void spn_lock_file_from_deps(spn_lock_file_t* lock, spn_build_context_t* build) {
   sp_dyn_array_clear(*lock);
 
-  sp_dyn_array_for(context->deps, i) {
-    spn_dep_context_t* dep = &context->deps[i];
+  sp_dyn_array_for(build->deps, i) {
+    spn_dep_context_t* dep = &build->deps[i];
 
     spn_lock_entry_t entry = SP_ZERO_INITIALIZE();
-    entry.name = sp_str_copy(dep->id);
-    entry.url = spn_git_get_remote_url(dep->paths.source);
-    entry.commit = spn_git_get_commit(dep->paths.source);
+    entry.name = sp_str_copy(dep->info->name);
+    entry.url = spn_git_get_remote_url(dep->info->paths.source);
+    entry.commit = spn_git_get_commit(dep->info->paths.source, SPN_GIT_HEAD);
     entry.build_id = sp_str_copy(dep->build_id);
 
     sp_dyn_array_push(*lock, entry);
@@ -1885,8 +1952,6 @@ void spn_cli_command_build(spn_cli_t* cli) {
 
   spn_lock_file_read(&app.lock, app.paths.lock);
 
-  spn_build_context_prepare(&app.build);
-
   sp_dyn_array_for(app.build.deps, index) {
     spn_dep_context_t* dep = app.build.deps + index;
     sp_thread_init(&dep->thread, spn_dep_context_build_async, dep);
@@ -1916,23 +1981,43 @@ void spn_cli_command_build(spn_cli_t* cli) {
 
   spn_tui_cleanup(&app.tui);
 
-  // Generate lock file after successful build
-  bool all_succeeded = true;
+  // Report any failures
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+
+  bool failed = false;
   sp_dyn_array_for(app.build.deps, i) {
     spn_dep_context_t* dep = &app.build.deps[i];
-    if (dep->state != SPN_DEP_BUILD_STATE_DONE) {
-      all_succeeded = false;
-      break;
+    if (dep->state.build != SPN_DEP_BUILD_STATE_DONE) {
+      failed = true;
+
+      sp_size_t file_size = 0;
+      c8* file_data = (c8*)SDL_LoadFile(sp_str_to_cstr(dep->paths.std_err), &file_size);
+
+      if (!file_data) {
+        SP_FATAL(
+          "Failed to open {:fg brightcyan} while reporting error for {:fg brightcyan}",
+          SP_FMT_STR(dep->paths.std_err),
+          SP_FMT_STR(dep->info->name)
+        );
+      }
+
+      sp_str_builder_new_line(&builder);
+      sp_str_builder_append_fmt(&builder, "{:fg brightyellow}", SP_FMT_STR(dep->info->name));
+      sp_str_builder_new_line(&builder);
+      sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_CSTR(file_data));
     }
   }
 
-  if (all_succeeded) {
-    spn_lock_file_from_deps(&app.lock, &app.build);
-    if (!spn_lock_file_write(&app.lock, app.paths.lock)) {
-      SP_LOG("Warning: Failed to write lock file to {:fg brightcyan}", SP_FMT_STR(app.paths.lock));
-    } else {
-      SP_LOG("Generated lock file: {:fg brightcyan}", SP_FMT_STR(app.paths.lock));
-    }
+  if (failed) {
+    sp_log(sp_str_builder_write(&builder));
+    SP_EXIT_FAILURE();
+  }
+
+  spn_lock_file_from_deps(&app.lock, &app.build);
+  if (!spn_lock_file_write(&app.lock, app.paths.lock)) {
+    SP_LOG("Warning: Failed to write lock file to {:fg brightcyan}", SP_FMT_STR(app.paths.lock));
+  } else {
+    SP_LOG("Generated lock file: {:fg brightcyan}", SP_FMT_STR(app.paths.lock));
   }
 }
 

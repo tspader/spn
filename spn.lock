@@ -1,36 +1,36 @@
 [[package]]
 name = "sp"
 git_url = "git@github.com:spaderthomas/sp.git"
-git_commit = "0c02db82398004e15615a4bdfc520569a7084be7"
-build_id = "dfc2a432"
+git_commit = "0c02db8239"
+build_id = "ec53e611"
 
 [[package]]
 name = "argparse"
 git_url = "git@github.com:spaderthomas/argparse.git"
-git_commit = "45e0e563c4a79cdda4ed6bcaeaaa234774c6e024"
-build_id = "11e20932"
+git_commit = "45e0e563c4"
+build_id = "7475cf26"
 
 [[package]]
 name = "sdl3"
 git_url = "git@github.com:libsdl-org/SDL.git"
-git_commit = "7323104f970162c4a400a255ab77463532202392"
-build_id = "f99ad78d"
+git_commit = "1f007ad5cd"
+build_id = "fececb17"
 
 [[package]]
 name = "utest"
 git_url = "git@github.com:sheredom/utest.h.git"
-git_commit = "fb622dc480a56cc53ac9562a4436281bef91c989"
-build_id = "304b9af9"
+git_commit = "fb622dc480"
+build_id = "b1d3b34a"
 
 [[package]]
 name = "toml"
 git_url = "git@github.com:tspader/toml.git"
-git_commit = "73b6aa43835ff9a3aa80577242dccd2ded4b3820"
-build_id = "2c83a82"
+git_commit = "73b6aa4383"
+build_id = "43d14bfa"
 
 [[package]]
 name = "dr_libs"
 git_url = "git@github.com:mackron/dr_libs.git"
-git_commit = "b962384395249f54168d5f5f175c47bd7b39dc1d"
-build_id = "e9aa6cc4"
+git_commit = "b962384395"
+build_id = "b11add31"
 

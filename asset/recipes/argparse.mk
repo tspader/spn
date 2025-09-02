@@ -1,18 +1,4 @@
-include spn.mk
-
 SPN_URL := git@github.com:tspader/argparse.git
-HEADER = $(SPN_DIR_STORE_INCLUDE)/argparse.h
+SPN_SINGLE_HEADER := argparse.h
 
-
-.PHONY: spn-clone spn-build
-
-$(SPN_DIR_PROJECT):
-	git clone $(SPN_URL) $(SPN_DIR_PROJECT)
-
-$(HEADER): $(SPN_DIR_PROJECT)
-	cp $(SPN_DIR_PROJECT)/argparse.h $(HEADER)
-
-spn-clone: $(SPN_DIR_PROJECT)
-
-spn-build: $(HEADER)
-
+include spn_sfh.mk
