@@ -270,8 +270,6 @@ sp_dyn_array(sp_str_t) spn_dep_read_libs(sp_str_t file_path);
 sp_str_t               spn_dep_option_env_name(spn_dep_option_t* option);
 sp_str_t               spn_dep_build_state_to_str(spn_dep_build_state_t state);
 spn_lock_entry_t*      spn_dep_context_get_lock_entry(spn_dep_context_t* dep);
-void                   spn_dep_context_build(spn_dep_context_t* context);
-void                   spn_dep_context_clone(spn_dep_context_t* context);
 void                   spn_dep_context_prepare(spn_dep_context_t* context);
 void                   spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* toml);
 spn_dep_context_t      spn_dep_context_from_default_profile(sp_str_t name);
@@ -735,8 +733,7 @@ void spn_cli_command_print(spn_cli_t* cli) {
 
   spn_build_context_t build = spn_build_context_from_default_profile();
   sp_dyn_array_for(build.deps, index) {
-    spn_dep_context_t* dep = build.deps + index;
-    spn_dep_context_prepare(dep);
+    spn_dep_context_prepare(build.deps + index);
   }
 
   sp_str_t result = SP_ZERO_INITIALIZE();
@@ -804,6 +801,9 @@ spn_dep_context_t spn_dep_context_from_default_profile(sp_str_t name) {
       }
     }
   }
+
+  spn_lock_entry_t* lock = spn_dep_context_get_lock_entry(&dep);
+  dep.commits.current = lock ? lock->commit : spn_git_get_commit(dep.info->paths.source, SPN_GIT_ORIGIN_HEAD);
 
   return dep;
 }
@@ -1336,8 +1336,6 @@ s32 spn_dep_context_build_async(void* user_data) {
     spn_git_fetch(dep->info->paths.source);
 
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
-    spn_lock_entry_t* lock = spn_dep_context_get_lock_entry(dep);
-    dep->commits.current = lock ? lock->commit : spn_git_get_commit(dep->info->paths.source, SPN_GIT_ORIGIN_HEAD);
     spn_git_checkout(dep->info->paths.source, dep->commits.current);
 
     dep->commits.delta = spn_git_num_updates(dep->info->paths.source, dep->commits.current, SPN_GIT_ORIGIN_HEAD);
@@ -1657,6 +1655,8 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   qsort(app->deps, sp_dyn_array_size(app->deps), sizeof(spn_dep_info_t), spn_dep_sort_kernel_alphabetical);
 
+  spn_lock_file_read(&app->lock, app->paths.lock);
+
   bool needs_project = true;
   if (cli->num_args) {
     if (sp_cstr_equal(cli->args[0], "init") ||
@@ -1949,8 +1949,6 @@ bool spn_project_read(spn_project_t* project, sp_str_t path) {
 
 void spn_cli_command_build(spn_cli_t* cli) {
   app.build = spn_build_context_from_default_profile();
-
-  spn_lock_file_read(&app.lock, app.paths.lock);
 
   sp_dyn_array_for(app.build.deps, index) {
     spn_dep_context_t* dep = app.build.deps + index;
