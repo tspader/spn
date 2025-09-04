@@ -1,8 +1,8 @@
 [[package]]
 name = "sp"
 git_url = "git@github.com:spaderthomas/sp.git"
-git_commit = "0c02db8239"
-build_id = "ec53e611"
+git_commit = "1e00c112d3"
+build_id = "2cce1b49"
 
 [[package]]
 name = "argparse"
@@ -13,8 +13,8 @@ build_id = "7475cf26"
 [[package]]
 name = "sdl3"
 git_url = "git@github.com:libsdl-org/SDL.git"
-git_commit = "1f007ad5cd"
-build_id = "fececb17"
+git_commit = "9abeeebad5"
+build_id = "6984906c"
 
 [[package]]
 name = "utest"

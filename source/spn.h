@@ -1,6 +1,27 @@
 #ifndef SPN_H
 #define SPN_H
 
+#ifdef _WIN32
+  #include "windows.h"
+  #include "shlobj.h"
+  #include "commdlg.h"
+  #include "shellapi.h"
+  #include <conio.h>
+  #include <io.h>
+#else
+  #include <termios.h>
+  #include <unistd.h>
+  #include <fcntl.h>
+#endif
+
+#ifdef _WIN32
+#define SDL_DECLSPEC __declspec(dllimport)
+#define SPN_API __declspec(dllexport)
+#define SP_API SPN_API
+#else
+#define SPN_API
+#endif
+
 #define SP_IMPLEMENTATION
 #define SP_OS_BACKEND_SDL
 #include "sp.h"
@@ -11,10 +32,9 @@
 #define TOML_IMPLEMENTATION
 #include "toml.h"
 
-#include <termios.h>
-#include <unistd.h>
-#include <fcntl.h>
-
+#include "lua.h"
+#include "lualib.h"
+#include "lauxlib.h"
 
 ///////////
 // SHELL //
@@ -53,6 +73,10 @@ spn_sh_process_result_t spn_sh_read_process(SDL_Process* process);
 
 typedef struct spn_build_context_t spn_build_context_t;
 
+typedef struct {
+  u32 std_in;
+} sp_tui_checkpoint_t;
+
 typedef enum {
   SPN_TUI_STATE_INTERACTIVE,
   SPN_TUI_STATE_NONINTERACTIVE
@@ -65,11 +89,30 @@ typedef struct {
   u32 width;
 
   struct {
+#ifdef SP_WIN32
+    sp_win32_dword_t original_input_mode;
+    sp_win32_dword_t original_output_mode;
+    sp_win32_handle_t input_handle;
+    sp_win32_handle_t output_handle;
+#else
     struct termios ios;
+#endif
     bool modified;
   } terminal;
 } spn_tui_t;
 
+void sp_tui_print(sp_str_t str);
+void sp_tui_up(u32 n);
+void sp_tui_down(u32 n);
+void sp_tui_clear_line();
+void sp_tui_show_cursor();
+void sp_tui_hide_cursor();
+void sp_tui_home();
+void sp_tui_flush();
+void sp_tui_checkpoint(spn_tui_t* tui);
+void sp_tui_restore(spn_tui_t* tui);
+void sp_tui_setup_raw_mode(spn_tui_t* tui);
+bool sp_tui_read_char(c8* input_char);
 void spn_tui_update_noninteractive(spn_tui_t* tui);
 void spn_tui_update_interactive(spn_tui_t* tui);
 void spn_tui_update(spn_tui_t* tui);
@@ -91,6 +134,49 @@ sp_str_t spn_git_get_remote_url(sp_str_t repo_path);
 sp_str_t spn_git_get_commit(sp_str_t repo_path, sp_str_t id);
 sp_str_t spn_git_get_commit_message(sp_str_t repo_path, sp_str_t id);
 sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer);
+
+
+/////////
+// LUA //
+/////////
+typedef enum {
+  SP_LUA_OK,
+  SP_LUA_ERROR_PATH_DOES_NOT_EXIST,
+  SP_LUA_ERROR_PATH_IS_NOT_DIRECTORY,
+  SP_LUA_ERROR_FILE_LOAD_ERROR,
+  SP_LUA_ERROR_FILE_RUN_ERROR,
+} sp_lua_error_t;
+
+typedef lua_State* sp_lua_context_t;
+
+typedef struct {
+  s32 count;
+} sp_lua_pop_t;
+
+typedef struct {
+  sp_lua_context_t state;
+  sp_lua_pop_t pop;
+} sp_lua_t;
+
+#define SPN_LUA_MASTER_TABLE "spn"
+
+
+/////////////////
+// TOML WRITER //
+/////////////////
+typedef struct {
+  sp_str_builder_t builder;
+  s32 indent_level;
+} sp_toml_writer_t;
+
+void     sp_toml_writer_add_header(sp_toml_writer_t* writer, sp_str_t name);
+void     sp_toml_writer_add_string(sp_toml_writer_t* writer, sp_str_t key, sp_str_t value);
+void     sp_toml_writer_add_s32(sp_toml_writer_t* writer, sp_str_t key, s32 value);
+void     sp_toml_writer_add_bool(sp_toml_writer_t* writer, sp_str_t key, bool value);
+void     sp_toml_writer_add_str_array(sp_toml_writer_t* writer, sp_str_t key, sp_dyn_array(sp_str_t) values);
+void     sp_toml_writer_new_line(sp_toml_writer_t* writer);
+sp_str_t sp_toml_writer_write(sp_toml_writer_t* writer);
+
 
 /////////
 // CLI //
@@ -129,7 +215,7 @@ typedef enum {
 typedef enum {
   SPN_PRINT_COMPILER_NONE,
   SPN_PRINT_COMPILER_GCC,
-} spn_cli_print_compiler_t;
+} spn_cli_compiler_t;
 
 typedef struct {
   const c8* kind;
@@ -138,7 +224,7 @@ typedef struct {
 } spn_cli_print_t;
 
 spn_cli_print_kind_t spn_print_kind_from_cstr(sp_str_t str);
-spn_cli_print_compiler_t spn_print_compiler_from_cstr(sp_str_t str);
+spn_cli_compiler_t spn_print_compiler_from_cstr(sp_str_t str);
 
 typedef struct {
   u32 num_args;
@@ -288,13 +374,13 @@ spn_lock_entry_t*      spn_dep_context_get_lock_entry(spn_dep_context_t* dep);
 void                   spn_dep_context_prepare(spn_dep_context_t* context);
 void                   spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* toml);
 spn_dep_context_t      spn_dep_context_from_default_profile(sp_str_t name);
-void                   spn_dep_context_set_env_var(spn_dep_context_t* context, sp_str_t name, sp_str_t value);
+void                   spn_dep_context_set_env(spn_dep_context_t* context, sp_str_t name, sp_str_t value);
 void                   spn_dep_context_set_build_state(spn_dep_context_t* dep, spn_dep_build_state_t state);
 void                   spn_dep_context_set_build_error(spn_dep_context_t* dep, sp_str_t error);
 spn_dep_context_t*     spn_dep_context_find(spn_build_context_t* build, sp_str_t name);
-sp_str_t               spn_print(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_print_compiler_t c);
-sp_str_t               spn_print_one(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_print_compiler_t c);
-sp_str_t               spn_print_all(spn_dep_context_t* dep, spn_cli_print_compiler_t c);
+sp_str_t               spn_print(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t c);
+sp_str_t               spn_print_one(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t c);
+sp_str_t               spn_print_all(spn_dep_context_t* dep, spn_cli_compiler_t c);
 spn_build_context_t    spn_build_context_from_default_profile();
 
 /////////
@@ -305,7 +391,7 @@ typedef struct {
   bool auto_pull_recipes;
   bool auto_pull_deps;
   sp_str_t cache_override;
-  sp_str_t spn_dir;  // Override path to spn repo for development
+  sp_str_t recipe_override;
   bool builtin_recipes_enabled;
 } spn_config_t;
 
@@ -318,10 +404,11 @@ typedef struct {
   sp_str_t config;
   sp_str_t   user_toml;
   sp_str_t cache;
-  sp_str_t   store;
   sp_str_t   build;
+  sp_str_t   store;
   sp_str_t   source;
-  sp_str_t     bootstrap;
+  sp_str_t     spn;
+  sp_str_t       lua;
   sp_str_t       recipes;
   sp_str_t project;
   sp_str_t   toml;
@@ -342,6 +429,14 @@ typedef struct {
 } spn_project_t;
 
 typedef struct {
+  spn_dep_info_t* deps;
+} spn_lua_context_t;
+
+
+/////////
+// APP //
+/////////
+typedef struct {
   spn_cli_t cli;
   spn_paths_t paths;
   spn_targets_t targets;
@@ -352,6 +447,8 @@ typedef struct {
   sp_dyn_array(spn_dep_info_t) deps;
   sp_dyn_array(spn_lock_entry_t) lock;
   SDL_AtomicInt control;
+  sp_lua_t lua;
+  spn_lua_context_t c;
 } spn_app_t;
 
 extern spn_app_t app;
@@ -365,22 +462,6 @@ bool               spn_lock_file_read(spn_lock_file_t* lock, sp_str_t path);
 void               spn_lock_file_from_deps(spn_lock_file_t* lock, spn_build_context_t* context);
 bool               spn_project_read(spn_project_t* project, sp_str_t path);
 
-/////////////////
-// TOML WRITER //
-/////////////////
-typedef struct {
-  sp_str_builder_t builder;
-  s32 indent_level;
-} sp_toml_writer_t;
-
-void     sp_toml_writer_add_header(sp_toml_writer_t* writer, sp_str_t name);
-void     sp_toml_writer_add_string(sp_toml_writer_t* writer, sp_str_t key, sp_str_t value);
-void     sp_toml_writer_add_s32(sp_toml_writer_t* writer, sp_str_t key, s32 value);
-void     sp_toml_writer_add_bool(sp_toml_writer_t* writer, sp_str_t key, bool value);
-void     sp_toml_writer_add_string_array(sp_toml_writer_t* writer, sp_str_t key, sp_dyn_array(sp_str_t) values);
-void     sp_toml_writer_new_line(sp_toml_writer_t* writer);
-sp_str_t sp_toml_writer_write(sp_toml_writer_t* writer);
-
 
 ////////////////////
 // IMPLEMENTATION //
@@ -388,6 +469,185 @@ sp_str_t sp_toml_writer_write(sp_toml_writer_t* writer);
 #ifdef SPN_IMPLEMENTATION
 
 spn_app_t app;
+
+void sp_lua_pop_add(sp_lua_pop_t* pop) {
+  pop->count++;
+}
+
+void sp_lua_pop_process(sp_lua_pop_t* pop) {
+  lua_pop(app.lua.state, pop->count);
+  pop->count = 0;
+}
+
+const char* sp_lua_format_file_load_error(const char* error) {
+  static char buffer [2048];
+  const char* fmt = "  %s";
+  snprintf(&buffer[0], 2048, fmt, error);
+
+  return &buffer[0];
+}
+
+s32 sp_lua_format_file_load_error_l(sp_lua_context_t l) {
+  const char* error = lua_tostring(app.lua.state, 1);
+  error = sp_lua_format_file_load_error(error);
+
+  lua_pop(app.lua.state, 1);
+  lua_pushstring(app.lua.state, error);
+  return 1;
+}
+
+sp_str_t sp_lua_error_to_string(sp_lua_error_t error) {
+  switch (error) {
+    SP_SWITCH_ENUM_TO_STRING_LOWER(SP_LUA_OK)
+    SP_SWITCH_ENUM_TO_STRING_LOWER(SP_LUA_ERROR_PATH_DOES_NOT_EXIST)
+    SP_SWITCH_ENUM_TO_STRING_LOWER(SP_LUA_ERROR_PATH_IS_NOT_DIRECTORY)
+    SP_SWITCH_ENUM_TO_STRING_LOWER(SP_LUA_ERROR_FILE_LOAD_ERROR)
+    SP_SWITCH_ENUM_TO_STRING_LOWER(SP_LUA_ERROR_FILE_RUN_ERROR)
+  }
+}
+
+
+void sp_lua_check_load_error(sp_lua_error_t result) {
+  if (result) {
+    const char* error = lua_tostring(app.lua.state, -1);
+    SP_FATAL("Load failed: {:fg brightred} {:fg brightblack}", sp_lua_error_to_string(result), SP_FMT_CSTR(error));
+  }
+}
+
+void sp_lua_check_run_error(sp_lua_error_t result) {
+  if (result) {
+    const char* error = lua_tostring(app.lua.state, -1);
+    SP_FATAL("Run failed: {:color brightred}", SP_FMT_CSTR(error));
+  }
+}
+
+sp_lua_error_t sp_lua_pcall(sp_str_t fn) {
+  lua_pushstring(app.lua.state, sp_str_to_cstr(fn));
+  lua_gettable(app.lua.state, -2);
+  s32 result = lua_pcall(app.lua.state, 0, 0, 0);
+  sp_lua_check_run_error(result);
+  return result;
+}
+
+sp_lua_error_t sp_lua_script_file(sp_str_t file_path) {
+  sp_lua_context_t l = app.lua.state;
+  s32 initial_stack_size = lua_gettop(l);
+
+  SP_LOG("sp_lua_script_file(): {:color brightblue}", SP_FMT_STR(file_path));
+
+  lua_pushcfunction(l, &sp_lua_format_file_load_error_l);
+
+  const char* file_path_cstr = sp_str_to_cstr(file_path);
+  bool result = luaL_loadfile(l, file_path_cstr);
+
+  // In all error cases, do not return early.
+  if (result) {
+    // There's a syntax error in the file. Since loadfile doesn't call the
+    // function we put on the stack, format the message manually.
+    const char* unformatted_error = lua_tostring(l, -1);
+    SP_LOG(
+      "Error loading {:fg brightblue}: {:fg brightblack}",
+      SP_FMT_STR(file_path),
+      SP_FMT_CSTR(sp_lua_format_file_load_error(unformatted_error))
+    );
+
+    lua_pop(l, 2);
+
+    return SP_LUA_ERROR_FILE_LOAD_ERROR;
+  }
+  else {
+    // The chunk compiled OK. Run it.
+    result = lua_pcall(l, 0, 0, -2);
+
+    if (result) {
+      // There was a runtime error running the chunk.
+      const char* unformatted_error = lua_tostring(l, -1);
+      SP_LOG(
+        "Error running {:fg brightblue}: {:fg brightblack}",
+        SP_FMT_STR(file_path),
+        SP_FMT_CSTR(sp_lua_format_file_load_error(unformatted_error))
+      );
+
+      lua_pop(l, 2);
+
+      return SP_LUA_ERROR_FILE_RUN_ERROR;
+    }
+
+    // The chunk loaded successfully!
+    lua_pop(l, 1);
+    return SP_LUA_OK;
+  }
+}
+
+sp_lua_error_t sp_lua_run(sp_lua_t* lua, const c8* script) {
+  sp_lua_context_t l = app.lua.state;
+
+  SP_LOG("{:fg brightyellow} {:fg brightblack}", SP_FMT_CSTR("lua"), SP_FMT_CSTR(script));
+  lua_pushcfunction(l, &sp_lua_format_file_load_error_l);
+  bool result = luaL_loadstring(l, script);
+
+  if (result) {
+    // There's a syntax error in the file.
+    const char* unformatted_error = lua_tostring(l, -1);
+    SP_LOG(
+      "Error loading script: {:fg brightred}",
+      SP_FMT_CSTR(sp_lua_format_file_load_error(unformatted_error))
+    );
+
+    lua_pop(l, 2);
+
+    return SP_LUA_ERROR_FILE_LOAD_ERROR;
+  }
+  else {
+    // The chunk compiled OK. Run it.
+    result = lua_pcall(l, 0, 0, -2);
+
+    if (result) {
+      // There was a runtime error running the chunk.
+      const char* unformatted_error = lua_tostring(l, -1);
+      SP_LOG(
+        "Error running script: {:fg brightred}",
+        SP_FMT_CSTR(sp_lua_format_file_load_error(unformatted_error))
+      );
+
+      lua_pop(l, 2);
+
+      return SP_LUA_ERROR_FILE_RUN_ERROR;
+    }
+
+    lua_pop(l, 1);
+    return SP_LUA_OK;
+  }
+}
+
+sp_lua_error_t sp_lua_run_fmt(sp_lua_t* lua, const c8* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  sp_str_t str = sp_format_v(SP_CSTR(fmt), args);
+  va_end(args);
+
+  return sp_lua_run(lua, sp_str_to_cstr(str));
+}
+
+void spn_lua_init() {
+  app.lua.state = luaL_newstate();
+  luaL_openlibs(app.lua.state);
+
+  sp_lua_run_fmt(&app.lua, "package.path = package.path .. ';' .. '{}/?.lua'", SP_FMT_STR(app.paths.lua));
+  sp_lua_run(&app.lua, "spn = require('spn')");
+
+  // spn.internal.init()
+  lua_getglobal(app.lua.state, "pcall");
+
+  lua_getglobal(app.lua.state, "spn");
+  lua_getfield(app.lua.state, -1, "internal");
+  lua_getfield(app.lua.state, -1, "init");
+  lua_remove(app.lua.state, -2);
+  lua_remove(app.lua.state, -2);
+
+  //lua_pushlightuserdata(L, my_struct);
+  lua_pcall(app.lua.state, 0, 0, 0);
+}
 
 // SHELL
 void spn_sh_make(spn_sh_make_context_t* make) {
@@ -459,6 +719,76 @@ void sp_tui_home() {
 void sp_tui_flush() {
   fflush(stdout);
 }
+
+// Platform-specific TUI implementations
+#ifdef SP_WIN32
+
+void sp_tui_checkpoint(spn_tui_t* tui) {
+  tui->terminal.input_handle = GetStdHandle(STD_INPUT_HANDLE);
+  tui->terminal.output_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+  GetConsoleMode(tui->terminal.input_handle, (DWORD*)&tui->terminal.original_input_mode);
+  GetConsoleMode(tui->terminal.output_handle, (DWORD*)&tui->terminal.original_output_mode);
+  tui->terminal.modified = true;
+}
+
+void sp_tui_restore(spn_tui_t* tui) {
+  if (tui->terminal.modified) {
+    SetConsoleMode(tui->terminal.input_handle, (DWORD)tui->terminal.original_input_mode);
+    SetConsoleMode(tui->terminal.output_handle, (DWORD)tui->terminal.original_output_mode);
+  }
+}
+
+void sp_tui_setup_raw_mode(spn_tui_t* tui) {
+  // Enable virtual terminal processing for ANSI sequences
+  sp_win32_dword_t output_mode = tui->terminal.original_output_mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+  SetConsoleMode(tui->terminal.output_handle, (DWORD)output_mode);
+
+  // Disable line input and echo for raw character input
+  sp_win32_dword_t input_mode = tui->terminal.original_input_mode & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT);
+  SetConsoleMode(tui->terminal.input_handle, (DWORD)input_mode);
+
+
+  CONSOLE_CURSOR_INFO info;
+  GetConsoleCursorInfo(tui->terminal.output_handle, &info);
+  info.bVisible = FALSE;
+  info.dwSize = 25;
+  SetConsoleCursorInfo(tui->terminal.output_handle, &info);
+}
+
+bool sp_tui_read_char(c8* input_char) {
+  if (_kbhit()) {
+    *input_char = _getch();
+    return true;
+  }
+  return false;
+}
+
+#else // POSIX
+
+void sp_tui_checkpoint(spn_tui_t* tui) {
+  tcgetattr(STDIN_FILENO, &tui->terminal.ios);
+  tui->terminal.modified = true;
+}
+
+void sp_tui_restore(spn_tui_t* tui) {
+  if (tui->terminal.modified) {
+    tcsetattr(STDIN_FILENO, TCSANOW, &tui->terminal.ios);
+  }
+}
+
+void sp_tui_setup_raw_mode(spn_tui_t* tui) {
+  struct termios ios = tui->terminal.ios;
+  ios.c_lflag &= ~(ICANON | ECHO);
+  tcsetattr(STDIN_FILENO, TCSANOW, &ios);
+  fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
+}
+
+bool sp_tui_read_char(c8* input_char) {
+  return read(STDIN_FILENO, input_char, 1) == 1;
+}
+
+#endif
 
 // TOML
 #define TOML_READ_BOOL(table, var, key) \
@@ -659,14 +989,14 @@ spn_cli_print_kind_t spn_print_kind_from_cstr(sp_str_t str) {
   SP_FATAL("Unknown flag {}; options are [include, lib-include, libs]",  SP_FMT_COLOR(SP_ANSI_FG_YELLOW), SP_FMT_QUOTED_STR(str));
 }
 
-spn_cli_print_compiler_t spn_print_compiler_from_cstr(sp_str_t str) {
+spn_cli_compiler_t spn_print_compiler_from_cstr(sp_str_t str) {
   if      (sp_str_equal_cstr(str, ""))    return SPN_PRINT_COMPILER_NONE;
   else if (sp_str_equal_cstr(str, "gcc")) return SPN_PRINT_COMPILER_GCC;
 
   SP_FATAL("Unknown flag {}; options are [include, lib-include, libs]",  SP_FMT_COLOR(SP_ANSI_FG_YELLOW), SP_FMT_QUOTED_STR(str));
 }
 
-sp_str_t spn_print_one(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_print_compiler_t compiler) {
+sp_str_t spn_print_one(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t compiler) {
   sp_str_t output = SP_ZERO_INITIALIZE();
   switch (kind) {
     case SPN_PRINT_INCLUDE: {
@@ -708,7 +1038,7 @@ sp_str_t spn_print_one(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cl
   }
 }
 
-sp_str_t spn_print_all(spn_dep_context_t* dep, spn_cli_print_compiler_t compiler) {
+sp_str_t spn_print_all(spn_dep_context_t* dep, spn_cli_compiler_t compiler) {
   spn_cli_print_kind_t kinds [] = { SPN_PRINT_INCLUDE, SPN_PRINT_LIB_INCLUDE, SPN_PRINT_LIBS };
 
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
@@ -722,7 +1052,7 @@ sp_str_t spn_print_all(spn_dep_context_t* dep, spn_cli_print_compiler_t compiler
   return result;
 }
 
-sp_str_t spn_print(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_print_compiler_t compiler) {
+sp_str_t spn_print(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t compiler) {
   switch (kind) {
     case SPN_PRINT_ALL: return spn_print_all(dep, compiler);
     default:            return spn_print_one(dep, kind, compiler);
@@ -753,7 +1083,7 @@ void spn_cli_command_print(spn_cli_t* cli) {
 
   sp_str_t package = sp_str_view(command->package);
   spn_cli_print_kind_t kind = spn_print_kind_from_cstr(sp_str_view(command->kind));
-  spn_cli_print_compiler_t compiler = spn_print_compiler_from_cstr(sp_str_view(command->compiler));
+  spn_cli_compiler_t compiler = spn_print_compiler_from_cstr(sp_str_view(command->compiler));
 
   spn_build_context_t build = spn_build_context_from_default_profile();
   sp_dyn_array_for(build.deps, index) {
@@ -1225,7 +1555,7 @@ void spn_tui_update_interactive(spn_tui_t* tui) {
 void spn_tui_cleanup(spn_tui_t* tui) {
   switch (tui->state) {
     case SPN_TUI_STATE_INTERACTIVE: {
-      tcsetattr(STDIN_FILENO, TCSANOW, &tui->terminal.ios);
+      sp_tui_restore(tui);
       sp_tui_show_cursor();
       sp_tui_home();
       sp_tui_flush();
@@ -1242,7 +1572,7 @@ void spn_tui_read(spn_tui_t* tui) {
   if (tui->state == SPN_TUI_STATE_NONINTERACTIVE) return;
 
   c8 input_char;
-  if (read(STDIN_FILENO, &input_char, 1) == 1) {
+  if (sp_tui_read_char(&input_char)) {
     // Distribute input to waiting threads
     sp_dyn_array_for(app.build.deps, i) {
       spn_dep_context_t* dep = app.build.deps + i;
@@ -1276,13 +1606,8 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_state_t state) {
       sp_tui_hide_cursor();
       sp_tui_flush();
 
-      // Set terminal to non-blocking mode
-      tcgetattr(STDIN_FILENO, &tui->terminal.ios);
-      struct termios ios = tui->terminal.ios;
-      ios.c_lflag &= ~(ICANON | ECHO);
-      tcsetattr(STDIN_FILENO, TCSANOW, &ios);
-      fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
-      tui->terminal.modified = true;
+      sp_tui_checkpoint(tui);
+      sp_tui_setup_raw_mode(tui);
 
       break;
     }
@@ -1324,7 +1649,7 @@ spn_dep_context_t* spn_dep_context_find(spn_build_context_t* build, sp_str_t nam
   return SP_NULLPTR;
 }
 
-void spn_dep_context_set_env_var(spn_dep_context_t* dep, sp_str_t name, sp_str_t value) {
+void spn_dep_context_set_env(spn_dep_context_t* dep, sp_str_t name, sp_str_t value) {
   if (!SDL_SetEnvironmentVariable(dep->environment, sp_str_to_cstr(name), sp_str_to_cstr(value), SP_SDL_OVERWRITE_ENV_VAR)) {
     SP_FATAL("Failed to set {}={} in build context for {}", SP_FMT_STR(name), SP_FMT_STR(value), SP_FMT_STR(dep->info->name));
   }
@@ -1375,15 +1700,15 @@ void spn_dep_context_prepare(spn_dep_context_t* dep) {
   dep->err = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_err), "w");
 
   dep->environment = SDL_CreateEnvironment(SP_SDL_INHERIT_ENVIRONMENT);
-  spn_dep_context_set_env_var(dep, SP_LIT("SPN_DIR_PROJECT"), dep->info->paths.source);
-  spn_dep_context_set_env_var(dep, SP_LIT("SPN_DIR_BUILD"), dep->paths.build);
-  spn_dep_context_set_env_var(dep, SP_LIT("SPN_DIR_STORE_INCLUDE"), dep->paths.include);
-  spn_dep_context_set_env_var(dep, SP_LIT("SPN_DIR_STORE_BIN"), dep->paths.bin);
-  spn_dep_context_set_env_var(dep, SP_LIT("SPN_DIR_STORE_VENDOR"), dep->paths.vendor);
+  spn_dep_context_set_env(dep, SP_LIT("SPN_DIR_PROJECT"), dep->info->paths.source);
+  spn_dep_context_set_env(dep, SP_LIT("SPN_DIR_BUILD"), dep->paths.build);
+  spn_dep_context_set_env(dep, SP_LIT("SPN_DIR_STORE_INCLUDE"), dep->paths.include);
+  spn_dep_context_set_env(dep, SP_LIT("SPN_DIR_STORE_BIN"), dep->paths.bin);
+  spn_dep_context_set_env(dep, SP_LIT("SPN_DIR_STORE_VENDOR"), dep->paths.vendor);
   sp_dyn_array_for(dep->options, index) {
     spn_dep_option_t* option = &dep->options[index];
     sp_str_t key = sp_str_concat(SP_LIT("SPN_OPT_"), option->key);
-    spn_dep_context_set_env_var(dep, key, option->value);
+    spn_dep_context_set_env(dep, key, option->value);
   }
 
   dep->shell = SDL_CreateProperties();
@@ -1575,6 +1900,11 @@ spn_lock_entry_t* spn_dep_context_get_lock_entry(spn_dep_context_t* dep) {
   return SP_NULLPTR;
 }
 
+SPN_API u32 foo(u32 bar) {
+  SP_LOG("from C: bar is {:fg brightyellow}", SP_FMT_U32(bar));
+  return bar * 2;
+}
+
 void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   spn_cli_t* cli = &app->cli;
 
@@ -1623,24 +1953,31 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     .url = SP_LIT("spn-package-url"),
   };
 
-  app->paths.executable = sp_os_get_executable_path();
-  app->paths.install = sp_os_parent_path(app->paths.executable);
+  sp_str_t sdl_base = sp_os_normalize_path(sp_str_from_cstr(SDL_GetBasePath()));
+  sp_str_t sdl_prefix = sp_os_normalize_path(sp_str_from_cstr(SDL_GetPrefPath(SP_NULLPTR, "spn")));
+  sp_str_t sdl_current = sp_os_normalize_path(sp_str_from_cstr(SDL_GetCurrentDirectory()));
 
+  // Install
+  app->paths.executable = sp_os_get_executable_path();
+  app->paths.install = sdl_base;
+
+  // Project
   if (app->cli.project_directory) {
     app->paths.project = sp_str_from_cstr(app->cli.project_directory);
   }
   else {
-    c8* working_directory = SDL_GetCurrentDirectory();
-    app->paths.project = sp_os_canonicalize_path(SP_CSTR(working_directory));
-    SDL_free(working_directory);
+    app->paths.project = sdl_current;
   }
   app->paths.toml = sp_os_join_path(app->paths.project, SP_LIT("spn.toml"));
   app->paths.lock = sp_os_join_path(app->paths.project, SP_LIT("spn.lock"));
 
-  const c8* xdg_cache = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "XDG_CACHE_HOME");
+  // Config
   const c8* xdg_config = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "XDG_CONFIG_HOME");
   const c8* home = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "HOME");
 
+#ifdef SP_WIN32
+  app->paths.config = sp_os_join_path(sdl_prefix, SP_LIT("config"));
+#else
   if (xdg_config) {
     app->paths.config = sp_os_join_path(SP_CSTR(xdg_config), SP_LIT("spn"));
   }
@@ -1650,21 +1987,17 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   else {
     SP_FATAL("No $XDG_CONFIG_HOME? No $HOME? Someone fucked up here and surely it was me.");
   }
+#endif
 
   app->paths.user_toml = sp_os_join_path(app->paths.config, SP_LIT("spn.toml"));
 
-  // Use cache_override from config if set, otherwise use default locations
-  if (sp_str_valid(app->config.cache_override)) {
+  spn_config_read(&app->config, app->paths.user_toml);
+
+  // Cache
+  if (app->config.cache_override.len) {
     app->paths.cache = sp_str_copy(app->config.cache_override);
-  }
-  else if (xdg_cache) {
-    app->paths.cache = sp_str_join(SP_CSTR(xdg_cache), SP_LIT("spn"), SP_LIT("/"));
-  }
-  else if (home) {
-    app->paths.cache = sp_str_join(SP_CSTR(home), SP_LIT(".cache/spn"), SP_LIT("/"));
-  }
-  else {
-    SP_FATAL("No $XDG_CACHE_HOME? No $HOME? Someone fucked up here and surely it was me.");
+  } else {
+    app->paths.cache = sp_os_join_path(sdl_prefix, SP_LIT("cache"));
   }
 
   app->paths.source = sp_os_join_path(app->paths.cache, SP_LIT("source"));
@@ -1675,33 +2008,37 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   sp_os_create_directory(app->paths.source);
   sp_os_create_directory(app->paths.build);
 
-  spn_config_read(&app->config, app->paths.user_toml);
+  // Recipes
+  if (app->config.recipe_override.len) {
+    app->paths.spn = sp_str_copy(app->config.recipe_override);
+    app->paths.lua = sp_os_join_path(app->paths.spn, SP_LIT("source"));
+    app->paths.recipes = sp_os_join_path(app->paths.spn, SP_LIT("asset/recipes"));
 
-  if (app->config.spn_dir.len > 0) {
-    app->paths.bootstrap = sp_str_copy(app->config.spn_dir);
+    if (!sp_os_does_path_exist(app->paths.recipes)) {
+      SP_FATAL("Custom recipe_override {} does not exist", SP_FMT_STR(app->paths.recipes));
+    }
   } else {
-    app->paths.bootstrap = sp_os_join_path(app->paths.source, SP_LIT("spn"));
-  }
-  app->paths.recipes = sp_os_join_path(app->paths.bootstrap, SP_LIT("asset/recipes"));
+    sp_str_t spn = sp_os_join_path(app->paths.source, SP_LIT("spn"));
+    app->paths.spn = spn;
+    app->paths.lua = sp_os_join_path(spn, SP_LIT("source"));
+    app->paths.recipes = sp_os_join_path(spn, SP_LIT("asset/recipes"));
 
-  if (!app->config.spn_dir.len) {
     const c8* url = "https://github.com/tspader/spn.git";
-    const c8* spn = sp_str_to_cstr(app->paths.bootstrap);
-    if (!sp_os_does_path_exist(app->paths.bootstrap)) {
-      SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
+    if (!sp_os_does_path_exist(spn)) {
+      SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_STR(spn));
 
-      SDL_Process* process = SPN_SH("git", "clone", url, spn);
+      SDL_Process* process = SPN_SH("git", "clone", url, sp_str_to_cstr(spn));
       spn_sh_process_result_t result = spn_sh_read_process(process);
       if (result.return_code) {
-        SP_FATAL("Failed to clone spn recipe sources from {} to {}", SP_FMT_CSTR(url), SP_FMT_CSTR(spn));
+        SP_FATAL("Failed to clone spn recipe sources from {} to {}", SP_FMT_CSTR(url), SP_FMT_STR(spn));
       }
     }
     else {
-      u32 num_updates = spn_git_num_updates(app->paths.bootstrap, SPN_GIT_HEAD, SPN_GIT_UPSTREAM);
+      u32 num_updates = spn_git_num_updates(spn, SPN_GIT_HEAD, SPN_GIT_UPSTREAM);
       if (num_updates > 0) {
         if (app->config.auto_pull_recipes) {
           SP_LOG("Updating spn recipes ({} commits behind)...", SP_FMT_U32(num_updates));
-          spn_git_checkout(app->paths.bootstrap, SPN_GIT_ORIGIN_HEAD);
+          spn_git_checkout(spn, SPN_GIT_ORIGIN_HEAD);
         }
         else {
           SP_LOG("spn has {} recipe updates available (auto_pull_recipes=false)", SP_FMT_U32(num_updates));
@@ -1709,14 +2046,14 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
       }
     }
   }
-  else {
-    if (!sp_os_does_path_exist(app->paths.bootstrap)) {
-      SP_FATAL("Custom spn_dir {} does not exist", SP_FMT_STR(app->paths.bootstrap));
-    }
-    if (!sp_os_does_path_exist(app->paths.recipes)) {
-      SP_FATAL("Custom spn_dir {} does not contain asset/recipes folder", SP_FMT_STR(app->paths.bootstrap));
-    }
+    SP_LOG("spn -> {:color brightcyan}", SP_FMT_STR(app->paths.spn));
+    SP_LOG("lua -> {:color brightcyan}", SP_FMT_STR(app->paths.lua));
+    SP_LOG("recipes -> {:color brightcyan}", SP_FMT_STR(app->paths.recipes));
+
+  if (!sp_os_does_path_exist(app->paths.recipes)) {
+    SP_FATAL("Recipe directory {:color brightcyan} does not exist", SP_FMT_STR(app->paths.recipes));
   }
+  spn_lua_init();
 
   // Read all the recipe files from disk
   sp_os_directory_entry_list_t entries = sp_os_scan_directory(app->paths.recipes);
@@ -1724,6 +2061,8 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     sp_str_t name = sp_os_extract_stem(entry->file_name);
     if (sp_str_equal_cstr(name, "spn")) continue;
     if (sp_str_equal_cstr(name, "spn_easy")) continue;
+
+    //spn_dep_read(name, dep);
 
     spn_dep_info_t dep = {
       .name = name,
@@ -1813,7 +2152,7 @@ void spn_config_read_from_string(spn_config_t* config, sp_str_t toml_content) {
     .auto_pull_deps = false,
     .toml = SP_NULLPTR,
     .cache_override = SP_ZERO_INITIALIZE(),
-    .spn_dir = SP_ZERO_INITIALIZE(),
+    .recipe_override = SP_ZERO_INITIALIZE(),
     .builtin_recipes_enabled = true
   };
 
@@ -1834,9 +2173,9 @@ void spn_config_read_from_string(spn_config_t* config, sp_str_t toml_content) {
       config->cache_override = sp_str_from_cstr(cache_override.u.s);
     }
 
-    toml_value_t spn_dir = toml_table_string(options, "spn_dir");
-    if (spn_dir.ok) {
-      config->spn_dir = sp_str_from_cstr(spn_dir.u.s);
+    toml_value_t recipe_override = toml_table_string(options, "recipe_override");
+    if (recipe_override.ok) {
+      config->recipe_override = sp_str_from_cstr(recipe_override.u.s);
     }
   }
 }
