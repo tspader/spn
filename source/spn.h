@@ -648,6 +648,8 @@ sp_lua_error_t sp_lua_run_fmt(sp_lua_t* lua, const c8* fmt, ...) {
 
 void spn_lua_init() {
   app.lua.state = luaL_newstate();
+  luaL_openlibs(app.lua.state);
+
   app.context = (spn_lua_context_t) {
     .cli = &app.cli,
     .paths = &app.paths,
@@ -657,48 +659,6 @@ void spn_lua_init() {
     .lock = &app.lock,
     .config = &app.config,
   };
-
-  luaL_openlibs(app.lua.state);
-
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  sp_str_builder_append_fmt(&builder,  "local loader = loadfile('{}');", SP_FMT_STR(app.paths.user_config));
-  sp_str_builder_append_cstr(&builder, "if not loader then return nil end;");
-  sp_str_builder_append_cstr(&builder, "local ok, config = pcall(loader);");
-  sp_str_builder_append_cstr(&builder, "if not ok then return nil end;");
-  sp_str_builder_append_cstr(&builder, "return 'spn';");
-
-  if (luaL_dostring(app.lua.state, sp_str_builder_write_cstr(&builder))) {
-    SP_FATAL("Failed to run bootstrapping Lua chunk: {:fg brightblack}", SP_FMT_STR(sp_str_builder_write(&builder)));
-  }
-
-  if (lua_isnil(app.lua.state, -1)) {
-    app.paths.spn = sp_os_join_path(app.paths.storage, SP_LIT("spn"));
-  }
-  else {
-    const c8* spn = lua_tostring(app.lua.state, -1);
-    SP_LOG("Got it: {:fg brightcyan}", SP_FMT_CSTR(spn));
-    app.paths.spn = sp_str_from_cstr(spn);
-  }
-
-
-
-
-  sp_lua_run_fmt(&app.lua, "package.path = package.path .. ';' .. '{}/?.lua'", SP_FMT_STR(app.paths.lua));
-  sp_lua_run(&app.lua, "spn = require('spn')");
-
-  // spn.internal.init()
-  lua_getglobal(app.lua.state, "pcall");
-
-  lua_getglobal(app.lua.state, "spn");
-  lua_getfield(app.lua.state, -1, "internal");
-  lua_getfield(app.lua.state, -1, "init");
-  lua_remove(app.lua.state, -2);
-  lua_remove(app.lua.state, -2);
-
-  lua_pushlightuserdata(app.lua.state, &app.context);
-  lua_pcall(app.lua.state, 0, 0, 0);
-
-  sp_lua_run(&app.lua, "spn = require('spn'); spn.configure();");
 }
 
 // SHELL
@@ -2042,12 +2002,42 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   spn_lua_init();
 
+  // Bootstrap the user config, which tells us if spn itself is installed in the usual,
+  // well-known location or in somewhere the user specified (for development)
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+  sp_str_builder_append_fmt(&builder,  "local loader = loadfile('{}');", SP_FMT_STR(app->paths.user_config));
+  sp_str_builder_append_cstr(&builder, "if not loader then return nil end;");
+  sp_str_builder_append_cstr(&builder, "local ok, config = pcall(loader);");
+  sp_str_builder_append_cstr(&builder, "if not ok then return nil end;");
+  sp_str_builder_append_cstr(&builder, "return config and config.spn or nil;");
+
+  if (luaL_dostring(app->lua.state, sp_str_builder_write_cstr(&builder))) {
+    const char* error = lua_tostring(app->lua.state, -1);
+    lua_pop(app->lua.state, 1);
+    SP_FATAL("Failed to run bootstrap Lua chunk: {}", SP_FMT_CSTR(error));
+  }
+
+  if (lua_isnil(app->lua.state, -1)) {
+    app->paths.spn = sp_os_join_path(app->paths.storage, SP_LIT("spn"));
+  }
+  else {
+    const c8* spn = lua_tostring(app->lua.state, -1);
+    SP_ASSERT(spn);
+    app->paths.spn = sp_os_normalize_path(sp_str_from_cstr(spn));
+  }
+  lua_pop(app->lua.state, 1);
+
   app->paths.lua = sp_os_join_path(app->paths.spn, SP_LIT("source"));
   app->paths.recipes = sp_os_join_path(app->paths.spn, SP_LIT("asset/recipes"));
 
+  // If the recipe directory doesn't exist, we need to clone it
   const c8* url = "https://github.com/tspader/spn.git";
   if (!sp_os_does_path_exist(app->paths.spn)) {
-    SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_STR(app->paths.spn));
+    SP_LOG(
+      "Cloning recipe repository from {:fg brightcyan} to {:fg brightcyan}",
+      SP_FMT_CSTR(url),
+      SP_FMT_STR(app->paths.spn)
+    );
 
     SDL_Process* process = SPN_SH("git", "clone", url, sp_str_to_cstr(app->paths.spn));
     spn_sh_process_result_t result = spn_sh_read_process(process);
@@ -2068,13 +2058,43 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     }
   }
 
-  SP_LOG("spn -> {:color brightcyan}", SP_FMT_STR(app->paths.spn));
-  SP_LOG("lua -> {:color brightcyan}", SP_FMT_STR(app->paths.lua));
-  SP_LOG("recipes -> {:color brightcyan}", SP_FMT_STR(app->paths.recipes));
-
   if (!sp_os_does_path_exist(app->paths.recipes)) {
     SP_FATAL("Recipe directory {:color brightcyan} does not exist", SP_FMT_STR(app->paths.recipes));
   }
+
+  // At this point, we know we have all our Lua sources.
+  sp_str_t script = sp_format("package.path = package.path .. ';{}/?.lua'", SP_FMT_STR(app->paths.lua));
+  s32 result = luaL_dostring(app->lua.state, sp_str_to_cstr(script));
+  SP_ASSERT(!result);
+
+  if (luaL_dostring(app->lua.state, "spn = require('spn')")) {
+    SP_FATAL(
+      "{:fg brightyellow} failed: {:fg brightblack}",
+      SP_FMT_CSTR("spn.internal.ffi()"),
+      SP_FMT_CSTR(lua_tostring(app->lua.state, -1))
+    );
+  }
+
+  if (luaL_dostring(app->lua.state, "require('spn').internal.ffi()")) {
+    SP_FATAL(
+      "{:fg brightyellow} failed: {:fg brightblack}",
+      SP_FMT_CSTR("spn.internal.ffi()"),
+      SP_FMT_CSTR(lua_tostring(app->lua.state, -1))
+    );
+  }
+
+  lua_getglobal(app->lua.state, "spn");
+  lua_getfield(app->lua.state, -1, "internal");
+  lua_getfield(app->lua.state, -1, "init");
+  lua_pushlightuserdata(app->lua.state, &app->context);
+  if (lua_pcall(app->lua.state, 1, 0, 0) != 0) {
+    SP_FATAL(
+      "{:fg brightyellow}  failed: {:fg brightblack}",
+      SP_FMT_CSTR("spn.internal.init()"),
+      SP_FMT_CSTR(lua_tostring(app->lua.state, -1))
+    );
+  }
+  lua_pop(app->lua.state, 2);
 
   // Find the cache directory after the config has been fully loaded
   app->paths.cache = sp_os_join_path(app->paths.storage, SP_LIT("cache"));
@@ -2086,14 +2106,17 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   sp_os_create_directory(app->paths.source);
   sp_os_create_directory(app->paths.build);
 
+
   // Read all the recipe files from disk
   sp_os_directory_entry_list_t entries = sp_os_scan_directory(app->paths.recipes);
   for (sp_os_directory_entry_t* entry = entries.data; entry < entries.data + entries.count; entry++) {
+    if (!sp_str_equal_cstr(sp_os_extract_extension(entry->file_name), "mk")) {
+      continue;
+    }
+
     sp_str_t name = sp_os_extract_stem(entry->file_name);
     if (sp_str_equal_cstr(name, "spn")) continue;
     if (sp_str_equal_cstr(name, "spn_easy")) continue;
-
-    //spn_dep_read(name, dep);
 
     spn_dep_info_t dep = {
       .name = name,

@@ -2,37 +2,68 @@ local ffi = require('ffi')
 
 local spn = {
   recipes = {},
-  internal = {},
+  internal = {
+    recipes = {}
+  },
 }
 
 function spn.log(fmt, ...)
   print(string.format(fmt, ...))
 end
 
-function spn.recipes.single_header(options)
-  return options
+function spn.recipes.default()
+  return {
+    files = {
+      include = {},
+      bin = {},
+      vendor = {}
+    }
+  }
+end
+
+function spn.recipes.single_header(config)
+  local recipe = spn.recipes.default()
+  recipe.git = config.git
+  table.insert(recipe.files.include, config.header)
+  return recipe
 end
 
 function spn.internal.read(recipe)
 end
 
-function spn.internal.configure()
-  local app = spn.internal.app
-  local file_path = app.paths.user_config
-  local config = loadfile(ffi.string(file_path.data, file_path.len))
-  if config then
-    print('found a config')
-    print(config())
-  else
-    print('no config')
+function spn.internal.init(app)
+  app = ffi.cast('spn_lua_context_t*', app)
+  spn.internal.app = spp
+
+  local config = loadfile(tostring(app.paths.user_config))
+  if not config then
+    return
   end
 
+  ok, config = pcall(config)
+  if config.spn then
+    app.config.paths.spn = sp.str.from_cstr(config.spn)
+  end
+
+  local entries = sp.os.scan_directory(app.paths.recipes)
+  for index = 0, entries.count do
+    local entry = entries.data[index]
+    local extension = sp.os.extract_extension(entry.file_name)
+    if sp.str.equal_cstr(extension, "lua") then
+      local name = sp.os.extract_stem(entry.file_name)
+      local recipe = dofile(entry.file_path:cstr())
+      spn.internal.recipes[name:cstr()] = recipe
+
+      local dep = ffi.new('spn_dep_info_t')
+      dep.name = name
+      dep.url = sp.str.from_cstr(recipe.git)
+      dep.paths.source = sp.os.join_path(app.paths.source, name)
+    end
+  end
 end
 
-function spn.internal.init(app)
-  print(app)
-  spn.internal.app = app
-  header = ffi.cdef([[
+function spn.internal.ffi()
+  ffi.cdef([[
     typedef int8_t   s8;
     typedef int16_t  s16;
     typedef int32_t  s32;
@@ -83,56 +114,6 @@ function spn.internal.init(app)
     } spn_sh_process_context_t;
 
     /////////
-    // TUI //
-    /////////
-    typedef struct {
-      u32 std_in;
-    } sp_tui_checkpoint_t;
-
-    typedef enum {
-      SPN_TUI_STATE_INTERACTIVE,
-      SPN_TUI_STATE_NONINTERACTIVE
-    } spn_tui_state_t;
-
-    typedef struct {
-      spn_tui_state_t state;
-      bool* terminal_reported;
-      u32 num_deps;
-      u32 width;
-
-      struct {
-    #ifdef SP_WIN32
-        sp_win32_dword_t original_input_mode;
-        sp_win32_dword_t original_output_mode;
-        sp_win32_handle_t input_handle;
-        sp_win32_handle_t output_handle;
-    #else
-        struct termios ios;
-    #endif
-        bool modified;
-      } terminal;
-    } spn_tui_t;
-
-    void sp_tui_print(sp_str_t str);
-    void sp_tui_up(u32 n);
-    void sp_tui_down(u32 n);
-    void sp_tui_clear_line();
-    void sp_tui_show_cursor();
-    void sp_tui_hide_cursor();
-    void sp_tui_home();
-    void sp_tui_flush();
-    void sp_tui_checkpoint(spn_tui_t* tui);
-    void sp_tui_restore(spn_tui_t* tui);
-    void sp_tui_setup_raw_mode(spn_tui_t* tui);
-    bool sp_tui_read_char(c8* input_char);
-    void spn_tui_update_noninteractive(spn_tui_t* tui);
-    void spn_tui_update_interactive(spn_tui_t* tui);
-    void spn_tui_update(spn_tui_t* tui);
-    void spn_tui_read(spn_tui_t* tui);
-    void spn_tui_init(spn_tui_t* tui, spn_tui_state_t);
-    void spn_tui_cleanup(spn_tui_t* tui);
-
-    /////////
     // GIT //
     /////////
     sp_str_t spn_git_fetch(sp_str_t repo);
@@ -154,11 +135,6 @@ function spn.internal.init(app)
       SP_LUA_ERROR_FILE_LOAD_ERROR,
       SP_LUA_ERROR_FILE_RUN_ERROR,
     } sp_lua_error_t;
-
-    typedef lua_State* sp_lua_context_t;
-
-
-
 
 
     /////////
@@ -281,11 +257,6 @@ function spn.internal.init(app)
 
     typedef struct {
       sp_str_t key;
-      toml_table_t* table;
-    } spn_dep_parse_entry_t;
-
-    typedef struct {
-      sp_str_t key;
       sp_str_t value;
     } spn_dep_option_t;
 
@@ -309,32 +280,18 @@ function spn.internal.init(app)
       sp_str_t build_id;
     } spn_lock_entry_t;
 
+    typedef struct spn_dep_context_t spn_dep_context_t;
     typedef spn_lock_entry_t* spn_lock_file_t;
 
-    struct spn_build_context_t {
+    typedef struct {
       spn_dep_context_t* deps;
-    };
+    } spn_build_context_t;
 
-    spn_dep_info_t*        spn_dep_find(sp_str_t name);
-    bool                   spn_dep_is_binary(spn_dep_info_t* dep);
-    bool                   spn_dep_state_is_terminal(spn_dep_context_t* dep);
-    s32                    spn_dep_sort_kernel_alphabetical(const void* a, const void* b);
-    sp_str_t               spn_dep_read_url(sp_str_t file_path);
-    sp_str_t*              spn_dep_read_libs(sp_str_t file_path);
-    sp_str_t               spn_dep_option_env_name(spn_dep_option_t* option);
-    sp_str_t               spn_dep_build_state_to_str(spn_dep_build_state_t state);
-    spn_lock_entry_t*      spn_dep_context_get_lock_entry(spn_dep_context_t* dep);
-    void                   spn_dep_context_prepare(spn_dep_context_t* context);
-    void                   spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* toml);
-    spn_dep_context_t      spn_dep_context_from_default_profile(sp_str_t name);
-    void                   spn_dep_context_set_env(spn_dep_context_t* context, sp_str_t name, sp_str_t value);
-    void                   spn_dep_context_set_build_state(spn_dep_context_t* dep, spn_dep_build_state_t state);
-    void                   spn_dep_context_set_build_error(spn_dep_context_t* dep, sp_str_t error);
-    spn_dep_context_t*     spn_dep_context_find(spn_build_context_t* build, sp_str_t name);
-    sp_str_t               spn_print(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t c);
-    sp_str_t               spn_print_one(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t c);
-    sp_str_t               spn_print_all(spn_dep_context_t* dep, spn_cli_compiler_t c);
-    spn_build_context_t    spn_build_context_from_default_profile();
+    spn_dep_info_t* spn_dep_find(sp_str_t name);
+    sp_str_t        spn_dep_read_url(sp_str_t file_path);
+    sp_str_t*       spn_dep_read_libs(sp_str_t file_path);
+    sp_str_t        spn_dep_option_env_name(spn_dep_option_t* option);
+    sp_str_t        spn_dep_build_state_to_str(spn_dep_build_state_t state);
 
     /////////
     // APP //
@@ -382,36 +339,79 @@ function spn.internal.init(app)
       toml_table_t* toml;
     } spn_project_t;
 
-
-
     typedef struct {
       struct {
         sp_str_t spn;
       } paths;
     } spn_lua_config_t;
 
-
-    /////////
-    // APP //
-    /////////
     typedef struct {
-      spn_cli_t cli;
-      spn_paths_t paths;
-      spn_targets_t targets;
-      spn_project_t project;
-      spn_config_t toml_config;
-      spn_build_context_t build;
-      spn_tui_t tui;
-      spn_dep_info_t deps;
-      spn_lock_entry_t lock;
-      SDL_AtomicInt control;
-
-      spn_lua_config_t config;
-      sp_lua_t lua;
-    } spn_app_t;
-
-    void sp_os_log(sp_str_t message);
+      spn_cli_t* cli;
+      spn_paths_t* paths;
+      spn_project_t* project;
+      spn_build_context_t* build;
+      spn_dep_info_t** deps;
+      spn_lock_entry_t** lock;
+      spn_lua_config_t* config;
+    } spn_lua_context_t;
   ]])
+
+  ffi.cdef([[
+    typedef enum {
+      SP_OS_FILE_ATTR_NONE = 0,
+      SP_OS_FILE_ATTR_REGULAR_FILE = 1,
+      SP_OS_FILE_ATTR_DIRECTORY = 2,
+    } sp_os_file_attr_t;
+
+    typedef struct {
+      sp_str_t file_path;
+      sp_str_t file_name;
+      sp_os_file_attr_t attributes;
+    } sp_os_directory_entry_t;
+
+    typedef struct {
+      sp_os_directory_entry_t* data;
+      u32 count;
+    } sp_os_directory_entry_list_t;
+
+    c8*                          sp_cstr_copy(const c8* str);
+    bool                         sp_str_equal_cstr(sp_str_t str, const c8* cstr);
+    sp_str_t                     sp_str_from_cstr(const c8* cstr);
+    sp_str_t                     sp_os_extract_extension(sp_str_t path);
+    sp_str_t                     sp_os_extract_stem(sp_str_t path);
+    sp_str_t                     sp_os_join_path(sp_str_t a, sp_str_t b);
+    void                         sp_os_log(sp_str_t message);
+    sp_os_directory_entry_list_t sp_os_scan_directory(sp_str_t path);
+  ]])
+
+  sp = {
+    os = {},
+    str = {},
+    cstr = {}
+  }
+  for module_name, module in pairs(sp) do
+    setmetatable(module, {
+      __index = function(_, key)
+        key = string.format("sp_%s_%s", module_name, key)
+        return ffi.C[key]
+      end
+    })
+  end
+
+  spn.string = ffi.metatype('sp_str_t', {
+    __tostring = function(self) return ffi.string(self.data, self.len) end,
+    __len = function(self) return self.len end,
+    __eq = function(a, b) return tostring(a) == tostring(b) end,
+    __index = function(self, key)
+      if key == 'cstr' then
+        return function() return ffi.string(self.data, self.len) end
+      else
+        return function(_, ...)
+          local str = ffi.string(self.data, self.len)
+          return str[key](str, ...) end
+      end
+    end,
+  })
 end
 
 return spn
