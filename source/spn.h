@@ -402,15 +402,16 @@ void spn_config_read_from_string(spn_config_t* config, sp_str_t toml_content);
 typedef struct {
   sp_str_t install;
   sp_str_t   executable;
-  sp_str_t config;
-  sp_str_t   user_toml;
-  sp_str_t cache;
-  sp_str_t   build;
-  sp_str_t   store;
-  sp_str_t   source;
-  sp_str_t     spn;
-  sp_str_t       lua;
-  sp_str_t       recipes;
+  sp_str_t storage;
+  sp_str_t   config;
+  sp_str_t     user_config;
+  sp_str_t   spn;
+  sp_str_t     lua;
+  sp_str_t     recipes;
+  sp_str_t   cache;
+  sp_str_t     build;
+  sp_str_t     store;
+  sp_str_t     source;
   sp_str_t project;
   sp_str_t   toml;
   sp_str_t   lock;
@@ -429,8 +430,22 @@ typedef struct {
   toml_table_t* toml;
 } spn_project_t;
 
+
+
 typedef struct {
-  spn_dep_info_t* deps;
+  struct {
+    sp_str_t spn;
+  } paths;
+} spn_lua_config_t;
+
+typedef struct {
+  spn_cli_t* cli;
+  spn_paths_t* paths;
+  spn_project_t* project;
+  spn_build_context_t* build;
+  spn_dep_info_t** deps;
+  spn_lock_entry_t** lock;
+  spn_lua_config_t* config;
 } spn_lua_context_t;
 
 
@@ -440,16 +455,17 @@ typedef struct {
 typedef struct {
   spn_cli_t cli;
   spn_paths_t paths;
-  spn_targets_t targets;
   spn_project_t project;
-  spn_config_t config;
   spn_build_context_t build;
-  spn_tui_t tui;
   sp_dyn_array(spn_dep_info_t) deps;
   sp_dyn_array(spn_lock_entry_t) lock;
+  spn_lua_config_t config;
+  spn_lua_context_t context;
+  spn_targets_t targets;
+  spn_config_t toml_config;
+  spn_tui_t tui;
   SDL_AtomicInt control;
   sp_lua_t lua;
-  spn_lua_context_t c;
 } spn_app_t;
 
 extern spn_app_t app;
@@ -632,7 +648,35 @@ sp_lua_error_t sp_lua_run_fmt(sp_lua_t* lua, const c8* fmt, ...) {
 
 void spn_lua_init() {
   app.lua.state = luaL_newstate();
+  app.context = (spn_lua_context_t) {
+    .cli = &app.cli,
+    .paths = &app.paths,
+    .project = &app.project,
+    .build = &app.build,
+    .deps = &app.deps,
+    .lock = &app.lock,
+    .config = &app.config,
+  };
+
   luaL_openlibs(app.lua.state);
+
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+  sp_str_builder_append_fmt(&builder,  "local loader = loadfile('{}');", SP_FMT_STR(app.paths.user_config));
+  sp_str_builder_append_cstr(&builder, "if not loader then return nil end;");
+  sp_str_builder_append_cstr(&builder, "local ok, config = pcall(loader);");
+  sp_str_builder_append_cstr(&builder, "if not ok then return nil end;");
+  sp_str_builder_append_cstr(&builder, "return 'spn';");
+
+  if (luaL_dostring(app.lua.state, sp_str_builder_write_cstr(&builder))) {
+    SP_FATAL("Failed to run bootstrapping Lua chunk: {:fg brightblack}", SP_FMT_STR(sp_str_builder_write(&builder)));
+  }
+
+  if (!lua_isnil(app.lua.state, -1)) {
+    SP_LOG("Got it: {:fg brightcyan}", SP_FMT_CSTR(lua_tostring(app.lua.state, -1)));
+  }
+
+
+
 
   sp_lua_run_fmt(&app.lua, "package.path = package.path .. ';' .. '{}/?.lua'", SP_FMT_STR(app.paths.lua));
   sp_lua_run(&app.lua, "spn = require('spn')");
@@ -646,8 +690,10 @@ void spn_lua_init() {
   lua_remove(app.lua.state, -2);
   lua_remove(app.lua.state, -2);
 
-  //lua_pushlightuserdata(L, my_struct);
+  lua_pushlightuserdata(app.lua.state, &app.context);
   lua_pcall(app.lua.state, 0, 0, 0);
+
+  sp_lua_run(&app.lua, "spn = require('spn'); spn.configure();");
 }
 
 // SHELL
@@ -1801,7 +1847,7 @@ s32 spn_dep_context_build_async(void* user_data) {
       break;
     }
     case SPN_DEP_REPO_STATE_STALE: {
-      if (!app.config.auto_pull_deps) {
+      if (!app.toml_config.auto_pull_deps) {
         c8 key_offset = SDL_GetAtomicInt(&app.control);
         SDL_AddAtomicInt(&app.control, 3);
         dep->confirm_keys[0] = 'a' + key_offset;
@@ -1824,7 +1870,7 @@ s32 spn_dep_context_build_async(void* user_data) {
             return 1;
           }
           else if (choice == dep->confirm_keys[2]) {
-            app.config.auto_pull_deps = true;
+            app.toml_config.auto_pull_deps = true;
             break;
           }
           else {
@@ -1954,31 +2000,29 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     .url = SP_LIT("spn-package-url"),
   };
 
-  sp_str_t sdl_base = sp_os_normalize_path(sp_str_from_cstr(SDL_GetBasePath()));
-  sp_str_t sdl_prefix = sp_os_normalize_path(sp_str_from_cstr(SDL_GetPrefPath(SP_NULLPTR, "spn")));
-  sp_str_t sdl_current = sp_os_normalize_path(sp_str_from_cstr(SDL_GetCurrentDirectory()));
+  app->paths.storage = sp_os_normalize_path(sp_str_from_cstr(SDL_GetPrefPath(SP_NULLPTR, "spn")));
 
   // Install
   app->paths.executable = sp_os_get_executable_path();
-  app->paths.install = sdl_base;
+  app->paths.install = sp_os_normalize_path(sp_str_from_cstr(SDL_GetBasePath()));
 
   // Project
   if (app->cli.project_directory) {
     app->paths.project = sp_str_from_cstr(app->cli.project_directory);
   }
   else {
-    app->paths.project = sdl_current;
+    app->paths.project = sp_os_normalize_path(sp_str_from_cstr(SDL_GetCurrentDirectory()));
   }
   app->paths.toml = sp_os_join_path(app->paths.project, SP_LIT("spn.toml"));
   app->paths.lock = sp_os_join_path(app->paths.project, SP_LIT("spn.lock"));
 
   // Config
-  const c8* xdg_config = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "XDG_CONFIG_HOME");
-  const c8* home = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "HOME");
-
 #ifdef SP_WIN32
   app->paths.config = sp_os_join_path(sdl_prefix, SP_LIT("config"));
 #else
+  const c8* xdg_config = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "XDG_CONFIG_HOME");
+  const c8* home = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "HOME");
+
   if (xdg_config) {
     app->paths.config = sp_os_join_path(SP_CSTR(xdg_config), SP_LIT("spn"));
   }
@@ -1989,18 +2033,11 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     SP_FATAL("No $XDG_CONFIG_HOME? No $HOME? Someone fucked up here and surely it was me.");
   }
 #endif
+  app->paths.user_config = sp_os_join_path(app->paths.config, SP_LIT("spn.lua"));
 
-  app->paths.user_toml = sp_os_join_path(app->paths.config, SP_LIT("spn.toml"));
+  spn_lua_init();
 
-  spn_config_read(&app->config, app->paths.user_toml);
-
-  // Cache
-  if (app->config.cache_override.len) {
-    app->paths.cache = sp_str_copy(app->config.cache_override);
-  } else {
-    app->paths.cache = sp_os_join_path(sdl_prefix, SP_LIT("cache"));
-  }
-
+  app->paths.cache = sp_os_join_path(app->paths.storage, SP_LIT("cache"));
   app->paths.source = sp_os_join_path(app->paths.cache, SP_LIT("source"));
   app->paths.build = sp_os_join_path(app->paths.cache, SP_LIT("build"));
   app->paths.store = sp_os_join_path(app->paths.cache, SP_LIT("store"));
@@ -2009,52 +2046,41 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   sp_os_create_directory(app->paths.source);
   sp_os_create_directory(app->paths.build);
 
-  // Recipes
-  if (app->config.recipe_override.len) {
-    app->paths.spn = sp_str_copy(app->config.recipe_override);
-    app->paths.lua = sp_os_join_path(app->paths.spn, SP_LIT("source"));
-    app->paths.recipes = sp_os_join_path(app->paths.spn, SP_LIT("asset/recipes"));
+  // @claude: load the config here
 
-    if (!sp_os_does_path_exist(app->paths.recipes)) {
-      SP_FATAL("Custom recipe_override {} does not exist", SP_FMT_STR(app->paths.recipes));
+  app->paths.spn = sp_os_join_path(app->paths.source, SP_LIT("spn"));
+  app->paths.lua = sp_os_join_path(app->paths.spn, SP_LIT("source"));
+  app->paths.recipes = sp_os_join_path(app->paths.spn, SP_LIT("asset/recipes"));
+
+  const c8* url = "https://github.com/tspader/spn.git";
+  if (!sp_os_does_path_exist(app->paths.spn)) {
+    SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_STR(app->paths.spn));
+
+    SDL_Process* process = SPN_SH("git", "clone", url, sp_str_to_cstr(app->paths.spn));
+    spn_sh_process_result_t result = spn_sh_read_process(process);
+    if (result.return_code) {
+      SP_FATAL("Failed to clone spn recipe sources from {} to {}", SP_FMT_CSTR(url), SP_FMT_STR(app->paths.spn));
     }
-  } else {
-    sp_str_t spn = sp_os_join_path(app->paths.source, SP_LIT("spn"));
-    app->paths.spn = spn;
-    app->paths.lua = sp_os_join_path(spn, SP_LIT("source"));
-    app->paths.recipes = sp_os_join_path(spn, SP_LIT("asset/recipes"));
-
-    const c8* url = "https://github.com/tspader/spn.git";
-    if (!sp_os_does_path_exist(spn)) {
-      SP_LOG("Cloning recipe repository from {} to {}", SP_FMT_CSTR(url), SP_FMT_STR(spn));
-
-      SDL_Process* process = SPN_SH("git", "clone", url, sp_str_to_cstr(spn));
-      spn_sh_process_result_t result = spn_sh_read_process(process);
-      if (result.return_code) {
-        SP_FATAL("Failed to clone spn recipe sources from {} to {}", SP_FMT_CSTR(url), SP_FMT_STR(spn));
+  }
+  else {
+    u32 num_updates = spn_git_num_updates(app->paths.spn, SPN_GIT_HEAD, SPN_GIT_UPSTREAM);
+    if (num_updates > 0) {
+      if (app->toml_config.auto_pull_recipes) {
+        SP_LOG("Updating spn recipes ({} commits behind)...", SP_FMT_U32(num_updates));
+        spn_git_checkout(app->paths.spn, SPN_GIT_ORIGIN_HEAD);
       }
-    }
-    else {
-      u32 num_updates = spn_git_num_updates(spn, SPN_GIT_HEAD, SPN_GIT_UPSTREAM);
-      if (num_updates > 0) {
-        if (app->config.auto_pull_recipes) {
-          SP_LOG("Updating spn recipes ({} commits behind)...", SP_FMT_U32(num_updates));
-          spn_git_checkout(spn, SPN_GIT_ORIGIN_HEAD);
-        }
-        else {
-          SP_LOG("spn has {} recipe updates available (auto_pull_recipes=false)", SP_FMT_U32(num_updates));
-        }
+      else {
+        SP_LOG("spn has {} recipe updates available (auto_pull_recipes=false)", SP_FMT_U32(num_updates));
       }
     }
   }
-    SP_LOG("spn -> {:color brightcyan}", SP_FMT_STR(app->paths.spn));
-    SP_LOG("lua -> {:color brightcyan}", SP_FMT_STR(app->paths.lua));
-    SP_LOG("recipes -> {:color brightcyan}", SP_FMT_STR(app->paths.recipes));
+  SP_LOG("spn -> {:color brightcyan}", SP_FMT_STR(app->paths.spn));
+  SP_LOG("lua -> {:color brightcyan}", SP_FMT_STR(app->paths.lua));
+  SP_LOG("recipes -> {:color brightcyan}", SP_FMT_STR(app->paths.recipes));
 
   if (!sp_os_does_path_exist(app->paths.recipes)) {
     SP_FATAL("Recipe directory {:color brightcyan} does not exist", SP_FMT_STR(app->paths.recipes));
   }
-  spn_lua_init();
 
   // Read all the recipe files from disk
   sp_os_directory_entry_list_t entries = sp_os_scan_directory(app->paths.recipes);
