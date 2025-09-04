@@ -22,6 +22,7 @@
 #define SPN_API
 #endif
 
+#define SP_STRNLEN
 #define SP_IMPLEMENTATION
 #define SP_OS_BACKEND_SDL
 #include "sp.h"

@@ -1,8 +1,8 @@
 [[package]]
 name = "sp"
 git_url = "git@github.com:spaderthomas/sp.git"
-git_commit = "1e00c112d3"
-build_id = "2cce1b49"
+git_commit = "f2b1299379"
+build_id = "a42e11d8"
 
 [[package]]
 name = "argparse"
@@ -13,8 +13,8 @@ build_id = "7475cf26"
 [[package]]
 name = "sdl3"
 git_url = "git@github.com:libsdl-org/SDL.git"
-git_commit = "9abeeebad5"
-build_id = "6984906c"
+git_commit = "637a9b34ab"
+build_id = "67e0a53d"
 
 [[package]]
 name = "utest"
@@ -25,8 +25,8 @@ build_id = "b1d3b34a"
 [[package]]
 name = "toml"
 git_url = "git@github.com:tspader/toml.git"
-git_commit = "73b6aa4383"
-build_id = "43d14bfa"
+git_commit = "2e8ffdfa21"
+build_id = "1dd6067e"
 
 [[package]]
 name = "dr_libs"
