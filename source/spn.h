@@ -671,8 +671,13 @@ void spn_lua_init() {
     SP_FATAL("Failed to run bootstrapping Lua chunk: {:fg brightblack}", SP_FMT_STR(sp_str_builder_write(&builder)));
   }
 
-  if (!lua_isnil(app.lua.state, -1)) {
-    SP_LOG("Got it: {:fg brightcyan}", SP_FMT_CSTR(lua_tostring(app.lua.state, -1)));
+  if (lua_isnil(app.lua.state, -1)) {
+    app.paths.spn = sp_os_join_path(app.paths.storage, SP_LIT("spn"));
+  }
+  else {
+    const c8* spn = lua_tostring(app.lua.state, -1);
+    SP_LOG("Got it: {:fg brightcyan}", SP_FMT_CSTR(spn));
+    app.paths.spn = sp_str_from_cstr(spn);
   }
 
 
@@ -2037,18 +2042,6 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   spn_lua_init();
 
-  app->paths.cache = sp_os_join_path(app->paths.storage, SP_LIT("cache"));
-  app->paths.source = sp_os_join_path(app->paths.cache, SP_LIT("source"));
-  app->paths.build = sp_os_join_path(app->paths.cache, SP_LIT("build"));
-  app->paths.store = sp_os_join_path(app->paths.cache, SP_LIT("store"));
-
-  sp_os_create_directory(app->paths.cache);
-  sp_os_create_directory(app->paths.source);
-  sp_os_create_directory(app->paths.build);
-
-  // @claude: load the config here
-
-  app->paths.spn = sp_os_join_path(app->paths.source, SP_LIT("spn"));
   app->paths.lua = sp_os_join_path(app->paths.spn, SP_LIT("source"));
   app->paths.recipes = sp_os_join_path(app->paths.spn, SP_LIT("asset/recipes"));
 
@@ -2074,6 +2067,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
       }
     }
   }
+
   SP_LOG("spn -> {:color brightcyan}", SP_FMT_STR(app->paths.spn));
   SP_LOG("lua -> {:color brightcyan}", SP_FMT_STR(app->paths.lua));
   SP_LOG("recipes -> {:color brightcyan}", SP_FMT_STR(app->paths.recipes));
@@ -2081,6 +2075,16 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   if (!sp_os_does_path_exist(app->paths.recipes)) {
     SP_FATAL("Recipe directory {:color brightcyan} does not exist", SP_FMT_STR(app->paths.recipes));
   }
+
+  // Find the cache directory after the config has been fully loaded
+  app->paths.cache = sp_os_join_path(app->paths.storage, SP_LIT("cache"));
+  app->paths.source = sp_os_join_path(app->paths.cache, SP_LIT("source"));
+  app->paths.build = sp_os_join_path(app->paths.cache, SP_LIT("build"));
+  app->paths.store = sp_os_join_path(app->paths.cache, SP_LIT("store"));
+
+  sp_os_create_directory(app->paths.cache);
+  sp_os_create_directory(app->paths.source);
+  sp_os_create_directory(app->paths.build);
 
   // Read all the recipe files from disk
   sp_os_directory_entry_list_t entries = sp_os_scan_directory(app->paths.recipes);
