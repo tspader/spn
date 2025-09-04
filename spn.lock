@@ -1,8 +1,8 @@
 [[package]]
 name = "sp"
 git_url = "git@github.com:tspader/sp.git"
-git_commit = "f2b1299379"
-build_id = "a42e11d8"
+git_commit = "bd28b1115b"
+build_id = "9b248e39"
 
 [[package]]
 name = "argparse"
@@ -13,8 +13,8 @@ build_id = "7475cf26"
 [[package]]
 name = "sdl3"
 git_url = "git@github.com:libsdl-org/SDL.git"
-git_commit = "637a9b34ab"
-build_id = "67e0a53d"
+git_commit = "a9b5a1e785"
+build_id = "928714c9"
 
 [[package]]
 name = "utest"

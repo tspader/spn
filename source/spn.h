@@ -240,7 +240,6 @@ typedef struct {
   spn_cli_dir_t dir;
 } spn_cli_t;
 
-void spn_cli_command_add(spn_cli_t* cli);
 void spn_cli_command_init(spn_cli_t* cli);
 void spn_cli_command_list(spn_cli_t* cli);
 void spn_cli_command_nuke(spn_cli_t* cli);
@@ -311,7 +310,7 @@ typedef struct {
   sp_str_t name;
   sp_str_t url;
   spn_dep_paths_t paths;
-  sp_dyn_array(sp_str_t) libs;
+  sp_str_t lib;
 } spn_dep_info_t;
 
 typedef sp_str_t spn_dep_id_t;
@@ -400,6 +399,12 @@ void spn_config_read(spn_config_t* config, sp_str_t path);
 void spn_config_read_from_string(spn_config_t* config, sp_str_t toml_content);
 
 typedef struct {
+  sp_str_t dir;
+  sp_str_t   config;
+  sp_str_t   lock;
+} spn_project_paths_t;
+
+typedef struct {
   sp_str_t install;
   sp_str_t   executable;
   sp_str_t storage;
@@ -412,9 +417,7 @@ typedef struct {
   sp_str_t     build;
   sp_str_t     store;
   sp_str_t     source;
-  sp_str_t project;
-  sp_str_t   toml;
-  sp_str_t   lock;
+  spn_project_paths_t project;
 } spn_paths_t;
 
 typedef struct {
@@ -852,52 +855,6 @@ sp_str_t sp_toml_writer_write(sp_toml_writer_t* writer) {
 }
 
 // CLI
-void spn_cli_command_add(spn_cli_t* cli) {
-  spn_cli_add_t* add = &cli->add;
-
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_STRING('p', "package", &add->package, SP_NULLPTR, SP_NULLPTR),
-      OPT_END()
-    },
-    (const c8* const []) {
-      "spn add <package>",
-      "Add a package dependency to your project",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
-
-  if (!cli->num_args) {
-    argparse_usage(&argparse);
-    exit(0);
-  }
-
-  add->package = SP_CSTR(cli->args[0]);
-
-  spn_dep_info_t* dep = spn_dep_find(add->package);
-  if (!dep) {
-    SP_FATAL("Could not find {} in available dependencies", SP_FMT_QUOTED_STR(add->package));
-  }
-
-  if (spn_project_find_dependency(&app.project, add->package)) {
-    SP_LOG("{} is already in defined in {}", SP_FMT_STR(add->package), SP_FMT_STR(app.paths.toml));
-    SP_EXIT_SUCCESS();
-  }
-
-  spn_dep_id_t id = sp_str_copy(add->package);
-  sp_dyn_array_push(app.project.dependencies, id);
-
-  if (!spn_project_write(&app.project, app.paths.toml)) {
-    SP_FATAL("Failed to write project TOML file");
-  }
-
-  SP_LOG("Added {} to {}", SP_FMT_STR(add->package), SP_FMT_STR(app.paths.toml));
-}
 
 void spn_cli_command_init(spn_cli_t* cli) {
   struct argparse argparse;
@@ -917,16 +874,16 @@ void spn_cli_command_init(spn_cli_t* cli) {
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
   // Check if project file already exists
-  if (sp_os_does_path_exist(app.paths.toml)) {
-    SP_LOG("Project already initialized at {}", SP_FMT_COLOR(SP_ANSI_FG_CYAN), SP_FMT_STR(app.paths.toml));
+  if (sp_os_does_path_exist(app.paths.project.config)) {
+    SP_LOG("Project already initialized at {}", SP_FMT_COLOR(SP_ANSI_FG_CYAN), SP_FMT_STR(app.paths.project.config));
     return;
   }
 
   app.project = (spn_project_t){
-    .name = sp_os_extract_file_name(app.paths.project)
+    .name = sp_os_extract_file_name(app.paths.project.dir)
   };
 
-  if (!spn_project_write(&app.project, app.paths.toml)) {
+  if (!spn_project_write(&app.project, app.paths.project.config)) {
     SP_FATAL("Failed to write project TOML file");
   }
 
@@ -973,7 +930,7 @@ void spn_cli_command_list(spn_cli_t* cli) {
 
 void spn_cli_command_nuke(spn_cli_t* cli) {
   sp_os_remove_directory(app.paths.cache);
-  sp_os_remove_file(app.paths.toml);
+  sp_os_remove_file(app.paths.project.config);
 }
 
 void spn_cli_command_clean(spn_cli_t* cli) {
@@ -1023,8 +980,7 @@ sp_str_t spn_print_one(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cl
     }
     case SPN_PRINT_LIBS: {
       if (spn_dep_is_binary(dep->info)) {
-        SP_ASSERT(sp_dyn_array_size(dep->info->libs));
-        output = dep->info->libs[0];
+        output = dep->info->lib;
       }
       break;
     }
@@ -1354,7 +1310,7 @@ spn_dep_info_t* spn_dep_find(sp_str_t name) {
 }
 
 bool spn_dep_is_binary(spn_dep_info_t* dep) {
-  return sp_dyn_array_size(dep->libs);
+  return dep->lib.len;
 }
 
 s32 spn_dep_sort_kernel_alphabetical(const void* a, const void* b) {
@@ -1973,13 +1929,13 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   // Project
   if (app->cli.project_directory) {
-    app->paths.project = sp_str_from_cstr(app->cli.project_directory);
+    app->paths.project.dir = sp_str_from_cstr(app->cli.project_directory);
   }
   else {
-    app->paths.project = sp_os_normalize_path(sp_str_from_cstr(SDL_GetCurrentDirectory()));
+    app->paths.project.dir = sp_os_normalize_path(sp_str_from_cstr(SDL_GetCurrentDirectory()));
   }
-  app->paths.toml = sp_os_join_path(app->paths.project, SP_LIT("spn.toml"));
-  app->paths.lock = sp_os_join_path(app->paths.project, SP_LIT("spn.lock"));
+  app->paths.project.config = sp_os_join_path(app->paths.project.dir, SP_LIT("spn.toml"));
+  app->paths.project.lock = sp_os_join_path(app->paths.project.dir, SP_LIT("spn.lock"));
 
   // Config
 #ifdef SP_WIN32
@@ -2062,6 +2018,16 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     SP_FATAL("Recipe directory {:color brightcyan} does not exist", SP_FMT_STR(app->paths.recipes));
   }
 
+  // Find the cache directory after the config has been fully loaded
+  app->paths.cache = sp_os_join_path(app->paths.storage, SP_LIT("cache"));
+  app->paths.source = sp_os_join_path(app->paths.cache, SP_LIT("source"));
+  app->paths.build = sp_os_join_path(app->paths.cache, SP_LIT("build"));
+  app->paths.store = sp_os_join_path(app->paths.cache, SP_LIT("store"));
+
+  sp_os_create_directory(app->paths.cache);
+  sp_os_create_directory(app->paths.source);
+  sp_os_create_directory(app->paths.build);
+
   // At this point, we know we have all our Lua sources.
   sp_str_t script = sp_format("package.path = package.path .. ';{}/?.lua'", SP_FMT_STR(app->paths.lua));
   s32 result = luaL_dostring(app->lua.state, sp_str_to_cstr(script));
@@ -2096,63 +2062,19 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   }
   lua_pop(app->lua.state, 2);
 
-  // Find the cache directory after the config has been fully loaded
-  app->paths.cache = sp_os_join_path(app->paths.storage, SP_LIT("cache"));
-  app->paths.source = sp_os_join_path(app->paths.cache, SP_LIT("source"));
-  app->paths.build = sp_os_join_path(app->paths.cache, SP_LIT("build"));
-  app->paths.store = sp_os_join_path(app->paths.cache, SP_LIT("store"));
-
-  sp_os_create_directory(app->paths.cache);
-  sp_os_create_directory(app->paths.source);
-  sp_os_create_directory(app->paths.build);
-
-
-  // Read all the recipe files from disk
-  sp_os_directory_entry_list_t entries = sp_os_scan_directory(app->paths.recipes);
-  for (sp_os_directory_entry_t* entry = entries.data; entry < entries.data + entries.count; entry++) {
-    if (!sp_str_equal_cstr(sp_os_extract_extension(entry->file_name), "mk")) {
-      continue;
-    }
-
-    sp_str_t name = sp_os_extract_stem(entry->file_name);
-    if (sp_str_equal_cstr(name, "spn")) continue;
-    if (sp_str_equal_cstr(name, "spn_easy")) continue;
-
-    spn_dep_info_t dep = {
-      .name = name,
-      .url = spn_dep_read_url(entry->file_path),
-      .libs = spn_dep_read_libs(entry->file_path),
-      .paths = {
-        .source = sp_os_join_path(app->paths.source, name),
-        .recipe = sp_os_join_path(app->paths.recipes, sp_format("{}.mk", SP_FMT_STR(name))),
-      }
-    };
-    sp_dyn_array_push(app->deps, dep);
-  }
-
   qsort(app->deps, sp_dyn_array_size(app->deps), sizeof(spn_dep_info_t), spn_dep_sort_kernel_alphabetical);
 
-  spn_lock_file_read(&app->lock, app->paths.lock);
+  spn_lock_file_read(&app->lock, app->paths.project.lock);
 
   bool needs_project = true;
   if (cli->num_args) {
     if (sp_cstr_equal(cli->args[0], "init") ||
         sp_cstr_equal(cli->args[0], "list") ||
-        sp_cstr_equal(cli->args[0], "nuke") ||
         sp_cstr_equal(cli->args[0], "clean")) {
       needs_project = false;
     }
   }
 
-  if (needs_project) {
-    if (!sp_os_does_path_exist(app->paths.toml)) {
-      SP_FATAL("Expected project TOML file at {:color cyan}, but it did not exist", SP_FMT_STR(app->paths.toml));
-    }
-
-    if (!spn_project_read(&app->project, app->paths.toml)) {
-      SP_FATAL("Failed to read project TOML file at {:color cyan}", SP_FMT_STR(app->paths.toml));
-    }
-  }
 }
 
 void spn_app_run(spn_app_t* app) {
@@ -2160,9 +2082,6 @@ void spn_app_run(spn_app_t* app) {
 
   if (!cli->num_args || !cli->args || !cli->args[0]) {
     SP_ASSERT(false);
-  }
-  else if (sp_cstr_equal("add", cli->args[0])) {
-    spn_cli_command_add(cli);
   }
   else if (sp_cstr_equal("init", cli->args[0])) {
     spn_cli_command_init(cli);
@@ -2487,15 +2406,14 @@ void spn_cli_command_build(spn_cli_t* cli) {
   }
 
   if (failed) {
-    sp_log(sp_str_builder_write(&builder));
-    SP_EXIT_FAILURE();
+    SP_FATAL("Build failed: {:fg brightblack}", SP_FMT_STR(sp_str_builder_write(&builder)));
   }
 
   spn_lock_file_from_deps(&app.lock, &app.build);
-  if (!spn_lock_file_write(&app.lock, app.paths.lock)) {
-    SP_LOG("Warning: Failed to write lock file to {:fg brightcyan}", SP_FMT_STR(app.paths.lock));
+  if (!spn_lock_file_write(&app.lock, app.paths.project.lock)) {
+    SP_LOG("Warning: Failed to write lock file to {:fg brightcyan}", SP_FMT_STR(app.paths.project.lock));
   } else {
-    SP_LOG("Generated lock file: {:fg brightcyan}", SP_FMT_STR(app.paths.lock));
+    SP_LOG("Generated lock file: {:fg brightcyan}", SP_FMT_STR(app.paths.project.lock));
   }
 }
 

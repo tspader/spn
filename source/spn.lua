@@ -17,13 +17,15 @@ function spn.recipes.default()
       include = {},
       bin = {},
       vendor = {}
-    }
+    },
+    lib = '',
   }
 end
 
 function spn.recipes.single_header(config)
   local recipe = spn.recipes.default()
   recipe.git = config.git
+  recipe.lib = config.lib or ''
   table.insert(recipe.files.include, config.header)
   return recipe
 end
@@ -35,7 +37,7 @@ function spn.internal.init(app)
   app = ffi.cast('spn_lua_context_t*', app)
   spn.internal.app = spp
 
-  local config = loadfile(tostring(app.paths.user_config))
+  local config = loadfile(app.paths.user_config:cstr())
   if not config then
     return
   end
@@ -56,10 +58,19 @@ function spn.internal.init(app)
 
       local dep = ffi.new('spn_dep_info_t')
       dep.name = name
-      dep.url = sp.str.from_cstr(recipe.git)
+      dep.git = sp.str.from_cstr(recipe.git)
       dep.paths.source = sp.os.join_path(app.paths.source, name)
+      dep.lib = sp.str.from_cstr(recipe.lib)
+
+      sp.dyn_array.push_f(
+        ffi.cast('void**', app.deps),
+        dep,
+        ffi.sizeof('spn_dep_info_t')
+      )
     end
   end
+
+  local project = loadfile(app.paths.project.config:cstr())
 end
 
 function spn.internal.ffi()
@@ -97,9 +108,9 @@ function spn.internal.ffi()
 
     typedef struct {
       sp_str_t name;
-      sp_str_t url;
+      sp_str_t git;
       spn_dep_paths_t paths;
-      sp_str_t* libs;
+      sp_str_t lib;
     } spn_dep_info_t;
 
 
@@ -382,12 +393,14 @@ function spn.internal.ffi()
     sp_str_t                     sp_os_join_path(sp_str_t a, sp_str_t b);
     void                         sp_os_log(sp_str_t message);
     sp_os_directory_entry_list_t sp_os_scan_directory(sp_str_t path);
+    void                         sp_dyn_array_push_f(void** arr, void* val, u32 val_len);
   ]])
 
   sp = {
     os = {},
     str = {},
-    cstr = {}
+    cstr = {},
+    dyn_array = {}
   }
   for module_name, module in pairs(sp) do
     setmetatable(module, {
