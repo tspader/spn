@@ -1,36 +1,7 @@
-[[package]]
-name = "sp"
-git_url = "git@github.com:tspader/sp.git"
-git_commit = "bd28b1115b"
-build_id = "9b248e39"
-
-[[package]]
-name = "argparse"
-git_url = "git@github.com:tspader/argparse.git"
-git_commit = "45e0e563c4"
-build_id = "7475cf26"
-
-[[package]]
-name = "sdl3"
-git_url = "git@github.com:libsdl-org/SDL.git"
-git_commit = "a9b5a1e785"
-build_id = "928714c9"
-
-[[package]]
-name = "utest"
-git_url = "git@github.com:sheredom/utest.h.git"
-git_commit = "fb622dc480"
-build_id = "b1d3b34a"
-
-[[package]]
-name = "toml"
-git_url = "git@github.com:tspader/toml.git"
-git_commit = "2e8ffdfa21"
-build_id = "1dd6067e"
-
-[[package]]
-name = "dr_libs"
-git_url = "git@github.com:mackron/dr_libs.git"
-git_commit = "b962384395"
-build_id = "b11add31"
-
+return {
+  sp = {
+    git_url = "git@github.com:tspader/sp.git",
+    git_commit = "bd28b1115b",
+    build_id = "9b248e39"
+  },
+}

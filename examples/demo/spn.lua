@@ -1,7 +1,8 @@
 local project = {
-  name = 'spn',
+  name = 'demo',
   deps = {
-    sp = {}
+    sp = {},
+    argparse = {},
   },
 }
 

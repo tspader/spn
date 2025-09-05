@@ -72,8 +72,6 @@ spn_sh_process_result_t spn_sh_read_process(SDL_Process* process);
 #define SPN_TUI_NUM_OPTIONS 3
 #define SP_TUI_PRINT(command) printf("%s", command)
 
-typedef struct spn_build_context_t spn_build_context_t;
-
 typedef struct {
   u32 std_in;
 } sp_tui_checkpoint_t;
@@ -306,26 +304,30 @@ typedef struct {
   sp_str_t value;
 } spn_dep_option_t;
 
+// Specific to the recipe
 typedef struct {
   sp_str_t name;
-  sp_str_t url;
-  spn_dep_paths_t paths;
+  sp_str_t git;
   sp_str_t lib;
+  spn_dep_paths_t paths;
 } spn_dep_info_t;
 
-typedef sp_str_t spn_dep_id_t;
-
-typedef struct {
-  u32 delta;
-} spn_dep_update_info_t;
-
+// Specific to a project
 typedef struct {
   spn_dep_info_t* info;
-  sp_dyn_array(spn_dep_option_t) options;
+  sp_hash_t hash;
+  sp_str_t commit;
+} spn_dep_spec_t;
+
+// Specific to a single build
+typedef struct {
+  spn_dep_info_t* info;
+  spn_dep_spec_t* project;
+  sp_str_t build_id;
   spn_dep_build_kind_t kind;
   spn_dep_build_paths_t paths;
-  sp_str_t build_id;
 
+  sp_lua_t lua;
   SDL_PropertiesID shell;
   SDL_Environment* environment;
   SDL_IOStream* out;
@@ -334,7 +336,6 @@ typedef struct {
   spn_dep_state_t state;
 
   struct {
-    sp_str_t current;
     sp_str_t desired;
     sp_str_t resolved;
     sp_str_t message;
@@ -347,7 +348,7 @@ typedef struct {
   c8 user_choice;
 
   sp_str_t build_error;
-} spn_dep_context_t;
+} spn_dep_build_context_t;
 
 typedef struct {
   sp_str_t name;
@@ -358,46 +359,31 @@ typedef struct {
 
 typedef sp_dyn_array(spn_lock_entry_t) spn_lock_file_t;
 
-struct spn_build_context_t {
-  sp_dyn_array(spn_dep_context_t) deps;
-};
+typedef struct {
+  sp_dyn_array(spn_dep_build_context_t) deps;
+} spn_build_context_t;
 
 spn_dep_info_t*        spn_dep_find(sp_str_t name);
 bool                   spn_dep_is_binary(spn_dep_info_t* dep);
-bool                   spn_dep_state_is_terminal(spn_dep_context_t* dep);
+bool                   spn_dep_state_is_terminal(spn_dep_build_context_t* dep);
 s32                    spn_dep_sort_kernel_alphabetical(const void* a, const void* b);
 sp_str_t               spn_dep_read_url(sp_str_t file_path);
 sp_dyn_array(sp_str_t) spn_dep_read_libs(sp_str_t file_path);
 sp_str_t               spn_dep_option_env_name(spn_dep_option_t* option);
 sp_str_t               spn_dep_build_state_to_str(spn_dep_build_state_t state);
-spn_lock_entry_t*      spn_dep_context_get_lock_entry(spn_dep_context_t* dep);
-void                   spn_dep_context_prepare(spn_dep_context_t* context);
-void                   spn_dep_context_add_options(spn_dep_context_t* context, toml_table_t* toml);
-spn_dep_context_t      spn_dep_context_from_default_profile(sp_str_t name);
-void                   spn_dep_context_set_env(spn_dep_context_t* context, sp_str_t name, sp_str_t value);
-void                   spn_dep_context_set_build_state(spn_dep_context_t* dep, spn_dep_build_state_t state);
-void                   spn_dep_context_set_build_error(spn_dep_context_t* dep, sp_str_t error);
-spn_dep_context_t*     spn_dep_context_find(spn_build_context_t* build, sp_str_t name);
-sp_str_t               spn_print(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t c);
-sp_str_t               spn_print_one(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t c);
-sp_str_t               spn_print_all(spn_dep_context_t* dep, spn_cli_compiler_t c);
-spn_build_context_t    spn_build_context_from_default_profile();
+spn_lock_entry_t*      spn_dep_context_get_lock_entry(spn_dep_build_context_t* dep);
+void                   spn_dep_context_prepare(spn_dep_build_context_t* context);
+void                   spn_dep_context_add_options(spn_dep_build_context_t* context, toml_table_t* toml);
+void                   spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state);
+void                   spn_dep_context_set_build_error(spn_dep_build_context_t* dep, sp_str_t error);
+spn_dep_build_context_t*     spn_dep_context_find(spn_build_context_t* build, sp_str_t name);
+sp_str_t               spn_print(spn_dep_build_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t c);
+sp_str_t               spn_print_one(spn_dep_build_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t c);
+sp_str_t               spn_print_all(spn_dep_build_context_t* dep, spn_cli_compiler_t c);
 
-/////////
-// APP //
-/////////
-typedef struct {
-  toml_table_t* toml;
-  bool auto_pull_recipes;
-  bool auto_pull_deps;
-  sp_str_t cache_override;
-  sp_str_t recipe_override;
-  bool builtin_recipes_enabled;
-} spn_config_t;
-
-void spn_config_read(spn_config_t* config, sp_str_t path);
-void spn_config_read_from_string(spn_config_t* config, sp_str_t toml_content);
-
+////////////
+// CONFIG //
+////////////
 typedef struct {
   sp_str_t dir;
   sp_str_t   config;
@@ -417,6 +403,7 @@ typedef struct {
   sp_str_t     build;
   sp_str_t     store;
   sp_str_t     source;
+  sp_str_t work;
   spn_project_paths_t project;
 } spn_paths_t;
 
@@ -429,16 +416,21 @@ typedef struct {
 
 typedef struct {
   sp_str_t name;
-  sp_dyn_array(spn_dep_id_t) dependencies;
-  toml_table_t* toml;
+  sp_dyn_array(spn_dep_spec_t) deps;
 } spn_project_t;
 
+spn_dep_spec_t* spn_project_find_dep(sp_str_t name);
 
-
+/////////
+// LUA //
+/////////
 typedef struct {
   struct {
     sp_str_t spn;
   } paths;
+
+  bool pull_recipes;
+  bool pull_deps;
 } spn_lua_config_t;
 
 typedef struct {
@@ -465,7 +457,6 @@ typedef struct {
   spn_lua_config_t config;
   spn_lua_context_t context;
   spn_targets_t targets;
-  spn_config_t toml_config;
   spn_tui_t tui;
   SDL_AtomicInt control;
   sp_lua_t lua;
@@ -475,12 +466,9 @@ extern spn_app_t app;
 
 void               spn_app_init(spn_app_t* app, u32 num_args, const c8** args);
 void               spn_app_run(spn_app_t* app);
-spn_dep_context_t* spn_project_find_dependency(spn_project_t* project, sp_str_t name);
 bool               spn_project_write(spn_project_t* project, sp_str_t path);
 bool               spn_lock_file_write(spn_lock_file_t* lock, sp_str_t path);
-bool               spn_lock_file_read(spn_lock_file_t* lock, sp_str_t path);
 void               spn_lock_file_from_deps(spn_lock_file_t* lock, spn_build_context_t* context);
-bool               spn_project_read(spn_project_t* project, sp_str_t path);
 
 
 ////////////////////
@@ -920,7 +908,7 @@ void spn_cli_command_list(spn_cli_t* cli) {
       &builder,
       "{:fg brightcyan} {}",
       SP_FMT_STR(sp_str_pad(dep->name, max_name_len)),
-      SP_FMT_STR(dep->url)
+      SP_FMT_STR(dep->git)
     );
     sp_str_builder_new_line(&builder);
   }
@@ -965,7 +953,7 @@ spn_cli_compiler_t spn_print_compiler_from_cstr(sp_str_t str) {
   SP_FATAL("Unknown flag {}; options are [include, lib-include, libs]",  SP_FMT_COLOR(SP_ANSI_FG_YELLOW), SP_FMT_QUOTED_STR(str));
 }
 
-sp_str_t spn_print_one(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t compiler) {
+sp_str_t spn_print_one(spn_dep_build_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t compiler) {
   sp_str_t output = SP_ZERO_INITIALIZE();
   switch (kind) {
     case SPN_PRINT_INCLUDE: {
@@ -1006,7 +994,7 @@ sp_str_t spn_print_one(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cl
   }
 }
 
-sp_str_t spn_print_all(spn_dep_context_t* dep, spn_cli_compiler_t compiler) {
+sp_str_t spn_print_all(spn_dep_build_context_t* dep, spn_cli_compiler_t compiler) {
   spn_cli_print_kind_t kinds [] = { SPN_PRINT_INCLUDE, SPN_PRINT_LIB_INCLUDE, SPN_PRINT_LIBS };
 
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
@@ -1020,7 +1008,7 @@ sp_str_t spn_print_all(spn_dep_context_t* dep, spn_cli_compiler_t compiler) {
   return result;
 }
 
-sp_str_t spn_print(spn_dep_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t compiler) {
+sp_str_t spn_print(spn_dep_build_context_t* dep, spn_cli_print_kind_t kind, spn_cli_compiler_t compiler) {
   switch (kind) {
     case SPN_PRINT_ALL: return spn_print_all(dep, compiler);
     default:            return spn_print_one(dep, kind, compiler);
@@ -1053,14 +1041,13 @@ void spn_cli_command_print(spn_cli_t* cli) {
   spn_cli_print_kind_t kind = spn_print_kind_from_cstr(sp_str_view(command->kind));
   spn_cli_compiler_t compiler = spn_print_compiler_from_cstr(sp_str_view(command->compiler));
 
-  spn_build_context_t build = spn_build_context_from_default_profile();
-  sp_dyn_array_for(build.deps, index) {
-    spn_dep_context_prepare(build.deps + index);
+  sp_dyn_array_for(app.build.deps, index) {
+    spn_dep_context_prepare(app.build.deps + index);
   }
 
   sp_str_t result = SP_ZERO_INITIALIZE();
   if (package.len) {
-    spn_dep_context_t* dep = spn_dep_context_find(&build, package);
+    spn_dep_build_context_t* dep = spn_dep_context_find(&app.build, package);
     if (!dep) {
       SP_FATAL("Package {:fg brightcyan} not found", SP_FMT_STR(package));
     }
@@ -1069,8 +1056,8 @@ void spn_cli_command_print(spn_cli_t* cli) {
   else {
     sp_str_builder_t builder = SP_ZERO_INITIALIZE();
 
-    sp_dyn_array_for(build.deps, i) {
-      spn_dep_context_t* dep = build.deps + i;
+    sp_dyn_array_for(app.build.deps, i) {
+      spn_dep_build_context_t* dep = app.build.deps + i;
 
       sp_str_t str = spn_print(dep, kind, compiler);
       if (str.len) {
@@ -1116,12 +1103,7 @@ void spn_cli_command_dir(spn_cli_t* cli) {
   sp_str_t package = sp_str_view(command->package);
   spn_cli_dir_kind_t kind = spn_dir_kind_from_cstr(sp_str_view(command->kind));
 
-  spn_build_context_t build = spn_build_context_from_default_profile();
-  sp_dyn_array_for(build.deps, index) {
-    spn_dep_context_prepare(build.deps + index);
-  }
-
-  spn_dep_context_t* dep = spn_dep_context_find(&build, package);
+  spn_dep_build_context_t* dep = spn_dep_context_find(&app.build, package);
   if (!dep) {
     SP_FATAL("Package {:fg brightcyan} not found", SP_FMT_STR(package));
   }
@@ -1135,103 +1117,6 @@ void spn_cli_command_dir(spn_cli_t* cli) {
   }
 
   printf("%.*s", output.len, output.data);
-}
-
-spn_build_context_t spn_build_context_from_default_profile() {
-  spn_build_context_t context = SP_ZERO_INITIALIZE();
-
-  sp_dyn_array_for(app.project.dependencies, index) {
-    spn_dep_id_t id = app.project.dependencies[index];
-    spn_dep_context_t dep = spn_dep_context_from_default_profile(id);
-    sp_dyn_array_push(context.deps, dep);
-  }
-
-  return context;
-}
-
-spn_dep_context_t spn_dep_context_from_default_profile(sp_str_t name) {
-  spn_dep_context_t dep = {
-    .info = spn_dep_find(name),
-    .options = SP_NULLPTR
-  };
-
-  if (!dep.info) {
-    SP_FATAL(
-      "{:color brightblue} was in your dependencies, but we couldn't find a recipe for it",
-      SP_FMT_STR(dep.info->name)
-    );
-  }
-
-  // Check if there's a [deps.id] section with configuration
-  toml_table_t* deps = toml_table_table(app.project.toml, "deps");
-  if (deps) {
-    toml_table_t* toml = toml_table_table(deps, sp_str_to_cstr(name));
-    if (toml) {
-      toml_table_t* options = toml_table_table(toml, "options");
-      if (options) {
-        spn_dep_context_add_options(&dep, options);
-      }
-    }
-  }
-
-  spn_lock_entry_t* lock = spn_dep_context_get_lock_entry(&dep);
-  dep.commits.current = lock ? lock->commit : spn_git_get_commit(dep.info->paths.source, SPN_GIT_ORIGIN_HEAD);
-
-  return dep;
-}
-
-void spn_dep_context_add_options(spn_dep_context_t* dep, toml_table_t* options) {
-  sp_dyn_array(spn_dep_parse_entry_t) entries = SP_NULLPTR;
-
-  sp_dyn_array_push(entries, ((spn_dep_parse_entry_t) {
-    .key = SP_LIT(""),
-    .table = options
-  }));
-
-  while (sp_dyn_array_size(entries)) {
-    spn_dep_parse_entry_t entry = *sp_dyn_array_back(entries);
-    sp_dyn_array_pop(entries);
-
-    for (u32 index = 0; index < toml_table_len(entry.table); index++) {
-      s32 key_len;
-      const c8* key_data = toml_table_key(entry.table, index, &key_len);
-      sp_str_t key = SP_CSTR(key_data);
-
-      sp_str_t full_key = SP_ZERO_INITIALIZE();
-      if (entry.key.len) {
-        full_key = sp_str_join(entry.key, key, SP_LIT("."));
-      }
-      else {
-        full_key = sp_str_copy(key);
-      }
-
-      toml_table_t* table = toml_table_table(entry.table, key_data);
-      toml_array_t* array = toml_table_array(options, key_data);
-
-      if (table) {
-        sp_dyn_array_push(entries, ((spn_dep_parse_entry_t) {
-          .key = full_key,
-          .table = table
-        }));
-      }
-      else if (array) {
-      }
-      else {
-        spn_dep_option_t option = SP_ZERO_INITIALIZE();
-        option.key = sp_str_copy(full_key);
-        option.key = sp_str_to_upper(option.key);
-        option.key = sp_str_replace_c8(option.key, '.', '_');
-        option.value = sp_str_from_cstr(toml_table_unparsed(entry.table, key_data));
-        sp_dyn_array_push(dep->options, option);
-      }
-    }
-  }
-
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(dep->info->name));
-  sp_dyn_array_for(dep->options, index) {
-    spn_dep_option_t* option = &dep->options[index];
-  }
 }
 
 sp_str_t spn_dep_build_state_to_str(spn_dep_build_state_t state) {
@@ -1250,7 +1135,7 @@ sp_str_t spn_dep_build_state_to_str(spn_dep_build_state_t state) {
   }
 }
 
-bool spn_dep_state_is_terminal(spn_dep_context_t* dep) {
+bool spn_dep_state_is_terminal(spn_dep_build_context_t* dep) {
   switch (dep->state.build) {
     case SPN_DEP_BUILD_STATE_FAILED:
     case SPN_DEP_BUILD_STATE_DONE:
@@ -1325,23 +1210,13 @@ sp_str_t spn_dep_option_env_name(spn_dep_option_t* option) {
 
 spn_sh_process_result_t spn_sh_read_process(SDL_Process* process) {
   spn_sh_process_result_t result = SP_ZERO_INITIALIZE();
-  sp_size_t len = 0;
+  SDL_WaitProcess(process, true, &result.return_code);
 
-  // Try SDL_ReadProcess first - this works when stdio is piped to app
+  sp_size_t len = 0;
   void* output_data = SDL_ReadProcess(process, &len, &result.return_code);
 
-  if (output_data) {
-    result.output.data = (c8*)output_data;
-    result.output.len = (u32)len;
-  } else if (result.return_code == -1) {
-    // SDL_ReadProcess returns -1 when IO is redirected
-    // Use SDL_WaitProcess instead to get the actual exit code
-    SDL_WaitProcess(process, true, &result.return_code);
-    result.output = SP_LIT("");
-  } else {
-    result.output = SP_LIT("");
-  }
-
+  result.output.data = (c8*)output_data;
+  result.output.len = (u32)len;
   return result;
 }
 
@@ -1409,7 +1284,7 @@ sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer) {
 
 void spn_tui_update_noninteractive(spn_tui_t* tui) {
   sp_dyn_array_for(app.build.deps, i) {
-    spn_dep_context_t* dep = &app.build.deps[i];
+    spn_dep_build_context_t* dep = &app.build.deps[i];
 
     if (!tui->terminal_reported[i] && spn_dep_state_is_terminal(dep)) {
       tui->terminal_reported[i] = true;
@@ -1435,7 +1310,7 @@ void spn_tui_update_interactive(spn_tui_t* tui) {
   sp_tui_up(sp_dyn_array_size(app.build.deps));
 
   sp_dyn_array_for(app.build.deps, index) {
-    spn_dep_context_t* dep = app.build.deps + index;
+    spn_dep_build_context_t* dep = app.build.deps + index;
     sp_str_builder_t builder = SP_ZERO_INITIALIZE();
 
     sp_mutex_lock(&dep->mutex);
@@ -1543,7 +1418,7 @@ void spn_tui_read(spn_tui_t* tui) {
   if (sp_tui_read_char(&input_char)) {
     // Distribute input to waiting threads
     sp_dyn_array_for(app.build.deps, i) {
-      spn_dep_context_t* dep = app.build.deps + i;
+      spn_dep_build_context_t* dep = app.build.deps + i;
       if (dep->state.build != SPN_DEP_BUILD_STATE_AWAITING_CONFIRMATION) continue;
 
       for (u32 j = 0; j < SPN_TUI_NUM_OPTIONS; j++) {
@@ -1562,7 +1437,7 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_state_t state) {
   tui->num_deps = sp_dyn_array_size(app.build.deps);
   tui->width = 0;
   sp_dyn_array_for(app.build.deps, i) {
-    spn_dep_context_t* dep = &app.build.deps[i];
+    spn_dep_build_context_t* dep = &app.build.deps[i];
     tui->width = SP_MAX(tui->width, dep->info->name.len);
   }
 
@@ -1585,7 +1460,7 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_state_t state) {
 
       // Print initial state for each dependency
       sp_dyn_array_for(app.build.deps, i) {
-        spn_dep_context_t* dep = &app.build.deps[i];
+        spn_dep_build_context_t* dep = &app.build.deps[i];
         sp_str_t name = sp_str_pad(dep->info->name, tui->width);
         sp_str_t state_str = spn_dep_build_state_to_str(dep->state.build);
         SP_LOG("{} {:fg brightcyan}", SP_FMT_STR(name), SP_FMT_STR(state_str));
@@ -1606,9 +1481,9 @@ void spn_tui_update(spn_tui_t* tui) {
   }
 }
 
-spn_dep_context_t* spn_dep_context_find(spn_build_context_t* build, sp_str_t name) {
+spn_dep_build_context_t* spn_dep_context_find(spn_build_context_t* build, sp_str_t name) {
   sp_dyn_array_for(build->deps, index) {
-    spn_dep_context_t* dep = build->deps + index;
+    spn_dep_build_context_t* dep = build->deps + index;
     if (sp_str_equal(dep->info->name, name)) {
       return dep;
     }
@@ -1617,13 +1492,7 @@ spn_dep_context_t* spn_dep_context_find(spn_build_context_t* build, sp_str_t nam
   return SP_NULLPTR;
 }
 
-void spn_dep_context_set_env(spn_dep_context_t* dep, sp_str_t name, sp_str_t value) {
-  if (!SDL_SetEnvironmentVariable(dep->environment, sp_str_to_cstr(name), sp_str_to_cstr(value), SP_SDL_OVERWRITE_ENV_VAR)) {
-    SP_FATAL("Failed to set {}={} in build context for {}", SP_FMT_STR(name), SP_FMT_STR(value), SP_FMT_STR(dep->info->name));
-  }
-}
-
-void spn_dep_context_prepare(spn_dep_context_t* dep) {
+void spn_dep_context_prepare(spn_dep_build_context_t* dep) {
   sp_mutex_lock(&dep->mutex);
   dep->commits.resolved = spn_git_get_commit(dep->info->paths.source, SPN_GIT_HEAD);
   dep->commits.message = spn_git_get_commit_message(dep->info->paths.source, dep->commits.resolved);
@@ -1633,17 +1502,8 @@ void spn_dep_context_prepare(spn_dep_context_t* dep) {
   dep->kind = SPN_BUILD_KIND_DEBUG;
 
   sp_dyn_array(sp_hash_t) hashes = SP_NULLPTR;
-
-  sp_dyn_array_push(hashes, sp_hash_str(dep->info->name));
   sp_dyn_array_push(hashes, sp_hash_str(dep->commits.resolved));
-  sp_dyn_array_push(hashes, sp_hash_bytes(&dep->kind, sizeof(dep->kind), 0));
-
-  sp_dyn_array_for(dep->options, index) {
-    spn_dep_option_t* option = &dep->options[index];
-    sp_dyn_array_push(hashes, sp_hash_str(option->key));
-    sp_dyn_array_push(hashes, sp_hash_str(option->value));
-  }
-
+  sp_dyn_array_push(hashes, dep->project->hash);
   sp_hash_t hash = sp_hash_combine(hashes, sp_dyn_array_size(hashes));
   dep->build_id = sp_format("{}", SP_FMT_SHORT_HASH(hash));
 
@@ -1667,21 +1527,7 @@ void spn_dep_context_prepare(spn_dep_context_t* dep) {
   dep->out = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_out), "w");
   dep->err = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_err), "w");
 
-  dep->environment = SDL_CreateEnvironment(SP_SDL_INHERIT_ENVIRONMENT);
-  spn_dep_context_set_env(dep, SP_LIT("SPN_DIR_PROJECT"), dep->info->paths.source);
-  spn_dep_context_set_env(dep, SP_LIT("SPN_DIR_BUILD"), dep->paths.build);
-  spn_dep_context_set_env(dep, SP_LIT("SPN_DIR_STORE_INCLUDE"), dep->paths.include);
-  spn_dep_context_set_env(dep, SP_LIT("SPN_DIR_STORE_BIN"), dep->paths.bin);
-  spn_dep_context_set_env(dep, SP_LIT("SPN_DIR_STORE_VENDOR"), dep->paths.vendor);
-  sp_dyn_array_for(dep->options, index) {
-    spn_dep_option_t* option = &dep->options[index];
-    sp_str_t key = sp_str_concat(SP_LIT("SPN_OPT_"), option->key);
-    spn_dep_context_set_env(dep, key, option->value);
-  }
-
   dep->shell = SDL_CreateProperties();
-  SDL_SetPointerProperty(dep->shell, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, dep->environment);
-
   SDL_SetNumberProperty(dep->shell, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL);
 
   SDL_SetPointerProperty(dep->shell, SDL_PROP_PROCESS_CREATE_STDOUT_POINTER, dep->out);
@@ -1693,19 +1539,34 @@ void spn_dep_context_prepare(spn_dep_context_t* dep) {
   dep->state.build = SPN_DEP_BUILD_STATE_IDLE;
   sp_mutex_init(&dep->mutex, SP_MUTEX_PLAIN);
 
+  dep->lua.state = luaL_newstate();
+  luaL_openlibs(dep->lua.state);
+
+  s32 result = luaL_dostring(dep->lua.state, sp_str_to_cstr(sp_format(
+    "package.path = '{}/?.lua;' .. package.path",
+    SP_FMT_STR(app.paths.lua)))
+  );
+  if (result) {
+    SP_FATAL(
+      "Failed to update {:fg brightyellow} while preparing {:fg cyan}",
+      SP_FMT_CSTR("package.path"),
+      SP_FMT_STR(dep->info->name)
+    );
+  }
 }
 
 s32 spn_dep_context_build_async(void* user_data) {
-  spn_dep_context_t* dep = (spn_dep_context_t*)user_data;
+  spn_dep_build_context_t* dep = (spn_dep_build_context_t*)user_data;
 
+  // Determine the state of our copy of the repository
   if (sp_os_does_path_exist(dep->info->paths.source)) {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
     spn_git_fetch(dep->info->paths.source);
 
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
-    spn_git_checkout(dep->info->paths.source, dep->commits.current);
+    spn_git_checkout(dep->info->paths.source, dep->project->commit);
 
-    dep->commits.delta = spn_git_num_updates(dep->info->paths.source, dep->commits.current, SPN_GIT_ORIGIN_HEAD);
+    dep->commits.delta = spn_git_num_updates(dep->info->paths.source, dep->project->commit, SPN_GIT_ORIGIN_HEAD);
 
     bool is_stale = dep->commits.delta > 0;
     bool is_locked = app.cli.lock;
@@ -1726,30 +1587,22 @@ s32 spn_dep_context_build_async(void* user_data) {
     dep->state.repo = SPN_DEP_REPO_STATE_UNINITIALIZED;
   }
 
+  // Take whatever action is needed to get the repository to the commit we're going to build
   switch (dep->state.repo) {
     case SPN_DEP_REPO_STATE_UNINITIALIZED: {
       spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
 
-      // We can't set the full environment that we give when we build, because pretty much everything (e.g.
-      // build and store directories) are calculated from the build ID. But since the repo hasn't been
-      // cloned, we do not know what commit we're building, and thus cannot calculate a build ID.
-      //
-      // We *do* know where to clone the repo, since that's independent of build ID, and we need to pass that
-      // to the Makefile when we run the clone target.
-      SDL_Environment* env = SDL_CreateEnvironment(SP_SDL_INHERIT_ENVIRONMENT);
-      SDL_SetEnvironmentVariable(env, "SPN_DIR_PROJECT", sp_str_to_cstr(dep->info->paths.source), SP_SDL_OVERWRITE_ENV_VAR);
-      SDL_PropertiesID shell = SDL_CreateProperties();
-      SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, env);
-      spn_sh_make_context_t make = {
-        .makefile = dep->info->paths.recipe,
-        .target = app.targets.clone,
-        .shell = shell
-      };
-      spn_sh_make(&make);
+      sp_str_t url = sp_format("https://github.com/{}.git", SP_FMT_STR(dep->info->git));
+      SDL_Process* process = SPN_SH(
+        "git", "clone",
+        sp_str_to_cstr(url),
+        sp_str_to_cstr(dep->info->paths.source),
+        "--quiet"
+      );
 
-      if (!make.process) {
+      if (!process) {
         spn_dep_context_set_build_error(dep, sp_format(
-          "Failed to spawn process for {:color cyan} {}",
+          "Failed to spawn process to clone {:color brightcyan} {}",
           dep->info->name,
           SP_FMT_CSTR(SDL_GetError())
         ));
@@ -1757,18 +1610,24 @@ s32 spn_dep_context_build_async(void* user_data) {
         return 1;
       }
 
-      SDL_WaitProcess(make.process, true, &make.result.return_code);
-      if (make.result.return_code > 0) {
-        spn_dep_context_set_build_error(dep, spn_sh_build_make_error(&make));
-        return make.result.return_code;
+      spn_sh_process_result_t result = spn_sh_read_process(process);
+      if (result.return_code) {
+        spn_dep_context_set_build_error(dep, sp_format(
+          "Failed to clone {:fg brightcyan} with exit code {:fg brightred}",
+          SP_FMT_STR(dep->info->name),
+          SP_FMT_S32(result.return_code)
+        ));
+
+        SDL_DestroyProcess(process);
+        return result.return_code;
       }
 
-      SDL_DestroyProcess(make.process);
 
+      SDL_DestroyProcess(process);
       break;
     }
     case SPN_DEP_REPO_STATE_STALE: {
-      if (!app.toml_config.auto_pull_deps) {
+      if (!app.config.pull_deps) {
         c8 key_offset = SDL_GetAtomicInt(&app.control);
         SDL_AddAtomicInt(&app.control, 3);
         dep->confirm_keys[0] = 'a' + key_offset;
@@ -1791,7 +1650,6 @@ s32 spn_dep_context_build_async(void* user_data) {
             return 1;
           }
           else if (choice == dep->confirm_keys[2]) {
-            app.toml_config.auto_pull_deps = true;
             break;
           }
           else {
@@ -1811,53 +1669,53 @@ s32 spn_dep_context_build_async(void* user_data) {
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PREPARING);
   spn_dep_context_prepare(dep);
 
+  // Build
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_BUILDING);
-  spn_sh_make_context_t make = {
-    .makefile = dep->info->paths.recipe,
-    .target = app.targets.build,
-    .working_directory = dep->paths.build,
-    .shell = dep->shell
-  };
-  spn_sh_make(&make);
 
-  if (!make.process) {
+  sp_str_builder_t builder = SP_ZERO_STRUCT(sp_str_builder_t);
+  sp_str_builder_append_cstr(&builder, "local spn = require('spn');");
+  sp_str_builder_append_cstr(&builder, "spn.internal.build(...);");
+  const c8* chunk = sp_str_builder_write_cstr(&builder);
+
+  if (luaL_loadstring(dep->lua.state, chunk) != LUA_OK) {
     spn_dep_context_set_build_error(dep, sp_format(
-      "Failed to spawn build process for {:color cyan} {}",
-      dep->info->name,
-      SP_FMT_CSTR(SDL_GetError())
+      "{:fg brightred}: {:fg brightblack}",
+      SP_FMT_CSTR("failed"),
+      SP_FMT_CSTR(lua_tostring(dep->lua.state, -1))
     ));
-
     return 1;
   }
 
-  make.result = spn_sh_read_process(make.process);
-
-  if (make.result.return_code != 0) {
-    spn_dep_context_set_build_error(dep, spn_sh_build_make_error(&make));
-    return make.result.return_code;
+  lua_pushlightuserdata(dep->lua.state, dep);
+  if (lua_pcall(dep->lua.state, 1, 0, 0) != 0) {
+    spn_dep_context_set_build_error(dep, sp_format(
+      "{:fg brightred}: {:fg brightblack}",
+      SP_FMT_CSTR("failed"),
+      SP_FMT_CSTR(lua_tostring(dep->lua.state, -1))
+    ));
+    return 1;
   }
-
-  SDL_DestroyProcess(make.process);
+  lua_pop(dep->lua.state, 2);
 
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
 
   return 0;
 }
 
-void spn_dep_context_set_build_state(spn_dep_context_t* dep, spn_dep_build_state_t state) {
+void spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state) {
   sp_mutex_lock(&dep->mutex);
   dep->state.build = state;
   sp_mutex_unlock(&dep->mutex);
 }
 
-void spn_dep_context_set_build_error(spn_dep_context_t* dep, sp_str_t error) {
+void spn_dep_context_set_build_error(spn_dep_build_context_t* dep, sp_str_t error) {
   sp_mutex_lock(&dep->mutex);
   dep->state.build = SPN_DEP_BUILD_STATE_FAILED;
   dep->build_error = sp_str_copy(error);
   sp_mutex_unlock(&dep->mutex);
 }
 
-spn_lock_entry_t* spn_dep_context_get_lock_entry(spn_dep_context_t* dep) {
+spn_lock_entry_t* spn_dep_context_get_lock_entry(spn_dep_build_context_t* dep) {
   sp_dyn_array_for(app.lock, index) {
     spn_lock_entry_t* lock = app.lock + index;
     if (sp_str_equal(lock->name, dep->info->name)) {
@@ -1926,16 +1784,18 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   // Install
   app->paths.executable = sp_os_get_executable_path();
   app->paths.install = sp_os_normalize_path(sp_str_from_cstr(SDL_GetBasePath()));
+  app->paths.work = sp_os_normalize_path(sp_str_from_cstr(SDL_GetCurrentDirectory()));
 
   // Project
   if (app->cli.project_directory) {
-    app->paths.project.dir = sp_str_from_cstr(app->cli.project_directory);
+    sp_str_t project = sp_os_join_path(app->paths.work, SP_CSTR(app->cli.project_directory));
+    app->paths.project.dir = sp_os_canonicalize_path(project);
   }
   else {
-    app->paths.project.dir = sp_os_normalize_path(sp_str_from_cstr(SDL_GetCurrentDirectory()));
+    app->paths.project.dir = sp_str_copy(app->paths.work);
   }
-  app->paths.project.config = sp_os_join_path(app->paths.project.dir, SP_LIT("spn.toml"));
-  app->paths.project.lock = sp_os_join_path(app->paths.project.dir, SP_LIT("spn.lock"));
+  app->paths.project.config = sp_os_join_path(app->paths.project.dir, SP_LIT("spn.lua"));
+  app->paths.project.lock = sp_os_join_path(app->paths.project.dir, SP_LIT("spn.lock.lua"));
 
   // Config
 #ifdef SP_WIN32
@@ -2004,7 +1864,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   else {
     u32 num_updates = spn_git_num_updates(app->paths.spn, SPN_GIT_HEAD, SPN_GIT_UPSTREAM);
     if (num_updates > 0) {
-      if (app->toml_config.auto_pull_recipes) {
+      if (app->config.pull_recipes) {
         SP_LOG("Updating spn recipes ({} commits behind)...", SP_FMT_U32(num_updates));
         spn_git_checkout(app->paths.spn, SPN_GIT_ORIGIN_HEAD);
       }
@@ -2029,52 +1889,41 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   sp_os_create_directory(app->paths.build);
 
   // At this point, we know we have all our Lua sources.
-  sp_str_t script = sp_format("package.path = package.path .. ';{}/?.lua'", SP_FMT_STR(app->paths.lua));
+  sp_str_t script = sp_format("package.path = '{}/?.lua;' .. package.path", SP_FMT_STR(app->paths.lua));
   s32 result = luaL_dostring(app->lua.state, sp_str_to_cstr(script));
   SP_ASSERT(!result);
 
-  if (luaL_dostring(app->lua.state, "spn = require('spn')")) {
+
+  builder = SP_ZERO_STRUCT(sp_str_builder_t);
+  sp_str_builder_append_cstr(&builder, "local spn = require('spn');");
+  sp_str_builder_append_cstr(&builder, "spn.internal.init(...);");
+  const c8* chunk = sp_str_builder_write_cstr(&builder);
+
+  if (luaL_loadstring(app->lua.state, chunk) != LUA_OK) {
     SP_FATAL(
-      "{:fg brightyellow} failed: {:fg brightblack}",
-      SP_FMT_CSTR("spn.internal.ffi()"),
+      "{:fg brightblack} failed to load chunk: {:fg brightred}",
+      SP_FMT_CSTR(chunk),
       SP_FMT_CSTR(lua_tostring(app->lua.state, -1))
     );
   }
 
-  if (luaL_dostring(app->lua.state, "require('spn').internal.ffi()")) {
-    SP_FATAL(
-      "{:fg brightyellow} failed: {:fg brightblack}",
-      SP_FMT_CSTR("spn.internal.ffi()"),
-      SP_FMT_CSTR(lua_tostring(app->lua.state, -1))
-    );
-  }
-
-  lua_getglobal(app->lua.state, "spn");
-  lua_getfield(app->lua.state, -1, "internal");
-  lua_getfield(app->lua.state, -1, "init");
   lua_pushlightuserdata(app->lua.state, &app->context);
   if (lua_pcall(app->lua.state, 1, 0, 0) != 0) {
     SP_FATAL(
-      "{:fg brightyellow}  failed: {:fg brightblack}",
-      SP_FMT_CSTR("spn.internal.init()"),
+      "{:fg brightblack} failed: {:fg brightred}",
+      SP_FMT_CSTR(chunk),
       SP_FMT_CSTR(lua_tostring(app->lua.state, -1))
     );
   }
   lua_pop(app->lua.state, 2);
 
-  qsort(app->deps, sp_dyn_array_size(app->deps), sizeof(spn_dep_info_t), spn_dep_sort_kernel_alphabetical);
-
-  spn_lock_file_read(&app->lock, app->paths.project.lock);
-
-  bool needs_project = true;
-  if (cli->num_args) {
-    if (sp_cstr_equal(cli->args[0], "init") ||
-        sp_cstr_equal(cli->args[0], "list") ||
-        sp_cstr_equal(cli->args[0], "clean")) {
-      needs_project = false;
-    }
+  // Allocate a build context for each dependency
+  sp_dyn_array_for(app->project.deps, index) {
+    spn_dep_build_context_t build = SP_ZERO_INITIALIZE();
+    build.project = app->project.deps + index;
+    build.info = build.project->info;
+    sp_dyn_array_push(app->build.deps, build);
   }
-
 }
 
 void spn_app_run(spn_app_t* app) {
@@ -2106,102 +1955,22 @@ void spn_app_run(spn_app_t* app) {
   }
 }
 
-void spn_config_read(spn_config_t* config, sp_str_t path) {
-  size_t file_size;
-  c8* file_data = (c8*)SDL_LoadFile(sp_str_to_cstr(path), &file_size);
-  if (!file_data) {
-    spn_config_read_from_string(config, SP_LIT(""));
-    return;
-  }
-
-  sp_str_t content = sp_str_from_cstr_sized(file_data, file_size);
-  spn_config_read_from_string(config, content);
-  SDL_free(file_data);
-}
-
-void spn_config_read_from_string(spn_config_t* config, sp_str_t toml_content) {
-  *config = (spn_config_t) {
-    .auto_pull_recipes = false,
-    .auto_pull_deps = false,
-    .toml = SP_NULLPTR,
-    .cache_override = SP_ZERO_INITIALIZE(),
-    .recipe_override = SP_ZERO_INITIALIZE(),
-    .builtin_recipes_enabled = true
-  };
-
-  c8* toml_error = (c8*)sp_alloc(256);
-  config->toml = toml_parse(sp_str_to_cstr(toml_content), toml_error, 256);
-  if (!config->toml) {
-    SP_FATAL("Failed to parse TOML: {}", SP_FMT_CSTR(toml_error));
-  }
-
-  toml_table_t* options = toml_table_table(config->toml, "options");
-  if (options) {
-    TOML_READ_BOOL(options, config->auto_pull_recipes, "auto_pull_recipes");
-    TOML_READ_BOOL(options, config->auto_pull_deps, "auto_pull_deps");
-    TOML_READ_BOOL(options, config->builtin_recipes_enabled, "builtin_recipes_enabled");
-
-    toml_value_t cache_override = toml_table_string(options, "cache_override");
-    if (cache_override.ok) {
-      config->cache_override = sp_str_from_cstr(cache_override.u.s);
-    }
-
-    toml_value_t recipe_override = toml_table_string(options, "recipe_override");
-    if (recipe_override.ok) {
-      config->recipe_override = sp_str_from_cstr(recipe_override.u.s);
-    }
-  }
-}
-
-spn_dep_context_t* spn_project_find_dependency(spn_project_t* project, sp_str_t name) {
-  SP_ASSERT(project);
-  if (!project->dependencies) return SP_NULLPTR;
-
-  sp_dyn_array_for(project->dependencies, index) {
-    if (sp_str_equal(project->dependencies[index], name)) {
-      return (spn_dep_context_t*)1; // Just return non-null to indicate found
+spn_dep_spec_t* spn_project_find_dep(sp_str_t name) {
+  sp_dyn_array_for(app.project.deps, index) {
+    spn_dep_spec_t* dep = app.project.deps + index;
+    if (sp_str_equal(dep->info->name, name)) {
+      return dep;
     }
   }
 
   return SP_NULLPTR;
 }
 
-bool spn_project_write(spn_project_t* project, sp_str_t path) {
-  sp_toml_writer_t writer = SP_ZERO_INITIALIZE();
-
-  sp_toml_writer_add_header(&writer, sp_str_lit("project"));
-  sp_toml_writer_add_string(&writer, sp_str_lit("name"), project->name);
-  if (project->dependencies) {
-    sp_toml_writer_add_string_array(&writer, sp_str_lit("deps"), project->dependencies);
-  }
-
-  sp_toml_writer_new_line(&writer);
-
-  // Add configuration sections for deps that have options
-  if (project->dependencies) {
-    toml_table_t* deps_table = project->toml ? toml_table_table(project->toml, "deps") : SP_NULLPTR;
-    sp_dyn_array_for(project->dependencies, i) {
-      spn_dep_id_t id = project->dependencies[i];
-      // Check if this dep has configuration in the original toml
-      if (deps_table) {
-        toml_table_t* dep_config = toml_table_table(deps_table, sp_str_to_cstr(id));
-        if (dep_config) {
-          sp_toml_writer_add_header(&writer, sp_format("deps.{}", SP_FMT_STR(id)));
-          // TODO: Write the actual configuration options here
-        }
-      }
-    }
-  }
-
-  sp_str_t content = sp_toml_writer_write(&writer);
-  return SDL_SaveFile(sp_str_to_cstr(path), content.data, content.len);
-}
-
 void spn_lock_file_from_deps(spn_lock_file_t* lock, spn_build_context_t* build) {
   sp_dyn_array_clear(*lock);
 
   sp_dyn_array_for(build->deps, i) {
-    spn_dep_context_t* dep = &build->deps[i];
+    spn_dep_build_context_t* dep = &build->deps[i];
 
     spn_lock_entry_t entry = SP_ZERO_INITIALIZE();
     entry.name = sp_str_copy(dep->info->name);
@@ -2211,6 +1980,10 @@ void spn_lock_file_from_deps(spn_lock_file_t* lock, spn_build_context_t* build) 
 
     sp_dyn_array_push(*lock, entry);
   }
+}
+
+bool spn_project_write(spn_project_t* project, sp_str_t path) {
+  return true;
 }
 
 bool spn_lock_file_write(spn_lock_file_t* lock, sp_str_t path) {
@@ -2240,117 +2013,9 @@ bool spn_lock_file_write(spn_lock_file_t* lock, sp_str_t path) {
   return true;
 }
 
-bool spn_lock_file_read(spn_lock_file_t* lock, sp_str_t path) {
-  size_t file_size;
-  void* file_data = SDL_LoadFile(sp_str_to_cstr(path), &file_size);
-
-  if (!file_data) {
-    return false;
-  }
-
-  c8 err_buf[256];
-  toml_table_t* toml = toml_parse((c8*)file_data, err_buf, sizeof(err_buf));
-  SDL_free(file_data);
-
-  if (!toml) {
-    SP_LOG("Warning: Failed to parse lock file: {}", SP_FMT_CSTR(err_buf));
-    return false;
-  }
-
-  toml_array_t* packages = toml_table_array(toml, "package");
-  if (!packages) {
-    return false;
-  }
-
-  for (u32 index = 0; index < toml_array_len(packages); index++) {
-    toml_table_t* package = toml_array_table(packages, index);
-
-    spn_lock_entry_t entry = SP_ZERO_INITIALIZE();
-
-    toml_value_t name = toml_table_string(package, "name");
-    SP_ASSERT(name.ok);
-    entry.name = sp_str_from_cstr(name.u.s);
-
-    toml_value_t git_url = toml_table_string(package, "git_url");
-    SP_ASSERT(git_url.ok);
-    entry.url = sp_str_from_cstr(git_url.u.s);
-
-    toml_value_t git_commit = toml_table_string(package, "git_commit");
-    SP_ASSERT(git_commit.ok);
-    entry.commit = sp_str_from_cstr(git_commit.u.s);
-
-    toml_value_t build_id = toml_table_string(package, "build_id");
-    SP_ASSERT(build_id.ok);
-    entry.build_id = sp_str_from_cstr(build_id.u.s);
-
-    sp_dyn_array_push(*lock, entry);
-  }
-
-  toml_free(toml);
-  return true;
-}
-
-bool spn_project_read(spn_project_t* project, sp_str_t path) {
-  size_t file_size;
-  void* file_data = SDL_LoadFile(sp_str_to_cstr(path), &file_size);
-
-  if (!file_data) {
-    SP_FATAL("Failed to read project file at {}", SP_FMT_STR(path));
-  }
-
-  c8* toml_error = (c8*)sp_alloc(256);
-  project->toml = toml_parse(file_data, toml_error, 256);
-  SP_ASSERT_FMT(project->toml, "Failed to read project file at {}: {}", SP_FMT_STR(path), SP_FMT_CSTR(toml_error));
-
-  toml_table_t* project_table = toml_table_table(project->toml, "project");
-  SP_ASSERT_FMT(project->toml, "Malformed project file: missing [project]");
-
-  toml_value_t name = toml_table_string(project_table, "name");
-  SP_ASSERT_FMT(name.ok, "Malformed project file: missing project.name");
-  project->name = sp_str_from_cstr(name.u.s);
-
-  // First read the deps array from [project]
-  toml_array_t* deps_array = toml_table_array(project_table, "deps");
-  if (deps_array) {
-    for (u32 i = 0; i < toml_array_len(deps_array); i++) {
-      toml_value_t dep = toml_array_string(deps_array, i);
-      if (dep.ok) {
-        spn_dep_id_t id = sp_str_from_cstr(dep.u.s);
-        sp_dyn_array_push(project->dependencies, id);
-      }
-    }
-  }
-
-  // Also support legacy format where deps are keys under [deps] table
-  toml_table_t* deps_table = toml_table_table(project->toml, "deps");
-  if (deps_table && !deps_array) {
-    for (u32 index = 0; index < toml_table_len(deps_table); index++) {
-      s32 len;
-      const c8* key = toml_table_key(deps_table, index, &len);
-
-      spn_dep_id_t id = sp_str_from_cstr_sized(key, len);
-      // Only add if not already in the list (from deps array)
-      bool found = false;
-      sp_dyn_array_for(project->dependencies, j) {
-        if (sp_str_equal(project->dependencies[j], id)) {
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        sp_dyn_array_push(project->dependencies, id);
-      }
-    }
-  }
-
-  return true;
-}
-
 void spn_cli_command_build(spn_cli_t* cli) {
-  app.build = spn_build_context_from_default_profile();
-
   sp_dyn_array_for(app.build.deps, index) {
-    spn_dep_context_t* dep = app.build.deps + index;
+    spn_dep_build_context_t* dep = app.build.deps + index;
     sp_thread_init(&dep->thread, spn_dep_context_build_async, dep);
   }
 
@@ -2360,7 +2025,7 @@ void spn_cli_command_build(spn_cli_t* cli) {
     bool building = false;
 
     sp_dyn_array_for(app.build.deps, index) {
-      spn_dep_context_t* dep = app.build.deps + index;
+      spn_dep_build_context_t* dep = app.build.deps + index;
 
       sp_mutex_lock(&dep->mutex);
       if (!spn_dep_state_is_terminal(dep)) {
@@ -2383,7 +2048,7 @@ void spn_cli_command_build(spn_cli_t* cli) {
 
   bool failed = false;
   sp_dyn_array_for(app.build.deps, i) {
-    spn_dep_context_t* dep = &app.build.deps[i];
+    spn_dep_build_context_t* dep = &app.build.deps[i];
     if (dep->state.build != SPN_DEP_BUILD_STATE_DONE) {
       failed = true;
 
