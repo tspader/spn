@@ -1,4 +1,0 @@
-[project]
-name = "drwav"
-deps = ["dr_libs"]
-

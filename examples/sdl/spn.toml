@@ -1,6 +1,0 @@
-[project]
-name = "sdl"
-deps = ["sp", "sdl3"]
-
-[deps.sp]
-options.backend = "sdl"

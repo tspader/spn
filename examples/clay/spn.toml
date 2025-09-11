@@ -1,4 +1,0 @@
-[project]
-name = "clay"
-deps = ["clay"]
-

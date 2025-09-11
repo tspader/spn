@@ -1,6 +1,0 @@
-[[package]]
-name = "sdl3"
-git_url = "git@github.com:libsdl-org/SDL.git"
-git_commit = "1f007ad5cd"
-build_id = "fececb17"
-

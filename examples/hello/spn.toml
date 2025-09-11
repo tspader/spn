@@ -1,4 +1,0 @@
-[project]
-name = "hello"
-deps = ["sdl3"]
-

@@ -1,6 +1,0 @@
-[project]
-name = "hello"
-deps = ["sp", "argparse"]
-
-[deps.sp]
-options.foo = "bar"

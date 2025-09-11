@@ -1,17 +1,68 @@
+ifeq ($(OS),Windows_NT)
+  CC := gcc
+  MAKE := make
+  CMAKE := cmake
+  SDL := SDL3.lib
+  LUAJIT := lua51.lib
+  SPN_EXE := spn.exe
+  RPATH_FLAG :=
+  IS_SPN_PREINSTALLED := $(shell where $(SPN_EXE) 2>NUL)
+else
+  CC := bear --append -- gcc
+  MAKE := bear --append -- make
+  CMAKE := bear --append -- cmake
+  SDL := libSDL3.a
+  LUAJIT := libluajit.a
+  SPN_EXE := spn
+  IS_SPN_PREINSTALLED := $(shell which $(SPN_EXE) 2>/dev/null)
+
+ifeq ($(shell uname),Darwin)
+  RPATH_FLAG := -Wl,-rpath,@loader_path
+endif
+
+ifeq ($(shell uname),Linux)
+  RPATH_FLAG := -Wl,-rpath,\$$ORIGIN
+endif
+endif
+
+
+PREINSTALLED_SPN := $(SPN_EXE)
+PREBUILT_SPN := ./build/bin/$(SPN_EXE)
+
+IS_SPN_PREBUILT := $(wildcard $(PREBUILT_SPN))
+ifneq ($(IS_SPN_PREBUILT),)
+  DEFAULT_TARGET := build
+  BOOTSTRAPPED_SPN := $(PREBUILT_SPN)
+else ifneq ($(IS_SPN_PREINSTALLED),)
+  DEFAULT_TARGET := build
+  BOOTSTRAPPED_SPN := $(PREINSTALLED_SPN)
+else
+  DEFAULT_TARGET := bootstrap
+endif
+
+#define SP_ANSI_FG_BRIGHT_YELLOW  "\033[93m"
+ANSI_FG_CYAN := \033[36m
+ANSI_FG_BRIGHT_BLACK := \033[90m
+ANSI_FG_BRIGHT_CYAN := \033[96m
+ANSI_FG_BRIGHT_YELLOW := \033[93m
+ANSI_RESET := \033[0m
+
 SPN_DIR_BUILD:= build
   SPN_DIR_BUILD_BOOTSTRAP:= $(SPN_DIR_BUILD)/bootstrap
+		SPN_BOOTSTRAP_WORK := $(SPN_DIR_BUILD_BOOTSTRAP)/work
 		SPN_BOOTSTRAP_BIN := $(SPN_DIR_BUILD_BOOTSTRAP)/bin
-			SPN_BOOTSTRAP_BIN_SDL := $(SPN_BOOTSTRAP_BIN)/libSDL3.so
+			SPN_BOOTSTRAP_SDL_BINARY := $(SPN_BOOTSTRAP_BIN)/$(SDL)
+			SPN_BOOTSTRAP_LUAJIT_BINARY := $(SPN_BOOTSTRAP_BIN)/$(LUAJIT)
 		SPN_BOOTSTRAP_SDL := $(SPN_DIR_BUILD_BOOTSTRAP)/SDL
 		SPN_BOOTSTRAP_SP := $(SPN_DIR_BUILD_BOOTSTRAP)/sp
 		SPN_BOOTSTRAP_ARGPARSE := $(SPN_DIR_BUILD_BOOTSTRAP)/argparse
+		SPN_BOOTSTRAP_LUAJIT := $(SPN_DIR_BUILD_BOOTSTRAP)/luajit
 		SPN_BOOTSTRAP_TOML := $(SPN_DIR_BUILD_BOOTSTRAP)/toml
+		SPN_BOOTSTRAP_W64DEVKIT := $(SPN_DIR_BUILD_BOOTSTRAP)/w64devkit
   SPN_DIR_BUILD_EXAMPLES := $(SPN_DIR_BUILD)/examples
   SPN_DIR_BUILD_OUTPUT := $(SPN_DIR_BUILD)/bin
     SPN_BINARY := $(SPN_DIR_BUILD_OUTPUT)/spn
-    SPN_TEST_BINARY := $(SPN_DIR_BUILD_OUTPUT)/spn-test
 SPN_DIR_SOURCE := source
-SPN_DIR_TEST := test
 SPN_MAKEFILE := Makefile
 SPN_COMPILE_DB := compile_commands.json
 SPN_CLANGD := .clangd
@@ -21,42 +72,28 @@ SPN_INSTALL_PREFIX ?= $(HOME)/.local/bin
 BUILD_TYPE ?= debug
 CMAKE_TYPE := Debug
 MAKEFLAGS += -j8
-CC := bear --append -- gcc
-MAKE := bear --append -- make
-CMAKE := bear --append -- cmake
 
+define print_heading
+	@printf "$(ANSI_FG_BRIGHT_CYAN)>> $(ANSI_RESET)"
+endef
+
+define print_and_run
+	@printf "$(ANSI_FG_BRIGHT_CYAN)>>> $(ANSI_RESET)"
+	@printf "$(ANSI_FG_BRIGHT_YELLOW)$1$(ANSI_RESET)"
+	@echo
+	@$1
+endef
 
 FLAG_LANGUAGE := -std=c11
 FLAG_INCLUDES :=  -I$(SPN_DIR_SOURCE)
 FLAG_OUTPUT := -o $(SPN_BINARY)
-FLAG_OPTIMIZATION := -g
-CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_INCLUDES) $(FLAG_OUTPUT) $(FLAG_OPTIMIZATION)
-
-TEST_FLAG_OUTPUT := -o $(SPN_TEST_BINARY)
-SPN_TEST_CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_INCLUDES) $(TEST_FLAG_OUTPUT) $(FLAG_OPTIMIZATION)
-
+FLAG_OPTIMIZATION := -g -rdynamic
+FLAG_LIBS := -lm -lpthread -lelf -ldl
+CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_OPTIMIZATION) $(FLAG_INCLUDES) $(FLAG_LIBS) $(FLAG_OUTPUT)
 
 SPN_CLANGD_HEADER_ONLY_BULLSHIT := -DSP_OS_BACKEND_SDL, -DSP_IMPLEMENTATION, -DSPN_IMPLEMENTATION, -include, toml/toml.h, -include, sp/sp.h, -include, SDL3/SDL.h, -Wno-macro-redefined, -Wno-unused-includes
 
-SDL_FLAG_DEFINES := -DCMAKE_BUILD_TYPE=$(CMAKE_TYPE) -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF -DSDL_EXAMPLES=OFF
-SDL_CMAKE_FLAGS := $(SDL_FLAG_DEFINES)
-
-IS_SPN_AVAILABLE := $(or $(shell which spn 2>/dev/null),$(wildcard ./build/bin/spn))
-ifeq ($(IS_SPN_AVAILABLE),)
-  DEFAULT_TARGET := bootstrap
-  BOOTSTRAPPING_SPN := build/bin/spn
-else
-  DEFAULT_TARGET := build
-  BOOTSTRAPPING_SPN := spn
-endif
-SPN := ./build/bin/spn
-
-BOOTSTRAP_INCLUDE := -I$(SPN_BOOTSTRAP_SDL) -I$(SPN_BOOTSTRAP_SP) -I$(SPN_BOOTSTRAP_TOML) -I$(SPN_BOOTSTRAP_ARGPARSE)
-BOOTSTRAP_LIB_INCLUDE := -L$(SPN_BOOTSTRAP_BIN)
-BOOTSTRAP_LIBS := -lSDL3
-BOOTSTRAP_FLAGS := $(BOOTSTRAP_INCLUDE) $(BOOTSTRAP_LIBS) $(BOOTSTRAP_LIB_INCLUDE)
-
-.PHONY: all build sdl clangd clean examples test install uninstall
+.PHONY: all build sdl clangd clean examples install uninstall
 .NOTPARALLEL: examples $(EXAMPLE_BINARIES)
 
 all: $(DEFAULT_TARGET)
@@ -67,42 +104,43 @@ $(SPN_DIR_BUILD_OUTPUT):
 $(SPN_DIR_BUILD_EXAMPLES):
 	@mkdir -p $(SPN_DIR_BUILD_EXAMPLES)
 
-$(SPN_DIR_BUILD_BOOTSTRAP):
-	@mkdir -p $(SPN_DIR_BUILD_BOOTSTRAP)
-
 $(SPN_BINARY): $(SPN_DIR_SOURCE)/main.c $(SPN_DIR_SOURCE)/spn.h  | $(SPN_DIR_BUILD_OUTPUT)
-	@echo ">> building spn"
-	$(eval SPN_FLAGS := $(shell $(BOOTSTRAPPING_SPN) print --compiler gcc))
-	$(CC) $(CC_FLAGS) $(SPN_FLAGS) $(SPN_DIR_SOURCE)/main.c
+	$(call print_heading)
+	@printf "building $(ANSI_FG_BRIGHT_CYAN)spn$(ANSI_RESET)"
+	@echo
 
-$(SPN_TEST_BINARY): $(SPN_DIR_TEST)/main.c $(SPN_DIR_SOURCE)/spn.h $(SPN_BINARY)
-	$(eval SPN_FLAGS := $(shell $(SPN) print --compiler gcc))
-	$(CC) $(SPN_TEST_CC_FLAGS) $(SPN_FLAGS) $(SPN_DIR_TEST)/main.c
+	$(call print_and_run,$(BOOTSTRAPPED_SPN) build)
+	$(call print_and_run,$(CC) $(CC_FLAGS) $$($(BOOTSTRAPPED_SPN) print --compiler gcc) ./source/main.c)
 
 $(SPN_COMPILE_DB): $(SPN_MAKEFILE)
 
 $(SPN_CLANGD): $(SPN_COMPILE_DB)
 	@printf "CompileFlags:\n  Add: [$(SPN_CLANGD_HEADER_ONLY_BULLSHIT)]\n" > $(SPN_CLANGD)
 
+############
+# EXAMPLES #
+############
 EXAMPLES := $(notdir $(wildcard examples/*))
 EXAMPLE_DIRS := $(addprefix examples/, $(EXAMPLES))
 EXAMPLE_BINARIES := $(addprefix build/examples/, $(EXAMPLES))
-$(EXAMPLE_BINARIES): build/examples/%: examples/%/main.c examples/%/spn.toml | $(SPN_DIR_BUILD_EXAMPLES)
+$(EXAMPLE_BINARIES): build/examples/%: examples/%/main.c examples/%/spn.lua | $(SPN_DIR_BUILD_EXAMPLES)
 	$(eval BINARY := $@)
 	$(eval EXAMPLE := $*)
 	$(eval EXAMPLE_DIR := examples/$*)
+
+	$(call print_heading)
+	@printf "building $(ANSI_FG_BRIGHT_CYAN)$(EXAMPLE_DIR)$(ANSI_RESET)"
+
 	@echo
-	@echo ">> building $(EXAMPLE_DIR)"
+	$(call print_and_run,$(BOOTSTRAPPED_SPN) --lock -C $(EXAMPLE_DIR) build)
+	$(call print_and_run,$(BOOTSTRAPPED_SPN) --lock -C $(EXAMPLE_DIR) copy build/examples)
+	$(call print_and_run,$(CC) -o $(BINARY) $$($(BOOTSTRAPPED_SPN) -C $(EXAMPLE_DIR) print --compiler gcc) $(RPATH_FLAG) -lm $(EXAMPLE_DIR)/main.c)
+	@echo
 
-	$(SPN) --lock -C $(EXAMPLE_DIR) build
-	$(eval SPN_FLAGS := $(shell $(SPN) -C $(EXAMPLE_DIR) print --compiler gcc))
-	$(CC) $(EXAMPLE_DIR)/main.c -o $(BINARY) $(SPN_FLAGS) -lm
-
-
+###########
+# PHONIES #
+###########
 build: $(SPN_BINARY)
-
-test: build $(SPN_TEST_BINARY)
-	@$(SPN_TEST_BINARY)
 
 examples: $(DEFAULT_TARGET) $(EXAMPLE_BINARIES)
 
@@ -117,34 +155,71 @@ uninstall:
 clangd: $(SPN_COMPILE_DB) $(SPN_CLANGD)
 
 clean:
-	@rm -rf $(SPN_DIR_BUILD)
+	@rm -rf $(SPN_DIR_BUILD)/bin
+	@rm -rf $(SPN_DIR_BUILD)/examples
 	@rm -f $(SPN_COMPILE_DB)
 	@rm -f $(SPN_CLANGD)
 
 
+ifeq ($(OS),Windows_NT)
+  BOOTSTRAP_LIBS := $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT)/src/lua51.dll
+else ifeq ($(shell uname),Darwin)
+  MACOSX_DEPLOYMENT_TARGET := 15.0
+  MACOS_FRAMEWORKS := -framework CoreFoundation -framework Foundation -framework Cocoa \
+                      -framework IOKit -framework GameController -framework ForceFeedback \
+                      -framework AVFoundation -framework CoreAudio -framework AudioToolbox \
+                      -framework Metal -framework MetalKit -framework QuartzCore \
+											-framework CoreHaptics -framework CoreMedia -framework Carbon -framework UniformTypeIdentifiers
+  BOOTSTRAP_LIBS := $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT)/src/libluajit.a -lm -ldl $(MACOS_FRAMEWORKS)
+
+	export MACOSX_DEPLOYMENT_TARGET
+else
+  BOOTSTRAP_LIBS := $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT)/src/libluajit.a
+endif
+
+BOOTSTRAP_INCLUDE := -I$(SPN_BOOTSTRAP_SDL)/include -I$(SPN_BOOTSTRAP_SP) -I$(SPN_BOOTSTRAP_TOML) -I$(SPN_BOOTSTRAP_ARGPARSE) -I$(SPN_BOOTSTRAP_LUAJIT)/src
+BOOTSTRAP_FLAGS := $(BOOTSTRAP_INCLUDE) $(FLAG_LIBS) $(BOOTSTRAP_LIBS)
+
+
+$(SPN_DIR_BUILD_BOOTSTRAP):
+	@mkdir -p $(SPN_DIR_BUILD_BOOTSTRAP)
+
+$(SPN_BOOTSTRAP_BIN): $(SPN_DIR_BUILD_BOOTSTRAP)
+	@mkdir -p $(SPN_BOOTSTRAP_BIN)
+
+$(SPN_BOOTSTRAP_WORK): $(SPN_DIR_BUILD_BOOTSTRAP)
+	@mkdir -p $(SPN_BOOTSTRAP_WORK)
+
 $(SPN_BOOTSTRAP_SDL): | $(SPN_DIR_BUILD_BOOTSTRAP)
-	@git clone git@github.com:libsdl-org/SDL.git $(SPN_BOOTSTRAP_SDL)
+	@git clone https://github.com/libsdl-org/SDL.git $(SPN_BOOTSTRAP_SDL)
 
 $(SPN_BOOTSTRAP_SP): | $(SPN_DIR_BUILD_BOOTSTRAP)
-	@git clone git@github.com:tspader/sp.git $(SPN_BOOTSTRAP_SP)
-
-$(SPN_BOOTSTRAP_TOML): | $(SPN_DIR_BUILD_BOOTSTRAP)
-	@git clone git@github.com:tspader/toml.git $(SPN_BOOTSTRAP_TOML)
+	@git clone https://github.com/tspader/sp.git $(SPN_BOOTSTRAP_SP)
 
 $(SPN_BOOTSTRAP_ARGPARSE): | $(SPN_DIR_BUILD_BOOTSTRAP)
-	@git clone git@github.com:tspader/argparse.git $(SPN_BOOTSTRAP_ARGPARSE)
+	@git clone https://github.com/tspader/argparse.git $(SPN_BOOTSTRAP_ARGPARSE)
 
-$(SPN_BOOTSTRAP_BIN)/libSDL3.so: | $(SPN_BOOTSTRAP_SDL)
-	$(eval SDL_FLAGS := -DCMAKE_BUILD_TYPE=Debug -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF -DSDL_EXAMPLES=OFF)
-	cmake -S$(SPN_BOOTSTRAP_SDL) -B$(SPN_BOOTSTRAP_BIN) $(SDL_FLAGS)
-	cmake --build $(SPN_BOOTSTRAP_BIN) --parallel
+$(SPN_BOOTSTRAP_LUAJIT): | $(SPN_DIR_BUILD_BOOTSTRAP)
+	@git clone https://github.com/LuaJIT/LuaJIT.git $(SPN_BOOTSTRAP_LUAJIT)
 
-bootstrap: $(SPN_BOOTSTRAP_BIN_SDL) | $(SPN_BOOTSTRAP_SP) $(SPN_BOOTSTRAP_ARGPARSE) $(SPN_BOOTSTRAP_TOML) $(SPN_DIR_BUILD_OUTPUT)
-	@echo ">> bootstrapping spn"
-	$(CC) $(CC_FLAGS) $(BOOTSTRAP_FLAGS) $(SPN_DIR_SOURCE)/main.c
+$(SPN_BOOTSTRAP_LUAJIT_BINARY): | $(SPN_BOOTSTRAP_LUAJIT) $(SPN_BOOTSTRAP_BIN)
+	@make -C $(SPN_BOOTSTRAP_LUAJIT) amalg
+	@cp $(SPN_BOOTSTRAP_LUAJIT)/src/$(LUAJIT) $(SPN_BOOTSTRAP_LUAJIT_BINARY)
+
+$(SPN_BOOTSTRAP_SDL_BINARY): | $(SPN_BOOTSTRAP_SDL) $(SPN_BOOTSTRAP_WORK) $(SPN_BOOTSTRAP_BIN)
+	$(eval SDL_FLAGS := -DCMAKE_BUILD_TYPE=Debug -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF -DSDL_UNIX_CONSOLE_BUILD=ON)
+	cmake -S$(SPN_BOOTSTRAP_SDL) -B$(SPN_BOOTSTRAP_WORK) $(SDL_FLAGS)
+	cmake --build $(SPN_BOOTSTRAP_WORK) --parallel
+	@cp $(SPN_BOOTSTRAP_WORK)/$(SDL) $(SPN_BOOTSTRAP_SDL_BINARY) 2>/dev/null
+
+SPN_BOOTSTRAP_DEPS := $(SPN_BOOTSTRAP_SP) $(SPN_BOOTSTRAP_ARGPARSE) $(SPN_DIR_BUILD_OUTPUT)
+
+bootstrap: $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT_BINARY) | $(SPN_BOOTSTRAP_DEPS)
+	@printf "$(ANSI_FG_BRIGHT_CYAN)>> $(ANSI_RESET)"
+	@echo "bootstrapping spn"
+	$(CC) $(CC_FLAGS) $(BOOTSTRAP_INCLUDE) ./source/main.c $(BOOTSTRAP_LIBS)
 	@echo
-	@echo ">> building with bootstrapped binary"
-	$(MAKE)
+	@printf "$(ANSI_FG_BRIGHT_CYAN)>> $(ANSI_RESET)"
+	@printf "done! try $(ANSI_FG_BRIGHT_CYAN)make examples$(ANSI_RESET) to build some projects with your spn binary"
 	@echo
-	@echo ">> done! try 'make examples' to build some projects with your spn binary"
 

@@ -1,3 +1,0 @@
-[project]
-name = "kitchen-sink"
-deps = ["sp", "argparse", "sdl3"]
