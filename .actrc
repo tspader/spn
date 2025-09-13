@@ -1,0 +1,5 @@
+# Configuration for act (GitHub Actions local runner)
+# Use catthehacker's Ubuntu 20.04 image which is optimized for act
+-P ubuntu-20.04=catthehacker/ubuntu:act-20.04
+# Use default medium runner size
+--container-architecture linux/amd64

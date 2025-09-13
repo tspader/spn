@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - run: |
+        if [ "$EUID" -ne 0 ]; then SUDO=sudo; fi
+        ${SUDO:-} apt-get update
+        ${SUDO:-} apt-get install -y build-essential cmake libelf-dev git
+
+    - run: make bootstrap CC=gcc MAKE=make CMAKE=cmake
+
+    - run: make build CC=gcc MAKE=make CMAKE=cmake
+
+    - run: |
+        mkdir -p ~/.config/spn
+        echo "return {}" > ~/.config/spn/spn.lua
+
+    - run: make build/examples/sdl CC=gcc MAKE=make CMAKE=cmake
+
+    - uses: actions/upload-artifact@v4
+      if: ${{ !env.ACT }}
+      with:
+        name: build-artifacts
+        path: build/
