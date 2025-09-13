@@ -124,17 +124,19 @@ EXAMPLES := $(notdir $(wildcard examples/*))
 EXAMPLE_DIRS := $(addprefix examples/, $(EXAMPLES))
 EXAMPLE_BINARIES := $(addprefix build/examples/, $(EXAMPLES))
 $(EXAMPLE_BINARIES): build/examples/%: examples/%/main.c examples/%/spn.lua | $(SPN_DIR_BUILD_EXAMPLES)
-	$(eval BINARY := $@)
 	$(eval EXAMPLE := $*)
 	$(eval EXAMPLE_DIR := examples/$*)
+	$(eval EXAMPLE_BUILD_DIR := build/examples/$*)
+	$(eval EXAMPLE_BINARY := $(EXAMPLE_BUILD_DIR)/main)
 
 	$(call print_heading)
 	@printf "building $(ANSI_FG_BRIGHT_CYAN)$(EXAMPLE_DIR)$(ANSI_RESET)"
 
 	@echo
+	@mkdir -p $(EXAMPLE_BUILD_DIR)
 	$(call print_and_run,$(BOOTSTRAPPED_SPN) --lock -C $(EXAMPLE_DIR) build)
-	$(call print_and_run,$(BOOTSTRAPPED_SPN) --lock -C $(EXAMPLE_DIR) copy build/examples)
-	$(call print_and_run,$(CC) -o $(BINARY) $$($(BOOTSTRAPPED_SPN) -C $(EXAMPLE_DIR) print --compiler gcc) $(RPATH_FLAG) -lm $(EXAMPLE_DIR)/main.c)
+	$(call print_and_run,$(BOOTSTRAPPED_SPN) --lock -C $(EXAMPLE_DIR) copy $(EXAMPLE_BUILD_DIR))
+	$(call print_and_run,$(CC) -o $(EXAMPLE_BINARY) $$($(BOOTSTRAPPED_SPN) -C $(EXAMPLE_DIR) print) -lm $(EXAMPLE_DIR)/main.c)
 	@echo
 
 ###########

@@ -6,19 +6,19 @@ return {
       name = "argparse"
     },
     {
-      build_id = "a0208b11",
-      commit = "4efdfd92a2",
-      name = "sdl3"
-    },
-    {
-      build_id = "9255de0c",
-      commit = "0961adaf76",
+      build_id = "fee33525",
+      commit = "6ecf2722ba",
       name = "sp"
     },
     {
       build_id = "cad1a4c6",
       commit = "871db2c84e",
       name = "luajit"
+    },
+    {
+      build_id = "5d6cf95d",
+      commit = "fe314a1b8a",
+      name = "sdl3"
     }
   }
 }
