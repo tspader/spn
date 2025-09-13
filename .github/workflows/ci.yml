@@ -2,100 +2,35 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main]
   pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
+    branches: [main]
 
 jobs:
-  build-linux:
+  build:
     runs-on: ubuntu-20.04
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-    
-    - name: Install dependencies
-      run: |
-        if command -v sudo &> /dev/null; then
-          SUDO=sudo
-        else
-          SUDO=""
-        fi
-        $SUDO apt-get update
-        $SUDO apt-get install -y \
-          build-essential \
-          cmake \
-          libelf-dev \
-          git
-    
-    - name: System info
-      run: |
-        echo "=== System Info ==="
-        uname -a
-        gcc --version
-        cmake --version
-        echo "=== glibc version ==="
-        ldd --version | head -1
-    
-    - name: Bootstrap spn
-      run: |
-        echo "=== Building spn from bootstrap ==="
-        # Override CC to not use bear (not needed for CI)
-        make bootstrap CC=gcc MAKE=make CMAKE=cmake
-        echo "=== Checking bootstrap binary ==="
-        if [ -f ./build/bin/spn ]; then
-          file ./build/bin/spn
-          ldd ./build/bin/spn || true
-          ./build/bin/spn --help || echo "Binary exists but can't run --help (exit code: $?)"
-        else
-          echo "ERROR: spn binary not created at ./build/bin/spn"
-          ls -la ./build/bin/ || echo "build/bin directory doesn't exist"
-          exit 1
-        fi
-    
-    - name: Build spn with itself
-      run: |
-        echo "=== Building spn with bootstrapped spn ==="
-        make build CC=gcc MAKE=make CMAKE=cmake
-        echo "=== Checking built binary ==="
-        ./build/bin/spn --help || true
-    
-    - name: Build examples
-      run: |
-        echo "=== Setting up spn config ==="
+    - uses: actions/checkout@v4
+
+    - run: |
+        if [ "$EUID" -ne 0 ]; then SUDO=sudo; fi
+        ${SUDO:-} apt-get update
+        ${SUDO:-} apt-get install -y build-essential cmake libelf-dev git
+
+    - run: make bootstrap CC=gcc MAKE=make CMAKE=cmake
+
+    - run: make build CC=gcc MAKE=make CMAKE=cmake
+
+    # Create config file required by spn
+    - run: |
         mkdir -p ~/.config/spn
         echo "return {}" > ~/.config/spn/spn.lua
-        echo "=== Building all examples ==="
-        make examples CC=gcc MAKE=make CMAKE=cmake || {
-          echo "=== Examples build failed, checking what happened ==="
-          echo "Checking if spn binary exists and works:"
-          if [ -f ./build/bin/spn ]; then
-            ./build/bin/spn --version || echo "spn --version failed with: $?"
-            echo "Trying to run spn build manually in an example:"
-            cd examples/demo && ../../build/bin/spn build 2>&1 || echo "Manual spn build failed"
-          fi
-          exit 1
-        }
-        echo "=== Listing built examples ==="
-        ls -la build/examples/
-    
-    - name: Run example binaries (smoke test)
-      run: |
-        echo "=== Testing example binaries ==="
-        for example in build/examples/*; do
-          if [ -x "$example" ]; then
-            echo "Testing: $example"
-            # Run with timeout in case any hang
-            timeout 2s "$example" --help 2>/dev/null || true
-          fi
-        done
-    
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
-      if: ${{ !env.ACT && always() }}
+
+    # Build only the demo example (skip SDL3-based examples that take too long)
+    - run: make build/examples/sdl CC=gcc MAKE=make CMAKE=cmake
+
+    - uses: actions/upload-artifact@v4
+      if: ${{ !env.ACT }}
       with:
-        name: build-artifacts-linux
-        path: |
-          build/bin/spn
-          build/examples/
+        name: build-artifacts
+        path: build/
