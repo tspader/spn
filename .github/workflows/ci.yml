@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
 
@@ -21,12 +21,10 @@ jobs:
 
     - run: make build CC=gcc MAKE=make CMAKE=cmake
 
-    # Create config file required by spn
     - run: |
         mkdir -p ~/.config/spn
         echo "return {}" > ~/.config/spn/spn.lua
 
-    # Build only the demo example (skip SDL3-based examples that take too long)
     - run: make build/examples/sdl CC=gcc MAKE=make CMAKE=cmake
 
     - uses: actions/upload-artifact@v4
