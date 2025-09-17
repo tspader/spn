@@ -6,8 +6,8 @@ return {
       name = "argparse"
     },
     {
-      build_id = "fee33525",
-      commit = "6ecf2722ba",
+      build_id = "96b879b",
+      commit = "b582f0f763",
       name = "sp"
     },
     {
@@ -16,8 +16,8 @@ return {
       name = "luajit"
     },
     {
-      build_id = "5d6cf95d",
-      commit = "fe314a1b8a",
+      build_id = "d7a0878e",
+      commit = "3876ce3495",
       name = "sdl3"
     }
   }
