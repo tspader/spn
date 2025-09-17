@@ -1722,7 +1722,7 @@ s32 spn_dep_context_build_async(void* user_data) {
     bool is_stale = dep->commits.delta > 0;
     bool is_locked = app.cli.lock;
 
-    dep->state.repo = SPN_DEP_REPO_STATE_CLEAN;
+    dep->state.repo = SPN_DEP_REPO_STATE_STALE;
   }
   else {
     dep->state.repo = SPN_DEP_REPO_STATE_UNINITIALIZED;
