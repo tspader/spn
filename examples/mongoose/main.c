@@ -66,7 +66,6 @@ typedef struct {
     u32 p2;
   } score;
   u32 winner_id;
-  bool running;
 } spn_mg_game_state_t;
 
 
@@ -78,6 +77,7 @@ typedef struct {
   spn_mg_game_state_t state;
   struct mg_connection* conn;
   u32 round;
+  bool running;
 } spn_mg_context_t;
 
 typedef struct {
@@ -189,13 +189,16 @@ void spn_mg_server_handler(struct mg_connection* c, int ev, void* ev_data) {
             mg_ws_send(c, &msg, sizeof(msg), WEBSOCKET_OP_BINARY);
 
             if (app.server.round >= SPN_MG_MAX_ROUNDS) {
+              // Determine winner based on actual scores
+              u32 winner = (app.server.state.score.p1 > app.server.state.score.p2) ? SPN_MG_PLAYER_1 : SPN_MG_PLAYER_2;
+
               msg.type = SPN_MG_EVENT_DECLARE_WINNER;
-              msg.winner.player_id = 1;
+              msg.winner.player_id = winner;
               mg_ws_send(c, &msg, sizeof(msg), WEBSOCKET_OP_BINARY);
 
-              app.server.state.winner_id = 1;
+              app.server.state.winner_id = winner;
 
-              spn_mg_server_log("{:fg brightred}", SP_FMT_CSTR("P1 is the winner"));
+              spn_mg_server_log("{:fg brightred}", SP_FMT_CSTR("game over"));
             }
 
             break;
@@ -239,7 +242,6 @@ void spn_mg_client_handler(struct mg_connection* c, int ev, void* ev_data) {
     case MG_EV_WS_MSG: {
       struct mg_ws_message* wm = (struct mg_ws_message*)ev_data;
 
-      // Check if it's a binary message
       if ((wm->flags & 0x0F) == WEBSOCKET_OP_BINARY) {
         SP_ASSERT(wm->data.len == sizeof(spn_mg_event_t));
         spn_mg_event_t message = *(spn_mg_event_t*)wm->data.buf;
@@ -281,7 +283,7 @@ void spn_mg_client_handler(struct mg_connection* c, int ev, void* ev_data) {
             );
 
             app.client.state.winner_id = message.winner.player_id;
-            app.client.state.running = false;
+            app.client.running = false;
             break;
           }
 
@@ -295,13 +297,13 @@ void spn_mg_client_handler(struct mg_connection* c, int ev, void* ev_data) {
 
     case MG_EV_ERROR: {
       spn_mg_client_log("error: {}", SP_FMT_CSTR((c8*)ev_data));
-      app.client.state.running = false;
+      app.client.running = false;
       break;
     }
 
     case MG_EV_CLOSE: {
       spn_mg_client_log("connection closed");
-      app.client.state.running = false;
+      app.client.running = false;
       break;
     }
   }
@@ -319,7 +321,7 @@ s32 spn_mg_server_thread(void* user_data) {
 
   sp_semaphore_signal(&app.semaphore);
 
-  while (app.server.state.running) {
+  while (app.server.running) {
     mg_mgr_poll(&app.server.mgr, 100);
   }
 
@@ -353,11 +355,7 @@ s32 spn_mg_client_thread(void* user_data) {
   }
 
   // Poll for game updates from the server
-  for (int i = 0; i < 50; i++) {
-    if (!app.client.state.running) {
-      break;
-    }
-
+  while (app.client.running) {
     mg_mgr_poll(&app.client.mgr, 100);
   }
 
@@ -376,8 +374,8 @@ s32 main(s32 num_args, const c8** args) {
   });
 
   SP_LOG("{:fg brightgreen} starting mongoose demo", SP_FMT_CSTR("main  "));
-  app.client.state.running = true;
-  app.server.state.running = true;
+  app.client.running = true;
+  app.server.running = true;
 
   sp_semaphore_init(&app.semaphore);
   sp_mutex_init(&app.mutex, SP_MUTEX_PLAIN);
@@ -387,10 +385,11 @@ s32 main(s32 num_args, const c8** args) {
   sp_thread_init(&client, spn_mg_client_thread, NULL);
 
   sp_thread_join(&client);
-  app.server.state.running = false;
+  app.server.running = false;
   sp_thread_join(&server);
 
   sp_semaphore_destroy(&app.semaphore);
+  sp_mutex_destroy(&app.mutex);
 
   return 0;
 }
