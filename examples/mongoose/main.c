@@ -5,141 +5,172 @@
 #include "mongoose.h"
 #include "mongoose.c"
 
-#include <unistd.h>
+typedef enum {
+  SPN_MG_UPDATE_SCORE,
+  SPN_MG_DECLARE_WINNER,
+} spn_mg_event_type_t;
 
 typedef struct {
-  struct mg_mgr mgr;
-  struct mg_connection *conn;
-  bool is_connected;
-  bool is_running;
-  u32 msg_count;
-} spn_ws_context_t;
+  u32 player_id;
+  s32 score;
+} spn_mg_score_update_t;
 
-static sp_semaphore_t server_ready;
+typedef struct {
+  u32 player_id;
+} spn_mg_winner_t;
 
-static void server_handler(struct mg_connection *c, int ev, void *ev_data) {
-  if (ev == MG_EV_HTTP_MSG) {
-    struct mg_http_message *hm = (struct mg_http_message *) ev_data;
-    if (mg_match(hm->uri, mg_str("/ws"), NULL)) {
-      mg_ws_upgrade(c, hm, NULL);
-      SP_LOG("Server: WebSocket client connected");
-    }
-  } else if (ev == MG_EV_WS_MSG) {
-    struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
-    SP_LOG("Server received: {}B message", SP_FMT_U32((u32)wm->data.len));
+typedef struct {
+  spn_mg_event_type_t type;
+  union {
+    spn_mg_score_update_t score_update;
+    spn_mg_winner_t winner;
+  };
+} spn_mg_message_t;
 
-    const c8* response = "pong from server";
-    mg_ws_send(c, response, strlen(response), WEBSOCKET_OP_TEXT);
-  }
+typedef struct {
+  u32 player1_score;
+  u32 player2_score;
+  u32 winner_id;
+} spn_mg_game_state_t;
+
+spn_mg_game_state_t server_state = {0};
+spn_mg_game_state_t client_state = {0};
+
+void spn_mg_send_message(struct mg_connection* c, spn_mg_message_t* msg) {
+  sp_str_t data = sp_format("{} {} {}",
+    SP_FMT_U32(msg->type),
+    SP_FMT_U32(msg->type == SPN_MG_UPDATE_SCORE ? msg->score_update.player_id : msg->winner.player_id),
+    SP_FMT_S32(msg->type == SPN_MG_UPDATE_SCORE ? msg->score_update.score : 0)
+  );
+  mg_ws_send(c, data.data, data.len, WEBSOCKET_OP_TEXT);
 }
 
-static void client_handler(struct mg_connection *c, int ev, void *ev_data) {
-  spn_ws_context_t *ctx = (spn_ws_context_t *)c->fn_data;
+spn_mg_message_t spn_mg_parse_message(sp_str_t data) {
+  spn_mg_message_t msg = SP_ZERO_STRUCT(spn_mg_message_t);
 
-  if (ev == MG_EV_CONNECT) {
-    struct mg_str host = mg_url_host("ws://127.0.0.1:8080");
-    mg_printf(c,
-              "GET /ws HTTP/1.1\r\n"
-              "Host: %.*s\r\n"
-              "Upgrade: websocket\r\n"
-              "Connection: Upgrade\r\n"
-              "Sec-WebSocket-Version: 13\r\n"
-              "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n",
-              (int)host.len, host.buf);
-  } else if (ev == MG_EV_WS_OPEN) {
-    ctx->is_connected = true;
-    SP_LOG("Client: WebSocket connection established");
+  u32 values[3] = {0};
+  u32 count = 0;
 
-    // Send first message immediately
-    const c8* msg = "ping #0 from client";
-    mg_ws_send(c, msg, strlen(msg), WEBSOCKET_OP_TEXT);
-    ctx->msg_count = 1;
-  } else if (ev == MG_EV_WS_MSG) {
-    struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
-    SP_LOG("Client received: {}B message", SP_FMT_U32((u32)wm->data.len));
+  sp_str_t remaining = data;
+  while (remaining.len > 0 && count < 3) {
+    u32 i = 0;
+    while (i < remaining.len && remaining.data[i] != ' ') i++;
 
-    // Send next message
-    if (ctx->msg_count < 5) {
-      c8 msg[64];
-      snprintf(msg, sizeof(msg), "ping #%u from client", ctx->msg_count++);
-      mg_ws_send(c, msg, strlen(msg), WEBSOCKET_OP_TEXT);
+    sp_str_t token = {.data = remaining.data, .len = i};
+    values[count++] = sp_parse_u32(token);
+
+    if (i < remaining.len) {
+      remaining.data += i + 1;
+      remaining.len -= i + 1;
     } else {
-      mg_ws_send(c, "goodbye", 7, WEBSOCKET_OP_TEXT);
-      ctx->is_running = false;
+      break;
     }
-  } else if (ev == MG_EV_ERROR) {
-    SP_LOG("Client error: {}", SP_FMT_CSTR((c8 *)ev_data));
-    ctx->is_connected = false;
-  } else if (ev == MG_EV_CLOSE) {
-    ctx->is_connected = false;
-    ctx->is_running = false;
   }
+
+  if (count >= 2) {
+    msg.type = values[0];
+    switch (msg.type) {
+      case SPN_MG_UPDATE_SCORE:
+        msg.score_update.player_id = values[1];
+        if (count >= 3) {
+          msg.score_update.score = (s32)values[2];
+        }
+        break;
+      case SPN_MG_DECLARE_WINNER:
+        msg.winner.player_id = values[1];
+        break;
+    }
+  }
+
+  return msg;
 }
 
-static s32 server_thread(void *arg) {
-  spn_ws_context_t *ctx = (spn_ws_context_t *)arg;
+void spn_mg_handler(struct mg_connection* c, int ev, void* ev_data) {
+  switch (ev) {
+    case MG_EV_ACCEPT: {
+      SP_LOG("Server: client accepted");
+      break;
+    }
 
-  mg_mgr_init(&ctx->mgr);
-  mg_http_listen(&ctx->mgr, "http://127.0.0.1:8080", server_handler, NULL);
-  SP_LOG("Server started on port 8080");
+    case MG_EV_HTTP_MSG: {
+      struct mg_http_message* hm = (struct mg_http_message*)ev_data;
 
-  sp_semaphore_signal(&server_ready);
+      // Server: handle WebSocket upgrade
+      if (mg_match(hm->uri, mg_str("/ws"), NULL)) {
+        mg_ws_upgrade(c, hm, NULL);
+        SP_LOG("Server: WebSocket upgraded");
 
-  while (ctx->is_running) {
-    mg_mgr_poll(&ctx->mgr, 100);
+        // After upgrade, immediately send initial game state
+        spn_mg_message_t msg = {
+          .type = SPN_MG_UPDATE_SCORE,
+          .score_update = {.player_id = 1, .score = 0}
+        };
+        spn_mg_send_message(c, &msg);
+
+        msg.score_update.player_id = 2;
+        msg.score_update.score = 0;
+        spn_mg_send_message(c, &msg);
+      } else {
+        // Serve a simple test page
+        mg_http_reply(c, 200, "", "WebSocket Game Server Running\n");
+      }
+      break;
+    }
+
+    case MG_EV_WS_MSG: {
+      struct mg_ws_message* wm = (struct mg_ws_message*)ev_data;
+      sp_str_t data = {.data = (c8*)wm->data.buf, .len = (u32)wm->data.len};
+      SP_LOG("Server: received {}", SP_FMT_STR(data));
+
+      // Simulate game logic
+      server_state.player1_score += 10;
+      server_state.player2_score += 5;
+
+      // Send score updates
+      spn_mg_message_t msg = {
+        .type = SPN_MG_UPDATE_SCORE,
+        .score_update = {.player_id = 1, .score = server_state.player1_score}
+      };
+      spn_mg_send_message(c, &msg);
+
+      msg.score_update.player_id = 2;
+      msg.score_update.score = server_state.player2_score;
+      spn_mg_send_message(c, &msg);
+
+      // Check for winner
+      if (server_state.player1_score >= 30) {
+        msg.type = SPN_MG_DECLARE_WINNER;
+        msg.winner.player_id = 1;
+        spn_mg_send_message(c, &msg);
+        server_state.winner_id = 1;
+        SP_LOG("Server: game over, player 1 wins");
+      }
+      break;
+    }
   }
-
-  SP_LOG("Server shutting down");
-  mg_mgr_free(&ctx->mgr);
-  return 0;
-}
-
-static s32 client_thread(void *arg) {
-  spn_ws_context_t *ctx = (spn_ws_context_t *)arg;
-
-  sp_semaphore_wait(&server_ready);
-  usleep(100000);  // 100ms delay
-
-  mg_mgr_init(&ctx->mgr);
-  ctx->conn = mg_ws_connect(&ctx->mgr, "ws://127.0.0.1:8080/ws", client_handler, ctx, NULL);
-
-  if (!ctx->conn) {
-    SP_LOG("Client: Failed to create connection");
-    mg_mgr_free(&ctx->mgr);
-    return 1;
-  }
-
-  while (ctx->is_running) {
-    mg_mgr_poll(&ctx->mgr, 100);
-    usleep(100000); // 100ms between polls
-  }
-
-  SP_LOG("Client shutting down");
-  mg_mgr_free(&ctx->mgr);
-  return 0;
 }
 
 s32 main(s32 num_args, const c8** args) {
-  sp_init((sp_config_t) {
+  sp_init((sp_config_t){
     .allocator = sp_allocator_default()
   });
 
-  spn_ws_context_t server_ctx = { .is_running = true, .msg_count = 0 };
-  spn_ws_context_t client_ctx = { .is_running = true, .is_connected = false, .msg_count = 0 };
+  struct mg_mgr mgr;
+  mg_mgr_init(&mgr);
 
-  sp_semaphore_init(&server_ready);
+  // Start server
+  mg_http_listen(&mgr, "http://0.0.0.0:8080", spn_mg_handler, NULL);
+  SP_LOG("Server: listening on port 8080");
+  SP_LOG("Open http://localhost:8080 in browser or use WebSocket client");
+  SP_LOG("WebSocket endpoint: ws://localhost:8080/ws");
 
-  sp_thread_t server, client;
-  sp_thread_init(&server, server_thread, &server_ctx);
-  sp_thread_init(&client, client_thread, &client_ctx);
+  // Run server
+  SP_LOG("Server: running (press Ctrl+C to stop)");
+  for (int i = 0; i < 100; i++) {
+    mg_mgr_poll(&mgr, 100);
+  }
 
-  sp_thread_join(&client);
-
-  // Stop server after client finishes
-  server_ctx.is_running = false;
-  sp_thread_join(&server);
-
-  SP_LOG("WebSocket demo completed");
-
+  mg_mgr_free(&mgr);
+  SP_LOG("Server: stopped");
   return 0;
 }

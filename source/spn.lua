@@ -65,7 +65,6 @@ function spn.init(app)
 
   app = ffi.cast('spn_lua_context_t*', app)
   spn.app = app
-
   local config = dofile(app.paths.user_config:cstr())
   if not config then
     return
