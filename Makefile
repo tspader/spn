@@ -203,7 +203,7 @@ bootstrap: $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT_BINARY) | $(SPN_BO
 EXAMPLES := $(notdir $(wildcard examples/*))
 EXAMPLE_DIRS := $(addprefix examples/, $(EXAMPLES))
 EXAMPLE_BINARIES := $(addprefix build/examples/, $(EXAMPLES))
-$(EXAMPLE_BINARIES): build/examples/%: examples/%/main.c examples/%/spn.lua | $(SPN_DIR_BUILD_EXAMPLES)
+$(EXAMPLE_BINARIES): build/examples/%: examples/%/main.c examples/%/spn.lua $(SPN_MAKEFILE) | $(SPN_DIR_BUILD_EXAMPLES)
 	$(eval EXAMPLE := $*)
 	$(eval EXAMPLE_DIR := examples/$*)
 	$(eval EXAMPLE_BUILD_DIR := build/examples/$*)
