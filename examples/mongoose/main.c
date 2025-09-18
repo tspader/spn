@@ -10,9 +10,22 @@
 #include "mongoose.h"
 #include "mongoose.c"
 
-/////////////////
-// GAME EVENTS //
-/////////////////
+//////////////
+// REQUESTS //
+//////////////
+typedef enum {
+  SPN_MG_REQUEST_NONE,
+  SPN_MG_REQUEST_PLAY,
+  SPN_MG_REQUEST_TURN,
+} spn_mg_request_kind_t;
+
+typedef struct {
+  spn_mg_request_kind_t kind;
+}spn_mg_request_t;
+
+////////////
+// EVENTS //
+////////////
 typedef enum {
   SPN_MG_UPDATE_SCORE,
   SPN_MG_DECLARE_WINNER,
@@ -30,18 +43,28 @@ typedef struct {
 typedef struct {
   spn_mg_event_type_t type;
   union {
-    spn_mg_score_update_t score_update;
+    spn_mg_score_update_t score;
     spn_mg_winner_t winner;
   };
-} spn_mg_message_t;
+} spn_mg_event_t;
 
 
 ////////////////
 // GAME STATE //
 ////////////////
+typedef enum {
+  SPN_MG_PLAYER_NONE,
+  SPN_MG_PLAYER_1,
+  SPN_MG_PLAYER_2,
+} spn_mg_player_id_t;
+
+#define SPN_MG_MAX_ROUNDS 3
+
 typedef struct {
-  u32 player1_score;
-  u32 player2_score;
+  struct {
+    u32 p1;
+    u32 p2;
+  } score;
   u32 winner_id;
   bool running;
 } spn_mg_game_state_t;
@@ -65,59 +88,34 @@ typedef struct {
 
 spn_mg_app_t app;
 
-void spn_mg_send_message(struct mg_connection* c, spn_mg_message_t* msg) {
-  sp_str_t data = sp_format("{} {} {}",
-    SP_FMT_U32(msg->type),
-    SP_FMT_U32(msg->type == SPN_MG_UPDATE_SCORE ? msg->score_update.player_id : msg->winner.player_id),
-    SP_FMT_S32(msg->type == SPN_MG_UPDATE_SCORE ? msg->score_update.score : 0)
-  );
-  mg_ws_send(c, data.data, data.len, WEBSOCKET_OP_TEXT);
+
+////////////
+// LOGGING //
+////////////
+void spn_mg_server_log(const c8* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  sp_str_t formatted = sp_format_v(SP_CSTR(fmt), args);
+  va_end(args);
+  SP_LOG("{:fg brightcyan}: {}", SP_FMT_CSTR("Server"), SP_FMT_STR(formatted));
 }
 
-spn_mg_message_t spn_mg_parse_message(sp_str_t data) {
-  spn_mg_message_t msg = SP_ZERO_STRUCT(spn_mg_message_t);
-
-  u32 values[3] = {0};
-  u32 count = 0;
-
-  sp_str_t remaining = data;
-  while (remaining.len > 0 && count < 3) {
-    u32 i = 0;
-    while (i < remaining.len && remaining.data[i] != ' ') i++;
-
-    sp_str_t token = {.data = remaining.data, .len = i};
-    values[count++] = sp_parse_u32(token);
-
-    if (i < remaining.len) {
-      remaining.data += i + 1;
-      remaining.len -= i + 1;
-    } else {
-      break;
-    }
-  }
-
-  if (count >= 2) {
-    msg.type = values[0];
-    switch (msg.type) {
-      case SPN_MG_UPDATE_SCORE:
-        msg.score_update.player_id = values[1];
-        if (count >= 3) {
-          msg.score_update.score = (s32)values[2];
-        }
-        break;
-      case SPN_MG_DECLARE_WINNER:
-        msg.winner.player_id = values[1];
-        break;
-    }
-  }
-
-  return msg;
+void spn_mg_client_log(const c8* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  sp_str_t formatted = sp_format_v(SP_CSTR(fmt), args);
+  va_end(args);
+  SP_LOG("{:fg brightgreen}: {}", SP_FMT_CSTR("Client"), SP_FMT_STR(formatted));
 }
 
+
+//////////////
+// HANDLERS //
+//////////////
 void spn_mg_server_handler(struct mg_connection* c, int ev, void* ev_data) {
   switch (ev) {
     case MG_EV_ACCEPT: {
-      SP_LOG("Server: client accepted");
+      spn_mg_server_log("Client accepted");
       break;
     }
 
@@ -125,9 +123,10 @@ void spn_mg_server_handler(struct mg_connection* c, int ev, void* ev_data) {
       struct mg_http_message* hm = (struct mg_http_message*)ev_data;
       if (mg_match(hm->uri, mg_str("/ws"), NULL)) {
         mg_ws_upgrade(c, hm, NULL);
-        SP_LOG("Server: WebSocket upgraded");
+        spn_mg_server_log("WebSocket upgraded");
         app.server.conn = c;
-      } else {
+      }
+      else {
         mg_http_reply(c, 404, "", "Not Found\n");
       }
       break;
@@ -135,40 +134,59 @@ void spn_mg_server_handler(struct mg_connection* c, int ev, void* ev_data) {
 
     case MG_EV_WS_MSG: {
       struct mg_ws_message* wm = (struct mg_ws_message*)ev_data;
-      sp_str_t data = {.data = (c8*)wm->data.buf, .len = (u32)wm->data.len};
-      SP_LOG("Server: received message: {}", SP_FMT_STR(data));
 
-      // Simulate game round
-      app.server.round++;
-      app.server.state.player1_score += 10;
-      app.server.state.player2_score += 5;
+      if ((wm->flags & 0x0F) == WEBSOCKET_OP_BINARY) {
+        SP_ASSERT(wm->data.len == sizeof(spn_mg_request_t));
+        spn_mg_request_t* request = (spn_mg_request_t*)ev_data;
 
-      SP_LOG("Server: round {} - updating scores", SP_FMT_U32(app.server.round));
+        switch (request->kind) {
+          case SPN_MG_REQUEST_PLAY: {
+            spn_mg_server_log("{:fg brightblack}", SP_FMT_CSTR("SPN_MG_REQUEST_PLAY"));
+            app.server.round = 0;
+            app.server.state.score.p1 = 0;
+            app.server.state.score.p2 = 0;
+            break;
+          }
+          case SPN_MG_REQUEST_TURN: {
+            spn_mg_server_log("{:fg brightblack}", SP_FMT_CSTR("SPN_MG_REQUEST_TURN"));
 
-      // Send score updates
-      spn_mg_message_t msg = {
-        .type = SPN_MG_UPDATE_SCORE,
-        .score_update = {.player_id = 1, .score = app.server.state.player1_score}
-      };
-      spn_mg_send_message(c, &msg);
+            app.server.round++;
+            app.server.state.score.p1 += 10;
+            app.server.state.score.p2 += 5;
 
-      msg.score_update.player_id = 2;
-      msg.score_update.score = app.server.state.player2_score;
-      spn_mg_send_message(c, &msg);
+            spn_mg_event_t msg;
+            msg.type = SPN_MG_UPDATE_SCORE;
+            msg.score.player_id = SPN_MG_PLAYER_1;
+            msg.score.score = app.server.state.score.p1;
+            mg_ws_send(c, &msg, sizeof(msg), WEBSOCKET_OP_BINARY);
 
-      // Check for winner after 3 rounds
-      if (app.server.round >= 3) {
-        msg.type = SPN_MG_DECLARE_WINNER;
-        msg.winner.player_id = 1;
-        spn_mg_send_message(c, &msg);
-        app.server.state.winner_id = 1;
-        SP_LOG("Server: game over, player 1 wins");
+            msg.score.player_id = SPN_MG_PLAYER_2;
+            msg.score.score = app.server.state.score.p2;
+            mg_ws_send(c, &msg, sizeof(msg), WEBSOCKET_OP_BINARY);
+
+            if (app.server.round >= SPN_MG_MAX_ROUNDS) {
+              msg.type = SPN_MG_DECLARE_WINNER;
+              msg.winner.player_id = 1;
+              mg_ws_send(c, &msg, sizeof(msg), WEBSOCKET_OP_BINARY);
+
+              app.server.state.winner_id = 1;
+              spn_mg_server_log("game over, player 1 wins");
+            }
+
+            break;
+          }
+          default: {
+            spn_mg_server_log("{:fg red}: {:fg brightblack}", SP_FMT_CSTR("unknown request"), SP_FMT_U32(request->kind));
+            SP_UNREACHABLE_CASE();
+          }
+        }
       }
+
       break;
     }
 
     case MG_EV_CLOSE: {
-      SP_LOG("Server: client disconnected");
+      spn_mg_server_log("client disconnected");
       app.server.conn = NULL;
       break;
     }
@@ -178,84 +196,100 @@ void spn_mg_server_handler(struct mg_connection* c, int ev, void* ev_data) {
 void spn_mg_client_handler(struct mg_connection* c, int ev, void* ev_data) {
   switch (ev) {
     case MG_EV_CONNECT: {
-      SP_LOG("Client: TCP connected");
+      spn_mg_client_log("TCP connected");
       break;
     }
 
     case MG_EV_WS_OPEN: {
-      SP_LOG("Client: WebSocket opened, starting game");
+      spn_mg_client_log("WebSocket opened, starting game");
       app.client.conn = c;
-      // Send first play message
-      sp_str_t msg = SP_CSTR("play");
-      mg_ws_send(c, msg.data, msg.len, WEBSOCKET_OP_TEXT);
+
+      spn_mg_request_t request = {
+        .kind = SPN_MG_REQUEST_PLAY
+      };
+      mg_ws_send(c, &request, sizeof(request), WEBSOCKET_OP_BINARY);
       break;
     }
 
     case MG_EV_WS_MSG: {
       struct mg_ws_message* wm = (struct mg_ws_message*)ev_data;
-      sp_str_t data = {.data = (c8*)wm->data.buf, .len = (u32)wm->data.len};
 
-      spn_mg_message_t msg = spn_mg_parse_message(data);
+      // Check if it's a binary message
+      if ((wm->flags & 0x0F) == WEBSOCKET_OP_BINARY) {
+        SP_ASSERT(wm->data.len == sizeof(spn_mg_event_t));
+        spn_mg_event_t message = *(spn_mg_event_t*)wm->data.buf;
 
-      switch (msg.type) {
-        case SPN_MG_UPDATE_SCORE: {
-          if (msg.score_update.player_id == 1) {
-            app.client.state.player1_score = msg.score_update.score;
-          } else if (msg.score_update.player_id == 2) {
-            app.client.state.player2_score = msg.score_update.score;
+        switch (message.type) {
+          case SPN_MG_UPDATE_SCORE: {
+            if (message.score.player_id == 1) {
+              app.client.state.score.p1 = message.score.score;
+            }
+            else if (message.score.player_id == 2) {
+              app.client.state.score.p2 = message.score.score;
+            }
+
+            spn_mg_client_log(
+              "{:fg brightblack} P{} -> {}",
+              SP_FMT_CSTR("SPN_MG_UPDATE_SCORE"),
+              SP_FMT_U32(message.score.player_id),
+              SP_FMT_S32(message.score.score)
+            );
+
+            if (app.client.state.winner_id == 0) {
+              sp_os_sleep_ms(500);
+
+              spn_mg_request_t request = {
+                .kind = SPN_MG_REQUEST_TURN
+              };
+              mg_ws_send(c, &request, sizeof(request), WEBSOCKET_OP_BINARY);
+            }
+            break;
           }
 
-          SP_LOG("Client: Player {} score = {}",
-            SP_FMT_U32(msg.score_update.player_id),
-            SP_FMT_S32(msg.score_update.score)
-          );
+          case SPN_MG_DECLARE_WINNER: {
+            spn_mg_client_log(
+              "{:fg brightblack} P1 ({}) P2 ({})",
+              SP_FMT_CSTR("SPN_MG_DECLARE_WINNER"),
+              SP_FMT_U32(app.client.state.score.p1),
+              SP_FMT_U32(app.client.state.score.p2)
+            );
 
-          // Wait a bit then play next round if no winner yet
-          if (app.client.state.winner_id == 0) {
-            usleep(500000); // 500ms
-            sp_str_t play = SP_CSTR("play");
-            SP_LOG("Client: requesting next round");
-            mg_ws_send(c, play.data, play.len, WEBSOCKET_OP_TEXT);
+            app.client.state.winner_id = message.winner.player_id;
+            app.client.state.running = false;
+            break;
           }
-          break;
-        }
 
-        case SPN_MG_DECLARE_WINNER: {
-          app.client.state.winner_id = msg.winner.player_id;
-          SP_LOG("Client: Player {} wins! Final: P1={} P2={}",
-            SP_FMT_U32(msg.winner.player_id),
-            SP_FMT_U32(app.client.state.player1_score),
-            SP_FMT_U32(app.client.state.player2_score)
-          );
-          app.client.state.running = false;
-          break;
+          default:
+            spn_mg_client_log("unknown message type {}", SP_FMT_U32(message.type));
+            break;
         }
-
-        default:
-          break;
       }
       break;
     }
 
     case MG_EV_ERROR: {
-      SP_LOG("Client error: {}", SP_FMT_CSTR((c8*)ev_data));
+      spn_mg_client_log("error: {}", SP_FMT_CSTR((c8*)ev_data));
       app.client.state.running = false;
       break;
     }
 
     case MG_EV_CLOSE: {
-      SP_LOG("Client: connection closed");
+      spn_mg_client_log("connection closed");
       app.client.state.running = false;
       break;
     }
   }
 }
 
+
+/////////////
+// THREADS //
+/////////////
 s32 spn_mg_server_thread(void* user_data) {
   mg_mgr_init(&app.server.mgr);
 
   mg_http_listen(&app.server.mgr, "http://0.0.0.0:8080", spn_mg_server_handler, NULL);
-  SP_LOG("Server: listening on port 8080");
+  spn_mg_server_log("Listening on port 8080");
 
   sp_semaphore_signal(&app.semaphore);
 
@@ -264,7 +298,7 @@ s32 spn_mg_server_thread(void* user_data) {
   }
 
   mg_mgr_free(&app.server.mgr);
-  SP_LOG("Server: shutting down");
+  spn_mg_server_log("shutting down");
   return 0;
 }
 
@@ -272,30 +306,41 @@ s32 spn_mg_client_thread(void* user_data) {
   sp_semaphore_wait(&app.semaphore);
 
   // Let server fully start
-  usleep(200000); // 200ms
+  sp_os_sleep_ms(200.0);
 
   mg_mgr_init(&app.client.mgr);
 
-  SP_LOG("Client: connecting to ws://127.0.0.1:8080/ws");
-  struct mg_connection* conn = mg_ws_connect(&app.client.mgr, "ws://127.0.0.1:8080/ws",
-                                              spn_mg_client_handler, NULL, NULL);
+  spn_mg_client_log("connecting to ws://127.0.0.1:8080/ws");
+  struct mg_connection* conn = mg_ws_connect(
+    &app.client.mgr,
+    "ws://127.0.0.1:8080/ws",
+    spn_mg_client_handler, NULL, NULL
+  );
 
   if (!conn) {
-    SP_LOG("Client: failed to create connection");
+    spn_mg_client_log("failed to create connection");
     mg_mgr_free(&app.client.mgr);
     return 1;
   }
 
-  // Run client for up to 10 seconds or until game ends
-  for (int i = 0; i < 100 && app.client.state.running; i++) {
+  // Poll for game updates from the server
+  for (int i = 0; i < 50; i++) {
+    if (!app.client.state.running) {
+      break;
+    }
+
     mg_mgr_poll(&app.client.mgr, 100);
   }
 
   mg_mgr_free(&app.client.mgr);
-  SP_LOG("Client: shutting down");
+  spn_mg_client_log("shutting down");
   return 0;
 }
 
+
+//////////
+// MAIN //
+//////////
 s32 main(s32 num_args, const c8** args) {
   sp_init((sp_config_t){
     .allocator = sp_allocator_default()
@@ -303,18 +348,9 @@ s32 main(s32 num_args, const c8** args) {
 
   SP_LOG("Starting WebSocket game example");
 
-  app = (spn_mg_app_t) {
-    .client = {
-      .state = {
-        .running = true
-      }
-    },
-    .server = {
-      .state = {
-        .running = true
-      }
-    },
-  };
+  app.client.state.running = true;
+  app.server.state.running = true;
+
   sp_semaphore_init(&app.semaphore);
 
   sp_thread_t server, client;
