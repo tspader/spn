@@ -27,8 +27,8 @@ typedef struct {
 // EVENTS //
 ////////////
 typedef enum {
-  SPN_MG_UPDATE_SCORE,
-  SPN_MG_DECLARE_WINNER,
+  SPN_MG_EVENT_UPDATE_SCORE,
+  SPN_MG_EVENT_DECLARE_WINNER,
 } spn_mg_event_type_t;
 
 typedef struct {
@@ -84,6 +84,7 @@ typedef struct {
   spn_mg_context_t client;
   spn_mg_context_t server;
   sp_semaphore_t semaphore;
+  sp_mutex_t mutex;
 } spn_mg_app_t;
 
 spn_mg_app_t app;
@@ -93,19 +94,24 @@ spn_mg_app_t app;
 // LOGGING //
 ////////////
 void spn_mg_server_log(const c8* fmt, ...) {
+  sp_mutex_lock(&app.mutex);
   va_list args;
   va_start(args, fmt);
   sp_str_t formatted = sp_format_v(SP_CSTR(fmt), args);
   va_end(args);
-  SP_LOG("{:fg brightcyan}: {}", SP_FMT_CSTR("Server"), SP_FMT_STR(formatted));
+  SP_LOG("{:fg brightcyan} {}", SP_FMT_CSTR("server"), SP_FMT_STR(formatted));
+  sp_mutex_unlock(&app.mutex);
+
 }
 
 void spn_mg_client_log(const c8* fmt, ...) {
+  sp_mutex_lock(&app.mutex);
   va_list args;
   va_start(args, fmt);
   sp_str_t formatted = sp_format_v(SP_CSTR(fmt), args);
   va_end(args);
-  SP_LOG("{:fg brightgreen}: {}", SP_FMT_CSTR("Client"), SP_FMT_STR(formatted));
+  SP_LOG("{:fg brightgreen} {}", SP_FMT_CSTR("client"), SP_FMT_STR(formatted));
+  sp_mutex_unlock(&app.mutex);
 }
 
 
@@ -137,7 +143,7 @@ void spn_mg_server_handler(struct mg_connection* c, int ev, void* ev_data) {
 
       if ((wm->flags & 0x0F) == WEBSOCKET_OP_BINARY) {
         SP_ASSERT(wm->data.len == sizeof(spn_mg_request_t));
-        spn_mg_request_t* request = (spn_mg_request_t*)ev_data;
+        spn_mg_request_t* request = (spn_mg_request_t*)wm->data.buf;
 
         switch (request->kind) {
           case SPN_MG_REQUEST_PLAY: {
@@ -145,17 +151,35 @@ void spn_mg_server_handler(struct mg_connection* c, int ev, void* ev_data) {
             app.server.round = 0;
             app.server.state.score.p1 = 0;
             app.server.state.score.p2 = 0;
+            app.server.state.winner_id = 0;
+
+            // Send initial score to start the game
+            spn_mg_event_t msg;
+            msg.type = SPN_MG_EVENT_UPDATE_SCORE;
+            msg.score.player_id = SPN_MG_PLAYER_1;
+            msg.score.score = 0;
+            mg_ws_send(c, &msg, sizeof(msg), WEBSOCKET_OP_BINARY);
+
+            msg.score.player_id = SPN_MG_PLAYER_2;
+            msg.score.score = 0;
+            mg_ws_send(c, &msg, sizeof(msg), WEBSOCKET_OP_BINARY);
             break;
           }
           case SPN_MG_REQUEST_TURN: {
             spn_mg_server_log("{:fg brightblack}", SP_FMT_CSTR("SPN_MG_REQUEST_TURN"));
+
+            // Don't process turns after game is over
+            if (app.server.state.winner_id != 0) {
+              spn_mg_server_log("Game already finished, ignoring turn");
+              break;
+            }
 
             app.server.round++;
             app.server.state.score.p1 += 10;
             app.server.state.score.p2 += 5;
 
             spn_mg_event_t msg;
-            msg.type = SPN_MG_UPDATE_SCORE;
+            msg.type = SPN_MG_EVENT_UPDATE_SCORE;
             msg.score.player_id = SPN_MG_PLAYER_1;
             msg.score.score = app.server.state.score.p1;
             mg_ws_send(c, &msg, sizeof(msg), WEBSOCKET_OP_BINARY);
@@ -165,12 +189,13 @@ void spn_mg_server_handler(struct mg_connection* c, int ev, void* ev_data) {
             mg_ws_send(c, &msg, sizeof(msg), WEBSOCKET_OP_BINARY);
 
             if (app.server.round >= SPN_MG_MAX_ROUNDS) {
-              msg.type = SPN_MG_DECLARE_WINNER;
+              msg.type = SPN_MG_EVENT_DECLARE_WINNER;
               msg.winner.player_id = 1;
               mg_ws_send(c, &msg, sizeof(msg), WEBSOCKET_OP_BINARY);
 
               app.server.state.winner_id = 1;
-              spn_mg_server_log("game over, player 1 wins");
+
+              spn_mg_server_log("{:fg brightred}", SP_FMT_CSTR("P1 is the winner"));
             }
 
             break;
@@ -220,36 +245,37 @@ void spn_mg_client_handler(struct mg_connection* c, int ev, void* ev_data) {
         spn_mg_event_t message = *(spn_mg_event_t*)wm->data.buf;
 
         switch (message.type) {
-          case SPN_MG_UPDATE_SCORE: {
+          case SPN_MG_EVENT_UPDATE_SCORE: {
             if (message.score.player_id == 1) {
               app.client.state.score.p1 = message.score.score;
             }
             else if (message.score.player_id == 2) {
               app.client.state.score.p2 = message.score.score;
+
+              // After receiving P2 score, send next turn if game not over
+              if (app.client.state.winner_id == 0) {
+                sp_os_sleep_ms(500);
+
+                spn_mg_request_t request = {
+                  .kind = SPN_MG_REQUEST_TURN
+                };
+                mg_ws_send(c, &request, sizeof(request), WEBSOCKET_OP_BINARY);
+              }
             }
 
             spn_mg_client_log(
               "{:fg brightblack} P{} -> {}",
-              SP_FMT_CSTR("SPN_MG_UPDATE_SCORE"),
+              SP_FMT_CSTR("SPN_MG_EVENT_UPDATE_SCORE"),
               SP_FMT_U32(message.score.player_id),
               SP_FMT_S32(message.score.score)
             );
-
-            if (app.client.state.winner_id == 0) {
-              sp_os_sleep_ms(500);
-
-              spn_mg_request_t request = {
-                .kind = SPN_MG_REQUEST_TURN
-              };
-              mg_ws_send(c, &request, sizeof(request), WEBSOCKET_OP_BINARY);
-            }
             break;
           }
 
-          case SPN_MG_DECLARE_WINNER: {
+          case SPN_MG_EVENT_DECLARE_WINNER: {
             spn_mg_client_log(
               "{:fg brightblack} P1 ({}) P2 ({})",
-              SP_FMT_CSTR("SPN_MG_DECLARE_WINNER"),
+              SP_FMT_CSTR("SPN_MG_EVENT_DECLARE_WINNER"),
               SP_FMT_U32(app.client.state.score.p1),
               SP_FMT_U32(app.client.state.score.p2)
             );
@@ -289,7 +315,7 @@ s32 spn_mg_server_thread(void* user_data) {
   mg_mgr_init(&app.server.mgr);
 
   mg_http_listen(&app.server.mgr, "http://0.0.0.0:8080", spn_mg_server_handler, NULL);
-  spn_mg_server_log("Listening on port 8080");
+  spn_mg_server_log("Listening on port {:fg brightyellow}", SP_FMT_U32(8080));
 
   sp_semaphore_signal(&app.semaphore);
 
@@ -310,7 +336,10 @@ s32 spn_mg_client_thread(void* user_data) {
 
   mg_mgr_init(&app.client.mgr);
 
-  spn_mg_client_log("connecting to ws://127.0.0.1:8080/ws");
+  spn_mg_client_log(
+    "connecting to {:fg brightyellow}",
+    SP_FMT_CSTR("ws://127.0.0.1:8080/ws")
+  );
   struct mg_connection* conn = mg_ws_connect(
     &app.client.mgr,
     "ws://127.0.0.1:8080/ws",
@@ -346,12 +375,12 @@ s32 main(s32 num_args, const c8** args) {
     .allocator = sp_allocator_default()
   });
 
-  SP_LOG("Starting WebSocket game example");
-
+  SP_LOG("{:fg brightgreen} starting mongoose demo", SP_FMT_CSTR("main  "));
   app.client.state.running = true;
   app.server.state.running = true;
 
   sp_semaphore_init(&app.semaphore);
+  sp_mutex_init(&app.mutex, SP_MUTEX_PLAIN);
 
   sp_thread_t server, client;
   sp_thread_init(&server, spn_mg_server_thread, NULL);
@@ -363,6 +392,5 @@ s32 main(s32 num_args, const c8** args) {
 
   sp_semaphore_destroy(&app.semaphore);
 
-  SP_LOG("Game session completed");
   return 0;
 }
