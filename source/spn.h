@@ -135,6 +135,7 @@ typedef enum {
 } sp_os_lib_kind_t;
 
 SP_API sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer);
+SP_API bool     sp_str_empty(sp_str_t str);
 SP_API bool     sp_os_is_glob(sp_str_t path);
 SP_API void     sp_os_copy(sp_str_t from, sp_str_t to);
 SP_API void     sp_os_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to);
@@ -345,9 +346,10 @@ typedef struct {
   spn_dep_build_kind_t kind;
   spn_dep_build_paths_t paths;
   bool force;
+  bool update;
 
   struct {
-    sp_str_t desired;
+    sp_str_t locked;
     sp_str_t resolved;
     sp_str_t message;
     u32 delta;
@@ -392,6 +394,7 @@ spn_lock_entry_t*        spn_dep_context_get_lock_entry(spn_dep_build_context_t*
 void                     spn_dep_context_prepare(spn_dep_build_context_t* context);
 void                     spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state);
 void                     spn_dep_context_set_build_error(spn_dep_build_context_t* dep, sp_str_t error);
+void                     spn_dep_context_clone(spn_dep_build_context_t* dep);
 s32                      spn_dep_context_build_async(void* user_data);
 spn_dep_build_context_t* spn_build_context_find_dep(spn_build_context_t* build, sp_str_t name);
 sp_str_t                 spn_print(spn_dep_build_context_t* dep, spn_generator_entry_t kind, spn_generator_compiler_t c);
@@ -1438,6 +1441,10 @@ void spn_git_checkout(sp_str_t repo, sp_str_t commit) {
 ///////////////////
 // SP EXTENSIONS //
 ///////////////////
+bool sp_str_empty(sp_str_t str) {
+  return !str.len;
+}
+
 sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer) {
   if (!n) return sp_str_copy(str);
   if (str.len <= n) return sp_str_copy(str);
@@ -1461,15 +1468,7 @@ void sp_os_copy(sp_str_t from, sp_str_t to) {
     sp_os_copy_glob(from, sp_str_lit("*"), sp_os_join_path(to, sp_os_extract_stem(from)));
   }
   else if (sp_os_is_regular_file(from)) {
-    if (sp_os_is_directory(to)) {
-      to = sp_os_join_path(to, sp_os_extract_file_name(from));
-      sp_os_create_directory(to);
-      sp_os_copy_file(from, to);
-    }
-    else if (sp_os_is_regular_file(to)) {
-      sp_os_create_directory(sp_os_parent_path(to));
-      sp_os_copy_file(from, to);
-    }
+    sp_os_copy_file(from, to);
   }
 }
 
@@ -1489,6 +1488,7 @@ void sp_os_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to) {
 
 void sp_os_copy_file(sp_str_t from, sp_str_t to) {
   if (sp_os_is_directory(to)) {
+    sp_os_create_directory(to);
     to = sp_os_join_path(to, sp_os_extract_file_name(from));
   }
 
@@ -1765,6 +1765,45 @@ spn_dep_build_context_t* spn_build_context_find_dep(spn_build_context_t* build, 
   return SP_NULLPTR;
 }
 
+void spn_dep_context_clone(spn_dep_build_context_t* dep) {
+  sp_str_t url = sp_format("https://github.com/{}.git", SP_FMT_STR(dep->info->git));
+  SDL_Process* process = SPN_SH(
+    "git", "clone",
+    sp_str_to_cstr(url),
+    sp_str_to_cstr(dep->info->paths.source),
+    "--quiet"
+  );
+
+  if (!process) {
+    spn_dep_context_set_build_error(dep, sp_format(
+      "Failed to spawn process to clone {:color brightcyan} {}",
+      dep->info->name,
+      SP_FMT_CSTR(SDL_GetError())
+    ));
+    return;
+  }
+
+  spn_sh_process_result_t result = spn_sh_read_process(process);
+  if (result.return_code) {
+    spn_dep_context_set_build_error(dep, sp_format(
+      "Failed to clone {:fg brightcyan} with exit code {:fg brightred}",
+      SP_FMT_STR(dep->info->name),
+      SP_FMT_S32(result.return_code)
+    ));
+
+    SDL_DestroyProcess(process);
+    return;
+  }
+
+  SDL_DestroyProcess(process);
+}
+
+void spn_dep_checkout(spn_dep_build_context_t *dep) {
+  if (dep->info->branch.len) {
+    spn_git_checkout(dep->info->paths.source, dep->info->branch);
+  }
+}
+
 void spn_dep_context_prepare(spn_dep_build_context_t* dep) {
   sp_mutex_init(&dep->mutex, SP_MUTEX_PLAIN);
 
@@ -1805,74 +1844,25 @@ s32 spn_dep_context_build_async(void* user_data) {
     spn_git_fetch(dep->info->paths.source);
 
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
-    if (dep->info->branch.len) {
-      spn_git_checkout(dep->info->paths.source, dep->info->branch);
+    if (sp_str_empty(dep->commits.locked)) {
+      dep->commits.resolved = dep->info->branch;
+    }
+    else if (dep->update){
+      dep->commits.resolved = SPN_GIT_ORIGIN_HEAD;
     }
     else {
-      spn_git_checkout(dep->info->paths.source, SPN_GIT_ORIGIN_HEAD);
+      dep->commits.resolved = dep->commits.locked;
     }
+    spn_git_checkout(dep->info->paths.source, dep->commits.resolved);
 
-    #if 0
-    spn_git_checkout(dep->info->paths.source, dep->spec->commit);
-
-    dep->commits.delta = spn_git_num_updates(dep->info->paths.source, dep->spec->commit, SPN_GIT_ORIGIN_HEAD);
-    bool is_stale = dep->commits.delta > 0;
-    bool is_locked = app.cli.lock;
-
-    dep->state.repo = SPN_DEP_REPO_STATE_STALE;
-    #endif
-
-    dep->state.repo = SPN_DEP_REPO_STATE_CLEAN;
   }
   else {
-    dep->state.repo = SPN_DEP_REPO_STATE_UNINITIALIZED;
-  }
+    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
+    spn_dep_context_clone(dep);
+    SP_ASSERT(sp_os_is_directory(dep->info->paths.source));
 
-  // Take whatever action is needed to get the repository to the commit we're going to build
-  switch (dep->state.repo) {
-    case SPN_DEP_REPO_STATE_UNINITIALIZED: {
-      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
-
-      sp_str_t url = sp_format("https://github.com/{}.git", SP_FMT_STR(dep->info->git));
-      SDL_Process* process = SPN_SH(
-        "git", "clone",
-        sp_str_to_cstr(url),
-        sp_str_to_cstr(dep->info->paths.source),
-        "--quiet"
-      );
-
-      if (!process) {
-        spn_dep_context_set_build_error(dep, sp_format(
-          "Failed to spawn process to clone {:color brightcyan} {}",
-          dep->info->name,
-          SP_FMT_CSTR(SDL_GetError())
-        ));
-
-        return 1;
-      }
-
-      spn_sh_process_result_t result = spn_sh_read_process(process);
-      if (result.return_code) {
-        spn_dep_context_set_build_error(dep, sp_format(
-          "Failed to clone {:fg brightcyan} with exit code {:fg brightred}",
-          SP_FMT_STR(dep->info->name),
-          SP_FMT_S32(result.return_code)
-        ));
-
-        SDL_DestroyProcess(process);
-        return result.return_code;
-      }
-
-      SDL_DestroyProcess(process);
-      break;
-    }
-    case SPN_DEP_REPO_STATE_STALE: {
-      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
-      spn_git_checkout(dep->info->paths.source, SPN_GIT_ORIGIN_HEAD);
-    }
-    case SPN_DEP_REPO_STATE_CLEAN: {
-      break;
-    }
+    dep->commits.resolved = dep->info->branch;
+    spn_git_checkout(dep->info->paths.source, dep->commits.resolved);
   }
 
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PREPARING);
