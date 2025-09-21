@@ -1457,11 +1457,19 @@ void sp_os_copy(sp_str_t from, sp_str_t to) {
     sp_os_copy_glob(sp_os_parent_path(from), sp_os_extract_file_name(from), to);
   }
   else if (sp_os_is_directory(from)) {
-    sp_os_create_directory(to);
-    sp_os_copy_directory(from, to);
+    SP_ASSERT(sp_os_is_directory(to));
+    sp_os_copy_glob(from, sp_str_lit("*"), sp_os_join_path(to, sp_os_extract_stem(from)));
   }
   else if (sp_os_is_regular_file(from)) {
-    sp_os_copy_file(from, to);
+    if (sp_os_is_directory(to)) {
+      to = sp_os_join_path(to, sp_os_extract_file_name(from));
+      sp_os_create_directory(to);
+      sp_os_copy_file(from, to);
+    }
+    else if (sp_os_is_regular_file(to)) {
+      sp_os_create_directory(sp_os_parent_path(to));
+      sp_os_copy_file(from, to);
+    }
   }
 }
 
@@ -1475,16 +1483,23 @@ void sp_os_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to) {
 
   for (u32 i = 0; i < num_files; i++) {
     sp_str_t entry_path = sp_str_view(entries[i]);
-    sp_os_copy(sp_os_join_path(from, entry_path), sp_os_join_path(to, entry_path));
+    sp_os_copy(sp_os_join_path(from, entry_path), to);
   }
-
 }
 
 void sp_os_copy_file(sp_str_t from, sp_str_t to) {
+  if (sp_os_is_directory(to)) {
+    to = sp_os_join_path(to, sp_os_extract_file_name(from));
+  }
+
   SDL_CopyFile(sp_str_to_cstr(from), sp_str_to_cstr(to));
 }
 
 void sp_os_copy_directory(sp_str_t from, sp_str_t to) {
+  if (sp_os_is_directory(to)) {
+    to = sp_os_join_path(to, sp_os_extract_file_name(from));
+  }
+
   sp_os_copy_glob(from, sp_str_lit("*"), to);
 }
 

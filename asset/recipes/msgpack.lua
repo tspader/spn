@@ -9,22 +9,10 @@ local config = spn.recipes.basic({
     builder:cmake({
       install = true
     })
-    builder:copy({
-      { builder:source('example/*.c'), builder:include('example') }
-    });
 
-  --   builder:copy({
-  --     source = {
-  --       ['include/msgpack.h'] = builder.path.include(),
-  --       ['include/msgpack/*'] = builder.path.include('msgpack'),
-  --       ['example'] = builder.path.include(),
-  --     },
-  --     work = {
-  --       ['include/msgpack/*'] = builder.path.include('msgpack'),
-  --       ['libmsgpack-c.so'] = builder.path.lib(),
-  --       ['libmsgpack-c.a'] = builder.path.lib()
-  --     }
-    -- })
+    builder:copy({
+      { builder:source('example'), builder:include() },
+    });
   end
 
 })

@@ -1,0 +1,15 @@
+CompileFlags:
+  Add:
+    - -DSPN_IMPLEMENTATION
+    - -DSP_IMPLEMENTATION
+    - -DSP_OS_BACKEND_SDL
+    - -DSP_APP
+    - -DSP_APP_IMPLEMENTATION
+    - -include sp.h
+    - -include SDL3/SDL.h
+Diagnostics:
+  Suppress:
+    - unused-includes
+    - misc-definitions-in-headers
+    - macro-redefined
+    - sign-compare

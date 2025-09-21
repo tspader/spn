@@ -2,13 +2,11 @@ local spn = require('spn')
 
 local config = spn.recipes.basic({
   git = 'cesanta/mongoose',
-  copy = {
-    [spn.dir.include] = {
-      [spn.dir.source] = {
-        'mongoose.h',
-        'mongoose.c',
-      },
-    },
-  },
+  build = function (builder)
+    builder:copy({
+      { builder:source('mongoose.h'), builder:include() },
+      { builder:source('mongoose.c'), builder:include() },
+    })
+  end
 })
 return config

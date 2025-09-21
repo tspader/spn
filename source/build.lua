@@ -182,19 +182,34 @@ function module:path(base, subpath)
   }
 end
 
+function module:source(subpath)
+  return self:path(self.paths.source, subpath)
+end
+
+function module:work(subpath)
+  return self:path(self.paths.work, subpath)
+end
+
+function module:store(subpath)
+  return self:path(self.paths.store, subpath)
+end
+
 function module:include(subpath)
   return self:path(self.paths.include, subpath)
 end
 
-function module:source(subpath)
-  return self:path(self.paths.source, subpath)
+function module:lib(subpath)
+  return self:path(self.paths.lib, subpath)
+end
+
+function module:vendor(subpath)
+  return self:path(self.paths.vendor, subpath)
 end
 
 function module:copy(config)
   for entry in iterator.values(config) do
     local from = entry[1]
     local to = entry[2]
-    print(string.format('    %s -> %s', from.absolute, to.absolute))
     sp.os.copy(sp.str.from_cstr(from.absolute), sp.str.from_cstr(to.absolute))
   end
 end

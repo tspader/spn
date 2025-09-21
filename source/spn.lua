@@ -14,7 +14,7 @@ local spn_lua_dep_builder_t = require('build')
 ---@class spn_lua_dep_paths_t
 ---@field recipe string
 ---@field source string
----@field build string
+---@field work string
 ---@field store string
 ---@field lib string
 ---@field include string
@@ -290,7 +290,11 @@ end
 ---@return spn_lua_recipe_t
 local single_header = function(config)
   local recipe = basic(config)
-  table.insert(recipe.copy[spn.dir.include][spn.dir.source], config.header)
+  recipe.build = function(builder)
+    builder:copy({
+      { builder:source(config.header), builder:include() }
+    })
+  end
   return recipe
 end
 

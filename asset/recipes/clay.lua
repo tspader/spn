@@ -2,14 +2,12 @@ local spn = require('spn')
 
 local config = spn.recipes.basic({
   git = 'nicbarker/clay',
-  copy = {
-    [spn.dir.include] = {
-      [spn.dir.source] = {
-        'clay.h',
-        'examples',
-        'renderers',
-      },
-    }
-  }
+  build = function(builder)
+    builder:copy({
+      { builder:source('clay.h'), builder:include() },
+      { builder:source('examples'), builder:include() },
+      { builder:source('renderers'), builder:include() },
+    })
+  end
 })
 return config

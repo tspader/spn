@@ -69,8 +69,6 @@ SPN_DIR_BUILD:= build
 SPN_DIR_SOURCE := source
 SPN_MAKEFILE := Makefile
 SPN_COMPILE_DB := compile_commands.json
-SPN_CLANGD := .clangd
-SPN_DIR_CACHE := ~/.cache/spn
 SPN_INSTALL_PREFIX ?= $(HOME)/.local/bin
 
 #########
@@ -86,8 +84,6 @@ FLAG_OUTPUT := -o $(SPN_BINARY)
 FLAG_OPTIMIZATION := -g -rdynamic
 FLAG_LIBS := -lm -lpthread -lelf -ldl
 CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_OPTIMIZATION) $(FLAG_INCLUDES) $(FLAG_LIBS) $(FLAG_OUTPUT)
-
-SPN_CLANGD_HEADER_ONLY_BULLSHIT := -DSP_OS_BACKEND_SDL, -DSP_IMPLEMENTATION, -DSPN_IMPLEMENTATION, -include, toml/toml.h, -include, sp/sp.h, -include, SDL3/SDL.h, -Wno-macro-redefined, -Wno-unused-includes
 
 ###############
 # ENTRY POINT #
@@ -129,9 +125,6 @@ $(SPN_BINARY): $(SPN_DIR_SOURCE)/main.c $(SPN_DIR_SOURCE)/spn.h  | $(SPN_DIR_BUI
 	$(call print_and_run,$(CC) $(CC_FLAGS) $$($(BOOTSTRAPPED_SPN) print --compiler gcc) ./source/main.c)
 
 $(SPN_COMPILE_DB): $(SPN_MAKEFILE)
-
-$(SPN_CLANGD): $(SPN_COMPILE_DB)
-	@printf "CompileFlags:\n  Add: [$(SPN_CLANGD_HEADER_ONLY_BULLSHIT)]\n" > $(SPN_CLANGD)
 
 #############
 # BOOTSTRAP #
@@ -234,10 +227,9 @@ install: $(DEFAULT_TARGET)
 uninstall:
 	@rm -f $(SPN_INSTALL_PREFIX)/spn
 
-clangd: $(SPN_COMPILE_DB) $(SPN_CLANGD)
+clangd: $(SPN_COMPILE_DB)
 
 clean:
 	@rm -rf $(SPN_DIR_BUILD)/bin
 	@rm -rf $(SPN_DIR_BUILD)/examples
 	@rm -f $(SPN_COMPILE_DB)
-	@rm -f $(SPN_CLANGD)
