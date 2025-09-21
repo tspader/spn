@@ -245,7 +245,7 @@ function module.load()
     typedef struct {
       spn_dep_info_t* info;
       sp_hash_t hash;
-      sp_str_t commit;
+      sp_str_t lock;
     } spn_dep_spec_t;
 
     // Specific to a single build

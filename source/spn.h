@@ -335,7 +335,7 @@ typedef struct {
 typedef struct {
   spn_dep_info_t* info;
   sp_hash_t hash;
-  sp_str_t commit;
+  sp_str_t lock;
 } spn_dep_spec_t;
 
 // Specific to a single build
@@ -349,7 +349,6 @@ typedef struct {
   bool update;
 
   struct {
-    sp_str_t locked;
     sp_str_t resolved;
     sp_str_t message;
     u32 delta;
@@ -1850,11 +1849,11 @@ s32 spn_dep_context_build_async(void* user_data) {
     spn_git_fetch(dep->info->paths.source);
 
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
-    if (dep->update || sp_str_empty(dep->commits.locked)){
+    if (dep->update || sp_str_empty(dep->spec->lock)){
       dep->commits.resolved = spn_dep_context_find_latest_commit(dep);
     }
     else {
-      dep->commits.resolved = dep->commits.locked;
+      dep->commits.resolved = dep->spec->lock;
     }
 
     spn_git_checkout(dep->info->paths.source, dep->commits.resolved);

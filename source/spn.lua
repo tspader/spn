@@ -39,7 +39,7 @@ local spn_lua_dep_builder_t = require('build')
 
 local spn = {
   recipes = {},
-  lock = {},
+  lock_file = {},
   project = {
     name = '',
     deps = {},
@@ -106,7 +106,17 @@ function spn.init(app)
   end
 
   spn.project = dofile(app.paths.project.config:cstr())
-  --spn.lock = dofile(app.paths.project.lock:cstr())
+
+  spn.lock_file = {
+    deps = {}
+  }
+
+  local chunk, err = loadfile(app.paths.project.lock:cstr())
+  if chunk then
+    local ok, lock_file = pcall(chunk)
+    spn.lock_file = lock_file
+  end
+
   --name, url commit, build ID on spn_lock_entry_t goes to lock file
   --grab current commit from lockfile OR origin/head spn_git_get_commit(source, SPN_GIT_ORIGIN_HEAD)
   app.project.name = sp.str.from_cstr(spn.project.name)
@@ -143,8 +153,9 @@ function spn.init(app)
     local dep = ffi.new('spn_dep_spec_t')
     dep.info = ffi.C.spn_dep_find(sp.str.from_cstr(name))
     dep.hash = ffi.C.sp_hash_combine(hashes[0], #values)
-    if sp.os.does_path_exist(dep.info.paths.source) then
-      dep.commit = ffi.C.spn_git_get_commit(dep.info.paths.source, sp.str.from_cstr("origin/HEAD"))
+    local lock = spn.lock_file.deps[name]
+    if lock then
+      dep.lock = sp.str.from_cstr(lock.commit)
     end
 
     app.project.deps = sp.dyn_array.push(app.project.deps, dep)
@@ -181,7 +192,7 @@ function spn.lock()
     local commit = ffi.string(entry.commit.data, entry.commit.len)
     local build_id = ffi.string(entry.build_id.data, entry.build_id.len)
 
-    lockfile.deps[i + 1] = {
+    lockfile.deps[name] = {
       name = name,
       commit = commit,
       build_id = build_id
