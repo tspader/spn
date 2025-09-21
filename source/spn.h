@@ -1580,11 +1580,12 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_build_context_t* dep) {
     case SPN_DEP_BUILD_STATE_DONE: {
       if (tui->state == SPN_TUI_STATE_INTERACTIVE) {
         status = sp_format(
-          "{} {:color brightgreen} {:color brightblack} {} {:color brightcyan}",
+          "{} {:color brightgreen} {:color brightblack} {} {:color brightyellow} {:color brightcyan}",
           SP_FMT_STR(name),
           SP_FMT_STR(state),
           SP_FMT_STR(dep->commits.resolved),
           SP_FMT_STR(dep->commits.message),
+          SP_FMT_U32(dep->commits.delta),
           SP_FMT_STR(dep->paths.store)
         );
       }
@@ -1818,6 +1819,7 @@ void spn_dep_context_prepare(spn_dep_build_context_t* dep) {
   dep->commits.message = sp_str_truncate(dep->commits.message, 32, SP_LIT("..."));
   dep->commits.message = sp_str_replace_c8(dep->commits.message, '\n', ' ');
   dep->commits.message = sp_str_pad(dep->commits.message, 32);
+  dep->commits.delta = spn_git_num_updates(dep->info->paths.source, dep->commits.resolved, spn_dep_context_find_latest_commit(dep));
 
   dep->kind = SPN_BUILD_KIND_DEBUG;
 
