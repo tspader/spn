@@ -158,7 +158,7 @@ function module.load()
       const c8** args;
       const c8* project_directory;
       bool no_interactive;
-      bool lock;
+
       spn_cli_add_t add;
       spn_cli_init_t init;
       spn_cli_list_t list;
@@ -256,6 +256,7 @@ function module.load()
       spn_dep_build_kind_t kind;
       spn_dep_build_paths_t paths;
       bool force;
+      bool update;
 
       struct {
         sp_str_t desired;

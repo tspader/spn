@@ -226,6 +226,7 @@ typedef struct {
 
 typedef struct {
   bool force;
+  bool update;
 } spn_cli_build_t;
 
 typedef struct {
@@ -247,7 +248,6 @@ typedef struct {
   const c8** args;
   const c8* project_directory;
   bool no_interactive;
-  bool lock;
   spn_cli_add_t add;
   spn_cli_init_t init;
   spn_cli_list_t list;
@@ -395,6 +395,7 @@ void                     spn_dep_context_prepare(spn_dep_build_context_t* contex
 void                     spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state);
 void                     spn_dep_context_set_build_error(spn_dep_build_context_t* dep, sp_str_t error);
 void                     spn_dep_context_clone(spn_dep_build_context_t* dep);
+sp_str_t                 spn_dep_context_find_latest_commit(spn_dep_build_context_t* dep);
 s32                      spn_dep_context_build_async(void* user_data);
 spn_dep_build_context_t* spn_build_context_find_dep(spn_build_context_t* build, sp_str_t name);
 sp_str_t                 spn_print(spn_dep_build_context_t* dep, spn_generator_entry_t kind, spn_generator_compiler_t c);
@@ -531,7 +532,6 @@ typedef struct {
   sp_dyn_array(spn_lock_entry_t) lock;
   spn_lua_config_t config;
   spn_lua_context_t context;
-  spn_targets_t targets;
   spn_tui_t tui;
   SDL_AtomicInt control;
   sp_lua_t lua;
@@ -1283,11 +1283,12 @@ void spn_cli_command_build(spn_cli_t* cli) {
     &argparse,
     (struct argparse_option []) {
       OPT_HELP(),
-      OPT_BOOLEAN('f', "force", &command->force, "force a build, even if it exists in the store", SP_NULLPTR),
+      OPT_BOOLEAN('f', "force", &command->force, "force build, even if it exists in the store", SP_NULLPTR),
+      OPT_BOOLEAN('u', "update", &command->update, "pull latest for all deps", SP_NULLPTR),
       OPT_END()
     },
     (const c8* const []) {
-      "spn build [--force]",
+      "spn build [--force] [--update]",
       SP_NULLPTR
     },
     SP_NULL
@@ -1297,6 +1298,7 @@ void spn_cli_command_build(spn_cli_t* cli) {
   sp_dyn_array_for(app.build.deps, index) {
     spn_dep_build_context_t* dep = app.build.deps + index;
     dep->force = command->force;
+    dep->update = command->update;
     sp_thread_init(&dep->thread, spn_dep_context_build_async, dep);
   }
 
@@ -1765,6 +1767,10 @@ spn_dep_build_context_t* spn_build_context_find_dep(spn_build_context_t* build, 
   return SP_NULLPTR;
 }
 
+sp_str_t spn_dep_context_find_latest_commit(spn_dep_build_context_t* dep) {
+  return spn_git_get_commit(dep->info->paths.source, sp_format("origin/{}", SP_FMT_STR(dep->info->branch)));
+}
+
 void spn_dep_context_clone(spn_dep_build_context_t* dep) {
   sp_str_t url = sp_format("https://github.com/{}.git", SP_FMT_STR(dep->info->git));
   SDL_Process* process = SPN_SH(
@@ -1844,24 +1850,21 @@ s32 spn_dep_context_build_async(void* user_data) {
     spn_git_fetch(dep->info->paths.source);
 
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
-    if (sp_str_empty(dep->commits.locked)) {
-      dep->commits.resolved = dep->info->branch;
-    }
-    else if (dep->update){
-      dep->commits.resolved = SPN_GIT_ORIGIN_HEAD;
+    if (dep->update || sp_str_empty(dep->commits.locked)){
+      dep->commits.resolved = spn_dep_context_find_latest_commit(dep);
     }
     else {
       dep->commits.resolved = dep->commits.locked;
     }
-    spn_git_checkout(dep->info->paths.source, dep->commits.resolved);
 
+    spn_git_checkout(dep->info->paths.source, dep->commits.resolved);
   }
   else {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
     spn_dep_context_clone(dep);
     SP_ASSERT(sp_os_is_directory(dep->info->paths.source));
 
-    dep->commits.resolved = dep->info->branch;
+    dep->commits.resolved = spn_git_get_commit(dep->info->paths.source, dep->info->branch);
     spn_git_checkout(dep->info->paths.source, dep->commits.resolved);
   }
 
@@ -1999,7 +2002,6 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     OPT_HELP(),
     OPT_STRING('C', "project-dir", &cli->project_directory, "specify the directory containing spn.lua", SP_NULLPTR),
     OPT_BOOLEAN('n', "no-interactive", &cli->no_interactive, "disable interactive tui", SP_NULLPTR),
-    OPT_BOOLEAN('l', "lock", &cli->lock, "use commits from lockfile without prompting for updates", SP_NULLPTR),
     OPT_END(),
   };
 
@@ -2024,7 +2026,6 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   cli->args = args;
   cli->num_args = num_args;
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
-  //cli->no_interactive = true;
 
   if (!cli->num_args || !cli->args[0]) {
     argparse_usage(&argparse);
@@ -2032,13 +2033,6 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   }
 
   SDL_SetAtomicInt(&app->control, 0);
-
-  app->targets = (spn_targets_t) {
-    .build = SP_LIT("spn-build-internal"),
-    .clone = SP_LIT("spn-clone"),
-    .libs = SP_LIT("spn-package-libs"),
-    .url = SP_LIT("spn-package-url"),
-  };
 
 #ifdef SP_WIN32
   app->paths.storage = sp_os_normalize_path(sp_str_from_cstr(SDL_GetPrefPath(SP_NULLPTR, "spn")));
