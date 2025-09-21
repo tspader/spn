@@ -237,6 +237,7 @@ function module.load()
     typedef struct {
       sp_str_t name;
       sp_str_t git;
+      sp_str_t branch;
       sp_str_t lib;
       spn_dep_paths_t paths;
     } spn_dep_info_t;
@@ -254,6 +255,7 @@ function module.load()
       sp_str_t build_id;
       spn_dep_build_kind_t kind;
       spn_dep_build_paths_t paths;
+      bool force;
 
       struct {
         sp_str_t desired;
@@ -377,14 +379,15 @@ function module.load()
       u32 count;
     } sp_os_directory_entry_list_t;
 
-    sp_hash_t sp_hash_str(sp_str_t str);
-    sp_hash_t sp_hash_combine(sp_hash_t* hashes, u32 num_hashes);
-    void* sp_alloc(u32 n);
+    sp_hash_t                    sp_hash_str(sp_str_t str);
+    sp_hash_t                    sp_hash_combine(sp_hash_t* hashes, u32 num_hashes);
+    void*                        sp_alloc(u32 n);
     c8*                          sp_cstr_copy(const c8* str);
     sp_str_t                     sp_str_copy(sp_str_t str);
     bool                         sp_str_equal_cstr(sp_str_t str, const c8* cstr);
     sp_str_t                     sp_str_from_cstr(const c8* cstr);
     c8*                          sp_str_to_cstr(sp_str_t str);
+    void                         sp_os_copy(sp_str_t from, sp_str_t to);
     void                         sp_os_copy_file(sp_str_t from, sp_str_t to);
     void                         sp_os_copy_directory(sp_str_t from, sp_str_t to);
     sp_str_t                     sp_os_extract_extension(sp_str_t path);
@@ -416,9 +419,11 @@ function module.load()
       end
     })
   end
+
   module.sp.alloc = function(ctype)
     return ffi.cast(string.format('%s *', ctype), ffi.C.sp_alloc(ffi.sizeof(ctype)))
   end
+
   module.sp.dyn_array = {
     push = function(array, value)
       local arr_ptr = ffi.new('void* [1]')
@@ -432,6 +437,7 @@ function module.load()
       return arr_ptr[0]
     end
   }
+
 
   -- spn
   module.spn.string = ffi.metatype('sp_str_t', {

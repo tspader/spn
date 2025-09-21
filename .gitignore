@@ -1,6 +1,7 @@
 .cache
 compile_commands.json
 .clangd
+.vscode
 
 build
 examples/**/spn.lock.lua

@@ -30,6 +30,7 @@ local spn_lua_dep_builder_t = require('build')
 
 ---@class spn_lua_cmake_config_t
 ---@field defines string[]|nil
+---@field install boolean|nil
 ---@field parallel boolean|nil
 
 ---@class spn_lua_sh_config_t
@@ -46,11 +47,11 @@ local spn = {
 
   iterator = require('iterator'),
   dir = {
-      source = 'source',
-      work = 'work',
-      include = 'include',
-      lib = 'lib',
-      vendor = 'vendor',
+    source = 'source',
+    work = 'work',
+    include = 'include',
+    lib = 'lib',
+    vendor = 'vendor',
   },
   join_path = function(la, lb)
     return sp.os.join_path(sp.str.from_cstr(la), sp.str.from_cstr(lb)):cstr()
@@ -93,6 +94,7 @@ function spn.init(app)
       dep.name = sp.os.extract_stem(entry.file_name)
       dep.git = sp.str.from_cstr(recipe.git)
       dep.lib = sp.str.from_cstr(recipe.lib)
+      dep.branch = sp.str.from_cstr(recipe.branch)
       dep.paths.source = sp.os.join_path(app.paths.source, dep.name)
       dep.paths.recipe = sp.str.copy(entry.file_path)
 
@@ -155,7 +157,7 @@ function spn.build(dep)
   -- has to be done in the thread's entry point.
   c.load()
 
-  local builder = spn_lua_dep_builder_t:new(ffi.cast('spn_dep_build_context_t*', dep))
+  local builder = spn_lua_dep_builder_t.new(ffi.cast('spn_dep_build_context_t*', dep))
   builder:build()
 end
 
@@ -227,6 +229,7 @@ end
 ---@class spn_lua_recipe_t
 ---@field git string
 ---@field lib string
+---@field branch string
 ---@field copy spn_lua_copy_entries_t
 ---@field build fun(spn_lua_dep_build_t): nil
 
@@ -239,6 +242,7 @@ end
 ---@class spn_lua_recipe_config_t
 ---@field git string
 ---@field lib? string
+---@field branch? string
 ---@field copy spn_lua_copy_entries_t
 ---@field build fun(spn_lua_dep_build_t): nil | nil
 
@@ -252,6 +256,7 @@ local recipe_template = function()
   local recipe = {
     git = '',
     lib = '',
+    branch = '',
     copy = {
       [spn.dir.include] = {
         [spn.dir.work] = {},
@@ -274,6 +279,7 @@ local basic = function(config)
   local recipe = recipe_template()
   recipe.git = config.git
   recipe.lib = config.lib or recipe.lib
+  recipe.branch = config.branch or recipe.branch
   recipe.copy = config.copy or recipe.copy
   recipe.build = config.build or recipe.build
   return recipe
