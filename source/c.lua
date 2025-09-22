@@ -247,6 +247,11 @@ function module.load()
       sp_hash_t hash;
       sp_str_t lock;
       spn_dep_build_kind_t kind;
+      struct {
+        bool include;
+        bool vendor;
+        bool store;
+      } include;
     } spn_dep_spec_t;
 
     // Specific to a single build
@@ -256,6 +261,7 @@ function module.load()
       sp_str_t build_id;
       spn_dep_build_mode_t mode;
       spn_dep_build_paths_t paths;
+
       bool force;
       bool update;
 

@@ -184,12 +184,12 @@ typedef enum {
   SPN_GENERATOR_LIBS,
   SPN_GENERATOR_RPATH,
   SPN_GENERATOR_ALL,
-} spn_generator_entry_kind_t;
+} spn_gen_entry_kind_t;
 
 typedef enum {
   SPN_GENERATOR_COMPILER_NONE,
   SPN_GENERATOR_COMPILER_GCC,
-} spn_generator_compiler_t;
+} spn_gen_compiler_t;
 
 typedef enum {
   SPN_DIR_STORE,
@@ -199,7 +199,7 @@ typedef enum {
 
 typedef struct {
   spn_generator_kind_t kind;
-  spn_generator_compiler_t compiler;
+  spn_gen_compiler_t compiler;
   sp_str_t file_name;
   sp_str_t output;
 
@@ -211,8 +211,8 @@ typedef struct {
 
 
 spn_generator_kind_t spn_generator_kind_from_str(sp_str_t str);
-spn_generator_entry_kind_t spn_generator_entry_from_str(sp_str_t str);
-spn_generator_compiler_t spn_generator_compiler_from_str(sp_str_t str);
+spn_gen_entry_kind_t spn_generator_entry_from_str(sp_str_t str);
+spn_gen_compiler_t spn_generator_compiler_from_str(sp_str_t str);
 spn_cache_dir_kind_t spn_dir_kind_from_str(sp_str_t str);
 
 
@@ -285,6 +285,11 @@ typedef struct {
   sp_hash_t hash;
   sp_str_t lock;
   spn_dep_build_kind_t kind;
+  struct {
+    bool include;
+    bool vendor;
+    bool store;
+  } include;
 } spn_dep_spec_t;
 
 // Specific to a single build
@@ -294,6 +299,7 @@ typedef struct {
   sp_str_t build_id;
   spn_dep_build_mode_t mode;
   spn_dep_build_paths_t paths;
+
   bool force;
   bool update;
 
@@ -349,10 +355,10 @@ sp_str_t                 spn_dep_context_find_latest_commit(spn_dep_build_contex
 s32                      spn_dep_context_build_async(void* user_data);
 bool                     spn_dep_context_is_binary(spn_dep_build_context_t* dep);
 spn_dep_build_context_t* spn_build_context_find_dep(spn_build_context_t* build, sp_str_t name);
-sp_str_t                 spn_print(spn_dep_build_context_t* dep, spn_generator_entry_kind_t kind, spn_generator_compiler_t c);
-sp_str_t                 spn_print_one(spn_dep_build_context_t* dep, spn_generator_entry_kind_t kind, spn_generator_compiler_t c);
-sp_str_t                 spn_print_all(spn_dep_build_context_t* dep, spn_generator_compiler_t c);
-sp_str_t                 spn_print_one_deps(spn_generator_entry_kind_t kind, spn_generator_compiler_t c);
+sp_str_t                 spn_print(spn_dep_build_context_t* dep, spn_gen_entry_kind_t kind, spn_gen_compiler_t c);
+sp_str_t                 spn_print_one(spn_dep_build_context_t* dep, spn_gen_entry_kind_t kind, spn_gen_compiler_t c);
+sp_str_t                 spn_print_all(spn_dep_build_context_t* dep, spn_gen_compiler_t c);
+sp_str_t                 spn_print_one_deps(spn_gen_entry_kind_t kind, spn_gen_compiler_t c);
 
 
 /////////
@@ -971,7 +977,7 @@ spn_cache_dir_kind_t spn_dir_kind_from_str(sp_str_t str) {
   SP_FATAL("Unknown dir kind {:fg brightyellow}; options are [store, include, vendor]", SP_FMT_STR(str));
 }
 
-spn_generator_entry_kind_t spn_generator_entry_from_str(sp_str_t str) {
+spn_gen_entry_kind_t spn_generator_entry_from_str(sp_str_t str) {
   if      (sp_str_equal_cstr(str, ""))            return SPN_GENERATOR_ALL;
   else if (sp_str_equal_cstr(str, "include"))     return SPN_GENERATOR_INCLUDE;
   else if (sp_str_equal_cstr(str, "lib-include")) return SPN_GENERATOR_LIB_INCLUDE;
@@ -980,7 +986,7 @@ spn_generator_entry_kind_t spn_generator_entry_from_str(sp_str_t str) {
   SP_FATAL("Unknown flag {:fg brightyellow}; options are [include, lib-include, libs]", SP_FMT_QUOTED_STR(str));
 }
 
-spn_generator_compiler_t spn_generator_compiler_from_str(sp_str_t str) {
+spn_gen_compiler_t spn_generator_compiler_from_str(sp_str_t str) {
   if      (sp_str_equal_cstr(str, ""))    return SPN_GENERATOR_COMPILER_NONE;
   else if (sp_str_equal_cstr(str, "gcc")) return SPN_GENERATOR_COMPILER_GCC;
 
@@ -995,36 +1001,41 @@ spn_generator_kind_t spn_generator_kind_from_str(sp_str_t str) {
   SP_FATAL("Unknown generator {:fg brightyellow}; options are [[empty], shell, make]", SP_FMT_STR(str));
 }
 
-typedef struct {
-  spn_generator_entry_kind_t kind;
-  spn_generator_compiler_t compiler;
-} spn_generator_format_context_t;
-
-sp_str_t spn_generator_format_entry_kernel(sp_str_map_context_t* context) {
-  spn_generator_format_context_t* format = (spn_generator_format_context_t*)context->user_data;
-  switch (format->compiler) {
+sp_str_t spn_gen_format_entry(sp_str_t entry, spn_gen_entry_kind_t kind, spn_gen_compiler_t compiler) {
+  switch (compiler) {
     case SPN_GENERATOR_COMPILER_NONE: {
-      return context->str;
+      return entry;
     }
     case SPN_GENERATOR_COMPILER_GCC: {
-      switch (format->kind) {
-        case SPN_GENERATOR_INCLUDE:     return sp_format("-I{}",          SP_FMT_STR(context->str));
-        case SPN_GENERATOR_LIB_INCLUDE: return sp_format("-L{}",          SP_FMT_STR(context->str));
-        case SPN_GENERATOR_LIBS:        return sp_format("{}",            SP_FMT_STR(context->str));
-        case SPN_GENERATOR_RPATH:       return sp_format("-Wl,-rpath,{}", SP_FMT_STR(context->str));
-        default: SP_FATAL("Unknown generator entry: {:fg brightred}", SP_FMT_U32(format->kind));
+      switch (kind) {
+        case SPN_GENERATOR_INCLUDE:     return sp_format("-I{}",          SP_FMT_STR(entry));
+        case SPN_GENERATOR_LIB_INCLUDE: return sp_format("-L{}",          SP_FMT_STR(entry));
+        case SPN_GENERATOR_LIBS:        return sp_format("{}",            SP_FMT_STR(entry));
+        case SPN_GENERATOR_RPATH:       return sp_format("-Wl,-rpath,{}", SP_FMT_STR(entry));
+        default: SP_FATAL("Unknown generator entry: {:fg brightred}", SP_FMT_U32(kind));
       }
     }
   }
 }
 
-sp_str_t spn_print_one(spn_dep_build_context_t* dep, spn_generator_entry_kind_t kind, spn_generator_compiler_t compiler) {
+typedef struct {
+  spn_gen_entry_kind_t kind;
+  spn_gen_compiler_t compiler;
+} spn_gen_format_context_t;
+
+sp_str_t spn_generator_format_entry_kernel(sp_str_map_context_t* context) {
+  spn_gen_format_context_t* format = (spn_gen_format_context_t*)context->user_data;
+  return spn_gen_format_entry(context->str, format->kind, format->compiler);
+}
+
+sp_str_t spn_print_one(spn_dep_build_context_t* dep, spn_gen_entry_kind_t kind, spn_gen_compiler_t compiler) {
   sp_dyn_array(sp_str_t) entries = SP_NULLPTR;
 
   switch (kind) {
     case SPN_GENERATOR_INCLUDE: {
-      sp_dyn_array_push(entries, dep->paths.include);
-      sp_dyn_array_push(entries, dep->paths.vendor);
+      if (dep->spec->include.include) sp_dyn_array_push(entries, dep->paths.include);
+      if (dep->spec->include.vendor) sp_dyn_array_push(entries, dep->paths.vendor);
+      if (dep->spec->include.store) sp_dyn_array_push(entries, dep->paths.store);
       break;
     }
     case SPN_GENERATOR_RPATH:
@@ -1062,7 +1073,7 @@ sp_str_t spn_print_one(spn_dep_build_context_t* dep, spn_generator_entry_kind_t 
     }
   }
 
-  spn_generator_format_context_t context = {
+  spn_gen_format_context_t context = {
     .compiler = compiler,
     .kind = kind
   };
@@ -1071,8 +1082,8 @@ sp_str_t spn_print_one(spn_dep_build_context_t* dep, spn_generator_entry_kind_t 
   return sp_str_join_n(entries, sp_dyn_array_size(entries), sp_str_lit(" "));
 }
 
-sp_str_t spn_print_all(spn_dep_build_context_t* dep, spn_generator_compiler_t compiler) {
-  spn_generator_entry_kind_t kinds [] = { SPN_GENERATOR_INCLUDE, SPN_GENERATOR_LIB_INCLUDE, SPN_GENERATOR_LIBS };
+sp_str_t spn_print_all(spn_dep_build_context_t* dep, spn_gen_compiler_t compiler) {
+  spn_gen_entry_kind_t kinds [] = { SPN_GENERATOR_INCLUDE, SPN_GENERATOR_LIB_INCLUDE, SPN_GENERATOR_LIBS };
 
   sp_dyn_array(sp_str_t) entries = SP_NULLPTR;
   SP_CARR_FOR(kinds, index) {
@@ -1082,7 +1093,7 @@ sp_str_t spn_print_all(spn_dep_build_context_t* dep, spn_generator_compiler_t co
   return sp_str_join_n(entries, sp_dyn_array_size(entries), sp_str_lit(" "));
 }
 
-sp_str_t spn_print_one_deps(spn_generator_entry_kind_t kind, spn_generator_compiler_t compiler) {
+sp_str_t spn_print_one_deps(spn_gen_entry_kind_t kind, spn_gen_compiler_t compiler) {
   sp_dyn_array(sp_str_t) entries = SP_NULLPTR;
   sp_dyn_array_for(app.build.deps, index) {
     spn_dep_build_context_t* dep = app.build.deps + index;
@@ -1092,7 +1103,7 @@ sp_str_t spn_print_one_deps(spn_generator_entry_kind_t kind, spn_generator_compi
   return sp_str_join_n(entries, sp_dyn_array_size(entries), sp_str_lit(" "));
 }
 
-sp_str_t spn_print(spn_dep_build_context_t* dep, spn_generator_entry_kind_t kind, spn_generator_compiler_t compiler) {
+sp_str_t spn_print(spn_dep_build_context_t* dep, spn_gen_entry_kind_t kind, spn_gen_compiler_t compiler) {
   switch (kind) {
     case SPN_GENERATOR_ALL: return spn_print_all(dep, compiler);
     default:            return spn_print_one(dep, kind, compiler);
@@ -2070,7 +2081,8 @@ s32 spn_dep_context_build_async(void* user_data) {
     spn_dep_context_clone(dep);
     SP_ASSERT(sp_os_is_directory(dep->info->paths.source));
 
-    dep->commits.resolved = spn_git_get_commit(dep->info->paths.source, dep->info->branch);
+    sp_str_t branch = sp_format("origin/{}",  SP_FMT_STR(dep->info->branch));
+    dep->commits.resolved = spn_git_get_commit(dep->info->paths.source, branch);
     spn_git_checkout(dep->info->paths.source, dep->commits.resolved);
   }
 

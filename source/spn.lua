@@ -10,8 +10,14 @@ local spn_lua_dep_builder_t = require('build')
 -------------
 -- PROJECT --
 -------------
+---@class spn_lua_dep_include_t
+---@field include boolean
+---@field vendor boolean
+---@field store boolean
+
 ---@class spn_lua_dep_t
 ---@field kind? string
+---@field include? spn_lua_dep_include_t
 ---@field options table
 
 
@@ -51,17 +57,14 @@ local spn_lua_dep_builder_t = require('build')
 ---@field git string
 ---@field lib string
 ---@field kinds string[]
+---@field include spn_lua_dep_include_t
 ---@field branch string
 ---@field build fun(spn_lua_dep_build_t): nil
-
----@class spn_lua_copy_entries_config_t
----@field include? string[]
----@field lib? string[]
----@field vendor? string[]
 
 ---@class spn_lua_recipe_config_t
 ---@field git string
 ---@field kinds? string[]
+---@field include? spn_lua_dep_include_t
 ---@field lib? string
 ---@field branch? string
 ---@field build fun(spn_lua_dep_build_t): nil | nil
@@ -177,6 +180,12 @@ function spn.init(app)
     local kind = spec.kind or recipe.kinds[1]
     dep.kind = c.spn.dep.build_kind_from_str(sp.str.from_cstr(kind))
 
+    if spec.include then
+      dep.include.include = spn.ternary(spec.include.include, recipe.include.include)
+      dep.include.vendor = spn.ternary(spec.include.vendor, recipe.include.vendor)
+      dep.include.store = spn.ternary(spec.include.store, recipe.include.store)
+    end
+
     -- Hash name and everything in the options table
     local values = {}
     table.insert(values, name)
@@ -278,6 +287,11 @@ function spn.copy(to)
   end
 end
 
+function spn.ternary(value, default_value)
+  if value == nil then return default_value end
+  return value
+end
+
 ---@param config spn_lua_recipe_config_t
 ---@return spn_lua_recipe_t
 local basic = function(config)
@@ -285,6 +299,11 @@ local basic = function(config)
     git = '',
     lib = '',
     kinds = { 'shared', 'static', 'source' },
+    include = {
+      include = true,
+      vendor = false,
+      store = false
+    },
     branch = 'HEAD',
     build = function() end
   }
@@ -294,6 +313,13 @@ local basic = function(config)
   recipe.kinds = config.kinds or recipe.kinds
   recipe.branch = config.branch or recipe.branch
   recipe.build = config.build or recipe.build
+  if config.include then
+    recipe.include = {
+      include = spn.ternary(config.include.include, true),
+      vendor = spn.ternary(config.include.vendor, true),
+      store = spn.ternary(config.include.store, true),
+    }
+  end
   return recipe
 end
 
