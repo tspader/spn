@@ -111,6 +111,7 @@ typedef struct {
 } spn_sh_process_context_t;
 
 void spn_sh_run(spn_sh_process_context_t* context);
+s32  spn_sh_wait(spn_sh_process_context_t* context);
 spn_sh_process_result_t spn_sh_read_process(SDL_Process* process);
 
 /////////
@@ -480,6 +481,10 @@ typedef struct {
 
 typedef struct {
   const c8* package;
+} spn_cli_which_t;
+
+typedef struct {
+  const c8* package;
 } spn_cli_ls_t;
 
 typedef struct {
@@ -494,6 +499,7 @@ typedef struct {
   spn_cli_print_t print;
   spn_cli_build_t build;
   spn_cli_ls_t ls;
+  spn_cli_which_t which;
 } spn_cli_t;
 
 void spn_cli_command_init(spn_cli_t* cli);
@@ -505,6 +511,7 @@ void spn_cli_command_dir(spn_cli_t* cli);
 void spn_cli_command_copy(spn_cli_t* cli);
 void spn_cli_command_print(spn_cli_t* cli);
 void spn_cli_command_ls(spn_cli_t* cli);
+void spn_cli_command_which(spn_cli_t* cli);
 
 /////////
 // LUA //
@@ -737,7 +744,8 @@ void spn_lua_init() {
   };
 }
 
-// SHELL
+///////////
+// SHELL //
 void spn_sh_run(spn_sh_process_context_t* context) {
   SDL_PropertiesID shell = SDL_CreateProperties();
   if (context->shell) {
@@ -773,6 +781,11 @@ void spn_sh_run(spn_sh_process_context_t* context) {
     );
     return;
   }
+}
+
+s32 spn_sh_wait(spn_sh_process_context_t* context) {
+  SDL_WaitProcess(context->process, true, &context->result.return_code);
+  return context->result.return_code;
 }
 
 // TUI
@@ -1362,6 +1375,47 @@ void spn_cli_command_ls(spn_cli_t* cli) {
 
   sp_str_t store_path = dep->paths.store;
   sp_sh_ls(store_path);
+}
+
+void spn_cli_command_which(spn_cli_t* cli) {
+  struct argparse argparse;
+  argparse_init(
+    &argparse,
+    (struct argparse_option []) {
+      OPT_HELP(),
+      OPT_END()
+    },
+    (const c8* const []) {
+      "spn which <package>",
+      "Print the cache directory for this package for this project",
+      SP_NULLPTR
+    },
+    SP_NULL
+  );
+  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+
+  if (cli->num_args < 1) {
+    if (app.build.deps) {
+      SP_FATAL(
+        "no package name specified; try {:fg brightyellow} {:fg yellow}",
+        SP_FMT_CSTR("spn which"),
+        SP_FMT_STR(app.build.deps[0].info->name)
+      );
+    }
+    else {
+      SP_FATAL("you have no dependencies lol");
+    }
+  }
+
+  sp_str_t package = sp_str_view(cli->args[0]);
+
+  spn_dep_build_context_t* dep = spn_build_context_find_dep(&app.build, package);
+  if (!dep) {
+    SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(package));
+  }
+
+  spn_dep_context_prepare(dep);
+  sp_log(dep->paths.store);
 }
 
 void spn_cli_command_build(spn_cli_t* cli) {
@@ -2366,6 +2420,9 @@ void spn_app_run(spn_app_t* app) {
   }
   else if (sp_cstr_equal("ls", cli->args[0])) {
     spn_cli_command_ls(cli);
+  }
+  else if (sp_cstr_equal("which", cli->args[0])) {
+    spn_cli_command_which(cli);
   }
 }
 

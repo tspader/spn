@@ -5,7 +5,8 @@ local module = {
     cstr = {},
   },
   spn = {
-    dep = {}
+    dep = {},
+    sh = {},
   },
   sdl = {}
 }
@@ -80,6 +81,7 @@ function module.load()
     } spn_sh_process_context_t;
 
     void spn_sh_run(spn_sh_process_context_t* context);
+    s32  spn_sh_wait(spn_sh_process_context_t* context);
     spn_sh_process_result_t spn_sh_read_process(SDL_Process* process);
 
 

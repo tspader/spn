@@ -1,7 +1,9 @@
 local project = {
   name = 'hello',
   deps = {
-    luajit = {},
+    luajit = {
+      kind = 'shared'
+    },
   },
 }
 

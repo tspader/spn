@@ -6,7 +6,7 @@ return {
       name = "argparse"
     },
     luajit = {
-      build_id = "594c3c51",
+      build_id = "c6caadc1",
       commit = "871db2c84e",
       name = "luajit"
     },

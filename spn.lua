@@ -4,7 +4,9 @@ local project = {
     sp = {},
     sdl3 = {},
     argparse = {},
-    luajit = {}
+    luajit = {
+      kind = 'shared'
+    }
   },
 }
 

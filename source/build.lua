@@ -79,7 +79,8 @@ function module:sh(config)
     context.args = args_array[0]
   end
 
-  ffi.C.spn_sh_run(context)
+  c.spn.sh.run(context)
+  c.spn.sh.wait(context)
 
   if context.result.return_code ~= 0 then
     dbg()
