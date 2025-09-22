@@ -4,6 +4,7 @@ local dbg = require('debugger')
 local config = spn.recipes.basic({
   git = 'msgpack/msgpack-c',
   branch = 'c_master',
+  kinds = { 'shared', 'static' },
   lib = 'msgpack-c',
   build = function(builder)
     builder:cmake({
