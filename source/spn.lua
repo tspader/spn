@@ -180,11 +180,19 @@ function spn.init(app)
     local kind = spec.kind or recipe.kinds[1]
     dep.kind = c.spn.dep.build_kind_from_str(sp.str.from_cstr(kind))
 
-    if spec.include then
-      dep.include.include = spn.ternary(spec.include.include, recipe.include.include)
-      dep.include.vendor = spn.ternary(spec.include.vendor, recipe.include.vendor)
-      dep.include.store = spn.ternary(spec.include.store, recipe.include.store)
+    local include = {}
+    for key, value in spn.iterator.pairs(recipe.include) do
+      include[key] = value
     end
+    if spec.include then
+      for key, value in spn.iterator.pairs(spec.include) do
+        include[key] = value
+      end
+    end
+
+    dep.include.include = include.include
+    dep.include.vendor = include.vendor
+    dep.include.store = include.store
 
     -- Hash name and everything in the options table
     local values = {}
@@ -315,9 +323,9 @@ local basic = function(config)
   recipe.build = config.build or recipe.build
   if config.include then
     recipe.include = {
-      include = spn.ternary(config.include.include, true),
-      vendor = spn.ternary(config.include.vendor, true),
-      store = spn.ternary(config.include.store, true),
+      include = spn.ternary(config.include.include, recipe.include.include),
+      vendor = spn.ternary(config.include.vendor, recipe.include.vendor),
+      store = spn.ternary(config.include.store, recipe.include.store),
     }
   end
   return recipe
