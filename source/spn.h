@@ -137,6 +137,7 @@ typedef enum {
 SP_API sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer);
 SP_API bool     sp_str_empty(sp_str_t str);
 SP_API bool     sp_os_is_glob(sp_str_t path);
+bool     sp_os_is_program_on_path(sp_str_t program);
 SP_API void     sp_os_copy(sp_str_t from, sp_str_t to);
 SP_API void     sp_os_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to);
 SP_API void     sp_os_copy_file(sp_str_t from, sp_str_t to);
@@ -478,6 +479,10 @@ typedef struct {
 } spn_cli_print_t;
 
 typedef struct {
+  const c8* package;
+} spn_cli_ls_t;
+
+typedef struct {
   u32 num_args;
   const c8** args;
   const c8* project_directory;
@@ -488,6 +493,7 @@ typedef struct {
   spn_cli_dir_t dir;
   spn_cli_print_t print;
   spn_cli_build_t build;
+  spn_cli_ls_t ls;
 } spn_cli_t;
 
 void spn_cli_command_init(spn_cli_t* cli);
@@ -498,6 +504,7 @@ void spn_cli_command_build(spn_cli_t* cli);
 void spn_cli_command_dir(spn_cli_t* cli);
 void spn_cli_command_copy(spn_cli_t* cli);
 void spn_cli_command_print(spn_cli_t* cli);
+void spn_cli_command_ls(spn_cli_t* cli);
 
 /////////
 // LUA //
@@ -765,18 +772,6 @@ void spn_sh_run(spn_sh_process_context_t* context) {
       SP_FMT_CSTR(SDL_GetError())
     );
     return;
-  }
-
-  s32 return_code = 0;
-  SDL_WaitProcess(context->process, true, &return_code);
-
-  if (return_code) {
-    SP_LOG(
-      "{:fg brightyellow} {:fg brightblack} -> {}",
-      SP_FMT_STR(sp_str_pad(SP_LIT("shell"), 8)),
-      sp_str_join_cstr_n(args, sp_dyn_array_size(args) - 1, SP_LIT(" ")),
-      SP_FMT_S32(return_code)
-    );
   }
 }
 
@@ -1292,6 +1287,83 @@ void spn_cli_command_print(spn_cli_t* cli) {
   }
 }
 
+void sp_sh_ls(sp_str_t path) {
+  if (!sp_os_does_path_exist(path)) {
+    SP_LOG("{:fg brightcyan} hasn't been built for your configuration", SP_FMT_STR(path));
+    return;
+  }
+
+  struct {
+    const c8* command;
+    const c8* args [4];
+  } tools [4] = {
+    { "lsd", "--tree", "--depth", "2" },
+    { "tree", "-L", "2" },
+    { "ls" },
+  };
+
+  SP_CARR_FOR(tools, i) {
+    if (sp_os_is_program_on_path(sp_str_view(tools[i].command))) {
+      spn_sh_process_context_t context = SP_ZERO_INITIALIZE();
+      context.command = sp_str_view(tools[i].command);
+
+      SP_CARR_FOR(tools[i].args, j) {
+        const c8* arg = tools[i].args[j];
+        if (!arg) break;
+        sp_dyn_array_push(context.args, sp_str_view(arg));
+      }
+
+      sp_dyn_array_push(context.args, path);
+
+      spn_sh_run(&context);
+      return;
+    }
+  }
+}
+
+void spn_cli_command_ls(spn_cli_t* cli) {
+  struct argparse argparse;
+  argparse_init(
+    &argparse,
+    (struct argparse_option []) {
+      OPT_HELP(),
+      OPT_END()
+    },
+    (const c8* const []) {
+      "spn ls <package>",
+      "List files in a package's cache directory",
+      SP_NULLPTR
+    },
+    SP_NULL
+  );
+  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+
+  if (cli->num_args < 1) {
+    if (app.build.deps) {
+      SP_FATAL(
+        "no package name specified; try {:fg brightyellow} {:fg yellow}",
+        SP_FMT_CSTR("spn ls"),
+        SP_FMT_STR(app.build.deps[0].info->name)
+      );
+    }
+    else {
+      SP_FATAL("you have no dependencies lol");
+    }
+  }
+
+  sp_str_t package = sp_str_view(cli->args[0]);
+
+  spn_dep_build_context_t* dep = spn_build_context_find_dep(&app.build, package);
+  if (!dep) {
+    SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(package));
+  }
+
+  spn_dep_context_prepare(dep);
+
+  sp_str_t store_path = dep->paths.store;
+  sp_sh_ls(store_path);
+}
+
 void spn_cli_command_build(spn_cli_t* cli) {
   spn_cli_build_t* command = &cli->build;
 
@@ -1476,6 +1548,24 @@ sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer) {
 bool sp_os_is_glob(sp_str_t path) {
   sp_str_t file_name = sp_os_extract_file_name(path);
   return sp_str_contains_n(&file_name, 1, sp_str_lit("*"));
+}
+
+bool sp_os_is_program_on_path(sp_str_t program) {
+  spn_sh_process_context_t context = SP_ZERO_INITIALIZE();
+
+  context.command = SP_LIT("which");
+  sp_dyn_array_push(context.args, program);
+
+  context.shell = SDL_CreateProperties();
+  SDL_SetNumberProperty(context.shell, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL);
+  SDL_SetNumberProperty(context.shell, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_NULL);
+  SDL_SetBooleanProperty(context.shell, SDL_PROP_PROCESS_CREATE_STDERR_TO_STDOUT_BOOLEAN, true);
+
+  spn_sh_run(&context);
+
+  SDL_WaitProcess(context.process, true, &context.result.return_code);
+
+  return !context.result.return_code;
 }
 
 void sp_os_copy(sp_str_t from, sp_str_t to) {
@@ -2273,6 +2363,9 @@ void spn_app_run(spn_app_t* app) {
   }
   else if (sp_cstr_equal("print", cli->args[0])) {
     spn_cli_command_print(cli);
+  }
+  else if (sp_cstr_equal("ls", cli->args[0])) {
+    spn_cli_command_ls(cli);
   }
 }
 
