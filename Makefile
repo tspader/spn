@@ -209,7 +209,7 @@ $(EXAMPLE_BINARIES): build/examples/%: examples/%/main.c examples/%/spn.lua $(SP
 	@mkdir -p $(EXAMPLE_BUILD_DIR)
 	$(call print_and_run,$(BOOTSTRAPPED_SPN) -C $(EXAMPLE_DIR) build)
 	$(call print_and_run,$(BOOTSTRAPPED_SPN) -C $(EXAMPLE_DIR) copy $(EXAMPLE_BUILD_DIR))
-	$(call print_and_run,$(CC) -g -o $(EXAMPLE_BINARY) $$($(BOOTSTRAPPED_SPN) -C $(EXAMPLE_DIR) print) -lm $(EXAMPLE_DIR)/main.c)
+	$(call print_and_run,$(CC) $(EXAMPLE_DIR)/main.c -g -o $(EXAMPLE_BINARY) $$($(BOOTSTRAPPED_SPN) -C $(EXAMPLE_DIR) print) -lm)
 	@echo
 
 ###########
