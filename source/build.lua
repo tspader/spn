@@ -14,6 +14,7 @@ function module.new(dep)
   local self = setmetatable({}, module)
   self.dep = dep
   self.name = dep.info.name:cstr()
+  self.kind = c.spn.dep.build_kind_to_str(dep.spec.kind):cstr()
   self.paths = {
     recipe = dep.info.paths.recipe:cstr(),
     source = dep.paths.source:cstr(),
@@ -129,7 +130,7 @@ end
 function module:cmake(config)
   config = config or {}
   config.defines = config.defines or {}
-  config.parallel = (config.parallel == nil) and false or config.parallel
+  config.parallel = (config.parallel == nil) and true or config.parallel
   config.install = (config.install == nil) and false or config.install
 
   -- Generate

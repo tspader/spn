@@ -214,63 +214,19 @@ spn_generator_entry_t spn_generator_entry_from_str(sp_str_t str);
 spn_generator_compiler_t spn_generator_compiler_from_str(sp_str_t str);
 spn_cache_dir_kind_t spn_dir_kind_from_str(sp_str_t str);
 
-/////////
-// CLI //
-/////////
-typedef struct {
-  sp_str_t package;
-} spn_cli_add_t;
-
-typedef struct {
-} spn_cli_init_t;
-
-typedef struct {
-  bool force;
-  bool update;
-} spn_cli_build_t;
-
-typedef struct {
-} spn_cli_list_t;
-
-typedef struct {
-  const c8* package;
-  const c8* kind;
-} spn_cli_dir_t;
-
-typedef struct {
-  const c8* generator;
-  const c8* compiler;
-  const c8* path;
-} spn_cli_print_t;
-
-typedef struct {
-  u32 num_args;
-  const c8** args;
-  const c8* project_directory;
-  bool no_interactive;
-  spn_cli_add_t add;
-  spn_cli_init_t init;
-  spn_cli_list_t list;
-  spn_cli_dir_t dir;
-  spn_cli_print_t print;
-  spn_cli_build_t build;
-} spn_cli_t;
-
-void spn_cli_command_init(spn_cli_t* cli);
-void spn_cli_command_list(spn_cli_t* cli);
-void spn_cli_command_nuke(spn_cli_t* cli);
-void spn_cli_command_clean(spn_cli_t* cli);
-void spn_cli_command_build(spn_cli_t* cli);
-void spn_cli_command_dir(spn_cli_t* cli);
-void spn_cli_command_copy(spn_cli_t* cli);
-void spn_cli_command_print(spn_cli_t* cli);
 
 //////////////////
 // DEPENDENCIES //
 //////////////////
 typedef enum {
-  SPN_BUILD_KIND_DEBUG,
-  SPN_BUILD_KIND_RELEASE,
+  SPN_DEP_BUILD_MODE_DEBUG,
+  SPN_DEP_BUILD_MODE_RELEASE,
+} spn_dep_build_mode_t;
+
+typedef enum {
+  SPN_DEP_BUILD_KIND_SHARED,
+  SPN_DEP_BUILD_KIND_STATIC,
+  SPN_DEP_BUILD_KIND_SOURCE,
 } spn_dep_build_kind_t;
 
 typedef enum {
@@ -313,15 +269,6 @@ typedef struct {
   sp_str_t vendor;
 } spn_dep_build_paths_t;
 
-typedef struct {
-  sp_str_t key;
-} spn_dep_parse_entry_t;
-
-typedef struct {
-  sp_str_t key;
-  sp_str_t value;
-} spn_dep_option_t;
-
 // Specific to the recipe
 typedef struct {
   sp_str_t name;
@@ -336,6 +283,7 @@ typedef struct {
   spn_dep_info_t* info;
   sp_hash_t hash;
   sp_str_t lock;
+  spn_dep_build_kind_t kind;
 } spn_dep_spec_t;
 
 // Specific to a single build
@@ -343,7 +291,7 @@ typedef struct {
   spn_dep_info_t* info;
   spn_dep_spec_t* spec;
   sp_str_t build_id;
-  spn_dep_build_kind_t kind;
+  spn_dep_build_mode_t mode;
   spn_dep_build_paths_t paths;
   bool force;
   bool update;
@@ -387,7 +335,10 @@ spn_dep_info_t*          spn_dep_find(sp_str_t name);
 bool                     spn_dep_is_binary(spn_dep_info_t* dep);
 bool                     spn_dep_state_is_terminal(spn_dep_build_context_t* dep);
 s32                      spn_dep_sort_kernel_alphabetical(const void* a, const void* b);
-sp_str_t                 spn_dep_option_env_name(spn_dep_option_t* option);
+spn_dep_build_mode_t     spn_dep_build_mode_from_str(sp_str_t str);
+sp_str_t                 spn_dep_build_mode_to_str(spn_dep_build_mode_t mode);
+spn_dep_build_kind_t     spn_dep_build_kind_from_str(sp_str_t str);
+sp_str_t                 spn_dep_build_kind_to_str(spn_dep_build_kind_t kind);
 sp_str_t                 spn_dep_state_to_str(spn_dep_build_state_t state);
 spn_lock_entry_t*        spn_dep_context_get_lock_entry(spn_dep_build_context_t* dep);
 void                     spn_dep_context_prepare(spn_dep_build_context_t* context);
@@ -495,6 +446,58 @@ typedef struct {
 } spn_project_t;
 
 spn_dep_spec_t* spn_project_find_dep(sp_str_t name);
+
+
+/////////
+// CLI //
+/////////
+typedef struct {
+  sp_str_t package;
+} spn_cli_add_t;
+
+typedef struct {
+} spn_cli_init_t;
+
+typedef struct {
+  bool force;
+  bool update;
+} spn_cli_build_t;
+
+typedef struct {
+} spn_cli_list_t;
+
+typedef struct {
+  const c8* package;
+  const c8* kind;
+} spn_cli_dir_t;
+
+typedef struct {
+  const c8* generator;
+  const c8* compiler;
+  const c8* path;
+} spn_cli_print_t;
+
+typedef struct {
+  u32 num_args;
+  const c8** args;
+  const c8* project_directory;
+  bool no_interactive;
+  spn_cli_add_t add;
+  spn_cli_init_t init;
+  spn_cli_list_t list;
+  spn_cli_dir_t dir;
+  spn_cli_print_t print;
+  spn_cli_build_t build;
+} spn_cli_t;
+
+void spn_cli_command_init(spn_cli_t* cli);
+void spn_cli_command_list(spn_cli_t* cli);
+void spn_cli_command_nuke(spn_cli_t* cli);
+void spn_cli_command_clean(spn_cli_t* cli);
+void spn_cli_command_build(spn_cli_t* cli);
+void spn_cli_command_dir(spn_cli_t* cli);
+void spn_cli_command_copy(spn_cli_t* cli);
+void spn_cli_command_print(spn_cli_t* cli);
 
 /////////
 // LUA //
@@ -1707,17 +1710,49 @@ void spn_tui_update(spn_tui_t* tui) {
 ///////////
 // BUILD //
 ///////////
+spn_dep_build_mode_t spn_dep_build_mode_from_str(sp_str_t str) {
+  if      (sp_str_equal_cstr(str, "debug"))   return SPN_DEP_BUILD_MODE_DEBUG;
+  else if (sp_str_equal_cstr(str, "release")) return SPN_DEP_BUILD_MODE_RELEASE;
+
+  SP_FATAL("Unknown build mode {:fg brightyellow}; options are [debug, release]", SP_FMT_STR(str));
+}
+
+sp_str_t spn_dep_build_mode_to_str(spn_dep_build_mode_t mode) {
+  switch (mode) {
+    case SPN_DEP_BUILD_MODE_DEBUG:   return sp_str_lit("debug");
+    case SPN_DEP_BUILD_MODE_RELEASE: return sp_str_lit("release");
+    default: SP_UNREACHABLE();
+  }
+}
+
+spn_dep_build_kind_t spn_dep_build_kind_from_str(sp_str_t str) {
+  if      (sp_str_equal_cstr(str, "shared")) return SPN_DEP_BUILD_KIND_SHARED;
+  else if (sp_str_equal_cstr(str, "static")) return SPN_DEP_BUILD_KIND_STATIC;
+  else if (sp_str_equal_cstr(str, "source")) return SPN_DEP_BUILD_KIND_SOURCE;
+
+  SP_FATAL("Unknown build kind {:fg brightyellow}; options are [shared, static, source]", SP_FMT_STR(str));
+}
+
+sp_str_t spn_dep_build_kind_to_str(spn_dep_build_kind_t kind) {
+  switch (kind) {
+    case SPN_DEP_BUILD_KIND_SHARED: return sp_str_lit("shared");
+    case SPN_DEP_BUILD_KIND_STATIC: return sp_str_lit("static");
+    case SPN_DEP_BUILD_KIND_SOURCE: return sp_str_lit("source");
+    default: SP_UNREACHABLE();
+  }
+}
+
 sp_str_t spn_dep_state_to_str(spn_dep_build_state_t state) {
   switch (state) {
-    case SPN_DEP_BUILD_STATE_IDLE: return SP_LIT("idle");
-    case SPN_DEP_BUILD_STATE_CLONING: return SP_LIT("cloning");
-    case SPN_DEP_BUILD_STATE_FETCHING: return SP_LIT("fetching");
-    case SPN_DEP_BUILD_STATE_PREPARING: return SP_LIT("preparing");
+    case SPN_DEP_BUILD_STATE_IDLE:         return SP_LIT("idle");
+    case SPN_DEP_BUILD_STATE_CLONING:      return SP_LIT("cloning");
+    case SPN_DEP_BUILD_STATE_FETCHING:     return SP_LIT("fetching");
+    case SPN_DEP_BUILD_STATE_PREPARING:    return SP_LIT("preparing");
     case SPN_DEP_BUILD_STATE_CHECKING_OUT: return SP_LIT("checking out");
-    case SPN_DEP_BUILD_STATE_BUILDING: return SP_LIT("building");
-    case SPN_DEP_BUILD_STATE_DONE: return SP_LIT("done");
-    case SPN_DEP_BUILD_STATE_CANCELED: return SP_LIT("canceled");
-    case SPN_DEP_BUILD_STATE_FAILED: return SP_LIT("failed");
+    case SPN_DEP_BUILD_STATE_BUILDING:     return SP_LIT("building");
+    case SPN_DEP_BUILD_STATE_DONE:         return SP_LIT("done");
+    case SPN_DEP_BUILD_STATE_CANCELED:     return SP_LIT("canceled");
+    case SPN_DEP_BUILD_STATE_FAILED:       return SP_LIT("failed");
     default: SP_FATAL("spn_dep_state_to_str(): Unknown build state {:fg brightred}", SP_FMT_U32(state));
   }
 }
@@ -1750,10 +1785,6 @@ s32 spn_dep_sort_kernel_alphabetical(const void* a, const void* b) {
   spn_dep_info_t* da = (spn_dep_info_t*)a;
   spn_dep_info_t* db = (spn_dep_info_t*)b;
   return sp_str_sort_kernel_alphabetical(&da->name, &db->name);
-}
-
-sp_str_t spn_dep_option_env_name(spn_dep_option_t* option) {
-  return SP_LIT("");
 }
 
 spn_dep_build_context_t* spn_build_context_find_dep(spn_build_context_t* build, sp_str_t name) {
@@ -1821,7 +1852,7 @@ void spn_dep_context_prepare(spn_dep_build_context_t* dep) {
   dep->commits.message = sp_str_pad(dep->commits.message, 32);
   dep->commits.delta = spn_git_num_updates(dep->info->paths.source, dep->commits.resolved, spn_dep_context_find_latest_commit(dep));
 
-  dep->kind = SPN_BUILD_KIND_DEBUG;
+  dep->mode = SPN_DEP_BUILD_MODE_DEBUG;
 
   sp_dyn_array(sp_hash_t) hashes = SP_NULLPTR;
   sp_dyn_array_push(hashes, sp_hash_str(dep->commits.resolved));

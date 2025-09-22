@@ -1,7 +1,9 @@
 local project = {
   name = 'dr_libs',
   deps = {
-    dr_libs = {},
+    dr_libs = {
+      kind = 'static'
+    },
   },
 }
 

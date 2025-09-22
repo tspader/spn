@@ -7,10 +7,17 @@ local serpent = require('serpent')
 local sp_lua_stack_t = require('stack')
 local spn_lua_dep_builder_t = require('build')
 
+-------------
+-- PROJECT --
+-------------
 ---@class spn_lua_dep_t
----@field name string
+---@field kind? string
 ---@field options table
 
+
+-----------
+-- BUILD --
+-----------
 ---@class spn_lua_dep_paths_t
 ---@field recipe string
 ---@field source string
@@ -37,6 +44,35 @@ local spn_lua_dep_builder_t = require('build')
 ---@field command string
 ---@field args string[]|nil
 
+------------
+-- RECIPE --
+------------
+---@class spn_lua_recipe_t
+---@field git string
+---@field lib string
+---@field kinds string[]
+---@field branch string
+---@field build fun(spn_lua_dep_build_t): nil
+
+---@class spn_lua_copy_entries_config_t
+---@field include? string[]
+---@field lib? string[]
+---@field vendor? string[]
+
+---@class spn_lua_recipe_config_t
+---@field git string
+---@field kinds? string[]
+---@field lib? string
+---@field branch? string
+---@field build fun(spn_lua_dep_build_t): nil | nil
+
+---@class spn_lua_single_header_config_t : spn_lua_recipe_config_t
+---@field header string
+
+
+------------
+-- MODULE --
+------------
 local spn = {
   recipes = {},
   lock_file = {},
@@ -58,12 +94,14 @@ local spn = {
   end
 }
 
+
 ----------
 -- INIT --
 ----------
 function spn.init(app)
   c.load()
 
+  -- Load the project agnostic user config
   app = ffi.cast('spn_lua_context_t*', app)
   spn.app = app
   local config = dofile(app.paths.user_config:cstr())
@@ -83,6 +121,7 @@ function spn.init(app)
     app.config.pull_deps = config.pull_deps
   end
 
+  -- Read all recipes
   local entries = sp.os.scan_directory(app.paths.recipes)
   for index = 0, entries.count do
     local entry = entries.data[index]
@@ -100,11 +139,12 @@ function spn.init(app)
 
       app.deps[0] = sp.dyn_array.push(app.deps[0], dep)
 
-      local name = entry.file_path:cstr()
-      spn.recipes[name] = dofile(name)
+      local name = dep.name:cstr()
+      spn.recipes[name] = dofile(entry.file_path:cstr())
     end
   end
 
+  -- Read this project
   spn.project = dofile(app.paths.project.config:cstr())
 
   spn.lock_file = {
@@ -117,15 +157,30 @@ function spn.init(app)
     spn.lock_file = lock_file
   end
 
-  --name, url commit, build ID on spn_lock_entry_t goes to lock file
-  --grab current commit from lockfile OR origin/head spn_git_get_commit(source, SPN_GIT_ORIGIN_HEAD)
   app.project.name = sp.str.from_cstr(spn.project.name)
 
+  -- Read each dep used by the project
   for name, spec in pairs(spn.project.deps) do
     ---@cast spec spn_lua_dep_t
 
+    -- Copy what we need from the table into a struct
+    local recipe = spn.recipes[name]
+
+    local dep = ffi.new('spn_dep_spec_t')
+    dep.info = ffi.C.spn_dep_find(sp.str.from_cstr(name))
+
+    local lock = spn.lock_file.deps[name]
+    if lock then
+      dep.lock = sp.str.from_cstr(lock.commit)
+    end
+
+    local kind = spec.kind or recipe.kinds[1]
+    dep.kind = c.spn.dep.build_kind_from_str(sp.str.from_cstr(kind))
+
+    -- Hash name and everything in the options table
     local values = {}
     table.insert(values, name)
+    table.insert(values, kind)
 
     local stack = sp_lua_stack_t:new()
     stack:push(spec.options)
@@ -146,26 +201,20 @@ function spn.init(app)
     local hashes = ffi.new('sp_hash_t* [1]')
     local hash = ffi.new('sp_hash_t [1]')
     for value in spn.iterator.values(values) do
-      hash[0] = ffi.C.sp_hash_str(sp.str.from_cstr(tostring(value)))
+      local hashable = tostring(value)
+      hash[0] = ffi.C.sp_hash_str(sp.str.from_cstr(hashable))
       hashes[0] = sp.dyn_array.push(hashes[0], hash)
     end
 
-    local dep = ffi.new('spn_dep_spec_t')
-    dep.info = ffi.C.spn_dep_find(sp.str.from_cstr(name))
     dep.hash = ffi.C.sp_hash_combine(hashes[0], #values)
-    local lock = spn.lock_file.deps[name]
-    if lock then
-      dep.lock = sp.str.from_cstr(lock.commit)
-    end
 
+    -- Push it to an array in C
     app.project.deps = sp.dyn_array.push(app.project.deps, dep)
   end
 end
 
 function spn.build(dep)
-  -- This function is called from the dependency's build thread. Lua is not thread-safe, which means that
-  -- each thread must have its own interpreter context, and that we must load the FFI again. This only
-  -- has to be done in the thread's entry point.
+  -- Load the FFI again; each dep gets its own Lua context
   c.load()
 
   local builder = spn_lua_dep_builder_t.new(ffi.cast('spn_dep_build_context_t*', dep))
@@ -216,12 +265,11 @@ end
 function spn.copy(to)
   to = sp.str.from_cstr(to)
 
-  print(inspect(spn.project))
   for dep in spn.iterator.values(spn.project.deps) do
     local entries = sp.os.scan_directory(sp.str.from_cstr(dep.paths.lib))
+
     for j = 0, entries.count - 1 do
       local entry = entries.data[j]
-      print(entry.file_path:cstr())
       sp.os.copy_file(
         entry.file_path,
         sp.os.join_path(sp.str.from_cstr(to), sp.os.extract_file_name(entry.file_path))
@@ -230,68 +278,21 @@ function spn.copy(to)
   end
 end
 
-
-
----@class spn_lua_copy_entries_t
----@field include string[]
----@field lib string[]
----@field vendor string[]
-
----@class spn_lua_recipe_t
----@field git string
----@field lib string
----@field branch string
----@field copy spn_lua_copy_entries_t
----@field build fun(spn_lua_dep_build_t): nil
-
-
----@class spn_lua_copy_entries_config_t
----@field include? string[]
----@field lib? string[]
----@field vendor? string[]
-
----@class spn_lua_recipe_config_t
----@field git string
----@field lib? string
----@field branch? string
----@field copy spn_lua_copy_entries_t
----@field build fun(spn_lua_dep_build_t): nil | nil
-
-
-
----@class spn_lua_single_header_config_t : spn_lua_recipe_config_t
----@field header string
-
----@return spn_lua_recipe_t
-local recipe_template = function()
-  local recipe = {
-    git = '',
-    lib = '',
-    branch = 'HEAD',
-    copy = {
-      [spn.dir.include] = {
-        [spn.dir.work] = {},
-        [spn.dir.source] = {}
-      },
-      [spn.dir.lib] = {
-        [spn.dir.work] = {},
-        [spn.dir.source] = {}
-      },
-    },
-    build = function(context)  end
-  }
-
-  return recipe
-end
-
 ---@param config spn_lua_recipe_config_t
 ---@return spn_lua_recipe_t
 local basic = function(config)
-  local recipe = recipe_template()
+  local recipe = {
+    git = '',
+    lib = '',
+    kinds = { 'shared', 'static', 'source' },
+    branch = 'HEAD',
+    build = function() end
+  }
+
   recipe.git = config.git
   recipe.lib = config.lib or recipe.lib
+  recipe.kinds = config.kinds or recipe.kinds
   recipe.branch = config.branch or recipe.branch
-  recipe.copy = config.copy or recipe.copy
   recipe.build = config.build or recipe.build
   return recipe
 end
@@ -301,6 +302,7 @@ end
 ---@return spn_lua_recipe_t
 local single_header = function(config)
   local recipe = basic(config)
+  recipe.kinds = { 'source' }
   recipe.build = function(builder)
     builder:copy({
       { builder:source(config.header), builder:include() }
@@ -317,7 +319,11 @@ local module = {
   dir = spn.dir,
   join_path = spn.join_path,
   iterator = spn.iterator,
-
+  build_kind = {
+    shared = 'shared',
+    static = 'static',
+    source = 'source'
+  },
   internal = spn
 }
 

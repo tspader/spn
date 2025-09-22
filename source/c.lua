@@ -4,7 +4,9 @@ local module = {
     str = {},
     cstr = {},
   },
-  spn = {},
+  spn = {
+    dep = {}
+  },
   sdl = {}
 }
 
@@ -179,8 +181,14 @@ function module.load()
     // DEPENDENCIES //
     //////////////////
     typedef enum {
-      SPN_BUILD_KIND_DEBUG,
-      SPN_BUILD_KIND_RELEASE,
+      SPN_DEP_BUILD_MODE_DEBUG,
+      SPN_DEP_BUILD_MODE_RELEASE,
+    } spn_dep_build_mode_t;
+
+    typedef enum {
+      SPN_DEP_BUILD_KIND_SHARED,
+      SPN_DEP_BUILD_KIND_STATIC,
+      SPN_DEP_BUILD_KIND_SOURCE,
     } spn_dep_build_kind_t;
 
     typedef enum {
@@ -225,16 +233,6 @@ function module.load()
     } spn_dep_build_paths_t;
 
     typedef struct {
-      sp_str_t key;
-      toml_table_t* table;
-    } spn_dep_parse_entry_t;
-
-    typedef struct {
-      sp_str_t key;
-      sp_str_t value;
-    } spn_dep_option_t;
-
-    typedef struct {
       sp_str_t name;
       sp_str_t git;
       sp_str_t branch;
@@ -246,14 +244,15 @@ function module.load()
       spn_dep_info_t* info;
       sp_hash_t hash;
       sp_str_t lock;
+      spn_dep_build_kind_t kind;
     } spn_dep_spec_t;
 
     // Specific to a single build
     typedef struct {
       spn_dep_info_t* info;
-      spn_dep_spec_t* project;
+      spn_dep_spec_t* spec;
       sp_str_t build_id;
-      spn_dep_build_kind_t kind;
+      spn_dep_build_mode_t mode;
       spn_dep_build_paths_t paths;
       bool force;
       bool update;
@@ -295,12 +294,13 @@ function module.load()
       spn_dep_build_context_t* deps;
     } spn_build_context_t;
 
-    spn_dep_info_t* spn_dep_find(sp_str_t name);
-    sp_str_t        spn_dep_read_url(sp_str_t file_path);
-    sp_str_t*       spn_dep_read_libs(sp_str_t file_path);
-    sp_str_t        spn_dep_option_env_name(spn_dep_option_t* option);
-    sp_str_t        spn_dep_build_state_to_str(spn_dep_build_state_t state);
-    void            spn_dep_context_prepare(spn_dep_build_context_t* context);
+    spn_dep_info_t*      spn_dep_find(sp_str_t name);
+    void                 spn_dep_context_prepare(spn_dep_build_context_t* context);
+    sp_str_t             spn_dep_build_state_to_str(spn_dep_build_state_t state);
+    spn_dep_build_mode_t spn_dep_build_mode_from_str(sp_str_t str);
+    sp_str_t             spn_dep_build_mode_to_str(spn_dep_build_mode_t mode);
+    spn_dep_build_kind_t spn_dep_build_kind_from_str(sp_str_t str);
+    sp_str_t             spn_dep_build_kind_to_str(spn_dep_build_kind_t kind);
 
     /////////
     // APP //
@@ -441,6 +441,15 @@ function module.load()
 
 
   -- spn
+  for name, namespace in pairs(module.spn) do
+    setmetatable(namespace, {
+      __index = function(_, key)
+        key = string.format("spn_%s_%s", name, key)
+        return ffi.C[key]
+      end
+    })
+  end
+
   module.spn.string = ffi.metatype('sp_str_t', {
     __tostring = function(self) return ffi.string(self.data, self.len) end,
     __len = function(self) return self.len end,
