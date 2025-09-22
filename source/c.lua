@@ -258,7 +258,6 @@ function module.load()
       bool update;
 
       struct {
-        sp_str_t desired;
         sp_str_t resolved;
         sp_str_t message;
         u32 delta;

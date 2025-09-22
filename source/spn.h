@@ -131,7 +131,7 @@ sp_str_t spn_git_get_commit_message(sp_str_t repo_path, sp_str_t id);
 // SP
 typedef enum {
   SP_OS_LIB_SHARED,
-  SP_OS_LIB_STATIC
+  SP_OS_LIB_STATIC,
 } sp_os_lib_kind_t;
 
 SP_API sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer);
@@ -224,8 +224,8 @@ typedef enum {
 } spn_dep_build_mode_t;
 
 typedef enum {
-  SPN_DEP_BUILD_KIND_SHARED,
-  SPN_DEP_BUILD_KIND_STATIC,
+  SPN_DEP_BUILD_KIND_SHARED = SP_OS_LIB_SHARED,
+  SPN_DEP_BUILD_KIND_STATIC = SP_OS_LIB_STATIC,
   SPN_DEP_BUILD_KIND_SOURCE,
 } spn_dep_build_kind_t;
 
@@ -332,7 +332,6 @@ typedef struct {
 } spn_build_context_t;
 
 spn_dep_info_t*          spn_dep_find(sp_str_t name);
-bool                     spn_dep_is_binary(spn_dep_info_t* dep);
 bool                     spn_dep_state_is_terminal(spn_dep_build_context_t* dep);
 s32                      spn_dep_sort_kernel_alphabetical(const void* a, const void* b);
 spn_dep_build_mode_t     spn_dep_build_mode_from_str(sp_str_t str);
@@ -347,6 +346,7 @@ void                     spn_dep_context_set_build_error(spn_dep_build_context_t
 void                     spn_dep_context_clone(spn_dep_build_context_t* dep);
 sp_str_t                 spn_dep_context_find_latest_commit(spn_dep_build_context_t* dep);
 s32                      spn_dep_context_build_async(void* user_data);
+bool                     spn_dep_context_is_binary(spn_dep_build_context_t* dep);
 spn_dep_build_context_t* spn_build_context_find_dep(spn_build_context_t* build, sp_str_t name);
 sp_str_t                 spn_print(spn_dep_build_context_t* dep, spn_generator_entry_t kind, spn_generator_compiler_t c);
 sp_str_t                 spn_print_one(spn_dep_build_context_t* dep, spn_generator_entry_t kind, spn_generator_compiler_t c);
@@ -990,31 +990,46 @@ spn_generator_kind_t spn_generator_kind_from_str(sp_str_t str) {
 
 sp_str_t spn_print_one(spn_dep_build_context_t* dep, spn_generator_entry_t kind, spn_generator_compiler_t compiler) {
   sp_str_t output = SP_ZERO_INITIALIZE();
+
   switch (kind) {
     case SPN_GENERATOR_INCLUDE: {
       output = dep->paths.include;
       break;
     }
+    case SPN_GENERATOR_RPATH:
     case SPN_GENERATOR_LIB_INCLUDE:  {
-      if (spn_dep_is_binary(dep->info)) return SP_ZERO_STRUCT(sp_str_t);
-      output = dep->paths.lib;
+      switch (dep->spec->kind) {
+        case SPN_DEP_BUILD_KIND_SHARED:
+        case SPN_DEP_BUILD_KIND_STATIC: {
+          output = dep->paths.lib;
+          break;
+        }
+        case SPN_DEP_BUILD_KIND_SOURCE: {
+          return SP_ZERO_STRUCT(sp_str_t);
+        }
+      }
+
       break;
     }
     case SPN_GENERATOR_LIBS: {
-      if (!spn_dep_is_binary(dep->info)) return SP_ZERO_STRUCT(sp_str_t);
-      output = sp_os_join_path(dep->paths.lib, sp_os_lib_to_file_name(dep->info->lib, SP_OS_LIB_SHARED));
-      break;
-    }
-    case SPN_GENERATOR_RPATH: {
-      if (!spn_dep_is_binary(dep->info)) return SP_ZERO_STRUCT(sp_str_t);
-      output = dep->paths.lib;
+      switch (dep->spec->kind) {
+        case SPN_DEP_BUILD_KIND_SHARED:
+        case SPN_DEP_BUILD_KIND_STATIC: {
+          sp_os_lib_kind_t kind = (sp_os_lib_kind_t)dep->spec->kind;
+          sp_str_t lib = sp_os_lib_to_file_name(dep->info->lib, kind);
+          output = sp_os_join_path(dep->paths.lib, lib);
+          break;
+        }
+        case SPN_DEP_BUILD_KIND_SOURCE: {
+          return SP_ZERO_STRUCT(sp_str_t);
+        }
+      }
       break;
     }
     default: {
       SP_UNREACHABLE_CASE();
     }
   }
-
 
   switch (compiler) {
     case SPN_GENERATOR_COMPILER_NONE: {
@@ -1026,7 +1041,7 @@ sp_str_t spn_print_one(spn_dep_build_context_t* dep, spn_generator_entry_t kind,
         case SPN_GENERATOR_LIB_INCLUDE: return sp_format("-L{}",          SP_FMT_STR(output));
         case SPN_GENERATOR_LIBS:        return sp_format("{}",            SP_FMT_STR(output));
         case SPN_GENERATOR_RPATH:       return sp_format("-Wl,-rpath,{}", SP_FMT_STR(output));
-        default:                    SP_UNREACHABLE_RETURN(SP_LIT(""));
+        default: SP_UNREACHABLE_RETURN(SP_LIT(""));
       }
     }
   }
@@ -1777,10 +1792,6 @@ spn_dep_info_t* spn_dep_find(sp_str_t name) {
   return SP_NULLPTR;
 }
 
-bool spn_dep_is_binary(spn_dep_info_t* dep) {
-  return dep->lib.len;
-}
-
 s32 spn_dep_sort_kernel_alphabetical(const void* a, const void* b) {
   spn_dep_info_t* da = (spn_dep_info_t*)a;
   spn_dep_info_t* db = (spn_dep_info_t*)b;
@@ -1797,6 +1808,17 @@ spn_dep_build_context_t* spn_build_context_find_dep(spn_build_context_t* build, 
 
   return SP_NULLPTR;
 }
+
+bool spn_dep_context_is_binary(spn_dep_build_context_t* dep) {
+  switch (dep->spec->kind) {
+    case SPN_DEP_BUILD_KIND_SHARED: return true;
+    case SPN_DEP_BUILD_KIND_STATIC: return true;
+    case SPN_DEP_BUILD_KIND_SOURCE: return false;
+  }
+
+  SP_UNREACHABLE();
+}
+
 
 sp_str_t spn_dep_context_find_latest_commit(spn_dep_build_context_t* dep) {
   return spn_git_get_commit(dep->info->paths.source, sp_format("origin/{}", SP_FMT_STR(dep->info->branch)));
