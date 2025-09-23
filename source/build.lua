@@ -66,7 +66,11 @@ end
 function module:sh(config)
   local context = ffi.new('spn_sh_process_context_t')
   context.command = sp.str.from_cstr(config.command)
-  context.work = self.dep.paths.work
+  local work = self.dep.paths.work
+  if config.directory then
+    work = sp.str.from_cstr(config.directory)
+  end
+  context.work = work
   context.shell = self.dep.sh
 
   if config.args then
@@ -138,11 +142,12 @@ end
 function module:make(config)
   config = config or {}
 
+  local directory = config.directory or self.paths.work
   local sh = {
     command = 'make',
     args = {
       '--quiet',
-      '--directory', self.paths.work
+      '--directory', directory
     }
   }
 
@@ -151,8 +156,26 @@ function module:make(config)
     table.insert(sh.args, config.makefile)
   end
 
-  if config.target then
+  if config.jobs then
+    table.insert(sh.args, string.format('--jobs=%s', config.jobs))
+  end
+
+  if config.variables then
+    for name, value in iterator.pairs(config.variables) do
+      table.insert(sh.args, string.format('%s=%s', name, value))
+    end
+  end
+
+  if config.targets then
+    for target in iterator.values(config.targets) do
+      table.insert(sh.args, target)
+    end
+  elseif config.target then
     table.insert(sh.args, config.target)
+  end
+
+  if config.directory then
+    sh.directory = config.directory
   end
 
   self:sh(sh)

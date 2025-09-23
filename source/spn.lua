@@ -47,6 +47,10 @@ local spn_lua_dep_builder_t = require('build')
 ---@class spn_lua_make_config_t
 ---@field makefile string|nil
 ---@field target string|nil
+---@field targets string[]|nil
+---@field directory string|nil
+---@field jobs number|string|nil
+---@field variables table<string, string>|nil
 
 ---@class spn_lua_cmake_config_t
 ---@field defines string[]|nil
@@ -56,6 +60,7 @@ local spn_lua_dep_builder_t = require('build')
 ---@class spn_lua_sh_config_t
 ---@field command string
 ---@field args string[]|nil
+---@field directory string|nil
 
 ------------
 -- RECIPE --
@@ -114,9 +119,16 @@ function spn.init(app)
   -- Load the project agnostic user config
   app = ffi.cast('spn_lua_context_t*', app)
   spn.app = app
-  local config = dofile(app.paths.user_config:cstr())
-  if not config then
-    return
+  local config = {}
+  local loader = loadfile(app.paths.user_config:cstr())
+  if loader then
+    local ok, result = pcall(loader)
+    if not ok then
+      error(string.format('failed to evaluate user config %s: %s', app.paths.user_config:cstr(), result))
+    end
+    if type(result) == 'table' then
+      config = result
+    end
   end
 
   if config.spn then

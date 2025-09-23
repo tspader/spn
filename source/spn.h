@@ -1990,10 +1990,9 @@ sp_str_t spn_dep_context_find_latest_commit(spn_dep_build_context_t* dep) {
 void spn_dep_context_clone(spn_dep_build_context_t* dep) {
   sp_str_t url = sp_format("https://github.com/{}.git", SP_FMT_STR(dep->info->git));
   SDL_Process* process = SPN_SH(
-    "git", "clone",
+    "git", "clone", "--quiet",
     sp_str_to_cstr(url),
-    sp_str_to_cstr(dep->info->paths.source),
-    "--quiet"
+    sp_str_to_cstr(dep->info->paths.source)
   );
 
   if (!process) {
@@ -2298,60 +2297,66 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   // Bootstrap the user config, which tells us if spn itself is installed in the usual,
   // well-known location or in somewhere the user specified (for development)
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  sp_str_builder_append_fmt(&builder,  "local loader = loadfile('{}');", SP_FMT_STR(app->paths.user_config));
-  sp_str_builder_append_cstr(&builder, "if not loader then return nil end;");
-  sp_str_builder_append_cstr(&builder, "local ok, config = pcall(loader);");
-  sp_str_builder_append_cstr(&builder, "if not ok then return nil end;");
-  sp_str_builder_append_cstr(&builder, "return config and config.spn or nil;");
+  if (sp_os_does_path_exist(app->paths.user_config)) {
+    sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+    sp_str_builder_append_fmt(&builder,  "local loader = loadfile('{}');", SP_FMT_STR(app->paths.user_config));
+    sp_str_builder_append_cstr(&builder, "if not loader then return nil end;");
+    sp_str_builder_append_cstr(&builder, "local ok, config = pcall(loader);");
+    sp_str_builder_append_cstr(&builder, "if not ok then return nil end;");
+    sp_str_builder_append_cstr(&builder, "return config and config.spn or nil;");
 
-  if (luaL_dostring(app->lua.state, sp_str_builder_write_cstr(&builder))) {
-    const char* error = lua_tostring(app->lua.state, -1);
+    if (luaL_dostring(app->lua.state, sp_str_builder_write_cstr(&builder))) {
+      const char* error = lua_tostring(app->lua.state, -1);
+      lua_pop(app->lua.state, 1);
+      SP_FATAL("Failed to run bootstrap Lua chunk: {}", SP_FMT_CSTR(error));
+    }
+
+    const c8* spn = lua_tostring(app->lua.state, -1);
+    SP_ASSERT(spn);
+    app->paths.spn = sp_os_normalize_path(sp_str_view(spn));
+
     lua_pop(app->lua.state, 1);
-    SP_FATAL("Failed to run bootstrap Lua chunk: {}", SP_FMT_CSTR(error));
+  }
+  else {
+    app->paths.spn = sp_os_join_path(app->paths.storage, SP_LIT("spn"));
   }
 
-  if (lua_isnil(app->lua.state, -1)) {
-    app->paths.spn = sp_os_join_path(app->paths.storage, SP_LIT("spn"));
-
+  if (!sp_os_does_path_exist(app->paths.spn)) {
     // If the recipe directory doesn't exist, we need to clone it
     const c8* url = "https://github.com/tspader/spn.git";
-    if (!sp_os_does_path_exist(app->paths.spn)) {
-      SP_LOG(
-        "Cloning recipe repository from {:fg brightcyan} to {:fg brightcyan}",
+    SP_LOG(
+      "Cloning recipe repository from {:fg brightcyan} to {:fg brightcyan}",
+      SP_FMT_CSTR(url),
+      SP_FMT_STR(app->paths.spn)
+    );
+
+    SDL_Process* process = SPN_SH(
+      "git", "clone", "--quiet",
+      url,
+      sp_str_to_cstr(app->paths.spn)
+    );
+    spn_sh_process_result_t result = spn_sh_read_process(process);
+    if (result.return_code) {
+      SP_FATAL(
+        "Failed to clone spn recipe sources from {} to {}",
         SP_FMT_CSTR(url),
         SP_FMT_STR(app->paths.spn)
       );
-
-      SDL_Process* process = SPN_SH("git", "clone", url, sp_str_to_cstr(app->paths.spn));
-      spn_sh_process_result_t result = spn_sh_read_process(process);
-      if (result.return_code) {
-        SP_FATAL(
-          "Failed to clone spn recipe sources from {} to {}",
-          SP_FMT_CSTR(url),
-          SP_FMT_STR(app->paths.spn)
-        );
-      }
-    }
-    else {
-      u32 num_updates = spn_git_num_updates(app->paths.spn, SPN_GIT_HEAD, SPN_GIT_UPSTREAM);
-      if (num_updates > 0) {
-        if (app->config.pull_recipes) {
-          SP_LOG("Updating spn recipes ({} commits behind)...", SP_FMT_U32(num_updates));
-          spn_git_checkout(app->paths.spn, SPN_GIT_ORIGIN_HEAD);
-        }
-        else {
-          SP_LOG("spn has {} recipe updates available (auto_pull_recipes=false)", SP_FMT_U32(num_updates));
-        }
-      }
     }
   }
   else {
-    const c8* spn = lua_tostring(app->lua.state, -1);
-    SP_ASSERT(spn);
-    app->paths.spn = sp_os_normalize_path(sp_str_from_cstr(spn));
+    // If it does, we need to pull
+    u32 num_updates = spn_git_num_updates(app->paths.spn, SPN_GIT_HEAD, SPN_GIT_UPSTREAM);
+    if (num_updates > 0) {
+      if (app->config.pull_recipes) {
+        SP_LOG("Updating spn recipes ({} commits behind)...", SP_FMT_U32(num_updates));
+        spn_git_checkout(app->paths.spn, SPN_GIT_ORIGIN_HEAD);
+      }
+      else {
+        SP_LOG("spn has {} recipe updates available (auto_pull_recipes=false)", SP_FMT_U32(num_updates));
+      }
+    }
   }
-  lua_pop(app->lua.state, 1);
 
   app->paths.lua = sp_os_join_path(app->paths.spn, SP_LIT("source"));
   app->paths.recipes = sp_os_join_path(app->paths.spn, SP_LIT("asset/recipes"));
@@ -2377,7 +2382,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   s32 result = luaL_dostring(app->lua.state, sp_str_to_cstr(script));
   SP_ASSERT(!result);
 
-  builder = SP_ZERO_STRUCT(sp_str_builder_t);
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
   sp_str_builder_append_cstr(&builder, "local spn = require('spn');");
   sp_str_builder_append_cstr(&builder, "spn.internal.init(...);");
   const c8* chunk = sp_str_builder_write_cstr(&builder);
