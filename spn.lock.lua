@@ -11,13 +11,13 @@ return {
       name = "luajit"
     },
     sdl3 = {
-      build_id = "60b39f36",
-      commit = "6d0fdb627e",
+      build_id = "9b870ab9",
+      commit = "221d1f12ea",
       name = "sdl3"
     },
     sp = {
-      build_id = "adbc9cb1",
-      commit = "f6f2ca45a2",
+      build_id = "41b7bc76",
+      commit = "c69044df42",
       name = "sp"
     }
   }

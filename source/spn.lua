@@ -133,7 +133,7 @@ function spn.init(app)
 
   -- Read all recipes
   local entries = sp.os.scan_directory(app.paths.recipes)
-  for index = 0, entries.count do
+  for index = 0, entries.count - 1 do
     local entry = entries.data[index]
     local extension = sp.os.extract_extension(entry.file_name)
     if sp.str.equal_cstr(extension, "lua") then
@@ -153,7 +153,6 @@ function spn.init(app)
       spn.recipes[name] = dofile(entry.file_path:cstr())
     end
   end
-
   -- Read this project
   spn.project = dofile(app.paths.project.config:cstr())
 

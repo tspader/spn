@@ -32,10 +32,20 @@ ifeq ($(OS),Windows_NT)
   RPATH_FLAG :=
   IS_SPN_PREINSTALLED := $(shell where $(SPN_EXE) 2>NUL)
 else
-  CC := bear --append -- gcc
-  CXX := bear --append -- g++
-  MAKE := bear --append -- make
-  CMAKE := bear --append -- cmake
+  HAS_BEAR := $(shell which bear 2>/dev/null)
+
+  ifdef HAS_BEAR
+    CC := bear --append -- gcc
+    CXX := bear --append -- g++
+    MAKE := bear --append -- make
+    CMAKE := bear --append -- cmake
+	else
+    CC := gcc
+    CXX := g++
+    MAKE := make
+    CMAKE := cmake
+	endif
+
   SDL := libSDL3.a
   LUAJIT := libluajit.a
   SPN_EXE := spn
@@ -84,8 +94,8 @@ FLAG_LANGUAGE := -std=c11
 FLAG_INCLUDES :=  -I$(SPN_DIR_SOURCE)
 FLAG_OUTPUT := -o $(SPN_BINARY)
 FLAG_OPTIMIZATION := -g -rdynamic
-FLAG_LIBS := -lm -lpthread -lelf -ldl
-CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_OPTIMIZATION) $(FLAG_INCLUDES) $(FLAG_LIBS) $(FLAG_OUTPUT)
+SYSTEM_LIBS := -lm -lpthread -lelf -ldl
+CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_OPTIMIZATION) $(FLAG_INCLUDES) $(FLAG_OUTPUT)
 
 ###############
 # ENTRY POINT #
@@ -124,7 +134,7 @@ $(SPN_BINARY): $(SPN_DIR_SOURCE)/main.c $(SPN_DIR_SOURCE)/spn.h  | $(SPN_DIR_BUI
 	@echo
 
 	$(call print_and_run,$(BOOTSTRAPPED_SPN) build)
-	$(call print_and_run,$(CC) $(CC_FLAGS) $$($(BOOTSTRAPPED_SPN) print --compiler gcc) ./source/main.c)
+	$(call print_and_run,$(CC) ./source/main.c $(CC_FLAGS) $$($(BOOTSTRAPPED_SPN) print --compiler gcc) $(SYSTEM_LIBS))
 
 $(SPN_COMPILE_DB): $(SPN_MAKEFILE)
 
@@ -146,9 +156,6 @@ else ifeq ($(shell uname),Darwin)
 else
   BOOTSTRAP_LIBS := $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT)/src/libluajit.a
 endif
-
-BOOTSTRAP_INCLUDE := -I$(SPN_BOOTSTRAP_SDL)/include -I$(SPN_BOOTSTRAP_SP) -I$(SPN_BOOTSTRAP_TOML) -I$(SPN_BOOTSTRAP_ARGPARSE) -I$(SPN_BOOTSTRAP_LUAJIT)/src
-BOOTSTRAP_FLAGS := $(BOOTSTRAP_INCLUDE) $(FLAG_LIBS) $(BOOTSTRAP_LIBS)
 
 $(SPN_DIR_BUILD_BOOTSTRAP):
 	@mkdir -p $(SPN_DIR_BUILD_BOOTSTRAP)
@@ -182,11 +189,12 @@ $(SPN_BOOTSTRAP_SDL_BINARY): | $(SPN_BOOTSTRAP_SDL) $(SPN_BOOTSTRAP_WORK) $(SPN_
 	@cp $(SPN_BOOTSTRAP_WORK)/$(SDL) $(SPN_BOOTSTRAP_SDL_BINARY) 2>/dev/null
 
 SPN_BOOTSTRAP_DEPS := $(SPN_BOOTSTRAP_SP) $(SPN_BOOTSTRAP_ARGPARSE) $(SPN_DIR_BUILD_OUTPUT)
+BOOTSTRAP_INCLUDE := -I$(SPN_BOOTSTRAP_SDL)/include -I$(SPN_BOOTSTRAP_SP) -I$(SPN_BOOTSTRAP_TOML) -I$(SPN_BOOTSTRAP_ARGPARSE) -I$(SPN_BOOTSTRAP_LUAJIT)/src
 
 bootstrap: $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT_BINARY) | $(SPN_BOOTSTRAP_DEPS)
 	@printf "$(ANSI_FG_BRIGHT_CYAN)>> $(ANSI_RESET)"
 	@echo "bootstrapping spn"
-	$(CC) $(CC_FLAGS) $(BOOTSTRAP_INCLUDE) ./source/main.c $(BOOTSTRAP_LIBS)
+	$(CC) $(CC_FLAGS) $(BOOTSTRAP_INCLUDE) ./source/main.c $(BOOTSTRAP_LIBS) $(SYSTEM_LIBS)
 	@echo
 	@printf "$(ANSI_FG_BRIGHT_CYAN)>> $(ANSI_RESET)"
 	@printf "done! try $(ANSI_FG_BRIGHT_CYAN)make examples$(ANSI_RESET) to build some projects with your spn binary"
