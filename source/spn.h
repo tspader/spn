@@ -1438,7 +1438,7 @@ void spn_cli_command_which(spn_cli_t* cli) {
   }
 
   spn_dep_context_prepare(dep);
-  sp_log(dep->paths.store);
+  printf("%.*s", dep->paths.store.len, dep->paths.store.data);
 }
 
 void spn_cli_command_build(spn_cli_t* cli) {
