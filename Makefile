@@ -240,7 +240,7 @@ $(EXAMPLE_TARGETS_CPP): build/examples/%/main: examples/%/main.cpp examples/%/sp
 ###########
 build: $(SPN_BINARY)
 
-examples: $(DEFAULT_TARGET) $(EXAMPLE_DIRS_C)
+examples: $(DEFAULT_TARGET) $(EXAMPLES)
 
 install: $(DEFAULT_TARGET)
 	@mkdir -p $(SPN_INSTALL_PREFIX)
