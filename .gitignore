@@ -8,7 +8,6 @@ examples/**/spn.lock.lua
 .claude
 CLAUDE.md
 .mcp.json
-AGENTS.md
 
 .spackle/*
 external/*
