@@ -114,9 +114,16 @@ function spn.init(app)
   -- Load the project agnostic user config
   app = ffi.cast('spn_lua_context_t*', app)
   spn.app = app
-  local config = dofile(app.paths.user_config:cstr())
-  if not config then
-    return
+  local config = {}
+  local loader = loadfile(app.paths.user_config:cstr())
+  if loader then
+    local ok, result = pcall(loader)
+    if not ok then
+      error(string.format('failed to evaluate user config %s: %s', app.paths.user_config:cstr(), result))
+    end
+    if type(result) == 'table' then
+      config = result
+    end
   end
 
   if config.spn then

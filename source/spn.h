@@ -1990,10 +1990,9 @@ sp_str_t spn_dep_context_find_latest_commit(spn_dep_build_context_t* dep) {
 void spn_dep_context_clone(spn_dep_build_context_t* dep) {
   sp_str_t url = sp_format("https://github.com/{}.git", SP_FMT_STR(dep->info->git));
   SDL_Process* process = SPN_SH(
-    "git", "clone",
+    "git", "clone", "--quiet",
     sp_str_to_cstr(url),
-    sp_str_to_cstr(dep->info->paths.source),
-    "--quiet"
+    sp_str_to_cstr(dep->info->paths.source)
   );
 
   if (!process) {
@@ -2323,7 +2322,11 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
         SP_FMT_STR(app->paths.spn)
       );
 
-      SDL_Process* process = SPN_SH("git", "clone", url, sp_str_to_cstr(app->paths.spn));
+      SDL_Process* process = SPN_SH(
+        "git", "clone", "--quiet",
+        url,
+        sp_str_to_cstr(app->paths.spn)
+      );
       spn_sh_process_result_t result = spn_sh_read_process(process);
       if (result.return_code) {
         SP_FATAL(
@@ -2353,8 +2356,22 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   }
   lua_pop(app->lua.state, 1);
 
+  sp_str_t repo_root = sp_os_join_path(app->paths.install, SP_LIT(".."));
+  repo_root = sp_os_join_path(repo_root, SP_LIT(".."));
+  repo_root = sp_os_canonicalize_path(repo_root);
+
   app->paths.lua = sp_os_join_path(app->paths.spn, SP_LIT("source"));
   app->paths.recipes = sp_os_join_path(app->paths.spn, SP_LIT("asset/recipes"));
+
+  sp_str_t local_source = sp_os_join_path(repo_root, SP_LIT("source"));
+  if (sp_os_does_path_exist(local_source)) {
+    app->paths.lua = local_source;
+  }
+
+  sp_str_t local_recipes = sp_os_join_path(repo_root, SP_LIT("asset/recipes"));
+  if (sp_os_does_path_exist(local_recipes)) {
+    app->paths.recipes = local_recipes;
+  }
 
   SP_ASSERT_FMT(
     sp_os_does_path_exist(app->paths.recipes),
