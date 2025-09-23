@@ -23,6 +23,7 @@ endef
 ############
 ifeq ($(OS),Windows_NT)
   CC := gcc
+  CXX := g++
   MAKE := make
   CMAKE := cmake
   SDL := SDL3.lib
@@ -32,6 +33,7 @@ ifeq ($(OS),Windows_NT)
   IS_SPN_PREINSTALLED := $(shell where $(SPN_EXE) 2>NUL)
 else
   CC := bear --append -- gcc
+  CXX := bear --append -- g++
   MAKE := bear --append -- make
   CMAKE := bear --append -- cmake
   SDL := libSDL3.a
@@ -103,7 +105,7 @@ else
 endif
 
 .PHONY: all build sdl clangd clean examples install uninstall
-.NOTPARALLEL: examples $(EXAMPLE_BINARIES)
+.NOTPARALLEL: examples $(EXAMPLE_DIRS)
 
 all: $(DEFAULT_TARGET)
 
@@ -193,31 +195,44 @@ bootstrap: $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT_BINARY) | $(SPN_BO
 ############
 # EXAMPLES #
 ############
-EXAMPLES := $(notdir $(wildcard examples/*))
-EXAMPLE_DIRS := $(addprefix examples/, $(EXAMPLES))
-EXAMPLE_BINARIES := $(addprefix build/examples/, $(EXAMPLES))
-$(EXAMPLE_BINARIES): build/examples/%: examples/%/main.c examples/%/spn.lua $(SPN_MAKEFILE) | $(SPN_DIR_BUILD_EXAMPLES)
+EXAMPLE_DIRS := $(wildcard examples/*)
+EXAMPLES_C := $(foreach dir,$(EXAMPLE_DIRS),$(if $(wildcard $(dir)/main.c),$(notdir $(dir))))
+EXAMPLES_CPP := $(foreach dir,$(EXAMPLE_DIRS),$(if $(wildcard $(dir)/main.cpp),$(notdir $(dir))))
+EXAMPLES := $(EXAMPLES_C) $(EXAMPLES_CPP)
+
+EXAMPLE_TARGETS_C := $(addsuffix /main,$(addprefix build/examples/, $(EXAMPLES_C)))
+EXAMPLE_TARGETS_CPP := $(addsuffix /main,$(addprefix build/examples/, $(EXAMPLES_CPP)))
+
+define build_example
+  $(call print_heading)
+	@printf "example: $(ANSI_FG_BRIGHT_CYAN)$(1)$(ANSI_RESET)"
+	@echo
+
+	@mkdir -p ./build/examples/$(1)
+	$(call print_and_run,$(BOOTSTRAPPED_SPN) -C ./examples/$(1) build)
+	$(call print_and_run,$(BOOTSTRAPPED_SPN) -C ./examples/$(1) copy ./build/examples/$(1))
+	$(call print_and_run,$(2) ./examples/$(1)/main.* -g -o ./build/examples/$(1)/main $$($(BOOTSTRAPPED_SPN) -C ./examples/$(1) print) -lm)
+	@echo
+endef
+
+.PHONY: $(EXAMPLES)
+
+$(EXAMPLES): %: build/examples/%/main
+
+$(EXAMPLE_TARGETS_C): build/examples/%/main: examples/%/main.c examples/%/spn.lua $(SPN_MAKEFILE)
 	$(eval EXAMPLE := $*)
-	$(eval EXAMPLE_DIR := examples/$*)
-	$(eval EXAMPLE_BUILD_DIR := build/examples/$*)
-	$(eval EXAMPLE_BINARY := $(EXAMPLE_BUILD_DIR)/main)
+	$(call build_example,$(EXAMPLE),$(CC))
 
-	$(call print_heading)
-	@printf "building $(ANSI_FG_BRIGHT_CYAN)$(EXAMPLE_DIR)$(ANSI_RESET)"
-
-	@echo
-	@mkdir -p $(EXAMPLE_BUILD_DIR)
-	$(call print_and_run,$(BOOTSTRAPPED_SPN) -C $(EXAMPLE_DIR) build)
-	$(call print_and_run,$(BOOTSTRAPPED_SPN) -C $(EXAMPLE_DIR) copy $(EXAMPLE_BUILD_DIR))
-	$(call print_and_run,$(CC) $(EXAMPLE_DIR)/main.c -g -o $(EXAMPLE_BINARY) $$($(BOOTSTRAPPED_SPN) -C $(EXAMPLE_DIR) print) -lm)
-	@echo
+$(EXAMPLE_TARGETS_CPP): build/examples/%/main: examples/%/main.cpp examples/%/spn.lua $(SPN_MAKEFILE)
+	$(eval EXAMPLE := $*)
+	$(call build_example,$(EXAMPLE),$(CXX))
 
 ###########
 # PHONIES #
 ###########
 build: $(SPN_BINARY)
 
-examples: $(DEFAULT_TARGET) $(EXAMPLE_BINARIES)
+examples: $(DEFAULT_TARGET) $(EXAMPLE_DIRS_C)
 
 install: $(DEFAULT_TARGET)
 	@mkdir -p $(SPN_INSTALL_PREFIX)
