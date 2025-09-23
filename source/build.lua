@@ -103,6 +103,37 @@ function module:sh_proxy(config)
   })
 end
 
+---@param config spn_lua_cc_config_t
+function module:cc(config)
+  config = config or {}
+
+  local sh = {
+    command = config.compiler,
+    args = {
+      '-o', self.paths.work .. '/' .. config.output
+    }
+  }
+
+  for source in iterator.values(config.source) do
+    table.insert(sh.args, self.paths.source .. '/' ..  source)
+  end
+
+  if config.shared then
+    table.insert(sh.args, '-shared')
+    table.insert(sh.args, '-fPIC')
+  end
+
+  if config.include then
+    for include in iterator.values(config.include) do
+      local path = self.paths.source .. '/' .. include
+      table.insert(sh.args, string.format('-I%s', path))
+    end
+  end
+
+  self:sh(sh)
+end
+
+
 ---@param config spn_lua_make_config_t
 function module:make(config)
   config = config or {}

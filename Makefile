@@ -8,11 +8,11 @@ ANSI_FG_BRIGHT_YELLOW := \033[93m
 ANSI_RESET := \033[0m
 
 define print_heading
-	@printf "$(ANSI_FG_BRIGHT_CYAN)>> $(ANSI_RESET)"
+	@printf "$(ANSI_FG_BRIGHT_CYAN)> $(ANSI_RESET)"
 endef
 
 define print_and_run
-	@printf "$(ANSI_FG_BRIGHT_CYAN)>>> $(ANSI_RESET)"
+	@printf "$(ANSI_FG_BRIGHT_CYAN)>> $(ANSI_RESET)"
 	@printf "$(ANSI_FG_BRIGHT_YELLOW)$1$(ANSI_RESET)"
 	@echo
 	@$1

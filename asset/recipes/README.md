@@ -1,0 +1,18 @@
+i pretty much add libraries to this as i need them. but here's some that are on my list regardles. roughly ordered.
+- stb
+- freetype
+- cjson
+- raylib
+- hmm
+- microui
+- uv
+- sodium
+- treesitter
+- curl
+- sokol
+- sds
+- glfw
+- nuklear
+- quickjs
+- miniz
+- linenoise

@@ -37,6 +37,13 @@ local spn_lua_dep_builder_t = require('build')
 ---@field dep spn_lua_dep_t
 ---@field paths spn_lua_dep_paths_t
 
+---@class spn_lua_cc_config_t
+---@field compiler string
+---@field output string
+---@field shared string|nil
+---@field source string[]|nil
+---@field include string[]|nil
+
 ---@class spn_lua_make_config_t
 ---@field makefile string|nil
 ---@field target string|nil
