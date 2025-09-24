@@ -1,13 +1,12 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
-int main() {
+#define match(v) switch ((size_t)(v))
+
+s32 main() {
   FT_Library library;
   FT_Face face = SP_NULLPTR;
   FT_Error status;
@@ -17,97 +16,115 @@ int main() {
     SP_FATAL("Failed to initialize FreeType");
   }
 
-  int major = 0;
-  int minor = 0;
-  int patch = 0;
+  s32 major = 0;
+  s32 minor = 0;
+  s32 patch = 0;
   FT_Library_Version(library, &major, &minor, &patch);
   SP_LOG("FreeType, v{:fg brightred}.{:fg brightgreen}.{:fg brightcyan}", SP_FMT_S32(major), SP_FMT_S32(minor), SP_FMT_S32(patch));
 
-  SP_LOG("{:fg brightcyan}", SP_FMT_STR(sp_os_get_executable_path()));
-  sp_str_t font_path = sp_os_join_path(sp_os_get_executable_path(), sp_str_view("Hack-Regular.ttf"));
-  status = FT_New_Face(library, sp_str_to_cstr(font_path), 0, &face);
+  sp_str_t executable = sp_os_get_executable_path(); // i.e. /build/examples/freetype/main
+
+  sp_str_t project = executable;
+  for (u32 i = 0; i < 3; i++) {
+    project = sp_os_parent_path(project);
+  }
+
+  sp_str_t asset = sp_os_join_path(project, sp_str_lit("asset"));
+  sp_str_t fonts = sp_os_join_path(asset, sp_str_lit("fonts"));
+
+  sp_str_t font = sp_os_join_path(fonts, sp_str_lit("Hack-Regular.ttf"));
+  u32 font_size = 20;
+  sp_str_t text = sp_str_lit("hello, world!");
+
+  SP_LOG(
+    "Using font {:fg brightcyan} to print {:fg brightyellow}",
+    SP_FMT_STR(font),
+    SP_FMT_STR(text)
+  );
+
+  status = FT_New_Face(library, sp_str_to_cstr(font), 0, &face);
   if (status) {
     SP_FATAL("Failed to load face: {:fg brightblack}", SP_FMT_S32(status));
   }
-  FT_Set_Pixel_Sizes(face, 0, 16);
+  FT_Set_Pixel_Sizes(face, 0, font_size);
 
+  typedef struct {
+    u8* bitmap_data;
+    s32 width;
+    s32 height;
+    s32 bitmap_top;
+    s32 bitmap_left;
+  } glyph_t;
 
-  sp_str_t text = sp_str_lit("hello, world!");
-
-  // Store character bitmap data and metrics
-  unsigned char* bitmap_data[256];
-  int char_widths[256];
-  int char_heights[256];
-  int char_bitmap_top[256];
-  int char_bitmap_left[256];
-  int max_ascender = 0;
-  int max_descender = 0;
+  glyph_t glyphs[256];
+  s32 max_ascender = 0;
+  s32 max_descender = 0;
 
   // Load all characters and copy bitmap data
-  for (int i = 0; i < text.len; i++) {
+  for (u32 i = 0; i < text.len; i++) {
     c8 ch = sp_str_at(text, i);
     if (ch == ' ') {
-      bitmap_data[i] = SP_NULLPTR;
-      char_widths[i] = 8;
-      char_heights[i] = 0;
-      char_bitmap_top[i] = 0;
-      char_bitmap_left[i] = 0;
+      glyphs[i].bitmap_data = SP_NULLPTR;
+      glyphs[i].width = 8;
+      glyphs[i].height = 0;
+      glyphs[i].bitmap_top = 0;
+      glyphs[i].bitmap_left = 0;
       continue;
     }
 
     FT_Load_Char(face, ch, FT_LOAD_RENDER);
     FT_Bitmap* bitmap = &face->glyph->bitmap;
 
-    char_widths[i] = bitmap->width;
-    char_heights[i] = bitmap->rows;
-    char_bitmap_top[i] = face->glyph->bitmap_top;
-    char_bitmap_left[i] = face->glyph->bitmap_left;
+    glyphs[i].width = bitmap->width;
+    glyphs[i].height = bitmap->rows;
+    glyphs[i].bitmap_top = face->glyph->bitmap_top;
+    glyphs[i].bitmap_left = face->glyph->bitmap_left;
 
     // Copy bitmap data
-    int data_size = bitmap->width * bitmap->rows;
-    bitmap_data[i] = malloc(data_size);
-    memcpy(bitmap_data[i], bitmap->buffer, data_size);
+    s32 data_size = bitmap->width * bitmap->rows;
+    glyphs[i].bitmap_data = malloc(data_size);
+    memcpy(glyphs[i].bitmap_data, bitmap->buffer, data_size);
 
     // Track max ascender and descender for baseline alignment
     if (face->glyph->bitmap_top > max_ascender) {
       max_ascender = face->glyph->bitmap_top;
     }
-    int descender = char_heights[i] - face->glyph->bitmap_top;
+    s32 descender = glyphs[i].height - face->glyph->bitmap_top;
     if (descender > max_descender) {
       max_descender = descender;
     }
   }
 
-  int total_height = max_ascender + max_descender;
+  s32 total_height = max_ascender + max_descender;
 
   // Render line by line with proper baseline alignment
-  for (int y = 0; y < total_height; y++) {
-    for (int i = 0; i < text.len; i++) {
-      if (bitmap_data[i] == SP_NULLPTR) {
+  for (s32 y = 0; y < total_height; y++) {
+    for (s32 i = 0; i < text.len; i++) {
+      match(glyphs[i].bitmap_data) {
+      }
+      if (glyphs[i].bitmap_data == SP_NULLPTR) {
         // Space character
-        for (int x = 0; x < char_widths[i]; x++) {
+        for (s32 x = 0; x < glyphs[i].width; x++) {
           printf(" ");
         }
-      } else {
+      }
+      else {
         // Calculate the y position in the character's bitmap based on baseline
-        int char_y = y - (max_ascender - char_bitmap_top[i]);
+        s32 char_y = y - (max_ascender - glyphs[i].bitmap_top);
 
-        for (int x = 0; x < char_widths[i]; x++) {
-          if (char_y >= 0 && char_y < char_heights[i]) {
-            unsigned char pixel = bitmap_data[i][char_y * char_widths[i] + x];
+        for (s32 x = 0; x < glyphs[i].width; x++) {
+          if (char_y >= 0 && char_y < glyphs[i].height) {
+            unsigned char pixel = glyphs[i].bitmap_data[char_y * glyphs[i].width + x];
 
             // Convert to grayscale and use truecolor terminal escapes
-            int gray = pixel;
-            printf("\033[38;2;%d;%d;%dm", gray, gray, gray);
-
-            // Use Unicode block characters based on brightness
-            if (pixel > 192) printf("█");      // Full block
-            else if (pixel > 128) printf("▓"); // Dark shade
-            else if (pixel > 64) printf("▒");  // Medium shade
-            else if (pixel > 32) printf("░");  // Light shade
-            else printf(" ");
-
-            printf("\033[0m"); // Reset color
+            sp_str_t block = sp_format(
+              "\033[38;2;{};{};{}m{}\033[0m",
+              SP_FMT_U32(pixel),
+              SP_FMT_U32(pixel),
+              SP_FMT_U32(pixel),
+              SP_FMT_CSTR(pixel > 32 ? "█" : " ")
+            );
+            printf("%.*s", block.len, block.data);
           } else {
             printf(" ");
           }
