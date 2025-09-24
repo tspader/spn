@@ -24,20 +24,24 @@ int main() {
   SP_LOG("FreeType, v{:fg brightred}.{:fg brightgreen}.{:fg brightcyan}", SP_FMT_S32(major), SP_FMT_S32(minor), SP_FMT_S32(patch));
 
   SP_LOG("{:fg brightcyan}", SP_FMT_STR(sp_os_get_executable_path()));
-  status = FT_New_Face(library, "/usr/share/fonts/TTF/Hack-Regular.ttf", 0, &face);
+  sp_str_t font_path = sp_os_join_path(sp_os_get_executable_path(), sp_str_view("Hack-Regular.ttf"));
+  status = FT_New_Face(library, sp_str_to_cstr(font_path), 0, &face);
   if (status) {
     SP_FATAL("Failed to load face: {:fg brightblack}", SP_FMT_S32(status));
   }
-  FT_Set_Pixel_Sizes(face, 0, 24);
+  FT_Set_Pixel_Sizes(face, 0, 16);
 
 
-  sp_str_t text = sp_str_lit("hello");
+  sp_str_t text = sp_str_lit("hello, world!");
 
-  // Store character bitmap data
+  // Store character bitmap data and metrics
   unsigned char* bitmap_data[256];
   int char_widths[256];
   int char_heights[256];
-  int max_height = 0;
+  int char_bitmap_top[256];
+  int char_bitmap_left[256];
+  int max_ascender = 0;
+  int max_descender = 0;
 
   // Load all characters and copy bitmap data
   for (int i = 0; i < text.len; i++) {
@@ -46,6 +50,8 @@ int main() {
       bitmap_data[i] = SP_NULLPTR;
       char_widths[i] = 8;
       char_heights[i] = 0;
+      char_bitmap_top[i] = 0;
+      char_bitmap_left[i] = 0;
       continue;
     }
 
@@ -54,19 +60,28 @@ int main() {
 
     char_widths[i] = bitmap->width;
     char_heights[i] = bitmap->rows;
+    char_bitmap_top[i] = face->glyph->bitmap_top;
+    char_bitmap_left[i] = face->glyph->bitmap_left;
 
     // Copy bitmap data
     int data_size = bitmap->width * bitmap->rows;
     bitmap_data[i] = malloc(data_size);
     memcpy(bitmap_data[i], bitmap->buffer, data_size);
 
-    if (bitmap->rows > max_height) {
-      max_height = bitmap->rows;
+    // Track max ascender and descender for baseline alignment
+    if (face->glyph->bitmap_top > max_ascender) {
+      max_ascender = face->glyph->bitmap_top;
+    }
+    int descender = char_heights[i] - face->glyph->bitmap_top;
+    if (descender > max_descender) {
+      max_descender = descender;
     }
   }
 
-  // Render line by line
-  for (int y = 0; y < max_height; y++) {
+  int total_height = max_ascender + max_descender;
+
+  // Render line by line with proper baseline alignment
+  for (int y = 0; y < total_height; y++) {
     for (int i = 0; i < text.len; i++) {
       if (bitmap_data[i] == SP_NULLPTR) {
         // Space character
@@ -74,13 +89,25 @@ int main() {
           printf(" ");
         }
       } else {
+        // Calculate the y position in the character's bitmap based on baseline
+        int char_y = y - (max_ascender - char_bitmap_top[i]);
+
         for (int x = 0; x < char_widths[i]; x++) {
-          if (y < char_heights[i]) {
-            unsigned char pixel = bitmap_data[i][y * char_widths[i] + x];
-            if (pixel > 128) printf("#");
-            else if (pixel > 64) printf("*");
-            else if (pixel > 32) printf(".");
+          if (char_y >= 0 && char_y < char_heights[i]) {
+            unsigned char pixel = bitmap_data[i][char_y * char_widths[i] + x];
+
+            // Convert to grayscale and use truecolor terminal escapes
+            int gray = pixel;
+            printf("\033[38;2;%d;%d;%dm", gray, gray, gray);
+
+            // Use Unicode block characters based on brightness
+            if (pixel > 192) printf("█");      // Full block
+            else if (pixel > 128) printf("▓"); // Dark shade
+            else if (pixel > 64) printf("▒");  // Medium shade
+            else if (pixel > 32) printf("░");  // Light shade
             else printf(" ");
+
+            printf("\033[0m"); // Reset color
           } else {
             printf(" ");
           }
