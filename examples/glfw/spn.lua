@@ -1,8 +1,13 @@
 local project = {
   name = 'glfw',
-  deps = {
-    glfw = {},
+  system_deps = {
+    'GL',
   },
+  deps = {
+    glfw = {
+      kind = 'static'
+    },
+  }
 }
 
 return project

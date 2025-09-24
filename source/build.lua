@@ -87,7 +87,7 @@ function module:sh(config)
   c.spn.sh.wait(context)
 
   if context.result.return_code ~= 0 then
-    dbg()
+    error()
   end
 end
 

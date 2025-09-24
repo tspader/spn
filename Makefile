@@ -217,7 +217,7 @@ define build_example
 	@echo
 
 	@mkdir -p ./build/examples/$(1)
-	$(call print_and_run,$(BOOTSTRAPPED_SPN) -C ./examples/$(1) build)
+	$(call print_and_run,$(BOOTSTRAPPED_SPN) -C ./examples/$(1) --no-interactive build)
 	$(call print_and_run,$(BOOTSTRAPPED_SPN) -C ./examples/$(1) copy ./build/examples/$(1))
 	$(call print_and_run,$(2) ./examples/$(1)/main.* -g -o ./build/examples/$(1)/main $$($(BOOTSTRAPPED_SPN) -C ./examples/$(1) print) -lm)
 	@echo

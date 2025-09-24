@@ -10,13 +10,15 @@
 - `make bootstrap` only needed on a fresh clone; builds SDL, LuaJIT, and seeds `build/bin/spn`.
 - `make build` recompiles the CLI with the existing bootstrapper; run before pushing to ensure a clean binary.
 - `make install` installs `spn` to `${HOME}/.local/bin`; use `make uninstall` to remove it.
-- `make examples` validates recipes by compiling each sample into `build/examples/<name>`.
-- `spn init`, `spn add <pkg>`, `spn build`, and `spn print --compiler gcc` exercise the CLI; quote them when documenting behaviour.
+- `make $example` builds a single example and puts the binary in `build/examples/$example/main`
+- `make examples` validates recipes by compiling each sample into `build/examples/$example/main`
+- `spn --no-interactive build`, and `spn print --compiler gcc` exercise the CLI; quote them when documenting behaviour.
 
 ## Coding Style & Naming Conventions
 - C sources use two-space indentation, snake_case for functions, and uppercase macros; prefer `spn_`/`sp_` prefixes for new APIs.
 - Lua modules mirror that casing and start with `local module = {}`; keep tables immutable unless mutation is explicit.
-- Keep includes grouped by domain (platform, libs, project) and favour early returns for error paths.
+- NEVER ADD OR USE THE C STANDARD LIBRARY; ALWAYS USE SP.H
+- NEVER COMMENT
 
 ## Testing Guidelines
 - No formal unit suite yet; rely on `make build` plus targeted `make examples` runs that cover the recipes you touched.
@@ -24,3 +26,4 @@
 
 ## Commit & Pull Request Guidelines
 - NEVER RUN GIT. NEVER COMMIT ANYTHING, EVER. NEVER ADD. NEVER, EVER RUN GIT.
+- NEVER COMMENT

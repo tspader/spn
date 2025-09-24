@@ -337,6 +337,7 @@ function module.load()
 
     typedef struct {
       sp_str_t name;
+      sp_str_t* system_deps;
       spn_dep_spec_t* deps;
     } spn_project_t;
 

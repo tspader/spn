@@ -165,6 +165,7 @@ function spn.init(app)
       spn.recipes[name] = dofile(entry.file_path:cstr())
     end
   end
+
   -- Read this project
   spn.project = dofile(app.paths.project.config:cstr())
 
@@ -179,6 +180,11 @@ function spn.init(app)
   end
 
   app.project.name = sp.str.from_cstr(spn.project.name)
+  if spn.project.system_deps then
+    for dep_name in spn.iterator.values(spn.project.system_deps) do
+      app.project.system_deps = sp.dyn_array.push(app.project.system_deps, sp.str.from_cstr(dep_name))
+    end
+  end
 
   -- Read each dep used by the project
   for name, spec in pairs(spn.project.deps) do
