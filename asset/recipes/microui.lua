@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'rxi/microui',
-  lib = 'microui',
+  libs = { 'microui' },
   kinds = { 'source' },
   include = {
     vendor = true,
@@ -11,6 +11,7 @@ local recipe = spn.recipes.basic({
     builder:copy({
       { builder:source('src/microui.h'), builder:include() },
       { builder:source('src/microui.c'), builder:vendor() },
+      { builder:source('demo'), builder:vendor() },
     })
   end,
 })

@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'bellard/quickjs',
-  lib = 'quickjs',
+  libs = { 'quickjs' },
   kinds = { 'static' },
   build = function(builder)
     builder:make({

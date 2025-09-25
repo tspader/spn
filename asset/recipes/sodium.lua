@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'jedisct1/libsodium',
-  lib = 'sodium',
+  libs = { 'sodium' },
   kinds = { 'shared', 'static' },
   build = function(builder)
     local shared = builder.kind == 'shared'

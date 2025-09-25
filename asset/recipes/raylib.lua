@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'raysan5/raylib',
-  lib = 'raylib',
+  libs = { 'raylib' },
   kinds = { 'shared', 'static' },
   build = function(builder)
     local shared = builder.kind == 'shared'
@@ -20,6 +20,7 @@ local recipe = spn.recipes.basic({
       { builder:source('src/rlgl.h'), builder:include() },
       { builder:source('src/raymath.h'), builder:include() },
       { builder:source('src/extras'), builder:include() },
+      { builder:source('examples'), builder:vendor() },
       { builder:store('lib/libraylib.*'), builder:lib() },
     })
   end,

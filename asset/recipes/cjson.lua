@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'DaveGamble/cJSON',
-  lib = 'cjson',
+  libs = { 'cjson' },
   kinds = { 'source' },
   include = {
     vendor = true,

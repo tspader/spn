@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'antirez/linenoise',
-  lib = 'linenoise',
+  libs = { 'linenoise' },
   kinds = { 'source' },
   include = {
     vendor = true,

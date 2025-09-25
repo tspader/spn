@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'ggml-org/whisper.cpp',
-  lib = 'whisper',
+  libs = { 'whisper' },
   kinds = { 'shared', 'static' },
   build = function(builder)
     builder:cmake({

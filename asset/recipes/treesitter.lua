@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'tree-sitter/tree-sitter',
-  lib = 'tree-sitter',
+  libs = { 'tree-sitter' },
   kinds = { 'static' },
   build = function(builder)
     builder:make({

@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'freetype/freetype',
-  lib = 'freetype',
+  libs = { 'freetype' },
   kinds = { 'shared', 'static' },
   build = function(builder)
     local shared = builder.kind == 'shared'

@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'curl/curl',
-  lib = 'curl',
+  libs = { 'curl' },
   kinds = { 'shared', 'static' },
   build = function(builder)
     local shared = builder.kind == 'shared'

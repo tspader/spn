@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'richgel999/miniz',
-  lib = 'miniz',
+  libs = { 'miniz' },
   kinds = { 'source' },
   include = {
     vendor = true,

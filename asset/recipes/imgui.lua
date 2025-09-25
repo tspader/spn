@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local config = spn.recipes.basic({
   git = 'ocornut/imgui',
-  lib = 'imgui',
+  libs = { 'imgui' },
   kinds = {
     'source',
     'shared',

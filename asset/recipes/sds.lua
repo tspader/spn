@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'antirez/sds',
-  lib = 'sds',
+  libs = { 'sds' },
   kinds = { 'source' },
   include = {
     vendor = true,

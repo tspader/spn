@@ -5,7 +5,7 @@ local config = spn.recipes.basic({
   git = 'msgpack/msgpack-c',
   branch = 'c_master',
   kinds = { 'shared', 'static' },
-  lib = 'msgpack-c',
+  libs = { 'msgpack-c' },
   build = function(builder)
     builder:cmake({
       install = true

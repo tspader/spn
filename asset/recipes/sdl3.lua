@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'libsdl-org/SDL',
-  lib = 'SDL3',
+  libs = { 'SDL3' },
   kinds = { 'shared', 'static' },
   build = function(builder)
     builder:cmake({

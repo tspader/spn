@@ -3,7 +3,7 @@ local spn = require('spn')
 local recipe = spn.recipes.basic({
   git = 'LuaJIT/LuaJIT',
   kinds = { 'static', 'shared' },
-  lib = 'luajit',
+  libs = { 'luajit' },
   build = function(builder)
     -- mike.......
     builder:sh({
