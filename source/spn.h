@@ -1869,20 +1869,20 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_build_context_t* dep) {
       sp_str_t error = dep->error.len ? dep->error : SP_LIT("No error reported");
 
       status = sp_format(
-        "{} {:color brightgreen} {:color brightblack} {} {:color brightcyan} {:color brightred}",
+      "{} {:fg red} use {:fg yellow} {:fg yellow} to output the build log; or use {:fg yellow} {:fg yellow}",
         SP_FMT_STR(name),
         SP_FMT_STR(state),
-        SP_FMT_STR(dep->commits.resolved),
-        SP_FMT_STR(dep->commits.message),
-        SP_FMT_STR(dep->paths.store),
-        SP_FMT_STR(error)
-      );
+      SP_FMT_CSTR("spn ls --log"),
+      SP_FMT_STR(dep->info->name),
+      SP_FMT_CSTR("spn which --dir work"),
+      SP_FMT_STR(dep->info->name)
+    );
       break;
     }
     case SPN_DEP_BUILD_STATE_DONE: {
       if (tui->state == SPN_TUI_STATE_INTERACTIVE) {
         status = sp_format(
-          "{} {:color brightgreen} {:color brightblack} {} {:color brightyellow} {:color brightcyan}",
+          "{} {:color green} {:color brightblack} {} {:color brightyellow} {:color brightcyan}",
           SP_FMT_STR(name),
           SP_FMT_STR(state),
           SP_FMT_STR(dep->commits.resolved),
@@ -1893,7 +1893,7 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_build_context_t* dep) {
       }
       else {
         status = sp_format(
-          "{} {:color brightgreen}",
+          "{} {:color green}",
           SP_FMT_STR(name),
           SP_FMT_STR(state)
         );
@@ -2253,10 +2253,15 @@ s32 spn_dep_context_build_async(void* user_data) {
 
   const c8* chunk = "require('spn').internal.build(...)";
   if (luaL_loadstring(dep->lua.state, chunk) != LUA_OK) {
+    const c8* error = lua_tostring(dep->lua.state, -1);
+    if (error) {
+      SDL_WriteIO(dep->std.out, error, sp_cstr_len(error));
+    }
+
     spn_dep_context_set_build_error(dep, sp_format(
-      "{:fg brightred}: {:fg brightblack}",
-      SP_FMT_CSTR("failed"),
-      SP_FMT_CSTR(lua_tostring(dep->lua.state, -1))
+      "{:fg brightyellow} {:fg brightblack}",
+      SP_FMT_CSTR("spn ls --log"),
+      SP_FMT_STR(dep->info->name)
     ));
     return 1;
   }
@@ -2264,11 +2269,22 @@ s32 spn_dep_context_build_async(void* user_data) {
   lua_pushlightuserdata(dep->lua.state, &app.context);
   lua_pushlightuserdata(dep->lua.state, dep);
   if (lua_pcall(dep->lua.state, 2, 0, 0) != 0) {
-    spn_dep_context_set_build_error(dep, sp_format(
-      "{:fg brightred}: {:fg brightblack}",
-      SP_FMT_CSTR("failed"),
-      SP_FMT_CSTR(lua_tostring(dep->lua.state, -1))
-    ));
+    const c8* error = lua_tostring(dep->lua.state, -1);
+    if (error) {
+      sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+      sp_str_builder_new_line(&builder);
+      sp_str_builder_new_line(&builder);
+      sp_str_builder_append_fmt(
+        &builder,
+        "spn: the build failed, and this is the error from lua: {}",
+        SP_FMT_CSTR(error)
+      );
+      SDL_WriteIO(dep->std.out, builder.buffer.data, builder.buffer.count);
+    }
+
+    error = error ? error : "";
+    spn_dep_context_set_build_error(dep, sp_str_view(error));
+
     return 1;
   }
   lua_pop(dep->lua.state, 2);

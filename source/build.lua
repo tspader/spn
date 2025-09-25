@@ -61,7 +61,7 @@ function module:sh(config)
   c.spn.sh.wait(context)
 
   if context.result.return_code ~= 0 then
-    error('cum')
+    error(string.format('failed with return code %d', context.result.return_code))
   end
 end
 
