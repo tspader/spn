@@ -9,11 +9,14 @@ module.__index = module
 -------------
 -- BUILDER --
 -------------
-function module.new(dep)
+function module.new(dep, recipe)
   local self = setmetatable({}, module)
+  self.recipe = recipe
+  self.options = recipe.spec.options
+  self.kind = recipe.spec.kind
+
   self.dep = dep
   self.name = dep.info.name:cstr()
-  self.kind = c.spn.dep.build_kind_to_str(dep.spec.kind):cstr()
   self.paths = {
     recipe = dep.info.paths.recipe:cstr(),
     source = dep.paths.source:cstr(),
@@ -27,35 +30,7 @@ function module.new(dep)
 end
 
 function module:build()
-  self.recipe = dofile(self.paths.recipe)
-
-  if self.recipe.build then
-    self.recipe.build(self)
-  end
-
-  if self.recipe.copy then
-    for to_id, entries in iterator.pairs(self.recipe.copy) do
-      local store = sp.str.from_cstr(self.paths[to_id])
-
-      for from_id, files in iterator.pairs(entries) do
-        local source = sp.str.from_cstr(self.paths[from_id])
-
-        for file_path in iterator.values(files) do
-          local from = sp.os.join_path(source, sp.str.from_cstr(file_path))
-
-          local target_name = sp.os.extract_file_name(sp.str.from_cstr(file_path))
-          local to = sp.os.join_path(store, target_name)
-
-          if sp.os.is_directory(from) then
-            sp.os.copy_directory(from, to)
-          elseif sp.os.is_regular_file(from) then
-            sp.os.copy_file(from, to)
-          end
-        end
-      end
-    end
-  end
-
+  self.recipe.build(self)
 end
 
 ----------------
@@ -86,7 +61,7 @@ function module:sh(config)
   c.spn.sh.wait(context)
 
   if context.result.return_code ~= 0 then
-    error()
+    error('cum')
   end
 end
 

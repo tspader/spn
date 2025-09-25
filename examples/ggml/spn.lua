@@ -4,6 +4,13 @@ local project = {
     ggml = {
       include = {
         vendor = true
+      },
+      options = {
+        backends = {
+          cuda = true,
+          cpu = true,
+          metal = true,
+        }
       }
     },
   },

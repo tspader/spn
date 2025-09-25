@@ -1,3 +1,4 @@
+local dbg = require('debugger')
 ---@class sp_lua_stack_t
 local sp_lua_stack_t = {}
 sp_lua_stack_t.__index = sp_lua_stack_t
@@ -5,21 +6,7 @@ sp_lua_stack_t.__index = sp_lua_stack_t
 ---@param v any
 ---@return string
 local hash_anything = function(v)
-	if type(v) == 'table' then
-	  if not v then return '0x00000000' end
-
-    local str = tostring(v)
-    local parts = {}
-    for match in string.gmatch(str, ' ') do
-      table.insert(parts, match)
-    end
-
-    local address = parts[2]
-
-	  return address
-  else
-    return tostring(v)
-	end
+  return tostring(v)
 end
 
 function sp_lua_stack_t:new()
@@ -53,6 +40,7 @@ function sp_lua_stack_t:push(item)
   table.insert(self.stack, item)
 
   local hash = hash_anything(item)
+  if not hash then dbg() end
   self.visited[hash] = true
 end
 

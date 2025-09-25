@@ -1080,7 +1080,10 @@ sp_str_t spn_gen_build_entry_for_dep(spn_dep_build_context_t* dep, spn_gen_entry
           sp_os_lib_kind_t kind = (sp_os_lib_kind_t)dep->spec->kind;
 
           sp_dyn_array_for(dep->info->libs, index) {
-            sp_dyn_array_push(entries, sp_os_lib_to_file_name(dep->info->libs[index], kind));
+            sp_str_t lib = dep->info->libs[index];
+            lib = sp_os_lib_to_file_name(lib, kind);
+            lib = sp_os_join_path(dep->paths.lib, lib);
+            sp_dyn_array_push(entries, lib);
           }
           break;
         }
@@ -1548,7 +1551,7 @@ void spn_cli_command_recipe(spn_cli_t* cli) {
   if (!file_data) {
     SP_FATAL("failed to read recipe file: {:fg brightyellow}", SP_FMT_STR(recipe_path));
   }
-  
+
   printf("%.*s", (int)file_size, file_data);
   SDL_free(file_data);
 }
@@ -2258,8 +2261,9 @@ s32 spn_dep_context_build_async(void* user_data) {
     return 1;
   }
 
+  lua_pushlightuserdata(dep->lua.state, &app.context);
   lua_pushlightuserdata(dep->lua.state, dep);
-  if (lua_pcall(dep->lua.state, 1, 0, 0) != 0) {
+  if (lua_pcall(dep->lua.state, 2, 0, 0) != 0) {
     spn_dep_context_set_build_error(dep, sp_format(
       "{:fg brightred}: {:fg brightblack}",
       SP_FMT_CSTR("failed"),
@@ -2513,8 +2517,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   lua_pushlightuserdata(app->lua.state, &app->context);
   if (lua_pcall(app->lua.state, 1, 0, 0) != 0) {
     SP_FATAL(
-      "{:fg brightblack} failed: {:fg brightred}",
-      SP_FMT_CSTR(chunk),
+      "Loading project failed in Lua: {:fg brightblack}",
       SP_FMT_CSTR(lua_tostring(app->lua.state, -1))
     );
   }

@@ -71,7 +71,9 @@ local spn_lua_dep_builder_t = require('build')
 ---@field kinds string[]
 ---@field include spn_lua_dep_include_t
 ---@field branch string
+---@field options table
 ---@field build fun(spn_lua_dep_build_t): nil
+---@field configure fun(table): nil
 
 ---@class spn_lua_recipe_config_t
 ---@field git string
@@ -79,7 +81,9 @@ local spn_lua_dep_builder_t = require('build')
 ---@field include? spn_lua_dep_include_t
 ---@field libs? string[]
 ---@field branch? string
+---@field options? table
 ---@field build fun(spn_lua_dep_build_t): nil | nil
+---@field configure? fun(table): nil
 
 ---@class spn_lua_single_header_config_t : spn_lua_recipe_config_t
 ---@field header string
@@ -90,11 +94,14 @@ local spn_lua_dep_builder_t = require('build')
 ------------
 local spn = {
   recipes = {},
-  lock_file = {},
+  lock_file = {
+    deps = {}
+  },
   project = {
     name = '',
     deps = {},
   },
+  config = {},
 
   iterator = require('iterator'),
   dir = {
@@ -113,13 +120,9 @@ local spn = {
 ----------
 -- INIT --
 ----------
-function spn.init(app)
-  c.load()
+function spn.load()
+  local app = spn.app
 
-  -- Load the project agnostic user config
-  app = ffi.cast('spn_lua_context_t*', app)
-  spn.app = app
-  local config = {}
   local loader = loadfile(app.paths.user_config:cstr())
   if loader then
     local ok, result = pcall(loader)
@@ -127,73 +130,92 @@ function spn.init(app)
       error(string.format('failed to evaluate user config %s: %s', app.paths.user_config:cstr(), result))
     end
     if type(result) == 'table' then
-      config = result
+      spn.config = result
     end
   end
 
-  if config.spn then
-    app.config.paths.spn = sp.str.from_cstr(config.spn)
+  local chunk, _ = loadfile(app.paths.project.config:cstr())
+  if chunk then
+    local _, project = pcall(chunk)
+    spn.project = project
+  end
+  spn.project = dofile(app.paths.project.config:cstr())
+
+  local chunk, _ = loadfile(app.paths.project.lock:cstr())
+  if chunk then
+    local _, lock_file = pcall(chunk)
+    spn.lock_file = lock_file
   end
 
-  if config.pull_recipes then
-    app.config.pull_recipes = config.pull_recipes
-  end
-
-  if config.pull_deps then
-    app.config.pull_deps = config.pull_deps
-  end
-
-  -- Read all recipes
   local entries = sp.os.scan_directory(app.paths.recipes)
   for index = 0, entries.count - 1 do
     local entry = entries.data[index]
     local extension = sp.os.extract_extension(entry.file_name)
+
     if sp.str.equal_cstr(extension, "lua") then
       local recipe = dofile(entry.file_path:cstr())
+      recipe.name = sp.os.extract_stem(entry.file_name):cstr()
+      recipe.file_path = entry.file_path:cstr()
 
-      local dep = ffi.new('spn_dep_info_t')
-      dep.name = sp.os.extract_stem(entry.file_name)
-      dep.git = sp.str.from_cstr(recipe.git)
-      dep.branch = sp.str.from_cstr(recipe.branch)
-      dep.paths.source = sp.os.join_path(app.paths.source, dep.name)
-      dep.paths.recipe = sp.str.copy(entry.file_path)
-
-      for lib in spn.iterator.values(recipe.libs) do
-        dep.libs = sp.dyn_array.push(dep.libs, sp.str.from_cstr(lib))
-      end
-
-      app.deps[0] = sp.dyn_array.push(app.deps[0], dep)
-
-      local name = dep.name:cstr()
-      spn.recipes[name] = dofile(entry.file_path:cstr())
+      spn.recipes[recipe.name] = recipe
     end
   end
 
-  -- Read this project
-  spn.project = dofile(app.paths.project.config:cstr())
+  for name, spec in pairs(spn.project.deps) do
+    local recipe = spn.recipes[name]
+    recipe.spec = {
+      kind = spec.kind or recipe.kinds[1],
+      include = spn.merge(recipe.include, spec.include),
+      options = spn.merge(recipe.options, spec.options),
+    }
+    recipe:configure()
+  end
+end
 
-  spn.lock_file = {
-    deps = {}
-  }
+function spn.parse()
+  local app = spn.app
 
-  local chunk, err = loadfile(app.paths.project.lock:cstr())
-  if chunk then
-    local ok, lock_file = pcall(chunk)
-    spn.lock_file = lock_file
+  -- User config
+  if spn.config.spn then
+    app.config.paths.spn = sp.str.from_cstr(spn.config.spn)
   end
 
+  if spn.config.pull_recipes then
+    app.config.pull_recipes = spn.config.pull_recipes
+  end
+
+  if spn.config.pull_deps then
+    app.config.pull_deps = spn.config.pull_deps
+  end
+
+  -- Project file
   app.project.name = sp.str.from_cstr(spn.project.name)
+
   if spn.project.system_deps then
     for dep_name in spn.iterator.values(spn.project.system_deps) do
       app.project.system_deps = sp.dyn_array.push(app.project.system_deps, sp.str.from_cstr(dep_name))
     end
   end
 
-  -- Read each dep used by the project
-  for name, spec in pairs(spn.project.deps) do
-    ---@cast spec spn_lua_dep_t
+  -- Dependencies
+  for name in spn.iterator.keys(spn.project.deps) do
+    local recipe = spn.recipes[name]
 
-    -- Copy what we need from the table into a struct
+    local dep = ffi.new('spn_dep_info_t')
+    dep.name = sp.str.from_cstr(recipe.name)
+    dep.git = sp.str.from_cstr(recipe.git)
+    dep.branch = sp.str.from_cstr(recipe.branch)
+    dep.paths.source = sp.os.join_path(app.paths.source, dep.name)
+    dep.paths.recipe = sp.str.from_cstr(recipe.file_path)
+
+    for lib in spn.iterator.values(recipe.libs) do
+      dep.libs = sp.dyn_array.push(dep.libs, sp.str.from_cstr(lib))
+    end
+
+    app.deps[0] = sp.dyn_array.push(app.deps[0], dep)
+  end
+
+  for name in spn.iterator.keys(spn.project.deps) do
     local recipe = spn.recipes[name]
 
     local dep = ffi.new('spn_dep_spec_t')
@@ -204,30 +226,19 @@ function spn.init(app)
       dep.lock = sp.str.from_cstr(lock.commit)
     end
 
-    local kind = spec.kind or recipe.kinds[1]
-    dep.kind = c.spn.dep.build_kind_from_str(sp.str.from_cstr(kind))
+    dep.kind = c.spn.dep.build_kind_from_str(sp.str.from_cstr(recipe.spec.kind))
 
-    local include = {}
-    for key, value in spn.iterator.pairs(recipe.include) do
-      include[key] = value
-    end
-    if spec.include then
-      for key, value in spn.iterator.pairs(spec.include) do
-        include[key] = value
-      end
-    end
-
-    dep.include.include = include.include
-    dep.include.vendor = include.vendor
-    dep.include.store = include.store
+    dep.include.include = recipe.spec.include.include
+    dep.include.vendor = recipe.spec.include.vendor
+    dep.include.store = recipe.spec.include.store
 
     -- Hash name and everything in the options table
     local values = {}
     table.insert(values, name)
-    table.insert(values, kind)
+    table.insert(values, recipe.spec.kind)
 
     local stack = sp_lua_stack_t:new()
-    stack:push(spec.options)
+    stack:push(recipe.spec.options)
 
     while not stack:is_empty() do
       local t = stack:pop()
@@ -236,11 +247,12 @@ function spn.init(app)
         if type(value) == 'table' then
           stack:push(value)
         else
-          table.insert(values, key)
-          table.insert(values, value)
+          table.insert(values, string.format('%s:%s', key, value))
         end
       end
     end
+
+    table.sort(values)
 
     local hashes = ffi.new('sp_hash_t* [1]')
     local hash = ffi.new('sp_hash_t [1]')
@@ -257,11 +269,26 @@ function spn.init(app)
   end
 end
 
-function spn.build(dep)
-  -- Load the FFI again; each dep gets its own Lua context
+function spn.context(app)
   c.load()
 
-  local builder = spn_lua_dep_builder_t.new(ffi.cast('spn_dep_build_context_t*', dep))
+  app = ffi.cast('spn_lua_context_t*', app)
+  spn.app = app
+end
+
+function spn.init(app)
+  spn.context(app)
+  spn.load()
+  spn.parse()
+end
+
+function spn.build(app, dep)
+  spn.context(app)
+  spn.load()
+
+  dep = ffi.cast('spn_dep_build_context_t*', dep)
+  local recipe = spn.recipes[dep.info.name:cstr()]
+  local builder = spn_lua_dep_builder_t.new(dep, recipe)
   builder:build()
 end
 
@@ -327,6 +354,27 @@ function spn.ternary(value, default_value)
   return value
 end
 
+function spn.merge(base, apply)
+  if type(base) ~= 'table' or type(apply) ~= 'table' then
+    return base
+  end
+
+  local result = {}
+  for k, v in pairs(base) do
+    result[k] = v
+  end
+
+  for k, v in pairs(apply) do
+    if type(v) == 'table' and type(result[k]) == 'table' then
+      result[k] = spn.merge(result[k], v)
+    else
+      result[k] = v
+    end
+  end
+
+  return result
+end
+
 ---@param config spn_lua_recipe_config_t
 ---@return spn_lua_recipe_t
 local basic = function(config)
@@ -340,14 +388,18 @@ local basic = function(config)
       store = false
     },
     branch = 'HEAD',
-    build = function() end
+    options = {},
+    build = function() end,
+    configure = function() end,
   }
 
   recipe.git = config.git
   recipe.libs = config.libs or recipe.libs
   recipe.kinds = config.kinds or recipe.kinds
   recipe.branch = config.branch or recipe.branch
+  recipe.options = config.options or recipe.options
   recipe.build = config.build or recipe.build
+  recipe.configure = config.configure or recipe.configure
   if config.include then
     recipe.include = {
       include = spn.ternary(config.include.include, recipe.include.include),
@@ -385,6 +437,7 @@ local module = {
     static = 'static',
     source = 'source'
   },
+  table_merge = spn_table_merge,
   internal = spn
 }
 
