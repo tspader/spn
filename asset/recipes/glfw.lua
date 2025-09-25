@@ -2,7 +2,7 @@ local spn = require('spn')
 
 local recipe = spn.recipes.basic({
   git = 'glfw/glfw',
-  lib = 'glfw3',
+  lib = 'glfw',
   kinds = { 'shared', 'static' },
   build = function(builder)
     local shared = builder.kind == 'shared'
@@ -15,6 +15,10 @@ local recipe = spn.recipes.basic({
         { 'GLFW_BUILD_WAYLAND', false },
       },
       install = true,
+    })
+
+    builder:copy({
+      { builder:lib('libglfw3.a'), builder:lib('libglfw.a') }
     })
 
   end,

@@ -1,11 +1,10 @@
 local project = {
-  name = 'glfw',
+  name = 'glfw3',
   system_deps = {
     'GL',
   },
   deps = {
     glfw = {
-      kind = 'static'
     },
   }
 }
