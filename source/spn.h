@@ -1515,7 +1515,7 @@ void spn_cli_command_recipe(spn_cli_t* cli) {
     },
     (const c8* const []) {
       "spn recipe <package>",
-      "Print the recipe path for this package",
+      "Print the recipe contents for this package",
       SP_NULLPTR
     },
     SP_NULL
@@ -1542,7 +1542,15 @@ void spn_cli_command_recipe(spn_cli_t* cli) {
     SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(package));
   }
 
-  printf("%.*s", dep->info->paths.recipe.len, dep->info->paths.recipe.data);
+  sp_str_t recipe_path = dep->info->paths.recipe;
+  sp_size_t file_size = 0;
+  c8* file_data = (c8*)SDL_LoadFile(sp_str_to_cstr(recipe_path), &file_size);
+  if (!file_data) {
+    SP_FATAL("failed to read recipe file: {:fg brightyellow}", SP_FMT_STR(recipe_path));
+  }
+  
+  printf("%.*s", (int)file_size, file_data);
+  SDL_free(file_data);
 }
 
 void spn_cli_command_build(spn_cli_t* cli) {
