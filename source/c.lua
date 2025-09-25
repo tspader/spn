@@ -238,7 +238,7 @@ function module.load()
       sp_str_t name;
       sp_str_t git;
       sp_str_t branch;
-      sp_str_t lib;
+      sp_str_t* libs;
       spn_dep_paths_t paths;
     } spn_dep_info_t;
 

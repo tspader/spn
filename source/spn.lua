@@ -67,7 +67,7 @@ local spn_lua_dep_builder_t = require('build')
 ------------
 ---@class spn_lua_recipe_t
 ---@field git string
----@field lib string
+---@field libs string[]
 ---@field kinds string[]
 ---@field include spn_lua_dep_include_t
 ---@field branch string
@@ -77,7 +77,7 @@ local spn_lua_dep_builder_t = require('build')
 ---@field git string
 ---@field kinds? string[]
 ---@field include? spn_lua_dep_include_t
----@field lib? string
+---@field libs? string[]
 ---@field branch? string
 ---@field build fun(spn_lua_dep_build_t): nil | nil
 
@@ -154,10 +154,13 @@ function spn.init(app)
       local dep = ffi.new('spn_dep_info_t')
       dep.name = sp.os.extract_stem(entry.file_name)
       dep.git = sp.str.from_cstr(recipe.git)
-      dep.lib = sp.str.from_cstr(recipe.lib)
       dep.branch = sp.str.from_cstr(recipe.branch)
       dep.paths.source = sp.os.join_path(app.paths.source, dep.name)
       dep.paths.recipe = sp.str.copy(entry.file_path)
+
+      for lib in spn.iterator.values(recipe.libs) do
+        dep.libs = sp.dyn_array.push(dep.libs, sp.str.from_cstr(lib))
+      end
 
       app.deps[0] = sp.dyn_array.push(app.deps[0], dep)
 
@@ -329,7 +332,7 @@ end
 local basic = function(config)
   local recipe = {
     git = '',
-    lib = '',
+    libs = {},
     kinds = { 'shared', 'static', 'source' },
     include = {
       include = true,
@@ -341,7 +344,7 @@ local basic = function(config)
   }
 
   recipe.git = config.git
-  recipe.lib = config.lib or recipe.lib
+  recipe.libs = config.libs or recipe.libs
   recipe.kinds = config.kinds or recipe.kinds
   recipe.branch = config.branch or recipe.branch
   recipe.build = config.build or recipe.build

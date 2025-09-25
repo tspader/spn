@@ -1,6 +1,5 @@
 local ffi = require('ffi')
 local iterator = require('iterator')
-local dbg = require('debugger')
 local c = require('c')
 local sp = c.sp
 

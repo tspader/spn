@@ -4,6 +4,9 @@ local recipe = spn.recipes.basic({
   git = 'ggml-org/ggml',
   lib = 'ggml',
   kinds = { 'shared', 'static' },
+  options = {
+    backend = 'cpu', -- 'cuda', 'metal'
+  },
   build = function(builder)
     builder:cmake({
       install = true,

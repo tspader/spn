@@ -280,7 +280,7 @@ typedef struct {
   sp_str_t name;
   sp_str_t git;
   sp_str_t branch;
-  sp_str_t lib;
+  sp_dyn_array(sp_str_t) libs;
   spn_dep_paths_t paths;
 } spn_dep_info_t;
 
@@ -502,6 +502,10 @@ typedef struct {
 } spn_cli_ls_t;
 
 typedef struct {
+  const c8* package;
+} spn_cli_recipe_t;
+
+typedef struct {
   u32 num_args;
   const c8** args;
   const c8* project_directory;
@@ -514,6 +518,7 @@ typedef struct {
   spn_cli_build_t build;
   spn_cli_ls_t ls;
   spn_cli_which_t which;
+  spn_cli_recipe_t recipe;
 } spn_cli_t;
 
 void spn_cli_command_init(spn_cli_t* cli);
@@ -526,6 +531,7 @@ void spn_cli_command_copy(spn_cli_t* cli);
 void spn_cli_command_print(spn_cli_t* cli);
 void spn_cli_command_ls(spn_cli_t* cli);
 void spn_cli_command_which(spn_cli_t* cli);
+void spn_cli_command_recipe(spn_cli_t* cli);
 
 /////////
 // LUA //
@@ -1072,8 +1078,10 @@ sp_str_t spn_gen_build_entry_for_dep(spn_dep_build_context_t* dep, spn_gen_entry
         case SPN_DEP_BUILD_KIND_SHARED:
         case SPN_DEP_BUILD_KIND_STATIC: {
           sp_os_lib_kind_t kind = (sp_os_lib_kind_t)dep->spec->kind;
-          sp_str_t lib = sp_os_lib_to_file_name(dep->info->lib, kind);
-          sp_dyn_array_push(entries, sp_os_join_path(dep->paths.lib, lib));
+
+          sp_dyn_array_for(dep->info->libs, index) {
+            sp_dyn_array_push(entries, sp_os_lib_to_file_name(dep->info->libs[index], kind));
+          }
           break;
         }
         case SPN_DEP_BUILD_KIND_SOURCE: {
@@ -1438,7 +1446,7 @@ void spn_cli_command_ls(spn_cli_t* cli) {
   } else {
     dir_path = dep->paths.store;
   }
-  
+
   sp_sh_ls(dir_path);
 }
 
@@ -1481,7 +1489,7 @@ void spn_cli_command_which(spn_cli_t* cli) {
   }
 
   spn_dep_context_prepare(dep);
-  
+
   if (cli->which.dir) {
     spn_cache_dir_kind_t dir_kind = spn_dir_kind_from_str(sp_str_view(cli->which.dir));
     switch (dir_kind) {
@@ -1495,6 +1503,46 @@ void spn_cli_command_which(spn_cli_t* cli) {
   } else {
     printf("%.*s", dep->paths.store.len, dep->paths.store.data);
   }
+}
+
+void spn_cli_command_recipe(spn_cli_t* cli) {
+  struct argparse argparse;
+  argparse_init(
+    &argparse,
+    (struct argparse_option []) {
+      OPT_HELP(),
+      OPT_END()
+    },
+    (const c8* const []) {
+      "spn recipe <package>",
+      "Print the recipe path for this package",
+      SP_NULLPTR
+    },
+    SP_NULL
+  );
+  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+
+  if (cli->num_args < 1) {
+    if (app.build.deps) {
+      SP_FATAL(
+        "no package name specified; try {:fg brightyellow} {:fg yellow}",
+        SP_FMT_CSTR("spn recipe"),
+        SP_FMT_STR(app.build.deps[0].info->name)
+      );
+    }
+    else {
+      SP_FATAL("you have no dependencies lol");
+    }
+  }
+
+  sp_str_t package = sp_str_view(cli->args[0]);
+
+  spn_dep_build_context_t* dep = spn_build_context_find_dep(&app.build, package);
+  if (!dep) {
+    SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(package));
+  }
+
+  printf("%.*s", dep->info->paths.recipe.len, dep->info->paths.recipe.data);
 }
 
 void spn_cli_command_build(spn_cli_t* cli) {
@@ -2507,6 +2555,9 @@ void spn_app_run(spn_app_t* app) {
   }
   else if (sp_cstr_equal("which", cli->args[0])) {
     spn_cli_command_which(cli);
+  }
+  else if (sp_cstr_equal("recipe", cli->args[0])) {
+    spn_cli_command_recipe(cli);
   }
 }
 
