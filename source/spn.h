@@ -196,6 +196,9 @@ typedef enum {
   SPN_DIR_STORE,
   SPN_DIR_INCLUDE,
   SPN_DIR_VENDOR,
+  SPN_DIR_LIB,
+  SPN_DIR_SOURCE,
+  SPN_DIR_WORK,
 } spn_cache_dir_kind_t;
 
 typedef struct {
@@ -490,10 +493,12 @@ typedef struct {
 
 typedef struct {
   const c8* package;
+  const c8* dir;
 } spn_cli_which_t;
 
 typedef struct {
   const c8* package;
+  const c8* dir;
 } spn_cli_ls_t;
 
 typedef struct {
@@ -977,8 +982,11 @@ spn_cache_dir_kind_t spn_dir_kind_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "store"))    return SPN_DIR_STORE;
   else if (sp_str_equal_cstr(str, "include"))  return SPN_DIR_INCLUDE;
   else if (sp_str_equal_cstr(str, "vendor"))   return SPN_DIR_VENDOR;
+  else if (sp_str_equal_cstr(str, "lib"))      return SPN_DIR_LIB;
+  else if (sp_str_equal_cstr(str, "source"))   return SPN_DIR_SOURCE;
+  else if (sp_str_equal_cstr(str, "work"))      return SPN_DIR_WORK;
 
-  SP_FATAL("Unknown dir kind {:fg brightyellow}; options are [store, include, vendor]", SP_FMT_STR(str));
+  SP_FATAL("Unknown dir kind {:fg brightyellow}; options are [store, include, vendor, lib, source, work]", SP_FMT_STR(str));
 }
 
 spn_gen_entry_kind_t spn_gen_entry_from_str(sp_str_t str) {
@@ -1382,6 +1390,7 @@ void spn_cli_command_ls(spn_cli_t* cli) {
     &argparse,
     (struct argparse_option []) {
       OPT_HELP(),
+      OPT_STRING('d', "dir", &cli->ls.dir, "which directory to list (store, include, lib, source, work, vendor)", SP_NULLPTR),
       OPT_END()
     },
     (const c8* const []) {
@@ -1415,8 +1424,22 @@ void spn_cli_command_ls(spn_cli_t* cli) {
 
   spn_dep_context_prepare(dep);
 
-  sp_str_t store_path = dep->paths.store;
-  sp_sh_ls(store_path);
+  sp_str_t dir_path;
+  if (cli->ls.dir) {
+    spn_cache_dir_kind_t dir_kind = spn_dir_kind_from_str(sp_str_view(cli->ls.dir));
+    switch (dir_kind) {
+      case SPN_DIR_STORE:   { dir_path = dep->paths.store; break; }
+      case SPN_DIR_INCLUDE: { dir_path = dep->paths.include; break; }
+      case SPN_DIR_LIB:     { dir_path = dep->paths.lib; break; }
+      case SPN_DIR_VENDOR:  { dir_path = dep->paths.vendor; break; }
+      case SPN_DIR_SOURCE:  { dir_path = dep->paths.source; break; }
+      case SPN_DIR_WORK:    { dir_path = dep->paths.work; break; }
+    }
+  } else {
+    dir_path = dep->paths.store;
+  }
+  
+  sp_sh_ls(dir_path);
 }
 
 void spn_cli_command_which(spn_cli_t* cli) {
@@ -1425,6 +1448,7 @@ void spn_cli_command_which(spn_cli_t* cli) {
     &argparse,
     (struct argparse_option []) {
       OPT_HELP(),
+      OPT_STRING('d', "dir", &cli->which.dir, "which directory to show (store, include, lib, source, work, vendor)", SP_NULLPTR),
       OPT_END()
     },
     (const c8* const []) {
@@ -1457,7 +1481,20 @@ void spn_cli_command_which(spn_cli_t* cli) {
   }
 
   spn_dep_context_prepare(dep);
-  printf("%.*s", dep->paths.store.len, dep->paths.store.data);
+  
+  if (cli->which.dir) {
+    spn_cache_dir_kind_t dir_kind = spn_dir_kind_from_str(sp_str_view(cli->which.dir));
+    switch (dir_kind) {
+      case SPN_DIR_STORE:   { printf("%.*s", dep->paths.store.len, dep->paths.store.data); break; }
+      case SPN_DIR_INCLUDE: { printf("%.*s", dep->paths.include.len, dep->paths.include.data); break; }
+      case SPN_DIR_LIB:     { printf("%.*s", dep->paths.lib.len, dep->paths.lib.data); break; }
+      case SPN_DIR_VENDOR:  { printf("%.*s", dep->paths.vendor.len, dep->paths.vendor.data); break; }
+      case SPN_DIR_SOURCE:  { printf("%.*s", dep->paths.source.len, dep->paths.source.data); break; }
+      case SPN_DIR_WORK:    { printf("%.*s", dep->paths.work.len, dep->paths.work.data); break; }
+    }
+  } else {
+    printf("%.*s", dep->paths.store.len, dep->paths.store.data);
+  }
 }
 
 void spn_cli_command_build(spn_cli_t* cli) {
