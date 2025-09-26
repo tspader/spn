@@ -1615,6 +1615,8 @@ void spn_cli_command_build(spn_cli_t* cli) {
   sp_dyn_array_for(app.build.deps, i) {
     spn_dep_build_context_t* dep = &app.build.deps[i];
 
+    SDL_CloseIO(dep->std.out);
+
     switch (dep->state.build) {
       case SPN_DEP_BUILD_STATE_DONE: {
         break;
@@ -1623,20 +1625,14 @@ void spn_cli_command_build(spn_cli_t* cli) {
       default: {
         failed = true;
 
-        sp_size_t file_size = 0;
-        c8* file_data = (c8*)SDL_LoadFile(sp_str_to_cstr(dep->paths.std_err), &file_size);
-        if (!file_data) {
-          SP_FATAL(
-            "Failed to open {:fg brightcyan} while reporting error for {:fg brightcyan}",
-            SP_FMT_STR(dep->paths.std_err),
-            SP_FMT_STR(dep->info->name)
-          );
-        }
+        struct { sp_size_t size; c8* data; } buffer;
+        buffer.data = SDL_LoadFile(sp_str_to_cstr(dep->paths.std_out), &buffer.size);
 
         sp_str_builder_new_line(&builder);
-        sp_str_builder_append_fmt(&builder, "{:fg brightyellow}", SP_FMT_STR(dep->info->name));
+        sp_str_builder_append_fmt(&builder, "> {:fg brightyellow}", SP_FMT_STR(dep->info->name));
         sp_str_builder_new_line(&builder);
-        sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_CSTR(file_data));
+        sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_CSTR(buffer.data));
+        sp_log(sp_str_builder_write(&builder));
 
         SDL_RemovePath(sp_str_to_cstr(dep->paths.store));
 
@@ -1869,13 +1865,13 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_build_context_t* dep) {
       sp_str_t error = dep->error.len ? dep->error : SP_LIT("No error reported");
 
       status = sp_format(
-      "{} {:fg red} use {:fg yellow} {:fg yellow} to output the build log; or use {:fg yellow} {:fg yellow}",
+        "{} {:color red} {:color brightblack} {} {:color brightyellow} {:color brightcyan}",
         SP_FMT_STR(name),
         SP_FMT_STR(state),
-      SP_FMT_CSTR("spn ls --log"),
-      SP_FMT_STR(dep->info->name),
-      SP_FMT_CSTR("spn which --dir work"),
-      SP_FMT_STR(dep->info->name)
+        SP_FMT_STR(dep->commits.resolved),
+        SP_FMT_STR(dep->commits.message),
+        SP_FMT_U32(dep->commits.delta),
+        SP_FMT_STR(dep->paths.std_out)
     );
       break;
     }
@@ -2263,7 +2259,7 @@ s32 spn_dep_context_build_async(void* user_data) {
       SP_FMT_CSTR("spn ls --log"),
       SP_FMT_STR(dep->info->name)
     ));
-    return 1;
+    return 0;
   }
 
   lua_pushlightuserdata(dep->lua.state, &app.context);
@@ -2271,21 +2267,12 @@ s32 spn_dep_context_build_async(void* user_data) {
   if (lua_pcall(dep->lua.state, 2, 0, 0) != 0) {
     const c8* error = lua_tostring(dep->lua.state, -1);
     if (error) {
-      sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-      sp_str_builder_new_line(&builder);
-      sp_str_builder_new_line(&builder);
-      sp_str_builder_append_fmt(
-        &builder,
-        "spn: the build failed, and this is the error from lua: {}",
-        SP_FMT_CSTR(error)
-      );
-      SDL_WriteIO(dep->std.out, builder.buffer.data, builder.buffer.count);
+      SDL_WriteIO(dep->std.out, error, sp_cstr_len(error));
     }
 
-    error = error ? error : "";
-    spn_dep_context_set_build_error(dep, sp_str_view(error));
+    spn_dep_context_set_build_error(dep, sp_str_from_cstr(error ? error : ""));
 
-    return 1;
+    return 0;
   }
   lua_pop(dep->lua.state, 2);
 
@@ -2314,8 +2301,6 @@ s32 spn_dep_context_build_async(void* user_data) {
 
 
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
-  SDL_CloseIO(dep->std.err);
-  SDL_CloseIO(dep->std.out);
 
   return 0;
 }
