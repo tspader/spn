@@ -6,12 +6,12 @@ return {
       name = "argparse"
     },
     luajit = {
-      build_id = "c6caadc1",
+      build_id = "594c3c51",
       commit = "871db2c84e",
       name = "luajit"
     },
     sdl3 = {
-      build_id = "b5447ec7",
+      build_id = "ada9b33a",
       commit = "c39d772a07",
       name = "sdl3"
     },

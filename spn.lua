@@ -2,10 +2,12 @@ local project = {
   name = 'spn',
   deps = {
     sp = {},
-    sdl3 = {},
+    sdl3 = {
+      kind = 'static'
+    },
     argparse = {},
     luajit = {
-      kind = 'shared'
+      kind = 'static'
     }
   },
 }

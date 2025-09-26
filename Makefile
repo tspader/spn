@@ -32,18 +32,17 @@ ifeq ($(OS),Windows_NT)
   RPATH_FLAG :=
   IS_SPN_PREINSTALLED := $(shell where $(SPN_EXE) 2>NUL)
 else
-  HAS_BEAR := $(shell which bear 2>/dev/null)
+  CC := clang
+  CXX := g++
+  MAKE := make
+  CMAKE := cmake
 
+  HAS_BEAR := $(shell which bear 2>/dev/null)
   ifdef HAS_BEAR
-    CC := bear --append -- gcc
+    CC := bear --append -- $(CC)
     CXX := bear --append -- g++
     MAKE := bear --append -- make
     CMAKE := bear --append -- cmake
-	else
-    CC := gcc
-    CXX := g++
-    MAKE := make
-    CMAKE := cmake
 	endif
 
   SDL := libSDL3.a
@@ -51,13 +50,16 @@ else
   SPN_EXE := spn
   IS_SPN_PREINSTALLED := $(shell which $(SPN_EXE) 2>/dev/null)
 
-ifeq ($(shell uname),Darwin)
-  RPATH_FLAG := -Wl,-rpath,@loader_path
-endif
+  ifeq ($(shell uname),Darwin)
+    MACOSX_DEPLOYMENT_TARGET := 15.0
+    SYSTEM_LIBS := -framework CoreFoundation -framework Foundation -framework Cocoa -framework IOKit -framework GameController -framework ForceFeedback -framework AVFoundation -framework CoreAudio -framework AudioToolbox -framework Metal -framework MetalKit -framework Quartz -framework CoreHaptics -framework CoreMedia -framework Carbon -framework UniformTypeIdentifiers
+    RPATH_FLAG := -Wl,-rpath,@loader_path
+  endif
 
-ifeq ($(shell uname),Linux)
-  RPATH_FLAG := -Wl,-rpath,\$$ORIGIN
-endif
+  ifeq ($(shell uname),Linux)
+    RPATH_FLAG := -Wl,-rpath,\$$ORIGIN
+    SYSTEM_LIBS += -lm -lpthread -ldl -lelf
+  endif
 endif
 
 #########
@@ -94,7 +96,6 @@ FLAG_LANGUAGE := -std=c11
 FLAG_INCLUDES :=  -I$(SPN_DIR_SOURCE)
 FLAG_OUTPUT := -o $(SPN_BINARY)
 FLAG_OPTIMIZATION := -g -rdynamic
-SYSTEM_LIBS := -lm -lpthread -lelf -ldl
 CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_OPTIMIZATION) $(FLAG_INCLUDES) $(FLAG_OUTPUT)
 
 ###############
@@ -134,7 +135,7 @@ $(SPN_BINARY): $(SPN_DIR_SOURCE)/main.c $(SPN_DIR_SOURCE)/spn.h  | $(SPN_DIR_BUI
 	@echo
 
 	$(call print_and_run,$(BOOTSTRAPPED_SPN) build)
-	$(call print_and_run,$(CC) ./source/main.c $(CC_FLAGS) $$($(BOOTSTRAPPED_SPN) print --compiler gcc) $(SYSTEM_LIBS))
+	$(CC) ./source/main.c $(CC_FLAGS) $$($(BOOTSTRAPPED_SPN) print --compiler gcc) $(SYSTEM_LIBS)
 
 $(SPN_COMPILE_DB): $(SPN_MAKEFILE)
 
@@ -144,15 +145,7 @@ $(SPN_COMPILE_DB): $(SPN_MAKEFILE)
 ifeq ($(OS),Windows_NT)
   BOOTSTRAP_LIBS := $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT)/src/lua51.dll
 else ifeq ($(shell uname),Darwin)
-  MACOSX_DEPLOYMENT_TARGET := 15.0
-  MACOS_FRAMEWORKS := -framework CoreFoundation -framework Foundation -framework Cocoa \
-                      -framework IOKit -framework GameController -framework ForceFeedback \
-                      -framework AVFoundation -framework CoreAudio -framework AudioToolbox \
-                      -framework Metal -framework MetalKit -framework QuartzCore \
-                      -framework CoreHaptics -framework CoreMedia -framework Carbon -framework UniformTypeIdentifiers
-  BOOTSTRAP_LIBS := $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT)/src/libluajit.a -lm -ldl $(MACOS_FRAMEWORKS)
-
-	export MACOSX_DEPLOYMENT_TARGET
+  BOOTSTRAP_LIBS := $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT)/src/libluajit.a
 else
   BOOTSTRAP_LIBS := $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT)/src/libluajit.a
 endif
