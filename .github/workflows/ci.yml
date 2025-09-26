@@ -15,17 +15,13 @@ jobs:
     - run: |
         if [ "$EUID" -ne 0 ]; then SUDO=sudo; fi
         ${SUDO:-} apt-get update
-        ${SUDO:-} apt-get install -y build-essential cmake libelf-dev git
+        ${SUDO:-} apt-get install -y build-essential cmake libelf-dev git libssl-dev libpsl-dev build-essential
 
-    - run: make bootstrap CC=gcc MAKE=make CMAKE=cmake
+    - run: make bootstrap
 
-    - run: make build CC=gcc MAKE=make CMAKE=cmake
-
-    - run: |
-        mkdir -p ~/.config/spn
-        echo "return {}" > ~/.config/spn/spn.lua
-
-    - run: make build/examples/sdl CC=gcc MAKE=make CMAKE=cmake
+    - run: make install
+    
+    - run: make examples
 
     - uses: actions/upload-artifact@v4
       if: ${{ !env.ACT }}
