@@ -35,7 +35,7 @@ else
   HAS_BEAR := $(shell which bear 2>/dev/null)
 
   ifdef HAS_BEAR
-    CC := bear --append -- gcc
+    CC := bear --append -- clang
     CXX := bear --append -- g++
     MAKE := bear --append -- make
     CMAKE := bear --append -- cmake
@@ -94,7 +94,7 @@ FLAG_LANGUAGE := -std=c11
 FLAG_INCLUDES :=  -I$(SPN_DIR_SOURCE)
 FLAG_OUTPUT := -o $(SPN_BINARY)
 FLAG_OPTIMIZATION := -g -rdynamic
-SYSTEM_LIBS := -lm -lpthread -lelf -ldl
+SYSTEM_LIBS := -lm -lpthread -ldl
 CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_OPTIMIZATION) $(FLAG_INCLUDES) $(FLAG_OUTPUT)
 
 ###############

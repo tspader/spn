@@ -1,7 +1,7 @@
 local project = {
   name = 'glfw',
   system_deps = {
-    'GL',
+    '-Framework OpenGL',
   },
   deps = {
     glfw = {

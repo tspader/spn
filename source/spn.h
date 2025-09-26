@@ -46,50 +46,6 @@
   #include <string.h>
 #endif
 
-sp_str_t sp_elf_get_soname(sp_str_t path) {
-  if (elf_version(EV_CURRENT) == EV_NONE) return SP_ZERO_STRUCT(sp_str_t);
-
-  int fd = open(sp_str_to_cstr(path), O_RDONLY);
-  if (fd < 0) return SP_ZERO_STRUCT(sp_str_t);
-
-  Elf* elf = elf_begin(fd, ELF_C_READ, SP_NULLPTR);
-  if (!elf) {
-    close(fd);
-    return SP_ZERO_STRUCT(sp_str_t);
-  }
-
-  Elf_Scn* scn = SP_NULLPTR;
-  GElf_Shdr shdr;
-
-  while ((scn = elf_nextscn(elf, scn)) != SP_NULLPTR) {
-    if (gelf_getshdr(scn, &shdr) != &shdr) continue;
-    if (shdr.sh_type != SHT_DYNAMIC) continue;
-
-    Elf_Data* data = elf_getdata(scn, SP_NULLPTR);
-    if (!data) continue;
-
-    for (size_t i = 0; i < shdr.sh_size / shdr.sh_entsize; i++) {
-      GElf_Dyn dyn;
-      if (gelf_getdyn(data, i, &dyn) != &dyn) continue;
-      if (dyn.d_tag == DT_NULL) break;
-      if (dyn.d_tag != DT_SONAME) continue;
-
-      char* soname = elf_strptr(elf, shdr.sh_link, dyn.d_un.d_val);
-      SP_ASSERT(soname);
-
-      sp_str_t result = sp_str_from_cstr(soname);
-      elf_end(elf);
-      close(fd);
-
-      return result;
-    }
-  }
-
-  elf_end(elf);
-  close(fd);
-  return SP_ZERO_STRUCT(sp_str_t);
-}
-
 ///////////
 // SHELL //
 ///////////
@@ -1711,6 +1667,51 @@ void sp_os_copy_directory(sp_str_t from, sp_str_t to) {
 }
 
 #if defined(SP_LINUX)
+  sp_str_t sp_elf_get_soname(sp_str_t path) {
+    if (elf_version(EV_CURRENT) == EV_NONE) return SP_ZERO_STRUCT(sp_str_t);
+
+    int fd = open(sp_str_to_cstr(path), O_RDONLY);
+    if (fd < 0) return SP_ZERO_STRUCT(sp_str_t);
+
+    Elf* elf = elf_begin(fd, ELF_C_READ, SP_NULLPTR);
+    if (!elf) {
+      close(fd);
+      return SP_ZERO_STRUCT(sp_str_t);
+    }
+
+    Elf_Scn* scn = SP_NULLPTR;
+    GElf_Shdr shdr;
+
+    while ((scn = elf_nextscn(elf, scn)) != SP_NULLPTR) {
+      if (gelf_getshdr(scn, &shdr) != &shdr) continue;
+      if (shdr.sh_type != SHT_DYNAMIC) continue;
+
+      Elf_Data* data = elf_getdata(scn, SP_NULLPTR);
+      if (!data) continue;
+
+      for (size_t i = 0; i < shdr.sh_size / shdr.sh_entsize; i++) {
+        GElf_Dyn dyn;
+        if (gelf_getdyn(data, i, &dyn) != &dyn) continue;
+        if (dyn.d_tag == DT_NULL) break;
+        if (dyn.d_tag != DT_SONAME) continue;
+
+        char* soname = elf_strptr(elf, shdr.sh_link, dyn.d_un.d_val);
+        SP_ASSERT(soname);
+
+        sp_str_t result = sp_str_from_cstr(soname);
+        elf_end(elf);
+        close(fd);
+
+        return result;
+      }
+    }
+
+    elf_end(elf);
+    close(fd);
+    return SP_ZERO_STRUCT(sp_str_t);
+  }
+
+
   sp_str_t sp_os_lib_kind_to_extension(sp_os_lib_kind_t kind) {
     switch (kind) {
       case SP_OS_LIB_SHARED: return SP_LIT("so");
