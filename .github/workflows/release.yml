@@ -1,0 +1,75 @@
+name: Release builds
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.allow_failure }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-x86_64
+            allow_failure: false
+            setup_script: |
+              sudo apt-get update
+              sudo apt-get install -y \
+                build-essential \
+                gcc \
+                g++ \
+                make \
+                cmake \
+                git \
+                pkg-config \
+                libelf-dev \
+                libssl-dev \
+                libpsl-dev
+          - os: macos-latest
+            label: macos-universal
+            allow_failure: true
+            setup_script: |
+              brew update
+              brew install cmake sdl3 luajit pkg-config libpsl
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          ${{ matrix.setup_script }}
+
+      - name: Build
+        run: make bootstrap
+
+      - name: Prepare artifact
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp build/bin/spn "dist/spn-${{ matrix.label }}"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: spn-${{ matrix.label }}
+          path: dist/spn-${{ matrix.label }}
+
+      - name: Upload release asset
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: dist/spn-${{ matrix.label }}
+          asset_name: spn-${{ matrix.label }}
+          asset_content_type: application/octet-stream
