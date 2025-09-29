@@ -12,3 +12,5 @@ CLAUDE.md
 
 .spackle/*
 external/*
+asset/docker
+target/distrib

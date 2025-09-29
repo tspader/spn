@@ -1,0 +1,23 @@
+[workspace]
+members = ["dist:."]
+
+[package]
+name = "spn"
+version = "0.1.0"
+repository = "https://github.com/tspader/spn"
+binaries = ["spn"]
+build-command = ["make"]
+
+[dist]
+# CI backends to support
+ci = "github"
+# The installers to generate for each app
+installers = ["shell"]
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"]
+# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
+cargo-dist-version = "0.30.0"
+# Path that installers should place binaries in
+install-path = "CARGO_HOME"
+# Whether to install an updater program
+install-updater = false
