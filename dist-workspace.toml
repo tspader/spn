@@ -8,6 +8,10 @@ repository = "https://github.com/tspader/spn"
 binaries = ["spn"]
 build-command = ["make", "dist"]
 
+[dist.min-glibc-version]
+"*" = "2.17"
+
+# Config for 'dist'
 [dist]
 # CI backends to support
 ci = "github"
