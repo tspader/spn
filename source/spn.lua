@@ -1,5 +1,4 @@
 local inspect = require('inspect')
-local dbg = require('debugger')
 local ffi = require('ffi')
 local c = require('c')
 local sp = c.sp

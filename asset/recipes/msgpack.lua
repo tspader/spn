@@ -1,5 +1,4 @@
 local spn = require('spn')
-local dbg = require('debugger')
 
 local config = spn.recipes.basic({
   git = 'msgpack/msgpack-c',

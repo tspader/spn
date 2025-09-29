@@ -1,5 +1,4 @@
 local spn = require('spn')
-local dbg = require('debugger')
 
 local recipe = spn.recipes.basic({
   git = 'ggml-org/ggml',

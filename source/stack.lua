@@ -1,4 +1,3 @@
-local dbg = require('debugger')
 ---@class sp_lua_stack_t
 local sp_lua_stack_t = {}
 sp_lua_stack_t.__index = sp_lua_stack_t
@@ -40,7 +39,6 @@ function sp_lua_stack_t:push(item)
   table.insert(self.stack, item)
 
   local hash = hash_anything(item)
-  if not hash then dbg() end
   self.visited[hash] = true
 end
 
