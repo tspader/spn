@@ -22,6 +22,7 @@ cargo-dist-version = "0.30.0"
 install-path = "~/.local/bin"
 # Whether to install an updater program
 install-updater = false
+# Which actions to run on pull requests
 pr-run-mode = "upload"
 
 
