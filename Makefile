@@ -58,7 +58,7 @@ else
 
   ifeq ($(shell uname),Linux)
     RPATH_FLAG := -Wl,-rpath,\$$ORIGIN
-    SYSTEM_LIBS += -lm -lpthread -ldl -lelf
+    SYSTEM_LIBS += -lm -lpthread -ldl
   endif
 endif
 
@@ -213,7 +213,7 @@ define build_example
 	@mkdir -p ./build/examples/$(1)
 	$(call print_and_run,$(BOOTSTRAPPED_SPN) -C ./examples/$(1) --no-interactive build)
 	$(call print_and_run,$(BOOTSTRAPPED_SPN) -C ./examples/$(1) copy ./build/examples/$(1))
-	$(call print_and_run,$(2) ./examples/$(1)/main.* -g -o ./build/examples/$(1)/main $$($(BOOTSTRAPPED_SPN) -C ./examples/$(1) print) -lm)
+	$(call print_and_run,$(2) ./examples/$(1)/main.* -g -o ./build/examples/$(1)/main $$($(BOOTSTRAPPED_SPN) -C ./examples/$(1) print) $(RPATH_FLAG) -lm)
 	@echo
 endef
 

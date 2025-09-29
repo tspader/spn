@@ -38,9 +38,6 @@
 #endif
 
 #ifdef SP_LINUX
-#include <libelf.h>
-#include <gelf.h>
-#include <elf.h>
   #include <link.h>
   #include <unistd.h>
   #include <string.h>
@@ -1760,7 +1757,7 @@ void sp_os_copy_directory(sp_str_t from, sp_str_t to) {
   sp_os_copy_glob(from, sp_str_lit("*"), to);
 }
 
-#if defined(SP_LINUX)
+#if defined(SP_ELF)
   sp_str_t sp_elf_get_soname(sp_str_t path) {
     if (elf_version(EV_CURRENT) == EV_NONE) return SP_ZERO_STRUCT(sp_str_t);
 
@@ -1804,7 +1801,9 @@ void sp_os_copy_directory(sp_str_t from, sp_str_t to) {
     close(fd);
     return SP_ZERO_STRUCT(sp_str_t);
   }
+#endif
 
+#if defined(SP_LINUX)
   sp_str_t sp_os_lib_kind_to_extension(sp_os_lib_kind_t kind) {
     switch (kind) {
       case SP_OS_LIB_SHARED: return SP_LIT("so");
@@ -2277,30 +2276,6 @@ s32 spn_dep_context_build_async(void* user_data) {
     return 0;
   }
   lua_pop(dep->lua.state, 2);
-
-  // Manually read SONAME from each library produced and create a copy that contains the SONAME. I'm not
-  // sure if this is bad. Virtually every library will produce three files to begin with:
-  //  - libfoo.so
-  //  - libfoo.so.2
-  //  - libfoo.so.2.0.69
-  //
-  //  With the fully versioned one being the real file and the other two being links. But I'd have to
-  //  implement globs in the recipe copy entries to get them all. And I don't feel like doing that.
-  #ifdef SP_LINUX
-  sp_os_directory_entry_list_t entries = sp_os_scan_directory(dep->paths.lib);
-  for (u32 i = 0; i < entries.count; i++) {
-    sp_os_directory_entry_t* entry = entries.data + i;
-
-    sp_str_t soname = sp_elf_get_soname(entry->file_path);
-    if (!sp_str_valid(soname)) continue;
-
-    sp_str_t so_path = sp_os_join_path(dep->paths.lib, soname);
-    if (sp_os_does_path_exist(so_path)) continue;
-
-    sp_os_copy_file(entry->file_path, so_path); // @spader symlink?
-  }
-  #endif
-
 
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
 
