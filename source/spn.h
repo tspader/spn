@@ -2409,12 +2409,22 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     }
 
     const c8* spn = lua_tostring(app->lua.state, -1);
-    SP_ASSERT(spn);
-    app->paths.spn = sp_os_normalize_path(sp_str_view(spn));
+    if (spn) {
+      app->paths.spn = sp_os_normalize_path(sp_str_view(spn));
+
+      if (!sp_os_does_path_exist(app->paths.spn)) {
+        SP_FATAL(
+          "Your custom directory for recipes from {:fg brightcyan} resolved to {:fg brightcyan}, but it doesn't exist",
+          SP_FMT_STR(app->paths.user_config),
+          SP_FMT_STR(app->paths.spn)
+        );
+      }
+    }
 
     lua_pop(app->lua.state, 1);
   }
-  else {
+
+  if (!sp_str_valid(app->paths.spn)) {
     app->paths.spn = sp_os_join_path(app->paths.storage, SP_LIT("spn"));
   }
 
@@ -2447,10 +2457,11 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     if (num_updates > 0) {
       if (app->config.pull_recipes) {
         SP_LOG("Updating spn recipes ({} commits behind)...", SP_FMT_U32(num_updates));
+        spn_git_fetch(app->paths.spn);
         spn_git_checkout(app->paths.spn, SPN_GIT_ORIGIN_HEAD);
       }
       else {
-        SP_LOG("spn has {} recipe updates available (auto_pull_recipes=false)", SP_FMT_U32(num_updates));
+        SP_LOG("spn has {} recipe updates available", SP_FMT_U32(num_updates));
       }
     }
   }

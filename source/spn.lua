@@ -129,8 +129,11 @@ function spn.load()
     if not ok then
       error(string.format('failed to evaluate user config %s: %s', app.paths.user_config:cstr(), result))
     end
+
     if type(result) == 'table' then
       spn.config = result
+    else
+      error(string.format('user config did not return a table (%s)', app.paths.user_config:cstr()))
     end
   end
 
