@@ -1,6 +1,0 @@
-[submodule "external/sp"]
-	path = external/sp
-	url = git@github.com:spaderthomas/sp.git
-[submodule "external/SDL"]
-	path = external/SDL
-	url = git@github.com:libsdl-org/SDL
