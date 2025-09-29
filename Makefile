@@ -2,6 +2,7 @@
 # UTILS #
 #########
 ANSI_FG_CYAN := \033[36m
+ANSI_FG_GREEN := \033[32m
 ANSI_FG_BRIGHT_BLACK := \033[90m
 ANSI_FG_BRIGHT_CYAN := \033[96m
 ANSI_FG_BRIGHT_YELLOW := \033[93m
@@ -17,6 +18,7 @@ define print_and_run
 	@echo
 	@$1
 endef
+
 
 ############
 # PLATFORM #
@@ -34,6 +36,10 @@ else
   CC := gcc
   CXX := g++
   MAKE := make
+  SDL := libSDL3.a
+  LUAJIT := libluajit.a
+  SPN_EXE := spn
+  IS_SPN_PREINSTALLED := $(shell which $(SPN_EXE) 2>/dev/null)
 
   HAS_CLANG := $(shell which clang 2>/dev/null)
   ifdef HAS_CLANG
@@ -46,17 +52,12 @@ else
     CC := bear --append -- $(CC)
     CXX := bear --append -- $(CXX)
     MAKE := bear --append -- $(MAKE)
-	endif
-
-  SDL := libSDL3.a
-  LUAJIT := libluajit.a
-  SPN_EXE := spn
-  IS_SPN_PREINSTALLED := $(shell which $(SPN_EXE) 2>/dev/null)
+  endif
 
   ifeq ($(shell uname),Darwin)
     MACOSX_DEPLOYMENT_TARGET := 15.0
-    SYSTEM_LIBS := -framework CoreFoundation -framework Foundation -framework Cocoa -framework IOKit -framework GameController -framework ForceFeedback -framework AVFoundation -framework CoreAudio -framework AudioToolbox -framework Metal -framework MetalKit -framework Quartz -framework CoreHaptics -framework CoreMedia -framework Carbon -framework UniformTypeIdentifiers
     RPATH_FLAG := -Wl,-rpath,@loader_path
+    SYSTEM_LIBS := -framework CoreFoundation -framework Foundation -framework Cocoa -framework IOKit -framework GameController -framework ForceFeedback -framework AVFoundation -framework CoreAudio -framework AudioToolbox -framework Metal -framework MetalKit -framework Quartz -framework CoreHaptics -framework CoreMedia -framework Carbon -framework UniformTypeIdentifiers
   endif
 
   ifeq ($(shell uname),Linux)
@@ -64,6 +65,7 @@ else
     SYSTEM_LIBS += -lm -lpthread -ldl
   endif
 endif
+
 
 #########
 # PATHS #
@@ -88,17 +90,16 @@ SPN_MAKEFILE := Makefile
 SPN_COMPILE_DB := compile_commands.json
 SPN_INSTALL_PREFIX ?= $(HOME)/.local/bin
 
+
 #########
 # FLAGS #
 #########
-BUILD_TYPE ?= debug
-MAKEFLAGS += -j8
-
 FLAG_LANGUAGE := -std=c11
 FLAG_INCLUDES :=  -I$(SPN_DIR_SOURCE)
 FLAG_OUTPUT := -o $(SPN_BINARY)
 FLAG_OPTIMIZATION := -g -rdynamic
 CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_OPTIMIZATION) $(FLAG_INCLUDES) $(FLAG_OUTPUT)
+
 
 ###############
 # ENTRY POINT #
@@ -122,6 +123,7 @@ endif
 
 all: $(DEFAULT_TARGET)
 
+
 #######
 # SPN #
 #######
@@ -141,17 +143,10 @@ $(SPN_BINARY): $(SPN_DIR_SOURCE)/main.c $(SPN_DIR_SOURCE)/spn.h  | $(SPN_DIR_BUI
 
 $(SPN_COMPILE_DB): $(SPN_MAKEFILE)
 
+
 #############
 # BOOTSTRAP #
 #############
-ifeq ($(OS),Windows_NT)
-  BOOTSTRAP_LIBS := $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT)/src/lua51.dll
-else ifeq ($(shell uname),Darwin)
-  BOOTSTRAP_LIBS := $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT)/src/libluajit.a
-else
-  BOOTSTRAP_LIBS := $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT)/src/libluajit.a
-endif
-
 $(SPN_DIR_BUILD_BOOTSTRAP):
 	@mkdir -p $(SPN_DIR_BUILD_BOOTSTRAP)
 
@@ -186,18 +181,20 @@ SPN_BOOTSTRAP_DEPS := $(SPN_BOOTSTRAP_SP) $(SPN_BOOTSTRAP_ARGPARSE) $(SPN_DIR_BU
 BOOTSTRAP_INCLUDE := -I$(SPN_BOOTSTRAP_SDL)/include -I$(SPN_BOOTSTRAP_SP) -I$(SPN_BOOTSTRAP_TOML) -I$(SPN_BOOTSTRAP_ARGPARSE) -I$(SPN_BOOTSTRAP_LUAJIT)/src
 
 bootstrap: $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT_BINARY) | $(SPN_BOOTSTRAP_DEPS)
-	@printf "$(ANSI_FG_BRIGHT_CYAN)>> $(ANSI_RESET)"
+	$(call print_heading)
 	@echo "bootstrapping spn"
-	$(CC) $(CC_FLAGS) $(BOOTSTRAP_INCLUDE) ./source/main.c $(BOOTSTRAP_LIBS) $(SYSTEM_LIBS)
+
+	$(call print_and_run,$(CC) $(CC_FLAGS) $(BOOTSTRAP_INCLUDE) ./source/main.c $(SPN_BOOTSTRAP_LUAJIT_BINARY) $(SPN_BOOTSTRAP_SDL_BINARY) $(SYSTEM_LIBS))
 	@echo
-	@printf "$(ANSI_FG_BRIGHT_CYAN)>> $(ANSI_RESET)"
-	@printf "done! try $(ANSI_FG_BRIGHT_CYAN)make examples$(ANSI_RESET) to build some projects with your spn binary"
+
+	@printf "$(ANSI_FG_GREEN)OK!$(ANSI_RESET) try $(ANSI_FG_BRIGHT_YELLOW)make examples$(ANSI_RESET) to build some projects with your spn binary"
 	@echo
+
 
 ############
 # EXAMPLES #
 ############
-CI_SKIP_EXAMPLES := ggml whisper glfw raylib
+CI_SKIP_EXAMPLES := ggml whisper glfw raylib # Just because these need an X server or GPU or whatever
 
 EXAMPLE_DIRS := $(wildcard examples/*)
 EXAMPLES_C := $(foreach dir,$(EXAMPLE_DIRS),$(if $(wildcard $(dir)/main.c),$(notdir $(dir))))
@@ -219,8 +216,6 @@ define build_example
 	@echo
 endef
 
-.PHONY: $(EXAMPLES)
-
 $(EXAMPLES): %: build/examples/%/main
 
 $(EXAMPLE_TARGETS_C): build/examples/%/main: examples/%/main.c examples/%/spn.lua $(SPN_MAKEFILE)
@@ -231,14 +226,20 @@ $(EXAMPLE_TARGETS_CPP): build/examples/%/main: examples/%/main.cpp examples/%/sp
 	$(eval EXAMPLE := $*)
 	$(call build_example,$(EXAMPLE),$(CXX))
 
+
 ###########
 # PHONIES #
 ###########
+.PHONY: $(EXAMPLES)
+
 build: $(SPN_BINARY)
+
+dist: $(DEFAULT_TARGET)
+	@cp $(SPN_BINARY) . # dist expects our binary to be in the root
 
 examples: $(DEFAULT_TARGET) $(EXAMPLES)
 
-ci: $(DEFAULT_TARGET)
+smoke: $(DEFAULT_TARGET)
 	@for example in $(EXAMPLES); do \
 		if ! echo "$(CI_SKIP_EXAMPLES)" | grep -qw "$$example"; then \
 			$(MAKE) $$example; \
@@ -259,3 +260,4 @@ clean:
 	@rm -rf $(SPN_DIR_BUILD)/bin
 	@rm -rf $(SPN_DIR_BUILD)/examples
 	@rm -f $(SPN_COMPILE_DB)
+
