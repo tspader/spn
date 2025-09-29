@@ -22,6 +22,7 @@ cargo-dist-version = "0.30.0"
 install-path = "~/.local/bin"
 # Whether to install an updater program
 install-updater = false
+pr-run-mode = "upload"
 
 
 [dist.github-custom-runners]
