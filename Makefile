@@ -25,24 +25,27 @@ ifeq ($(OS),Windows_NT)
   CC := gcc
   CXX := g++
   MAKE := make
-  CMAKE := cmake
   SDL := SDL3.lib
   LUAJIT := lua51.lib
   SPN_EXE := spn.exe
   RPATH_FLAG :=
   IS_SPN_PREINSTALLED := $(shell where $(SPN_EXE) 2>NUL)
 else
-  CC := clang
+  CC := gcc
   CXX := g++
   MAKE := make
-  CMAKE := cmake
+
+  HAS_CLANG := $(shell which clang 2>/dev/null)
+  ifdef HAS_CLANG
+    CC := clang
+    CXX := clang++
+  endif
 
   HAS_BEAR := $(shell which bear 2>/dev/null)
   ifdef HAS_BEAR
     CC := bear --append -- $(CC)
-    CXX := bear --append -- g++
-    MAKE := bear --append -- make
-    CMAKE := bear --append -- cmake
+    CXX := bear --append -- $(CXX)
+    MAKE := bear --append -- $(MAKE)
 	endif
 
   SDL := libSDL3.a
@@ -89,7 +92,6 @@ SPN_INSTALL_PREFIX ?= $(HOME)/.local/bin
 # FLAGS #
 #########
 BUILD_TYPE ?= debug
-CMAKE_TYPE := Debug
 MAKEFLAGS += -j8
 
 FLAG_LANGUAGE := -std=c11
