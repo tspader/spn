@@ -97,7 +97,7 @@ SPN_INSTALL_PREFIX ?= $(HOME)/.local/bin
 FLAG_LANGUAGE := -std=c11
 FLAG_INCLUDES :=  -I$(SPN_DIR_SOURCE)
 FLAG_OUTPUT := -o $(SPN_BINARY)
-FLAG_LINKAGE := -static -Wl,--gc-sections -Wl,--strip-all
+FLAG_LINKAGE := -Wl,--gc-sections -Wl,--strip-all
 CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_LINKAGE) $(FLAG_INCLUDES) $(FLAG_OUTPUT)
 
 
