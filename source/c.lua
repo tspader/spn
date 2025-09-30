@@ -8,10 +8,11 @@ local module = {
     dep = {},
     sh = {},
   },
-  sdl = {}
+  sdl = {},
+  -- app = nil
 }
 
-function module.load()
+function module.load(app)
   local ffi = require('ffi')
 
   ffi.cdef([[
@@ -19,42 +20,33 @@ function module.load()
     typedef struct SDL_Environment SDL_Environment;
     typedef struct SDL_IOStream    SDL_IOStream;
     typedef uint32_t               SDL_PropertiesID;
-
-    bool SDL_CopyFile(const char* from, const char* to);
-    const char* SDL_GetCurrentDirectory(void);
-    bool SDL_SetCurrentDirectory(const char* path);
-    SDL_Process* SDL_CreateProcess(const char* const* args, bool pipe_stdio);
-    bool SDL_WaitProcess(SDL_Process* process, bool block, int* result);
-    bool SDL_KillProcess(SDL_Process* process, bool force);
   ]])
 
   ffi.cdef([[
-    typedef int8_t              s8;
-    typedef int16_t             s16;
-    typedef int32_t             s32;
-    typedef int64_t             s64;
-    typedef uint8_t             u8;
-    typedef uint16_t            u16;
-    typedef uint32_t            u32;
-    typedef uint64_t            u64;
-    typedef float               f32;
-    typedef double              f64;
-    typedef char                c8;
-    typedef wchar_t             c16;
-    typedef size_t              sp_size_t;
-    typedef u64                 sp_hash_t;
-    typedef void*               sp_opaque_ptr;
-    typedef void*               sp_thread_t;
-    typedef void*               sp_mutex_t;
-    typedef struct toml_table_t toml_table_t;
-    typedef struct lua_State    lua_State;
-    typedef lua_State* sp_lua_context_t;
+    typedef int8_t           s8;
+    typedef int16_t          s16;
+    typedef int32_t          s32;
+    typedef int64_t          s64;
+    typedef uint8_t          u8;
+    typedef uint16_t         u16;
+    typedef uint32_t         u32;
+    typedef uint64_t         u64;
+    typedef float            f32;
+    typedef double           f64;
+    typedef char             c8;
+    typedef wchar_t          c16;
+    typedef size_t           sp_size_t;
+    typedef u64              sp_hash_t;
+    typedef void*            sp_opaque_ptr;
+    typedef void*            sp_thread_t;
+    typedef void*            sp_mutex_t;
+    typedef struct lua_State lua_State;
+    typedef lua_State*       sp_lua_context_t;
 
     typedef struct {
       u32 len;
       const c8* data;
     } sp_str_t;
-
 
     typedef struct {
       s32 count;
@@ -65,6 +57,25 @@ function module.load()
       sp_lua_pop_t pop;
     } sp_lua_t;
 
+    typedef enum {
+      SP_OS_FILE_ATTR_NONE = 0,
+      SP_OS_FILE_ATTR_REGULAR_FILE = 1,
+      SP_OS_FILE_ATTR_DIRECTORY = 2,
+    } sp_os_file_attr_t;
+
+    typedef struct {
+      sp_str_t file_path;
+      sp_str_t file_name;
+      sp_os_file_attr_t attributes;
+    } sp_os_directory_entry_t;
+
+    typedef struct {
+      sp_os_directory_entry_t* data;
+      u32 count;
+    } sp_os_directory_entry_list_t;
+  ]])
+
+  ffi.cdef([[
     typedef struct {
       sp_str_t output;
       s32 return_code;
@@ -80,23 +91,6 @@ function module.load()
       spn_sh_process_result_t result;
     } spn_sh_process_context_t;
 
-    void spn_sh_run(spn_sh_process_context_t* context);
-    s32  spn_sh_wait(spn_sh_process_context_t* context);
-    spn_sh_process_result_t spn_sh_read_process(SDL_Process* process);
-
-
-    /////////
-    // GIT //
-    /////////
-    sp_str_t spn_git_fetch(sp_str_t repo);
-    u32      spn_git_num_updates(sp_str_t repo, sp_str_t from, sp_str_t to);
-    void     spn_git_checkout(sp_str_t repo, sp_str_t commit);
-    sp_str_t spn_git_get_remote_url(sp_str_t repo_path);
-    sp_str_t spn_git_get_commit(sp_str_t repo_path, sp_str_t id);
-    sp_str_t spn_git_get_commit_message(sp_str_t repo_path, sp_str_t id);
-    sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer);
-
-
     /////////
     // LUA //
     /////////
@@ -107,7 +101,6 @@ function module.load()
       SP_LUA_ERROR_FILE_LOAD_ERROR,
       SP_LUA_ERROR_FILE_RUN_ERROR,
     } sp_lua_error_t;
-
 
     /////////
     // CLI //
@@ -133,8 +126,6 @@ function module.load()
       const c8* kind;
     } spn_cli_dir_t;
 
-    spn_cli_dir_kind_t spn_dir_kind_from_cstr(sp_str_t str);
-
     typedef enum {
       SPN_PRINT_NONE,
       SPN_PRINT_INCLUDE,
@@ -154,9 +145,6 @@ function module.load()
       const c8* compiler;
     } spn_cli_print_t;
 
-    spn_cli_print_kind_t spn_print_kind_from_cstr(sp_str_t str);
-    spn_cli_compiler_t spn_print_compiler_from_cstr(sp_str_t str);
-
     typedef struct {
       u32 num_args;
       const c8** args;
@@ -169,15 +157,6 @@ function module.load()
       spn_cli_print_t flags;
       spn_cli_dir_t dir;
     } spn_cli_t;
-
-    void spn_cli_command_add(spn_cli_t* cli);
-    void spn_cli_command_init(spn_cli_t* cli);
-    void spn_cli_command_list(spn_cli_t* cli);
-    void spn_cli_command_nuke(spn_cli_t* cli);
-    void spn_cli_command_clean(spn_cli_t* cli);
-    void spn_cli_command_print(spn_cli_t* cli);
-    void spn_cli_command_build(spn_cli_t* cli);
-    void spn_cli_command_dir(spn_cli_t* cli);
 
     //////////////////
     // DEPENDENCIES //
@@ -287,7 +266,6 @@ function module.load()
       sp_str_t error;
     } spn_dep_build_context_t;
 
-
     typedef struct {
       sp_str_t name;
       sp_str_t url;
@@ -300,14 +278,6 @@ function module.load()
     typedef struct {
       spn_dep_build_context_t* deps;
     } spn_build_context_t;
-
-    spn_dep_info_t*      spn_dep_find(sp_str_t name);
-    void                 spn_dep_context_prepare(spn_dep_build_context_t* context);
-    sp_str_t             spn_dep_build_state_to_str(spn_dep_build_state_t state);
-    spn_dep_build_mode_t spn_dep_build_mode_from_str(sp_str_t str);
-    sp_str_t             spn_dep_build_mode_to_str(spn_dep_build_mode_t mode);
-    spn_dep_build_kind_t spn_dep_build_kind_from_str(sp_str_t str);
-    sp_str_t             spn_dep_build_kind_to_str(spn_dep_build_kind_t kind);
 
     /////////
     // APP //
@@ -341,8 +311,6 @@ function module.load()
       spn_dep_spec_t* deps;
     } spn_project_t;
 
-    spn_dep_spec_t* spn_project_find_dep(sp_str_t name);
-
     typedef struct {
       sp_str_t build;
       sp_str_t clone;
@@ -367,70 +335,56 @@ function module.load()
       spn_dep_info_t** deps;
       spn_lock_entry_t** lock;
       spn_lua_config_t* config;
+
+      bool (*SDL_CopyFile)(const c8*, const c8*);
+      c8* (*SDL_GetCurrentDirectory)(void);
+      SDL_Process* (*SDL_CreateProcess)(const c8* const* args, bool pipe_stdio);
+      bool (*SDL_WaitProcess)(SDL_Process* process, bool block, int* result);
+      bool (*SDL_KillProcess)(SDL_Process* process, bool force);
+      sp_hash_t (*sp_hash_str)(sp_str_t str);
+      sp_hash_t (*sp_hash_combine)(sp_hash_t* hashes, u32 num_hashes);
+      void* (*sp_alloc)(u32 n);
+      c8* (*sp_cstr_copy)(const c8* str);
+      sp_str_t (*sp_str_copy)(sp_str_t str);
+      bool (*sp_str_equal_cstr)(sp_str_t str, const c8* cstr);
+      sp_str_t (*sp_str_from_cstr)(const c8* cstr);
+      c8* (*sp_str_to_cstr)(sp_str_t str);
+      void (*sp_os_copy)(sp_str_t from, sp_str_t to);
+      void (*sp_os_copy_file)(sp_str_t from, sp_str_t to);
+      void (*sp_os_copy_directory)(sp_str_t from, sp_str_t to);
+      sp_str_t (*sp_os_extract_extension)(sp_str_t path);
+      sp_str_t (*sp_os_extract_stem)(sp_str_t path);
+      sp_str_t (*sp_os_extract_file_name)(sp_str_t path);
+      sp_str_t (*sp_os_join_path)(sp_str_t a, sp_str_t b);
+      bool (*sp_os_does_path_exist)(sp_str_t a);
+      void (*sp_os_log)(sp_str_t message);
+      sp_os_directory_entry_list_t (*sp_os_scan_directory)(sp_str_t path);
+      bool (*sp_os_is_directory)(sp_str_t path);
+      bool (*sp_os_is_regular_file)(sp_str_t path);
+      void (*sp_dyn_array_push_f)(void** arr, void* val, u32 val_len);
+      void (*spn_sh_run)(spn_sh_process_context_t* context);
+      s32 (*spn_sh_wait)(spn_sh_process_context_t* context);
+      spn_sh_process_result_t (*spn_sh_read_process)(SDL_Process* process);
+      sp_str_t (*spn_git_fetch)(sp_str_t repo);
+      u32 (*spn_git_num_updates)(sp_str_t repo, sp_str_t from, sp_str_t to);
+      void (*spn_git_checkout)(sp_str_t repo, sp_str_t commit);
+      sp_str_t (*spn_git_get_remote_url)(sp_str_t repo_path);
+      sp_str_t (*spn_git_get_commit)(sp_str_t repo_path, sp_str_t id);
+      sp_str_t (*spn_git_get_commit_message)(sp_str_t repo_path, sp_str_t id);
+      sp_str_t (*sp_str_truncate)(sp_str_t str, u32 n, sp_str_t trailer);
     } spn_lua_context_t;
   ]])
 
-  ffi.cdef([[
-    typedef enum {
-      SP_OS_FILE_ATTR_NONE = 0,
-      SP_OS_FILE_ATTR_REGULAR_FILE = 1,
-      SP_OS_FILE_ATTR_DIRECTORY = 2,
-    } sp_os_file_attr_t;
-
-    typedef struct {
-      sp_str_t file_path;
-      sp_str_t file_name;
-      sp_os_file_attr_t attributes;
-    } sp_os_directory_entry_t;
-
-    typedef struct {
-      sp_os_directory_entry_t* data;
-      u32 count;
-    } sp_os_directory_entry_list_t;
-
-    sp_hash_t                    sp_hash_str(sp_str_t str);
-    sp_hash_t                    sp_hash_combine(sp_hash_t* hashes, u32 num_hashes);
-    void*                        sp_alloc(u32 n);
-    c8*                          sp_cstr_copy(const c8* str);
-    sp_str_t                     sp_str_copy(sp_str_t str);
-    bool                         sp_str_equal_cstr(sp_str_t str, const c8* cstr);
-    sp_str_t                     sp_str_from_cstr(const c8* cstr);
-    c8*                          sp_str_to_cstr(sp_str_t str);
-    void                         sp_os_copy(sp_str_t from, sp_str_t to);
-    void                         sp_os_copy_file(sp_str_t from, sp_str_t to);
-    void                         sp_os_copy_directory(sp_str_t from, sp_str_t to);
-    sp_str_t                     sp_os_extract_extension(sp_str_t path);
-    sp_str_t                     sp_os_extract_stem(sp_str_t path);
-    sp_str_t                     sp_os_extract_file_name(sp_str_t path);
-    sp_str_t                     sp_os_join_path(sp_str_t a, sp_str_t b);
-    bool                         sp_os_does_path_exist(sp_str_t a);
-    void                         sp_os_log(sp_str_t message);
-    sp_os_directory_entry_list_t sp_os_scan_directory(sp_str_t path);
-    bool                         sp_os_is_directory(sp_str_t path);
-    bool                         sp_os_is_regular_file(sp_str_t path);
-    void                         sp_dyn_array_push_f(void** arr, void* val, u32 val_len);
-  ]])
-
-  -- SDL3
-  setmetatable(module.sdl, {
-    __index = function(_, key)
-      key = string.format('SDL_%s', key)
-      return ffi.C[key]
-    end
-  })
+  module.app = ffi.cast('spn_lua_context_t*', app)
 
   -- sp.h
   for name, namespace in pairs(module.sp) do
     setmetatable(namespace, {
       __index = function(_, key)
         key = string.format("sp_%s_%s", name, key)
-        return ffi.C[key]
+        return module.app[key]
       end
     })
-  end
-
-  module.sp.alloc = function(ctype)
-    return ffi.cast(string.format('%s *', ctype), ffi.C.sp_alloc(ffi.sizeof(ctype)))
   end
 
   module.sp.dyn_array = {
@@ -438,7 +392,7 @@ function module.load()
       local arr_ptr = ffi.new('void* [1]')
       arr_ptr[0] = array
 
-      ffi.C.sp_dyn_array_push_f(
+      module.app.sp_dyn_array_push_f(
         ffi.cast('void**', arr_ptr),
         ffi.cast('void*',  value),
         ffi.sizeof(value)
@@ -453,7 +407,7 @@ function module.load()
     setmetatable(namespace, {
       __index = function(_, key)
         key = string.format("spn_%s_%s", name, key)
-        return ffi.C[key]
+        return module.app[key]
       end
     })
   end

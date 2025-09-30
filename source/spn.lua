@@ -120,7 +120,7 @@ local spn = {
 -- INIT --
 ----------
 function spn.load()
-  local app = spn.app
+  local app = c.app
 
   local loader = loadfile(app.paths.user_config:cstr())
   if loader then
@@ -175,7 +175,7 @@ function spn.load()
 end
 
 function spn.parse()
-  local app = spn.app
+  local app = c.app
 
   -- User config
   if spn.config.spn then
@@ -272,10 +272,7 @@ function spn.parse()
 end
 
 function spn.context(app)
-  c.load()
-
-  app = ffi.cast('spn_lua_context_t*', app)
-  spn.app = app
+  c.load(app)
 end
 
 function spn.init(app)
@@ -295,8 +292,8 @@ function spn.build(app, dep)
 end
 
 function spn.lock()
-  local context = spn.app
-  local lock_array = context.lock[0]
+  local app = c.app
+  local lock_array = app.lock[0]
 
   local num_deps = 0
   for _ in pairs(spn.project.deps) do
@@ -323,7 +320,7 @@ function spn.lock()
 
   local serialized = serpent.block(lockfile, {comment = false, sortkeys = true})
 
-  local path = context.paths.project.lock:cstr()
+  local path = app.paths.project.lock:cstr()
   local file = io.open(path, 'w')
   if not file then
     return false

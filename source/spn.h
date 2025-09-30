@@ -1,6 +1,7 @@
 #ifndef SPN_H
 #define SPN_H
 
+#include "SDL3/SDL_filesystem.h"
 #ifdef _WIN32
 #define SDL_DECLSPEC __declspec(dllimport)
 #define SPN_API __declspec(dllexport)
@@ -508,6 +509,43 @@ typedef struct {
   spn_dep_info_t** deps;
   spn_lock_entry_t** lock;
   spn_lua_config_t* config;
+
+  bool (*SDL_CopyFile)(const c8*, const c8*);
+  c8* (*SDL_GetCurrentDirectory)(void);
+  SDL_Process* (*SDL_CreateProcess)(const c8* const* args, bool pipe_stdio);
+  bool (*SDL_WaitProcess)(SDL_Process* process, bool block, int* result);
+  bool (*SDL_KillProcess)(SDL_Process* process, bool force);
+  sp_hash_t (*sp_hash_str)(sp_str_t str);
+  sp_hash_t (*sp_hash_combine)(sp_hash_t* hashes, u32 num_hashes);
+  void* (*sp_alloc)(u32 n);
+  c8* (*sp_cstr_copy)(const c8* str);
+  sp_str_t (*sp_str_copy)(sp_str_t str);
+  bool (*sp_str_equal_cstr)(sp_str_t str, const c8* cstr);
+  sp_str_t (*sp_str_from_cstr)(const c8* cstr);
+  c8* (*sp_str_to_cstr)(sp_str_t str);
+  void (*sp_os_copy)(sp_str_t from, sp_str_t to);
+  void (*sp_os_copy_file)(sp_str_t from, sp_str_t to);
+  void (*sp_os_copy_directory)(sp_str_t from, sp_str_t to);
+  sp_str_t (*sp_os_extract_extension)(sp_str_t path);
+  sp_str_t (*sp_os_extract_stem)(sp_str_t path);
+  sp_str_t (*sp_os_extract_file_name)(sp_str_t path);
+  sp_str_t (*sp_os_join_path)(sp_str_t a, sp_str_t b);
+  bool (*sp_os_does_path_exist)(sp_str_t a);
+  void (*sp_os_log)(sp_str_t message);
+  sp_os_directory_entry_list_t (*sp_os_scan_directory)(sp_str_t path);
+  bool (*sp_os_is_directory)(sp_str_t path);
+  bool (*sp_os_is_regular_file)(sp_str_t path);
+  void (*sp_dyn_array_push_f)(void** arr, void* val, u32 val_len);
+  void (*spn_sh_run)(spn_sh_process_context_t* context);
+  s32 (*spn_sh_wait)(spn_sh_process_context_t* context);
+  spn_sh_process_result_t (*spn_sh_read_process)(SDL_Process* process);
+  sp_str_t (*spn_git_fetch)(sp_str_t repo);
+  u32 (*spn_git_num_updates)(sp_str_t repo, sp_str_t from, sp_str_t to);
+  void (*spn_git_checkout)(sp_str_t repo, sp_str_t commit);
+  sp_str_t (*spn_git_get_remote_url)(sp_str_t repo_path);
+  sp_str_t (*spn_git_get_commit)(sp_str_t repo_path, sp_str_t id);
+  sp_str_t (*spn_git_get_commit_message)(sp_str_t repo_path, sp_str_t id);
+  sp_str_t (*sp_str_truncate)(sp_str_t str, u32 n, sp_str_t trailer);
 } spn_lua_context_t;
 
 
@@ -716,6 +754,42 @@ void spn_lua_init() {
     .deps = &app.deps,
     .lock = &app.lock,
     .config = &app.config,
+    .SDL_CopyFile = SDL_CopyFile,
+    .SDL_GetCurrentDirectory = SDL_GetCurrentDirectory,
+    .SDL_CreateProcess = SDL_CreateProcess,
+    .SDL_WaitProcess = SDL_WaitProcess,
+    .SDL_KillProcess = SDL_KillProcess,
+    .sp_hash_str = sp_hash_str,
+    .sp_hash_combine = sp_hash_combine,
+    .sp_alloc = sp_alloc,
+    .sp_cstr_copy = sp_cstr_copy,
+    .sp_str_copy = sp_str_copy,
+    .sp_str_equal_cstr = sp_str_equal_cstr,
+    .sp_str_from_cstr = sp_str_from_cstr,
+    .sp_str_to_cstr = sp_str_to_cstr,
+    .sp_os_copy = sp_os_copy,
+    .sp_os_copy_file = sp_os_copy_file,
+    .sp_os_copy_directory = sp_os_copy_directory,
+    .sp_os_extract_extension = sp_os_extract_extension,
+    .sp_os_extract_stem = sp_os_extract_stem,
+    .sp_os_extract_file_name = sp_os_extract_file_name,
+    .sp_os_join_path = sp_os_join_path,
+    .sp_os_does_path_exist = sp_os_does_path_exist,
+    .sp_os_log = sp_os_log,
+    .sp_os_scan_directory = sp_os_scan_directory,
+    .sp_os_is_directory = sp_os_is_directory,
+    .sp_os_is_regular_file = sp_os_is_regular_file,
+    .sp_dyn_array_push_f = sp_dyn_array_push_f,
+    .spn_sh_run = spn_sh_run,
+    .spn_sh_wait = spn_sh_wait,
+    .spn_sh_read_process = spn_sh_read_process,
+    .spn_git_fetch = spn_git_fetch,
+    .spn_git_num_updates = spn_git_num_updates,
+    .spn_git_checkout = spn_git_checkout,
+    .spn_git_get_remote_url = spn_git_get_remote_url,
+    .spn_git_get_commit = spn_git_get_commit,
+    .spn_git_get_commit_message = spn_git_get_commit_message,
+    .sp_str_truncate = sp_str_truncate,
   };
 }
 
