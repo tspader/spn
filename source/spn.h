@@ -308,6 +308,7 @@ spn_dep_build_kind_t     spn_dep_build_kind_from_str(sp_str_t str);
 sp_str_t                 spn_dep_build_kind_to_str(spn_dep_build_kind_t kind);
 sp_str_t                 spn_dep_state_to_str(spn_dep_build_state_t state);
 spn_lock_entry_t*        spn_dep_context_get_lock_entry(spn_dep_build_context_t* dep);
+void                     spn_dep_resolve_commit(spn_dep_build_context_t* dep, sp_str_t commit);
 void                     spn_dep_context_prepare(spn_dep_build_context_t* context);
 void                     spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state);
 void                     spn_dep_context_set_build_error(spn_dep_build_context_t* dep, sp_str_t error);
@@ -1170,6 +1171,18 @@ sp_str_t spn_gen_build_entries_for_all(spn_gen_entry_kind_t kind, spn_gen_compil
   return sp_str_join_n(entries, sp_dyn_array_size(entries), sp_str_lit(" "));
 }
 
+sp_str_t spn_dep_get_dir_path(spn_dep_build_context_t* dep, spn_cache_dir_kind_t kind) {
+  switch (kind) {
+    case SPN_DIR_STORE:   return dep->paths.store;
+    case SPN_DIR_INCLUDE: return dep->paths.include;
+    case SPN_DIR_LIB:     return dep->paths.lib;
+    case SPN_DIR_VENDOR:  return dep->paths.vendor;
+    case SPN_DIR_SOURCE:  return dep->paths.source;
+    case SPN_DIR_WORK:    return dep->paths.work;
+  }
+  SP_UNREACHABLE();
+}
+
 void spn_cli_command_dir(spn_cli_t* cli) {
   spn_cli_dir_t* command = &cli->dir;
 
@@ -1204,14 +1217,7 @@ void spn_cli_command_dir(spn_cli_t* cli) {
     SP_FATAL("Package {:fg brightcyan} not found", SP_FMT_STR(package));
   }
 
-  sp_str_t output = SP_ZERO_INITIALIZE();
-  switch (kind) {
-    case SPN_DIR_STORE:   output = dep->paths.store; break;
-    case SPN_DIR_INCLUDE: output = dep->paths.include; break;
-    case SPN_DIR_VENDOR:  output = dep->paths.vendor; break;
-    default: SP_UNREACHABLE_CASE();
-  }
-
+  sp_str_t output = spn_dep_get_dir_path(dep, kind);
   printf("%.*s", output.len, output.data);
 }
 
@@ -1467,22 +1473,19 @@ void spn_cli_command_ls(spn_cli_t* cli) {
     SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(package));
   }
 
+  if (sp_str_empty(dep->spec->lock)) {
+    SP_FATAL(
+      "Package {:fg brightcyan} hasn't been built yet. Run {:fg brightyellow} first.",
+      SP_FMT_STR(package),
+      SP_FMT_CSTR("spn build")
+    );
+  }
+
+  spn_dep_resolve_commit(dep, dep->spec->lock);
   spn_dep_context_prepare(dep);
 
-  sp_str_t dir_path;
-  if (cli->ls.dir) {
-    spn_cache_dir_kind_t dir_kind = spn_dir_kind_from_str(sp_str_view(cli->ls.dir));
-    switch (dir_kind) {
-      case SPN_DIR_STORE:   { dir_path = dep->paths.store; break; }
-      case SPN_DIR_INCLUDE: { dir_path = dep->paths.include; break; }
-      case SPN_DIR_LIB:     { dir_path = dep->paths.lib; break; }
-      case SPN_DIR_VENDOR:  { dir_path = dep->paths.vendor; break; }
-      case SPN_DIR_SOURCE:  { dir_path = dep->paths.source; break; }
-      case SPN_DIR_WORK:    { dir_path = dep->paths.work; break; }
-    }
-  } else {
-    dir_path = dep->paths.store;
-  }
+  spn_cache_dir_kind_t dir_kind = cli->ls.dir ? spn_dir_kind_from_str(sp_str_view(cli->ls.dir)) : SPN_DIR_STORE;
+  sp_str_t dir_path = spn_dep_get_dir_path(dep, dir_kind);
 
   sp_sh_ls(dir_path);
 }
@@ -1525,21 +1528,24 @@ void spn_cli_command_which(spn_cli_t* cli) {
     SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(package));
   }
 
+  if (sp_str_empty(dep->spec->lock)) {
+    SP_FATAL(
+      "Package {:fg brightcyan} hasn't been built yet. Run {:fg brightyellow} first.",
+      SP_FMT_STR(package),
+      SP_FMT_CSTR("spn build")
+    );
+  }
+
+  spn_dep_resolve_commit(dep, dep->spec->lock);
   spn_dep_context_prepare(dep);
 
+  spn_cache_dir_kind_t kind = SPN_DIR_STORE;
   if (cli->which.dir) {
-    spn_cache_dir_kind_t dir_kind = spn_dir_kind_from_str(sp_str_view(cli->which.dir));
-    switch (dir_kind) {
-      case SPN_DIR_STORE:   { printf("%.*s", dep->paths.store.len, dep->paths.store.data); break; }
-      case SPN_DIR_INCLUDE: { printf("%.*s", dep->paths.include.len, dep->paths.include.data); break; }
-      case SPN_DIR_LIB:     { printf("%.*s", dep->paths.lib.len, dep->paths.lib.data); break; }
-      case SPN_DIR_VENDOR:  { printf("%.*s", dep->paths.vendor.len, dep->paths.vendor.data); break; }
-      case SPN_DIR_SOURCE:  { printf("%.*s", dep->paths.source.len, dep->paths.source.data); break; }
-      case SPN_DIR_WORK:    { printf("%.*s", dep->paths.work.len, dep->paths.work.data); break; }
-    }
-  } else {
-    printf("%.*s", dep->paths.store.len, dep->paths.store.data);
+    kind = spn_dir_kind_from_str(sp_str_view(cli->which.dir));
   }
+
+  sp_str_t dir = spn_dep_get_dir_path(dep, kind);
+  printf("%.*s", dir.len, dir.data);
 }
 
 void spn_cli_command_recipe(spn_cli_t* cli) {
@@ -2222,16 +2228,31 @@ void spn_dep_checkout(spn_dep_build_context_t *dep) {
   }
 }
 
+void spn_dep_resolve_commit(spn_dep_build_context_t* dep, sp_str_t commit) {
+  sp_mutex_lock(&dep->mutex);
+
+  dep->commits.resolved = commit;
+
+  if (sp_os_does_path_exist(dep->info->paths.source)) {
+    dep->commits.message = spn_git_get_commit_message(dep->info->paths.source, dep->commits.resolved);
+    dep->commits.message = sp_str_truncate(dep->commits.message, 32, SP_LIT("..."));
+    dep->commits.message = sp_str_replace_c8(dep->commits.message, '\n', ' ');
+    dep->commits.message = sp_str_pad(dep->commits.message, 32);
+    dep->commits.delta = spn_git_num_updates(dep->info->paths.source, dep->commits.resolved, spn_dep_context_find_latest_commit(dep));
+  } else {
+    dep->commits.message = SP_ZERO_STRUCT(sp_str_t);
+    dep->commits.delta = 0;
+  }
+
+  sp_mutex_unlock(&dep->mutex);
+}
+
 void spn_dep_context_prepare(spn_dep_build_context_t* dep) {
   sp_mutex_init(&dep->mutex, SP_MUTEX_PLAIN);
 
   sp_mutex_lock(&dep->mutex);
-  dep->commits.resolved = spn_git_get_commit(dep->info->paths.source, SPN_GIT_HEAD);
-  dep->commits.message = spn_git_get_commit_message(dep->info->paths.source, dep->commits.resolved);
-  dep->commits.message = sp_str_truncate(dep->commits.message, 32, SP_LIT("..."));
-  dep->commits.message = sp_str_replace_c8(dep->commits.message, '\n', ' ');
-  dep->commits.message = sp_str_pad(dep->commits.message, 32);
-  dep->commits.delta = spn_git_num_updates(dep->info->paths.source, dep->commits.resolved, spn_dep_context_find_latest_commit(dep));
+
+  SP_ASSERT(!sp_str_empty(dep->commits.resolved));
 
   dep->mode = SPN_DEP_BUILD_MODE_DEBUG;
 
@@ -2258,19 +2279,21 @@ void spn_dep_context_prepare(spn_dep_build_context_t* dep) {
 s32 spn_dep_context_build_async(void* user_data) {
   spn_dep_build_context_t* dep = (spn_dep_build_context_t*)user_data;
 
+  sp_str_t resolved;
+
   if (sp_os_does_path_exist(dep->info->paths.source)) {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
     spn_git_fetch(dep->info->paths.source);
 
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
     if (dep->update || sp_str_empty(dep->spec->lock)){
-      dep->commits.resolved = spn_dep_context_find_latest_commit(dep);
+      resolved = spn_dep_context_find_latest_commit(dep);
     }
     else {
-      dep->commits.resolved = dep->spec->lock;
+      resolved = dep->spec->lock;
     }
 
-    spn_git_checkout(dep->info->paths.source, dep->commits.resolved);
+    spn_git_checkout(dep->info->paths.source, resolved);
   }
   else {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
@@ -2278,11 +2301,12 @@ s32 spn_dep_context_build_async(void* user_data) {
     SP_ASSERT(sp_os_is_directory(dep->info->paths.source));
 
     sp_str_t branch = sp_format("origin/{}",  SP_FMT_STR(dep->info->branch));
-    dep->commits.resolved = spn_git_get_commit(dep->info->paths.source, branch);
-    spn_git_checkout(dep->info->paths.source, dep->commits.resolved);
+    resolved = spn_git_get_commit(dep->info->paths.source, branch);
+    spn_git_checkout(dep->info->paths.source, resolved);
   }
 
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PREPARING);
+  spn_dep_resolve_commit(dep, resolved);
   spn_dep_context_prepare(dep);
 
   // @spader
