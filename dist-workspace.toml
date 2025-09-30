@@ -3,7 +3,7 @@ members = ["dist:."]
 
 [package]
 name = "spn"
-version = "0.1.8"
+version = "0.1.9"
 repository = "https://github.com/tspader/spn"
 binaries = ["spn"]
 build-command = ["make", "dist"]
