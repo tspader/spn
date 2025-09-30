@@ -537,16 +537,18 @@ typedef struct {
   bool            (*sp_os_is_directory)(sp_str_t path);
   bool            (*sp_os_is_regular_file)(sp_str_t path);
   void            (*sp_dyn_array_push_f)(void** arr, void* val, u32 val_len);
-  void            (*spn_sh_run)(spn_sh_process_context_t* context);
-  s32             (*spn_sh_wait)(spn_sh_process_context_t* context);
-  spn_sh_result_t (*spn_sh_read_process)(SDL_Process* process);
+  spn_dep_info_t* (*spn_dep_find)(sp_str_t name);
   sp_str_t        (*spn_git_fetch)(sp_str_t repo);
   u32             (*spn_git_num_updates)(sp_str_t repo, sp_str_t from, sp_str_t to);
   void            (*spn_git_checkout)(sp_str_t repo, sp_str_t commit);
   sp_str_t        (*spn_git_get_remote_url)(sp_str_t repo_path);
   sp_str_t        (*spn_git_get_commit)(sp_str_t repo_path, sp_str_t id);
   sp_str_t        (*spn_git_get_commit_message)(sp_str_t repo_path, sp_str_t id);
+  void            (*spn_sh_run)(spn_sh_process_context_t* context);
+  s32             (*spn_sh_wait)(spn_sh_process_context_t* context);
+  spn_sh_result_t (*spn_sh_read_process)(SDL_Process* process);
   sp_str_t        (*sp_str_truncate)(sp_str_t str, u32 n, sp_str_t trailer);
+  spn_dep_build_kind_t (*spn_dep_build_kind_from_str)(sp_str_t str);
 } spn_lua_context_t;
 
 
@@ -755,42 +757,44 @@ void spn_lua_init() {
     .deps = &app.deps,
     .lock = &app.lock,
     .config = &app.config,
-    .SDL_CopyFile = SDL_CopyFile,
-    .SDL_GetCurrentDirectory = SDL_GetCurrentDirectory,
-    .SDL_CreateProcess = SDL_CreateProcess,
-    .SDL_WaitProcess = SDL_WaitProcess,
-    .SDL_KillProcess = SDL_KillProcess,
-    .sp_hash_str = sp_hash_str,
-    .sp_hash_combine = sp_hash_combine,
-    .sp_alloc = sp_alloc,
-    .sp_cstr_copy = sp_cstr_copy,
-    .sp_str_copy = sp_str_copy,
-    .sp_str_equal_cstr = sp_str_equal_cstr,
-    .sp_str_from_cstr = sp_str_from_cstr,
-    .sp_str_to_cstr = sp_str_to_cstr,
-    .sp_os_copy = sp_os_copy,
-    .sp_os_copy_file = sp_os_copy_file,
-    .sp_os_copy_directory = sp_os_copy_directory,
-    .sp_os_extract_extension = sp_os_extract_extension,
-    .sp_os_extract_stem = sp_os_extract_stem,
-    .sp_os_extract_file_name = sp_os_extract_file_name,
-    .sp_os_join_path = sp_os_join_path,
-    .sp_os_does_path_exist = sp_os_does_path_exist,
-    .sp_os_log = sp_os_log,
-    .sp_os_scan_directory = sp_os_scan_directory,
-    .sp_os_is_directory = sp_os_is_directory,
-    .sp_os_is_regular_file = sp_os_is_regular_file,
-    .sp_dyn_array_push_f = sp_dyn_array_push_f,
-    .spn_sh_run = spn_sh_run,
-    .spn_sh_wait = spn_sh_wait,
-    .spn_sh_read_process = spn_sh_read_process,
-    .spn_git_fetch = spn_git_fetch,
-    .spn_git_num_updates = spn_git_num_updates,
-    .spn_git_checkout = spn_git_checkout,
-    .spn_git_get_remote_url = spn_git_get_remote_url,
-    .spn_git_get_commit = spn_git_get_commit,
-    .spn_git_get_commit_message = spn_git_get_commit_message,
-    .sp_str_truncate = sp_str_truncate,
+    .SDL_CopyFile                  = SDL_CopyFile,
+    .SDL_GetCurrentDirectory       = SDL_GetCurrentDirectory,
+    .SDL_CreateProcess             = SDL_CreateProcess,
+    .SDL_WaitProcess               = SDL_WaitProcess,
+    .SDL_KillProcess               = SDL_KillProcess,
+    .sp_hash_str                   = sp_hash_str,
+    .sp_hash_combine               = sp_hash_combine,
+    .sp_alloc                      = sp_alloc,
+    .sp_cstr_copy                  = sp_cstr_copy,
+    .sp_str_copy                   = sp_str_copy,
+    .sp_str_equal_cstr             = sp_str_equal_cstr,
+    .sp_str_from_cstr              = sp_str_from_cstr,
+    .sp_str_to_cstr                = sp_str_to_cstr,
+    .sp_os_copy                    = sp_os_copy,
+    .sp_os_copy_file               = sp_os_copy_file,
+    .sp_os_copy_directory          = sp_os_copy_directory,
+    .sp_os_extract_extension       = sp_os_extract_extension,
+    .sp_os_extract_stem            = sp_os_extract_stem,
+    .sp_os_extract_file_name       = sp_os_extract_file_name,
+    .sp_os_join_path               = sp_os_join_path,
+    .sp_os_does_path_exist         = sp_os_does_path_exist,
+    .sp_os_log                     = sp_os_log,
+    .sp_os_scan_directory          = sp_os_scan_directory,
+    .sp_os_is_directory            = sp_os_is_directory,
+    .sp_os_is_regular_file         = sp_os_is_regular_file,
+    .sp_dyn_array_push_f           = sp_dyn_array_push_f,
+    .spn_dep_find                  = spn_dep_find,
+    .spn_git_fetch                 = spn_git_fetch,
+    .spn_git_num_updates           = spn_git_num_updates,
+    .spn_git_checkout              = spn_git_checkout,
+    .spn_git_get_remote_url        = spn_git_get_remote_url,
+    .spn_git_get_commit            = spn_git_get_commit,
+    .spn_git_get_commit_message    = spn_git_get_commit_message,
+    .spn_sh_run                    = spn_sh_run,
+    .spn_sh_wait                   = spn_sh_wait,
+    .spn_sh_read_process           = spn_sh_read_process,
+    .sp_str_truncate               = sp_str_truncate,
+    .spn_dep_build_kind_from_str   = spn_dep_build_kind_from_str,
   };
 }
 

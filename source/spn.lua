@@ -221,7 +221,7 @@ function spn.parse()
     local recipe = spn.recipes[name]
 
     local dep = ffi.new('spn_dep_spec_t')
-    dep.info = ffi.C.spn_dep_find(sp.str.from_cstr(name))
+    dep.info = c.spn.dep.find(sp.str.from_cstr(name))
 
     local lock = spn.lock_file.deps[name]
     if lock then
@@ -260,11 +260,11 @@ function spn.parse()
     local hash = ffi.new('sp_hash_t [1]')
     for value in spn.iterator.values(values) do
       local hashable = tostring(value)
-      hash[0] = ffi.C.sp_hash_str(sp.str.from_cstr(hashable))
+      hash[0] = sp.hash.str(sp.str.from_cstr(hashable))
       hashes[0] = sp.dyn_array.push(hashes[0], hash)
     end
 
-    dep.hash = ffi.C.sp_hash_combine(hashes[0], #values)
+    dep.hash = sp.hash.combine(hashes[0], #values)
 
     -- Push it to an array in C
     app.project.deps = sp.dyn_array.push(app.project.deps, dep)
