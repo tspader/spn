@@ -57,11 +57,13 @@ else
   ifeq ($(shell uname),Darwin)
     MACOSX_DEPLOYMENT_TARGET := 15.0
     RPATH_FLAG := -Wl,-rpath,@loader_path
+    FLAG_LINKAGE :=
     SYSTEM_LIBS := -framework CoreFoundation -framework Foundation -framework Cocoa -framework IOKit -framework GameController -framework ForceFeedback -framework AVFoundation -framework CoreAudio -framework AudioToolbox -framework Metal -framework MetalKit -framework Quartz -framework CoreHaptics -framework CoreMedia -framework Carbon -framework UniformTypeIdentifiers
   endif
 
   ifeq ($(shell uname),Linux)
     RPATH_FLAG := -Wl,-rpath,\$$ORIGIN
+    FLAG_LINKAGE := -static -Wl,--gc-sections -Wl,--strip-all
     SYSTEM_LIBS += -lm -lpthread
   endif
 endif
@@ -97,7 +99,6 @@ SPN_INSTALL_PREFIX ?= $(HOME)/.local/bin
 FLAG_LANGUAGE := -std=c11
 FLAG_INCLUDES :=  -I$(SPN_DIR_SOURCE)
 FLAG_OUTPUT := -o $(SPN_BINARY)
-FLAG_LINKAGE := -Wl,--gc-sections -Wl,--strip-all
 CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_LINKAGE) $(FLAG_INCLUDES) $(FLAG_OUTPUT)
 
 
