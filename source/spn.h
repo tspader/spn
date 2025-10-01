@@ -1,11 +1,21 @@
 #ifndef SPN_H
 #define SPN_H
 
-#include "SDL3/SDL_filesystem.h"
 #ifdef _WIN32
-#define SDL_DECLSPEC __declspec(dllimport)
 #define SPN_API __declspec(dllexport)
 #define SP_API SPN_API
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <shlobj.h>
+#include <commdlg.h>
+#include <shellapi.h>
+#include <conio.h>
+#include <io.h>
 #else
 #define SPN_API
 #endif
@@ -21,15 +31,6 @@
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
-
-#ifdef SP_WIN32
-  #include "windows.h"
-  #include "shlobj.h"
-  #include "commdlg.h"
-  #include "shellapi.h"
-  #include <conio.h>
-  #include <io.h>
-#endif
 
 #ifdef SP_POSIX
   #include <termios.h>
@@ -2476,6 +2477,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   // Config
 #ifdef SP_WIN32
+  sp_str_t sdl_prefix = app->paths.storage;
   app->paths.config = sp_os_join_path(sdl_prefix, SP_LIT("config"));
 #else
   const c8* xdg_config = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "XDG_CONFIG_HOME");

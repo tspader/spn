@@ -1,4 +1,6 @@
-#########
+###########
+# Makefile #
+###########
 # UTILS #
 #########
 ANSI_FG_CYAN := \033[36m
@@ -20,109 +22,113 @@ define print_and_run
 endef
 
 
+
+
 ############
 # PLATFORM #
 ############
-ifeq ($(OS),Windows_NT)
-  CC := gcc
-  CXX := g++
-  MAKE := make
-  SDL := SDL3.lib
-  LUAJIT := lua51.lib
-  SPN_EXE := spn.exe
-  RPATH_FLAG :=
-  IS_SPN_PREINSTALLED := $(shell where $(SPN_EXE) 2>NUL)
+
+CARGO_DIST_TARGET ?=
+ifeq ($(CARGO_DIST_TARGET),)
+  UNAME_S := $(shell uname -s)
+  UNAME_M := $(shell uname -m)
+  ifeq ($(UNAME_S),Linux)
+    TARGET := $(UNAME_M)-unknown-linux-gnu
+  else ifeq ($(UNAME_S),Darwin)
+    TARGET := $(UNAME_M)-apple-darwin
+  endif
 else
-  CC := gcc
-  CXX := g++
-  MAKE := make
-  SDL := libSDL3.a
-  LUAJIT := libluajit.a
-  SPN_EXE := spn
-  IS_SPN_PREINSTALLED := $(shell which $(SPN_EXE) 2>/dev/null)
-
-  HAS_CLANG := $(shell which clang 2>/dev/null)
-  ifdef HAS_CLANG
-    CC := clang
-    CXX := clang++
-  endif
-
-  HAS_BEAR := $(shell which bear 2>/dev/null)
-  ifdef HAS_BEAR
-    CC := bear --append -- $(CC)
-    CXX := bear --append -- $(CXX)
-    MAKE := bear --append -- $(MAKE)
-  endif
-
-  ifeq ($(shell uname),Darwin)
-    MACOSX_DEPLOYMENT_TARGET := 15.0
-    RPATH_FLAG := -Wl,-rpath,@loader_path
-    FLAG_LINKAGE :=
-    SYSTEM_LIBS := -framework CoreFoundation -framework Foundation -framework Cocoa -framework IOKit -framework GameController -framework ForceFeedback -framework AVFoundation -framework CoreAudio -framework AudioToolbox -framework Metal -framework MetalKit -framework Quartz -framework CoreHaptics -framework CoreMedia -framework Carbon -framework UniformTypeIdentifiers
-  endif
-
-  ifeq ($(shell uname),Linux)
-    RPATH_FLAG := -Wl,-rpath,\$$ORIGIN
-    FLAG_LINKAGE := -static -Wl,--gc-sections -Wl,--strip-all
-    SYSTEM_LIBS += -lm -lpthread
-  endif
+  TARGET := $(CARGO_DIST_TARGET)
 endif
 
+TARGET_PARTS := $(subst -, ,$(TARGET))
+TARGET_ARCH := $(word 1,$(TARGET_PARTS))
+ifeq ($(words $(TARGET_PARTS)),4)
+  TARGET_VENDOR := $(word 2,$(TARGET_PARTS))
+  TARGET_OS := $(word 3,$(TARGET_PARTS))
+else
+  TARGET_VENDOR := $(word 2,$(TARGET_PARTS))
+  TARGET_OS := $(word 3,$(TARGET_PARTS))
+endif
+
+ifeq ($(TARGET_OS),windows)
+  CC := $(TARGET_ARCH)-w64-mingw32-gcc
+  CXX := $(TARGET_ARCH)-w64-mingw32-g++
+  SPN := spn.exe
+  FLAG_SYSTEM_LIBS := -lws2_32 -luser32 -lkernel32 -lwinmm -limm32 -lole32 -loleaut32 -lversion -lshell32 -lsetupapi -ladvapi32 -lgdi32
+  FLAG_LINKAGE := -static -Wl,--gc-sections -Wl,--strip-all
+  FLAG_RPATH :=
+  SDL_LIB := libSDL3.a
+  LJ_LIB := libluajit.a
+  LJ_CROSS := $(TARGET_ARCH)-w64-mingw32-
+  LJ_HOST_CC := gcc -m64
+  LJ_TARGET_SYS := Windows
+  CMAKE_FLAGS := -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=$(TARGET_ARCH) -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
+else ifeq ($(TARGET_OS),linux)
+  CC := gcc
+  CXX := g++
+  SPN := spn
+  FLAG_SYSTEM_LIBS := -lm -lpthread
+  FLAG_LINKAGE := -static -Wl,--gc-sections -Wl,--strip-all
+  FLAG_RPATH := -Wl,-rpath,\$$ORIGIN
+  SDL_LIB := libSDL3.a
+  LJ_LIB := libluajit.a
+  LJ_CROSS :=
+  LJ_HOST_CC := gcc -m64
+  LJ_TARGET_SYS :=
+  CMAKE_FLAGS :=
+else ifeq ($(TARGET_OS),darwin)
+  MACOSX_DEPLOYMENT_TARGET := 15.0
+  CC := clang
+  CXX := clang++
+  SPN := spn
+  FLAG_SYSTEM_LIBS := -framework CoreFoundation -framework Foundation -framework Cocoa -framework IOKit -framework GameController -framework ForceFeedback -framework AVFoundation -framework CoreAudio -framework AudioToolbox -framework Metal -framework MetalKit -framework Quartz -framework CoreHaptics -framework CoreMedia -framework Carbon -framework UniformTypeIdentifiers
+  FLAG_LINKAGE :=
+  FLAG_RPATH := -Wl,-rpath,@loader_path
+  SDL_LIB := libSDL3.a
+  LJ_LIB := libluajit.a
+  LJ_CROSS :=
+  LJ_HOST_CC := gcc -m64
+  LJ_TARGET_SYS :=
+  CMAKE_FLAGS :=
+endif
 
 #########
 # PATHS #
 #########
 SPN_DIR_BUILD:= build
   SPN_DIR_BUILD_BOOTSTRAP:= $(SPN_DIR_BUILD)/bootstrap
-		SPN_BOOTSTRAP_WORK := $(SPN_DIR_BUILD_BOOTSTRAP)/work
-		SPN_BOOTSTRAP_BIN := $(SPN_DIR_BUILD_BOOTSTRAP)/bin
-			SPN_BOOTSTRAP_SDL_BINARY := $(SPN_BOOTSTRAP_BIN)/$(SDL)
-			SPN_BOOTSTRAP_LUAJIT_BINARY := $(SPN_BOOTSTRAP_BIN)/$(LUAJIT)
-		SPN_BOOTSTRAP_SDL := $(SPN_DIR_BUILD_BOOTSTRAP)/SDL
-		SPN_BOOTSTRAP_SP := $(SPN_DIR_BUILD_BOOTSTRAP)/sp
-		SPN_BOOTSTRAP_ARGPARSE := $(SPN_DIR_BUILD_BOOTSTRAP)/argparse
-		SPN_BOOTSTRAP_LUAJIT := $(SPN_DIR_BUILD_BOOTSTRAP)/luajit
-		SPN_BOOTSTRAP_TOML := $(SPN_DIR_BUILD_BOOTSTRAP)/toml
-		SPN_BOOTSTRAP_W64DEVKIT := $(SPN_DIR_BUILD_BOOTSTRAP)/w64devkit
+    SPN_BOOTSTRAP_WORK := $(SPN_DIR_BUILD_BOOTSTRAP)/work
+    SPN_BOOTSTRAP_BIN := $(SPN_DIR_BUILD_BOOTSTRAP)/bin
+      SPN_BOOTSTRAP_SDL_BINARY := $(SPN_BOOTSTRAP_BIN)/$(SDL_LIB)
+      SPN_BOOTSTRAP_LUAJIT_BINARY := $(SPN_BOOTSTRAP_BIN)/$(LJ_LIB)
+    SPN_BOOTSTRAP_SDL := $(SPN_DIR_BUILD_BOOTSTRAP)/SDL
+    SPN_BOOTSTRAP_SP := $(SPN_DIR_BUILD_BOOTSTRAP)/sp
+    SPN_BOOTSTRAP_ARGPARSE := $(SPN_DIR_BUILD_BOOTSTRAP)/argparse
+    SPN_BOOTSTRAP_LUAJIT := $(SPN_DIR_BUILD_BOOTSTRAP)/luajit
   SPN_DIR_BUILD_EXAMPLES := $(SPN_DIR_BUILD)/examples
   SPN_DIR_BUILD_OUTPUT := $(SPN_DIR_BUILD)/bin
-    SPN_BINARY := $(SPN_DIR_BUILD_OUTPUT)/spn
+    SPN_OUTPUT := $(SPN_DIR_BUILD_OUTPUT)/$(SPN)
 SPN_DIR_SOURCE := source
+SPN_DIR_ASSET := asset
 SPN_MAKEFILE := Makefile
 SPN_COMPILE_DB := compile_commands.json
 SPN_INSTALL_PREFIX ?= $(HOME)/.local/bin
+
 
 
 #########
 # FLAGS #
 #########
 FLAG_LANGUAGE := -std=c11
-FLAG_INCLUDES :=  -I$(SPN_DIR_SOURCE)
-FLAG_OUTPUT := -o $(SPN_BINARY)
-CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_LINKAGE) $(FLAG_INCLUDES) $(FLAG_OUTPUT)
+BOOTSTRAP_INCLUDES := -I$(SPN_BOOTSTRAP_SDL)/include -I$(SPN_BOOTSTRAP_SP) -I$(SPN_BOOTSTRAP_ARGPARSE) -I$(SPN_BOOTSTRAP_LUAJIT)/src -I$(SPN_DIR_SOURCE)
+CC_FLAGS := $(FLAG_LANGUAGE) $(FLAG_LINKAGE) $(BOOTSTRAP_INCLUDES) -o $(SPN_OUTPUT)
 
 
-###############
-# ENTRY POINT #
-###############
-PREINSTALLED_SPN := $(SPN_EXE)
-PREBUILT_SPN := ./build/bin/$(SPN_EXE)
-
-IS_SPN_PREBUILT := $(wildcard $(PREBUILT_SPN))
-ifneq ($(IS_SPN_PREBUILT),)
-  DEFAULT_TARGET := build
-  BOOTSTRAPPED_SPN := $(PREBUILT_SPN)
-else ifneq ($(IS_SPN_PREINSTALLED),)
-  DEFAULT_TARGET := build
-  BOOTSTRAPPED_SPN := $(PREINSTALLED_SPN)
-else
-  DEFAULT_TARGET := bootstrap
-endif
-
-.PHONY: all build sdl clangd clean examples install uninstall
+.PHONY: all build clangd clean examples install uninstall
 .NOTPARALLEL: examples $(EXAMPLE_DIRS)
 
-all: $(DEFAULT_TARGET)
+all: build
 
 
 #######
@@ -133,16 +139,6 @@ $(SPN_DIR_BUILD_OUTPUT):
 
 $(SPN_DIR_BUILD_EXAMPLES):
 	@mkdir -p $(SPN_DIR_BUILD_EXAMPLES)
-
-$(SPN_BINARY): $(SPN_DIR_SOURCE)/main.c $(SPN_DIR_SOURCE)/spn.h  | $(SPN_DIR_BUILD_OUTPUT)
-	$(call print_heading)
-	@printf "building $(ANSI_FG_BRIGHT_CYAN)spn$(ANSI_RESET)"
-	@echo
-
-	$(call print_and_run,$(BOOTSTRAPPED_SPN) build)
-	$(CC) ./source/main.c $(CC_FLAGS) $$($(BOOTSTRAPPED_SPN) print --compiler gcc) $(SYSTEM_LIBS)
-
-$(SPN_COMPILE_DB): $(SPN_MAKEFILE)
 
 
 #############
@@ -170,27 +166,32 @@ $(SPN_BOOTSTRAP_LUAJIT): | $(SPN_DIR_BUILD_BOOTSTRAP)
 	@git clone https://github.com/LuaJIT/LuaJIT.git $(SPN_BOOTSTRAP_LUAJIT)
 
 $(SPN_BOOTSTRAP_LUAJIT_BINARY): | $(SPN_BOOTSTRAP_LUAJIT) $(SPN_BOOTSTRAP_BIN)
-	@export MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) && make -C $(SPN_BOOTSTRAP_LUAJIT) BUILDMODE="static" amalg
-	@cp $(SPN_BOOTSTRAP_LUAJIT)/src/$(LUAJIT) $(SPN_BOOTSTRAP_LUAJIT_BINARY)
+	@make -C $(SPN_BOOTSTRAP_LUAJIT) clean
+	@$(if $(MACOSX_DEPLOYMENT_TARGET),export MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) &&) \
+	  make -C $(SPN_BOOTSTRAP_LUAJIT) amalg BUILDMODE=static \
+	    $(if $(LJ_CROSS),CROSS=$(LJ_CROSS)) \
+	    $(if $(LJ_TARGET_SYS),TARGET_SYS=$(LJ_TARGET_SYS)) \
+	    HOST_CC="$(LJ_HOST_CC)"
+	@cp $(SPN_BOOTSTRAP_LUAJIT)/src/$(LJ_LIB) $@
 
-$(SPN_BOOTSTRAP_SDL_BINARY): | $(SPN_BOOTSTRAP_SDL) $(SPN_BOOTSTRAP_WORK) $(SPN_BOOTSTRAP_BIN)
-	cmake -S$(SPN_BOOTSTRAP_SDL) -B$(SPN_BOOTSTRAP_WORK) -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF -DSDL_AUDIO=OFF -DSDL_VIDEO=OFF -DSDL_RENDER=OFF -DSDL_CAMERA=OFF -DSDL_JOYSTICK=OFF -DSDL_HAPTIC=OFF -DSDL_HIDAPI=OFF -DSDL_SENSOR=OFF -DSDL_POWER=OFF -DSDL_DIALOG=OFF -DSDL_GPU=OFF -DSDL_VULKAN=OFF -DSDL_OPENGL=OFF -DSDL_OPENGLES=OFF -DSDL_WAYLAND=OFF -DSDL_X11=OFF -DSDL_KMSDRM=OFF -DSDL_OFFSCREEN=OFF -DSDL_DUMMYVIDEO=OFF -DSDL_DUMMYAUDIO=OFF -DSDL_DUMMYCAMERA=OFF -DSDL_DISKAUDIO=OFF -DSDL_PIPEWIRE=OFF -DSDL_PULSEAUDIO=OFF -DSDL_ALSA=OFF -DSDL_JACK=OFF -DSDL_SNDIO=OFF -DSDL_OSS=OFF -DSDL_TRAY=OFF -DSDL_UNIX_CONSOLE_BUILD=ON -DCMAKE_BUILD_TYPE=Release
+$(SPN_BOOTSTRAP_SDL_BINARY): $(SPN_BOOTSTRAP_LUAJIT_BINARY) $(SPN_BOOTSTRAP_SDL) $(SPN_BOOTSTRAP_WORK) $(SPN_BOOTSTRAP_BIN)
+	cmake -S$(SPN_BOOTSTRAP_SDL) -B$(SPN_BOOTSTRAP_WORK) \
+	  -DCMAKE_C_COMPILER=$(CC) \
+	  -DCMAKE_CXX_COMPILER=$(CXX) \
+	  $(CMAKE_FLAGS) \
+	  -DCMAKE_BUILD_TYPE=Release -DSDL_SHARED=OFF -DSDL_STATIC=ON -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF -DSDL_AUDIO=OFF -DSDL_VIDEO=OFF -DSDL_RENDER=OFF -DSDL_CAMERA=OFF -DSDL_JOYSTICK=OFF -DSDL_HAPTIC=OFF -DSDL_HIDAPI=OFF -DSDL_SENSOR=OFF -DSDL_POWER=OFF -DSDL_DIALOG=OFF -DSDL_GPU=OFF -DSDL_VULKAN=OFF -DSDL_OPENGL=OFF -DSDL_OPENGLES=OFF -DSDL_WAYLAND=OFF -DSDL_X11=OFF -DSDL_KMSDRM=OFF -DSDL_OFFSCREEN=OFF -DSDL_DUMMYVIDEO=OFF -DSDL_DUMMYAUDIO=OFF -DSDL_DUMMYCAMERA=OFF -DSDL_DISKAUDIO=OFF -DSDL_PIPEWIRE=OFF -DSDL_PULSEAUDIO=OFF -DSDL_ALSA=OFF -DSDL_JACK=OFF -DSDL_SNDIO=OFF -DSDL_OSS=OFF -DSDL_TRAY=OFF -DSDL_UNIX_CONSOLE_BUILD=ON
 	cmake --build $(SPN_BOOTSTRAP_WORK) --parallel
-	@cp $(SPN_BOOTSTRAP_WORK)/$(SDL) $(SPN_BOOTSTRAP_SDL_BINARY) 2>/dev/null
+	@cp $(SPN_BOOTSTRAP_WORK)/$(SDL_LIB) $@
 
-SPN_BOOTSTRAP_DEPS := $(SPN_BOOTSTRAP_SP) $(SPN_BOOTSTRAP_ARGPARSE) $(SPN_DIR_BUILD_OUTPUT)
-BOOTSTRAP_INCLUDE := -I$(SPN_BOOTSTRAP_SDL)/include -I$(SPN_BOOTSTRAP_SP) -I$(SPN_BOOTSTRAP_TOML) -I$(SPN_BOOTSTRAP_ARGPARSE) -I$(SPN_BOOTSTRAP_LUAJIT)/src
-
-bootstrap: $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT_BINARY) | $(SPN_BOOTSTRAP_DEPS)
+$(SPN_OUTPUT): $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT_BINARY) $(SPN_DIR_SOURCE)/spn.h | $(SPN_DIR_BUILD_OUTPUT) $(SPN_BOOTSTRAP_ARGPARSE) $(SPN_BOOTSTRAP_SP)
 	$(call print_heading)
-	@echo "bootstrapping spn"
+	@echo "bootstrapping spn ($(TARGET_ARCH)-$(TARGET_VENDOR)-$(TARGET_OS))"
 
-	$(call print_and_run,$(CC) $(CC_FLAGS) $(BOOTSTRAP_INCLUDE) ./source/main.c $(SPN_BOOTSTRAP_LUAJIT_BINARY) $(SPN_BOOTSTRAP_SDL_BINARY) $(SYSTEM_LIBS))
+	$(call print_and_run,$(CC) -std=c11 $(FLAG_LINKAGE) $(BOOTSTRAP_INCLUDES) -o $(SPN_DIR_BUILD_OUTPUT)/$(SPN) ./source/main.c $(SPN_BOOTSTRAP_LUAJIT_BINARY) $(SPN_BOOTSTRAP_SDL_BINARY) $(FLAG_SYSTEM_LIBS))
 	@echo
 
 	@printf "$(ANSI_FG_GREEN)OK!$(ANSI_RESET) try $(ANSI_FG_BRIGHT_YELLOW)make examples$(ANSI_RESET) to build some projects with your spn binary"
 	@echo
-
 
 ############
 # EXAMPLES #
@@ -211,9 +212,9 @@ define build_example
 	@echo
 
 	@mkdir -p ./build/examples/$(1)
-	$(call print_and_run,$(BOOTSTRAPPED_SPN) -C ./examples/$(1) --no-interactive build)
-	$(call print_and_run,$(BOOTSTRAPPED_SPN) -C ./examples/$(1) copy ./build/examples/$(1))
-	$(call print_and_run,$(2) ./examples/$(1)/main.* -g -o ./build/examples/$(1)/main $$($(BOOTSTRAPPED_SPN) -C ./examples/$(1) print) $(RPATH_FLAG) -lm)
+	$(call print_and_run,$(SPN_OUTPUT) -C ./examples/$(1) --no-interactive build)
+	$(call print_and_run,$(SPN_OUTPUT) -C ./examples/$(1) copy ./build/examples/$(1))
+	$(call print_and_run,$(2) ./examples/$(1)/main.* -g -o ./build/examples/$(1)/main $$($(SPN_OUTPUT) -C ./examples/$(1) print) $(FLAG_RPATH) -lm)
 	@echo
 endef
 
@@ -231,34 +232,51 @@ $(EXAMPLE_TARGETS_CPP): build/examples/%/main: examples/%/main.cpp examples/%/sp
 ###########
 # PHONIES #
 ###########
-.PHONY: $(EXAMPLES)
+.PHONY: $(EXAMPLES) windows help
 
-build: $(SPN_BINARY)
+help:
+	@echo "Targets:"
+	@echo "  build         Build spn binary (default)"
+	@echo "  examples      Build all example projects"
+	@echo "  install       Install to ~/.local/bin (or SPN_INSTALL_PREFIX)"
+	@echo "  clean         Remove build artifacts"
+	@echo "  clangd        Generate compile_commands.json"
+	@echo ""
+	@echo "Cross-compilation:"
+	@echo "  make TARGET=x86_64-pc-windows-gnu"
+	@echo "  make windows  (shorthand for windows target)"
 
-dist: $(DEFAULT_TARGET)
-	@cp $(SPN_BINARY) . # dist expects our binary to be in the root
+build: $(SPN_OUTPUT)
 
-examples: $(DEFAULT_TARGET) $(EXAMPLES)
+windows:
+	@$(MAKE) TARGET=x86_64-pc-windows-gnu
 
-smoke: $(DEFAULT_TARGET)
+dist:
+	@$(MAKE) $(SPN_OUTPUT)
+	@cp $(SPN_OUTPUT) ./$(SPN)
+
+examples: build $(EXAMPLES)
+
+smoke: build
 	@for example in $(EXAMPLES); do \
 		if ! echo "$(CI_SKIP_EXAMPLES)" | grep -qw "$$example"; then \
 			$(MAKE) $$example; \
 		fi; \
 	done
 
-install: $(DEFAULT_TARGET)
+install: build
 	@mkdir -p $(SPN_INSTALL_PREFIX)
-	@cp $(SPN_BINARY) $(SPN_INSTALL_PREFIX)/spn
-	@echo "Installed spn to $(SPN_INSTALL_PREFIX)/spn"
+	@cp $(SPN_DIR_BUILD_OUTPUT)/$(SPN) $(SPN_INSTALL_PREFIX)/$(SPN)
+	@echo "Installed $(SPN) to $(SPN_INSTALL_PREFIX)/$(SPN)"
 
 uninstall:
-	@rm -f $(SPN_INSTALL_PREFIX)/spn
+	@rm -f $(SPN_INSTALL_PREFIX)/$(SPN)
 
 clangd: $(SPN_COMPILE_DB)
 
 clean:
 	@rm -rf $(SPN_DIR_BUILD)/bin
 	@rm -rf $(SPN_DIR_BUILD)/examples
+	@rm -rf $(SPN_DIR_BUILD_BOOTSTRAP)/work
+	@rm -rf $(SPN_DIR_BUILD_BOOTSTRAP)/bin
 	@rm -f $(SPN_COMPILE_DB)
-
