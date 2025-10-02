@@ -2,20 +2,23 @@
 #define SPN_H
 
 #ifdef _WIN32
-#define SPN_API __declspec(dllexport)
-#define SP_API SPN_API
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#include <shlobj.h>
-#include <commdlg.h>
-#include <shellapi.h>
-#include <conio.h>
-#include <io.h>
+  #define SPN_API __declspec(dllexport)
+  #define SP_API SPN_API
+
+  #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+  #endif
+
+  #ifndef NOMINMAX
+    #define NOMINMAX
+  #endif
+
+  #include <windows.h>
+  #include <shlobj.h>
+  #include <commdlg.h>
+  #include <shellapi.h>
+  #include <conio.h>
+  #include <io.h>
 #else
 #define SPN_API
 #endif
@@ -1308,9 +1311,10 @@ void spn_cli_command_print(spn_cli_t* cli) {
   if (!command->generator) command->generator = "";
   if (!command->compiler) command->compiler = "gcc";
 
-
   sp_dyn_array_for(app.build.deps, index) {
-    spn_dep_context_prepare(app.build.deps + index);
+    spn_dep_build_context_t* dep = app.build.deps + index;
+    spn_dep_resolve_commit(dep, dep->spec->lock);
+    spn_dep_context_prepare(dep);
   }
 
   spn_generator_context_t gen = {

@@ -52,30 +52,30 @@ else
 endif
 
 ifeq ($(TARGET_OS),windows)
-  CC := $(TARGET_ARCH)-w64-mingw32-gcc
-  CXX := $(TARGET_ARCH)-w64-mingw32-g++
+  MINGW_PREFIX := $(TARGET_ARCH)-w64-mingw32
+  CC := $(MINGW_PREFIX)-gcc
+  CXX := $(MINGW_PREFIX)-g++
   SPN := spn.exe
   FLAG_SYSTEM_LIBS := -lws2_32 -luser32 -lkernel32 -lwinmm -limm32 -lole32 -loleaut32 -lversion -lshell32 -lsetupapi -ladvapi32 -lgdi32
   FLAG_LINKAGE := -static -Wl,--gc-sections -Wl,--strip-all
   FLAG_RPATH :=
   SDL_LIB := libSDL3.a
   LJ_LIB := libluajit.a
-  LJ_CROSS := $(TARGET_ARCH)-w64-mingw32-
-  LJ_HOST_CC := gcc -m64
-  LJ_TARGET_SYS := Windows
+  LJ_ENV :=
+  LJ_FLAGS := CROSS=$(MINGW_PREFIX)- TARGET_SYS=Windows HOST_CC="gcc -m64"
   CMAKE_FLAGS := -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=$(TARGET_ARCH) -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
 else ifeq ($(TARGET_OS),linux)
   CC := gcc
   CXX := g++
   SPN := spn
   FLAG_SYSTEM_LIBS := -lm -lpthread
-  FLAG_LINKAGE := -static -Wl,--gc-sections -Wl,--strip-all
+  #FLAG_LINKAGE := -static -Wl,--gc-sections -Wl,--strip-all
+  FLAG_LINKAGE := -static -g
   FLAG_RPATH := -Wl,-rpath,\$$ORIGIN
   SDL_LIB := libSDL3.a
   LJ_LIB := libluajit.a
-  LJ_CROSS :=
-  LJ_HOST_CC := gcc -m64
-  LJ_TARGET_SYS :=
+  LJ_ENV :=
+  LJ_FLAGS := HOST_CC="gcc -m64"
   CMAKE_FLAGS :=
 else ifeq ($(TARGET_OS),darwin)
   MACOSX_DEPLOYMENT_TARGET := 15.0
@@ -87,9 +87,8 @@ else ifeq ($(TARGET_OS),darwin)
   FLAG_RPATH := -Wl,-rpath,@loader_path
   SDL_LIB := libSDL3.a
   LJ_LIB := libluajit.a
-  LJ_CROSS :=
-  LJ_HOST_CC := gcc -m64
-  LJ_TARGET_SYS :=
+  LJ_ENV := export MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) &&
+  LJ_FLAGS := HOST_CC="gcc -m64"
   CMAKE_FLAGS :=
 endif
 
@@ -167,11 +166,7 @@ $(SPN_BOOTSTRAP_LUAJIT): | $(SPN_DIR_BUILD_BOOTSTRAP)
 
 $(SPN_BOOTSTRAP_LUAJIT_BINARY): | $(SPN_BOOTSTRAP_LUAJIT) $(SPN_BOOTSTRAP_BIN)
 	@make -C $(SPN_BOOTSTRAP_LUAJIT) clean
-	@$(if $(MACOSX_DEPLOYMENT_TARGET),export MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) &&) \
-	  make -C $(SPN_BOOTSTRAP_LUAJIT) amalg BUILDMODE=static \
-	    $(if $(LJ_CROSS),CROSS=$(LJ_CROSS)) \
-	    $(if $(LJ_TARGET_SYS),TARGET_SYS=$(LJ_TARGET_SYS)) \
-	    HOST_CC="$(LJ_HOST_CC)"
+	@$(LJ_ENV) make -C $(SPN_BOOTSTRAP_LUAJIT) amalg BUILDMODE=static $(LJ_FLAGS)
 	@cp $(SPN_BOOTSTRAP_LUAJIT)/src/$(LJ_LIB) $@
 
 $(SPN_BOOTSTRAP_SDL_BINARY): $(SPN_BOOTSTRAP_LUAJIT_BINARY) $(SPN_BOOTSTRAP_SDL) $(SPN_BOOTSTRAP_WORK) $(SPN_BOOTSTRAP_BIN)
@@ -183,7 +178,7 @@ $(SPN_BOOTSTRAP_SDL_BINARY): $(SPN_BOOTSTRAP_LUAJIT_BINARY) $(SPN_BOOTSTRAP_SDL)
 	cmake --build $(SPN_BOOTSTRAP_WORK) --parallel
 	@cp $(SPN_BOOTSTRAP_WORK)/$(SDL_LIB) $@
 
-$(SPN_OUTPUT): $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT_BINARY) $(SPN_DIR_SOURCE)/spn.h | $(SPN_DIR_BUILD_OUTPUT) $(SPN_BOOTSTRAP_ARGPARSE) $(SPN_BOOTSTRAP_SP)
+$(SPN_OUTPUT): $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT_BINARY) $(SPN_DIR_SOURCE)/spn.h $(SPN_MAKEFILE) | $(SPN_DIR_BUILD_OUTPUT) $(SPN_BOOTSTRAP_ARGPARSE) $(SPN_BOOTSTRAP_SP)
 	$(call print_heading)
 	@echo "bootstrapping spn ($(TARGET_ARCH)-$(TARGET_VENDOR)-$(TARGET_OS))"
 
