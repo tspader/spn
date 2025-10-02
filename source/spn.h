@@ -1256,7 +1256,7 @@ void spn_cli_command_copy(spn_cli_t* cli) {
 
   sp_dyn_array_for(app.build.deps, index) {
     spn_dep_build_context_t* dep = app.build.deps + index;
-    spn_dep_resolve_commit(dep, dep->spec->lock)
+    spn_dep_resolve_commit(dep, dep->spec->lock);
     spn_dep_context_prepare(dep);
 
     sp_os_directory_entry_list_t entries = sp_os_scan_directory(dep->paths.lib);
