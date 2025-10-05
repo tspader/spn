@@ -39,22 +39,22 @@ end
 ---@param config spn_lua_sh_config_t
 function module:sh(config)
   local context = ffi.new('spn_sh_process_context_t')
+
   context.command = sp.str.from_cstr(config.command)
+
   local work = self.dep.paths.work
   if config.directory then
     work = sp.str.from_cstr(config.directory)
   end
   context.work = work
+
   context.shell = self.dep.sh
 
   if config.args then
-    local args_array = ffi.new('sp_str_t* [1]')
     for arg in iterator.values(config.args) do
-      local str_arg = sp.str.from_cstr(arg)
-      args_array[0] = sp.dyn_array.push(args_array[0], str_arg)
+      print(arg)
+      c.spn.sh.add_arg(context, c.sp.str.from_cstr(arg))
     end
-
-    context.args = args_array[0]
   end
 
   c.spn.sh.run(context)

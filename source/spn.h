@@ -1,6 +1,9 @@
 #ifndef SPN_H
 #define SPN_H
 
+#include <SDL3/SDL_process.h>
+#include <SDL3/SDL_properties.h>
+#include <SDL3/SDL_stdinc.h>
 #ifdef _WIN32
   #define SPN_API __declspec(dllexport)
   #define SP_API SPN_API
@@ -61,8 +64,14 @@ typedef struct {
 } spn_sh_result_t;
 
 typedef struct {
+  sp_str_t name;
+  sp_str_t value;
+} spn_sh_env_var_t;
+
+typedef struct {
   sp_str_t command;
   sp_dyn_array(sp_str_t) args;
+  sp_dyn_array(spn_sh_env_var_t) env;
   sp_str_t work;
 
   SDL_PropertiesID shell;
@@ -73,6 +82,8 @@ typedef struct {
 void spn_sh_run(spn_sh_process_context_t* context);
 s32  spn_sh_wait(spn_sh_process_context_t* context);
 spn_sh_result_t spn_sh_read_process(SDL_Process* process);
+void spn_sh_add_arg(spn_sh_process_context_t* context, sp_str_t arg);
+void spn_sh_add_env(spn_sh_process_context_t* context, sp_str_t name, sp_str_t val);
 
 /////////
 // GIT //
@@ -552,6 +563,8 @@ typedef struct {
   void            (*spn_sh_run)(spn_sh_process_context_t* context);
   s32             (*spn_sh_wait)(spn_sh_process_context_t* context);
   spn_sh_result_t (*spn_sh_read_process)(SDL_Process* process);
+  void            (*spn_sh_add_arg)(spn_sh_process_context_t*, sp_str_t);
+  void            (*spn_sh_add_env)(spn_sh_process_context_t*, sp_str_t, sp_str_t);
   sp_str_t        (*sp_str_truncate)(sp_str_t str, u32 n, sp_str_t trailer);
   spn_dep_build_kind_t (*spn_dep_build_kind_from_str)(sp_str_t str);
 } spn_lua_context_t;
@@ -819,8 +832,16 @@ void spn_sh_run(spn_sh_process_context_t* context) {
     }
   }
   sp_dyn_array_push(args, SP_NULLPTR);
-
   SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, args);
+
+  SDL_Environment* env = SDL_CreateEnvironment(true);
+  sp_dyn_array_for(context->env, index) {
+    spn_sh_env_var_t var = context->env[index];
+    const c8* name = sp_str_to_cstr(var.name);
+    const c8* value = sp_str_to_cstr(var.value);
+    SDL_SetEnvironmentVariable(env, name, value, true);
+  }
+  SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, env);
 
   if (context->work.len) {
     SDL_SetStringProperty(
@@ -1694,6 +1715,19 @@ void spn_cli_command_build(spn_cli_t* cli) {
 ///////////
 // SHELL //
 ///////////
+void spn_sh_add_arg(spn_sh_process_context_t* context, sp_str_t arg) {
+  SP_ASSERT(context);
+  sp_dyn_array_push(context->args, arg);
+}
+
+void spn_sh_add_env(spn_sh_process_context_t* context, sp_str_t name, sp_str_t value) {
+  SP_ASSERT(context);
+  spn_sh_env_var_t var = {
+    .name = sp_str_copy(name),
+    .value = sp_str_copy(value)
+  };
+  sp_dyn_array_push(context->env, var);
+}
 spn_sh_result_t spn_sh_read_process(SDL_Process* process) {
   spn_sh_result_t result = SP_ZERO_INITIALIZE();
 

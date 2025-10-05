@@ -374,6 +374,8 @@ typedef struct {
   void            (*spn_sh_run)(spn_sh_process_context_t* context);
   s32             (*spn_sh_wait)(spn_sh_process_context_t* context);
   spn_sh_result_t (*spn_sh_read_process)(SDL_Process* process);
+  void            (*spn_sh_add_arg)(spn_sh_process_context_t*, sp_str_t);
+  void            (*spn_sh_add_env)(spn_sh_process_context_t*, sp_str_t, sp_str_t);
   sp_str_t        (*sp_str_truncate)(sp_str_t str, u32 n, sp_str_t trailer);
   spn_dep_build_kind_t (*spn_dep_build_kind_from_str)(sp_str_t str);
 } spn_lua_context_t;
