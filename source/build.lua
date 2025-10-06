@@ -27,6 +27,9 @@ function module.new(dep, recipe)
     include = dep.paths.include:cstr(),
     vendor = dep.paths.vendor:cstr(),
   }
+
+  self.platform = c.sp.os.platform_name():cstr()
+
   return self
 end
 
@@ -52,8 +55,8 @@ function module:sh(config)
     c.spn.sh.add_arg(context, c.sp.str.from_cstr(arg))
   end
 
-  for env in iterator.values(config.env) do
-    c.spn.sh.add_env(context, c.sp.str.from_cstr(env))
+  for name, value in iterator.pairs(config.env) do
+    c.spn.sh.add_env(context, c.sp.str.from_cstr(name), c.sp.str.from_cstr(value))
   end
 
   c.spn.sh.run(context)
@@ -121,7 +124,8 @@ function module:make(config)
     args = {
       '--quiet',
       '--directory', directory
-    }
+    },
+    env = config.env or {}
   }
 
   if config.makefile then

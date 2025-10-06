@@ -1,9 +1,6 @@
 #ifndef SPN_H
 #define SPN_H
 
-#include <SDL3/SDL_process.h>
-#include <SDL3/SDL_properties.h>
-#include <SDL3/SDL_stdinc.h>
 #ifdef _WIN32
   #define SPN_API __declspec(dllexport)
   #define SP_API SPN_API
@@ -552,6 +549,7 @@ typedef struct {
   sp_os_dirs_t    (*sp_os_scan_directory)(sp_str_t path);
   bool            (*sp_os_is_directory)(sp_str_t path);
   bool            (*sp_os_is_regular_file)(sp_str_t path);
+  sp_str_t        (*sp_os_platform_name)(void);
   void            (*sp_dyn_array_push_f)(void** arr, void* val, u32 val_len);
   spn_dep_info_t* (*spn_dep_find)(sp_str_t name);
   sp_str_t        (*spn_git_fetch)(sp_str_t repo);
@@ -775,46 +773,47 @@ void spn_lua_init() {
     .deps = &app.deps,
     .lock = &app.lock,
     .config = &app.config,
-    .SDL_CopyFile                  = SDL_CopyFile,
-    .SDL_GetCurrentDirectory       = SDL_GetCurrentDirectory,
-    .SDL_CreateProcess             = SDL_CreateProcess,
-    .SDL_WaitProcess               = SDL_WaitProcess,
-    .SDL_KillProcess               = SDL_KillProcess,
-    .sp_hash_str                   = sp_hash_str,
-    .sp_hash_combine               = sp_hash_combine,
-    .sp_alloc                      = sp_alloc,
-    .sp_cstr_copy                  = sp_cstr_copy,
-    .sp_str_copy                   = sp_str_copy,
-    .sp_str_equal_cstr             = sp_str_equal_cstr,
-    .sp_str_from_cstr              = sp_str_from_cstr,
-    .sp_str_to_cstr                = sp_str_to_cstr,
-    .sp_os_copy                    = sp_os_copy,
-    .sp_os_copy_file               = sp_os_copy_file,
-    .sp_os_copy_directory          = sp_os_copy_directory,
-    .sp_os_extract_extension       = sp_os_extract_extension,
-    .sp_os_extract_stem            = sp_os_extract_stem,
-    .sp_os_extract_file_name       = sp_os_extract_file_name,
-    .sp_os_join_path               = sp_os_join_path,
-    .sp_os_does_path_exist         = sp_os_does_path_exist,
-    .sp_os_log                     = sp_os_log,
-    .sp_os_scan_directory          = sp_os_scan_directory,
-    .sp_os_is_directory            = sp_os_is_directory,
-    .sp_os_is_regular_file         = sp_os_is_regular_file,
-    .sp_dyn_array_push_f           = sp_dyn_array_push_f,
-    .spn_dep_find                  = spn_dep_find,
-    .spn_git_fetch                 = spn_git_fetch,
-    .spn_git_num_updates           = spn_git_num_updates,
-    .spn_git_checkout              = spn_git_checkout,
-    .spn_git_get_remote_url        = spn_git_get_remote_url,
-    .spn_git_get_commit            = spn_git_get_commit,
-    .spn_git_get_commit_message    = spn_git_get_commit_message,
-    .spn_sh_run                    = spn_sh_run,
-    .spn_sh_wait                   = spn_sh_wait,
-    .spn_sh_read_process           = spn_sh_read_process,
-    .spn_sh_add_arg                = spn_sh_add_arg,
-    .spn_sh_add_env                = spn_sh_add_env,
-    .sp_str_truncate               = sp_str_truncate,
-    .spn_dep_build_kind_from_str   = spn_dep_build_kind_from_str,
+    .SDL_CopyFile                = SDL_CopyFile,
+    .SDL_GetCurrentDirectory     = SDL_GetCurrentDirectory,
+    .SDL_CreateProcess           = SDL_CreateProcess,
+    .SDL_WaitProcess             = SDL_WaitProcess,
+    .SDL_KillProcess             = SDL_KillProcess,
+    .sp_hash_str                 = sp_hash_str,
+    .sp_hash_combine             = sp_hash_combine,
+    .sp_alloc                    = sp_alloc,
+    .sp_cstr_copy                = sp_cstr_copy,
+    .sp_str_copy                 = sp_str_copy,
+    .sp_str_equal_cstr           = sp_str_equal_cstr,
+    .sp_str_from_cstr            = sp_str_from_cstr,
+    .sp_str_to_cstr              = sp_str_to_cstr,
+    .sp_os_copy                  = sp_os_copy,
+    .sp_os_copy_file             = sp_os_copy_file,
+    .sp_os_copy_directory        = sp_os_copy_directory,
+    .sp_os_extract_extension     = sp_os_extract_extension,
+    .sp_os_extract_stem          = sp_os_extract_stem,
+    .sp_os_extract_file_name     = sp_os_extract_file_name,
+    .sp_os_join_path             = sp_os_join_path,
+    .sp_os_does_path_exist       = sp_os_does_path_exist,
+    .sp_os_log                   = sp_os_log,
+    .sp_os_scan_directory        = sp_os_scan_directory,
+    .sp_os_is_directory          = sp_os_is_directory,
+    .sp_os_is_regular_file       = sp_os_is_regular_file,
+    .sp_os_platform_name         = sp_os_platform_name,
+    .sp_dyn_array_push_f         = sp_dyn_array_push_f,
+    .spn_dep_find                = spn_dep_find,
+    .spn_git_fetch               = spn_git_fetch,
+    .spn_git_num_updates         = spn_git_num_updates,
+    .spn_git_checkout            = spn_git_checkout,
+    .spn_git_get_remote_url      = spn_git_get_remote_url,
+    .spn_git_get_commit          = spn_git_get_commit,
+    .spn_git_get_commit_message  = spn_git_get_commit_message,
+    .spn_sh_run                  = spn_sh_run,
+    .spn_sh_wait                 = spn_sh_wait,
+    .spn_sh_read_process         = spn_sh_read_process,
+    .spn_sh_add_arg              = spn_sh_add_arg,
+    .spn_sh_add_env              = spn_sh_add_env,
+    .sp_str_truncate             = sp_str_truncate,
+    .spn_dep_build_kind_from_str = spn_dep_build_kind_from_str,
   };
 }
 

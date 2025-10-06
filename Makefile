@@ -83,12 +83,12 @@ else ifeq ($(TARGET_OS),darwin)
   CXX := clang++
   SPN := spn
   FLAG_SYSTEM_LIBS := -framework CoreFoundation -framework Foundation -framework Cocoa -framework IOKit -framework GameController -framework ForceFeedback -framework AVFoundation -framework CoreAudio -framework AudioToolbox -framework Metal -framework MetalKit -framework Quartz -framework CoreHaptics -framework CoreMedia -framework Carbon -framework UniformTypeIdentifiers
-  FLAG_LINKAGE :=
+  FLAG_LINKAGE := -g
   FLAG_RPATH := -Wl,-rpath,@loader_path
   SDL_LIB := libSDL3.a
   LJ_LIB := libluajit.a
   LJ_ENV := export MACOSX_DEPLOYMENT_TARGET=$(MACOSX_DEPLOYMENT_TARGET) &&
-  LJ_FLAGS := HOST_CC="gcc -m64"
+  LJ_FLAGS := HOST_CC="clang"
   CMAKE_FLAGS :=
 endif
 

@@ -369,6 +369,7 @@ typedef struct {
   sp_os_dirs_t    (*sp_os_scan_directory)(sp_str_t path);
   bool            (*sp_os_is_directory)(sp_str_t path);
   bool            (*sp_os_is_regular_file)(sp_str_t path);
+  sp_str_t        (*sp_os_platform_name)(void);
   void            (*sp_dyn_array_push_f)(void** arr, void* val, u32 val_len);
   spn_dep_info_t* (*spn_dep_find)(sp_str_t name);
   sp_str_t        (*spn_git_fetch)(sp_str_t repo);
