@@ -1,5 +1,6 @@
 local inspect = require('inspect')
 local ffi = require('ffi')
+local utils = require('utils')
 local c = require('c')
 local sp = c.sp
 local serpent = require('serpent')
@@ -47,7 +48,7 @@ local spn_lua_dep_builder_t = require('build')
 ---@field makefile string|nil
 ---@field target string|nil
 ---@field targets string[]|nil
----@field directory string|nil
+---@field cwd string|nil
 ---@field jobs number|string|nil
 ---@field variables table<string, string>|nil
 
@@ -60,7 +61,7 @@ local spn_lua_dep_builder_t = require('build')
 ---@field command string
 ---@field args? string[]
 ---@field env? string[]
----@field directory string|nil
+---@field cwd string|nil
 
 ------------
 -- RECIPE --
@@ -168,8 +169,8 @@ function spn.load()
     local recipe = spn.recipes[name]
     recipe.spec = {
       kind = spec.kind or recipe.kinds[1],
-      include = spn.merge(recipe.include, spec.include),
-      options = spn.merge(recipe.options, spec.options),
+      include = utils.merge(recipe.include, spec.include),
+      options = utils.merge(recipe.options, spec.options),
     }
     recipe:configure()
   end
@@ -349,32 +350,6 @@ function spn.copy(to)
   end
 end
 
-function spn.ternary(value, default_value)
-  if value == nil then return default_value end
-  return value
-end
-
-function spn.merge(base, apply)
-  if type(base) ~= 'table' or type(apply) ~= 'table' then
-    return base
-  end
-
-  local result = {}
-  for k, v in pairs(base) do
-    result[k] = v
-  end
-
-  for k, v in pairs(apply) do
-    if type(v) == 'table' and type(result[k]) == 'table' then
-      result[k] = spn.merge(result[k], v)
-    else
-      result[k] = v
-    end
-  end
-
-  return result
-end
-
 ---@param config spn_lua_recipe_config_t
 ---@return spn_lua_recipe_t
 local basic = function(config)
@@ -402,9 +377,9 @@ local basic = function(config)
   recipe.configure = config.configure or recipe.configure
   if config.include then
     recipe.include = {
-      include = spn.ternary(config.include.include, recipe.include.include),
-      vendor = spn.ternary(config.include.vendor, recipe.include.vendor),
-      store = spn.ternary(config.include.store, recipe.include.store),
+      include = utils.ternary(config.include.include, recipe.include.include),
+      vendor = utils.ternary(config.include.vendor, recipe.include.vendor),
+      store = utils.ternary(config.include.store, recipe.include.store),
     }
   end
   return recipe
@@ -437,7 +412,9 @@ local module = {
     static = 'static',
     source = 'source'
   },
-  table_merge = spn_table_merge,
+  utils = {
+    merge = utils.merge,
+  },
   internal = spn
 }
 

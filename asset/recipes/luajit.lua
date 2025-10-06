@@ -13,7 +13,7 @@ local recipe = spn.recipes.basic({
       { builder:source('*'), builder:work() }
     })
 
-    local make = {
+    builder:make({
       target = 'amalg',
       macos = {
         env = {
@@ -24,19 +24,7 @@ local recipe = spn.recipes.basic({
           TARGET_DYLIBPATH = '@rpath/libluajit.dylib'
         }
       }
-    }
-
-    if builder.platform == 'macos' then
-      make.env = {
-        MACOSX_DEPLOYMENT_TARGET = '13.0'
-      }
-      make.variables = {
-        LUAJIT_SO = 'libluajit.dylib',
-        TARGET_DYLIBPATH = '@rpath/libluajit.dylib'
-      }
-    end
-
-    builder:make(make)
+    })
 
     builder:copy({
       { builder:source('src/lua.h'), builder:include() },

@@ -1,7 +1,7 @@
 local ffi = require('ffi')
 local iterator = require('iterator')
+local utils = require('utils')
 local c = require('c')
-local inspect = require('inspect')
 local sp = c.sp
 
 local module = {}
@@ -42,13 +42,15 @@ end
 ----------------
 ---@param config spn_lua_sh_config_t
 function module:sh(config)
-  config.directory = config.directory or self.paths.work
+  config = config or {}
+  config = utils.merge(config, config[self.platform] or {})
+  config.cwd = config.cwd or self.paths.work
   config.args = config.args or {}
   config.env = config.env or {}
 
   local context = ffi.new('spn_sh_process_context_t')
   context.command = sp.str.from_cstr(config.command)
-  context.work = sp.str.from_cstr(config.directory)
+  context.work = sp.str.from_cstr(config.cwd)
   context.shell = self.dep.sh
 
   for arg in iterator.values(config.args) do
@@ -86,6 +88,7 @@ end
 ---@param config spn_lua_cc_config_t
 function module:cc(config)
   config = config or {}
+  config = utils.merge(config, config[self.platform] or {})
 
   local sh = {
     command = config.compiler,
@@ -117,15 +120,15 @@ end
 ---@param config spn_lua_make_config_t
 function module:make(config)
   config = config or {}
+  config = utils.merge(config, config[self.platform] or {})
 
-  local directory = config.directory or self.paths.work
   local sh = {
     command = 'make',
     args = {
       '--quiet',
-      '--directory', directory
+      '--directory', config.cwd or self.paths.work
     },
-    env = config.env or {}
+    env = config.env
   }
 
   if config.makefile then
@@ -149,10 +152,8 @@ function module:make(config)
     end
   elseif config.target then
     table.insert(sh.args, config.target)
-  end
-
-  if config.directory then
-    sh.directory = config.directory
+  else
+    error()
   end
 
   self:sh(sh)
@@ -161,7 +162,7 @@ end
 ---@param config spn_lua_cmake_config_t
 function module:cmake(config)
   config = config or {}
-  config.defines = config.defines or {}
+  config = utils.merge(config, config[self.platform] or {})
   config.parallel = (config.parallel == nil) and true or config.parallel
   config.install = (config.install == nil) and false or config.install
 
@@ -174,10 +175,12 @@ function module:cmake(config)
     }
   }
 
-  for define in iterator.values(config.defines) do
-    local name = define[1]
-    local value = define[2] and 'ON' or 'OFF'
-    table.insert(sh.args, string.format('-D%s=%s', name, value))
+  if config.defines then
+    for define in iterator.values(config.defines) do
+      local name = define[1]
+      local value = define[2] and 'ON' or 'OFF'
+      table.insert(sh.args, string.format('-D%s=%s', name, value))
+    end
   end
 
   self:sh_proxy(sh)
