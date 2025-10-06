@@ -811,6 +811,8 @@ void spn_lua_init() {
     .spn_sh_run                    = spn_sh_run,
     .spn_sh_wait                   = spn_sh_wait,
     .spn_sh_read_process           = spn_sh_read_process,
+    .spn_sh_add_arg                = spn_sh_add_arg,
+    .spn_sh_add_env                = spn_sh_add_env,
     .sp_str_truncate               = sp_str_truncate,
     .spn_dep_build_kind_from_str   = spn_dep_build_kind_from_str,
   };

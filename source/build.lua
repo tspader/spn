@@ -1,6 +1,7 @@
 local ffi = require('ffi')
 local iterator = require('iterator')
 local c = require('c')
+local inspect = require('inspect')
 local sp = c.sp
 
 local module = {}
@@ -38,23 +39,21 @@ end
 ----------------
 ---@param config spn_lua_sh_config_t
 function module:sh(config)
+  config.directory = config.directory or self.paths.work
+  config.args = config.args or {}
+  config.env = config.env or {}
+
   local context = ffi.new('spn_sh_process_context_t')
-
   context.command = sp.str.from_cstr(config.command)
-
-  local work = self.dep.paths.work
-  if config.directory then
-    work = sp.str.from_cstr(config.directory)
-  end
-  context.work = work
-
+  context.work = sp.str.from_cstr(config.directory)
   context.shell = self.dep.sh
 
-  if config.args then
-    for arg in iterator.values(config.args) do
-      print(arg)
-      c.spn.sh.add_arg(context, c.sp.str.from_cstr(arg))
-    end
+  for arg in iterator.values(config.args) do
+    c.spn.sh.add_arg(context, c.sp.str.from_cstr(arg))
+  end
+
+  for env in iterator.values(config.env) do
+    c.spn.sh.add_env(context, c.sp.str.from_cstr(env))
   end
 
   c.spn.sh.run(context)

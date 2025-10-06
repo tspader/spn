@@ -4,15 +4,20 @@ local recipe = spn.recipes.basic({
   git = 'LuaJIT/LuaJIT',
   kinds = { 'static', 'shared' },
   libs = { 'luajit' },
+  options = {
+
+  },
   build = function(builder)
     -- mike.......
-    builder:sh({
-      command = 'rsync',
-      args = {'-a', '--exclude=.git', builder.paths.source .. '/', builder.paths.work .. '/'}
+    builder:copy({
+      { builder:source('*'), builder:work() }
     })
 
     builder:make({
-      target = 'amalg'
+      target = 'amalg',
+      env = {
+        MACOSX_DEPLOYMENT_TARGET = '13.0'
+      }
     })
 
     builder:copy({

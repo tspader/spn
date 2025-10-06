@@ -58,7 +58,8 @@ local spn_lua_dep_builder_t = require('build')
 
 ---@class spn_lua_sh_config_t
 ---@field command string
----@field args string[]|nil
+---@field args? string[]
+---@field env? string[]
 ---@field directory string|nil
 
 ------------

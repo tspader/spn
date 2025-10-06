@@ -84,8 +84,14 @@ function module.load(app)
     } spn_sh_result_t;
 
     typedef struct {
+      sp_str_t name;
+      sp_str_t value;
+    } spn_sh_env_var_t;
+
+    typedef struct {
       sp_str_t command;
       sp_str_t* args;
+      spn_sh_env_var_t* env;
       sp_str_t work;
 
       SDL_PropertiesID shell;
