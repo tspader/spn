@@ -173,8 +173,6 @@ function module:make(config)
     end
   elseif config.target then
     table.insert(sh.args, config.target)
-  else
-    error()
   end
 
   self:sh(sh)
@@ -198,12 +196,11 @@ function module:cmake(config)
   }
 
   local build_type = self.mode == 'debug' and 'Debug' or 'Release'
-  print(build_type)
   table.insert(sh.args, string.format('-DCMAKE_BUILD_TYPE=%s', build_type))
+  table.insert(sh.args, string.format('-DCMAKE_DEBUG_POSTFIX='))
 
-  if self.kind == 'shared' then
-    table.insert(config.defines, { 'BUILD_SHARED_LIBS', false })
-  end
+  local shared = self.kind == 'shared'
+  table.insert(config.defines, { 'BUILD_SHARED_LIBS', shared })
 
   for define in iterator.values(config.defines) do
     local name = define[1]
@@ -236,6 +233,16 @@ function module:cmake(config)
       }
     })
   end
+end
+
+function module:configure(config)
+  local sh = {
+    command = self:source('configure').absolute,
+    args = {
+      self.kind == 'shared' and '--enable-shared' or '--disable-shared',
+      self.kind == 'shared' and '--disable-static' or '--enable-static',
+    }
+  }
 end
 
 function module:path(base, subpath)

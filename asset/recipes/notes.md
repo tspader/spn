@@ -1,0 +1,2 @@
+# curl
+- produces libcurl-d.*

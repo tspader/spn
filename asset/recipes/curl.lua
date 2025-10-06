@@ -13,7 +13,6 @@ local recipe = spn.recipes.basic({
       },
       install = true,
     })
-
   end,
 })
 

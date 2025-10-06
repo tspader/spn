@@ -5,10 +5,9 @@ local recipe = spn.recipes.basic({
   libs = { 'freetype' },
   kinds = { 'shared', 'static' },
   build = function(builder)
-    local shared = builder.kind == 'shared'
     builder:cmake({
       defines = {
-        { 'BUILD_SHARED_LIBS', shared },
+        { 'DISABLE_FORCE_DEBUG_POSTFIX', true, }
       },
       install = true,
     })

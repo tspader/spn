@@ -5,10 +5,7 @@ local recipe = spn.recipes.basic({
   libs = { 'quickjs' },
   kinds = { 'static' },
   build = function(builder)
-    builder:make({
-      directory = builder.paths.source,
-      targets = { 'libquickjs.a' },
-    })
+    builder:make()
 
     builder:copy({
       { builder:source('quickjs.h'), builder:include() },
