@@ -161,6 +161,7 @@ typedef enum {
 } spn_gen_compiler_t;
 
 typedef enum {
+  SPN_DIR_CACHE,
   SPN_DIR_STORE,
   SPN_DIR_INCLUDE,
   SPN_DIR_VENDOR,
@@ -186,7 +187,7 @@ typedef struct {
 spn_generator_kind_t spn_gen_kind_from_str(sp_str_t str);
 spn_gen_entry_kind_t spn_gen_entry_from_str(sp_str_t str);
 spn_gen_compiler_t   spn_gen_compiler_from_str(sp_str_t str);
-spn_cache_dir_kind_t spn_dir_kind_from_str(sp_str_t str);
+spn_cache_dir_kind_t spn_cache_dir_kind_from_str(sp_str_t str);
 sp_str_t             spn_gen_format_entry_for_compiler(sp_str_t entry, spn_gen_entry_kind_t kind, spn_gen_compiler_t compiler);
 
 //////////////////
@@ -220,6 +221,11 @@ typedef enum {
   SPN_DEP_BUILD_STATE_CANCELED,
   SPN_DEP_BUILD_STATE_FAILED
 } spn_dep_build_state_t;
+
+typedef struct {
+  sp_str_t name;
+  spn_dep_build_mode_t mode;
+} spn_build_profile_t;
 
 typedef struct {
   spn_dep_build_state_t build;
@@ -269,8 +275,8 @@ typedef struct {
 typedef struct {
   spn_dep_info_t* info;
   spn_dep_spec_t* spec;
+  spn_build_profile_t* profile;
   sp_str_t build_id;
-  spn_dep_build_mode_t mode;
   spn_dep_build_paths_t paths;
 
   bool force;
@@ -309,6 +315,7 @@ typedef sp_dyn_array(spn_lock_entry_t) spn_lock_file_t;
 
 typedef struct {
   sp_dyn_array(spn_dep_build_context_t) deps;
+  spn_build_profile_t* profile;
 } spn_build_context_t;
 
 spn_dep_info_t*          spn_dep_find(sp_str_t name);
@@ -320,8 +327,7 @@ spn_dep_build_kind_t     spn_dep_build_kind_from_str(sp_str_t str);
 sp_str_t                 spn_dep_build_kind_to_str(spn_dep_build_kind_t kind);
 sp_str_t                 spn_dep_state_to_str(spn_dep_build_state_t state);
 spn_lock_entry_t*        spn_dep_context_get_lock_entry(spn_dep_build_context_t* dep);
-void                     spn_dep_resolve_commit(spn_dep_build_context_t* dep, sp_str_t commit);
-void                     spn_dep_context_prepare(spn_dep_build_context_t* context);
+void                     spn_dep_context_prepare(spn_dep_build_context_t* context, sp_str_t commit);
 void                     spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state);
 void                     spn_dep_context_set_build_error(spn_dep_build_context_t* dep, sp_str_t error);
 void                     spn_dep_context_clone(spn_dep_build_context_t* dep);
@@ -426,6 +432,7 @@ typedef struct {
   sp_str_t name;
   sp_dyn_array(sp_str_t) system_deps;
   sp_dyn_array(spn_dep_spec_t) deps;
+  sp_dyn_array(spn_build_profile_t) profiles;
 } spn_project_t;
 
 spn_dep_spec_t* spn_project_find_dep(sp_str_t name);
@@ -439,20 +446,9 @@ typedef struct {
 } spn_cli_add_t;
 
 typedef struct {
-} spn_cli_init_t;
-
-typedef struct {
   bool force;
   bool update;
 } spn_cli_build_t;
-
-typedef struct {
-} spn_cli_list_t;
-
-typedef struct {
-  const c8* package;
-  const c8* kind;
-} spn_cli_dir_t;
 
 typedef struct {
   const c8* generator;
@@ -478,11 +474,9 @@ typedef struct {
   u32 num_args;
   const c8** args;
   const c8* project_directory;
+  const c8* matrix;
   bool no_interactive;
   spn_cli_add_t add;
-  spn_cli_init_t init;
-  spn_cli_list_t list;
-  spn_cli_dir_t dir;
   spn_cli_print_t print;
   spn_cli_build_t build;
   spn_cli_ls_t ls;
@@ -495,7 +489,6 @@ void spn_cli_command_list(spn_cli_t* cli);
 void spn_cli_command_nuke(spn_cli_t* cli);
 void spn_cli_command_clean(spn_cli_t* cli);
 void spn_cli_command_build(spn_cli_t* cli);
-void spn_cli_command_dir(spn_cli_t* cli);
 void spn_cli_command_copy(spn_cli_t* cli);
 void spn_cli_command_print(spn_cli_t* cli);
 void spn_cli_command_ls(spn_cli_t* cli);
@@ -524,47 +517,49 @@ typedef struct {
   spn_lock_entry_t** lock;
   spn_lua_config_t* config;
 
-  bool            (*SDL_CopyFile)(const c8*, const c8*);
-  c8*             (*SDL_GetCurrentDirectory)(void);
-  SDL_Process*    (*SDL_CreateProcess)(const c8* const* args, bool pipe_stdio);
-  bool            (*SDL_WaitProcess)(SDL_Process* process, bool block, int* result);
-  bool            (*SDL_KillProcess)(SDL_Process* process, bool force);
-  sp_hash_t       (*sp_hash_str)(sp_str_t str);
-  sp_hash_t       (*sp_hash_combine)(sp_hash_t* hashes, u32 num_hashes);
-  void*           (*sp_alloc)(u32 n);
-  c8*             (*sp_cstr_copy)(const c8* str);
-  sp_str_t        (*sp_str_copy)(sp_str_t str);
-  bool            (*sp_str_equal_cstr)(sp_str_t str, const c8* cstr);
-  sp_str_t        (*sp_str_from_cstr)(const c8* cstr);
-  c8*             (*sp_str_to_cstr)(sp_str_t str);
-  void            (*sp_os_copy)(sp_str_t from, sp_str_t to);
-  void            (*sp_os_copy_file)(sp_str_t from, sp_str_t to);
-  void            (*sp_os_copy_directory)(sp_str_t from, sp_str_t to);
-  sp_str_t        (*sp_os_extract_extension)(sp_str_t path);
-  sp_str_t        (*sp_os_extract_stem)(sp_str_t path);
-  sp_str_t        (*sp_os_extract_file_name)(sp_str_t path);
-  sp_str_t        (*sp_os_join_path)(sp_str_t a, sp_str_t b);
-  bool            (*sp_os_does_path_exist)(sp_str_t a);
-  void            (*sp_os_log)(sp_str_t message);
-  sp_os_dirs_t    (*sp_os_scan_directory)(sp_str_t path);
-  bool            (*sp_os_is_directory)(sp_str_t path);
-  bool            (*sp_os_is_regular_file)(sp_str_t path);
-  sp_str_t        (*sp_os_platform_name)(void);
-  void            (*sp_dyn_array_push_f)(void** arr, void* val, u32 val_len);
-  spn_dep_info_t* (*spn_dep_find)(sp_str_t name);
-  sp_str_t        (*spn_git_fetch)(sp_str_t repo);
-  u32             (*spn_git_num_updates)(sp_str_t repo, sp_str_t from, sp_str_t to);
-  void            (*spn_git_checkout)(sp_str_t repo, sp_str_t commit);
-  sp_str_t        (*spn_git_get_remote_url)(sp_str_t repo_path);
-  sp_str_t        (*spn_git_get_commit)(sp_str_t repo_path, sp_str_t id);
-  sp_str_t        (*spn_git_get_commit_message)(sp_str_t repo_path, sp_str_t id);
-  void            (*spn_sh_run)(spn_sh_process_context_t* context);
-  s32             (*spn_sh_wait)(spn_sh_process_context_t* context);
-  spn_sh_result_t (*spn_sh_read_process)(SDL_Process* process);
-  void            (*spn_sh_add_arg)(spn_sh_process_context_t*, sp_str_t);
-  void            (*spn_sh_add_env)(spn_sh_process_context_t*, sp_str_t, sp_str_t);
-  sp_str_t        (*sp_str_truncate)(sp_str_t str, u32 n, sp_str_t trailer);
+  bool                 (*SDL_CopyFile)(const c8*, const c8*);
+  c8*                  (*SDL_GetCurrentDirectory)(void);
+  SDL_Process*         (*SDL_CreateProcess)(const c8* const* args, bool pipe_stdio);
+  bool                 (*SDL_WaitProcess)(SDL_Process* process, bool block, int* result);
+  bool                 (*SDL_KillProcess)(SDL_Process* process, bool force);
+  sp_hash_t            (*sp_hash_str)(sp_str_t str);
+  sp_hash_t            (*sp_hash_combine)(sp_hash_t* hashes, u32 num_hashes);
+  void*                (*sp_alloc)(u32 n);
+  c8*                  (*sp_cstr_copy)(const c8* str);
+  sp_str_t             (*sp_str_copy)(sp_str_t str);
+  bool                 (*sp_str_equal_cstr)(sp_str_t str, const c8* cstr);
+  sp_str_t             (*sp_str_from_cstr)(const c8* cstr);
+  c8*                  (*sp_str_to_cstr)(sp_str_t str);
+  void                 (*sp_os_copy)(sp_str_t from, sp_str_t to);
+  void                 (*sp_os_copy_file)(sp_str_t from, sp_str_t to);
+  void                 (*sp_os_copy_directory)(sp_str_t from, sp_str_t to);
+  sp_str_t             (*sp_os_extract_extension)(sp_str_t path);
+  sp_str_t             (*sp_os_extract_stem)(sp_str_t path);
+  sp_str_t             (*sp_os_extract_file_name)(sp_str_t path);
+  sp_str_t             (*sp_os_join_path)(sp_str_t a, sp_str_t b);
+  bool                 (*sp_os_does_path_exist)(sp_str_t a);
+  void                 (*sp_os_log)(sp_str_t message);
+  sp_os_dirs_t         (*sp_os_scan_directory)(sp_str_t path);
+  bool                 (*sp_os_is_directory)(sp_str_t path);
+  bool                 (*sp_os_is_regular_file)(sp_str_t path);
+  sp_str_t             (*sp_os_platform_name)(void);
+  void                 (*sp_dyn_array_push_f)(void** arr, void* val, u32 val_len);
+  spn_dep_info_t*      (*spn_dep_find)(sp_str_t name);
+  sp_str_t             (*spn_git_fetch)(sp_str_t repo);
+  u32                  (*spn_git_num_updates)(sp_str_t repo, sp_str_t from, sp_str_t to);
+  void                 (*spn_git_checkout)(sp_str_t repo, sp_str_t commit);
+  sp_str_t             (*spn_git_get_remote_url)(sp_str_t repo_path);
+  sp_str_t             (*spn_git_get_commit)(sp_str_t repo_path, sp_str_t id);
+  sp_str_t             (*spn_git_get_commit_message)(sp_str_t repo_path, sp_str_t id);
+  void                 (*spn_sh_run)(spn_sh_process_context_t* context);
+  s32                  (*spn_sh_wait)(spn_sh_process_context_t* context);
+  spn_sh_result_t      (*spn_sh_read_process)(SDL_Process* process);
+  void                 (*spn_sh_add_arg)(spn_sh_process_context_t*, sp_str_t);
+  void                 (*spn_sh_add_env)(spn_sh_process_context_t*, sp_str_t, sp_str_t);
+  sp_str_t             (*sp_str_truncate)(sp_str_t str, u32 n, sp_str_t trailer);
   spn_dep_build_kind_t (*spn_dep_build_kind_from_str)(sp_str_t str);
+  sp_str_t             (*spn_dep_build_mode_to_str)(spn_dep_build_mode_t);
+  spn_dep_build_mode_t (*spn_dep_build_mode_from_str)(sp_str_t);
 } spn_lua_context_t;
 
 
@@ -814,6 +809,8 @@ void spn_lua_init() {
     .spn_sh_add_env              = spn_sh_add_env,
     .sp_str_truncate             = sp_str_truncate,
     .spn_dep_build_kind_from_str = spn_dep_build_kind_from_str,
+    .spn_dep_build_mode_to_str   = spn_dep_build_mode_to_str,
+    .spn_dep_build_mode_from_str = spn_dep_build_mode_from_str,
   };
 }
 
@@ -1040,20 +1037,23 @@ void spn_cli_command_nuke(spn_cli_t* cli) {
 }
 
 void spn_cli_command_clean(spn_cli_t* cli) {
+  SP_LOG("Removing {:fg brightcyan}", SP_FMT_STR(app.paths.build));
   sp_os_remove_directory(app.paths.build);
+  SP_LOG("Removing {:fg brightcyan}", SP_FMT_STR(app.paths.store));
   sp_os_remove_directory(app.paths.store);
 }
 
-spn_cache_dir_kind_t spn_dir_kind_from_str(sp_str_t str) {
+spn_cache_dir_kind_t spn_cache_dir_kind_from_str(sp_str_t str) {
   if      (sp_str_equal_cstr(str, ""))         return SPN_DIR_STORE;
+  else if (sp_str_equal_cstr(str, "cache"))    return SPN_DIR_CACHE;
   else if (sp_str_equal_cstr(str, "store"))    return SPN_DIR_STORE;
   else if (sp_str_equal_cstr(str, "include"))  return SPN_DIR_INCLUDE;
   else if (sp_str_equal_cstr(str, "vendor"))   return SPN_DIR_VENDOR;
   else if (sp_str_equal_cstr(str, "lib"))      return SPN_DIR_LIB;
   else if (sp_str_equal_cstr(str, "source"))   return SPN_DIR_SOURCE;
-  else if (sp_str_equal_cstr(str, "work"))      return SPN_DIR_WORK;
+  else if (sp_str_equal_cstr(str, "work"))     return SPN_DIR_WORK;
 
-  SP_FATAL("Unknown dir kind {:fg brightyellow}; options are [store, include, vendor, lib, source, work]", SP_FMT_STR(str));
+  SP_FATAL("Unknown dir kind {:fg brightyellow}; options are [cache, store, include, vendor, lib, source, work]", SP_FMT_STR(str));
 }
 
 spn_gen_entry_kind_t spn_gen_entry_from_str(sp_str_t str) {
@@ -1197,7 +1197,18 @@ sp_str_t spn_gen_build_entries_for_all(spn_gen_entry_kind_t kind, spn_gen_compil
   return sp_str_join_n(entries, sp_dyn_array_size(entries), sp_str_lit(" "));
 }
 
-sp_str_t spn_dep_get_dir_path(spn_dep_build_context_t* dep, spn_cache_dir_kind_t kind) {
+sp_str_t spn_cache_dir_kind_to_path(spn_cache_dir_kind_t kind) {
+  switch (kind) {
+    case SPN_DIR_CACHE:   return app.paths.cache;
+    case SPN_DIR_STORE:   return app.paths.store;
+    case SPN_DIR_SOURCE:  return app.paths.source;
+    case SPN_DIR_WORK:    return app.paths.work;
+    default: SP_UNREACHABLE();
+  }
+  SP_UNREACHABLE();
+}
+
+sp_str_t spn_cache_dir_kind_to_dep_path(spn_dep_build_context_t* dep, spn_cache_dir_kind_t kind) {
   switch (kind) {
     case SPN_DIR_STORE:   return dep->paths.store;
     case SPN_DIR_INCLUDE: return dep->paths.include;
@@ -1205,46 +1216,10 @@ sp_str_t spn_dep_get_dir_path(spn_dep_build_context_t* dep, spn_cache_dir_kind_t
     case SPN_DIR_VENDOR:  return dep->paths.vendor;
     case SPN_DIR_SOURCE:  return dep->paths.source;
     case SPN_DIR_WORK:    return dep->paths.work;
+    case SPN_DIR_CACHE:   SP_ASSERT(false);
+    default: SP_UNREACHABLE();
   }
   SP_UNREACHABLE();
-}
-
-void spn_cli_command_dir(spn_cli_t* cli) {
-  spn_cli_dir_t* command = &cli->dir;
-
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_END()
-    },
-    (const c8* const []) {
-      "spn dir <package> [store|include|vendor]",
-      "Output the directory path for a package",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
-
-  if (cli->num_args < 1) {
-    SP_FATAL("Package name required");
-  }
-
-  command->package = cli->args[0];
-  command->kind = cli->num_args > 1 ? cli->args[1] : "";
-
-  sp_str_t package = sp_str_view(command->package);
-  spn_cache_dir_kind_t kind = spn_dir_kind_from_str(sp_str_view(command->kind));
-
-  spn_dep_build_context_t* dep = spn_build_context_find_dep(&app.build, package);
-  if (!dep) {
-    SP_FATAL("Package {:fg brightcyan} not found", SP_FMT_STR(package));
-  }
-
-  sp_str_t output = spn_dep_get_dir_path(dep, kind);
-  printf("%.*s", output.len, output.data);
 }
 
 void spn_cli_command_copy(spn_cli_t* cli) {
@@ -1278,8 +1253,7 @@ void spn_cli_command_copy(spn_cli_t* cli) {
 
   sp_dyn_array_for(app.build.deps, index) {
     spn_dep_build_context_t* dep = app.build.deps + index;
-    spn_dep_resolve_commit(dep, dep->spec->lock);
-    spn_dep_context_prepare(dep);
+    spn_dep_context_prepare(dep, dep->spec->lock);
 
     sp_os_directory_entry_list_t entries = sp_os_scan_directory(dep->paths.lib);
     for (u32 i = 0; i < entries.count; i++) {
@@ -1336,8 +1310,7 @@ void spn_cli_command_print(spn_cli_t* cli) {
 
   sp_dyn_array_for(app.build.deps, index) {
     spn_dep_build_context_t* dep = app.build.deps + index;
-    spn_dep_resolve_commit(dep, dep->spec->lock);
-    spn_dep_context_prepare(dep);
+    spn_dep_context_prepare(dep, dep->spec->lock);
   }
 
   spn_generator_context_t gen = {
@@ -1469,6 +1442,7 @@ void spn_cli_command_ls(spn_cli_t* cli) {
     &argparse,
     (struct argparse_option []) {
       OPT_HELP(),
+      OPT_STRING('p', "package", &cli->ls.package, "", SP_NULLPTR),
       OPT_STRING('d', "dir", &cli->ls.dir, "which directory to list (store, include, lib, source, work, vendor)", SP_NULLPTR),
       OPT_END()
     },
@@ -1481,41 +1455,42 @@ void spn_cli_command_ls(spn_cli_t* cli) {
   );
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
-  if (cli->num_args < 1) {
-    if (app.build.deps) {
+  spn_cli_ls_t* ls = &cli->ls;
+  if (ls->package) {
+    sp_str_t package = sp_str_view(ls->package);
+
+    spn_dep_build_context_t* dep = spn_build_context_find_dep(&app.build, package);
+    if (!dep) {
+      SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(package));
+    }
+
+    if (sp_str_empty(dep->spec->lock)) {
       SP_FATAL(
-        "no package name specified; try {:fg brightyellow} {:fg yellow}",
-        SP_FMT_CSTR("spn ls"),
-        SP_FMT_STR(app.build.deps[0].info->name)
+        "Package {:fg brightcyan} hasn't been built yet. Run {:fg brightyellow} first.",
+        SP_FMT_STR(package),
+        SP_FMT_CSTR("spn build")
       );
     }
-    else {
-      SP_FATAL("you have no dependencies lol");
+
+    spn_dep_context_prepare(dep, dep->spec->lock);
+
+    spn_cache_dir_kind_t kind = SPN_DIR_STORE;
+    if (cli->ls.dir) {
+      kind = spn_cache_dir_kind_from_str(sp_str_view(cli->ls.dir));
     }
+
+    sp_str_t dir = spn_cache_dir_kind_to_dep_path(dep, kind);
+    sp_sh_ls(dir);
   }
+  else {
+    spn_cache_dir_kind_t kind = SPN_DIR_CACHE;
+    if (cli->ls.dir) {
+      kind = spn_cache_dir_kind_from_str(sp_str_view(cli->ls.dir));
+    }
 
-  sp_str_t package = sp_str_view(cli->args[0]);
-
-  spn_dep_build_context_t* dep = spn_build_context_find_dep(&app.build, package);
-  if (!dep) {
-    SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(package));
+    sp_str_t dir = spn_cache_dir_kind_to_path(kind);
+    sp_sh_ls(dir);
   }
-
-  if (sp_str_empty(dep->spec->lock)) {
-    SP_FATAL(
-      "Package {:fg brightcyan} hasn't been built yet. Run {:fg brightyellow} first.",
-      SP_FMT_STR(package),
-      SP_FMT_CSTR("spn build")
-    );
-  }
-
-  spn_dep_resolve_commit(dep, dep->spec->lock);
-  spn_dep_context_prepare(dep);
-
-  spn_cache_dir_kind_t dir_kind = cli->ls.dir ? spn_dir_kind_from_str(sp_str_view(cli->ls.dir)) : SPN_DIR_STORE;
-  sp_str_t dir_path = spn_dep_get_dir_path(dep, dir_kind);
-
-  sp_sh_ls(dir_path);
 }
 
 void spn_cli_command_which(spn_cli_t* cli) {
@@ -1524,6 +1499,7 @@ void spn_cli_command_which(spn_cli_t* cli) {
     &argparse,
     (struct argparse_option []) {
       OPT_HELP(),
+      OPT_STRING('p', "package", &cli->which.package, "", SP_NULLPTR),
       OPT_STRING('d', "dir", &cli->which.dir, "which directory to show (store, include, lib, source, work, vendor)", SP_NULLPTR),
       OPT_END()
     },
@@ -1536,44 +1512,43 @@ void spn_cli_command_which(spn_cli_t* cli) {
   );
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
-  if (cli->num_args < 1) {
-    if (app.build.deps) {
+  spn_cli_which_t* which = &cli->which;
+  if (which->package) {
+    sp_str_t package = sp_str_view(which->package);
+
+    spn_dep_build_context_t* dep = spn_build_context_find_dep(&app.build, package);
+    if (!dep) {
+      SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(package));
+    }
+
+    if (sp_str_empty(dep->spec->lock)) {
       SP_FATAL(
-        "no package name specified; try {:fg brightyellow} {:fg yellow}",
-        SP_FMT_CSTR("spn which"),
-        SP_FMT_STR(app.build.deps[0].info->name)
+        "Package {:fg brightcyan} hasn't been built yet. Run {:fg brightyellow} first.",
+        SP_FMT_STR(package),
+        SP_FMT_CSTR("spn build")
       );
     }
-    else {
-      SP_FATAL("you have no dependencies lol");
+
+    spn_dep_context_prepare(dep, dep->spec->lock);
+
+    spn_cache_dir_kind_t kind = SPN_DIR_STORE;
+    if (cli->which.dir) {
+      kind = spn_cache_dir_kind_from_str(sp_str_view(cli->which.dir));
     }
+
+    sp_str_t dir = spn_cache_dir_kind_to_dep_path(dep, kind);
+    printf("%.*s", dir.len, dir.data);
+
   }
+  else {
+    spn_cache_dir_kind_t kind = SPN_DIR_CACHE;
+    if (cli->which.dir) {
+      kind = spn_cache_dir_kind_from_str(sp_str_view(cli->which.dir));
+    }
 
-  sp_str_t package = sp_str_view(cli->args[0]);
-
-  spn_dep_build_context_t* dep = spn_build_context_find_dep(&app.build, package);
-  if (!dep) {
-    SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(package));
+    sp_str_t dir = spn_cache_dir_kind_to_path(kind);
+    printf("%.*s", dir.len, dir.data);
   }
-
-  if (sp_str_empty(dep->spec->lock)) {
-    SP_FATAL(
-      "Package {:fg brightcyan} hasn't been built yet. Run {:fg brightyellow} first.",
-      SP_FMT_STR(package),
-      SP_FMT_CSTR("spn build")
-    );
-  }
-
-  spn_dep_resolve_commit(dep, dep->spec->lock);
-  spn_dep_context_prepare(dep);
-
-  spn_cache_dir_kind_t kind = SPN_DIR_STORE;
-  if (cli->which.dir) {
-    kind = spn_dir_kind_from_str(sp_str_view(cli->which.dir));
-  }
-
-  sp_str_t dir = spn_dep_get_dir_path(dep, kind);
-  printf("%.*s", dir.len, dir.data);
 }
 
 void spn_cli_command_recipe(spn_cli_t* cli) {
@@ -2269,7 +2244,9 @@ void spn_dep_checkout(spn_dep_build_context_t *dep) {
   }
 }
 
-void spn_dep_resolve_commit(spn_dep_build_context_t* dep, sp_str_t commit) {
+void spn_dep_context_prepare(spn_dep_build_context_t* dep, sp_str_t commit) {
+  SP_ASSERT(!sp_str_empty(commit));
+
   sp_mutex_lock(&dep->mutex);
 
   dep->commits.resolved = commit;
@@ -2280,22 +2257,13 @@ void spn_dep_resolve_commit(spn_dep_build_context_t* dep, sp_str_t commit) {
     dep->commits.message = sp_str_replace_c8(dep->commits.message, '\n', ' ');
     dep->commits.message = sp_str_pad(dep->commits.message, 32);
     dep->commits.delta = spn_git_num_updates(dep->info->paths.source, dep->commits.resolved, spn_dep_context_find_latest_commit(dep));
-  } else {
+  }
+  else {
     dep->commits.message = SP_ZERO_STRUCT(sp_str_t);
     dep->commits.delta = 0;
   }
 
-  sp_mutex_unlock(&dep->mutex);
-}
-
-void spn_dep_context_prepare(spn_dep_build_context_t* dep) {
-  sp_mutex_init(&dep->mutex, SP_MUTEX_PLAIN);
-
-  sp_mutex_lock(&dep->mutex);
-
-  SP_ASSERT(!sp_str_empty(dep->commits.resolved));
-
-  dep->mode = SPN_DEP_BUILD_MODE_DEBUG;
+  dep->profile = app.build.profile;
 
   sp_dyn_array(sp_hash_t) hashes = SP_NULLPTR;
   sp_dyn_array_push(hashes, sp_hash_str(dep->commits.resolved));
@@ -2347,8 +2315,7 @@ s32 spn_dep_context_build_async(void* user_data) {
   }
 
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PREPARING);
-  spn_dep_resolve_commit(dep, resolved);
-  spn_dep_context_prepare(dep);
+  spn_dep_context_prepare(dep, resolved);
 
   // @spader
   // The store is immutable; if there's an entry in the store with this build ID, then we know it was
@@ -2459,6 +2426,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   struct argparse_option options [] = {
     OPT_HELP(),
     OPT_STRING('C', "project-dir", &cli->project_directory, "specify the directory containing spn.lua", SP_NULLPTR),
+    OPT_STRING('m', "matrix", &cli->matrix, "build matrix to use; 'debug' and 'release' provided unless you specify custom matrices; defaults to first listed matrix, or 'debug'", SP_NULLPTR),
     OPT_BOOLEAN('n', "no-interactive", &cli->no_interactive, "disable interactive tui", SP_NULLPTR),
     OPT_END(),
   };
@@ -2658,10 +2626,35 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   lua_pop(app->lua.state, 2);
 
   sp_dyn_array_for(app->project.deps, index) {
-    spn_dep_build_context_t build = SP_ZERO_INITIALIZE();
-    build.spec = app->project.deps + index;
-    build.info = build.spec->info;
-    sp_dyn_array_push(app->build.deps, build);
+    spn_dep_spec_t* spec = app->project.deps + index;
+
+    spn_dep_build_context_t dep = SP_ZERO_INITIALIZE();
+    dep.spec = spec;
+    dep.info = spec->info;
+    sp_mutex_init(&dep.mutex, SP_MUTEX_PLAIN);
+    sp_dyn_array_push(app->build.deps, dep);
+  }
+
+  if (cli->matrix) {
+    sp_str_t matrix_name = sp_str_view(cli->matrix);
+
+    sp_dyn_array_for(app->project.profiles, index) {
+      spn_build_profile_t* matrix = app->project.profiles + index;
+      if (sp_str_equal(matrix->name, matrix_name)) {
+        app->build.profile = matrix;
+        break;
+      }
+    }
+
+    SP_ASSERT_FMT(
+      app->build.profile,
+      "Tried to use matrix {:fg brightyellow}, but it wasn't found",
+      SP_FMT_STR(matrix_name)
+    );
+  }
+  else {
+    // No matrix specified; just use the first one
+    app->build.profile = app->project.profiles;
   }
 }
 
@@ -2685,9 +2678,6 @@ void spn_app_run(spn_app_t* app) {
   }
   else if (sp_cstr_equal("build", cli->args[0])) {
     spn_cli_command_build(cli);
-  }
-  else if (sp_cstr_equal("dir", cli->args[0])) {
-    spn_cli_command_dir(cli);
   }
   else if (sp_cstr_equal("copy", cli->args[0])) {
     spn_cli_command_copy(cli);

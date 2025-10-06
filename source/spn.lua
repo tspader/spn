@@ -174,6 +174,20 @@ function spn.load()
     }
     recipe:configure()
   end
+
+  spn.project.profiles = spn.project.profiles or {
+    {
+      name = 'debug',
+      mode = 'debug',
+    },
+    {
+      name = 'release',
+      mode = 'release',
+    },
+  }
+  for profile in spn.iterator.values(spn.project.profiles) do
+    profile.mode = profile.mode or 'debug'
+  end
 end
 
 function spn.parse()
@@ -194,6 +208,13 @@ function spn.parse()
 
   -- Project file
   app.project.name = sp.str.from_cstr(spn.project.name)
+
+  for config in spn.iterator.values(spn.project.profiles) do
+    local profile = ffi.new('spn_build_profile_t')
+    profile.name = sp.str.from_cstr(config.name)
+    profile.mode = c.spn.dep.build_mode_from_str(sp.str.from_cstr(config.mode))
+    app.project.profiles = sp.dyn_array.push(app.project.profiles, profile)
+  end
 
   if spn.project.system_deps then
     for dep_name in spn.iterator.values(spn.project.system_deps) do

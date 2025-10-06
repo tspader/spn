@@ -25,7 +25,6 @@ local config = spn.recipes.basic({
       })
     elseif builder.kind == 'shared' then
       builder:cc({
-        compiler = 'g++',
         shared = true,
         source = {
           'imgui.cpp',

@@ -200,6 +200,11 @@ function module.load(app)
     } spn_dep_build_state_t;
 
     typedef struct {
+      sp_str_t name;
+      spn_dep_build_mode_t mode;
+    } spn_build_profile_t;
+
+    typedef struct {
       spn_dep_build_state_t build;
       spn_dep_repo_state_t repo;
     } spn_dep_state_t;
@@ -245,8 +250,8 @@ function module.load(app)
     typedef struct {
       spn_dep_info_t* info;
       spn_dep_spec_t* spec;
+      spn_build_profile_t* profile;
       sp_str_t build_id;
-      spn_dep_build_mode_t mode;
       spn_dep_build_paths_t paths;
 
       bool force;
@@ -317,6 +322,7 @@ function module.load(app)
       sp_str_t name;
       sp_str_t* system_deps;
       spn_dep_spec_t* deps;
+      spn_build_profile_t* profiles;
     } spn_project_t;
 
     typedef struct {
@@ -344,47 +350,49 @@ typedef struct {
   spn_lock_entry_t** lock;
   spn_lua_config_t* config;
 
-  bool            (*SDL_CopyFile)(const c8*, const c8*);
-  c8*             (*SDL_GetCurrentDirectory)(void);
-  SDL_Process*    (*SDL_CreateProcess)(const c8* const* args, bool pipe_stdio);
-  bool            (*SDL_WaitProcess)(SDL_Process* process, bool block, int* result);
-  bool            (*SDL_KillProcess)(SDL_Process* process, bool force);
-  sp_hash_t       (*sp_hash_str)(sp_str_t str);
-  sp_hash_t       (*sp_hash_combine)(sp_hash_t* hashes, u32 num_hashes);
-  void*           (*sp_alloc)(u32 n);
-  c8*             (*sp_cstr_copy)(const c8* str);
-  sp_str_t        (*sp_str_copy)(sp_str_t str);
-  bool            (*sp_str_equal_cstr)(sp_str_t str, const c8* cstr);
-  sp_str_t        (*sp_str_from_cstr)(const c8* cstr);
-  c8*             (*sp_str_to_cstr)(sp_str_t str);
-  void            (*sp_os_copy)(sp_str_t from, sp_str_t to);
-  void            (*sp_os_copy_file)(sp_str_t from, sp_str_t to);
-  void            (*sp_os_copy_directory)(sp_str_t from, sp_str_t to);
-  sp_str_t        (*sp_os_extract_extension)(sp_str_t path);
-  sp_str_t        (*sp_os_extract_stem)(sp_str_t path);
-  sp_str_t        (*sp_os_extract_file_name)(sp_str_t path);
-  sp_str_t        (*sp_os_join_path)(sp_str_t a, sp_str_t b);
-  bool            (*sp_os_does_path_exist)(sp_str_t a);
-  void            (*sp_os_log)(sp_str_t message);
-  sp_os_dirs_t    (*sp_os_scan_directory)(sp_str_t path);
-  bool            (*sp_os_is_directory)(sp_str_t path);
-  bool            (*sp_os_is_regular_file)(sp_str_t path);
-  sp_str_t        (*sp_os_platform_name)(void);
-  void            (*sp_dyn_array_push_f)(void** arr, void* val, u32 val_len);
-  spn_dep_info_t* (*spn_dep_find)(sp_str_t name);
-  sp_str_t        (*spn_git_fetch)(sp_str_t repo);
-  u32             (*spn_git_num_updates)(sp_str_t repo, sp_str_t from, sp_str_t to);
-  void            (*spn_git_checkout)(sp_str_t repo, sp_str_t commit);
-  sp_str_t        (*spn_git_get_remote_url)(sp_str_t repo_path);
-  sp_str_t        (*spn_git_get_commit)(sp_str_t repo_path, sp_str_t id);
-  sp_str_t        (*spn_git_get_commit_message)(sp_str_t repo_path, sp_str_t id);
-  void            (*spn_sh_run)(spn_sh_process_context_t* context);
-  s32             (*spn_sh_wait)(spn_sh_process_context_t* context);
-  spn_sh_result_t (*spn_sh_read_process)(SDL_Process* process);
-  void            (*spn_sh_add_arg)(spn_sh_process_context_t*, sp_str_t);
-  void            (*spn_sh_add_env)(spn_sh_process_context_t*, sp_str_t, sp_str_t);
-  sp_str_t        (*sp_str_truncate)(sp_str_t str, u32 n, sp_str_t trailer);
+  bool                 (*SDL_CopyFile)(const c8*, const c8*);
+  c8*                  (*SDL_GetCurrentDirectory)(void);
+  SDL_Process*         (*SDL_CreateProcess)(const c8* const* args, bool pipe_stdio);
+  bool                 (*SDL_WaitProcess)(SDL_Process* process, bool block, int* result);
+  bool                 (*SDL_KillProcess)(SDL_Process* process, bool force);
+  sp_hash_t            (*sp_hash_str)(sp_str_t str);
+  sp_hash_t            (*sp_hash_combine)(sp_hash_t* hashes, u32 num_hashes);
+  void*                (*sp_alloc)(u32 n);
+  c8*                  (*sp_cstr_copy)(const c8* str);
+  sp_str_t             (*sp_str_copy)(sp_str_t str);
+  bool                 (*sp_str_equal_cstr)(sp_str_t str, const c8* cstr);
+  sp_str_t             (*sp_str_from_cstr)(const c8* cstr);
+  c8*                  (*sp_str_to_cstr)(sp_str_t str);
+  void                 (*sp_os_copy)(sp_str_t from, sp_str_t to);
+  void                 (*sp_os_copy_file)(sp_str_t from, sp_str_t to);
+  void                 (*sp_os_copy_directory)(sp_str_t from, sp_str_t to);
+  sp_str_t             (*sp_os_extract_extension)(sp_str_t path);
+  sp_str_t             (*sp_os_extract_stem)(sp_str_t path);
+  sp_str_t             (*sp_os_extract_file_name)(sp_str_t path);
+  sp_str_t             (*sp_os_join_path)(sp_str_t a, sp_str_t b);
+  bool                 (*sp_os_does_path_exist)(sp_str_t a);
+  void                 (*sp_os_log)(sp_str_t message);
+  sp_os_dirs_t         (*sp_os_scan_directory)(sp_str_t path);
+  bool                 (*sp_os_is_directory)(sp_str_t path);
+  bool                 (*sp_os_is_regular_file)(sp_str_t path);
+  sp_str_t             (*sp_os_platform_name)(void);
+  void                 (*sp_dyn_array_push_f)(void** arr, void* val, u32 val_len);
+  spn_dep_info_t*      (*spn_dep_find)(sp_str_t name);
+  sp_str_t             (*spn_git_fetch)(sp_str_t repo);
+  u32                  (*spn_git_num_updates)(sp_str_t repo, sp_str_t from, sp_str_t to);
+  void                 (*spn_git_checkout)(sp_str_t repo, sp_str_t commit);
+  sp_str_t             (*spn_git_get_remote_url)(sp_str_t repo_path);
+  sp_str_t             (*spn_git_get_commit)(sp_str_t repo_path, sp_str_t id);
+  sp_str_t             (*spn_git_get_commit_message)(sp_str_t repo_path, sp_str_t id);
+  void                 (*spn_sh_run)(spn_sh_process_context_t* context);
+  s32                  (*spn_sh_wait)(spn_sh_process_context_t* context);
+  spn_sh_result_t      (*spn_sh_read_process)(SDL_Process* process);
+  void                 (*spn_sh_add_arg)(spn_sh_process_context_t*, sp_str_t);
+  void                 (*spn_sh_add_env)(spn_sh_process_context_t*, sp_str_t, sp_str_t);
+  sp_str_t             (*sp_str_truncate)(sp_str_t str, u32 n, sp_str_t trailer);
   spn_dep_build_kind_t (*spn_dep_build_kind_from_str)(sp_str_t str);
+  sp_str_t             (*spn_dep_build_mode_to_str)(spn_dep_build_mode_t);
+  spn_dep_build_mode_t (*spn_dep_build_mode_from_str)(sp_str_t);
 } spn_lua_context_t;
   ]])
 
@@ -424,6 +432,11 @@ typedef struct {
       end
     })
   end
+
+  module.spn.build_mode = {
+    debug = ffi.C.SPN_DEP_BUILD_MODE_DEBUG,
+    release = ffi.C.SPN_DEP_BUILD_MODE_RELEASE,
+  }
 
   module.spn.string = ffi.metatype('sp_str_t', {
     __tostring = function(self) return ffi.string(self.data, self.len) end,

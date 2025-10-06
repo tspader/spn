@@ -17,6 +17,7 @@ function module.new(dep, recipe)
   self.kind = recipe.spec.kind
 
   self.dep = dep
+  self.mode = c.spn.dep.build_mode_to_str(dep.profile.mode):cstr()
   self.name = dep.info.name:cstr()
   self.paths = {
     recipe = dep.info.paths.recipe:cstr(),
@@ -29,6 +30,25 @@ function module.new(dep, recipe)
   }
 
   self.platform = c.sp.os.platform_name():cstr()
+  if self.platform == 'macos' then
+    self.profile = {
+      cc = 'clang',
+      cxx = 'clang++',
+      make = 'make'
+    }
+  elseif self.platform == 'linux' then
+    self.profile = {
+      cc = 'gcc',
+      cxx = 'g++',
+      make = 'make'
+    }
+  else
+    self.profile = {
+      cc = 'gcc',
+      cxx = 'g++',
+      make = 'make'
+    }
+  end
 
   return self
 end
@@ -91,7 +111,7 @@ function module:cc(config)
   config = utils.merge(config, config[self.platform] or {})
 
   local sh = {
-    command = config.compiler,
+    command = self.profile.cc,
     args = {
       '-o', self.paths.work .. '/' .. config.output
     }
@@ -163,6 +183,7 @@ end
 function module:cmake(config)
   config = config or {}
   config = utils.merge(config, config[self.platform] or {})
+  config.defines = config.defines or {}
   config.parallel = (config.parallel == nil) and true or config.parallel
   config.install = (config.install == nil) and false or config.install
 
@@ -175,12 +196,18 @@ function module:cmake(config)
     }
   }
 
-  if config.defines then
-    for define in iterator.values(config.defines) do
-      local name = define[1]
-      local value = define[2] and 'ON' or 'OFF'
-      table.insert(sh.args, string.format('-D%s=%s', name, value))
-    end
+  local build_type = self.mode == 'debug' and 'Debug' or 'Release'
+  print(build_type)
+  table.insert(sh.args, string.format('-DCMAKE_BUILD_TYPE=%s', build_type))
+
+  if self.kind == 'shared' then
+    table.insert(config.defines, { 'BUILD_SHARED_LIBS', false })
+  end
+
+  for define in iterator.values(config.defines) do
+    local name = define[1]
+    local value = define[2] and 'ON' or 'OFF'
+    table.insert(sh.args, string.format('-D%s=%s', name, value))
   end
 
   self:sh_proxy(sh)

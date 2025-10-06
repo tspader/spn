@@ -9,7 +9,7 @@ local project = {
     luajit = {
       kind = 'static'
     }
-  },
+  }
 }
 
 return project
