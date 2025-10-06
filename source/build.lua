@@ -141,13 +141,14 @@ end
 ---@param config spn_lua_make_config_t
 function module:make(config)
   config = config or {}
+  config.jobs = config.jobs or 4
   config = utils.merge(config, config[self.platform] or {})
 
   local sh = {
     command = 'make',
     args = {
       '--quiet',
-      '--directory', config.cwd or self.paths.work
+      '--directory', config.dir or self.paths.work
     },
     env = config.env
   }
@@ -236,13 +237,25 @@ function module:cmake(config)
 end
 
 function module:configure(config)
+  config = config or {}
+
   local sh = {
     command = self:source('configure').absolute,
     args = {
+      string.format('--prefix=%s', self.paths.store),
       self.kind == 'shared' and '--enable-shared' or '--disable-shared',
       self.kind == 'shared' and '--disable-static' or '--enable-static',
-    }
+    },
+    cwd = self.paths.work
   }
+
+  if config.args then
+    for arg in iterator.values(config.args) do
+      table.insert(sh.args, arg)
+    end
+  end
+
+  self:sh(sh)
 end
 
 function module:path(base, subpath)

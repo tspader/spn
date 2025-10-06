@@ -2,7 +2,9 @@ local project = {
   name = 'sqlite',
   deps = {
     sp = {},
-    sqlite = {}
+    sqlite = {
+      kind = 'static'
+    }
   },
 }
 

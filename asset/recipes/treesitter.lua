@@ -5,21 +5,16 @@ local recipe = spn.recipes.basic({
   libs = { 'tree-sitter' },
   kinds = { 'static' },
   build = function(builder)
-    builder:make({
-      directory = builder.paths.source,
-      jobs = 8,
+    local make = {
       variables = {
-        PREFIX = builder.paths.store,
+        PREFIX = builder.paths.store
       },
-    })
+      dir = builder.paths.source
+    }
+    builder:make(make)
 
-    builder:make({
-      directory = builder.paths.source,
-      variables = {
-        PREFIX = builder.paths.store,
-      },
-      targets = { 'install' },
-    })
+    make.target = 'install'
+    builder:make(make)
   end,
 })
 
