@@ -225,7 +225,8 @@ typedef enum {
 typedef struct {
   sp_str_t name;
   spn_dep_build_mode_t mode;
-} spn_build_profile_t;
+  sp_hash_t hash;
+} spn_build_matrix_t;
 
 typedef struct {
   spn_dep_build_state_t build;
@@ -275,7 +276,7 @@ typedef struct {
 typedef struct {
   spn_dep_info_t* info;
   spn_dep_spec_t* spec;
-  spn_build_profile_t* profile;
+  spn_build_matrix_t* matrix;
   sp_str_t build_id;
   spn_dep_build_paths_t paths;
 
@@ -315,7 +316,7 @@ typedef sp_dyn_array(spn_lock_entry_t) spn_lock_file_t;
 
 typedef struct {
   sp_dyn_array(spn_dep_build_context_t) deps;
-  spn_build_profile_t* profile;
+  spn_build_matrix_t* matrix;
 } spn_build_context_t;
 
 spn_dep_info_t*          spn_dep_find(sp_str_t name);
@@ -432,7 +433,7 @@ typedef struct {
   sp_str_t name;
   sp_dyn_array(sp_str_t) system_deps;
   sp_dyn_array(spn_dep_spec_t) deps;
-  sp_dyn_array(spn_build_profile_t) profiles;
+  sp_dyn_array(spn_build_matrix_t) matrices;
 } spn_project_t;
 
 spn_dep_spec_t* spn_project_find_dep(sp_str_t name);
@@ -2263,11 +2264,12 @@ void spn_dep_context_prepare(spn_dep_build_context_t* dep, sp_str_t commit) {
     dep->commits.delta = 0;
   }
 
-  dep->profile = app.build.profile;
+  dep->matrix = app.build.matrix;
 
   sp_dyn_array(sp_hash_t) hashes = SP_NULLPTR;
   sp_dyn_array_push(hashes, sp_hash_str(dep->commits.resolved));
   sp_dyn_array_push(hashes, dep->spec->hash);
+  sp_dyn_array_push(hashes, dep->matrix->hash);
   sp_hash_t hash = sp_hash_combine(hashes, sp_dyn_array_size(hashes));
   dep->build_id = sp_format("{}", SP_FMT_SHORT_HASH(hash));
 
@@ -2638,23 +2640,23 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   if (cli->matrix) {
     sp_str_t matrix_name = sp_str_view(cli->matrix);
 
-    sp_dyn_array_for(app->project.profiles, index) {
-      spn_build_profile_t* matrix = app->project.profiles + index;
+    sp_dyn_array_for(app->project.matrices, index) {
+      spn_build_matrix_t* matrix = app->project.matrices + index;
       if (sp_str_equal(matrix->name, matrix_name)) {
-        app->build.profile = matrix;
+        app->build.matrix = matrix;
         break;
       }
     }
 
     SP_ASSERT_FMT(
-      app->build.profile,
+      app->build.matrix,
       "Tried to use matrix {:fg brightyellow}, but it wasn't found",
       SP_FMT_STR(matrix_name)
     );
   }
   else {
     // No matrix specified; just use the first one
-    app->build.profile = app->project.profiles;
+    app->build.matrix = app->project.matrices;
   }
 }
 

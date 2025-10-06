@@ -17,7 +17,7 @@ function module.new(dep, recipe)
   self.kind = recipe.spec.kind
 
   self.dep = dep
-  self.mode = c.spn.dep.build_mode_to_str(dep.profile.mode):cstr()
+  self.mode = c.spn.dep.build_mode_to_str(dep.matrix.mode):cstr()
   self.name = dep.info.name:cstr()
   self.paths = {
     recipe = dep.info.paths.recipe:cstr(),
@@ -30,23 +30,24 @@ function module.new(dep, recipe)
   }
 
   self.platform = c.sp.os.platform_name():cstr()
+
+  -- @spader
+  -- Half baked. I only invoke the compiler directly to build ImGui as a DLL, and I don't want to
+  -- do that almost ever. The only thing I can see is if we wanna do cross compilation, just stick
+  -- your compiler and cflags in the build matrix and spn passes it along when it builds.
+  --
+  -- but for now...yeah, just leaving this here
   if self.platform == 'macos' then
-    self.profile = {
+    self.tools = {
       cc = 'clang',
-      cxx = 'clang++',
-      make = 'make'
     }
   elseif self.platform == 'linux' then
-    self.profile = {
+    self.tools = {
       cc = 'gcc',
-      cxx = 'g++',
-      make = 'make'
     }
   else
-    self.profile = {
+    self.tools = {
       cc = 'gcc',
-      cxx = 'g++',
-      make = 'make'
     }
   end
 
@@ -111,7 +112,7 @@ function module:cc(config)
   config = utils.merge(config, config[self.platform] or {})
 
   local sh = {
-    command = self.profile.cc,
+    command = self.tools.cc,
     args = {
       '-o', self.paths.work .. '/' .. config.output
     }

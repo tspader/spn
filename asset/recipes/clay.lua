@@ -1,5 +1,4 @@
 local spn = require('spn')
-local c = require('c')
 
 local config = spn.recipes.basic({
   git = 'nicbarker/clay',

@@ -175,7 +175,7 @@ function spn.load()
     recipe:configure()
   end
 
-  spn.project.profiles = spn.project.profiles or {
+  spn.project.matrices = spn.project.matrices or {
     {
       name = 'debug',
       mode = 'debug',
@@ -185,8 +185,8 @@ function spn.load()
       mode = 'release',
     },
   }
-  for profile in spn.iterator.values(spn.project.profiles) do
-    profile.mode = profile.mode or 'debug'
+  for matrix in spn.iterator.values(spn.project.matrices) do
+    matrix.mode = matrix.mode or 'debug'
   end
 end
 
@@ -209,11 +209,13 @@ function spn.parse()
   -- Project file
   app.project.name = sp.str.from_cstr(spn.project.name)
 
-  for config in spn.iterator.values(spn.project.profiles) do
-    local profile = ffi.new('spn_build_profile_t')
-    profile.name = sp.str.from_cstr(config.name)
-    profile.mode = c.spn.dep.build_mode_from_str(sp.str.from_cstr(config.mode))
-    app.project.profiles = sp.dyn_array.push(app.project.profiles, profile)
+  for config in spn.iterator.values(spn.project.matrices) do
+    local matrix = ffi.new('spn_build_matrix_t')
+    matrix.name = sp.str.from_cstr(config.name)
+    matrix.mode = c.spn.dep.build_mode_from_str(sp.str.from_cstr(config.mode))
+    matrix.hash = sp.hash.combine({ matrix.mode })
+
+    app.project.matrices = sp.dyn_array.push(app.project.matrices, matrix)
   end
 
   if spn.project.system_deps then
@@ -277,17 +279,7 @@ function spn.parse()
       end
     end
 
-    table.sort(values)
-
-    local hashes = ffi.new('sp_hash_t* [1]')
-    local hash = ffi.new('sp_hash_t [1]')
-    for value in spn.iterator.values(values) do
-      local hashable = tostring(value)
-      hash[0] = sp.hash.str(sp.str.from_cstr(hashable))
-      hashes[0] = sp.dyn_array.push(hashes[0], hash)
-    end
-
-    dep.hash = sp.hash.combine(hashes[0], #values)
+    dep.hash = sp.hash.combine(values)
 
     -- Push it to an array in C
     app.project.deps = sp.dyn_array.push(app.project.deps, dep)

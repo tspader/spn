@@ -1,3 +1,5 @@
+local iterator = require('iterator')
+
 local module = {
   sp = {
     os = {},
@@ -202,7 +204,8 @@ function module.load(app)
     typedef struct {
       sp_str_t name;
       spn_dep_build_mode_t mode;
-    } spn_build_profile_t;
+      sp_hash_t hash;
+    } spn_build_matrix_t;
 
     typedef struct {
       spn_dep_build_state_t build;
@@ -250,7 +253,7 @@ function module.load(app)
     typedef struct {
       spn_dep_info_t* info;
       spn_dep_spec_t* spec;
-      spn_build_profile_t* profile;
+      spn_build_matrix_t* matrix;
       sp_str_t build_id;
       spn_dep_build_paths_t paths;
 
@@ -322,7 +325,7 @@ function module.load(app)
       sp_str_t name;
       sp_str_t* system_deps;
       spn_dep_spec_t* deps;
-      spn_build_profile_t* profiles;
+      spn_build_matrix_t* matrices;
     } spn_project_t;
 
     typedef struct {
@@ -431,6 +434,21 @@ typedef struct {
         return module.app[key]
       end
     })
+  end
+
+  module.sp.hash.combine = function(values)
+    table.sort(values)
+
+    local hashes = ffi.new('sp_hash_t* [1]')
+    local hash = ffi.new('sp_hash_t [1]')
+    for value in iterator.values(values) do
+      local hashable = tostring(value)
+      hashable = module.sp.str.from_cstr(hashable)
+      hash[0] = module.sp.hash.str(hashable)
+      hashes[0] = module.sp.dyn_array.push(hashes[0], hash)
+    end
+
+    return module.app.sp_hash_combine(hashes[0], #values)
   end
 
   module.spn.build_mode = {
