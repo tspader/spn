@@ -16,12 +16,8 @@ local recipe = spn.recipes.basic({
     })
 
     builder:copy({
-      { builder:source('src/raylib.h'), builder:include() },
-      { builder:source('src/rlgl.h'), builder:include() },
-      { builder:source('src/raymath.h'), builder:include() },
       { builder:source('src/extras'), builder:include() },
       { builder:source('examples'), builder:vendor() },
-      { builder:store('lib/libraylib.*'), builder:lib() },
     })
   end,
 })

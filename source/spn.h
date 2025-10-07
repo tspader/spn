@@ -103,15 +103,15 @@ typedef enum {
   SP_OS_LIB_STATIC,
 } sp_os_lib_kind_t;
 
-SP_API sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer);
-SP_API bool     sp_os_is_glob(sp_str_t path);
-SP_API bool     sp_os_is_program_on_path(sp_str_t program);
-SP_API void     sp_os_copy(sp_str_t from, sp_str_t to);
-SP_API void     sp_os_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to);
-SP_API void     sp_os_copy_file(sp_str_t from, sp_str_t to);
-SP_API void     sp_os_copy_directory(sp_str_t from, sp_str_t to);
-SP_API sp_str_t sp_os_lib_kind_to_extension(sp_os_lib_kind_t kind);
-SP_API sp_str_t sp_os_lib_to_file_name(sp_str_t lib_name, sp_os_lib_kind_t kind);
+SP_API sp_str_t         sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer);
+SP_API bool             sp_os_is_glob(sp_str_t path);
+SP_API bool             sp_os_is_program_on_path(sp_str_t program);
+SP_API void             sp_os_copy(sp_str_t from, sp_str_t to);
+SP_API void             sp_os_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to);
+SP_API void             sp_os_copy_file(sp_str_t from, sp_str_t to);
+SP_API void             sp_os_copy_directory(sp_str_t from, sp_str_t to);
+SP_API sp_str_t         sp_os_lib_kind_to_extension(sp_os_lib_kind_t kind);
+SP_API sp_str_t         sp_os_lib_to_file_name(sp_str_t lib_name, sp_os_lib_kind_t kind);
 
 
 /////////
@@ -475,6 +475,7 @@ typedef struct {
   u32 num_args;
   const c8** args;
   const c8* project_directory;
+  const c8* project_file;
   const c8* matrix;
   bool no_interactive;
   spn_cli_add_t add;
@@ -495,6 +496,8 @@ void spn_cli_command_print(spn_cli_t* cli);
 void spn_cli_command_ls(spn_cli_t* cli);
 void spn_cli_command_which(spn_cli_t* cli);
 void spn_cli_command_recipe(spn_cli_t* cli);
+void spn_cli_assert_dep_is_built(spn_dep_build_context_t* dep);
+spn_dep_build_context_t* spn_cli_assert_dep_exists(sp_str_t dep_name);
 
 /////////
 // LUA //
@@ -962,6 +965,26 @@ void sp_tui_setup_raw_mode(spn_tui_t* tui) {
 #endif
 
 // CLI
+spn_dep_build_context_t* spn_cli_assert_dep_exists(sp_str_t dep_name) {
+  spn_dep_build_context_t* dep = spn_build_context_find_dep(&app.build, dep_name);
+  if (!dep) {
+    SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(dep_name));
+  }
+  return dep;
+}
+
+void spn_cli_assert_dep_is_built(spn_dep_build_context_t* dep) {
+  if (sp_str_empty(dep->spec->lock)) {
+    SP_FATAL(
+      "{:fg brightcyan} hasn't been built yet. Run {:fg brightyellow} first.",
+      SP_FMT_STR(dep->info->name),
+      SP_FMT_CSTR("spn build")
+    );
+  }
+
+
+}
+
 void spn_cli_command_init(spn_cli_t* cli) {
   struct argparse argparse;
   argparse_init(
@@ -1254,6 +1277,7 @@ void spn_cli_command_copy(spn_cli_t* cli) {
 
   sp_dyn_array_for(app.build.deps, index) {
     spn_dep_build_context_t* dep = app.build.deps + index;
+    spn_cli_assert_dep_is_built(dep);
     spn_dep_context_prepare(dep, dep->spec->lock);
 
     sp_os_directory_entry_list_t entries = sp_os_scan_directory(dep->paths.lib);
@@ -1311,6 +1335,7 @@ void spn_cli_command_print(spn_cli_t* cli) {
 
   sp_dyn_array_for(app.build.deps, index) {
     spn_dep_build_context_t* dep = app.build.deps + index;
+    spn_cli_assert_dep_is_built(dep);
     spn_dep_context_prepare(dep, dep->spec->lock);
   }
 
@@ -1458,21 +1483,8 @@ void spn_cli_command_ls(spn_cli_t* cli) {
 
   spn_cli_ls_t* ls = &cli->ls;
   if (ls->package) {
-    sp_str_t package = sp_str_view(ls->package);
-
-    spn_dep_build_context_t* dep = spn_build_context_find_dep(&app.build, package);
-    if (!dep) {
-      SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(package));
-    }
-
-    if (sp_str_empty(dep->spec->lock)) {
-      SP_FATAL(
-        "Package {:fg brightcyan} hasn't been built yet. Run {:fg brightyellow} first.",
-        SP_FMT_STR(package),
-        SP_FMT_CSTR("spn build")
-      );
-    }
-
+    spn_dep_build_context_t* dep = spn_cli_assert_dep_exists(sp_str_view(ls->package));
+    spn_cli_assert_dep_is_built(dep);
     spn_dep_context_prepare(dep, dep->spec->lock);
 
     spn_cache_dir_kind_t kind = SPN_DIR_STORE;
@@ -1515,21 +1527,8 @@ void spn_cli_command_which(spn_cli_t* cli) {
 
   spn_cli_which_t* which = &cli->which;
   if (which->package) {
-    sp_str_t package = sp_str_view(which->package);
-
-    spn_dep_build_context_t* dep = spn_build_context_find_dep(&app.build, package);
-    if (!dep) {
-      SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(package));
-    }
-
-    if (sp_str_empty(dep->spec->lock)) {
-      SP_FATAL(
-        "Package {:fg brightcyan} hasn't been built yet. Run {:fg brightyellow} first.",
-        SP_FMT_STR(package),
-        SP_FMT_CSTR("spn build")
-      );
-    }
-
+    spn_dep_build_context_t* dep = spn_cli_assert_dep_exists(sp_str_view(which->package));
+    spn_cli_assert_dep_is_built(dep);
     spn_dep_context_prepare(dep, dep->spec->lock);
 
     spn_cache_dir_kind_t kind = SPN_DIR_STORE;
@@ -1582,12 +1581,9 @@ void spn_cli_command_recipe(spn_cli_t* cli) {
     }
   }
 
-  sp_str_t package = sp_str_view(cli->args[0]);
-
-  spn_dep_build_context_t* dep = spn_build_context_find_dep(&app.build, package);
-  if (!dep) {
-    SP_FATAL("{:fg brightyellow} is not in this project", SP_FMT_STR(package));
-  }
+  spn_dep_build_context_t* dep = spn_cli_assert_dep_exists(sp_str_view(cli->args[0]));
+  spn_cli_assert_dep_is_built(dep);
+  spn_dep_context_prepare(dep, dep->spec->lock);
 
   sp_str_t recipe_path = dep->info->paths.recipe;
   sp_size_t file_size = 0;
@@ -2428,6 +2424,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   struct argparse_option options [] = {
     OPT_HELP(),
     OPT_STRING('C', "project-dir", &cli->project_directory, "specify the directory containing spn.lua", SP_NULLPTR),
+    OPT_STRING('f', "file", &cli->project_file, "specify the project file path", SP_NULLPTR),
     OPT_STRING('m', "matrix", &cli->matrix, "build matrix to use; 'debug' and 'release' provided unless you specify custom matrices; defaults to first listed matrix, or 'debug'", SP_NULLPTR),
     OPT_BOOLEAN('n', "no-interactive", &cli->no_interactive, "disable interactive tui", SP_NULLPTR),
     OPT_END(),
@@ -2475,15 +2472,31 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   app->paths.work = sp_os_normalize_path(sp_str_from_cstr(SDL_GetCurrentDirectory()));
 
   // Project
-  if (app->cli.project_directory) {
-    sp_str_t project = sp_os_join_path(app->paths.work, SP_CSTR(app->cli.project_directory));
-    app->paths.project.dir = sp_os_canonicalize_path(project);
+  sp_str_t project_file = sp_str_lit("spn.lua");
+  sp_str_t lock_file = sp_str_lit("spn.lock.lua");
+
+  if (app->cli.project_file) {
+    sp_str_t file_path = sp_str_view(app->cli.project_file);
+    if (app->cli.project_file[0] != '/') {
+      file_path = sp_os_join_path(app->paths.work, file_path);
+    }
+
+    file_path = sp_os_canonicalize_path(file_path);
+    project_file = sp_os_extract_file_name(file_path);
+    lock_file = sp_format("{}.lock.lua", SP_FMT_STR(sp_os_extract_stem(file_path)));
+    app->paths.project.dir = sp_os_parent_path(file_path);
+  }
+  else if (app->cli.project_directory) {
+    sp_str_t project = sp_os_join_path(app->paths.work, sp_str_view(app->cli.project_directory));
+    project = sp_os_canonicalize_path(project);
+    app->paths.project.dir = project;
   }
   else {
     app->paths.project.dir = sp_str_copy(app->paths.work);
   }
-  app->paths.project.config = sp_os_join_path(app->paths.project.dir, SP_LIT("spn.lua"));
-  app->paths.project.lock = sp_os_join_path(app->paths.project.dir, SP_LIT("spn.lock.lua"));
+
+  app->paths.project.config = sp_os_join_path(app->paths.project.dir, project_file);
+  app->paths.project.lock = sp_os_join_path(app->paths.project.dir, lock_file);
 
   // Config
 #ifdef SP_WIN32

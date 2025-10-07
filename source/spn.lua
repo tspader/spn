@@ -175,7 +175,7 @@ function spn.load()
     recipe:configure()
   end
 
-  spn.project.matrices = spn.project.matrices or {
+  spn.project.matrix = spn.project.matrix or {
     {
       name = 'debug',
       mode = 'debug',
@@ -185,7 +185,7 @@ function spn.load()
       mode = 'release',
     },
   }
-  for matrix in spn.iterator.values(spn.project.matrices) do
+  for matrix in spn.iterator.values(spn.project.matrix) do
     matrix.mode = matrix.mode or 'debug'
   end
 end
@@ -209,7 +209,7 @@ function spn.parse()
   -- Project file
   app.project.name = sp.str.from_cstr(spn.project.name)
 
-  for config in spn.iterator.values(spn.project.matrices) do
+  for config in spn.iterator.values(spn.project.matrix) do
     local matrix = ffi.new('spn_build_matrix_t')
     matrix.name = sp.str.from_cstr(config.name)
     matrix.mode = c.spn.dep.build_mode_from_str(sp.str.from_cstr(config.mode))

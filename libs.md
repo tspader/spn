@@ -106,6 +106,24 @@
 - **shared**: `make BUILDMODE=dynamic` → shared lib + dynamically linked binary
 - **both**: `make BUILDMODE=mixed` (default) → both libs + statically linked binary
 
+### Shared vs Static Smoke Examples
+
+| Library  | Shared example(s) | Static example(s) |
+|----------|-------------------|-------------------|
+| curl     | `examples/curl` | `examples/curl_static` |
+| freetype | `examples/freetype` | `examples/freetype_static` |
+| ggml     | `examples/ggml` | `examples/ggml_static` |
+| glfw     | `examples/glfw` | `examples/glfw_static` |
+| luajit   | `examples/luajit` | `examples/luajit_static` |
+| md4c     | `examples/md4c` | `examples/md4c_static` |
+| msgpack  | `examples/msgpack` | `examples/msgpack_static` |
+| raylib   | `examples/raylib` | `examples/raylib_static` |
+| sdl3     | `examples/hello`, `examples/sdl_shared`, `examples/imgui_sdl3_sdlrenderer3` | `examples/hello_static`, `examples/sdl`, `examples/imgui_sdl3_sdlrenderer3_static` |
+| sodium   | `examples/sodium` | `examples/sodium_static` |
+| sqlite   | `examples/sqlite_shared` | `examples/sqlite` |
+| uv       | `examples/uv` | `examples/uv_static` |
+| whisper  | `examples/whisper` | `examples/whisper_static` |
+
 ## Smoke Test Failures
 
 ### quickjs

@@ -92,6 +92,14 @@ else ifeq ($(TARGET_OS),darwin)
   CMAKE_FLAGS :=
 endif
 
+BEAR := $(shell command -v bear 2>/dev/null)
+ifneq ($(BEAR),)
+  BEAR_WRAP := bear --append --
+  MAKE := $(BEAR_WRAP) $(MAKE)
+  CC := $(BEAR_WRAP) $(CC)
+  CXX := $(BEAR_WRAP) $(CXX)
+endif
+
 #########
 # PATHS #
 #########
@@ -191,7 +199,7 @@ $(SPN_OUTPUT): $(SPN_BOOTSTRAP_SDL_BINARY) $(SPN_BOOTSTRAP_LUAJIT_BINARY) $(SPN_
 ############
 # EXAMPLES #
 ############
-CI_SKIP_EXAMPLES := ggml whisper glfw raylib # Just because these need an X server or GPU or whatever
+CI_SKIP_EXAMPLES := ggml whisper ggml_static whisper_static glfw glfw_static raylib raylib_static # Just because these need an X server or GPU or whatever
 
 EXAMPLE_DIRS := $(wildcard examples/*)
 EXAMPLES_C := $(foreach dir,$(EXAMPLE_DIRS),$(if $(wildcard $(dir)/main.c),$(notdir $(dir))))
@@ -201,15 +209,31 @@ EXAMPLES := $(EXAMPLES_C) $(EXAMPLES_CPP)
 EXAMPLE_TARGETS_C := $(addsuffix /main,$(addprefix build/examples/, $(EXAMPLES_C)))
 EXAMPLE_TARGETS_CPP := $(addsuffix /main,$(addprefix build/examples/, $(EXAMPLES_CPP)))
 
+EXAMPLE_MATRICES ?= debug
+
+example_matrix_binary = $(if $(filter debug,$(1)),main,main-$(1))
+example_matrix_cflags = $(if $(filter release,$(1)),-O2 -DNDEBUG,-g)
+
+define build_example_matrix
+	@printf "$(ANSI_FG_BRIGHT_BLACK)  matrix: $(3)$(ANSI_RESET)"
+	@echo
+	$(call print_and_run,$(SPN_OUTPUT) -C ./examples/$(1) --no-interactive --matrix $(3) clean)
+	$(call print_and_run,$(SPN_OUTPUT) -C ./examples/$(1) --no-interactive --matrix $(3) build)
+	@rm -rf ./build/examples/$(1)/$(3)
+	@mkdir -p ./build/examples/$(1)/$(3)
+	$(call print_and_run,$(SPN_OUTPUT) -C ./examples/$(1) --no-interactive --matrix $(3) copy ./build/examples/$(1)/$(3))
+	$(call print_and_run,$(2) ./examples/$(1)/main.* $(call example_matrix_cflags,$(3)) -o ./build/examples/$(1)/$(call example_matrix_binary,$(3)) $$($(SPN_OUTPUT) -C ./examples/$(1) --no-interactive --matrix $(3) print) $(FLAG_RPATH) -lm)
+	@:
+endef
+
 define build_example
-  $(call print_heading)
+	$(call print_heading)
 	@printf "example: $(ANSI_FG_BRIGHT_CYAN)$(1)$(ANSI_RESET)"
 	@echo
 
+	@rm -rf ./build/examples/$(1)
 	@mkdir -p ./build/examples/$(1)
-	$(call print_and_run,$(SPN_OUTPUT) -C ./examples/$(1) --no-interactive build)
-	$(call print_and_run,$(SPN_OUTPUT) -C ./examples/$(1) copy ./build/examples/$(1))
-	$(call print_and_run,$(2) ./examples/$(1)/main.* -g -o ./build/examples/$(1)/main $$($(SPN_OUTPUT) -C ./examples/$(1) print) $(FLAG_RPATH) -lm)
+	$(foreach matrix,$(EXAMPLE_MATRICES),$(call build_example_matrix,$(1),$(2),$(matrix)))
 	@echo
 endef
 
@@ -227,7 +251,7 @@ $(EXAMPLE_TARGETS_CPP): build/examples/%/main: examples/%/main.cpp examples/%/sp
 ###########
 # PHONIES #
 ###########
-.PHONY: $(EXAMPLES) windows help
+.PHONY: $(EXAMPLES) windows help test
 
 help:
 	@echo "Targets:"
@@ -253,11 +277,18 @@ dist:
 examples: build $(EXAMPLES)
 
 smoke: build
+	@rm -rf ./build/examples
 	@for example in $(EXAMPLES); do \
 		if ! echo "$(CI_SKIP_EXAMPLES)" | grep -qw "$$example"; then \
-			$(MAKE) $$example; \
+			$(MAKE) EXAMPLE_MATRICES="debug release" $$example; \
 		fi; \
 	done
+
+build/bin/test: build test/main.c
+	$(SPN_OUTPUT) -C test --no-interactive build
+	$(CC) ./test/main.c -g $$($(SPN_OUTPUT) -C test --no-interactive print) -o ./build/bin/test
+
+test: build/bin/test
 
 install: build
 	@mkdir -p $(SPN_INSTALL_PREFIX)

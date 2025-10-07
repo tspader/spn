@@ -6,6 +6,9 @@ build/*
 !build/llm
 examples/**/spn.lock.lua
 
+test/main
+test/spn.lock.lua
+
 .claude
 CLAUDE.md
 .mcp.json
