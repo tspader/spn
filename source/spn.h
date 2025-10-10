@@ -1144,6 +1144,18 @@ sp_str_t spn_gen_build_entry_for_dep(spn_dep_build_context_t* dep, spn_gen_entry
       break;
     }
     case SPN_GENERATOR_RPATH:
+      switch (dep->spec->kind) {
+        case SPN_DEP_BUILD_KIND_SHARED: {
+          sp_dyn_array_push(entries, dep->paths.lib);
+          break;
+        }
+        case SPN_DEP_BUILD_KIND_STATIC:
+        case SPN_DEP_BUILD_KIND_SOURCE: {
+          return SP_ZERO_STRUCT(sp_str_t);
+        }
+      }
+
+      break;
     case SPN_GENERATOR_LIB_INCLUDE:  {
       switch (dep->spec->kind) {
         case SPN_DEP_BUILD_KIND_SHARED:
@@ -2557,10 +2569,9 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   }
 
   if (!sp_os_does_path_exist(app->paths.spn)) {
-    // If the recipe directory doesn't exist, we need to clone it
     const c8* url = "https://github.com/tspader/spn.git";
     SP_LOG(
-      "Cloning recipe repository from {:fg brightcyan} to {:fg brightcyan}",
+      "Cloning recipes from {:fg brightcyan} to {:fg brightcyan}",
       SP_FMT_CSTR(url),
       SP_FMT_STR(app->paths.spn)
     );
@@ -2577,20 +2588,6 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
         SP_FMT_CSTR(url),
         SP_FMT_STR(app->paths.spn)
       );
-    }
-  }
-  else {
-    // If it does, we need to pull
-    u32 num_updates = spn_git_num_updates(app->paths.spn, SPN_GIT_HEAD, SPN_GIT_UPSTREAM);
-    if (num_updates > 0) {
-      if (app->config.pull_recipes) {
-        SP_LOG("Updating spn recipes ({} commits behind)...", SP_FMT_U32(num_updates));
-        spn_git_fetch(app->paths.spn);
-        spn_git_checkout(app->paths.spn, SPN_GIT_ORIGIN_HEAD);
-      }
-      else {
-        SP_LOG("spn has {} recipe updates available", SP_FMT_U32(num_updates));
-      }
     }
   }
 
