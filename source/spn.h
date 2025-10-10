@@ -117,12 +117,15 @@ SP_API sp_str_t         sp_os_lib_to_file_name(sp_str_t lib_name, sp_os_lib_kind
 /////////
 // LUA //
 /////////
+#define SP_LUA_ERROR_X(X) \
+  X(SP_LUA_OK) \
+  X(SP_LUA_ERROR_PATH_DOES_NOT_EXIST) \
+  X(SP_LUA_ERROR_PATH_IS_NOT_DIRECTORY) \
+  X(SP_LUA_ERROR_FILE_LOAD_ERROR) \
+  X(SP_LUA_ERROR_FILE_RUN_ERROR)
+
 typedef enum {
-  SP_LUA_OK,
-  SP_LUA_ERROR_PATH_DOES_NOT_EXIST,
-  SP_LUA_ERROR_PATH_IS_NOT_DIRECTORY,
-  SP_LUA_ERROR_FILE_LOAD_ERROR,
-  SP_LUA_ERROR_FILE_RUN_ERROR,
+  SP_LUA_ERROR_X(SP_X_ENUM_DEFINE)
 } sp_lua_error_t;
 
 typedef lua_State* sp_lua_context_t;
@@ -628,11 +631,8 @@ s32 sp_lua_format_file_load_error_l(sp_lua_context_t l) {
 
 sp_str_t sp_lua_error_to_string(sp_lua_error_t error) {
   switch (error) {
-    SP_SWITCH_ENUM_TO_STRING_LOWER(SP_LUA_OK)
-    SP_SWITCH_ENUM_TO_STRING_LOWER(SP_LUA_ERROR_PATH_DOES_NOT_EXIST)
-    SP_SWITCH_ENUM_TO_STRING_LOWER(SP_LUA_ERROR_PATH_IS_NOT_DIRECTORY)
-    SP_SWITCH_ENUM_TO_STRING_LOWER(SP_LUA_ERROR_FILE_LOAD_ERROR)
-    SP_SWITCH_ENUM_TO_STRING_LOWER(SP_LUA_ERROR_FILE_RUN_ERROR)
+    SP_LUA_ERROR_X(SP_X_ENUM_CASE_TO_STRING)
+    default: SP_UNREACHABLE_RETURN(sp_str_lit(""));
   }
 }
 
