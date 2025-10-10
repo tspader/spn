@@ -82,13 +82,14 @@ endif
 #########
 SPN_DIR_BUILD:= build
   SPN_DIR_BUILD_BOOTSTRAP:= $(SPN_DIR_BUILD)/bootstrap
+    BOOTSTRAP_BIN = $(SPN_DIR_BUILD_BOOTSTRAP)/bin
+      BOOTSTRAP_SPN = $(BOOTSTRAP_BIN)/$(SPN)
   SPN_DIR_BUILD_EXAMPLES := $(SPN_DIR_BUILD)/examples
   SPN_DIR_BUILD_OUTPUT := $(SPN_DIR_BUILD)/bin
     SPN_OUTPUT := $(SPN_DIR_BUILD_OUTPUT)/$(SPN)
 SPN_DIR_SOURCE := source
 SPN_DIR_ASSET := asset
 SPN_MAKEFILE := Makefile
-SPN_COMPILE_DB := compile_commands.json
 SPN_INSTALL_PREFIX ?= $(HOME)/.local/bin
 
 
@@ -122,7 +123,6 @@ $(SPN_DIR_BUILD_EXAMPLES):
 BOOTSTRAP_ARCHIVE_LINUX := build/bootstrap/spn-x86_64-unknown-linux-musl.tar.xz
 BOOTSTRAP_ARCHIVE_DARWIN := build/bootstrap/spn-aarch64-apple-darwin.tar.xz
 BOOTSTRAP_ARCHIVE_WINDOWS := build/bootstrap/spn-x86_64-pc-windows-gnu.zip
-BOOTSTRAP_BIN = build/bootstrap/bin
 
 ifeq ($(TARGET_OS),linux)
   BOOTSTRAP_ARCHIVE := $(BOOTSTRAP_ARCHIVE_LINUX)
@@ -138,7 +138,6 @@ else ifeq ($(TARGET_OS),windows)
   BOOTSTRAP_ARCHIVE_DIR := spn-x86_64-pc-windows-gnu
 endif
 
-BOOTSTRAP_SPN := $(BOOTSTRAP_BIN)/$(SPN)
 
 $(BOOTSTRAP_BIN):
 	mkdir -p $(BOOTSTRAP_BIN)
@@ -161,19 +160,7 @@ $(SPN_OUTPUT): $(BOOTSTRAP_SPN) $(SPN_DIR_SOURCE)/spn.h $(SPN_MAKEFILE) | $(SPN_
 ###########
 # PHONIES #
 ###########
-.PHONY: $(EXAMPLES) windows help test
-
-help:
-	@echo "Targets:"
-	@echo "  build         Build spn binary (default)"
-	@echo "  examples      Build all example projects"
-	@echo "  install       Install to ~/.local/bin (or SPN_INSTALL_PREFIX)"
-	@echo "  clean         Remove build artifacts"
-	@echo "  clangd        Generate compile_commands.json"
-	@echo ""
-	@echo "Cross-compilation:"
-	@echo "  make TARGET=x86_64-pc-windows-gnu"
-	@echo "  make windows  (shorthand for windows target)"
+.PHONY: build windows dist smoke test install uninstall clean
 
 build: $(SPN_OUTPUT)
 
@@ -183,8 +170,6 @@ windows:
 dist:
 	@$(MAKE) $(SPN_OUTPUT)
 	@cp $(SPN_OUTPUT) ./$(SPN)
-
-examples: build $(EXAMPLES)
 
 smoke: build test
 	./build/bin/test --mode debug curl sqlite cjson clay
@@ -203,9 +188,7 @@ install: build
 uninstall:
 	@rm -f $(SPN_INSTALL_PREFIX)/$(SPN)
 
-clangd: $(SPN_COMPILE_DB)
-
 clean:
+	@rm -rf $(BOOTSTRAP_BIN)
 	@rm -rf $(SPN_DIR_BUILD)/bin
 	@rm -rf $(SPN_DIR_BUILD)/examples
-	@rm -f $(SPN_COMPILE_DB)
