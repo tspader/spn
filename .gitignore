@@ -4,7 +4,7 @@ compile_commands.json
 
 build/*
 !build/llm
-examples/**/spn.lock.lua
+examples/**/*.lock.lua
 
 test/main
 test/spn.lock.lua
