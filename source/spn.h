@@ -25,7 +25,6 @@
 
 #define SP_STRNLEN
 #define SP_IMPLEMENTATION
-#define SP_OS_BACKEND_SDL
 #include "sp.h"
 
 #define ARGPARSE_IMPLEMENTATION
@@ -34,6 +33,8 @@
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
+
+#include "SDL3/SDL.h"
 
 #ifdef SP_POSIX
   #include <termios.h>

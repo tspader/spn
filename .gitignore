@@ -3,7 +3,8 @@ compile_commands.json
 .vscode
 
 build/*
-!build/llm
+!build/bootstrap/
+!build/bootstrap/*.tar.xz
 examples/**/*.lock.lua
 
 test/main
@@ -17,3 +18,4 @@ CLAUDE.md
 external/*
 asset/docker
 target/distrib
+build/bootstrap/bin
