@@ -151,20 +151,42 @@ function spn.load()
     spn.lock_file = lock_file
   end
 
-  local entries = sp.os.scan_directory(app.paths.recipes)
-  for index = 0, entries.count - 1 do
-    local entry = entries.data[index]
-    local extension = sp.os.extract_extension(entry.file_name)
+  -- Build the recipe search paths, then load all recipes we find in them
+  local recipe_dirs = {}
 
-    if sp.str.equal_cstr(extension, "lua") then
-      local recipe = dofile(entry.file_path:cstr())
-      recipe.name = sp.os.extract_stem(entry.file_name):cstr()
-      recipe.file_path = entry.file_path:cstr()
+  table.insert(recipe_dirs, app.paths.recipes)
+  for dir in spn.iterator.values(spn.project.recipe_dirs or {}) do
+    table.insert(recipe_dirs, sp.os.join_path(app.paths.project.dir, sp.str.from_cstr(dir)))
+  end
 
-      spn.recipes[recipe.name] = recipe
+  for dir in spn.iterator.values(recipe_dirs) do
+    if not sp.os.does_path_exist(dir) then return end
+    if not sp.os.is_directory(dir) then return end
+
+    local entries = sp.os.scan_directory(dir)
+    for index = 0, entries.count - 1 do
+      local entry = entries.data[index]
+      local extension = sp.os.extract_extension(entry.file_name)
+
+      if sp.str.equal_cstr(extension, "lua") then
+        local recipe = dofile(entry.file_path:cstr())
+        recipe.name = sp.os.extract_stem(entry.file_name):cstr()
+        recipe.file_path = entry.file_path:cstr()
+
+        spn.recipes[recipe.name] = recipe
+      end
     end
   end
 
+  if spn.project.recipes then
+    for name, recipe in pairs(spn.project.recipes) do
+      recipe.name = name
+      recipe.file_path = app.paths.project.config:cstr()
+      spn.recipes[name] = recipe
+    end
+  end
+
+  -- Configure the deps that the project uses with the project's options
   for name, spec in pairs(spn.project.deps) do
     local recipe = spn.recipes[name]
     recipe.spec = {
