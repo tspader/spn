@@ -1,5 +1,5 @@
 local project = {
-  name = 'hello-static',
+  name = 'sdl3-static',
   system_deps = {
     'm'
   },

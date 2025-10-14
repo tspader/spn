@@ -22,7 +22,7 @@ s32 main(s32 num_args, const c8** args) {
       OPT_END()
     },
     (const c8* const []) {
-      "kitchen-sink [options]",
+      "sp-demo [options]",
       SP_NULLPTR
     },
     SP_NULL

@@ -1,5 +1,5 @@
 local project = {
-  name = 'hello',
+  name = 'sdl3-shared',
   deps = {
     sdl3 = {},
   },

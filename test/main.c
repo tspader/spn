@@ -688,7 +688,12 @@ void spn_print_summary(void) {
   }
 
   sp_log(SP_LIT(""));
-  sp_log(sp_format("{:fg green} passed {:fg red} failed {:fg yellow} skipped", SP_FMT_U32(passed), SP_FMT_U32(failed), SP_FMT_U32(app.num_skipped)));
+  if (failed) {
+    sp_log(sp_format("{:fg brightgreen} passed {:fg red} failed", SP_FMT_U32(passed), SP_FMT_U32(failed)));
+  }
+  else {
+    sp_log(sp_format("{:fg green} passed", SP_FMT_U32(passed)));
+  }
 }
 
 s32 main(s32 num_args, const c8** args) {

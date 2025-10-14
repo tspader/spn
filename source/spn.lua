@@ -182,6 +182,7 @@ function spn.load()
     for name, recipe in pairs(spn.project.recipes) do
       recipe.name = name
       recipe.file_path = app.paths.project.config:cstr()
+
       spn.recipes[name] = recipe
     end
   end
