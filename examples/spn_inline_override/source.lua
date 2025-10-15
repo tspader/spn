@@ -1,15 +1,16 @@
 local spn = require('spn')
 
 local project = {
-  name = 'test_inline_recipe',
+  name = 'spn_inline_override',
+  recipe_dirs = { './recipes' },
   recipes = {
-    testlib = spn.recipes.single_header({
+    stb_sp = spn.recipes.single_header({
       git = 'nothings/stb',
       header = 'stb_sprintf.h',
     })
   },
   deps = {
-    testlib = {},
+    stb_sp = {},
   },
 }
 
