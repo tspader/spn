@@ -160,8 +160,8 @@ function spn.load()
   end
 
   for dir in spn.iterator.values(recipe_dirs) do
-    if not sp.os.does_path_exist(dir) then return end
-    if not sp.os.is_directory(dir) then return end
+    if not sp.os.does_path_exist(dir) then goto continue end
+    if not sp.os.is_directory(dir) then goto continue end
 
     local entries = sp.os.scan_directory(dir)
     for index = 0, entries.count - 1 do
@@ -176,6 +176,8 @@ function spn.load()
         spn.recipes[recipe.name] = recipe
       end
     end
+
+    ::continue::
   end
 
   if spn.project.recipes then

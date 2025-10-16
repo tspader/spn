@@ -1,8 +1,11 @@
 local project = {
   name = 'imgui',
   deps = {
-    imgui = {},
-    sdl3 = {}
+    imgui = {
+      kind = 'shared'
+    },
+    sdl3 = {},
+    sp = {}
   },
 }
 

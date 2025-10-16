@@ -6,8 +6,8 @@ return {
       name = "argparse"
     },
     sp = {
-      build_id = "f2ead9f6",
-      commit = "bcd9629016",
+      build_id = "915da721",
+      commit = "2810c48808",
       name = "sp"
     }
   }

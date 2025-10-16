@@ -1,0 +1,4 @@
+- static failures:
+  - freetype (need system libs, then need brotli + bzip, just configuration)
+  - ggml (same thing as whisper, need to configure backend)
+  - whisper (not vendoring example)

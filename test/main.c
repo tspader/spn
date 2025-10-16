@@ -5,15 +5,17 @@
 #define ARGPARSE_IMPLEMENTATION
 #include "argparse.h"
 
+#include "fnmatch.h"
+
 /////////////
 // TESTING //
 /////////////
 
 #define SPN_TEST_BUILD_KIND(X) \
+  X(SPN_TEST_BUILD_KIND_ALL,    "all") \
   X(SPN_TEST_BUILD_KIND_SHARED, "shared") \
-  X(SPN_TEST_BUILD_KIND_STATIC, "static") \
   X(SPN_TEST_BUILD_KIND_SOURCE, "source") \
-  X(SPN_TEST_BUILD_KIND_ALL,    "all")
+  X(SPN_TEST_BUILD_KIND_STATIC, "static")
 
 typedef enum {
   SPN_TEST_BUILD_KIND(SP_X_NAMED_ENUM_DEFINE)
@@ -21,9 +23,9 @@ typedef enum {
 } spn_test_build_kind_t;
 
 #define SPN_TEST_BUILD_MODE(X) \
+  X(SPN_TEST_BUILD_MODE_ALL,     "all") \
   X(SPN_TEST_BUILD_MODE_DEBUG,   "debug") \
-  X(SPN_TEST_BUILD_MODE_RELEASE, "release") \
-  X(SPN_TEST_BUILD_MODE_ALL,     "all")
+  X(SPN_TEST_BUILD_MODE_RELEASE, "release")
 
 typedef enum {
   SPN_TEST_BUILD_MODE(SP_X_NAMED_ENUM_DEFINE)
@@ -45,7 +47,7 @@ typedef enum {
   X(SPN_TEST_STATUS_SUCCESS,        "success") \
   X(SPN_TEST_STATUS_FAILED_DEPS,    "failed") \
   X(SPN_TEST_STATUS_FAILED_COMPILE, "failed") \
-  X(SPN_TEST_STATUS_SKIPPED,        "skipped")
+  X(SPN_TEST_STATUS_DRY_RUN,        "dry")
 
 typedef enum {
   SPN_TEST_STATUS(SP_X_NAMED_ENUM_DEFINE)
@@ -105,6 +107,7 @@ typedef struct {
   struct {
     spn_test_command_t build;
     spn_test_command_t copy;
+    spn_test_command_t print;
     spn_test_command_t compile;
   } commands;
 
@@ -172,6 +175,7 @@ void spn_tui_update_noninteractive(void);
 void spn_tui_update_interactive(void);
 bool spn_test_is_all_done(void);
 void spn_test_tui_update(void);
+s32 spn_test_qsort_kernel(const void* va, const void* vb);
 
 spn_test_build_kind_t spn_test_build_kind_from_str(sp_str_t str) {
   if      (sp_str_equal_cstr(str, "shared")) return SPN_TEST_BUILD_KIND_SHARED;
@@ -191,8 +195,8 @@ sp_str_t spn_test_status_to_color(spn_test_status_t status, sp_str_t padded) {
     case SPN_TEST_STATUS_SUCCESS:        return sp_format("{:fg brightgreen}",  SP_FMT_STR(padded));
     case SPN_TEST_STATUS_FAILED_DEPS:    return sp_format("{:fg brightred}",    SP_FMT_STR(padded));
     case SPN_TEST_STATUS_FAILED_COMPILE: return sp_format("{:fg brightred}",    SP_FMT_STR(padded));
+    case SPN_TEST_STATUS_DRY_RUN:        return sp_format("{:fg brightgreen}", SP_FMT_STR(padded));
     case SPN_TEST_STATUS_PENDING:        return sp_format("{:fg brightyellow}", SP_FMT_STR(padded));
-    case SPN_TEST_STATUS_SKIPPED:        return sp_format("{:fg brightyellow}", SP_FMT_STR(padded));
     case SPN_TEST_STATUS_BUILDING_DEPS:  return sp_format("{:fg brightcyan}",   SP_FMT_STR(padded));
     case SPN_TEST_STATUS_COMPILING:      return sp_format("{:fg brightcyan}",   SP_FMT_STR(padded));
     default:                             return sp_format("{:fg white}",  SP_FMT_STR(padded));
@@ -219,6 +223,25 @@ sp_str_t spn_test_status_to_str(spn_test_status_t status) {
     default: SP_UNREACHABLE_RETURN(SP_LIT(""));
   }
 }
+
+s32 spn_test_qsort_kernel(const void* va, const void* vb) {
+  spn_test_descriptor_t* a = (spn_test_descriptor_t*)va;
+  spn_test_descriptor_t* b = (spn_test_descriptor_t*)vb;
+
+  s32 cmp = sp_str_compare_alphabetical(a->name, b->name);
+  if (cmp != SP_QSORT_EQUAL) return cmp;
+
+  if (a->mode > b->mode) return SP_QSORT_A_FIRST;
+  if (a->mode < b->mode) return SP_QSORT_B_FIRST;
+
+  if (a->kind > b->kind) return SP_QSORT_A_FIRST;
+  if (a->kind < b->kind) return SP_QSORT_B_FIRST;
+
+  if (a->language > b->language) return SP_QSORT_A_FIRST;
+  if (a->language < b->language) return SP_QSORT_B_FIRST;
+
+  SP_UNREACHABLE_RETURN(SP_QSORT_EQUAL);
+};
 
 spn_timestamp_t spn_time_now(void) {
   sp_os_date_time_t dt = sp_os_get_date_time();
@@ -403,8 +426,7 @@ s32 spn_run_command(spn_test_command_t* command) {
 bool spn_test_is_terminal(spn_test_descriptor_t* test) {
   return test->status == SPN_TEST_STATUS_SUCCESS ||
          test->status == SPN_TEST_STATUS_FAILED_DEPS ||
-         test->status == SPN_TEST_STATUS_FAILED_COMPILE ||
-         test->status == SPN_TEST_STATUS_SKIPPED;
+         test->status == SPN_TEST_STATUS_FAILED_COMPILE;
 }
 
 bool spn_test_is_running(spn_test_descriptor_t* test) {
@@ -680,7 +702,6 @@ void spn_print_summary(void) {
 
     switch (test->status) {
       case SPN_TEST_STATUS_SUCCESS: { passed++; break; }
-      case SPN_TEST_STATUS_SKIPPED: { skipped++; break; }
       case SPN_TEST_STATUS_FAILED_DEPS:
       case SPN_TEST_STATUS_FAILED_COMPILE: { failed++; break; }
       default: { break; }
@@ -772,8 +793,12 @@ s32 main(s32 num_args, const c8** args) {
 
     if (sp_dyn_array_size(app.packages) > 0) {
       bool found = false;
-      sp_dyn_array_for(app.packages, pkg_idx) {
-        if (sp_str_equal(entry->file_name, app.packages[pkg_idx])) {
+      sp_dyn_array_for(app.packages, j) {
+        sp_str_t package = app.packages[j];
+        if (sp_str_equal(entry->file_name, package)) {
+          found = true;
+          break;
+        } else if (!fnmatch(sp_str_to_cstr(package), sp_str_to_cstr(entry->file_name), FNM_CASEFOLD)) {
           found = true;
           break;
         }
@@ -839,8 +864,8 @@ s32 main(s32 num_args, const c8** args) {
         sp_dyn_array_push(queue->tests, test_index);
         test->kind = kind;
         test->mode = mode;
-        test->status = SPN_TEST_STATUS_PENDING;
-        test->tui_status = SPN_TEST_STATUS_PENDING;
+        test->status = app.cli.dry_run ? SPN_TEST_STATUS_DRY_RUN : SPN_TEST_STATUS_PENDING;
+        test->tui_status = test->status;
         test->project_file = spn_project_file_for_kind(info.path, kind);
         test->language = sp_os_does_path_exist(info.main.c) ? SPN_TEST_LANGUAGE_C : SPN_TEST_LANGUAGE_CPP;
         test->main = test->language == SPN_TEST_LANGUAGE_C ? info.main.c : info.main.cpp;
@@ -881,14 +906,22 @@ s32 main(s32 num_args, const c8** args) {
           );
         }
 
-        test->commands.compile = spn_make_command(
+        test->commands.print = spn_make_command(
           sp_format(
-            "{} {} $({} --no-interactive -f {} --matrix {} print --compiler gcc) -Wl,-rpath,$ORIGIN -o {} -lm",
-            SP_FMT_CSTR(test->language == SPN_TEST_LANGUAGE_C ? "gcc" : "g++"),
-            SP_FMT_STR(test->main),
+            "{} --no-interactive -f {} --matrix {} print --compiler gcc",
             SP_FMT_STR(app.paths.spn),
             SP_FMT_STR(test->project_file),
-            SP_FMT_STR(mode_str),
+            SP_FMT_STR(mode_str)
+          ),
+          sp_str_lit("")
+        );
+
+        test->commands.compile = spn_make_command(
+          sp_format(
+            "bear --append -- {} {} -g $({}) -Wl,-rpath,$ORIGIN -o {} -lm",
+            SP_FMT_CSTR(test->language == SPN_TEST_LANGUAGE_C ? "gcc" : "g++"),
+            SP_FMT_STR(test->main),
+            SP_FMT_STR(test->commands.print.raw),
             SP_FMT_STR(test->output.executable)
           ),
           sp_os_join_path(test->output.logs, SP_LIT("compile.log"))
@@ -902,6 +935,8 @@ s32 main(s32 num_args, const c8** args) {
     sp_log(sp_format("{:fg yellow} no tests to run", SP_FMT_CSTR("!")));
     SP_EXIT_SUCCESS();
   }
+
+  qsort(app.tests, sp_dyn_array_size(app.tests), sizeof(spn_test_descriptor_t), spn_test_qsort_kernel);
 
   if (app.cli.dry_run) {
     spn_print_summary();
