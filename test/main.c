@@ -586,7 +586,8 @@ void spn_log_failures(void) {
         sp_log(sp_format("  {:fg brightblack} $ {}", SP_FMT_CSTR("compile"), SP_FMT_STR(test->commands.compile.raw)));
         sp_str_t compile_log = sp_os_read_file(test->commands.compile.log_path);
         if (compile_log.len) {
-          sp_log(sp_format("  {:fg white} {}", SP_FMT_CSTR("compile"), SP_FMT_STR(compile_log)));
+          sp_os_log(compile_log);
+          sp_os_log(sp_str_lit("\n"));
         }
       }
     }
