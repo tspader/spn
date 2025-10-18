@@ -8,18 +8,18 @@ local recipe = spn.recipes.basic({
     builder:cmake({
       install = true,
       defines = {
-        { 'BUILD_SHARED_LIBS', builder.kind == spn.build_kind.shared },
         { 'WHISPER_BUILD_TESTS', false },
         { 'WHISPER_BUILD_EXAMPLES', false },
         { 'WHISPER_BUILD_SERVER', false },
         { 'WHISPER_CURL', false },
         { 'WHISPER_SDL2', false },
-        { 'GGML_CCACHE', false },
+        { 'WHISPER_USE_SYSTEM_GGML', true },
       }
     })
     builder:copy({
       { builder:source('samples/jfk.wav'), builder:vendor('whisper-jfk.wav') },
       { builder:source('models/for-tests-ggml-tiny.en.bin'), builder:vendor('whisper-tiny-en.bin') },
+
     })
   end,
 })

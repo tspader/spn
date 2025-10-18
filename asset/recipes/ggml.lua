@@ -11,7 +11,8 @@ local recipe = spn.recipes.basic({
     backends = {
       cpu = true,
       cuda = false,
-      metal = false
+      metal = false,
+      vulkan = false,
     }
   },
   configure = function(self)
@@ -26,10 +27,12 @@ local recipe = spn.recipes.basic({
       install = true,
       defines = {
         { 'BUILD_SHARED_LIBS', builder.kind == spn.build_kind.shared },
+        { 'GGML_STATIC', builder.kind == spn.build_kind.static },
         { 'GGML_BUILD_TESTS', false },
         { 'GGML_BUILD_EXAMPLES', false },
         { 'GGML_CPU', builder.options.backends.cpu },
         { 'GGML_CUDA', builder.options.backends.cuda },
+        { 'GGML_VULKAN', builder.options.backends.vulkan },
         { 'GGML_METAL', builder.options.backends.metal },
       }
     })
