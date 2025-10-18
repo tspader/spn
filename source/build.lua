@@ -205,7 +205,10 @@ function module:cmake(config)
 
   for define in iterator.values(config.defines) do
     local name = define[1]
-    local value = define[2] and 'ON' or 'OFF'
+    local value = define[2]
+    if type(value) == 'bool' then
+      value = value and 'ON' or 'OFF'
+    end
     table.insert(sh.args, string.format('-D%s=%s', name, value))
   end
 
