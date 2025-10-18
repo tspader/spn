@@ -7,9 +7,10 @@ local project = {
       },
       options = {
         backends = {
-          cuda = true,
           cpu = true,
-          metal = true,
+          -- GPU backends, of course, also work
+          cuda = false,
+          metal = false,
         }
       }
     },

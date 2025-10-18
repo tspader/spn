@@ -8,13 +8,14 @@ local project = {
       },
       options = {
         backends = {
-          cuda = true,
           cpu = true,
-          metal = true,
         }
       }
     },
   },
+  system_deps = {
+    'gomp'
+  }
 }
 
 return project
