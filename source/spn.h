@@ -140,6 +140,9 @@ typedef struct {
   sp_lua_pop_t pop;
 } sp_lua_t;
 
+s32 sp_lua_set_path(sp_lua_context_t lua, sp_str_t path);
+s32 sp_lua_prepend_to_path(sp_lua_context_t lua, sp_str_t path);
+
 ///////////////
 // GENERATOR //
 ///////////////
@@ -1868,6 +1871,20 @@ void sp_os_copy_directory(sp_str_t from, sp_str_t to) {
   sp_os_copy_glob(from, sp_str_lit("*"), to);
 }
 
+s32 sp_lua_set_path(sp_lua_context_t lua, sp_str_t path) {
+  return luaL_dostring(lua, sp_str_to_cstr(sp_format(
+    "package.path = '{}'",
+    SP_FMT_STR(path)))
+  );
+}
+
+s32 sp_lua_prepend_to_path(sp_lua_context_t lua, sp_str_t path) {
+  return luaL_dostring(lua, sp_str_to_cstr(sp_format(
+    "package.path = '{}/?.lua;' .. package.path",
+    SP_FMT_STR(path)))
+  );
+}
+
 #if defined(SP_ELF)
   sp_str_t sp_elf_get_soname(sp_str_t path) {
     if (elf_version(EV_CURRENT) == EV_NONE) return SP_ZERO_STRUCT(sp_str_t);
@@ -2355,17 +2372,13 @@ s32 spn_dep_context_build_async(void* user_data) {
   dep->lua.state = luaL_newstate();
   luaL_openlibs(dep->lua.state);
 
-  s32 result = luaL_dostring(dep->lua.state, sp_str_to_cstr(sp_format(
-    "package.path = '{}/?.lua;' .. package.path",
-    SP_FMT_STR(app.paths.lua)))
-  );
   SP_ASSERT_FMT(
-    !result,
-    "Failed to update {:fg brightyellow} while preparing {:fg cyan}",
+    !sp_lua_prepend_to_path(dep->lua.state, app.paths.lua),
+    "Failed to prepend {:fg brightcyan} {:fg brightyellow} while preparing {:fg cyan}",
+    SP_FMT_STR(app.paths.project.dir),
     SP_FMT_CSTR("package.path"),
     SP_FMT_STR(dep->info->name)
   );
-
 
   // Build
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_BUILDING);
@@ -2612,9 +2625,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   sp_os_create_directory(app->paths.build);
 
   // At this point, we know we have all our Lua sources.
-  sp_str_t script = sp_format("package.path = '{}/?.lua;' .. package.path", SP_FMT_STR(app->paths.lua));
-  s32 result = luaL_dostring(app->lua.state, sp_str_to_cstr(script));
-  SP_ASSERT(!result);
+  SP_ASSERT(!sp_lua_prepend_to_path(app->lua.state, app->paths.lua));
 
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
   sp_str_builder_append_cstr(&builder, "local spn = require('spn');");
