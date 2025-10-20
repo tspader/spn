@@ -124,6 +124,8 @@ local spn = {
 function spn.load()
   local app = c.app
 
+  -- User config
+  spn.config = {}
   local loader = loadfile(app.paths.user_config:cstr())
   if loader then
     local ok, result = pcall(loader)
@@ -138,6 +140,7 @@ function spn.load()
     end
   end
 
+  -- Project file
   local chunk, _ = loadfile(app.paths.project.config:cstr())
   if chunk then
     local _, project = pcall(chunk)
@@ -145,7 +148,7 @@ function spn.load()
   end
   spn.project = dofile(app.paths.project.config:cstr())
 
-  local chunk, _ = loadfile(app.paths.project.lock:cstr())
+  chunk, _ = loadfile(app.paths.project.lock:cstr())
   if chunk then
     local _, lock_file = pcall(chunk)
     spn.lock_file = lock_file
@@ -223,13 +226,8 @@ function spn.parse()
     app.config.paths.spn = sp.str.from_cstr(spn.config.spn)
   end
 
-  if spn.config.pull_recipes then
-    app.config.pull_recipes = spn.config.pull_recipes
-  end
-
-  if spn.config.pull_deps then
-    app.config.pull_deps = spn.config.pull_deps
-  end
+  app.config.interactive = sp.ternary(spn.config.interactive)
+  app.config.quiet = sp.ternary(spn.config.quiet)
 
   -- Project file
   app.project.name = sp.str.from_cstr(spn.project.name)

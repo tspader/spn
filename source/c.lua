@@ -51,6 +51,12 @@ function module.load(app)
       const c8* data;
     } sp_str_t;
 
+    typedef enum {
+      SP_TERNARY_FALSE,
+      SP_TERNARY_TRUE,
+      SP_TERNARY_NULL,
+    } sp_ternary_t;
+
     typedef struct {
       s32 count;
     } sp_lua_pop_t;
@@ -340,8 +346,8 @@ function module.load(app)
         sp_str_t spn;
       } paths;
 
-      bool pull_recipes;
-      bool pull_deps;
+      sp_ternary_t interactive;
+      sp_ternary_t quiet;
     } spn_lua_config_t;
 
 typedef struct {
@@ -424,6 +430,16 @@ typedef struct {
       return arr_ptr[0]
     end
   }
+
+  module.sp.ternary = function(value)
+    if value == nil then
+      return ffi.C.SP_TERNARY_NULL
+    elseif value then
+      return ffi.C.SP_TERNARY_TRUE
+    else
+      return ffi.C.SP_TERNARY_FALSE
+    end
+  end
 
 
   -- spn

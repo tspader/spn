@@ -104,15 +104,25 @@ typedef enum {
   SP_OS_LIB_STATIC,
 } sp_os_lib_kind_t;
 
-SP_API sp_str_t         sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer);
-SP_API bool             sp_os_is_glob(sp_str_t path);
-SP_API bool             sp_os_is_program_on_path(sp_str_t program);
-SP_API void             sp_os_copy(sp_str_t from, sp_str_t to);
-SP_API void             sp_os_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to);
-SP_API void             sp_os_copy_file(sp_str_t from, sp_str_t to);
-SP_API void             sp_os_copy_directory(sp_str_t from, sp_str_t to);
-SP_API sp_str_t         sp_os_lib_kind_to_extension(sp_os_lib_kind_t kind);
-SP_API sp_str_t         sp_os_lib_to_file_name(sp_str_t lib_name, sp_os_lib_kind_t kind);
+#define SP_TERNARY_X(X) \
+  X(SP_TERNARY_FALSE) \
+  X(SP_TERNARY_TRUE) \
+  X(SP_TERNARY_NULL)
+
+typedef enum {
+  SP_TERNARY_X(SP_X_ENUM_DEFINE)
+} sp_ternary_t;
+
+SP_API sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer);
+SP_API bool     sp_os_is_glob(sp_str_t path);
+SP_API bool     sp_os_is_program_on_path(sp_str_t program);
+SP_API void     sp_os_copy(sp_str_t from, sp_str_t to);
+SP_API void     sp_os_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to);
+SP_API void     sp_os_copy_file(sp_str_t from, sp_str_t to);
+SP_API void     sp_os_copy_directory(sp_str_t from, sp_str_t to);
+SP_API sp_str_t sp_os_lib_kind_to_extension(sp_os_lib_kind_t kind);
+SP_API sp_str_t sp_os_lib_to_file_name(sp_str_t lib_name, sp_os_lib_kind_t kind);
+SP_API sp_str_t sp_ternary_to_str(sp_ternary_t ternary);
 
 
 /////////
@@ -362,7 +372,8 @@ typedef struct {
 
 typedef enum {
   SPN_TUI_STATE_INTERACTIVE,
-  SPN_TUI_STATE_NONINTERACTIVE
+  SPN_TUI_STATE_NONINTERACTIVE,
+  SPN_TUI_STATE_QUIET,
 } spn_tui_state_t;
 
 typedef struct {
@@ -394,10 +405,8 @@ void sp_tui_flush();
 void sp_tui_checkpoint(spn_tui_t* tui);
 void sp_tui_restore(spn_tui_t* tui);
 void sp_tui_setup_raw_mode(spn_tui_t* tui);
-void spn_tui_update_noninteractive(spn_tui_t* tui);
-void spn_tui_update_interactive(spn_tui_t* tui);
 void spn_tui_update(spn_tui_t* tui);
-void spn_tui_init(spn_tui_t* tui, spn_tui_state_t);
+void spn_tui_init(spn_tui_t* tui);
 void spn_tui_cleanup(spn_tui_t* tui);
 void spn_tui_print_dep(spn_tui_t* tui, spn_dep_build_context_t* dep);
 
@@ -485,6 +494,9 @@ typedef struct {
   const c8* project_file;
   const c8* matrix;
   bool no_interactive;
+  bool quiet;
+  spn_tui_state_t tui;
+
   spn_cli_add_t add;
   spn_cli_print_t print;
   spn_cli_build_t build;
@@ -514,8 +526,8 @@ typedef struct {
     sp_str_t spn;
   } paths;
 
-  bool pull_recipes;
-  bool pull_deps;
+  sp_ternary_t interactive;
+  sp_ternary_t quiet;
 } spn_lua_config_t;
 
 typedef sp_os_directory_entry_list_t sp_os_dirs_t;
@@ -1639,7 +1651,28 @@ void spn_cli_command_build(spn_cli_t* cli) {
     sp_thread_init(&dep->thread, spn_dep_context_build_async, dep);
   }
 
-  spn_tui_init(&app.tui, app.cli.no_interactive ? SPN_TUI_STATE_NONINTERACTIVE : SPN_TUI_STATE_INTERACTIVE);
+  switch (app.config.interactive) {
+    case SP_TERNARY_NULL: {
+      app.tui.state = !app.cli.no_interactive ? SPN_TUI_STATE_INTERACTIVE : SPN_TUI_STATE_NONINTERACTIVE;
+      break;
+    }
+    case SP_TERNARY_TRUE:
+    case SP_TERNARY_FALSE: {
+      app.tui.state = app.config.interactive ? SPN_TUI_STATE_INTERACTIVE : SPN_TUI_STATE_NONINTERACTIVE;
+    }
+  }
+
+  switch (app.config.quiet) {
+    case SP_TERNARY_NULL:
+    case SP_TERNARY_FALSE: {
+      break;
+    }
+    case SP_TERNARY_TRUE: {
+      app.tui.state = SPN_TUI_STATE_QUIET;
+    }
+  }
+
+  spn_tui_init(&app.tui);
 
   while (true) {
     bool building = false;
@@ -1885,6 +1918,12 @@ s32 sp_lua_prepend_to_path(sp_lua_context_t lua, sp_str_t path) {
   );
 }
 
+sp_str_t sp_ternary_to_str(sp_ternary_t ternary) {
+  switch (ternary) {
+    SP_TERNARY_X(SP_X_ENUM_CASE_TO_STRING_LOWER)
+  }
+}
+
 #if defined(SP_ELF)
   sp_str_t sp_elf_get_soname(sp_str_t path) {
     if (elf_version(EV_CURRENT) == EV_NONE) return SP_ZERO_STRUCT(sp_str_t);
@@ -2005,24 +2044,15 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_build_context_t* dep) {
       break;
     }
     case SPN_DEP_BUILD_STATE_DONE: {
-      if (tui->state == SPN_TUI_STATE_INTERACTIVE) {
-        status = sp_format(
-          "{} {:color green} {:color brightblack} {} {:color brightyellow} {:color brightcyan}",
-          SP_FMT_STR(name),
-          SP_FMT_STR(state),
-          SP_FMT_STR(dep->commits.resolved),
-          SP_FMT_STR(dep->commits.message),
-          SP_FMT_U32(dep->commits.delta),
-          SP_FMT_STR(dep->paths.store)
-        );
-      }
-      else {
-        status = sp_format(
-          "{} {:color green}",
-          SP_FMT_STR(name),
-          SP_FMT_STR(state)
-        );
-      }
+      status = sp_format(
+        "{} {:color green} {:color brightblack} {} {:color brightyellow} {:color brightcyan}",
+        SP_FMT_STR(name),
+        SP_FMT_STR(state),
+        SP_FMT_STR(dep->commits.resolved),
+        SP_FMT_STR(dep->commits.message),
+        SP_FMT_U32(dep->commits.delta),
+        SP_FMT_STR(dep->paths.store)
+      );
       break;
     }
     case SPN_DEP_BUILD_STATE_BUILDING: {
@@ -2050,33 +2080,6 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_build_context_t* dep) {
   sp_tui_print(status);
 }
 
-void spn_tui_update_noninteractive(spn_tui_t* tui) {
-  sp_dyn_array_for(app.build.deps, i) {
-    spn_dep_build_context_t* dep = &app.build.deps[i];
-
-    if (dep->state.build != dep->tui_state.build) {
-      dep->tui_state = dep->state;
-      spn_tui_print_dep(tui, dep);
-      sp_tui_print(SP_LIT("\n"));
-    }
-  }
-}
-
-void spn_tui_update_interactive(spn_tui_t* tui) {
-  sp_tui_up(sp_dyn_array_size(app.build.deps));
-
-  sp_dyn_array_for(app.build.deps, index) {
-    spn_dep_build_context_t* dep = app.build.deps + index;
-
-    sp_tui_home();
-    sp_tui_clear_line();
-    spn_tui_print_dep(tui, dep);
-    sp_tui_down(1);
-  }
-
-  sp_tui_flush();
-}
-
 void spn_tui_cleanup(spn_tui_t* tui) {
   switch (tui->state) {
     case SPN_TUI_STATE_INTERACTIVE: {
@@ -2086,14 +2089,23 @@ void spn_tui_cleanup(spn_tui_t* tui) {
       sp_tui_flush();
       break;
     }
-    default: {
+    case SPN_TUI_STATE_NONINTERACTIVE: {
+      break;
+    }
+    case SPN_TUI_STATE_QUIET: {
+      sp_dyn_array_for(app.build.deps, i) {
+        spn_dep_build_context_t* dep = &app.build.deps[i];
+        dep->tui_state = dep->state;
+        spn_tui_print_dep(tui, dep);
+        sp_tui_print(SP_LIT("\n"));
+      }
+
       break;
     }
   }
 }
 
-void spn_tui_init(spn_tui_t* tui, spn_tui_state_t state) {
-  tui->state = state;
+void spn_tui_init(spn_tui_t* tui) {
   tui->num_deps = sp_dyn_array_size(app.build.deps);
   tui->width = 0;
   sp_dyn_array_for(app.build.deps, i) {
@@ -2114,6 +2126,7 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_state_t state) {
 
       break;
     }
+    case SPN_TUI_STATE_QUIET:
     case SPN_TUI_STATE_NONINTERACTIVE: {
       break;
     }
@@ -2122,12 +2135,37 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_state_t state) {
 
 void spn_tui_update(spn_tui_t* tui) {
   switch (tui->state) {
-    case SPN_TUI_STATE_INTERACTIVE:
-      spn_tui_update_interactive(tui);
+    case SPN_TUI_STATE_INTERACTIVE: {
+      sp_tui_up(sp_dyn_array_size(app.build.deps));
+
+      sp_dyn_array_for(app.build.deps, index) {
+        spn_dep_build_context_t* dep = app.build.deps + index;
+
+        sp_tui_home();
+        sp_tui_clear_line();
+        spn_tui_print_dep(tui, dep);
+        sp_tui_down(1);
+      }
+
+      sp_tui_flush();
       break;
-    case SPN_TUI_STATE_NONINTERACTIVE:
-      spn_tui_update_noninteractive(tui);
+    }
+    case SPN_TUI_STATE_NONINTERACTIVE: {
+      sp_dyn_array_for(app.build.deps, i) {
+        spn_dep_build_context_t* dep = &app.build.deps[i];
+
+        if (dep->state.build != dep->tui_state.build) {
+          dep->tui_state = dep->state;
+          spn_tui_print_dep(tui, dep);
+          sp_tui_print(SP_LIT("\n"));
+        }
+      }
+
       break;
+    }
+    case SPN_TUI_STATE_QUIET: {
+      break;
+    }
   }
 }
 
@@ -2453,6 +2491,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     OPT_STRING('f', "file", &cli->project_file, "specify the project file path", SP_NULLPTR),
     OPT_STRING('m', "matrix", &cli->matrix, "build matrix to use; 'debug' and 'release' provided unless you specify custom matrices; defaults to first listed matrix, or 'debug'", SP_NULLPTR),
     OPT_BOOLEAN('n', "no-interactive", &cli->no_interactive, "disable interactive tui", SP_NULLPTR),
+    OPT_BOOLEAN('q', "quiet", &cli->quiet, "only print final result; no intermediate build steps", SP_NULLPTR),
     OPT_END(),
   };
 
