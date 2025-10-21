@@ -228,6 +228,9 @@ function spn.parse()
 
   app.config.interactive = sp.ternary(spn.config.interactive)
   app.config.quiet = sp.ternary(spn.config.quiet)
+  if spn.config.output then
+    app.config.output = sp.str.from_cstr(spn.config.output)
+  end
 
   -- Project file
   app.project.name = sp.str.from_cstr(spn.project.name)

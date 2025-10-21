@@ -32,6 +32,10 @@
 
 #include "lua.h"
 #include "lualib.h"
+
+#ifdef SP_POSIX
+#include <signal.h>
+#endif
 #include "lauxlib.h"
 
 #include "SDL3/SDL.h"
@@ -374,6 +378,7 @@ typedef enum {
   SPN_TUI_STATE_INTERACTIVE,
   SPN_TUI_STATE_NONINTERACTIVE,
   SPN_TUI_STATE_QUIET,
+  SPN_TUI_STATE_NONE,
 } spn_tui_state_t;
 
 typedef struct {
@@ -474,12 +479,10 @@ typedef struct {
 } spn_cli_print_t;
 
 typedef struct {
-  const c8* package;
   const c8* dir;
 } spn_cli_which_t;
 
 typedef struct {
-  const c8* package;
   const c8* dir;
 } spn_cli_ls_t;
 
@@ -493,8 +496,7 @@ typedef struct {
   const c8* project_directory;
   const c8* project_file;
   const c8* matrix;
-  bool no_interactive;
-  bool quiet;
+  const c8* output;
   spn_tui_state_t tui;
 
   spn_cli_add_t add;
@@ -506,6 +508,7 @@ typedef struct {
 } spn_cli_t;
 
 void spn_cli_command_init(spn_cli_t* cli);
+void spn_cli_command_add(spn_cli_t* cli);
 void spn_cli_command_list(spn_cli_t* cli);
 void spn_cli_command_nuke(spn_cli_t* cli);
 void spn_cli_command_clean(spn_cli_t* cli);
@@ -528,6 +531,7 @@ typedef struct {
 
   sp_ternary_t interactive;
   sp_ternary_t quiet;
+  sp_str_t output;
 } spn_lua_config_t;
 
 typedef sp_os_directory_entry_list_t sp_os_dirs_t;
@@ -1033,6 +1037,93 @@ void spn_cli_command_init(spn_cli_t* cli) {
   }
 }
 
+void spn_cli_command_add(spn_cli_t* cli) {
+  struct argparse argparse;
+  argparse_init(
+    &argparse,
+    (struct argparse_option []) {
+      OPT_HELP(),
+      OPT_END()
+    },
+    (const c8* const []) {
+      "spn add <package>",
+      "Add a dependency to the project",
+      SP_NULLPTR
+    },
+    SP_NULL
+  );
+  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+
+  // Get package name from positional argument
+  if (cli->num_args < 1 || !cli->args[0]) {
+    SP_FATAL("Package name required. Usage: spn add <package>");
+  }
+
+  const c8* package_name = cli->args[0];
+
+  // Check if project file exists
+  if (!sp_os_does_path_exist(app.paths.project.config)) {
+    SP_FATAL("No spn.lua found. Run 'spn init' first.");
+  }
+
+  // Read the existing file
+  size_t file_size;
+  c8* file_content = SDL_LoadFile(sp_str_to_cstr(app.paths.project.config), &file_size);
+  if (!file_content) {
+    SP_FATAL("Failed to read project file");
+  }
+
+  // Find the dep section markers
+  const c8* dep_start_marker = "-- Dependencies: DO NOT REMOVE THIS LINE";
+  const c8* dep_end_marker = "-- End Dependencies: DO NOT REMOVE THIS LINE";
+
+  c8* dep_start = strstr(file_content, dep_start_marker);
+  c8* dep_end = strstr(file_content, dep_end_marker);
+
+  if (!dep_start || !dep_end) {
+    SDL_free(file_content);
+    SP_FATAL("Could not find dependency section markers in spn.lua");
+  }
+
+  // Find the closing brace of the deps table (just before the end marker)
+  c8* closing_brace = dep_end - 1;
+  while (closing_brace > dep_start && (*closing_brace == ' ' || *closing_brace == '\t' || *closing_brace == '\n')) {
+    closing_brace--;
+  }
+
+  if (*closing_brace != '}') {
+    SDL_free(file_content);
+    SP_FATAL("Malformed deps table in spn.lua");
+  }
+
+  // Build the new file content with the added dep
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+
+  // Add content before the closing brace
+  sp_str_builder_append(&builder, SP_RVAL(sp_str_t){ .data = file_content, .len = (u32)(closing_brace - file_content) });
+
+  // Add the new dependency
+  sp_str_builder_append_fmt(&builder, "  {} = {},\n", SP_FMT_CSTR(package_name));
+
+  // Add the closing brace and everything after
+  sp_str_builder_append(&builder, SP_RVAL(sp_str_t){ .data = closing_brace, .len = (u32)(file_size - (closing_brace - file_content)) });
+
+  // Write the file back
+  SDL_IOStream* file = SDL_IOFromFile(sp_str_to_cstr(app.paths.project.config), "w");
+  if (!file) {
+    SDL_free(file_content);
+    SP_FATAL("Failed to open project file for writing");
+  }
+
+  sp_str_t new_content = sp_str_builder_write(&builder);
+  SDL_WriteIO(file, new_content.data, new_content.len);
+  SDL_CloseIO(file);
+
+  SDL_free(file_content);
+
+  SP_LOG("Added {:fg cyan} to project dependencies", SP_FMT_CSTR(package_name));
+}
+
 void spn_cli_command_list(spn_cli_t* cli) {
   struct argparse argparse;
   argparse_init(
@@ -1496,12 +1587,11 @@ void spn_cli_command_ls(spn_cli_t* cli) {
     &argparse,
     (struct argparse_option []) {
       OPT_HELP(),
-      OPT_STRING('p', "package", &cli->ls.package, "", SP_NULLPTR),
       OPT_STRING('d', "dir", &cli->ls.dir, "which directory to list (store, include, lib, source, work, vendor)", SP_NULLPTR),
       OPT_END()
     },
     (const c8* const []) {
-      "spn ls <package>",
+      "spn ls [package]",
       "List files in a package's cache directory",
       SP_NULLPTR
     },
@@ -1509,9 +1599,14 @@ void spn_cli_command_ls(spn_cli_t* cli) {
   );
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
-  spn_cli_ls_t* ls = &cli->ls;
-  if (ls->package) {
-    spn_dep_build_context_t* dep = spn_cli_assert_dep_exists(sp_str_view(ls->package));
+  // Get package name from positional argument if provided
+  const c8* package = SP_NULLPTR;
+  if (cli->num_args > 0 && cli->args[0]) {
+    package = cli->args[0];
+  }
+
+  if (package) {
+    spn_dep_build_context_t* dep = spn_cli_assert_dep_exists(sp_str_view(package));
     spn_cli_assert_dep_is_built(dep);
     spn_dep_context_prepare(dep, dep->spec->lock);
 
@@ -1540,12 +1635,11 @@ void spn_cli_command_which(spn_cli_t* cli) {
     &argparse,
     (struct argparse_option []) {
       OPT_HELP(),
-      OPT_STRING('p', "package", &cli->which.package, "", SP_NULLPTR),
       OPT_STRING('d', "dir", &cli->which.dir, "which directory to show (store, include, lib, source, work, vendor)", SP_NULLPTR),
       OPT_END()
     },
     (const c8* const []) {
-      "spn which <package>",
+      "spn which [package]",
       "Print the cache directory for this package for this project",
       SP_NULLPTR
     },
@@ -1553,9 +1647,14 @@ void spn_cli_command_which(spn_cli_t* cli) {
   );
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
-  spn_cli_which_t* which = &cli->which;
-  if (which->package) {
-    spn_dep_build_context_t* dep = spn_cli_assert_dep_exists(sp_str_view(which->package));
+  // Get package name from positional argument if provided
+  const c8* package = SP_NULLPTR;
+  if (cli->num_args > 0 && cli->args[0]) {
+    package = cli->args[0];
+  }
+
+  if (package) {
+    spn_dep_build_context_t* dep = spn_cli_assert_dep_exists(sp_str_view(package));
     spn_cli_assert_dep_is_built(dep);
     spn_dep_context_prepare(dep, dep->spec->lock);
 
@@ -1651,30 +1750,68 @@ void spn_cli_command_build(spn_cli_t* cli) {
     sp_thread_init(&dep->thread, spn_dep_context_build_async, dep);
   }
 
-  switch (app.config.interactive) {
-    case SP_TERNARY_NULL: {
-      app.tui.state = !app.cli.no_interactive ? SPN_TUI_STATE_INTERACTIVE : SPN_TUI_STATE_NONINTERACTIVE;
-      break;
-    }
-    case SP_TERNARY_TRUE:
-    case SP_TERNARY_FALSE: {
-      app.tui.state = app.config.interactive ? SPN_TUI_STATE_INTERACTIVE : SPN_TUI_STATE_NONINTERACTIVE;
-    }
+  // Determine TUI state from --output flag, config, or defaults
+  // Priority: CLI flag > config file > default
+
+  const c8* output_mode = SP_NULLPTR;
+
+  // First check if --output was specified via CLI
+  if (app.cli.output) {
+    output_mode = app.cli.output;
+  }
+  // Check config file output setting
+  else if (app.config.output.len > 0) {
+    output_mode = sp_str_to_cstr(app.config.output);
   }
 
-  switch (app.config.quiet) {
-    case SP_TERNARY_NULL:
-    case SP_TERNARY_FALSE: {
-      break;
+  // Parse output mode if set
+  if (output_mode) {
+    if (sp_cstr_equal(output_mode, "interactive")) {
+      app.tui.state = SPN_TUI_STATE_INTERACTIVE;
     }
-    case SP_TERNARY_TRUE: {
+    else if (sp_cstr_equal(output_mode, "noninteractive")) {
+      app.tui.state = SPN_TUI_STATE_NONINTERACTIVE;
+    }
+    else if (sp_cstr_equal(output_mode, "quiet")) {
       app.tui.state = SPN_TUI_STATE_QUIET;
     }
+    else if (sp_cstr_equal(output_mode, "none")) {
+      app.tui.state = SPN_TUI_STATE_NONE;
+    }
+    else {
+      // Default to interactive if invalid value
+      app.tui.state = SPN_TUI_STATE_INTERACTIVE;
+    }
+  }
+  // Check legacy config file settings (interactive/quiet)
+  else if (app.config.quiet == SP_TERNARY_TRUE) {
+    app.tui.state = SPN_TUI_STATE_QUIET;
+  }
+  else if (app.config.interactive != SP_TERNARY_NULL) {
+    app.tui.state = app.config.interactive ? SPN_TUI_STATE_INTERACTIVE : SPN_TUI_STATE_NONINTERACTIVE;
+  }
+  // Default to interactive
+  else {
+    app.tui.state = SPN_TUI_STATE_INTERACTIVE;
   }
 
   spn_tui_init(&app.tui);
 
   while (true) {
+    // Check if user requested cancellation (e.g., Ctrl-C)
+    if (SDL_GetAtomicInt(&app.control) != 0) {
+      // Signal all threads to stop
+      sp_dyn_array_for(app.build.deps, index) {
+        spn_dep_build_context_t* dep = app.build.deps + index;
+        sp_mutex_lock(&dep->mutex);
+        if (!spn_dep_state_is_terminal(dep)) {
+          dep->state.build = SPN_DEP_BUILD_STATE_FAILED;
+        }
+        sp_mutex_unlock(&dep->mutex);
+      }
+      break;
+    }
+
     bool building = false;
 
     sp_dyn_array_for(app.build.deps, index) {
@@ -2102,6 +2239,10 @@ void spn_tui_cleanup(spn_tui_t* tui) {
 
       break;
     }
+    case SPN_TUI_STATE_NONE: {
+      // Print nothing
+      break;
+    }
   }
 }
 
@@ -2127,7 +2268,8 @@ void spn_tui_init(spn_tui_t* tui) {
       break;
     }
     case SPN_TUI_STATE_QUIET:
-    case SPN_TUI_STATE_NONINTERACTIVE: {
+    case SPN_TUI_STATE_NONINTERACTIVE:
+    case SPN_TUI_STATE_NONE: {
       break;
     }
   }
@@ -2163,7 +2305,8 @@ void spn_tui_update(spn_tui_t* tui) {
 
       break;
     }
-    case SPN_TUI_STATE_QUIET: {
+    case SPN_TUI_STATE_QUIET:
+    case SPN_TUI_STATE_NONE: {
       break;
     }
   }
@@ -2356,9 +2499,27 @@ s32 spn_dep_context_build_async(void* user_data) {
 
   sp_str_t resolved;
 
+  // Check if build was cancelled before starting
+  if (SDL_GetAtomicInt(&app.control) != 0) {
+    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
+    return 1;
+  }
+
   if (sp_os_does_path_exist(dep->info->paths.source)) {
+    // Check if cancelled before fetching
+    if (SDL_GetAtomicInt(&app.control) != 0) {
+      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
+      return 1;
+    }
+
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
     spn_git_fetch(dep->info->paths.source);
+
+    // Check if cancelled after fetching
+    if (SDL_GetAtomicInt(&app.control) != 0) {
+      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
+      return 1;
+    }
 
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
     if (dep->update || sp_str_empty(dep->spec->lock)){
@@ -2371,13 +2532,31 @@ s32 spn_dep_context_build_async(void* user_data) {
     spn_git_checkout(dep->info->paths.source, resolved);
   }
   else {
+    // Check if cancelled before cloning
+    if (SDL_GetAtomicInt(&app.control) != 0) {
+      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
+      return 1;
+    }
+
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
     spn_dep_context_clone(dep);
     SP_ASSERT(sp_os_is_directory(dep->info->paths.source));
 
+    // Check if cancelled after cloning
+    if (SDL_GetAtomicInt(&app.control) != 0) {
+      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
+      return 1;
+    }
+
     sp_str_t branch = sp_format("origin/{}",  SP_FMT_STR(dep->info->branch));
     resolved = spn_git_get_commit(dep->info->paths.source, branch);
     spn_git_checkout(dep->info->paths.source, resolved);
+  }
+
+  // Check if cancelled before preparing
+  if (SDL_GetAtomicInt(&app.control) != 0) {
+    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
+    return 1;
   }
 
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PREPARING);
@@ -2391,6 +2570,12 @@ s32 spn_dep_context_build_async(void* user_data) {
       spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
       return 0;
     }
+  }
+
+  // Check if cancelled before building
+  if (SDL_GetAtomicInt(&app.control) != 0) {
+    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
+    return 1;
   }
 
   sp_os_create_directory(dep->paths.work);
@@ -2417,6 +2602,12 @@ s32 spn_dep_context_build_async(void* user_data) {
     SP_FMT_CSTR("package.path"),
     SP_FMT_STR(dep->info->name)
   );
+
+  // Check if cancelled before starting build
+  if (SDL_GetAtomicInt(&app.control) != 0) {
+    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
+    return 1;
+  }
 
   // Build
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_BUILDING);
@@ -2482,6 +2673,88 @@ spn_lock_entry_t* spn_dep_context_get_lock_entry(spn_dep_build_context_t* dep) {
 /////////
 // APP //
 /////////
+#ifdef SP_POSIX
+// Signal handler for Ctrl-C (SIGINT)
+void spn_signal_handler(int signum) {
+  if (signum == SIGINT) {
+    // Set control flag to signal threads to stop
+    SDL_SetAtomicInt(&app.control, 1);
+
+    // Print newline for cleaner output
+    printf("\n");
+    fflush(stdout);
+  }
+}
+
+// Install signal handler
+void spn_install_signal_handlers() {
+  struct sigaction sa;
+  sa.sa_handler = spn_signal_handler;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = 0;
+  sigaction(SIGINT, &sa, NULL);
+}
+#else
+void spn_install_signal_handlers() {
+  // Windows signal handling could be added here if needed
+}
+#endif
+
+// Helper function to extract global flags from argument list
+// This allows global flags to appear before or after the subcommand
+void spn_extract_global_flags(spn_cli_t* cli) {
+  // Scan through all remaining args and extract global flags
+  u32 write_idx = 0;
+  for (u32 read_idx = 0; read_idx < cli->num_args; read_idx++) {
+    const c8* arg = cli->args[read_idx];
+    bool is_global_flag = false;
+
+    // Check for --output / -o
+    if (sp_cstr_equal(arg, "--output") || sp_cstr_equal(arg, "-o")) {
+      if (read_idx + 1 < cli->num_args) {
+        cli->output = cli->args[read_idx + 1];
+        read_idx++; // Skip the value
+        is_global_flag = true;
+      }
+    }
+    // Check for --matrix / -m
+    else if (sp_cstr_equal(arg, "--matrix") || sp_cstr_equal(arg, "-m")) {
+      if (read_idx + 1 < cli->num_args) {
+        cli->matrix = cli->args[read_idx + 1];
+        read_idx++; // Skip the value
+        is_global_flag = true;
+      }
+    }
+    // Check for --project-dir / -C
+    else if (sp_cstr_equal(arg, "--project-dir") || sp_cstr_equal(arg, "-C")) {
+      if (read_idx + 1 < cli->num_args) {
+        cli->project_directory = cli->args[read_idx + 1];
+        read_idx++; // Skip the value
+        is_global_flag = true;
+      }
+    }
+    // Check for --file / -f
+    else if (sp_cstr_equal(arg, "--file") || sp_cstr_equal(arg, "-f")) {
+      if (read_idx + 1 < cli->num_args) {
+        cli->project_file = cli->args[read_idx + 1];
+        read_idx++; // Skip the value
+        is_global_flag = true;
+      }
+    }
+
+    if (!is_global_flag) {
+      // Keep this argument
+      if (write_idx != read_idx) {
+        ((const c8**)cli->args)[write_idx] = arg;
+      }
+      write_idx++;
+    }
+  }
+
+  // Update num_args to reflect removed global flags
+  cli->num_args = write_idx;
+}
+
 void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   spn_cli_t* cli = &app->cli;
 
@@ -2490,8 +2763,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     OPT_STRING('C', "project-dir", &cli->project_directory, "specify the directory containing spn.lua", SP_NULLPTR),
     OPT_STRING('f', "file", &cli->project_file, "specify the project file path", SP_NULLPTR),
     OPT_STRING('m', "matrix", &cli->matrix, "build matrix to use; 'debug' and 'release' provided unless you specify custom matrices; defaults to first listed matrix, or 'debug'", SP_NULLPTR),
-    OPT_BOOLEAN('n', "no-interactive", &cli->no_interactive, "disable interactive tui", SP_NULLPTR),
-    OPT_BOOLEAN('q', "quiet", &cli->quiet, "only print final result; no intermediate build steps", SP_NULLPTR),
+    OPT_STRING('o', "output", &cli->output, "output mode: interactive (update in place), noninteractive (update serially), quiet (print result at end), none (print nothing)", SP_NULLPTR),
     OPT_END(),
   };
 
@@ -2517,12 +2789,18 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   cli->num_args = num_args;
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
+  // Extract any global flags that appear after the subcommand
+  spn_extract_global_flags(cli);
+
   if (!cli->num_args || !cli->args[0]) {
     argparse_usage(&argparse);
     exit(0);
   }
 
   SDL_SetAtomicInt(&app->control, 0);
+
+  // Install signal handlers for clean shutdown on Ctrl-C
+  spn_install_signal_handlers();
 
 #ifdef SP_WIN32
   app->paths.storage = sp_os_normalize_path(sp_str_from_cstr(SDL_GetPrefPath(SP_NULLPTR, "spn")));
@@ -2730,6 +3008,9 @@ void spn_app_run(spn_app_t* app) {
   else if (sp_cstr_equal("init", cli->args[0])) {
     spn_cli_command_init(cli);
   }
+  else if (sp_cstr_equal("add", cli->args[0])) {
+    spn_cli_command_add(cli);
+  }
   else if (sp_cstr_equal("list", cli->args[0])) {
     spn_cli_command_list(cli);
   }
@@ -2774,6 +3055,34 @@ spn_dep_spec_t* spn_project_find_dep(sp_str_t name) {
 }
 
 bool spn_project_write(spn_project_t* project, sp_str_t path) {
+  // Create a basic spn.lua file with structured dep section
+  const c8* template_content =
+    "-- SPN Project Configuration\n"
+    "-- Dependencies: DO NOT REMOVE THIS LINE\n"
+    "local deps = {\n"
+    "  -- Add dependencies here using: spn add <package>\n"
+    "  -- Example:\n"
+    "  -- sp = {},\n"
+    "}\n"
+    "-- End Dependencies: DO NOT REMOVE THIS LINE\n"
+    "\n"
+    "return {\n"
+    "  name = \"%s\",\n"
+    "  deps = deps,\n"
+    "}\n";
+
+  const c8* name_cstr = sp_str_to_cstr(project->name);
+  sp_str_t content = sp_format(template_content, name_cstr);
+
+  SDL_IOStream* file = SDL_IOFromFile(sp_str_to_cstr(path), "w");
+  if (!file) {
+    return false;
+  }
+
+  SDL_WriteIO(file, content.data, content.len);
+  SDL_CloseIO(file);
+
+  SP_LOG("Initialized new project at {:fg cyan}", SP_FMT_STR(path));
   return true;
 }
 

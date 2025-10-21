@@ -151,10 +151,10 @@ $(BOOTSTRAP_SPN): $(BOOTSTRAP_ARCHIVE) | $(BOOTSTRAP_BIN)
 $(SPN_OUTPUT): $(BOOTSTRAP_SPN) $(SPN_DIR_SOURCE)/spn.h $(SPN_MAKEFILE) | $(SPN_DIR_BUILD_OUTPUT)
 	$(call print_heading)
 	@echo "building dependencies"
-	$(BOOTSTRAP_SPN) --no-interactive build
+	$(BOOTSTRAP_SPN) --output noninteractive build
 	$(call print_heading)
 	@echo "building spn"
-	$(CC) ./source/main.c $(CFLAGS) $$($(BOOTSTRAP_SPN) --no-interactive print) $(FLAG_SYSTEM_LIBS)
+	$(CC) ./source/main.c $(CFLAGS) $$($(BOOTSTRAP_SPN) --output noninteractive print) $(FLAG_SYSTEM_LIBS)
 
 
 ###########
@@ -175,8 +175,8 @@ smoke: build test
 	./build/bin/test --mode debug curl sqlite cjson clay
 
 build/bin/test: build test/main.c
-	$(SPN_OUTPUT) -C test --no-interactive build
-	$(CC) ./test/main.c -g $$($(SPN_OUTPUT) -C test --no-interactive print) -o ./build/bin/test
+	$(SPN_OUTPUT) -C test --output noninteractive build
+	$(CC) ./test/main.c -g $$($(SPN_OUTPUT) -C test --output noninteractive print) -o ./build/bin/test
 
 test: build/bin/test
 

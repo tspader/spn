@@ -885,7 +885,7 @@ s32 main(s32 num_args, const c8** args) {
 
         test->commands.build = spn_make_command(
           sp_format(
-            "{} --no-interactive -f {} --matrix {} build --force",
+            "{} --output noninteractive -f {} --matrix {} build --force",
             SP_FMT_STR(app.paths.spn),
             SP_FMT_STR(test->project_file),
             SP_FMT_STR(mode_str)
@@ -897,7 +897,7 @@ s32 main(s32 num_args, const c8** args) {
         if (needs_copy) {
           test->commands.copy = spn_make_command(
             sp_format(
-              "{} --no-interactive -f {} --matrix {} copy {}",
+              "{} --output noninteractive -f {} --matrix {} copy {}",
               SP_FMT_STR(app.paths.spn),
               SP_FMT_STR(test->project_file),
               SP_FMT_STR(mode_str),
@@ -909,7 +909,7 @@ s32 main(s32 num_args, const c8** args) {
 
         test->commands.print = spn_make_command(
           sp_format(
-            "{} --no-interactive -f {} --matrix {} print --compiler gcc",
+            "{} --output noninteractive -f {} --matrix {} print --compiler gcc",
             SP_FMT_STR(app.paths.spn),
             SP_FMT_STR(test->project_file),
             SP_FMT_STR(mode_str)
