@@ -6,13 +6,13 @@ return {
       name = "argparse"
     },
     luajit = {
-      build_id = "55b16ec2",
-      commit = "25a61a1821",
+      build_id = "adcc8cd7",
+      commit = "871db2c84e",
       name = "luajit"
     },
     sdl3 = {
-      build_id = "c7d8c382",
-      commit = "91a5598283",
+      build_id = "19e43d5b",
+      commit = "544772173f",
       name = "sdl3"
     },
     sp = {

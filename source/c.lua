@@ -224,9 +224,8 @@ function module.load(app)
     } spn_dep_paths_t;
 
     typedef struct {
-      sp_str_t std_out;
-      sp_str_t std_err;
-      sp_str_t std_in;
+      sp_str_t log;
+      sp_str_t stamp;
       sp_str_t source;
       sp_str_t work;
       sp_str_t store;
@@ -280,7 +279,6 @@ function module.load(app)
       SDL_Environment* env;
       struct {
         SDL_IOStream* out;
-        SDL_IOStream* err;
       } std;
 
       sp_thread_t thread;

@@ -234,6 +234,7 @@ typedef enum {
   SPN_DEP_BUILD_STATE_CHECKING_OUT,
   SPN_DEP_BUILD_STATE_PREPARING,
   SPN_DEP_BUILD_STATE_BUILDING,
+  SPN_DEP_BUILD_STATE_STAMPING,
   SPN_DEP_BUILD_STATE_DONE,
   SPN_DEP_BUILD_STATE_CANCELED,
   SPN_DEP_BUILD_STATE_FAILED
@@ -256,9 +257,8 @@ typedef struct {
 } spn_dep_paths_t;
 
 typedef struct {
-  sp_str_t std_out;
-  sp_str_t std_err;
-  sp_str_t std_in;
+  sp_str_t log;
+  sp_str_t stamp;
   sp_str_t source;
   sp_str_t work;
   sp_str_t store;
@@ -312,10 +312,10 @@ typedef struct {
   sp_lua_t lua;
   SDL_PropertiesID sh;
   SDL_Environment* env;
+
   struct {
     SDL_IOStream* out;
-    SDL_IOStream* err;
-  } std;
+  } io;
 
   sp_thread_t thread;
   sp_mutex_t mutex;
@@ -346,6 +346,7 @@ sp_str_t                 spn_dep_build_kind_to_str(spn_dep_build_kind_t kind);
 sp_str_t                 spn_dep_state_to_str(spn_dep_build_state_t state);
 spn_lock_entry_t*        spn_dep_context_get_lock_entry(spn_dep_build_context_t* dep);
 void                     spn_dep_context_prepare(spn_dep_build_context_t* context, sp_str_t commit);
+bool                     spn_dep_context_is_build_stamped(spn_dep_build_context_t* context);
 void                     spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state);
 void                     spn_dep_context_set_build_error(spn_dep_build_context_t* dep, sp_str_t error);
 void                     spn_dep_context_clone(spn_dep_build_context_t* dep);
@@ -1704,7 +1705,7 @@ void spn_cli_command_build(spn_cli_t* cli) {
   sp_dyn_array_for(app.build.deps, i) {
     spn_dep_build_context_t* dep = &app.build.deps[i];
 
-    SDL_CloseIO(dep->std.out);
+    SDL_CloseIO(dep->io.out);
 
     switch (dep->state.build) {
       case SPN_DEP_BUILD_STATE_DONE: {
@@ -1715,7 +1716,7 @@ void spn_cli_command_build(spn_cli_t* cli) {
         failed = true;
 
         struct { sp_size_t size; c8* data; } buffer;
-        buffer.data = SDL_LoadFile(sp_str_to_cstr(dep->paths.std_out), &buffer.size);
+        buffer.data = SDL_LoadFile(sp_str_to_cstr(dep->paths.log), &buffer.size);
 
         sp_str_builder_new_line(&builder);
         sp_str_builder_append_fmt(&builder, "> {:fg brightyellow}", SP_FMT_STR(dep->info->name));
@@ -2039,7 +2040,7 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_build_context_t* dep) {
         SP_FMT_STR(dep->commits.resolved),
         SP_FMT_STR(dep->commits.message),
         SP_FMT_U32(dep->commits.delta),
-        SP_FMT_STR(dep->paths.std_out)
+        SP_FMT_STR(dep->paths.log)
     );
       break;
     }
@@ -2309,6 +2310,10 @@ void spn_dep_checkout(spn_dep_build_context_t *dep) {
   }
 }
 
+bool spn_dep_context_is_build_stamped(spn_dep_build_context_t* context) {
+  return sp_os_does_path_exist(context->paths.stamp);
+}
+
 void spn_dep_context_prepare(spn_dep_build_context_t* dep, sp_str_t commit) {
   SP_ASSERT(!sp_str_empty(commit));
 
@@ -2345,9 +2350,8 @@ void spn_dep_context_prepare(spn_dep_build_context_t* dep, sp_str_t commit) {
   dep->paths.include = sp_os_join_path(dep->paths.store, SP_LIT("include"));
   dep->paths.lib = sp_os_join_path(dep->paths.store, SP_LIT("lib"));
   dep->paths.vendor = sp_os_join_path(dep->paths.store, SP_LIT("vendor"));
-  dep->paths.std_out = sp_os_join_path(dep->paths.work, SP_LIT("build.stdout"));
-  dep->paths.std_err = sp_os_join_path(dep->paths.work, SP_LIT("build.stderr"));
-  dep->paths.std_in  = sp_os_join_path(dep->paths.work, SP_LIT("build.stdin"));
+  dep->paths.log = sp_os_join_path(dep->paths.work, SP_LIT("spn.log"));
+  dep->paths.stamp = sp_os_join_path(dep->paths.store, SP_LIT("spn.stamp"));
   sp_mutex_unlock(&dep->mutex);
 }
 
@@ -2356,37 +2360,29 @@ s32 spn_dep_context_build_async(void* user_data) {
 
   sp_str_t resolved;
 
-  if (sp_os_does_path_exist(dep->info->paths.source)) {
-    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
-    spn_git_fetch(dep->info->paths.source);
-
-    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
-    if (dep->update || sp_str_empty(dep->spec->lock)){
-      resolved = spn_dep_context_find_latest_commit(dep);
-    }
-    else {
-      resolved = dep->spec->lock;
-    }
-
-    spn_git_checkout(dep->info->paths.source, resolved);
-  }
-  else {
+  if (!sp_os_does_path_exist(dep->info->paths.source)) {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
     spn_dep_context_clone(dep);
     SP_ASSERT(sp_os_is_directory(dep->info->paths.source));
-
-    sp_str_t branch = sp_format("origin/{}",  SP_FMT_STR(dep->info->branch));
-    resolved = spn_git_get_commit(dep->info->paths.source, branch);
-    spn_git_checkout(dep->info->paths.source, resolved);
+  } else {
+    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
+    spn_git_fetch(dep->info->paths.source);
   }
+
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
+  if (dep->update || sp_str_empty(dep->spec->lock)){
+    resolved = spn_dep_context_find_latest_commit(dep);
+  }
+  else {
+    resolved = dep->spec->lock;
+  }
+
+  spn_git_checkout(dep->info->paths.source, resolved);
 
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PREPARING);
   spn_dep_context_prepare(dep, resolved);
 
-  // @spader
-  // The store is immutable; if there's an entry in the store with this build ID, then we know it was
-  // produced a build of this package. If, in practice, that turns out to be untrue, then that's a bug.
-  if (sp_os_does_path_exist(dep->paths.store)) {
+  if (spn_dep_context_is_build_stamped(dep)) {
     if (!dep->force) {
       spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
       return 0;
@@ -2398,13 +2394,12 @@ s32 spn_dep_context_build_async(void* user_data) {
   sp_os_create_directory(dep->paths.include);
   sp_os_create_directory(dep->paths.lib);
   sp_os_create_directory(dep->paths.vendor);
-  dep->std.out = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_out), "w");
-  dep->std.err = SDL_IOFromFile(sp_str_to_cstr(dep->paths.std_err), "w");
+  dep->io.out = SDL_IOFromFile(sp_str_to_cstr(dep->paths.log), "w");
 
   dep->sh = SDL_CreateProperties();
   SDL_SetNumberProperty(dep->sh, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL);
   SDL_SetNumberProperty(dep->sh, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_REDIRECT);
-  SDL_SetPointerProperty(dep->sh, SDL_PROP_PROCESS_CREATE_STDOUT_POINTER, dep->std.out);
+  SDL_SetPointerProperty(dep->sh, SDL_PROP_PROCESS_CREATE_STDOUT_POINTER, dep->io.out);
   SDL_SetBooleanProperty(dep->sh, SDL_PROP_PROCESS_CREATE_STDERR_TO_STDOUT_BOOLEAN, true);
 
   dep->lua.state = luaL_newstate();
@@ -2425,7 +2420,7 @@ s32 spn_dep_context_build_async(void* user_data) {
   if (luaL_loadstring(dep->lua.state, chunk) != LUA_OK) {
     const c8* error = lua_tostring(dep->lua.state, -1);
     if (error) {
-      SDL_WriteIO(dep->std.out, error, sp_cstr_len(error));
+      SDL_WriteIO(dep->io.out, error, sp_cstr_len(error));
     }
 
     spn_dep_context_set_build_error(dep, sp_format(
@@ -2441,7 +2436,7 @@ s32 spn_dep_context_build_async(void* user_data) {
   if (lua_pcall(dep->lua.state, 2, 0, 0) != 0) {
     const c8* error = lua_tostring(dep->lua.state, -1);
     if (error) {
-      SDL_WriteIO(dep->std.out, error, sp_cstr_len(error));
+      SDL_WriteIO(dep->io.out, error, sp_cstr_len(error));
     }
 
     spn_dep_context_set_build_error(dep, sp_str_from_cstr(error ? error : ""));
@@ -2449,6 +2444,9 @@ s32 spn_dep_context_build_async(void* user_data) {
     return 0;
   }
   lua_pop(dep->lua.state, 2);
+
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_STAMPING);
+  sp_os_create_file(dep->paths.stamp);
 
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
 
