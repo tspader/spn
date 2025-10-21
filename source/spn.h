@@ -1073,12 +1073,30 @@ void spn_cli_command_add(spn_cli_t* cli) {
     SP_FATAL("Failed to read project file");
   }
 
-  // Find the dep section markers
+  // Find the dep section markers using sp.h APIs (no C stdlib)
   const c8* dep_start_marker = "-- Dependencies: DO NOT REMOVE THIS LINE";
   const c8* dep_end_marker = "-- End Dependencies: DO NOT REMOVE THIS LINE";
 
-  c8* dep_start = strstr(file_content, dep_start_marker);
-  c8* dep_end = strstr(file_content, dep_end_marker);
+  u32 marker_start_len = sp_cstr_len(dep_start_marker);
+  u32 marker_end_len = sp_cstr_len(dep_end_marker);
+
+  // Find dep_start by scanning through file_content
+  c8* dep_start = SP_NULLPTR;
+  for (u32 i = 0; i <= file_size - marker_start_len; i++) {
+    if (sp_os_is_memory_equal(file_content + i, dep_start_marker, marker_start_len)) {
+      dep_start = file_content + i;
+      break;
+    }
+  }
+
+  // Find dep_end by scanning through file_content
+  c8* dep_end = SP_NULLPTR;
+  for (u32 i = 0; i <= file_size - marker_end_len; i++) {
+    if (sp_os_is_memory_equal(file_content + i, dep_end_marker, marker_end_len)) {
+      dep_end = file_content + i;
+      break;
+    }
+  }
 
   if (!dep_start || !dep_end) {
     SDL_free(file_content);
