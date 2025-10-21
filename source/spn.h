@@ -350,7 +350,7 @@ sp_str_t                 spn_dep_build_kind_to_str(spn_dep_build_kind_t kind);
 sp_str_t                 spn_dep_state_to_str(spn_dep_build_state_t state);
 spn_lock_entry_t*        spn_dep_context_get_lock_entry(spn_dep_build_context_t* dep);
 void                     spn_dep_context_prepare(spn_dep_build_context_t* context, sp_str_t commit);
-void                     spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state);
+bool                     spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state);
 void                     spn_dep_context_set_build_error(spn_dep_build_context_t* dep, sp_str_t error);
 void                     spn_dep_context_clone(spn_dep_build_context_t* dep);
 sp_str_t                 spn_dep_context_find_latest_commit(spn_dep_build_context_t* dep);
@@ -375,14 +375,17 @@ typedef struct {
 } sp_tui_checkpoint_t;
 
 typedef enum {
-  SPN_TUI_STATE_INTERACTIVE,
-  SPN_TUI_STATE_NONINTERACTIVE,
-  SPN_TUI_STATE_QUIET,
-  SPN_TUI_STATE_NONE,
-} spn_tui_state_t;
+  SPN_OUTPUT_MODE_INTERACTIVE,
+  SPN_OUTPUT_MODE_NONINTERACTIVE,
+  SPN_OUTPUT_MODE_QUIET,
+  SPN_OUTPUT_MODE_NONE,
+} spn_output_mode_t;
+
+spn_output_mode_t spn_output_mode_from_str(sp_str_t str);
+sp_str_t          spn_output_mode_to_str(spn_output_mode_t mode);
 
 typedef struct {
-  spn_tui_state_t state;
+  spn_output_mode_t mode;
   u32 num_deps;
   u32 width;
 
@@ -497,7 +500,6 @@ typedef struct {
   const c8* project_file;
   const c8* matrix;
   const c8* output;
-  spn_tui_state_t tui;
 
   spn_cli_add_t add;
   spn_cli_print_t print;
@@ -529,8 +531,6 @@ typedef struct {
     sp_str_t spn;
   } paths;
 
-  sp_ternary_t interactive;
-  sp_ternary_t quiet;
   sp_str_t output;
 } spn_lua_config_t;
 
@@ -1447,10 +1447,12 @@ void spn_cli_command_print(spn_cli_t* cli) {
       OPT_STRING('p', "path", &command->path, "write generated flags to a file", SP_NULLPTR),
       OPT_STRING('c', "compiler", &command->compiler, "generate for compiler [*gcc, msvc]", SP_NULLPTR),
       OPT_STRING('g', "generator", &command->generator, "output format [*raw, shell, make]", SP_NULLPTR),
+      OPT_STRING('o', "output", &cli->output, "output mode: interactive, noninteractive, quiet, none", SP_NULLPTR),
+      OPT_STRING('m', "matrix", &cli->matrix, "build matrix to use", SP_NULLPTR),
       OPT_END()
     },
     (const c8* const []) {
-      "spn print [--generator raw] [--path none] [--compiler gcc]",
+      "spn print [options]",
       SP_NULLPTR
     },
     SP_NULL
@@ -1751,10 +1753,12 @@ void spn_cli_command_build(spn_cli_t* cli) {
       OPT_HELP(),
       OPT_BOOLEAN('f', "force", &command->force, "force build, even if it exists in the store", SP_NULLPTR),
       OPT_BOOLEAN('u', "update", &command->update, "pull latest for all deps", SP_NULLPTR),
+      OPT_STRING('o', "output", &cli->output, "output mode: interactive, noninteractive, quiet, none", SP_NULLPTR),
+      OPT_STRING('m', "matrix", &cli->matrix, "build matrix to use", SP_NULLPTR),
       OPT_END()
     },
     (const c8* const []) {
-      "spn build [--force] [--update]",
+      "spn build [options]",
       SP_NULLPTR
     },
     SP_NULL
@@ -1768,49 +1772,20 @@ void spn_cli_command_build(spn_cli_t* cli) {
     sp_thread_init(&dep->thread, spn_dep_context_build_async, dep);
   }
 
-  // Determine TUI state from --output flag, config, or defaults
-  // Priority: CLI flag > config file > default
-
   const c8* output_mode = SP_NULLPTR;
 
-  // First check if --output was specified via CLI
   if (app.cli.output) {
     output_mode = app.cli.output;
   }
-  // Check config file output setting
   else if (app.config.output.len > 0) {
     output_mode = sp_str_to_cstr(app.config.output);
   }
 
-  // Parse output mode if set
   if (output_mode) {
-    if (sp_cstr_equal(output_mode, "interactive")) {
-      app.tui.state = SPN_TUI_STATE_INTERACTIVE;
-    }
-    else if (sp_cstr_equal(output_mode, "noninteractive")) {
-      app.tui.state = SPN_TUI_STATE_NONINTERACTIVE;
-    }
-    else if (sp_cstr_equal(output_mode, "quiet")) {
-      app.tui.state = SPN_TUI_STATE_QUIET;
-    }
-    else if (sp_cstr_equal(output_mode, "none")) {
-      app.tui.state = SPN_TUI_STATE_NONE;
-    }
-    else {
-      // Default to interactive if invalid value
-      app.tui.state = SPN_TUI_STATE_INTERACTIVE;
-    }
+    app.tui.mode = spn_output_mode_from_str(sp_str_from_cstr(output_mode));
   }
-  // Check legacy config file settings (interactive/quiet)
-  else if (app.config.quiet == SP_TERNARY_TRUE) {
-    app.tui.state = SPN_TUI_STATE_QUIET;
-  }
-  else if (app.config.interactive != SP_TERNARY_NULL) {
-    app.tui.state = app.config.interactive ? SPN_TUI_STATE_INTERACTIVE : SPN_TUI_STATE_NONINTERACTIVE;
-  }
-  // Default to interactive
   else {
-    app.tui.state = SPN_TUI_STATE_INTERACTIVE;
+    app.tui.mode = SPN_OUTPUT_MODE_INTERACTIVE;
   }
 
   spn_tui_init(&app.tui);
@@ -2236,18 +2211,18 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_build_context_t* dep) {
 }
 
 void spn_tui_cleanup(spn_tui_t* tui) {
-  switch (tui->state) {
-    case SPN_TUI_STATE_INTERACTIVE: {
+  switch (tui->mode) {
+    case SPN_OUTPUT_MODE_INTERACTIVE: {
       sp_tui_restore(tui);
       sp_tui_show_cursor();
       sp_tui_home();
       sp_tui_flush();
       break;
     }
-    case SPN_TUI_STATE_NONINTERACTIVE: {
+    case SPN_OUTPUT_MODE_NONINTERACTIVE: {
       break;
     }
-    case SPN_TUI_STATE_QUIET: {
+    case SPN_OUTPUT_MODE_QUIET: {
       sp_dyn_array_for(app.build.deps, i) {
         spn_dep_build_context_t* dep = &app.build.deps[i];
         dep->tui_state = dep->state;
@@ -2257,8 +2232,7 @@ void spn_tui_cleanup(spn_tui_t* tui) {
 
       break;
     }
-    case SPN_TUI_STATE_NONE: {
-      // Print nothing
+    case SPN_OUTPUT_MODE_NONE: {
       break;
     }
   }
@@ -2272,8 +2246,8 @@ void spn_tui_init(spn_tui_t* tui) {
     tui->width = SP_MAX(tui->width, dep->info->name.len);
   }
 
-  switch (tui->state) {
-    case SPN_TUI_STATE_INTERACTIVE: {
+  switch (tui->mode) {
+    case SPN_OUTPUT_MODE_INTERACTIVE: {
       sp_dyn_array_for(app.build.deps, index) {
         sp_tui_print(SP_LIT("\n"));
       }
@@ -2285,17 +2259,17 @@ void spn_tui_init(spn_tui_t* tui) {
 
       break;
     }
-    case SPN_TUI_STATE_QUIET:
-    case SPN_TUI_STATE_NONINTERACTIVE:
-    case SPN_TUI_STATE_NONE: {
+    case SPN_OUTPUT_MODE_QUIET:
+    case SPN_OUTPUT_MODE_NONINTERACTIVE:
+    case SPN_OUTPUT_MODE_NONE: {
       break;
     }
   }
 }
 
 void spn_tui_update(spn_tui_t* tui) {
-  switch (tui->state) {
-    case SPN_TUI_STATE_INTERACTIVE: {
+  switch (tui->mode) {
+    case SPN_OUTPUT_MODE_INTERACTIVE: {
       sp_tui_up(sp_dyn_array_size(app.build.deps));
 
       sp_dyn_array_for(app.build.deps, index) {
@@ -2310,7 +2284,7 @@ void spn_tui_update(spn_tui_t* tui) {
       sp_tui_flush();
       break;
     }
-    case SPN_TUI_STATE_NONINTERACTIVE: {
+    case SPN_OUTPUT_MODE_NONINTERACTIVE: {
       sp_dyn_array_for(app.build.deps, i) {
         spn_dep_build_context_t* dep = &app.build.deps[i];
 
@@ -2323,10 +2297,29 @@ void spn_tui_update(spn_tui_t* tui) {
 
       break;
     }
-    case SPN_TUI_STATE_QUIET:
-    case SPN_TUI_STATE_NONE: {
+    case SPN_OUTPUT_MODE_QUIET:
+    case SPN_OUTPUT_MODE_NONE: {
       break;
     }
+  }
+}
+
+spn_output_mode_t spn_output_mode_from_str(sp_str_t str) {
+  if      (sp_str_equal_cstr(str, "interactive"))    return SPN_OUTPUT_MODE_INTERACTIVE;
+  else if (sp_str_equal_cstr(str, "noninteractive")) return SPN_OUTPUT_MODE_NONINTERACTIVE;
+  else if (sp_str_equal_cstr(str, "quiet"))          return SPN_OUTPUT_MODE_QUIET;
+  else if (sp_str_equal_cstr(str, "none"))           return SPN_OUTPUT_MODE_NONE;
+
+  SP_FATAL("Unknown output mode {:fg brightyellow}; options are [interactive, noninteractive, quiet, none]", SP_FMT_STR(str));
+}
+
+sp_str_t spn_output_mode_to_str(spn_output_mode_t mode) {
+  switch (mode) {
+    case SPN_OUTPUT_MODE_INTERACTIVE:    return sp_str_lit("interactive");
+    case SPN_OUTPUT_MODE_NONINTERACTIVE: return sp_str_lit("noninteractive");
+    case SPN_OUTPUT_MODE_QUIET:          return sp_str_lit("quiet");
+    case SPN_OUTPUT_MODE_NONE:           return sp_str_lit("none");
+    default: SP_UNREACHABLE();
   }
 }
 
@@ -2517,29 +2510,11 @@ s32 spn_dep_context_build_async(void* user_data) {
 
   sp_str_t resolved;
 
-  // Check if build was cancelled before starting
-  if (SDL_GetAtomicInt(&app.control) != 0) {
-    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
-    return 1;
-  }
-
   if (sp_os_does_path_exist(dep->info->paths.source)) {
-    // Check if cancelled before fetching
-    if (SDL_GetAtomicInt(&app.control) != 0) {
-      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
-      return 1;
-    }
-
-    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
+    if (spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING)) return 1;
     spn_git_fetch(dep->info->paths.source);
 
-    // Check if cancelled after fetching
-    if (SDL_GetAtomicInt(&app.control) != 0) {
-      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
-      return 1;
-    }
-
-    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
+    if (spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT)) return 1;
     if (dep->update || sp_str_empty(dep->spec->lock)){
       resolved = spn_dep_context_find_latest_commit(dep);
     }
@@ -2550,50 +2525,23 @@ s32 spn_dep_context_build_async(void* user_data) {
     spn_git_checkout(dep->info->paths.source, resolved);
   }
   else {
-    // Check if cancelled before cloning
-    if (SDL_GetAtomicInt(&app.control) != 0) {
-      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
-      return 1;
-    }
-
-    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
+    if (spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING)) return 1;
     spn_dep_context_clone(dep);
     SP_ASSERT(sp_os_is_directory(dep->info->paths.source));
-
-    // Check if cancelled after cloning
-    if (SDL_GetAtomicInt(&app.control) != 0) {
-      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
-      return 1;
-    }
 
     sp_str_t branch = sp_format("origin/{}",  SP_FMT_STR(dep->info->branch));
     resolved = spn_git_get_commit(dep->info->paths.source, branch);
     spn_git_checkout(dep->info->paths.source, resolved);
   }
 
-  // Check if cancelled before preparing
-  if (SDL_GetAtomicInt(&app.control) != 0) {
-    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
-    return 1;
-  }
-
-  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PREPARING);
+  if (spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PREPARING)) return 1;
   spn_dep_context_prepare(dep, resolved);
 
-  // @spader
-  // The store is immutable; if there's an entry in the store with this build ID, then we know it was
-  // produced a build of this package. If, in practice, that turns out to be untrue, then that's a bug.
   if (sp_os_does_path_exist(dep->paths.store)) {
     if (!dep->force) {
       spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
       return 0;
     }
-  }
-
-  // Check if cancelled before building
-  if (SDL_GetAtomicInt(&app.control) != 0) {
-    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
-    return 1;
   }
 
   sp_os_create_directory(dep->paths.work);
@@ -2621,14 +2569,7 @@ s32 spn_dep_context_build_async(void* user_data) {
     SP_FMT_STR(dep->info->name)
   );
 
-  // Check if cancelled before starting build
-  if (SDL_GetAtomicInt(&app.control) != 0) {
-    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FAILED);
-    return 1;
-  }
-
-  // Build
-  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_BUILDING);
+  if (spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_BUILDING)) return 1;
 
   const c8* chunk = "require('spn').internal.build(...)";
   if (luaL_loadstring(dep->lua.state, chunk) != LUA_OK) {
@@ -2664,10 +2605,17 @@ s32 spn_dep_context_build_async(void* user_data) {
   return 0;
 }
 
-void spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state) {
+bool spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state) {
+  if (SDL_GetAtomicInt(&app.control) != 0) {
+    sp_mutex_lock(&dep->mutex);
+    dep->state.build = SPN_DEP_BUILD_STATE_FAILED;
+    sp_mutex_unlock(&dep->mutex);
+    return true;
+  }
   sp_mutex_lock(&dep->mutex);
   dep->state.build = state;
   sp_mutex_unlock(&dep->mutex);
+  return false;
 }
 
 void spn_dep_context_set_build_error(spn_dep_build_context_t* dep, sp_str_t error) {
@@ -2692,19 +2640,14 @@ spn_lock_entry_t* spn_dep_context_get_lock_entry(spn_dep_build_context_t* dep) {
 // APP //
 /////////
 #ifdef SP_POSIX
-// Signal handler for Ctrl-C (SIGINT)
 void spn_signal_handler(int signum) {
   if (signum == SIGINT) {
-    // Set control flag to signal threads to stop
     SDL_SetAtomicInt(&app.control, 1);
-
-    // Print newline for cleaner output
     printf("\n");
     fflush(stdout);
   }
 }
 
-// Install signal handler
 void spn_install_signal_handlers() {
   struct sigaction sa;
   sa.sa_handler = spn_signal_handler;
@@ -2713,65 +2656,20 @@ void spn_install_signal_handlers() {
   sigaction(SIGINT, &sa, NULL);
 }
 #else
+sp_win32_bool_t spn_windows_console_handler(sp_win32_dword_t ctrl_type) {
+  if (ctrl_type == CTRL_C_EVENT || ctrl_type == CTRL_BREAK_EVENT) {
+    SDL_SetAtomicInt(&app.control, 1);
+    printf("\n");
+    fflush(stdout);
+    return TRUE;
+  }
+  return FALSE;
+}
+
 void spn_install_signal_handlers() {
-  // Windows signal handling could be added here if needed
+  SetConsoleCtrlHandler((PHANDLER_ROUTINE)spn_windows_console_handler, TRUE);
 }
 #endif
-
-// Helper function to extract global flags from argument list
-// This allows global flags to appear before or after the subcommand
-void spn_extract_global_flags(spn_cli_t* cli) {
-  // Scan through all remaining args and extract global flags
-  u32 write_idx = 0;
-  for (u32 read_idx = 0; read_idx < cli->num_args; read_idx++) {
-    const c8* arg = cli->args[read_idx];
-    bool is_global_flag = false;
-
-    // Check for --output / -o
-    if (sp_cstr_equal(arg, "--output") || sp_cstr_equal(arg, "-o")) {
-      if (read_idx + 1 < cli->num_args) {
-        cli->output = cli->args[read_idx + 1];
-        read_idx++; // Skip the value
-        is_global_flag = true;
-      }
-    }
-    // Check for --matrix / -m
-    else if (sp_cstr_equal(arg, "--matrix") || sp_cstr_equal(arg, "-m")) {
-      if (read_idx + 1 < cli->num_args) {
-        cli->matrix = cli->args[read_idx + 1];
-        read_idx++; // Skip the value
-        is_global_flag = true;
-      }
-    }
-    // Check for --project-dir / -C
-    else if (sp_cstr_equal(arg, "--project-dir") || sp_cstr_equal(arg, "-C")) {
-      if (read_idx + 1 < cli->num_args) {
-        cli->project_directory = cli->args[read_idx + 1];
-        read_idx++; // Skip the value
-        is_global_flag = true;
-      }
-    }
-    // Check for --file / -f
-    else if (sp_cstr_equal(arg, "--file") || sp_cstr_equal(arg, "-f")) {
-      if (read_idx + 1 < cli->num_args) {
-        cli->project_file = cli->args[read_idx + 1];
-        read_idx++; // Skip the value
-        is_global_flag = true;
-      }
-    }
-
-    if (!is_global_flag) {
-      // Keep this argument
-      if (write_idx != read_idx) {
-        ((const c8**)cli->args)[write_idx] = arg;
-      }
-      write_idx++;
-    }
-  }
-
-  // Update num_args to reflect removed global flags
-  cli->num_args = write_idx;
-}
 
 void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   spn_cli_t* cli = &app->cli;
@@ -2807,9 +2705,6 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   cli->num_args = num_args;
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
-  // Extract any global flags that appear after the subcommand
-  spn_extract_global_flags(cli);
-
   if (!cli->num_args || !cli->args[0]) {
     argparse_usage(&argparse);
     exit(0);
@@ -2817,7 +2712,6 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   SDL_SetAtomicInt(&app->control, 0);
 
-  // Install signal handlers for clean shutdown on Ctrl-C
   spn_install_signal_handlers();
 
 #ifdef SP_WIN32

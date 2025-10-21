@@ -226,8 +226,6 @@ function spn.parse()
     app.config.paths.spn = sp.str.from_cstr(spn.config.spn)
   end
 
-  app.config.interactive = sp.ternary(spn.config.interactive)
-  app.config.quiet = sp.ternary(spn.config.quiet)
   if spn.config.output then
     app.config.output = sp.str.from_cstr(spn.config.output)
   end
