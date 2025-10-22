@@ -54,3 +54,18 @@ sometimes this is to generate a project for a platform-appropriate executor (e.g
 ## mixed
 - xmake: generator + executor; prefers to just grab binaries for your deps + lets you specify your project in lua in the same way you would in cmake (e.g. build an executable, include so-and-so directory)
 - bazel: generator + executor; everything is totally hermetic, expects you to build from source everything short of the kernel and libc. designed for google where they use huge monorepos
+
+- i want to build all the recipes with tcc on the fly instead of using lua
+- i also want to build spn itself using tcc to avoid ABI incompatibility between spn and recipes
+    - if i can't, i can always generate functions that return the offset of struct members of the project descriptor struct instead of using the struct directly
+- had to build/install tcc from source because arch package is outdated and breaks with link.h
+- just replacing gcc with tcc in the makefile errors because you aren't linking to libgcc
+- so i tried building all my deps with tcc by:
+    - set CC := tcc in the makefile
+    - set tools.cc = 'tcc' in build.lua
+    - export CC=tcc in the shell before doing anything
+- SDL failed to build because:
+    - shared builds require -Wl,--version-script=..., which is just a way to list symbols you want exported. tcc does not support this
+    - assembly stuff is generally kind of broken; need to define STBI_NO_SIMD in CMAKE_C_FLAGS + patch SDL to not use a Q constraint
+    - after that it builds (as a static library)
+
