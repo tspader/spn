@@ -175,8 +175,8 @@ smoke: build test
 	./build/bin/test --mode debug curl sqlite cjson clay
 
 build/bin/test: build test/main.c
-	$(SPN_OUTPUT) -C test --no-interactive build
-	$(CC) ./test/main.c -g $$($(SPN_OUTPUT) -C test --no-interactive print) -o ./build/bin/test
+	$(SPN_OUTPUT) -C test --output noninteractive build
+	$(CC) ./test/main.c -g $$($(SPN_OUTPUT) -C test --output noninteractive print) -o ./build/bin/test
 
 test: build/bin/test
 
