@@ -1,7 +1,8 @@
 local spn = require('spn')
 
 local recipe = spn.recipes.basic({
-  git = 'libsdl-org/SDL',
+  git = 'tspader/SDL',
+  branch = 'spn',
   libs = { 'SDL3' },
   kinds = { 'shared', 'static' },
   build = function(builder)
@@ -12,6 +13,9 @@ local recipe = spn.recipes.basic({
         { 'SDL_STATIC', builder.kind == spn.build_kind.static },
         { 'SDL_TESTS', false },
         { 'SDL_EXAMPLES', false },
+      },
+      cflags = {
+        { 'STBI_NO_SIMD', 1 }
       }
     })
   end

@@ -751,7 +751,7 @@ s32 main(s32 num_args, const c8** args) {
   app.paths.build = sp_os_parent_path(exe_dir);
   app.paths.repo = sp_os_parent_path(app.paths.build);
   app.paths.source = sp_os_join_path(app.paths.repo, SP_LIT("source"));
-  app.paths.include = sp_os_join_path(app.paths.repo, SP_LIT("build"));
+  app.paths.include = sp_os_join_path(app.paths.source, SP_LIT("build"));
   app.paths.spn = sp_os_join_path(app.paths.bin, SP_LIT("spn"));
   app.paths.examples = sp_os_join_path(app.paths.repo, SP_LIT("examples"));
   app.paths.asset = sp_os_join_path(app.paths.repo, SP_LIT("asset"));
@@ -945,7 +945,7 @@ s32 main(s32 num_args, const c8** args) {
 
         test->commands.compile = spn_make_command(
           sp_format(
-            "bear --append -- {} {} -g -I{} $({}) -Wl,-rpath,$ORIGIN -o {} -lm",
+            "bear --append -- {} {} -g -I{} $({}) -o {} -lm",
             SP_FMT_CSTR(test->language == SPN_TEST_LANGUAGE_C ? "tcc" : "g++"),
             SP_FMT_STR(test->main),
             SP_FMT_STR(app.paths.include),
