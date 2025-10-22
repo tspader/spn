@@ -2554,7 +2554,7 @@ s32 spn_dep_context_build_async(void* user_data) {
     SP_FMT_STR(dep->info->name)
   );
 
-  if (spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_BUILDING)) return 1;
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_BUILDING);
 
   const c8* chunk = "require('spn').internal.build(...)";
   if (luaL_loadstring(dep->lua.state, chunk) != LUA_OK) {
@@ -2593,17 +2593,10 @@ s32 spn_dep_context_build_async(void* user_data) {
   return 0;
 }
 
-bool spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state) {
-  if (SDL_GetAtomicInt(&app.control) != 0) {
-    sp_mutex_lock(&dep->mutex);
-    dep->state.build = SPN_DEP_BUILD_STATE_FAILED;
-    sp_mutex_unlock(&dep->mutex);
-    return true;
-  }
+void spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state) {
   sp_mutex_lock(&dep->mutex);
   dep->state.build = state;
   sp_mutex_unlock(&dep->mutex);
-  return false;
 }
 
 void spn_dep_context_set_build_error(spn_dep_build_context_t* dep, sp_str_t error) {

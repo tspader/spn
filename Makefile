@@ -148,10 +148,10 @@ $(BOOTSTRAP_SPN): $(BOOTSTRAP_ARCHIVE) | $(BOOTSTRAP_BIN)
 $(SPN_OUTPUT): $(BOOTSTRAP_SPN) source/*.h source/*.c $(SPN_MAKEFILE) | $(SPN_DIR_BUILD_OUTPUT)
 	$(call print_heading)
 	@echo "building dependencies"
-	$(BOOTSTRAP_SPN) --no-interactive build
+	$(BOOTSTRAP_SPN) build --output noninteractive
 	$(call print_heading)
 	@echo "building spn"
-	$(CC) ./source/main.c $(CFLAGS) $$($(BOOTSTRAP_SPN) --no-interactive print) $(FLAG_SYSTEM_LIBS)
+	$(CC) ./source/main.c $(CFLAGS) $$($(BOOTSTRAP_SPN) print --output noninteractive) $(FLAG_SYSTEM_LIBS)
 
 
 ###########
