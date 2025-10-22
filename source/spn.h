@@ -27,6 +27,8 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
+#include "build/spn.h"
+
 #define ARGPARSE_IMPLEMENTATION
 #include "argparse.h"
 
@@ -103,11 +105,6 @@ sp_str_t spn_git_get_commit_message(sp_str_t repo_path, sp_str_t id);
 
 
 // SP
-typedef enum {
-  SP_OS_LIB_SHARED,
-  SP_OS_LIB_STATIC,
-} sp_os_lib_kind_t;
-
 #define SP_TERNARY_X(X) \
   X(SP_TERNARY_FALSE) \
   X(SP_TERNARY_TRUE) \
@@ -214,16 +211,6 @@ sp_str_t             spn_gen_format_entry_for_compiler(sp_str_t entry, spn_gen_e
 //////////////////
 // DEPENDENCIES //
 //////////////////
-typedef enum {
-  SPN_DEP_BUILD_MODE_DEBUG,
-  SPN_DEP_BUILD_MODE_RELEASE,
-} spn_dep_build_mode_t;
-
-typedef enum {
-  SPN_DEP_BUILD_KIND_SHARED = SP_OS_LIB_SHARED,
-  SPN_DEP_BUILD_KIND_STATIC = SP_OS_LIB_STATIC,
-  SPN_DEP_BUILD_KIND_SOURCE,
-} spn_dep_build_kind_t;
 
 typedef enum {
   SPN_DEP_REPO_STATE_UNINITIALIZED,
@@ -375,11 +362,14 @@ typedef struct {
   u32 std_in;
 } sp_tui_checkpoint_t;
 
+#define SPN_OUTPUT_MODE_X(X) \
+  X(SPN_OUTPUT_MODE_INTERACTIVE) \
+  X(SPN_OUTPUT_MODE_NONINTERACTIVE) \
+  X(SPN_OUTPUT_MODE_QUIET) \
+  X(SPN_OUTPUT_MODE_NONE)
+
 typedef enum {
-  SPN_OUTPUT_MODE_INTERACTIVE,
-  SPN_OUTPUT_MODE_NONINTERACTIVE,
-  SPN_OUTPUT_MODE_QUIET,
-  SPN_OUTPUT_MODE_NONE,
+  SPN_OUTPUT_MODE_X(SP_X_ENUM_DEFINE)
 } spn_output_mode_t;
 
 spn_output_mode_t spn_output_mode_from_str(sp_str_t str);
@@ -2316,10 +2306,7 @@ spn_output_mode_t spn_output_mode_from_str(sp_str_t str) {
 
 sp_str_t spn_output_mode_to_str(spn_output_mode_t mode) {
   switch (mode) {
-    case SPN_OUTPUT_MODE_INTERACTIVE:    return sp_str_lit("interactive");
-    case SPN_OUTPUT_MODE_NONINTERACTIVE: return sp_str_lit("noninteractive");
-    case SPN_OUTPUT_MODE_QUIET:          return sp_str_lit("quiet");
-    case SPN_OUTPUT_MODE_NONE:           return sp_str_lit("none");
+    SPN_OUTPUT_MODE_X(SP_X_ENUM_CASE_TO_STRING_LOWER)
     default: SP_UNREACHABLE();
   }
 }

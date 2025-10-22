@@ -49,6 +49,7 @@ function module.load(app)
     typedef struct {
       u32 len;
       const c8* data;
+      u32 capacity;
     } sp_str_t;
 
     typedef enum {

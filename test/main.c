@@ -134,12 +134,14 @@ typedef struct {
 
   struct {
     sp_str_t build;
-    sp_str_t bin;
-    sp_str_t spn;
+    sp_str_t   bin;
+    sp_str_t     spn;
     sp_str_t repo;
-    sp_str_t asset;
-    sp_str_t recipes;
-    sp_str_t examples;
+    sp_str_t   source;
+    sp_str_t     include;
+    sp_str_t   asset;
+    sp_str_t     recipes;
+    sp_str_t   examples;
   } paths;
 
   spn_test_build_kind_t kind;
@@ -415,8 +417,7 @@ s32 spn_run_command(spn_test_command_t* command) {
 
   command->executed = true;
   spn_timestamp_t start = spn_time_now();
-  sp_str_t quoted_log = sp_format("\"{}\"", SP_FMT_STR(command->log_path));
-  sp_str_t wrapped = sp_format("{} > {} 2>&1", SP_FMT_STR(command->raw), SP_FMT_STR(quoted_log));
+  sp_str_t wrapped = sp_format("{} > {} 2>&1", SP_FMT_STR(command->raw), SP_FMT_QUOTED_STR(command->log_path));
   command->code = system(sp_str_to_cstr(wrapped));
   spn_timestamp_t end = spn_time_now();
   command->duration_ms = spn_time_elapsed_ms(start, end);
@@ -544,7 +545,7 @@ s32 spn_test_build_async(void* userdata) {
   if (spn_run_command(&test->commands.compile) != 0) {
     spn_test_set_status(test, SPN_TEST_STATUS_FAILED_COMPILE);
     sp_mutex_lock(&test->mutex);
-    test->error = SP_LIT("gcc compilation failed");
+    test->error = SP_LIT("compilation failed");
     sp_mutex_unlock(&test->mutex);
     return 1;
   }
@@ -553,42 +554,65 @@ s32 spn_test_build_async(void* userdata) {
   return 0;
 }
 
+
 void spn_log_failures(void) {
   bool printed_header = false;
+
+  sp_dyn_array(spn_test_descriptor_t*) failures = SP_NULLPTR;
   sp_dyn_array_for(app.tests, index) {
     spn_test_descriptor_t* test = app.tests + index;
     if (test->status == SPN_TEST_STATUS_FAILED_DEPS || test->status == SPN_TEST_STATUS_FAILED_COMPILE) {
-      if (!printed_header) {
-        sp_log(SP_LIT(""));
-        sp_log(sp_format("{:fg red} failures", SP_FMT_CSTR("!")));
-        printed_header = true;
+      sp_dyn_array_push(failures, test);
+    }
+  }
+
+  if (!sp_dyn_array_size(failures)) return;
+
+  sp_dyn_array(sp_str_t) failure_names = SP_NULLPTR;
+  sp_dyn_array_for(failures, index) {
+    spn_test_descriptor_t* failure = failures[index];
+    sp_dyn_array_push(failure_names, failure->name);
+  }
+
+  SP_LOG(
+    "{:fg red} failures ({})",
+    SP_FMT_U32(sp_dyn_array_size(failures)),
+    SP_FMT_STR(sp_str_join_n(failure_names, sp_dyn_array_size(failure_names), sp_str_lit(" ")))
+  );
+
+  sp_dyn_array_for(failures, index) {
+    spn_test_descriptor_t* test = failures[index];
+
+    sp_log(sp_format("{:fg red} {}", SP_FMT_CSTR(">"), SP_FMT_STR(test->name)));
+
+    if (test->commands.build.executed) {
+      SP_LOG("{:fg red} build", SP_FMT_CSTR(">>"));
+      SP_LOG("{:fg brightyellow}", SP_FMT_STR(test->commands.build.raw));
+
+
+      sp_str_t build_log = sp_os_read_file(test->commands.build.log_path);
+      if (build_log.len) {
+        sp_os_log(build_log);
       }
+    }
 
-      sp_log(sp_format("{:fg red} {}", SP_FMT_CSTR("-"), SP_FMT_STR(test->name)));
+    if (test->commands.copy.executed) {
+      SP_LOG("{:fg brightred} {:fg brightblack}", SP_FMT_CSTR(">>"), SP_FMT_CSTR("copy"));
+      SP_LOG("{:fg brightyellow}", SP_FMT_STR(test->commands.copy.raw));
 
-      if (test->commands.build.executed) {
-        sp_log(sp_format("  {:fg brightblack} $ {}", SP_FMT_CSTR("build"), SP_FMT_STR(test->commands.build.raw)));
-        sp_str_t build_log = sp_os_read_file(test->commands.build.log_path);
-        if (build_log.len) {
-          sp_log(sp_format("  {:fg white} {}", SP_FMT_CSTR("build"), SP_FMT_STR(build_log)));
-        }
+      sp_str_t copy_log = sp_os_read_file(test->commands.copy.log_path);
+      if (copy_log.len) {
+        sp_os_log(copy_log);
       }
+    }
 
-      if (test->commands.copy.executed) {
-        sp_log(sp_format("  {:fg brightblack} $ {}", SP_FMT_CSTR("copy"), SP_FMT_STR(test->commands.copy.raw)));
-        sp_str_t copy_log = sp_os_read_file(test->commands.copy.log_path);
-        if (copy_log.len) {
-          sp_log(sp_format("  {:fg white} {}", SP_FMT_CSTR("copy"), SP_FMT_STR(copy_log)));
-        }
-      }
+    if (test->commands.compile.executed) {
+      SP_LOG("{:fg brightred} {:fg brightblack}", SP_FMT_CSTR(">>"), SP_FMT_CSTR("copy"));
+      SP_LOG("{:fg brightyellow}", SP_FMT_STR(test->commands.compile.raw));
 
-      if (test->commands.compile.executed) {
-        sp_log(sp_format("  {:fg brightblack} $ {}", SP_FMT_CSTR("compile"), SP_FMT_STR(test->commands.compile.raw)));
-        sp_str_t compile_log = sp_os_read_file(test->commands.compile.log_path);
-        if (compile_log.len) {
-          sp_os_log(compile_log);
-          sp_os_log(sp_str_lit("\n"));
-        }
+      sp_str_t compile_log = sp_os_read_file(test->commands.compile.log_path);
+      if (compile_log.len) {
+        sp_os_log(compile_log);
       }
     }
   }
@@ -726,6 +750,8 @@ s32 main(s32 num_args, const c8** args) {
   app.paths.bin = exe_dir;
   app.paths.build = sp_os_parent_path(exe_dir);
   app.paths.repo = sp_os_parent_path(app.paths.build);
+  app.paths.source = sp_os_join_path(app.paths.repo, SP_LIT("source"));
+  app.paths.include = sp_os_join_path(app.paths.repo, SP_LIT("build"));
   app.paths.spn = sp_os_join_path(app.paths.bin, SP_LIT("spn"));
   app.paths.examples = sp_os_join_path(app.paths.repo, SP_LIT("examples"));
   app.paths.asset = sp_os_join_path(app.paths.repo, SP_LIT("asset"));
@@ -919,9 +945,10 @@ s32 main(s32 num_args, const c8** args) {
 
         test->commands.compile = spn_make_command(
           sp_format(
-            "bear --append -- {} {} -g $({}) -Wl,-rpath,$ORIGIN -o {} -lm",
-            SP_FMT_CSTR(test->language == SPN_TEST_LANGUAGE_C ? "gcc" : "g++"),
+            "bear --append -- {} {} -g -I{} $({}) -Wl,-rpath,$ORIGIN -o {} -lm",
+            SP_FMT_CSTR(test->language == SPN_TEST_LANGUAGE_C ? "tcc" : "g++"),
             SP_FMT_STR(test->main),
+            SP_FMT_STR(app.paths.include),
             SP_FMT_STR(test->commands.print.raw),
             SP_FMT_STR(test->output.executable)
           ),

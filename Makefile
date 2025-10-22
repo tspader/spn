@@ -100,10 +100,7 @@ SPN_INSTALL_PREFIX ?= $(HOME)/.local/bin
 FLAG_LANGUAGE := -std=c11
 CFLAGS := $(FLAG_LANGUAGE) $(FLAG_LINKAGE) -I$(SPN_DIR_SOURCE) -o $(SPN_OUTPUT)
 
-
-.PHONY: all build clangd clean examples install uninstall
-.NOTPARALLEL: examples $(EXAMPLE_DIRS)
-
+.PHONY: all
 all: build
 
 
@@ -148,7 +145,7 @@ $(BOOTSTRAP_SPN): $(BOOTSTRAP_ARCHIVE) | $(BOOTSTRAP_BIN)
 	@$(BOOTSTRAP_EXTRACT)
 	@chmod +x $(BOOTSTRAP_SPN)
 
-$(SPN_OUTPUT): $(BOOTSTRAP_SPN) $(SPN_DIR_SOURCE)/spn.h $(SPN_MAKEFILE) | $(SPN_DIR_BUILD_OUTPUT)
+$(SPN_OUTPUT): $(BOOTSTRAP_SPN) source/*.h source/*.c $(SPN_MAKEFILE) | $(SPN_DIR_BUILD_OUTPUT)
 	$(call print_heading)
 	@echo "building dependencies"
 	$(BOOTSTRAP_SPN) --no-interactive build

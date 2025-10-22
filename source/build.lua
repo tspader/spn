@@ -82,6 +82,17 @@ function module:sh(config)
     c.spn.sh.add_env(context, c.sp.str.from_cstr(name), c.sp.str.from_cstr(value))
   end
 
+  local sh = config.command
+  for name, value in iterator.pairs(config.env) do
+    sh = sh .. string.format('%s="%s" ', name, tostring(value))
+  end
+
+  for arg in iterator.values(config.args) do
+    sh = sh .. arg .. ' '
+  end
+
+  print(sh)
+
   c.spn.sh.run(context)
   c.spn.sh.wait(context)
 
@@ -176,6 +187,12 @@ function module:make(config)
     table.insert(sh.args, config.target)
   end
 
+  if config.args then
+    for arg in iterator.values(config.args) do
+      table.insert(sh.args, arg)
+    end
+  end
+
   self:sh(sh)
 end
 
@@ -184,6 +201,7 @@ function module:cmake(config)
   config = config or {}
   config = utils.merge(config, config[self.platform] or {})
   config.defines = config.defines or {}
+  config.cflags = config.cflags or {}
   config.parallel = (config.parallel == nil) and true or config.parallel
   config.install = (config.install == nil) and false or config.install
 
@@ -210,6 +228,17 @@ function module:cmake(config)
       value = value and 'ON' or 'OFF'
     end
     table.insert(sh.args, string.format('-D%s=%s', name, value))
+  end
+
+  if #config.cflags then
+    local cflags = ''
+    for flag in iterator.values(config.cflags) do
+      local name = flag[1]
+      local value = tostring(flag[2])
+      cflags = cflags .. string.format('-D%s=%s ', name, value)
+    end
+
+    table.insert(sh.args, string.format('-DCMAKE_C_FLAGS="%s"', cflags))
   end
 
   self:sh_proxy(sh)
