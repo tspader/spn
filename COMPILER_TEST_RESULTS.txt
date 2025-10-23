@@ -144,3 +144,23 @@ LIBRARY COMPILATION TEST RESULTS
 35. whisper
    - SKIPPED (requires cmake and ML dependencies)
 
+24. sqlite
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS (requires -D_LARGEFILE64_SOURCE)
+
+25. quickjs
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+26. treesitter
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+27. luajit
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS (static lib only)
+   - tcc:      FAILED (missing compiler defines for JIT)
+
