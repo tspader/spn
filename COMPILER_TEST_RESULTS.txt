@@ -1,0 +1,146 @@
+LIBRARY COMPILATION TEST RESULTS
+=================================
+
+1. argparse
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+2. cjson
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+3. clay
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS (requires CLAY_DISABLE_SIMD)
+
+4. cr (C++ library)
+   - gcc/g++:  SUCCESS
+   - musl-gcc: N/A (musl-g++ not available)
+   - tcc:      N/A (TCC does not support C++)
+
+5. curl (complex build system with cmake and many dependencies)
+   - gcc:      SKIPPED (requires cmake build)
+   - musl-gcc: SKIPPED (requires cmake build)
+   - tcc:      SKIPPED (requires cmake build)
+
+6. dr_libs
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+7. freetype (complex build system)
+   - SKIPPED (requires extensive build dependencies)
+
+8. git (complex build system)
+   - SKIPPED (requires extensive build dependencies)
+
+9. glfw (complex build system with cmake)
+   - SKIPPED (requires X11/Wayland dependencies)
+
+10. hmm (HandmadeMath)
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+11. incbin
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+12. linenoise
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+13. md4c
+   - SKIPPED (requires cmake)
+
+14. microui
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+15. mongoose
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+16. miniz
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+17. msgpack
+   - SKIPPED (requires cmake)
+
+18. nuklear
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+19. sds
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+20. stb
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS (requires STBI_NO_SIMD)
+
+21. toml
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+22. utest
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+23. sokol
+   - gcc:      SUCCESS
+   - musl-gcc: SUCCESS
+   - tcc:      SUCCESS
+
+24. sqlite
+   - SKIPPED (requires configure build system, large repo)
+
+25. tcc
+   - gcc:      SUCCESS (already built from source successfully)
+   - musl-gcc: SUCCESS (can build tcc with musl)
+   - tcc:      N/A (tcc can't compile itself without bootstrap)
+
+26. ggml
+   - SKIPPED (complex build system with cmake)
+
+27. imgui (C++ library)
+   - SKIPPED (C++ library, TCC does not support C++)
+
+28. luajit
+   - SKIPPED (requires complex custom build system)
+
+29. quickjs
+   - SKIPPED (requires complex custom build system)
+
+30. raylib
+   - SKIPPED (requires cmake and graphics dependencies)
+
+31. sdl3
+   - SKIPPED (requires cmake and extensive dependencies)
+
+32. sodium
+   - SKIPPED (requires autoconf/configure build system)
+
+33. treesitter
+   - SKIPPED (requires complex build system)
+
+34. uv (libuv)
+   - SKIPPED (requires cmake and complex dependencies)
+
+35. whisper
+   - SKIPPED (requires cmake and ML dependencies)
+
