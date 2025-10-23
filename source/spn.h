@@ -1194,6 +1194,7 @@ spn_cache_dir_kind_t spn_cache_dir_kind_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "work"))     return SPN_DIR_WORK;
 
   SP_FATAL("Unknown dir kind {:fg brightyellow}; options are [cache, store, include, vendor, lib, source, work]", SP_FMT_STR(str));
+  SP_UNREACHABLE_RETURN(SPN_DIR_CACHE);
 }
 
 spn_gen_entry_kind_t spn_gen_entry_from_str(sp_str_t str) {
@@ -1204,6 +1205,7 @@ spn_gen_entry_kind_t spn_gen_entry_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "system-libs")) return SPN_GENERATOR_SYSTEM_LIBS;
 
   SP_FATAL("Unknown flag {:fg brightyellow}; options are [include, lib-include, libs, system-libs]", SP_FMT_QUOTED_STR(str));
+  SP_UNREACHABLE_RETURN(SPN_GENERATOR_ALL);
 }
 
 spn_gen_compiler_t spn_gen_compiler_from_str(sp_str_t str) {
@@ -1211,6 +1213,7 @@ spn_gen_compiler_t spn_gen_compiler_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "gcc")) return SPN_GENERATOR_COMPILER_GCC;
 
   SP_FATAL("Unknown compiler {:fg brightyellow}; options are [gcc]", SP_FMT_STR(str));
+  SP_UNREACHABLE_RETURN(SPN_GENERATOR_COMPILER_NONE);
 }
 
 spn_generator_kind_t spn_gen_kind_from_str(sp_str_t str) {
@@ -1219,6 +1222,7 @@ spn_generator_kind_t spn_gen_kind_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "make"))       return SPN_GEN_KIND_MAKE;
 
   SP_FATAL("Unknown generator {:fg brightyellow}; options are [[empty], shell, make]", SP_FMT_STR(str));
+  SP_UNREACHABLE_RETURN(SPN_GEN_KIND_RAW);
 }
 
 typedef struct {
@@ -1243,9 +1247,10 @@ sp_str_t spn_gen_format_entry_for_compiler(sp_str_t entry, spn_gen_entry_kind_t 
         case SPN_GENERATOR_LIBS:        return sp_format("{}",            SP_FMT_STR(entry));
         case SPN_GENERATOR_SYSTEM_LIBS: return sp_format("-l{}",          SP_FMT_STR(entry));
         case SPN_GENERATOR_RPATH:       return sp_format("-Wl,-rpath,{}", SP_FMT_STR(entry));
-        default: SP_FATAL("Unknown generator entry: {:fg brightred}", SP_FMT_U32(kind));
+        default: SP_UNREACHABLE_RETURN(sp_str_lit(""));
       }
     }
+    default: SP_UNREACHABLE_RETURN(sp_str_lit(""));
   }
 }
 
@@ -1355,9 +1360,8 @@ sp_str_t spn_cache_dir_kind_to_path(spn_cache_dir_kind_t kind) {
     case SPN_DIR_STORE:   return app.paths.store;
     case SPN_DIR_SOURCE:  return app.paths.source;
     case SPN_DIR_WORK:    return app.paths.work;
-    default: SP_UNREACHABLE();
+    default: SP_UNREACHABLE_RETURN(sp_str_lit(""));
   }
-  SP_UNREACHABLE();
 }
 
 sp_str_t spn_cache_dir_kind_to_dep_path(spn_dep_build_context_t* dep, spn_cache_dir_kind_t kind) {
@@ -1369,9 +1373,8 @@ sp_str_t spn_cache_dir_kind_to_dep_path(spn_dep_build_context_t* dep, spn_cache_
     case SPN_DIR_SOURCE:  return dep->paths.source;
     case SPN_DIR_WORK:    return dep->paths.work;
     case SPN_DIR_CACHE:   SP_ASSERT(false);
-    default: SP_UNREACHABLE();
+    default: SP_UNREACHABLE_RETURN(sp_str_lit(""));
   }
-  SP_UNREACHABLE();
 }
 
 void spn_cli_command_copy(spn_cli_t* cli) {
@@ -2042,6 +2045,7 @@ s32 sp_lua_prepend_to_path(sp_lua_context_t lua, sp_str_t path) {
 sp_str_t sp_ternary_to_str(sp_ternary_t ternary) {
   switch (ternary) {
     SP_TERNARY_X(SP_X_ENUM_CASE_TO_STRING_LOWER)
+    default: SP_UNREACHABLE_RETURN(sp_str_lit(""));
   }
 }
 
@@ -2098,7 +2102,7 @@ sp_str_t sp_ternary_to_str(sp_ternary_t ternary) {
       case SP_OS_LIB_STATIC: return SP_LIT("a");
     }
 
-    SP_UNREACHABLE();
+    SP_UNREACHABLE_RETURN(sp_str_lit(""));
   }
 
   sp_str_t sp_os_lib_to_file_name(sp_str_t lib_name, sp_os_lib_kind_t kind) {
@@ -2302,13 +2306,14 @@ spn_output_mode_t spn_output_mode_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "none"))           return SPN_OUTPUT_MODE_NONE;
 
   SP_FATAL("Unknown output mode {:fg brightyellow}; options are [interactive, noninteractive, quiet, none]", SP_FMT_STR(str));
+  SP_UNREACHABLE_RETURN(SPN_OUTPUT_MODE_NONE);
 }
 
 sp_str_t spn_output_mode_to_str(spn_output_mode_t mode) {
   switch (mode) {
     SPN_OUTPUT_MODE_X(SP_X_ENUM_CASE_TO_STRING_LOWER)
-    default: SP_UNREACHABLE();
   }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
 ///////////
@@ -2319,13 +2324,14 @@ spn_dep_build_mode_t spn_dep_build_mode_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "release")) return SPN_DEP_BUILD_MODE_RELEASE;
 
   SP_FATAL("Unknown build mode {:fg brightyellow}; options are [debug, release]", SP_FMT_STR(str));
+  SP_UNREACHABLE_RETURN(SPN_DEP_BUILD_MODE_DEBUG);
 }
 
 sp_str_t spn_dep_build_mode_to_str(spn_dep_build_mode_t mode) {
   switch (mode) {
     case SPN_DEP_BUILD_MODE_DEBUG:   return sp_str_lit("debug");
     case SPN_DEP_BUILD_MODE_RELEASE: return sp_str_lit("release");
-    default: SP_UNREACHABLE();
+    default: SP_UNREACHABLE_RETURN(sp_str_lit(""));
   }
 }
 
@@ -2335,6 +2341,7 @@ spn_dep_build_kind_t spn_dep_build_kind_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "source")) return SPN_DEP_BUILD_KIND_SOURCE;
 
   SP_FATAL("Unknown build kind {:fg brightyellow}; options are [shared, static, source]", SP_FMT_STR(str));
+  SP_UNREACHABLE_RETURN(SPN_DEP_BUILD_KIND_SHARED);
 }
 
 sp_str_t spn_dep_build_kind_to_str(spn_dep_build_kind_t kind) {
@@ -2342,7 +2349,7 @@ sp_str_t spn_dep_build_kind_to_str(spn_dep_build_kind_t kind) {
     case SPN_DEP_BUILD_KIND_SHARED: return sp_str_lit("shared");
     case SPN_DEP_BUILD_KIND_STATIC: return sp_str_lit("static");
     case SPN_DEP_BUILD_KIND_SOURCE: return sp_str_lit("source");
-    default: SP_UNREACHABLE();
+    default: SP_UNREACHABLE_RETURN(sp_str_lit(""));
   }
 }
 
@@ -2357,7 +2364,7 @@ sp_str_t spn_dep_state_to_str(spn_dep_build_state_t state) {
     case SPN_DEP_BUILD_STATE_DONE:         return SP_LIT("done");
     case SPN_DEP_BUILD_STATE_CANCELED:     return SP_LIT("canceled");
     case SPN_DEP_BUILD_STATE_FAILED:       return SP_LIT("failed");
-    default: SP_FATAL("spn_dep_state_to_str(): Unknown build state {:fg brightred}", SP_FMT_U32(state));
+    default: SP_UNREACHABLE_RETURN(sp_str_lit(""));
   }
 }
 
@@ -2405,7 +2412,7 @@ bool spn_dep_context_is_binary(spn_dep_build_context_t* dep) {
     case SPN_DEP_BUILD_KIND_SOURCE: return false;
   }
 
-  SP_UNREACHABLE();
+  SP_UNREACHABLE_RETURN(false);
 }
 
 
