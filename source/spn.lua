@@ -124,6 +124,8 @@ local spn = {
 function spn.load()
   local app = c.app
 
+  print(app)
+  print(app.paths.user_config:cstr())
   -- User config
   spn.config = {}
   local loader = loadfile(app.paths.user_config:cstr())
@@ -140,6 +142,7 @@ function spn.load()
     end
   end
 
+  print('project')
   -- Project file
   local chunk, _ = loadfile(app.paths.project.config:cstr())
   if chunk then
@@ -154,6 +157,7 @@ function spn.load()
     spn.lock_file = lock_file
   end
 
+  print('recipes')
   -- Build the recipe search paths, then load all recipes we find in them
   local recipe_dirs = {}
 
@@ -192,6 +196,7 @@ function spn.load()
     end
   end
 
+  print('deps')
   -- Configure the deps that the project uses with the project's options
   for name, spec in pairs(spn.project.deps) do
     local recipe = spn.recipes[name]
@@ -315,8 +320,11 @@ function spn.context(app)
 end
 
 function spn.init(app)
+  print('ctx')
   spn.context(app)
+  print('load')
   spn.load()
+  print('parse')
   spn.parse()
 end
 

@@ -1,0 +1,6 @@
+[submodule "external/sp"]
+	path = external/sp
+	url = git@github.com:tspader/sp.git
+[submodule "external/argparse"]
+	path = external/argparse
+	url = git@github.com:tspader/argparse.git

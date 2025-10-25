@@ -148,10 +148,11 @@ $(BOOTSTRAP_SPN): $(BOOTSTRAP_ARCHIVE) | $(BOOTSTRAP_BIN)
 $(SPN_OUTPUT): $(BOOTSTRAP_SPN) source/*.h source/*.c $(SPN_MAKEFILE) | $(SPN_DIR_BUILD_OUTPUT)
 	$(call print_heading)
 	@echo "building dependencies"
-	$(BOOTSTRAP_SPN) build --output noninteractive
+	#$(BOOTSTRAP_SPN) build --output noninteractive
 	$(call print_heading)
 	@echo "building spn"
-	$(CC) ./source/main.c $(CFLAGS) $$($(BOOTSTRAP_SPN) print --output noninteractive) $(FLAG_SYSTEM_LIBS)
+	#$(CC) ./source/main.c $(CFLAGS) $$($(BOOTSTRAP_SPN) print --output noninteractive) $(FLAG_SYSTEM_LIBS)
+	$(CC) ./source/main.c $(CFLAGS) -I./external/sp -I./external/argparse -I$(HOME)/.local/include/luajit-2.1 $(HOME)/.local/lib/libluajit-5.1.a $(FLAG_SYSTEM_LIBS)
 
 
 ###########

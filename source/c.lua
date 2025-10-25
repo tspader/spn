@@ -249,58 +249,48 @@ function module.load(app)
     /////////
     // CLI //
     /////////
-    typedef struct {
-      sp_str_t package;
-    } spn_cli_add_t;
+typedef struct {
+  sp_str_t package;
+} spn_cli_add_t;
 
-    typedef struct {
-    } spn_cli_init_t;
+typedef struct {
+  bool force;
+  bool update;
+} spn_cli_build_t;
 
-    typedef struct {
-    } spn_cli_list_t;
+typedef struct {
+  const c8* generator;
+  const c8* compiler;
+  const c8* path;
+} spn_cli_print_t;
 
-    typedef enum {
-      SPN_DIR_STORE,
-      SPN_DIR_INCLUDE,
-      SPN_DIR_VENDOR,
-    } spn_cli_dir_kind_t;
+typedef struct {
+  const c8* dir;
+} spn_cli_which_t;
 
-    typedef struct {
-      const c8* package;
-      const c8* kind;
-    } spn_cli_dir_t;
+typedef struct {
+  const c8* dir;
+} spn_cli_ls_t;
 
-    typedef enum {
-      SPN_PRINT_NONE,
-      SPN_PRINT_INCLUDE,
-      SPN_PRINT_LIB_INCLUDE,
-      SPN_PRINT_LIBS,
-      SPN_PRINT_ALL,
-    } spn_cli_print_kind_t;
+typedef struct {
+  const c8* package;
+} spn_cli_recipe_t;
 
-    typedef enum {
-      SPN_PRINT_COMPILER_NONE,
-      SPN_PRINT_COMPILER_GCC,
-    } spn_cli_compiler_t;
+typedef struct {
+  u32 num_args;
+  const c8** args;
+  const c8* project_directory;
+  const c8* project_file;
+  const c8* matrix;
+  const c8* output;
 
-    typedef struct {
-      const c8* kind;
-      const c8* package;
-      const c8* compiler;
-    } spn_cli_print_t;
-
-    typedef struct {
-      u32 num_args;
-      const c8** args;
-      const c8* project_directory;
-      bool no_interactive;
-
-      spn_cli_add_t add;
-      spn_cli_init_t init;
-      spn_cli_list_t list;
-      spn_cli_print_t flags;
-      spn_cli_dir_t dir;
-    } spn_cli_t;
+  spn_cli_add_t add;
+  spn_cli_print_t print;
+  spn_cli_build_t build;
+  spn_cli_ls_t ls;
+  spn_cli_which_t which;
+  spn_cli_recipe_t recipe;
+} spn_cli_t;
 
     //////////////////
     // DEPENDENCIES //
@@ -437,8 +427,9 @@ function module.load(app)
     } spn_project_paths_t;
 
     typedef struct {
-      sp_str_t install;
-      sp_str_t   executable;
+      spn_project_paths_t project;
+      sp_str_t work;
+      sp_str_t executable;
       sp_str_t storage;
       sp_str_t   config;
       sp_str_t     user_config;
@@ -449,8 +440,6 @@ function module.load(app)
       sp_str_t     build;
       sp_str_t     store;
       sp_str_t     source;
-      sp_str_t work;
-      spn_project_paths_t project;
     } spn_paths_t;
 
     typedef struct {
