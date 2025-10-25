@@ -189,3 +189,6 @@ clean:
 	@rm -rf $(BOOTSTRAP_BIN)
 	@rm -rf $(SPN_DIR_BUILD)/bin
 	@rm -rf $(SPN_DIR_BUILD)/examples
+
+tcc:
+	tcc ./source/main.c -std=c11 -static -g -Isource -o build/bin/spn $$(build/bootstrap/bin/spn print --output noninteractive) -lm -lpthread

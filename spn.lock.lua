@@ -1,8 +1,8 @@
 return {
   deps = {
     argparse = {
-      build_id = "e900572f",
-      commit = "45e0e563c4",
+      build_id = "b1e35efa",
+      commit = "f71ed6c7b1",
       name = "argparse"
     },
     luajit = {
@@ -10,14 +10,9 @@ return {
       commit = "25a61a1821",
       name = "luajit"
     },
-    sdl3 = {
-      build_id = "151e933",
-      commit = "7957880981",
-      name = "sdl3"
-    },
     sp = {
-      build_id = "827dbb57",
-      commit = "8b66ea0074",
+      build_id = "e1167fcd",
+      commit = "d7c2ee99b3",
       name = "sp"
     }
   }

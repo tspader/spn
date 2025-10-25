@@ -19,13 +19,6 @@ function module.load(app)
   local ffi = require('ffi')
 
   ffi.cdef([[
-    typedef struct SDL_Process     SDL_Process;
-    typedef struct SDL_Environment SDL_Environment;
-    typedef struct SDL_IOStream    SDL_IOStream;
-    typedef uint32_t               SDL_PropertiesID;
-  ]])
-
-  ffi.cdef([[
     typedef int8_t           s8;
     typedef int16_t          s16;
     typedef int32_t          s32;
@@ -84,30 +77,164 @@ function module.load(app)
       u32 count;
     } sp_os_directory_entry_list_t;
     typedef sp_os_directory_entry_list_t sp_os_dirs_t;
-  ]])
 
-  ffi.cdef([[
-    typedef struct {
-      sp_str_t output;
-      s32 return_code;
-    } spn_sh_result_t;
+    typedef enum {
+      SP_ALLOCATOR_MODE_ALLOC,
+      SP_ALLOCATOR_MODE_FREE,
+      SP_ALLOCATOR_MODE_RESIZE,
+    } sp_allocator_mode_t;
+
+    typedef void* (*sp_alloc_fn_t)(void*, sp_allocator_mode_t, u32, void*);
+
+    typedef struct sp_allocator_t {
+      sp_alloc_fn_t on_alloc;
+      void* user_data;
+    } sp_allocator_t;
+
+    typedef enum {
+      SP_IO_SEEK_SET,
+      SP_IO_SEEK_CUR,
+      SP_IO_SEEK_END,
+    } sp_io_whence_t;
+
+    typedef enum {
+      SP_IO_MODE_READ   = 1 << 0,
+      SP_IO_MODE_WRITE  = 1 << 1,
+      SP_IO_MODE_APPEND = 1 << 2,
+    } sp_io_mode_t;
+
+    typedef enum {
+      SP_IO_FILE_CLOSE_MODE_NONE,
+      SP_IO_FILE_CLOSE_MODE_AUTO,
+    } sp_io_file_close_mode_t;
+
+    typedef struct sp_io_stream_t sp_io_stream_t;
+
+    typedef s64  (*sp_io_size_fn )(sp_io_stream_t*);
+    typedef s64  (*sp_io_seek_fn )(sp_io_stream_t*, s64, sp_io_whence_t);
+    typedef u64  (*sp_io_read_fn )(sp_io_stream_t*, void* , u64);
+    typedef u64  (*sp_io_write_fn)(sp_io_stream_t*, const void*, u64);
+    typedef void (*sp_io_close_fn)(sp_io_stream_t*);
 
     typedef struct {
-      sp_str_t name;
+      sp_io_size_fn  size;
+      sp_io_seek_fn  seek;
+      sp_io_read_fn  read;
+      sp_io_write_fn write;
+      sp_io_close_fn close;
+    } sp_io_callbacks_t;
+
+    typedef struct {
+      s32 fd;
+      sp_io_file_close_mode_t close_mode;
+    } sp_io_file_data_t;
+
+    typedef struct {
+      u8* base;
+      u8* here;
+      u8* stop;
+    } sp_io_memory_data_t;
+
+    struct sp_io_stream_t {
+      sp_io_callbacks_t callbacks;
+      union {
+        sp_io_file_data_t file;
+        sp_io_memory_data_t memory;
+      };
+      sp_allocator_t allocator;
+    };
+
+
+    typedef enum {
+      SP_PS_IO_FILENO_NONE,
+      SP_PS_IO_FILENO_STDIN = 0,
+      SP_PS_IO_FILENO_STDOUT = 1,
+      SP_PS_IO_FILENO_STDERR = 2,
+    } sp_ps_io_file_number_t;
+
+    typedef enum {
+      SP_ENV_EXPORT_OVERWRITE_DUPES,
+      SP_ENV_EXPORT_SKIP_DUPES,
+    } sp_env_export_overwrite_t;
+
+    typedef enum {
+      SP_PS_IO_MODE_INHERIT,
+      SP_PS_IO_MODE_NULL,
+      SP_PS_IO_MODE_CREATE,
+      SP_PS_IO_MODE_EXISTING,
+      SP_PS_IO_MODE_REDIRECT,
+    } sp_ps_io_mode_t;
+
+    typedef enum {
+      SP_PS_IO_NONBLOCKING,
+      SP_PS_IO_BLOCKING,
+    } sp_ps_io_blocking_t;
+
+    typedef enum {
+      SP_PS_ENV_INHERIT,
+      SP_PS_ENV_CLEAN,
+      SP_PS_ENV_EXISTING,
+    } sp_ps_env_mode_t;
+
+    typedef enum {
+      SP_PS_STATE_RUNNING,
+      SP_PS_STATE_DONE
+    } sp_ps_state_t;
+
+    typedef struct {
+      sp_str_t key;
       sp_str_t value;
-    } spn_sh_env_var_t;
+    } sp_env_var_t;
+
+    typedef void* sp_env_table_t;
+
+    typedef struct {
+      sp_env_table_t vars;
+    } sp_env_t;
+
+    typedef struct {
+      sp_ps_io_mode_t mode;
+      sp_io_stream_t stream;
+      sp_ps_io_blocking_t block;
+    } sp_ps_io_stream_config_t;
+
+    typedef struct {
+      sp_ps_io_stream_config_t in;
+      sp_ps_io_stream_config_t out;
+      sp_ps_io_stream_config_t err;
+    } sp_ps_io_config_t;
+
+    typedef sp_ps_io_config_t sp_ps_io_t;
+
+    typedef struct {
+      sp_ps_env_mode_t mode;
+      sp_env_t env;
+      sp_env_var_t extra [16];
+    } sp_ps_env_config_t;
 
     typedef struct {
       sp_str_t command;
-      sp_str_t* args;
-      spn_sh_env_var_t* env;
-      sp_str_t work;
+      sp_str_t args [8];
+      sp_str_t cwd;
+      sp_ps_env_config_t env;
+      sp_ps_io_config_t io;
+    } sp_ps_config_t;
 
-      SDL_PropertiesID shell;
-      SDL_Process* process;
-      spn_sh_result_t result;
-    } spn_sh_process_context_t;
+    typedef struct {
+      c8** argv;
+      c8** envp;
+      sp_ps_env_mode_t env_mode;
+    } sp_ps_platform_t;
 
+    typedef struct {
+      s32 pid;
+      sp_ps_io_t io;
+      sp_ps_platform_t platform;
+      sp_allocator_t allocator;
+    } sp_ps_t;
+  ]])
+
+  ffi.cdef([[
     /////////
     // LUA //
     /////////
@@ -276,11 +403,10 @@ function module.load(app)
       spn_dep_state_t tui_state;
 
       sp_lua_t lua;
-      SDL_PropertiesID sh;
-      SDL_Environment* env;
-      struct {
-        SDL_IOStream* out;
-      } std;
+
+      sp_ps_config_t cfg;
+      sp_ps_t ps;
+      sp_io_stream_t log;
 
       sp_thread_t thread;
       sp_mutex_t mutex;
@@ -298,6 +424,7 @@ function module.load(app)
 
     typedef struct {
       spn_dep_build_context_t* deps;
+      spn_build_matrix_t* matrix;
     } spn_build_context_t;
 
     /////////
@@ -345,8 +472,7 @@ function module.load(app)
         sp_str_t spn;
       } paths;
 
-      sp_ternary_t interactive;
-      sp_ternary_t quiet;
+      sp_str_t output;
     } spn_lua_config_t;
 
 typedef struct {
@@ -358,11 +484,6 @@ typedef struct {
   spn_lock_entry_t** lock;
   spn_lua_config_t* config;
 
-  bool                 (*SDL_CopyFile)(const c8*, const c8*);
-  c8*                  (*SDL_GetCurrentDirectory)(void);
-  SDL_Process*         (*SDL_CreateProcess)(const c8* const* args, bool pipe_stdio);
-  bool                 (*SDL_WaitProcess)(SDL_Process* process, bool block, int* result);
-  bool                 (*SDL_KillProcess)(SDL_Process* process, bool force);
   sp_hash_t            (*sp_hash_str)(sp_str_t str);
   sp_hash_t            (*sp_hash_combine)(sp_hash_t* hashes, u32 num_hashes);
   void*                (*sp_alloc)(u32 n);
@@ -392,11 +513,6 @@ typedef struct {
   sp_str_t             (*spn_git_get_remote_url)(sp_str_t repo_path);
   sp_str_t             (*spn_git_get_commit)(sp_str_t repo_path, sp_str_t id);
   sp_str_t             (*spn_git_get_commit_message)(sp_str_t repo_path, sp_str_t id);
-  void                 (*spn_sh_run)(spn_sh_process_context_t* context);
-  s32                  (*spn_sh_wait)(spn_sh_process_context_t* context);
-  spn_sh_result_t      (*spn_sh_read_process)(SDL_Process* process);
-  void                 (*spn_sh_add_arg)(spn_sh_process_context_t*, sp_str_t);
-  void                 (*spn_sh_add_env)(spn_sh_process_context_t*, sp_str_t, sp_str_t);
   sp_str_t             (*sp_str_truncate)(sp_str_t str, u32 n, sp_str_t trailer);
   spn_dep_build_kind_t (*spn_dep_build_kind_from_str)(sp_str_t str);
   sp_str_t             (*spn_dep_build_mode_to_str)(spn_dep_build_mode_t);

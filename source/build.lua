@@ -74,10 +74,12 @@ function module:sh(config)
   context.work = sp.str.from_cstr(config.cwd)
   context.shell = self.dep.sh
 
+  -- @sdl
   for arg in iterator.values(config.args) do
     c.spn.sh.add_arg(context, c.sp.str.from_cstr(arg))
   end
 
+  -- @sdl
   for name, value in iterator.pairs(config.env) do
     c.spn.sh.add_env(context, c.sp.str.from_cstr(name), c.sp.str.from_cstr(value))
   end

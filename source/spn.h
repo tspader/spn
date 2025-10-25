@@ -40,8 +40,6 @@
 #endif
 #include "lauxlib.h"
 
-#include "SDL3/SDL.h"
-
 #ifdef SP_POSIX
   #include <termios.h>
   #include <unistd.h>
@@ -55,39 +53,7 @@
   #include <string.h>
 #endif
 
-
-
-///////////
-// SHELL //
-///////////
-#define SPN_SH(...) SDL_CreateProcess((const c8* []) { __VA_ARGS__, SP_NULLPTR }, SP_SDL_PIPE_STDIO)
-
-typedef struct {
-  sp_str_t output;
-  s32 return_code;
-} spn_sh_result_t;
-
-typedef struct {
-  sp_str_t name;
-  sp_str_t value;
-} spn_sh_env_var_t;
-
-typedef struct {
-  sp_str_t command;
-  sp_dyn_array(sp_str_t) args;
-  sp_dyn_array(spn_sh_env_var_t) env;
-  sp_str_t work;
-
-  SDL_PropertiesID shell;
-  SDL_Process* process;
-  spn_sh_result_t result;
-} spn_sh_process_context_t;
-
-void spn_sh_run(spn_sh_process_context_t* context);
-s32  spn_sh_wait(spn_sh_process_context_t* context);
-spn_sh_result_t spn_sh_read_process(SDL_Process* process);
-void spn_sh_add_arg(spn_sh_process_context_t* context, sp_str_t arg);
-void spn_sh_add_env(spn_sh_process_context_t* context, sp_str_t name, sp_str_t val);
+#define SPN_PROCESS_BACKEND_SP
 
 /////////
 // GIT //
@@ -96,7 +62,8 @@ void spn_sh_add_env(spn_sh_process_context_t* context, sp_str_t name, sp_str_t v
 #define SPN_GIT_HEAD SP_LIT("HEAD")
 #define SPN_GIT_UPSTREAM SP_LIT("@{u}")
 
-sp_str_t spn_git_fetch(sp_str_t repo);
+bool     spn_git_clone(sp_str_t url, sp_str_t path);
+bool     spn_git_fetch(sp_str_t repo);
 u32      spn_git_num_updates(sp_str_t repo, sp_str_t from, sp_str_t to);
 void     spn_git_checkout(sp_str_t repo, sp_str_t commit);
 sp_str_t spn_git_get_remote_url(sp_str_t repo_path);
@@ -124,6 +91,7 @@ SP_API void     sp_os_copy_directory(sp_str_t from, sp_str_t to);
 SP_API sp_str_t sp_os_lib_kind_to_extension(sp_os_lib_kind_t kind);
 SP_API sp_str_t sp_os_lib_to_file_name(sp_str_t lib_name, sp_os_lib_kind_t kind);
 SP_API sp_str_t sp_ternary_to_str(sp_ternary_t ternary);
+SP_API sp_env_t foo();
 
 
 /////////
@@ -301,12 +269,11 @@ typedef struct {
   spn_dep_state_t tui_state;
 
   sp_lua_t lua;
-  SDL_PropertiesID sh;
-  SDL_Environment* env;
 
-  struct {
-    SDL_IOStream* out;
-  } io;
+
+  sp_ps_config_t cfg;
+  sp_ps_t ps;
+  sp_io_stream_t log;
 
   sp_thread_t thread;
   sp_mutex_t mutex;
@@ -340,7 +307,6 @@ void                     spn_dep_context_prepare(spn_dep_build_context_t* contex
 bool                     spn_dep_context_is_build_stamped(spn_dep_build_context_t* context);
 void                     spn_dep_context_set_build_state(spn_dep_build_context_t* dep, spn_dep_build_state_t state);
 void                     spn_dep_context_set_build_error(spn_dep_build_context_t* dep, sp_str_t error);
-void                     spn_dep_context_clone(spn_dep_build_context_t* dep);
 sp_str_t                 spn_dep_context_find_latest_commit(spn_dep_build_context_t* dep);
 s32                      spn_dep_context_build_async(void* user_data);
 bool                     spn_dep_context_is_binary(spn_dep_build_context_t* dep);
@@ -421,8 +387,9 @@ typedef struct {
 } spn_project_paths_t;
 
 typedef struct {
-  sp_str_t install;
-  sp_str_t   executable;
+  spn_project_paths_t project;
+  sp_str_t work;
+  sp_str_t executable;
   sp_str_t storage;
   sp_str_t   config;
   sp_str_t     user_config;
@@ -433,8 +400,6 @@ typedef struct {
   sp_str_t     build;
   sp_str_t     store;
   sp_str_t     source;
-  sp_str_t work;
-  spn_project_paths_t project;
 } spn_paths_t;
 
 typedef struct {
@@ -500,8 +465,6 @@ typedef struct {
   spn_cli_recipe_t recipe;
 } spn_cli_t;
 
-void spn_cli_command_init(spn_cli_t* cli);
-void spn_cli_command_add(spn_cli_t* cli);
 void spn_cli_command_list(spn_cli_t* cli);
 void spn_cli_command_nuke(spn_cli_t* cli);
 void spn_cli_command_clean(spn_cli_t* cli);
@@ -535,11 +498,6 @@ typedef struct {
   spn_lock_entry_t** lock;
   spn_lua_config_t* config;
 
-  bool                 (*SDL_CopyFile)(const c8*, const c8*);
-  c8*                  (*SDL_GetCurrentDirectory)(void);
-  SDL_Process*         (*SDL_CreateProcess)(const c8* const* args, bool pipe_stdio);
-  bool                 (*SDL_WaitProcess)(SDL_Process* process, bool block, int* result);
-  bool                 (*SDL_KillProcess)(SDL_Process* process, bool force);
   sp_hash_t            (*sp_hash_str)(sp_str_t str);
   sp_hash_t            (*sp_hash_combine)(sp_hash_t* hashes, u32 num_hashes);
   void*                (*sp_alloc)(u32 n);
@@ -563,17 +521,12 @@ typedef struct {
   sp_str_t             (*sp_os_platform_name)(void);
   void                 (*sp_dyn_array_push_f)(void** arr, void* val, u32 val_len);
   spn_dep_info_t*      (*spn_dep_find)(sp_str_t name);
-  sp_str_t             (*spn_git_fetch)(sp_str_t repo);
+  bool                 (*spn_git_fetch)(sp_str_t repo);
   u32                  (*spn_git_num_updates)(sp_str_t repo, sp_str_t from, sp_str_t to);
   void                 (*spn_git_checkout)(sp_str_t repo, sp_str_t commit);
   sp_str_t             (*spn_git_get_remote_url)(sp_str_t repo_path);
   sp_str_t             (*spn_git_get_commit)(sp_str_t repo_path, sp_str_t id);
   sp_str_t             (*spn_git_get_commit_message)(sp_str_t repo_path, sp_str_t id);
-  void                 (*spn_sh_run)(spn_sh_process_context_t* context);
-  s32                  (*spn_sh_wait)(spn_sh_process_context_t* context);
-  spn_sh_result_t      (*spn_sh_read_process)(SDL_Process* process);
-  void                 (*spn_sh_add_arg)(spn_sh_process_context_t*, sp_str_t);
-  void                 (*spn_sh_add_env)(spn_sh_process_context_t*, sp_str_t, sp_str_t);
   sp_str_t             (*sp_str_truncate)(sp_str_t str, u32 n, sp_str_t trailer);
   spn_dep_build_kind_t (*spn_dep_build_kind_from_str)(sp_str_t str);
   sp_str_t             (*spn_dep_build_mode_to_str)(spn_dep_build_mode_t);
@@ -594,15 +547,14 @@ typedef struct {
   spn_lua_config_t config;
   spn_lua_context_t context;
   spn_tui_t tui;
-  SDL_AtomicInt control;
+  sp_atomic_s32 control;
   sp_lua_t lua;
 } spn_app_t;
 
-extern spn_app_t app;
+spn_app_t app;
 
 void               spn_app_init(spn_app_t* app, u32 num_args, const c8** args);
 void               spn_app_run(spn_app_t* app);
-bool               spn_project_write(spn_project_t* project, sp_str_t path);
 bool               spn_lock_file_write(spn_lock_file_t* lock, sp_str_t path);
 void               spn_lock_file_from_deps(spn_lock_file_t* lock, spn_build_context_t* context);
 
@@ -611,8 +563,6 @@ void               spn_lock_file_from_deps(spn_lock_file_t* lock, spn_build_cont
 // IMPLEMENTATION //
 ////////////////////
 #ifdef SPN_IMPLEMENTATION
-
-spn_app_t app;
 
 void sp_lua_pop_add(sp_lua_pop_t* pop) {
   pop->count++;
@@ -783,11 +733,6 @@ void spn_lua_init() {
     .deps = &app.deps,
     .lock = &app.lock,
     .config = &app.config,
-    .SDL_CopyFile                = SDL_CopyFile,
-    .SDL_GetCurrentDirectory     = SDL_GetCurrentDirectory,
-    .SDL_CreateProcess           = SDL_CreateProcess,
-    .SDL_WaitProcess             = SDL_WaitProcess,
-    .SDL_KillProcess             = SDL_KillProcess,
     .sp_hash_str                 = sp_hash_str,
     .sp_hash_combine             = sp_hash_combine,
     .sp_alloc                    = sp_alloc,
@@ -817,68 +762,11 @@ void spn_lua_init() {
     .spn_git_get_remote_url      = spn_git_get_remote_url,
     .spn_git_get_commit          = spn_git_get_commit,
     .spn_git_get_commit_message  = spn_git_get_commit_message,
-    .spn_sh_run                  = spn_sh_run,
-    .spn_sh_wait                 = spn_sh_wait,
-    .spn_sh_read_process         = spn_sh_read_process,
-    .spn_sh_add_arg              = spn_sh_add_arg,
-    .spn_sh_add_env              = spn_sh_add_env,
     .sp_str_truncate             = sp_str_truncate,
     .spn_dep_build_kind_from_str = spn_dep_build_kind_from_str,
     .spn_dep_build_mode_to_str   = spn_dep_build_mode_to_str,
     .spn_dep_build_mode_from_str = spn_dep_build_mode_from_str,
   };
-}
-
-///////////
-// SHELL //
-void spn_sh_run(spn_sh_process_context_t* context) {
-  SDL_PropertiesID shell = SDL_CreateProperties();
-  if (context->shell) {
-    SDL_CopyProperties(context->shell, shell);
-  }
-
-  sp_dyn_array(const c8*) args = SP_NULLPTR;
-  sp_dyn_array_push(args, sp_str_to_cstr(context->command));
-  if (context->args) {
-    sp_dyn_array_for(context->args, index) {
-      sp_dyn_array_push(args, sp_str_to_cstr(context->args[index]));
-    }
-  }
-  sp_dyn_array_push(args, SP_NULLPTR);
-  SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, args);
-
-  SDL_Environment* env = SDL_CreateEnvironment(true);
-  sp_dyn_array_for(context->env, index) {
-    spn_sh_env_var_t var = context->env[index];
-    const c8* name = sp_str_to_cstr(var.name);
-    const c8* value = sp_str_to_cstr(var.value);
-    SDL_SetEnvironmentVariable(env, name, value, true);
-  }
-  SDL_SetPointerProperty(shell, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, env);
-
-  if (context->work.len) {
-    SDL_SetStringProperty(
-      shell,
-      SDL_PROP_PROCESS_CREATE_WORKING_DIRECTORY_STRING,
-      sp_str_to_cstr(context->work)
-    );
-  }
-
-  context->process = SDL_CreateProcessWithProperties(shell);
-  if (!context->process) {
-    SP_LOG(
-      "{:fg brightyellow} {:fg brightblack} Failed to create process: {}",
-      SP_FMT_STR(sp_str_pad(SP_LIT("shell"), 8)),
-      sp_str_join_cstr_n(args, sp_dyn_array_size(args) - 1, SP_LIT(" ")),
-      SP_FMT_CSTR(SDL_GetError())
-    );
-    return;
-  }
-}
-
-s32 spn_sh_wait(spn_sh_process_context_t* context) {
-  SDL_WaitProcess(context->process, true, &context->result.return_code);
-  return context->result.return_code;
 }
 
 // TUI
@@ -992,146 +880,8 @@ void spn_cli_assert_dep_is_built(spn_dep_build_context_t* dep) {
       SP_FMT_CSTR("spn build")
     );
   }
-
-
 }
 
-void spn_cli_command_init(spn_cli_t* cli) {
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_END()
-    },
-    (const c8* const []) {
-      "spn init",
-      "Initialize a new spn project in the current directory",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
-
-  // Check if project file already exists
-  if (sp_os_does_path_exist(app.paths.project.config)) {
-    SP_LOG("Project already initialized at {}", SP_FMT_COLOR(SP_ANSI_FG_CYAN), SP_FMT_STR(app.paths.project.config));
-    return;
-  }
-
-  app.project = (spn_project_t){
-    .name = sp_os_extract_file_name(app.paths.project.dir)
-  };
-
-  if (!spn_project_write(&app.project, app.paths.project.config)) {
-    SP_FATAL("Failed to write project file");
-  }
-}
-
-void spn_cli_command_add(spn_cli_t* cli) {
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_END()
-    },
-    (const c8* const []) {
-      "spn add <package>",
-      "Add a dependency to the project",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
-
-  // Get package name from positional argument
-  if (cli->num_args < 1 || !cli->args[0]) {
-    SP_FATAL("Package name required. Usage: spn add <package>");
-  }
-
-  const c8* package_name = cli->args[0];
-
-  // Check if project file exists
-  if (!sp_os_does_path_exist(app.paths.project.config)) {
-    SP_FATAL("No spn.lua found. Run 'spn init' first.");
-  }
-
-  // Read the existing file
-  size_t file_size;
-  c8* file_content = SDL_LoadFile(sp_str_to_cstr(app.paths.project.config), &file_size);
-  if (!file_content) {
-    SP_FATAL("Failed to read project file");
-  }
-
-  // Find the dep section markers using sp.h APIs (no C stdlib)
-  const c8* dep_start_marker = "-- Dependencies: DO NOT REMOVE THIS LINE";
-  const c8* dep_end_marker = "-- End Dependencies: DO NOT REMOVE THIS LINE";
-
-  u32 marker_start_len = sp_cstr_len(dep_start_marker);
-  u32 marker_end_len = sp_cstr_len(dep_end_marker);
-
-  // Find dep_start by scanning through file_content
-  c8* dep_start = SP_NULLPTR;
-  for (u32 i = 0; i <= file_size - marker_start_len; i++) {
-    if (sp_os_is_memory_equal(file_content + i, dep_start_marker, marker_start_len)) {
-      dep_start = file_content + i;
-      break;
-    }
-  }
-
-  // Find dep_end by scanning through file_content
-  c8* dep_end = SP_NULLPTR;
-  for (u32 i = 0; i <= file_size - marker_end_len; i++) {
-    if (sp_os_is_memory_equal(file_content + i, dep_end_marker, marker_end_len)) {
-      dep_end = file_content + i;
-      break;
-    }
-  }
-
-  if (!dep_start || !dep_end) {
-    SDL_free(file_content);
-    SP_FATAL("Could not find dependency section markers in spn.lua");
-  }
-
-  // Find the closing brace of the deps table (just before the end marker)
-  c8* closing_brace = dep_end - 1;
-  while (closing_brace > dep_start && (*closing_brace == ' ' || *closing_brace == '\t' || *closing_brace == '\n')) {
-    closing_brace--;
-  }
-
-  if (*closing_brace != '}') {
-    SDL_free(file_content);
-    SP_FATAL("Malformed deps table in spn.lua");
-  }
-
-  // Build the new file content with the added dep
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-
-  // Add content before the closing brace
-  sp_str_builder_append(&builder, SP_RVAL(sp_str_t){ .data = file_content, .len = (u32)(closing_brace - file_content) });
-
-  // Add the new dependency
-  sp_str_builder_append_fmt(&builder, "  {} = {},\n", SP_FMT_CSTR(package_name));
-
-  // Add the closing brace and everything after
-  sp_str_builder_append(&builder, SP_RVAL(sp_str_t){ .data = closing_brace, .len = (u32)(file_size - (closing_brace - file_content)) });
-
-  // Write the file back
-  SDL_IOStream* file = SDL_IOFromFile(sp_str_to_cstr(app.paths.project.config), "w");
-  if (!file) {
-    SDL_free(file_content);
-    SP_FATAL("Failed to open project file for writing");
-  }
-
-  sp_str_t new_content = sp_str_builder_write(&builder);
-  SDL_WriteIO(file, new_content.data, new_content.len);
-  SDL_CloseIO(file);
-
-  SDL_free(file_content);
-
-  SP_LOG("Added {:fg cyan} to project dependencies", SP_FMT_CSTR(package_name));
-}
 
 void spn_cli_command_list(spn_cli_t* cli) {
   struct argparse argparse;
@@ -1550,8 +1300,9 @@ void spn_cli_command_print(spn_cli_t* cli) {
     sp_os_create_directory(destination);
 
     sp_str_t file_path = sp_os_join_path(destination, gen.file_name);
-    if (!SDL_SaveFile(sp_str_to_cstr(file_path), gen.output.data, gen.output.len)) {
-      SP_FATAL("Failed to write {}: {}", SP_FMT_STR(file_path), SP_FMT_CSTR(SDL_GetError()));
+    sp_io_stream_t file = sp_io_from_file(sp_os_join_path(destination, gen.file_name), SP_IO_MODE_WRITE);
+    if (sp_io_write_str(&file, gen.output)) {
+      SP_FATAL("Failed to write {}", SP_FMT_STR(file_path));
     }
 
     SP_LOG("Generated {:fg brightcyan}", SP_FMT_STR(file_path));
@@ -1578,18 +1329,19 @@ void sp_sh_ls(sp_str_t path) {
 
   SP_CARR_FOR(tools, i) {
     if (sp_os_is_program_on_path(sp_str_view(tools[i].command))) {
-      spn_sh_process_context_t context = SP_ZERO_INITIALIZE();
-      context.command = sp_str_view(tools[i].command);
+      sp_ps_config_t config = SP_ZERO_INITIALIZE();
+      config.command = sp_str_view(tools[i].command);
 
       SP_CARR_FOR(tools[i].args, j) {
         const c8* arg = tools[i].args[j];
         if (!arg) break;
-        sp_dyn_array_push(context.args, sp_str_view(arg));
+        sp_ps_config_add_arg(&config, sp_str_view(arg));
       }
 
-      sp_dyn_array_push(context.args, path);
+      sp_ps_config_add_arg(&config, path);
 
-      spn_sh_run(&context);
+      sp_ps_output_t result = sp_ps_run(config);
+      SP_ASSERT(!result.status.exit_code);
       return;
     }
   }
@@ -1727,14 +1479,12 @@ void spn_cli_command_recipe(spn_cli_t* cli) {
   spn_dep_context_prepare(dep, dep->spec->lock);
 
   sp_str_t recipe_path = dep->info->paths.recipe;
-  sp_size_t file_size = 0;
-  c8* file_data = (c8*)SDL_LoadFile(sp_str_to_cstr(recipe_path), &file_size);
-  if (!file_data) {
+  sp_str_t recipe = sp_io_read_file(recipe_path);
+  if (!sp_str_valid(recipe)) {
     SP_FATAL("failed to read recipe file: {:fg brightyellow}", SP_FMT_STR(recipe_path));
   }
 
-  printf("%.*s", (int)file_size, file_data);
-  SDL_free(file_data);
+  sp_os_log(recipe);
 }
 
 void spn_cli_command_build(spn_cli_t* cli) {
@@ -1786,7 +1536,7 @@ void spn_cli_command_build(spn_cli_t* cli) {
 
   while (true) {
     // Check if user requested cancellation (e.g., Ctrl-C)
-    if (SDL_GetAtomicInt(&app.control) != 0) {
+    if (sp_atomic_s32_get(&app.control) != 0) {
       // Signal all threads to stop
       sp_dyn_array_for(app.build.deps, index) {
         spn_dep_build_context_t* dep = app.build.deps + index;
@@ -1816,7 +1566,7 @@ void spn_cli_command_build(spn_cli_t* cli) {
     if (!building) {
       break;
     }
-    SDL_Delay(5);
+    sp_os_sleep_ms(10);
   }
 
   spn_tui_cleanup(&app.tui);
@@ -1828,7 +1578,7 @@ void spn_cli_command_build(spn_cli_t* cli) {
   sp_dyn_array_for(app.build.deps, i) {
     spn_dep_build_context_t* dep = &app.build.deps[i];
 
-    SDL_CloseIO(dep->io.out);
+    sp_io_close(&dep->log);
 
     switch (dep->state.build) {
       case SPN_DEP_BUILD_STATE_DONE: {
@@ -1838,16 +1588,11 @@ void spn_cli_command_build(spn_cli_t* cli) {
       default: {
         failed = true;
 
-        struct { sp_size_t size; c8* data; } buffer;
-        buffer.data = SDL_LoadFile(sp_str_to_cstr(dep->paths.log), &buffer.size);
-
         sp_str_builder_new_line(&builder);
         sp_str_builder_append_fmt(&builder, "> {:fg brightyellow}", SP_FMT_STR(dep->info->name));
         sp_str_builder_new_line(&builder);
-        sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_CSTR(buffer.data));
+        sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_STR(sp_io_read_file(dep->paths.log)));
         sp_log(sp_str_builder_write(&builder));
-
-        SDL_RemovePath(sp_str_to_cstr(dep->paths.store));
 
         break;
       }
@@ -1858,174 +1603,102 @@ void spn_cli_command_build(spn_cli_t* cli) {
   spn_lock_file_write(&app.lock, app.paths.project.lock);
 }
 
-///////////
-// SHELL //
-///////////
-void spn_sh_add_arg(spn_sh_process_context_t* context, sp_str_t arg) {
-  SP_ASSERT(context);
-  sp_dyn_array_push(context->args, arg);
+/////////
+// GIT //
+/////////
+bool spn_git_clone(sp_str_t url, sp_str_t path) {
+  sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
+    .command = SP_LIT("git"),
+    .args = {
+      SP_LIT("clone"), SP_LIT("--quiet"),
+      url,
+      path
+    },
+  });
+
+  return !result.status.exit_code;
 }
 
-void spn_sh_add_env(spn_sh_process_context_t* context, sp_str_t name, sp_str_t value) {
-  SP_ASSERT(context);
-  spn_sh_env_var_t var = {
-    .name = sp_str_copy(name),
-    .value = sp_str_copy(value)
-  };
-  sp_dyn_array_push(context->env, var);
-}
-spn_sh_result_t spn_sh_read_process(SDL_Process* process) {
-  spn_sh_result_t result = SP_ZERO_INITIALIZE();
+bool spn_git_fetch(sp_str_t repo) {
+  sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
+    .command = SP_LIT("git"),
+    .args = {
+      SP_LIT("-C"), repo,
+      SP_LIT("fetch"), SP_LIT("--quiet")
+    },
+  });
 
-  sp_size_t len = 0;
-  void* output_data = SDL_ReadProcess(process, &len, &result.return_code);
-
-  result.output.data = (c8*)output_data;
-  result.output.len = (u32)len;
-  SDL_WaitProcess(process, true, &result.return_code);
-  return result;
+  return !result.status.exit_code;
 }
 
-sp_str_t spn_git_fetch(sp_str_t repo_path) {
-  SDL_Process* process = SPN_SH("git", "-C", sp_str_to_cstr(repo_path), "fetch", "--quiet");
-  SP_ASSERT(process);
+u32 spn_git_num_updates(sp_str_t repo, sp_str_t from, sp_str_t to) {
+  sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
+    .command = SP_LIT("git"),
+    .args = {
+      SP_LIT("-C"), repo,
+      SP_LIT("rev-list"), sp_format("{}..{}", SP_FMT_STR(from), SP_FMT_STR(to)),
+      SP_LIT("--count")
+    },
+  });
 
-  spn_sh_result_t result = spn_sh_read_process(process);
-  SDL_DestroyProcess(process);
-  return result.output;
-}
-
-u32 spn_git_num_updates(sp_str_t repo_path, sp_str_t from, sp_str_t to) {
-  sp_str_t specifier = sp_format("{}..{}", SP_FMT_STR(from), SP_FMT_STR(to));
-  SDL_Process* process = SPN_SH("git", "-C", sp_str_to_cstr(repo_path), "rev-list", sp_str_to_cstr(specifier), "--count");
-  SP_ASSERT(process);
-
-  spn_sh_result_t result = spn_sh_read_process(process);
-  SDL_DestroyProcess(process);
-
-  sp_str_t trimmed = sp_str_trim_right(result.output);
+  sp_str_t trimmed = sp_str_trim_right(result.out);
   return sp_parse_u32(trimmed);
 }
 
-sp_str_t spn_git_get_remote_url(sp_str_t repo_path) {
-  SDL_Process* process = SPN_SH("git", "-C", sp_str_to_cstr(repo_path), "remote", "get-url", "origin");
-  SP_ASSERT(process);
+sp_str_t spn_git_get_remote_url(sp_str_t repo) {
+  sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
+    .command = SP_LIT("git"),
+    .args = {
+      SP_LIT("-C"), repo,
+      SP_LIT("remote"), SP_LIT("get-url"), SP_LIT("origin")
+    },
+  });
 
-  spn_sh_result_t result = spn_sh_read_process(process);
-  SP_ASSERT_FMT(!result.return_code, "Failed to get remote URL for {:fg brightcyan}", SP_FMT_STR(repo_path));
-  SDL_DestroyProcess(process);
-
-  return sp_str_trim_right(result.output);
+  SP_ASSERT_FMT(!result.status.exit_code, "Failed to get remote URL for {:fg brightcyan}", SP_FMT_STR(repo));
+  return sp_str_trim_right(result.out);
 }
 
 sp_str_t spn_git_get_commit(sp_str_t repo_path, sp_str_t id) {
-  SDL_Process* process = SPN_SH("git", "-C", sp_str_to_cstr(repo_path), "rev-parse", "--short=10", sp_str_to_cstr(id));
-  SP_ASSERT(process);
+  sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
+    .command = SP_LIT("git"),
+    .args = {
+      SP_LIT("-C"), repo_path,
+      SP_LIT("rev-parse"),
+      SP_LIT("--short=10"),
+      id
+    }
+  });
 
-  spn_sh_result_t result = spn_sh_read_process(process);
-  SP_ASSERT_FMT(!result.return_code, "Failed to get revision for {:fg brightcyan}", SP_FMT_STR(repo_path));
-  SDL_DestroyProcess(process);
-
-  return sp_str_trim_right(result.output);
+  return sp_str_trim_right(result.out);
 }
 
 sp_str_t spn_git_get_commit_message(sp_str_t repo_path, sp_str_t id) {
-  SDL_Process* process = SPN_SH("git", "-C", sp_str_to_cstr(repo_path), "log", "--format=%B", "-n", "1", sp_str_to_cstr(id));
-  SP_ASSERT(process);
+  sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
+    .command = SP_LIT("git"),
+    .args = {
+      SP_LIT("-C"), repo_path,
+      SP_LIT("log"),
+      SP_LIT("--format=%B"),
+      SP_LIT("-n"),
+      SP_LIT("1"),
+      id
+    }
+  });
 
-  spn_sh_result_t result = spn_sh_read_process(process);
-  SP_ASSERT_FMT(!result.return_code, "Failed to get check out {:fg brightcyan} {:fg brightcyan}", SP_FMT_STR(repo_path), SP_FMT_STR(id));
-  SDL_DestroyProcess(process);
-
-  return sp_str_trim_right(result.output);
+  return sp_str_trim_right(result.out);
 }
 
 void spn_git_checkout(sp_str_t repo, sp_str_t commit) {
-  SDL_Process* process = SPN_SH("git", "-C", sp_str_to_cstr(repo), "checkout", "--quiet", sp_str_to_cstr(commit));
-  SP_ASSERT(process);
-
-  spn_sh_result_t result = spn_sh_read_process(process);
-  SP_ASSERT_FMT(!result.return_code, "Failed to get check out {:fg brightcyan} {:fg brightcyan}", SP_FMT_STR(repo), SP_FMT_STR(commit));
-  SDL_DestroyProcess(process);
-}
-
-///////////////////
-// SP EXTENSIONS //
-///////////////////
-sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer) {
-  if (!n) return sp_str_copy(str);
-  if (str.len <= n) return sp_str_copy(str);
-  SP_ASSERT(trailer.len <= n);
-
-  str.len = n - trailer.len;
-  return sp_str_concat(str, trailer);
-}
-
-bool sp_os_is_glob(sp_str_t path) {
-  sp_str_t file_name = sp_os_extract_file_name(path);
-  return sp_str_contains_n(&file_name, 1, sp_str_lit("*"));
-}
-
-bool sp_os_is_program_on_path(sp_str_t program) {
-  spn_sh_process_context_t context = SP_ZERO_INITIALIZE();
-
-  context.command = SP_LIT("which");
-  sp_dyn_array_push(context.args, program);
-
-  context.shell = SDL_CreateProperties();
-  SDL_SetNumberProperty(context.shell, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL);
-  SDL_SetNumberProperty(context.shell, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_NULL);
-  SDL_SetBooleanProperty(context.shell, SDL_PROP_PROCESS_CREATE_STDERR_TO_STDOUT_BOOLEAN, true);
-
-  spn_sh_run(&context);
-
-  SDL_WaitProcess(context.process, true, &context.result.return_code);
-
-  return !context.result.return_code;
-}
-
-void sp_os_copy(sp_str_t from, sp_str_t to) {
-  if (sp_os_is_glob(from)) {
-    sp_os_copy_glob(sp_os_parent_path(from), sp_os_extract_file_name(from), to);
-  }
-  else if (sp_os_is_directory(from)) {
-    SP_ASSERT(sp_os_is_directory(to));
-    sp_os_copy_glob(from, sp_str_lit("*"), sp_os_join_path(to, sp_os_extract_stem(from)));
-  }
-  else if (sp_os_is_regular_file(from)) {
-    sp_os_copy_file(from, to);
-  }
-}
-
-void sp_os_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to) {
-  SDL_CreateDirectory(sp_str_to_cstr(to));
-
-  s32 num_files = 0;
-  c8** entries = SDL_GlobDirectory(sp_str_to_cstr(from), sp_str_to_cstr(glob), SDL_GLOB_CASEINSENSITIVE, &num_files);
-
-  if (!entries) return;
-
-  for (u32 i = 0; i < num_files; i++) {
-    sp_str_t entry_path = sp_str_view(entries[i]);
-    sp_os_copy(sp_os_join_path(from, entry_path), to);
-  }
-}
-
-void sp_os_copy_file(sp_str_t from, sp_str_t to) {
-  if (sp_os_is_directory(to)) {
-    sp_os_create_directory(to);
-    to = sp_os_join_path(to, sp_os_extract_file_name(from));
-  }
-
-  SDL_CopyFile(sp_str_to_cstr(from), sp_str_to_cstr(to));
-}
-
-void sp_os_copy_directory(sp_str_t from, sp_str_t to) {
-  if (sp_os_is_directory(to)) {
-    to = sp_os_join_path(to, sp_os_extract_file_name(from));
-  }
-
-  sp_os_copy_glob(from, sp_str_lit("*"), to);
+  sp_ps_t process = sp_ps_create((sp_ps_config_t) {
+    .command = SP_LIT("git"),
+    .args = {
+      SP_LIT("-C"), repo,
+      SP_LIT("checkout"),
+      SP_LIT("quiet"),
+      commit
+    }
+  });
+  sp_ps_wait(&process);
 }
 
 s32 sp_lua_set_path(sp_lua_context_t lua, sp_str_t path) {
@@ -2420,38 +2093,6 @@ sp_str_t spn_dep_context_find_latest_commit(spn_dep_build_context_t* dep) {
   return spn_git_get_commit(dep->info->paths.source, sp_format("origin/{}", SP_FMT_STR(dep->info->branch)));
 }
 
-void spn_dep_context_clone(spn_dep_build_context_t* dep) {
-  sp_str_t url = sp_format("https://github.com/{}.git", SP_FMT_STR(dep->info->git));
-  SDL_Process* process = SPN_SH(
-    "git", "clone", "--quiet",
-    sp_str_to_cstr(url),
-    sp_str_to_cstr(dep->info->paths.source)
-  );
-
-  if (!process) {
-    spn_dep_context_set_build_error(dep, sp_format(
-      "Failed to spawn process to clone {:color brightcyan} {}",
-      dep->info->name,
-      SP_FMT_CSTR(SDL_GetError())
-    ));
-    return;
-  }
-
-  spn_sh_result_t result = spn_sh_read_process(process);
-  if (result.return_code) {
-    spn_dep_context_set_build_error(dep, sp_format(
-      "Failed to clone {:fg brightcyan} with exit code {:fg brightred}",
-      SP_FMT_STR(dep->info->name),
-      SP_FMT_S32(result.return_code)
-    ));
-
-    SDL_DestroyProcess(process);
-    return;
-  }
-
-  SDL_DestroyProcess(process);
-}
-
 void spn_dep_checkout(spn_dep_build_context_t *dep) {
   if (dep->info->branch.len) {
     spn_git_checkout(dep->info->paths.source, dep->info->branch);
@@ -2510,7 +2151,17 @@ s32 spn_dep_context_build_async(void* user_data) {
 
   if (!sp_os_does_path_exist(dep->info->paths.source)) {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
-    spn_dep_context_clone(dep);
+
+    sp_str_t url = sp_format("https://github.com/{}.git", SP_FMT_STR(dep->info->git));
+    if (spn_git_clone(url, dep->info->paths.source)) {
+      spn_dep_context_set_build_error(dep, sp_format(
+        "Failed to clone {:fg brightcyan}",
+        SP_FMT_STR(dep->info->name)
+      ));
+
+      return 0;
+    }
+
     SP_ASSERT(sp_os_is_directory(dep->info->paths.source));
   } else {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
@@ -2542,13 +2193,17 @@ s32 spn_dep_context_build_async(void* user_data) {
   sp_os_create_directory(dep->paths.include);
   sp_os_create_directory(dep->paths.lib);
   sp_os_create_directory(dep->paths.vendor);
-  dep->io.out = SDL_IOFromFile(sp_str_to_cstr(dep->paths.log), "w");
+  dep->log = sp_io_from_file(dep->paths.log, SP_IO_MODE_WRITE);
 
-  dep->sh = SDL_CreateProperties();
-  SDL_SetNumberProperty(dep->sh, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL);
-  SDL_SetNumberProperty(dep->sh, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_REDIRECT);
-  SDL_SetPointerProperty(dep->sh, SDL_PROP_PROCESS_CREATE_STDOUT_POINTER, dep->io.out);
-  SDL_SetBooleanProperty(dep->sh, SDL_PROP_PROCESS_CREATE_STDERR_TO_STDOUT_BOOLEAN, true);
+  dep->cfg = (sp_ps_config_t) {
+    .io = {
+      .in = { .mode = SP_PS_IO_MODE_NULL },
+      .out = { .mode = SP_PS_IO_MODE_EXISTING, .stream = dep->log },
+      .err = { .mode = SP_PS_IO_MODE_REDIRECT }
+    },
+    .cwd = dep->paths.work
+  };
+
 
   dep->lua.state = luaL_newstate();
   luaL_openlibs(dep->lua.state);
@@ -2565,10 +2220,7 @@ s32 spn_dep_context_build_async(void* user_data) {
 
   const c8* chunk = "require('spn').internal.build(...)";
   if (luaL_loadstring(dep->lua.state, chunk) != LUA_OK) {
-    const c8* error = lua_tostring(dep->lua.state, -1);
-    if (error) {
-      SDL_WriteIO(dep->io.out, error, sp_cstr_len(error));
-    }
+    sp_io_write_str(&dep->log, SP_LIT("Internal failure while loading build chunk"));
 
     spn_dep_context_set_build_error(dep, sp_format(
       "{:fg brightyellow} {:fg brightblack}",
@@ -2581,12 +2233,11 @@ s32 spn_dep_context_build_async(void* user_data) {
   lua_pushlightuserdata(dep->lua.state, &app.context);
   lua_pushlightuserdata(dep->lua.state, dep);
   if (lua_pcall(dep->lua.state, 2, 0, 0) != 0) {
-    const c8* error = lua_tostring(dep->lua.state, -1);
-    if (error) {
-      SDL_WriteIO(dep->io.out, error, sp_cstr_len(error));
-    }
+    sp_str_t error = sp_str_view(lua_tostring(dep->lua.state, -1));
+    if (!sp_str_valid(error)) error = SP_LIT("Build failed, but no error was returned from Lua");
 
-    spn_dep_context_set_build_error(dep, sp_str_from_cstr(error ? error : ""));
+    sp_io_write_str(&dep->log, error);
+    spn_dep_context_set_build_error(dep, error);
 
     return 0;
   }
@@ -2630,7 +2281,7 @@ spn_lock_entry_t* spn_dep_context_get_lock_entry(spn_dep_build_context_t* dep) {
 #ifdef SP_POSIX
 void spn_signal_handler(int signum) {
   if (signum == SIGINT) {
-    SDL_SetAtomicInt(&app.control, 1);
+    sp_atomic_s32_set(&app.control, 1);
     printf("\n");
     fflush(stdout);
   }
@@ -2646,7 +2297,7 @@ void spn_install_signal_handlers() {
 #else
 sp_win32_bool_t spn_windows_console_handler(sp_win32_dword_t ctrl_type) {
   if (ctrl_type == CTRL_C_EVENT || ctrl_type == CTRL_BREAK_EVENT) {
-    SDL_SetAtomicInt(&app.control, 1);
+    sp_atomic_s32_set(&app->control, 1);
     printf("\n");
     fflush(stdout);
     return TRUE;
@@ -2698,21 +2349,15 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     exit(0);
   }
 
-  SDL_SetAtomicInt(&app->control, 0);
+  sp_atomic_s32_set(&app->control, 0);
 
   spn_install_signal_handlers();
 
-#ifdef SP_WIN32
-  app->paths.storage = sp_os_normalize_path(sp_str_from_cstr(SDL_GetPrefPath(SP_NULLPTR, "spn")));
-#else
-  sp_str_t _home = sp_os_normalize_path(sp_str_from_cstr(SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "HOME")));
-  app->paths.storage = sp_os_join_path(_home, SP_LIT(".local/share/spn"));
-#endif
+  app->paths.storage = sp_os_join_path(sp_os_get_storage_path(), SP_LIT("spn"));
 
   // Install
   app->paths.executable = sp_os_get_executable_path();
-  app->paths.install = sp_os_normalize_path(sp_str_from_cstr(SDL_GetBasePath()));
-  app->paths.work = sp_os_normalize_path(sp_str_from_cstr(SDL_GetCurrentDirectory()));
+  app->paths.work = sp_os_get_cwd();
 
   // Project
   sp_str_t project_file = sp_str_lit("spn.lua");
@@ -2742,23 +2387,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   app->paths.project.lock = sp_os_join_path(app->paths.project.dir, lock_file);
 
   // Config
-#ifdef SP_WIN32
-  sp_str_t sdl_prefix = app->paths.storage;
-  app->paths.config = sp_os_join_path(sdl_prefix, SP_LIT("config"));
-#else
-  const c8* xdg_config = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "XDG_CONFIG_HOME");
-  const c8* home = SDL_GetEnvironmentVariable(SDL_GetEnvironment(), "HOME");
-
-  if (xdg_config) {
-    app->paths.config = sp_os_join_path(SP_CSTR(xdg_config), SP_LIT("spn"));
-  }
-  else if (home) {
-    app->paths.config = sp_os_join_path(SP_CSTR(home), SP_LIT(".config/spn"));
-  }
-  else {
-    SP_FATAL("No $XDG_CONFIG_HOME? No $HOME? Someone fucked up here and surely it was me.");
-  }
-#endif
+  app->paths.config = sp_os_join_path(sp_os_get_config_path(), SP_LIT("spn"));
   app->paths.user_config = sp_os_join_path(app->paths.config, SP_LIT("spn.lua"));
 
   spn_lua_init();
@@ -2800,23 +2429,17 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   }
 
   if (!sp_os_does_path_exist(app->paths.spn)) {
-    const c8* url = "https://github.com/tspader/spn.git";
+    sp_str_t url = SP_LIT("https://github.com/tspader/spn.git");
     SP_LOG(
       "Cloning recipes from {:fg brightcyan} to {:fg brightcyan}",
-      SP_FMT_CSTR(url),
+      SP_FMT_STR(url),
       SP_FMT_STR(app->paths.spn)
     );
 
-    SDL_Process* process = SPN_SH(
-      "git", "clone", "--quiet",
-      url,
-      sp_str_to_cstr(app->paths.spn)
-    );
-    spn_sh_result_t result = spn_sh_read_process(process);
-    if (result.return_code) {
+    if (!spn_git_clone(url, app->paths.spn)) {
       SP_FATAL(
         "Failed to clone spn recipe sources from {} to {}",
-        SP_FMT_CSTR(url),
+        SP_FMT_STR(url),
         SP_FMT_STR(app->paths.spn)
       );
     }
@@ -2905,12 +2528,6 @@ void spn_app_run(spn_app_t* app) {
   if (!cli->num_args || !cli->args || !cli->args[0]) {
     SP_ASSERT(false);
   }
-  else if (sp_cstr_equal("init", cli->args[0])) {
-    spn_cli_command_init(cli);
-  }
-  else if (sp_cstr_equal("add", cli->args[0])) {
-    spn_cli_command_add(cli);
-  }
   else if (sp_cstr_equal("list", cli->args[0])) {
     spn_cli_command_list(cli);
   }
@@ -2954,37 +2571,6 @@ spn_dep_spec_t* spn_project_find_dep(sp_str_t name) {
   return SP_NULLPTR;
 }
 
-bool spn_project_write(spn_project_t* project, sp_str_t path) {
-  // Create a basic spn.lua file with structured dep section
-  const c8* template_content =
-    "-- SPN Project Configuration\n"
-    "-- Dependencies: DO NOT REMOVE THIS LINE\n"
-    "local deps = {\n"
-    "  -- Add dependencies here using: spn add <package>\n"
-    "  -- Example:\n"
-    "  -- sp = {},\n"
-    "}\n"
-    "-- End Dependencies: DO NOT REMOVE THIS LINE\n"
-    "\n"
-    "return {\n"
-    "  name = \"%s\",\n"
-    "  deps = deps,\n"
-    "}\n";
-
-  const c8* name_cstr = sp_str_to_cstr(project->name);
-  sp_str_t content = sp_format(template_content, name_cstr);
-
-  SDL_IOStream* file = SDL_IOFromFile(sp_str_to_cstr(path), "w");
-  if (!file) {
-    return false;
-  }
-
-  SDL_WriteIO(file, content.data, content.len);
-  SDL_CloseIO(file);
-
-  SP_LOG("Initialized new project at {:fg cyan}", SP_FMT_STR(path));
-  return true;
-}
 
 ///////////////
 // LOCK FILE //

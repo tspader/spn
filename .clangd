@@ -5,7 +5,6 @@ CompileFlags:
     - -DSP_APP
     - -DSP_APP_IMPLEMENTATION
     - -include sp.h
-    - -include SDL3/SDL.h
 Diagnostics:
   Suppress:
     - unused-includes
