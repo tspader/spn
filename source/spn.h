@@ -1,8 +1,3 @@
-/*
-
-
-
-*/
 #ifndef SPN_H
 #define SPN_H
 
@@ -399,12 +394,27 @@ void spn_cli_command_ls(spn_cli_t* cli);
 void spn_cli_command_which(spn_cli_t* cli);
 void spn_cli_command_recipe(spn_cli_t* cli);
 void spn_cli_assert_dep_is_built(spn_dep_t* dep);
-spn_dep_t* spn_cli_assert_dep_exists(sp_str_t dep_name);
 
 
+///////
+// PROJECT //
+///////
+typedef struct {
+  sp_str_t content;
+  u32 line;
+  u32 column;
+} spn_project_parser_t;
+
+typedef struct {
+  u32 start_line;
+  u32 end_line;
+  bool found;
+} spn_deps_section_t;
+
+void spn_project_update_lockfile(void);
 
 
-/////////
+///////
 // APP //
 /////////
 typedef struct {
@@ -1761,7 +1771,180 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   }
 }
 
-/////////
+typedef struct {
+  sp_str_t deps;
+  sp_str_t locks;
+} spn_parser_sentinel_t;
+
+typedef struct {
+  u32 deps;
+  u32 locks;
+  u32 rest;
+} spn_parser_markers_t;
+
+typedef struct {
+  sp_str_t file;
+  u32 index;
+} spn_parser_t;
+
+bool spn_parser_is_done(spn_parser_t* parser);
+void spn_parser_eat(spn_parser_t* parser);
+void spn_parser_eat_n(spn_parser_t* parser, u32 n);
+c8 spn_parser_peek(spn_parser_t* parser);
+
+sp_str_t spn_parser_peek_line(spn_parser_t* parser) {
+  u32 start = parser->index;
+  u32 end = start;
+  while (end < parser->file.len && parser->file.data[end] != '\n') {
+    end++;
+  }
+  if (end < parser->file.len && parser->file.data[end] == '\n') {
+    end++;
+  }
+  return sp_str_sub(parser->file, start, end - start);
+}
+
+c8 spn_parser_peek(spn_parser_t* parser) {
+  return sp_str_at(parser->file, parser->index);
+}
+
+void spn_parser_eat_n(spn_parser_t* parser, u32 n) {
+  parser->index += n;
+}
+
+void spn_parser_eat(spn_parser_t* parser) {
+  parser->index++;
+}
+
+bool spn_parser_is_done(spn_parser_t* parser) {
+  return parser->index == parser->file.len;
+}
+
+bool spn_parser_line_is_whitespace(sp_str_t line) {
+  for (u32 i = 0; i < line.len; i++) {
+    c8 c = line.data[i];
+    if (c != ' ' && c != '\t' && c != '\r' && c != '\n' && c != '\\') {
+      return false;
+    }
+  }
+  return true;
+}
+
+void spn_parser_eat_deps(spn_parser_t* parser) {
+  sp_str_t first_line = spn_parser_peek_line(parser);
+  spn_parser_eat_n(parser, first_line.len);
+
+  while (!spn_parser_is_done(parser)) {
+    sp_str_t line = spn_parser_peek_line(parser);
+    if (sp_str_contains(line, SP_LIT("SPN_DEP"))) {
+      spn_parser_eat_n(parser, line.len);
+    }
+    else if (spn_parser_line_is_whitespace(line)) {
+      spn_parser_eat_n(parser, line.len);
+      return;
+    }
+    else {
+      SP_FATAL("expected whitespace after SPN_DEPS section");
+    }
+  }
+}
+
+void spn_parser_eat_locks(spn_parser_t* parser) {
+  sp_str_t first_line = spn_parser_peek_line(parser);
+  spn_parser_eat_n(parser, first_line.len);
+
+  while (!spn_parser_is_done(parser)) {
+    sp_str_t line = spn_parser_peek_line(parser);
+    if (sp_str_contains(line, SP_LIT("SPN_LOCK"))) {
+      spn_parser_eat_n(parser, line.len);
+    }
+    else if (spn_parser_line_is_whitespace(line)) {
+      spn_parser_eat_n(parser, line.len);
+      return;
+    }
+    else {
+      return;
+    }
+  }
+}
+
+void spn_project_update_lockfile() {
+  spn_parser_sentinel_t sentinel = {
+    .deps = SP_LIT("SPN_DEPS"),
+    .locks = SP_LIT("SPN_LOCKS"),
+  };
+
+  spn_parser_markers_t markers = SP_ZERO_INITIALIZE();
+
+  spn_parser_t parser = {
+    .file = sp_io_read_file(app.paths.project.config),
+    .index = 0,
+  };
+
+  while (!spn_parser_is_done(&parser)) {
+    c8 c = spn_parser_peek(&parser);
+    switch (c) {
+      case 'S': {
+        sp_str_t candidate = {
+          .data = parser.file.data + parser.index,
+          .len = SP_MIN(parser.file.len - parser.index, sentinel.deps.len)
+        };
+        if (sp_str_equal(candidate, sentinel.deps)) {
+          spn_parser_eat_n(&parser, sentinel.deps.len);
+          spn_parser_eat_deps(&parser);
+          markers.locks = parser.index;
+          markers.rest = parser.index;
+        }
+        else {
+          candidate.len = SP_MIN(parser.file.len - parser.index, sentinel.locks.len);
+          if (sp_str_equal(candidate, sentinel.locks)) {
+            spn_parser_eat_n(&parser, sentinel.locks.len);
+            spn_parser_eat_locks(&parser);
+            markers.rest = parser.index;
+          }
+          else {
+            spn_parser_eat(&parser);
+          }
+        }
+        break;
+      }
+      default: {
+        spn_parser_eat(&parser);
+        break;
+      }
+    }
+  }
+
+  if (markers.locks == 0) {
+    return;
+  }
+
+  sp_str_builder_t lockfile = SP_ZERO_INITIALIZE();
+  sp_str_builder_append_cstr(&lockfile, "#define SPN_LOCKS() \\\n");
+  sp_ht_for(app.deps, it) {
+    spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
+    sp_str_builder_append_fmt(&lockfile, "  SPN_LOCK({}, {}) \\\n",
+      SP_FMT_STR(dep->name),
+      SP_FMT_QSTR(dep->commits.resolved));
+  }
+  sp_str_builder_append_c8(&lockfile, '\n');
+
+  sp_str_t before = sp_str_sub(parser.file, 0, markers.locks);
+  sp_str_t after = sp_str_sub(parser.file, markers.rest, parser.file.len - markers.rest);
+  sp_str_t generated = sp_str_builder_write(&lockfile);
+
+  sp_str_builder_t output = SP_ZERO_INITIALIZE();
+  sp_str_builder_append(&output, before);
+  sp_str_builder_append(&output, generated);
+  sp_str_builder_append(&output, after);
+
+  sp_str_t final = sp_str_builder_write(&output);
+  sp_io_stream_t file = sp_io_from_file(app.paths.project.config, SP_IO_MODE_WRITE);
+  sp_io_write(&file, final.data, final.len);
+  sp_io_close(&file);
+}
+
+///////
 // CLI //
 /////////
 void spn_cli_run(spn_app_t* app) {
@@ -2233,8 +2416,8 @@ void spn_cli_command_build(spn_cli_t* cli) {
     // Check if user requested cancellation (e.g., Ctrl-C)
     if (sp_atomic_s32_get(&app.control) != 0) {
       // Signal all threads to stop
-  sp_ht_for(app.deps, it) {
-    spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
+      sp_ht_for(app.deps, it) {
+        spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
         sp_mutex_lock(&dep->mutex);
         if (!spn_dep_state_is_terminal(dep)) {
           dep->state.build = SPN_DEP_BUILD_STATE_FAILED;
@@ -2246,8 +2429,8 @@ void spn_cli_command_build(spn_cli_t* cli) {
 
     bool building = false;
 
-  sp_ht_for(app.deps, it) {
-    spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
+    sp_ht_for(app.deps, it) {
+      spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
 
       sp_mutex_lock(&dep->mutex);
       if (!spn_dep_state_is_terminal(dep)) {
@@ -2307,6 +2490,9 @@ void spn_cli_command_build(spn_cli_t* cli) {
 
     sp_ht_insert(app.lock, entry.name, entry);
   }
+
+
+  spn_project_update_lockfile();
 }
 
 
