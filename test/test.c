@@ -1,3 +1,4 @@
+#include "spn/types.h"
 #define SPN_BUILD
 
 #ifdef SPN_BUILD
@@ -12,7 +13,8 @@
 
 #define SPN_LOCKS() \
   SPN_LOCK(sp,  "aa17b02c") \
-  SPN_LOCK(tcc, "01d1b7bc")
+  SPN_LOCK(tcc, "01d1b7bc") \
+  SPN_LOCK(argparse, "HEAD")
 
 #include "spn/gen.h"
 

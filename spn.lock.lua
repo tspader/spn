@@ -6,13 +6,13 @@ return {
       name = "argparse"
     },
     sp = {
-      build_id = "19a96433",
-      commit = "5318fe70dd",
+      build_id = "dd855d63",
+      commit = "aa17b02c58",
       name = "sp"
     },
     tcc = {
-      build_id = "8df6315c",
-      commit = "01d1b7bc76",
+      build_id = "4c87a48",
+      commit = "f4e01bfcab",
       name = "tcc"
     }
   }

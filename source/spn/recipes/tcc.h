@@ -22,7 +22,7 @@ spn_recipe_info_t tcc() {
     .git = "TinyCC/tinycc",
     .kinds = {
       SPN_DEP_BUILD_KIND_STATIC,
-      SPN_DEP_BUILD_KIND_SHARED
+      SPN_DEP_BUILD_KIND_SHARED,
     },
     .libs = {
       "tcc"

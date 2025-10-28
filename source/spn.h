@@ -1,9 +1,5 @@
 /*
 
-# TO DO
-- check the kind you specified against the kinds that the recipe provides
-- if kind is none in the project, default to the first kind specified by the recipe
-
 
 
 */
@@ -177,6 +173,10 @@ typedef struct {
   sp_str_t branch;
   sp_dyn_array(sp_str_t) libs;
   spn_recipe_paths_t paths;
+  struct {
+    sp_ht(spn_dep_kind_t, bool) enabled;
+    spn_dep_kind_t fallback;
+  } kinds;
 
   spn_recipe_fn_t info;
   spn_recipe_configure_fn_t configure;
@@ -243,6 +243,7 @@ sp_str_t             spn_cache_dir_kind_to_dep_path(spn_dep_t* dep, spn_cache_di
 spn_dep_t*           spn_dep_builder_find_dep(spn_dep_builder_t* build);
 sp_str_t             spn_required_cstr(const c8* value);
 sp_str_t             spn_optional_cstr(const c8* value, const c8* fallback);
+spn_dep_kind_t       spn_opt_build_kind(spn_dep_kind_t kind, spn_recipe_t* recipe);
 spn_recipe_t*        spn_recipe_find(sp_str_t name);
 s32                  spn_recipe_sort_kernel_alphabetical(const void* a, const void* b);
 bool                 spn_dep_state_is_terminal(spn_dep_t* dep);
@@ -1182,7 +1183,7 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_t* dep) {
     }
     case SPN_DEP_BUILD_STATE_DONE: {
       status = sp_format(
-        "{} {:color green} {:color brightblack} {} {:color brightyellow} {:color brightcyan}",
+        "{} {:color green} {:color brightblack :pad 10} {} {:color brightyellow} {:color brightcyan}",
         SP_FMT_STR(name),
         SP_FMT_STR(state),
         SP_FMT_STR(dep->commits.resolved),
@@ -1327,6 +1328,22 @@ sp_str_t spn_optional_cstr(const c8* value, const c8* fallback) {
   }
 
   return sp_str_copy(result);
+}
+
+spn_dep_kind_t spn_opt_build_kind(spn_dep_kind_t kind, spn_recipe_t* recipe) {
+  if (!kind) {
+    return recipe->kinds.fallback;
+  }
+
+  if (sp_ht_getp(recipe->kinds.enabled, kind)) {
+    return kind;
+  }
+
+  SP_FATAL(
+    "Recipe {:fg brightcyan} doesn't support building as kind {:fg brightyellow}",
+    SP_FMT_STR(recipe->name),
+    SP_FMT_QSTR(spn_dep_build_kind_to_str(kind))
+  );
 }
 
 bool spn_dep_state_is_terminal(spn_dep_t* dep) {
@@ -1581,7 +1598,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   app->paths.work = sp_os_get_cwd();
 
   // Project
-  sp_str_t project_file = sp_str_lit("test/test.c");
+  sp_str_t project_file = sp_str_lit("spn.h");
 
   if (app->cli.project_file) {
     sp_str_t file_path = sp_str_view(app->cli.project_file);
@@ -1606,8 +1623,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   // Config
   app->paths.config = sp_os_join_path(sp_os_get_config_path(), SP_LIT("spn"));
-  //app->paths.user_config = sp_os_join_path(app->paths.config, SP_LIT("spn.h"));
-  app->paths.user_config = sp_os_join_path(app->paths.project.dir, SP_LIT("test/config.h"));
+  app->paths.user_config = sp_os_join_path(app->paths.config, SP_LIT("spn.h"));
 
   // Bootstrap the user config, which tells us if spn itself is installed in the usual,
   // well-known location or in somewhere the user specified (for development)
@@ -1712,6 +1728,13 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
       if (!info.libs[i]) break;
       sp_dyn_array_push(recipe->libs, sp_str_from_cstr(info.libs[i]));
     }
+
+    recipe->kinds.fallback = info.kinds[0];
+    SP_ASSERT(recipe->kinds.fallback != SPN_DEP_BUILD_KIND_NONE);
+    SP_CARR_FOR(info.kinds, i) {
+      if (info.kinds[i] == SPN_DEP_BUILD_KIND_NONE) break;
+      sp_ht_insert(recipe->kinds.enabled, info.kinds[i], true);
+    }
   }
 
   // Deps
@@ -1720,7 +1743,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
     spn_dep_t dep = SP_ZERO_INITIALIZE();
     dep.name = recipe->name;
-    dep.kind = deps[i].kind;
+    dep.kind = spn_opt_build_kind(deps[i].kind, recipe);
     dep.options = deps[i].options;
     dep.recipe = recipe;
     dep.lock = sp_str_from_cstr(deps[i].lock);
