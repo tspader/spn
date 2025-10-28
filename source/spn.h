@@ -1,3 +1,12 @@
+/*
+
+# TO DO
+- check the kind you specified against the kinds that the recipe provides
+- if kind is none in the project, default to the first kind specified by the recipe
+
+
+
+*/
 #ifndef SPN_H
 #define SPN_H
 
@@ -193,11 +202,6 @@ typedef struct {
   spn_dep_mode_t mode;
   spn_opaque_options_t options;
   sp_hash_t hash;
-  struct {
-    bool include;
-    bool vendor;
-    bool store;
-  } include;
 
   spn_recipe_t* recipe;
   sp_str_t build_id;
@@ -457,6 +461,8 @@ typedef struct {
 #define SPN_LIB_ENTRIES(APPLY) \
   APPLY(spn_copy) \
   APPLY(spn_copy_n) \
+  APPLY(spn_autoconf) \
+  APPLY(spn_make) \
 
 #define SPN_DEFINE_LIB_ENTRY(SYM) { .symbol = SP_MACRO_STR(SYM), .fn = SYM },
 
@@ -467,6 +473,40 @@ spn_lib_fn_t spn_lib [] = {
 spn_dep_t* spn_dep_builder_find_dep(spn_dep_builder_t* build) {
   return sp_ht_getp(app.deps, sp_str_view(build->name));
 }
+
+void spn_make(spn_dep_builder_t* build, spn_make_t make){
+  spn_dep_t* dep = spn_dep_builder_find_dep(build);
+
+  sp_ps_config_t ps = {
+    .command = SP_LIT("make"),
+    .args = {
+      SP_LIT("--quiet"),
+      SP_LIT("--directory"), dep->paths.work
+    },
+    .cwd = dep->paths.work
+  };
+
+  if (make.target) {
+    sp_ps_config_add_arg(&ps, sp_str_view(make.target));
+  }
+
+  sp_ps_output_t result = sp_ps_run(ps);
+}
+
+void spn_autoconf(spn_dep_builder_t* build, spn_autoconf_t config) {
+  spn_dep_t* dep = spn_dep_builder_find_dep(build);
+
+  sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
+    .command = sp_os_join_path(dep->paths.source, SP_LIT("configure")),
+    .args = {
+      sp_format("--prefix={}", SP_FMT_STR(dep->paths.store)),
+      dep->kind == SPN_DEP_BUILD_KIND_SHARED ? SP_LIT("--enable-shared") : SP_LIT("--disable-shared"),
+      dep->kind == SPN_DEP_BUILD_KIND_STATIC ? SP_LIT("--enable-static") : SP_LIT("--disable-static"),
+    },
+    .cwd = dep->paths.work
+  });
+}
+
 
 void spn_copy(spn_dep_builder_t* build, spn_cache_dir_kind_t from_kind, const c8* from_path, spn_cache_dir_kind_t to_kind, const c8* to_path) {
   spn_dep_t* dep = spn_dep_builder_find_dep(build);
@@ -763,9 +803,7 @@ sp_str_t spn_gen_build_entry_for_dep(spn_dep_t* dep, spn_gen_entry_kind_t kind, 
 
   switch (kind) {
     case SPN_GENERATOR_INCLUDE: {
-      if (dep->include.include) sp_dyn_array_push(entries, dep->paths.include);
-      if (dep->include.vendor) sp_dyn_array_push(entries, dep->paths.vendor);
-      if (dep->include.store) sp_dyn_array_push(entries, dep->paths.store);
+      sp_dyn_array_push(entries, dep->paths.include);
       break;
     }
     case SPN_GENERATOR_RPATH:
@@ -923,7 +961,7 @@ bool spn_git_fetch(sp_str_t repo) {
     },
   });
 
-  return !result.status.exit_code;
+  return result.status.exit_code;
 }
 
 u32 spn_git_num_updates(sp_str_t repo, sp_str_t from, sp_str_t to) {
@@ -935,6 +973,7 @@ u32 spn_git_num_updates(sp_str_t repo, sp_str_t from, sp_str_t to) {
       SP_LIT("--count")
     },
   });
+  SP_ASSERT_FMT(!result.status.exit_code, "Failed to get commit delta for {:fg brightcyan}", SP_FMT_STR(repo));
 
   sp_str_t trimmed = sp_str_trim_right(result.out);
   return sp_parse_u32(trimmed);
@@ -953,25 +992,26 @@ sp_str_t spn_git_get_remote_url(sp_str_t repo) {
   return sp_str_trim_right(result.out);
 }
 
-sp_str_t spn_git_get_commit(sp_str_t repo_path, sp_str_t id) {
+sp_str_t spn_git_get_commit(sp_str_t repo, sp_str_t id) {
   sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
-      SP_LIT("-C"), repo_path,
+      SP_LIT("-C"), repo,
       SP_LIT("rev-parse"),
       SP_LIT("--short=10"),
       id
     }
   });
+  SP_ASSERT_FMT(!result.status.exit_code, "Failed to get {:fg brightyellow}:{:fg brightcyan}", SP_FMT_STR(repo), SP_FMT_STR(id));
 
   return sp_str_trim_right(result.out);
 }
 
-sp_str_t spn_git_get_commit_message(sp_str_t repo_path, sp_str_t id) {
+sp_str_t spn_git_get_commit_message(sp_str_t repo, sp_str_t id) {
   sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
-      SP_LIT("-C"), repo_path,
+      SP_LIT("-C"), repo,
       SP_LIT("log"),
       SP_LIT("--format=%B"),
       SP_LIT("-n"),
@@ -979,21 +1019,23 @@ sp_str_t spn_git_get_commit_message(sp_str_t repo_path, sp_str_t id) {
       id
     }
   });
+  SP_ASSERT_FMT(!result.status.exit_code, "Failed to log {:fg brightyellow}:{:fg brightcyan}", SP_FMT_STR(repo), SP_FMT_STR(id));
 
   return sp_str_trim_right(result.out);
 }
 
-void spn_git_checkout(sp_str_t repo, sp_str_t commit) {
-  sp_ps_t process = sp_ps_create((sp_ps_config_t) {
+void spn_git_checkout(sp_str_t repo, sp_str_t id) {
+  sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
       SP_LIT("checkout"),
       SP_LIT("--quiet"),
-      commit
+      id
     }
   });
-  sp_ps_wait(&process);
+  SP_ASSERT_FMT(!result.status.exit_code, "Failed to checkout {:fg brightcyan}:{:fg brightyellow}", SP_FMT_STR(repo), SP_FMT_STR(id));
+
 }
 
 
@@ -1390,7 +1432,7 @@ s32 spn_dep_context_build_async(void* user_data) {
     SP_ASSERT(sp_os_is_directory(dep->recipe->paths.source));
   } else {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
-    spn_git_fetch(dep->recipe->paths.source);
+    SP_ASSERT(!spn_git_fetch(dep->recipe->paths.source));
   }
 
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
@@ -1593,7 +1635,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
       SP_FMT_STR(app->paths.spn)
     );
 
-    if (!spn_git_clone(url, app->paths.spn)) {
+    if (spn_git_clone(url, app->paths.spn)) {
       SP_FATAL(
         "Failed to clone spn recipe sources from {} to {}",
         SP_FMT_STR(url),
@@ -1681,7 +1723,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     dep.kind = deps[i].kind;
     dep.options = deps[i].options;
     dep.recipe = recipe;
-    //dep.lock = deps[i].lock;
+    dep.lock = sp_str_from_cstr(deps[i].lock);
     dep.mode = SPN_DEP_BUILD_MODE_DEBUG;
     sp_mutex_init(&dep.mutex, SP_MUTEX_PLAIN);
 
@@ -1899,8 +1941,8 @@ void spn_cli_command_print(spn_cli_t* cli) {
   }
 
   spn_generator_context_t gen = {
-    .kind = spn_gen_kind_from_str(SP_CSTR(command->generator)),
-    .compiler = spn_gen_compiler_from_str(SP_CSTR(command->compiler))
+    .kind = spn_gen_kind_from_str(sp_str_view(command->generator)),
+    .compiler = spn_gen_compiler_from_str(sp_str_view(command->compiler))
   };
   gen.include = spn_gen_build_entries_for_all(SPN_GENERATOR_INCLUDE, gen.compiler);
   gen.lib_include = spn_gen_build_entries_for_all(SPN_GENERATOR_LIB_INCLUDE, gen.compiler);

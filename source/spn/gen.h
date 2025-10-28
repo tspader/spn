@@ -1,16 +1,3 @@
-#ifndef SPN_GEN_H
-#define SPN_GEN_H
-
-#define _SPN_OPTIONS_T(PACKAGE) spn_##PACKAGE##_options_t
-#define SPN_OPTIONS_T(PACKAGE) _SPN_OPTIONS_T(PACKAGE)
-#define SPN_OPTION(TYPE, NAME) TYPE NAME;
-
-#define _SP_MSTR(x) #x
-#define SP_MSTR(x) _SP_MSTR(x)
-
-#endif
-
-
 
 #ifdef SPN_OPTIONS
 #include "spn/recipe.h"
@@ -33,13 +20,16 @@ typedef struct {
 #define SPN_IMPLEMENTATION
 #include "spn/recipe.h"
 
-#undef SPN_DEP
-#define SPN_DEP(DEP) spn_##DEP##_options_t DEP;
+#if !defined(SPN_LOCKS)
+#define SPN_LOCKS()
+#endif
 
 typedef struct {
   const char* name;
 
   struct {
+    #undef SPN_DEP
+    #define SPN_DEP(DEP) spn_##DEP##_options_t DEP;
     SPN_DEPS()
   } deps;
 } spn_build_t;
@@ -54,26 +44,26 @@ spn_opaque_build_t spn_build_opaque() {
   spn.num_deps = 0;
 
   #undef SPN_DEP
-  #define SPN_DEP(DEP) spn_opaque_dep_t DEP = { \
-    .name = SP_MSTR(DEP), \
-    .kind = build.deps.DEP.kind, \
-  }; \
-  DEP.options.size = sizeof(SPN_OPTIONS_T(DEP)); \
-  DEP.options.data = calloc(DEP.options.size, 1); \
-  memcpy(DEP.options.data, &build.deps.DEP, DEP.options.size); \
-
-
-  #ifdef SPN_LOCKS
-  #define SPN_LOCK(DEP, COMMIT) DEP.lock = COMMIT;
-  SPN_LOCKS()
-  // put array of { name, commit } onto opaque build
-  // put on dep
-  // all good
-  #endif
-
-  spn.deps[spn.num_deps++] = DEP;
-
+  #define SPN_DEP(DEP) \
+    spn_opaque_dep_t DEP = { \
+      .name = SP_MSTR(DEP), \
+      .kind = build.deps.DEP.kind, \
+    }; \
+    DEP.options.size = sizeof(SPN_OPTIONS_T(DEP)); \
+    DEP.options.data = calloc(DEP.options.size, 1); \
+    memcpy(DEP.options.data, &build.deps.DEP, DEP.options.size);
   SPN_DEPS()
+
+  #undef SPN_LOCK
+  #define SPN_LOCK(DEP, COMMIT) \
+    DEP.lock = COMMIT;
+  SPN_LOCKS()
+
+  #undef SPN_DEP
+  #define SPN_DEP(DEP) \
+    spn.deps[spn.num_deps++] = DEP;
+  SPN_DEPS()
+
   return spn;
 }
 

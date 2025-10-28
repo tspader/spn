@@ -26,6 +26,7 @@ typedef struct {
   } paths;
 } spn_dep_builder_t;
 
+
 typedef struct {
   spn_cache_dir_kind_t dir;
   const c8* path;
@@ -52,5 +53,21 @@ typedef struct spn_recipe_config {
 } spn_recipe_info_t;
 
 typedef spn_recipe_info_t (*spn_recipe_fn_t)(void);
+
+#define SPN_SINGLE_HEADER(DEP, GIT, HEADER) \
+  void SP_MCAT(DEP, _package)(spn_dep_builder_t build) { \
+    spn_copy(&build, SPN_DIR_SOURCE, HEADER, SPN_DIR_INCLUDE, NULL); \
+  } \
+ \
+  spn_recipe_info_t DEP() { \
+    return (spn_recipe_info_t) { \
+      .name = SP_MSTR(DEP), \
+      .git = GIT, \
+      .kinds = { \
+        SPN_DEP_BUILD_KIND_SOURCE \
+      }, \
+      .package = SP_MCAT(DEP, _package), \
+    }; \
+  }
 
 #endif
