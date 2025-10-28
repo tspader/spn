@@ -743,8 +743,6 @@ void spn_print_summary(void) {
 }
 
 s32 main(s32 num_args, const c8** args) {
-  sp_init_default();
-
   app = SP_ZERO_STRUCT(spn_test_app_t);
   sp_str_t exe_dir = sp_os_get_executable_path();
   app.paths.bin = exe_dir;
@@ -811,9 +809,9 @@ s32 main(s32 num_args, const c8** args) {
   app.pad.copy = 10;
   app.pad.cc = 10;
 
-  sp_os_directory_entry_list_t entries = sp_os_scan_directory(app.paths.examples);
-  for (u32 i = 0; i < entries.count; i++) {
-    sp_os_directory_entry_t* entry = entries.data + i;
+  sp_da(sp_os_dir_entry_t) entries = sp_os_scan_directory(app.paths.examples);
+  sp_dyn_array_for(entries, i) {
+    sp_os_dir_entry_t* entry = entries + i;
     if (!sp_os_is_directory(entry->file_path)) continue;
     if (sp_str_empty(entry->file_name)) continue;
     if (sp_str_at(entry->file_name, 0) == '.') continue;

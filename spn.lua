@@ -3,9 +3,7 @@ local project = {
   deps = {
     sp = {},
     argparse = {},
-    luajit = {
-      kind = 'static'
-    }
+    tcc = {}
   }
 }
 
