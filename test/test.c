@@ -1,6 +1,3 @@
-#include "spn/types.h"
-#define SPN_BUILD
-
 #ifdef SPN_BUILD
 #include "spn/recipes/sp.h"
 #include "spn/recipes/tcc.h"
@@ -21,10 +18,7 @@
 spn_build_t spn_build() {
   return (spn_build_t) {
     .name = "sp",
-    .deps = {
-      .sp = {},
-      .tcc = {}
-    }
+    .deps = {}
   };
 }
 #endif
