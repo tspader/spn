@@ -5,6 +5,7 @@ CompileFlags:
     - -DSP_APP
     - -DSP_APP_IMPLEMENTATION
     - -include sp.h
+    - "-I./source/build/"
 Diagnostics:
   Suppress:
     - unused-includes

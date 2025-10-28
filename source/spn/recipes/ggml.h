@@ -1,8 +1,8 @@
+#include "spn/recipe.h"
+
 #define SPN_PACKAGE ggml
 #define SPN_OPTIONS() \
   SPN_OPTION(ggml_backend_t, backend)
-
-#include "spn/types.h"
 
 typedef struct {
   bool cpu;

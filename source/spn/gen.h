@@ -25,8 +25,6 @@ typedef struct {
 #endif
 
 
-
-
 #ifdef SPN_DEPS
 #include "spn/types.h"
 #include "spn/build.h"
@@ -63,6 +61,16 @@ spn_opaque_build_t spn_build_opaque() {
   DEP.options.size = sizeof(SPN_OPTIONS_T(DEP)); \
   DEP.options.data = calloc(DEP.options.size, 1); \
   memcpy(DEP.options.data, &build.deps.DEP, DEP.options.size); \
+
+
+  #ifdef SPN_LOCKS
+  #define SPN_LOCK(DEP, COMMIT) DEP.lock = COMMIT;
+  SPN_LOCKS()
+  // put array of { name, commit } onto opaque build
+  // put on dep
+  // all good
+  #endif
+
   spn.deps[spn.num_deps++] = DEP;
 
   SPN_DEPS()
@@ -71,3 +79,4 @@ spn_opaque_build_t spn_build_opaque() {
 
 #undef SPN_DEPS
 #endif
+

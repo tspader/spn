@@ -34,6 +34,7 @@ typedef enum {
 } spn_dep_kind_t;
 
 typedef enum {
+  SPN_DIR_NONE,
   SPN_DIR_CACHE,
   SPN_DIR_STORE,
   SPN_DIR_INCLUDE,

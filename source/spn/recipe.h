@@ -53,7 +53,4 @@ typedef struct spn_recipe_config {
 
 typedef spn_recipe_info_t (*spn_recipe_fn_t)(void);
 
-void spn_recipe_copy(spn_dep_builder_t* recipe, spn_cache_dir_kind_t from, const c8* pf, spn_cache_dir_kind_t to, const c8* dt);
-void spn_recipe_copy_n(spn_dep_builder_t* recipe, spn_recipe_copy_config_t entries [16]);
 #endif
-
