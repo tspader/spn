@@ -6,10 +6,6 @@
 #include "spn/recipe.h"
 #include "spn/config.h"
 
-#define _SPN_OPTIONS_T(PACKAGE) spn_##PACKAGE##_options_t
-#define SPN_OPTIONS_T(PACKAGE) _SPN_OPTIONS_T(PACKAGE)
-#define SPN_OPTION(TYPE, NAME) TYPE NAME;
-
 #define _SP_MSTR(x) #x
 #define SP_MSTR(x) _SP_MSTR(x)
 
@@ -17,6 +13,8 @@
 #define SP_MCAT(x, y) _SP_MCAT(x, y)
 
 #define SPN_COPY_N_MAX_ENTRIES 16
+
+#define SPN_DEP(expr) you_forgot_to_escape_a_dep_with_backslash spn_static_assert;
 
 typedef struct {
   const c8* target;

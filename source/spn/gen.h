@@ -1,6 +1,7 @@
-
 #ifdef SPN_OPTIONS
-#include "spn/recipe.h"
+#define _SPN_OPTIONS_T(PACKAGE) spn_##PACKAGE##_options_t
+#define SPN_OPTIONS_T(PACKAGE) _SPN_OPTIONS_T(PACKAGE)
+#define SPN_OPTION(TYPE, NAME) TYPE NAME;
 
 typedef struct {
   spn_dep_kind_t kind;
@@ -9,6 +10,7 @@ typedef struct {
 
 #undef SPN_PACKAGE
 #undef SPN_OPTIONS
+#undef SPN_OPTION
 #endif
 
 
@@ -69,4 +71,3 @@ spn_opaque_build_t spn_build_opaque() {
 
 #undef SPN_DEPS
 #endif
-
