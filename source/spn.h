@@ -1919,10 +1919,19 @@ void spn_project_update_lockfile() {
     return;
   }
 
-  sp_str_builder_t lockfile = SP_ZERO_INITIALIZE();
-  sp_str_builder_append_cstr(&lockfile, "#define SPN_LOCKS() \\\n");
+  sp_da(sp_str_t) names = SP_ZERO_INITIALIZE();
   sp_ht_for(app.deps, it) {
     spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
+    sp_dyn_array_push(names, dep->name);
+  }
+
+  qsort(names, sp_dyn_array_size(names), sizeof(sp_str_t), sp_str_sort_kernel_alphabetical);
+
+  sp_str_builder_t lockfile = SP_ZERO_INITIALIZE();
+  sp_str_builder_append_cstr(&lockfile, "#define SPN_LOCKS() \\\n");
+  sp_dyn_array_for(names, i) {
+    sp_str_t name = names[i];
+    spn_dep_t* dep = sp_ht_getp(app.deps, name);
     sp_str_builder_append_fmt(&lockfile, "  SPN_LOCK({}, {}) \\\n",
       SP_FMT_STR(dep->name),
       SP_FMT_QSTR(dep->commits.resolved));
