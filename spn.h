@@ -7,11 +7,6 @@
   SPN_DEP(tcc) \
   SPN_DEP(argparse)
 
-#define SPN_LOCKS() \
-  SPN_LOCK(argparse, "HEAD") \
-  SPN_LOCK(sp, "aa17b02c") \
-  SPN_LOCK(tcc, "01d1b7bc") \
-
 #include "spn/gen.h"
 
 spn_build_t spn_build() {
