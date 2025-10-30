@@ -9,8 +9,6 @@
 
 #define SPN_COPY_N_MAX_ENTRIES 16
 
-#define SPN_COMPTIME_FAIL(HEADER, MESSAGE) HEADER##__##MESSAGE spn_static_assert;
-#define SPN_COMPTIME_UNDEFINED(HEADER, VAR) HEADER##__##VAR##_was_not_defined spn_static_assert;
 #define SPN_DEP(expr) you_forgot_to_escape_a_dep_with_backslash spn_static_assert;
 
 #ifndef SP_SP_H

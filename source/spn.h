@@ -78,6 +78,7 @@ typedef TCCState spn_tcc_t;
 spn_tcc_t* spn_tcc_new();
 void       spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path);
 void       spn_tcc_error(void* opaque, const char* message);
+void       spn_tcc_list_fn(void* opaque, const char* name, const void* value);
 
 
 ///////////////
@@ -333,9 +334,11 @@ typedef struct {
 
 SP_TYPEDEF_FN(spn_user_config_t, spn_user_config_fn_t);
 SP_TYPEDEF_FN(spn_opaque_build_t, spn_build_fn_t);
+SP_TYPEDEF_FN(const c8*, spn_version_fn_t);
 
 typedef struct {
   spn_build_fn_t build;
+  spn_version_fn_t version;
 } spn_project_fns_t;
 
 
@@ -1079,6 +1082,7 @@ spn_tcc_t* spn_tcc_new() {
   tcc_set_output_type(tcc, TCC_OUTPUT_MEMORY);
   tcc_add_include_path(tcc, "/home/spader/source/sp");
   tcc_add_include_path(tcc, "/home/spader/source/spn/source");
+  tcc_define_symbol(tcc, "SPN", "");
   return tcc;
 }
 
@@ -1094,6 +1098,11 @@ void spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path) {
 
 void spn_tcc_error(void* opaque, const char* message) {
   SP_LOG("{:fg brightred}", SP_FMT_CSTR(message));
+}
+
+void spn_tcc_list_fn(void* opaque, const char* name, const void* value) {
+  sp_da(sp_str_t) syms = (sp_da(sp_str_t))opaque;
+  sp_dyn_array_push(syms, sp_str_from_cstr(name));
 }
 
 #if defined(SP_ELF)
@@ -1690,6 +1699,13 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   // Compile the project and get the build struct
   spn_tcc_t* tcc = spn_tcc_new();
+  tcc_define_symbol(tcc, "SPN_PROJECT", "");
+  tcc_compile_string(tcc, "const char* spn_version() { return \"foo\"; }");
+  tcc_relocate(tcc);
+
+  app->fns.version = tcc_get_symbol(tcc, "spn_version");
+  const c8* version = app->fns.version();
+
   tcc_define_symbol(tcc, "SPN_BUILD", "");
   spn_tcc_register_libspn(tcc);
   tcc_add_file(tcc, sp_str_to_cstr(app->paths.project.file));

@@ -1,18 +1,19 @@
-#define SPN_PROJECT
-#define SPN_BUILD
-
+#ifdef SPN
 #ifdef SPN_PROJECT
-#define SPN_DEPS() \
-  SPN_DEP(sp) \
-  SPN_DEP(tcc) \
-  SPN_DEP(argparse)
+#define SPN_VERSION() 100
+#define SPN_COMMIT() "85d0ea3af1a0"
 
-#define SPN_VERSION 100
+#define SPN_DEPS()  \
+  SPN_DEP(sp)       \
+  SPN_DEP(tcc)      \
+  SPN_DEP(argparse)
 
 #define SPN_LOCKS() \
   SPN_LOCK(argparse, "HEAD") \
   SPN_LOCK(sp, "aa17b02c") \
   SPN_LOCK(tcc, "01d1b7bc")
+
+#include "spn/gen/project.h"
 #endif
 
 #ifdef SPN_BUILD
@@ -25,12 +26,17 @@
 spn_build_t spn_build() {
   return (spn_build_t) {
     .name = "sp",
-    .deps = {}
+    .deps = {
+      .sp = {
+        .kind = SPN_DEP_BUILD_KIND_SOURCE
+      }
+    }
   };
 }
 #endif
+#endif
 
-#ifndef SPN_BUILD
+#ifndef SPN
 
 #define SP_IMPLEMENTATION
 #include "sp.h"

@@ -1,7 +1,13 @@
 #define SPN_IMPLEMENTATION
 
+#include "spn/spn.h"
+
 #if !defined(SPN_LOCKS)
 #define SPN_LOCKS()
+#endif
+
+#if !defined(SPN_DEPS)
+#define SPN_DEPS()
 #endif
 
 typedef struct {
