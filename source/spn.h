@@ -1699,13 +1699,13 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   // Compile the project and get the build struct
   spn_tcc_t* tcc = spn_tcc_new();
-  tcc_define_symbol(tcc, "SPN_PROJECT", "");
-  tcc_compile_string(tcc, "const char* spn_version() { return \"foo\"; }");
+  tcc_add_file(tcc, sp_str_to_cstr(app->paths.project.file));
   tcc_relocate(tcc);
 
   app->fns.version = tcc_get_symbol(tcc, "spn_version");
-  const c8* version = app->fns.version();
+  sp_str_from_cstr(app->fns.version());
 
+  tcc = spn_tcc_new();
   tcc_define_symbol(tcc, "SPN_BUILD", "");
   spn_tcc_register_libspn(tcc);
   tcc_add_file(tcc, sp_str_to_cstr(app->paths.project.file));
@@ -2308,7 +2308,7 @@ void spn_cli_command_build(spn_cli_t* cli) {
   }
 
   sp_io_stream_t io = sp_io_from_file(app.paths.project.lock, SP_IO_MODE_WRITE);
-  sp_io_write_str(&io, SP_LIT("#define SP_LOCKS() \\"));
+  sp_io_write_str(&io, SP_LIT("#define SP_LOCKS() \\\n"));
 
   sp_ht_for(app.deps, it) {
     spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
@@ -2319,12 +2319,11 @@ void spn_cli_command_build(spn_cli_t* cli) {
     entry.commit = spn_git_get_commit(dep->recipe->paths.source, SPN_GIT_HEAD);
     entry.build_id = sp_str_copy(dep->build_id);
 
-    sp_io_write_str(&io, sp_format("SP_LOCK({}, {}) \\\n", SP_FMT_STR(entry.name), SP_FMT_QSTR(entry.commit)));
+    sp_io_write_str(&io, sp_str_lit("  "));
+    sp_io_write_str(&io, sp_format("SP_LOCK({}, {}) \\", SP_FMT_STR(entry.name), SP_FMT_QSTR(entry.commit)));
+    sp_io_write_str(&io, sp_str_lit("\n"));
   }
   sp_io_close(&io);
-
-
-
 }
 
 

@@ -6,9 +6,10 @@
   SPN_DEP(tcc) \
   SPN_DEP(argparse)
 
-const char* spn_version() {
-  return "d";
-}
+#define SPN_LOCKS()
+
+#include "spn/gen/project.h"
+
 #ifdef SPN_BUILD
 #include "spn/recipes/sp.h"
 #include "spn/recipes/tcc.h"
