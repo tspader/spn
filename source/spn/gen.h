@@ -1,26 +1,4 @@
-#ifdef SPN_OPTIONS
-#define _SPN_OPTIONS_T(PACKAGE) spn_##PACKAGE##_options_t
-#define SPN_OPTIONS_T(PACKAGE) _SPN_OPTIONS_T(PACKAGE)
-#define SPN_OPTION(TYPE, NAME) TYPE NAME;
-
-typedef struct {
-  spn_dep_kind_t kind;
-  SPN_OPTIONS()
-} SPN_OPTIONS_T(SPN_PACKAGE);
-
-#undef SPN_PACKAGE
-#undef SPN_OPTIONS
-#undef SPN_OPTION
-#endif
-
-
-#ifdef SPN_DEPS
-#include "spn/types.h"
-#include "spn/build.h"
-#include "spn/recipe.h"
-
 #define SPN_IMPLEMENTATION
-#include "spn/recipe.h"
 
 #if !defined(SPN_LOCKS)
 #define SPN_LOCKS()
@@ -70,4 +48,3 @@ spn_opaque_build_t spn_build_opaque() {
 }
 
 #undef SPN_DEPS
-#endif

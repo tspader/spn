@@ -1,17 +1,24 @@
-#ifdef SPN_BUILD
-#include "spn/recipes/sp.h"
-#include "spn/recipes/tcc.h"
-#include "spn/recipes/argparse.h"
+#define SPN_PROJECT
+#define SPN_BUILD
 
+#ifdef SPN_PROJECT
 #define SPN_DEPS() \
   SPN_DEP(sp) \
   SPN_DEP(tcc) \
   SPN_DEP(argparse)
 
+#define SPN_VERSION 100
+
 #define SPN_LOCKS() \
   SPN_LOCK(argparse, "HEAD") \
   SPN_LOCK(sp, "aa17b02c") \
   SPN_LOCK(tcc, "01d1b7bc")
+#endif
+
+#ifdef SPN_BUILD
+#include "spn/recipes/sp.h"
+#include "spn/recipes/tcc.h"
+#include "spn/recipes/argparse.h"
 
 #include "spn/gen.h"
 

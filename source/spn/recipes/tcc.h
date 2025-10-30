@@ -3,7 +3,7 @@
 #define SPN_PACKAGE tcc
 #define SPN_OPTIONS()
 
-#include "spn/gen.h"
+#include "spn/gen/recipe.h"
 
 void tcc_build(spn_dep_builder_t build) {
   spn_autoconf(&build, (spn_autoconf_t){});

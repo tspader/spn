@@ -1,4 +1,4 @@
-#include "spn/recipe.h"
+#include "spn/spn.h"
 
 #define SPN_PACKAGE ggml
 #define SPN_OPTIONS() \
@@ -10,7 +10,7 @@ typedef struct {
   bool metal;
 } ggml_backend_t;
 
-#include "spn/gen.h"
+#include "spn/gen/recipe.h"
 
 void ggml_configure(spn_dep_builder_t build) {
 }
