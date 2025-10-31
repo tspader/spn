@@ -142,10 +142,6 @@ typedef struct {
   sp_str_t rpath;
 } spn_generator_context_t;
 
-spn_generator_kind_t spn_gen_kind_from_str(sp_str_t str);
-spn_gen_entry_kind_t spn_gen_entry_from_str(sp_str_t str);
-spn_gen_compiler_t   spn_gen_compiler_from_str(sp_str_t str);
-sp_str_t             spn_gen_format_entry_for_compiler(sp_str_t entry, spn_gen_entry_kind_t kind, spn_gen_compiler_t compiler);
 
 //////////////////
 // DEPENDENCIES //
@@ -256,21 +252,29 @@ typedef struct {
 
 typedef sp_ht(sp_str_t, spn_lock_entry_t) spn_lock_file_t;
 
+spn_generator_kind_t spn_gen_kind_from_str(sp_str_t str);
+spn_gen_entry_kind_t spn_gen_entry_from_str(sp_str_t str);
+spn_gen_compiler_t   spn_gen_compiler_from_str(sp_str_t str);
+sp_str_t             spn_gen_format_entry_for_compiler(sp_str_t entry, spn_gen_entry_kind_t kind, spn_gen_compiler_t compiler);
+sp_str_t             spn_gen_build_entry_for_dep(spn_dep_t* dep, spn_gen_entry_kind_t kind, spn_gen_compiler_t c);
+sp_str_t             spn_gen_build_entries_for_dep(spn_dep_t* dep, spn_gen_compiler_t c);
+sp_str_t             spn_gen_build_entries_for_all(spn_gen_entry_kind_t kind, spn_gen_compiler_t c);
+sp_str_t             spn_print_system_deps_only(spn_gen_compiler_t compiler);
+sp_str_t             spn_print_deps_only(spn_gen_entry_kind_t kind, spn_gen_compiler_t compiler);
+
+sp_str_t             spn_opt_cstr_required(const c8* value);
+sp_str_t             spn_opt_cstr_optional(const c8* value, const c8* fallback);
+spn_dep_kind_t       spn_opt_build_kind(spn_dep_kind_t kind, spn_recipe_t* recipe);
+
 spn_cache_dir_kind_t spn_cache_dir_kind_from_str(sp_str_t str);
 sp_str_t             spn_cache_dir_kind_to_dep_path(spn_dep_t* dep, spn_cache_dir_kind_t kind);
-spn_dep_t*           spn_dep_builder_find_dep(spn_dep_builder_t* build);
-sp_str_t             spn_required_cstr(const c8* value);
-sp_str_t             spn_optional_cstr(const c8* value, const c8* fallback);
-spn_dep_kind_t       spn_opt_build_kind(spn_dep_kind_t kind, spn_recipe_t* recipe);
-spn_recipe_t*        spn_recipe_find(sp_str_t name);
-s32                  spn_sort_kernel_dep_ptr(const void* a, const void* b);
-bool                 spn_dep_state_is_terminal(spn_dep_t* dep);
 spn_dep_mode_t       spn_dep_build_mode_from_str(sp_str_t str);
 sp_str_t             spn_dep_build_mode_to_str(spn_dep_mode_t mode);
 spn_dep_kind_t       spn_dep_build_kind_from_str(sp_str_t str);
 sp_str_t             spn_dep_build_kind_to_str(spn_dep_kind_t kind);
-sp_os_lib_kind_t     spn_dep_kind_to_os_lib_kind(spn_dep_kind_t kind);
 sp_str_t             spn_dep_state_to_str(spn_dep_build_state_t state);
+bool                 spn_dep_state_is_terminal(spn_dep_t* dep);
+sp_os_lib_kind_t     spn_dep_kind_to_os_lib_kind(spn_dep_kind_t kind);
 void                 spn_dep_context_init(spn_dep_t* dep, sp_str_t name);
 s32                  spn_dep_context_add(void* user_data);
 s32                  spn_dep_context_build(void* user_data);
@@ -283,12 +287,11 @@ void                 spn_dep_context_set_build_state(spn_dep_t* dep, spn_dep_bui
 void                 spn_dep_context_set_build_error(spn_dep_t* dep, sp_str_t error);
 sp_str_t             spn_dep_context_find_latest_commit(spn_dep_t* dep);
 bool                 spn_dep_context_is_binary(spn_dep_t* dep);
-sp_str_t             spn_gen_build_entry_for_dep(spn_dep_t* dep, spn_gen_entry_kind_t kind, spn_gen_compiler_t c);
-sp_str_t             spn_gen_build_entries_for_dep(spn_dep_t* dep, spn_gen_compiler_t c);
-sp_str_t             spn_gen_build_entries_for_all(spn_gen_entry_kind_t kind, spn_gen_compiler_t c);
-sp_str_t             spn_print_system_deps_only(spn_gen_compiler_t compiler);
-sp_str_t             spn_print_deps_only(spn_gen_entry_kind_t kind, spn_gen_compiler_t compiler);
-void spn_update_lock_file();
+spn_dep_t*           spn_dep_builder_find_dep(spn_dep_builder_t* build);
+spn_recipe_t*        spn_recipe_find(sp_str_t name);
+s32                  spn_sort_kernel_dep_ptr(const void* a, const void* b);
+
+void                 spn_update_lock_file();
 
 
 /////////
@@ -312,7 +315,7 @@ typedef enum {
 } spn_tui_mode_t;
 
 spn_tui_mode_t spn_output_mode_from_str(sp_str_t str);
-sp_str_t          spn_output_mode_to_str(spn_tui_mode_t mode);
+sp_str_t       spn_output_mode_to_str(spn_tui_mode_t mode);
 
 typedef struct {
   spn_tui_mode_t mode;
@@ -1485,12 +1488,12 @@ void spn_update_lock_file() {
 ///////////
 // BUILD //
 ///////////
-sp_str_t spn_required_cstr(const c8* value) {
+sp_str_t spn_opt_cstr_required(const c8* value) {
   SP_ASSERT(value);
   return sp_str_from_cstr(value);
 }
 
-sp_str_t spn_optional_cstr(const c8* value, const c8* fallback) {
+sp_str_t spn_opt_cstr_optional(const c8* value, const c8* fallback) {
   sp_str_t result = sp_str_view(value);
   if (sp_str_empty(result)) {
     return sp_str_from_cstr(fallback);
@@ -1940,9 +1943,9 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     SP_ASSERT(recipe->info);
 
     spn_recipe_info_t info = recipe->info();
-    recipe->name = spn_required_cstr(info.name);
-    recipe->git = spn_required_cstr(info.git);
-    recipe->branch = spn_optional_cstr(info.branch, "HEAD");
+    recipe->name = spn_opt_cstr_required(info.name);
+    recipe->git = spn_opt_cstr_required(info.git);
+    recipe->branch = spn_opt_cstr_optional(info.branch, "HEAD");
     recipe->build = info.build;
     recipe->configure = info.configure;
     recipe->package = info.package;
