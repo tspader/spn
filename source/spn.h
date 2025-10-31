@@ -473,6 +473,7 @@ typedef struct {
   spn_tui_t tui;
   sp_atomic_s32 control;
   spn_tcc_t* tcc;
+  sp_str_t tcc_error;
 
   spn_user_config_t user_config;
   spn_version_info_t version;
@@ -1132,7 +1133,6 @@ spn_tcc_t* spn_tcc_new() {
   spn_tcc_t* tcc = tcc_new();
   tcc_set_error_func(tcc, SP_NULLPTR, spn_tcc_error);
   tcc_set_output_type(tcc, TCC_OUTPUT_MEMORY);
-  tcc_add_include_path(tcc, "/home/spader/source/sp");
   tcc_add_include_path(tcc, "/home/spader/source/spn/source");
   tcc_add_include_path(tcc, "/Users/spader/source/scratch/spn/source");
   sp_dyn_array_for(app.search, it) {
@@ -1153,7 +1153,7 @@ void spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path) {
 }
 
 void spn_tcc_error(void* opaque, const char* message) {
-  SP_LOG("{:fg brightred}", SP_FMT_CSTR(message));
+  app.tcc_error = sp_str_from_cstr(message);
 }
 
 void spn_tcc_list_fn(void* opaque, const char* name, const void* value) {
@@ -1966,7 +1966,17 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   // Compile without SPN_BUILD so we can determine the spn version
   spn_tcc_t* tcc = spn_tcc_new();
-  tcc_add_file(tcc, sp_str_to_cstr(app->paths.project.spn_h));
+  if (tcc_add_file(tcc, sp_str_to_cstr(app->paths.project.spn_h))) {
+    SP_FATAL(
+      "{:fg brightcyan} is malformed: {:fg brightblack}",
+      SP_FMT_STR(app->paths.project.spn_h),
+      SP_FMT_STR(app->tcc_error)
+    );
+  }
+
+  if (tcc_add_file(tcc, "spn/gen/project.h")) {
+    SP_FATAL("{}", SP_FMT_STR(app->tcc_error));
+  }
   tcc_relocate(tcc);
 
   app->fns.version = tcc_get_symbol(tcc, "spn_version");
@@ -1976,7 +1986,13 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   tcc = spn_tcc_new();
   tcc_define_symbol(tcc, "SPN_BUILD", "");
   spn_tcc_register_libspn(tcc);
-  tcc_add_file(tcc, sp_str_to_cstr(app->paths.project.spn_h));
+  if (tcc_add_file(tcc, sp_str_to_cstr(app->paths.project.spn_h))) {
+    SP_FATAL(
+      "Failed to compile {:fg brightcyan}: {:fg brightblack}",
+      SP_FMT_STR(app->paths.project.spn_h),
+      SP_FMT_STR(app->tcc_error)
+    );
+  }
   tcc_relocate(tcc);
 
   app->fns.build = tcc_get_symbol(tcc, "spn_build_opaque");
