@@ -2,17 +2,21 @@
 #define SPN_COMMIT "85d0ea3af1a0"
 
 #define SPN_DEPS() \
-  SPN_DEP(sp)
+  SPN_DEP(argparse) \
+  SPN_DEP(sp) \
+  SPN_DEP(tcc)
 
 #define SPN_LOCKS() \
-  SPN_LOCK(sp, "5e0f6593f7")
+  SPN_LOCK(argparse, "") \
+  SPN_LOCK(sp, "") \
+  SPN_LOCK(tcc, "")
 
 #include "spn/gen/project.h"
 
 #ifdef SPN_BUILD
 #include "spn/recipes/sp.h"
-//#include "spn/recipes/tcc.h"
-//#include "spn/recipes/argparse.h"
+#include "spn/recipes/tcc.h"
+#include "spn/recipes/argparse.h"
 
 #include "spn/gen.h"
 

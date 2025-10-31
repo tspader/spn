@@ -51,8 +51,18 @@
   #include <string.h>
 #endif
 
+#define SPN_VERSION 1
+#define SPN_COMMIT "00c0fa98"
+
 #define SP_FMT_QSTR(STR) SP_FMT_QUOTED_STR(STR)
 #define SP_FMT_QCSTR(CSTR) SP_FMT_QUOTED_STR(sp_str_view(CSTR))
+
+sp_str_t sp_str_map_kernel_colorize(sp_str_map_context_t* context) {
+  sp_str_t id = *(sp_str_t*)context->user_data;
+  sp_str_t ansi = sp_format_color_id_to_ansi_fg(id);
+  return sp_format("{}{}{}", SP_FMT_STR(ansi), SP_FMT_STR(context->str), SP_FMT_CSTR(SP_ANSI_RESET));
+}
+
 
 /////////
 // GIT //
@@ -123,14 +133,13 @@ spn_gen_entry_kind_t spn_gen_entry_from_str(sp_str_t str);
 spn_gen_compiler_t   spn_gen_compiler_from_str(sp_str_t str);
 sp_str_t             spn_gen_format_entry_for_compiler(sp_str_t entry, spn_gen_entry_kind_t kind, spn_gen_compiler_t compiler);
 
-
 //////////////////
 // DEPENDENCIES //
 //////////////////
 typedef enum {
-  SPN_DEP_REPO_STATE_UNINITIALIZED,
-  SPN_DEP_REPO_STATE_STALE,
-  SPN_DEP_REPO_STATE_CLEAN,
+  SPN_DEP_REPO_STATE_NOT_CLONED,
+  SPN_DEP_REPO_STATE_UNLOCKED,
+  SPN_DEP_REPO_STATE_LOCKED,
 } spn_dep_repo_state_t;
 
 typedef enum {
@@ -154,7 +163,6 @@ typedef struct {
 
 typedef struct {
   spn_dep_build_state_t build;
-  spn_dep_repo_state_t repo;
 } spn_dep_state_t;
 
 // Specific to the recipe
@@ -241,8 +249,7 @@ sp_str_t             spn_required_cstr(const c8* value);
 sp_str_t             spn_optional_cstr(const c8* value, const c8* fallback);
 spn_dep_kind_t       spn_opt_build_kind(spn_dep_kind_t kind, spn_recipe_t* recipe);
 spn_recipe_t*        spn_recipe_find(sp_str_t name);
-s32                  spn_recipe_sort_kernel_alphabetical(const void* a, const void* b);
-s32                  spn_lock_sort_kernel_alphabetical(const void* a, const void* b);
+s32                  spn_sort_kernel_dep_ptr(const void* a, const void* b);
 bool                 spn_dep_state_is_terminal(spn_dep_t* dep);
 spn_dep_mode_t       spn_dep_build_mode_from_str(sp_str_t str);
 sp_str_t             spn_dep_build_mode_to_str(spn_dep_mode_t mode);
@@ -250,7 +257,7 @@ spn_dep_kind_t       spn_dep_build_kind_from_str(sp_str_t str);
 sp_str_t             spn_dep_build_kind_to_str(spn_dep_kind_t kind);
 sp_os_lib_kind_t     spn_dep_kind_to_os_lib_kind(spn_dep_kind_t kind);
 sp_str_t             spn_dep_state_to_str(spn_dep_build_state_t state);
-void                 spn_dep_context_prepare(spn_dep_t* context, sp_str_t commit);
+void                 spn_dep_context_prepare(spn_dep_t* context);
 bool                 spn_dep_context_is_build_stamped(spn_dep_t* context);
 void                 spn_dep_context_set_build_state(spn_dep_t* dep, spn_dep_build_state_t state);
 void                 spn_dep_context_set_build_error(spn_dep_t* dep, sp_str_t error);
@@ -262,6 +269,7 @@ sp_str_t             spn_gen_build_entries_for_dep(spn_dep_t* dep, spn_gen_compi
 sp_str_t             spn_gen_build_entries_for_all(spn_gen_entry_kind_t kind, spn_gen_compiler_t c);
 sp_str_t             spn_print_system_deps_only(spn_gen_compiler_t compiler);
 sp_str_t             spn_print_deps_only(spn_gen_entry_kind_t kind, spn_gen_compiler_t compiler);
+void spn_update_lock_file();
 
 
 /////////
@@ -346,7 +354,7 @@ typedef struct {
 // CLI //
 /////////
 typedef struct {
-  sp_str_t package;
+  const c8* package;
 } spn_cli_add_t;
 
 typedef struct {
@@ -388,12 +396,16 @@ typedef struct {
   spn_cli_recipe_t recipe;
 } spn_cli_t;
 
-void spn_cli_command_list(spn_cli_t* cli);
-void spn_cli_command_nuke(spn_cli_t* cli);
 void spn_cli_command_clean(spn_cli_t* cli);
+
 void spn_cli_command_build(spn_cli_t* cli);
-void spn_cli_command_copy(spn_cli_t* cli);
 void spn_cli_command_print(spn_cli_t* cli);
+void spn_cli_command_copy(spn_cli_t* cli);
+
+void spn_cli_command_init(spn_cli_t* cli);
+void spn_cli_command_add(spn_cli_t* cli);
+
+void spn_cli_command_list(spn_cli_t* cli);
 void spn_cli_command_ls(spn_cli_t* cli);
 void spn_cli_command_which(spn_cli_t* cli);
 void spn_cli_command_recipe(spn_cli_t* cli);
@@ -1024,6 +1036,9 @@ sp_str_t spn_git_get_commit_message(sp_str_t repo, sp_str_t id) {
 }
 
 void spn_git_checkout(sp_str_t repo, sp_str_t id) {
+  SP_ASSERT(!sp_str_empty(id));
+  SP_ASSERT(sp_os_does_path_exist(repo));
+
   sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
@@ -1034,7 +1049,6 @@ void spn_git_checkout(sp_str_t repo, sp_str_t id) {
     }
   });
   SP_ASSERT_FMT(!result.status.exit_code, "Failed to checkout {:fg brightcyan}:{:fg brightyellow}", SP_FMT_STR(repo), SP_FMT_STR(id));
-
 }
 
 
@@ -1083,6 +1097,9 @@ spn_tcc_t* spn_tcc_new() {
   tcc_set_output_type(tcc, TCC_OUTPUT_MEMORY);
   tcc_add_include_path(tcc, "/home/spader/source/sp");
   tcc_add_include_path(tcc, "/home/spader/source/spn/source");
+  sp_dyn_array_for(app.search, it) {
+    tcc_add_include_path(tcc, sp_str_to_cstr(app.search[it]));
+  }
   tcc_define_symbol(tcc, "SPN", "");
   return tcc;
 }
@@ -1316,6 +1333,68 @@ void spn_tui_update(spn_tui_t* tui) {
   }
 }
 
+void spn_update_lock_file() {
+  sp_str_t haystack = sp_io_read_file(app.paths.project.spn_h);
+  sp_str_t needle = sp_str_lit("#include \"spn/gen/project.h\"");
+  sp_str_t mark = SP_ZERO_INITIALIZE();
+  while (true) {
+    switch (sp_str_at(haystack, 0)) {
+      case '#': {
+        if (sp_str_starts_with(haystack, needle)) {
+          SP_ASSERT(haystack.len >= needle.len);
+          mark = sp_str_sub(haystack, needle.len, haystack.len - needle.len);
+          break;
+        }
+      }
+      default: {
+        haystack.data++;
+        haystack.len--;
+        break;
+      }
+    }
+
+    if (sp_str_empty(haystack)) break;
+    if (sp_str_valid(mark)) break;
+  }
+
+  SP_ASSERT(sp_str_valid(mark));
+
+  sp_io_stream_t io = sp_io_from_file(app.paths.project.spn_h, SP_IO_MODE_WRITE);
+  sp_io_write_str(&io, sp_format("#define SPN_VERSION {}\n", SP_FMT_U32(app.version.version)));
+  sp_io_write_str(&io, sp_format("#define SPN_COMMIT {}\n", SP_FMT_QCSTR(app.version.commit)));
+  sp_io_write_cstr(&io, "\n");
+
+  sp_da(spn_dep_t*) sorted = SP_NULLPTR;
+  sp_ht_for(app.deps, it) {
+    spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
+    sp_dyn_array_push(sorted, dep);
+  }
+  qsort(sorted, sp_dyn_array_size(sorted), sizeof(spn_dep_t*), spn_sort_kernel_dep_ptr);
+
+  sp_da(sp_str_t) deps = SP_NULLPTR;
+  sp_dyn_array_push(deps, SP_LIT("#define SPN_DEPS()"));
+
+  sp_da(sp_str_t) locks = SP_NULLPTR;
+  sp_dyn_array_push(locks, SP_LIT("#define SPN_LOCKS()"));
+
+  sp_dyn_array_for(sorted, it) {
+    spn_dep_t* dep = sorted[it];
+    sp_dyn_array_push(deps, sp_format("  SPN_DEP({})", SP_FMT_STR(dep->name)));
+    sp_dyn_array_push(locks, sp_format("  SPN_LOCK({}, {})", SP_FMT_STR(dep->name), SP_FMT_QSTR(dep->commits.resolved)));
+  }
+
+  sp_io_write_str(&io, sp_str_join_n(deps, sp_dyn_array_size(deps), SP_LIT(" \\\n")));
+  sp_io_write_cstr(&io, "\n\n");
+
+  sp_io_write_str(&io, sp_str_join_n(locks, sp_dyn_array_size(locks), SP_LIT(" \\\n")));
+  sp_io_write_cstr(&io, "\n\n");
+
+  sp_io_write_str(&io, needle);
+
+  sp_io_write_str(&io, mark);
+
+  sp_io_close(&io);
+}
 
 ///////////
 // BUILD //
@@ -1374,10 +1453,10 @@ spn_recipe_t* spn_recipe_find(sp_str_t name) {
   return sp_ht_getp(app.recipes, name);
 }
 
-s32 spn_recipe_sort_kernel_alphabetical(const void* a, const void* b) {
-  spn_recipe_t* da = (spn_recipe_t*)a;
-  spn_recipe_t* db = (spn_recipe_t*)b;
-  return sp_str_sort_kernel_alphabetical(&da->name, &db->name);
+s32 spn_sort_kernel_dep_ptr(const void* a, const void* b) {
+  spn_dep_t* da = *(spn_dep_t**)a;
+  spn_dep_t* db = *(spn_dep_t**)b;
+  return sp_str_compare_alphabetical(da->name, db->name);
 }
 
 sp_str_t spn_dep_context_find_latest_commit(spn_dep_t* dep) {
@@ -1394,24 +1473,8 @@ bool spn_dep_context_is_build_stamped(spn_dep_t* context) {
   return sp_os_does_path_exist(context->paths.stamp);
 }
 
-void spn_dep_context_prepare(spn_dep_t* dep, sp_str_t commit) {
-  SP_ASSERT(!sp_str_empty(commit));
-
+void spn_dep_context_prepare(spn_dep_t* dep) {
   sp_mutex_lock(&dep->mutex);
-
-  dep->commits.resolved = commit;
-
-  if (sp_os_does_path_exist(dep->recipe->paths.source)) {
-    dep->commits.message = spn_git_get_commit_message(dep->recipe->paths.source, dep->commits.resolved);
-    dep->commits.message = sp_str_truncate(dep->commits.message, 32, SP_LIT("..."));
-    dep->commits.message = sp_str_replace_c8(dep->commits.message, '\n', ' ');
-    dep->commits.message = sp_str_pad(dep->commits.message, 32);
-    dep->commits.delta = spn_git_num_updates(dep->recipe->paths.source, dep->commits.resolved, spn_dep_context_find_latest_commit(dep));
-  }
-  else {
-    dep->commits.message = SP_ZERO_STRUCT(sp_str_t);
-    dep->commits.delta = 0;
-  }
 
   sp_dyn_array(sp_hash_t) hashes = SP_NULLPTR;
   sp_dyn_array_push(hashes, sp_hash_str(dep->commits.resolved));
@@ -1429,14 +1492,11 @@ void spn_dep_context_prepare(spn_dep_t* dep, sp_str_t commit) {
   dep->paths.vendor = sp_os_join_path(dep->paths.store, SP_LIT("vendor"));
   dep->paths.log = sp_os_join_path(dep->paths.work, SP_LIT("spn.log"));
   dep->paths.stamp = sp_os_join_path(dep->paths.store, SP_LIT("spn.stamp"));
+
   sp_mutex_unlock(&dep->mutex);
 }
 
-s32 spn_dep_context_build_async(void* user_data) {
-  spn_dep_t* dep = (spn_dep_t*)user_data;
-
-  sp_str_t resolved;
-
+s32 spn_dep_context_sync_remote(spn_dep_t* dep) {
   if (!sp_os_does_path_exist(dep->recipe->paths.source)) {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
 
@@ -1451,23 +1511,43 @@ s32 spn_dep_context_build_async(void* user_data) {
     }
 
     SP_ASSERT(sp_os_is_directory(dep->recipe->paths.source));
-  } else {
+  }
+  else {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
     SP_ASSERT(!spn_git_fetch(dep->recipe->paths.source));
   }
+}
 
-  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
-  if (dep->update || sp_str_empty(dep->lock)){
-    resolved = spn_dep_context_find_latest_commit(dep);
+s32 spn_dep_context_resolve_commit(spn_dep_t* dep) {
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PREPARING);
+  sp_mutex_lock(&dep->mutex);
+
+  if (dep->update || sp_str_empty(dep->lock)) {
+    dep->commits.resolved = spn_dep_context_find_latest_commit(dep);
   }
   else {
-    resolved = dep->lock;
+    dep->commits.resolved = dep->lock;
   }
 
-  spn_git_checkout(dep->recipe->paths.source, resolved);
+  dep->commits.message = spn_git_get_commit_message(dep->recipe->paths.source, dep->commits.resolved);
+  dep->commits.message = sp_str_truncate(dep->commits.message, 32, SP_LIT("..."));
+  dep->commits.message = sp_str_replace_c8(dep->commits.message, '\n', ' ');
+  dep->commits.message = sp_str_pad(dep->commits.message, 32);
+  dep->commits.delta = spn_git_num_updates(dep->recipe->paths.source, dep->commits.resolved, spn_dep_context_find_latest_commit(dep));
 
-  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PREPARING);
-  spn_dep_context_prepare(dep, resolved);
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
+  spn_git_checkout(dep->recipe->paths.source, dep->commits.resolved);
+
+  sp_mutex_unlock(&dep->mutex);
+}
+
+
+s32 spn_dep_context_build_async(void* user_data) {
+  spn_dep_t* dep = (spn_dep_t*)user_data;
+
+  spn_dep_context_sync_remote(dep);
+  spn_dep_context_resolve_commit(dep);
+  spn_dep_context_prepare(dep);
 
   if (spn_dep_context_is_build_stamped(dep)) {
     if (!dep->force) {
@@ -1587,6 +1667,11 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   sp_atomic_s32_set(&app->control, 0);
 
+  app->version = (spn_version_info_t) {
+    .version = SPN_VERSION,
+    .commit = SPN_COMMIT
+  };
+
   spn_install_signal_handlers();
 
   sp_ht_set_fns(app->recipes, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
@@ -1698,7 +1783,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     }
   }
 
-  // Compile the project and get the build struct
+  // Compile without SPN_BUILD so we can determine the spn version
   spn_tcc_t* tcc = spn_tcc_new();
   tcc_add_file(tcc, sp_str_to_cstr(app->paths.project.spn_h));
   tcc_relocate(tcc);
@@ -1706,6 +1791,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   app->fns.version = tcc_get_symbol(tcc, "spn_version");
   app->version = app->fns.version();
 
+  // Compile the build function using the right spn headers
   tcc = spn_tcc_new();
   tcc_define_symbol(tcc, "SPN_BUILD", "");
   spn_tcc_register_libspn(tcc);
@@ -1785,9 +1871,6 @@ void spn_cli_run(spn_app_t* app) {
   else if (sp_cstr_equal("list", cli->args[0])) {
     spn_cli_command_list(cli);
   }
-  else if (sp_cstr_equal("nuke", cli->args[0])) {
-    spn_cli_command_nuke(cli);
-  }
   else if (sp_cstr_equal("clean", cli->args[0])) {
     spn_cli_command_clean(cli);
   }
@@ -1809,6 +1892,9 @@ void spn_cli_run(spn_app_t* app) {
   else if (sp_cstr_equal("recipe", cli->args[0])) {
     spn_cli_command_recipe(cli);
   }
+  else if (sp_cstr_equal("add", cli->args[0])) {
+    spn_cli_command_add(cli);
+  }
 }
 
 
@@ -1826,6 +1912,56 @@ void spn_cli_assert_dep_is_built(spn_dep_t* dep) {
       SP_FMT_CSTR("spn build")
     );
   }
+}
+
+void spn_cli_command_init(spn_cli_t* cli) {
+
+}
+
+void spn_cli_command_add(spn_cli_t* cli) {
+  struct argparse argparse;
+  argparse_init(
+    &argparse,
+    (struct argparse_option []) {
+      OPT_HELP(),
+      OPT_END()
+    },
+    (const c8* []) {
+      "spn add",
+      SP_NULLPTR
+    },
+    SP_NULL
+  );
+  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+
+  if (!cli->num_args || !cli->args[0]) {
+    argparse_usage(&argparse);
+    return;
+  }
+
+  sp_str_t name = sp_str_from_cstr(cli->args[0]);
+
+  spn_recipe_t* recipe = sp_ht_getp(app.recipes, name);
+  if (!recipe) {
+    sp_str_t prefix = sp_str_lit("  > ");
+    sp_str_t color = sp_str_lit("brightcyan");
+    sp_da(sp_str_t) search = app.search;
+    search = sp_str_map(search, sp_dyn_array_size(search), &color, sp_str_map_kernel_colorize);
+    search = sp_str_map(search, sp_dyn_array_size(search), &prefix, sp_str_map_kernel_prepend);
+
+    SP_FATAL(
+      "Could not find {:fg yellow} on search path: \n{}",
+      SP_FMT_STR(name),
+      SP_FMT_STR(sp_str_join_n(search, sp_dyn_array_size(search), sp_str_lit("\n")))
+    );
+  }
+
+  spn_dep_t dep = {
+    .name = name,
+  };
+  sp_ht_insert(app.deps, name, dep);
+
+  spn_update_lock_file();
 }
 
 void spn_cli_command_list(spn_cli_t* cli) {
@@ -1865,11 +2001,6 @@ void spn_cli_command_list(spn_cli_t* cli) {
   }
 
   sp_log(sp_str_builder_write(&builder));
-}
-
-void spn_cli_command_nuke(spn_cli_t* cli) {
-  sp_os_remove_directory(app.paths.cache);
-  sp_os_remove_file(app.paths.project.spn_h);
 }
 
 void spn_cli_command_clean(spn_cli_t* cli) {
@@ -1972,6 +2103,7 @@ void spn_cli_command_print(spn_cli_t* cli) {
   sp_ht_for(app.deps, it) {
     spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
     spn_cli_assert_dep_is_built(dep);
+    spn_dep_context_resolve_commit(dep);
     spn_dep_context_prepare(dep, dep->lock);
   }
 
@@ -2308,60 +2440,7 @@ void spn_cli_command_build(spn_cli_t* cli) {
     }
   }
 
-  sp_str_t haystack = sp_io_read_file(app.paths.project.spn_h);
-  sp_str_t needle = sp_str_lit("#include \"spn/gen/project.h\"");
-  sp_str_t mark = SP_ZERO_INITIALIZE();
-  while (true) {
-    switch (sp_str_at(haystack, 0)) {
-      case '#': {
-        if (sp_str_starts_with(haystack, needle)) {
-          SP_ASSERT(haystack.len >= needle.len);
-          mark = sp_str_sub(haystack, needle.len, haystack.len - needle.len);
-          break;
-        }
-      }
-      default: {
-        haystack.data++;
-        haystack.len--;
-        break;
-      }
-    }
-
-    if (sp_str_empty(haystack)) break;
-    if (sp_str_valid(mark)) break;
-  }
-
-  SP_ASSERT(sp_str_valid(mark));
-
-  sp_io_stream_t io = sp_io_from_file(app.paths.project.lock, SP_IO_MODE_WRITE);
-  sp_io_write_str(&io, sp_format("#define SPN_VERSION {}\n", SP_FMT_U32(app.version.version)));
-  sp_io_write_str(&io, sp_format("#define SPN_COMMIT {}\n", SP_FMT_QCSTR(app.version.commit)));
-  sp_io_write_cstr(&io, "\n");
-
-
-  sp_io_write_cstr(&io, "#define SPN_DEPS() \\\n");
-  sp_ht_for(app.deps, it) {
-    spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
-    sp_io_write_cstr(&io, "  ");
-    sp_io_write_str(&io, sp_format("SPN_DEP({}) \\\n", SP_FMT_STR(dep->name)));
-    sp_io_write_str(&io, sp_str_lit("\n"));
-  }
-
-  sp_da(sp_str_t) locks = SP_NULLPTR;
-  sp_dyn_array_push(locks, SP_LIT("#define SPN_LOCKS()"));
-  sp_ht_for(app.deps, it) {
-    spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
-    sp_dyn_array_push(locks, sp_format("  SPN_LOCK({}, {})", SP_FMT_STR(dep->name), SP_FMT_QSTR(dep->commits.resolved)));
-  }
-
-  sp_io_write_str(&io, sp_str_join_n(locks, sp_dyn_array_size(locks), SP_LIT(" \\\n")));
-  sp_io_write_cstr(&io, "\n\n");
-
-  sp_io_write_str(&io, needle);
-
-  sp_io_write_str(&io, mark);
-
-  sp_io_close(&io);
+  spn_update_lock_file();
 }
 
 
