@@ -148,7 +148,7 @@ $(BOOTSTRAP_SPN): $(BOOTSTRAP_ARCHIVE) | $(BOOTSTRAP_BIN)
 $(SPN_OUTPUT): $(BOOTSTRAP_SPN) source/*.h source/*.c source/spn/*.h $(SPN_MAKEFILE) | $(SPN_DIR_BUILD_OUTPUT)
 	$(call print_heading)
 	@echo "building dependencies"
-	spn --no-interactive build
+	#spn --no-interactive build
 	$(call print_heading)
 	@echo "building spn"
 	$(CC) ./source/main.c $(CFLAGS) $$(spn print) $(FLAG_SYSTEM_LIBS)
