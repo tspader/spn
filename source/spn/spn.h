@@ -75,6 +75,11 @@ typedef struct {
   u32 num_deps;
 } spn_opaque_build_t;
 
+typedef struct {
+  u32 version;
+  const c8* commit;
+} spn_version_info_t;
+
 ////////////
 // RECIPE //
 ////////////

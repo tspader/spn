@@ -328,13 +328,13 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_t* dep);
 ////////////
 typedef struct {
   sp_str_t dir;
-  sp_str_t   file;
+  sp_str_t   spn_h;
   sp_str_t   lock;
 } spn_project_paths_t;
 
 SP_TYPEDEF_FN(spn_user_config_t, spn_user_config_fn_t);
 SP_TYPEDEF_FN(spn_opaque_build_t, spn_build_fn_t);
-SP_TYPEDEF_FN(const c8*, spn_version_fn_t);
+SP_TYPEDEF_FN(spn_version_info_t, spn_version_fn_t);
 
 typedef struct {
   spn_build_fn_t build;
@@ -428,6 +428,7 @@ typedef struct {
   spn_tcc_t* tcc;
 
   spn_user_config_t user_config;
+  spn_version_info_t version;
   sp_dyn_array(sp_str_t) search;
   sp_ht(sp_str_t, spn_recipe_t) recipes;
   sp_ht(sp_str_t, spn_dep_t) deps;
@@ -1622,7 +1623,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     app->paths.project.dir = sp_str_copy(app->paths.work);
   }
 
-  app->paths.project.file = sp_os_join_path(app->paths.project.dir, project_file);
+  app->paths.project.spn_h = sp_os_join_path(app->paths.project.dir, project_file);
   app->paths.project.lock = sp_os_join_path(app->paths.project.dir, SP_LIT("spn.lock.h"));
 
   // Config
@@ -1699,16 +1700,16 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   // Compile the project and get the build struct
   spn_tcc_t* tcc = spn_tcc_new();
-  tcc_add_file(tcc, sp_str_to_cstr(app->paths.project.file));
+  tcc_add_file(tcc, sp_str_to_cstr(app->paths.project.spn_h));
   tcc_relocate(tcc);
 
   app->fns.version = tcc_get_symbol(tcc, "spn_version");
-  sp_str_from_cstr(app->fns.version());
+  app->version = app->fns.version();
 
   tcc = spn_tcc_new();
   tcc_define_symbol(tcc, "SPN_BUILD", "");
   spn_tcc_register_libspn(tcc);
-  tcc_add_file(tcc, sp_str_to_cstr(app->paths.project.file));
+  tcc_add_file(tcc, sp_str_to_cstr(app->paths.project.spn_h));
   tcc_relocate(tcc);
 
   app->fns.build = tcc_get_symbol(tcc, "spn_build_opaque");
@@ -1868,7 +1869,7 @@ void spn_cli_command_list(spn_cli_t* cli) {
 
 void spn_cli_command_nuke(spn_cli_t* cli) {
   sp_os_remove_directory(app.paths.cache);
-  sp_os_remove_file(app.paths.project.file);
+  sp_os_remove_file(app.paths.project.spn_h);
 }
 
 void spn_cli_command_clean(spn_cli_t* cli) {
@@ -2307,22 +2308,59 @@ void spn_cli_command_build(spn_cli_t* cli) {
     }
   }
 
-  sp_io_stream_t io = sp_io_from_file(app.paths.project.lock, SP_IO_MODE_WRITE);
-  sp_io_write_str(&io, SP_LIT("#define SP_LOCKS() \\\n"));
+  sp_str_t haystack = sp_io_read_file(app.paths.project.spn_h);
+  sp_str_t needle = sp_str_lit("#include \"spn/gen/project.h\"");
+  sp_str_t mark = SP_ZERO_INITIALIZE();
+  while (true) {
+    switch (sp_str_at(haystack, 0)) {
+      case '#': {
+        if (sp_str_starts_with(haystack, needle)) {
+          SP_ASSERT(haystack.len >= needle.len);
+          mark = sp_str_sub(haystack, needle.len, haystack.len - needle.len);
+          break;
+        }
+      }
+      default: {
+        haystack.data++;
+        haystack.len--;
+        break;
+      }
+    }
 
+    if (sp_str_empty(haystack)) break;
+    if (sp_str_valid(mark)) break;
+  }
+
+  SP_ASSERT(sp_str_valid(mark));
+
+  sp_io_stream_t io = sp_io_from_file(app.paths.project.lock, SP_IO_MODE_WRITE);
+  sp_io_write_str(&io, sp_format("#define SPN_VERSION {}\n", SP_FMT_U32(app.version.version)));
+  sp_io_write_str(&io, sp_format("#define SPN_COMMIT {}\n", SP_FMT_QCSTR(app.version.commit)));
+  sp_io_write_cstr(&io, "\n");
+
+
+  sp_io_write_cstr(&io, "#define SPN_DEPS() \\\n");
   sp_ht_for(app.deps, it) {
     spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
-
-    spn_lock_entry_t entry = SP_ZERO_INITIALIZE();
-    entry.name = sp_str_copy(dep->recipe->name);
-    entry.url = spn_git_get_remote_url(dep->recipe->paths.source);
-    entry.commit = spn_git_get_commit(dep->recipe->paths.source, SPN_GIT_HEAD);
-    entry.build_id = sp_str_copy(dep->build_id);
-
-    sp_io_write_str(&io, sp_str_lit("  "));
-    sp_io_write_str(&io, sp_format("SP_LOCK({}, {}) \\", SP_FMT_STR(entry.name), SP_FMT_QSTR(entry.commit)));
+    sp_io_write_cstr(&io, "  ");
+    sp_io_write_str(&io, sp_format("SPN_DEP({}) \\\n", SP_FMT_STR(dep->name)));
     sp_io_write_str(&io, sp_str_lit("\n"));
   }
+
+  sp_da(sp_str_t) locks = SP_NULLPTR;
+  sp_dyn_array_push(locks, SP_LIT("#define SPN_LOCKS()"));
+  sp_ht_for(app.deps, it) {
+    spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
+    sp_dyn_array_push(locks, sp_format("  SPN_LOCK({}, {})", SP_FMT_STR(dep->name), SP_FMT_QSTR(dep->commits.resolved)));
+  }
+
+  sp_io_write_str(&io, sp_str_join_n(locks, sp_dyn_array_size(locks), SP_LIT(" \\\n")));
+  sp_io_write_cstr(&io, "\n\n");
+
+  sp_io_write_str(&io, needle);
+
+  sp_io_write_str(&io, mark);
+
   sp_io_close(&io);
 }
 
