@@ -154,6 +154,7 @@ typedef enum {
 } spn_dep_repo_state_t;
 
 typedef enum {
+  SPN_DEP_BUILD_STATE_NONE,
   SPN_DEP_BUILD_STATE_IDLE,
   SPN_DEP_BUILD_STATE_CLONING,
   SPN_DEP_BUILD_STATE_FETCHING,
@@ -276,7 +277,7 @@ sp_str_t             spn_dep_build_kind_to_str(spn_dep_kind_t kind);
 sp_str_t             spn_dep_state_to_str(spn_dep_build_state_t state);
 bool                 spn_dep_state_is_terminal(spn_dep_t* dep);
 sp_os_lib_kind_t     spn_dep_kind_to_os_lib_kind(spn_dep_kind_t kind);
-void                 spn_dep_context_init(spn_dep_t* dep, sp_str_t name);
+void                 spn_dep_context_init(spn_dep_t* dep, spn_recipe_t* recipe);
 s32                  spn_dep_context_add(void* user_data);
 s32                  spn_dep_context_build(void* user_data);
 spn_err_t            spn_dep_context_sync_remote(spn_dep_t* dep);
@@ -290,6 +291,7 @@ void                 spn_dep_context_set_build_error(spn_dep_t* dep, sp_str_t er
 sp_str_t             spn_dep_context_find_latest_commit(spn_dep_t* dep);
 bool                 spn_dep_context_is_binary(spn_dep_t* dep);
 spn_dep_t*           spn_dep_builder_find_dep(spn_dep_builder_t* build);
+void                 spn_recipe_compile(spn_tcc_t* tcc, spn_recipe_t* recipe);
 spn_recipe_t*        spn_recipe_find(sp_str_t name);
 s32                  spn_sort_kernel_dep_ptr(const void* a, const void* b);
 
@@ -1339,6 +1341,7 @@ void spn_tui_run(spn_tui_t* tui) {
     }
 
     switch (dep->state.build) {
+      case SPN_DEP_BUILD_STATE_NONE:
       case SPN_DEP_BUILD_STATE_DONE: {
         break;
       }
@@ -1523,6 +1526,7 @@ spn_dep_kind_t spn_opt_build_kind(spn_dep_kind_t kind, spn_recipe_t* recipe) {
 
 bool spn_dep_state_is_terminal(spn_dep_t* dep) {
   switch (dep->state.build) {
+    case SPN_DEP_BUILD_STATE_NONE:
     case SPN_DEP_BUILD_STATE_FAILED:
     case SPN_DEP_BUILD_STATE_DONE:
     case SPN_DEP_BUILD_STATE_CANCELED: return true;
@@ -1539,6 +1543,30 @@ bool spn_dep_context_is_binary(spn_dep_t* dep) {
   }
 
   SP_UNREACHABLE_RETURN(false);
+}
+void spn_recipe_compile(spn_tcc_t* tcc, spn_recipe_t* recipe) {
+  recipe->info = tcc_get_symbol(tcc, sp_str_to_cstr(recipe->name));
+  SP_ASSERT(recipe->info);
+
+  spn_recipe_info_t info = recipe->info();
+  recipe->name = spn_opt_cstr_required(info.name);
+  recipe->git = spn_opt_cstr_required(info.git);
+  recipe->branch = spn_opt_cstr_optional(info.branch, "HEAD");
+  recipe->build = info.build;
+  recipe->configure = info.configure;
+  recipe->package = info.package;
+  SP_CARR_FOR(info.libs, i) {
+    if (!info.libs[i]) break;
+    sp_dyn_array_push(recipe->libs, sp_str_from_cstr(info.libs[i]));
+  }
+
+  recipe->kinds.fallback = info.kinds[0];
+  SP_ASSERT(recipe->kinds.fallback != SPN_DEP_BUILD_KIND_NONE);
+  SP_CARR_FOR(info.kinds, i) {
+    if (info.kinds[i] == SPN_DEP_BUILD_KIND_NONE) break;
+    sp_ht_insert(recipe->kinds.enabled, info.kinds[i], true);
+  }
+
 }
 
 spn_recipe_t* spn_recipe_find(sp_str_t name) {
@@ -1559,8 +1587,10 @@ bool spn_dep_context_is_build_stamped(spn_dep_t* context) {
   return sp_os_does_path_exist(context->paths.stamp);
 }
 
-void spn_dep_context_init(spn_dep_t* dep, sp_str_t name) {
-  dep->name = sp_str_copy(name);
+void spn_dep_context_init(spn_dep_t* dep, spn_recipe_t* recipe) {
+  SP_ASSERT(recipe);
+  dep->name = sp_str_copy(recipe->name);
+  dep->recipe = recipe;
   sp_mutex_init(&dep->mutex, SP_MUTEX_PLAIN);
 }
 
@@ -1949,29 +1979,10 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   sp_ht_insert(app->matrices, matrix.name, matrix);
 
   // Recipes
-  for (u32 i = 0; i < build.num_deps; i++) {
-    spn_recipe_t* recipe = sp_ht_getp(app->recipes, sp_str_view(build.deps[i].name));
-    recipe->info = tcc_get_symbol(tcc, sp_str_to_cstr(recipe->name));
-    SP_ASSERT(recipe->info);
-
-    spn_recipe_info_t info = recipe->info();
-    recipe->name = spn_opt_cstr_required(info.name);
-    recipe->git = spn_opt_cstr_required(info.git);
-    recipe->branch = spn_opt_cstr_optional(info.branch, "HEAD");
-    recipe->build = info.build;
-    recipe->configure = info.configure;
-    recipe->package = info.package;
-    SP_CARR_FOR(info.libs, i) {
-      if (!info.libs[i]) break;
-      sp_dyn_array_push(recipe->libs, sp_str_from_cstr(info.libs[i]));
-    }
-
-    recipe->kinds.fallback = info.kinds[0];
-    SP_ASSERT(recipe->kinds.fallback != SPN_DEP_BUILD_KIND_NONE);
-    SP_CARR_FOR(info.kinds, i) {
-      if (info.kinds[i] == SPN_DEP_BUILD_KIND_NONE) break;
-      sp_ht_insert(recipe->kinds.enabled, info.kinds[i], true);
-    }
+  for (u32 it = 0; it < build.num_deps; it++) {
+    spn_opaque_dep_t dep = build.deps[it];
+    spn_recipe_t* recipe = sp_ht_getp(app->recipes, sp_str_view(dep.name));
+    spn_recipe_compile(tcc, recipe);
   }
 
   // Deps
@@ -1979,10 +1990,9 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     spn_recipe_t* recipe = sp_ht_getp(app->recipes, sp_str_view(build.deps[i].name));
 
     spn_dep_t dep = SP_ZERO_INITIALIZE();
-    dep.name = recipe->name;
+    spn_dep_context_init(&dep, recipe);
     dep.kind = spn_opt_build_kind(deps[i].kind, recipe);
     dep.options = deps[i].options;
-    dep.recipe = recipe;
     dep.lock = sp_str_from_cstr(deps[i].lock);
     dep.mode = SPN_DEP_BUILD_MODE_DEBUG;
     sp_mutex_init(&dep.mutex, SP_MUTEX_PLAIN);
@@ -2449,6 +2459,10 @@ void spn_cli_add(spn_cli_t* cli) {
 
   sp_str_t name = sp_str_from_cstr(cli->args[0]);
 
+  if (sp_ht_getp(app.deps, name)) {
+    SP_FATAL("{:fg brightyellow} is already in your project", SP_FMT_STR(name));
+  }
+
   spn_recipe_t* recipe = sp_ht_getp(app.recipes, name);
   if (!recipe) {
     sp_str_t prefix = sp_str_lit("  > ");
@@ -2464,14 +2478,21 @@ void spn_cli_add(spn_cli_t* cli) {
     );
   }
 
+  spn_tcc_t* tcc = spn_tcc_new();
+  SP_ASSERT(!tcc_add_file(tcc, sp_str_to_cstr(recipe->paths.file)));
+  spn_tcc_register_libspn(tcc);
+  SP_ASSERT(!tcc_relocate(tcc));
+  spn_recipe_compile(tcc, recipe);
+
   spn_tui_mode_t mode = app.cli.output ?
     spn_output_mode_from_str(sp_str_view(app.cli.output)) :
     SPN_OUTPUT_MODE_NONINTERACTIVE;
 
   sp_ht_insert(app.deps, name, SP_ZERO_STRUCT(spn_dep_t));
   spn_dep_t* dep = sp_ht_getp(app.deps, name);
-  spn_dep_context_init(dep, name);
+  spn_dep_context_init(dep, recipe);
 
+  dep->state.build = SPN_DEP_BUILD_STATE_IDLE;
   sp_thread_init(&dep->thread, spn_dep_context_add, dep);
 
   spn_tui_init(&app.tui, mode);
@@ -2510,6 +2531,7 @@ void spn_cli_build(spn_cli_t* cli) {
     spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
     dep->force = command->force;
     dep->update = command->update;
+    dep->state.build = SPN_DEP_BUILD_STATE_IDLE;
     sp_thread_init(&dep->thread, spn_dep_context_build, dep);
   }
 
