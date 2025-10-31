@@ -7,9 +7,9 @@
   SPN_DEP(tcc)
 
 #define SPN_LOCKS() \
-  SPN_LOCK(argparse, "") \
-  SPN_LOCK(sp, "") \
-  SPN_LOCK(tcc, "")
+  SPN_LOCK(argparse, "f71ed6c7b1") \
+  SPN_LOCK(sp, "80efa56421") \
+  SPN_LOCK(tcc, "f4e01bfcab")
 
 #include "spn/gen/project.h"
 

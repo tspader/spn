@@ -178,6 +178,11 @@ typedef struct {
 } spn_dep_state_t;
 
 // Specific to the recipe
+typedef enum {
+  SPN_RECIPE_STATE_UNLOADED,
+  SPN_RECIPE_STATE_LOADED,
+} spn_recipe_state_t;
+
 typedef struct {
   sp_str_t source;
   sp_str_t file;
@@ -198,6 +203,8 @@ typedef struct {
   spn_recipe_configure_fn_t configure;
   spn_recipe_build_fn_t build;
   spn_recipe_package_fn_t package;
+
+  spn_recipe_state_t state;
 } spn_recipe_t;
 
 // Specific to a single build
@@ -278,8 +285,10 @@ sp_str_t             spn_dep_state_to_str(spn_dep_build_state_t state);
 bool                 spn_dep_state_is_terminal(spn_dep_t* dep);
 sp_os_lib_kind_t     spn_dep_kind_to_os_lib_kind(spn_dep_kind_t kind);
 void                 spn_dep_context_init(spn_dep_t* dep, spn_recipe_t* recipe);
-s32                  spn_dep_context_add(void* user_data);
-s32                  spn_dep_context_build(void* user_data);
+s32                  spn_dep_thread_resolve(void* user_data);
+s32                  spn_dep_thread_build(void* user_data);
+s32                  spn_dep_context_resolve(spn_dep_t* dep);
+s32                  spn_dep_context_build(spn_dep_t* dep);
 spn_err_t            spn_dep_context_sync_remote(spn_dep_t* dep);
 spn_err_t            spn_dep_context_sync_local(spn_dep_t* dep);
 void                 spn_dep_context_set_commit(spn_dep_t* dep, sp_str_t commit);
@@ -291,7 +300,7 @@ void                 spn_dep_context_set_build_error(spn_dep_t* dep, sp_str_t er
 sp_str_t             spn_dep_context_find_latest_commit(spn_dep_t* dep);
 bool                 spn_dep_context_is_binary(spn_dep_t* dep);
 spn_dep_t*           spn_dep_builder_find_dep(spn_dep_builder_t* build);
-void                 spn_recipe_compile(spn_tcc_t* tcc, spn_recipe_t* recipe);
+void                 spn_recipe_load(spn_tcc_t* tcc, spn_recipe_t* recipe);
 spn_recipe_t*        spn_recipe_find(sp_str_t name);
 s32                  spn_sort_kernel_dep_ptr(const void* a, const void* b);
 
@@ -1544,7 +1553,7 @@ bool spn_dep_context_is_binary(spn_dep_t* dep) {
 
   SP_UNREACHABLE_RETURN(false);
 }
-void spn_recipe_compile(spn_tcc_t* tcc, spn_recipe_t* recipe) {
+void spn_recipe_load(spn_tcc_t* tcc, spn_recipe_t* recipe) {
   recipe->info = tcc_get_symbol(tcc, sp_str_to_cstr(recipe->name));
   SP_ASSERT(recipe->info);
 
@@ -1567,6 +1576,7 @@ void spn_recipe_compile(spn_tcc_t* tcc, spn_recipe_t* recipe) {
     sp_ht_insert(recipe->kinds.enabled, info.kinds[i], true);
   }
 
+  recipe->state = SPN_RECIPE_STATE_LOADED;
 }
 
 spn_recipe_t* spn_recipe_find(sp_str_t name) {
@@ -1699,28 +1709,32 @@ spn_err_t spn_dep_context_sync_local(spn_dep_t* dep) {
   return spn_git_checkout(dep->recipe->paths.source, dep->commits.resolved);
 }
 
-SPN_ASYNC s32 spn_dep_context_add(void* user_data) {
+s32 spn_dep_thread_resolve(void* user_data) {
   spn_dep_t* dep = (spn_dep_t*)user_data;
+  if (spn_dep_context_resolve(dep)) return 1;
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
+}
 
+s32 spn_dep_thread_build(void* user_data) {
+  spn_dep_t* dep = (spn_dep_t*)user_data;
+  if (spn_dep_context_resolve(dep)) return 1;
+  if (spn_dep_context_build(dep)) return 1;
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
+}
+
+s32 spn_dep_context_resolve(spn_dep_t* dep) {
   SP_ASSERT(!spn_dep_context_sync_remote(dep));
   SP_ASSERT(!spn_dep_context_resolve_commit(dep));
-
-  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
 
   return SPN_OK;
 }
 
-SPN_ASYNC s32 spn_dep_context_build(void* user_data) {
-  spn_dep_t* dep = (spn_dep_t*)user_data;
-
-  SP_ASSERT(!spn_dep_context_sync_remote(dep));
-  SP_ASSERT(!spn_dep_context_resolve_commit(dep));
+s32 spn_dep_context_build(spn_dep_t* dep) {
   SP_ASSERT(!spn_dep_context_sync_local(dep));
   SP_ASSERT(!spn_dep_context_resolve_build_id(dep));
 
   if (spn_dep_context_is_build_stamped(dep)) {
     if (!dep->force) {
-      spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
       return 0;
     }
   }
@@ -1772,8 +1786,6 @@ SPN_ASYNC s32 spn_dep_context_build(void* user_data) {
 
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_STAMPING);
   sp_os_create_file(dep->paths.stamp);
-
-  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
 
   return SPN_OK;
 }
@@ -1982,7 +1994,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   for (u32 it = 0; it < build.num_deps; it++) {
     spn_opaque_dep_t dep = build.deps[it];
     spn_recipe_t* recipe = sp_ht_getp(app->recipes, sp_str_view(dep.name));
-    spn_recipe_compile(tcc, recipe);
+    spn_recipe_load(tcc, recipe);
   }
 
   // Deps
@@ -2482,19 +2494,21 @@ void spn_cli_add(spn_cli_t* cli) {
   SP_ASSERT(!tcc_add_file(tcc, sp_str_to_cstr(recipe->paths.file)));
   spn_tcc_register_libspn(tcc);
   SP_ASSERT(!tcc_relocate(tcc));
-  spn_recipe_compile(tcc, recipe);
-
-  spn_tui_mode_t mode = app.cli.output ?
-    spn_output_mode_from_str(sp_str_view(app.cli.output)) :
-    SPN_OUTPUT_MODE_NONINTERACTIVE;
+  spn_recipe_load(tcc, recipe);
 
   sp_ht_insert(app.deps, name, SP_ZERO_STRUCT(spn_dep_t));
   spn_dep_t* dep = sp_ht_getp(app.deps, name);
   spn_dep_context_init(dep, recipe);
 
-  dep->state.build = SPN_DEP_BUILD_STATE_IDLE;
-  sp_thread_init(&dep->thread, spn_dep_context_add, dep);
+  sp_ht_for(app.deps, it) {
+    spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
+    dep->state.build = SPN_DEP_BUILD_STATE_IDLE;
+    sp_thread_init(&dep->thread, spn_dep_thread_resolve, dep);
+  }
 
+  spn_tui_mode_t mode = app.cli.output ?
+    spn_output_mode_from_str(sp_str_view(app.cli.output)) :
+    SPN_OUTPUT_MODE_NONINTERACTIVE;
   spn_tui_init(&app.tui, mode);
   spn_tui_run(&app.tui);
 
@@ -2532,7 +2546,7 @@ void spn_cli_build(spn_cli_t* cli) {
     dep->force = command->force;
     dep->update = command->update;
     dep->state.build = SPN_DEP_BUILD_STATE_IDLE;
-    sp_thread_init(&dep->thread, spn_dep_context_build, dep);
+    sp_thread_init(&dep->thread, spn_dep_thread_build, dep);
   }
 
   spn_tui_init(&app.tui, mode);
