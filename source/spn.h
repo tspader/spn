@@ -54,6 +54,21 @@
 #define SPN_VERSION 1
 #define SPN_COMMIT "00c0fa98"
 
+#define SPN_ASYNC
+
+
+#define SPN_ERR(X) \
+  X(SPN_OK, "ok") \
+  X(SPN_ERROR, "error")
+
+typedef enum {
+  SPN_ERR(SP_X_NAMED_ENUM_DEFINE)
+} spn_err_t;
+
+
+////////
+// SP //
+////////
 #define SP_FMT_QSTR(STR) SP_FMT_QUOTED_STR(STR)
 #define SP_FMT_QCSTR(CSTR) SP_FMT_QUOTED_STR(sp_str_view(CSTR))
 
@@ -63,7 +78,6 @@ sp_str_t sp_str_map_kernel_colorize(sp_str_map_context_t* context) {
   return sp_format("{}{}{}", SP_FMT_STR(ansi), SP_FMT_STR(context->str), SP_FMT_CSTR(SP_ANSI_RESET));
 }
 
-
 /////////
 // GIT //
 /////////
@@ -71,13 +85,13 @@ sp_str_t sp_str_map_kernel_colorize(sp_str_map_context_t* context) {
 #define SPN_GIT_HEAD SP_LIT("HEAD")
 #define SPN_GIT_UPSTREAM SP_LIT("@{u}")
 
-bool     spn_git_clone(sp_str_t url, sp_str_t path);
-bool     spn_git_fetch(sp_str_t repo);
-u32      spn_git_num_updates(sp_str_t repo, sp_str_t from, sp_str_t to);
-void     spn_git_checkout(sp_str_t repo, sp_str_t commit);
-sp_str_t spn_git_get_remote_url(sp_str_t repo_path);
-sp_str_t spn_git_get_commit(sp_str_t repo_path, sp_str_t id);
-sp_str_t spn_git_get_commit_message(sp_str_t repo_path, sp_str_t id);
+bool      spn_git_clone(sp_str_t url, sp_str_t path);
+bool      spn_git_fetch(sp_str_t repo);
+u32       spn_git_num_updates(sp_str_t repo, sp_str_t from, sp_str_t to);
+spn_err_t spn_git_checkout(sp_str_t repo, sp_str_t commit);
+sp_str_t  spn_git_get_remote_url(sp_str_t repo_path);
+sp_str_t  spn_git_get_commit(sp_str_t repo_path, sp_str_t id);
+sp_str_t  spn_git_get_commit_message(sp_str_t repo_path, sp_str_t id);
 
 
 /////////
@@ -147,7 +161,7 @@ typedef enum {
   SPN_DEP_BUILD_STATE_CLONING,
   SPN_DEP_BUILD_STATE_FETCHING,
   SPN_DEP_BUILD_STATE_CHECKING_OUT,
-  SPN_DEP_BUILD_STATE_PREPARING,
+  SPN_DEP_BUILD_STATE_RESOLVING,
   SPN_DEP_BUILD_STATE_BUILDING,
   SPN_DEP_BUILD_STATE_PACKAGING,
   SPN_DEP_BUILD_STATE_STAMPING,
@@ -257,12 +271,17 @@ spn_dep_kind_t       spn_dep_build_kind_from_str(sp_str_t str);
 sp_str_t             spn_dep_build_kind_to_str(spn_dep_kind_t kind);
 sp_os_lib_kind_t     spn_dep_kind_to_os_lib_kind(spn_dep_kind_t kind);
 sp_str_t             spn_dep_state_to_str(spn_dep_build_state_t state);
-void                 spn_dep_context_prepare(spn_dep_t* context);
+void                 spn_dep_context_init(spn_dep_t* dep, sp_str_t name);
+s32                  spn_dep_context_add(void* user_data);
+s32                  spn_dep_context_build(void* user_data);
+spn_err_t            spn_dep_context_sync_remote(spn_dep_t* dep);
+spn_err_t            spn_dep_context_sync_local(spn_dep_t* dep);
+spn_err_t            spn_dep_context_resolve_commit(spn_dep_t* dep);
+spn_err_t            spn_dep_context_resolve_build_id(spn_dep_t* dep);
 bool                 spn_dep_context_is_build_stamped(spn_dep_t* context);
 void                 spn_dep_context_set_build_state(spn_dep_t* dep, spn_dep_build_state_t state);
 void                 spn_dep_context_set_build_error(spn_dep_t* dep, sp_str_t error);
 sp_str_t             spn_dep_context_find_latest_commit(spn_dep_t* dep);
-s32                  spn_dep_context_build_async(void* user_data);
 bool                 spn_dep_context_is_binary(spn_dep_t* dep);
 sp_str_t             spn_gen_build_entry_for_dep(spn_dep_t* dep, spn_gen_entry_kind_t kind, spn_gen_compiler_t c);
 sp_str_t             spn_gen_build_entries_for_dep(spn_dep_t* dep, spn_gen_compiler_t c);
@@ -290,13 +309,13 @@ typedef struct {
 
 typedef enum {
   SPN_OUTPUT_MODE_X(SP_X_ENUM_DEFINE)
-} spn_output_mode_t;
+} spn_tui_mode_t;
 
-spn_output_mode_t spn_output_mode_from_str(sp_str_t str);
-sp_str_t          spn_output_mode_to_str(spn_output_mode_t mode);
+spn_tui_mode_t spn_output_mode_from_str(sp_str_t str);
+sp_str_t          spn_output_mode_to_str(spn_tui_mode_t mode);
 
 typedef struct {
-  spn_output_mode_t mode;
+  spn_tui_mode_t mode;
   u32 num_deps;
   u32 width;
 
@@ -325,8 +344,8 @@ void sp_tui_checkpoint(spn_tui_t* tui);
 void sp_tui_restore(spn_tui_t* tui);
 void sp_tui_setup_raw_mode(spn_tui_t* tui);
 void spn_tui_update(spn_tui_t* tui);
-void spn_tui_init(spn_tui_t* tui);
-void spn_tui_cleanup(spn_tui_t* tui);
+void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode);
+void spn_tui_run(spn_tui_t* tui);
 void spn_tui_print_dep(spn_tui_t* tui, spn_dep_t* dep);
 
 
@@ -396,20 +415,20 @@ typedef struct {
   spn_cli_recipe_t recipe;
 } spn_cli_t;
 
-void spn_cli_command_clean(spn_cli_t* cli);
+void spn_cli_clean(spn_cli_t* cli);
 
-void spn_cli_command_build(spn_cli_t* cli);
-void spn_cli_command_print(spn_cli_t* cli);
-void spn_cli_command_copy(spn_cli_t* cli);
+void spn_cli_build(spn_cli_t* cli);
+void spn_cli_print(spn_cli_t* cli);
+void spn_cli_copy(spn_cli_t* cli);
 
-void spn_cli_command_init(spn_cli_t* cli);
-void spn_cli_command_add(spn_cli_t* cli);
+void spn_cli_init(spn_cli_t* cli);
+void spn_cli_add(spn_cli_t* cli);
 
-void spn_cli_command_list(spn_cli_t* cli);
-void spn_cli_command_ls(spn_cli_t* cli);
-void spn_cli_command_which(spn_cli_t* cli);
-void spn_cli_command_recipe(spn_cli_t* cli);
-void spn_cli_assert_dep_is_built(spn_dep_t* dep);
+void spn_cli_list(spn_cli_t* cli);
+void spn_cli_ls(spn_cli_t* cli);
+void spn_cli_which(spn_cli_t* cli);
+void spn_cli_recipe(spn_cli_t* cli);
+void spn_cli_assert_dep_is_locked(spn_dep_t* dep);
 
 
 
@@ -632,7 +651,7 @@ void sp_tui_setup_raw_mode(spn_tui_t* tui) {
 ///////////
 // ENUMS //
 ///////////
-spn_output_mode_t spn_output_mode_from_str(sp_str_t str) {
+spn_tui_mode_t spn_output_mode_from_str(sp_str_t str) {
   if      (sp_str_equal_cstr(str, "interactive"))    return SPN_OUTPUT_MODE_INTERACTIVE;
   else if (sp_str_equal_cstr(str, "noninteractive")) return SPN_OUTPUT_MODE_NONINTERACTIVE;
   else if (sp_str_equal_cstr(str, "quiet"))          return SPN_OUTPUT_MODE_QUIET;
@@ -642,7 +661,7 @@ spn_output_mode_t spn_output_mode_from_str(sp_str_t str) {
   SP_UNREACHABLE_RETURN(SPN_OUTPUT_MODE_NONE);
 }
 
-sp_str_t spn_output_mode_to_str(spn_output_mode_t mode) {
+sp_str_t spn_output_mode_to_str(spn_tui_mode_t mode) {
   switch (mode) {
     SPN_OUTPUT_MODE_X(SP_X_ENUM_CASE_TO_STRING_LOWER)
   }
@@ -688,7 +707,7 @@ sp_str_t spn_dep_state_to_str(spn_dep_build_state_t state) {
     case SPN_DEP_BUILD_STATE_IDLE:         return SP_LIT("idle");
     case SPN_DEP_BUILD_STATE_CLONING:      return SP_LIT("cloning");
     case SPN_DEP_BUILD_STATE_FETCHING:     return SP_LIT("fetching");
-    case SPN_DEP_BUILD_STATE_PREPARING:    return SP_LIT("preparing");
+    case SPN_DEP_BUILD_STATE_RESOLVING:    return SP_LIT("resolving");
     case SPN_DEP_BUILD_STATE_CHECKING_OUT: return SP_LIT("checking out");
     case SPN_DEP_BUILD_STATE_BUILDING:     return SP_LIT("building");
     case SPN_DEP_BUILD_STATE_DONE:         return SP_LIT("done");
@@ -1035,9 +1054,9 @@ sp_str_t spn_git_get_commit_message(sp_str_t repo, sp_str_t id) {
   return sp_str_trim_right(result.out);
 }
 
-void spn_git_checkout(sp_str_t repo, sp_str_t id) {
-  SP_ASSERT(!sp_str_empty(id));
-  SP_ASSERT(sp_os_does_path_exist(repo));
+spn_err_t spn_git_checkout(sp_str_t repo, sp_str_t id) {
+  if (sp_str_empty(id)) return SPN_ERROR;
+  if (!sp_os_does_path_exist(repo)) return SPN_ERROR;
 
   sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
     .command = SP_LIT("git"),
@@ -1048,7 +1067,9 @@ void spn_git_checkout(sp_str_t repo, sp_str_t id) {
       id
     }
   });
-  SP_ASSERT_FMT(!result.status.exit_code, "Failed to checkout {:fg brightcyan}:{:fg brightyellow}", SP_FMT_STR(repo), SP_FMT_STR(id));
+
+  if (result.status.exit_code) return SPN_ERROR;
+  return SPN_OK;
 }
 
 
@@ -1239,7 +1260,41 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_t* dep) {
   sp_tui_print(status);
 }
 
-void spn_tui_cleanup(spn_tui_t* tui) {
+void spn_tui_run(spn_tui_t* tui) {
+  while (true) {
+    if (sp_atomic_s32_get(&app.control) != 0) {
+      sp_ht_for(app.deps, it) {
+        spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
+        sp_mutex_lock(&dep->mutex);
+        if (!spn_dep_state_is_terminal(dep)) {
+          dep->state.build = SPN_DEP_BUILD_STATE_FAILED;
+        }
+        sp_mutex_unlock(&dep->mutex);
+      }
+      break;
+    }
+
+    bool building = false;
+
+    sp_ht_for(app.deps, it) {
+      spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
+
+      sp_mutex_lock(&dep->mutex);
+      if (!spn_dep_state_is_terminal(dep)) {
+        building = true;
+      }
+      sp_mutex_unlock(&dep->mutex);
+    }
+
+    spn_tui_update(&app.tui);
+
+    if (!building) {
+      break;
+    }
+    sp_os_sleep_ms(10);
+  }
+
+  // Clean up
   switch (tui->mode) {
     case SPN_OUTPUT_MODE_INTERACTIVE: {
       sp_tui_restore(tui);
@@ -1252,8 +1307,8 @@ void spn_tui_cleanup(spn_tui_t* tui) {
       break;
     }
     case SPN_OUTPUT_MODE_QUIET: {
-  sp_ht_for(app.deps, it) {
-    spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
+      sp_ht_for(app.deps, it) {
+        spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
         dep->tui_state = dep->state;
         spn_tui_print_dep(tui, dep);
         sp_tui_print(SP_LIT("\n"));
@@ -1265,9 +1320,40 @@ void spn_tui_cleanup(spn_tui_t* tui) {
       break;
     }
   }
+
+  // Report any failures
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+
+  bool failed = false;
+  sp_ht_for(app.deps, it) {
+    spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
+
+    if (dep->log.file.fd) {
+      sp_io_close(&dep->log);
+    }
+
+    switch (dep->state.build) {
+      case SPN_DEP_BUILD_STATE_DONE: {
+        break;
+      }
+      case SPN_DEP_BUILD_STATE_FAILED:
+      default: {
+        failed = true;
+
+        sp_str_builder_new_line(&builder);
+        sp_str_builder_append_fmt(&builder, "> {:fg brightyellow}", SP_FMT_STR(dep->recipe->name));
+        sp_str_builder_new_line(&builder);
+        sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_STR(sp_io_read_file(dep->paths.log)));
+        sp_log(sp_str_builder_write(&builder));
+
+        break;
+      }
+    }
+  }
 }
 
-void spn_tui_init(spn_tui_t* tui) {
+void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode) {
+  tui->mode = mode;
   tui->num_deps = sp_ht_size(app.deps);
   tui->width = 0;
   sp_ht_for(app.deps, it) {
@@ -1463,17 +1549,20 @@ sp_str_t spn_dep_context_find_latest_commit(spn_dep_t* dep) {
   return spn_git_get_commit(dep->recipe->paths.source, sp_format("origin/{}", SP_FMT_STR(dep->recipe->branch)));
 }
 
-void spn_dep_checkout(spn_dep_t *dep) {
-  if (dep->recipe->branch.len) {
-    spn_git_checkout(dep->recipe->paths.source, dep->recipe->branch);
-  }
-}
-
 bool spn_dep_context_is_build_stamped(spn_dep_t* context) {
   return sp_os_does_path_exist(context->paths.stamp);
 }
 
-void spn_dep_context_prepare(spn_dep_t* dep) {
+void spn_dep_context_init(spn_dep_t* dep, sp_str_t name) {
+  dep->name = sp_str_copy(name);
+  sp_mutex_init(&dep->mutex, SP_MUTEX_PLAIN);
+}
+
+spn_err_t spn_dep_context_resolve_build_id(spn_dep_t* dep) {
+  if (sp_str_empty(dep->commits.resolved)) {
+    return SPN_ERROR;
+  }
+
   sp_mutex_lock(&dep->mutex);
 
   sp_dyn_array(sp_hash_t) hashes = SP_NULLPTR;
@@ -1494,9 +1583,11 @@ void spn_dep_context_prepare(spn_dep_t* dep) {
   dep->paths.stamp = sp_os_join_path(dep->paths.store, SP_LIT("spn.stamp"));
 
   sp_mutex_unlock(&dep->mutex);
+
+  return SPN_OK;
 }
 
-s32 spn_dep_context_sync_remote(spn_dep_t* dep) {
+spn_err_t spn_dep_context_sync_remote(spn_dep_t* dep) {
   if (!sp_os_does_path_exist(dep->recipe->paths.source)) {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
 
@@ -1507,7 +1598,7 @@ s32 spn_dep_context_sync_remote(spn_dep_t* dep) {
         SP_FMT_STR(dep->recipe->name)
       ));
 
-      return 0;
+      return SPN_ERROR;
     }
 
     SP_ASSERT(sp_os_is_directory(dep->recipe->paths.source));
@@ -1516,38 +1607,71 @@ s32 spn_dep_context_sync_remote(spn_dep_t* dep) {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
     SP_ASSERT(!spn_git_fetch(dep->recipe->paths.source));
   }
+
+  return SPN_OK;
 }
 
-s32 spn_dep_context_resolve_commit(spn_dep_t* dep) {
-  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PREPARING);
+spn_err_t spn_dep_context_set_commit(spn_dep_t* dep, sp_str_t commit) {
   sp_mutex_lock(&dep->mutex);
-
-  if (dep->update || sp_str_empty(dep->lock)) {
-    dep->commits.resolved = spn_dep_context_find_latest_commit(dep);
-  }
-  else {
-    dep->commits.resolved = dep->lock;
-  }
-
-  dep->commits.message = spn_git_get_commit_message(dep->recipe->paths.source, dep->commits.resolved);
-  dep->commits.message = sp_str_truncate(dep->commits.message, 32, SP_LIT("..."));
-  dep->commits.message = sp_str_replace_c8(dep->commits.message, '\n', ' ');
-  dep->commits.message = sp_str_pad(dep->commits.message, 32);
-  dep->commits.delta = spn_git_num_updates(dep->recipe->paths.source, dep->commits.resolved, spn_dep_context_find_latest_commit(dep));
-
-  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
-  spn_git_checkout(dep->recipe->paths.source, dep->commits.resolved);
-
+  dep->commits.resolved = commit;
   sp_mutex_unlock(&dep->mutex);
 }
 
+spn_err_t spn_dep_context_resolve_commit(spn_dep_t* dep) {
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_RESOLVING);
 
-s32 spn_dep_context_build_async(void* user_data) {
+  sp_str_t commit = SP_ZERO_INITIALIZE();
+
+  bool update = false;
+  update |= dep->update;
+  update |= sp_str_empty(dep->lock);
+  if (update) {
+    commit = spn_dep_context_find_latest_commit(dep);
+  }
+  else {
+    commit = dep->lock;
+  }
+
+  sp_str_t message = spn_git_get_commit_message(dep->recipe->paths.source, commit);
+  message = sp_str_truncate(message, 32, SP_LIT("..."));
+  message = sp_str_replace_c8(message, '\n', ' ');
+  message = sp_str_pad(message, 32);
+
+  u32 delta = spn_git_num_updates(dep->recipe->paths.source, commit, spn_dep_context_find_latest_commit(dep));
+
+  sp_mutex_lock(&dep->mutex);
+
+  dep->commits.resolved = commit;
+  dep->commits.message = message;
+  dep->commits.delta = delta;
+
+  sp_mutex_unlock(&dep->mutex);
+
+  return SPN_OK;
+}
+
+spn_err_t spn_dep_context_sync_local(spn_dep_t* dep) {
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
+
+  return spn_git_checkout(dep->recipe->paths.source, dep->commits.resolved);
+}
+
+SPN_ASYNC s32 spn_dep_context_add(void* user_data) {
   spn_dep_t* dep = (spn_dep_t*)user_data;
 
-  spn_dep_context_sync_remote(dep);
-  spn_dep_context_resolve_commit(dep);
-  spn_dep_context_prepare(dep);
+  SP_ASSERT(!spn_dep_context_sync_remote(dep));
+  SP_ASSERT(!spn_dep_context_resolve_commit(dep));
+
+  spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
+}
+
+SPN_ASYNC s32 spn_dep_context_build(void* user_data) {
+  spn_dep_t* dep = (spn_dep_t*)user_data;
+
+  SP_ASSERT(!spn_dep_context_sync_remote(dep));
+  SP_ASSERT(!spn_dep_context_resolve_commit(dep));
+  SP_ASSERT(!spn_dep_context_sync_local(dep));
+  SP_ASSERT(!spn_dep_context_resolve_build_id(dep));
 
   if (spn_dep_context_is_build_stamped(dep)) {
     if (!dep->force) {
@@ -1869,31 +1993,31 @@ void spn_cli_run(spn_app_t* app) {
     SP_ASSERT(false);
   }
   else if (sp_cstr_equal("list", cli->args[0])) {
-    spn_cli_command_list(cli);
+    spn_cli_list(cli);
   }
   else if (sp_cstr_equal("clean", cli->args[0])) {
-    spn_cli_command_clean(cli);
+    spn_cli_clean(cli);
   }
   else if (sp_cstr_equal("build", cli->args[0])) {
-    spn_cli_command_build(cli);
+    spn_cli_build(cli);
   }
   else if (sp_cstr_equal("copy", cli->args[0])) {
-    spn_cli_command_copy(cli);
+    spn_cli_copy(cli);
   }
   else if (sp_cstr_equal("print", cli->args[0])) {
-    spn_cli_command_print(cli);
+    spn_cli_print(cli);
   }
   else if (sp_cstr_equal("ls", cli->args[0])) {
-    spn_cli_command_ls(cli);
+    spn_cli_ls(cli);
   }
   else if (sp_cstr_equal("which", cli->args[0])) {
-    spn_cli_command_which(cli);
+    spn_cli_which(cli);
   }
   else if (sp_cstr_equal("recipe", cli->args[0])) {
-    spn_cli_command_recipe(cli);
+    spn_cli_recipe(cli);
   }
   else if (sp_cstr_equal("add", cli->args[0])) {
-    spn_cli_command_add(cli);
+    spn_cli_add(cli);
   }
 }
 
@@ -1904,7 +2028,7 @@ spn_dep_t* spn_cli_assert_dep_exists(sp_str_t name) {
   return dep;
 }
 
-void spn_cli_assert_dep_is_built(spn_dep_t* dep) {
+void spn_cli_assert_dep_is_locked(spn_dep_t* dep) {
   if (sp_str_empty(dep->lock)) {
     SP_FATAL(
       "{:fg brightcyan} hasn't been built yet. Run {:fg brightyellow} first.",
@@ -1914,57 +2038,11 @@ void spn_cli_assert_dep_is_built(spn_dep_t* dep) {
   }
 }
 
-void spn_cli_command_init(spn_cli_t* cli) {
+void spn_cli_init(spn_cli_t* cli) {
 
 }
 
-void spn_cli_command_add(spn_cli_t* cli) {
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_END()
-    },
-    (const c8* []) {
-      "spn add",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
-
-  if (!cli->num_args || !cli->args[0]) {
-    argparse_usage(&argparse);
-    return;
-  }
-
-  sp_str_t name = sp_str_from_cstr(cli->args[0]);
-
-  spn_recipe_t* recipe = sp_ht_getp(app.recipes, name);
-  if (!recipe) {
-    sp_str_t prefix = sp_str_lit("  > ");
-    sp_str_t color = sp_str_lit("brightcyan");
-    sp_da(sp_str_t) search = app.search;
-    search = sp_str_map(search, sp_dyn_array_size(search), &color, sp_str_map_kernel_colorize);
-    search = sp_str_map(search, sp_dyn_array_size(search), &prefix, sp_str_map_kernel_prepend);
-
-    SP_FATAL(
-      "Could not find {:fg yellow} on search path: \n{}",
-      SP_FMT_STR(name),
-      SP_FMT_STR(sp_str_join_n(search, sp_dyn_array_size(search), sp_str_lit("\n")))
-    );
-  }
-
-  spn_dep_t dep = {
-    .name = name,
-  };
-  sp_ht_insert(app.deps, name, dep);
-
-  spn_update_lock_file();
-}
-
-void spn_cli_command_list(spn_cli_t* cli) {
+void spn_cli_list(spn_cli_t* cli) {
   struct argparse argparse;
   argparse_init(
     &argparse,
@@ -2003,7 +2081,7 @@ void spn_cli_command_list(spn_cli_t* cli) {
   sp_log(sp_str_builder_write(&builder));
 }
 
-void spn_cli_command_clean(spn_cli_t* cli) {
+void spn_cli_clean(spn_cli_t* cli) {
   SP_LOG("Removing {:fg brightcyan}", SP_FMT_STR(app.paths.build));
   sp_os_remove_directory(app.paths.build);
   SP_LOG("Removing {:fg brightcyan}", SP_FMT_STR(app.paths.store));
@@ -2011,7 +2089,7 @@ void spn_cli_command_clean(spn_cli_t* cli) {
 }
 
 
-void spn_cli_command_copy(spn_cli_t* cli) {
+void spn_cli_copy(spn_cli_t* cli) {
   struct argparse argparse;
   argparse_init(
     &argparse,
@@ -2042,8 +2120,8 @@ void spn_cli_command_copy(spn_cli_t* cli) {
 
   sp_ht_for(app.deps, it) {
     spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
-    spn_cli_assert_dep_is_built(dep);
-    spn_dep_context_prepare(dep, dep->lock);
+    spn_cli_assert_dep_is_locked(dep);
+    spn_dep_context_resolve_build_id(dep, dep->lock);
 
     sp_dyn_array(sp_os_dir_entry_t) entries = sp_os_scan_directory(dep->paths.lib);
     sp_dyn_array_for(entries, i) {
@@ -2064,7 +2142,7 @@ void spn_cli_command_copy(spn_cli_t* cli) {
   }
 }
 
-void spn_cli_command_print(spn_cli_t* cli) {
+void spn_cli_print(spn_cli_t* cli) {
   spn_cli_print_t* command = &cli->print;
 
   struct argparse argparse;
@@ -2102,9 +2180,9 @@ void spn_cli_command_print(spn_cli_t* cli) {
 
   sp_ht_for(app.deps, it) {
     spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
-    spn_cli_assert_dep_is_built(dep);
+    spn_cli_assert_dep_is_locked(dep);
     spn_dep_context_resolve_commit(dep);
-    spn_dep_context_prepare(dep, dep->lock);
+    spn_dep_context_resolve_build_id(dep, dep->lock);
   }
 
   spn_generator_context_t gen = {
@@ -2198,7 +2276,7 @@ void spn_cli_command_print(spn_cli_t* cli) {
 }
 
 
-void spn_cli_command_ls(spn_cli_t* cli) {
+void spn_cli_ls(spn_cli_t* cli) {
   struct argparse argparse;
   argparse_init(
     &argparse,
@@ -2224,8 +2302,8 @@ void spn_cli_command_ls(spn_cli_t* cli) {
 
   if (package) {
     spn_dep_t* dep = spn_cli_assert_dep_exists(sp_str_view(package));
-    spn_cli_assert_dep_is_built(dep);
-    spn_dep_context_prepare(dep, dep->lock);
+    spn_cli_assert_dep_is_locked(dep);
+    spn_dep_context_resolve_build_id(dep, dep->lock);
 
     spn_cache_dir_kind_t kind = SPN_DIR_STORE;
     if (cli->ls.dir) {
@@ -2246,7 +2324,7 @@ void spn_cli_command_ls(spn_cli_t* cli) {
   }
 }
 
-void spn_cli_command_which(spn_cli_t* cli) {
+void spn_cli_which(spn_cli_t* cli) {
   struct argparse argparse;
   argparse_init(
     &argparse,
@@ -2272,8 +2350,8 @@ void spn_cli_command_which(spn_cli_t* cli) {
 
   if (package) {
     spn_dep_t* dep = spn_cli_assert_dep_exists(sp_str_view(package));
-    spn_cli_assert_dep_is_built(dep);
-    spn_dep_context_prepare(dep, dep->lock);
+    spn_cli_assert_dep_is_locked(dep);
+    spn_dep_context_resolve_build_id(dep, dep->lock);
 
     spn_cache_dir_kind_t kind = SPN_DIR_STORE;
     if (cli->which.dir) {
@@ -2295,7 +2373,7 @@ void spn_cli_command_which(spn_cli_t* cli) {
   }
 }
 
-void spn_cli_command_recipe(spn_cli_t* cli) {
+void spn_cli_recipe(spn_cli_t* cli) {
   struct argparse argparse;
   argparse_init(
     &argparse,
@@ -2317,8 +2395,8 @@ void spn_cli_command_recipe(spn_cli_t* cli) {
   }
 
   spn_dep_t* dep = spn_cli_assert_dep_exists(sp_str_view(cli->args[0]));
-  spn_cli_assert_dep_is_built(dep);
-  spn_dep_context_prepare(dep, dep->lock);
+  spn_cli_assert_dep_is_locked(dep);
+  spn_dep_context_resolve_build_id(dep, dep->lock);
 
   sp_str_t recipe_path = dep->recipe->paths.file;
   sp_str_t recipe = sp_io_read_file(recipe_path);
@@ -2329,7 +2407,61 @@ void spn_cli_command_recipe(spn_cli_t* cli) {
   sp_os_log(recipe);
 }
 
-void spn_cli_command_build(spn_cli_t* cli) {
+void spn_cli_add(spn_cli_t* cli) {
+  struct argparse argparse;
+  argparse_init(
+    &argparse,
+    (struct argparse_option []) {
+      OPT_HELP(),
+      OPT_END()
+    },
+    (const c8* []) {
+      "spn add",
+      SP_NULLPTR
+    },
+    SP_NULL
+  );
+  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+
+  if (!cli->num_args || !cli->args[0]) {
+    argparse_usage(&argparse);
+    return;
+  }
+
+  sp_str_t name = sp_str_from_cstr(cli->args[0]);
+
+  spn_recipe_t* recipe = sp_ht_getp(app.recipes, name);
+  if (!recipe) {
+    sp_str_t prefix = sp_str_lit("  > ");
+    sp_str_t color = sp_str_lit("brightcyan");
+    sp_da(sp_str_t) search = app.search;
+    search = sp_str_map(search, sp_dyn_array_size(search), &color, sp_str_map_kernel_colorize);
+    search = sp_str_map(search, sp_dyn_array_size(search), &prefix, sp_str_map_kernel_prepend);
+
+    SP_FATAL(
+      "Could not find {:fg yellow} on search path: \n{}",
+      SP_FMT_STR(name),
+      SP_FMT_STR(sp_str_join_n(search, sp_dyn_array_size(search), sp_str_lit("\n")))
+    );
+  }
+
+  spn_tui_mode_t mode = app.cli.output ?
+    spn_output_mode_from_str(sp_str_view(app.cli.output)) :
+    SPN_OUTPUT_MODE_INTERACTIVE;
+
+  sp_ht_insert(app.deps, name, SP_ZERO_STRUCT(spn_dep_t));
+  spn_dep_t* dep = sp_ht_getp(app.deps, name);
+  spn_dep_context_init(dep, name);
+
+  sp_thread_init(&dep->thread, spn_dep_context_add, dep);
+
+  spn_tui_init(&app.tui, mode);
+  spn_tui_run(&app.tui);
+
+  spn_update_lock_file();
+}
+
+void spn_cli_build(spn_cli_t* cli) {
   spn_cli_build_t* command = &cli->build;
 
   struct argparse argparse;
@@ -2351,94 +2483,19 @@ void spn_cli_command_build(spn_cli_t* cli) {
   );
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
+  spn_tui_mode_t mode = app.cli.output ?
+    spn_output_mode_from_str(sp_str_view(app.cli.output)) :
+    SPN_OUTPUT_MODE_INTERACTIVE;
+
   sp_ht_for(app.deps, it) {
     spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
     dep->force = command->force;
     dep->update = command->update;
-    sp_thread_init(&dep->thread, spn_dep_context_build_async, dep);
+    sp_thread_init(&dep->thread, spn_dep_context_build, dep);
   }
 
-  const c8* output_mode = SP_NULLPTR;
-
-  if (app.cli.output) {
-    output_mode = app.cli.output;
-  }
-
-  if (output_mode) {
-    app.tui.mode = spn_output_mode_from_str(sp_str_from_cstr(output_mode));
-  }
-  else {
-    app.tui.mode = SPN_OUTPUT_MODE_INTERACTIVE;
-  }
-
-  spn_tui_init(&app.tui);
-
-  while (true) {
-    // Check if user requested cancellation (e.g., Ctrl-C)
-    if (sp_atomic_s32_get(&app.control) != 0) {
-      // Signal all threads to stop
-      sp_ht_for(app.deps, it) {
-        spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
-        sp_mutex_lock(&dep->mutex);
-        if (!spn_dep_state_is_terminal(dep)) {
-          dep->state.build = SPN_DEP_BUILD_STATE_FAILED;
-        }
-        sp_mutex_unlock(&dep->mutex);
-      }
-      break;
-    }
-
-    bool building = false;
-
-    sp_ht_for(app.deps, it) {
-      spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
-
-      sp_mutex_lock(&dep->mutex);
-      if (!spn_dep_state_is_terminal(dep)) {
-        building = true;
-      }
-      sp_mutex_unlock(&dep->mutex);
-    }
-
-    spn_tui_update(&app.tui);
-
-    if (!building) {
-      break;
-    }
-    sp_os_sleep_ms(10);
-  }
-
-  spn_tui_cleanup(&app.tui);
-
-  // Report any failures
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-
-  bool failed = false;
-  sp_ht_for(app.deps, it) {
-    spn_dep_t* dep = sp_ht_it_getp(app.deps, it);
-
-    if (dep->log.file.fd) {
-      sp_io_close(&dep->log);
-    }
-
-    switch (dep->state.build) {
-      case SPN_DEP_BUILD_STATE_DONE: {
-        break;
-      }
-      case SPN_DEP_BUILD_STATE_FAILED:
-      default: {
-        failed = true;
-
-        sp_str_builder_new_line(&builder);
-        sp_str_builder_append_fmt(&builder, "> {:fg brightyellow}", SP_FMT_STR(dep->recipe->name));
-        sp_str_builder_new_line(&builder);
-        sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_STR(sp_io_read_file(dep->paths.log)));
-        sp_log(sp_str_builder_write(&builder));
-
-        break;
-      }
-    }
-  }
+  spn_tui_init(&app.tui, mode);
+  spn_tui_run(&app.tui);
 
   spn_update_lock_file();
 }
