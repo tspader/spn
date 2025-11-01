@@ -267,29 +267,6 @@ typedef struct {
   sp_str_t file;
 } spn_package_paths_t;
 
-typedef enum {
-  SPN_VERSION_EQ,
-  SPN_VERSION_GEQ,
-  SPN_VERSION_GT,
-  SPN_VERSION_LEQ,
-  SPN_VERSION_LT,
-} spn_version_op_t;
-
-typedef struct {
-  u32 major;
-  u32 minor;
-  u32 patch;
-} spn_version_t;
-
-typedef struct {
-  spn_version_t low;
-  spn_version_t high;
-  struct {
-    spn_version_op_t low;
-    spn_version_op_t high;
-  } ops;
-} spn_version_range_t;
-
 typedef struct {
   sp_da(sp_str_t) headers;
   sp_da(sp_str_t) sources;
@@ -316,14 +293,14 @@ typedef struct {
 
 typedef struct {
   sp_str_t name;
-  spn_version_range_t version;
+  spn_semver_range_t range;
 } spn_dep_req_t;
 
 struct spn_package {
   spn_toml_package_t toml;
   sp_str_t name;
   sp_str_t repo;
-  spn_version_t version;
+  spn_semver_t version;
   spn_package_paths_t paths;
   sp_ht(spn_lib_kind_t, spn_lib_t) lib;
   sp_ht(sp_str_t, spn_bin_t) bin;
@@ -338,7 +315,6 @@ struct spn_package {
 };
 
 spn_package_t spn_package_load(sp_str_t file_path);
-spn_version_range_t spn_version_range_from_str(sp_str_t str);
 
 // Specific to a single build
 typedef struct {
@@ -2020,11 +1996,19 @@ spn_semver_range_t spn_semver_caret_to_range(spn_semver_parsed_t parsed) {
     range.high.version.minor = 0;
     range.high.version.patch = 0;
   } else if (parsed.version.minor > 0) {
-    range.low = (spn_semver_bound_t){ parsed.version, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { parsed.version.major, parsed.version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
+    range.low.op = SPN_SEMVER_OP_GEQ;
+    range.low.version = parsed.version;
+    range.high.op = SPN_SEMVER_OP_LT;
+    range.high.version.major = parsed.version.major;
+    range.high.version.minor = parsed.version.minor + 1;
+    range.high.version.patch = 0;
   } else {
-    range.low = (spn_semver_bound_t){ parsed.version, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { parsed.version.major, parsed.version.minor, parsed.version.patch + 1 }, SPN_SEMVER_OP_LT };
+    range.low.op = SPN_SEMVER_OP_GEQ;
+    range.low.version = parsed.version;
+    range.high.op = SPN_SEMVER_OP_LT;
+    range.high.version.major = parsed.version.major;
+    range.high.version.minor = parsed.version.minor;
+    range.high.version.patch = parsed.version.patch + 1;
   }
 
   return range;
@@ -2033,14 +2017,26 @@ spn_semver_range_t spn_semver_caret_to_range(spn_semver_parsed_t parsed) {
 spn_semver_range_t spn_semver_tilde_to_range(spn_semver_parsed_t parsed) {
   spn_semver_range_t range = {0};
   if (parsed.components.patch) {
-    range.low = (spn_semver_bound_t){ parsed.version, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { parsed.version.major, parsed.version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
+    range.low.op = SPN_SEMVER_OP_GEQ;
+    range.low.version = parsed.version;
+    range.high.op = SPN_SEMVER_OP_LT;
+    range.high.version.major = parsed.version.major;
+    range.high.version.minor = parsed.version.minor + 1;
+    range.high.version.patch = 0;
   } else if (parsed.components.minor) {
-    range.low = (spn_semver_bound_t){ parsed.version, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { parsed.version.major, parsed.version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
+    range.low.op = SPN_SEMVER_OP_GEQ;
+    range.low.version = parsed.version;
+    range.high.op = SPN_SEMVER_OP_LT;
+    range.high.version.major = parsed.version.major;
+    range.high.version.minor = parsed.version.minor + 1;
+    range.high.version.patch = 0;
   } else {
-    range.low = (spn_semver_bound_t){ parsed.version, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { parsed.version.major + 1, 0, 0 }, SPN_SEMVER_OP_LT };
+    range.low.op = SPN_SEMVER_OP_GEQ;
+    range.low.version = parsed.version;
+    range.high.op = SPN_SEMVER_OP_LT;
+    range.high.version.major = parsed.version.major + 1;
+    range.high.version.minor = 0;
+    range.high.version.patch = 0;
   }
 
   return range;
@@ -2050,14 +2046,32 @@ spn_semver_range_t spn_semver_wildcard_to_range(spn_semver_parsed_t parsed) {
   spn_semver_range_t range = {0};
 
   if (!parsed.components.major) {
-    range.low = (spn_semver_bound_t){ { 0, 0, 0 }, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF }, SPN_SEMVER_OP_LT };
+    range.low.op = SPN_SEMVER_OP_GEQ;
+    range.low.version.major = 0;
+    range.low.version.minor = 0;
+    range.low.version.patch = 0;
+    range.high.op = SPN_SEMVER_OP_LT;
+    range.high.version.major = 0xFFFFFFFF;
+    range.high.version.minor = 0xFFFFFFFF;
+    range.high.version.patch = 0xFFFFFFFF;
   } else if (!parsed.components.minor) {
-    range.low = (spn_semver_bound_t){ { parsed.version.major, 0, 0 }, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { parsed.version.major + 1, 0, 0 }, SPN_SEMVER_OP_LT };
+    range.low.op = SPN_SEMVER_OP_GEQ;
+    range.low.version.major = parsed.version.major;
+    range.low.version.minor = 0;
+    range.low.version.patch = 0;
+    range.high.op = SPN_SEMVER_OP_LT;
+    range.high.version.major = parsed.version.major + 1;
+    range.high.version.minor = 0;
+    range.high.version.patch = 0;
   } else {
-    range.low = (spn_semver_bound_t){ { parsed.version.major, parsed.version.minor, 0 }, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { parsed.version.major, parsed.version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
+    range.low.op = SPN_SEMVER_OP_GEQ;
+    range.low.version.major = parsed.version.major;
+    range.low.version.minor = parsed.version.minor;
+    range.low.version.patch = 0;
+    range.high.op = SPN_SEMVER_OP_LT;
+    range.high.version.major = parsed.version.major;
+    range.high.version.minor = parsed.version.minor + 1;
+    range.high.version.patch = 0;
   }
 
   return range;
@@ -2066,8 +2080,12 @@ spn_semver_range_t spn_semver_wildcard_to_range(spn_semver_parsed_t parsed) {
 spn_semver_range_t spn_semver_comparison_to_range(spn_semver_op_t op, spn_semver_t version) {
   spn_semver_range_t range = {0};
 
-  range.low = (spn_semver_bound_t){ version, op };
-  range.high = (spn_semver_bound_t){ { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF }, SPN_SEMVER_OP_LT };
+  range.low.op = op;
+  range.low.version = version;
+  range.high.op = SPN_SEMVER_OP_LT;
+  range.high.version.major = 0xFFFFFFFF;
+  range.high.version.minor = 0xFFFFFFFF;
+  range.high.version.patch = 0xFFFFFFFF;
 
   return range;
 }
@@ -2120,21 +2138,35 @@ spn_semver_range_t spn_semver_range_from_str(sp_str_t str) {
     spn_semver_op_t op;
     if (c == '>') {
       spn_semver_parser_eat(&parser);
-      if (!spn_semver_parser_is_done(&parser) && spn_semver_parser_peek(&parser) == '=') {
-        spn_semver_parser_eat(&parser);
-        op = SPN_SEMVER_OP_GEQ;
-      } else {
+
+      bool done = spn_semver_parser_is_done(&parser);
+      if (done) {
         op = SPN_SEMVER_OP_GT;
       }
-    } else if (c == '<') {
-      spn_semver_parser_eat(&parser);
-      if (!spn_semver_parser_is_done(&parser) && spn_semver_parser_peek(&parser) == '=') {
+      else if (spn_semver_parser_peek(&parser) == '=') {
         spn_semver_parser_eat(&parser);
-        op = SPN_SEMVER_OP_LEQ;
-      } else {
+        op = SPN_SEMVER_OP_GEQ;
+      }
+      else {
+        op = SPN_SEMVER_OP_GT;
+      }
+    }
+    else if (c == '<') {
+      spn_semver_parser_eat(&parser);
+
+      bool done = spn_semver_parser_is_done(&parser);
+      if (done) {
         op = SPN_SEMVER_OP_LT;
       }
-    } else {
+      else if (spn_semver_parser_peek(&parser) == '=') {
+        spn_semver_parser_eat(&parser);
+        op = SPN_SEMVER_OP_LEQ;
+      }
+      else {
+        op = SPN_SEMVER_OP_LT;
+      }
+    }
+    else {
       spn_semver_parser_eat(&parser);
       op = SPN_SEMVER_OP_EQ;
     }
@@ -2151,9 +2183,6 @@ spn_semver_range_t spn_semver_range_from_str(sp_str_t str) {
   return range;
 }
 
-spn_version_range_t spn_version_range_from_str(sp_str_t str) {
-  return (spn_version_range_t){0};
-}
 
 spn_package_t spn_package_load(sp_str_t file_path) {
   spn_toml_package_t toml = SP_ZERO_INITIALIZE();
@@ -2212,7 +2241,7 @@ spn_package_t spn_package_load(sp_str_t file_path) {
     spn_toml_for(toml.deps, n, key) {
       spn_dep_req_t dep = {
         .name = sp_str_from_cstr(key),
-        .version = spn_version_range_from_str(spn_toml_str(toml.deps, key)),
+        .range = spn_semver_range_from_str(spn_toml_str(toml.deps, key)),
       };
 
       sp_ht_insert(package.deps, dep.name, dep);
