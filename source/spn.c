@@ -178,6 +178,17 @@ typedef struct {
 } spn_semver_t;
 
 typedef struct {
+  bool major;
+  bool minor;
+  bool patch;
+} spn_semver_components_t;
+
+typedef struct {
+  spn_semver_t version;
+  spn_semver_components_t components;
+} spn_semver_parsed_t;
+
+typedef struct {
   spn_semver_t version;
   spn_semver_op_t op;
 } spn_semver_bound_t;
@@ -185,22 +196,32 @@ typedef struct {
 typedef struct {
   spn_semver_bound_t low;
   spn_semver_bound_t high;
-} spn_version_range_t;
+} spn_semver_range_t;
 
 typedef struct {
-  sp_str_t fmt;
+  sp_str_t str;
   u32 it;
 } spn_semver_parser_t;
 
-c8           spn_semver_parser_peek(spn_semver_parser_t* parser);
-void         spn_semver_parser_eat(spn_semver_parser_t* parser);
-void         spn_semver_parser_eat_and_assert(spn_semver_parser_t* parser, c8 c);
-bool         spn_semver_parser_is_digit(c8 c);
-bool         spn_semver_parser_is_whitespace(spn_semver_parser_t* parser);
-bool         spn_semver_parser_is_done(spn_semver_parser_t* parser);
-void         spn_semver_parser_eat_whitespace(spn_semver_parser_t* parser);
-u32          spn_semver_parser_parse_number(spn_semver_parser_t* parser);
-spn_semver_t spn_semver_parser_parse_version(spn_semver_parser_t* parser, bool* has_minor, bool* has_patch);
+c8                  spn_semver_parser_peek(spn_semver_parser_t* parser);
+void                spn_semver_parser_eat(spn_semver_parser_t* parser);
+void                spn_semver_parser_eat_and_assert(spn_semver_parser_t* parser, c8 c);
+bool                spn_semver_parser_is_digit(c8 c);
+bool                spn_semver_parser_is_whitespace(c8 c);
+bool                spn_semver_parser_is_done(spn_semver_parser_t* parser);
+void                spn_semver_parser_eat_whitespace(spn_semver_parser_t* parser);
+u32                 spn_semver_parser_parse_number(spn_semver_parser_t* parser);
+spn_semver_parsed_t spn_semver_parser_parse_version(spn_semver_parser_t* parser);
+sp_str_t spn_semver_op_to_str(spn_semver_op_t op) {
+  switch (op) {
+    case SPN_SEMVER_OP_EQ: return sp_str_lit("==");
+    case SPN_SEMVER_OP_GEQ: return sp_str_lit(">=");
+    case SPN_SEMVER_OP_GT: return sp_str_lit(">");
+    case SPN_SEMVER_OP_LEQ: return sp_str_lit("<=");
+    case SPN_SEMVER_OP_LT: return sp_str_lit("<");
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
 
 //////////////////
 // DEPENDENCIES //
@@ -608,13 +629,6 @@ void spn_cli_run(spn_app_t* app);
 ////////////////////
 // IMPLEMENTATION //
 ////////////////////
-s32 main(s32 num_args, const c8** args) {
-  app = SP_ZERO_STRUCT(spn_app_t);
-  spn_app_init(&app, num_args, args);
-  spn_cli_run(&app);
-
-  return 0;
-}
 
 ////////////
 // LIBSPN //
@@ -1926,7 +1940,7 @@ void spn_dep_context_set_build_error(spn_dep_t* dep, sp_str_t error) {
 
 c8 spn_semver_parser_peek(spn_semver_parser_t* parser) {
   if (spn_semver_parser_is_done(parser)) return '\0';
-  return sp_str_at(parser->fmt, parser->it);
+  return sp_str_at(parser->str, parser->it);
 }
 
 void spn_semver_parser_eat(spn_semver_parser_t* parser) {
@@ -1942,19 +1956,18 @@ bool spn_semver_parser_is_digit(c8 c) {
   return c >= '0' && c <= '9';
 }
 
-bool spn_semver_parser_is_whitespace(spn_semver_parser_t* parser) {
-  c8 c = sp_str_at(parser->fmt, parser->it);
+bool spn_semver_parser_is_whitespace(c8 c) {
   return c == ' ' || c == '\t' || c == '\n';
 }
 
 bool spn_semver_parser_is_done(spn_semver_parser_t* parser) {
-  return parser->it >= parser->fmt.len;
+  return parser->it >= parser->str.len;
 }
 
 void spn_semver_parser_eat_whitespace(spn_semver_parser_t* parser) {
   while (true) {
     if (spn_semver_parser_is_done(parser)) break;
-    if (!spn_semver_parser_is_whitespace(parser)) break;
+    if (!spn_semver_parser_is_whitespace(spn_semver_parser_peek(parser))) break;
 
     spn_semver_parser_eat(parser);
   }
@@ -1974,77 +1987,84 @@ u32 spn_semver_parser_parse_number(spn_semver_parser_t* parser) {
   return result;
 }
 
-spn_semver_t spn_semver_parser_parse_version(spn_semver_parser_t* parser, bool* has_minor, bool* has_patch) {
-  spn_semver_t version = SP_ZERO_INITIALIZE();
+spn_semver_parsed_t spn_semver_parser_parse_version(spn_semver_parser_t* parser) {
+  spn_semver_parsed_t parsed = SP_ZERO_INITIALIZE();
 
-  version.major = spn_semver_parser_parse_number(parser);
+  parsed.version.major = spn_semver_parser_parse_number(parser);
+  parsed.components.major = true;
 
-  if (!spn_semver_parser_is_done(parser) && spn_semver_parser_peek(parser) == '.') {
-    spn_semver_parser_eat(parser);
-    version.minor = spn_semver_parser_parse_number(parser);
-    if (has_minor) *has_minor = true;
+  if (spn_semver_parser_is_done(parser)) return parsed;
+  if (spn_semver_parser_peek(parser) != '.') return parsed;
 
-    if (!spn_semver_parser_is_done(parser) && spn_semver_parser_peek(parser) == '.') {
-      spn_semver_parser_eat(parser);
-      version.patch = spn_semver_parser_parse_number(parser);
-      if (has_patch) *has_patch = true;
-    }
-  }
+  spn_semver_parser_eat(parser);
+  parsed.version.minor = spn_semver_parser_parse_number(parser);
+  parsed.components.minor = true;
 
-  return version;
+  if (spn_semver_parser_is_done(parser)) return parsed;
+  if (spn_semver_parser_peek(parser) != '.') return parsed;
+
+  spn_semver_parser_eat(parser);
+  parsed.version.patch = spn_semver_parser_parse_number(parser);
+  parsed.components.patch = true;
+
+  return parsed;
 }
 
-spn_version_range_t spn_semver_caret_to_range(spn_semver_t version, bool has_minor, bool has_patch) {
-  spn_version_range_t range = {0};
-  if (version.major > 0) {
-    range.low = (spn_semver_bound_t){ version, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { version.major + 1, 0, 0 }, SPN_SEMVER_OP_LT };
-  } else if (version.minor > 0) {
-    range.low = (spn_semver_bound_t){ version, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { version.major, version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
+spn_semver_range_t spn_semver_caret_to_range(spn_semver_parsed_t parsed) {
+  spn_semver_range_t range = {0};
+  if (parsed.version.major > 0) {
+    range.low.op = SPN_SEMVER_OP_GEQ;
+    range.low.version = parsed.version;
+    range.high.op = SPN_SEMVER_OP_LT;
+    range.high.version.major = parsed.version.major + 1;
+    range.high.version.minor = 0;
+    range.high.version.patch = 0;
+  } else if (parsed.version.minor > 0) {
+    range.low = (spn_semver_bound_t){ parsed.version, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { parsed.version.major, parsed.version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
   } else {
-    range.low = (spn_semver_bound_t){ version, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { version.major, version.minor, version.patch + 1 }, SPN_SEMVER_OP_LT };
+    range.low = (spn_semver_bound_t){ parsed.version, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { parsed.version.major, parsed.version.minor, parsed.version.patch + 1 }, SPN_SEMVER_OP_LT };
   }
 
   return range;
 }
 
-spn_version_range_t spn_semver_tilde_to_range(spn_semver_t version, bool has_minor, bool has_patch) {
-  spn_version_range_t range = {0};
-  if (has_patch) {
-    range.low = (spn_semver_bound_t){ version, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { version.major, version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
-  } else if (has_minor) {
-    range.low = (spn_semver_bound_t){ version, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { version.major, version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
+spn_semver_range_t spn_semver_tilde_to_range(spn_semver_parsed_t parsed) {
+  spn_semver_range_t range = {0};
+  if (parsed.components.patch) {
+    range.low = (spn_semver_bound_t){ parsed.version, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { parsed.version.major, parsed.version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
+  } else if (parsed.components.minor) {
+    range.low = (spn_semver_bound_t){ parsed.version, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { parsed.version.major, parsed.version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
   } else {
-    range.low = (spn_semver_bound_t){ version, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { version.major + 1, 0, 0 }, SPN_SEMVER_OP_LT };
+    range.low = (spn_semver_bound_t){ parsed.version, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { parsed.version.major + 1, 0, 0 }, SPN_SEMVER_OP_LT };
   }
 
   return range;
 }
 
-spn_version_range_t spn_semver_wildcard_to_range(spn_semver_t version, bool has_major, bool has_minor) {
-  spn_version_range_t range = {0};
+spn_semver_range_t spn_semver_wildcard_to_range(spn_semver_parsed_t parsed) {
+  spn_semver_range_t range = {0};
 
-  if (!has_major) {
+  if (!parsed.components.major) {
     range.low = (spn_semver_bound_t){ { 0, 0, 0 }, SPN_SEMVER_OP_GEQ };
     range.high = (spn_semver_bound_t){ { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF }, SPN_SEMVER_OP_LT };
-  } else if (!has_minor) {
-    range.low = (spn_semver_bound_t){ { version.major, 0, 0 }, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { version.major + 1, 0, 0 }, SPN_SEMVER_OP_LT };
+  } else if (!parsed.components.minor) {
+    range.low = (spn_semver_bound_t){ { parsed.version.major, 0, 0 }, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { parsed.version.major + 1, 0, 0 }, SPN_SEMVER_OP_LT };
   } else {
-    range.low = (spn_semver_bound_t){ { version.major, version.minor, 0 }, SPN_SEMVER_OP_GEQ };
-    range.high = (spn_semver_bound_t){ { version.major, version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
+    range.low = (spn_semver_bound_t){ { parsed.version.major, parsed.version.minor, 0 }, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { parsed.version.major, parsed.version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
   }
 
   return range;
 }
 
-spn_version_range_t spn_semver_comparison_to_range(spn_semver_op_t op, spn_semver_t version) {
-  spn_version_range_t range = {0};
+spn_semver_range_t spn_semver_comparison_to_range(spn_semver_op_t op, spn_semver_t version) {
+  spn_semver_range_t range = {0};
 
   range.low = (spn_semver_bound_t){ version, op };
   range.high = (spn_semver_bound_t){ { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF }, SPN_SEMVER_OP_LT };
@@ -2052,9 +2072,9 @@ spn_version_range_t spn_semver_comparison_to_range(spn_semver_op_t op, spn_semve
   return range;
 }
 
-spn_version_range_t spn_version_range_from_str(sp_str_t str) {
-  spn_semver_parser_t parser = { .fmt = str, .it = 0 };
-  spn_version_range_t range = {0};
+spn_semver_range_t spn_semver_range_from_str(sp_str_t str) {
+  spn_semver_parser_t parser = { .str = str, .it = 0 };
+  spn_semver_range_t range = {0};
 
   spn_semver_parser_eat_whitespace(&parser);
 
@@ -2062,45 +2082,39 @@ spn_version_range_t spn_version_range_from_str(sp_str_t str) {
 
   if (c == '^') {
     spn_semver_parser_eat(&parser);
-    bool has_minor = false, has_patch = false;
-    spn_semver_t version = spn_semver_parser_parse_version(&parser, &has_minor, &has_patch);
-    range = spn_semver_caret_to_range(version, has_minor, has_patch);
+    spn_semver_parsed_t parsed = spn_semver_parser_parse_version(&parser);
+    range = spn_semver_caret_to_range(parsed);
   }
   else if (c == '~') {
     spn_semver_parser_eat(&parser);
-    bool has_minor = false, has_patch = false;
-    spn_semver_t version = spn_semver_parser_parse_version(&parser, &has_minor, &has_patch);
-    range = spn_semver_tilde_to_range(version, has_minor, has_patch);
+    spn_semver_parsed_t parsed = spn_semver_parser_parse_version(&parser);
+    range = spn_semver_tilde_to_range(parsed);
   }
   else if (c == '*') {
     spn_semver_parser_eat(&parser);
-    range = spn_semver_wildcard_to_range((spn_semver_t){0}, false, false);
+    range = spn_semver_wildcard_to_range((spn_semver_parsed_t){0});
   }
   else if (spn_semver_parser_is_digit(c)) {
     u32 saved_it = parser.it;
-    bool has_major = false, has_minor = false;
-    spn_semver_t version = spn_semver_parser_parse_version(&parser, &has_minor, &has_minor);
-    has_major = true;
+    spn_semver_parsed_t parsed = spn_semver_parser_parse_version(&parser);
 
-    if (!spn_semver_parser_is_done(&parser) && spn_semver_parser_peek(&parser) == '.') {
-      spn_semver_parser_eat(&parser);
-      if (!spn_semver_parser_is_done(&parser) && spn_semver_parser_peek(&parser) == '*') {
+    if (!spn_semver_parser_is_done(&parser)) {
+      c8 next = spn_semver_parser_peek(&parser);
+      if (next == '.') {
         spn_semver_parser_eat(&parser);
-        if (!has_minor) {
-          range = spn_semver_wildcard_to_range(version, true, false);
-        } else {
-          range = spn_semver_wildcard_to_range(version, true, true);
+        SP_ASSERT(!spn_semver_parser_is_done(&parser));
+        if (spn_semver_parser_peek(&parser) == '*') {
+          spn_semver_parser_eat(&parser);
+          range = spn_semver_wildcard_to_range(parsed);
+          return range;
         }
-        return range;
-      } else {
         parser.it = saved_it;
       }
     }
 
     parser.it = saved_it;
-    bool has_minor_v2 = false, has_patch_v2 = false;
-    version = spn_semver_parser_parse_version(&parser, &has_minor_v2, &has_patch_v2);
-    range = spn_semver_caret_to_range(version, has_minor_v2, has_patch_v2);
+    parsed = spn_semver_parser_parse_version(&parser);
+    range = spn_semver_caret_to_range(parsed);
   }
   else if (c == '>' || c == '<' || c == '=') {
     spn_semver_op_t op;
@@ -2126,15 +2140,19 @@ spn_version_range_t spn_version_range_from_str(sp_str_t str) {
     }
 
     spn_semver_parser_eat_whitespace(&parser);
-    bool has_minor = false, has_patch = false;
-    spn_semver_t version = spn_semver_parser_parse_version(&parser, &has_minor, &has_patch);
-    range = spn_semver_comparison_to_range(op, version);
+    SP_ASSERT(!spn_semver_parser_is_done(&parser));
+    spn_semver_parsed_t parsed = spn_semver_parser_parse_version(&parser);
+    range = spn_semver_comparison_to_range(op, parsed.version);
   }
   else {
     SP_ASSERT(false && "unsupported semver format");
   }
 
   return range;
+}
+
+spn_version_range_t spn_version_range_from_str(sp_str_t str) {
+  return (spn_version_range_t){0};
 }
 
 spn_package_t spn_package_load(sp_str_t file_path) {
@@ -2917,4 +2935,52 @@ void spn_cli_build(spn_cli_t* cli) {
   spn_tui_run(&app.tui);
 
   spn_update_lock_file();
+}
+
+
+s32 main(s32 num_args, const c8** args) {
+
+  sp_str_t versions [] = {
+    sp_str_lit("1.2.3"),
+    sp_str_lit("^1.2.3"),
+    sp_str_lit("1.2"),
+    sp_str_lit("1"),
+    sp_str_lit("0.2.3"),
+    sp_str_lit("0.2"),
+    sp_str_lit("0.0.3"),
+    sp_str_lit("0.0"),
+    sp_str_lit("0"),
+    sp_str_lit("~1.2.3"),
+    sp_str_lit("~1.2"),
+    sp_str_lit("~1"),
+    sp_str_lit("*"),
+    sp_str_lit("1.*"),
+    sp_str_lit("1.2.*"),
+    sp_str_lit(">= 1.2.0"),
+    sp_str_lit("> 1"),
+    sp_str_lit("< 2"),
+    sp_str_lit("= 1.2.3"),
+  };
+  SP_CARR_FOR(versions, it) {
+    sp_str_t version = versions[it];
+    spn_semver_range_t range = spn_semver_range_from_str(version);
+    SP_LOG(
+      "{:fg brightblack} -> {:fg brightgreen}{:fg cyan}.{:fg cyan}.{:fg cyan}, {:fg brightgreen}{:fg cyan}.{:fg cyan}.{:fg cyan}",
+      SP_FMT_STR(sp_str_pad(version, 12)),
+      SP_FMT_STR(spn_semver_op_to_str(range.low.op)),
+      SP_FMT_U32(range.low.version.major),
+      SP_FMT_U32(range.low.version.minor),
+      SP_FMT_U32(range.low.version.patch),
+      SP_FMT_STR(spn_semver_op_to_str(range.high.op)),
+      SP_FMT_U32(range.high.version.major),
+      SP_FMT_U32(range.high.version.minor),
+      SP_FMT_U32(range.high.version.patch)
+    );
+  }
+  SP_EXIT_SUCCESS();
+  app = SP_ZERO_STRUCT(spn_app_t);
+  spn_app_init(&app, num_args, args);
+  spn_cli_run(&app);
+
+  return 0;
 }
