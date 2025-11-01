@@ -1,6 +1,10 @@
 [package]
 name = "spn"
 
-[dependencies]
+[deps]
 sp = "1.0.0"
-toml = "1.0.0"
+
+[[bin]]
+name = "spn"
+entry = "source/spn.c"
+
