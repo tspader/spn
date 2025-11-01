@@ -3,7 +3,8 @@ local project = {
   deps = {
     sp = {},
     argparse = {},
-    tcc = {}
+    tcc = {},
+    toml = {},
   }
 }
 

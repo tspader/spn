@@ -98,7 +98,7 @@ SPN_INSTALL_PREFIX ?= $(HOME)/.local/bin
 # FLAGS #
 #########
 FLAG_LANGUAGE := -std=c11
-CFLAGS := $(FLAG_LANGUAGE) $(FLAG_LINKAGE) -I$(SPN_DIR_SOURCE) -o $(SPN_OUTPUT)
+CFLAGS := $(FLAG_LANGUAGE) $(FLAG_LINKAGE) -I./include -o $(SPN_OUTPUT)
 
 .PHONY: all
 all: build
@@ -145,13 +145,13 @@ $(BOOTSTRAP_SPN): $(BOOTSTRAP_ARCHIVE) | $(BOOTSTRAP_BIN)
 	@$(BOOTSTRAP_EXTRACT)
 	@chmod +x $(BOOTSTRAP_SPN)
 
-$(SPN_OUTPUT): $(BOOTSTRAP_SPN) source/*.h source/*.c source/spn/*.h $(SPN_MAKEFILE) | $(SPN_DIR_BUILD_OUTPUT)
+$(SPN_OUTPUT): $(BOOTSTRAP_SPN) source/spn.c include/spn/spn.h Makefile | $(SPN_DIR_BUILD_OUTPUT)
 	$(call print_heading)
 	@echo "building dependencies"
 	#spn --no-interactive build
 	$(call print_heading)
 	@echo "building spn"
-	$(CC) ./source/main.c $(CFLAGS) $$(spn print) $(FLAG_SYSTEM_LIBS)
+	$(CC) ./source/spn.c $(CFLAGS) $$(spn print) $(FLAG_SYSTEM_LIBS)
 	#$(CC) ./source/main.c $(CFLAGS) $$(./build/bin/spn -f ./test/test.c print) $(FLAG_SYSTEM_LIBS)
 	#$(CC) ./source/main.c $(CFLAGS) -I./external/sp -I./external/argparse -I$(HOME)/.local/include/luajit-2.1 $(HOME)/.local/lib/libluajit-5.1.a $(FLAG_SYSTEM_LIBS)
 

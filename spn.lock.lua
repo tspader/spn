@@ -14,6 +14,11 @@ return {
       build_id = "4c87a48",
       commit = "f4e01bfcab",
       name = "tcc"
+    },
+    toml = {
+      build_id = "a5fc5305",
+      commit = "2e8ffdfa21",
+      name = "toml"
     }
   }
 }

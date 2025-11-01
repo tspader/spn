@@ -1,0 +1,6 @@
+[package]
+name = "spn"
+
+[dependencies]
+sp = "1.0.0"
+toml = "1.0.0"
