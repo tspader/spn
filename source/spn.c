@@ -161,6 +161,46 @@ typedef struct {
   sp_str_t rpath;
 } spn_generator_context_t;
 
+// SEMVER //
+///////////
+typedef enum {
+  SPN_SEMVER_OP_LT = 0,
+  SPN_SEMVER_OP_LEQ = 1,
+  SPN_SEMVER_OP_GT = 2,
+  SPN_SEMVER_OP_GEQ = 3,
+  SPN_SEMVER_OP_EQ = 4,
+} spn_semver_op_t;
+
+typedef struct {
+  u32 major;
+  u32 minor;
+  u32 patch;
+} spn_semver_t;
+
+typedef struct {
+  spn_semver_t version;
+  spn_semver_op_t op;
+} spn_semver_bound_t;
+
+typedef struct {
+  spn_semver_bound_t low;
+  spn_semver_bound_t high;
+} spn_version_range_t;
+
+typedef struct {
+  sp_str_t fmt;
+  u32 it;
+} spn_semver_parser_t;
+
+c8           spn_semver_parser_peek(spn_semver_parser_t* parser);
+void         spn_semver_parser_eat(spn_semver_parser_t* parser);
+void         spn_semver_parser_eat_and_assert(spn_semver_parser_t* parser, c8 c);
+bool         spn_semver_parser_is_digit(c8 c);
+bool         spn_semver_parser_is_whitespace(spn_semver_parser_t* parser);
+bool         spn_semver_parser_is_done(spn_semver_parser_t* parser);
+void         spn_semver_parser_eat_whitespace(spn_semver_parser_t* parser);
+u32          spn_semver_parser_parse_number(spn_semver_parser_t* parser);
+spn_semver_t spn_semver_parser_parse_version(spn_semver_parser_t* parser, bool* has_minor, bool* has_patch);
 
 //////////////////
 // DEPENDENCIES //
@@ -1881,8 +1921,219 @@ void spn_dep_context_set_build_error(spn_dep_t* dep, sp_str_t error) {
   sp_mutex_unlock(&dep->mutex);
 }
 
+
+
+
+c8 spn_semver_parser_peek(spn_semver_parser_t* parser) {
+  if (spn_semver_parser_is_done(parser)) return '\0';
+  return sp_str_at(parser->fmt, parser->it);
+}
+
+void spn_semver_parser_eat(spn_semver_parser_t* parser) {
+  parser->it++;
+}
+
+void spn_semver_parser_eat_and_assert(spn_semver_parser_t* parser, c8 c) {
+  SP_ASSERT(spn_semver_parser_peek(parser) == c);
+  spn_semver_parser_eat(parser);
+}
+
+bool spn_semver_parser_is_digit(c8 c) {
+  return c >= '0' && c <= '9';
+}
+
+bool spn_semver_parser_is_whitespace(spn_semver_parser_t* parser) {
+  c8 c = sp_str_at(parser->fmt, parser->it);
+  return c == ' ' || c == '\t' || c == '\n';
+}
+
+bool spn_semver_parser_is_done(spn_semver_parser_t* parser) {
+  return parser->it >= parser->fmt.len;
+}
+
+void spn_semver_parser_eat_whitespace(spn_semver_parser_t* parser) {
+  while (true) {
+    if (spn_semver_parser_is_done(parser)) break;
+    if (!spn_semver_parser_is_whitespace(parser)) break;
+
+    spn_semver_parser_eat(parser);
+  }
+}
+
+u32 spn_semver_parser_parse_number(spn_semver_parser_t* parser) {
+  u32 result = 0;
+  while (true) {
+    if (spn_semver_parser_is_done(parser)) break;
+    if (!spn_semver_parser_is_digit(spn_semver_parser_peek(parser))) break;
+
+    c8 c = spn_semver_parser_peek(parser);
+    result = result * 10 + (c - '0');
+    spn_semver_parser_eat(parser);
+  }
+
+  return result;
+}
+
+spn_semver_t spn_semver_parser_parse_version(spn_semver_parser_t* parser, bool* has_minor, bool* has_patch) {
+  spn_semver_t version = SP_ZERO_INITIALIZE();
+
+  version.major = spn_semver_parser_parse_number(parser);
+
+  if (!spn_semver_parser_is_done(parser) && spn_semver_parser_peek(parser) == '.') {
+    spn_semver_parser_eat(parser);
+    version.minor = spn_semver_parser_parse_number(parser);
+    if (has_minor) *has_minor = true;
+
+    if (!spn_semver_parser_is_done(parser) && spn_semver_parser_peek(parser) == '.') {
+      spn_semver_parser_eat(parser);
+      version.patch = spn_semver_parser_parse_number(parser);
+      if (has_patch) *has_patch = true;
+    }
+  }
+
+  return version;
+}
+
+spn_version_range_t spn_semver_caret_to_range(spn_semver_t version, bool has_minor, bool has_patch) {
+  spn_version_range_t range = {0};
+  if (version.major > 0) {
+    range.low = (spn_semver_bound_t){ version, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { version.major + 1, 0, 0 }, SPN_SEMVER_OP_LT };
+  } else if (version.minor > 0) {
+    range.low = (spn_semver_bound_t){ version, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { version.major, version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
+  } else {
+    range.low = (spn_semver_bound_t){ version, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { version.major, version.minor, version.patch + 1 }, SPN_SEMVER_OP_LT };
+  }
+
+  return range;
+}
+
+spn_version_range_t spn_semver_tilde_to_range(spn_semver_t version, bool has_minor, bool has_patch) {
+  spn_version_range_t range = {0};
+  if (has_patch) {
+    range.low = (spn_semver_bound_t){ version, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { version.major, version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
+  } else if (has_minor) {
+    range.low = (spn_semver_bound_t){ version, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { version.major, version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
+  } else {
+    range.low = (spn_semver_bound_t){ version, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { version.major + 1, 0, 0 }, SPN_SEMVER_OP_LT };
+  }
+
+  return range;
+}
+
+spn_version_range_t spn_semver_wildcard_to_range(spn_semver_t version, bool has_major, bool has_minor) {
+  spn_version_range_t range = {0};
+
+  if (!has_major) {
+    range.low = (spn_semver_bound_t){ { 0, 0, 0 }, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF }, SPN_SEMVER_OP_LT };
+  } else if (!has_minor) {
+    range.low = (spn_semver_bound_t){ { version.major, 0, 0 }, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { version.major + 1, 0, 0 }, SPN_SEMVER_OP_LT };
+  } else {
+    range.low = (spn_semver_bound_t){ { version.major, version.minor, 0 }, SPN_SEMVER_OP_GEQ };
+    range.high = (spn_semver_bound_t){ { version.major, version.minor + 1, 0 }, SPN_SEMVER_OP_LT };
+  }
+
+  return range;
+}
+
+spn_version_range_t spn_semver_comparison_to_range(spn_semver_op_t op, spn_semver_t version) {
+  spn_version_range_t range = {0};
+
+  range.low = (spn_semver_bound_t){ version, op };
+  range.high = (spn_semver_bound_t){ { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF }, SPN_SEMVER_OP_LT };
+
+  return range;
+}
+
 spn_version_range_t spn_version_range_from_str(sp_str_t str) {
-  spn_version_range_t range = SP_ZERO_INITIALIZE();
+  spn_semver_parser_t parser = { .fmt = str, .it = 0 };
+  spn_version_range_t range = {0};
+
+  spn_semver_parser_eat_whitespace(&parser);
+
+  c8 c = spn_semver_parser_peek(&parser);
+
+  if (c == '^') {
+    spn_semver_parser_eat(&parser);
+    bool has_minor = false, has_patch = false;
+    spn_semver_t version = spn_semver_parser_parse_version(&parser, &has_minor, &has_patch);
+    range = spn_semver_caret_to_range(version, has_minor, has_patch);
+  }
+  else if (c == '~') {
+    spn_semver_parser_eat(&parser);
+    bool has_minor = false, has_patch = false;
+    spn_semver_t version = spn_semver_parser_parse_version(&parser, &has_minor, &has_patch);
+    range = spn_semver_tilde_to_range(version, has_minor, has_patch);
+  }
+  else if (c == '*') {
+    spn_semver_parser_eat(&parser);
+    range = spn_semver_wildcard_to_range((spn_semver_t){0}, false, false);
+  }
+  else if (spn_semver_parser_is_digit(c)) {
+    u32 saved_it = parser.it;
+    bool has_major = false, has_minor = false;
+    spn_semver_t version = spn_semver_parser_parse_version(&parser, &has_minor, &has_minor);
+    has_major = true;
+
+    if (!spn_semver_parser_is_done(&parser) && spn_semver_parser_peek(&parser) == '.') {
+      spn_semver_parser_eat(&parser);
+      if (!spn_semver_parser_is_done(&parser) && spn_semver_parser_peek(&parser) == '*') {
+        spn_semver_parser_eat(&parser);
+        if (!has_minor) {
+          range = spn_semver_wildcard_to_range(version, true, false);
+        } else {
+          range = spn_semver_wildcard_to_range(version, true, true);
+        }
+        return range;
+      } else {
+        parser.it = saved_it;
+      }
+    }
+
+    parser.it = saved_it;
+    bool has_minor_v2 = false, has_patch_v2 = false;
+    version = spn_semver_parser_parse_version(&parser, &has_minor_v2, &has_patch_v2);
+    range = spn_semver_caret_to_range(version, has_minor_v2, has_patch_v2);
+  }
+  else if (c == '>' || c == '<' || c == '=') {
+    spn_semver_op_t op;
+    if (c == '>') {
+      spn_semver_parser_eat(&parser);
+      if (!spn_semver_parser_is_done(&parser) && spn_semver_parser_peek(&parser) == '=') {
+        spn_semver_parser_eat(&parser);
+        op = SPN_SEMVER_OP_GEQ;
+      } else {
+        op = SPN_SEMVER_OP_GT;
+      }
+    } else if (c == '<') {
+      spn_semver_parser_eat(&parser);
+      if (!spn_semver_parser_is_done(&parser) && spn_semver_parser_peek(&parser) == '=') {
+        spn_semver_parser_eat(&parser);
+        op = SPN_SEMVER_OP_LEQ;
+      } else {
+        op = SPN_SEMVER_OP_LT;
+      }
+    } else {
+      spn_semver_parser_eat(&parser);
+      op = SPN_SEMVER_OP_EQ;
+    }
+
+    spn_semver_parser_eat_whitespace(&parser);
+    bool has_minor = false, has_patch = false;
+    spn_semver_t version = spn_semver_parser_parse_version(&parser, &has_minor, &has_patch);
+    range = spn_semver_comparison_to_range(op, version);
+  }
+  else {
+    SP_ASSERT(false && "unsupported semver format");
+  }
+
   return range;
 }
 
