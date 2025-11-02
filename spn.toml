@@ -8,3 +8,6 @@ sp = "1.0.0"
 name = "spn"
 entry = "source/spn.c"
 
+[[bin]]
+name = "spn-test"
+entry = "test/main.c"

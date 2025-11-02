@@ -212,16 +212,6 @@ bool                spn_semver_parser_is_done(spn_semver_parser_t* parser);
 void                spn_semver_parser_eat_whitespace(spn_semver_parser_t* parser);
 u32                 spn_semver_parser_parse_number(spn_semver_parser_t* parser);
 spn_semver_parsed_t spn_semver_parser_parse_version(spn_semver_parser_t* parser);
-sp_str_t spn_semver_op_to_str(spn_semver_op_t op) {
-  switch (op) {
-    case SPN_SEMVER_OP_EQ: return sp_str_lit("==");
-    case SPN_SEMVER_OP_GEQ: return sp_str_lit(">=");
-    case SPN_SEMVER_OP_GT: return sp_str_lit(">");
-    case SPN_SEMVER_OP_LEQ: return sp_str_lit("<=");
-    case SPN_SEMVER_OP_LT: return sp_str_lit("<");
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
 
 //////////////////
 // DEPENDENCIES //
@@ -2181,6 +2171,17 @@ spn_semver_range_t spn_semver_range_from_str(sp_str_t str) {
   }
 
   return range;
+}
+
+sp_str_t spn_semver_op_to_str(spn_semver_op_t op) {
+  switch (op) {
+    case SPN_SEMVER_OP_EQ: return sp_str_lit("==");
+    case SPN_SEMVER_OP_GEQ: return sp_str_lit(">=");
+    case SPN_SEMVER_OP_GT: return sp_str_lit(">");
+    case SPN_SEMVER_OP_LEQ: return sp_str_lit("<=");
+    case SPN_SEMVER_OP_LT: return sp_str_lit("<");
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
 
