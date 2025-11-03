@@ -1,2 +1,3 @@
-[versions.0_1_0]
+[[versions]]
+version = "0.1.0"
 commit = "80efa56421bf"

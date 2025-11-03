@@ -107,6 +107,7 @@ typedef struct {
   toml_array_t* bin;
   toml_table_t* deps;
   toml_table_t* metadata;
+  toml_array_t* versions;
 } spn_toml_package_t;
 
 toml_table_t* spn_toml_parse(sp_str_t path);
@@ -214,6 +215,8 @@ bool                spn_semver_parser_is_done(spn_semver_parser_t* parser);
 void                spn_semver_parser_eat_whitespace(spn_semver_parser_t* parser);
 u32                 spn_semver_parser_parse_number(spn_semver_parser_t* parser);
 spn_semver_parsed_t spn_semver_parser_parse_version(spn_semver_parser_t* parser);
+spn_semver_t        spn_semver_from_str(sp_str_t);
+spn_semver_range_t  spn_semver_range_from_str(sp_str_t str);
 
 //////////////////
 // DEPENDENCIES //
@@ -294,9 +297,8 @@ typedef struct {
 typedef struct {
   spn_semver_t version;
   sp_str_t commit;
-} spn_metadata_entry_t;
+} spn_metadata_t;
 
-typedef sp_ht(spn_semver_t, spn_metadata_entry_t) spn_metadata_t;
 
 struct spn_package {
   spn_toml_package_t toml;
@@ -306,6 +308,7 @@ struct spn_package {
   sp_ht(spn_lib_kind_t, spn_lib_t) lib;
   sp_ht(sp_str_t, spn_bin_t) bin;
   sp_ht(sp_str_t, spn_dep_req_t) deps;
+  sp_ht(spn_semver_t, spn_metadata_t) metadata;
 
   spn_dep_fn_t info;
   spn_dep_fn_t configure;
@@ -591,7 +594,6 @@ typedef struct {
   spn_package_t package;
   sp_dyn_array(sp_str_t) search;
   sp_ht(sp_str_t, spn_package_t) packages;
-  sp_ht(sp_str_t, spn_metadata_t) metadata;
   sp_ht(sp_str_t, spn_dep_t) deps;
   sp_ht(sp_str_t, spn_dep_t) builds;
   sp_ht(sp_str_t, spn_build_matrix_t) matrices;
@@ -1842,6 +1844,7 @@ s32 spn_dep_thread_resolve(void* user_data) {
   spn_dep_t* dep = (spn_dep_t*)user_data;
   if (spn_dep_context_resolve(dep)) return 1;
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
+  return 0;
 }
 
 s32 spn_dep_thread_build(void* user_data) {
@@ -1849,6 +1852,7 @@ s32 spn_dep_thread_build(void* user_data) {
   if (spn_dep_context_resolve(dep)) return 1;
   if (spn_dep_context_build(dep)) return 1;
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_DONE);
+  return 0;
 }
 
 s32 spn_dep_context_resolve(spn_dep_t* dep) {
@@ -2186,6 +2190,14 @@ spn_semver_range_t spn_semver_range_from_str(sp_str_t str) {
   return range;
 }
 
+spn_semver_t spn_semver_from_str(sp_str_t str) {
+  spn_semver_parser_t parser = {
+    .str = str
+  };
+  spn_semver_parsed_t parsed = spn_semver_parser_parse_version(&parser);
+  return parsed.version;
+}
+
 sp_str_t spn_semver_op_to_str(spn_semver_op_t op) {
   switch (op) {
     case SPN_SEMVER_OP_EQ: return sp_str_lit("==");
@@ -2198,23 +2210,23 @@ sp_str_t spn_semver_op_to_str(spn_semver_op_t op) {
 }
 
 
-spn_package_t spn_package_load(sp_str_t file_path) {
+spn_package_t spn_package_load(sp_str_t manifest_path) {
   spn_package_t package = SP_ZERO_INITIALIZE();
   sp_ht_set_fns(package.bin, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(package.deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  package.paths.roo
-  package.paths = (spn_package_paths_t) {
-    .manifest = sp_str_copy(file_path),
-  };
+  sp_ht_set_fns(package.metadata, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+  package.paths.root = sp_os_parent_path(manifest_path);
+  package.paths.manifest = sp_str_copy(manifest_path);
+  package.paths.metadata = sp_os_join_path(package.paths.root, sp_str_lit("metadata.toml"));
+  package.paths.script = sp_os_join_path(package.paths.root, sp_str_lit("spn.c"));
 
   spn_toml_package_t toml = SP_ZERO_INITIALIZE();
-  toml.root = spn_toml_parse(file_path);
+  toml.root = spn_toml_parse(package.paths.manifest);
   toml.package = toml_table_table(toml.root, "package");
   toml.lib = toml_table_table(toml.root, "lib");
   toml.bin = toml_table_array(toml.root, "bin");
   toml.deps = toml_table_table(toml.root, "deps");
-  toml.metadata = spn_toml_parse();
-
+  toml.metadata = spn_toml_parse(package.paths.metadata);
 
   package.toml = toml;
   package.name = spn_toml_str(toml.package, "name");
@@ -2262,6 +2274,22 @@ spn_package_t spn_package_load(sp_str_t file_path) {
       };
 
       sp_ht_insert(package.deps, dep.name, dep);
+    }
+  }
+
+  if (toml.metadata) {
+    toml.versions = toml_table_array(toml.metadata, "versions");
+
+    const c8* key = SP_NULLPTR;
+    spn_toml_arr_for(toml.versions, it) {
+      toml_table_t* entry = toml_array_table(toml.versions, it);
+
+      spn_metadata_t metadata = {
+        .version = spn_semver_from_str(spn_toml_str(entry, "version")),
+        .commit = spn_toml_str(entry, "commit"),
+      };
+
+      sp_ht_insert(package.metadata, metadata.version, metadata);
     }
   }
 
