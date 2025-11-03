@@ -1,8 +1,6 @@
 [package]
 name = "sp"
 repo = "tspader/sp"
-version = "1.0.0"
-commit = "80efa56421bf"
 
 [lib.source]
 headers = ["sp.h"]

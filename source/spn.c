@@ -106,6 +106,7 @@ typedef struct {
   toml_table_t* so;
   toml_array_t* bin;
   toml_table_t* deps;
+  toml_table_t* metadata;
 } spn_toml_package_t;
 
 toml_table_t* spn_toml_parse(sp_str_t path);
@@ -161,8 +162,9 @@ typedef struct {
   sp_str_t rpath;
 } spn_generator_context_t;
 
+////////////
 // SEMVER //
-///////////
+////////////
 typedef enum {
   SPN_SEMVER_OP_LT = 0,
   SPN_SEMVER_OP_LEQ = 1,
@@ -254,7 +256,10 @@ typedef enum {
 
 typedef struct {
   sp_str_t source;
-  sp_str_t file;
+  sp_str_t root;
+  sp_str_t   manifest;
+  sp_str_t   metadata;
+  sp_str_t   script;
 } spn_package_paths_t;
 
 typedef struct {
@@ -286,11 +291,17 @@ typedef struct {
   spn_semver_range_t range;
 } spn_dep_req_t;
 
+typedef struct {
+  spn_semver_t version;
+  sp_str_t commit;
+} spn_metadata_entry_t;
+
+typedef sp_ht(spn_semver_t, spn_metadata_entry_t) spn_metadata_t;
+
 struct spn_package {
   spn_toml_package_t toml;
   sp_str_t name;
   sp_str_t repo;
-  spn_semver_t version;
   spn_package_paths_t paths;
   sp_ht(spn_lib_kind_t, spn_lib_t) lib;
   sp_ht(sp_str_t, spn_bin_t) bin;
@@ -580,6 +591,7 @@ typedef struct {
   spn_package_t package;
   sp_dyn_array(sp_str_t) search;
   sp_ht(sp_str_t, spn_package_t) packages;
+  sp_ht(sp_str_t, spn_metadata_t) metadata;
   sp_ht(sp_str_t, spn_dep_t) deps;
   sp_ht(sp_str_t, spn_dep_t) builds;
   sp_ht(sp_str_t, spn_build_matrix_t) matrices;
@@ -1902,8 +1914,9 @@ void spn_dep_context_set_build_error(spn_dep_t* dep, sp_str_t error) {
 }
 
 
-
-
+////////////
+// SEMVER //
+////////////
 c8 spn_semver_parser_peek(spn_semver_parser_t* parser) {
   if (spn_semver_parser_is_done(parser)) return '\0';
   return sp_str_at(parser->str, parser->it);
@@ -2186,25 +2199,28 @@ sp_str_t spn_semver_op_to_str(spn_semver_op_t op) {
 
 
 spn_package_t spn_package_load(sp_str_t file_path) {
+  spn_package_t package = SP_ZERO_INITIALIZE();
+  sp_ht_set_fns(package.bin, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+  sp_ht_set_fns(package.deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+  package.paths.roo
+  package.paths = (spn_package_paths_t) {
+    .manifest = sp_str_copy(file_path),
+  };
+
   spn_toml_package_t toml = SP_ZERO_INITIALIZE();
   toml.root = spn_toml_parse(file_path);
   toml.package = toml_table_table(toml.root, "package");
   toml.lib = toml_table_table(toml.root, "lib");
   toml.bin = toml_table_array(toml.root, "bin");
   toml.deps = toml_table_table(toml.root, "deps");
+  toml.metadata = spn_toml_parse();
 
-  spn_package_t package = SP_ZERO_INITIALIZE();
-  sp_ht_set_fns(package.bin, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(package.deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
 
   package.toml = toml;
   package.name = spn_toml_str(toml.package, "name");
   package.repo = spn_toml_str_opt(toml.package, "repo", "");
-  package.paths = (spn_package_paths_t) {
-    .source = sp_os_join_path(app.paths.source, package.name),
-    .file = sp_str_copy(file_path),
-  };
   package.state = SPN_PACKAGE_STATE_UNLOADED;
+  package.paths.source = sp_os_join_path(app.paths.source, package.name);
 
   if (toml.lib) {
     toml.src = toml_table_table(toml.lib, "source");
@@ -2251,6 +2267,7 @@ spn_package_t spn_package_load(sp_str_t file_path) {
 
   return package;
 }
+
 
 /////////
 // APP //
@@ -2419,8 +2436,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
         sp_dyn_array_push(search, sp_str_copy(entry.file_path));
       }
       else {
-        sp_str_t ext = sp_os_extract_extension(entry.file_name);
-        if (!sp_str_equal_cstr(ext, "toml")) continue;
+        if (!sp_str_equal_cstr(entry.file_name, "spn.toml")) continue;
 
         sp_dyn_array_push(files, sp_str_copy(entry.file_path));
       }
@@ -2857,7 +2873,7 @@ void spn_cli_recipe(spn_cli_t* cli) {
   spn_dep_context_set_commit(dep, dep->lock);
   spn_dep_context_resolve_build_id(dep);
 
-  sp_str_t recipe_path = dep->recipe->paths.file;
+  sp_str_t recipe_path = dep->recipe->paths.manifest;
   sp_str_t recipe = sp_io_read_file(recipe_path);
   if (!sp_str_valid(recipe)) {
     SP_FATAL("failed to read recipe file: {:fg brightyellow}", SP_FMT_STR(recipe_path));
@@ -2969,45 +2985,6 @@ void spn_cli_build(spn_cli_t* cli) {
 
 
 s32 main(s32 num_args, const c8** args) {
-
-  sp_str_t versions [] = {
-    sp_str_lit("1.2.3"),
-    sp_str_lit("^1.2.3"),
-    sp_str_lit("1.2"),
-    sp_str_lit("1"),
-    sp_str_lit("0.2.3"),
-    sp_str_lit("0.2"),
-    sp_str_lit("0.0.3"),
-    sp_str_lit("0.0"),
-    sp_str_lit("0"),
-    sp_str_lit("~1.2.3"),
-    sp_str_lit("~1.2"),
-    sp_str_lit("~1"),
-    sp_str_lit("*"),
-    sp_str_lit("1.*"),
-    sp_str_lit("1.2.*"),
-    sp_str_lit(">= 1.2.0"),
-    sp_str_lit("> 1"),
-    sp_str_lit("< 2"),
-    sp_str_lit("= 1.2.3"),
-  };
-  SP_CARR_FOR(versions, it) {
-    sp_str_t version = versions[it];
-    spn_semver_range_t range = spn_semver_range_from_str(version);
-    SP_LOG(
-      "{:fg brightblack} -> {:fg brightgreen}{:fg cyan}.{:fg cyan}.{:fg cyan}, {:fg brightgreen}{:fg cyan}.{:fg cyan}.{:fg cyan}",
-      SP_FMT_STR(sp_str_pad(version, 12)),
-      SP_FMT_STR(spn_semver_op_to_str(range.low.op)),
-      SP_FMT_U32(range.low.version.major),
-      SP_FMT_U32(range.low.version.minor),
-      SP_FMT_U32(range.low.version.patch),
-      SP_FMT_STR(spn_semver_op_to_str(range.high.op)),
-      SP_FMT_U32(range.high.version.major),
-      SP_FMT_U32(range.high.version.minor),
-      SP_FMT_U32(range.high.version.patch)
-    );
-  }
-  SP_EXIT_SUCCESS();
   app = SP_ZERO_STRUCT(spn_app_t);
   spn_app_init(&app, num_args, args);
   spn_cli_run(&app);
