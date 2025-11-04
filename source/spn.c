@@ -1455,6 +1455,10 @@ void spn_toml_append_array_table(spn_toml_writer_t* writer) {
   spn_toml_context_t* top = &writer->stack[depth - 1];
   SP_ASSERT(top->kind == SPN_TOML_CONTEXT_ARRAY);
 
+  if (top->header_written) {
+    sp_str_builder_new_line(&writer->builder);
+  }
+
   sp_dyn_array(sp_str_t) path_parts = SP_NULLPTR;
   for (u32 i = 1; i < depth; i++) {
     sp_dyn_array_push(path_parts, writer->stack[i].key);
@@ -3204,6 +3208,11 @@ void spn_cli_add(spn_cli_t* cli) {
       SP_FMT_STR(sp_str_join_n(search, sp_dyn_array_size(search), sp_str_lit("\n")))
     );
   }
+
+  // get the latest package version
+  // insert into package.deps
+  // resolve
+  //
 }
 
 void spn_cli_print(spn_cli_t* cli) {
@@ -3389,23 +3398,53 @@ void spn_cli_build(spn_cli_t* cli) {
   spn_update_lock_file();
 }
 
-
-s32 main(s32 num_args, const c8** args) {
+void test() {
   spn_toml_writer_t toml = spn_toml_writer_new();
-  spn_toml_append_str(&toml, "foo", sp_str_lit("bar"));
 
-  spn_toml_begin_table(&toml, "tbl");
-  spn_toml_append_str(&toml, "tbl_key", sp_str_lit("tbl_val"));
+  spn_toml_begin_table(&toml, "package");
+  spn_toml_append_str(&toml, "name", sp_str_lit("spn"));
+  spn_toml_append_str(&toml, "repo", sp_str_lit("tspader/spn"));
   spn_toml_end_table(&toml);
 
-  spn_toml_begin_array(&toml, "arr");
-  spn_toml_append_str(&toml, "arr_key", sp_str_lit("arr_val"));
+  spn_toml_begin_table(&toml, "deps");
+  spn_toml_append_str(&toml, "sp", sp_str_lit("1.1.0"));
+  spn_toml_append_str(&toml, "tcc", sp_str_lit("1.0.0"));
+  spn_toml_end_table(&toml);
+
+  spn_toml_begin_table(&toml, "lib");
+  sp_da(sp_str_t) kinds = SP_NULLPTR;
+  sp_dyn_array_push(kinds, sp_str_lit("static"));
+  sp_dyn_array_push(kinds, sp_str_lit("shared"));
+  spn_toml_append_str_array(&toml, "kinds", kinds);
+  spn_toml_append_str(&toml, "name", sp_str_lit("spn"));
+  spn_toml_end_table(&toml);
+
+  spn_toml_begin_array(&toml, "bin");
+  spn_toml_append_array_table(&toml);
+  spn_toml_append_str(&toml, "name", sp_str_lit("spn"));
+  spn_toml_append_str(&toml, "entry", sp_str_lit("source/spn.c"));
+  spn_toml_append_array_table(&toml);
+  spn_toml_append_str(&toml, "name", sp_str_lit("spn-test"));
+  spn_toml_append_str(&toml, "entry", sp_str_lit("test/main.c"));
   spn_toml_end_array(&toml);
+
+  spn_toml_begin_table(&toml, "options");
+  spn_toml_append_str(&toml, "foo", sp_str_lit("bar"));
+  spn_toml_append_s64(&toml, "baz", 69);
+  spn_toml_end_table(&toml);
+
+  spn_toml_begin_table(&toml, "config");
+  spn_toml_begin_table(&toml, "sp");
+  spn_toml_append_bool(&toml, "use_foo", true);
+  spn_toml_end_table(&toml);
+  spn_toml_end_table(&toml);
 
   sp_log(spn_toml_writer_write(&toml));
   SP_EXIT_SUCCESS();
+}
 
 
+s32 main(s32 num_args, const c8** args) {
   app = SP_ZERO_STRUCT(spn_app_t);
   spn_app_init(&app, num_args, args);
   spn_cli_run(&app);
