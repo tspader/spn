@@ -98,7 +98,8 @@ SPN_INSTALL_PREFIX ?= $(HOME)/.local/bin
 # FLAGS #
 #########
 FLAG_LANGUAGE := -std=c11
-CFLAGS := $(FLAG_LANGUAGE) $(FLAG_LINKAGE) -I./include -o $(SPN_OUTPUT)
+FLAG_WARNINGS := -Wall -Wno-unused-variable -Wno-missing-braces -Wno-unused-but-set-variable
+CFLAGS := $(FLAG_WARNINGS) $(FLAG_LANGUAGE) $(FLAG_LINKAGE) -I./include -o $(SPN_OUTPUT)
 
 .PHONY: all
 all: build
