@@ -1,0 +1,9 @@
+[package]
+name = "tcc"
+repo = "TinyCC/tinycc"
+
+[deps]
+"sp" = "1.2.0"
+
+[lib.source]
+headers = [""]

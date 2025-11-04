@@ -69,6 +69,30 @@ typedef enum {
 #define _SP_MCAT(x, y) x##y
 #define SP_MCAT(x, y) _SP_MCAT(x, y)
 
+#define SP_OPT_SOME 1
+#define SP_OPT_NONE 0
+
+#define SP_LIMIT_MAX_U32 4294967295U
+#define SP_LIMIT_MIN_U32 0U
+#define SP_LIMIT_MAX_S32 2147483647
+#define SP_LIMIT_MIN_S32 (-2147483647 - 1)
+#define SP_LIMIT_MAX_S64 9223372036854775807LL
+#define SP_LIMIT_MIN_S64 (-9223372036854775807LL - 1)
+#define SP_LIMIT_MAX_F32 3.40282346638528859812e+38F
+#define SP_LIMIT_MIN_F32 1.17549435082228750797e-38F
+#define SP_LIMIT_MAX_F64 1.7976931348623157081e+308
+#define SP_LIMIT_MIN_F64 2.2250738585072014077e-308
+
+#define sp_opt(T) struct { \
+  T value; \
+  u8 some; \
+}
+
+#define sp_opt_set(O, V) do { (O).value = (V); (O).some = SP_OPT_SOME; } while (0)
+#define sp_opt_get(O) (O).value
+
+#define sp_dyn_array_sort(arr, fn) qsort(arr, sp_dyn_array_size(arr), sizeof((arr)[0]), fn)
+
 sp_str_t sp_str_map_kernel_colorize(sp_str_map_context_t* context) {
   sp_str_t id = *(sp_str_t*)context->user_data;
   sp_str_t ansi = sp_format_color_id_to_ansi_fg(id);
@@ -217,6 +241,13 @@ u32                 spn_semver_parser_parse_number(spn_semver_parser_t* parser);
 spn_semver_parsed_t spn_semver_parser_parse_version(spn_semver_parser_t* parser);
 spn_semver_t        spn_semver_from_str(sp_str_t);
 spn_semver_range_t  spn_semver_range_from_str(sp_str_t str);
+bool spn_semver_eq(spn_semver_t lhs, spn_semver_t rhs);
+bool spn_semver_geq(spn_semver_t lhs, spn_semver_t rhs);
+bool spn_semver_ge(spn_semver_t lhs, spn_semver_t rhs);
+bool spn_semver_leq(spn_semver_t lhs, spn_semver_t rhs);
+bool spn_semver_le(spn_semver_t lhs, spn_semver_t rhs);
+s32 spn_semver_cmp(spn_semver_t lhs, spn_semver_t rhs);
+s32 spn_semver_sort_kernel(const void* a, const void* b);
 
 //////////////////
 // DEPENDENCIES //
@@ -309,6 +340,7 @@ struct spn_package {
   sp_ht(sp_str_t, spn_bin_t) bin;
   sp_ht(sp_str_t, spn_dep_req_t) deps;
   sp_ht(spn_semver_t, spn_metadata_t) metadata;
+  sp_da(spn_semver_t) versions;
 
   spn_dep_fn_t info;
   spn_dep_fn_t configure;
@@ -368,6 +400,7 @@ struct spn_dep {
   bool force;
   bool update;
 
+  spn_metadata_t metadata;
   struct {
     sp_str_t resolved;
     sp_str_t message;
@@ -428,6 +461,23 @@ spn_package_t*        spn_recipe_find(sp_str_t name);
 s32                  spn_sort_kernel_dep_ptr(const void* a, const void* b);
 
 void                 spn_update_lock_file();
+
+// inclusive (e.g. 0, 1 => 2 versions) range into package.versions; !ok -> nothing found
+typedef struct {
+  sp_opt(u32) low;
+  sp_opt(u32) high;
+} spn_dep_version_range_t;
+
+typedef struct {
+  sp_ht(sp_str_t, sp_da(spn_dep_version_range_t)) ranges;
+  sp_ht(sp_str_t, spn_semver_t) versions;
+  sp_ht(sp_str_t, bool) visited;
+} spn_resolver_t;
+
+
+void spn_resolver_init(spn_resolver_t* resolver);
+void spn_resolver_add_package_constraints(spn_resolver_t* resolver, spn_package_t* package);
+spn_dep_version_range_t spn_package_collect_versions(spn_dep_req_t req);
 
 ////////////
 // CONFIG //
@@ -592,6 +642,7 @@ typedef struct {
 
   spn_config_t config;
   spn_package_t package;
+  spn_resolver_t resolver;
   sp_dyn_array(sp_str_t) search;
   sp_ht(sp_str_t, spn_package_t) packages;
   sp_ht(sp_str_t, spn_dep_t) deps;
@@ -1281,6 +1332,8 @@ void spn_install_signal_handlers() {
 // TOML //
 //////////
 toml_table_t* spn_toml_parse(sp_str_t path) {
+  if (!sp_os_does_path_exist(path)) return SP_NULLPTR;
+
   sp_str_t file = sp_io_read_file(path);
   return toml_parse(sp_str_to_cstr(file), SP_NULLPTR, 0);
 }
@@ -1837,7 +1890,7 @@ spn_err_t spn_dep_context_resolve_commit(spn_dep_t* dep) {
 spn_err_t spn_dep_context_sync_local(spn_dep_t* dep) {
   spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CHECKING_OUT);
 
-  return spn_git_checkout(dep->recipe->paths.source, dep->commits.resolved);
+  return spn_git_checkout(dep->recipe->paths.source, dep->metadata.commit);
 }
 
 s32 spn_dep_thread_resolve(void* user_data) {
@@ -2209,12 +2262,59 @@ sp_str_t spn_semver_op_to_str(spn_semver_op_t op) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+sp_str_t spn_semver_to_str(spn_semver_t version) {
+  return sp_format(
+    "{:fg brightblack}.{:fg brightblack}.{:fg brightblack}",
+    SP_FMT_U32(version.major),
+    SP_FMT_U32(version.minor),
+    SP_FMT_U32(version.patch)
+  );
+}
+
+bool spn_semver_eq(spn_semver_t lhs, spn_semver_t rhs) {
+  return lhs.major == rhs.major && lhs.minor == rhs.minor && lhs.patch == rhs.patch;
+}
+
+bool spn_semver_geq(spn_semver_t lhs, spn_semver_t rhs) {
+  if (lhs.major != rhs.major) return lhs.major > rhs.major;
+  if (lhs.minor != rhs.minor) return lhs.minor > rhs.minor;
+  return lhs.patch >= rhs.patch;
+}
+
+bool spn_semver_ge(spn_semver_t lhs, spn_semver_t rhs) {
+  if (lhs.major != rhs.major) return lhs.major > rhs.major;
+  if (lhs.minor != rhs.minor) return lhs.minor > rhs.minor;
+  return lhs.patch > rhs.patch;
+}
+
+bool spn_semver_leq(spn_semver_t lhs, spn_semver_t rhs) {
+  if (lhs.major != rhs.major) return lhs.major < rhs.major;
+  if (lhs.minor != rhs.minor) return lhs.minor < rhs.minor;
+  return lhs.patch <= rhs.patch;
+}
+
+bool spn_semver_le(spn_semver_t lhs, spn_semver_t rhs) {
+  if (lhs.major != rhs.major) return lhs.major < rhs.major;
+  if (lhs.minor != rhs.minor) return lhs.minor < rhs.minor;
+  return lhs.patch < rhs.patch;
+}
+
+s32 spn_semver_cmp(spn_semver_t lhs, spn_semver_t rhs) {
+  if (spn_semver_eq(lhs, rhs)) return SP_QSORT_EQUAL;
+  if (spn_semver_leq(lhs, rhs)) return SP_QSORT_A_FIRST;
+  return SP_QSORT_B_FIRST;
+}
+
+s32 spn_semver_sort_kernel(const void* a, const void* b) {
+  const spn_semver_t* lhs = (const spn_semver_t*)a;
+  const spn_semver_t* rhs = (const spn_semver_t*)b;
+  return spn_semver_cmp(*lhs, *rhs);
+}
 
 spn_package_t spn_package_load(sp_str_t manifest_path) {
   spn_package_t package = SP_ZERO_INITIALIZE();
   sp_ht_set_fns(package.bin, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(package.deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(package.metadata, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   package.paths.root = sp_os_parent_path(manifest_path);
   package.paths.manifest = sp_str_copy(manifest_path);
   package.paths.metadata = sp_os_join_path(package.paths.root, sp_str_lit("metadata.toml"));
@@ -2284,18 +2384,111 @@ spn_package_t spn_package_load(sp_str_t manifest_path) {
     spn_toml_arr_for(toml.versions, it) {
       toml_table_t* entry = toml_array_table(toml.versions, it);
 
+      spn_semver_t version = spn_semver_from_str(spn_toml_str(entry, "version"));
       spn_metadata_t metadata = {
-        .version = spn_semver_from_str(spn_toml_str(entry, "version")),
+        .version = version,
         .commit = spn_toml_str(entry, "commit"),
       };
 
-      sp_ht_insert(package.metadata, metadata.version, metadata);
+      sp_ht_insert(package.metadata, version, metadata);
+      sp_dyn_array_push(package.versions, version);
     }
+
+    sp_dyn_array_sort(package.versions, spn_semver_sort_kernel);
   }
 
   return package;
 }
 
+
+spn_dep_version_range_t spn_package_collect_versions(spn_dep_req_t req) {
+  spn_semver_t low = req.range.low.version;
+  spn_semver_t high = req.range.high.version;
+
+  spn_dep_version_range_t range = SP_ZERO_INITIALIZE();
+
+  spn_package_t* package = sp_ht_getp(app.packages, req.name);
+  sp_dyn_array_for(package->versions, it) {
+    spn_semver_t version = package->versions[it];
+
+    if (!range.low.some) {
+      if (spn_semver_geq(version, low)) {
+        sp_opt_set(range.low, it);
+      }
+    }
+
+    if (spn_semver_leq(version, high)) {
+      sp_opt_set(range.high, it);
+    }
+  }
+
+  return range;
+}
+
+void spn_resolver_init(spn_resolver_t* resolver) {
+  sp_ht_set_fns(resolver->ranges, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+  sp_ht_set_fns(resolver->versions, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+  sp_ht_set_fns(resolver->visited, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+}
+
+void spn_resolver_add_package_constraints(spn_resolver_t* resolver, spn_package_t* package) {
+  // Check for circular dependencies
+  if (sp_ht_key_exists(resolver->visited, package->name)) {
+    SP_FATAL("{:fg brightcyan} transitively includes itself", SP_FMT_STR(package->name));
+  }
+
+  // Mark as visiting
+  sp_ht_insert(resolver->visited, package->name, true);
+
+  sp_ht_for(package->deps, it) {
+    spn_dep_req_t* request = sp_ht_it_getp(package->deps, it);
+    spn_package_t* dep = sp_ht_getp(app.packages, request->name);
+
+    if (!sp_ht_key_exists(resolver->ranges, dep->name)) {
+      sp_ht_insert(resolver->ranges, dep->name, SP_NULLPTR);
+    }
+    sp_da(spn_dep_version_range_t)* ranges = sp_ht_getp(resolver->ranges, dep->name);
+
+    sp_dyn_array_push(*ranges, spn_package_collect_versions(*request));
+  }
+
+  sp_ht_for(package->deps, it) {
+    spn_dep_req_t* request = sp_ht_it_getp(package->deps, it);
+    spn_package_t* dep = sp_ht_getp(app.packages, request->name);
+    spn_resolver_add_package_constraints(resolver, dep);
+  }
+
+  // Unmark (allows diamond dependencies)
+  sp_ht_erase(resolver->visited, package->name);
+}
+
+void spn_resolver_resolve(spn_resolver_t* resolver) {
+  spn_resolver_init(resolver);
+  spn_resolver_add_package_constraints(resolver, &app.package);
+  sp_ht_for(resolver->ranges, it) {
+    sp_str_t name = *sp_ht_it_getkp(resolver->ranges, it);
+    spn_package_t* dep = sp_ht_getp(app.packages, name);
+
+    sp_da(spn_dep_version_range_t) ranges = *sp_ht_it_getp(resolver->ranges, it);
+    SP_ASSERT(sp_dyn_array_size(ranges));
+
+    u32 low = SP_LIMIT_MIN_U32, high = SP_LIMIT_MAX_U32;
+    sp_dyn_array_for(ranges, n) {
+      spn_dep_version_range_t range = ranges[n];
+      SP_ASSERT(range.low.some);
+      SP_ASSERT(range.high.some);
+
+      low = SP_MAX(low, range.low.value);
+      high = SP_MIN(high, range.high.value);
+    }
+
+    SP_ASSERT(low <= high);
+
+    spn_semver_t version = dep->versions[high];
+    sp_ht_insert(resolver->versions, name, version);
+    SP_LOG("{:fg brightcyan}: {}", SP_FMT_STR(name), SP_FMT_STR(spn_semver_to_str(version)));
+  }
+}
 
 /////////
 // APP //
@@ -2478,8 +2671,6 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   }
 
   app->package = spn_package_load(app->paths.project.toml);
-
-
 }
 
 ///////
@@ -2992,6 +3183,8 @@ void spn_cli_build(spn_cli_t* cli) {
     SP_NULL
   );
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+
+  spn_resolver_resolve(&app.resolver);
 
   spn_tui_mode_t mode = app.cli.output ?
     spn_output_mode_from_str(sp_str_view(app.cli.output)) :

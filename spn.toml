@@ -2,7 +2,8 @@
 name = "spn"
 
 [deps]
-sp = "0.1.0"
+sp = "1.1.0"
+tcc = "1.0.0"
 
 [[bin]]
 name = "spn"
