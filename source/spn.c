@@ -273,6 +273,7 @@ u32                 spn_semver_parser_parse_number(spn_semver_parser_t* parser);
 spn_semver_parsed_t spn_semver_parser_parse_version(spn_semver_parser_t* parser);
 spn_semver_t        spn_semver_from_str(sp_str_t);
 spn_semver_range_t  spn_semver_range_from_str(sp_str_t str);
+sp_str_t            spn_semver_range_to_str(spn_semver_range_t range);
 bool spn_semver_eq(spn_semver_t lhs, spn_semver_t rhs);
 bool spn_semver_geq(spn_semver_t lhs, spn_semver_t rhs);
 bool spn_semver_ge(spn_semver_t lhs, spn_semver_t rhs);
@@ -467,6 +468,7 @@ spn_package_t*        spn_recipe_find(sp_str_t name);
 s32                  spn_sort_kernel_dep_ptr(const void* a, const void* b);
 
 void                 spn_update_lock_file();
+void                 spn_update_project_toml();
 
 // inclusive (e.g. 0, 1 => 2 versions) range into package.versions; !ok -> nothing found
 typedef struct {
@@ -1852,6 +1854,95 @@ void spn_tui_update(spn_tui_t* tui) {
 void spn_update_lock_file() {
 }
 
+void spn_update_project_toml() {
+  spn_toml_writer_t toml = spn_toml_writer_new();
+
+  spn_toml_begin_table(&toml, "package");
+  spn_toml_append_str(&toml, "name", app.package.name);
+  if (!sp_str_empty(app.package.repo)) {
+    spn_toml_append_str(&toml, "repo", app.package.repo);
+  }
+  if (!sp_str_empty(app.package.author)) {
+    spn_toml_append_str(&toml, "author", app.package.author);
+  }
+  if (!sp_str_empty(app.package.maintainer)) {
+    spn_toml_append_str(&toml, "maintainer", app.package.maintainer);
+  }
+  spn_toml_end_table(&toml);
+
+  if (sp_ht_size(app.package.deps) > 0) {
+    spn_toml_begin_table(&toml, "deps");
+    sp_ht_for(app.package.deps, it) {
+      sp_str_t* name = sp_ht_it_getkp(app.package.deps, it);
+      spn_dep_req_t* req = sp_ht_it_getp(app.package.deps, it);
+      spn_toml_append_str(&toml, sp_str_to_cstr(*name), spn_semver_range_to_str(req->range));
+    }
+    spn_toml_end_table(&toml);
+  }
+
+  if (sp_ht_size(app.package.lib.enabled) > 0) {
+    spn_toml_begin_table(&toml, "lib");
+    sp_da(sp_str_t) kinds = SP_NULLPTR;
+    sp_ht_for(app.package.lib.enabled, it) {
+      spn_lib_kind_t* kind = sp_ht_it_getkp(app.package.lib.enabled, it);
+      bool* enabled = sp_ht_it_getp(app.package.lib.enabled, it);
+      if (*enabled) {
+        sp_dyn_array_push(kinds, spn_dep_build_kind_to_str(*kind));
+      }
+    }
+    if (sp_dyn_array_size(kinds) > 0) {
+      spn_toml_append_str_array(&toml, "kinds", kinds);
+    }
+    if (sp_str_valid(app.package.lib.name)) {
+      spn_toml_append_str(&toml, "name", app.package.lib.name);
+    }
+    spn_toml_end_table(&toml);
+  }
+
+  if (sp_ht_size(app.package.bin) > 0) {
+    spn_toml_begin_array(&toml, "bin");
+    sp_ht_for(app.package.bin, it) {
+      spn_bin_t* bin = sp_ht_it_getp(app.package.bin, it);
+      spn_toml_append_array_table(&toml);
+      spn_toml_append_str(&toml, "name", bin->name);
+      spn_toml_append_str(&toml, "entry", bin->entry);
+    }
+    spn_toml_end_array(&toml);
+  }
+
+  if (sp_ht_size(app.package.options) > 0) {
+    spn_toml_begin_table(&toml, "options");
+    sp_ht_for(app.package.options, it) {
+      sp_str_t* key = sp_ht_it_getkp(app.package.options, it);
+      spn_dep_option_t* option = sp_ht_it_getp(app.package.options, it);
+      spn_toml_append_option(&toml, sp_str_to_cstr(*key), *option);
+    }
+    spn_toml_end_table(&toml);
+  }
+
+  if (sp_ht_size(app.package.config) > 0) {
+    spn_toml_begin_table(&toml, "config");
+    sp_ht_for(app.package.config, it) {
+      sp_str_t* dep_name = sp_ht_it_getkp(app.package.config, it);
+      spn_dep_options_t* options = sp_ht_it_getp(app.package.config, it);
+      spn_toml_begin_table(&toml, sp_str_to_cstr(*dep_name));
+      sp_ht_for(*options, opt_it) {
+        sp_str_t* key = sp_ht_it_getkp(*options, opt_it);
+        spn_dep_option_t* option = sp_ht_it_getp(*options, opt_it);
+        spn_toml_append_option(&toml, sp_str_to_cstr(*key), *option);
+      }
+      spn_toml_end_table(&toml);
+    }
+    spn_toml_end_table(&toml);
+  }
+
+  sp_str_t output = spn_toml_writer_write(&toml);
+  output = sp_str_trim_right(output);
+  sp_io_stream_t file = sp_io_from_file(app.paths.project.toml, SP_IO_MODE_WRITE);
+  sp_io_write_str(&file, output);
+  sp_io_close(&file);
+}
+
 ///////////
 // BUILD //
 ///////////
@@ -3209,6 +3300,7 @@ void spn_cli_add(spn_cli_t* cli) {
     );
   }
 
+  spn_update_project_toml();
   // get the latest package version
   // insert into package.deps
   // resolve
