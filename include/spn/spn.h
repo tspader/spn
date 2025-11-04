@@ -43,14 +43,28 @@ typedef enum {
   SPN_DIR_WORK = 7,
 } spn_dir_kind_t;
 
+typedef enum {
+  SPN_C89,
+  SPN_C99,
+  SPN_C11,
+} spn_c_standard_t;
+
 typedef struct spn_config spn_config_t;
 typedef struct spn_package spn_package_t;
 typedef struct spn_dep_context spn_dep_context_t;
 typedef struct spn_autoconf spn_autoconf_t;
 typedef struct spn_make spn_make_t;
+typedef struct spn_cc spn_cc_t;
 
 typedef void(*spn_config_fn_t)(spn_config_t*);
 typedef void(*spn_dep_fn_t)(spn_dep_context_t*);
+
+void spn_cc_set_compiler(spn_cc_t* cc, const c8* compiler);
+void spn_cc_add_include_dir(spn_cc_t* cc, const c8* dir);
+void spn_cc_set_c_standard(spn_cc_t* cc, spn_c_standard_t c);
+void spn_cc_enable_warning(spn_cc_t* cc, const c8* warning);
+void spn_cc_disable_warning(spn_cc_t* cc, const c8* warning);
+void spn_cc_use_static_libc(spn_cc_t* cc);
 
 void            spn_make(spn_dep_context_t* build);
 spn_make_t*     spn_make_new(spn_dep_context_t* build);

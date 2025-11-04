@@ -136,9 +136,39 @@ typedef struct {
   toml_table_t*   config;
 } spn_toml_package_t;
 
+typedef enum {
+  SPN_TOML_CONTEXT_ROOT,
+  SPN_TOML_CONTEXT_TABLE,
+  SPN_TOML_CONTEXT_ARRAY,
+} spn_toml_context_kind_t;
+
+typedef struct {
+  spn_toml_context_kind_t kind;
+  sp_str_t key;
+  bool header_written;
+} spn_toml_context_t;
+
+typedef struct {
+  sp_str_builder_t builder;
+  sp_da(spn_toml_context_t) stack;
+} spn_toml_writer_t;
+
 toml_table_t* spn_toml_parse(sp_str_t path);
 sp_str_t spn_toml_str(toml_table_t* toml, const c8* key);
 sp_str_t spn_toml_arr_str(toml_array_t* toml, u32 it);
+
+spn_toml_writer_t spn_toml_writer_new();
+sp_str_t          spn_toml_writer_write(spn_toml_writer_t* writer);
+void              spn_toml_ensure_header_written(spn_toml_writer_t* writer);
+void              spn_toml_begin_table(spn_toml_writer_t* writer, const c8* key);
+void              spn_toml_end_table(spn_toml_writer_t* writer);
+void              spn_toml_begin_array(spn_toml_writer_t* writer, const c8* key);
+void              spn_toml_end_array(spn_toml_writer_t* writer);
+void              spn_toml_append_array_table(spn_toml_writer_t* writer);
+void              spn_toml_append_str(spn_toml_writer_t* writer, const c8* key, sp_str_t value);
+void              spn_toml_append_s64(spn_toml_writer_t* writer, const c8* key, s64 value);
+void              spn_toml_append_bool(spn_toml_writer_t* writer, const c8* key, bool value);
+void              spn_toml_append_str_array(spn_toml_writer_t* writer, const c8* key, sp_da(sp_str_t) values);
 
 /////////
 // TCC //
@@ -299,6 +329,7 @@ typedef struct {
 typedef sp_ht(sp_str_t, spn_dep_option_t) spn_dep_options_t;
 
 spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key);
+void             spn_toml_append_option(spn_toml_writer_t* writer, const c8* key, spn_dep_option_t option);
 
 // Specific to the recipe
 typedef enum {
@@ -661,7 +692,7 @@ typedef struct {
   APPLY(spn_autoconf_new) \
   APPLY(spn_autoconf_run) \
   APPLY(spn_dep_log) \
-  APPLY(spn_dep_set_u32) \
+  APPLY(spn_dep_set_s64) \
   APPLY(spn_copy)
 
 #define SPN_DEFINE_LIB_ENTRY(SYM) { .symbol = SP_MACRO_STR(SYM), .fn = SYM },
@@ -1340,6 +1371,165 @@ sp_da(sp_str_t) spn_toml_arr_strs(toml_array_t* toml) {
   }
 
   return strs;
+}
+
+spn_toml_writer_t spn_toml_writer_new() {
+  spn_toml_writer_t writer = SP_ZERO_INITIALIZE();;
+
+  spn_toml_context_t root = {
+    .kind = SPN_TOML_CONTEXT_ROOT,
+    .key = sp_str_lit(""),
+    .header_written = true
+  };
+  sp_dyn_array_push(writer.stack, root);
+
+  return writer;
+}
+
+void spn_toml_ensure_header_written(spn_toml_writer_t* writer) {
+  u32 depth = sp_dyn_array_size(writer->stack);
+  SP_ASSERT(depth > 0);
+
+  spn_toml_context_t* top = &writer->stack[depth - 1];
+  if (top->header_written) return;
+
+  sp_dyn_array(sp_str_t) path_parts = SP_NULLPTR;
+  for (u32 i = 1; i < depth; i++) {
+    sp_dyn_array_push(path_parts, writer->stack[i].key);
+  }
+
+  sp_str_t path = sp_str_join_n(path_parts, sp_dyn_array_size(path_parts), sp_str_lit("."));
+
+  if (top->kind == SPN_TOML_CONTEXT_TABLE) {
+    sp_str_builder_append_fmt(&writer->builder, "[{}]", SP_FMT_STR(path));
+  }
+
+  sp_str_builder_new_line(&writer->builder);
+  top->header_written = true;
+}
+
+void spn_toml_begin_table(spn_toml_writer_t* writer, const c8* key) {
+  spn_toml_context_t context = {
+    .kind = SPN_TOML_CONTEXT_TABLE,
+    .key = sp_str_from_cstr(key),
+    .header_written = false
+  };
+  sp_dyn_array_push(writer->stack, context);
+}
+
+void spn_toml_end_table(spn_toml_writer_t* writer) {
+  u32 depth = sp_dyn_array_size(writer->stack);
+  SP_ASSERT(depth > 1);
+
+  spn_toml_context_t* top = &writer->stack[depth - 1];
+  SP_ASSERT(top->kind == SPN_TOML_CONTEXT_TABLE);
+
+  sp_dyn_array_pop(writer->stack);
+  sp_str_builder_new_line(&writer->builder);
+}
+
+void spn_toml_begin_array(spn_toml_writer_t* writer, const c8* key) {
+  spn_toml_context_t context = {
+    .kind = SPN_TOML_CONTEXT_ARRAY,
+    .key = sp_str_from_cstr(key),
+    .header_written = false
+  };
+  sp_dyn_array_push(writer->stack, context);
+}
+
+void spn_toml_end_array(spn_toml_writer_t* writer) {
+  u32 depth = sp_dyn_array_size(writer->stack);
+  SP_ASSERT(depth > 1);
+
+  spn_toml_context_t* top = &writer->stack[depth - 1];
+  SP_ASSERT(top->kind == SPN_TOML_CONTEXT_ARRAY);
+
+  sp_dyn_array_pop(writer->stack);
+  sp_str_builder_new_line(&writer->builder);
+}
+
+void spn_toml_append_array_table(spn_toml_writer_t* writer) {
+  u32 depth = sp_dyn_array_size(writer->stack);
+  SP_ASSERT(depth > 1);
+
+  spn_toml_context_t* top = &writer->stack[depth - 1];
+  SP_ASSERT(top->kind == SPN_TOML_CONTEXT_ARRAY);
+
+  sp_dyn_array(sp_str_t) path_parts = SP_NULLPTR;
+  for (u32 i = 1; i < depth; i++) {
+    sp_dyn_array_push(path_parts, writer->stack[i].key);
+  }
+
+  sp_str_t path = sp_str_join_n(path_parts, sp_dyn_array_size(path_parts), sp_str_lit("."));
+  sp_str_builder_append_fmt(&writer->builder, "[[{}]]", SP_FMT_STR(path));
+  sp_str_builder_new_line(&writer->builder);
+
+  top->header_written = true;
+}
+
+void spn_toml_append_str(spn_toml_writer_t* writer, const c8* key, sp_str_t value) {
+  spn_toml_ensure_header_written(writer);
+  sp_str_builder_append_fmt(&writer->builder, "{} = {}",
+    SP_FMT_CSTR(key),
+    SP_FMT_QUOTED_STR(value));
+  sp_str_builder_new_line(&writer->builder);
+}
+
+void spn_toml_append_s64(spn_toml_writer_t* writer, const c8* key, s64 value) {
+  spn_toml_ensure_header_written(writer);
+  sp_str_builder_append_fmt(&writer->builder, "{} = {}",
+    SP_FMT_CSTR(key),
+    SP_FMT_S64(value));
+  sp_str_builder_new_line(&writer->builder);
+}
+
+void spn_toml_append_bool(spn_toml_writer_t* writer, const c8* key, bool value) {
+  spn_toml_ensure_header_written(writer);
+  sp_str_builder_append_fmt(&writer->builder, "{} = {}",
+    SP_FMT_CSTR(key),
+    SP_FMT_CSTR(value ? "true" : "false"));
+  sp_str_builder_new_line(&writer->builder);
+}
+
+void spn_toml_append_option(spn_toml_writer_t* writer, const c8* key, spn_dep_option_t option) {
+  switch (option.kind) {
+    case SPN_DEP_OPTION_KIND_BOOL: {
+      spn_toml_append_bool(writer, key, option.b);
+      break;
+    }
+    case SPN_DEP_OPTION_KIND_S64: {
+      spn_toml_append_s64(writer, key, option.s);
+      break;
+    }
+    case SPN_DEP_OPTION_KIND_STR: {
+      spn_toml_append_str(writer, key, option.str);
+      break;
+    }
+  }
+}
+
+void spn_toml_append_str_array(spn_toml_writer_t* writer, const c8* key, sp_da(sp_str_t) values) {
+  spn_toml_ensure_header_written(writer);
+
+  sp_str_builder_append_fmt(&writer->builder, "{} = [", SP_FMT_CSTR(key));
+
+  u32 count = sp_dyn_array_size(values);
+  for (u32 i = 0; i < count; i++) {
+    sp_str_builder_append_fmt(&writer->builder, "{}", SP_FMT_QUOTED_STR(values[i]));
+    if (i < count - 1) {
+      sp_str_builder_append_cstr(&writer->builder, ", ");
+    }
+  }
+
+  sp_str_builder_append_c8(&writer->builder, ']');
+  sp_str_builder_new_line(&writer->builder);
+}
+
+sp_str_t spn_toml_writer_write(spn_toml_writer_t* writer) {
+  u32 depth = sp_dyn_array_size(writer->stack);
+  SP_ASSERT(depth == 1);
+
+  return sp_str_builder_write(&writer->builder);
 }
 
 /////////
@@ -3201,6 +3391,21 @@ void spn_cli_build(spn_cli_t* cli) {
 
 
 s32 main(s32 num_args, const c8** args) {
+  spn_toml_writer_t toml = spn_toml_writer_new();
+  spn_toml_append_str(&toml, "foo", sp_str_lit("bar"));
+
+  spn_toml_begin_table(&toml, "tbl");
+  spn_toml_append_str(&toml, "tbl_key", sp_str_lit("tbl_val"));
+  spn_toml_end_table(&toml);
+
+  spn_toml_begin_array(&toml, "arr");
+  spn_toml_append_str(&toml, "arr_key", sp_str_lit("arr_val"));
+  spn_toml_end_array(&toml);
+
+  sp_log(spn_toml_writer_write(&toml));
+  SP_EXIT_SUCCESS();
+
+
   app = SP_ZERO_STRUCT(spn_app_t);
   spn_app_init(&app, num_args, args);
   spn_cli_run(&app);
