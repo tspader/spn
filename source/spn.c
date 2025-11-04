@@ -3300,11 +3300,19 @@ void spn_cli_add(spn_cli_t* cli) {
     );
   }
 
+  if (sp_dyn_array_empty(package->versions)) {
+    SP_FATAL("{:fg brightcyan} has no known versions", SP_FMT_STR(package->name));
+  }
+
+  spn_dep_req_t dep = {
+    .name = sp_str_copy(package->name),
+    .range = spn_semver_comparison_to_range(SPN_SEMVER_OP_GEQ, *sp_dyn_array_back(package->versions))
+  };
+  sp_ht_insert(app.package.deps, dep.name, dep);
+
+  spn_app_prepare();
+
   spn_update_project_toml();
-  // get the latest package version
-  // insert into package.deps
-  // resolve
-  //
 }
 
 void spn_cli_print(spn_cli_t* cli) {
