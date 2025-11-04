@@ -282,21 +282,17 @@ typedef struct {
 
 typedef enum {
   SPN_DEP_OPTION_KIND_BOOL,
-  SPN_DEP_OPTION_KIND_U32,
-  SPN_DEP_OPTION_KIND_F32,
+  SPN_DEP_OPTION_KIND_S64,
   SPN_DEP_OPTION_KIND_STR,
-  SPN_DEP_OPTION_KIND_PTR,
 } spn_dep_option_kind_t;
 
 typedef struct {
   sp_str_t name;
   spn_dep_option_kind_t kind;
   union {
-    bool boolean;
-    u32 u32;
-    f32 f32;
+    bool b;
+    s64 s;
     sp_str_t str;
-    void* ptr;
   };
 } spn_dep_option_t;
 
@@ -737,11 +733,11 @@ void spn_dep_log(spn_dep_context_t* dep, const c8* message) {
   sp_io_write_cstr(&dep->log, message);
 }
 
-void spn_dep_set_u32(spn_dep_context_t* dep, const c8* name, u32 value) {
+void spn_dep_set_s64(spn_dep_context_t* dep, const c8* name, s64 value) {
   spn_dep_option_t option = {
-    .kind = SPN_DEP_OPTION_KIND_U32,
+    .kind = SPN_DEP_OPTION_KIND_S64,
     .name = sp_str_from_cstr(name),
-    .u32 = value
+    .s = value
   };
   sp_ht_insert(dep->options, option.name, option);
 }
@@ -2140,9 +2136,19 @@ sp_str_t spn_semver_op_to_str(spn_semver_op_t op) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+sp_str_t spn_semver_range_to_str(spn_semver_range_t range) {
+  return sp_format(
+    "{}{}.{}.{}",
+    SP_FMT_STR(spn_semver_op_to_str(range.low.op)),
+    SP_FMT_U32(range.low.version.major),
+    SP_FMT_U32(range.low.version.minor),
+    SP_FMT_U32(range.low.version.patch)
+  );
+}
+
 sp_str_t spn_semver_to_str(spn_semver_t version) {
   return sp_format(
-    "{:fg brightblack}.{:fg brightblack}.{:fg brightblack}",
+    "{}.{}.{}",
     SP_FMT_U32(version.major),
     SP_FMT_U32(version.minor),
     SP_FMT_U32(version.patch)
@@ -2193,12 +2199,13 @@ spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key) {
   toml_unparsed_t unparsed = toml_table_unparsed(toml, key);
   SP_ASSERT(unparsed);
 
-  bool boolean;
-  u32 u32;
-  f32 f32;
+  bool b;
+  s64 s;
+  f32 f;
   c8* cstr;
   s32 len;
   void* ptr;
+
   if (!toml_value_string(unparsed, &cstr, &len)) {
     return (spn_dep_option_t) {
       .kind = SPN_DEP_OPTION_KIND_STR,
@@ -2206,13 +2213,22 @@ spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key) {
       .str = sp_str_from_cstr(cstr)
     };
   }
-  else {
+  else if (!toml_value_int(unparsed, &s)) {
     return (spn_dep_option_t) {
-      .kind = SPN_DEP_OPTION_KIND_STR,
+      .kind = SPN_DEP_OPTION_KIND_S64,
       .name = sp_str_from_cstr(key),
-      .str = sp_str_from_cstr("unknown")
+      .s = s
     };
   }
+  else if (!toml_value_bool(unparsed, &b)) {
+    return (spn_dep_option_t) {
+      .kind = SPN_DEP_OPTION_KIND_BOOL,
+      .name = sp_str_from_cstr(key),
+      .b = b
+    };
+  }
+
+  SP_UNREACHABLE_RETURN(SP_ZERO_STRUCT(spn_dep_option_t));
 }
 
 // @spader make this return spn_err_t, bubble from the tcc util fns, give a separate error for add/reloc/other errors, !exist isnt an error
@@ -2299,7 +2315,8 @@ spn_package_t spn_package_load(sp_str_t manifest_path) {
   if (toml.options) {
     const c8* key = SP_NULLPTR;
     spn_toml_for(toml.options, n, key) {
-
+      spn_dep_option_t option = spn_dep_option_from_toml(toml.options, key);
+      sp_ht_insert(package.options, option.name, option);
     }
   }
 

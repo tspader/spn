@@ -4,3 +4,6 @@ repo = "tspader/sp"
 
 [lib]
 kinds = ["source"]
+
+[options]
+use_foo = false

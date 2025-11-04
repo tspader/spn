@@ -14,3 +14,10 @@ entry = "source/spn.c"
 [[bin]]
 name = "spn-test"
 entry = "test/main.c"
+
+[options]
+foo = "bar"
+baz = 69
+
+[config.sp]
+use_foo = true

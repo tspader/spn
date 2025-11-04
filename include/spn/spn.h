@@ -60,7 +60,12 @@ void            spn_autoconf(spn_dep_context_t* build);
 spn_autoconf_t* spn_autoconf_new(spn_dep_context_t* build);
 void            spn_autoconf_run(spn_autoconf_t* autoconf);
 void            spn_dep_log(spn_dep_context_t* dep, const c8* message);
-void            spn_dep_set_u32(spn_dep_context_t* dep, const c8* name, u32 value);
+s64             spn_dep_get_s64(spn_dep_context_t* dep, const c8* name);
+void            spn_dep_set_s64(spn_dep_context_t* dep, const c8* name, s64 value);
+const c8*       spn_dep_get_str(spn_dep_context_t* dep, const c8* name);
+void            spn_dep_set_str(spn_dep_context_t* dep, const c8* name, const c8* value);
+bool            spn_dep_get_bool(spn_dep_context_t* dep, const c8* name);
+void            spn_dep_set_bool(spn_dep_context_t* dep, const c8* name, bool value);
 void            spn_copy(spn_dep_context_t* build, spn_dir_kind_t from, const c8* from_path, spn_dir_kind_t to, const c8* to_path);
 
 #endif
