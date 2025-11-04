@@ -342,6 +342,8 @@ typedef struct {
 struct spn_package {
   sp_str_t name;
   sp_str_t repo;
+  sp_str_t author;
+  sp_str_t maintainer;
   spn_package_paths_t paths;
   spn_lib_t lib;
   sp_ht(sp_str_t, spn_bin_t) bin;
@@ -2249,6 +2251,8 @@ spn_package_t spn_package_load(sp_str_t manifest_path) {
   package.toml = toml;
   package.name = spn_toml_str(toml.package, "name");
   package.repo = spn_toml_str_opt(toml.package, "repo", "");
+  package.author = spn_toml_str_opt(toml.package, "author", "");
+  package.maintainer = spn_toml_str_opt(toml.package, "maintainer", "");
   package.state = SPN_PACKAGE_STATE_UNLOADED;
   package.paths.source = sp_os_join_path(app.paths.source, package.name);
 

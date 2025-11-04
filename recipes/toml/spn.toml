@@ -1,0 +1,9 @@
+[package]
+name = "toml"
+repo = "tspader/toml"
+author = "cktan"
+maintainer = "tspader"
+description = "A C99 and TOML 1.0.0 compliant TOML parser"
+
+[lib]
+kinds = ["source"]

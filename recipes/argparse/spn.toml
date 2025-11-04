@@ -1,0 +1,9 @@
+[package]
+name = "argparse"
+repo = "tspader/argparse"
+author = "cofyc"
+maintainer = "tspader"
+description = "A command line arguments parsing library inspired by Python's argparse module"
+
+[lib]
+kinds = ["source"]
