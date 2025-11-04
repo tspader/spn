@@ -2,5 +2,5 @@
 name = "sp"
 repo = "tspader/sp"
 
-[lib.source]
-headers = ["sp.h"]
+[lib]
+kinds = ["source"]

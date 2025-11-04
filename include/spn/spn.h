@@ -45,21 +45,22 @@ typedef enum {
 
 typedef struct spn_config spn_config_t;
 typedef struct spn_package spn_package_t;
-typedef struct spn_dep spn_dep_t;
+typedef struct spn_dep_context spn_dep_context_t;
 typedef struct spn_autoconf spn_autoconf_t;
 typedef struct spn_make spn_make_t;
 
 typedef void(*spn_config_fn_t)(spn_config_t*);
-typedef void(*spn_dep_fn_t)(spn_dep_t*);
+typedef void(*spn_dep_fn_t)(spn_dep_context_t*);
 
-void            spn_make(spn_dep_t* build);
-spn_make_t*     spn_make_new(spn_dep_t* build);
+void            spn_make(spn_dep_context_t* build);
+spn_make_t*     spn_make_new(spn_dep_context_t* build);
 void            spn_make_add_target(spn_make_t* make, const c8* target);
 void            spn_make_run(spn_make_t* make);
-void            spn_autoconf(spn_dep_t* build);
-spn_autoconf_t* spn_autoconf_new(spn_dep_t* build);
+void            spn_autoconf(spn_dep_context_t* build);
+spn_autoconf_t* spn_autoconf_new(spn_dep_context_t* build);
 void            spn_autoconf_run(spn_autoconf_t* autoconf);
-void            spn_dep_set_u32(spn_dep_t* dep, const c8* name, u32 value);
-void            spn_copy(spn_dep_t* build, spn_dir_kind_t from, const c8* from_path, spn_dir_kind_t to, const c8* to_path);
+void            spn_dep_log(spn_dep_context_t* dep, const c8* message);
+void            spn_dep_set_u32(spn_dep_context_t* dep, const c8* name, u32 value);
+void            spn_copy(spn_dep_context_t* build, spn_dir_kind_t from, const c8* from_path, spn_dir_kind_t to, const c8* to_path);
 
 #endif
