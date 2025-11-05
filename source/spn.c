@@ -374,28 +374,24 @@ typedef struct {
   sp_str_t commit;
 } spn_metadata_t;
 
-typedef struct {
-  sp_str_t name;
-  spn_semver_t version;
-  sp_str_t commit;
-  sp_da(sp_str_t) deps;
-} spn_lock_entry_t;
-
 typedef enum {
-  SPN_DEP_IMPORT_KIND_EXPLICIT,   // In spn.toml [deps]
-  SPN_DEP_IMPORT_KIND_TRANSITIVE  // Pulled in transitively
+  SPN_DEP_IMPORT_KIND_EXPLICIT,
+  SPN_DEP_IMPORT_KIND_TRANSITIVE
 } spn_dep_import_kind_t;
 
 typedef struct {
   sp_str_t name;
+  spn_semver_t version;
+  sp_str_t commit;
   spn_dep_import_kind_t import_kind;
   sp_da(sp_str_t) deps;
   sp_da(sp_str_t) dependents;
-} spn_lock_dep_node_t;
+} spn_lock_entry_t;
 
 typedef struct {
-  sp_da(spn_lock_entry_t) packages;
-  sp_ht(sp_str_t, spn_lock_dep_node_t) graph;
+  spn_semver_t version;
+  sp_str_t commit;
+  sp_ht(sp_str_t, spn_lock_entry_t) entries;
 } spn_lock_file_t;
 
 
@@ -1920,46 +1916,50 @@ void spn_tui_update(spn_tui_t* tui) {
   }
 }
 
-void spn_update_lock_file() {
-  spn_toml_writer_t toml = spn_toml_writer_new();
-
-  spn_toml_begin_table_cstr(&toml, "spn");
-  spn_toml_append_str_cstr(&toml, "version", sp_str_lit(SPN_VERSION));
-  spn_toml_append_str_cstr(&toml, "commit", sp_str_lit(SPN_COMMIT));
-  spn_toml_end_table(&toml);
-
-  if (sp_ht_size(app.deps) > 0) {
-    spn_toml_begin_array_cstr(&toml, "package");
-    sp_ht_for(app.deps, it) {
-      spn_dep_context_t* dep = sp_ht_it_getp(app.deps, it);
-      spn_toml_append_array_table(&toml);
-      spn_toml_append_str_cstr(&toml, "name", dep->name);
-      spn_toml_append_str_cstr(&toml, "version", spn_semver_to_str(dep->metadata.version));
-      spn_toml_append_str_cstr(&toml, "commit", dep->metadata.commit);
-
-      if (sp_ht_size(dep->package->deps) > 0) {
-        sp_da(sp_str_t) dep_names = SP_NULLPTR;
-        sp_ht_for(dep->package->deps, dep_it) {
-          sp_str_t* name = sp_ht_it_getkp(dep->package->deps, dep_it);
-          sp_dyn_array_push(dep_names, *name);
-        }
-        spn_toml_append_str_array_cstr(&toml, "deps", dep_names);
-      }
-    }
-    spn_toml_end_array(&toml);
-  }
-
-  sp_str_t output = spn_toml_writer_write(&toml);
-  sp_io_stream_t file = sp_io_from_file(app.paths.project.lock, SP_IO_MODE_WRITE);
-  sp_io_write_str(&file, output);
-  sp_io_close(&file);
+void spn_lock_file_init(spn_lock_file_t* lock) {
+  sp_ht_set_fns(lock->entries, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
 }
 
+spn_lock_file_t spn_build_lock_file() {
+  spn_lock_file_t lock = SP_ZERO_INITIALIZE();
+  spn_lock_file_init(&lock);
+
+  // Add an entry for each dep
+  sp_ht_for(app.deps, it) {
+    spn_dep_context_t* dep = sp_ht_it_getp(app.deps, it);
+    spn_package_t* pkg = sp_ht_getp(app.packages, dep->name);
+
+    spn_lock_entry_t entry = {
+      .name = sp_str_copy(dep->name),
+      .version = dep->metadata.version,
+      .commit = dep->metadata.commit,
+      .import_kind = sp_ht_key_exists(app.package.deps, pkg->name),
+    };
+
+    sp_ht_for(pkg->deps, n) {
+      spn_dep_req_t* request = sp_ht_it_getp(pkg->deps, n);
+      sp_dyn_array_push(entry.deps, request->name);
+    }
+
+    sp_ht_insert(lock.entries, entry.name, entry);
+  }
+
+  // Now that everyone has a node, go back and add the reverse references
+  sp_ht_for(lock.entries, it) {
+    spn_lock_entry_t* entry = sp_ht_it_getp(lock.entries, it);
+
+    sp_dyn_array_for(entry->deps, n) {
+      spn_lock_entry_t* dep = sp_ht_getp(lock.entries, entry->deps[n]);
+      sp_dyn_array_push(dep->dependents, entry->name);
+    }
+  }
+
+  return lock;
+}
 
 spn_lock_file_t spn_load_lock_file() {
-  spn_lock_file_t lock = {
-    .packages = SP_NULLPTR
-  };
+  spn_lock_file_t lock = SP_ZERO_INITIALIZE();
+  spn_lock_file_init(&lock);
 
   if (!sp_os_does_path_exist(app.paths.project.lock)) {
     return lock;
@@ -1981,42 +1981,54 @@ spn_lock_file_t spn_load_lock_file() {
       .commit = spn_toml_str(pkg, "commit"),
       .deps = spn_toml_arr_strs(toml_table_array(pkg, "deps")),
     };
-    sp_dyn_array_push(lock.packages, entry);
+    entry.import_kind = sp_ht_getp(app.package.deps, entry.name)
+      ? SPN_DEP_IMPORT_KIND_EXPLICIT
+      : SPN_DEP_IMPORT_KIND_TRANSITIVE;
+    sp_ht_insert(lock.entries, entry.name, entry);
   }
 
-  // Build the dependency graph
-  sp_ht_set_fns(lock.graph, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+  sp_ht_for(lock.entries, it) {
+    spn_lock_entry_t* entry = sp_ht_it_getp(lock.entries, it);
 
-  sp_dyn_array_for(lock.packages, i) {
-    spn_lock_entry_t* entry = &lock.packages[i];
-
-    spn_lock_dep_node_t node = {
-      .name = sp_str_copy(entry->name),
-      .deps = entry->deps,
-      .import_kind = sp_ht_getp(app.package.deps, entry->name)
-        ? SPN_DEP_IMPORT_KIND_EXPLICIT
-        : SPN_DEP_IMPORT_KIND_TRANSITIVE,
-    };
-
-    sp_ht_insert(lock.graph, node.name, node);
-  }
-
-  sp_ht_for(lock.graph, it) {
-    spn_lock_dep_node_t* node = sp_ht_it_getp(lock.graph, it);
-
-    sp_dyn_array_for(node->deps, i) {
-      sp_str_t dep_name = node->deps[i];
-      spn_lock_dep_node_t* dep_node = sp_ht_getp(lock.graph, dep_name);
-
-      if (dep_node) {
-        sp_dyn_array_push(dep_node->dependents, sp_str_copy(node->name));
-      }
+    sp_dyn_array_for(entry->deps, n) {
+      spn_lock_entry_t* dep = sp_ht_getp(lock.entries, entry->deps[n]);
+      sp_dyn_array_push(dep->dependents, entry->name);
     }
   }
 
   return lock;
 }
 
+void spn_update_lock_file() {
+  spn_lock_file_t lock = spn_build_lock_file();
+
+  spn_toml_writer_t toml = spn_toml_writer_new();
+
+  spn_toml_begin_table_cstr(&toml, "spn");
+  spn_toml_append_str_cstr(&toml, "version", sp_str_lit(SPN_VERSION));
+  spn_toml_append_str_cstr(&toml, "commit", sp_str_lit(SPN_COMMIT));
+  spn_toml_end_table(&toml);
+
+  spn_toml_begin_array_cstr(&toml, "package");
+  sp_ht_for(lock.entries, it) {
+    spn_lock_entry_t* entry = sp_ht_it_getp(lock.entries, it);
+
+    spn_toml_append_array_table(&toml);
+    spn_toml_append_str_cstr(&toml, "name", entry->name);
+    spn_toml_append_str_cstr(&toml, "version", spn_semver_to_str(entry->version));
+    spn_toml_append_str_cstr(&toml, "commit", entry->commit);
+
+    if (sp_dyn_array_size(entry->deps)) {
+      spn_toml_append_str_array_cstr(&toml, "deps", entry->deps);
+    }
+  }
+  spn_toml_end_array(&toml);
+
+  sp_str_t output = spn_toml_writer_write(&toml);
+  sp_io_stream_t file = sp_io_from_file(app.paths.project.lock, SP_IO_MODE_WRITE);
+  sp_io_write_str(&file, output);
+  sp_io_close(&file);
+}
 void spn_update_project_toml() {
   spn_toml_writer_t toml = spn_toml_writer_new();
 
@@ -2880,8 +2892,9 @@ void spn_resolver_add_package_constraints(spn_resolver_t* resolver, spn_package_
 
 void spn_resolver_resolve_from_lock_file(spn_resolver_t* resolver) {
   SP_ASSERT(app.lock.some);
-  sp_dyn_array_for(app.lock.value.packages, i) {
-    spn_lock_entry_t* entry = &app.lock.value.packages[i];
+
+  sp_ht_for(app.lock.value.entries, it) {
+    spn_lock_entry_t* entry = sp_ht_it_getp(app.lock.value.entries, it);
     sp_ht_insert(resolver->versions, entry->name, entry->version);
   }
 }
@@ -3162,9 +3175,8 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   app->package = spn_package_load(app->paths.project.toml);
 
-  spn_lock_file_t lock = spn_load_lock_file();
-  if (sp_dyn_array_size(lock.packages) > 0) {
-    sp_opt_set(app->lock, lock);
+  if (sp_os_does_path_exist(app->paths.project.lock)) {
+    sp_opt_set(app->lock, spn_load_lock_file());
   }
 }
 
