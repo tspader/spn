@@ -6,7 +6,6 @@
 #include <cJSON.c>
 
 int main(void) {
-  sp_init_default();
   cJSON* json = cJSON_CreateObject();
   cJSON_AddNumberToObject(json, "filmore", 69);
   cJSON_AddStringToObject(json, "guitar", "jerry");
