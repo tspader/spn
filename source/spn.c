@@ -373,6 +373,10 @@ typedef struct {
   sp_str_t commit;
 } spn_lock_entry_t;
 
+typedef struct {
+  sp_da(spn_lock_entry_t) packages;
+} spn_lock_file_t;
+
 
 struct spn_package {
   sp_str_t name;
@@ -476,7 +480,7 @@ s32                  spn_sort_kernel_dep_ptr(const void* a, const void* b);
 
 void                 spn_update_lock_file();
 void                 spn_update_project_toml();
-sp_da(spn_lock_entry_t) spn_load_lock_file();
+spn_lock_file_t      spn_load_lock_file();
 
 // inclusive (e.g. 0, 1 => 2 versions) range into package.versions; !ok -> nothing found
 typedef struct {
@@ -493,6 +497,7 @@ typedef struct {
 
 void spn_resolver_init(spn_resolver_t* resolver);
 void spn_resolver_add_package_constraints(spn_resolver_t* resolver, spn_package_t* package);
+void spn_resolver_resolve_from_lock_file(spn_resolver_t* resolver);
 spn_dep_version_range_t spn_package_collect_versions(spn_dep_req_t req);
 
 ////////////
@@ -1895,21 +1900,23 @@ void spn_update_lock_file() {
   sp_io_close(&file);
 }
 
-sp_da(spn_lock_entry_t) spn_load_lock_file() {
-  sp_da(spn_lock_entry_t) entries = SP_NULLPTR;
+spn_lock_file_t spn_load_lock_file() {
+  spn_lock_file_t lock = {
+    .packages = SP_NULLPTR
+  };
 
   if (!sp_os_does_path_exist(app.paths.project.lock)) {
-    return entries;
+    return lock;
   }
 
   toml_table_t* root = spn_toml_parse(app.paths.project.lock);
   if (!root) {
-    return entries;
+    return lock;
   }
 
   toml_array_t* packages = toml_table_array(root, "package");
   if (!packages) {
-    return entries;
+    return lock;
   }
 
   spn_toml_arr_for(packages, it) {
@@ -1921,10 +1928,10 @@ sp_da(spn_lock_entry_t) spn_load_lock_file() {
       .version = spn_semver_from_str(spn_toml_str(pkg, "version")),
       .commit = spn_toml_str(pkg, "commit")
     };
-    sp_dyn_array_push(entries, entry);
+    sp_dyn_array_push(lock.packages, entry);
   }
 
-  return entries;
+  return lock;
 }
 
 void spn_update_project_toml() {
@@ -2786,6 +2793,14 @@ void spn_resolver_add_package_constraints(spn_resolver_t* resolver, spn_package_
 
   // Unmark (allows diamond dependencies)
   sp_ht_erase(resolver->visited, package->name);
+}
+
+void spn_resolver_resolve_from_lock_file(spn_resolver_t* resolver) {
+  spn_lock_file_t lock = spn_load_lock_file();
+  sp_dyn_array_for(lock.packages, i) {
+    spn_lock_entry_t* entry = &lock.packages[i];
+    sp_ht_insert(resolver->versions, entry->name, entry->version);
+  }
 }
 
 void spn_resolver_resolve(spn_resolver_t* resolver) {
