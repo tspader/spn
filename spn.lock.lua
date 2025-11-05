@@ -11,8 +11,8 @@ return {
       name = "sp"
     },
     tcc = {
-      build_id = "4c87a48",
-      commit = "f4e01bfcab",
+      build_id = "b7bde39e",
+      commit = "ab2ce3b13a",
       name = "tcc"
     },
     toml = {

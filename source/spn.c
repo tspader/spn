@@ -498,6 +498,8 @@ typedef struct {
 void spn_resolver_init(spn_resolver_t* resolver);
 void spn_resolver_add_package_constraints(spn_resolver_t* resolver, spn_package_t* package);
 void spn_resolver_resolve_from_lock_file(spn_resolver_t* resolver);
+void spn_resolver_resolve_from_solver(spn_resolver_t* resolver);
+void spn_resolver_resolve(spn_resolver_t* resolver);
 spn_dep_version_range_t spn_package_collect_versions(spn_dep_req_t req);
 
 ////////////
@@ -663,6 +665,7 @@ typedef struct {
 
   spn_config_t config;
   spn_package_t package;
+  sp_opt(spn_lock_file_t) lock;
   spn_resolver_t resolver;
   sp_dyn_array(sp_str_t) search;
   sp_ht(sp_str_t, spn_package_t) packages;
@@ -2796,14 +2799,14 @@ void spn_resolver_add_package_constraints(spn_resolver_t* resolver, spn_package_
 }
 
 void spn_resolver_resolve_from_lock_file(spn_resolver_t* resolver) {
-  spn_lock_file_t lock = spn_load_lock_file();
-  sp_dyn_array_for(lock.packages, i) {
-    spn_lock_entry_t* entry = &lock.packages[i];
+  SP_ASSERT(app.lock.some);
+  sp_dyn_array_for(app.lock.value.packages, i) {
+    spn_lock_entry_t* entry = &app.lock.value.packages[i];
     sp_ht_insert(resolver->versions, entry->name, entry->version);
   }
 }
 
-void spn_resolver_resolve(spn_resolver_t* resolver) {
+void spn_resolver_resolve_from_solver(spn_resolver_t* resolver) {
   spn_resolver_init(resolver);
   spn_resolver_add_package_constraints(resolver, &app.package);
   sp_ht_for(resolver->ranges, it) {
@@ -2831,8 +2834,15 @@ void spn_resolver_resolve(spn_resolver_t* resolver) {
   }
 }
 
+void spn_resolver_resolve(spn_resolver_t* resolver) {
+  if (app.lock.some) {
+    spn_resolver_resolve_from_lock_file(resolver);
+  } else {
+    spn_resolver_resolve_from_solver(resolver);
+  }
+}
+
 void spn_app_prepare() {
-  spn_resolver_resolve(&app.resolver);
   sp_ht_for(app.resolver.versions, it) {
     sp_str_t name = *sp_ht_it_getkp(app.resolver.versions, it);
     spn_semver_t version = *sp_ht_it_getp(app.resolver.versions, it);
@@ -3071,6 +3081,11 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   }
 
   app->package = spn_package_load(app->paths.project.toml);
+
+  spn_lock_file_t lock = spn_load_lock_file();
+  if (sp_dyn_array_size(lock.packages) > 0) {
+    sp_opt_set(app->lock, lock);
+  }
 }
 
 /////////
@@ -3285,11 +3300,14 @@ void spn_cli_which(spn_cli_t* cli) {
   );
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
-  // Get package name from positional argument if provided
   const c8* package = SP_NULLPTR;
   if (cli->num_args > 0 && cli->args[0]) {
     package = cli->args[0];
   }
+
+
+  spn_resolver_resolve_from_lock_file(&app.resolver);
+  spn_app_prepare();
 
   if (package) {
     spn_dep_context_t* dep = spn_cli_assert_dep_exists(sp_str_view(package));
@@ -3398,6 +3416,7 @@ void spn_cli_add(spn_cli_t* cli) {
   };
   sp_ht_insert(app.package.deps, dep.name, dep);
 
+  spn_resolver_resolve_from_solver(&app.resolver);
   spn_app_prepare();
 
   spn_update_project_toml();
@@ -3436,6 +3455,11 @@ void spn_cli_print(spn_cli_t* cli) {
   if (!command->generator) command->generator = "";
   if (!command->compiler) command->compiler = "gcc";
 
+  if (!app.lock.some) {
+    SP_FATAL("No lock file found. Run {:fg yellow} first.", SP_FMT_CSTR("spn build"));
+  }
+
+  spn_resolver_resolve_from_lock_file(&app.resolver);
   spn_app_prepare();
 
   spn_generator_context_t gen = {
@@ -3550,6 +3574,7 @@ void spn_cli_build(spn_cli_t* cli) {
   );
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
+  spn_resolver_resolve(&app.resolver);
   spn_app_prepare();
 
   // basic TUI api for making tables?
