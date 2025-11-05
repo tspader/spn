@@ -1955,39 +1955,6 @@ void spn_update_lock_file() {
   sp_io_close(&file);
 }
 
-void spn_lock_build_graph(spn_lock_file_t* lock) {
-  // Initialize graph hash table
-  sp_ht_set_fns(lock->graph, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-
-  // Create a node for each package
-  sp_dyn_array_for(lock->packages, i) {
-    spn_lock_entry_t* entry = &lock->packages[i];
-
-    spn_lock_dep_node_t node = {
-      .name = sp_str_copy(entry->name),
-      .deps = entry->deps,
-      .import_kind = sp_ht_getp(app.package.deps, entry->name)
-        ? SPN_DEP_IMPORT_KIND_EXPLICIT
-        : SPN_DEP_IMPORT_KIND_TRANSITIVE,
-    };
-
-    sp_ht_insert(lock->graph, node.name, node);
-  }
-
-  // Step 2: Build reverse edges (dependents)
-  sp_ht_for(lock->graph, it) {
-    spn_lock_dep_node_t* node = sp_ht_it_getp(lock->graph, it);
-
-    sp_dyn_array_for(node->deps, i) {
-      sp_str_t dep_name = node->deps[i];
-      spn_lock_dep_node_t* dep_node = sp_ht_getp(lock->graph, dep_name);
-
-      if (dep_node) {
-        sp_dyn_array_push(dep_node->dependents, sp_str_copy(node->name));
-      }
-    }
-  }
-}
 
 spn_lock_file_t spn_load_lock_file() {
   spn_lock_file_t lock = {
@@ -1999,18 +1966,14 @@ spn_lock_file_t spn_load_lock_file() {
   }
 
   toml_table_t* root = spn_toml_parse(app.paths.project.lock);
-  if (!root) {
-    return lock;
-  }
+  SP_ASSERT(root);
 
   toml_array_t* packages = toml_table_array(root, "package");
-  if (!packages) {
-    return lock;
-  }
+  SP_ASSERT(packages);
 
   spn_toml_arr_for(packages, it) {
     toml_table_t* pkg = toml_array_table(packages, it);
-    if (!pkg) continue;
+    SP_ASSERT(pkg);
 
     spn_lock_entry_t entry = {
       .name = spn_toml_str(pkg, "name"),
@@ -2021,9 +1984,34 @@ spn_lock_file_t spn_load_lock_file() {
     sp_dyn_array_push(lock.packages, entry);
   }
 
-  // Build dependency graph
-  if (sp_dyn_array_size(lock.packages) > 0) {
-    spn_lock_build_graph(&lock);
+  // Build the dependency graph
+  sp_ht_set_fns(lock.graph, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+
+  sp_dyn_array_for(lock.packages, i) {
+    spn_lock_entry_t* entry = &lock.packages[i];
+
+    spn_lock_dep_node_t node = {
+      .name = sp_str_copy(entry->name),
+      .deps = entry->deps,
+      .import_kind = sp_ht_getp(app.package.deps, entry->name)
+        ? SPN_DEP_IMPORT_KIND_EXPLICIT
+        : SPN_DEP_IMPORT_KIND_TRANSITIVE,
+    };
+
+    sp_ht_insert(lock.graph, node.name, node);
+  }
+
+  sp_ht_for(lock.graph, it) {
+    spn_lock_dep_node_t* node = sp_ht_it_getp(lock.graph, it);
+
+    sp_dyn_array_for(node->deps, i) {
+      sp_str_t dep_name = node->deps[i];
+      spn_lock_dep_node_t* dep_node = sp_ht_getp(lock.graph, dep_name);
+
+      if (dep_node) {
+        sp_dyn_array_push(dep_node->dependents, sp_str_copy(node->name));
+      }
+    }
   }
 
   return lock;

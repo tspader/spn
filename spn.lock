@@ -3,6 +3,11 @@ version = "1.0.0"
 commit = "00c0fa98"
 
 [[package]]
+name = "sp"
+version = "1.4.0"
+commit = "80efa56421bf"
+
+[[package]]
 name = "argparse"
 version = "1.2.0"
 commit = "f71ed6c7b11c"
