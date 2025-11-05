@@ -378,10 +378,24 @@ typedef struct {
   sp_str_t name;
   spn_semver_t version;
   sp_str_t commit;
+  sp_da(sp_str_t) deps;
 } spn_lock_entry_t;
+
+typedef enum {
+  SPN_DEP_IMPORT_KIND_EXPLICIT,   // In spn.toml [deps]
+  SPN_DEP_IMPORT_KIND_TRANSITIVE  // Pulled in transitively
+} spn_dep_import_kind_t;
+
+typedef struct {
+  sp_str_t name;
+  spn_dep_import_kind_t import_kind;
+  sp_da(sp_str_t) deps;
+  sp_da(sp_str_t) dependents;
+} spn_lock_dep_node_t;
 
 typedef struct {
   sp_da(spn_lock_entry_t) packages;
+  sp_ht(sp_str_t, spn_lock_dep_node_t) graph;
 } spn_lock_file_t;
 
 
@@ -1941,6 +1955,40 @@ void spn_update_lock_file() {
   sp_io_close(&file);
 }
 
+void spn_lock_build_graph(spn_lock_file_t* lock) {
+  // Initialize graph hash table
+  sp_ht_set_fns(lock->graph, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+
+  // Create a node for each package
+  sp_dyn_array_for(lock->packages, i) {
+    spn_lock_entry_t* entry = &lock->packages[i];
+
+    spn_lock_dep_node_t node = {
+      .name = sp_str_copy(entry->name),
+      .deps = entry->deps,
+      .import_kind = sp_ht_getp(app.package.deps, entry->name)
+        ? SPN_DEP_IMPORT_KIND_EXPLICIT
+        : SPN_DEP_IMPORT_KIND_TRANSITIVE,
+    };
+
+    sp_ht_insert(lock->graph, node.name, node);
+  }
+
+  // Step 2: Build reverse edges (dependents)
+  sp_ht_for(lock->graph, it) {
+    spn_lock_dep_node_t* node = sp_ht_it_getp(lock->graph, it);
+
+    sp_dyn_array_for(node->deps, i) {
+      sp_str_t dep_name = node->deps[i];
+      spn_lock_dep_node_t* dep_node = sp_ht_getp(lock->graph, dep_name);
+
+      if (dep_node) {
+        sp_dyn_array_push(dep_node->dependents, sp_str_copy(node->name));
+      }
+    }
+  }
+}
+
 spn_lock_file_t spn_load_lock_file() {
   spn_lock_file_t lock = {
     .packages = SP_NULLPTR
@@ -1967,9 +2015,15 @@ spn_lock_file_t spn_load_lock_file() {
     spn_lock_entry_t entry = {
       .name = spn_toml_str(pkg, "name"),
       .version = spn_semver_from_str(spn_toml_str(pkg, "version")),
-      .commit = spn_toml_str(pkg, "commit")
+      .commit = spn_toml_str(pkg, "commit"),
+      .deps = spn_toml_arr_strs(toml_table_array(pkg, "deps")),
     };
     sp_dyn_array_push(lock.packages, entry);
+  }
+
+  // Build dependency graph
+  if (sp_dyn_array_size(lock.packages) > 0) {
+    spn_lock_build_graph(&lock);
   }
 
   return lock;
