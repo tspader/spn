@@ -15,6 +15,7 @@ CLAUDE.md
 .mcp.json
 
 .spackle/*
+external/*
 asset/docker
 target/distrib
 build/bootstrap/bin
