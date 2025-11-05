@@ -6,5 +6,5 @@ void build(spn_dep_context_t* dep) {
 }
 
 void package(spn_dep_context_t* dep) {
-  spn_copy(dep, SPN_DIR_SOURCE, "sp.h", SPN_DIR_STORE, "");
+  spn_copy(dep, SPN_DIR_SOURCE, "sp.h", SPN_DIR_INCLUDE, "");
 }

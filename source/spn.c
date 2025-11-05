@@ -600,6 +600,10 @@ typedef struct {
 } spn_cli_add_t;
 
 typedef struct {
+  bool bare;
+} spn_cli_init_t;
+
+typedef struct {
   bool force;
   bool update;
 } spn_cli_build_t;
@@ -631,6 +635,7 @@ typedef struct {
   const c8* output;
 
   spn_cli_add_t add;
+  spn_cli_init_t init;
   spn_cli_print_t print;
   spn_cli_build_t build;
   spn_cli_ls_t ls;
@@ -644,6 +649,7 @@ void spn_cli_build(spn_cli_t* cli);
 void spn_cli_print(spn_cli_t* cli);
 void spn_cli_copy(spn_cli_t* cli);
 
+void spn_app_add(sp_str_t name);
 void spn_cli_init(spn_cli_t* cli);
 void spn_cli_add(spn_cli_t* cli);
 
@@ -3230,6 +3236,9 @@ void spn_cli_run(spn_app_t* app) {
   else if (sp_cstr_equal("recipe", cli->args[0])) {
     spn_cli_recipe(cli);
   }
+  else if (sp_cstr_equal("init", cli->args[0])) {
+    spn_cli_init(cli);
+  }
   else if (sp_cstr_equal("add", cli->args[0])) {
     spn_cli_add(cli);
   }
@@ -3244,7 +3253,73 @@ spn_dep_context_t* spn_cli_assert_dep_exists(sp_str_t name) {
 
 
 void spn_cli_init(spn_cli_t* cli) {
+  spn_cli_init_t* command = &cli->init;
+  
+  struct argparse argparse;
+  argparse_init(
+    &argparse,
+    (struct argparse_option []) {
+      OPT_HELP(),
+      OPT_BOOLEAN('b', "bare", &command->bare, "create minimal project without sp dependency or main.c", SP_NULLPTR),
+      OPT_END()
+    },
+    (const c8* const []) {
+      "spn init [options]",
+      "Initialize a new spn project",
+      SP_NULLPTR
+    },
+    SP_NULL
+  );
+  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
+  // Get current directory name for project name
+  sp_str_t cwd = sp_os_get_cwd();
+  sp_str_t project_name = sp_os_extract_file_name(cwd);
+
+  // Check if files already exist before writing anything
+  sp_str_t spn_toml_path = sp_str_lit("spn.toml");
+  sp_str_t main_c_path = sp_str_lit("main.c");
+  
+  if (sp_os_does_path_exist(spn_toml_path)) {
+    SP_FATAL("{:fg brightyellow} already exists", SP_FMT_STR(spn_toml_path));
+  }
+  
+  if (!command->bare && sp_os_does_path_exist(main_c_path)) {
+    SP_FATAL("{:fg brightyellow} already exists", SP_FMT_STR(main_c_path));
+  }
+
+  spn_package_init(&app.package);
+  spn_package_set_manifest(&app.package, spn_toml_path);
+  spn_package_set_name(&app.package, project_name);
+
+  if (!command->bare) {
+    spn_app_add(sp_str_lit("sp"));
+  }
+
+  spn_update_project_toml();
+
+  if (!command->bare) {
+    sp_io_stream_t main_file = sp_io_from_file(main_c_path, SP_IO_MODE_WRITE);
+
+    sp_str_t main_content = sp_str_lit(
+      "#define SP_IMPLEMENTATION\n"
+      "#include \"sp.h\"\n"
+      "\n"
+      "s32 main(s32 num_args, const c8** args) {\n"
+      "  SP_LOG(\"hello, {:fg brightcyan}\", SP_FMT_CSTR(\"world\"));\n"
+      "  SP_EXIT_SUCCESS();\n"
+      "}\n"
+    );
+
+    if (sp_io_write_str(&main_file, main_content) != main_content.len) {
+      SP_FATAL("Failed to write {:fg brightyellow}", SP_FMT_STR(main_c_path));
+    }
+    
+    sp_io_close(&main_file);
+  }
+
+  SP_LOG("Initialized {:fg brightcyan} project{:fg brightcyan}", 
+    command->bare ? SP_FMT_CSTR("bare") : SP_FMT_STR(project_name));
 }
 
 void spn_cli_list(spn_cli_t* cli) {
@@ -3473,29 +3548,7 @@ void spn_cli_recipe(spn_cli_t* cli) {
   sp_os_log(recipe);
 }
 
-void spn_cli_add(spn_cli_t* cli) {
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_END()
-    },
-    (const c8* []) {
-      "spn add",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
-
-  if (!cli->num_args || !cli->args[0]) {
-    argparse_usage(&argparse);
-    return;
-  }
-
-  sp_str_t name = sp_str_from_cstr(cli->args[0]);
-
+void spn_app_add(sp_str_t name) {
   if (sp_ht_getp(app.deps, name)) {
     SP_FATAL("{:fg brightyellow} is already in your project", SP_FMT_STR(name));
   }
@@ -3529,6 +3582,31 @@ void spn_cli_add(spn_cli_t* cli) {
   spn_app_prepare();
 
   spn_update_project_toml();
+}
+
+void spn_cli_add(spn_cli_t* cli) {
+  struct argparse argparse;
+  argparse_init(
+    &argparse,
+    (struct argparse_option []) {
+      OPT_HELP(),
+      OPT_END()
+    },
+    (const c8* []) {
+      "spn add",
+      SP_NULLPTR
+    },
+    SP_NULL
+  );
+  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+
+  if (!cli->num_args || !cli->args[0]) {
+    argparse_usage(&argparse);
+    return;
+  }
+
+  sp_str_t name = sp_str_from_cstr(cli->args[0]);
+  spn_app_add(name);
 }
 
 void spn_cli_print(spn_cli_t* cli) {
