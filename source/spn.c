@@ -362,7 +362,15 @@ typedef struct {
 typedef struct {
   sp_str_t name;
   sp_str_t entry;
+  sp_str_t profile;
 } spn_bin_t;
+
+typedef struct {
+  spn_gen_compiler_t compiler;
+  spn_lib_kind_t libc;
+  spn_c_standard_t language;
+  spn_dep_mode_t mode;
+} spn_profile_t;
 
 typedef struct {
   sp_str_t name;
@@ -645,6 +653,7 @@ typedef struct {
 
 void spn_cli_clean(spn_cli_t* cli);
 
+void spn_bin_build(spn_bin_t* bin, spn_profile_t* profile);
 void spn_cli_build(spn_cli_t* cli);
 void spn_cli_print(spn_cli_t* cli);
 void spn_cli_copy(spn_cli_t* cli);
@@ -694,6 +703,7 @@ typedef struct {
   sp_ht(sp_str_t, spn_package_t) packages;
   sp_ht(sp_str_t, spn_dep_context_t) deps;
   sp_ht(sp_str_t, spn_build_matrix_t) matrices;
+  sp_ht(sp_str_t, spn_profile_t) profiles;
   sp_dyn_array(sp_str_t) system_deps;
 } spn_app_t;
 
@@ -956,6 +966,7 @@ spn_lib_kind_t spn_lib_kind_from_str(sp_str_t str) {
   if      (sp_str_equal_cstr(str, "shared")) return SPN_LIB_KIND_SHARED;
   else if (sp_str_equal_cstr(str, "static")) return SPN_LIB_KIND_STATIC;
   else if (sp_str_equal_cstr(str, "source")) return SPN_LIB_KIND_SOURCE;
+  else if (sp_str_equal_cstr(str, "none"))   return SPN_LIB_KIND_NONE;
 
   SP_FATAL("Unknown build kind {:fg brightyellow}; options are [shared, static, source]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
@@ -2775,6 +2786,7 @@ spn_package_t spn_package_load(sp_str_t manifest_path) {
       spn_bin_t bin = {
         .name = spn_toml_str(it, "name"),
         .entry = spn_toml_str(it, "entry"),
+        .profile = spn_toml_str_opt(it, "profile", "default"),
       };
 
       sp_ht_insert(package.bin, bin.name, bin);
@@ -3088,6 +3100,15 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   sp_ht_set_fns(app->packages, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(app->deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(app->matrices, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+  sp_ht_set_fns(app->profiles, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+
+  spn_profile_t default_profile = {
+    .compiler = SPN_GENERATOR_COMPILER_GCC,
+    .libc = SPN_LIB_KIND_SHARED,
+    .language = SPN_C11,
+    .mode = SPN_DEP_BUILD_MODE_DEBUG
+  };
+  sp_ht_insert(app->profiles, sp_str_lit("default"), default_profile);
 
   app->paths.storage = sp_os_join_path(sp_os_get_storage_path(), SP_LIT("spn"));
 
@@ -3254,7 +3275,7 @@ spn_dep_context_t* spn_cli_assert_dep_exists(sp_str_t name) {
 
 void spn_cli_init(spn_cli_t* cli) {
   spn_cli_init_t* command = &cli->init;
-  
+
   struct argparse argparse;
   argparse_init(
     &argparse,
@@ -3279,11 +3300,11 @@ void spn_cli_init(spn_cli_t* cli) {
   // Check if files already exist before writing anything
   sp_str_t spn_toml_path = sp_str_lit("spn.toml");
   sp_str_t main_c_path = sp_str_lit("main.c");
-  
+
   if (sp_os_does_path_exist(spn_toml_path)) {
     SP_FATAL("{:fg brightyellow} already exists", SP_FMT_STR(spn_toml_path));
   }
-  
+
   if (!command->bare && sp_os_does_path_exist(main_c_path)) {
     SP_FATAL("{:fg brightyellow} already exists", SP_FMT_STR(main_c_path));
   }
@@ -3314,11 +3335,11 @@ void spn_cli_init(spn_cli_t* cli) {
     if (sp_io_write_str(&main_file, main_content) != main_content.len) {
       SP_FATAL("Failed to write {:fg brightyellow}", SP_FMT_STR(main_c_path));
     }
-    
+
     sp_io_close(&main_file);
   }
 
-  SP_LOG("Initialized {:fg brightcyan} project{:fg brightcyan}", 
+  SP_LOG("Initialized {:fg brightcyan} project{:fg brightcyan}",
     command->bare ? SP_FMT_CSTR("bare") : SP_FMT_STR(project_name));
 }
 
@@ -3739,6 +3760,23 @@ void spn_cli_print(spn_cli_t* cli) {
   }
 }
 
+void spn_bin_build(spn_bin_t* bin, spn_profile_t* profile) {
+  SP_ASSERT(bin);
+  SP_ASSERT(profile);
+
+  SP_LOG("Building bin: {:fg brightcyan}", SP_FMT_STR(bin->name));
+  SP_LOG("  Entry: {:fg brightcyan}", SP_FMT_STR(bin->entry));
+  SP_LOG("  Profile: {:fg brightcyan}", SP_FMT_STR(bin->profile));
+  SP_LOG("  Compiler: {:fg brightcyan}", SP_FMT_CSTR(profile->compiler == SPN_GENERATOR_COMPILER_GCC ? "gcc" : "unknown"));
+  SP_LOG("  Libc: {:fg brightcyan}", SP_FMT_CSTR(profile->libc == SPN_LIB_KIND_SHARED ? "shared" :
+                                     profile->libc == SPN_LIB_KIND_STATIC ? "static" :
+                                     profile->libc == SPN_LIB_KIND_SOURCE ? "source" : "none"));
+  SP_LOG("  Language: {:fg brightcyan}", SP_FMT_CSTR(profile->language == SPN_C89 ? "c89" :
+                                     profile->language == SPN_C99 ? "c99" :
+                                     profile->language == SPN_C11 ? "c11" : "unknown"));
+  SP_LOG("  Mode: {:fg brightcyan}", SP_FMT_CSTR(profile->mode == SPN_DEP_BUILD_MODE_DEBUG ? "debug" : "release"));
+}
+
 void spn_cli_build(spn_cli_t* cli) {
   spn_cli_build_t* command = &cli->build;
 
@@ -3796,6 +3834,12 @@ void spn_cli_build(spn_cli_t* cli) {
   spn_tui_run(&app.tui);
 
   spn_update_lock_file();
+
+  sp_ht_for(app.package.bin, it) {
+    spn_bin_t* bin = sp_ht_it_getp(app.package.bin, it);
+    spn_profile_t* profile = sp_ht_getp(app.profiles, bin->profile);
+    spn_bin_build(bin, profile);
+  }
 }
 
 void test() {
