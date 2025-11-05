@@ -3,9 +3,9 @@ version = "1.0.0"
 commit = "00c0fa98"
 
 [[package]]
-name = "sp"
-version = "1.4.0"
-commit = "80efa56421bf"
+name = "toml"
+version = "1.2.0"
+commit = "2e8ffdfa215c"
 
 [[package]]
 name = "argparse"
@@ -19,6 +19,7 @@ commit = "01d1b7bc7601"
 deps = ["sp"]
 
 [[package]]
-name = "toml"
-version = "1.2.0"
-commit = "2e8ffdfa215c"
+name = "sp"
+version = "1.4.1"
+commit = "30b07466ac02"
+

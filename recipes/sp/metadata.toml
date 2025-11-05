@@ -17,3 +17,7 @@ commit = "80efa56421bf"
 [[versions]]
 version = "1.4.0"
 commit = "80efa56421bf"
+
+[[versions]]
+version = "1.4.1"
+commit = "30b07466ac02"

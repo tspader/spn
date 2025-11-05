@@ -15,6 +15,7 @@
   #include <io.h>
 #endif
 
+#define SP_PS_MAX_ARGS 32
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
@@ -985,10 +986,27 @@ sp_str_t spn_dep_build_kind_to_str(spn_lib_kind_t kind) {
 sp_str_t spn_cc_lib_kind_to_switch(spn_lib_kind_t kind) {
   switch (kind) {
     case SPN_LIB_KIND_STATIC: return sp_str_lit("-static");
-    case SPN_LIB_KIND_SHARED: 
+    case SPN_LIB_KIND_SHARED:
     case SPN_LIB_KIND_SOURCE:
     case SPN_LIB_KIND_NONE:
     default: return sp_str_lit("");
+  }
+}
+
+sp_str_t spn_cc_c_standard_to_switch(spn_c_standard_t standard) {
+  switch (standard) {
+    case SPN_C89: return sp_str_lit("-std=c89");
+    case SPN_C99: return sp_str_lit("-std=c99");
+    case SPN_C11: return sp_str_lit("-std=c11");
+    default: return sp_str_lit("");
+  }
+}
+
+sp_str_t spn_cc_compiler_to_command(spn_gen_compiler_t compiler) {
+  switch (compiler) {
+    case SPN_GENERATOR_COMPILER_GCC: return sp_str_lit("gcc");
+    case SPN_GENERATOR_COMPILER_NONE:
+    default: return sp_str_lit("gcc");
   }
 }
 
@@ -3326,6 +3344,14 @@ void spn_cli_init(spn_cli_t* cli) {
 
   if (!command->bare) {
     spn_app_add(sp_str_lit("sp"));
+
+    // Add binary entry for main.c
+    spn_bin_t main_bin = {
+      .name = project_name,
+      .entry = sp_str_lit("main.c"),
+      .profile = sp_str_lit("debug")
+    };
+    sp_ht_insert(app.package.bin, main_bin.name, main_bin);
   }
 
   spn_update_project_toml();
@@ -3779,38 +3805,183 @@ void spn_bin_build(spn_bin_t bin, spn_profile_t profile) {
   sp_str_t build_dir = sp_str_lit("build");
   sp_str_t profile_dir = sp_os_join_path(build_dir, bin.profile);
   sp_str_t output_path = sp_os_join_path(profile_dir, bin.name);
-  
+
   sp_os_create_directory(build_dir);
   sp_os_create_directory(profile_dir);
-  
+
+  // Generate all dependency flags using the same logic as spn print
+  sp_str_t includes = spn_gen_build_entries_for_all(SPN_GENERATOR_INCLUDE, profile.compiler);
+  sp_str_t lib_includes = spn_gen_build_entries_for_all(SPN_GENERATOR_LIB_INCLUDE, profile.compiler);
+  sp_str_t libs = spn_gen_build_entries_for_all(SPN_GENERATOR_LIBS, profile.compiler);
+  sp_str_t rpath = spn_gen_build_entries_for_all(SPN_GENERATOR_RPATH, profile.compiler);
+
+  // Generate system libs
+  spn_gen_format_context_t fmt = {
+    .kind = SPN_GENERATOR_SYSTEM_LIBS,
+    .compiler = profile.compiler
+  };
+  sp_dyn_array(sp_str_t) entries = sp_str_map(app.system_deps, sp_dyn_array_size(app.system_deps), &fmt, spn_generator_format_entry_kernel);
+  sp_str_t system_libs = sp_str_join_n(entries, sp_dyn_array_size(entries), sp_str_lit(" "));
+
   sp_ps_config_t cfg = SP_ZERO_INITIALIZE();
-  cfg.command = sp_str_lit("gcc");
-  
+  cfg.command = spn_cc_compiler_to_command(profile.compiler);
+
+  // Add entry file
   sp_ps_config_add_arg(&cfg, bin.entry);
-  
+
+  sp_da(sp_str_t) inc = sp_str_split_c8(includes, ' ');
+  sp_dyn_array_for(inc, it) {
+    sp_ps_config_add_arg(&cfg, inc[it]);
+  }
+
+  // // Add library include directories - split by spaces and add individually
+  // if (lib_includes.len > 0) {
+  //   const c8* start = lib_includes.data;
+  //   const c8* end = lib_includes.data + lib_includes.len;
+  //   const c8* current = start;
+  //
+  //   while (current < end) {
+  //     // Skip whitespace
+  //     while (current < end && (*current == ' ' || *current == '\t')) {
+  //       current++;
+  //     }
+  //
+  //     if (current >= end) break;
+  //
+  //     // Find next whitespace
+  //     const c8* arg_start = current;
+  //     while (current < end && *current != ' ' && *current != '\t') {
+  //       current++;
+  //     }
+  //
+  //     sp_str_t arg = {
+  //       .data = arg_start,
+  //       .len = (u32)(current - arg_start)
+  //     };
+  //
+  //     if (arg.len > 0) {
+  //       sp_ps_config_add_arg(&cfg, arg);
+  //     }
+  //   }
+  // }
+  //
+  // // Add C standard
+  sp_str_t c_std = spn_cc_c_standard_to_switch(profile.language);
+  if (c_std.len > 0) {
+    sp_ps_config_add_arg(&cfg, c_std);
+  }
+
+  // Add debug flag
+  if (profile.mode == SPN_DEP_BUILD_MODE_DEBUG) {
+    sp_ps_config_add_arg(&cfg, sp_str_lit("-g"));
+  }
+
+  // Add library kind switch
   sp_str_t lib_switch = spn_cc_lib_kind_to_switch(profile.libc);
   if (lib_switch.len > 0) {
     sp_ps_config_add_arg(&cfg, lib_switch);
   }
-  
-  sp_str_t c_std = sp_str_lit("");
-  switch (profile.language) {
-    case SPN_C89: c_std = sp_str_lit("-std=c89"); break;
-    case SPN_C99: c_std = sp_str_lit("-std=c99"); break;
-    case SPN_C11: c_std = sp_str_lit("-std=c11"); break;
+
+  // Add libraries - split by spaces and add individually
+  if (libs.len > 0) {
+    const c8* start = libs.data;
+    const c8* end = libs.data + libs.len;
+    const c8* current = start;
+
+    while (current < end) {
+      // Skip whitespace
+      while (current < end && (*current == ' ' || *current == '\t')) {
+        current++;
+      }
+
+      if (current >= end) break;
+
+      // Find next whitespace
+      const c8* arg_start = current;
+      while (current < end && *current != ' ' && *current != '\t') {
+        current++;
+      }
+
+      sp_str_t arg = {
+        .data = arg_start,
+        .len = (u32)(current - arg_start)
+      };
+
+      if (arg.len > 0) {
+        sp_ps_config_add_arg(&cfg, arg);
+      }
+    }
   }
-  if (c_std.len > 0) {
-    sp_ps_config_add_arg(&cfg, c_std);
+
+  // Add system libraries - split by spaces and add individually
+  if (system_libs.len > 0) {
+    const c8* start = system_libs.data;
+    const c8* end = system_libs.data + system_libs.len;
+    const c8* current = start;
+
+    while (current < end) {
+      // Skip whitespace
+      while (current < end && (*current == ' ' || *current == '\t')) {
+        current++;
+      }
+
+      if (current >= end) break;
+
+      // Find next whitespace
+      const c8* arg_start = current;
+      while (current < end && *current != ' ' && *current != '\t') {
+        current++;
+      }
+
+      sp_str_t arg = {
+        .data = arg_start,
+        .len = (u32)(current - arg_start)
+      };
+
+      if (arg.len > 0) {
+        sp_ps_config_add_arg(&cfg, arg);
+      }
+    }
   }
-  
-  if (profile.mode == SPN_DEP_BUILD_MODE_DEBUG) {
-    sp_ps_config_add_arg(&cfg, sp_str_lit("-g"));
+
+  // Add rpath - split by spaces and add individually
+  if (rpath.len > 0) {
+    const c8* start = rpath.data;
+    const c8* end = rpath.data + rpath.len;
+    const c8* current = start;
+
+    while (current < end) {
+      // Skip whitespace
+      while (current < end && (*current == ' ' || *current == '\t')) {
+        current++;
+      }
+
+      if (current >= end) break;
+
+      // Find next whitespace
+      const c8* arg_start = current;
+      while (current < end && *current != ' ' && *current != '\t') {
+        current++;
+      }
+
+      sp_str_t arg = {
+        .data = arg_start,
+        .len = (u32)(current - arg_start)
+      };
+
+      if (arg.len > 0) {
+        sp_ps_config_add_arg(&cfg, arg);
+      }
+    }
   }
-  
+  sp_ps_config_add_arg(&cfg, sp_str_lit("-I./include"));
+
+  // Add output
   sp_ps_config_add_arg(&cfg, sp_str_lit("-o"));
   sp_ps_config_add_arg(&cfg, output_path);
-  
-  sp_ps_run(cfg);
+
+  sp_ps_output_t result = sp_ps_run(cfg);
+  SP_ASSERT(!result.status.exit_code);
 }
 
 void spn_cli_build(spn_cli_t* cli) {
