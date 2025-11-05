@@ -2296,7 +2296,15 @@ void spn_update_project_toml() {
       spn_bin_t* bin = sp_ht_it_getp(app.package.bin, it);
       spn_toml_append_array_table(&toml);
       spn_toml_append_str_cstr(&toml, "name", bin->name);
-      spn_toml_append_str_cstr(&toml, "entry", bin->entry);
+      if (sp_dyn_array_size(bin->source)) {
+        spn_toml_append_str_array_cstr(&toml, "source", bin->source);
+      }
+      if (sp_dyn_array_size(bin->include)) {
+        spn_toml_append_str_array_cstr(&toml, "include", bin->include);
+      }
+      if (!sp_str_empty(bin->profile)) {
+        spn_toml_append_str_cstr(&toml, "profile", bin->profile);
+      }
     }
     spn_toml_end_array(&toml);
   }
@@ -3301,13 +3309,21 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   sp_ht_set_fns(app->matrices, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(app->profiles, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
 
-  spn_profile_t default_profile = {
+  spn_profile_t debug = {
     .cc = SPN_CC_GCC,
     .libc = SPN_LIB_KIND_SHARED,
     .standard = SPN_C11,
     .mode = SPN_DEP_BUILD_MODE_DEBUG
   };
-  sp_ht_insert(app->profiles, sp_str_lit("debug"), default_profile);
+  sp_ht_insert(app->profiles, sp_str_lit("debug"), debug);
+
+  spn_profile_t release = {
+    .cc = SPN_CC_GCC,
+    .libc = SPN_LIB_KIND_SHARED,
+    .standard = SPN_C11,
+    .mode = SPN_DEP_BUILD_MODE_RELEASE
+  };
+  sp_ht_insert(app->profiles, sp_str_lit("release"), release);
 
   app->paths.storage = sp_os_join_path(sp_os_get_storage_path(), SP_LIT("spn"));
 
