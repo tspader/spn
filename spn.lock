@@ -1,0 +1,25 @@
+[spn]
+version = "1.0.0"
+commit = "00c0fa98"
+
+[[package]]
+name = "sp"
+version = "1.3.1"
+commit = "80efa56421bf"
+
+[[package]]
+name = "argparse"
+version = "1.2.0"
+commit = "f71ed6c7b11c"
+
+[[package]]
+name = "tcc"
+version = "1.0.0"
+commit = "01d1b7bc7601"
+deps = ["sp"]
+
+[[package]]
+name = "toml"
+version = "1.2.0"
+commit = "2e8ffdfa215c"
+

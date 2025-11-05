@@ -59,12 +59,9 @@ typedef struct spn_cc spn_cc_t;
 typedef void(*spn_config_fn_t)(spn_config_t*);
 typedef void(*spn_dep_fn_t)(spn_dep_context_t*);
 
-// write the lock file:
-//   [[package]]
-//   name = "..."
-//   version = "..."
-//   deps = ["..."]
-// load the
+// write the lock file
+// load the lock file
+// spn_resolver_resolve_from_lock_file()
 void spn_cc_set_compiler(spn_cc_t* cc, const c8* compiler);
 void spn_cc_add_include_dir(spn_cc_t* cc, const c8* dir);
 void spn_cc_set_c_standard(spn_cc_t* cc, spn_c_standard_t c);

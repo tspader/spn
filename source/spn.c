@@ -45,7 +45,7 @@
 
 #include "spn/spn.h"
 
-#define SPN_VERSION 1
+#define SPN_VERSION "1.0.0"
 #define SPN_COMMIT "00c0fa98"
 
 
@@ -274,6 +274,7 @@ spn_semver_parsed_t spn_semver_parser_parse_version(spn_semver_parser_t* parser)
 spn_semver_t        spn_semver_from_str(sp_str_t);
 spn_semver_range_t  spn_semver_range_from_str(sp_str_t str);
 sp_str_t            spn_semver_range_to_str(spn_semver_range_t range);
+sp_str_t            spn_semver_to_str(spn_semver_t version);
 bool spn_semver_eq(spn_semver_t lhs, spn_semver_t rhs);
 bool spn_semver_geq(spn_semver_t lhs, spn_semver_t rhs);
 bool spn_semver_ge(spn_semver_t lhs, spn_semver_t rhs);
@@ -365,6 +366,12 @@ typedef struct {
   spn_semver_t version;
   sp_str_t commit;
 } spn_metadata_t;
+
+typedef struct {
+  sp_str_t name;
+  spn_semver_t version;
+  sp_str_t commit;
+} spn_lock_entry_t;
 
 
 struct spn_package {
@@ -469,6 +476,7 @@ s32                  spn_sort_kernel_dep_ptr(const void* a, const void* b);
 
 void                 spn_update_lock_file();
 void                 spn_update_project_toml();
+sp_da(spn_lock_entry_t) spn_load_lock_file();
 
 // inclusive (e.g. 0, 1 => 2 versions) range into package.versions; !ok -> nothing found
 typedef struct {
@@ -661,6 +669,7 @@ typedef struct {
 spn_app_t app;
 
 void spn_app_init(spn_app_t* app, u32 num_args, const c8** args);
+void spn_app_prepare();
 void spn_cli_run(spn_app_t* app);
 
 
@@ -1852,6 +1861,70 @@ void spn_tui_update(spn_tui_t* tui) {
 }
 
 void spn_update_lock_file() {
+  spn_toml_writer_t toml = spn_toml_writer_new();
+
+  spn_toml_begin_table(&toml, "spn");
+  spn_toml_append_str(&toml, "version", sp_str_lit(SPN_VERSION));
+  spn_toml_append_str(&toml, "commit", sp_str_lit(SPN_COMMIT));
+  spn_toml_end_table(&toml);
+
+  if (sp_ht_size(app.deps) > 0) {
+    spn_toml_begin_array(&toml, "package");
+    sp_ht_for(app.deps, it) {
+      spn_dep_context_t* dep = sp_ht_it_getp(app.deps, it);
+      spn_toml_append_array_table(&toml);
+      spn_toml_append_str(&toml, "name", dep->name);
+      spn_toml_append_str(&toml, "version", spn_semver_to_str(dep->metadata.version));
+      spn_toml_append_str(&toml, "commit", dep->metadata.commit);
+
+      if (sp_ht_size(dep->package->deps) > 0) {
+        sp_da(sp_str_t) dep_names = SP_NULLPTR;
+        sp_ht_for(dep->package->deps, dep_it) {
+          sp_str_t* name = sp_ht_it_getkp(dep->package->deps, dep_it);
+          sp_dyn_array_push(dep_names, *name);
+        }
+        spn_toml_append_str_array(&toml, "deps", dep_names);
+      }
+    }
+    spn_toml_end_array(&toml);
+  }
+
+  sp_str_t output = spn_toml_writer_write(&toml);
+  sp_io_stream_t file = sp_io_from_file(app.paths.project.lock, SP_IO_MODE_WRITE);
+  sp_io_write_str(&file, output);
+  sp_io_close(&file);
+}
+
+sp_da(spn_lock_entry_t) spn_load_lock_file() {
+  sp_da(spn_lock_entry_t) entries = SP_NULLPTR;
+
+  if (!sp_os_does_path_exist(app.paths.project.lock)) {
+    return entries;
+  }
+
+  toml_table_t* root = spn_toml_parse(app.paths.project.lock);
+  if (!root) {
+    return entries;
+  }
+
+  toml_array_t* packages = toml_table_array(root, "package");
+  if (!packages) {
+    return entries;
+  }
+
+  spn_toml_arr_for(packages, it) {
+    toml_table_t* pkg = toml_array_table(packages, it);
+    if (!pkg) continue;
+
+    spn_lock_entry_t entry = {
+      .name = spn_toml_str(pkg, "name"),
+      .version = spn_semver_from_str(spn_toml_str(pkg, "version")),
+      .commit = spn_toml_str(pkg, "commit")
+    };
+    sp_dyn_array_push(entries, entry);
+  }
+
+  return entries;
 }
 
 void spn_update_project_toml() {
