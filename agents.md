@@ -15,3 +15,9 @@
 - never free allocated memory; we intentionally leak
 - build with `make`, don't run it or write unit tests
 - if you get build errors for missing headers/deps, stop and ask me to fix it
+
+## Rules
+- Always add paths to `spn_paths_t` if project-specific, or `spn_*_paths_t` for item-specific paths
+- Always use the global app reference instead of function arguments for app-wide data
+  - Bad: `void foo(spn_tool_paths_t* paths) { ... }`
+  - Good: `void foo() { app.paths.tools }`
