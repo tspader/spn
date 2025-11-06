@@ -7,8 +7,8 @@ build/*
 !build/bootstrap/*.tar.xz
 examples/**/*.lock.lua
 
-test/main
-test/spn.lock.lua
+test/**/build
+test/**/spn.lock
 
 .claude
 CLAUDE.md
