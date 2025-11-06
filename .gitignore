@@ -16,6 +16,7 @@ CLAUDE.md
 
 .spackle/*
 external/*
+test/tmp
 asset/docker
 target/distrib
 build/bootstrap/bin

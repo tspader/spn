@@ -3,10 +3,9 @@ version = "1.0.0"
 commit = "00c0fa98"
 
 [[package]]
-name = "tcc"
-version = "1.0.0"
-commit = "01d1b7bc7601"
-deps = ["sp"]
+name = "argparse"
+version = "1.2.0"
+commit = "f71ed6c7b11c"
 
 [[package]]
 name = "sp"
@@ -14,9 +13,10 @@ version = "1.4.1"
 commit = "30b07466ac02"
 
 [[package]]
-name = "argparse"
-version = "1.2.0"
-commit = "f71ed6c7b11c"
+name = "tcc"
+version = "1.0.0"
+commit = "01d1b7bc7601"
+deps = ["sp"]
 
 [[package]]
 name = "toml"

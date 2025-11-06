@@ -93,6 +93,12 @@ typedef enum {
 #define sp_opt_get(O) (O).value
 
 #define sp_dyn_array_sort(arr, fn) qsort(arr, sp_dyn_array_size(arr), sizeof((arr)[0]), fn)
+#define sp_ht_collect_keys(ht, da) \
+  do { \
+    sp_ht_for((ht), __it) { \
+      sp_dyn_array_push((da), *sp_ht_it_getkp((ht), __it)); \
+    } \
+  } while(0)
 
 sp_str_t sp_str_map_kernel_colorize(sp_str_map_context_t* context) {
   sp_str_t id = *(sp_str_t*)context->user_data;
@@ -2228,6 +2234,10 @@ spn_lock_file_t spn_load_lock_file() {
 void spn_update_lock_file() {
   spn_lock_file_t lock = spn_build_lock_file();
 
+  sp_da(sp_str_t) keys = SP_NULLPTR;
+  sp_ht_collect_keys(lock.entries, keys);
+  sp_dyn_array_sort(keys, sp_str_sort_kernel_alphabetical);
+
   spn_toml_writer_t toml = spn_toml_writer_new();
 
   spn_toml_begin_table_cstr(&toml, "spn");
@@ -2236,8 +2246,8 @@ void spn_update_lock_file() {
   spn_toml_end_table(&toml);
 
   spn_toml_begin_array_cstr(&toml, "package");
-  sp_ht_for(lock.entries, it) {
-    spn_lock_entry_t* entry = sp_ht_it_getp(lock.entries, it);
+  sp_dyn_array_for(keys, it) {
+    spn_lock_entry_t* entry = sp_ht_getp(lock.entries, keys[it]);
 
     spn_toml_append_array_table(&toml);
     spn_toml_append_str_cstr(&toml, "name", entry->name);
