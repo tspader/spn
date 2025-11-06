@@ -241,6 +241,14 @@ typedef enum {
   SPN_SEMVER_OP_EQ = 4,
 } spn_semver_op_t;
 
+typedef enum {
+  SPN_SEMVER_MOD_NONE,
+  SPN_SEMVER_MOD_CARET,
+  SPN_SEMVER_MOD_TILDE,
+  SPN_SEMVER_MOD_WILDCARD,
+  SPN_SEMVER_MOD_CMP,
+} spn_semver_mod_t;
+
 typedef struct {
   u32 major;
   u32 minor;
@@ -266,6 +274,7 @@ typedef struct {
 typedef struct {
   spn_semver_bound_t low;
   spn_semver_bound_t high;
+  spn_semver_mod_t mod;
 } spn_semver_range_t;
 
 typedef struct {
@@ -628,6 +637,10 @@ typedef struct {
 } spn_cli_add_t;
 
 typedef struct {
+  const c8* package;
+} spn_cli_update_t;
+
+typedef struct {
   bool bare;
 } spn_cli_init_t;
 
@@ -663,6 +676,7 @@ typedef struct {
   const c8* output;
 
   spn_cli_add_t add;
+  spn_cli_update_t update;
   spn_cli_init_t init;
   spn_cli_print_t print;
   spn_cli_build_t build;
@@ -678,8 +692,10 @@ void spn_cli_print(spn_cli_t* cli);
 void spn_cli_copy(spn_cli_t* cli);
 
 void spn_app_add(sp_str_t name);
+void spn_app_update(sp_str_t name);
 void spn_cli_init(spn_cli_t* cli);
 void spn_cli_add(spn_cli_t* cli);
+void spn_cli_update(spn_cli_t* cli);
 
 void spn_cli_list(spn_cli_t* cli);
 void spn_cli_ls(spn_cli_t* cli);
@@ -2649,7 +2665,10 @@ spn_semver_parsed_t spn_semver_parser_parse_version(spn_semver_parser_t* parser)
 }
 
 spn_semver_range_t spn_semver_caret_to_range(spn_semver_parsed_t parsed) {
-  spn_semver_range_t range = {0};
+  spn_semver_range_t range = {
+    .mod = SPN_SEMVER_MOD_CARET
+  };
+
   if (parsed.version.major > 0) {
     range.low.op = SPN_SEMVER_OP_GEQ;
     range.low.version = parsed.version;
@@ -2677,7 +2696,10 @@ spn_semver_range_t spn_semver_caret_to_range(spn_semver_parsed_t parsed) {
 }
 
 spn_semver_range_t spn_semver_tilde_to_range(spn_semver_parsed_t parsed) {
-  spn_semver_range_t range = {0};
+  spn_semver_range_t range = {
+    .mod = SPN_SEMVER_MOD_TILDE
+  };
+
   if (parsed.components.patch) {
     range.low.op = SPN_SEMVER_OP_GEQ;
     range.low.version = parsed.version;
@@ -2705,7 +2727,9 @@ spn_semver_range_t spn_semver_tilde_to_range(spn_semver_parsed_t parsed) {
 }
 
 spn_semver_range_t spn_semver_wildcard_to_range(spn_semver_parsed_t parsed) {
-  spn_semver_range_t range = {0};
+  spn_semver_range_t range = {
+    .mod = SPN_SEMVER_MOD_WILDCARD
+  };
 
   if (!parsed.components.major) {
     range.low.op = SPN_SEMVER_OP_GEQ;
@@ -2740,14 +2764,47 @@ spn_semver_range_t spn_semver_wildcard_to_range(spn_semver_parsed_t parsed) {
 }
 
 spn_semver_range_t spn_semver_comparison_to_range(spn_semver_op_t op, spn_semver_t version) {
-  spn_semver_range_t range = {0};
+  spn_semver_range_t range = {
+    .mod = SPN_SEMVER_MOD_CMP
+  };
 
-  range.low.op = op;
-  range.low.version = version;
-  range.high.op = SPN_SEMVER_OP_LT;
-  range.high.version.major = 0xFFFFFFFF;
-  range.high.version.minor = 0xFFFFFFFF;
-  range.high.version.patch = 0xFFFFFFFF;
+  switch (op) {
+    case SPN_SEMVER_OP_EQ: {
+      range.low.op = SPN_SEMVER_OP_GEQ;
+      range.low.version = version;
+      range.high.op = SPN_SEMVER_OP_LEQ;
+      range.high.version = version;
+      break;
+    }
+    case SPN_SEMVER_OP_GEQ: {
+      range.low.op = SPN_SEMVER_OP_GEQ;
+      range.low.version = version;
+      range.high.op = SPN_SEMVER_OP_LEQ;
+      range.high.version = (spn_semver_t){SP_LIMIT_MAX_U32, SP_LIMIT_MAX_U32, SP_LIMIT_MAX_U32};
+      break;
+    }
+    case SPN_SEMVER_OP_GT: {
+      range.low.op = SPN_SEMVER_OP_GT;
+      range.low.version = version;
+      range.high.op = SPN_SEMVER_OP_LEQ;
+      range.high.version = (spn_semver_t){SP_LIMIT_MAX_U32, SP_LIMIT_MAX_U32, SP_LIMIT_MAX_U32};
+      break;
+    }
+    case SPN_SEMVER_OP_LEQ: {
+      range.low.op = SPN_SEMVER_OP_GEQ;
+      range.low.version = (spn_semver_t){SP_LIMIT_MIN_U32, SP_LIMIT_MIN_U32, SP_LIMIT_MIN_U32};
+      range.high.op = SPN_SEMVER_OP_LEQ;
+      range.high.version = version;
+      break;
+    }
+    case SPN_SEMVER_OP_LT: {
+      range.low.op = SPN_SEMVER_OP_GEQ;
+      range.low.version = (spn_semver_t){SP_LIMIT_MIN_U32, SP_LIMIT_MIN_U32, SP_LIMIT_MIN_U32};
+      range.high.op = SPN_SEMVER_OP_LT;
+      range.high.version = version;
+      break;
+    }
+  }
 
   return range;
 }
@@ -2864,14 +2921,15 @@ sp_str_t spn_semver_op_to_str(spn_semver_op_t op) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-sp_str_t spn_semver_range_to_str(spn_semver_range_t range) {
-  return sp_format(
-    "{}{}.{}.{}",
-    SP_FMT_STR(spn_semver_op_to_str(range.low.op)),
-    SP_FMT_U32(range.low.version.major),
-    SP_FMT_U32(range.low.version.minor),
-    SP_FMT_U32(range.low.version.patch)
-  );
+sp_str_t spn_semver_mod_to_str(spn_semver_mod_t mod, spn_semver_op_t op) {
+  switch (mod) {
+    case SPN_SEMVER_MOD_TILDE: return sp_str_lit("~");
+    case SPN_SEMVER_MOD_CARET: return sp_str_lit("^");
+    case SPN_SEMVER_MOD_WILDCARD: return sp_str_lit("*");
+    case SPN_SEMVER_MOD_CMP: return spn_semver_op_to_str(op);
+    case SPN_SEMVER_MOD_NONE: return sp_str_lit("");
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
 sp_str_t spn_semver_to_str(spn_semver_t version) {
@@ -2880,6 +2938,14 @@ sp_str_t spn_semver_to_str(spn_semver_t version) {
     SP_FMT_U32(version.major),
     SP_FMT_U32(version.minor),
     SP_FMT_U32(version.patch)
+  );
+}
+
+sp_str_t spn_semver_range_to_str(spn_semver_range_t range) {
+  return sp_format(
+    "{}{}",
+    SP_FMT_STR(spn_semver_mod_to_str(range.mod, range.low.op)),
+    SP_FMT_STR(spn_semver_to_str(range.low.version))
   );
 }
 
@@ -2921,6 +2987,29 @@ s32 spn_semver_sort_kernel(const void* a, const void* b) {
   const spn_semver_t* lhs = (const spn_semver_t*)a;
   const spn_semver_t* rhs = (const spn_semver_t*)b;
   return spn_semver_cmp(*lhs, *rhs);
+}
+
+bool spn_semver_satisfies(spn_semver_t version, spn_semver_t bound_version, spn_semver_op_t op) {
+  switch (op) {
+    case SPN_SEMVER_OP_EQ: {
+      return spn_semver_eq(version, bound_version);
+    }
+    case SPN_SEMVER_OP_LT: {
+      return spn_semver_le(version, bound_version);
+    }
+    case SPN_SEMVER_OP_LEQ: {
+      return spn_semver_leq(version, bound_version);
+    }
+    case SPN_SEMVER_OP_GT: {
+      return spn_semver_ge(version, bound_version);
+    }
+    case SPN_SEMVER_OP_GEQ: {
+      return spn_semver_geq(version, bound_version);
+    }
+    default: {
+      SP_UNREACHABLE_CASE();
+    }
+  }
 }
 
 spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key) {
@@ -3183,12 +3272,12 @@ void spn_resolver_add_package_constraints(spn_resolver_t* resolver, spn_package_
       spn_semver_t version = dep->versions[it];
 
       if (!range.low.some) {
-        if (spn_semver_geq(version, low)) {
+        if (spn_semver_satisfies(version, low, request.range.low.op)) {
           sp_opt_set(range.low, it);
         }
       }
 
-      if (spn_semver_leq(version, high)) {
+      if (spn_semver_satisfies(version, high, request.range.high.op)) {
         sp_opt_set(range.high, it);
       }
     }
@@ -3390,6 +3479,8 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     "\n"
     "Commands:\n"
     "  init           Initialize a new spn project in the current directory\n"
+    "  add <package>  Add a package to your project\n"
+    "  update <package> Update a package to the latest version\n"
     "  build          Build all project dependencies\n"
     "  list           List all available packages\n"
     "  clean          Remove build and store directories\n"
@@ -3622,6 +3713,9 @@ void spn_cli_run(spn_app_t* app) {
   }
   else if (sp_cstr_equal("add", cli->args[0])) {
     spn_cli_add(cli);
+  }
+  else if (sp_cstr_equal("update", cli->args[0])) {
+    spn_cli_update(cli);
   }
 }
 
@@ -3961,9 +4055,13 @@ void spn_app_add(sp_str_t name) {
     SP_FATAL("{:fg brightcyan} has no known versions", SP_FMT_STR(package->name));
   }
 
+  spn_semver_parsed_t version = {
+    .version = *sp_dyn_array_back(package->versions),
+    .components = { true, true, true }
+  };
   spn_dep_req_t dep = {
     .name = sp_str_copy(package->name),
-    .range = spn_semver_comparison_to_range(SPN_SEMVER_OP_GEQ, *sp_dyn_array_back(package->versions))
+    .range = spn_semver_caret_to_range(version)
   };
   sp_ht_insert(app.package.deps, dep.name, dep);
 
@@ -3971,6 +4069,44 @@ void spn_app_add(sp_str_t name) {
   spn_app_prepare();
 
   spn_update_project_toml();
+}
+
+void spn_app_update(sp_str_t name) {
+  spn_dep_context_t* dep = sp_ht_getp(app.deps, name);
+  if (!dep) {
+    SP_FATAL("{:fg brightyellow} is not in your project", SP_FMT_STR(name));
+  }
+
+  spn_package_t* package = sp_ht_getp(app.packages, name);
+  if (!package) {
+    sp_str_t prefix = sp_str_lit("  > ");
+    sp_str_t color = sp_str_lit("brightcyan");
+    sp_da(sp_str_t) search = app.search;
+    search = sp_str_map(search, sp_dyn_array_size(search), &color, sp_str_map_kernel_colorize);
+    search = sp_str_map(search, sp_dyn_array_size(search), &prefix, sp_str_map_kernel_prepend);
+
+    SP_FATAL(
+      "Could not find {:fg yellow} on search path: \n{}",
+      SP_FMT_STR(name),
+      SP_FMT_STR(sp_str_join_n(search, sp_dyn_array_size(search), sp_str_lit("\n")))
+    );
+  }
+
+  if (sp_dyn_array_empty(package->versions)) {
+    SP_FATAL("{:fg brightcyan} has no known versions", SP_FMT_STR(package->name));
+  }
+
+  spn_dep_req_t request = {
+    .name = sp_str_copy(package->name),
+    .range = spn_semver_comparison_to_range(SPN_SEMVER_OP_GEQ, *sp_dyn_array_back(package->versions))
+  };
+
+  sp_ht_insert(app.package.deps, request.name, request);
+
+  spn_resolver_resolve_from_solver(&app.resolver);
+  spn_app_prepare();
+
+  spn_update_lock_file();
 }
 
 void spn_cli_add(spn_cli_t* cli) {
@@ -3996,6 +4132,31 @@ void spn_cli_add(spn_cli_t* cli) {
 
   sp_str_t name = sp_str_from_cstr(cli->args[0]);
   spn_app_add(name);
+}
+
+void spn_cli_update(spn_cli_t* cli) {
+  struct argparse argparse;
+  argparse_init(
+    &argparse,
+    (struct argparse_option []) {
+      OPT_HELP(),
+      OPT_END()
+    },
+    (const c8* []) {
+      "spn update",
+      SP_NULLPTR
+    },
+    SP_NULL
+  );
+  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+
+  if (!cli->num_args || !cli->args[0]) {
+    argparse_usage(&argparse);
+    return;
+  }
+
+  sp_str_t name = sp_str_from_cstr(cli->args[0]);
+  spn_app_update(name);
 }
 
 void spn_cli_print(spn_cli_t* cli) {
