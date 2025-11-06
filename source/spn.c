@@ -140,6 +140,7 @@ typedef struct {
   toml_table_t*     so;
   toml_array_t*   bin;
   toml_array_t*   profile;
+  toml_array_t*   registry;
   toml_table_t*   deps;
   toml_table_t*   options;
   toml_table_t*   config;
@@ -408,6 +409,13 @@ typedef struct {
   sp_ht(sp_str_t, spn_lock_entry_t) entries;
 } spn_lock_file_t;
 
+typedef struct {
+  sp_str_t name;
+  sp_str_t location;
+  spn_registry_kind_t kind;
+} spn_registry_t;
+
+sp_str_t spn_registry_get_path(spn_registry_t* registry);
 
 struct spn_package {
   sp_str_t name;
@@ -421,13 +429,13 @@ struct spn_package {
   sp_ht(sp_str_t, spn_dep_options_t) config;
   sp_ht(spn_semver_t, spn_metadata_t) metadata;
   sp_da(spn_semver_t) versions;
+  sp_ht(sp_str_t, spn_registry_t) registries;
 
   spn_dep_fn_t on_configure;
   spn_dep_fn_t on_build;
   spn_dep_fn_t on_package;
 
   spn_toml_package_t toml;
-  spn_package_state_t state;
   spn_package_paths_t paths;
 };
 
@@ -474,6 +482,7 @@ struct spn_dep_context {
 spn_generator_kind_t spn_gen_kind_from_str(sp_str_t str);
 spn_gen_entry_kind_t spn_gen_entry_from_str(sp_str_t str);
 spn_cc_kind_t   spn_cc_kind_from_str(sp_str_t str);
+spn_registry_kind_t spn_registry_kind_from_str(sp_str_t str);
 sp_str_t             spn_gen_format_entry_for_compiler(sp_str_t entry, spn_gen_entry_kind_t kind, spn_cc_kind_t compiler);
 sp_str_t             spn_cc_kind_to_executable(spn_cc_kind_t compiler);
 sp_str_t             spn_cc_c_standard_to_switch(spn_c_standard_t standard);
@@ -536,7 +545,6 @@ void spn_resolver_add_package_constraints(spn_resolver_t* resolver, spn_package_
 void spn_resolver_resolve_from_lock_file(spn_resolver_t* resolver);
 void spn_resolver_resolve_from_solver(spn_resolver_t* resolver);
 void spn_resolver_resolve(spn_resolver_t* resolver);
-spn_dep_version_range_t spn_package_collect_versions(spn_dep_req_t req);
 
 ////////////
 // CONFIG //
@@ -549,6 +557,7 @@ typedef struct {
 
 struct spn_config {
   sp_str_t spn;
+  sp_ht(sp_str_t, spn_registry_t) registries;
 };
 
 
@@ -709,13 +718,14 @@ typedef struct {
   spn_package_t package;
   sp_opt(spn_lock_file_t) lock;
   spn_resolver_t resolver;
-  sp_dyn_array(sp_str_t) search;
+  spn_registry_t registry;
+  sp_da(sp_str_t) search;
   sp_ht(sp_str_t, spn_package_t) packages;
   sp_ht(sp_str_t, spn_dep_context_t) deps;
   sp_ht(sp_str_t, spn_build_matrix_t) matrices;
   sp_ht(sp_str_t, spn_profile_t) profiles;
   sp_opt(sp_str_t) default_profile;
-  sp_dyn_array(sp_str_t) system_deps;
+  sp_da(sp_str_t) system_deps;
 } spn_app_t;
 
 spn_app_t app;
@@ -1252,6 +1262,15 @@ spn_c_standard_t spn_c_standard_from_str(sp_str_t str) {
 
   SP_FATAL("Unknown C standard {:fg brightyellow}; options are [c89, c99, c11]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_C99);
+}
+
+spn_registry_kind_t spn_registry_kind_from_str(sp_str_t str) {
+  if      (sp_str_equal_cstr(str, "workspace")) return SPN_REGISTRY_KIND_WORKSPACE;
+  else if (sp_str_equal_cstr(str, "user"))      return SPN_REGISTRY_KIND_USER;
+  else if (sp_str_equal_cstr(str, "remote"))    return SPN_REGISTRY_KIND_REMOTE;
+
+  SP_FATAL("Unknown registry kind {:fg brightyellow}; options are [workspace, user, remote]", SP_FMT_STR(str));
+  SP_UNREACHABLE_RETURN(SPN_REGISTRY_KIND_WORKSPACE);
 }
 
 spn_generator_kind_t spn_gen_kind_from_str(sp_str_t str) {
@@ -2981,6 +3000,7 @@ spn_package_t spn_package_load(sp_str_t manifest_path) {
   toml.lib = toml_table_table(toml.spn, "lib");
   toml.bin = toml_table_array(toml.spn, "bin");
   toml.profile = toml_table_array(toml.spn, "profile");
+  toml.registry = toml_table_array(toml.spn, "registry");
   toml.deps = toml_table_table(toml.spn, "deps");
   toml.options = toml_table_table(toml.spn, "options");
   toml.config = toml_table_table(toml.spn, "config");
@@ -2991,7 +3011,6 @@ spn_package_t spn_package_load(sp_str_t manifest_path) {
   package.repo = spn_toml_str_opt(toml.package, "repo", "");
   package.author = spn_toml_str_opt(toml.package, "author", "");
   package.maintainer = spn_toml_str_opt(toml.package, "maintainer", "");
-  package.state = SPN_PACKAGE_STATE_UNLOADED;
 
   if (toml.lib) {
     toml_array_t* kinds = toml_table_array(toml.lib, "kinds");
@@ -3025,6 +3044,20 @@ spn_package_t spn_package_load(sp_str_t manifest_path) {
       if (!app.default_profile.some) {
         sp_opt_set(app.default_profile, profile_name);
       }
+    }
+  }
+
+  if (toml.registry) {
+    spn_toml_arr_for(toml.registry, n) {
+      toml_table_t* it = toml_array_table(toml.registry, n);
+
+      spn_registry_t registry = {
+        .name = spn_toml_str(it, "name"),
+        .location = spn_toml_str(it, "location"),
+        .kind = SPN_REGISTRY_KIND_WORKSPACE,
+      };
+
+      sp_ht_insert(package.registries, registry.name, registry);
     }
   }
 
@@ -3112,10 +3145,6 @@ spn_package_t spn_package_load(sp_str_t manifest_path) {
   }
 
   return package;
-}
-
-
-spn_dep_version_range_t spn_package_collect_versions(spn_dep_req_t req) {
 }
 
 void spn_resolver_init(spn_resolver_t* resolver) {
@@ -3298,6 +3327,23 @@ void spn_app_prepare() {
   }
 }
 
+sp_str_t spn_registry_get_path(spn_registry_t* registry) {
+  switch (registry->kind) {
+    case SPN_REGISTRY_KIND_WORKSPACE: {
+      return sp_os_join_path(app.paths.project.dir, registry->location);
+    }
+    case SPN_REGISTRY_KIND_BUILTIN:
+    case SPN_REGISTRY_KIND_USER: {
+      return sp_str_copy(registry->location);
+    }
+    case SPN_REGISTRY_KIND_REMOTE: {
+      SP_UNREACHABLE();
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 /////////
 // APP //
 /////////
@@ -3406,16 +3452,28 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   // Config
   app->paths.config_dir = sp_os_join_path(sp_os_get_config_path(), SP_LIT("spn"));
-  app->paths.config = sp_os_join_path(app->paths.config_dir, SP_LIT("spn.toml"));
+  app->paths.config = sp_os_join_path(app->paths.config_dir, SP_LIT("spn.toml")); // @llm user config is here
 
-  // Bootstrap the user config, which tells us if spn itself is installed in the usual,
-  // well-known location or in somewhere the user specified (for development)
   if (sp_os_does_path_exist(app->paths.config)) {
     toml_table_t* toml = spn_toml_parse(app->paths.config);
 
     toml_value_t spn = toml_table_string(toml, "spn");
     if (spn.ok) {
       app->paths.spn = sp_str_view(spn.u.s);
+    }
+
+    toml_array_t* registries = toml_table_array(toml, "registry");
+    if (registries) {
+      spn_toml_arr_for(registries, n) {
+        toml_table_t* it = toml_array_table(registries, n);
+        spn_registry_t registry = {
+          .name = spn_toml_str(it, "name"),
+          .location = spn_toml_str(it, "location"),
+          .kind = SPN_REGISTRY_KIND_USER
+        };
+
+        sp_ht_insert(app->config.registries, registry.name, registry);
+      }
     }
   }
 
@@ -3434,7 +3492,12 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     SP_ASSERT(!spn_git_clone(url, app->paths.spn));
   }
 
-  sp_dyn_array_push(app->search, sp_os_join_path(app->paths.spn, SP_LIT("recipes")));
+  // Initialize builtin registry
+  app->registry = (spn_registry_t) {
+    .name = sp_str_lit("builtin"),
+    .location = sp_os_join_path(app->paths.spn, sp_str_lit("recipes")),
+    .kind = SPN_REGISTRY_KIND_BUILTIN
+  };
 
   // Find the cache directory after the config has been fully loaded
   app->paths.cache = sp_os_join_path(app->paths.storage, SP_LIT("cache"));
@@ -3446,23 +3509,40 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   sp_os_create_directory(app->paths.source);
   sp_os_create_directory(app->paths.build);
 
-  sp_da(sp_str_t) search = SP_NULLPTR;
+  if (sp_os_does_path_exist(app->paths.project.toml)) {
+    app->package = spn_package_load(app->paths.project.toml);
+  }
+
+  sp_ht_for(app->package.registries, it) {
+    spn_registry_t* registry = sp_ht_it_getp(app->package.registries, it);
+    sp_dyn_array_push(app->search, spn_registry_get_path(registry));
+  }
+
+  sp_ht_for(app->config.registries, it) {
+    spn_registry_t* registry = sp_ht_it_getp(app->config.registries, it);
+    sp_dyn_array_push(app->search, spn_registry_get_path(registry));
+  }
+
+  sp_dyn_array_push(app->search, spn_registry_get_path(&app->registry));
+
+  sp_da(sp_str_t) search_queue = SP_NULLPTR;
   sp_dyn_array_for(app->search, it) {
-    sp_dyn_array_push(search, app->search[it]);
+    sp_dyn_array_push(search_queue, app->search[it]);
   }
 
   sp_da(sp_str_t) files = SP_NULLPTR;
-
-  sp_dyn_array_for(search, i) {
-    sp_str_t path = search[i];
+  sp_dyn_array_for(search_queue, i) {
+    sp_str_t path = search_queue[i];
     if (!sp_os_does_path_exist(path)) continue;
-    if (!sp_os_is_directory(path)) continue;
+    if (!sp_os_is_directory(path)) {
+      SP_FATAL("{:fg brightcyan} is on the search path, but it's not a directory", SP_FMT_STR(path));
+    }
 
     sp_da(sp_os_dir_entry_t) entries = sp_os_scan_directory(path);
     sp_dyn_array_for(entries, i) {
       sp_os_dir_entry_t entry = entries[i];
       if (sp_os_is_directory(entry.file_path)) {
-        sp_dyn_array_push(search, sp_str_copy(entry.file_path));
+        sp_dyn_array_push(search_queue, sp_str_copy(entry.file_path));
       }
       else {
         if (!sp_str_equal_cstr(entry.file_name, "spn.toml")) continue;
@@ -3478,9 +3558,6 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     sp_ht_insert(app->packages, package.name, package);
   }
 
-  if (sp_os_does_path_exist(app->paths.project.toml)) {
-    app->package = spn_package_load(app->paths.project.toml);
-  }
 
   if (sp_ht_empty(app->profiles)) {
     spn_profile_t debug = {

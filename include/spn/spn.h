@@ -54,6 +54,13 @@ typedef enum {
   SPN_CC_GCC,
 } spn_cc_kind_t;
 
+typedef enum {
+  SPN_REGISTRY_KIND_WORKSPACE,
+  SPN_REGISTRY_KIND_USER,
+  SPN_REGISTRY_KIND_REMOTE,
+  SPN_REGISTRY_KIND_BUILTIN,
+} spn_registry_kind_t;
+
 typedef struct spn_config spn_config_t;
 typedef struct spn_package spn_package_t;
 typedef struct spn_dep_context spn_dep_context_t;

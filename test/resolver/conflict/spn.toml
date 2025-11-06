@@ -1,0 +1,10 @@
+[package]
+name = "resolver_conflict"
+
+[[registry]]
+name = "registry"
+location = "./registry"
+
+[deps]
+foo = "1.0.0"
+bar = "1.0.0"

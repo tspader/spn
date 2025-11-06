@@ -1,0 +1,6 @@
+[package]
+name = "bar"
+repo = "tspader/bar"
+
+[lib]
+kinds = ["source"]
