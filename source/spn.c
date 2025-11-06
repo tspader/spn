@@ -641,6 +641,10 @@ typedef struct {
 } spn_cli_update_t;
 
 typedef struct {
+  const c8* command;
+} spn_cli_tool_t;
+
+typedef struct {
   bool bare;
 } spn_cli_init_t;
 
@@ -677,6 +681,7 @@ typedef struct {
 
   spn_cli_add_t add;
   spn_cli_update_t update;
+  spn_cli_tool_t tool;
   spn_cli_init_t init;
   spn_cli_print_t print;
   spn_cli_build_t build;
@@ -696,6 +701,7 @@ void spn_app_update(sp_str_t name);
 void spn_cli_init(spn_cli_t* cli);
 void spn_cli_add(spn_cli_t* cli);
 void spn_cli_update(spn_cli_t* cli);
+void spn_cli_tool(spn_cli_t* cli);
 
 void spn_cli_list(spn_cli_t* cli);
 void spn_cli_ls(spn_cli_t* cli);
@@ -3481,6 +3487,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     "  init           Initialize a new spn project in the current directory\n"
     "  add <package>  Add a package to your project\n"
     "  update <package> Update a package to the latest version\n"
+    "  tool           Manage spn tools\n"
     "  build          Build all project dependencies\n"
     "  list           List all available packages\n"
     "  clean          Remove build and store directories\n"
@@ -3716,6 +3723,9 @@ void spn_cli_run(spn_app_t* app) {
   }
   else if (sp_cstr_equal("update", cli->args[0])) {
     spn_cli_update(cli);
+  }
+  else if (sp_cstr_equal("tool", cli->args[0])) {
+    spn_cli_tool(cli);
   }
 }
 
@@ -4157,6 +4167,77 @@ void spn_cli_update(spn_cli_t* cli) {
 
   sp_str_t name = sp_str_from_cstr(cli->args[0]);
   spn_app_update(name);
+}
+
+void spn_cli_tool(spn_cli_t* cli) {
+  struct argparse argparse;
+  argparse_init(
+    &argparse,
+    (struct argparse_option []) {
+      OPT_HELP(),
+      OPT_END()
+    },
+    (const c8* []) {
+      "spn tool",
+      SP_NULLPTR
+    },
+    SP_NULL
+  );
+  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+
+  if (!cli->num_args || !cli->args[0]) {
+    sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+
+    sp_str_builder_append_fmt(&builder, "Usage: {:fg brightcyan}spn tool [OPTIONS] <COMMAND>");
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_append_cstr(&builder, "Manage spn tools");
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_append_cstr(&builder, "Commands:");
+    sp_str_builder_new_line(&builder);
+
+    sp_str_builder_indent(&builder);
+    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}{:fg brightyellow}     Install commands provided by a package", SP_FMT_CSTR("install"), SP_FMT_CSTR("<package>"));
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}{:fg brightyellow}      Uninstall a tool", SP_FMT_CSTR("uninstall"), SP_FMT_CSTR("<tool>"));
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}{:fg brightyellow} [args...]   Run a command provided by a package", SP_FMT_CSTR("run"), SP_FMT_CSTR("<tool>"));
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}                  List installed tools", SP_FMT_CSTR("list"));
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_append_fmt(&builder, "{:fg brightcyan} [tool]        Upgrade installed tools", SP_FMT_CSTR("upgrade"), SP_FMT_CSTR("[tool]"));
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}         Ensure that tool executable directory is on the PATH", SP_FMT_CSTR("update-shell"));
+    sp_str_builder_dedent(&builder);
+
+    SP_LOG("{}", SP_FMT_STR(sp_str_builder_write(&builder)));
+    return;
+  }
+
+  const c8* subcommand = cli->args[0];
+
+  if (sp_cstr_equal("install", subcommand)) {
+    SP_LOG("tool {:fg brightcyan}install - not implemented yet", SP_FMT_CSTR("install"));
+  }
+  else if (sp_cstr_equal("uninstall", subcommand)) {
+    SP_LOG("tool {:fg brightcyan}uninstall - not implemented yet", SP_FMT_CSTR("uninstall"));
+  }
+  else if (sp_cstr_equal("run", subcommand)) {
+    SP_LOG("tool {:fg brightcyan}run - not implemented yet", SP_FMT_CSTR("run"));
+  }
+  else if (sp_cstr_equal("list", subcommand)) {
+    SP_LOG("tool {:fg brightcyan}list - not implemented yet", SP_FMT_CSTR("list"));
+  }
+  else if (sp_cstr_equal("upgrade", subcommand)) {
+    SP_LOG("tool {:fg brightcyan}upgrade - not implemented yet", SP_FMT_CSTR("upgrade"));
+  }
+  else if (sp_cstr_equal("update-shell", subcommand)) {
+    SP_LOG("tool {:fg brightcyan}update-shell - not implemented yet", SP_FMT_CSTR("update-shell"));
+  }
+  else {
+    SP_FATAL("Unknown tool subcommand: {:fg yellow}{}", SP_FMT_CSTR(subcommand));
+  }
 }
 
 void spn_cli_print(spn_cli_t* cli) {

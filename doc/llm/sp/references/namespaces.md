@@ -1,7 +1,5 @@
 # sp.h API Namespaces
 
-This document lists all public APIs in sp.h organized by namespace/category. See api_categories.md in the doc/ directory for function line numbers.
-
 ## Memory Management
 
 Tags: memory, allocator, allocation, context

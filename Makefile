@@ -204,3 +204,6 @@ hand:
 
 tcc:
 	tcc ./source/main.c -std=c11 -static -g -Isource -o build/bin/spn $$(build/bootstrap/bin/spn print --output noninteractive) -lm -lpthread
+
+boots:
+	curl --proto '=https' --tlsv1.2 -LsSf https://github.com/tspader/spn/releases/download/v0.2.2/spn-installer.sh | sh
