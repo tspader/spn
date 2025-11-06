@@ -2924,7 +2924,7 @@ sp_str_t spn_semver_op_to_str(spn_semver_op_t op) {
 sp_str_t spn_semver_mod_to_str(spn_semver_mod_t mod, spn_semver_op_t op) {
   switch (mod) {
     case SPN_SEMVER_MOD_TILDE: return sp_str_lit("~");
-    case SPN_SEMVER_MOD_CARET: return sp_str_lit("^");
+    case SPN_SEMVER_MOD_CARET: return sp_str_lit(""); // ^ is implied
     case SPN_SEMVER_MOD_WILDCARD: return sp_str_lit("*");
     case SPN_SEMVER_MOD_CMP: return spn_semver_op_to_str(op);
     case SPN_SEMVER_MOD_NONE: return sp_str_lit("");
