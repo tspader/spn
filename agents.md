@@ -4,6 +4,7 @@
   - `sp.h` instead of C standard library
   - x macro enums
   - `sp_ht` and `sp_da` macro-codegen'd hash table / dyn array
+  - `sp_str_t` ptr + len strings instead of null terminated
 - core files:
   - `source/spn.c` is the entire implementation
   - `include/spn/spn.h` for public API used in packages
