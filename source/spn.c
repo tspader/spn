@@ -91,6 +91,7 @@ typedef enum {
 
 #define sp_opt_set(O, V) do { (O).value = (V); (O).some = SP_OPT_SOME; } while (0)
 #define sp_opt_get(O) (O).value
+#define sp_opt_some(V) { .value = V, .some = SP_OPT_SOME }
 
 #define sp_dyn_array_sort(arr, fn) qsort(arr, sp_dyn_array_size(arr), sizeof((arr)[0]), fn)
 #define sp_ht_collect_keys(ht, da) \
@@ -517,10 +518,10 @@ spn_lock_file_t      spn_load_lock_file();
 
 void spn_bin_build(spn_bin_t bin);
 
-// inclusive (e.g. 0, 1 => 2 versions) range into package.versions; !ok -> nothing found
 typedef struct {
   sp_opt(u32) low;
   sp_opt(u32) high;
+  spn_dep_req_t source;
 } spn_dep_version_range_t;
 
 typedef struct {
@@ -3115,27 +3116,6 @@ spn_package_t spn_package_load(sp_str_t manifest_path) {
 
 
 spn_dep_version_range_t spn_package_collect_versions(spn_dep_req_t req) {
-  spn_semver_t low = req.range.low.version;
-  spn_semver_t high = req.range.high.version;
-
-  spn_dep_version_range_t range = SP_ZERO_INITIALIZE();
-
-  spn_package_t* package = sp_ht_getp(app.packages, req.name);
-  sp_dyn_array_for(package->versions, it) {
-    spn_semver_t version = package->versions[it];
-
-    if (!range.low.some) {
-      if (spn_semver_geq(version, low)) {
-        sp_opt_set(range.low, it);
-      }
-    }
-
-    if (spn_semver_leq(version, high)) {
-      sp_opt_set(range.high, it);
-    }
-  }
-
-  return range;
 }
 
 void spn_resolver_init(spn_resolver_t* resolver) {
@@ -3145,24 +3125,46 @@ void spn_resolver_init(spn_resolver_t* resolver) {
 }
 
 void spn_resolver_add_package_constraints(spn_resolver_t* resolver, spn_package_t* package) {
-  // Check for circular dependencies
   if (sp_ht_key_exists(resolver->visited, package->name)) {
+    // @spader keep a stack to provide a real error message
     SP_FATAL("{:fg brightcyan} transitively includes itself", SP_FMT_STR(package->name));
   }
 
-  // Mark as visiting
+  // mark as visiting; until we finish this subtree, we can't see this package again (no circular deps)
   sp_ht_insert(resolver->visited, package->name, true);
 
   sp_ht_for(package->deps, it) {
-    spn_dep_req_t* request = sp_ht_it_getp(package->deps, it);
-    spn_package_t* dep = sp_ht_getp(app.packages, request->name);
+    spn_dep_req_t request = *sp_ht_it_getp(package->deps, it);
+    spn_package_t* dep = sp_ht_getp(app.packages, request.name);
 
     if (!sp_ht_key_exists(resolver->ranges, dep->name)) {
       sp_ht_insert(resolver->ranges, dep->name, SP_NULLPTR);
     }
     sp_da(spn_dep_version_range_t)* ranges = sp_ht_getp(resolver->ranges, dep->name);
 
-    sp_dyn_array_push(*ranges, spn_package_collect_versions(*request));
+    // collect versions which satisfy this range
+    spn_dep_version_range_t range = {
+      .source = request
+    };
+
+    spn_semver_t low = request.range.low.version;
+    spn_semver_t high = request.range.high.version;
+
+    sp_dyn_array_for(dep->versions, it) {
+      spn_semver_t version = dep->versions[it];
+
+      if (!range.low.some) {
+        if (spn_semver_geq(version, low)) {
+          sp_opt_set(range.low, it);
+        }
+      }
+
+      if (spn_semver_leq(version, high)) {
+        sp_opt_set(range.high, it);
+      }
+    }
+
+    sp_dyn_array_push(*ranges, range);
   }
 
   sp_ht_for(package->deps, it) {
@@ -3171,7 +3173,7 @@ void spn_resolver_add_package_constraints(spn_resolver_t* resolver, spn_package_
     spn_resolver_add_package_constraints(resolver, dep);
   }
 
-  // Unmark (allows diamond dependencies)
+
   sp_ht_erase(resolver->visited, package->name);
 }
 
@@ -3194,17 +3196,34 @@ void spn_resolver_resolve_from_solver(spn_resolver_t* resolver) {
     sp_da(spn_dep_version_range_t) ranges = *sp_ht_it_getp(resolver->ranges, it);
     SP_ASSERT(sp_dyn_array_size(ranges));
 
+    spn_dep_req_t sl, sh = SP_ZERO_INITIALIZE();
     u32 low = SP_LIMIT_MIN_U32, high = SP_LIMIT_MAX_U32;
     sp_dyn_array_for(ranges, n) {
       spn_dep_version_range_t range = ranges[n];
       SP_ASSERT(range.low.some);
       SP_ASSERT(range.high.some);
 
-      low = SP_MAX(low, range.low.value);
-      high = SP_MIN(high, range.high.value);
+      if (sp_opt_get(range.low) >= low) {
+        low = sp_opt_get(range.low);
+        sl = range.source;
+      }
+      if (sp_opt_get(range.high) <= high) {
+        high = sp_opt_get(range.high);
+        sh = range.source;
+      }
     }
 
-    SP_ASSERT(low <= high);
+    if (low > high) {
+      sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+      sp_str_builder_append_fmt(&builder, "{:fg brightcyan} cannot be resolved:", SP_FMT_STR(name));
+      sp_str_builder_indent(&builder);
+      sp_str_builder_new_line(&builder);
+      sp_str_builder_append_fmt(&builder, "{:fg brightcyan} requires {:fg brightred}", SP_FMT_STR(sl.name), SP_FMT_STR(spn_semver_range_to_str(sl.range)));
+      sp_str_builder_new_line(&builder);
+      sp_str_builder_append_fmt(&builder, "{:fg brightcyan} requires {:fg brightred}", SP_FMT_STR(sh.name), SP_FMT_STR(spn_semver_range_to_str(sh.range)));
+
+      SP_FATAL("{}", SP_FMT_STR(sp_str_builder_move(&builder)));
+    }
 
     spn_semver_t version = dep->versions[high];
     sp_ht_insert(resolver->versions, name, version);
