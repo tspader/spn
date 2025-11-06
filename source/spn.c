@@ -107,6 +107,13 @@ sp_str_t sp_str_map_kernel_colorize(sp_str_map_context_t* context) {
   return sp_format("{}{}{}", SP_FMT_STR(ansi), SP_FMT_STR(context->str), SP_FMT_CSTR(SP_ANSI_RESET));
 }
 
+sp_str_t sp_os_get_bin_path() {
+  sp_str_t path = sp_os_get_env_var(SP_LIT("HOME"));
+  SP_ASSERT(!sp_str_empty(path));
+
+  return sp_os_join_path(path, sp_str_lit(".local/bin"));
+}
+
 /////////
 // GIT //
 /////////
@@ -570,6 +577,34 @@ struct spn_config {
 };
 
 
+
+typedef struct {
+  sp_str_t dir;
+  sp_str_t manifest;
+  sp_str_t lock;
+} spn_tools_paths_t;
+
+typedef struct {
+  sp_str_t dir;
+  sp_str_t bin;
+  sp_str_t lib;
+} spn_tool_paths_t;
+
+void spn_tool_ensure_manifest();
+void spn_tool_install(sp_str_t package_arg);
+void spn_tool_list();
+void spn_tool_run(sp_str_t package_name, sp_da(sp_str_t) args);
+void spn_tool_upgrade(sp_str_t package_name);
+
+
+// GEN
+typedef struct {
+  spn_gen_entry_kind_t kind;
+  spn_cc_kind_t compiler;
+} spn_gen_format_context_t;
+
+sp_str_t spn_generator_format_entry_kernel(sp_str_map_context_t* context);
+
 /////////
 // TUI //
 /////////
@@ -632,6 +667,36 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_context_t* dep);
 /////////
 // CLI //
 /////////
+#define SPN_CLI_MAX_SUBCOMMANDS 16
+#define SPN_CLI_MAX_ARGS 4
+
+typedef struct {
+  const c8* name;
+  const c8* args [SPN_CLI_MAX_ARGS];
+  const c8* usage;
+  const c8* summary;
+} spn_cli_command_usage_t;
+
+typedef struct {
+  const c8* usage;
+  const c8* summary;
+  spn_cli_command_usage_t commands [SPN_CLI_MAX_SUBCOMMANDS];
+} spn_cli_usage_t;
+
+typedef struct {
+  sp_str_t name;
+  sp_str_t usage;
+  sp_da(sp_str_t) args;
+} spn_cli_command_info_t;
+
+typedef struct {
+  struct {
+    u32 name;
+    u32 args;
+  } width;
+  sp_da(spn_cli_command_info_t) commands;
+} spn_cli_usage_info_t;
+
 typedef struct {
   const c8* package;
 } spn_cli_add_t;
@@ -715,8 +780,10 @@ void spn_cli_recipe(spn_cli_t* cli);
 /////////
 typedef struct {
   spn_project_paths_t project;
+  spn_tools_paths_t tools;
   sp_str_t work;
   sp_str_t executable;
+  sp_str_t bin;
   sp_str_t storage;
   sp_str_t   config_dir;
   sp_str_t     config;
@@ -1331,11 +1398,6 @@ sp_str_t spn_cache_dir_kind_to_dep_path(spn_dep_context_t* dep, spn_dir_kind_t k
 ///////////////
 // GENERATOR //
 ///////////////
-typedef struct {
-  spn_gen_entry_kind_t kind;
-  spn_cc_kind_t compiler;
-} spn_gen_format_context_t;
-
 sp_str_t spn_generator_format_entry_kernel(sp_str_map_context_t* context) {
   spn_gen_format_context_t* format = (spn_gen_format_context_t*)context->user_data;
   return spn_gen_format_entry_for_compiler(context->str, format->kind, format->compiler);
@@ -3518,6 +3580,7 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   sp_ht_set_fns(app->profiles, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
 
   app->paths.storage = sp_os_join_path(sp_os_get_storage_path(), SP_LIT("spn"));
+  app->paths.bin = sp_os_get_bin_path();
 
   // Install
   app->paths.executable = sp_os_get_executable_path();
@@ -3677,6 +3740,11 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     sp_opt_set(app->default_profile, sp_str_lit("debug"));
   }
 
+  app->paths.tools.dir = sp_os_join_path(app->paths.storage, sp_str_lit("tools"));
+  app->paths.tools.manifest = sp_os_join_path(app->paths.tools.dir, sp_str_lit("spn.toml"));
+  app->paths.tools.lock = sp_os_join_path(app->paths.tools.dir, sp_str_lit("spn.lock"));
+
+
   if (sp_os_does_path_exist(app->paths.project.lock)) {
     sp_opt_set(app->lock, spn_load_lock_file());
   }
@@ -3685,6 +3753,80 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 /////////
 // CLI //
 /////////
+sp_str_t spn_cli_usage(spn_cli_usage_t* cli) {
+  spn_cli_usage_info_t info = SP_ZERO_INITIALIZE();
+
+  sp_carr_for(cli->commands, it) {
+    spn_cli_command_usage_t command = cli->commands[it];
+    if (!command.name) break;
+
+    spn_cli_command_info_t cmd = SP_ZERO_INITIALIZE();
+    cmd.name = sp_str_from_cstr(command.name);
+    cmd.usage = sp_str_from_cstr(command.usage ? command.usage : "");
+
+    info.width.name = SP_MAX(info.width.name, sp_cstr_len(command.name));
+
+
+    u32 args = 0;
+    sp_carr_for(command.args, n) {
+      const c8* arg = command.args[n];
+      if (!arg) break;
+
+      sp_dyn_array_push(cmd.args, sp_str_from_cstr(arg));
+      args += sp_cstr_len(arg) + 1;
+    }
+    sp_dyn_array_push(cmd.args, sp_str_from_cstr(""));
+
+    info.width.args = SP_MAX(info.width.args, args);
+
+    sp_dyn_array_push(info.commands, cmd);
+  }
+
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+
+  if (cli->summary) {
+    sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_CSTR("summary"));
+    sp_str_builder_indent(&builder);
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_append_fmt(&builder, "{}", SP_FMT_CSTR(cli->summary));
+    sp_str_builder_dedent(&builder);
+
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_new_line(&builder);
+  }
+
+  if (cli->usage) {
+    sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_CSTR("usage"));
+    sp_str_builder_indent(&builder);
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}", SP_FMT_CSTR(cli->usage));
+    sp_str_builder_dedent(&builder);
+
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_new_line(&builder);
+  }
+
+  if (!sp_dyn_array_empty(info.commands)) {
+    sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_CSTR("usage"));
+    sp_str_builder_indent(&builder);
+    sp_str_builder_new_line(&builder);
+
+    sp_dyn_array_for(info.commands, it) {
+      spn_cli_command_info_t command = info.commands[it];
+
+      sp_str_t name = sp_str_pad(command.name, info.width.name);
+      sp_str_t args = sp_str_join_n(command.args, sp_dyn_array_size(command.args), sp_str_lit(" "));
+      args = sp_str_pad(args, info.width.args);
+      sp_str_builder_append_fmt(&builder, "{:fg brightcyan} {:fg brightyellow} {}", SP_FMT_STR(name), SP_FMT_STR(args), SP_FMT_STR(command.usage));
+      sp_str_builder_new_line(&builder);
+    }
+
+    sp_str_builder_dedent(&builder);
+  }
+
+  return sp_str_builder_move(&builder);
+}
+
 void spn_cli_run(spn_app_t* app) {
   spn_cli_t* cli = &app->cli;
 
@@ -4185,34 +4327,39 @@ void spn_cli_tool(spn_cli_t* cli) {
   );
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
+  spn_cli_usage_t usage = {
+    .summary = "Run, install, and manage binaries defined by spn packages",
+    .commands = {
+      {
+        .name = "install",
+        .args = { "package" },
+        .usage = "Install a package's binary targets to the PATH"
+      },
+      {
+        .name = "uninstall",
+        .args = { "package" },
+        .usage = "Uninstall a package's binary targets to the PATH"
+      },
+      {
+        .name = "run",
+        .args = { "package" },
+        .usage = "Run a package's binary; if a package exports more than one, run the first"
+      },
+      {
+        .name = "list",
+        .usage = "List installed tools"
+      },
+      {
+        .name = "upgrade",
+        .args = { "package" },
+        .usage = "Upgrade a tool to the latest version"
+      },
+    }
+  };
+
   if (!cli->num_args || !cli->args[0]) {
-    sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-
-    sp_str_builder_append_fmt(&builder, "Usage: {:fg brightcyan}spn tool [OPTIONS] <COMMAND>");
-    sp_str_builder_new_line(&builder);
-    sp_str_builder_new_line(&builder);
-    sp_str_builder_append_cstr(&builder, "Manage spn tools");
-    sp_str_builder_new_line(&builder);
-    sp_str_builder_new_line(&builder);
-    sp_str_builder_append_cstr(&builder, "Commands:");
-    sp_str_builder_new_line(&builder);
-
-    sp_str_builder_indent(&builder);
-    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}{:fg brightyellow}     Install commands provided by a package", SP_FMT_CSTR("install"), SP_FMT_CSTR("<package>"));
-    sp_str_builder_new_line(&builder);
-    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}{:fg brightyellow}      Uninstall a tool", SP_FMT_CSTR("uninstall"), SP_FMT_CSTR("<tool>"));
-    sp_str_builder_new_line(&builder);
-    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}{:fg brightyellow} [args...]   Run a command provided by a package", SP_FMT_CSTR("run"), SP_FMT_CSTR("<tool>"));
-    sp_str_builder_new_line(&builder);
-    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}                  List installed tools", SP_FMT_CSTR("list"));
-    sp_str_builder_new_line(&builder);
-    sp_str_builder_append_fmt(&builder, "{:fg brightcyan} [tool]        Upgrade installed tools", SP_FMT_CSTR("upgrade"), SP_FMT_CSTR("[tool]"));
-    sp_str_builder_new_line(&builder);
-    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}         Ensure that tool executable directory is on the PATH", SP_FMT_CSTR("update-shell"));
-    sp_str_builder_dedent(&builder);
-
-    SP_LOG("{}", SP_FMT_STR(sp_str_builder_write(&builder)));
-    return;
+    sp_log(spn_cli_usage(&usage));
+    SP_EXIT_FAILURE();
   }
 
   const c8* subcommand = cli->args[0];
