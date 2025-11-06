@@ -96,7 +96,7 @@ typedef enum {
 
 sp_str_t sp_str_map_kernel_colorize(sp_str_map_context_t* context) {
   sp_str_t id = *(sp_str_t*)context->user_data;
- sp_str_t ansi = sp_format_color_id_to_ansi_fg(id);
+  sp_str_t ansi = sp_format_color_id_to_ansi_fg(id);
   return sp_format("{}{}{}", SP_FMT_STR(ansi), SP_FMT_STR(context->str), SP_FMT_CSTR(SP_ANSI_RESET));
 }
 
@@ -132,6 +132,7 @@ typedef struct {
   toml_table_t*     a;
   toml_table_t*     so;
   toml_array_t*   bin;
+  toml_array_t*   profile;
   toml_table_t*   deps;
   toml_table_t*   options;
   toml_table_t*   config;
@@ -358,7 +359,7 @@ typedef struct {
 typedef struct {
   sp_str_t name;
   sp_str_t entry;
-  sp_str_t profile;
+  sp_opt(sp_str_t) profile;
   sp_da(sp_str_t) source;
   sp_da(sp_str_t) include;
 } spn_bin_t;
@@ -465,7 +466,7 @@ struct spn_dep_context {
 
 spn_generator_kind_t spn_gen_kind_from_str(sp_str_t str);
 spn_gen_entry_kind_t spn_gen_entry_from_str(sp_str_t str);
-spn_cc_kind_t   spn_gen_compiler_from_str(sp_str_t str);
+spn_cc_kind_t   spn_cc_kind_from_str(sp_str_t str);
 sp_str_t             spn_gen_format_entry_for_compiler(sp_str_t entry, spn_gen_entry_kind_t kind, spn_cc_kind_t compiler);
 sp_str_t             spn_cc_kind_to_executable(spn_cc_kind_t compiler);
 sp_str_t             spn_cc_c_standard_to_switch(spn_c_standard_t standard);
@@ -706,6 +707,7 @@ typedef struct {
   sp_ht(sp_str_t, spn_dep_context_t) deps;
   sp_ht(sp_str_t, spn_build_matrix_t) matrices;
   sp_ht(sp_str_t, spn_profile_t) profiles;
+  sp_opt(sp_str_t) default_profile;
   sp_dyn_array(sp_str_t) system_deps;
 } spn_app_t;
 
@@ -1228,12 +1230,21 @@ spn_gen_entry_kind_t spn_gen_entry_from_str(sp_str_t str) {
   SP_UNREACHABLE_RETURN(SPN_GENERATOR_ALL);
 }
 
-spn_cc_kind_t spn_gen_compiler_from_str(sp_str_t str) {
+spn_cc_kind_t spn_cc_kind_from_str(sp_str_t str) {
   if      (sp_str_equal_cstr(str, ""))    return SPN_CC_NONE;
   else if (sp_str_equal_cstr(str, "gcc")) return SPN_CC_GCC;
 
   SP_FATAL("Unknown compiler {:fg brightyellow}; options are [gcc]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_CC_NONE);
+}
+
+spn_c_standard_t spn_c_standard_from_str(sp_str_t str) {
+  if      (sp_str_equal_cstr(str, "c89")) return SPN_C89;
+  else if (sp_str_equal_cstr(str, "c99")) return SPN_C99;
+  else if (sp_str_equal_cstr(str, "c11")) return SPN_C11;
+
+  SP_FATAL("Unknown C standard {:fg brightyellow}; options are [c89, c99, c11]", SP_FMT_STR(str));
+  SP_UNREACHABLE_RETURN(SPN_C99);
 }
 
 spn_generator_kind_t spn_gen_kind_from_str(sp_str_t str) {
@@ -2302,8 +2313,8 @@ void spn_update_project_toml() {
       if (sp_dyn_array_size(bin->include)) {
         spn_toml_append_str_array_cstr(&toml, "include", bin->include);
       }
-      if (!sp_str_empty(bin->profile)) {
-        spn_toml_append_str_cstr(&toml, "profile", bin->profile);
+      if (bin->profile.some) {
+        spn_toml_append_str_cstr(&toml, "profile", sp_opt_get(bin->profile));
       }
     }
     spn_toml_end_array(&toml);
@@ -2958,6 +2969,7 @@ spn_package_t spn_package_load(sp_str_t manifest_path) {
   toml.package = toml_table_table(toml.spn, "package");
   toml.lib = toml_table_table(toml.spn, "lib");
   toml.bin = toml_table_array(toml.spn, "bin");
+  toml.profile = toml_table_array(toml.spn, "profile");
   toml.deps = toml_table_table(toml.spn, "deps");
   toml.options = toml_table_table(toml.spn, "options");
   toml.config = toml_table_table(toml.spn, "config");
@@ -2986,15 +2998,38 @@ spn_package_t spn_package_load(sp_str_t manifest_path) {
     if (sp_ht_key_exists(package.lib.enabled, SPN_LIB_KIND_STATIC)) SP_ASSERT(!sp_str_empty(package.lib.name));
   }
 
+  if (toml.profile) {
+    spn_toml_arr_for(toml.profile, n) {
+      toml_table_t* it = toml_array_table(toml.profile, n);
+      spn_profile_t profile = SP_ZERO_INITIALIZE();
+
+      profile.cc = spn_cc_kind_from_str(spn_toml_str_opt(it, "cc", "gcc"));
+      profile.libc = spn_lib_kind_from_str(spn_toml_str_opt(it, "libc", "shared"));
+      profile.standard = spn_c_standard_from_str(spn_toml_str_opt(it, "standard", "c99"));
+      profile.mode = spn_dep_build_mode_from_str(spn_toml_str_opt(it, "mode", "debug"));
+
+      sp_str_t profile_name = spn_toml_str(it, "name");
+      sp_ht_insert(app.profiles, profile_name, profile);
+
+      if (!app.default_profile.some) {
+        sp_opt_set(app.default_profile, profile_name);
+      }
+    }
+  }
+
   if (toml.bin) {
     spn_toml_arr_for(toml.bin, n) {
       toml_table_t* it = toml_array_table(toml.bin, n);
-      spn_bin_t bin = {
-        .name = spn_toml_str(it, "name"),
-        .profile = spn_toml_str_opt(it, "profile", "debug"),
-        .source = spn_toml_arr_strs(toml_table_array(it, "source")),
-        .include = spn_toml_arr_strs(toml_table_array(it, "include")),
-      };
+      spn_bin_t bin = SP_ZERO_INITIALIZE();
+      bin.name = spn_toml_str(it, "name");
+
+      toml_value_t profile = toml_table_string(it, "profile");
+      if (profile.ok) {
+        sp_opt_set(bin.profile, sp_str_from_cstr(profile.u.s));
+      }
+
+      bin.source = spn_toml_arr_strs(toml_table_array(it, "source"));
+      bin.include = spn_toml_arr_strs(toml_table_array(it, "include"));
 
       sp_ht_insert(package.bin, bin.name, bin);
     }
@@ -3309,22 +3344,6 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
   sp_ht_set_fns(app->matrices, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(app->profiles, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
 
-  spn_profile_t debug = {
-    .cc = SPN_CC_GCC,
-    .libc = SPN_LIB_KIND_SHARED,
-    .standard = SPN_C11,
-    .mode = SPN_DEP_BUILD_MODE_DEBUG
-  };
-  sp_ht_insert(app->profiles, sp_str_lit("debug"), debug);
-
-  spn_profile_t release = {
-    .cc = SPN_CC_GCC,
-    .libc = SPN_LIB_KIND_SHARED,
-    .standard = SPN_C11,
-    .mode = SPN_DEP_BUILD_MODE_RELEASE
-  };
-  sp_ht_insert(app->profiles, sp_str_lit("release"), release);
-
   app->paths.storage = sp_os_join_path(sp_os_get_storage_path(), SP_LIT("spn"));
 
   // Install
@@ -3432,6 +3451,26 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
 
   if (sp_os_does_path_exist(app->paths.project.toml)) {
     app->package = spn_package_load(app->paths.project.toml);
+  }
+
+  if (sp_ht_empty(app->profiles)) {
+    spn_profile_t debug = {
+      .cc = SPN_CC_GCC,
+      .libc = SPN_LIB_KIND_SHARED,
+      .standard = SPN_C11,
+      .mode = SPN_DEP_BUILD_MODE_DEBUG
+    };
+    sp_ht_insert(app->profiles, sp_str_lit("debug"), debug);
+
+    spn_profile_t release = {
+      .cc = SPN_CC_GCC,
+      .libc = SPN_LIB_KIND_SHARED,
+      .standard = SPN_C11,
+      .mode = SPN_DEP_BUILD_MODE_RELEASE
+    };
+    sp_ht_insert(app->profiles, sp_str_lit("release"), release);
+
+    sp_opt_set(app->default_profile, sp_str_lit("debug"));
   }
 
   if (sp_os_does_path_exist(app->paths.project.lock)) {
@@ -3895,7 +3934,7 @@ void spn_cli_print(spn_cli_t* cli) {
 
   spn_generator_context_t gen = {
     .kind = spn_gen_kind_from_str(sp_str_view(command->generator)),
-    .compiler = spn_gen_compiler_from_str(sp_str_view(command->compiler))
+    .compiler = spn_cc_kind_from_str(sp_str_view(command->compiler))
   };
   gen.include = spn_gen_build_entries_for_all(SPN_GENERATOR_INCLUDE, gen.compiler);
   gen.lib_include = spn_gen_build_entries_for_all(SPN_GENERATOR_LIB_INCLUDE, gen.compiler);
@@ -3989,7 +4028,8 @@ sp_str_t spn_compiler_to_str(spn_cc_kind_t compiler) {
 
 void spn_bin_build(spn_bin_t bin) {
   spn_cc_t cc = SP_ZERO_INITIALIZE();
-  spn_cc_set_profile(&cc, bin.profile);
+  sp_str_t profile_name = bin.profile.some ? sp_opt_get(bin.profile) : sp_opt_get(app.default_profile);
+  spn_cc_set_profile(&cc, profile_name);
   spn_cc_set_output_dir(&cc, sp_str_lit("build"));
 
   spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_CC_TARGET_EXECUTABLE, bin.name);
