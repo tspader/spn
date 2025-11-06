@@ -1,5 +1,4 @@
 // spn add argparse
-// spn build
 // verify sp still has a ^ in the project file
 
 #define SP_IMPLEMENTATION

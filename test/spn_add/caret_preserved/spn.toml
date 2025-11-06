@@ -3,7 +3,6 @@ name = "caret_preserved"
 
 [deps]
 sp = "^1.5.0"
-argparse = ">=1.2.0"
 
 [[bin]]
 name = "caret_preserved"
