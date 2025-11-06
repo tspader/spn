@@ -1,0 +1,11 @@
+[package]
+name = "opt_cc"
+
+[[profile]]
+name = "profile"
+cc = "clang"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+profile = "profile"

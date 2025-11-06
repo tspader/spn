@@ -1,0 +1,11 @@
+[package]
+name = "opt_standard"
+
+[[profile]]
+name = "profile"
+stanard = "c89"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+profile = "profile"

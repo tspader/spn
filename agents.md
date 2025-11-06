@@ -1,7 +1,16 @@
 # Project Overview
 - **spn**: Package manager and build tool for C projects in the style of UV or cargo (spn.toml + spn.c)
-- Written in C using **sp.h** (single-header standard library replacement)
-- Core files: `source/spn.c` for all implementation code, `include/spn/spn.h` for public API
-- **ALWAYS activate the `sp` skill** when working with this codebase: use `Skill("sp")`
-- No memory leak concerns - this codebase doesn't free memory
-- build with plain `make`, don't run it or write unit tests
+- written in modern C
+  - `sp.h` instead of C standard library
+  - x macro enums
+  - `sp_ht` and `sp_da` macro-codegen'd hash table / dyn array
+- core files:
+  - `source/spn.c` is the entire implementation
+  - `include/spn/spn.h` for public API used in packages
+  - `spn.toml` is the package for spn itself; (downstream example)
+  - `packages/sp/spn.toml` is the package for `sp.h` (source-only example)
+  - `packages/tcc/spn.toml` is the package for `tcc` (compiled example)
+- always use the `sp.h` skill (either with your `Skill` tool or with `./doc/llm/sp/SKILL.md`)
+- never free allocated memory; we intentionally leak
+- build with `make`, don't run it or write unit tests
+- if you get build errors for missing headers/deps, stop and ask me to fix it

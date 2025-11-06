@@ -1,0 +1,11 @@
+[package]
+name = "opt_mode"
+
+[[profile]]
+name = "profile"
+mode = "release"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+profile = "profile"
