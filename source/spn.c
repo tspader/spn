@@ -670,6 +670,17 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_context_t* dep);
 #define SPN_CLI_MAX_SUBCOMMANDS 16
 #define SPN_CLI_MAX_ARGS 4
 
+#define SPN_TOOL_SUBCOMMAND(X) \
+  X(SPN_TOOL_INSTALL, "install") \
+  X(SPN_TOOL_UNINSTALL, "uninstall") \
+  X(SPN_TOOL_RUN, "run") \
+  X(SPN_TOOL_LIST, "list") \
+  X(SPN_TOOL_UPDATE, "update")
+
+typedef enum {
+  SPN_TOOL_SUBCOMMAND(SP_X_NAMED_ENUM_DEFINE)
+} spn_tool_cmd_t;
+
 typedef struct {
   const c8* name;
   const c8* args [SPN_CLI_MAX_ARGS];
@@ -696,6 +707,8 @@ typedef struct {
   } width;
   sp_da(spn_cli_command_info_t) commands;
 } spn_cli_usage_info_t;
+
+sp_str_t spn_cli_usage(spn_cli_usage_t* cli);
 
 typedef struct {
   const c8* package;
@@ -1212,6 +1225,18 @@ spn_tui_mode_t spn_output_mode_from_str(sp_str_t str) {
 
   SP_FATAL("Unknown output mode {:fg brightyellow}; options are [interactive, noninteractive, quiet, none]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_OUTPUT_MODE_NONE);
+}
+
+spn_tool_cmd_t spn_tool_subcommand_from_str(sp_str_t str) {
+  SPN_TOOL_SUBCOMMAND(SP_X_NAMED_ENUM_STR_TO_ENUM)
+  SP_UNREACHABLE_RETURN(SPN_TOOL_INSTALL);
+}
+
+sp_str_t spn_tool_subcommand_to_str(spn_tool_cmd_t cmd) {
+  switch (cmd) {
+    SPN_TOOL_SUBCOMMAND(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
 sp_str_t spn_output_mode_to_str(spn_tui_mode_t mode) {
@@ -3501,6 +3526,13 @@ sp_str_t spn_registry_get_path(spn_registry_t* registry) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+void spn_tool_install(sp_str_t name) {
+  sp_str_t dir = sp_os_join_path(app.paths.work, name);
+  if (sp_os_is_directory(dir)) {
+
+  }
+}
+
 /////////
 // APP //
 /////////
@@ -3557,6 +3589,61 @@ void spn_app_init(spn_app_t* app, u32 num_args, const c8** args) {
     "  print <path>   Generate installation script and copy binaries",
     SP_NULLPTR
   };
+
+  spn_cli_usage_t usage = {
+    .summary = "A package manager and build tool for modern C",
+    .commands = {
+      {
+        .name = "init",
+        .usage = "Initialize a project in the current directory"
+      },
+      {
+        .name = "add",
+        .args = { "package" },
+        .usage = "Add the latest version of a package to the project"
+      },
+      {
+        .name = "build",
+        .usage = "Build the project, including dependencies, from source"
+      },
+      {
+        .name = "print",
+        .usage = "Print or write the compiler flags needed to consume a package"
+      },
+      {
+        .name = "link",
+        .args = { "kind" },
+        .usage = "Link or copy the binary outputs of your dependencies"
+      },
+      {
+        .name = "update",
+        .args = { "package" },
+        .usage = "Update an existing package to the latest version in the project"
+      },
+      {
+        .name = "list",
+        .usage = "List all known packages in all registries"
+      },
+      {
+        .name = "which",
+        .args = { "package", "dir"},
+        .usage = "Print the absolute path of a cache dir for a package"
+      },
+      {
+        .name = "ls",
+        .args = { "package", "dir"},
+        .usage = "Run ls against a cache dir for a package (e.g. to see build output)"
+      },
+      {
+        .name = "recipe",
+        .args = { "package" },
+        .usage = "Print the full recipe source for a package"
+      },
+    }
+  };
+  sp_str_t help = spn_cli_usage(&usage);
+  sp_log(help);
+  SP_EXIT_SUCCESS();
 
   struct argparse argparse;
   argparse_init(&argparse, options, usages, ARGPARSE_STOP_AT_NON_OPTION);
@@ -3775,7 +3862,6 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cli) {
       sp_dyn_array_push(cmd.args, sp_str_from_cstr(arg));
       args += sp_cstr_len(arg) + 1;
     }
-    sp_dyn_array_push(cmd.args, sp_str_from_cstr(""));
 
     info.width.args = SP_MAX(info.width.args, args);
 
@@ -3815,9 +3901,13 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cli) {
       spn_cli_command_info_t command = info.commands[it];
 
       sp_str_t name = sp_str_pad(command.name, info.width.name);
-      sp_str_t args = sp_str_join_n(command.args, sp_dyn_array_size(command.args), sp_str_lit(" "));
+      sp_str_t args = sp_str_join_n(command.args, sp_dyn_array_size(command.args), sp_str_lit(", "));
       args = sp_str_pad(args, info.width.args);
-      sp_str_builder_append_fmt(&builder, "{:fg brightcyan} {:fg brightyellow} {}", SP_FMT_STR(name), SP_FMT_STR(args), SP_FMT_STR(command.usage));
+      sp_str_builder_append_fmt(
+        &builder,
+        "{:fg brightcyan} {:fg brightyellow} {}",
+        SP_FMT_STR(name), SP_FMT_STR(args), SP_FMT_STR(command.usage)
+      );
       sp_str_builder_new_line(&builder);
     }
 
@@ -4356,35 +4446,30 @@ void spn_cli_tool(spn_cli_t* cli) {
       },
     }
   };
+  sp_str_t help = spn_cli_usage(&usage);
 
   if (!cli->num_args || !cli->args[0]) {
-    sp_log(spn_cli_usage(&usage));
+    sp_log(help);
     SP_EXIT_FAILURE();
   }
 
-  const c8* subcommand = cli->args[0];
+  spn_tool_cmd_t cmd = spn_tool_subcommand_from_str(sp_str_view(cli->args[0]));
+  switch (cmd) {
+    case SPN_TOOL_INSTALL: {
+      if (!cli->args[1]) {
+        sp_log(help);
+        SP_EXIT_FAILURE();
+      }
 
-  if (sp_cstr_equal("install", subcommand)) {
-    SP_LOG("tool {:fg brightcyan}install - not implemented yet", SP_FMT_CSTR("install"));
+      sp_str_t tool = sp_str_view(cli->args[1]);
+      spn_tool_install(tool);
+      break;
+    }
+    default: {
+      break;
+    }
   }
-  else if (sp_cstr_equal("uninstall", subcommand)) {
-    SP_LOG("tool {:fg brightcyan}uninstall - not implemented yet", SP_FMT_CSTR("uninstall"));
-  }
-  else if (sp_cstr_equal("run", subcommand)) {
-    SP_LOG("tool {:fg brightcyan}run - not implemented yet", SP_FMT_CSTR("run"));
-  }
-  else if (sp_cstr_equal("list", subcommand)) {
-    SP_LOG("tool {:fg brightcyan}list - not implemented yet", SP_FMT_CSTR("list"));
-  }
-  else if (sp_cstr_equal("upgrade", subcommand)) {
-    SP_LOG("tool {:fg brightcyan}upgrade - not implemented yet", SP_FMT_CSTR("upgrade"));
-  }
-  else if (sp_cstr_equal("update-shell", subcommand)) {
-    SP_LOG("tool {:fg brightcyan}update-shell - not implemented yet", SP_FMT_CSTR("update-shell"));
-  }
-  else {
-    SP_FATAL("Unknown tool subcommand: {:fg yellow}{}", SP_FMT_CSTR(subcommand));
-  }
+  SP_EXIT_SUCCESS();
 }
 
 void spn_cli_print(spn_cli_t* cli) {

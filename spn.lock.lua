@@ -5,11 +5,6 @@ return {
       commit = "f71ed6c7b1",
       name = "argparse"
     },
-    sp = {
-      build_id = "8b33800b",
-      commit = "80efa56421",
-      name = "sp"
-    },
     tcc = {
       build_id = "b7bde39e",
       commit = "ab2ce3b13a",
