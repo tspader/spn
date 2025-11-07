@@ -1,0 +1,9 @@
+[package]
+name = "utest"
+repo = "sheredom/utest.h"
+author = "sheredom"
+maintainer = "tspader"
+description = ""
+
+[lib]
+kinds = ["source"]

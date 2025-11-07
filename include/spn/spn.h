@@ -44,14 +44,15 @@ typedef enum {
 } spn_dir_kind_t;
 
 typedef enum {
-  SPN_C89,
-  SPN_C99,
   SPN_C11,
+  SPN_C99,
+  SPN_C89,
 } spn_c_standard_t;
 
 typedef enum {
   SPN_CC_NONE,
   SPN_CC_GCC,
+  SPN_CC_TCC,
 } spn_cc_kind_t;
 
 typedef enum {
