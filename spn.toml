@@ -1,20 +1,21 @@
 [package]
 name = "spn"
 
-[deps]
-sp = "^1.4.0"
-argparse = ">=1.0.0"
-tcc = ">=1.0.0"
-toml = ">=1.0.0"
+[options]
+foo = "bar"
+baz = 69
 
 [[bin]]
 name = "spn"
 source = ["source/spn.c"]
 include = ["include"]
 
-[options]
-foo = "bar"
-baz = 69
+
+[deps]
+sp = "^1.4.0"
+argparse = ">=1.0.0"
+tcc = ">=1.0.0"
+toml = ">=1.0.0"
 
 [config.sp]
 use_foo = true

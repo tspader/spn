@@ -2,7 +2,6 @@
 name = "resolver_conflict"
 
 [[registry]]
-name = "registry"
 location = "./registry"
 
 [deps]

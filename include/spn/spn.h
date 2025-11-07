@@ -56,9 +56,9 @@ typedef enum {
 
 typedef enum {
   SPN_REGISTRY_KIND_WORKSPACE,
-  SPN_REGISTRY_KIND_USER,
+  SPN_REGISTRY_KIND_FILE,
   SPN_REGISTRY_KIND_REMOTE,
-  SPN_REGISTRY_KIND_BUILTIN,
+  SPN_REGISTRY_KIND_INDEX,
 } spn_registry_kind_t;
 
 typedef struct spn_config spn_config_t;
