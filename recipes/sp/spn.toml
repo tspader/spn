@@ -1,6 +1,8 @@
 [package]
 name = "sp"
 repo = "tspader/sp"
+version = "1.5.1"
+commit = "7a3f19628b14"
 
 [lib]
 kinds = ["source"]

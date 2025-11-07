@@ -1,6 +1,8 @@
 [package]
 name = "toml"
 repo = "tspader/toml"
+version = "1.2.0"
+commit = "2e8ffdfa215c"
 author = "cktan"
 maintainer = "tspader"
 description = "A C99 and TOML 1.0.0 compliant TOML parser"

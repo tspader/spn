@@ -1,3 +1,19 @@
+# spn build --profile profile
+we just need to add a string arg via argparse; SP_FATAL() if we can't find the profile.
+
+# spn tool
+- `spn tool install foo` -> try to find package for `foo` in registries (do not try to load an spn.toml)
+- `spn tool install .` -> look in `.` for `spn.toml` and use that as the package
+- "install a tool" means to build a package and add any `[[bin]]` entries to ~/.local/bin
+- we'll keep an `spn.toml` in ~/.local/share/spn/tools
+- we'll build just as if we were running `spn build` builds all the tools into the spn cache, just like normal (user doesn't run this manually, just as a point of reference)
+- we need to copy the binary + any shared libraries into the right place; for now, we can ignore shared libraries. we'll use `spn link`
+- `spn tool list` just list the deps used by that internal spn.toml, use the same code as for spn list.
+- `spn tool run $package` run the first binary provided by a package
+- `spn tool upgrade $package` equivalent of `spn upgrade` on internal spn.toml
+
+11/6: note that we should NOT literally shell out with a subprocess; that's awful. we'll use the right programmatic interfaces. the problem is that a lot of code is hardcoded to assume one spn_app_t / one top level package at once. i rewrote a bunch of it today to be better. not sure if it's 100% there yet. creating a second app is still a little funky? but it should be close. just gotta keep going with the implementation (spn init + spn add + spn upgrade + spn build + spn link). shouldnt need any custom code in sp.c; `spn link` should be able to link anywhere we want + just link a subset of files + link flat if we want.
+
 # spn link
 `spn link $package [--bin, --lib] [--mode (hard, symbolic, copy)]`
 - enumerate `[[bin]]` entries and `[lib]`; collect binaries or libs as appropriate; copy from $store/bin/$file or $store/lib/$file
@@ -15,16 +31,6 @@
 - used to work, need to verify if it still does and fix if not
 - -f / --file looks for the file itself
 
-# spn tool
-- `spn tool install foo` -> try to find package for `foo` in registries (do not try to load an spn.toml)
-- `spn tool install .` -> look in `.` for `spn.toml` and use that as the package
-- "install a tool" means to build a package and add any `[[bin]]` entries to ~/.local/bin
-- we'll keep an `spn.toml` in ~/.local/share/spn/tools
-- we'll build just as if we were running `spn build` builds all the tools into the spn cache, just like normal (user doesn't run this manually, just as a point of reference)
-- we need to copy the binary + any shared libraries into the right place; for now, we can ignore shared libraries. we'll use `spn link`
-- `spn tool list` just list the deps used by that internal spn.toml, use the same code as for spn list.
-- `spn tool run $package` run the first binary provided by a package
-- `spn tool upgrade $package` equivalent of `spn upgrade` on internal spn.toml
 
 # spn run $bin
 find the bin with the matching name in the project file. compile it to memory with tcc and run it immediately.
@@ -56,3 +62,5 @@ would be cool if we could implement this as a package; have an spn.toml that lis
 
 better to build it into the toml?
 
+# convert other help strings to helper struct
+spn_cli_usage_t, i think. expand the struct or make a similar one as needed for comamnds that don't have subcommands? also need to make it a little better (e.g. add examples)
