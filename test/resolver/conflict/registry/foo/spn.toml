@@ -1,0 +1,6 @@
+[package]
+name = "foo"
+repo = "tspader/foo"
+
+[lib]
+kinds = ["source"]

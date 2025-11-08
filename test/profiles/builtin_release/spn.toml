@@ -1,0 +1,7 @@
+[package]
+name = "builtin_release"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+profile = "release"

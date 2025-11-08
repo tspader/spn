@@ -98,7 +98,8 @@ SPN_INSTALL_PREFIX ?= $(HOME)/.local/bin
 # FLAGS #
 #########
 FLAG_LANGUAGE := -std=c11
-CFLAGS := $(FLAG_LANGUAGE) $(FLAG_LINKAGE) -I$(SPN_DIR_SOURCE) -o $(SPN_OUTPUT)
+FLAG_WARNINGS := -Wall -Wno-unused-variable -Wno-missing-braces -Wno-unused-but-set-variable
+CFLAGS := $(FLAG_WARNINGS) $(FLAG_LANGUAGE) $(FLAG_LINKAGE) -I./include -o $(SPN_OUTPUT)
 
 .PHONY: all
 all: build
@@ -145,13 +146,15 @@ $(BOOTSTRAP_SPN): $(BOOTSTRAP_ARCHIVE) | $(BOOTSTRAP_BIN)
 	@$(BOOTSTRAP_EXTRACT)
 	@chmod +x $(BOOTSTRAP_SPN)
 
-$(SPN_OUTPUT): $(BOOTSTRAP_SPN) source/*.h source/*.c $(SPN_MAKEFILE) | $(SPN_DIR_BUILD_OUTPUT)
+$(SPN_OUTPUT): $(BOOTSTRAP_SPN) source/spn.c include/spn/spn.h Makefile | $(SPN_DIR_BUILD_OUTPUT)
 	$(call print_heading)
 	@echo "building dependencies"
-	$(BOOTSTRAP_SPN) build --output noninteractive
+	#spn --no-interactive build
 	$(call print_heading)
 	@echo "building spn"
-	$(CC) ./source/main.c $(CFLAGS) $$($(BOOTSTRAP_SPN) print --output noninteractive) $(FLAG_SYSTEM_LIBS)
+	$(CC) ./source/spn.c $(CFLAGS) $$(spn print) $(FLAG_SYSTEM_LIBS)
+	#$(CC) ./source/main.c $(CFLAGS) $$(./build/bin/spn -f ./test/test.c print) $(FLAG_SYSTEM_LIBS)
+	#$(CC) ./source/main.c $(CFLAGS) -I./external/sp -I./external/argparse -I$(HOME)/.local/include/luajit-2.1 $(HOME)/.local/lib/libluajit-5.1.a $(FLAG_SYSTEM_LIBS)
 
 
 ###########
@@ -190,5 +193,17 @@ clean:
 	@rm -rf $(SPN_DIR_BUILD)/bin
 	@rm -rf $(SPN_DIR_BUILD)/examples
 
+./build/bin/debug.o: ./test/test.c
+	bear --append -- tcc -c ./test/test.c -I./source -I../sp -I.. -o ./build/bin/debug.o -DSPN_BUILD
+
+./build/bin/debug: ./test/test.c ./build/bin/debug.o
+	bear --append -- tcc  ./test/test.c -I./source -I../sp -I.. -o ./build/bin/debug ./build/bin/debug.o
+
+hand:
+	bear --append -- tcc -g ./test/test.c -I./source -I../sp -I.. -o ./build/bin/debug
+
 tcc:
 	tcc ./source/main.c -std=c11 -static -g -Isource -o build/bin/spn $$(build/bootstrap/bin/spn print --output noninteractive) -lm -lpthread
+
+boots:
+	curl --proto '=https' --tlsv1.2 -LsSf https://github.com/tspader/spn/releases/download/v0.2.2/spn-installer.sh | sh

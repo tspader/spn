@@ -1,0 +1,12 @@
+[package]
+name = "tcc"
+repo = "TinyCC/tinycc"
+version = "1.0.0"
+commit = "01d1b7bc7601"
+
+[deps]
+"sp" = "1.2.0"
+
+[lib]
+kinds = ["static"]
+name = 'tcc'

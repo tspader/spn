@@ -1,0 +1,10 @@
+[package]
+name = "user_profile_removes_builtins"
+
+[[profile]]
+name = "profile"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+profile = "debug"

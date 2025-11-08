@@ -1,0 +1,7 @@
+[package]
+name = "builtin_debug"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+profile = "debug"

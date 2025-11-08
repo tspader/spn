@@ -1,19 +1,24 @@
 return {
   deps = {
     argparse = {
-      build_id = "b1e35efa",
+      build_id = "c90eaad7",
       commit = "f71ed6c7b1",
       name = "argparse"
     },
-    luajit = {
-      build_id = "34ef41d9",
-      commit = "25a61a1821",
-      name = "luajit"
-    },
     sp = {
-      build_id = "e1167fcd",
-      commit = "d7c2ee99b3",
+      build_id = "5b39265f",
+      commit = "08641c5612",
       name = "sp"
+    },
+    tcc = {
+      build_id = "b7bde39e",
+      commit = "ab2ce3b13a",
+      name = "tcc"
+    },
+    toml = {
+      build_id = "a5fc5305",
+      commit = "2e8ffdfa21",
+      name = "toml"
     }
   }
 }

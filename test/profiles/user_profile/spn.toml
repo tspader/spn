@@ -1,0 +1,10 @@
+[package]
+name = "user_profile"
+
+[[profile]]
+name = "profile"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+profile = "profile"

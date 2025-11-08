@@ -1,0 +1,10 @@
+[package]
+name = "undefined_profile"
+
+[[profile]]
+name = "profile"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+profile = "undefined_profile"

@@ -1,0 +1,11 @@
+[package]
+name = "utest"
+repo = "sheredom/utest.h"
+version = "1.0.0"
+commit = "fb622dc480a5"
+author = "sheredom"
+maintainer = "tspader"
+description = ""
+
+[lib]
+kinds = ["source"]

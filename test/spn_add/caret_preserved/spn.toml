@@ -1,0 +1,9 @@
+[package]
+name = "caret_preserved"
+
+[deps]
+sp = "^1.5.0"
+
+[[bin]]
+name = "caret_preserved"
+source = ["main.c"]

@@ -1,0 +1,11 @@
+[package]
+name = "opt_libc"
+
+[[profile]]
+name = "profile"
+libc = "static"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+profile = "profile"
