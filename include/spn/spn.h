@@ -56,11 +56,11 @@ typedef enum {
 } spn_cc_kind_t;
 
 typedef enum {
-  SPN_REGISTRY_KIND_WORKSPACE,
-  SPN_REGISTRY_KIND_FILE,
-  SPN_REGISTRY_KIND_REMOTE,
-  SPN_REGISTRY_KIND_INDEX,
-} spn_registry_kind_t;
+  SPN_PACKAGE_KIND_WORKSPACE,
+  SPN_PACKAGE_KIND_FILE,
+  SPN_PACKAGE_KIND_REMOTE,
+  SPN_PACKAGE_KIND_INDEX,
+} spn_package_kind_t;
 
 typedef struct spn_config spn_config_t;
 typedef struct spn_package spn_package_t;
