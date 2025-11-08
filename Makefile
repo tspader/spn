@@ -145,6 +145,9 @@ $(BOOTSTRAP_SPN): $(BOOTSTRAP_ARCHIVE) | $(BOOTSTRAP_BIN)
 	@echo "extracting spn bootstrap binary"
 	@$(BOOTSTRAP_EXTRACT)
 	@chmod +x $(BOOTSTRAP_SPN)
+	@git clone https://github.com/tspader/spn.git ~/.local/share/spn/spn
+	@git -C ~/.local/share/spn/spn checkout bootstrap
+
 
 $(SPN_OUTPUT): $(BOOTSTRAP_SPN) source/spn.c include/spn.h Makefile | $(SPN_DIR_BUILD_OUTPUT)
 	$(call print_heading)
@@ -188,9 +191,12 @@ uninstall:
 	@rm -f $(SPN_INSTALL_PREFIX)/$(SPN)
 
 clean:
-	@rm -rf $(BOOTSTRAP_BIN)
-	@rm -rf $(SPN_DIR_BUILD)/bin
-	@rm -rf $(SPN_DIR_BUILD)/examples
+	@rm -rf ./bootstrap/bin
+	@rm -rf ./build
+
+nuke: clean
+	@rm ~/.local/bin/spn
+	@rm -rf ~/.local/share/spn
 
 ./build/bin/debug.o: ./test/test.c
 	bear --append -- tcc -c ./test/test.c -I./source -I../sp -I.. -o ./build/bin/debug.o -DSPN_BUILD
