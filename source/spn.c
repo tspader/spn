@@ -2610,6 +2610,7 @@ void spn_dep_context_run_build_script(spn_dep_context_t* dep) {
 s32 spn_dep_context_build_from_file(spn_dep_context_t* dep) {
   spn_dep_context_build_binaries(dep);
   spn_dep_context_run_build_script(dep);
+  return SPN_OK;
 }
 
 s32 spn_dep_context_build_from_index(spn_dep_context_t* dep) {
@@ -3205,6 +3206,7 @@ spn_package_t spn_package_from_default(sp_str_t name) {
   package.name = sp_str_copy(name);
   package.version = spn_semver_lit(0, 1, 0);
   sp_dyn_array_push(package.versions, package.version);
+  return package;
 }
 
 spn_package_t spn_package_load_from_index(sp_str_t path) {

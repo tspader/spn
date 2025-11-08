@@ -80,10 +80,10 @@ endif
 #########
 # PATHS #
 #########
+SPN_DIR_BUILD_BOOTSTRAP := bootstrap
+  BOOTSTRAP_BIN = $(SPN_DIR_BUILD_BOOTSTRAP)/bin
+    BOOTSTRAP_SPN = $(BOOTSTRAP_BIN)/$(SPN)
 SPN_DIR_BUILD:= build
-  SPN_DIR_BUILD_BOOTSTRAP:= $(SPN_DIR_BUILD)/bootstrap
-    BOOTSTRAP_BIN = $(SPN_DIR_BUILD_BOOTSTRAP)/bin
-      BOOTSTRAP_SPN = $(BOOTSTRAP_BIN)/$(SPN)
   SPN_DIR_BUILD_EXAMPLES := $(SPN_DIR_BUILD)/examples
   SPN_DIR_BUILD_OUTPUT := $(SPN_DIR_BUILD)/bin
     SPN_OUTPUT := $(SPN_DIR_BUILD_OUTPUT)/$(SPN)
@@ -118,9 +118,9 @@ $(SPN_DIR_BUILD_EXAMPLES):
 #############
 # BOOTSTRAP #
 #############
-BOOTSTRAP_ARCHIVE_LINUX := build/bootstrap/spn-x86_64-unknown-linux-musl.tar.xz
-BOOTSTRAP_ARCHIVE_DARWIN := build/bootstrap/spn-aarch64-apple-darwin.tar.xz
-BOOTSTRAP_ARCHIVE_WINDOWS := build/bootstrap/spn-x86_64-pc-windows-gnu.zip
+BOOTSTRAP_ARCHIVE_LINUX := bootstrap/spn-x86_64-unknown-linux-musl.tar.xz
+BOOTSTRAP_ARCHIVE_DARWIN := bootstrap/spn-aarch64-apple-darwin.tar.xz
+BOOTSTRAP_ARCHIVE_WINDOWS := bootstrap/spn-x86_64-pc-windows-gnu.zip
 
 ifeq ($(TARGET_OS),linux)
   BOOTSTRAP_ARCHIVE := $(BOOTSTRAP_ARCHIVE_LINUX)
@@ -146,15 +146,14 @@ $(BOOTSTRAP_SPN): $(BOOTSTRAP_ARCHIVE) | $(BOOTSTRAP_BIN)
 	@$(BOOTSTRAP_EXTRACT)
 	@chmod +x $(BOOTSTRAP_SPN)
 
-$(SPN_OUTPUT): $(BOOTSTRAP_SPN) source/spn.c include/spn/spn.h Makefile | $(SPN_DIR_BUILD_OUTPUT)
+$(SPN_OUTPUT): $(BOOTSTRAP_SPN) source/spn.c include/spn.h Makefile | $(SPN_DIR_BUILD_OUTPUT)
 	$(call print_heading)
 	@echo "building dependencies"
-	#spn --no-interactive build
+	./bootstrap/bin/spn build
 	$(call print_heading)
 	@echo "building spn"
-	$(CC) ./source/spn.c $(CFLAGS) $$(spn print) $(FLAG_SYSTEM_LIBS)
-	#$(CC) ./source/main.c $(CFLAGS) $$(./build/bin/spn -f ./test/test.c print) $(FLAG_SYSTEM_LIBS)
-	#$(CC) ./source/main.c $(CFLAGS) -I./external/sp -I./external/argparse -I$(HOME)/.local/include/luajit-2.1 $(HOME)/.local/lib/libluajit-5.1.a $(FLAG_SYSTEM_LIBS)
+	#$(CC) ./source/spn.c $(CFLAGS) $$(spn print) $(FLAG_SYSTEM_LIBS)
+	$(CC) ./source/spn.c $(CFLAGS) $$(./bootstrap/bin/spn print) $(FLAG_SYSTEM_LIBS)
 
 
 ###########
