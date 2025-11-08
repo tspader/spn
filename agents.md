@@ -1,23 +1,37 @@
 # Project Overview
 - **spn**: Package manager and build tool for C projects in the style of UV or cargo (spn.toml + spn.c)
-- written in modern C
-  - `sp.h` instead of C standard library
-  - x macro enums
-  - `sp_ht` and `sp_da` macro-codegen'd hash table / dyn array
-  - `sp_str_t` ptr + len strings instead of null terminated
-- core files:
-  - `source/spn.c` is the entire implementation
-  - `include/spn/spn.h` for public API used in packages
-  - `spn.toml` is the package for spn itself; (downstream example)
-  - `packages/sp/spn.toml` is the package for `sp.h` (source-only example)
-  - `packages/tcc/spn.toml` is the package for `tcc` (compiled example)
-- always use the `sp.h` skill (either with your `Skill` tool or with `./doc/llm/sp/SKILL.md`)
-- never free allocated memory; we intentionally leak
-- build with `make`, don't run it or write unit tests
-- if you get build errors for missing headers/deps, stop and ask me to fix it
+- written in modern C using `sp.h` (use the `sp` skill or `./doc/sp/SKILL.md` if you do not have access to global skills)
+  - `spn` is an extension of `sp.h`, so its instructions and style are exactly the same as this project's
+  - reference the `sp` skill or `./doc/sp/SKILL.md` judiciously
+```xml
+<example>
+user: Write a function that reads a file and logs its contents
+assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn.c for existing contextual examples]
+</example>
+```
 
+# Files
+- `source/spn.c` is the entire implementation
+- `include/spn/spn.h` for public API used in packages
+- `spn.toml` is the package for spn itself; (downstream example)
+- `packages/sp/spn.toml` is the package for `sp.h` (source-only example)
+- `packages/tcc/spn.toml` is the package for `tcc` (compiled example)
+
+# Build
+- build with `spn build` (`spn` is installed globally and is different than the resulting binary from the build)
+- run with `./build/debug/spn $args`
+- never, ever run the binary in `./bootstrap`. use the globally installed `spn` or your build only. if neither work, stop and ask for help.
+- if you get build errors for missing headers/deps, stop and ask me to fix it
+```xml
+<example>
+user: [Describes a feature to implement]
+assistant: [Implements feature, builds with "spn build", sees an error from a dependency (e.g. unknown type), stops to ask the user to resolve]
+user: [Resolves build failure]
+assistant: [Continues implementing feature]
+</example>
+
+```
 ## Rules
-- Always add paths to `spn_paths_t` if project-specific, or `spn_*_paths_t` for item-specific paths
-- Always use the global app reference instead of function arguments for app-wide data
-  - Bad: `void foo(spn_tool_paths_t* paths) { ... }`
-  - Good: `void foo() { app.paths.tools }`
+- always add paths to `spn_paths_t` if project-specific, or `spn_*_paths_t` for item-specific paths
+- never free allocated memory; we intentionally leak
+- always use the `sp.h` skill when (either with your `Skill` tool or with `./doc/llm/sp/SKILL.md`)

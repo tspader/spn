@@ -1,5 +1,9 @@
-# spn build --profile profile
-we just need to add a string arg via argparse; SP_FATAL() if we can't find the profile.
+- [SPN-005](tickets/spn-005.md) ditch argparse
+- [SPN-001](tickets/spn-001.md) ensure that your profile's `cc` is exported for dep builds
+- [SPN-002](tickets/spn-002.md) `spn build`: specify profile
+- [SPN-003] `spn build`: specify a single target or dependency
+- [SPN-004] `spn tool install`: implement installing packages from the index
+
 
 # spn tool
 - `spn tool install foo` -> try to find package for `foo` in registries (do not try to load an spn.toml)
