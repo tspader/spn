@@ -1,4 +1,4 @@
-#include "spn/spn.h"
+#include "spn.h"
 
 void build(spn_dep_context_t* dep) {
 }

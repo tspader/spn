@@ -44,7 +44,7 @@
   #include <string.h>
 #endif
 
-#include "spn/spn.h"
+#include "spn.h"
 
 #define SPN_VERSION "1.0.0"
 #define SPN_COMMIT "00c0fa98"
@@ -365,7 +365,6 @@ spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key);
 void             spn_toml_append_option(spn_toml_writer_t* writer, sp_str_t key, spn_dep_option_t option);
 void             spn_toml_append_option_cstr(spn_toml_writer_t* writer, const c8* key, spn_dep_option_t option);
 
-// Specific to the recipe
 typedef enum {
   SPN_PACKAGE_STATE_UNLOADED,
   SPN_PACKAGE_STATE_LOADED,
@@ -553,7 +552,7 @@ sp_str_t         spn_dep_build_kind_to_str(spn_lib_kind_t kind);
 sp_str_t         spn_dep_state_to_str(spn_dep_state_t state);
 bool             spn_dep_state_is_terminal(spn_dep_context_t* dep);
 sp_os_lib_kind_t spn_lib_kind_to_sp_os_lib_kind(spn_lib_kind_t kind);
-void             spn_dep_context_init(spn_dep_context_t* dep, spn_package_t* recipe);
+void             spn_dep_context_init(spn_dep_context_t* dep, spn_package_t* package);
 s32              spn_dep_thread_resolve(void* user_data);
 s32              spn_dep_thread_build(void* user_data);
 s32              spn_dep_context_resolve(spn_dep_context_t* dep);
@@ -570,8 +569,6 @@ bool             spn_dep_context_is_build_stamped(spn_dep_context_t* context);
 void             spn_dep_context_set_build_state(spn_dep_context_t* dep, spn_dep_state_t state);
 void             spn_dep_context_set_build_error(spn_dep_context_t* dep, sp_str_t error);
 bool             spn_dep_context_is_binary(spn_dep_context_t* dep);
-void             spn_recipe_load(spn_tcc_t* tcc, spn_package_t* recipe);
-s32              spn_sort_kernel_dep_ptr(const void* a, const void* b);
 spn_lock_file_t  spn_load_lock_file(sp_str_t path);
 spn_dep_req_t    spn_dep_req_from_str(sp_str_t str);
 sp_str_t         spn_dep_req_to_str(spn_dep_req_t req);
@@ -708,7 +705,7 @@ void spn_tui_print_dep(spn_tui_t* tui, spn_dep_context_t* dep);
   X(SPN_CLI_UPDATE, "update") \
   X(SPN_CLI_WHICH, "which") \
   X(SPN_CLI_LS, "ls") \
-  X(SPN_CLI_RECIPE, "recipe")
+  X(SPN_CLI_MANIFEST, "manifest")
 
 typedef enum {
   SPN_CLI_COMMAND(SP_X_NAMED_ENUM_DEFINE)
@@ -791,7 +788,7 @@ typedef struct {
 
 typedef struct {
   const c8* package;
-} spn_cli_recipe_t;
+} spn_cli_manifest_t;
 
 typedef struct {
   u32 num_args;
@@ -809,7 +806,7 @@ typedef struct {
   spn_cli_build_t build;
   spn_cli_ls_t ls;
   spn_cli_which_t which;
-  spn_cli_recipe_t recipe;
+  spn_cli_manifest_t manifest;
 } spn_cli_t;
 
 void spn_cli_assert_num_args(spn_cli_t* cli, u32 n, sp_str_t help);
@@ -830,7 +827,7 @@ void spn_cli_tool(spn_cli_t* cli);
 void spn_cli_list(spn_cli_t* cli);
 void spn_cli_ls(spn_cli_t* cli);
 void spn_cli_which(spn_cli_t* cli);
-void spn_cli_recipe(spn_cli_t* cli);
+void spn_cli_manifest(spn_cli_t* cli);
 
 
 
@@ -852,7 +849,8 @@ typedef struct {
   sp_str_t   config_dir;
   sp_str_t     config;
   sp_str_t   spn;
-  sp_str_t     recipes;
+  sp_str_t     include;
+  sp_str_t     index;
   sp_str_t   cache;
   sp_str_t     build;
   sp_str_t     store;
@@ -2100,8 +2098,7 @@ spn_tcc_t* spn_tcc_new() {
   spn_tcc_t* tcc = tcc_new();
   tcc_set_error_func(tcc, SP_NULLPTR, spn_tcc_error);
   tcc_set_output_type(tcc, TCC_OUTPUT_MEMORY);
-  tcc_add_include_path(tcc, "/home/spader/source/spn/include");
-  tcc_add_include_path(tcc, "/Users/spader/source/spn/include");
+  tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include));
   tcc_define_symbol(tcc, "SPN", "");
   spn_tcc_register(tcc);
   return tcc;
@@ -2523,13 +2520,6 @@ bool spn_dep_context_is_binary(spn_dep_context_t* dep) {
 
   SP_UNREACHABLE_RETURN(false);
 }
-
-s32 spn_sort_kernel_dep_ptr(const void* a, const void* b) {
-  spn_dep_context_t* da = *(spn_dep_context_t**)a;
-  spn_dep_context_t* db = *(spn_dep_context_t**)b;
-  return sp_str_compare_alphabetical(da->name, db->name);
-}
-
 
 bool spn_dep_context_is_build_stamped(spn_dep_context_t* context) {
   return sp_os_does_path_exist(context->paths.stamp);
@@ -3817,10 +3807,10 @@ sp_str_t spn_registry_get_path(spn_registry_t* registry) {
     case SPN_PACKAGE_KIND_WORKSPACE: {
       return sp_os_join_path(app.paths.dir, registry->location);
     }
-    case SPN_PACKAGE_KIND_INDEX:
-    case SPN_PACKAGE_KIND_FILE: {
+    case SPN_PACKAGE_KIND_INDEX: {
       return sp_str_copy(registry->location);
     }
+    case SPN_PACKAGE_KIND_FILE:
     case SPN_PACKAGE_KIND_REMOTE: {
       SP_UNREACHABLE();
     }
@@ -4116,9 +4106,9 @@ void spn_init(u32 num_args, const c8** args) {
         .usage = "Run ls against a cache dir for a package (e.g. to see build output)"
       },
       {
-        .name = "recipe",
+        .name = "manigest",
         .args = { "package" },
-        .usage = "Print the full recipe source for a package"
+        .usage = "Print the full manifest source for a package"
       },
     }
   };
@@ -4170,13 +4160,16 @@ void spn_init(u32 num_args, const c8** args) {
   }
 
   if (!sp_str_valid(spn.paths.spn)) {
-    spn.paths.spn = sp_os_join_path(spn.paths.storage, SP_LIT("spn"));
+    spn.paths.spn = sp_os_join_path(spn.paths.storage, sp_str_lit("spn"));
   }
+
+  spn.paths.index = sp_os_join_path(spn.paths.spn, sp_str_lit("packages"));
+  spn.paths.include = sp_os_join_path(spn.paths.spn, sp_str_lit("include"));
 
   if (!sp_os_does_path_exist(spn.paths.spn)) {
     sp_str_t url = SP_LIT("https://github.com/tspader/spn.git");
     SP_LOG(
-      "Cloning recipes from {:fg brightcyan} to {:fg brightcyan}",
+      "Cloning index from {:fg brightcyan} to {:fg brightcyan}",
       SP_FMT_STR(url),
       SP_FMT_STR(spn.paths.spn)
     );
@@ -4186,7 +4179,7 @@ void spn_init(u32 num_args, const c8** args) {
 
   // Initialize builtin registry
   spn.registry = (spn_registry_t) {
-    .location = sp_os_join_path(spn.paths.spn, sp_str_lit("recipes")),
+    .location = spn.paths.index,
     .kind = SPN_PACKAGE_KIND_INDEX
   };
 
@@ -4313,8 +4306,8 @@ void spn_cli_run() {
   else if (sp_cstr_equal("which", cli->args[0])) {
     spn_cli_which(cli);
   }
-  else if (sp_cstr_equal("recipe", cli->args[0])) {
-    spn_cli_recipe(cli);
+  else if (sp_cstr_equal("manifest", cli->args[0])) {
+    spn_cli_manifest(cli);
   }
   else if (sp_cstr_equal("init", cli->args[0])) {
     spn_cli_init(cli);
@@ -4383,7 +4376,7 @@ void spn_cli_list(spn_cli_t* cli) {
     },
     (const c8* const []) {
       "spn list",
-      "List all available recipe packages",
+      "List all available packages",
       SP_NULLPTR
     },
     SP_NULL
@@ -4577,7 +4570,7 @@ void spn_cli_which(spn_cli_t* cli) {
   }
 }
 
-void spn_cli_recipe(spn_cli_t* cli) {
+void spn_cli_manifest(spn_cli_t* cli) {
   struct argparse argparse;
   argparse_init(
     &argparse,
@@ -4586,8 +4579,8 @@ void spn_cli_recipe(spn_cli_t* cli) {
       OPT_END()
     },
     (const c8* const []) {
-      "spn recipe <package>",
-      "Print the recipe contents for this package",
+      "spn manifest <package>",
+      "Print the manigest contents for this package",
       SP_NULLPTR
     },
     SP_NULL
@@ -4595,18 +4588,18 @@ void spn_cli_recipe(spn_cli_t* cli) {
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
 
   if (!cli->num_args) {
-    SP_FATAL("no package name specified");
+    SP_FATAL("No package name specified");
   }
 
   spn_dep_context_t* dep = spn_cli_assert_dep_exists(sp_str_view(cli->args[0]));
 
-  sp_str_t recipe_path = dep->package->paths.manifest;
-  sp_str_t recipe = sp_io_read_file(recipe_path);
-  if (!sp_str_valid(recipe)) {
-    SP_FATAL("failed to read recipe file: {:fg brightyellow}", SP_FMT_STR(recipe_path));
+  sp_str_t path = dep->package->paths.manifest;
+  sp_str_t manifest = sp_io_read_file(path);
+  if (!sp_str_valid(manifest)) {
+    SP_FATAL("Failed to read manifest at {:fg brightyellow}", SP_FMT_STR(path));
   }
 
-  sp_os_log(recipe);
+  sp_os_log(manifest);
 }
 
 spn_dep_req_t spn_dep_req_from_str(sp_str_t str) {

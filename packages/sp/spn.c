@@ -1,5 +1,4 @@
-#include "spn/spn.h"
-#include "stdio.h"
+#include "spn.h"
 
 void build(spn_dep_context_t* dep) {
   spn_dep_log(dep, "hello, world\n");
