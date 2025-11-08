@@ -97,7 +97,6 @@ typedef enum {
 #define sp_opt_none(V) { .some = SP_OPT_NONE }
 #define sp_opt_is_null(V) ((V).some == SP_OPT_NONE)
 
-#define sp_dyn_array_sort(arr, fn) qsort(arr, sp_dyn_array_size(arr), sizeof((arr)[0]), fn)
 #define sp_ht_collect_keys(ht, da) \
   do { \
     sp_ht_for((ht), __it) { \
@@ -337,11 +336,6 @@ typedef enum {
   SPN_DEP_BUILD_STATE_CANCELED,
   SPN_DEP_BUILD_STATE_FAILED
 } spn_dep_state_t;
-
-typedef struct {
-  sp_str_t name;
-  spn_dep_mode_t mode;
-} spn_build_matrix_t;
 
 typedef enum {
   SPN_DEP_OPTION_KIND_BOOL,
@@ -711,6 +705,7 @@ typedef enum {
   SPN_CLI_COMMAND(SP_X_NAMED_ENUM_DEFINE)
 } spn_cli_cmd_t;
 
+
 #define SPN_TOOL_SUBCOMMAND(X) \
   X(SPN_TOOL_INSTALL, "install") \
   X(SPN_TOOL_UNINSTALL, "uninstall") \
@@ -722,9 +717,27 @@ typedef enum {
   SPN_TOOL_SUBCOMMAND(SP_X_NAMED_ENUM_DEFINE)
 } spn_tool_cmd_t;
 
+
+#define SPN_CLI_ARG_KIND(X) \
+  X(SPN_CLI_ARG_KIND_REQUIRED, "required") \
+  X(SPN_CLI_ARG_KIND_OPTIONAL, "opional")
+
+typedef enum {
+  SPN_CLI_ARG_KIND(SP_X_NAMED_ENUM_DEFINE)
+} spn_cli_arg_kind_t;
+
+sp_str_t spn_cli_arg_kind_to_str(spn_cli_arg_kind_t kind);
+spn_cli_arg_kind_t spn_cli_arg_kind_from_str(sp_str_t str);
+
 typedef struct {
   const c8* name;
-  const c8* args [SPN_CLI_MAX_ARGS];
+  spn_cli_arg_kind_t kind;
+  const c8* summary;
+} spn_cli_arg_usage_t;
+
+typedef struct {
+  const c8* name;
+  spn_cli_arg_usage_t args [SPN_CLI_MAX_ARGS];
   const c8* usage;
   const c8* summary;
 } spn_cli_command_usage_t;
@@ -737,8 +750,16 @@ typedef struct {
 
 typedef struct {
   sp_str_t name;
+  spn_cli_arg_kind_t kind;
+  sp_str_t summary;
+} spn_cli_arg_info_t;
+
+typedef struct {
+  sp_str_t name;
   sp_str_t usage;
-  sp_da(sp_str_t) args;
+  sp_str_t summary;
+  sp_da(spn_cli_arg_info_t) args;
+  sp_da(sp_str_t) brief;
 } spn_cli_command_info_t;
 
 typedef struct {
@@ -769,7 +790,7 @@ typedef struct {
 
 typedef struct {
   bool force;
-  bool update;
+  const c8* profile;
 } spn_cli_build_t;
 
 typedef struct {
@@ -795,7 +816,6 @@ typedef struct {
   const c8** args;
   const c8* project_directory;
   const c8* project_file;
-  const c8* matrix;
   const c8* output;
 
   spn_cli_add_t add;
@@ -865,7 +885,6 @@ typedef struct {
   sp_da(sp_str_t) search;
   sp_ht(sp_str_t, spn_package_t) packages;
   sp_ht(sp_str_t, spn_dep_context_t) deps;
-  sp_ht(sp_str_t, spn_build_matrix_t) matrices;
   sp_da(sp_str_t) system_deps;
   sp_ht(sp_str_t, spn_compile_thread_ctx_t) threads;
   sp_ht(sp_str_t, sp_str_t) index;
@@ -1317,6 +1336,18 @@ void sp_tui_setup_raw_mode(spn_tui_t* tui) {
 ///////////
 // ENUMS //
 ///////////
+spn_cli_arg_kind_t spn_cli_arg_kind_from_str(sp_str_t str) {
+  SPN_CLI_ARG_KIND(SP_X_NAMED_ENUM_STR_TO_ENUM)
+  SP_UNREACHABLE_RETURN(SPN_CLI_ARG_KIND_REQUIRED);
+}
+
+sp_str_t spn_cli_arg_kind_to_str(spn_cli_arg_kind_t kind) {
+  switch (kind) {
+    SPN_CLI_ARG_KIND(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 spn_cli_cmd_t spn_cli_command_from_str(sp_str_t str) {
   SPN_CLI_COMMAND(SP_X_NAMED_ENUM_STR_TO_ENUM)
   SP_UNREACHABLE_RETURN(SPN_CLI_LS);
@@ -3672,6 +3703,7 @@ void spn_app_write_manifest(spn_package_t* package, sp_str_t path) {
 
   spn_toml_begin_table_cstr(&toml, "package");
   spn_toml_append_str_cstr(&toml, "name", package->name);
+  spn_toml_append_str_cstr(&toml, "version", spn_semver_to_str(package->version));
   if (!sp_str_empty(package->repo)) {
     spn_toml_append_str_cstr(&toml, "repo", package->repo);
   }
@@ -3949,7 +3981,6 @@ spn_app_t spn_app_load(spn_app_config_t config) {
 
   sp_ht_set_fns(app.packages, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(app.deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(app.matrices, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(app.threads, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(app.index, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
 
@@ -3986,9 +4017,9 @@ spn_app_t spn_app_load(spn_app_config_t config) {
       );
     }
 
-    sp_da(sp_os_dir_entry_t) entries = sp_os_scan_directory(path);
+    sp_da(sp_os_dir_ent_t) entries = sp_os_scan_directory(path);
     sp_dyn_array_for(entries, i) {
-      sp_os_dir_entry_t entry = entries[i];
+      sp_os_dir_ent_t entry = entries[i];
       sp_str_t stem = sp_os_extract_stem(entry.file_path);
       sp_ht_insert(app.index, stem, entry.file_path);
     }
@@ -4047,13 +4078,6 @@ void spn_init(u32 num_args, const c8** args) {
       SP_NULLPTR
     ),
     OPT_STRING(
-      'm',
-      "matrix",
-      &cli->matrix,
-      "",
-      SP_NULLPTR
-    ),
-    OPT_STRING(
       'o',
       "output",
       &cli->output,
@@ -4068,49 +4092,55 @@ void spn_init(u32 num_args, const c8** args) {
     .commands = {
       {
         .name = "init",
-        .usage = "Initialize a project in the current directory"
+        .summary = "Initialize a project in the current directory"
       },
       {
         .name = "add",
-        .args = { "package" },
-        .usage = "Add the latest version of a package to the project"
+        .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package to add" } },
+        .summary = "Add the latest version of a package to the project"
       },
       {
         .name = "build",
-        .usage = "Build the project, including dependencies, from source"
+        .summary = "Build the project, including dependencies, from source"
       },
       {
         .name = "print",
-        .usage = "Print or write the compiler flags needed to consume a package"
+        .summary = "Print or write the compiler flags needed to consume a package"
       },
       {
         .name = "link",
-        .args = { "kind" },
-        .usage = "Link or copy the binary outputs of your dependencies"
+        .args = { { .name = "kind", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The link kind" } },
+        .summary = "Link or copy the binary outputs of your dependencies"
       },
       {
         .name = "update",
-        .args = { "package" },
-        .usage = "Update an existing package to the latest version in the project"
+        .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package to update" } },
+        .summary = "Update an existing package to the latest version in the project"
       },
       {
         .name = "list",
-        .usage = "List all known packages in all registries"
+        .summary = "List all known packages in all registries"
       },
       {
         .name = "which",
-        .args = { "package", "dir"},
-        .usage = "Print the absolute path of a cache dir for a package"
+        .args = {
+          { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package name" },
+          { .name = "dir", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The cache directory" }
+        },
+        .summary = "Print the absolute path of a cache dir for a package"
       },
       {
         .name = "ls",
-        .args = { "package", "dir"},
-        .usage = "Run ls against a cache dir for a package (e.g. to see build output)"
+        .args = {
+          { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package name" },
+          { .name = "dir", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The cache directory" }
+        },
+        .summary = "Run ls against a cache dir for a package (e.g. to see build output)"
       },
       {
         .name = "manigest",
-        .args = { "package" },
-        .usage = "Print the full manifest source for a package"
+        .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package name" } },
+        .summary = "Print the full manifest source for a package"
       },
     }
   };
@@ -4204,6 +4234,53 @@ void spn_init(u32 num_args, const c8** args) {
 /////////
 // CLI //
 /////////
+sp_str_t spn_cli_command_usage(spn_cli_command_usage_t cmd) {
+  spn_cli_usage_info_t metadata = SP_ZERO_INITIALIZE();
+  spn_cli_command_info_t info = {
+    .name = sp_str_from_cstr(cmd.name),
+    .usage = sp_str_from_cstr(cmd.usage),
+    .summary = sp_str_from_cstr(cmd.summary),
+  };
+
+  sp_carr_for(cmd.args, it) {
+    if (!cmd.args[it].name) break;
+
+    spn_cli_arg_info_t arg = {
+      .name = sp_str_from_cstr(cmd.args[it].name),
+      .kind = cmd.args[it].kind,
+      .summary = sp_str_from_cstr(cmd.args[it].summary),
+    };
+    sp_da_push(info.args, arg);
+
+    metadata.width.args = SP_MAX(metadata.width.args, arg.name.len);
+  }
+
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+
+  SP_ASSERT(!sp_str_empty(info.summary));
+  sp_str_builder_append_fmt(&builder, "{}", SP_FMT_CSTR(cmd.summary));
+  sp_str_builder_new_line(&builder);
+  sp_str_builder_new_line(&builder);
+
+  sp_dyn_array_for(info.args, it) {
+    spn_cli_arg_info_t arg = info.args[it];
+
+    sp_str_t name = sp_str_pad(arg.name, metadata.width.name);
+    sp_str_t status = arg.kind == SPN_CLI_ARG_KIND_OPTIONAL ?
+      sp_format("{:fg brightblack}", SP_FMT_STR(spn_cli_arg_kind_to_str(arg.kind))) :
+      sp_format("", SP_FMT_STR(spn_cli_arg_kind_to_str(arg.kind)));
+
+    sp_str_builder_append_fmt(
+      &builder,
+      "{:fg brightyellow} {} {}",
+      SP_FMT_STR(name), SP_FMT_STR(status), SP_FMT_STR(arg.summary)
+    );
+    sp_str_builder_new_line(&builder);
+  }
+
+  return sp_str_builder_move(&builder);
+}
+
 sp_str_t spn_cli_usage(spn_cli_usage_t* cli) {
   spn_cli_usage_info_t info = SP_ZERO_INITIALIZE();
 
@@ -4213,21 +4290,31 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cli) {
 
     spn_cli_command_info_t cmd = SP_ZERO_INITIALIZE();
     cmd.name = sp_str_from_cstr(command.name);
-    cmd.usage = sp_str_from_cstr(command.usage ? command.usage : "");
+    cmd.usage = sp_str_from_cstr(command.summary ? command.summary : "");
 
     info.width.name = SP_MAX(info.width.name, sp_cstr_len(command.name));
 
 
-    u32 args = 0;
     sp_carr_for(command.args, n) {
-      const c8* arg = command.args[n];
-      if (!arg) break;
+      spn_cli_arg_usage_t a = command.args[n];
+      if (!a.name) break;
 
-      sp_dyn_array_push(cmd.args, sp_str_from_cstr(arg));
-      args += sp_cstr_len(arg) + 1;
+      spn_cli_arg_info_t arg = {
+        .name = sp_str_from_cstr(a.name),
+        .kind = cmd.args[it].kind,
+        .summary = sp_str_from_cstr(a.summary),
+      };
+      sp_da_push(cmd.args, arg);
+
+      sp_da_push(cmd.brief, arg.name);
     }
 
-    info.width.args = SP_MAX(info.width.args, args);
+    u32 width = 0;
+    sp_da_for(cmd.brief, it) {
+      width += cmd.brief[it].len;
+    }
+
+    info.width.args = SP_MAX(info.width.args, width);
 
     sp_dyn_array_push(info.commands, cmd);
   }
@@ -4235,18 +4322,14 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cli) {
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
 
   if (cli->summary) {
-    sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_CSTR("summary"));
-    sp_str_builder_indent(&builder);
-    sp_str_builder_new_line(&builder);
     sp_str_builder_append_fmt(&builder, "{}", SP_FMT_CSTR(cli->summary));
-    sp_str_builder_dedent(&builder);
 
     sp_str_builder_new_line(&builder);
     sp_str_builder_new_line(&builder);
   }
 
   if (cli->usage) {
-    sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_CSTR("usage"));
+    sp_str_builder_append_fmt(&builder, "{}", SP_FMT_CSTR("usage"));
     sp_str_builder_indent(&builder);
     sp_str_builder_new_line(&builder);
     sp_str_builder_append_fmt(&builder, "{:fg brightcyan}", SP_FMT_CSTR(cli->usage));
@@ -4265,7 +4348,7 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cli) {
       spn_cli_command_info_t command = info.commands[it];
 
       sp_str_t name = sp_str_pad(command.name, info.width.name);
-      sp_str_t args = sp_str_join_n(command.args, sp_dyn_array_size(command.args), sp_str_lit(", "));
+      sp_str_t args = sp_str_join_n(command.brief, sp_dyn_array_size(command.brief), sp_str_lit(", "));
       args = sp_str_pad(args, info.width.args);
       sp_str_builder_append_fmt(
         &builder,
@@ -4457,9 +4540,9 @@ void spn_cli_copy(spn_cli_t* cli) {
   sp_ht_for(app.deps, it) {
     spn_dep_context_t* dep = sp_ht_it_getp(app.deps, it);
 
-    sp_dyn_array(sp_os_dir_entry_t) entries = sp_os_scan_directory(dep->paths.lib);
+    sp_dyn_array(sp_os_dir_ent_t) entries = sp_os_scan_directory(dep->paths.lib);
     sp_dyn_array_for(entries, i) {
-      sp_os_dir_entry_t* entry = entries + i;
+      sp_os_dir_ent_t* entry = entries + i;
       sp_os_copy_file(
         entry->file_path,
         sp_os_join_path(to, sp_os_extract_file_name(entry->file_path))
@@ -4807,27 +4890,27 @@ void spn_cli_tool(spn_cli_t* cli) {
     .commands = {
       {
         .name = "install",
-        .args = { "package" },
-        .usage = "Install a package's binary targets to the PATH"
+        .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package to install" } },
+        .summary = "Install a package's binary targets to the PATH"
       },
       {
         .name = "uninstall",
-        .args = { "package" },
-        .usage = "Uninstall a package's binary targets to the PATH"
+        .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package to uninstall" } },
+        .summary = "Uninstall a package's binary targets to the PATH"
       },
       {
         .name = "run",
-        .args = { "package" },
-        .usage = "Run a package's binary; if a package exports more than one, run the first"
+        .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package to run" } },
+        .summary = "Run a package's binary; if a package exports more than one, run the first"
       },
       {
         .name = "list",
-        .usage = "List installed tools"
+        .summary = "List installed tools"
       },
       {
         .name = "upgrade",
-        .args = { "package" },
-        .usage = "Upgrade a tool to the latest version"
+        .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The tool to upgrade" } },
+        .summary = "Upgrade a tool to the latest version"
       },
     }
   };
@@ -4866,7 +4949,6 @@ void spn_cli_print(spn_cli_t* cli) {
       OPT_STRING('c', "compiler", &command->compiler, "generate for compiler [*gcc, msvc]", SP_NULLPTR),
       OPT_STRING('g', "generator", &command->generator, "output format [*raw, shell, make]", SP_NULLPTR),
       OPT_STRING('o', "output", &cli->output, "output mode: interactive, noninteractive, quiet, none", SP_NULLPTR),
-      OPT_STRING('m', "matrix", &cli->matrix, "build matrix to use", SP_NULLPTR),
       OPT_END()
     },
     (const c8* const []) {
@@ -5052,9 +5134,8 @@ void spn_cli_build(spn_cli_t* cli) {
     (struct argparse_option []) {
       OPT_HELP(),
       OPT_BOOLEAN('f', "force", &command->force, "force build, even if it exists in the store", SP_NULLPTR),
-      OPT_BOOLEAN('u', "update", &command->update, "pull latest for all deps", SP_NULLPTR),
+      OPT_BOOLEAN('p', "profile", &command->profile, "", SP_NULLPTR),
       OPT_STRING('o', "output", &cli->output, "output mode: interactive, noninteractive, quiet, none", SP_NULLPTR),
-      OPT_STRING('m', "matrix", &cli->matrix, "build matrix to use", SP_NULLPTR),
       OPT_END()
     },
     (const c8* const []) {
@@ -5064,6 +5145,15 @@ void spn_cli_build(spn_cli_t* cli) {
     SP_NULL
   );
   cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+
+  spn_cli_command_usage_t usage = {
+    .name = "build",
+    .usage = "Build one or more of the project's targets",
+  };
+
+  if (cli->num_args) {
+    spn_cli_assert_num_args(cli, 1, sp_str_lit(""));
+  }
 
   spn_app_resolve(&app);
   spn_app_prepare(&app);
@@ -5075,7 +5165,6 @@ void spn_cli_build(spn_cli_t* cli) {
   sp_ht_for(app.deps, it) {
     spn_dep_context_t* dep = sp_ht_it_getp(app.deps, it);
     dep->force = command->force;
-    dep->update = command->update;
     dep->state = SPN_DEP_BUILD_STATE_IDLE;
     sp_thread_init(&dep->thread, spn_dep_thread_build, dep);
   }
