@@ -3,6 +3,8 @@ name = "sp"
 repo = "tspader/sp"
 version = "1.6.0"
 commit = "ae2f8baa4493"
+author = "tspader"
+maintainer = "tspader"
 
 [lib]
 kinds = ["source"]
