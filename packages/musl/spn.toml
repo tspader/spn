@@ -1,0 +1,12 @@
+[package]
+name = "musl"
+repo = "kraj/musl"
+version = "1.2.5"
+commit = "0784374d561435f7c787a555aeab8ede699ed298"
+author = "richfelker"
+maintainer = "tspader"
+description = "musl libc"
+
+[lib]
+kinds = ["static"]
+name = "c"

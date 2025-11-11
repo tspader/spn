@@ -1,0 +1,12 @@
+[package]
+name = "musl-example"
+version = "0.1.0"
+
+[deps]
+musl = "1.2.5"
+sp = "1.6.0"
+
+
+[[bin]]
+name = "musl-example"
+source = ["main.c"]
