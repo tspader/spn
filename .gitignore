@@ -3,8 +3,10 @@ compile_commands.json
 .vscode
 
 build/*
-bootstrap/bin
+bootstrap/
 examples/**/*.lock**
+packages/**/build
+packages/**/spn.lock
 
 test/**/build
 test/**/spn.lock
