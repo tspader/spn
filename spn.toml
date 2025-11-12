@@ -11,6 +11,8 @@ toml = "1.2.0"
 [[profile]]
 name = "debug"
 cc = "musl-gcc"
+libc = "musl"
+linkage = "static"
 
 
 [[bin]]

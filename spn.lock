@@ -16,7 +16,6 @@ commit = "ae2f8baa4493"
 name = "tcc"
 version = "1.0.0"
 commit = "01d1b7bc7601"
-deps = ["sp"]
 
 [[package]]
 name = "toml"

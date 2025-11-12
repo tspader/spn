@@ -33,6 +33,13 @@ typedef enum {
 } spn_lib_kind_t;
 
 typedef enum {
+  SPN_LIBC_GNU = 0,
+  SPN_LIBC_MUSL = 1,
+  SPN_LIBC_COSMOPOLITAN = 2,
+  SPN_LIBC_CUSTOM = 3,
+} spn_libc_kind_t;
+
+typedef enum {
   SPN_DIR_NONE = 0,
   SPN_DIR_CACHE = 1,
   SPN_DIR_STORE = 2,
@@ -81,7 +88,9 @@ void            spn_make_run(spn_make_t* make);
 void            spn_autoconf(spn_dep_context_t* build);
 spn_autoconf_t* spn_autoconf_new(spn_dep_context_t* build);
 void            spn_autoconf_run(spn_autoconf_t* autoconf);
+void            spn_autoconf_add_flag(spn_autoconf_t* autoconf, const c8* flag);
 void            spn_dep_log(spn_dep_context_t* dep, const c8* message);
+spn_libc_kind_t spn_dep_get_libc(spn_dep_context_t* dep);
 s64             spn_dep_get_s64(spn_dep_context_t* dep, const c8* name);
 void            spn_dep_set_s64(spn_dep_context_t* dep, const c8* name, s64 value);
 const c8*       spn_dep_get_str(spn_dep_context_t* dep, const c8* name);

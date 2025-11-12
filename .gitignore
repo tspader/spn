@@ -3,6 +3,7 @@ compile_commands.json
 .vscode
 
 build/*
+target/*
 bootstrap/
 examples/**/*.lock**
 packages/**/build
