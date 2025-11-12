@@ -52,7 +52,9 @@ typedef enum {
 typedef enum {
   SPN_CC_NONE,
   SPN_CC_GCC,
+  SPN_CC_MUSL_GCC,
   SPN_CC_TCC,
+  SPN_CC_CUSTOM,
 } spn_cc_kind_t;
 
 typedef enum {

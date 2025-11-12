@@ -6,9 +6,6 @@ commit = "01d1b7bc7601"
 author = "bellard"
 maintainer = "tspader"
 
-[deps]
-"sp" = "1.2.0"
-
 [lib]
 kinds = ["static"]
 name = 'tcc'

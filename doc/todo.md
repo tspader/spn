@@ -68,3 +68,9 @@ better to build it into the toml?
 
 # convert other help strings to helper struct
 spn_cli_usage_t, i think. expand the struct or make a similar one as needed for comamnds that don't have subcommands? also need to make it a little better (e.g. add examples)
+
+# spn query $package --symbols
+list all symbols in a package
+
+write a minimal C parser to grab functions and types, or parse the ELF
+
