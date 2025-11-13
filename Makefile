@@ -1,75 +1,53 @@
-.PHONY: all clean bootstrap
+.PHONY: all clean install uninstall clone headers
 
 all: bootstrap/bin/spn
 
-bootstrap/external:
+###########
+## CLONE ##
+###########
+clone:
 	@mkdir -p bootstrap/external
+	git clone https://github.com/tspader/argparse.git bootstrap/external/argparse
+	git clone https://github.com/tspader/sp.git bootstrap/external/sp
+	git clone https://github.com/tspader/toml.git bootstrap/external/toml
+	git clone https://github.com/tinycc/tinycc.git bootstrap/external/tinycc
 
-bootstrap/external/argparse: bootstrap/external
-	@if [ ! -d "$@" ]; then \
-		echo "Cloning argparse..."; \
-		git clone https://github.com/tspader/argparse.git $@; \
-	fi
+bootstrap/external/argparse bootstrap/external/sp bootstrap/external/toml bootstrap/external/tinycc: clone
 
-bootstrap/external/sp: bootstrap/external
-	@if [ ! -d "$@" ]; then \
-		echo "Cloning sp..."; \
-		git clone https://github.com/tspader/sp.git $@; \
-	fi
 
-bootstrap/external/toml: bootstrap/external
-	@if [ ! -d "$@" ]; then \
-		echo "Cloning toml..."; \
-		git clone https://github.com/tspader/toml.git $@; \
-	fi
-
-bootstrap/external/tinycc: bootstrap/external
-	@if [ ! -d "$@" ]; then \
-		echo "Cloning tinycc..."; \
-		git clone https://github.com/tinycc/tinycc.git $@; \
-	fi
-
-bootstrap/lib/libtcc.a: bootstrap/external/tinycc
-	@if [ ! -f "$@" ]; then echo "Building tinycc..."; cd bootstrap/external/tinycc && ./configure --enable-static --prefix=$(PWD)/bootstrap && $(MAKE) && $(MAKE) install; fi
-
-bootstrap/include:
+#############
+## HEADERS ##
+#############
+headers: bootstrap/external/sp bootstrap/external/toml bootstrap/external/argparse bootstrap/lib/libtcc.a
 	@mkdir -p bootstrap/include
+	cp bootstrap/external/sp/sp.h bootstrap/include/sp.h
+	cp bootstrap/external/toml/toml.h bootstrap/include/toml.h
+	cp bootstrap/external/argparse/argparse.h bootstrap/include/argparse.h
+	cp bootstrap/external/tinycc/libtcc.h bootstrap/include/libtcc.h
 
-bootstrap/include/%.h: bootstrap/external/%/spn.h | bootstrap/include
-	@cp $< $@
+bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/argparse.h bootstrap/include/libtcc.h: headers
 
-bootstrap/include/sp.h: bootstrap/external/sp | bootstrap/include
-	@cp bootstrap/external/sp/sp.h $@
 
-bootstrap/include/toml.h: bootstrap/external/toml | bootstrap/include
-	@cp bootstrap/external/toml/toml.h $@
+##############
+## BINARIES ##
+##############
+bootstrap/lib/libtcc.a: bootstrap/external/tinycc
+	cd bootstrap/external/tinycc && ./configure --enable-static --prefix=$(PWD)/bootstrap && $(MAKE) && $(MAKE) install
 
-bootstrap/include/libtcc.h: bootstrap/lib/libtcc.a | bootstrap/include
-	@cp bootstrap/external/tinycc/libtcc.h $@
-
-bootstrap/include/argparse.h: bootstrap/external/argparse | bootstrap/include
-	@cp bootstrap/external/argparse/argparse.h $@
-
-bootstrap/bin:
+bootstrap/bin/spn: source/spn.c bootstrap/lib/libtcc.a bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h
 	@mkdir -p bootstrap/bin
+	gcc -g -o $@ source/spn.c -Iinclude -Ibootstrap/include bootstrap/lib/libtcc.a
 
-bootstrap/bin/spn: source/spn.c bootstrap/lib/libtcc.a bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h | bootstrap/bin
-	@echo "Building spn..."
-	gcc -g -static -o $@ $< -Iinclude -Ibootstrap/include bootstrap/lib/libtcc.a
 
-bootstrap: bootstrap/bin/spn
-
+#############
+## PHONIES ##
+#############
 install: bootstrap/bin/spn
-	@mkdir -p $(HOME)/.local/bin && cp bootstrap/bin/spn $(HOME)/.local/bin/
+	@mkdir -p $(HOME)/.local/bin
+	cp bootstrap/bin/spn $(HOME)/.local/bin/
 
 uninstall:
-	@rm -f $(HOME)/.local/bin/spn
+	rm -f $(HOME)/.local/bin/spn
 
 clean:
-	rm -rf bootstrap/external
-	rm -rf bootstrap/lib
-	rm -rf bootstrap/include
-	rm -rf bootstrap/bin
-
-c:
-	rm bootstrap/bin/spn
+	rm -rf bootstrap
