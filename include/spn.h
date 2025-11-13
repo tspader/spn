@@ -1,7 +1,7 @@
 #ifndef SPN_SPN_H
 #define SPN_SPN_H
 
-#ifndef SP_SP_H
+#ifndef SP_SPACE_H
   #include <stdint.h>
   #include <stdbool.h>
   #include <stdlib.h>
