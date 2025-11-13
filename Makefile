@@ -7,10 +7,10 @@ all: bootstrap/bin/spn
 ###########
 clone:
 	@mkdir -p bootstrap/external
-	git clone https://github.com/tspader/argparse.git bootstrap/external/argparse
-	git clone https://github.com/tspader/sp.git bootstrap/external/sp
-	git clone https://github.com/tspader/toml.git bootstrap/external/toml
-	git clone https://github.com/tinycc/tinycc.git bootstrap/external/tinycc
+	@if [ ! -d bootstrap/external/argparse ]; then git clone https://github.com/tspader/argparse.git bootstrap/external/argparse; fi
+	@if [ ! -d bootstrap/external/sp ]; then git clone https://github.com/tspader/sp.git bootstrap/external/sp; fi
+	@if [ ! -d bootstrap/external/toml ]; then git clone https://github.com/tspader/toml.git bootstrap/external/toml; fi
+	@if [ ! -d bootstrap/external/tinycc ]; then git clone https://github.com/tinycc/tinycc.git bootstrap/external/tinycc; fi
 
 bootstrap/external/argparse bootstrap/external/sp bootstrap/external/toml bootstrap/external/tinycc: clone
 
@@ -32,7 +32,7 @@ bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/argparse.h boo
 ## BINARIES ##
 ##############
 bootstrap/lib/libtcc.a: bootstrap/external/tinycc
-	cd bootstrap/external/tinycc && ./configure --enable-static --prefix=$(PWD)/bootstrap && $(MAKE) && $(MAKE) install
+	@if [ ! -f bootstrap/lib/libtcc.a ]; then cd bootstrap/external/tinycc && ./configure --enable-static --prefix=$(PWD)/bootstrap && $(MAKE) && $(MAKE) install; fi
 
 bootstrap/bin/spn: source/spn.c bootstrap/lib/libtcc.a bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h
 	@mkdir -p bootstrap/bin

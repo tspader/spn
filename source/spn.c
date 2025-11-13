@@ -5908,8 +5908,8 @@ void spn_cli_build(spn_cli_t* cli) {
     (struct argparse_option []) {
       OPT_BOOLEAN('h', "help", &cli->help, "", SP_NULLPTR),
       OPT_BOOLEAN('f', "force", &command->force, "force build, even if it exists in the store", SP_NULLPTR),
-      OPT_BOOLEAN('t', "target", &command->target, "", SP_NULLPTR),
-      OPT_BOOLEAN('p', "profile", &command->profile, "", SP_NULLPTR),
+      OPT_STRING('t', "target", &command->target, "Target to build; if omitted, build all targets", SP_NULLPTR),
+      OPT_STRING('p', "profile", &command->profile, "Profile to use; if omitted, use default profile", SP_NULLPTR),
       OPT_STRING('o', "output", &cli->output, "output mode: interactive, noninteractive, quiet, none", SP_NULLPTR),
       OPT_END()
     },
@@ -5934,17 +5934,45 @@ void spn_cli_build(spn_cli_t* cli) {
   }
 
   if (cli->num_args) {
-    spn_cli_assert_num_args(cli, 1, sp_str_lit(""));
+    spn_cli_assert_num_args(cli, 2, sp_str_lit(""));
   }
 
   sp_opt(spn_bin_t) target = SP_ZERO_INITIALIZE();
+  sp_str_t target_name = SP_ZERO_INITIALIZE();
+  sp_str_t profile_name = SP_ZERO_INITIALIZE();
+  
+  // Check for target via flag first
   if (command->target) {
-    sp_str_t name = sp_str_view(command->target);
-    if (!sp_ht_key_exists(app.package.bin, name)) {
-      SP_FATAL("{:fg brightcyan} isn't defined in {:fg brightcyan}", SP_FMT_STR(name), SP_FMT_STR(app.paths.manifest));
+    target_name = sp_str_view(command->target);
+  }
+  // Then check for positional argument
+  else if (cli->num_args > 0) {
+    target_name = spn_cli_get_arg(cli, 0);
+  }
+  
+  // Check for profile via flag first
+  if (command->profile) {
+    profile_name = sp_str_view(command->profile);
+  }
+  // Then check for positional profile argument (second argument)
+  else if (cli->num_args > 1) {
+    profile_name = spn_cli_get_arg(cli, 1);
+  }
+  
+  if (!sp_str_empty(target_name)) {
+    if (!sp_ht_key_exists(app.package.bin, target_name)) {
+      SP_FATAL("{:fg brightcyan} isn't defined in {:fg brightcyan}", SP_FMT_STR(target_name), SP_FMT_STR(app.paths.manifest));
     }
 
-    sp_opt_set(target, *sp_ht_getp(app.package.bin, name));
+    sp_opt_set(target, *sp_ht_getp(app.package.bin, target_name));
+  }
+
+  // Handle profile selection
+  if (!sp_str_empty(profile_name)) {
+    if (!sp_ht_key_exists(app.package.profiles, profile_name)) {
+      SP_FATAL("{:fg brightcyan} profile isn't defined in {:fg brightcyan}", SP_FMT_STR(profile_name), SP_FMT_STR(app.paths.manifest));
+    }
+    app.profile = *sp_ht_getp(app.package.profiles, profile_name);
   }
 
   spn_app_resolve(&app);
