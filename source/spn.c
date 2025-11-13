@@ -38,8 +38,8 @@
   #include <dlfcn.h>
 #endif
 
+  #ifdef SP_LINUX
   #include <link.h>
-#ifdef SP_LINUX
   #include <unistd.h>
   #include <string.h>
 #endif
