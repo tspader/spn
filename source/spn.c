@@ -19,8 +19,6 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
-#define ARGPARSE_IMPLEMENTATION
-#include "argparse.h"
 
 #define TOML_IMPLEMENTATION
 #include "toml.h"
@@ -891,6 +889,7 @@ typedef struct {
   u32 argc;
   spn_cli_command_usage_t cli;
   bool skip_help;
+  bool stop_at_non_option;  // Stop parsing when we hit first non-option (for global options)
   u32 it;
   sp_str_t positionals[SPN_CLI_MAX_ARGS];
   u32 num_positionals;
@@ -930,11 +929,11 @@ sp_str_t spn_cli_command_usage(spn_cli_command_usage_t cmd);
 
 
 typedef struct {
-  const c8* package;
+  sp_str_t package;
 } spn_cli_add_t;
 
 typedef struct {
-  const c8* package;
+  sp_str_t package;
 } spn_cli_update_t;
 
 typedef struct {
@@ -947,34 +946,42 @@ typedef struct {
 
 typedef struct {
   bool force;
-  const c8* target;
-  const c8* profile;
+  sp_str_t target;
+  sp_str_t profile;
+  sp_str_t target_arg;
+  sp_str_t profile_arg;
 } spn_cli_build_t;
 
 typedef struct {
-  const c8* generator;
-  const c8* compiler;
-  const c8* path;
+  sp_str_t generator;
+  sp_str_t compiler;
+  sp_str_t path;
 } spn_cli_print_t;
 
 typedef struct {
-  const c8* dir;
+  sp_str_t dir;
+  sp_str_t package;
 } spn_cli_which_t;
 
 typedef struct {
-  const c8* dir;
+  sp_str_t dir;
+  sp_str_t package;
 } spn_cli_ls_t;
 
 typedef struct {
-  const c8* package;
+  sp_str_t package;
 } spn_cli_manifest_t;
+
+typedef struct {
+  sp_str_t directory;
+} spn_cli_copy_t;
 
 typedef struct {
   u32 num_args;
   const c8** args;
-  const c8* project_directory;
-  const c8* project_file;
-  const c8* output;
+  sp_str_t project_directory;
+  sp_str_t project_file;
+  sp_str_t output;
   bool help;
 
   spn_cli_add_t add;
@@ -986,6 +993,7 @@ typedef struct {
   spn_cli_ls_t ls;
   spn_cli_which_t which;
   spn_cli_manifest_t manifest;
+  spn_cli_copy_t copy;
 } spn_cli_t;
 
 void spn_cli_assert_num_args(spn_cli_t* cli, u32 n, sp_str_t help);
@@ -4558,31 +4566,29 @@ spn_app_t spn_app_load(spn_app_config_t config) {
 void spn_init(u32 num_args, const c8** args) {
   spn_cli_t* cli = &spn.cli;
 
-  struct argparse_option options [] = {
-    OPT_HELP(),
-    OPT_STRING(
-      'C',
-      "project-dir",
-      &cli->project_directory,
-      "specify the directory containing project file",
-      SP_NULLPTR
-    ),
-    OPT_STRING(
-      'f',
-      "file",
-      &cli->project_file,
-      "specify the project file path",
-      SP_NULLPTR
-    ),
-    OPT_STRING(
-      'o',
-      "output",
-      &cli->output,
-      "output mode: interactive (update in place), noninteractive (update serially), quiet (print result at end), none (print nothing)",
-      SP_NULLPTR
-    ),
-    OPT_END(),
+  // Parse global options using the CLI parser
+  spn_cli_parser_t global_parser = {
+    .argv = (c8**)args + 1,  // Skip argv[0] (program name)
+    .argc = num_args - 1,
+    .stop_at_non_option = true,  // Stop at subcommand name
+    .skip_help = true,  // Don't auto-print help and exit - we handle it below
+    .cli = (spn_cli_command_usage_t) {
+      .name = "spn",
+      .summary = "A package manager and build tool for modern C",
+      .opts = {
+        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print help message", SPN_CLI_NO_PLACEHOLDER, &cli->help },
+        { "C", "project-dir", SPN_CLI_OPT_KIND_STRING, "Specify the directory containing project file", "DIR", &cli->project_directory },
+        { "f", "file", SPN_CLI_OPT_KIND_STRING, "Specify the project file path", "FILE", &cli->project_file },
+        { "o", "output", SPN_CLI_OPT_KIND_STRING, "Output mode: interactive, noninteractive, quiet, none", "MODE", &cli->output }
+      },
+      .args = {}
+    }
   };
+  spn_cli_parse_command(&global_parser);
+
+  // Update cli args to point to remaining args (subcommand and its args)
+  cli->args = &args[1 + global_parser.it];
+  cli->num_args = num_args - 1 - global_parser.it;
 
   spn_cli_usage_t usage = {
     .summary = "A package manager and build tool for modern C",
@@ -4660,13 +4666,7 @@ void spn_init(u32 num_args, const c8** args) {
   };
   sp_str_t help = spn_cli_usage(&usage);
 
-  struct argparse argparse;
-  argparse_init(&argparse, options, SP_NULLPTR, ARGPARSE_STOP_AT_NON_OPTION);
-  cli->args = args;
-  cli->num_args = num_args;
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
-
-  if (!cli->num_args) {
+  if (cli->help || !cli->num_args) {
     sp_log(help);
     SP_EXIT_FAILURE();
   }
@@ -4924,6 +4924,10 @@ spn_err_t spn_cli_parse_command(spn_cli_parser_t* p) {
     }
     else {
       // Positional argument
+      if (p->stop_at_non_option) {
+        // Stop parsing here - leave remaining args for subcommand
+        break;
+      }
       p->positionals[p->num_positionals++] = arg;
       spn_cli_parser_eat(p);
     }
@@ -5211,9 +5215,10 @@ sp_str_t spn_cli_get_arg(spn_cli_t* cli, u32 n) {
 void spn_cli_init(spn_cli_t* cli) {
   spn_cli_init_t* cmd = &cli->init;
 
+  // Skip the command name itself (first arg)
   spn_cli_parser_t parser = {
-    .argv = (c8**)cli->args,
-    .argc = cli->num_args,
+    .argv = (c8**)cli->args + 1,
+    .argc = cli->num_args - 1,
     .cli = (spn_cli_command_usage_t) {
       .name = "init",
       .summary = "Initialize a new spn project",
@@ -5236,21 +5241,20 @@ void spn_cli_init(spn_cli_t* cli) {
 }
 
 void spn_cli_list(spn_cli_t* cli) {
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_END()
-    },
-    (const c8* const []) {
-      "spn list",
-      "List all available packages",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+  // Skip the command name itself (first arg)
+  spn_cli_parser_t parser = {
+    .argv = (c8**)cli->args + 1,
+    .argc = cli->num_args - 1,
+    .cli = (spn_cli_command_usage_t) {
+      .name = "list",
+      .summary = "List all available packages",
+      .opts = {
+        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print this message", SPN_CLI_NO_PLACEHOLDER, &cli->help }
+      },
+      .args = {}
+    }
+  };
+  spn_cli_parse_command(&parser);
 
   sp_tui_begin_table(&spn.tui);
   sp_tui_table_setup_column(&spn.tui, sp_str_lit("Package"));
@@ -5286,31 +5290,26 @@ void spn_cli_clean(spn_cli_t* cli) {
 
 
 void spn_cli_copy(spn_cli_t* cli) {
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_END()
-    },
-    (const c8* const []) {
-      "spn copy <directory>",
-      "Copy all project binary dependencies to a directory",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+  spn_cli_copy_t* cmd = &cli->copy;
 
-  if (cli->num_args < 1) {
-    SP_FATAL(
-      "You must specify a destination (e.g. {:fg brightyellow})",
-      SP_FMT_CSTR("spn copy ./build/lib")
-    );
-  }
+  // Skip the command name itself (first arg)
+  spn_cli_parser_t parser = {
+    .argv = (c8**)cli->args + 1,
+    .argc = cli->num_args - 1,
+    .cli = (spn_cli_command_usage_t) {
+      .name = "copy",
+      .summary = "Copy all project binary dependencies to a directory",
+      .opts = {
+        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print this message", SPN_CLI_NO_PLACEHOLDER, &cli->help }
+      },
+      .args = {
+        { "directory", SPN_CLI_ARG_KIND_REQUIRED, "The destination directory", &cmd->directory }
+      }
+    }
+  };
+  spn_cli_parse_command(&parser);
 
-  sp_str_t destination = SP_CSTR(cli->args[0]);
-  destination = sp_os_normalize_path(destination);
+  sp_str_t destination = sp_os_normalize_path(cmd->directory);
   sp_str_t to = sp_os_join_path(spn.paths.work, destination);
   sp_os_create_directory(to);
 
@@ -5329,35 +5328,32 @@ void spn_cli_copy(spn_cli_t* cli) {
 }
 
 void spn_cli_ls(spn_cli_t* cli) {
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_STRING('d', "dir", &cli->ls.dir, "which directory to list (store, include, lib, source, work, vendor)", SP_NULLPTR),
-      OPT_END()
-    },
-    (const c8* const []) {
-      "spn ls [package]",
-      "List files in a package's cache directory",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+  spn_cli_ls_t* cmd = &cli->ls;
 
-  // Get package name from positional argument if provided
-  const c8* package = SP_NULLPTR;
-  if (cli->num_args > 0 && cli->args[0]) {
-    package = cli->args[0];
-  }
+  // Skip the command name itself (first arg)
+  spn_cli_parser_t parser = {
+    .argv = (c8**)cli->args + 1,
+    .argc = cli->num_args - 1,
+    .cli = (spn_cli_command_usage_t) {
+      .name = "ls",
+      .summary = "List files in a package's cache directory",
+      .opts = {
+        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print this message", SPN_CLI_NO_PLACEHOLDER, &cli->help },
+        { "d", "dir", SPN_CLI_OPT_KIND_STRING, "Which directory to list (store, include, lib, source, work, vendor)", "DIR", &cmd->dir }
+      },
+      .args = {
+        { "package", SPN_CLI_ARG_KIND_OPTIONAL, "The package to list", &cmd->package }
+      }
+    }
+  };
+  spn_cli_parse_command(&parser);
 
-  if (package) {
-    spn_dep_context_t* dep = spn_cli_assert_dep_exists(sp_str_view(package));
+  if (sp_str_valid(cmd->package)) {
+    spn_dep_context_t* dep = spn_cli_assert_dep_exists(cmd->package);
 
     spn_dir_kind_t kind = SPN_DIR_STORE;
-    if (cli->ls.dir) {
-      kind = spn_cache_dir_kind_from_str(sp_str_view(cli->ls.dir));
+    if (sp_str_valid(cmd->dir)) {
+      kind = spn_cache_dir_kind_from_str(cmd->dir);
     }
 
     sp_str_t dir = spn_cache_dir_kind_to_dep_path(dep, kind);
@@ -5365,8 +5361,8 @@ void spn_cli_ls(spn_cli_t* cli) {
   }
   else {
     spn_dir_kind_t kind = SPN_DIR_CACHE;
-    if (cli->ls.dir) {
-      kind = spn_cache_dir_kind_from_str(sp_str_view(cli->ls.dir));
+    if (sp_str_valid(cmd->dir)) {
+      kind = spn_cache_dir_kind_from_str(cmd->dir);
     }
 
     sp_str_t dir = spn_cache_dir_kind_to_path(kind);
@@ -5375,38 +5371,35 @@ void spn_cli_ls(spn_cli_t* cli) {
 }
 
 void spn_cli_which(spn_cli_t* cli) {
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_STRING('d', "dir", &cli->which.dir, "which directory to show (store, include, lib, source, work, vendor)", SP_NULLPTR),
-      OPT_END()
-    },
-    (const c8* const []) {
-      "spn which [package]",
-      "Print the cache directory for this package for this project",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+  spn_cli_which_t* cmd = &cli->which;
 
-  const c8* package = SP_NULLPTR;
-  if (cli->num_args > 0 && cli->args[0]) {
-    package = cli->args[0];
-  }
-
+  // Skip the command name itself (first arg)
+  spn_cli_parser_t parser = {
+    .argv = (c8**)cli->args + 1,
+    .argc = cli->num_args - 1,
+    .cli = (spn_cli_command_usage_t) {
+      .name = "which",
+      .summary = "Print the cache directory for a package",
+      .opts = {
+        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print this message", SPN_CLI_NO_PLACEHOLDER, &cli->help },
+        { "d", "dir", SPN_CLI_OPT_KIND_STRING, "Which directory to show (store, include, lib, source, work, vendor)", "DIR", &cmd->dir }
+      },
+      .args = {
+        { "package", SPN_CLI_ARG_KIND_OPTIONAL, "The package to show path for", &cmd->package }
+      }
+    }
+  };
+  spn_cli_parse_command(&parser);
 
   spn_app_resolve(&app);
   spn_app_prepare_deps(&app);
 
-  if (package) {
-    spn_dep_context_t* dep = spn_cli_assert_dep_exists(sp_str_view(package));
+  if (sp_str_valid(cmd->package)) {
+    spn_dep_context_t* dep = spn_cli_assert_dep_exists(cmd->package);
 
     spn_dir_kind_t kind = SPN_DIR_STORE;
-    if (cli->which.dir) {
-      kind = spn_cache_dir_kind_from_str(sp_str_view(cli->which.dir));
+    if (sp_str_valid(cmd->dir)) {
+      kind = spn_cache_dir_kind_from_str(cmd->dir);
     }
 
     sp_str_t dir = spn_cache_dir_kind_to_dep_path(dep, kind);
@@ -5415,8 +5408,8 @@ void spn_cli_which(spn_cli_t* cli) {
   }
   else {
     spn_dir_kind_t kind = SPN_DIR_CACHE;
-    if (cli->which.dir) {
-      kind = spn_cache_dir_kind_from_str(sp_str_view(cli->which.dir));
+    if (sp_str_valid(cmd->dir)) {
+      kind = spn_cache_dir_kind_from_str(cmd->dir);
     }
 
     sp_str_t dir = spn_cache_dir_kind_to_path(kind);
@@ -5425,27 +5418,26 @@ void spn_cli_which(spn_cli_t* cli) {
 }
 
 void spn_cli_manifest(spn_cli_t* cli) {
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_END()
-    },
-    (const c8* const []) {
-      "spn manifest <package>",
-      "Print the manifest contents for this package",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+  spn_cli_manifest_t* cmd = &cli->manifest;
 
-  if (!cli->num_args) {
-    SP_FATAL("No package name specified");
-  }
+  // Skip the command name itself (first arg)
+  spn_cli_parser_t parser = {
+    .argv = (c8**)cli->args + 1,
+    .argc = cli->num_args - 1,
+    .cli = (spn_cli_command_usage_t) {
+      .name = "manifest",
+      .summary = "Print the manifest contents for a package",
+      .opts = {
+        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print this message", SPN_CLI_NO_PLACEHOLDER, &cli->help }
+      },
+      .args = {
+        { "package", SPN_CLI_ARG_KIND_REQUIRED, "The package to show manifest for", &cmd->package }
+      }
+    }
+  };
+  spn_cli_parse_command(&parser);
 
-  spn_dep_context_t* dep = spn_cli_assert_dep_exists(sp_str_view(cli->args[0]));
+  spn_dep_context_t* dep = spn_cli_assert_dep_exists(cmd->package);
 
   sp_str_t path = dep->package->paths.manifest;
   sp_str_t manifest = sp_io_read_file(path);
@@ -5589,23 +5581,26 @@ void spn_app_update(sp_str_t name) {
 }
 
 void spn_cli_add(spn_cli_t* cli) {
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_END()
-    },
-    (const c8* []) {
-      "spn add",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
-  spn_cli_assert_num_args(cli, 1, sp_str_lit(""));
+  spn_cli_add_t* cmd = &cli->add;
 
-  spn_package_add_dep_from_index(&app.package, spn_cli_get_arg(cli, 0));
+  // Skip the command name itself (first arg)
+  spn_cli_parser_t parser = {
+    .argv = (c8**)cli->args + 1,
+    .argc = cli->num_args - 1,
+    .cli = (spn_cli_command_usage_t) {
+      .name = "add",
+      .summary = "Add a package to the project",
+      .opts = {
+        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print this message", SPN_CLI_NO_PLACEHOLDER, &cli->help }
+      },
+      .args = {
+        { "package", SPN_CLI_ARG_KIND_REQUIRED, "The package to add", &cmd->package }
+      }
+    }
+  };
+  spn_cli_parse_command(&parser);
+
+  spn_package_add_dep_from_index(&app.package, cmd->package);
   spn_app_resolve_from_solver(&app);
   spn_app_prepare_deps(&app);
 
@@ -5614,45 +5609,36 @@ void spn_cli_add(spn_cli_t* cli) {
 }
 
 void spn_cli_update(spn_cli_t* cli) {
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_END()
-    },
-    (const c8* []) {
-      "spn update",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+  spn_cli_update_t* cmd = &cli->update;
 
-  if (!cli->num_args || !cli->args[0]) {
-    argparse_usage(&argparse);
-    return;
-  }
+  // Skip the command name itself (first arg)
+  spn_cli_parser_t parser = {
+    .argv = (c8**)cli->args + 1,
+    .argc = cli->num_args - 1,
+    .cli = (spn_cli_command_usage_t) {
+      .name = "update",
+      .summary = "Update a package to the latest version",
+      .opts = {
+        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print this message", SPN_CLI_NO_PLACEHOLDER, &cli->help }
+      },
+      .args = {
+        { "package", SPN_CLI_ARG_KIND_REQUIRED, "The package to update", &cmd->package }
+      }
+    }
+  };
+  spn_cli_parse_command(&parser);
 
-  sp_str_t name = sp_str_from_cstr(cli->args[0]);
-  spn_app_update(name);
+  spn_app_update(cmd->package);
 }
 
 void spn_cli_tool(spn_cli_t* cli) {
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_BOOLEAN('h', "help", &cli->help, "", SP_NULLPTR),
-      OPT_END()
-    },
-    (const c8* []) {
-      "spn tool",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+  // Check for help flag manually since this is a command with subcommands
+  for (u32 i = 0; i < cli->num_args; i++) {
+    if (sp_cstr_equal(cli->args[i], "--help") || sp_cstr_equal(cli->args[i], "-h")) {
+      cli->help = true;
+      break;
+    }
+  }
 
   spn_cli_usage_t usage = {
     .summary = "Run, install, and manage binaries defined by spn packages",
@@ -5727,34 +5713,34 @@ void spn_cli_tool(spn_cli_t* cli) {
 void spn_cli_print(spn_cli_t* cli) {
   spn_cli_print_t* command = &cli->print;
 
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_HELP(),
-      OPT_STRING('p', "path", &command->path, "write generated flags to a file", SP_NULLPTR),
-      OPT_STRING('c', "compiler", &command->compiler, "generate for compiler [*gcc, msvc]", SP_NULLPTR),
-      OPT_STRING('g', "generator", &command->generator, "output format [*raw, shell, make]", SP_NULLPTR),
-      OPT_STRING('o', "output", &cli->output, "output mode: interactive, noninteractive, quiet, none", SP_NULLPTR),
-      OPT_END()
-    },
-    (const c8* const []) {
-      "spn print [options]",
-      SP_NULLPTR
-    },
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
+  // Skip the command name itself (first arg)
+  spn_cli_parser_t parser = {
+    .argv = (c8**)cli->args + 1,
+    .argc = cli->num_args - 1,
+    .cli = (spn_cli_command_usage_t) {
+      .name = "print",
+      .summary = "Print or write compiler flags for consuming packages",
+      .opts = {
+        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print this message", SPN_CLI_NO_PLACEHOLDER, &cli->help },
+        { "p", "path", SPN_CLI_OPT_KIND_STRING, "Write generated flags to a file", "PATH", &command->path },
+        { "c", "compiler", SPN_CLI_OPT_KIND_STRING, "Generate for compiler [*gcc, msvc]", "COMPILER", &command->compiler },
+        { "g", "generator", SPN_CLI_OPT_KIND_STRING, "Output format [*raw, shell, make]", "GENERATOR", &command->generator },
+        { "o", "output", SPN_CLI_OPT_KIND_STRING, "Output mode: interactive, noninteractive, quiet, none", "MODE", &cli->output }
+      },
+      .args = {}
+    }
+  };
+  spn_cli_parse_command(&parser);
 
-  if (command->path && !command->generator) {
+  if (sp_str_valid(command->path) && !sp_str_valid(command->generator)) {
     SP_FATAL(
       "output path was specified, but no generator. try e.g.:\n  spn print --path {} {:fg yellow}",
-      SP_FMT_CSTR(command->path),
+      SP_FMT_STR(command->path),
       SP_FMT_CSTR("--generator make")
     );
   }
-  if (!command->generator) command->generator = "";
-  if (!command->compiler) command->compiler = "gcc";
+  if (!sp_str_valid(command->generator)) command->generator = sp_str_lit("");
+  if (!sp_str_valid(command->compiler)) command->compiler = sp_str_lit("gcc");
 
   if (!app.lock.some) {
     SP_FATAL("No lock file found. Run {:fg yellow} first.", SP_FMT_CSTR("spn build"));
@@ -5764,8 +5750,8 @@ void spn_cli_print(spn_cli_t* cli) {
   spn_app_prepare_deps(&app);
 
   spn_generator_context_t gen = {
-    .kind = spn_gen_kind_from_str(sp_str_view(command->generator)),
-    .compiler = spn_cc_kind_from_str(sp_str_view(command->compiler))
+    .kind = spn_gen_kind_from_str(command->generator),
+    .compiler = spn_cc_kind_from_str(command->compiler)
   };
   gen.include = spn_gen_build_entries_for_all(SPN_GENERATOR_INCLUDE, gen.compiler);
   gen.lib_include = spn_gen_build_entries_for_all(SPN_GENERATOR_LIB_INCLUDE, gen.compiler);
@@ -5834,9 +5820,8 @@ void spn_cli_print(spn_cli_t* cli) {
     }
   }
 
-  if (command->path) {
-    sp_str_t destination = SP_CSTR(command->path);
-    destination = sp_os_normalize_path(destination);
+  if (sp_str_valid(command->path)) {
+    sp_str_t destination = sp_os_normalize_path(command->path);
     destination = sp_os_join_path(spn.paths.work, destination);
     sp_os_create_directory(destination);
 
@@ -5902,61 +5887,46 @@ spn_err_t spn_dep_context_build_binaries(spn_dep_context_t* build) {
 void spn_cli_build(spn_cli_t* cli) {
   spn_cli_build_t* command = &cli->build;
 
-  struct argparse argparse;
-  argparse_init(
-    &argparse,
-    (struct argparse_option []) {
-      OPT_BOOLEAN('h', "help", &cli->help, "", SP_NULLPTR),
-      OPT_BOOLEAN('f', "force", &command->force, "force build, even if it exists in the store", SP_NULLPTR),
-      OPT_STRING('t', "target", &command->target, "Target to build; if omitted, build all targets", SP_NULLPTR),
-      OPT_STRING('p', "profile", &command->profile, "Profile to use; if omitted, use default profile", SP_NULLPTR),
-      OPT_STRING('o', "output", &cli->output, "output mode: interactive, noninteractive, quiet, none", SP_NULLPTR),
-      OPT_END()
-    },
-    SP_NULLPTR,
-    SP_NULL
-  );
-  cli->num_args = argparse_parse(&argparse, cli->num_args, cli->args);
-
-  spn_cli_command_usage_t usage = {
-    .name = "build",
-    .summary = "Build one or more of the project's targets",
-    .args = {
-      { "target", SPN_CLI_ARG_KIND_OPTIONAL, "Target to build; if omitted, build all targets" },
-      { "profile", SPN_CLI_ARG_KIND_OPTIONAL, "Profile to use; if omitted, default to first defined profile. If no profiles are defined, uses built in debug profile" },
+  // Skip the command name itself (first arg)
+  spn_cli_parser_t parser = {
+    .argv = (c8**)cli->args + 1,
+    .argc = cli->num_args - 1,
+    .cli = (spn_cli_command_usage_t) {
+      .name = "build",
+      .summary = "Build one or more of the project's targets",
+      .opts = {
+        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print this message", SPN_CLI_NO_PLACEHOLDER, &cli->help },
+        { "f", "force", SPN_CLI_OPT_KIND_BOOLEAN, "Force build, even if it exists in the store", SPN_CLI_NO_PLACEHOLDER, &command->force },
+        { "t", "target", SPN_CLI_OPT_KIND_STRING, "Target to build; if omitted, build all targets", "TARGET", &command->target },
+        { "p", "profile", SPN_CLI_OPT_KIND_STRING, "Profile to use; if omitted, use default profile", "PROFILE", &command->profile },
+        { "o", "output", SPN_CLI_OPT_KIND_STRING, "Output mode: interactive, noninteractive, quiet, none", "MODE", &cli->output }
+      },
+      .args = {
+        { "target", SPN_CLI_ARG_KIND_OPTIONAL, "Target to build; if omitted, build all targets", &command->target_arg },
+        { "profile", SPN_CLI_ARG_KIND_OPTIONAL, "Profile to use; if omitted, default to first defined profile", &command->profile_arg }
+      }
     }
   };
-  sp_str_t help = spn_cli_command_usage(usage);
-
-  if (cli->help) {
-    sp_log(help);
-    SP_EXIT_SUCCESS();
-  }
-
-  if (cli->num_args) {
-    spn_cli_assert_num_args(cli, 2, sp_str_lit(""));
-  }
+  spn_cli_parse_command(&parser);
 
   sp_opt(spn_bin_t) target = SP_ZERO_INITIALIZE();
   sp_str_t target_name = SP_ZERO_INITIALIZE();
   sp_str_t profile_name = SP_ZERO_INITIALIZE();
-  
-  // Check for target via flag first
-  if (command->target) {
-    target_name = sp_str_view(command->target);
+
+  // Check for target via flag first, then positional argument
+  if (sp_str_valid(command->target)) {
+    target_name = command->target;
   }
-  // Then check for positional argument
-  else if (cli->num_args > 0) {
-    target_name = spn_cli_get_arg(cli, 0);
+  else if (sp_str_valid(command->target_arg)) {
+    target_name = command->target_arg;
   }
-  
-  // Check for profile via flag first
-  if (command->profile) {
-    profile_name = sp_str_view(command->profile);
+
+  // Check for profile via flag first, then positional argument
+  if (sp_str_valid(command->profile)) {
+    profile_name = command->profile;
   }
-  // Then check for positional profile argument (second argument)
-  else if (cli->num_args > 1) {
-    profile_name = spn_cli_get_arg(cli, 1);
+  else if (sp_str_valid(command->profile_arg)) {
+    profile_name = command->profile_arg;
   }
   
   if (!sp_str_empty(target_name)) {
@@ -5978,8 +5948,8 @@ void spn_cli_build(spn_cli_t* cli) {
   spn_app_resolve(&app);
   spn_app_prepare_deps(&app);
 
-  spn_tui_mode_t mode = spn.cli.output ?
-    spn_output_mode_from_str(sp_str_view(spn.cli.output)) :
+  spn_tui_mode_t mode = sp_str_valid(spn.cli.output) ?
+    spn_output_mode_from_str(spn.cli.output) :
     SPN_OUTPUT_MODE_QUIET;
 
   sp_ht_for(app.deps, it) {
