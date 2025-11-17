@@ -36,8 +36,8 @@
   #include <dlfcn.h>
 #endif
 
-  #ifdef SP_LINUX
-  #include <link.h>
+#ifdef SP_LINUX
+  //#include <link.h>
   #include <unistd.h>
   #include <string.h>
 #endif
@@ -770,7 +770,8 @@ sp_str_t sp_tui_render(spn_tui_t* tui);
 // CLI //
 /////////
 #define SPN_CLI_MAX_SUBCOMMANDS 16
-#define SPN_CLI_MAX_ARGS 4
+#define SPN_CLI_MAX_SUBCOMMANDS_NESTED 8
+#define SPN_CLI_MAX_ARGS 8
 #define SPN_CLI_MAX_OPTS 8
 #define SPN_CLI_NO_PLACEHOLDER SP_NULLPTR
 
@@ -841,12 +842,15 @@ typedef struct {
   void* ptr;
 } spn_cli_opt_usage_t;
 
+typedef struct spn_cli_subcommand_usage_t spn_cli_subcommand_usage_t;
+
 typedef struct {
   const c8* name;
   spn_cli_opt_usage_t opts [SPN_CLI_MAX_OPTS];
   spn_cli_arg_usage_t args [SPN_CLI_MAX_ARGS];
   const c8* usage;
   const c8* summary;
+  spn_cli_subcommand_usage_t* subcommands;
 } spn_cli_command_usage_t;
 
 typedef struct {
@@ -854,6 +858,12 @@ typedef struct {
   const c8* summary;
   spn_cli_command_usage_t commands [SPN_CLI_MAX_SUBCOMMANDS];
 } spn_cli_usage_t;
+
+struct spn_cli_subcommand_usage_t {
+  const c8* usage;
+  const c8* summary;
+  spn_cli_command_usage_t commands [SPN_CLI_MAX_SUBCOMMANDS_NESTED];
+};
 
 typedef struct {
   sp_str_t name;
@@ -928,6 +938,7 @@ void      spn_cli_assign_s64(void* ptr, s64 value);
 void      spn_cli_assign(spn_cli_opt_usage_t opt, sp_str_t value);
 spn_err_t spn_cli_parse_command(spn_cli_parser_t* p);
 sp_str_t  spn_cli_usage(spn_cli_usage_t* cli);
+sp_str_t  spn_cli_subcommand_usage(spn_cli_subcommand_usage_t* subcmds, const c8* parent_cmd_name);
 sp_str_t spn_cli_command_usage(spn_cli_command_usage_t cmd);
 
 
@@ -940,7 +951,22 @@ typedef struct {
 } spn_cli_update_t;
 
 typedef struct {
-  const c8* command;
+  sp_str_t package;
+  bool force;
+  sp_str_t version;
+} spn_cli_tool_install_t;
+
+typedef struct {
+  sp_str_t package;
+  sp_str_t command;
+} spn_cli_tool_run_t;
+
+typedef struct {
+  spn_tool_cmd_t subcommand;
+  union {
+    spn_cli_tool_install_t install;
+    spn_cli_tool_run_t run;
+  };
 } spn_cli_tool_t;
 
 typedef struct {
@@ -1013,6 +1039,8 @@ void spn_cli_init(spn_cli_t* cli);
 void spn_cli_add(spn_cli_t* cli);
 void spn_cli_update(spn_cli_t* cli);
 void spn_cli_tool(spn_cli_t* cli);
+void spn_tool_cmd_install(spn_cli_t* cli);
+void spn_tool_cmd_run(spn_cli_t* cli);
 
 void spn_cli_list(spn_cli_t* cli);
 void spn_cli_ls(spn_cli_t* cli);
@@ -1594,6 +1622,7 @@ sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc) {
     case SPN_LIBC_COSMOPOLITAN: return sp_str_lit("cosmopolitan");
     case SPN_LIBC_CUSTOM:       return sp_str_lit("custom");
   }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
 spn_dep_mode_t spn_dep_build_mode_from_str(sp_str_t str) {
@@ -1658,6 +1687,7 @@ sp_str_t spn_cc_kind_to_executable(spn_cc_kind_t compiler) {
     case SPN_CC_CUSTOM:   SP_FALLTHROUGH();
     case SPN_CC_NONE:     return sp_str_lit("gcc");
   }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
 sp_str_t spn_dep_state_to_str(spn_dep_state_t state) {
@@ -3620,7 +3650,7 @@ bool spn_semver_satisfies(spn_semver_t version, spn_semver_t bound_version, spn_
       return spn_semver_geq(version, bound_version);
     }
     default: {
-      SP_UNREACHABLE_CASE();
+      SP_UNREACHABLE_RETURN(false);
     }
   }
 }
@@ -4129,7 +4159,13 @@ void spn_app_prepare_deps(spn_app_t* app) {
 
     sp_dyn_array(sp_hash_t) hashes = SP_NULLPTR;
     sp_dyn_array_push(hashes, sp_hash_str(dep.metadata.commit));
-    sp_dyn_array_push(hashes, sp_hash_bytes(&dep.metadata.version, sizeof(spn_semver_t), 0)); // padding?
+    sp_dyn_array_push(hashes, dep.profile.linkage);
+    sp_dyn_array_push(hashes, dep.profile.libc);
+    sp_dyn_array_push(hashes, dep.profile.standard);
+    sp_dyn_array_push(hashes, dep.profile.mode);
+    sp_dyn_array_push(hashes, dep.metadata.version.major);
+    sp_dyn_array_push(hashes, dep.metadata.version.minor);
+    sp_dyn_array_push(hashes, dep.metadata.version.patch);
     dep.build_id = sp_hash_combine(hashes, sp_dyn_array_size(hashes));
     sp_str_t build_id = sp_format("{}", SP_FMT_SHORT_HASH(dep.build_id));
 
@@ -4670,6 +4706,34 @@ void spn_init(u32 num_args, const c8** args) {
         .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package name", .ptr = &cli->manifest.package } },
         .summary = "Print the full manifest source for a package"
       },
+      {
+        .name = "tool",
+        .summary = "Run, install, and manage binaries defined by spn packages",
+        .subcommands = &(spn_cli_subcommand_usage_t) {
+          .summary = "Tool subcommands",
+          .commands = {
+            {
+              .name = "install",
+              .opts = {
+                { .brief = "f", .name = "force", .kind = SPN_CLI_OPT_KIND_BOOLEAN, .summary = "Force reinstall even if already installed", .ptr = &cli->tool.install.force },
+                { .brief = "v", .name = "version", .kind = SPN_CLI_OPT_KIND_STRING, .summary = "Version to install", .placeholder = "VERSION", .ptr = &cli->tool.install.version }
+              },
+              .args = {
+                { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package to install", .ptr = &cli->tool.install.package }
+              },
+              .summary = "Install a package's binary targets to the PATH"
+            },
+            {
+              .name = "run",
+              .args = {
+                { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package to run", .ptr = &cli->tool.run.package },
+                { .name = "command", .kind = SPN_CLI_ARG_KIND_OPTIONAL, .summary = "The command to run", .ptr = &cli->tool.run.command }
+              },
+              .summary = "Run a binary from a package"
+            }
+          }
+        }
+      },
     }
   };
   sp_str_t help = spn_cli_usage(&usage);
@@ -4692,15 +4756,60 @@ void spn_init(u32 num_args, const c8** args) {
     }
   }
 
-  // If we found a command schema with options or arguments, parse them
-  if (cmd_schema && (cmd_schema->opts[0].name || cmd_schema->args[0].name)) {
-    spn_cli_parser_t cmd_parser = {
-      .argv = (c8**)cli->args + 1,  // Skip command name
-      .argc = cli->num_args - 1,
-      .cli = *cmd_schema,
-      .skip_help = false
-    };
-    spn_cli_parse_command(&cmd_parser);
+  // If we found a command schema, check if it has subcommands or options/arguments
+  if (cmd_schema) {
+    // Check if this command has nested subcommands
+    if (cmd_schema->subcommands) {
+      // Parse subcommand name from args[1]
+      if (cli->num_args < 2) {
+        // No subcommand provided, show help
+        sp_str_t subcmd_help = spn_cli_subcommand_usage(cmd_schema->subcommands, cmd_schema->name);
+        sp_log(subcmd_help);
+        SP_EXIT_FAILURE();
+      }
+
+      sp_str_t subcmd_name = sp_str_from_cstr(cli->args[1]);
+      spn_cli_command_usage_t* subcmd_schema = NULL;
+
+      // Find matching subcommand
+      for (u32 i = 0; i < SPN_CLI_MAX_SUBCOMMANDS_NESTED; i++) {
+        if (!cmd_schema->subcommands->commands[i].name) break;
+        if (sp_str_equal_cstr(subcmd_name, cmd_schema->subcommands->commands[i].name)) {
+          subcmd_schema = &cmd_schema->subcommands->commands[i];
+          break;
+        }
+      }
+
+      if (!subcmd_schema) {
+        sp_str_t subcmd_help = spn_cli_subcommand_usage(cmd_schema->subcommands, cmd_schema->name);
+        sp_log(subcmd_help);
+        SP_EXIT_FAILURE();
+      }
+
+      // Store which subcommand was matched (for tag union)
+      if (sp_str_equal_cstr(cmd_name, "tool")) {
+        cli->tool.subcommand = spn_tool_subcommand_from_str(subcmd_name);
+      }
+
+      // Parse subcommand options/args
+      spn_cli_parser_t subcmd_parser = {
+        .argv = (c8**)cli->args + 2,  // Skip command and subcommand name
+        .argc = cli->num_args - 2,
+        .cli = *subcmd_schema,
+        .skip_help = false
+      };
+      spn_cli_parse_command(&subcmd_parser);
+    }
+    // Regular command with options or arguments
+    else if (cmd_schema->opts[0].name || cmd_schema->args[0].name) {
+      spn_cli_parser_t cmd_parser = {
+        .argv = (c8**)cli->args + 1,  // Skip command name
+        .argc = cli->num_args - 1,
+        .cli = *cmd_schema,
+        .skip_help = false
+      };
+      spn_cli_parse_command(&cmd_parser);
+    }
   }
 
   sp_atomic_s32_set(&spn.control, 0);
@@ -5181,6 +5290,58 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cli) {
   return sp_str_builder_move(&builder);
 }
 
+sp_str_t spn_cli_subcommand_usage(spn_cli_subcommand_usage_t* subcmds, const c8* parent_cmd_name) {
+  spn_cli_usage_info_t info = SP_ZERO_INITIALIZE();
+
+  sp_carr_for(subcmds->commands, it) {
+    spn_cli_command_usage_t command = subcmds->commands[it];
+    if (!command.name) break;
+
+    spn_cli_command_info_t cmd = spn_cli_command_info_from_usage(command);
+    sp_dyn_array_push(info.commands, cmd);
+  }
+
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+
+  if (subcmds->summary) {
+    sp_str_builder_append_fmt(&builder, "{}", SP_FMT_CSTR(subcmds->summary));
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_new_line(&builder);
+  }
+
+  if (!sp_dyn_array_empty(info.commands)) {
+    sp_str_builder_append_fmt(&builder, "{:fg brightgreen}", SP_FMT_CSTR("usage"));
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_append_fmt(&builder, "  spn {:fg brightcyan} <subcommand>", SP_FMT_CSTR(parent_cmd_name));
+    sp_str_builder_new_line(&builder);
+    sp_str_builder_new_line(&builder);
+
+    sp_tui_begin_table(&spn.tui);
+    sp_tui_table_setup_column(&spn.tui, sp_str_lit("Subcommand"));
+    sp_tui_table_setup_column(&spn.tui, sp_str_lit("Arguments"));
+    sp_tui_table_setup_column(&spn.tui, sp_str_lit("Description"));
+    sp_tui_table_header_row(&spn.tui);
+
+    sp_dyn_array_for(info.commands, it) {
+      spn_cli_command_info_t command = info.commands[it];
+      sp_str_t args = sp_str_join_n(command.brief, sp_dyn_array_size(command.brief), sp_str_lit(", "));
+
+      sp_tui_table_next_row(&spn.tui);
+      sp_tui_table_fmt(&spn.tui, "{:fg brightcyan}", SP_FMT_STR(command.name));
+      sp_tui_table_fmt(&spn.tui, "{:fg brightyellow}", SP_FMT_STR(args));
+      sp_tui_table_str(&spn.tui, command.summary);
+    }
+
+    sp_tui_table_set_indent(&spn.tui, 1);
+    sp_tui_table_end(&spn.tui);
+    sp_str_t table = sp_tui_render(&spn.tui);
+
+    sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(table));
+  }
+
+  return sp_str_builder_move(&builder);
+}
+
 void spn_cli_run() {
   spn_cli_t* cli = &spn.cli;
 
@@ -5597,83 +5758,48 @@ void spn_cli_update(spn_cli_t* cli) {
   spn_app_update(cmd->package);
 }
 
+void spn_tool_cmd_install(spn_cli_t* cli) {
+  spn_cli_tool_install_t* cmd = &cli->tool.install;
+
+  SP_LOG("tool install: package={}, force={}, version={}",
+    SP_FMT_STR(cmd->package),
+    SP_FMT_U32(cmd->force),
+    SP_FMT_STR(cmd->version));
+
+  // TODO: Implement tool install functionality
+  // 1. Build the package
+  // 2. Find binaries in the package
+  // 3. Symlink them to ~/.local/bin
+}
+
+void spn_tool_cmd_run(spn_cli_t* cli) {
+  spn_cli_tool_run_t* cmd = &cli->tool.run;
+
+  SP_LOG("tool run: package={}, command={}",
+    SP_FMT_STR(cmd->package),
+    SP_FMT_STR(cmd->command));
+
+  // TODO: Implement tool run functionality
+  // 1. Find the package binary
+  // 2. Execute it with the given command
+}
+
 void spn_cli_tool(spn_cli_t* cli) {
-  // Check for help flag manually since this is a command with subcommands
-  for (u32 i = 0; i < cli->num_args; i++) {
-    if (sp_cstr_equal(cli->args[i], "--help") || sp_cstr_equal(cli->args[i], "-h")) {
-      cli->help = true;
+  // Dispatch based on tag union subcommand
+  switch (cli->tool.subcommand) {
+    case SPN_TOOL_INSTALL: {
+      spn_tool_cmd_install(cli);
       break;
     }
-  }
-
-  spn_cli_usage_t usage = {
-    .summary = "Run, install, and manage binaries defined by spn packages",
-    .commands = {
-      {
-        .name = "install",
-        .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package to install" } },
-        .summary = "Install a package's binary targets to the PATH"
-      },
-      {
-        .name = "uninstall",
-        .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package to uninstall" } },
-        .summary = "Uninstall a package's binary targets to the PATH"
-      },
-      {
-        .name = "run",
-        .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package to run" } },
-        .summary = "Run a package's binary; if a package exports more than one, run the first"
-      },
-      {
-        .name = "list",
-        .summary = "List installed tools"
-      },
-      {
-        .name = "upgrade",
-        .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The tool to upgrade" } },
-        .summary = "Upgrade a tool to the latest version"
-      },
-    }
-  };
-  sp_str_t help = spn_cli_usage(&usage);
-
-  if (!cli->num_args || !cli->args[0]) {
-    sp_log(help);
-    SP_EXIT_FAILURE();
-  }
-
-  spn_tool_cmd_t cmd = spn_tool_subcommand_from_str(sp_str_view(cli->args[0]));
-  switch (cmd) {
-    case SPN_TOOL_INSTALL: {
-      spn_cli_command_usage_t usage = {
-        .name = "install",
-        .summary = "Install a package's binary targets to the PATH",
-        .opts = {
-          { .brief = "f", .name = "force", .kind = SPN_CLI_OPT_KIND_BOOLEAN, .summary = "Force reinstall even if already installed" },
-          { .brief = "v", .name = "version", .kind = SPN_CLI_OPT_KIND_STRING, .summary = "Specific version to install", .placeholder = "VERSION" }
-        },
-        .args = {
-          { "package", SPN_CLI_ARG_KIND_REQUIRED, "The package to install" }
-        }
-      };
-      sp_str_t install_help = spn_cli_command_usage(usage);
-
-      if (cli->help) {
-        sp_log(install_help);
-        SP_EXIT_SUCCESS();
-      }
-
-      spn_cli_assert_num_args(cli, 2, install_help);
-
-      sp_str_t tool = spn_cli_get_arg(cli, 1);
-      spn_tool_install(tool);
+    case SPN_TOOL_RUN: {
+      spn_tool_cmd_run(cli);
       break;
     }
     default: {
+      // Other subcommands not yet implemented
       break;
     }
   }
-  SP_EXIT_SUCCESS();
 }
 
 void spn_cli_print(spn_cli_t* cli) {
