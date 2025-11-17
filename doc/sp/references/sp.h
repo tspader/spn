@@ -194,15 +194,6 @@ extern char** environ;
 #define SP_EXIT_SUCCESS() exit(0)
 #define SP_EXIT_FAILURE() exit(1)
 #define SP_ASSERT(condition) assert((condition))
-#define SP_ASSERT_FMT(COND, FMT, ...) \
-  do { \
-    if (!(COND)) { \
-      const c8* condition = SP_MACRO_STR(COND); \
-      sp_str_t message = sp_format((FMT), ##__VA_ARGS__); \
-      SP_LOG("SP_ASSERT({:color red}): {}", SP_FMT_CSTR(condition), SP_FMT_STR(message)); \
-      SP_EXIT_FAILURE(); \
-    } \
-  } while (0)
 #define SP_FATAL(FMT, ...) \
   do { \
     sp_str_t message = sp_format((FMT), ##__VA_ARGS__); \
@@ -214,10 +205,21 @@ extern char** environ;
 #define SP_UNREACHABLE_CASE() SP_ASSERT(false); break;
 #define SP_UNREACHABLE_RETURN(v) SP_ASSERT(false); return (v)
 #define SP_BROKEN() SP_ASSERT(false)
+#define SP_ASSERT_FMT(COND, FMT, ...) \
+  do { \
+    if (!(COND)) { \
+      const c8* condition = SP_MACRO_STR(COND); \
+      sp_str_t message = sp_format((FMT), ##__VA_ARGS__); \
+      SP_LOG("SP_ASSERT({:color red}): {}", SP_FMT_CSTR(condition), SP_FMT_STR(message)); \
+      SP_EXIT_FAILURE(); \
+    } \
+  } while (0)
 #define SP_UNTESTED()
 #define SP_INCOMPLETE()
 
 #define SP_TYPEDEF_FN(return_type, name, ...) typedef return_type(*name)(__VA_ARGS__)
+
+#define SP_UNUSED(x) ((void)(x))
 
 #define SP_PRINTF_U8 "%hhu"
 #define SP_PRINTF_U16 "%hu"
@@ -258,7 +260,7 @@ extern char** environ;
 #define SP_X_NAMED_ENUM_CASE_TO_CSTR(ID, NAME)         case ID: { return (NAME); }
 #define SP_X_NAMED_ENUM_CASE_TO_STRING(ID, NAME)       case ID: { return sp_str_lit(NAME); }
 #define SP_X_NAMED_ENUM_CASE_TO_STRING_UPPER(ID, NAME) case ID: { return sp_str_to_upper(sp_str_lit(NAME)); }
-#define SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER(ID, NAME) case ID: { return sp_str_to_lower(sp_str_LIT(NAME)); }
+#define SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER(ID, NAME) case ID: { return sp_str_to_lower(sp_str_lit(NAME)); }
 #define SP_X_NAMED_ENUM_DEFINE(ID, NAME) ID,
 #define SP_X_NAMED_ENUM_STR_TO_ENUM(ID, NAME) if (sp_str_equal(str, SP_LIT(NAME))) return ID;
 
@@ -275,8 +277,6 @@ extern char** environ;
 #ifndef SP_IMP
   #define SP_IMP
 #endif
-
-#define SP_UNUSED(x) ((void)(x))
 
 #define SP_ANSI_RESET             "\033[0m"
 #define SP_ANSI_BOLD              "\033[1m"
@@ -361,6 +361,7 @@ typedef enum {
   SP_ERR_IO_CLOSE_FAILED,
   SP_ERR_IO_READ_FAILED,
   SP_ERR_LAZY,
+  SP_ERR_OS,
 } sp_err_t;
 
 void sp_err_set(sp_err_t err);
@@ -380,12 +381,12 @@ typedef enum {
 
 SP_TYPEDEF_FN(
   void*,
-  sp_alloc_fn_t,
+  sp_allocator_fn_t,
   void* user_data, sp_allocator_mode_t mode, u32 size, void* ptr
 );
 
 typedef struct sp_allocator_t {
-  sp_alloc_fn_t on_alloc;
+  sp_allocator_fn_t on_alloc;
   void* user_data;
 } sp_allocator_t;
 
@@ -459,26 +460,7 @@ SP_API void sp_fixed_array_clear(sp_fixed_array_t* fixed_array);
 SP_API u32  sp_fixed_array_byte_size(sp_fixed_array_t* fixed_array);
 SP_API u8*  sp_fixed_array_at(sp_fixed_array_t* fixed_array, u32 index);
 
-///////////////////
-// DYNAMIC ARRAY //
-///////////////////
-typedef struct {
-  u8* data;
-  u32 size;
-  u32 capacity;
-  u32 element_size;
-} sp_dynamic_array_t;
 
-#define sp_dynamic_array(t) sp_dynamic_array_t
-
-SP_API void sp_dynamic_array_init(sp_dynamic_array_t* arr, u32 element_size);
-SP_API u8*  sp_dynamic_array_push(sp_dynamic_array_t* arr, void* data);
-SP_API u8*  sp_dynamic_array_push_n(sp_dynamic_array_t* arr, void* data, u32 count);
-SP_API u8*  sp_dynamic_array_reserve(sp_dynamic_array_t* arr, u32 count);
-SP_API void sp_dynamic_array_clear(sp_dynamic_array_t* arr);
-SP_API u32  sp_dynamic_array_byte_size(sp_dynamic_array_t* arr);
-SP_API u8*  sp_dynamic_array_at(sp_dynamic_array_t* arr, u32 index);
-SP_API void sp_dynamic_array_grow(sp_dynamic_array_t* arr, u32 capacity);
 
 ///////////////////
 // DYNAMIC ARRAY //
@@ -494,6 +476,23 @@ void sp_dyn_array_push_f(void** arr, void* val, u32 val_len);
 
 #define sp_dyn_array(T) T*
 #define sp_da(T) T*
+
+#define sp_da_for(__ARR, __IT) sp_dyn_array_for(__ARR, __IT)
+#define sp_da_head(__ARR) sp_dyn_array_head(__ARR)
+#define sp_da_size(__ARR) sp_dyn_array_size(__ARR)
+#define sp_da_capacity(__ARR) sp_dyn_array_capacity(__ARR)
+#define sp_da_empty(__ARR) sp_dyn_array_empty(__ARR)
+#define sp_da_full(__ARR) sp_dyn_array_full(__ARR)
+#define sp_da_clear(__ARR) sp_dyn_array_clear(__ARR)
+#define sp_da_free(__ARR) sp_dyn_array_free(__ARR)
+#define sp_da_need_grow(__ARR, __N) sp_dyn_array_need_grow(__ARR, __N)
+#define sp_da_grow(__ARR) sp_dyn_array_grow(__ARR)
+#define sp_da_push(__ARR, __VAL) sp_dyn_array_push(__ARR, __VAL)
+#define sp_da_reserve(__ARR, __AMOUNT) sp_dyn_array_reserve(__ARR, __AMOUNT)
+#define sp_da_pop(__ARR) sp_dyn_array_pop(__ARR)
+#define sp_da_back(__ARR) sp_dyn_array_back(__ARR)
+#define sp_da_new(__T) sp_dyn_array_new(__T)
+
 #define sp_dyn_array_for(__ARR, __IT) for (u32 __IT = 0; __IT < sp_dyn_array_size((__ARR)); __IT++)
 
 #define sp_dyn_array_head(__ARR)\
@@ -563,6 +562,7 @@ void sp_dyn_array_push_f(void** arr, void* val, u32 val_len);
 #define sp_dyn_array_new(__T)\
     ((__T*)sp_dyn_array_resize_impl(NULL, sizeof(__T), 0))
 
+#define sp_dyn_array_sort(arr, fn) qsort(arr, sp_dyn_array_size(arr), sizeof((arr)[0]), fn)
 
 ////////////////
 // HASH TABLE //
@@ -751,6 +751,9 @@ typedef struct {
 #define sp_ht_for(__ht, __it)\
   for (sp_ht_it __it = sp_ht_it_init(__ht); sp_ht_it_valid(__ht, __it); sp_ht_it_advance(__ht, __it))
 
+#define sp_ht_front(__ht)\
+  ((__ht) == NULL || !sp_ht_it_valid(__ht, sp_ht_it_init(__ht)) ? NULL : sp_ht_it_getp(__ht, sp_ht_it_init(__ht)))
+
 #define sp_ht_tmp_key_index(__HT) sp_ht_get_key_index_fn((void**)&((__HT)->data), (void*)&((__HT)->tmp_key), (__HT)->info)
 
 u32        sp_ht_get_key_index_fn(void** data, void* key, sp_ht_info_t info);
@@ -773,44 +776,44 @@ typedef struct {
   u32 head;
   u32 size;
   u32 capacity;
-} sp_rb_t;
+} sp_ring_buffer_t;
 
-#define sp_rb(t) sp_rb_t
+#define sp_ring_buffer(t) sp_ring_buffer_t
 
 typedef struct {
   s32 index;
   bool reverse;
-  sp_rb_t* buffer;
+  sp_ring_buffer_t* buffer;
 } sp_rb_it_t;
 
-SP_API void*                     sp_rb_at(sp_rb_t* buffer, u32 index);
-SP_API void                      sp_rb_init(sp_rb_t* buffer, u32 capacity, u32 element_size);
-SP_API void*                     sp_rb_back(sp_rb_t* buffer);
-SP_API void*                     sp_rb_push(sp_rb_t* buffer, void* data);
-SP_API void*                     sp_rb_push_zero(sp_rb_t* buffer);
-SP_API void*                     sp_rb_push_overwrite(sp_rb_t* buffer, void* data);
-SP_API void*                     sp_rb_push_overwrite_zero(sp_rb_t* buffer);
-SP_API void*                     sp_rb_pop(sp_rb_t* buffer);
-SP_API u32                       sp_rb_bytes(sp_rb_t* buffer);
-SP_API void                      sp_rb_clear(sp_rb_t* buffer);
-SP_API void                      sp_rb_destroy(sp_rb_t* buffer);
-SP_API bool                      sp_rb_is_full(sp_rb_t* buffer);
-SP_API bool                      sp_rb_is_empty(sp_rb_t* buffer);
-SP_API void*                     sp_rb_it_deref(sp_rb_it_t* it);
-SP_API void                      sp_rb_it_next(sp_rb_it_t* it);
-SP_API void                      sp_rb_it_prev(sp_rb_it_t* it);
-SP_API bool                      sp_rb_it_done(sp_rb_it_t* it);
-SP_API sp_rb_it_t sp_rb_it(sp_rb_t* buffer);
-SP_API sp_rb_it_t sp_rb_riter(sp_rb_t* buffer);
+SP_API void*      sp_ring_buffer_at(sp_ring_buffer_t* buffer, u32 index);
+SP_API void       sp_ring_buffer_init(sp_ring_buffer_t* buffer, u32 capacity, u32 element_size);
+SP_API void*      sp_ring_buffer_back(sp_ring_buffer_t* buffer);
+SP_API void*      sp_ring_buffer_push(sp_ring_buffer_t* buffer, void* data);
+SP_API void*      sp_ring_buffer_push_zero(sp_ring_buffer_t* buffer);
+SP_API void*      sp_ring_buffer_push_overwrite(sp_ring_buffer_t* buffer, void* data);
+SP_API void*      sp_ring_buffer_push_overwrite_zero(sp_ring_buffer_t* buffer);
+SP_API void*      sp_ring_buffer_pop(sp_ring_buffer_t* buffer);
+SP_API u32        sp_ring_buffer_bytes(sp_ring_buffer_t* buffer);
+SP_API void       sp_ring_buffer_clear(sp_ring_buffer_t* buffer);
+SP_API void       sp_ring_buffer_destroy(sp_ring_buffer_t* buffer);
+SP_API bool       sp_ring_buffer_is_full(sp_ring_buffer_t* buffer);
+SP_API bool       sp_ring_buffer_is_empty(sp_ring_buffer_t* buffer);
+SP_API void*      sp_rb_it_getvp(sp_rb_it_t* it);
+SP_API void       sp_rb_it_next(sp_rb_it_t* it);
+SP_API void       sp_rb_it_prev(sp_rb_it_t* it);
+SP_API bool       sp_rb_it_done(sp_rb_it_t* it);
+SP_API sp_rb_it_t sp_rb_it_new(sp_ring_buffer_t* buffer);
+SP_API sp_rb_it_t sp_rb_rit_new(sp_ring_buffer_t* buffer);
 
-#define sp_rb_for(rb, it)  for (sp_rb_it_t (it) = sp_rb_it(&(rb)); !sp_rb_it_done(&(it)); sp_rb_it_next(&(it)))
-#define sp_rb_rfor(rb, it) for (sp_rb_it_t (it) = sp_rb_riter(&(rb)); !sp_rb_it_done(&(it)); sp_rb_it_prev(&(it)))
-#define sp_rb_it(it, t) ((t*)sp_rb_it_deref(&(it)))
+#define sp_ring_buffer_for(rb, it)  for (sp_rb_it_t (it) = sp_rb_it_new(&(rb)); !sp_rb_it_done(&(it)); sp_rb_it_next(&(it)))
+#define sp_ring_buffer_rfor(rb, it) for (sp_rb_it_t (it) = sp_rb_rit_new(&(rb)); !sp_rb_it_done(&(it)); sp_rb_it_prev(&(it)))
+#define sp_rb_it_getp(it, t) ((t*)sp_rb_it_getvp((it)))
 
-#define sp_rb_push_literal(__RB_PTR, __TYPE, __VALUE) \
+#define sp_ring_buffer_push_literal(__RB_PTR, __TYPE, __VALUE) \
     do { \
         __TYPE __sp_rb_tmp = (__VALUE); \
-        sp_rb_push((__RB_PTR), &__sp_rb_tmp); \
+        sp_ring_buffer_push((__RB_PTR), &__sp_rb_tmp); \
     } while (0)
 
 
@@ -879,87 +882,93 @@ SP_TYPEDEF_FN(void, sp_str_reduce_fn_t, sp_str_reduce_context_t* context);
 #define sp_str(STR, LEN) SP_RVAL(sp_str_t) { .len = (u32)(LEN), .data = (const c8*)(STR) }
 #define SP_STR(STR, LEN) sp_str(STR, LEN)
 #define SP_LIT(STR) sp_str_lit(STR)
+#define sp_str_for(str, it) for (u32 it = 0; it < str.len; it++)
 
-SP_API void     sp_str_builder_grow(sp_str_builder_t* builder, u32 requested_capacity);
-SP_API void     sp_str_builder_add_capacity(sp_str_builder_t* builder, u32 amount);
-SP_API void     sp_str_builder_indent(sp_str_builder_t* builder);
-SP_API void     sp_str_builder_dedent(sp_str_builder_t* builder);
-SP_API void     sp_str_builder_append(sp_str_builder_t* builder, sp_str_t str);
-SP_API void     sp_str_builder_append_cstr(sp_str_builder_t* builder, const c8* str);
-SP_API void     sp_str_builder_append_c8(sp_str_builder_t* builder, c8 c);
-SP_API void     sp_str_builder_append_fmt_str(sp_str_builder_t* builder, sp_str_t fmt, ...);
-SP_API void     sp_str_builder_append_fmt(sp_str_builder_t* builder, const c8* fmt, ...);
-SP_API void     sp_str_builder_new_line(sp_str_builder_t* builder);
-SP_API sp_str_t sp_str_builder_move(sp_str_builder_t* builder);
-SP_API sp_str_t sp_str_builder_write(sp_str_builder_t* builder);
-SP_API c8*      sp_str_builder_write_cstr(sp_str_builder_t* builder);
-
-SP_API c8*                    sp_cstr_copy(const c8* str);
-SP_API void                   sp_cstr_copy_to(const c8* str, c8* buffer, u32 buffer_length);
-SP_API c8*                    sp_cstr_copy_sized(const c8* str, u32 length);
-SP_API void                   sp_cstr_copy_to_sized(const c8* str, u32 length, c8* buffer, u32 buffer_length);
-SP_API bool                   sp_cstr_equal(const c8* a, const c8* b);
-SP_API u32                    sp_cstr_len(const c8* str);
-SP_API u32                    sp_cstr_len_sized(const c8* str, u32 n);
-SP_API c8*                    sp_wstr_to_cstr(c16* str, u32 len);
-SP_API c8*                    sp_str_to_cstr(sp_str_t str);
-SP_API c8*                    sp_str_to_cstr_double_nt(sp_str_t str);
-SP_API sp_str_t               sp_str_copy(sp_str_t str);
-SP_API void                   sp_str_copy_to(sp_str_t str, c8* buffer, u32 capacity);
-SP_API sp_str_t               sp_str_null_terminate(sp_str_t str);
-SP_API sp_str_t               sp_str_from_cstr(const c8* str);
-SP_API sp_str_t               sp_str_from_cstr_sized(const c8* str, u32 length);
-SP_API sp_str_t               sp_str_from_cstr_null(const c8* str);
-SP_API sp_str_t               sp_str_alloc(u32 capacity);
-SP_API sp_str_t               sp_str_view(const c8* cstr);
-SP_API bool                   sp_str_empty(sp_str_t);
-SP_API bool                   sp_str_equal(sp_str_t a, sp_str_t b);
-SP_API bool                   sp_str_equal_cstr(sp_str_t a, const c8* b);
-SP_API bool                   sp_str_starts_with(sp_str_t str, sp_str_t prefix);
-SP_API bool                   sp_str_ends_with(sp_str_t str, sp_str_t suffix);
-SP_API bool                   sp_str_contains(sp_str_t str, sp_str_t needle);
-SP_API bool                   sp_str_valid(sp_str_t str);
-SP_API c8                     sp_str_at(sp_str_t str, s32 index);
-SP_API c8                     sp_str_at_reverse(sp_str_t str, s32 index);
-SP_API c8                     sp_str_back(sp_str_t str);
-SP_API s32                    sp_str_compare_alphabetical(sp_str_t a, sp_str_t b);
-SP_API sp_str_t               sp_str_sub(sp_str_t str, s32 index, s32 len);
-SP_API sp_str_t               sp_str_sub_reverse(sp_str_t str, s32 index, s32 len);
-SP_API sp_str_t               sp_str_concat(sp_str_t a, sp_str_t b);
-SP_API sp_str_t               sp_str_replace_c8(sp_str_t str, c8 from, c8 to);
-SP_API sp_str_t               sp_str_pad(sp_str_t str, u32 n);
-SP_API sp_str_t               sp_str_trim(sp_str_t str);
-SP_API sp_str_t               sp_str_trim_right(sp_str_t str);
-SP_API sp_str_t               sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer);
-SP_API sp_str_t               sp_str_join(sp_str_t a, sp_str_t b, sp_str_t join);
-SP_API sp_str_t               sp_str_join_cstr_n(const c8** strings, u32 num_strings, sp_str_t join);
-SP_API sp_str_t               sp_str_to_upper(sp_str_t str);
-SP_API sp_str_t               sp_str_to_lower(sp_str_t str);
-SP_API sp_str_t               sp_str_capitalize_words(sp_str_t str);
-SP_API sp_str_pair_t          sp_str_cleave_c8(sp_str_t str, c8 delimiter);
+SP_API void            sp_str_builder_grow(sp_str_builder_t* builder, u32 requested_capacity);
+SP_API void            sp_str_builder_add_capacity(sp_str_builder_t* builder, u32 amount);
+SP_API void            sp_str_builder_indent(sp_str_builder_t* builder);
+SP_API void            sp_str_builder_dedent(sp_str_builder_t* builder);
+SP_API void            sp_str_builder_append(sp_str_builder_t* builder, sp_str_t str);
+SP_API void            sp_str_builder_append_cstr(sp_str_builder_t* builder, const c8* str);
+SP_API void            sp_str_builder_append_c8(sp_str_builder_t* builder, c8 c);
+SP_API void            sp_str_builder_append_fmt_str(sp_str_builder_t* builder, sp_str_t fmt, ...);
+SP_API void            sp_str_builder_append_fmt(sp_str_builder_t* builder, const c8* fmt, ...);
+SP_API void            sp_str_builder_new_line(sp_str_builder_t* builder);
+SP_API sp_str_t        sp_str_builder_move(sp_str_builder_t* builder);
+SP_API sp_str_t        sp_str_builder_write(sp_str_builder_t* builder);
+SP_API c8*             sp_str_builder_write_cstr(sp_str_builder_t* builder);
+SP_API c8*             sp_cstr_copy(const c8* str);
+SP_API void            sp_cstr_copy_to(const c8* str, c8* buffer, u32 buffer_length);
+SP_API c8*             sp_cstr_copy_sized(const c8* str, u32 length);
+SP_API void            sp_cstr_copy_to_sized(const c8* str, u32 length, c8* buffer, u32 buffer_length);
+SP_API bool            sp_cstr_equal(const c8* a, const c8* b);
+SP_API u32             sp_cstr_len(const c8* str);
+SP_API u32             sp_cstr_len_sized(const c8* str, u32 n);
+SP_API c8*             sp_wstr_to_cstr(c16* str, u32 len);
+SP_API c8*             sp_str_to_cstr(sp_str_t str);
+SP_API c8*             sp_str_to_cstr_double_nt(sp_str_t str);
+SP_API sp_str_t        sp_str_copy(sp_str_t str);
+SP_API void            sp_str_copy_to(sp_str_t str, c8* buffer, u32 capacity);
+SP_API sp_str_t        sp_str_null_terminate(sp_str_t str);
+SP_API sp_str_t        sp_str_from_cstr(const c8* str);
+SP_API sp_str_t        sp_str_from_cstr_sized(const c8* str, u32 length);
+SP_API sp_str_t        sp_str_from_cstr_null(const c8* str);
+SP_API sp_str_t        sp_str_alloc(u32 capacity);
+SP_API sp_str_t        sp_str_view(const c8* cstr);
+SP_API bool            sp_str_empty(sp_str_t);
+SP_API bool            sp_str_equal(sp_str_t a, sp_str_t b);
+SP_API bool            sp_str_equal_cstr(sp_str_t a, const c8* b);
+SP_API bool            sp_str_starts_with(sp_str_t str, sp_str_t prefix);
+SP_API bool            sp_str_ends_with(sp_str_t str, sp_str_t suffix);
+SP_API bool            sp_str_contains(sp_str_t str, sp_str_t needle);
+SP_API bool            sp_str_valid(sp_str_t str);
+SP_API c8              sp_str_at(sp_str_t str, s32 index);
+SP_API c8              sp_str_at_reverse(sp_str_t str, s32 index);
+SP_API c8              sp_str_back(sp_str_t str);
+SP_API s32             sp_str_compare_alphabetical(sp_str_t a, sp_str_t b);
+SP_API sp_str_t        sp_str_prefix(sp_str_t str, s32 len);
+SP_API sp_str_t        sp_str_suffix(sp_str_t str, s32 len);
+SP_API sp_str_t        sp_str_sub(sp_str_t str, s32 index, s32 len);
+SP_API sp_str_t        sp_str_sub_reverse(sp_str_t str, s32 index, s32 len);
+SP_API sp_str_t        sp_str_concat(sp_str_t a, sp_str_t b);
+SP_API sp_str_t        sp_str_replace_c8(sp_str_t str, c8 from, c8 to);
+SP_API sp_str_t        sp_str_pad(sp_str_t str, u32 n);
+SP_API sp_str_t        sp_str_trim_left(sp_str_t str);
+SP_API sp_str_t        sp_str_trim_right(sp_str_t str);
+SP_API sp_str_t        sp_str_trim(sp_str_t str);
+SP_API sp_str_t        sp_str_strip_left(sp_str_t str, sp_str_t strip);
+SP_API sp_str_t        sp_str_strip_right(sp_str_t str, sp_str_t strip);
+SP_API sp_str_t        sp_str_strip(sp_str_t str, sp_str_t strip);
+SP_API sp_str_t        sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer);
+SP_API sp_str_t        sp_str_join(sp_str_t a, sp_str_t b, sp_str_t join);
+SP_API sp_str_t        sp_str_join_cstr_n(const c8** strings, u32 num_strings, sp_str_t join);
+SP_API sp_str_t        sp_str_to_upper(sp_str_t str);
+SP_API sp_str_t        sp_str_to_lower(sp_str_t str);
+SP_API sp_str_t        sp_str_capitalize_words(sp_str_t str);
+SP_API sp_str_pair_t   sp_str_cleave_c8(sp_str_t str, c8 delimiter);
 SP_API sp_da(sp_str_t) sp_str_split_c8(sp_str_t, c8 c);
-SP_API bool                   sp_str_contains_n(sp_str_t* strs, u32 n, sp_str_t needle);
-SP_API sp_str_t               sp_str_join_n(sp_str_t* strs, u32 n, sp_str_t joiner);
-SP_API u32                    sp_str_count_n(sp_str_t* strs, u32 n, sp_str_t needle);
-SP_API sp_str_t               sp_str_find_longest_n(sp_str_t* strs, u32 n);
-SP_API sp_str_t               sp_str_find_shortest_n(sp_str_t* strs, u32 n);
+SP_API bool            sp_str_contains_n(sp_str_t* strs, u32 n, sp_str_t needle);
+SP_API sp_str_t        sp_str_join_n(sp_str_t* strs, u32 n, sp_str_t joiner);
+SP_API u32             sp_str_count_n(sp_str_t* strs, u32 n, sp_str_t needle);
+SP_API sp_str_t        sp_str_find_longest_n(sp_str_t* strs, u32 n);
+SP_API sp_str_t        sp_str_find_shortest_n(sp_str_t* strs, u32 n);
 SP_API sp_da(sp_str_t) sp_str_pad_to_longest(sp_str_t* strs, u32 n);
-SP_API sp_str_t               sp_str_reduce(sp_str_t* strs, u32 n, void* user_data, sp_str_reduce_fn_t fn);
-SP_API void                   sp_str_reduce_kernel_join(sp_str_reduce_context_t* context);
-SP_API void                   sp_str_reduce_kernel_contains(sp_str_reduce_context_t* context);
-SP_API void                   sp_str_reduce_kernel_count(sp_str_reduce_context_t* context);
-SP_API void                   sp_str_reduce_kernel_longest(sp_str_reduce_context_t* context);
-SP_API void                   sp_str_reduce_kernel_shortest(sp_str_reduce_context_t* context);
+SP_API sp_str_t        sp_str_reduce(sp_str_t* strs, u32 n, void* user_data, sp_str_reduce_fn_t fn);
+SP_API void            sp_str_reduce_kernel_join(sp_str_reduce_context_t* context);
+SP_API void            sp_str_reduce_kernel_contains(sp_str_reduce_context_t* context);
+SP_API void            sp_str_reduce_kernel_count(sp_str_reduce_context_t* context);
+SP_API void            sp_str_reduce_kernel_longest(sp_str_reduce_context_t* context);
+SP_API void            sp_str_reduce_kernel_shortest(sp_str_reduce_context_t* context);
 SP_API sp_da(sp_str_t) sp_str_map(sp_str_t* s, u32 n, sp_opaque_ptr user_data, sp_str_map_fn_t fn);
-SP_API sp_str_t               sp_str_map_kernel_prepend(sp_str_map_context_t* context);
-SP_API sp_str_t               sp_str_map_kernel_append(sp_str_map_context_t* context);
-SP_API sp_str_t               sp_str_map_kernel_prefix(sp_str_map_context_t* context);
-SP_API sp_str_t               sp_str_map_kernel_trim(sp_str_map_context_t* context);
-SP_API sp_str_t               sp_str_map_kernel_pad(sp_str_map_context_t* context);
-SP_API sp_str_t               sp_str_map_kernel_to_upper(sp_str_map_context_t* context);
-SP_API sp_str_t               sp_str_map_kernel_to_lower(sp_str_map_context_t* context);
-SP_API sp_str_t               sp_str_map_kernel_capitalize_words(sp_str_map_context_t* context);
-SP_API s32                    sp_str_sort_kernel_alphabetical(const void* a, const void* b);
+SP_API sp_str_t        sp_str_map_kernel_prepend(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_append(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_prefix(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_trim(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_pad(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_to_upper(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_to_lower(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_capitalize_words(sp_str_map_context_t* context);
+SP_API s32             sp_str_sort_kernel_alphabetical(const void* a, const void* b);
 
 
 // ████████╗██╗███╗   ███╗███████╗
@@ -1066,8 +1075,8 @@ struct sp_file_monitor {
 	sp_file_change_event_t events_to_watch;
 	void* userdata;
 	u32 debounce_time_ms;
-	sp_dynamic_array_t changes;
-	sp_dynamic_array_t cache;
+	sp_dyn_array(sp_file_change_t) changes;
+	sp_dyn_array(sp_cache_entry_t) cache;
   sp_opaque_ptr os;
 };
 
@@ -1126,8 +1135,8 @@ SP_API sp_cache_entry_t* sp_file_monitor_find_cache_entry(sp_file_monitor_t* mon
 #ifdef SP_LINUX
   typedef struct {
     s32 fd;
-    sp_dynamic_array_t watch_descs;
-    sp_dynamic_array_t watch_paths;
+    sp_dyn_array(s32) watch_descs;
+    sp_dyn_array(sp_str_t) watch_paths;
     u8 buffer[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
   } sp_os_linux_file_monitor_t;
 
@@ -1142,8 +1151,9 @@ SP_API sp_cache_entry_t* sp_file_monitor_find_cache_entry(sp_file_monitor_t* mon
 
 typedef enum {
   SP_OS_FILE_ATTR_NONE = 0,
-  SP_OS_FILE_ATTR_REGULAR_FILE = 1,
-  SP_OS_FILE_ATTR_DIRECTORY = 2,
+  SP_OS_FILE_ATTR_REGULAR_FILE = (1 << 0),
+  SP_OS_FILE_ATTR_DIRECTORY    = (1 << 1),
+  SP_OS_FILE_ATTR_SYMLINK      = (1 << 2),
 } sp_os_file_attr_t;
 
 typedef enum {
@@ -1164,6 +1174,12 @@ typedef enum {
   SP_OS_LIB_STATIC,
 } sp_os_lib_kind_t;
 
+typedef enum {
+  SP_OS_LINK_HARD,
+  SP_OS_LINK_SYMBOLIC,
+  SP_OS_LINK_COPY,
+} sp_os_link_kind_t;
+
 typedef struct {
   s32 year;
   s32 month;
@@ -1178,60 +1194,66 @@ typedef struct {
   sp_str_t file_path;
   sp_str_t file_name;
   sp_os_file_attr_t attributes;
-} sp_os_dir_entry_t;
+} sp_os_dir_ent_t;
 
-SP_API void*                    sp_os_allocate_memory(u32 size);
-SP_API void*                    sp_os_reallocate_memory(void* ptr, u32 size);
-SP_API void                     sp_os_free_memory(void* ptr);
-SP_API void                     sp_os_copy_memory(const void* source, void* dest, u32 num_bytes);
-SP_API void                     sp_os_move_memory(const void* source, void* dest, u32 num_bytes);
-SP_API bool                     sp_os_is_memory_equal(const void* a, const void* b, size_t len);
-SP_API void                     sp_os_fill_memory(void* buffer, u32 buffer_size, void* fill, u32 fill_size);
-SP_API void                     sp_os_fill_memory_u8(void* buffer, u32 buffer_size, u8 fill);
-SP_API void                     sp_os_zero_memory(void* buffer, u32 buffer_size);
-SP_API sp_os_platform_kind_t    sp_os_platform_kind();
-SP_API sp_str_t                 sp_os_platform_name();
-SP_API void                     sp_os_sleep_ms(f64 ms);
-SP_API c8*                      sp_os_wstr_to_cstr(c16* str, u32 len);
-SP_API void                     sp_os_print(sp_str_t message);
-SP_API void                     sp_os_log(sp_str_t message);
-SP_API sp_str_t                 sp_os_lib_kind_to_extension(sp_os_lib_kind_t kind);
-SP_API sp_str_t                 sp_os_lib_to_file_name(sp_str_t lib, sp_os_lib_kind_t kind);
+SP_API void*                  sp_os_allocate_memory(u32 size);
+SP_API void*                  sp_os_reallocate_memory(void* ptr, u32 size);
+SP_API void                   sp_os_free_memory(void* ptr);
+SP_API void                   sp_os_copy_memory(const void* source, void* dest, u32 num_bytes);
+SP_API void                   sp_os_move_memory(const void* source, void* dest, u32 num_bytes);
+SP_API bool                   sp_os_is_memory_equal(const void* a, const void* b, size_t len);
+SP_API void                   sp_os_fill_memory(void* buffer, u32 buffer_size, void* fill, u32 fill_size);
+SP_API void                   sp_os_fill_memory_u8(void* buffer, u32 buffer_size, u8 fill);
+SP_API void                   sp_os_zero_memory(void* buffer, u32 buffer_size);
+SP_API sp_os_platform_kind_t  sp_os_platform_kind();
+SP_API sp_str_t               sp_os_platform_name();
+SP_API void                   sp_os_sleep_ms(f64 ms);
+SP_API c8*                    sp_os_wstr_to_cstr(c16* str, u32 len);
+SP_API void                   sp_os_print(sp_str_t message);
+SP_API void                   sp_os_log(sp_str_t message);
+SP_API sp_str_t               sp_os_lib_kind_to_extension(sp_os_lib_kind_t kind);
+SP_API sp_str_t               sp_os_lib_to_file_name(sp_str_t lib, sp_os_lib_kind_t kind);
 
-SP_API bool                     sp_os_is_regular_file(sp_str_t path);
-SP_API bool                     sp_os_is_directory(sp_str_t path);
-SP_API bool                     sp_os_is_path_root(sp_str_t path);
-SP_API bool                     sp_os_is_glob(sp_str_t path);
-SP_API bool                     sp_os_is_program_on_path(sp_str_t program);
-SP_API bool                     sp_os_does_path_exist(sp_str_t path);
-SP_API void                     sp_os_create_directory(sp_str_t path);
-SP_API void                     sp_os_remove_directory(sp_str_t path);
-SP_API void                     sp_os_create_file(sp_str_t path);
-SP_API void                     sp_os_remove_file(sp_str_t path);
-SP_API void                     sp_os_copy(sp_str_t from, sp_str_t to);
-SP_API void                     sp_os_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to);
-SP_API void                     sp_os_copy_file(sp_str_t from, sp_str_t to);
-SP_API void                     sp_os_copy_directory(sp_str_t from, sp_str_t to);
-SP_API sp_da(sp_os_dir_entry_t) sp_os_scan_directory(sp_str_t path);
-SP_API sp_str_t                 sp_os_normalize_path(sp_str_t path);
-SP_API void                     sp_os_normalize_path_soft(sp_str_t* path);
-SP_API sp_str_t                 sp_os_parent_path(sp_str_t path);
-SP_API sp_str_t                 sp_os_join_path(sp_str_t a, sp_str_t b);
-SP_API sp_str_t                 sp_os_extract_extension(sp_str_t path);
-SP_API sp_str_t                 sp_os_extract_stem(sp_str_t path);
-SP_API sp_str_t                 sp_os_extract_file_name(sp_str_t path);
-SP_API sp_str_t                 sp_os_get_cwd();
-SP_API sp_str_t                 sp_os_get_executable_path();
-SP_API sp_str_t                 sp_os_get_storage_path();
-SP_API sp_str_t                 sp_os_get_config_path();
-SP_API sp_str_t                 sp_os_canonicalize_path(sp_str_t path);
-SP_API sp_tm_epoch_t            sp_os_file_mod_time_precise(sp_str_t path);
-SP_API sp_os_file_attr_t        sp_os_file_attributes(sp_str_t path);
-SP_IMP sp_os_file_attr_t        sp_os_winapi_attr_to_sp_attr(u32 attr);
-SP_IMP void                     sp_os_file_monitor_init(sp_file_monitor_t* monitor);
-SP_IMP void                     sp_os_file_monitor_add_directory(sp_file_monitor_t* monitor, sp_str_t path);
-SP_IMP void                     sp_os_file_monitor_add_file(sp_file_monitor_t* monitor, sp_str_t file_path);
-SP_IMP void                     sp_os_file_monitor_process_changes(sp_file_monitor_t* monitor);
+SP_API bool                   sp_os_is_regular_file(sp_str_t path);
+SP_API bool                   sp_os_is_symlink(sp_str_t path);
+SP_API bool                   sp_os_is_directory(sp_str_t path);
+SP_API bool                   sp_os_is_target_regular_file(sp_str_t path);
+SP_API bool                   sp_os_is_target_directory(sp_str_t path);
+SP_API bool                   sp_os_is_path_root(sp_str_t path);
+SP_API bool                   sp_os_is_glob(sp_str_t path);
+SP_API bool                   sp_os_is_program_on_path(sp_str_t program);
+SP_API bool                   sp_os_does_path_exist(sp_str_t path);
+SP_API void                   sp_os_create_directory(sp_str_t path);
+SP_API void                   sp_os_remove_directory(sp_str_t path);
+SP_API void                   sp_os_create_file(sp_str_t path);
+SP_API void                   sp_os_remove_file(sp_str_t path);
+SP_API sp_err_t               sp_os_copy(sp_str_t from, sp_str_t to);
+SP_API void                   sp_os_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to);
+SP_API void                   sp_os_copy_file(sp_str_t from, sp_str_t to);
+SP_API void                   sp_os_copy_directory(sp_str_t from, sp_str_t to);
+SP_API sp_err_t               sp_os_create_hard_link(sp_str_t target, sp_str_t link_path);
+SP_API sp_err_t               sp_os_create_symbolic_link(sp_str_t target, sp_str_t link_path);
+SP_API sp_err_t               sp_os_link(sp_str_t from, sp_str_t to, sp_os_link_kind_t kind);
+SP_API sp_da(sp_os_dir_ent_t) sp_os_scan_directory(sp_str_t path);
+SP_API sp_str_t               sp_os_normalize_path(sp_str_t path);
+SP_API void                   sp_os_normalize_path_soft(sp_str_t* path);
+SP_API sp_str_t               sp_os_parent_path(sp_str_t path);
+SP_API sp_str_t               sp_os_join_path(sp_str_t a, sp_str_t b);
+SP_API sp_str_t               sp_os_extract_extension(sp_str_t path);
+SP_API sp_str_t               sp_os_extract_stem(sp_str_t path);
+SP_API sp_str_t               sp_os_extract_file_name(sp_str_t path);
+SP_API sp_str_t               sp_os_get_cwd();
+SP_API sp_str_t               sp_os_get_executable_path();
+SP_API sp_str_t               sp_os_get_storage_path();
+SP_API sp_str_t               sp_os_get_config_path();
+SP_API sp_str_t               sp_os_canonicalize_path(sp_str_t path);
+SP_API sp_tm_epoch_t          sp_os_file_mod_time_precise(sp_str_t path);
+SP_API sp_os_file_attr_t      sp_os_get_file_attrs(sp_str_t path);
+SP_IMP sp_os_file_attr_t      sp_os_winapi_attr_to_sp_attr(u32 attr);
+SP_IMP void                   sp_os_file_monitor_init(sp_file_monitor_t* monitor);
+SP_IMP void                   sp_os_file_monitor_add_directory(sp_file_monitor_t* monitor, sp_str_t path);
+SP_IMP void                   sp_os_file_monitor_add_file(sp_file_monitor_t* monitor, sp_str_t file_path);
+SP_IMP void                   sp_os_file_monitor_process_changes(sp_file_monitor_t* monitor);
 
 
 // ████████╗██╗  ██╗██████╗ ███████╗ █████╗ ██████╗ ██╗███╗   ██╗ ██████╗
@@ -1629,7 +1651,6 @@ SP_IMP void sp_ps_set_blocking(s32 fd);
  SP_FMT_X(hash_short, sp_hash_t) \
  SP_FMT_X(str_builder, sp_str_builder_t) \
  SP_FMT_X(fixed_array, sp_fixed_array_t) \
- SP_FMT_X(dynamic_array, sp_dynamic_array_t) \
  SP_FMT_X(quoted_str, sp_str_t) \
  SP_FMT_X(color, const c8*) \
 
@@ -1807,10 +1828,10 @@ struct sp_asset_registry {
   sp_thread_t thread;
   bool shutdown_requested;
 
-  sp_da(sp_asset_t) assets;
-  sp_da(sp_asset_importer_t) importers;
-  sp_rb(sp_asset_import_context_t) import_queue;
-  sp_rb(sp_asset_import_context_t) completion_queue;
+  sp_dyn_array(sp_asset_t) assets;
+  sp_dyn_array(sp_asset_importer_t) importers;
+  sp_ring_buffer(sp_asset_import_context_t) import_queue;
+  sp_ring_buffer(sp_asset_import_context_t) completion_queue;
 };
 
 void                  sp_asset_registry_init(sp_asset_registry_t* registry, sp_asset_registry_config_t config);
@@ -2724,15 +2745,7 @@ void sp_fmt_format_fixed_array(sp_str_builder_t* builder, sp_format_arg_t* arg) 
   sp_str_builder_append_cstr(builder, " }");
 }
 
-void sp_fmt_format_dynamic_array(sp_str_builder_t* builder, sp_format_arg_t* arg) {
-  sp_dynamic_array_t arr = arg->dynamic_array_value;
 
-  sp_str_builder_append_cstr(builder, "{ size: ");
-  sp_fmt_format_unsigned(builder, arr.size, 10);
-  sp_str_builder_append_cstr(builder, ", capacity: ");
-  sp_fmt_format_unsigned(builder, arr.capacity, 10);
-  sp_str_builder_append_cstr(builder, " }");
-}
 
 void sp_fmt_format_quoted_str(sp_str_builder_t* builder, sp_format_arg_t* arg) {
   sp_str_t value = arg->quoted_str_value;
@@ -3356,6 +3369,14 @@ sp_str_t sp_str_join_cstr_n(const c8** strings, u32 num_strings, sp_str_t join) 
   return sp_str_builder_write(&builder);
 }
 
+sp_str_t sp_str_prefix(sp_str_t str, s32 len) {
+  return sp_str_sub(str, 0, len);
+}
+
+sp_str_t sp_str_suffix(sp_str_t str, s32 len) {
+  return sp_str_sub(str, str.len - len, len);
+}
+
 sp_str_t sp_str_sub(sp_str_t str, s32 index, s32 len) {
   sp_str_t substr = {
     .len = (u32)len,
@@ -3559,10 +3580,10 @@ sp_str_t sp_str_replace_c8(sp_str_t str, c8 from, c8 to) {
   return sp_str_builder_write(&builder);
 }
 
-sp_da(sp_str_t) sp_str_split_c8(sp_str_t str, c8 delimiter) {
+sp_dyn_array(sp_str_t) sp_str_split_c8(sp_str_t str, c8 delimiter) {
   if (sp_str_empty(str)) return SP_NULLPTR;
 
-  sp_da(sp_str_t) result = SP_NULLPTR;
+  sp_dyn_array(sp_str_t) result = SP_NULLPTR;
 
   u32 i = 0, j = 0;
   for (; j < str.len; j++) {
@@ -3613,23 +3634,49 @@ sp_str_t sp_str_trim_right(sp_str_t str) {
   return str;
 }
 
+sp_str_t sp_str_trim_left(sp_str_t str) {
+  sp_str_t trimmed = str;
+
+  sp_str_for(str, it) {
+    c8 c = sp_str_at(str, it);
+
+    switch (c) {
+      case ' ':
+      case '\t':
+      case '\r':
+      case '\n': {
+        trimmed.data++; trimmed.len--;
+        break;
+      }
+      default: {
+        return trimmed;
+      }
+    }
+  }
+
+  return trimmed;
+}
+
 sp_str_t sp_str_trim(sp_str_t str) {
-  u32 start = 0;
-  u32 end = str.len;
+  sp_str_t trimmed = str;
+  trimmed = sp_str_trim_left(trimmed);
+  trimmed = sp_str_trim_right(trimmed);
+  return trimmed;
+}
 
-  while (start < str.len) {
-    c8 c = str.data[start];
-    if (c != ' ' && c != '\t' && c != '\n' && c != '\r') break;
-    start++;
-  }
+sp_str_t sp_str_strip_left(sp_str_t str, sp_str_t strip) {
+  if (!sp_str_starts_with(str, strip)) return str;
+  return sp_str_suffix(str, str.len - strip.len);
+}
 
-  while (end > start) {
-    c8 c = str.data[end - 1];
-    if (c != ' ' && c != '\t' && c != '\n' && c != '\r') break;
-    end--;
-  }
+sp_str_t sp_str_strip_right(sp_str_t str, sp_str_t strip) {
+  if (!sp_str_ends_with(str, strip)) return str;
+  return sp_str_prefix(str, str.len - strip.len);
+}
 
-  return sp_str_sub(str, start, end - start);
+sp_str_t sp_str_strip(sp_str_t str, sp_str_t strip) {
+  sp_str_t result = sp_str_strip_left(str, strip);
+  return sp_str_strip_right(result, strip);
 }
 
 sp_str_t sp_str_to_upper(sp_str_t str) {
@@ -3697,8 +3744,8 @@ sp_str_t sp_str_truncate(sp_str_t str, u32 n, sp_str_t trailer) {
   return sp_str_concat(str, trailer);
 }
 
-sp_da(sp_str_t) sp_str_map(sp_str_t* strs, u32 num_strs, sp_opaque_ptr user_data, sp_str_map_fn_t fn) {
-  sp_da(sp_str_t) results = SP_NULLPTR;
+sp_dyn_array(sp_str_t) sp_str_map(sp_str_t* strs, u32 num_strs, sp_opaque_ptr user_data, sp_str_map_fn_t fn) {
+  sp_dyn_array(sp_str_t) results = SP_NULLPTR;
 
   for (u32 index = 0; index < num_strs; index++) {
     sp_str_map_context_t context = SP_ZERO_INITIALIZE();
@@ -3821,7 +3868,7 @@ sp_str_t sp_str_find_shortest_n(sp_str_t* strs, u32 n) {
   return shortest;
 }
 
-sp_da(sp_str_t) sp_str_pad_to_longest(sp_str_t* strs, u32 n) {
+sp_dyn_array(sp_str_t) sp_str_pad_to_longest(sp_str_t* strs, u32 n) {
   sp_str_t longest = sp_str_find_longest_n(strs, n);
   return sp_str_map(strs, n, &longest.len, sp_str_map_kernel_pad);
 }
@@ -3829,62 +3876,7 @@ sp_da(sp_str_t) sp_str_pad_to_longest(sp_str_t* strs, u32 n) {
 
 ///////////////////
 // DYNAMIC ARRAY //
-///////////////////
-void sp_dynamic_array_init(sp_dynamic_array_t* arr, u32 element_size) {
-  SP_ASSERT(arr);
-
-  arr->size = 0;
-  arr->capacity = 2;
-  arr->element_size = element_size;
-  arr->data = (u8*)sp_alloc(arr->capacity * element_size);
-}
-
-u8* sp_dynamic_array_at(sp_dynamic_array_t* arr, u32 index) {
-  SP_ASSERT(arr);
-  return arr->data + (index * arr->element_size);
-}
-
-u8* sp_dynamic_array_push(sp_dynamic_array_t* arr, void* data) {
-  return sp_dynamic_array_push_n(arr, data, 1);
-}
-
-u8* sp_dynamic_array_push_n(sp_dynamic_array_t* arr, void* data, u32 count) {
-  SP_ASSERT(arr);
-
-  u8* reserved = sp_dynamic_array_reserve(arr, count);
-  if (data) sp_os_copy_memory(data, reserved, arr->element_size * count);
-  return reserved;
-}
-
-u8* sp_dynamic_array_reserve(sp_dynamic_array_t* arr, u32 count) {
-  SP_ASSERT(arr);
-
-  sp_dynamic_array_grow(arr, arr->size + count);
-
-  u8* element = sp_dynamic_array_at(arr, arr->size);
-  arr->size += count;
-  return element;
-}
-
-void sp_dynamic_array_clear(sp_dynamic_array_t* arr) {
-  SP_ASSERT(arr);
-
-  arr->size = 0;
-}
-
-u32 sp_dynamic_array_byte_size(sp_dynamic_array_t* arr) {
-  SP_ASSERT(arr);
-
-  return arr->size * arr->element_size;
-}
-
-void sp_dynamic_array_grow(sp_dynamic_array_t* arr, u32 capacity) {
-  SP_ASSERT(arr);
-
-  if (arr->capacity >= capacity) return;
-  arr->capacity = SP_MAX(arr->capacity * 2, capacity);
-  arr->data = (u8*)sp_realloc(arr->data, arr->capacity * arr->element_size);
-}
+//
 
 
 /////////////////
@@ -4082,6 +4074,16 @@ sp_str_t sp_os_extract_stem(sp_str_t path) {
   return stem;
 }
 
+sp_err_t sp_os_link(sp_str_t from, sp_str_t to, sp_os_link_kind_t kind) {
+  switch (kind) {
+    case SP_OS_LINK_HARD:     return sp_os_create_hard_link(from, to);
+    case SP_OS_LINK_SYMBOLIC: return sp_os_create_symbolic_link(from, to);
+    case SP_OS_LINK_COPY:     return sp_os_copy(from, to);
+  }
+
+  SP_UNREACHABLE_RETURN(SP_ERR_OK);
+}
+
 void sp_spin_pause() {
   #if defined(SP_AMD64)
     #if defined(SP_MSVC)
@@ -4238,6 +4240,24 @@ s32 sp_atomic_s32_get(sp_atomic_s32* value) {
     return attribute & FILE_ATTRIBUTE_DIRECTORY;
   }
 
+  bool sp_os_is_symlink(sp_str_t path) {
+    sp_win32_dword_t attr = GetFileAttributesA(sp_str_to_cstr(path));
+    if (attr == INVALID_FILE_ATTRIBUTES) return false;
+    return (attr & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+  }
+
+  bool sp_os_is_target_regular_file(sp_str_t path) {
+    sp_win32_dword_t attribute = GetFileAttributesA(sp_str_to_cstr(path));
+    if (attribute == INVALID_FILE_ATTRIBUTES) return false;
+    return !(attribute & FILE_ATTRIBUTE_DIRECTORY);
+  }
+
+  bool sp_os_is_target_directory(sp_str_t path) {
+    sp_win32_dword_t attribute = GetFileAttributesA(sp_str_to_cstr(path));
+    if (attribute == INVALID_FILE_ATTRIBUTES) return false;
+    return attribute & FILE_ATTRIBUTE_DIRECTORY;
+  }
+
   bool sp_os_is_path_root(sp_str_t path) {
     if (path.len == 0) return true;
     if (path.len == 1 && path.data[0] == '/') return true;
@@ -4284,7 +4304,14 @@ s32 sp_atomic_s32_get(sp_atomic_s32* value) {
   }
 
   void sp_os_remove_file(sp_str_t path) {
-    DeleteFileA(sp_str_to_cstr(path));
+    sp_win32_dword_t attr = GetFileAttributesA(sp_str_to_cstr(path));
+    if (attr != INVALID_FILE_ATTRIBUTES &&
+        (attr & FILE_ATTRIBUTE_REPARSE_POINT) &&
+        (attr & FILE_ATTRIBUTE_DIRECTORY)) {
+      RemoveDirectoryA(sp_str_to_cstr(path));
+    } else {
+      DeleteFileA(sp_str_to_cstr(path));
+    }
   }
 
   bool sp_os_is_glob(sp_str_t path) {
@@ -4304,17 +4331,19 @@ s32 sp_atomic_s32_get(sp_atomic_s32* value) {
     return output.status.exit_code == 0;
   }
 
-  void sp_os_copy(sp_str_t from, sp_str_t to) {
+  sp_err_t sp_os_copy(sp_str_t from, sp_str_t to) {
     if (sp_os_is_glob(from)) {
       sp_os_copy_glob(sp_os_parent_path(from), sp_os_extract_file_name(from), to);
     }
-    else if (sp_os_is_directory(from)) {
-      SP_ASSERT(sp_os_is_directory(to));
-      sp_os_copy_glob(from, sp_str_lit("*"), sp_os_join_path(to, sp_os_extract_stem(from)));
+    else if (sp_os_is_target_directory(from)) {
+      SP_ASSERT(sp_os_is_target_directory(to));
+      sp_os_copy_glob(from, sp_str_lit("*"), sp_os_join_path(to, sp_os_extract_file_name(from)));
     }
-    else if (sp_os_is_regular_file(from)) {
+    else if (sp_os_is_target_regular_file(from)) {
       sp_os_copy_file(from, to);
     }
+
+    return SP_ERR_OK;
   }
 
   void sp_os_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to) {
@@ -4371,12 +4400,12 @@ s32 sp_atomic_s32_get(sp_atomic_s32* value) {
     sp_os_copy_glob(from, sp_str_lit("*"), to);
   }
 
-  sp_da(sp_os_dir_entry_t) sp_os_scan_directory(sp_str_t path) {
+  sp_da(sp_os_dir_ent_t) sp_os_scan_directory(sp_str_t path) {
     if (!sp_os_is_directory(path) || !sp_os_does_path_exist(path)) {
       return SP_NULLPTR;
     }
 
-    sp_da(sp_os_dir_entry_t) entries = SP_NULLPTR;
+    sp_dyn_array(sp_os_dir_ent_t) entries = SP_NULLPTR;
 
     sp_str_builder_t builder = SP_ZERO_INITIALIZE();
     sp_str_builder_append(&builder, path);
@@ -4400,10 +4429,10 @@ s32 sp_atomic_s32_get(sp_atomic_s32* value) {
       sp_str_t file_path = sp_str_builder_write(&entry_builder);
       sp_os_normalize_path(file_path);
 
-      sp_os_dir_entry_t entry = SP_RVAL(sp_os_dir_entry_t) {
+      sp_os_dir_ent_t entry = SP_RVAL(sp_os_dir_ent_t) {
         .file_path = file_path,
         .file_name = sp_str_from_cstr(find_data.cFileName),
-        .attributes = sp_os_file_attributes(file_path),
+        .attributes = sp_os_get_file_attrs(file_path),
       };
       sp_dyn_array_push(entries, entry);
     } while (FindNextFile(handle, &find_data));
@@ -4541,15 +4570,15 @@ s32 sp_atomic_s32_get(sp_atomic_s32* value) {
     };
   }
 
-  sp_os_file_attr_t sp_os_file_attributes(sp_str_t path) {
+  sp_os_file_attr_t sp_os_get_file_attrs(sp_str_t path) {
     return sp_os_winapi_attr_to_sp_attr(GetFileAttributesA(sp_str_to_cstr(path)));
   }
 
   sp_os_file_attr_t sp_os_winapi_attr_to_sp_attr(u32 attr) {
-    u32 result = SP_OS_FILE_ATTR_NONE;
-    if ( (attr & FILE_ATTRIBUTE_DIRECTORY)) result |= SP_OS_FILE_ATTR_DIRECTORY;
-    if (!(attr & FILE_ATTRIBUTE_DIRECTORY)) result |= SP_OS_FILE_ATTR_REGULAR_FILE;
-    return (sp_os_file_attr_t)result;
+    if (attr == INVALID_FILE_ATTRIBUTES) return SP_OS_FILE_ATTR_NONE;
+    if (attr & FILE_ATTRIBUTE_REPARSE_POINT) return SP_OS_FILE_ATTR_SYMLINK;
+    if (attr & FILE_ATTRIBUTE_DIRECTORY) return SP_OS_FILE_ATTR_DIRECTORY;
+    return SP_OS_FILE_ATTR_REGULAR_FILE;
   }
 
   bool sp_os_is_memory_equal(const void* a, const void* b, size_t len) {
@@ -4777,16 +4806,36 @@ s32 sp_atomic_s32_get(sp_atomic_s32* value) {
   bool sp_os_is_regular_file(sp_str_t path) {
     struct stat st;
     c8* path_cstr = sp_str_to_cstr(path);
-    s32 result = stat(path_cstr, &st);
+    s32 result = lstat(path_cstr, &st);
     if (result != 0) return false;
     return S_ISREG(st.st_mode);
+  }
+
+  bool sp_os_is_symlink(sp_str_t path) {
+    struct stat st;
+    c8* path_cstr = sp_str_to_cstr(path);
+    s32 result = lstat(path_cstr, &st);
+    if (result != 0) return false;
+    return S_ISLNK(st.st_mode);
   }
 
   bool sp_os_is_directory(sp_str_t path) {
     struct stat st;
     c8* path_cstr = sp_str_to_cstr(path);
-    s32 result = stat(path_cstr, &st);
+    s32 result = lstat(path_cstr, &st);
     if (result != 0) return false;
+    return S_ISDIR(st.st_mode);
+  }
+
+  bool sp_os_is_target_regular_file(sp_str_t path) {
+    struct stat st;
+    if (stat(sp_str_to_cstr(path), &st) != 0) return false;
+    return S_ISREG(st.st_mode);
+  }
+
+  bool sp_os_is_target_directory(sp_str_t path) {
+    struct stat st;
+    if (stat(sp_str_to_cstr(path), &st) != 0) return false;
     return S_ISDIR(st.st_mode);
   }
 
@@ -4798,15 +4847,16 @@ s32 sp_atomic_s32_get(sp_atomic_s32* value) {
   }
 
   void sp_os_remove_directory(sp_str_t path) {
-    sp_da(sp_os_dir_entry_t) entries = sp_os_scan_directory(path);
+    sp_da(sp_os_dir_ent_t) entries = sp_os_scan_directory(path);
 
     sp_dyn_array_for(entries, i) {
-      sp_os_dir_entry_t* entry = &entries[i];
+      sp_os_dir_ent_t* entry = &entries[i];
 
-      if (sp_os_is_directory(entry->file_path)) {
+      if (sp_os_is_symlink(entry->file_path)) {
+        sp_os_remove_file(entry->file_path);
+      } else if (sp_os_is_directory(entry->file_path)) {
         sp_os_remove_directory(entry->file_path);
-      }
-      if (sp_os_is_regular_file(entry->file_path)) {
+      } else if (sp_os_is_regular_file(entry->file_path)) {
         sp_os_remove_file(entry->file_path);
       }
     }
@@ -4862,26 +4912,28 @@ s32 sp_atomic_s32_get(sp_atomic_s32* value) {
     return output.status.exit_code == 0;
   }
 
-  void sp_os_copy(sp_str_t from, sp_str_t to) {
+  sp_err_t sp_os_copy(sp_str_t from, sp_str_t to) {
     if (sp_os_is_glob(from)) {
       sp_os_copy_glob(sp_os_parent_path(from), sp_os_extract_file_name(from), to);
     }
-    else if (sp_os_is_directory(from)) {
-      SP_ASSERT(sp_os_is_directory(to));
-      sp_os_copy_glob(from, sp_str_lit("*"), sp_os_join_path(to, sp_os_extract_stem(from)));
+    else if (sp_os_is_target_directory(from)) {
+      SP_ASSERT(sp_os_is_target_directory(to));
+      sp_os_copy_glob(from, sp_str_lit("*"), sp_os_join_path(to, sp_os_extract_file_name(from)));
     }
-    else if (sp_os_is_regular_file(from)) {
+    else if (sp_os_is_target_regular_file(from)) {
       sp_os_copy_file(from, to);
     }
+
+    return SP_ERR_OK;
   }
 
   void sp_os_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to) {
     sp_os_create_directory(to);
 
-    sp_da(sp_os_dir_entry_t) entries = sp_os_scan_directory(from);
+    sp_da(sp_os_dir_ent_t) entries = sp_os_scan_directory(from);
 
     sp_dyn_array_for(entries, i) {
-      sp_os_dir_entry_t* entry = &entries[i];
+      sp_os_dir_ent_t* entry = &entries[i];
       sp_str_t entry_name = entry->file_name;
 
       bool matches = sp_str_equal(glob, sp_str_lit("*"));
@@ -4929,12 +4981,12 @@ s32 sp_atomic_s32_get(sp_atomic_s32* value) {
     sp_os_copy_glob(from, sp_str_lit("*"), to);
   }
 
-  sp_da(sp_os_dir_entry_t) sp_os_scan_directory(sp_str_t path) {
+  sp_da(sp_os_dir_ent_t) sp_os_scan_directory(sp_str_t path) {
     if (!sp_os_is_directory(path) || !sp_os_does_path_exist(path)) {
       return SP_NULLPTR;
     }
 
-    sp_da(sp_os_dir_entry_t) entries = SP_NULLPTR;
+    sp_dyn_array(sp_os_dir_ent_t) entries = SP_NULLPTR;
 
     c8* path_cstr = sp_str_to_cstr(path);
     DIR* dir = opendir(path_cstr);
@@ -4955,12 +5007,12 @@ s32 sp_atomic_s32_get(sp_atomic_s32* value) {
       sp_str_t file_path = sp_str_builder_write(&entry_builder);
       sp_os_normalize_path(file_path);
 
-      sp_os_dir_entry_t dir_entry = {
+      sp_os_dir_ent_t dir_ent = {
         .file_path = file_path,
         .file_name = sp_str_from_cstr(entry->d_name),
-        .attributes = sp_os_file_attributes(file_path),
+        .attributes = sp_os_get_file_attrs(file_path),
       };
-      sp_dyn_array_push(entries, dir_entry);
+      sp_dyn_array_push(entries, dir_ent);
     }
 
     closedir(dir);
@@ -5121,17 +5173,19 @@ s32 sp_atomic_s32_get(sp_atomic_s32* value) {
     return result;
   }
 
-  sp_os_file_attr_t sp_os_file_attributes(sp_str_t path) {
-    struct stat st;
-    if (stat(sp_str_to_cstr(path), &st) == 0) {
-      if (S_ISDIR(st.st_mode)) {
-        return SP_OS_FILE_ATTR_DIRECTORY;
-      } else if (S_ISREG(st.st_mode)) {
-        return SP_OS_FILE_ATTR_REGULAR_FILE;
-      }
+sp_os_file_attr_t sp_os_get_file_attrs(sp_str_t path) {
+  struct stat st;
+  if (lstat(sp_str_to_cstr(path), &st) == 0) {
+    if (S_ISLNK(st.st_mode)) {
+      return SP_OS_FILE_ATTR_SYMLINK;
+    } else if (S_ISDIR(st.st_mode)) {
+      return SP_OS_FILE_ATTR_DIRECTORY;
+    } else if (S_ISREG(st.st_mode)) {
+      return SP_OS_FILE_ATTR_REGULAR_FILE;
     }
-    return SP_OS_FILE_ATTR_NONE;
   }
+  return SP_OS_FILE_ATTR_NONE;
+}
 
   void sp_os_print(sp_str_t message) {
     write(STDOUT_FILENO, message.data, message.len);
@@ -5316,7 +5370,7 @@ void sp_ps_free_posix_args(c8** args) {
 }
 
 c8** sp_ps_build_posix_env(sp_ps_env_config_t* config) {
-  sp_da(c8*) envp = SP_NULLPTR;
+  sp_dyn_array(c8*) envp = SP_NULLPTR;
 
   sp_env_t env = SP_ZERO_INITIALIZE();
   sp_env_init(&env);
@@ -5566,6 +5620,15 @@ sp_ps_t sp_ps_create(sp_ps_config_t config) {
 }
 
 sp_ps_output_t sp_ps_run(sp_ps_config_t config) {
+  if (config.io.out.mode == SP_PS_IO_MODE_EXISTING || config.io.out.mode == SP_PS_IO_MODE_REDIRECT) {
+    SP_FATAL(
+      "You called sp_ps_run() but your config redirected stdout. sp_ps_run() always creates a new "
+      "file descriptor for stdout, since its purpose is to run a command and capture output without "
+      "the command polluting the parent command's output. If you really wanted this, use sp_ps_create() "
+      "and sp_ps_output(). The failing command was {:fg brightyellow}",
+      SP_FMT_STR(config.command)
+    );
+  }
   config.io.out = (sp_ps_io_stream_config_t) {
     .mode = SP_PS_IO_MODE_CREATE
   };
@@ -5736,6 +5799,20 @@ sp_ps_output_t sp_ps_output(sp_ps_t* proc) {
   }
 
   return result;
+}
+
+sp_err_t sp_os_create_hard_link(sp_str_t target, sp_str_t link_path) {
+  if (link(sp_str_to_cstr(target), sp_str_to_cstr(link_path))) {
+    return SP_ERR_OS;
+  }
+  return SP_ERR_OK;
+}
+
+sp_err_t sp_os_create_symbolic_link(sp_str_t target, sp_str_t link_path) {
+  if (symlink(sp_str_to_cstr(target), sp_str_to_cstr(link_path)) != 0) {
+    return SP_ERR_OS;
+  }
+  return SP_ERR_OK;
 }
 #endif
 
@@ -6045,9 +6122,6 @@ sp_str_t sp_os_get_config_path() {
       linux_monitor->fd = 0;
     }
 
-    sp_dynamic_array_init(&linux_monitor->watch_descs, sizeof(s32));
-    sp_dynamic_array_init(&linux_monitor->watch_paths, sizeof(sp_str_t));
-
     monitor->os = linux_monitor;
   }
 
@@ -6074,9 +6148,8 @@ sp_str_t sp_os_get_config_path() {
     s32 wd = inotify_add_watch(linux_monitor->fd, path_cstr, mask);
 
     if (wd != -1) {
-      sp_dynamic_array_push(&linux_monitor->watch_descs, &wd);
-      sp_str_t path_copy = sp_str_copy(path);
-      sp_dynamic_array_push(&linux_monitor->watch_paths, &path_copy);
+      sp_dyn_array_push(linux_monitor->watch_descs, wd);
+      sp_dyn_array_push(linux_monitor->watch_paths, sp_str_copy(path));
     }
 
   }
@@ -6104,10 +6177,10 @@ sp_str_t sp_os_get_config_path() {
       struct inotify_event* event = (struct inotify_event*)ptr;
 
       // Find which path this watch descriptor corresponds to
-      for (u32 i = 0; i < linux_monitor->watch_descs.size; i++) {
-        s32* wd = (s32*)sp_dynamic_array_at(&linux_monitor->watch_descs, i);
-        if (*wd == event->wd) {
-          sp_str_t* dir_path = (sp_str_t*)sp_dynamic_array_at(&linux_monitor->watch_paths, i);
+      sp_dyn_array_for(linux_monitor->watch_descs, it) {
+        s32 wd = linux_monitor->watch_descs[it];
+        if (wd == event->wd) {
+          sp_str_t dir_path = linux_monitor->watch_paths[it];
 
           // Build full path if there's a filename
           sp_str_t file_name = SP_ZERO_STRUCT(sp_str_t);
@@ -6118,12 +6191,12 @@ sp_str_t sp_os_get_config_path() {
 
             // Build full path
             sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-            sp_str_builder_append(&builder, *dir_path);
+            sp_str_builder_append(&builder, dir_path);
             sp_str_builder_append(&builder, sp_str_lit("/"));
             sp_str_builder_append(&builder, file_name);
             file_path = sp_str_builder_write(&builder);
           } else {
-            file_path = sp_str_copy(*dir_path);
+            file_path = sp_str_copy(dir_path);
             file_name = sp_os_extract_file_name(file_path);
           }
 
@@ -6147,7 +6220,7 @@ sp_str_t sp_os_get_config_path() {
               .events = events,
               .time = 0  // TODO: get actual time
             };
-            sp_dynamic_array_push(&monitor->changes, &change);
+            sp_dyn_array_push(monitor->changes, change);
           }
           break;
         }
@@ -6232,8 +6305,6 @@ void sp_file_monitor_init_debounce(sp_file_monitor_t* monitor, sp_file_change_ca
   monitor->events_to_watch = events;
   monitor->userdata = userdata;
   monitor->debounce_time_ms = debounce_ms;
-  sp_dynamic_array_init(&monitor->changes, sizeof(sp_file_change_t));
-  sp_dynamic_array_init(&monitor->cache, sizeof(sp_cache_entry_t));
   sp_os_file_monitor_init(monitor);
 }
 
@@ -6250,12 +6321,12 @@ void sp_file_monitor_process_changes(sp_file_monitor_t* monitor) {
 }
 
 void sp_file_monitor_emit_changes(sp_file_monitor_t* monitor) {
-  for (u32 i = 0; i < monitor->changes.size; i++) {
-    sp_file_change_t* change = (sp_file_change_t*)sp_dynamic_array_at(&monitor->changes, i);
+  sp_dyn_array_for(monitor->changes, it) {
+    sp_file_change_t* change = &monitor->changes[it];
     monitor->callback(monitor, change, monitor->userdata);
   }
 
-  sp_dynamic_array_clear(&monitor->changes);
+  sp_dyn_array_clear(monitor->changes);
 }
 
 sp_cache_entry_t* sp_file_monitor_find_cache_entry(sp_file_monitor_t* monitor, sp_str_t file_path) {
@@ -6263,8 +6334,8 @@ sp_cache_entry_t* sp_file_monitor_find_cache_entry(sp_file_monitor_t* monitor, s
   sp_hash_t file_hash = sp_hash_cstr(file_path_cstr);
 
   sp_cache_entry_t* found = NULL;
-  for (u32 i = 0; i < monitor->cache.size; i++) {
-    sp_cache_entry_t* entry = (sp_cache_entry_t*)sp_dynamic_array_at(&monitor->cache, i);
+  for (u32 i = 0; i < sp_dyn_array_size(monitor->cache); i++) {
+    sp_cache_entry_t* entry = &monitor->cache[i];
     if (entry->hash == file_hash) {
       found = entry;
       break;
@@ -6272,7 +6343,8 @@ sp_cache_entry_t* sp_file_monitor_find_cache_entry(sp_file_monitor_t* monitor, s
   }
 
   if (!found) {
-    found = (sp_cache_entry_t*)sp_dynamic_array_push(&monitor->cache, NULL);
+    sp_dyn_array_push(monitor->cache, SP_ZERO_STRUCT(sp_cache_entry_t));
+    found = &monitor->cache[sp_dyn_array_size(monitor->cache) - 1];
     found->hash = file_hash;
   }
 
@@ -6290,11 +6362,11 @@ bool sp_file_monitor_check_cache(sp_file_monitor_t* monitor, sp_str_t file_path,
 ////////////////////////////
 // RING BUFFER IMPLEMENTATION
 ////////////////////////////
-void* sp_rb_at(sp_rb_t* buffer, u32 index) {
+void* sp_ring_buffer_at(sp_ring_buffer_t* buffer, u32 index) {
     return buffer->data + ((buffer->head + buffer->element_size * index) % (buffer->capacity * buffer->element_size));
 }
 
-void sp_rb_init(sp_rb_t* buffer, u32 capacity, u32 element_size) {
+void sp_ring_buffer_init(sp_ring_buffer_t* buffer, u32 capacity, u32 element_size) {
     buffer->size = 0;
     buffer->head = 0;
     buffer->capacity = capacity;
@@ -6303,40 +6375,40 @@ void sp_rb_init(sp_rb_t* buffer, u32 capacity, u32 element_size) {
     sp_os_zero_memory(buffer->data, capacity * element_size);
 }
 
-void* sp_rb_back(sp_rb_t* buffer) {
+void* sp_ring_buffer_back(sp_ring_buffer_t* buffer) {
     SP_ASSERT(buffer->size);
-    return sp_rb_at(buffer, buffer->size - 1);
+    return sp_ring_buffer_at(buffer, buffer->size - 1);
 }
 
-void* sp_rb_push(sp_rb_t* buffer, void* data) {
+void* sp_ring_buffer_push(sp_ring_buffer_t* buffer, void* data) {
     SP_ASSERT(buffer->size < buffer->capacity);
 
     u32 index = (buffer->head + buffer->size * buffer->element_size) % (buffer->capacity * buffer->element_size);
     sp_os_copy_memory(data, buffer->data + index, buffer->element_size);
     buffer->size += 1;
-    return sp_rb_back(buffer);
+    return sp_ring_buffer_back(buffer);
 }
 
-void* sp_rb_push_zero(sp_rb_t* buffer) {
+void* sp_ring_buffer_push_zero(sp_ring_buffer_t* buffer) {
     SP_ASSERT(buffer->size < buffer->capacity);
 
     u32 index = (buffer->head + buffer->size * buffer->element_size) % (buffer->capacity * buffer->element_size);
     sp_os_zero_memory(buffer->data + index, buffer->element_size);
     buffer->size += 1;
-    return sp_rb_back(buffer);
+    return sp_ring_buffer_back(buffer);
 }
 
-void* sp_rb_push_overwrite(sp_rb_t* buffer, void* data) {
-    if (buffer->size == buffer->capacity) sp_rb_pop(buffer);
-    return sp_rb_push(buffer, data);
+void* sp_ring_buffer_push_overwrite(sp_ring_buffer_t* buffer, void* data) {
+    if (buffer->size == buffer->capacity) sp_ring_buffer_pop(buffer);
+    return sp_ring_buffer_push(buffer, data);
 }
 
-void* sp_rb_push_overwrite_zero(sp_rb_t* buffer) {
-    if (buffer->size == buffer->capacity) sp_rb_pop(buffer);
-    return sp_rb_push_zero(buffer);
+void* sp_ring_buffer_push_overwrite_zero(sp_ring_buffer_t* buffer) {
+    if (buffer->size == buffer->capacity) sp_ring_buffer_pop(buffer);
+    return sp_ring_buffer_push_zero(buffer);
 }
 
-void* sp_rb_pop(sp_rb_t* buffer) {
+void* sp_ring_buffer_pop(sp_ring_buffer_t* buffer) {
     SP_ASSERT(buffer->size);
 
     void* element = buffer->data + buffer->head;
@@ -6345,17 +6417,17 @@ void* sp_rb_pop(sp_rb_t* buffer) {
     return element;
 }
 
-u32 sp_rb_bytes(sp_rb_t* buffer) {
+u32 sp_ring_buffer_bytes(sp_ring_buffer_t* buffer) {
     return buffer->capacity * buffer->element_size;
 }
 
-void sp_rb_clear(sp_rb_t* buffer) {
-    sp_os_zero_memory(buffer->data, sp_rb_bytes(buffer));
+void sp_ring_buffer_clear(sp_ring_buffer_t* buffer) {
+    sp_os_zero_memory(buffer->data, sp_ring_buffer_bytes(buffer));
     buffer->size = 0;
     buffer->head = 0;
 }
 
-void sp_rb_destroy(sp_rb_t* buffer) {
+void sp_ring_buffer_destroy(sp_ring_buffer_t* buffer) {
     if (buffer->data) {
         buffer->data = NULL;
         buffer->size = 0;
@@ -6364,16 +6436,16 @@ void sp_rb_destroy(sp_rb_t* buffer) {
     }
 }
 
-bool sp_rb_is_full(sp_rb_t* buffer) {
+bool sp_ring_buffer_is_full(sp_ring_buffer_t* buffer) {
     return buffer->capacity == buffer->size;
 }
 
-bool sp_rb_is_empty(sp_rb_t* buffer) {
+bool sp_ring_buffer_is_empty(sp_ring_buffer_t* buffer) {
     return buffer->size == 0;
 }
 
-void* sp_rb_it_deref(sp_rb_it_t* it) {
-    return sp_rb_at(it->buffer, it->index);
+void* sp_rb_it_getvp(sp_rb_it_t* it) {
+    return sp_ring_buffer_at(it->buffer, it->index);
 }
 
 void sp_rb_it_next(sp_rb_it_t* it) {
@@ -6391,7 +6463,7 @@ bool sp_rb_it_done(sp_rb_it_t* it) {
     return it->index >= (s32)it->buffer->size;
 }
 
-sp_rb_it_t sp_rb_it(sp_rb_t* buffer) {
+sp_rb_it_t sp_rb_it_new(sp_ring_buffer_t* buffer) {
     sp_rb_it_t iterator;
     iterator.index = 0;
     iterator.reverse = false;
@@ -6399,7 +6471,7 @@ sp_rb_it_t sp_rb_it(sp_rb_t* buffer) {
     return iterator;
 }
 
-sp_rb_it_t sp_rb_riter(sp_rb_t* buffer) {
+sp_rb_it_t sp_rb_rit_new(sp_ring_buffer_t* buffer) {
     sp_rb_it_t iterator;
     iterator.index = buffer->size - 1;
     iterator.reverse = true;
@@ -6652,8 +6724,7 @@ sp_io_stream_t sp_io_from_file(sp_str_t path, sp_io_mode_t mode) {
     sp_err_set(SP_ERR_IO);
     return stream;
   }
-
-  SP_ASSERT(sp_os_is_regular_file(path));
+  SP_ASSERT(sp_os_is_target_regular_file(path));
 
   return stream;
 }
@@ -6762,8 +6833,8 @@ void sp_asset_registry_init(sp_asset_registry_t* registry, sp_asset_registry_con
   sp_semaphore_init(&registry->semaphore);
   registry->shutdown_requested = false;
 
-  sp_rb_init(&registry->import_queue, 128, sizeof(sp_asset_import_context_t));
-  sp_rb_init(&registry->completion_queue, 128, sizeof(sp_asset_import_context_t));
+  sp_ring_buffer_init(&registry->import_queue, 128, sizeof(sp_asset_import_context_t));
+  sp_ring_buffer_init(&registry->completion_queue, 128, sizeof(sp_asset_import_context_t));
 
   for (u32 index = 0; index < SP_ASSET_REGISTRY_CONFIG_MAX_IMPORTERS; index++) {
     sp_asset_importer_config_t* cfg = &config.importers[index];
@@ -6798,8 +6869,8 @@ void sp_asset_registry_shutdown(sp_asset_registry_t* registry) {
 
 void sp_asset_registry_process_completions(sp_asset_registry_t* registry) {
   sp_mutex_lock(&registry->completion_mutex);
-  while (!sp_rb_is_empty(&registry->completion_queue)) {
-    sp_asset_import_context_t context = *((sp_asset_import_context_t*)sp_rb_pop(&registry->completion_queue));
+  while (!sp_ring_buffer_is_empty(&registry->completion_queue)) {
+    sp_asset_import_context_t context = *((sp_asset_import_context_t*)sp_ring_buffer_pop(&registry->completion_queue));
     sp_mutex_unlock(&registry->completion_mutex);
 
     context.importer->on_completion(&context);
@@ -6853,7 +6924,7 @@ sp_future_t* sp_asset_registry_import(sp_asset_registry_t* registry, sp_asset_ki
   };
 
   sp_mutex_lock(&registry->import_mutex);
-  sp_rb_push(&registry->import_queue, &context);
+  sp_ring_buffer_push(&registry->import_queue, &context);
   sp_mutex_unlock(&registry->import_mutex);
 
   sp_semaphore_signal(&registry->semaphore);
@@ -6901,8 +6972,8 @@ s32 sp_asset_registry_thread_fn(void* user_data) {
 
     sp_mutex_lock(&registry->import_mutex);
 
-    while (!sp_rb_is_empty(&registry->import_queue)) {
-      sp_asset_import_context_t context = *((sp_asset_import_context_t*)sp_rb_pop(&registry->import_queue));
+    while (!sp_ring_buffer_is_empty(&registry->import_queue)) {
+      sp_asset_import_context_t context = *((sp_asset_import_context_t*)sp_ring_buffer_pop(&registry->import_queue));
 
       sp_mutex_unlock(&registry->import_mutex);
 
@@ -6914,7 +6985,7 @@ s32 sp_asset_registry_thread_fn(void* user_data) {
       sp_mutex_unlock(&registry->mutex);
 
       sp_mutex_lock(&registry->completion_mutex);
-      sp_rb_push(&registry->completion_queue, &context);
+      sp_ring_buffer_push(&registry->completion_queue, &context);
       sp_mutex_unlock(&registry->completion_mutex);
 
       sp_mutex_lock(&registry->import_mutex);
