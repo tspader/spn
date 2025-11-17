@@ -838,7 +838,7 @@ typedef struct {
   void* ptr;
 } spn_cli_opt_usage_t;
 
-typedef struct spn_cli_command_usage {
+typedef struct {
   const c8* name;
   spn_cli_opt_usage_t opts [SPN_CLI_MAX_OPTS];
   spn_cli_arg_usage_t args [SPN_CLI_MAX_ARGS];
@@ -847,17 +847,9 @@ typedef struct spn_cli_command_usage {
 } spn_cli_command_usage_t;
 
 typedef struct {
-  const c8* name;
   const c8* usage;
   const c8* summary;
   spn_cli_command_usage_t commands [SPN_CLI_MAX_SUBCOMMANDS];
-} spn_cli_tool_usage_t;
-
-typedef struct {
-  const c8* usage;
-  const c8* summary;
-  spn_cli_command_usage_t commands [SPN_CLI_MAX_SUBCOMMANDS];
-  spn_cli_tool_usage_t tools [SPN_CLI_MAX_SUBCOMMANDS];
 } spn_cli_usage_t;
 
 typedef struct {
@@ -897,6 +889,7 @@ typedef struct {
   u32 argc;
   spn_cli_command_usage_t cli;
   bool skip_help;
+  bool stop_at_non_option;  // Stop parsing when we hit first non-option (for global options)
   u32 it;
   sp_str_t positionals[SPN_CLI_MAX_ARGS];
   u32 num_positionals;
@@ -986,9 +979,9 @@ typedef struct {
 typedef struct {
   u32 num_args;
   const c8** args;
-  const c8* project_directory;
-  const c8* project_file;
-  const c8* output;
+  sp_str_t project_directory;
+  sp_str_t project_file;
+  sp_str_t output;
   bool help;
 
   spn_cli_add_t add;
@@ -1952,6 +1945,7 @@ void sp_sh_ls(sp_str_t path) {
 
       sp_ps_output_t result = sp_ps_run(config);
       SP_ASSERT(!result.status.exit_code);
+      printf("%.*s", result.out.len, result.out.data);
       return;
     }
   }
@@ -4572,49 +4566,30 @@ spn_app_t spn_app_load(spn_app_config_t config) {
 
 void spn_init(u32 num_args, const c8** args) {
   spn_cli_t* cli = &spn.cli;
-  cli->args = args;
-  cli->num_args = num_args;
 
-  // Parse global options manually
-  // Start at 1 to skip argv[0] (program name)
-  u32 arg_idx = 1;
-  while (arg_idx < cli->num_args) {
-    const c8* arg = cli->args[arg_idx];
+  // Parse global options using the CLI parser
+  spn_cli_parser_t global_parser = {
+    .argv = (c8**)args + 1,  // Skip argv[0] (program name)
+    .argc = num_args - 1,
+    .stop_at_non_option = true,  // Stop at subcommand name
+    .skip_help = true,  // Don't auto-print help and exit - we handle it below
+    .cli = (spn_cli_command_usage_t) {
+      .name = "spn",
+      .summary = "A package manager and build tool for modern C",
+      .opts = {
+        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print help message", SPN_CLI_NO_PLACEHOLDER, &cli->help },
+        { "C", "project-dir", SPN_CLI_OPT_KIND_STRING, "Specify the directory containing project file", "DIR", &cli->project_directory },
+        { "f", "file", SPN_CLI_OPT_KIND_STRING, "Specify the project file path", "FILE", &cli->project_file },
+        { "o", "output", SPN_CLI_OPT_KIND_STRING, "Output mode: interactive, noninteractive, quiet, none", "MODE", &cli->output }
+      },
+      .args = {}
+    }
+  };
+  spn_cli_parse_command(&global_parser);
 
-    if (sp_cstr_equal(arg, "--help") || sp_cstr_equal(arg, "-h")) {
-      cli->help = true;
-      arg_idx++;
-    }
-    else if (sp_cstr_equal(arg, "--project-dir") || sp_cstr_equal(arg, "-C")) {
-      arg_idx++;
-      if (arg_idx < cli->num_args) {
-        cli->project_directory = cli->args[arg_idx];
-        arg_idx++;
-      }
-    }
-    else if (sp_cstr_equal(arg, "--file") || sp_cstr_equal(arg, "-f")) {
-      arg_idx++;
-      if (arg_idx < cli->num_args) {
-        cli->project_file = cli->args[arg_idx];
-        arg_idx++;
-      }
-    }
-    else if (sp_cstr_equal(arg, "--output") || sp_cstr_equal(arg, "-o")) {
-      arg_idx++;
-      if (arg_idx < cli->num_args) {
-        cli->output = cli->args[arg_idx];
-        arg_idx++;
-      }
-    }
-    else {
-      // Non-option argument - this is the subcommand
-      break;
-    }
-  }
-
-  // Update args to point to remaining arguments (subcommand and its args)
-  cli->args = &args[arg_idx];
-  cli->num_args = num_args - arg_idx;
+  // Update cli args to point to remaining args (subcommand and its args)
+  cli->args = &args[1 + global_parser.it];
+  cli->num_args = num_args - 1 - global_parser.it;
 
   spn_cli_usage_t usage = {
     .summary = "A package manager and build tool for modern C",
@@ -4669,64 +4644,60 @@ void spn_init(u32 num_args, const c8** args) {
       },
       {
         .name = "which",
+        .opts = {
+          { .brief = "d", .name = "dir", .kind = SPN_CLI_OPT_KIND_STRING, .summary = "Which directory to show (store, include, lib, source, work, vendor)", .placeholder = "DIR", .ptr = &cli->which.dir }
+        },
         .args = {
-          { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package name" },
-          { .name = "dir", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The cache directory" }
+          { .name = "package", .kind = SPN_CLI_ARG_KIND_OPTIONAL, .summary = "The package to show path for", .ptr = &cli->which.package }
         },
         .summary = "Print the absolute path of a cache dir for a package"
       },
       {
         .name = "ls",
+        .opts = {
+          { .brief = "d", .name = "dir", .kind = SPN_CLI_OPT_KIND_STRING, .summary = "Which directory to list (store, include, lib, source, work, vendor)", .placeholder = "DIR", .ptr = &cli->ls.dir }
+        },
         .args = {
-          { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package name" },
-          { .name = "dir", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The cache directory" }
+          { .name = "package", .kind = SPN_CLI_ARG_KIND_OPTIONAL, .summary = "The package to list", .ptr = &cli->ls.package }
         },
         .summary = "Run ls against a cache dir for a package (e.g. to see build output)"
       },
       {
-        .name = "manifest",
-        .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package name" } },
-        .summary = "Print the full manifest source for a package",
+        .name = "manigest",
+        .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package name", .ptr = &cli->manifest.package } },
+        .summary = "Print the full manifest source for a package"
       },
-    },
-    .tools = {
-      {
-        .name = "tool",
-        .summary = "Run, install, and manage binaries defined by spn packages",
-        .commands = {
-          {
-            .name = "install",
-            .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package to install" } },
-            .summary = "Install a package's binary targets to the PATH"
-          },
-          {
-            .name = "uninstall",
-            .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package to uninstall" } },
-            .summary = "Uninstall a package's binary targets to the PATH"
-          },
-          {
-            .name = "run",
-            .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package to run" } },
-            .summary = "Run a package's binary; if a package exports more than one, run the first"
-          },
-          {
-            .name = "list",
-            .summary = "List installed tools"
-          },
-          {
-            .name = "upgrade",
-            .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The tool to upgrade" } },
-            .summary = "Upgrade a tool to the latest version"
-          },
-        }
-      }
-    },
+    }
   };
   sp_str_t help = spn_cli_usage(&usage);
 
   if (cli->help || !cli->num_args) {
     sp_log(help);
     SP_EXIT_FAILURE();
+  }
+
+  // Parse command-specific options and arguments
+  sp_str_t cmd_name = sp_str_from_cstr(cli->args[0]);
+  spn_cli_command_usage_t* cmd_schema = NULL;
+
+  // Find matching command in usage
+  for (u32 i = 0; i < SPN_CLI_MAX_SUBCOMMANDS; i++) {
+    if (!usage.commands[i].name) break;
+    if (sp_str_equal_cstr(cmd_name, usage.commands[i].name)) {
+      cmd_schema = &usage.commands[i];
+      break;
+    }
+  }
+
+  // If we found a command schema with options or arguments, parse them
+  if (cmd_schema && (cmd_schema->opts[0].name || cmd_schema->args[0].name)) {
+    spn_cli_parser_t cmd_parser = {
+      .argv = (c8**)cli->args + 1,  // Skip command name
+      .argc = cli->num_args - 1,
+      .cli = *cmd_schema,
+      .skip_help = false
+    };
+    spn_cli_parse_command(&cmd_parser);
   }
 
   sp_atomic_s32_set(&spn.control, 0);
@@ -4982,6 +4953,10 @@ spn_err_t spn_cli_parse_command(spn_cli_parser_t* p) {
     }
     else {
       // Positional argument
+      if (p->stop_at_non_option) {
+        // Stop parsing here - leave remaining args for subcommand
+        break;
+      }
       p->positionals[p->num_positionals++] = arg;
       spn_cli_parser_eat(p);
     }
@@ -5384,23 +5359,8 @@ void spn_cli_copy(spn_cli_t* cli) {
 void spn_cli_ls(spn_cli_t* cli) {
   spn_cli_ls_t* cmd = &cli->ls;
 
-  // Skip the command name itself (first arg)
-  spn_cli_parser_t parser = {
-    .argv = (c8**)cli->args + 1,
-    .argc = cli->num_args - 1,
-    .cli = (spn_cli_command_usage_t) {
-      .name = "ls",
-      .summary = "List files in a package's cache directory",
-      .opts = {
-        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print this message", SPN_CLI_NO_PLACEHOLDER, &cli->help },
-        { "d", "dir", SPN_CLI_OPT_KIND_STRING, "Which directory to list (store, include, lib, source, work, vendor)", "DIR", &cmd->dir }
-      },
-      .args = {
-        { "package", SPN_CLI_ARG_KIND_OPTIONAL, "The package to list", &cmd->package }
-      }
-    }
-  };
-  spn_cli_parse_command(&parser);
+  spn_app_resolve(&app);
+  spn_app_prepare_deps(&app);
 
   if (sp_str_valid(cmd->package)) {
     spn_dep_context_t* dep = spn_cli_assert_dep_exists(cmd->package);
@@ -5426,24 +5386,6 @@ void spn_cli_ls(spn_cli_t* cli) {
 
 void spn_cli_which(spn_cli_t* cli) {
   spn_cli_which_t* cmd = &cli->which;
-
-  // Skip the command name itself (first arg)
-  spn_cli_parser_t parser = {
-    .argv = (c8**)cli->args + 1,
-    .argc = cli->num_args - 1,
-    .cli = (spn_cli_command_usage_t) {
-      .name = "which",
-      .summary = "Print the cache directory for a package",
-      .opts = {
-        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print this message", SPN_CLI_NO_PLACEHOLDER, &cli->help },
-        { "d", "dir", SPN_CLI_OPT_KIND_STRING, "Which directory to show (store, include, lib, source, work, vendor)", "DIR", &cmd->dir }
-      },
-      .args = {
-        { "package", SPN_CLI_ARG_KIND_OPTIONAL, "The package to show path for", &cmd->package }
-      }
-    }
-  };
-  spn_cli_parse_command(&parser);
 
   spn_app_resolve(&app);
   spn_app_prepare_deps(&app);
@@ -5474,22 +5416,8 @@ void spn_cli_which(spn_cli_t* cli) {
 void spn_cli_manifest(spn_cli_t* cli) {
   spn_cli_manifest_t* cmd = &cli->manifest;
 
-  // Skip the command name itself (first arg)
-  spn_cli_parser_t parser = {
-    .argv = (c8**)cli->args + 1,
-    .argc = cli->num_args - 1,
-    .cli = (spn_cli_command_usage_t) {
-      .name = "manifest",
-      .summary = "Print the manifest contents for a package",
-      .opts = {
-        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print this message", SPN_CLI_NO_PLACEHOLDER, &cli->help }
-      },
-      .args = {
-        { "package", SPN_CLI_ARG_KIND_REQUIRED, "The package to show manifest for", &cmd->package }
-      }
-    }
-  };
-  spn_cli_parse_command(&parser);
+  spn_app_resolve(&app);
+  spn_app_prepare_deps(&app);
 
   spn_dep_context_t* dep = spn_cli_assert_dep_exists(cmd->package);
 
@@ -6002,8 +5930,8 @@ void spn_cli_build(spn_cli_t* cli) {
   spn_app_resolve(&app);
   spn_app_prepare_deps(&app);
 
-  spn_tui_mode_t mode = spn.cli.output ?
-    spn_output_mode_from_str(sp_str_view(spn.cli.output)) :
+  spn_tui_mode_t mode = sp_str_valid(spn.cli.output) ?
+    spn_output_mode_from_str(spn.cli.output) :
     SPN_OUTPUT_MODE_QUIET;
 
   sp_ht_for(app.deps, it) {
