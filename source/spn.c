@@ -778,12 +778,15 @@ sp_str_t sp_tui_render(spn_tui_t* tui);
   X(SPN_CLI_INIT, "init") \
   X(SPN_CLI_ADD, "add") \
   X(SPN_CLI_BUILD, "build") \
+  X(SPN_CLI_CLEAN, "clean") \
   X(SPN_CLI_PRINT, "print") \
-  X(SPN_CLI_LINK, "link") \
+  X(SPN_CLI_COPY, "copy") \
   X(SPN_CLI_UPDATE, "update") \
+  X(SPN_CLI_LIST, "list") \
   X(SPN_CLI_WHICH, "which") \
   X(SPN_CLI_LS, "ls") \
-  X(SPN_CLI_MANIFEST, "manifest")
+  X(SPN_CLI_MANIFEST, "manifest") \
+  X(SPN_CLI_TOOL, "tool")
 
 typedef enum {
   SPN_CLI_COMMAND(SP_X_NAMED_ENUM_DEFINE)
@@ -1945,7 +1948,7 @@ void sp_sh_ls(sp_str_t path) {
 
       sp_ps_output_t result = sp_ps_run(config);
       SP_ASSERT(!result.status.exit_code);
-      printf("%.*s", result.out.len, result.out.data);
+      SP_LOG("{}", SP_FMT_STR(sp_str_trim(result.out)));
       return;
     }
   }
@@ -5184,41 +5187,22 @@ void spn_cli_run() {
   if (!cli->num_args || !cli->args || !cli->args[0]) {
     SP_ASSERT(false);
   }
-  else if (sp_cstr_equal("list", cli->args[0])) {
-    spn_cli_list(cli);
-  }
-  else if (sp_cstr_equal("clean", cli->args[0])) {
-    spn_cli_clean(cli);
-  }
-  else if (sp_cstr_equal("build", cli->args[0])) {
-    spn_cli_build(cli);
-  }
-  else if (sp_cstr_equal("copy", cli->args[0])) {
-    spn_cli_copy(cli);
-  }
-  else if (sp_cstr_equal("print", cli->args[0])) {
-    spn_cli_print(cli);
-  }
-  else if (sp_cstr_equal("ls", cli->args[0])) {
-    spn_cli_ls(cli);
-  }
-  else if (sp_cstr_equal("which", cli->args[0])) {
-    spn_cli_which(cli);
-  }
-  else if (sp_cstr_equal("manifest", cli->args[0])) {
-    spn_cli_manifest(cli);
-  }
-  else if (sp_cstr_equal("init", cli->args[0])) {
-    spn_cli_init(cli);
-  }
-  else if (sp_cstr_equal("add", cli->args[0])) {
-    spn_cli_add(cli);
-  }
-  else if (sp_cstr_equal("update", cli->args[0])) {
-    spn_cli_update(cli);
-  }
-  else if (sp_cstr_equal("tool", cli->args[0])) {
-    spn_cli_tool(cli);
+
+  spn_cli_cmd_t cmd = spn_cli_command_from_str(sp_str_from_cstr(cli->args[0]));
+
+  switch (cmd) {
+    case SPN_CLI_INIT: { spn_cli_init(cli); break; }
+    case SPN_CLI_ADD: { spn_cli_add(cli); break; }
+    case SPN_CLI_BUILD: { spn_cli_build(cli); break; }
+    case SPN_CLI_CLEAN: { spn_cli_clean(cli); break; }
+    case SPN_CLI_PRINT: { spn_cli_print(cli); break; }
+    case SPN_CLI_COPY: { spn_cli_copy(cli); break; }
+    case SPN_CLI_UPDATE: { spn_cli_update(cli); break; }
+    case SPN_CLI_LIST: { spn_cli_list(cli); break; }
+    case SPN_CLI_WHICH: { spn_cli_which(cli); break; }
+    case SPN_CLI_LS: { spn_cli_ls(cli); break; }
+    case SPN_CLI_MANIFEST: { spn_cli_manifest(cli); break; }
+    case SPN_CLI_TOOL: { spn_cli_tool(cli); break; }
   }
 }
 
@@ -5816,7 +5800,7 @@ void spn_cli_print(spn_cli_t* cli) {
     SP_LOG("Generated {:fg brightcyan}", SP_FMT_STR(file_path));
   }
   else {
-    printf("%.*s", gen.output.len, gen.output.data);
+    SP_LOG("{}", SP_FMT_STR(gen.output));
   }
 }
 
