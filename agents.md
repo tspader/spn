@@ -22,3 +22,4 @@ assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn
 
 ## Rules
 - always use the `sp.h` skill when (either with your `Skill` tool or with `./doc/llm/sp/SKILL.md`)
+- never use the C standard library. always use `sp.h`
