@@ -18,20 +18,7 @@ assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn
 - `packages/tcc/spn.toml` is the package for `tcc` (compiled example)
 
 # Build
-- build with `spn build` (`spn` is installed globally and is different than the resulting binary from the build)
-- run with `./build/debug/spn $args`
-- never, ever run the binary in `./bootstrap`. use the globally installed `spn` or your build only. if neither work, stop and ask for help.
-- if you get build errors for missing headers/deps, stop and ask me to fix it
-```xml
-<example>
-user: [Describes a feature to implement]
-assistant: [Implements feature, builds with "spn build", sees an error from a dependency (e.g. unknown type), stops to ask the user to resolve]
-user: [Resolves build failure]
-assistant: [Continues implementing feature]
-</example>
+- build with `make` to output to `./bootstrap/bin/spn`
 
-```
 ## Rules
-- always add paths to `spn_paths_t` if project-specific, or `spn_*_paths_t` for item-specific paths
-- never free allocated memory; we intentionally leak
 - always use the `sp.h` skill when (either with your `Skill` tool or with `./doc/llm/sp/SKILL.md`)
