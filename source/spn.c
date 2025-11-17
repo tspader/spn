@@ -1039,6 +1039,7 @@ void spn_cli_init(spn_cli_t* cli);
 void spn_cli_add(spn_cli_t* cli);
 void spn_cli_update(spn_cli_t* cli);
 void spn_cli_tool(spn_cli_t* cli);
+void spn_tool_install_local(sp_str_t manifest_path, sp_str_t project_dir);
 void spn_tool_cmd_install(spn_cli_t* cli);
 void spn_tool_cmd_run(spn_cli_t* cli);
 
@@ -4815,6 +4816,7 @@ void spn_init(u32 num_args, const c8** args) {
   sp_atomic_s32_set(&spn.control, 0);
 
   spn.paths.work = sp_os_get_cwd();
+  spn.paths.bin = sp_os_get_bin_path();
   spn.paths.storage = sp_os_join_path(sp_os_get_storage_path(), sp_str_lit("spn"));
   spn.paths.tools.dir = sp_os_join_path(spn.paths.storage, sp_str_lit("tools"));
   spn.paths.tools.manifest = sp_os_join_path(spn.paths.tools.dir, sp_str_lit("spn.toml"));
@@ -5758,6 +5760,40 @@ void spn_cli_update(spn_cli_t* cli) {
   spn_app_update(cmd->package);
 }
 
+void spn_tool_install_local(sp_str_t manifest_path, sp_str_t project_dir) {
+  SP_LOG("Installing local tool from {:fg brightcyan}", SP_FMT_STR(project_dir));
+
+  spn_app_t tool = spn_app_load((spn_app_config_t) {
+    .manifest = manifest_path
+  });
+
+  spn_app_resolve(&tool);
+  spn_app_prepare_deps(&tool);
+
+  spn_dep_context_t build = spn_app_prepare_project(&tool);
+  spn_dep_context_build(&build);
+
+  sp_os_create_directory(spn.paths.bin);
+
+  sp_ht_for(tool.package.bin, it) {
+    spn_bin_t* bin = sp_ht_it_getp(tool.package.bin, it);
+    sp_str_t binary_path = sp_os_join_path(build.paths.bin, bin->name);
+    sp_str_t target = sp_os_join_path(spn.paths.bin, bin->name);
+
+    if (sp_os_does_path_exist(target)) {
+      sp_os_remove_file(target);
+    }
+
+    sp_os_create_symbolic_link(binary_path, target);
+
+    SP_LOG("{:fg brightcyan} -> {:fg brightcyan}",
+      SP_FMT_STR(bin->name),
+      SP_FMT_STR(binary_path));
+  }
+
+  SP_LOG("{:fg brightgreen} Local tool installed successfully", SP_LIT("✓"));
+}
+
 void spn_tool_cmd_install(spn_cli_t* cli) {
   spn_cli_tool_install_t* cmd = &cli->tool.install;
 
@@ -5766,10 +5802,15 @@ void spn_tool_cmd_install(spn_cli_t* cli) {
     SP_FMT_U32(cmd->force),
     SP_FMT_STR(cmd->version));
 
-  // TODO: Implement tool install functionality
-  // 1. Build the package
-  // 2. Find binaries in the package
-  // 3. Symlink them to ~/.local/bin
+  sp_str_t candidate_path = sp_os_join_path(spn.paths.work, cmd->package);
+  sp_str_t manifest_path = sp_os_join_path(candidate_path, sp_str_lit("spn.toml"));
+
+  if (sp_os_does_path_exist(manifest_path)) {
+    spn_tool_install_local(manifest_path, candidate_path);
+  } else {
+    SP_FATAL("Index tool installation not yet implemented. Package {:fg brightcyan} not found as local directory.",
+      SP_FMT_STR(cmd->package));
+  }
 }
 
 void spn_tool_cmd_run(spn_cli_t* cli) {
