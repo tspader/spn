@@ -9,3 +9,6 @@ maintainer = "tspader"
 [lib]
 kinds = ["static"]
 name = 'tcc'
+
+[[bin]]
+name = "tcc"

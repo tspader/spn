@@ -65,6 +65,7 @@ typedef enum {
 } spn_cc_kind_t;
 
 typedef enum {
+  SPN_PACKAGE_KIND_NONE,
   SPN_PACKAGE_KIND_WORKSPACE,
   SPN_PACKAGE_KIND_FILE,
   SPN_PACKAGE_KIND_REMOTE,
