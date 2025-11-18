@@ -23,6 +23,11 @@ name = "spn"
 source = ["source/spn.c"]
 include = ["include"]
 
+[[bin]]
+name = "spn-test-graph"
+source = ["test/graph/main.c"]
+include = ["include", "source", "test/graph"]
+
 [options]
 foo = "bar"
 baz = 69
