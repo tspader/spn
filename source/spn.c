@@ -1103,11 +1103,10 @@ typedef enum {
 spn_app_t app;
 
 spn_app_t      spn_app_new();
-spn_app_t      spn_app_init(sp_str_t path, sp_str_t name, spn_app_init_mode_t mode);
 void           spn_app_load(spn_app_t* app, sp_str_t manifest_path);
 void           spn_app_resolve(spn_app_t* app);
-void           spn_app_prepare_dep_builds(spn_app_t* app);
 void           spn_app_prepare_build(spn_app_t* app);
+void           spn_app_prepare_dep_builds(spn_app_t* app);
 void           spn_app_resolve_from_solver(spn_app_t* app);
 void           spn_app_update_lock_file(spn_app_t* app);
 void           spn_app_resolve_from_lock_file(spn_app_t* app);
@@ -1116,10 +1115,11 @@ spn_pkg_t*     spn_app_find_package(spn_app_t* app, spn_dep_req_t dep);
 s32            spn_app_thread_build_binary(void* user_data);
 void           spn_app_add_package_constraints(spn_app_t* app, spn_pkg_t* package);
 void           spn_app_bail_on_missing_package(spn_app_t* app, sp_str_t name);
+spn_app_t      spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode_t mode);
 void           spn_resolver_init(spn_resolver_t* r);
 
 void spn_tool_ensure_manifest();
-void spn_app_link_tool(spn_app_t* tool, spn_pkg_build_t* build);
+void spk_pkg_link_binaries(spn_pkg_build_t* build);
 void spn_tool_list();
 void spn_tool_run(sp_str_t package_name, sp_da(sp_str_t) args);
 void spn_tool_upgrade(sp_str_t package_name);
@@ -4513,7 +4513,7 @@ spn_app_t spn_app_new() {
   return app;
 }
 
-spn_app_t spn_app_init(sp_str_t path, sp_str_t name, spn_app_init_mode_t mode) {
+spn_app_t spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode_t mode) {
   sp_str_t paths [] = {
     sp_os_join_path(path, sp_str_lit("spn.toml")),
     sp_os_join_path(path, sp_str_lit("spn.c")),
@@ -5452,7 +5452,7 @@ void spn_cli_init(spn_cli_t* cli) {
   };
   spn_cli_parse_command(&parser);
 
-  spn_app_t app = spn_app_init(
+  spn_app_t app = spn_app_init_and_write(
     spn.paths.work,
     sp_os_extract_stem(spn.paths.work),
     cmd->bare ? SPN_APP_INIT_BARE : SPN_APP_INIT_NORMAL
@@ -5781,9 +5781,9 @@ void spn_cli_update(spn_cli_t* cli) {
   spn_app_update(cmd->package);
 }
 
-void spn_app_link_tool(spn_app_t* tool, spn_pkg_build_t* build) {
-  sp_ht_for(tool->package.bin, it) {
-    spn_bin_t* bin = sp_ht_it_getp(tool->package.bin, it);
+void spn_pkg_link_binaries(spn_pkg_build_t* build) {
+  sp_ht_for(build->package->bin, it) {
+    spn_bin_t* bin = sp_ht_it_getp(build->package->bin, it);
     sp_str_t binary_path = spn_pkg_build_get_bin_path(build, bin);
     sp_str_t tool_path = spn_get_tool_path(bin);
 
@@ -5835,20 +5835,30 @@ void spn_cli_tool_install(spn_cli_t* cli) {
       }
     }
 
-    spn_app_link_tool(&tool, &app.build);
+    spk_pkg_link_binaries(&app.build);
   }
   else {
     if (!sp_ht_key_exists(app.registry, cmd->package)) {
       spn_app_bail_on_missing_package(&app, cmd->package);
     }
 
+    spn_app_t tool = SP_ZERO_INITIALIZE();
     if (!sp_os_does_path_exist(spn.paths.tools.manifest)) {
-      spn_app_t tool = spn_app_init(
+      tool = spn_app_init_and_write(
         spn.paths.tools.manifest,
         sp_str_lit("tools"),
         SPN_APP_INIT_BARE
       );
     }
+    else {
+      tool = spn_app_new();
+      spn_app_load(&tool, spn.paths.tools.manifest);
+    }
+
+    // does the tools project have the requested tool?
+    // if not, add via dep request
+    // spn build (resolve -> prepare -> threads)
+    // link binaries
   }
 }
 
@@ -6134,7 +6144,6 @@ void spn_cli_build(spn_cli_t* cli) {
     sp_opt_set(target, *sp_ht_getp(app.package.bin, target_name));
   }
 
-  // Handle profile selection
   if (!sp_str_empty(profile_name)) {
     if (!sp_ht_key_exists(app.package.profiles, profile_name)) {
       SP_FATAL("{:fg brightcyan} profile isn't defined in {:fg brightcyan}", SP_FMT_STR(profile_name), SP_FMT_STR(app.package.paths.manifest));
@@ -6144,6 +6153,7 @@ void spn_cli_build(spn_cli_t* cli) {
 
   spn_app_resolve(&app);
   spn_app_prepare_dep_builds(&app);
+  spn_app_prepare_build(&app);
 
   spn_tui_mode_t mode = sp_str_valid(spn.cli.output) ?
     spn_output_mode_from_str(spn.cli.output) :
@@ -6159,7 +6169,6 @@ void spn_cli_build(spn_cli_t* cli) {
   spn_tui_init(&spn.tui, mode);
   spn_tui_run(&spn.tui);
 
-  spn_app_prepare_build(&app);
   switch (target.some) {
     case SP_OPT_SOME: {
       spn_dep_context_build_binary(&app.build, sp_opt_get(target));
