@@ -660,11 +660,6 @@ typedef struct {
   sp_str_t lib;
 } spn_tool_paths_t;
 
-void spn_tool_ensure_manifest();
-void spn_tool_install(sp_str_t name);
-void spn_tool_list();
-void spn_tool_run(sp_str_t package_name, sp_da(sp_str_t) args);
-void spn_tool_upgrade(sp_str_t package_name);
 
 
 // GEN
@@ -953,7 +948,10 @@ typedef struct {
 } spn_cli_update_t;
 
 typedef struct {
-  sp_str_t package;
+  union {
+    sp_str_t package;
+    sp_str_t dir;
+  };
   bool force;
   sp_str_t version;
 } spn_cli_tool_install_t;
@@ -1115,7 +1113,14 @@ spn_pkg_t*     spn_app_find_package(spn_app_t* app, spn_dep_req_t dep);
 spn_pkg_t      spn_app_new(sp_str_t path, sp_str_t name, spn_app_init_mode_t mode);
 s32            spn_app_thread_build_binary(void* user_data);
 void           spn_app_add_package_constraints(spn_app_t* app, spn_pkg_t* package);
+void           spn_app_bail_on_missing_package(spn_app_t* app, sp_str_t name);
 void           spn_resolver_init(spn_resolver_t* r);
+
+void spn_tool_ensure_manifest();
+void spn_tool_install(spn_app_t* tool, spn_pkg_build_t* build);
+void spn_tool_list();
+void spn_tool_run(sp_str_t package_name, sp_da(sp_str_t) args);
+void spn_tool_upgrade(sp_str_t package_name);
 
 void spn_cli_run();
 
@@ -3940,6 +3945,21 @@ void spn_resolver_init(spn_resolver_t* resolver) {
   sp_ht_set_fns(resolver->visited, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
 }
 
+void spn_app_bail_on_missing_package(spn_app_t* app, sp_str_t name) {
+  sp_str_t prefix = sp_str_lit("  > ");
+  sp_str_t color = sp_str_lit("brightcyan");
+
+  sp_da(sp_str_t) search = app->search;
+  search = sp_str_map(search, sp_dyn_array_size(search), &color, sp_str_map_kernel_colorize);
+  search = sp_str_map(search, sp_dyn_array_size(search), &prefix, sp_str_map_kernel_prepend);
+
+  SP_FATAL(
+    "Could not find {:fg yellow} on search path: \n{}",
+    SP_FMT_STR(name),
+    SP_FMT_STR(sp_str_join_n(search, sp_dyn_array_size(search), sp_str_lit("\n")))
+  );
+}
+
 void spn_app_add_package_constraints(spn_app_t* app, spn_pkg_t* package) {
   spn_resolver_t* resolver = &app->resolver;
 
@@ -4419,7 +4439,7 @@ spn_pkg_t* spn_app_find_package(spn_app_t* app, spn_dep_req_t request) {
       case SPN_PACKAGE_KIND_INDEX: {
         sp_str_t* path = sp_ht_getp(app->registry, name);
         if (!path) {
-          SP_FATAL("{:fg brightcyan} was not found on search paths", SP_FMT_STR(name));
+          spn_app_bail_on_missing_package(app, name);
         }
 
         spn_pkg_t package = spn_package_load_from_index(*path);
@@ -4440,23 +4460,6 @@ spn_pkg_t* spn_app_find_package(spn_app_t* app, spn_dep_req_t request) {
   return package;
 }
 
-
-void spn_tool_install(sp_str_t id) {
-  if (!sp_os_does_path_exist(spn.paths.tools.manifest)) {
-    spn_pkg_t package = spn_app_new(spn.paths.tools.dir, sp_str_lit("spn_tools"), SPN_APP_INIT_BARE);
-    spn_app_write_manifest(&package, spn.paths.tools.manifest);
-  }
-
-  spn_pkg_t package = spn_package_load(spn.paths.tools.manifest);
-
-  sp_str_t dir = sp_os_join_path(spn.paths.work, id);
-  sp_str_t manifest = sp_os_join_path(dir, sp_str_lit("spn.toml"));
-  if (sp_os_does_path_exist(manifest)) {
-    spn_package_add_dep_from_manifest(&package, manifest);
-  }
-
-  spn_app_write_manifest(&package, spn.paths.tools.manifest);
-}
 
 /////////
 // APP //
@@ -4903,6 +4906,7 @@ void spn_init(u32 num_args, const c8** args) {
   sp_os_create_directory(spn.paths.source);
   sp_os_create_directory(spn.paths.build);
   sp_os_create_directory(spn.paths.store);
+  sp_os_create_directory(spn.paths.bin);
 
   app = spn_app_load((spn_app_config_t) {
     .manifest = sp_os_join_path(spn.paths.work, sp_str_lit("spn.toml"))
@@ -5669,17 +5673,7 @@ void spn_package_add_dep_from_index(spn_pkg_t* package, sp_str_t name) {
   };
   spn_pkg_t* dep = spn_app_find_package(&app, request);
   if (!dep) {
-    sp_str_t prefix = sp_str_lit("  > ");
-    sp_str_t color = sp_str_lit("brightcyan");
-    sp_da(sp_str_t) search = app.search;
-    search = sp_str_map(search, sp_dyn_array_size(search), &color, sp_str_map_kernel_colorize);
-    search = sp_str_map(search, sp_dyn_array_size(search), &prefix, sp_str_map_kernel_prepend);
-
-    SP_FATAL(
-      "Could not find {:fg yellow} on search path: \n{}",
-      SP_FMT_STR(name),
-      SP_FMT_STR(sp_str_join_n(search, sp_dyn_array_size(search), sp_str_lit("\n")))
-    );
+    spn_app_bail_on_missing_package(&app, name);
   }
 
   if (sp_dyn_array_empty(dep->versions)) {
@@ -5781,14 +5775,40 @@ void spn_cli_update(spn_cli_t* cli) {
   spn_app_update(cmd->package);
 }
 
+void spn_tool_install(spn_app_t* tool, spn_pkg_build_t* build) {
+  sp_ht_for(tool->package.bin, it) {
+    spn_bin_t* bin = sp_ht_it_getp(tool->package.bin, it);
+    sp_str_t binary_path = spn_pkg_build_get_bin_path(build, bin);
+    sp_str_t tool_path = spn_get_tool_path(bin);
+
+    if (sp_os_does_path_exist(tool_path)) {
+      sp_os_remove_file(tool_path);
+    }
+
+    if (!sp_os_does_path_exist(binary_path)) {
+      SP_WARN("{:fg brightcyan} doesn't exist; did you run {:fg yellow}?",
+        SP_FMT_STR(binary_path),
+        SP_FMT_CSTR("spn build")
+      );
+    }
+
+    sp_os_create_symbolic_link(binary_path, tool_path);
+
+    SP_LOG("Installed {:fg brightcyan}",
+      SP_FMT_STR(tool_path)
+    );
+  }
+
+}
+
 void spn_cli_tool_install(spn_cli_t* cli) {
   spn_cli_tool_install_t* cmd = &cli->tool.install;
 
-  sp_str_t dir = sp_os_join_path(spn.paths.work, cmd->package);
-  dir = sp_os_canonicalize_path(dir);
+  sp_str_t dir = sp_os_canonicalize_path(sp_os_join_path(spn.paths.work, cmd->dir));
   sp_str_t file_path = sp_os_join_path(dir, sp_str_lit("spn.toml"));
 
   if (sp_os_does_path_exist(file_path)) {
+    // Load the manifest, build it, and install from the local copy
     spn_app_t tool = spn_app_load((spn_app_config_t) {
       .manifest = file_path
     });
@@ -5798,35 +5818,26 @@ void spn_cli_tool_install(spn_cli_t* cli) {
     spn_pkg_build_t build = spn_app_prepare_project(&tool);
     spn_pkg_build_run(&build);
 
-    sp_os_create_directory(spn.paths.bin);
-
     sp_ht_for(tool.package.bin, it) {
       spn_bin_t* bin = sp_ht_it_getp(tool.package.bin, it);
       sp_str_t binary_path = spn_pkg_build_get_bin_path(&build, bin);
       sp_str_t tool_path = spn_get_tool_path(bin);
 
-      if (sp_os_does_path_exist(tool_path)) {
-        if (sp_os_is_regular_file(tool_path) && !cmd->force) {
-          SP_FATAL(
-            "{:fg brightcyan} was not created by spn. Use {:fg yellow} to overwrite it.",
-            SP_FMT_STR(tool_path),
-            SP_FMT_CSTR("--force")
-          );
-        }
-
-        sp_os_remove_file(tool_path);
+      if (sp_os_is_regular_file(tool_path) && !cmd->force) {
+        SP_FATAL(
+          "{:fg brightcyan} was not created by spn. Use {:fg yellow} to overwrite it.",
+          SP_FMT_STR(tool_path),
+          SP_FMT_CSTR("--force")
+        );
       }
-
-      sp_os_create_symbolic_link(binary_path, tool_path);
-
-      SP_LOG("Installed {:fg brightcyan}",
-        SP_FMT_STR(tool_path)
-      );
     }
+
+    spn_tool_install(&tool, &build);
   }
   else {
-    SP_FATAL("Index tool installation not yet implemented. Package {:fg brightcyan} not found as local directory.",
-      SP_FMT_STR(cmd->package));
+    if (!sp_ht_key_exists(app.registry, cmd->package)) {
+      spn_app_bail_on_missing_package(&app, cmd->package);
+    }
   }
 }
 
@@ -6027,6 +6038,8 @@ spn_err_t spn_dep_context_build_binary(spn_pkg_build_t* build, spn_bin_t bin) {
   spn_dep_context_set_build_state(build, SPN_DEP_BUILD_STATE_BUILDING);
   spn_pkg_t* package = build->package;
 
+  SP_ASSERT(!sp_da_empty(bin.source));
+
   spn_cc_t cc = spn_cc_new(build);
   spn_cc_set_output_dir(&cc, build->paths.bin);
 
@@ -6054,8 +6067,13 @@ spn_err_t spn_dep_context_build_binary(spn_pkg_build_t* build, spn_bin_t bin) {
 spn_err_t spn_dep_context_build_binaries(spn_pkg_build_t* build) {
   sp_ht_for(build->package->bin, it) {
     spn_bin_t bin = *sp_ht_it_getp(build->package->bin, it);
-    spn_err_t result = spn_dep_context_build_binary(build, bin);
 
+    // If there are no sources, it's just a binary produced by their external build system that they want to expose via spn
+    if (sp_da_empty(bin.source)) {
+      continue;
+    }
+
+    spn_err_t result = spn_dep_context_build_binary(build, bin);
     if (result) {
       spn_dep_context_set_build_state(build, SPN_DEP_BUILD_STATE_FAILED);
       return result;
