@@ -2,9 +2,11 @@ CompileFlags:
   Add:
     - -DSPN_IMPLEMENTATION
     - -DSP_IMPLEMENTATION
+    - -DSP_CLI_IMPLEMENTATION
     - -DSP_APP
     - -DSP_APP_IMPLEMENTATION
     - -include sp.h
+    - -include source
 Diagnostics:
   Suppress:
     - unused-includes
