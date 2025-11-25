@@ -103,13 +103,13 @@ typedef enum {
 
 #define sp_carr_empty(CARR) ( \
   (CARR) == NULL || \
-  sp_os_is_memory_equal(&(CARR)[0], &(sp_env_var_t){SP_ZERO_INITIALIZE()}, sizeof((CARR)[0])) \
+  sp_mem_is_equal(&(CARR)[0], &(sp_env_var_t){SP_ZERO_INITIALIZE()}, sizeof((CARR)[0])) \
 )
 
 #define sp_carr_len_nt(CARR) ( \
   (CARR) == NULL ? 0 : ({ \
     u32 len = 0; \
-    while (!sp_os_is_memory_equal(&(CARR)[len], &(sp_env_var_t){SP_ZERO_INITIALIZE()}, sizeof((CARR)[0]))) { \
+    while (!sp_mem_is_equal(&(CARR)[len], &(sp_env_var_t){SP_ZERO_INITIALIZE()}, sizeof((CARR)[0]))) { \
       len++; \
     } \
     len; \
@@ -133,7 +133,7 @@ sp_str_t sp_os_get_bin_path() {
   sp_str_t path = sp_os_get_env_var(SP_LIT("HOME"));
   SP_ASSERT(!sp_str_empty(path));
 
-  return sp_os_join_path(path, sp_str_lit(".local/bin"));
+  return sp_fs_join_path(path, sp_str_lit(".local/bin"));
 }
 
 sp_str_t sp_ps_config_render(sp_ps_config_t ps) {
@@ -669,59 +669,6 @@ typedef struct {
 } spn_gen_format_context_t;
 
 sp_str_t spn_generator_format_entry_kernel(sp_str_map_context_t* context);
-
-
-//
-//
-
-#define SPN_BUILD_COMMAND(X) \
-  X(SPN_BUILD_COMMAND_DEP, "build_dep") \
-  X(SPN_BUILD_COMMAND_SUBPROCESS, "subprocess")
-
-typedef enum {
-  SPN_BUILD_COMMAND(SP_X_NAMED_ENUM_DEFINE)
-} spn_build_cmd_kind_t;
-
-typedef u32 spn_graph_id_t;
-
-typedef struct {
-  spn_build_cmd_kind_t kind;
-  spn_graph_id_t id;
-  sp_ps_config_t ps;
-  sp_da(spn_graph_id_t) consumes;
-  sp_da(spn_graph_id_t) produces;
-
-  union {
-    struct {} dep;
-    struct {} subprocess;
-  };
-} spn_build_cmd_t;
-
-typedef struct {
-  spn_graph_id_t id;
-  sp_str_t path;
-  sp_tm_epoch_t mod_time;
-
-  spn_graph_id_t producer;
-  sp_da(spn_graph_id_t) consumers;
-} spn_build_file_t;
-
-typedef struct {
-  sp_da(spn_build_file_t) files;
-  sp_da(spn_build_cmd_t) commands;
-} spn_build_graph_t;
-
-SP_TYPEDEF_FN(void, spn_build_graph_cmd_fn_t, spn_build_graph_t* graph, spn_build_cmd_t* cmd, void* user_data);
-SP_TYPEDEF_FN(void, spn_build_graph_file_fn_t, spn_build_graph_t* graph, spn_build_file_t* cmd, void* user_data);
-
-#define spn_graph_sanity(node) SP_ASSERT((node) && (node)->id)
-
-spn_build_graph_t* spn_build_graph_new();
-sp_str_t spn_build_graph_to_str(spn_build_graph_t* graph);
-spn_build_file_t* spn_build_graph_add_file(spn_build_graph_t* graph, sp_str_t path);
-spn_build_cmd_t* spn_build_graph_add_command(spn_build_graph_t* graph, spn_build_cmd_kind_t kind);
-void spn_build_file_set_command(spn_build_file_t* file, spn_build_cmd_t* cmd);
-void spn_build_command_add_input(spn_build_cmd_t* cmd, spn_build_file_t* file);
 
 
 /////////
@@ -1338,7 +1285,7 @@ void spn_autoconf_run(spn_autoconf_t* autoconf) {
   spn_pkg_build_t* build = autoconf->build;
 
   sp_ps_config_t config = {
-    .command = sp_os_join_path(build->paths.source, SP_LIT("configure")),
+    .command = sp_fs_join_path(build->paths.source, SP_LIT("configure")),
     .args = {
       sp_format("--prefix={}", SP_FMT_STR(build->paths.store)),
       build->kind == SPN_LIB_KIND_SHARED ?
@@ -1368,7 +1315,7 @@ spn_cc_t spn_cc_new(spn_pkg_build_t* build) {
 }
 
 void spn_cc_add_include(spn_cc_t* cc, sp_str_t dir) {
-  sp_dyn_array_push(cc->include, sp_os_join_path(app.paths.dir, dir));
+  sp_dyn_array_push(cc->include, sp_fs_join_path(app.paths.dir, dir));
 }
 
 void spn_cc_add_define(spn_cc_t* cc, sp_str_t var) {
@@ -1376,11 +1323,11 @@ void spn_cc_add_define(spn_cc_t* cc, sp_str_t var) {
 }
 
 void spn_cc_target_add_source(spn_cc_target_t* target, sp_str_t file_path) {
-  sp_dyn_array_push(target->source, sp_os_join_path(app.paths.dir, file_path));
+  sp_dyn_array_push(target->source, sp_fs_join_path(app.paths.dir, file_path));
 }
 
 void spn_cc_target_add_include(spn_cc_target_t* target, sp_str_t dir) {
-  sp_dyn_array_push(target->include, sp_os_join_path(app.paths.dir, dir));
+  sp_dyn_array_push(target->include, sp_fs_join_path(app.paths.dir, dir));
 }
 
 void spn_cc_target_add_define(spn_cc_target_t* target, sp_str_t var) {
@@ -1462,7 +1409,7 @@ spn_err_t spn_cc_run(spn_cc_t* cc) {
         sp_ps_config_add_arg(&cfg, spn_cc_lib_kind_to_switch(profile->linkage));
 
         sp_ps_config_add_arg(&cfg, sp_str_lit("-o"));
-        sp_ps_config_add_arg(&cfg, sp_os_join_path(cc->build->paths.bin, target.name));
+        sp_ps_config_add_arg(&cfg, sp_fs_join_path(cc->build->paths.bin, target.name));
 
         if (profile->linkage == SPN_LIB_KIND_STATIC) {
           sp_ps_config_add_arg(&cfg, sp_str_lit("-static"));
@@ -1509,9 +1456,9 @@ void spn_dep_set_s64(spn_pkg_build_t* dep, const c8* name, s64 value) {
 }
 
 void spn_copy(spn_pkg_build_t* dep, spn_dir_kind_t from_kind, const c8* from_path, spn_dir_kind_t to_kind, const c8* to_path) {
-  sp_str_t from = sp_os_join_path(spn_cache_dir_kind_to_dep_path(dep, from_kind), sp_str_view(from_path));
-  sp_str_t to = sp_os_join_path(spn_cache_dir_kind_to_dep_path(dep, to_kind), sp_str_view(to_path));
-  sp_os_copy(from, to);
+  sp_str_t from = sp_fs_join_path(spn_cache_dir_kind_to_dep_path(dep, from_kind), sp_str_view(from_path));
+  sp_str_t to = sp_fs_join_path(spn_cache_dir_kind_to_dep_path(dep, to_kind), sp_str_view(to_path));
+  sp_fs_copy(from, to);
 
 }
 
@@ -1954,7 +1901,7 @@ sp_dyn_array(sp_str_t) spn_gen_build_entry_for_dep(spn_pkg_build_t* dep, spn_gen
           sp_os_lib_kind_t kind = spn_lib_kind_to_sp_os_lib_kind(dep->kind);
           sp_str_t lib = dep->package->lib.name;
           lib = sp_os_lib_to_file_name(lib, kind);
-          lib = sp_os_join_path(dep->paths.lib, lib);
+          lib = sp_fs_join_path(dep->paths.lib, lib);
           sp_dyn_array_push(entries, lib);
           break;
         }
@@ -2013,7 +1960,7 @@ sp_str_t spn_gen_build_entries_for_all(spn_gen_entry_kind_t kind, spn_cc_kind_t 
 
 
 void sp_sh_ls(sp_str_t path) {
-  if (!sp_os_does_path_exist(path)) {
+  if (!sp_fs_exists(path)) {
     SP_LOG("{:fg brightcyan} hasn't been built for your configuration", SP_FMT_STR(path));
     return;
   }
@@ -2028,7 +1975,7 @@ void sp_sh_ls(sp_str_t path) {
   };
 
   SP_CARR_FOR(tools, i) {
-    if (sp_os_is_program_on_path(sp_str_view(tools[i].command))) {
+    if (sp_fs_is_on_path(sp_str_view(tools[i].command))) {
       sp_ps_config_t config = SP_ZERO_INITIALIZE();
       config.command = sp_str_view(tools[i].command);
 
@@ -2139,7 +2086,7 @@ sp_str_t spn_git_get_commit_message(sp_str_t repo, sp_str_t id) {
 
 spn_err_t spn_git_checkout(sp_str_t repo, sp_str_t id) {
   if (sp_str_empty(id)) return SPN_ERROR;
-  if (!sp_os_does_path_exist(repo)) return SPN_ERROR;
+  if (!sp_fs_exists(repo)) return SPN_ERROR;
 
   sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
     .command = SP_LIT("git"),
@@ -2195,7 +2142,7 @@ void spn_install_signal_handlers() {
 // TOML //
 //////////
 toml_table_t* spn_toml_parse(sp_str_t path) {
-  if (!sp_os_does_path_exist(path)) return SP_NULLPTR;
+  if (!sp_fs_exists(path)) return SP_NULLPTR;
 
   sp_str_t file = sp_io_read_file(path);
   return toml_parse(sp_str_to_cstr(file), SP_NULLPTR, 0);
@@ -2965,7 +2912,7 @@ spn_lock_file_t spn_load_lock_file(sp_str_t path) {
   spn_lock_file_t lock = SP_ZERO_INITIALIZE();
   spn_lock_file_init(&lock);
 
-  SP_ASSERT(sp_os_does_path_exist(path));
+  SP_ASSERT(sp_fs_exists(path));
 
   toml_table_t* root = spn_toml_parse(path);
   SP_ASSERT(root);
@@ -3038,7 +2985,7 @@ bool spn_dep_context_is_binary(spn_pkg_build_t* dep) {
 }
 
 bool spn_dep_context_is_build_stamped(spn_pkg_build_t* context) {
-  return sp_os_does_path_exist(context->paths.stamp);
+  return sp_fs_exists(context->paths.stamp);
 }
 
 void spn_dep_context_init(spn_pkg_build_t* dep, spn_pkg_t* package) {
@@ -3049,7 +2996,7 @@ void spn_dep_context_init(spn_pkg_build_t* dep, spn_pkg_t* package) {
 }
 
 spn_err_t spn_dep_context_sync_remote(spn_pkg_build_t* dep) {
-  if (!sp_os_does_path_exist(dep->paths.source)) {
+  if (!sp_fs_exists(dep->paths.source)) {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
 
     sp_str_t url = sp_format("https://github.com/{}.git", SP_FMT_STR(dep->package->repo));
@@ -3062,7 +3009,7 @@ spn_err_t spn_dep_context_sync_remote(spn_pkg_build_t* dep) {
       return SPN_ERROR;
     }
 
-    SP_ASSERT(sp_os_is_directory(dep->paths.source));
+    SP_ASSERT(sp_fs_is_dir(dep->paths.source));
   }
   else {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
@@ -3300,11 +3247,11 @@ s32 spn_dep_thread_build(void* user_data) {
 }
 
 sp_str_t spn_pkg_build_get_bin_path(spn_pkg_build_t* build, spn_bin_t* bin) {
-  return sp_os_join_path(build->paths.bin, bin->name);
+  return sp_fs_join_path(build->paths.bin, bin->name);
 }
 
 sp_str_t spn_get_tool_path(spn_bin_t* bin) {
-  return sp_os_join_path(spn.paths.bin, bin->name);
+  return sp_fs_join_path(spn.paths.bin, bin->name);
 }
 
 ////////////
@@ -3767,7 +3714,7 @@ spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key) {
 }
 
 void spn_pkg_compile(spn_pkg_t* package) {
-  if (!sp_os_does_path_exist(package->paths.script)) return;
+  if (!sp_fs_exists(package->paths.script)) return;
 
   spn_tcc_t* tcc = spn_tcc_new();
   spn_tcc_add_file(tcc, package->paths.script);
@@ -3789,17 +3736,17 @@ void spn_pkg_init(spn_pkg_t* package) {
 void spn_pkg_set_index(spn_pkg_t* package, sp_str_t path) {
   package->kind = SPN_PACKAGE_KIND_INDEX;
   package->paths.dir = sp_str_copy(path);
-  package->paths.manifest = sp_os_join_path(package->paths.dir, sp_str_lit("spn.toml"));
-  package->paths.metadata = sp_os_join_path(package->paths.dir, sp_str_lit("metadata.toml"));
-  package->paths.script = sp_os_join_path(package->paths.dir, sp_str_lit("spn.c"));
+  package->paths.manifest = sp_fs_join_path(package->paths.dir, sp_str_lit("spn.toml"));
+  package->paths.metadata = sp_fs_join_path(package->paths.dir, sp_str_lit("metadata.toml"));
+  package->paths.script = sp_fs_join_path(package->paths.dir, sp_str_lit("spn.c"));
 }
 
 void spn_pkg_set_manifest(spn_pkg_t* package, sp_str_t path) {
   package->kind = SPN_PACKAGE_KIND_FILE;
-  package->paths.dir = sp_os_parent_path(path);
+  package->paths.dir = sp_fs_parent_path(path);
   package->paths.manifest = sp_str_copy(path);
-  package->paths.metadata = sp_os_join_path(package->paths.dir, sp_str_lit("metadata.toml"));
-  package->paths.script = sp_os_join_path(package->paths.dir, sp_str_lit("spn.c"));
+  package->paths.metadata = sp_fs_join_path(package->paths.dir, sp_str_lit("metadata.toml"));
+  package->paths.script = sp_fs_join_path(package->paths.dir, sp_str_lit("spn.c"));
 }
 
 void spn_pkg_add_version(spn_pkg_t* package, spn_semver_t version, sp_str_t commit) {
@@ -3821,7 +3768,7 @@ spn_pkg_t spn_pkg_new(sp_str_t name) {
 
 spn_pkg_t spn_pkg_from_bare_default(sp_str_t path, sp_str_t name) {
   spn_pkg_t package = spn_pkg_new(name);
-  spn_pkg_set_manifest(&package, sp_os_join_path(path, sp_str_lit("spn.toml")));
+  spn_pkg_set_manifest(&package, sp_fs_join_path(path, sp_str_lit("spn.toml")));
   package.version = (spn_semver_t) { 0, 1, 0 };
   sp_dyn_array_push(package.versions, package.version);
   return package;
@@ -3829,7 +3776,7 @@ spn_pkg_t spn_pkg_from_bare_default(sp_str_t path, sp_str_t name) {
 
 spn_pkg_t spn_pkg_from_default(sp_str_t path, sp_str_t name) {
   spn_pkg_t package = spn_pkg_new(name);
-  spn_pkg_set_manifest(&package, sp_os_join_path(path, sp_str_lit("spn.toml")));
+  spn_pkg_set_manifest(&package, sp_fs_join_path(path, sp_str_lit("spn.toml")));
   spn_pkg_add_dep_from_index(&package, sp_str_lit("sp"));
 
   package.version = (spn_semver_t) { 0, 1, 0 };
@@ -3845,8 +3792,8 @@ spn_pkg_t spn_pkg_from_default(sp_str_t path, sp_str_t name) {
 }
 
 spn_pkg_t spn_pkg_from_index(sp_str_t path) {
-  sp_str_t manifest = sp_os_join_path(path, sp_str_lit("spn.toml"));
-  SP_ASSERT(sp_os_does_path_exist(manifest));
+  sp_str_t manifest = sp_fs_join_path(path, sp_str_lit("spn.toml"));
+  SP_ASSERT(sp_fs_exists(manifest));
 
   spn_pkg_t package = spn_pkg_load(manifest);
   spn_pkg_set_index(&package, path);
@@ -3870,7 +3817,7 @@ spn_pkg_t spn_pkg_from_index(sp_str_t path) {
 }
 
 spn_pkg_t spn_pkg_from_manifest(sp_str_t manifest) {
-  SP_ASSERT(sp_os_does_path_exist(manifest));
+  SP_ASSERT(sp_fs_exists(manifest));
 
   spn_pkg_t package = spn_pkg_load(manifest);
   spn_pkg_set_manifest(&package, manifest);
@@ -4195,28 +4142,28 @@ void spn_app_resolve(spn_app_t* app) {
 }
 
 void spn_app_prepare_build_io(spn_pkg_build_t* dep) {
-  dep->paths.include = sp_os_join_path(dep->paths.store, SP_LIT("include"));
-  dep->paths.bin = sp_os_join_path(dep->paths.store, SP_LIT("bin"));
-  dep->paths.lib = sp_os_join_path(dep->paths.store, SP_LIT("lib"));
-  dep->paths.vendor = sp_os_join_path(dep->paths.store, SP_LIT("vendor"));
-  dep->paths.stamp = sp_os_join_path(dep->paths.store, SP_LIT("spn.stamp"));
-  dep->paths.log = sp_os_join_path(dep->paths.work, SP_LIT("spn.log"));
+  dep->paths.include = sp_fs_join_path(dep->paths.store, SP_LIT("include"));
+  dep->paths.bin = sp_fs_join_path(dep->paths.store, SP_LIT("bin"));
+  dep->paths.lib = sp_fs_join_path(dep->paths.store, SP_LIT("lib"));
+  dep->paths.vendor = sp_fs_join_path(dep->paths.store, SP_LIT("vendor"));
+  dep->paths.stamp = sp_fs_join_path(dep->paths.store, SP_LIT("spn.stamp"));
+  dep->paths.log = sp_fs_join_path(dep->paths.work, SP_LIT("spn.log"));
 
-  sp_os_create_directory(dep->paths.work);
-  sp_os_create_directory(dep->paths.store);
-  sp_os_create_directory(dep->paths.bin);
-  sp_os_create_directory(dep->paths.include);
-  sp_os_create_directory(dep->paths.lib);
-  sp_os_create_directory(dep->paths.vendor);
+  sp_fs_create_dir(dep->paths.work);
+  sp_fs_create_dir(dep->paths.store);
+  sp_fs_create_dir(dep->paths.bin);
+  sp_fs_create_dir(dep->paths.include);
+  sp_fs_create_dir(dep->paths.lib);
+  sp_fs_create_dir(dep->paths.vendor);
 
-  sp_os_create_file(dep->paths.log);
+  sp_fs_create_file(dep->paths.log);
   dep->log = sp_io_from_file(dep->paths.log, SP_IO_MODE_WRITE);
   spn_dep_log(dep, "build");
 }
 
 void spn_app_prepare_build(spn_app_t* app) {
-  sp_str_t dir = sp_os_join_path(app->package.paths.dir, sp_str_lit("build"));
-  sp_str_t profile = sp_os_join_path(dir, app->profile.name);
+  sp_str_t dir = sp_fs_join_path(app->package.paths.dir, sp_str_lit("build"));
+  sp_str_t profile = sp_fs_join_path(dir, app->profile.name);
 
   app->build = (spn_pkg_build_t) {
     .name = app->package.name,
@@ -4224,8 +4171,8 @@ void spn_app_prepare_build(spn_app_t* app) {
     .package = &app->package,
     .profile = app->profile,
     .paths = {
-      .store = sp_os_join_path(profile, sp_str_lit("store")),
-      .work = sp_os_join_path(profile, sp_str_lit("work")),
+      .store = sp_fs_join_path(profile, sp_str_lit("store")),
+      .work = sp_fs_join_path(profile, sp_str_lit("work")),
       .source = sp_str_copy(app->package.paths.dir),
     }
   };
@@ -4286,12 +4233,12 @@ void spn_app_prepare_dep_builds(spn_app_t* app) {
 
     switch (request.kind) {
       case SPN_PACKAGE_KIND_INDEX: {
-        sp_str_t work = sp_os_join_path(spn.paths.build, package->name);
-        sp_str_t store = sp_os_join_path(spn.paths.store, package->name);
+        sp_str_t work = sp_fs_join_path(spn.paths.build, package->name);
+        sp_str_t store = sp_fs_join_path(spn.paths.store, package->name);
 
-        dep.paths.work = sp_os_join_path(work, build_id);
-        dep.paths.store = sp_os_join_path(store, build_id);
-        dep.paths.source = sp_os_join_path(spn.paths.source, package->name);
+        dep.paths.work = sp_fs_join_path(work, build_id);
+        dep.paths.store = sp_fs_join_path(store, build_id);
+        dep.paths.source = sp_fs_join_path(spn.paths.source, package->name);
 
         break;
       }
@@ -4492,7 +4439,7 @@ void spn_app_write_manifest(spn_pkg_t* package, sp_str_t path) {
 sp_str_t spn_registry_get_path(spn_registry_t* registry) {
   switch (registry->kind) {
     case SPN_PACKAGE_KIND_WORKSPACE: {
-      return sp_os_join_path(app.paths.dir, registry->location);
+      return sp_fs_join_path(app.paths.dir, registry->location);
     }
     case SPN_PACKAGE_KIND_INDEX: {
       return sp_str_copy(registry->location);
@@ -4563,120 +4510,6 @@ spn_opt_dep_t spn_app_find_dep(spn_app_t* app, sp_str_t name) {
   return opt;
 }
 
-// GRAPH
-sp_str_t spn_build_cmd_kind_to_str(spn_build_cmd_kind_t kind) {
-  switch (kind) {
-    SPN_BUILD_COMMAND(SP_X_NAMED_ENUM_CASE_TO_STRING)
-  }
-}
-spn_build_graph_t* spn_build_graph_new() {
-  spn_build_graph_t* graph = SP_ALLOC(spn_build_graph_t);
-  sp_da_push(graph->commands, SP_ZERO_STRUCT(spn_build_cmd_t));
-  sp_da_push(graph->files, SP_ZERO_STRUCT(spn_build_file_t));
-  return graph;
-}
-
-spn_build_file_t* spn_build_graph_add_file(spn_build_graph_t* graph, sp_str_t path) {
-  spn_build_file_t file = {
-    .path = sp_str_copy(path),
-  };
-  sp_da_push(graph->files, file);
-
-  return sp_da_back(graph->files);
-}
-
-spn_build_cmd_t* spn_build_graph_add_command(spn_build_graph_t* graph, spn_build_cmd_kind_t kind) {
-  spn_build_cmd_t cmd = {
-    .kind = kind,
-  };
-  sp_da_push(graph->commands, cmd);
-
-  return sp_da_back(graph->commands);
-
-}
-
-void spn_build_file_set_command(spn_build_file_t* file, spn_build_cmd_t* cmd) {
-  spn_graph_sanity(file);
-  spn_graph_sanity(cmd);
-
-  file->producer = cmd->id;
-  sp_da_push(cmd->produces, file->id);
-}
-
-void spn_build_command_add_input(spn_build_cmd_t* cmd, spn_build_file_t* file) {
-  spn_graph_sanity(file);
-  spn_graph_sanity(cmd);
-  sp_da_push(cmd->consumes, file->id);
-  sp_da_push(file->consumers, cmd->id);
-}
-
-
-sp_da(spn_graph_id_t) spn_build_graph_find_outputs(spn_build_graph_t* graph) {
-  sp_da(spn_graph_id_t) ids = SP_ZERO_INITIALIZE();
-
-  for (u32 it = 1; it < sp_da_size(graph->files); it++) {
-    spn_build_file_t* file = graph->files + it;
-    if (sp_da_empty(file->consumers)) {
-      sp_da_push(ids, file->id);
-    }
-  }
-}
-
-spn_build_file_t* spn_build_graph_find_file(spn_build_graph_t* graph, spn_graph_id_t id) {
-  return graph->files + id;
-}
-
-spn_build_cmd_t* spn_build_graph_find_command(spn_build_graph_t* graph, spn_graph_id_t id) {
-  return graph->commands + id;
-}
-
-sp_str_t spn_build_graph_iterate(spn_build_graph_t* graph, spn_build_graph_cmd_fn_t on_cmd, spn_build_graph_file_fn_t on_file, void* user_data) {
-  typedef struct {
-    sp_ht(spn_graph_id_t, bool) files;
-    sp_ht(spn_graph_id_t, bool) commands;
-  } spn_graph_visited_t;
-
-  spn_graph_visited_t visited = SP_ZERO_INITIALIZE();
-  sp_da(spn_graph_id_t) queue = spn_build_graph_find_outputs(graph);
-
-  while (!sp_da_empty(queue)) {
-    spn_graph_id_t id = *sp_da_back(queue);
-    sp_da_pop(queue);
-
-    sp_ht_insert(visited.files, id, true);
-
-    // Visit this file
-    spn_build_file_t* file = spn_build_graph_find_file(graph, id);
-    on_file(graph, file, user_data);
-
-    // Visit the file's producer and put the files it consumes on the queue
-    if (file->producer) {
-      if (sp_ht_key_exists(visited.commands, file->producer)) continue;
-
-      spn_build_cmd_t* cmd = spn_build_graph_find_command(graph, file->producer);
-      on_cmd(graph, cmd, user_data);
-
-      sp_da_for(cmd->consumes, it) {
-        if (sp_ht_key_exists(visited.files, cmd->consumes[it])) continue;
-
-        sp_da_push(queue, cmd->consumes[it]);
-      }
-    }
-  }
-}
-
-void spn_build_graph_to_str_file_fn(spn_build_graph_t* graph, spn_build_file_t* file, void* user_data) {
-  SP_LOG("{}", SP_FMT_STR(file->path));
-}
-
-void spn_build_graph_to_str_cmd_fn(spn_build_graph_t* graph, spn_build_cmd_t* cmd, void* user_data) {
-  SP_LOG("{}", SP_FMT_STR(spn_build_cmd_kind_to_str(cmd->kind)));
-}
-
-sp_str_t spn_build_graph_to_str(spn_build_graph_t* graph) {
-
-}
-
 
 /////////
 // APP //
@@ -4696,11 +4529,11 @@ spn_app_t spn_app_new() {
 
 spn_app_t spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode_t mode) {
   sp_str_t paths [] = {
-    sp_os_join_path(path, sp_str_lit("spn.toml")),
-    sp_os_join_path(path, sp_str_lit("spn.c")),
+    sp_fs_join_path(path, sp_str_lit("spn.toml")),
+    sp_fs_join_path(path, sp_str_lit("spn.c")),
   };
   sp_carr_for(paths, it) {
-    if (sp_os_does_path_exist(paths[it])) {
+    if (sp_fs_exists(paths[it])) {
       SP_FATAL("{:fg brightcyan} already exists; bailing", SP_FMT_STR(paths[it]));
     }
   }
@@ -4710,7 +4543,7 @@ spn_app_t spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode
     case SPN_APP_INIT_NORMAL: {
       app.package = spn_pkg_from_default(path, name);
 
-      sp_str_t main = sp_os_join_path(path, sp_str_lit("main.c"));
+      sp_str_t main = sp_fs_join_path(path, sp_str_lit("main.c"));
       sp_io_stream_t io = sp_io_from_file(main, SP_IO_MODE_WRITE);
 
       sp_str_t content = sp_str_lit(
@@ -4746,12 +4579,12 @@ spn_app_t spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode
 
 void spn_app_load(spn_app_t* app, sp_str_t manifest_path) {
   // Load the top level package
-  if (sp_os_does_path_exist(manifest_path)) {
+  if (sp_fs_exists(manifest_path)) {
     app->package = spn_pkg_from_manifest(manifest_path);
   }
 
   app->paths.dir = app->package.paths.dir;
-  app->paths.lock = sp_os_join_path(app->paths.dir, SP_LIT("spn.lock"));
+  app->paths.lock = sp_fs_join_path(app->paths.dir, SP_LIT("spn.lock"));
 
   // Now that we know all the registries, discover all packages
   sp_dyn_array_push(app->search, spn_registry_get_path(&spn.registry));
@@ -4768,24 +4601,24 @@ void spn_app_load(spn_app_t* app, sp_str_t manifest_path) {
 
   sp_dyn_array_for(app->search, i) {
     sp_str_t path = app->search[i];
-    if (!sp_os_does_path_exist(path)) continue;
-    if (!sp_os_is_directory(path)) {
+    if (!sp_fs_exists(path)) continue;
+    if (!sp_fs_is_dir(path)) {
       SP_FATAL(
         "{:fg brightcyan} is on the search path, but it's not a directory",
         SP_FMT_STR(path)
       );
     }
 
-    sp_da(sp_os_dir_ent_t) entries = sp_os_scan_directory(path);
+    sp_da(sp_os_dir_ent_t) entries = sp_fs_collect(path);
     sp_dyn_array_for(entries, i) {
       sp_os_dir_ent_t entry = entries[i];
-      sp_str_t stem = sp_os_extract_stem(entry.file_path);
+      sp_str_t stem = sp_fs_get_stem(entry.file_path);
       sp_ht_insert(app->registry, stem, entry.file_path);
     }
   }
 
   // Load the lock file
-  if (sp_os_does_path_exist(app->paths.lock)) {
+  if (sp_fs_exists(app->paths.lock)) {
     sp_opt_set(app->lock, spn_load_lock_file(app->paths.lock));
   }
 
@@ -4850,10 +4683,10 @@ void spn_app_build(spn_app_t* app, spn_tui_mode_t tui, bool force) {
   //   }
   // }
 
-  sp_da(sp_os_dir_ent_t) entries = sp_os_scan_directory(app->build.paths.bin);
+  sp_da(sp_os_dir_ent_t) entries = sp_fs_collect(app->build.paths.bin);
   sp_da_for(entries, it) {
     sp_os_dir_ent_t entry = entries[it];
-    sp_os_copy(entry.file_path, sp_os_parent_path(app->build.paths.store));
+    sp_fs_copy(entry.file_path, sp_fs_parent_path(app->build.paths.store));
   }
 
   switch (app->build.state) {
@@ -5089,18 +4922,18 @@ void spn_init(u32 num_args, const c8** args) {
 
   sp_atomic_s32_set(&spn.control, 0);
 
-  spn.paths.work = sp_os_get_cwd();
+  spn.paths.work = sp_fs_get_cwd();
   spn.paths.bin = sp_os_get_bin_path();
-  spn.paths.storage = sp_os_join_path(sp_os_get_storage_path(), sp_str_lit("spn"));
-  spn.paths.tools.dir = sp_os_join_path(spn.paths.storage, sp_str_lit("tools"));
-  spn.paths.tools.manifest = sp_os_join_path(spn.paths.tools.dir, sp_str_lit("spn.toml"));
-  spn.paths.tools.lock = sp_os_join_path(spn.paths.storage, sp_str_lit("spn.lock"));
+  spn.paths.storage = sp_fs_join_path(sp_fs_get_storage_path(), sp_str_lit("spn"));
+  spn.paths.tools.dir = sp_fs_join_path(spn.paths.storage, sp_str_lit("tools"));
+  spn.paths.tools.manifest = sp_fs_join_path(spn.paths.tools.dir, sp_str_lit("spn.toml"));
+  spn.paths.tools.lock = sp_fs_join_path(spn.paths.storage, sp_str_lit("spn.lock"));
 
   // Config
-  spn.paths.config_dir = sp_os_join_path(sp_os_get_config_path(), SP_LIT("spn"));
-  spn.paths.config = sp_os_join_path(spn.paths.config_dir, SP_LIT("spn.toml"));
+  spn.paths.config_dir = sp_fs_join_path(sp_fs_get_config_path(), SP_LIT("spn"));
+  spn.paths.config = sp_fs_join_path(spn.paths.config_dir, SP_LIT("spn.toml"));
 
-  if (sp_os_does_path_exist(spn.paths.config)) {
+  if (sp_fs_exists(spn.paths.config)) {
     toml_table_t* toml = spn_toml_parse(spn.paths.config);
 
     toml_value_t dir = toml_table_string(toml, "spn");
@@ -5123,13 +4956,13 @@ void spn_init(u32 num_args, const c8** args) {
   }
 
   if (!sp_str_valid(spn.paths.spn)) {
-    spn.paths.spn = sp_os_join_path(spn.paths.storage, sp_str_lit("spn"));
+    spn.paths.spn = sp_fs_join_path(spn.paths.storage, sp_str_lit("spn"));
   }
 
-  spn.paths.index = sp_os_join_path(spn.paths.spn, sp_str_lit("packages"));
-  spn.paths.include = sp_os_join_path(spn.paths.spn, sp_str_lit("include"));
+  spn.paths.index = sp_fs_join_path(spn.paths.spn, sp_str_lit("packages"));
+  spn.paths.include = sp_fs_join_path(spn.paths.spn, sp_str_lit("include"));
 
-  if (!sp_os_does_path_exist(spn.paths.spn)) {
+  if (!sp_fs_exists(spn.paths.spn)) {
     sp_str_t url = SP_LIT("https://github.com/tspader/spn.git");
     SP_LOG(
       "Cloning index from {:fg brightcyan} to {:fg brightcyan}",
@@ -5147,20 +4980,20 @@ void spn_init(u32 num_args, const c8** args) {
   };
 
   // Find the cache directory after the config has been fully loaded
-  spn.paths.cache = sp_os_join_path(spn.paths.storage, SP_LIT("cache"));
-  spn.paths.source = sp_os_join_path(spn.paths.cache, SP_LIT("source"));
-  spn.paths.build = sp_os_join_path(spn.paths.cache, SP_LIT("build"));
-  spn.paths.store = sp_os_join_path(spn.paths.cache, SP_LIT("store"));
+  spn.paths.cache = sp_fs_join_path(spn.paths.storage, SP_LIT("cache"));
+  spn.paths.source = sp_fs_join_path(spn.paths.cache, SP_LIT("source"));
+  spn.paths.build = sp_fs_join_path(spn.paths.cache, SP_LIT("build"));
+  spn.paths.store = sp_fs_join_path(spn.paths.cache, SP_LIT("store"));
 
-  sp_os_create_directory(spn.paths.cache);
-  sp_os_create_directory(spn.paths.source);
-  sp_os_create_directory(spn.paths.build);
-  sp_os_create_directory(spn.paths.store);
-  sp_os_create_directory(spn.paths.bin);
-  sp_os_create_directory(spn.paths.tools.dir);
+  sp_fs_create_dir(spn.paths.cache);
+  sp_fs_create_dir(spn.paths.source);
+  sp_fs_create_dir(spn.paths.build);
+  sp_fs_create_dir(spn.paths.store);
+  sp_fs_create_dir(spn.paths.bin);
+  sp_fs_create_dir(spn.paths.tools.dir);
 
   app = spn_app_new();
-  spn_app_load(&app, sp_os_join_path(spn.paths.work, sp_str_lit("spn.toml")));
+  spn_app_load(&app, sp_fs_join_path(spn.paths.work, sp_str_lit("spn.toml")));
 }
 
 /////////
@@ -5684,7 +5517,7 @@ void spn_cli_init(spn_cli_t* cli) {
 
   spn_app_t app = spn_app_init_and_write(
     spn.paths.work,
-    sp_os_extract_stem(spn.paths.work),
+    sp_fs_get_stem(spn.paths.work),
     cmd->bare ? SPN_APP_INIT_BARE : SPN_APP_INIT_NORMAL
   );
 
@@ -5717,7 +5550,7 @@ void spn_cli_list(spn_cli_t* cli) {
   sp_ht_for(app.registry, it) {
     sp_str_t path = *sp_ht_it_getp(app.registry, it);
     spn_pkg_t* package = spn_app_find_package(&app, (spn_dep_req_t) {
-      .name = sp_os_extract_stem(path),
+      .name = sp_fs_get_stem(path),
       .kind = SPN_PACKAGE_KIND_INDEX
     });
 
@@ -5734,9 +5567,9 @@ void spn_cli_list(spn_cli_t* cli) {
 
 void spn_cli_clean(spn_cli_t* cli) {
   SP_LOG("Removing {:fg brightcyan}", SP_FMT_STR(spn.paths.build));
-  sp_os_remove_directory(spn.paths.build);
+  sp_fs_remove_dir(spn.paths.build);
   SP_LOG("Removing {:fg brightcyan}", SP_FMT_STR(spn.paths.store));
-  sp_os_remove_directory(spn.paths.store);
+  sp_fs_remove_dir(spn.paths.store);
 }
 
 
@@ -5760,19 +5593,19 @@ void spn_cli_copy(spn_cli_t* cli) {
   };
   spn_cli_parse_command(&parser);
 
-  sp_str_t destination = sp_os_normalize_path(cmd->directory);
-  sp_str_t to = sp_os_join_path(spn.paths.work, destination);
-  sp_os_create_directory(to);
+  sp_str_t destination = sp_fs_normalize_path(cmd->directory);
+  sp_str_t to = sp_fs_join_path(spn.paths.work, destination);
+  sp_fs_create_dir(to);
 
   sp_ht_for(app.deps, it) {
     spn_pkg_build_t* dep = sp_ht_it_getp(app.deps, it);
 
-    sp_dyn_array(sp_os_dir_ent_t) entries = sp_os_scan_directory(dep->paths.lib);
+    sp_dyn_array(sp_os_dir_ent_t) entries = sp_fs_collect(dep->paths.lib);
     sp_dyn_array_for(entries, i) {
       sp_os_dir_ent_t* entry = entries + i;
-      sp_os_copy_file(
+      sp_fs_copy_file(
         entry->file_path,
-        sp_os_join_path(to, sp_os_extract_file_name(entry->file_path))
+        sp_fs_join_path(to, sp_fs_get_name(entry->file_path))
       );
     }
   }
@@ -5849,7 +5682,7 @@ void spn_cli_manifest(spn_cli_t* cli) {
     SP_FATAL("Failed to read manifest at {:fg brightyellow}", SP_FMT_STR(path));
   }
 
-  sp_os_log(manifest);
+  sp_log(manifest);
 }
 
 spn_dep_req_t spn_dep_req_from_str(sp_str_t str) {
@@ -6016,18 +5849,18 @@ void spn_pkg_link_binaries(spn_pkg_build_t* build) {
     sp_str_t binary_path = spn_pkg_build_get_bin_path(build, bin);
     sp_str_t tool_path = spn_get_tool_path(bin);
 
-    if (sp_os_does_path_exist(tool_path)) {
-      sp_os_remove_file(tool_path);
+    if (sp_fs_exists(tool_path)) {
+      sp_fs_remove_file(tool_path);
     }
 
-    if (!sp_os_does_path_exist(binary_path)) {
+    if (!sp_fs_exists(binary_path)) {
       SP_WARN("{:fg brightcyan} doesn't exist; did you run {:fg yellow}?",
         SP_FMT_STR(binary_path),
         SP_FMT_CSTR("spn build")
       );
     }
 
-    sp_os_create_symbolic_link(binary_path, tool_path);
+    sp_fs_create_sym_link(binary_path, tool_path);
 
     SP_LOG("Installed {:fg brightcyan}",
       SP_FMT_STR(tool_path)
@@ -6039,10 +5872,10 @@ void spn_pkg_link_binaries(spn_pkg_build_t* build) {
 void spn_cli_tool_install(spn_cli_t* cli) {
   spn_cli_tool_install_t* cmd = &cli->tool.install;
 
-  sp_str_t dir = sp_os_canonicalize_path(sp_os_join_path(spn.paths.work, cmd->dir));
-  sp_str_t file_path = sp_os_join_path(dir, sp_str_lit("spn.toml"));
+  sp_str_t dir = sp_fs_canonicalize_path(sp_fs_join_path(spn.paths.work, cmd->dir));
+  sp_str_t file_path = sp_fs_join_path(dir, sp_str_lit("spn.toml"));
 
-  if (sp_os_does_path_exist(file_path)) {
+  if (sp_fs_exists(file_path)) {
     spn_app_t tool = spn_app_new();
     spn_app_load(&tool, file_path);
     spn_app_resolve(&tool);
@@ -6055,7 +5888,7 @@ void spn_cli_tool_install(spn_cli_t* cli) {
       sp_str_t binary_path = spn_pkg_build_get_bin_path(&app.build, bin);
       sp_str_t tool_path = spn_get_tool_path(bin);
 
-      if (sp_os_is_regular_file(tool_path) && !cmd->force) {
+      if (sp_fs_is_regular_file(tool_path) && !cmd->force) {
         SP_FATAL(
           "{:fg brightcyan} was not created by spn. Use {:fg yellow} to overwrite it.",
           SP_FMT_STR(tool_path),
@@ -6072,7 +5905,7 @@ void spn_cli_tool_install(spn_cli_t* cli) {
     }
 
     spn_app_t tool = SP_ZERO_INITIALIZE();
-    if (!sp_os_does_path_exist(spn.paths.tools.manifest)) {
+    if (!sp_fs_exists(spn.paths.tools.manifest)) {
       spn_app_init_and_write(
         spn.paths.tools.dir,
         sp_str_lit("tools"),
@@ -6114,11 +5947,11 @@ void spn_cli_tool_install(spn_cli_t* cli) {
 void spn_cli_tool_uninstall(spn_cli_t* cli) {
   spn_cli_tool_install_t* cmd = &cli->tool.install;
 
-  sp_str_t dir = sp_os_join_path(spn.paths.work, cmd->package);
-  dir = sp_os_canonicalize_path(dir);
-  sp_str_t file_path = sp_os_join_path(dir, sp_str_lit("spn.toml"));
+  sp_str_t dir = sp_fs_join_path(spn.paths.work, cmd->package);
+  dir = sp_fs_canonicalize_path(dir);
+  sp_str_t file_path = sp_fs_join_path(dir, sp_str_lit("spn.toml"));
 
-  if (sp_os_does_path_exist(file_path)) {
+  if (sp_fs_exists(file_path)) {
     spn_app_t tool = spn_app_new();
     spn_app_load(&tool, file_path);
 
@@ -6126,10 +5959,10 @@ void spn_cli_tool_uninstall(spn_cli_t* cli) {
       spn_bin_t* bin = sp_ht_it_getp(tool.package.bin, it);
       sp_str_t tool_path = spn_get_tool_path(bin);
 
-      if (!sp_os_does_path_exist(tool_path)) {
+      if (!sp_fs_exists(tool_path)) {
         continue;
       }
-      if (sp_os_is_regular_file(tool_path) && !cmd->force) {
+      if (sp_fs_is_regular_file(tool_path) && !cmd->force) {
         SP_FATAL(
           "{:fg brightcyan} was not created by spn. Use {:fg yellow} if you want to remove it anyway.",
           SP_FMT_STR(tool_path),
@@ -6137,7 +5970,7 @@ void spn_cli_tool_uninstall(spn_cli_t* cli) {
         );
       }
 
-      sp_os_remove_file(tool_path);
+      sp_fs_remove_file(tool_path);
 
       SP_LOG("Uninstalled {:fg brightcyan}",
         SP_FMT_STR(tool_path)
@@ -6282,12 +6115,12 @@ void spn_cli_print(spn_cli_t* cli) {
   }
 
   if (sp_str_valid(command->path)) {
-    sp_str_t destination = sp_os_normalize_path(command->path);
-    destination = sp_os_join_path(spn.paths.work, destination);
-    sp_os_create_directory(destination);
+    sp_str_t destination = sp_fs_normalize_path(command->path);
+    destination = sp_fs_join_path(spn.paths.work, destination);
+    sp_fs_create_dir(destination);
 
-    sp_str_t file_path = sp_os_join_path(destination, gen.file_name);
-    sp_io_stream_t file = sp_io_from_file(sp_os_join_path(destination, gen.file_name), SP_IO_MODE_WRITE);
+    sp_str_t file_path = sp_fs_join_path(destination, gen.file_name);
+    sp_io_stream_t file = sp_io_from_file(sp_fs_join_path(destination, gen.file_name), SP_IO_MODE_WRITE);
     if (sp_io_write_str(&file, gen.output)) {
       SP_FATAL("Failed to write {}", SP_FMT_STR(file_path));
     }
@@ -6439,18 +6272,6 @@ void spn_cli_build(spn_cli_t* cli) {
 }
 
 s32 main(s32 num_args, const c8** args) {
-  spn_build_graph_t* graph = spn_build_graph_new();
-  spn_build_file_t* bar_exe = spn_build_graph_add_file(graph, sp_str_lit("foo/bar.exe"));
-  spn_build_cmd_t* cc = spn_build_graph_add_command(graph, SPN_BUILD_COMMAND_SUBPROCESS);
-  spn_build_file_set_command(bar_exe, cc);
-
-
-  spn_build_file_t* la = spn_build_graph_add_file(graph, sp_str_lit("foo/a.o"));
-  spn_build_file_t* lb = spn_build_graph_add_file(graph, sp_str_lit("foo/b.o"));
-  spn_build_cmd_t* l = spn_build_graph_add_command(graph, SPN_BUILD_COMMAND_SUBPROCESS);
-  spn_build_file_set_command(la, l);
-  spn_build_file_set_command(lb, l);
-
   spn = SP_ZERO_STRUCT(spn_ctx_t);
   app = SP_ZERO_STRUCT(spn_app_t);
   spn_init(num_args, args);

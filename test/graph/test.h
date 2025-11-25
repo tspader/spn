@@ -27,21 +27,21 @@ void sp_test_file_manager_cleanup(sp_test_file_manager_t* manager);
 
 #if defined(SP_TEST_IMPLEMENTATION)
 void sp_test_file_manager_init(sp_test_file_manager_t* manager) {
-  manager->paths.bin = sp_os_get_executable_path();
-  manager->paths.build = sp_os_parent_path(manager->paths.bin);
-  manager->paths.root = sp_os_parent_path(manager->paths.build);
-  manager->paths.test = sp_os_join_path(manager->paths.build, sp_str_lit("test"));
+  manager->paths.bin = sp_fs_get_exe_path();
+  manager->paths.build = sp_fs_parent_path(manager->paths.bin);
+  manager->paths.root = sp_fs_parent_path(manager->paths.build);
+  manager->paths.test = sp_fs_join_path(manager->paths.build, sp_str_lit("test"));
 
-  sp_os_remove_directory(manager->paths.test);
-  sp_os_create_directory(manager->paths.test);
+  sp_fs_remove_dir(manager->paths.test);
+  sp_fs_create_dir(manager->paths.test);
 }
 
 sp_str_t sp_test_file_path(sp_test_file_manager_t* manager, sp_str_t name) {
-  return sp_os_join_path(manager->paths.test, name);
+  return sp_fs_join_path(manager->paths.test, name);
 }
 
 void sp_test_file_create_ex(sp_test_file_config_t config) {
-  sp_os_remove_file(config.path);
+  sp_fs_remove_file(config.path);
 
   sp_io_stream_t stream = sp_io_from_file(config.path, SP_IO_MODE_WRITE);
   SP_ASSERT(stream.file.fd != 0);
@@ -65,6 +65,6 @@ sp_str_t sp_test_file_create_empty(sp_test_file_manager_t* manager, sp_str_t rel
 }
 
 void sp_test_file_manager_cleanup(sp_test_file_manager_t* manager) {
-  sp_os_remove_directory(manager->paths.test);
+  sp_fs_remove_dir(manager->paths.test);
 }
 #endif
