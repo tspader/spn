@@ -13,13 +13,16 @@ assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn
 # Files
 - `source/spn.c` is the entire implementation
 - `include/spn/spn.h` for public API used in packages
-- `spn.toml` is the package for spn itself; (downstream example)
-- `packages/sp/spn.toml` is the package for `sp.h` (source-only example)
-- `packages/tcc/spn.toml` is the package for `tcc` (compiled example)
+- `spn.toml` is the package for spn itself; (example of a downstream project that uses spn)
+- `examples/tcc/spn.toml` is the package for the `tcc` example (minimal example of a downstream project)
+- `packages/sp/spn.toml` is the package for `sp.h` (example of a source-only spn package)
+- `packages/tcc/spn.toml` is the package for `tcc` (example of a compiled spn package)
 
 # Build
-- build with `make` to output to `./bootstrap/bin/spn`
+- build with `spn build --profile=debug` to output to `./build/debug`
+- if you need to test a change you made, building spn itself is often the best way; use e.g. `./build/debug/spn build --profile=debug` to use a fresh debug build
+- if you, for some reason, need a non-bootstrapped build, build with `make` to output to `./bootstrap/bin/spn`
 
 ## Rules
-- always use the `sp.h` skill when (either with your `Skill` tool or with `./doc/llm/sp/SKILL.md`)
+- always use the `sp.h` skill when writing against sp.h APIs (either with your `Skill` tool or with `./doc/llm/sp/SKILL.md`)
 - never use the C standard library. always use `sp.h`

@@ -577,7 +577,7 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
             };
             sp_da_push(dirty->errors, err);
           } else {
-            sp_tm_epoch_t mtime = sp_os_file_mod_time_precise(file->path);
+            sp_tm_epoch_t mtime = sp_fs_get_mod_time(file->path);
             sp_ht_insert(dirty->mod_times, node.id, mtime);
           }
         } else {
@@ -608,7 +608,7 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
               is_dirty = true;
               break;
             }
-            sp_tm_epoch_t mtime = sp_os_file_mod_time_precise(output->path);
+            sp_tm_epoch_t mtime = sp_fs_get_mod_time(output->path);
             sp_ht_insert(dirty->mod_times, cmd->produces[i], mtime);
           }
         }

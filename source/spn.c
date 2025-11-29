@@ -505,6 +505,7 @@ struct spn_pkg {
   sp_da(spn_registry_t) registries;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
+  sp_da(sp_str_t) system_deps;
   sp_ht(sp_str_t, spn_profile_t) profiles;
   spn_package_kind_t kind;
 
@@ -544,7 +545,6 @@ typedef struct {
 struct spn_pkg_build {
   sp_str_t name;
   spn_lib_kind_t kind;
-  spn_dep_mode_t mode;
   spn_metadata_t metadata;
   spn_dep_options_t options;
   sp_hash_t build_id;
@@ -629,6 +629,7 @@ typedef struct {
   sp_ht(sp_str_t, sp_da(spn_dep_version_range_t)) ranges;
   sp_ht(sp_str_t, spn_semver_t) versions;
   sp_ht(sp_str_t, bool) visited;
+  sp_da(sp_str_t) system_deps;
 } spn_resolver_t;
 
 
@@ -1083,7 +1084,6 @@ typedef struct {
   sp_ht(sp_str_t, sp_str_t) registry;
   sp_ht(sp_str_t, spn_pkg_t) cache;
   sp_ht(sp_str_t, spn_pkg_build_t) deps;
-  sp_da(sp_str_t) system_deps;
   sp_ht(sp_str_t, spn_compile_thread_ctx_t) threads;
 } spn_app_t;
 
@@ -1401,7 +1401,7 @@ void spn_cmake_configure(spn_cmake_t* cmake) {
 
   sp_ps_config_add_arg(&config, spn_cmake_format_define(
     SP_LIT("CMAKE_BUILD_TYPE"),
-    build->mode == SPN_DEP_BUILD_MODE_RELEASE ? SP_LIT("Release") : SP_LIT("Debug"))
+    build->profile.mode == SPN_DEP_BUILD_MODE_RELEASE ? SP_LIT("Release") : SP_LIT("Debug"))
   );
 
   sp_da_for(cmake->defines, it) {
@@ -1535,6 +1535,10 @@ spn_err_t spn_cc_run(spn_cc_t* cc) {
           sp_dyn_array_for(rpath, i) {
             sp_ps_config_add_arg(&cfg, rpath[i]);
           }
+        }
+
+        sp_dyn_array_for(app.resolver.system_deps, i) {
+          sp_ps_config_add_arg(&cfg, spn_gen_format_entry_for_compiler(app.resolver.system_deps[i], SPN_GENERATOR_SYSTEM_LIBS, profile->cc.kind));
         }
 
         sp_ps_config_add_arg(&cfg, spn_cc_c_standard_to_switch(profile->standard));
@@ -3995,6 +3999,11 @@ spn_pkg_t spn_pkg_load(sp_str_t manifest_path) {
     if (define) {
       package.define = spn_toml_arr_to_str_arr(define);
     }
+
+    toml_array_t* system_deps = toml_table_array(toml.package, "system_deps");
+    if (system_deps) {
+      package.system_deps = spn_toml_arr_to_str_arr(system_deps);
+    }
   }
 
   if (toml.lib) {
@@ -4202,6 +4211,16 @@ void spn_app_add_package_constraints(spn_app_t* app, spn_pkg_t* package) {
     spn_dep_req_t request = *sp_ht_it_getp(package->deps, it);
     spn_pkg_t* dep = spn_app_find_package(app, request);
     spn_app_add_package_constraints(app, dep);
+
+    // collect system deps from this dependency
+    sp_dyn_array_for(dep->system_deps, i) {
+      sp_str_t sys_dep = dep->system_deps[i];
+      bool found = false;
+      sp_dyn_array_for(resolver->system_deps, j) {
+        if (sp_str_equal(resolver->system_deps[j], sys_dep)) { found = true; break; }
+      }
+      if (!found) sp_dyn_array_push(resolver->system_deps, sys_dep);
+    }
   }
 
   sp_ht_erase(resolver->visited, package->name);
@@ -4304,7 +4323,6 @@ void spn_app_prepare_build(spn_app_t* app) {
 
   app->build = (spn_pkg_build_t) {
     .name = app->package.name,
-    .mode = SPN_DEP_BUILD_MODE_DEBUG,
     .package = &app->package,
     .profile = app->profile,
     .paths = {
@@ -4332,7 +4350,6 @@ void spn_app_prepare_dep_builds(spn_app_t* app) {
     // add a new build context for this dep
     spn_pkg_build_t dep = {
       .name = name,
-      .mode = SPN_DEP_BUILD_MODE_DEBUG,
       .metadata = *metadata,
       .profile = app->profile,
     };
@@ -4358,12 +4375,11 @@ void spn_app_prepare_dep_builds(spn_app_t* app) {
 
     sp_dyn_array(sp_hash_t) hashes = SP_NULLPTR;
     sp_dyn_array_push(hashes, sp_hash_str(dep.metadata.commit));
-    sp_dyn_array_push(hashes, dep.profile.linkage);
+    sp_dyn_array_push(hashes, sp_hash_str(dep.profile.cc.exe));
+    sp_dyn_array_push(hashes, dep.profile.cc.kind);
     sp_dyn_array_push(hashes, dep.profile.libc);
-    sp_dyn_array_push(hashes, dep.profile.standard);
     sp_dyn_array_push(hashes, dep.profile.mode);
     sp_dyn_array_push(hashes, dep.kind);
-    sp_dyn_array_push(hashes, dep.mode);
     sp_dyn_array_push(hashes, dep.metadata.version.major);
     sp_dyn_array_push(hashes, dep.metadata.version.minor);
     sp_dyn_array_push(hashes, dep.metadata.version.patch);
@@ -4456,6 +4472,9 @@ void spn_app_write_manifest(spn_pkg_t* package, sp_str_t path) {
   }
   if (!sp_dyn_array_empty(package->include)) {
     spn_toml_append_str_array_cstr(&toml, "include", package->include);
+  }
+  if (!sp_dyn_array_empty(package->system_deps)) {
+    spn_toml_append_str_array_cstr(&toml, "system_deps", package->system_deps);
   }
   spn_toml_end_table(&toml);
 
@@ -4945,7 +4964,7 @@ void spn_init(u32 num_args, const c8** args) {
         .summary = "Run ls against a cache dir for a package (e.g. to see build output)"
       },
       {
-        .name = "manigest",
+        .name = "manifest",
         .args = { { .name = "package", .kind = SPN_CLI_ARG_KIND_REQUIRED, .summary = "The package name", .ptr = &cli->manifest.package } },
         .summary = "Print the full manifest source for a package"
       },
@@ -6195,7 +6214,7 @@ void spn_cli_print(spn_cli_t* cli) {
     .kind = SPN_GENERATOR_SYSTEM_LIBS,
     .compiler = gen.compiler
   };
-  sp_dyn_array(sp_str_t) entries = sp_str_map(app.system_deps, sp_dyn_array_size(app.system_deps), &fmt, spn_generator_format_entry_kernel);
+  sp_dyn_array(sp_str_t) entries = sp_str_map(app.resolver.system_deps, sp_dyn_array_size(app.resolver.system_deps), &fmt, spn_generator_format_entry_kernel);
   gen.system_libs = sp_str_join_n(entries, sp_dyn_array_size(entries), sp_str_lit(" "));
 
   switch (gen.kind) {
@@ -6377,9 +6396,7 @@ void spn_cli_build(spn_cli_t* cli) {
   spn_app_prepare_dep_builds(&app);
   spn_app_prepare_build(&app);
 
-  spn_tui_mode_t mode = sp_str_valid(spn.cli.output) ?
-    spn_output_mode_from_str(spn.cli.output) :
-    SPN_OUTPUT_MODE_INTERACTIVE;
+  spn_tui_mode_t mode = SPN_OUTPUT_MODE_NONINTERACTIVE;
 
   spn_app_build_deps(&app, mode, command->force);
 

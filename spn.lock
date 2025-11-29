@@ -10,7 +10,7 @@ commit = "f71ed6c7b11c"
 [[package]]
 name = "sp"
 version = "1.6.3"
-commit = "97c51daee697"
+commit = "a013cd7c2e8a"
 
 [[package]]
 name = "tcc"

@@ -11,7 +11,7 @@ toml = "1.2.0"
 
 [[profile]]
 name = "debug"
-cc = "musl-gcc"
+cc = "tcc"
 
 [[profile]]
 name = "macos"
