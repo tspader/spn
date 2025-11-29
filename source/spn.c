@@ -1206,6 +1206,18 @@ struct spn_autoconf {
   sp_da(sp_str_t) flags;
 };
 
+typedef struct {
+  sp_str_t name;
+  sp_str_t value;
+} spn_cmake_define_t;
+
+struct spn_cmake {
+  spn_pkg_build_t* build;
+  spn_cmake_gen_t generator;
+  sp_da(spn_cmake_define_t) defines;
+  sp_da(sp_str_t) args;
+};
+
 spn_cc_t         spn_cc_new(spn_pkg_build_t* build);
 void             spn_cc_add_include(spn_cc_t* cc, sp_str_t dir);
 void             spn_cc_add_define(spn_cc_t* cc, sp_str_t var);
@@ -1229,6 +1241,15 @@ typedef struct {
   APPLY(spn_autoconf_new) \
   APPLY(spn_autoconf_run) \
   APPLY(spn_autoconf_add_flag) \
+  APPLY(spn_cmake) \
+  APPLY(spn_cmake_new) \
+  APPLY(spn_cmake_set_generator) \
+  APPLY(spn_cmake_add_define) \
+  APPLY(spn_cmake_add_arg) \
+  APPLY(spn_cmake_configure) \
+  APPLY(spn_cmake_build) \
+  APPLY(spn_cmake_install) \
+  APPLY(spn_cmake_run) \
   APPLY(spn_dep_log) \
   APPLY(spn_dep_get_libc) \
   APPLY(spn_dep_set_s64) \
@@ -1306,6 +1327,122 @@ void spn_autoconf_run(spn_autoconf_t* autoconf) {
 
 void spn_autoconf_add_flag(spn_autoconf_t* autoconf, const c8* flag) {
   sp_da_push(autoconf->flags, sp_str_from_cstr(flag));
+}
+
+sp_str_t spn_cmake_gen_to_str(spn_cmake_gen_t gen) {
+  switch (gen) {
+    case SPN_CMAKE_GEN_DEFAULT:        return (sp_str_t){0};
+    case SPN_CMAKE_GEN_UNIX_MAKEFILES: return sp_str_lit("Unix Makefiles");
+    case SPN_CMAKE_GEN_NINJA:          return sp_str_lit("Ninja");
+    case SPN_CMAKE_GEN_XCODE:          return sp_str_lit("Xcode");
+    case SPN_CMAKE_GEN_MSVC:           return sp_str_lit("Visual Studio 17 2022");
+    case SPN_CMAKE_GEN_MINGW:          return sp_str_lit("MinGW Makefiles");
+  }
+  return (sp_str_t){0};
+}
+
+void spn_cmake(spn_pkg_build_t* build) {
+  spn_cmake_t* cmake = spn_cmake_new(build);
+  spn_cmake_run(cmake);
+}
+
+spn_cmake_t* spn_cmake_new(spn_pkg_build_t* build) {
+  spn_cmake_t* cmake = SP_ALLOC(spn_cmake_t);
+  cmake->build = build;
+  cmake->generator = SPN_CMAKE_GEN_DEFAULT;
+  return cmake;
+}
+
+void spn_cmake_set_generator(spn_cmake_t* cmake, spn_cmake_gen_t gen) {
+  cmake->generator = gen;
+}
+
+static sp_str_t spn_cmake_format_define(sp_str_t name, sp_str_t value) {
+  return sp_format("-D{}={}", SP_FMT_STR(name), SP_FMT_STR(value));
+}
+
+void spn_cmake_add_define(spn_cmake_t* cmake, const c8* name, const c8* value) {
+  spn_cmake_define_t def = {
+    .name = sp_str_from_cstr(name),
+    .value = sp_str_from_cstr(value),
+  };
+  sp_da_push(cmake->defines, def);
+}
+
+void spn_cmake_add_arg(spn_cmake_t* cmake, const c8* arg) {
+  sp_da_push(cmake->args, sp_str_from_cstr(arg));
+}
+
+void spn_cmake_configure(spn_cmake_t* cmake) {
+  spn_pkg_build_t* build = cmake->build;
+
+  sp_ps_config_t config = {
+    .command = SP_LIT("cmake"),
+    .args = {
+      SP_LIT("-S"), build->paths.source,
+      SP_LIT("-B"), build->paths.work,
+    }
+  };
+
+  if (cmake->generator != SPN_CMAKE_GEN_DEFAULT) {
+    sp_ps_config_add_arg(&config, SP_LIT("-G"));
+    sp_ps_config_add_arg(&config, spn_cmake_gen_to_str(cmake->generator));
+  }
+
+  sp_ps_config_add_arg(&config, spn_cmake_format_define(
+    SP_LIT("CMAKE_INSTALL_PREFIX"),
+    build->paths.store)
+  );
+
+  sp_ps_config_add_arg(&config, spn_cmake_format_define(
+    SP_LIT("BUILD_SHARED_LIBS"),
+    build->kind == SPN_LIB_KIND_SHARED ? SP_LIT("ON") : SP_LIT("OFF"))
+  );
+
+  sp_ps_config_add_arg(&config, spn_cmake_format_define(
+    SP_LIT("CMAKE_BUILD_TYPE"),
+    build->mode == SPN_DEP_BUILD_MODE_RELEASE ? SP_LIT("Release") : SP_LIT("Debug"))
+  );
+
+  sp_da_for(cmake->defines, it) {
+    spn_cmake_define_t define = cmake->defines[it];
+    sp_ps_config_add_arg(&config, spn_cmake_format_define(define.name, define.value));
+  }
+
+  sp_da_for(cmake->args, it) {
+    sp_ps_config_add_arg(&config, cmake->args[it]);
+  }
+
+  spn_dep_context_subprocess(build, config);
+}
+
+void spn_cmake_build(spn_cmake_t* cmake) {
+  spn_pkg_build_t* build = cmake->build;
+
+  spn_dep_context_subprocess(build, (sp_ps_config_t) {
+    .command = SP_LIT("cmake"),
+    .args = {
+      SP_LIT("--build"),
+      build->paths.work
+    }
+  });
+}
+
+void spn_cmake_install(spn_cmake_t* cmake) {
+  spn_pkg_build_t* build = cmake->build;
+
+  spn_dep_context_subprocess(build, (sp_ps_config_t) {
+    .command = SP_LIT("cmake"),
+    .args = {
+      SP_LIT("--install"),
+      build->paths.work
+    }
+  });
+}
+
+void spn_cmake_run(spn_cmake_t* cmake) {
+  spn_cmake_configure(cmake);
+  spn_cmake_build(cmake);
 }
 
 spn_cc_t spn_cc_new(spn_pkg_build_t* build) {

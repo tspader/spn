@@ -5,14 +5,13 @@ version = "0.1.0"
 [deps]
 sp = "1.4.0"
 argparse = ">=1.0.0"
+utest = "1.0.0"
 tcc = ">=1.0.0"
 toml = "1.2.0"
 
 [[profile]]
 name = "debug"
 cc = "musl-gcc"
-libc = "musl"
-linkage = "static"
 
 [[profile]]
 name = "macos"
@@ -26,11 +25,4 @@ include = ["include"]
 [[bin]]
 name = "spn-test-graph"
 source = ["test/graph/main.c"]
-include = ["include", "source", "test/graph"]
-
-[options]
-foo = "bar"
-baz = 69
-
-[config.sp]
-use_foo = true
+include = ["include", "source", "test/graph", "test/tools"]

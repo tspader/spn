@@ -72,11 +72,21 @@ typedef enum {
   SPN_PACKAGE_KIND_INDEX,
 } spn_package_kind_t;
 
+typedef enum {
+  SPN_CMAKE_GEN_DEFAULT,
+  SPN_CMAKE_GEN_UNIX_MAKEFILES,
+  SPN_CMAKE_GEN_NINJA,
+  SPN_CMAKE_GEN_XCODE,
+  SPN_CMAKE_GEN_MSVC,
+  SPN_CMAKE_GEN_MINGW,
+} spn_cmake_gen_t;
+
 typedef struct spn_config spn_config_t;
 typedef struct spn_pkg spn_pkg_t;
 typedef struct spn_pkg_build spn_pkg_build_t;
 typedef struct spn_autoconf spn_autoconf_t;
 typedef struct spn_make spn_make_t;
+typedef struct spn_cmake spn_cmake_t;
 typedef struct spn_cc spn_cc_t;
 
 typedef void(*spn_config_fn_t)(spn_config_t*);
@@ -90,6 +100,15 @@ void            spn_autoconf(spn_pkg_build_t* build);
 spn_autoconf_t* spn_autoconf_new(spn_pkg_build_t* build);
 void            spn_autoconf_run(spn_autoconf_t* autoconf);
 void            spn_autoconf_add_flag(spn_autoconf_t* autoconf, const c8* flag);
+void            spn_cmake(spn_pkg_build_t* build);
+spn_cmake_t*    spn_cmake_new(spn_pkg_build_t* build);
+void            spn_cmake_set_generator(spn_cmake_t* cmake, spn_cmake_gen_t gen);
+void            spn_cmake_add_define(spn_cmake_t* cmake, const c8* name, const c8* value);
+void            spn_cmake_add_arg(spn_cmake_t* cmake, const c8* arg);
+void            spn_cmake_configure(spn_cmake_t* cmake);
+void            spn_cmake_build(spn_cmake_t* cmake);
+void            spn_cmake_install(spn_cmake_t* cmake);
+void            spn_cmake_run(spn_cmake_t* cmake);
 void            spn_dep_log(spn_pkg_build_t* dep, const c8* message);
 spn_libc_kind_t spn_dep_get_libc(spn_pkg_build_t* dep);
 s64             spn_dep_get_s64(spn_pkg_build_t* dep, const c8* name);
