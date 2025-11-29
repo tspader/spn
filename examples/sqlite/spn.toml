@@ -1,0 +1,15 @@
+[package]
+name = "sqlite-example"
+version = "0.1.0"
+
+[deps]
+sqlite = "3.51.1"
+sp = "1.6.3"
+
+
+[[bin]]
+name = "sqlite-example"
+source = ["main.c"]
+
+[config.sqlite]
+kind = "static"
