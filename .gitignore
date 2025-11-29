@@ -12,6 +12,9 @@ packages/**/spn.lock
 test/**/build
 test/**/spn.lock
 
+examples/**/build
+examples/**/spn.lock
+
 .claude
 CLAUDE.md
 .mcp.json

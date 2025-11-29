@@ -4362,6 +4362,8 @@ void spn_app_prepare_dep_builds(spn_app_t* app) {
     sp_dyn_array_push(hashes, dep.profile.libc);
     sp_dyn_array_push(hashes, dep.profile.standard);
     sp_dyn_array_push(hashes, dep.profile.mode);
+    sp_dyn_array_push(hashes, dep.kind);
+    sp_dyn_array_push(hashes, dep.mode);
     sp_dyn_array_push(hashes, dep.metadata.version.major);
     sp_dyn_array_push(hashes, dep.metadata.version.minor);
     sp_dyn_array_push(hashes, dep.metadata.version.patch);

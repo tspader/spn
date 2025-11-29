@@ -1,0 +1,12 @@
+[package]
+name = "tcc-example"
+version = "0.1.0"
+
+[deps]
+tcc = "1.0.0"
+sp = "1.6.3"
+
+
+[[bin]]
+name = "tcc-example"
+source = ["main.c"]
