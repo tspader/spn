@@ -10,38 +10,19 @@ tcc = ">=1.0.0"
 toml = "1.2.0"
 
 [[profile]]
-name = "musl"
-cc = "musl-gcc"
-linkage = "static"
-
-[[bin]]
 name = "debug"
-cc = "musl-gcc"
-linkage = "static"
-libc = "musl"
-standard = "c99"
-mode = "debug"
+cc = "gcc"
+
+[[profile]]
+name = "macos"
+cc = "clang"
 
 [[bin]]
 name = "spn"
 source = ["source/spn.c"]
 include = ["include"]
-define = ["SPN_CLI"]
 
 [[bin]]
-name = "test-sp-cli"
-source = ["test/cli/main.c"]
-include = ["include", "source"]
-
-[[bin]]
-name = "test-spn-cli"
-source = ["test/cli/cli.c"]
-include = ["include", "source"]
-
-[options]
-foo = "bar"
-baz = 69
-
-[config.sp]
-use_foo = true
-
+name = "spn-test-graph"
+source = ["test/graph/main.c"]
+include = ["include", "source", "test/graph", "test/tools"]
