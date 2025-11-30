@@ -65,10 +65,10 @@ typedef enum {
   SPN_BUILD_CMD_FN = 1,
 } spn_build_cmd_kind_t;
 
-typedef struct spn_build_cmd_t spn_build_cmd_t;
-SP_TYPEDEF_FN(void, spn_bg_on_execute_fn_t, spn_build_cmd_t* cmd, void* user_data);
+typedef struct spn_build_cmd spn_build_cmd_t;
+SP_TYPEDEF_FN(void, spn_bg_fn_t, spn_build_cmd_t* cmd, void* user_data);
 
-struct spn_build_cmd_t {
+struct spn_build_cmd {
   spn_build_cmd_kind_t kind;
   spn_bg_id_t id;
   sp_str_t tag;
@@ -78,7 +78,7 @@ struct spn_build_cmd_t {
   union {
     sp_ps_config_t ps;
     struct {
-      spn_bg_on_execute_fn_t on_execute;
+      spn_bg_fn_t on_execute;
       void* user_data;
     } fn;
   };
@@ -130,6 +130,7 @@ typedef struct {
 
 typedef struct {
   sp_tm_epoch_t mod_time;
+  bool exists;
 } spn_bg_dirty_file_metadata_t;
 
 typedef struct {
@@ -178,48 +179,49 @@ typedef struct {
 } spn_bg_it_t;
 
 
-spn_bg_visited_t* spn_bg_visited_new();
-bool spn_bg_visited_visit(spn_bg_visited_t* visited, spn_bg_node_t id);
-
-// iterator struct w/ visited list on it
-// clean up all these:
-/*
-        if (sp_ht_key_exists(visited.files, node.id)) continue;
-        sp_ht_insert(visited.files, node.id, true);
-*/
-// also add the queue to that struct
-// all paths is just dfs + dont check visited
-
-void spn_bg_all_paths_file(spn_build_graph_t* graph, spn_bg_id_t file_id, spn_bg_cmd_fn_t on_cmd, spn_bg_file_fn_t on_file, void* user_data);
-void spn_bg_all_paths_cmd(spn_build_graph_t* graph, spn_bg_id_t cmd_id, spn_bg_cmd_fn_t on_cmd, spn_bg_file_fn_t on_file, void* user_data);
-
-spn_bg_it_t spn_bg_it_new(spn_bg_it_config_t config);
-spn_bg_node_t spn_bg_it_next(spn_bg_it_t* it);
-void spn_bg_it_add_children(spn_bg_it_t* it, spn_bg_node_t node);
-bool spn_bg_it_done(spn_bg_it_t* it);
 spn_build_graph_t* spn_bg_new();
-spn_bg_id_t spn_bg_add_file(spn_build_graph_t* graph, sp_str_t path);
-spn_bg_id_t spn_bg_add_command(spn_build_graph_t* graph, spn_build_cmd_kind_t kind);
-bool spn_bg_is_file_input(spn_build_file_t* file);
-void spn_build_file_set_command(spn_build_graph_t* graph, spn_bg_id_t file_id, spn_bg_id_t cmd_id);
-void spn_build_command_add_output(spn_build_graph_t* graph, spn_bg_id_t cmd_id, spn_bg_id_t file_id);
-void spn_build_command_add_input(spn_build_graph_t* graph, spn_bg_id_t cmd_id, spn_bg_id_t file_id);
-spn_build_file_t* spn_bg_find_file(spn_build_graph_t* graph, spn_bg_id_t id);
-spn_build_cmd_t* spn_bg_find_command(spn_build_graph_t* graph, spn_bg_id_t id);
+spn_bg_id_t        spn_bg_add_file(spn_build_graph_t* graph, sp_str_t path);
+spn_bg_id_t        spn_bg_add_command(spn_build_graph_t* graph, spn_build_cmd_kind_t kind);
+spn_bg_id_t        spn_bg_add_subproces(spn_build_graph_t* graph, sp_ps_config_t ps);
+spn_bg_id_t        spn_bg_add_fn(spn_build_graph_t* graph, spn_bg_fn_t fn, void* user_data);
 sp_da(spn_bg_id_t) spn_bg_find_outputs(spn_build_graph_t* graph);
-void spn_bg_tag_command(spn_build_graph_t* graph, spn_bg_id_t id, sp_str_t tag);
-void spn_bg_tag_command_c(spn_build_graph_t* graph, spn_bg_id_t id, const c8* tag);
 
-sp_str_t spn_bg_dfs(spn_bg_it_config_t config);
-sp_str_t spn_bg_bfs(spn_bg_it_config_t config);
-sp_str_t spn_bg_all_paths(spn_bg_it_config_t config);
-void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_str_t path);
+// FILE
+spn_build_file_t*  spn_bg_find_file(spn_build_graph_t* graph, spn_bg_id_t id);
+bool               spn_bg_is_file_input(spn_build_file_t* file);
+void               spn_build_file_set_command(spn_build_graph_t* graph, spn_bg_id_t file_id, spn_bg_id_t cmd_id);
+sp_str_t           spn_bg_file_id_to_str(spn_build_graph_t* graph, spn_bg_id_t id);
+sp_str_t           spn_bg_file_to_str(spn_build_file_t* file);
 
-spn_bg_dirty_t* spn_bg_dirty_new();
-spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph);
-bool spn_bg_is_file_dirty(spn_bg_dirty_t* dirty, spn_bg_id_t file_id);
-bool spn_bg_is_cmd_dirty(spn_bg_dirty_t* dirty, spn_bg_id_t cmd_id);
+// COMMAND
+spn_build_cmd_t*   spn_bg_find_command(spn_build_graph_t* graph, spn_bg_id_t id);
+void               spn_bg_tag_command(spn_build_graph_t* graph, spn_bg_id_t id, sp_str_t tag);
+void               spn_bg_tag_command_c(spn_build_graph_t* graph, spn_bg_id_t id, const c8* tag);
+void               spn_build_command_set_fn(spn_build_graph_t* graph, spn_bg_id_t id, spn_bg_fn_t fn, void* user_data);
+void               spn_build_command_add_output(spn_build_graph_t* graph, spn_bg_id_t cmd_id, spn_bg_id_t file_id);
+void               spn_build_command_add_input(spn_build_graph_t* graph, spn_bg_id_t cmd_id, spn_bg_id_t file_id);
+sp_str_t           spn_bg_cmd_id_to_str(spn_build_graph_t* graph, spn_bg_id_t id);
+sp_str_t           spn_bg_cmd_to_str(spn_build_cmd_t* cmd);
 
+// TRAVERSAL
+spn_bg_it_t        spn_bg_it_new(spn_bg_it_config_t config);
+spn_bg_node_t      spn_bg_it_next(spn_bg_it_t* it);
+void               spn_bg_it_add_children(spn_bg_it_t* it, spn_bg_node_t node);
+bool               spn_bg_it_done(spn_bg_it_t* it);
+sp_str_t           spn_bg_dfs(spn_bg_it_config_t config);
+sp_str_t           spn_bg_bfs(spn_bg_it_config_t config);
+sp_str_t           spn_bg_all_paths(spn_bg_it_config_t config);
+void               spn_bg_to_mermaid(spn_build_graph_t* graph, sp_str_t path);
+
+// DIRTY
+spn_bg_dirty_t*    spn_bg_dirty_new();
+spn_bg_dirty_t*    spn_bg_compute_dirty(spn_build_graph_t* graph);
+bool               spn_bg_is_file_dirty(spn_bg_dirty_t* dirty, spn_bg_id_t file_id);
+bool               spn_bg_is_cmd_dirty(spn_bg_dirty_t* dirty, spn_bg_id_t cmd_id);
+
+// VISITED
+spn_bg_visited_t*  spn_bg_visited_new();
+bool               spn_bg_visited_visit(spn_bg_visited_t* visited, spn_bg_node_t id);
 
 
 
@@ -399,6 +401,14 @@ spn_build_graph_t* spn_bg_new() {
 }
 
 spn_bg_id_t spn_bg_add_file(spn_build_graph_t* graph, sp_str_t path) {
+  // @spader: obviously a hack
+  sp_da_for(graph->files, it) {
+    spn_build_file_t file = graph->files[it];
+    if (sp_str_equal(file.path, path)) {
+      return file.id;
+    }
+  }
+
   spn_build_file_t file = {
     .id = {
       .index = sp_da_size(graph->files),
@@ -422,6 +432,22 @@ spn_bg_id_t spn_bg_add_command(spn_build_graph_t* graph, spn_build_cmd_kind_t ki
   return cmd.id;
 }
 
+spn_bg_id_t spn_bg_add_subproces(spn_build_graph_t* graph, sp_ps_config_t ps) {
+  spn_bg_id_t id = spn_bg_add_command(graph, SPN_BUILD_CMD_SUBPROCESS);
+  spn_build_cmd_t* cmd = spn_bg_find_command(graph, id);
+  cmd->ps = sp_ps_config_copy(&ps);
+  return id;
+}
+
+spn_bg_id_t spn_bg_add_fn(spn_build_graph_t* graph, spn_bg_fn_t fn, void* user_data) {
+  spn_bg_id_t id = spn_bg_add_command(graph, SPN_BUILD_CMD_FN);
+  spn_build_cmd_t* cmd = spn_bg_find_command(graph, id);
+  cmd->fn.on_execute = fn;
+  cmd->fn.user_data = user_data;
+  return id;
+
+}
+
 bool spn_bg_is_file_input(spn_build_file_t* file) {
   return !file->producer.occupied;
 }
@@ -431,6 +457,14 @@ void spn_build_file_set_command(spn_build_graph_t* graph, spn_bg_id_t file_id, s
   spn_build_cmd_t* cmd = spn_bg_find_command(graph, cmd_id);
   file->producer = cmd_id;
   sp_da_push(cmd->produces, file_id);
+}
+
+void spn_build_command_set_fn(spn_build_graph_t* graph, spn_bg_id_t id, spn_bg_fn_t fn, void* user_data) {
+  spn_build_cmd_t* cmd = spn_bg_find_command(graph, id);
+  SP_ASSERT(cmd);
+  SP_ASSERT(cmd->kind == SPN_BUILD_CMD_FN);
+  cmd->fn.on_execute = fn;
+  cmd->fn.user_data = user_data;
 }
 
 void spn_build_command_add_output(spn_build_graph_t* graph, spn_bg_id_t cmd_id, spn_bg_id_t file_id) {
@@ -539,16 +573,56 @@ sp_str_t spn_bg_bfs(spn_bg_it_config_t config) {
   return spn_bg_traverse(config);
 }
 
+sp_str_t spn_bg_file_id_to_str(spn_build_graph_t* graph, spn_bg_id_t id) {
+  spn_build_file_t* file = spn_bg_find_file(graph, id);
+  SP_ASSERT(file);
+  return spn_bg_file_to_str(file);
+}
 
+sp_str_t spn_bg_cmd_id_to_str(spn_build_graph_t* graph, spn_bg_id_t id) {
+  spn_build_cmd_t* cmd = spn_bg_find_command(graph, id);
+  SP_ASSERT(cmd);
+  return spn_bg_cmd_to_str(cmd);
+}
+
+sp_str_t spn_bg_file_to_str(spn_build_file_t* file) {
+  return file->path;
+}
+
+sp_str_t spn_bg_cmd_to_str(spn_build_cmd_t* cmd) {
+  if (!sp_str_empty(cmd->tag)) {
+    return cmd->tag;
+  } else if (cmd->kind == SPN_BUILD_CMD_SUBPROCESS && !sp_str_empty(cmd->ps.command)) {
+    return cmd->ps.command;
+  } else {
+    return sp_format("{}", SP_FMT_PTR(cmd));
+  }
+}
+
+sp_str_t spn_bg_mermaid_class(sp_str_t name, sp_str_t fill, sp_str_t stroke, sp_str_t color) {
+  return sp_format(
+    "  classDef {} fill:{},stroke:{},color:{}\n",
+    SP_FMT_STR(name),
+    SP_FMT_STR(fill),
+    SP_FMT_STR(stroke),
+    SP_FMT_STR(color)
+  );
+}
 
 void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_str_t path) {
-  sp_io_stream_t stream = sp_io_from_file(path, SP_IO_MODE_WRITE);
+  sp_str_t stroke = sp_str_lit("#1a1a2e");
+  sp_str_t color = sp_str_lit("#e0e0e0");
+  sp_str_t intermediate = sp_str_lit("#606087");
+  sp_str_t input = sp_str_lit("#558a89");
+  sp_str_t output = sp_str_lit("#608767");
+  sp_str_t cmd = sp_str_lit("#8a5555");
 
+  sp_io_stream_t stream = sp_io_from_file(path, SP_IO_MODE_WRITE);
   sp_io_write_str(&stream, sp_str_lit("graph TD\n"));
-  sp_io_write_str(&stream, sp_str_lit("  classDef input fill:#4a3828,stroke:#3a2818,color:#e8e8e8\n"));
-  sp_io_write_str(&stream, sp_str_lit("  classDef output fill:#2e4038,stroke:#1e3028,color:#e8e8e8\n"));
-  sp_io_write_str(&stream, sp_str_lit("  classDef intermediate fill:#4a4428,stroke:#3a3418,color:#e8e8e8\n"));
-  sp_io_write_str(&stream, sp_str_lit("  classDef cmd fill:#2e3848,stroke:#1e2838,color:#e8e8e8\n"));
+  sp_io_write_str(&stream, spn_bg_mermaid_class(sp_str_lit("input"), input, stroke, color));
+  sp_io_write_str(&stream, spn_bg_mermaid_class(sp_str_lit("output"), output, stroke, color));
+  sp_io_write_str(&stream, spn_bg_mermaid_class(sp_str_lit("intermediate"), intermediate, stroke, color));
+  sp_io_write_str(&stream, spn_bg_mermaid_class(sp_str_lit("cmd"), cmd, stroke, color));
   sp_io_write_str(&stream, sp_str_lit("  linkStyle default stroke:#909090,stroke-width:2px\n"));
 
   sp_da_for(graph->files, it) {
@@ -597,7 +671,6 @@ spn_bg_dirty_t* spn_bg_dirty_new() {
 
 spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
   spn_bg_dirty_t* dirty = spn_bg_dirty_new();
-  spn_bg_visited_t* visited = spn_bg_visited_new();
   spn_bg_it_t it = spn_bg_it_new((spn_bg_it_config_t){
     .graph = graph,
     .mode = SPN_BG_ITER_MODE_BREADTH_FIRST,
@@ -609,12 +682,13 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
     spn_build_file_t* file = &graph->files[it];
     spn_bg_dirty_file_metadata_t metadata = {
       .mod_time = sp_fs_get_mod_time(file->path),
+      .exists = sp_fs_exists(file->path)
     };
 
     sp_ht_insert(dirty->metadata.files, file->id, metadata);
 
     if (spn_bg_is_file_input(file)) {
-      if (!sp_fs_exists(file->path)) {
+      if (!metadata.exists) {
         spn_bg_err_t err = {
           .kind = SPN_BG_ERR_MISSING_INPUT,
           .missing_input = { .file_id = file->id }
@@ -630,13 +704,15 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
     spn_bg_dirty_cmd_metadata_t metadata = {
       .in = SP_LIMIT_EPOCH_MIN,
       .out = SP_LIMIT_EPOCH_MAX,
-      .degree = sp_da_size(cmd->consumes)
+      .degree = SP_MAX(sp_da_size(cmd->consumes), 1)
     };
 
+    bool missing_output = false;
     sp_da_for(cmd->produces, n) {
       spn_bg_dirty_file_metadata_t* m = sp_ht_getp(dirty->metadata.files, cmd->produces[n]);
       SP_ASSERT(m);
       metadata.out = sp_tm_epoch_min(m->mod_time, metadata.out);
+      missing_output |= !m->exists;
     }
 
     sp_da_for(cmd->consumes, n) {
@@ -645,7 +721,7 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
       metadata.in = sp_tm_epoch_max(m->mod_time, metadata.in);
     }
 
-    if (sp_tm_epoch_gt(metadata.in, metadata.out)) {
+    if (sp_tm_epoch_gt(metadata.in, metadata.out) || missing_output) {
       sp_ht_insert(dirty->commands, cmd->id, true);
     }
 

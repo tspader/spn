@@ -380,6 +380,38 @@ comb_graph_t create_comb_graph() {
   return r;
 }
 
+// ┌─────────┐     ┌───┐     ┌─────────┐     ┌───┐
+// │ generate│────▶│ a │────▶│ compile │────▶│ b │
+// └─────────┘     └───┘     └─────────┘     └───┘
+typedef struct {
+  spn_build_graph_t* graph;
+  spn_bg_id_t a, b;
+  spn_bg_id_t generate, compile;
+} no_input_graph_t;
+
+no_input_graph_t create_no_input_graph() {
+  no_input_graph_t r;
+  r.graph = spn_bg_new();
+
+  r.a = spn_bg_add_file(r.graph, sp_str_lit("a"));
+  r.b = spn_bg_add_file(r.graph, sp_str_lit("b"));
+
+  r.generate = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+
+  spn_bg_tag_command_c(r.graph, r.generate, "generate");
+  spn_bg_tag_command_c(r.graph, r.compile, "compile");
+
+  // generate (no inputs) -> a
+  spn_build_file_set_command(r.graph, r.a, r.generate);
+
+  // a -> compile -> b
+  spn_build_command_add_input(r.graph, r.compile, r.a);
+  spn_build_file_set_command(r.graph, r.b, r.compile);
+
+  return r;
+}
+
 typedef struct {
   short_linear_graph_t short_linear;
   fork_join_graph_t fork_join;
@@ -389,6 +421,7 @@ typedef struct {
   multi_output_graph_t multi_output;
   asymmetric_fork_graph_t asymmetric_fork;
   comb_graph_t comb;
+  no_input_graph_t no_input;
 } graphs_t;
 
 void bind_graph(spn_build_graph_t* g, sp_test_file_manager_t* fm) {
@@ -412,6 +445,7 @@ graphs_t build_graphs(sp_test_file_manager_t* file_manager) {
     .multi_output = create_multi_output_graph(),
     .asymmetric_fork = create_asymmetric_fork_graph(),
     .comb = create_comb_graph(),
+    .no_input = create_no_input_graph(),
   };
 
   bind_graph(graphs.short_linear.graph, file_manager);
@@ -422,6 +456,7 @@ graphs_t build_graphs(sp_test_file_manager_t* file_manager) {
   bind_graph(graphs.multi_output.graph, file_manager);
   bind_graph(graphs.asymmetric_fork.graph, file_manager);
   bind_graph(graphs.comb.graph, file_manager);
+  bind_graph(graphs.no_input.graph, file_manager);
 
   return graphs;
 }
@@ -522,25 +557,6 @@ typedef struct {
   spn_bg_err_kind_t errors [SPN_DIRTY_TEST_MAX_NODE];
 } expected_dirty_t;
 
-sp_str_t spn_bg_file_to_str(spn_build_graph_t* graph, spn_bg_id_t id) {
-  spn_build_file_t* file = spn_bg_find_file(graph, id);
-  SP_ASSERT(file);
-  return file->path;
-}
-
-sp_str_t spn_bg_cmd_to_str(spn_build_graph_t* graph, spn_bg_id_t id) {
-  spn_build_cmd_t* cmd = spn_bg_find_command(graph, id);
-  SP_ASSERT(cmd);
-
-  if (!sp_str_empty(cmd->tag)) {
-    return cmd->tag;
-  } else if (cmd->kind == SPN_BUILD_CMD_SUBPROCESS && !sp_str_empty(cmd->ps.command)) {
-    return cmd->ps.command;
-  } else {
-    return sp_format("{}", SP_FMT_PTR(cmd));
-  }
-}
-
 void expect_dirty(s32* utest_result, spn_build_graph_t* graph, spn_bg_dirty_t* dirty, expected_dirty_t ex) {
   sp_carr_for(ex.errors, it) {
     if (ex.errors[it] == SPN_BG_OK) break;
@@ -555,7 +571,7 @@ void expect_dirty(s32* utest_result, spn_build_graph_t* graph, spn_bg_dirty_t* d
 
     bool is_dirty = spn_bg_is_file_dirty(dirty, id);
     if (!is_dirty) {
-      sp_str_t message = sp_format("{:fg cyan} was not dirty", SP_FMT_STR(spn_bg_file_to_str(graph, id)));
+      sp_str_t message = sp_format("{:fg cyan} was not dirty", SP_FMT_STR(spn_bg_file_id_to_str(graph, id)));
       EXPECT_TRUE_MSG(is_dirty, sp_str_to_cstr(message));
     }
   }
@@ -566,7 +582,7 @@ void expect_dirty(s32* utest_result, spn_build_graph_t* graph, spn_bg_dirty_t* d
 
     bool is_dirty = spn_bg_is_file_dirty(dirty, id);
     if (is_dirty) {
-      sp_str_t message = sp_format("{:fg cyan} was not clean", SP_FMT_STR(spn_bg_file_to_str(graph, id)));
+      sp_str_t message = sp_format("{:fg cyan} was not clean", SP_FMT_STR(spn_bg_file_id_to_str(graph, id)));
       EXPECT_FALSE_MSG(is_dirty, sp_str_to_cstr(message));
     }
   }
@@ -577,7 +593,7 @@ void expect_dirty(s32* utest_result, spn_build_graph_t* graph, spn_bg_dirty_t* d
 
     bool is_dirty = spn_bg_is_cmd_dirty(dirty, id);
     if (!is_dirty) {
-      sp_str_t message = sp_format("{:fg yellow} was not dirty", SP_FMT_STR(spn_bg_cmd_to_str(graph, id)));
+      sp_str_t message = sp_format("{:fg yellow} was not dirty", SP_FMT_STR(spn_bg_cmd_id_to_str(graph, id)));
       EXPECT_TRUE_MSG(is_dirty, sp_str_to_cstr(message));
     }
   }
@@ -588,7 +604,7 @@ void expect_dirty(s32* utest_result, spn_build_graph_t* graph, spn_bg_dirty_t* d
 
     bool is_dirty = spn_bg_is_cmd_dirty(dirty, id);
     if (is_dirty) {
-      sp_str_t message = sp_format("{:fg yellow} was not clean", SP_FMT_STR(spn_bg_cmd_to_str(graph, id)));
+      sp_str_t message = sp_format("{:fg yellow} was not clean", SP_FMT_STR(spn_bg_cmd_id_to_str(graph, id)));
       EXPECT_FALSE_MSG(is_dirty, sp_str_to_cstr(message));
     }
   }
@@ -905,6 +921,21 @@ UTEST_F(spn_dirty_tests, comb_partial_dirty) {
     .commands = {
       .dirty = { g.compile_3 },
       .clean = { g.compile_1, g.compile_2 },
+    },
+  });
+}
+
+UTEST_F(spn_dirty_tests, no_input_missing_output) {
+  no_input_graph_t g = uf->g.no_input;
+
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
+
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.a, g.b },
+    },
+    .commands = {
+      .dirty = { g.generate, g.compile },
     },
   });
 }

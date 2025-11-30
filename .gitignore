@@ -25,3 +25,6 @@ test/tmp
 asset/docker
 target/distrib
 build/bootstrap/bin
+
+**/*.mmd
+**/*.png
