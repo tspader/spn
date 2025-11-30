@@ -43,6 +43,7 @@
 #endif
 
 #include "spn.h"
+#include "graph.h"
 
 #define SPN_VERSION "1.0.0"
 #define SPN_COMMIT "00c0fa98"
@@ -74,32 +75,6 @@ typedef enum {
     SP_LOG("{:color brightyellow}: {}", SP_FMT_CSTR("SP_WARN()"), SP_FMT_STR(__sp_warn_message)); \
   } while (0)
 
-typedef enum {
-  SP_OPT_NONE = 0,
-  SP_OPT_SOME = 1,
-} sp_optional_t;
-
-#define SP_LIMIT_MAX_U32 4294967295U
-#define SP_LIMIT_MIN_U32 0U
-#define SP_LIMIT_MAX_S32 2147483647
-#define SP_LIMIT_MIN_S32 (-2147483647 - 1)
-#define SP_LIMIT_MAX_S64 9223372036854775807LL
-#define SP_LIMIT_MIN_S64 (-9223372036854775807LL - 1)
-#define SP_LIMIT_MAX_F32 3.40282346638528859812e+38F
-#define SP_LIMIT_MIN_F32 1.17549435082228750797e-38F
-#define SP_LIMIT_MAX_F64 1.7976931348623157081e+308
-#define SP_LIMIT_MIN_F64 2.2250738585072014077e-308
-
-#define sp_opt(T) struct { \
-  T value; \
-  sp_optional_t some; \
-}
-
-#define sp_opt_set(O, V) do { (O).value = (V); (O).some = SP_OPT_SOME; } while (0)
-#define sp_opt_get(O) (O).value
-#define sp_opt_some(V) { .value = V, .some = SP_OPT_SOME }
-#define sp_opt_none(V) { .some = SP_OPT_NONE }
-#define sp_opt_is_null(V) ((V).some == SP_OPT_NONE)
 
 #define sp_carr_empty(CARR) ( \
   (CARR) == NULL || \
@@ -3586,26 +3561,26 @@ spn_semver_range_t spn_semver_comparison_to_range(spn_semver_op_t op, spn_semver
       range.low.op = SPN_SEMVER_OP_GEQ;
       range.low.version = version;
       range.high.op = SPN_SEMVER_OP_LEQ;
-      range.high.version = (spn_semver_t){SP_LIMIT_MAX_U32, SP_LIMIT_MAX_U32, SP_LIMIT_MAX_U32};
+      range.high.version = (spn_semver_t){0, SP_LIMIT_U32_MAX, SP_LIMIT_U32_MAX};
       break;
     }
     case SPN_SEMVER_OP_GT: {
       range.low.op = SPN_SEMVER_OP_GT;
       range.low.version = version;
       range.high.op = SPN_SEMVER_OP_LEQ;
-      range.high.version = (spn_semver_t){SP_LIMIT_MAX_U32, SP_LIMIT_MAX_U32, SP_LIMIT_MAX_U32};
+      range.high.version = (spn_semver_t){SP_LIMIT_U32_MAX, SP_LIMIT_U32_MAX, SP_LIMIT_U32_MAX};
       break;
     }
     case SPN_SEMVER_OP_LEQ: {
       range.low.op = SPN_SEMVER_OP_GEQ;
-      range.low.version = (spn_semver_t){SP_LIMIT_MIN_U32, SP_LIMIT_MIN_U32, SP_LIMIT_MIN_U32};
+      range.low.version = SP_ZERO_STRUCT(spn_semver_t);
       range.high.op = SPN_SEMVER_OP_LEQ;
       range.high.version = version;
       break;
     }
     case SPN_SEMVER_OP_LT: {
       range.low.op = SPN_SEMVER_OP_GEQ;
-      range.low.version = (spn_semver_t){SP_LIMIT_MIN_U32, SP_LIMIT_MIN_U32, SP_LIMIT_MIN_U32};
+      range.low.version = SP_ZERO_STRUCT(spn_semver_t);
       range.high.op = SPN_SEMVER_OP_LT;
       range.high.version = version;
       break;
@@ -4250,7 +4225,7 @@ void spn_app_resolve_from_solver(spn_app_t* app) {
     SP_ASSERT(sp_dyn_array_size(ranges));
 
     spn_dep_req_t sl, sh = SP_ZERO_INITIALIZE();
-    u32 low = SP_LIMIT_MIN_U32, high = SP_LIMIT_MAX_U32;
+    u32 low = 0, high = SP_LIMIT_U32_MAX;
     sp_dyn_array_for(ranges, n) {
       spn_dep_version_range_t range = ranges[n];
       SP_ASSERT(range.low.some);

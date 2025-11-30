@@ -42,14 +42,14 @@ void build_fn_noop(spn_build_cmd_t* cmd, void* ud) {
 ////////////
 // GRAPHS //
 ////////////
-// ┌───┐     ┌───────┐     ┌───┐
-// │ a │────▶│ touch │────▶│ b │
-// └───┘     └───────┘     └───┘
+// ┌───┐     ┌─────────┐     ┌───┐
+// │ a │────▶│ compile │────▶│ b │
+// └───┘     └─────────┘     └───┘
 typedef struct {
   spn_build_graph_t* graph;
   spn_bg_id_t a;
   spn_bg_id_t b;
-  spn_bg_id_t touch;
+  spn_bg_id_t compile;
 } short_linear_graph_t;
 
 short_linear_graph_t create_short_linear_graph() {
@@ -57,22 +57,22 @@ short_linear_graph_t create_short_linear_graph() {
   g.graph = spn_bg_new();
   g.a = spn_bg_add_file(g.graph, sp_str_lit("a"));
   g.b = spn_bg_add_file(g.graph, sp_str_lit("b"));
-  g.touch = spn_bg_add_command(g.graph, SPN_BUILD_CMD_FN);
+  g.compile = spn_bg_add_command(g.graph, SPN_BUILD_CMD_FN);
 
-  spn_build_cmd_t* touch = spn_bg_find_command(g.graph, g.touch);
-  spn_build_command_add_input(g.graph, g.touch, g.a);
-  spn_build_command_add_output(g.graph, g.touch, g.b);
+  spn_bg_tag_command_c(g.graph, g.compile, "compile");
+  spn_build_command_add_input(g.graph, g.compile, g.a);
+  spn_build_command_add_output(g.graph, g.compile, g.b);
 
   return g;
 }
 
-// ┌───┐     ┌──────┐     ┌───┐     ┌──────┐     ┌───┐
-// │ a │────▶│ cmd1 │────▶│ b │────▶│ cmd2 │────▶│ c │
-// └───┘     └──────┘     └───┘     └──────┘     └───┘
+// ┌───┐     ┌─────────┐     ┌───┐     ┌─────────┐     ┌───┐
+// │ a │────▶│ compile │────▶│ b │────▶│ compile │────▶│ c │
+// └───┘     └─────────┘     └───┘     └─────────┘     └───┘
 typedef struct {
   spn_build_graph_t* graph;
   spn_bg_id_t a, b, c;
-  spn_bg_id_t cmd1, cmd2;
+  spn_bg_id_t compile_1, compile_2;
 } long_linear_graph_t;
 
 long_linear_graph_t create_long_linear_graph() {
@@ -82,120 +82,125 @@ long_linear_graph_t create_long_linear_graph() {
   r.b = spn_bg_add_file(r.graph, sp_str_lit("b"));
   r.c = spn_bg_add_file(r.graph, sp_str_lit("c"));
 
-  r.cmd1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.cmd2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
 
-  spn_build_command_add_input(r.graph, r.cmd1, r.a);
-  spn_build_file_set_command(r.graph, r.b, r.cmd1);
+  spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
+  spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
 
-  spn_build_command_add_input(r.graph, r.cmd2, r.b);
-  spn_build_file_set_command(r.graph, r.c, r.cmd2);
+  spn_build_command_add_input(r.graph, r.compile_1, r.a);
+  spn_build_file_set_command(r.graph, r.b, r.compile_1);
+
+  spn_build_command_add_input(r.graph, r.compile_2, r.b);
+  spn_build_file_set_command(r.graph, r.c, r.compile_2);
 
   return r;
 }
 
- // ┌────────┐     ┌─────┐     ┌────────┐
- // │ main.c │────▶│ gcc │────▶│ main.o │──┐
- // └────────┘     └─────┘     └────────┘  │     ┌────┐     ┌─────────────┐
- //                                        ├────▶│ ld │────▶│ program.exe │
- // ┌─────────┐     ┌─────┐     ┌─────────┐│     └────┘     └─────────────┘
- // │ utils.c │────▶│ gcc │────▶│ utils.o │┘
- // └─────────┘     └─────┘     └─────────┘
+ // ┌───┐     ┌─────────┐     ┌───┐
+ // │ a │────▶│ compile │────▶│ b │──┐
+ // └───┘     └─────────┘     └───┘  │  ┌──────┐     ┌───┐
+ //                                  ├─▶│ join │────▶│ d │
+ // ┌───┐     ┌─────────┐     ┌───┐  │  └──────┘     └───┘
+ // │ c │────▶│ compile │────▶│ e │──┘
+ // └───┘     └─────────┘     └───┘
 typedef struct {
   spn_build_graph_t* graph;
-  spn_bg_id_t src1, src2, obj1, obj2, exe;
-  spn_bg_id_t compile1, compile2, link;
+  spn_bg_id_t a, b, c, d, e;
+  spn_bg_id_t compile_1, compile_2, join;
 } fork_join_graph_t;
 
 fork_join_graph_t create_fork_join_graph() {
   fork_join_graph_t r;
   r.graph = spn_bg_new();
 
-  r.exe = spn_bg_add_file(r.graph, sp_str_lit("program.exe"));
-  r.obj1 = spn_bg_add_file(r.graph, sp_str_lit("main.o"));
-  r.obj2 = spn_bg_add_file(r.graph, sp_str_lit("utils.o"));
-  r.src1 = spn_bg_add_file(r.graph, sp_str_lit("main.c"));
-  r.src2 = spn_bg_add_file(r.graph, sp_str_lit("utils.c"));
+  r.a = spn_bg_add_file(r.graph, sp_str_lit("a"));
+  r.b = spn_bg_add_file(r.graph, sp_str_lit("b"));
+  r.c = spn_bg_add_file(r.graph, sp_str_lit("c"));
+  r.d = spn_bg_add_file(r.graph, sp_str_lit("d"));
+  r.e = spn_bg_add_file(r.graph, sp_str_lit("e"));
 
-  r.link = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.join = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
 
-  spn_bg_tag_command_c(r.graph, r.link, "ld");
-  spn_bg_tag_command_c(r.graph, r.compile1, "gcc");
-  spn_bg_tag_command_c(r.graph, r.compile2, "gcc");
+  spn_bg_tag_command_c(r.graph, r.join, "join");
+  spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
+  spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
 
-  spn_build_command_add_input(r.graph, r.link, r.obj1);
-  spn_build_command_add_input(r.graph, r.link, r.obj2);
-  spn_build_command_add_output(r.graph, r.link, r.exe);
+  spn_build_command_add_input(r.graph, r.join, r.b);
+  spn_build_command_add_input(r.graph, r.join, r.e);
+  spn_build_command_add_output(r.graph, r.join, r.d);
 
-  spn_build_command_add_input(r.graph, r.compile1, r.src1);
-  spn_build_command_add_output(r.graph, r.compile1, r.obj1);
+  spn_build_command_add_input(r.graph, r.compile_1, r.a);
+  spn_build_command_add_output(r.graph, r.compile_1, r.b);
 
-  spn_build_command_add_input(r.graph, r.compile2, r.src2);
-  spn_build_command_add_output(r.graph, r.compile2, r.obj2);
+  spn_build_command_add_input(r.graph, r.compile_2, r.c);
+  spn_build_command_add_output(r.graph, r.compile_2, r.e);
 
   return r;
 }
 
- //               ┌────┐
- //            ┌─▶│ td │──┐
- // ┌──────┐   │  └────┘  │  ┌──────┐     ┌──────┐
- // │ tdns │──▶├          ├─▶│ join │────▶│ tdns │──┐
- // └──────┘   │  ┌────┐  │  └──────┘     └──────┘  │  ┌──────┐     ┌────────────────┐
- //            └─▶│ ns │──┘                         ├─▶│ love │────▶│ tdns loves alg │
- //               └────┘                            │  └──────┘     └────────────────┘
- //                                        ┌─────┐  │
- //                                        │ alg │──┘
- //                                        └─────┘
-spn_build_graph_t* create_split_join_graph() {
-  spn_build_graph_t* g = spn_bg_new();
-  spn_bg_id_t tdns = spn_bg_add_file(g, sp_str_lit("tdns"));
-  spn_bg_id_t td = spn_bg_add_file(g, sp_str_lit("td"));
-  spn_bg_id_t ns = spn_bg_add_file(g, sp_str_lit("ns"));
-  spn_bg_id_t tdns2 = spn_bg_add_file(g, sp_str_lit("tdns"));
-  spn_bg_id_t alg = spn_bg_add_file(g, sp_str_lit("alg"));
-  spn_bg_id_t tdns_loves_alg = spn_bg_add_file(g, sp_str_lit("tdns loves alg"));
+ //                       ┌───┐
+ //                    ┌─▶│ b │──┐
+ // ┌───┐     ┌───────┐│  └───┘  │  ┌──────┐     ┌───┐
+ // │ a │────▶│ split │┤         ├─▶│ join │────▶│ d │──┐
+ // └───┘     └───────┘│  ┌───┐  │  └──────┘     └───┘  │  ┌──────┐     ┌───┐
+ //                    └─▶│ c │──┘                      ├─▶│ join │────▶│ f │
+ //                       └───┘                         │  └──────┘     └───┘
+ //                                              ┌───┐  │
+ //                                              │ e │──┘
+ //                                              └───┘
+typedef struct {
+  spn_build_graph_t* graph;
+  spn_bg_id_t a, b, c, d, e, f;
+  spn_bg_id_t split, join_1, join_2;
+} split_join_graph_t;
 
-  spn_bg_id_t split = spn_bg_add_command(g, SPN_BUILD_CMD_FN);
-  spn_bg_id_t join = spn_bg_add_command(g, SPN_BUILD_CMD_FN);
-  spn_bg_id_t love = spn_bg_add_command(g, SPN_BUILD_CMD_FN);
+split_join_graph_t create_split_join_graph() {
+  split_join_graph_t r;
+  r.graph = spn_bg_new();
+  r.a = spn_bg_add_file(r.graph, sp_str_lit("a"));
+  r.b = spn_bg_add_file(r.graph, sp_str_lit("b"));
+  r.c = spn_bg_add_file(r.graph, sp_str_lit("c"));
+  r.d = spn_bg_add_file(r.graph, sp_str_lit("d"));
+  r.e = spn_bg_add_file(r.graph, sp_str_lit("e"));
+  r.f = spn_bg_add_file(r.graph, sp_str_lit("f"));
 
-  spn_build_cmd_t* cmd = spn_bg_find_command(g, split);
-  spn_bg_tag_command_c(g, split, "split");
+  r.split = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.join_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.join_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
 
-  cmd = spn_bg_find_command(g, join);
-  spn_bg_tag_command_c(g, join, "join");
+  spn_bg_tag_command_c(r.graph, r.split, "split");
+  spn_bg_tag_command_c(r.graph, r.join_1, "join");
+  spn_bg_tag_command_c(r.graph, r.join_2, "join");
 
-  cmd = spn_bg_find_command(g, love);
-  spn_bg_tag_command_c(g, love, "love");
+  spn_build_command_add_input(r.graph, r.split, r.a);
+  spn_build_command_add_output(r.graph, r.split, r.b);
+  spn_build_command_add_output(r.graph, r.split, r.c);
 
-  spn_build_command_add_input(g, split, tdns);
-  spn_build_command_add_output(g, split, td);
-  spn_build_command_add_output(g, split, ns);
+  spn_build_command_add_input(r.graph, r.join_1, r.b);
+  spn_build_command_add_input(r.graph, r.join_1, r.c);
+  spn_build_file_set_command(r.graph, r.d, r.join_1);
 
-  spn_build_command_add_input(g, join, td);
-  spn_build_command_add_input(g, join, ns);
-  spn_build_file_set_command(g, tdns2, join);
+  spn_build_command_add_input(r.graph, r.join_2, r.d);
+  spn_build_command_add_input(r.graph, r.join_2, r.e);
+  spn_build_file_set_command(r.graph, r.f, r.join_2);
 
-  spn_build_command_add_input(g, love, tdns2);
-  spn_build_command_add_input(g, love, alg);
-  spn_build_file_set_command(g, tdns_loves_alg, love);
-
-  return g;
+  return r;
 }
 
-//          ┌───────┐     ┌───┐
-//       ┌─▶│ left  │────▶│ b │──┐
-// ┌───┐ │  └───────┘     └───┘  │  ┌──────┐     ┌───┐
-// │ a │─┤                       ├─▶│ join │────▶│ d │
-// └───┘ │  ┌───────┐     ┌───┐  │  └──────┘     └───┘
-//       └─▶│ right │────▶│ c │──┘
-//          └───────┘     └───┘
+//          ┌─────────┐     ┌───┐
+//       ┌─▶│ compile │────▶│ b │──┐
+// ┌───┐ │  └─────────┘     └───┘  │  ┌──────┐     ┌───┐
+// │ a │─┤                         ├─▶│ join │────▶│ d │
+// └───┘ │  ┌─────────┐     ┌───┐  │  └──────┘     └───┘
+//       └─▶│ compile │────▶│ c │──┘
+//          └─────────┘     └───┘
 typedef struct {
   spn_build_graph_t* graph;
   spn_bg_id_t a, b, c, d;
-  spn_bg_id_t left, right, join;
+  spn_bg_id_t compile_1, compile_2, join;
 } diamond_graph_t;
 
 diamond_graph_t create_diamond_graph() {
@@ -205,19 +210,19 @@ diamond_graph_t create_diamond_graph() {
   r.b = spn_bg_add_file(r.graph, sp_str_lit("b"));
   r.c = spn_bg_add_file(r.graph, sp_str_lit("c"));
   r.d = spn_bg_add_file(r.graph, sp_str_lit("d"));
-  r.left = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.right = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
   r.join = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
 
-  spn_bg_tag_command_c(r.graph, r.left, "left");
-  spn_bg_tag_command_c(r.graph, r.right, "right");
+  spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
+  spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
   spn_bg_tag_command_c(r.graph, r.join, "join");
 
-  spn_build_command_add_input(r.graph, r.left, r.a);
-  spn_build_file_set_command(r.graph, r.b, r.left);
+  spn_build_command_add_input(r.graph, r.compile_1, r.a);
+  spn_build_file_set_command(r.graph, r.b, r.compile_1);
 
-  spn_build_command_add_input(r.graph, r.right, r.a);
-  spn_build_file_set_command(r.graph, r.c, r.right);
+  spn_build_command_add_input(r.graph, r.compile_2, r.a);
+  spn_build_file_set_command(r.graph, r.c, r.compile_2);
 
   spn_build_command_add_input(r.graph, r.join, r.b);
   spn_build_command_add_input(r.graph, r.join, r.c);
@@ -226,17 +231,76 @@ diamond_graph_t create_diamond_graph() {
   return r;
 }
 
-//                       ┌───┐     ┌────────┐     ┌───┐
-//                    ┌─▶│ b │────▶│ proc_b │────▶│ d │
-// ┌───┐     ┌───────┐│  └───┘     └────────┘     └───┘
+// ┌───┐     ┌─────────┐     ┌───┐     ┌─────────┐     ┌───┐     ┌─────────┐     ┌───┐     ┌─────────┐     ┌───┐
+// │ a │────▶│ compile │────▶│ b │────▶│ compile │────▶│ c │────▶│ compile │────▶│ d │────▶│ compile │────▶│ e │──┐
+// └───┘     └─────────┘     └───┘     └─────────┘     └───┘     └─────────┘     └───┘     └─────────┘     └───┘  │
+//                                                                                                                │  ┌──────┐     ┌───┐
+//                                                                                                                ├─▶│ join │────▶│ g │
+//                                                                                                         ┌───┐  │  └──────┘     └───┘
+//                                                                                                         │ f │──┘
+//                                                                                                         └───┘
+typedef struct {
+  spn_build_graph_t* graph;
+  spn_bg_id_t a, b, c, d, e, f, g;
+  spn_bg_id_t compile_1, compile_2, compile_3, compile_4, join;
+} asymmetric_fork_graph_t;
+
+asymmetric_fork_graph_t create_asymmetric_fork_graph() {
+  asymmetric_fork_graph_t r;
+  r.graph = spn_bg_new();
+
+  r.a = spn_bg_add_file(r.graph, sp_str_lit("a"));
+  r.b = spn_bg_add_file(r.graph, sp_str_lit("b"));
+  r.c = spn_bg_add_file(r.graph, sp_str_lit("c"));
+  r.d = spn_bg_add_file(r.graph, sp_str_lit("d"));
+  r.e = spn_bg_add_file(r.graph, sp_str_lit("e"));
+  r.f = spn_bg_add_file(r.graph, sp_str_lit("f"));
+  r.g = spn_bg_add_file(r.graph, sp_str_lit("g"));
+
+  r.compile_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_3 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_4 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.join = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+
+  spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
+  spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
+  spn_bg_tag_command_c(r.graph, r.compile_3, "compile");
+  spn_bg_tag_command_c(r.graph, r.compile_4, "compile");
+  spn_bg_tag_command_c(r.graph, r.join, "join");
+
+  // Long top chain: a -> compile_1 -> b -> compile_2 -> c -> compile_3 -> d -> compile_4 -> e
+  spn_build_command_add_input(r.graph, r.compile_1, r.a);
+  spn_build_file_set_command(r.graph, r.b, r.compile_1);
+
+  spn_build_command_add_input(r.graph, r.compile_2, r.b);
+  spn_build_file_set_command(r.graph, r.c, r.compile_2);
+
+  spn_build_command_add_input(r.graph, r.compile_3, r.c);
+  spn_build_file_set_command(r.graph, r.d, r.compile_3);
+
+  spn_build_command_add_input(r.graph, r.compile_4, r.d);
+  spn_build_file_set_command(r.graph, r.e, r.compile_4);
+
+  // Join: e + f -> join -> g
+  spn_build_command_add_input(r.graph, r.join, r.e);
+  spn_build_command_add_input(r.graph, r.join, r.f);
+  spn_build_file_set_command(r.graph, r.g, r.join);
+
+  return r;
+}
+
+//                       ┌───┐     ┌─────────┐     ┌───┐
+//                    ┌─▶│ b │────▶│ compile │────▶│ d │
+// ┌───┐     ┌───────┐│  └───┘     └─────────┘     └───┘
 // │ a │────▶│ split │┤
-// └───┘     └───────┘│  ┌───┐     ┌────────┐     ┌───┐
-//                    └─▶│ c │────▶│ proc_c │────▶│ e │
-//                       └───┘     └────────┘     └───┘
+// └───┘     └───────┘│  ┌───┐     ┌─────────┐     ┌───┐
+//                    └─▶│ c │────▶│ compile │────▶│ e │
+//                       └───┘     └─────────┘     └───┘
 typedef struct {
   spn_build_graph_t* graph;
   spn_bg_id_t a, b, c, d, e;
-  spn_bg_id_t split, proc_b, proc_c;
+  spn_bg_id_t split, compile_1, compile_2;
 } multi_output_graph_t;
 
 multi_output_graph_t create_multi_output_graph() {
@@ -249,18 +313,69 @@ multi_output_graph_t create_multi_output_graph() {
   r.e = spn_bg_add_file(r.graph, sp_str_lit("e"));
 
   r.split = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.proc_b = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.proc_c = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+
+  spn_bg_tag_command_c(r.graph, r.split, "split");
+  spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
+  spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
 
   spn_build_command_add_input(r.graph, r.split, r.a);
   spn_build_file_set_command(r.graph, r.b, r.split);
   spn_build_file_set_command(r.graph, r.c, r.split);
 
-  spn_build_command_add_input(r.graph, r.proc_b, r.b);
-  spn_build_file_set_command(r.graph, r.d, r.proc_b);
+  spn_build_command_add_input(r.graph, r.compile_1, r.b);
+  spn_build_file_set_command(r.graph, r.d, r.compile_1);
 
-  spn_build_command_add_input(r.graph, r.proc_c, r.c);
-  spn_build_file_set_command(r.graph, r.e, r.proc_c);
+  spn_build_command_add_input(r.graph, r.compile_2, r.c);
+  spn_build_file_set_command(r.graph, r.e, r.compile_2);
+
+  return r;
+}
+
+// ┌───┐
+// │ a │─┬──────────────────────┬───────────────────────┐
+// └───┘ │                      │                       │
+//       ▼                      ▼                       ▼
+//   ┌─────────┐     ┌───┐  ┌─────────┐     ┌───┐  ┌─────────┐     ┌───┐
+//   │ compile │────▶│ b │─▶│ compile │────▶│ c │─▶│ compile │────▶│ d │
+//   └─────────┘     └───┘  └─────────┘     └───┘  └─────────┘     └───┘
+typedef struct {
+  spn_build_graph_t* graph;
+  spn_bg_id_t a, b, c, d;
+  spn_bg_id_t compile_1, compile_2, compile_3;
+} comb_graph_t;
+
+comb_graph_t create_comb_graph() {
+  comb_graph_t r;
+  r.graph = spn_bg_new();
+
+  r.a = spn_bg_add_file(r.graph, sp_str_lit("a"));
+  r.b = spn_bg_add_file(r.graph, sp_str_lit("b"));
+  r.c = spn_bg_add_file(r.graph, sp_str_lit("c"));
+  r.d = spn_bg_add_file(r.graph, sp_str_lit("d"));
+
+  r.compile_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_3 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+
+  spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
+  spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
+  spn_bg_tag_command_c(r.graph, r.compile_3, "compile");
+
+  // a -> compile_1 -> b
+  spn_build_command_add_input(r.graph, r.compile_1, r.a);
+  spn_build_file_set_command(r.graph, r.b, r.compile_1);
+
+  // b + a -> compile_2 -> c
+  spn_build_command_add_input(r.graph, r.compile_2, r.b);
+  spn_build_command_add_input(r.graph, r.compile_2, r.a);
+  spn_build_file_set_command(r.graph, r.c, r.compile_2);
+
+  // c + a -> compile_3 -> d
+  spn_build_command_add_input(r.graph, r.compile_3, r.c);
+  spn_build_command_add_input(r.graph, r.compile_3, r.a);
+  spn_build_file_set_command(r.graph, r.d, r.compile_3);
 
   return r;
 }
@@ -268,10 +383,12 @@ multi_output_graph_t create_multi_output_graph() {
 typedef struct {
   short_linear_graph_t short_linear;
   fork_join_graph_t fork_join;
-  spn_build_graph_t* split_join;
+  split_join_graph_t split_join;
   long_linear_graph_t long_linear;
   diamond_graph_t diamond;
   multi_output_graph_t multi_output;
+  asymmetric_fork_graph_t asymmetric_fork;
+  comb_graph_t comb;
 } graphs_t;
 
 void bind_graph(spn_build_graph_t* g, sp_test_file_manager_t* fm) {
@@ -293,14 +410,18 @@ graphs_t build_graphs(sp_test_file_manager_t* file_manager) {
     .long_linear = create_long_linear_graph(),
     .diamond = create_diamond_graph(),
     .multi_output = create_multi_output_graph(),
+    .asymmetric_fork = create_asymmetric_fork_graph(),
+    .comb = create_comb_graph(),
   };
 
   bind_graph(graphs.short_linear.graph, file_manager);
   bind_graph(graphs.fork_join.graph, file_manager);
-  bind_graph(graphs.split_join, file_manager);
+  bind_graph(graphs.split_join.graph, file_manager);
   bind_graph(graphs.long_linear.graph, file_manager);
   bind_graph(graphs.diamond.graph, file_manager);
   bind_graph(graphs.multi_output.graph, file_manager);
+  bind_graph(graphs.asymmetric_fork.graph, file_manager);
+  bind_graph(graphs.comb.graph, file_manager);
 
   return graphs;
 }
@@ -380,7 +501,7 @@ UTEST_F(spn_test_traversal, visit_once) {
 UTEST_F(spn_test_traversal, find_outputs) {
   EXPECT_EQ(sp_da_size(spn_bg_find_outputs(uf->graphs.short_linear.graph)), 1);
   EXPECT_EQ(sp_da_size(spn_bg_find_outputs(uf->graphs.fork_join.graph)), 1);
-  EXPECT_EQ(sp_da_size(spn_bg_find_outputs(uf->graphs.split_join)), 1);
+  EXPECT_EQ(sp_da_size(spn_bg_find_outputs(uf->graphs.split_join.graph)), 1);
 }
 
 
@@ -401,7 +522,26 @@ typedef struct {
   spn_bg_err_kind_t errors [SPN_DIRTY_TEST_MAX_NODE];
 } expected_dirty_t;
 
-void expect_dirty(s32* utest_result, spn_bg_dirty_t* dirty, expected_dirty_t ex) {
+sp_str_t spn_bg_file_to_str(spn_build_graph_t* graph, spn_bg_id_t id) {
+  spn_build_file_t* file = spn_bg_find_file(graph, id);
+  SP_ASSERT(file);
+  return file->path;
+}
+
+sp_str_t spn_bg_cmd_to_str(spn_build_graph_t* graph, spn_bg_id_t id) {
+  spn_build_cmd_t* cmd = spn_bg_find_command(graph, id);
+  SP_ASSERT(cmd);
+
+  if (!sp_str_empty(cmd->tag)) {
+    return cmd->tag;
+  } else if (cmd->kind == SPN_BUILD_CMD_SUBPROCESS && !sp_str_empty(cmd->ps.command)) {
+    return cmd->ps.command;
+  } else {
+    return sp_format("{}", SP_FMT_PTR(cmd));
+  }
+}
+
+void expect_dirty(s32* utest_result, spn_build_graph_t* graph, spn_bg_dirty_t* dirty, expected_dirty_t ex) {
   sp_carr_for(ex.errors, it) {
     if (ex.errors[it] == SPN_BG_OK) break;
 
@@ -413,28 +553,44 @@ void expect_dirty(s32* utest_result, spn_bg_dirty_t* dirty, expected_dirty_t ex)
     spn_bg_id_t id = ex.files.dirty[it];
     if (!id.occupied) break;
 
-    EXPECT_TRUE(spn_bg_is_file_dirty(dirty, id));
+    bool is_dirty = spn_bg_is_file_dirty(dirty, id);
+    if (!is_dirty) {
+      sp_str_t message = sp_format("{:fg cyan} was not dirty", SP_FMT_STR(spn_bg_file_to_str(graph, id)));
+      EXPECT_TRUE_MSG(is_dirty, sp_str_to_cstr(message));
+    }
   }
 
   sp_carr_for(ex.files.clean, it) {
     spn_bg_id_t id = ex.files.clean[it];
     if (!id.occupied) break;
 
-    EXPECT_TRUE(!spn_bg_is_file_dirty(dirty, id));
+    bool is_dirty = spn_bg_is_file_dirty(dirty, id);
+    if (is_dirty) {
+      sp_str_t message = sp_format("{:fg cyan} was not clean", SP_FMT_STR(spn_bg_file_to_str(graph, id)));
+      EXPECT_FALSE_MSG(is_dirty, sp_str_to_cstr(message));
+    }
   }
 
   sp_carr_for(ex.commands.dirty, it) {
     spn_bg_id_t id = ex.commands.dirty[it];
     if (!id.occupied) break;
 
-    EXPECT_TRUE(spn_bg_is_cmd_dirty(dirty, id));
+    bool is_dirty = spn_bg_is_cmd_dirty(dirty, id);
+    if (!is_dirty) {
+      sp_str_t message = sp_format("{:fg yellow} was not dirty", SP_FMT_STR(spn_bg_cmd_to_str(graph, id)));
+      EXPECT_TRUE_MSG(is_dirty, sp_str_to_cstr(message));
+    }
   }
 
   sp_carr_for(ex.commands.clean, it) {
     spn_bg_id_t id = ex.commands.clean[it];
     if (!id.occupied) break;
 
-    EXPECT_TRUE(!spn_bg_is_cmd_dirty(dirty, id));
+    bool is_dirty = spn_bg_is_cmd_dirty(dirty, id);
+    if (is_dirty) {
+      sp_str_t message = sp_format("{:fg yellow} was not clean", SP_FMT_STR(spn_bg_cmd_to_str(graph, id)));
+      EXPECT_FALSE_MSG(is_dirty, sp_str_to_cstr(message));
+    }
   }
 }
 
@@ -453,9 +609,10 @@ UTEST_F_TEARDOWN(spn_dirty_tests) {
 }
 
 UTEST_F(spn_dirty_tests, missing_input_errors) {
-  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(uf->g.short_linear.graph);
+  spn_build_graph_t* graph = uf->g.short_linear.graph;
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(graph);
 
-  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+  expect_dirty(utest_result, graph, dirty, (expected_dirty_t) {
     .errors = {
       SPN_BG_ERR_MISSING_INPUT
     },
@@ -467,13 +624,13 @@ UTEST_F(spn_dirty_tests, missing_output_is_dirty) {
   touch_node(g.graph, g.a);
   spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
     .files = {
       .dirty = { g.b },
       .clean = { g.a },
     },
     .commands = {
-      .dirty = { g.touch }
+      .dirty = { g.compile }
     }
   });
 }
@@ -484,13 +641,13 @@ UTEST_F(spn_dirty_tests, input_newer_than_output_is_dirty) {
   touch_node(g.graph, g.a);
   spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
     .files = {
       .dirty = { g.b },
       .clean = { g.a },
     },
     .commands = {
-      .dirty = { g.touch }
+      .dirty = { g.compile }
     }
   });
 }
@@ -501,12 +658,12 @@ UTEST_F(spn_dirty_tests, output_newer_than_input_is_clean) {
   touch_node(g.graph, g.b);
   spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
     .files = {
       .clean = { g.b, g.a },
     },
     .commands = {
-      .clean = { g.touch }
+      .clean = { g.compile }
     }
   });
 }
@@ -520,13 +677,13 @@ UTEST_F(spn_dirty_tests, long_linear_dirty_propagates) {
 
   spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
     .files = {
       .dirty = { g.b, g.c },
       .clean = { g.a },
     },
     .commands = {
-      .dirty = { g.cmd1, g.cmd2 },
+      .dirty = { g.compile_1, g.compile_2 },
     },
   });
 }
@@ -544,14 +701,14 @@ UTEST_F(spn_dirty_tests, long_linear_partial) {
 
   spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
     .files = {
       .dirty = { g.c },
       .clean = { g.a, g.b },
     },
     .commands = {
-      .clean = { g.cmd1 },
-      .dirty = { g.cmd2 },
+      .clean = { g.compile_1 },
+      .dirty = { g.compile_2 },
     },
   });
 }
@@ -562,35 +719,81 @@ UTEST_F(spn_dirty_tests, diamond_propagation) {
 
   spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
     .files = {
       .dirty = { g.b, g.c, g.d },
       .clean = { g.a },
     },
     .commands = {
-      .dirty = { g.left, g.right, g.join },
+      .dirty = { g.compile_1, g.compile_2, g.join },
     },
   });
 }
 
-UTEST_F(spn_dirty_tests, fork_join_partial_rebuild) {
+UTEST_F(spn_dirty_tests, fork_join_partial_missing) {
   fork_join_graph_t g = uf->g.fork_join;
 
-  touch_node(g.graph, g.src2);
-  touch_node(g.graph, g.obj2);
-  touch_node(g.graph, g.exe);
-  touch_node(g.graph, g.src1);
+  touch_node(g.graph, g.c);
+  touch_node(g.graph, g.e);
+  touch_node(g.graph, g.d);
+  touch_node(g.graph, g.a);
 
   spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
     .files = {
-      .dirty = { g.obj1, g.exe },
-      .clean = { g.src1, g.src2, g.obj2 },
+      .dirty = { g.b, g.d },
+      .clean = { g.a, g.c, g.e },
     },
     .commands = {
-      .dirty = { g.compile1, g.link },
-      .clean = { g.compile2 },
+      .dirty = { g.compile_1, g.join },
+      .clean = { g.compile_2 },
+    },
+  });
+}
+
+UTEST_F(spn_dirty_tests, fork_join_partial_rhs) {
+  fork_join_graph_t g = uf->g.fork_join;
+
+  touch_node(g.graph, g.a);
+  touch_node(g.graph, g.c);
+  touch_node(g.graph, g.e);
+  touch_node(g.graph, g.d);
+  touch_node(g.graph, g.b);
+
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
+
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.d },
+      .clean = { g.a, g.c, g.e, g.b },
+    },
+    .commands = {
+      .dirty = { g.join },
+      .clean = { g.compile_1, g.compile_2 },
+    },
+  });
+}
+
+UTEST_F(spn_dirty_tests, fork_join_partial_lhs) {
+  fork_join_graph_t g = uf->g.fork_join;
+
+  touch_node(g.graph, g.c);
+  touch_node(g.graph, g.a);
+  touch_node(g.graph, g.b);
+  touch_node(g.graph, g.d);
+  touch_node(g.graph, g.e);
+
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
+
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.d },
+      .clean = { g.a, g.c, g.e, g.b },
+    },
+    .commands = {
+      .dirty = { g.join },
+      .clean = { g.compile_1, g.compile_2 },
     },
   });
 }
@@ -603,7 +806,7 @@ UTEST_F(spn_dirty_tests, multi_output_missing_peer) {
 
   spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
     .files = {
       .dirty = { g.b, g.c },
       .clean = { g.a },
@@ -614,8 +817,97 @@ UTEST_F(spn_dirty_tests, multi_output_missing_peer) {
   });
 }
 
+UTEST_F(spn_dirty_tests, split_join_asymmetric) {
+  split_join_graph_t g = uf->g.split_join;
 
+  touch_node(g.graph, g.a);
+  touch_node(g.graph, g.b);
+  touch_node(g.graph, g.c);
+  touch_node(g.graph, g.d);
+  touch_node(g.graph, g.e);
+  touch_node(g.graph, g.f);
 
+  touch_node(g.graph, g.a);
+
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
+
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.f },
+    },
+    .commands = {
+      .dirty = { g.join_2 },
+    },
+  });
+}
+
+UTEST_F(spn_dirty_tests, asymmetric_long_fork_dirty) {
+  asymmetric_fork_graph_t g = uf->g.asymmetric_fork;
+
+  touch_node(g.graph, g.a);
+  touch_node(g.graph, g.b);
+  touch_node(g.graph, g.c);
+  touch_node(g.graph, g.d);
+  touch_node(g.graph, g.e);
+  touch_node(g.graph, g.f);
+  touch_node(g.graph, g.g);
+
+  touch_node(g.graph, g.a);
+
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
+
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.b, g.c, g.d, g.e, g.g },
+      .clean = { g.f }
+    },
+    .commands = {
+      .dirty = { g.compile_1, g.compile_2, g.compile_3, g.compile_4, g.join },
+    },
+  });
+}
+
+UTEST_F(spn_dirty_tests, comb_all_dirty) {
+  comb_graph_t g = uf->g.comb;
+
+  touch_node(g.graph, g.a);
+
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
+
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.b, g.c, g.d },
+      .clean = { g.a },
+    },
+    .commands = {
+      .dirty = { g.compile_1, g.compile_2, g.compile_3 },
+    },
+  });
+}
+
+UTEST_F(spn_dirty_tests, comb_partial_dirty) {
+  comb_graph_t g = uf->g.comb;
+
+  touch_node(g.graph, g.a);
+  touch_node(g.graph, g.b);
+  touch_node(g.graph, g.c);
+  touch_node(g.graph, g.d);
+
+  touch_node(g.graph, g.c);
+
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
+
+  expect_dirty(utest_result, g.graph, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.d },
+      .clean = { g.a, g.b, g.c },
+    },
+    .commands = {
+      .dirty = { g.compile_3 },
+      .clean = { g.compile_1, g.compile_2 },
+    },
+  });
+}
 
 //////////////
 // EXECUTOR //
@@ -670,7 +962,7 @@ UTEST_F(spn_executor_test, short_linear_new_input) {
   touch_node(g.graph, g.a);
 
   expect_execution(utest_result, g.graph, (expected_execution_t) {
-    .expected = { g.touch },
+    .expected = { g.compile },
     .config = { .enable_logging = true }
   });
 }
@@ -690,7 +982,7 @@ UTEST_F(spn_executor_test, long_linear_chain_propagation) {
   touch_node(g.graph, g.a);
 
   expect_execution(utest_result, g.graph, (expected_execution_t) {
-    .expected = { g.cmd1, g.cmd2 },
+    .expected = { g.compile_1, g.compile_2 },
     .config = { .enable_logging = true }
   });
 }
@@ -704,7 +996,7 @@ UTEST_F(spn_executor_test, long_linear_partial_dirty) {
   touch_node(g.graph, g.b);
 
   expect_execution(utest_result, g.graph, (expected_execution_t) {
-    .expected = { g.cmd2 },
+    .expected = { g.compile_2 },
     .config = { .enable_logging = true }
   });
 }
@@ -714,21 +1006,21 @@ UTEST_F(spn_executor_test, diamond_all_dirty) {
   touch_node(g.graph, g.a);
 
   expect_execution(utest_result, g.graph, (expected_execution_t) {
-    .expected = { g.left, g.right, g.join },
+    .expected = { g.compile_1, g.compile_2, g.join },
     .config = { .enable_logging = true }
   });
 }
 
 UTEST_F(spn_executor_test, fork_join_partial_dirty) {
   fork_join_graph_t g = uf->graphs.fork_join;
-  // set up: src2, obj2 are up to date; src1 is newer than obj1
-  touch_node(g.graph, g.src2);
-  touch_node(g.graph, g.obj2);
-  touch_node(g.graph, g.exe);
-  touch_node(g.graph, g.src1);
+  // set up: c, e are up to date; a is newer than b
+  touch_node(g.graph, g.c);
+  touch_node(g.graph, g.e);
+  touch_node(g.graph, g.d);
+  touch_node(g.graph, g.a);
 
   expect_execution(utest_result, g.graph, (expected_execution_t) {
-    .expected = { g.compile1, g.link },
+    .expected = { g.compile_1, g.join },
     .config = { .enable_logging = true }
   });
 }
@@ -738,7 +1030,7 @@ UTEST_F(spn_executor_test, multi_output_all_dirty) {
   touch_node(g.graph, g.a);
 
   expect_execution(utest_result, g.graph, (expected_execution_t) {
-    .expected = { g.split, g.proc_b, g.proc_c },
+    .expected = { g.split, g.compile_1, g.compile_2 },
     .config = { .enable_logging = true }
   });
 }

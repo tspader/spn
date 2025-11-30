@@ -1,53 +1,6 @@
 #ifndef SPN_TEST_GRAPH_H
 #define SPN_TEST_GRAPH_H
 
-#include "sp.h"
-#include <limits.h>
-#include <signal.h>
-#include <stdbool.h>
-#include <float.h>
-
-#define SP_LIMIT_S8_MIN   INT8_MIN
-#define SP_LIMIT_S8_MAX   INT8_MAX
-#define SP_LIMIT_S16_MIN  INT16_MIN
-#define SP_LIMIT_S16_MAX  INT16_MAX
-#define SP_LIMIT_S32_MIN  INT32_MIN
-#define SP_LIMIT_S32_MAX  INT32_MAX
-#define SP_LIMIT_S64_MIN  INT64_MIN
-#define SP_LIMIT_S64_MAX  INT64_MAX
-
-#define SP_LIMIT_U8_MAX   UINT8_MAX
-#define SP_LIMIT_U16_MAX  UINT16_MAX
-#define SP_LIMIT_U32_MAX  UINT32_MAX
-#define SP_LIMIT_U64_MAX  UINT64_MAX
-
-#define SP_LIMIT_F32_MIN  FLT_MIN
-#define SP_LIMIT_F32_MAX  FLT_MAX
-#define SP_LIMIT_F64_MIN  DBL_MIN
-#define SP_LIMIT_F64_MAX  DBL_MAX
-
-#define SP_LIMIT_EPOCH_MIN SP_ZERO_STRUCT(sp_tm_epoch_t)
-#define SP_LIMIT_EPOCH_MAX SP_RVAL(sp_tm_epoch_t) { .s = SP_LIMIT_U64_MAX, .ns = SP_LIMIT_U32_MAX }
-
-typedef enum {
-  SP_OPT_NONE = 0,
-  SP_OPT_SOME = 1,
-} sp_optional_t;
-
-#define sp_opt(T) struct { \
-  T value; \
-  sp_optional_t some; \
-}
-
-#define sp_opt_set(O, V) do { (O).value = (V); (O).some = SP_OPT_SOME; } while (0)
-#define sp_opt_get(O) (O).value
-#define sp_opt_some(V) { .value = V, .some = SP_OPT_SOME }
-#define sp_opt_none(V) { .some = SP_OPT_NONE }
-#define sp_opt_is_null(V) ((V).some == SP_OPT_NONE)
-
-#define SP_ALLOC(T) (T*)sp_alloc(sizeof(T))
-#define sp_da_rfor(__ARR, __IT) for (u32 __IT = sp_dyn_array_size(__ARR); __IT-- > 0; )
-
 SP_TYPEDEF_FN(void, sp_it_next_fn_t, s64*);
 SP_TYPEDEF_FN(bool, sp_it_check_fn_t, s64, s64);
 
@@ -172,9 +125,10 @@ typedef struct {
 typedef struct {
   sp_tm_epoch_t in;
   sp_tm_epoch_t out;
+  u32 degree;
 } spn_bg_dirty_cmd_metadata_t;
 
-typedef union {
+typedef struct {
   sp_tm_epoch_t mod_time;
 } spn_bg_dirty_file_metadata_t;
 
@@ -253,6 +207,9 @@ void spn_build_command_add_input(spn_build_graph_t* graph, spn_bg_id_t cmd_id, s
 spn_build_file_t* spn_bg_find_file(spn_build_graph_t* graph, spn_bg_id_t id);
 spn_build_cmd_t* spn_bg_find_command(spn_build_graph_t* graph, spn_bg_id_t id);
 sp_da(spn_bg_id_t) spn_bg_find_outputs(spn_build_graph_t* graph);
+void spn_bg_tag_command(spn_build_graph_t* graph, spn_bg_id_t id, sp_str_t tag);
+void spn_bg_tag_command_c(spn_build_graph_t* graph, spn_bg_id_t id, const c8* tag);
+
 sp_str_t spn_bg_dfs(spn_bg_it_config_t config);
 sp_str_t spn_bg_bfs(spn_bg_it_config_t config);
 sp_str_t spn_bg_all_paths(spn_bg_it_config_t config);
@@ -382,7 +339,7 @@ void spn_bg_it_add_children(spn_bg_it_t* it, spn_bg_node_t node) {
           if (file->producer.occupied) {
             spn_bg_node_t cmd = {
               .kind = SPN_BUILD_GRAPH_NODE_CMD,
-              .id = file->producer.index
+              .id = file->producer
             };
             sp_da_push(it->nodes, cmd);
           }
@@ -437,7 +394,7 @@ void spn_bg_it_add_children(spn_bg_it_t* it, spn_bg_node_t node) {
 }
 
 spn_build_graph_t* spn_bg_new() {
-  spn_build_graph_t* graph = calloc(1, sizeof(spn_build_graph_t));
+  spn_build_graph_t* graph = SP_ALLOC(spn_build_graph_t);
   return graph;
 }
 
@@ -510,7 +467,6 @@ void spn_bg_tag_command_c(spn_build_graph_t* graph, spn_bg_id_t id, const c8* ta
   SP_ASSERT(cmd);
   cmd->tag = sp_str_from_cstr(tag);
 }
-
 
 sp_da(spn_bg_id_t) spn_bg_find_outputs(spn_build_graph_t* graph) {
   sp_da(spn_bg_id_t) ids = SP_ZERO_INITIALIZE();
@@ -648,20 +604,33 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
     .direction = SPN_BG_ITER_DIR_IN_TO_OUT,
   });
 
+  // get file mod times in a single pass
   sp_da_for(graph->files, it) {
     spn_build_file_t* file = &graph->files[it];
     spn_bg_dirty_file_metadata_t metadata = {
-      .mod_time = sp_fs_get_mod_time(file->path)
+      .mod_time = sp_fs_get_mod_time(file->path),
     };
 
     sp_ht_insert(dirty->metadata.files, file->id, metadata);
+
+    if (spn_bg_is_file_input(file)) {
+      if (!sp_fs_exists(file->path)) {
+        spn_bg_err_t err = {
+          .kind = SPN_BG_ERR_MISSING_INPUT,
+          .missing_input = { .file_id = file->id }
+        };
+        sp_da_push(dirty->errors, err);
+      }
+    }
   }
 
+  // first pass: check each command, locally, for inputs newer than outputs
   sp_da_for(graph->commands, it) {
     spn_build_cmd_t* cmd = &graph->commands[it];
     spn_bg_dirty_cmd_metadata_t metadata = {
       .in = SP_LIMIT_EPOCH_MIN,
-      .out = SP_LIMIT_EPOCH_MAX
+      .out = SP_LIMIT_EPOCH_MAX,
+      .degree = sp_da_size(cmd->consumes)
     };
 
     sp_da_for(cmd->produces, n) {
@@ -676,77 +645,45 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
       metadata.in = sp_tm_epoch_max(m->mod_time, metadata.in);
     }
 
+    if (sp_tm_epoch_gt(metadata.in, metadata.out)) {
+      sp_ht_insert(dirty->commands, cmd->id, true);
+    }
+
     sp_ht_insert(dirty->metadata.commands, cmd->id, metadata);
   }
 
-
+  // second pass: bootleg kahn's, to propagate dirtiness
   while (!spn_bg_it_done(&it)) {
     spn_bg_node_t node = spn_bg_it_next(&it);
 
-    if (spn_bg_visited_visit(visited, node)) continue;
-
     switch (node.kind) {
       case SPN_BUILD_GRAPH_NODE_FILE: {
-        spn_bg_dirty_file_metadata_t* meta = sp_ht_getp(dirty->metadata.files, node.id);
-        SP_ASSERT(meta);
         spn_build_file_t* file = spn_bg_find_file(graph, node.id);
+        if (sp_ht_key_exists(dirty->commands, file->producer)) {
+          sp_ht_insert(dirty->files, node.id, true);
+        }
 
-        if (spn_bg_is_file_input(file)) {
-          if (!meta->mod_time.s) {
-            spn_bg_err_t err = {
-              .kind = SPN_BG_ERR_MISSING_INPUT,
-              .missing_input = { .file_id = node.id }
-            };
-            sp_da_push(dirty->errors, err);
-          }
-        }
-        else {
-          if (sp_ht_key_exists(dirty->commands, file->producer)) {
-            sp_ht_insert(dirty->files, node.id, true);
-          }
-        }
+        spn_bg_it_add_children(&it, node);
         break;
       }
       case SPN_BUILD_GRAPH_NODE_CMD: {
-        spn_build_cmd_t* cmd = spn_bg_find_command(graph, node.id);
-        bool is_dirty = false;
+        spn_bg_dirty_cmd_metadata_t* m = sp_ht_getp(dirty->metadata.commands, node.id);
+        m->degree--;
 
-        // are inputs dirty?
-        sp_da_for(cmd->consumes, i) {
-          if (sp_ht_key_exists(dirty->files, cmd->consumes[i])) {
-            is_dirty = true;
-            break;
-          }
-        }
-
-        // are outputs missing?
-        if (!is_dirty) {
-          sp_da_for(cmd->produces, i) {
-            spn_build_file_t* output = spn_bg_find_file(graph, cmd->produces[i]);
-            if (!sp_fs_exists(output->path)) {
-              is_dirty = true;
-              break;
+        if (!m->degree) {
+          spn_build_cmd_t* cmd = spn_bg_find_command(graph, node.id);
+          sp_da_for(cmd->consumes, n) {
+            if (sp_ht_key_exists(dirty->files, cmd->consumes[n])) {
+              sp_ht_insert(dirty->commands, node.id, true);
             }
           }
-        }
 
-        // are inputs newer than outputs?
-        if (!is_dirty) {
-          spn_bg_dirty_cmd_metadata_t* meta = sp_ht_getp(dirty->metadata.commands, node.id);
-          SP_ASSERT(meta);
-          if (sp_tm_epoch_gt(meta->in, meta->out)) {
-            is_dirty = true;
-          }
-        }
-
-        if (is_dirty) {
-          sp_ht_insert(dirty->commands, node.id, true);
+          spn_bg_it_add_children(&it, node);
         }
         break;
       }
     }
 
-    spn_bg_it_add_children(&it, node);
   }
 
   return dirty;

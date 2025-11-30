@@ -11,7 +11,7 @@ toml = "1.2.0"
 
 [[profile]]
 name = "debug"
-cc = "tcc"
+cc = "gcc"
 
 [[profile]]
 name = "macos"
@@ -25,4 +25,4 @@ include = ["include"]
 [[bin]]
 name = "spn-test-graph"
 source = ["test/graph/main.c"]
-include = ["include", "source", "test/graph", "test/tools"]
+include = ["include", "source", "test/tools"]
