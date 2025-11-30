@@ -5,7 +5,29 @@
 #include <limits.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <float.h>
 
+#define SP_LIMIT_S8_MIN   INT8_MIN
+#define SP_LIMIT_S8_MAX   INT8_MAX
+#define SP_LIMIT_S16_MIN  INT16_MIN
+#define SP_LIMIT_S16_MAX  INT16_MAX
+#define SP_LIMIT_S32_MIN  INT32_MIN
+#define SP_LIMIT_S32_MAX  INT32_MAX
+#define SP_LIMIT_S64_MIN  INT64_MIN
+#define SP_LIMIT_S64_MAX  INT64_MAX
+
+#define SP_LIMIT_U8_MAX   UINT8_MAX
+#define SP_LIMIT_U16_MAX  UINT16_MAX
+#define SP_LIMIT_U32_MAX  UINT32_MAX
+#define SP_LIMIT_U64_MAX  UINT64_MAX
+
+#define SP_LIMIT_F32_MIN  FLT_MIN
+#define SP_LIMIT_F32_MAX  FLT_MAX
+#define SP_LIMIT_F64_MIN  DBL_MIN
+#define SP_LIMIT_F64_MAX  DBL_MAX
+
+#define SP_LIMIT_EPOCH_MIN SP_ZERO_STRUCT(sp_tm_epoch_t)
+#define SP_LIMIT_EPOCH_MAX SP_RVAL(sp_tm_epoch_t) { .s = SP_LIMIT_U64_MAX, .ns = SP_LIMIT_U32_MAX }
 
 typedef enum {
   SP_OPT_NONE = 0,
@@ -47,6 +69,34 @@ bool sp_it_eq(s64 it, s64 bound) { return it == bound; }
 #define sp_it_for(it, begin, end, on_check, on_next) for (s64 it = begin; on_check(it, end); on_next(it))
 #define sp_it_for_range(range) for (range.n = range.begin; range.on_check(range.n, range.end); range.on_next(&range.n))
 
+bool sp_tm_epoch_gt(sp_tm_epoch_t a, sp_tm_epoch_t b) {
+  return a.s > b.s || (a.s == b.s && a.ns > b.ns);
+}
+
+bool sp_tm_epoch_ge(sp_tm_epoch_t a, sp_tm_epoch_t b) {
+  return a.s > b.s || (a.s == b.s && a.ns >= b.ns);
+}
+
+bool sp_tm_epoch_lt(sp_tm_epoch_t a, sp_tm_epoch_t b) {
+  return a.s < b.s || (a.s == b.s && a.ns < b.ns);
+}
+
+bool sp_tm_epoch_le(sp_tm_epoch_t a, sp_tm_epoch_t b) {
+  return a.s < b.s || (a.s == b.s && a.ns <= b.ns);
+}
+
+bool sp_tm_epoch_eq(sp_tm_epoch_t a, sp_tm_epoch_t b) {
+  return a.s == b.s && a.ns == b.ns;
+}
+
+sp_tm_epoch_t sp_tm_epoch_min(sp_tm_epoch_t a, sp_tm_epoch_t b) {
+  return sp_tm_epoch_lt(a, b) ? a : b;
+}
+
+sp_tm_epoch_t sp_tm_epoch_max(sp_tm_epoch_t a, sp_tm_epoch_t b) {
+  return sp_tm_epoch_gt(a, b) ? a : b;
+}
+
 typedef struct {
   u32 index;
   u8 occupied;
@@ -58,9 +108,8 @@ typedef enum {
 } spn_bg_node_kind_t;
 
 typedef enum {
-  SPN_BUILD_CMD_DEP = 0,
-  SPN_BUILD_CMD_SUBPROCESS = 1,
-  SPN_BUILD_CMD_FN = 2,
+  SPN_BUILD_CMD_SUBPROCESS = 0,
+  SPN_BUILD_CMD_FN = 1,
 } spn_build_cmd_kind_t;
 
 typedef struct spn_build_cmd_t spn_build_cmd_t;
@@ -69,13 +118,12 @@ SP_TYPEDEF_FN(void, spn_bg_on_execute_fn_t, spn_build_cmd_t* cmd, void* user_dat
 struct spn_build_cmd_t {
   spn_build_cmd_kind_t kind;
   spn_bg_id_t id;
-  sp_ps_config_t ps;
+  sp_str_t tag;
   sp_da(spn_bg_id_t) consumes;
   sp_da(spn_bg_id_t) produces;
 
   union {
-    struct {} dep;
-    struct {} subprocess;
+    sp_ps_config_t ps;
     struct {
       spn_bg_on_execute_fn_t on_execute;
       void* user_data;
@@ -110,6 +158,7 @@ typedef struct {
 } spn_bg_visited_t;
 
 typedef enum {
+  SPN_BG_OK,
   SPN_BG_ERR_MISSING_INPUT,
 } spn_bg_err_kind_t;
 
@@ -121,9 +170,21 @@ typedef struct {
 } spn_bg_err_t;
 
 typedef struct {
+  sp_tm_epoch_t in;
+  sp_tm_epoch_t out;
+} spn_bg_dirty_cmd_metadata_t;
+
+typedef union {
+  sp_tm_epoch_t mod_time;
+} spn_bg_dirty_file_metadata_t;
+
+typedef struct {
   sp_ht(spn_bg_id_t, bool) files;
   sp_ht(spn_bg_id_t, bool) commands;
-  sp_ht(spn_bg_id_t, sp_tm_epoch_t) mod_times;
+  struct {
+    sp_ht(spn_bg_id_t, spn_bg_dirty_file_metadata_t) files;
+    sp_ht(spn_bg_id_t, spn_bg_dirty_cmd_metadata_t) commands;
+  } metadata;
   sp_da(spn_bg_err_t) errors;
 } spn_bg_dirty_t;
 
@@ -185,7 +246,9 @@ bool spn_bg_it_done(spn_bg_it_t* it);
 spn_build_graph_t* spn_bg_new();
 spn_bg_id_t spn_bg_add_file(spn_build_graph_t* graph, sp_str_t path);
 spn_bg_id_t spn_bg_add_command(spn_build_graph_t* graph, spn_build_cmd_kind_t kind);
+bool spn_bg_is_file_input(spn_build_file_t* file);
 void spn_build_file_set_command(spn_build_graph_t* graph, spn_bg_id_t file_id, spn_bg_id_t cmd_id);
+void spn_build_command_add_output(spn_build_graph_t* graph, spn_bg_id_t cmd_id, spn_bg_id_t file_id);
 void spn_build_command_add_input(spn_build_graph_t* graph, spn_bg_id_t cmd_id, spn_bg_id_t file_id);
 spn_build_file_t* spn_bg_find_file(spn_build_graph_t* graph, spn_bg_id_t id);
 spn_build_cmd_t* spn_bg_find_command(spn_build_graph_t* graph, spn_bg_id_t id);
@@ -402,9 +465,21 @@ spn_bg_id_t spn_bg_add_command(spn_build_graph_t* graph, spn_build_cmd_kind_t ki
   return cmd.id;
 }
 
+bool spn_bg_is_file_input(spn_build_file_t* file) {
+  return !file->producer.occupied;
+}
+
 void spn_build_file_set_command(spn_build_graph_t* graph, spn_bg_id_t file_id, spn_bg_id_t cmd_id) {
   spn_build_file_t* file = spn_bg_find_file(graph, file_id);
   spn_build_cmd_t* cmd = spn_bg_find_command(graph, cmd_id);
+  file->producer = cmd_id;
+  sp_da_push(cmd->produces, file_id);
+}
+
+void spn_build_command_add_output(spn_build_graph_t* graph, spn_bg_id_t cmd_id, spn_bg_id_t file_id) {
+  spn_build_file_t* file = spn_bg_find_file(graph, file_id);
+  spn_build_cmd_t* cmd = spn_bg_find_command(graph, cmd_id);
+  SP_ASSERT(!file->producer.occupied);
   file->producer = cmd_id;
   sp_da_push(cmd->produces, file_id);
 }
@@ -423,6 +498,19 @@ spn_build_file_t* spn_bg_find_file(spn_build_graph_t* graph, spn_bg_id_t id) {
 spn_build_cmd_t* spn_bg_find_command(spn_build_graph_t* graph, spn_bg_id_t id) {
   return graph->commands + id.index;
 }
+
+void spn_bg_tag_command(spn_build_graph_t* graph, spn_bg_id_t id, sp_str_t tag) {
+  spn_build_cmd_t* cmd = spn_bg_find_command(graph, id);
+  SP_ASSERT(cmd);
+  cmd->tag = sp_str_copy(tag);
+}
+
+void spn_bg_tag_command_c(spn_build_graph_t* graph, spn_bg_id_t id, const c8* tag) {
+  spn_build_cmd_t* cmd = spn_bg_find_command(graph, id);
+  SP_ASSERT(cmd);
+  cmd->tag = sp_str_from_cstr(tag);
+}
+
 
 sp_da(spn_bg_id_t) spn_bg_find_outputs(spn_build_graph_t* graph) {
   sp_da(spn_bg_id_t) ids = SP_ZERO_INITIALIZE();
@@ -526,7 +614,7 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_str_t path) {
   sp_da_for(graph->commands, it) {
     spn_build_cmd_t* cmd = &graph->commands[it];
     sp_io_write_str(&stream, sp_format("  C{}[\"{}\"]:::cmd\n",
-      SP_FMT_U32(cmd->id.index), SP_FMT_STR(cmd->ps.command)));
+      SP_FMT_U32(cmd->id.index), SP_FMT_STR(cmd->tag)));
 
     sp_da_for(cmd->consumes, input_it) {
       sp_io_write_str(&stream, sp_format("  F{} --> C{}\n",
@@ -546,7 +634,8 @@ spn_bg_dirty_t* spn_bg_dirty_new() {
   spn_bg_dirty_t* dirty = SP_ALLOC(spn_bg_dirty_t);
   sp_ht_set_fns(dirty->files, sp_ht_on_hash_key, sp_ht_on_compare_key);
   sp_ht_set_fns(dirty->commands, sp_ht_on_hash_key, sp_ht_on_compare_key);
-  sp_ht_set_fns(dirty->mod_times, sp_ht_on_hash_key, sp_ht_on_compare_key);
+  sp_ht_set_fns(dirty->metadata.files, sp_ht_on_hash_key, sp_ht_on_compare_key);
+  sp_ht_set_fns(dirty->metadata.commands, sp_ht_on_hash_key, sp_ht_on_compare_key);
   return dirty;
 }
 
@@ -559,6 +648,38 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
     .direction = SPN_BG_ITER_DIR_IN_TO_OUT,
   });
 
+  sp_da_for(graph->files, it) {
+    spn_build_file_t* file = &graph->files[it];
+    spn_bg_dirty_file_metadata_t metadata = {
+      .mod_time = sp_fs_get_mod_time(file->path)
+    };
+
+    sp_ht_insert(dirty->metadata.files, file->id, metadata);
+  }
+
+  sp_da_for(graph->commands, it) {
+    spn_build_cmd_t* cmd = &graph->commands[it];
+    spn_bg_dirty_cmd_metadata_t metadata = {
+      .in = SP_LIMIT_EPOCH_MIN,
+      .out = SP_LIMIT_EPOCH_MAX
+    };
+
+    sp_da_for(cmd->produces, n) {
+      spn_bg_dirty_file_metadata_t* m = sp_ht_getp(dirty->metadata.files, cmd->produces[n]);
+      SP_ASSERT(m);
+      metadata.out = sp_tm_epoch_min(m->mod_time, metadata.out);
+    }
+
+    sp_da_for(cmd->consumes, n) {
+      spn_bg_dirty_file_metadata_t* m = sp_ht_getp(dirty->metadata.files, cmd->consumes[n]);
+      SP_ASSERT(m);
+      metadata.in = sp_tm_epoch_max(m->mod_time, metadata.in);
+    }
+
+    sp_ht_insert(dirty->metadata.commands, cmd->id, metadata);
+  }
+
+
   while (!spn_bg_it_done(&it)) {
     spn_bg_node_t node = spn_bg_it_next(&it);
 
@@ -566,22 +687,20 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
 
     switch (node.kind) {
       case SPN_BUILD_GRAPH_NODE_FILE: {
+        spn_bg_dirty_file_metadata_t* meta = sp_ht_getp(dirty->metadata.files, node.id);
+        SP_ASSERT(meta);
         spn_build_file_t* file = spn_bg_find_file(graph, node.id);
 
-        if (!file->producer.occupied) {
-          // Source file - must exist
-          if (!sp_fs_exists(file->path)) {
+        if (spn_bg_is_file_input(file)) {
+          if (!meta->mod_time.s) {
             spn_bg_err_t err = {
               .kind = SPN_BG_ERR_MISSING_INPUT,
               .missing_input = { .file_id = node.id }
             };
             sp_da_push(dirty->errors, err);
-          } else {
-            sp_tm_epoch_t mtime = sp_fs_get_mod_time(file->path);
-            sp_ht_insert(dirty->mod_times, node.id, mtime);
           }
-        } else {
-          // Produced file - dirty if producer is dirty
+        }
+        else {
           if (sp_ht_key_exists(dirty->commands, file->producer)) {
             sp_ht_insert(dirty->files, node.id, true);
           }
@@ -592,7 +711,7 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
         spn_build_cmd_t* cmd = spn_bg_find_command(graph, node.id);
         bool is_dirty = false;
 
-        // Check if any input is dirty
+        // are inputs dirty?
         sp_da_for(cmd->consumes, i) {
           if (sp_ht_key_exists(dirty->files, cmd->consumes[i])) {
             is_dirty = true;
@@ -600,7 +719,7 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
           }
         }
 
-        // Check if any output is missing, and cache mod times
+        // are outputs missing?
         if (!is_dirty) {
           sp_da_for(cmd->produces, i) {
             spn_build_file_t* output = spn_bg_find_file(graph, cmd->produces[i]);
@@ -608,28 +727,15 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
               is_dirty = true;
               break;
             }
-            sp_tm_epoch_t mtime = sp_fs_get_mod_time(output->path);
-            sp_ht_insert(dirty->mod_times, cmd->produces[i], mtime);
           }
         }
 
-        // Check if any input is newer than any output
+        // are inputs newer than outputs?
         if (!is_dirty) {
-          sp_da_for(cmd->consumes, i) {
-            sp_tm_epoch_t* input_mtime = sp_ht_getp(dirty->mod_times, cmd->consumes[i]);
-            if (!input_mtime) continue;
-
-            sp_da_for(cmd->produces, j) {
-              sp_tm_epoch_t* output_mtime = sp_ht_getp(dirty->mod_times, cmd->produces[j]);
-              if (!output_mtime) continue;
-
-              if (input_mtime->s > output_mtime->s ||
-                  (input_mtime->s == output_mtime->s && input_mtime->ns > output_mtime->ns)) {
-                is_dirty = true;
-                break;
-              }
-            }
-            if (is_dirty) break;
+          spn_bg_dirty_cmd_metadata_t* meta = sp_ht_getp(dirty->metadata.commands, node.id);
+          SP_ASSERT(meta);
+          if (sp_tm_epoch_gt(meta->in, meta->out)) {
+            is_dirty = true;
           }
         }
 
@@ -672,6 +778,7 @@ typedef struct {
   sp_ht(spn_bg_id_t, bool) enqueued;
 
   spn_build_graph_t* graph;
+  spn_bg_dirty_t* dirty;
   u32 num_threads;
   sp_da(sp_thread_t) threads;
   sp_da(spn_bg_id_t) ran;
@@ -681,11 +788,17 @@ typedef struct {
   sp_atomic_s32 shutdown;
 } spn_bg_executor_t;
 
+spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, u32 num_threads);
+void spn_bg_executor_run(spn_bg_executor_t* ex);
+void spn_bg_executor_join(spn_bg_executor_t* ex);
+void spn_bg_executor_free(spn_bg_executor_t* ex);
+
 bool spn_bg_cmd_is_ready(spn_bg_executor_t* ex, spn_bg_id_t cmd_id) {
   spn_build_cmd_t* cmd = spn_bg_find_command(ex->graph, cmd_id);
   sp_da_for(cmd->consumes, i) {
     spn_build_file_t* file = spn_bg_find_file(ex->graph, cmd->consumes[i]);
-    if (!file->producer.occupied) continue;  // source file - always ready
+    if (!file->producer.occupied) continue;
+    if (!sp_ht_key_exists(ex->dirty->commands, file->producer)) continue;
     if (!sp_ht_key_exists(ex->completed, file->producer)) return false;
   }
   return true;
@@ -715,9 +828,6 @@ s32 spn_bg_worker_fn(void* user_data) {
     spn_build_cmd_t* cmd = spn_bg_find_command(ex->graph, cmd_id);
     sp_opt(spn_bg_exec_error_t) error = SP_ZERO_INITIALIZE();
     switch (cmd->kind) {
-      case SPN_BUILD_CMD_DEP: {
-        break;
-      }
       case SPN_BUILD_CMD_SUBPROCESS: {
         sp_ps_output_t result = sp_ps_run(cmd->ps);
         if (result.status.exit_code) {
@@ -775,9 +885,8 @@ s32 spn_bg_worker_fn(void* user_data) {
 
 spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, u32 num_threads) {
   spn_bg_executor_t* ex = SP_ALLOC(spn_bg_executor_t);
-  *ex = (spn_bg_executor_t){0};
-
   ex->graph = graph;
+  ex->dirty = dirty;
   ex->num_threads = num_threads;
 
   sp_mutex_init(&ex->mutex, SP_MUTEX_PLAIN);
@@ -787,9 +896,16 @@ spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t*
   sp_ht_set_fns(ex->completed, sp_ht_on_hash_key, sp_ht_on_compare_key);
   sp_ht_set_fns(ex->enqueued, sp_ht_on_hash_key, sp_ht_on_compare_key);
 
-  // Find initially ready commands
-  sp_ht_for(dirty->commands, it) {
-    spn_bg_id_t* cmd_id = sp_ht_it_getkp(dirty->commands, it);
+  return ex;
+}
+
+void spn_bg_executor_run(spn_bg_executor_t* ex) {
+  if (sp_ht_empty(ex->dirty->commands)) {
+    return;
+  }
+
+  sp_ht_for(ex->dirty->commands, it) {
+    spn_bg_id_t* cmd_id = sp_ht_it_getkp(ex->dirty->commands, it);
     if (spn_bg_cmd_is_ready(ex, *cmd_id)) {
       sp_ht_insert(ex->enqueued, *cmd_id, true);
       sp_ring_buffer_push(&ex->ready_queue, cmd_id);
@@ -797,17 +913,14 @@ spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t*
     }
   }
 
-  // Spawn threads
-  for (u32 i = 0; i < num_threads; i++) {
+  for (u32 i = 0; i < ex->num_threads; i++) {
     sp_thread_t thread;
     sp_thread_init(&thread, spn_bg_worker_fn, ex);
     sp_da_push(ex->threads, thread);
   }
-
-  return ex;
 }
 
-void spn_bg_executor_run(spn_bg_executor_t* ex) {
+void spn_bg_executor_join(spn_bg_executor_t* ex) {
   sp_da_for(ex->threads, i) {
     sp_thread_join(&ex->threads[i]);
   }

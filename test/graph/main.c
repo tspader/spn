@@ -8,41 +8,90 @@
 
 
 void touch_file(sp_str_t path) {
+  // @spader: i tried to be smart and poll, but it was junk
+  if (sp_fs_exists(path)) {
+    sp_os_sleep_ms(100);
+  }
+
   sp_io_stream_t s = sp_io_from_file(path, SP_IO_MODE_APPEND);
   sp_io_write_str(&s, sp_str_lit(" "));
   sp_io_close(&s);
 }
 
+void touch_node(spn_build_graph_t* graph, spn_bg_id_t id) {
+  spn_build_file_t* file = spn_bg_find_file(graph, id);
+  SP_ASSERT(file);
+  touch_file(file->path);
+}
+
+
+
+///////////////////////
+// BUILD COMMAND FNS //
+///////////////////////
+sp_mutex_t g_log_mutex;
+
+void build_fn_noop(spn_build_cmd_t* cmd, void* ud) {
+
+}
+
 #define uf utest_fixture
 
- // Graph A (simple):
- // ┌──────────┐     ┌─────┐     ┌────────────────┐     ┌────┐     ┌────────────┐
- // │ source.c │────▶│ gcc │────▶│ intermediate.o │────▶│ ld │────▶│ output.txt │
- // └──────────┘     └─────┘     └────────────────┘     └────┘     └────────────┘
-spn_build_graph_t* create_linear_graph() {
-  spn_build_graph_t* graph = spn_bg_new();
-  spn_build_cmd_t* command = SP_NULLPTR;
 
-  spn_bg_id_t output = spn_bg_add_file(graph, sp_str_lit("output.txt"));
-  spn_bg_id_t intermediate = spn_bg_add_file(graph, sp_str_lit("intermediate.o"));
-  spn_bg_id_t source = spn_bg_add_file(graph, sp_str_lit("source.c"));
 
-  spn_bg_id_t link = spn_bg_add_command(graph, SPN_BUILD_CMD_SUBPROCESS);
-  spn_bg_id_t compile = spn_bg_add_command(graph, SPN_BUILD_CMD_SUBPROCESS);
+////////////
+// GRAPHS //
+////////////
+// ┌───┐     ┌───────┐     ┌───┐
+// │ a │────▶│ touch │────▶│ b │
+// └───┘     └───────┘     └───┘
+typedef struct {
+  spn_build_graph_t* graph;
+  spn_bg_id_t a;
+  spn_bg_id_t b;
+  spn_bg_id_t touch;
+} short_linear_graph_t;
 
-  command = spn_bg_find_command(graph, link);
-  command->ps.command = sp_str_lit("ld");
+short_linear_graph_t create_short_linear_graph() {
+  short_linear_graph_t g;
+  g.graph = spn_bg_new();
+  g.a = spn_bg_add_file(g.graph, sp_str_lit("a"));
+  g.b = spn_bg_add_file(g.graph, sp_str_lit("b"));
+  g.touch = spn_bg_add_command(g.graph, SPN_BUILD_CMD_FN);
 
-  command = spn_bg_find_command(graph, compile);
-  command->ps.command = sp_str_lit("gcc");
+  spn_build_cmd_t* touch = spn_bg_find_command(g.graph, g.touch);
+  spn_build_command_add_input(g.graph, g.touch, g.a);
+  spn_build_command_add_output(g.graph, g.touch, g.b);
 
-  spn_build_file_set_command(graph, output, link);
-  spn_build_command_add_input(graph, link, intermediate);
+  return g;
+}
 
-  spn_build_file_set_command(graph, intermediate, compile);
-  spn_build_command_add_input(graph, compile, source);
+// ┌───┐     ┌──────┐     ┌───┐     ┌──────┐     ┌───┐
+// │ a │────▶│ cmd1 │────▶│ b │────▶│ cmd2 │────▶│ c │
+// └───┘     └──────┘     └───┘     └──────┘     └───┘
+typedef struct {
+  spn_build_graph_t* graph;
+  spn_bg_id_t a, b, c;
+  spn_bg_id_t cmd1, cmd2;
+} long_linear_graph_t;
 
-  return graph;
+long_linear_graph_t create_long_linear_graph() {
+  long_linear_graph_t r;
+  r.graph = spn_bg_new();
+  r.a = spn_bg_add_file(r.graph, sp_str_lit("a"));
+  r.b = spn_bg_add_file(r.graph, sp_str_lit("b"));
+  r.c = spn_bg_add_file(r.graph, sp_str_lit("c"));
+
+  r.cmd1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.cmd2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+
+  spn_build_command_add_input(r.graph, r.cmd1, r.a);
+  spn_build_file_set_command(r.graph, r.b, r.cmd1);
+
+  spn_build_command_add_input(r.graph, r.cmd2, r.b);
+  spn_build_file_set_command(r.graph, r.c, r.cmd2);
+
+  return r;
 }
 
  // ┌────────┐     ┌─────┐     ┌────────┐
@@ -52,39 +101,41 @@ spn_build_graph_t* create_linear_graph() {
  // ┌─────────┐     ┌─────┐     ┌─────────┐│     └────┘     └─────────────┘
  // │ utils.c │────▶│ gcc │────▶│ utils.o │┘
  // └─────────┘     └─────┘     └─────────┘
-spn_build_graph_t* create_fork_join_graph() {
-  spn_build_graph_t* graph = spn_bg_new();
+typedef struct {
+  spn_build_graph_t* graph;
+  spn_bg_id_t src1, src2, obj1, obj2, exe;
+  spn_bg_id_t compile1, compile2, link;
+} fork_join_graph_t;
 
-  spn_bg_id_t exe = spn_bg_add_file(graph, sp_str_lit("program.exe"));
-  spn_bg_id_t obj1 = spn_bg_add_file(graph, sp_str_lit("main.o"));
-  spn_bg_id_t obj2 = spn_bg_add_file(graph, sp_str_lit("utils.o"));
-  spn_bg_id_t src1 = spn_bg_add_file(graph, sp_str_lit("main.c"));
-  spn_bg_id_t src2 = spn_bg_add_file(graph, sp_str_lit("utils.c"));
+fork_join_graph_t create_fork_join_graph() {
+  fork_join_graph_t r;
+  r.graph = spn_bg_new();
 
-  spn_bg_id_t link = spn_bg_add_command(graph, SPN_BUILD_CMD_SUBPROCESS);
-  spn_bg_id_t compile1 = spn_bg_add_command(graph, SPN_BUILD_CMD_SUBPROCESS);
-  spn_bg_id_t compile2 = spn_bg_add_command(graph, SPN_BUILD_CMD_SUBPROCESS);
+  r.exe = spn_bg_add_file(r.graph, sp_str_lit("program.exe"));
+  r.obj1 = spn_bg_add_file(r.graph, sp_str_lit("main.o"));
+  r.obj2 = spn_bg_add_file(r.graph, sp_str_lit("utils.o"));
+  r.src1 = spn_bg_add_file(r.graph, sp_str_lit("main.c"));
+  r.src2 = spn_bg_add_file(r.graph, sp_str_lit("utils.c"));
 
-  spn_build_cmd_t* command = spn_bg_find_command(graph, link);
-  command->ps.command = sp_str_lit("ld");
+  r.link = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
 
-  command = spn_bg_find_command(graph, compile1);
-  command->ps.command = sp_str_lit("gcc");
+  spn_bg_tag_command_c(r.graph, r.link, "ld");
+  spn_bg_tag_command_c(r.graph, r.compile1, "gcc");
+  spn_bg_tag_command_c(r.graph, r.compile2, "gcc");
 
-  command = spn_bg_find_command(graph, compile2);
-  command->ps.command = sp_str_lit("gcc");
+  spn_build_command_add_input(r.graph, r.link, r.obj1);
+  spn_build_command_add_input(r.graph, r.link, r.obj2);
+  spn_build_command_add_output(r.graph, r.link, r.exe);
 
-  spn_build_file_set_command(graph, exe, link);
-  spn_build_command_add_input(graph, link, obj1);
-  spn_build_command_add_input(graph, link, obj2);
+  spn_build_command_add_input(r.graph, r.compile1, r.src1);
+  spn_build_command_add_output(r.graph, r.compile1, r.obj1);
 
-  spn_build_file_set_command(graph, obj1, compile1);
-  spn_build_command_add_input(graph, compile1, src1);
+  spn_build_command_add_input(r.graph, r.compile2, r.src2);
+  spn_build_command_add_output(r.graph, r.compile2, r.obj2);
 
-  spn_build_file_set_command(graph, obj2, compile2);
-  spn_build_command_add_input(graph, compile2, src2);
-
-  return graph;
+  return r;
 }
 
  //               ┌────┐
@@ -106,22 +157,22 @@ spn_build_graph_t* create_split_join_graph() {
   spn_bg_id_t alg = spn_bg_add_file(g, sp_str_lit("alg"));
   spn_bg_id_t tdns_loves_alg = spn_bg_add_file(g, sp_str_lit("tdns loves alg"));
 
-  spn_bg_id_t split = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
-  spn_bg_id_t join = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
-  spn_bg_id_t love = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
+  spn_bg_id_t split = spn_bg_add_command(g, SPN_BUILD_CMD_FN);
+  spn_bg_id_t join = spn_bg_add_command(g, SPN_BUILD_CMD_FN);
+  spn_bg_id_t love = spn_bg_add_command(g, SPN_BUILD_CMD_FN);
 
   spn_build_cmd_t* cmd = spn_bg_find_command(g, split);
-  cmd->ps.command = sp_str_lit("split");
+  spn_bg_tag_command_c(g, split, "split");
 
   cmd = spn_bg_find_command(g, join);
-  cmd->ps.command = sp_str_lit("join");
+  spn_bg_tag_command_c(g, join, "join");
 
   cmd = spn_bg_find_command(g, love);
-  cmd->ps.command = sp_str_lit("love");
+  spn_bg_tag_command_c(g, love, "love");
 
   spn_build_command_add_input(g, split, tdns);
-  spn_build_file_set_command(g, td, split);
-  spn_build_file_set_command(g, ns, split);
+  spn_build_command_add_output(g, split, td);
+  spn_build_command_add_output(g, split, ns);
 
   spn_build_command_add_input(g, join, td);
   spn_build_command_add_input(g, join, ns);
@@ -134,135 +185,143 @@ spn_build_graph_t* create_split_join_graph() {
   return g;
 }
 
-spn_build_graph_t* create_single_graph() {
-  spn_build_graph_t* g = spn_bg_new();
-  spn_bg_id_t src = spn_bg_add_file(g, sp_str_lit("src"));
-  spn_bg_id_t out = spn_bg_add_file(g, sp_str_lit("out"));
-  spn_bg_id_t cmd = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
-  spn_bg_find_command(g, cmd)->ps.command = sp_str_lit("build");
-  spn_build_command_add_input(g, cmd, src);
-  spn_build_file_set_command(g, out, cmd);
-  return g;
+//          ┌───────┐     ┌───┐
+//       ┌─▶│ left  │────▶│ b │──┐
+// ┌───┐ │  └───────┘     └───┘  │  ┌──────┐     ┌───┐
+// │ a │─┤                       ├─▶│ join │────▶│ d │
+// └───┘ │  ┌───────┐     ┌───┐  │  └──────┘     └───┘
+//       └─▶│ right │────▶│ c │──┘
+//          └───────┘     └───┘
+typedef struct {
+  spn_build_graph_t* graph;
+  spn_bg_id_t a, b, c, d;
+  spn_bg_id_t left, right, join;
+} diamond_graph_t;
+
+diamond_graph_t create_diamond_graph() {
+  diamond_graph_t r;
+  r.graph = spn_bg_new();
+  r.a = spn_bg_add_file(r.graph, sp_str_lit("a"));
+  r.b = spn_bg_add_file(r.graph, sp_str_lit("b"));
+  r.c = spn_bg_add_file(r.graph, sp_str_lit("c"));
+  r.d = spn_bg_add_file(r.graph, sp_str_lit("d"));
+  r.left = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.right = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.join = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+
+  spn_bg_tag_command_c(r.graph, r.left, "left");
+  spn_bg_tag_command_c(r.graph, r.right, "right");
+  spn_bg_tag_command_c(r.graph, r.join, "join");
+
+  spn_build_command_add_input(r.graph, r.left, r.a);
+  spn_build_file_set_command(r.graph, r.b, r.left);
+
+  spn_build_command_add_input(r.graph, r.right, r.a);
+  spn_build_file_set_command(r.graph, r.c, r.right);
+
+  spn_build_command_add_input(r.graph, r.join, r.b);
+  spn_build_command_add_input(r.graph, r.join, r.c);
+  spn_build_file_set_command(r.graph, r.d, r.join);
+
+  return r;
 }
 
-spn_build_graph_t* create_wide_parallel_graph() {
-  spn_build_graph_t* g = spn_bg_new();
-  for (u32 i = 0; i < 4; i++) {
-    spn_bg_id_t src = spn_bg_add_file(g, sp_format("src{}", SP_FMT_U32(i)));
-    spn_bg_id_t out = spn_bg_add_file(g, sp_format("out{}", SP_FMT_U32(i)));
-    spn_bg_id_t cmd = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
-    spn_bg_find_command(g, cmd)->ps.command = sp_format("cmd{}", SP_FMT_U32(i));
-    spn_build_command_add_input(g, cmd, src);
-    spn_build_file_set_command(g, out, cmd);
-  }
-  return g;
-}
+//                       ┌───┐     ┌────────┐     ┌───┐
+//                    ┌─▶│ b │────▶│ proc_b │────▶│ d │
+// ┌───┐     ┌───────┐│  └───┘     └────────┘     └───┘
+// │ a │────▶│ split │┤
+// └───┘     └───────┘│  ┌───┐     ┌────────┐     ┌───┐
+//                    └─▶│ c │────▶│ proc_c │────▶│ e │
+//                       └───┘     └────────┘     └───┘
+typedef struct {
+  spn_build_graph_t* graph;
+  spn_bg_id_t a, b, c, d, e;
+  spn_bg_id_t split, proc_b, proc_c;
+} multi_output_graph_t;
 
-spn_build_graph_t* create_diamond_graph() {
-  spn_build_graph_t* g = spn_bg_new();
-  spn_bg_id_t a = spn_bg_add_file(g, sp_str_lit("a"));
-  spn_bg_id_t b = spn_bg_add_file(g, sp_str_lit("b"));
-  spn_bg_id_t c = spn_bg_add_file(g, sp_str_lit("c"));
-  spn_bg_id_t d = spn_bg_add_file(g, sp_str_lit("d"));
+multi_output_graph_t create_multi_output_graph() {
+  multi_output_graph_t r;
+  r.graph = spn_bg_new();
+  r.a = spn_bg_add_file(r.graph, sp_str_lit("a"));
+  r.b = spn_bg_add_file(r.graph, sp_str_lit("b"));
+  r.c = spn_bg_add_file(r.graph, sp_str_lit("c"));
+  r.d = spn_bg_add_file(r.graph, sp_str_lit("d"));
+  r.e = spn_bg_add_file(r.graph, sp_str_lit("e"));
 
-  spn_bg_id_t cmd1 = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
-  spn_bg_id_t cmd2 = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
-  spn_bg_id_t cmd3 = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
+  r.split = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.proc_b = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.proc_c = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
 
-  spn_bg_find_command(g, cmd1)->ps.command = sp_str_lit("left");
-  spn_bg_find_command(g, cmd2)->ps.command = sp_str_lit("right");
-  spn_bg_find_command(g, cmd3)->ps.command = sp_str_lit("join");
+  spn_build_command_add_input(r.graph, r.split, r.a);
+  spn_build_file_set_command(r.graph, r.b, r.split);
+  spn_build_file_set_command(r.graph, r.c, r.split);
 
-  spn_build_command_add_input(g, cmd1, a);
-  spn_build_file_set_command(g, b, cmd1);
+  spn_build_command_add_input(r.graph, r.proc_b, r.b);
+  spn_build_file_set_command(r.graph, r.d, r.proc_b);
 
-  spn_build_command_add_input(g, cmd2, a);
-  spn_build_file_set_command(g, c, cmd2);
+  spn_build_command_add_input(r.graph, r.proc_c, r.c);
+  spn_build_file_set_command(r.graph, r.e, r.proc_c);
 
-  spn_build_command_add_input(g, cmd3, b);
-  spn_build_command_add_input(g, cmd3, c);
-  spn_build_file_set_command(g, d, cmd3);
-
-  return g;
-}
-
-spn_build_graph_t* create_multi_output_graph() {
-  spn_build_graph_t* g = spn_bg_new();
-  spn_bg_id_t a = spn_bg_add_file(g, sp_str_lit("a"));
-  spn_bg_id_t b = spn_bg_add_file(g, sp_str_lit("b"));
-  spn_bg_id_t c = spn_bg_add_file(g, sp_str_lit("c"));
-  spn_bg_id_t d = spn_bg_add_file(g, sp_str_lit("d"));
-  spn_bg_id_t e = spn_bg_add_file(g, sp_str_lit("e"));
-
-  spn_bg_id_t cmd1 = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
-  spn_bg_id_t cmd2 = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
-  spn_bg_id_t cmd3 = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
-
-  spn_bg_find_command(g, cmd1)->ps.command = sp_str_lit("split");
-  spn_bg_find_command(g, cmd2)->ps.command = sp_str_lit("proc_b");
-  spn_bg_find_command(g, cmd3)->ps.command = sp_str_lit("proc_c");
-
-  spn_build_command_add_input(g, cmd1, a);
-  spn_build_file_set_command(g, b, cmd1);
-  spn_build_file_set_command(g, c, cmd1);
-
-  spn_build_command_add_input(g, cmd2, b);
-  spn_build_file_set_command(g, d, cmd2);
-
-  spn_build_command_add_input(g, cmd3, c);
-  spn_build_file_set_command(g, e, cmd3);
-
-  return g;
-}
-
-spn_build_graph_t* create_error_chain_graph() {
-  spn_build_graph_t* g = spn_bg_new();
-  spn_bg_id_t a = spn_bg_add_file(g, sp_str_lit("a"));
-  spn_bg_id_t b = spn_bg_add_file(g, sp_str_lit("b"));
-  spn_bg_id_t c = spn_bg_add_file(g, sp_str_lit("c"));
-
-  spn_bg_id_t cmd1 = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
-  spn_bg_id_t cmd2 = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
-
-  spn_bg_find_command(g, cmd1)->ps.command = sp_str_lit("fail");
-  spn_bg_find_command(g, cmd2)->ps.command = sp_str_lit("after");
-
-  spn_build_command_add_input(g, cmd1, a);
-  spn_build_file_set_command(g, b, cmd1);
-
-  spn_build_command_add_input(g, cmd2, b);
-  spn_build_file_set_command(g, c, cmd2);
-
-  return g;
+  return r;
 }
 
 typedef struct {
-  spn_build_graph_t* linear;
-  spn_build_graph_t* fork_join;
+  short_linear_graph_t short_linear;
+  fork_join_graph_t fork_join;
   spn_build_graph_t* split_join;
-  spn_build_graph_t* single;
-  spn_build_graph_t* wide_parallel;
-  spn_build_graph_t* diamond;
-  spn_build_graph_t* multi_output;
-  spn_build_graph_t* error_chain;
-} spn_test_graphs_t;
+  long_linear_graph_t long_linear;
+  diamond_graph_t diamond;
+  multi_output_graph_t multi_output;
+} graphs_t;
 
-struct spn_test_graphs {
-  spn_test_graphs_t graphs;
-};
+void bind_graph(spn_build_graph_t* g, sp_test_file_manager_t* fm) {
+  sp_da_for(g->files, i) {
+    g->files[i].path = sp_test_file_path(fm, g->files[i].path);
+  }
 
-UTEST_F_SETUP(spn_test_graphs) {
-  uf->graphs.linear = create_linear_graph();
-  uf->graphs.fork_join = create_fork_join_graph();
-  uf->graphs.split_join = create_split_join_graph();
-  uf->graphs.single = create_single_graph();
-  uf->graphs.wide_parallel = create_wide_parallel_graph();
-  uf->graphs.diamond = create_diamond_graph();
-  uf->graphs.multi_output = create_multi_output_graph();
-  uf->graphs.error_chain = create_error_chain_graph();
+  sp_da_for(g->commands, i) {
+    g->commands[i].kind = SPN_BUILD_CMD_FN;
+    g->commands[i].fn.on_execute = build_fn_noop;
+  }
 }
 
-UTEST_F_TEARDOWN(spn_test_graphs) {
+graphs_t build_graphs(sp_test_file_manager_t* file_manager) {
+  graphs_t graphs = {
+    .short_linear = create_short_linear_graph(),
+    .fork_join = create_fork_join_graph(),
+    .split_join = create_split_join_graph(),
+    .long_linear = create_long_linear_graph(),
+    .diamond = create_diamond_graph(),
+    .multi_output = create_multi_output_graph(),
+  };
+
+  bind_graph(graphs.short_linear.graph, file_manager);
+  bind_graph(graphs.fork_join.graph, file_manager);
+  bind_graph(graphs.split_join, file_manager);
+  bind_graph(graphs.long_linear.graph, file_manager);
+  bind_graph(graphs.diamond.graph, file_manager);
+  bind_graph(graphs.multi_output.graph, file_manager);
+
+  return graphs;
+}
+
+
+
+///////////////
+// TRAVERSAL //
+///////////////
+struct spn_test_traversal {
+  sp_test_file_manager_t file_manager;
+  graphs_t graphs;
+};
+
+UTEST_F_SETUP(spn_test_traversal) {
+  sp_test_file_manager_init(&uf->file_manager);
+  uf->graphs = build_graphs(&uf->file_manager);
+}
+
+UTEST_F_TEARDOWN(spn_test_traversal) {
+  sp_test_file_manager_cleanup(&uf->file_manager);
 }
 
 typedef struct {
@@ -280,217 +339,400 @@ void count_cmd_fn(spn_build_graph_t* graph, spn_build_cmd_t* cmd, void* user_dat
   counter->cmd_count++;
 }
 
-UTEST_F(spn_test_graphs, visit_once) {
-  visit_counter_t counter = {0};
+UTEST_F(spn_test_traversal, visit_once) {
+  visit_counter_t counter = SP_ZERO_INITIALIZE();
 
   spn_bg_dfs((spn_bg_it_config_t){
-    .graph = uf->graphs.linear,
+    .graph = uf->graphs.short_linear.graph,
     .direction = SPN_BG_ITER_DIR_OUT_TO_IN,
     .on_cmd = count_cmd_fn,
     .on_file = count_file_fn,
     .user_data = &counter,
   });
-  EXPECT_EQ(3, counter.file_count);
-  EXPECT_EQ(2, counter.cmd_count);
+  EXPECT_EQ(2, counter.file_count);
+  EXPECT_EQ(1, counter.cmd_count);
 
   counter.file_count = 0;
   counter.cmd_count = 0;
   spn_bg_bfs((spn_bg_it_config_t){
-    .graph = uf->graphs.linear,
+    .graph = uf->graphs.short_linear.graph,
     .direction = SPN_BG_ITER_DIR_OUT_TO_IN,
     .on_cmd = count_cmd_fn,
     .on_file = count_file_fn,
     .user_data = &counter,
   });
-  EXPECT_EQ(3, counter.file_count);
-  EXPECT_EQ(2, counter.cmd_count);
+  EXPECT_EQ(2, counter.file_count);
+  EXPECT_EQ(1, counter.cmd_count);
 
   counter.file_count = 0;
   counter.cmd_count = 0;
   spn_bg_dfs((spn_bg_it_config_t){
-    .graph = uf->graphs.linear,
+    .graph = uf->graphs.short_linear.graph,
     .direction = SPN_BG_ITER_DIR_IN_TO_OUT,
     .on_cmd = count_cmd_fn,
     .on_file = count_file_fn,
     .user_data = &counter,
   });
-  EXPECT_EQ(3, counter.file_count);
-  EXPECT_EQ(2, counter.cmd_count);
+  EXPECT_EQ(2, counter.file_count);
+  EXPECT_EQ(1, counter.cmd_count);
 }
 
-UTEST_F(spn_test_graphs, find_outputs) {
-  sp_da(spn_bg_id_t) outputs_a = spn_bg_find_outputs(uf->graphs.linear);
-  EXPECT_EQ(1, sp_da_size(outputs_a));
+UTEST_F(spn_test_traversal, find_outputs) {
+  EXPECT_EQ(sp_da_size(spn_bg_find_outputs(uf->graphs.short_linear.graph)), 1);
+  EXPECT_EQ(sp_da_size(spn_bg_find_outputs(uf->graphs.fork_join.graph)), 1);
+  EXPECT_EQ(sp_da_size(spn_bg_find_outputs(uf->graphs.split_join)), 1);
+}
 
-  sp_da(spn_bg_id_t) outputs_b = spn_bg_find_outputs(uf->graphs.fork_join);
-  EXPECT_EQ(1, sp_da_size(outputs_b));
 
-  sp_da(spn_bg_id_t) outputs_c = spn_bg_find_outputs(uf->graphs.split_join);
-  EXPECT_EQ(1, sp_da_size(outputs_c));
+
+///////////
+// DIRTY //
+///////////
+#define SPN_DIRTY_TEST_MAX_NODE 16
+
+typedef struct {
+  spn_bg_id_t dirty [SPN_DIRTY_TEST_MAX_NODE];
+  spn_bg_id_t clean [SPN_DIRTY_TEST_MAX_NODE];
+} expected_dirty_state_t;
+
+typedef struct {
+  expected_dirty_state_t files;
+  expected_dirty_state_t commands;
+  spn_bg_err_kind_t errors [SPN_DIRTY_TEST_MAX_NODE];
+} expected_dirty_t;
+
+void expect_dirty(s32* utest_result, spn_bg_dirty_t* dirty, expected_dirty_t ex) {
+  sp_carr_for(ex.errors, it) {
+    if (ex.errors[it] == SPN_BG_OK) break;
+
+    EXPECT_TRUE(sp_da_size(dirty->errors) > it);
+    EXPECT_TRUE(ex.errors[it] == dirty->errors[it].kind);
+  }
+
+  sp_carr_for(ex.files.dirty, it) {
+    spn_bg_id_t id = ex.files.dirty[it];
+    if (!id.occupied) break;
+
+    EXPECT_TRUE(spn_bg_is_file_dirty(dirty, id));
+  }
+
+  sp_carr_for(ex.files.clean, it) {
+    spn_bg_id_t id = ex.files.clean[it];
+    if (!id.occupied) break;
+
+    EXPECT_TRUE(!spn_bg_is_file_dirty(dirty, id));
+  }
+
+  sp_carr_for(ex.commands.dirty, it) {
+    spn_bg_id_t id = ex.commands.dirty[it];
+    if (!id.occupied) break;
+
+    EXPECT_TRUE(spn_bg_is_cmd_dirty(dirty, id));
+  }
+
+  sp_carr_for(ex.commands.clean, it) {
+    spn_bg_id_t id = ex.commands.clean[it];
+    if (!id.occupied) break;
+
+    EXPECT_TRUE(!spn_bg_is_cmd_dirty(dirty, id));
+  }
 }
 
 struct spn_dirty_tests {
   sp_test_file_manager_t fm;
+  graphs_t g;
 };
 
 UTEST_F_SETUP(spn_dirty_tests) {
   sp_test_file_manager_init(&uf->fm);
+  uf->g = build_graphs(&uf->fm);
 }
 
 UTEST_F_TEARDOWN(spn_dirty_tests) {
   sp_test_file_manager_cleanup(&uf->fm);
 }
 
-typedef struct {
-  spn_build_graph_t* g;
-  spn_bg_id_t src;
-  spn_bg_id_t out;
-  spn_bg_id_t cmd;
-} dirty_test_graph_t;
-
-// ┌───────┐     ┌─────┐     ┌───────┐
-// │  src  │────▶│ cmd │────▶│  out  │
-// └───────┘     └─────┘     └───────┘
-dirty_test_graph_t create_dirty_test_graph(sp_str_t src_path, sp_str_t out_path) {
-  dirty_test_graph_t r;
-  r.g = spn_bg_new();
-  r.src = spn_bg_add_file(r.g, src_path);
-  r.out = spn_bg_add_file(r.g, out_path);
-  r.cmd = spn_bg_add_command(r.g, SPN_BUILD_CMD_SUBPROCESS);
-  spn_build_command_add_input(r.g, r.cmd, r.src);
-  spn_build_file_set_command(r.g, r.out, r.cmd);
-  return r;
-}
-
 UTEST_F(spn_dirty_tests, missing_input_errors) {
-  dirty_test_graph_t t = create_dirty_test_graph(sp_str_lit("nonexistent.c"), sp_str_lit("out.o"));
-  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(t.g);
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(uf->g.short_linear.graph);
 
-  EXPECT_EQ(1, sp_da_size(dirty->errors));
-  EXPECT_EQ(SPN_BG_ERR_MISSING_INPUT, dirty->errors[0].kind);
+  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+    .errors = {
+      SPN_BG_ERR_MISSING_INPUT
+    },
+  });
 }
 
 UTEST_F(spn_dirty_tests, missing_output_is_dirty) {
-  sp_str_t src_path = sp_test_file_create_empty(&uf->fm, sp_str_lit("src.c"));
-  dirty_test_graph_t t = create_dirty_test_graph(src_path, sp_str_lit("missing.o"));
-  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(t.g);
+  short_linear_graph_t g = uf->g.short_linear;
+  touch_node(g.graph, g.a);
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  EXPECT_EQ(0, sp_da_size(dirty->errors));
-  EXPECT_TRUE(spn_bg_is_cmd_dirty(dirty, t.cmd));
-  EXPECT_TRUE(spn_bg_is_file_dirty(dirty, t.out));
+  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.b },
+      .clean = { g.a },
+    },
+    .commands = {
+      .dirty = { g.touch }
+    }
+  });
 }
 
 UTEST_F(spn_dirty_tests, input_newer_than_output_is_dirty) {
-  sp_str_t src_path = sp_test_file_create_empty(&uf->fm, sp_str_lit("src.c"));
-  sp_str_t out_path = sp_test_file_create_empty(&uf->fm, sp_str_lit("out.o"));
-  sp_os_sleep_ms(10);
-  touch_file(src_path);
+  short_linear_graph_t g = uf->g.short_linear;
+  touch_node(g.graph, g.b);
+  touch_node(g.graph, g.a);
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  dirty_test_graph_t t = create_dirty_test_graph(src_path, out_path);
-  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(t.g);
-
-  EXPECT_EQ(0, sp_da_size(dirty->errors));
-  EXPECT_TRUE(spn_bg_is_cmd_dirty(dirty, t.cmd));
+  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.b },
+      .clean = { g.a },
+    },
+    .commands = {
+      .dirty = { g.touch }
+    }
+  });
 }
 
 UTEST_F(spn_dirty_tests, output_newer_than_input_is_clean) {
-  sp_str_t src_path = sp_test_file_create_empty(&uf->fm, sp_str_lit("src.c"));
-  sp_os_sleep_ms(10);
-  sp_str_t out_path = sp_test_file_create_empty(&uf->fm, sp_str_lit("out.o"));
+  short_linear_graph_t g = uf->g.short_linear;
+  touch_node(g.graph, g.a);
+  touch_node(g.graph, g.b);
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  dirty_test_graph_t t = create_dirty_test_graph(src_path, out_path);
-  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(t.g);
-
-  EXPECT_EQ(0, sp_da_size(dirty->errors));
-  EXPECT_FALSE(spn_bg_is_cmd_dirty(dirty, t.cmd));
-  EXPECT_FALSE(spn_bg_is_file_dirty(dirty, t.out));
+  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+    .files = {
+      .clean = { g.b, g.a },
+    },
+    .commands = {
+      .clean = { g.touch }
+    }
+  });
 }
 
-// ┌─────┐     ┌──────┐     ┌─────┐     ┌──────┐     ┌───────┐
-// │  a  │────▶│ cmd1 │────▶│  b  │────▶│ cmd2 │────▶│   c   │
-// └─────┘     └──────┘     └─────┘     └──────┘     └───────┘
-UTEST_F(spn_dirty_tests, dirty_propagates_through_chain) {
-  sp_str_t a_path = sp_test_file_create_empty(&uf->fm, sp_str_lit("a.c"));
-  sp_os_sleep_ms(10);
-  sp_str_t b_path = sp_test_file_create_empty(&uf->fm, sp_str_lit("b.o"));
-  sp_os_sleep_ms(10);
-  sp_str_t c_path = sp_test_file_create_empty(&uf->fm, sp_str_lit("c.exe"));
+UTEST_F(spn_dirty_tests, long_linear_dirty_propagates) {
+  long_linear_graph_t g = uf->g.long_linear;
 
-  sp_os_sleep_ms(10);
-  touch_file(a_path);
+  touch_node(g.graph, g.b);
+  touch_node(g.graph, g.c);
+  touch_node(g.graph, g.a);
 
-  spn_build_graph_t* g = spn_bg_new();
-  spn_bg_id_t a = spn_bg_add_file(g, a_path);
-  spn_bg_id_t b = spn_bg_add_file(g, b_path);
-  spn_bg_id_t c = spn_bg_add_file(g, c_path);
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  spn_bg_id_t cmd1 = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
-  spn_bg_id_t cmd2 = spn_bg_add_command(g, SPN_BUILD_CMD_SUBPROCESS);
-
-  spn_build_command_add_input(g, cmd1, a);
-  spn_build_file_set_command(g, b, cmd1);
-
-  spn_build_command_add_input(g, cmd2, b);
-  spn_build_file_set_command(g, c, cmd2);
-
-  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g);
-
-  EXPECT_EQ(0, sp_da_size(dirty->errors));
-  EXPECT_TRUE(spn_bg_is_cmd_dirty(dirty, cmd1));  // a > b
-  EXPECT_TRUE(spn_bg_is_file_dirty(dirty, b));     // produced by dirty cmd
-  EXPECT_TRUE(spn_bg_is_cmd_dirty(dirty, cmd2));   // input b is dirty
-  EXPECT_TRUE(spn_bg_is_file_dirty(dirty, c));     // produced by dirty cmd
+  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.b, g.c },
+      .clean = { g.a },
+    },
+    .commands = {
+      .dirty = { g.cmd1, g.cmd2 },
+    },
+  });
 }
 
-// ============================================================================
-// Scratchpad for executor experiments
-// ============================================================================
+UTEST_F(spn_dirty_tests, long_linear_partial) {
+  long_linear_graph_t g = uf->g.long_linear;
 
-sp_mutex_t g_log_mutex;
+  // touch_node(g.graph, g.a);
+  // touch_node(g.graph, g.c);
+  // touch_node(g.graph, g.b);
+  touch_node(g.graph, g.a);
+  touch_node(g.graph, g.b);
+  touch_node(g.graph, g.c);
+  touch_node(g.graph, g.b);
 
-void log_cmd_execute(spn_build_cmd_t* cmd, void* user_data) {
-  sp_mutex_lock(&g_log_mutex);
-  printf("cmd %u: %.*s\n",
-    cmd->id.index,
-    (int)cmd->ps.command.len, cmd->ps.command.data);
-  sp_mutex_unlock(&g_log_mutex);
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  // Simulate some work
-  sp_os_sleep_ms(10);
+  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.c },
+      .clean = { g.a, g.b },
+    },
+    .commands = {
+      .clean = { g.cmd1 },
+      .dirty = { g.cmd2 },
+    },
+  });
 }
 
-void set_all_cmds_on_execute(spn_build_graph_t* graph) {
-  sp_da_for(graph->commands, i) {
-    graph->commands[i].kind = SPN_BUILD_CMD_FN;
-    graph->commands[i].fn.on_execute = log_cmd_execute;
-  }
+UTEST_F(spn_dirty_tests, diamond_propagation) {
+  diamond_graph_t g = uf->g.diamond;
+  touch_node(g.graph, g.a);
+
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
+
+  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.b, g.c, g.d },
+      .clean = { g.a },
+    },
+    .commands = {
+      .dirty = { g.left, g.right, g.join },
+    },
+  });
 }
 
-UTEST(scratchpad, executor_experiment) {
-  sp_mutex_init(&g_log_mutex, SP_MUTEX_PLAIN);
+UTEST_F(spn_dirty_tests, fork_join_partial_rebuild) {
+  fork_join_graph_t g = uf->g.fork_join;
 
-  // Use graph C which has parallel paths
-  spn_build_graph_t* g = create_split_join_graph();
-  set_all_cmds_on_execute(g);
+  touch_node(g.graph, g.src2);
+  touch_node(g.graph, g.obj2);
+  touch_node(g.graph, g.exe);
+  touch_node(g.graph, g.src1);
 
-  // Mark all commands dirty (no files on disk)
-  spn_bg_dirty_t* dirty = SP_ALLOC(spn_bg_dirty_t);
-  sp_ht_set_fns(dirty->commands, sp_ht_on_hash_key, sp_ht_on_compare_key);
-  sp_da_for(g->commands, i) {
-    sp_ht_insert(dirty->commands, g->commands[i].id, true);
-  }
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
 
-  printf("\n--- Running executor with 4 threads ---\n");
-  spn_bg_executor_t* ex = spn_bg_executor_new(g, dirty, 4);
+  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.obj1, g.exe },
+      .clean = { g.src1, g.src2, g.obj2 },
+    },
+    .commands = {
+      .dirty = { g.compile1, g.link },
+      .clean = { g.compile2 },
+    },
+  });
+}
+
+UTEST_F(spn_dirty_tests, multi_output_missing_peer) {
+  multi_output_graph_t g = uf->g.multi_output;
+
+  touch_node(g.graph, g.a);
+  touch_node(g.graph, g.c);
+
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(g.graph);
+
+  expect_dirty(utest_result, dirty, (expected_dirty_t) {
+    .files = {
+      .dirty = { g.b, g.c },
+      .clean = { g.a },
+    },
+    .commands = {
+      .dirty = { g.split },
+    },
+  });
+}
+
+
+
+
+//////////////
+// EXECUTOR //
+//////////////
+typedef struct {
+  spn_bg_id_t expected[SPN_DIRTY_TEST_MAX_NODE];
+} expected_execution_t;
+
+void
+expect_execution(
+  s32*                 utest_result,
+  spn_build_graph_t*   graph,
+  u32                  num_threads,
+  expected_execution_t exp
+) {
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(graph);
+  spn_bg_executor_t* ex = spn_bg_executor_new(graph, dirty, num_threads);
   spn_bg_executor_run(ex);
+  spn_bg_executor_join(ex);
 
-  printf("--- Ran %u commands ---\n", sp_da_size(ex->ran));
-  sp_da_for(ex->ran, i) {
-    spn_build_cmd_t* cmd = spn_bg_find_command(g, ex->ran[i]);
-    printf("  %u: %.*s\n", ex->ran[i].index, (int)cmd->ps.command.len, cmd->ps.command.data);
+  u32 num_expected = 0;
+  sp_carr_for(exp.expected, it) {
+    spn_bg_id_t id = exp.expected[it];
+    if (!id.occupied) {
+      break;
+    }
+
+    num_expected++;
+    EXPECT_TRUE(sp_ht_key_exists(ex->completed, id));
   }
 
-  EXPECT_EQ(3, sp_da_size(ex->ran));
+  u32 num_run = sp_da_size(ex->ran);
+  EXPECT_EQ(num_run, num_expected);
+}
+
+typedef struct spn_executor_test {
+  sp_test_file_manager_t file_manager;
+  graphs_t graphs;
+} spn_executor_test_t;
+
+UTEST_F_SETUP(spn_executor_test) {
+  sp_test_file_manager_init(&uf->file_manager);
+  uf->graphs = build_graphs(&uf->file_manager);
+}
+
+UTEST_F_TEARDOWN(spn_executor_test) {
+  sp_test_file_manager_cleanup(&uf->file_manager);
+}
+
+UTEST_F(spn_executor_test, short_linear_new_input) {
+  short_linear_graph_t g = uf->graphs.short_linear;
+  touch_node(g.graph, g.a);
+
+  expect_execution(utest_result, g.graph, 4, (expected_execution_t) {
+    .expected = { g.touch }
+  });
+}
+
+UTEST_F(spn_executor_test, short_linear_clean) {
+  short_linear_graph_t g = uf->graphs.short_linear;
+  touch_node(g.graph, g.a);
+  touch_node(g.graph, g.b);
+
+  expect_execution(utest_result, g.graph, 4, SP_ZERO_STRUCT(expected_execution_t));
+}
+
+UTEST_F(spn_executor_test, long_linear_chain_propagation) {
+  long_linear_graph_t g = uf->graphs.long_linear;
+  touch_node(g.graph, g.a);
+
+  expect_execution(utest_result, g.graph, 4, (expected_execution_t) {
+    .expected = { g.cmd1, g.cmd2 }
+  });
+}
+
+UTEST_F(spn_executor_test, long_linear_partial_dirty) {
+  long_linear_graph_t g = uf->graphs.long_linear;
+  touch_node(g.graph, g.a);
+  touch_node(g.graph, g.b);
+  touch_node(g.graph, g.c);
+  // now touch b to make it newer than c
+  touch_node(g.graph, g.b);
+
+  expect_execution(utest_result, g.graph, 4, (expected_execution_t) {
+    .expected = { g.cmd2 }
+  });
+}
+
+UTEST_F(spn_executor_test, diamond_all_dirty) {
+  diamond_graph_t g = uf->graphs.diamond;
+  touch_node(g.graph, g.a);
+
+  expect_execution(utest_result, g.graph, 4, (expected_execution_t) {
+    .expected = { g.left, g.right, g.join }
+  });
+}
+
+UTEST_F(spn_executor_test, fork_join_partial_dirty) {
+  fork_join_graph_t g = uf->graphs.fork_join;
+  // set up: src2, obj2 are up to date; src1 is newer than obj1
+  touch_node(g.graph, g.src2);
+  touch_node(g.graph, g.obj2);
+  touch_node(g.graph, g.exe);
+  touch_node(g.graph, g.src1);
+
+  expect_execution(utest_result, g.graph, 4, (expected_execution_t) {
+    .expected = { g.compile1, g.link }
+  });
+}
+
+UTEST_F(spn_executor_test, multi_output_all_dirty) {
+  multi_output_graph_t g = uf->graphs.multi_output;
+  touch_node(g.graph, g.a);
+
+  expect_execution(utest_result, g.graph, 4, (expected_execution_t) {
+    .expected = { g.split, g.proc_b, g.proc_c }
+  });
 }
 
 UTEST_MAIN();
