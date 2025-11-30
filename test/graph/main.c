@@ -622,17 +622,17 @@ UTEST_F(spn_dirty_tests, multi_output_missing_peer) {
 //////////////
 typedef struct {
   spn_bg_id_t expected[SPN_DIRTY_TEST_MAX_NODE];
+  spn_bg_executor_config_t config;
 } expected_execution_t;
 
 void
 expect_execution(
   s32*                 utest_result,
   spn_build_graph_t*   graph,
-  u32                  num_threads,
   expected_execution_t exp
 ) {
   spn_bg_dirty_t* dirty = spn_bg_compute_dirty(graph);
-  spn_bg_executor_t* ex = spn_bg_executor_new(graph, dirty, num_threads);
+  spn_bg_executor_t* ex = spn_bg_executor_new(graph, dirty, exp.config);
   spn_bg_executor_run(ex);
   spn_bg_executor_join(ex);
 
@@ -669,8 +669,9 @@ UTEST_F(spn_executor_test, short_linear_new_input) {
   short_linear_graph_t g = uf->graphs.short_linear;
   touch_node(g.graph, g.a);
 
-  expect_execution(utest_result, g.graph, 4, (expected_execution_t) {
-    .expected = { g.touch }
+  expect_execution(utest_result, g.graph, (expected_execution_t) {
+    .expected = { g.touch },
+    .config = { .enable_logging = true }
   });
 }
 
@@ -679,15 +680,18 @@ UTEST_F(spn_executor_test, short_linear_clean) {
   touch_node(g.graph, g.a);
   touch_node(g.graph, g.b);
 
-  expect_execution(utest_result, g.graph, 4, SP_ZERO_STRUCT(expected_execution_t));
+  expect_execution(utest_result, g.graph, (expected_execution_t) {
+    .config = { .enable_logging = true }
+  });
 }
 
 UTEST_F(spn_executor_test, long_linear_chain_propagation) {
   long_linear_graph_t g = uf->graphs.long_linear;
   touch_node(g.graph, g.a);
 
-  expect_execution(utest_result, g.graph, 4, (expected_execution_t) {
-    .expected = { g.cmd1, g.cmd2 }
+  expect_execution(utest_result, g.graph, (expected_execution_t) {
+    .expected = { g.cmd1, g.cmd2 },
+    .config = { .enable_logging = true }
   });
 }
 
@@ -699,8 +703,9 @@ UTEST_F(spn_executor_test, long_linear_partial_dirty) {
   // now touch b to make it newer than c
   touch_node(g.graph, g.b);
 
-  expect_execution(utest_result, g.graph, 4, (expected_execution_t) {
-    .expected = { g.cmd2 }
+  expect_execution(utest_result, g.graph, (expected_execution_t) {
+    .expected = { g.cmd2 },
+    .config = { .enable_logging = true }
   });
 }
 
@@ -708,8 +713,9 @@ UTEST_F(spn_executor_test, diamond_all_dirty) {
   diamond_graph_t g = uf->graphs.diamond;
   touch_node(g.graph, g.a);
 
-  expect_execution(utest_result, g.graph, 4, (expected_execution_t) {
-    .expected = { g.left, g.right, g.join }
+  expect_execution(utest_result, g.graph, (expected_execution_t) {
+    .expected = { g.left, g.right, g.join },
+    .config = { .enable_logging = true }
   });
 }
 
@@ -721,8 +727,9 @@ UTEST_F(spn_executor_test, fork_join_partial_dirty) {
   touch_node(g.graph, g.exe);
   touch_node(g.graph, g.src1);
 
-  expect_execution(utest_result, g.graph, 4, (expected_execution_t) {
-    .expected = { g.compile1, g.link }
+  expect_execution(utest_result, g.graph, (expected_execution_t) {
+    .expected = { g.compile1, g.link },
+    .config = { .enable_logging = true }
   });
 }
 
@@ -730,8 +737,9 @@ UTEST_F(spn_executor_test, multi_output_all_dirty) {
   multi_output_graph_t g = uf->graphs.multi_output;
   touch_node(g.graph, g.a);
 
-  expect_execution(utest_result, g.graph, 4, (expected_execution_t) {
-    .expected = { g.split, g.proc_b, g.proc_c }
+  expect_execution(utest_result, g.graph, (expected_execution_t) {
+    .expected = { g.split, g.proc_b, g.proc_c },
+    .config = { .enable_logging = true }
   });
 }
 

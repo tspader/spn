@@ -770,6 +770,11 @@ typedef struct {
 } spn_bg_exec_error_t;
 
 typedef struct {
+  u32 num_threads;
+  bool enable_logging;
+} spn_bg_executor_config_t;
+
+typedef struct {
   sp_ring_buffer_t ready_queue;
   sp_mutex_t mutex;
   sp_semaphore_t work_available;
@@ -780,6 +785,7 @@ typedef struct {
   spn_build_graph_t* graph;
   spn_bg_dirty_t* dirty;
   u32 num_threads;
+  bool enable_logging;
   sp_da(sp_thread_t) threads;
   sp_da(spn_bg_id_t) ran;
   sp_da(spn_bg_exec_error_t) errors;
@@ -788,10 +794,24 @@ typedef struct {
   sp_atomic_s32 shutdown;
 } spn_bg_executor_t;
 
-spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, u32 num_threads);
+spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, spn_bg_executor_config_t config);
 void spn_bg_executor_run(spn_bg_executor_t* ex);
 void spn_bg_executor_join(spn_bg_executor_t* ex);
 void spn_bg_executor_free(spn_bg_executor_t* ex);
+
+void spn_bg_executor_log_cmd(spn_bg_executor_t* ex, spn_build_cmd_t* cmd) {
+  if (!ex->enable_logging) return;
+
+  sp_mutex_lock(&ex->mutex);
+  if (!sp_str_empty(cmd->tag)) {
+    sp_os_print(sp_format("[exec] {}\n", SP_FMT_STR(cmd->tag)));
+  } else if (cmd->kind == SPN_BUILD_CMD_SUBPROCESS && !sp_str_empty(cmd->ps.command)) {
+    sp_os_print(sp_format("[exec] {}\n", SP_FMT_STR(cmd->ps.command)));
+  } else {
+    sp_os_print(sp_format("[exec] cmd@{}\n", SP_FMT_PTR(cmd)));
+  }
+  sp_mutex_unlock(&ex->mutex);
+}
 
 bool spn_bg_cmd_is_ready(spn_bg_executor_t* ex, spn_bg_id_t cmd_id) {
   spn_build_cmd_t* cmd = spn_bg_find_command(ex->graph, cmd_id);
@@ -826,6 +846,8 @@ s32 spn_bg_worker_fn(void* user_data) {
     sp_mutex_unlock(&ex->mutex);
 
     spn_build_cmd_t* cmd = spn_bg_find_command(ex->graph, cmd_id);
+    spn_bg_executor_log_cmd(ex, cmd);
+
     sp_opt(spn_bg_exec_error_t) error = SP_ZERO_INITIALIZE();
     switch (cmd->kind) {
       case SPN_BUILD_CMD_SUBPROCESS: {
@@ -883,11 +905,12 @@ s32 spn_bg_worker_fn(void* user_data) {
   }
 }
 
-spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, u32 num_threads) {
+spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, spn_bg_executor_config_t config) {
   spn_bg_executor_t* ex = SP_ALLOC(spn_bg_executor_t);
   ex->graph = graph;
   ex->dirty = dirty;
-  ex->num_threads = num_threads;
+  ex->num_threads = config.num_threads ? config.num_threads : 4;
+  ex->enable_logging = config.enable_logging;
 
   sp_mutex_init(&ex->mutex, SP_MUTEX_PLAIN);
   sp_semaphore_init(&ex->work_available);
