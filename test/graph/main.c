@@ -1016,10 +1016,11 @@ UTEST_F(spn_executor_test, long_linear_chain_propagation) {
 
 UTEST_F(spn_executor_test, long_linear_partial_dirty) {
   long_linear_graph_t g = uf->graphs.long_linear;
+
   touch_node(g.graph, g.a);
   touch_node(g.graph, g.b);
   touch_node(g.graph, g.c);
-  // now touch b to make it newer than c
+
   touch_node(g.graph, g.b);
 
   expect_execution(utest_result, g.graph, (expected_execution_t) {
@@ -1038,7 +1039,7 @@ UTEST_F(spn_executor_test, diamond_all_dirty) {
 
 UTEST_F(spn_executor_test, fork_join_partial_dirty) {
   fork_join_graph_t g = uf->graphs.fork_join;
-  // set up: c, e are up to date; a is newer than b
+
   touch_node(g.graph, g.c);
   touch_node(g.graph, g.e);
   touch_node(g.graph, g.d);

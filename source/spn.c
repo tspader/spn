@@ -525,7 +525,7 @@ typedef struct {
 } spn_event_buffer_t;
 
 spn_event_buffer_t* spn_event_buffer_new();
-void spn_push_build_event(spn_event_buffer_t* events, spn_build_ctx_t* ctx, spn_build_event_t event);
+void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_ctx_t* ctx, spn_build_event_t event);
 
 typedef struct {
   spn_bg_id_t build;
@@ -3472,7 +3472,7 @@ spn_semver_range_t spn_semver_comparison_to_range(spn_semver_op_t op, spn_semver
       range.low.op = SPN_SEMVER_OP_GEQ;
       range.low.version = version;
       range.high.op = SPN_SEMVER_OP_LEQ;
-      range.high.version = (spn_semver_t){0, SP_LIMIT_U32_MAX, SP_LIMIT_U32_MAX};
+      range.high.version = (spn_semver_t){SP_LIMIT_U32_MAX, SP_LIMIT_U32_MAX, SP_LIMIT_U32_MAX};
       break;
     }
     case SPN_SEMVER_OP_GT: {
@@ -4203,7 +4203,7 @@ void spn_build_ctx_prepare_io(spn_build_ctx_t* build) {
 }
 
 void spn_pkg_build_run(spn_pkg_build_t* build) {
-  SP_ASSERT(!spn_dep_context_is_build_stamped(build));
+  //SP_ASSERT(!spn_dep_context_is_build_stamped(build));
 
   spn_dep_context_run_build_script(build);
   spn_dep_context_stamp(build);
@@ -4339,7 +4339,7 @@ sp_mutex_t* g_mutex = SP_NULLPTR;
 
 void spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_build_t* build = (spn_pkg_build_t*)user_data;
-  spn_push_build_event(build->ctx.events, &build->ctx, (spn_build_event_t) {
+  spn_event_buffer_push(build->ctx.events, &build->ctx, (spn_build_event_t) {
     .kind = SPN_BUILD_EVENT_CHECKOUT
   });
 
@@ -6328,7 +6328,7 @@ spn_event_buffer_t* spn_event_buffer_new() {
   return events;
 }
 
-void spn_push_build_event(spn_event_buffer_t* events, spn_build_ctx_t* build, spn_build_event_t event) {
+void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_ctx_t* build, spn_build_event_t event) {
   event.ctx = build;
 
   sp_mutex_lock(&events->mutex);
@@ -6424,10 +6424,6 @@ void spn_cli_build(spn_cli_t* cli) {
   spn_build_tui_t tui = {
     .events = app.build.events
   };
-
-  while (true) {
-
-  }
 
 
   spn_bg_to_mermaid(&app.build.graph, sp_str_lit("graph.mmd"));
