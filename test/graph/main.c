@@ -19,7 +19,7 @@ void touch_file(sp_str_t path) {
 }
 
 void touch_node(spn_build_graph_t* graph, spn_bg_id_t id) {
-  spn_build_file_t* file = spn_bg_find_file(graph, id);
+  spn_bg_file_t* file = spn_bg_find_file(graph, id);
   SP_ASSERT(file);
   touch_file(file->path);
 }
@@ -31,7 +31,7 @@ void touch_node(spn_build_graph_t* graph, spn_bg_id_t id) {
 ///////////////////////
 sp_mutex_t g_log_mutex;
 
-void build_fn_noop(spn_build_cmd_t* cmd, void* ud) {
+void build_fn_noop(spn_bg_cmd_t* cmd, void* ud) {
 
 }
 
@@ -60,8 +60,8 @@ short_linear_graph_t create_short_linear_graph() {
   g.compile = spn_bg_add_command(g.graph, SPN_BUILD_CMD_FN);
 
   spn_bg_tag_command_c(g.graph, g.compile, "compile");
-  spn_build_command_add_input(g.graph, g.compile, g.a);
-  spn_build_command_add_output(g.graph, g.compile, g.b);
+  spn_bg_cmd_add_input(g.graph, g.compile, g.a);
+  spn_bg_cmd_add_output(g.graph, g.compile, g.b);
 
   return g;
 }
@@ -88,11 +88,11 @@ long_linear_graph_t create_long_linear_graph() {
   spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
   spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
 
-  spn_build_command_add_input(r.graph, r.compile_1, r.a);
-  spn_build_file_set_command(r.graph, r.b, r.compile_1);
+  spn_bg_cmd_add_input(r.graph, r.compile_1, r.a);
+  spn_bg_file_set_producer(r.graph, r.b, r.compile_1);
 
-  spn_build_command_add_input(r.graph, r.compile_2, r.b);
-  spn_build_file_set_command(r.graph, r.c, r.compile_2);
+  spn_bg_cmd_add_input(r.graph, r.compile_2, r.b);
+  spn_bg_file_set_producer(r.graph, r.c, r.compile_2);
 
   return r;
 }
@@ -128,15 +128,15 @@ fork_join_graph_t create_fork_join_graph() {
   spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
   spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
 
-  spn_build_command_add_input(r.graph, r.join, r.b);
-  spn_build_command_add_input(r.graph, r.join, r.e);
-  spn_build_command_add_output(r.graph, r.join, r.d);
+  spn_bg_cmd_add_input(r.graph, r.join, r.b);
+  spn_bg_cmd_add_input(r.graph, r.join, r.e);
+  spn_bg_cmd_add_output(r.graph, r.join, r.d);
 
-  spn_build_command_add_input(r.graph, r.compile_1, r.a);
-  spn_build_command_add_output(r.graph, r.compile_1, r.b);
+  spn_bg_cmd_add_input(r.graph, r.compile_1, r.a);
+  spn_bg_cmd_add_output(r.graph, r.compile_1, r.b);
 
-  spn_build_command_add_input(r.graph, r.compile_2, r.c);
-  spn_build_command_add_output(r.graph, r.compile_2, r.e);
+  spn_bg_cmd_add_input(r.graph, r.compile_2, r.c);
+  spn_bg_cmd_add_output(r.graph, r.compile_2, r.e);
 
   return r;
 }
@@ -175,17 +175,17 @@ split_join_graph_t create_split_join_graph() {
   spn_bg_tag_command_c(r.graph, r.join_1, "join");
   spn_bg_tag_command_c(r.graph, r.join_2, "join");
 
-  spn_build_command_add_input(r.graph, r.split, r.a);
-  spn_build_command_add_output(r.graph, r.split, r.b);
-  spn_build_command_add_output(r.graph, r.split, r.c);
+  spn_bg_cmd_add_input(r.graph, r.split, r.a);
+  spn_bg_cmd_add_output(r.graph, r.split, r.b);
+  spn_bg_cmd_add_output(r.graph, r.split, r.c);
 
-  spn_build_command_add_input(r.graph, r.join_1, r.b);
-  spn_build_command_add_input(r.graph, r.join_1, r.c);
-  spn_build_file_set_command(r.graph, r.d, r.join_1);
+  spn_bg_cmd_add_input(r.graph, r.join_1, r.b);
+  spn_bg_cmd_add_input(r.graph, r.join_1, r.c);
+  spn_bg_file_set_producer(r.graph, r.d, r.join_1);
 
-  spn_build_command_add_input(r.graph, r.join_2, r.d);
-  spn_build_command_add_input(r.graph, r.join_2, r.e);
-  spn_build_file_set_command(r.graph, r.f, r.join_2);
+  spn_bg_cmd_add_input(r.graph, r.join_2, r.d);
+  spn_bg_cmd_add_input(r.graph, r.join_2, r.e);
+  spn_bg_file_set_producer(r.graph, r.f, r.join_2);
 
   return r;
 }
@@ -218,15 +218,15 @@ diamond_graph_t create_diamond_graph() {
   spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
   spn_bg_tag_command_c(r.graph, r.join, "join");
 
-  spn_build_command_add_input(r.graph, r.compile_1, r.a);
-  spn_build_file_set_command(r.graph, r.b, r.compile_1);
+  spn_bg_cmd_add_input(r.graph, r.compile_1, r.a);
+  spn_bg_file_set_producer(r.graph, r.b, r.compile_1);
 
-  spn_build_command_add_input(r.graph, r.compile_2, r.a);
-  spn_build_file_set_command(r.graph, r.c, r.compile_2);
+  spn_bg_cmd_add_input(r.graph, r.compile_2, r.a);
+  spn_bg_file_set_producer(r.graph, r.c, r.compile_2);
 
-  spn_build_command_add_input(r.graph, r.join, r.b);
-  spn_build_command_add_input(r.graph, r.join, r.c);
-  spn_build_file_set_command(r.graph, r.d, r.join);
+  spn_bg_cmd_add_input(r.graph, r.join, r.b);
+  spn_bg_cmd_add_input(r.graph, r.join, r.c);
+  spn_bg_file_set_producer(r.graph, r.d, r.join);
 
   return r;
 }
@@ -270,22 +270,22 @@ asymmetric_fork_graph_t create_asymmetric_fork_graph() {
   spn_bg_tag_command_c(r.graph, r.join, "join");
 
   // Long top chain: a -> compile_1 -> b -> compile_2 -> c -> compile_3 -> d -> compile_4 -> e
-  spn_build_command_add_input(r.graph, r.compile_1, r.a);
-  spn_build_file_set_command(r.graph, r.b, r.compile_1);
+  spn_bg_cmd_add_input(r.graph, r.compile_1, r.a);
+  spn_bg_file_set_producer(r.graph, r.b, r.compile_1);
 
-  spn_build_command_add_input(r.graph, r.compile_2, r.b);
-  spn_build_file_set_command(r.graph, r.c, r.compile_2);
+  spn_bg_cmd_add_input(r.graph, r.compile_2, r.b);
+  spn_bg_file_set_producer(r.graph, r.c, r.compile_2);
 
-  spn_build_command_add_input(r.graph, r.compile_3, r.c);
-  spn_build_file_set_command(r.graph, r.d, r.compile_3);
+  spn_bg_cmd_add_input(r.graph, r.compile_3, r.c);
+  spn_bg_file_set_producer(r.graph, r.d, r.compile_3);
 
-  spn_build_command_add_input(r.graph, r.compile_4, r.d);
-  spn_build_file_set_command(r.graph, r.e, r.compile_4);
+  spn_bg_cmd_add_input(r.graph, r.compile_4, r.d);
+  spn_bg_file_set_producer(r.graph, r.e, r.compile_4);
 
   // Join: e + f -> join -> g
-  spn_build_command_add_input(r.graph, r.join, r.e);
-  spn_build_command_add_input(r.graph, r.join, r.f);
-  spn_build_file_set_command(r.graph, r.g, r.join);
+  spn_bg_cmd_add_input(r.graph, r.join, r.e);
+  spn_bg_cmd_add_input(r.graph, r.join, r.f);
+  spn_bg_file_set_producer(r.graph, r.g, r.join);
 
   return r;
 }
@@ -320,15 +320,15 @@ multi_output_graph_t create_multi_output_graph() {
   spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
   spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
 
-  spn_build_command_add_input(r.graph, r.split, r.a);
-  spn_build_file_set_command(r.graph, r.b, r.split);
-  spn_build_file_set_command(r.graph, r.c, r.split);
+  spn_bg_cmd_add_input(r.graph, r.split, r.a);
+  spn_bg_file_set_producer(r.graph, r.b, r.split);
+  spn_bg_file_set_producer(r.graph, r.c, r.split);
 
-  spn_build_command_add_input(r.graph, r.compile_1, r.b);
-  spn_build_file_set_command(r.graph, r.d, r.compile_1);
+  spn_bg_cmd_add_input(r.graph, r.compile_1, r.b);
+  spn_bg_file_set_producer(r.graph, r.d, r.compile_1);
 
-  spn_build_command_add_input(r.graph, r.compile_2, r.c);
-  spn_build_file_set_command(r.graph, r.e, r.compile_2);
+  spn_bg_cmd_add_input(r.graph, r.compile_2, r.c);
+  spn_bg_file_set_producer(r.graph, r.e, r.compile_2);
 
   return r;
 }
@@ -364,18 +364,18 @@ comb_graph_t create_comb_graph() {
   spn_bg_tag_command_c(r.graph, r.compile_3, "compile");
 
   // a -> compile_1 -> b
-  spn_build_command_add_input(r.graph, r.compile_1, r.a);
-  spn_build_file_set_command(r.graph, r.b, r.compile_1);
+  spn_bg_cmd_add_input(r.graph, r.compile_1, r.a);
+  spn_bg_file_set_producer(r.graph, r.b, r.compile_1);
 
   // b + a -> compile_2 -> c
-  spn_build_command_add_input(r.graph, r.compile_2, r.b);
-  spn_build_command_add_input(r.graph, r.compile_2, r.a);
-  spn_build_file_set_command(r.graph, r.c, r.compile_2);
+  spn_bg_cmd_add_input(r.graph, r.compile_2, r.b);
+  spn_bg_cmd_add_input(r.graph, r.compile_2, r.a);
+  spn_bg_file_set_producer(r.graph, r.c, r.compile_2);
 
   // c + a -> compile_3 -> d
-  spn_build_command_add_input(r.graph, r.compile_3, r.c);
-  spn_build_command_add_input(r.graph, r.compile_3, r.a);
-  spn_build_file_set_command(r.graph, r.d, r.compile_3);
+  spn_bg_cmd_add_input(r.graph, r.compile_3, r.c);
+  spn_bg_cmd_add_input(r.graph, r.compile_3, r.a);
+  spn_bg_file_set_producer(r.graph, r.d, r.compile_3);
 
   return r;
 }
@@ -403,11 +403,11 @@ no_input_graph_t create_no_input_graph() {
   spn_bg_tag_command_c(r.graph, r.compile, "compile");
 
   // generate (no inputs) -> a
-  spn_build_file_set_command(r.graph, r.a, r.generate);
+  spn_bg_file_set_producer(r.graph, r.a, r.generate);
 
   // a -> compile -> b
-  spn_build_command_add_input(r.graph, r.compile, r.a);
-  spn_build_file_set_command(r.graph, r.b, r.compile);
+  spn_bg_cmd_add_input(r.graph, r.compile, r.a);
+  spn_bg_file_set_producer(r.graph, r.b, r.compile);
 
   return r;
 }
@@ -485,12 +485,12 @@ typedef struct {
   u32 cmd_count;
 } visit_counter_t;
 
-void count_file_fn(spn_build_graph_t* graph, spn_build_file_t* file, void* user_data) {
+void count_file_fn(spn_build_graph_t* graph, spn_bg_file_t* file, void* user_data) {
   visit_counter_t* counter = (visit_counter_t*)user_data;
   counter->file_count++;
 }
 
-void count_cmd_fn(spn_build_graph_t* graph, spn_build_cmd_t* cmd, void* user_data) {
+void count_cmd_fn(spn_build_graph_t* graph, spn_bg_cmd_t* cmd, void* user_data) {
   visit_counter_t* counter = (visit_counter_t*)user_data;
   counter->cmd_count++;
 }
@@ -994,7 +994,6 @@ UTEST_F(spn_executor_test, short_linear_new_input) {
 
   expect_execution(utest_result, g.graph, (expected_execution_t) {
     .expected = { g.compile },
-    .config = { .enable_logging = true }
   });
 }
 
@@ -1003,9 +1002,7 @@ UTEST_F(spn_executor_test, short_linear_clean) {
   touch_node(g.graph, g.a);
   touch_node(g.graph, g.b);
 
-  expect_execution(utest_result, g.graph, (expected_execution_t) {
-    .config = { .enable_logging = true }
-  });
+  expect_execution(utest_result, g.graph, SP_ZERO_STRUCT(expected_execution_t));
 }
 
 UTEST_F(spn_executor_test, long_linear_chain_propagation) {
@@ -1014,7 +1011,6 @@ UTEST_F(spn_executor_test, long_linear_chain_propagation) {
 
   expect_execution(utest_result, g.graph, (expected_execution_t) {
     .expected = { g.compile_1, g.compile_2 },
-    .config = { .enable_logging = true }
   });
 }
 
@@ -1028,7 +1024,6 @@ UTEST_F(spn_executor_test, long_linear_partial_dirty) {
 
   expect_execution(utest_result, g.graph, (expected_execution_t) {
     .expected = { g.compile_2 },
-    .config = { .enable_logging = true }
   });
 }
 
@@ -1038,7 +1033,6 @@ UTEST_F(spn_executor_test, diamond_all_dirty) {
 
   expect_execution(utest_result, g.graph, (expected_execution_t) {
     .expected = { g.compile_1, g.compile_2, g.join },
-    .config = { .enable_logging = true }
   });
 }
 
@@ -1052,7 +1046,6 @@ UTEST_F(spn_executor_test, fork_join_partial_dirty) {
 
   expect_execution(utest_result, g.graph, (expected_execution_t) {
     .expected = { g.compile_1, g.join },
-    .config = { .enable_logging = true }
   });
 }
 
@@ -1062,7 +1055,6 @@ UTEST_F(spn_executor_test, multi_output_all_dirty) {
 
   expect_execution(utest_result, g.graph, (expected_execution_t) {
     .expected = { g.split, g.compile_1, g.compile_2 },
-    .config = { .enable_logging = true }
   });
 }
 
