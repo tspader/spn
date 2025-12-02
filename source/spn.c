@@ -614,6 +614,8 @@ typedef struct {
   spn_event_buffer_t* events;
 } spn_build_t;
 
+spn_build_t* spn_build_new();
+
 typedef struct {
   spn_event_buffer_t* events;
 
@@ -4370,10 +4372,21 @@ void spn_executor_bin(spn_bg_cmd_t* cmd, void* user_data) {
   spn_bin_build_run(build);
 }
 
+void spn_build_init(spn_build_t* build) {
+  build->events = spn_event_buffer_new();
+  sp_ht_set_fns(build->bins, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+  sp_ht_set_fns(build->deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+}
+
+spn_build_t* spn_build_new() {
+  spn_build_t* build = SP_ALLOC(spn_build_t);
+  spn_build_init(build);
+  return build;
+}
+
 void spn_app_prepare_build(spn_app_t* app) {
   spn_build_t build = SP_ZERO_INITIALIZE();
-  sp_ht_set_fns(build.bins, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(build.deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+  spn_build_init(&build);
 
   // DEPS
   sp_ht_for(app->package.deps, it) {
@@ -4391,6 +4404,7 @@ void spn_app_prepare_build(spn_app_t* app) {
       .ctx = {
         .name = name,
         .profile = app->profile,
+        .events = build.events
       },
       .metadata = *metadata,
     };
@@ -4474,6 +4488,7 @@ void spn_app_prepare_build(spn_app_t* app) {
         .name = bin->name,
         .package = &app->package,
         .profile = app->profile,
+        .events = build.events,
         .paths = {
           .store = sp_fs_join_path(profile, sp_str_lit("store")),
           .work = sp_fs_join_path(profile, sp_str_lit("work")),
