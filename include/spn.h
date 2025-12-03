@@ -23,14 +23,14 @@
 typedef enum {
   SPN_DEP_BUILD_MODE_DEBUG = 0,
   SPN_DEP_BUILD_MODE_RELEASE = 1,
-} spn_dep_mode_t;
+} spn_build_mode_t;
 
 typedef enum {
   SPN_LIB_KIND_NONE = 0,
   SPN_LIB_KIND_SHARED = 1,
   SPN_LIB_KIND_STATIC = 2,
   SPN_LIB_KIND_SOURCE = 3,
-} spn_lib_kind_t;
+} spn_pkg_linkage_t;
 
 typedef enum {
   SPN_LIBC_GNU = 0,
