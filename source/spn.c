@@ -95,94 +95,15 @@ typedef enum {
     } \
   } while(0)
 
-typedef enum sp_interp_mode_t {
-  SP_INTERP_MODE_LERP,
-  SP_INTERP_MODE_EASE_IN,
-  SP_INTERP_MODE_EASE_OUT,
-  SP_INTERP_MODE_EASE_INOUT,
-  SP_INTERP_MODE_EASE_INOUT_BOUNCE,
-  SP_INTERP_MODE_EXPONENTIAL,
-  SP_INTERP_MODE_PARABOLIC,
-  SP_INTERP_MODE_COUNT
-} sp_interp_mode_t;
-
-typedef struct sp_interp_t {
-  f32 start;
-  f32 delta;
-  f32 t;
-  f32 time_scale;
-} sp_interp_t;
-
-sp_interp_t sp_interp_build(f32 start, f32 target, f32 time) {
-  return (sp_interp_t) { .start = start, .delta = target - start, .t = 0, .time_scale = 1.0f / time };
-}
-
-bool sp_interp_update(sp_interp_t* interp, f32 dt) {
-  interp->t += dt * interp->time_scale;
-  if (interp->t > 1.0f) { interp->t = 1.0f; }
-  return interp->t >= 1.0f;
-}
-
-f32 sp_interp_lerp(sp_interp_t* interp) {
-  return interp->start + interp->delta * interp->t;
-}
-
-f32 sp_interp_ease_in(sp_interp_t* interp) {
-  f32 eased = interp->t * interp->t;
-  return interp->start + interp->delta * eased;
-}
-
-f32 sp_interp_ease_out(sp_interp_t* interp) {
-  f32 eased = 1.0f - (1.0f - interp->t) * (1.0f - interp->t);
-  return interp->start + interp->delta * eased;
-}
-
-f32 sp_interp_ease_inout(sp_interp_t* interp) {
-  f32 eased;
-  if (interp->t < 0.5f) {
-    eased = 2.0f * interp->t * interp->t;
-  } else {
-    eased = 1.0f - (-2.0f * interp->t + 2.0f) * (-2.0f * interp->t + 2.0f) / 2.0f;
-  }
-  return interp->start + interp->delta * eased;
-}
-
-f32 sp_interp_ease_inout_bounce(sp_interp_t* interp) {
-  f32 c1 = 1.70158f;
-  f32 c2 = c1 * 1.525f;
-  f32 eased;
-  if (interp->t < 0.5f) {
-    f32 x = 2.0f * interp->t;
-    eased = 0.5f * (x * x * ((c2 + 1.0f) * x - c2));
-  } else {
-    f32 x = 2.0f * interp->t - 2.0f;
-    eased = 0.5f * (x * x * ((c2 + 1.0f) * x + c2) + 2.0f);
-  }
-  return interp->start + interp->delta * eased;
-}
-
-f32 sp_interp_exponential(sp_interp_t* interp) {
-  f32 k = 5.0f;
-  f32 e_k = 148.413159f; // exp(5)
-  f32 eased = (expf(k * interp->t) - 1.0f) / (e_k - 1.0f);
-  return interp->start + interp->delta * eased;
-}
-
-f32 sp_interp_parabolic(sp_interp_t* interp) {
-  f32 x = 2.0f * interp->t - 1.0f;
-  f32 eased = 1.0f - x * x;
-  return interp->start + interp->delta * eased;
-}
 
 /////////////
 // SPINNER //
 /////////////
-
 #define SPN_SPINNER_WIDTH      8
 #define SPN_SPINNER_TRAIL_LEN  6
 #define SPN_SPINNER_CYCLE_MS   500.0f
-#define SPN_SPINNER_HOLD_START_MS 500.0f
-#define SPN_SPINNER_HOLD_END_MS   150.0f
+#define SPN_SPINNER_HOLD_START_MS 300.0f
+#define SPN_SPINNER_HOLD_END_MS   100.0f
 
 #define SPN_SPINNER_ACTIVE   "\u25A0"
 #define SPN_SPINNER_INACTIVE "\u2B1D"
@@ -190,29 +111,39 @@ f32 sp_interp_parabolic(sp_interp_t* interp) {
 typedef struct spn_spinner_t {
   sp_interp_t interp;
   bool        forward;
+  bool        render_forward;  // direction for trail rendering
   f32         hold_ms;
+  f32         hold_total_ms;   // total hold time for fade calculation
   f32         value;
 } spn_spinner_t;
 
 void spn_spinner_init(spn_spinner_t* s) {
   s->interp = sp_interp_build(0.0f, 1.0f, SPN_SPINNER_CYCLE_MS);
   s->forward = true;
+  s->render_forward = true;
   s->hold_ms = 0;
+  s->hold_total_ms = 0;
   s->value = 0;
 }
 
 void spn_spinner_update(spn_spinner_t* s, f32 dt_ms) {
   if (s->hold_ms > 0) {
     s->hold_ms -= dt_ms;
+    // Once hold expires, flip render direction
+    if (s->hold_ms <= 0) {
+      s->render_forward = s->forward;
+    }
     return;
   }
 
   if (sp_interp_update(&s->interp, dt_ms)) {
     s->forward = !s->forward;
-    s->hold_ms = s->forward ? SPN_SPINNER_HOLD_START_MS : SPN_SPINNER_HOLD_END_MS;
+    s->hold_total_ms = s->forward ? SPN_SPINNER_HOLD_START_MS : SPN_SPINNER_HOLD_END_MS;
+    s->hold_ms = s->hold_total_ms;
     s->interp = sp_interp_build(s->forward ? 0.0f : 1.0f,
                                  s->forward ? 1.0f : 0.0f,
                                  SPN_SPINNER_CYCLE_MS);
+    // render_forward stays the same until hold expires
   }
   s->value = sp_interp_ease_inout(&s->interp);
 }
@@ -221,23 +152,42 @@ sp_str_t spn_spinner_render(spn_spinner_t* s, u8 r, u8 g, u8 b) {
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
   f32 active_pos = s->value * (SPN_SPINNER_WIDTH - 1);
 
+  // Calculate trail fade during hold period
+  f32 trail_fade = 1.0f;
+  if (s->hold_ms > 0 && s->hold_total_ms > 0) {
+    // Fade trail out over the hold period
+    trail_fade = s->hold_ms / s->hold_total_ms;
+  }
+
   for (u32 i = 0; i < SPN_SPINNER_WIDTH; i++) {
-    f32 dist = s->forward ? (active_pos - (f32)i) : ((f32)i - active_pos);
+    f32 pos = (f32)i;
+    f32 abs_dist = active_pos - pos;
+    if (abs_dist < 0) abs_dist = -abs_dist;
+
+    // Use render_forward for trail direction (delays flip until hold ends)
+    bool is_behind = s->render_forward ? (pos < active_pos) : (pos > active_pos);
 
     u8 cr, cg, cb;
     const c8* glyph;
 
-    if (dist >= 0.0f && dist < 1.0f) {
+    if (abs_dist < 1.0f) {
+      // Head position
       cr = r; cg = g; cb = b;
       glyph = SPN_SPINNER_ACTIVE;
-    } else if (dist >= 1.0f && dist < (f32)SPN_SPINNER_TRAIL_LEN) {
+    } else if (is_behind && abs_dist < (f32)SPN_SPINNER_TRAIL_LEN) {
+      // Trail - fade based on distance AND hold fade
       f32 alpha = 1.0f;
-      for (s32 j = 0; j < (s32)dist; j++) alpha *= 0.65f;
+      for (s32 j = 0; j < (s32)abs_dist; j++) alpha *= 0.65f;
+      alpha *= trail_fade;  // Additional fade during hold
+      // Clamp to inactive brightness minimum
+      f32 inactive = 0.2f;
+      alpha = inactive + alpha * (1.0f - inactive);
       cr = (u8)(r * alpha);
       cg = (u8)(g * alpha);
       cb = (u8)(b * alpha);
       glyph = SPN_SPINNER_ACTIVE;
     } else {
+      // Inactive
       cr = (u8)(r * 0.2f);
       cg = (u8)(g * 0.2f);
       cb = (u8)(b * 0.2f);
@@ -854,7 +804,7 @@ typedef struct {
 typedef struct {
   sp_str_t dir;
   sp_str_t   lock;
-} spn_project_paths_t;
+} spn_app_paths_t;
 
 struct spn_config {
   sp_str_t spn;
@@ -1304,26 +1254,7 @@ typedef struct {
 } spn_compile_thread_ctx_t;
 
 typedef struct {
-  spn_tools_paths_t tools;
-  sp_str_t cwd;
-  sp_str_t project;
-  sp_str_t   manifest;
-  sp_str_t executable;
-  sp_str_t bin;
-  sp_str_t storage;
-  sp_str_t   config_dir;
-  sp_str_t     config;
-  sp_str_t   spn;
-  sp_str_t     include;
-  sp_str_t     index;
-  sp_str_t   cache;
-  sp_str_t     build;
-  sp_str_t     store;
-  sp_str_t     source;
-} spn_paths_t;
-
-typedef struct {
-  spn_project_paths_t paths;
+  spn_app_paths_t paths;
   spn_pkg_t package;
   sp_opt(spn_lock_file_t) lock;
   spn_profile_t profile;
@@ -1375,7 +1306,26 @@ sp_str_t       spn_get_tool_path(spn_bin_t* bin);
 
 typedef struct {
   spn_cli_t cli;
-  spn_paths_t paths;
+  struct {
+    spn_tools_paths_t tools;
+    sp_str_t cwd;
+    sp_str_t project;
+    sp_str_t   manifest;
+    sp_str_t executable;
+    sp_str_t config_dir;     // $HOME/.config/spn
+    sp_str_t   config;       // $HOME/.config/spn/spn.toml
+    sp_str_t bin;            // $HOME/.local/bin
+    sp_str_t storage;        // $HOME/.loca/share/spn
+    sp_str_t   log;          // $HOME/.loca/share/spn/log
+    sp_str_t     invocation; // $HOME/.loca/share/spn/log/$ISO_TIMESTAMP.log
+    sp_str_t   spn;
+    sp_str_t     include;
+    sp_str_t     index;
+    sp_str_t   cache;
+    sp_str_t     build;
+    sp_str_t     store;
+    sp_str_t     source;
+  } paths;
   spn_tui_t tui;
   sp_atomic_s32 control;
   sp_str_t tcc_error;
@@ -4265,6 +4215,15 @@ void spn_app_add_package_constraints(spn_app_t* app, spn_pkg_t* package) {
     sp_dyn_array_push(*ranges, range);
   }
 
+  sp_dyn_array_for(package->system_deps, i) {
+    sp_str_t sys_dep = package->system_deps[i];
+    bool found = false;
+    sp_dyn_array_for(resolver->system_deps, j) {
+      if (sp_str_equal(resolver->system_deps[j], sys_dep)) { found = true; break; }
+    }
+    if (!found) sp_dyn_array_push(resolver->system_deps, sys_dep);
+  }
+
   sp_ht_for(package->deps, it) {
     spn_pkg_req_t request = *sp_ht_it_getp(package->deps, it);
     spn_pkg_t* dep = spn_app_find_package(app, request);
@@ -4708,6 +4667,11 @@ void spn_app_prepare_build(spn_app_t* app) {
     spn_bg_cmd_add_output(&build.graph, nodes.sync, nodes.repo);
     spn_bg_cmd_add_input(&build.graph, nodes.build, nodes.repo);
     spn_bg_cmd_add_output(&build.graph, nodes.build, nodes.stamp);
+
+    if (spn.cli.build.force) {
+      spn_bg_id_t force = spn_bg_add_file(&build.graph, spn.paths.invocation);
+      spn_bg_cmd_add_input(&build.graph, nodes.build, force);
+    }
 
     dep->nodes = nodes;
   }
@@ -5600,17 +5564,23 @@ void spn_init(u32 num_args, const c8** args) {
   };
 
   // Find the cache directory after the config has been fully loaded
+  spn.paths.log = sp_fs_join_path(spn.paths.storage, SP_LIT("log"));
   spn.paths.cache = sp_fs_join_path(spn.paths.storage, SP_LIT("cache"));
   spn.paths.source = sp_fs_join_path(spn.paths.cache, SP_LIT("source"));
   spn.paths.build = sp_fs_join_path(spn.paths.cache, SP_LIT("build"));
   spn.paths.store = sp_fs_join_path(spn.paths.cache, SP_LIT("store"));
 
+  sp_fs_create_dir(spn.paths.log);
   sp_fs_create_dir(spn.paths.cache);
   sp_fs_create_dir(spn.paths.source);
   sp_fs_create_dir(spn.paths.build);
   sp_fs_create_dir(spn.paths.store);
   sp_fs_create_dir(spn.paths.bin);
   sp_fs_create_dir(spn.paths.tools.dir);
+
+  sp_tm_epoch_t now = sp_tm_now_epoch();
+  spn.paths.invocation = sp_fs_join_path(spn.paths.log, sp_tm_to_iso8601(now));
+  sp_fs_create_file(spn.paths.invocation);
 
   if (sp_str_valid(cli->project_dir)) {
     spn.paths.project = sp_fs_canonicalize_path(cli->project_dir);
@@ -6676,6 +6646,12 @@ void spn_cli_build(spn_cli_t* cli) {
 }
 
 s32 main(s32 num_args, const c8** args) {
+  spn = SP_ZERO_STRUCT(spn_ctx_t);
+  app = SP_ZERO_STRUCT(spn_app_t);
+  spn_init(num_args, args);
+  spn_cli_run();
+  return 0;
+  #if 0
   (void)num_args; (void)args;
 
   spn_spinner_t spinner;
@@ -6697,10 +6673,12 @@ s32 main(s32 num_args, const c8** args) {
     sp_tui_print(frame);
     sp_tui_flush();
 
-    sp_os_sleep_ms(1);
+    sp_os_sleep_ms(4);
   }
 
   sp_tui_show_cursor();
   sp_tui_flush();
   SP_EXIT_SUCCESS();
+  #endif
+
 }

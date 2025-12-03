@@ -1,6 +1,7 @@
 [package]
 name = "spn"
 version = "0.1.0"
+system_deps = ["m"]
 
 [deps]
 sp = "1.4.0"
@@ -8,6 +9,7 @@ argparse = ">=1.0.0"
 utest = "1.0.0"
 tcc = ">=1.0.0"
 toml = "1.2.0"
+
 
 [[profile]]
 name = "debug"

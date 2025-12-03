@@ -1,8 +1,8 @@
 [package]
 name = "sp"
 repo = "tspader/sp"
-version = "1.6.4"
-commit = "5ebe20457f24"
+version = "1.6.5"
+commit = "0d9ffaa344eb"
 author = "tspader"
 maintainer = "tspader"
 
