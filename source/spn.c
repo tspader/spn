@@ -174,6 +174,84 @@ f32 sp_interp_parabolic(sp_interp_t* interp) {
   return interp->start + interp->delta * eased;
 }
 
+/////////////
+// SPINNER //
+/////////////
+
+#define SPN_SPINNER_WIDTH      8
+#define SPN_SPINNER_TRAIL_LEN  6
+#define SPN_SPINNER_CYCLE_MS   500.0f
+#define SPN_SPINNER_HOLD_START_MS 500.0f
+#define SPN_SPINNER_HOLD_END_MS   150.0f
+
+#define SPN_SPINNER_ACTIVE   "\u25A0"
+#define SPN_SPINNER_INACTIVE "\u2B1D"
+
+typedef struct spn_spinner_t {
+  sp_interp_t interp;
+  bool        forward;
+  f32         hold_ms;
+  f32         value;
+} spn_spinner_t;
+
+void spn_spinner_init(spn_spinner_t* s) {
+  s->interp = sp_interp_build(0.0f, 1.0f, SPN_SPINNER_CYCLE_MS);
+  s->forward = true;
+  s->hold_ms = 0;
+  s->value = 0;
+}
+
+void spn_spinner_update(spn_spinner_t* s, f32 dt_ms) {
+  if (s->hold_ms > 0) {
+    s->hold_ms -= dt_ms;
+    return;
+  }
+
+  if (sp_interp_update(&s->interp, dt_ms)) {
+    s->forward = !s->forward;
+    s->hold_ms = s->forward ? SPN_SPINNER_HOLD_START_MS : SPN_SPINNER_HOLD_END_MS;
+    s->interp = sp_interp_build(s->forward ? 0.0f : 1.0f,
+                                 s->forward ? 1.0f : 0.0f,
+                                 SPN_SPINNER_CYCLE_MS);
+  }
+  s->value = sp_interp_ease_inout(&s->interp);
+}
+
+sp_str_t spn_spinner_render(spn_spinner_t* s, u8 r, u8 g, u8 b) {
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+  f32 active_pos = s->value * (SPN_SPINNER_WIDTH - 1);
+
+  for (u32 i = 0; i < SPN_SPINNER_WIDTH; i++) {
+    f32 dist = s->forward ? (active_pos - (f32)i) : ((f32)i - active_pos);
+
+    u8 cr, cg, cb;
+    const c8* glyph;
+
+    if (dist >= 0.0f && dist < 1.0f) {
+      cr = r; cg = g; cb = b;
+      glyph = SPN_SPINNER_ACTIVE;
+    } else if (dist >= 1.0f && dist < (f32)SPN_SPINNER_TRAIL_LEN) {
+      f32 alpha = 1.0f;
+      for (s32 j = 0; j < (s32)dist; j++) alpha *= 0.65f;
+      cr = (u8)(r * alpha);
+      cg = (u8)(g * alpha);
+      cb = (u8)(b * alpha);
+      glyph = SPN_SPINNER_ACTIVE;
+    } else {
+      cr = (u8)(r * 0.2f);
+      cg = (u8)(g * 0.2f);
+      cb = (u8)(b * 0.2f);
+      glyph = SPN_SPINNER_INACTIVE;
+    }
+
+    sp_str_builder_append_fmt(&builder, "\033[38;2;{};{};{}m{}",
+      SP_FMT_U32(cr), SP_FMT_U32(cg), SP_FMT_U32(cb), SP_FMT_CSTR(glyph));
+  }
+
+  sp_str_builder_append_cstr(&builder, SP_ANSI_RESET);
+  return sp_str_builder_move(&builder);
+}
+
 
 sp_str_t sp_str_map_kernel_colorize(sp_str_map_context_t* context) {
   sp_str_t id = *(sp_str_t*)context->user_data;
@@ -6598,10 +6676,31 @@ void spn_cli_build(spn_cli_t* cli) {
 }
 
 s32 main(s32 num_args, const c8** args) {
-  spn = SP_ZERO_STRUCT(spn_ctx_t);
-  app = SP_ZERO_STRUCT(spn_app_t);
-  spn_init(num_args, args);
-  spn_cli_run();
+  (void)num_args; (void)args;
 
-  return 0;
+  spn_spinner_t spinner;
+  spn_spinner_init(&spinner);
+
+  sp_tui_hide_cursor();
+  sp_tui_flush();
+
+  sp_tm_timer_t timer = sp_tm_start_timer();
+
+  for (;;) {
+    u64 elapsed_ns = sp_tm_lap_timer(&timer);
+    f32 dt_ms = (f32)elapsed_ns / 1000000.0f;
+
+    spn_spinner_update(&spinner, dt_ms);
+
+    sp_str_t frame = spn_spinner_render(&spinner, 255, 0, 0);
+    sp_tui_home();
+    sp_tui_print(frame);
+    sp_tui_flush();
+
+    sp_os_sleep_ms(1);
+  }
+
+  sp_tui_show_cursor();
+  sp_tui_flush();
+  SP_EXIT_SUCCESS();
 }
