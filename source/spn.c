@@ -769,7 +769,12 @@ typedef struct {
 } sp_tui_cursor_t;
 
 typedef struct {
-  sp_da(sp_str_t) names;
+  sp_str_t name;
+  u32 min_width;
+} sp_tui_column_t;
+
+typedef struct {
+  sp_da(sp_tui_column_t) cols;
   sp_da(sp_da(sp_str_t)) rows;         // Array of rows, each row is array of cells
   sp_tui_cursor_t cursor;
   sp_tui_table_state_t state;
@@ -815,6 +820,7 @@ void spn_tui_run(spn_tui_t* tui);
 
 void     sp_tui_begin_table(spn_tui_t* tui);
 void     sp_tui_table_setup_column(spn_tui_t* tui, sp_str_t name);
+void     sp_tui_table_setup_column_ex(spn_tui_t* tui, sp_str_t name, u32 min_width);
 void     sp_tui_table_header_row(spn_tui_t* tui);
 void     sp_tui_table_next_row(spn_tui_t* tui);
 void     sp_tui_table_column(spn_tui_t* tui, u32 n);
@@ -2802,7 +2808,7 @@ sp_str_t sp_str_visual_pad(sp_str_t str, u32 target_visual_width) {
 void sp_tui_begin_table(spn_tui_t* tui) {
   SP_ASSERT(tui->table.state == SP_TUI_TABLE_NONE);
 
-  tui->table.names = SP_NULLPTR;
+  tui->table.cols = SP_NULLPTR;
   tui->table.rows = SP_NULLPTR;
   tui->table.cursor = (sp_tui_cursor_t) { .row = 0, .col = 0 };
   tui->table.state = SP_TUI_TABLE_SETUP;
@@ -2811,8 +2817,13 @@ void sp_tui_begin_table(spn_tui_t* tui) {
 }
 
 void sp_tui_table_setup_column(spn_tui_t* tui, sp_str_t name) {
+  sp_tui_table_setup_column_ex(tui, name, 0);
+}
+
+void sp_tui_table_setup_column_ex(spn_tui_t* tui, sp_str_t name, u32 min_width) {
   SP_ASSERT(tui->table.state == SP_TUI_TABLE_SETUP);
-  sp_dyn_array_push(tui->table.names, name);
+  sp_tui_column_t col = { .name = name, .min_width = min_width };
+  sp_dyn_array_push(tui->table.cols, col);
   tui->table.columns++;
 }
 
@@ -2846,8 +2857,8 @@ void sp_tui_table_column(spn_tui_t* tui, u32 n) {
 void sp_tui_table_column_named(spn_tui_t* tui, sp_str_t name) {
   SP_ASSERT(tui->table.state == SP_TUI_TABLE_BUILDING);
 
-  sp_dyn_array_for(tui->table.names, i) {
-    if (sp_str_equal(tui->table.names[i], name)) {
+  sp_dyn_array_for(tui->table.cols, i) {
+    if (sp_str_equal(tui->table.cols[i].name, name)) {
       tui->table.cursor.col = i;
       return;
     }
@@ -2909,7 +2920,7 @@ sp_str_t sp_tui_render(spn_tui_t* tui) {
   // Calculate column widths based on visual width (excluding ANSI codes)
   sp_da(u32) widths = SP_NULLPTR;
   for (u32 col = 0; col < tui->table.columns; col++) {
-    u32 max_width = 0;
+    u32 max_width = tui->table.cols[col].min_width;
 
     sp_dyn_array_for(tui->table.rows, row_idx) {
       sp_da(sp_str_t)* row = &tui->table.rows[row_idx];
