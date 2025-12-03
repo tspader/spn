@@ -922,6 +922,7 @@ spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t*
 
 void spn_bg_executor_run(spn_bg_executor_t* ex) {
   if (sp_ht_empty(ex->dirty->commands)) {
+    sp_atomic_s32_set(&ex->shutdown, 1);
     return;
   }
 
