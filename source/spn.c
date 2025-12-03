@@ -500,6 +500,7 @@ void          spn_pkg_init(spn_pkg_t* package);
 void          spn_pkg_set_index(spn_pkg_t* package, sp_str_t path);
 void          spn_pkg_set_manifest(spn_pkg_t* package, sp_str_t path);
 void          spn_pkg_add_version(spn_pkg_t* package, spn_semver_t version, sp_str_t commit);
+sp_str_t      spn_pkg_get_url(spn_pkg_t* build);
 
 typedef struct spn_build_ctx spn_build_ctx_t;
 
@@ -2749,8 +2750,17 @@ void spn_tui_run(spn_tui_t* tui) {
       );
 
       switch (event.kind) {
+        case SPN_BUILD_EVENT_SYNC: {
+          sp_str_builder_append_fmt(&builder, "{:fg brightblack} ",
+            SP_FMT_STR(spn_pkg_get_url(event.ctx->package)));
+          break;
+        }
         case SPN_BUILD_EVENT_CHECKOUT: {
-          //sp_str_builder_append_fmt(&builder, )
+          sp_str_builder_append_fmt(&builder, "{} ({:fg brightblack}: {})",
+            SP_FMT_STR(spn_semver_to_str(event.checkout.version)),
+            SP_FMT_STR(event.checkout.commit),
+            SP_FMT_STR(sp_str_truncate(event.checkout.message, 32, sp_str_lit("...")))
+          );
           break;
         }
         case SPN_BUILD_EVENT_RESOLVE: {
@@ -3730,6 +3740,10 @@ void spn_pkg_add_version(spn_pkg_t* package, spn_semver_t version, sp_str_t comm
   sp_dyn_array_push(package->versions, version);
 }
 
+sp_str_t spn_pkg_get_url(spn_pkg_t* pkg) {
+  return sp_format("https://github.com/{}.git", SP_FMT_STR(pkg->repo));
+}
+
 spn_pkg_t spn_pkg_new(sp_str_t name) {
   spn_pkg_t package = SP_ZERO_INITIALIZE();
   spn_pkg_init(&package);
@@ -4152,28 +4166,28 @@ void spn_pkg_build_run(spn_pkg_build_t* build) {
   spn_dep_context_stamp(build);
 }
 
-spn_err_t spn_pkg_build_sync_remote(spn_pkg_build_t* dep) {
-  if (!sp_fs_exists(dep->ctx.paths.source)) {
-    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_CLONING);
+spn_err_t spn_pkg_build_sync_remote(spn_pkg_build_t* build) {
+  if (!sp_fs_exists(build->ctx.paths.source)) {
+    spn_dep_context_set_build_state(build, SPN_DEP_BUILD_STATE_CLONING);
 
-    sp_str_t url = sp_format("https://github.com/{}.git", SP_FMT_STR(dep->ctx.package->repo));
-    if (spn_git_clone(url, dep->ctx.paths.source)) {
-      spn_dep_context_set_build_error(dep, sp_format(
+    sp_str_t url = spn_pkg_get_url(build->ctx.package);
+    if (spn_git_clone(url, build->ctx.paths.source)) {
+      spn_dep_context_set_build_error(build, sp_format(
         "Failed to clone {:fg brightcyan}",
-        SP_FMT_STR(dep->ctx.package->name)
+        SP_FMT_STR(build->ctx.package->name)
       ));
 
       return SPN_ERROR;
     }
 
-    SP_ASSERT(sp_fs_is_dir(dep->ctx.paths.source));
+    SP_ASSERT(sp_fs_is_dir(build->ctx.paths.source));
   }
   else {
-    spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_FETCHING);
-    if (spn_git_fetch(dep->ctx.paths.source)) {
-      spn_dep_context_set_build_error(dep, sp_format(
+    spn_dep_context_set_build_state(build, SPN_DEP_BUILD_STATE_FETCHING);
+    if (spn_git_fetch(build->ctx.paths.source)) {
+      spn_dep_context_set_build_error(build, sp_format(
         "Failed to fetch {:fg brightcyan}",
-        SP_FMT_STR(dep->ctx.package->name)
+        SP_FMT_STR(build->ctx.package->name)
       ));
 
       return SPN_ERROR;
@@ -6474,7 +6488,6 @@ sp_da(spn_build_event_t) spn_event_buffer_drain(spn_event_buffer_t* events) {
 }
 
 spn_err_t spn_bin_build_run(spn_bin_build_t* build) {
-  //spn_dep_context_set_build_state(build, SPN_DEP_BUILD_STATE_BUILDING);
   spn_pkg_t* package = build->ctx.package;
   spn_bin_t* bin = build->bin;
 
@@ -6504,11 +6517,9 @@ spn_err_t spn_bin_build_run(spn_bin_build_t* build) {
   return spn_cc_run(&cc);
 }
 
-
 void spn_cli_build(spn_cli_t* cli) {
   spn_cli_build_t* command = &cli->build;
 
-  // Skip the command name itself (first arg)
   spn_cli_parser_t parser = {
     .argv = (c8**)cli->args + 1,
     .argc = cli->num_args - 1,
@@ -6517,10 +6528,10 @@ void spn_cli_build(spn_cli_t* cli) {
       .summary = "Build one or more of the project's targets",
       .opts = {
         { "h", "help",    SPN_CLI_OPT_KIND_BOOLEAN, "",                                   SPN_CLI_NO_PLACEHOLDER, &cli->help },
-        { "f", "force",   SPN_CLI_OPT_KIND_BOOLEAN, "Force build, bypassing any caching", SPN_CLI_NO_PLACEHOLDER, &command->force },
-        { "t", "target",  SPN_CLI_OPT_KIND_STRING,  "Target to build; if omitted, build all targets", "TARGET", &command->target },
-        { "p", "profile", SPN_CLI_OPT_KIND_STRING,  "Profile to use; if omitted, use default profile", "PROFILE", &command->profile },
-        { "o", "output",  SPN_CLI_OPT_KIND_STRING,  "Output mode: interactive, noninteractive, quiet, none", "MODE", &cli->output }
+        { "f", "force",   SPN_CLI_OPT_KIND_BOOLEAN, "Force rebuild", SPN_CLI_NO_PLACEHOLDER, &command->force },
+        { "t", "target",  SPN_CLI_OPT_KIND_STRING,  "Target to build; if omitted, build all", "TARGET", &command->target },
+        { "p", "profile", SPN_CLI_OPT_KIND_STRING,  "Profile to use; if omitted, first listed", "PROFILE", &command->profile },
+        { "o", "output",  SPN_CLI_OPT_KIND_STRING,  "Output mode: interactive, serial, quiet, none", "MODE", &cli->output }
       },
     }
   };
