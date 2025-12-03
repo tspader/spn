@@ -95,6 +95,86 @@ typedef enum {
     } \
   } while(0)
 
+typedef enum sp_interp_mode_t {
+  SP_INTERP_MODE_LERP,
+  SP_INTERP_MODE_EASE_IN,
+  SP_INTERP_MODE_EASE_OUT,
+  SP_INTERP_MODE_EASE_INOUT,
+  SP_INTERP_MODE_EASE_INOUT_BOUNCE,
+  SP_INTERP_MODE_EXPONENTIAL,
+  SP_INTERP_MODE_PARABOLIC,
+  SP_INTERP_MODE_COUNT
+} sp_interp_mode_t;
+
+typedef struct sp_interp_t {
+  f32 start;
+  f32 delta;
+  f32 t;
+  f32 time_scale;
+} sp_interp_t;
+
+sp_interp_t sp_interp_build(f32 start, f32 target, f32 time) {
+  return (sp_interp_t) { .start = start, .delta = target - start, .t = 0, .time_scale = 1.0f / time };
+}
+
+bool sp_interp_update(sp_interp_t* interp, f32 dt) {
+  interp->t += dt * interp->time_scale;
+  if (interp->t > 1.0f) { interp->t = 1.0f; }
+  return interp->t >= 1.0f;
+}
+
+f32 sp_interp_lerp(sp_interp_t* interp) {
+  return interp->start + interp->delta * interp->t;
+}
+
+f32 sp_interp_ease_in(sp_interp_t* interp) {
+  f32 eased = interp->t * interp->t;
+  return interp->start + interp->delta * eased;
+}
+
+f32 sp_interp_ease_out(sp_interp_t* interp) {
+  f32 eased = 1.0f - (1.0f - interp->t) * (1.0f - interp->t);
+  return interp->start + interp->delta * eased;
+}
+
+f32 sp_interp_ease_inout(sp_interp_t* interp) {
+  f32 eased;
+  if (interp->t < 0.5f) {
+    eased = 2.0f * interp->t * interp->t;
+  } else {
+    eased = 1.0f - (-2.0f * interp->t + 2.0f) * (-2.0f * interp->t + 2.0f) / 2.0f;
+  }
+  return interp->start + interp->delta * eased;
+}
+
+f32 sp_interp_ease_inout_bounce(sp_interp_t* interp) {
+  f32 c1 = 1.70158f;
+  f32 c2 = c1 * 1.525f;
+  f32 eased;
+  if (interp->t < 0.5f) {
+    f32 x = 2.0f * interp->t;
+    eased = 0.5f * (x * x * ((c2 + 1.0f) * x - c2));
+  } else {
+    f32 x = 2.0f * interp->t - 2.0f;
+    eased = 0.5f * (x * x * ((c2 + 1.0f) * x + c2) + 2.0f);
+  }
+  return interp->start + interp->delta * eased;
+}
+
+f32 sp_interp_exponential(sp_interp_t* interp) {
+  f32 k = 5.0f;
+  f32 e_k = 148.413159f; // exp(5)
+  f32 eased = (expf(k * interp->t) - 1.0f) / (e_k - 1.0f);
+  return interp->start + interp->delta * eased;
+}
+
+f32 sp_interp_parabolic(sp_interp_t* interp) {
+  f32 x = 2.0f * interp->t - 1.0f;
+  f32 eased = 1.0f - x * x;
+  return interp->start + interp->delta * eased;
+}
+
+
 sp_str_t sp_str_map_kernel_colorize(sp_str_map_context_t* context) {
   sp_str_t id = *(sp_str_t*)context->user_data;
   sp_str_t ansi = sp_format_color_id_to_ansi_fg(id);
@@ -469,7 +549,7 @@ struct spn_pkg {
   spn_semver_t version;
   spn_lib_t lib;
   sp_ht(sp_str_t, spn_bin_t) bin;
-  sp_ht(sp_str_t, spn_dep_req_t) deps;
+  sp_ht(sp_str_t, spn_pkg_req_t) deps;
   sp_ht(sp_str_t, spn_dep_option_t) options;
   sp_ht(sp_str_t, spn_dep_options_t) config;
   sp_ht(spn_semver_t, spn_metadata_t) metadata;
@@ -634,7 +714,7 @@ spn_build_t* spn_build_new();
 spn_generator_kind_t   spn_gen_kind_from_str(sp_str_t str);
 spn_gen_entry_kind_t   spn_gen_entry_from_str(sp_str_t str);
 spn_cc_kind_t          spn_cc_kind_from_str(sp_str_t str);
-spn_package_kind_t    spn_registry_kind_from_str(sp_str_t str);
+spn_package_kind_t     spn_registry_kind_from_str(sp_str_t str);
 sp_str_t               spn_gen_format_entry_for_compiler(sp_str_t entry, spn_gen_entry_kind_t kind, spn_cc_kind_t compiler);
 sp_str_t               spn_cc_kind_to_executable(spn_cc_kind_t compiler);
 sp_str_t               spn_cc_c_standard_to_switch(spn_c_standard_t standard);
@@ -801,6 +881,33 @@ typedef struct {
 
   sp_tui_table_t table;
 } spn_tui_t;
+
+#define SP_TUI_COLOR(r, g, b) "\033[38;2;" SP_MACRO_STR(r) ";" SP_MACRO_STR(g) ";" SP_MACRO_STR(b) "m"
+#define SP_TUI_INDIAN_RED       SP_TUI_COLOR(180, 101, 111)
+#define SP_TUI_TYRIAN_PURPLE    SP_TUI_COLOR(95,  26,  55)
+#define SP_TUI_CARDINAL         SP_TUI_COLOR(194, 37,  50)
+#define SP_TUI_CELADON          SP_TUI_COLOR(183, 227, 204)
+#define SP_TUI_SPRING_GREEN     SP_TUI_COLOR(89,  255, 160)
+#define SP_TUI_MINDARO          SP_TUI_COLOR(188, 231, 132)
+#define SP_TUI_LIGHT_GREEN      SP_TUI_COLOR(161, 239, 139)
+#define SP_TUI_ZOMP             SP_TUI_COLOR(99,  160, 136)
+#define SP_TUI_MIDNIGHT_GREEN   SP_TUI_COLOR(25,  83,  95)
+#define SP_TUI_PRUSSIAN_BLUE    SP_TUI_COLOR(16,  43,  63)
+#define SP_TUI_ORANGE           SP_TUI_COLOR(249, 166, 32)
+#define SP_TUI_SUNGLOW          SP_TUI_COLOR(255, 209, 102)
+#define SP_TUI_SELECTIVE_YELLOW SP_TUI_COLOR(250, 188, 42)
+#define SP_TUI_GUNMETAL         SP_TUI_COLOR(43,  61,  65)
+#define SP_TUI_PAYNES_GRAY      SP_TUI_COLOR(76,  95,  107)
+#define SP_TUI_CADET_GRAY       SP_TUI_COLOR(131, 160, 160)
+#define SP_TUI_CHARCOAL         SP_TUI_COLOR(64,  67,  78)
+#define SP_TUI_COOL_GRAY        SP_TUI_COLOR(140, 148, 173)
+#define SP_TUI_CREAM            SP_TUI_COLOR(245, 255, 198)
+#define SP_TUI_MISTY_ROSE       SP_TUI_COLOR(255, 227, 227)
+#define SP_TUI_TAUPE            SP_TUI_COLOR(68,  53,  39)
+#define SP_TUI_DARK_GREEN       SP_TUI_COLOR(4,   27,  21)
+#define SP_TUI_RICH_BLACK       SP_TUI_COLOR(4,   10,  15)
+#define SP_TUI_WHITE            SP_TUI_COLOR(255, 255, 255)
+
 
 void     sp_tui_print(sp_str_t str);
 void     sp_tui_up(u32 n);
@@ -1162,7 +1269,7 @@ typedef enum {
 
 spn_app_t app;
 
-typedef sp_opt(spn_dep_req_t) spn_opt_dep_t;
+typedef sp_opt(spn_pkg_req_t) spn_opt_dep_t;
 
 spn_app_t      spn_app_new();
 void           spn_app_load(spn_app_t* app, sp_str_t manifest_path);
@@ -2683,16 +2790,24 @@ void spn_tcc_list_fn(void* opaque, const char* name, const void* value) {
 sp_str_t spn_tui_name_to_color(sp_str_t str);
 
 sp_str_t spn_tui_name_to_color(sp_str_t str) {
-  static const c8* colors[] = {
-    "\x1b[91m", // bright red
-    "\x1b[92m", // bright green
-    "\x1b[93m", // bright yellow
-    "\x1b[94m", // bright blue
-    "\x1b[95m", // bright magenta
-    "\x1b[96m", // bright cyan
+  static const c8* colors [] = {
+    SP_TUI_INDIAN_RED,
+    SP_TUI_ZOMP,
+    SP_TUI_COOL_GRAY,
+    SP_TUI_MISTY_ROSE,
+    SP_TUI_CELADON,
+    SP_TUI_SUNGLOW,
+    SP_TUI_SELECTIVE_YELLOW,
+    SP_TUI_MINDARO,
+    SP_TUI_PAYNES_GRAY,
+    SP_TUI_CREAM,
   };
+  static sp_ht(sp_hash_t, u32) occupied = SP_NULLPTR;
+  static u32 next_index = 0;
+
   sp_hash_t hash = sp_hash_str(str);
-  u32 index = hash % sp_carr_len(colors);
+  u32 truncated_hash = (u32)(hash ^ (hash >> 32));
+  u32 index = ((u64)truncated_hash * sp_carr_len(colors) >> 32);
   return sp_str_view(colors[index]);
 }
 
@@ -2730,10 +2845,12 @@ void spn_tui_run(spn_tui_t* tui) {
           break;
         }
         case SPN_BUILD_EVENT_CHECKOUT: {
-          sp_str_builder_append_fmt(&builder, "{} ({:fg brightblack}: {})",
+          sp_str_builder_append_fmt(&builder, "{} {:fg brightblack} {}{}{}",
             SP_FMT_STR(spn_semver_to_str(event.checkout.version)),
             SP_FMT_STR(event.checkout.commit),
-            SP_FMT_STR(sp_str_truncate(event.checkout.message, 32, sp_str_lit("...")))
+            SP_FMT_CSTR(SP_ANSI_ITALIC),
+            SP_FMT_STR(sp_str_truncate(event.checkout.message, 32, sp_str_lit("..."))),
+            SP_FMT_CSTR(SP_ANSI_RESET)
           );
           break;
         }
@@ -3825,7 +3942,7 @@ spn_pkg_t spn_pkg_load(sp_str_t manifest_path) {
   if (toml.deps) {
     const c8* key = SP_NULLPTR;
     spn_toml_for(toml.deps, n, key) {
-      spn_pkg_req_t dep = spn_dep_req_from_str(spn_toml_str(toml.deps, key));
+      spn_pkg_req_t dep = spn_pkg_req_from_str(spn_toml_str(toml.deps, key));
       dep.name = sp_str_from_cstr(key);
 
       sp_ht_insert(package.deps, dep.name, dep);
@@ -3868,7 +3985,7 @@ spn_pkg_t spn_pkg_load(sp_str_t manifest_path) {
   return package;
 }
 
-spn_pkg_req_t spn_dep_req_from_str(sp_str_t str) {
+spn_pkg_req_t spn_pkg_req_from_str(sp_str_t str) {
   spn_pkg_req_t dep = SP_ZERO_INITIALIZE();
   if (sp_str_starts_with(str, sp_str_lit("file://"))) {
     return (spn_pkg_req_t) {
@@ -3883,10 +4000,10 @@ spn_pkg_req_t spn_dep_req_from_str(sp_str_t str) {
     };
   }
 
-  SP_UNREACHABLE_RETURN(SP_ZERO_STRUCT(spn_dep_req_t));
+  SP_UNREACHABLE_RETURN(SP_ZERO_STRUCT(spn_pkg_req_t));
 }
 
-sp_str_t spn_dep_req_to_str(spn_pkg_req_t dep) {
+sp_str_t spn_pkg_req_to_str(spn_pkg_req_t dep) {
   switch (dep.kind) {
     case SPN_PACKAGE_KIND_REMOTE:
     case SPN_PACKAGE_KIND_FILE: {
@@ -4447,7 +4564,7 @@ void spn_app_prepare_build(spn_app_t* app) {
       case SPN_PACKAGE_KIND_FILE:
       case SPN_PACKAGE_KIND_WORKSPACE:
       case SPN_PACKAGE_KIND_REMOTE: {
-        SP_FATAL("Tried to prepare {:fg brightcyan}, but kind was {:fg brightyellow}", SP_FMT_STR(dep.ctx.name), SP_FMT_STR(spn_dep_req_to_str(request)));
+        SP_FATAL("Tried to prepare {:fg brightcyan}, but kind was {:fg brightyellow}", SP_FMT_STR(dep.ctx.name), SP_FMT_STR(spn_pkg_req_to_str(request)));
         SP_BROKEN();
         break;
       }
@@ -4640,7 +4757,7 @@ void spn_app_write_manifest(spn_pkg_t* package, sp_str_t path) {
     sp_ht_for(package->deps, it) {
       sp_str_t name = *sp_ht_it_getkp(package->deps, it);
       spn_pkg_req_t req = *sp_ht_it_getp(package->deps, it);
-      spn_toml_append_str(&toml, name, spn_dep_req_to_str(req));
+      spn_toml_append_str(&toml, name, spn_pkg_req_to_str(req));
     }
     spn_toml_end_table(&toml);
   }
@@ -4935,13 +5052,10 @@ void spn_app_load(spn_app_t* app, sp_str_t manifest_path) {
 
   // Load the lock file
   if (sp_fs_exists(app->paths.lock)) {
-    sp_opt_set(app->lock, spn_load_lock_file(app->paths.lock));
+    sp_opt_set(app->lock, spn_lock_file_load(app->paths.lock));
   }
 
   // The project is loaded; apply any defaults
-  //
-
-
   if (!sp_ht_empty(app->package.profiles)) {
     sp_ht_for(app->package.profiles, it) {
       app->profile = *sp_ht_it_getp(app->package.profiles, it);
@@ -5141,7 +5255,7 @@ void spn_init(u32 num_args, const c8** args) {
       },
       {
         .name = "list",
-        .summary = "List all known packages in all registries"
+        .summary = "Cum all known packages in all registries"
       },
       {
         .name = "which",
