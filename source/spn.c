@@ -2817,26 +2817,23 @@ void spn_tcc_list_fn(void* opaque, const char* name, const void* value) {
 /////////
 sp_str_t spn_tui_name_to_color(sp_str_t str);
 
-sp_str_t spn_tui_name_to_color(sp_str_t str) {
-  static const c8* colors [] = {
-    SP_TUI_INDIAN_RED,
-    SP_TUI_ZOMP,
-    SP_TUI_COOL_GRAY,
-    SP_TUI_MISTY_ROSE,
-    SP_TUI_CELADON,
-    SP_TUI_SUNGLOW,
-    SP_TUI_SELECTIVE_YELLOW,
-    SP_TUI_MINDARO,
-    SP_TUI_PAYNES_GRAY,
-    SP_TUI_CREAM,
-  };
-  static sp_ht(sp_hash_t, u32) occupied = SP_NULLPTR;
-  static u32 next_index = 0;
+sp_str_t spn_tui_color_rgb(u8 r, u8 g, u8 b) {
+  return sp_format("\033[38;2;{};{};{}m", SP_FMT_U32(r), SP_FMT_U32(g), SP_FMT_U32(b));
+}
 
+sp_str_t spn_tui_name_to_color(sp_str_t str) {
   sp_hash_t hash = sp_hash_str(str);
   u32 truncated_hash = (u32)(hash ^ (hash >> 32));
-  u32 index = ((u64)truncated_hash * sp_carr_len(colors) >> 32);
-  return sp_str_view(colors[index]);
+  f32 hue = (f32)(((u64)truncated_hash * 360) >> 32);
+
+  sp_color_t hsv = { .h = hue, .s = 45.0f, .v = 75.0f, .a = 1.0f };
+  sp_color_t rgb = sp_color_hsv_to_rgb(hsv);
+
+  u8 r = (u8)(rgb.r * 255.0f);
+  u8 g = (u8)(rgb.g * 255.0f);
+  u8 b = (u8)(rgb.b * 255.0f);
+
+  return spn_tui_color_rgb(r, g, b);
 }
 
 void spn_tui_run(spn_tui_t* tui) {
@@ -2893,7 +2890,16 @@ void spn_tui_run(spn_tui_t* tui) {
         }
       }
 
-      sp_log(sp_str_builder_move(&builder));
+      switch (event.kind) {
+        case SPN_BUILD_EVENT_COMPILE: {
+          break;
+        }
+        default: {
+          sp_log(sp_str_builder_move(&builder));
+          break;
+        }
+      }
+
     }
 
     if (sp_atomic_s32_get(&ex->shutdown)) break;
@@ -4376,6 +4382,8 @@ spn_err_t spn_pkg_build_resolve_commit(spn_pkg_build_t* build) {
   sp_str_t message = spn_git_get_commit_message(build->ctx.paths.source, build->metadata.commit);
   message = sp_str_truncate(message, 32, SP_LIT("..."));
   message = sp_str_replace_c8(message, '\n', ' ');
+  message = sp_str_replace_c8(message, '{', '['); // @spader @hack
+  message = sp_str_replace_c8(message, '}', ']');
   message = sp_str_pad(message, 32);
 
   sp_mutex_lock(&build->mutex);
@@ -4670,7 +4678,7 @@ void spn_app_prepare_build(spn_app_t* app) {
 
     if (spn.cli.build.force) {
       spn_bg_id_t force = spn_bg_add_file(&build.graph, spn.paths.invocation);
-      spn_bg_cmd_add_input(&build.graph, nodes.build, force);
+      spn_bg_cmd_add_input(&build.graph, nodes.sync, force);
     }
 
     dep->nodes = nodes;
