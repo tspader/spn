@@ -72,21 +72,7 @@ typedef enum {
 #define sp_rb_push(rb, value) sp_ring_buffer_push(&(rb), &(value))
 #define sp_rb_for(rb, it) sp_ring_buffer_for(rb, it)
 
-
-#define sp_carr_empty(CARR) ( \
-  (CARR) == NULL || \
-  sp_mem_is_equal(&(CARR)[0], &(sp_env_var_t){SP_ZERO_INITIALIZE()}, sizeof((CARR)[0])) \
-)
-
-#define sp_carr_len_nt(CARR) ( \
-  (CARR) == NULL ? 0 : ({ \
-    u32 len = 0; \
-    while (!sp_mem_is_equal(&(CARR)[len], &(sp_env_var_t){SP_ZERO_INITIALIZE()}, sizeof((CARR)[0]))) { \
-      len++; \
-    } \
-    len; \
-  }) \
-)
+#define sp_typedef_fn(return_type, name, ...) SP_TYPEDEF_FN(return_type, name, __VA_ARGS__)
 
 #define sp_ht_collect_keys(ht, da) \
   do { \
@@ -95,14 +81,117 @@ typedef enum {
     } \
   } while(0)
 
+sp_str_t sp_color_to_tui_rgb(sp_color_t color);
+sp_str_t sp_color_to_tui_rgb_f(u8 r, u8 g, u8 b);
+
+
+typedef enum {
+  SP_APP_OK = 0,
+  SP_APP_ERR = 1,
+  SP_APP_QUIT = 2
+} sp_app_result_t;
+
+typedef struct sp_app sp_app_t;
+
+sp_typedef_fn(sp_app_result_t, sp_app_init_fn_t, sp_app_t*);
+sp_typedef_fn(sp_app_result_t, sp_app_poll_fn_t, sp_app_t*);
+sp_typedef_fn(sp_app_result_t, sp_app_update_fn_t, sp_app_t*);
+sp_typedef_fn(sp_app_result_t, sp_app_deinit_fn_t, sp_app_t*);
+
+typedef struct {
+  void* user_data;
+  sp_app_init_fn_t on_init;
+  sp_app_poll_fn_t on_poll;
+  sp_app_update_fn_t on_update;
+  sp_app_deinit_fn_t on_deinit;
+  u32 fps;
+} sp_app_config_t;
+
+struct sp_app {
+  void* user_data;
+  sp_app_init_fn_t on_init;
+  sp_app_poll_fn_t on_poll;
+  sp_app_update_fn_t on_update;
+  sp_app_deinit_fn_t on_deinit;
+
+  s32 return_code;
+  sp_atomic_s32 shutdown;
+
+  u32 fps;
+
+  struct {
+    sp_tm_timer_t timer;
+    u64 target;
+    u64 accumulated;
+    u64 num;
+  } frame;
+};
+
+static sp_app_t _sp_app;
+extern sp_app_config_t sp_main(s32 num_args, const c8** args);
+SP_API sp_app_t*       sp_app_new(sp_app_config_t config);
+
+
+
+sp_app_t* sp_app_new(sp_app_config_t config) {
+  sp_app_t* app = SP_ALLOC(sp_app_t);
+  *app = (sp_app_t) {
+    .user_data = config.user_data,
+    .on_init = config.on_init,
+    .on_poll = config.on_poll,
+    .on_update = config.on_update,
+    .on_deinit = config.on_deinit,
+    .fps = config.fps,
+    .frame = {
+      .target = sp_tm_fps_to_ns(config.fps),
+    }
+  };
+}
+
+#define SP_MAIN
+#if defined(SP_MAIN)
+
+s32 main(s32 num_args, const c8** args) {
+  sp_app_config_t config = sp_main(num_args, args);
+  sp_app_t* app = sp_app_new(config);
+
+  if (app->on_init) {
+    app->on_init(app);
+  }
+
+  app->frame.timer = sp_tm_start_timer();
+  while (true) {
+    if (app->on_poll) {
+      app->on_poll(app);
+    }
+
+    app->frame.accumulated += sp_tm_lap_timer(&app->frame.timer);
+    if (app->frame.accumulated >= app->frame.target) {
+      app->frame.accumulated -= app->frame.target;
+      app->frame.num++;
+      if (app->on_update(app) != SP_APP_OK) {
+        break;
+      };
+    }
+    else {
+      sp_sleep_ns(app->frame.target - app->frame.accumulated);
+    }
+  }
+
+  if (app->on_deinit) {
+    app->on_deinit(app);
+  }
+
+  return app->return_code;
+}
+#endif
 
 /////////////
 // SPINNER //
 /////////////
-#define SPN_SPINNER_WIDTH      8
 #define SPN_SPINNER_TRAIL_LEN  6
 #define SPN_SPINNER_CYCLE_MS   500.0f
-#define SPN_SPINNER_HOLD_START_MS 300.0f
+#define SPN_SPINNER_HOLD_START_MS 500.0f
 #define SPN_SPINNER_HOLD_END_MS   100.0f
 
 #define SPN_SPINNER_ACTIVE   "\u25A0"
@@ -115,15 +204,19 @@ typedef struct spn_spinner_t {
   f32         hold_ms;
   f32         hold_total_ms;   // total hold time for fade calculation
   f32         value;
+  u32         width;
+  sp_color_t  color;
 } spn_spinner_t;
 
-void spn_spinner_init(spn_spinner_t* s) {
+void spn_spinner_init(spn_spinner_t* s, sp_color_t color) {
   s->interp = sp_interp_build(0.0f, 1.0f, SPN_SPINNER_CYCLE_MS);
   s->forward = true;
   s->render_forward = true;
   s->hold_ms = 0;
   s->hold_total_ms = 0;
   s->value = 0;
+  s->width = 8;
+  s->color = color;
 }
 
 void spn_spinner_update(spn_spinner_t* s, f32 dt_ms) {
@@ -148,9 +241,9 @@ void spn_spinner_update(spn_spinner_t* s, f32 dt_ms) {
   s->value = sp_interp_ease_inout(&s->interp);
 }
 
-sp_str_t spn_spinner_render(spn_spinner_t* s, u8 r, u8 g, u8 b) {
+sp_str_t spn_spinner_render(spn_spinner_t* s) {
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  f32 active_pos = s->value * (SPN_SPINNER_WIDTH - 1);
+  f32 active_pos = s->value * (s->width - 1);
 
   // Calculate trail fade during hold period
   f32 trail_fade = 1.0f;
@@ -159,7 +252,7 @@ sp_str_t spn_spinner_render(spn_spinner_t* s, u8 r, u8 g, u8 b) {
     trail_fade = s->hold_ms / s->hold_total_ms;
   }
 
-  for (u32 i = 0; i < SPN_SPINNER_WIDTH; i++) {
+  for (u32 i = 0; i < s->width; i++) {
     f32 pos = (f32)i;
     f32 abs_dist = active_pos - pos;
     if (abs_dist < 0) abs_dist = -abs_dist;
@@ -167,35 +260,44 @@ sp_str_t spn_spinner_render(spn_spinner_t* s, u8 r, u8 g, u8 b) {
     // Use render_forward for trail direction (delays flip until hold ends)
     bool is_behind = s->render_forward ? (pos < active_pos) : (pos > active_pos);
 
-    u8 cr, cg, cb;
+    sp_color_t color = SP_ZERO_INITIALIZE();
     const c8* glyph;
+
 
     if (abs_dist < 1.0f) {
       // Head position
-      cr = r; cg = g; cb = b;
+      color = s->color;
       glyph = SPN_SPINNER_ACTIVE;
-    } else if (is_behind && abs_dist < (f32)SPN_SPINNER_TRAIL_LEN) {
+    }
+    else if (is_behind && abs_dist < (f32)SPN_SPINNER_TRAIL_LEN) {
       // Trail - fade based on distance AND hold fade
       f32 alpha = 1.0f;
-      for (s32 j = 0; j < (s32)abs_dist; j++) alpha *= 0.65f;
+      for (s32 j = 0; j < (s32)abs_dist; j++) {
+        alpha *= 0.65f;
+      }
       alpha *= trail_fade;  // Additional fade during hold
       // Clamp to inactive brightness minimum
       f32 inactive = 0.2f;
       alpha = inactive + alpha * (1.0f - inactive);
-      cr = (u8)(r * alpha);
-      cg = (u8)(g * alpha);
-      cb = (u8)(b * alpha);
+
+      sp_color_t hsv = sp_color_rgb_to_hsv(s->color);
+      hsv.v *= alpha;
+
+      color = sp_color_hsv_to_rgb(hsv);
       glyph = SPN_SPINNER_ACTIVE;
-    } else {
+    }
+    else {
       // Inactive
-      cr = (u8)(r * 0.2f);
-      cg = (u8)(g * 0.2f);
-      cb = (u8)(b * 0.2f);
+      sp_color_t hsv = sp_color_rgb_to_hsv(s->color);
+      hsv.v *= 0.2f;
+      color = sp_color_hsv_to_rgb(hsv);
       glyph = SPN_SPINNER_INACTIVE;
     }
 
-    sp_str_builder_append_fmt(&builder, "\033[38;2;{};{};{}m{}",
-      SP_FMT_U32(cr), SP_FMT_U32(cg), SP_FMT_U32(cb), SP_FMT_CSTR(glyph));
+    sp_str_builder_append_fmt(&builder, "{}{}",
+      SP_FMT_STR(sp_color_to_tui_rgb(color)),
+      SP_FMT_CSTR(glyph)
+    );
   }
 
   sp_str_builder_append_cstr(&builder, SP_ANSI_RESET);
@@ -844,7 +946,7 @@ sp_str_t spn_generator_format_entry_kernel(sp_str_map_context_t* context);
 // TUI //
 /////////
 #define SPN_TUI_NUM_OPTIONS 3
-#define SP_TUI_PRINT(command) printf("%s", command)
+#define SP_TUI_PRINT(command) sp_io_write_cstr(&spn.logger.err, command);
 
 typedef struct {
   u32 std_in;
@@ -894,6 +996,17 @@ typedef struct {
   u32 width;
   sp_ht(sp_str_t, spn_dep_state_t) state;
   spn_build_t* build;
+  spn_spinner_t spinner;
+
+  struct {
+    u32 num_done;
+    u32 num_total;
+  } info;
+
+  struct {
+    sp_tm_timer_t timer;
+    u64 accumulated;
+  } frame;
 
   struct {
 #ifdef SP_WIN32
@@ -961,7 +1074,6 @@ void     sp_tui_table_set_indent(sp_tui_table_t* table, u32 indent);
 void     sp_tui_table_end(sp_tui_table_t* table);
 sp_str_t sp_tui_table_render(sp_tui_table_t* table);
 void     spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode, spn_build_t* build);
-void     spn_tui_run(spn_tui_t* tui);
 
 
 /////////
@@ -1092,7 +1204,7 @@ typedef struct {
 } spn_cli_usage_info_t;
 
 typedef struct {
-  c8** argv;
+  const c8** argv;
   u32 argc;
   spn_cli_command_usage_t cli;
   bool skip_help;
@@ -1332,6 +1444,9 @@ typedef struct {
   spn_config_t config;
   spn_registry_t registry;
   spn_event_buffer_t* events;
+  sp_app_t* sp;
+  s32 num_args;
+  const c8** args;
 
   struct {
     sp_io_stream_t out;
@@ -1340,7 +1455,9 @@ typedef struct {
 } spn_ctx_t;
 
 spn_ctx_t spn;
-void spn_init(u32 num_args, const c8** args);
+sp_app_result_t spn_init(sp_app_t* app);
+sp_app_result_t spn_poll(sp_app_t* app);
+sp_app_result_t spn_update(sp_app_t* app);
 void spn_log(const c8* fmt, ...);
 void spn_warn(const c8* fmt, ...);
 
@@ -1784,7 +1901,7 @@ spn_err_t spn_cc_run(spn_cc_t* cc) {
 }
 
 void spn_dep_log(spn_pkg_build_t* dep, const c8* message) {
-  sp_io_write_line(&dep->ctx.log, sp_tm_to_iso8601(sp_tm_now_epoch()));
+  sp_io_write_line(&dep->ctx.log, sp_tm_epoch_to_iso8601(sp_tm_now_epoch()));
   sp_io_write_line(&dep->ctx.log, sp_str_view(message));
 }
 
@@ -1813,7 +1930,7 @@ void spn_copy(spn_pkg_build_t* dep, spn_dir_kind_t from_kind, const c8* from_pat
 // TUI //
 /////////
 void sp_tui_print(sp_str_t str) {
-  printf("%.*s", str.len, str.data);
+  sp_io_write_str(&spn.logger.err, str);
 }
 
 void sp_tui_up(u32 n) {
@@ -1843,7 +1960,7 @@ void sp_tui_home() {
 }
 
 void sp_tui_flush() {
-  fflush(stdout);
+  fflush(stderr);
 }
 
 #ifdef SP_WIN32
@@ -2442,40 +2559,8 @@ spn_err_t spn_git_checkout(sp_str_t repo, sp_str_t id) {
 }
 
 
-/////////////
-// SIGNALS //
-/////////////
-#ifdef SP_POSIX
-void spn_signal_handler(int signum) {
-  if (signum == SIGINT) {
-    sp_atomic_s32_set(&spn.control, 1);
-    printf("\n");
-    fflush(stdout);
-  }
-}
 
-void spn_install_signal_handlers() {
-  struct sigaction sa;
-  sa.sa_handler = spn_signal_handler;
-  sigemptyset(&sa.sa_mask);
-  sa.sa_flags = 0;
-  sigaction(SIGINT, &sa, NULL);
-}
-#else
-sp_win32_bool_t spn_windows_console_handler(sp_win32_dword_t ctrl_type) {
-  if (ctrl_type == CTRL_C_EVENT || ctrl_type == CTRL_BREAK_EVENT) {
-    sp_atomic_s32_set(&app->control, 1);
-    printf("\n");
-    fflush(stdout);
-    return TRUE;
-  }
-  return FALSE;
-}
 
-void spn_install_signal_handlers() {
-  SetConsoleCtrlHandler((PHANDLER_ROUTINE)spn_windows_console_handler, TRUE);
-}
-#endif
 
 //////////
 // TOML //
@@ -2817,7 +2902,11 @@ void spn_tcc_list_fn(void* opaque, const char* name, const void* value) {
 /////////
 sp_str_t spn_tui_name_to_color(sp_str_t str);
 
-sp_str_t spn_tui_color_rgb(u8 r, u8 g, u8 b) {
+sp_str_t sp_color_to_tui_rgb(sp_color_t c) {
+  return sp_color_to_tui_rgb_f(c.r * 255, c.g * 255, c.b * 255);
+}
+
+sp_str_t sp_color_to_tui_rgb_f(u8 r, u8 g, u8 b) {
   return sp_format("\033[38;2;{};{};{}m", SP_FMT_U32(r), SP_FMT_U32(g), SP_FMT_U32(b));
 }
 
@@ -2826,125 +2915,21 @@ sp_str_t spn_tui_name_to_color(sp_str_t str) {
   u32 truncated_hash = (u32)(hash ^ (hash >> 32));
   f32 hue = (f32)(((u64)truncated_hash * 360) >> 32);
 
-  sp_color_t hsv = { .h = hue, .s = 45.0f, .v = 75.0f, .a = 1.0f };
+  sp_color_t hsv = { .h = hue, .s = 50.0f, .v = 66.0f, .a = 1.0f };
   sp_color_t rgb = sp_color_hsv_to_rgb(hsv);
 
   u8 r = (u8)(rgb.r * 255.0f);
   u8 g = (u8)(rgb.g * 255.0f);
   u8 b = (u8)(rgb.b * 255.0f);
 
-  return spn_tui_color_rgb(r, g, b);
-}
-
-void spn_tui_run(spn_tui_t* tui) {
-  spn_build_t* build = tui->build;
-  spn_bg_executor_t* ex = tui->build->executor;
-
-  u32 max_name = 0;
-  sp_ht_for_kv(build->deps, it) {
-    max_name = SP_MAX(max_name, it.key->len);
-  }
-
-  do {
-    sp_da(spn_build_event_t) events = spn_event_buffer_drain(spn.events);
-
-    sp_da_for(events, it) {
-      spn_build_event_t event = events[it];
-
-      sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-      sp_str_builder_append_fmt(&builder,
-        "{:fg brightblack :pad 8} ",
-        SP_FMT_STR(spn_build_event_kind_to_str(event.kind))
-      );
-      sp_str_builder_append_fmt(&builder,
-        "{}{}{} ",
-        SP_FMT_STR(spn_tui_name_to_color(event.ctx->name)),
-        SP_FMT_STR(sp_str_pad(event.ctx->name, max_name)),
-        SP_FMT_CSTR(SP_ANSI_RESET)
-      );
-
-      switch (event.kind) {
-        case SPN_BUILD_EVENT_SYNC: {
-          sp_str_builder_append_fmt(&builder, "{:fg brightblack} ",
-            SP_FMT_STR(spn_pkg_get_url(event.ctx->package)));
-          break;
-        }
-        case SPN_BUILD_EVENT_CHECKOUT: {
-          sp_str_builder_append_fmt(&builder, "{} {:fg brightblack} {}{}{}",
-            SP_FMT_STR(spn_semver_to_str(event.checkout.version)),
-            SP_FMT_STR(event.checkout.commit),
-            SP_FMT_CSTR(SP_ANSI_ITALIC),
-            SP_FMT_STR(sp_str_truncate(event.checkout.message, 32, sp_str_lit("..."))),
-            SP_FMT_CSTR(SP_ANSI_RESET)
-          );
-          break;
-        }
-        case SPN_BUILD_EVENT_RESOLVE: {
-          break;
-        }
-        case SPN_BUILD_EVENT_COMPILE: {
-          break;
-        }
-        default: {
-          break;
-        }
-      }
-
-      switch (event.kind) {
-        case SPN_BUILD_EVENT_COMPILE: {
-          break;
-        }
-        default: {
-          sp_log(sp_str_builder_move(&builder));
-          break;
-        }
-      }
-
-    }
-
-    if (sp_atomic_s32_get(&ex->shutdown)) break;
-
-    sp_os_sleep_ms(10);
-  } while (true);
-
-    //sp_mem_scratch_t scratch = sp_mem_begin_scratch();
-    // sp_tui_begin_table(&tui->table);
-    // sp_tui_table_setup_column_ex(&tui->table, sp_str_lit("event"), 16);
-    // sp_tui_table_setup_column_ex(&tui->table, sp_str_lit("target"), 16);
-    // sp_tui_table_header_row(&tui->table);
-    //
-    // sp_tui_table_next_row(&tui->table);
-    // sp_tui_table_str(&tui->table, spn_build_event_kind_to_str(event.kind));
-    // sp_tui_table_str(&tui->table, event.ctx->name);
-    //
-    // sp_tui_table_end(&tui->table);
-    // sp_log(sp_tui_table_render(&tui->table));
-
-
-  // Clean up
-  switch (tui->mode) {
-    case SPN_OUTPUT_MODE_INTERACTIVE: {
-      sp_tui_restore(tui);
-      sp_tui_show_cursor();
-      sp_tui_home();
-      sp_tui_flush();
-      break;
-    }
-    case SPN_OUTPUT_MODE_NONINTERACTIVE: {
-      break;
-    }
-    case SPN_OUTPUT_MODE_QUIET: {
-      break;
-    }
-    case SPN_OUTPUT_MODE_NONE: {
-      break;
-    }
-  }
+  return sp_color_to_tui_rgb_f(r, g, b);
 }
 
 void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode, spn_build_t* build) {
   tui->build = build;
   tui->mode = mode;
+  tui->info.num_total = sp_ht_size(build->dirty->commands);
+  spn_spinner_init(&tui->spinner, sp_color_rgb_255(99,  160, 136));
 
   switch (tui->mode) {
     case SPN_OUTPUT_MODE_INTERACTIVE: {
@@ -3254,6 +3239,17 @@ bool spn_pkg_build_is_stamped(spn_pkg_build_t* context) {
   return sp_fs_exists(context->ctx.paths.stamp);
 }
 
+bool sp_cmp_kernel_env_var(void* va, void* vb) {
+  sp_env_var_t* a = (sp_env_var_t*)a;
+  sp_env_var_t* b = (sp_env_var_t*)b;
+  if (!sp_str_equal(a->key, b->key)) return false;
+  return sp_str_equal(a->value, b->value);
+}
+
+bool sp_zcmp_kernel_env_var(void* va) {
+  sp_env_var_t* a = (sp_env_var_t*)a;
+  return !sp_str_valid(a->key) && !sp_str_valid(a->value);
+}
 
 sp_ps_output_t spn_build_ctx_subprocess(spn_build_ctx_t* build, sp_ps_config_t config) {
   config.io = (sp_ps_io_config_t) {
@@ -3263,7 +3259,15 @@ sp_ps_output_t spn_build_ctx_subprocess(spn_build_ctx_t* build, sp_ps_config_t c
   };
   config.cwd = build->paths.work;
 
-  u32 it = sp_carr_len_nt(config.env.extra);
+
+  u32 it = 0;
+  for (; it < sp_carr_len(config.env.extra); it++) {
+    if (!sp_str_valid(config.env.extra[it].key)) {
+      break;
+    }
+  }
+  SP_ASSERT(it != sp_carr_len(config.env.extra));
+
   config.env.extra[it] = (sp_env_var_t) {
     .key = sp_str_lit("CC"),
     .value = build->profile.cc.exe
@@ -4428,12 +4432,20 @@ void spn_pkg_build_stamp(spn_pkg_build_t* dep) {
     spn_toml_append_str(&writer, sp_str_lit("command"), command.command);
 
     // Add arguments as an array if there are any
-    u32 num_args = sp_carr_len_nt(command.args);
+    u32 num_args = 0;
+    for (; num_args < sp_carr_len(command.args); num_args++) {
+      if (!sp_str_valid(command.args[num_args])) {
+        break;
+      }
+    }
     if (num_args) {
       spn_toml_append_str_carr_cstr(&writer, "args", command.args, num_args);
     }
 
-    if (!sp_ht_empty(command.env.env.vars) || sp_carr_len_nt(command.env.extra) > 0) {
+
+    bool has_env = !sp_ht_empty(command.env.env.vars);
+    bool has_extra = sp_str_valid(command.env.extra[0].key);
+    if (has_env || has_extra) {
       spn_toml_begin_table_cstr(&writer, "env");
 
       sp_ht_for(command.env.env.vars, it) {
@@ -4459,6 +4471,7 @@ void spn_pkg_build_stamp(spn_pkg_build_t* dep) {
 }
 
 void spn_pkg_build_run_script(spn_pkg_build_t* dep) {
+  sp_os_sleep_ms(2000);
   spn_pkg_compile(dep->ctx.package);
 
   if (dep->ctx.package->on_build) {
@@ -4525,7 +4538,21 @@ void spn_executor_bin(spn_bg_cmd_t* cmd, void* user_data) {
   //SP_LOG("spn_executor_bin(): {:fg brightcyan}", SP_FMT_STR(build->ctx.name));
   sp_mutex_unlock(g_mutex);
 
-  spn_bin_build_run(build);
+  spn_err_t err = spn_bin_build_run(build);
+  switch (err) {
+    case SPN_OK: {
+      spn_event_buffer_push_ex(spn.events, &build->ctx, (spn_build_event_t) {
+        .kind = SPN_BUILD_EVENT_DONE
+      });
+      break;
+    }
+    case SPN_ERROR: {
+      spn_event_buffer_push_ex(spn.events, &build->ctx, (spn_build_event_t) {
+        .kind = SPN_BUILD_EVENT_FAILED
+      });
+      break;
+    }
+  }
 }
 
 void spn_build_init(spn_build_t* build) {
@@ -4982,7 +5009,7 @@ spn_pkg_t* spn_app_find_package(spn_app_t* app, spn_pkg_req_t request) {
 }
 
 spn_opt_dep_t spn_app_find_dep(spn_app_t* app, sp_str_t name) {
-  spn_opt_dep_t opt = sp_opt_none(V);
+  spn_opt_dep_t opt = sp_opt_none();
 
   spn_pkg_req_t* dep = sp_ht_getp(app->package.deps, name);
   if (dep) {
@@ -4998,8 +5025,6 @@ spn_opt_dep_t spn_app_find_dep(spn_app_t* app, sp_str_t name) {
 /////////
 spn_app_t spn_app_new() {
   spn_app_t app = SP_ZERO_INITIALIZE();
-
-  spn_install_signal_handlers();
 
   sp_ht_set_fns(app.cache, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(app.build.deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
@@ -5157,10 +5182,190 @@ void spn_warn(const c8* fmt, ...) {
   sp_io_write_line(&spn.logger.err, str);
 }
 
+#ifdef SP_POSIX
+void spn_signal_handler(s32 kind) {
+  switch (kind) {
+    case SIGINT: {
+      printf("sigint\n");
+      sp_atomic_s32_set(&spn.sp->shutdown, 1);
+      sp_io_write_new_line(&spn.logger.out);
+      sp_io_write_new_line(&spn.logger.err);
+      break;
+    }
+    default: {
+      break;
+    }
+  }
+}
 
-void spn_init(u32 num_args, const c8** args) {
+void spn_install_signal_handlers() {
+  struct sigaction sa;
+  sa.sa_handler = spn_signal_handler;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = 0;
+  sigaction(SIGINT, &sa, NULL);
+}
+#else
+sp_win32_bool_t spn_windows_console_handler(sp_win32_dword_t ctrl_type) {
+  if (ctrl_type == CTRL_C_EVENT || ctrl_type == CTRL_BREAK_EVENT) {
+    sp_atomic_s32_set(&app->control, 1);
+    printf("\n");
+    fflush(stdout);
+    return TRUE;
+  }
+  return FALSE;
+}
+
+void spn_install_signal_handlers() {
+  SetConsoleCtrlHandler((PHANDLER_ROUTINE)spn_windows_console_handler, TRUE);
+}
+#endif
+
+
+
+sp_app_result_t spn_poll(sp_app_t* app) {
+  // @hack, properly init this
+  spn_build_t* build = spn.tui.build;
+  spn_bg_executor_t* ex = build->executor;
+
+  u32 max_name = 0;
+  sp_ht_for_kv(build->deps, it) {
+    max_name = SP_MAX(max_name, it.key->len);
+  }
+
+  sp_da(spn_build_event_t) events = spn_event_buffer_drain(spn.events);
+
+  sp_mutex_lock(&ex->mutex);
+  spn.tui.info.num_done = sp_ht_size(ex->completed);
+  sp_mutex_unlock(&ex->mutex);
+
+  sp_da_for(events, it) {
+    spn_build_event_t event = events[it];
+
+    sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+    switch (event.kind) {
+      case SPN_BUILD_EVENT_DONE: {
+        sp_str_builder_append_fmt(&builder,
+          "{:fg green :pad 8} ",
+          SP_FMT_STR(spn_build_event_kind_to_str(event.kind))
+        );
+        break;
+      }
+      case SPN_BUILD_EVENT_FAILED: {
+        sp_str_builder_append_fmt(&builder,
+          "{:fg red :pad 8} ",
+          SP_FMT_STR(spn_build_event_kind_to_str(event.kind))
+        );
+        break;
+      }
+      default: {
+        sp_str_builder_append_fmt(&builder,
+          "{:fg brightblack :pad 8} ",
+          SP_FMT_STR(spn_build_event_kind_to_str(event.kind))
+        );
+        break;
+      }
+    }
+
+    sp_str_builder_append_fmt(&builder,
+      "{}{}{} ",
+      SP_FMT_STR(spn_tui_name_to_color(event.ctx->name)),
+      SP_FMT_STR(sp_str_pad(event.ctx->name, max_name)),
+      SP_FMT_CSTR(SP_ANSI_RESET)
+    );
+
+    switch (event.kind) {
+      case SPN_BUILD_EVENT_SYNC: {
+        sp_str_builder_append_fmt(&builder, "{:fg brightblack} ",
+          SP_FMT_STR(spn_pkg_get_url(event.ctx->package)));
+        break;
+      }
+      case SPN_BUILD_EVENT_CHECKOUT: {
+        sp_str_builder_append_fmt(&builder, "{} {:fg brightblack} {}{}{}",
+          SP_FMT_STR(spn_semver_to_str(event.checkout.version)),
+          SP_FMT_STR(event.checkout.commit),
+          SP_FMT_CSTR(SP_ANSI_ITALIC),
+          SP_FMT_STR(sp_str_truncate(event.checkout.message, 32, sp_str_lit("..."))),
+          SP_FMT_CSTR(SP_ANSI_RESET)
+        );
+        break;
+      }
+      case SPN_BUILD_EVENT_RESOLVE: {
+        break;
+      }
+      case SPN_BUILD_EVENT_COMPILE: {
+        sp_da(sp_str_t) args = event.compile.ps.dyn_args;
+        sp_str_t msg = sp_str_join_n(args, sp_da_size(args), sp_str_lit(" "));
+        sp_io_write_str(&event.ctx->log, msg);
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+
+    switch (event.kind) {
+      case SPN_BUILD_EVENT_COMPILE: {
+        break;
+      }
+      default: {
+        sp_tui_home();
+        sp_tui_clear_line();
+        sp_io_write_line(&spn.logger.err, sp_str_builder_move(&builder));
+        break;
+      }
+    }
+  }
+}
+
+sp_app_result_t spn_update(sp_app_t* app) {
+  //spn.tui.spinner.width = spn.tui.info.num_done;
+  spn_spinner_update(&spn.tui.spinner, sp_tm_ns_to_ms_f(app->frame.target));
+
+  sp_tui_home();
+  sp_tui_clear_line();
+  sp_tui_print(sp_format("[{}/{}] {}",
+    SP_FMT_U32(spn.tui.info.num_done),
+    SP_FMT_U32(spn.tui.info.num_total),
+    SP_FMT_STR(spn_spinner_render(&spn.tui.spinner))
+  ));
+  sp_tui_flush();
+
+
+  if (sp_atomic_s32_get(&spn.tui.build->executor->shutdown)) {
+    spn_poll(app);
+    return SP_APP_QUIT;
+  }
+
+  return SP_APP_OK;
+}
+
+sp_app_result_t spn_deinit(sp_app_t* app) {
+  switch (spn.tui.mode) {
+    case SPN_OUTPUT_MODE_INTERACTIVE: {
+      sp_tui_restore(&spn.tui);
+      sp_tui_show_cursor();
+      sp_tui_home();
+      sp_tui_flush();
+      break;
+    }
+    case SPN_OUTPUT_MODE_NONINTERACTIVE: {
+      break;
+    }
+    case SPN_OUTPUT_MODE_QUIET: {
+      break;
+    }
+    case SPN_OUTPUT_MODE_NONE: {
+      break;
+    }
+  }
+}
+
+sp_app_result_t spn_init(sp_app_t* sp) {
+  spn.sp = sp;
   spn_cli_t* cli = &spn.cli;
 
+  spn_install_signal_handlers();
   spn.logger.out = sp_io_from_file_handle(STDOUT_FILENO, SP_IO_FILE_CLOSE_MODE_NONE);
   spn.logger.err = sp_io_from_file_handle(STDERR_FILENO, SP_IO_FILE_CLOSE_MODE_NONE);
 
@@ -5168,8 +5373,8 @@ void spn_init(u32 num_args, const c8** args) {
 
   // Parse global options using the CLI parser
   spn_cli_parser_t global_parser = {
-    .argv = (c8**)args + 1,
-    .argc = num_args - 1,
+    .argv = spn.args + 1,
+    .argc = spn.num_args - 1,
     .stop_at_non_option = true,
     .skip_help = true,
     .cli = (spn_cli_command_usage_t) {
@@ -5187,8 +5392,8 @@ void spn_init(u32 num_args, const c8** args) {
   spn_cli_parse_command(&global_parser);
 
   // Update cli args to point to remaining args (subcommand and its args)
-  cli->args = &args[1 + global_parser.it];
-  cli->num_args = num_args - 1 - global_parser.it;
+  cli->args = &spn.args[1 + global_parser.it];
+  cli->num_args = spn.num_args - 1 - global_parser.it;
 
   spn_cli_usage_t usage = {
     .summary = "A package manager and build tool for modern C",
@@ -5446,7 +5651,7 @@ void spn_init(u32 num_args, const c8** args) {
 
   if (cli->help || !cli->num_args) {
     sp_log(help);
-    SP_EXIT_FAILURE();
+    return SP_ERR_LAZY;
   }
 
   sp_str_t cmd_name = sp_str_from_cstr(cli->args[0]);
@@ -5466,7 +5671,7 @@ void spn_init(u32 num_args, const c8** args) {
       if (cli->num_args < 2) {
         sp_str_t subcmd_help = spn_cli_subcommand_usage(cmd_schema->subcommands, cmd_schema->name);
         sp_log(subcmd_help);
-        SP_EXIT_FAILURE();
+        return SP_ERR_LAZY;
       }
 
       sp_str_t subcmd_name = sp_str_from_cstr(cli->args[1]);
@@ -5494,7 +5699,7 @@ void spn_init(u32 num_args, const c8** args) {
 
       // Parse subcommand options/args
       spn_cli_parser_t subcmd_parser = {
-        .argv = (c8**)cli->args + 2,
+        .argv = cli->args + 2,
         .argc = cli->num_args - 2,
         .cli = *subcmd_schema,
         .skip_help = false
@@ -5503,7 +5708,7 @@ void spn_init(u32 num_args, const c8** args) {
     }
     else if (cmd_schema->opts[0].name || cmd_schema->args[0].name) {
       spn_cli_parser_t cmd_parser = {
-        .argv = (c8**)cli->args + 1,
+        .argv = cli->args + 1,
         .argc = cli->num_args - 1,
         .cli = *cmd_schema,
         .skip_help = false
@@ -5587,7 +5792,7 @@ void spn_init(u32 num_args, const c8** args) {
   sp_fs_create_dir(spn.paths.tools.dir);
 
   sp_tm_epoch_t now = sp_tm_now_epoch();
-  spn.paths.invocation = sp_fs_join_path(spn.paths.log, sp_tm_to_iso8601(now));
+  spn.paths.invocation = sp_fs_join_path(spn.paths.log, sp_tm_epoch_to_iso8601(now));
   sp_fs_create_file(spn.paths.invocation);
 
   if (sp_str_valid(cli->project_dir)) {
@@ -5600,6 +5805,27 @@ void spn_init(u32 num_args, const c8** args) {
 
   app = spn_app_new();
   spn_app_load(&app, spn.paths.project);
+
+  SP_ASSERT(cli->num_args);
+  SP_ASSERT(cli->args);
+  SP_ASSERT(cli->args[0]);
+
+  switch (spn_cli_command_from_str(sp_str_from_cstr(cli->args[0]))) {
+    case SPN_CLI_INIT:     { spn_cli_init(cli); break; }
+    case SPN_CLI_ADD:      { spn_cli_add(cli); break; }
+    case SPN_CLI_BUILD:    { spn_cli_build(cli); break; }
+    case SPN_CLI_CLEAN:    { spn_cli_clean(cli); break; }
+    case SPN_CLI_PRINT:    { spn_cli_print(cli); break; }
+    case SPN_CLI_COPY:     { spn_cli_copy(cli); break; }
+    case SPN_CLI_UPDATE:   { spn_cli_update(cli); break; }
+    case SPN_CLI_LIST:     { spn_cli_list(cli); break; }
+    case SPN_CLI_WHICH:    { spn_cli_which(cli); break; }
+    case SPN_CLI_LS:       { spn_cli_ls(cli); break; }
+    case SPN_CLI_MANIFEST: { spn_cli_manifest(cli); break; }
+    case SPN_CLI_TOOL:     { spn_cli_tool(cli); break; }
+  }
+
+  return SP_ERR_OK;
 }
 
 /////////
@@ -5634,7 +5860,7 @@ void spn_cli_parser_eat(spn_cli_parser_t* p) {
 
 bool spn_cli_parser_is_opt(spn_cli_parser_t* p) {
   if (spn_cli_parser_is_done(p)) return false;
-  c8* arg = p->argv[p->it];
+  const c8* arg = p->argv[p->it];
   return arg[0] == '-';
 }
 
@@ -6059,28 +6285,6 @@ sp_str_t spn_cli_subcommand_usage(spn_cli_subcommand_usage_t* subcmds, const c8*
 }
 
 void spn_cli_run() {
-  spn_cli_t* cli = &spn.cli;
-
-  if (!cli->num_args || !cli->args || !cli->args[0]) {
-    SP_ASSERT(false);
-  }
-
-  spn_cli_cmd_t cmd = spn_cli_command_from_str(sp_str_from_cstr(cli->args[0]));
-
-  switch (cmd) {
-    case SPN_CLI_INIT: { spn_cli_init(cli); break; }
-    case SPN_CLI_ADD: { spn_cli_add(cli); break; }
-    case SPN_CLI_BUILD: { spn_cli_build(cli); break; }
-    case SPN_CLI_CLEAN: { spn_cli_clean(cli); break; }
-    case SPN_CLI_PRINT: { spn_cli_print(cli); break; }
-    case SPN_CLI_COPY: { spn_cli_copy(cli); break; }
-    case SPN_CLI_UPDATE: { spn_cli_update(cli); break; }
-    case SPN_CLI_LIST: { spn_cli_list(cli); break; }
-    case SPN_CLI_WHICH: { spn_cli_which(cli); break; }
-    case SPN_CLI_LS: { spn_cli_ls(cli); break; }
-    case SPN_CLI_MANIFEST: { spn_cli_manifest(cli); break; }
-    case SPN_CLI_TOOL: { spn_cli_tool(cli); break; }
-  }
 }
 
 
@@ -6107,7 +6311,7 @@ void spn_cli_init(spn_cli_t* cli) {
 
   // Skip the command name itself (first arg)
   spn_cli_parser_t parser = {
-    .argv = (c8**)cli->args + 1,
+    .argv = cli->args + 1,
     .argc = cli->num_args - 1,
     .cli = (spn_cli_command_usage_t) {
       .name = "init",
@@ -6133,7 +6337,7 @@ void spn_cli_init(spn_cli_t* cli) {
 void spn_cli_list(spn_cli_t* cli) {
   // Skip the command name itself (first arg)
   spn_cli_parser_t parser = {
-    .argv = (c8**)cli->args + 1,
+    .argv = cli->args + 1,
     .argc = cli->num_args - 1,
     .cli = (spn_cli_command_usage_t) {
       .name = "list",
@@ -6184,7 +6388,7 @@ void spn_cli_copy(spn_cli_t* cli) {
 
   // Skip the command name itself (first arg)
   spn_cli_parser_t parser = {
-    .argv = (c8**)cli->args + 1,
+    .argv = cli->args + 1,
     .argc = cli->num_args - 1,
     .cli = (spn_cli_command_usage_t) {
       .name = "copy",
@@ -6293,7 +6497,7 @@ void spn_cli_add(spn_cli_t* cli) {
 
   // Skip the command name itself (first arg)
   spn_cli_parser_t parser = {
-    .argv = (c8**)cli->args + 1,
+    .argv = cli->args + 1,
     .argc = cli->num_args - 1,
     .cli = (spn_cli_command_usage_t) {
       .name = "add",
@@ -6320,7 +6524,7 @@ void spn_cli_update(spn_cli_t* cli) {
 
   // Skip the command name itself (first arg)
   spn_cli_parser_t parser = {
-    .argv = (c8**)cli->args + 1,
+    .argv = cli->args + 1,
     .argc = cli->num_args - 1,
     .cli = (spn_cli_command_usage_t) {
       .name = "update",
@@ -6406,7 +6610,7 @@ void spn_cli_print(spn_cli_t* cli) {
 
   // Skip the command name itself (first arg)
   spn_cli_parser_t parser = {
-    .argv = (c8**)cli->args + 1,
+    .argv = cli->args + 1,
     .argc = cli->num_args - 1,
     .cli = (spn_cli_command_usage_t) {
       .name = "print",
@@ -6602,13 +6806,13 @@ void spn_cli_build(spn_cli_t* cli) {
   spn_cli_build_t* command = &cli->build;
 
   spn_cli_parser_t parser = {
-    .argv = (c8**)cli->args + 1,
+    .argv = cli->args + 1,
     .argc = cli->num_args - 1,
     .cli = (spn_cli_command_usage_t) {
       .name = "build",
       .summary = "Build one or more of the project's targets",
       .opts = {
-        { "h", "help",    SPN_CLI_OPT_KIND_BOOLEAN, "",                                   SPN_CLI_NO_PLACEHOLDER, &cli->help },
+        { "h", "help",    SPN_CLI_OPT_KIND_BOOLEAN, "", SPN_CLI_NO_PLACEHOLDER, &cli->help },
         { "f", "force",   SPN_CLI_OPT_KIND_BOOLEAN, "Force rebuild", SPN_CLI_NO_PLACEHOLDER, &command->force },
         { "t", "target",  SPN_CLI_OPT_KIND_STRING,  "Target to build; if omitted, build all", "TARGET", &command->target },
         { "p", "profile", SPN_CLI_OPT_KIND_STRING,  "Profile to use; if omitted, first listed", "PROFILE", &command->profile },
@@ -6620,14 +6824,14 @@ void spn_cli_build(spn_cli_t* cli) {
 
   sp_opt(spn_bin_t) target = SP_ZERO_INITIALIZE();
   sp_str_t target_name = SP_ZERO_INITIALIZE();
-  sp_str_t profile_name = SP_ZERO_INITIALIZE();
+  sp_str_t profile = SP_ZERO_INITIALIZE();
 
   if (sp_str_valid(command->target)) {
     target_name = command->target;
   }
 
   if (sp_str_valid(command->profile)) {
-    profile_name = command->profile;
+    profile = command->profile;
   }
 
   if (!sp_str_empty(target_name)) {
@@ -6638,55 +6842,32 @@ void spn_cli_build(spn_cli_t* cli) {
     sp_opt_set(target, *sp_ht_getp(app.package.bin, target_name));
   }
 
-  if (!sp_str_empty(profile_name)) {
-    if (!sp_ht_key_exists(app.package.profiles, profile_name)) {
-      SP_FATAL("{:fg brightcyan} profile isn't defined in {:fg brightcyan}", SP_FMT_STR(profile_name), SP_FMT_STR(app.package.paths.manifest));
+  if (!sp_str_empty(profile)) {
+    if (!sp_ht_key_exists(app.package.profiles, profile)) {
+      SP_FATAL("{:fg brightcyan} profile isn't defined in {:fg brightcyan}", SP_FMT_STR(profile), SP_FMT_STR(app.package.paths.manifest));
     }
-    app.profile = *sp_ht_getp(app.package.profiles, profile_name);
+    app.profile = *sp_ht_getp(app.package.profiles, profile);
   }
 
   spn_app_resolve(&app);
   spn_app_prepare_build(&app);
   spn_app_build(&app);
 
-  spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_QUIET, &app.build);
-  spn_tui_run(&spn.tui);
+  spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_INTERACTIVE, &app.build);
 }
 
-s32 main(s32 num_args, const c8** args) {
-  spn = SP_ZERO_STRUCT(spn_ctx_t);
+sp_app_config_t sp_main(s32 num_args, const c8** args) {
+  spn = (spn_ctx_t) {
+    .num_args = num_args,
+    .args = args
+  };
   app = SP_ZERO_STRUCT(spn_app_t);
-  spn_init(num_args, args);
-  spn_cli_run();
-  return 0;
-  #if 0
-  (void)num_args; (void)args;
 
-  spn_spinner_t spinner;
-  spn_spinner_init(&spinner);
-
-  sp_tui_hide_cursor();
-  sp_tui_flush();
-
-  sp_tm_timer_t timer = sp_tm_start_timer();
-
-  for (;;) {
-    u64 elapsed_ns = sp_tm_lap_timer(&timer);
-    f32 dt_ms = (f32)elapsed_ns / 1000000.0f;
-
-    spn_spinner_update(&spinner, dt_ms);
-
-    sp_str_t frame = spn_spinner_render(&spinner, 255, 0, 0);
-    sp_tui_home();
-    sp_tui_print(frame);
-    sp_tui_flush();
-
-    sp_os_sleep_ms(4);
-  }
-
-  sp_tui_show_cursor();
-  sp_tui_flush();
-  SP_EXIT_SUCCESS();
-  #endif
-
+  return (sp_app_config_t) {
+    .on_init = spn_init,
+    .on_poll = spn_poll,
+    .on_update = spn_update,
+    .on_deinit = spn_deinit,
+    .fps = 144,
+  };
 }

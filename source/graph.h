@@ -210,7 +210,43 @@ bool               spn_bg_visited_mark(spn_bg_visited_t* visited, spn_bg_node_t 
 
 
 
+//////////////
+// EXECUTOR //
+//////////////
+typedef struct {
+  spn_bg_id_t cmd_id;
+  sp_ps_output_t output;
+} spn_bg_exec_error_t;
 
+typedef struct {
+  u32 num_threads;
+  bool enable_logging;
+} spn_bg_executor_config_t;
+
+typedef struct {
+  sp_ring_buffer_t ready_queue;
+  sp_mutex_t mutex;
+  sp_semaphore_t work_available;
+
+  sp_ht(spn_bg_id_t, bool) completed;
+  sp_ht(spn_bg_id_t, bool) enqueued;
+
+  spn_build_graph_t* graph;
+  spn_bg_dirty_t* dirty;
+  u32 num_threads;
+  bool enable_logging;
+  sp_da(sp_thread_t) threads;
+  sp_da(spn_bg_id_t) ran;
+  sp_da(spn_bg_exec_error_t) errors;
+
+  s32 active_workers;
+  sp_atomic_s32 shutdown;
+} spn_bg_executor_t;
+
+spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, spn_bg_executor_config_t config);
+void spn_bg_executor_run(spn_bg_executor_t* ex);
+void spn_bg_executor_join(spn_bg_executor_t* ex);
+void spn_bg_executor_free(spn_bg_executor_t* ex);
 
 
 
@@ -758,44 +794,7 @@ bool spn_bg_is_cmd_dirty(spn_bg_dirty_t* dirty, spn_bg_id_t cmd_id) {
   return sp_ht_key_exists(dirty->commands, cmd_id);
 }
 
-// ============================================================================
-// Executor
-// ============================================================================
 
-typedef struct {
-  spn_bg_id_t cmd_id;
-  sp_ps_output_t output;
-} spn_bg_exec_error_t;
-
-typedef struct {
-  u32 num_threads;
-  bool enable_logging;
-} spn_bg_executor_config_t;
-
-typedef struct {
-  sp_ring_buffer_t ready_queue;
-  sp_mutex_t mutex;
-  sp_semaphore_t work_available;
-
-  sp_ht(spn_bg_id_t, bool) completed;
-  sp_ht(spn_bg_id_t, bool) enqueued;
-
-  spn_build_graph_t* graph;
-  spn_bg_dirty_t* dirty;
-  u32 num_threads;
-  bool enable_logging;
-  sp_da(sp_thread_t) threads;
-  sp_da(spn_bg_id_t) ran;
-  sp_da(spn_bg_exec_error_t) errors;
-
-  s32 active_workers;
-  sp_atomic_s32 shutdown;
-} spn_bg_executor_t;
-
-spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, spn_bg_executor_config_t config);
-void spn_bg_executor_run(spn_bg_executor_t* ex);
-void spn_bg_executor_join(spn_bg_executor_t* ex);
-void spn_bg_executor_free(spn_bg_executor_t* ex);
 
 void spn_bg_executor_log_cmd(spn_bg_executor_t* ex, spn_bg_cmd_t* cmd) {
   if (!ex->enable_logging) return;
