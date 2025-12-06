@@ -127,7 +127,6 @@ struct sp_app {
   } frame;
 };
 
-static sp_app_t _sp_app;
 extern sp_app_config_t sp_main(s32 num_args, const c8** args);
 SP_API sp_app_t*       sp_app_new(sp_app_config_t config);
 
@@ -146,6 +145,7 @@ sp_app_t* sp_app_new(sp_app_config_t config) {
       .target = sp_tm_fps_to_ns(config.fps),
     }
   };
+  return app;
 }
 
 #define SP_MAIN
@@ -153,36 +153,36 @@ sp_app_t* sp_app_new(sp_app_config_t config) {
 
 s32 main(s32 num_args, const c8** args) {
   sp_app_config_t config = sp_main(num_args, args);
-  sp_app_t* app = sp_app_new(config);
+  sp_app_t* sp = sp_app_new(config);
 
-  if (app->on_init) {
-    app->on_init(app);
+  if (sp->on_init) {
+    sp->on_init(sp);
   }
 
-  app->frame.timer = sp_tm_start_timer();
+  sp->frame.timer = sp_tm_start_timer();
   while (true) {
-    if (app->on_poll) {
-      app->on_poll(app);
+    if (sp->on_poll) {
+      sp->on_poll(sp);
     }
 
-    app->frame.accumulated += sp_tm_lap_timer(&app->frame.timer);
-    if (app->frame.accumulated >= app->frame.target) {
-      app->frame.accumulated -= app->frame.target;
-      app->frame.num++;
-      if (app->on_update(app) != SP_APP_OK) {
+    sp->frame.accumulated += sp_tm_lap_timer(&sp->frame.timer);
+    if (sp->frame.accumulated >= sp->frame.target) {
+      sp->frame.accumulated -= sp->frame.target;
+      sp->frame.num++;
+      if (sp->on_update(sp) != SP_APP_OK) {
         break;
       };
     }
     else {
-      sp_sleep_ns(app->frame.target - app->frame.accumulated);
+      sp_sleep_ns(sp->frame.target - sp->frame.accumulated);
     }
   }
 
-  if (app->on_deinit) {
-    app->on_deinit(app);
+  if (sp->on_deinit) {
+    sp->on_deinit(sp);
   }
 
-  return app->return_code;
+  return sp->return_code;
 }
 #endif
 
@@ -2914,6 +2914,9 @@ sp_str_t spn_tui_name_to_color(sp_str_t str) {
   sp_hash_t hash = sp_hash_str(str);
   u32 truncated_hash = (u32)(hash ^ (hash >> 32));
   f32 hue = (f32)(((u64)truncated_hash * 360) >> 32);
+  if (hue >= 90 && hue <= 135) hue -= 45;
+  if (hue >= 340) hue -= 20;
+  if (hue <= 25) hue += 25;
 
   sp_color_t hsv = { .h = hue, .s = 50.0f, .v = 66.0f, .a = 1.0f };
   sp_color_t rgb = sp_color_hsv_to_rgb(hsv);
@@ -5283,7 +5286,7 @@ sp_app_result_t spn_poll(sp_app_t* app) {
       case SPN_BUILD_EVENT_CHECKOUT: {
         sp_str_builder_append_fmt(&builder, "{} {:fg brightblack} {}{}{}",
           SP_FMT_STR(spn_semver_to_str(event.checkout.version)),
-          SP_FMT_STR(event.checkout.commit),
+          SP_FMT_STR(sp_str_truncate(event.checkout.commit, 8, SP_ZERO_STRUCT(sp_str_t))),
           SP_FMT_CSTR(SP_ANSI_ITALIC),
           SP_FMT_STR(sp_str_truncate(event.checkout.message, 32, sp_str_lit("..."))),
           SP_FMT_CSTR(SP_ANSI_RESET)
@@ -5318,9 +5321,9 @@ sp_app_result_t spn_poll(sp_app_t* app) {
   }
 }
 
-sp_app_result_t spn_update(sp_app_t* app) {
+sp_app_result_t spn_update(sp_app_t* sp) {
   //spn.tui.spinner.width = spn.tui.info.num_done;
-  spn_spinner_update(&spn.tui.spinner, sp_tm_ns_to_ms_f(app->frame.target));
+  spn_spinner_update(&spn.tui.spinner, sp_tm_ns_to_ms_f(sp->frame.target));
 
   sp_tui_home();
   sp_tui_clear_line();
@@ -5333,7 +5336,17 @@ sp_app_result_t spn_update(sp_app_t* app) {
 
 
   if (sp_atomic_s32_get(&spn.tui.build->executor->shutdown)) {
-    spn_poll(app);
+    spn_bg_executor_t* ex = spn.tui.build->executor;
+    spn_bg_executor_join(ex);
+    spn_poll(sp);
+
+    sp_tui_home();
+    sp_tui_clear_line();
+    sp_io_write_line(&spn.logger.err, sp_format("Built profile {:fg cyan} in {:fg cyan}s",
+      SP_FMT_STR(app.profile.name),
+      SP_FMT_F32(sp_tm_ns_to_s_f(ex->elapsed))
+    ));
+
     return SP_APP_QUIT;
   }
 

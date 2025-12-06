@@ -235,7 +235,10 @@ typedef struct {
   spn_bg_dirty_t* dirty;
   u32 num_threads;
   bool enable_logging;
-  sp_da(sp_thread_t) threads;
+  sp_thread_t driver;
+  sp_tm_timer_t timer;
+  u64 elapsed;
+  sp_da(sp_thread_t) workers;
   sp_da(spn_bg_id_t) ran;
   sp_da(spn_bg_exec_error_t) errors;
 
@@ -902,6 +905,37 @@ s32 spn_bg_worker_fn(void* user_data) {
   }
 }
 
+s32 spn_bg_driver_fn(void* user_data) {
+  spn_bg_executor_t* ex = (spn_bg_executor_t*)user_data;
+  ex->timer = sp_tm_start_timer();
+
+  if (sp_ht_empty(ex->dirty->commands)) {
+    sp_atomic_s32_set(&ex->shutdown, 1);
+    return 0;
+  }
+
+  sp_ht_for(ex->dirty->commands, it) {
+    spn_bg_id_t* cmd_id = sp_ht_it_getkp(ex->dirty->commands, it);
+    if (spn_bg_cmd_is_ready(ex, *cmd_id)) {
+      sp_ht_insert(ex->enqueued, *cmd_id, true);
+      sp_ring_buffer_push(&ex->ready_queue, cmd_id);
+      sp_semaphore_signal(&ex->work_available);
+    }
+  }
+
+  for (u32 i = 0; i < ex->num_threads; i++) {
+    sp_thread_t thread;
+    sp_thread_init(&thread, spn_bg_worker_fn, ex);
+    sp_da_push(ex->workers, thread);
+  }
+
+  sp_da_for(ex->workers, i) {
+    sp_thread_join(&ex->workers[i]);
+  }
+
+  return 0;
+}
+
 spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, spn_bg_executor_config_t config) {
   spn_bg_executor_t* ex = SP_ALLOC(spn_bg_executor_t);
   ex->graph = graph;
@@ -920,31 +954,12 @@ spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t*
 }
 
 void spn_bg_executor_run(spn_bg_executor_t* ex) {
-  if (sp_ht_empty(ex->dirty->commands)) {
-    sp_atomic_s32_set(&ex->shutdown, 1);
-    return;
-  }
-
-  sp_ht_for(ex->dirty->commands, it) {
-    spn_bg_id_t* cmd_id = sp_ht_it_getkp(ex->dirty->commands, it);
-    if (spn_bg_cmd_is_ready(ex, *cmd_id)) {
-      sp_ht_insert(ex->enqueued, *cmd_id, true);
-      sp_ring_buffer_push(&ex->ready_queue, cmd_id);
-      sp_semaphore_signal(&ex->work_available);
-    }
-  }
-
-  for (u32 i = 0; i < ex->num_threads; i++) {
-    sp_thread_t thread;
-    sp_thread_init(&thread, spn_bg_worker_fn, ex);
-    sp_da_push(ex->threads, thread);
-  }
+  sp_thread_init(&ex->driver, spn_bg_driver_fn, ex);
 }
 
 void spn_bg_executor_join(spn_bg_executor_t* ex) {
-  sp_da_for(ex->threads, i) {
-    sp_thread_join(&ex->threads[i]);
-  }
+  ex->elapsed = sp_tm_read_timer(&ex->timer);
+  sp_thread_join(&ex->driver);
 }
 
 void spn_bg_executor_free(spn_bg_executor_t* ex) {
