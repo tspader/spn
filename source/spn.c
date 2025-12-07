@@ -86,7 +86,6 @@ typedef s32 spn_err_t;
 sp_str_t sp_color_to_tui_rgb(sp_color_t color);
 sp_str_t sp_color_to_tui_rgb_f(u8 r, u8 g, u8 b);
 
-
 typedef enum {
   SP_APP_OK = 0,
   SP_APP_ERR = 1,
@@ -1399,7 +1398,7 @@ spn_app_t      spn_app_new();
 void           spn_app_load(spn_app_t* app, sp_str_t manifest_path);
 void           spn_app_resolve(spn_app_t* app);
 void           spn_app_prepare_build(spn_app_t* app);
-void           spn_app_prepare_build_graph(spn_app_t* app);
+void           spn_app_prepare_build_ex(spn_app_t* app, sp_str_t filter);
 void           spn_app_resolve_from_solver(spn_app_t* app);
 void           spn_app_build(spn_app_t* app);
 void           spn_app_update_lock_file(spn_app_t* app);
@@ -1837,8 +1836,8 @@ spn_err_t spn_cc_run(spn_cc_t* cc) {
           }
         }
 
-        sp_ht_for(app.build.deps, it) {
-          spn_pkg_build_t* dep = sp_ht_it_getp(app.build.deps, it);
+        sp_ht_for_kv(app.build.deps, it) {
+          spn_pkg_build_t* dep = it.val;
 
           sp_dyn_array(sp_str_t) includes = spn_gen_build_entry_for_dep(dep, SPN_GENERATOR_INCLUDE, profile->cc.kind);
           sp_dyn_array_for(includes, i) {
@@ -2405,8 +2404,8 @@ sp_str_t spn_gen_build_entries_for_dep(spn_pkg_build_t* dep, spn_cc_kind_t compi
 sp_str_t spn_gen_build_entries_for_all(spn_gen_entry_kind_t kind, spn_cc_kind_t compiler) {
   sp_dyn_array(sp_str_t) entries = SP_NULLPTR;
 
-  sp_ht_for(app.build.deps, it) {
-    spn_pkg_build_t* dep = sp_ht_it_getp(app.build.deps, it);
+  sp_ht_for_kv(app.build.deps, it) {
+    spn_pkg_build_t* dep = it.val;
     sp_dyn_array(sp_str_t) dep_entries = spn_gen_build_entry_for_dep(dep, kind, compiler);
     sp_str_t dep_flags = sp_str_join_n(dep_entries, sp_dyn_array_size(dep_entries), sp_str_lit(" "));
     if (dep_flags.len > 0) {
@@ -3164,8 +3163,8 @@ spn_lock_file_t spn_build_lock_file() {
   spn_lock_file_init(&lock);
 
   // Add an entry for each dep
-  sp_ht_for(app.package.deps, it) {
-    spn_pkg_req_t request = *sp_ht_it_getp(app.package.deps, it);
+  sp_ht_for_kv(app.package.deps, it) {
+    spn_pkg_req_t request = *it.val;
     spn_pkg_build_t* dep = sp_ht_getp(app.build.deps, request.name);
     spn_pkg_t* package = spn_app_find_package(&app, request);
 
@@ -4508,14 +4507,8 @@ spn_err_t spn_pkg_build_run_script(spn_pkg_build_t* dep) {
 }
 
 
-sp_mutex_t* g_mutex = SP_NULLPTR;
-
 s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_build_t* build = (spn_pkg_build_t*)user_data;
-
-  sp_mutex_lock(g_mutex);
-  //SP_LOG("spn_executor_clone(): {:fg brightcyan}", SP_FMT_STR(build->ctx.package->name));
-  sp_mutex_unlock(g_mutex);
 
   spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_SYNC);
   spn_pkg_build_sync_remote(build);
@@ -4578,6 +4571,10 @@ spn_build_t* spn_build_new() {
 }
 
 void spn_app_prepare_build(spn_app_t* app) {
+  spn_app_prepare_build_ex(app, SP_ZERO_STRUCT(sp_str_t));
+}
+
+void spn_app_prepare_build_ex(spn_app_t* app, sp_str_t filter) {
   spn_build_t build = SP_ZERO_INITIALIZE();
   spn_build_init(&build);
 
@@ -4670,8 +4667,11 @@ void spn_app_prepare_build(spn_app_t* app) {
   sp_str_t dir = sp_fs_join_path(app->package.paths.dir, sp_str_lit("build"));
   sp_str_t profile = sp_fs_join_path(dir, app->profile.name);
 
-  sp_ht_for(app->package.bin, it) {
-    spn_bin_t* bin = sp_ht_it_getp(app->package.bin, it);
+  sp_ht_for_kv(app->package.bin, it) {
+    spn_bin_t* bin = it.val;
+    if (!sp_str_empty(filter)) {
+
+    }
 
     spn_bin_build_t b = {
       .bin = bin,
@@ -4688,12 +4688,6 @@ void spn_app_prepare_build(spn_app_t* app) {
     };
     spn_build_ctx_prepare_io(&b.ctx);
     sp_ht_insert(build.bins, b.ctx.name, b);
-  }
-
-  // GRAPH
-  if (!g_mutex) {
-    g_mutex = SP_ALLOC(sp_mutex_t);
-    sp_mutex_init(g_mutex, SP_MUTEX_PLAIN);
   }
 
   // GRAPH: DEPS
