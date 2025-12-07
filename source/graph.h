@@ -932,11 +932,10 @@ s32 spn_bg_driver_fn(void* user_data) {
     return 0;
   }
 
-  sp_ht_for(ex->dirty->commands, it) {
-    spn_bg_id_t* cmd_id = sp_ht_it_getkp(ex->dirty->commands, it);
-    if (spn_bg_cmd_is_ready(ex, *cmd_id)) {
-      sp_ht_insert(ex->enqueued, *cmd_id, true);
-      sp_ring_buffer_push(&ex->ready_queue, cmd_id);
+  sp_ht_for_kv(ex->dirty->commands, it) {
+    if (spn_bg_cmd_is_ready(ex, *it.key)) {
+      sp_ht_insert(ex->enqueued, *it.key, true);
+      sp_ring_buffer_push(&ex->ready_queue, it.key);
       sp_semaphore_signal(&ex->work_available);
     }
   }
