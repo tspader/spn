@@ -52,7 +52,7 @@ sp_tm_epoch_t sp_tm_epoch_max(sp_tm_epoch_t a, sp_tm_epoch_t b) {
 
 typedef struct {
   u32 index;
-  u8 occupied;
+  u32 occupied;
 } spn_bg_id_t;
 
 typedef enum {
@@ -66,7 +66,7 @@ typedef enum {
 } spn_bg_cmd_kind_t;
 
 typedef struct spn_build_cmd spn_bg_cmd_t;
-SP_TYPEDEF_FN(void, spn_bg_fn_t, spn_bg_cmd_t* cmd, void* user_data);
+SP_TYPEDEF_FN(s32, spn_bg_fn_t, spn_bg_cmd_t* cmd, void* user_data);
 
 struct spn_build_cmd {
   spn_bg_cmd_kind_t kind;
@@ -215,7 +215,7 @@ bool               spn_bg_visited_mark(spn_bg_visited_t* visited, spn_bg_node_t 
 //////////////
 typedef struct {
   spn_bg_id_t cmd_id;
-  sp_ps_output_t output;
+  s32 result;
 } spn_bg_exec_error_t;
 
 typedef struct {
@@ -855,14 +855,20 @@ s32 spn_bg_worker_fn(void* user_data) {
         if (result.status.exit_code) {
           sp_opt_set(error, ((spn_bg_exec_error_t) {
             .cmd_id = cmd_id,
-            .output = result
+            .result = result.status.exit_code
           }));
         }
         break;
       }
       case SPN_BUILD_CMD_FN: {
         if (cmd->fn.on_execute) {
-          cmd->fn.on_execute(cmd, cmd->fn.user_data);
+          s32 result = cmd->fn.on_execute(cmd, cmd->fn.user_data);
+          if (result) {
+            sp_opt_set(error, ((spn_bg_exec_error_t) {
+              .cmd_id = cmd_id,
+              .result = result
+            }));
+          }
         }
         break;
       }
@@ -876,32 +882,44 @@ s32 spn_bg_worker_fn(void* user_data) {
     switch (error.some) {
       case SP_OPT_SOME: {
         sp_da_push(ex->errors, error.value);
-        break;
+
+        sp_atomic_s32_set(&ex->shutdown, 1);
+        sp_semaphore_signal(&ex->work_available);
+        sp_mutex_unlock(&ex->mutex);
+        return 0;
       }
       case SP_OPT_NONE: {
+        // check anything that could be ready now that we're done
         sp_da_for(cmd->produces, i) {
           spn_bg_file_t* file = spn_bg_find_file(ex->graph, cmd->produces[i]);
+
           sp_da_for(file->consumers, j) {
             spn_bg_id_t downstream = file->consumers[j];
-            if (sp_ht_key_exists(ex->enqueued, downstream)) continue;
-
-            if (spn_bg_cmd_is_ready(ex, downstream)) {
-              sp_ht_insert(ex->enqueued, downstream, true);
-              sp_ring_buffer_push(&ex->ready_queue, &downstream);
-              sp_semaphore_signal(&ex->work_available);
+            if (!sp_ht_key_exists(ex->enqueued, downstream)) {
+              if (spn_bg_cmd_is_ready(ex, downstream)) {
+                sp_ht_insert(ex->enqueued, downstream, true);
+                sp_ring_buffer_push(&ex->ready_queue, &downstream);
+                sp_semaphore_signal(&ex->work_available);
+              }
             }
           }
         }
+
+        // if we're the last one, and this was the last task, shut down
+        bool is_work_done = sp_ring_buffer_is_empty(&ex->ready_queue);
+        bool is_last_worker = ex->active_workers == 0;
+        if (is_work_done && is_last_worker) {
+          sp_atomic_s32_set(&ex->shutdown, 1);
+          sp_semaphore_signal(&ex->work_available);
+          sp_mutex_unlock(&ex->mutex);
+          return 0;
+        }
+
+        sp_mutex_unlock(&ex->mutex);
+
         break;
       }
     }
-
-    // Termination check
-    if (sp_ring_buffer_is_empty(&ex->ready_queue) && ex->active_workers == 0) {
-      sp_atomic_s32_set(&ex->shutdown, 1);
-      sp_semaphore_signal(&ex->work_available);
-    }
-    sp_mutex_unlock(&ex->mutex);
   }
 }
 

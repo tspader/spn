@@ -1001,6 +1001,7 @@ typedef struct {
   struct {
     u32 num_done;
     u32 num_total;
+    u32 max_name;
   } info;
 
   struct {
@@ -2932,6 +2933,15 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode, spn_build_t* build) {
   tui->build = build;
   tui->mode = mode;
   tui->info.num_total = sp_ht_size(build->dirty->commands);
+
+  sp_ht_for_kv(build->deps, it) {
+    tui->info.max_name = SP_MAX(tui->info.max_name, it.key->len);
+  }
+
+  sp_ht_for_kv(build->bins, it) {
+    tui->info.max_name = SP_MAX(tui->info.max_name, it.key->len);
+  }
+
   spn_spinner_init(&tui->spinner, sp_color_rgb_255(99,  160, 136));
 
   switch (tui->mode) {
@@ -4332,7 +4342,7 @@ void spn_build_ctx_prepare_io(spn_build_ctx_t* build) {
   build->paths.lib = sp_fs_join_path(build->paths.store, SP_LIT("lib"));
   build->paths.vendor = sp_fs_join_path(build->paths.store, SP_LIT("vendor"));
   build->paths.stamp = sp_fs_join_path(build->paths.store, SP_LIT("spn.stamp"));
-  build->paths.log = sp_fs_join_path(build->paths.work, SP_LIT("spn.log"));
+  build->paths.log = sp_fs_join_path(build->paths.work, sp_format("{}.log", SP_FMT_STR(build->name)));
 
   sp_fs_create_dir(build->paths.work);
   sp_fs_create_dir(build->paths.store);
@@ -4491,7 +4501,7 @@ void spn_pkg_build_run_script(spn_pkg_build_t* dep) {
 
 sp_mutex_t* g_mutex = SP_NULLPTR;
 
-void spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
+s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_build_t* build = (spn_pkg_build_t*)user_data;
 
   sp_mutex_lock(g_mutex);
@@ -4518,7 +4528,7 @@ void spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_build_sync_local(build);
 }
 
-void spn_executor_run_pkg_build(spn_bg_cmd_t* cmd, void* user_data) {
+s32 spn_executor_run_pkg_build(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_build_t* build = (spn_pkg_build_t*)user_data;
   spn_event_buffer_push_ex(spn.events, &build->ctx, (spn_build_event_t) {
     .kind = SPN_BUILD_EVENT_BUILD
@@ -4531,7 +4541,7 @@ void spn_executor_run_pkg_build(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_build_run(build);
 }
 
-void spn_executor_bin(spn_bg_cmd_t* cmd, void* user_data) {
+s32 spn_executor_bin(spn_bg_cmd_t* cmd, void* user_data) {
   spn_bin_build_t* build = (spn_bin_build_t*)user_data;
   spn_event_buffer_push_ex(spn.events, &build->ctx, (spn_build_event_t) {
     .kind = SPN_BUILD_EVENT_BUILD
@@ -4665,7 +4675,6 @@ void spn_app_prepare_build(spn_app_t* app) {
   sp_ht_for(app->package.bin, it) {
     spn_bin_t* bin = sp_ht_it_getp(app->package.bin, it);
 
-    // @spader: each binary should have its own log/paths
     spn_bin_build_t b = {
       .bin = bin,
       .ctx = {
@@ -5231,11 +5240,6 @@ sp_app_result_t spn_poll(sp_app_t* app) {
   spn_build_t* build = spn.tui.build;
   spn_bg_executor_t* ex = build->executor;
 
-  u32 max_name = 0;
-  sp_ht_for_kv(build->deps, it) {
-    max_name = SP_MAX(max_name, it.key->len);
-  }
-
   sp_da(spn_build_event_t) events = spn_event_buffer_drain(spn.events);
 
   sp_mutex_lock(&ex->mutex);
@@ -5273,7 +5277,7 @@ sp_app_result_t spn_poll(sp_app_t* app) {
     sp_str_builder_append_fmt(&builder,
       "{}{}{} ",
       SP_FMT_STR(spn_tui_name_to_color(event.ctx->name)),
-      SP_FMT_STR(sp_str_pad(event.ctx->name, max_name)),
+      SP_FMT_STR(sp_str_pad(event.ctx->name, spn.tui.info.max_name)),
       SP_FMT_CSTR(SP_ANSI_RESET)
     );
 
@@ -5342,6 +5346,7 @@ sp_app_result_t spn_update(sp_app_t* sp) {
 
     sp_tui_home();
     sp_tui_clear_line();
+
     sp_io_write_line(&spn.logger.err, sp_format("Built profile {:fg cyan} in {:fg cyan}s",
       SP_FMT_STR(app.profile.name),
       SP_FMT_F32(sp_tm_ns_to_s_f(ex->elapsed))

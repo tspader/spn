@@ -31,8 +31,8 @@ void touch_node(spn_build_graph_t* graph, spn_bg_id_t id) {
 ///////////////////////
 sp_mutex_t g_log_mutex;
 
-void build_fn_noop(spn_bg_cmd_t* cmd, void* ud) {
-
+s32 build_fn_noop(spn_bg_cmd_t* cmd, void* ud) {
+  return 0;
 }
 
 #define uf utest_fixture
