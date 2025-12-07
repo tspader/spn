@@ -53,9 +53,9 @@
   X(SPN_OK, "ok") \
   X(SPN_ERROR, "error")
 
-typedef enum {
-  SPN_ERR(SP_X_NAMED_ENUM_DEFINE)
-} spn_err_t;
+typedef s32 spn_err_t;
+#define SPN_OK 0
+#define SPN_ERROR 1
 
 
 ////////
@@ -71,6 +71,8 @@ typedef enum {
 
 #define sp_rb_push(rb, value) sp_ring_buffer_push(&(rb), &(value))
 #define sp_rb_for(rb, it) sp_ring_buffer_for(rb, it)
+
+#define sp_try(expr) do { s32 _sp_result = (expr); if (_sp_result) return _sp_result; } while (0)
 
 #define sp_typedef_fn(return_type, name, ...) SP_TYPEDEF_FN(return_type, name, __VA_ARGS__)
 
@@ -156,7 +158,7 @@ s32 main(s32 num_args, const c8** args) {
   sp_app_t* sp = sp_app_new(config);
 
   if (sp->on_init) {
-    sp->on_init(sp);
+    sp_try(sp->on_init(sp));
   }
 
   sp->frame.timer = sp_tm_start_timer();
@@ -426,8 +428,8 @@ void              spn_toml_append_str_carr_cstr(spn_toml_writer_t* writer, const
 typedef TCCState spn_tcc_t;
 
 spn_tcc_t* spn_tcc_new();
-void       spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path);
-void       spn_tcc_register(spn_tcc_t* tcc);
+spn_err_t  spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path);
+spn_err_t  spn_tcc_register(spn_tcc_t* tcc);
 void       spn_tcc_error(void* opaque, const char* message);
 void       spn_tcc_list_fn(void* opaque, const char* name, const void* value);
 
@@ -703,7 +705,7 @@ spn_pkg_t     spn_pkg_load(sp_str_t path);
 spn_pkg_t     spn_pkg_from_default(sp_str_t path, sp_str_t name);
 spn_pkg_t     spn_pkg_from_index(sp_str_t path);
 spn_pkg_t     spn_pkg_from_manifest(sp_str_t path);
-void          spn_pkg_compile(spn_pkg_t* package);
+spn_err_t     spn_pkg_compile(spn_pkg_t* package);
 void          spn_pkg_add_dep(spn_pkg_t* package, spn_pkg_req_t request);
 void          spn_pkg_add_dep_from_index(spn_pkg_t* package, sp_str_t name);
 void          spn_pkg_init(spn_pkg_t* package);
@@ -872,14 +874,14 @@ void              spn_dep_context_set_build_error(spn_pkg_build_t* dep, sp_str_t
 void              spn_build_ctx_prepare_io(spn_build_ctx_t* build);
 sp_ps_output_t    spn_build_ctx_subprocess(spn_build_ctx_t* build, sp_ps_config_t config);
 spn_err_t         spn_bin_build_run(spn_bin_build_t* build);
-void              spn_pkg_build_run(spn_pkg_build_t* dep);
+spn_err_t         spn_pkg_build_run(spn_pkg_build_t* dep);
+spn_err_t         spn_pkg_build_run_script(spn_pkg_build_t* dep);
 spn_err_t         spn_pkg_build_sync_remote(spn_pkg_build_t* dep);
 spn_err_t         spn_pkg_build_sync_local(spn_pkg_build_t* dep);
 spn_err_t         spn_pkg_build_resolve_commit(spn_pkg_build_t* dep);
 void              spn_pkg_build_stamp(spn_pkg_build_t* build);
 sp_str_t          spn_pkg_build_get_bin_path(spn_pkg_build_t* build, spn_bin_t* bin);
 bool              spn_pkg_build_is_stamped(spn_pkg_build_t* context);
-void              spn_pkg_build_run_script(spn_pkg_build_t* dep);
 
 spn_lock_file_t   spn_load_lock_file(sp_str_t path);
 spn_pkg_req_t     spn_pkg_req_from_str(sp_str_t str);
@@ -2832,14 +2834,16 @@ spn_tcc_t* spn_tcc_new() {
   return tcc;
 }
 
-void spn_tcc_register(spn_tcc_t* tcc) {
+spn_err_t spn_tcc_register(spn_tcc_t* tcc) {
   sp_carr_for(spn_lib, it) {
-    tcc_add_symbol(tcc, spn_lib[it].symbol, spn_lib[it].fn);
+    sp_try(tcc_add_symbol(tcc, spn_lib[it].symbol, spn_lib[it].fn));
   }
+  return SPN_OK;
 }
 
-void spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path) {
-  tcc_add_file(tcc, sp_str_to_cstr(file_path));
+spn_err_t spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path) {
+  sp_try(tcc_add_file(tcc, sp_str_to_cstr(file_path)));
+  return SPN_OK;
 }
 
 void spn_tcc_error(void* opaque, const char* message) {
@@ -2919,7 +2923,7 @@ sp_str_t spn_tui_name_to_color(sp_str_t str) {
   if (hue >= 340) hue -= 20;
   if (hue <= 25) hue += 25;
 
-  sp_color_t hsv = { .h = hue, .s = 50.0f, .v = 66.0f, .a = 1.0f };
+  sp_color_t hsv = { .h = hue, .s = 40.0f, .v = 75.0f, .a = 1.0f };
   sp_color_t rgb = sp_color_hsv_to_rgb(hsv);
 
   u8 r = (u8)(rgb.r * 255.0f);
@@ -3773,16 +3777,19 @@ spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key) {
   SP_UNREACHABLE_RETURN(SP_ZERO_STRUCT(spn_dep_option_t));
 }
 
-void spn_pkg_compile(spn_pkg_t* package) {
-  if (!sp_fs_exists(package->paths.script)) return;
+spn_err_t spn_pkg_compile(spn_pkg_t* package) {
+  if (!sp_fs_exists(package->paths.script)) {
+    return SPN_ERROR;
+  }
 
   spn_tcc_t* tcc = spn_tcc_new();
-  spn_tcc_add_file(tcc, package->paths.script);
-  tcc_set_options(tcc, "-nostdlib");
-  s32 v = tcc_relocate(tcc);
-  sp_str_t e = spn.tcc_error;
+  sp_try(spn_tcc_add_file(tcc, package->paths.script));
+  sp_try(tcc_set_options(tcc, "-nostdlib"));
+  sp_try(tcc_relocate(tcc));
   package->on_package = tcc_get_symbol(tcc, "package");
   package->on_build = tcc_get_symbol(tcc, "build");
+
+  return SPN_OK;
 }
 
 void spn_pkg_init(spn_pkg_t* package) {
@@ -4355,11 +4362,12 @@ void spn_build_ctx_prepare_io(spn_build_ctx_t* build) {
   build->log = sp_io_from_file(build->paths.log, SP_IO_MODE_WRITE);
 }
 
-void spn_pkg_build_run(spn_pkg_build_t* build) {
+spn_err_t spn_pkg_build_run(spn_pkg_build_t* build) {
   //SP_ASSERT(!spn_dep_context_is_build_stamped(build));
 
-  spn_pkg_build_run_script(build);
+  sp_try(spn_pkg_build_run_script(build));
   spn_pkg_build_stamp(build);
+  return SPN_OK;
 }
 
 spn_err_t spn_pkg_build_sync_remote(spn_pkg_build_t* build) {
@@ -4483,8 +4491,7 @@ void spn_pkg_build_stamp(spn_pkg_build_t* dep) {
   sp_io_close(&io);
 }
 
-void spn_pkg_build_run_script(spn_pkg_build_t* dep) {
-  sp_os_sleep_ms(2000);
+spn_err_t spn_pkg_build_run_script(spn_pkg_build_t* dep) {
   spn_pkg_compile(dep->ctx.package);
 
   if (dep->ctx.package->on_build) {
@@ -4496,6 +4503,8 @@ void spn_pkg_build_run_script(spn_pkg_build_t* dep) {
     spn_dep_context_set_build_state(dep, SPN_DEP_BUILD_STATE_PACKAGING);
     dep->ctx.package->on_package(dep);
   }
+
+  return SPN_OK;
 }
 
 
@@ -4526,46 +4535,35 @@ s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
     }
   });
   spn_pkg_build_sync_local(build);
+
+  return SPN_OK;
 }
 
 s32 spn_executor_run_pkg_build(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_build_t* build = (spn_pkg_build_t*)user_data;
-  spn_event_buffer_push_ex(spn.events, &build->ctx, (spn_build_event_t) {
-    .kind = SPN_BUILD_EVENT_BUILD
-  });
+  spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_BUILD);
+  //return 69;
 
-  sp_mutex_lock(g_mutex);
-  //SP_LOG("spn_executor_build(): {:fg brightcyan}", SP_FMT_STR(build->ctx.package->name));
-  sp_mutex_unlock(g_mutex);
+  spn_err_t err = spn_pkg_build_run(build);
+  switch (err) {
+    case SPN_OK:    { spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_DONE); break; }
+    case SPN_ERROR: { spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_FAILED); break; }
+  }
 
-  spn_pkg_build_run(build);
+  return err;
 }
 
 s32 spn_executor_bin(spn_bg_cmd_t* cmd, void* user_data) {
   spn_bin_build_t* build = (spn_bin_build_t*)user_data;
-  spn_event_buffer_push_ex(spn.events, &build->ctx, (spn_build_event_t) {
-    .kind = SPN_BUILD_EVENT_BUILD
-  });
-
-  sp_mutex_lock(g_mutex);
-  //SP_LOG("spn_executor_bin(): {:fg brightcyan}", SP_FMT_STR(build->ctx.name));
-  sp_mutex_unlock(g_mutex);
+  spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_BUILD);
 
   spn_err_t err = spn_bin_build_run(build);
   switch (err) {
-    case SPN_OK: {
-      spn_event_buffer_push_ex(spn.events, &build->ctx, (spn_build_event_t) {
-        .kind = SPN_BUILD_EVENT_DONE
-      });
-      break;
-    }
-    case SPN_ERROR: {
-      spn_event_buffer_push_ex(spn.events, &build->ctx, (spn_build_event_t) {
-        .kind = SPN_BUILD_EVENT_FAILED
-      });
-      break;
-    }
+    case SPN_OK:    { spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_DONE); break; }
+    case SPN_ERROR: { spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_FAILED); break; }
   }
+
+  return err;
 }
 
 void spn_build_init(spn_build_t* build) {
@@ -4708,8 +4706,8 @@ void spn_app_prepare_build(spn_app_t* app) {
       .stamp = spn_bg_add_file(&build.graph, dep->ctx.paths.stamp),
     };
 
-    spn_bg_tag_command(&build.graph, nodes.sync, sp_format("[{}] sync", SP_FMT_STR(dep->ctx.name)));
-    spn_bg_tag_command(&build.graph, nodes.build, sp_format("[{}] build", SP_FMT_STR(dep->ctx.name)));
+    spn_bg_tag_command(&build.graph, nodes.sync, sp_format("{} (sync)", SP_FMT_STR(dep->ctx.name)));
+    spn_bg_tag_command(&build.graph, nodes.build, sp_format("{} (build)", SP_FMT_STR(dep->ctx.name)));
 
     spn_bg_cmd_add_output(&build.graph, nodes.sync, nodes.repo);
     spn_bg_cmd_add_input(&build.graph, nodes.build, nodes.repo);
@@ -4774,7 +4772,7 @@ void spn_app_build(spn_app_t* app) {
 
   build->dirty = spn_bg_compute_dirty(&build->graph);
   spn_bg_executor_config_t config = {
-    .num_threads = 4,
+    .num_threads = 3,
     .enable_logging = false
   };
 
@@ -5253,8 +5251,10 @@ sp_app_result_t spn_poll(sp_app_t* app) {
     switch (event.kind) {
       case SPN_BUILD_EVENT_DONE: {
         sp_str_builder_append_fmt(&builder,
-          "{:fg green :pad 8} ",
-          SP_FMT_STR(spn_build_event_kind_to_str(event.kind))
+          "{}{:fg green :pad 8}{} ",
+          SP_FMT_CSTR(SP_ANSI_BOLD),
+          SP_FMT_STR(spn_build_event_kind_to_str(event.kind)),
+          SP_FMT_CSTR(SP_ANSI_RESET)
         );
         break;
       }
@@ -5326,7 +5326,6 @@ sp_app_result_t spn_poll(sp_app_t* app) {
 }
 
 sp_app_result_t spn_update(sp_app_t* sp) {
-  //spn.tui.spinner.width = spn.tui.info.num_done;
   spn_spinner_update(&spn.tui.spinner, sp_tm_ns_to_ms_f(sp->frame.target));
 
   sp_tui_home();
@@ -5338,19 +5337,47 @@ sp_app_result_t spn_update(sp_app_t* sp) {
   ));
   sp_tui_flush();
 
-
-  if (sp_atomic_s32_get(&spn.tui.build->executor->shutdown)) {
-    spn_bg_executor_t* ex = spn.tui.build->executor;
+  spn_bg_executor_t* ex = spn.tui.build->executor;
+  if (sp_atomic_s32_get(&ex->shutdown)) {
     spn_bg_executor_join(ex);
     spn_poll(sp);
 
     sp_tui_home();
     sp_tui_clear_line();
 
-    sp_io_write_line(&spn.logger.err, sp_format("Built profile {:fg cyan} in {:fg cyan}s",
-      SP_FMT_STR(app.profile.name),
-      SP_FMT_F32(sp_tm_ns_to_s_f(ex->elapsed))
-    ));
+    sp_opt(spn_bg_exec_error_t) error = SP_ZERO_INITIALIZE();
+    if (sp_da_size(ex->errors)) {
+      sp_opt_set(error, ex->errors[0]);
+    }
+
+    switch (error.some) {
+      case SP_OPT_SOME: {
+        spn_bg_cmd_t* cmd = spn_bg_find_command(&spn.tui.build->graph, error.value.cmd_id);
+        spn_build_ctx_t* build = (spn_build_ctx_t*)cmd->fn.user_data;
+        sp_io_write_new_line(&spn.logger.err);
+        sp_io_write_line(&spn.logger.err, sp_format("Building {:fg cyan} failed ({}{}{} failed with status {:fg brightblack}):",
+          SP_FMT_STR(app.profile.name),
+          SP_FMT_STR(spn_tui_name_to_color(build->name)),
+          SP_FMT_STR(build->name),
+          SP_FMT_CSTR(SP_ANSI_RESET),
+          SP_FMT_S32(error.value.result)
+        ));
+
+        sp_io_seek(&build->log, 0, SP_IO_SEEK_SET);
+        sp_io_write_cstr(&spn.logger.err, SP_ANSI_FG_BRIGHT_BLACK);
+        sp_io_write_str(&spn.logger.err, sp_io_read_file(build->paths.log));
+        sp_io_write_cstr(&spn.logger.err, SP_ANSI_RESET);
+        break;
+      }
+      case SP_OPT_NONE: {
+        sp_io_write_line(&spn.logger.err, sp_format("Built profile {:fg cyan} in {:fg cyan}s",
+          SP_FMT_STR(app.profile.name),
+          SP_FMT_F32(sp_tm_ns_to_s_f(ex->elapsed))
+        ));
+        break;
+      }
+    }
+
 
     return SP_APP_QUIT;
   }
@@ -5669,7 +5696,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   if (cli->help || !cli->num_args) {
     sp_log(help);
-    return SP_ERR_LAZY;
+    return SP_APP_QUIT;
   }
 
   sp_str_t cmd_name = sp_str_from_cstr(cli->args[0]);
@@ -5689,7 +5716,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       if (cli->num_args < 2) {
         sp_str_t subcmd_help = spn_cli_subcommand_usage(cmd_schema->subcommands, cmd_schema->name);
         sp_log(subcmd_help);
-        return SP_ERR_LAZY;
+        return SP_APP_QUIT;
       }
 
       sp_str_t subcmd_name = sp_str_from_cstr(cli->args[1]);
@@ -5843,7 +5870,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     case SPN_CLI_TOOL:     { spn_cli_tool(cli); break; }
   }
 
-  return SP_ERR_OK;
+  return SP_APP_OK;
 }
 
 /////////
