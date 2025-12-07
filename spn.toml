@@ -3,12 +3,19 @@ name = "spn"
 version = "0.1.0"
 system_deps = ["m"]
 
-[deps]
+# [deps]
+# sp = "1.4.0"
+# tcc = ">=1.0.0"
+# toml = "1.2.0"
+# utest = "1.0.0"
+
+[deps.package]
 sp = "1.4.0"
-utest = "1.0.0"
 tcc = ">=1.0.0"
 toml = "1.2.0"
 
+[deps.test]
+utest = "1.0.0"
 
 [[profile]]
 name = "debug"
@@ -24,7 +31,14 @@ source = ["source/spn.c"]
 include = ["include"]
 
 
-[[bin]]
+[[test]]
 name = "spn-test-graph"
 source = ["test/graph/main.c"]
 include = ["include", "source", "test/tools"]
+
+[[test]]
+name = "spn-test-cli"
+source = ["test/cli/main.c"]
+include = ["include", "source", "test/tools"]
+
+

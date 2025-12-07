@@ -43,7 +43,8 @@ bootstrap/lib/libtcc.a: bootstrap/external/tinycc
 
 bootstrap/bin/spn: source/spn.c bootstrap/lib/libtcc.a bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h
 	@mkdir -p bootstrap/bin
-	gcc -g -o $@ source/spn.c -Iinclude -Ibootstrap/include bootstrap/lib/libtcc.a -lm
+	#gcc -g -o $@ source/spn.c -Iinclude -Ibootstrap/include bootstrap/lib/libtcc.a -lm -ltcc
+	gcc -g -o $@ source/spn.c -Iinclude -Ibootstrap/include -lm -ltcc
 
 
 #############

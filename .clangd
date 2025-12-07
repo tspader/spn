@@ -5,6 +5,8 @@ CompileFlags:
     - -DSP_APP
     - -DSP_APP_IMPLEMENTATION
     - -include sp.h
+    - -xc
+    - -xc-header
 Diagnostics:
   Suppress:
     - unused-includes
