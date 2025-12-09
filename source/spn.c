@@ -1178,6 +1178,7 @@ typedef struct {
 
 typedef struct {
   bool force;
+  bool tests;
   sp_str_t target;
   sp_str_t profile;
 } spn_cli_build_t;
@@ -1275,13 +1276,21 @@ typedef enum {
   SPN_APP_INIT_BARE,
 } spn_app_init_mode_t;
 
+typedef enum {
+  SPN_TARGET_FILTER_MODE_KIND,
+  SPN_TARGET_FILTER_MODE_NAME,
+} spn_target_filter_mode_t;
+
 typedef struct {
-  sp_str_t filter;
-  struct {
-    bool public;
-    bool private;
-    bool test;
-  } disabled;
+  spn_target_filter_mode_t mode;
+  union {
+    struct {
+      bool public;
+      bool private;
+      bool test;
+    } disabled;
+    sp_str_t name;
+  };
 } spn_target_filter_t;
 
 bool spn_target_filter_pass(spn_target_filter_t* filter, spn_bin_t* bin);
@@ -4561,15 +4570,16 @@ s32 spn_executor_bin(spn_bg_cmd_t* cmd, void* user_data) {
 }
 
 bool spn_target_filter_pass(spn_target_filter_t* filter, spn_bin_t* bin) {
-  bool pass = true;
-  if (!sp_str_empty(filter->filter)) {
-    pass = sp_str_equal(filter->filter, bin->name) && pass;
+  switch (filter->mode) {
+    case SPN_TARGET_FILTER_MODE_NAME:
+      return sp_str_equal(filter->name, bin->name);
+    case SPN_TARGET_FILTER_MODE_KIND:
+      if (filter->disabled.private && bin->kind == SPN_BIN_PRIVATE) return false;
+      if (filter->disabled.public && bin->kind == SPN_BIN_PUBLIC) return false;
+      if (filter->disabled.test && bin->kind == SPN_BIN_TEST) return false;
+      return true;
   }
-
-  if (filter->disabled.private && bin->kind == SPN_BIN_PRIVATE) pass = false;
-  if (filter->disabled.public && bin->kind == SPN_BIN_PUBLIC) pass = false;
-  if (filter->disabled.test && bin->kind == SPN_BIN_TEST) pass = false;
-  return pass;
+  return false;
 }
 
 spn_build_t* spn_build_new() {
@@ -5581,20 +5591,12 @@ sp_app_result_t spn_init(sp_app_t* sp) {
             .summary = "Target to build",
             .placeholder = "TARGET",
             .ptr = &spn.cli.build.target
-          }
-        },
-        .args = {
-          {
-            .name = "target",
-            .kind = SPN_CLI_ARG_KIND_OPTIONAL,
-            .summary = "Target to build; if omitted, build all targets",
-            .ptr = &spn.cli.build.target
           },
           {
-            .name = "profile",
-            .kind = SPN_CLI_ARG_KIND_OPTIONAL,
-            .summary = "Profile to use; if omitted, default to first defined profile",
-            .ptr = &spn.cli.build.profile
+            .name = "tests",
+            .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+            .summary = "Include test targets",
+            .ptr = &spn.cli.build.tests
           }
         },
         .summary = "Build the project, including dependencies, from source",
@@ -6587,8 +6589,6 @@ spn_cli_result_t spn_cli_test(spn_cli_t* cli) {
 spn_cli_result_t spn_cli_build(spn_cli_t* cli) {
   spn_cli_build_t* command = &cli->build;
 
-  // you have the advanced filter, now make "spn test" build just the tests and run them
-
   if (!sp_str_empty(command->profile)) {
     if (!sp_ht_key_exists(app.package.profiles, command->profile)) {
       spn_error("{:fg brightcyan} profile isn't defined in {:fg brightcyan}",
@@ -6602,12 +6602,22 @@ spn_cli_result_t spn_cli_build(spn_cli_t* cli) {
   }
 
   spn_app_resolve(&app);
-  spn_app_prepare_build_ex(&app, (spn_target_filter_t) {
-    .filter = command->target,
-    // .disabled = {
-    //   .test = true
-    // }
-  });
+
+  spn_target_filter_t filter;
+  if (!sp_str_empty(command->target)) {
+    filter = (spn_target_filter_t) {
+      .mode = SPN_TARGET_FILTER_MODE_NAME,
+      .name = command->target
+    };
+  } else {
+    filter = (spn_target_filter_t) {
+      .mode = SPN_TARGET_FILTER_MODE_KIND,
+      .disabled = {
+        .test = !command->tests
+      }
+    };
+  }
+  spn_app_prepare_build_ex(&app, filter);
 
   app.build.dirty = command->force ?
     spn_bg_compute_forced_dirty(&app.build.graph) :
