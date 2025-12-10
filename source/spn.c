@@ -2978,18 +2978,17 @@ sp_str_t spn_tui_name_to_color(sp_str_t str) {
 
 sp_str_t spn_tui_render_log(sp_io_stream_t* io, sp_str_t name) {
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  sp_str_builder_new_line(&builder);
   sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(spn_tui_color_name(name)));
   sp_str_builder_new_line(&builder);
 
-  sp_str_t trailer = sp_str_lit("...");
+  sp_str_t trailer = sp_str_lit("CUM CUM!!! CUM!!!!!!");
   sp_io_seek(io, 0, SP_IO_SEEK_SET);
   s64 size = SP_MIN(sp_io_size(io), 1024);
   c8* buffer = (c8*)sp_alloc(size);
   sp_io_read(io, buffer, size);
   sp_io_close(io);
 
-  sp_str_t log = sp_str_truncate(sp_str(buffer, size), 1024, sp_str_lit("..."));
+  sp_str_t log = sp_str_truncate(sp_str(buffer, size), 1023, sp_str_lit("\n...truncated"));
 
   sp_str_builder_append_cstr(&builder, SP_ANSI_FG_BRIGHT_BLACK);
   sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(log));
@@ -6211,35 +6210,15 @@ sp_app_result_t spn_update(sp_app_t* sp) {
         SP_LOG("{:fg green}", SP_FMT_CSTR("OK"));
       }
       else {
-        sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-        sp_str_builder_new_line(&builder);
-
         sp_ht_for_kv(tests, it) {
           spn_bin_ctx_t* target = sp_ht_getp(build->contexts.bins, *it.key);
           spn_build_ctx_t* ctx = &target->ctx;
-          sp_io_stream_t* io = &ctx->logs.test;
 
           if (*it.val) {
-            sp_str_builder_new_line(&builder);
-            sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(spn_tui_color_name(ctx->name)));
-            sp_str_builder_new_line(&builder);
-
-            sp_str_t trailer = sp_str_lit("...");
-            sp_io_seek(io, 0, SP_IO_SEEK_SET);
-            s64 size = SP_MIN(sp_io_size(io), 1024);
-            c8* buffer = (c8*)sp_alloc(size);
-            sp_io_read(io, buffer, size);
-            sp_io_close(io);
-
-            sp_str_t log = sp_str_truncate(sp_str(buffer, size), 1024, sp_str_lit("..."));
-
-            sp_str_builder_append_cstr(&builder, SP_ANSI_FG_BRIGHT_BLACK);
-            sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(log));
-            sp_str_builder_append_cstr(&builder, SP_ANSI_RESET);
+            sp_io_write_new_line(&spn.logger.err);
+            sp_io_write_str(&spn.logger.err, spn_tui_render_log(&ctx->logs.test, ctx->name));
           }
         }
-
-        spn_log("{}", SP_FMT_STR(sp_str_builder_move(&builder)));
       }
 
       return SP_APP_QUIT;
