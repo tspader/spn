@@ -47,7 +47,7 @@ typedef struct {
 } spn_cli_opt_usage_t;
 
 typedef struct spn_cli_subcommand_usage_t spn_cli_subcommand_usage_t;
-typedef struct spn_cli_t spn_cli_t;
+typedef struct spn_cli spn_cli_t;
 
 typedef struct {
   const c8* name;
