@@ -1,6 +1,8 @@
 #ifndef SPN_TEST_GRAPH_H
 #define SPN_TEST_GRAPH_H
 
+#define SP_ALLOC(T) (T*)sp_alloc(sizeof(T))
+
 SP_TYPEDEF_FN(void, sp_it_next_fn_t, s64*);
 SP_TYPEDEF_FN(bool, sp_it_check_fn_t, s64, s64);
 
