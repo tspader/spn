@@ -784,17 +784,19 @@ bool spn_target_filter_pass(spn_target_filter_t* filter, spn_bin_t* bin);
 typedef struct spn_build_ctx spn_build_ctx_t;
 
 #define SPN_BUILD_EVENT(X) \
-  X(SPN_BUILD_EVENT_FETCH, "fetch") \
-  X(SPN_BUILD_EVENT_RESOLVE, "resolve") \
-  X(SPN_BUILD_EVENT_SYNC, "sync") \
+  X(SPN_BUILD_EVENT_FETCH, "fetching") \
+  X(SPN_BUILD_EVENT_RESOLVE, "resolving") \
+  X(SPN_BUILD_EVENT_SYNC, "syncng") \
   X(SPN_BUILD_EVENT_CHECKOUT, "checkout") \
-  X(SPN_BUILD_EVENT_BUILD, "build") \
-  X(SPN_BUILD_EVENT_PACKAGE, "package") \
-  X(SPN_BUILD_EVENT_DONE, "done") \
+  X(SPN_BUILD_EVENT_BUILD, "building") \
+  X(SPN_BUILD_EVENT_PACKAGE, "packaging") \
+  X(SPN_BUILD_EVENT_BUILD_PASSED, "built") \
+  X(SPN_BUILD_EVENT_BUILD_FAILED, "failed") \
   X(SPN_BUILD_EVENT_CANCELLED, "cancelled") \
-  X(SPN_BUILD_EVENT_FAILED, "failed") \
-  X(SPN_BUILD_EVENT_COMPILE, "compile") \
-  X(SPN_BUILD_EVENT_RUN, "running")
+  X(SPN_BUILD_EVENT_COMPILE, "compiling") \
+  X(SPN_BUILD_EVENT_TEST_RUN, "running") \
+  X(SPN_BUILD_EVENT_TEST_PASSED, "passed") \
+  X(SPN_BUILD_EVENT_TEST_FAILED, "failed")
 
 typedef enum {
   SPN_BUILD_EVENT(SP_X_NAMED_ENUM_DEFINE)
@@ -1413,6 +1415,7 @@ sp_app_result_t spn_update(sp_app_t* app);
 void spn_log(const c8* fmt, ...);
 void spn_warn(const c8* fmt, ...);
 void spn_error(const c8* fmt, ...);
+void spn_tui(const c8* fmt, ...);
 
 
 
@@ -2933,17 +2936,12 @@ sp_str_t sp_color_to_tui_rgb_f(u8 r, u8 g, u8 b) {
   return sp_format("\033[38;2;{};{};{}m", SP_FMT_U32(r), SP_FMT_U32(g), SP_FMT_U32(b));
 }
 
-sp_str_t spn_tui_colored_name(sp_str_t name, u32 padded_len, c8 pad) {
-  sp_str_builder_t b = SP_ZERO_INITIALIZE();
-  sp_str_builder_append(&b, spn_tui_name_to_color(name));
-  sp_str_builder_append(&b, name);
-  sp_str_builder_append_cstr(&b, SP_ANSI_RESET);
-
-  if (padded_len > name.len) {
-    sp_str_builder_append(&b, sp_str_repeat(pad, padded_len - name.len));
-  }
-
-  return sp_str_builder_move(&b);
+sp_str_t spn_tui_color_name(sp_str_t name) {
+  return sp_format("{}{}{}",
+    SP_FMT_STR(spn_tui_name_to_color(name)),
+    SP_FMT_STR(name),
+    SP_FMT_CSTR(SP_ANSI_RESET)
+  );
 }
 
 sp_str_t spn_tui_decorate_name(sp_str_t name, u32 padded_len, c8 pad) {
@@ -2978,30 +2976,58 @@ sp_str_t spn_tui_name_to_color(sp_str_t str) {
   return sp_color_to_tui_rgb_f(r, g, b);
 }
 
+sp_str_t spn_tui_render_log(sp_io_stream_t* io, sp_str_t name) {
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+  sp_str_builder_new_line(&builder);
+  sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(spn_tui_color_name(name)));
+  sp_str_builder_new_line(&builder);
+
+  sp_str_t trailer = sp_str_lit("...");
+  sp_io_seek(io, 0, SP_IO_SEEK_SET);
+  s64 size = SP_MIN(sp_io_size(io), 1024);
+  c8* buffer = (c8*)sp_alloc(size);
+  sp_io_read(io, buffer, size);
+  sp_io_close(io);
+
+  sp_str_t log = sp_str_truncate(sp_str(buffer, size), 1024, sp_str_lit("..."));
+
+  sp_str_builder_append_cstr(&builder, SP_ANSI_FG_BRIGHT_BLACK);
+  sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(log));
+  sp_str_builder_append_cstr(&builder, SP_ANSI_RESET);
+
+  if (buffer[size - 1] != '\n') {
+    sp_str_builder_new_line(&builder);
+  }
+
+  return sp_str_builder_move(&builder);
+}
+
 sp_str_t spn_tui_render_build_event(spn_build_event_t* event) {
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
 
   // event kind
   switch (event->kind) {
-    case SPN_BUILD_EVENT_DONE: {
+    case SPN_BUILD_EVENT_TEST_PASSED:
+    case SPN_BUILD_EVENT_BUILD_PASSED: {
       sp_str_builder_append_fmt(&builder,
-        "{}{:fg green :pad 8}{} ",
+        "{}{:fg green :pad 10}{} ",
         SP_FMT_CSTR(SP_ANSI_BOLD),
         SP_FMT_STR(spn_build_event_kind_to_str(event->kind)),
         SP_FMT_CSTR(SP_ANSI_RESET)
       );
       break;
     }
-    case SPN_BUILD_EVENT_FAILED: {
+    case SPN_BUILD_EVENT_TEST_FAILED:
+    case SPN_BUILD_EVENT_BUILD_FAILED: {
       sp_str_builder_append_fmt(&builder,
-        "{:fg red :pad 8} ",
+        "{:fg red :pad 10} ",
         SP_FMT_STR(spn_build_event_kind_to_str(event->kind))
       );
       break;
     }
     default: {
       sp_str_builder_append_fmt(&builder,
-        "{:fg brightblack :pad 8} ",
+        "{:fg brightblack :pad 10} ",
         SP_FMT_STR(spn_build_event_kind_to_str(event->kind))
       );
       break;
@@ -3036,6 +3062,10 @@ sp_str_t spn_tui_render_build_event(spn_build_event_t* event) {
       break;
     }
     case SPN_BUILD_EVENT_COMPILE: {
+      break;
+    }
+    case SPN_BUILD_EVENT_TEST_FAILED: {
+      sp_str_builder_append_fmt(&builder, "returned code {}", SP_FMT_S32(1));
       break;
     }
     default: {
@@ -4480,7 +4510,7 @@ void spn_build_ctx_prepare_io(spn_build_ctx_t* build) {
   sp_fs_create_dir(build->paths.vendor);
 
   sp_fs_create_file(build->paths.logs.build);
-  build->logs.build = sp_io_from_file(build->paths.logs.build, SP_IO_MODE_WRITE);
+  build->logs.build = sp_io_from_file(build->paths.logs.build, SP_IO_MODE_READ | SP_IO_MODE_WRITE);
 }
 
 spn_err_t spn_pkg_build_run(spn_pkg_ctx_t* build) {
@@ -4656,8 +4686,8 @@ s32 spn_executor_run_pkg_build(spn_bg_cmd_t* cmd, void* user_data) {
 
   spn_err_t err = spn_pkg_build_run(build);
   switch (err) {
-    case SPN_OK:    { spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_DONE); break; }
-    case SPN_ERROR: { spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_FAILED); break; }
+    case SPN_OK:    { spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_BUILD_PASSED); break; }
+    case SPN_ERROR: { spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_BUILD_FAILED); break; }
   }
 
   return err;
@@ -4669,8 +4699,8 @@ s32 spn_executor_bin(spn_bg_cmd_t* cmd, void* user_data) {
 
   spn_err_t err = spn_bin_build_run(build);
   switch (err) {
-    case SPN_OK:    { spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_DONE); break; }
-    case SPN_ERROR: { spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_FAILED); break; }
+    case SPN_OK:    { spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_BUILD_PASSED); break; }
+    case SPN_ERROR: { spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_BUILD_FAILED); break; }
   }
 
   return err;
@@ -5394,6 +5424,15 @@ void spn_error(const c8* fmt, ...) {
   sp_io_write_line(&spn.logger.err, str);
 }
 
+void spn_tui(const c8* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  sp_str_t str = sp_format_v(SP_CSTR(fmt), args);
+  va_end(args);
+
+  sp_io_write_line(&spn.logger.err, str);
+}
+
 #ifdef SP_POSIX
 void spn_signal_handler(s32 kind) {
   switch (kind) {
@@ -6061,21 +6100,28 @@ sp_app_result_t spn_update(sp_app_t* sp) {
         switch (error.some) {
           case SP_OPT_SOME: {
             spn_bg_cmd_t* cmd = spn_bg_find_command(&spn.tui.build->graph, error.value.cmd_id);
-            spn_build_ctx_t* build = (spn_build_ctx_t*)cmd->fn.user_data;
-            sp_io_write_new_line(&spn.logger.err);
-            sp_io_write_line(&spn.logger.err, sp_format(
-              "Building {:fg cyan} failed ({}{}{} failed with status {:fg brightblack}):",
-              SP_FMT_STR(build->profile.name),
-              SP_FMT_STR(spn_tui_name_to_color(build->name)),
-              SP_FMT_STR(build->name),
-              SP_FMT_CSTR(SP_ANSI_RESET),
-              SP_FMT_S32(error.value.result)
-            ));
+            spn_build_ctx_t* ctx = (spn_build_ctx_t*)cmd->fn.user_data;
+            sp_io_write_str(&spn.logger.err, spn_tui_render_log(&ctx->logs.build, ctx->name));
 
-            sp_io_seek(&build->logs.build, 0, SP_IO_SEEK_SET);
-            sp_io_write_cstr(&spn.logger.err, SP_ANSI_FG_BRIGHT_BLACK);
-            sp_io_write_str(&spn.logger.err, sp_io_read_file(build->paths.logs.build));
-            sp_io_write_cstr(&spn.logger.err, SP_ANSI_RESET);
+
+
+
+
+            //
+            // sp_io_write_new_line(&spn.logger.err);
+            // sp_io_write_line(&spn.logger.err, sp_format(
+            //   "Building {:fg cyan} failed ({}{}{} failed with status {:fg brightblack}):",
+            //   SP_FMT_STR(build->profile.name),
+            //   SP_FMT_STR(spn_tui_name_to_color(build->name)),
+            //   SP_FMT_STR(build->name),
+            //   SP_FMT_CSTR(SP_ANSI_RESET),
+            //   SP_FMT_S32(error.value.result)
+            // ));
+            //
+            // sp_io_seek(&build->logs.build, 0, SP_IO_SEEK_SET);
+            // sp_io_write_cstr(&spn.logger.err, SP_ANSI_FG_BRIGHT_BLACK);
+            // sp_io_write_str(&spn.logger.err, sp_io_read_file(build->paths.logs.build));
+            // sp_io_write_cstr(&spn.logger.err, SP_ANSI_RESET);
 
             return SP_APP_ERR;
           }
@@ -6123,16 +6169,10 @@ sp_app_result_t spn_update(sp_app_t* sp) {
         sp_fs_create_file(ctx->paths.logs.test);
         ctx->logs.test = sp_io_from_file(ctx->paths.logs.test, SP_IO_MODE_WRITE | SP_IO_MODE_READ);
 
-        spn_build_event_t event = spn_build_event_new(ctx, SPN_BUILD_EVENT_RUN);
+        spn_build_event_t event = spn_build_event_new(ctx, SPN_BUILD_EVENT_TEST_RUN);
         sp_io_write_line(&spn.logger.err, spn_tui_render_build_event(&event));
 
-
-        sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-
-        u32 desired_width = spn.tui.info.max_name + 3;
-        sp_os_print(sp_str_lit("  "));
-        sp_os_print(spn_tui_colored_name(bin->name, desired_width, '.'));
-
+        // run it
         sp_ps_t process = sp_ps_create((sp_ps_config_t) {
           .command = sp_fs_join_path(ctx->paths.bin, bin->name),
           .io = {
@@ -6143,19 +6183,24 @@ sp_app_result_t spn_update(sp_app_t* sp) {
           .cwd = ctx->paths.work,
         });
         sp_ps_output_t result = sp_ps_output(&process);
-
         sp_ht_insert(tests, bin->name, result.status.exit_code);
 
         switch (result.status.exit_code) {
           case SP_ERR_OK: {
-            SP_LOG("{:fg green}", SP_FMT_CSTR("OK"));
+            spn_build_event_t event = spn_build_event_new(ctx, SPN_BUILD_EVENT_TEST_PASSED);
+            sp_io_write_line(&spn.logger.err, spn_tui_render_build_event(&event));
+
+            //spn_tui("{:fg green}", SP_FMT_CSTR("OK"));
             break;
           }
           default: {
-            SP_LOG("{:fg red} (returned code {:fg brightblack})",
-              SP_FMT_CSTR("FAIL"),
-              SP_FMT_S32(result.status.exit_code)
-            );
+            spn_build_event_t event = spn_build_event_new(ctx, SPN_BUILD_EVENT_TEST_FAILED);
+            sp_io_write_line(&spn.logger.err, spn_tui_render_build_event(&event));
+
+            // SP_LOG("{:fg red} (returned code {:fg brightblack})",
+            //   SP_FMT_CSTR("FAIL"),
+            //   SP_FMT_S32(result.status.exit_code)
+            // );
             ok = false;
             break;
           }
@@ -6176,7 +6221,7 @@ sp_app_result_t spn_update(sp_app_t* sp) {
 
           if (*it.val) {
             sp_str_builder_new_line(&builder);
-            sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(spn_tui_colored_name(*it.key, 0, 0)));
+            sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(spn_tui_color_name(ctx->name)));
             sp_str_builder_new_line(&builder);
 
             sp_str_t trailer = sp_str_lit("...");
