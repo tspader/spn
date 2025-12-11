@@ -1177,6 +1177,7 @@ typedef enum {
 } spn_tool_cmd_t;
 
 #define SPN_CLI_IMPLEMENTATION
+#define SPN_CLI_HELP
 #include "cli.h"
 
 typedef struct {
@@ -1257,7 +1258,7 @@ struct spn_cli {
   sp_str_t output;
   bool help;
 
-  spn_cli_usage_t usage;
+  spn_cli_command_usage_t cmd;
   spn_cli_add_t add;
   spn_cli_update_t update;
   spn_cli_tool_t tool;
@@ -1287,6 +1288,8 @@ spn_cli_result_t spn_cli_list(spn_cli_t* cli);
 spn_cli_result_t spn_cli_ls(spn_cli_t* cli);
 spn_cli_result_t spn_cli_which(spn_cli_t* cli);
 spn_cli_result_t spn_cli_manifest(spn_cli_t* cli);
+spn_cli_result_t spn_cli_root(spn_cli_t* cli);
+spn_cli_result_t spn_cli_help(spn_cli_parser_t* p);
 
 #define SPN_CLI_UNIMPLEMENTED() SP_LOG("unimplemented"); return SPN_CLI_ERR;
 
@@ -5539,7 +5542,6 @@ void spn_install_signal_handlers() {
 /////////
 sp_app_result_t spn_init(sp_app_t* sp) {
   spn.sp = sp;
-  spn_cli_t* cli = &spn.cli;
 
   spn_install_signal_handlers();
   spn.logger.out = sp_io_from_file_handle(STDOUT_FILENO, SP_IO_FILE_CLOSE_MODE_NONE);
@@ -5547,33 +5549,96 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   spn.events = spn_event_buffer_new();
 
-  // Parse global options using the CLI parser
-  spn_cli_parser_t global_parser = {
-    .args = spn.args + 1,
-    .num_args = spn.num_args - 1,
-    .stop_at_non_option = true,
-    .skip_help = true,
-    .cli = (spn_cli_command_usage_t) {
-      .name = "spn",
-      .summary = "A package manager and build tool for modern C",
-      .opts = {
-        { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print help message", SPN_CLI_NO_PLACEHOLDER, &cli->help },
-        { "C", "project-dir", SPN_CLI_OPT_KIND_STRING, "Specify the directory containing project file", "DIR", &cli->project_dir },
-        { "f", "file", SPN_CLI_OPT_KIND_STRING, "Specify the project file path", "FILE", &cli->project_file },
-        { "o", "output", SPN_CLI_OPT_KIND_STRING, "Output mode: interactive, noninteractive, quiet, none", "MODE", &cli->output }
-      },
-      .args = {}
+  sp_atomic_s32_set(&spn.control, 0);
+
+  spn.paths.cwd = sp_fs_get_cwd();
+  spn.paths.bin = sp_os_get_bin_path();
+  spn.paths.storage = sp_fs_join_path(sp_fs_get_storage_path(), sp_str_lit("spn"));
+  spn.paths.tools.dir = sp_fs_join_path(spn.paths.storage, sp_str_lit("tools"));
+  spn.paths.tools.manifest = sp_fs_join_path(spn.paths.tools.dir, sp_str_lit("spn.toml"));
+  spn.paths.tools.lock = sp_fs_join_path(spn.paths.storage, sp_str_lit("spn.lock"));
+
+  // Config
+  spn.paths.config_dir = sp_fs_join_path(sp_fs_get_config_path(), SP_LIT("spn"));
+  spn.paths.config = sp_fs_join_path(spn.paths.config_dir, SP_LIT("spn.toml"));
+
+  if (sp_fs_exists(spn.paths.config)) {
+    toml_table_t* toml = spn_toml_parse(spn.paths.config);
+
+    toml_value_t dir = toml_table_string(toml, "spn");
+    if (dir.ok) {
+      spn.paths.spn = sp_str_view(dir.u.s);
     }
+
+    toml_array_t* registries = toml_table_array(toml, "registry");
+    if (registries) {
+      spn_toml_arr_for(registries, n) {
+        toml_table_t* it = toml_array_table(registries, n);
+        spn_registry_t registry = {
+          .location = spn_toml_str(it, "location"),
+          .kind = SPN_PACKAGE_KIND_FILE
+        };
+
+        sp_dyn_array_push(spn.config.registries, registry);
+      }
+    }
+  }
+
+  if (!sp_str_valid(spn.paths.spn)) {
+    spn.paths.spn = sp_fs_join_path(spn.paths.storage, sp_str_lit("spn"));
+  }
+
+  spn.paths.index = sp_fs_join_path(spn.paths.spn, sp_str_lit("packages"));
+  spn.paths.include = sp_fs_join_path(spn.paths.spn, sp_str_lit("include"));
+
+  if (!sp_fs_exists(spn.paths.spn)) {
+    sp_str_t url = SP_LIT("https://github.com/tspader/spn.git");
+    SP_LOG(
+      "Cloning index from {:fg brightcyan} to {:fg brightcyan}",
+      SP_FMT_STR(url),
+      SP_FMT_STR(spn.paths.spn)
+    );
+
+    SP_ASSERT(!spn_git_clone(url, spn.paths.spn));
+  }
+
+  // Initialize builtin registry
+  spn.registry = (spn_registry_t) {
+    .location = spn.paths.index,
+    .kind = SPN_PACKAGE_KIND_INDEX
   };
-  spn_cli_parse_command(&global_parser);
 
-  // Update cli args to point to remaining args (subcommand and its args)
-  cli->args = &spn.args[1 + global_parser.it];
-  cli->num_args = spn.num_args - 1 - global_parser.it;
+  // Find the cache directory after the config has been fully loaded
+  spn.paths.runtime = sp_fs_join_path(spn.paths.storage, SP_LIT("runtime"));
+  spn.paths.log = sp_fs_join_path(spn.paths.storage, SP_LIT("log"));
+  spn.paths.cache = sp_fs_join_path(spn.paths.storage, SP_LIT("cache"));
+  spn.paths.source = sp_fs_join_path(spn.paths.cache, SP_LIT("source"));
+  spn.paths.build = sp_fs_join_path(spn.paths.cache, SP_LIT("build"));
+  spn.paths.store = sp_fs_join_path(spn.paths.cache, SP_LIT("store"));
 
-  spn.cli.usage = (spn_cli_usage_t) {
+  sp_fs_create_dir(spn.paths.log);
+  sp_fs_create_dir(spn.paths.cache);
+  sp_fs_create_dir(spn.paths.source);
+  sp_fs_create_dir(spn.paths.build);
+  sp_fs_create_dir(spn.paths.store);
+  sp_fs_create_dir(spn.paths.bin);
+  sp_fs_create_dir(spn.paths.tools.dir);
+
+  sp_tm_epoch_t now = sp_tm_now_epoch();
+  spn.paths.invocation = sp_fs_join_path(spn.paths.log, sp_tm_epoch_to_iso8601(now));
+  sp_fs_create_file(spn.paths.invocation);
+
+  spn_cli_t* cli = &spn.cli;
+  spn.cli.cmd = (spn_cli_command_usage_t) {
+    .name = "spn",
     .summary = "A package manager and build tool for modern C",
-    .commands = {
+    .opts = {
+      { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print help message", SPN_CLI_NO_PLACEHOLDER, &cli->help },
+      { "C", "project-dir", SPN_CLI_OPT_KIND_STRING, "Specify the directory containing project file", "DIR", &cli->project_dir },
+      { "f", "file", SPN_CLI_OPT_KIND_STRING, "Specify the project file path", "FILE", &cli->project_file },
+      { "o", "output", SPN_CLI_OPT_KIND_STRING, "Output mode: interactive, noninteractive, quiet, none", "MODE", &cli->output }
+    },
+    .commands = (spn_cli_command_usage_t[]) {
       {
         .name = "init",
         .opts = {
@@ -5787,81 +5852,79 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       {
         .name = "tool",
         .summary = "Run, install, and manage binaries defined by spn packages",
-        .subcommands = &(spn_cli_subcommand_usage_t) {
-          .summary = "Tool subcommands",
-          .commands = {
-            {
-              .name = "install",
-              .opts = {
-                {
-                  .brief = "f",
-                  .name = "force",
-                  .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-                  .summary = "Force reinstall even if already installed",
-                  .ptr = &cli->tool.install.force
-                },
-                {
-                  .brief = "v",
-                  .name = "version",
-                  .kind = SPN_CLI_OPT_KIND_STRING,
-                  .summary = "Version to install",
-                  .placeholder = "VERSION",
-                  .ptr = &cli->tool.install.version
-                }
+        .commands = (spn_cli_command_usage_t[]) {
+          {
+            .name = "install",
+            .opts = {
+              {
+                .brief = "f",
+                .name = "force",
+                .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+                .summary = "Force reinstall even if already installed",
+                .ptr = &cli->tool.install.force
               },
-              .args = {
-                {
-                  .name = "package",
-                  .kind = SPN_CLI_ARG_KIND_REQUIRED,
-                  .summary = "The package to install",
-                  .ptr = &cli->tool.install.package
-                }
-              },
-              .summary = "Install a package's binary targets to the PATH",
-              .handler = spn_cli_tool_install
+              {
+                .brief = "v",
+                .name = "version",
+                .kind = SPN_CLI_OPT_KIND_STRING,
+                .summary = "Version to install",
+                .placeholder = "VERSION",
+                .ptr = &cli->tool.install.version
+              }
             },
-            {
-              .name = "uninstall",
-              .opts = {
-                {
-                  .brief = "f",
-                  .name = "force",
-                  .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-                  .summary = "Force removal even if not installed by spn",
-                  .ptr = &cli->tool.install.force
-                }
-              },
-              .args = {
-                {
-                  .name = "package",
-                  .kind = SPN_CLI_ARG_KIND_REQUIRED,
-                  .summary = "The package to uninstall",
-                  .ptr = &cli->tool.install.package
-                }
-              },
-              .summary = "Uninstall a package's binary targets from the PATH",
-              .handler = spn_cli_tool_uninstall
+            .args = {
+              {
+                .name = "package",
+                .kind = SPN_CLI_ARG_KIND_REQUIRED,
+                .summary = "The package to install",
+                .ptr = &cli->tool.install.package
+              }
             },
-            {
-              .name = "run",
-              .args = {
-                {
-                  .name = "package",
-                  .kind = SPN_CLI_ARG_KIND_REQUIRED,
-                  .summary = "The package to run",
-                  .ptr = &cli->tool.run.package
-                },
-                {
-                  .name = "command",
-                  .kind = SPN_CLI_ARG_KIND_OPTIONAL,
-                  .summary = "The command to run",
-                  .ptr = &cli->tool.run.command
-                }
+            .summary = "Install a package's binary targets to the PATH",
+            .handler = spn_cli_tool_install
+          },
+          {
+            .name = "uninstall",
+            .opts = {
+              {
+                .brief = "f",
+                .name = "force",
+                .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+                .summary = "Force removal even if not installed by spn",
+                .ptr = &cli->tool.install.force
+              }
+            },
+            .args = {
+              {
+                .name = "package",
+                .kind = SPN_CLI_ARG_KIND_REQUIRED,
+                .summary = "The package to uninstall",
+                .ptr = &cli->tool.install.package
+              }
+            },
+            .summary = "Uninstall a package's binary targets from the PATH",
+            .handler = spn_cli_tool_uninstall
+          },
+          {
+            .name = "run",
+            .args = {
+              {
+                .name = "package",
+                .kind = SPN_CLI_ARG_KIND_REQUIRED,
+                .summary = "The package to run",
+                .ptr = &cli->tool.run.package
               },
-              .summary = "Run a binary from a package",
-              .handler = spn_cli_tool_run
-            }
-          }
+              {
+                .name = "command",
+                .kind = SPN_CLI_ARG_KIND_OPTIONAL,
+                .summary = "The command to run",
+                .ptr = &cli->tool.run.command
+              }
+            },
+            .summary = "Run a binary from a package",
+            .handler = spn_cli_tool_run
+          },
+          SPN_CLI_ARGS_DONE,
         },
         .handler = spn_cli_tool
       },
@@ -5869,94 +5932,30 @@ sp_app_result_t spn_init(sp_app_t* sp) {
         .name = "clean",
         .summary = "Remove build cache and store directories",
         .handler = spn_cli_clean
-      }
-    }
-  };
-  sp_str_t help = spn_cli_usage(&spn.cli.usage);
-
-  if (cli->help || !cli->num_args) {
-    sp_log(help);
-    return SP_APP_QUIT;
-  }
-
-  sp_atomic_s32_set(&spn.control, 0);
-
-  spn.paths.cwd = sp_fs_get_cwd();
-  spn.paths.bin = sp_os_get_bin_path();
-  spn.paths.storage = sp_fs_join_path(sp_fs_get_storage_path(), sp_str_lit("spn"));
-  spn.paths.tools.dir = sp_fs_join_path(spn.paths.storage, sp_str_lit("tools"));
-  spn.paths.tools.manifest = sp_fs_join_path(spn.paths.tools.dir, sp_str_lit("spn.toml"));
-  spn.paths.tools.lock = sp_fs_join_path(spn.paths.storage, sp_str_lit("spn.lock"));
-
-  // Config
-  spn.paths.config_dir = sp_fs_join_path(sp_fs_get_config_path(), SP_LIT("spn"));
-  spn.paths.config = sp_fs_join_path(spn.paths.config_dir, SP_LIT("spn.toml"));
-
-  if (sp_fs_exists(spn.paths.config)) {
-    toml_table_t* toml = spn_toml_parse(spn.paths.config);
-
-    toml_value_t dir = toml_table_string(toml, "spn");
-    if (dir.ok) {
-      spn.paths.spn = sp_str_view(dir.u.s);
-    }
-
-    toml_array_t* registries = toml_table_array(toml, "registry");
-    if (registries) {
-      spn_toml_arr_for(registries, n) {
-        toml_table_t* it = toml_array_table(registries, n);
-        spn_registry_t registry = {
-          .location = spn_toml_str(it, "location"),
-          .kind = SPN_PACKAGE_KIND_FILE
-        };
-
-        sp_dyn_array_push(spn.config.registries, registry);
-      }
-    }
-  }
-
-  if (!sp_str_valid(spn.paths.spn)) {
-    spn.paths.spn = sp_fs_join_path(spn.paths.storage, sp_str_lit("spn"));
-  }
-
-  spn.paths.index = sp_fs_join_path(spn.paths.spn, sp_str_lit("packages"));
-  spn.paths.include = sp_fs_join_path(spn.paths.spn, sp_str_lit("include"));
-
-  if (!sp_fs_exists(spn.paths.spn)) {
-    sp_str_t url = SP_LIT("https://github.com/tspader/spn.git");
-    SP_LOG(
-      "Cloning index from {:fg brightcyan} to {:fg brightcyan}",
-      SP_FMT_STR(url),
-      SP_FMT_STR(spn.paths.spn)
-    );
-
-    SP_ASSERT(!spn_git_clone(url, spn.paths.spn));
-  }
-
-  // Initialize builtin registry
-  spn.registry = (spn_registry_t) {
-    .location = spn.paths.index,
-    .kind = SPN_PACKAGE_KIND_INDEX
+      },
+      SPN_CLI_ARGS_DONE,
+    },
+    .handler = spn_cli_root
   };
 
-  // Find the cache directory after the config has been fully loaded
-  spn.paths.runtime = sp_fs_join_path(spn.paths.storage, SP_LIT("runtime"));
-  spn.paths.log = sp_fs_join_path(spn.paths.storage, SP_LIT("log"));
-  spn.paths.cache = sp_fs_join_path(spn.paths.storage, SP_LIT("cache"));
-  spn.paths.source = sp_fs_join_path(spn.paths.cache, SP_LIT("source"));
-  spn.paths.build = sp_fs_join_path(spn.paths.cache, SP_LIT("build"));
-  spn.paths.store = sp_fs_join_path(spn.paths.cache, SP_LIT("store"));
+  spn_cli_parser_t parser = {
+    .args = spn.args + 1,
+    .num_args = spn.num_args - 1,
+    .cmd = &cli->cmd
+  };
 
-  sp_fs_create_dir(spn.paths.log);
-  sp_fs_create_dir(spn.paths.cache);
-  sp_fs_create_dir(spn.paths.source);
-  sp_fs_create_dir(spn.paths.build);
-  sp_fs_create_dir(spn.paths.store);
-  sp_fs_create_dir(spn.paths.bin);
-  sp_fs_create_dir(spn.paths.tools.dir);
+  #if 0
+#endif
 
-  sp_tm_epoch_t now = sp_tm_now_epoch();
-  spn.paths.invocation = sp_fs_join_path(spn.paths.log, sp_tm_epoch_to_iso8601(now));
-  sp_fs_create_file(spn.paths.invocation);
+  switch (spn_cli_parse(&parser)) {
+    case SPN_CLI_OK: break;
+    case SPN_CLI_DONE: spn_cli_help(&parser); return SP_APP_QUIT;
+    case SPN_CLI_ERR:
+      if (sp_str_valid(parser.err)) sp_io_write_line(&spn.logger.err, parser.err);
+      spn_cli_help(&parser);
+      return SP_APP_ERR;
+  }
+
 
   if (sp_str_valid(cli->project_dir)) {
     spn.paths.project = sp_fs_canonicalize_path(cli->project_dir);
@@ -5969,13 +5968,9 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   app = spn_app_new();
   spn_app_load(&app, spn.paths.manifest);
 
-  SP_ASSERT(cli->num_args);
-  SP_ASSERT(cli->args);
-  SP_ASSERT(cli->args[0]);
-
-  spn_cli_result_t result = spn_cli_dispatch(&spn.cli.usage, cli, cli->args, cli->num_args);
+  spn_cli_result_t result = spn_cli_dispatch(&parser, cli);
   switch (result) {
-    case SPN_CLI_CONTINUE: {
+    case SPN_CLI_OK: {
       return SP_APP_CONTINUE;
       break;
     }
@@ -6379,39 +6374,86 @@ sp_str_t spn_cli_command_usage(spn_cli_command_usage_t cmd) {
   return sp_str_builder_move(&builder);
 }
 
-sp_str_t spn_cli_usage(spn_cli_usage_t* cli) {
+sp_str_t spn_cli_usage(spn_cli_command_usage_t* cmd) {
+  spn_cli_command_info_t cmd_info = spn_cli_command_info_from_usage(*cmd);
   spn_cli_usage_info_t info = SP_ZERO_INITIALIZE();
 
-  sp_carr_for(cli->commands, it) {
-    spn_cli_command_usage_t command = cli->commands[it];
-    if (!command.name) break;
-
-    spn_cli_command_info_t cmd = spn_cli_command_info_from_usage(command);
-    sp_dyn_array_push(info.commands, cmd);
+  // Collect subcommands
+  if (cmd->commands) {
+    for (spn_cli_command_usage_t* sub = cmd->commands; sub->name; sub++) {
+      spn_cli_command_info_t sub_info = spn_cli_command_info_from_usage(*sub);
+      sp_dyn_array_push(info.commands, sub_info);
+    }
   }
 
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
 
-  if (cli->summary) {
-    sp_str_builder_append_fmt(&builder, "{}", SP_FMT_CSTR(cli->summary));
-
+  if (cmd->summary) {
+    sp_str_builder_append_fmt(&builder, "{}", SP_FMT_CSTR(cmd->summary));
     sp_str_builder_new_line(&builder);
     sp_str_builder_new_line(&builder);
   }
 
-  if (cli->usage) {
+  if (cmd->usage) {
     sp_str_builder_append_fmt(&builder, "{:fg brightgreen}", SP_FMT_CSTR("usage"));
     sp_str_builder_indent(&builder);
     sp_str_builder_new_line(&builder);
-    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}", SP_FMT_CSTR(cli->usage));
+    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}", SP_FMT_CSTR(cmd->usage));
     sp_str_builder_dedent(&builder);
-
     sp_str_builder_new_line(&builder);
     sp_str_builder_new_line(&builder);
   }
 
+  // Render opts (from the command itself)
+  if (!sp_dyn_array_empty(cmd_info.opts)) {
+    sp_str_builder_append_fmt(&builder, "{:fg brightgreen}", SP_FMT_CSTR("options"));
+    sp_str_builder_new_line(&builder);
+
+    sp_tui_begin_table(&spn.tui.table);
+    sp_tui_table_setup_column(&spn.tui.table, sp_str_lit("Short"));
+    sp_tui_table_setup_column(&spn.tui.table, sp_str_lit("Long"));
+    sp_tui_table_setup_column(&spn.tui.table, sp_str_lit("Type"));
+    sp_tui_table_setup_column(&spn.tui.table, sp_str_lit("Description"));
+    sp_tui_table_header_row(&spn.tui.table);
+
+    sp_dyn_array_for(cmd_info.opts, it) {
+      spn_cli_opt_info_t opt = cmd_info.opts[it];
+
+      sp_str_t short_display;
+      if (!sp_str_empty(opt.brief)) {
+        sp_str_t short_text = sp_format("-{}", SP_FMT_STR(opt.brief));
+        short_display = sp_format("{:fg brightyellow}", SP_FMT_STR(short_text));
+      } else {
+        short_display = sp_str_lit("");
+      }
+
+      sp_str_t long_display;
+      if (!sp_str_empty(opt.placeholder)) {
+        sp_str_t long_text = sp_format("--{}", SP_FMT_STR(opt.name));
+        long_display = sp_format("{:fg brightyellow}={:fg white}", SP_FMT_STR(long_text), SP_FMT_STR(opt.placeholder));
+      } else {
+        sp_str_t long_text = sp_format("--{}", SP_FMT_STR(opt.name));
+        long_display = sp_format("{:fg brightyellow}", SP_FMT_STR(long_text));
+      }
+
+      sp_str_t kind_str = sp_format("{:fg brightblack}", SP_FMT_STR(spn_cli_opt_kind_to_str(opt.kind)));
+
+      sp_tui_table_next_row(&spn.tui.table);
+      sp_tui_table_str(&spn.tui.table, short_display);
+      sp_tui_table_str(&spn.tui.table, long_display);
+      sp_tui_table_str(&spn.tui.table, kind_str);
+      sp_tui_table_str(&spn.tui.table, opt.summary);
+    }
+
+    sp_tui_table_set_indent(&spn.tui.table, 1);
+    sp_tui_table_end(&spn.tui.table);
+    sp_str_builder_append(&builder, sp_tui_table_render(&spn.tui.table));
+    sp_str_builder_new_line(&builder);
+  }
+
+  // Render subcommands
   if (!sp_dyn_array_empty(info.commands)) {
-    sp_str_builder_append_fmt(&builder, "{:fg brightgreen}", SP_FMT_CSTR("usage"));
+    sp_str_builder_append_fmt(&builder, "{:fg brightgreen}", SP_FMT_CSTR("commands"));
     sp_str_builder_new_line(&builder);
 
     sp_tui_begin_table(&spn.tui.table);
@@ -6432,65 +6474,28 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cli) {
 
     sp_tui_table_set_indent(&spn.tui.table, 1);
     sp_tui_table_end(&spn.tui.table);
-    sp_str_t table = sp_tui_table_render(&spn.tui.table);
-
-    sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(table));
+    sp_str_builder_append(&builder, sp_tui_table_render(&spn.tui.table));
   }
 
   return sp_str_builder_move(&builder);
 }
 
-sp_str_t spn_cli_subcommand_usage(spn_cli_subcommand_usage_t* subcmds, const c8* parent_cmd_name) {
-  spn_cli_usage_info_t info = SP_ZERO_INITIALIZE();
-
-  sp_carr_for(subcmds->commands, it) {
-    spn_cli_command_usage_t command = subcmds->commands[it];
-    if (!command.name) break;
-
-    spn_cli_command_info_t cmd = spn_cli_command_info_from_usage(command);
-    sp_dyn_array_push(info.commands, cmd);
+spn_cli_result_t spn_cli_help(spn_cli_parser_t* p) {
+  if (!p->resolved) {
+    sp_log(spn_cli_command_usage(*p->cmd));
+    return SPN_CLI_DONE;
   }
-
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-
-  if (subcmds->summary) {
-    sp_str_builder_append_fmt(&builder, "{}", SP_FMT_CSTR(subcmds->summary));
-    sp_str_builder_new_line(&builder);
-    sp_str_builder_new_line(&builder);
+  else if (!p->resolved->commands) {
+    sp_log(spn_cli_command_usage(*p->resolved));
+    return SPN_CLI_DONE;
   }
-
-  if (!sp_dyn_array_empty(info.commands)) {
-    sp_str_builder_append_fmt(&builder, "{:fg brightgreen}", SP_FMT_CSTR("usage"));
-    sp_str_builder_new_line(&builder);
-    sp_str_builder_append_fmt(&builder, "  spn {:fg brightcyan} <subcommand>", SP_FMT_CSTR(parent_cmd_name));
-    sp_str_builder_new_line(&builder);
-    sp_str_builder_new_line(&builder);
-
-    sp_tui_begin_table(&spn.tui.table);
-    sp_tui_table_setup_column(&spn.tui.table, sp_str_lit("Subcommand"));
-    sp_tui_table_setup_column(&spn.tui.table, sp_str_lit("Arguments"));
-    sp_tui_table_setup_column(&spn.tui.table, sp_str_lit("Description"));
-    sp_tui_table_header_row(&spn.tui.table);
-
-    sp_dyn_array_for(info.commands, it) {
-      spn_cli_command_info_t command = info.commands[it];
-      sp_str_t args = sp_str_join_n(command.brief, sp_dyn_array_size(command.brief), sp_str_lit(", "));
-
-      sp_tui_table_next_row(&spn.tui.table);
-      sp_tui_table_fmt(&spn.tui.table, "{:fg brightcyan}", SP_FMT_STR(command.name));
-      sp_tui_table_fmt(&spn.tui.table, "{:fg brightyellow}", SP_FMT_STR(args));
-      sp_tui_table_str(&spn.tui.table, command.summary);
-    }
-
-    sp_tui_table_set_indent(&spn.tui.table, 1);
-    sp_tui_table_end(&spn.tui.table);
-    sp_str_t table = sp_tui_table_render(&spn.tui.table);
-
-    sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(table));
+  else {
+    sp_log(spn_cli_command_usage(*p->resolved->commands));
+    return SPN_CLI_DONE;
   }
-
-  return sp_str_builder_move(&builder);
+  return SPN_CLI_DONE;
 }
+
 
 /////////
 // CLI //
@@ -6511,6 +6516,12 @@ spn_cli_result_t spn_cli_init(spn_cli_t* cli) {
   );
 
   SP_LOG("Initialized project {:fg brightcyan}. Run {:fg brightyellow} to build.", SP_FMT_STR(app.package.name), SP_FMT_CSTR("spn build"));
+  return SPN_CLI_DONE;
+}
+
+spn_cli_result_t spn_cli_root(spn_cli_t* cli) {
+  sp_str_t help = spn_cli_usage(&cli->cmd);
+  sp_log(help);
   return SPN_CLI_DONE;
 }
 
@@ -6811,7 +6822,7 @@ spn_cli_result_t spn_cli_test(spn_cli_t* cli) {
   }
 
   app.state = SPN_APP_STATE_PREPARE_BUILD;
-  return SPN_CLI_CONTINUE;
+  return SPN_CLI_OK;
 }
 
 spn_cli_result_t spn_cli_build(spn_cli_t* cli) {
@@ -6841,5 +6852,5 @@ spn_cli_result_t spn_cli_build(spn_cli_t* cli) {
 
   app.state = SPN_APP_STATE_PREPARE_BUILD;
 
-  return SPN_CLI_CONTINUE;
+  return SPN_CLI_OK;
 }

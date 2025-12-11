@@ -1,9 +1,11 @@
 #ifndef SPN_CLI_H
 #define SPN_CLI_H
 
+#define SPN_CLI_ARGS_DONE SP_ZERO_STRUCT(spn_cli_command_usage_t)
+
 typedef enum {
+  SPN_CLI_OK,
   SPN_CLI_DONE,
-  SPN_CLI_CONTINUE,
   SPN_CLI_ERR,
 } spn_cli_result_t;
 
@@ -46,30 +48,32 @@ typedef struct {
   void* ptr;
 } spn_cli_opt_usage_t;
 
-typedef struct spn_cli_subcommand_usage_t spn_cli_subcommand_usage_t;
 typedef struct spn_cli spn_cli_t;
+typedef struct spn_cli_command_usage_t spn_cli_command_usage_t;
 
-typedef struct {
+struct spn_cli_command_usage_t {
   const c8* name;
-  spn_cli_opt_usage_t opts [SPN_CLI_MAX_OPTS];
-  spn_cli_arg_usage_t args [SPN_CLI_MAX_ARGS];
   const c8* usage;
   const c8* summary;
-  spn_cli_subcommand_usage_t* subcommands;
+  spn_cli_opt_usage_t opts [SPN_CLI_MAX_OPTS];
+  spn_cli_arg_usage_t args [SPN_CLI_MAX_ARGS];
+  spn_cli_command_usage_t* commands;
   spn_cli_result_t (*handler)(spn_cli_t*);
-} spn_cli_command_usage_t;
+};
 
+// Legacy alias - will be removed in phase 5
 typedef struct {
   const c8* usage;
   const c8* summary;
   spn_cli_command_usage_t commands [SPN_CLI_MAX_SUBCOMMANDS];
 } spn_cli_usage_t;
 
-struct spn_cli_subcommand_usage_t {
+// Legacy alias - will be removed in phase 5
+typedef struct {
   const c8* usage;
   const c8* summary;
   spn_cli_command_usage_t commands [SPN_CLI_MAX_SUBCOMMANDS_NESTED];
-};
+} spn_cli_subcommand_usage_t;
 
 typedef struct {
   sp_str_t name;
@@ -106,8 +110,8 @@ typedef struct {
 typedef struct {
   const c8** args;
   u32 num_args;
-  spn_cli_command_usage_t cli;
-  bool skip_help;
+  spn_cli_command_usage_t* cmd;
+  spn_cli_command_usage_t* resolved;
   bool stop_at_non_option;
   u32 it;
   sp_str_t positionals[SPN_CLI_MAX_ARGS];
@@ -141,26 +145,20 @@ void      spn_cli_assign_bool(void* ptr, bool value);
 void      spn_cli_assign_str(void* ptr, sp_str_t value);
 void      spn_cli_assign_s64(void* ptr, s64 value);
 void      spn_cli_assign(spn_cli_opt_usage_t opt, sp_str_t value);
-s32       spn_cli_parse_command(spn_cli_parser_t* p);
-sp_str_t  spn_cli_usage(spn_cli_usage_t* cli);
-sp_str_t  spn_cli_subcommand_usage(spn_cli_subcommand_usage_t* subcmds, const c8* parent_cmd_name);
+spn_cli_result_t spn_cli_parse_opts(spn_cli_parser_t* p, spn_cli_command_usage_t* cmd);
+spn_cli_result_t spn_cli_parse(spn_cli_parser_t* p);
+spn_cli_result_t spn_cli_dispatch(spn_cli_parser_t* p, spn_cli_t* user_data);
+spn_cli_result_t spn_cli_run(spn_cli_command_usage_t* cmd, spn_cli_t* user_data, const c8** args, u32 num_args);
+sp_str_t  spn_cli_usage(spn_cli_command_usage_t* cmd);
 sp_str_t  spn_cli_command_usage(spn_cli_command_usage_t cmd);
 sp_str_t  spn_cli_arg_kind_to_str(spn_cli_arg_kind_t kind);
 spn_cli_arg_kind_t spn_cli_arg_kind_from_str(sp_str_t str);
-spn_cli_result_t spn_cli_dispatch(spn_cli_usage_t* cli, spn_cli_t* user_data, const c8** args, u32 num_args);
 
 #ifdef SPN_CLI_IMPLEMENTATION
 
-#ifndef SPN_OK
-#define SPN_OK 0
-#endif
-#ifndef SPN_ERROR
-#define SPN_ERROR 1
-#endif
-
-s32 spn_cli_parser_err(spn_cli_parser_t* parser, sp_str_t err) {
+spn_cli_result_t spn_cli_parser_err(spn_cli_parser_t* parser, sp_str_t err) {
   parser->err = sp_str_copy(err);
-  return SPN_ERROR;
+  return SPN_CLI_ERR;
 }
 
 bool spn_cli_parser_is_done(spn_cli_parser_t* p) {
@@ -229,8 +227,7 @@ void spn_cli_assign(spn_cli_opt_usage_t opt, sp_str_t value) {
   }
 }
 
-s32 spn_cli_parse_command(spn_cli_parser_t* p) {
-  spn_cli_command_usage_t* cmd = &p->cli;
+spn_cli_result_t spn_cli_parse_opts(spn_cli_parser_t* p, spn_cli_command_usage_t* cmd) {
   while (true) {
     if (spn_cli_parser_is_done(p)) {
       break;
@@ -313,12 +310,14 @@ s32 spn_cli_parse_command(spn_cli_parser_t* p) {
             if (!opt.brief) break;
 
             if (opt.brief[0] == brief) {
-              sp_str_t value;
-              if (spn_cli_str_parser_is_done(&ap)) {
-                value = spn_cli_parser_peek(p);
-                spn_cli_parser_eat(p);
-              } else {
-                value = spn_cli_str_parser_rest(&ap);
+              sp_str_t value = SP_ZERO_STRUCT(sp_str_t);
+              if (opt.kind != SPN_CLI_OPT_KIND_BOOLEAN) {
+                if (spn_cli_str_parser_is_done(&ap)) {
+                  value = spn_cli_parser_peek(p);
+                  spn_cli_parser_eat(p);
+                } else {
+                  value = spn_cli_str_parser_rest(&ap);
+                }
               }
               spn_cli_assign(opt, value);
 
@@ -367,62 +366,55 @@ s32 spn_cli_parse_command(spn_cli_parser_t* p) {
     }
   }
 
-  return SPN_OK;
+  return SPN_CLI_OK;
 }
 
-spn_cli_result_t spn_cli_dispatch_cmd(spn_cli_command_usage_t* cmd, spn_cli_t* user_data, const c8** args, u32 num_args);
+spn_cli_result_t spn_cli_parse(spn_cli_parser_t* p) {
+  spn_cli_command_usage_t* cmd = p->cmd;
 
-spn_cli_result_t spn_cli_dispatch(spn_cli_usage_t* cli, spn_cli_t* user_data, const c8** args, u32 num_args) {
-  if (num_args == 0) {
-    return SPN_CLI_ERR;
-  }
+  p->stop_at_non_option = (cmd->commands != SP_NULLPTR);
+  s32 err = spn_cli_parse_opts(p, cmd);
+  if (err) return err;
 
-  sp_str_t cmd_name = sp_str_view(args[0]);
+  if (cmd->commands && (p->num_args - p->it) >= 1) {
+    sp_str_t subcmd_name = sp_str_view(p->args[p->it]);
 
-  sp_carr_for(cli->commands, i) {
-    spn_cli_command_usage_t* cmd = &cli->commands[i];
-    if (!cmd->name) break;
-
-    if (sp_str_equal_cstr(cmd_name, cmd->name)) {
-      return spn_cli_dispatch_cmd(cmd, user_data, args + 1, num_args - 1);
-    }
-  }
-
-  return SPN_CLI_ERR;
-}
-
-spn_cli_result_t spn_cli_dispatch_cmd(spn_cli_command_usage_t* cmd, spn_cli_t* user_data, const c8** args, u32 num_args) {
-  if (cmd->subcommands) {
-    if (num_args < 1) {
-      return SPN_CLI_ERR;
-    }
-
-    sp_str_t subcmd_name = sp_str_view(args[0]);
-
-    sp_carr_for(cmd->subcommands->commands, j) {
-      spn_cli_command_usage_t* subcmd = &cmd->subcommands->commands[j];
-      if (!subcmd->name) break;
-
+    for (spn_cli_command_usage_t* subcmd = cmd->commands; subcmd->name; subcmd++) {
       if (sp_str_equal_cstr(subcmd_name, subcmd->name)) {
-        return spn_cli_dispatch_cmd(subcmd, user_data, args + 1, num_args - 1);
+        p->it++;
+        p->cmd = subcmd;
+        return spn_cli_parse(p);
       }
     }
 
     return SPN_CLI_ERR;
   }
 
+  p->resolved = cmd;
+  return SPN_CLI_OK;
+}
+
+spn_cli_result_t spn_cli_dispatch(spn_cli_parser_t* p, spn_cli_t* user_data) {
+  if (p->resolved->handler) {
+    return p->resolved->handler(user_data);
+  }
+  return SPN_CLI_ERR;
+}
+
+spn_cli_result_t spn_cli_run(spn_cli_command_usage_t* cmd, spn_cli_t* user_data, const c8** args, u32 num_args) {
   spn_cli_parser_t parser = {
     .args = args,
     .num_args = num_args,
-    .cli = *cmd
+    .cmd = cmd
   };
-  s32 err = spn_cli_parse_command(&parser);
-  if (err) return SPN_CLI_ERR;
 
-  if (cmd->handler) {
-    return cmd->handler(user_data);
+  sp_try(spn_cli_parse(&parser));
+
+  if (parser.resolved->handler) {
+    return parser.resolved->handler(user_data);
   }
-  return SPN_CLI_DONE;
+
+  return SPN_CLI_ERR;
 }
 
 #endif

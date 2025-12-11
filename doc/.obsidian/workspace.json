@@ -13,12 +13,28 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "todo/tool.md",
+                "file": "cli.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "tool"
+              "title": "cli"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e4493482c1973856",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "93aedaf4f5034553",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
             }
           }
         ]
@@ -183,8 +199,9 @@
       "bases:Create new base": false
     }
   },
-  "active": "5dcf77d9225dc8d8",
+  "active": "93aedaf4f5034553",
   "lastOpenFiles": [
+    "cli.md",
     "todo/test.md",
     "todo/list.md",
     "todo/link.md",
