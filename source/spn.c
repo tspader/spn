@@ -15,6 +15,7 @@
   #include <io.h>
 #endif
 
+#define SP_MAIN
 #define SP_PS_MAX_ARGS 32
 #define SP_IMPLEMENTATION
 #include "sp.h"
@@ -39,6 +40,8 @@
   //#include <link.h>
   #include <unistd.h>
   #include <string.h>
+  #include <pty.h>
+  #include <sys/wait.h>
 #endif
 
 #include "spn.h"
@@ -72,8 +75,6 @@ typedef s32 spn_err_t;
 #define sp_rb_for(rb, it) sp_ring_buffer_for(rb, it)
 
 #define sp_try(expr) do { s32 _sp_result = (expr); if (_sp_result) return _sp_result; } while (0)
-
-#define sp_typedef_fn(return_type, name, ...) SP_TYPEDEF_FN(return_type, name, __VA_ARGS__)
 
 #define sp_ht_collect_keys(ht, da) \
   do { \
@@ -120,106 +121,70 @@ void sp_scratch_log() {
   SP_LOG("{}", SP_FMT_U32(arena->bytes_used));
 }
 
-typedef enum {
-  SP_APP_CONTINUE = 0,
-  SP_APP_ERR = 1,
-  SP_APP_QUIT = 2
-} sp_app_result_t;
+void strip_ansi(char* buf, ssize_t* len) {
+    char* out = buf;
+    char* in = buf;
+    char* end = buf + *len;
 
-typedef struct sp_app sp_app_t;
-
-sp_typedef_fn(sp_app_result_t, sp_app_init_fn_t, sp_app_t*);
-sp_typedef_fn(sp_app_result_t, sp_app_poll_fn_t, sp_app_t*);
-sp_typedef_fn(sp_app_result_t, sp_app_update_fn_t, sp_app_t*);
-sp_typedef_fn(sp_app_result_t, sp_app_deinit_fn_t, sp_app_t*);
-
-typedef struct {
-  void* user_data;
-  sp_app_init_fn_t on_init;
-  sp_app_poll_fn_t on_poll;
-  sp_app_update_fn_t on_update;
-  sp_app_deinit_fn_t on_deinit;
-  u32 fps;
-} sp_app_config_t;
-
-struct sp_app {
-  void* user_data;
-  sp_app_init_fn_t on_init;
-  sp_app_poll_fn_t on_poll;
-  sp_app_update_fn_t on_update;
-  sp_app_deinit_fn_t on_deinit;
-
-  s32 return_code;
-  sp_atomic_s32 shutdown;
-
-  u32 fps;
-
-  struct {
-    sp_tm_timer_t timer;
-    u64 target;
-    u64 accumulated;
-    u64 num;
-  } frame;
-};
-
-extern sp_app_config_t sp_main(s32 num_args, const c8** args);
-SP_API sp_app_t*       sp_app_new(sp_app_config_t config);
-
-
-
-sp_app_t* sp_app_new(sp_app_config_t config) {
-  sp_app_t* app = SP_ALLOC(sp_app_t);
-  *app = (sp_app_t) {
-    .user_data = config.user_data,
-    .on_init = config.on_init,
-    .on_poll = config.on_poll,
-    .on_update = config.on_update,
-    .on_deinit = config.on_deinit,
-    .fps = config.fps,
-    .frame = {
-      .target = sp_tm_fps_to_ns(config.fps),
+    while (in < end) {
+        if (*in == '\033' && in + 1 < end && *(in + 1) == '[') {
+            // Skip ESC[...m sequences
+            in += 2;
+            while (in < end && !(*in >= 'A' && *in <= 'z')) in++;
+            if (in < end) in++;  // skip the final letter
+        } else {
+            *out++ = *in++;
+        }
     }
-  };
-  return app;
+    *len = out - buf;
 }
 
-#define SP_MAIN
-#if defined(SP_MAIN)
-
-s32 main(s32 num_args, const c8** args) {
-  sp_app_config_t config = sp_main(num_args, args);
-  sp_app_t* sp = sp_app_new(config);
-
-  if (sp->on_init) {
-    sp_try(sp->on_init(sp));
+#ifdef SP_LINUX
+// pty-wrap: run a command with stdout/stderr connected to a pty
+// This forces line-buffering so output is flushed before crashes
+s32 spn_pty_wrap(s32 num_args, const c8** args) {
+  if (num_args < 3) {
+    fprintf(stderr, "usage: spn --pty-wrap <command> [args...]\n");
+    return 1;
   }
 
-  sp->frame.timer = sp_tm_start_timer();
-  while (true) {
-    if (sp->on_poll) {
-      sp->on_poll(sp);
-    }
+  int master;
+  pid_t pid = forkpty(&master, NULL, NULL, NULL);
 
-    sp->frame.accumulated += sp_tm_lap_timer(&sp->frame.timer);
-    if (sp->frame.accumulated >= sp->frame.target) {
-      sp->frame.accumulated -= sp->frame.target;
-      sp->frame.num++;
-      if (sp->on_update(sp) != SP_APP_CONTINUE) {
-        break;
-      };
-    }
-    else {
-      sp_sleep_ns(sp->frame.target - sp->frame.accumulated);
-    }
+  if (pid < 0) {
+    perror("forkpty");
+    return 1;
   }
 
-  if (sp->on_deinit) {
-    sp->on_deinit(sp);
+  if (pid == 0) {
+    // Child: stdout/stderr are now the slave side of the pty
+    // libc will line-buffer because isatty(1) == true
+    execvp(args[2], (char* const*)&args[2]);
+    _exit(127);
   }
 
-  return sp->return_code;
+  // Parent: copy master -> stdout
+  char buf[4096];
+  ssize_t n;
+  while ((n = read(master, buf, sizeof(buf))) > 0) {
+    strip_ansi(buf, &n);
+    write(STDOUT_FILENO, buf, n);
+  }
+
+  int status;
+  waitpid(pid, &status, 0);
+  close(master);
+
+  if (WIFEXITED(status)) {
+    return WEXITSTATUS(status);
+  }
+  if (WIFSIGNALED(status)) {
+    return 128 + WTERMSIG(status);
+  }
+  return 1;
 }
 #endif
+
 
 /////////////
 // SPINNER //
@@ -5816,69 +5781,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   if (cli->help || !cli->num_args) {
     sp_log(help);
     return SP_APP_QUIT;
-  }
-
-  sp_str_t cmd_name = sp_str_from_cstr(cli->args[0]);
-  spn_cli_command_usage_t* cmd_schema = NULL;
-
-  sp_carr_for(spn.cli.usage.commands, it) {
-    if (!spn.cli.usage.commands[it].name) break;
-    if (sp_str_equal_cstr(cmd_name, spn.cli.usage.commands[it].name)) {
-      cmd_schema = &spn.cli.usage.commands[it];
-      break;
-    }
-  }
-
-  // If we found a command schema, check if it has subcommands or options/arguments
-  if (cmd_schema) {
-    if (cmd_schema->subcommands) {
-      if (cli->num_args < 2) {
-        sp_str_t subcmd_help = spn_cli_subcommand_usage(cmd_schema->subcommands, cmd_schema->name);
-        sp_log(subcmd_help);
-        return SP_APP_QUIT;
-      }
-
-      sp_str_t subcmd_name = sp_str_from_cstr(cli->args[1]);
-      spn_cli_command_usage_t* subcmd_schema = NULL;
-
-      // Find matching subcommand
-      sp_carr_for(cmd_schema->subcommands->commands, it) {
-        if (!cmd_schema->subcommands->commands[it].name) break;
-        if (sp_str_equal_cstr(subcmd_name, cmd_schema->subcommands->commands[it].name)) {
-          subcmd_schema = &cmd_schema->subcommands->commands[it];
-          break;
-        }
-      }
-
-      if (!subcmd_schema) {
-        sp_str_t subcmd_help = spn_cli_subcommand_usage(cmd_schema->subcommands, cmd_schema->name);
-        sp_log(subcmd_help);
-        SP_EXIT_FAILURE();
-      }
-
-      // Store which subcommand was matched (for tag union)
-      if (sp_str_equal_cstr(cmd_name, "tool")) {
-        cli->tool.subcommand = spn_tool_subcommand_from_str(subcmd_name);
-      }
-
-      // Parse subcommand options/args
-      spn_cli_parser_t subcmd_parser = {
-        .args = cli->args + 2,
-        .num_args = cli->num_args - 2,
-        .cli = *subcmd_schema,
-        .skip_help = false
-      };
-      spn_cli_parse_command(&subcmd_parser);
-    }
-    else if (cmd_schema->opts[0].name || cmd_schema->args[0].name) {
-      spn_cli_parser_t cmd_parser = {
-        .args = cli->args + 1,
-        .num_args = cli->num_args - 1,
-        .cli = *cmd_schema,
-        .skip_help = false
-      };
-      spn_cli_parse_command(&cmd_parser);
-    }
   }
 
   sp_atomic_s32_set(&spn.control, 0);
