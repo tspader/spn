@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "todo/link.md",
+                "file": "todo/tool.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "link"
+              "title": "tool"
             }
           }
         ]
@@ -185,17 +185,17 @@
   },
   "active": "5dcf77d9225dc8d8",
   "lastOpenFiles": [
-    "todo/cli.md",
-    "todo/link.md",
+    "todo/test.md",
     "todo/list.md",
+    "todo/link.md",
+    "todo/cli.md",
     "todo/manifest.md",
     "todo/output.md",
-    "todo/test.md",
+    "todo/run.md",
     "todo/todo.md",
     "todo/tool.md",
     "allocations.md",
     "cli-refactor-implementation.md",
-    "todo/run.md",
     "llm/tmux/tools/wait-for-text.sh",
     "llm/tmux/tools/find-sessions.sh",
     "llm/tmux/tools",
