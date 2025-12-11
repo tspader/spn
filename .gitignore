@@ -8,6 +8,7 @@ bootstrap/
 examples/**/*.lock**
 packages/**/build
 packages/**/spn.lock
+doc/
 
 test/**/build
 test/**/spn.lock
