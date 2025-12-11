@@ -3,6 +3,7 @@ CompileFlags:
     - -DSPN_IMPLEMENTATION
     - -DSP_IMPLEMENTATION
     - -DSP_APP
+    - -DSPN_CLI_IMPLEMENTATION
     - -DSP_APP_IMPLEMENTATION
     - -include sp.h
     - -xc

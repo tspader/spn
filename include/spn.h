@@ -84,6 +84,8 @@ typedef enum {
 
 typedef struct spn_config spn_config_t;
 typedef struct spn_pkg spn_pkg_t;
+typedef struct spn_build_ctx spn_build_ctx_t;
+typedef struct spn_bin_ctx spn_bin_ctx_t;
 typedef struct spn_pkg_ctx spn_pkg_ctx_t;
 typedef struct spn_autoconf spn_autoconf_t;
 typedef struct spn_make spn_make_t;
@@ -91,7 +93,7 @@ typedef struct spn_cmake spn_cmake_t;
 typedef struct spn_cc spn_cc_t;
 
 typedef void(*spn_config_fn_t)(spn_config_t*);
-typedef void(*spn_dep_fn_t)(spn_pkg_ctx_t*);
+typedef void(*spn_build_fn_t)(spn_build_ctx_t*);
 
 void            spn_make(spn_pkg_ctx_t* build);
 spn_make_t*     spn_make_new(spn_pkg_ctx_t* build);
@@ -110,14 +112,11 @@ void            spn_cmake_configure(spn_cmake_t* cmake);
 void            spn_cmake_build(spn_cmake_t* cmake);
 void            spn_cmake_install(spn_cmake_t* cmake);
 void            spn_cmake_run(spn_cmake_t* cmake);
-void            spn_dep_log(spn_pkg_ctx_t* dep, const c8* message);
-spn_libc_kind_t spn_dep_get_libc(spn_pkg_ctx_t* dep);
-s64             spn_dep_get_s64(spn_pkg_ctx_t* dep, const c8* name);
-void            spn_dep_set_s64(spn_pkg_ctx_t* dep, const c8* name, s64 value);
-const c8*       spn_dep_get_str(spn_pkg_ctx_t* dep, const c8* name);
-void            spn_dep_set_str(spn_pkg_ctx_t* dep, const c8* name, const c8* value);
-bool            spn_dep_get_bool(spn_pkg_ctx_t* dep, const c8* name);
-void            spn_dep_set_bool(spn_pkg_ctx_t* dep, const c8* name, bool value);
+
 void            spn_copy(spn_pkg_ctx_t* build, spn_dir_kind_t from, const c8* from_path, spn_dir_kind_t to, const c8* to_path);
+
+void            spn_log(spn_build_ctx_t* build, const c8* message);
+spn_bin_ctx_t*  spn_get_target(spn_build_ctx_t* build, const c8* name);
+spn_libc_kind_t spn_get_libc(spn_build_ctx_t* ctx);
 
 #endif
