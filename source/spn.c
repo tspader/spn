@@ -816,16 +816,13 @@ struct spn_pkg_ctx {
   spn_pkg_build_nodes_t nodes;
 };
 
-typedef sp_ht(sp_str_t, spn_bin_ctx_t) spn_bin_ctx_table_t;
-typedef sp_ht(sp_str_t, spn_pkg_ctx_t) spn_pkg_ctx_table_t;
-
 struct spn_builder {
   spn_target_filter_t filter;
   spn_profile_t profile;
   sp_da(spn_target_t*) targets;
   struct {
-    spn_bin_ctx_table_t bins;
-    spn_pkg_ctx_table_t deps;
+    sp_ht(sp_str_t, spn_bin_ctx_t) bins;
+    sp_ht(sp_str_t, spn_pkg_ctx_t) deps;
     spn_build_ctx_t package;
   } contexts;
   spn_build_graph_t graph;
@@ -876,7 +873,7 @@ spn_err_t         spn_pkg_build_sync_remote(spn_pkg_ctx_t* dep);
 spn_err_t         spn_pkg_build_sync_local(spn_pkg_ctx_t* dep);
 spn_err_t         spn_pkg_build_resolve_commit(spn_pkg_ctx_t* dep);
 void              spn_pkg_build_stamp(spn_pkg_ctx_t* build);
-sp_str_t          spn_pkg_build_get_bin_path(spn_pkg_ctx_t* build, spn_target_t* bin);
+sp_str_t          spn_pkg_build_get_target_path(spn_pkg_ctx_t* build, spn_target_t* target);
 bool              spn_pkg_build_is_stamped(spn_pkg_ctx_t* context);
 sp_str_t          spn_pkg_build_get_include_dir(spn_pkg_ctx_t* pkg);
 sp_str_t          spn_pkg_build_get_lib_dir(spn_pkg_ctx_t* pkg);
@@ -3544,7 +3541,7 @@ void spn_dep_context_set_build_error(spn_pkg_ctx_t* dep, sp_str_t error) {
 }
 
 
-sp_str_t spn_pkg_build_get_bin_path(spn_pkg_ctx_t* build, spn_target_t* bin) {
+sp_str_t spn_pkg_build_get_target_path(spn_pkg_ctx_t* build, spn_target_t* bin) {
   return sp_fs_join_path(build->ctx.paths.bin, bin->name);
 }
 
