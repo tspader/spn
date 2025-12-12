@@ -610,7 +610,7 @@ typedef struct {
   sp_da(sp_str_t) source;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
-} spn_bin_t;
+} spn_target_t;
 
 typedef enum {
   SPN_PROFILE_BUILTIN,
@@ -683,8 +683,8 @@ struct spn_pkg {
   sp_str_t maintainer;
   spn_semver_t version;
   spn_lib_t lib;
-  sp_ht(sp_str_t, spn_bin_t) bins;
-  sp_ht(sp_str_t, spn_bin_t) tests;
+  sp_ht(sp_str_t, spn_target_t) binaries;
+  sp_ht(sp_str_t, spn_target_t) tests;
   spn_pkg_dep_reqs_t deps;
   sp_ht(sp_str_t, spn_dep_option_t) options;
   sp_ht(sp_str_t, spn_dep_options_t) config;
@@ -728,7 +728,7 @@ typedef struct {
   } disabled;
 } spn_target_filter_t;
 
-bool spn_target_filter_pass(spn_target_filter_t* filter, spn_bin_t* bin);
+bool spn_target_filter_pass(spn_target_filter_t* filter, spn_target_t* target);
 bool spn_target_filter_pass_visibility(spn_target_filter_t* filter, spn_visibility_t visibility);
 
 
@@ -797,7 +797,7 @@ struct spn_build_ctx {
 
 struct spn_bin_ctx {
   spn_build_ctx_t ctx;
-  spn_bin_t* bin;
+  spn_target_t* bin;
 };
 
 struct spn_pkg_ctx {
@@ -822,7 +822,7 @@ typedef sp_ht(sp_str_t, spn_pkg_ctx_t) spn_pkg_ctx_table_t;
 struct spn_builder {
   spn_target_filter_t filter;
   spn_profile_t profile;
-  sp_da(spn_bin_t*) bins;
+  sp_da(spn_target_t*) targets;
   struct {
     spn_bin_ctx_table_t bins;
     spn_pkg_ctx_table_t deps;
@@ -876,7 +876,7 @@ spn_err_t         spn_pkg_build_sync_remote(spn_pkg_ctx_t* dep);
 spn_err_t         spn_pkg_build_sync_local(spn_pkg_ctx_t* dep);
 spn_err_t         spn_pkg_build_resolve_commit(spn_pkg_ctx_t* dep);
 void              spn_pkg_build_stamp(spn_pkg_ctx_t* build);
-sp_str_t          spn_pkg_build_get_bin_path(spn_pkg_ctx_t* build, spn_bin_t* bin);
+sp_str_t          spn_pkg_build_get_bin_path(spn_pkg_ctx_t* build, spn_target_t* bin);
 bool              spn_pkg_build_is_stamped(spn_pkg_ctx_t* context);
 sp_str_t          spn_pkg_build_get_include_dir(spn_pkg_ctx_t* pkg);
 sp_str_t          spn_pkg_build_get_lib_dir(spn_pkg_ctx_t* pkg);
@@ -1365,7 +1365,7 @@ void           spn_tool_ensure_manifest();
 void           spn_tool_list();
 void           spn_tool_run(sp_str_t package_name, sp_da(sp_str_t) args);
 void           spn_tool_upgrade(sp_str_t package_name);
-sp_str_t       spn_get_tool_path(spn_bin_t* bin);
+sp_str_t       spn_get_tool_path(spn_target_t* bin);
 
 typedef struct {
   spn_cli_t cli;
@@ -1776,6 +1776,13 @@ void spn_cc_target_add_rpath(spn_cc_target_t* target, sp_str_t dir) {
 
 void spn_cc_target_embed_file(spn_cc_target_t* cc, sp_str_t file_path) {
   //sp_io_from_file(file_path, sp_io_mode_t mode)
+}
+
+// @lib
+// manifests for third party packages should still use [[lib]], so everything
+// would flow through this code path. the pkg_ctx version won't exist
+void spn_cc_target_add_library(spn_cc_target_t* target, spn_build_ctx_t* ctx) {
+
 }
 
 void spn_cc_target_add_dep(spn_cc_target_t* target, spn_pkg_ctx_t* pkg) {
@@ -3537,11 +3544,11 @@ void spn_dep_context_set_build_error(spn_pkg_ctx_t* dep, sp_str_t error) {
 }
 
 
-sp_str_t spn_pkg_build_get_bin_path(spn_pkg_ctx_t* build, spn_bin_t* bin) {
+sp_str_t spn_pkg_build_get_bin_path(spn_pkg_ctx_t* build, spn_target_t* bin) {
   return sp_fs_join_path(build->ctx.paths.bin, bin->name);
 }
 
-sp_str_t spn_get_tool_path(spn_bin_t* bin) {
+sp_str_t spn_get_tool_path(spn_target_t* bin) {
   return sp_fs_join_path(spn.paths.bin, bin->name);
 }
 
@@ -4005,7 +4012,7 @@ spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key) {
 }
 
 void spn_pkg_init(spn_pkg_t* package) {
-  sp_ht_set_fns(package->bins, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+  sp_ht_set_fns(package->binaries, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(package->tests, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(package->deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(package->options, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
@@ -4066,11 +4073,11 @@ spn_pkg_t spn_pkg_from_default(sp_str_t path, sp_str_t name) {
   package.version = (spn_semver_t) { 0, 1, 0 };
   sp_dyn_array_push(package.versions, package.version);
 
-  spn_bin_t bin = {
+  spn_target_t bin = {
     .name = sp_str_copy(package.name),
   };
   sp_dyn_array_push(bin.source, sp_str_lit("main.c"));
-  sp_ht_insert(package.bins, bin.name, bin);
+  sp_ht_insert(package.binaries, bin.name, bin);
 
   return package;
 }
@@ -4108,8 +4115,8 @@ spn_pkg_t spn_pkg_from_manifest(sp_str_t manifest) {
   return package;
 }
 
-spn_bin_t spn_pkg_load_bin(toml_table_t* toml) {
-  spn_bin_t bin = SP_ZERO_INITIALIZE();
+spn_target_t spn_pkg_load_bin(toml_table_t* toml) {
+  spn_target_t bin = SP_ZERO_INITIALIZE();
 
   if (!toml) return bin;
 
@@ -4231,14 +4238,14 @@ spn_pkg_t spn_pkg_load(sp_str_t manifest_path) {
 
   if (toml.bin) {
     spn_toml_arr_for(toml.bin, n) {
-      spn_bin_t bin = spn_pkg_load_bin(toml_array_table(toml.bin, n));
-      sp_ht_insert(package.bins, bin.name, bin);
+      spn_target_t bin = spn_pkg_load_bin(toml_array_table(toml.bin, n));
+      sp_ht_insert(package.binaries, bin.name, bin);
     }
   }
 
   if (toml.test) {
     spn_toml_arr_for(toml.test, n) {
-      spn_bin_t test = spn_pkg_load_bin(toml_array_table(toml.test, n));
+      spn_target_t test = spn_pkg_load_bin(toml_array_table(toml.test, n));
       test.visibility = SPN_VISIBILITY_TEST;
       sp_ht_insert(package.tests, test.name, test);
     }
@@ -4967,7 +4974,7 @@ bool spn_target_filter_pass_visibility(spn_target_filter_t* filter, spn_visibili
   }
 }
 
-bool spn_target_filter_pass(spn_target_filter_t* filter, spn_bin_t* bin) {
+bool spn_target_filter_pass(spn_target_filter_t* filter, spn_target_t* bin) {
   if (!sp_str_empty(filter->name)) {
     return sp_str_equal(filter->name, bin->name);
   }
@@ -5060,7 +5067,7 @@ sp_da(spn_build_event_t) spn_event_buffer_drain(spn_event_buffer_t* events) {
 
 spn_err_t spn_bin_build_run(spn_bin_ctx_t* build) {
   spn_pkg_t* package = build->ctx.package;
-  spn_bin_t* bin = build->bin;
+  spn_target_t* bin = build->bin;
   spn_builder_t* builder = build->ctx.builder;
 
   SP_ASSERT(!sp_da_empty(bin->source));
@@ -5124,17 +5131,17 @@ void spn_app_prepare_build(spn_app_t* app) {
   app->paths.profile = sp_fs_join_path(app->paths.build, app->build.profile.name);
 
   // FILTER
-  sp_ht_for_kv(app->package.bins, it) {
-    spn_bin_t* bin = it.val;
-    if (spn_target_filter_pass(&app->build.filter, bin)) {
-      sp_da_push(app->build.bins, bin);
+  sp_ht_for_kv(app->package.binaries, it) {
+    spn_target_t* target = it.val;
+    if (spn_target_filter_pass(&app->build.filter, target)) {
+      sp_da_push(app->build.targets, target);
     }
   }
 
   sp_ht_for_kv(app->package.tests, it) {
-    spn_bin_t* bin = it.val;
-    if (spn_target_filter_pass(&app->build.filter, bin)) {
-      sp_da_push(app->build.bins, bin);
+    spn_target_t* target = it.val;
+    if (spn_target_filter_pass(&app->build.filter, target)) {
+      sp_da_push(app->build.targets, target);
     }
   }
 
@@ -5156,10 +5163,10 @@ void spn_app_prepare_build(spn_app_t* app) {
   });
 
   // BINARIES
-  sp_da_for(app->build.bins, it) {
-    spn_bin_t* bin = app->build.bins[it];
+  sp_da_for(app->build.targets, it) {
+    spn_target_t* target = app->build.targets[it];
     spn_bin_ctx_t b = {
-      .bin = bin,
+      .bin = target,
       .ctx = spn_build_ctx_make((spn_build_ctx_config_t) {
         .package = &app->package,
         .builder = &app->build,
@@ -5280,7 +5287,7 @@ void spn_app_prepare_build(spn_app_t* app) {
   // GRAPH: BINARIES
   sp_ht_for_kv(app->build.contexts.bins, it) {
     spn_build_ctx_t* ctx = &it.val->ctx;
-    spn_bin_t* bin = it.val->bin;
+    spn_target_t* bin = it.val->bin;
     sp_str_t file_path = sp_fs_join_path(ctx->paths.bin, ctx->name);
 
     spn_bin_build_nodes_t nodes = {
@@ -5422,9 +5429,9 @@ void spn_app_write_manifest(spn_pkg_t* package, sp_str_t path) {
     spn_toml_end_table(&toml);
   }
 
-  if (sp_ht_size(package->bins)) {
+  if (sp_ht_size(package->binaries)) {
     spn_toml_begin_array_cstr(&toml, "bin");
-    sp_ht_for_kv(package->bins, it) {
+    sp_ht_for_kv(package->binaries, it) {
       spn_toml_append_array_table(&toml);
       spn_toml_append_str_cstr(&toml, "name", it.val->name);
 
@@ -6371,7 +6378,7 @@ sp_app_result_t spn_update(sp_app_t* sp) {
 
       sp_ht_for_kv(build->contexts.bins, it) {
         spn_build_ctx_t* ctx = &it.val->ctx;
-        spn_bin_t* bin = it.val->bin;
+        spn_target_t* bin = it.val->bin;
 
         if (!spn_target_filter_pass(&build->filter, bin)) {
           continue;
