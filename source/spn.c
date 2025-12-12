@@ -898,6 +898,13 @@ spn_pkg_req_t     spn_pkg_req_from_str(sp_str_t str);
 sp_str_t          spn_pkg_req_to_str(spn_pkg_req_t request);
 
 
+#define SPN_RESOLVE_STRATEGY(X) \
+  X(SPN_RESOLVE_STRATEGY_LOCK_FILE, "lock") \
+  X(SPN_RESOLVE_STRATEGY_SOLVER, "solver")
+
+typedef enum {
+  SPN_RESOLVE_STRATEGY(SP_X_NAMED_ENUM_DEFINE)
+} spn_resolve_strategy_t;
 
 typedef struct {
   sp_opt(u32) low;
@@ -953,6 +960,7 @@ typedef struct {
     struct { sp_ps_config_t ps; } compile;
     struct { sp_str_t commit; spn_semver_t version; sp_str_t message; } checkout;
     struct { u64 time; } done;
+    struct { spn_resolve_strategy_t strategy; } resolve;
   };
 } spn_build_event_t;
 
@@ -2132,6 +2140,18 @@ sp_str_t spn_bin_kind_to_str(spn_visibility_t kind) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+spn_resolve_strategy_t spn_resolve_strategy_from_str(sp_str_t str) {
+  SPN_RESOLVE_STRATEGY(SP_X_NAMED_ENUM_STR_TO_ENUM)
+  SP_UNREACHABLE_RETURN(SPN_RESOLVE_STRATEGY_SOLVER);
+}
+
+sp_str_t spn_resolve_strategy_to_str(spn_resolve_strategy_t strategy) {
+  switch (strategy) {
+    SPN_RESOLVE_STRATEGY(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 spn_visibility_t spn_visibility_from_str(sp_str_t str) {
   SPN_VISIBILITY_KIND(SP_X_NAMED_ENUM_STR_TO_ENUM)
   SP_UNREACHABLE_RETURN(SPN_VISIBILITY_PUBLIC);
@@ -3154,6 +3174,16 @@ sp_str_t spn_tui_render_build_event(spn_build_event_t* event) {
       break;
     }
     case SPN_BUILD_EVENT_RESOLVE: {
+      switch (event->resolve.strategy) {
+        case SPN_RESOLVE_STRATEGY_SOLVER: {
+          sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_CSTR("solver"));
+          break;
+        }
+        case SPN_RESOLVE_STRATEGY_LOCK_FILE: {
+          sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_CSTR("lock"));
+          break;
+        }
+      }
       break;
     }
     case SPN_BUILD_EVENT_COMPILE: {
@@ -4752,10 +4782,24 @@ void spn_app_resolve_from_solver(spn_app_t* app) {
 void spn_app_resolve(spn_app_t* app) {
   switch (app->lock.some) {
     case SP_OPT_SOME: {
+      spn_event_buffer_push_ex(spn.events, &app->build.contexts.package, (spn_build_event_t) {
+        .kind = SPN_BUILD_EVENT_RESOLVE,
+        .resolve = {
+          .strategy = SPN_RESOLVE_STRATEGY_LOCK_FILE
+        }
+      });
+
       spn_app_resolve_from_lock_file(app);
       break;
     }
     case SP_OPT_NONE: {
+      spn_event_buffer_push_ex(spn.events, &app->build.contexts.package, (spn_build_event_t) {
+        .kind = SPN_BUILD_EVENT_RESOLVE,
+        .resolve = {
+          .strategy = SPN_RESOLVE_STRATEGY_SOLVER
+        }
+      });
+
       spn_app_resolve_from_solver(app);
       break;
     }
@@ -4959,7 +5003,6 @@ spn_err_t spn_build_ctx_run_script(spn_build_ctx_t* build) {
 
   return SPN_OK;
 }
-
 
 s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_ctx_t* build = (spn_pkg_ctx_t*)user_data;
@@ -6364,6 +6407,11 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
             sp_io_write_str(&event->ctx->logs.build, msg);
 
             break;
+          }
+          case SPN_BUILD_EVENT_RESOLVE: {
+            sp_io_write_str(&event->ctx->logs.build, sp_str_lit("resolved"));
+            break;
+
           }
           default: {
             sp_tui_home();
