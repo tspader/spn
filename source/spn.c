@@ -603,6 +603,17 @@ typedef enum {
   SPN_VISIBILITY_KIND(SP_X_NAMED_ENUM_DEFINE)
 } spn_visibility_t;
 
+#define SPN_PACKAGE_KIND(X) \
+  X(SPN_PACKAGE_KIND_NONE, "none") \
+  X(SPN_PACKAGE_KIND_WORKSPACE, "workspace") \
+  X(SPN_PACKAGE_KIND_FILE, "file") \
+  X(SPN_PACKAGE_KIND_REMOTE, "remote") \
+  X(SPN_PACKAGE_KIND_INDEX, "index")
+
+typedef enum {
+  SPN_PACKAGE_KIND(SP_X_NAMED_ENUM_DEFINE)
+} spn_package_kind_t;
+
 
 typedef struct {
   spn_visibility_t visibility;
@@ -655,8 +666,11 @@ typedef struct {
   spn_semver_t version;
   sp_str_t commit;
   spn_dep_import_kind_t import_kind;
+  spn_visibility_t visibility;
+  spn_package_kind_t kind;
   sp_da(sp_str_t) deps;
   sp_da(sp_str_t) dependents;
+  sp_da(sp_str_t) system_deps;
 } spn_lock_entry_t;
 
 typedef struct {
@@ -893,7 +907,7 @@ typedef struct {
 
 typedef struct {
   sp_str_t name;
-  spn_pkg_req_t request;
+  spn_package_kind_t kind;
   spn_semver_t version;
 } spn_resolved_pkg_t;
 
@@ -2054,16 +2068,16 @@ void sp_tui_setup_raw_mode(spn_tui_t* tui) {
 ///////////
 // ENUMS //
 ///////////
-spn_cli_arg_kind_t spn_cli_arg_kind_from_str(sp_str_t str) {
-  SPN_CLI_ARG_KIND(SP_X_NAMED_ENUM_STR_TO_ENUM)
-  SP_UNREACHABLE_RETURN(SPN_CLI_ARG_KIND_REQUIRED);
-}
-
 sp_str_t spn_cli_opt_kind_to_str(spn_cli_opt_kind_t kind) {
   switch (kind) {
     SPN_CLI_OPT_KIND(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+spn_cli_arg_kind_t spn_cli_arg_kind_from_str(sp_str_t str) {
+  SPN_CLI_ARG_KIND(SP_X_NAMED_ENUM_STR_TO_ENUM)
+  SP_UNREACHABLE_RETURN(SPN_CLI_ARG_KIND_REQUIRED);
 }
 
 sp_str_t spn_cli_arg_kind_to_str(spn_cli_arg_kind_t kind) {
@@ -2118,9 +2132,28 @@ sp_str_t spn_bin_kind_to_str(spn_visibility_t kind) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-spn_visibility_t spn_bin_kind_from_str(sp_str_t str) {
+spn_visibility_t spn_visibility_from_str(sp_str_t str) {
   SPN_VISIBILITY_KIND(SP_X_NAMED_ENUM_STR_TO_ENUM)
   SP_UNREACHABLE_RETURN(SPN_VISIBILITY_PUBLIC);
+}
+
+sp_str_t spn_visibility_to_str(spn_visibility_t visibility) {
+  switch (visibility) {
+    SPN_VISIBILITY_KIND(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+sp_str_t spn_package_kind_to_str(spn_package_kind_t kind) {
+  switch (kind) {
+    SPN_PACKAGE_KIND(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+spn_package_kind_t spn_package_kind_from_str(sp_str_t str) {
+  SPN_PACKAGE_KIND(SP_X_NAMED_ENUM_STR_TO_ENUM)
+  SP_UNREACHABLE_RETURN(SPN_PACKAGE_KIND_NONE);
 }
 
 spn_tui_mode_t spn_output_mode_from_str(sp_str_t str) {
@@ -3381,27 +3414,32 @@ void spn_lock_file_init(spn_lock_file_t* lock) {
 }
 
 spn_lock_file_t spn_build_lock_file() {
-  // doesn't account for test vs. package deps
-  SP_BROKEN();
-
   spn_lock_file_t lock = SP_ZERO_INITIALIZE();
   spn_lock_file_init(&lock);
 
-  // Add an entry for each dep
-  sp_ht_for_kv(app.package.deps, it) {
-    spn_pkg_req_t request = *it.val;
-    spn_pkg_ctx_t* dep = sp_ht_getp(app.build.contexts.deps, request.name);
-    spn_pkg_t* package = spn_app_ensure_package(&app, request);
+  sp_ht_for_kv(app.resolver.resolved, it) {
+    spn_resolved_pkg_t* resolved = it.val;
+    spn_pkg_ctx_t* dep = sp_ht_getp(app.build.contexts.deps, resolved->name);
+    spn_pkg_t* package = dep->ctx.package;
+
+    spn_pkg_req_t* direct_req = sp_ht_getp(app.package.deps, resolved->name);
+    bool is_explicit = direct_req != SP_NULLPTR;
 
     spn_lock_entry_t entry = {
-      .name = sp_str_copy(dep->ctx.name),
+      .name = sp_str_copy(resolved->name),
       .version = dep->metadata.version,
-      .commit = dep->metadata.commit,
-      .import_kind = sp_ht_key_exists(app.package.deps, package->name),
+      .commit = sp_str_copy(dep->metadata.commit),
+      .import_kind = is_explicit ? SPN_DEP_IMPORT_KIND_EXPLICIT : SPN_DEP_IMPORT_KIND_TRANSITIVE,
+      .visibility = is_explicit ? direct_req->visibility : SPN_VISIBILITY_PUBLIC,
+      .kind = resolved->kind,
     };
 
+    sp_da_for(package->system_deps, i) {
+      sp_da_push(entry.system_deps, sp_str_copy(package->system_deps[i]));
+    }
+
     sp_ht_for_kv(package->deps, n) {
-      sp_dyn_array_push(entry.deps, n.val->name);
+      sp_dyn_array_push(entry.deps, sp_str_copy(n.val->name));
     }
 
     sp_ht_insert(lock.entries, entry.name, entry);
@@ -3411,7 +3449,7 @@ spn_lock_file_t spn_build_lock_file() {
   sp_ht_for_kv(lock.entries, it) {
     sp_dyn_array_for(it.val->deps, n) {
       spn_lock_entry_t* dep = sp_ht_getp(lock.entries, it.val->deps[n]);
-      sp_dyn_array_push(dep->dependents, it.val->name);
+      if (dep) sp_dyn_array_push(dep->dependents, sp_str_copy(it.val->name));
     }
   }
 
@@ -3438,7 +3476,10 @@ spn_lock_file_t spn_lock_file_load(sp_str_t path) {
       .name = spn_toml_str(pkg, "name"),
       .version = spn_semver_from_str(spn_toml_str(pkg, "version")),
       .commit = spn_toml_str(pkg, "commit"),
+      .kind = spn_package_kind_from_str(spn_toml_str(pkg, "kind")),
+      .visibility = spn_visibility_from_str(spn_toml_str(pkg, "visibility")),
       .deps = spn_toml_arr_to_str_arr(toml_table_array(pkg, "deps")),
+      .system_deps = spn_toml_arr_to_str_arr(toml_table_array(pkg, "system_deps")),
     };
     sp_ht_insert(lock.entries, entry.name, entry);
   }
@@ -3446,7 +3487,7 @@ spn_lock_file_t spn_lock_file_load(sp_str_t path) {
   sp_ht_for_kv(lock.entries, it) {
     sp_dyn_array_for(it.val->deps, n) {
       spn_lock_entry_t* dep = sp_ht_getp(lock.entries, it.val->deps[n]);
-      sp_dyn_array_push(dep->dependents, it.val->name);
+      if (dep) sp_dyn_array_push(dep->dependents, it.val->name);
     }
   }
 
@@ -4112,7 +4153,7 @@ spn_target_t spn_pkg_load_bin(toml_table_t* toml) {
 
   toml_value_t kind = toml_table_string(toml, "kind");
   bin.visibility = kind.ok ?
-    spn_bin_kind_from_str(sp_str_view(kind.u.s)) :
+    spn_visibility_from_str(sp_str_view(kind.u.s)) :
     SPN_VISIBILITY_PUBLIC;
 
   return bin;
@@ -4620,14 +4661,43 @@ void spn_app_resolve_from_lock_file(spn_app_t* app) {
 
   spn_lock_file_t* lock = &app->lock.value;
   sp_ht_for_kv(lock->entries, it) {
-    sp_ht_insert(app->resolver.resolved, it.val->name, ((spn_resolved_pkg_t) {
+    spn_lock_entry_t* entry = it.val;
+
+    spn_pkg_req_t request = {
       .name = *it.key,
-      .request = {
-        .name = *it.key,
-        .kind = SPN_PACKAGE_KIND_INDEX, // @hack
-      },
-      .version = it.val->version
+      .kind = entry->kind,
+      .visibility = entry->visibility,
+    };
+
+    if (request.kind == SPN_PACKAGE_KIND_INDEX) {
+      request.range = (spn_semver_range_t) {
+        .low = { .version = entry->version, .op = SPN_SEMVER_OP_EQ },
+        .high = { .version = entry->version, .op = SPN_SEMVER_OP_EQ },
+        .mod = SPN_SEMVER_MOD_CMP
+      };
+    }
+
+    spn_app_ensure_package(app, request);
+
+    sp_ht_insert(app->resolver.resolved, entry->name, ((spn_resolved_pkg_t) {
+      .name = *it.key,
+      .kind = request.kind,
+      .version = entry->version
     }));
+
+    sp_da_for(entry->system_deps, i) {
+      sp_str_t sys_dep = entry->system_deps[i];
+      bool found = false;
+      sp_da_for(app->resolver.system_deps, j) {
+        if (sp_str_equal(app->resolver.system_deps[j], sys_dep)) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        sp_da_push(app->resolver.system_deps, sys_dep);
+      }
+    }
   }
 }
 
@@ -4674,7 +4744,7 @@ void spn_app_resolve_from_solver(spn_app_t* app) {
     sp_ht_insert(app->resolver.resolved, name, ((spn_resolved_pkg_t) {
       .name = name,
       .version = dep->versions[high],
-      .request = req_high
+      .kind = req_high.kind,
     }));
   }
 }
@@ -5203,7 +5273,7 @@ void spn_app_prepare_build(spn_app_t* app) {
       .linkage = linkage
     };
 
-    switch (resolved.request.kind) {
+    switch (resolved.kind) {
       case SPN_PACKAGE_KIND_INDEX: {
         dep.ctx = spn_build_ctx_make((spn_build_ctx_config_t) {
           .name = package->name,
@@ -5219,14 +5289,7 @@ void spn_app_prepare_build(spn_app_t* app) {
       }
       case SPN_PACKAGE_KIND_FILE:
       case SPN_PACKAGE_KIND_WORKSPACE:
-      case SPN_PACKAGE_KIND_REMOTE: {
-        SP_FATAL("Tried to prepare {:fg brightcyan}, but kind was {:fg brightyellow}",
-          SP_FMT_STR(dep.ctx.name),
-          SP_FMT_STR(spn_pkg_req_to_str(resolved.request))
-        );
-        SP_BROKEN();
-        break;
-      }
+      case SPN_PACKAGE_KIND_REMOTE:
       case SPN_PACKAGE_KIND_NONE: {
         SP_UNREACHABLE_CASE();
       }
@@ -5326,9 +5389,15 @@ void spn_app_update_lock_file(spn_app_t* app) {
     spn_toml_append_str_cstr(&toml, "name", entry->name);
     spn_toml_append_str_cstr(&toml, "version", spn_semver_to_str(entry->version));
     spn_toml_append_str_cstr(&toml, "commit", entry->commit);
+    spn_toml_append_str_cstr(&toml, "kind", spn_package_kind_to_str(entry->kind));
+    spn_toml_append_str_cstr(&toml, "visibility", spn_visibility_to_str(entry->visibility));
 
     if (sp_dyn_array_size(entry->deps)) {
       spn_toml_append_str_array_cstr(&toml, "deps", entry->deps);
+    }
+
+    if (sp_dyn_array_size(entry->system_deps)) {
+      spn_toml_append_str_array_cstr(&toml, "system_deps", entry->system_deps);
     }
   }
   spn_toml_end_array(&toml);
@@ -6388,10 +6457,13 @@ sp_app_result_t spn_update(sp_app_t* sp) {
               return SP_APP_CONTINUE;
             }
             else {
+              if (!app->lock.some) {
+                spn_app_update_lock_file(app);
+              }
+
               spn_build_event_t event = spn_build_event_make(&build->contexts.package, SPN_BUILD_EVENT_BUILD_PASSED);
               event.done.time = build->executor->elapsed;
               sp_io_write_line(&spn.logger.err, spn_tui_render_build_event(&event));
-
 
               return SP_APP_QUIT;
             }
@@ -6461,6 +6533,10 @@ sp_app_result_t spn_update(sp_app_t* sp) {
             break;
           }
         }
+      }
+
+      if (!app->lock.some) {
+        spn_app_update_lock_file(app);
       }
 
       if (ok) {

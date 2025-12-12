@@ -1,0 +1,7 @@
+- [ ] Run `spn build` and verify that it succeeded
+    - [ ] Verify that `spn.lock` was created
+    - [ ] Verify that `sp` is present in the lock file
+- [ ] Delete `./build`
+- [ ] Run `spn build` again
+  - [ ] Verify that it succeeds
+  - [ ] Verify that the lock file is the same

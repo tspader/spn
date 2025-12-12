@@ -10,7 +10,7 @@ system_deps = ["m"]
 # utest = "1.0.0"
 
 [deps.package]
-sp = "1.4.0"
+sp = "1.6.6"
 tcc = ">=1.0.0"
 toml = "1.2.0"
 

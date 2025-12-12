@@ -1,0 +1,10 @@
+[package]
+name = "smoke"
+version = "0.1.0"
+
+[deps.package]
+sp = "1.6.6"
+
+[[bin]]
+name = "smoke"
+source = ["main.c"]

@@ -1,31 +1,3 @@
 [[versions]]
-version = "1.1.0"
-commit = "93743cb51d61"
-
-[[versions]]
-version = "1.2.0"
-commit = "5318fe70dd68"
-
-[[versions]]
-version = "1.2.1"
-commit = "dd684ad74f3c"
-
-[[versions]]
-version = "1.3.1"
-commit = "80efa56421bf"
-
-[[versions]]
-version = "1.4.0"
-commit = "80efa56421bf"
-
-[[versions]]
-version = "1.4.1"
-commit = "30b07466ac02"
-
-[[versions]]
-version = "1.5.0"
-commit = "f2e9dff7d3fc"
-
-[[versions]]
 version = "1.5.1"
-commit = "7a3f19628b14"
+commit = "2eadd71"

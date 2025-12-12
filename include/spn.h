@@ -66,14 +66,6 @@ typedef enum {
 } spn_cc_kind_t;
 
 typedef enum {
-  SPN_PACKAGE_KIND_NONE,
-  SPN_PACKAGE_KIND_WORKSPACE,
-  SPN_PACKAGE_KIND_FILE,
-  SPN_PACKAGE_KIND_REMOTE,
-  SPN_PACKAGE_KIND_INDEX,
-} spn_package_kind_t;
-
-typedef enum {
   SPN_CMAKE_GEN_DEFAULT,
   SPN_CMAKE_GEN_UNIX_MAKEFILES,
   SPN_CMAKE_GEN_NINJA,
