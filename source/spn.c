@@ -4883,7 +4883,7 @@ spn_err_t spn_build_ctx_compile(spn_build_ctx_t* ctx) {
 
   spn_tcc_t* tcc = spn_tcc_new(ctx);
   sp_try(spn_tcc_add_file(tcc, ctx->package->paths.script));
-  //sp_try_as(tcc_set_options(tcc, "-nostdlib"), SPN_ERROR);
+  sp_try_as(tcc_set_options(tcc, "-nostdlib"), SPN_ERROR);
   sp_try_as(tcc_relocate(tcc), SPN_ERROR);
   ctx->package->on_package = tcc_get_symbol(tcc, "package");
   ctx->package->on_build = tcc_get_symbol(tcc, "build");
