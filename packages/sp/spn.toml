@@ -5,6 +5,7 @@ version = "1.6.6"
 commit = "f8688093f692"
 author = "tspader"
 maintainer = "tspader"
+system_deps = ["m"]
 
 [lib]
 kinds = ["source"]
