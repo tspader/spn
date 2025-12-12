@@ -6367,11 +6367,12 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   switch (result) {
     case SPN_CLI_OK: {
       return SP_APP_CONTINUE;
-      break;
     }
-    case SPN_CLI_DONE:
-    case SPN_CLI_ERR: {
+    case SPN_CLI_DONE: {
       return SP_APP_QUIT;
+    }
+    case SPN_CLI_ERR: {
+      return SP_APP_ERR;
     }
     default: {
       SP_UNREACHABLE_CASE();
@@ -6610,7 +6611,7 @@ sp_app_result_t spn_update(sp_app_t* sp) {
       return SP_APP_QUIT;
     }
     case SPN_APP_STATE_IDLE: {
-      SP_UNREACHABLE_CASE();
+      return SP_APP_QUIT;
     }
   }
 }
