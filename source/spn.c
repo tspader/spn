@@ -723,7 +723,6 @@ typedef struct {
   sp_str_t name;
   struct {
     bool public;
-    bool private;
     bool test;
   } disabled;
 } spn_target_filter_t;
@@ -755,7 +754,7 @@ typedef struct {
 typedef struct spn_builder spn_builder_t;
 
 typedef struct {
-  sp_opt(sp_str_t) name;
+  sp_str_t name;
   spn_pkg_t* package;
   spn_builder_t* builder;
   struct {
@@ -3098,19 +3097,7 @@ sp_str_t spn_tui_render_build_event(spn_build_event_t* event) {
   }
 
   // package
-  switch (event->kind) {
-    case SPN_BUILD_EVENT_TARGET_BUILD:
-    case SPN_BUILD_EVENT_TARGET_BUILD_PASSED:
-    case SPN_BUILD_EVENT_TARGET_BUILD_FAILED: {
-      // sp_str_t path = sp_format("./build/{}/{}", SP_FMT_STR(event->ctx->profile.name), SP_FMT_STR(event->ctx->name));
-      // sp_str_builder_append(&builder, spn_tui_decorate_name(path, spn.tui.info.max_name, ' '));
-      // break;
-    }
-    default: {
-      sp_str_builder_append(&builder, spn_tui_decorate_name(event->ctx->name, spn.tui.info.max_name, ' '));
-      break;
-    }
-  }
+  sp_str_builder_append(&builder, spn_tui_decorate_name(event->ctx->name, spn.tui.info.max_name, ' '));
   sp_str_builder_append_c8(&builder, ' ');
 
   // extras
@@ -4544,10 +4531,6 @@ void spn_app_add_package_constraints(spn_app_t* app, spn_pkg_t* package) {
   sp_ht_insert(resolver->visited, package->name, true);
 
   sp_ht_for_kv(package->deps, it) {
-    if (!spn_target_filter_pass_visibility(&app->config.filter, it.val->visibility)) {
-      continue;
-    }
-
     spn_pkg_req_t request = *it.val;
     SP_ASSERT(!sp_str_empty(request.name));
     spn_pkg_t* dep = spn_app_ensure_package(app, request);
@@ -4863,10 +4846,7 @@ spn_build_ctx_t spn_build_ctx_make(spn_build_ctx_config_t config) {
 }
 
 void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t config) {
-  switch (config.name.some) {
-    case SP_OPT_SOME: ctx->name = sp_str_copy(config.name.value); break;
-    case SP_OPT_NONE: ctx->name = sp_str_copy(config.package->name); break;
-  }
+  ctx->name = sp_str_copy(config.name);
   ctx->profile = config.builder->profile;
   ctx->package = config.package;
   ctx->builder = config.builder;
@@ -5142,14 +5122,9 @@ void spn_app_prepare_build(spn_app_t* app) {
     }
   }
 
-  app->build.contexts.package = (spn_build_ctx_t) {
-    .name = app->package.name,
-    .package = &app->package,
-  };
-
   // PACKAGE
   app->build.contexts.package = spn_build_ctx_make((spn_build_ctx_config_t) {
-    .name = sp_opt_some(sp_str_lit("package")),
+    .name = app->package.name,
     .package = &app->package,
     .builder = &app->build,
     .paths = {
@@ -5165,6 +5140,7 @@ void spn_app_prepare_build(spn_app_t* app) {
     spn_bin_ctx_t b = {
       .bin = target,
       .ctx = spn_build_ctx_make((spn_build_ctx_config_t) {
+        .name = target->name,
         .package = &app->package,
         .builder = &app->build,
         .paths = {
@@ -5230,6 +5206,7 @@ void spn_app_prepare_build(spn_app_t* app) {
     switch (resolved.request.kind) {
       case SPN_PACKAGE_KIND_INDEX: {
         dep.ctx = spn_build_ctx_make((spn_build_ctx_config_t) {
+          .name = package->name,
           .package = package,
           .builder = &app->build,
           .paths = {
@@ -7114,7 +7091,6 @@ spn_cli_result_t spn_cli_test(spn_cli_t* cli) {
       .name = command->target,
       .disabled = {
         .public = true,
-        .private = true
       }
     },
   };
