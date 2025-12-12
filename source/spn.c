@@ -710,7 +710,7 @@ spn_pkg_t     spn_pkg_from_default(sp_str_t path, sp_str_t name);
 spn_pkg_t     spn_pkg_from_index(sp_str_t path);
 spn_pkg_t     spn_pkg_from_manifest(sp_str_t path);
 void          spn_pkg_add_dep(spn_pkg_t* package, spn_pkg_req_t request);
-void          spn_pkg_add_dep_from_index(spn_pkg_t* package, sp_str_t name);
+void          spn_pkg_add_dep_from_index(spn_pkg_t* package, sp_str_t name, spn_visibility_t visibility);
 void          spn_pkg_init(spn_pkg_t* package);
 void          spn_pkg_set_index(spn_pkg_t* package, sp_str_t path);
 void          spn_pkg_set_manifest(spn_pkg_t* package, sp_str_t path);
@@ -1190,6 +1190,7 @@ typedef enum {
 
 typedef struct {
   sp_str_t package;
+  bool test;
 } spn_cli_add_t;
 
 typedef struct {
@@ -4065,7 +4066,7 @@ spn_pkg_t spn_pkg_from_bare_default(sp_str_t path, sp_str_t name) {
 spn_pkg_t spn_pkg_from_default(sp_str_t path, sp_str_t name) {
   spn_pkg_t package = spn_pkg_new(name);
   spn_pkg_set_manifest(&package, sp_fs_join_path(path, sp_str_lit("spn.toml")));
-  spn_pkg_add_dep_from_index(&package, sp_str_lit("sp"));
+  spn_pkg_add_dep_from_index(&package, sp_str_lit("sp"), SPN_VISIBILITY_PUBLIC);
 
   package.version = (spn_semver_t) { 0, 1, 0 };
   sp_dyn_array_push(package.versions, package.version);
@@ -4329,12 +4330,10 @@ sp_str_t spn_pkg_req_to_str(spn_pkg_req_t dep) {
 }
 
 void spn_pkg_add_dep(spn_pkg_t* package, spn_pkg_req_t request) {
-  SP_BROKEN(); // package vs. test deps
   sp_ht_insert(package->deps, request.name, request);
 }
 
-void spn_pkg_add_dep_from_index(spn_pkg_t* package, sp_str_t name) {
-  SP_BROKEN(); // package vs. test deps
+void spn_pkg_add_dep_from_index(spn_pkg_t* package, sp_str_t name, spn_visibility_t visibility) {
   SP_ASSERT(package);
 
   if (sp_ht_getp(package->deps, name)) {
@@ -4343,7 +4342,8 @@ void spn_pkg_add_dep_from_index(spn_pkg_t* package, sp_str_t name) {
 
   spn_pkg_req_t request = {
     .name = sp_str_copy(name),
-    .kind = SPN_PACKAGE_KIND_INDEX
+    .kind = SPN_PACKAGE_KIND_INDEX,
+    .visibility = visibility
   };
 
   spn_pkg_t* dep = spn_app_ensure_package(&app, request);
@@ -5383,18 +5383,51 @@ void spn_app_write_manifest(spn_pkg_t* package, sp_str_t path) {
   if (!sp_dyn_array_empty(package->system_deps)) {
     spn_toml_append_str_array_cstr(&toml, "system_deps", package->system_deps);
   }
+  if (!sp_dyn_array_empty(package->define)) {
+    spn_toml_append_str_array_cstr(&toml, "define", package->define);
+  }
   spn_toml_end_table(&toml);
 
   if (sp_ht_size(package->deps)) {
-    spn_toml_begin_table_cstr(&toml, "deps.package");
+    // Write package deps
+    bool has_package_deps = false;
     sp_ht_for_kv(package->deps, it) {
-      spn_toml_append_str(&toml, *it.key, spn_pkg_req_to_str(*it.val));
+      if (it.val->visibility != SPN_VISIBILITY_TEST) {
+        has_package_deps = true;
+        break;
+      }
     }
-    spn_toml_end_table(&toml);
+    if (has_package_deps) {
+      spn_toml_begin_table_cstr(&toml, "deps.package");
+      sp_ht_for_kv(package->deps, it) {
+        if (it.val->visibility != SPN_VISIBILITY_TEST) {
+          spn_toml_append_str(&toml, *it.key, spn_pkg_req_to_str(*it.val));
+        }
+      }
+      spn_toml_end_table(&toml);
+    }
+
+    // Write test deps
+    bool has_test_deps = false;
+    sp_ht_for_kv(package->deps, it) {
+      if (it.val->visibility == SPN_VISIBILITY_TEST) {
+        has_test_deps = true;
+        break;
+      }
+    }
+    if (has_test_deps) {
+      spn_toml_begin_table_cstr(&toml, "deps.test");
+      sp_ht_for_kv(package->deps, it) {
+        if (it.val->visibility == SPN_VISIBILITY_TEST) {
+          spn_toml_append_str(&toml, *it.key, spn_pkg_req_to_str(*it.val));
+        }
+      }
+      spn_toml_end_table(&toml);
+    }
   }
 
   if (sp_ht_size(package->profiles)) {
-    spn_toml_begin_array_cstr(&toml, "bin");
+    spn_toml_begin_array_cstr(&toml, "profile");
     sp_ht_for_kv(package->profiles, it) {
       if (it.val->kind != SPN_PROFILE_BUILTIN) {
         spn_toml_append_array_table(&toml);
@@ -5432,6 +5465,9 @@ void spn_app_write_manifest(spn_pkg_t* package, sp_str_t path) {
       spn_toml_append_array_table(&toml);
       spn_toml_append_str_cstr(&toml, "name", it.val->name);
 
+      if (it.val->visibility != SPN_VISIBILITY_PUBLIC) {
+        spn_toml_append_str_cstr(&toml, "kind", spn_bin_kind_to_str(it.val->visibility));
+      }
       if (sp_dyn_array_size(it.val->source)) {
         spn_toml_append_str_array_cstr(&toml, "source", it.val->source);
       }
@@ -5439,7 +5475,26 @@ void spn_app_write_manifest(spn_pkg_t* package, sp_str_t path) {
         spn_toml_append_str_array_cstr(&toml, "include", it.val->include);
       }
       if (sp_dyn_array_size(it.val->define)) {
-        spn_toml_append_str_array_cstr(&toml, "include", it.val->define);
+        spn_toml_append_str_array_cstr(&toml, "define", it.val->define);
+      }
+    }
+    spn_toml_end_array(&toml);
+  }
+
+  if (sp_ht_size(package->tests)) {
+    spn_toml_begin_array_cstr(&toml, "test");
+    sp_ht_for_kv(package->tests, it) {
+      spn_toml_append_array_table(&toml);
+      spn_toml_append_str_cstr(&toml, "name", it.val->name);
+
+      if (sp_dyn_array_size(it.val->source)) {
+        spn_toml_append_str_array_cstr(&toml, "source", it.val->source);
+      }
+      if (sp_dyn_array_size(it.val->include)) {
+        spn_toml_append_str_array_cstr(&toml, "include", it.val->include);
+      }
+      if (sp_dyn_array_size(it.val->define)) {
+        spn_toml_append_str_array_cstr(&toml, "define", it.val->define);
       }
     }
     spn_toml_end_array(&toml);
@@ -5906,6 +5961,15 @@ sp_app_result_t spn_init(sp_app_t* sp) {
             .kind = SPN_CLI_ARG_KIND_REQUIRED,
             .summary = "The package to add",
             .ptr = &spn.cli.add.package
+          }
+        },
+        .opts = {
+          {
+            .brief = "t",
+            .name = "test",
+            .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+            .summary = "Add as a test dependency",
+            .ptr = &spn.cli.add.test
           }
         },
         .summary = "Add the latest version of a package to the project",
@@ -6902,7 +6966,8 @@ spn_cli_result_t spn_cli_manifest(spn_cli_t* cli) {
 spn_cli_result_t spn_cli_add(spn_cli_t* cli) {
   spn_cli_add_t* cmd = &cli->add;
 
-  spn_pkg_add_dep_from_index(&app.package, cmd->package);
+  spn_visibility_t visibility = cmd->test ? SPN_VISIBILITY_TEST : SPN_VISIBILITY_PUBLIC;
+  spn_pkg_add_dep_from_index(&app.package, cmd->package, visibility);
   spn_app_resolve_from_solver(&app);
   spn_app_prepare_build(&app);
   spn_app_update_lock_file(&app);

@@ -1,0 +1,11 @@
+[package]
+name = "test_visibility"
+version = "0.1.0"
+
+[deps.package]
+sp = "1.6.6"
+
+
+[[bin]]
+name = "binary"
+source = ["main.c"]

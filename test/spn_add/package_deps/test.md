@@ -1,0 +1,4 @@
+- Verify that the tests fail to build by default because `sp.h` is missing.
+- Add `sp` as a dependency
+- Rebuild
+- Verify that the build works and that the binary runs.
