@@ -1,7 +1,6 @@
 [package]
 name = "spn"
 version = "0.1.0"
-system_deps = ["m"]
 
 # [deps]
 # sp = "1.4.0"
@@ -40,5 +39,3 @@ include = ["include", "source", "test/tools"]
 name = "spn-test-cli"
 source = ["test/cli/main.c"]
 include = ["include", "source", "test/tools"]
-
-
