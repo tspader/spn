@@ -752,7 +752,7 @@ typedef struct {
 } spn_bin_build_nodes_t;
 
 typedef struct {
-  spn_bg_id_t sync;
+  spn_bg_id_t fetch;
   spn_bg_id_t repo;
   spn_bg_id_t build;
   spn_bg_id_t stamp;
@@ -4413,12 +4413,8 @@ void spn_pkg_add_dep(spn_pkg_t* package, spn_pkg_req_t request) {
   sp_ht_insert(package->deps, request.name, request);
 }
 
-void spn_pkg_add_dep_from_index(spn_pkg_t* package, sp_str_t name, spn_visibility_t visibility) {
+void spn_pkg_set_dep_from_index(spn_pkg_t* package, sp_str_t name, spn_visibility_t visibility) {
   SP_ASSERT(package);
-
-  if (sp_ht_getp(package->deps, name)) {
-    SP_FATAL("{:fg brightyellow} is already in your project", SP_FMT_STR(name));
-  }
 
   spn_pkg_req_t request = {
     .name = sp_str_copy(name),
@@ -4441,6 +4437,13 @@ void spn_pkg_add_dep_from_index(spn_pkg_t* package, sp_str_t name, spn_visibilit
   };
   request.range = spn_semver_caret_to_range(version);
   spn_pkg_add_dep(package, request);
+}
+
+void spn_pkg_add_dep_from_index(spn_pkg_t* package, sp_str_t name, spn_visibility_t visibility) {
+  if (sp_ht_getp(package->deps, name)) {
+    SP_FATAL("{:fg brightyellow} is already in your project", SP_FMT_STR(name));
+  }
+  spn_pkg_set_dep_from_index(package, name, visibility);
 }
 
 void spn_resolver_init(spn_resolver_t* resolver) {
@@ -5011,6 +5014,12 @@ s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
 
   spn_pkg_build_resolve_commit(build);
 
+  return SPN_OK;
+}
+
+s32 spn_executor_run_pkg_build(spn_bg_cmd_t* cmd, void* user_data) {
+  spn_pkg_ctx_t* build = (spn_pkg_ctx_t*)user_data;
+
   // @spader @allocator
   // you need to give the build context an allocator; technically, this is fine, since the default
   // malloc wrapper is stateless. but really, this memory would get allocated with some TLS allocator
@@ -5025,11 +5034,6 @@ s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
   });
   spn_pkg_build_sync_local(build);
 
-  return SPN_OK;
-}
-
-s32 spn_executor_run_pkg_build(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_pkg_ctx_t* build = (spn_pkg_ctx_t*)user_data;
   spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_DEP_BUILD);
   //return 69;
 
@@ -5329,16 +5333,16 @@ void spn_app_prepare_build(spn_app_t* app) {
   sp_ht_for_kv(app->build.contexts.deps, it) {
     spn_pkg_ctx_t* dep = it.val;
     spn_pkg_build_nodes_t nodes = {
-      .sync = spn_bg_add_fn(&app->build.graph, spn_executor_sync_repo, dep),
+      .fetch = spn_bg_add_fn(&app->build.graph, spn_executor_sync_repo, dep),
       .repo = spn_bg_add_file(&app->build.graph, dep->ctx.paths.source),
       .build = spn_bg_add_fn(&app->build.graph, spn_executor_run_pkg_build, dep),
       .stamp = spn_bg_add_file(&app->build.graph, dep->ctx.paths.stamp),
     };
 
-    spn_bg_tag_command(&app->build.graph, nodes.sync, sp_format("{} (sync)", SP_FMT_STR(dep->ctx.name)));
+    spn_bg_tag_command(&app->build.graph, nodes.fetch, sp_format("{} (sync)", SP_FMT_STR(dep->ctx.name)));
     spn_bg_tag_command(&app->build.graph, nodes.build, sp_format("{} (build)", SP_FMT_STR(dep->ctx.name)));
 
-    spn_bg_cmd_add_output(&app->build.graph, nodes.sync, nodes.repo);
+    spn_bg_cmd_add_output(&app->build.graph, nodes.fetch, nodes.repo);
     spn_bg_cmd_add_input(&app->build.graph, nodes.build, nodes.repo);
     spn_bg_cmd_add_output(&app->build.graph, nodes.build, nodes.stamp);
 
@@ -6400,14 +6404,16 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
           case SPN_BUILD_EVENT_COMPILE: {
             sp_da(sp_str_t) args = event->compile.ps.dyn_args;
             sp_str_t msg = sp_str_join_n(args, sp_da_size(args), sp_str_lit(" "));
-            sp_io_write_str(&event->ctx->logs.build, msg);
-
+            sp_io_write_line(&event->ctx->logs.build, msg);
             break;
           }
           case SPN_BUILD_EVENT_RESOLVE: {
-            sp_io_write_str(&event->ctx->logs.build, sp_str_lit("resolved"));
+            sp_io_write_line(&event->ctx->logs.build, sp_str_lit("resolved"));
+            // sp_ht_for_kv(app->resolver.resolved, it) {
+              // sp_io_write_line(&event->ctx->logs.build, sp_format("{}: {}",
+              //                 SP_FMT_STR(*it.key), SP_FMT_STR(spn_semver_to_str(it.val->version))));
+            // }
             break;
-
           }
           default: {
             sp_tui_home();
@@ -7073,7 +7079,19 @@ spn_cli_result_t spn_cli_add(spn_cli_t* cli) {
 }
 
 spn_cli_result_t spn_cli_update(spn_cli_t* cli) {
-  SPN_CLI_UNIMPLEMENTED();
+  spn_cli_update_t* cmd = &cli->update;
+
+  spn_pkg_req_t* existing = sp_ht_getp(app.package.deps, cmd->package);
+  if (!existing) {
+    SP_FATAL("package {:fg brightcyan} is not a dependency", SP_FMT_STR(cmd->package));
+  }
+
+  spn_pkg_set_dep_from_index(&app.package, cmd->package, existing->visibility);
+  spn_app_resolve_from_solver(&app);
+  spn_app_prepare_build(&app);
+  spn_app_update_lock_file(&app);
+  spn_app_write_manifest(&app.package, app.package.paths.manifest);
+  return SPN_CLI_DONE;
 }
 
 spn_cli_result_t spn_cli_tool_install(spn_cli_t* cli) {

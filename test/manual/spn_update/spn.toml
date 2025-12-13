@@ -1,0 +1,10 @@
+[package]
+name = "spn_update"
+version = "0.1.0"
+
+[deps.package]
+sp = "=1.5.1"
+
+[[bin]]
+name = "spn_update"
+source = ["main.c"]
