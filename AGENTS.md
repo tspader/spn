@@ -26,3 +26,6 @@ assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn
 ## Rules
 - always use the `sp.h` skill when writing against sp.h APIs (either with your `Skill` tool or with `./doc/llm/sp/SKILL.md`)
 - never use the C standard library. always use `sp.h`
+- always prefer to initialize structs with designated initializers when possible
+  - you MUST use SP_ZERO_INITIALIZE() if you don't use a designated initializer
+  - sp_alloc() and SP_ALLOC() return zero allocated memory; do not re-zero

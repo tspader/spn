@@ -11,6 +11,18 @@ packages/**/spn.lock
 
 test/**/build
 test/**/spn.lock
+test/manual/spn_generate/**/*.mk
+test/manual/spn_generate/cmake/*
+!test/manual/spn_generate/cmake/CMakeLists.txt
+test/manual/spn_generate/make/*
+!test/manual/spn_generate/make/Makefile
+test/manual/spn_generate/pkgconfig/*
+!test/manual/spn_generate/pkgconfig/build.sh
+test/manual/spn_generate/pkgconfig_cmake/*
+!test/manual/spn_generate/pkgconfig_cmake/build.sh
+test/manual/spn_generate/shell/*
+!test/manual/spn_generate/shell/build.sh
+
 doc/
 
 examples/**/build

@@ -430,6 +430,8 @@ typedef enum {
   SPN_GEN_KIND_RAW,
   SPN_GEN_KIND_SHELL,
   SPN_GEN_KIND_MAKE,
+  SPN_GEN_KIND_CMAKE,
+  SPN_GEN_KIND_PKGCONFIG,
 } spn_generator_kind_t;
 
 typedef enum {
@@ -1182,7 +1184,7 @@ void     spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode, spn_builder_t* build)
   X(SPN_CLI_BUILD, "build") \
   X(SPN_CLI_TEST, "test") \
   X(SPN_CLI_CLEAN, "clean") \
-  X(SPN_CLI_PRINT, "print") \
+  X(SPN_CLI_GENERATE, "generate") \
   X(SPN_CLI_COPY, "copy") \
   X(SPN_CLI_UPDATE, "update") \
   X(SPN_CLI_LIST, "list") \
@@ -1261,7 +1263,7 @@ typedef struct {
   sp_str_t generator;
   sp_str_t compiler;
   sp_str_t path;
-} spn_cli_print_t;
+} spn_cli_generate_t;
 
 typedef struct {
   sp_str_t dir;
@@ -1294,7 +1296,7 @@ struct spn_cli {
   spn_cli_update_t update;
   spn_cli_tool_t tool;
   spn_cli_init_t init;
-  spn_cli_print_t print;
+  spn_cli_generate_t generate;
   spn_cli_build_t build;
   spn_cli_test_t test;
   spn_cli_ls_t ls;
@@ -1306,7 +1308,7 @@ struct spn_cli {
 spn_cli_result_t spn_cli_clean(spn_cli_t* cli);
 spn_cli_result_t spn_cli_build(spn_cli_t* cli);
 spn_cli_result_t spn_cli_test(spn_cli_t* cli);
-spn_cli_result_t spn_cli_print(spn_cli_t* cli);
+spn_cli_result_t spn_cli_generate(spn_cli_t* cli);
 spn_cli_result_t spn_cli_copy(spn_cli_t* cli);
 spn_cli_result_t spn_cli_init(spn_cli_t* cli);
 spn_cli_result_t spn_cli_add(spn_cli_t* cli);
@@ -1328,8 +1330,7 @@ spn_cli_result_t spn_cli_help(spn_cli_parser_t* p);
 // APP //
 /////////
 typedef enum {
-  SPN_APP_STATE_IDLE,
-  SPN_APP_STATE_PREPARE_BUILD,
+  SPN_APP_STATE_INIT,
   SPN_APP_STATE_BUILDING,
   SPN_APP_STATE_PREPARE_RUN,
   SPN_APP_STATE_RUNNING,
@@ -1337,8 +1338,9 @@ typedef enum {
 
 typedef struct {
   spn_target_filter_t filter;
+  spn_profile_t profile;
   bool force;
-  bool run_tests;
+  struct { bool tests; bool build; } tasks;
 } spn_app_config_t;
 
 typedef struct {
@@ -1350,7 +1352,6 @@ typedef struct {
   spn_app_state_t state;
 
   spn_app_config_t config;
-  spn_profile_t profile;
 
   sp_da(sp_str_t) search;
   sp_ht(sp_str_t, sp_str_t) registry;
@@ -2362,8 +2363,10 @@ spn_generator_kind_t spn_gen_kind_from_str(sp_str_t str) {
   if      (sp_str_equal_cstr(str, ""))           return SPN_GEN_KIND_RAW;
   else if (sp_str_equal_cstr(str, "shell"))      return SPN_GEN_KIND_SHELL;
   else if (sp_str_equal_cstr(str, "make"))       return SPN_GEN_KIND_MAKE;
+  else if (sp_str_equal_cstr(str, "cmake"))      return SPN_GEN_KIND_CMAKE;
+  else if (sp_str_equal_cstr(str, "pkgconfig"))  return SPN_GEN_KIND_PKGCONFIG;
 
-  SP_FATAL("Unknown generator {:fg brightyellow}; options are [[empty], shell, make]", SP_FMT_STR(str));
+  SP_FATAL("Unknown generator {:fg brightyellow}; options are [[empty], shell, make, cmake, pkgconfig]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_GEN_KIND_RAW);
 }
 
@@ -5198,9 +5201,10 @@ spn_err_t spn_bin_build_run(spn_bin_ctx_t* build) {
 /////////
 // APP //
 /////////
+
 void spn_app_prepare_build(spn_app_t* app) {
   app->build = (spn_builder_t) {
-    .profile = app->profile,
+    .profile = app->config.profile,
     .filter = app->config.filter
   };
   spn_builder_init(&app->build);
@@ -5814,14 +5818,8 @@ void spn_app_load(spn_app_t* app, sp_str_t manifest_path) {
     sp_opt_set(app->lock, spn_lock_file_load(app->paths.lock));
   }
 
-  // The project is loaded; apply any defaults
-  if (!sp_ht_empty(app->package.profiles)) {
-    sp_ht_for_kv(app->package.profiles, it) {
-      app->profile = *it.val;
-      break;
-    }
-  }
-  else {
+  // apply any defaults
+  if (sp_ht_empty(app->package.profiles)) {
     spn_profile_t debug = {
       .name = sp_str_lit("debug"),
       .cc = { SPN_CC_GCC, sp_str_lit("gcc") },
@@ -5833,18 +5831,35 @@ void spn_app_load(spn_app_t* app, sp_str_t manifest_path) {
     };
     sp_ht_insert(app->package.profiles, debug.name, debug);
 
-    spn_profile_t release = {
-      .name = sp_str_lit("release"),
-      .cc = { SPN_CC_GCC, sp_str_lit("gcc") },
-      .linkage = SPN_LIB_KIND_SHARED,
-      .libc = SPN_LIBC_GNU,
-      .standard = SPN_C11,
-      .mode = SPN_DEP_BUILD_MODE_RELEASE,
-      .kind = SPN_PROFILE_BUILTIN,
+    spn_profile_t profiles [] = {
+      {
+        .name = sp_str_lit("debug"),
+        .linkage  = SPN_LIB_KIND_SHARED,
+        .libc     = SPN_LIBC_GNU,
+        .standard = SPN_C11,
+        .mode     = SPN_DEP_BUILD_MODE_DEBUG,
+        .kind     = SPN_PROFILE_BUILTIN,
+        .cc = {
+          .kind = SPN_CC_GCC,
+          .exe = sp_str_lit("gcc")
+        },
+      },
+      {
+        .name     = sp_str_lit("release"),
+        .linkage  = SPN_LIB_KIND_SHARED,
+        .libc     = SPN_LIBC_GNU,
+        .standard = SPN_C11,
+        .mode     = SPN_DEP_BUILD_MODE_RELEASE,
+        .kind     = SPN_PROFILE_BUILTIN,
+        .cc = {
+          .kind = SPN_CC_GCC,
+          .exe = sp_str_lit("gcc")
+        },
+      }
     };
-    sp_ht_insert(app->package.profiles, release.name, release);
-
-    app->profile = debug;
+    sp_carr_for(profiles, it) {
+      sp_ht_insert(app->package.profiles, profiles[it].name, profiles[it]);
+    }
   }
 }
 
@@ -6126,35 +6141,35 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       },
 
       {
-        .name = "print",
+        .name = "generate",
         .opts = {
           {
             .brief = "g",
             .name = "generator",
             .kind = SPN_CLI_OPT_KIND_STRING,
-            .summary = "Generator type",
+            .summary = "Generator type (raw, shell, make)",
             .placeholder = "TYPE",
-            .ptr = &spn.cli.print.generator
+            .ptr = &spn.cli.generate.generator
           },
           {
             .brief = "c",
             .name = "compiler",
             .kind = SPN_CLI_OPT_KIND_STRING,
-            .summary = "Compiler to use",
+            .summary = "Compiler to format flags for (gcc, clang, tcc)",
             .placeholder = "COMPILER",
-            .ptr = &spn.cli.print.compiler
+            .ptr = &spn.cli.generate.compiler
           },
           {
             .brief = "p",
             .name = "path",
             .kind = SPN_CLI_OPT_KIND_STRING,
-            .summary = "Package path",
+            .summary = "Output directory for generated file",
             .placeholder = "PATH",
-            .ptr = &spn.cli.print.path
+            .ptr = &spn.cli.generate.path
           }
         },
-        .summary = "Print or write the compiler flags needed to consume a package",
-        .handler = spn_cli_print
+        .summary = "Generate build system files with dependency flags",
+        .handler = spn_cli_generate
       },
       {
         .name = "link",
@@ -6383,9 +6398,6 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
   spn_app_t* app = (spn_app_t*)sp->user_data;
 
   switch (app->state) {
-    case SPN_APP_STATE_PREPARE_BUILD: {
-      return SP_APP_CONTINUE;
-    }
     case SPN_APP_STATE_BUILDING: {
       // @hack, properly init this
       spn_builder_t* build = &app->build;
@@ -6426,13 +6438,9 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
       }
       return SP_APP_CONTINUE;
     }
-    case SPN_APP_STATE_PREPARE_RUN: {
-      return SP_APP_CONTINUE;
-    }
+    case SPN_APP_STATE_INIT:
+    case SPN_APP_STATE_PREPARE_RUN:
     case SPN_APP_STATE_RUNNING: {
-      return SP_APP_CONTINUE;
-    }
-    case SPN_APP_STATE_IDLE: {
       return SP_APP_CONTINUE;
     }
   }
@@ -6443,29 +6451,39 @@ sp_app_result_t spn_update(sp_app_t* sp) {
   spn_builder_t* build = &app->build;
 
   switch (app->state) {
-    // PREPARE_BUILD
-    case SPN_APP_STATE_PREPARE_BUILD: {
-      spn_app_resolve(app);
-      spn_app_prepare_build(app);
+    // INIT
+    case SPN_APP_STATE_INIT: {
+      SP_ASSERT(app->config.tasks.build || app->config.tasks.tests);
 
-      spn_build_ctx_compile(&build->contexts.package);
-      spn_build_ctx_run_script(&build->contexts.package);
+      if (app->config.tasks.build) {
+        spn_app_resolve(app);
+        spn_app_prepare_build(app);
 
-      build->dirty = app->config.force ?
-        spn_bg_compute_forced_dirty(&build->graph) :
-        spn_bg_compute_dirty(&build->graph);
+        spn_build_ctx_compile(&build->contexts.package);
+        spn_build_ctx_run_script(&build->contexts.package);
 
-      build->executor = spn_bg_executor_new(&build->graph, build->dirty, (spn_bg_executor_config_t) {
-        .num_threads = 3,
-        .enable_logging = false
-      });
+        build->dirty = app->config.force ?
+          spn_bg_compute_forced_dirty(&build->graph) :
+          spn_bg_compute_dirty(&build->graph);
 
-      spn_bg_executor_run(app->build.executor);
+        build->executor = spn_bg_executor_new(&build->graph, build->dirty, (spn_bg_executor_config_t) {
+          .num_threads = 3,
+          .enable_logging = false
+        });
 
-      spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_INTERACTIVE, &app->build);
+        spn_bg_executor_run(app->build.executor);
 
-      app->state = SPN_APP_STATE_BUILDING;
-      return SP_APP_CONTINUE;
+        spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_INTERACTIVE, &app->build);
+
+        app->state = SPN_APP_STATE_BUILDING;
+        return SP_APP_CONTINUE;
+      }
+      else if (app->config.tasks.tests){
+        app->state = SPN_APP_STATE_PREPARE_RUN;
+        return SP_APP_CONTINUE;
+      }
+
+      SP_UNREACHABLE_RETURN(SP_APP_ERR);
     }
     // BUILDING
     case SPN_APP_STATE_BUILDING: {
@@ -6502,24 +6520,20 @@ sp_app_result_t spn_update(sp_app_t* sp) {
             return SP_APP_ERR;
           }
           case SP_OPT_NONE: {
-            if (app->config.run_tests) {
+            if (app->config.tasks.tests) {
               app->state = SPN_APP_STATE_PREPARE_RUN;
               return SP_APP_CONTINUE;
             }
-            else {
-              if (!app->lock.some) {
-                spn_app_update_lock_file(app);
-              }
 
-              spn_build_event_t event = spn_build_event_make(&build->contexts.package, SPN_BUILD_EVENT_BUILD_PASSED);
-              event.done.time = build->executor->elapsed;
-              sp_io_write_line(&spn.logger.err, spn_tui_render_build_event(&event));
-
-              return SP_APP_QUIT;
+            if (!app->lock.some) {
+              spn_app_update_lock_file(app);
             }
 
+            spn_build_event_t event = spn_build_event_make(&build->contexts.package, SPN_BUILD_EVENT_BUILD_PASSED);
+            event.done.time = build->executor->elapsed;
+            sp_io_write_line(&spn.logger.err, spn_tui_render_build_event(&event));
 
-            break;
+            return SP_APP_QUIT;
           }
         }
 
@@ -6609,9 +6623,6 @@ sp_app_result_t spn_update(sp_app_t* sp) {
     // RUNNING
     case SPN_APP_STATE_RUNNING: {
       SP_UNREACHABLE();
-      return SP_APP_QUIT;
-    }
-    case SPN_APP_STATE_IDLE: {
       return SP_APP_QUIT;
     }
   }
@@ -6908,6 +6919,31 @@ spn_cli_result_t spn_cli_help(spn_cli_parser_t* p) {
   return SPN_CLI_DONE;
 }
 
+spn_err_t spn_cli_set_profile(spn_app_t* app, sp_str_t profile_name) {
+  if (sp_str_empty(profile_name)) {
+    SP_ASSERT(!sp_ht_empty(app->package.profiles));
+
+    sp_ht_for_kv(app->package.profiles, it) {
+      app->config.profile = *it.val;
+      return SPN_OK;
+    }
+    SP_UNREACHABLE_RETURN(SPN_ERROR);
+  }
+
+
+  if (!sp_ht_key_exists(app->package.profiles, profile_name)) {
+    spn_ctx_error("{:fg brightcyan} profile isn't defined in {:fg brightcyan}",
+      SP_FMT_STR(profile_name),
+      SP_FMT_STR(app->package.paths.manifest)
+    );
+    return SPN_ERROR;
+  }
+
+  app->config.profile = *sp_ht_getp(app->package.profiles, profile_name);
+  return SPN_OK;
+}
+
+
 
 /////////
 // CLI //
@@ -7110,171 +7146,204 @@ spn_cli_result_t spn_cli_tool(spn_cli_t* cli) {
   SPN_CLI_UNIMPLEMENTED();
 }
 
-spn_cli_result_t spn_cli_print(spn_cli_t* cli) {
-  SPN_CLI_UNIMPLEMENTED();
+spn_cli_result_t spn_cli_generate(spn_cli_t* cli) {
+  spn_cli_generate_t* command = &cli->generate;
 
-  // if (sp_str_valid(command->path) && !sp_str_valid(command->generator)) {
-  //   SP_FATAL(
-  //     "output path was specified, but no generator. try e.g.:\n  spn print --path {} {:fg yellow}",
-  //     SP_FMT_STR(command->path),
-  //     SP_FMT_CSTR("--generator make")
-  //   );
-  // }
-  // if (!sp_str_valid(command->generator)) command->generator = sp_str_lit("");
-  // if (!sp_str_valid(command->compiler)) command->compiler = sp_str_lit("gcc");
-  //
-  // if (!app.lock.some) {
-  //   SP_FATAL("No lock file found. Run {:fg yellow} first.", SP_FMT_CSTR("spn build"));
-  // }
-  //
-  // spn_app_resolve(&app);
-  // spn_app_prepare_build(&app);
-  //
-  // spn_generator_context_t gen = {
-  //   .kind = spn_gen_kind_from_str(command->generator),
-  //   .compiler = spn_cc_kind_from_str(command->compiler)
-  // };
-  // gen.include = spn_gen_build_entries_for_all(SPN_GEN_INCLUDE, gen.compiler);
-  // gen.lib_include = spn_gen_build_entries_for_all(SPN_GEN_LIB_INCLUDE, gen.compiler);
-  // gen.libs = spn_gen_build_entries_for_all(SPN_GEN_LIBS, gen.compiler);
-  // gen.rpath = spn_gen_build_entries_for_all(SPN_GEN_RPATH, gen.compiler);
-  //
-  // spn_gen_format_context_t fmt = {
-  //   .kind = SPN_GEN_SYSTEM_LIBS,
-  //   .compiler = gen.compiler
-  // };
-  // sp_dyn_array(sp_str_t) entries = sp_str_map(app.resolver.system_deps, sp_dyn_array_size(app.resolver.system_deps), &fmt, spn_generator_format_entry_kernel);
-  // gen.system_libs = sp_str_join_n(entries, sp_dyn_array_size(entries), sp_str_lit(" "));
-  //
-  // switch (gen.kind) {
-  //   case SPN_GEN_KIND_RAW: {
-  //     gen.output = sp_format(
-  //       "{} {} {} {} {}",
-  //       SP_FMT_STR(gen.include),
-  //       SP_FMT_STR(gen.lib_include),
-  //       SP_FMT_STR(gen.libs),
-  //       SP_FMT_STR(gen.system_libs),
-  //       SP_FMT_STR(gen.rpath)
-  //     );
-  //     break;
-  //   }
-  //   case SPN_GEN_KIND_SHELL: {
-  //     gen.file_name = SP_LIT("spn.sh");
-  //     const c8* template =
-  //       "export SPN_INCLUDES={}"                                         "\n"
-  //       "export SPN_LIB_INCLUDES={}"                                     "\n"
-  //       "export SPN_LIBS={}"                                             "\n"
-  //       "export SPN_SYSTEM_LIBS={}"                                      "\n"
-  //       "export SPN_RPATH={}"                                 "\n"
-  //       "export SPN_FLAGS=\"$SPN_INCLUDES $SPN_LIB_INCLUDES $SPN_LIBS $SPN_SYSTEM_LIBS\"" "\n";
-  //     gen.output = sp_format(template,
-  //       SP_FMT_QUOTED_STR(gen.include),
-  //       SP_FMT_QUOTED_STR(gen.lib_include),
-  //       SP_FMT_QUOTED_STR(gen.libs),
-  //       SP_FMT_QUOTED_STR(gen.system_libs),
-  //       SP_FMT_QUOTED_STR(gen.rpath)
-  //     );
-  //     break;
-  //   }
-  //
-  //   case SPN_GEN_KIND_MAKE: {
-  //     gen.file_name = SP_LIT("spn.mk");
-  //     const c8* template =
-  //       "SPN_INCLUDES := {}"            "\n"
-  //       "SPN_LIB_INCLUDES := {}"        "\n"
-  //       "SPN_LIBS := {}"                "\n"
-  //       "SPN_SYSTEM_LIBS := {}"         "\n"
-  //       "SPN_RPATH := {}"                "\n"
-  //       "SPN_FLAGS := $(SPN_INCLUDES) $(SPN_LIB_INCLUDES) $(SPN_LIBS) $(SPN_SYSTEM_LIBS)";
-  //     gen.output = sp_format(template,
-  //       SP_FMT_QUOTED_STR(gen.include),
-  //       SP_FMT_QUOTED_STR(gen.lib_include),
-  //       SP_FMT_QUOTED_STR(gen.libs),
-  //       SP_FMT_QUOTED_STR(gen.system_libs),
-  //       SP_FMT_QUOTED_STR(gen.rpath)
-  //     );
-  //     break;
-  //   }
-  //
-  //   default: {
-  //     SP_UNREACHABLE();
-  //   }
-  // }
-  //
-  // if (sp_str_valid(command->path)) {
-  //   sp_str_t destination = sp_fs_normalize_path(command->path);
-  //   destination = sp_fs_join_path(spn.paths.cwd, destination);
-  //   sp_fs_create_dir(destination);
-  //
-  //   sp_str_t file_path = sp_fs_join_path(destination, gen.file_name);
-  //   sp_io_stream_t file = sp_io_from_file(sp_fs_join_path(destination, gen.file_name), SP_IO_MODE_WRITE);
-  //   if (sp_io_write_str(&file, gen.output)) {
-  //     SP_FATAL("Failed to write {}", SP_FMT_STR(file_path));
-  //   }
-  //
-  //   SP_LOG("Generated {:fg brightcyan}", SP_FMT_STR(file_path));
-  // }
-  // else {
-  //   SP_LOG("{}", SP_FMT_STR(gen.output));
-  // }
-  // return SPN_CLI_DONE;
+  if (sp_str_valid(command->path) && !sp_str_valid(command->generator)) {
+    SP_FATAL(
+      "output path was specified, but no generator. try e.g.:\n  spn generate --path {} {:fg yellow}",
+      SP_FMT_STR(command->path),
+      SP_FMT_CSTR("--generator make")
+    );
+  }
+  if (!sp_str_valid(command->generator)) command->generator = sp_str_lit("");
+  if (!sp_str_valid(command->compiler)) command->compiler = sp_str_lit("gcc");
+
+  if (!app.lock.some) {
+    SP_FATAL("No lock file found. Run {:fg yellow} first.", SP_FMT_CSTR("spn build"));
+  }
+
+  spn_app_resolve(&app);
+  spn_app_prepare_build(&app);
+
+  spn_generator_context_t gen = {
+    .kind = spn_gen_kind_from_str(command->generator),
+    .compiler = spn_cc_kind_from_str(command->compiler)
+  };
+  gen.include = spn_gen_build_entries_for_all(SPN_GEN_INCLUDE, gen.compiler);
+  gen.lib_include = spn_gen_build_entries_for_all(SPN_GEN_LIB_INCLUDE, gen.compiler);
+  gen.libs = spn_gen_build_entries_for_all(SPN_GEN_LIBS, gen.compiler);
+  gen.rpath = spn_gen_build_entries_for_all(SPN_GEN_RPATH, gen.compiler);
+
+  spn_gen_format_context_t fmt = {
+    .kind = SPN_GEN_SYSTEM_LIBS,
+    .compiler = gen.compiler
+  };
+  sp_dyn_array(sp_str_t) entries = sp_str_map(app.resolver.system_deps, sp_dyn_array_size(app.resolver.system_deps), &fmt, spn_generator_format_entry_kernel);
+  gen.system_libs = sp_str_join_n(entries, sp_dyn_array_size(entries), sp_str_lit(" "));
+
+  switch (gen.kind) {
+    case SPN_GEN_KIND_RAW: {
+      gen.file_name = SP_LIT("spn.txt");
+      gen.output = sp_format(
+        "{} {} {} {} {}",
+        SP_FMT_STR(gen.include),
+        SP_FMT_STR(gen.lib_include),
+        SP_FMT_STR(gen.libs),
+        SP_FMT_STR(gen.system_libs),
+        SP_FMT_STR(gen.rpath)
+      );
+      break;
+    }
+    case SPN_GEN_KIND_SHELL: {
+      gen.file_name = SP_LIT("spn.sh");
+      const c8* template =
+        "export SPN_INCLUDES=\"{}\"\n"
+        "export SPN_LIB_INCLUDES=\"{}\"\n"
+        "export SPN_LIBS=\"{}\"\n"
+        "export SPN_SYSTEM_LIBS=\"{}\"\n"
+        "export SPN_RPATH=\"{}\"\n"
+        "export SPN_FLAGS=\"$SPN_INCLUDES $SPN_LIB_INCLUDES $SPN_LIBS $SPN_SYSTEM_LIBS $SPN_RPATH\"\n";
+      gen.output = sp_format(template,
+        SP_FMT_STR(gen.include),
+        SP_FMT_STR(gen.lib_include),
+        SP_FMT_STR(gen.libs),
+        SP_FMT_STR(gen.system_libs),
+        SP_FMT_STR(gen.rpath)
+      );
+      break;
+    }
+
+    case SPN_GEN_KIND_MAKE: {
+      gen.file_name = SP_LIT("spn.mk");
+      const c8* template =
+        "SPN_INCLUDES := {}\n"
+        "SPN_LIB_INCLUDES := {}\n"
+        "SPN_LIBS := {}\n"
+        "SPN_SYSTEM_LIBS := {}\n"
+        "SPN_RPATH := {}\n"
+        "SPN_FLAGS := $(SPN_INCLUDES) $(SPN_LIB_INCLUDES) $(SPN_LIBS) $(SPN_SYSTEM_LIBS) $(SPN_RPATH)\n";
+      gen.output = sp_format(template,
+        SP_FMT_STR(gen.include),
+        SP_FMT_STR(gen.lib_include),
+        SP_FMT_STR(gen.libs),
+        SP_FMT_STR(gen.system_libs),
+        SP_FMT_STR(gen.rpath)
+      );
+      break;
+    }
+
+    case SPN_GEN_KIND_CMAKE: {
+      gen.file_name = SP_LIT("spn.cmake");
+      const c8* template =
+        "set(SPN_INCLUDES \"{}\")\n"
+        "set(SPN_LIB_INCLUDES \"{}\")\n"
+        "set(SPN_LIBS \"{}\")\n"
+        "set(SPN_SYSTEM_LIBS \"{}\")\n"
+        "set(SPN_RPATH \"{}\")\n"
+        "set(SPN_FLAGS \"$";
+      sp_str_t template_end = sp_str_lit(
+        "{SPN_INCLUDES} $"
+        "{SPN_LIB_INCLUDES} $"
+        "{SPN_LIBS} $"
+        "{SPN_SYSTEM_LIBS} $"
+        "{SPN_RPATH}\")\n");
+      sp_str_t formatted = sp_format(template,
+        SP_FMT_STR(gen.include),
+        SP_FMT_STR(gen.lib_include),
+        SP_FMT_STR(gen.libs),
+        SP_FMT_STR(gen.system_libs),
+        SP_FMT_STR(gen.rpath)
+      );
+      gen.output = sp_str_concat(formatted, template_end);
+      break;
+    }
+
+    case SPN_GEN_KIND_PKGCONFIG: {
+      gen.file_name = SP_LIT("spn.pc");
+      const c8* template =
+        "Name: {}\n"
+        "Description: spn-managed dependencies for {}\n"
+        "Version: {}.{}.{}\n"
+        "Cflags: {} {}\n"
+        "Libs: {} {} {}\n";
+      gen.output = sp_format(template,
+        SP_FMT_STR(app.package.name),
+        SP_FMT_STR(app.package.name),
+        SP_FMT_U32(app.package.version.major),
+        SP_FMT_U32(app.package.version.minor),
+        SP_FMT_U32(app.package.version.patch),
+        SP_FMT_STR(gen.include),
+        SP_FMT_STR(gen.lib_include),
+        SP_FMT_STR(gen.libs),
+        SP_FMT_STR(gen.system_libs),
+        SP_FMT_STR(gen.rpath)
+      );
+      break;
+    }
+
+    default: {
+      SP_UNREACHABLE();
+    }
+  }
+
+  if (sp_str_valid(command->path)) {
+    sp_str_t destination = sp_fs_normalize_path(command->path);
+    destination = sp_fs_join_path(spn.paths.cwd, destination);
+    sp_fs_create_dir(destination);
+
+    sp_str_t file_path = sp_fs_join_path(destination, gen.file_name);
+    sp_io_stream_t file = sp_io_from_file(file_path, SP_IO_MODE_WRITE);
+    if (sp_io_write_str(&file, gen.output) != gen.output.len) {
+      SP_FATAL("Failed to write {}", SP_FMT_STR(file_path));
+    }
+    sp_io_close(&file);
+
+    spn_ctx_log("Generated {:fg brightcyan}", SP_FMT_STR(file_path));
+  }
+  else {
+    sp_log(gen.output);
+  }
+  return SPN_CLI_DONE;
 }
 
 spn_cli_result_t spn_cli_test(spn_cli_t* cli) {
   spn_cli_test_t* command = &cli->test;
 
   app.config = (spn_app_config_t) {
-    .run_tests = true,
+    .tasks = {
+      .build = true,
+      .tests = true,
+    },
     .filter = (spn_target_filter_t) {
       .name = command->target,
       .disabled = {
-        .public = true,
+        .public = true
       }
-    },
-  };
-
-  if (!sp_str_empty(command->profile)) {
-    if (!sp_ht_key_exists(app.package.profiles, command->profile)) {
-      spn_ctx_error("{:fg brightcyan} profile isn't defined in {:fg brightcyan}",
-        SP_FMT_STR(command->profile),
-        SP_FMT_STR(app.package.paths.manifest
-      ));
-      return SPN_CLI_ERR;
     }
+  };
+  sp_try_as(spn_cli_set_profile(&app, command->profile), SPN_CLI_ERR);
 
-    app.profile = *sp_ht_getp(app.package.profiles, command->profile);
-  }
-
-  app.state = SPN_APP_STATE_PREPARE_BUILD;
   return SPN_CLI_OK;
 }
 
 spn_cli_result_t spn_cli_build(spn_cli_t* cli) {
   spn_cli_build_t* command = &cli->build;
 
-  if (!sp_str_empty(command->profile)) {
-    if (!sp_ht_key_exists(app.package.profiles, command->profile)) {
-      spn_ctx_error("{:fg brightcyan} profile isn't defined in {:fg brightcyan}",
-        SP_FMT_STR(command->profile),
-        SP_FMT_STR(app.package.paths.manifest
-      ));
-      return SPN_CLI_ERR;
-    }
-
-    app.profile = *sp_ht_getp(app.package.profiles, command->profile);
-  }
-
   app.config = (spn_app_config_t) {
+    .force = command->force,
+    .tasks = {
+      .build = true
+    },
     .filter = (spn_target_filter_t) {
       .name = command->target,
       .disabled = {
         .test = sp_str_empty(command->target) && !command->tests
       }
     },
-    .force = command->force
   };
 
-  app.state = SPN_APP_STATE_PREPARE_BUILD;
+  sp_try_as(spn_cli_set_profile(&app, command->profile), SPN_CLI_ERR);
 
   return SPN_CLI_OK;
 }
