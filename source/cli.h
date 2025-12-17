@@ -4,7 +4,7 @@
 #define SPN_CLI_ARGS_DONE SP_ZERO_STRUCT(spn_cli_command_usage_t)
 
 typedef enum {
-  SPN_CLI_OK,
+  SPN_CLI_CONTINUE,
   SPN_CLI_DONE,
   SPN_CLI_ERR,
 } spn_cli_result_t;
@@ -366,7 +366,7 @@ spn_cli_result_t spn_cli_parse_opts(spn_cli_parser_t* p, spn_cli_command_usage_t
     }
   }
 
-  return SPN_CLI_OK;
+  return SPN_CLI_CONTINUE;
 }
 
 spn_cli_result_t spn_cli_parse(spn_cli_parser_t* p) {
@@ -391,7 +391,7 @@ spn_cli_result_t spn_cli_parse(spn_cli_parser_t* p) {
   }
 
   p->resolved = cmd;
-  return SPN_CLI_OK;
+  return SPN_CLI_CONTINUE;
 }
 
 spn_cli_result_t spn_cli_dispatch(spn_cli_parser_t* p, spn_cli_t* user_data) {

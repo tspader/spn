@@ -6357,7 +6357,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   };
 
   switch (spn_cli_parse(&parser)) {
-    case SPN_CLI_OK: break;
+    case SPN_CLI_CONTINUE: break;
     case SPN_CLI_DONE: spn_cli_help(&parser); return SP_APP_QUIT;
     case SPN_CLI_ERR:
       if (sp_str_valid(parser.err)) sp_io_write_line(&spn.logger.err, parser.err);
@@ -6379,7 +6379,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   spn_cli_result_t result = spn_cli_dispatch(&parser, cli);
   switch (result) {
-    case SPN_CLI_OK: {
+    case SPN_CLI_CONTINUE: {
       return SP_APP_CONTINUE;
     }
     case SPN_CLI_DONE: {
@@ -7324,7 +7324,7 @@ spn_cli_result_t spn_cli_test(spn_cli_t* cli) {
   };
   sp_try_as(spn_cli_set_profile(&app, command->profile), SPN_CLI_ERR);
 
-  return SPN_CLI_OK;
+  return SPN_CLI_CONTINUE;
 }
 
 spn_cli_result_t spn_cli_build(spn_cli_t* cli) {
@@ -7345,5 +7345,5 @@ spn_cli_result_t spn_cli_build(spn_cli_t* cli) {
 
   sp_try_as(spn_cli_set_profile(&app, command->profile), SPN_CLI_ERR);
 
-  return SPN_CLI_OK;
+  return SPN_CLI_CONTINUE;
 }
