@@ -247,7 +247,7 @@ static spn_cli_result_t stub_handler_done(spn_cli_t* cli) {
 
 static spn_cli_result_t stub_handler_continue(spn_cli_t* cli) {
   (void)cli;
-  return SPN_CLI_OK;
+  return SPN_CLI_DONE;
 }
 
 static spn_cli_result_t stub_handler_err(spn_cli_t* cli) {
@@ -317,7 +317,7 @@ UTEST_F(spn_dispatch, handler_return_value) {
         { 0 },
       },
     },
-    .expect_result = SPN_CLI_OK,
+    .expect_result = SPN_CLI_DONE,
   });
 }
 
@@ -337,7 +337,7 @@ UTEST_F(spn_dispatch, subcommand_found) {
         { 0 },
       },
     },
-    .expect_result = SPN_CLI_OK,
+    .expect_result = SPN_CLI_DONE,
   });
 }
 
@@ -399,7 +399,7 @@ UTEST_F(spn_dispatch, nested_commands) {
   const c8* args[] = { "tool", "install" };
   spn_cli_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 2);
 
-  EXPECT_EQ(SPN_CLI_OK, result);
+  EXPECT_EQ(SPN_CLI_DONE, result);
 }
 
 // Test: opts parsed at root level, then at subcommand level
