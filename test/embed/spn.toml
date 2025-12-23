@@ -1,0 +1,15 @@
+[package]
+name = "embed"
+version = "0.1.0"
+
+[deps.package]
+sp = "1.6.6"
+
+[[bin]]
+name = "foo"
+source = ["src/foo.c"]
+
+[[bin]]
+name = "bar"
+source = ["src/bar.c"]
+
