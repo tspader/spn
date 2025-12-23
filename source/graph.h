@@ -222,7 +222,7 @@ typedef struct {
 } spn_bg_executor_config_t;
 
 typedef struct {
-  sp_ring_buffer_t ready_queue;
+  sp_rb(spn_bg_id_t) ready_queue;
   sp_mutex_t mutex;
   sp_semaphore_t work_available;
 
@@ -851,12 +851,13 @@ s32 spn_bg_worker_fn(void* user_data) {
     }
 
     sp_mutex_lock(&ex->mutex);
-    if (sp_ring_buffer_is_empty(&ex->ready_queue)) {
+    if (sp_rb_empty(ex->ready_queue)) {
       sp_mutex_unlock(&ex->mutex);
       continue;
     }
 
-    spn_bg_id_t cmd_id = *(spn_bg_id_t*)sp_ring_buffer_pop(&ex->ready_queue);
+    spn_bg_id_t cmd_id = *sp_rb_peek(ex->ready_queue);
+    sp_rb_pop(ex->ready_queue);
     ex->active_workers++;
     sp_mutex_unlock(&ex->mutex);
 
@@ -913,7 +914,7 @@ s32 spn_bg_worker_fn(void* user_data) {
             if (!sp_ht_key_exists(ex->enqueued, downstream)) {
               if (spn_bg_cmd_is_ready(ex, downstream)) {
                 sp_ht_insert(ex->enqueued, downstream, true);
-                sp_ring_buffer_push(&ex->ready_queue, &downstream);
+                sp_rb_push(ex->ready_queue, downstream);
                 sp_semaphore_signal(&ex->work_available);
               }
             }
@@ -921,7 +922,7 @@ s32 spn_bg_worker_fn(void* user_data) {
         }
 
         // if we're the last one, and this was the last task, shut down
-        bool is_work_done = sp_ring_buffer_is_empty(&ex->ready_queue);
+        bool is_work_done = sp_rb_empty(ex->ready_queue);
         bool is_last_worker = ex->active_workers == 0;
         if (is_work_done && is_last_worker) {
           sp_atomic_s32_set(&ex->shutdown, 1);
@@ -950,7 +951,7 @@ s32 spn_bg_driver_fn(void* user_data) {
   sp_ht_for_kv(ex->dirty->commands, it) {
     if (spn_bg_cmd_is_ready(ex, *it.key)) {
       sp_ht_insert(ex->enqueued, *it.key, true);
-      sp_ring_buffer_push(&ex->ready_queue, it.key);
+      sp_rb_push(ex->ready_queue, *it.key);
       sp_semaphore_signal(&ex->work_available);
     }
   }
@@ -977,7 +978,6 @@ spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t*
 
   sp_mutex_init(&ex->mutex, SP_MUTEX_PLAIN);
   sp_semaphore_init(&ex->work_available);
-  sp_ring_buffer_init(&ex->ready_queue, 64, sizeof(spn_bg_id_t));
 
   sp_ht_set_fns(ex->completed, sp_ht_on_hash_key, sp_ht_on_compare_key);
   sp_ht_set_fns(ex->enqueued, sp_ht_on_hash_key, sp_ht_on_compare_key);
@@ -995,7 +995,7 @@ void spn_bg_executor_join(spn_bg_executor_t* ex) {
 }
 
 void spn_bg_executor_free(spn_bg_executor_t* ex) {
-  sp_ring_buffer_destroy(&ex->ready_queue);
+  sp_rb_free(ex->ready_queue);
   sp_mutex_destroy(&ex->mutex);
   sp_semaphore_destroy(&ex->work_available);
 }

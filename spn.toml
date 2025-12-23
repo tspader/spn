@@ -31,11 +31,11 @@ include = ["include"]
 
 
 [[test]]
-name = "spn-test-graph"
+name = "graph"
 source = ["test/graph/main.c"]
 include = ["include", "source", "test/tools"]
 
 [[test]]
-name = "spn-test-cli"
+name = "cli"
 source = ["test/cli/main.c"]
 include = ["include", "source", "test/tools"]

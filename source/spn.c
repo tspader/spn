@@ -71,8 +71,7 @@ typedef s32 spn_err_t;
 #define _SP_MCAT(x, y) x##y
 #define SP_MCAT(x, y) _SP_MCAT(x, y)
 
-#define sp_rb_push(rb, value) sp_ring_buffer_push(&(rb), &(value))
-#define sp_rb_for(rb, it) sp_ring_buffer_for(rb, it)
+
 
 #define sp_try(expr) do { s32 _sp_result = (expr); if (_sp_result) return _sp_result; } while (0)
 #define sp_try_as(expr, err) do { s32 _sp_result = (expr); if (_sp_result) return err; } while (0)
@@ -5130,7 +5129,6 @@ spn_build_event_t spn_build_event_make(spn_build_ctx_t* ctx, spn_build_event_kin
 
 spn_event_buffer_t* spn_event_buffer_new() {
   spn_event_buffer_t* events = SP_ALLOC(spn_event_buffer_t);
-  sp_ring_buffer_init(&events->buffer, 64, sizeof(spn_build_event_t));
   return events;
 }
 
@@ -5151,11 +5149,11 @@ sp_da(spn_build_event_t) spn_event_buffer_drain(spn_event_buffer_t* events) {
 
   sp_da(spn_build_event_t) result = SP_NULLPTR;
   sp_rb_for(events->buffer, it) {
-    spn_build_event_t* event = sp_rb_it_getp(&it, spn_build_event_t);
+    spn_build_event_t* event = &sp_rb_at(events->buffer, it);
     sp_da_push(result, *event);
   }
 
-  sp_ring_buffer_clear(&events->buffer);
+  sp_rb_clear(events->buffer);
   sp_mutex_unlock(&events->mutex);
 
   return result;
