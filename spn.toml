@@ -2,12 +2,6 @@
 name = "spn"
 version = "0.1.0"
 
-# [deps]
-# sp = "1.4.0"
-# tcc = ">=1.0.0"
-# toml = "1.2.0"
-# utest = "1.0.0"
-
 [deps.package]
 sp = "1.6.6"
 tcc = ">=1.0.0"
