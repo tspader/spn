@@ -73,9 +73,6 @@ typedef s32 spn_err_t;
 
 
 
-#define sp_try(expr) do { s32 _sp_result = (expr); if (_sp_result) return _sp_result; } while (0)
-#define sp_try_as(expr, err) do { s32 _sp_result = (expr); if (_sp_result) return err; } while (0)
-
 #define sp_ht_collect_keys(ht, da) \
   do { \
     sp_ht_for_kv((ht), __it) { \
@@ -712,7 +709,6 @@ struct spn_pkg {
   sp_ht(sp_str_t, spn_profile_t) profiles;
   spn_package_kind_t kind;
 
-  spn_build_fn_t on_configure;
   spn_build_fn_t on_build;
   spn_build_fn_t on_package;
 
