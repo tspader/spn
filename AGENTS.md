@@ -1,5 +1,6 @@
-# Project Overview
-- **spn**: Package manager and build tool for C projects in the style of UV or cargo (spn.toml + spn.c)
+# overview
+`spn` is a package manager and build tool for C projects in the style of UV or cargo (spn.toml + spn.c)
+
 - written in modern C using `sp.h` (use the `sp` skill or `./doc/sp/SKILL.md` if you do not have access to global skills)
   - `spn` is an extension of `sp.h`, so its instructions and style are exactly the same as this project's
   - reference the `sp` skill or `./doc/sp/SKILL.md` judiciously
@@ -11,8 +12,10 @@ assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn
 ```
 
 # Files
-- `source/spn.c` is the entire implementation
-- `include/spn/spn.h` for public API used in packages
+- `source/spn.c` is most of the code (large file; search, don't read)
+- `source/graph.h` is the build DAG
+- `source/cli.h` is a generic CLI library
+- `include/spn/spn.h` for public API used in downstream packages
 - `spn.toml` is the package for spn itself; (example of a downstream project that uses spn)
 - `examples/tcc/spn.toml` is the package for the `tcc` example (minimal example of a downstream project)
 - `packages/sp/spn.toml` is the package for `sp.h` (example of a source-only spn package)

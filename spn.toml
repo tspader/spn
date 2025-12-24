@@ -25,6 +25,11 @@ include = ["include"]
 
 
 [[test]]
+name = "task"
+source = ["test/task/main.c"]
+include = ["include", "source", "test/tools"]
+
+[[test]]
 name = "graph"
 source = ["test/graph/main.c"]
 include = ["include", "source", "test/tools"]
