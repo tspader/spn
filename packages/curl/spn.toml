@@ -1,0 +1,11 @@
+[package]
+name = "curl"
+repo = "curl/curl"
+version = "7.20"
+commit = "400fffa90f30c7a2dc762fa33009d24851bd2016"
+author = "bagder"
+maintainer = "tspader"
+
+[lib]
+kinds = ["shared", "static"]
+name = "curl"
