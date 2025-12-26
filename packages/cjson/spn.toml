@@ -1,0 +1,10 @@
+[package]
+name = "cjson"
+repo = "DaveGamble/cjson"
+version = "1.17.19"
+commit = "c859b25da02955fef659d658b8f324b5cde87be3"
+author = "DaveGamble"
+maintainer = "tspader"
+
+[lib]
+kinds = ["source"]
