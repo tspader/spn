@@ -1,0 +1,10 @@
+[package]
+name = "mongoose"
+repo = "cesanta/mongoose"
+version = "7.20"
+commit = "236724ea2948396b4f83b68c366a169e795aa7ef"
+author = "cesanta"
+maintainer = "tspader"
+
+[lib]
+kinds = ["source"]
