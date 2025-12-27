@@ -93,6 +93,8 @@ sp_str_t       sp_intern_get_or_insert_str(sp_intern_t* intern, sp_str_t str);
 sp_intern_id_t sp_intern_get(sp_intern_t* intern, sp_str_t str);
 sp_str_t       sp_intern_get_str(sp_intern_t* intern, sp_str_t str);
 sp_str_t       sp_intern_resolve_id(sp_intern_t* intern, sp_intern_id_t id);
+bool           sp_intern_is_equal(sp_intern_t* intern, sp_intern_id_t a, sp_intern_id_t b);
+bool           sp_intern_is_equal_str(sp_intern_t* intern, sp_str_t a, sp_str_t b);
 u64            sp_intern_size(sp_intern_t* intern);
 u64            sp_intern_bytes_used(sp_intern_t* intern);
 u64            sp_intern_bytes_allocated(sp_intern_t* intern);
@@ -160,6 +162,20 @@ sp_intern_id_t sp_intern_get_or_insert(sp_intern_t* intern, sp_str_t str) {
 sp_str_t sp_intern_get_or_insert_str(sp_intern_t* intern, sp_str_t str) {
   sp_intern_id_t id = sp_intern_get_or_insert(intern, str);
   return sp_intern_resolve_id(intern, id);
+}
+
+bool sp_intern_is_equal(sp_intern_t* intern, sp_intern_id_t a, sp_intern_id_t b) {
+  return a == b;
+}
+
+bool sp_intern_is_equal_str(sp_intern_t* intern, sp_str_t a, sp_str_t b) {
+  sp_intern_id_t ia = sp_intern_get(intern, a);
+  if (!ia) return false;
+
+  sp_intern_id_t ib = sp_intern_get(intern, b);
+  if (!ib) return false;
+
+  return ia == ib;
 }
 
 u64 sp_intern_size(sp_intern_t* intern) {

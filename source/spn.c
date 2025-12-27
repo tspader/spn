@@ -593,14 +593,6 @@ typedef struct {
   sp_str_t name;
 } spn_lib_t;
 
-#define SPN_VISIBILITY_KIND(X) \
-  X(SPN_VISIBILITY_PUBLIC, "public") \
-  X(SPN_VISIBILITY_TEST, "test")
-
-typedef enum {
-  SPN_VISIBILITY_KIND(SP_X_NAMED_ENUM_DEFINE)
-} spn_visibility_t;
-
 #define SPN_PACKAGE_KIND(X) \
   X(SPN_PACKAGE_KIND_NONE, "none") \
   X(SPN_PACKAGE_KIND_WORKSPACE, "workspace") \
@@ -626,13 +618,13 @@ sp_str_t          spn_c_standard_to_str(spn_c_standard_t standard);
 
 
 
-typedef struct {
+struct spn_target {
   spn_visibility_t visibility;
   sp_str_t name;
   sp_da(sp_str_t) source;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
-} spn_target_t;
+};
 
 typedef enum {
   SPN_PROFILE_BUILTIN,
@@ -1476,6 +1468,8 @@ sp_app_result_t spn_poll(sp_app_t* app);
 sp_app_result_t spn_update(sp_app_t* app);
 sp_str_t spn_intern(sp_str_t str);
 sp_str_t spn_intern_cstr(const c8* cstr);
+bool spn_intern_is_equal(sp_str_t a, sp_str_t b);
+bool spn_intern_is_equal_cstr(sp_str_t str, const c8* cstr);
 void spn_ctx_log(const c8* fmt, ...);
 void spn_ctx_warn(const c8* fmt, ...);
 void spn_ctx_error(const c8* fmt, ...);
@@ -2175,9 +2169,10 @@ sp_str_t spn_build_event_kind_to_str(spn_build_event_kind_t kind) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-sp_str_t spn_bin_kind_to_str(spn_visibility_t kind) {
+sp_str_t spn_visibility_to_str(spn_visibility_t kind) {
   switch (kind) {
-    SPN_VISIBILITY_KIND(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
+    case SPN_VISIBILITY_PUBLIC: return spn_intern_cstr("public");
+    case SPN_VISIBILITY_TEST: return spn_intern_cstr("test");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
@@ -2195,15 +2190,9 @@ sp_str_t spn_resolve_strategy_to_str(spn_resolve_strategy_t strategy) {
 }
 
 spn_visibility_t spn_visibility_from_str(sp_str_t str) {
-  SPN_VISIBILITY_KIND(SP_X_NAMED_ENUM_STR_TO_ENUM)
+  if (spn_intern_is_equal_cstr(str, "public")) return SPN_VISIBILITY_PUBLIC;
+  if (spn_intern_is_equal_cstr(str, "test"))   return SPN_VISIBILITY_TEST;
   SP_UNREACHABLE_RETURN(SPN_VISIBILITY_PUBLIC);
-}
-
-sp_str_t spn_visibility_to_str(spn_visibility_t visibility) {
-  switch (visibility) {
-    SPN_VISIBILITY_KIND(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
 sp_str_t spn_package_kind_to_str(spn_pkg_kind_t kind) {
@@ -5578,7 +5567,7 @@ void spn_app_write_manifest(spn_pkg_t* pkg, sp_str_t path) {
       spn_toml_append_str_cstr(&toml, "name", bin->name);
 
       if (bin->visibility != SPN_VISIBILITY_PUBLIC) {
-        spn_toml_append_str_cstr(&toml, "kind", spn_bin_kind_to_str(bin->visibility));
+        spn_toml_append_str_cstr(&toml, "kind", spn_visibility_to_str(bin->visibility));
       }
       if (sp_dyn_array_size(bin->source)) {
         spn_toml_append_str_array_cstr(&toml, "source", bin->source);
@@ -5979,6 +5968,16 @@ sp_str_t spn_intern(sp_str_t str) {
 
 sp_str_t spn_intern_cstr(const c8* cstr) {
   return sp_intern_get_or_insert_str(spn.intern, sp_str_view(cstr));
+}
+
+bool spn_intern_is_equal(sp_str_t a, sp_str_t b) {
+  return sp_intern_is_equal_str(spn.intern, a, b);
+}
+
+bool spn_intern_is_equal_cstr(sp_str_t str, const c8* cstr) {
+  sp_intern_id_t is = sp_intern_get_or_insert(spn.intern, str);
+  sp_intern_id_t ic = sp_intern_get_or_insert(spn.intern, sp_str_view(cstr));
+  return is == ic;
 }
 
 sp_app_result_t spn_init(sp_app_t* sp) {

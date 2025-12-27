@@ -74,6 +74,12 @@ typedef enum {
   SPN_CMAKE_GEN_MINGW,
 } spn_cmake_gen_t;
 
+typedef enum {
+  SPN_VISIBILITY_PUBLIC,
+  SPN_VISIBILITY_TEST,
+} spn_visibility_t;
+
+
 typedef struct spn_config spn_config_t;
 typedef struct spn_pkg spn_pkg_t;
 typedef struct spn_build_ctx spn_build_ctx_t;
@@ -83,6 +89,7 @@ typedef struct spn_make spn_make_t;
 typedef struct spn_cmake spn_cmake_t;
 typedef struct spn_cc spn_cc_t;
 typedef struct spn_profile spn_profile_t;
+typedef struct spn_target spn_target_t;
 
 typedef void(*spn_config_fn_t)(spn_config_t*);
 typedef void(*spn_build_fn_t)(spn_build_ctx_t*);
@@ -124,6 +131,8 @@ void           spn_profile_set_linkage(spn_profile_t* profile, spn_pkg_linkage_t
 void           spn_profile_set_libc(spn_profile_t* profile, spn_libc_kind_t libc);
 void           spn_profile_set_standard(spn_profile_t* profile, spn_c_standard_t standard);
 void           spn_profile_set_mode(spn_profile_t* profile, spn_build_mode_t mode);
+spn_target_t*  spn_pkg_add_bin(spn_pkg_t* pkg, const c8* name);
+spn_target_t*  spn_target_set_visibility(spn_target_t* target, spn_visibility_t visibility);
 
 void            spn_log(spn_build_ctx_t* build, const c8* message);
 spn_bin_ctx_t*  spn_get_target(spn_build_ctx_t* build, const c8* name);
