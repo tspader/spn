@@ -1,6 +1,6 @@
 #include "spn.h"
 
-void build(spn_pkg_ctx_t* b) {
+void build(spn_build_ctx_t* b) {
   spn_cmake_t* cmake = spn_cmake_new(b);
   spn_cmake_add_define(cmake, "BUILD_TESTING", "OFF");
   spn_cmake_add_define(cmake, "CURL_DISABLE_TESTS", "ON");
@@ -28,7 +28,7 @@ void build(spn_pkg_ctx_t* b) {
   spn_cmake_run(cmake);
 }
 
-void package(spn_pkg_ctx_t* b) {
+void package(spn_build_ctx_t* b) {
   spn_cmake_t* cmake = spn_cmake_new(b);
   spn_cmake_install(cmake);
 }

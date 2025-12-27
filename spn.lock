@@ -8,7 +8,7 @@ system_deps = ["m"]
 [[dep]]
 name = "sp"
 version = "1.6.6"
-commit = "577f1422fdcd"
+commit = "361dc0b403ec"
 kind = "index"
 visibility = "public"
 
