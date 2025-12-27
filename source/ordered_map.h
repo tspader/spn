@@ -17,7 +17,7 @@
   } while (0)
 
 #define sp_om_new(om)                                                              \
-  sp_om_new_ex(om, sp_mem_arena_new_ex(4096, SP_MEM_ARENA_MODE_NO_REALLOC), sp_mem_arena_new(4096))
+  sp_om_new_ex(om, sp_mem_arena_new_ex(4096, SP_MEM_ARENA_MODE_NO_REALLOC, 0), sp_mem_arena_new(4096))
 
 
 #define sp_om_ensure(om)                                                           \
@@ -57,6 +57,7 @@
 #define sp_om_has(om, key)        ((om) && sp_str_ht_exists((om)->index, (key)))
 #define sp_om_at(om, n)           ((om)->order[(n)])
 #define sp_om_size(om)            (!(om) ? 0 : sp_da_size((om)->order))
+#define sp_om_empty(om)           (!(om) ? true : (sp_da_size((om)->order) == 0))
 #define sp_om_for(om, it)         for (u32 it = 0; it < sp_om_size(om); it++)
 
 #if defined(SP_CPP)
@@ -85,10 +86,7 @@ typedef struct {
 } sp_intern_t;
 
 
-// id get_or_insert();
-// str get_or_insert();
-// id get();
-// str get();
+sp_intern_t*   sp_intern_new();
 void           sp_intern_init(sp_intern_t* intern);
 sp_intern_id_t sp_intern_get_or_insert(sp_intern_t* intern, sp_str_t str);
 sp_str_t       sp_intern_get_or_insert_str(sp_intern_t* intern, sp_str_t str);
@@ -102,9 +100,15 @@ u64            sp_intern_bytes_allocated(sp_intern_t* intern);
 
 #ifdef SP_OM_IMPLEMENTATION
 
+sp_intern_t* sp_intern_new() {
+  sp_intern_t* intern = sp_alloc_type(sp_intern_t);
+  sp_intern_init(intern);
+  return intern;
+}
+
 void sp_intern_init(sp_intern_t* intern) {
   sp_require(intern);
-  intern->arenas.data = sp_mem_arena_new_ex(512, SP_MEM_ARENA_MODE_NO_REALLOC);
+  intern->arenas.data = sp_mem_arena_new_ex(512, SP_MEM_ARENA_MODE_NO_REALLOC, 0);
   intern->arenas.metadata = sp_mem_arena_new(512);
 
   sp_mem_arena_alloc(intern->arenas.data, 1);
