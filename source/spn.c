@@ -714,8 +714,9 @@ struct spn_pkg {
   sp_str_t maintainer;
   spn_semver_t version;
   spn_lib_t lib;
-  sp_ht(sp_str_t, spn_target_t) binaries;
-  sp_ht(sp_str_t, spn_target_t) tests;
+  sp_om(spn_target_t) binaries;
+  sp_om(spn_target_t) tests;
+  sp_om(spn_profile_t) profiles;
   spn_pkg_dep_reqs_t deps;
   sp_ht(sp_str_t, spn_dep_option_t) options;
   sp_ht(sp_str_t, spn_dep_options_t) config;
@@ -725,7 +726,6 @@ struct spn_pkg {
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) system_deps;
-  sp_om(spn_profile_t) profiles;
   spn_pkg_kind_t kind;
 
   spn_build_fn_t on_build;
@@ -4123,10 +4123,6 @@ spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key) {
 void spn_pkg_init(spn_pkg_t* pkg) {
   pkg->arena = sp_mem_arena_new(4096);
 
-  sp_ht_set_fns(pkg->binaries, sp_ht_on_hash_str_key,
-                sp_ht_on_compare_str_key);
-  sp_ht_set_fns(pkg->tests, sp_ht_on_hash_str_key,
-                sp_ht_on_compare_str_key);
   sp_ht_set_fns(pkg->deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(pkg->options, sp_ht_on_hash_str_key,
                 sp_ht_on_compare_str_key);
@@ -4170,20 +4166,20 @@ spn_pkg_t spn_pkg_from_bare_default(sp_str_t path, sp_str_t name) {
 }
 
 spn_pkg_t spn_pkg_from_default(sp_str_t path, sp_str_t name) {
-  spn_pkg_t package = spn_pkg_new(name);
-  spn_pkg_set_manifest(&package, sp_fs_join_path(path, sp_str_lit("spn.toml")));
-  spn_pkg_add_dep_from_index(&package, sp_str_lit("sp"), SPN_VISIBILITY_PUBLIC);
+  spn_pkg_t pkg = spn_pkg_new(name);
+  spn_pkg_set_manifest(&pkg, sp_fs_join_path(path, sp_str_lit("spn.toml")));
+  spn_pkg_add_dep_from_index(&pkg, sp_str_lit("sp"), SPN_VISIBILITY_PUBLIC);
 
-  package.version = (spn_semver_t){0, 1, 0};
-  sp_dyn_array_push(package.versions, package.version);
+  pkg.version = (spn_semver_t){0, 1, 0};
+  sp_dyn_array_push(pkg.versions, pkg.version);
 
   spn_target_t bin = {
-      .name = sp_str_copy(package.name),
+    .name = spn_intern(pkg.name),
   };
   sp_dyn_array_push(bin.source, sp_str_lit("main.c"));
-  sp_ht_insert(package.binaries, bin.name, bin);
+  sp_om_insert(pkg.binaries, bin.name, bin);
 
-  return package;
+  return pkg;
 }
 
 spn_pkg_t spn_pkg_from_index(sp_str_t path) {
@@ -4502,7 +4498,7 @@ spn_pkg_t spn_pkg_load(sp_str_t manifest_path) {
   if (toml.bin) {
     spn_toml_arr_for(toml.bin, n) {
       spn_target_t bin = spn_pkg_load_bin(toml_array_table(toml.bin, n));
-      sp_ht_insert(pkg.binaries, bin.name, bin);
+      sp_om_insert(pkg.binaries, bin.name, bin);
     }
   }
 
@@ -4510,7 +4506,7 @@ spn_pkg_t spn_pkg_load(sp_str_t manifest_path) {
     spn_toml_arr_for(toml.test, n) {
       spn_target_t test = spn_pkg_load_bin(toml_array_table(toml.test, n));
       test.visibility = SPN_VISIBILITY_TEST;
-      sp_ht_insert(pkg.tests, test.name, test);
+      sp_om_insert(pkg.tests, test.name, test);
     }
   }
 
@@ -5239,15 +5235,15 @@ void spn_app_prepare_build(spn_app_t* app) {
   app->paths.profile = sp_fs_join_path(app->paths.build, app->builder.profile.name);
 
   // FILTER
-  sp_ht_for_kv(app->package.binaries, it) {
-    spn_target_t* target = it.val;
+  sp_om_for(app->package.binaries, it) {
+    spn_target_t* target = sp_om_at(app->package.binaries, it);
     if (spn_target_filter_pass(&app->builder.filter, target)) {
       sp_da_push(app->builder.targets, target);
     }
   }
 
-  sp_ht_for_kv(app->package.tests, it) {
-    spn_target_t* target = it.val;
+  sp_om_for(app->package.tests, it) {
+    spn_target_t* target = sp_om_at(app->package.tests, it);
     if (spn_target_filter_pass(&app->builder.filter, target)) {
       sp_da_push(app->builder.targets, target);
     }
@@ -5574,42 +5570,45 @@ void spn_app_write_manifest(spn_pkg_t* pkg, sp_str_t path) {
     spn_toml_end_table(&toml);
   }
 
-  if (sp_ht_size(pkg->binaries)) {
+  if (!sp_om_empty(pkg->binaries)) {
     spn_toml_begin_array_cstr(&toml, "bin");
-    sp_ht_for_kv(pkg->binaries, it) {
+    sp_om_for(pkg->binaries, it) {
+      spn_target_t* bin = sp_om_at(pkg->binaries, it);
       spn_toml_append_array_table(&toml);
-      spn_toml_append_str_cstr(&toml, "name", it.val->name);
+      spn_toml_append_str_cstr(&toml, "name", bin->name);
 
-      if (it.val->visibility != SPN_VISIBILITY_PUBLIC) {
-        spn_toml_append_str_cstr(&toml, "kind", spn_bin_kind_to_str(it.val->visibility));
+      if (bin->visibility != SPN_VISIBILITY_PUBLIC) {
+        spn_toml_append_str_cstr(&toml, "kind", spn_bin_kind_to_str(bin->visibility));
       }
-      if (sp_dyn_array_size(it.val->source)) {
-        spn_toml_append_str_array_cstr(&toml, "source", it.val->source);
+      if (sp_dyn_array_size(bin->source)) {
+        spn_toml_append_str_array_cstr(&toml, "source", bin->source);
       }
-      if (sp_dyn_array_size(it.val->include)) {
-        spn_toml_append_str_array_cstr(&toml, "include", it.val->include);
+      if (sp_dyn_array_size(bin->include)) {
+        spn_toml_append_str_array_cstr(&toml, "include", bin->include);
       }
-      if (sp_dyn_array_size(it.val->define)) {
-        spn_toml_append_str_array_cstr(&toml, "define", it.val->define);
+      if (sp_dyn_array_size(bin->define)) {
+        spn_toml_append_str_array_cstr(&toml, "define", bin->define);
       }
     }
     spn_toml_end_array(&toml);
   }
 
-  if (sp_ht_size(pkg->tests)) {
+  if (!sp_om_empty(pkg->tests)) {
     spn_toml_begin_array_cstr(&toml, "test");
-    sp_ht_for_kv(pkg->tests, it) {
-      spn_toml_append_array_table(&toml);
-      spn_toml_append_str_cstr(&toml, "name", it.val->name);
+    sp_om_for(pkg->tests, it) {
+      spn_target_t* test = sp_om_at(pkg->binaries, it);
 
-      if (sp_dyn_array_size(it.val->source)) {
-        spn_toml_append_str_array_cstr(&toml, "source", it.val->source);
+      spn_toml_append_array_table(&toml);
+      spn_toml_append_str_cstr(&toml, "name", test->name);
+
+      if (sp_dyn_array_size(test->source)) {
+        spn_toml_append_str_array_cstr(&toml, "source", test->source);
       }
-      if (sp_dyn_array_size(it.val->include)) {
-        spn_toml_append_str_array_cstr(&toml, "include", it.val->include);
+      if (sp_dyn_array_size(test->include)) {
+        spn_toml_append_str_array_cstr(&toml, "include", test->include);
       }
-      if (sp_dyn_array_size(it.val->define)) {
-        spn_toml_append_str_array_cstr(&toml, "define", it.val->define);
+      if (sp_dyn_array_size(test->define)) {
+        spn_toml_append_str_array_cstr(&toml, "define", test->define);
       }
     }
     spn_toml_end_array(&toml);
