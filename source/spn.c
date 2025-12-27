@@ -46,6 +46,7 @@
 
 #include "spn.h"
 #include "graph.h"
+#include "ordered_map.h"
 
 #define SPN_TASK_IMPLEMENTATION
 #include "task.h"
@@ -116,9 +117,6 @@ sp_str_t sp_str_repeat(c8 c, u32 len) {
   return sp_str(buffer, len);
 }
 
-void sp_context_push_arena(sp_mem_arena_t* arena) {
-  sp_context_push_allocator(sp_mem_arena_as_allocator(arena));
-}
 
 void strip_ansi(char* buf, ssize_t* len) {
     char* out = buf;
@@ -639,7 +637,7 @@ typedef enum {
   SPN_PROFILE_USER,
 } spn_profile_kind_t;
 
-typedef struct {
+struct spn_profile {
   sp_str_t name;
   spn_pkg_linkage_t linkage;
   spn_libc_kind_t libc;
@@ -650,7 +648,7 @@ typedef struct {
     spn_cc_kind_t kind;
     sp_str_t exe;
   } cc;
-} spn_profile_t;
+};
 
 typedef struct {
   sp_str_t name;
@@ -761,6 +759,7 @@ void spn_pkg_add_version_ex(spn_pkg_t* package, spn_semver_t version, sp_str_t c
 void spn_pkg_add_include_ex(spn_pkg_t* package, sp_str_t include);
 void spn_pkg_add_define_ex(spn_pkg_t* package, sp_str_t define);
 void spn_pkg_add_system_dep_ex(spn_pkg_t* package, sp_str_t dep);
+spn_profile_t* spn_pkg_add_profile_ex(spn_pkg_t* package, sp_str_t name);
 
 
 ////////////
@@ -1461,6 +1460,7 @@ typedef struct {
   sp_app_t* sp;
   s32 num_args;
   const c8** args;
+  sp_intern_t intern;
 
   struct {
     sp_io_stream_t out;
@@ -4303,6 +4303,70 @@ void spn_pkg_add_system_dep_ex(spn_pkg_t* pkg, sp_str_t dep) {
   sp_context_pop();
 }
 
+void spn_pkg_add_linkage(spn_pkg_t* pkg, spn_pkg_linkage_t linkage) {
+  sp_context_push_arena(pkg->arena);
+  sp_ht_insert(pkg->lib.enabled, linkage, true);
+  sp_context_pop();
+}
+
+spn_profile_t* spn_pkg_add_profile(spn_pkg_t* pkg, const c8* name) {
+  return spn_pkg_add_profile_ex(pkg, sp_str_view(name));
+}
+
+spn_profile_t* spn_pkg_add_profile_ex(spn_pkg_t* pkg, sp_str_t name) {
+  sp_context_push_arena(pkg->arena);
+  spn_profile_t profile = {
+    .name = sp_str_copy(name),
+    .cc.exe = sp_str_lit("gcc"),
+    .cc.kind = SPN_CC_GCC,
+    .linkage = SPN_LIB_KIND_SHARED,
+    .libc = SPN_LIBC_GNU,
+    .standard = SPN_C99,
+    .mode = SPN_DEP_BUILD_MODE_DEBUG,
+    .kind = SPN_PROFILE_USER,
+  };
+  sp_ht_insert(pkg->profiles, profile.name, profile);
+  sp_context_pop();
+  return sp_ht_getp(pkg->profiles, name);
+}
+
+void spn_profile_set_cc(spn_profile_t* profile, spn_cc_kind_t kind) {
+  profile->cc.kind = kind;
+  switch (kind) {
+    case SPN_CC_NONE:     profile->cc.exe = sp_str_lit("");         break;
+    case SPN_CC_GCC:      profile->cc.exe = sp_str_lit("gcc");      break;
+    case SPN_CC_CLANG:    profile->cc.exe = sp_str_lit("clang");    break;
+    case SPN_CC_MUSL_GCC: profile->cc.exe = sp_str_lit("musl-gcc"); break;
+    case SPN_CC_TCC:      profile->cc.exe = sp_str_lit("tcc");      break;
+    case SPN_CC_CUSTOM:   break;
+  }
+}
+
+void spn_profile_set_cc_exe(spn_profile_t* profile, const c8* exe) {
+  profile->cc.exe = sp_str_view(exe);
+  profile->cc.kind = spn_cc_kind_from_str(profile->cc.exe);
+}
+
+void spn_profile_set_linkage(spn_profile_t* profile, spn_pkg_linkage_t linkage) {
+  profile->linkage = linkage;
+}
+
+void spn_profile_set_libc(spn_profile_t* profile, spn_libc_kind_t libc) {
+  profile->libc = libc;
+}
+
+void spn_profile_set_standard(spn_profile_t* profile, spn_c_standard_t standard) {
+  profile->standard = standard;
+}
+
+void spn_profile_set_mode(spn_profile_t* profile, spn_build_mode_t mode) {
+  profile->mode = mode;
+}
+
+void spn_profile_set_kind(spn_profile_t* profile, spn_profile_kind_t kind) {
+  profile->kind = kind;
+}
+
 sp_str_t spn_pkg_get_url(spn_pkg_t* pkg) {
   return pkg->url;
 }
@@ -4391,7 +4455,7 @@ spn_pkg_t spn_pkg_load(sp_str_t manifest_path) {
       SP_ASSERT(value.ok);
 
       spn_pkg_linkage_t kind = spn_lib_kind_from_str(sp_str_view(value.u.s));
-      sp_ht_insert(pkg.lib.enabled, kind, true);
+      spn_pkg_add_linkage(&pkg, kind);
     }
 
     pkg.lib.name = spn_toml_str_opt(toml.lib, "name", "");
@@ -4405,22 +4469,18 @@ spn_pkg_t spn_pkg_load(sp_str_t manifest_path) {
   if (toml.profile) {
     spn_toml_arr_for(toml.profile, n) {
       toml_table_t *it = toml_array_table(toml.profile, n);
-      spn_profile_t profile = SP_ZERO_INITIALIZE();
+      spn_profile_t* profile = spn_pkg_add_profile(&pkg, spn_toml_cstr(it, "name"));
 
-      profile.name = spn_toml_str(it, "name");
-      profile.cc.exe = spn_toml_str_opt(it, "cc", "gcc");
-      profile.cc.kind = spn_cc_kind_from_str(profile.cc.exe);
-      profile.linkage =
+      profile->cc.exe = spn_toml_str_opt(it, "cc", "gcc");
+      profile->cc.kind = spn_cc_kind_from_str(profile->cc.exe);
+      profile->linkage =
           spn_lib_kind_from_str(spn_toml_str_opt(it, "linkage", "shared"));
-      profile.libc =
+      profile->libc =
           spn_libc_kind_from_str(spn_toml_str_opt(it, "libc", "gnu"));
-      profile.standard =
+      profile->standard =
           spn_c_standard_from_str(spn_toml_str_opt(it, "standard", "c99"));
-      profile.mode =
+      profile->mode =
           spn_dep_build_mode_from_str(spn_toml_str_opt(it, "mode", "debug"));
-      profile.kind = SPN_PROFILE_USER;
-
-      sp_ht_insert(pkg.profiles, profile.name, profile);
     }
   }
 

@@ -82,6 +82,7 @@ typedef struct spn_autoconf spn_autoconf_t;
 typedef struct spn_make spn_make_t;
 typedef struct spn_cmake spn_cmake_t;
 typedef struct spn_cc spn_cc_t;
+typedef struct spn_profile spn_profile_t;
 
 typedef void(*spn_config_fn_t)(spn_config_t*);
 typedef void(*spn_build_fn_t)(spn_build_ctx_t*);
@@ -106,16 +107,23 @@ void            spn_cmake_run(spn_cmake_t* cmake);
 
 void            spn_copy(spn_build_ctx_t* build, spn_dir_kind_t from, const c8* from_path, spn_dir_kind_t to, const c8* to_path);
 
-// @claude
-void spn_pkg_set_name(spn_pkg_t* pkg, const c8* name);
-void spn_pkg_set_repo(spn_pkg_t* pkg, const c8* repo);
-void spn_pkg_set_author(spn_pkg_t* pkg, const c8* author);
-void spn_pkg_set_maintainer(spn_pkg_t* pkg, const c8* maintainer);
-void spn_pkg_add_version(spn_pkg_t* pkg, const c8* version, const c8* commit);
-void spn_pkg_add_include(spn_pkg_t* pkg, const c8* path);
-void spn_pkg_add_define(spn_pkg_t* pkg, const c8* define);
-void spn_pkg_add_system_dep(spn_pkg_t* pkg, const c8* dep);
-void spn_pkg_add_linkage(spn_pkg_t* pkg, spn_pkg_linkage_t linkage);
+void           spn_pkg_set_name(spn_pkg_t* pkg, const c8* name);
+void           spn_pkg_set_repo(spn_pkg_t* pkg, const c8* repo);
+void           spn_pkg_set_author(spn_pkg_t* pkg, const c8* author);
+void           spn_pkg_set_maintainer(spn_pkg_t* pkg, const c8* maintainer);
+void           spn_pkg_add_version(spn_pkg_t* pkg, const c8* version, const c8* commit);
+void           spn_pkg_add_include(spn_pkg_t* pkg, const c8* path);
+void           spn_pkg_add_define(spn_pkg_t* pkg, const c8* define);
+void           spn_pkg_add_system_dep(spn_pkg_t* pkg, const c8* dep);
+
+void           spn_pkg_add_linkage(spn_pkg_t* pkg, spn_pkg_linkage_t linkage);
+spn_profile_t* spn_pkg_add_profile(spn_pkg_t* pkg, const c8* name);
+void           spn_profile_set_cc(spn_profile_t* profile, spn_cc_kind_t kind);
+void           spn_profile_set_cc_exe(spn_profile_t* profile, const c8* exe);
+void           spn_profile_set_linkage(spn_profile_t* profile, spn_pkg_linkage_t linkage);
+void           spn_profile_set_libc(spn_profile_t* profile, spn_libc_kind_t libc);
+void           spn_profile_set_standard(spn_profile_t* profile, spn_c_standard_t standard);
+void           spn_profile_set_mode(spn_profile_t* profile, spn_build_mode_t mode);
 
 void            spn_log(spn_build_ctx_t* build, const c8* message);
 spn_bin_ctx_t*  spn_get_target(spn_build_ctx_t* build, const c8* name);
