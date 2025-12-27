@@ -23,7 +23,8 @@ test/manual/spn_generate/pkgconfig_cmake/*
 test/manual/spn_generate/shell/*
 !test/manual/spn_generate/shell/build.sh
 
-doc/
+doc/*
+!doc/skill
 
 examples/**/build
 examples/**/spn.lock
