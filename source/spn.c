@@ -2260,6 +2260,12 @@ spn_pkg_linkage_t spn_lib_kind_from_str(sp_str_t str) {
   SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
 }
 
+spn_pkg_linkage_t spn_pkg_linkage_from_str(sp_str_t str) {
+  if (spn_intern_is_equal_cstr(str, "shared")) return SPN_LIB_KIND_SHARED;
+  if (spn_intern_is_equal_cstr(str, "static")) return SPN_LIB_KIND_STATIC;
+  return SPN_LIB_KIND_SHARED;
+}
+
 sp_str_t spn_pkg_linkage_to_str(spn_pkg_linkage_t kind) {
   switch (kind) {
     case SPN_LIB_KIND_SHARED: return sp_str_lit("shared");
@@ -4319,11 +4325,11 @@ spn_profile_t* spn_pkg_add_profile_ex(spn_pkg_t* pkg, spn_profile_t profile) {
 void spn_profile_set_cc(spn_profile_t* profile, spn_cc_kind_t kind) {
   profile->cc.kind = kind;
   switch (kind) {
-    case SPN_CC_NONE:     profile->cc.exe = sp_str_lit("");         break;
-    case SPN_CC_GCC:      profile->cc.exe = sp_str_lit("gcc");      break;
-    case SPN_CC_CLANG:    profile->cc.exe = sp_str_lit("clang");    break;
-    case SPN_CC_MUSL_GCC: profile->cc.exe = sp_str_lit("musl-gcc"); break;
-    case SPN_CC_TCC:      profile->cc.exe = sp_str_lit("tcc");      break;
+    case SPN_CC_NONE:     profile->cc.exe = spn_intern_cstr("");         break;
+    case SPN_CC_GCC:      profile->cc.exe = spn_intern_cstr("gcc");      break;
+    case SPN_CC_CLANG:    profile->cc.exe = spn_intern_cstr("clang");    break;
+    case SPN_CC_MUSL_GCC: profile->cc.exe = spn_intern_cstr("musl-gcc"); break;
+    case SPN_CC_TCC:      profile->cc.exe = spn_intern_cstr("tcc");      break;
     case SPN_CC_CUSTOM:   break;
   }
 }
@@ -4455,18 +4461,13 @@ spn_pkg_t spn_pkg_load(sp_str_t manifest_path) {
   if (toml.profile) {
     spn_toml_arr_for(toml.profile, n) {
       toml_table_t *it = toml_array_table(toml.profile, n);
-      spn_profile_t* profile = spn_pkg_add_profile(&pkg, spn_toml_cstr(it, "name"));
 
-      profile->cc.exe = spn_toml_str_opt(it, "cc", "gcc");
-      profile->cc.kind = spn_cc_kind_from_str(profile->cc.exe);
-      profile->linkage =
-          spn_lib_kind_from_str(spn_toml_str_opt(it, "linkage", "shared"));
-      profile->libc =
-          spn_libc_kind_from_str(spn_toml_str_opt(it, "libc", "gnu"));
-      profile->standard =
-          spn_c_standard_from_str(spn_toml_str_opt(it, "standard", "c99"));
-      profile->mode =
-          spn_dep_build_mode_from_str(spn_toml_str_opt(it, "mode", "debug"));
+      spn_profile_t* profile = spn_pkg_add_profile(&pkg, spn_toml_cstr(it, "name"));
+      spn_profile_set_cc(profile, spn_cc_kind_from_str(spn_toml_str_opt(it, "cc", "gcc")));
+      spn_profile_set_linkage(profile, spn_pkg_linkage_from_str(spn_toml_str_opt(it, "linkage", "shared")));
+      spn_profile_set_libc(profile, spn_libc_kind_from_str(spn_toml_str_opt(it, "libc", "gnu")));
+      spn_profile_set_standard(profile, spn_c_standard_from_str(spn_toml_str_opt(it, "standard", "c99")));
+      spn_profile_set_mode(profile, spn_dep_build_mode_from_str(spn_toml_str_opt(it, "mode", "debug")));
     }
   }
 
