@@ -90,52 +90,53 @@ typedef struct spn_cmake spn_cmake_t;
 typedef struct spn_cc spn_cc_t;
 typedef struct spn_profile spn_profile_t;
 typedef struct spn_target spn_target_t;
+typedef struct spn_registry spn_registry_t;
 
 typedef void(*spn_config_fn_t)(spn_config_t*);
 typedef void(*spn_build_fn_t)(spn_build_ctx_t*);
 
-void            spn_make(spn_build_ctx_t* build);
-spn_make_t*     spn_make_new(spn_build_ctx_t* build);
-void            spn_make_add_target(spn_make_t* make, const c8* target);
-void            spn_make_run(spn_make_t* make);
-void            spn_autoconf(spn_build_ctx_t* build);
-spn_autoconf_t* spn_autoconf_new(spn_build_ctx_t* build);
-void            spn_autoconf_run(spn_autoconf_t* autoconf);
-void            spn_autoconf_add_flag(spn_autoconf_t* autoconf, const c8* flag);
-void            spn_cmake(spn_build_ctx_t* build);
-spn_cmake_t*    spn_cmake_new(spn_build_ctx_t* build);
-void            spn_cmake_set_generator(spn_cmake_t* cmake, spn_cmake_gen_t gen);
-void            spn_cmake_add_define(spn_cmake_t* cmake, const c8* name, const c8* value);
-void            spn_cmake_add_arg(spn_cmake_t* cmake, const c8* arg);
-void            spn_cmake_configure(spn_cmake_t* cmake);
-void            spn_cmake_build(spn_cmake_t* cmake);
-void            spn_cmake_install(spn_cmake_t* cmake);
-void            spn_cmake_run(spn_cmake_t* cmake);
 
-void            spn_copy(spn_build_ctx_t* build, spn_dir_kind_t from, const c8* from_path, spn_dir_kind_t to, const c8* to_path);
+spn_pkg_t*        spn_get_pkg(spn_build_ctx_t* b);
+spn_profile_t*    spn_get_profile(spn_build_ctx_t* b);
+spn_target_t*     spn_add_bin(spn_build_ctx_t* b, const c8* name);
+void              spn_copy(spn_build_ctx_t* b, spn_dir_kind_t from, const c8* pf, spn_dir_kind_t to, const c8* pt);
+void              spn_log(spn_build_ctx_t* b, const c8* message);
+void              spn_pkg_add_include(spn_pkg_t* pkg, const c8* path);
+void              spn_pkg_add_define(spn_pkg_t* pkg, const c8* define);
+void              spn_pkg_add_system_dep(spn_pkg_t* pkg, const c8* dep);
+void              spn_pkg_add_linkage(spn_pkg_t* pkg, spn_pkg_linkage_t linkage);
+void              spn_pkg_add_dep(spn_pkg_t* pkg, const c8* name, const c8* version, spn_visibility_t visibility);
+spn_registry_t*   spn_pkg_add_registry(spn_pkg_t* pkg, const c8* name, const c8* location);
+spn_cc_kind_t     spn_profile_get_cc(spn_profile_t* profile);
+const c8*         spn_profile_get_cc_exe(spn_profile_t* profile);
+spn_pkg_linkage_t spn_profile_get_linkage(spn_profile_t* profile);
+spn_libc_kind_t   spn_profile_get_libc(spn_profile_t* profile);
+spn_c_standard_t  spn_profile_get_standard(spn_profile_t* profile);
+spn_build_mode_t  spn_profile_get_mode(spn_profile_t* profile);
 
-void           spn_pkg_set_name(spn_pkg_t* pkg, const c8* name);
-void           spn_pkg_set_repo(spn_pkg_t* pkg, const c8* repo);
-void           spn_pkg_set_author(spn_pkg_t* pkg, const c8* author);
-void           spn_pkg_set_maintainer(spn_pkg_t* pkg, const c8* maintainer);
-void           spn_pkg_add_version(spn_pkg_t* pkg, const c8* version, const c8* commit);
-void           spn_pkg_add_include(spn_pkg_t* pkg, const c8* path);
-void           spn_pkg_add_define(spn_pkg_t* pkg, const c8* define);
-void           spn_pkg_add_system_dep(spn_pkg_t* pkg, const c8* dep);
+void              spn_target_add_source(spn_target_t* target, const c8* source);
+void              spn_target_add_include(spn_target_t* target, const c8* include);
+void              spn_target_add_define(spn_target_t* target, const c8* define);
+void              spn_target_set_visibility(spn_target_t* target, spn_visibility_t visibility);
 
-void           spn_pkg_add_linkage(spn_pkg_t* pkg, spn_pkg_linkage_t linkage);
-spn_profile_t* spn_pkg_add_profile(spn_pkg_t* pkg, const c8* name);
-void           spn_profile_set_cc(spn_profile_t* profile, spn_cc_kind_t kind);
-void           spn_profile_set_cc_exe(spn_profile_t* profile, const c8* exe);
-void           spn_profile_set_linkage(spn_profile_t* profile, spn_pkg_linkage_t linkage);
-void           spn_profile_set_libc(spn_profile_t* profile, spn_libc_kind_t libc);
-void           spn_profile_set_standard(spn_profile_t* profile, spn_c_standard_t standard);
-void           spn_profile_set_mode(spn_profile_t* profile, spn_build_mode_t mode);
-spn_target_t*  spn_pkg_add_bin(spn_pkg_t* pkg, const c8* name);
-spn_target_t*  spn_target_set_visibility(spn_target_t* target, spn_visibility_t visibility);
+void              spn_make(spn_build_ctx_t* build);
+spn_make_t*       spn_make_new(spn_build_ctx_t* build);
+void              spn_make_add_target(spn_make_t* make, const c8* target);
+void              spn_make_run(spn_make_t* make);
+void              spn_autoconf(spn_build_ctx_t* build);
+spn_autoconf_t*   spn_autoconf_new(spn_build_ctx_t* build);
+void              spn_autoconf_run(spn_autoconf_t* autoconf);
+void              spn_autoconf_add_flag(spn_autoconf_t* autoconf, const c8* flag);
+void              spn_cmake(spn_build_ctx_t* build);
+spn_cmake_t*      spn_cmake_new(spn_build_ctx_t* build);
+void              spn_cmake_set_generator(spn_cmake_t* cmake, spn_cmake_gen_t gen);
+void              spn_cmake_add_define(spn_cmake_t* cmake, const c8* name, const c8* value);
+void              spn_cmake_add_arg(spn_cmake_t* cmake, const c8* arg);
+void              spn_cmake_configure(spn_cmake_t* cmake);
+void              spn_cmake_build(spn_cmake_t* cmake);
+void              spn_cmake_install(spn_cmake_t* cmake);
+void              spn_cmake_run(spn_cmake_t* cmake);
 
-void            spn_log(spn_build_ctx_t* build, const c8* message);
-spn_bin_ctx_t*  spn_get_target(spn_build_ctx_t* build, const c8* name);
-spn_libc_kind_t spn_get_libc(spn_build_ctx_t* ctx);
+
 
 #endif
