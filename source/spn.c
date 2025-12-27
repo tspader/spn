@@ -116,6 +116,10 @@ sp_str_t sp_str_repeat(c8 c, u32 len) {
   return sp_str(buffer, len);
 }
 
+void sp_context_push_arena(sp_mem_arena_t* arena) {
+  sp_context_push_allocator(sp_mem_arena_as_allocator(arena));
+}
+
 void strip_ansi(char* buf, ssize_t* len) {
     char* out = buf;
     char* in = buf;
@@ -356,6 +360,11 @@ sp_str_t  spn_git_get_commit_message(sp_str_t repo_path, sp_str_t id);
 //////////
 // TOML //
 //////////
+u32 spn_toml_arr_len(toml_array_t* array) {
+  if (!array) return 0;
+  return toml_array_len(array);
+}
+
 #define spn_toml_arr_for(arr, it) for (u32 it = 0; it < toml_array_len(arr); it++)
 #define spn_toml_for(tbl, it, key) \
     for (s32 it = 0, SP_UNIQUE_ID() = 0; it < toml_table_len(tbl) && (key = toml_table_key(tbl, it, &SP_UNIQUE_ID())); it++)
@@ -700,6 +709,7 @@ typedef sp_ht(sp_str_t, spn_pkg_req_t) spn_pkg_dep_reqs_t;
 struct spn_pkg {
   sp_str_t name;
   sp_str_t repo;
+  sp_str_t url;
   sp_str_t author;
   sp_str_t maintainer;
   spn_semver_t version;
@@ -721,6 +731,8 @@ struct spn_pkg {
   spn_build_fn_t on_build;
   spn_build_fn_t on_package;
 
+  sp_mem_arena_t* arena;
+
   struct {
     sp_str_t dir;
     sp_str_t   manifest;
@@ -739,12 +751,16 @@ void      spn_pkg_add_dep_from_index(spn_pkg_t* pkg, sp_str_t name, spn_visibili
 void      spn_pkg_init(spn_pkg_t* package);
 void      spn_pkg_set_index(spn_pkg_t* package, sp_str_t path);
 void      spn_pkg_set_manifest(spn_pkg_t* package, sp_str_t path);
-void      spn_pkg_add_version(spn_pkg_t* package, spn_semver_t version, sp_str_t commit);
 sp_str_t  spn_pkg_get_url(spn_pkg_t* build);
-
-// @claude
 void spn_pkg_set_name_ex(spn_pkg_t* pkg, sp_str_t name);
 void spn_pkg_set_repo_ex(spn_pkg_t* pkg, sp_str_t repo);
+void spn_pkg_set_author_ex(spn_pkg_t* pkg, sp_str_t author);
+void spn_pkg_set_maintainer_ex(spn_pkg_t* pkg, sp_str_t maintainer);
+void spn_pkg_set_commit_ex(spn_pkg_t* pkg, sp_str_t commit);
+void spn_pkg_add_version_ex(spn_pkg_t* package, spn_semver_t version, sp_str_t commit);
+void spn_pkg_add_include_ex(spn_pkg_t* package, sp_str_t include);
+void spn_pkg_add_define_ex(spn_pkg_t* package, sp_str_t define);
+void spn_pkg_add_system_dep_ex(spn_pkg_t* package, sp_str_t dep);
 
 
 ////////////
@@ -2746,26 +2762,41 @@ toml_table_t* spn_toml_parse(sp_str_t path) {
   return toml_parse(sp_str_to_cstr(file), SP_NULLPTR, 0);
 }
 
-sp_str_t spn_toml_str(toml_table_t* toml, const c8* key) {
+const c8* spn_toml_cstr(toml_table_t* toml, const c8* key) {
   toml_value_t value = toml_table_string(toml, key);
   SP_ASSERT_FMT(value.ok, "missing string key: {:fg brightcyan}", SP_FMT_CSTR(key));
-  return sp_str_view(value.u.s);
+  return value.u.s;
+}
+
+const c8* spn_toml_cstr_opt(toml_table_t* toml, const c8* key, const c8* fallback) {
+  toml_value_t value = toml_table_string(toml, key);
+  if (!value.ok) {
+    return fallback;
+  }
+
+  return value.u.s;
+}
+
+const c8* spn_toml_arr_cstr(toml_array_t* toml, u32 it) {
+  toml_value_t value = toml_array_string(toml, it);
+  SP_ASSERT(value.ok);
+  return value.u.s;
+}
+
+
+
+sp_str_t spn_toml_arr_str(toml_array_t* toml, u32 it) {
+  return sp_str_view(spn_toml_arr_cstr(toml, it));
+}
+
+sp_str_t spn_toml_str(toml_table_t* toml, const c8* key) {
+  return sp_str_view(spn_toml_cstr(toml, key));
 }
 
 sp_str_t spn_toml_str_opt(toml_table_t* toml, const c8* key, const c8* fallback) {
-  toml_value_t value = toml_table_string(toml, key);
-  if (!value.ok) {
-    return sp_str_view(fallback);
-  }
-
-  return sp_str_view(value.u.s);
+  return sp_str_view(spn_toml_cstr_opt(toml, key, fallback));
 }
 
-sp_str_t spn_toml_arr_str(toml_array_t* toml, u32 it) {
-  toml_value_t value = toml_array_string(toml, it);
-  SP_ASSERT(value.ok);
-  return sp_str_view(value.u.s);
-}
 
 sp_da(sp_str_t) spn_toml_arr_to_str_arr(toml_array_t* toml) {
   if (!toml) return SP_NULLPTR;
@@ -4085,43 +4116,40 @@ spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key) {
   SP_UNREACHABLE_RETURN(SP_ZERO_STRUCT(spn_dep_option_t));
 }
 
-void spn_pkg_init(spn_pkg_t* package) {
-  sp_ht_set_fns(package->binaries, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(package->tests, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(package->deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(package->options, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(package->config, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(package->profiles, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+void spn_pkg_init(spn_pkg_t* pkg) {
+  pkg->arena = sp_mem_arena_new(4096);
+
+  sp_ht_set_fns(pkg->binaries, sp_ht_on_hash_str_key,
+                sp_ht_on_compare_str_key);
+  sp_ht_set_fns(pkg->tests, sp_ht_on_hash_str_key,
+                sp_ht_on_compare_str_key);
+  sp_ht_set_fns(pkg->deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+  sp_ht_set_fns(pkg->options, sp_ht_on_hash_str_key,
+                sp_ht_on_compare_str_key);
+  sp_ht_set_fns(pkg->config, sp_ht_on_hash_str_key,
+                sp_ht_on_compare_str_key);
+  sp_ht_set_fns(pkg->profiles, sp_ht_on_hash_str_key,
+                sp_ht_on_compare_str_key);
 }
 
-void spn_pkg_set_index(spn_pkg_t* package, sp_str_t path) {
-  package->kind = SPN_PACKAGE_KIND_INDEX;
-  package->paths.dir = sp_str_copy(path);
-  package->paths.manifest = sp_fs_join_path(package->paths.dir, sp_str_lit("spn.toml"));
-  package->paths.metadata = sp_fs_join_path(package->paths.dir, sp_str_lit("metadata.toml"));
-  package->paths.script = sp_fs_join_path(package->paths.dir, sp_str_lit("spn.c"));
+void spn_pkg_set_index(spn_pkg_t* pkg, sp_str_t path) {
+  sp_context_push_arena(pkg->arena);
+  pkg->kind = SPN_PACKAGE_KIND_INDEX;
+  pkg->paths.dir = sp_str_copy(path);
+  pkg->paths.manifest = sp_fs_join_path(pkg->paths.dir, sp_str_lit("spn.toml"));
+  pkg->paths.metadata = sp_fs_join_path(pkg->paths.dir, sp_str_lit("metadata.toml"));
+  pkg->paths.script = sp_fs_join_path(pkg->paths.dir, sp_str_lit("spn.c"));
+  sp_context_pop();
 }
 
-void spn_pkg_set_manifest(spn_pkg_t* package, sp_str_t path) {
-  package->kind = SPN_PACKAGE_KIND_FILE;
-  package->paths.dir = sp_fs_parent_path(path);
-  package->paths.manifest = sp_str_copy(path);
-  package->paths.metadata = sp_fs_join_path(package->paths.dir, sp_str_lit("metadata.toml"));
-  package->paths.script = sp_fs_join_path(package->paths.dir, sp_str_lit("spn.c"));
-}
-
-void spn_pkg_add_version(spn_pkg_t* package, spn_semver_t version, sp_str_t commit) {
-  spn_metadata_t metadata = {
-    .version = version,
-    .commit = sp_str_copy(commit)
-  };
-
-  sp_ht_insert(package->metadata, version, metadata);
-  sp_dyn_array_push(package->versions, version);
-}
-
-sp_str_t spn_pkg_get_url(spn_pkg_t* pkg) {
-  return sp_format("https://github.com/{}.git", SP_FMT_STR(pkg->repo));
+void spn_pkg_set_manifest(spn_pkg_t* pkg, sp_str_t path) {
+  sp_context_push_arena(pkg->arena);
+  pkg->kind = SPN_PACKAGE_KIND_FILE;
+  pkg->paths.dir = sp_fs_parent_path(path);
+  pkg->paths.manifest = sp_str_copy(path);
+  pkg->paths.metadata = sp_fs_join_path(pkg->paths.dir, sp_str_lit("metadata.toml"));
+  pkg->paths.script = sp_fs_join_path(pkg->paths.dir, sp_str_lit("spn.c"));
+  sp_context_pop();
 }
 
 spn_pkg_t spn_pkg_new(sp_str_t name) {
@@ -4134,7 +4162,7 @@ spn_pkg_t spn_pkg_new(sp_str_t name) {
 spn_pkg_t spn_pkg_from_bare_default(sp_str_t path, sp_str_t name) {
   spn_pkg_t package = spn_pkg_new(name);
   spn_pkg_set_manifest(&package, sp_fs_join_path(path, sp_str_lit("spn.toml")));
-  package.version = (spn_semver_t) { 0, 1, 0 };
+  package.version = (spn_semver_t){0, 1, 0};
   sp_dyn_array_push(package.versions, package.version);
   return package;
 }
@@ -4144,11 +4172,11 @@ spn_pkg_t spn_pkg_from_default(sp_str_t path, sp_str_t name) {
   spn_pkg_set_manifest(&package, sp_fs_join_path(path, sp_str_lit("spn.toml")));
   spn_pkg_add_dep_from_index(&package, sp_str_lit("sp"), SPN_VISIBILITY_PUBLIC);
 
-  package.version = (spn_semver_t) { 0, 1, 0 };
+  package.version = (spn_semver_t){0, 1, 0};
   sp_dyn_array_push(package.versions, package.version);
 
   spn_target_t bin = {
-    .name = sp_str_copy(package.name),
+      .name = sp_str_copy(package.name),
   };
   sp_dyn_array_push(bin.source, sp_str_lit("main.c"));
   sp_ht_insert(package.binaries, bin.name, bin);
@@ -4163,16 +4191,17 @@ spn_pkg_t spn_pkg_from_index(sp_str_t path) {
   spn_pkg_t package = spn_pkg_load(manifest);
   spn_pkg_set_index(&package, path);
 
-  toml_table_t* metadata = spn_toml_parse(package.paths.metadata);
+  toml_table_t *metadata = spn_toml_parse(package.paths.metadata);
   if (metadata) {
-    toml_array_t* versions = toml_table_array(metadata, "versions");
+    toml_array_t *versions = toml_table_array(metadata, "versions");
 
-    const c8* key = SP_NULLPTR;
+    const c8 *key = SP_NULLPTR;
     spn_toml_arr_for(versions, it) {
-      toml_table_t* entry = toml_array_table(versions, it);
+      toml_table_t *entry = toml_array_table(versions, it);
 
-      spn_semver_t version = spn_semver_from_str(spn_toml_str(entry, "version"));
-      spn_pkg_add_version(&package, version, spn_toml_str(entry, "commit"));
+      spn_semver_t version =
+          spn_semver_from_str(spn_toml_str(entry, "version"));
+      spn_pkg_add_version_ex(&package, version, spn_toml_str(entry, "commit"));
     }
 
     sp_dyn_array_sort(package.versions, spn_semver_sort_kernel);
@@ -4189,20 +4218,104 @@ spn_pkg_t spn_pkg_from_manifest(sp_str_t manifest) {
   return package;
 }
 
+void spn_pkg_set_name(spn_pkg_t* pkg, const c8* name) {
+  spn_pkg_set_name_ex(pkg, sp_str_view(name));
+}
+
 void spn_pkg_set_name_ex(spn_pkg_t* pkg, sp_str_t name) {
+  sp_context_push_arena(pkg->arena);
   pkg->name = sp_str_copy(name);
+  sp_context_pop();
+}
+
+void spn_pkg_set_repo(spn_pkg_t* pkg, const c8* repo) {
+  spn_pkg_set_repo_ex(pkg, sp_str_view(repo));
 }
 
 void spn_pkg_set_repo_ex(spn_pkg_t* pkg, sp_str_t repo) {
+  sp_context_push_arena(pkg->arena);
   pkg->repo = sp_str_copy(repo);
+  pkg->url = sp_format("https://github.com/{}.git", SP_FMT_STR(pkg->repo)); // lol
+  sp_context_pop();
 }
 
+void spn_pkg_set_author(spn_pkg_t* pkg, const c8* author) {
+  spn_pkg_set_author_ex(pkg, sp_str_view(author));
+}
+
+void spn_pkg_set_author_ex(spn_pkg_t* pkg, sp_str_t author) {
+  sp_context_push_arena(pkg->arena);
+  pkg->author = sp_str_copy(author);
+  sp_context_pop();
+}
+
+void spn_pkg_set_maintainer(spn_pkg_t* pkg, const c8* maintainer) {
+  spn_pkg_set_maintainer_ex(pkg, sp_str_view(maintainer));
+}
+
+void spn_pkg_set_maintainer_ex(spn_pkg_t* pkg, sp_str_t maintainer) {
+  sp_context_push_arena(pkg->arena);
+  pkg->maintainer = sp_str_copy(maintainer);
+  sp_context_pop();
+}
+
+void spn_pkg_add_version(spn_pkg_t* pkg, const c8* version, const c8* commit) {
+  spn_pkg_add_version_ex(pkg, spn_semver_from_str(sp_str_view(version)), sp_str_view(commit));
+}
+
+void spn_pkg_add_version_ex(spn_pkg_t* pkg, spn_semver_t version, sp_str_t commit) {
+  sp_context_push_arena(pkg->arena);
+  sp_ht_insert(pkg->metadata, version, ((spn_metadata_t) {
+    .version = version,
+    .commit = sp_str_copy(commit)
+  }));
+  sp_dyn_array_push(pkg->versions, version);
+  sp_context_pop();
+}
+
+void spn_pkg_add_include(spn_pkg_t* pkg, const c8* include) {
+  spn_pkg_add_include_ex(pkg, sp_str_view(include));
+}
+
+void spn_pkg_add_include_ex(spn_pkg_t* pkg, sp_str_t include) {
+  sp_context_push_arena(pkg->arena);
+  sp_da_push(pkg->include, sp_str_copy(include));
+  sp_context_pop();
+}
+
+void spn_pkg_add_define(spn_pkg_t* pkg, const c8* define) {
+  spn_pkg_add_define_ex(pkg, sp_str_view(define));
+}
+
+void spn_pkg_add_define_ex(spn_pkg_t* pkg, sp_str_t define) {
+  sp_context_push_arena(pkg->arena);
+  sp_da_push(pkg->define, sp_str_copy(define));
+  sp_context_pop();
+}
+
+void spn_pkg_add_system_dep(spn_pkg_t* pkg, const c8* dep) {
+  spn_pkg_add_system_dep_ex(pkg, sp_str_view(dep));
+}
+
+void spn_pkg_add_system_dep_ex(spn_pkg_t* pkg, sp_str_t dep) {
+  sp_context_push_arena(pkg->arena);
+  sp_da_push(pkg->system_deps, sp_str_copy(dep));
+  sp_context_pop();
+}
+
+sp_str_t spn_pkg_get_url(spn_pkg_t* pkg) {
+  return pkg->url;
+}
+
+
 // @spader
-// make this go through the literal exact same code path as what you call in configure
+// make this go through the literal exact same code path as what you call in
+// configure
 spn_target_t spn_pkg_load_bin(toml_table_t* toml) {
   spn_target_t bin = SP_ZERO_INITIALIZE();
 
-  if (!toml) return bin;
+  if (!toml)
+    return bin;
 
   bin.name = spn_toml_str(toml, "name");
   bin.source = spn_toml_arr_to_str_arr(toml_table_array(toml, "source"));
@@ -4210,17 +4323,18 @@ spn_target_t spn_pkg_load_bin(toml_table_t* toml) {
   bin.define = spn_toml_arr_to_str_arr(toml_table_array(toml, "define"));
 
   toml_value_t kind = toml_table_string(toml, "kind");
-  bin.visibility = kind.ok ?
-    spn_visibility_from_str(sp_str_view(kind.u.s)) :
-    SPN_VISIBILITY_PUBLIC;
+  bin.visibility = kind.ok ? spn_visibility_from_str(sp_str_view(kind.u.s))
+                           : SPN_VISIBILITY_PUBLIC;
 
   return bin;
 }
 
-void spn_pkg_load_deps(toml_table_t* toml, spn_pkg_t* package, spn_visibility_t visibility) {
-  if (!toml) return;
+void spn_pkg_load_deps(toml_table_t *toml, spn_pkg_t *package,
+                       spn_visibility_t visibility) {
+  if (!toml)
+    return;
 
-  const c8* key = SP_NULLPTR;
+  const c8 *key = SP_NULLPTR;
   spn_toml_for(toml, n, key) {
     spn_pkg_req_t dep = spn_pkg_req_from_str(spn_toml_str(toml, key));
     dep.name = sp_str_from_cstr(key);
@@ -4231,8 +4345,8 @@ void spn_pkg_load_deps(toml_table_t* toml, spn_pkg_t* package, spn_visibility_t 
 }
 
 spn_pkg_t spn_pkg_load(sp_str_t manifest_path) {
-  spn_pkg_t package = SP_ZERO_INITIALIZE();
-  spn_pkg_init(&package);
+  spn_pkg_t pkg = SP_ZERO_INITIALIZE();
+  spn_pkg_init(&pkg);
 
   spn_toml_package_t toml = SP_ZERO_INITIALIZE();
   toml.manifest = spn_toml_parse(manifest_path);
@@ -4246,84 +4360,88 @@ spn_pkg_t spn_pkg_load(sp_str_t manifest_path) {
   toml.options = toml_table_table(toml.manifest, "options");
   toml.config = toml_table_table(toml.manifest, "config");
 
-  package.name = spn_toml_str(toml.package, "name");
-  package.repo = spn_toml_str_opt(toml.package, "repo", "");
-  package.author = spn_toml_str_opt(toml.package, "author", "");
-  package.maintainer = spn_toml_str_opt(toml.package, "maintainer", "");
+  spn_pkg_set_name(&pkg, spn_toml_cstr(toml.package, "name"));
+  spn_pkg_set_repo(&pkg, spn_toml_cstr(toml.package, "repo"));
+  spn_pkg_set_author(&pkg, spn_toml_cstr_opt(toml.package, "author", ""));
+  spn_pkg_set_maintainer(&pkg, spn_toml_cstr_opt(toml.package, "maintainer", ""));
 
-  sp_str_t commit = spn_toml_str_opt(toml.package, "commit", "");
-  package.version = spn_semver_from_str(spn_toml_str(toml.package, "version"));
-  spn_pkg_add_version(&package, package.version, commit);
+  const c8* version = spn_toml_cstr(toml.package, "version");
+  const c8* commit = spn_toml_cstr_opt(toml.package, "commit", "");
+  spn_pkg_add_version(&pkg, version, commit);
 
-  if (toml.package) {
-    toml_array_t* include = toml_table_array(toml.package, "include");
-    if (include) {
-      package.include = spn_toml_arr_to_str_arr(include);
-    }
+  toml_array_t* include = toml_table_array(toml.package, "include");
+  spn_toml_arr_for(include, it) {
+    spn_pkg_add_include(&pkg, spn_toml_arr_cstr(include, it));
+  }
 
-    toml_array_t* define = toml_table_array(toml.package, "define");
-    if (define) {
-      package.define = spn_toml_arr_to_str_arr(define);
-    }
+  toml_array_t* define = toml_table_array(toml.package, "define");
+  spn_toml_arr_for(define, it) {
+    spn_pkg_add_define(&pkg, spn_toml_arr_cstr(define, it));
+  }
 
-    toml_array_t* system_deps = toml_table_array(toml.package, "system_deps");
-    if (system_deps) {
-      package.system_deps = spn_toml_arr_to_str_arr(system_deps);
-    }
+  toml_array_t* system_deps = toml_table_array(toml.package, "system_deps");
+  spn_toml_arr_for(system_deps, it) {
+    spn_pkg_add_system_dep(&pkg, spn_toml_arr_cstr(system_deps, it));
   }
 
   if (toml.lib) {
-    toml_array_t* kinds = toml_table_array(toml.lib, "kinds");
+    toml_array_t *kinds = toml_table_array(toml.lib, "kinds");
     spn_toml_arr_for(kinds, it) {
       toml_value_t value = toml_array_string(kinds, it);
       SP_ASSERT(value.ok);
 
       spn_pkg_linkage_t kind = spn_lib_kind_from_str(sp_str_view(value.u.s));
-      sp_ht_insert(package.lib.enabled, kind, true);
+      sp_ht_insert(pkg.lib.enabled, kind, true);
     }
 
-    package.lib.name = spn_toml_str_opt(toml.lib, "name", "");
+    pkg.lib.name = spn_toml_str_opt(toml.lib, "name", "");
 
-    if (sp_ht_key_exists(package.lib.enabled, SPN_LIB_KIND_SHARED)) SP_ASSERT(!sp_str_empty(package.lib.name));
-    if (sp_ht_key_exists(package.lib.enabled, SPN_LIB_KIND_STATIC)) SP_ASSERT(!sp_str_empty(package.lib.name));
+    if (sp_ht_key_exists(pkg.lib.enabled, SPN_LIB_KIND_SHARED))
+      SP_ASSERT(!sp_str_empty(pkg.lib.name));
+    if (sp_ht_key_exists(pkg.lib.enabled, SPN_LIB_KIND_STATIC))
+      SP_ASSERT(!sp_str_empty(pkg.lib.name));
   }
 
   if (toml.profile) {
     spn_toml_arr_for(toml.profile, n) {
-      toml_table_t* it = toml_array_table(toml.profile, n);
+      toml_table_t *it = toml_array_table(toml.profile, n);
       spn_profile_t profile = SP_ZERO_INITIALIZE();
 
       profile.name = spn_toml_str(it, "name");
       profile.cc.exe = spn_toml_str_opt(it, "cc", "gcc");
       profile.cc.kind = spn_cc_kind_from_str(profile.cc.exe);
-      profile.linkage = spn_lib_kind_from_str(spn_toml_str_opt(it, "linkage", "shared"));
-      profile.libc = spn_libc_kind_from_str(spn_toml_str_opt(it, "libc", "gnu"));
-      profile.standard = spn_c_standard_from_str(spn_toml_str_opt(it, "standard", "c99"));
-      profile.mode = spn_dep_build_mode_from_str(spn_toml_str_opt(it, "mode", "debug"));
+      profile.linkage =
+          spn_lib_kind_from_str(spn_toml_str_opt(it, "linkage", "shared"));
+      profile.libc =
+          spn_libc_kind_from_str(spn_toml_str_opt(it, "libc", "gnu"));
+      profile.standard =
+          spn_c_standard_from_str(spn_toml_str_opt(it, "standard", "c99"));
+      profile.mode =
+          spn_dep_build_mode_from_str(spn_toml_str_opt(it, "mode", "debug"));
       profile.kind = SPN_PROFILE_USER;
 
-      sp_ht_insert(package.profiles, profile.name, profile);
+      sp_ht_insert(pkg.profiles, profile.name, profile);
     }
   }
 
   if (toml.registry) {
     spn_toml_arr_for(toml.registry, n) {
-      toml_table_t* it = toml_array_table(toml.registry, n);
+      toml_table_t *it = toml_array_table(toml.registry, n);
 
       spn_registry_t registry = {
-        .name = spn_toml_str_opt(it, "name", ""),
-        .location = spn_toml_str(it, "location"),
-        .kind = SPN_PACKAGE_KIND_WORKSPACE,
+          .name = spn_toml_str_opt(it, "name", ""),
+          .location = spn_toml_str(it, "location"),
+          .kind = SPN_PACKAGE_KIND_WORKSPACE,
       };
 
-      sp_dyn_array_push(package.registries, registry);
+      sp_dyn_array_push(pkg.registries, registry);
     }
   }
 
   if (toml.bin) {
     spn_toml_arr_for(toml.bin, n) {
       spn_target_t bin = spn_pkg_load_bin(toml_array_table(toml.bin, n));
-      sp_ht_insert(package.binaries, bin.name, bin);
+      sp_ht_insert(pkg.binaries, bin.name, bin);
     }
   }
 
@@ -4331,49 +4449,51 @@ spn_pkg_t spn_pkg_load(sp_str_t manifest_path) {
     spn_toml_arr_for(toml.test, n) {
       spn_target_t test = spn_pkg_load_bin(toml_array_table(toml.test, n));
       test.visibility = SPN_VISIBILITY_TEST;
-      sp_ht_insert(package.tests, test.name, test);
+      sp_ht_insert(pkg.tests, test.name, test);
     }
   }
 
   if (toml.deps) {
-    spn_pkg_load_deps(toml_table_table(toml.deps, "package"), &package, SPN_VISIBILITY_PUBLIC);
-    spn_pkg_load_deps(toml_table_table(toml.deps, "test"), &package, SPN_VISIBILITY_TEST);
+    spn_pkg_load_deps(toml_table_table(toml.deps, "package"), &pkg,
+                      SPN_VISIBILITY_PUBLIC);
+    spn_pkg_load_deps(toml_table_table(toml.deps, "test"), &pkg,
+                      SPN_VISIBILITY_TEST);
   }
 
   if (toml.options) {
-    const c8* key = SP_NULLPTR;
+    const c8 *key = SP_NULLPTR;
     spn_toml_for(toml.options, n, key) {
       spn_dep_option_t option = spn_dep_option_from_toml(toml.options, key);
-      sp_ht_insert(package.options, option.name, option);
+      sp_ht_insert(pkg.options, option.name, option);
     }
   }
 
   if (toml.config) {
-    sp_da(toml_table_t*) configs = SP_ZERO_INITIALIZE();
-    const c8* key = SP_NULLPTR;
+    sp_da(toml_table_t *) configs = SP_ZERO_INITIALIZE();
+    const c8 *key = SP_NULLPTR;
     spn_toml_for(toml.config, n, key) {
       sp_dyn_array_push(configs, toml_table_table(toml.config, key));
     }
 
     sp_dyn_array_for(configs, it) {
-      toml_table_t* config = configs[it];
+      toml_table_t *config = configs[it];
 
       sp_str_t name = sp_str_from_cstr(config->key);
 
       spn_dep_options_t options = SP_NULLPTR;
       sp_ht_set_fns(options, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
 
-      const c8* key = SP_NULLPTR;
+      const c8 *key = SP_NULLPTR;
       spn_toml_for(config, n, key) {
         spn_dep_option_t option = spn_dep_option_from_toml(config, key);
         sp_ht_insert(options, option.name, option);
       }
 
-      sp_ht_insert(package.config, name, options);
+      sp_ht_insert(pkg.config, name, options);
     }
   }
 
-  return package;
+  return pkg;
 }
 
 spn_pkg_req_t spn_pkg_req_from_str(sp_str_t str) {

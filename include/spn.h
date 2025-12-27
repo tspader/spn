@@ -109,6 +109,13 @@ void            spn_copy(spn_build_ctx_t* build, spn_dir_kind_t from, const c8* 
 // @claude
 void spn_pkg_set_name(spn_pkg_t* pkg, const c8* name);
 void spn_pkg_set_repo(spn_pkg_t* pkg, const c8* repo);
+void spn_pkg_set_author(spn_pkg_t* pkg, const c8* author);
+void spn_pkg_set_maintainer(spn_pkg_t* pkg, const c8* maintainer);
+void spn_pkg_add_version(spn_pkg_t* pkg, const c8* version, const c8* commit);
+void spn_pkg_add_include(spn_pkg_t* pkg, const c8* path);
+void spn_pkg_add_define(spn_pkg_t* pkg, const c8* define);
+void spn_pkg_add_system_dep(spn_pkg_t* pkg, const c8* dep);
+void spn_pkg_add_linkage(spn_pkg_t* pkg, spn_pkg_linkage_t linkage);
 
 void            spn_log(spn_build_ctx_t* build, const c8* message);
 spn_bin_ctx_t*  spn_get_target(spn_build_ctx_t* build, const c8* name);
