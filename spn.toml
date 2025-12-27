@@ -1,6 +1,7 @@
 [package]
 name = "spn"
 version = "0.1.0"
+repo = "tspader/spn"
 
 [deps.package]
 sp = "1.6.6"
