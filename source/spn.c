@@ -2048,6 +2048,12 @@ spn_target_t* spn_add_bin(spn_build_ctx_t* b, const c8* name) {
   return target;
 }
 
+spn_target_t* spn_add_test(spn_build_ctx_t* b, const c8* name) {
+  spn_target_t* target = spn_pkg_add_test(b->pkg, name);
+  spn_builder_add_target(b->builder, target);
+  return target;
+}
+
 void spn_log(spn_build_ctx_t* ctx, const c8* message) {
   sp_io_stream_t* io = &ctx->logs.build;
   sp_io_write_line(io, sp_tm_epoch_to_iso8601(sp_tm_now_epoch()));

@@ -37,10 +37,10 @@ include = ["include", "source", "test/tools"]
 
 [[test]]
 name = "graph"
-source = ["test/graph/main.c"]
+source = ["test/core/graph.c"]
 include = ["include", "source", "test/tools"]
 
 [[test]]
 name = "cli"
-source = ["test/cli/main.c"]
+source = ["test/core/main.c"]
 include = ["include", "source", "test/tools"]
