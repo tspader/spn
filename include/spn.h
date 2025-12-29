@@ -99,6 +99,7 @@ typedef void(*spn_build_fn_t)(spn_build_ctx_t*);
 spn_pkg_t*        spn_get_pkg(spn_build_ctx_t* b);
 spn_profile_t*    spn_get_profile(spn_build_ctx_t* b);
 spn_target_t*     spn_add_bin(spn_build_ctx_t* b, const c8* name);
+spn_target_t*     spn_add_test(spn_build_ctx_t* b, const c8* name);
 void              spn_copy(spn_build_ctx_t* b, spn_dir_kind_t from, const c8* pf, spn_dir_kind_t to, const c8* pt);
 void              spn_log(spn_build_ctx_t* b, const c8* message);
 void              spn_pkg_add_include(spn_pkg_t* pkg, const c8* path);

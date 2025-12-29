@@ -1,6 +1,3 @@
-// spn add argparse
-// verify sp still has a ^ in the project file
-
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
