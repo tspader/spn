@@ -25,19 +25,17 @@
 
 #include "libtcc.h"
 
-#ifdef SP_POSIX
-#include <signal.h>
-#endif
+#include <setjmp.h>
 
-#ifdef SP_POSIX
+#if defined(SP_POSIX)
+  #include <dlfcn.h>
+  #include <fcntl.h>
+  #include <signal.h>
   #include <termios.h>
   #include <unistd.h>
-  #include <fcntl.h>
-  #include <dlfcn.h>
 #endif
 
-#ifdef SP_LINUX
-  //#include <link.h>
+#if defined(SP_LINUX)
   #include <unistd.h>
   #include <string.h>
   #include <pty.h>
@@ -429,6 +427,7 @@ typedef TCCState spn_tcc_t;
 spn_tcc_t* spn_tcc_new(spn_build_ctx_t* ctx);
 spn_err_t  spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path);
 spn_err_t  spn_tcc_register(spn_tcc_t* tcc);
+s32        spn_tcc_backtrace(void* ud, void* pc, const c8* file, s32 line, const c8* fn, const c8* message);
 void       spn_tcc_error(void* opaque, const char* message);
 void       spn_tcc_list_fn(void* opaque, const char* name, const void* value);
 
@@ -1006,6 +1005,7 @@ void spn_builder_add_dep(spn_builder_t* builder, spn_resolved_pkg_t* resolved);
   X(SPN_BUILD_EVENT_CHECKOUT, "checkout") \
   X(SPN_BUILD_EVENT_BUILD, "build") \
   X(SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED, "failed") \
+  X(SPN_BUILD_EVENT_BUILD_SCRIPT_CRASHED, "failed") \
   X(SPN_BUILD_EVENT_BUILD_CONFIGURE_FAILED, "failed") \
   X(SPN_BUILD_EVENT_DEP_BUILD, "build") \
   X(SPN_BUILD_EVENT_DEP_BUILD_PASSED, "ok") \
@@ -3155,8 +3155,9 @@ sp_str_t spn_toml_writer_write(spn_toml_writer_t* writer) {
 spn_tcc_t* spn_tcc_new(spn_build_ctx_t* ctx) {
   spn_tcc_t* tcc = tcc_new();
   tcc_set_error_func(tcc, ctx, spn_tcc_error);
+  tcc_set_backtrace_func(tcc, ctx, spn_tcc_backtrace);
   tcc_set_lib_path(tcc, sp_str_to_cstr(spn.paths.runtime));
-  sp_try_as(tcc_set_options(tcc, "-gdwarf -nostdlib -Wall -Werror"), SP_NULLPTR);
+  sp_try_as(tcc_set_options(tcc, "-gdwarf -Wall -Werror"), SP_NULLPTR);
   tcc_set_output_type(tcc, TCC_OUTPUT_MEMORY);
   sp_try_as(tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include)), SP_NULLPTR);
   tcc_define_symbol(tcc, "SPN", "");
@@ -3174,6 +3175,10 @@ spn_err_t spn_tcc_register(spn_tcc_t* tcc) {
 spn_err_t spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path) {
   sp_try_as(tcc_add_file(tcc, sp_str_to_cstr(file_path)), SPN_ERROR);
   return SPN_OK;
+}
+
+s32 spn_tcc_backtrace(void* ud, void* pc, const c8* file, s32 line, const c8* fn, const c8* message) {
+  return 0;
 }
 
 void spn_tcc_error(void* user_data, const char* message) {
@@ -3331,6 +3336,7 @@ sp_str_t spn_tui_render_build_event(spn_build_event_t* event) {
     case SPN_BUILD_EVENT_TEST_FAILED:
     case SPN_BUILD_EVENT_DEP_BUILD_FAILED:
     case SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED:
+    case SPN_BUILD_EVENT_BUILD_SCRIPT_CRASHED:
     case SPN_BUILD_EVENT_BUILD_CONFIGURE_FAILED:
     case SPN_BUILD_EVENT_TARGET_BUILD_FAILED: {
       sp_str_builder_append_fmt(&builder,
@@ -3416,6 +3422,10 @@ sp_str_t spn_tui_render_build_event(spn_build_event_t* event) {
         SP_FMT_STR(event->ctx->profile->name),
         SP_FMT_F32(sp_tm_ns_to_s_f(event->done.time))
       );
+      break;
+    }
+    case SPN_BUILD_EVENT_BUILD_SCRIPT_CRASHED: {
+      sp_str_builder_append_cstr(&builder, "crashed");
       break;
     }
     default: {
@@ -5348,11 +5358,26 @@ spn_err_t spn_build_ctx_compile(spn_build_ctx_t* ctx) {
   return SPN_OK;
 }
 
+spn_err_t spn_build_ctx_run_hook(spn_build_ctx_t* ctx, spn_build_fn_t fn) {
+  jmp_buf jump;
+  int status = tcc_setjmp(ctx->tcc, jump, fn);
+  if (!status) {
+    fn(ctx);
+  }
+  else {
+    spn_event_buffer_push(spn.events, ctx, SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED);
+    return SPN_ERROR;
+  }
+
+  return SPN_OK;
+}
+
+
 spn_err_t spn_build_ctx_run_build(spn_build_ctx_t* ctx) {
   sp_tm_timer_t timer = sp_tm_start_timer();
 
   if (ctx->on_build) {
-    ctx->on_build(ctx);
+    sp_try(spn_build_ctx_run_hook(ctx, ctx->on_build));
     ctx->time.build = sp_tm_read_timer(&timer);
   }
 
@@ -5363,7 +5388,7 @@ spn_err_t spn_build_ctx_run_configure(spn_build_ctx_t* ctx) {
   sp_tm_timer_t timer = sp_tm_start_timer();
 
   if (ctx->on_configure) {
-    ctx->on_configure(ctx);
+    sp_try(spn_build_ctx_run_hook(ctx, ctx->on_configure));
     ctx->time.configure = sp_tm_read_timer(&timer);
   }
 
@@ -5374,12 +5399,13 @@ spn_err_t spn_build_ctx_run_package(spn_build_ctx_t* ctx) {
   sp_tm_timer_t timer = sp_tm_start_timer();
 
   if (ctx->on_package) {
-    ctx->on_package(ctx);
+    sp_try(spn_build_ctx_run_hook(ctx, ctx->on_package));
     ctx->time.package = sp_tm_read_timer(&timer);
   }
 
   return SPN_OK;
 }
+
 
 s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_ctx_t* build = (spn_pkg_ctx_t*)user_data;
