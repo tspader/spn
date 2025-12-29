@@ -10,7 +10,7 @@ clone:
 	@if [ ! -d bootstrap/external/argparse ]; then git clone https://github.com/tspader/argparse.git bootstrap/external/argparse; fi
 	@if [ ! -d bootstrap/external/sp ]; then git clone https://github.com/tspader/sp.git bootstrap/external/sp; fi
 	@if [ ! -d bootstrap/external/toml ]; then git clone https://github.com/tspader/toml.git bootstrap/external/toml; fi
-	@if [ ! -d bootstrap/external/tinycc ]; then git clone https://github.com/tinycc/tinycc.git bootstrap/external/tinycc; fi
+	@if [ ! -d bootstrap/external/tinycc ]; then git clone https://github.com/tspader/tinycc.git bootstrap/external/tinycc && git -C bootstrap/external/tinycc checkout spn; fi
 
 bootstrap/external/argparse bootstrap/external/sp bootstrap/external/toml bootstrap/external/tinycc: clone
 

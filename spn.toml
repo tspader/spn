@@ -4,8 +4,8 @@ version = "0.1.0"
 repo = "tspader/spn"
 
 [deps.package]
+spcc = "1.0.0"
 sp = "1.6.6"
-tcc = ">=1.0.0"
 toml = "1.2.0"
 
 [deps.test]
@@ -14,16 +14,33 @@ utest = "1.0.0"
 [[profile]]
 name = "debug"
 cc = "clang"
+linkage = "shared"
+libc = "gnu"
+standard = "c99"
+mode = "debug"
 
 [[profile]]
 name = "macos"
 cc = "clang"
+linkage = "shared"
+libc = "gnu"
+standard = "c99"
+mode = "debug"
 
 [[bin]]
 name = "spn"
 source = ["source/spn.c"]
 include = ["include"]
 
+[[test]]
+name = "cli"
+source = ["test/core/cli.c"]
+include = ["include", "source", "test/tools"]
+
+[[test]]
+name = "graph"
+source = ["test/core/graph.c"]
+include = ["include", "source", "test/tools"]
 
 [[test]]
 name = "task"
@@ -33,14 +50,4 @@ include = ["include", "source", "test/tools"]
 [[test]]
 name = "om"
 source = ["test/core/ordered_map.c"]
-include = ["include", "source", "test/tools"]
-
-[[test]]
-name = "graph"
-source = ["test/core/graph.c"]
-include = ["include", "source", "test/tools"]
-
-[[test]]
-name = "cli"
-source = ["test/core/cli.c"]
 include = ["include", "source", "test/tools"]

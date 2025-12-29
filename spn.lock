@@ -8,14 +8,14 @@ system_deps = ["m"]
 [[dep]]
 name = "sp"
 version = "1.6.6"
-commit = "361dc0b403ec"
+commit = "7a354ae48a33"
 kind = "index"
 visibility = "public"
 
 [[dep]]
-name = "tcc"
+name = "spcc"
 version = "1.0.0"
-commit = "01d1b7bc7601"
+commit = "7a0131c0f119"
 kind = "index"
 visibility = "public"
 
