@@ -421,6 +421,18 @@ void              spn_toml_append_str_carr(spn_toml_writer_t* writer, sp_str_t k
 void              spn_toml_append_str_carr_cstr(spn_toml_writer_t* writer, const c8* key, sp_str_t* values, u32 len);
 
 
+/////////
+// TCC //
+/////////
+typedef TCCState spn_tcc_t;
+
+spn_tcc_t* spn_tcc_new(spn_build_ctx_t* ctx);
+spn_err_t  spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path);
+spn_err_t  spn_tcc_register(spn_tcc_t* tcc);
+void       spn_tcc_error(void* opaque, const char* message);
+void       spn_tcc_list_fn(void* opaque, const char* name, const void* value);
+
+
 ///////////////
 // GENERATOR //
 ///////////////
@@ -612,6 +624,23 @@ spn_c_standard_t  spn_c_standard_from_str(sp_str_t str);
 sp_str_t          spn_c_standard_to_str(spn_c_standard_t standard);
 
 
+typedef enum {
+  SPN_EMBED_FILE,
+  SPN_EMBED_MEM,
+} spn_embed_kind_t;
+
+typedef struct {
+  spn_embed_kind_t kind;
+  sp_str_t symbol;
+  struct {
+    sp_str_t data;
+    sp_str_t size;
+  } types;
+  union {
+    struct { sp_str_t path; } file;
+    struct { const u8* buffer; u64 size; } memory;
+  };
+} spn_embed_t;
 
 struct spn_target {
   sp_str_t name;
@@ -620,6 +649,7 @@ struct spn_target {
   sp_da(sp_str_t) source;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
+  sp_da(spn_embed_t) embed;
 };
 
 typedef enum {
@@ -760,6 +790,9 @@ spn_target_t*   spn_pkg_get_target_ex(spn_pkg_t* pkg, sp_str_t name);
 void            spn_target_add_source_ex(spn_target_t* target, sp_str_t source);
 void            spn_target_add_include_ex(spn_target_t* target, sp_str_t include);
 void            spn_target_add_define_ex(spn_target_t* target, sp_str_t define);
+void            spn_target_set_visibility(spn_target_t* target, spn_visibility_t visibility);
+void            spn_target_embed_file_ex_s(spn_target_t* target, sp_str_t file, sp_str_t symbol, sp_str_t data_type, sp_str_t size_type);
+void            spn_target_embed_mem_ex_s(spn_target_t* target, sp_str_t symbol, const u8* buffer, u64 buffer_size, sp_str_t data_type, sp_str_t size_type);
 void            spn_profile_set_cc(spn_profile_t* profile, spn_cc_kind_t kind);
 void            spn_profile_set_cc_exe(spn_profile_t* profile, const c8* exe);
 void            spn_profile_set_linkage(spn_profile_t* profile, spn_pkg_linkage_t linkage);
@@ -860,6 +893,11 @@ struct spn_build_ctx {
   spn_profile_t* profile;
   spn_pkg_linkage_t linkage;
 
+  spn_tcc_t* tcc;
+  struct {
+    c8* data;
+    u64 size;
+  } elf;
   spn_build_fn_t on_configure;
   spn_build_fn_t on_build;
   spn_build_fn_t on_package;
@@ -1067,16 +1105,6 @@ sp_str_t        spn_gen_build_entries_for_all(spn_gen_entry_t kind, spn_cc_kind_
 
 
 
-/////////
-// TCC //
-/////////
-typedef TCCState spn_tcc_t;
-
-spn_tcc_t* spn_tcc_new(spn_build_ctx_t* ctx);
-spn_err_t  spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path);
-spn_err_t  spn_tcc_register(spn_tcc_t* tcc);
-void       spn_tcc_error(void* opaque, const char* message);
-void       spn_tcc_list_fn(void* opaque, const char* name, const void* value);
 
 
 
@@ -1445,6 +1473,35 @@ void           spn_tool_run(sp_str_t package_name, sp_da(sp_str_t) args);
 void           spn_tool_upgrade(sp_str_t package_name);
 sp_str_t       spn_get_tool_path(spn_target_t* bin);
 
+
+
+typedef enum {
+  JIT_NOACTION = 0,
+  JIT_REGISTER_FN,
+  JIT_UNREGISTER_FN
+} jit_actions_t;
+
+struct jit_code_entry {
+  struct jit_code_entry *next_entry;
+  struct jit_code_entry *prev_entry;
+  const char *symfile_addr;
+  uint64_t symfile_size;
+};
+
+struct jit_descriptor {
+  uint32_t version;
+  uint32_t action_flag;
+  struct jit_code_entry *relevant_entry;
+  struct jit_code_entry *first_entry;
+};
+
+void __attribute__((noinline)) __jit_debug_register_code(void) {
+  __asm__ volatile("");
+}
+
+struct jit_descriptor __jit_debug_descriptor = { 1, 0, 0, 0 };
+
+
 typedef struct {
   spn_cli_t cli;
   struct {
@@ -1478,6 +1535,8 @@ typedef struct {
   s32 num_args;
   const c8** args;
   sp_intern_t* intern;
+  struct jit_code_entry jit;
+
 
   struct {
     sp_io_stream_t out;
@@ -1540,7 +1599,7 @@ typedef struct {
   sp_da(sp_str_t) libs;
   sp_da(sp_str_t) lib_dirs;
   sp_da(sp_str_t) rpath;
-  sp_da(sp_io_stream_t) embed;
+  sp_da(spn_embed_t) embed;
 
   spn_cc_target_kind_t kind;
   union {
@@ -1594,6 +1653,7 @@ void             spn_cc_target_add_lib(spn_cc_target_t* cc, sp_str_t lib);
 void             spn_cc_target_add_lib_dir(spn_cc_target_t* cc, sp_str_t dir);
 void             spn_cc_target_add_rpath(spn_cc_target_t* cc, sp_str_t dir);
 void             spn_cc_target_embed_file(spn_cc_target_t* cc, sp_str_t file_path);
+sp_str_t         spn_cc_symbol_from_embedded_file(sp_str_t file_path);
 spn_err_t        spn_cc_run(spn_cc_t* cc);
 
 typedef struct {
@@ -1645,7 +1705,7 @@ typedef struct {
 
 #define SPN_DEFINE_LIB_ENTRY(SYM) { .symbol = SP_MACRO_STR(SYM), .fn = SYM },
 
-spn_lib_fn_t spn_lib [] = {
+spn_lib_fn_t spn_symbol_table [] = {
   SPN_LIB_ENTRIES(SPN_DEFINE_LIB_ENTRY)
 };
 
@@ -1876,8 +1936,17 @@ void spn_cc_target_add_rpath(spn_cc_target_t* target, sp_str_t dir) {
   sp_da_push(target->rpath, sp_str_copy(dir));
 }
 
+sp_str_t spn_cc_symbol_from_embedded_file(sp_str_t file_path) {
+  sp_str_t symbol = file_path;
+  symbol = sp_str_replace_c8(symbol, '/', '_');
+  symbol = sp_str_replace_c8(symbol, '.', '_');
+  symbol = sp_str_replace_c8(symbol, '-', '_');
+  return symbol;
+}
+
 void spn_cc_target_embed_file(spn_cc_target_t* cc, sp_str_t file_path) {
   //sp_io_from_file(file_path, sp_io_mode_t mode)
+  // use sp_elf to make an elf with the symbol -> buffer data and "$symbol_size" -> buffer_size
 }
 
 // @lib
@@ -3087,6 +3156,7 @@ spn_tcc_t* spn_tcc_new(spn_build_ctx_t* ctx) {
   spn_tcc_t* tcc = tcc_new();
   tcc_set_error_func(tcc, ctx, spn_tcc_error);
   tcc_set_lib_path(tcc, sp_str_to_cstr(spn.paths.runtime));
+  sp_try_as(tcc_set_options(tcc, "-gdwarf -nostdlib -Wall -Werror"), SP_NULLPTR);
   tcc_set_output_type(tcc, TCC_OUTPUT_MEMORY);
   sp_try_as(tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include)), SP_NULLPTR);
   tcc_define_symbol(tcc, "SPN", "");
@@ -3095,8 +3165,8 @@ spn_tcc_t* spn_tcc_new(spn_build_ctx_t* ctx) {
 }
 
 spn_err_t spn_tcc_register(spn_tcc_t* tcc) {
-  sp_carr_for(spn_lib, it) {
-    sp_try_as(tcc_add_symbol(tcc, spn_lib[it].symbol, spn_lib[it].fn), SPN_ERROR);
+  sp_carr_for(spn_symbol_table, it) {
+    sp_try_as(tcc_add_symbol(tcc, spn_symbol_table[it].symbol, spn_symbol_table[it].fn), SPN_ERROR);
   }
   return SPN_OK;
 }
@@ -4507,6 +4577,71 @@ void spn_target_set_visibility(spn_target_t* target, spn_visibility_t visibility
   target->visibility = visibility;
 }
 
+void spn_target_embed_file(spn_target_t* target, const c8* file) {
+  spn_target_embed_file_ex(target, SP_EMBED_DEFAULT_SYMBOL, SP_EMBED_DEFAULT_SYMBOL, SP_EMBED_DEFAULT_DATA_T, SP_EMBED_DEFAULT_SIZE_T);
+}
+
+void spn_target_embed_file_ex(
+  spn_target_t* target,
+  const c8* file,
+  const c8* symbol,
+  const c8* data_type, const c8* size_type
+) {
+  spn_target_embed_file_ex_s(target, sp_str_view(file), sp_str_view(symbol), sp_str_view(data_type), sp_str_view(size_type));
+}
+
+void spn_target_embed_file_ex_s(
+  spn_target_t* target,
+  sp_str_t file,
+  sp_str_t symbol,
+  sp_str_t data_type, sp_str_t size_type
+) {
+  sp_da_push(target->embed, ((spn_embed_t) {
+    .kind = SPN_EMBED_MEM,
+    .symbol = spn_intern(symbol),
+    .types = {
+      .data = spn_intern(data_type),
+      .size = spn_intern(size_type),
+    },
+    .file = {
+      .path = spn_intern(file),
+    }
+  }));
+}
+
+void spn_target_embed_mem(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size) {
+  spn_target_embed_mem_ex(target, symbol, buffer, buffer_size, SP_EMBED_DEFAULT_DATA_T, SP_EMBED_DEFAULT_SIZE_T);
+}
+
+void spn_target_embed_mem_ex(
+  spn_target_t* target,
+  const c8* symbol,
+  const u8* buffer, u64 size,
+  const c8* data_type, const c8* size_type
+) {
+  spn_target_embed_mem_ex_s(target, sp_str_view(symbol), buffer, size, sp_str_view(data_type), sp_str_view(size_type));
+}
+
+void spn_target_embed_mem_ex_s(
+  spn_target_t* target,
+  sp_str_t symbol,
+  const u8* buffer, u64 size,
+  sp_str_t data_type, sp_str_t size_type
+) {
+  sp_da_push(target->embed, ((spn_embed_t) {
+    .kind = SPN_EMBED_MEM,
+    .symbol = spn_intern(symbol),
+    .types = {
+      .data = spn_intern(data_type),
+      .size = spn_intern(size_type),
+    },
+    .memory = {
+      .buffer = buffer,
+      .size = size
+    }
+  }));
+}
+
 spn_registry_t* spn_pkg_add_registry(spn_pkg_t* pkg, const c8* name, const c8* location) {
   return spn_pkg_add_registry_ex(pkg, spn_intern_cstr(name), spn_intern_cstr(location));
 }
@@ -5176,6 +5311,23 @@ void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t config) {
   spn_build_ctx_prepare_io(ctx);
 }
 
+void register_jit_code(const char *elf_data, size_t elf_size) {
+  struct jit_code_entry *entry = sp_alloc_type(struct jit_code_entry);
+  entry->symfile_addr = elf_data;
+  entry->symfile_size = elf_size;
+
+  entry->next_entry = __jit_debug_descriptor.first_entry;
+  entry->prev_entry = NULL;
+  if (entry->next_entry)
+    entry->next_entry->prev_entry = entry;
+
+  __jit_debug_descriptor.first_entry = entry;
+  __jit_debug_descriptor.relevant_entry = entry;
+  __jit_debug_descriptor.action_flag = JIT_REGISTER_FN;
+
+  __jit_debug_register_code();
+}
+
 spn_err_t spn_build_ctx_compile(spn_build_ctx_t* ctx) {
   if (!sp_fs_exists(ctx->pkg->paths.script)) {
     return SPN_ERROR;
@@ -5185,8 +5337,8 @@ spn_err_t spn_build_ctx_compile(spn_build_ctx_t* ctx) {
 
   spn_tcc_t* tcc = spn_tcc_new(ctx);
   sp_try(spn_tcc_add_file(tcc, ctx->pkg->paths.script));
-  sp_try_as(tcc_set_options(tcc, "-nostdlib -Wall -Werror"), SPN_ERROR);
   sp_try_as(tcc_relocate(tcc), SPN_ERROR);
+  ctx->tcc = tcc;
   ctx->on_configure = tcc_get_symbol(tcc, "configure");
   ctx->on_package = tcc_get_symbol(tcc, "package");
   ctx->on_build = tcc_get_symbol(tcc, "build");
@@ -6740,6 +6892,14 @@ spn_task_result_t spn_task_configure_init(void* user_data) {
     spn_event_buffer_push(spn.events, &b->contexts.pkg, SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED);
     return SPN_TASK_ERROR;
   }
+
+  {
+    spn_build_ctx_t* ctx = &b->contexts.pkg;
+    TCCState* tcc = ctx->tcc;
+    sp_try_as(tcc_output_relocated_elf_to_mem(tcc, (void**)&ctx->elf.data, &ctx->elf.size), SPN_ERROR);
+    register_jit_code(ctx->elf.data, ctx->elf.size);
+  }
+
 
   // run configure()
   sp_om_for(b->contexts.deps, it) {

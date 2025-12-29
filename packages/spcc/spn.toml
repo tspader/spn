@@ -1,0 +1,14 @@
+[package]
+name = "spcc"
+repo = "tspader/tinycc"
+version = "1.0.0"
+commit = "7a0131c0f119"
+author = "bellard"
+maintainer = "tspader"
+
+[lib]
+kinds = ["static"]
+name = 'tcc'
+
+[[bin]]
+name = "tcc"

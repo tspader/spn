@@ -95,6 +95,9 @@ typedef struct spn_registry spn_registry_t;
 typedef void(*spn_config_fn_t)(spn_config_t*);
 typedef void(*spn_build_fn_t)(spn_build_ctx_t*);
 
+#define SP_EMBED_DEFAULT_SYMBOL SP_NULLPTR
+#define SP_EMBED_DEFAULT_DATA_T SP_NULLPTR
+#define SP_EMBED_DEFAULT_SIZE_T SP_NULLPTR
 
 spn_pkg_t*        spn_get_pkg(spn_build_ctx_t* b);
 spn_profile_t*    spn_get_profile(spn_build_ctx_t* b);
@@ -120,7 +123,10 @@ spn_build_mode_t  spn_profile_get_mode(spn_profile_t* profile);
 void              spn_target_add_source(spn_target_t* target, const c8* source);
 void              spn_target_add_include(spn_target_t* target, const c8* include);
 void              spn_target_add_define(spn_target_t* target, const c8* define);
-void              spn_target_set_visibility(spn_target_t* target, spn_visibility_t visibility);
+void              spn_target_embed_file(spn_target_t* target, const c8* file);
+void              spn_target_embed_file_ex(spn_target_t* target, const c8* file, const c8* symbol, const c8* data_type, const c8* size_type);
+void              spn_target_embed_mem(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size);
+void              spn_target_embed_mem_ex(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size, const c8* data_type, const c8* size_type);
 
 void              spn_make(spn_build_ctx_t* build);
 spn_make_t*       spn_make_new(spn_build_ctx_t* build);
