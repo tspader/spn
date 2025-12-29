@@ -1,0 +1,8 @@
+[package]
+name = "add_system_dep"
+version = "0.1.0"
+repo = "repo/repo"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

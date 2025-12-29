@@ -752,13 +752,14 @@ spn_target_t*   spn_pkg_add_bin(spn_pkg_t* pkg, const c8* name);
 spn_target_t*   spn_pkg_add_test(spn_pkg_t* pkg, const c8* name);
 spn_target_t*   spn_pkg_add_bin_ex(spn_pkg_t* pkg, sp_str_t name);
 spn_target_t*   spn_pkg_add_test_ex(spn_pkg_t* pkg, sp_str_t name);
+void            spn_pkg_add_dep_latest(spn_pkg_t* pkg, sp_str_t name, spn_visibility_t visibility);
+void            spn_pkg_add_dep_ex(spn_pkg_t* pkg, sp_str_t name, sp_str_t version, spn_visibility_t visibility);
 sp_str_t        spn_pkg_get_url(spn_pkg_t* build);
 spn_profile_t*  spn_pkg_get_profile_or_default(spn_pkg_t* pkg, sp_str_t name);
+spn_target_t*   spn_pkg_get_target_ex(spn_pkg_t* pkg, sp_str_t name);
 void            spn_target_add_source_ex(spn_target_t* target, sp_str_t source);
 void            spn_target_add_include_ex(spn_target_t* target, sp_str_t include);
 void            spn_target_add_define_ex(spn_target_t* target, sp_str_t define);
-void            spn_pkg_add_dep_latest(spn_pkg_t* pkg, sp_str_t name, spn_visibility_t visibility);
-void            spn_pkg_add_dep_ex(spn_pkg_t* pkg, sp_str_t name, sp_str_t version, spn_visibility_t visibility);
 void            spn_profile_set_cc(spn_profile_t* profile, spn_cc_kind_t kind);
 void            spn_profile_set_cc_exe(spn_profile_t* profile, const c8* exe);
 void            spn_profile_set_linkage(spn_profile_t* profile, spn_pkg_linkage_t linkage);
@@ -1603,7 +1604,9 @@ typedef struct {
 #define SPN_LIB_ENTRIES(APPLY) \
   APPLY(spn_get_pkg) \
   APPLY(spn_get_profile) \
+  APPLY(spn_get_target) \
   APPLY(spn_add_bin) \
+  APPLY(spn_add_test) \
   APPLY(spn_copy) \
   APPLY(spn_log) \
   APPLY(spn_pkg_add_include) \
@@ -2040,6 +2043,10 @@ spn_pkg_t* spn_get_pkg(spn_build_ctx_t* b) {
 
 spn_profile_t* spn_get_profile(spn_build_ctx_t* b) {
   return b->profile;
+}
+
+spn_target_t* spn_get_target(spn_build_ctx_t* b, const c8* name) {
+  return spn_pkg_get_target(b->pkg, name);
 }
 
 spn_target_t* spn_add_bin(spn_build_ctx_t* b, const c8* name) {
@@ -3103,6 +3110,7 @@ void spn_tcc_error(void* user_data, const char* message) {
   spn_build_ctx_t* ctx = (spn_build_ctx_t*)user_data;
   sp_io_write_cstr(&ctx->logs.build, message);
   sp_io_write_new_line(&ctx->logs.build);
+  spn_ctx_error(message);
   // @spader emit an event here
 }
 
@@ -4517,6 +4525,18 @@ sp_str_t spn_pkg_get_url(spn_pkg_t* pkg) {
   return pkg->url;
 }
 
+spn_target_t* spn_pkg_get_target(spn_pkg_t* pkg, const c8* name) {
+  return spn_pkg_get_target_ex(pkg, sp_str_view(name));
+}
+
+spn_target_t* spn_pkg_get_target_ex(spn_pkg_t* pkg, sp_str_t name) {
+  spn_target_t* target = sp_om_get(pkg->binaries, name);
+  if (target) {
+    return target;
+  }
+
+  return sp_om_get(pkg->tests, name);
+}
 
 void spn_pkg_load_deps(toml_table_t *toml, spn_pkg_t *package, spn_visibility_t visibility) {
   if (!toml) return;
