@@ -1,0 +1,8 @@
+[package]
+name = "add_define"
+version = "0.1.0"
+repo = "repo/repo"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

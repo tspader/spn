@@ -42,5 +42,5 @@ include = ["include", "source", "test/tools"]
 
 [[test]]
 name = "cli"
-source = ["test/core/main.c"]
+source = ["test/core/cli.c"]
 include = ["include", "source", "test/tools"]
