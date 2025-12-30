@@ -198,7 +198,7 @@ void               spn_bg_it_add_children(spn_bg_it_t* it, spn_bg_node_t node);
 bool               spn_bg_it_done(spn_bg_it_t* it);
 sp_str_t           spn_bg_dfs(spn_bg_it_config_t config);
 sp_str_t           spn_bg_bfs(spn_bg_it_config_t config);
-void               spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_stream_t* stream);
+void               spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_t* stream);
 spn_bg_dirty_t*    spn_bg_dirty_new();
 spn_bg_dirty_t*    spn_bg_compute_dirty(spn_build_graph_t* graph);
 bool               spn_bg_is_file_dirty(spn_bg_dirty_t* dirty, spn_bg_id_t id);
@@ -631,7 +631,7 @@ sp_str_t spn_bg_mermaid_class(sp_str_t name, sp_str_t fill, sp_str_t stroke, sp_
   );
 }
 
-void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_stream_t* stream) {
+void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_t* stream) {
   sp_str_t stroke = sp_str_lit("#1a1a2e");
   sp_str_t color = sp_str_lit("#e0e0e0");
   sp_str_t intermediate = sp_str_lit("#606087");
