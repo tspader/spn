@@ -13,11 +13,13 @@ utest = "1.0.0"
 
 [[profile]]
 name = "debug"
-cc = "clang"
-linkage = "shared"
-libc = "gnu"
-standard = "c99"
 mode = "debug"
+cc = "clang"
+
+[[profile]]
+name = "release"
+mode = "release"
+cc = "clang"
 
 [[profile]]
 name = "macos"

@@ -13,7 +13,7 @@ void touch_file(sp_str_t path) {
     sp_os_sleep_ms(100);
   }
 
-  sp_io_stream_t s = sp_io_from_file(path, SP_IO_MODE_APPEND);
+  sp_io_t s = sp_io_from_file(path, SP_IO_MODE_APPEND);
   sp_io_write_str(&s, sp_str_lit(" "));
   sp_io_close(&s);
 }
