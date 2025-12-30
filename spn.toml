@@ -45,11 +45,6 @@ source = ["test/core/graph.c"]
 include = ["include", "source", "test/tools"]
 
 [[test]]
-name = "task"
-source = ["test/core/task.c"]
-include = ["include", "source", "test/tools"]
-
-[[test]]
 name = "om"
 source = ["test/core/ordered_map.c"]
 include = ["include", "source", "test/tools"]

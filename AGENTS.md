@@ -23,7 +23,7 @@ assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn
 
 # Build
 - build with `spn build --profile=debug` to output to `./build/debug`
-- if you need to test a change you made, building spn itself is often the best way; use e.g. `./build/debug/spn build --profile=debug` to use a fresh debug build
+- run the resulting build `./build/debug/store/bin/spn` to verify your changes
 - if you, for some reason, need a non-bootstrapped build, build with `make` to output to `./bootstrap/bin/spn`
 
 ## Rules

@@ -49,9 +49,6 @@
 #define SP_OM_IMPLEMENTATION
 #include "ordered_map.h"
 
-#define SPN_TASK_IMPLEMENTATION
-#include "task.h"
-
 #define SPN_VERSION "1.0.0"
 #define SPN_COMMIT "00c0fa98"
 
@@ -1541,14 +1538,31 @@ typedef enum {
   SPN_TASK_KIND_COUNT,
 } spn_task_kind_t;
 
-spn_task_result_t spn_task_resolve_init(void* ud);
-spn_task_result_t spn_task_sync_init(void* ud);
-spn_task_result_t spn_task_sync_update(void* ud);
-spn_task_result_t spn_task_build_init(void* ud);
-spn_task_result_t spn_task_build_update(void* ud);
-spn_task_result_t spn_task_configure_init(void* ud);
-spn_task_result_t spn_task_run_init(void* ud);
-spn_task_result_t spn_task_cleanup_init(void* ud);
+typedef enum {
+  SPN_TASK_CONTINUE,
+  SPN_TASK_DONE,
+  SPN_TASK_ERROR,
+} spn_task_result_t;
+
+#define SPN_TASK_MAX_QUEUE 32
+
+typedef struct {
+  s32 data[SPN_TASK_MAX_QUEUE];
+  u32 len;
+  u32 index;
+  bool initted;
+} spn_task_executor_t;
+
+void spn_task_enqueue(spn_task_executor_t* ex, s32 kind);
+
+
+void              spn_task_sync_init(spn_app_t* app);
+void              spn_task_build_init(spn_app_t* app);
+spn_task_result_t spn_task_resolve_update(spn_app_t* app);
+spn_task_result_t spn_task_sync_update(spn_app_t* app);
+spn_task_result_t spn_task_configure_update(spn_app_t* app);
+spn_task_result_t spn_task_build_update(spn_app_t* app);
+spn_task_result_t spn_task_run_update(spn_app_t* app);
 
 typedef struct {
   spn_target_filter_t filter;
@@ -4419,7 +4433,7 @@ spn_pkg_t spn_pkg_from_default(sp_str_t path, sp_str_t name) {
   spn_pkg_t pkg = spn_pkg_new(name);
   spn_pkg_set_manifest(&pkg, sp_fs_join_path(path, sp_str_lit("spn.toml")));
   spn_pkg_add_dep_latest(&pkg, sp_str_lit("sp"), SPN_VISIBILITY_PUBLIC);
-  spn_pkg_set_repo(&pkg, "repo/repo");
+  spn_pkg_set_repo(&pkg, "");
   spn_pkg_add_version(&pkg, "0.1.0", "");
 
   spn_target_t* bin = spn_pkg_add_bin_ex(&pkg, pkg.name);
@@ -4869,7 +4883,7 @@ spn_pkg_t spn_pkg_load(sp_str_t manifest_path) {
   toml.config = toml_table_table(toml.manifest, "config");
 
   spn_pkg_set_name(&pkg, spn_toml_cstr(toml.package, "name"));
-  spn_pkg_set_repo(&pkg, spn_toml_cstr(toml.package, "repo"));
+  spn_pkg_set_repo(&pkg, spn_toml_cstr_opt(toml.package, "repo", ""));
   spn_pkg_set_author(&pkg, spn_toml_cstr_opt(toml.package, "author", ""));
   spn_pkg_set_maintainer(&pkg, spn_toml_cstr_opt(toml.package, "maintainer", ""));
 
@@ -5489,7 +5503,7 @@ void register_jit_code(const char *elf_data, size_t elf_size) {
 
 spn_err_t spn_build_ctx_compile(spn_build_ctx_t* ctx) {
   if (!sp_fs_exists(ctx->pkg->paths.script)) {
-    return SPN_ERROR;
+    return SPN_OK;
   }
 
   sp_tm_timer_t timer = sp_tm_start_timer();
@@ -6225,29 +6239,7 @@ spn_pkg_t* spn_app_ensure_package(spn_app_t* app, spn_pkg_req_t request) {
 }
 
 spn_app_t spn_app_new() {
-  spn_app_t app = {
-    .tasks = {
-      .tasks = {
-        [SPN_TASK_KIND_RESOLVE] = {
-          .init = spn_task_resolve_init,
-        },
-        [SPN_TASK_KIND_SYNC] = {
-          .init = spn_task_sync_init,
-          .update = spn_task_sync_update,
-        },
-        [SPN_TASK_KIND_CONFIGURE] = {
-          .init = spn_task_configure_init,
-        },
-        [SPN_TASK_KIND_RUN_BUILD] = {
-          .init = spn_task_build_init,
-          .update = spn_task_build_update,
-        },
-        [SPN_TASK_KIND_RUN] = {
-          .init = spn_task_run_init,
-        },
-      },
-    }
-  };
+  spn_app_t app = SP_ZERO_INITIALIZE();
 
   sp_ht_set_fns(app.registry, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
 
@@ -6985,12 +6977,49 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
 
 sp_app_result_t spn_update(sp_app_t* sp) {
   spn_app_t* app = (spn_app_t*)sp->user_data;
-  spn_builder_t* b = &app->builder;
 
-  switch (spn_task_tick(&app->tasks, app)) {
-    case SPN_TASK_CONTINUE: return SP_APP_CONTINUE;
-    case SPN_TASK_DONE: return SP_APP_QUIT;
+  spn_task_executor_t* queue = &app->tasks;
+  s32 task = queue->data[queue->index];
+  spn_task_result_t result = SPN_TASK_DONE;
+
+  switch (task) {
+    case SPN_TASK_KIND_NONE: {
+      return SP_APP_QUIT;
+    }
+    case SPN_TASK_KIND_RESOLVE: {
+      result = spn_task_resolve_update(app);
+      break;
+    }
+    case SPN_TASK_KIND_SYNC: {
+      if (!queue->initted) spn_task_sync_init(app);
+      result = spn_task_sync_update(app);
+      break;
+    }
+    case SPN_TASK_KIND_CONFIGURE: {
+      result = spn_task_configure_update(app);
+      break;
+    }
+    case SPN_TASK_KIND_RUN_BUILD: {
+      if (!queue->initted) spn_task_build_init(app);
+      result = spn_task_build_update(app);
+      break;
+    }
+    case SPN_TASK_KIND_RUN: {
+      result = spn_task_run_update(app);
+      break;
+    }
+  }
+
+  queue->initted = true;
+
+  switch (result) {
     case SPN_TASK_ERROR: return SP_APP_ERR;
+    case SPN_TASK_CONTINUE: return SP_APP_CONTINUE;
+    case SPN_TASK_DONE: {
+      queue->index++;
+      queue->initted = false;
+      return SP_APP_CONTINUE;
+    }
   }
 }
 
@@ -7029,7 +7058,7 @@ sp_app_config_t sp_main(s32 num_args, const c8** args) {
     .on_poll = spn_poll,
     .on_update = spn_update,
     .on_deinit = spn_deinit,
-    .fps = 144,
+    .fps = 30,
   };
 }
 
@@ -7037,10 +7066,13 @@ sp_app_config_t sp_main(s32 num_args, const c8** args) {
 ///////////
 // TASKS //
 ///////////
+void spn_task_enqueue(spn_task_executor_t* ex, s32 kind) {
+  sp_assert(ex->len < SPN_TASK_MAX_QUEUE);
+  ex->data[ex->len++] = kind;
+}
 
 // TASK: RESOLVE
-spn_task_result_t spn_task_resolve_init(void* user_data) {
-  spn_app_t* app = (spn_app_t*)user_data;
+spn_task_result_t spn_task_resolve_update(spn_app_t* app) {
   spn_builder_t* b = &app->builder;
 
   spn_app_resolve(app);
@@ -7062,8 +7094,7 @@ spn_task_result_t spn_task_resolve_init(void* user_data) {
 }
 
 // TASK: SYNC
-spn_task_result_t spn_task_sync_init(void* user_data) {
-  spn_app_t* app = (spn_app_t*)user_data;
+void spn_task_sync_init(spn_app_t* app) {
   spn_builder_t* b = &app->builder;
 
   spn_build_graph_t* graph = &b->sync.graph;
@@ -7083,12 +7114,9 @@ spn_task_result_t spn_task_sync_init(void* user_data) {
   });
 
   spn_bg_executor_run(b->sync.executor);
-
-  return SPN_TASK_CONTINUE;
 }
 
-spn_task_result_t spn_task_sync_update(void* user_data) {
-  spn_app_t* app = (spn_app_t*)user_data;
+spn_task_result_t spn_task_sync_update(spn_app_t* app) {
   spn_bg_ctx_t* sync = &app->builder.sync;
 
   if (sp_atomic_s32_get(&sync->executor->shutdown)) {
@@ -7099,8 +7127,7 @@ spn_task_result_t spn_task_sync_update(void* user_data) {
   return SPN_TASK_CONTINUE;
 }
 
-spn_task_result_t spn_task_configure_init(void* user_data) {
-  spn_app_t* app = (spn_app_t*)user_data;
+spn_task_result_t spn_task_configure_update(spn_app_t* app) {
   spn_builder_t* b = &app->builder;
 
   // compile everyone first
@@ -7117,14 +7144,6 @@ spn_task_result_t spn_task_configure_init(void* user_data) {
     spn_event_buffer_push(spn.events, &b->contexts.pkg, SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED);
     return SPN_TASK_ERROR;
   }
-
-  {
-    spn_build_ctx_t* ctx = &b->contexts.pkg;
-    TCCState* tcc = ctx->tcc;
-    sp_try_as(tcc_output_relocated_elf_to_mem(tcc, (void**)&ctx->elf.data, &ctx->elf.size), SPN_ERROR);
-    register_jit_code(ctx->elf.data, ctx->elf.size);
-  }
-
 
   // run configure()
   sp_om_for(b->contexts.deps, it) {
@@ -7146,8 +7165,7 @@ spn_task_result_t spn_task_configure_init(void* user_data) {
 }
 
 // TASK: BUILD
-spn_task_result_t spn_task_build_init(void* user_data) {
-  spn_app_t* app = (spn_app_t*)user_data;
+void spn_task_build_init(spn_app_t* app) {
   spn_builder_t* b = &app->builder;
 
   // GRAPH: DEPS
@@ -7225,12 +7243,9 @@ spn_task_result_t spn_task_build_init(void* user_data) {
   });
 
   spn_bg_executor_run(app->builder.build.executor);
-
-  return SPN_TASK_CONTINUE;
 }
 
-spn_task_result_t spn_task_build_update(void* user_data) {
-  spn_app_t* app = (spn_app_t*)user_data;
+spn_task_result_t spn_task_build_update(spn_app_t* app) {
   spn_builder_t* b = &app->builder;
   spn_bg_ctx_t* build = &b->build;
 
@@ -7276,8 +7291,7 @@ spn_task_result_t spn_task_build_update(void* user_data) {
 }
 
 
-spn_task_result_t spn_task_run_init(void* user_data) {
-  spn_app_t* app = (spn_app_t*)user_data;
+spn_task_result_t spn_task_run_update(spn_app_t* app) {
   spn_builder_t* b = &app->builder;
 
   sp_ht(sp_str_t, s32) tests = SP_NULLPTR;
@@ -8026,7 +8040,6 @@ spn_cli_result_t spn_cli_test(spn_cli_t* cli) {
 }
 
 spn_cli_result_t spn_cli_build(spn_cli_t* cli) {
-    spn_ctx_error("{}{}", SP_FMT_C8(doc_embed_bin[0]), SP_FMT_C8(doc_embed_bin[1]));
   spn_cli_build_t* command = &cli->build;
 
   app.config = (spn_app_config_t) {
