@@ -22,6 +22,11 @@ mode = "release"
 cc = "clang"
 
 [[profile]]
+name = "fast"
+mode = "debug"
+cc = "tcc"
+
+[[profile]]
 name = "macos"
 cc = "clang"
 linkage = "shared"

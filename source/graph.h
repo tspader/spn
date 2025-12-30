@@ -631,7 +631,7 @@ sp_str_t spn_bg_mermaid_class(sp_str_t name, sp_str_t fill, sp_str_t stroke, sp_
   );
 }
 
-void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_t* stream) {
+void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_t* io) {
   sp_str_t stroke = sp_str_lit("#1a1a2e");
   sp_str_t color = sp_str_lit("#e0e0e0");
   sp_str_t intermediate = sp_str_lit("#606087");
@@ -639,12 +639,12 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_t* stream) {
   sp_str_t output = sp_str_lit("#608767");
   sp_str_t cmd = sp_str_lit("#8a5555");
 
-  sp_io_write_str(stream, sp_str_lit("graph TD\n"));
-  sp_io_write_str(stream, spn_bg_mermaid_class(sp_str_lit("input"), input, stroke, color));
-  sp_io_write_str(stream, spn_bg_mermaid_class(sp_str_lit("output"), output, stroke, color));
-  sp_io_write_str(stream, spn_bg_mermaid_class(sp_str_lit("intermediate"), intermediate, stroke, color));
-  sp_io_write_str(stream, spn_bg_mermaid_class(sp_str_lit("cmd"), cmd, stroke, color));
-  sp_io_write_str(stream, sp_str_lit("  linkStyle default stroke:#909090,stroke-width:2px\n"));
+  sp_io_write_str(io, sp_str_lit("graph TD\n"));
+  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("input"), input, stroke, color));
+  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("output"), output, stroke, color));
+  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("intermediate"), intermediate, stroke, color));
+  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("cmd"), cmd, stroke, color));
+  sp_io_write_str(io, sp_str_lit("  linkStyle default stroke:#909090,stroke-width:2px\n"));
 
   sp_da_for(graph->files, it) {
     spn_bg_file_t* file = &graph->files[it];
@@ -658,22 +658,22 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_t* stream) {
       cls = sp_str_lit("output");
     }
 
-    sp_io_write_str(stream, sp_format("  F{}[\"{}\"]:::{}\n",
+    sp_io_write_str(io, sp_format("  F{}[\"{}\"]:::{}\n",
       SP_FMT_U32(file->id.index), SP_FMT_STR(file->path), SP_FMT_STR(cls)));
   }
 
   sp_da_for(graph->commands, it) {
     spn_bg_cmd_t* cmd = &graph->commands[it];
-    sp_io_write_str(stream, sp_format("  C{}[\"{}\"]:::cmd\n",
+    sp_io_write_str(io, sp_format("  C{}[\"{}\"]:::cmd\n",
       SP_FMT_U32(cmd->id.index), SP_FMT_STR(cmd->tag)));
 
     sp_da_for(cmd->consumes, input_it) {
-      sp_io_write_str(stream, sp_format("  F{} --> C{}\n",
+      sp_io_write_str(io, sp_format("  F{} --> C{}\n",
         SP_FMT_U32(cmd->consumes[input_it].index), SP_FMT_U32(cmd->id.index)));
     }
 
     sp_da_for(cmd->produces, output_it) {
-      sp_io_write_str(stream, sp_format("  C{} --> F{}\n",
+      sp_io_write_str(io, sp_format("  C{} --> F{}\n",
         SP_FMT_U32(cmd->id.index), SP_FMT_U32(cmd->produces[output_it].index)));
     }
   }
