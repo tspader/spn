@@ -43,15 +43,15 @@ sp_str_t sp_test_file_path(sp_test_file_manager_t* manager, sp_str_t name) {
 void sp_test_file_create_ex(sp_test_file_config_t config) {
   sp_fs_remove_file(config.path);
 
-  sp_io_t stream = sp_io_from_file(config.path, SP_IO_MODE_WRITE);
-  SP_ASSERT(stream.file.fd != 0);
+  sp_io_t io = sp_io_from_file(config.path, SP_IO_MODE_WRITE);
+  SP_ASSERT(io.file.fd != 0);
 
   if (config.content.len > 0) {
-    u64 bytes_written = sp_io_write(&stream, config.content.data, config.content.len);
+    u64 bytes_written = sp_io_write(&io, config.content.data, config.content.len);
     SP_ASSERT(bytes_written == config.content.len);
   }
 
-  sp_io_close(&stream);
+  sp_io_close(&io);
 }
 
 sp_str_t sp_test_file_create_empty(sp_test_file_manager_t* manager, sp_str_t relative) {
