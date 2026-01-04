@@ -1530,6 +1530,7 @@ spn_cli_result_t spn_cli_manifest(spn_cli_t* cli);
 spn_cli_result_t spn_cli_graph(spn_cli_t* cli);
 spn_cli_result_t spn_cli_root(spn_cli_t* cli);
 spn_cli_result_t spn_cli_help(spn_cli_parser_t* p);
+spn_cli_command_usage_t spn_cli();
 
 #define SPN_CLI_UNIMPLEMENTED() SP_LOG("unimplemented"); return SPN_CLI_ERR;
 
@@ -3324,7 +3325,7 @@ spn_tcc_t* spn_tcc_new(spn_build_ctx_t* ctx) {
   tcc_set_error_func(tcc, ctx, spn_tcc_error);
   tcc_set_backtrace_func(tcc, ctx, spn_tcc_backtrace);
   tcc_set_lib_path(tcc, sp_str_to_cstr(spn.paths.runtime));
-  sp_try_as(tcc_set_options(tcc, "-nostdlib -nostdinc -gdwarf -Wall -Werror"), SP_NULLPTR);
+  sp_try_as(tcc_set_options(tcc, "-gdwarf -Wall -Werror"), SP_NULLPTR);
   tcc_set_output_type(tcc, TCC_OUTPUT_MEMORY);
   sp_try_as(tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include)), SP_NULLPTR);
   tcc_define_symbol(tcc, "SPN", "");
@@ -6658,6 +6659,8 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   sp_fs_create_dir(spn.paths.bin);
   sp_fs_create_dir(spn.paths.tools.dir);
 
+  // @spader
+  // spn_extract_runtime()
   if (!sp_fs_exists(spn.paths.runtime)) {
     sp_fs_create_dir(spn.paths.runtime);
     sp_fs_create_dir(sp_fs_join_path(spn.paths.runtime, sp_str_lit("include")));
@@ -6689,338 +6692,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   spn_cli_t* cli = &spn.cli;
-  spn.cli.cmd = (spn_cli_command_usage_t) {
-    .name = "spn",
-    .summary = "A package manager and build tool for modern C",
-    .opts = {
-      { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print help message", SPN_CLI_NO_PLACEHOLDER, &cli->help },
-      { "C", "project-dir", SPN_CLI_OPT_KIND_STRING, "Specify the directory containing project file", "DIR", &cli->project_dir },
-      { "f", "file", SPN_CLI_OPT_KIND_STRING, "Specify the project file path", "FILE", &cli->project_file },
-      { "o", "output", SPN_CLI_OPT_KIND_STRING, "Output mode: interactive, noninteractive, quiet, none", "MODE", &cli->output }
-    },
-    .commands = (spn_cli_command_usage_t[]) {
-      {
-        .name = "init",
-        .opts = {
-          {
-            .brief = "b",
-            .name = "bare",
-            .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-            .summary = "Create minimal project without sp dependency or main.c",
-            .ptr = &cli->init.bare
-          }
-        },
-        .summary = "Initialize a project in the current directory",
-        .handler = spn_cli_init
-      },
-      {
-        .name = "add",
-        .args = {
-          {
-            .name = "package",
-            .kind = SPN_CLI_ARG_KIND_REQUIRED,
-            .summary = "The package to add",
-            .ptr = &spn.cli.add.package
-          }
-        },
-        .opts = {
-          {
-            .brief = "t",
-            .name = "test",
-            .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-            .summary = "Add as a test dependency",
-            .ptr = &spn.cli.add.test
-          }
-        },
-        .summary = "Add the latest version of a package to the project",
-        .handler = spn_cli_add
-      },
-
-      {
-        .name = "build",
-        .opts = {
-          {
-            .brief = "f",
-            .name = "force",
-            .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-            .summary = "Force build, even if it exists in store",
-            .ptr = &spn.cli.build.force
-          },
-          {
-            .brief = "p",
-            .name = "profile",
-            .kind = SPN_CLI_OPT_KIND_STRING,
-            .summary = "Profile to use for building",
-            .placeholder = "PROFILE",
-            .ptr = &spn.cli.build.profile
-          },
-          {
-            .brief = "t",
-            .name = "target",
-            .kind = SPN_CLI_OPT_KIND_STRING,
-            .summary = "Target to build",
-            .placeholder = "TARGET",
-            .ptr = &spn.cli.build.target
-          },
-          {
-            .name = "tests",
-            .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-            .summary = "Include test targets",
-            .ptr = &spn.cli.build.tests
-          }
-        },
-        .summary = "Build the project, including dependencies, from source",
-        .handler = spn_cli_build
-      },
-
-      {
-        .name = "test",
-        .opts = {
-          {
-            .brief = "p",
-            .name = "profile",
-            .kind = SPN_CLI_OPT_KIND_STRING,
-            .summary = "Profile to use for building",
-            .placeholder = "PROFILE",
-            .ptr = &spn.cli.test.profile
-          },
-          {
-            .brief = "t",
-            .name = "target",
-            .kind = SPN_CLI_OPT_KIND_STRING,
-            .summary = "Test target to run",
-            .placeholder = "TARGET",
-            .ptr = &spn.cli.test.target
-          }
-        },
-        .summary = "Build and run tests",
-        .handler = spn_cli_test
-      },
-
-      {
-        .name = "generate",
-        .opts = {
-          {
-            .brief = "g",
-            .name = "generator",
-            .kind = SPN_CLI_OPT_KIND_STRING,
-            .summary = "Generator type (raw, shell, make)",
-            .placeholder = "TYPE",
-            .ptr = &spn.cli.generate.generator
-          },
-          {
-            .brief = "c",
-            .name = "compiler",
-            .kind = SPN_CLI_OPT_KIND_STRING,
-            .summary = "Compiler to format flags for (gcc, clang, tcc)",
-            .placeholder = "COMPILER",
-            .ptr = &spn.cli.generate.compiler
-          },
-          {
-            .brief = "p",
-            .name = "path",
-            .kind = SPN_CLI_OPT_KIND_STRING,
-            .summary = "Output directory for generated file",
-            .placeholder = "PATH",
-            .ptr = &spn.cli.generate.path
-          }
-        },
-        .summary = "Generate build system files with dependency flags",
-        .handler = spn_cli_generate
-      },
-      {
-        .name = "link",
-        .args = {
-          {
-            .name = "kind",
-            .kind = SPN_CLI_ARG_KIND_REQUIRED,
-            .summary = "The link kind",
-            .ptr = &spn.cli.copy.directory
-          }
-        },
-        .summary = "Link or copy the binary outputs of your dependencies",
-        .handler = spn_cli_copy
-      },
-      {
-        .name = "update",
-        .args = {
-          {
-            .name = "package",
-            .kind = SPN_CLI_ARG_KIND_REQUIRED,
-            .summary = "The package to update",
-            .ptr = &spn.cli.update.package
-          }
-        },
-        .summary = "Update an existing package to the latest version in the project",
-        .handler = spn_cli_update
-      },
-      {
-        .name = "list",
-        .summary = "List all known packages in all registries",
-        .handler = spn_cli_list
-      },
-      {
-        .name = "which",
-        .opts = {
-          {
-            .brief = "d",
-            .name = "dir",
-            .kind = SPN_CLI_OPT_KIND_STRING,
-            .summary = "Which directory to show (store, include, lib, source, work, vendor)",
-            .placeholder = "DIR",
-            .ptr = &cli->which.dir
-          }
-        },
-        .args = {
-          {
-            .name = "package",
-            .kind = SPN_CLI_ARG_KIND_OPTIONAL,
-            .summary = "The package to show path for",
-            .ptr = &cli->which.package
-          }
-        },
-        .summary = "Print the absolute path of a cache dir for a package",
-        .handler = spn_cli_which
-      },
-      {
-        .name = "ls",
-        .opts = {
-          {
-            .brief = "d",
-            .name = "dir",
-            .kind = SPN_CLI_OPT_KIND_STRING,
-            .summary = "Which directory to list (store, include, lib, source, work, vendor)",
-            .placeholder = "DIR",
-            .ptr = &cli->ls.dir
-          }
-        },
-        .args = {
-          {
-            .name = "package",
-            .kind = SPN_CLI_ARG_KIND_OPTIONAL,
-            .summary = "The package to list",
-            .ptr = &cli->ls.package
-          }
-        },
-        .summary = "Run ls against a cache dir for a package (e.g. to see build output)",
-        .handler = spn_cli_ls
-      },
-      {
-        .name = "manifest",
-        .args = {
-          {
-            .name = "package",
-            .kind = SPN_CLI_ARG_KIND_REQUIRED,
-            .summary = "The package name",
-            .ptr = &cli->manifest.package
-          }
-        },
-        .summary = "Print the full manifest source for a package",
-        .handler = spn_cli_manifest
-      },
-      {
-        .name = "graph",
-        .opts = {
-          {
-            .brief = "o",
-            .name = "output",
-            .kind = SPN_CLI_OPT_KIND_STRING,
-            .summary = "Output file path (stdout if not specified)",
-            .placeholder = "FILE",
-            .ptr = &cli->graph.output
-          }
-        },
-        .summary = "Output the build graph as mermaid",
-        .handler = spn_cli_graph
-      },
-      {
-        .name = "tool",
-        .summary = "Run, install, and manage binaries defined by spn packages",
-        .commands = (spn_cli_command_usage_t[]) {
-          {
-            .name = "install",
-            .opts = {
-              {
-                .brief = "f",
-                .name = "force",
-                .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-                .summary = "Force reinstall even if already installed",
-                .ptr = &cli->tool.install.force
-              },
-              {
-                .brief = "v",
-                .name = "version",
-                .kind = SPN_CLI_OPT_KIND_STRING,
-                .summary = "Version to install",
-                .placeholder = "VERSION",
-                .ptr = &cli->tool.install.version
-              }
-            },
-            .args = {
-              {
-                .name = "package",
-                .kind = SPN_CLI_ARG_KIND_REQUIRED,
-                .summary = "The package to install",
-                .ptr = &cli->tool.install.package
-              }
-            },
-            .summary = "Install a package's binary targets to the PATH",
-            .handler = spn_cli_tool_install
-          },
-          {
-            .name = "uninstall",
-            .opts = {
-              {
-                .brief = "f",
-                .name = "force",
-                .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-                .summary = "Force removal even if not installed by spn",
-                .ptr = &cli->tool.install.force
-              }
-            },
-            .args = {
-              {
-                .name = "package",
-                .kind = SPN_CLI_ARG_KIND_REQUIRED,
-                .summary = "The package to uninstall",
-                .ptr = &cli->tool.install.package
-              }
-            },
-            .summary = "Uninstall a package's binary targets from the PATH",
-            .handler = spn_cli_tool_uninstall
-          },
-          {
-            .name = "run",
-            .args = {
-              {
-                .name = "package",
-                .kind = SPN_CLI_ARG_KIND_REQUIRED,
-                .summary = "The package to run",
-                .ptr = &cli->tool.run.package
-              },
-              {
-                .name = "command",
-                .kind = SPN_CLI_ARG_KIND_OPTIONAL,
-                .summary = "The command to run",
-                .ptr = &cli->tool.run.command
-              }
-            },
-            .summary = "Run a binary from a package",
-            .handler = spn_cli_tool_run
-          },
-          SPN_CLI_ARGS_DONE,
-        },
-        .handler = spn_cli_tool
-      },
-      {
-        .name = "clean",
-        .summary = "Remove build cache and store directories",
-        .handler = spn_cli_clean
-      },
-      SPN_CLI_ARGS_DONE,
-    },
-    .handler = spn_cli_root
-  };
+  spn.cli.cmd = spn_cli();
 
   spn_cli_parser_t parser = {
     .args = spn.args + 1,
@@ -7129,11 +6801,15 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
 sp_app_result_t spn_update(sp_app_t* sp) {
   spn_app_t* app = (spn_app_t*)sp->user_data;
 
-  spn_task_executor_t* queue = &app->tasks;
-  s32 task = queue->data[queue->index];
+  spn_task_executor_t* task = &app->tasks;
+  s32 kind = task->data[task->index];
   spn_task_result_t result = SPN_TASK_DONE;
 
-  switch (task) {
+  // if (!task->initted) {
+  //   spn_event_buffer_push_ex(spn.events, app->ev, spn_build_event_t event)
+  // }
+
+  switch (kind) {
     case SPN_TASK_KIND_NONE: {
       return SP_APP_QUIT;
     }
@@ -7142,7 +6818,7 @@ sp_app_result_t spn_update(sp_app_t* sp) {
       break;
     }
     case SPN_TASK_KIND_SYNC: {
-      if (!queue->initted) spn_task_sync_init(app);
+      if (!task->initted) spn_task_sync_init(app);
       result = spn_task_sync_update(app);
       break;
     }
@@ -7155,7 +6831,7 @@ sp_app_result_t spn_update(sp_app_t* sp) {
       break;
     }
     case SPN_TASK_KIND_RUN_BUILD_GRAPH: {
-      if (!queue->initted) spn_task_run_build_graph_init(app);
+      if (!task->initted) spn_task_run_build_graph_init(app);
       result = spn_task_run_build_graph_update(app);
       break;
     }
@@ -7169,14 +6845,14 @@ sp_app_result_t spn_update(sp_app_t* sp) {
     }
   }
 
-  queue->initted = true;
+  task->initted = true;
 
   switch (result) {
     case SPN_TASK_ERROR: return SP_APP_ERR;
     case SPN_TASK_CONTINUE: return SP_APP_CONTINUE;
     case SPN_TASK_DONE: {
-      queue->index++;
-      queue->initted = false;
+      task->index++;
+      task->initted = false;
       return SP_APP_CONTINUE;
     }
   }
@@ -8277,4 +7953,341 @@ spn_cli_result_t spn_cli_build(spn_cli_t* cli) {
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN_BUILD_GRAPH);
 
   return SPN_CLI_CONTINUE;
+}
+
+spn_cli_command_usage_t spn_cli() {
+  spn_cli_t* cli = &spn.cli;
+  return (spn_cli_command_usage_t) {
+    .name = "spn",
+    .summary = "A package manager and build tool for modern C",
+    .opts = {
+      { "h", "help", SPN_CLI_OPT_KIND_BOOLEAN, "Print help message", SPN_CLI_NO_PLACEHOLDER, &cli->help },
+      { "C", "project-dir", SPN_CLI_OPT_KIND_STRING, "Specify the directory containing project file", "DIR", &cli->project_dir },
+      { "f", "file", SPN_CLI_OPT_KIND_STRING, "Specify the project file path", "FILE", &cli->project_file },
+      { "o", "output", SPN_CLI_OPT_KIND_STRING, "Output mode: interactive, noninteractive, quiet, none", "MODE", &cli->output }
+    },
+    .commands = (spn_cli_command_usage_t[]) {
+      {
+        .name = "init",
+        .opts = {
+          {
+            .brief = "b",
+            .name = "bare",
+            .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+            .summary = "Create minimal project without sp dependency or main.c",
+            .ptr = &cli->init.bare
+          }
+        },
+        .summary = "Initialize a project in the current directory",
+        .handler = spn_cli_init
+      },
+      {
+        .name = "add",
+        .args = {
+          {
+            .name = "package",
+            .kind = SPN_CLI_ARG_KIND_REQUIRED,
+            .summary = "The package to add",
+            .ptr = &spn.cli.add.package
+          }
+        },
+        .opts = {
+          {
+            .brief = "t",
+            .name = "test",
+            .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+            .summary = "Add as a test dependency",
+            .ptr = &spn.cli.add.test
+          }
+        },
+        .summary = "Add the latest version of a package to the project",
+        .handler = spn_cli_add
+      },
+
+      {
+        .name = "build",
+        .opts = {
+          {
+            .brief = "f",
+            .name = "force",
+            .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+            .summary = "Force build, even if it exists in store",
+            .ptr = &spn.cli.build.force
+          },
+          {
+            .brief = "p",
+            .name = "profile",
+            .kind = SPN_CLI_OPT_KIND_STRING,
+            .summary = "Profile to use for building",
+            .placeholder = "PROFILE",
+            .ptr = &spn.cli.build.profile
+          },
+          {
+            .brief = "t",
+            .name = "target",
+            .kind = SPN_CLI_OPT_KIND_STRING,
+            .summary = "Target to build",
+            .placeholder = "TARGET",
+            .ptr = &spn.cli.build.target
+          },
+          {
+            .name = "tests",
+            .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+            .summary = "Include test targets",
+            .ptr = &spn.cli.build.tests
+          }
+        },
+        .summary = "Build the project, including dependencies, from source",
+        .handler = spn_cli_build
+      },
+
+      {
+        .name = "test",
+        .opts = {
+          {
+            .brief = "p",
+            .name = "profile",
+            .kind = SPN_CLI_OPT_KIND_STRING,
+            .summary = "Profile to use for building",
+            .placeholder = "PROFILE",
+            .ptr = &spn.cli.test.profile
+          },
+          {
+            .brief = "t",
+            .name = "target",
+            .kind = SPN_CLI_OPT_KIND_STRING,
+            .summary = "Test target to run",
+            .placeholder = "TARGET",
+            .ptr = &spn.cli.test.target
+          }
+        },
+        .summary = "Build and run tests",
+        .handler = spn_cli_test
+      },
+
+      {
+        .name = "generate",
+        .opts = {
+          {
+            .brief = "g",
+            .name = "generator",
+            .kind = SPN_CLI_OPT_KIND_STRING,
+            .summary = "Generator type (raw, shell, make)",
+            .placeholder = "TYPE",
+            .ptr = &spn.cli.generate.generator
+          },
+          {
+            .brief = "c",
+            .name = "compiler",
+            .kind = SPN_CLI_OPT_KIND_STRING,
+            .summary = "Compiler to format flags for (gcc, clang, tcc)",
+            .placeholder = "COMPILER",
+            .ptr = &spn.cli.generate.compiler
+          },
+          {
+            .brief = "p",
+            .name = "path",
+            .kind = SPN_CLI_OPT_KIND_STRING,
+            .summary = "Output directory for generated file",
+            .placeholder = "PATH",
+            .ptr = &spn.cli.generate.path
+          }
+        },
+        .summary = "Generate build system files with dependency flags",
+        .handler = spn_cli_generate
+      },
+      {
+        .name = "link",
+        .args = {
+          {
+            .name = "kind",
+            .kind = SPN_CLI_ARG_KIND_REQUIRED,
+            .summary = "The link kind",
+            .ptr = &spn.cli.copy.directory
+          }
+        },
+        .summary = "Link or copy the binary outputs of your dependencies",
+        .handler = spn_cli_copy
+      },
+      {
+        .name = "update",
+        .args = {
+          {
+            .name = "package",
+            .kind = SPN_CLI_ARG_KIND_REQUIRED,
+            .summary = "The package to update",
+            .ptr = &spn.cli.update.package
+          }
+        },
+        .summary = "Update an existing package to the latest version in the project",
+        .handler = spn_cli_update
+      },
+      {
+        .name = "list",
+        .summary = "List all known packages in all registries",
+        .handler = spn_cli_list
+      },
+      {
+        .name = "which",
+        .opts = {
+          {
+            .brief = "d",
+            .name = "dir",
+            .kind = SPN_CLI_OPT_KIND_STRING,
+            .summary = "Which directory to show (store, include, lib, source, work, vendor)",
+            .placeholder = "DIR",
+            .ptr = &cli->which.dir
+          }
+        },
+        .args = {
+          {
+            .name = "package",
+            .kind = SPN_CLI_ARG_KIND_OPTIONAL,
+            .summary = "The package to show path for",
+            .ptr = &cli->which.package
+          }
+        },
+        .summary = "Print the absolute path of a cache dir for a package",
+        .handler = spn_cli_which
+      },
+      {
+        .name = "ls",
+        .opts = {
+          {
+            .brief = "d",
+            .name = "dir",
+            .kind = SPN_CLI_OPT_KIND_STRING,
+            .summary = "Which directory to list (store, include, lib, source, work, vendor)",
+            .placeholder = "DIR",
+            .ptr = &cli->ls.dir
+          }
+        },
+        .args = {
+          {
+            .name = "package",
+            .kind = SPN_CLI_ARG_KIND_OPTIONAL,
+            .summary = "The package to list",
+            .ptr = &cli->ls.package
+          }
+        },
+        .summary = "Run ls against a cache dir for a package (e.g. to see build output)",
+        .handler = spn_cli_ls
+      },
+      {
+        .name = "manifest",
+        .args = {
+          {
+            .name = "package",
+            .kind = SPN_CLI_ARG_KIND_REQUIRED,
+            .summary = "The package name",
+            .ptr = &cli->manifest.package
+          }
+        },
+        .summary = "Print the full manifest source for a package",
+        .handler = spn_cli_manifest
+      },
+      {
+        .name = "graph",
+        .opts = {
+          {
+            .brief = "o",
+            .name = "output",
+            .kind = SPN_CLI_OPT_KIND_STRING,
+            .summary = "Output file path (stdout if not specified)",
+            .placeholder = "FILE",
+            .ptr = &cli->graph.output
+          }
+        },
+        .summary = "Output the build graph as mermaid",
+        .handler = spn_cli_graph
+      },
+      {
+        .name = "tool",
+        .summary = "Run, install, and manage binaries defined by spn packages",
+        .commands = (spn_cli_command_usage_t[]) {
+          {
+            .name = "install",
+            .opts = {
+              {
+                .brief = "f",
+                .name = "force",
+                .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+                .summary = "Force reinstall even if already installed",
+                .ptr = &cli->tool.install.force
+              },
+              {
+                .brief = "v",
+                .name = "version",
+                .kind = SPN_CLI_OPT_KIND_STRING,
+                .summary = "Version to install",
+                .placeholder = "VERSION",
+                .ptr = &cli->tool.install.version
+              }
+            },
+            .args = {
+              {
+                .name = "package",
+                .kind = SPN_CLI_ARG_KIND_REQUIRED,
+                .summary = "The package to install",
+                .ptr = &cli->tool.install.package
+              }
+            },
+            .summary = "Install a package's binary targets to the PATH",
+            .handler = spn_cli_tool_install
+          },
+          {
+            .name = "uninstall",
+            .opts = {
+              {
+                .brief = "f",
+                .name = "force",
+                .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+                .summary = "Force removal even if not installed by spn",
+                .ptr = &cli->tool.install.force
+              }
+            },
+            .args = {
+              {
+                .name = "package",
+                .kind = SPN_CLI_ARG_KIND_REQUIRED,
+                .summary = "The package to uninstall",
+                .ptr = &cli->tool.install.package
+              }
+            },
+            .summary = "Uninstall a package's binary targets from the PATH",
+            .handler = spn_cli_tool_uninstall
+          },
+          {
+            .name = "run",
+            .args = {
+              {
+                .name = "package",
+                .kind = SPN_CLI_ARG_KIND_REQUIRED,
+                .summary = "The package to run",
+                .ptr = &cli->tool.run.package
+              },
+              {
+                .name = "command",
+                .kind = SPN_CLI_ARG_KIND_OPTIONAL,
+                .summary = "The command to run",
+                .ptr = &cli->tool.run.command
+              }
+            },
+            .summary = "Run a binary from a package",
+            .handler = spn_cli_tool_run
+          },
+          SPN_CLI_ARGS_DONE,
+        },
+        .handler = spn_cli_tool
+      },
+      {
+        .name = "clean",
+        .summary = "Remove build cache and store directories",
+        .handler = spn_cli_clean
+      },
+      SPN_CLI_ARGS_DONE,
+    },
+    .handler = spn_cli_root
+  };
+
 }
