@@ -27,6 +27,13 @@ mode = "debug"
 cc = "tcc"
 
 [[profile]]
+name = "static"
+mode = "debug"
+cc = "musl-gcc"
+libc = "musl"
+linkage = "static"
+
+[[profile]]
 name = "macos"
 cc = "clang"
 linkage = "shared"
