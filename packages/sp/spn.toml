@@ -2,7 +2,7 @@
 name = "sp"
 repo = "tspader/sp"
 version = "1.6.6"
-commit = "f1f82e4a03fb"
+commit = "2365635171e7"
 author = "tspader"
 maintainer = "tspader"
 system_deps = ["m"]
