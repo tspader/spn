@@ -1,0 +1,15 @@
+[package]
+name = "smoke"
+version = "0.1.0"
+
+[deps.build]
+# sp = "1.6.6"
+# cjson = "1.0.0"
+sqlite = "3.51.1"
+
+[[bin]]
+name = "smoke"
+source = ["main.c"]
+
+[config.sqlite]
+kind = "static"

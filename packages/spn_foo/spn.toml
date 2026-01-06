@@ -1,0 +1,15 @@
+[package]
+name = "spn_foo"
+repo = "tspader/sp"
+version = "1.0.0"
+commit = "2365635171e7"
+author = "tspader"
+maintainer = "tspader"
+description = "has a pkg dep"
+
+[deps.package]
+spn_bar = "1.0.0"
+spn_qux = "1.0.0"
+
+[lib]
+kinds = ["source"]

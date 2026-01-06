@@ -1,0 +1,11 @@
+[package]
+name = "spn_qux"
+repo = "tspader/sp"
+version = "1.0.0"
+commit = "2365635171e7"
+author = "tspader"
+maintainer = "tspader"
+description = "has a pkg dep"
+
+[lib]
+kinds = ["source"]

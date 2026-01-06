@@ -34,3 +34,4 @@ assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn
 - always prefer to initialize structs with designated initializers when possible
   - you MUST use SP_ZERO_INITIALIZE() if you don't use a designated initializer
   - sp_alloc() and SP_ALLOC() return zero allocated memory; do not re-zero
+- always use braces for one liner scopes (e.g. `for`, `if`)
