@@ -969,7 +969,6 @@ typedef struct {
   sp_ht(sp_str_t, bool) visited;
   sp_da(sp_str_t) system_deps;
   sp_ht(sp_str_t, spn_resolved_pkg_t) resolved;
-  spn_build_ctx_t* ctx;
 } spn_resolver_t;
 
 
@@ -986,6 +985,11 @@ typedef struct {
 typedef struct {
   spn_bg_id_t build;
   spn_bg_id_t stamp;
+
+  struct {
+    spn_bg_id_t run;
+    spn_bg_id_t stamp;
+  } configure;
 } spn_pkg_nodes_t;
 
 typedef struct {
@@ -1598,6 +1602,7 @@ spn_task_result_t spn_task_resolve(spn_app_t* app);
 void              spn_task_sync_init(spn_app_t* app);
 spn_task_result_t spn_task_sync_update(spn_app_t* app);
 spn_task_result_t spn_task_configure_update(spn_app_t* app);
+spn_task_result_t spn_task_prepare_configure_graph_update(spn_app_t* app);
 void              spn_task_run_build_graph_init(spn_app_t* app);
 spn_task_result_t spn_task_run_build_graph_update(spn_app_t* app);
 spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app);
@@ -7141,6 +7146,43 @@ spn_task_result_t spn_task_configure_update(spn_app_t* app) {
   }
 
   return SPN_TASK_DONE;
+}
+
+s32 spn_executor_configure(void* user_data) {
+  spn_build_ctx_t* ctx = (spn_build_ctx_t*)user_data;
+  return SPN_OK;
+}
+
+spn_task_result_t spn_task_prepare_configure_graph_update(spn_app_t* app) {
+  spn_bg_ctx_t bg = SP_ZERO_INITIALIZE();
+  spn_build_graph_t* graph = &bg.graph;
+  spn_builder_t* b = &app->builder;
+
+  sp_ht_for(app->resolver.resolved, it) {
+    sp_str_t name = *sp_ht_it_getkp(app->resolver.resolved, it);
+    spn_resolved_pkg_t* resolved = sp_ht_it_getp(app->resolver.resolved, it);
+    spn_dep_ctx_t* dep = sp_om_get(b->contexts.deps, name);
+    sp_assert(dep);
+    dep->nodes.configure = spn_bg_add_fn(graph, spn_executor_configure, &dep->ctx);
+    spn_bg_tag_command(graph, dep->nodes.configure, name);
+  }
+
+  sp_om_for(b->contexts.deps, it) {
+    spn_dep_ctx_t* dep = sp_om_at(b->contexts.deps, it);
+    spn_pkg_t* pkg = dep->ctx.pkg;
+
+    sp_ht_for(pkg->deps, dit) {
+      spn_bg_cmd_add_input(graph, dep->nodes.configure, spn_bg_id_t file)
+      sp_str_t dep_name = sp_ht_getkp(pkg->deps, dit);
+    }
+
+  }
+
+  sp_ht_for(app->resolver.resolved, it) {
+    sp_str_t name = *sp_ht_it_getkp(app->resolver.resolved, it);
+    spn_resolved_pkg_t* resolved = sp_ht_it_getp(app->resolver.resolved, it);
+    spn_dep_ctx_t* dep = sp_om_get(b->contexts.deps, name);
+  }
 }
 
 // TASK: PREPARE BUILD GRAPH
