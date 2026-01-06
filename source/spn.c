@@ -1158,7 +1158,8 @@ s32 spn_executor_run_build_script(spn_bg_cmd_t* cmd, void* user_data);
   X(SPN_BUILD_EVENT_TEST_RUN, "run") \
   X(SPN_BUILD_EVENT_TEST_PASSED, "ok") \
   X(SPN_BUILD_EVENT_TESTS_PASSED, "tested") \
-  X(SPN_BUILD_EVENT_TEST_FAILED, "failed")
+  X(SPN_BUILD_EVENT_TEST_FAILED, "failed") \
+  X(SPN_BUILD_EVENT_CLEAN, "clean")
 
 typedef enum {
   SPN_BUILD_EVENT(SP_X_NAMED_ENUM_DEFINE)
@@ -1177,6 +1178,7 @@ typedef struct {
     struct { spn_resolve_strategy_t strategy; } resolve;
     struct { spn_pkg_t* pkg; } circular;
     struct { spn_pkg_req_t request; } unknown;
+    struct { sp_str_t path; } clean;
   };
 } spn_build_event_t;
 
@@ -1501,6 +1503,10 @@ typedef struct {
   sp_str_t output;
 } spn_cli_graph_t;
 
+typedef struct {
+  sp_str_t profile;
+} spn_cli_clean_t;
+
 struct spn_cli {
   u32 num_args;
   const c8** args;
@@ -1524,6 +1530,7 @@ struct spn_cli {
   spn_cli_manifest_t manifest;
   spn_cli_copy_t copy;
   spn_cli_graph_t graph;
+  spn_cli_clean_t clean;
 };
 
 sp_app_result_t spn_cli_clean(spn_cli_t* cli);
@@ -2510,6 +2517,7 @@ spn_verbosity_t spn_build_event_get_verbosity(spn_build_event_kind_t kind) {
     case SPN_BUILD_EVENT_TEST_FAILED: return SPN_VERBOSITY_QUIET;
     case SPN_BUILD_EVENT_BUILD: return SPN_VERBOSITY_DEBUG;
     case SPN_BUILD_EVENT_COMPILE: return SPN_VERBOSITY_DEBUG;
+    case SPN_BUILD_EVENT_CLEAN: return SPN_VERBOSITY_NORMAL;
   }
   SP_UNREACHABLE_RETURN(SPN_VERBOSITY_NORMAL);
 }
@@ -3672,6 +3680,14 @@ sp_str_t spn_tui_render_build_event(spn_build_event_t* event) {
         &builder,
         "{:fg brightcyan} transitively includes itself",
         SP_FMT_STR(event->circular.pkg->name)
+      );
+      break;
+    }
+    case SPN_BUILD_EVENT_CLEAN: {
+      sp_str_builder_append_fmt(
+        &builder,
+        "{:fg brightcyan}",
+        SP_FMT_STR(event->clean.path)
       );
       break;
     }
@@ -7678,10 +7694,53 @@ sp_app_result_t spn_cli_list(spn_cli_t* cli) {
 }
 
 sp_app_result_t spn_cli_clean(spn_cli_t* cli) {
-  SP_LOG("Removing {:fg brightcyan}", SP_FMT_STR(spn.paths.build));
-  sp_fs_remove_dir(spn.paths.build);
-  SP_LOG("Removing {:fg brightcyan}", SP_FMT_STR(spn.paths.store));
-  sp_fs_remove_dir(spn.paths.store);
+  spn_cli_clean_t* cmd = &cli->clean;
+
+  // Create a minimal context for clean events
+  spn_build_ctx_t ctx = SP_ZERO_INITIALIZE();
+  ctx.name = sp_str_lit("package");
+
+  spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_INTERACTIVE);
+
+  sp_str_t build_dir = sp_fs_join_path(app.paths.dir, sp_str_lit("build"));
+
+  if (sp_str_valid(cmd->profile)) {
+    // Clean only the specified profile
+    sp_str_t profile_dir = sp_fs_join_path(build_dir, cmd->profile);
+    if (sp_fs_exists(profile_dir)) {
+      spn_event_buffer_push_ex(spn.events, &ctx, (spn_build_event_t) {
+        .kind = SPN_BUILD_EVENT_CLEAN,
+        .clean.path = profile_dir
+      });
+      sp_fs_remove_dir(profile_dir);
+    }
+  } else {
+    // Clean the entire build directory
+    if (sp_fs_exists(build_dir)) {
+      spn_event_buffer_push_ex(spn.events, &ctx, (spn_build_event_t) {
+        .kind = SPN_BUILD_EVENT_CLEAN,
+        .clean.path = build_dir
+      });
+      sp_fs_remove_dir(build_dir);
+    }
+
+    // Remove the lock file
+    if (sp_fs_exists(app.paths.lock)) {
+      spn_event_buffer_push_ex(spn.events, &ctx, (spn_build_event_t) {
+        .kind = SPN_BUILD_EVENT_CLEAN,
+        .clean.path = app.paths.lock
+      });
+      sp_fs_remove_file(app.paths.lock);
+    }
+  }
+
+  // Drain and render events
+  sp_da(spn_build_event_t) events = spn_event_buffer_drain(spn.events);
+  sp_da_for(events, it) {
+    spn_build_event_t* event = &events[it];
+    sp_io_write_line(&spn.logger.err, spn_tui_render_build_event(event));
+  }
+
   return SP_APP_QUIT;
 }
 
@@ -8381,7 +8440,17 @@ spn_cli_command_usage_t spn_cli() {
     },
     {
       .name = "clean",
-      .summary = "Remove build cache and store directories",
+      .summary = "Remove build directory and lock file",
+      .opts = {
+        {
+          .brief = "p",
+          .name = "profile",
+          .kind = SPN_CLI_OPT_KIND_STRING,
+          .summary = "Only clean the specified profile",
+          .placeholder = "PROFILE",
+          .ptr = &spn.cli.clean.profile
+        }
+      },
       .handler = spn_cli_clean
     },
     SPN_CLI_ARGS_DONE,
