@@ -1,0 +1,11 @@
+[package]
+name = "smoke"
+version = "0.1.0"
+
+[deps.build]
+sp = "1.6.6"
+cjson = "1.0.0"
+
+[[bin]]
+name = "smoke"
+source = ["main.c"]
