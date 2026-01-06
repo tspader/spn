@@ -325,11 +325,11 @@ sp_str_t sp_ps_config_render(sp_ps_config_t ps) {
   return sp_str_builder_write(&b);
 }
 
-void sp_io_write_new_line(sp_io_t* io) {
-  sp_io_write_cstr(io, "\n");
+void sp_io_write_new_line(sp_io_writer_t* io) {
+  sp_io_write_str(io, sp_str_lit("\n"));
 }
 
-void sp_io_write_line(sp_io_t* io, sp_str_t line) {
+void sp_io_write_line(sp_io_writer_t* io, sp_str_t line) {
   sp_io_write_str(io, line);
   sp_io_write_new_line(io);
 }
@@ -752,7 +752,7 @@ void             spn_cc_target_add_rpath(spn_cc_target_t* cc, sp_str_t dir);
 spn_err_t        spn_cc_run(spn_cc_t* cc);
 sp_str_t         spn_cc_symbol_from_embedded_file(sp_str_t file_path);
 void             spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx);
-spn_err_t        spn_cc_embed_ctx_add(spn_cc_embed_ctx_t* ctx, sp_io_t io, sp_str_t symbol, sp_str_t data_type, sp_str_t size_type);
+spn_err_t        spn_cc_embed_ctx_add(spn_cc_embed_ctx_t* ctx, sp_io_reader_t reader, sp_str_t symbol, sp_str_t data_type, sp_str_t size_type);
 spn_err_t        spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_str_t header);
 
 
@@ -1045,8 +1045,8 @@ struct spn_build_ctx {
   sp_da(sp_ps_config_t) commands;
   sp_ps_t ps;
   struct {
-    sp_io_t build;
-    sp_io_t test;
+    sp_io_writer_t build;
+    sp_io_writer_t test;
   } logs;
 };
 
@@ -1257,7 +1257,7 @@ sp_str_t        spn_gen_build_entries_for_all(spn_gen_entry_t kind, spn_cc_kind_
 // TUI //
 /////////
 #define SPN_TUI_NUM_OPTIONS 3
-#define SP_TUI_PRINT(command) sp_io_write_cstr(&spn.logger.err, command);
+#define SP_TUI_PRINT(command) sp_io_write_str(&spn.logger.err, sp_str_view(command));
 
 typedef struct {
   u32 std_in;
@@ -1721,8 +1721,8 @@ typedef struct {
 
 
   struct {
-    sp_io_t out;
-    sp_io_t err;
+    sp_io_writer_t out;
+    sp_io_writer_t err;
   } logger;
   spn_verbosity_t verbosity;
 } spn_ctx_t;
@@ -2154,7 +2154,7 @@ void spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx) {
 
 spn_err_t spn_cc_embed_ctx_add(
   spn_cc_embed_ctx_t* ctx,
-  sp_io_t io,
+  sp_io_reader_t io,
   sp_str_t symbol,
   sp_str_t data_type,
   sp_str_t size_type
@@ -2162,8 +2162,8 @@ spn_err_t spn_cc_embed_ctx_add(
   sp_elf_section_t* symtab = sp_elf_find_section_by_name(ctx->elf, sp_str_lit(".symtab"));
   sp_elf_section_t* section = sp_elf_find_section_by_name(ctx->elf, sp_str_lit(".rodata"));
 
-  u64 size = sp_io_size(&io);
-  sp_io_seek(&io, 0, SP_IO_SEEK_SET);
+  u64 size = sp_io_reader_size(&io);
+  sp_io_reader_seek(&io, 0, SP_IO_SEEK_SET);
 
   {
     u64 offset = section->buffer.size;
@@ -2207,7 +2207,7 @@ spn_err_t spn_cc_embed_ctx_add(
 spn_err_t spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_str_t header) {
   sp_try_as(sp_elf_write_to_file(ctx->elf, object), SPN_ERROR);
 
-  sp_io_t io = sp_io_from_file(header, SP_IO_MODE_WRITE);
+  sp_io_writer_t io = sp_io_writer_from_file(header, SP_IO_WRITE_MODE_OVERWRITE);
   sp_da_for(ctx->entries, it) {
     spn_cc_embed_t entry = ctx->entries[it];
     sp_io_write_str(&io, sp_format(
@@ -2227,7 +2227,7 @@ spn_err_t spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_st
     sp_io_write_new_line(&io);
   }
 
-  sp_io_close(&io);
+  sp_io_writer_close(&io);
   return SPN_OK;
 }
 
@@ -3531,30 +3531,6 @@ sp_str_t spn_tui_name_to_color(sp_str_t str) {
 //   return sp_color_to_tui_rgb_f(r, g, b);
 // }
 
-sp_str_t spn_tui_render_log(sp_io_t* io, sp_str_t name) {
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(spn_tui_color_name(name)));
-  sp_str_builder_new_line(&builder);
-
-  sp_io_seek(io, 0, SP_IO_SEEK_SET);
-  s64 size = sp_io_size(io);
-  c8* buffer = sp_alloc_n(c8, size);
-  sp_io_read(io, buffer, size);
-  sp_io_close(io);
-
-  sp_str_t log = sp_str(buffer, size);
-
-  sp_str_builder_append_cstr(&builder, SP_ANSI_FG_BRIGHT_BLACK);
-  sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(log));
-  sp_str_builder_append_cstr(&builder, SP_ANSI_RESET);
-
-  if (buffer[size - 1] != '\n') {
-    sp_str_builder_new_line(&builder);
-  }
-
-  return sp_str_builder_move(&builder);
-}
-
 sp_str_t spn_tui_render_build_event(spn_build_event_t* event) {
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
 
@@ -4045,7 +4021,7 @@ bool sp_zcmp_kernel_env_var(void* va) {
 sp_ps_output_t spn_build_ctx_subprocess(spn_build_ctx_t* build, sp_ps_config_t config) {
   config.io = (sp_ps_io_config_t) {
     .in = { .mode = SP_PS_IO_MODE_NULL },
-    .out = { .mode = SP_PS_IO_MODE_EXISTING, .stream = build->logs.build },
+    .out = { .mode = SP_PS_IO_MODE_EXISTING, .fd = build->logs.build.file.fd },
     .err = { .mode = SP_PS_IO_MODE_REDIRECT }
   };
   config.cwd = build->paths.work;
@@ -5551,7 +5527,7 @@ spn_err_t spn_pkg_build_sync_local(spn_dep_ctx_t* dep) {
 }
 
 void spn_build_ctx_stamp(spn_build_ctx_t* ctx) {
-  sp_io_t io = sp_io_from_file(ctx->paths.stamp, SP_IO_MODE_WRITE);
+  sp_io_writer_t io = sp_io_writer_from_file(ctx->paths.stamp, SP_IO_WRITE_MODE_OVERWRITE);
 
   spn_toml_writer_t writer = spn_toml_writer_new();
   spn_toml_begin_table_cstr(&writer, "package");
@@ -5609,7 +5585,7 @@ void spn_build_ctx_stamp(spn_build_ctx_t* ctx) {
   spn_toml_end_array(&writer);
 
   sp_io_write_str(&io, spn_toml_writer_write(&writer));
-  sp_io_close(&io);
+  sp_io_writer_close(&io);
 }
 
 spn_build_ctx_t spn_build_ctx_make(spn_build_ctx_config_t config) {
@@ -5654,16 +5630,16 @@ void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t config) {
   sp_fs_create_dir(ctx->paths.vendor);
 
   sp_fs_create_file(ctx->paths.logs.build);
-  ctx->logs.build = sp_io_from_file(ctx->paths.logs.build, SP_IO_MODE_READ | SP_IO_MODE_WRITE);
+  ctx->logs.build = sp_io_writer_from_file(ctx->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
 }
 
 void spn_build_ctx_deinit(spn_build_ctx_t* ctx) {
-  sp_io_close(&ctx->logs.build);
-  sp_io_close(&ctx->logs.test);
+  sp_io_writer_close(&ctx->logs.build);
+  sp_io_writer_close(&ctx->logs.test);
 }
 
 void spn_build_ctx_log(spn_build_ctx_t* ctx, sp_str_t message) {
-  sp_io_t* io = &ctx->logs.build;
+  sp_io_writer_t* io = &ctx->logs.build;
   sp_str_builder_t builder;
   sp_io_write_str(io, sp_tm_epoch_to_iso8601(sp_tm_now_epoch()));
   sp_io_write_cstr(io, " [info] ");
@@ -5878,7 +5854,7 @@ s32 spn_executor_build_target(spn_bg_cmd_t* cmd, void* user_data) {
       spn_embed_t embed = target->embed[it];
       sp_str_t symbol = embed.symbol;
       spn_embed_types_t types = embed.types;
-      sp_io_t io = SP_ZERO_INITIALIZE();
+      sp_io_reader_t io = SP_ZERO_INITIALIZE();
 
       if (sp_str_empty(embed.types.size)) {
         embed.types.data = spn_intern_cstr("unsigned char");
@@ -5887,7 +5863,7 @@ s32 spn_executor_build_target(spn_bg_cmd_t* cmd, void* user_data) {
 
       switch (embed.kind) {
         case SPN_EMBED_MEM: {
-          io = sp_io_from_const_mem(embed.memory.buffer, embed.memory.size);
+          io = sp_io_reader_from_mem(embed.memory.buffer, embed.memory.size);
           break;
         }
         case SPN_EMBED_FILE: {
@@ -5895,7 +5871,7 @@ s32 spn_executor_build_target(spn_bg_cmd_t* cmd, void* user_data) {
             return SPN_ERROR;
           }
 
-          io = sp_io_from_file(embed.file.path, SP_IO_MODE_READ);
+          io = sp_io_reader_from_file(embed.file.path);
 
           if (sp_str_empty(symbol)) {
             symbol = spn_cc_symbol_from_embedded_file(embed.file.path);
@@ -6199,9 +6175,9 @@ void spn_app_update_lock_file(spn_app_t* app) {
   spn_toml_end_array(&toml);
 
   sp_str_t output = spn_toml_writer_write(&toml);
-  sp_io_t file = sp_io_from_file(app->paths.lock, SP_IO_MODE_WRITE);
+  sp_io_writer_t file = sp_io_writer_from_file(app->paths.lock, SP_IO_WRITE_MODE_OVERWRITE);
   sp_io_write_str(&file, output);
-  sp_io_close(&file);
+  sp_io_writer_close(&file);
 }
 
 void spn_app_write_manifest(spn_pkg_t* pkg, sp_str_t path) {
@@ -6401,9 +6377,9 @@ void spn_app_write_manifest(spn_pkg_t* pkg, sp_str_t path) {
 
   sp_str_t output = spn_toml_writer_write(&toml);
   output = sp_str_trim_right(output);
-  sp_io_t file = sp_io_from_file(path, SP_IO_MODE_WRITE);
+  sp_io_writer_t file = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_OVERWRITE);
   sp_io_write_str(&file, output);
-  sp_io_close(&file);
+  sp_io_writer_close(&file);
 }
 
 sp_str_t spn_registry_get_path(spn_registry_t* registry) {
@@ -6505,7 +6481,7 @@ spn_app_t spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode
       app.package = spn_pkg_from_default(path, name);
 
       sp_str_t main = sp_fs_join_path(path, sp_str_lit("main.c"));
-      sp_io_t io = sp_io_from_file(main, SP_IO_MODE_WRITE);
+      sp_io_writer_t io = sp_io_writer_from_file(main, SP_IO_WRITE_MODE_OVERWRITE);
 
       sp_str_t content = sp_str_lit(
         "#define SP_IMPLEMENTATION\n"
@@ -6521,7 +6497,7 @@ spn_app_t spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode
         SP_FATAL("Failed to write {:fg brightyellow}", SP_FMT_STR(main));
       }
 
-      sp_io_close(&io);
+      sp_io_writer_close(&io);
 
       spn_app_write_manifest(&app.package, app.package.paths.manifest);
 
@@ -6726,8 +6702,8 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.arena = sp_mem_arena_new_ex(256, SP_MEM_ARENA_MODE_NO_REALLOC, 1);
 
   spn_install_signal_handlers();
-  spn.logger.out = sp_io_from_file_handle(STDOUT_FILENO, SP_IO_FILE_CLOSE_MODE_NONE);
-  spn.logger.err = sp_io_from_file_handle(STDERR_FILENO, SP_IO_FILE_CLOSE_MODE_NONE);
+  spn.logger.out = sp_io_writer_from_fd(STDOUT_FILENO, SP_IO_CLOSE_MODE_NONE);
+  spn.logger.err = sp_io_writer_from_fd(STDERR_FILENO, SP_IO_CLOSE_MODE_NONE);
 
   spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_INTERACTIVE);
 
@@ -6835,7 +6811,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     };
     sp_carr_for(runtime, it) {
       sp_str_t path = sp_fs_join_path(spn.paths.runtime, runtime[it].path);
-      sp_io_t io = sp_io_from_file(path, SP_IO_MODE_WRITE);
+      sp_io_writer_t io = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_OVERWRITE);
       sp_io_write(&io, runtime[it].data, runtime[it].size);
     }
   }
@@ -7060,7 +7036,7 @@ sp_app_config_t sp_main(s32 num_args, const c8** args) {
     .on_poll = spn_poll,
     .on_update = spn_update,
     .on_deinit = spn_deinit,
-    .fps = 30,
+    .fps = 144,
   };
 }
 
@@ -7279,7 +7255,8 @@ spn_task_result_t spn_task_run_build_graph_update(spn_app_t* app) {
         // @spader emit an event?
         spn_bg_cmd_t* cmd = spn_bg_find_command(&build->graph, error.value.cmd_id);
         spn_build_ctx_t* ctx = (spn_build_ctx_t*)cmd->fn.user_data;
-        sp_io_write_str(&spn.logger.err, spn_tui_render_log(&ctx->logs.build, ctx->name));
+        sp_io_writer_close(&ctx->logs.build);
+        sp_io_write_str(&spn.logger.err, sp_io_read_file(ctx->paths.logs.build));
         return SPN_TASK_ERROR;
       }
       case SP_OPT_NONE: {
@@ -7321,7 +7298,7 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
     }
 
     sp_fs_create_file(ctx->paths.logs.test);
-    ctx->logs.test = sp_io_from_file(ctx->paths.logs.test, SP_IO_MODE_WRITE | SP_IO_MODE_READ);
+    ctx->logs.test = sp_io_writer_from_file(ctx->paths.logs.test, SP_IO_WRITE_MODE_OVERWRITE);
 
     // @spader just do this async + emit events
     spn_event_buffer_push(spn.events, ctx, SPN_BUILD_EVENT_TEST_RUN);
@@ -7331,7 +7308,7 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
       .command = sp_fs_join_path(ctx->paths.bin, target->name),
       .io = {
         .in =  { .mode = SP_PS_IO_MODE_NULL },
-        .out = { .mode = SP_PS_IO_MODE_EXISTING, .stream = ctx->logs.test },
+        .out = { .mode = SP_PS_IO_MODE_EXISTING, .fd = ctx->logs.test.file.fd },
         .err = { .mode = SP_PS_IO_MODE_REDIRECT }
       },
       .cwd = ctx->paths.work,
@@ -7357,8 +7334,8 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
 
     if (*it.val) {
       ok = false;
-      sp_io_write_new_line(&spn.logger.err);
-      sp_io_write_str(&spn.logger.err, spn_tui_render_log(&ctx->logs.test, ctx->name));
+      sp_io_writer_close(&ctx->logs.test);
+      sp_io_write_str(&spn.logger.err, sp_io_read_file(ctx->paths.logs.test));
     }
   }
 
@@ -7377,9 +7354,9 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
 
 spn_task_result_t spn_task_render_build_graph(spn_app_t* app) {
   if (sp_str_valid(spn.cli.graph.output)) {
-    sp_io_t stream = sp_io_from_file(spn.cli.graph.output, SP_IO_MODE_WRITE);
+    sp_io_writer_t stream = sp_io_writer_from_file(spn.cli.graph.output, SP_IO_WRITE_MODE_OVERWRITE);
     spn_bg_to_mermaid(&app->builder.build.graph, &stream);
-    sp_io_close(&stream);
+    sp_io_writer_close(&stream);
   }
   else {
     spn_bg_to_mermaid(&app->builder.build.graph, &spn.logger.out);
@@ -7520,11 +7497,11 @@ spn_task_result_t spn_task_generate(spn_app_t* app) {
     sp_fs_create_dir(destination);
 
     sp_str_t file_path = sp_fs_join_path(destination, gen.file_name);
-    sp_io_t file = sp_io_from_file(file_path, SP_IO_MODE_WRITE);
+    sp_io_writer_t file = sp_io_writer_from_file(file_path, SP_IO_WRITE_MODE_OVERWRITE);
     if (sp_io_write_str(&file, gen.output) != gen.output.len) {
       SP_FATAL("Failed to write {}", SP_FMT_STR(file_path));
     }
-    sp_io_close(&file);
+    sp_io_writer_close(&file);
 
     spn_event_buffer_push_ex(spn.events, &app->builder.contexts.pkg, (spn_build_event_t) {
       .kind = SPN_BUILD_EVENT_GENERATE,
