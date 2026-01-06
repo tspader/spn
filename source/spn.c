@@ -6729,6 +6729,8 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.logger.out = sp_io_from_file_handle(STDOUT_FILENO, SP_IO_FILE_CLOSE_MODE_NONE);
   spn.logger.err = sp_io_from_file_handle(STDERR_FILENO, SP_IO_FILE_CLOSE_MODE_NONE);
 
+  spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_INTERACTIVE);
+
   spn.events = spn_event_buffer_new();
 
   sp_atomic_s32_set(&spn.control, 0);
@@ -7088,8 +7090,6 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
     spn_pkg_t* pkg = sp_om_at(b->contexts.bins, it)->ctx.pkg;
     spn.tui.info.max_name = SP_MAX(spn.tui.info.max_name, pkg->name.len);
   }
-
-  spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_INTERACTIVE);
 
   return SPN_TASK_DONE;
 }
@@ -7878,8 +7878,6 @@ sp_app_result_t spn_cli_clean(spn_cli_t* cli) {
   // Create a minimal context for clean events
   spn_build_ctx_t ctx = SP_ZERO_INITIALIZE();
   ctx.name = sp_str_lit("package");
-
-  spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_INTERACTIVE);
 
   sp_str_t build_dir = sp_fs_join_path(app.paths.dir, sp_str_lit("build"));
 
