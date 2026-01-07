@@ -19,7 +19,7 @@
 #define SP_MAIN
 #define SP_PS_MAX_ARGS 32
 #define SP_IMPLEMENTATION
-#include "sp.h"
+#include "sp/sp.h"
 
 #define TOML_IMPLEMENTATION
 #include "toml.h"
@@ -760,19 +760,7 @@ void             spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx);
 spn_err_t        spn_cc_embed_ctx_add(spn_cc_embed_ctx_t* ctx, sp_io_reader_t reader, sp_str_t symbol, sp_str_t data_type, sp_str_t size_type);
 spn_err_t        spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_str_t header);
 
-void spn_cc_ps_add_includes(sp_ps_config_t* ps, sp_da(sp_str_t) inc, spn_cc_kind_t cc);
-void spn_cc_ps_add_defines(sp_ps_config_t* ps, sp_da(sp_str_t) defs, spn_cc_kind_t cc);
-void spn_cc_ps_add_lib_dirs(sp_ps_config_t* ps, sp_da(sp_str_t) dirs, spn_cc_kind_t cc);
-void spn_cc_ps_add_libs(sp_ps_config_t* ps, sp_da(sp_str_t) libs, spn_cc_kind_t cc);
-void spn_cc_ps_add_rpaths(sp_ps_config_t* ps, sp_da(sp_str_t) rpaths, spn_cc_kind_t cc);
-void spn_cc_ps_add_system_deps(sp_ps_config_t* ps, sp_da(sp_str_t) deps, spn_cc_kind_t cc);
 
-void spn_cc_str_add_includes(sp_str_builder_t* b, sp_da(sp_str_t) inc, spn_cc_kind_t cc);
-void spn_cc_str_add_defines(sp_str_builder_t* b, sp_da(sp_str_t) defs, spn_cc_kind_t cc);
-void spn_cc_str_add_lib_dirs(sp_str_builder_t* b, sp_da(sp_str_t) dirs, spn_cc_kind_t cc);
-void spn_cc_str_add_libs(sp_str_builder_t* b, sp_da(sp_str_t) libs, spn_cc_kind_t cc);
-void spn_cc_str_add_rpaths(sp_str_builder_t* b, sp_da(sp_str_t) rpaths, spn_cc_kind_t cc);
-void spn_cc_str_add_system_deps(sp_str_builder_t* b, sp_da(sp_str_t) deps, spn_cc_kind_t cc);
 
 
 struct spn_target {
@@ -1586,6 +1574,7 @@ typedef enum {
   SPN_TASK_KIND_RESOLVE,
   SPN_TASK_KIND_SYNC,
   SPN_TASK_KIND_CONFIGURE,
+  SPN_TASK_KIND_CONFIGURE_NEW,
   SPN_TASK_KIND_PREPARE_BUILD_GRAPH,
   SPN_TASK_KIND_RUN_BUILD_GRAPH,
   SPN_TASK_KIND_RENDER_BUILD_GRAPH,
@@ -2108,131 +2097,7 @@ spn_cc_target_t* spn_cc_add_target(spn_cc_t* cc, spn_cc_target_kind_t kind, sp_s
   return sp_da_back(cc->targets);
 }
 
-void spn_cc_ps_add_includes(sp_ps_config_t* ps, sp_da(sp_str_t) includes, spn_cc_kind_t compiler) {
-  sp_da_for(includes, j) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(
-      includes[j],
-      SPN_GEN_INCLUDE,
-      compiler
-    ));
-  }
-}
 
-void spn_cc_ps_add_defines(sp_ps_config_t* ps, sp_da(sp_str_t) defines, spn_cc_kind_t compiler) {
-  sp_da_for(defines, j) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(
-      defines[j],
-      SPN_GEN_DEFINE,
-      compiler
-    ));
-  }
-}
-
-void spn_cc_ps_add_lib_dirs(sp_ps_config_t* ps, sp_da(sp_str_t) lib_dirs, spn_cc_kind_t compiler) {
-  sp_da_for(lib_dirs, j) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(
-      lib_dirs[j],
-      SPN_GEN_LIB_INCLUDE,
-      compiler
-    ));
-  }
-}
-
-void spn_cc_ps_add_libs(sp_ps_config_t* ps, sp_da(sp_str_t) libs, spn_cc_kind_t compiler) {
-  sp_da_for(libs, j) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(
-      libs[j],
-      SPN_GEN_LIBS,
-      compiler
-    ));
-  }
-}
-
-void spn_cc_ps_add_rpaths(sp_ps_config_t* ps, sp_da(sp_str_t) rpaths, spn_cc_kind_t compiler) {
-  sp_da_for(rpaths, j) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(
-      rpaths[j],
-      SPN_GEN_RPATH,
-      compiler
-    ));
-  }
-}
-
-void spn_cc_ps_add_system_deps(sp_ps_config_t* ps, sp_da(sp_str_t) system_deps, spn_cc_kind_t compiler) {
-  sp_da_for(system_deps, j) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(
-      system_deps[j],
-      SPN_GEN_SYSTEM_LIBS,
-      compiler
-    ));
-  }
-}
-
-void spn_cc_str_add_includes(sp_str_builder_t* b, sp_da(sp_str_t) includes, spn_cc_kind_t compiler) {
-  sp_da_for(includes, j) {
-    sp_str_builder_append(b, spn_gen_format_entry(
-      includes[j],
-      SPN_GEN_INCLUDE,
-      compiler
-    ));
-    sp_str_builder_append_c8(b, ' ');
-  }
-}
-
-void spn_cc_str_add_defines(sp_str_builder_t* b, sp_da(sp_str_t) defines, spn_cc_kind_t compiler) {
-  sp_da_for(defines, j) {
-    sp_str_builder_append(b, spn_gen_format_entry(
-      defines[j],
-      SPN_GEN_DEFINE,
-      compiler
-    ));
-    sp_str_builder_append_c8(b, ' ');
-  }
-}
-
-void spn_cc_str_add_lib_dirs(sp_str_builder_t* b, sp_da(sp_str_t) lib_dirs, spn_cc_kind_t compiler) {
-  sp_da_for(lib_dirs, j) {
-    sp_str_builder_append(b, spn_gen_format_entry(
-      lib_dirs[j],
-      SPN_GEN_LIB_INCLUDE,
-      compiler
-    ));
-    sp_str_builder_append_c8(b, ' ');
-  }
-}
-
-void spn_cc_str_add_libs(sp_str_builder_t* b, sp_da(sp_str_t) libs, spn_cc_kind_t compiler) {
-  sp_da_for(libs, j) {
-    sp_str_builder_append(b, spn_gen_format_entry(
-      libs[j],
-      SPN_GEN_LIBS,
-      compiler
-    ));
-    sp_str_builder_append_c8(b, ' ');
-  }
-}
-
-void spn_cc_str_add_rpaths(sp_str_builder_t* b, sp_da(sp_str_t) rpaths, spn_cc_kind_t compiler) {
-  sp_da_for(rpaths, j) {
-    sp_str_builder_append(b, spn_gen_format_entry(
-      rpaths[j],
-      SPN_GEN_RPATH,
-      compiler
-    ));
-    sp_str_builder_append_c8(b, ' ');
-  }
-}
-
-void spn_cc_str_add_system_deps(sp_str_builder_t* b, sp_da(sp_str_t) system_deps, spn_cc_kind_t compiler) {
-  sp_da_for(system_deps, j) {
-    sp_str_builder_append(b, spn_gen_format_entry(
-      system_deps[j],
-      SPN_GEN_SYSTEM_LIBS,
-      compiler
-    ));
-    sp_str_builder_append_c8(b, ' ');
-  }
-}
 
 void spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx) {
   ctx->elf = sp_elf_new_with_null_section();
@@ -2328,8 +2193,13 @@ sp_ps_config_t spn_cc_to_ps(spn_cc_t* cc) {
     .command = sp_str_copy(profile->cc.exe),
   };
 
-  spn_cc_ps_add_includes(&ps, cc->include, profile->cc.kind);
-  spn_cc_ps_add_defines(&ps, cc->define, profile->cc.kind);
+  sp_da_for(cc->include, i) {
+    sp_ps_config_add_arg(&ps, spn_gen_format_entry(cc->include[i], SPN_GEN_INCLUDE, compiler));
+  }
+  sp_da_for(cc->define, i) {
+    sp_ps_config_add_arg(&ps, spn_gen_format_entry(cc->define[i], SPN_GEN_DEFINE, compiler));
+  }
+
   sp_ps_config_add_arg(&ps, spn_cc_c_standard_to_switch(profile->standard));
   sp_ps_config_add_arg(&ps, spn_cc_build_mode_to_switch(profile->mode));
   sp_ps_config_add_arg(&ps, spn_cc_lib_kind_to_switch(profile->linkage));
@@ -2344,11 +2214,22 @@ void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* 
     sp_ps_config_add_arg(ps, target->source[j]);
   }
 
-  spn_cc_ps_add_includes(ps, target->include, compiler);
-  spn_cc_ps_add_defines(ps, target->define, compiler);
-  spn_cc_ps_add_lib_dirs(ps, target->lib_dirs, compiler);
-  spn_cc_ps_add_libs(ps, target->libs, compiler);
-  spn_cc_ps_add_rpaths(ps, target->rpath, compiler);
+  sp_da_for(target->include, i) {
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->include[i], SPN_GEN_INCLUDE, compiler));
+  }
+  sp_da_for(target->define, i) {
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->define[i], SPN_GEN_DEFINE, compiler));
+  }
+  sp_da_for(target->lib_dirs, i) {
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->lib_dirs[i], SPN_GEN_LIB_INCLUDE, compiler));
+  }
+  sp_da_for(target->libs, i) {
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->libs[i], SPN_GEN_LIBS, compiler));
+  }
+  sp_da_for(target->rpath, i) {
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->rpath[i], SPN_GEN_RPATH, compiler));
+  }
+
   sp_ps_config_add_arg(ps, sp_str_lit("-Werror=return-type"));
   sp_ps_config_add_arg(ps, sp_str_lit("-o"));
   sp_ps_config_add_arg(ps, sp_fs_join_path(cc->build->paths.bin, target->name));
@@ -2357,9 +2238,10 @@ void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* 
 void spn_cc_target_to_tcc(spn_cc_t* cc, spn_cc_target_t* target, spn_tcc_t* tcc) {
   spn_profile_t* profile = cc->build->profile;
   spn_cc_kind_t compiler = profile->cc.kind;
+  s32 result = 0;
 
   sp_da_for(cc->include, it) {
-    tcc_add_include_path(tcc, sp_str_to_cstr(cc->include[it]));
+    result = tcc_add_include_path(tcc, sp_str_to_cstr(cc->include[it]));
   }
 
   sp_da_for(cc->define, it) {
@@ -2375,11 +2257,11 @@ void spn_cc_target_to_tcc(spn_cc_t* cc, spn_cc_target_t* target, spn_tcc_t* tcc)
   }
 
   sp_da_for(target->lib_dirs, it) {
-    tcc_add_library_path(tcc, sp_str_to_cstr(target->lib_dirs[it]));
+    result = tcc_add_library_path(tcc, sp_str_to_cstr(target->lib_dirs[it]));
   }
 
   sp_da_for(target->libs, it) {
-    tcc_add_library(tcc, sp_str_to_cstr(target->libs[it]));
+    result = tcc_add_file(tcc, sp_str_to_cstr(target->libs[it]));
   }
 }
 
@@ -2396,7 +2278,9 @@ spn_err_t spn_cc_run(spn_cc_t* cc) {
       case SPN_CC_TARGET_EXECUTABLE: {
         sp_ps_config_t process = sp_ps_config_copy(&common);
         spn_cc_target_to_ps(cc, &target, &process);
-        spn_cc_ps_add_system_deps(&process, app.resolver.system_deps, compiler);
+        sp_da_for(app.resolver.system_deps, i) {
+          sp_ps_config_add_arg(&process, spn_gen_format_entry(app.resolver.system_deps[i], SPN_GEN_SYSTEM_LIBS, compiler));
+        }
 
         spn_event_buffer_push_ex(spn.events, cc->build, (spn_build_event_t) {
           .kind = SPN_BUILD_EVENT_COMPILE,
@@ -5825,9 +5709,9 @@ spn_err_t spn_builder_compile_pkg(spn_builder_t* builder, spn_build_ctx_t* ctx) 
     }
   }
 
-  spn_cc_target_to_tcc(&cc, target, tcc);
 
   sp_try(spn_tcc_add_file(tcc, ctx->pkg->paths.script));
+  spn_cc_target_to_tcc(&cc, target, tcc);
   sp_try_as(tcc_relocate(tcc), SPN_ERROR);
   ctx->tcc = tcc;
   ctx->on_configure = tcc_get_symbol(tcc, "configure");
@@ -7063,6 +6947,10 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
 sp_app_result_t spn_update(sp_app_t* sp) {
   spn_app_t* app = (spn_app_t*)sp->user_data;
 
+  if (sp_atomic_s32_get(&sp->shutdown)) {
+    return SP_APP_QUIT;
+  }
+
   spn_task_executor_t* task = &app->tasks;
   s32 kind = task->data[task->index];
   spn_task_result_t result = SPN_TASK_DONE;
@@ -7085,9 +6973,12 @@ sp_app_result_t spn_update(sp_app_t* sp) {
       break;
     }
     case SPN_TASK_KIND_CONFIGURE: {
+      result = spn_task_configure_update(app);
+      break;
+    }
+    case SPN_TASK_KIND_CONFIGURE_NEW: {
       if (!task->initted) spn_task_cfg_init(app);
       result = spn_task_cfg_update(app);
-      //result = spn_task_configure_update(app);
       break;
     }
     case SPN_TASK_KIND_PREPARE_BUILD_GRAPH: {
@@ -7298,6 +7189,11 @@ spn_task_result_t spn_task_configure_update(spn_app_t* app) {
 
 s32 spn_executor_configure(spn_bg_cmd_t* cmd, void* user_data) {
   spn_build_ctx_t* ctx = (spn_build_ctx_t*)user_data;
+
+  if (sp_str_equal_cstr(ctx->pkg->name, "sqlite")) {
+    return SPN_OK;
+  }
+
   if (spn_builder_compile_pkg(ctx->builder, ctx)) {
     spn_push_event((spn_build_event_t) {
       .kind = SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED
@@ -7326,7 +7222,6 @@ s32 spn_executor_configure(spn_bg_cmd_t* cmd, void* user_data) {
     return SPN_ERROR;
   }
 
-  spn_log_info("configure: {}", SP_FMT_STR(ctx->name));
   return SPN_OK;
 }
 
@@ -8256,9 +8151,9 @@ sp_app_result_t spn_cli_graph(spn_cli_t* cli) {
 
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PREPARE_BUILD_GRAPH);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RENDER_BUILD_GRAPH);
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE_NEW);
+  // spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PREPARE_BUILD_GRAPH);
+  // spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RENDER_BUILD_GRAPH);
 
   return SP_APP_CONTINUE;
 }
@@ -8377,8 +8272,8 @@ sp_app_result_t spn_cli_build(spn_cli_t* cli) {
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
-  // spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PREPARE_BUILD_GRAPH);
-  // spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN_BUILD_GRAPH);
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PREPARE_BUILD_GRAPH);
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN_BUILD_GRAPH);
 
   return SP_APP_CONTINUE;
 }
