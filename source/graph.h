@@ -213,7 +213,7 @@ void               spn_bg_it_add_children(spn_bg_it_t* it, spn_bg_node_t node);
 bool               spn_bg_it_done(spn_bg_it_t* it);
 sp_str_t           spn_bg_dfs(spn_bg_it_config_t config);
 sp_str_t           spn_bg_bfs(spn_bg_it_config_t config);
-void               spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* stream);
+void               spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* stream, sp_str_t project_dir, sp_str_t cache_dir);
 spn_bg_dirty_t*    spn_bg_dirty_new();
 spn_bg_dirty_t*    spn_bg_compute_dirty(spn_build_graph_t* graph);
 bool               spn_bg_is_file_dirty(spn_bg_dirty_t* dirty, spn_bg_id_t id);
@@ -677,7 +677,7 @@ sp_str_t spn_bg_viz_kind_to_class(spn_bg_viz_kind_t kind) {
   return sp_str_lit("source");
 }
 
-void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* io) {
+void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* io, sp_str_t project_dir, sp_str_t cache_dir) {
   sp_str_t stroke = sp_str_lit("#1a1a2e");
   sp_str_t text = sp_str_lit("#e0e0e0");
 
@@ -700,8 +700,16 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* io) {
     spn_bg_file_t* file = &graph->files[it];
     sp_str_t cls = spn_bg_viz_kind_to_class(file->viz);
 
+    // Replace path prefixes with $PROJECT or $CACHE for cleaner display
+    sp_str_t path = file->path;
+    if (sp_str_valid(project_dir) && sp_str_starts_with(path, project_dir)) {
+      path = sp_format("$PROJECT{}", SP_FMT_STR(sp_str_suffix(path, path.len - project_dir.len)));
+    } else if (sp_str_valid(cache_dir) && sp_str_starts_with(path, cache_dir)) {
+      path = sp_format("$CACHE{}", SP_FMT_STR(sp_str_suffix(path, path.len - cache_dir.len)));
+    }
+
     sp_io_write_str(io, sp_format("  F{}[\"{}\"]:::{}\n",
-      SP_FMT_U32(file->id.index), SP_FMT_STR(file->path), SP_FMT_STR(cls)));
+      SP_FMT_U32(file->id.index), SP_FMT_STR(path), SP_FMT_STR(cls)));
   }
 
   sp_da_for(graph->commands, it) {

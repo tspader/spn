@@ -7338,7 +7338,7 @@ spn_task_result_t spn_task_cfg_init(spn_app_t* app) {
 
   sp_str_t path = sp_fs_join_path(b->contexts.pkg.paths.work, sp_str_lit("graph.mmd"));
   sp_io_writer_t writer = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_OVERWRITE);
-  spn_bg_to_mermaid(graph, &writer);
+  spn_bg_to_mermaid(graph, &writer, app->paths.dir, spn.paths.cache);
 
   b->configure.dirty = spn_bg_compute_dirty(graph);
   b->configure.executor = spn_bg_executor_new(
@@ -7704,11 +7704,11 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
 spn_task_result_t spn_task_render_build_graph(spn_app_t* app) {
   if (sp_str_valid(spn.cli.graph.output)) {
     sp_io_writer_t stream = sp_io_writer_from_file(spn.cli.graph.output, SP_IO_WRITE_MODE_OVERWRITE);
-    spn_bg_to_mermaid(&app->builder.build.graph, &stream);
+    spn_bg_to_mermaid(&app->builder.build.graph, &stream, app->paths.dir, spn.paths.cache);
     sp_io_writer_close(&stream);
   }
   else {
-    spn_bg_to_mermaid(&app->builder.build.graph, &spn.logger.out);
+    spn_bg_to_mermaid(&app->builder.build.graph, &spn.logger.out, app->paths.dir, spn.paths.cache);
   }
 
   return SPN_TASK_DONE;
