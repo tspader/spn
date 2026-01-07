@@ -70,6 +70,7 @@ typedef s32 spn_err_t;
 #define _SP_MCAT(x, y) x##y
 #define SP_MCAT(x, y) _SP_MCAT(x, y)
 
+#define sp_try_goto(expr, label) do { s32 _sp_result = (expr); if (_sp_result) { goto label; }; } while (0)
 
 
 #define sp_ht_collect_keys(ht, da) \
@@ -424,12 +425,17 @@ void              spn_toml_append_str_carr_cstr(spn_toml_writer_t* writer, const
 /////////
 typedef TCCState spn_tcc_t;
 
-spn_tcc_t* spn_tcc_new(spn_build_ctx_t* ctx);
+typedef struct {
+  spn_build_ctx_t* b;
+  sp_str_t error;
+} spn_tcc_err_ctx_t;
+
 spn_err_t  spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path);
 spn_err_t  spn_tcc_register(spn_tcc_t* tcc);
 s32        spn_tcc_backtrace(void* ud, void* pc, const c8* file, s32 line, const c8* fn, const c8* message);
-void       spn_tcc_error(void* opaque, const char* message);
-void       spn_tcc_list_fn(void* opaque, const char* name, const void* value);
+void       spn_tcc_on_build_script_compile_error(void* user_data, const c8* message);
+void       spn_tcc_error(void* opaque, const c8* message);
+void       spn_tcc_list_fn(void* opaque, const c8* name, const void* value);
 
 
 ///////////////
@@ -1046,6 +1052,7 @@ struct spn_build_ctx {
   } paths;
 
   sp_mem_arena_t* arena;
+  sp_str_t error;
   spn_build_time_t time;
   sp_da(sp_ps_config_t) commands;
   sp_ps_t ps;
@@ -1144,12 +1151,16 @@ typedef enum {
   SPN_BUILD_EVENT_SYNC,
   SPN_BUILD_EVENT_CHECKOUT,
   SPN_BUILD_EVENT_BUILD,
+  SPN_BUILD_EVENT_BUILD_SCRIPT_COMPILE,
+  SPN_BUILD_EVENT_BUILD_SCRIPT_COMPILE_FAILED,
   SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE,
   SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD,
+  SPN_BUILD_EVENT_BUILD_SCRIPT_PACKAGE,
   SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED,
   SPN_BUILD_EVENT_BUILD_SCRIPT_CRASHED,
   SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE_FAILED,
   SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD_FAILED,
+  SPN_BUILD_EVENT_BUILD_SCRIPT_PACKAGE_FAILED,
   SPN_BUILD_EVENT_DEP_BUILD,
   SPN_BUILD_EVENT_DEP_BUILD_PASSED,
   SPN_BUILD_EVENT_DEP_BUILD_FAILED,
@@ -1185,6 +1196,7 @@ typedef struct {
     struct { spn_pkg_req_t request; } unknown;
     struct { sp_str_t path; } clean;
     struct { sp_str_t path; } generate;
+    struct { sp_str_t error; } compile_failed;
   };
 } spn_build_event_t;
 
@@ -1291,19 +1303,56 @@ typedef enum {
   SPN_BUILD_EVENT_COLOR_RED,
 } spn_build_event_color_t;
 
+#define SPN_BUILD_EVENT_BOLD     true
+#define SPN_BUILD_EVENT_NOT_BOLD false
+
 typedef struct {
+  const c8* name;
   spn_build_event_color_t color;
   spn_verbosity_t verbosity;
+  bool bold;
 } spn_build_event_display_t;
 
-spn_build_event_display_t tui_events [] = {
-  [SPN_BUILD_EVENT_FETCH]           = { .color = SPN_BUILD_EVENT_COLOR_NONE, .verbosity = SPN_VERBOSITY_NORMAL },
-  [SPN_BUILD_EVENT_ERR_UNKNOWN_PKG] = { .color = SPN_BUILD_EVENT_COLOR_RED,  .verbosity = SPN_VERBOSITY_NORMAL },
+spn_build_event_display_t tui_events[] = {
+  [SPN_BUILD_EVENT_FETCH]                         = { "fetch",     SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_ERR_CIRCULAR_DEP]              = { "failed",    SPN_BUILD_EVENT_COLOR_RED,   SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_ERR_UNKNOWN_PKG]               = { "failed",    SPN_BUILD_EVENT_COLOR_RED,   SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_RESOLVE]                       = { "resolve",   SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_RESOLVE_FAILED]                = { "failed",    SPN_BUILD_EVENT_COLOR_RED,   SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_SYNC]                          = { "sync",      SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_CHECKOUT]                      = { "checkout",  SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_BUILD]                         = { "build",     SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_DEBUG,  SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_BUILD_SCRIPT_COMPILE]          = { "compile",   SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_BUILD_SCRIPT_COMPILE_FAILED]   = { "failed",    SPN_BUILD_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE]        = { "configure", SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD]            = { "build()",   SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_BUILD_SCRIPT_PACKAGE]          = { "package()", SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED]           = { "failed",    SPN_BUILD_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_BUILD_SCRIPT_CRASHED]          = { "failed",    SPN_BUILD_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE_FAILED] = { "failed",    SPN_BUILD_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD_FAILED]     = { "failed",    SPN_BUILD_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_BUILD_SCRIPT_PACKAGE_FAILED]   = { "failed",    SPN_BUILD_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_DEP_BUILD]                     = { "build",     SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_DEP_BUILD_PASSED]              = { "ok",        SPN_BUILD_EVENT_COLOR_GREEN, SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_BOLD     },
+  [SPN_BUILD_EVENT_DEP_BUILD_FAILED]              = { "failed",    SPN_BUILD_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_TARGET_BUILD]                  = { "build",     SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_TARGET_BUILD_PASSED]           = { "ok",        SPN_BUILD_EVENT_COLOR_GREEN, SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_BOLD     },
+  [SPN_BUILD_EVENT_TARGET_BUILD_FAILED]           = { "failed",    SPN_BUILD_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_BUILD_PASSED]                  = { "built",     SPN_BUILD_EVENT_COLOR_GREEN, SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_BOLD     },
+  [SPN_BUILD_EVENT_PACKAGE]                       = { "package",   SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_CANCEL]                        = { "cancel",    SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_COMPILE]                       = { "compile",   SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_DEBUG,  SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_TCC_ERROR]                     = { "error",     SPN_BUILD_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_TEST_RUN]                      = { "run",       SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_TEST_PASSED]                   = { "ok",        SPN_BUILD_EVENT_COLOR_GREEN, SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_BOLD     },
+  [SPN_BUILD_EVENT_TESTS_PASSED]                  = { "tested",    SPN_BUILD_EVENT_COLOR_GREEN, SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_BOLD     },
+  [SPN_BUILD_EVENT_TEST_FAILED]                   = { "failed",    SPN_BUILD_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_CLEAN]                         = { "clean",     SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
+  [SPN_BUILD_EVENT_GENERATE]                      = { "generate",  SPN_BUILD_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_BUILD_EVENT_NOT_BOLD },
 };
 
 spn_tui_mode_t spn_output_mode_from_str(sp_str_t str);
 sp_str_t       spn_output_mode_to_str(spn_tui_mode_t mode);
-void spn_tui_render_event_name(spn_build_event_t* event, sp_str_builder_t* builder);
 
 typedef enum {
   SP_TUI_TABLE_NONE,
@@ -1596,6 +1645,7 @@ typedef enum {
   SPN_TASK_KIND_RENDER_BUILD_GRAPH,
   SPN_TASK_KIND_RUN,
   SPN_TASK_KIND_GENERATE,
+  SPN_TASK_KIND_WHICH,
   SPN_TASK_KIND_COUNT,
 } spn_task_kind_t;
 
@@ -1629,6 +1679,8 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app);
 spn_task_result_t spn_task_render_build_graph(spn_app_t* app);
 spn_task_result_t spn_task_run_tests(spn_app_t* app);
 spn_task_result_t spn_task_generate(spn_app_t* app);
+spn_task_result_t spn_task_which(spn_app_t* app);
+spn_dep_ctx_t*    spn_cli_assert_dep_exists(sp_str_t name);
 
 typedef struct {
   spn_target_filter_t filter;
@@ -2517,77 +2569,11 @@ sp_str_t spn_output_mode_to_str(spn_tui_mode_t mode) {
 }
 
 sp_str_t spn_build_event_kind_to_str(spn_build_event_kind_t kind) {
-  switch (kind) {
-    case SPN_BUILD_EVENT_FETCH:                       return sp_str_lit("fetch");
-    case SPN_BUILD_EVENT_ERR_CIRCULAR_DEP:            return sp_str_lit("failed");
-    case SPN_BUILD_EVENT_ERR_UNKNOWN_PKG:             return sp_str_lit("failed");
-    case SPN_BUILD_EVENT_RESOLVE:                     return sp_str_lit("resolve");
-    case SPN_BUILD_EVENT_RESOLVE_FAILED:              return sp_str_lit("failed");
-    case SPN_BUILD_EVENT_SYNC:                        return sp_str_lit("sync");
-    case SPN_BUILD_EVENT_CHECKOUT:                    return sp_str_lit("checkout");
-    case SPN_BUILD_EVENT_BUILD:                       return sp_str_lit("build");
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE:      return sp_str_lit("configure");
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD:          return sp_str_lit("build()");
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED:         return sp_str_lit("failed");
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_CRASHED:        return sp_str_lit("failed");
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE_FAILED: return sp_str_lit("failed");
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD_FAILED:   return sp_str_lit("failed");
-    case SPN_BUILD_EVENT_DEP_BUILD:                   return sp_str_lit("build");
-    case SPN_BUILD_EVENT_DEP_BUILD_PASSED:            return sp_str_lit("ok");
-    case SPN_BUILD_EVENT_DEP_BUILD_FAILED:            return sp_str_lit("failed");
-    case SPN_BUILD_EVENT_TARGET_BUILD:                return sp_str_lit("build");
-    case SPN_BUILD_EVENT_TARGET_BUILD_PASSED:         return sp_str_lit("ok");
-    case SPN_BUILD_EVENT_TARGET_BUILD_FAILED:         return sp_str_lit("failed");
-    case SPN_BUILD_EVENT_BUILD_PASSED:                return sp_str_lit("built");
-    case SPN_BUILD_EVENT_PACKAGE:                     return sp_str_lit("package");
-    case SPN_BUILD_EVENT_CANCEL:                      return sp_str_lit("cancel");
-    case SPN_BUILD_EVENT_COMPILE:                     return sp_str_lit("compile");
-    case SPN_BUILD_EVENT_TCC_ERROR:                   return sp_str_lit("error");
-    case SPN_BUILD_EVENT_TEST_RUN:                    return sp_str_lit("run");
-    case SPN_BUILD_EVENT_TEST_PASSED:                 return sp_str_lit("ok");
-    case SPN_BUILD_EVENT_TESTS_PASSED:                return sp_str_lit("tested");
-    case SPN_BUILD_EVENT_TEST_FAILED:                 return sp_str_lit("failed");
-    case SPN_BUILD_EVENT_CLEAN:                       return sp_str_lit("clean");
-    case SPN_BUILD_EVENT_GENERATE:                    return sp_str_lit("generate");
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+  return sp_str_from_cstr(tui_events[kind].name);
 }
 
 spn_verbosity_t spn_build_event_get_verbosity(spn_build_event_kind_t kind) {
-  switch (kind) {
-    case SPN_BUILD_EVENT_FETCH:            return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_RESOLVE:          return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_RESOLVE_FAILED:   return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_ERR_CIRCULAR_DEP: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_ERR_UNKNOWN_PKG: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_DEP_BUILD_PASSED: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_TARGET_BUILD_PASSED: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_BUILD_PASSED: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_CANCEL: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_TEST_PASSED: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_TESTS_PASSED: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_SYNC: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_CHECKOUT: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_DEP_BUILD: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_TARGET_BUILD: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_PACKAGE: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_TEST_RUN: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED: return SPN_VERBOSITY_QUIET;
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_CRASHED: return SPN_VERBOSITY_QUIET;
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE_FAILED: return SPN_VERBOSITY_QUIET;
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD_FAILED: return SPN_VERBOSITY_QUIET;
-    case SPN_BUILD_EVENT_DEP_BUILD_FAILED: return SPN_VERBOSITY_QUIET;
-    case SPN_BUILD_EVENT_TARGET_BUILD_FAILED: return SPN_VERBOSITY_QUIET;
-    case SPN_BUILD_EVENT_TCC_ERROR: return SPN_VERBOSITY_QUIET;
-    case SPN_BUILD_EVENT_TEST_FAILED: return SPN_VERBOSITY_QUIET;
-    case SPN_BUILD_EVENT_BUILD: return SPN_VERBOSITY_DEBUG;
-    case SPN_BUILD_EVENT_COMPILE: return SPN_VERBOSITY_DEBUG;
-    case SPN_BUILD_EVENT_CLEAN: return SPN_VERBOSITY_NORMAL;
-    case SPN_BUILD_EVENT_GENERATE: return SPN_VERBOSITY_NORMAL;
-  }
-  SP_UNREACHABLE_RETURN(SPN_VERBOSITY_NORMAL);
+  return tui_events[kind].verbosity;
 }
 
 sp_str_t spn_visibility_to_str(spn_visibility_t kind) {
@@ -2614,6 +2600,7 @@ sp_str_t spn_resolve_strategy_to_str(spn_resolve_strategy_t strategy) {
 spn_visibility_t spn_visibility_from_str(sp_str_t str) {
   if (spn_intern_is_equal_cstr(str, "public")) return SPN_VISIBILITY_PUBLIC;
   if (spn_intern_is_equal_cstr(str, "test"))   return SPN_VISIBILITY_TEST;
+  if (spn_intern_is_equal_cstr(str, "build"))  return SPN_VISIBILITY_BUILD;
   SP_UNREACHABLE_RETURN(SPN_VISIBILITY_PUBLIC);
 }
 
@@ -3448,19 +3435,6 @@ sp_str_t spn_toml_writer_write(spn_toml_writer_t* writer) {
 /////////
 // TCC //
 /////////
-spn_tcc_t* spn_tcc_new(spn_build_ctx_t* ctx) {
-  spn_tcc_t* tcc = tcc_new();
-  tcc_set_error_func(tcc, ctx, spn_tcc_error);
-  tcc_set_backtrace_func(tcc, ctx, spn_tcc_backtrace);
-  tcc_set_lib_path(tcc, sp_str_to_cstr(spn.paths.runtime));
-
-  sp_try_as(tcc_set_options(tcc, "-gdwarf -Wall -Werror"), SP_NULLPTR);
-  tcc_set_output_type(tcc, TCC_OUTPUT_MEMORY);
-  sp_try_as(tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include)), SP_NULLPTR);
-  tcc_define_symbol(tcc, "SPN", "");
-  sp_try_as(spn_tcc_register(tcc), SP_NULLPTR);
-  return tcc;
-}
 spn_err_t spn_tcc_register(spn_tcc_t* tcc) {
   sp_carr_for(spn_symbol_table, it) {
     sp_try_as(tcc_add_symbol(tcc, spn_symbol_table[it].symbol, spn_symbol_table[it].fn), SPN_ERROR);
@@ -3477,22 +3451,15 @@ s32 spn_tcc_backtrace(void* ud, void* pc, const c8* file, s32 line, const c8* fn
   return 0;
 }
 
-void spn_tcc_error(void* user_data, const char* message) {
+void spn_tcc_on_build_script_compile_error(void* user_data, const c8* message) {
   spn_build_ctx_t* ctx = (spn_build_ctx_t*)user_data;
+
   sp_context_push_allocator(sp_mem_arena_as_allocator(ctx->arena));
-  sp_str_t error = sp_str_from_cstr(message);
+  ctx->error = sp_str_from_cstr(message);
   sp_context_pop();
-
-  spn_build_ctx_log(ctx, sp_str_lit("error from tcc!"));
-  spn_build_ctx_log(ctx, error);
-
-  spn_event_buffer_push_ex(spn.events, ctx, (spn_build_event_t) {
-    .kind = SPN_BUILD_EVENT_TCC_ERROR,
-    .tcc = error
-  });
 }
 
-void spn_tcc_list_fn(void* opaque, const char* name, const void* value) {
+void spn_tcc_list_fn(void* opaque, const c8* name, const void* value) {
   sp_da(sp_str_t) syms = (sp_da(sp_str_t))opaque;
   sp_dyn_array_push(syms, sp_str_from_cstr(name));
 }
@@ -3595,62 +3562,32 @@ sp_str_t spn_tui_name_to_color(sp_str_t str) {
 //   return sp_color_to_tui_rgb_f(r, g, b);
 // }
 
-void spn_tui_render_event_name(spn_build_event_t* event, sp_str_builder_t* builder) {
-  const c8* fmt = SP_NULLPTR;
-
-  switch (tui_events[event->kind].color) {
-    case SPN_BUILD_EVENT_COLOR_NONE: { fmt = "{:fg brightblack :pad 9}"; break; }
-    case SPN_BUILD_EVENT_COLOR_GREEN: { fmt = "{:fg green :pad 9}"; break; }
-    case SPN_BUILD_EVENT_COLOR_RED: { fmt = "{:fg red :pad 9}"; break; }
-  }
-  sp_str_builder_append_fmt(builder,
-    "{:fg red :pad 9} ",
-    SP_FMT_STR(spn_build_event_kind_to_str(event->kind))
-  );
-}
-
 sp_str_t spn_tui_render_build_event(spn_build_event_t* event) {
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
 
-  // event kind
-  switch (event->kind) {
-    case SPN_BUILD_EVENT_TEST_PASSED:
-    case SPN_BUILD_EVENT_TESTS_PASSED:
-    case SPN_BUILD_EVENT_TARGET_BUILD_PASSED:
-    case SPN_BUILD_EVENT_DEP_BUILD_PASSED:
-    case SPN_BUILD_EVENT_BUILD_PASSED: {
-      sp_str_builder_append_fmt(&builder,
-        "{}{:fg green :pad 9}{} ",
-        SP_FMT_CSTR(SP_ANSI_BOLD),
-        SP_FMT_STR(spn_build_event_kind_to_str(event->kind)),
-        SP_FMT_CSTR(SP_ANSI_RESET)
-      );
+  spn_build_event_display_t display = tui_events[event->kind];
+  sp_str_t name = spn_build_event_kind_to_str(event->kind);
+  if (display.bold) {
+    sp_str_builder_append_cstr(&builder, SP_ANSI_BOLD);
+  }
+  switch (display.color) {
+    case SPN_BUILD_EVENT_COLOR_NONE: {
+      sp_str_builder_append_fmt(&builder, "{:fg brightblack :pad 9}", SP_FMT_STR(name));
       break;
     }
-    case SPN_BUILD_EVENT_ERR_CIRCULAR_DEP:
-    case SPN_BUILD_EVENT_ERR_UNKNOWN_PKG:
-    case SPN_BUILD_EVENT_TCC_ERROR:
-    case SPN_BUILD_EVENT_TEST_FAILED:
-    case SPN_BUILD_EVENT_DEP_BUILD_FAILED:
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED:
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_CRASHED:
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE_FAILED:
-    case SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD_FAILED:
-    case SPN_BUILD_EVENT_TARGET_BUILD_FAILED: {
-      sp_str_builder_append_fmt(&builder,
-        "{:fg red :pad 9} ",
-        SP_FMT_STR(spn_build_event_kind_to_str(event->kind))
-      );
+    case SPN_BUILD_EVENT_COLOR_GREEN: {
+      sp_str_builder_append_fmt(&builder, "{:fg green :pad 9}", SP_FMT_STR(name));
       break;
     }
-    default: {
-      sp_str_builder_append_fmt(&builder,
-        "{:fg brightblack :pad 9} ",
-        SP_FMT_STR(spn_build_event_kind_to_str(event->kind))
-      );
+    case SPN_BUILD_EVENT_COLOR_RED: {
+      sp_str_builder_append_fmt(&builder, "{:fg red :pad 9}", SP_FMT_STR(name));
       break;
     }
   }
+  if (display.bold) {
+    sp_str_builder_append_cstr(&builder, SP_ANSI_RESET);
+  }
+  sp_str_builder_append_c8(&builder, ' ');
 
   // package
   sp_str_builder_append(&builder, spn_tui_decorate_name(event->ctx->name, spn.tui.info.max_name, ' '));
@@ -3724,6 +3661,10 @@ sp_str_t spn_tui_render_build_event(spn_build_event_t* event) {
     }
     case SPN_BUILD_EVENT_BUILD_SCRIPT_CRASHED: {
       sp_str_builder_append_cstr(&builder, "crashed");
+      break;
+    }
+    case SPN_BUILD_EVENT_BUILD_SCRIPT_COMPILE_FAILED: {
+      sp_str_builder_append(&builder, event->compile_failed.error);
       break;
     }
     case SPN_BUILD_EVENT_ERR_UNKNOWN_PKG: {
@@ -5755,9 +5696,21 @@ spn_err_t spn_builder_compile_pkg(spn_builder_t* builder, spn_build_ctx_t* ctx) 
     return SPN_OK;
   }
 
+  spn_event_buffer_push(spn.events, ctx, SPN_BUILD_EVENT_BUILD_SCRIPT_COMPILE);
+
   sp_tm_timer_t timer = sp_tm_start_timer();
 
-  spn_tcc_t* tcc = spn_tcc_new(ctx);
+  spn_tcc_t* tcc = tcc_new();
+  tcc_set_error_func(tcc, ctx, spn_tcc_on_build_script_compile_error);
+  tcc_set_backtrace_func(tcc, ctx, spn_tcc_backtrace);
+  tcc_set_lib_path(tcc, sp_str_to_cstr(spn.paths.runtime));
+  tcc_set_options(tcc, "-gdwarf -Wall -Werror");
+  tcc_set_output_type(tcc, TCC_OUTPUT_MEMORY);
+  tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include));
+  tcc_define_symbol(tcc, "SPN", "");
+  sp_try_goto(spn_tcc_register(tcc), fail);
+  sp_try_goto(tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include)), fail);
+  sp_try_goto(spn_tcc_register(tcc), fail);
 
   spn_pkg_t* pkg = ctx->pkg;
   spn_cc_t cc = spn_cc_new(ctx);
@@ -5769,10 +5722,10 @@ spn_err_t spn_builder_compile_pkg(spn_builder_t* builder, spn_build_ctx_t* ctx) 
     }
   }
 
-
-  sp_try(spn_tcc_add_file(tcc, ctx->pkg->paths.script));
+  sp_try_goto(spn_tcc_add_file(tcc, ctx->pkg->paths.script), fail);
   spn_cc_target_to_tcc(&cc, target, tcc);
-  sp_try_as(tcc_relocate(tcc), SPN_ERROR);
+  sp_try_goto(tcc_relocate(tcc), fail);
+
   ctx->tcc = tcc;
   ctx->on_configure = tcc_get_symbol(tcc, "configure");
   ctx->on_package = tcc_get_symbol(tcc, "package");
@@ -5781,6 +5734,15 @@ spn_err_t spn_builder_compile_pkg(spn_builder_t* builder, spn_build_ctx_t* ctx) 
   ctx->time.compile = sp_tm_read_timer(&timer);
 
   return SPN_OK;
+
+fail:
+  spn_event_buffer_push_ex(spn.events, ctx, (spn_build_event_t) {
+    .kind = SPN_BUILD_EVENT_BUILD_SCRIPT_COMPILE_FAILED,
+    .compile_failed = {
+      .error = ctx->error
+    }
+  });
+  return SPN_ERROR;
 }
 
 spn_err_t spn_build_ctx_run_hook(spn_build_ctx_t* ctx, spn_build_fn_t fn) {
@@ -5799,36 +5761,45 @@ spn_err_t spn_build_ctx_run_hook(spn_build_ctx_t* ctx, spn_build_fn_t fn) {
 
 
 spn_err_t spn_build_ctx_run_build(spn_build_ctx_t* ctx) {
-  sp_tm_timer_t timer = sp_tm_start_timer();
+  spn_err_t result = SPN_OK;
 
   if (ctx->on_build) {
-    sp_try(spn_build_ctx_run_hook(ctx, ctx->on_build));
+    spn_event_buffer_push(spn.events, ctx, SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD);
+
+    sp_tm_timer_t timer = sp_tm_start_timer();
+    result = spn_build_ctx_run_hook(ctx, ctx->on_build);
     ctx->time.build = sp_tm_read_timer(&timer);
   }
 
-  return SPN_OK;
+  return result;
 }
 
 spn_err_t spn_build_ctx_run_configure(spn_build_ctx_t* ctx) {
-  sp_tm_timer_t timer = sp_tm_start_timer();
+  spn_err_t result = SPN_OK;
 
   if (ctx->on_configure) {
-    sp_try(spn_build_ctx_run_hook(ctx, ctx->on_configure));
+    spn_event_buffer_push(spn.events, ctx, SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE);
+
+    sp_tm_timer_t timer = sp_tm_start_timer();
+    result = spn_build_ctx_run_hook(ctx, ctx->on_configure);
     ctx->time.configure = sp_tm_read_timer(&timer);
   }
 
-  return SPN_OK;
+  return result;
 }
 
 spn_err_t spn_build_ctx_run_package(spn_build_ctx_t* ctx) {
-  sp_tm_timer_t timer = sp_tm_start_timer();
+  spn_err_t result = SPN_OK;
 
   if (ctx->on_package) {
-    sp_try(spn_build_ctx_run_hook(ctx, ctx->on_package));
+    spn_event_buffer_push(spn.events, ctx, SPN_BUILD_EVENT_BUILD_SCRIPT_PACKAGE);
+
+    sp_tm_timer_t timer = sp_tm_start_timer();
+    result = spn_build_ctx_run_hook(ctx, ctx->on_package);
     ctx->time.package = sp_tm_read_timer(&timer);
   }
 
-  return SPN_OK;
+  return result;
 }
 
 
@@ -5847,16 +5818,12 @@ s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
 
   build->message = message;
 
-  // @spader @allocator
-  // you need to give the build context an allocator; technically, this is fine, since the default
-  // malloc wrapper is stateless. but really, this memory would get allocated with some TLS allocator
-  // and potentially junked before the main thread can read it. and also unfreeable
   spn_event_buffer_push_ex(spn.events, &build->ctx, (spn_build_event_t) {
     .kind = SPN_BUILD_EVENT_CHECKOUT,
     .checkout = {
-      .commit = sp_str_copy(build->metadata.commit),
+      .commit = spn_intern(build->metadata.commit),
       .version = build->metadata.version,
-      .message = sp_str_copy(build->message)
+      .message = spn_intern(build->message)
     }
   });
   spn_pkg_build_sync_local(build);
@@ -7062,6 +7029,10 @@ sp_app_result_t spn_update(sp_app_t* sp) {
       result = spn_task_generate(app);
       break;
     }
+    case SPN_TASK_KIND_WHICH: {
+      result = spn_task_which(app);
+      break;
+    }
     case SPN_TASK_KIND_COUNT: {
       SP_UNREACHABLE();
       break;
@@ -7254,12 +7225,7 @@ s32 spn_executor_configure(spn_bg_cmd_t* cmd, void* user_data) {
     return SPN_OK;
   }
 
-  if (spn_builder_compile_pkg(ctx->builder, ctx)) {
-    spn_push_event((spn_build_event_t) {
-      .kind = SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED
-    });
-    return SPN_ERROR;
-  }
+  sp_try(spn_builder_compile_pkg(ctx->builder, ctx));
 
   if (spn_build_ctx_run_configure(ctx)) {
     spn_push_event((spn_build_event_t) {
@@ -7281,6 +7247,8 @@ s32 spn_executor_configure(spn_bg_cmd_t* cmd, void* user_data) {
     });
     return SPN_ERROR;
   }
+
+  spn_build_ctx_stamp(ctx);
 
   return SPN_OK;
 }
@@ -7729,6 +7697,26 @@ spn_task_result_t spn_task_generate(spn_app_t* app) {
   return SPN_TASK_DONE;
 }
 
+spn_task_result_t spn_task_which(spn_app_t* app) {
+  spn_cli_which_t* cmd = &spn.cli.which;
+
+  spn_dir_kind_t kind = SPN_DIR_STORE;
+  if (sp_str_valid(cmd->dir)) {
+    kind = spn_cache_dir_kind_from_str(cmd->dir);
+  }
+
+  if (sp_str_valid(cmd->package)) {
+    spn_dep_ctx_t* dep = spn_cli_assert_dep_exists(cmd->package);
+    sp_str_t dir = spn_build_ctx_get_dir(&dep->ctx, kind);
+    spn_log_info("{}", SP_FMT_STR(dir));
+  }
+  else {
+    spn_log_info("{}", SP_FMT_STR(spn_cache_dir_kind_to_path(kind)));
+  }
+
+  return SPN_TASK_DONE;
+}
+
 /////////
 // CLI //
 /////////
@@ -8157,23 +8145,13 @@ sp_app_result_t spn_cli_ls(spn_cli_t* cli) {
 }
 
 sp_app_result_t spn_cli_which(spn_cli_t* cli) {
-  spn_cli_which_t* cmd = &cli->which;
+  sp_try(spn_cli_set_profile(&app, sp_str_lit("")));
 
-  spn_app_resolve(&app);
-
-  if (sp_str_valid(cmd->package)) {
-    sp_str_t dir = spn_cli_get_resolved_pkg_source(cmd->package);
-    spn_log_info("{}", SP_FMT_STR(dir));
-  }
-  else {
-    spn_dir_kind_t kind = SPN_DIR_CACHE;
-    if (sp_str_valid(cmd->dir)) {
-      kind = spn_cache_dir_kind_from_str(cmd->dir);
-    }
-
-    spn_log_info("{}", SP_FMT_STR(spn_cache_dir_kind_to_path(kind)));
-  }
-  return SP_APP_QUIT;
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_WHICH);
+  return SP_APP_CONTINUE;
 }
 
 sp_app_result_t spn_cli_manifest(spn_cli_t* cli) {
