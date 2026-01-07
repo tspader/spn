@@ -7377,7 +7377,7 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
     .build = spn_bg_add_fn(&app->builder.build.graph, spn_executor_run_build_script, &b->contexts.pkg),
     .stamp = spn_bg_add_file(&app->builder.build.graph, b->contexts.pkg.paths.stamp.store),
   };
-  spn_bg_tag_command(&app->builder.build.graph, pkg.build, sp_format("{}::build()", SP_FMT_STR(b->contexts.pkg.name)));
+  spn_bg_tag_command(&app->builder.build.graph, pkg.build, sp_format("{}::build", SP_FMT_STR(b->contexts.pkg.name)));
   spn_bg_cmd_add_output(&app->builder.build.graph, pkg.build, pkg.stamp);
   spn_bg_cmd_add_input(&app->builder.build.graph, pkg.build, manifest);
   sp_om_for(b->contexts.deps, it) {
@@ -7438,41 +7438,38 @@ s32 spn_executor_run_build(spn_bg_cmd_t* cmd, void* user_data) {
   return 0;
 }
 
-// Helper: Add targets for a package to the build graph
+// Helper: Add a single target to the build graph
 // Adds: stamp.work -> target::compile -> binary -> package()
-void spn_build_graph_add_targets(
+void spn_build_graph_add_target(
   spn_build_graph_t* graph,
   spn_build_ctx_t* ctx,
   spn_pkg_nodes_v2_t* nodes,
-  sp_om(spn_target_t)* targets
+  spn_target_t* target
 ) {
-  sp_om_for(*targets, it) {
-    spn_target_t* target = sp_om_at(*targets, it);
+  // binary output file
+  sp_str_t bin_path = sp_fs_join_path(ctx->paths.bin, target->name);
+  spn_bg_id_t bin_file = spn_bg_add_file_ex(graph, bin_path, SPN_BG_VIZ_BINARY);
 
-    // binary output file
-    sp_str_t bin_path = sp_fs_join_path(ctx->paths.bin, target->name);
-    spn_bg_id_t bin_file = spn_bg_add_file(graph, bin_path);
+  // compile target command
+  spn_bg_id_t compile_target = spn_bg_add_fn(graph, spn_executor_compile_target, target);
+  spn_bg_tag_command(graph, compile_target, sp_format("{}::compile", SP_FMT_STR(target->name)));
+  spn_bg_cmd_set_kind(graph, compile_target, SPN_BG_VIZ_CMD);
 
-    // compile target command
-    spn_bg_id_t compile_target = spn_bg_add_fn(graph, spn_executor_compile_target, target);
-    spn_bg_tag_command(graph, compile_target, sp_format("{}::compile", SP_FMT_STR(target->name)));
+  // depends on stamp.work (build() must have run)
+  spn_bg_cmd_add_input(graph, compile_target, nodes->stamp.work);
 
-    // depends on stamp.work (build() must have run)
-    spn_bg_cmd_add_input(graph, compile_target, nodes->stamp.work);
-
-    // add source files as inputs
-    sp_da_for(target->source, sit) {
-      sp_str_t source_path = sp_fs_join_path(ctx->paths.source, target->source[sit]);
-      spn_bg_id_t source_node = spn_bg_add_file(graph, source_path);
-      spn_bg_cmd_add_input(graph, compile_target, source_node);
-    }
-
-    // produces the binary
-    spn_bg_cmd_add_output(graph, compile_target, bin_file);
-
-    // package() depends on binary
-    spn_bg_cmd_add_input(graph, nodes->cmd.package, bin_file);
+  // add source files as inputs
+  sp_da_for(target->source, sit) {
+    sp_str_t source_path = sp_fs_join_path(ctx->paths.source, target->source[sit]);
+    spn_bg_id_t source_node = spn_bg_add_file_ex(graph, source_path, SPN_BG_VIZ_SOURCE);
+    spn_bg_cmd_add_input(graph, compile_target, source_node);
   }
+
+  // produces the binary
+  spn_bg_cmd_add_output(graph, compile_target, bin_file);
+
+  // package() depends on binary
+  spn_bg_cmd_add_input(graph, nodes->cmd.package, bin_file);
 }
 
 // Helper: Add a package sub-graph to the build graph
@@ -7483,30 +7480,35 @@ void spn_build_graph_add_targets(
 spn_pkg_nodes_v2_t spn_build_graph_add_pkg(spn_build_graph_t* graph, spn_build_ctx_t* ctx) {
   spn_pkg_nodes_v2_t nodes = SP_ZERO_INITIALIZE();
 
-  // Input files
-  nodes.manifest = spn_bg_add_file(graph, ctx->pkg->paths.manifest);
-  nodes.script = spn_bg_add_file(graph, ctx->pkg->paths.script);
+  // Input files (manifests)
+  nodes.manifest = spn_bg_add_file_ex(graph, ctx->pkg->paths.manifest, SPN_BG_VIZ_MANIFEST);
+  nodes.script = spn_bg_add_file_ex(graph, ctx->pkg->paths.script, SPN_BG_VIZ_MANIFEST);
 
   // build() -> stamp.work
-  nodes.stamp.work = spn_bg_add_file(graph, ctx->paths.stamp.work);
+  nodes.stamp.work = spn_bg_add_file_ex(graph, ctx->paths.stamp.work, SPN_BG_VIZ_STAMP);
 
   nodes.cmd.build = spn_bg_add_fn(graph, spn_executor_run_build, ctx);
-  spn_bg_tag_command(graph, nodes.cmd.build, sp_format("{}::build()", SP_FMT_STR(ctx->name)));
+  spn_bg_tag_command(graph, nodes.cmd.build, sp_format("{}::script::build", SP_FMT_STR(ctx->name)));
+  spn_bg_cmd_set_kind(graph, nodes.cmd.build, SPN_BG_VIZ_CMD);
   spn_bg_cmd_add_input(graph, nodes.cmd.build, nodes.manifest);
   spn_bg_cmd_add_input(graph, nodes.cmd.build, nodes.script);
   spn_bg_cmd_add_output(graph, nodes.cmd.build, nodes.stamp.work);
 
   // package() -> stamp.store
-  nodes.stamp.store = spn_bg_add_file(graph, ctx->paths.stamp.store);
+  nodes.stamp.store = spn_bg_add_file_ex(graph, ctx->paths.stamp.store, SPN_BG_VIZ_STAMP);
 
   nodes.cmd.package = spn_bg_add_fn(graph, spn_executor_run_package, ctx);
-  spn_bg_tag_command(graph, nodes.cmd.package, sp_format("{}::package()", SP_FMT_STR(ctx->name)));
+  spn_bg_tag_command(graph, nodes.cmd.package, sp_format("{}::script::package", SP_FMT_STR(ctx->name)));
+  spn_bg_cmd_set_kind(graph, nodes.cmd.package, SPN_BG_VIZ_CMD);
   // stamp.work -> package() (direct edge for packages with no targets)
   spn_bg_cmd_add_input(graph, nodes.cmd.package, nodes.stamp.work);
   spn_bg_cmd_add_output(graph, nodes.cmd.package, nodes.stamp.store);
 
   // Add binary targets
-  spn_build_graph_add_targets(graph, ctx, &nodes, &ctx->pkg->binaries);
+  sp_om_for(ctx->pkg->binaries, it) {
+    spn_target_t* target = sp_om_at(ctx->pkg->binaries, it);
+    spn_build_graph_add_target(graph, ctx, &nodes, target);
+  }
 
   return nodes;
 }

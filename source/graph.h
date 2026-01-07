@@ -67,11 +67,22 @@ typedef enum {
   SPN_BUILD_CMD_FN = 1,
 } spn_bg_cmd_kind_t;
 
+// Visualization kinds (used by mermaid renderer)
+typedef enum {
+  SPN_BG_VIZ_DEFAULT = 0,
+  SPN_BG_VIZ_MANIFEST,  // spn.toml, spn.c
+  SPN_BG_VIZ_STAMP,     // .stamp files
+  SPN_BG_VIZ_BINARY,    // target binaries
+  SPN_BG_VIZ_SOURCE,    // source files (.c, .h)
+  SPN_BG_VIZ_CMD,       // generic command
+} spn_bg_viz_kind_t;
+
 typedef struct spn_build_cmd spn_bg_cmd_t;
 SP_TYPEDEF_FN(s32, spn_bg_fn_t, spn_bg_cmd_t* cmd, void* user_data);
 
 struct spn_build_cmd {
   spn_bg_cmd_kind_t kind;
+  spn_bg_viz_kind_t viz;
   spn_bg_id_t id;
   sp_str_t tag;
   sp_da(spn_bg_id_t) consumes;
@@ -88,6 +99,7 @@ struct spn_build_cmd {
 
 typedef struct {
   spn_bg_id_t id;
+  spn_bg_viz_kind_t viz;
   sp_str_t path;
   sp_tm_epoch_t mod_time;
 
@@ -175,9 +187,12 @@ typedef struct {
 
 spn_build_graph_t* spn_bg_new();
 spn_bg_id_t        spn_bg_add_file(spn_build_graph_t* graph, sp_str_t path);
+spn_bg_id_t        spn_bg_add_file_ex(spn_build_graph_t* graph, sp_str_t path, spn_bg_viz_kind_t viz_kind);
+void               spn_bg_file_set_viz_kind(spn_build_graph_t* graph, spn_bg_id_t id, spn_bg_viz_kind_t kind);
 spn_bg_id_t        spn_bg_add_command(spn_build_graph_t* graph, spn_bg_cmd_kind_t kind);
-spn_bg_id_t        spn_bg_add_subproces(spn_build_graph_t* graph, sp_ps_config_t ps);
+spn_bg_id_t        spn_bg_add_subprocess(spn_build_graph_t* graph, sp_ps_config_t ps);
 spn_bg_id_t        spn_bg_add_fn(spn_build_graph_t* graph, spn_bg_fn_t fn, void* user_data);
+void               spn_bg_cmd_set_kind(spn_build_graph_t* graph, spn_bg_id_t id, spn_bg_viz_kind_t kind);
 sp_da(spn_bg_id_t) spn_bg_find_outputs(spn_build_graph_t* graph);
 spn_bg_file_t*     spn_bg_find_file(spn_build_graph_t* graph, spn_bg_id_t id);
 bool               spn_bg_is_file_input(spn_bg_file_t* file);
@@ -442,6 +457,19 @@ spn_bg_id_t spn_bg_add_file(spn_build_graph_t* graph, sp_str_t path) {
   return file.id;
 }
 
+spn_bg_id_t spn_bg_add_file_ex(spn_build_graph_t* graph, sp_str_t path, spn_bg_viz_kind_t viz_kind) {
+  spn_bg_id_t id = spn_bg_add_file(graph, path);
+  spn_bg_file_set_viz_kind(graph, id, viz_kind);
+  return id;
+}
+
+void spn_bg_file_set_viz_kind(spn_build_graph_t* graph, spn_bg_id_t id, spn_bg_viz_kind_t kind) {
+  spn_bg_file_t* file = spn_bg_find_file(graph, id);
+  if (file) {
+    file->viz = kind;
+  }
+}
+
 spn_bg_id_t spn_bg_add_command(spn_build_graph_t* graph, spn_bg_cmd_kind_t kind) {
   spn_bg_cmd_t cmd = {
     .id = {
@@ -454,7 +482,7 @@ spn_bg_id_t spn_bg_add_command(spn_build_graph_t* graph, spn_bg_cmd_kind_t kind)
   return cmd.id;
 }
 
-spn_bg_id_t spn_bg_add_subproces(spn_build_graph_t* graph, sp_ps_config_t ps) {
+spn_bg_id_t spn_bg_add_subprocess(spn_build_graph_t* graph, sp_ps_config_t ps) {
   spn_bg_id_t id = spn_bg_add_command(graph, SPN_BUILD_CMD_SUBPROCESS);
   spn_bg_cmd_t* cmd = spn_bg_find_command(graph, id);
   cmd->ps = sp_ps_config_copy(&ps);
@@ -467,7 +495,13 @@ spn_bg_id_t spn_bg_add_fn(spn_build_graph_t* graph, spn_bg_fn_t fn, void* user_d
   cmd->fn.on_execute = fn;
   cmd->fn.user_data = user_data;
   return id;
+}
 
+void spn_bg_cmd_set_kind(spn_build_graph_t* graph, spn_bg_id_t id, spn_bg_viz_kind_t kind) {
+  spn_bg_cmd_t* cmd = spn_bg_find_command(graph, id);
+  if (cmd) {
+    cmd->viz = kind;
+  }
 }
 
 bool spn_bg_is_file_input(spn_bg_file_t* file) {
@@ -631,32 +665,40 @@ sp_str_t spn_bg_mermaid_class(sp_str_t name, sp_str_t fill, sp_str_t stroke, sp_
   );
 }
 
+sp_str_t spn_bg_viz_kind_to_class(spn_bg_viz_kind_t kind) {
+  switch (kind) {
+    case SPN_BG_VIZ_MANIFEST: return sp_str_lit("manifest");
+    case SPN_BG_VIZ_STAMP:    return sp_str_lit("stamp");
+    case SPN_BG_VIZ_BINARY:   return sp_str_lit("binary");
+    case SPN_BG_VIZ_SOURCE:   return sp_str_lit("source");
+    case SPN_BG_VIZ_CMD:      return sp_str_lit("cmd");
+    case SPN_BG_VIZ_DEFAULT:  return sp_str_lit("source");
+  }
+  return sp_str_lit("source");
+}
+
 void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* io) {
   sp_str_t stroke = sp_str_lit("#1a1a2e");
-  sp_str_t color = sp_str_lit("#e0e0e0");
-  sp_str_t intermediate = sp_str_lit("#606087");
-  sp_str_t input = sp_str_lit("#558a89");
-  sp_str_t output = sp_str_lit("#608767");
-  sp_str_t cmd = sp_str_lit("#8a5555");
+  sp_str_t text = sp_str_lit("#e0e0e0");
+
+  // Low saturation colors (HSV with S~45, V~72)
+  sp_str_t manifest = sp_str_lit("#65a3a3");  // manifests + build scripts (cyan)
+  sp_str_t cmd_color = sp_str_lit("#a36565"); // commands (muted red)
+  sp_str_t stamp = sp_str_lit("#8565a3");     // stamps (purple)
+  sp_str_t binary = sp_str_lit("#65a365");    // target binaries (green)
+  sp_str_t source = sp_str_lit("#a39a65");    // source files (yellow/orange)
 
   sp_io_write_str(io, sp_str_lit("graph TD\n"));
-  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("input"), input, stroke, color));
-  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("output"), output, stroke, color));
-  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("intermediate"), intermediate, stroke, color));
-  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("cmd"), cmd, stroke, color));
+  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("manifest"), manifest, stroke, text));
+  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("cmd"), cmd_color, stroke, text));
+  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("stamp"), stamp, stroke, text));
+  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("binary"), binary, stroke, text));
+  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("source"), source, stroke, text));
   sp_io_write_str(io, sp_str_lit("  linkStyle default stroke:#909090,stroke-width:2px\n"));
 
   sp_da_for(graph->files, it) {
     spn_bg_file_t* file = &graph->files[it];
-    bool is_input = !file->producer.occupied;
-    bool is_output = sp_da_empty(file->consumers);
-
-    sp_str_t cls = sp_str_lit("intermediate");
-    if (is_input) {
-      cls = sp_str_lit("input");
-    } else if (is_output) {
-      cls = sp_str_lit("output");
-    }
+    sp_str_t cls = spn_bg_viz_kind_to_class(file->viz);
 
     sp_io_write_str(io, sp_format("  F{}[\"{}\"]:::{}\n",
       SP_FMT_U32(file->id.index), SP_FMT_STR(file->path), SP_FMT_STR(cls)));
@@ -664,8 +706,10 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* io) {
 
   sp_da_for(graph->commands, it) {
     spn_bg_cmd_t* cmd = &graph->commands[it];
-    sp_io_write_str(io, sp_format("  C{}[\"{}\"]:::cmd\n",
-      SP_FMT_U32(cmd->id.index), SP_FMT_STR(cmd->tag)));
+    sp_str_t cls = spn_bg_viz_kind_to_class(cmd->viz);
+
+    sp_io_write_str(io, sp_format("  C{}[\"{}\"]:::{}\n",
+      SP_FMT_U32(cmd->id.index), SP_FMT_STR(cmd->tag), SP_FMT_STR(cls)));
 
     sp_da_for(cmd->consumes, input_it) {
       sp_io_write_str(io, sp_format("  F{} --> C{}\n",
