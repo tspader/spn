@@ -1,0 +1,7 @@
+[package]
+name = "stamp_input"
+version = "0.0.1"
+
+[[bin]]
+name = "stamp_input"
+source = ["main.c"]

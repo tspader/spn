@@ -1,0 +1,7 @@
+[package]
+name = "diamond_deps"
+version = "0.0.1"
+
+[[bin]]
+name = "diamond_deps"
+source = ["main.c"]

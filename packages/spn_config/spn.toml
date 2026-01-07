@@ -1,0 +1,14 @@
+[package]
+name = "spn_config"
+repo = "tspader/sp"
+version = "1.0.0"
+commit = "fd9b5c03f181"
+author = "tspader"
+maintainer = "tspader"
+description = "config file loader"
+
+[deps.package]
+spn_json = "1.0.0"
+
+[lib]
+kinds = ["source"]

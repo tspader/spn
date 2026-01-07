@@ -1,0 +1,12 @@
+[package]
+name = "basic_node"
+version = "0.0.1"
+
+[[bin]]
+name = "basic_node"
+source = ["main.c"]
+
+[[bin]]
+name = "foobar"
+source = ["foo.c", "bar.c"]
+

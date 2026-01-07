@@ -25,6 +25,7 @@ test/manual/spn_generate/shell/*
 
 doc/*
 !doc/skill
+!doc/ref
 
 examples/**/build
 examples/**/spn.lock
@@ -42,3 +43,6 @@ build/bootstrap/bin
 
 **/*.mmd
 **/*.png
+
+**/node_modules
+test/tools/graph

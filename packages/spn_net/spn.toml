@@ -1,0 +1,15 @@
+[package]
+name = "spn_net"
+repo = "tspader/sp"
+version = "1.0.0"
+commit = "fd9b5c03f181"
+author = "tspader"
+maintainer = "tspader"
+description = "networking library"
+
+[deps.package]
+spn_log = "1.0.0"
+spn_json = "1.0.0"
+
+[lib]
+kinds = ["source"]

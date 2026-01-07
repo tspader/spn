@@ -7,6 +7,18 @@ author = "sqlite"
 maintainer = "tspader"
 system_deps = ["m"]
 
+[[profile]]
+name = "debug"
+mode = "debug"
+cc = "tcc"
+linkage = "static"
+
+[[profile]]
+name = "release"
+mode = "release"
+cc = "tcc"
+linkage = "static"
+
 [lib]
 kinds = ["static", "shared"]
 name = 'sqlite3'

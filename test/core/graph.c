@@ -13,9 +13,9 @@ void touch_file(sp_str_t path) {
     sp_os_sleep_ms(100);
   }
 
-  sp_io_t s = sp_io_from_file(path, SP_IO_MODE_APPEND);
+  sp_io_writer_t s = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_APPEND);
   sp_io_write_str(&s, sp_str_lit(" "));
-  sp_io_close(&s);
+  sp_io_writer_close(&s);
 }
 
 void touch_node(spn_build_graph_t* graph, spn_bg_id_t id) {
