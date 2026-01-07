@@ -999,6 +999,20 @@ typedef struct {
   spn_bg_id_t stamp;
 } spn_pkg_nodes_t;
 
+// V2: Node IDs for package sub-graph (JIT compilation happens in phase 1)
+typedef struct {
+  spn_bg_id_t manifest;
+  spn_bg_id_t script;
+  struct {
+    spn_bg_id_t build;
+    spn_bg_id_t package;
+  } cmd;
+  struct {
+    spn_bg_id_t work;
+    spn_bg_id_t store;
+  } stamp;
+} spn_pkg_nodes_v2_t;
+
 typedef struct {
   u64 compile;
   u64 configure;
@@ -1040,11 +1054,14 @@ struct spn_build_ctx {
     sp_str_t work;
     sp_str_t   spn;
     sp_str_t store;
-    sp_str_t   stamp;
     sp_str_t   include;
     sp_str_t   lib;
     sp_str_t   bin;
     sp_str_t   vendor;
+    struct {
+      sp_str_t work;
+      sp_str_t store;
+    } stamp;
     struct {
       sp_str_t build;
       sp_str_t test;
@@ -1075,6 +1092,7 @@ typedef struct {
   sp_str_t message;
   bool force;
   spn_pkg_nodes_t nodes;
+  spn_pkg_nodes_v2_t nodes_v2;
 } spn_dep_ctx_t;
 
 typedef struct {
@@ -1138,6 +1156,12 @@ void spn_builder_add_dep(spn_builder_t* builder, spn_resolved_pkg_t* resolved);
 s32 spn_executor_build_dependency(spn_bg_cmd_t* cmd, void* user_data);
 s32 spn_executor_build_target(spn_bg_cmd_t* cmd, void* user_data);
 s32 spn_executor_run_build_script(spn_bg_cmd_t* cmd, void* user_data);
+
+// V2 executor functions
+s32 spn_executor_compile_build_script(spn_bg_cmd_t* cmd, void* user_data);
+s32 spn_executor_run_build(spn_bg_cmd_t* cmd, void* user_data);
+s32 spn_executor_compile_target(spn_bg_cmd_t* cmd, void* user_data);
+s32 spn_executor_run_package(spn_bg_cmd_t* cmd, void* user_data);
 
 ////////////
 // EVENTS //
@@ -1641,6 +1665,7 @@ typedef enum {
   SPN_TASK_KIND_CONFIGURE,
   SPN_TASK_KIND_CONFIGURE_NEW,
   SPN_TASK_KIND_PREPARE_BUILD_GRAPH,
+  SPN_TASK_KIND_PREPARE_BUILD_GRAPH_V2,
   SPN_TASK_KIND_RUN_BUILD_GRAPH,
   SPN_TASK_KIND_RENDER_BUILD_GRAPH,
   SPN_TASK_KIND_RUN,
@@ -1676,6 +1701,7 @@ spn_task_result_t spn_task_cfg_update(spn_app_t* app);
 void              spn_task_run_build_graph_init(spn_app_t* app);
 spn_task_result_t spn_task_run_build_graph_update(spn_app_t* app);
 spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app);
+spn_task_result_t spn_task_prepare_build_graph_v2(spn_app_t* app);
 spn_task_result_t spn_task_render_build_graph(spn_app_t* app);
 spn_task_result_t spn_task_run_tests(spn_app_t* app);
 spn_task_result_t spn_task_generate(spn_app_t* app);
@@ -4022,7 +4048,7 @@ spn_lock_file_t spn_lock_file_load(sp_str_t path) {
 // BUILD //
 ///////////
 bool spn_pkg_build_is_stamped(spn_dep_ctx_t* build) {
-  return sp_fs_exists(build->ctx.paths.stamp);
+  return sp_fs_exists(build->ctx.paths.stamp.store);
 }
 
 bool sp_cmp_kernel_env_var(void* va, void* vb) {
@@ -5546,7 +5572,7 @@ spn_err_t spn_pkg_build_sync_local(spn_dep_ctx_t* dep) {
 }
 
 void spn_build_ctx_stamp(spn_build_ctx_t* ctx) {
-  sp_io_writer_t io = sp_io_writer_from_file(ctx->paths.stamp, SP_IO_WRITE_MODE_OVERWRITE);
+  sp_io_writer_t io = sp_io_writer_from_file(ctx->paths.stamp.store, SP_IO_WRITE_MODE_OVERWRITE);
 
   spn_toml_writer_t writer = spn_toml_writer_new();
   spn_toml_begin_table_cstr(&writer, "package");
@@ -5629,7 +5655,8 @@ void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t config) {
   ctx->paths.bin = sp_fs_join_path(ctx->paths.store, SP_LIT("bin"));
   ctx->paths.lib = sp_fs_join_path(ctx->paths.store, SP_LIT("lib"));
   ctx->paths.vendor = sp_fs_join_path(ctx->paths.store, SP_LIT("vendor"));
-  ctx->paths.stamp = sp_fs_join_path(ctx->paths.store, SP_LIT("spn.stamp"));
+  ctx->paths.stamp.store = sp_fs_join_path(ctx->paths.store, SP_LIT("spn.stamp"));
+  ctx->paths.stamp.work = sp_fs_join_path(ctx->paths.work, SP_LIT("spn.stamp"));
   ctx->paths.spn = sp_fs_join_path(ctx->paths.work, SP_LIT("spn"));
   ctx->paths.logs.build = sp_fs_join_path(
     ctx->paths.work,
@@ -7012,6 +7039,10 @@ sp_app_result_t spn_update(sp_app_t* sp) {
       result = spn_task_prepare_build_graph(app);
       break;
     }
+    case SPN_TASK_KIND_PREPARE_BUILD_GRAPH_V2: {
+      result = spn_task_prepare_build_graph_v2(app);
+      break;
+    }
     case SPN_TASK_KIND_RUN_BUILD_GRAPH: {
       if (!task->initted) spn_task_run_build_graph_init(app);
       result = spn_task_run_build_graph_update(app);
@@ -7221,10 +7252,6 @@ spn_task_result_t spn_task_configure_update(spn_app_t* app) {
 s32 spn_executor_configure(spn_bg_cmd_t* cmd, void* user_data) {
   spn_build_ctx_t* ctx = (spn_build_ctx_t*)user_data;
 
-  if (sp_str_equal_cstr(ctx->pkg->name, "sqlite")) {
-    return SPN_OK;
-  }
-
   sp_try(spn_builder_compile_pkg(ctx->builder, ctx));
 
   if (spn_build_ctx_run_configure(ctx)) {
@@ -7281,7 +7308,7 @@ spn_task_result_t spn_task_cfg_init(spn_app_t* app) {
   spn_build_graph_t* graph = &b->configure.graph;
 
   spn_bg_id_t build = spn_bg_add_fn(graph, spn_executor_configure, &b->contexts.pkg);
-  spn_bg_id_t stamp = spn_bg_add_file(graph, b->contexts.pkg.paths.stamp);
+  spn_bg_id_t stamp = spn_bg_add_file(graph, b->contexts.pkg.paths.stamp.store);
   spn_bg_tag_command(graph, build, app->package.name);
   spn_bg_cmd_add_output(graph, build, stamp);
 
@@ -7291,7 +7318,7 @@ spn_task_result_t spn_task_cfg_init(spn_app_t* app) {
     spn_dep_ctx_t* dep = sp_om_get(b->contexts.deps, name);
     sp_assert(dep);
     dep->nodes.build = spn_bg_add_fn(graph, spn_executor_configure, &dep->ctx);
-    dep->nodes.stamp = spn_bg_add_file(graph, dep->ctx.paths.stamp);
+    dep->nodes.stamp = spn_bg_add_file(graph, dep->ctx.paths.stamp.store);
     spn_bg_tag_command(graph, dep->nodes.build, name);
     spn_bg_cmd_add_output(graph, dep->nodes.build, dep->nodes.stamp);
     spn_bg_cmd_add_input(graph, build, dep->nodes.stamp);
@@ -7334,7 +7361,7 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
 
     spn_pkg_nodes_t nodes = {
       .build = spn_bg_add_fn(&app->builder.build.graph, spn_executor_build_dependency, dep),
-      .stamp = spn_bg_add_file(&app->builder.build.graph, dep->ctx.paths.stamp),
+      .stamp = spn_bg_add_file(&app->builder.build.graph, dep->ctx.paths.stamp.store),
     };
     spn_bg_tag_command(&app->builder.build.graph, nodes.build, sp_format("{}::build", SP_FMT_STR(dep->ctx.name)));
     spn_bg_cmd_add_output(&app->builder.build.graph, nodes.build, nodes.stamp);
@@ -7348,7 +7375,7 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
   // GRAPH: PACKAGE
   spn_pkg_nodes_t pkg = {
     .build = spn_bg_add_fn(&app->builder.build.graph, spn_executor_run_build_script, &b->contexts.pkg),
-    .stamp = spn_bg_add_file(&app->builder.build.graph, b->contexts.pkg.paths.stamp),
+    .stamp = spn_bg_add_file(&app->builder.build.graph, b->contexts.pkg.paths.stamp.store),
   };
   spn_bg_tag_command(&app->builder.build.graph, pkg.build, sp_format("{}::build()", SP_FMT_STR(b->contexts.pkg.name)));
   spn_bg_cmd_add_output(&app->builder.build.graph, pkg.build, pkg.stamp);
@@ -7394,6 +7421,145 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
         spn_bg_id_t node = spn_bg_add_file(&app->builder.build.graph, header);
         spn_bg_cmd_add_input(&app->builder.build.graph, pkg.build, node);
       }
+    }
+  }
+
+  return SPN_TASK_DONE;
+}
+
+// Stub executor functions for v2 graph
+s32 spn_executor_compile_build_script(spn_bg_cmd_t* cmd, void* user_data) {
+  (void)cmd; (void)user_data;
+  return 0;
+}
+
+s32 spn_executor_run_build(spn_bg_cmd_t* cmd, void* user_data) {
+  (void)cmd; (void)user_data;
+  return 0;
+}
+
+// Helper: Add targets for a package to the build graph
+// Adds: stamp.work -> target::compile -> binary -> package()
+void spn_build_graph_add_targets(
+  spn_build_graph_t* graph,
+  spn_build_ctx_t* ctx,
+  spn_pkg_nodes_v2_t* nodes,
+  sp_om(spn_target_t)* targets
+) {
+  sp_om_for(*targets, it) {
+    spn_target_t* target = sp_om_at(*targets, it);
+
+    // binary output file
+    sp_str_t bin_path = sp_fs_join_path(ctx->paths.bin, target->name);
+    spn_bg_id_t bin_file = spn_bg_add_file(graph, bin_path);
+
+    // compile target command
+    spn_bg_id_t compile_target = spn_bg_add_fn(graph, spn_executor_compile_target, target);
+    spn_bg_tag_command(graph, compile_target, sp_format("{}::compile", SP_FMT_STR(target->name)));
+
+    // depends on stamp.work (build() must have run)
+    spn_bg_cmd_add_input(graph, compile_target, nodes->stamp.work);
+
+    // add source files as inputs
+    sp_da_for(target->source, sit) {
+      sp_str_t source_path = sp_fs_join_path(ctx->paths.source, target->source[sit]);
+      spn_bg_id_t source_node = spn_bg_add_file(graph, source_path);
+      spn_bg_cmd_add_input(graph, compile_target, source_node);
+    }
+
+    // produces the binary
+    spn_bg_cmd_add_output(graph, compile_target, bin_file);
+
+    // package() depends on binary
+    spn_bg_cmd_add_input(graph, nodes->cmd.package, bin_file);
+  }
+}
+
+// Helper: Add a package sub-graph to the build graph
+// Graph structure:
+//   manifest + script -> build() -> stamp.work -> targets -> package() -> stamp.store
+//                                              \-----------/
+// Note: JIT compilation happens in phase 1 (CONFIGURE_NEW), not here
+spn_pkg_nodes_v2_t spn_build_graph_add_pkg(spn_build_graph_t* graph, spn_build_ctx_t* ctx) {
+  spn_pkg_nodes_v2_t nodes = SP_ZERO_INITIALIZE();
+
+  // Input files
+  nodes.manifest = spn_bg_add_file(graph, ctx->pkg->paths.manifest);
+  nodes.script = spn_bg_add_file(graph, ctx->pkg->paths.script);
+
+  // build() -> stamp.work
+  nodes.stamp.work = spn_bg_add_file(graph, ctx->paths.stamp.work);
+
+  nodes.cmd.build = spn_bg_add_fn(graph, spn_executor_run_build, ctx);
+  spn_bg_tag_command(graph, nodes.cmd.build, sp_format("{}::build()", SP_FMT_STR(ctx->name)));
+  spn_bg_cmd_add_input(graph, nodes.cmd.build, nodes.manifest);
+  spn_bg_cmd_add_input(graph, nodes.cmd.build, nodes.script);
+  spn_bg_cmd_add_output(graph, nodes.cmd.build, nodes.stamp.work);
+
+  // package() -> stamp.store
+  nodes.stamp.store = spn_bg_add_file(graph, ctx->paths.stamp.store);
+
+  nodes.cmd.package = spn_bg_add_fn(graph, spn_executor_run_package, ctx);
+  spn_bg_tag_command(graph, nodes.cmd.package, sp_format("{}::package()", SP_FMT_STR(ctx->name)));
+  // stamp.work -> package() (direct edge for packages with no targets)
+  spn_bg_cmd_add_input(graph, nodes.cmd.package, nodes.stamp.work);
+  spn_bg_cmd_add_output(graph, nodes.cmd.package, nodes.stamp.store);
+
+  // Add binary targets
+  spn_build_graph_add_targets(graph, ctx, &nodes, &ctx->pkg->binaries);
+
+  return nodes;
+}
+
+s32 spn_executor_compile_target(spn_bg_cmd_t* cmd, void* user_data) {
+  (void)cmd; (void)user_data;
+  return 0;
+}
+
+s32 spn_executor_run_package(spn_bg_cmd_t* cmd, void* user_data) {
+  (void)cmd; (void)user_data;
+  return 0;
+}
+
+// TASK: PREPARE BUILD GRAPH V2
+// Build graph structure for each package:
+//   manifest + script -> build() -> stamp.work -> targets -> package() -> stamp.store
+//
+// Dependencies:
+//   - Each package's build() depends on its direct deps' stamp.store
+spn_task_result_t spn_task_prepare_build_graph_v2(spn_app_t* app) {
+  spn_builder_t* b = &app->builder;
+  spn_build_graph_t* graph = &b->build.graph;
+
+  // === PHASE 1: Add all dependency sub-graphs (includes their targets) ===
+  sp_om_for(b->contexts.deps, it) {
+    spn_dep_ctx_t* dep = sp_om_at(b->contexts.deps, it);
+    dep->nodes_v2 = spn_build_graph_add_pkg(graph, &dep->ctx);
+  }
+
+  // === PHASE 2: Link dependency build() hooks to their parent deps' stamp.store ===
+  sp_om_for(b->contexts.deps, it) {
+    spn_dep_ctx_t* dep = sp_om_at(b->contexts.deps, it);
+    spn_pkg_t* pkg = dep->ctx.pkg;
+
+    sp_ht_for(pkg->deps, dit) {
+      sp_str_t parent_name = *sp_ht_it_getkp(pkg->deps, dit);
+      spn_dep_ctx_t* parent = sp_om_get(b->contexts.deps, parent_name);
+      if (parent) {
+        spn_bg_cmd_add_input(graph, dep->nodes_v2.cmd.build, parent->nodes_v2.stamp.store);
+      }
+    }
+  }
+
+  // === PHASE 3: Add root package sub-graph (includes its targets) ===
+  spn_pkg_nodes_v2_t pkg_nodes = spn_build_graph_add_pkg(graph, &b->contexts.pkg);
+
+  // Root package's build() depends on all direct deps' stamp.store
+  sp_ht_for(app->package.deps, it) {
+    sp_str_t dep_name = *sp_ht_it_getkp(app->package.deps, it);
+    spn_dep_ctx_t* dep = sp_om_get(b->contexts.deps, dep_name);
+    if (dep) {
+      spn_bg_cmd_add_input(graph, pkg_nodes.cmd.build, dep->nodes_v2.stamp.store);
     }
   }
 
@@ -8190,8 +8356,8 @@ sp_app_result_t spn_cli_graph(spn_cli_t* cli) {
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE_NEW);
-  // spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PREPARE_BUILD_GRAPH);
-  // spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RENDER_BUILD_GRAPH);
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PREPARE_BUILD_GRAPH_V2);
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RENDER_BUILD_GRAPH);
 
   return SP_APP_CONTINUE;
 }
