@@ -13,7 +13,11 @@ assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn
 
 # building and testing
 - build with `pspn build --profile debug` to output to `./build/debug`
-- run the resulting build `./build/debug/store/bin/spn` to verify your changes
+- `tspn` is a link on the $PATH to the debug binary; use it when testing what you built
+  - example:
+    1. make a code change
+    2. `pspn build --profile debug` to build with known-good copy
+    3. `tspn build -p fast -f` to use the new binary to force build some other profile
 - if you, for some reason, need a non-bootstrapped build, build with `make` to output to `./bootstrap/bin/spn`
 - use ./build/llm as your temporary directory when testing; do not use /tmp
 

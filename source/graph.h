@@ -83,6 +83,7 @@ SP_TYPEDEF_FN(s32, spn_bg_fn_t, spn_bg_cmd_t* cmd, void* user_data);
 struct spn_build_cmd {
   spn_bg_cmd_kind_t kind;
   spn_bg_viz_kind_t viz;
+  sp_str_t package;
   spn_bg_id_t id;
   sp_str_t tag;
   sp_da(spn_bg_id_t) consumes;
@@ -100,6 +101,7 @@ struct spn_build_cmd {
 typedef struct {
   spn_bg_id_t id;
   spn_bg_viz_kind_t viz;
+  sp_str_t package;
   sp_str_t path;
   sp_tm_epoch_t mod_time;
 
@@ -189,10 +191,12 @@ spn_build_graph_t* spn_bg_new();
 spn_bg_id_t        spn_bg_add_file(spn_build_graph_t* graph, sp_str_t path);
 spn_bg_id_t        spn_bg_add_file_ex(spn_build_graph_t* graph, sp_str_t path, spn_bg_viz_kind_t viz_kind);
 void               spn_bg_file_set_viz_kind(spn_build_graph_t* graph, spn_bg_id_t id, spn_bg_viz_kind_t kind);
+void               spn_bg_file_set_package(spn_build_graph_t* graph, spn_bg_id_t id, sp_str_t package);
 spn_bg_id_t        spn_bg_add_command(spn_build_graph_t* graph, spn_bg_cmd_kind_t kind);
 spn_bg_id_t        spn_bg_add_subprocess(spn_build_graph_t* graph, sp_ps_config_t ps);
 spn_bg_id_t        spn_bg_add_fn(spn_build_graph_t* graph, spn_bg_fn_t fn, void* user_data);
 void               spn_bg_cmd_set_kind(spn_build_graph_t* graph, spn_bg_id_t id, spn_bg_viz_kind_t kind);
+void               spn_bg_cmd_set_package(spn_build_graph_t* graph, spn_bg_id_t id, sp_str_t package);
 sp_da(spn_bg_id_t) spn_bg_find_outputs(spn_build_graph_t* graph);
 spn_bg_file_t*     spn_bg_find_file(spn_build_graph_t* graph, spn_bg_id_t id);
 bool               spn_bg_is_file_input(spn_bg_file_t* file);
@@ -470,6 +474,13 @@ void spn_bg_file_set_viz_kind(spn_build_graph_t* graph, spn_bg_id_t id, spn_bg_v
   }
 }
 
+void spn_bg_file_set_package(spn_build_graph_t* graph, spn_bg_id_t id, sp_str_t package) {
+  spn_bg_file_t* file = spn_bg_find_file(graph, id);
+  if (file) {
+    file->package = package;
+  }
+}
+
 spn_bg_id_t spn_bg_add_command(spn_build_graph_t* graph, spn_bg_cmd_kind_t kind) {
   spn_bg_cmd_t cmd = {
     .id = {
@@ -501,6 +512,13 @@ void spn_bg_cmd_set_kind(spn_build_graph_t* graph, spn_bg_id_t id, spn_bg_viz_ki
   spn_bg_cmd_t* cmd = spn_bg_find_command(graph, id);
   if (cmd) {
     cmd->viz = kind;
+  }
+}
+
+void spn_bg_cmd_set_package(spn_build_graph_t* graph, spn_bg_id_t id, sp_str_t package) {
+  spn_bg_cmd_t* cmd = spn_bg_find_command(graph, id);
+  if (cmd) {
+    cmd->package = package;
   }
 }
 
@@ -677,6 +695,15 @@ sp_str_t spn_bg_viz_kind_to_class(spn_bg_viz_kind_t kind) {
   return sp_str_lit("source");
 }
 
+sp_str_t spn_bg_mermaid_shorten_path(sp_str_t path, sp_str_t project_dir, sp_str_t cache_dir) {
+  if (sp_str_valid(project_dir) && sp_str_starts_with(path, project_dir)) {
+    return sp_format("$PROJECT{}", SP_FMT_STR(sp_str_suffix(path, path.len - project_dir.len)));
+  } else if (sp_str_valid(cache_dir) && sp_str_starts_with(path, cache_dir)) {
+    return sp_format("$CACHE{}", SP_FMT_STR(sp_str_suffix(path, path.len - cache_dir.len)));
+  }
+  return path;
+}
+
 void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* io, sp_str_t project_dir, sp_str_t cache_dir) {
   sp_str_t stroke = sp_str_lit("#1a1a2e");
   sp_str_t text = sp_str_lit("#e0e0e0");
@@ -696,28 +723,78 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* io, sp_str_t pr
   sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("source"), source, stroke, text));
   sp_io_write_str(io, sp_str_lit("  linkStyle default stroke:#909090,stroke-width:2px\n"));
 
+  // Collect unique package names
+  sp_ht(sp_str_t, bool) packages = SP_ZERO_INITIALIZE();
+  sp_ht_set_fns(packages, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+
   sp_da_for(graph->files, it) {
     spn_bg_file_t* file = &graph->files[it];
-    sp_str_t cls = spn_bg_viz_kind_to_class(file->viz);
+    if (sp_str_valid(file->package) && !sp_ht_key_exists(packages, file->package)) {
+      sp_ht_insert(packages, file->package, true);
+    }
+  }
+  sp_da_for(graph->commands, it) {
+    spn_bg_cmd_t* cmd = &graph->commands[it];
+    if (sp_str_valid(cmd->package) && !sp_ht_key_exists(packages, cmd->package)) {
+      sp_ht_insert(packages, cmd->package, true);
+    }
+  }
 
-    // Replace path prefixes with $PROJECT or $CACHE for cleaner display
-    sp_str_t path = file->path;
-    if (sp_str_valid(project_dir) && sp_str_starts_with(path, project_dir)) {
-      path = sp_format("$PROJECT{}", SP_FMT_STR(sp_str_suffix(path, path.len - project_dir.len)));
-    } else if (sp_str_valid(cache_dir) && sp_str_starts_with(path, cache_dir)) {
-      path = sp_format("$CACHE{}", SP_FMT_STR(sp_str_suffix(path, path.len - cache_dir.len)));
+  // Emit subgraphs per package
+  sp_ht_for(packages, pkg_it) {
+    sp_str_t pkg_name = *sp_ht_it_getkp(packages, pkg_it);
+    sp_io_write_str(io, sp_format("  subgraph {}[{}]\n", SP_FMT_STR(pkg_name), SP_FMT_STR(pkg_name)));
+
+    // Emit files belonging to this package
+    sp_da_for(graph->files, it) {
+      spn_bg_file_t* file = &graph->files[it];
+      if (!sp_str_equal(file->package, pkg_name)) {
+        continue;
+      }
+      sp_str_t cls = spn_bg_viz_kind_to_class(file->viz);
+      sp_str_t path = spn_bg_mermaid_shorten_path(file->path, project_dir, cache_dir);
+      sp_io_write_str(io, sp_format("    F{}[\"{}\"]:::{}\n",
+        SP_FMT_U32(file->id.index), SP_FMT_STR(path), SP_FMT_STR(cls)));
     }
 
+    // Emit commands belonging to this package
+    sp_da_for(graph->commands, it) {
+      spn_bg_cmd_t* cmd = &graph->commands[it];
+      if (!sp_str_equal(cmd->package, pkg_name)) {
+        continue;
+      }
+      sp_str_t cls = spn_bg_viz_kind_to_class(cmd->viz);
+      sp_io_write_str(io, sp_format("    C{}[\"{}\"]:::{}\n",
+        SP_FMT_U32(cmd->id.index), SP_FMT_STR(cmd->tag), SP_FMT_STR(cls)));
+    }
+
+    sp_io_write_str(io, sp_str_lit("  end\n"));
+  }
+
+  // Emit orphan nodes (no package assigned)
+  sp_da_for(graph->files, it) {
+    spn_bg_file_t* file = &graph->files[it];
+    if (sp_str_valid(file->package)) {
+      continue;
+    }
+    sp_str_t cls = spn_bg_viz_kind_to_class(file->viz);
+    sp_str_t path = spn_bg_mermaid_shorten_path(file->path, project_dir, cache_dir);
     sp_io_write_str(io, sp_format("  F{}[\"{}\"]:::{}\n",
       SP_FMT_U32(file->id.index), SP_FMT_STR(path), SP_FMT_STR(cls)));
   }
-
   sp_da_for(graph->commands, it) {
     spn_bg_cmd_t* cmd = &graph->commands[it];
+    if (sp_str_valid(cmd->package)) {
+      continue;
+    }
     sp_str_t cls = spn_bg_viz_kind_to_class(cmd->viz);
-
     sp_io_write_str(io, sp_format("  C{}[\"{}\"]:::{}\n",
       SP_FMT_U32(cmd->id.index), SP_FMT_STR(cmd->tag), SP_FMT_STR(cls)));
+  }
+
+  // Emit all edges (outside subgraphs)
+  sp_da_for(graph->commands, it) {
+    spn_bg_cmd_t* cmd = &graph->commands[it];
 
     sp_da_for(cmd->consumes, input_it) {
       sp_io_write_str(io, sp_format("  F{} --> C{}\n",

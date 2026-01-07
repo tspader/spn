@@ -1528,6 +1528,7 @@ typedef enum {
 typedef struct {
   sp_str_t package;
   bool test;
+  bool build;
 } spn_cli_add_t;
 
 typedef struct {
@@ -7446,14 +7447,18 @@ void spn_build_graph_add_target(
   spn_pkg_nodes_v2_t* nodes,
   spn_target_t* target
 ) {
+  sp_str_t pkg_name = ctx->name;
+
   // binary output file
   sp_str_t bin_path = sp_fs_join_path(ctx->paths.bin, target->name);
   spn_bg_id_t bin_file = spn_bg_add_file_ex(graph, bin_path, SPN_BG_VIZ_BINARY);
+  spn_bg_file_set_package(graph, bin_file, pkg_name);
 
   // compile target command
   spn_bg_id_t compile_target = spn_bg_add_fn(graph, spn_executor_compile_target, target);
   spn_bg_tag_command(graph, compile_target, sp_format("{}::compile", SP_FMT_STR(target->name)));
   spn_bg_cmd_set_kind(graph, compile_target, SPN_BG_VIZ_CMD);
+  spn_bg_cmd_set_package(graph, compile_target, pkg_name);
 
   // depends on stamp.work (build() must have run)
   spn_bg_cmd_add_input(graph, compile_target, nodes->stamp.work);
@@ -7462,6 +7467,7 @@ void spn_build_graph_add_target(
   sp_da_for(target->source, sit) {
     sp_str_t source_path = sp_fs_join_path(ctx->paths.source, target->source[sit]);
     spn_bg_id_t source_node = spn_bg_add_file_ex(graph, source_path, SPN_BG_VIZ_SOURCE);
+    spn_bg_file_set_package(graph, source_node, pkg_name);
     spn_bg_cmd_add_input(graph, compile_target, source_node);
   }
 
@@ -7479,27 +7485,34 @@ void spn_build_graph_add_target(
 // Note: JIT compilation happens in phase 1 (CONFIGURE_NEW), not here
 spn_pkg_nodes_v2_t spn_build_graph_add_pkg(spn_build_graph_t* graph, spn_build_ctx_t* ctx) {
   spn_pkg_nodes_v2_t nodes = SP_ZERO_INITIALIZE();
+  sp_str_t pkg_name = ctx->name;
 
   // Input files (manifests)
   nodes.manifest = spn_bg_add_file_ex(graph, ctx->pkg->paths.manifest, SPN_BG_VIZ_MANIFEST);
+  spn_bg_file_set_package(graph, nodes.manifest, pkg_name);
   nodes.script = spn_bg_add_file_ex(graph, ctx->pkg->paths.script, SPN_BG_VIZ_MANIFEST);
+  spn_bg_file_set_package(graph, nodes.script, pkg_name);
 
   // build() -> stamp.work
   nodes.stamp.work = spn_bg_add_file_ex(graph, ctx->paths.stamp.work, SPN_BG_VIZ_STAMP);
+  spn_bg_file_set_package(graph, nodes.stamp.work, pkg_name);
 
   nodes.cmd.build = spn_bg_add_fn(graph, spn_executor_run_build, ctx);
   spn_bg_tag_command(graph, nodes.cmd.build, sp_format("{}::script::build", SP_FMT_STR(ctx->name)));
   spn_bg_cmd_set_kind(graph, nodes.cmd.build, SPN_BG_VIZ_CMD);
+  spn_bg_cmd_set_package(graph, nodes.cmd.build, pkg_name);
   spn_bg_cmd_add_input(graph, nodes.cmd.build, nodes.manifest);
   spn_bg_cmd_add_input(graph, nodes.cmd.build, nodes.script);
   spn_bg_cmd_add_output(graph, nodes.cmd.build, nodes.stamp.work);
 
   // package() -> stamp.store
   nodes.stamp.store = spn_bg_add_file_ex(graph, ctx->paths.stamp.store, SPN_BG_VIZ_STAMP);
+  spn_bg_file_set_package(graph, nodes.stamp.store, pkg_name);
 
   nodes.cmd.package = spn_bg_add_fn(graph, spn_executor_run_package, ctx);
   spn_bg_tag_command(graph, nodes.cmd.package, sp_format("{}::script::package", SP_FMT_STR(ctx->name)));
   spn_bg_cmd_set_kind(graph, nodes.cmd.package, SPN_BG_VIZ_CMD);
+  spn_bg_cmd_set_package(graph, nodes.cmd.package, pkg_name);
   // stamp.work -> package() (direct edge for packages with no targets)
   spn_bg_cmd_add_input(graph, nodes.cmd.package, nodes.stamp.work);
   spn_bg_cmd_add_output(graph, nodes.cmd.package, nodes.stamp.store);
@@ -8367,7 +8380,13 @@ sp_app_result_t spn_cli_graph(spn_cli_t* cli) {
 sp_app_result_t spn_cli_add(spn_cli_t* cli) {
   spn_cli_add_t* cmd = &cli->add;
 
-  spn_visibility_t visibility = cmd->test ? SPN_VISIBILITY_TEST : SPN_VISIBILITY_PUBLIC;
+  if (cmd->test && cmd->build) {
+    SP_FATAL("cannot specify both {:fg yellow} and {:fg yellow}", SP_FMT_CSTR("--test"), SP_FMT_CSTR("--build"));
+  }
+
+  spn_visibility_t visibility = cmd->test  ? SPN_VISIBILITY_TEST
+                              : cmd->build ? SPN_VISIBILITY_BUILD
+                              :              SPN_VISIBILITY_PUBLIC;
   if (sp_ht_getp(app.package.deps, cmd->package)) {
     SP_FATAL("{:fg brightyellow} is already in your project", SP_FMT_STR(cmd->package));
   }
@@ -8593,6 +8612,13 @@ spn_cli_command_usage_t spn_cli() {
           .kind = SPN_CLI_OPT_KIND_BOOLEAN,
           .summary = "Add as a test dependency",
           .ptr = &spn.cli.add.test
+        },
+        {
+          .brief = "b",
+          .name = "build",
+          .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+          .summary = "Add as a build dependency",
+          .ptr = &spn.cli.add.build
         }
       },
       .summary = "Add the latest version of a package to the project",
