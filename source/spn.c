@@ -19,7 +19,7 @@
 #define SP_MAIN
 #define SP_PS_MAX_ARGS 32
 #define SP_IMPLEMENTATION
-#include "sp/sp.h"
+#include "sp.h"
 
 #define TOML_IMPLEMENTATION
 #include "toml.h"
@@ -1135,42 +1135,40 @@ s32 spn_executor_run_build_script(spn_bg_cmd_t* cmd, void* user_data);
 ////////////
 // EVENTS //
 ////////////
-#define SPN_BUILD_EVENT(X) \
-  X(SPN_BUILD_EVENT_FETCH, "fetch") \
-  X(SPN_BUILD_EVENT_ERR_CIRCULAR_DEP, "failed") \
-  X(SPN_BUILD_EVENT_ERR_UNKNOWN_PKG, "failed") \
-  X(SPN_BUILD_EVENT_RESOLVE, "resolve") \
-  X(SPN_BUILD_EVENT_RESOLVE_FAILED, "failed") \
-  X(SPN_BUILD_EVENT_SYNC, "sync") \
-  X(SPN_BUILD_EVENT_CHECKOUT, "checkout") \
-  X(SPN_BUILD_EVENT_BUILD, "build") \
-  X(SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE, "configure") \
-  X(SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD, "build()") \
-  X(SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED, "failed") \
-  X(SPN_BUILD_EVENT_BUILD_SCRIPT_CRASHED, "failed") \
-  X(SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE_FAILED, "failed") \
-  X(SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD_FAILED, "failed") \
-  X(SPN_BUILD_EVENT_DEP_BUILD, "build") \
-  X(SPN_BUILD_EVENT_DEP_BUILD_PASSED, "ok") \
-  X(SPN_BUILD_EVENT_DEP_BUILD_FAILED, "failed") \
-  X(SPN_BUILD_EVENT_TARGET_BUILD, "build") \
-  X(SPN_BUILD_EVENT_TARGET_BUILD_PASSED, "ok") \
-  X(SPN_BUILD_EVENT_TARGET_BUILD_FAILED, "failed") \
-  X(SPN_BUILD_EVENT_BUILD_PASSED, "built") \
-  X(SPN_BUILD_EVENT_PACKAGE, "package") \
-  X(SPN_BUILD_EVENT_CANCEL, "cancel") \
-  X(SPN_BUILD_EVENT_COMPILE, "compile") \
-  X(SPN_BUILD_EVENT_TCC_ERROR, "error") \
-  X(SPN_BUILD_EVENT_TEST_RUN, "run") \
-  X(SPN_BUILD_EVENT_TEST_PASSED, "ok") \
-  X(SPN_BUILD_EVENT_TESTS_PASSED, "tested") \
-  X(SPN_BUILD_EVENT_TEST_FAILED, "failed") \
-  X(SPN_BUILD_EVENT_CLEAN, "clean") \
-  X(SPN_BUILD_EVENT_GENERATE, "generate")
-
 typedef enum {
-  SPN_BUILD_EVENT(SP_X_NAMED_ENUM_DEFINE)
+  SPN_BUILD_EVENT_FETCH,
+  SPN_BUILD_EVENT_ERR_CIRCULAR_DEP,
+  SPN_BUILD_EVENT_ERR_UNKNOWN_PKG,
+  SPN_BUILD_EVENT_RESOLVE,
+  SPN_BUILD_EVENT_RESOLVE_FAILED,
+  SPN_BUILD_EVENT_SYNC,
+  SPN_BUILD_EVENT_CHECKOUT,
+  SPN_BUILD_EVENT_BUILD,
+  SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE,
+  SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD,
+  SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED,
+  SPN_BUILD_EVENT_BUILD_SCRIPT_CRASHED,
+  SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE_FAILED,
+  SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD_FAILED,
+  SPN_BUILD_EVENT_DEP_BUILD,
+  SPN_BUILD_EVENT_DEP_BUILD_PASSED,
+  SPN_BUILD_EVENT_DEP_BUILD_FAILED,
+  SPN_BUILD_EVENT_TARGET_BUILD,
+  SPN_BUILD_EVENT_TARGET_BUILD_PASSED,
+  SPN_BUILD_EVENT_TARGET_BUILD_FAILED,
+  SPN_BUILD_EVENT_BUILD_PASSED,
+  SPN_BUILD_EVENT_PACKAGE,
+  SPN_BUILD_EVENT_CANCEL,
+  SPN_BUILD_EVENT_COMPILE,
+  SPN_BUILD_EVENT_TCC_ERROR,
+  SPN_BUILD_EVENT_TEST_RUN,
+  SPN_BUILD_EVENT_TEST_PASSED,
+  SPN_BUILD_EVENT_TESTS_PASSED,
+  SPN_BUILD_EVENT_TEST_FAILED,
+  SPN_BUILD_EVENT_CLEAN,
+  SPN_BUILD_EVENT_GENERATE,
 } spn_build_event_kind_t;
+
 
 typedef struct {
   spn_build_event_kind_t kind;
@@ -1279,15 +1277,33 @@ typedef enum {
   SPN_OUTPUT_MODE(SP_X_ENUM_DEFINE)
 } spn_tui_mode_t;
 
-spn_tui_mode_t spn_output_mode_from_str(sp_str_t str);
-sp_str_t       spn_output_mode_to_str(spn_tui_mode_t mode);
+typedef enum {
+  SPN_VERBOSITY_QUIET,
+  SPN_VERBOSITY_NORMAL,
+  SPN_VERBOSITY_VERBOSE,
+  SPN_VERBOSITY_DEBUG,
+} spn_verbosity_t;
+
 
 typedef enum {
-  SPN_VERBOSITY_QUIET,   // errors only
-  SPN_VERBOSITY_NORMAL,  // default
-  SPN_VERBOSITY_VERBOSE, // detailed
-  SPN_VERBOSITY_DEBUG,   // everything
-} spn_verbosity_t;
+  SPN_BUILD_EVENT_COLOR_NONE,
+  SPN_BUILD_EVENT_COLOR_GREEN,
+  SPN_BUILD_EVENT_COLOR_RED,
+} spn_build_event_color_t;
+
+typedef struct {
+  spn_build_event_color_t color;
+  spn_verbosity_t verbosity;
+} spn_build_event_display_t;
+
+spn_build_event_display_t tui_events [] = {
+  [SPN_BUILD_EVENT_FETCH]           = { .color = SPN_BUILD_EVENT_COLOR_NONE, .verbosity = SPN_VERBOSITY_NORMAL },
+  [SPN_BUILD_EVENT_ERR_UNKNOWN_PKG] = { .color = SPN_BUILD_EVENT_COLOR_RED,  .verbosity = SPN_VERBOSITY_NORMAL },
+};
+
+spn_tui_mode_t spn_output_mode_from_str(sp_str_t str);
+sp_str_t       spn_output_mode_to_str(spn_tui_mode_t mode);
+void spn_tui_render_event_name(spn_build_event_t* event, sp_str_builder_t* builder);
 
 typedef enum {
   SP_TUI_TABLE_NONE,
@@ -2502,7 +2518,37 @@ sp_str_t spn_output_mode_to_str(spn_tui_mode_t mode) {
 
 sp_str_t spn_build_event_kind_to_str(spn_build_event_kind_t kind) {
   switch (kind) {
-    SPN_BUILD_EVENT(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
+    case SPN_BUILD_EVENT_FETCH:                       return sp_str_lit("fetch");
+    case SPN_BUILD_EVENT_ERR_CIRCULAR_DEP:            return sp_str_lit("failed");
+    case SPN_BUILD_EVENT_ERR_UNKNOWN_PKG:             return sp_str_lit("failed");
+    case SPN_BUILD_EVENT_RESOLVE:                     return sp_str_lit("resolve");
+    case SPN_BUILD_EVENT_RESOLVE_FAILED:              return sp_str_lit("failed");
+    case SPN_BUILD_EVENT_SYNC:                        return sp_str_lit("sync");
+    case SPN_BUILD_EVENT_CHECKOUT:                    return sp_str_lit("checkout");
+    case SPN_BUILD_EVENT_BUILD:                       return sp_str_lit("build");
+    case SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE:      return sp_str_lit("configure");
+    case SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD:          return sp_str_lit("build()");
+    case SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED:         return sp_str_lit("failed");
+    case SPN_BUILD_EVENT_BUILD_SCRIPT_CRASHED:        return sp_str_lit("failed");
+    case SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE_FAILED: return sp_str_lit("failed");
+    case SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD_FAILED:   return sp_str_lit("failed");
+    case SPN_BUILD_EVENT_DEP_BUILD:                   return sp_str_lit("build");
+    case SPN_BUILD_EVENT_DEP_BUILD_PASSED:            return sp_str_lit("ok");
+    case SPN_BUILD_EVENT_DEP_BUILD_FAILED:            return sp_str_lit("failed");
+    case SPN_BUILD_EVENT_TARGET_BUILD:                return sp_str_lit("build");
+    case SPN_BUILD_EVENT_TARGET_BUILD_PASSED:         return sp_str_lit("ok");
+    case SPN_BUILD_EVENT_TARGET_BUILD_FAILED:         return sp_str_lit("failed");
+    case SPN_BUILD_EVENT_BUILD_PASSED:                return sp_str_lit("built");
+    case SPN_BUILD_EVENT_PACKAGE:                     return sp_str_lit("package");
+    case SPN_BUILD_EVENT_CANCEL:                      return sp_str_lit("cancel");
+    case SPN_BUILD_EVENT_COMPILE:                     return sp_str_lit("compile");
+    case SPN_BUILD_EVENT_TCC_ERROR:                   return sp_str_lit("error");
+    case SPN_BUILD_EVENT_TEST_RUN:                    return sp_str_lit("run");
+    case SPN_BUILD_EVENT_TEST_PASSED:                 return sp_str_lit("ok");
+    case SPN_BUILD_EVENT_TESTS_PASSED:                return sp_str_lit("tested");
+    case SPN_BUILD_EVENT_TEST_FAILED:                 return sp_str_lit("failed");
+    case SPN_BUILD_EVENT_CLEAN:                       return sp_str_lit("clean");
+    case SPN_BUILD_EVENT_GENERATE:                    return sp_str_lit("generate");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
@@ -3548,6 +3594,20 @@ sp_str_t spn_tui_name_to_color(sp_str_t str) {
 //
 //   return sp_color_to_tui_rgb_f(r, g, b);
 // }
+
+void spn_tui_render_event_name(spn_build_event_t* event, sp_str_builder_t* builder) {
+  const c8* fmt = SP_NULLPTR;
+
+  switch (tui_events[event->kind].color) {
+    case SPN_BUILD_EVENT_COLOR_NONE: { fmt = "{:fg brightblack :pad 9}"; break; }
+    case SPN_BUILD_EVENT_COLOR_GREEN: { fmt = "{:fg green :pad 9}"; break; }
+    case SPN_BUILD_EVENT_COLOR_RED: { fmt = "{:fg red :pad 9}"; break; }
+  }
+  sp_str_builder_append_fmt(builder,
+    "{:fg red :pad 9} ",
+    SP_FMT_STR(spn_build_event_kind_to_str(event->kind))
+  );
+}
 
 sp_str_t spn_tui_render_build_event(spn_build_event_t* event) {
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
