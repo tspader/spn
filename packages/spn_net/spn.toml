@@ -1,14 +1,15 @@
 [package]
-name = "spn_bar"
+name = "spn_net"
 repo = "tspader/sp"
 version = "1.0.0"
-commit = "2365635171e7"
+commit = "fd9b5c03f181"
 author = "tspader"
 maintainer = "tspader"
-description = "has a pkg dep"
+description = "networking library"
 
 [deps.package]
-spn_baz = "1.0.0"
+spn_log = "1.0.0"
+spn_json = "1.0.0"
 
 [lib]
 kinds = ["source"]

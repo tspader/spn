@@ -1,15 +1,14 @@
 [package]
-name = "spn_foo"
+name = "spn_json"
 repo = "tspader/sp"
 version = "1.0.0"
-commit = "2365635171e7"
+commit = "fd9b5c03f181"
 author = "tspader"
 maintainer = "tspader"
-description = "has a pkg dep"
+description = "JSON parser"
 
 [deps.package]
-spn_bar = "1.0.0"
-spn_qux = "1.0.0"
+spn_simd = "1.0.0"
 
 [lib]
 kinds = ["source"]

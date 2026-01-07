@@ -1,11 +1,14 @@
 [package]
-name = "spn_qux"
+name = "spn_log"
 repo = "tspader/sp"
 version = "1.0.0"
-commit = "2365635171e7"
+commit = "fd9b5c03f181"
 author = "tspader"
 maintainer = "tspader"
-description = "has a pkg dep"
+description = "logging library"
+
+[deps.package]
+spn_alloc = "1.0.0"
 
 [lib]
 kinds = ["source"]

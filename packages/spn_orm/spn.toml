@@ -1,0 +1,18 @@
+[package]
+name = "spn_orm"
+repo = "tspader/sp"
+version = "1.0.0"
+commit = "fd9b5c03f181"
+author = "tspader"
+maintainer = "tspader"
+description = "object-relational mapping library"
+
+[deps.package]
+spn_schema = "1.0.0"
+spn_log = "1.0.0"
+
+[deps.build]
+spn_codegen = "1.0.0"
+
+[lib]
+kinds = ["source"]

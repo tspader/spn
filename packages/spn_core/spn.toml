@@ -1,0 +1,11 @@
+[package]
+name = "spn_core"
+repo = "tspader/sp"
+version = "1.0.0"
+commit = "fd9b5c03f181"
+author = "tspader"
+maintainer = "tspader"
+description = "base utilities"
+
+[lib]
+kinds = ["source"]

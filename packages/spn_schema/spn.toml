@@ -1,0 +1,14 @@
+[package]
+name = "spn_schema"
+repo = "tspader/sp"
+version = "1.0.0"
+commit = "fd9b5c03f181"
+author = "tspader"
+maintainer = "tspader"
+description = "JSON schema validation"
+
+[deps.package]
+spn_json = "1.0.0"
+
+[lib]
+kinds = ["source"]
