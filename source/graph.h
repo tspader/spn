@@ -217,7 +217,7 @@ void               spn_bg_it_add_children(spn_bg_it_t* it, spn_bg_node_t node);
 bool               spn_bg_it_done(spn_bg_it_t* it);
 sp_str_t           spn_bg_dfs(spn_bg_it_config_t config);
 sp_str_t           spn_bg_bfs(spn_bg_it_config_t config);
-void               spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* stream, sp_str_t project_dir, sp_str_t cache_dir);
+void               spn_bg_to_mermaid(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, sp_io_writer_t* stream, sp_str_t project_dir, sp_str_t cache_dir);
 spn_bg_dirty_t*    spn_bg_dirty_new();
 spn_bg_dirty_t*    spn_bg_compute_dirty(spn_build_graph_t* graph);
 bool               spn_bg_is_file_dirty(spn_bg_dirty_t* dirty, spn_bg_id_t id);
@@ -695,6 +695,14 @@ sp_str_t spn_bg_viz_kind_to_class(spn_bg_viz_kind_t kind) {
   return sp_str_lit("source");
 }
 
+sp_str_t spn_bg_file_dirty_class(spn_bg_dirty_t* dirty, spn_bg_id_t id) {
+  return spn_bg_is_file_dirty(dirty, id) ? sp_str_lit("dirty") : sp_str_lit("clean");
+}
+
+sp_str_t spn_bg_cmd_dirty_class(spn_bg_dirty_t* dirty, spn_bg_id_t id) {
+  return spn_bg_is_cmd_dirty(dirty, id) ? sp_str_lit("dirty") : sp_str_lit("clean");
+}
+
 sp_str_t spn_bg_mermaid_shorten_path(sp_str_t path, sp_str_t project_dir, sp_str_t cache_dir) {
   if (sp_str_valid(project_dir) && sp_str_starts_with(path, project_dir)) {
     return sp_format("$PROJECT{}", SP_FMT_STR(sp_str_suffix(path, path.len - project_dir.len)));
@@ -704,23 +712,31 @@ sp_str_t spn_bg_mermaid_shorten_path(sp_str_t path, sp_str_t project_dir, sp_str
   return path;
 }
 
-void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* io, sp_str_t project_dir, sp_str_t cache_dir) {
+void spn_bg_to_mermaid(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, sp_io_writer_t* io, sp_str_t project_dir, sp_str_t cache_dir) {
   sp_str_t stroke = sp_str_lit("#1a1a2e");
   sp_str_t text = sp_str_lit("#e0e0e0");
 
-  // Low saturation colors (HSV with S~45, V~72)
-  sp_str_t manifest = sp_str_lit("#65a3a3");  // manifests + build scripts (cyan)
-  sp_str_t cmd_color = sp_str_lit("#a36565"); // commands (muted red)
-  sp_str_t stamp = sp_str_lit("#8565a3");     // stamps (purple)
-  sp_str_t binary = sp_str_lit("#65a365");    // target binaries (green)
-  sp_str_t source = sp_str_lit("#a39a65");    // source files (yellow/orange)
-
   sp_io_write_str(io, sp_str_lit("graph TD\n"));
-  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("manifest"), manifest, stroke, text));
-  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("cmd"), cmd_color, stroke, text));
-  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("stamp"), stamp, stroke, text));
-  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("binary"), binary, stroke, text));
-  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("source"), source, stroke, text));
+
+  if (dirty) {
+    // Dirty mode: color by dirtiness
+    sp_str_t dirty_color = sp_str_lit("#a36565");  // muted red - needs rebuild
+    sp_str_t clean_color = sp_str_lit("#65a365");  // muted green - up to date
+    sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("dirty"), dirty_color, stroke, text));
+    sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("clean"), clean_color, stroke, text));
+  } else {
+    // Default mode: color by viz kind
+    sp_str_t manifest = sp_str_lit("#65a3a3");  // manifests + build scripts (cyan)
+    sp_str_t cmd_color = sp_str_lit("#a36565"); // commands (muted red)
+    sp_str_t stamp = sp_str_lit("#8565a3");     // stamps (purple)
+    sp_str_t binary = sp_str_lit("#65a365");    // target binaries (green)
+    sp_str_t source = sp_str_lit("#a39a65");    // source files (yellow/orange)
+    sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("manifest"), manifest, stroke, text));
+    sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("cmd"), cmd_color, stroke, text));
+    sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("stamp"), stamp, stroke, text));
+    sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("binary"), binary, stroke, text));
+    sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("source"), source, stroke, text));
+  }
   sp_io_write_str(io, sp_str_lit("  linkStyle default stroke:#909090,stroke-width:2px\n"));
 
   // Collect unique package names
@@ -751,7 +767,7 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* io, sp_str_t pr
       if (!sp_str_equal(file->package, pkg_name)) {
         continue;
       }
-      sp_str_t cls = spn_bg_viz_kind_to_class(file->viz);
+      sp_str_t cls = dirty ? spn_bg_file_dirty_class(dirty, file->id) : spn_bg_viz_kind_to_class(file->viz);
       sp_str_t path = spn_bg_mermaid_shorten_path(file->path, project_dir, cache_dir);
       sp_io_write_str(io, sp_format("    F{}[\"{}\"]:::{}\n",
         SP_FMT_U32(file->id.index), SP_FMT_STR(path), SP_FMT_STR(cls)));
@@ -763,7 +779,7 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* io, sp_str_t pr
       if (!sp_str_equal(cmd->package, pkg_name)) {
         continue;
       }
-      sp_str_t cls = spn_bg_viz_kind_to_class(cmd->viz);
+      sp_str_t cls = dirty ? spn_bg_cmd_dirty_class(dirty, cmd->id) : spn_bg_viz_kind_to_class(cmd->viz);
       sp_io_write_str(io, sp_format("    C{}[\"{}\"]:::{}\n",
         SP_FMT_U32(cmd->id.index), SP_FMT_STR(cmd->tag), SP_FMT_STR(cls)));
     }
@@ -777,7 +793,7 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* io, sp_str_t pr
     if (sp_str_valid(file->package)) {
       continue;
     }
-    sp_str_t cls = spn_bg_viz_kind_to_class(file->viz);
+    sp_str_t cls = dirty ? spn_bg_file_dirty_class(dirty, file->id) : spn_bg_viz_kind_to_class(file->viz);
     sp_str_t path = spn_bg_mermaid_shorten_path(file->path, project_dir, cache_dir);
     sp_io_write_str(io, sp_format("  F{}[\"{}\"]:::{}\n",
       SP_FMT_U32(file->id.index), SP_FMT_STR(path), SP_FMT_STR(cls)));
@@ -787,7 +803,7 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, sp_io_writer_t* io, sp_str_t pr
     if (sp_str_valid(cmd->package)) {
       continue;
     }
-    sp_str_t cls = spn_bg_viz_kind_to_class(cmd->viz);
+    sp_str_t cls = dirty ? spn_bg_cmd_dirty_class(dirty, cmd->id) : spn_bg_viz_kind_to_class(cmd->viz);
     sp_io_write_str(io, sp_format("  C{}[\"{}\"]:::{}\n",
       SP_FMT_U32(cmd->id.index), SP_FMT_STR(cmd->tag), SP_FMT_STR(cls)));
   }
