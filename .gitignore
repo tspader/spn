@@ -42,3 +42,5 @@ build/bootstrap/bin
 
 **/*.mmd
 **/*.png
+
+**/node_modules

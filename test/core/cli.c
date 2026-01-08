@@ -240,30 +240,30 @@ UTEST_F(spn_parse_cmd, stop_at_non_option) {
 // DISPATCH //
 //////////////
 
-static spn_cli_result_t stub_handler_done(spn_cli_t* cli) {
+static sp_app_result_t stub_handler_done(spn_cli_t* cli) {
   (void)cli;
-  return SPN_CLI_DONE;
+  return SP_APP_QUIT;
 }
 
-static spn_cli_result_t stub_handler_continue(spn_cli_t* cli) {
+static sp_app_result_t stub_handler_continue(spn_cli_t* cli) {
   (void)cli;
-  return SPN_CLI_DONE;
+  return SP_APP_QUIT;
 }
 
-static spn_cli_result_t stub_handler_err(spn_cli_t* cli) {
+static sp_app_result_t stub_handler_err(spn_cli_t* cli) {
   (void)cli;
-  return SPN_CLI_ERR;
+  return SP_APP_ERR;
 }
 
 typedef struct {
   const c8* args[CLI_TEST_MAX_ARGS];
   u32 num_args;
   spn_cli_command_usage_t cmd;
-  spn_cli_result_t expect_result;
+  sp_app_result_t expect_result;
 } cli_dispatch_test_t;
 
 void expect_dispatch(s32* utest_result, cli_dispatch_test_t t) {
-  spn_cli_result_t result = spn_cli_run(&t.cmd, SP_NULLPTR, t.args, t.num_args);
+  sp_app_result_t result = spn_cli_run(&t.cmd, SP_NULLPTR, t.args, t.num_args);
   EXPECT_EQ(t.expect_result, result);
 }
 
@@ -289,7 +289,7 @@ UTEST_F(spn_dispatch, known_command) {
         { 0 },
       },
     },
-    .expect_result = SPN_CLI_DONE,
+    .expect_result = SP_APP_QUIT,
   });
 }
 
@@ -303,7 +303,7 @@ UTEST_F(spn_dispatch, unknown_command) {
         { 0 },
       },
     },
-    .expect_result = SPN_CLI_ERR,
+    .expect_result = SP_APP_ERR,
   });
 }
 
@@ -317,7 +317,7 @@ UTEST_F(spn_dispatch, handler_return_value) {
         { 0 },
       },
     },
-    .expect_result = SPN_CLI_DONE,
+    .expect_result = SP_APP_QUIT,
   });
 }
 
@@ -337,7 +337,7 @@ UTEST_F(spn_dispatch, subcommand_found) {
         { 0 },
       },
     },
-    .expect_result = SPN_CLI_DONE,
+    .expect_result = SP_APP_QUIT,
   });
 }
 
@@ -351,7 +351,7 @@ UTEST_F(spn_dispatch, subcommand_missing) {
         { 0 },
       },
     },
-    .expect_result = SPN_CLI_ERR,
+    .expect_result = SP_APP_ERR,
   });
 }
 
@@ -374,9 +374,9 @@ UTEST_F(spn_dispatch, cmd_with_opts) {
   };
 
   const c8* args[] = { "--verbose", "build" };
-  spn_cli_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 2);
+sp_app_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 2);
 
-  EXPECT_EQ(SPN_CLI_DONE, result);
+  EXPECT_EQ(SP_APP_QUIT, result);
   EXPECT_TRUE(verbose);
 }
 
@@ -397,9 +397,9 @@ UTEST_F(spn_dispatch, nested_commands) {
   };
 
   const c8* args[] = { "tool", "install" };
-  spn_cli_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 2);
+sp_app_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 2);
 
-  EXPECT_EQ(SPN_CLI_DONE, result);
+  EXPECT_EQ(SP_APP_QUIT, result);
 }
 
 // Test: opts parsed at root level, then at subcommand level
@@ -425,9 +425,9 @@ UTEST_F(spn_dispatch, opts_at_each_level) {
   };
 
   const c8* args[] = { "--root-flag", "sub", "--sub-flag" };
-  spn_cli_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 3);
+  sp_app_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 3);
 
-  EXPECT_EQ(SPN_CLI_DONE, result);
+  EXPECT_EQ(SP_APP_QUIT, result);
   EXPECT_TRUE(root_opt);
   EXPECT_TRUE(sub_opt);
 }
@@ -447,9 +447,9 @@ UTEST_F(spn_dispatch, root_handler) {
   };
 
   const c8* args[] = { "--flag", "--target", "foo" };
-  spn_cli_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 3);
+  sp_app_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 3);
 
-  EXPECT_EQ(SPN_CLI_DONE, result);
+  EXPECT_EQ(SP_APP_QUIT, result);
   EXPECT_TRUE(flag);
   EXPECT_TRUE(sp_str_equal(target, sp_str_lit("foo")));
 }
@@ -491,9 +491,9 @@ UTEST_F(spn_parse_cmd, opt_after_positional) {
 }
 
 static spn_cli_t* captured_cli = SP_NULLPTR;
-static spn_cli_result_t capture_handler(spn_cli_t* cli) {
+static sp_app_result_t capture_handler(spn_cli_t* cli) {
   captured_cli = cli;
-  return SPN_CLI_DONE;
+  return SP_APP_QUIT;
 }
 
 UTEST_F(spn_dispatch, handler_receives_user_data) {
@@ -518,9 +518,9 @@ UTEST_F(spn_dispatch, no_handler_no_subcommands) {
   };
 
   const c8* args[] = {};
-  spn_cli_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 0);
+  sp_app_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 0);
 
-  EXPECT_EQ(SPN_CLI_ERR, result);
+  EXPECT_EQ(SP_APP_ERR, result);
 }
 
 UTEST_F(spn_parse_cmd, bool_opt_short_no_consume) {

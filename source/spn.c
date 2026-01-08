@@ -6098,10 +6098,9 @@ void spn_builder_init(spn_builder_t* builder, spn_pkg_t* pkg, spn_profile_t* pro
 
 spn_dep_ctx_t* spn_builder_find_pkg_ctx(spn_builder_t* builder, sp_str_t name) {
   sp_mutex_lock(&builder->mutex);
-  if (sp_str_equal(name, builder->pkg->name)) {
-    return &builder->contexts.pkg_v2;
-  }
-  spn_dep_ctx_t* pkg = sp_om_get(builder->contexts.deps, name);
+  spn_dep_ctx_t* pkg = sp_str_equal(name, builder->pkg->name) ?
+    &builder->contexts.pkg_v2 :
+    sp_om_get(builder->contexts.deps, name);
   sp_mutex_unlock(&builder->mutex);
 
   return pkg;
