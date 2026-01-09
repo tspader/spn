@@ -44,3 +44,4 @@ build/bootstrap/bin
 **/*.png
 
 **/node_modules
+test/tools/graph
