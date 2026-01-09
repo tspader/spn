@@ -1071,6 +1071,7 @@ struct spn_build_ctx {
     struct {
       sp_str_t build;
       sp_str_t package;
+      sp_str_t nodes;
     } stamp;
     struct {
       sp_str_t build;
@@ -2180,14 +2181,19 @@ s32 spn_executor_run_user_fn(spn_bg_cmd_t* cmd, void* user_data) {
     .kind = SPN_BUILD_EVENT_BUILD_SCRIPT_USER_FN,
     .node = { .info = node }
   });
+  spn_err_t err = SPN_OK;
   if (node->fn) {
     spn_node_ctx_t ctx = {
       .build = node->ctx,
       .user_data = node->user_data
     };
-    return node->fn(&ctx);
+    err = node->fn(&ctx);
   }
-  return SPN_OK;
+  if (err == SPN_OK && sp_da_empty(node->outputs)) {
+    sp_str_t stamp = sp_format("{}/{}.stamp", SP_FMT_STR(node->ctx->paths.stamp.nodes), SP_FMT_STR(node->tag));
+    sp_fs_create_file(stamp);
+  }
+  return err;
 }
 
 spn_bg_id_t spn_build_ctx_get_file_node(spn_build_ctx_t* ctx, spn_build_graph_t* graph, sp_str_t path) {
@@ -2218,7 +2224,7 @@ void spn_build_graph_add_user_nodes(spn_build_ctx_t* ctx, spn_build_graph_t* gra
     }
 
     if (sp_da_empty(node->outputs)) {
-      sp_str_t stamp = sp_format("{}/{}.stamp", SP_FMT_STR(ctx->paths.stamp.build), SP_FMT_STR(node->tag));
+      sp_str_t stamp = sp_format("{}/{}.stamp", SP_FMT_STR(ctx->paths.stamp.nodes), SP_FMT_STR(node->tag));
       spn_bg_id_t file = spn_build_ctx_get_file_node(ctx, graph, stamp);
       spn_bg_cmd_add_output(graph, node->graph_cmd, file);
       spn_bg_file_set_viz_kind(graph, file, SPN_BG_VIZ_STAMP);
@@ -2236,7 +2242,7 @@ void spn_build_graph_add_user_nodes(spn_build_ctx_t* ctx, spn_build_graph_t* gra
       spn_user_node_t* dep = spn_find_user_node(dep_handle);
       sp_str_t dep_output;
       if (sp_da_empty(dep->outputs)) {
-        dep_output = sp_format("{}/{}.stamp", SP_FMT_STR(dep_handle.ctx->paths.stamp.build), SP_FMT_STR(dep->tag));
+        dep_output = sp_format("{}/{}.stamp", SP_FMT_STR(dep_handle.ctx->paths.stamp.nodes), SP_FMT_STR(dep->tag));
       } else {
         dep_output = dep->outputs[0];
       }
@@ -5807,6 +5813,7 @@ void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t config) {
   ctx->paths.stamp.package = sp_fs_join_path(ctx->paths.store, SP_LIT("spn.stamp"));
   ctx->paths.stamp.build = sp_fs_join_path(ctx->paths.work, SP_LIT("spn.stamp"));
   ctx->paths.spn = sp_fs_join_path(ctx->paths.work, SP_LIT("spn"));
+  ctx->paths.stamp.nodes = sp_fs_join_path(ctx->paths.spn, SP_LIT("stamp"));
   ctx->paths.logs.build = sp_fs_join_path(
     ctx->paths.work,
     spn_build_ctx_get_build_log_name(ctx)
@@ -5818,6 +5825,7 @@ void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t config) {
 
   sp_fs_create_dir(ctx->paths.work);
   sp_fs_create_dir(ctx->paths.spn);
+  sp_fs_create_dir(ctx->paths.stamp.nodes);
   sp_fs_create_dir(ctx->paths.store);
   sp_fs_create_dir(ctx->paths.bin);
   sp_fs_create_dir(ctx->paths.include);
