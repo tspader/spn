@@ -217,7 +217,7 @@ void               spn_bg_it_add_children(spn_bg_it_t* it, spn_bg_node_t node);
 bool               spn_bg_it_done(spn_bg_it_t* it);
 sp_str_t           spn_bg_dfs(spn_bg_it_config_t config);
 sp_str_t           spn_bg_bfs(spn_bg_it_config_t config);
-void               spn_bg_to_mermaid(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, sp_io_writer_t* stream, sp_str_t project_dir, sp_str_t cache_dir);
+void               spn_bg_to_mermaid(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, sp_io_writer_t* stream, sp_str_t project_dir, sp_str_t cache_dir, sp_str_t work_dir, sp_str_t store_dir);
 spn_bg_dirty_t*    spn_bg_dirty_new();
 spn_bg_dirty_t*    spn_bg_compute_dirty(spn_build_graph_t* graph);
 bool               spn_bg_is_file_dirty(spn_bg_dirty_t* dirty, spn_bg_id_t id);
@@ -703,8 +703,13 @@ sp_str_t spn_bg_cmd_dirty_class(spn_bg_dirty_t* dirty, spn_bg_id_t id) {
   return spn_bg_is_cmd_dirty(dirty, id) ? sp_str_lit("dirty") : sp_str_lit("clean");
 }
 
-sp_str_t spn_bg_mermaid_shorten_path(sp_str_t path, sp_str_t project_dir, sp_str_t cache_dir) {
-  if (sp_str_valid(project_dir) && sp_str_starts_with(path, project_dir)) {
+sp_str_t spn_bg_mermaid_shorten_path(sp_str_t path, sp_str_t project_dir, sp_str_t cache_dir, sp_str_t work_dir, sp_str_t store_dir) {
+  // Try most specific paths first (work/store are subdirs of project)
+  if (sp_str_valid(work_dir) && sp_str_starts_with(path, work_dir)) {
+    return sp_format("$WORK{}", SP_FMT_STR(sp_str_suffix(path, path.len - work_dir.len)));
+  } else if (sp_str_valid(store_dir) && sp_str_starts_with(path, store_dir)) {
+    return sp_format("$STORE{}", SP_FMT_STR(sp_str_suffix(path, path.len - store_dir.len)));
+  } else if (sp_str_valid(project_dir) && sp_str_starts_with(path, project_dir)) {
     return sp_format("$PROJECT{}", SP_FMT_STR(sp_str_suffix(path, path.len - project_dir.len)));
   } else if (sp_str_valid(cache_dir) && sp_str_starts_with(path, cache_dir)) {
     return sp_format("$CACHE{}", SP_FMT_STR(sp_str_suffix(path, path.len - cache_dir.len)));
@@ -712,7 +717,7 @@ sp_str_t spn_bg_mermaid_shorten_path(sp_str_t path, sp_str_t project_dir, sp_str
   return path;
 }
 
-void spn_bg_to_mermaid(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, sp_io_writer_t* io, sp_str_t project_dir, sp_str_t cache_dir) {
+void spn_bg_to_mermaid(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, sp_io_writer_t* io, sp_str_t project_dir, sp_str_t cache_dir, sp_str_t work_dir, sp_str_t store_dir) {
   sp_str_t stroke = sp_str_lit("#1a1a2e");
   sp_str_t text = sp_str_lit("#e0e0e0");
 
@@ -768,7 +773,7 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, sp_io_wr
         continue;
       }
       sp_str_t cls = dirty ? spn_bg_file_dirty_class(dirty, file->id) : spn_bg_viz_kind_to_class(file->viz);
-      sp_str_t path = spn_bg_mermaid_shorten_path(file->path, project_dir, cache_dir);
+      sp_str_t path = spn_bg_mermaid_shorten_path(file->path, project_dir, cache_dir, work_dir, store_dir);
       sp_io_write_str(io, sp_format("    F{}[\"{}\"]:::{}\n",
         SP_FMT_U32(file->id.index), SP_FMT_STR(path), SP_FMT_STR(cls)));
     }
@@ -794,7 +799,7 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, sp_io_wr
       continue;
     }
     sp_str_t cls = dirty ? spn_bg_file_dirty_class(dirty, file->id) : spn_bg_viz_kind_to_class(file->viz);
-    sp_str_t path = spn_bg_mermaid_shorten_path(file->path, project_dir, cache_dir);
+    sp_str_t path = spn_bg_mermaid_shorten_path(file->path, project_dir, cache_dir, work_dir, store_dir);
     sp_io_write_str(io, sp_format("  F{}[\"{}\"]:::{}\n",
       SP_FMT_U32(file->id.index), SP_FMT_STR(path), SP_FMT_STR(cls)));
   }
