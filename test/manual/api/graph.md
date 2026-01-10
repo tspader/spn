@@ -36,13 +36,18 @@ typedef spn_err_t (*spn_node_fn_t)(spn_node_ctx_t*);
 - `spn_build_ctx_t::file_to_graph_id` - Per-package hash table for file node deduplication
 
 ### Graph Construction
-`spn_build_graph_add_user_nodes()` performs two-pass construction:
+`spn_build_graph_add_user_nodes()` performs multi-pass construction:
 1. **Pass 1**: Create command nodes for all user nodes
-2. **Pass 2**: Wire inputs, outputs, and dependencies
-   - Inputs create file nodes and add to command inputs
+2. **Pass 2**: Wire outputs (tracking them for orphan detection)
    - Outputs create file nodes and add to command outputs
    - Nodes without outputs auto-generate stamp files: `{stamp_dir}/{tag}.stamp`
+3. **Pass 3**: Wire inputs and explicit dependencies
+   - Inputs create file nodes and add to command inputs
+   - Root nodes (no inputs/deps) depend on `sync::entry_stamp`
    - Explicit deps link to dependency's first output or stamp file
+4. **Pass 4**: Connect only orphan outputs to `sync::user`
+   - Outputs with no consumers are wired to `sync::user`
+   - If no orphans exist, `sync::user` depends on `sync::entry_stamp` for ordering
 
 ### Key Behavior
 - Nodes are added during `configure()`, not `build()`

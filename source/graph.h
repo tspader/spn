@@ -745,13 +745,13 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, sp_io_wr
 
   sp_da_for(graph->files, it) {
     spn_bg_file_t* file = &graph->files[it];
-    if (sp_str_valid(file->package) && !sp_ht_key_exists(packages, file->package)) {
+    if (!sp_str_empty(file->package) && !sp_ht_key_exists(packages, file->package)) {
       sp_ht_insert(packages, file->package, true);
     }
   }
   sp_da_for(graph->commands, it) {
     spn_bg_cmd_t* cmd = &graph->commands[it];
-    if (sp_str_valid(cmd->package) && !sp_ht_key_exists(packages, cmd->package)) {
+    if (!sp_str_empty(cmd->package) && !sp_ht_key_exists(packages, cmd->package)) {
       sp_ht_insert(packages, cmd->package, true);
     }
   }
@@ -790,7 +790,7 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, sp_io_wr
   // Emit orphan nodes (no package assigned)
   sp_da_for(graph->files, it) {
     spn_bg_file_t* file = &graph->files[it];
-    if (sp_str_valid(file->package)) {
+    if (!sp_str_empty(file->package)) {
       continue;
     }
     sp_str_t cls = dirty ? spn_bg_file_dirty_class(dirty, file->id) : spn_bg_viz_kind_to_class(file->viz);
@@ -800,7 +800,7 @@ void spn_bg_to_mermaid(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, sp_io_wr
   }
   sp_da_for(graph->commands, it) {
     spn_bg_cmd_t* cmd = &graph->commands[it];
-    if (sp_str_valid(cmd->package)) {
+    if (!sp_str_empty(cmd->package)) {
       continue;
     }
     sp_str_t cls = dirty ? spn_bg_cmd_dirty_class(dirty, cmd->id) : spn_bg_viz_kind_to_class(cmd->viz);
