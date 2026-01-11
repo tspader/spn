@@ -7824,22 +7824,33 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
   return SPN_TASK_DONE;
 }
 
-void spn_render_mermaid_file(spn_build_graph_t* graph, spn_build_ctx_t* ctx, spn_bg_id_t id, sp_io_writer_t* io, const c8* indent) {
+void spn_render_mermaid_file(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, spn_build_ctx_t* ctx, spn_bg_id_t id, sp_io_writer_t* io, const c8* indent) {
   spn_bg_file_t* file = spn_bg_find_file(graph, id);
-  sp_str_t cls = spn_bg_viz_kind_to_class(file->viz);
+  sp_str_t cls = dirty ? spn_bg_file_dirty_class(dirty, id) : spn_bg_viz_kind_to_class(file->viz);
   sp_str_t path = spn_bg_mermaid_shorten_path(file->path, ctx->paths.source, spn.paths.cache, ctx->paths.work, ctx->paths.store);
   sp_io_write_str(io, sp_format("{}F{}[\"{}\"]:::{}\n",
     SP_FMT_CSTR(indent), SP_FMT_U32(file->id.index), SP_FMT_STR(path), SP_FMT_STR(cls)));
 }
 
-void spn_render_mermaid_cmd(spn_build_graph_t* graph, spn_bg_id_t id, sp_io_writer_t* io, const c8* indent) {
+void spn_render_mermaid_cmd(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, spn_bg_id_t id, sp_io_writer_t* io, const c8* indent) {
   spn_bg_cmd_t* cmd = spn_bg_find_command(graph, id);
-  sp_str_t cls = spn_bg_viz_kind_to_class(cmd->viz);
+  sp_str_t cls = dirty ? spn_bg_cmd_dirty_class(dirty, id) : spn_bg_viz_kind_to_class(cmd->viz);
   sp_io_write_str(io, sp_format("{}C{}[\"{}\"]:::{}\n",
     SP_FMT_CSTR(indent), SP_FMT_U32(cmd->id.index), SP_FMT_STR(cmd->tag), SP_FMT_STR(cls)));
 }
 
-void spn_render_one_package_ctx(spn_builder_t* b, spn_dep_ctx_t* dep, sp_io_writer_t* io) {
+// render a command node using a file's path as the label (for collapsing cmd+stamp pairs)
+// uses the file's dirty status for coloring
+void spn_render_mermaid_cmd_as_file(spn_build_graph_t* graph, spn_bg_dirty_t* dirty, spn_build_ctx_t* ctx, spn_bg_id_t cmd_id, spn_bg_id_t file_id, sp_io_writer_t* io, const c8* indent) {
+  spn_bg_cmd_t* cmd = spn_bg_find_command(graph, cmd_id);
+  spn_bg_file_t* file = spn_bg_find_file(graph, file_id);
+  sp_str_t cls = dirty ? spn_bg_file_dirty_class(dirty, file_id) : spn_bg_viz_kind_to_class(cmd->viz);
+  sp_str_t path = spn_bg_mermaid_shorten_path(file->path, ctx->paths.source, spn.paths.cache, ctx->paths.work, ctx->paths.store);
+  sp_io_write_str(io, sp_format("{}C{}[\"{}\"]:::{}\n",
+    SP_FMT_CSTR(indent), SP_FMT_U32(cmd->id.index), SP_FMT_STR(path), SP_FMT_STR(cls)));
+}
+
+void spn_render_one_package_ctx(spn_builder_t* b, spn_bg_dirty_t* dirty, spn_dep_ctx_t* dep, sp_io_writer_t* io) {
   // for each package:
   // - subgraph: package              e.g. "sqlite"
   //   - manifest + script         *  e.g. "spn.toml" and "spn.c"
@@ -7866,34 +7877,32 @@ void spn_render_one_package_ctx(spn_builder_t* b, spn_dep_ctx_t* dep, sp_io_writ
   sp_io_write_str(io, sp_format("  subgraph {}[{}]\n", SP_FMT_STR(ctx->name), SP_FMT_STR(ctx->name)));
 
   // manifest + script
-  spn_render_mermaid_file(graph, ctx, nodes->manifest, io, "    ");
-  spn_render_mermaid_file(graph, ctx, nodes->script, io, "    ");
+  spn_render_mermaid_file(graph, dirty, ctx, nodes->manifest, io, "    ");
+  spn_render_mermaid_file(graph, dirty, ctx, nodes->script, io, "    ");
 
   // package() + stamp
-  spn_render_mermaid_cmd(graph, nodes->package, io, "    ");
-  spn_render_mermaid_file(graph, ctx, nodes->stamp.package, io, "    ");
+  spn_render_mermaid_cmd(graph, dirty, nodes->package, io, "    ");
+  spn_render_mermaid_file(graph, dirty, ctx, nodes->stamp.package, io, "    ");
 
   // user subgraph
   sp_io_write_str(io, sp_format("    subgraph {}__user[user]\n", SP_FMT_STR(ctx->name)));
 
-  // main + stamp
-  spn_render_mermaid_cmd(graph, nodes->main, io, "      ");
-  spn_render_mermaid_file(graph, ctx, nodes->stamp.main, io, "      ");
+  // main (collapsed with stamp.main)
+  spn_render_mermaid_cmd_as_file(graph, dirty, ctx, nodes->main, nodes->stamp.main, io, "      ");
 
-  // exit + stamp
-  spn_render_mermaid_cmd(graph, nodes->exit, io, "      ");
-  spn_render_mermaid_file(graph, ctx, nodes->stamp.exit, io, "      ");
+  // exit (collapsed with stamp.exit)
+  spn_render_mermaid_cmd_as_file(graph, dirty, ctx, nodes->exit, nodes->stamp.exit, io, "      ");
 
   // all user commands
   sp_da_for(ctx->user_nodes, it) {
     spn_user_node_t* node = &ctx->user_nodes[it];
-    spn_render_mermaid_cmd(graph, node->id, io, "      ");
+    spn_render_mermaid_cmd(graph, dirty, node->id, io, "      ");
   }
 
   // all user files
   sp_str_ht_for(ctx->files, it) {
     spn_bg_id_t file_id = *sp_str_ht_it_getp(ctx->files, it);
-    spn_render_mermaid_file(graph, ctx, file_id, io, "      ");
+    spn_render_mermaid_file(graph, dirty, ctx, file_id, io, "      ");
   }
 
   sp_io_write_cstr(io, "    end\n"); // user
@@ -7909,15 +7918,12 @@ void spn_render_one_package_ctx(spn_builder_t* b, spn_dep_ctx_t* dep, sp_io_writ
     sp_io_write_str(io, sp_format("    subgraph {}__{}[{}]\n",
       SP_FMT_STR(ctx->name), SP_FMT_STR(target->target->name), SP_FMT_STR(target->target->name)));
 
-    // compile
-    spn_render_mermaid_cmd(graph, target->nodes.compile, io, "      ");
-
-    // output
-    spn_render_mermaid_file(graph, ctx, target->nodes.output, io, "      ");
+    // compile (collapsed with output binary)
+    spn_render_mermaid_cmd_as_file(graph, dirty, ctx, target->nodes.compile, target->nodes.output, io, "      ");
 
     // source files
     sp_da_for(target->nodes.source, s) {
-      spn_render_mermaid_file(graph, ctx, target->nodes.source[s], io, "      ");
+      spn_render_mermaid_file(graph, dirty, ctx, target->nodes.source[s], io, "      ");
     }
 
     sp_io_write_cstr(io, "    end\n"); // target
@@ -7941,28 +7947,68 @@ void spn_render_to_mermaid(spn_app_t* app, sp_io_writer_t* io) {
 
   spn_builder_t* builder = &app->builder;
   spn_build_graph_t* graph = &builder->build.graph;
+  spn_bg_dirty_t* dirty = spn_bg_compute_dirty(graph);
+
+  // build remap table: collapsed stamp files -> their command
+  // key: stamp file index, value: command index
+  sp_ht(u32, u32) file_to_cmd = SP_ZERO_INITIALIZE();
+
+  // collect collapsed pairs from all packages (main+stamp, exit+stamp)
+  sp_om_for(builder->contexts.deps, it) {
+    spn_dep_ctx_t* dep = sp_om_at(builder->contexts.deps, it);
+    spn_pkg_nodes_v2_t* nodes = &dep->ctx.nodes.build;
+    sp_ht_insert(file_to_cmd, nodes->stamp.main.index, nodes->main.index);
+    sp_ht_insert(file_to_cmd, nodes->stamp.exit.index, nodes->exit.index);
+  }
+  {
+    spn_pkg_nodes_v2_t* nodes = &builder->contexts.pkg.ctx.nodes.build;
+    sp_ht_insert(file_to_cmd, nodes->stamp.main.index, nodes->main.index);
+    sp_ht_insert(file_to_cmd, nodes->stamp.exit.index, nodes->exit.index);
+  }
+
+  // collect collapsed pairs from all targets (compile+output)
+  sp_om_for(builder->contexts.targets, it) {
+    spn_target_ctx_t* target = sp_om_at(builder->contexts.targets, it);
+    sp_ht_insert(file_to_cmd, target->nodes.output.index, target->nodes.compile.index);
+  }
 
   // render dependency packages
   sp_om_for(builder->contexts.deps, it) {
     spn_dep_ctx_t* dep = sp_om_at(builder->contexts.deps, it);
-    spn_render_one_package_ctx(builder, dep, io);
+    spn_render_one_package_ctx(builder, dirty, dep, io);
   }
 
   // render root package
-  spn_render_one_package_ctx(builder, &builder->contexts.pkg, io);
+  spn_render_one_package_ctx(builder, dirty, &builder->contexts.pkg, io);
 
   // render edges
   sp_da_for(graph->commands, it) {
     spn_bg_cmd_t* cmd = &graph->commands[it];
 
     sp_da_for(cmd->consumes, i) {
-      sp_io_write_str(io, sp_format("  F{} --> C{}\n",
-        SP_FMT_U32(cmd->consumes[i].index), SP_FMT_U32(cmd->id.index)));
+      u32 file_idx = cmd->consumes[i].index;
+      u32* remapped = sp_ht_getp(file_to_cmd, file_idx);
+      if (remapped) {
+        // file was collapsed into a command - render C --> C
+        sp_io_write_str(io, sp_format("  C{} --> C{}\n",
+          SP_FMT_U32(*remapped), SP_FMT_U32(cmd->id.index)));
+      } else {
+        sp_io_write_str(io, sp_format("  F{} --> C{}\n",
+          SP_FMT_U32(file_idx), SP_FMT_U32(cmd->id.index)));
+      }
     }
 
     sp_da_for(cmd->produces, i) {
+      u32 file_idx = cmd->produces[i].index;
+      // skip internal edges (cmd -> its own collapsed stamp)
+      if (sp_ht_key_exists(file_to_cmd, file_idx)) {
+        u32* owner = sp_ht_getp(file_to_cmd, file_idx);
+        if (*owner == cmd->id.index) {
+          continue;  // skip: this cmd produces its own collapsed stamp
+        }
+      }
       sp_io_write_str(io, sp_format("  C{} --> F{}\n",
-        SP_FMT_U32(cmd->id.index), SP_FMT_U32(cmd->produces[i].index)));
+        SP_FMT_U32(cmd->id.index), SP_FMT_U32(file_idx)));
     }
   }
 }
