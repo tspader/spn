@@ -2,7 +2,7 @@
 name = "spcc"
 repo = "tspader/tinycc"
 version = "1.0.0"
-commit = "7a0131c0f119"
+commit = "06e307464b"
 author = "bellard"
 maintainer = "tspader"
 

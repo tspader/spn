@@ -65,6 +65,8 @@ typedef enum {
   SPN_CC_CLANG,
   SPN_CC_MUSL_GCC,
   SPN_CC_TCC,
+  SPN_CC_COSMOCC,
+  SPN_CC_ZIG,
   SPN_CC_CUSTOM,
 } spn_cc_kind_t;
 
