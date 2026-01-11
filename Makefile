@@ -41,13 +41,16 @@ bootstrap/include/libtcc.h: bootstrap/lib/libtcc.a
 bootstrap/lib/libtcc.a: bootstrap/external/tinycc
 	@if [ ! -f bootstrap/lib/libtcc.a ]; then cd bootstrap/external/tinycc && ./configure --enable-static --prefix=$(PWD)/bootstrap && $(MAKE) && $(MAKE) install; fi
 
-bootstrap/bin/spn: source/spn.c bootstrap/lib/libtcc.a bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h
-# 	@mkdir -p bootstrap/bin
-# 	#gcc -g -o $@ source/spn.c -Iinclude -Ibootstrap/include bootstrap/lib/libtcc.a -lm
-# 	gcc -g -o $@ source/spn.c -Iinclude -Ibootstrap/include -lm -ltcc
-# bootstrap/bin/spn: source/spn.c bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/argparse.h
+bootstrap/bin/embed: tools/embed.c bootstrap/include/sp.h
 	@mkdir -p bootstrap/bin
-	gcc -g -o $@ source/spn.c -Iinclude -Ibootstrap/include -lm bootstrap/lib/libtcc.a
+	gcc -g -o $@ tools/embed.c -Ibootstrap/include -lm
+
+bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h: bootstrap/bin/embed bootstrap/lib/libtcc.a
+	./bootstrap/bin/embed bootstrap/lib/tcc bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h
+
+bootstrap/bin/spn: source/spn.c bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h
+	@mkdir -p bootstrap/bin
+	gcc -g -o $@ source/spn.c -Iinclude -Ibootstrap/include -lm bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o
 
 
 #############

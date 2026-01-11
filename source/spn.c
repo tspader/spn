@@ -98,7 +98,7 @@ sp_str_t sp_str_pad_ex(sp_str_t str, u32 n, c8 c) {
     sp_str_builder_append_c8(&builder, c);
   }
 
-  return sp_str_builder_move(&builder);
+  return sp_str_builder_to_str(&builder);
 }
 
 sp_str_t sp_str_repeat(c8 c, u32 len) {
@@ -107,10 +107,6 @@ sp_str_t sp_str_repeat(c8 c, u32 len) {
   c8* buffer = (c8*)sp_alloc(len);
   sp_mem_fill(buffer, len, &c, sizeof(c8));
   return sp_str(buffer, len);
-}
-
-void sp_str_builder_free(sp_str_builder_t* builder) {
-  sp_free(builder->buffer.data);
 }
 
 void strip_ansi(char* buf, ssize_t* len) {
@@ -293,7 +289,7 @@ sp_str_t spn_spinner_render(spn_spinner_t* s) {
   }
 
   sp_str_builder_append_cstr(&builder, SP_ANSI_RESET);
-  return sp_str_builder_move(&builder);
+  return sp_str_builder_to_str(&builder);
 }
 
 
@@ -322,7 +318,7 @@ sp_str_t sp_ps_config_render(sp_ps_config_t ps) {
     sp_str_builder_append(&b, arg);
   }
 
-  return sp_str_builder_write(&b);
+  return sp_str_builder_to_str(&b);
 }
 
 void sp_io_write_new_line(sp_io_writer_t* io) {
@@ -1197,8 +1193,13 @@ spn_bg_id_t spn_build_ctx_get_or_insert_user_file(spn_build_ctx_t* ctx, spn_buil
 // V2 executor functions
 s32 spn_executor_build_target(spn_bg_cmd_t* cmd, void* user_data);
 s32 spn_executor_run_package(spn_bg_cmd_t* cmd, void* user_data);
-s32 spn_executor_sync_point(spn_bg_cmd_t* cmd, void* user_data);
 s32 spn_executor_sync_entry(spn_bg_cmd_t* cmd, void* user_data);
+
+typedef struct {
+  spn_build_ctx_t* ctx;
+  sp_str_t* stamp;
+} spn_sync_point_t;
+s32 spn_executor_sync_point(spn_bg_cmd_t* cmd, void* user_data);
 
 ////////////
 // EVENTS //
@@ -2861,6 +2862,8 @@ sp_str_t spn_cc_kind_to_executable(spn_cc_kind_t compiler) {
     case SPN_CC_GCC:      return sp_str_lit("gcc");
     case SPN_CC_CLANG:      return sp_str_lit("clang");
     case SPN_CC_MUSL_GCC: return sp_str_lit("musl-gcc");
+    case SPN_CC_COSMOCC: return sp_str_lit("cosmocc");
+    case SPN_CC_ZIG: return sp_str_lit("zcc");
     case SPN_CC_CUSTOM:   SP_FALLTHROUGH();
     case SPN_CC_NONE:     return sp_str_lit("gcc");
   }
@@ -2909,6 +2912,9 @@ spn_cc_kind_t spn_cc_kind_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "gcc")) return SPN_CC_GCC;
   else if (sp_str_equal_cstr(str, "clang")) return SPN_CC_CLANG;
   else if (sp_str_equal_cstr(str, "musl-gcc")) return SPN_CC_MUSL_GCC;
+  else if (sp_str_equal_cstr(str, "zcc")) return SPN_CC_ZIG;
+  else if (sp_str_equal_cstr(str, "zig cc")) return SPN_CC_ZIG;
+  else if (sp_str_equal_cstr(str, "cosmocc")) return SPN_CC_COSMOCC;
 
   spn_log_warn("Unknown compiler {:fg brightyellow}; we'll assume a gcc command line when generating switches", SP_FMT_STR(str));
   return SPN_CC_CUSTOM;
@@ -2981,6 +2987,8 @@ sp_str_t spn_gen_format_entry(sp_str_t entry, spn_gen_entry_t kind, spn_cc_kind_
     case SPN_CC_TCC:
     case SPN_CC_MUSL_GCC:
     case SPN_CC_CLANG:
+    case SPN_CC_ZIG:
+    case SPN_CC_COSMOCC:
     case SPN_CC_GCC: {
       switch (kind) {
         case SPN_GEN_INCLUDE:     return sp_format("-I{}",          SP_FMT_STR(entry));
@@ -2989,11 +2997,16 @@ sp_str_t spn_gen_format_entry(sp_str_t entry, spn_gen_entry_t kind, spn_cc_kind_
         case SPN_GEN_SYSTEM_LIBS: return sp_format("-l{}",          SP_FMT_STR(entry));
         case SPN_GEN_RPATH:       return sp_format("-Wl,-rpath,{}", SP_FMT_STR(entry));
         case SPN_GEN_DEFINE:      return sp_format("-D{}",          SP_FMT_STR(entry));
-        default: SP_UNREACHABLE_RETURN(sp_str_lit(""));
+        case SPN_GEN_NONE:
+        case SPN_GEN_ALL: {
+          sp_unreachable_case();
+        }
       }
     }
-    default: SP_UNREACHABLE_RETURN(sp_str_lit(""));
   }
+
+  sp_unreachable();
+  return sp_str_lit("");
 }
 
 sp_str_t spn_build_ctx_get_dir(const spn_build_ctx_t* b, spn_dir_kind_t kind) {
@@ -3573,7 +3586,7 @@ sp_str_t spn_toml_writer_write(spn_toml_writer_t* writer) {
   u32 depth = sp_dyn_array_size(writer->stack);
   SP_ASSERT(depth == 1);
 
-  return sp_str_builder_write(&writer->builder);
+  return sp_str_builder_to_str(&writer->builder);
 }
 
 /////////
@@ -3641,7 +3654,7 @@ sp_str_t spn_tui_decorate_name(sp_str_t name, u32 padded_len, c8 pad) {
     sp_str_builder_append(&b, sp_str_repeat(pad, padded_len - name.len));
   }
 
-  return sp_str_builder_move(&b);
+  return sp_str_builder_to_str(&b);
 }
 
 sp_str_t spn_tui_name_to_color(sp_str_t str) {
@@ -3844,7 +3857,7 @@ sp_str_t spn_tui_render_build_event(spn_build_event_t* event) {
     }
   }
 
-  return sp_str_builder_move(&builder);
+  return sp_str_builder_to_str(&builder);
 }
 
 void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode) {
@@ -3904,7 +3917,7 @@ sp_str_t sp_str_visual_pad(sp_str_t str, u32 target_visual_width) {
     sp_str_builder_append_c8(&builder, ' ');
   }
 
-  return sp_str_builder_write(&builder);
+  return sp_str_builder_to_str(&builder);
 }
 
 void sp_tui_begin_table(sp_tui_table_t* table) {
@@ -4057,7 +4070,7 @@ sp_str_t sp_tui_table_render(sp_tui_table_t* table) {
     sp_str_builder_new_line(&builder);
   }
 
-  return sp_str_builder_move(&builder);
+  return sp_str_builder_to_str(&builder);
 }
 
 void spn_lock_file_init(spn_lock_file_t* lock) {
@@ -4883,6 +4896,8 @@ void spn_profile_set_cc(spn_profile_t* profile, spn_cc_kind_t kind) {
     case SPN_CC_CLANG:    profile->cc.exe = spn_intern_cstr("clang");    break;
     case SPN_CC_MUSL_GCC: profile->cc.exe = spn_intern_cstr("musl-gcc"); break;
     case SPN_CC_TCC:      profile->cc.exe = spn_intern_cstr("tcc");      break;
+    case SPN_CC_COSMOCC:  profile->cc.exe = spn_intern_cstr("cosmocc");  break;
+    case SPN_CC_ZIG:      profile->cc.exe = spn_intern_cstr("zcc");      break;
     case SPN_CC_CUSTOM:   break;
   }
 }
@@ -5621,7 +5636,7 @@ spn_err_t spn_app_resolve_from_solver(spn_app_t* app) {
       sp_str_builder_new_line(&builder);
       sp_str_builder_append_fmt(&builder, "{:fg brightcyan} requires {:fg brightred}", SP_FMT_STR(req_high.name), SP_FMT_STR(spn_semver_range_to_str(req_high.range)));
 
-      SP_FATAL("{}", SP_FMT_STR(sp_str_builder_move(&builder)));
+      SP_FATAL("{}", SP_FMT_STR(sp_str_builder_to_str(&builder)));
     }
 
 
@@ -6069,7 +6084,7 @@ s32 spn_executor_build_target(spn_bg_cmd_t* cmd, void* user_data) {
     spn_push_event_ex((spn_build_event_t) {
       .kind = SPN_BUILD_EVENT_TARGET_BUILD,
       .target.build = {
-        .args = sp_str_builder_write(&log),
+        .args = sp_str_builder_to_str(&log),
       }
     });
 
@@ -7435,7 +7450,8 @@ s32 spn_executor_run_package(spn_bg_cmd_t* cmd, void* user_data) {
 
 s32 spn_executor_sync_point(spn_bg_cmd_t* cmd, void* user_data) {
   (void)cmd;
-  (void)user_data;
+  spn_sync_point_t* sync = (spn_sync_point_t*)user_data;
+  spn_build_ctx_stamp(sync->ctx, *sync->stamp);
   return SPN_OK;
 }
 
@@ -7596,10 +7612,16 @@ void spn_build_graph_add_pkg(spn_builder_t* b, spn_build_ctx_t* ctx) {
   nodes->script = spn_bg_add_file_ex(graph, ctx->pkg->paths.script, SPN_BG_VIZ_MANIFEST, ctx->name);
   nodes->package = spn_bg_add_fn_ex(graph, spn_executor_run_package, ctx, SPN_BG_VIZ_CMD, ctx->name, sp_str_lit("script::package"));
   nodes->stamp.package = spn_bg_add_file_ex(graph, ctx->paths.stamp.package, SPN_BG_VIZ_STAMP, ctx->name);
-  nodes->main = spn_bg_add_fn_ex(graph, spn_executor_sync_point, ctx, SPN_BG_VIZ_CMD, ctx->name, sp_str_lit("sync::main"));
   nodes->stamp.main = spn_bg_add_file_ex(graph, ctx->paths.stamp.main, SPN_BG_VIZ_CMD, ctx->name);
-  nodes->exit = spn_bg_add_fn_ex(graph, spn_executor_sync_point, ctx, SPN_BG_VIZ_CMD, ctx->name, sp_str_lit("sync::exit"));
   nodes->stamp.exit = spn_bg_add_file_ex(graph, ctx->paths.stamp.exit, SPN_BG_VIZ_CMD, ctx->name);
+
+  spn_sync_point_t* sync_main = SP_ALLOC(spn_sync_point_t);
+  *sync_main = (spn_sync_point_t){ .ctx = ctx, .stamp = &ctx->paths.stamp.main };
+  nodes->main = spn_bg_add_fn_ex(graph, spn_executor_sync_point, sync_main, SPN_BG_VIZ_CMD, ctx->name, sp_str_lit("sync::main"));
+
+  spn_sync_point_t* sync_exit = SP_ALLOC(spn_sync_point_t);
+  *sync_exit = (spn_sync_point_t){ .ctx = ctx, .stamp = &ctx->paths.stamp.exit };
+  nodes->exit = spn_bg_add_fn_ex(graph, spn_executor_sync_point, sync_exit, SPN_BG_VIZ_CMD, ctx->name, sp_str_lit("sync::exit"));
 
   spn_bg_cmd_add_input(graph, nodes->main, nodes->manifest);
   spn_bg_cmd_add_input(graph, nodes->main, nodes->script);
@@ -8330,7 +8352,7 @@ sp_str_t spn_cli_command_usage(spn_cli_command_usage_t cmd) {
     sp_str_builder_append_fmt(&builder, "{}", SP_FMT_STR(table));
   }
 
-  return sp_str_builder_move(&builder);
+  return sp_str_builder_to_str(&builder);
 }
 
 sp_str_t spn_cli_usage(spn_cli_command_usage_t* cmd) {
@@ -8436,7 +8458,7 @@ sp_str_t spn_cli_usage(spn_cli_command_usage_t* cmd) {
     sp_str_builder_append(&builder, sp_tui_table_render(&spn.tui.table));
   }
 
-  return sp_str_builder_move(&builder);
+  return sp_str_builder_to_str(&builder);
 }
 
 sp_app_result_t spn_cli_help(spn_cli_parser_t* p) {
