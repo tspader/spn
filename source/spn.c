@@ -987,9 +987,10 @@ typedef struct {
 // BUILD CONTEXT //
 ///////////////////
 typedef struct spn_builder spn_builder_t;
+typedef struct spn_dep_ctx_t spn_dep_ctx_t;
 
 struct spn_node_t {
-  spn_build_ctx_t* ctx;
+  spn_dep_ctx_t* ctx;
   u32 index;
 };
 
@@ -1091,9 +1092,6 @@ struct spn_build_ctx {
   sp_mem_arena_t* arena;
   sp_str_t error;
 
-  sp_da(spn_user_node_t) user_nodes;
-  sp_str_ht(spn_bg_id_t) files;  // path -> graph file node
-
   spn_build_time_t time;
   sp_da(sp_ps_config_t) commands;
   sp_ps_t ps;
@@ -1114,7 +1112,7 @@ typedef struct {
   } nodes;
 } spn_target_ctx_t;
 
-typedef struct {
+struct spn_dep_ctx_t {
   spn_build_ctx_t ctx;
   spn_metadata_t metadata;
   spn_dep_options_t options;
@@ -1125,9 +1123,12 @@ typedef struct {
   struct {
     spn_pkg_nodes_t configure;
     spn_pkg_nodes_v2_t build;
+    sp_da(spn_user_node_t) all;
+    sp_str_ht(spn_bg_id_t) files;
   } nodes;
 
-} spn_dep_ctx_t;
+
+};
 
 typedef struct {
   spn_build_graph_t graph;
@@ -2153,17 +2154,19 @@ void spn_cmake_run(spn_cmake_t* cmake) {
 }
 
 spn_user_node_t* spn_find_user_node(spn_node_t node) {
-  SP_ASSERT(node.index < sp_da_size(node.ctx->user_nodes));
-  return &node.ctx->user_nodes[node.index];
+  SP_ASSERT(node.index < sp_da_size(node.ctx->nodes.all));
+  return &node.ctx->nodes.all[node.index];
 }
 
-spn_node_t spn_add_node(spn_build_ctx_t* ctx, const c8* tag) {
-  u32 index = sp_da_size(ctx->user_nodes);
+spn_node_t spn_add_node(spn_build_ctx_t* c, const c8* tag) {
+  // @hack
+  spn_dep_ctx_t* ctx = (spn_dep_ctx_t*)c;
+  u32 index = sp_da_size(ctx->nodes.all);
   spn_user_node_t node = {
-    .ctx = ctx,
+    .ctx = &ctx->ctx,
     .tag = spn_intern_cstr(tag),
   };
-  sp_da_push(ctx->user_nodes, node);
+  sp_da_push(ctx->nodes.all, node);
 
   return (spn_node_t) {
     .ctx = ctx,
@@ -7549,11 +7552,11 @@ spn_task_result_t spn_task_cfg_init(spn_app_t* app) {
 }
 
 spn_bg_id_t spn_build_ctx_get_or_insert_user_file(spn_dep_ctx_t* ctx, spn_build_graph_t* graph, sp_str_t path) {
-  spn_bg_id_t* existing = sp_str_ht_get(ctx->ctx.files, path);
+  spn_bg_id_t* existing = sp_str_ht_get(ctx->nodes.files, path);
   if (existing) return *existing;
 
   spn_bg_id_t id = spn_bg_add_file_ex(graph, path, SPN_BG_VIZ_CMD, ctx->ctx.name);
-  sp_str_ht_insert(ctx->ctx.files, path, id);
+  sp_str_ht_insert(ctx->nodes.files, path, id);
   sp_da_push(ctx->nodes.build.user, id);
   return id;
 }
@@ -7638,14 +7641,14 @@ void spn_build_graph_add_pkg(spn_builder_t* b, spn_dep_ctx_t* ctx) {
 
   // add nodes the user defined in configure()
   // pass 1: create all command nodes
-  sp_da_for(ctx->ctx.user_nodes, it) {
-    spn_user_node_t* node = &ctx->ctx.user_nodes[it];
+  sp_da_for(ctx->nodes.all, it) {
+    spn_user_node_t* node = &ctx->nodes.all[it];
     spn_build_ctx_add_user_node(ctx, graph, node);
   }
 
   // pass 2: create all file in/outputs + create a stamp file for outputless commands
-  sp_da_for(ctx->ctx.user_nodes, it) {
-    spn_user_node_t* node = &ctx->ctx.user_nodes[it];
+  sp_da_for(ctx->nodes.all, it) {
+    spn_user_node_t* node = &ctx->nodes.all[it];
 
     // if no outputs, depend on the exit node's stamp
     if (sp_da_empty(node->outputs)) {
@@ -7670,8 +7673,8 @@ void spn_build_graph_add_pkg(spn_builder_t* b, spn_dep_ctx_t* ctx) {
   }
 
   // pass 3: now that all file nodes exist, set up links for command inputs
-  sp_da_for(ctx->ctx.user_nodes, it) {
-    spn_user_node_t* node = &ctx->ctx.user_nodes[it];
+  sp_da_for(ctx->nodes.all, it) {
+    spn_user_node_t* node = &ctx->nodes.all[it];
 
     // depend on the outputs of your command inputs
     sp_da_for(node->deps, dit) {
@@ -7921,14 +7924,14 @@ void spn_render_one_package_ctx(spn_builder_t* b, spn_bg_dirty_t* dirty, spn_dep
   spn_render_mermaid_cmd_as_file(graph, dirty, ctx, nodes->exit, nodes->stamp.exit, io, "      ");
 
   // all user commands
-  sp_da_for(ctx->user_nodes, it) {
-    spn_user_node_t* node = &ctx->user_nodes[it];
+  sp_da_for(dep->nodes.all, it) {
+    spn_user_node_t* node = &dep->nodes.all[it];
     spn_render_mermaid_cmd(graph, dirty, node->id, io, "      ");
   }
 
   // all user files
-  sp_str_ht_for(ctx->files, it) {
-    spn_bg_id_t file_id = *sp_str_ht_it_getp(ctx->files, it);
+  sp_str_ht_for(dep->nodes.files, it) {
+    spn_bg_id_t file_id = *sp_str_ht_it_getp(dep->nodes.files, it);
     spn_render_mermaid_file(graph, dirty, ctx, file_id, io, "      ");
   }
 
