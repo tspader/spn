@@ -5,7 +5,7 @@
 
 spn_err_t generate_header(spn_node_ctx_t* ctx) {
   spn_log(ctx->build, "generating version.h...");
-  spn_write_file(ctx->build, "version.h", 
+  spn_write_file(ctx->build, "version.h",
     "#ifndef VERSION_H\n"
     "#define VERSION_H\n"
     "#define VERSION_MAJOR 1\n"
@@ -17,17 +17,12 @@ spn_err_t generate_header(spn_node_ctx_t* ctx) {
 }
 
 void configure(spn_build_ctx_t* ctx) {
-  // Add work dir to include path so generated headers are found
-  // Use relative path since spn_add_include joins with project dir
-  spn_add_include(ctx, "build/debug/work");
-  
-  // Add nodes during configure - this is when the build graph is constructed
+  spn_add_include(ctx, spn_get_dir(ctx, SPN_DIR_WORK));
+
   spn_node_t gen = spn_add_node(ctx, "gen_version");
   spn_node_set_fn(gen, generate_header);
-  
-  // Output the generated header so the graph knows about it
-  const c8* output = spn_get_subdir(ctx, SPN_DIR_WORK, "version.h");
-  spn_node_add_output(gen, output);
+
+  spn_node_add_output(gen, spn_get_subdir(ctx, SPN_DIR_WORK, "version.h"));
 }
 
 void package(spn_build_ctx_t* ctx) {

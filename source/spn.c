@@ -1001,7 +1001,7 @@ typedef struct {
   sp_da(sp_str_t) inputs;
   sp_da(sp_str_t) outputs;
   sp_da(spn_node_t) deps;
-  spn_bg_id_t graph_cmd;
+  spn_bg_id_t id;
 } spn_user_node_t;
 
 
@@ -1015,22 +1015,18 @@ typedef struct {
   spn_bg_id_t stamp;
 } spn_pkg_nodes_t;
 
-// V2: Node IDs for package sub-graph (JIT compilation happens in phase 1)
-// Sync nodes are optional - .occupied=0 means the node doesn't exist
 typedef struct {
   spn_bg_id_t manifest;
   spn_bg_id_t script;
   spn_bg_id_t package;
+  spn_bg_id_t main;
+  spn_bg_id_t exit;
   struct {
-    spn_bg_id_t store;
+    spn_bg_id_t package;
+    spn_bg_id_t main;
+    spn_bg_id_t exit;
   } stamp;
-  struct {
-    spn_bg_id_t entry;        // optional: only when deps > 0 or root_user_nodes > 1
-    spn_bg_id_t entry_stamp;  // optional: paired with entry
-    spn_bg_id_t user;         // optional: only when orphan_outputs > 1
-    spn_bg_id_t user_stamp;   // optional: paired with user
-  } sync;
-  sp_da(spn_bg_id_t) orphan_outputs;  // user node outputs with no consumers (before targets added)
+  sp_da(spn_bg_id_t) user;
 } spn_pkg_nodes_v2_t;
 
 typedef struct {
@@ -1079,8 +1075,11 @@ struct spn_build_ctx {
     sp_str_t   bin;
     sp_str_t   vendor;
     struct {
+      sp_str_t dir;
       sp_str_t build;
       sp_str_t package;
+      sp_str_t main;
+      sp_str_t exit;
       sp_str_t nodes;
     } stamp;
     struct {
@@ -1093,14 +1092,14 @@ struct spn_build_ctx {
   sp_str_t error;
 
   sp_da(spn_user_node_t) user_nodes;
-  sp_str_ht(spn_bg_id_t) file_to_graph_id;  // path -> graph file node
+  sp_str_ht(spn_bg_id_t) files;  // path -> graph file node
 
   // @spader
   // @spader: graph_nodes should probably be on dep_ctx_t not build_ctx
   struct {
     spn_pkg_nodes_t configure;
     spn_pkg_nodes_v2_t build;
-  } graph_nodes;
+  } nodes;
   spn_build_time_t time;
   sp_da(sp_ps_config_t) commands;
   sp_ps_t ps;
@@ -1117,6 +1116,7 @@ typedef struct {
   struct {
     spn_bg_id_t output;
     spn_bg_id_t compile;
+    sp_da(spn_bg_id_t) source;
   } nodes;
 } spn_target_ctx_t;
 
@@ -1141,8 +1141,10 @@ struct spn_builder {
   spn_profile_t* profile;
   spn_target_filter_t filter;
 
+  // @refactor
+  // I'd like to not have the root package separate
   struct {
-    sp_om(spn_target_ctx_t) bins;
+    sp_om(spn_target_ctx_t) targets;
     sp_om(spn_dep_ctx_t) deps;
     spn_dep_ctx_t pkg;
   } contexts;
@@ -1188,9 +1190,9 @@ void spn_builder_set_filter(spn_builder_t* builder, spn_target_filter_t filter);
 void spn_builder_add_target(spn_builder_t* builder, spn_target_t* target);
 void spn_builder_add_dep(spn_builder_t* builder, spn_resolved_pkg_t* resolved);
 void spn_build_graph_add_pkg(spn_builder_t* b, spn_build_ctx_t* ctx);
-void spn_build_graph_add_user_nodes(spn_build_ctx_t* ctx, spn_build_graph_t* graph, spn_pkg_nodes_v2_t* pkg_nodes);
 void spn_build_graph_finalize_pkg(spn_builder_t* b, spn_build_ctx_t* ctx, bool has_targets);
-spn_bg_id_t spn_build_ctx_get_file_node(spn_build_ctx_t* ctx, spn_build_graph_t* graph, sp_str_t path);
+spn_bg_id_t spn_build_ctx_get_or_insert_user_file(spn_build_ctx_t* ctx, spn_build_graph_t* graph, sp_str_t path);
+
 
 // V2 executor functions
 s32 spn_executor_build_target(spn_bg_cmd_t* cmd, void* user_data);
@@ -2208,135 +2210,6 @@ s32 spn_executor_run_user_fn(spn_bg_cmd_t* cmd, void* user_data) {
   return err;
 }
 
-spn_bg_id_t spn_build_ctx_get_file_node(spn_build_ctx_t* ctx, spn_build_graph_t* graph, sp_str_t path) {
-  spn_bg_id_t* existing = sp_str_ht_get(ctx->file_to_graph_id, path);
-  if (existing) {
-    return *existing;
-  }
-  spn_bg_id_t id = spn_bg_add_file(graph, path);
-  sp_str_ht_insert(ctx->file_to_graph_id, path, id);
-  return id;
-}
-
-void spn_build_graph_add_user_nodes(spn_build_ctx_t* ctx, spn_build_graph_t* graph, spn_pkg_nodes_v2_t* pkg_nodes) {
-  // Count root user nodes (nodes with no inputs or deps)
-  s32 root_count = 0;
-  sp_da_for(ctx->user_nodes, it) {
-    spn_user_node_t* node = &ctx->user_nodes[it];
-    if (sp_da_empty(node->inputs) && sp_da_empty(node->deps)) {
-      root_count++;
-    }
-  }
-
-  // Determine if we need sync::entry
-  // Need it when: deps > 0 OR root_user_nodes > 1 OR has build() hook
-  bool has_deps = sp_ht_size(ctx->pkg->deps) > 0;
-  bool has_build_hook = ctx->on_build != SP_NULLPTR;
-  bool needs_entry_sync = has_deps || root_count > 1 || has_build_hook;
-
-  if (needs_entry_sync) {
-    pkg_nodes->sync.entry = spn_bg_add_fn(graph, spn_executor_sync_entry, ctx);
-    pkg_nodes->sync.entry_stamp = spn_bg_add_file_ex(graph, sp_format("{}/entry.stamp", SP_FMT_STR(ctx->paths.stamp.nodes)), SPN_BG_VIZ_STAMP);
-    spn_bg_cmd_add_output(graph, pkg_nodes->sync.entry, pkg_nodes->sync.entry_stamp);
-    // Manifest files are inputs to sync::entry when we have one
-    spn_bg_cmd_add_input(graph, pkg_nodes->sync.entry, pkg_nodes->manifest);
-    spn_bg_cmd_add_input(graph, pkg_nodes->sync.entry, pkg_nodes->script);
-  }
-
-  // If no user nodes, manifest files feed into package (or sync::entry if it exists)
-  if (sp_da_empty(ctx->user_nodes)) {
-    if (needs_entry_sync) {
-      spn_bg_cmd_add_input(graph, pkg_nodes->package, pkg_nodes->sync.entry_stamp);
-    } else {
-      // Simple case: manifests → package
-      spn_bg_cmd_add_input(graph, pkg_nodes->package, pkg_nodes->manifest);
-      spn_bg_cmd_add_input(graph, pkg_nodes->package, pkg_nodes->script);
-    }
-    return;
-  }
-
-  // Pass 1: Create all user node commands
-  sp_da_for(ctx->user_nodes, it) {
-    spn_user_node_t* node = &ctx->user_nodes[it];
-    node->graph_cmd = spn_bg_add_fn(graph, spn_executor_run_user_fn, node);
-    spn_bg_tag_command(graph, node->graph_cmd, sp_format("{}::{}", SP_FMT_STR(ctx->name), SP_FMT_STR(node->tag)));
-    spn_bg_cmd_set_kind(graph, node->graph_cmd, SPN_BG_VIZ_CMD);
-    spn_bg_cmd_set_package(graph, node->graph_cmd, ctx->name);
-  }
-
-  // Track all output files for later orphan detection
-  sp_da(spn_bg_id_t) output_files = SP_ZERO_INITIALIZE();
-
-  // Pass 2: Add all outputs first (so consumers are populated when we add inputs)
-  sp_da_for(ctx->user_nodes, it) {
-    spn_user_node_t* node = &ctx->user_nodes[it];
-
-    if (sp_da_empty(node->outputs)) {
-      sp_str_t stamp = sp_format("{}/{}.stamp", SP_FMT_STR(ctx->paths.stamp.nodes), SP_FMT_STR(node->tag));
-      spn_bg_id_t output_file = spn_build_ctx_get_file_node(ctx, graph, stamp);
-      spn_bg_cmd_add_output(graph, node->graph_cmd, output_file);
-      spn_bg_file_set_viz_kind(graph, output_file, SPN_BG_VIZ_STAMP);
-      spn_bg_file_set_package(graph, output_file, ctx->name);
-      sp_da_push(output_files, output_file);
-    } else {
-      sp_da_for(node->outputs, o) {
-        spn_bg_id_t file = spn_build_ctx_get_file_node(ctx, graph, node->outputs[o]);
-        spn_bg_cmd_add_output(graph, node->graph_cmd, file);
-        spn_bg_file_set_package(graph, file, ctx->name);
-        sp_da_push(output_files, file);
-      }
-    }
-  }
-
-  // Pass 3: Add all inputs and explicit deps
-  sp_da_for(ctx->user_nodes, it) {
-    spn_user_node_t* node = &ctx->user_nodes[it];
-    bool is_root = sp_da_empty(node->inputs) && sp_da_empty(node->deps);
-
-    sp_da_for(node->inputs, i) {
-      spn_bg_id_t file = spn_build_ctx_get_file_node(ctx, graph, node->inputs[i]);
-      spn_bg_cmd_add_input(graph, node->graph_cmd, file);
-    }
-
-    if (is_root) {
-      if (needs_entry_sync) {
-        // Root nodes depend on entry_stamp
-        spn_bg_cmd_add_input(graph, node->graph_cmd, pkg_nodes->sync.entry_stamp);
-      } else {
-        // Simple case: root nodes depend on manifest files directly
-        spn_bg_cmd_add_input(graph, node->graph_cmd, pkg_nodes->manifest);
-        spn_bg_cmd_add_input(graph, node->graph_cmd, pkg_nodes->script);
-      }
-    }
-
-    sp_da_for(node->deps, d) {
-      spn_node_t dep_handle = node->deps[d];
-      spn_user_node_t* dep = spn_find_user_node(dep_handle);
-      sp_str_t dep_output;
-      if (sp_da_empty(dep->outputs)) {
-        dep_output = sp_format("{}/{}.stamp", SP_FMT_STR(dep_handle.ctx->paths.stamp.nodes), SP_FMT_STR(dep->tag));
-      } else {
-        dep_output = dep->outputs[0];
-      }
-      spn_bg_id_t dep_file = spn_build_ctx_get_file_node(dep_handle.ctx, graph, dep_output);
-      spn_bg_cmd_add_input(graph, node->graph_cmd, dep_file);
-    }
-  }
-
-  // Pass 4: Count orphan outputs (no consumers)
-  sp_da(spn_bg_id_t) orphan_outputs = SP_ZERO_INITIALIZE();
-  sp_da_for(output_files, i) {
-    spn_bg_file_t* file = spn_bg_find_file(graph, output_files[i]);
-    if (sp_da_empty(file->consumers)) {
-      sp_da_push(orphan_outputs, output_files[i]);
-    }
-  }
-  sp_da_free(output_files);
-
-  // Store orphan outputs for later connection (after targets are added)
-  // Don't connect to package yet - that happens in spn_build_graph_finalize_pkg
-  pkg_nodes->orphan_outputs = orphan_outputs;
-}
 
 spn_cc_t spn_cc_new(spn_build_ctx_t* build) {
   return (spn_cc_t) {
@@ -5884,16 +5757,20 @@ void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t config) {
   ctx->builder = config.builder;
   ctx->paths.source = config.paths.source;
   ctx->paths.store = config.paths.store;
-  ctx->paths.work = config.paths.work;
-
   ctx->paths.include = sp_fs_join_path(ctx->paths.store, SP_LIT("include"));
   ctx->paths.bin = sp_fs_join_path(ctx->paths.store, SP_LIT("bin"));
   ctx->paths.lib = sp_fs_join_path(ctx->paths.store, SP_LIT("lib"));
   ctx->paths.vendor = sp_fs_join_path(ctx->paths.store, SP_LIT("vendor"));
+
+  ctx->paths.work = config.paths.work;
+  ctx->paths.spn = sp_fs_join_path(ctx->paths.work, SP_LIT("spn"));
+  ctx->paths.stamp.dir = sp_fs_join_path(ctx->paths.spn, SP_LIT("stamp"));
+  ctx->paths.stamp.main = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("main.stamp"));
+  ctx->paths.stamp.exit = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("user.stamp"));
+  ctx->paths.stamp.nodes = sp_fs_join_path(ctx->paths.spn, SP_LIT("stamp"));
   ctx->paths.stamp.package = sp_fs_join_path(ctx->paths.store, SP_LIT("spn.stamp"));
   ctx->paths.stamp.build = sp_fs_join_path(ctx->paths.work, SP_LIT("spn.stamp"));
-  ctx->paths.spn = sp_fs_join_path(ctx->paths.work, SP_LIT("spn"));
-  ctx->paths.stamp.nodes = sp_fs_join_path(ctx->paths.spn, SP_LIT("stamp"));
+
   ctx->paths.logs.build = sp_fs_join_path(
     ctx->paths.work,
     spn_build_ctx_get_build_log_name(ctx)
@@ -6341,7 +6218,7 @@ void spn_builder_set_filter(spn_builder_t* builder, spn_target_filter_t filter) 
 }
 
 void spn_builder_add_target(spn_builder_t* builder, spn_target_t* target) {
-  sp_om_insert(builder->contexts.bins, target->name, ((spn_target_ctx_t) {
+  sp_om_insert(builder->contexts.targets, target->name, ((spn_target_ctx_t) {
     .target = target,
     .ctx = spn_build_ctx_make((spn_build_ctx_config_t) {
       .name = target->name,
@@ -7359,8 +7236,8 @@ sp_app_result_t spn_deinit(sp_app_t* sp) {
     spn_build_ctx_deinit(&dep->ctx);
   }
 
-  sp_om_for(app->builder.contexts.bins, it) {
-    spn_target_ctx_t* target = sp_om_at(app->builder.contexts.bins, it);
+  sp_om_for(app->builder.contexts.targets, it) {
+    spn_target_ctx_t* target = sp_om_at(app->builder.contexts.targets, it);
     spn_build_ctx_deinit(&target->ctx);
   }
 
@@ -7408,8 +7285,8 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
     spn.tui.info.max_name = SP_MAX(spn.tui.info.max_name, pkg->name.len);
   }
 
-  sp_om_for(b->contexts.bins, it) {
-    spn_pkg_t* pkg = sp_om_at(b->contexts.bins, it)->ctx.pkg;
+  sp_om_for(b->contexts.targets, it) {
+    spn_pkg_t* pkg = sp_om_at(b->contexts.targets, it)->ctx.pkg;
     spn.tui.info.max_name = SP_MAX(spn.tui.info.max_name, pkg->name.len);
   }
 
@@ -7427,7 +7304,7 @@ void spn_task_sync_init(spn_app_t* app) {
   sp_om_for(b->contexts.deps, it) {
     spn_dep_ctx_t* dep = sp_om_at(b->contexts.deps, it);
     spn_bg_id_t sync = spn_bg_add_fn(graph, spn_executor_sync_repo, dep);
-    spn_bg_tag_command(graph, sync, sp_format("sync ({})", SP_FMT_STR(dep->ctx.name)));
+    spn_bg_cmd_set_metadata(graph, sync, sp_format("sync ({})", SP_FMT_STR(dep->ctx.name)), sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
   }
 
   b->sync.dirty = spn_bg_compute_forced_dirty(graph);
@@ -7610,7 +7487,7 @@ spn_task_result_t spn_task_cfg_init(spn_app_t* app) {
 
   spn_bg_id_t build = spn_bg_add_fn(graph, spn_executor_configure_regular_dep, &b->contexts.pkg.ctx);
   spn_bg_id_t stamp = spn_bg_add_file(graph, b->contexts.pkg.ctx.paths.stamp.package);
-  spn_bg_tag_command(graph, build, app->package.name);
+  spn_bg_cmd_set_metadata(graph, build, app->package.name, sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
   spn_bg_cmd_add_output(graph, build, stamp);
 
   sp_ht_for(app->resolver.resolved, it) {
@@ -7618,11 +7495,11 @@ spn_task_result_t spn_task_cfg_init(spn_app_t* app) {
     spn_resolved_pkg_t* resolved = sp_ht_it_getp(app->resolver.resolved, it);
     spn_dep_ctx_t* dep = sp_om_get(b->contexts.deps, name);
     sp_assert(dep);
-    dep->ctx.graph_nodes.configure.build = spn_bg_add_fn(graph, spn_executor_configure_build_dep, &dep->ctx);
-    dep->ctx.graph_nodes.configure.stamp = spn_bg_add_file(graph, dep->ctx.paths.stamp.package);
-    spn_bg_tag_command(graph, dep->ctx.graph_nodes.configure.build, name);
-    spn_bg_cmd_add_output(graph, dep->ctx.graph_nodes.configure.build, dep->ctx.graph_nodes.configure.stamp);
-    spn_bg_cmd_add_input(graph, build, dep->ctx.graph_nodes.configure.stamp);
+    dep->ctx.nodes.configure.build = spn_bg_add_fn(graph, spn_executor_configure_build_dep, &dep->ctx);
+    dep->ctx.nodes.configure.stamp = spn_bg_add_file(graph, dep->ctx.paths.stamp.package);
+    spn_bg_cmd_set_metadata(graph, dep->ctx.nodes.configure.build, name, sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
+    spn_bg_cmd_add_output(graph, dep->ctx.nodes.configure.build, dep->ctx.nodes.configure.stamp);
+    spn_bg_cmd_add_input(graph, build, dep->ctx.nodes.configure.stamp);
   }
 
   sp_om_for(b->contexts.deps, it) {
@@ -7633,7 +7510,7 @@ spn_task_result_t spn_task_cfg_init(spn_app_t* app) {
       sp_str_t parent_name = *sp_ht_it_getkp(pkg->deps, dit);
       spn_dep_ctx_t* parent = sp_om_get(b->contexts.deps, parent_name);
 
-      spn_bg_cmd_add_input(graph, dep->ctx.graph_nodes.configure.build, parent->ctx.graph_nodes.configure.stamp);
+      spn_bg_cmd_add_input(graph, dep->ctx.nodes.configure.build, parent->ctx.nodes.configure.stamp);
     }
   }
 
@@ -7649,209 +7526,167 @@ spn_task_result_t spn_task_cfg_init(spn_app_t* app) {
   return SPN_TASK_DONE;
 }
 
+spn_bg_id_t spn_build_ctx_get_or_insert_user_file(spn_build_ctx_t* ctx, spn_build_graph_t* graph, sp_str_t path) {
+  spn_bg_id_t* existing = sp_str_ht_get(ctx->files, path);
+  if (existing) return *existing;
+
+  spn_bg_id_t id = spn_bg_add_file_ex(graph, path, SPN_BG_VIZ_CMD, ctx->name);
+  sp_str_ht_insert(ctx->files, path, id);
+  sp_da_push(ctx->nodes.build.user, id);
+  return id;
+}
+
+sp_str_t spn_build_ctx_get_node_stamp_path(spn_build_ctx_t* ctx, spn_user_node_t* node) {
+  return sp_fs_join_path(ctx->paths.stamp.dir, node->tag);
+}
+
+void spn_build_ctx_add_user_node(spn_build_ctx_t* ctx, spn_build_graph_t* graph, spn_user_node_t* node) {
+  node->id = spn_bg_add_fn_ex(graph, spn_executor_run_user_fn, node, SPN_BG_VIZ_CMD, ctx->name, node->tag);
+  sp_da_push(ctx->nodes.build.user, node->id);
+}
+
 void spn_build_graph_add_target(spn_builder_t* builder, spn_target_ctx_t* build) {
   spn_build_graph_t* graph = &builder->build.graph;
-  spn_build_ctx_t* ctx = &build->ctx;
   spn_target_t* target = build->target;
+  spn_dep_ctx_t* dep = spn_builder_find_pkg_ctx(builder, target->pkg->name);
+  spn_build_ctx_t* ctx = &dep->ctx;
   spn_pkg_t* pkg = target->pkg;
 
-  sp_str_t path = sp_fs_join_path(ctx->paths.bin, target->name);
+  //                         ┌──────────┐
+  //                         │  foo.c   │──┐
+  //                         └──────────┘  │  ┌─────────────┐  ┌───────────────────────┐     ┌──────────────────┐
+  //                                       ├─▶│   compile   │─▶│   $STORE/bin/foobar   │────▶│ script::package  │
+  //                         ┌──────────┐  │  └─────────────┘  └───────────────────────┘     └──────────────────┘
+  //                         │  bar.c   │──┘         ▲
+  //                         └──────────┘            │
+  //                                                 │
+  // ┌ ─ ─ ─ ─ ─ ─ ─ ─ ┐     ┌─────────────┐         │
+  //     user graph     ────▶│ user::exit  │─────────┘
+  // └ ─ ─ ─ ─ ─ ─ ─ ─ ┘     └─────────────┘
+  //
+  sp_str_t subgraph = sp_str_join(ctx->name, target->name, sp_str_lit("::"));
 
-  build->nodes.output = spn_bg_add_file_ex(graph, path, SPN_BG_VIZ_BINARY);
-  build->nodes.compile = spn_bg_add_fn(graph, spn_executor_build_target, build);
+  build->nodes.compile = spn_bg_add_fn_ex(graph, spn_executor_build_target, build, SPN_BG_VIZ_CMD, ctx->name, sp_format("{}::compile", SP_FMT_STR(target->name)));
+  build->nodes.output = spn_bg_add_file_ex(graph, sp_fs_join_path(ctx->paths.bin, target->name), SPN_BG_VIZ_BINARY, ctx->name);
+
   spn_bg_cmd_add_output(graph, build->nodes.compile,  build->nodes.output);
+  spn_bg_cmd_add_input(graph, build->nodes.compile, dep->ctx.nodes.build.stamp.exit);
+  spn_bg_cmd_add_input(graph, dep->ctx.nodes.build.package, build->nodes.output);
 
-  // rerun the build script when any source files change
   sp_da_for(target->source, it) {
     sp_str_t file = sp_fs_join_path(ctx->paths.source, target->source[it]);
-    spn_bg_id_t node = spn_bg_add_file_ex(graph, file, SPN_BG_VIZ_SOURCE);
+    spn_bg_id_t node = spn_bg_add_file_ex(graph, file, SPN_BG_VIZ_SOURCE, ctx->name);
+    sp_da_push(build->nodes.source, node);
     spn_bg_cmd_add_input(graph, build->nodes.compile, node);
-
-    spn_bg_file_set_package(graph, node, pkg->name);
   }
-
-
-  spn_bg_file_set_package(graph, build->nodes.output, ctx->name);
-  spn_bg_tag_command(graph, build->nodes.compile, sp_format("{}::compile", SP_FMT_STR(target->name)));
-  spn_bg_cmd_set_kind(graph, build->nodes.compile, SPN_BG_VIZ_CMD);
-  spn_bg_cmd_set_package(graph, build->nodes.compile, ctx->name);
 }
 
 void spn_build_graph_add_pkg(spn_builder_t* b, spn_build_ctx_t* ctx) {
   spn_build_graph_t* graph = &b->build.graph;
-  spn_pkg_nodes_v2_t* nodes = &ctx->graph_nodes.build;
+  spn_pkg_nodes_v2_t* nodes = &ctx->nodes.build;
 
-  // Always create manifest files and package node
-  nodes->manifest = spn_bg_add_file_ex(graph, ctx->pkg->paths.manifest, SPN_BG_VIZ_MANIFEST);
-  nodes->script = spn_bg_add_file_ex(graph, ctx->pkg->paths.script, SPN_BG_VIZ_MANIFEST);
-  nodes->package = spn_bg_add_fn(graph, spn_executor_run_package, ctx);
-  nodes->stamp.store = spn_bg_add_file_ex(graph, ctx->paths.stamp.package, SPN_BG_VIZ_STAMP);
-  spn_bg_cmd_add_output(graph, nodes->package, nodes->stamp.store);
+  // ┌──────────┐
+  // │ spn.toml │──┐
+  // └──────────┘  │  ┌─────────────┐     ┌ ─ ─ ─ ─ ─ ─ ─ ─ ┐     ┌─────────────┐     ┌──────────────────┐
+  //               ├─▶│ user::main  │────▶    user graph     ────▶│ user::exit  │────▶│ script::package  │
+  // ┌──────────┐  │  └─────────────┘     └ ─ ─ ─ ─ ─ ─ ─ ─ ┘     └─────────────┘     └──────────────────┘
+  // │  spn.c   │──┘         │                                           ▲
+  // └──────────┘            └───────────────────────────────────────────┘
+  nodes->manifest = spn_bg_add_file_ex(graph, ctx->pkg->paths.manifest, SPN_BG_VIZ_MANIFEST, ctx->name);
+  nodes->script = spn_bg_add_file_ex(graph, ctx->pkg->paths.script, SPN_BG_VIZ_MANIFEST, ctx->name);
+  nodes->package = spn_bg_add_fn_ex(graph, spn_executor_run_package, ctx, SPN_BG_VIZ_CMD, ctx->name, sp_str_lit("script::package"));
+  nodes->stamp.package = spn_bg_add_file_ex(graph, ctx->paths.stamp.package, SPN_BG_VIZ_STAMP, ctx->name);
+  nodes->main = spn_bg_add_fn_ex(graph, spn_executor_sync_point, ctx, SPN_BG_VIZ_CMD, ctx->name, sp_str_lit("sync::main"));
+  nodes->stamp.main = spn_bg_add_file_ex(graph, ctx->paths.stamp.main, SPN_BG_VIZ_CMD, ctx->name);
+  nodes->exit = spn_bg_add_fn_ex(graph, spn_executor_sync_point, ctx, SPN_BG_VIZ_CMD, ctx->name, sp_str_lit("sync::exit"));
+  nodes->stamp.exit = spn_bg_add_file_ex(graph, ctx->paths.stamp.exit, SPN_BG_VIZ_CMD, ctx->name);
 
-  // Sync nodes start as empty - will be created conditionally in spn_build_graph_add_user_nodes
-  nodes->sync.entry = (spn_bg_id_t){0};
-  nodes->sync.entry_stamp = (spn_bg_id_t){0};
-  nodes->sync.user = (spn_bg_id_t){0};
-  nodes->sync.user_stamp = (spn_bg_id_t){0};
+  spn_bg_cmd_add_input(graph, nodes->main, nodes->manifest);
+  spn_bg_cmd_add_input(graph, nodes->main, nodes->script);
+  spn_bg_cmd_add_output(graph, nodes->main, nodes->stamp.main);
+  spn_bg_cmd_add_input(graph, nodes->exit, nodes->stamp.main);
+  spn_bg_cmd_add_output(graph, nodes->exit, nodes->stamp.exit);
+  spn_bg_cmd_add_input(graph, nodes->package, nodes->stamp.exit);
+  spn_bg_cmd_add_output(graph, nodes->package, nodes->stamp.package);
 
-  // Add user-defined nodes to the graph (this may create sync nodes if needed)
-  spn_build_graph_add_user_nodes(ctx, graph, nodes);
-
-  // Tag and set package for always-present nodes
-  spn_bg_tag_command(graph, nodes->package, sp_format("{}::script::package", SP_FMT_STR(ctx->name)));
-  spn_bg_file_set_package(graph, nodes->manifest, ctx->name);
-  spn_bg_file_set_package(graph, nodes->script, ctx->name);
-  spn_bg_file_set_package(graph, nodes->stamp.store, ctx->name);
-  spn_bg_cmd_set_kind(graph, nodes->package, SPN_BG_VIZ_CMD);
-  spn_bg_cmd_set_package(graph, nodes->package, ctx->name);
-
-  // Tag optional sync nodes if they were created
-  if (nodes->sync.entry.occupied) {
-    spn_bg_tag_command(graph, nodes->sync.entry, sp_format("{}::sync::entry", SP_FMT_STR(ctx->name)));
-    spn_bg_file_set_package(graph, nodes->sync.entry_stamp, ctx->name);
-    spn_bg_cmd_set_kind(graph, nodes->sync.entry, SPN_BG_VIZ_CMD);
-    spn_bg_cmd_set_package(graph, nodes->sync.entry, ctx->name);
+  // add nodes the user defined in configure()
+  // pass 1: create all command nodes
+  sp_da_for(ctx->user_nodes, it) {
+    spn_user_node_t* node = &ctx->user_nodes[it];
+    spn_build_ctx_add_user_node(ctx, graph, node);
   }
-  if (nodes->sync.user.occupied) {
-    spn_bg_tag_command(graph, nodes->sync.user, sp_format("{}::sync::user", SP_FMT_STR(ctx->name)));
-    spn_bg_file_set_package(graph, nodes->sync.user_stamp, ctx->name);
-    spn_bg_cmd_set_kind(graph, nodes->sync.user, SPN_BG_VIZ_CMD);
-    spn_bg_cmd_set_package(graph, nodes->sync.user, ctx->name);
+
+  // pass 2: create all file in/outputs + create a stamp file for outputless commands
+  sp_da_for(ctx->user_nodes, it) {
+    spn_user_node_t* node = &ctx->user_nodes[it];
+
+    // if no outputs, depend on the exit node's stamp
+    if (sp_da_empty(node->outputs)) {
+      sp_da_push(node->outputs, spn_build_ctx_get_node_stamp_path(ctx, node));
+    }
+
+    sp_da_for(node->outputs, o) {
+      spn_bg_id_t file = spn_build_ctx_get_or_insert_user_file(ctx, graph, node->outputs[o]);
+      spn_bg_cmd_add_output(graph, node->id, file);
+      spn_bg_cmd_add_input(graph, nodes->exit, file);
+    }
+
+    // if no inputs, depend on the main node's stamp
+    if (sp_da_empty(node->inputs) && sp_da_empty(node->deps)) {
+      spn_bg_cmd_add_input(graph, node->id, nodes->stamp.main);
+    }
+
+    sp_da_for(node->inputs, i) {
+      spn_bg_id_t file = spn_build_ctx_get_or_insert_user_file(ctx, graph, node->inputs[i]);
+      spn_bg_cmd_add_input(graph, node->id, file);
+    }
+  }
+
+  // pass 3: now that all file nodes exist, set up links for command inputs
+  sp_da_for(ctx->user_nodes, it) {
+    spn_user_node_t* node = &ctx->user_nodes[it];
+
+    // depend on the outputs of your command inputs
+    sp_da_for(node->deps, dit) {
+      spn_user_node_t* dep = spn_find_user_node(node->deps[dit]);
+      sp_da_for(dep->outputs, oit) {
+        spn_bg_id_t output = spn_build_ctx_get_or_insert_user_file(dep->ctx, graph, dep->outputs[oit]);
+        spn_bg_cmd_add_input(graph, node->id, output);
+      }
+    }
   }
 }
 
-// Finalize package graph after targets have been added
-// Connects orphan outputs to sync::user (if needed) or package
-void spn_build_graph_finalize_pkg(spn_builder_t* b, spn_build_ctx_t* ctx, bool has_targets) {
-  spn_build_graph_t* graph = &b->build.graph;
-  spn_pkg_nodes_v2_t* nodes = &ctx->graph_nodes.build;
-
-  // If orphan_outputs is NULL, there were no user nodes and 
-  // spn_build_graph_add_user_nodes already handled the package edges
-  if (nodes->orphan_outputs == SP_NULLPTR) {
-    return;
+void spn_build_graph_link_deps(spn_build_graph_t* graph, spn_builder_t* builder, spn_build_ctx_t* ctx) {
+  spn_pkg_t* pkg = ctx->pkg;
+  sp_ht_for(pkg->deps, dit) {
+    spn_dep_ctx_t* dep = sp_om_get(builder->contexts.deps, *sp_ht_it_getkp(pkg->deps, dit));
+    spn_bg_cmd_add_input(graph, ctx->nodes.build.main, dep->ctx.nodes.build.stamp.package);
   }
-
-  // If we have targets, they already consume orphan outputs via compile deps
-  // We only need to create sync::user if there are multiple orphans AND targets
-  // For now, let's just connect orphans appropriately
-
-  s32 orphan_count = sp_da_size(nodes->orphan_outputs);
-  bool needs_entry_sync = nodes->sync.entry.occupied;
-
-  // If no orphans, package needs to wait for something
-  if (orphan_count == 0) {
-    if (needs_entry_sync) {
-      spn_bg_cmd_add_input(graph, nodes->package, nodes->sync.entry_stamp);
-    } else {
-      spn_bg_cmd_add_input(graph, nodes->package, nodes->manifest);
-      spn_bg_cmd_add_input(graph, nodes->package, nodes->script);
-    }
-    return;
-  }
-
-  // Determine if we need sync::user
-  // Need it when: orphan_outputs > 1 (and has_targets, since targets consume them)
-  bool needs_user_sync = orphan_count > 1 && has_targets;
-
-  if (needs_user_sync) {
-    nodes->sync.user = spn_bg_add_fn(graph, spn_executor_sync_point, ctx);
-    nodes->sync.user_stamp = spn_bg_add_file_ex(graph, sp_format("{}/user.stamp", SP_FMT_STR(ctx->paths.stamp.nodes)), SPN_BG_VIZ_STAMP);
-    spn_bg_cmd_add_output(graph, nodes->sync.user, nodes->sync.user_stamp);
-
-    // All orphan outputs feed into sync::user
-    sp_da_for(nodes->orphan_outputs, i) {
-      spn_bg_cmd_add_input(graph, nodes->sync.user, nodes->orphan_outputs[i]);
-    }
-
-    // Tag the newly created sync::user
-    spn_bg_tag_command(graph, nodes->sync.user, sp_format("{}::sync::user", SP_FMT_STR(ctx->name)));
-    spn_bg_file_set_package(graph, nodes->sync.user_stamp, ctx->name);
-    spn_bg_cmd_set_kind(graph, nodes->sync.user, SPN_BG_VIZ_CMD);
-    spn_bg_cmd_set_package(graph, nodes->sync.user, ctx->name);
-  }
-
-  // If no targets, orphan outputs feed directly into package
-  if (!has_targets) {
-    sp_da_for(nodes->orphan_outputs, i) {
-      spn_bg_cmd_add_input(graph, nodes->package, nodes->orphan_outputs[i]);
-    }
-  }
-
-  sp_da_free(nodes->orphan_outputs);
-  nodes->orphan_outputs = SP_NULLPTR;
 }
 
 spn_task_result_t spn_task_prepare_build_graph_v2(spn_app_t* app) {
-  spn_builder_t* b = &app->builder;
-  spn_build_graph_t* graph = &b->build.graph;
+  spn_builder_t* builder = &app->builder;
+  spn_build_graph_t* graph = &builder->build.graph;
 
-  // Phase 1: Add every package (creates user nodes, but doesn't connect orphans yet)
-  sp_om_for(b->contexts.deps, it) {
-    spn_dep_ctx_t* dep = sp_om_at(b->contexts.deps, it);
-    spn_build_graph_add_pkg(b, &dep->ctx);
+  // phase 1: add each package to the graph
+  sp_om_for(builder->contexts.deps, it) {
+    spn_dep_ctx_t* dep = sp_om_at(builder->contexts.deps, it);
+    spn_build_graph_add_pkg(builder, &dep->ctx);
   }
-  spn_build_graph_add_pkg(b, &b->contexts.pkg.ctx);
+  spn_build_graph_add_pkg(builder, &builder->contexts.pkg.ctx);
 
-  // Phase 2: Add links between directly related packages
-  // If a package has deps, sync::entry must exist (created in spn_build_graph_add_user_nodes)
-  sp_om_for(b->contexts.deps, it) {
-    spn_dep_ctx_t* parent = sp_om_at(b->contexts.deps, it);
-    sp_ht_for(parent->ctx.pkg->deps, dit) {
-      spn_dep_ctx_t* grandparent = sp_om_get(b->contexts.deps, *sp_ht_it_getkp(parent->ctx.pkg->deps, dit));
-      spn_bg_cmd_add_input(graph, parent->ctx.graph_nodes.build.sync.entry, grandparent->ctx.graph_nodes.build.stamp.store);
-    }
+  // phase 3: add targets
+  sp_om_for(builder->contexts.targets, it) {
+    spn_build_graph_add_target(builder, sp_om_at(builder->contexts.targets, it));
   }
 
-  // Phase 3: Add all targets which passed the filter
-  // Track which packages have targets for orphan connection later
-  sp_ht(sp_str_t, bool) pkgs_with_targets = SP_NULLPTR;
-  sp_ht_set_fns(pkgs_with_targets, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-
-  sp_om_for(b->contexts.bins, it) {
-    spn_target_ctx_t* target = sp_om_at(b->contexts.bins, it);
-    spn_dep_ctx_t* pkg = spn_builder_find_pkg_ctx(b, target->ctx.pkg->name);
-    spn_pkg_nodes_v2_t* pkg_nodes = &pkg->ctx.graph_nodes.build;
-
-    spn_build_graph_add_target(b, target);
-    sp_ht_insert(pkgs_with_targets, pkg->ctx.name, true);
-
-    // Target consumes orphan outputs directly (no sync::user yet)
-    // If there are orphan outputs, add them as dependencies
-    sp_da_for(pkg_nodes->orphan_outputs, i) {
-      spn_bg_cmd_add_input(graph, target->nodes.compile, pkg_nodes->orphan_outputs[i]);
-    }
-
-    // If no orphan outputs, depend on entry sync or manifests
-    if (sp_da_empty(pkg_nodes->orphan_outputs)) {
-      if (pkg_nodes->sync.entry.occupied) {
-        spn_bg_cmd_add_input(graph, target->nodes.compile, pkg_nodes->sync.entry_stamp);
-      } else {
-        spn_bg_cmd_add_input(graph, target->nodes.compile, pkg_nodes->manifest);
-        spn_bg_cmd_add_input(graph, target->nodes.compile, pkg_nodes->script);
-      }
-    }
-
-    // Package waits for target output
-    spn_bg_cmd_add_input(graph, pkg_nodes->package, target->nodes.output);
+  // phase 2: link dependent packages
+  sp_om_for(builder->contexts.deps, it) {
+    spn_dep_ctx_t* parent = sp_om_at(builder->contexts.deps, it);
+    spn_build_graph_link_deps(graph, builder, &sp_om_at(builder->contexts.deps, it)->ctx);
   }
-
-  // Phase 4: Finalize orphan connections for all packages
-  sp_om_for(b->contexts.deps, it) {
-    spn_dep_ctx_t* dep = sp_om_at(b->contexts.deps, it);
-    bool has_targets = sp_ht_key_exists(pkgs_with_targets, dep->ctx.name);
-    spn_build_graph_finalize_pkg(b, &dep->ctx, has_targets);
-  }
-  {
-    bool has_targets = sp_ht_key_exists(pkgs_with_targets, b->contexts.pkg.ctx.name);
-    spn_build_graph_finalize_pkg(b, &b->contexts.pkg.ctx, has_targets);
-  }
-
-  // Phase 5: Link main package's sync::entry to dependency store stamps
-  sp_ht_for(app->package.deps, it) {
-    spn_dep_ctx_t* dep = sp_om_get(b->contexts.deps, *sp_ht_it_getkp(app->package.deps, it));
-    spn_bg_cmd_add_input(graph, b->contexts.pkg.ctx.graph_nodes.build.sync.entry, dep->ctx.graph_nodes.build.stamp.store);
-  }
+  spn_build_graph_link_deps(graph, builder, &builder->contexts.pkg.ctx);
 
   return SPN_TASK_DONE;
 }
@@ -7925,8 +7760,8 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
 
   sp_tm_timer_t timer = sp_tm_start_timer();
 
-  sp_om_for(b->contexts.bins, it) {
-    spn_target_ctx_t* bin = sp_om_at(b->contexts.bins, it);
+  sp_om_for(b->contexts.targets, it) {
+    spn_target_ctx_t* bin = sp_om_at(b->contexts.targets, it);
     spn_build_ctx_t* ctx = &bin->ctx;
     spn_target_t* target = bin->target;
 
@@ -7966,7 +7801,7 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
 
   bool ok = true;
   sp_ht_for_kv(tests, it) {
-    spn_target_ctx_t* target = sp_om_get(b->contexts.bins, *it.key);
+    spn_target_ctx_t* target = sp_om_get(b->contexts.targets, *it.key);
     spn_build_ctx_t* ctx = &target->ctx;
 
     if (*it.val) {
@@ -7989,18 +7824,80 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
   return SPN_TASK_DONE;
 }
 
+void spn_render_one_package_ctx(spn_builder_t* b, spn_dep_ctx_t* ctx, sp_io_writer_t* io) {
+  // for each package:
+  // - subgraph: package              e.g. "sqlite"
+  //   - manifest + script         *  e.g. "spn.toml" and "spn.c"
+  //   - package() + stamp         *  e.g. "sqlite::package" + "$STAMP/package.stamp"
+  //     - subgraph: user nodes
+  //       - main + stamp          *  e.g. "sqlite::user::main" + "$STAMP/main.stamp"
+  //       - exit + stamp          *  e.g. "sqlite::user::exit" + "$STAMP/exit.stamp"
+  //       - all user nodes        *  e.g. "sqlite::user::tag" or relative file path
+  //     - for each target:
+  //       - subgraph: target         e.g. "sqlite.jimsh"
+  //         - compile             ^  e.g. "sqlite::jimsh::compile"
+  //         - output              ^  e.g. "$STORE/bin/jimsh"
+  //         - source files        ^  e.g. "jimsh.c"
+  //
+  //  key:
+  //  * => get from spn_build_ctx_t's nodes.build
+  //  ^ => get from spn_target_ctx_t
+
+  sp_io_write_str(io, sp_format(
+    "  subgraph {}[{}]\n",
+    SP_FMT_STR(ctx->ctx.name),
+    SP_FMT_STR(ctx->ctx.name)
+  ));
+
+  sp_io_write_str(io, sp_format(
+    "  subgraph {}[{}]\n",
+    SP_FMT_STR(sp_format("{}::user", SP_FMT_STR(ctx->ctx.name))),
+    SP_FMT_CSTR("user")
+  ));
+
+  sp_io_write_cstr(io, "    end\n"); // user
+
+  sp_om_for(b->contexts.targets, it) {
+    spn_target_ctx_t* target = sp_om_at(b->contexts.targets, it);
+    if (target->target->pkg == ctx->ctx.pkg) {
+      // write them
+    }
+  }
+
+  sp_io_write_cstr(io, "  end\n"); // package
+}
+
+void spn_render_to_mermaid(spn_app_t* app, sp_io_writer_t* io) {
+  sp_str_t stroke = sp_str_lit("#1a1a2e");
+  sp_str_t text = sp_str_lit("#e0e0e0");
+
+  sp_io_write_str(io, sp_str_lit("graph TD\n"));
+
+  // color by dirtiness
+  sp_str_t dirty_color = sp_str_lit("#a36565");
+  sp_str_t clean_color = sp_str_lit("#65a365");
+  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("dirty"), dirty_color, stroke, text));
+  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("clean"), clean_color, stroke, text));
+  sp_io_write_str(io, sp_str_lit("  linkStyle default stroke:#909090,stroke-width:2px\n"));
+
+  spn_builder_t* builder = &app->builder;
+  spn_render_one_package_ctx(builder, &builder->contexts.pkg, io);
+}
+
 spn_task_result_t spn_task_render_build_graph(spn_app_t* app) {
   spn_bg_dirty_t* dirty = spn.cli.graph.dirty ? spn_bg_compute_dirty(&app->builder.build.graph) : NULL;
   sp_str_t work_dir = app->builder.contexts.pkg.ctx.paths.work;
   sp_str_t store_dir = app->builder.contexts.pkg.ctx.paths.store;
 
+
   if (sp_str_valid(spn.cli.graph.output)) {
-    sp_io_writer_t stream = sp_io_writer_from_file(spn.cli.graph.output, SP_IO_WRITE_MODE_OVERWRITE);
-    spn_bg_to_mermaid(&app->builder.build.graph, dirty, &stream, app->paths.dir, spn.paths.cache, work_dir, store_dir);
-    sp_io_writer_close(&stream);
+    sp_io_writer_t writer = sp_io_writer_from_file(spn.cli.graph.output, SP_IO_WRITE_MODE_OVERWRITE);
+    //spn_bg_to_mermaid(&app->builder.build.graph, dirty, &stream, app->paths.dir, spn.paths.cache, work_dir, store_dir);
+    spn_render_to_mermaid(app, &writer);
+    sp_io_writer_close(&writer);
   }
   else {
-    spn_bg_to_mermaid(&app->builder.build.graph, dirty, &spn.logger.out, app->paths.dir, spn.paths.cache, work_dir, store_dir);
+    spn_render_to_mermaid(app, &spn.logger.out);
   }
 
   return SPN_TASK_DONE;
