@@ -988,6 +988,10 @@ typedef struct {
 ///////////////////
 typedef struct spn_builder spn_builder_t;
 
+struct spn_node_t {
+  spn_build_ctx_t* ctx;
+  u32 index;
+};
 
 typedef struct {
   spn_build_ctx_t* ctx;
@@ -1090,12 +1094,6 @@ struct spn_build_ctx {
   sp_da(spn_user_node_t) user_nodes;
   sp_str_ht(spn_bg_id_t) files;  // path -> graph file node
 
-  // @spader
-  // @spader: graph_nodes should probably be on dep_ctx_t not build_ctx
-  struct {
-    spn_pkg_nodes_t configure;
-    spn_pkg_nodes_v2_t build;
-  } nodes;
   spn_build_time_t time;
   sp_da(sp_ps_config_t) commands;
   sp_ps_t ps;
@@ -1123,6 +1121,11 @@ typedef struct {
   sp_hash_t build_id;
   sp_str_t message;
   bool force;
+
+  struct {
+    spn_pkg_nodes_t configure;
+    spn_pkg_nodes_v2_t build;
+  } nodes;
 
 } spn_dep_ctx_t;
 
@@ -1185,9 +1188,12 @@ spn_dep_ctx_t*  spn_builder_find_pkg_ctx(spn_builder_t* builder, sp_str_t name);
 void spn_builder_set_filter(spn_builder_t* builder, spn_target_filter_t filter);
 void spn_builder_add_target(spn_builder_t* builder, spn_target_t* target);
 void spn_builder_add_dep(spn_builder_t* builder, spn_resolved_pkg_t* resolved);
-void spn_build_graph_add_pkg(spn_builder_t* b, spn_build_ctx_t* ctx);
+void spn_build_graph_add_pkg(spn_builder_t* b, spn_dep_ctx_t* ctx);
 void spn_build_graph_finalize_pkg(spn_builder_t* b, spn_build_ctx_t* ctx, bool has_targets);
-spn_bg_id_t spn_build_ctx_get_or_insert_user_file(spn_build_ctx_t* ctx, spn_build_graph_t* graph, sp_str_t path);
+spn_bg_id_t spn_build_ctx_get_or_insert_user_file(spn_dep_ctx_t* ctx, spn_build_graph_t* graph, sp_str_t path);
+void spn_build_ctx_add_user_node(spn_dep_ctx_t* ctx, spn_build_graph_t* graph, spn_user_node_t* node);
+sp_str_t spn_build_ctx_get_node_stamp_path(spn_build_ctx_t* ctx, spn_user_node_t* node);
+void spn_build_graph_link_deps(spn_build_graph_t* graph, spn_builder_t* builder, spn_dep_ctx_t* ctx);
 
 
 // V2 executor functions
@@ -7511,11 +7517,11 @@ spn_task_result_t spn_task_cfg_init(spn_app_t* app) {
     spn_resolved_pkg_t* resolved = sp_ht_it_getp(app->resolver.resolved, it);
     spn_dep_ctx_t* dep = sp_om_get(b->contexts.deps, name);
     sp_assert(dep);
-    dep->ctx.nodes.configure.build = spn_bg_add_fn(graph, spn_executor_configure_build_dep, &dep->ctx);
-    dep->ctx.nodes.configure.stamp = spn_bg_add_file(graph, dep->ctx.paths.stamp.package);
-    spn_bg_cmd_set_metadata(graph, dep->ctx.nodes.configure.build, name, sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
-    spn_bg_cmd_add_output(graph, dep->ctx.nodes.configure.build, dep->ctx.nodes.configure.stamp);
-    spn_bg_cmd_add_input(graph, build, dep->ctx.nodes.configure.stamp);
+    dep->nodes.configure.build = spn_bg_add_fn(graph, spn_executor_configure_build_dep, &dep->ctx);
+    dep->nodes.configure.stamp = spn_bg_add_file(graph, dep->ctx.paths.stamp.package);
+    spn_bg_cmd_set_metadata(graph, dep->nodes.configure.build, name, sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
+    spn_bg_cmd_add_output(graph, dep->nodes.configure.build, dep->nodes.configure.stamp);
+    spn_bg_cmd_add_input(graph, build, dep->nodes.configure.stamp);
   }
 
   sp_om_for(b->contexts.deps, it) {
@@ -7526,7 +7532,7 @@ spn_task_result_t spn_task_cfg_init(spn_app_t* app) {
       sp_str_t parent_name = *sp_ht_it_getkp(pkg->deps, dit);
       spn_dep_ctx_t* parent = sp_om_get(b->contexts.deps, parent_name);
 
-      spn_bg_cmd_add_input(graph, dep->ctx.nodes.configure.build, parent->ctx.nodes.configure.stamp);
+      spn_bg_cmd_add_input(graph, dep->nodes.configure.build, parent->nodes.configure.stamp);
     }
   }
 
@@ -7542,12 +7548,12 @@ spn_task_result_t spn_task_cfg_init(spn_app_t* app) {
   return SPN_TASK_DONE;
 }
 
-spn_bg_id_t spn_build_ctx_get_or_insert_user_file(spn_build_ctx_t* ctx, spn_build_graph_t* graph, sp_str_t path) {
-  spn_bg_id_t* existing = sp_str_ht_get(ctx->files, path);
+spn_bg_id_t spn_build_ctx_get_or_insert_user_file(spn_dep_ctx_t* ctx, spn_build_graph_t* graph, sp_str_t path) {
+  spn_bg_id_t* existing = sp_str_ht_get(ctx->ctx.files, path);
   if (existing) return *existing;
 
-  spn_bg_id_t id = spn_bg_add_file_ex(graph, path, SPN_BG_VIZ_CMD, ctx->name);
-  sp_str_ht_insert(ctx->files, path, id);
+  spn_bg_id_t id = spn_bg_add_file_ex(graph, path, SPN_BG_VIZ_CMD, ctx->ctx.name);
+  sp_str_ht_insert(ctx->ctx.files, path, id);
   sp_da_push(ctx->nodes.build.user, id);
   return id;
 }
@@ -7556,17 +7562,15 @@ sp_str_t spn_build_ctx_get_node_stamp_path(spn_build_ctx_t* ctx, spn_user_node_t
   return sp_fs_join_path(ctx->paths.stamp.dir, node->tag);
 }
 
-void spn_build_ctx_add_user_node(spn_build_ctx_t* ctx, spn_build_graph_t* graph, spn_user_node_t* node) {
-  node->id = spn_bg_add_fn_ex(graph, spn_executor_run_user_fn, node, SPN_BG_VIZ_CMD, ctx->name, node->tag);
+void spn_build_ctx_add_user_node(spn_dep_ctx_t* ctx, spn_build_graph_t* graph, spn_user_node_t* node) {
+  node->id = spn_bg_add_fn_ex(graph, spn_executor_run_user_fn, node, SPN_BG_VIZ_CMD, ctx->ctx.name, node->tag);
   sp_da_push(ctx->nodes.build.user, node->id);
 }
 
 void spn_build_graph_add_target(spn_builder_t* builder, spn_target_ctx_t* build) {
   spn_build_graph_t* graph = &builder->build.graph;
   spn_target_t* target = build->target;
-  spn_dep_ctx_t* dep = spn_builder_find_pkg_ctx(builder, target->pkg->name);
-  spn_build_ctx_t* ctx = &dep->ctx;
-  spn_pkg_t* pkg = target->pkg;
+  spn_dep_ctx_t* pkg = spn_builder_find_pkg_ctx(builder, target->pkg->name);
 
   //                         ┌──────────┐
   //                         │  foo.c   │──┐
@@ -7580,26 +7584,27 @@ void spn_build_graph_add_target(spn_builder_t* builder, spn_target_ctx_t* build)
   //     user graph     ────▶│ user::exit  │─────────┘
   // └ ─ ─ ─ ─ ─ ─ ─ ─ ┘     └─────────────┘
   //
-  sp_str_t subgraph = sp_str_join(ctx->name, target->name, sp_str_lit("::"));
+  sp_str_t subgraph = sp_str_join(pkg->ctx.name, target->name, sp_str_lit("::"));
 
-  build->nodes.compile = spn_bg_add_fn_ex(graph, spn_executor_build_target, build, SPN_BG_VIZ_CMD, ctx->name, sp_format("{}::compile", SP_FMT_STR(target->name)));
-  build->nodes.output = spn_bg_add_file_ex(graph, sp_fs_join_path(ctx->paths.bin, target->name), SPN_BG_VIZ_BINARY, ctx->name);
+  build->nodes.compile = spn_bg_add_fn_ex(graph, spn_executor_build_target, build, SPN_BG_VIZ_CMD, pkg->ctx.name, sp_format("{}::compile", SP_FMT_STR(target->name)));
+  build->nodes.output = spn_bg_add_file_ex(graph, sp_fs_join_path(pkg->ctx.paths.bin, target->name), SPN_BG_VIZ_BINARY, pkg->ctx.name);
 
   spn_bg_cmd_add_output(graph, build->nodes.compile,  build->nodes.output);
-  spn_bg_cmd_add_input(graph, build->nodes.compile, dep->ctx.nodes.build.stamp.exit);
-  spn_bg_cmd_add_input(graph, dep->ctx.nodes.build.package, build->nodes.output);
+  spn_bg_cmd_add_input(graph, build->nodes.compile, pkg->nodes.build.stamp.exit);
+  spn_bg_cmd_add_input(graph, pkg->nodes.build.package, build->nodes.output);
 
   sp_da_for(target->source, it) {
-    sp_str_t file = sp_fs_join_path(ctx->paths.source, target->source[it]);
-    spn_bg_id_t node = spn_bg_add_file_ex(graph, file, SPN_BG_VIZ_SOURCE, ctx->name);
+    sp_str_t file = sp_fs_join_path(pkg->ctx.paths.source, target->source[it]);
+    spn_bg_id_t node = spn_bg_add_file_ex(graph, file, SPN_BG_VIZ_SOURCE, pkg->ctx.name);
     sp_da_push(build->nodes.source, node);
     spn_bg_cmd_add_input(graph, build->nodes.compile, node);
   }
 }
 
-void spn_build_graph_add_pkg(spn_builder_t* b, spn_build_ctx_t* ctx) {
+void spn_build_graph_add_pkg(spn_builder_t* b, spn_dep_ctx_t* ctx) {
   spn_build_graph_t* graph = &b->build.graph;
   spn_pkg_nodes_v2_t* nodes = &ctx->nodes.build;
+  spn_pkg_t* pkg = ctx->ctx.pkg;
 
   // ┌──────────┐
   // │ spn.toml │──┐
@@ -7608,20 +7613,20 @@ void spn_build_graph_add_pkg(spn_builder_t* b, spn_build_ctx_t* ctx) {
   // ┌──────────┐  │  └─────────────┘     └ ─ ─ ─ ─ ─ ─ ─ ─ ┘     └─────────────┘     └──────────────────┘
   // │  spn.c   │──┘         │                                           ▲
   // └──────────┘            └───────────────────────────────────────────┘
-  nodes->manifest = spn_bg_add_file_ex(graph, ctx->pkg->paths.manifest, SPN_BG_VIZ_MANIFEST, ctx->name);
-  nodes->script = spn_bg_add_file_ex(graph, ctx->pkg->paths.script, SPN_BG_VIZ_MANIFEST, ctx->name);
-  nodes->package = spn_bg_add_fn_ex(graph, spn_executor_run_package, ctx, SPN_BG_VIZ_CMD, ctx->name, sp_str_lit("script::package"));
-  nodes->stamp.package = spn_bg_add_file_ex(graph, ctx->paths.stamp.package, SPN_BG_VIZ_STAMP, ctx->name);
-  nodes->stamp.main = spn_bg_add_file_ex(graph, ctx->paths.stamp.main, SPN_BG_VIZ_CMD, ctx->name);
-  nodes->stamp.exit = spn_bg_add_file_ex(graph, ctx->paths.stamp.exit, SPN_BG_VIZ_CMD, ctx->name);
+  nodes->manifest = spn_bg_add_file_ex(graph, pkg->paths.manifest, SPN_BG_VIZ_MANIFEST, ctx->ctx.name);
+  nodes->script = spn_bg_add_file_ex(graph, pkg->paths.script, SPN_BG_VIZ_MANIFEST, ctx->ctx.name);
+  nodes->package = spn_bg_add_fn_ex(graph, spn_executor_run_package, ctx, SPN_BG_VIZ_CMD, ctx->ctx.name, sp_str_lit("script::package"));
+  nodes->stamp.package = spn_bg_add_file_ex(graph, ctx->ctx.paths.stamp.package, SPN_BG_VIZ_STAMP, ctx->ctx.name);
+  nodes->stamp.main = spn_bg_add_file_ex(graph, ctx->ctx.paths.stamp.main, SPN_BG_VIZ_CMD, ctx->ctx.name);
+  nodes->stamp.exit = spn_bg_add_file_ex(graph, ctx->ctx.paths.stamp.exit, SPN_BG_VIZ_CMD, ctx->ctx.name);
 
   spn_sync_point_t* sync_main = SP_ALLOC(spn_sync_point_t);
-  *sync_main = (spn_sync_point_t){ .ctx = ctx, .stamp = &ctx->paths.stamp.main };
-  nodes->main = spn_bg_add_fn_ex(graph, spn_executor_sync_point, sync_main, SPN_BG_VIZ_CMD, ctx->name, sp_str_lit("sync::main"));
+  *sync_main = (spn_sync_point_t){ .ctx = &ctx->ctx, .stamp = &ctx->ctx.paths.stamp.main };
+  nodes->main = spn_bg_add_fn_ex(graph, spn_executor_sync_point, sync_main, SPN_BG_VIZ_CMD, ctx->ctx.name, sp_str_lit("sync::main"));
 
   spn_sync_point_t* sync_exit = SP_ALLOC(spn_sync_point_t);
-  *sync_exit = (spn_sync_point_t){ .ctx = ctx, .stamp = &ctx->paths.stamp.exit };
-  nodes->exit = spn_bg_add_fn_ex(graph, spn_executor_sync_point, sync_exit, SPN_BG_VIZ_CMD, ctx->name, sp_str_lit("sync::exit"));
+  *sync_exit = (spn_sync_point_t){ .ctx = &ctx->ctx, .stamp = &ctx->ctx.paths.stamp.exit };
+  nodes->exit = spn_bg_add_fn_ex(graph, spn_executor_sync_point, sync_exit, SPN_BG_VIZ_CMD, ctx->ctx.name, sp_str_lit("sync::exit"));
 
   spn_bg_cmd_add_input(graph, nodes->main, nodes->manifest);
   spn_bg_cmd_add_input(graph, nodes->main, nodes->script);
@@ -7633,18 +7638,18 @@ void spn_build_graph_add_pkg(spn_builder_t* b, spn_build_ctx_t* ctx) {
 
   // add nodes the user defined in configure()
   // pass 1: create all command nodes
-  sp_da_for(ctx->user_nodes, it) {
-    spn_user_node_t* node = &ctx->user_nodes[it];
+  sp_da_for(ctx->ctx.user_nodes, it) {
+    spn_user_node_t* node = &ctx->ctx.user_nodes[it];
     spn_build_ctx_add_user_node(ctx, graph, node);
   }
 
   // pass 2: create all file in/outputs + create a stamp file for outputless commands
-  sp_da_for(ctx->user_nodes, it) {
-    spn_user_node_t* node = &ctx->user_nodes[it];
+  sp_da_for(ctx->ctx.user_nodes, it) {
+    spn_user_node_t* node = &ctx->ctx.user_nodes[it];
 
     // if no outputs, depend on the exit node's stamp
     if (sp_da_empty(node->outputs)) {
-      sp_da_push(node->outputs, spn_build_ctx_get_node_stamp_path(ctx, node));
+      sp_da_push(node->outputs, spn_build_ctx_get_node_stamp_path(&ctx->ctx, node));
     }
 
     sp_da_for(node->outputs, o) {
@@ -7665,25 +7670,25 @@ void spn_build_graph_add_pkg(spn_builder_t* b, spn_build_ctx_t* ctx) {
   }
 
   // pass 3: now that all file nodes exist, set up links for command inputs
-  sp_da_for(ctx->user_nodes, it) {
-    spn_user_node_t* node = &ctx->user_nodes[it];
+  sp_da_for(ctx->ctx.user_nodes, it) {
+    spn_user_node_t* node = &ctx->ctx.user_nodes[it];
 
     // depend on the outputs of your command inputs
     sp_da_for(node->deps, dit) {
       spn_user_node_t* dep = spn_find_user_node(node->deps[dit]);
       sp_da_for(dep->outputs, oit) {
-        spn_bg_id_t output = spn_build_ctx_get_or_insert_user_file(dep->ctx, graph, dep->outputs[oit]);
+        spn_bg_id_t output = spn_build_ctx_get_or_insert_user_file(ctx, graph, dep->outputs[oit]);
         spn_bg_cmd_add_input(graph, node->id, output);
       }
     }
   }
 }
 
-void spn_build_graph_link_deps(spn_build_graph_t* graph, spn_builder_t* builder, spn_build_ctx_t* ctx) {
-  spn_pkg_t* pkg = ctx->pkg;
+void spn_build_graph_link_deps(spn_build_graph_t* graph, spn_builder_t* builder, spn_dep_ctx_t* ctx) {
+  spn_pkg_t* pkg = ctx->ctx.pkg;
   sp_ht_for(pkg->deps, dit) {
-    spn_dep_ctx_t* dep = sp_om_get(builder->contexts.deps, *sp_ht_it_getkp(pkg->deps, dit));
-    spn_bg_cmd_add_input(graph, ctx->nodes.build.main, dep->ctx.nodes.build.stamp.package);
+    spn_dep_ctx_t* parent = sp_om_get(builder->contexts.deps, *sp_ht_it_getkp(pkg->deps, dit));
+    spn_bg_cmd_add_input(graph, ctx->nodes.build.main, parent->nodes.build.stamp.package);
   }
 }
 
@@ -7893,7 +7898,7 @@ void spn_render_one_package_ctx(spn_builder_t* b, spn_bg_dirty_t* dirty, spn_dep
 
   spn_build_ctx_t* ctx = &dep->ctx;
   spn_build_graph_t* graph = &b->build.graph;
-  spn_pkg_nodes_v2_t* nodes = &ctx->nodes.build;
+  spn_pkg_nodes_v2_t* nodes = &dep->nodes.build;
 
   // package subgraph
   sp_io_write_str(io, sp_format("  subgraph {}[{}]\n", SP_FMT_STR(ctx->name), SP_FMT_STR(ctx->name)));
@@ -7978,12 +7983,12 @@ void spn_render_to_mermaid(spn_app_t* app, sp_io_writer_t* io) {
   // collect collapsed pairs from all packages (main+stamp, exit+stamp)
   sp_om_for(builder->contexts.deps, it) {
     spn_dep_ctx_t* dep = sp_om_at(builder->contexts.deps, it);
-    spn_pkg_nodes_v2_t* nodes = &dep->ctx.nodes.build;
+    spn_pkg_nodes_v2_t* nodes = &dep->nodes.build;
     sp_ht_insert(file_to_cmd, nodes->stamp.main.index, nodes->main.index);
     sp_ht_insert(file_to_cmd, nodes->stamp.exit.index, nodes->exit.index);
   }
   {
-    spn_pkg_nodes_v2_t* nodes = &builder->contexts.pkg.ctx.nodes.build;
+    spn_pkg_nodes_v2_t* nodes = &builder->contexts.pkg.nodes.build;
     sp_ht_insert(file_to_cmd, nodes->stamp.main.index, nodes->main.index);
     sp_ht_insert(file_to_cmd, nodes->stamp.exit.index, nodes->exit.index);
   }

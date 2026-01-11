@@ -155,10 +155,6 @@ void                   spn_cmake_build(spn_cmake_t* cmake);
 void                   spn_cmake_install(spn_cmake_t* cmake);
 void                   spn_cmake_run(spn_cmake_t* cmake);
 
-struct spn_node_t {
-  spn_build_ctx_t* ctx;
-  u32 index;
-};
 typedef struct spn_node_t spn_node_t;
 
 struct spn_node_ctx_t {
