@@ -7884,22 +7884,16 @@ void spn_render_one_package_ctx(spn_builder_t* b, spn_dep_ctx_t* dep, sp_io_writ
   spn_render_mermaid_cmd(graph, nodes->exit, io, "      ");
   spn_render_mermaid_file(graph, ctx, nodes->stamp.exit, io, "      ");
 
-  // all user nodes (commands and their file I/O)
+  // all user commands
   sp_da_for(ctx->user_nodes, it) {
     spn_user_node_t* node = &ctx->user_nodes[it];
     spn_render_mermaid_cmd(graph, node->id, io, "      ");
-    sp_da_for(node->inputs, i) {
-      spn_bg_id_t* file_id = sp_str_ht_get(ctx->files, node->inputs[i]);
-      if (file_id) {
-        spn_render_mermaid_file(graph, ctx, *file_id, io, "      ");
-      }
-    }
-    sp_da_for(node->outputs, o) {
-      spn_bg_id_t* file_id = sp_str_ht_get(ctx->files, node->outputs[o]);
-      if (file_id) {
-        spn_render_mermaid_file(graph, ctx, *file_id, io, "      ");
-      }
-    }
+  }
+
+  // all user files
+  sp_str_ht_for(ctx->files, it) {
+    spn_bg_id_t file_id = *sp_str_ht_it_getp(ctx->files, it);
+    spn_render_mermaid_file(graph, ctx, file_id, io, "      ");
   }
 
   sp_io_write_cstr(io, "    end\n"); // user
@@ -7946,6 +7940,7 @@ void spn_render_to_mermaid(spn_app_t* app, sp_io_writer_t* io) {
   sp_io_write_str(io, sp_str_lit("  linkStyle default stroke:#909090,stroke-width:2px\n"));
 
   spn_builder_t* builder = &app->builder;
+  spn_build_graph_t* graph = &builder->build.graph;
 
   // render dependency packages
   sp_om_for(builder->contexts.deps, it) {
@@ -7955,6 +7950,21 @@ void spn_render_to_mermaid(spn_app_t* app, sp_io_writer_t* io) {
 
   // render root package
   spn_render_one_package_ctx(builder, &builder->contexts.pkg, io);
+
+  // render edges
+  sp_da_for(graph->commands, it) {
+    spn_bg_cmd_t* cmd = &graph->commands[it];
+
+    sp_da_for(cmd->consumes, i) {
+      sp_io_write_str(io, sp_format("  F{} --> C{}\n",
+        SP_FMT_U32(cmd->consumes[i].index), SP_FMT_U32(cmd->id.index)));
+    }
+
+    sp_da_for(cmd->produces, i) {
+      sp_io_write_str(io, sp_format("  C{} --> F{}\n",
+        SP_FMT_U32(cmd->id.index), SP_FMT_U32(cmd->produces[i].index)));
+    }
+  }
 }
 
 spn_task_result_t spn_task_render_build_graph(spn_app_t* app) {
