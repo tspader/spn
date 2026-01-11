@@ -59,6 +59,7 @@
 #define sp_om_size(om)            (!(om) ? 0 : sp_da_size((om)->order))
 #define sp_om_empty(om)           (!(om) ? true : (sp_da_size((om)->order) == 0))
 #define sp_om_for(om, it)         for (u32 it = 0; it < sp_om_size(om); it++)
+#define sp_om_back(om)            (*sp_da_back((om)->order))
 
 #if defined(SP_CPP)
 SP_END_EXTERN_C()

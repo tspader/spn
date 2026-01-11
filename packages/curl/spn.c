@@ -1,7 +1,7 @@
 #include "spn.h"
 
-void build(spn_build_ctx_t* b) {
-  spn_cmake_t* cmake = spn_cmake_new(b);
+spn_err_t run_cmake(spn_node_ctx_t* ctx) {
+  spn_cmake_t* cmake = spn_cmake_new(ctx->build);
   spn_cmake_add_define(cmake, "BUILD_TESTING", "OFF");
   spn_cmake_add_define(cmake, "CURL_DISABLE_TESTS", "ON");
   spn_cmake_add_define(cmake, "CURL_DISABLE_EXAMPLES", "ON");
@@ -26,6 +26,12 @@ void build(spn_build_ctx_t* b) {
   spn_cmake_add_define(cmake, "CURL_DISABLE_SMTP", "ON");
   spn_cmake_add_define(cmake, "CURL_DISABLE_TFTP", "ON");
   spn_cmake_run(cmake);
+  return SPN_OK;
+}
+
+void configure(spn_build_ctx_t* ctx) {
+  spn_node_t cmake = spn_add_node(ctx, "cmake");
+  spn_node_set_fn(cmake, run_cmake);
 }
 
 void package(spn_build_ctx_t* b) {

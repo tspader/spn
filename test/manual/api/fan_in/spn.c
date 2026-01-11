@@ -44,7 +44,7 @@ spn_err_t gen_combined(spn_node_ctx_t* ctx) {
 }
 
 void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, "build/debug/work");
+  spn_add_include(ctx, SPN_DIR_WORK, "");
 
   const c8* alpha_h = spn_get_subdir(ctx, SPN_DIR_WORK, "alpha.h");
   const c8* beta_h = spn_get_subdir(ctx, SPN_DIR_WORK, "beta.h");

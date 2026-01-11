@@ -17,7 +17,7 @@ spn_err_t generate_header(spn_node_ctx_t* ctx) {
 }
 
 void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, spn_get_dir(ctx, SPN_DIR_WORK));
+  spn_add_include(ctx, SPN_DIR_WORK, "");
 
   spn_node_t gen = spn_add_node(ctx, "gen_version");
   spn_node_set_fn(gen, generate_header);

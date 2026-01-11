@@ -146,9 +146,16 @@ typedef struct {
 } spn_bg_dirty_file_metadata_t;
 
 typedef struct {
+  sp_ht(spn_bg_id_t, spn_bg_dirty_file_metadata_t) files;
+  sp_ht(spn_bg_id_t, spn_bg_dirty_cmd_metadata_t) commands;
+} spn_bg_dirty_metadata_t;
+
+typedef struct {
   sp_ht(spn_bg_id_t, bool) files;
   sp_ht(spn_bg_id_t, bool) commands;
   sp_da(spn_bg_err_t) errors;
+  spn_bg_dirty_metadata_t metadata;
+
 } spn_bg_dirty_t;
 
 typedef struct {
@@ -714,11 +721,22 @@ sp_str_t spn_bg_cmd_to_str(spn_bg_cmd_t* cmd) {
 
 sp_str_t spn_bg_mermaid_class(sp_str_t name, sp_str_t fill, sp_str_t stroke, sp_str_t color) {
   return sp_format(
-    "  classDef {} fill:{},stroke:{},color:{}\n",
+    "  classDef {} fill:{},stroke:{},color:{},white-space:nowrap,rx:16,ry:16\n",
     SP_FMT_STR(name),
     SP_FMT_STR(fill),
     SP_FMT_STR(stroke),
     SP_FMT_STR(color)
+  );
+}
+
+sp_str_t spn_bg_mermaid_class_ex(sp_str_t name, sp_str_t fill, sp_str_t stroke, sp_str_t color, sp_str_t font_size) {
+  return sp_format(
+    "  classDef {} fill:{},stroke:{},color:{},font-size:{},white-space:nowrap,rx:16,ry:16\n",
+    SP_FMT_STR(name),
+    SP_FMT_STR(fill),
+    SP_FMT_STR(stroke),
+    SP_FMT_STR(color),
+    SP_FMT_STR(font_size)
   );
 }
 
@@ -889,18 +907,13 @@ spn_bg_dirty_t* spn_bg_compute_forced_dirty(spn_build_graph_t* graph) {
 
 spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
   spn_bg_dirty_t* dirty = spn_bg_dirty_new();
+  spn_bg_dirty_metadata_t* metadata = &dirty->metadata;
 
   spn_bg_it_t it = spn_bg_it_new((spn_bg_it_config_t){
     .graph = graph,
     .mode = SPN_BG_ITER_MODE_BREADTH_FIRST,
     .direction = SPN_BG_ITER_DIR_IN_TO_OUT,
   });
-
-  struct {
-    sp_ht(spn_bg_id_t, spn_bg_dirty_file_metadata_t) files;
-    sp_ht(spn_bg_id_t, spn_bg_dirty_cmd_metadata_t) commands;
-  } metadata = SP_ZERO_INITIALIZE();
-
 
   // get file mod times in a single pass
   sp_da_for(graph->files, it) {
@@ -910,7 +923,7 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
       .exists = sp_fs_exists(file->path)
     };
 
-    sp_ht_insert(metadata.files, file->id, metadatum);
+    sp_ht_insert(metadata->files, file->id, metadatum);
 
     if (spn_bg_is_file_input(file)) {
       if (!metadatum.exists) {
@@ -934,14 +947,14 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
 
     bool missing_output = false;
     sp_da_for(cmd->produces, n) {
-      spn_bg_dirty_file_metadata_t* m = sp_ht_getp(metadata.files, cmd->produces[n]);
+      spn_bg_dirty_file_metadata_t* m = sp_ht_getp(metadata->files, cmd->produces[n]);
       SP_ASSERT(m);
       metadatum.out = sp_tm_epoch_min(m->mod_time, metadatum.out);
       missing_output |= !m->exists;
     }
 
     sp_da_for(cmd->consumes, n) {
-      spn_bg_dirty_file_metadata_t* m = sp_ht_getp(metadata.files, cmd->consumes[n]);
+      spn_bg_dirty_file_metadata_t* m = sp_ht_getp(metadata->files, cmd->consumes[n]);
       SP_ASSERT(m);
       metadatum.in = sp_tm_epoch_max(m->mod_time, metadatum.in);
     }
@@ -950,7 +963,7 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
       sp_ht_insert(dirty->commands, cmd->id, true);
     }
 
-    sp_ht_insert(metadata.commands, cmd->id, metadatum);
+    sp_ht_insert(metadata->commands, cmd->id, metadatum);
   }
 
   // second pass: bootleg kahn's, to propagate dirtiness
@@ -968,7 +981,7 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
         break;
       }
       case SPN_BUILD_GRAPH_NODE_CMD: {
-        spn_bg_dirty_cmd_metadata_t* m = sp_ht_getp(metadata.commands, node.id);
+        spn_bg_dirty_cmd_metadata_t* m = sp_ht_getp(metadata->commands, node.id);
         m->degree--;
 
         if (!m->degree) {
@@ -984,7 +997,6 @@ spn_bg_dirty_t* spn_bg_compute_dirty(spn_build_graph_t* graph) {
         break;
       }
     }
-
   }
 
   return dirty;

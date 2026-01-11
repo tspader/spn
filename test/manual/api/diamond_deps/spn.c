@@ -49,7 +49,7 @@ spn_err_t gen_final(spn_node_ctx_t* ctx) {
 }
 
 void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, "build/debug/work");
+  spn_add_include(ctx, SPN_DIR_WORK, "");
 
   const c8* base_h = spn_get_subdir(ctx, SPN_DIR_WORK, "base.h");
   const c8* left_h = spn_get_subdir(ctx, SPN_DIR_WORK, "left.h");

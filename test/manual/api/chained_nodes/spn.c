@@ -29,7 +29,7 @@ spn_err_t phase2_fn(spn_node_ctx_t* ctx) {
 }
 
 void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, "build/debug/work");
+  spn_add_include(ctx, SPN_DIR_WORK, "");
 
   const c8* intermediate = spn_get_subdir(ctx, SPN_DIR_WORK, "intermediate.h");
   const c8* final = spn_get_subdir(ctx, SPN_DIR_WORK, "final.h");
