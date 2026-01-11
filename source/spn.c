@@ -7443,6 +7443,8 @@ s32 spn_executor_configure_build_dep(spn_bg_cmd_t* cmd, void* user_data) {
     return SPN_ERROR;
   }
 
+  spn_pkg_ctx_stamp(ctx, ctx->paths.stamp.configure);
+
   spn_event_buffer_push(spn.events, &ctx->ctx, SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD);
   if (spn_pkg_ctx_run_build(ctx)) {
     spn_push_event_ex((spn_build_event_t) {
@@ -7567,6 +7569,9 @@ spn_task_result_t spn_task_cfg_init(spn_app_t* app) {
     (spn_bg_executor_config_t) {
     .num_threads = 1
   });
+  sp_str_t work_dir = app->builder.contexts.pkg.ctx.paths.work;
+  sp_str_t store_dir = app->builder.contexts.pkg.ctx.paths.store;
+  spn_bg_to_mermaid(&app->builder.configure.graph, b->configure.dirty, &spn.logger.err, app->paths.dir, spn.paths.cache, work_dir, store_dir);
   spn_bg_executor_run(b->configure.executor);
 
   return SPN_TASK_DONE;
