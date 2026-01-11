@@ -7824,7 +7824,22 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
   return SPN_TASK_DONE;
 }
 
-void spn_render_one_package_ctx(spn_builder_t* b, spn_dep_ctx_t* ctx, sp_io_writer_t* io) {
+void spn_render_mermaid_file(spn_build_graph_t* graph, spn_build_ctx_t* ctx, spn_bg_id_t id, sp_io_writer_t* io, const c8* indent) {
+  spn_bg_file_t* file = spn_bg_find_file(graph, id);
+  sp_str_t cls = spn_bg_viz_kind_to_class(file->viz);
+  sp_str_t path = spn_bg_mermaid_shorten_path(file->path, ctx->paths.source, spn.paths.cache, ctx->paths.work, ctx->paths.store);
+  sp_io_write_str(io, sp_format("{}F{}[\"{}\"]:::{}\n",
+    SP_FMT_CSTR(indent), SP_FMT_U32(file->id.index), SP_FMT_STR(path), SP_FMT_STR(cls)));
+}
+
+void spn_render_mermaid_cmd(spn_build_graph_t* graph, spn_bg_id_t id, sp_io_writer_t* io, const c8* indent) {
+  spn_bg_cmd_t* cmd = spn_bg_find_command(graph, id);
+  sp_str_t cls = spn_bg_viz_kind_to_class(cmd->viz);
+  sp_io_write_str(io, sp_format("{}C{}[\"{}\"]:::{}\n",
+    SP_FMT_CSTR(indent), SP_FMT_U32(cmd->id.index), SP_FMT_STR(cmd->tag), SP_FMT_STR(cls)));
+}
+
+void spn_render_one_package_ctx(spn_builder_t* b, spn_dep_ctx_t* dep, sp_io_writer_t* io) {
   // for each package:
   // - subgraph: package              e.g. "sqlite"
   //   - manifest + script         *  e.g. "spn.toml" and "spn.c"
@@ -7843,25 +7858,75 @@ void spn_render_one_package_ctx(spn_builder_t* b, spn_dep_ctx_t* ctx, sp_io_writ
   //  * => get from spn_build_ctx_t's nodes.build
   //  ^ => get from spn_target_ctx_t
 
-  sp_io_write_str(io, sp_format(
-    "  subgraph {}[{}]\n",
-    SP_FMT_STR(ctx->ctx.name),
-    SP_FMT_STR(ctx->ctx.name)
-  ));
+  spn_build_ctx_t* ctx = &dep->ctx;
+  spn_build_graph_t* graph = &b->build.graph;
+  spn_pkg_nodes_v2_t* nodes = &ctx->nodes.build;
 
-  sp_io_write_str(io, sp_format(
-    "  subgraph {}[{}]\n",
-    SP_FMT_STR(sp_format("{}::user", SP_FMT_STR(ctx->ctx.name))),
-    SP_FMT_CSTR("user")
-  ));
+  // package subgraph
+  sp_io_write_str(io, sp_format("  subgraph {}[{}]\n", SP_FMT_STR(ctx->name), SP_FMT_STR(ctx->name)));
+
+  // manifest + script
+  spn_render_mermaid_file(graph, ctx, nodes->manifest, io, "    ");
+  spn_render_mermaid_file(graph, ctx, nodes->script, io, "    ");
+
+  // package() + stamp
+  spn_render_mermaid_cmd(graph, nodes->package, io, "    ");
+  spn_render_mermaid_file(graph, ctx, nodes->stamp.package, io, "    ");
+
+  // user subgraph
+  sp_io_write_str(io, sp_format("    subgraph {}__user[user]\n", SP_FMT_STR(ctx->name)));
+
+  // main + stamp
+  spn_render_mermaid_cmd(graph, nodes->main, io, "      ");
+  spn_render_mermaid_file(graph, ctx, nodes->stamp.main, io, "      ");
+
+  // exit + stamp
+  spn_render_mermaid_cmd(graph, nodes->exit, io, "      ");
+  spn_render_mermaid_file(graph, ctx, nodes->stamp.exit, io, "      ");
+
+  // all user nodes (commands and their file I/O)
+  sp_da_for(ctx->user_nodes, it) {
+    spn_user_node_t* node = &ctx->user_nodes[it];
+    spn_render_mermaid_cmd(graph, node->id, io, "      ");
+    sp_da_for(node->inputs, i) {
+      spn_bg_id_t* file_id = sp_str_ht_get(ctx->files, node->inputs[i]);
+      if (file_id) {
+        spn_render_mermaid_file(graph, ctx, *file_id, io, "      ");
+      }
+    }
+    sp_da_for(node->outputs, o) {
+      spn_bg_id_t* file_id = sp_str_ht_get(ctx->files, node->outputs[o]);
+      if (file_id) {
+        spn_render_mermaid_file(graph, ctx, *file_id, io, "      ");
+      }
+    }
+  }
 
   sp_io_write_cstr(io, "    end\n"); // user
 
+  // for each target
   sp_om_for(b->contexts.targets, it) {
     spn_target_ctx_t* target = sp_om_at(b->contexts.targets, it);
-    if (target->target->pkg == ctx->ctx.pkg) {
-      // write them
+    if (target->target->pkg != ctx->pkg) {
+      continue;
     }
+
+    // target subgraph
+    sp_io_write_str(io, sp_format("    subgraph {}__{}[{}]\n",
+      SP_FMT_STR(ctx->name), SP_FMT_STR(target->target->name), SP_FMT_STR(target->target->name)));
+
+    // compile
+    spn_render_mermaid_cmd(graph, target->nodes.compile, io, "      ");
+
+    // output
+    spn_render_mermaid_file(graph, ctx, target->nodes.output, io, "      ");
+
+    // source files
+    sp_da_for(target->nodes.source, s) {
+      spn_render_mermaid_file(graph, ctx, target->nodes.source[s], io, "      ");
+    }
+
+    sp_io_write_cstr(io, "    end\n"); // target
   }
 
   sp_io_write_cstr(io, "  end\n"); // package
@@ -7881,6 +7946,14 @@ void spn_render_to_mermaid(spn_app_t* app, sp_io_writer_t* io) {
   sp_io_write_str(io, sp_str_lit("  linkStyle default stroke:#909090,stroke-width:2px\n"));
 
   spn_builder_t* builder = &app->builder;
+
+  // render dependency packages
+  sp_om_for(builder->contexts.deps, it) {
+    spn_dep_ctx_t* dep = sp_om_at(builder->contexts.deps, it);
+    spn_render_one_package_ctx(builder, dep, io);
+  }
+
+  // render root package
   spn_render_one_package_ctx(builder, &builder->contexts.pkg, io);
 }
 

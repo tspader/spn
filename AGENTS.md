@@ -18,7 +18,10 @@
 - example workflow:
   1. make code changes
   2. `pspn build --profile debug` to build with known-good copy
-  3. `tspn build -p debug -f` to use the new binary to test by force building
+  3. run `tspn` to test your new build; e.g.
+    - `tspn build -p debug -f` to use the new binary to test by force building spn itself
+    - `tspn -C test/manual/api/basic_node graph` to use the new binary against a test project
+
 
 # references
 - `source/spn.c` is most of the code (large file; search, don't read)
