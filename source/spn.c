@@ -874,19 +874,21 @@ struct spn_pkg {
     sp_str_t   manifest;
     sp_str_t   metadata;
     sp_str_t   script;
+    struct {
+      sp_str_t source;
+      sp_str_t work;
+      sp_str_t store;
+    } cache;
   } paths;
 };
 
 spn_pkg_t       spn_pkg_new(sp_str_t path);
 spn_pkg_t       spn_pkg_from_default(sp_str_t path, sp_str_t name);
 
-// Package loaders: initialize and populate *pkg from disk.
-// pkg must point to stable storage (e.g. app->package or sp_om entry).
-// pkg should be zero-initialized; spn_pkg_init() is called internally.
 void            spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path);
 void            spn_pkg_from_index(spn_pkg_t* pkg, sp_str_t index_path);
 void            spn_pkg_from_manifest(spn_pkg_t* pkg, sp_str_t manifest_path);
-void            spn_pkg_init(spn_pkg_t* pkg);
+void            spn_pkg_init(spn_pkg_t* pkg, sp_str_t name);
 void            spn_pkg_set_index(spn_pkg_t* pkg, sp_str_t path);
 void            spn_pkg_set_manifest(spn_pkg_t* pkg, sp_str_t path);
 void            spn_pkg_set_name(spn_pkg_t* pkg, const c8* name);
@@ -1050,6 +1052,12 @@ typedef struct {
   } paths;
 } spn_build_ctx_config_t;
 
+typedef struct {
+  u64 build_id;
+  spn_metadata_t metadata;
+  spn_build_ctx_config_t ctx;
+} spn_pkg_unit_config_t;
+
 struct spn_build_ctx {
   sp_str_t name;
   spn_builder_t* builder;
@@ -1189,7 +1197,7 @@ sp_str_t        spn_build_ctx_get_rpath(spn_build_ctx_t* ctx);
 sp_str_t        spn_build_ctx_get_build_log_name(spn_build_ctx_t* ctx);
 sp_str_t        spn_build_ctx_get_test_log_name(spn_build_ctx_t* ctx);
 
-void            spn_pkg_ctx_init(spn_dep_ctx_t* ctx, spn_build_ctx_config_t config);
+void            spn_pkg_ctx_init(spn_dep_ctx_t* ctx, spn_pkg_unit_config_t config);
 void            spn_pkg_ctx_stamp(spn_dep_ctx_t* ctx, sp_str_t path);
 spn_err_t       spn_pkg_build_sync_remote(spn_dep_ctx_t* dep);
 spn_err_t       spn_pkg_build_sync_local(spn_dep_ctx_t* dep);
@@ -4719,8 +4727,12 @@ spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key) {
   SP_UNREACHABLE_RETURN(SP_ZERO_STRUCT(spn_dep_option_t));
 }
 
-void spn_pkg_init(spn_pkg_t* pkg) {
+void spn_pkg_init(spn_pkg_t* pkg, sp_str_t name) {
   pkg->arena = sp_mem_arena_new(4096);
+  pkg->name = spn_intern(name);
+  pkg->paths.cache.source = sp_fs_join_path(spn.paths.source, pkg->name);
+  pkg->paths.cache.work = sp_fs_join_path(spn.paths.build, pkg->name);
+  pkg->paths.cache.store = sp_fs_join_path(spn.paths.store, pkg->name);
 
   sp_ht_set_fns(pkg->deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(pkg->options, sp_ht_on_hash_str_key,
@@ -4751,8 +4763,7 @@ void spn_pkg_set_manifest(spn_pkg_t* pkg, sp_str_t path) {
 
 spn_pkg_t spn_pkg_new(sp_str_t name) {
   spn_pkg_t package = SP_ZERO_INITIALIZE();
-  spn_pkg_init(&package);
-  package.name = sp_str_copy(name);
+  spn_pkg_init(&package, name);
   return package;
 }
 
@@ -4812,9 +4823,7 @@ void spn_pkg_set_name(spn_pkg_t* pkg, const c8* name) {
 }
 
 void spn_pkg_set_name_ex(spn_pkg_t* pkg, sp_str_t name) {
-  sp_context_push_arena(pkg->arena);
-  pkg->name = sp_str_copy(name);
-  sp_context_pop();
+  pkg->name = spn_intern(name);
 }
 
 void spn_pkg_set_repo(spn_pkg_t* pkg, const c8* repo) {
@@ -5208,7 +5217,6 @@ void spn_pkg_load_deps(toml_table_t *toml, spn_pkg_t *package, spn_visibility_t 
 }
 
 void spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
-  spn_pkg_init(pkg);
 
   spn_toml_package_t toml = SP_ZERO_INITIALIZE();
   toml.manifest = spn_toml_parse(manifest_path);
@@ -5222,7 +5230,7 @@ void spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   toml.options = toml_table_table(toml.manifest, "options");
   toml.config = toml_table_table(toml.manifest, "config");
 
-  spn_pkg_set_name(pkg, spn_toml_cstr(toml.package, "name"));
+  spn_pkg_init(pkg, spn_toml_str(toml.package, "name"));
   spn_pkg_set_repo(pkg, spn_toml_cstr_opt(toml.package, "repo", ""));
   spn_pkg_set_author(pkg, spn_toml_cstr_opt(toml.package, "author", ""));
   spn_pkg_set_maintainer(pkg, spn_toml_cstr_opt(toml.package, "maintainer", ""));
@@ -5712,8 +5720,8 @@ void spn_app_resolve(spn_app_t* app) {
   }
 }
 
-void spn_pkg_ctx_init(spn_dep_ctx_t* ctx, spn_build_ctx_config_t config) {
-  spn_build_ctx_init(&ctx->ctx, config);
+void spn_pkg_ctx_init(spn_dep_ctx_t* ctx, spn_pkg_unit_config_t config) {
+  spn_build_ctx_init(&ctx->ctx, config.ctx);
   ctx->paths.stamp.dir = sp_fs_join_path(ctx->ctx.paths.spn, SP_LIT("stamp"));
   ctx->paths.stamp.main = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("main.stamp"));
   ctx->paths.stamp.exit = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("user.stamp"));
@@ -6236,14 +6244,16 @@ void spn_builder_init(spn_builder_t* builder, spn_pkg_t* pkg, spn_profile_t* pro
   builder->paths.build = sp_fs_join_path(builder->paths.pkg, dir);
   builder->paths.profile = sp_fs_join_path(builder->paths.build, builder->profile->name);
 
-  spn_pkg_ctx_init(&builder->contexts.pkg, (spn_build_ctx_config_t) {
-    .name = pkg->name,
-    .package = pkg,
-    .builder = builder,
-    .paths = {
-      .store = sp_fs_join_path(builder->paths.profile, sp_str_lit("store")),
-      .work = sp_fs_join_path(builder->paths.profile, sp_str_lit("work")),
-      .source = sp_str_copy(builder->paths.pkg),
+  spn_pkg_ctx_init(&builder->contexts.pkg, (spn_pkg_unit_config_t)  {
+    .ctx = {
+      .name = pkg->name,
+      .package = pkg,
+      .builder = builder,
+      .paths = {
+        .store = sp_fs_join_path(builder->paths.profile, sp_str_lit("store")),
+        .work = sp_fs_join_path(builder->paths.profile, sp_str_lit("work")),
+        .source = sp_str_copy(builder->paths.pkg),
+      }
     }
   });
 
@@ -6326,15 +6336,19 @@ void spn_builder_add_dep(spn_builder_t* builder, spn_resolved_pkg_t* resolved) {
 
   switch (resolved->kind) {
     case SPN_PACKAGE_KIND_INDEX: {
-      spn_pkg_ctx_init(&dep, (spn_build_ctx_config_t) {
-        .name = pkg->name,
-        .package = pkg,
-        .builder = builder,
-        .linkage = linkage,
-        .paths = {
-          .work = sp_fs_join_path(sp_fs_join_path(spn.paths.build, pkg->name), build_str),
-          .store = sp_fs_join_path(sp_fs_join_path(spn.paths.store, pkg->name), build_str),
-          .source = sp_fs_join_path(spn.paths.source, pkg->name),
+      spn_pkg_ctx_init(&dep, (spn_pkg_unit_config_t)  {
+        .build_id = build_id,
+        .metadata = *metadata,
+        .ctx = {
+          .name = pkg->name,
+          .package = pkg,
+          .builder = builder,
+          .linkage = linkage,
+          .paths = {
+            .work = sp_fs_join_path(sp_fs_join_path(spn.paths.build, pkg->name), build_str),
+            .store = sp_fs_join_path(sp_fs_join_path(spn.paths.store, pkg->name), build_str),
+            .source = sp_fs_join_path(spn.paths.source, pkg->name),
+          }
         }
       });
       break;
