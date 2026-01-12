@@ -34,7 +34,7 @@ spn_err_t final_fn(spn_node_ctx_t* ctx) {
 }
 
 void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, "build/debug/work");
+  spn_add_include(ctx, SPN_DIR_PROJECT, "");
 
   spn_node_t step1 = spn_add_node(ctx, "step1");
   spn_node_set_fn(step1, step1_fn);

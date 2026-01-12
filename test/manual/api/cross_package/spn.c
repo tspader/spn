@@ -2,12 +2,12 @@
 
 spn_err_t gen_info(spn_node_ctx_t* ctx) {
   const spn_build_ctx_t* log_dep = spn_get_dep(ctx->build, "spn_log");
-  
+
   if (log_dep) {
     const c8* log_inc = spn_get_dir(log_dep, SPN_DIR_INCLUDE);
     spn_log(ctx->build, "found spn_log include dir");
     (void)log_inc;
-    
+
     spn_write_file(ctx->build, "dep_info.h",
       "#ifndef DEP_INFO_H\n"
       "#define DEP_INFO_H\n"
@@ -23,7 +23,7 @@ spn_err_t gen_info(spn_node_ctx_t* ctx) {
       "#endif\n"
     );
   }
-  
+
   return SPN_OK;
 }
 
@@ -33,7 +33,7 @@ spn_err_t setup_phase(spn_node_ctx_t* ctx) {
 }
 
 void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, "build/debug/work");
+  spn_add_include(ctx, SPN_DIR_WORK, "");
 
   spn_node_t setup = spn_add_node(ctx, "setup");
   spn_node_set_fn(setup, setup_phase);
