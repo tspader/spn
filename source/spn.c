@@ -805,7 +805,7 @@ typedef struct {
 typedef struct {
   spn_semver_t version;
   sp_str_t commit;
-} spn_metadata_t;
+} spn_pkg_metadata_t;
 
 typedef enum {
   SPN_DEP_IMPORT_KIND_EXPLICIT,
@@ -860,7 +860,7 @@ struct spn_pkg {
   sp_ht(sp_str_t, spn_pkg_req_t) deps;
   sp_ht(sp_str_t, spn_dep_option_t) options;
   sp_ht(sp_str_t, spn_dep_options_t) config;
-  sp_ht(spn_semver_t, spn_metadata_t) metadata;
+  sp_ht(spn_semver_t, spn_pkg_metadata_t) metadata;
   sp_da(spn_semver_t) versions;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
@@ -989,15 +989,15 @@ typedef struct {
 // BUILD CONTEXT //
 ///////////////////
 typedef struct spn_builder spn_builder_t;
-typedef struct spn_dep_ctx_t spn_dep_ctx_t;
+typedef struct spn_pkg_unit spn_pkg_unit_t;
 
 struct spn_node_t {
-  spn_dep_ctx_t* ctx;
+  spn_pkg_unit_t* ctx;
   u32 index;
 };
 
 typedef struct {
-  spn_dep_ctx_t* ctx;
+  spn_pkg_unit_t* ctx;
   sp_str_t tag;
   spn_node_fn_t fn;
   void* user_data;
@@ -1014,11 +1014,6 @@ typedef struct {
 } spn_target_nodes_t;
 
 typedef struct {
-  spn_bg_id_t build;
-  spn_bg_id_t stamp;
-} spn_pkg_nodes_t;
-
-typedef struct {
   spn_bg_id_t manifest;
   spn_bg_id_t script;
   spn_bg_id_t package;
@@ -1030,7 +1025,7 @@ typedef struct {
     spn_bg_id_t exit;
   } stamp;
   sp_da(spn_bg_id_t) user;
-} spn_pkg_nodes_v2_t;
+} spn_pkg_nodes_t;
 
 typedef struct {
   u64 compile;
@@ -1054,7 +1049,7 @@ typedef struct {
 
 typedef struct {
   u64 build_id;
-  spn_metadata_t metadata;
+  spn_pkg_metadata_t metadata;
   spn_build_ctx_config_t ctx;
 } spn_pkg_unit_config_t;
 
@@ -1080,15 +1075,15 @@ struct spn_build_ctx {
     } logs;
   } paths;
 
-  sp_mem_arena_t* arena;
-  sp_str_t error;
-
-  sp_da(sp_ps_config_t) commands;
-  sp_ps_t ps;
   struct {
     sp_io_writer_t build;
     sp_io_writer_t test;
   } logs;
+
+  sp_mem_arena_t* arena;
+  sp_str_t error;
+  sp_da(sp_ps_config_t) commands;
+  sp_ps_t ps;
 };
 
 typedef struct {
@@ -1111,24 +1106,23 @@ typedef struct {
     spn_bg_id_t compile;
     sp_da(spn_bg_id_t) source;
   } nodes;
-} spn_target_ctx_t;
+} spn_target_unit_t;
 
 typedef struct {
-  spn_dep_ctx_t* pkg;
+  spn_pkg_unit_t* pkg;
   sp_str_t file;
-} spn_stamp_ctx_t;
+} spn_stamp_unit_t;
 
-struct spn_dep_ctx_t {
+struct spn_pkg_unit {
   spn_build_ctx_t ctx;
-  spn_metadata_t metadata;
-  spn_dep_options_t options;
-  sp_hash_t build_id;
-  sp_str_t message;
-  bool force;
+  spn_pkg_metadata_t metadata;
 
   struct {
-    spn_pkg_nodes_t configure;
-    spn_pkg_nodes_v2_t build;
+    struct {
+      spn_bg_id_t build;
+      spn_bg_id_t stamp;
+    } configure;
+    spn_pkg_nodes_t build;
     sp_da(spn_user_node_t) all;
     sp_str_ht(spn_bg_id_t) files;
   } nodes;
@@ -1150,8 +1144,6 @@ struct spn_dep_ctx_t {
   spn_build_fn_t on_configure;
   spn_build_fn_t on_build;
   spn_build_fn_t on_package;
-
-
 };
 
 typedef struct {
@@ -1166,10 +1158,10 @@ struct spn_builder {
   spn_target_filter_t filter;
 
   struct {
-    sp_om(spn_target_ctx_t) targets;
-    sp_om(spn_dep_ctx_t) deps;
-    sp_om(spn_stamp_ctx_t) stamps;
-    spn_dep_ctx_t pkg;
+    sp_om(spn_target_unit_t) targets;
+    sp_om(spn_pkg_unit_t) deps;
+    sp_om(spn_stamp_unit_t) stamps;
+    spn_pkg_unit_t pkg;
   } contexts;
 
   struct {
@@ -1197,29 +1189,29 @@ sp_str_t        spn_build_ctx_get_rpath(spn_build_ctx_t* ctx);
 sp_str_t        spn_build_ctx_get_build_log_name(spn_build_ctx_t* ctx);
 sp_str_t        spn_build_ctx_get_test_log_name(spn_build_ctx_t* ctx);
 
-void            spn_pkg_ctx_init(spn_dep_ctx_t* ctx, spn_pkg_unit_config_t config);
-void            spn_pkg_ctx_stamp(spn_dep_ctx_t* ctx, sp_str_t path);
-spn_err_t       spn_pkg_build_sync_remote(spn_dep_ctx_t* dep);
-spn_err_t       spn_pkg_build_sync_local(spn_dep_ctx_t* dep);
-sp_str_t        spn_pkg_build_get_target_path(spn_dep_ctx_t* build, spn_target_t* target);
-spn_err_t   spn_dep_ctx_run_hook(spn_dep_ctx_t* ctx, spn_build_fn_t fn);
-spn_err_t       spn_pkg_ctx_run_configure(spn_dep_ctx_t* ctx);
-spn_err_t       spn_pkg_ctx_run_build(spn_dep_ctx_t* ctx);
-spn_err_t       spn_pkg_ctx_run_package(spn_dep_ctx_t* ctx);
+void            spn_pkg_ctx_init(spn_pkg_unit_t* ctx, spn_pkg_unit_config_t config);
+void            spn_pkg_ctx_stamp(spn_pkg_unit_t* ctx, sp_str_t path);
+spn_err_t       spn_pkg_build_sync_remote(spn_pkg_unit_t* dep);
+spn_err_t       spn_pkg_build_sync_local(spn_pkg_unit_t* dep);
+sp_str_t        spn_pkg_build_get_target_path(spn_pkg_unit_t* build, spn_target_t* target);
+spn_err_t   spn_dep_ctx_run_hook(spn_pkg_unit_t* ctx, spn_build_fn_t fn);
+spn_err_t       spn_pkg_ctx_run_configure(spn_pkg_unit_t* ctx);
+spn_err_t       spn_pkg_ctx_run_build(spn_pkg_unit_t* ctx);
+spn_err_t       spn_pkg_ctx_run_package(spn_pkg_unit_t* ctx);
 
 void            spn_builder_init(spn_builder_t* builder, spn_pkg_t* pkg, spn_profile_t* profile, sp_str_t dir);
-spn_err_t       spn_builder_compile_pkg(spn_builder_t* builder, spn_dep_ctx_t* ctx);
-spn_dep_ctx_t*  spn_builder_find_pkg_ctx(spn_builder_t* builder, sp_str_t name);
+spn_err_t       spn_builder_compile_pkg(spn_builder_t* builder, spn_pkg_unit_t* ctx);
+spn_pkg_unit_t*  spn_builder_find_pkg_ctx(spn_builder_t* builder, sp_str_t name);
 void spn_builder_set_filter(spn_builder_t* builder, spn_target_filter_t filter);
 void spn_builder_add_target(spn_builder_t* builder, spn_target_t* target);
 void spn_builder_add_dep(spn_builder_t* builder, spn_resolved_pkg_t* resolved);
-void spn_build_graph_add_pkg(spn_builder_t* b, spn_dep_ctx_t* ctx);
-void spn_build_graph_add_pkg_standalone(spn_build_graph_t* graph, spn_dep_ctx_t* ctx, spn_stamp_ctx_t* stamp_exit);
+void spn_build_graph_add_pkg(spn_builder_t* b, spn_pkg_unit_t* ctx);
+void spn_build_graph_add_pkg_standalone(spn_build_graph_t* graph, spn_pkg_unit_t* ctx, spn_stamp_unit_t* stamp_exit);
 void spn_build_graph_finalize_pkg(spn_builder_t* b, spn_build_ctx_t* ctx, bool has_targets);
-spn_bg_id_t spn_build_ctx_get_or_insert_user_file(spn_dep_ctx_t* ctx, spn_build_graph_t* graph, sp_str_t path);
-void spn_build_ctx_add_user_node(spn_dep_ctx_t* ctx, spn_build_graph_t* graph, spn_user_node_t* node);
-sp_str_t spn_build_ctx_get_node_stamp_path(spn_dep_ctx_t* ctx, spn_user_node_t* node);
-void spn_build_graph_link_deps(spn_build_graph_t* graph, spn_builder_t* builder, spn_dep_ctx_t* ctx);
+spn_bg_id_t spn_build_ctx_get_or_insert_user_file(spn_pkg_unit_t* ctx, spn_build_graph_t* graph, sp_str_t path);
+void spn_build_ctx_add_user_node(spn_pkg_unit_t* ctx, spn_build_graph_t* graph, spn_user_node_t* node);
+sp_str_t spn_build_ctx_get_node_stamp_path(spn_pkg_unit_t* ctx, spn_user_node_t* node);
+void spn_build_graph_link_deps(spn_build_graph_t* graph, spn_builder_t* builder, spn_pkg_unit_t* ctx);
 
 
 // V2 executor functions
@@ -1227,7 +1219,7 @@ s32 spn_executor_build_target(spn_bg_cmd_t* cmd, void* user_data);
 s32 spn_executor_run_package(spn_bg_cmd_t* cmd, void* user_data);
 
 typedef struct {
-  spn_dep_ctx_t* ctx;
+  spn_pkg_unit_t* ctx;
   sp_str_t* stamp;
 } spn_sync_point_t;
 s32 spn_executor_stamp(spn_bg_cmd_t* cmd, void* user_data);
@@ -1782,7 +1774,7 @@ spn_task_result_t spn_task_render_build_graph(spn_app_t* app);
 spn_task_result_t spn_task_run_tests(spn_app_t* app);
 spn_task_result_t spn_task_generate(spn_app_t* app);
 spn_task_result_t spn_task_which(spn_app_t* app);
-spn_dep_ctx_t*    spn_cli_assert_dep_exists(sp_str_t name);
+spn_pkg_unit_t*    spn_cli_assert_dep_exists(sp_str_t name);
 
 typedef struct {
   spn_target_filter_t filter;
@@ -2188,7 +2180,7 @@ spn_user_node_t* spn_find_user_node(spn_node_t node) {
 
 spn_node_t spn_add_node(spn_build_ctx_t* c, const c8* tag) {
   // @hack
-  spn_dep_ctx_t* ctx = (spn_dep_ctx_t*)c;
+  spn_pkg_unit_t* ctx = (spn_pkg_unit_t*)c;
   u32 index = sp_da_size(ctx->nodes.all);
   spn_user_node_t node = {
     .ctx = ctx,
@@ -2566,7 +2558,7 @@ spn_target_t* spn_get_target(spn_build_ctx_t* b, const c8* name) {
 }
 
 const spn_build_ctx_t* spn_get_dep(spn_build_ctx_t* b, const c8* name) {
-  spn_dep_ctx_t* dep = sp_om_get(b->builder->contexts.deps, spn_intern_cstr(name));
+  spn_pkg_unit_t* dep = sp_om_get(b->builder->contexts.deps, spn_intern_cstr(name));
   return &dep->ctx;
 }
 
@@ -3201,7 +3193,7 @@ sp_str_t spn_gen_build_entries_for_all(spn_gen_entry_t kind, spn_cc_kind_t compi
   sp_dyn_array(sp_str_t) entries = SP_NULLPTR;
 
   sp_om_for(app.builder.contexts.deps, it) {
-    spn_dep_ctx_t* dep = sp_om_at(app.builder.contexts.deps, it);
+    spn_pkg_unit_t* dep = sp_om_at(app.builder.contexts.deps, it);
     sp_dyn_array(sp_str_t) dep_entries = spn_gen_build_entry(&dep->ctx, kind, compiler);
     sp_str_t dep_flags = sp_str_join_n(dep_entries, sp_dyn_array_size(dep_entries), sp_str_lit(" "));
     if (dep_flags.len > 0) {
@@ -3655,7 +3647,7 @@ s32 spn_tcc_backtrace(void* ud, void* pc, const c8* file, s32 line, const c8* fn
 }
 
 void spn_tcc_on_build_script_compile_error(void* user_data, const c8* message) {
-  spn_dep_ctx_t* ctx = (spn_dep_ctx_t*)user_data;
+  spn_pkg_unit_t* ctx = (spn_pkg_unit_t*)user_data;
 
   sp_context_push_allocator(sp_mem_arena_as_allocator(ctx->ctx.arena));
   ctx->ctx.error = sp_str_from_cstr(message);
@@ -4131,7 +4123,7 @@ spn_lock_file_t spn_build_lock_file() {
   sp_ht_for_kv(app.resolver.resolved, it) {
     spn_resolved_pkg_t* resolved = it.val;
     spn_pkg_t* pkg = resolved->pkg;
-    spn_metadata_t* metadata = sp_ht_getp(pkg->metadata, resolved->version);
+    spn_pkg_metadata_t* metadata = sp_ht_getp(pkg->metadata, resolved->version);
 
     spn_pkg_req_t* direct_req = sp_ht_getp(app.package.deps, resolved->pkg->name);
     bool is_explicit = direct_req != SP_NULLPTR;
@@ -4260,7 +4252,7 @@ sp_ps_output_t spn_build_ctx_subprocess(spn_build_ctx_t* build, sp_ps_config_t c
   return sp_ps_output(&ps);
 }
 
-sp_str_t spn_pkg_build_get_target_path(spn_dep_ctx_t* build, spn_target_t* bin) {
+sp_str_t spn_pkg_build_get_target_path(spn_pkg_unit_t* build, spn_target_t* bin) {
   return sp_fs_join_path(build->ctx.paths.bin, bin->name);
 }
 
@@ -4863,7 +4855,7 @@ void spn_pkg_add_version(spn_pkg_t* pkg, const c8* version, const c8* commit) {
 
 void spn_pkg_add_version_ex(spn_pkg_t* pkg, spn_semver_t version, sp_str_t commit) {
   sp_context_push_arena(pkg->arena);
-  sp_ht_insert(pkg->metadata, version, ((spn_metadata_t) {
+  sp_ht_insert(pkg->metadata, version, ((spn_pkg_metadata_t) {
     .version = version,
     .commit = sp_str_copy(commit)
   }));
@@ -5720,7 +5712,7 @@ void spn_app_resolve(spn_app_t* app) {
   }
 }
 
-void spn_pkg_ctx_init(spn_dep_ctx_t* ctx, spn_pkg_unit_config_t config) {
+void spn_pkg_ctx_init(spn_pkg_unit_t* ctx, spn_pkg_unit_config_t config) {
   spn_build_ctx_init(&ctx->ctx, config.ctx);
   ctx->paths.stamp.dir = sp_fs_join_path(ctx->ctx.paths.spn, SP_LIT("stamp"));
   ctx->paths.stamp.main = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("main.stamp"));
@@ -5732,7 +5724,7 @@ void spn_pkg_ctx_init(spn_dep_ctx_t* ctx, spn_pkg_unit_config_t config) {
   sp_fs_create_dir(ctx->paths.stamp.dir);
 }
 
-spn_err_t spn_pkg_build_sync_remote(spn_dep_ctx_t* build) {
+spn_err_t spn_pkg_build_sync_remote(spn_pkg_unit_t* build) {
   if (!sp_fs_exists(build->ctx.paths.source)) {
     sp_str_t url = spn_pkg_get_url(build->ctx.pkg);
     sp_try(spn_git_clone(url, build->ctx.paths.source));
@@ -5744,11 +5736,11 @@ spn_err_t spn_pkg_build_sync_remote(spn_dep_ctx_t* build) {
   return SPN_OK;
 }
 
-spn_err_t spn_pkg_build_sync_local(spn_dep_ctx_t* dep) {
+spn_err_t spn_pkg_build_sync_local(spn_pkg_unit_t* dep) {
   return spn_git_checkout(dep->ctx.paths.source, dep->metadata.commit);
 }
 
-void spn_pkg_ctx_stamp(spn_dep_ctx_t* ctx, sp_str_t path) {
+void spn_pkg_ctx_stamp(spn_pkg_unit_t* ctx, sp_str_t path) {
   sp_io_writer_t io = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_OVERWRITE);
 
   spn_toml_writer_t writer = spn_toml_writer_new();
@@ -5888,7 +5880,7 @@ void register_jit_code(const char *elf_data, size_t elf_size) {
   // __jit_debug_register_code();
 }
 
-spn_err_t spn_builder_compile_pkg(spn_builder_t* builder, spn_dep_ctx_t* ctx) {
+spn_err_t spn_builder_compile_pkg(spn_builder_t* builder, spn_pkg_unit_t* ctx) {
   spn_pkg_t* pkg = ctx->ctx.pkg;
 
   if (!sp_fs_exists(pkg->paths.script)) {
@@ -5915,7 +5907,7 @@ spn_err_t spn_builder_compile_pkg(spn_builder_t* builder, spn_dep_ctx_t* ctx) {
   spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_CC_TARGET_JIT, pkg->name);
   sp_ht_for_kv(pkg->deps, it) {
     if (it.val->visibility == SPN_VISIBILITY_BUILD) {
-      spn_dep_ctx_t* dep = spn_builder_find_pkg_ctx(builder, *it.key);
+      spn_pkg_unit_t* dep = spn_builder_find_pkg_ctx(builder, *it.key);
       spn_cc_target_add_dep(target, &dep->ctx);
     }
   }
@@ -5943,7 +5935,7 @@ fail:
   return SPN_ERROR;
 }
 
-spn_err_t spn_dep_ctx_run_hook(spn_dep_ctx_t* ctx, spn_build_fn_t fn) {
+spn_err_t spn_dep_ctx_run_hook(spn_pkg_unit_t* ctx, spn_build_fn_t fn) {
   jmp_buf jump;
   int status = tcc_setjmp(ctx->tcc, jump, fn);
   if (!status) {
@@ -5958,7 +5950,7 @@ spn_err_t spn_dep_ctx_run_hook(spn_dep_ctx_t* ctx, spn_build_fn_t fn) {
 }
 
 
-spn_err_t spn_pkg_ctx_run_build(spn_dep_ctx_t* ctx) {
+spn_err_t spn_pkg_ctx_run_build(spn_pkg_unit_t* ctx) {
   spn_err_t result = SPN_OK;
 
   if (ctx->on_build) {
@@ -5970,7 +5962,7 @@ spn_err_t spn_pkg_ctx_run_build(spn_dep_ctx_t* ctx) {
   return result;
 }
 
-spn_err_t spn_pkg_ctx_run_configure(spn_dep_ctx_t* ctx) {
+spn_err_t spn_pkg_ctx_run_configure(spn_pkg_unit_t* ctx) {
   spn_err_t result = SPN_OK;
 
   if (ctx->on_configure) {
@@ -5982,7 +5974,7 @@ spn_err_t spn_pkg_ctx_run_configure(spn_dep_ctx_t* ctx) {
   return result;
 }
 
-spn_err_t spn_pkg_ctx_run_package(spn_dep_ctx_t* ctx) {
+spn_err_t spn_pkg_ctx_run_package(spn_pkg_unit_t* ctx) {
   spn_err_t result = SPN_OK;
 
   if (ctx->on_package) {
@@ -5996,7 +5988,7 @@ spn_err_t spn_pkg_ctx_run_package(spn_dep_ctx_t* ctx) {
 
 
 s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_dep_ctx_t* build = (spn_dep_ctx_t*)user_data;
+  spn_pkg_unit_t* build = (spn_pkg_unit_t*)user_data;
 
   spn_event_buffer_push(spn.events, &build->ctx, SPN_BUILD_EVENT_SYNC);
   spn_pkg_build_sync_remote(build);
@@ -6008,14 +6000,12 @@ s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
   message = sp_str_replace_c8(message, '}', ']');
   message = sp_str_pad(message, 32);
 
-  build->message = message;
-
   spn_event_buffer_push_ex(spn.events, &build->ctx, (spn_build_event_t) {
     .kind = SPN_BUILD_EVENT_CHECKOUT,
     .checkout = {
       .commit = spn_intern(build->metadata.commit),
       .version = build->metadata.version,
-      .message = spn_intern(build->message)
+      .message = spn_intern(message)
     }
   });
   spn_pkg_build_sync_local(build);
@@ -6024,12 +6014,11 @@ s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
 }
 
 s32 spn_executor_build_target(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_target_ctx_t* bin = (spn_target_ctx_t*)user_data;
-  spn_build_ctx_t* ctx = &bin->ctx;
-
-  spn_pkg_t* pkg = ctx->pkg;
-  spn_target_t* target = bin->target;
+  spn_target_unit_t* unit = (spn_target_unit_t*)user_data;
+  spn_build_ctx_t* ctx = &unit->ctx;
   spn_builder_t* builder = ctx->builder;
+  spn_target_t* target = unit->target;
+  spn_pkg_t* pkg = ctx->pkg;
 
   spn_cc_t cc = spn_cc_new(ctx);
   spn_cc_set_output_dir(&cc, ctx->paths.bin);
@@ -6055,7 +6044,7 @@ s32 spn_executor_build_target(spn_bg_cmd_t* cmd, void* user_data) {
 
   sp_ht_for_kv(pkg->deps, it) {
     if (spn_is_visibility_linked(target->visibility, it.val->visibility)) {
-      spn_dep_ctx_t* dep = spn_builder_find_pkg_ctx(builder, *it.key);
+      spn_pkg_unit_t* dep = spn_builder_find_pkg_ctx(builder, *it.key);
       spn_cc_target_add_dep(cc_target, &dep->ctx);
     }
   }
@@ -6101,7 +6090,7 @@ s32 spn_executor_build_target(spn_bg_cmd_t* cmd, void* user_data) {
     sp_str_t header = sp_fs_join_path(ctx->paths.spn, sp_format("{}.embed.h", SP_FMT_STR(pkg->name)));
     spn_cc_embed_ctx_write(&embedder, object, header);
     spn_cc_target_add_lib(cc_target, object);
-    spn_cc_target_add_include_abs(cc_target, bin->ctx.paths.spn);
+    spn_cc_target_add_include_abs(cc_target, unit->ctx.paths.spn);
   }
 
   sp_ps_config_t config = spn_cc_to_ps(&cc);
@@ -6260,9 +6249,9 @@ void spn_builder_init(spn_builder_t* builder, spn_pkg_t* pkg, spn_profile_t* pro
   sp_mutex_init(&builder->mutex, SP_MUTEX_PLAIN);
 }
 
-spn_dep_ctx_t* spn_builder_find_pkg_ctx(spn_builder_t* builder, sp_str_t name) {
+spn_pkg_unit_t* spn_builder_find_pkg_ctx(spn_builder_t* builder, sp_str_t name) {
   sp_mutex_lock(&builder->mutex);
-  spn_dep_ctx_t* pkg = sp_str_equal(name, builder->pkg->name) ?
+  spn_pkg_unit_t* pkg = sp_str_equal(name, builder->pkg->name) ?
     &builder->contexts.pkg :
     sp_om_get(builder->contexts.deps, name);
   sp_mutex_unlock(&builder->mutex);
@@ -6275,7 +6264,7 @@ void spn_builder_set_filter(spn_builder_t* builder, spn_target_filter_t filter) 
 }
 
 void spn_builder_add_target(spn_builder_t* builder, spn_target_t* target) {
-  sp_om_insert(builder->contexts.targets, target->name, ((spn_target_ctx_t) {
+  sp_om_insert(builder->contexts.targets, target->name, ((spn_target_unit_t) {
     .target = target,
     .ctx = spn_build_ctx_make((spn_build_ctx_config_t) {
       .name = target->name,
@@ -6292,7 +6281,7 @@ void spn_builder_add_target(spn_builder_t* builder, spn_target_t* target) {
 
 void spn_builder_add_dep(spn_builder_t* builder, spn_resolved_pkg_t* resolved) {
   spn_pkg_t* pkg = resolved->pkg;
-  spn_metadata_t* metadata = sp_ht_getp(pkg->metadata, resolved->version);
+  spn_pkg_metadata_t* metadata = sp_ht_getp(pkg->metadata, resolved->version);
   SP_ASSERT(metadata);
 
   spn_pkg_linkage_t linkage = SPN_LIB_KIND_NONE;
@@ -6329,14 +6318,10 @@ void spn_builder_add_dep(spn_builder_t* builder, spn_resolved_pkg_t* resolved) {
   sp_hash_t build_id = sp_hash_combine(hashes, sp_dyn_array_size(hashes));
   sp_str_t build_str = sp_format("{}", SP_FMT_SHORT_HASH(build_id));
 
-  spn_dep_ctx_t dep = {
-    .metadata = *metadata,
-    .build_id = build_id,
-  };
-
+  spn_pkg_unit_t unit = SP_ZERO_INITIALIZE();
   switch (resolved->kind) {
     case SPN_PACKAGE_KIND_INDEX: {
-      spn_pkg_ctx_init(&dep, (spn_pkg_unit_config_t)  {
+      spn_pkg_ctx_init(&unit, (spn_pkg_unit_config_t)  {
         .build_id = build_id,
         .metadata = *metadata,
         .ctx = {
@@ -6345,9 +6330,9 @@ void spn_builder_add_dep(spn_builder_t* builder, spn_resolved_pkg_t* resolved) {
           .builder = builder,
           .linkage = linkage,
           .paths = {
-            .work = sp_fs_join_path(sp_fs_join_path(spn.paths.build, pkg->name), build_str),
-            .store = sp_fs_join_path(sp_fs_join_path(spn.paths.store, pkg->name), build_str),
-            .source = sp_fs_join_path(spn.paths.source, pkg->name),
+            .work = sp_fs_join_path(pkg->paths.cache.work, build_str),
+            .store = sp_fs_join_path(pkg->paths.cache.store, build_str),
+            .source = pkg->paths.cache.source
           }
         }
       });
@@ -6361,7 +6346,7 @@ void spn_builder_add_dep(spn_builder_t* builder, spn_resolved_pkg_t* resolved) {
     }
   }
 
-  sp_om_insert(builder->contexts.deps, pkg->name, dep);
+  sp_om_insert(builder->contexts.deps, pkg->name, unit);
 }
 
 void spn_app_prepare_build(spn_app_t* app) {
@@ -7289,7 +7274,7 @@ sp_app_result_t spn_deinit(sp_app_t* sp) {
   }
 
   sp_om_for(app->builder.contexts.deps, it) {
-    spn_dep_ctx_t* dep = sp_om_at(app->builder.contexts.deps, it);
+    spn_pkg_unit_t* dep = sp_om_at(app->builder.contexts.deps, it);
     sp_fs_create_sym_link(
       dep->ctx.paths.logs.build,
       sp_fs_join_path(app->builder.contexts.pkg.ctx.paths.work, spn_build_ctx_get_build_log_name(&dep->ctx))
@@ -7298,8 +7283,8 @@ sp_app_result_t spn_deinit(sp_app_t* sp) {
   }
 
   sp_om_for(app->builder.contexts.targets, it) {
-    spn_target_ctx_t* target = sp_om_at(app->builder.contexts.targets, it);
-    spn_build_ctx_deinit(&target->ctx);
+    spn_target_unit_t* unit = sp_om_at(app->builder.contexts.targets, it);
+    spn_build_ctx_deinit(&unit->ctx);
   }
 
   spn_build_ctx_deinit(&app->builder.contexts.pkg.ctx);
@@ -7363,7 +7348,7 @@ void spn_task_sync_init(spn_app_t* app) {
   spn_event_buffer_push(spn.events, &b->contexts.pkg.ctx, SPN_BUILD_EVENT_FETCH);
 
   sp_om_for(b->contexts.deps, it) {
-    spn_dep_ctx_t* dep = sp_om_at(b->contexts.deps, it);
+    spn_pkg_unit_t* dep = sp_om_at(b->contexts.deps, it);
     spn_bg_id_t sync = spn_bg_add_fn(graph, spn_executor_sync_repo, dep);
     spn_bg_cmd_set_metadata(graph, sync, sp_format("sync ({})", SP_FMT_STR(dep->ctx.name)), sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
   }
@@ -7393,7 +7378,7 @@ spn_task_result_t spn_task_configure_update(spn_app_t* app) {
 
   // compile everyone first
   sp_om_for(b->contexts.deps, it) {
-    spn_dep_ctx_t* dep = sp_om_at(b->contexts.deps, it);
+    spn_pkg_unit_t* dep = sp_om_at(b->contexts.deps, it);
 
     if (spn_builder_compile_pkg(b, dep)) {
       spn_event_buffer_push(spn.events, &dep->ctx, SPN_BUILD_EVENT_BUILD_SCRIPT_FAILED);
@@ -7408,7 +7393,7 @@ spn_task_result_t spn_task_configure_update(spn_app_t* app) {
 
   // run configure()
   sp_om_for(b->contexts.deps, it) {
-    spn_dep_ctx_t* dep = sp_om_at(b->contexts.deps, it);
+    spn_pkg_unit_t* dep = sp_om_at(b->contexts.deps, it);
     spn_build_ctx_t* ctx = &dep->ctx;
 
     spn_event_buffer_push(spn.events, &dep->ctx, SPN_BUILD_EVENT_BUILD_SCRIPT_CONFIGURE);
@@ -7428,7 +7413,7 @@ spn_task_result_t spn_task_configure_update(spn_app_t* app) {
 }
 
 s32 spn_executor_configure_regular_dep(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_dep_ctx_t* ctx = (spn_dep_ctx_t*)user_data;
+  spn_pkg_unit_t* ctx = (spn_pkg_unit_t*)user_data;
 
   sp_try(spn_builder_compile_pkg(ctx->ctx.builder, ctx));
 
@@ -7444,7 +7429,7 @@ s32 spn_executor_configure_regular_dep(spn_bg_cmd_t* cmd, void* user_data) {
 }
 
 s32 spn_executor_configure_build_dep(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_dep_ctx_t* ctx = (spn_dep_ctx_t*)user_data;
+  spn_pkg_unit_t* ctx = (spn_pkg_unit_t*)user_data;
 
   sp_try(spn_builder_compile_pkg(ctx->ctx.builder, ctx));
 
@@ -7458,7 +7443,7 @@ s32 spn_executor_configure_build_dep(spn_bg_cmd_t* cmd, void* user_data) {
 
   spn_pkg_ctx_stamp(ctx, ctx->paths.stamp.configure);
 
-  spn_stamp_ctx_t stamp_exit = SP_ZERO_INITIALIZE();
+  spn_stamp_unit_t stamp_exit = SP_ZERO_INITIALIZE();
   spn_build_graph_t* graph = spn_bg_new();
   spn_build_graph_add_pkg_standalone(graph, ctx, &stamp_exit);
 
@@ -7478,7 +7463,7 @@ s32 spn_executor_configure_build_dep(spn_bg_cmd_t* cmd, void* user_data) {
 }
 
 s32 spn_executor_run_package(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_dep_ctx_t* ctx = (spn_dep_ctx_t*)user_data;
+  spn_pkg_unit_t* ctx = (spn_pkg_unit_t*)user_data;
 
   spn_event_buffer_push(spn.events, &ctx->ctx, SPN_BUILD_EVENT_BUILD_SCRIPT_PACKAGE);
 
@@ -7493,13 +7478,13 @@ s32 spn_executor_run_package(spn_bg_cmd_t* cmd, void* user_data) {
 }
 
 s32 spn_executor_stamp(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_stamp_ctx_t* stamp = (spn_stamp_ctx_t*)user_data;
+  spn_stamp_unit_t* stamp = (spn_stamp_unit_t*)user_data;
   spn_pkg_ctx_stamp(stamp->pkg, stamp->file);
   return SPN_OK;
 }
 
 s32 spn_executor_sync_entry(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_dep_ctx_t* ctx = (spn_dep_ctx_t*)user_data;
+  spn_pkg_unit_t* ctx = (spn_pkg_unit_t*)user_data;
 
   if (ctx->on_build) {
     spn_event_buffer_push(spn.events, &ctx->ctx, SPN_BUILD_EVENT_BUILD_SCRIPT_BUILD);
@@ -7551,7 +7536,7 @@ spn_task_result_t spn_task_build_configure_graph(spn_app_t* app) {
   sp_ht_for(app->resolver.resolved, it) {
     sp_str_t name = *sp_ht_it_getkp(app->resolver.resolved, it);
     spn_resolved_pkg_t* resolved = sp_ht_it_getp(app->resolver.resolved, it);
-    spn_dep_ctx_t* dep = sp_om_get(b->contexts.deps, name);
+    spn_pkg_unit_t* dep = sp_om_get(b->contexts.deps, name);
     sp_assert(dep);
     dep->nodes.configure.build = spn_bg_add_fn(graph, spn_executor_configure_build_dep, dep);
     dep->nodes.configure.stamp = spn_bg_add_file(graph, dep->paths.stamp.configure);
@@ -7561,12 +7546,12 @@ spn_task_result_t spn_task_build_configure_graph(spn_app_t* app) {
   }
 
   sp_om_for(b->contexts.deps, it) {
-    spn_dep_ctx_t* dep = sp_om_at(b->contexts.deps, it);
+    spn_pkg_unit_t* dep = sp_om_at(b->contexts.deps, it);
     spn_pkg_t* pkg = dep->ctx.pkg;
 
     sp_ht_for(pkg->deps, dit) {
       sp_str_t parent_name = *sp_ht_it_getkp(pkg->deps, dit);
-      spn_dep_ctx_t* parent = sp_om_get(b->contexts.deps, parent_name);
+      spn_pkg_unit_t* parent = sp_om_get(b->contexts.deps, parent_name);
 
       spn_bg_cmd_add_input(graph, dep->nodes.configure.build, parent->nodes.configure.stamp);
     }
@@ -7585,7 +7570,7 @@ spn_task_result_t spn_task_build_configure_graph(spn_app_t* app) {
   return SPN_TASK_DONE;
 }
 
-spn_bg_id_t spn_build_ctx_get_or_insert_user_file(spn_dep_ctx_t* ctx, spn_build_graph_t* graph, sp_str_t path) {
+spn_bg_id_t spn_build_ctx_get_or_insert_user_file(spn_pkg_unit_t* ctx, spn_build_graph_t* graph, sp_str_t path) {
   spn_bg_id_t* existing = sp_str_ht_get(ctx->nodes.files, path);
   if (existing) return *existing;
 
@@ -7595,19 +7580,19 @@ spn_bg_id_t spn_build_ctx_get_or_insert_user_file(spn_dep_ctx_t* ctx, spn_build_
   return id;
 }
 
-sp_str_t spn_build_ctx_get_node_stamp_path(spn_dep_ctx_t* ctx, spn_user_node_t* node) {
+sp_str_t spn_build_ctx_get_node_stamp_path(spn_pkg_unit_t* ctx, spn_user_node_t* node) {
   return sp_fs_join_path(ctx->paths.stamp.dir, node->tag);
 }
 
-void spn_build_ctx_add_user_node(spn_dep_ctx_t* ctx, spn_build_graph_t* graph, spn_user_node_t* node) {
+void spn_build_ctx_add_user_node(spn_pkg_unit_t* ctx, spn_build_graph_t* graph, spn_user_node_t* node) {
   node->id = spn_bg_add_fn_ex(graph, spn_executor_run_user_fn, node, SPN_BG_VIZ_CMD, ctx->ctx.name, node->tag);
   sp_da_push(ctx->nodes.build.user, node->id);
 }
 
-void spn_build_graph_add_target(spn_builder_t* builder, spn_target_ctx_t* build) {
+void spn_build_graph_add_target(spn_builder_t* builder, spn_target_unit_t* unit) {
   spn_build_graph_t* graph = &builder->build.graph;
-  spn_target_t* target = build->target;
-  spn_dep_ctx_t* pkg = spn_builder_find_pkg_ctx(builder, target->pkg->name);
+  spn_target_t* target = unit->target;
+  spn_pkg_unit_t* pkg = spn_builder_find_pkg_ctx(builder, target->pkg->name);
 
   //                         ┌──────────┐
   //                         │  foo.c   │──┐
@@ -7623,24 +7608,24 @@ void spn_build_graph_add_target(spn_builder_t* builder, spn_target_ctx_t* build)
   //
   sp_str_t subgraph = sp_str_join(pkg->ctx.name, target->name, sp_str_lit("::"));
 
-  build->nodes.compile = spn_bg_add_fn_ex(graph, spn_executor_build_target, build, SPN_BG_VIZ_CMD, pkg->ctx.name, sp_format("{}::compile", SP_FMT_STR(target->name)));
-  build->nodes.output = spn_bg_add_file_ex(graph, sp_fs_join_path(pkg->ctx.paths.bin, target->name), SPN_BG_VIZ_BINARY, pkg->ctx.name);
+  unit->nodes.compile = spn_bg_add_fn_ex(graph, spn_executor_build_target, unit, SPN_BG_VIZ_CMD, pkg->ctx.name, sp_format("{}::compile", SP_FMT_STR(target->name)));
+  unit->nodes.output = spn_bg_add_file_ex(graph, sp_fs_join_path(pkg->ctx.paths.bin, target->name), SPN_BG_VIZ_BINARY, pkg->ctx.name);
 
-  spn_bg_cmd_add_output(graph, build->nodes.compile,  build->nodes.output);
-  spn_bg_cmd_add_input(graph, build->nodes.compile, pkg->nodes.build.stamp.exit);
-  spn_bg_cmd_add_input(graph, pkg->nodes.build.package, build->nodes.output);
+  spn_bg_cmd_add_output(graph, unit->nodes.compile,  unit->nodes.output);
+  spn_bg_cmd_add_input(graph, unit->nodes.compile, pkg->nodes.build.stamp.exit);
+  spn_bg_cmd_add_input(graph, pkg->nodes.build.package, unit->nodes.output);
 
   sp_da_for(target->source, it) {
     sp_str_t file = sp_fs_join_path(pkg->ctx.paths.source, target->source[it]);
     spn_bg_id_t node = spn_bg_add_file_ex(graph, file, SPN_BG_VIZ_SOURCE, pkg->ctx.name);
-    sp_da_push(build->nodes.source, node);
-    spn_bg_cmd_add_input(graph, build->nodes.compile, node);
+    sp_da_push(unit->nodes.source, node);
+    spn_bg_cmd_add_input(graph, unit->nodes.compile, node);
   }
 }
 
-void spn_build_graph_add_pkg(spn_builder_t* b, spn_dep_ctx_t* ctx) {
+void spn_build_graph_add_pkg(spn_builder_t* b, spn_pkg_unit_t* ctx) {
   spn_build_graph_t* graph = &b->build.graph;
-  spn_pkg_nodes_v2_t* nodes = &ctx->nodes.build;
+  spn_pkg_nodes_t* nodes = &ctx->nodes.build;
   spn_pkg_t* pkg = ctx->ctx.pkg;
 
   // ┌──────────┐
@@ -7659,21 +7644,21 @@ void spn_build_graph_add_pkg(spn_builder_t* b, spn_dep_ctx_t* ctx) {
 
   {
     u64 index = sp_om_size(b->contexts.stamps);
-    sp_om_insert(b->contexts.stamps, ctx->paths.stamp.main, ((spn_stamp_ctx_t) {
+    sp_om_insert(b->contexts.stamps, ctx->paths.stamp.main, ((spn_stamp_unit_t) {
       .pkg = ctx,
       .file = ctx->paths.stamp.main
     }));
-    spn_stamp_ctx_t* stamp = sp_om_get(b->contexts.stamps, ctx->paths.stamp.main);
+    spn_stamp_unit_t* stamp = sp_om_get(b->contexts.stamps, ctx->paths.stamp.main);
     nodes->main = spn_bg_add_fn_ex(graph, spn_executor_stamp, stamp, SPN_BG_VIZ_CMD, ctx->ctx.name, sp_str_lit("sync::main"));
   }
 
   {
     u64 index = sp_om_size(b->contexts.stamps);
-    sp_om_insert(b->contexts.stamps, ctx->paths.stamp.exit, ((spn_stamp_ctx_t) {
+    sp_om_insert(b->contexts.stamps, ctx->paths.stamp.exit, ((spn_stamp_unit_t) {
       .pkg = ctx,
       .file = ctx->paths.stamp.exit
     }));
-    spn_stamp_ctx_t* stamp = sp_om_get(b->contexts.stamps, ctx->paths.stamp.exit);
+    spn_stamp_unit_t* stamp = sp_om_get(b->contexts.stamps, ctx->paths.stamp.exit);
     nodes->exit = spn_bg_add_fn_ex(graph, spn_executor_stamp, stamp, SPN_BG_VIZ_CMD, ctx->ctx.name, sp_str_lit("sync::exit"));
   }
 
@@ -7733,8 +7718,8 @@ void spn_build_graph_add_pkg(spn_builder_t* b, spn_dep_ctx_t* ctx) {
   }
 }
 
-void spn_build_graph_add_pkg_standalone(spn_build_graph_t* graph, spn_dep_ctx_t* ctx, spn_stamp_ctx_t* stamp_exit) {
-  spn_pkg_nodes_v2_t* nodes = &ctx->nodes.build;
+void spn_build_graph_add_pkg_standalone(spn_build_graph_t* graph, spn_pkg_unit_t* ctx, spn_stamp_unit_t* stamp_exit) {
+  spn_pkg_nodes_t* nodes = &ctx->nodes.build;
   spn_pkg_t* pkg = ctx->ctx.pkg;
 
   nodes->manifest = spn_bg_add_file_ex(graph, pkg->paths.manifest, SPN_BG_VIZ_MANIFEST, ctx->ctx.name);
@@ -7744,7 +7729,7 @@ void spn_build_graph_add_pkg_standalone(spn_build_graph_t* graph, spn_dep_ctx_t*
   nodes->stamp.main = spn_bg_add_file_ex(graph, ctx->paths.stamp.main, SPN_BG_VIZ_CMD, ctx->ctx.name);
   nodes->stamp.exit = spn_bg_add_file_ex(graph, ctx->paths.stamp.exit, SPN_BG_VIZ_CMD, ctx->ctx.name);
 
-  *stamp_exit = (spn_stamp_ctx_t) { .pkg = ctx, .file = ctx->paths.stamp.exit };
+  *stamp_exit = (spn_stamp_unit_t) { .pkg = ctx, .file = ctx->paths.stamp.exit };
 
   nodes->main = spn_bg_add_fn_ex(graph, spn_executor_sync_entry, ctx, SPN_BG_VIZ_CMD, ctx->ctx.name, sp_str_lit("sync::main"));
   nodes->exit = spn_bg_add_fn_ex(graph, spn_executor_stamp, stamp_exit, SPN_BG_VIZ_CMD, ctx->ctx.name, sp_str_lit("sync::exit"));
@@ -7798,10 +7783,10 @@ void spn_build_graph_add_pkg_standalone(spn_build_graph_t* graph, spn_dep_ctx_t*
   }
 }
 
-void spn_build_graph_link_deps(spn_build_graph_t* graph, spn_builder_t* builder, spn_dep_ctx_t* ctx) {
+void spn_build_graph_link_deps(spn_build_graph_t* graph, spn_builder_t* builder, spn_pkg_unit_t* ctx) {
   spn_pkg_t* pkg = ctx->ctx.pkg;
   sp_ht_for(pkg->deps, dit) {
-    spn_dep_ctx_t* parent = sp_om_get(builder->contexts.deps, *sp_ht_it_getkp(pkg->deps, dit));
+    spn_pkg_unit_t* parent = sp_om_get(builder->contexts.deps, *sp_ht_it_getkp(pkg->deps, dit));
     spn_bg_cmd_add_input(graph, ctx->nodes.build.main, parent->nodes.build.stamp.package);
   }
 }
@@ -7812,7 +7797,7 @@ spn_task_result_t spn_task_prepare_build_graph_v2(spn_app_t* app) {
 
   // phase 1: add each package to the graph
   sp_om_for(builder->contexts.deps, it) {
-    spn_dep_ctx_t* dep = sp_om_at(builder->contexts.deps, it);
+    spn_pkg_unit_t* dep = sp_om_at(builder->contexts.deps, it);
     spn_build_graph_add_pkg(builder, dep);
   }
   spn_build_graph_add_pkg(builder, &builder->contexts.pkg);
@@ -7824,7 +7809,7 @@ spn_task_result_t spn_task_prepare_build_graph_v2(spn_app_t* app) {
 
   // phase 2: link dependent packages
   sp_om_for(builder->contexts.deps, it) {
-    spn_dep_ctx_t* parent = sp_om_at(builder->contexts.deps, it);
+    spn_pkg_unit_t* parent = sp_om_at(builder->contexts.deps, it);
     spn_build_graph_link_deps(graph, builder, sp_om_at(builder->contexts.deps, it));
   }
   spn_build_graph_link_deps(graph, builder, &builder->contexts.pkg);
@@ -7902,9 +7887,9 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
   sp_tm_timer_t timer = sp_tm_start_timer();
 
   sp_om_for(b->contexts.targets, it) {
-    spn_target_ctx_t* bin = sp_om_at(b->contexts.targets, it);
-    spn_build_ctx_t* ctx = &bin->ctx;
-    spn_target_t* target = bin->target;
+    spn_target_unit_t* unit = sp_om_at(b->contexts.targets, it);
+    spn_build_ctx_t* ctx = &unit->ctx;
+    spn_target_t* target = unit->target;
 
     if (!spn_target_filter_pass(&b->filter, target)) {
       continue;
@@ -7942,8 +7927,8 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
 
   bool ok = true;
   sp_ht_for_kv(tests, it) {
-    spn_target_ctx_t* target = sp_om_get(b->contexts.targets, *it.key);
-    spn_build_ctx_t* ctx = &target->ctx;
+    spn_target_unit_t* unit = sp_om_get(b->contexts.targets, *it.key);
+    spn_build_ctx_t* ctx = &unit->ctx;
 
     if (*it.val) {
       ok = false;
@@ -7996,7 +7981,7 @@ void spn_render_mermaid_cmd_as_file(spn_build_graph_t* graph, spn_bg_dirty_t* di
     SP_FMT_CSTR(indent), SP_FMT_U32(cmd->id.index), SP_FMT_QSTR(tag), SP_FMT_STR(cls)));
 }
 
-void spn_render_one_package_ctx(spn_builder_t* b, spn_bg_dirty_t* dirty, spn_dep_ctx_t* dep, sp_io_writer_t* io) {
+void spn_render_one_package_ctx(spn_builder_t* b, spn_bg_dirty_t* dirty, spn_pkg_unit_t* dep, sp_io_writer_t* io) {
   // for each package:
   // - subgraph: package              e.g. "sqlite"
   //   - manifest + script         *  e.g. "spn.toml" and "spn.c"
@@ -8017,7 +8002,7 @@ void spn_render_one_package_ctx(spn_builder_t* b, spn_bg_dirty_t* dirty, spn_dep
 
   spn_build_ctx_t* ctx = &dep->ctx;
   spn_build_graph_t* graph = &b->build.graph;
-  spn_pkg_nodes_v2_t* nodes = &dep->nodes.build;
+  spn_pkg_nodes_t* nodes = &dep->nodes.build;
 
   // package subgraph
   sp_io_write_str(io, sp_format("  subgraph {}[{}]\n", SP_FMT_STR(ctx->name), SP_FMT_STR(ctx->name)));
@@ -8059,21 +8044,21 @@ void spn_render_one_package_ctx(spn_builder_t* b, spn_bg_dirty_t* dirty, spn_dep
 
   // for each target
   sp_om_for(b->contexts.targets, it) {
-    spn_target_ctx_t* target = sp_om_at(b->contexts.targets, it);
-    if (target->target->pkg != ctx->pkg) {
+    spn_target_unit_t* unit = sp_om_at(b->contexts.targets, it);
+    if (unit->target->pkg != ctx->pkg) {
       continue;
     }
 
     // target subgraph
     sp_io_write_str(io, sp_format("    subgraph {}__{}[{}]\n",
-      SP_FMT_STR(ctx->name), SP_FMT_STR(target->target->name), SP_FMT_STR(target->target->name)));
+      SP_FMT_STR(ctx->name), SP_FMT_STR(unit->target->name), SP_FMT_STR(unit->target->name)));
 
     // compile (collapsed with output binary)
-    spn_render_mermaid_cmd_as_file(graph, dirty, ctx, target->nodes.compile, target->nodes.output, io, "      ");
+    spn_render_mermaid_cmd_as_file(graph, dirty, ctx, unit->nodes.compile, unit->nodes.output, io, "      ");
 
     // source files
-    sp_da_for(target->nodes.source, s) {
-      spn_render_mermaid_file(graph, dirty, ctx, target->nodes.source[s], io, "      ");
+    sp_da_for(unit->nodes.source, s) {
+      spn_render_mermaid_file(graph, dirty, ctx, unit->nodes.source[s], io, "      ");
     }
 
     sp_io_write_cstr(io, "    end\n"); // target
@@ -8089,10 +8074,15 @@ void spn_render_to_mermaid(spn_app_t* app, sp_io_writer_t* io) {
   sp_io_write_str(io, sp_str_lit("graph TD\n"));
 
   // color by dirtiness
-  sp_str_t dirty_color = sp_str_lit("#a36565");
-  sp_str_t clean_color = sp_str_lit("#65a365");
-  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("dirty"), dirty_color, stroke, text));
-  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("clean"), clean_color, stroke, text));
+  struct {
+    sp_str_t clean;
+    sp_str_t dirty;
+  } colors = {
+    sp_str_lit("#a36565"),
+    sp_str_lit("#65a365"),
+  };
+  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("dirty"), colors.dirty, stroke, text));
+  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("clean"), colors.clean, stroke, text));
   sp_io_write_str(io, sp_str_lit("  linkStyle default stroke:#909090,stroke-width:2px\n"));
 
   spn_builder_t* builder = &app->builder;
@@ -8105,26 +8095,27 @@ void spn_render_to_mermaid(spn_app_t* app, sp_io_writer_t* io) {
 
   // collect collapsed pairs from all packages (main+stamp, exit+stamp)
   sp_om_for(builder->contexts.deps, it) {
-    spn_dep_ctx_t* dep = sp_om_at(builder->contexts.deps, it);
-    spn_pkg_nodes_v2_t* nodes = &dep->nodes.build;
+    spn_pkg_unit_t* unit = sp_om_at(builder->contexts.deps, it);
+    spn_pkg_nodes_t* nodes = &unit->nodes.build;
     sp_ht_insert(file_to_cmd, nodes->stamp.main.index, nodes->main.index);
     sp_ht_insert(file_to_cmd, nodes->stamp.exit.index, nodes->exit.index);
   }
+
   {
-    spn_pkg_nodes_v2_t* nodes = &builder->contexts.pkg.nodes.build;
+    spn_pkg_nodes_t* nodes = &builder->contexts.pkg.nodes.build;
     sp_ht_insert(file_to_cmd, nodes->stamp.main.index, nodes->main.index);
     sp_ht_insert(file_to_cmd, nodes->stamp.exit.index, nodes->exit.index);
   }
 
   // collect collapsed pairs from all targets (compile+output)
   sp_om_for(builder->contexts.targets, it) {
-    spn_target_ctx_t* target = sp_om_at(builder->contexts.targets, it);
-    sp_ht_insert(file_to_cmd, target->nodes.output.index, target->nodes.compile.index);
+    spn_target_unit_t* unit = sp_om_at(builder->contexts.targets, it);
+    sp_ht_insert(file_to_cmd, unit->nodes.output.index, unit->nodes.compile.index);
   }
 
   // render dependency packages
   sp_om_for(builder->contexts.deps, it) {
-    spn_dep_ctx_t* dep = sp_om_at(builder->contexts.deps, it);
+    spn_pkg_unit_t* dep = sp_om_at(builder->contexts.deps, it);
     spn_render_one_package_ctx(builder, dirty, dep, io);
   }
 
@@ -8334,7 +8325,7 @@ spn_task_result_t spn_task_which(spn_app_t* app) {
   }
 
   if (sp_str_valid(cmd->package)) {
-    spn_dep_ctx_t* dep = spn_cli_assert_dep_exists(cmd->package);
+    spn_pkg_unit_t* dep = spn_cli_assert_dep_exists(cmd->package);
     sp_str_t dir = spn_build_ctx_get_dir(&dep->ctx, kind);
     spn_log_info("{}", SP_FMT_STR(dir));
   }
@@ -8620,8 +8611,8 @@ sp_app_result_t spn_cli_set_profile(spn_app_t* app, sp_str_t name) {
   return SP_APP_CONTINUE;
 }
 
-spn_dep_ctx_t* spn_cli_assert_dep_exists(sp_str_t name) {
-  spn_dep_ctx_t* dep = sp_om_get(app.builder.contexts.deps, name);
+spn_pkg_unit_t* spn_cli_assert_dep_exists(sp_str_t name) {
+  spn_pkg_unit_t* dep = sp_om_get(app.builder.contexts.deps, name);
   SP_ASSERT_FMT(dep, "{:fg brightyellow} is not in this project", SP_FMT_STR(name));
   return dep;
 }
@@ -8736,7 +8727,7 @@ sp_app_result_t spn_cli_copy(spn_cli_t* cli) {
   sp_fs_create_dir(to);
 
   sp_om_for(app.builder.contexts.deps, it) {
-    spn_dep_ctx_t* dep = sp_om_at(app.builder.contexts.deps, it);
+    spn_pkg_unit_t* dep = sp_om_at(app.builder.contexts.deps, it);
     spn_build_ctx_t* ctx = &dep->ctx;
 
     sp_dyn_array(sp_os_dir_ent_t) entries = sp_fs_collect(ctx->paths.lib);
@@ -8788,7 +8779,7 @@ sp_app_result_t spn_cli_manifest(spn_cli_t* cli) {
   spn_app_resolve(&app);
   spn_app_prepare_build(&app);
 
-  spn_dep_ctx_t* dep = spn_cli_assert_dep_exists(cmd->package);
+  spn_pkg_unit_t* dep = spn_cli_assert_dep_exists(cmd->package);
 
   sp_str_t path = dep->ctx.pkg->paths.manifest;
   sp_str_t manifest = sp_io_read_file(path);
