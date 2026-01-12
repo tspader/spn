@@ -12,6 +12,10 @@ void build(spn_build_ctx_t* ctx) {
   spn_make(ctx);
 }
 
+void configure(spn_build_ctx_t* ctx) {
+  spn_add_node(ctx, "hello");
+}
+
 void package(spn_build_ctx_t* ctx) {
   spn_make_t* make = spn_make_new(ctx);
   spn_make_add_target(make, "install");

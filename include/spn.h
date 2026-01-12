@@ -117,9 +117,8 @@ void                   spn_add_include(spn_build_ctx_t* b, const c8* path);
 void                   spn_add_define(spn_build_ctx_t* b, const c8* define);
 void                   spn_add_system_dep(spn_build_ctx_t* b, const c8* dep);
 void                   spn_add_linkage(spn_build_ctx_t* b, spn_pkg_linkage_t linkage);
-void spn_add_dep(spn_build_ctx_t* b, const c8* name, const c8* version, spn_visibility_t viz);
 spn_registry_t*        spn_add_registry(spn_build_ctx_t* b, const c8* name, const c8* location);
-void spn_copy(spn_build_ctx_t* b, spn_dir_kind_t from, const c8* pf, spn_dir_kind_t to, const c8* pt);
+void                   spn_copy(spn_build_ctx_t* b, spn_dir_kind_t from, const c8* pf, spn_dir_kind_t to, const c8* pt);
 void                   spn_log(spn_build_ctx_t* b, const c8* message);
 spn_cc_kind_t          spn_profile_get_cc(spn_profile_t* profile);
 const c8*              spn_profile_get_cc_exe(spn_profile_t* profile);
@@ -156,6 +155,13 @@ void                   spn_cmake_install(spn_cmake_t* cmake);
 void                   spn_cmake_run(spn_cmake_t* cmake);
 
 typedef struct spn_node_t spn_node_t;
+typedef struct spn_pkg_unit_t spn_pkg_unit_t;
+
+struct spn_node_t {
+  spn_pkg_unit_t* ctx;
+  u32 index;
+};
+
 
 struct spn_node_ctx_t {
   spn_build_ctx_t* build;
