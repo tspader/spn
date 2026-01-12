@@ -1114,7 +1114,7 @@ struct spn_pkg_unit_t {
 
   struct {
     struct {
-      spn_bg_id_t build;
+      spn_bg_id_t run;
       spn_bg_id_t stamp;
     } configure;
     spn_pkg_nodes_t build;
@@ -1199,8 +1199,8 @@ void            spn_session_link_graph(spn_session_t* s, spn_build_graph_t* grap
 spn_bg_id_t     spn_bg_get_or_put_user_file(spn_pkg_unit_t* unit, spn_build_graph_t* g, sp_str_t path);
 void            spn_bg_add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit);
 s32             spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data);
-s32             spn_executor_configure_buildtime_pkg(spn_bg_cmd_t* cmd, void* user_data);
-s32             spn_executor_configure_runtime_pkg(spn_bg_cmd_t* cmd, void* user_data);
+s32             spn_executor_configure_pkg(spn_bg_cmd_t* cmd, void* user_data);
+s32             spn_executor_build_pkg(spn_bg_cmd_t* cmd, void* user_data);
 s32             spn_executor_user_fn(spn_bg_cmd_t* cmd, void* user_data);
 s32             spn_executor_build_target_unit(spn_bg_cmd_t* cmd, void* user_data);
 s32             spn_executor_run_package_hook(spn_bg_cmd_t* cmd, void* user_data);
@@ -6014,7 +6014,7 @@ s32 spn_executor_build_target_unit(spn_bg_cmd_t* cmd, void* user_data) {
   sp_ht_for_kv(pkg->deps, it) {
     if (spn_is_visibility_linked(target->visibility, it.val->visibility)) {
       spn_pkg_unit_t* unit = spn_session_find_pkg(session, *it.key);
-      spn_cc_target_add_dep(cc_target, &unit->ctx);
+      spn_cc_target_add_dep(cc_target, unit);
     }
   }
 
@@ -7380,7 +7380,7 @@ spn_task_result_t spn_task_configure_update(spn_app_t* app) {
   return SPN_TASK_DONE;
 }
 
-s32 spn_executor_configure_runtime_pkg(spn_bg_cmd_t* cmd, void* user_data) {
+s32 spn_executor_configure_pkg(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* ctx = (spn_pkg_unit_t*)user_data;
 
   sp_try(spn_session_compile_pkg(ctx->ctx.session, ctx));
@@ -7396,7 +7396,7 @@ s32 spn_executor_configure_runtime_pkg(spn_bg_cmd_t* cmd, void* user_data) {
   return SPN_OK;
 }
 
-s32 spn_executor_configure_buildtime_pkg(spn_bg_cmd_t* cmd, void* user_data) {
+s32 spn_executor_build_pkg(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* ctx = (spn_pkg_unit_t*)user_data;
 
   sp_try(spn_session_compile_pkg(ctx->ctx.session, ctx));
@@ -7484,7 +7484,7 @@ spn_task_result_t spn_task_prepare_configure_graph(spn_app_t* app) {
   spn_session_t* b = &app->session;
   spn_build_graph_t* graph = &b->configure.graph;
 
-  spn_bg_id_t build = spn_bg_add_fn(graph, spn_executor_configure_runtime_pkg, &b->units.root);
+  spn_bg_id_t build = spn_bg_add_fn(graph, spn_executor_configure_pkg, &b->units.root);
   spn_bg_id_t stamp = spn_bg_add_file(graph, b->units.root.paths.stamp.package);
   spn_bg_cmd_set_metadata(graph, build, app->package.name, sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
   spn_bg_cmd_add_output(graph, build, stamp);
@@ -7494,10 +7494,10 @@ spn_task_result_t spn_task_prepare_configure_graph(spn_app_t* app) {
     spn_resolved_pkg_t* resolved = sp_ht_it_getp(app->resolver.resolved, it);
     spn_pkg_unit_t* dep = sp_om_get(b->units.packages, name);
     sp_assert(dep);
-    dep->nodes.configure.build = spn_bg_add_fn(graph, spn_executor_configure_buildtime_pkg, dep);
+    dep->nodes.configure.run = spn_bg_add_fn(graph, spn_executor_build_pkg, dep);
     dep->nodes.configure.stamp = spn_bg_add_file(graph, dep->paths.stamp.configure);
-    spn_bg_cmd_set_metadata(graph, dep->nodes.configure.build, name, sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
-    spn_bg_cmd_add_output(graph, dep->nodes.configure.build, dep->nodes.configure.stamp);
+    spn_bg_cmd_set_metadata(graph, dep->nodes.configure.run, name, sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
+    spn_bg_cmd_add_output(graph, dep->nodes.configure.run, dep->nodes.configure.stamp);
     spn_bg_cmd_add_input(graph, build, dep->nodes.configure.stamp);
   }
 
@@ -7509,7 +7509,7 @@ spn_task_result_t spn_task_prepare_configure_graph(spn_app_t* app) {
       sp_str_t parent_name = *sp_ht_it_getkp(pkg->deps, dit);
       spn_pkg_unit_t* parent = sp_om_get(b->units.packages, parent_name);
 
-      spn_bg_cmd_add_input(graph, dep->nodes.configure.build, parent->nodes.configure.stamp);
+      spn_bg_cmd_add_input(graph, dep->nodes.configure.run, parent->nodes.configure.stamp);
     }
   }
 
@@ -7853,6 +7853,31 @@ void spn_render_mermaid_cmd_as_file(spn_build_graph_t* graph, spn_bg_dirty_t* di
     SP_FMT_CSTR(indent), SP_FMT_U32(cmd->id.index), SP_FMT_QSTR(tag), SP_FMT_STR(cls)));
 }
 
+void spn_bg_render_file_to_builder(sp_str_builder_t* builder, u32 id, sp_str_t file) {
+  sp_str_t prefix = SP_ZERO_INITIALIZE();
+  if (sp_str_starts_with(file, spn.paths.cache)) {
+    prefix = sp_str_lit("$CACHE");
+    file = sp_str_strip_left(file, spn.paths.cache);
+  }
+  else if (sp_str_starts_with(file, spn.paths.project)) {
+    prefix = sp_str_lit("$ROOT");
+    file = sp_str_strip_left(file, spn.paths.project);
+  }
+
+  sp_mem_scratch_t scratch = sp_mem_begin_scratch();
+  if (!sp_str_empty(prefix)) {
+    file = sp_str_concat(prefix, file);
+  }
+
+  sp_str_builder_new_line(builder);
+  sp_str_builder_append_fmt(builder, "F{}[{}]",
+    SP_FMT_U32(id),
+    SP_FMT_QSTR(file)
+  );
+
+  sp_mem_end_scratch(scratch);
+}
+
 void spn_bg_render_file_to_mermaid(sp_io_writer_t* io, u32 id, sp_str_t file) {
   sp_io_write_str(io, sp_format("F{}[{}]",
     SP_FMT_U32(id),
@@ -7860,104 +7885,88 @@ void spn_bg_render_file_to_mermaid(sp_io_writer_t* io, u32 id, sp_str_t file) {
   ));
 }
 
-void spn_bg_render_pkg_to_mermaid(spn_session_t* b, spn_bg_dirty_t* dirty, spn_pkg_unit_t* unit, sp_io_writer_t* io) {
-  // for each package:
-  // - subgraph: package              e.g. "sqlite"
-  //   - manifest + script         *  e.g. "spn.toml" and "spn.c"
-  //   - package() + stamp         *  e.g. "sqlite::package" + "$STAMP/package.stamp"
-  //     - subgraph: user nodes
-  //       - main + stamp          *  e.g. "sqlite::user::main" + "$STAMP/main.stamp"
-  //       - exit + stamp          *  e.g. "sqlite::user::exit" + "$STAMP/exit.stamp"
-  //       - all user nodes        *  e.g. "sqlite::user::tag" or relative file path
-  //     - for each target:
-  //       - subgraph: target         e.g. "sqlite.jimsh"
-  //         - compile             ^  e.g. "sqlite::jimsh::compile"
-  //         - output              ^  e.g. "$STORE/bin/jimsh"
-  //         - source files        ^  e.g. "jimsh.c"
-  //
-  //  key:
-  //  * => get from spn_build_ctx_t's nodes.build
-  //  ^ => get from spn_target_ctx_t
+void spn_bg_render_file_id_to_builder(spn_build_graph_t* graph, sp_str_builder_t* builder, spn_bg_id_t id) {
+  spn_bg_file_t* file = spn_bg_find_file(graph, id);
+  spn_bg_render_file_to_builder(builder, id.index, file->path);
+}
 
+void spn_bg_render_cmd_id_to_builder(spn_build_graph_t* graph, sp_str_builder_t* builder, spn_bg_id_t id) {
+  spn_bg_cmd_t* cmd = spn_bg_find_command(graph, id);
+
+  sp_str_builder_new_line(builder);
+  sp_str_builder_append_fmt(builder, "C{}[{}]",
+    SP_FMT_U32(cmd->id.index),
+    SP_FMT_QSTR(cmd->tag)
+  );
+}
+
+void spn_bg_begin_subgraph(sp_str_builder_t* builder, sp_str_t id, sp_str_t name) {
+  sp_str_builder_new_line(builder);
+  sp_str_builder_append_fmt(builder, "subgraph {}[{}]", SP_FMT_STR(id), SP_FMT_QSTR(name));
+  sp_str_builder_indent(builder);
+}
+
+void spn_bg_end_subgraph(sp_str_builder_t* builder) {
+  sp_str_builder_dedent(builder);
+  sp_str_builder_new_line(builder);
+  sp_str_builder_append_cstr(builder, "end");
+}
+
+void spn_bg_render_pkg_to_mermaid(spn_session_t* b, spn_bg_dirty_t* dirty, spn_pkg_unit_t* unit, sp_io_writer_t* io) {
   spn_build_ctx_t* ctx = &unit->ctx;
   spn_build_graph_t* graph = &b->build.graph;
   spn_pkg_nodes_t* nodes = &unit->nodes.build;
 
-  // package subgraph
-  sp_io_write_str(io, sp_format("  subgraph {}[{}]\n", SP_FMT_STR(ctx->name), SP_FMT_STR(ctx->name)));
+  sp_str_builder_t builder = {
+    .writer = io,
+    .indent = {
+      .level = 1,
+      .word = sp_str_lit("  ")
+    }
+  };
 
-  // manifest + script
-  spn_render_mermaid_file(graph, dirty, ctx, nodes->manifest, io, "    ");
-  spn_render_mermaid_file(graph, dirty, ctx, nodes->script, io, "    ");
+  spn_bg_begin_subgraph(&builder, ctx->name, ctx->name);
+    spn_bg_render_file_id_to_builder(graph, &builder, nodes->manifest);
+    spn_bg_render_file_id_to_builder(graph, &builder, nodes->script);
+    spn_bg_render_cmd_id_to_builder(graph, &builder, nodes->package);
+    spn_bg_render_file_id_to_builder(graph, &builder, nodes->stamp.package);
 
-  // package() + stamp
-  spn_render_mermaid_cmd(graph, dirty, nodes->package, io, "    ");
-  spn_render_mermaid_file(graph, dirty, ctx, nodes->stamp.package, io, "    ");
+    spn_bg_begin_subgraph(&builder, sp_format("{}::user", SP_FMT_STR(ctx->name)), sp_str_lit("user"));
+      spn_bg_render_cmd_id_to_builder(graph, &builder, nodes->main);
+      spn_bg_render_file_id_to_builder(graph, &builder, nodes->stamp.main);
+      spn_bg_render_cmd_id_to_builder(graph, &builder, nodes->exit);
+      spn_bg_render_file_id_to_builder(graph, &builder, nodes->stamp.exit);
 
-  // user subgraph
-  sp_io_write_str(io, sp_format("    subgraph {}__user[user]\n", SP_FMT_STR(ctx->name)));
+      sp_da_for(unit->nodes.all, it) {
+        spn_user_node_t* node = &unit->nodes.all[it];
+        spn_bg_render_cmd_id_to_builder(graph, &builder, node->id);
+      }
 
-  // main (collapsed with stamp.main)
-  spn_render_mermaid_cmd(graph, dirty, nodes->main, io, "    ");
-  spn_render_mermaid_file(graph, dirty, ctx, nodes->stamp.main, io, "    ");
-  //spn_render_mermaid_cmd_as_file(graph, dirty, ctx, nodes->main, nodes->stamp.main, io, "      ");
+      sp_str_ht_for(unit->nodes.files, it) {
+        spn_bg_id_t file_id = *sp_str_ht_it_getp(unit->nodes.files, it);
+        spn_bg_render_file_id_to_builder(graph, &builder, file_id);
+      }
+    spn_bg_end_subgraph(&builder);
 
-  // exit (collapsed with stamp.exit)
-  spn_render_mermaid_cmd(graph, dirty, nodes->exit, io, "    ");
-  spn_render_mermaid_file(graph, dirty, ctx, nodes->stamp.exit, io, "    ");
-  //spn_render_mermaid_cmd_as_file(graph, dirty, ctx, nodes->exit, nodes->stamp.exit, io, "      ");
+    sp_om_for(b->units.targets, it) {
+      spn_target_unit_t* unit = sp_om_at(b->units.targets, it);
+      spn_target_t* target = unit->target;
+      if (unit->target->pkg != ctx->pkg) {
+        continue;
+      }
 
-  // all user commands
-  sp_da_for(unit->nodes.all, it) {
-    spn_user_node_t* node = &unit->nodes.all[it];
-    spn_render_mermaid_cmd(graph, dirty, node->id, io, "      ");
-  }
-
-  // all user files
-  sp_str_ht_for(unit->nodes.files, it) {
-    spn_bg_id_t file_id = *sp_str_ht_it_getp(unit->nodes.files, it);
-    spn_render_mermaid_file(graph, dirty, ctx, file_id, io, "      ");
-  }
-
-  sp_io_write_cstr(io, "    "); // user
-  sp_io_write_cstr(io, "end"); // user
-  sp_io_write_new_line(io);
-
-  // for each target
-  sp_om_for(b->units.targets, it) {
-    spn_target_unit_t* unit = sp_om_at(b->units.targets, it);
-    spn_target_t* target = unit->target;
-    if (unit->target->pkg != ctx->pkg) {
-      continue;
+      spn_bg_begin_subgraph(&builder, sp_format("{}::{}", SP_FMT_STR(ctx->name), SP_FMT_STR(target->name)), target->name);
+        spn_bg_render_cmd_id_to_builder(graph, &builder, unit->nodes.compile);
+        spn_bg_render_file_id_to_builder(graph, &builder, unit->nodes.output);
+        sp_da_for(unit->nodes.source, s) {
+          spn_bg_render_file_id_to_builder(graph, &builder, unit->nodes.source[s]);
+        }
+      spn_bg_end_subgraph(&builder);
     }
 
-    // target subgraph
-    sp_io_write_cstr(io, "    ");
-    sp_io_write_str(io, sp_format("subgraph {}__{}[{}]", SP_FMT_STR(ctx->name), SP_FMT_STR(target->name), SP_FMT_STR(target->name)));
-    sp_io_write_new_line(io);
+  spn_bg_end_subgraph(&builder);
 
-    sp_io_write_cstr(io, "      ");
-    sp_io_write_str(io, sp_format("C{}[{}]\n",
-      SP_FMT_U32(unit->nodes.compile.index),
-      SP_FMT_QSTR(target->name)
-    ));
-    sp_io_write_new_line(io);
-
-    sp_io_write_cstr(io, "      ");
-    spn_bg_render_file_to_mermaid(io, unit->nodes.output.index, sp_fs_join_path(sp_str_lit("$STORE/bin"), target->name));
-    sp_io_write_new_line(io);
-
-    // source files
-    sp_da_for(unit->nodes.source, s) {
-      spn_render_mermaid_file(graph, dirty, ctx, unit->nodes.source[s], io, "      ");
-    }
-
-    sp_io_write_cstr(io, "    ");
-    sp_io_write_cstr(io, "end");
-    sp_io_write_new_line(io);
-  }
-
-  sp_io_write_cstr(io, "  end\n"); // package
+  sp_str_builder_new_line(&builder);
 }
 
 void spn_render_to_mermaid(spn_app_t* app, sp_io_writer_t* io) {
@@ -7971,8 +7980,8 @@ void spn_render_to_mermaid(spn_app_t* app, sp_io_writer_t* io) {
     sp_str_t clean;
     sp_str_t dirty;
   } colors = {
-    sp_str_lit("#a36565"),
-    sp_str_lit("#65a365"),
+    .clean = sp_str_lit("#65a365"),
+    .dirty = sp_str_lit("#a36565"),
   };
   sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("dirty"), colors.dirty, stroke, text));
   sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("clean"), colors.clean, stroke, text));
@@ -7982,60 +7991,55 @@ void spn_render_to_mermaid(spn_app_t* app, sp_io_writer_t* io) {
   spn_build_graph_t* graph = &session->build.graph;
   spn_bg_dirty_t* dirty = spn_bg_compute_dirty(graph);
 
-  // build remap table: collapsed stamp files -> their command
-  // key: stamp file index, value: command index
-  sp_ht(u32, u32) file_to_cmd = SP_ZERO_INITIALIZE();
+  // sp_ht_for(dirty->commands, it) {
+  //   spn_bg_id_t* id = sp_ht_it_getkp(dirty->commands, it);
+  //   spn_bg_cmd_t* cmd = spn_bg_find_command(graph, *id);
+  //   sp_io_write_line(&spn.logger.err, cmd->tag);
+  // }
+  // return;
 
-  // collect collapsed pairs from all packages (main+stamp, exit+stamp)
+  // packages
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    spn_pkg_nodes_t* nodes = &unit->nodes.build;
-    sp_ht_insert(file_to_cmd, nodes->stamp.main.index, nodes->main.index);
-    sp_ht_insert(file_to_cmd, nodes->stamp.exit.index, nodes->exit.index);
+    spn_bg_render_pkg_to_mermaid(session, dirty, unit, io);
   }
 
-  {
-    spn_pkg_nodes_t* nodes = &session->units.root.nodes.build;
-    sp_ht_insert(file_to_cmd, nodes->stamp.main.index, nodes->main.index);
-    sp_ht_insert(file_to_cmd, nodes->stamp.exit.index, nodes->exit.index);
-  }
-
-  // collect collapsed pairs from all targets (compile+output)
-  sp_om_for(session->units.targets, it) {
-    spn_target_unit_t* unit = sp_om_at(session->units.targets, it);
-    sp_ht_insert(file_to_cmd, unit->nodes.output.index, unit->nodes.compile.index);
-  }
-
-  // render dependency packages
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* dep = sp_om_at(session->units.packages, it);
-    spn_bg_render_pkg_to_mermaid(session, dirty, dep, io);
-  }
-
-  // render root package
   spn_bg_render_pkg_to_mermaid(session, dirty, &session->units.root, io);
 
-  // render edges (skip edges involving collapsed files)
+  // edges
   sp_da_for(graph->commands, it) {
     spn_bg_cmd_t* cmd = &graph->commands[it];
 
     sp_da_for(cmd->consumes, i) {
-      u32 file_idx = cmd->consumes[i].index;
-      if (sp_ht_key_exists(file_to_cmd, file_idx)) {
-        continue;
-      }
+      u32 id = cmd->consumes[i].index;
       sp_io_write_str(io, sp_format("  F{} --> C{}\n",
-        SP_FMT_U32(file_idx), SP_FMT_U32(cmd->id.index)));
+        SP_FMT_U32(id), SP_FMT_U32(cmd->id.index)));
     }
 
     sp_da_for(cmd->produces, i) {
-      u32 file_idx = cmd->produces[i].index;
-      if (sp_ht_key_exists(file_to_cmd, file_idx)) {
-        continue;
-      }
+      u32 id = cmd->produces[i].index;
       sp_io_write_str(io, sp_format("  C{} --> F{}\n",
-        SP_FMT_U32(cmd->id.index), SP_FMT_U32(file_idx)));
+        SP_FMT_U32(cmd->id.index), SP_FMT_U32(id)));
     }
+  }
+
+  sp_da_for(graph->commands, it) {
+    spn_bg_cmd_t* cmd = &graph->commands[it];
+    sp_io_write_str(io, sp_format("class C{} {}",
+      SP_FMT_U32(cmd->id.index),
+      SP_FMT_CSTR(spn_bg_is_cmd_dirty(dirty, cmd->id) ? "dirty" : "clean")
+    ));
+    sp_io_write_new_line(io);
+
+  }
+
+  sp_da_for(graph->files, it) {
+    spn_bg_file_t* file = &graph->files[it];
+    sp_io_write_str(io, sp_format("class F{} {}",
+      SP_FMT_U32(file->id.index),
+      SP_FMT_CSTR(spn_bg_is_file_dirty(dirty, file->id) ? "dirty" : "clean")
+    ));
+    sp_io_write_new_line(io);
   }
 }
 
