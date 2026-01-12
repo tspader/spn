@@ -1218,11 +1218,11 @@ spn_bg_id_t     spn_bg_get_or_put_user_file(spn_pkg_unit_t* unit, spn_build_grap
 void            spn_bg_add_pkg_node(spn_pkg_unit_t* unit, spn_build_graph_t* g, spn_user_node_t* node);
 
 void spn_build_graph_add_pkg_standalone(spn_build_graph_t* g, spn_pkg_unit_t* unit, spn_stamp_unit_t* stamp);
-void spn_build_graph_finalize_pkg(spn_session_t* b, spn_build_ctx_t* ctx, bool has_targets);
+void spn_build_graph_wire_user_nodes(spn_build_graph_t* g, spn_pkg_unit_t* unit, spn_pkg_nodes_t* nodes);
 
 s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data);
-s32 spn_executor_configure_build_dep(spn_bg_cmd_t* cmd, void* user_data);
-s32 spn_executor_configure_regular_dep(spn_bg_cmd_t* cmd, void* user_data);
+s32 spn_executor_configure_buildtime_pkg(spn_bg_cmd_t* cmd, void* user_data);
+s32 spn_executor_configure_runtime_pkg(spn_bg_cmd_t* cmd, void* user_data);
 s32 spn_executor_user_fn(spn_bg_cmd_t* cmd, void* user_data);
 s32 spn_executor_build_target_unit(spn_bg_cmd_t* cmd, void* user_data);
 s32 spn_executor_run_package_hook(spn_bg_cmd_t* cmd, void* user_data);
@@ -7416,7 +7416,7 @@ spn_task_result_t spn_task_configure_update(spn_app_t* app) {
   return SPN_TASK_DONE;
 }
 
-s32 spn_executor_configure_regular_dep(spn_bg_cmd_t* cmd, void* user_data) {
+s32 spn_executor_configure_runtime_pkg(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* ctx = (spn_pkg_unit_t*)user_data;
 
   sp_try(spn_session_compile_pkg(ctx->ctx.session, ctx));
@@ -7432,7 +7432,7 @@ s32 spn_executor_configure_regular_dep(spn_bg_cmd_t* cmd, void* user_data) {
   return SPN_OK;
 }
 
-s32 spn_executor_configure_build_dep(spn_bg_cmd_t* cmd, void* user_data) {
+s32 spn_executor_configure_buildtime_pkg(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* ctx = (spn_pkg_unit_t*)user_data;
 
   sp_try(spn_session_compile_pkg(ctx->ctx.session, ctx));
@@ -7532,7 +7532,7 @@ spn_task_result_t spn_task_build_configure_graph(spn_app_t* app) {
   spn_session_t* b = &app->session;
   spn_build_graph_t* graph = &b->configure.graph;
 
-  spn_bg_id_t build = spn_bg_add_fn(graph, spn_executor_configure_regular_dep, &b->contexts.root);
+  spn_bg_id_t build = spn_bg_add_fn(graph, spn_executor_configure_runtime_pkg, &b->contexts.root);
   spn_bg_id_t stamp = spn_bg_add_file(graph, b->contexts.root.paths.stamp.package);
   spn_bg_cmd_set_metadata(graph, build, app->package.name, sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
   spn_bg_cmd_add_output(graph, build, stamp);
@@ -7542,7 +7542,7 @@ spn_task_result_t spn_task_build_configure_graph(spn_app_t* app) {
     spn_resolved_pkg_t* resolved = sp_ht_it_getp(app->resolver.resolved, it);
     spn_pkg_unit_t* dep = sp_om_get(b->contexts.packages, name);
     sp_assert(dep);
-    dep->nodes.configure.build = spn_bg_add_fn(graph, spn_executor_configure_build_dep, dep);
+    dep->nodes.configure.build = spn_bg_add_fn(graph, spn_executor_configure_buildtime_pkg, dep);
     dep->nodes.configure.stamp = spn_bg_add_file(graph, dep->paths.stamp.configure);
     spn_bg_cmd_set_metadata(graph, dep->nodes.configure.build, name, sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
     spn_bg_cmd_add_output(graph, dep->nodes.configure.build, dep->nodes.configure.stamp);
@@ -7627,71 +7627,24 @@ void spn_build_graph_add_target(spn_session_t* session, spn_target_unit_t* unit)
   }
 }
 
-void spn_session_add_pkg_graph(spn_session_t* b, spn_pkg_unit_t* ctx) {
-  spn_build_graph_t* graph = &b->build.graph;
-  spn_pkg_nodes_t* nodes = &ctx->nodes.build;
-  spn_pkg_t* pkg = ctx->ctx.pkg;
-
-  // ┌──────────┐
-  // │ spn.toml │──┐
-  // └──────────┘  │  ┌─────────────┐     ┌ ─ ─ ─ ─ ─ ─ ─ ─ ┐     ┌─────────────┐     ┌──────────────────┐
-  //               ├─▶│ user::main  │────▶    user graph     ────▶│ user::exit  │────▶│ script::package  │
-  // ┌──────────┐  │  └─────────────┘     └ ─ ─ ─ ─ ─ ─ ─ ─ ┘     └─────────────┘     └──────────────────┘
-  // │  spn.c   │──┘         │                                           ▲
-  // └──────────┘            └───────────────────────────────────────────┘
-  nodes->manifest = spn_bg_add_file_ex(graph, pkg->paths.manifest, SPN_BG_VIZ_MANIFEST, ctx->ctx.name);
-  nodes->script = spn_bg_add_file_ex(graph, pkg->paths.script, SPN_BG_VIZ_MANIFEST, ctx->ctx.name);
-  nodes->package = spn_bg_add_fn_ex(graph, spn_executor_run_package_hook, ctx, SPN_BG_VIZ_CMD, ctx->ctx.name, sp_str_lit("script::package"));
-  nodes->stamp.package = spn_bg_add_file_ex(graph, ctx->paths.stamp.package, SPN_BG_VIZ_STAMP, ctx->ctx.name);
-  nodes->stamp.main = spn_bg_add_file_ex(graph, ctx->paths.stamp.main, SPN_BG_VIZ_CMD, ctx->ctx.name);
-  nodes->stamp.exit = spn_bg_add_file_ex(graph, ctx->paths.stamp.exit, SPN_BG_VIZ_CMD, ctx->ctx.name);
-
-  {
-    u64 index = sp_om_size(b->contexts.stamps);
-    sp_om_insert(b->contexts.stamps, ctx->paths.stamp.main, ((spn_stamp_unit_t) {
-      .pkg = ctx,
-      .file = ctx->paths.stamp.main
-    }));
-    spn_stamp_unit_t* stamp = sp_om_get(b->contexts.stamps, ctx->paths.stamp.main);
-    nodes->main = spn_bg_add_fn_ex(graph, spn_executor_write_stamp, stamp, SPN_BG_VIZ_CMD, ctx->ctx.name, sp_str_lit("sync::main"));
-  }
-
-  {
-    u64 index = sp_om_size(b->contexts.stamps);
-    sp_om_insert(b->contexts.stamps, ctx->paths.stamp.exit, ((spn_stamp_unit_t) {
-      .pkg = ctx,
-      .file = ctx->paths.stamp.exit
-    }));
-    spn_stamp_unit_t* stamp = sp_om_get(b->contexts.stamps, ctx->paths.stamp.exit);
-    nodes->exit = spn_bg_add_fn_ex(graph, spn_executor_write_stamp, stamp, SPN_BG_VIZ_CMD, ctx->ctx.name, sp_str_lit("sync::exit"));
-  }
-
-  spn_bg_cmd_add_input(graph, nodes->main, nodes->manifest);
-  spn_bg_cmd_add_input(graph, nodes->main, nodes->script);
-  spn_bg_cmd_add_output(graph, nodes->main, nodes->stamp.main);
-  spn_bg_cmd_add_input(graph, nodes->exit, nodes->stamp.main);
-  spn_bg_cmd_add_output(graph, nodes->exit, nodes->stamp.exit);
-  spn_bg_cmd_add_input(graph, nodes->package, nodes->stamp.exit);
-  spn_bg_cmd_add_output(graph, nodes->package, nodes->stamp.package);
-
-  // add nodes the user defined in configure()
+void spn_build_graph_wire_user_nodes(spn_build_graph_t* graph, spn_pkg_unit_t* unit, spn_pkg_nodes_t* nodes) {
   // pass 1: create all command nodes
-  sp_da_for(ctx->nodes.all, it) {
-    spn_user_node_t* node = &ctx->nodes.all[it];
-    spn_bg_add_pkg_node(ctx, graph, node);
+  sp_da_for(unit->nodes.all, it) {
+    spn_user_node_t* node = &unit->nodes.all[it];
+    spn_bg_add_pkg_node(unit, graph, node);
   }
 
   // pass 2: create all file in/outputs + create a stamp file for outputless commands
-  sp_da_for(ctx->nodes.all, it) {
-    spn_user_node_t* node = &ctx->nodes.all[it];
+  sp_da_for(unit->nodes.all, it) {
+    spn_user_node_t* node = &unit->nodes.all[it];
 
     // if no outputs, depend on the exit node's stamp
     if (sp_da_empty(node->outputs)) {
-      sp_da_push(node->outputs, spn_pkg_unit_get_node_stamp_file(ctx, node));
+      sp_da_push(node->outputs, spn_pkg_unit_get_node_stamp_file(unit, node));
     }
 
     sp_da_for(node->outputs, o) {
-      spn_bg_id_t file = spn_bg_get_or_put_user_file(ctx, graph, node->outputs[o]);
+      spn_bg_id_t file = spn_bg_get_or_put_user_file(unit, graph, node->outputs[o]);
       spn_bg_cmd_add_output(graph, node->id, file);
       spn_bg_cmd_add_input(graph, nodes->exit, file);
     }
@@ -7702,41 +7655,46 @@ void spn_session_add_pkg_graph(spn_session_t* b, spn_pkg_unit_t* ctx) {
     }
 
     sp_da_for(node->inputs, i) {
-      spn_bg_id_t file = spn_bg_get_or_put_user_file(ctx, graph, node->inputs[i]);
+      spn_bg_id_t file = spn_bg_get_or_put_user_file(unit, graph, node->inputs[i]);
       spn_bg_cmd_add_input(graph, node->id, file);
     }
   }
 
   // pass 3: now that all file nodes exist, set up links for command inputs
-  sp_da_for(ctx->nodes.all, it) {
-    spn_user_node_t* node = &ctx->nodes.all[it];
+  sp_da_for(unit->nodes.all, it) {
+    spn_user_node_t* node = &unit->nodes.all[it];
 
     // depend on the outputs of your command inputs
     sp_da_for(node->deps, dit) {
       spn_user_node_t* dep = spn_find_user_node(node->deps[dit]);
       sp_da_for(dep->outputs, oit) {
-        spn_bg_id_t output = spn_bg_get_or_put_user_file(ctx, graph, dep->outputs[oit]);
+        spn_bg_id_t output = spn_bg_get_or_put_user_file(unit, graph, dep->outputs[oit]);
         spn_bg_cmd_add_input(graph, node->id, output);
       }
     }
   }
 }
 
-void spn_build_graph_add_pkg_standalone(spn_build_graph_t* graph, spn_pkg_unit_t* ctx, spn_stamp_unit_t* stamp_exit) {
-  spn_pkg_nodes_t* nodes = &ctx->nodes.build;
-  spn_pkg_t* pkg = ctx->ctx.pkg;
+void spn_bg_add_internal_pkg_nodes(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
+  spn_pkg_nodes_t* nodes = &unit->nodes.build;
+  spn_pkg_t* pkg = unit->ctx.pkg;
 
-  nodes->manifest = spn_bg_add_file_ex(graph, pkg->paths.manifest, SPN_BG_VIZ_MANIFEST, ctx->ctx.name);
-  nodes->script = spn_bg_add_file_ex(graph, pkg->paths.script, SPN_BG_VIZ_MANIFEST, ctx->ctx.name);
-  nodes->package = spn_bg_add_fn_ex(graph, spn_executor_run_package_hook, ctx, SPN_BG_VIZ_CMD, ctx->ctx.name, sp_str_lit("script::package"));
-  nodes->stamp.package = spn_bg_add_file_ex(graph, ctx->paths.stamp.package, SPN_BG_VIZ_STAMP, ctx->ctx.name);
-  nodes->stamp.main = spn_bg_add_file_ex(graph, ctx->paths.stamp.main, SPN_BG_VIZ_CMD, ctx->ctx.name);
-  nodes->stamp.exit = spn_bg_add_file_ex(graph, ctx->paths.stamp.exit, SPN_BG_VIZ_CMD, ctx->ctx.name);
+  // ┌──────────┐
+  // │ spn.toml │──┐
+  // └──────────┘  │  ┌─────────────┐     ┌ ─ ─ ─ ─ ─ ─ ─ ─ ┐     ┌─────────────┐     ┌──────────────────┐
+  //               ├─▶│ user::main  │────▶    user graph     ────▶│ user::exit  │────▶│ script::package  │
+  // ┌──────────┐  │  └─────────────┘     └ ─ ─ ─ ─ ─ ─ ─ ─ ┘     └─────────────┘     └──────────────────┘
+  // │  spn.c   │──┘         │                                           ▲
+  // └──────────┘            └───────────────────────────────────────────┘
 
-  *stamp_exit = (spn_stamp_unit_t) { .pkg = ctx, .file = ctx->paths.stamp.exit };
-
-  nodes->main = spn_bg_add_fn_ex(graph, spn_executor_sync_entry, ctx, SPN_BG_VIZ_CMD, ctx->ctx.name, sp_str_lit("sync::main"));
-  nodes->exit = spn_bg_add_fn_ex(graph, spn_executor_write_stamp, stamp_exit, SPN_BG_VIZ_CMD, ctx->ctx.name, sp_str_lit("sync::exit"));
+  nodes->manifest = spn_bg_add_file_ex(graph, pkg->paths.manifest, SPN_BG_VIZ_MANIFEST, unit->ctx.name);
+  nodes->script = spn_bg_add_file_ex(graph, pkg->paths.script, SPN_BG_VIZ_MANIFEST, unit->ctx.name);
+  nodes->package = spn_bg_add_fn_ex(graph, spn_executor_run_package_hook, unit, SPN_BG_VIZ_CMD, unit->ctx.name, sp_str_lit("script::package"));
+  nodes->stamp.package = spn_bg_add_file_ex(graph, unit->paths.stamp.package, SPN_BG_VIZ_STAMP, unit->ctx.name);
+  nodes->stamp.main = spn_bg_add_file_ex(graph, unit->paths.stamp.main, SPN_BG_VIZ_CMD, unit->ctx.name);
+  nodes->stamp.exit = spn_bg_add_file_ex(graph, unit->paths.stamp.exit, SPN_BG_VIZ_CMD, unit->ctx.name);
+  nodes->main = spn_bg_add_fn_ex(graph, SP_NULLPTR, SP_NULLPTR, SPN_BG_VIZ_CMD, pkg->name, sp_str_lit("sync::main"));
+  nodes->exit = spn_bg_add_fn_ex(graph, SP_NULLPTR, SP_NULLPTR, SPN_BG_VIZ_CMD, pkg->name, sp_str_lit("sync::exit"));
 
   spn_bg_cmd_add_input(graph, nodes->main, nodes->manifest);
   spn_bg_cmd_add_input(graph, nodes->main, nodes->script);
@@ -7745,46 +7703,56 @@ void spn_build_graph_add_pkg_standalone(spn_build_graph_t* graph, spn_pkg_unit_t
   spn_bg_cmd_add_output(graph, nodes->exit, nodes->stamp.exit);
   spn_bg_cmd_add_input(graph, nodes->package, nodes->stamp.exit);
   spn_bg_cmd_add_output(graph, nodes->package, nodes->stamp.package);
+}
 
-  sp_da_for(ctx->nodes.all, it) {
-    spn_user_node_t* node = &ctx->nodes.all[it];
-    spn_bg_add_pkg_node(ctx, graph, node);
-  }
+void spn_session_add_pkg_graph(spn_session_t* b, spn_pkg_unit_t* ctx) {
+  spn_build_graph_t* graph = &b->build.graph;
+  spn_pkg_nodes_t* nodes = &ctx->nodes.build;
+  spn_pkg_t* pkg = ctx->ctx.pkg;
 
-  sp_da_for(ctx->nodes.all, it) {
-    spn_user_node_t* node = &ctx->nodes.all[it];
+  spn_bg_add_internal_pkg_nodes(graph, ctx);
 
-    if (sp_da_empty(node->outputs)) {
-      sp_da_push(node->outputs, spn_pkg_unit_get_node_stamp_file(ctx, node));
-    }
+  // wire up the entry/exit user nodes to stamp
+  spn_stamp_unit_t* stamp = SP_NULLPTR;
 
-    sp_da_for(node->outputs, o) {
-      spn_bg_id_t file = spn_bg_get_or_put_user_file(ctx, graph, node->outputs[o]);
-      spn_bg_cmd_add_output(graph, node->id, file);
-      spn_bg_cmd_add_input(graph, nodes->exit, file);
-    }
+  sp_om_insert(b->contexts.stamps, ctx->paths.stamp.main, ((spn_stamp_unit_t) {
+    .pkg = ctx,
+    .file = ctx->paths.stamp.main
+  }));
+  stamp = sp_om_get(b->contexts.stamps, ctx->paths.stamp.main);
+  spn_bg_cmd_set_fn(graph, nodes->main, spn_executor_write_stamp, stamp);
 
-    if (sp_da_empty(node->inputs) && sp_da_empty(node->deps)) {
-      spn_bg_cmd_add_input(graph, node->id, nodes->stamp.main);
-    }
+  sp_om_insert(b->contexts.stamps, ctx->paths.stamp.exit, ((spn_stamp_unit_t) {
+    .pkg = ctx,
+    .file = ctx->paths.stamp.exit
+  }));
+  stamp = sp_om_get(b->contexts.stamps, ctx->paths.stamp.exit);
+  spn_bg_cmd_set_fn(graph, nodes->exit, spn_executor_write_stamp, stamp);
 
-    sp_da_for(node->inputs, i) {
-      spn_bg_id_t file = spn_bg_get_or_put_user_file(ctx, graph, node->inputs[i]);
-      spn_bg_cmd_add_input(graph, node->id, file);
-    }
-  }
+  spn_build_graph_wire_user_nodes(graph, ctx, nodes);
+}
 
-  sp_da_for(ctx->nodes.all, it) {
-    spn_user_node_t* node = &ctx->nodes.all[it];
+void spn_build_graph_add_pkg_standalone(spn_build_graph_t* graph, spn_pkg_unit_t* unit, spn_stamp_unit_t* stamp_exit) {
+  spn_pkg_nodes_t* nodes = &unit->nodes.build;
+  spn_pkg_t* pkg = unit->ctx.pkg;
 
-    sp_da_for(node->deps, dit) {
-      spn_user_node_t* dep = spn_find_user_node(node->deps[dit]);
-      sp_da_for(dep->outputs, oit) {
-        spn_bg_id_t output = spn_bg_get_or_put_user_file(ctx, graph, dep->outputs[oit]);
-        spn_bg_cmd_add_input(graph, node->id, output);
-      }
-    }
-  }
+  spn_bg_add_internal_pkg_nodes(graph, unit);
+
+  spn_bg_cmd_set_fn(graph, nodes->main, spn_executor_sync_entry, unit);
+
+  // @hack
+  // session holds stamp units, but thats for build graph...
+  sp_context_push_arena(unit->ctx.arena);
+  spn_stamp_unit_t* stamp = sp_alloc_type(spn_stamp_unit_t);
+  *stamp = (spn_stamp_unit_t) {
+    .pkg = unit,
+    .file = unit->paths.stamp.exit
+  };
+  sp_context_pop();
+
+  spn_bg_cmd_set_fn(graph, nodes->exit, spn_executor_write_stamp, stamp);
+
+  spn_build_graph_wire_user_nodes(graph, unit, nodes);
 }
 
 void spn_session_link_graph(spn_session_t* s, spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
@@ -7814,9 +7782,9 @@ spn_task_result_t spn_task_prepare_build_graph_v2(spn_app_t* app) {
   // phase 2: link dependent packages
   sp_om_for(session->contexts.packages, it) {
     spn_pkg_unit_t* parent = sp_om_at(session->contexts.packages, it);
-    spn_session_link_graph(graph, session, sp_om_at(session->contexts.packages, it));
+    spn_session_link_graph(session, graph, sp_om_at(session->contexts.packages, it));
   }
-  spn_session_link_graph(graph, session, &session->contexts.root);
+  spn_session_link_graph(session, graph, &session->contexts.root);
 
   return SPN_TASK_DONE;
 }
