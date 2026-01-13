@@ -8040,22 +8040,30 @@ void spn_bg_render_pkg_to_mermaid(spn_session_t* b, spn_bg_dirty_t* dirty, spn_p
 }
 
 void spn_render_to_mermaid(spn_app_t* app, sp_io_writer_t* io) {
-  sp_str_t stroke = sp_str_lit("#101010");
-  sp_str_t text = sp_str_lit("#ffffff");
-
-  sp_io_write_str(io, sp_str_lit("graph TD\n"));
-
-  // color by dirtiness
   struct {
+    sp_str_t text;
+    sp_str_t stroke;
+    sp_str_t link;
     sp_str_t clean;
     sp_str_t dirty;
-  } colors = {
-    .clean = sp_str_lit("#65a365"),
-    .dirty = sp_str_lit("#a36565"),
+    sp_str_t outer_bg;
+    sp_str_t inner_bg;
+  } color = {
+    .text     = sp_str_lit("#ffffff"),
+    .stroke   = sp_str_lit("#101010"),
+    .link     = sp_str_lit("#505050"),
+    .clean    = sp_str_lit("#3d633d"),
+    .dirty    = sp_str_lit("#694141"),
+    .outer_bg = sp_str_lit("#191924"),
+    .inner_bg = sp_str_lit("#28283b"),
   };
-  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("dirty"), colors.dirty, stroke, text));
-  sp_io_write_str(io, spn_bg_mermaid_class(sp_str_lit("clean"), colors.clean, stroke, text));
-  sp_io_write_str(io, sp_str_lit("  linkStyle default stroke:#101010,stroke-width:2px\n"));
+
+  sp_io_write_str(io, sp_str_lit("%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '96px', 'fontFamily': 'monospace'}}}%%\n"));
+  sp_io_write_str(io, sp_str_lit("graph TD\n"));
+
+  sp_io_write_str(io, spn_bg_mermaid_class_ex(sp_str_lit("dirty"), color.dirty, color.stroke, color.text, sp_str_lit("32px")));
+  sp_io_write_str(io, spn_bg_mermaid_class_ex(sp_str_lit("clean"), color.clean, color.stroke, color.text, sp_str_lit("32px")));
+  sp_io_write_str(io, sp_format("  linkStyle default stroke:{},stroke-width:2px\n", SP_FMT_STR(color.link)));
 
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->build.graph;
@@ -8084,6 +8092,33 @@ void spn_render_to_mermaid(spn_app_t* app, sp_io_writer_t* io) {
       sp_io_write_str(io, sp_format("  C{} --> F{}\n",
         SP_FMT_U32(cmd->id.index), SP_FMT_U32(id)));
     }
+  }
+
+  // subgraph styles
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    sp_str_t name = unit->ctx.name;
+    sp_io_write_str(io, sp_format("  style {} fill:{},stroke:{},color:{}\n",
+      SP_FMT_STR(name), SP_FMT_STR(color.outer_bg), SP_FMT_STR(color.stroke), SP_FMT_STR(color.text)));
+    sp_io_write_str(io, sp_format("  style {}::user fill:{},stroke:{}\n",
+      SP_FMT_STR(name), SP_FMT_STR(color.inner_bg), SP_FMT_STR(color.outer_bg)));
+    sp_om_for(unit->targets, t) {
+      spn_target_unit_t* target = sp_om_at(unit->targets, t);
+      sp_io_write_str(io, sp_format("  style {}::{} fill:{},stroke:{}\n",
+        SP_FMT_STR(name), SP_FMT_STR(target->target->name), SP_FMT_STR(color.inner_bg), SP_FMT_STR(color.outer_bg)));
+    }
+  }
+
+  spn_pkg_unit_t* root = spn_session_find_root(session);
+  sp_str_t root_name = root->ctx.name;
+  sp_io_write_str(io, sp_format("  style {} fill:{},stroke:{},color:{}\n",
+    SP_FMT_STR(root_name), SP_FMT_STR(color.outer_bg), SP_FMT_STR(color.stroke), SP_FMT_STR(color.text)));
+  sp_io_write_str(io, sp_format("  style {}::user fill:{},stroke:{}\n",
+    SP_FMT_STR(root_name), SP_FMT_STR(color.inner_bg), SP_FMT_STR(color.outer_bg)));
+  sp_om_for(root->targets, t) {
+    spn_target_unit_t* target = sp_om_at(root->targets, t);
+    sp_io_write_str(io, sp_format("  style {}::{} fill:{},stroke:{}\n",
+      SP_FMT_STR(root_name), SP_FMT_STR(target->target->name), SP_FMT_STR(color.inner_bg), SP_FMT_STR(color.outer_bg)));
   }
 
   sp_da_for(graph->commands, it) {

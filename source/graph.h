@@ -729,6 +729,17 @@ sp_str_t spn_bg_mermaid_class(sp_str_t name, sp_str_t fill, sp_str_t stroke, sp_
   );
 }
 
+sp_str_t spn_bg_mermaid_class_ex(sp_str_t name, sp_str_t fill, sp_str_t stroke, sp_str_t color, sp_str_t font_size) {
+  return sp_format(
+    "  classDef {} fill:{},stroke:{},color:{},font-size:{},white-space:nowrap,rx:16,ry:16\n",
+    SP_FMT_STR(name),
+    SP_FMT_STR(fill),
+    SP_FMT_STR(stroke),
+    SP_FMT_STR(color),
+    SP_FMT_STR(font_size)
+  );
+}
+
 sp_str_t spn_bg_viz_kind_to_class(spn_bg_viz_kind_t kind) {
   switch (kind) {
     case SPN_BG_VIZ_MANIFEST: return sp_str_lit("manifest");
