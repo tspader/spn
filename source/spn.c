@@ -1,4 +1,3 @@
-#include <stddef.h>
 #ifdef _WIN32
   #ifndef WIN32_LEAN_AND_MEAN
     #define WIN32_LEAN_AND_MEAN
@@ -363,10 +362,7 @@ u32 spn_toml_array_len(toml_array_t* array) {
 typedef struct {
   toml_table_t* manifest;
   toml_table_t*   package;
-  toml_table_t*     lib;
-  toml_table_t*       src;
-  toml_table_t*       a;
-  toml_table_t*       so;
+  toml_array_t*   lib;
   toml_array_t*   bin;
   toml_array_t*   test;
   toml_table_t*   deps;
@@ -432,7 +428,6 @@ spn_err_t  spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path);
 spn_err_t  spn_tcc_register(spn_tcc_t* tcc);
 s32        spn_tcc_backtrace(void* ud, void* pc, const c8* file, s32 line, const c8* fn, const c8* message);
 void       spn_tcc_on_build_script_compile_error(void* user_data, const c8* message);
-void       spn_tcc_error(void* opaque, const c8* message);
 void       spn_tcc_list_fn(void* opaque, const c8* name, const void* value);
 
 
@@ -2576,6 +2571,13 @@ spn_target_t* spn_add_test(spn_config_t* c, const c8* name) {
   return target;
 }
 
+spn_target_t* spn_add_lib(spn_config_t* c, const c8* name, spn_pkg_linkage_t kind) {
+  spn_pkg_unit_t* unit = (spn_pkg_unit_t*)c;
+  spn_target_t* target = spn_pkg_add_lib(unit->ctx.pkg, name, kind);
+  spn_pkg_unit_add_target(unit, target);
+  return target;
+}
+
 void spn_log(spn_build_ctx_t* ctx, const c8* message) {
   spn_build_ctx_log(&ctx->logs, sp_str_view(message));
 }
@@ -2868,6 +2870,19 @@ spn_target_kind_t spn_pkg_linkage_to_target_kind(spn_pkg_linkage_t kind) {
   sp_unreachable_return(SPN_TARGET_EXE);
 }
 
+spn_pkg_linkage_t spn_target_kind_to_pkg_linkage(spn_target_kind_t kind) {
+  switch (kind) {
+    case SPN_TARGET_SHARED_LIB: return SPN_LIB_KIND_SHARED;
+    case SPN_TARGET_STATIC_LIB: return SPN_LIB_KIND_STATIC;
+    case SPN_TARGET_NONE:
+    case SPN_TARGET_EXE:
+    case SPN_TARGET_JIT: {
+      sp_unreachable_case();
+    }
+  }
+  sp_unreachable_return(SPN_LIB_KIND_SHARED);
+}
+
 sp_str_t spn_cc_lib_kind_to_switch(spn_pkg_linkage_t kind) {
   switch (kind) {
     case SPN_LIB_KIND_STATIC: return sp_str_lit("-static");
@@ -3098,8 +3113,12 @@ sp_str_t spn_build_ctx_get_lib_path(spn_build_ctx_t* build) {
   switch (build->linkage) {
     case SPN_LIB_KIND_SHARED:
     case SPN_LIB_KIND_STATIC: {
+      if (sp_om_empty(build->pkg->libs)) {
+        return SP_ZERO_STRUCT(sp_str_t);
+      }
+      spn_target_t* lib_target = sp_om_at(build->pkg->libs, 0);
       sp_os_lib_kind_t kind = spn_lib_kind_to_sp_os_lib_kind(build->linkage);
-      sp_str_t lib = build->pkg->lib.name;
+      sp_str_t lib = lib_target->name;
       lib = sp_os_lib_to_file_name(lib, kind);
       lib = sp_fs_join_path(build->paths.lib, lib);
       return lib;
@@ -3151,8 +3170,12 @@ sp_dyn_array(sp_str_t) spn_gen_build_entry(spn_build_ctx_t* build, spn_gen_entry
       switch (build->linkage) {
         case SPN_LIB_KIND_SHARED:
         case SPN_LIB_KIND_STATIC: {
+          if (sp_om_empty(build->pkg->libs)) {
+            return entries;
+          }
+          spn_target_t* lib_target = sp_om_at(build->pkg->libs, 0);
           sp_os_lib_kind_t kind = spn_lib_kind_to_sp_os_lib_kind(build->linkage);
-          sp_str_t lib = build->pkg->lib.name;
+          sp_str_t lib = lib_target->name;
           lib = sp_os_lib_to_file_name(lib, kind);
           lib = sp_fs_join_path(build->paths.lib, lib);
           sp_dyn_array_push(entries, lib);
@@ -4890,11 +4913,9 @@ void spn_pkg_add_system_dep_ex(spn_pkg_t* pkg, sp_str_t dep) {
   sp_context_pop();
 }
 
-// @lib take a spn_lib_t*
 void spn_pkg_add_linkage(spn_pkg_t* pkg, spn_pkg_linkage_t linkage) {
-  sp_context_push_arena(pkg->arena);
-  sp_ht_insert(pkg->lib.enabled, linkage, true);
-  sp_context_pop();
+  (void)pkg;
+  (void)linkage;
 }
 
 spn_profile_t* spn_pkg_add_profile(spn_pkg_t* pkg, const c8* name) {
@@ -5021,8 +5042,22 @@ spn_target_t* spn_pkg_add_lib_ex(spn_pkg_t* pkg, sp_str_t name, spn_pkg_linkage_
     .pkg = pkg,
     .visibility = SPN_VISIBILITY_PUBLIC,
   };
-  sp_om_insert(pkg->libs, lib.name, test);
-  return sp_om_back(pkg->libs);
+  sp_om_insert(pkg->libs, lib.name, lib);
+  return sp_om_get(pkg->libs, lib.name);
+}
+
+bool spn_pkg_has_lib_kind(spn_pkg_t* pkg, spn_pkg_linkage_t kind) {
+  if (kind == SPN_LIB_KIND_SOURCE) {
+    return sp_om_empty(pkg->libs);
+  }
+  spn_target_kind_t target_kind = spn_pkg_linkage_to_target_kind(kind);
+  sp_om_for(pkg->libs, it) {
+    spn_target_t* lib = sp_om_at(pkg->libs, it);
+    if (lib->kind == target_kind) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void spn_target_add_source(spn_target_t* target, const c8* source) {
@@ -5181,10 +5216,11 @@ spn_target_t* spn_pkg_get_target(spn_pkg_t* pkg, const c8* name) {
 }
 
 spn_target_t* spn_pkg_get_target_ex(spn_pkg_t* pkg, sp_str_t name) {
-  spn_target_t* target = sp_om_get(pkg->exes, name);
-  if (target) return target;
+  if (sp_om_has(pkg->exes, name)) return sp_om_get(pkg->exes, name);
+  if (sp_om_has(pkg->tests, name)) return sp_om_get(pkg->tests, name);
+  if (sp_om_has(pkg->libs, name)) return sp_om_get(pkg->libs, name);
 
-  return sp_om_get(pkg->tests, name);
+  return SP_NULLPTR;
 }
 
 void spn_add_include(spn_build_ctx_t* b, spn_pkg_dir_t dir, const c8* path) {
@@ -5222,7 +5258,7 @@ void spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   spn_toml_package_t toml = SP_ZERO_INITIALIZE();
   toml.manifest = spn_toml_parse(manifest_path);
   toml.package = toml_table_table(toml.manifest, "package");
-  toml.lib = toml_table_table(toml.manifest, "lib");
+  toml.lib = toml_table_array(toml.manifest, "lib");
   toml.bin = toml_table_array(toml.manifest, "bin");
   toml.test = toml_table_array(toml.manifest, "test");
   toml.profile = toml_table_array(toml.manifest, "profile");
@@ -5256,21 +5292,25 @@ void spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     spn_pkg_add_system_dep(pkg, spn_toml_arr_cstr(system_deps, it));
   }
 
-  // @lib iterate the libs and add
-  if (toml.lib) {
-    toml_array_t* kinds = toml_table_array(toml.lib, "kinds");
-    spn_toml_arr_for(kinds, it) {
-      spn_pkg_linkage_t kind = spn_lib_kind_from_str(spn_toml_arr_str(kinds, it));
-      spn_pkg_add_linkage(pkg, kind); // @lib spn_target_add_linkage
+  spn_toml_arr_for(toml.lib, n) {
+    toml_table_t* it = toml_array_table(toml.lib, n);
+    sp_str_t kind_str = spn_toml_str_opt(it, "kind", "static");
+    spn_pkg_linkage_t kind = spn_pkg_linkage_from_str(kind_str);
+    spn_target_t* lib = spn_pkg_add_lib(pkg, spn_toml_cstr(it, "name"), kind);
+
+    toml_array_t* source = toml_table_array(it, "source");
+    spn_toml_arr_for(source, s) {
+      spn_target_add_source_ex(lib, spn_toml_arr_str(source, s));
     }
 
-    pkg->lib.name = spn_toml_str_opt(toml.lib, "name", "");
-
-    if (sp_ht_key_exists(pkg->lib.enabled, SPN_LIB_KIND_SHARED)) {
-      sp_assert(!sp_str_empty(pkg->lib.name));
+    toml_array_t* include = toml_table_array(it, "include");
+    spn_toml_arr_for(include, i) {
+      spn_target_add_include_ex(lib, spn_toml_arr_str(include, i));
     }
-    if (sp_ht_key_exists(pkg->lib.enabled, SPN_LIB_KIND_STATIC)) {
-      sp_assert(!sp_str_empty(pkg->lib.name));
+
+    toml_array_t* define = toml_table_array(it, "define");
+    spn_toml_arr_for(define, d) {
+      spn_target_add_define_ex(lib, spn_toml_arr_str(define, d));
     }
   }
 
@@ -6309,9 +6349,9 @@ void spn_build_pkg_unit(spn_session_t* session, spn_pkg_unit_t* unit, spn_pkg_t*
           break;
         }
         case SP_OPT_NONE: {
-          if (pkg->linkage[SPN_LIB_KIND_SOURCE]) sp_opt_set(linkage, SPN_LIB_KIND_SOURCE); break;
-          if (pkg->linkage[SPN_LIB_KIND_STATIC]) sp_opt_set(linkage, SPN_LIB_KIND_STATIC); break;
-          if (pkg->linkage[SPN_LIB_KIND_SHARED]) sp_opt_set(linkage, SPN_LIB_KIND_SHARED); break;
+          if (spn_pkg_has_lib_kind(pkg, SPN_LIB_KIND_SOURCE)) { sp_opt_set(linkage, SPN_LIB_KIND_SOURCE); break; }
+          if (spn_pkg_has_lib_kind(pkg, SPN_LIB_KIND_STATIC)) { sp_opt_set(linkage, SPN_LIB_KIND_STATIC); break; }
+          if (spn_pkg_has_lib_kind(pkg, SPN_LIB_KIND_SHARED)) { sp_opt_set(linkage, SPN_LIB_KIND_SHARED); break; }
           sp_unreachable();
         }
       }
@@ -6567,24 +6607,27 @@ void spn_app_write_manifest(spn_pkg_t* pkg, sp_str_t path) {
     spn_toml_end_array(&toml);
   }
 
-  // @lib a lot more like iterating exes below
-  if (sp_ht_size(pkg->lib.enabled)) {
-    spn_toml_begin_table_cstr(&toml, "lib");
-    spn_toml_begin_array_cstr(&toml, "kinds");
-    if (pkg->lib.)
-    sp_da(sp_str_t) kinds = SP_NULLPTR;
-    sp_ht_for_kv(pkg->lib.enabled, it) {
-      if (*it.val) {
-        sp_dyn_array_push(kinds, spn_pkg_linkage_to_str(*it.key));
+  if (!sp_om_empty(pkg->libs)) {
+    spn_toml_begin_array_cstr(&toml, "lib");
+    sp_om_for(pkg->libs, it) {
+      spn_target_t* lib = sp_om_at(pkg->libs, it);
+      spn_toml_append_array_table(&toml);
+      spn_toml_append_str_cstr(&toml, "name", lib->name);
+
+      spn_pkg_linkage_t linkage = spn_target_kind_to_pkg_linkage(lib->kind);
+      spn_toml_append_str_cstr(&toml, "kind", spn_pkg_linkage_to_str(linkage));
+
+      if (sp_dyn_array_size(lib->source)) {
+        spn_toml_append_str_array_cstr(&toml, "source", lib->source);
+      }
+      if (sp_dyn_array_size(lib->include)) {
+        spn_toml_append_str_array_cstr(&toml, "include", lib->include);
+      }
+      if (sp_dyn_array_size(lib->define)) {
+        spn_toml_append_str_array_cstr(&toml, "define", lib->define);
       }
     }
-    if (sp_dyn_array_size(kinds)) {
-      spn_toml_append_str_array_cstr(&toml, "kinds", kinds);
-    }
-    if (sp_str_valid(pkg->lib.name)) {
-      spn_toml_append_str_cstr(&toml, "name", pkg->lib.name);
-    }
-    spn_toml_end_table(&toml);
+    spn_toml_end_array(&toml);
   }
 
   if (!sp_om_empty(pkg->exes)) {

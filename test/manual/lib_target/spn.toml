@@ -1,0 +1,17 @@
+[package]
+name = "lib_target_test"
+version = "0.1.0"
+
+[deps.package]
+toml = "^1.2.0"
+sp = "^1.6.6"
+
+
+[[lib]]
+name = "mylib"
+kind = "static"
+source = ["mylib.c"]
+
+[[bin]]
+name = "main"
+source = ["main.c"]
