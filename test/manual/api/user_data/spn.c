@@ -13,12 +13,12 @@ spn_err_t generate_with_config(spn_node_ctx_t* ctx) {
   }
 
   s32 result = cfg->base_value * cfg->multiplier;
-  
+
   if (result != 42) {
     spn_log(ctx->build, "ERROR: expected result 42");
     return SPN_ERROR;
   }
-  
+
   spn_write_file(ctx->build, "config.h",
     "#ifndef CONFIG_H\n"
     "#define CONFIG_H\n"
@@ -37,7 +37,7 @@ static codegen_config_t g_config = {
 };
 
 void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, "build/debug/work");
+  spn_add_include(ctx, SPN_DIR_WORK, "");
 
   spn_node_t gen = spn_add_node(ctx, "gen_config");
   spn_node_set_fn(gen, generate_with_config);

@@ -23,7 +23,7 @@ spn_err_t finalize(spn_node_ctx_t* ctx) {
 }
 
 void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, "build/debug/work");
+  spn_add_include(ctx, SPN_DIR_WORK, "");
 
   const c8* data_txt = spn_get_subdir(ctx, SPN_DIR_WORK, "data.txt");
   const c8* validated_h = spn_get_subdir(ctx, SPN_DIR_WORK, "validated.h");

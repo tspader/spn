@@ -1,23 +1,23 @@
 #include "spn.h"
 
 spn_err_t doit(spn_node_ctx_t* c) {
-  spn_build_ctx_t* ctx = c->build;
-  spn_profile_t* profile = spn_get_profile(ctx);
-
-  spn_autoconf_t* ac = spn_autoconf_new(ctx);
-  if (spn_profile_get_libc(profile) == SPN_LIBC_MUSL) {
-    spn_autoconf_add_flag(ac, "--config-musl");
-  }
-
-  spn_autoconf_run(ac);
-  spn_make(ctx);
+  // spn_build_ctx_t* ctx = c->build;
+  // spn_profile_t* profile = spn_get_profile(ctx);
+  //
+  // spn_autoconf_t* ac = spn_autoconf_new(ctx);
+  // if (spn_profile_get_libc(profile) == SPN_LIBC_MUSL) {
+  //   spn_autoconf_add_flag(ac, "--config-musl");
+  // }
+  //
+  // spn_autoconf_run(ac);
+  // spn_make(ctx);
 
   return SPN_OK;
 }
 
 void configure(spn_build_ctx_t* ctx) {
-  // spn_node_t node = spn_add_node(ctx, "hello");
-  // spn_node_set_fn(node, doit);
+  spn_node_t node = spn_add_node(ctx, "hello");
+  spn_node_set_fn(node, doit);
 }
 
 void package(spn_build_ctx_t* ctx) {

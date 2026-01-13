@@ -28,7 +28,7 @@ spn_err_t codegen_fn(spn_node_ctx_t* ctx) {
 }
 
 void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, "build/debug/work");
+  spn_add_include(ctx, SPN_DIR_WORK, "");
 
   // setup has no outputs - uses auto-generated stamp
   spn_node_t setup = spn_add_node(ctx, "setup");

@@ -2,7 +2,7 @@
 
 spn_err_t gen_all_headers(spn_node_ctx_t* ctx) {
   spn_log(ctx->build, "gen_all_headers: creating 3 headers from single node");
-  
+
   spn_write_file(ctx->build, "types.h",
     "#ifndef TYPES_H\n"
     "#define TYPES_H\n"
@@ -10,7 +10,7 @@ spn_err_t gen_all_headers(spn_node_ctx_t* ctx) {
     "typedef float my_float_t;\n"
     "#endif\n"
   );
-  
+
   spn_write_file(ctx->build, "constants.h",
     "#ifndef CONSTANTS_H\n"
     "#define CONSTANTS_H\n"
@@ -18,7 +18,7 @@ spn_err_t gen_all_headers(spn_node_ctx_t* ctx) {
     "#define MIN_SIZE 16\n"
     "#endif\n"
   );
-  
+
   spn_write_file(ctx->build, "macros.h",
     "#ifndef MACROS_H\n"
     "#define MACROS_H\n"
@@ -26,7 +26,7 @@ spn_err_t gen_all_headers(spn_node_ctx_t* ctx) {
     "#define CUBE(x) ((x) * (x) * (x))\n"
     "#endif\n"
   );
-  
+
   return SPN_OK;
 }
 
@@ -44,7 +44,7 @@ spn_err_t gen_combined(spn_node_ctx_t* ctx) {
 }
 
 void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, "build/debug/work");
+  spn_add_include(ctx, SPN_DIR_WORK, "");
 
   const c8* types_h = spn_get_subdir(ctx, SPN_DIR_WORK, "types.h");
   const c8* constants_h = spn_get_subdir(ctx, SPN_DIR_WORK, "constants.h");
