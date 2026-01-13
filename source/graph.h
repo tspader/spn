@@ -721,7 +721,7 @@ sp_str_t spn_bg_cmd_to_str(spn_bg_cmd_t* cmd) {
 
 sp_str_t spn_bg_mermaid_class(sp_str_t name, sp_str_t fill, sp_str_t stroke, sp_str_t color) {
   return sp_format(
-    "  classDef {} fill:{},stroke:{},color:{}\n",
+    "  classDef {} fill:{},stroke:{},color:{},white-space:nowrap,rx:16,ry:16\n",
     SP_FMT_STR(name),
     SP_FMT_STR(fill),
     SP_FMT_STR(stroke),

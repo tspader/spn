@@ -29,10 +29,9 @@ typedef enum {
 } spn_build_mode_t;
 
 typedef enum {
-  SPN_LIB_KIND_NONE = 0,
-  SPN_LIB_KIND_SHARED = 1,
-  SPN_LIB_KIND_STATIC = 2,
-  SPN_LIB_KIND_SOURCE = 3,
+  SPN_LIB_KIND_SHARED = 0,
+  SPN_LIB_KIND_STATIC = 1,
+  SPN_LIB_KIND_SOURCE = 2,
 } spn_pkg_linkage_t;
 
 typedef enum {
@@ -115,8 +114,9 @@ spn_target_t*     spn_get_target(spn_build_ctx_t* b, const c8* name);
 const spn_build_ctx_t*      spn_get_dep(spn_build_ctx_t* b, const c8* name);
 const c8*         spn_get_dir(const spn_build_ctx_t* b, spn_pkg_dir_t kind);
 const c8*         spn_get_subdir(const spn_build_ctx_t* b, spn_pkg_dir_t kind, const c8* path);
-spn_target_t*     spn_add_bin(spn_config_t* b, const c8* name);
+spn_target_t*     spn_add_exe(spn_config_t* b, const c8* name);
 spn_target_t*     spn_add_test(spn_config_t* c, const c8* name);
+spn_target_t*     spn_add_lib(spn_config_t* c, const c8* name, spn_pkg_linkage_t kind);
 void              spn_add_include(spn_build_ctx_t* b, spn_pkg_dir_t dir, const c8* path);
 void              spn_add_define(spn_build_ctx_t* b, const c8* define);
 void              spn_add_system_dep(spn_build_ctx_t* b, const c8* dep);
