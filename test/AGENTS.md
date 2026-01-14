@@ -1,0 +1,3 @@
+- Always use EXPECT_* from utest.h as your verifier in unit tests. EXPECT_* requires that utest_result is in scope; this is an s32* provided by utest.h and passed into every unit test, or stored and passed manually by us in helper functions
+- Never use string messages when using EXPECT_*
+- Always return void from unit test helpers; otherwise, utest.h macros break

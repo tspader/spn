@@ -1,3 +1,5 @@
+#ifndef SPN_TEST_H
+#define SPN_TEST_H
 #include "sp.h"
 
 #define ut (*utest_fixture)
@@ -5,66 +7,16 @@
 
 typedef struct {
   sp_str_t root;
-  sp_str_t build;
-  sp_str_t bin;
-  sp_str_t test;
-} sp_test_file_paths_t;
+} tmpfs_t;
 
-typedef struct {
-  sp_test_file_paths_t paths;
-} sp_test_file_manager_t;
+void     tmpfs_init(tmpfs_t* fs);
+void     tmpfs_init_named(tmpfs_t* fs, const c8* test);
+void     tmpfs_set_top_level(sp_str_t root);
+sp_str_t tmpfs_get(tmpfs_t* fs, sp_str_t name);
+void     tmpfs_create(tmpfs_t* fs, sp_str_t path, sp_str_t content);
+sp_str_t tmpfs_touch(tmpfs_t* fs, sp_str_t path);
+void     tmpfs_deinit(tmpfs_t* fs);
 
-typedef struct {
-  sp_str_t path;
-  sp_str_t content;
-} sp_test_file_config_t;
-
-void sp_test_file_manager_init(sp_test_file_manager_t* manager);
-sp_str_t sp_test_file_path(sp_test_file_manager_t* manager, sp_str_t name);
-void sp_test_file_create_ex(sp_test_file_config_t config);
-sp_str_t sp_test_file_create_empty(sp_test_file_manager_t* manager, sp_str_t path);
-void sp_test_file_manager_cleanup(sp_test_file_manager_t* manager);
-
-#if defined(SP_TEST_IMPLEMENTATION)
-void sp_test_file_manager_init(sp_test_file_manager_t* manager) {
-  manager->paths.bin = sp_fs_get_exe_path();
-  manager->paths.build = sp_fs_parent_path(manager->paths.bin);
-  manager->paths.root = sp_fs_parent_path(manager->paths.build);
-  manager->paths.test = sp_fs_join_path(manager->paths.build, sp_str_lit("test"));
-
-  sp_fs_remove_dir(manager->paths.test);
-  sp_fs_create_dir(manager->paths.test);
-}
-
-sp_str_t sp_test_file_path(sp_test_file_manager_t* manager, sp_str_t name) {
-  return sp_fs_join_path(manager->paths.test, name);
-}
-
-void sp_test_file_create_ex(sp_test_file_config_t config) {
-  sp_fs_remove_file(config.path);
-
-  sp_io_writer_t io = sp_io_writer_from_file(config.path, SP_IO_WRITE_MODE_OVERWRITE);
-  SP_ASSERT(io.file.fd != 0);
-
-  if (config.content.len > 0) {
-    u64 bytes_written = sp_io_write(&io, config.content.data, config.content.len);
-    SP_ASSERT(bytes_written == config.content.len);
-  }
-
-  sp_io_writer_close(&io);
-}
-
-sp_str_t sp_test_file_create_empty(sp_test_file_manager_t* manager, sp_str_t relative) {
-  sp_str_t path = sp_test_file_path(manager, relative);
-  sp_test_file_create_ex((sp_test_file_config_t) {
-    .path = path,
-    .content = SP_LIT(""),
-  });
-
-  return path;
-}
-
-void sp_test_file_manager_cleanup(sp_test_file_manager_t* manager) {
-  sp_fs_remove_dir(manager->paths.test);
-}
+void     git_repo_create_from_dir(sp_str_t source, sp_str_t repo);
+sp_str_t git_repo_head(sp_str_t repo);
 #endif

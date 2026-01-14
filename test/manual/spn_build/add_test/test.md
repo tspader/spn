@@ -1,2 +1,0 @@
-- Run `spn test`
-- Verify that the binary `test` ran and passed as a part of the tests

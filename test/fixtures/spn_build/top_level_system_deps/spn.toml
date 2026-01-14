@@ -1,0 +1,8 @@
+[package]
+name = "top_level_system_deps"
+version = "0.1.0"
+system_deps = ["m"]
+
+[[bin]]
+name = "main"
+source = ["main.c"]

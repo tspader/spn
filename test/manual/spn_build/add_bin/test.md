@@ -1,2 +1,0 @@
-- Run `spn build --profile debug`
-- Verify that `build/debug/store/bin/foo` was successfully built and can be run

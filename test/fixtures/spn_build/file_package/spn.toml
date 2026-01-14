@@ -1,0 +1,10 @@
+[package]
+name = "file_package"
+version = "0.1.0"
+
+[deps.package]
+spum = "file://./packages/spum/spn.toml"
+
+[[bin]]
+name = "file_package"
+source = ["main.c"]
