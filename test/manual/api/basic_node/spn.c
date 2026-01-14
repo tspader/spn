@@ -8,7 +8,7 @@ spn_err_t generate_header(spn_node_ctx_t* ctx) {
   spn_write_file(ctx->build, "version.h",
     "#ifndef VERSION_H\n"
     "#define VERSION_H\n"
-    "#define VERSION_MAJOR 1\n"
+    "#define VERSION_MAJOR 69\n"
     "#define VERSION_MINOR 2\n"
     "#define VERSION_PATCH 3\n"
     "#endif\n"
