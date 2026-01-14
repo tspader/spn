@@ -32,7 +32,7 @@ typedef enum {
   SPN_LIB_KIND_SHARED = 0,
   SPN_LIB_KIND_STATIC = 1,
   SPN_LIB_KIND_SOURCE = 2,
-} spn_pkg_linkage_t;
+} spn_linkage_t;
 
 typedef enum {
   SPN_LIBC_GNU = 0,
@@ -116,17 +116,17 @@ const c8*         spn_get_dir(const spn_build_ctx_t* b, spn_pkg_dir_t kind);
 const c8*         spn_get_subdir(const spn_build_ctx_t* b, spn_pkg_dir_t kind, const c8* path);
 spn_target_t*     spn_add_exe(spn_config_t* b, const c8* name);
 spn_target_t*     spn_add_test(spn_config_t* c, const c8* name);
-spn_target_t*     spn_add_lib(spn_config_t* c, const c8* name, spn_pkg_linkage_t kind);
+spn_target_t*     spn_add_lib(spn_config_t* c, const c8* name, spn_linkage_t kind);
 void              spn_add_include(spn_build_ctx_t* b, spn_pkg_dir_t dir, const c8* path);
 void              spn_add_define(spn_build_ctx_t* b, const c8* define);
 void              spn_add_system_dep(spn_build_ctx_t* b, const c8* dep);
-void              spn_add_linkage(spn_build_ctx_t* b, spn_pkg_linkage_t linkage);
+void              spn_add_linkage(spn_build_ctx_t* b, spn_linkage_t linkage);
 spn_registry_t*   spn_add_registry(spn_build_ctx_t* b, const c8* name, const c8* location);
 void              spn_copy(spn_build_ctx_t* b, spn_pkg_dir_t from, const c8* pf, spn_pkg_dir_t to, const c8* pt);
 void              spn_log(spn_build_ctx_t* b, const c8* message);
 spn_cc_kind_t     spn_profile_get_cc(spn_profile_t* profile);
 const c8*         spn_profile_get_cc_exe(spn_profile_t* profile);
-spn_pkg_linkage_t spn_profile_get_linkage(spn_profile_t* profile);
+spn_linkage_t spn_profile_get_linkage(spn_profile_t* profile);
 spn_libc_kind_t   spn_profile_get_libc(spn_profile_t* profile);
 spn_c_standard_t  spn_profile_get_standard(spn_profile_t* profile);
 spn_build_mode_t  spn_profile_get_mode(spn_profile_t* profile);
