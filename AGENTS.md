@@ -58,3 +58,5 @@ assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn
   - a memory arena (several in the codebase)
   - string interner (on global spn_ctx_t)
   - scratch arena, if transient (see: sp.h docs)
+- always use `sp_for(it, 5)` instead of `for (u32 it = 0; it < 5; it++)`
+- always use `it` as your iterator variable (not e.g. `i`)

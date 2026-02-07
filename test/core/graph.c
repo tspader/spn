@@ -8,14 +8,11 @@
 
 
 void touch_file(sp_str_t path) {
-  // @spader: i tried to be smart and poll, but it was junk
-  if (sp_fs_exists(path)) {
-    sp_os_sleep_ms(100);
-  }
-
   sp_io_writer_t s = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_APPEND);
   sp_io_write_str(&s, sp_str_lit(" "));
   sp_io_writer_close(&s);
+
+  sp_sleep_ms(50);
 }
 
 void touch_node(spn_build_graph_t* graph, spn_bg_id_t id) {
@@ -57,7 +54,7 @@ short_linear_graph_t create_short_linear_graph() {
   g.graph = spn_bg_new();
   g.a = spn_bg_add_file(g.graph, sp_str_lit("a"));
   g.b = spn_bg_add_file(g.graph, sp_str_lit("b"));
-  g.compile = spn_bg_add_command(g.graph, SPN_BUILD_CMD_FN);
+  g.compile = spn_bg_add_fn(g.graph, SP_NULLPTR, SP_NULLPTR);
 
   spn_bg_tag_command_c(g.graph, g.compile, "compile");
   spn_bg_cmd_add_input(g.graph, g.compile, g.a);
@@ -82,8 +79,8 @@ long_linear_graph_t create_long_linear_graph() {
   r.b = spn_bg_add_file(r.graph, sp_str_lit("b"));
   r.c = spn_bg_add_file(r.graph, sp_str_lit("c"));
 
-  r.compile_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_1 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.compile_2 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
 
   spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
   spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
@@ -120,9 +117,9 @@ fork_join_graph_t create_fork_join_graph() {
   r.d = spn_bg_add_file(r.graph, sp_str_lit("d"));
   r.e = spn_bg_add_file(r.graph, sp_str_lit("e"));
 
-  r.join = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.join = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.compile_1 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.compile_2 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
 
   spn_bg_tag_command_c(r.graph, r.join, "join");
   spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
@@ -167,9 +164,9 @@ split_join_graph_t create_split_join_graph() {
   r.e = spn_bg_add_file(r.graph, sp_str_lit("e"));
   r.f = spn_bg_add_file(r.graph, sp_str_lit("f"));
 
-  r.split = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.join_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.join_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.split = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.join_1 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.join_2 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
 
   spn_bg_tag_command_c(r.graph, r.split, "split");
   spn_bg_tag_command_c(r.graph, r.join_1, "join");
@@ -210,9 +207,9 @@ diamond_graph_t create_diamond_graph() {
   r.b = spn_bg_add_file(r.graph, sp_str_lit("b"));
   r.c = spn_bg_add_file(r.graph, sp_str_lit("c"));
   r.d = spn_bg_add_file(r.graph, sp_str_lit("d"));
-  r.compile_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.join = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_1 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.compile_2 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.join = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
 
   spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
   spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
@@ -257,11 +254,11 @@ asymmetric_fork_graph_t create_asymmetric_fork_graph() {
   r.f = spn_bg_add_file(r.graph, sp_str_lit("f"));
   r.g = spn_bg_add_file(r.graph, sp_str_lit("g"));
 
-  r.compile_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile_3 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile_4 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.join = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_1 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.compile_2 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.compile_3 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.compile_4 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.join = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
 
   spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
   spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
@@ -312,9 +309,9 @@ multi_output_graph_t create_multi_output_graph() {
   r.d = spn_bg_add_file(r.graph, sp_str_lit("d"));
   r.e = spn_bg_add_file(r.graph, sp_str_lit("e"));
 
-  r.split = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.split = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.compile_1 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.compile_2 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
 
   spn_bg_tag_command_c(r.graph, r.split, "split");
   spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
@@ -355,9 +352,9 @@ comb_graph_t create_comb_graph() {
   r.c = spn_bg_add_file(r.graph, sp_str_lit("c"));
   r.d = spn_bg_add_file(r.graph, sp_str_lit("d"));
 
-  r.compile_1 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile_2 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile_3 = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.compile_1 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.compile_2 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.compile_3 = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
 
   spn_bg_tag_command_c(r.graph, r.compile_1, "compile");
   spn_bg_tag_command_c(r.graph, r.compile_2, "compile");
@@ -396,8 +393,8 @@ no_input_graph_t create_no_input_graph() {
   r.a = spn_bg_add_file(r.graph, sp_str_lit("a"));
   r.b = spn_bg_add_file(r.graph, sp_str_lit("b"));
 
-  r.generate = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
-  r.compile = spn_bg_add_command(r.graph, SPN_BUILD_CMD_FN);
+  r.generate = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
+  r.compile = spn_bg_add_fn(r.graph, SP_NULLPTR, SP_NULLPTR);
 
   spn_bg_tag_command_c(r.graph, r.generate, "generate");
   spn_bg_tag_command_c(r.graph, r.compile, "compile");

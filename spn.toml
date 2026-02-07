@@ -60,3 +60,8 @@ include = ["include", "source", "test/tools"]
 name = "om"
 source = ["test/core/ordered_map.c"]
 include = ["include", "source", "test/tools"]
+
+[[test]]
+name = "integration"
+source = ["test/integration/main.c"]
+include = ["include", "source", "test/tools", "test/integration"]

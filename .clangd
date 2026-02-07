@@ -3,9 +3,13 @@ CompileFlags:
     - -DSPN_IMPLEMENTATION
     - -DSP_IMPLEMENTATION
     - -DSP_APP
+    - -DSP_PS
     - -DSPN_CLI_IMPLEMENTATION
     - -DSP_APP_IMPLEMENTATION
     - -include sp.h
+    - -Isource
+    - -Itest/tools
+    - -Ibootstrap/include
     - -xc
     - -xc-header
 Diagnostics:
