@@ -65,3 +65,9 @@ include = ["include", "source", "test/tools"]
 name = "integration"
 source = ["test/integration/main.c"]
 include = ["include", "source", "test/tools", "test/integration"]
+
+[[bin]]
+name = "reproduce"
+source = ["test/integration/reproduce.c"]
+include = ["include", "source", "test/tools", "test/integration"]
+

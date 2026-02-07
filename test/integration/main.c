@@ -72,15 +72,11 @@ void run_test(s32* utest_result, struct spn_init* fixture, test_t test) {
 }
 
 UTEST_F_SETUP(spn_init) {
-
-  // for now, this is OK
-  uf->paths.spn = sp_str_lit("/home/spader/.local/bin/bspn");
-
-  // uf->paths.spn = sp_format(
-  //   "{}/{}",
-  //   SP_FMT_STR(sp_fs_get_exe_path()),
-  //   SP_FMT_CSTR("spn")
-  // );
+  uf->paths.spn = sp_format(
+    "{}/{}",
+    SP_FMT_STR(sp_fs_get_exe_path()),
+    SP_FMT_CSTR("spn")
+  );
 
   sp_test_file_manager_init(&uf->file_manager);
   uf->runner.project = sp_test_file_path(&uf->file_manager, sp_str_lit("build_smoke_bare"));
