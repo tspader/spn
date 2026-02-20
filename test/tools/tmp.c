@@ -1,22 +1,49 @@
 #include "test.h"
 
-void tmpfs_init(tmpfs_t* fs) {
-  sp_str_t tmp = sp_str_lit("/tmp/spn");
+void tmpfs_init_named(tmpfs_t* fs, const c8* test) {
+  sp_str_t tmp = sp_os_get_env_as_path(sp_str_lit("SPN_TEST_TMP"));
+  if (sp_str_empty(tmp)) {
+    tmp = sp_str_lit(".tmp");
+  }
+
+  sp_str_t parent = sp_fs_parent_path(tmp);
+  if (!sp_str_empty(parent) && !sp_fs_exists(parent)) {
+    sp_fs_create_dir(parent);
+  }
+
   if (!sp_fs_exists(tmp)) {
     sp_fs_create_dir(tmp);
   }
 
+  tmp = sp_fs_canonicalize_path(tmp);
+
   sp_tm_epoch_t now = sp_tm_now_epoch();
+  sp_str_t iso = sp_tm_epoch_to_iso8601(now);
+  c8* sanitized = (c8*)sp_alloc(iso.len);
+  sp_for(it, iso.len) {
+    sanitized[it] = iso.data[it] == ':' ? '-' : iso.data[it];
+  }
+  sp_str_t iso_sanitized = sp_str(sanitized, iso.len);
+
+  sp_str_t test_name = sp_str_view(test);
+  if (sp_str_empty(test_name)) {
+    test_name = sp_str_lit("tmpfs");
+  }
+
   sp_str_t root = sp_format(
-    "{}/spn-test-{}-{}",
+    "{}/{}-{}",
     SP_FMT_STR(tmp),
-    SP_FMT_U64(now.s),
-    SP_FMT_U32(now.ns)
+    SP_FMT_STR(iso_sanitized),
+    SP_FMT_STR(test_name)
   );
 
   SP_ASSERT(!sp_fs_exists(root));
   sp_fs_create_dir(root);
   fs->root = root;
+}
+
+void tmpfs_init(tmpfs_t* fs) {
+  tmpfs_init_named(fs, "tmpfs");
 }
 
 sp_str_t tmpfs_get(tmpfs_t* fs, sp_str_t name) {

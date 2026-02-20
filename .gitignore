@@ -46,3 +46,4 @@ build/bootstrap/bin
 
 **/node_modules
 test/tools/graph
+/.tmp

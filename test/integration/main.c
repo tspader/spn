@@ -28,8 +28,6 @@ struct spn_build {
 };
 
 UTEST_F_SETUP(spn_build) {
-  tmpfs_init(&uf->fixture.fs);
-
   uf->fixture.paths.root = sp_fs_get_exe_path();
   sp_for(it, 4) {
     uf->fixture.paths.root = sp_fs_parent_path(uf->fixture.paths.root);
@@ -38,7 +36,6 @@ UTEST_F_SETUP(spn_build) {
   uf->fixture.paths.spn = sp_fs_join_path(uf->fixture.paths.root, sp_str_lit("bootstrap/bin/spn"));
   ASSERT_TRUE(sp_fs_exists(uf->fixture.paths.spn));
 
-  uf->fixture.paths.cache = tmpfs_get(&uf->fixture.fs, sp_str_lit("cache"));
 }
 
 UTEST_F_TEARDOWN(spn_build) {
@@ -67,6 +64,7 @@ void copy_project_files(s32* utest_result, fixture_t* fixture, const c8* path) {
 }
 
 void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
+  fixture->paths.cache = tmpfs_get(&fixture->fs, sp_str_lit("cache"));
   copy_project_files(utest_result, fixture, test.project);
 
   sp_for(it, SPN_TEST_MAX_ACTIONS) {
@@ -135,7 +133,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
           .env = {
             .extra = {
               {
-                .key = sp_str_lit("SPN_CACHE_DIR"),
+                .key = sp_str_lit("SPN_STORAGE_DIR"),
                 .value = fixture->paths.cache,
               },
             },
@@ -181,6 +179,8 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
 }
 
 UTEST_F(spn_build, tmpfs) {
+  tmpfs_init_named(&uf->fixture.fs, "tmpfs");
+
   tmpfs_create(&uf->fixture.fs, sp_str_lit("foo/bar.txt"), sp_str_lit("hello"));
 
   sp_str_t path = tmpfs_get(&uf->fixture.fs, sp_str_lit("foo/bar.txt"));
@@ -196,6 +196,8 @@ UTEST_F(spn_build, tmpfs) {
 }
 
 UTEST_F(spn_build, index_package) {
+  tmpfs_init_named(&uf->fixture.fs, "index_package");
+
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/fixtures/spn_build/index_package",
     .actions = {
@@ -222,6 +224,8 @@ UTEST_F(spn_build, index_package) {
 // }
 
 UTEST_F(spn_build, file_package) {
+  tmpfs_init_named(&uf->fixture.fs, "file_package");
+
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/fixtures/spn_build/file_package",
     .actions = {
@@ -233,6 +237,8 @@ UTEST_F(spn_build, file_package) {
 }
 
 UTEST_F(spn_build, editable_package) {
+  tmpfs_init_named(&uf->fixture.fs, "editable_package");
+
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/fixtures/spn_build/editable_package",
     .actions = {
@@ -270,6 +276,38 @@ UTEST_F(spn_build, editable_package) {
       },
       { .kind = ACTION_VERIFY_LOCKED },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
+    },
+  });
+}
+
+UTEST_F(spn_build, top_level_system_deps) {
+  tmpfs_init_named(&uf->fixture.fs, "top_level_system_deps");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/top_level_system_deps",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_LOCKED },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "sp" } },
+      {
+        .kind = ACTION_SUBPROCESS,
+        .process = {
+          .config = {
+            .command = sp_str_lit("./build/debug/store/bin/main"),
+          },
+          .rc = 0,
+        },
+      },
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--force" } } },
+      {
+        .kind = ACTION_SUBPROCESS,
+        .process = {
+          .config = {
+            .command = sp_str_lit("./build/debug/store/bin/main"),
+          },
+          .rc = 0,
+        },
+      },
     },
   });
 }

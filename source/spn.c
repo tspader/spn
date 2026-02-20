@@ -6217,7 +6217,7 @@ spn_err_t run_cc(spn_cc_t* cc, spn_cc_target_t* cc_target, sp_str_t cwd, spn_pkg
 s32 spn_executor_compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   spn_compile_unit_t* unit = (spn_compile_unit_t*)user_data;
 
-  spn_log_error("compile: {}", SP_FMT_STR(unit->paths.object));
+  //spn_log_error("compile: {}", SP_FMT_STR(unit->paths.object));
 
   spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->target->logs, (spn_build_event_t) {
     .kind = SPN_BUILD_EVENT_DEBUG,
@@ -6229,7 +6229,7 @@ s32 spn_executor_compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   sp_str_t file = sp_fs_get_name(unit->paths.object);
 
   spn_cc_t* cc = make_cc_for_compile_or_link(unit->pkg, unit->target->target, unit->target->paths.object, unit->profile);
-spn_cc_target_t* cc_target = spn_cc_add_target(cc, SPN_TARGET_OBJECT, file);
+  spn_cc_target_t* cc_target = spn_cc_add_target(cc, SPN_TARGET_OBJECT, file);
   setup_target_for_compile_or_link(cc, cc_target, unit->target->target, unit->pkg, unit->session);
 
   spn_cc_target_add_absolute_source(cc_target, unit->paths.source);
@@ -6241,7 +6241,7 @@ s32 spn_executor_link_target(spn_bg_cmd_t* cmd, void* user_data) {
   spn_target_unit_t* unit = (spn_target_unit_t*)user_data;
   spn_target_t* target = unit->target;
 
-  spn_log_error("link: {}", SP_FMT_STR(unit->target->name));
+  //spn_log_error("link: {}", SP_FMT_STR(unit->target->name));
 
   spn_cc_t* cc = make_cc_for_compile_or_link(unit->pkg, unit->target, unit->paths.bin, unit->session->profile);
   spn_cc_target_t* cc_target = spn_cc_add_target(cc, SPN_TARGET_EXE, target->name);
@@ -6482,9 +6482,9 @@ void spn_pkg_unit_add_target(spn_pkg_unit_t* pkg, spn_target_t* target) {
   unit->target = target;
 
   spn_bp_init(&unit->paths, target->name, (spn_bp_config_t) {
-    .source = session->paths.root,
-    .store = sp_fs_join_path(session->paths.profile, sp_str_lit("store")),
-    .work = sp_fs_join_path(session->paths.profile, sp_str_lit("work")),
+    .source = pkg->ctx.paths.source,
+    .store = pkg->ctx.paths.store,
+    .work = pkg->ctx.paths.work,
   });
   spn_bp_create(&unit->paths);
 
@@ -6498,7 +6498,7 @@ void spn_pkg_unit_add_target(spn_pkg_unit_t* pkg, spn_target_t* target) {
   });
 
   sp_da_for(target->source, it) {
-    sp_str_t file = sp_fs_join_path(session->paths.root, target->source[it]);
+    sp_str_t file = sp_fs_join_path(pkg->ctx.paths.source, target->source[it]);
     sp_str_t name = spn_intern(sp_fs_get_stem(file));
 
     if (!sp_om_has(pkg->objects, file)) {
@@ -7256,12 +7256,12 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.paths.cwd = sp_fs_get_cwd();
   spn.paths.bin = sp_os_get_bin_path();
 
-  sp_str_t storage = sp_env_get(spn.env, sp_str_lit("SPN_CACHE_DIR"));
+  sp_str_t storage = sp_env_get(spn.env, sp_str_lit("SPN_STORAGE_DIR"));
   if (sp_str_empty(storage)) {
-    storage = sp_fs_get_storage_path();
+    storage = sp_fs_join_path(sp_fs_get_storage_path(), sp_str_lit("spn"));
   }
 
-  spn.paths.storage = sp_fs_join_path(storage, sp_str_lit("spn"));
+  spn.paths.storage = storage;
   spn.paths.tools.dir = sp_fs_join_path(spn.paths.storage, sp_str_lit("tools"));
   spn.paths.tools.manifest = sp_fs_join_path(spn.paths.tools.dir, sp_str_lit("spn.toml"));
   spn.paths.tools.lock = sp_fs_join_path(spn.paths.storage, sp_str_lit("spn.lock"));
