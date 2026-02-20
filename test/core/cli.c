@@ -42,15 +42,15 @@ void expect_parse(s32* utest_result, cli_parse_test_t t) {
 }
 
 struct spn_parse_cmd {
-  sp_test_file_manager_t fm;
+  tmpfs_t fm;
 };
 
 UTEST_F_SETUP(spn_parse_cmd) {
-  sp_test_file_manager_init(&uf->fm);
+  tmpfs_init(&uf->fm);
 }
 
 UTEST_F_TEARDOWN(spn_parse_cmd) {
-  sp_test_file_manager_cleanup(&uf->fm);
+  tmpfs_deinit(&uf->fm);
 }
 
 UTEST_F(spn_parse_cmd, empty_args) {
@@ -268,15 +268,15 @@ void expect_dispatch(s32* utest_result, cli_dispatch_test_t t) {
 }
 
 struct spn_dispatch {
-  sp_test_file_manager_t fm;
+  tmpfs_t fm;
 };
 
 UTEST_F_SETUP(spn_dispatch) {
-  sp_test_file_manager_init(&uf->fm);
+  tmpfs_init(&uf->fm);
 }
 
 UTEST_F_TEARDOWN(spn_dispatch) {
-  sp_test_file_manager_cleanup(&uf->fm);
+  tmpfs_deinit(&uf->fm);
 }
 
 UTEST_F(spn_dispatch, known_command) {

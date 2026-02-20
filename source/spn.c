@@ -1826,7 +1826,12 @@ struct spn_app_t {
 
   spn_app_config_t config;
 
+  // the directories on which we look for packages
   sp_da(sp_str_t) search;
+
+  // a mapping of package name -> path to manifest; manifests are lazily
+  // loaded, so all we need to to is cache where to find a given package
+  // to avoid scanning the filesystem many times
   sp_ht(sp_str_t, sp_str_t) registry;
   sp_om(spn_pkg_t) cache;
 };
@@ -1923,6 +1928,7 @@ typedef struct {
   sp_intern_t* intern;
   struct jit_code_entry jit;
   sp_mem_arena_t* arena;
+  sp_env_t* env;
 
 
   struct {
@@ -1948,6 +1954,7 @@ void            spn_log_info(const c8* fmt, ...);
 void            spn_log_warn(const c8* fmt, ...);
 void            spn_log_error(const c8* fmt, ...);
 void            spn_ctx_tui(const c8* fmt, ...);
+sp_str_t        spn_get_config_path();
 
 
 
@@ -7231,6 +7238,9 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.logger.out = sp_io_writer_from_fd(STDOUT_FILENO, SP_IO_CLOSE_MODE_NONE);
   spn.logger.err = sp_io_writer_from_fd(STDERR_FILENO, SP_IO_CLOSE_MODE_NONE);
 
+  spn.env = sp_alloc_type(sp_env_t);
+  *spn.env = sp_env_capture();
+
   spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_INTERACTIVE);
 
   spn.events = spn_event_buffer_new();
@@ -7244,8 +7254,12 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.paths.tools.manifest = sp_fs_join_path(spn.paths.tools.dir, sp_str_lit("spn.toml"));
   spn.paths.tools.lock = sp_fs_join_path(spn.paths.storage, sp_str_lit("spn.lock"));
 
-  // Config
-  spn.paths.config_dir = sp_fs_join_path(sp_fs_get_config_path(), SP_LIT("spn"));
+  // CONFIG
+  sp_str_t config_dir = sp_env_get(spn.env, sp_str_lit("SPN_CONFIG_DIR"));
+  if (sp_str_empty(config_dir)) {
+    config_dir = sp_fs_get_config_path();
+  }
+  spn.paths.config_dir = sp_fs_join_path(config_dir, SP_LIT("spn"));
   spn.paths.config = sp_fs_join_path(spn.paths.config_dir, SP_LIT("spn.toml"));
 
   if (sp_fs_exists(spn.paths.config)) {
