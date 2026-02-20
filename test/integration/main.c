@@ -82,17 +82,17 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         break;
       }
       case ACTION_REMOVE_FILE: {
-        sp_str_t path = tmpfs_get(&fixture->fs, sp_str_view(action.remove.file));
+        sp_str_t path = tmpfs_get(&fixture->fs, sp_str_view(action.rm.file));
         sp_fs_remove_file(path);
         EXPECT_FALSE(sp_fs_exists(path));
         break;
       }
       case ACTION_MOVE_FILE: {
-        sp_str_t from = tmpfs_get(&fixture->fs, action.move_file.from);
-        sp_str_t to = tmpfs_get(&fixture->fs, action.move_file.to);
+        sp_str_t from = tmpfs_get(&fixture->fs, action.mv.from);
+        sp_str_t to = tmpfs_get(&fixture->fs, action.mv.to);
         sp_str_t content = sp_io_read_file(from);
 
-        tmpfs_create(&fixture->fs, action.move_file.to, content);
+        tmpfs_create(&fixture->fs, action.mv.to, content);
         sp_fs_remove_file(from);
 
         EXPECT_FALSE(sp_fs_exists(from));
@@ -109,6 +109,15 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         EXPECT_EQ(action.process.rc, output.status.exit_code);
         break;
       }
+      case ACTION_RUN_BIN: {
+        sp_ps_output_t output = sp_ps_run((sp_ps_config_t) {
+          .command = tmpfs_get(&fixture->fs, sp_format("build/debug/store/bin/{}", SP_FMT_CSTR(action.bin.name))),
+          .cwd = fixture->fs.root,
+        });
+
+        EXPECT_EQ(action.bin.rc, output.status.exit_code);
+        break;
+      }
       case ACTION_VERIFY_EXISTS: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_exists.file);
         EXPECT_TRUE(sp_fs_exists(path));
@@ -121,7 +130,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         break;
       }
       case ACTION_REMOVE_DIR: {
-        sp_str_t path = tmpfs_get(&fixture->fs, sp_str_view(action.remove.dir));
+        sp_str_t path = tmpfs_get(&fixture->fs, sp_str_view(action.rm.dir));
         sp_fs_remove_dir(path);
         EXPECT_FALSE(sp_fs_exists(path));
         break;
@@ -204,7 +213,7 @@ UTEST_F(spn_build, index_package) {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "sp" } },
-      { .kind = ACTION_REMOVE_DIR, .remove = { .dir = "build" } },
+      { .kind = ACTION_REMOVE_DIR, .rm = { .dir = "build" } },
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "sp" } },
@@ -242,40 +251,36 @@ UTEST_F(spn_build, editable_package) {
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/fixtures/spn_build/editable_package",
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       {
-        .kind = ACTION_SUBPROCESS,
-        .process = {
-          .config = {
-            .command = sp_str_lit("./build/debug/store/bin/editable_package"),
-          },
+        .kind = ACTION_RUN_BIN,
+        .bin = {
+          .name = "editable_package",
           .rc = 69,
         },
       },
       {
         .kind = ACTION_REMOVE_FILE,
-        .remove.file = "packages/spum/spum.h",
+        .rm.file = "packages/spum/spum.h",
       },
       {
         .kind = ACTION_MOVE_FILE,
-        .move_file = {
+        .mv = {
           .from = sp_str_lit("packages/spum/kram.h"),
           .to = sp_str_lit("packages/spum/spum.h"),
         },
       },
-      { .kind = ACTION_REMOVE_DIR, .remove.dir = "build" },
+      { .kind = ACTION_REMOVE_DIR, .rm.dir = "build" },
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       {
-        .kind = ACTION_SUBPROCESS,
-        .process = {
-          .config = {
-            .command = sp_str_lit("./build/debug/store/bin/editable_package"),
-          },
+        .kind = ACTION_RUN_BIN,
+        .bin = {
+          .name = "editable_package",
           .rc = 42,
         },
       },
       { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "spum" },
     },
   });
 }
@@ -289,25 +294,9 @@ UTEST_F(spn_build, top_level_system_deps) {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "sp" } },
-      {
-        .kind = ACTION_SUBPROCESS,
-        .process = {
-          .config = {
-            .command = sp_str_lit("./build/debug/store/bin/main"),
-          },
-          .rc = 0,
-        },
-      },
+      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--force" } } },
-      {
-        .kind = ACTION_SUBPROCESS,
-        .process = {
-          .config = {
-            .command = sp_str_lit("./build/debug/store/bin/main"),
-          },
-          .rc = 0,
-        },
-      },
+      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
     },
   });
 }

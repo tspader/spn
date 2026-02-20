@@ -1,5 +1,0 @@
-- [ ] Run `spn build`
-  - [ ] Verify that `spn.lock` was created
-  - [ ] Verify that the build succeeded and runs
-- [ ] Run `spn build --force`
-  - [ ] Verify that the build succeeded and runs
