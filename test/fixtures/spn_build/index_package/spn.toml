@@ -3,7 +3,7 @@ name = "index_package"
 version = "0.1.0"
 
 [deps.package]
-sp = "1.6.6"
+spum = "1.0.0"
 
 [[bin]]
 name = "index_package"

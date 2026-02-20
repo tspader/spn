@@ -1325,11 +1325,11 @@ typedef struct {
     struct { sp_str_t error; } compile_failed;
     struct { sp_str_t url; } sync;
     struct { sp_str_t message; } debug;
-    struct { sp_str_t target; s32 kind; } debug_target_add;
-    struct { sp_str_t target; sp_str_t source; } debug_target_source;
-    struct { sp_str_t profile; bool force; u32 packages; } debug_build_init;
-    struct { sp_str_t target; u32 objects; } debug_link_target;
-    struct { bool has_hook; s32 result; u64 time_ns; } debug_configure_hook;
+    struct { sp_str_t target; s32 kind; } target_add;
+    struct { sp_str_t target; sp_str_t source; } target_source;
+    struct { sp_str_t profile; bool force; u32 packages; } graph_init;
+    struct { sp_str_t target; u32 objects; } target_link;
+    struct { bool exists; s32 result; u64 time; } configure;
   };
 } spn_build_event_t;
 
@@ -3929,38 +3929,38 @@ sp_str_t spn_tui_render_build_event(spn_build_event_t* event) {
     }
     case SPN_EVENT_ADD_TARGET: {
       sp_str_builder_append_fmt(&builder, "target={} kind={}",
-        SP_FMT_STR(event->debug_target_add.target),
-        SP_FMT_S32(event->debug_target_add.kind)
+        SP_FMT_STR(event->target_add.target),
+        SP_FMT_S32(event->target_add.kind)
       );
       break;
     }
     case SPN_EVENT_ADD_SOURCE: {
       sp_str_builder_append_fmt(&builder, "target={} source={}",
-        SP_FMT_STR(event->debug_target_source.target),
-        SP_FMT_STR(event->debug_target_source.source)
+        SP_FMT_STR(event->target_source.target),
+        SP_FMT_STR(event->target_source.source)
       );
       break;
     }
     case SPN_EVENT_INIT_BUILD_GRAPH: {
       sp_str_builder_append_fmt(&builder, "profile={} force={} packages={}",
-        SP_FMT_STR(event->debug_build_init.profile),
-        SP_FMT_CSTR(event->debug_build_init.force ? "true" : "false"),
-        SP_FMT_U32(event->debug_build_init.packages)
+        SP_FMT_STR(event->graph_init.profile),
+        SP_FMT_CSTR(event->graph_init.force ? "true" : "false"),
+        SP_FMT_U32(event->graph_init.packages)
       );
       break;
     }
     case SPN_EVENT_LINK_TARGET: {
       sp_str_builder_append_fmt(&builder, "target={} objects={}",
-        SP_FMT_STR(event->debug_link_target.target),
-        SP_FMT_U32(event->debug_link_target.objects)
+        SP_FMT_STR(event->target_link.target),
+        SP_FMT_U32(event->target_link.objects)
       );
       break;
     }
     case SPN_EVENT_RUN_CONFIGURE: {
       sp_str_builder_append_fmt(&builder, "has_hook={} result={} time_ns={}",
-        SP_FMT_CSTR(event->debug_configure_hook.has_hook ? "true" : "false"),
-        SP_FMT_S32(event->debug_configure_hook.result),
-        SP_FMT_U64(event->debug_configure_hook.time_ns)
+        SP_FMT_CSTR(event->configure.exists ? "true" : "false"),
+        SP_FMT_S32(event->configure.result),
+        SP_FMT_U64(event->configure.time)
       );
       break;
     }
@@ -5164,7 +5164,7 @@ void spn_target_add_source_ex(spn_target_t* target, sp_str_t source) {
 
   spn_event_buffer_push_ex(spn.events, target->pkg, SP_NULLPTR, (spn_build_event_t) {
     .kind = SPN_EVENT_ADD_SOURCE,
-    .debug_target_source = {
+    .target_source = {
       .target = target->name,
       .source = source,
     }
@@ -6152,10 +6152,10 @@ spn_err_t spn_pkg_unit_run_configure_hook(spn_pkg_unit_t* unit) {
 
   spn_event_buffer_push_ctx(spn.events, &unit->ctx, (spn_build_event_t) {
     .kind = SPN_EVENT_RUN_CONFIGURE,
-    .debug_configure_hook = {
-      .has_hook = unit->on_configure,
+    .configure = {
+      .exists = unit->on_configure,
       .result = 0,
-      .time_ns = 0,
+      .time = 0,
     }
   });
 
@@ -6337,7 +6337,7 @@ s32 spn_executor_link_target(spn_bg_cmd_t* cmd, void* user_data) {
 
   spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_TARGET,
-    .debug_link_target = {
+    .target_link = {
       .target = target->name,
       .objects = sp_da_size(unit->objects),
     }
@@ -6579,7 +6579,7 @@ void spn_pkg_unit_add_target(spn_pkg_unit_t* pkg, spn_target_t* target) {
 
   spn_event_buffer_push_ex(spn.events, pkg->ctx.pkg, &pkg->ctx.logs, (spn_build_event_t) {
     .kind = SPN_EVENT_ADD_TARGET,
-    .debug_target_add = {
+    .target_add = {
       .target = target->name,
       .kind = target->kind,
     }
@@ -8135,7 +8135,7 @@ void spn_task_run_build_graph_init(spn_app_t* app) {
 
   spn_event_buffer_push_ctx(spn.events, &spn_session_find_root(b)->ctx, (spn_build_event_t) {
     .kind = SPN_EVENT_INIT_BUILD_GRAPH,
-    .debug_build_init = {
+    .graph_init = {
       .profile = b->profile->name,
       .force = app->config.force,
       .packages = num_packages,

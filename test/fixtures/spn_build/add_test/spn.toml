@@ -1,7 +1,7 @@
 [package]
-name = "top_level_system_deps"
+name = "add_bin"
 version = "0.1.0"
-system_deps = ["m"]
+repo = "repo/repo"
 
 [[bin]]
 name = "main"

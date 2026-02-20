@@ -3,9 +3,6 @@ name = "add_bin"
 version = "0.1.0"
 repo = "repo/repo"
 
-[deps.package]
-sp = "1.6.6"
-
 [[bin]]
 name = "main"
 source = ["main.c"]

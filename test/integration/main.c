@@ -19,7 +19,8 @@ typedef struct {
   struct {
     sp_str_t root;
     sp_str_t spn;
-    sp_str_t cache;
+    sp_str_t storage;
+    sp_str_t config;
   } paths;
 } fixture_t;
 
@@ -64,7 +65,18 @@ void copy_project_files(s32* utest_result, fixture_t* fixture, const c8* path) {
 }
 
 void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
-  fixture->paths.cache = tmpfs_get(&fixture->fs, sp_str_lit("cache"));
+  fixture->paths.storage = tmpfs_get(&fixture->fs, sp_str_lit(".home/storage"));
+  sp_fs_create_dir(fixture->paths.storage);
+  sp_str_t repo = sp_fs_join_path(fixture->paths.storage, sp_str_lit("spn"));
+  sp_str_t include = sp_fs_join_path(repo, sp_str_lit("include"));
+  sp_str_t index = sp_fs_join_path(repo, sp_str_lit("packages"));
+  sp_fs_create_dir(include);
+  sp_fs_create_dir(index);
+  sp_fs_copy(sp_fs_join_path(fixture->paths.root, sp_str_lit("include/spn.h")), include);
+
+
+  fixture->paths.config = tmpfs_get(&fixture->fs, sp_str_lit(".home/config"));
+  sp_fs_create_dir(fixture->paths.config);
   copy_project_files(utest_result, fixture, test.project);
 
   sp_for(it, SPN_TEST_MAX_ACTIONS) {
@@ -110,8 +122,14 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         break;
       }
       case ACTION_RUN_BIN: {
+        sp_str_t bin = tmpfs_get(&fixture->fs, sp_format(
+          "build/debug/store/bin/{}",
+          SP_FMT_CSTR(action.bin.name)
+        ));
+        EXPECT_TRUE(sp_fs_exists(bin));
+
         sp_ps_output_t output = sp_ps_run((sp_ps_config_t) {
-          .command = tmpfs_get(&fixture->fs, sp_format("build/debug/store/bin/{}", SP_FMT_CSTR(action.bin.name))),
+          .command = bin,
           .cwd = fixture->fs.root,
         });
 
@@ -141,10 +159,8 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
           .cwd = fixture->fs.root,
           .env = {
             .extra = {
-              {
-                .key = sp_str_lit("SPN_STORAGE_DIR"),
-                .value = fixture->paths.cache,
-              },
+              { sp_str_lit("SPN_STORAGE_DIR"), fixture->paths.storage },
+              { sp_str_lit("SPN_CONFIG_DIR"), fixture->paths.config },
             },
           },
         };
@@ -302,14 +318,62 @@ UTEST_F(spn_build, top_level_system_deps) {
 }
 
 UTEST_F(spn_build, add_bin) {
-  tmpfs_init_named(&uf->fixture.fs, "add_bin");
+  tmpfs_init_named(&uf->fixture.fs, "add_exe_smoke");
 
   run_test(utest_result, &uf->fixture, (test_t) {
-    .project = "test/fixtures/spn_build/add_bin",
+    .project = "test/fixtures/spn_build/add_exe/smoke",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/bin/foo") },
       { .kind = ACTION_RUN_BIN, .bin.name = "foo" },
+    },
+  });
+}
+
+UTEST_F(spn_build, add_define) {
+  tmpfs_init_named(&uf->fixture.fs, "add_define");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/add_define",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+    },
+  });
+}
+
+UTEST_F(spn_build, add_include) {
+  tmpfs_init_named(&uf->fixture.fs, "add_include");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/add_include",
+    .copy = { "include/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+    },
+  });
+}
+
+UTEST_F(spn_build, add_system_dep) {
+  tmpfs_init_named(&uf->fixture.fs, "add_system_dep");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/add_system_dep",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+    },
+  });
+}
+
+UTEST_F(spn_build, add_test) {
+  tmpfs_init_named(&uf->fixture.fs, "add_test");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/add_test",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_RUN_BIN, .bin.name = "test" },
     },
   });
 }

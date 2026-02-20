@@ -36,6 +36,7 @@ typedef struct {
 
 typedef struct {
   const c8* project;
+  const c8* copy [16];
   action_t actions[SPN_TEST_MAX_ACTIONS];
 } test_t;
 

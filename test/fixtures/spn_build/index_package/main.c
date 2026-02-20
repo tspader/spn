@@ -1,7 +1,9 @@
-#define SP_IMPLEMENTATION
-#include "sp.h"
+#include "spum.h"
 
-s32 main(s32 num_args, const c8** args) {
-  SP_LOG("hello, {:fg brightcyan}", SP_FMT_CSTR("world"));
-  SP_EXIT_SUCCESS();
+#if !defined(SPUM)
+  #error "expected SPUM or KRAM"
+#endif
+
+int main(int num_args, const char** args) {
+  return 0;
 }

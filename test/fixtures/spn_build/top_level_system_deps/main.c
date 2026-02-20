@@ -2,9 +2,6 @@
 #include <math.h>
 
 int main(int num_args, const char** args) {
-  (void)num_args;
-  (void)args;
-
   volatile double x = 69.0;
   printf("square root is %f\n", sin(x));
   return 0;

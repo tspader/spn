@@ -1,0 +1,6 @@
+[package]
+name = "spum"
+version = "1.0.0"
+
+[lib]
+kinds = ["source"]
