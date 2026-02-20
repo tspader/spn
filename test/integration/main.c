@@ -6,6 +6,12 @@
 #include "utest.h"
 #include "action.h"
 
+#define TOML_IMPLEMENTATION
+#include "toml.h"
+
+#define SPN_TOML_IMPLEMENTATION
+#include "spn_toml.h"
+
 UTEST_MAIN()
 
 #define uf utest_fixture
@@ -66,7 +72,6 @@ UTEST_F_SETUP(spn_build) {
 }
 
 UTEST_F_TEARDOWN(spn_build) {
-  sp_log(uf->fixture.fs.root);
 }
 
 void fixture_write_file(sp_str_t path, sp_str_t content) {
@@ -129,31 +134,6 @@ void fixture_manifest_set_package_url(sp_str_t manifest, sp_str_t url, sp_str_t*
   *out = sp_str_trim_right(sp_str_builder_to_str(&builder));
 }
 
-void fixture_manifest_get_package_version(sp_str_t manifest, sp_str_t* out) {
-  *out = sp_str_lit("");
-
-  bool in_package = false;
-  sp_da(sp_str_t) lines = sp_str_split_c8(manifest, '\n');
-  sp_da_for(lines, it) {
-    sp_str_t line = sp_str_trim(lines[it]);
-
-    if (sp_str_starts_with(line, sp_str_lit("["))) {
-      in_package = sp_str_equal(line, sp_str_lit("[package]"));
-      continue;
-    }
-
-    if (!in_package || !sp_str_starts_with(line, sp_str_lit("version = \""))) {
-      continue;
-    }
-
-    sp_da(sp_str_t) parts = sp_str_split_c8(line, '"');
-    if (sp_da_size(parts) >= 2) {
-      *out = parts[1];
-      return;
-    }
-  }
-}
-
 void copy_project_path(s32* utest_result, fixture_t* fixture, sp_str_t project, sp_str_t relative) {
   sp_str_t from = sp_fs_join_path(project, relative);
   if (sp_fs_is_glob(from)) {
@@ -197,12 +177,16 @@ void setup_fixture_index_from_remote(s32* utest_result, fixture_t* fixture, sp_s
     sp_str_t index_pkg = sp_fs_join_path(fixture->paths.index, entry->file_name);
     sp_fs_create_dir(index_pkg);
 
+    toml_table_t* manifest_table = spn_toml_parse(source_manifest);
+    EXPECT_TRUE(manifest_table != SP_NULLPTR);
+
+    toml_table_t* package = toml_table_table(manifest_table, "package");
+    EXPECT_TRUE(package != SP_NULLPTR);
+    sp_str_t version = spn_toml_str(package, "version");
+
     sp_str_t manifest = sp_io_read_file(source_manifest);
     sp_str_t manifest_with_url = SP_ZERO_STRUCT(sp_str_t);
     fixture_manifest_set_package_url(manifest, repo, &manifest_with_url);
-
-    sp_str_t version = SP_ZERO_STRUCT(sp_str_t);
-    fixture_manifest_get_package_version(manifest_with_url, &version);
     EXPECT_FALSE(sp_str_empty(version));
 
     fixture_write_file(sp_fs_join_path(index_pkg, sp_str_lit("spn.toml")), manifest_with_url);
@@ -212,15 +196,14 @@ void setup_fixture_index_from_remote(s32* utest_result, fixture_t* fixture, sp_s
       sp_fs_copy(source_script, index_pkg);
     }
 
-    fixture_write_file(
-      sp_fs_join_path(index_pkg, sp_str_lit("metadata.toml")),
-      sp_format(
-        "[[versions]]\n"
-        "version = \"{}\"\n"
-        "commit = \"HEAD\"\n",
-        SP_FMT_STR(version)
-      )
-    );
+    spn_toml_writer_t metadata = spn_toml_writer_new();
+    spn_toml_begin_array_cstr(&metadata, "versions");
+    spn_toml_append_array_table(&metadata);
+    spn_toml_append_str_cstr(&metadata, "version", version);
+    spn_toml_append_str_cstr(&metadata, "commit", sp_str_lit("HEAD"));
+    spn_toml_end_array(&metadata);
+
+    fixture_write_file(sp_fs_join_path(index_pkg, sp_str_lit("metadata.toml")), spn_toml_writer_write(&metadata));
   }
 }
 
