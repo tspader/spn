@@ -83,6 +83,24 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         tmpfs_create(&fixture->fs, action.create.file, action.create.content);
         break;
       }
+      case ACTION_REMOVE_FILE: {
+        sp_str_t path = tmpfs_get(&fixture->fs, sp_str_view(action.remove.file));
+        sp_fs_remove_file(path);
+        EXPECT_FALSE(sp_fs_exists(path));
+        break;
+      }
+      case ACTION_MOVE_FILE: {
+        sp_str_t from = tmpfs_get(&fixture->fs, action.move_file.from);
+        sp_str_t to = tmpfs_get(&fixture->fs, action.move_file.to);
+        sp_str_t content = sp_io_read_file(from);
+
+        tmpfs_create(&fixture->fs, action.move_file.to, content);
+        sp_fs_remove_file(from);
+
+        EXPECT_FALSE(sp_fs_exists(from));
+        EXPECT_TRUE(sp_fs_exists(to));
+        break;
+      }
       case ACTION_SUBPROCESS: {
         sp_ps_config_t config = action.process.config;
         if (sp_str_empty(config.cwd)) {
@@ -105,7 +123,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         break;
       }
       case ACTION_REMOVE_DIR: {
-        sp_str_t path = tmpfs_get(&fixture->fs, sp_str_view(action.remove_dir.path));
+        sp_str_t path = tmpfs_get(&fixture->fs, sp_str_view(action.remove.dir));
         sp_fs_remove_dir(path);
         EXPECT_FALSE(sp_fs_exists(path));
         break;
@@ -184,7 +202,7 @@ UTEST_F(spn_build, index_package) {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "sp" } },
-      { .kind = ACTION_REMOVE_DIR, .remove_dir = { .path = "build" } },
+      { .kind = ACTION_REMOVE_DIR, .remove = { .dir = "build" } },
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "sp" } },
@@ -229,17 +247,17 @@ UTEST_F(spn_build, editable_package) {
         },
       },
       {
-        .kind = ACTION_CREATE_FILE,
-        .create = {
-          .file = sp_str_lit("packages/spum/spum.h"),
-          .content = sp_str_lit(
-            "int spum() {\n"
-            "  return 42;\n"
-            "}\n"
-          ),
+        .kind = ACTION_REMOVE_FILE,
+        .remove.file = "packages/spum/spum.h",
+      },
+      {
+        .kind = ACTION_MOVE_FILE,
+        .move_file = {
+          .from = sp_str_lit("packages/spum/kram.h"),
+          .to = sp_str_lit("packages/spum/spum.h"),
         },
       },
-      { .kind = ACTION_REMOVE_DIR, .remove_dir = { .path = "build" } },
+      { .kind = ACTION_REMOVE_DIR, .remove.dir = "build" },
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       {
         .kind = ACTION_SUBPROCESS,

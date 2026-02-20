@@ -6,6 +6,8 @@
 typedef enum {
   ACTION_NONE,
   ACTION_CREATE_FILE,
+  ACTION_REMOVE_FILE,
+  ACTION_MOVE_FILE,
   ACTION_REMOVE_DIR,
   ACTION_SUBPROCESS,
   ACTION_VERIFY_EXISTS,
@@ -20,7 +22,11 @@ typedef struct {
 
   union {
     struct { sp_str_t file; sp_str_t content; } create;
-    struct { const c8* path; } remove_dir;
+    struct {
+      const c8* file;
+      const c8* dir;
+    } remove;
+    struct { sp_str_t from; sp_str_t to; } move_file;
     struct { sp_ps_config_t config; s32 rc; } process;
     struct { sp_str_t file; } verify_exists;
     struct { sp_str_t file; sp_str_t content; } verify_content;

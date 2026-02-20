@@ -1,9 +1,9 @@
 #include "test.h"
 
 void tmpfs_init(tmpfs_t* fs) {
-  sp_str_t tmp = sp_os_get_env_as_path(sp_str_lit("TMPDIR"));
-  if (sp_str_empty(tmp)) {
-    tmp = sp_str_lit("/tmp");
+  sp_str_t tmp = sp_str_lit("/tmp/spn");
+  if (!sp_fs_exists(tmp)) {
+    sp_fs_create_dir(tmp);
   }
 
   sp_tm_epoch_t now = sp_tm_now_epoch();
