@@ -4,7 +4,6 @@
 #define SPN_CLI_IMPLEMENTATION
 #include "cli.h"
 
-#define SP_TEST_IMPLEMENTATION
 #include "test.h"
 #include "utest.h"
 

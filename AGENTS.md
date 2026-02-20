@@ -6,6 +6,7 @@
 - `spn` is written in C using `sp.h` as its custom standard library
   - we adhere strictly to its coding style, `./doc/skill/sp.md`
   - reference the `sp` skill or `./doc/sp/SKILL.md` judiciously
+- we use a tiny game loop library from `sp.h`, so `sp_main` is the entry point
 
 # building
 - `spn` is self-hosting
@@ -24,10 +25,15 @@
 
 
 # references
-- `source/spn.c` is most of the code (large file; search, don't read)
-- `source/graph.h` is the build DAG
-- `source/cli.h` is a generic CLI library
-- `include/spn/spn.h` for public API used in downstream packages
+- `source/`
+  - `spn.c` is most of the code (large file; search, don't read)
+    - `spn_app_t` is all data for one invocation
+    - `spn_init` is the top level init function
+    - `spn_app_load` loads the package we're operating on
+  - `graph.h` is the build DAG
+  - `cli.h` is a generic CLI library
+- `include/`
+  - `spn/spn.h` for public API used in downstream packages
 - `spn.toml` is the package for spn itself; (example of a downstream project that uses spn)
 - `examples/tcc/spn.toml` is the package for the `tcc` example (minimal example of a downstream project)
 - `packages/sp/spn.toml` is the package for `sp.h` (example of a source-only spn package)

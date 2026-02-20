@@ -48,12 +48,12 @@ include = ["include"]
 
 [[test]]
 name = "cli"
-source = ["test/core/cli.c"]
+source = ["test/core/cli.c", "test/tools/test.c"]
 include = ["include", "source", "test/tools"]
 
 [[test]]
 name = "graph"
-source = ["test/core/graph.c"]
+source = ["test/core/graph.c", "test/tools/test.c"]
 include = ["include", "source", "test/tools"]
 
 [[test]]
@@ -63,11 +63,5 @@ include = ["include", "source", "test/tools"]
 
 [[test]]
 name = "integration"
-source = ["test/integration/main.c"]
+source = ["test/integration/main.c", "test/tools/test.c"]
 include = ["include", "source", "test/tools", "test/integration"]
-
-[[bin]]
-name = "reproduce"
-source = ["test/integration/reproduce.c"]
-include = ["include", "source", "test/tools", "test/integration"]
-

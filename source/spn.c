@@ -907,6 +907,8 @@ void            spn_pkg_set_name(spn_pkg_t* pkg, const c8* name);
 void            spn_pkg_set_name_ex(spn_pkg_t* pkg, sp_str_t name);
 void            spn_pkg_set_repo(spn_pkg_t* pkg, const c8* repo);
 void            spn_pkg_set_repo_ex(spn_pkg_t* pkg, sp_str_t repo);
+void            spn_pkg_set_url(spn_pkg_t* pkg, const c8* url);
+void            spn_pkg_set_url_ex(spn_pkg_t* pkg, sp_str_t url);
 void            spn_pkg_set_author(spn_pkg_t* pkg, const c8* author);
 void            spn_pkg_set_author_ex(spn_pkg_t* pkg, sp_str_t author);
 void            spn_pkg_set_maintainer(spn_pkg_t* pkg, const c8* maintainer);
@@ -4870,7 +4872,16 @@ void spn_pkg_set_repo(spn_pkg_t* pkg, const c8* repo) {
 void spn_pkg_set_repo_ex(spn_pkg_t* pkg, sp_str_t repo) {
   sp_context_push_arena(pkg->arena);
   pkg->repo = sp_str_copy(repo);
-  pkg->url = sp_format("https://github.com/{}.git", SP_FMT_STR(pkg->repo)); // lol
+  sp_context_pop();
+}
+
+void spn_pkg_set_url(spn_pkg_t* pkg, const c8* url) {
+  spn_pkg_set_url_ex(pkg, sp_str_view(url));
+}
+
+void spn_pkg_set_url_ex(spn_pkg_t* pkg, sp_str_t url) {
+  sp_context_push_arena(pkg->arena);
+  pkg->url = sp_str_copy(url);
   sp_context_pop();
 }
 
@@ -5297,7 +5308,7 @@ void spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   toml.config = toml_table_table(toml.manifest, "config");
 
   spn_pkg_init(pkg, spn_toml_str(toml.package, "name"));
-  spn_pkg_set_repo(pkg, spn_toml_cstr_opt(toml.package, "repo", ""));
+  spn_pkg_set_url(pkg, spn_toml_cstr_opt(toml.package, "url", ""));
   spn_pkg_set_author(pkg, spn_toml_cstr_opt(toml.package, "author", ""));
   spn_pkg_set_maintainer(pkg, spn_toml_cstr_opt(toml.package, "maintainer", ""));
 
@@ -6707,8 +6718,8 @@ void spn_app_write_manifest(spn_pkg_t* pkg, sp_str_t path) {
   spn_toml_begin_table_cstr(&toml, "package");
   spn_toml_append_str_cstr(&toml, "name", pkg->name);
   spn_toml_append_str_cstr(&toml, "version", spn_semver_to_str(pkg->version));
-  if (!sp_str_empty(pkg->repo)) {
-    spn_toml_append_str_cstr(&toml, "repo", pkg->repo);
+  if (!sp_str_empty(pkg->url)) {
+    spn_toml_append_str_cstr(&toml, "url", pkg->url);
   }
   if (!sp_str_empty(pkg->author)) {
     spn_toml_append_str_cstr(&toml, "author", pkg->author);

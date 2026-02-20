@@ -16,6 +16,10 @@ UTEST_MAIN()
 typedef struct {
   tmpfs_t fs;
   s32* result;
+  struct {
+    sp_str_t root;
+    sp_str_t spn;
+  } paths;
 } fixture_t;
 
 struct spn_build {
@@ -24,6 +28,14 @@ struct spn_build {
 
 UTEST_F_SETUP(spn_build) {
   tmpfs_init(&uf->fixture.fs);
+
+  uf->fixture.paths.root = sp_fs_get_exe_path();
+  sp_for(it, 4) {
+    uf->fixture.paths.root = sp_fs_parent_path(uf->fixture.paths.root);
+  }
+
+  uf->fixture.paths.spn = sp_fs_join_path(uf->fixture.paths.root, sp_str_lit("bootstrap/bin/spn"));
+  ASSERT_TRUE(sp_fs_exists(uf->fixture.paths.spn));
 }
 
 UTEST_F_TEARDOWN(spn_build) {
@@ -41,14 +53,11 @@ void copy_project_file_if_exists(fixture_t* fixture, sp_str_t project_root, cons
 }
 
 void copy_project_files(s32* utest_result, fixture_t* fixture, const c8* path) {
-  if (!path) return;
-
-  sp_str_t exe = sp_fs_get_exe_path();
-  sp_for(it, 4) {
-    exe = sp_fs_parent_path(exe);
+  if (!path) {
+    return;
   }
 
-  sp_str_t project = sp_fs_join_path(exe, sp_str_view(path));
+  sp_str_t project = sp_fs_join_path(fixture->paths.root, sp_str_view(path));
   ASSERT_TRUE(sp_fs_exists(project));
 
   copy_project_file_if_exists(fixture, project, "main.c");
@@ -102,7 +111,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
       }
       case ACTION_RUN_CLI: {
         sp_ps_config_t config = {
-          .command = sp_str_lit("tspn"),
+          .command = fixture->paths.spn,
           .cwd = fixture->fs.root,
         };
 
@@ -161,7 +170,7 @@ UTEST_F(spn_build, tmpfs) {
 
 UTEST_F(spn_build, smoke) {
   run_test(utest_result, &uf->fixture, (test_t) {
-    .project = "test/manual/spn_build/smoke",
+    .project = "test/fixtures/spn_build/smoke",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
@@ -170,6 +179,28 @@ UTEST_F(spn_build, smoke) {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "sp" } },
+    },
+  });
+}
+
+// UTEST_F(spn_build, codeberg) {
+//   run_test(utest_result, &uf->fixture, (test_t) {
+//     .project = "test/manual/spn_build/codeberg",
+//     .actions = {
+//       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+//       { .kind = ACTION_VERIFY_LOCKED },
+//       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "sp" } },
+//     },
+//   });
+// }
+
+UTEST_F(spn_build, local) {
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/local",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_LOCKED },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "local" } },
     },
   });
 }

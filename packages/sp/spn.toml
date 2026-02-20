@@ -1,6 +1,6 @@
 [package]
 name = "sp"
-repo = "tspader/sp"
+url = "https://github.com/tspader/sp.git"
 version = "1.6.6"
 commit = "e15f48c662e0"
 author = "tspader"

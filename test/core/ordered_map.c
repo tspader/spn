@@ -1,8 +1,6 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
-#define SP_TEST_IMPLEMENTATION
-#include "test.h"
 #include "utest.h"
 
 #define SP_OM_IMPLEMENTATION
