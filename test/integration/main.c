@@ -85,53 +85,58 @@ void fixture_write_file(sp_str_t path, sp_str_t content) {
   sp_io_writer_close(&io);
 }
 
-void fixture_manifest_set_package_url(sp_str_t manifest, sp_str_t url, sp_str_t* out) {
-  bool in_package = false;
-  bool has_package = false;
-  bool wrote_url = false;
+sp_str_t fixture_registry_manifest_from_source(toml_table_t* source, sp_str_t repo_url) {
+  toml_table_t* package = toml_table_table(source, "package");
+  SP_ASSERT(package);
 
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  sp_da(sp_str_t) lines = sp_str_split_c8(manifest, '\n');
-  sp_da_for(lines, it) {
-    sp_str_t line = lines[it];
-    sp_str_t trimmed = sp_str_trim(line);
+  spn_toml_writer_t writer = spn_toml_writer_new();
+  spn_toml_begin_table_cstr(&writer, "package");
+  spn_toml_append_str_cstr(&writer, "name", spn_toml_str(package, "name"));
+  spn_toml_append_str_cstr(&writer, "version", spn_toml_str(package, "version"));
+  spn_toml_append_str_cstr(&writer, "url", repo_url);
 
-    if (sp_str_starts_with(trimmed, sp_str_lit("["))) {
-      if (in_package && !wrote_url) {
-        sp_str_builder_append_fmt(&builder, "url = \"{}\"\n", SP_FMT_STR(url));
-      }
+  sp_str_t author = spn_toml_str_opt(package, "author", "");
+  if (!sp_str_empty(author)) {
+    spn_toml_append_str_cstr(&writer, "author", author);
+  }
 
-      in_package = sp_str_equal(trimmed, sp_str_lit("[package]"));
-      if (in_package) {
-        has_package = true;
-        wrote_url = false;
-      }
+  sp_str_t maintainer = spn_toml_str_opt(package, "maintainer", "");
+  if (!sp_str_empty(maintainer)) {
+    spn_toml_append_str_cstr(&writer, "maintainer", maintainer);
+  }
 
-      sp_str_builder_append(&builder, line);
-      sp_str_builder_append_c8(&builder, '\n');
-      continue;
+  sp_str_t commit = spn_toml_str_opt(package, "commit", "");
+  if (!sp_str_empty(commit)) {
+    spn_toml_append_str_cstr(&writer, "commit", commit);
+  }
+
+  toml_array_t* include = toml_table_array(package, "include");
+  if (spn_toml_array_len(include)) {
+    spn_toml_append_str_array_cstr(&writer, "include", spn_toml_arr_to_str_arr(include));
+  }
+
+  toml_array_t* define = toml_table_array(package, "define");
+  if (spn_toml_array_len(define)) {
+    spn_toml_append_str_array_cstr(&writer, "define", spn_toml_arr_to_str_arr(define));
+  }
+
+  toml_array_t* system_deps = toml_table_array(package, "system_deps");
+  if (spn_toml_array_len(system_deps)) {
+    spn_toml_append_str_array_cstr(&writer, "system_deps", spn_toml_arr_to_str_arr(system_deps));
+  }
+  spn_toml_end_table(&writer);
+
+  toml_table_t* lib = toml_table_table(source, "lib");
+  if (lib) {
+    toml_array_t* kinds = toml_table_array(lib, "kinds");
+    if (spn_toml_array_len(kinds)) {
+      spn_toml_begin_table_cstr(&writer, "lib");
+      spn_toml_append_str_array_cstr(&writer, "kinds", spn_toml_arr_to_str_arr(kinds));
+      spn_toml_end_table(&writer);
     }
-
-    if (in_package && sp_str_starts_with(trimmed, sp_str_lit("url = "))) {
-      sp_str_builder_append_fmt(&builder, "url = \"{}\"\n", SP_FMT_STR(url));
-      wrote_url = true;
-      continue;
-    }
-
-    sp_str_builder_append(&builder, line);
-    sp_str_builder_append_c8(&builder, '\n');
   }
 
-  if (in_package && !wrote_url) {
-    sp_str_builder_append_fmt(&builder, "url = \"{}\"\n", SP_FMT_STR(url));
-  }
-
-  if (!has_package) {
-    *out = manifest;
-    return;
-  }
-
-  *out = sp_str_trim_right(sp_str_builder_to_str(&builder));
+  return spn_toml_writer_write(&writer);
 }
 
 void copy_project_path(s32* utest_result, fixture_t* fixture, sp_str_t project, sp_str_t relative) {
@@ -184,9 +189,7 @@ void setup_fixture_index_from_remote(s32* utest_result, fixture_t* fixture, sp_s
     EXPECT_TRUE(package != SP_NULLPTR);
     sp_str_t version = spn_toml_str(package, "version");
 
-    sp_str_t manifest = sp_io_read_file(source_manifest);
-    sp_str_t manifest_with_url = SP_ZERO_STRUCT(sp_str_t);
-    fixture_manifest_set_package_url(manifest, repo, &manifest_with_url);
+    sp_str_t manifest_with_url = fixture_registry_manifest_from_source(manifest_table, repo);
     EXPECT_FALSE(sp_str_empty(version));
 
     fixture_write_file(sp_fs_join_path(index_pkg, sp_str_lit("spn.toml")), manifest_with_url);
