@@ -7258,9 +7258,16 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   sp_atomic_s32_set(&spn.control, 0);
 
+
   spn.paths.cwd = sp_fs_get_cwd();
   spn.paths.bin = sp_os_get_bin_path();
-  spn.paths.storage = sp_fs_join_path(sp_fs_get_storage_path(), sp_str_lit("spn"));
+
+  sp_str_t storage = sp_env_get(spn.env, sp_str_lit("SPN_CACHE_DIR"));
+  if (sp_str_empty(storage)) {
+    storage = sp_fs_get_storage_path();
+  }
+
+  spn.paths.storage = sp_fs_join_path(storage, sp_str_lit("spn"));
   spn.paths.tools.dir = sp_fs_join_path(spn.paths.storage, sp_str_lit("tools"));
   spn.paths.tools.manifest = sp_fs_join_path(spn.paths.tools.dir, sp_str_lit("spn.toml"));
   spn.paths.tools.lock = sp_fs_join_path(spn.paths.storage, sp_str_lit("spn.lock"));
@@ -7663,13 +7670,15 @@ void spn_task_sync_init(spn_app_t* app) {
     spn_bg_cmd_set_metadata(graph, sync, sp_format("sync ({})", SP_FMT_STR(dep->ctx.name)), sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
   }
 
-  b->sync.dirty = spn_bg_compute_forced_dirty(graph);
-  b->sync.executor = spn_bg_executor_new(graph, b->sync.dirty, (spn_bg_executor_config_t) {
-    .num_threads = 3,
-    .enable_logging = false
-  });
+  if (!sp_da_empty(graph->commands)) {
+    b->sync.dirty = spn_bg_compute_forced_dirty(graph);
+    b->sync.executor = spn_bg_executor_new(graph, b->sync.dirty, (spn_bg_executor_config_t) {
+      .num_threads = 3,
+      .enable_logging = false
+    });
 
-  spn_bg_executor_run(b->sync.executor);
+    spn_bg_executor_run(b->sync.executor);
+  }
 }
 
 spn_task_result_t spn_task_sync_update(spn_app_t* app) {

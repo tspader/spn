@@ -19,6 +19,7 @@ typedef struct {
   struct {
     sp_str_t root;
     sp_str_t spn;
+    sp_str_t cache;
   } paths;
 } fixture_t;
 
@@ -36,20 +37,12 @@ UTEST_F_SETUP(spn_build) {
 
   uf->fixture.paths.spn = sp_fs_join_path(uf->fixture.paths.root, sp_str_lit("bootstrap/bin/spn"));
   ASSERT_TRUE(sp_fs_exists(uf->fixture.paths.spn));
+
+  uf->fixture.paths.cache = tmpfs_get(&uf->fixture.fs, sp_str_lit("cache"));
 }
 
 UTEST_F_TEARDOWN(spn_build) {
-  tmpfs_deinit(&uf->fixture.fs);
-}
-
-void copy_project_file_if_exists(fixture_t* fixture, sp_str_t project_root, const c8* file_name) {
-  sp_str_t relative = sp_str_view(file_name);
-  sp_str_t source = sp_fs_join_path(project_root, relative);
-  if (!sp_fs_exists(source)) {
-    return;
-  }
-
-  tmpfs_create(&fixture->fs, relative, sp_io_read_file(source));
+  sp_log(uf->fixture.fs.root);
 }
 
 void copy_project_files(s32* utest_result, fixture_t* fixture, const c8* path) {
@@ -60,9 +53,17 @@ void copy_project_files(s32* utest_result, fixture_t* fixture, const c8* path) {
   sp_str_t project = sp_fs_join_path(fixture->paths.root, sp_str_view(path));
   ASSERT_TRUE(sp_fs_exists(project));
 
-  copy_project_file_if_exists(fixture, project, "main.c");
-  copy_project_file_if_exists(fixture, project, "spn.c");
-  copy_project_file_if_exists(fixture, project, "spn.toml");
+  sp_da(sp_os_dir_ent_t) entries = sp_fs_collect_recursive(project);
+  sp_dyn_array_for(entries, it) {
+    sp_os_dir_ent_t* entry = &entries[it];
+    if (sp_fs_is_dir(entry->file_path)) {
+      continue;
+    }
+
+    sp_str_t relative = sp_str_strip_left(entry->file_path, project);
+    relative = sp_str_strip_left(relative, sp_str_lit("/"));
+    tmpfs_create(&fixture->fs, relative, sp_io_read_file(entry->file_path));
+  }
 }
 
 void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
@@ -113,6 +114,14 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         sp_ps_config_t config = {
           .command = fixture->paths.spn,
           .cwd = fixture->fs.root,
+          .env = {
+            .extra = {
+              {
+                .key = sp_str_lit("SPN_CACHE_DIR"),
+                .value = fixture->paths.cache,
+              },
+            },
+          },
         };
 
         if (action.cli.cmd) {
@@ -168,9 +177,9 @@ UTEST_F(spn_build, tmpfs) {
   EXPECT_TRUE(sp_str_starts_with(touched, uf->fixture.fs.root));
 }
 
-UTEST_F(spn_build, smoke) {
+UTEST_F(spn_build, index_package) {
   run_test(utest_result, &uf->fixture, (test_t) {
-    .project = "test/fixtures/spn_build/smoke",
+    .project = "test/fixtures/spn_build/index_package",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
@@ -194,13 +203,55 @@ UTEST_F(spn_build, smoke) {
 //   });
 // }
 
-UTEST_F(spn_build, local) {
+UTEST_F(spn_build, file_package) {
   run_test(utest_result, &uf->fixture, (test_t) {
-    .project = "test/fixtures/spn_build/local",
+    .project = "test/fixtures/spn_build/file_package",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "local" } },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
+    },
+  });
+}
+
+UTEST_F(spn_build, editable_package) {
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/editable_package",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      {
+        .kind = ACTION_SUBPROCESS,
+        .process = {
+          .config = {
+            .command = sp_str_lit("./build/debug/store/bin/editable_package"),
+          },
+          .rc = 69,
+        },
+      },
+      {
+        .kind = ACTION_CREATE_FILE,
+        .create = {
+          .file = sp_str_lit("packages/spum/spum.h"),
+          .content = sp_str_lit(
+            "int spum() {\n"
+            "  return 42;\n"
+            "}\n"
+          ),
+        },
+      },
+      { .kind = ACTION_REMOVE_DIR, .remove_dir = { .path = "build" } },
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      {
+        .kind = ACTION_SUBPROCESS,
+        .process = {
+          .config = {
+            .command = sp_str_lit("./build/debug/store/bin/editable_package"),
+          },
+          .rc = 42,
+        },
+      },
+      { .kind = ACTION_VERIFY_LOCKED },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
     },
   });
 }
