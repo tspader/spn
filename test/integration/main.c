@@ -21,6 +21,7 @@ typedef struct {
     sp_str_t spn;
     sp_str_t storage;
     sp_str_t config;
+    sp_str_t index;
   } paths;
 } fixture_t;
 
@@ -28,7 +29,32 @@ struct spn_build {
   fixture_t fixture;
 };
 
+static bool tmpfs_top_level_initialized = false;
+
+void init_tmpfs_top_level(void) {
+  if (tmpfs_top_level_initialized) {
+    return;
+  }
+
+  sp_str_t tmp = sp_os_get_env_as_path(sp_str_lit("SPN_TEST_TMP"));
+  if (sp_str_empty(tmp)) {
+    tmp = sp_str_lit(".tmp");
+  }
+
+  sp_tm_epoch_t now = sp_tm_now_epoch();
+  sp_str_t iso = sp_tm_epoch_to_iso8601(now);
+  c8* sanitized = (c8*)sp_alloc(iso.len);
+  sp_for(it, iso.len) {
+    sanitized[it] = iso.data[it] == ':' ? '-' : iso.data[it];
+  }
+
+  tmpfs_set_top_level(sp_fs_join_path(tmp, sp_str(sanitized, iso.len)));
+  tmpfs_top_level_initialized = true;
+}
+
 UTEST_F_SETUP(spn_build) {
+  init_tmpfs_top_level();
+
   uf->fixture.paths.root = sp_fs_get_exe_path();
   sp_for(it, 4) {
     uf->fixture.paths.root = sp_fs_parent_path(uf->fixture.paths.root);
@@ -43,25 +69,192 @@ UTEST_F_TEARDOWN(spn_build) {
   sp_log(uf->fixture.fs.root);
 }
 
-void copy_project_files(s32* utest_result, fixture_t* fixture, const c8* path) {
-  if (!path) {
-    return;
+void fixture_write_file(sp_str_t path, sp_str_t content) {
+  sp_str_t parent = sp_fs_parent_path(path);
+  if (!sp_str_empty(parent)) {
+    sp_fs_create_dir(parent);
   }
 
-  sp_str_t project = sp_fs_join_path(fixture->paths.root, sp_str_view(path));
-  ASSERT_TRUE(sp_fs_exists(project));
+  sp_io_writer_t io = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_OVERWRITE);
+  sp_io_write_str(&io, content);
+  sp_io_writer_close(&io);
+}
 
-  sp_da(sp_os_dir_ent_t) entries = sp_fs_collect_recursive(project);
-  sp_dyn_array_for(entries, it) {
-    sp_os_dir_ent_t* entry = &entries[it];
-    if (sp_fs_is_dir(entry->file_path)) {
+void fixture_manifest_set_package_url(sp_str_t manifest, sp_str_t url, sp_str_t* out) {
+  bool in_package = false;
+  bool has_package = false;
+  bool wrote_url = false;
+
+  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+  sp_da(sp_str_t) lines = sp_str_split_c8(manifest, '\n');
+  sp_da_for(lines, it) {
+    sp_str_t line = lines[it];
+    sp_str_t trimmed = sp_str_trim(line);
+
+    if (sp_str_starts_with(trimmed, sp_str_lit("["))) {
+      if (in_package && !wrote_url) {
+        sp_str_builder_append_fmt(&builder, "url = \"{}\"\n", SP_FMT_STR(url));
+      }
+
+      in_package = sp_str_equal(trimmed, sp_str_lit("[package]"));
+      if (in_package) {
+        has_package = true;
+        wrote_url = false;
+      }
+
+      sp_str_builder_append(&builder, line);
+      sp_str_builder_append_c8(&builder, '\n');
       continue;
     }
 
-    sp_str_t relative = sp_str_strip_left(entry->file_path, project);
-    relative = sp_str_strip_left(relative, sp_str_lit("/"));
-    tmpfs_create(&fixture->fs, relative, sp_io_read_file(entry->file_path));
+    if (in_package && sp_str_starts_with(trimmed, sp_str_lit("url = "))) {
+      sp_str_builder_append_fmt(&builder, "url = \"{}\"\n", SP_FMT_STR(url));
+      wrote_url = true;
+      continue;
+    }
+
+    sp_str_builder_append(&builder, line);
+    sp_str_builder_append_c8(&builder, '\n');
   }
+
+  if (in_package && !wrote_url) {
+    sp_str_builder_append_fmt(&builder, "url = \"{}\"\n", SP_FMT_STR(url));
+  }
+
+  if (!has_package) {
+    *out = manifest;
+    return;
+  }
+
+  *out = sp_str_trim_right(sp_str_builder_to_str(&builder));
+}
+
+void fixture_manifest_get_package_version(sp_str_t manifest, sp_str_t* out) {
+  *out = sp_str_lit("");
+
+  bool in_package = false;
+  sp_da(sp_str_t) lines = sp_str_split_c8(manifest, '\n');
+  sp_da_for(lines, it) {
+    sp_str_t line = sp_str_trim(lines[it]);
+
+    if (sp_str_starts_with(line, sp_str_lit("["))) {
+      in_package = sp_str_equal(line, sp_str_lit("[package]"));
+      continue;
+    }
+
+    if (!in_package || !sp_str_starts_with(line, sp_str_lit("version = \""))) {
+      continue;
+    }
+
+    sp_da(sp_str_t) parts = sp_str_split_c8(line, '"');
+    if (sp_da_size(parts) >= 2) {
+      *out = parts[1];
+      return;
+    }
+  }
+}
+
+void copy_project_path(s32* utest_result, fixture_t* fixture, sp_str_t project, sp_str_t relative) {
+  sp_str_t from = sp_fs_join_path(project, relative);
+  if (sp_fs_is_glob(from)) {
+    EXPECT_TRUE(sp_fs_exists(sp_fs_parent_path(from)));
+  }
+  else {
+    EXPECT_TRUE(sp_fs_exists(from));
+  }
+
+  sp_str_t to = fixture->fs.root;
+  sp_str_t relative_parent = sp_fs_parent_path(relative);
+  if (!sp_str_empty(relative_parent)) {
+    to = tmpfs_get(&fixture->fs, relative_parent);
+    sp_fs_create_dir(to);
+  }
+
+  sp_fs_copy(from, to);
+}
+
+void setup_fixture_index_from_remote(s32* utest_result, fixture_t* fixture, sp_str_t project) {
+  sp_str_t remote = sp_fs_join_path(project, sp_str_lit("remote"));
+  if (!sp_fs_exists(remote)) {
+    return;
+  }
+
+  EXPECT_TRUE(sp_fs_is_dir(remote));
+
+  sp_da(sp_os_dir_ent_t) entries = sp_fs_collect(remote);
+  sp_da_for(entries, it) {
+    sp_os_dir_ent_t* entry = &entries[it];
+    if (!sp_fs_is_dir(entry->file_path)) {
+      continue;
+    }
+
+    sp_str_t repo = tmpfs_get(&fixture->fs, sp_fs_join_path(sp_str_lit("remote"), entry->file_name));
+    git_repo_create_from_dir(entry->file_path, repo);
+
+    sp_str_t source_manifest = sp_fs_join_path(entry->file_path, sp_str_lit("spn.toml"));
+    EXPECT_TRUE(sp_fs_exists(source_manifest));
+
+    sp_str_t index_pkg = sp_fs_join_path(fixture->paths.index, entry->file_name);
+    sp_fs_create_dir(index_pkg);
+
+    sp_str_t manifest = sp_io_read_file(source_manifest);
+    sp_str_t manifest_with_url = SP_ZERO_STRUCT(sp_str_t);
+    fixture_manifest_set_package_url(manifest, repo, &manifest_with_url);
+
+    sp_str_t version = SP_ZERO_STRUCT(sp_str_t);
+    fixture_manifest_get_package_version(manifest_with_url, &version);
+    EXPECT_FALSE(sp_str_empty(version));
+
+    fixture_write_file(sp_fs_join_path(index_pkg, sp_str_lit("spn.toml")), manifest_with_url);
+
+    sp_str_t source_script = sp_fs_join_path(entry->file_path, sp_str_lit("spn.c"));
+    if (sp_fs_exists(source_script)) {
+      sp_fs_copy(source_script, index_pkg);
+    }
+
+    fixture_write_file(
+      sp_fs_join_path(index_pkg, sp_str_lit("metadata.toml")),
+      sp_format(
+        "[[versions]]\n"
+        "version = \"{}\"\n"
+        "commit = \"HEAD\"\n",
+        SP_FMT_STR(version)
+      )
+    );
+  }
+}
+
+void copy_project_files(s32* utest_result, fixture_t* fixture, test_t test) {
+  if (!test.project) {
+    return;
+  }
+
+  sp_str_t project = sp_fs_join_path(fixture->paths.root, sp_str_view(test.project));
+  ASSERT_TRUE(sp_fs_exists(project));
+
+  const c8* auto_copy [] = {
+    "main.c",
+    "spn.c",
+    "spn.toml",
+  };
+
+  sp_carr_for(auto_copy, it) {
+    sp_str_t from = sp_fs_join_path(project, sp_str_view(auto_copy[it]));
+    if (sp_fs_exists(from)) {
+      sp_fs_copy(from, fixture->fs.root);
+    }
+  }
+
+  sp_carr_for(test.copy, it) {
+    const c8* path = test.copy[it];
+    if (!path) {
+      break;
+    }
+
+    copy_project_path(utest_result, fixture, project, sp_str_view(path));
+  }
+
+  setup_fixture_index_from_remote(utest_result, fixture, project);
 }
 
 void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
@@ -69,15 +262,15 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
   sp_fs_create_dir(fixture->paths.storage);
   sp_str_t repo = sp_fs_join_path(fixture->paths.storage, sp_str_lit("spn"));
   sp_str_t include = sp_fs_join_path(repo, sp_str_lit("include"));
-  sp_str_t index = sp_fs_join_path(repo, sp_str_lit("packages"));
+  fixture->paths.index = sp_fs_join_path(repo, sp_str_lit("packages"));
   sp_fs_create_dir(include);
-  sp_fs_create_dir(index);
+  sp_fs_create_dir(fixture->paths.index);
   sp_fs_copy(sp_fs_join_path(fixture->paths.root, sp_str_lit("include/spn.h")), include);
 
 
   fixture->paths.config = tmpfs_get(&fixture->fs, sp_str_lit(".home/config"));
   sp_fs_create_dir(fixture->paths.config);
-  copy_project_files(utest_result, fixture, test.project);
+  copy_project_files(utest_result, fixture, test);
 
   sp_for(it, SPN_TEST_MAX_ACTIONS) {
     action_t action = test.actions[it];
@@ -228,11 +421,11 @@ UTEST_F(spn_build, index_package) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "sp" } },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
       { .kind = ACTION_REMOVE_DIR, .rm = { .dir = "build" } },
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "sp" } },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
     },
   });
 }
@@ -253,6 +446,7 @@ UTEST_F(spn_build, file_package) {
 
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/fixtures/spn_build/file_package",
+    .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--force" } } },
       { .kind = ACTION_VERIFY_LOCKED },
@@ -266,6 +460,7 @@ UTEST_F(spn_build, editable_package) {
 
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/fixtures/spn_build/editable_package",
+    .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       {
@@ -308,8 +503,7 @@ UTEST_F(spn_build, top_level_system_deps) {
     .project = "test/fixtures/spn_build/top_level_system_deps",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "sp" } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("spn.lock") },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--force" } } },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },

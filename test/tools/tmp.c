@@ -1,6 +1,8 @@
 #include "test.h"
 
-void tmpfs_init_named(tmpfs_t* fs, const c8* test) {
+static sp_str_t tmpfs_top_level = SP_ZERO_INITIALIZE();
+
+sp_str_t tmpfs_default_top_level() {
   sp_str_t tmp = sp_os_get_env_as_path(sp_str_lit("SPN_TEST_TMP"));
   if (sp_str_empty(tmp)) {
     tmp = sp_str_lit(".tmp");
@@ -23,19 +25,34 @@ void tmpfs_init_named(tmpfs_t* fs, const c8* test) {
   sp_for(it, iso.len) {
     sanitized[it] = iso.data[it] == ':' ? '-' : iso.data[it];
   }
-  sp_str_t iso_sanitized = sp_str(sanitized, iso.len);
+
+  return sp_fs_join_path(tmp, sp_str(sanitized, iso.len));
+}
+
+void tmpfs_set_top_level(sp_str_t root) {
+  sp_str_t parent = sp_fs_parent_path(root);
+  if (!sp_str_empty(parent) && !sp_fs_exists(parent)) {
+    sp_fs_create_dir(parent);
+  }
+
+  if (!sp_fs_exists(root)) {
+    sp_fs_create_dir(root);
+  }
+
+  tmpfs_top_level = sp_fs_canonicalize_path(root);
+}
+
+void tmpfs_init_named(tmpfs_t* fs, const c8* test) {
+  if (sp_str_empty(tmpfs_top_level)) {
+    tmpfs_set_top_level(tmpfs_default_top_level());
+  }
 
   sp_str_t test_name = sp_str_view(test);
   if (sp_str_empty(test_name)) {
     test_name = sp_str_lit("tmpfs");
   }
 
-  sp_str_t root = sp_format(
-    "{}/{}-{}",
-    SP_FMT_STR(tmp),
-    SP_FMT_STR(iso_sanitized),
-    SP_FMT_STR(test_name)
-  );
+  sp_str_t root = sp_fs_join_path(tmpfs_top_level, test_name);
 
   SP_ASSERT(!sp_fs_exists(root));
   sp_fs_create_dir(root);
