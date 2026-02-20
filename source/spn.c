@@ -597,9 +597,9 @@ typedef enum {
 
 #define SPN_PACKAGE_KIND(X) \
   X(SPN_PACKAGE_KIND_NONE, "none") \
+  X(SPN_PACKAGE_KIND_ROOT, "root") \
   X(SPN_PACKAGE_KIND_WORKSPACE, "workspace") \
   X(SPN_PACKAGE_KIND_FILE, "file") \
-  X(SPN_PACKAGE_KIND_REMOTE, "remote") \
   X(SPN_PACKAGE_KIND_INDEX, "index")
 
 typedef enum {
@@ -621,7 +621,6 @@ sp_os_lib_kind_t  spn_pkg_linkage_to_sp_os_lib_kind(spn_linkage_t kind);
 spn_target_kind_t spn_pkg_linkage_to_target_kind(spn_linkage_t kind);
 spn_linkage_t spn_target_kind_to_pkg_linkage(spn_target_kind_t kind);
 sp_str_t          spn_pkg_linkage_to_str(spn_linkage_t kind);
-spn_pkg_kind_t    spn_pkg_kind_from_str(sp_str_t str);
 spn_gen_kind_t    spn_gen_kind_from_str(sp_str_t str);
 spn_gen_entry_t   spn_gen_entry_from_str(sp_str_t str);
 spn_cc_kind_t     spn_cc_kind_from_str(sp_str_t str);
@@ -3014,15 +3013,6 @@ spn_c_standard_t spn_c_standard_from_str(sp_str_t str) {
 
   SP_FATAL("Unknown C standard {:fg brightyellow}; options are [c89, c99, c11]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_C99);
-}
-
-spn_pkg_kind_t spn_pkg_kind_from_str(sp_str_t str) {
-  if      (sp_str_equal_cstr(str, "workspace")) return SPN_PACKAGE_KIND_WORKSPACE;
-  else if (sp_str_equal_cstr(str, "user"))      return SPN_PACKAGE_KIND_FILE;
-  else if (sp_str_equal_cstr(str, "remote"))    return SPN_PACKAGE_KIND_REMOTE;
-
-  SP_FATAL("Unknown registry kind {:fg brightyellow}; options are [workspace, user, remote]", SP_FMT_STR(str));
-  SP_UNREACHABLE_RETURN(SPN_PACKAGE_KIND_NONE);
 }
 
 spn_gen_kind_t spn_gen_kind_from_str(sp_str_t str) {
@@ -5475,13 +5465,13 @@ spn_pkg_req_t spn_pkg_req_from_str(sp_str_t str) {
 
 sp_str_t spn_pkg_req_to_str(spn_pkg_req_t dep) {
   switch (dep.kind) {
-    case SPN_PACKAGE_KIND_REMOTE:
     case SPN_PACKAGE_KIND_FILE: {
       return dep.file;
     }
     case SPN_PACKAGE_KIND_INDEX: {
       return spn_semver_range_to_str(dep.range);
     }
+    case SPN_PACKAGE_KIND_ROOT:
     case SPN_PACKAGE_KIND_WORKSPACE: {
       SP_BROKEN();
       break;
@@ -5664,7 +5654,7 @@ spn_err_t spn_app_add_pkg_constraints(spn_app_t* app, spn_pkg_t* pkg) {
 
         break;
       }
-      case SPN_PACKAGE_KIND_REMOTE:
+      case SPN_PACKAGE_KIND_ROOT:
       case SPN_PACKAGE_KIND_WORKSPACE: {
         SP_BROKEN();
         break;
@@ -5702,6 +5692,12 @@ void spn_app_resolve_from_lock_file(spn_app_t* app) {
         .high = { .version = entry->version, .op = SPN_SEMVER_OP_EQ },
         .mod = SPN_SEMVER_MOD_CMP
       };
+    }
+    else if (request.kind == SPN_PACKAGE_KIND_FILE) {
+      spn_pkg_req_t* dep = sp_ht_getp(app->package.deps, request.name);
+      SP_ASSERT(dep);
+      SP_ASSERT(dep->kind == SPN_PACKAGE_KIND_FILE);
+      request.file = dep->file;
     }
 
     spn_pkg_t* pkg = spn_app_ensure_package(app, request);
@@ -5804,7 +5800,7 @@ void spn_pkg_unit_init(spn_pkg_unit_t* ctx, spn_pkg_unit_config_t config) {
   ctx->paths.stamp.exit = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("user.stamp"));
   ctx->paths.stamp.configure = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("configure.stamp"));
   ctx->paths.stamp.build = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("build.stamp"));
-  ctx->paths.stamp.package = sp_fs_join_path(ctx->ctx.paths.store, SP_LIT("package.stamp"));
+  ctx->paths.stamp.package = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("package.stamp"));
 
   sp_fs_create_dir(ctx->paths.stamp.dir);
 }
@@ -6527,6 +6523,22 @@ void spn_pkg_unit_add_target(spn_pkg_unit_t* pkg, spn_target_t* target) {
 
 void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit, spn_pkg_t* pkg, spn_pkg_kind_t kind, spn_semver_t version) {
   switch (kind) {
+    case SPN_PACKAGE_KIND_ROOT:
+    case SPN_PACKAGE_KIND_FILE: {
+      spn_pkg_unit_init(unit, (spn_pkg_unit_config_t)  {
+        .ctx = {
+          .name = pkg->name,
+          .package = pkg,
+          .session = session,
+          .paths = {
+            .store = sp_fs_join_path(session->paths.profile, sp_str_lit("store")),
+            .work = sp_fs_join_path(session->paths.profile, sp_format("work/{}", SP_FMT_STR(pkg->name))),
+            .source = sp_str_copy(pkg->paths.root),
+          }
+        }
+      });
+      break;
+    }
     case SPN_PACKAGE_KIND_INDEX: {
       sp_opt(spn_linkage_t) linkage = SP_ZERO_INITIALIZE();
 
@@ -6583,29 +6595,14 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
       });
       break;
     }
-    case SPN_PACKAGE_KIND_FILE: {
-      spn_pkg_unit_init(unit, (spn_pkg_unit_config_t)  {
-        .ctx = {
-          .name = pkg->name,
-          .package = pkg,
-          .session = session,
-          .paths = {
-            .store = sp_fs_join_path(session->paths.profile, sp_str_lit("store")),
-            .work = sp_fs_join_path(session->paths.profile, sp_str_lit("work")),
-            .source = sp_str_copy(session->paths.root),
-          }
-        }
-      });
-      break;
-    }
     case SPN_PACKAGE_KIND_WORKSPACE:
-    case SPN_PACKAGE_KIND_REMOTE:
     case SPN_PACKAGE_KIND_NONE: {
       SP_UNREACHABLE_CASE();
     }
   }
 
   switch (kind) {
+    case SPN_PACKAGE_KIND_ROOT:
     case SPN_PACKAGE_KIND_FILE:
     case SPN_PACKAGE_KIND_INDEX: {
       sp_om_for(pkg->exes, it) {
@@ -6625,13 +6622,13 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
       break;
     }
     case SPN_PACKAGE_KIND_WORKSPACE:
-    case SPN_PACKAGE_KIND_REMOTE:
     case SPN_PACKAGE_KIND_NONE: {
       sp_unreachable_case();
     }
   }
 
   switch (kind) {
+    case SPN_PACKAGE_KIND_ROOT:
     case SPN_PACKAGE_KIND_FILE: {
       sp_om_for(pkg->tests, it) {
         spn_target_t* target = sp_om_at(pkg->tests, it);
@@ -6646,7 +6643,6 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
       break;
     }
     case SPN_PACKAGE_KIND_WORKSPACE:
-    case SPN_PACKAGE_KIND_REMOTE:
     case SPN_PACKAGE_KIND_NONE: {
       sp_unreachable_case();
     }
@@ -6928,12 +6924,10 @@ sp_str_t spn_registry_get_path(spn_registry_t* registry) {
     case SPN_PACKAGE_KIND_INDEX: {
       return sp_str_copy(registry->location);
     }
+    case SPN_PACKAGE_KIND_ROOT:
     case SPN_PACKAGE_KIND_FILE:
-    case SPN_PACKAGE_KIND_REMOTE: {
-      SP_UNREACHABLE();
-    }
     case SPN_PACKAGE_KIND_NONE: {
-      SP_UNREACHABLE_RETURN(sp_str_lit(""));
+      SP_UNREACHABLE();
     }
   }
 
@@ -6980,7 +6974,7 @@ spn_pkg_t* spn_app_ensure_package(spn_app_t* app, spn_pkg_req_t request) {
 
         break;
       }
-      case SPN_PACKAGE_KIND_REMOTE:
+      case SPN_PACKAGE_KIND_ROOT:
       case SPN_PACKAGE_KIND_WORKSPACE: {
         SP_FATAL("unimplemented find_package");
         break;
@@ -7294,7 +7288,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
         toml_table_t* it = toml_array_table(registries, n);
         spn_registry_t registry = {
           .location = spn_toml_str(it, "location"),
-          .kind = SPN_PACKAGE_KIND_FILE
+          .kind = SPN_PACKAGE_KIND_INDEX
         };
 
         sp_dyn_array_push(spn.config.registries, registry);
@@ -7640,7 +7634,7 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_session_init(session, &app->package, app->config.profile, sp_str_lit("build"));
   spn_session_set_filter(session, app->config.filter);
 
-  spn_init_pkg_unit_for_session(session, &session->units.root, &app->package, SPN_PACKAGE_KIND_FILE, app->package.version);
+  spn_init_pkg_unit_for_session(session, &session->units.root, &app->package, SPN_PACKAGE_KIND_ROOT, app->package.version);
 
   spn_app_resolve(app);
 
@@ -7666,6 +7660,11 @@ void spn_task_sync_init(spn_app_t* app) {
 
   sp_om_for(b->units.packages, it) {
     spn_pkg_unit_t* dep = sp_om_at(b->units.packages, it);
+
+    if (dep->ctx.pkg->kind != SPN_PACKAGE_KIND_INDEX) {
+      continue;
+    }
+
     spn_bg_id_t sync = spn_bg_add_fn(graph, spn_executor_sync_repo, dep);
     spn_bg_cmd_set_metadata(graph, sync, sp_format("sync ({})", SP_FMT_STR(dep->ctx.name)), sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
   }
@@ -7683,6 +7682,10 @@ void spn_task_sync_init(spn_app_t* app) {
 
 spn_task_result_t spn_task_sync_update(spn_app_t* app) {
   spn_bg_ctx_t* sync = &app->session.sync;
+
+  if (!sync->executor) {
+    return SPN_TASK_DONE;
+  }
 
   if (sp_atomic_s32_get(&sync->executor->shutdown)) {
     spn_bg_executor_join(sync->executor);

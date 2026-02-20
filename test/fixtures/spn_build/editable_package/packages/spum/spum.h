@@ -1,3 +1,1 @@
-int spum() {
-  return 69;
-}
+#define SPUM 1

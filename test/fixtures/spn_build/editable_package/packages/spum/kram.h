@@ -1,3 +1,1 @@
-int spum() {
-  return 42;
-}
+#define KRAM 1

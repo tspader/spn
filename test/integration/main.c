@@ -225,7 +225,7 @@ UTEST_F(spn_build, file_package) {
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/fixtures/spn_build/file_package",
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--force" } } },
       { .kind = ACTION_VERIFY_LOCKED },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
     },
