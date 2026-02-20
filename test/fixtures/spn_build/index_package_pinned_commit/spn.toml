@@ -1,0 +1,10 @@
+[package]
+name = "index_package_pinned_commit"
+version = "0.1.0"
+
+[deps.package]
+spum = "=1.0.0"
+
+[[bin]]
+name = "index_package_pinned_commit"
+source = ["main.c"]

@@ -1,0 +1,10 @@
+[package]
+name = "build_deps"
+version = "0.0.1"
+
+[deps.build]
+spum = "1.0.0"
+
+[[bin]]
+name = "build_deps"
+source = ["main.c"]

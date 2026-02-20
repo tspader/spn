@@ -1,5 +1,8 @@
 .PHONY: all clean install uninstall clone
 
+CC ?= gcc
+CFLAGS ?= -g -std=c99
+
 all: bootstrap/bin/spn
 
 ###########
@@ -38,19 +41,70 @@ bootstrap/include/libtcc.h: bootstrap/lib/libtcc.a
 ##############
 ## BINARIES ##
 ##############
+SPN_SOURCES := \
+	source/spn.c \
+	source/api.c \
+	source/app.c \
+	source/event.c \
+	source/unit.c \
+	source/signal.c \
+	source/graph.c \
+	source/tui.c \
+	source/ctx.c \
+	source/session.c \
+	source/intern.c \
+	source/log.c \
+	source/option.c \
+	source/index.c \
+	source/pkg.c \
+	source/lock.c \
+	source/profile.c \
+	source/cli.c \
+	source/gen.c \
+	source/target.c \
+	source/filter.c \
+	source/resolve.c \
+	source/semver.c \
+	source/spinner.c \
+	source/terminal.c \
+	source/external/autoconf.c \
+	source/external/cc.c \
+	source/external/cmake.c \
+	source/external/git.c \
+	source/external/make.c \
+	source/external/tcc.c \
+	source/external/tom.c \
+	source/sp/cli.c \
+	source/sp/it.c \
+	source/sp/tm.c \
+	source/sp/str.c \
+	source/sp/color.c \
+	source/sp/os.c \
+	source/sp/ps.c \
+	source/sp/io.c \
+	source/task/build.c \
+	source/task/configure.c \
+	source/task/graph.c \
+	source/task/generate.c \
+	source/task/resolve.c \
+	source/task/sync.c \
+	source/task/task.c \
+	source/task/test.c \
+	source/task/which.c
+
 bootstrap/lib/libtcc.a: bootstrap/external/tinycc
 	@if [ ! -f bootstrap/lib/libtcc.a ]; then cd bootstrap/external/tinycc && ./configure --enable-static --prefix=$(PWD)/bootstrap && $(MAKE) && $(MAKE) install; fi
 
 bootstrap/bin/embed: tools/embed.c bootstrap/include/sp.h
 	@mkdir -p bootstrap/bin
-	gcc -g -o $@ tools/embed.c -Ibootstrap/include -lm
+	$(CC) $(CFLAGS) -o $@ tools/embed.c -Ibootstrap/include -lm
 
 bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h: bootstrap/bin/embed bootstrap/lib/libtcc.a
 	./bootstrap/bin/embed bootstrap/lib/tcc bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h
 
-bootstrap/bin/spn: source/spn.c bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h
+bootstrap/bin/spn: $(SPN_SOURCES) bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h
 	@mkdir -p bootstrap/bin
-	gcc -g -o $@ source/spn.c -Iinclude -Ibootstrap/include -lm bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o
+	$(CC) $(CFLAGS) -o $@ $(SPN_SOURCES) -Isource -Iinclude -Ibootstrap/include -lm bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o
 
 
 #############

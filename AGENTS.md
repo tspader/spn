@@ -9,20 +9,11 @@
 - we use a tiny game loop library from `sp.h`, so `sp_main` is the entry point
 
 # building
-- `spn` is self-hosting
-  - `pspn` is a stable build i have copied on the $PATH; use it to build `spn`
-  - `tspn` is a link on the $PATH to the debug binary; use it when testing what you built
-- always build with `--profile debug` unless explicitly testing another profile
-- `build/debug` is the top level build output dir
-  - `build/debug/work` is for intermediate outputs and logs
-  - `build/debug/store` is for final outputs and binaries
-- example workflow:
-  1. make code changes
-  2. `pspn build --profile debug` to build with known-good copy
-  3. run `tspn` to test your new build; e.g.
-    - `tspn build -p debug -f` to use the new binary to test by force building spn itself
-    - `tspn -C test/manual/api/basic_node graph` to use the new binary against a test project
-
+- `make` to build `bootstrap/bin/spn`
+- `./bootstrap/bin/spn build --target $test --profile debug --force`
+    - e.g. `./bootstrap/bin/spn build -t integration -p debug -f`
+- `./build/debug/store/bin/$test`
+    - e.g. `./build/debug/store/bin/integration`
 
 # references
 - `source/`
@@ -49,20 +40,24 @@
 ```xml
 <example>
 user: Write a function that reads a file and logs its contents
-assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn.c for existing contextual examples]
+assistant: Invokes sp skill
+assistant: Reads reference at the beginning of sp.h
+assistant: Finds needed code, searches through our code for existing in-context examples
 </example>
 ```
 
 ## Rules
 - always use the `sp.h` skill when writing against sp.h APIs (either with your `Skill` tool or with `./doc/skill/sp.md`)
-- never use the C standard library. always use `sp.h`
-- always prefer to initialize structs with designated initializers when possible
-  - you MUST use SP_ZERO_INITIALIZE() if you don't use a designated initializer
-  - sp_alloc() and SP_ALLOC() return zero allocated memory; do not re-zero
+- always use SP_ZERO_INITIALIZE() instead of leaving variables uninitialized
 - always use braces for one liner scopes (e.g. `for`, `if`)
-- allocations are never done through the generic global allocator; prefer to allocate from:
+- always use `foo()` instead of `foo(void)` for no-argument functions
+- prefer designated initializers to memberwise assignment
+- prefer to use a specific allocator instead of the general purpose global allocator:
   - a memory arena (several in the codebase)
   - string interner (on global spn_ctx_t)
   - scratch arena, if transient (see: sp.h docs)
 - always use `sp_for(it, 5)` instead of `for (u32 it = 0; it < 5; it++)`
 - always use `it` as your iterator variable (not e.g. `i`)
+- prefer `const c8*` for structs or functions that are mostly used with literals, even if you convert to sp_str_t immediately when using
+- never re-zero memory returned by sp_alloc()
+- never use the C standard library. always use `sp.h`

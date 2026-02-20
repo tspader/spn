@@ -1,18 +1,6 @@
 # overview
 - sp.h is a single-header C standard library replacement
-
-# files
-- `sp.h` is all of the source code
-- `spn.toml` is the build manifest for our build tool, `spn`
-- `test/`: tests for each module as a single C file
-  - `test/bench`: benchmarks
-  - `test/tools/test.h`: common unit test tools
-  - `test/tools/*`: code for modules which test external processes
-- `tools/`: random, unstructured bullshit which is not part of the official build
-
-# commands
-- `spn test` builds and runs all unit tests
-- `spn test --target target` builds and runs the specific test target (as defined in spn.toml)
+- the first ~100 lines is a reference guide with searchable tags for each module
 
 # rules
 - Never comment any code, under any circumstances. Code with comments will be rejected outright.
@@ -88,22 +76,27 @@ u32 capacity = sp_da_capacity(numbers);
 
 ### Hash Tables (stb-style)
 ```c
-sp_ht(s32, s32) hta = SP_NULLPTR;
-sp_ht(sp_str_t, s32) htb = SP_NULLPTR;
-sp_ht_set_fns(hta, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+struct {
+  sp_ht(s32, s32) scalar;
+  sp_str_ht(s32) str;
+  sp_cstr_ht(s32) cstr;
+} ht = SP_ZERO_INITIALIZE();
 
-sp_ht_insert(htb, SP_LIT("answer"), 42);
+// no initialization needed
+sp_ht_insert(ht.scalar, 69, 420);
+bool exists = sp_ht_key_exists(ht.scalar, 69);
+s32* value = sp_ht_getp(ht.scalar, 69);
 
-s32* value_ptr = sp_ht_getp(htb, SP_LIT("answer"));
+// use sp_str_ht_insert(), not sp_ht_insert(); everything else is the same
+sp_str_ht_insert(ht.str, sp_str_lit("answer"), 42);
+sp_cstr_ht_insert(ht.str, "answer", 42);
 
-sp_ht_key_exists(htb, SP_LIT("answer"));
-
-sp_ht_for(htb, it) {
-  sp_str_t* key = sp_ht_it_getkp(map, it);
-  s32* val = sp_ht_it_getp(map, it);
+sp_ht_for(ht.str, it) {
+  sp_str_t key = *sp_ht_it_getkp(map, it);
+  s32 value = *sp_ht_it_getp(map, it);
 }
 
-// Cleanup happens automatically via allocator
+sp_ht_free(ht.scalar)
 ```
 
 ### Formatting and Logging
