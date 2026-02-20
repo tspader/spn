@@ -6155,9 +6155,18 @@ void setup_target_for_compile_or_link(spn_cc_t* cc, spn_cc_target_t* cc_target, 
     spn_cc_target_add_define(cc_target, target->define[i]);
   }
 
+  sp_da_for(pkg->system_deps, i) {
+    spn_cc_target_add_lib(cc_target, spn_gen_format_entry(pkg->system_deps[i], SPN_GEN_SYSTEM_LIBS, cc->compiler.kind));
+  }
+
   sp_ht_for_kv(pkg->deps, i) {
     if (spn_is_visibility_linked(target->visibility, i.val->visibility)) {
-      spn_cc_target_add_dep(cc_target, spn_session_find_pkg(session, *i.key));
+      spn_pkg_unit_t* dep = spn_session_find_pkg(session, *i.key);
+      spn_cc_target_add_dep(cc_target, dep);
+
+      sp_da_for(dep->ctx.pkg->system_deps, n) {
+        spn_cc_target_add_lib(cc_target, spn_gen_format_entry(dep->ctx.pkg->system_deps[n], SPN_GEN_SYSTEM_LIBS, cc->compiler.kind));
+      }
     }
   }
 }
