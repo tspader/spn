@@ -300,3 +300,16 @@ UTEST_F(spn_build, top_level_system_deps) {
     },
   });
 }
+
+UTEST_F(spn_build, add_bin) {
+  tmpfs_init_named(&uf->fixture.fs, "add_bin");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/add_bin",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/bin/foo") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "foo" },
+    },
+  });
+}
