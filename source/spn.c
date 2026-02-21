@@ -48,8 +48,32 @@
 #define SP_OM_IMPLEMENTATION
 #include "ordered_map.h"
 
+#define SPN_SPINNER_IMPLEMENTATION
+#include "spinner.h"
+
+#include "sp/macro.h"
+
+#include "sp/ht.h"
+
+#define SP_COLOR_IMPLEMENTATION
+#include "sp/color.h"
+
+#include "sp/str.h"
+
+#define SP_OS_IMPLEMENTATION
+#include "sp/os.h"
+
+#define SP_PS_IMPLEMENTATION
+#include "sp/ps.h"
+
+#define SP_IO_IMPLEMENTATION
+#include "sp/io.h"
+
+#define SPN_PTY_IMPLEMENTATION
+#include "pty.h"
+
 #define SPN_TOML_IMPLEMENTATION
-#include "spn_toml.h"
+#include "stoml.h"
 
 #define SPN_VERSION "1.0.0"
 #define SPN_COMMIT "00c0fa98"
@@ -59,282 +83,6 @@
 //typedef struct spn_pkg_unit_t spn_pkg_unit_t;
 typedef struct spn_target_unit spn_target_unit_t;
 typedef struct spn_session_t spn_session_t;
-
-////////
-// SP //
-////////
-#define SP_FMT_QSTR(STR) SP_FMT_QUOTED_STR(STR)
-#define SP_FMT_QCSTR(CSTR) SP_FMT_QUOTED_STR(sp_str_view(CSTR))
-#define SP_ALLOC(T) (T*)sp_alloc(sizeof(T))
-#define _SP_MSTR(x) #x
-#define SP_MSTR(x) _SP_MSTR(x)
-#define _SP_MCAT(x, y) x##y
-#define SP_MCAT(x, y) _SP_MCAT(x, y)
-#define SP_ZERO() SP_ZERO_INITIALIZE()
-
-#define sp_try_goto(expr, label) do { s32 _sp_result = (expr); if (_sp_result) { goto label; }; } while (0)
-
-
-#define sp_ht_collect_keys(ht, da) \
-  do { \
-    sp_ht_for_kv((ht), __it) { \
-      sp_dyn_array_push((da), *__it.key); \
-    } \
-  } while(0)
-
-#define sp_ht_get_key_index_mt(__HT, __PTR) sp_ht_get_key_index_fn((void**)&((__HT)->data), (void*)&((__PTR)), (__HT)->info)
-
-#define sp_ht_get_mt(__HT, __PTR, __INDEX)\
-    (\
-        (__HT) == SP_NULLPTR ? SP_NULLPTR :\
-        ((__INDEX) = sp_ht_get_key_index_mt(__HT, __PTR), \
-        ((__INDEX) != SP_HT_INVALID_INDEX ? &(__HT)->data[(__INDEX)].val : NULL)) \
-    )
-
-sp_str_t sp_color_to_tui_rgb(sp_color_t color);
-sp_str_t sp_color_to_tui_rgb_f(u8 r, u8 g, u8 b);
-
-sp_str_t sp_str_pad_ex(sp_str_t str, u32 n, c8 c) {
-  if (str.len >= n) return sp_str_copy(str);
-
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-
-  sp_str_builder_append(&builder, str);
-  for (u32 it = str.len; it < n; it++) {
-    sp_str_builder_append_c8(&builder, c);
-  }
-
-  return sp_str_builder_to_str(&builder);
-}
-
-sp_str_t sp_str_repeat(c8 c, u32 len) {
-  if (!len) return SP_ZERO_STRUCT(sp_str_t);
-
-  c8* buffer = (c8*)sp_alloc(len);
-  sp_mem_fill(buffer, len, &c, sizeof(c8));
-  return sp_str(buffer, len);
-}
-
-void strip_ansi(char* buf, ssize_t* len) {
-    char* out = buf;
-    char* in = buf;
-    char* end = buf + *len;
-
-    while (in < end) {
-        if (*in == '\033' && in + 1 < end && *(in + 1) == '[') {
-            // Skip ESC[...m sequences
-            in += 2;
-            while (in < end && !(*in >= 'A' && *in <= 'z')) in++;
-            if (in < end) in++;  // skip the final letter
-        } else {
-            *out++ = *in++;
-        }
-    }
-    *len = out - buf;
-}
-
-#ifdef SP_LINUX
-// pty-wrap: run a command with stdout/stderr connected to a pty
-// This forces line-buffering so output is flushed before crashes
-s32 spn_pty_wrap(s32 num_args, const c8** args) {
-  if (num_args < 3) {
-    fprintf(stderr, "usage: spn --pty-wrap <command> [args...]\n");
-    return 1;
-  }
-
-  int master;
-  pid_t pid = forkpty(&master, NULL, NULL, NULL);
-
-  if (pid < 0) {
-    perror("forkpty");
-    return 1;
-  }
-
-  if (pid == 0) {
-    // Child: stdout/stderr are now the slave side of the pty
-    // libc will line-buffer because isatty(1) == true
-    execvp(args[2], (char* const*)&args[2]);
-    _exit(127);
-  }
-
-  // Parent: copy master -> stdout
-  char buf[4096];
-  ssize_t n;
-  while ((n = read(master, buf, sizeof(buf))) > 0) {
-    strip_ansi(buf, &n);
-    write(STDOUT_FILENO, buf, n);
-  }
-
-  int status;
-  waitpid(pid, &status, 0);
-  close(master);
-
-  if (WIFEXITED(status)) {
-    return WEXITSTATUS(status);
-  }
-  if (WIFSIGNALED(status)) {
-    return 128 + WTERMSIG(status);
-  }
-  return 1;
-}
-#endif
-
-
-/////////////
-// SPINNER //
-/////////////
-#define SPN_SPINNER_TRAIL_LEN  6
-#define SPN_SPINNER_CYCLE_MS   500.0f
-#define SPN_SPINNER_HOLD_START_MS 500.0f
-#define SPN_SPINNER_HOLD_END_MS   100.0f
-
-#define SPN_SPINNER_ACTIVE   "\u25A0"
-#define SPN_SPINNER_INACTIVE "\u2B1D"
-
-typedef struct spn_spinner_t {
-  sp_interp_t interp;
-  bool        forward;
-  bool        render_forward;  // direction for trail rendering
-  f32         hold_ms;
-  f32         hold_total_ms;   // total hold time for fade calculation
-  f32         value;
-  u32         width;
-  sp_color_t  color;
-} spn_spinner_t;
-
-void spn_spinner_init(spn_spinner_t* s, sp_color_t color) {
-  s->interp = sp_interp_build(0.0f, 1.0f, SPN_SPINNER_CYCLE_MS);
-  s->forward = true;
-  s->render_forward = true;
-  s->hold_ms = 0;
-  s->hold_total_ms = 0;
-  s->value = 0;
-  s->width = 8;
-  s->color = color;
-}
-
-void spn_spinner_update(spn_spinner_t* s, f32 dt_ms) {
-  if (s->hold_ms > 0) {
-    s->hold_ms -= dt_ms;
-    // Once hold expires, flip render direction
-    if (s->hold_ms <= 0) {
-      s->render_forward = s->forward;
-    }
-    return;
-  }
-
-  if (sp_interp_update(&s->interp, dt_ms)) {
-    s->forward = !s->forward;
-    s->hold_total_ms = s->forward ? SPN_SPINNER_HOLD_START_MS : SPN_SPINNER_HOLD_END_MS;
-    s->hold_ms = s->hold_total_ms;
-    s->interp = sp_interp_build(s->forward ? 0.0f : 1.0f,
-                                 s->forward ? 1.0f : 0.0f,
-                                 SPN_SPINNER_CYCLE_MS);
-    // render_forward stays the same until hold expires
-  }
-  s->value = sp_interp_ease_inout(&s->interp);
-}
-
-sp_str_t spn_spinner_render(spn_spinner_t* s) {
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  f32 active_pos = s->value * (s->width - 1);
-
-  // Calculate trail fade during hold period
-  f32 trail_fade = 1.0f;
-  if (s->hold_ms > 0 && s->hold_total_ms > 0) {
-    // Fade trail out over the hold period
-    trail_fade = s->hold_ms / s->hold_total_ms;
-  }
-
-  for (u32 i = 0; i < s->width; i++) {
-    f32 pos = (f32)i;
-    f32 abs_dist = active_pos - pos;
-    if (abs_dist < 0) abs_dist = -abs_dist;
-
-    // Use render_forward for trail direction (delays flip until hold ends)
-    bool is_behind = s->render_forward ? (pos < active_pos) : (pos > active_pos);
-
-    sp_color_t color = SP_ZERO_INITIALIZE();
-    const c8* glyph;
-
-
-    if (abs_dist < 1.0f) {
-      // Head position
-      color = s->color;
-      glyph = SPN_SPINNER_ACTIVE;
-    }
-    else if (is_behind && abs_dist < (f32)SPN_SPINNER_TRAIL_LEN) {
-      // Trail - fade based on distance AND hold fade
-      f32 alpha = 1.0f;
-      for (s32 j = 0; j < (s32)abs_dist; j++) {
-        alpha *= 0.65f;
-      }
-      alpha *= trail_fade;  // Additional fade during hold
-      // Clamp to inactive brightness minimum
-      f32 inactive = 0.2f;
-      alpha = inactive + alpha * (1.0f - inactive);
-
-      sp_color_t hsv = sp_color_rgb_to_hsv(s->color);
-      hsv.v *= alpha;
-
-      color = sp_color_hsv_to_rgb(hsv);
-      glyph = SPN_SPINNER_ACTIVE;
-    }
-    else {
-      // Inactive
-      sp_color_t hsv = sp_color_rgb_to_hsv(s->color);
-      hsv.v *= 0.2f;
-      color = sp_color_hsv_to_rgb(hsv);
-      glyph = SPN_SPINNER_INACTIVE;
-    }
-
-    sp_str_builder_append_fmt(&builder, "{}{}",
-      SP_FMT_STR(sp_color_to_tui_rgb(color)),
-      SP_FMT_CSTR(glyph)
-    );
-  }
-
-  sp_str_builder_append_cstr(&builder, SP_ANSI_RESET);
-  return sp_str_builder_to_str(&builder);
-}
-
-
-sp_str_t sp_str_map_kernel_colorize(sp_str_map_context_t* context) {
-  sp_str_t id = *(sp_str_t*)context->user_data;
-  sp_str_t ansi = sp_format_color_id_to_ansi_fg(id);
-  return sp_format("{}{}{}", SP_FMT_STR(ansi), SP_FMT_STR(context->str), SP_FMT_CSTR(SP_ANSI_RESET));
-}
-
-sp_str_t sp_os_get_bin_path() {
-  sp_str_t path = sp_os_get_env_var(SP_LIT("HOME"));
-  SP_ASSERT(!sp_str_empty(path));
-
-  return sp_fs_join_path(path, sp_str_lit(".local/bin"));
-}
-
-sp_str_t sp_ps_config_render(sp_ps_config_t ps) {
-  sp_str_builder_t b = SP_ZERO_INITIALIZE();
-  sp_str_builder_append(&b, ps.command);
-
-  sp_carr_for(ps.args, it) {
-    sp_str_t arg = ps.args[it];
-    if (sp_str_empty(arg)) break;
-
-    sp_str_builder_append_c8(&b, ' ');
-    sp_str_builder_append(&b, arg);
-  }
-
-  return sp_str_builder_to_str(&b);
-}
-
-void sp_io_write_new_line(sp_io_writer_t* io) {
-  sp_io_write_str(io, sp_str_lit("\n"));
-}
-
-void sp_io_write_line(sp_io_writer_t* io, sp_str_t line) {
-  sp_io_write_str(io, line);
-  sp_io_write_new_line(io);
-}
 
 /////////
 // GIT //
@@ -3398,14 +3146,6 @@ void spn_tcc_list_fn(void* opaque, const c8* name, const void* value) {
 // TUI //
 /////////
 sp_str_t spn_tui_name_to_color(sp_str_t str);
-
-sp_str_t sp_color_to_tui_rgb(sp_color_t c) {
-  return sp_color_to_tui_rgb_f(c.r * 255, c.g * 255, c.b * 255);
-}
-
-sp_str_t sp_color_to_tui_rgb_f(u8 r, u8 g, u8 b) {
-  return sp_format("\033[38;2;{};{};{}m", SP_FMT_U32(r), SP_FMT_U32(g), SP_FMT_U32(b));
-}
 
 sp_str_t spn_tui_color_name(sp_str_t name) {
   return sp_format("{}{}{}",

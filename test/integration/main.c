@@ -10,7 +10,7 @@
 #include "toml.h"
 
 #define SPN_TOML_IMPLEMENTATION
-#include "spn_toml.h"
+#include "stoml.h"
 
 UTEST_MAIN()
 

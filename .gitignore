@@ -47,3 +47,4 @@ build/bootstrap/bin
 **/node_modules
 test/tools/graph
 /.tmp
+/compile_commands.json.backup

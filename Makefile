@@ -50,7 +50,7 @@ bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h: bootstrap/bin/embed boo
 
 bootstrap/bin/spn: source/spn.c bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h
 	@mkdir -p bootstrap/bin
-	gcc -g -o $@ source/spn.c -Iinclude -Ibootstrap/include -lm bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o
+	gcc -g -o $@ source/spn.c source/sp/str.c -Iinclude -Ibootstrap/include -lm bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o
 
 
 #############

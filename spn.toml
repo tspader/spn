@@ -43,7 +43,7 @@ mode = "debug"
 
 [[bin]]
 name = "spn"
-source = ["source/spn.c"]
+source = ["source/spn.c", "source/sp/str.c"]
 include = ["include"]
 
 [[test]]
