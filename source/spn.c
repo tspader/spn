@@ -45,34 +45,26 @@
 #include "spn.h"
 #include "graph.h"
 
-#define SP_OM_IMPLEMENTATION
 #include "ordered_map.h"
 
-#define SPN_SPINNER_IMPLEMENTATION
 #include "spinner.h"
 
 #include "sp/macro.h"
 
 #include "sp/ht.h"
 
-#define SP_COLOR_IMPLEMENTATION
 #include "sp/color.h"
 
 #include "sp/str.h"
 
-#define SP_OS_IMPLEMENTATION
 #include "sp/os.h"
 
-#define SP_PS_IMPLEMENTATION
 #include "sp/ps.h"
 
-#define SP_IO_IMPLEMENTATION
 #include "sp/io.h"
 
-#define SPN_PTY_IMPLEMENTATION
 #include "pty.h"
 
-#define SPN_TOML_IMPLEMENTATION
 #include "stoml.h"
 
 #define SPN_VERSION "1.0.0"
@@ -5316,6 +5308,7 @@ void spn_app_resolve(spn_app_t* app) {
 
 void spn_pkg_unit_init(spn_pkg_unit_t* ctx, spn_pkg_unit_config_t config) {
   spn_build_ctx_init(&ctx->ctx, config.ctx);
+  //ctx->metadata = config.metadata;
   ctx->paths.stamp.dir = sp_fs_join_path(ctx->ctx.paths.generated, SP_LIT("stamp"));
   ctx->paths.stamp.main = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("main.stamp"));
   ctx->paths.stamp.exit = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("user.stamp"));

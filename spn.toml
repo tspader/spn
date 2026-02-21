@@ -6,7 +6,7 @@ repo = "tspader/spn"
 [deps.package]
 spcc = "1.0.0"
 sp = "1.6.6"
-toml = "1.2.0"
+toml = "1.2.1"
 
 [deps.test]
 utest = "1.0.0"
@@ -43,7 +43,7 @@ mode = "debug"
 
 [[bin]]
 name = "spn"
-source = ["source/spn.c", "source/sp/str.c"]
+source = ["source/spn.c", "source/ordered_map.c", "source/spinner.c", "source/stoml.c", "source/pty.c", "source/sp/str.c", "source/sp/color.c", "source/sp/os.c", "source/sp/ps.c", "source/sp/io.c"]
 include = ["include"]
 
 [[test]]
@@ -63,5 +63,5 @@ include = ["include", "source", "test/tools"]
 
 [[test]]
 name = "integration"
-source = ["test/integration/main.c", "test/tools/test.c"]
+source = ["test/integration/main.c", "test/tools/test.c", "source/stoml.c"]
 include = ["include", "source", "test/tools", "test/integration"]

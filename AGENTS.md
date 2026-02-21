@@ -55,10 +55,8 @@ assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn
 
 ## Rules
 - always use the `sp.h` skill when writing against sp.h APIs (either with your `Skill` tool or with `./doc/skill/sp.md`)
-- never use the C standard library. always use `sp.h`
-- always prefer to initialize structs with designated initializers when possible
-  - you MUST use SP_ZERO_INITIALIZE() if you don't use a designated initializer
-  - sp_alloc() and SP_ALLOC() return zero allocated memory; do not re-zero
+- always use SP_ZERO_INITIALIZE() instead of leaving variables uninitialized
+- prefer designated initializers to memberwise assignment
 - always use braces for one liner scopes (e.g. `for`, `if`)
 - allocations are never done through the generic global allocator; prefer to allocate from:
   - a memory arena (several in the codebase)
@@ -66,3 +64,6 @@ assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn
   - scratch arena, if transient (see: sp.h docs)
 - always use `sp_for(it, 5)` instead of `for (u32 it = 0; it < 5; it++)`
 - always use `it` as your iterator variable (not e.g. `i`)
+- prefer `const c8*` for structs or functions that are mostly used with literals, even if you convert to sp_str_t immediately when using
+- never re-zero memory returned by sp_alloc()
+- never use the C standard library. always use `sp.h`

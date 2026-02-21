@@ -32,15 +32,30 @@ void git_repo_create_from_dir(sp_str_t source, sp_str_t repo) {
   SP_ASSERT(sp_fs_exists(source));
   SP_ASSERT(sp_fs_is_dir(source));
 
+  git_repo_init(repo);
+  git_repo_commit_from_dir(source, repo, sp_str_lit("fixture"));
+}
+
+void git_repo_init(sp_str_t repo) {
   sp_fs_create_dir(sp_fs_parent_path(repo));
   sp_fs_create_dir(repo);
-  git_repo_copy_dir(source, repo);
 
   git_repo_run(repo, sp_str_lit("init"), sp_str_lit("--quiet"), SP_ZERO_STRUCT(sp_str_t), SP_ZERO_STRUCT(sp_str_t), SP_ZERO_STRUCT(sp_str_t));
   git_repo_run(repo, sp_str_lit("config"), sp_str_lit("user.name"), sp_str_lit("spn-test"), SP_ZERO_STRUCT(sp_str_t), SP_ZERO_STRUCT(sp_str_t));
   git_repo_run(repo, sp_str_lit("config"), sp_str_lit("user.email"), sp_str_lit("spn-test@local"), SP_ZERO_STRUCT(sp_str_t), SP_ZERO_STRUCT(sp_str_t));
+}
+
+void git_repo_commit_from_dir(sp_str_t source, sp_str_t repo, sp_str_t message) {
+  SP_ASSERT(sp_fs_exists(source));
+  SP_ASSERT(sp_fs_is_dir(source));
+  SP_ASSERT(sp_fs_exists(repo));
+  SP_ASSERT(sp_fs_is_dir(repo));
+
+  git_repo_run(repo, sp_str_lit("rm"), sp_str_lit("-r"), sp_str_lit("--quiet"), sp_str_lit("--ignore-unmatch"), sp_str_lit("."));
+
+  git_repo_copy_dir(source, repo);
   git_repo_run(repo, sp_str_lit("add"), sp_str_lit("."), SP_ZERO_STRUCT(sp_str_t), SP_ZERO_STRUCT(sp_str_t), SP_ZERO_STRUCT(sp_str_t));
-  git_repo_run(repo, sp_str_lit("commit"), sp_str_lit("-m"), sp_str_lit("fixture"), sp_str_lit("--quiet"), SP_ZERO_STRUCT(sp_str_t));
+  git_repo_run(repo, sp_str_lit("commit"), sp_str_lit("-m"), message, sp_str_lit("--quiet"), sp_str_lit("--allow-empty"));
 }
 
 sp_str_t git_repo_head(sp_str_t repo) {
