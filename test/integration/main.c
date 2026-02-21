@@ -68,6 +68,9 @@ void init_tmpfs_top_level(void) {
 UTEST_F_SETUP(spn_build) {
   init_tmpfs_top_level();
 
+  //  $repo/build/$profile/store/bin/$test
+  //  │     │     │        │     │
+  //  4     3     2        1     0
   uf->fixture.paths.root = sp_fs_get_exe_path();
   sp_for(it, 4) {
     uf->fixture.paths.root = sp_fs_parent_path(uf->fixture.paths.root);
