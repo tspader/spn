@@ -46,6 +46,12 @@
 
 // SPN
 #include "spn.h"
+#include "autoconf.h"
+#include "cc.h"
+#include "cmake.h"
+#include "make.h"
+#include "gen.h"
+#include "profile.h"
 #include "semver.h"
 #include "external/git.h"
 #include "external/tcc.h"
@@ -70,43 +76,6 @@
 //typedef struct spn_pkg_unit_t spn_pkg_unit_t;
 typedef struct spn_target_unit spn_target_unit_t;
 typedef struct spn_session_t spn_session_t;
-
-
-///////////////
-// GENERATOR //
-///////////////
-typedef enum {
-  SPN_GEN_KIND_RAW,
-  SPN_GEN_KIND_SHELL,
-  SPN_GEN_KIND_MAKE,
-  SPN_GEN_KIND_CMAKE,
-  SPN_GEN_KIND_PKGCONFIG,
-} spn_gen_kind_t;
-
-typedef enum {
-  SPN_GEN_NONE,
-  SPN_GEN_INCLUDE,
-  SPN_GEN_LIB_INCLUDE,
-  SPN_GEN_LIBS,
-  SPN_GEN_SYSTEM_LIBS,
-  SPN_GEN_RPATH,
-  SPN_GEN_DEFINE,
-  SPN_GEN_ALL,
-} spn_gen_entry_t;
-
-typedef struct {
-  spn_gen_kind_t kind;
-  spn_cc_kind_t compiler;
-  sp_str_t file_name;
-  sp_str_t output;
-
-  sp_str_t include;
-  sp_str_t lib_include;
-  sp_str_t libs;
-  sp_str_t system_libs;
-  sp_str_t rpath;
-} spn_generator_t;
-
 
 //////////////////
 // DEPENDENCIES //
@@ -170,199 +139,10 @@ typedef enum {
   SPN_PACKAGE_KIND(SP_X_NAMED_ENUM_DEFINE)
 } spn_pkg_kind_t;
 
-typedef enum {
-  SPN_TARGET_NONE,
-  SPN_TARGET_SHARED_LIB,
-  SPN_TARGET_STATIC_LIB,
-  SPN_TARGET_EXE,
-  SPN_TARGET_JIT,
-  SPN_TARGET_OBJECT,
-} spn_target_kind_t;
-
 spn_pkg_dir_t    spn_cache_dir_kind_from_str(sp_str_t str);
 spn_linkage_t spn_pkg_linkage_from_str(sp_str_t str);
 sp_os_lib_kind_t  spn_pkg_linkage_to_sp_os_lib_kind(spn_linkage_t kind);
-spn_target_kind_t spn_pkg_linkage_to_target_kind(spn_linkage_t kind);
-spn_linkage_t spn_target_kind_to_pkg_linkage(spn_target_kind_t kind);
 sp_str_t          spn_pkg_linkage_to_str(spn_linkage_t kind);
-spn_gen_kind_t    spn_gen_kind_from_str(sp_str_t str);
-spn_gen_entry_t   spn_gen_entry_from_str(sp_str_t str);
-spn_cc_kind_t     spn_cc_kind_from_str(sp_str_t str);
-spn_c_standard_t  spn_c_standard_from_str(sp_str_t str);
-sp_str_t          spn_c_standard_to_str(spn_c_standard_t standard);
-
-
-////////
-// CC //
-////////
-typedef struct {
-  sp_str_t name;
-} spn_cc_executable_t;
-
-typedef struct {
-  sp_str_t name;
-} spn_cc_shared_lib_t;
-
-typedef struct {
-  sp_str_t name;
-} spn_cc_static_lib_t;
-
-typedef struct {
-  sp_str_t build;
-  sp_str_t   profile;
-  sp_str_t     output;
-} spn_cc_target_paths_t;
-
-#define SP_EMBED_DEFAULT_SYMBOL_S sp_str_lit("")
-#define SP_EMBED_DEFAULT_DATA_T_S sp_str_lit("")
-#define SP_EMBED_DEFAULT_SIZE_T_S sp_str_lit("")
-
-typedef enum {
-  SPN_EMBED_FILE,
-  SPN_EMBED_MEM,
-} spn_embed_kind_t;
-
-typedef struct {
-  sp_str_t data;
-  sp_str_t size;
-} spn_embed_types_t;
-
-typedef struct {
-  spn_embed_kind_t kind;
-  sp_str_t symbol;
-  spn_embed_types_t types;
-  union {
-    struct { sp_str_t path; } file;
-    struct { const u8* buffer; u64 size; } memory;
-  };
-} spn_embed_t;
-
-typedef struct {
-  sp_str_t symbol;
-  u64 size;
-  spn_embed_types_t types;
-} spn_cc_embed_t;
-
-typedef struct {
-  sp_elf_t* elf;
-  sp_da(spn_cc_embed_t) entries;
-} spn_cc_embed_ctx_t;
-
-typedef struct {
-  sp_str_t output;
-  sp_da(sp_str_t) source;
-  sp_da(sp_str_t) include;
-  sp_da(sp_str_t) define;
-  sp_da(sp_str_t) libs;
-  sp_da(sp_str_t) lib_dirs;
-  sp_da(sp_str_t) rpath;
-
-  spn_target_kind_t kind;
-  union {
-    spn_cc_executable_t exe;
-    spn_cc_shared_lib_t shared_lib;
-    spn_cc_static_lib_t static_lib;
-  };
-  spn_cc_t* cc;
-} spn_cc_target_t;
-
-struct spn_cc {
-  spn_profile_t* profile;
-  struct {
-    spn_cc_kind_t kind;
-    sp_str_t exe;
-  } compiler;
-  spn_c_standard_t standard;
-  spn_build_mode_t mode;
-  spn_linkage_t linkage;
-  sp_da(sp_str_t) include;
-  sp_da(sp_str_t) define;
-  sp_str_t dir;
-  sp_da(spn_cc_target_t) targets;
-  sp_ps_config_t config;
-};
-
-// MAKE
-struct spn_make {
-  spn_build_ctx_t* build;
-  sp_str_t target;
-};
-
-// AUTOCONF
-struct spn_autoconf {
-  spn_build_ctx_t* build;
-  sp_da(sp_str_t) flags;
-};
-
-// CMAKE
-typedef struct {
-  sp_str_t name;
-  sp_str_t value;
-} spn_cmake_define_t;
-
-struct spn_cmake {
-  spn_build_ctx_t* build;
-  spn_cmake_gen_t generator;
-  sp_da(spn_cmake_define_t) defines;
-  sp_da(sp_str_t) args;
-};
-
-
-void             spn_cc_set_profile(spn_cc_t* cc, spn_profile_t* profile);
-void             spn_cc_add_include(spn_cc_t* cc, sp_str_t dir);
-void             spn_cc_add_relative_include(spn_cc_t* cc, sp_str_t dir);
-void             spn_cc_add_define(spn_cc_t* cc, sp_str_t var);
-void             spn_cc_add_pkg(spn_cc_t* cc, spn_pkg_t* pkg);
-void             spn_cc_set_output_dir(spn_cc_t* cc, sp_str_t dir);
-spn_cc_target_t* spn_cc_add_target(spn_cc_t* cc, spn_target_kind_t kind, sp_str_t name);
-void             spn_cc_target_add_relative_source(spn_cc_target_t* cc, sp_str_t path);
-void             spn_cc_target_add_absolute_source(spn_cc_target_t* cc, sp_str_t path);
-void             spn_cc_target_add_define(spn_cc_target_t* cc, sp_str_t var);
-void             spn_cc_target_add_relative_include(spn_cc_target_t* cc, sp_str_t dir);
-void             spn_cc_target_add_absolute_include(spn_cc_target_t* cc, sp_str_t dir);
-void             spn_cc_target_add_lib(spn_cc_target_t* cc, sp_str_t lib);
-void             spn_cc_target_add_lib_dir(spn_cc_target_t* cc, sp_str_t dir);
-void             spn_cc_target_add_rpath(spn_cc_target_t* cc, sp_str_t dir);
-void             spn_cc_target_add_dep(spn_cc_target_t* target, spn_pkg_unit_t* dep);
-void             spn_cc_target_to_tcc(spn_cc_t* cc, spn_cc_target_t* target, spn_tcc_t* tcc);
-void             spn_cc_to_ps(spn_cc_t* cc, sp_ps_config_t* ps);
-void             spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps);
-sp_str_t         spn_cc_symbol_from_embedded_file(sp_str_t file_path);
-void             spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx);
-spn_err_t        spn_cc_embed_ctx_add(spn_cc_embed_ctx_t* ctx, sp_io_reader_t reader, sp_str_t symbol, sp_str_t data_type, sp_str_t size_type);
-spn_err_t        spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_str_t header);
-
-
-
-
-struct spn_target {
-  sp_str_t name;
-  spn_target_kind_t kind;
-  spn_pkg_t* pkg;
-  spn_visibility_t visibility;
-  sp_da(sp_str_t) source;
-  sp_da(sp_str_t) include;
-  sp_da(sp_str_t) define;
-  sp_da(spn_embed_t) embed;
-};
-
-typedef enum {
-  SPN_PROFILE_BUILTIN,
-  SPN_PROFILE_USER,
-} spn_profile_kind_t;
-
-struct spn_profile {
-  sp_str_t name;
-  spn_linkage_t linkage;
-  spn_libc_kind_t libc;
-  spn_c_standard_t standard;
-  spn_build_mode_t mode;
-  spn_profile_kind_t kind;
-  struct {
-    spn_cc_kind_t kind;
-    sp_str_t exe;
-  } cc;
-};
 
 typedef struct {
   sp_str_t name;
@@ -506,12 +286,6 @@ void            spn_target_add_define_ex(spn_target_t* target, sp_str_t define);
 void            spn_target_set_visibility(spn_target_t* target, spn_visibility_t viz);
 void            spn_target_embed_file_ex_s(spn_target_t* target, sp_str_t file, sp_str_t symbol, sp_str_t data_type, sp_str_t size_type);
 void            spn_target_embed_mem_ex_s(spn_target_t* target, sp_str_t symbol, const u8* buffer, u64 buffer_size, sp_str_t data_type, sp_str_t size_type);
-void            spn_profile_set_cc(spn_profile_t* profile, spn_cc_kind_t kind);
-void            spn_profile_set_cc_exe(spn_profile_t* profile, const c8* exe);
-void            spn_profile_set_linkage(spn_profile_t* profile, spn_linkage_t linkage);
-void            spn_profile_set_libc(spn_profile_t* profile, spn_libc_kind_t libc);
-void            spn_profile_set_standard(spn_profile_t* profile, spn_c_standard_t standard);
-void            spn_profile_set_mode(spn_profile_t* profile, spn_build_mode_t mode);
 
 
 
@@ -937,31 +711,6 @@ typedef struct {
   sp_str_t bin;
   sp_str_t lib;
 } spn_tool_paths_t;
-
-
-
-///////////////
-// GENERATOR //
-///////////////
-typedef struct {
-  spn_gen_entry_t kind;
-  spn_cc_kind_t compiler;
-} spn_gen_format_context_t;
-
-sp_str_t        spn_cc_kind_to_executable(spn_cc_kind_t compiler);
-sp_str_t        spn_cc_c_standard_to_switch(spn_c_standard_t standard);
-sp_str_t        spn_cc_lib_kind_to_switch(spn_linkage_t kind);
-sp_str_t        spn_cc_build_mode_to_switch(spn_build_mode_t mode);
-sp_str_t        spn_gen_format_entry(sp_str_t entry, spn_gen_entry_t kind, spn_cc_kind_t cc);
-sp_str_t        spn_gen_format_entry_kernel(sp_str_map_context_t* context);
-sp_da(sp_str_t) spn_gen_build_entry(spn_build_ctx_t* dep, spn_gen_entry_t kind, spn_cc_kind_t c);
-sp_str_t        spn_gen_build_entries_for_all(spn_gen_entry_t kind, spn_cc_kind_t c);
-
-
-
-
-
-
 /////////
 // TUI //
 /////////
