@@ -48,9 +48,9 @@ bootstrap/bin/embed: tools/embed.c bootstrap/include/sp.h
 bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h: bootstrap/bin/embed bootstrap/lib/libtcc.a
 	./bootstrap/bin/embed bootstrap/lib/tcc bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h
 
-bootstrap/bin/spn: source/spn.c source/cc.c source/gen.c source/target.c source/semver.c source/external/git.c source/external/tcc.c source/ordered_map.c source/spinner.c source/stoml.c source/pty.c source/sp/str.c source/sp/color.c source/sp/os.c source/sp/ps.c source/sp/io.c bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h
+bootstrap/bin/spn: source/spn.c source/intern.c source/log.c source/make.c source/cmake.c source/profile.c source/cc.c source/gen.c source/target.c source/semver.c source/external/git.c source/external/tcc.c source/ordered_map.c source/spinner.c source/stoml.c source/pty.c source/sp/str.c source/sp/color.c source/sp/os.c source/sp/ps.c source/sp/io.c bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h
 	@mkdir -p bootstrap/bin
-	gcc -g -o $@ source/spn.c source/cc.c source/gen.c source/target.c source/semver.c source/external/git.c source/external/tcc.c source/ordered_map.c source/spinner.c source/stoml.c source/pty.c source/sp/str.c source/sp/color.c source/sp/os.c source/sp/ps.c source/sp/io.c -Iinclude -Ibootstrap/include -lm bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o
+	gcc -g -o $@ source/spn.c source/intern.c source/log.c source/make.c source/cmake.c source/profile.c source/cc.c source/gen.c source/target.c source/semver.c source/external/git.c source/external/tcc.c source/ordered_map.c source/spinner.c source/stoml.c source/pty.c source/sp/str.c source/sp/color.c source/sp/os.c source/sp/ps.c source/sp/io.c -Iinclude -Ibootstrap/include -lm bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o
 
 
 #############

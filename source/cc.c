@@ -1,15 +1,13 @@
 #include "cc.h"
 
+#include "ctx.h"
 #include "gen.h"
+#include "intern.h"
+#include "log.h"
 #include "profile.h"
 #include "sp/io.h"
 #include "sp/os.h"
 #include "sp/str.h"
-
-sp_str_t spn_app_project_dir(void);
-sp_str_t spn_pkg_unit_get_include_dir(spn_pkg_unit_t* unit);
-sp_str_t spn_intern(sp_str_t str);
-void spn_log_warn(const c8* fmt, ...);
 
 void spn_cc_set_profile(spn_cc_t* cc, spn_profile_t* profile) {
   cc->standard = profile->standard;
