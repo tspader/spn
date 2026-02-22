@@ -1,3 +1,17 @@
+// EXTERNAL
+#define SP_MAIN
+#define SP_PS_MAX_ARGS 32
+#define SP_IMPLEMENTATION
+#include "sp.h"
+
+#define TOML_IMPLEMENTATION
+#include "toml.h"
+
+#include "libtcc.h"
+
+// STANDARD
+#include <setjmp.h>
+
 #ifdef _WIN32
   #ifndef WIN32_LEAN_AND_MEAN
     #define WIN32_LEAN_AND_MEAN
@@ -15,18 +29,6 @@
   #include <io.h>
 #endif
 
-#define SP_MAIN
-#define SP_PS_MAX_ARGS 32
-#define SP_IMPLEMENTATION
-#include "sp.h"
-
-#define TOML_IMPLEMENTATION
-#include "toml.h"
-
-#include "libtcc.h"
-
-#include <setjmp.h>
-
 #if defined(SP_POSIX)
   #include <dlfcn.h>
   #include <fcntl.h>
@@ -42,30 +44,20 @@
   #include <sys/wait.h>
 #endif
 
+// SPN
 #include "spn.h"
 #include "graph.h"
-
 #include "ordered_map.h"
-
-#include "spinner.h"
-
-#include "sp/macro.h"
-
-#include "sp/ht.h"
-
-#include "sp/color.h"
-
-#include "sp/str.h"
-
-#include "sp/os.h"
-
-#include "sp/ps.h"
-
-#include "sp/io.h"
-
 #include "pty.h"
-
+#include "spinner.h"
 #include "stoml.h"
+#include "sp/color.h"
+#include "sp/ht.h"
+#include "sp/io.h"
+#include "sp/macro.h"
+#include "sp/os.h"
+#include "sp/ps.h"
+#include "sp/str.h"
 
 #define SPN_VERSION "1.0.0"
 #define SPN_COMMIT "00c0fa98"
