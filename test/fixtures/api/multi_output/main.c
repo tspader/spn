@@ -4,7 +4,7 @@
 int main(void) {
   my_int_t x = 5;
   my_float_t f = 3.14f;
-  
+
   printf("x = %d, f = %f\n", x, (double)f);
   printf("MAX_SIZE = %d, MIN_SIZE = %d\n", MAX_SIZE, MIN_SIZE);
   printf("SQUARE(5) = %d, CUBE(3) = %d\n", SQUARE(5), CUBE(3));

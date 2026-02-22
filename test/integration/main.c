@@ -476,3 +476,95 @@ UTEST_F(spn_build, api_diamond_deps) {
     },
   });
 }
+
+UTEST_F(spn_build, api_fan_in) {
+  tmpfs_init_named(&uf->fixture.fs, "api_fan_in");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/fan_in",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/fan_in/combined.h") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "fan_in" },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_multi_output) {
+  tmpfs_init_named(&uf->fixture.fs, "api_multi_output");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/multi_output",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/multi_output/all.h") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "multi_output" },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_node_linking) {
+  tmpfs_init_named(&uf->fixture.fs, "api_node_linking");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/node_linking",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/node_linking/generated.h") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "node_linking" },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_orphan_outputs) {
+  tmpfs_init_named(&uf->fixture.fs, "api_orphan_outputs");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/orphan_outputs",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/orphan_outputs/orphan_header.h") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/orphan_outputs/consumed_header.h") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "orphan_outputs" },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_stamp_chain) {
+  tmpfs_init_named(&uf->fixture.fs, "api_stamp_chain");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/stamp_chain",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/stamp_chain/result.h") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "stamp_chain" },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_stamp_input) {
+  tmpfs_init_named(&uf->fixture.fs, "api_stamp_input");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/stamp_input",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/stamp_input/validated.h") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "stamp_input" },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_user_data) {
+  tmpfs_init_named(&uf->fixture.fs, "api_user_data");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/user_data",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/user_data/config.h") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "user_data" },
+    },
+  });
+}

@@ -1,4 +1,3 @@
-// This file will fail to compile if node linking doesn't work
 #include "generated.h"
 
 #include <stdio.h>

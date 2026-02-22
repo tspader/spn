@@ -1,12 +1,5 @@
 #include "spn.h"
 
-// Test: orphan outputs connect to sync::user, consumed outputs don't
-//
-// Graph should show:
-// - orphan_header.h -> sync::user (orphan, no consumers)
-// - consumed_header.h -> consumer node (has consumer, NOT to sync::user)
-// - consumer stamp -> sync::user (orphan stamp)
-
 spn_err_t gen_orphan(spn_node_ctx_t* ctx) {
   spn_log(ctx->build, "generating orphan_header.h (no consumers)...");
   spn_write_file(ctx->build, "orphan_header.h",
@@ -38,17 +31,14 @@ void configure(spn_build_ctx_t* ctx) {
   const c8* orphan_h = spn_get_subdir(ctx, SPN_DIR_WORK, "orphan_header.h");
   const c8* consumed_h = spn_get_subdir(ctx, SPN_DIR_WORK, "consumed_header.h");
 
-  // Node that produces an orphan output (no one consumes it)
   spn_node_t orphan = spn_add_node(ctx, "gen_orphan");
   spn_node_set_fn(orphan, gen_orphan);
   spn_node_add_output(orphan, orphan_h);
 
-  // Node that produces a consumed output
   spn_node_t producer = spn_add_node(ctx, "gen_consumed");
   spn_node_set_fn(producer, gen_consumed);
   spn_node_add_output(producer, consumed_h);
 
-  // Node that consumes the header (so it's NOT an orphan)
   spn_node_t consumer = spn_add_node(ctx, "consumer");
   spn_node_set_fn(consumer, consumer_fn);
   spn_node_add_input(consumer, consumed_h);
