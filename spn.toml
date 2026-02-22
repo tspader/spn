@@ -63,5 +63,5 @@ include = ["include", "source", "test/tools"]
 
 [[test]]
 name = "integration"
-source = ["test/integration/main.c", "test/tools/test.c", "source/stoml.c"]
+source = ["test/integration/main.c", "test/tools/test.c", "test/tools/harness.c", "test/tools/toml.c", "source/stoml.c"]
 include = ["include", "source", "test/tools", "test/integration"]

@@ -6,12 +6,6 @@
 #include "utest.h"
 #include "action.h"
 
-#define TOML_IMPLEMENTATION
-#include "toml.h"
-
-#define SPN_TOML_IMPLEMENTATION
-#include "stoml.h"
-
 UTEST_MAIN()
 
 #define uf utest_fixture
@@ -21,7 +15,6 @@ UTEST_MAIN()
 
 typedef struct {
   tmpfs_t fs;
-  s32* result;
   struct {
     sp_str_t root;
     sp_str_t spn;
@@ -36,19 +29,7 @@ struct spn_build {
   fixture_t fixture;
 };
 
-static bool tmpfs_top_level_initialized = false;
-
-s32 dir_entry_sort_kernel_by_name(const void* a, const void* b) {
-  const sp_os_dir_ent_t* lhs = (const sp_os_dir_ent_t*)a;
-  const sp_os_dir_ent_t* rhs = (const sp_os_dir_ent_t*)b;
-  return sp_str_sort_kernel_alphabetical(&lhs->file_name, &rhs->file_name);
-}
-
-void init_tmpfs_top_level(void) {
-  if (tmpfs_top_level_initialized) {
-    return;
-  }
-
+UTEST_INITIALIZER(spn_build_init_tmpfs_top_level) {
   sp_str_t tmp = sp_os_get_env_as_path(sp_str_lit("SPN_TEST_TMP"));
   if (sp_str_empty(tmp)) {
     tmp = sp_str_lit(".tmp");
@@ -62,12 +43,9 @@ void init_tmpfs_top_level(void) {
   }
 
   tmpfs_set_top_level(sp_fs_join_path(tmp, sp_str(sanitized, iso.len)));
-  tmpfs_top_level_initialized = true;
 }
 
 UTEST_F_SETUP(spn_build) {
-  init_tmpfs_top_level();
-
   //  $repo/build/$profile/store/bin/$test
   //  │     │     │        │     │
   //  4     3     2        1     0
@@ -82,177 +60,6 @@ UTEST_F_SETUP(spn_build) {
 }
 
 UTEST_F_TEARDOWN(spn_build) {
-}
-
-void fixture_write_file(sp_str_t path, sp_str_t content) {
-  sp_str_t parent = sp_fs_parent_path(path);
-  if (!sp_str_empty(parent)) {
-    sp_fs_create_dir(parent);
-  }
-
-  sp_io_writer_t io = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_OVERWRITE);
-  sp_io_write_str(&io, content);
-  sp_io_writer_close(&io);
-}
-
-sp_str_t fixture_registry_manifest_from_source(toml_table_t* source, sp_str_t repo_url) {
-  toml_table_t* package = toml_table_table(source, "package");
-  SP_ASSERT(package);
-
-  spn_toml_writer_t writer = spn_toml_writer_new();
-  spn_toml_begin_table_cstr(&writer, "package");
-  spn_toml_append_str_cstr(&writer, "name", spn_toml_str(package, "name"));
-  spn_toml_append_str_cstr(&writer, "version", spn_toml_str(package, "version"));
-  spn_toml_append_str_cstr(&writer, "url", repo_url);
-
-  sp_str_t author = spn_toml_str_opt(package, "author", "");
-  if (!sp_str_empty(author)) {
-    spn_toml_append_str_cstr(&writer, "author", author);
-  }
-
-  sp_str_t maintainer = spn_toml_str_opt(package, "maintainer", "");
-  if (!sp_str_empty(maintainer)) {
-    spn_toml_append_str_cstr(&writer, "maintainer", maintainer);
-  }
-
-  sp_str_t commit = spn_toml_str_opt(package, "commit", "");
-  if (!sp_str_empty(commit)) {
-    spn_toml_append_str_cstr(&writer, "commit", commit);
-  }
-
-  toml_array_t* include = toml_table_array(package, "include");
-  if (spn_toml_array_len(include)) {
-    spn_toml_append_str_array_cstr(&writer, "include", spn_toml_arr_to_str_arr(include));
-  }
-
-  toml_array_t* define = toml_table_array(package, "define");
-  if (spn_toml_array_len(define)) {
-    spn_toml_append_str_array_cstr(&writer, "define", spn_toml_arr_to_str_arr(define));
-  }
-
-  toml_array_t* system_deps = toml_table_array(package, "system_deps");
-  if (spn_toml_array_len(system_deps)) {
-    spn_toml_append_str_array_cstr(&writer, "system_deps", spn_toml_arr_to_str_arr(system_deps));
-  }
-  spn_toml_end_table(&writer);
-
-  toml_table_t* lib = toml_table_table(source, "lib");
-  if (lib) {
-    toml_array_t* kinds = toml_table_array(lib, "kinds");
-    if (spn_toml_array_len(kinds)) {
-      spn_toml_begin_table_cstr(&writer, "lib");
-      spn_toml_append_str_array_cstr(&writer, "kinds", spn_toml_arr_to_str_arr(kinds));
-      spn_toml_end_table(&writer);
-    }
-  }
-
-  return spn_toml_writer_write(&writer);
-}
-
-void copy_project_path(fixture_t* fixture, sp_str_t project, sp_str_t relative) {
-  UTEST_RESULT(fixture->result);
-
-  sp_str_t from = sp_fs_join_path(project, relative);
-
-  // there's no reason to specify something that doesn't exist
-  if (sp_fs_is_glob(from)) {
-    EXPECT_TRUE(sp_fs_exists(sp_fs_parent_path(from)));
-  } else {
-    EXPECT_TRUE(sp_fs_exists(from));
-  }
-
-  sp_str_t to = fixture->fs.root;
-
-  // we never want to change paths inside the test harness; always 1:1
-  sp_str_t parent = sp_fs_parent_path(relative);
-  if (!sp_str_empty(parent)) {
-    to = tmpfs_get(&fixture->fs, parent);
-    sp_fs_create_dir(to);
-  }
-
-  // source exists, destination exists, copy
-  sp_fs_copy(from, to);
-}
-
-void setup_fixture_index_from_remote(s32* utest_result, fixture_t* fixture, sp_str_t project) {
-  sp_str_t remote = sp_fs_join_path(project, sp_str_lit("remote"));
-  if (!sp_fs_exists(remote)) {
-    return;
-  }
-
-  EXPECT_TRUE(sp_fs_is_dir(remote));
-
-  sp_da(sp_os_dir_ent_t) entries = sp_fs_collect(remote);
-  sp_da_for(entries, it) {
-    sp_os_dir_ent_t* entry = &entries[it];
-    if (!sp_fs_is_dir(entry->file_path)) {
-      continue;
-    }
-
-    sp_da(sp_os_dir_ent_t) versions = sp_fs_collect(entry->file_path);
-    EXPECT_FALSE(sp_da_empty(versions));
-    sp_dyn_array_sort(versions, dir_entry_sort_kernel_by_name);
-
-    struct {
-      sp_str_t repo;
-      sp_str_t index;
-      sp_str_t manifest;
-    } paths = SP_ZERO_INITIALIZE();
-    paths.repo = tmpfs_get(&fixture->fs, sp_fs_join_path(sp_str_lit("remote"), entry->file_name));
-    paths.index = sp_fs_join_path(fixture->paths.index, entry->file_name);
-    paths.manifest = sp_fs_join_path(paths.index, sp_str_lit("spn.toml"));
-
-    git_repo_init(paths.repo);
-    sp_fs_create_dir(paths.index);
-
-    spn_toml_writer_t metadata = spn_toml_writer_new();
-    spn_toml_begin_array_cstr(&metadata, "versions");
-
-    bool wrote_manifest = false;
-    sp_da_for(versions, v) {
-      sp_os_dir_ent_t* dir = &versions[v];
-      ASSERT_TRUE(sp_fs_is_dir(dir->file_path));
-
-      sp_str_t version = dir->file_name;
-
-      struct {
-        sp_str_t manifest;
-        sp_str_t script;
-      } source = {
-        .manifest = sp_fs_join_path(dir->file_path, sp_str_lit("spn.toml")),
-        .script = sp_fs_join_path(dir->file_path, sp_str_lit("spn.c")),
-      };
-
-      ASSERT_TRUE(sp_fs_exists(source.manifest));
-
-      git_repo_commit_from_dir(dir->file_path, paths.repo, dir->file_name);
-      sp_str_t commit = git_repo_head(paths.repo);
-
-      toml_table_t* manifest = spn_toml_parse(source.manifest);
-      ASSERT_TRUE(manifest != SP_NULLPTR);
-
-      toml_table_t* package = toml_table_table(manifest, "package");
-      ASSERT_TRUE(package != SP_NULLPTR);
-
-      if (!wrote_manifest) {
-        fixture_write_file(paths.manifest, fixture_registry_manifest_from_source(manifest, paths.repo));
-
-        if (sp_fs_exists(source.script)) {
-          sp_fs_copy(source.script, paths.index);
-        }
-
-        wrote_manifest = true;
-      }
-
-      spn_toml_append_array_table(&metadata);
-      spn_toml_append_str_cstr(&metadata, "version", version);
-      spn_toml_append_str_cstr(&metadata, "commit", commit);
-    }
-
-    spn_toml_end_array(&metadata);
-    EXPECT_TRUE(wrote_manifest);
-    fixture_write_file(sp_fs_join_path(paths.index, sp_str_lit("metadata.toml")), spn_toml_writer_write(&metadata));
-  }
 }
 
 void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
@@ -287,11 +94,14 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
     }
 
     sp_carr_for(test.copy, it) {
-      if (!test.copy[it]) break;
-      copy_project_path(fixture, project, sp_str_view(test.copy[it]));
+      if (!test.copy[it]) {
+        break;
+      }
+
+      copy_project_path(utest_result, &fixture->fs, project, sp_str_view(test.copy[it]));
     }
 
-    setup_fixture_index_from_remote(utest_result, fixture, project);
+    setup_fixture_index_from_remote(utest_result, &fixture->fs, fixture->paths.index, project);
   }
 
   sp_for(it, SPN_TEST_MAX_ACTIONS) {
@@ -341,7 +151,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
           "build/debug/store/bin/{}",
           SP_FMT_CSTR(action.bin.name)
         ));
-        EXPECT_TRUE(sp_fs_exists(bin));
+        ASSERT_TRUE(sp_fs_exists(bin));
 
         sp_ps_output_t output = sp_ps_run((sp_ps_config_t) {
           .command = bin,
