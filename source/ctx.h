@@ -23,5 +23,6 @@ spn_build_mode_t spn_ctx_build_mode(spn_build_ctx_t* build);
 sp_ps_output_t spn_ctx_build_subprocess(spn_build_ctx_t* build, sp_ps_config_t cfg);
 sp_da(sp_str_t) spn_ctx_build_lib_entries(spn_build_ctx_t* build);
 sp_da(spn_build_ctx_t*) spn_ctx_all_build_contexts(void);
+void spn_ctx_push_target_source_event(spn_target_t* target, sp_str_t source);
 
 #endif

@@ -53,6 +53,8 @@
 #include "make.h"
 #include "gen.h"
 #include "intern.h"
+#include "resolve.h"
+#include "target_filter.h"
 #include "log.h"
 #include "profile.h"
 #include "semver.h"
@@ -283,47 +285,11 @@ sp_str_t        spn_pkg_get_url(spn_pkg_t* build);
 spn_profile_t*  spn_pkg_get_profile_or_default(spn_pkg_t* pkg, sp_str_t name);
 spn_target_t*   spn_pkg_get_target(spn_pkg_t* pkg, const c8* name);
 spn_target_t*   spn_pkg_get_target_ex(spn_pkg_t* pkg, sp_str_t name);
-void            spn_target_add_source_ex(spn_target_t* target, sp_str_t source);
-void            spn_target_add_include_ex(spn_target_t* target, sp_str_t include);
-void            spn_target_add_define_ex(spn_target_t* target, sp_str_t define);
-void            spn_target_set_visibility(spn_target_t* target, spn_visibility_t viz);
-void            spn_target_embed_file_ex_s(spn_target_t* target, sp_str_t file, sp_str_t symbol, sp_str_t data_type, sp_str_t size_type);
-void            spn_target_embed_mem_ex_s(spn_target_t* target, sp_str_t symbol, const u8* buffer, u64 buffer_size, sp_str_t data_type, sp_str_t size_type);
-
-
-
-
-////////////
-// FILTER //
-////////////
-typedef struct {
-  sp_str_t name;
-  struct {
-    bool public;
-    bool test;
-  } disabled;
-} spn_target_filter_t;
-
-bool spn_target_filter_pass(spn_target_filter_t* filter, spn_target_t* target);
-bool spn_is_visibility_linked(spn_visibility_t target, spn_visibility_t dep);
-
-
-//////////////
-// RESOLVER //
-//////////////
-#define SPN_RESOLVE_STRATEGY(X) \
-  X(SPN_RESOLVE_STRATEGY_LOCK_FILE, "lockfile") \
-  X(SPN_RESOLVE_STRATEGY_SOLVER, "solver")
-
-typedef enum {
-  SPN_RESOLVE_STRATEGY(SP_X_NAMED_ENUM_DEFINE)
-} spn_resolve_strategy_t;
-
 typedef struct {
   sp_opt(u32) low;
   sp_opt(u32) high;
   spn_pkg_req_t source;
-} spn_dep_version_range_t;
+} spn_resolve_range_t;
 
 typedef struct {
   spn_pkg_t* pkg;
@@ -332,7 +298,7 @@ typedef struct {
 } spn_resolved_pkg_t;
 
 typedef struct {
-  sp_str_ht(sp_da(spn_dep_version_range_t)) ranges;
+  sp_str_ht(sp_da(spn_resolve_range_t)) ranges;
   sp_str_ht(bool) visited;
   sp_str_ht(spn_resolved_pkg_t) resolved;
   sp_da(sp_str_t) system_deps;
@@ -1623,18 +1589,6 @@ sp_str_t spn_visibility_to_str(spn_visibility_t kind) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-spn_resolve_strategy_t spn_resolve_strategy_from_str(sp_str_t str) {
-  SPN_RESOLVE_STRATEGY(SP_X_NAMED_ENUM_STR_TO_ENUM)
-  SP_UNREACHABLE_RETURN(SPN_RESOLVE_STRATEGY_SOLVER);
-}
-
-sp_str_t spn_resolve_strategy_to_str(spn_resolve_strategy_t strategy) {
-  switch (strategy) {
-    SPN_RESOLVE_STRATEGY(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
 spn_visibility_t spn_visibility_from_str(sp_str_t str) {
   if (spn_intern_is_equal_cstr(str, "public")) return SPN_VISIBILITY_PUBLIC;
   if (spn_intern_is_equal_cstr(str, "test"))   return SPN_VISIBILITY_TEST;
@@ -1862,6 +1816,16 @@ sp_da(spn_build_ctx_t*) spn_ctx_all_build_contexts(void) {
     sp_da_push(builds, &unit->ctx);
   }
   return builds;
+}
+
+void spn_ctx_push_target_source_event(spn_target_t* target, sp_str_t source) {
+  spn_event_buffer_push_ex(spn.events, target->pkg, SP_NULLPTR, (spn_build_event_t) {
+    .kind = SPN_EVENT_ADD_SOURCE,
+    .target_source = {
+      .target = target->name,
+      .source = source,
+    }
+  });
 }
 
 sp_str_t spn_build_ctx_get_lib_dir(spn_build_ctx_t* build) {
@@ -2921,149 +2885,6 @@ bool spn_pkg_has_lib_kind(spn_pkg_t* pkg, spn_linkage_t kind) {
   return false;
 }
 
-void spn_target_add_source(spn_target_t* target, const c8* source) {
-  sp_require(target);
-  spn_target_add_source_ex(target, sp_str_view(source));
-}
-
-void spn_target_add_source_ex(spn_target_t* target, sp_str_t source) {
-  sp_require(target);
-
-  spn_event_buffer_push_ex(spn.events, target->pkg, SP_NULLPTR, (spn_build_event_t) {
-    .kind = SPN_EVENT_ADD_SOURCE,
-    .target_source = {
-      .target = target->name,
-      .source = source,
-    }
-  });
-
-  source = spn_intern(source);
-  sp_da_push(target->source, source);
-}
-
-void spn_target_add_include(spn_target_t* target, const c8* include) {
-  sp_require(target);
-  spn_target_add_include_ex(target, sp_str_view(include));
-}
-
-void spn_target_add_include_ex(spn_target_t* target, sp_str_t include) {
-  sp_require(target);
-  sp_da_push(target->include, spn_intern(include));
-}
-
-void spn_target_add_define(spn_target_t* target, const c8* define) {
-  sp_require(target);
-  spn_target_add_define_ex(target, sp_str_view(define));
-}
-
-void spn_target_add_define_ex(spn_target_t* target, sp_str_t define) {
-  sp_require(target);
-  sp_da_push(target->define, spn_intern(define));
-}
-
-void spn_target_set_visibility(spn_target_t* target, spn_visibility_t visibility) {
-  sp_require(target);
-  target->visibility = visibility;
-}
-
-void spn_target_embed_file(spn_target_t* target, const c8* file) {
-  spn_target_embed_file_ex_s(target, sp_str_view(file), SP_EMBED_DEFAULT_SYMBOL_S, SP_EMBED_DEFAULT_DATA_T_S, SP_EMBED_DEFAULT_SIZE_T_S);
-}
-
-void spn_target_embed_file_ex(
-  spn_target_t* target,
-  const c8* file,
-  const c8* symbol,
-  const c8* data_type, const c8* size_type
-) {
-  spn_target_embed_file_ex_s(target, sp_str_view(file), sp_str_view(symbol), sp_str_view(data_type), sp_str_view(size_type));
-}
-
-void spn_target_embed_file_ex_s(
-  spn_target_t* target,
-  sp_str_t file,
-  sp_str_t symbol,
-  sp_str_t data_type, sp_str_t size_type
-) {
-  sp_da_push(target->embed, ((spn_embed_t) {
-    .kind = SPN_EMBED_FILE,
-    .symbol = spn_intern(symbol),
-    .types = {
-      .data = spn_intern(data_type),
-      .size = spn_intern(size_type),
-    },
-    .file = {
-      .path = spn_intern(file),
-    }
-  }));
-}
-
-void spn_target_embed_mem(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size) {
-  spn_target_embed_mem_ex(target, symbol, buffer, buffer_size, SP_EMBED_DEFAULT_DATA_T, SP_EMBED_DEFAULT_SIZE_T);
-}
-
-void spn_target_embed_mem_ex(
-  spn_target_t* target,
-  const c8* symbol,
-  const u8* buffer, u64 size,
-  const c8* data_type, const c8* size_type
-) {
-  spn_target_embed_mem_ex_s(target, sp_str_view(symbol), buffer, size, sp_str_view(data_type), sp_str_view(size_type));
-}
-
-void spn_target_embed_mem_ex_s(
-  spn_target_t* target,
-  sp_str_t symbol,
-  const u8* buffer, u64 size,
-  sp_str_t data_type, sp_str_t size_type
-) {
-  sp_da_push(target->embed, ((spn_embed_t) {
-    .kind = SPN_EMBED_MEM,
-    .symbol = spn_intern(symbol),
-    .types = {
-      .data = spn_intern(data_type),
-      .size = spn_intern(size_type),
-    },
-    .memory = {
-      .buffer = buffer,
-      .size = size
-    }
-  }));
-}
-
-void spn_target_embed_dir(spn_target_t* target, const c8* dir) {
-  spn_target_embed_dir_ex(target, dir, SP_EMBED_DEFAULT_DATA_T, SP_EMBED_DEFAULT_SIZE_T);
-}
-
-void spn_target_embed_dir_ex(spn_target_t* target, const c8* dir, const c8* data_type, const c8* size_type) {
-  spn_embed_t embed = {
-    .types = {
-      .data = spn_intern_cstr(data_type),
-      .size = spn_intern_cstr(size_type),
-    }
-  };
-
-  sp_str_t root = sp_str_view(dir);
-
-  sp_da(sp_os_dir_ent_t) entries = sp_fs_collect_recursive(root);
-  sp_da_for(entries, it) {
-    sp_os_dir_ent_t* entry = &entries[it];
-    if (sp_fs_is_regular_file(entry->file_path)) {
-      spn_target_embed_file_ex_s(
-        target,
-        entry->file_path,
-        spn_cc_symbol_from_embedded_file(
-          sp_str_suffix(
-            entry->file_path,
-            entry->file_path.len - root.len - 1
-          )
-        ),
-        embed.types.data, embed.types.size
-      );
-    }
-  }
-}
-
 spn_registry_t* spn_pkg_add_registry(spn_pkg_t* pkg, const c8* name, const c8* location) {
   return spn_pkg_add_registry_ex(pkg, spn_intern_cstr(name), spn_intern_cstr(location));
 }
@@ -3463,10 +3284,10 @@ spn_err_t spn_app_add_pkg_constraints(spn_app_t* app, spn_pkg_t* pkg) {
     if (!sp_ht_key_exists(resolver->ranges, dep->name)) {
       sp_ht_insert(resolver->ranges, dep->name, SP_NULLPTR);
     }
-    sp_da(spn_dep_version_range_t)* ranges = sp_ht_getp(resolver->ranges, dep->name);
+    sp_da(spn_resolve_range_t)* ranges = sp_ht_getp(resolver->ranges, dep->name);
 
     // collect the range of versions which satisfy the request
-    spn_dep_version_range_t range = {
+    spn_resolve_range_t range = {
       .source = request
     };
 
@@ -3571,7 +3392,7 @@ spn_err_t spn_app_resolve_from_solver(spn_app_t* app) {
 
   sp_ht_for_kv(app->resolver.ranges, it) {
     sp_str_t name = *it.key;
-    sp_da(spn_dep_version_range_t) ranges = *it.val;
+    sp_da(spn_resolve_range_t) ranges = *it.val;
     if (sp_da_empty(ranges)) {
       return SPN_ERROR;
     }
@@ -3579,7 +3400,7 @@ spn_err_t spn_app_resolve_from_solver(spn_app_t* app) {
     spn_pkg_req_t req_low, req_high = SP_ZERO_INITIALIZE();
     u32 low = 0, high = SP_LIMIT_U32_MAX;
     sp_dyn_array_for(ranges, n) {
-      spn_dep_version_range_t range = ranges[n];
+      spn_resolve_range_t range = ranges[n];
       SP_ASSERT(range.low.some);
       SP_ASSERT(range.high.some);
 
@@ -4194,41 +4015,6 @@ s32 spn_executor_link_target(spn_bg_cmd_t* cmd, void* user_data) {
   return SPN_OK;
 }
 
-bool spn_target_filter_pass(spn_target_filter_t* filter, spn_target_t* target) {
-  if (!sp_str_empty(filter->name)) {
-    return sp_str_equal(filter->name, target->name);
-  }
-
-  switch (target->visibility) {
-    case SPN_VISIBILITY_PUBLIC: return !filter->disabled.public;
-    case SPN_VISIBILITY_TEST: return !filter->disabled.test;
-    case SPN_VISIBILITY_BUILD: return true;
-  }
-  sp_unreachable_return(false);
-}
-
-bool spn_is_visibility_linked(spn_visibility_t target, spn_visibility_t dep) {
-  switch (target) {
-    case SPN_VISIBILITY_PUBLIC: {
-      switch (dep) {
-        case SPN_VISIBILITY_PUBLIC: return true;
-        case SPN_VISIBILITY_TEST: return false;
-        case SPN_VISIBILITY_BUILD: return false;
-      }
-    }
-    case SPN_VISIBILITY_TEST: {
-      switch (dep) {
-        case SPN_VISIBILITY_PUBLIC: return true;
-        case SPN_VISIBILITY_TEST: return true;
-        case SPN_VISIBILITY_BUILD: return false;
-      }
-    }
-    case SPN_VISIBILITY_BUILD: {
-      return false;
-    }
-  }
-  SP_UNREACHABLE_RETURN(false);
-}
 sp_str_t spn_compiler_to_str(spn_cc_kind_t compiler) {
   return sp_str_lit("clang");
 }
