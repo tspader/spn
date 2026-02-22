@@ -1,8 +1,5 @@
 #include "spn.h"
 
-// Test: basic node that generates a header file
-// The main.c will fail to compile if this doesn't run
-
 spn_err_t generate_header(spn_node_ctx_t* ctx) {
   spn_log(ctx->build, "generating version.h...");
   spn_write_file(ctx->build, "version.h",
@@ -26,6 +23,5 @@ void configure(spn_build_ctx_t* ctx) {
 }
 
 void package(spn_build_ctx_t* ctx) {
-  // Copy generated header to include dir
   spn_copy(ctx, SPN_DIR_WORK, "version.h", SPN_DIR_INCLUDE, "");
 }

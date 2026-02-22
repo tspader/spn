@@ -1,4 +1,3 @@
-// This file will fail to compile if the chained nodes don't run correctly
 #include "final.h"
 
 #include <stdio.h>

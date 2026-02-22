@@ -14,7 +14,8 @@ spn_err_t gen_info(spn_node_ctx_t* ctx) {
       "#define HAS_LOG_DEP 1\n"
       "#endif\n"
     );
-  } else {
+  }
+  else {
     spn_log(ctx->build, "WARNING: spn_log dependency not found");
     spn_write_file(ctx->build, "dep_info.h",
       "#ifndef DEP_INFO_H\n"

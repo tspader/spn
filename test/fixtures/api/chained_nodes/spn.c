@@ -1,10 +1,5 @@
 #include "spn.h"
 
-// Test: chained nodes that share a file
-// phase1 produces intermediate.h
-// phase2 consumes intermediate.h and produces final.h
-// This tests that the shared file uses the same graph node
-
 spn_err_t phase1_fn(spn_node_ctx_t* ctx) {
   spn_log(ctx->build, "phase1: generating intermediate.h...");
   spn_write_file(ctx->build, "intermediate.h",
@@ -40,7 +35,7 @@ void configure(spn_build_ctx_t* ctx) {
 
   spn_node_t phase2 = spn_add_node(ctx, "phase2");
   spn_node_set_fn(phase2, phase2_fn);
-  spn_node_add_input(phase2, intermediate);  // shared file - should get same graph node
+  spn_node_add_input(phase2, intermediate);
   spn_node_add_output(phase2, final);
 }
 

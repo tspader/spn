@@ -166,6 +166,14 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         EXPECT_TRUE(sp_fs_exists(path));
         break;
       }
+      case ACTION_VERIFY_INCLUDE: {
+        sp_str_t path = tmpfs_get(
+          &fixture->fs,
+          sp_fs_join_path(sp_str_lit("build/debug/store/include"), action.verify_include.file)
+        );
+        EXPECT_TRUE(sp_fs_exists(path));
+        break;
+      }
       case ACTION_VERIFY_CONTENT: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_content.file);
         sp_str_t content = sp_io_read_file(path);
@@ -412,6 +420,59 @@ UTEST_F(spn_build, add_test) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_RUN_BIN, .bin.name = "test" },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_basic_node) {
+  tmpfs_init_named(&uf->fixture.fs, "api_basic_node");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/basic_node",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("version.h") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "basic_node" },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_chained_nodes) {
+  tmpfs_init_named(&uf->fixture.fs, "api_chained_nodes");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/chained_nodes",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/chained_nodes/final.h") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "chained_nodes" },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_cross_package) {
+  tmpfs_init_named(&uf->fixture.fs, "api_cross_package");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/cross_package",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/cross_package/dep_info.h") },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "spn_log" },
+      { .kind = ACTION_RUN_BIN, .bin.name = "cross_package" },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_diamond_deps) {
+  tmpfs_init_named(&uf->fixture.fs, "api_diamond_deps");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/diamond_deps",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/diamond_deps/final.h") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "diamond_deps" },
     },
   });
 }
