@@ -1,11 +1,11 @@
 #include "spn.h"
 
 spn_err_t gen_info(spn_node_ctx_t* ctx) {
-  const spn_build_ctx_t* log_dep = spn_get_dep(ctx->build, "spn_log");
+  const spn_build_ctx_t* log_dep = spn_get_dep(ctx->build, "spum");
 
   if (log_dep) {
     const c8* log_inc = spn_get_dir(log_dep, SPN_DIR_INCLUDE);
-    spn_log(ctx->build, "found spn_log include dir");
+    spn_log(ctx->build, "found spum include dir");
     (void)log_inc;
 
     spn_write_file(ctx->build, "dep_info.h",
@@ -16,7 +16,7 @@ spn_err_t gen_info(spn_node_ctx_t* ctx) {
     );
   }
   else {
-    spn_log(ctx->build, "WARNING: spn_log dependency not found");
+    spn_log(ctx->build, "WARNING: spum dependency not found");
     spn_write_file(ctx->build, "dep_info.h",
       "#ifndef DEP_INFO_H\n"
       "#define DEP_INFO_H\n"

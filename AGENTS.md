@@ -11,6 +11,9 @@
 # building
 - `make` to build `bootstrap/bin/spn`
 - `./bootstrap/bin/spn build --target $test --profile debug --force`
+    - e.g. `./bootstrap/bin/spn build -t integration -p debug -f`
+- `./build/debug/store/bin/$test`
+    - e.g. `./build/debug/store/bin/integration`
 
 # references
 - `source/`

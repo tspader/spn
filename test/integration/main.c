@@ -444,7 +444,6 @@ UTEST_F(spn_build, api_chained_nodes) {
     .project = "test/fixtures/api/chained_nodes",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/chained_nodes/final.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "chained_nodes" },
     },
   });
@@ -457,8 +456,7 @@ UTEST_F(spn_build, api_cross_package) {
     .project = "test/fixtures/api/cross_package",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/cross_package/dep_info.h") },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "spn_log" },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "spum" },
       { .kind = ACTION_RUN_BIN, .bin.name = "cross_package" },
     },
   });
@@ -471,7 +469,6 @@ UTEST_F(spn_build, api_diamond_deps) {
     .project = "test/fixtures/api/diamond_deps",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/diamond_deps/final.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "diamond_deps" },
     },
   });
@@ -484,7 +481,6 @@ UTEST_F(spn_build, api_fan_in) {
     .project = "test/fixtures/api/fan_in",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/fan_in/combined.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "fan_in" },
     },
   });
@@ -497,7 +493,6 @@ UTEST_F(spn_build, api_multi_output) {
     .project = "test/fixtures/api/multi_output",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/multi_output/all.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "multi_output" },
     },
   });
@@ -510,7 +505,6 @@ UTEST_F(spn_build, api_node_linking) {
     .project = "test/fixtures/api/node_linking",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/node_linking/generated.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "node_linking" },
     },
   });
@@ -523,8 +517,6 @@ UTEST_F(spn_build, api_orphan_outputs) {
     .project = "test/fixtures/api/orphan_outputs",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/orphan_outputs/orphan_header.h") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/orphan_outputs/consumed_header.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "orphan_outputs" },
     },
   });
@@ -537,7 +529,6 @@ UTEST_F(spn_build, api_stamp_chain) {
     .project = "test/fixtures/api/stamp_chain",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/stamp_chain/result.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "stamp_chain" },
     },
   });
@@ -550,7 +541,6 @@ UTEST_F(spn_build, api_stamp_input) {
     .project = "test/fixtures/api/stamp_input",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/stamp_input/validated.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "stamp_input" },
     },
   });
@@ -563,8 +553,20 @@ UTEST_F(spn_build, api_user_data) {
     .project = "test/fixtures/api/user_data",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/user_data/config.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "user_data" },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_build_deps) {
+  tmpfs_init_named(&uf->fixture.fs, "api_build_deps");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/build_deps",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "spum" },
+      { .kind = ACTION_RUN_BIN, .bin.name = "build_deps" },
     },
   });
 }

@@ -1,10 +1,10 @@
 [package]
-name = "cross_package"
+name = "build_deps"
 version = "0.0.1"
 
-[deps.package]
+[deps.build]
 spum = "1.0.0"
 
 [[bin]]
-name = "cross_package"
+name = "build_deps"
 source = ["main.c"]

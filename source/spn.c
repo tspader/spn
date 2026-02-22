@@ -5511,8 +5511,8 @@ spn_err_t spn_session_compile_pkg(spn_session_t* session, spn_pkg_unit_t* unit) 
     }
   }
 
-  sp_try_goto(spn_tcc_add_file(tcc, pkg->paths.script), fail);
   spn_cc_target_to_tcc(&cc, target, tcc);
+  sp_try_goto(spn_tcc_add_file(tcc, pkg->paths.script), fail);
   sp_try_goto(tcc_relocate(tcc), fail);
 
   unit->tcc = tcc;

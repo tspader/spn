@@ -1,5 +1,5 @@
 [package]
-name = "spn_log"
+name = "spum"
 version = "1.0.0"
 
 [lib]
