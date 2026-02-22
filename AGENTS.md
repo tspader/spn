@@ -9,20 +9,8 @@
 - we use a tiny game loop library from `sp.h`, so `sp_main` is the entry point
 
 # building
-- `spn` is self-hosting
-  - `pspn` is a stable build i have copied on the $PATH; use it to build `spn`
-  - `tspn` is a link on the $PATH to the debug binary; use it when testing what you built
-- always build with `--profile debug` unless explicitly testing another profile
-- `build/debug` is the top level build output dir
-  - `build/debug/work` is for intermediate outputs and logs
-  - `build/debug/store` is for final outputs and binaries
-- example workflow:
-  1. make code changes
-  2. `pspn build --profile debug` to build with known-good copy
-  3. run `tspn` to test your new build; e.g.
-    - `tspn build -p debug -f` to use the new binary to test by force building spn itself
-    - `tspn -C test/manual/api/basic_node graph` to use the new binary against a test project
-
+- `make` to build `bootstrap/bin/spn`
+- `./bootstrap/bin/spn build --target $test --profile debug --force`
 
 # references
 - `source/`
@@ -49,7 +37,9 @@
 ```xml
 <example>
 user: Write a function that reads a file and logs its contents
-assistant: [Uses Task tool and sp skill to find relevant APIs; looks through spn.c for existing contextual examples]
+assistant: Invokes sp skill
+assistant: Reads reference at the beginning of sp.h
+assistant: Finds needed code, searches through our code for existing in-context examples
 </example>
 ```
 

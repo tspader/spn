@@ -1,3 +1,3 @@
-int jerry() {
+int spum() {
   return 69;
 }
