@@ -1,6 +1,5 @@
 // EXTERNAL
 #define SP_MAIN
-#define SP_PS_MAX_ARGS 32
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
@@ -3517,6 +3516,10 @@ spn_pkg_t* spn_app_ensure_package(spn_app_t* app, spn_pkg_req_t request) {
   sp_str_t name = spn_intern(request.name);
 
   if (!sp_om_has(app->cache, name)) {
+    sp_om_insert(app->cache, name, SP_ZERO_STRUCT(spn_pkg_t));
+    spn_pkg_t* pkg = sp_om_get(app->cache, name);
+    spn_pkg_init(pkg, name);
+
     switch (request.kind) {
       case SPN_PACKAGE_KIND_FILE: {
         sp_str_t prefix = sp_str_lit("file://");
@@ -3524,8 +3527,7 @@ spn_pkg_t* spn_app_ensure_package(spn_app_t* app, spn_pkg_req_t request) {
           .data = request.file.data + prefix.len,
           .len = request.file.len - prefix.len
         };
-        sp_om_insert(app->cache, name, SP_ZERO_STRUCT(spn_pkg_t));
-        spn_pkg_from_manifest(sp_om_get(app->cache, name), manifest);
+        spn_pkg_from_manifest(pkg, manifest);
 
         break;
       }
@@ -3535,8 +3537,7 @@ spn_pkg_t* spn_app_ensure_package(spn_app_t* app, spn_pkg_req_t request) {
           spn_app_bail_on_missing_package(app, name);
         }
 
-        sp_om_insert(app->cache, name, SP_ZERO_STRUCT(spn_pkg_t));
-        spn_pkg_from_index(sp_om_get(app->cache, name), *path);
+        spn_pkg_from_index(pkg, *path);
 
         break;
       }

@@ -111,7 +111,8 @@ void spn_pkg_from_index(spn_pkg_t* pkg, sp_str_t path) {
 
   spn_pkg_set_index(pkg, path);
   if (sp_fs_exists(pkg->paths.manifest)) {
-    spn_pkg_from_manifest(pkg, pkg->paths.manifest);
+    spn_pkg_load(pkg, pkg->paths.manifest);
+    pkg->kind = SPN_PACKAGE_KIND_INDEX;
   }
 }
 
