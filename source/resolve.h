@@ -3,6 +3,9 @@
 
 #include "sp.h"
 #include "pkg.h"
+#include "spn.h"
+
+typedef struct spn_pkg_cache* spn_pkg_cache_t;
 
 #define SPN_RESOLVE_STRATEGY(X) \
   X(SPN_RESOLVE_STRATEGY_LOCK_FILE, "lockfile") \
@@ -25,17 +28,20 @@ typedef struct {
 } spn_resolved_pkg_t;
 
 typedef struct {
+  spn_pkg_t* pkg;
+  spn_pkg_cache_t* cache;
+  sp_str_ht(sp_str_t)* registry;
   sp_str_ht(sp_da(spn_resolve_range_t)) ranges;
   sp_str_ht(bool) visited;
   sp_str_ht(spn_resolved_pkg_t) resolved;
   sp_da(sp_str_t) system_deps;
 } spn_resolver_t;
 
-spn_pkg_req_t spn_pkg_req_from_str(sp_str_t str);
-sp_str_t spn_pkg_req_to_str(spn_pkg_req_t dep);
-void spn_resolver_init(spn_resolver_t* resolver, spn_pkg_t* pkg);
+void spn_resolver_init(spn_resolver_t* r, spn_pkg_t* pkg, spn_pkg_cache_t* cache);
 
+spn_pkg_req_t          spn_pkg_req_from_str(sp_str_t str);
+sp_str_t               spn_pkg_req_to_str(spn_pkg_req_t dep);
 spn_resolve_strategy_t spn_resolve_strategy_from_str(sp_str_t str);
-sp_str_t spn_resolve_strategy_to_str(spn_resolve_strategy_t strategy);
+sp_str_t               spn_resolve_strategy_to_str(spn_resolve_strategy_t strategy);
 
 #endif

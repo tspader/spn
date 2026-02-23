@@ -2,7 +2,7 @@
 
 #include "ctx.h"
 
-sp_str_t spn_registry_get_path(spn_registry_t* registry) {
+sp_str_t spn_registry_get_path(spn_index_t* registry) {
   switch (registry->kind) {
     case SPN_PACKAGE_KIND_WORKSPACE: {
       return sp_fs_join_path(spn_app_project_dir(), registry->location);

@@ -127,6 +127,6 @@ void spn_add_linkage(spn_build_ctx_t* b, spn_linkage_t linkage) {
   spn_pkg_add_linkage(b->pkg, linkage);
 }
 
-spn_registry_t* spn_add_registry(spn_build_ctx_t* b, const c8* name, const c8* location) {
+spn_index_t* spn_add_index(spn_build_ctx_t* b, const c8* name, const c8* location) {
   return spn_pkg_add_registry(b->pkg, name, location);
 }

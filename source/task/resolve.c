@@ -9,7 +9,7 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
 
   spn_app_resolve(app);
 
-  sp_ht_for_kv(app->resolver.resolved, it) {
+  sp_str_ht_for_kv(app->resolver.resolved, it) {
     spn_session_add_pkg_unit(session, *it.val);
   }
 

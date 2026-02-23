@@ -12,6 +12,6 @@ struct spn_registry {
   spn_pkg_kind_t kind;
 };
 
-sp_str_t spn_registry_get_path(spn_registry_t* registry);
+sp_str_t spn_registry_get_path(spn_index_t* registry);
 
 #endif

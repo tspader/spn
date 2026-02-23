@@ -1,10 +1,14 @@
 #include "pkg.h"
 
+#include "app.h"
 #include "ctx.h"
 #include "intern.h"
 #include "registry.h"
 #include "resolve.h"
 #include "external/cc.h"
+#include "sp/str.h"
+
+extern spn_app_t app;
 
 sp_str_t spn_package_kind_to_str(spn_pkg_kind_t kind) {
   switch (kind) {
@@ -422,8 +426,21 @@ void spn_pkg_add_dep(spn_pkg_t* pkg, sp_str_t name, sp_str_t version, spn_visibi
     req.kind = SPN_PACKAGE_KIND_INDEX;
 
     spn_pkg_t* dep = spn_ctx_ensure_package(req);
+
+    // @spader: Return an error, log higher up
     if (!dep) {
-      spn_ctx_bail_on_missing_package(name);
+      sp_str_t prefix = sp_str_lit("  > ");
+      sp_str_t color = sp_str_lit("brightcyan");
+
+      sp_da(sp_str_t) search = app.search;
+      search = sp_str_map(search, sp_dyn_array_size(search), &color, sp_str_map_kernel_colorize);
+      search = sp_str_map(search, sp_dyn_array_size(search), &prefix, sp_str_map_kernel_prepend);
+
+      SP_FATAL(
+        "Could not find {:fg yellow} on search path: \n{}",
+        SP_FMT_STR(name),
+        SP_FMT_STR(sp_str_join_n(search, sp_dyn_array_size(search), sp_str_lit("\n")))
+      );
     }
 
     if (sp_dyn_array_empty(dep->versions)) {
@@ -523,12 +540,12 @@ bool spn_pkg_has_lib_kind(spn_pkg_t* pkg, spn_linkage_t kind) {
   return false;
 }
 
-spn_registry_t* spn_pkg_add_registry(spn_pkg_t* pkg, const c8* name, const c8* location) {
+spn_index_t* spn_pkg_add_registry(spn_pkg_t* pkg, const c8* name, const c8* location) {
   return spn_pkg_add_registry_ex(pkg, spn_intern_cstr(name), spn_intern_cstr(location));
 }
 
-spn_registry_t* spn_pkg_add_registry_ex(spn_pkg_t* pkg, sp_str_t name, sp_str_t location) {
-  spn_registry_t registry = {
+spn_index_t* spn_pkg_add_registry_ex(spn_pkg_t* pkg, sp_str_t name, sp_str_t location) {
+  spn_index_t registry = {
     .name = spn_intern(name),
     .location = spn_intern(location),
     .kind = SPN_PACKAGE_KIND_WORKSPACE

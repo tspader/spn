@@ -133,7 +133,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     if (registries) {
       spn_toml_arr_for(registries, n) {
         toml_table_t* it = toml_array_table(registries, n);
-        spn_registry_t registry = {
+        spn_index_t registry = {
           .location = spn_toml_str(it, "location"),
           .kind = SPN_PACKAGE_KIND_INDEX
         };
@@ -162,7 +162,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   // Initialize builtin registry
-  spn.registry = (spn_registry_t) {
+  spn.registry = (spn_index_t) {
     .location = spn.paths.index,
     .kind = SPN_PACKAGE_KIND_INDEX
   };
@@ -254,7 +254,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
   spn.paths.manifest = sp_fs_join_path(spn.paths.project, sp_str_lit("spn.toml"));
 
-  app = spn_app_new();
+  app = SP_ZERO_STRUCT(spn_app_t);
   spn_app_load(&app, spn.paths.manifest);
 
   switch (spn_cli_dispatch(&parser, cli)) {
@@ -280,9 +280,9 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
         break;
       }
       case SPN_EVENT_RESOLVE: {
-        sp_ht_for(app->resolver.resolved, it) {
-          sp_str_t name = *sp_ht_it_getkp(app->resolver.resolved, it);
-          spn_resolved_pkg_t resolved = *sp_ht_it_getp(app->resolver.resolved, it);
+        sp_str_ht_for(app->resolver.resolved, it) {
+          sp_str_t name = *sp_str_ht_it_getkp(app->resolver.resolved, it);
+          spn_resolved_pkg_t resolved = *sp_str_ht_it_getp(app->resolver.resolved, it);
           spn_build_ctx_log(event->io, sp_format(
             "Resolved {} to version {}",
             SP_FMT_STR(resolved.pkg->name),

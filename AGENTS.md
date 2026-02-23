@@ -49,9 +49,10 @@ assistant: Finds needed code, searches through our code for existing in-context 
 ## Rules
 - always use the `sp.h` skill when writing against sp.h APIs (either with your `Skill` tool or with `./doc/skill/sp.md`)
 - always use SP_ZERO_INITIALIZE() instead of leaving variables uninitialized
-- prefer designated initializers to memberwise assignment
 - always use braces for one liner scopes (e.g. `for`, `if`)
-- allocations are never done through the generic global allocator; prefer to allocate from:
+- always use `foo()` instead of `foo(void)` for no-argument functions
+- prefer designated initializers to memberwise assignment
+- prefer to use a specific allocator instead of the general purpose global allocator:
   - a memory arena (several in the codebase)
   - string interner (on global spn_ctx_t)
   - scratch arena, if transient (see: sp.h docs)

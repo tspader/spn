@@ -97,10 +97,6 @@ spn_pkg_t* spn_ctx_ensure_package(spn_pkg_req_t req) {
   return spn_app_ensure_package(&app, req);
 }
 
-void spn_ctx_bail_on_missing_package(sp_str_t name) {
-  spn_app_bail_on_missing_package(&app, name);
-}
-
 spn_pkg_t* spn_ctx_root_package(void) {
   return &app.package;
 }

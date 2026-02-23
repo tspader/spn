@@ -96,7 +96,7 @@ typedef struct spn_cmake spn_cmake_t;
 typedef struct spn_cc spn_cc_t;
 typedef struct spn_profile spn_profile_t;
 typedef struct spn_target spn_target_t;
-typedef struct spn_registry spn_registry_t;
+typedef struct spn_registry spn_index_t;
 typedef void* spn_config_t;
 typedef void* spn_build_t;
 
@@ -116,7 +116,7 @@ void              spn_add_include(spn_build_ctx_t* b, spn_pkg_dir_t dir, const c
 void              spn_add_define(spn_build_ctx_t* b, const c8* define);
 void              spn_add_system_dep(spn_build_ctx_t* b, const c8* dep);
 void              spn_add_linkage(spn_build_ctx_t* b, spn_linkage_t linkage);
-spn_registry_t*   spn_add_registry(spn_build_ctx_t* b, const c8* name, const c8* location);
+spn_index_t*   spn_add_index(spn_build_ctx_t* b, const c8* name, const c8* location);
 void              spn_copy(spn_build_ctx_t* b, spn_pkg_dir_t from, const c8* pf, spn_pkg_dir_t to, const c8* pt);
 void              spn_log(spn_build_ctx_t* b, const c8* message);
 spn_cc_kind_t     spn_profile_get_cc(spn_profile_t* profile);

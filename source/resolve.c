@@ -1,3 +1,4 @@
+#include "app.h"
 #include "resolve.h"
 
 spn_pkg_req_t spn_pkg_req_from_str(sp_str_t str) {
@@ -35,12 +36,9 @@ sp_str_t spn_pkg_req_to_str(spn_pkg_req_t dep) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-void spn_resolver_init(spn_resolver_t* resolver, spn_pkg_t* pkg) {
-  (void)pkg;
-
-  sp_ht_set_fns(resolver->ranges, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(resolver->resolved, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(resolver->visited, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+void spn_resolver_init(spn_resolver_t* r, spn_pkg_t* pkg, spn_pkg_cache_t* cache) {
+  r->pkg = pkg;
+  r->cache = cache;
 }
 
 spn_resolve_strategy_t spn_resolve_strategy_from_str(sp_str_t str) {

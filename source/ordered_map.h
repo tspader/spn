@@ -3,19 +3,21 @@
 
 #include "sp.h"
 
-#define sp_om(T)                                                                   \
-  struct {                                                                         \
+#define sp_om_body(T)                                                                   \
+  {                                                                         \
     struct { sp_mem_arena_t* data; sp_mem_arena_t* metadata; } arenas; \
     sp_da(T*) order;                                                               \
     sp_str_ht(T*) index;                                                           \
     T* temp;                                                                       \
-  }*
+  }
 
-#define sp_om_new_ex(om, darena, marena)                                                    \
+#define sp_om(T) struct sp_om_body(T)*
+
+#define sp_om_new_ex(om, darena, marena)                                           \
   do {                                                                             \
-    (om) = sp_alloc_hint(&(om), sizeof(*(om)));                                      \
-    (om)->arenas.data = darena;                                                           \
-    (om)->arenas.metadata = marena;                                                           \
+    (om) = sp_alloc_hint(&(om), sizeof(*(om)));                                    \
+    (om)->arenas.data = darena;                                                    \
+    (om)->arenas.metadata = marena;                                                \
   } while (0)
 
 #define sp_om_new(om)                                                              \

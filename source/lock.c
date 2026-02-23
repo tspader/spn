@@ -10,7 +10,7 @@ spn_lock_file_t spn_build_lock_file(void) {
   spn_resolver_t* resolver = spn_ctx_resolver();
   spn_pkg_t* root_pkg = spn_ctx_root_package();
 
-  sp_ht_for_kv(resolver->resolved, it) {
+  sp_str_ht_for_kv(resolver->resolved, it) {
     spn_resolved_pkg_t* resolved = it.val;
     spn_pkg_t* pkg = resolved->pkg;
     spn_pkg_metadata_t* metadata = sp_ht_getp(pkg->metadata, resolved->version);

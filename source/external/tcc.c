@@ -22,7 +22,7 @@ static spn_tcc_symbol_t spn_tcc_symbol_table[] = {
   SPN_DEFINE_LIB_ENTRY(spn_add_define)
   SPN_DEFINE_LIB_ENTRY(spn_add_system_dep)
   SPN_DEFINE_LIB_ENTRY(spn_add_linkage)
-  SPN_DEFINE_LIB_ENTRY(spn_add_registry)
+  SPN_DEFINE_LIB_ENTRY(spn_add_index)
   SPN_DEFINE_LIB_ENTRY(spn_copy)
   SPN_DEFINE_LIB_ENTRY(spn_log)
   SPN_DEFINE_LIB_ENTRY(spn_profile_get_cc)

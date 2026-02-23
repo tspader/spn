@@ -358,7 +358,7 @@ sp_app_result_t spn_cli_set_profile(spn_app_t* app, sp_str_t name) {
 
 // Get resolved package path from resolver (doesn't require builder init)
 sp_str_t spn_cli_get_resolved_pkg_source(sp_str_t name) {
-  spn_resolved_pkg_t* resolved = sp_ht_getp(app.resolver.resolved, name);
+  spn_resolved_pkg_t* resolved = sp_str_ht_get(app.resolver.resolved, name);
   SP_ASSERT_FMT(resolved, "{:fg brightyellow} is not in this project", SP_FMT_STR(name));
   return sp_fs_join_path(spn.paths.source, resolved->pkg->name);
 }
@@ -390,7 +390,7 @@ sp_app_result_t spn_cli_list(spn_cli_t* cli) {
   sp_tui_table_setup_column(&spn.tui.table, sp_str_lit("Author"));
   sp_tui_table_header_row(&spn.tui.table);
 
-  sp_ht_for_kv(app.registry, it) {
+  sp_str_ht_for_kv(app.registry, it) {
     spn_pkg_t* package = spn_app_ensure_package(&app, (spn_pkg_req_t) {
       .name = sp_fs_get_stem(*it.val),
       .kind = SPN_PACKAGE_KIND_INDEX

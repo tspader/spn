@@ -1,5 +1,6 @@
 #include "app.h"
 #include "external/cc.h"
+#include "sp.h"
 #include "sp/ht.h"
 #include "sp/str.h"
 
@@ -246,7 +247,7 @@ void spn_app_write_manifest(spn_pkg_t* pkg, sp_str_t path) {
   if (!sp_om_empty(pkg->registries)) {
     spn_toml_begin_array_cstr(&toml, "registry");
     sp_om_for(pkg->registries, it) {
-      spn_registry_t* registry = sp_om_at(pkg->registries, it);
+      spn_index_t* registry = sp_om_at(pkg->registries, it);
 
       spn_toml_append_array_table(&toml);
 
@@ -296,10 +297,8 @@ spn_pkg_t* spn_app_ensure_package(spn_app_t* app, spn_pkg_req_t request) {
         break;
       }
       case SPN_PACKAGE_KIND_INDEX: {
-        sp_str_t* path = sp_ht_getp(app->registry, name);
-        if (!path) {
-          spn_app_bail_on_missing_package(app, name);
-        }
+        sp_str_t* path = sp_str_ht_get(app->registry, name);
+        if (!path) return SP_NULLPTR;
 
         spn_pkg_from_index(pkg, *path);
 
@@ -319,14 +318,6 @@ spn_pkg_t* spn_app_ensure_package(spn_app_t* app, spn_pkg_req_t request) {
   return spn_app_find_package_from_request(app, request);
 }
 
-spn_app_t spn_app_new() {
-  spn_app_t app = SP_ZERO_INITIALIZE();
-
-  sp_ht_set_fns(app.registry, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-
-  return app;
-}
-
 spn_app_t spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode_t mode) {
   sp_str_t paths [] = {
     sp_fs_join_path(path, sp_str_lit("spn.toml")),
@@ -338,7 +329,7 @@ spn_app_t spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode
     }
   }
 
-  spn_app_t app = spn_app_new();
+  spn_app_t app = SP_ZERO_INITIALIZE();
   switch (mode) {
     case SPN_APP_INIT_NORMAL: {
       app.package = spn_pkg_from_default(path, name);
@@ -391,12 +382,12 @@ void spn_app_load(spn_app_t* app, sp_str_t manifest_path) {
   sp_dyn_array_push(app->search, spn_registry_get_path(&spn.registry));
 
   sp_dyn_array_for(spn.registries, it) {
-    spn_registry_t* registry = &spn.registries[it];
+    spn_index_t* registry = &spn.registries[it];
     sp_dyn_array_push(app->search, spn_registry_get_path(registry));
   }
 
   sp_om_for(app->package.registries, it) {
-    spn_registry_t* registry = sp_om_at(app->package.registries, it);
+    spn_index_t* registry = sp_om_at(app->package.registries, it);
     sp_dyn_array_push(app->search, spn_registry_get_path(registry));
   }
 
@@ -414,7 +405,7 @@ void spn_app_load(spn_app_t* app, sp_str_t manifest_path) {
     sp_dyn_array_for(entries, i) {
       sp_os_dir_ent_t entry = entries[i];
       sp_str_t stem = sp_fs_get_stem(entry.file_path);
-      sp_ht_insert(app->registry, stem, entry.file_path);
+      sp_str_ht_insert(app->registry, stem, entry.file_path);
     }
   }
 
@@ -457,21 +448,6 @@ void spn_app_load(spn_app_t* app, sp_str_t manifest_path) {
   }
 }
 
-void spn_app_bail_on_missing_package(spn_app_t* app, sp_str_t name) {
-  sp_str_t prefix = sp_str_lit("  > ");
-  sp_str_t color = sp_str_lit("brightcyan");
-
-  sp_da(sp_str_t) search = app->search;
-  search = sp_str_map(search, sp_dyn_array_size(search), &color, sp_str_map_kernel_colorize);
-  search = sp_str_map(search, sp_dyn_array_size(search), &prefix, sp_str_map_kernel_prepend);
-
-  SP_FATAL(
-    "Could not find {:fg yellow} on search path: \n{}",
-    SP_FMT_STR(name),
-    SP_FMT_STR(sp_str_join_n(search, sp_dyn_array_size(search), sp_str_lit("\n")))
-  );
-}
-
 spn_err_t spn_app_add_pkg_constraints(spn_app_t* app, spn_pkg_t* pkg) {
   spn_resolver_t* resolver = &app->resolver;
 
@@ -497,7 +473,7 @@ spn_err_t spn_app_add_pkg_constraints(spn_app_t* app, spn_pkg_t* pkg) {
   }
 
   // prevent circular deps by marking this dep until we're done with the subtree
-  sp_ht_insert(resolver->visited, pkg->name, true);
+  sp_str_ht_insert(resolver->visited, pkg->name, true);
 
   sp_ht_for_kv(pkg->deps, it) {
     spn_pkg_req_t request = *it.val;
@@ -520,9 +496,9 @@ spn_err_t spn_app_add_pkg_constraints(spn_app_t* app, spn_pkg_t* pkg) {
 
     // add the dependency itself
     if (!sp_ht_key_exists(resolver->ranges, dep->name)) {
-      sp_ht_insert(resolver->ranges, dep->name, SP_NULLPTR);
+      sp_str_ht_insert(resolver->ranges, dep->name, SP_NULLPTR);
     }
-    sp_da(spn_resolve_range_t)* ranges = sp_ht_getp(resolver->ranges, dep->name);
+    sp_da(spn_resolve_range_t)* ranges = sp_str_ht_get(resolver->ranges, dep->name);
 
     // collect the range of versions which satisfy the request
     spn_resolve_range_t range = {
@@ -577,13 +553,12 @@ spn_err_t spn_app_add_pkg_constraints(spn_app_t* app, spn_pkg_t* pkg) {
     sp_dyn_array_push(*ranges, range);
   }
 
-  sp_ht_erase(resolver->visited, pkg->name);
+  sp_str_ht_erase(resolver->visited, pkg->name);
 
   return SPN_OK;
 }
 
 void spn_app_resolve_from_lock_file(spn_app_t* app) {
-  spn_resolver_init(&app->resolver, &app->package);
   SP_ASSERT(app->lock.some);
 
   spn_lock_file_t* lock = &app->lock.value;
@@ -612,7 +587,7 @@ void spn_app_resolve_from_lock_file(spn_app_t* app) {
 
     spn_pkg_t* pkg = spn_app_ensure_package(app, request);
 
-    sp_ht_insert(app->resolver.resolved, entry->name, ((spn_resolved_pkg_t) {
+    sp_str_ht_insert(app->resolver.resolved, entry->name, ((spn_resolved_pkg_t) {
       .pkg = pkg,
       .kind = request.kind,
       .version = entry->version
@@ -625,10 +600,9 @@ void spn_app_resolve_from_lock_file(spn_app_t* app) {
 }
 
 spn_err_t spn_app_resolve_from_solver(spn_app_t* app) {
-  spn_resolver_init(&app->resolver, &app->package);
   sp_try(spn_app_add_pkg_constraints(app, &app->package));
 
-  sp_ht_for_kv(app->resolver.ranges, it) {
+  sp_str_ht_for_kv(app->resolver.ranges, it) {
     sp_str_t name = *it.key;
     sp_da(spn_resolve_range_t) ranges = *it.val;
     if (sp_da_empty(ranges)) {
@@ -666,7 +640,7 @@ spn_err_t spn_app_resolve_from_solver(spn_app_t* app) {
 
 
     spn_pkg_t* pkg = spn_app_ensure_package(app, req_high);
-    sp_ht_insert(app->resolver.resolved, name, ((spn_resolved_pkg_t) {
+    sp_str_ht_insert(app->resolver.resolved, name, ((spn_resolved_pkg_t) {
       .pkg = pkg,
       .version = pkg->versions[high],
       .kind = req_high.kind,
@@ -677,6 +651,8 @@ spn_err_t spn_app_resolve_from_solver(spn_app_t* app) {
 }
 
 void spn_app_resolve(spn_app_t* app) {
+  spn_resolver_init(&app->resolver, &app->package, &app->cache, &app->registry);
+
   switch (app->lock.some) {
     case SP_OPT_SOME: {
       spn_event_buffer_push_ctx(spn.events, &spn_session_find_root(&app->session)->ctx, (spn_build_event_t) {
