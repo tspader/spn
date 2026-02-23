@@ -161,6 +161,10 @@ sp_app_result_t spn_cli_manifest(spn_cli_t* cli);
 sp_app_result_t spn_cli_graph(spn_cli_t* cli);
 sp_app_result_t spn_cli_root(spn_cli_t* cli);
 sp_app_result_t spn_cli_help(spn_cli_parser_t* p);
+spn_cli_cmd_t spn_cli_command_from_str(sp_str_t str);
+sp_str_t spn_cli_command_to_str(spn_cli_cmd_t cmd);
+spn_tool_cmd_t spn_tool_subcommand_from_str(sp_str_t str);
+sp_str_t spn_tool_subcommand_to_str(spn_tool_cmd_t cmd);
 spn_cli_command_usage_t spn_cli(void);
 
 #define SPN_CLI_UNIMPLEMENTED() SP_LOG("unimplemented"); return SP_APP_ERR;

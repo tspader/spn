@@ -55,6 +55,7 @@ SPN_SOURCES := \
 	source/cmake.c \
 	source/profile.c \
 	source/cc.c \
+	source/cli.c \
 	source/gen.c \
 	source/target.c \
 	source/filter.c \
