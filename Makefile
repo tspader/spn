@@ -40,6 +40,8 @@ bootstrap/include/libtcc.h: bootstrap/lib/libtcc.a
 ##############
 SPN_SOURCES := \
 	source/spn.c \
+	source/unit.c \
+	source/executor.c \
 	source/main.c \
 	source/graph.c \
 	source/task.c \

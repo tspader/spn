@@ -1,6 +1,12 @@
 #ifndef SPN_TASK_H
 #define SPN_TASK_H
 
+#include "sp.h"
+
+#include "graph.h"
+#include "node.h"
+#include "unit.h"
+
 typedef struct spn_app_t spn_app_t;
 
 typedef enum {
@@ -49,5 +55,10 @@ spn_task_result_t spn_task_graph(spn_app_t* app);
 spn_task_result_t spn_task_run_tests(spn_app_t* app);
 spn_task_result_t spn_task_generate(spn_app_t* app);
 spn_task_result_t spn_task_which(spn_app_t* app);
+
+spn_bg_id_t spn_bg_get_or_put_user_file(spn_pkg_unit_t* unit, spn_build_graph_t* graph, sp_str_t path);
+sp_str_t spn_pkg_unit_get_node_stamp_file(spn_pkg_unit_t* ctx, spn_user_node_t* node);
+void spn_bg_add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit);
+void spn_bg_add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_unit_t* unit);
 
 #endif

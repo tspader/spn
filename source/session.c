@@ -31,62 +31,6 @@ void spn_session_set_filter(spn_session_t* session, spn_target_filter_t filter) 
   session->filter = filter;
 }
 
-void spn_pkg_unit_add_target(spn_pkg_unit_t* pkg, spn_target_t* target) {
-  spn_session_t* session = pkg->ctx.session;
-
-  spn_event_buffer_push_ex(spn.events, pkg->ctx.pkg, &pkg->ctx.logs, (spn_build_event_t) {
-    .kind = SPN_EVENT_ADD_TARGET,
-    .target_add = {
-      .target = target->name,
-      .kind = target->kind,
-    }
-  });
-
-  sp_om_insert(pkg->targets, target->name, SP_ZERO_STRUCT(spn_target_unit_t));
-  spn_target_unit_t* unit = sp_om_back(pkg->targets);
-  unit->session = pkg->ctx.session;
-  unit->pkg = pkg->ctx.pkg;
-  unit->info = target;
-
-  spn_bp_config_t config = {
-    .source = pkg->ctx.paths.source,
-    .store = pkg->ctx.paths.store,
-    .work = pkg->ctx.paths.work,
-  };
-
-  unit->paths.source = sp_str_copy(config.source);
-  unit->paths.work = sp_str_copy(config.work);
-  unit->paths.store = sp_str_copy(config.store);
-  unit->paths.include = sp_fs_join_path(unit->paths.store, SP_LIT("include"));
-  unit->paths.bin = sp_fs_join_path(unit->paths.store, SP_LIT("bin"));
-  unit->paths.lib = sp_fs_join_path(unit->paths.store, SP_LIT("lib"));
-  unit->paths.vendor = sp_fs_join_path(unit->paths.store, SP_LIT("vendor"));
-  unit->paths.generated = sp_fs_join_path(unit->paths.work, SP_LIT("spn"));
-  unit->paths.object = sp_fs_join_path(unit->paths.generated, sp_str_lit("object"));
-  unit->paths.logs.build = sp_fs_join_path(unit->paths.work, sp_format("{}.build.log", SP_FMT_STR(target->name)));
-  unit->paths.logs.test = sp_fs_join_path(unit->paths.work, sp_format("{}.test.log", SP_FMT_STR(target->name)));
-
-  sp_fs_create_dir(unit->paths.work);
-  sp_fs_create_dir(unit->paths.generated);
-  sp_fs_create_dir(unit->paths.object);
-  sp_fs_create_dir(unit->paths.store);
-  sp_fs_create_dir(unit->paths.bin);
-  sp_fs_create_dir(unit->paths.include);
-  sp_fs_create_dir(unit->paths.lib);
-  sp_fs_create_dir(unit->paths.vendor);
-  sp_fs_create_file(unit->paths.logs.build);
-
-  unit->logs.build = sp_io_writer_from_file(unit->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
-
-  spn_event_buffer_push_ex(spn.events, pkg->ctx.pkg, &pkg->ctx.logs, (spn_build_event_t) {
-    .kind = SPN_EVENT_ADD_TARGET,
-    .target.add = {
-      .name = target->name
-    }
-  });
-
-}
-
 void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit, spn_pkg_t* pkg, spn_pkg_kind_t kind, spn_semver_t version) {
   switch (kind) {
     case SPN_PACKAGE_KIND_ROOT:
