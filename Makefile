@@ -45,6 +45,7 @@ SPN_SOURCES := \
 	source/task.c \
 	source/tui.c \
 	source/ctx.c \
+	source/session.c \
 	source/intern.c \
 	source/log.c \
 	source/option.c \
