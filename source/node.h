@@ -37,4 +37,6 @@ typedef struct {
   sp_da(spn_bg_id_t) user;
 } spn_pkg_nodes_t;
 
+spn_user_node_t* spn_find_user_node(spn_node_t node);
+
 #endif
