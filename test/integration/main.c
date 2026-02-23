@@ -71,6 +71,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
   sp_fs_create_dir(fixture->paths.storage);
   sp_fs_create_dir(fixture->paths.include);
   sp_fs_create_dir(fixture->paths.index);
+  setup_fixture_envrc(&fixture->fs, fixture->paths.storage, fixture->paths.config);
 
   sp_fs_copy(sp_fs_join_path(fixture->paths.root, sp_str_lit("include/spn.h")), fixture->paths.include);
 

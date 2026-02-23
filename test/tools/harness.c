@@ -174,3 +174,14 @@ void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, s
     fixture_write_file(paths.metadata, spn_toml_writer_write(&metadata));
   }
 }
+
+void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t config) {
+  sp_str_t path = tmpfs_get(fs, sp_str_lit(".envrc"));
+  sp_str_t content = sp_format(
+    "export SPN_STORAGE_DIR={}\n"
+    "export SPN_CONFIG_DIR={}\n",
+    SP_FMT_STR(storage),
+    SP_FMT_STR(config)
+  );
+  fixture_write_file(path, content);
+}

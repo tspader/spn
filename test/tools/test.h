@@ -22,6 +22,7 @@ void     tmpfs_deinit(tmpfs_t* fs);
 
 void     copy_project_path(s32* utest_result, tmpfs_t* fs, sp_str_t project, sp_str_t relative);
 void     setup_fixture_index_from_remote(s32* utest_result, tmpfs_t* fs, sp_str_t index, sp_str_t project);
+void     setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t config);
 
 void     git_repo_create_from_dir(sp_str_t source, sp_str_t repo);
 void     git_repo_init(sp_str_t repo);
