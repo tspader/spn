@@ -50,14 +50,9 @@ spn_linkage_t spn_lib_kind_from_str(sp_str_t str) {
 }
 
 spn_linkage_t spn_pkg_linkage_from_str(sp_str_t str) {
-  if (sp_str_equal_cstr(str, "shared")) {
-    return SPN_LIB_KIND_SHARED;
-  }
-  if (sp_str_equal_cstr(str, "static")) {
-    return SPN_LIB_KIND_STATIC;
-  }
-
-  return SPN_LIB_KIND_SOURCE;
+  if (spn_intern_is_equal_cstr(str, "shared")) return SPN_LIB_KIND_SHARED;
+  if (spn_intern_is_equal_cstr(str, "static")) return SPN_LIB_KIND_STATIC;
+  return SPN_LIB_KIND_SHARED;
 }
 
 sp_str_t spn_pkg_linkage_to_str(spn_linkage_t kind) {

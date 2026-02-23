@@ -20,33 +20,15 @@ spn_pkg_kind_t spn_package_kind_from_str(sp_str_t str) {
 }
 
 spn_pkg_dir_t spn_cache_dir_kind_from_str(sp_str_t str) {
-  if (sp_str_equal_cstr(str, "")) {
-    return SPN_DIR_STORE;
-  }
-  if (sp_str_equal_cstr(str, "cache")) {
-    return SPN_DIR_CACHE;
-  }
-  if (sp_str_equal_cstr(str, "store")) {
-    return SPN_DIR_STORE;
-  }
-  if (sp_str_equal_cstr(str, "include")) {
-    return SPN_DIR_INCLUDE;
-  }
-  if (sp_str_equal_cstr(str, "vendor")) {
-    return SPN_DIR_VENDOR;
-  }
-  if (sp_str_equal_cstr(str, "lib")) {
-    return SPN_DIR_LIB;
-  }
-  if (sp_str_equal_cstr(str, "source")) {
-    return SPN_DIR_SOURCE;
-  }
-  if (sp_str_equal_cstr(str, "work")) {
-    return SPN_DIR_WORK;
-  }
-  if (sp_str_equal_cstr(str, "project")) {
-    return SPN_DIR_PROJECT;
-  }
+  if      (sp_str_equal_cstr(str, ""))         return SPN_DIR_STORE;
+  else if (sp_str_equal_cstr(str, "cache"))    return SPN_DIR_CACHE;
+  else if (sp_str_equal_cstr(str, "store"))    return SPN_DIR_STORE;
+  else if (sp_str_equal_cstr(str, "include"))  return SPN_DIR_INCLUDE;
+  else if (sp_str_equal_cstr(str, "vendor"))   return SPN_DIR_VENDOR;
+  else if (sp_str_equal_cstr(str, "lib"))      return SPN_DIR_LIB;
+  else if (sp_str_equal_cstr(str, "source"))   return SPN_DIR_SOURCE;
+  else if (sp_str_equal_cstr(str, "work"))     return SPN_DIR_WORK;
+  else if (sp_str_equal_cstr(str, "project"))  return SPN_DIR_PROJECT;
 
   SP_FATAL("Unknown dir kind {:fg brightyellow}; options are [cache, store, include, vendor, lib, source, work]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_DIR_CACHE);
@@ -69,16 +51,18 @@ void spn_pkg_set_index(spn_pkg_t* pkg, sp_str_t path) {
   pkg->kind = SPN_PACKAGE_KIND_INDEX;
   pkg->paths.root = sp_str_copy(path);
   pkg->paths.manifest = sp_fs_join_path(pkg->paths.root, sp_str_lit("spn.toml"));
+  pkg->paths.metadata = sp_fs_join_path(pkg->paths.root, sp_str_lit("metadata.toml"));
+  pkg->paths.script = sp_fs_join_path(pkg->paths.root, sp_str_lit("spn.c"));
   sp_context_pop();
 }
 
 void spn_pkg_set_manifest(spn_pkg_t* pkg, sp_str_t path) {
   sp_context_push_arena(pkg->arena);
-  pkg->kind = SPN_PACKAGE_KIND_WORKSPACE;
-  pkg->paths.manifest = path;
+  pkg->kind = SPN_PACKAGE_KIND_FILE;
+  pkg->paths.manifest = sp_str_copy(path);
   pkg->paths.root = sp_fs_parent_path(path);
   pkg->paths.script = sp_fs_join_path(pkg->paths.root, SP_LIT("spn.c"));
-  pkg->paths.metadata = sp_fs_join_path(pkg->paths.root, SP_LIT("spn.meta.toml"));
+  pkg->paths.metadata = sp_fs_join_path(pkg->paths.root, SP_LIT("metadata.toml"));
   sp_context_pop();
 }
 
@@ -88,48 +72,61 @@ spn_pkg_t spn_pkg_new(sp_str_t name) {
   return pkg;
 }
 
-static spn_pkg_t spn_pkg_from_bare_default(sp_str_t path, sp_str_t name) {
-  spn_pkg_t pkg = spn_pkg_new(name);
-  spn_pkg_set_manifest(&pkg, sp_fs_join_path(path, SP_LIT("spn.toml")));
-  return pkg;
+spn_pkg_t spn_pkg_from_bare_default(sp_str_t path, sp_str_t name) {
+  spn_pkg_t package = spn_pkg_new(name);
+  spn_pkg_set_manifest(&package, sp_fs_join_path(path, sp_str_lit("spn.toml")));
+  package.version = (spn_semver_t){0, 1, 0};
+  sp_dyn_array_push(package.versions, package.version);
+  return package;
 }
 
 spn_pkg_t spn_pkg_from_default(sp_str_t path, sp_str_t name) {
-  spn_pkg_t pkg = spn_pkg_from_bare_default(path, name);
+  spn_pkg_t pkg = spn_pkg_new(name);
+  spn_pkg_set_manifest(&pkg, sp_fs_join_path(path, sp_str_lit("spn.toml")));
+  spn_pkg_add_dep_latest(&pkg, sp_str_lit("sp"), SPN_VISIBILITY_PUBLIC);
+  spn_pkg_set_repo(&pkg, "");
   spn_pkg_add_version(&pkg, "0.1.0", "");
-  spn_profile_t* profile = spn_pkg_add_profile(&pkg, "debug");
-  spn_profile_set_cc(profile, SPN_CC_CLANG);
-  spn_profile_set_standard(profile, SPN_C99);
-  spn_profile_set_mode(profile, SPN_DEP_BUILD_MODE_DEBUG);
+
+  spn_target_t* bin = spn_pkg_add_exe_ex(&pkg, pkg.name);
+  spn_target_add_source_ex(bin, sp_str_lit("main.c"));
 
   return pkg;
 }
 
 void spn_pkg_from_index(spn_pkg_t* pkg, sp_str_t path) {
-  SP_ASSERT(sp_fs_exists(path));
-  SP_ASSERT(sp_fs_is_dir(path));
+  sp_str_t manifest = sp_fs_join_path(path, sp_str_lit("spn.toml"));
+  SP_ASSERT(sp_fs_exists(manifest));
 
+  spn_pkg_load(pkg, manifest);
   spn_pkg_set_index(pkg, path);
-  if (sp_fs_exists(pkg->paths.manifest)) {
-    spn_pkg_load(pkg, pkg->paths.manifest);
-    pkg->kind = SPN_PACKAGE_KIND_INDEX;
+
+  toml_table_t* metadata = spn_toml_parse(pkg->paths.metadata);
+  if (metadata) {
+    toml_array_t* versions = toml_table_array(metadata, "versions");
+
+    const c8* key = SP_NULLPTR;
+    spn_toml_arr_for(versions, it) {
+      toml_table_t* entry = toml_array_table(versions, it);
+
+      spn_semver_t version = spn_semver_from_str(spn_toml_str(entry, "version"));
+      spn_pkg_add_version_ex(pkg, version, spn_toml_str(entry, "commit"));
+    }
+
+    sp_dyn_array_sort(pkg->versions, spn_semver_sort_kernel);
   }
 }
 
 void spn_pkg_from_manifest(spn_pkg_t* pkg, sp_str_t manifest) {
   SP_ASSERT(sp_fs_exists(manifest));
-  SP_ASSERT(!sp_fs_is_dir(manifest));
 
   spn_pkg_load(pkg, manifest);
   spn_pkg_set_manifest(pkg, manifest);
 }
 
-static void spn_pkg_load_deps(toml_table_t* toml, spn_pkg_t* package, spn_visibility_t visibility) {
-  if (!toml) {
-    return;
-  }
+void spn_pkg_load_deps(toml_table_t* toml, spn_pkg_t* package, spn_visibility_t visibility) {
+  if (!toml) return;
 
-  const c8* key = SP_NULLPTR;
+  const c8 *key = SP_NULLPTR;
   spn_toml_for(toml, n, key) {
     sp_str_t version = spn_toml_str(toml, key);
     spn_pkg_add_dep(package, sp_str_view(key), version, visibility);
@@ -429,17 +426,16 @@ void spn_pkg_add_dep(spn_pkg_t* pkg, sp_str_t name, sp_str_t version, spn_visibi
       spn_ctx_bail_on_missing_package(name);
     }
 
-    if (sp_da_empty(dep->versions)) {
+    if (sp_dyn_array_empty(dep->versions)) {
       SP_FATAL("{:fg brightcyan} has no known versions", SP_FMT_STR(dep->name));
     }
 
     spn_semver_parsed_t parsed = {
-      .version = *sp_da_back(dep->versions),
+      .version = *sp_dyn_array_back(dep->versions),
       .components = { true, true, true }
     };
     req.range = spn_semver_caret_to_range(parsed);
-  }
-  else {
+  } else {
     req = spn_pkg_req_from_str(version);
     req.name = spn_intern(name);
     req.visibility = visibility;

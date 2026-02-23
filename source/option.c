@@ -50,6 +50,9 @@ void spn_toml_append_option(spn_toml_writer_t* writer, sp_str_t key, spn_dep_opt
       spn_toml_append_str(writer, key, option.str);
       break;
     }
+    default: {
+      SP_UNREACHABLE_CASE();
+    }
   }
 }
 
