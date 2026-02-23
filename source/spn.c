@@ -340,18 +340,18 @@ sp_app_result_t spn_update(sp_app_t* sp) {
       result = spn_task_sync_update(app);
       break;
     }
-    case SPN_TASK_KIND_CONFIGURE_V2: {
-      if (!task->initted) spn_task_prepare_configure_graph(app);
+    case SPN_TASK_KIND_CONFIGURE: {
+      if (!task->initted) spn_task_init_configure_graph(app);
       result = spn_task_update_configure_graph(app);
       break;
     }
-    case SPN_TASK_KIND_PREPARE_BUILD_GRAPH_V2: {
-      result = spn_task_prepare_build_graph_v2(app);
+    case SPN_TASK_KIND_PREPARE_BUILD_GRAPH: {
+      result = spn_task_prepare_build_graph(app);
       break;
     }
     case SPN_TASK_KIND_RUN_BUILD_GRAPH: {
-      if (!task->initted) spn_task_run_build_graph_init(app);
-      result = spn_task_run_build_graph_update(app);
+      if (!task->initted) spn_task_init_build_graph(app);
+      result = spn_task_run_build_graph(app);
       break;
     }
     case SPN_TASK_KIND_RENDER_BUILD_GRAPH: {
@@ -368,10 +368,6 @@ sp_app_result_t spn_update(sp_app_t* sp) {
     }
     case SPN_TASK_KIND_WHICH: {
       result = spn_task_which(app);
-      break;
-    }
-    case SPN_TASK_KIND_PREPARE_BUILD_GRAPH: {
-      result = SPN_TASK_DONE;
       break;
     }
     case SPN_TASK_KIND_COUNT: {

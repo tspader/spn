@@ -1,6 +1,10 @@
 #include "app.h"
+#include "intern.h"
+#include "session.h"
+#include "task.h"
+#include "unit.h"
 
-s32 spn_executor_configure_pkg(spn_bg_cmd_t* cmd, void* user_data) {
+s32 configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* pkg = (spn_pkg_unit_t*)user_data;
 
   sp_try(spn_session_compile_pkg(pkg->ctx.session, pkg));
@@ -55,12 +59,12 @@ spn_task_result_t spn_task_update_configure_graph(spn_app_t* app) {
   return SPN_TASK_CONTINUE;
 }
 
-spn_task_result_t spn_task_prepare_configure_graph(spn_app_t* app) {
+spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   spn_session_t* b = &app->session;
   spn_build_graph_t* graph = &b->configure.graph;
   spn_pkg_unit_t* root = spn_session_find_root(&app->session);
 
-  root->nodes.configure.run = spn_bg_add_fn_ex(graph, spn_executor_configure_pkg, root, SPN_BG_VIZ_DEFAULT, app->package.name, sp_str_lit("configure"));
+  root->nodes.configure.run = spn_bg_add_fn_ex(graph, configure_package, root, SPN_BG_VIZ_DEFAULT, app->package.name, sp_str_lit("configure"));
   root->nodes.configure.stamp = spn_bg_add_file(graph, root->paths.stamp.package);
   spn_bg_cmd_add_output(graph, root->nodes.configure.run, root->nodes.configure.stamp);
 
@@ -69,7 +73,7 @@ spn_task_result_t spn_task_prepare_configure_graph(spn_app_t* app) {
     spn_resolved_pkg_t* resolved = sp_ht_it_getp(app->resolver.resolved, it);
     spn_pkg_unit_t* unit = sp_om_get(b->units.packages, name);
     sp_assert(unit);
-    unit->nodes.configure.run = spn_bg_add_fn_ex(graph, spn_executor_configure_pkg, unit, SPN_BG_VIZ_DEFAULT, app->package.name, sp_str_lit("configure"));
+    unit->nodes.configure.run = spn_bg_add_fn_ex(graph, configure_package, unit, SPN_BG_VIZ_DEFAULT, app->package.name, sp_str_lit("configure"));
     unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
     spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp);
     spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp);
