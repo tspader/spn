@@ -1,10 +1,10 @@
 #include "pkg.h"
 
-#include "cc.h"
 #include "ctx.h"
 #include "intern.h"
 #include "registry.h"
 #include "resolve.h"
+#include "external/cc.h"
 
 sp_str_t spn_package_kind_to_str(spn_pkg_kind_t kind) {
   switch (kind) {

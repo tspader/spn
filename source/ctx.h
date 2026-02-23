@@ -4,7 +4,7 @@
 #include "sp.h"
 #include "spn.h"
 #include "log.h"
-#include "ordered_map.h"
+#include "intern.h"
 #include "pkg.h"
 #include "resolve.h"
 

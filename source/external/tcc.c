@@ -1,6 +1,6 @@
 #include "tcc.h"
 
-#include "../sp/macro.h"
+#include "sp/macro.h"
 
 typedef struct {
   const c8* symbol;

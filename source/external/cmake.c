@@ -26,6 +26,10 @@ sp_str_t spn_cmake_gen_to_str(spn_cmake_gen_t gen) {
   return SP_ZERO_STRUCT(sp_str_t);
 }
 
+static sp_str_t spn_cmake_format_define(sp_str_t name, sp_str_t value) {
+  return sp_format("-D{}={}", SP_FMT_STR(name), SP_FMT_STR(value));
+}
+
 void spn_cmake(spn_build_ctx_t* build) {
   spn_cmake_t* cmake = spn_cmake_new(build);
   spn_cmake_run(cmake);
@@ -40,10 +44,6 @@ spn_cmake_t* spn_cmake_new(spn_build_ctx_t* build) {
 
 void spn_cmake_set_generator(spn_cmake_t* cmake, spn_cmake_gen_t gen) {
   cmake->generator = gen;
-}
-
-static sp_str_t spn_cmake_format_define(sp_str_t name, sp_str_t value) {
-  return sp_format("-D{}={}", SP_FMT_STR(name), SP_FMT_STR(value));
 }
 
 void spn_cmake_add_define(spn_cmake_t* cmake, const c8* name, const c8* value) {

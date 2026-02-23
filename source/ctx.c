@@ -1,6 +1,7 @@
 #include "ctx.h"
 
 #include "app.h"
+#include "unit.h"
 
 sp_str_t spn_app_project_dir(void) {
   return app.paths.dir;

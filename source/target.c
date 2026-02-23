@@ -1,8 +1,7 @@
 #include "target.h"
-
-#include "cc.h"
 #include "ctx.h"
 #include "intern.h"
+#include "external/cc.h"
 
 sp_str_t spn_visibility_to_str(spn_visibility_t kind) {
   switch (kind) {
@@ -185,21 +184,6 @@ void spn_target_embed_file_ex_s(
   }));
 }
 
-void spn_target_embed_mem(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size) {
-  spn_target_embed_mem_ex(target, symbol, buffer, buffer_size, SP_EMBED_DEFAULT_DATA_T, SP_EMBED_DEFAULT_SIZE_T);
-}
-
-void spn_target_embed_mem_ex(
-  spn_target_t* target,
-  const c8* symbol,
-  const u8* buffer,
-  u64 size,
-  const c8* data_type,
-  const c8* size_type
-) {
-  spn_target_embed_mem_ex_s(target, sp_str_view(symbol), buffer, size, sp_str_view(data_type), sp_str_view(size_type));
-}
-
 void spn_target_embed_mem_ex_s(
   spn_target_t* target,
   sp_str_t symbol,
@@ -220,6 +204,21 @@ void spn_target_embed_mem_ex_s(
       .size = size
     }
   }));
+}
+
+void spn_target_embed_mem(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size) {
+  spn_target_embed_mem_ex(target, symbol, buffer, buffer_size, SP_EMBED_DEFAULT_DATA_T, SP_EMBED_DEFAULT_SIZE_T);
+}
+
+void spn_target_embed_mem_ex(
+  spn_target_t* target,
+  const c8* symbol,
+  const u8* buffer,
+  u64 size,
+  const c8* data_type,
+  const c8* size_type
+) {
+  spn_target_embed_mem_ex_s(target, sp_str_view(symbol), buffer, size, sp_str_view(data_type), sp_str_view(size_type));
 }
 
 void spn_target_embed_dir(spn_target_t* target, const c8* dir) {

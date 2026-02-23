@@ -2,7 +2,7 @@
 #define _GNU_SOURCE
 #endif
 
-#include "pty.h"
+#include "terminal.h"
 
 #ifdef SP_LINUX
 

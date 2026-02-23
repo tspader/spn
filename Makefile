@@ -40,11 +40,13 @@ bootstrap/include/libtcc.h: bootstrap/lib/libtcc.a
 ##############
 SPN_SOURCES := \
 	source/spn.c \
+	source/api.c \
+	source/app.c \
+	source/event.c \
 	source/unit.c \
 	source/executor.c \
-	source/main.c \
+	source/signal.c \
 	source/graph.c \
-	source/task.c \
 	source/tui.c \
 	source/ctx.c \
 	source/session.c \
@@ -54,23 +56,22 @@ SPN_SOURCES := \
 	source/registry.c \
 	source/pkg.c \
 	source/lock.c \
-	source/autoconf.c \
-	source/make.c \
-	source/cmake.c \
 	source/profile.c \
-	source/cc.c \
 	source/cli.c \
 	source/gen.c \
 	source/target.c \
 	source/filter.c \
 	source/resolve.c \
 	source/semver.c \
-	source/external/git.c \
-	source/external/tcc.c \
-	source/ordered_map.c \
 	source/spinner.c \
+	source/terminal.c \
+	source/external/autoconf.c \
+	source/external/cc.c \
+	source/external/cmake.c \
+	source/external/git.c \
+	source/external/make.c \
+	source/external/tcc.c \
 	source/external/tom.c \
-	source/pty.c \
 	source/sp/cli.c \
 	source/sp/it.c \
 	source/sp/tm.c \
@@ -78,7 +79,8 @@ SPN_SOURCES := \
 	source/sp/color.c \
 	source/sp/os.c \
 	source/sp/ps.c \
-	source/sp/io.c
+	source/sp/io.c \
+	source/task/task.c
 
 bootstrap/lib/libtcc.a: bootstrap/external/tinycc
 	@if [ ! -f bootstrap/lib/libtcc.a ]; then cd bootstrap/external/tinycc && ./configure --enable-static --prefix=$(PWD)/bootstrap && $(MAKE) && $(MAKE) install; fi
@@ -92,7 +94,7 @@ bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h: bootstrap/bin/embed boo
 
 bootstrap/bin/spn: $(SPN_SOURCES) bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h
 	@mkdir -p bootstrap/bin
-	gcc -g -o $@ $(SPN_SOURCES) -Iinclude -Ibootstrap/include -lm bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o
+	gcc -g -o $@ $(SPN_SOURCES) -Isource -Iinclude -Ibootstrap/include -lm bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o
 
 
 #############

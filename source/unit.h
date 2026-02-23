@@ -168,6 +168,8 @@ spn_err_t spn_pkg_unit_sync_local(spn_pkg_unit_t* dep);
 spn_err_t spn_pkg_unit_call_hook(spn_pkg_unit_t* ctx, spn_build_fn_t fn);
 spn_err_t spn_pkg_unit_run_configure_hook(spn_pkg_unit_t* ctx);
 spn_err_t spn_pkg_unit_run_package_hook(spn_pkg_unit_t* ctx);
+sp_str_t  spn_pkg_unit_get_node_stamp_file(spn_pkg_unit_t* ctx, spn_user_node_t* node);
 void spn_pkg_unit_add_target(spn_pkg_unit_t* pkg, spn_target_t* target);
+sp_str_t spn_cache_dir_kind_to_path(spn_pkg_dir_t kind);
 
 #endif

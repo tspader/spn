@@ -1,10 +1,10 @@
-#include "cc.h"
 
 #include "ctx.h"
 #include "gen.h"
 #include "intern.h"
 #include "log.h"
 #include "profile.h"
+#include "external/cc.h"
 #include "sp/io.h"
 #include "sp/os.h"
 #include "sp/str.h"

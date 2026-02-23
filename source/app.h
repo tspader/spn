@@ -4,16 +4,20 @@
 #include "sp.h"
 #include "spn.h"
 
-#include "event_buffer.h"
+#include "event.h"
 #include "intern.h"
+#include "jit.h"
 #include "lock.h"
 #include "log.h"
 #include "registry.h"
 #include "resolve.h"
 #include "session.h"
 #include "cli.h"
-#include "task.h"
 #include "tui.h"
+#include "task/task.h"
+
+#define SPN_VERSION "1.0.0"
+#define SPN_COMMIT "00c0fa98"
 
 typedef struct {
   sp_str_t dir;
@@ -65,26 +69,6 @@ typedef enum {
   SPN_APP_INIT_BARE,
 } spn_app_init_mode_t;
 
-typedef enum {
-  JIT_NOACTION = 0,
-  JIT_REGISTER_FN,
-  JIT_UNREGISTER_FN
-} jit_actions_t;
-
-struct jit_code_entry {
-  struct jit_code_entry* next_entry;
-  struct jit_code_entry* prev_entry;
-  const char* symfile_addr;
-  uint64_t symfile_size;
-};
-
-struct jit_descriptor {
-  uint32_t version;
-  uint32_t action_flag;
-  struct jit_code_entry* relevant_entry;
-  struct jit_code_entry* first_entry;
-};
-
 typedef struct {
   spn_cli_t cli;
   struct {
@@ -117,7 +101,7 @@ typedef struct {
   s32 num_args;
   const c8** args;
   sp_intern_t* intern;
-  struct jit_code_entry jit;
+  spn_jit_entry_t jit;
   sp_mem_arena_t* arena;
   sp_env_t* env;
 
@@ -148,12 +132,6 @@ void       spn_resolver_init(spn_resolver_t* r, spn_pkg_t* pkg);
 spn_err_t  spn_app_resolve_from_solver(spn_app_t* app);
 void       spn_app_resolve_from_lock_file(spn_app_t* app);
 
-void       spn_tool_ensure_manifest(void);
-void       spn_tool_list(void);
-void       spn_tool_run(sp_str_t package_name, sp_da(sp_str_t) args);
-void       spn_tool_upgrade(sp_str_t package_name);
-sp_str_t   spn_get_tool_path(spn_target_t* bin);
-
 sp_app_result_t spn_init(sp_app_t* app);
 sp_app_result_t spn_poll(sp_app_t* app);
 sp_app_result_t spn_update(sp_app_t* app);
@@ -161,7 +139,5 @@ sp_app_result_t spn_deinit(sp_app_t* app);
 void            spn_push_event(spn_build_event_kind_t kind);
 void            spn_push_event_ex(spn_build_event_t event);
 sp_str_t        spn_get_config_path(void);
-sp_str_t        spn_cache_dir_kind_to_path(spn_pkg_dir_t kind);
-spn_pkg_unit_t* spn_cli_assert_unit_exists(sp_str_t name);
 
 #endif

@@ -1,7 +1,7 @@
 #include "profile.h"
 
-#include "cc.h"
 #include "intern.h"
+#include "external/cc.h"
 
 spn_libc_kind_t spn_libc_kind_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "gnu")) {
@@ -69,6 +69,26 @@ spn_cc_kind_t spn_profile_get_cc(spn_profile_t* profile) {
   return profile->cc.kind;
 }
 
+const c8* spn_profile_get_cc_exe(spn_profile_t* profile) {
+  return profile->cc.exe.data;
+}
+
+spn_linkage_t spn_profile_get_linkage(spn_profile_t* profile) {
+  return profile->linkage;
+}
+
+spn_libc_kind_t spn_profile_get_libc(spn_profile_t* profile) {
+  return profile->libc;
+}
+
+spn_c_standard_t spn_profile_get_standard(spn_profile_t* profile) {
+  return profile->standard;
+}
+
+spn_build_mode_t spn_profile_get_mode(spn_profile_t* profile) {
+  return profile->mode;
+}
+
 void spn_profile_set_cc(spn_profile_t* profile, spn_cc_kind_t kind) {
   profile->cc.kind = kind;
 
@@ -107,41 +127,21 @@ void spn_profile_set_cc(spn_profile_t* profile, spn_cc_kind_t kind) {
   }
 }
 
-const c8* spn_profile_get_cc_exe(spn_profile_t* profile) {
-  return profile->cc.exe.data;
-}
-
 void spn_profile_set_cc_exe(spn_profile_t* profile, const c8* exe) {
   profile->cc.exe = sp_str_view(exe);
   profile->cc.kind = spn_cc_kind_from_str(profile->cc.exe);
-}
-
-spn_linkage_t spn_profile_get_linkage(spn_profile_t* profile) {
-  return profile->linkage;
 }
 
 void spn_profile_set_linkage(spn_profile_t* profile, spn_linkage_t linkage) {
   profile->linkage = linkage;
 }
 
-spn_libc_kind_t spn_profile_get_libc(spn_profile_t* profile) {
-  return profile->libc;
-}
-
 void spn_profile_set_libc(spn_profile_t* profile, spn_libc_kind_t libc) {
   profile->libc = libc;
 }
 
-spn_c_standard_t spn_profile_get_standard(spn_profile_t* profile) {
-  return profile->standard;
-}
-
 void spn_profile_set_standard(spn_profile_t* profile, spn_c_standard_t standard) {
   profile->standard = standard;
-}
-
-spn_build_mode_t spn_profile_get_mode(spn_profile_t* profile) {
-  return profile->mode;
 }
 
 void spn_profile_set_mode(spn_profile_t* profile, spn_build_mode_t mode) {

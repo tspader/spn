@@ -356,12 +356,6 @@ sp_app_result_t spn_cli_set_profile(spn_app_t* app, sp_str_t name) {
   return SP_APP_CONTINUE;
 }
 
-spn_pkg_unit_t* spn_cli_assert_unit_exists(sp_str_t name) {
-  spn_pkg_unit_t* dep = sp_om_get(app.session.units.packages, name);
-  SP_ASSERT_FMT(dep, "{:fg brightyellow} is not in this project", SP_FMT_STR(name));
-  return dep;
-}
-
 // Get resolved package path from resolver (doesn't require builder init)
 sp_str_t spn_cli_get_resolved_pkg_source(sp_str_t name) {
   spn_resolved_pkg_t* resolved = sp_ht_getp(app.resolver.resolved, name);
@@ -522,7 +516,7 @@ sp_app_result_t spn_cli_manifest(spn_cli_t* cli) {
 
   spn_app_resolve(&app);
 
-  spn_pkg_unit_t* dep = spn_cli_assert_unit_exists(cmd->package);
+  spn_pkg_unit_t* dep = spn_session_find_pkg_or_assert(&app.session, cmd->package);
 
   sp_str_t path = dep->ctx.pkg->paths.manifest;
   sp_str_t manifest = sp_io_read_file(path);

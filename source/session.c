@@ -1,6 +1,8 @@
 #include "app.h"
-
+#include "unit.h"
+#include "external/cc.h"
 #include "sp/ht.h"
+#include "sp/macro.h"
 
 void spn_session_init(spn_session_t* session, spn_pkg_t* pkg, spn_profile_t* profile, sp_str_t dir) {
   session->pkg = pkg;
@@ -22,6 +24,13 @@ spn_pkg_unit_t* spn_session_find_pkg(spn_session_t* session, sp_str_t name) {
 
   return pkg;
 }
+
+spn_pkg_unit_t* spn_session_find_pkg_or_assert(spn_session_t* s, sp_str_t name) {
+  spn_pkg_unit_t* unit = spn_session_find_pkg(s, name);
+  SP_ASSERT_FMT(unit, "{:fg brightyellow} is not in this project", SP_FMT_STR(name));
+  return unit;
+}
+
 
 spn_pkg_unit_t* spn_session_find_root(spn_session_t* s) {
   return spn_session_find_pkg(s, s->pkg->name);
@@ -164,4 +173,73 @@ void spn_session_add_pkg_unit(spn_session_t* session, spn_resolved_pkg_t resolve
   sp_om_insert(session->units.packages, resolved.pkg->name, SP_ZERO_STRUCT(spn_pkg_unit_t));
   spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
   spn_init_pkg_unit_for_session(session, unit, resolved.pkg, resolved.kind, resolved.version);
+}
+
+
+spn_err_t spn_session_compile_pkg(spn_session_t* session, spn_pkg_unit_t* unit) {
+  spn_pkg_t* pkg = unit->ctx.pkg;
+
+  if (!sp_fs_exists(pkg->paths.script)) {
+    return SPN_OK;
+  }
+
+  spn_event_buffer_push(spn.events, &unit->ctx, SPN_EVENT_BUILD_SCRIPT_COMPILE);
+
+  sp_tm_timer_t timer = sp_tm_start_timer();
+  spn_tcc_err_ctx_t error_context = {
+    .arena = unit->ctx.arena,
+    .error = sp_str_lit("")
+  };
+
+  spn_tcc_t* tcc = tcc_new();
+  tcc_set_error_func(tcc, &error_context, spn_tcc_on_build_script_compile_error);
+  tcc_set_backtrace_func(tcc, &error_context, spn_tcc_backtrace);
+  tcc_set_lib_path(tcc, sp_str_to_cstr(spn.paths.runtime));
+  tcc_set_options(tcc, "-gdwarf -Wall -Werror");
+  tcc_set_output_type(tcc, TCC_OUTPUT_MEMORY);
+  tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include));
+  tcc_define_symbol(tcc, "SPN", "");
+  sp_try_goto(spn_tcc_register(tcc), fail);
+  sp_try_goto(tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include)), fail);
+  sp_try_goto(spn_tcc_register(tcc), fail);
+
+  spn_cc_t cc = SP_ZERO();
+  spn_cc_set_profile(&cc, session->profile);
+  spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_TARGET_JIT, pkg->name);
+  sp_ht_for_kv(pkg->deps, it) {
+    switch (it.val->visibility) {
+      case SPN_VISIBILITY_BUILD: {
+        spn_cc_target_add_dep(target, spn_session_find_pkg(session, *it.key));
+        break;
+      }
+      case SPN_VISIBILITY_TEST:
+      case SPN_VISIBILITY_PUBLIC: {
+        break;
+      }
+    }
+    if (it.val->visibility == SPN_VISIBILITY_BUILD) {
+    }
+  }
+
+  spn_cc_target_to_tcc(&cc, target, tcc);
+  sp_try_goto(spn_tcc_add_file(tcc, pkg->paths.script), fail);
+  sp_try_goto(tcc_relocate(tcc), fail);
+
+  unit->tcc = tcc;
+  unit->on_configure = tcc_get_symbol(tcc, "configure");
+  unit->on_package = tcc_get_symbol(tcc, "package");
+  sp_assert_fmt(!tcc_get_symbol(tcc, "build"), "{} still has build()", SP_FMT_STR(unit->ctx.name));
+
+  unit->time.compile = sp_tm_read_timer(&timer);
+
+  return SPN_OK;
+
+fail:
+  spn_event_buffer_push_ctx(spn.events, &unit->ctx, (spn_build_event_t) {
+    .kind = SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,
+    .compile_failed = {
+      .error = error_context.error
+    }
+  });
+  return SPN_ERROR;
 }
