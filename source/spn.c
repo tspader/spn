@@ -138,7 +138,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
           .kind = SPN_PACKAGE_KIND_INDEX
         };
 
-        sp_dyn_array_push(spn.config.registries, registry);
+        sp_dyn_array_push(spn.registries, registry);
       }
     }
   }

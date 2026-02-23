@@ -10,7 +10,6 @@
 #include "semver.h"
 #include "filter.h"
 #include "unit.h"
-#include "executor.h"
 
 typedef enum {
   SPN_DEP_REPO_STATE_NOT_CLONED,
@@ -75,7 +74,6 @@ spn_err_t       spn_session_compile_pkg(spn_session_t* s, spn_pkg_unit_t* ctx);
 spn_pkg_unit_t* spn_session_find_pkg(spn_session_t* s, sp_str_t name);
 spn_pkg_unit_t* spn_session_find_root(spn_session_t* s);
 void            spn_session_set_filter(spn_session_t* s, spn_target_filter_t filter);
-void            spn_session_link_graph(spn_session_t* s, spn_build_graph_t* graph, spn_pkg_unit_t* unit);
 spn_pkg_unit_t* spn_session_find_pkg_or_assert(spn_session_t* s, sp_str_t name);
 
 #endif

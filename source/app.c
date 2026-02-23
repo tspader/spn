@@ -390,8 +390,8 @@ void spn_app_load(spn_app_t* app, sp_str_t manifest_path) {
   // Now that we know all the registries, discover all packages
   sp_dyn_array_push(app->search, spn_registry_get_path(&spn.registry));
 
-  sp_dyn_array_for(spn.config.registries, it) {
-    spn_registry_t* registry = &spn.config.registries[it];
+  sp_dyn_array_for(spn.registries, it) {
+    spn_registry_t* registry = &spn.registries[it];
     sp_dyn_array_push(app->search, spn_registry_get_path(registry));
   }
 

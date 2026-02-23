@@ -24,11 +24,6 @@ typedef struct {
   sp_str_t lock;
 } spn_app_paths_t;
 
-struct spn_foo {
-  sp_str_t spn;
-  sp_da(spn_registry_t) registries;
-};
-
 typedef struct {
   sp_str_t dir;
   sp_str_t manifest;
@@ -94,7 +89,7 @@ typedef struct {
   spn_tui_t tui;
   sp_atomic_s32 control;
   sp_str_t tcc_error;
-  spn_foo_t config;
+  sp_da(spn_registry_t) registries;
   spn_registry_t registry;
   spn_event_buffer_t* events;
   sp_app_t* sp;

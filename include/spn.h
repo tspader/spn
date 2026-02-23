@@ -86,7 +86,6 @@ typedef enum {
 } spn_visibility_t;
 
 
-typedef struct spn_foo spn_foo_t;
 typedef struct spn_pkg spn_pkg_t;
 typedef struct spn_build_ctx spn_build_ctx_t;
 typedef struct spn_cfg_ctx spn_cfg_ctx_t;
@@ -101,7 +100,6 @@ typedef struct spn_registry spn_registry_t;
 typedef void* spn_config_t;
 typedef void* spn_build_t;
 
-typedef void(*spn_config_fn_t)(spn_foo_t*);
 typedef void(*spn_build_fn_t)(spn_build_ctx_t*);
 
 #define SP_EMBED_DEFAULT_SYMBOL SP_NULLPTR

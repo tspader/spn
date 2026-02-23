@@ -44,7 +44,6 @@ SPN_SOURCES := \
 	source/app.c \
 	source/event.c \
 	source/unit.c \
-	source/executor.c \
 	source/signal.c \
 	source/graph.c \
 	source/tui.c \
@@ -80,7 +79,15 @@ SPN_SOURCES := \
 	source/sp/os.c \
 	source/sp/ps.c \
 	source/sp/io.c \
-	source/task/task.c
+	source/task/build.c \
+	source/task/configure.c \
+	source/task/graph.c \
+	source/task/generate.c \
+	source/task/resolve.c \
+	source/task/sync.c \
+	source/task/task.c \
+	source/task/test.c \
+	source/task/which.c
 
 bootstrap/lib/libtcc.a: bootstrap/external/tinycc
 	@if [ ! -f bootstrap/lib/libtcc.a ]; then cd bootstrap/external/tinycc && ./configure --enable-static --prefix=$(PWD)/bootstrap && $(MAKE) && $(MAKE) install; fi

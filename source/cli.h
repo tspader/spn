@@ -2,7 +2,6 @@
 #define SPN_INTERNAL_CLI_H
 
 #include "sp.h"
-
 #include "sp/cli.h"
 
 #define SPN_CLI_COMMAND(X) \
