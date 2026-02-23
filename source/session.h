@@ -6,7 +6,6 @@
 #include "graph.h"
 #include "pkg.h"
 #include "profile.h"
-#include "resolve.h"
 #include "semver.h"
 #include "filter.h"
 #include "unit.h"
@@ -67,7 +66,6 @@ struct spn_session_t {
 };
 
 void            spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit, spn_pkg_t* pkg, spn_pkg_kind_t kind, spn_semver_t version);
-void            spn_session_add_pkg_unit(spn_session_t* session, spn_resolved_pkg_t resolved);
 
 void            spn_session_init(spn_session_t* s, spn_pkg_t* pkg, spn_profile_t* profile, sp_str_t dir);
 spn_err_t       spn_session_compile_pkg(spn_session_t* s, spn_pkg_unit_t* ctx);

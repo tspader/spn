@@ -102,7 +102,7 @@ spn_pkg_t* spn_ctx_root_package(void) {
 }
 
 spn_resolver_t* spn_ctx_resolver(void) {
-  return &app.resolver;
+  return app.resolver;
 }
 
 void spn_ctx_push_target_source_event(spn_target_t* target, sp_str_t source) {
@@ -113,4 +113,14 @@ void spn_ctx_push_target_source_event(spn_target_t* target, sp_str_t source) {
       .source = source,
     }
   });
+}
+
+void spn_push_event(spn_build_event_kind_t kind) {
+  spn_push_event_ex((spn_build_event_t) {
+    .kind = kind
+  });
+}
+
+void spn_push_event_ex(spn_build_event_t event) {
+  spn_event_buffer_push_ctx(spn.events, &spn_session_find_root(&app.session)->ctx, event);
 }

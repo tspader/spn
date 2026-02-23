@@ -2,10 +2,10 @@
 #define SPN_RESOLVE_H
 
 #include "sp.h"
+#include "app.h"
 #include "pkg.h"
 #include "spn.h"
 
-typedef struct spn_pkg_cache* spn_pkg_cache_t;
 
 #define SPN_RESOLVE_STRATEGY(X) \
   X(SPN_RESOLVE_STRATEGY_LOCK_FILE, "lockfile") \
@@ -27,7 +27,7 @@ typedef struct {
   spn_semver_t version;
 } spn_resolved_pkg_t;
 
-typedef struct {
+typedef struct spn_resolver_t {
   spn_pkg_t* pkg;
   spn_pkg_cache_t* cache;
   sp_str_ht(sp_str_t)* registry;

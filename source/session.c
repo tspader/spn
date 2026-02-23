@@ -1,4 +1,5 @@
 #include "app.h"
+#include "event.h"
 #include "unit.h"
 #include "external/cc.h"
 #include "sp/ht.h"
@@ -168,13 +169,6 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
   }
 
 }
-
-void spn_session_add_pkg_unit(spn_session_t* session, spn_resolved_pkg_t resolved) {
-  sp_om_insert(session->units.packages, resolved.pkg->name, SP_ZERO_STRUCT(spn_pkg_unit_t));
-  spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
-  spn_init_pkg_unit_for_session(session, unit, resolved.pkg, resolved.kind, resolved.version);
-}
-
 
 spn_err_t spn_session_compile_pkg(spn_session_t* session, spn_pkg_unit_t* unit) {
   spn_pkg_t* pkg = unit->ctx.pkg;

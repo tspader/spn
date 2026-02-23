@@ -52,7 +52,7 @@ SPN_SOURCES := \
 	source/intern.c \
 	source/log.c \
 	source/option.c \
-	source/registry.c \
+	source/index.c \
 	source/pkg.c \
 	source/lock.c \
 	source/profile.c \

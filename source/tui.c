@@ -272,7 +272,7 @@ static sp_str_t spn_tui_name_to_color(sp_str_t str) {
   return sp_color_to_tui_rgb_f(r, g, b);
 }
 
-sp_str_t spn_tui_render_build_event(spn_build_event_t* event, u32 max_name) {
+sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
 
   spn_build_event_display_t display = event_info[event->kind];

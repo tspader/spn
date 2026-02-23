@@ -1,4 +1,5 @@
 #include "app.h"
+#include "event.h"
 #include "pkg.h"
 #include "sp/io.h"
 
@@ -358,7 +359,7 @@ sp_app_result_t spn_cli_set_profile(spn_app_t* app, sp_str_t name) {
 
 // Get resolved package path from resolver (doesn't require builder init)
 sp_str_t spn_cli_get_resolved_pkg_source(sp_str_t name) {
-  spn_resolved_pkg_t* resolved = sp_str_ht_get(app.resolver.resolved, name);
+  spn_resolved_pkg_t* resolved = sp_str_ht_get(app.resolver->resolved, name);
   SP_ASSERT_FMT(resolved, "{:fg brightyellow} is not in this project", SP_FMT_STR(name));
   return sp_fs_join_path(spn.paths.source, resolved->pkg->name);
 }
@@ -451,7 +452,7 @@ sp_app_result_t spn_cli_clean(spn_cli_t* cli) {
   sp_da(spn_build_event_t) events = spn_event_buffer_drain(spn.events);
   sp_da_for(events, it) {
     spn_build_event_t* event = &events[it];
-    sp_io_write_line(&spn.logger.err, spn_tui_render_build_event(event, spn.tui.info.max_name));
+    sp_io_write_line(&spn.logger.err, spn_tui_render_event(event, spn.tui.info.max_name));
   }
 
   return SP_APP_QUIT;

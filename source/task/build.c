@@ -1,4 +1,5 @@
 #include "app.h"
+#include "event.h"
 #include "gen.h"
 #include "session.h"
 #include "external/cc.h"

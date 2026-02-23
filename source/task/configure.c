@@ -1,4 +1,5 @@
 #include "app.h"
+#include "event.h"
 #include "intern.h"
 #include "session.h"
 #include "task.h"
@@ -68,9 +69,9 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   root->nodes.configure.stamp = spn_bg_add_file(graph, root->paths.stamp.package);
   spn_bg_cmd_add_output(graph, root->nodes.configure.run, root->nodes.configure.stamp);
 
-  sp_str_ht_for(app->resolver.resolved, it) {
-    sp_str_t name = *sp_str_ht_it_getkp(app->resolver.resolved, it);
-    spn_resolved_pkg_t* resolved = sp_str_ht_it_getp(app->resolver.resolved, it);
+  sp_str_ht_for(app->resolver->resolved, it) {
+    sp_str_t name = *sp_str_ht_it_getkp(app->resolver->resolved, it);
+    spn_resolved_pkg_t* resolved = sp_str_ht_it_getp(app->resolver->resolved, it);
     spn_pkg_unit_t* unit = sp_om_get(b->units.packages, name);
     sp_assert(unit);
     unit->nodes.configure.run = spn_bg_add_fn_ex(graph, configure_package, unit, SPN_BG_VIZ_DEFAULT, app->package.name, sp_str_lit("configure"));

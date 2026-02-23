@@ -63,6 +63,11 @@ typedef struct {
   sp_str_t store;
 } spn_bp_config_t;
 
+typedef struct spn_build_io_t {
+  sp_io_writer_t build;
+  sp_io_writer_t test;
+} spn_build_io_t;
+
 struct spn_build_ctx {
   sp_str_t name;
   spn_session_t* session;

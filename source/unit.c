@@ -1,8 +1,7 @@
 #include "app.h"
-
+#include "event.h"
 #include "external/cc.h"
 #include "external/git.h"
-
 #include "sp/io.h"
 
 #include <setjmp.h>

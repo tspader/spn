@@ -7,11 +7,7 @@
 #include "resolve.h"
 
 typedef struct spn_build_ctx spn_build_ctx_t;
-
-typedef struct {
-  sp_io_writer_t build;
-  sp_io_writer_t test;
-} spn_build_io_t;
+typedef struct spn_build_io_t spn_build_io_t;
 
 typedef enum {
   SPN_EVENT_FETCH,
@@ -53,7 +49,7 @@ typedef enum {
   SPN_EVENT_RUN_CONFIGURE,
 } spn_build_event_kind_t;
 
-typedef struct {
+typedef struct spn_build_event_t {
   spn_build_event_kind_t kind;
   spn_pkg_t* pkg;
   spn_build_io_t* io;
@@ -95,7 +91,7 @@ typedef struct {
   };
 } spn_build_event_t;
 
-typedef struct {
+typedef struct spn_event_buffer_t {
   sp_rb(spn_build_event_t) buffer;
   sp_mutex_t mutex;
   sp_cv_t condition;
@@ -110,6 +106,8 @@ spn_build_event_t   spn_build_event_make(spn_build_ctx_t* ctx, spn_build_event_k
 void                spn_push_event_ex(spn_build_event_t event);
 void                spn_push_event(spn_build_event_kind_t kind);
 sp_da(spn_build_event_t) spn_event_buffer_drain(spn_event_buffer_t* events);
+sp_str_t        spn_build_event_kind_to_str(spn_build_event_kind_t kind);
+spn_verbosity_t spn_build_event_get_verbosity(spn_build_event_kind_t kind);
 
 
 

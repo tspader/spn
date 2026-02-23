@@ -41,7 +41,7 @@
 #include "intern.h"
 #include "lock.h"
 #include "option.h"
-#include "registry.h"
+#include "index.h"
 #include "resolve.h"
 #include "signal.spn.h"
 #include "spn.h"
@@ -129,16 +129,16 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       spn.paths.spn = sp_str_view(dir.u.s);
     }
 
-    toml_array_t* registries = toml_table_array(toml, "registry");
+    toml_array_t* registries = toml_table_array(toml, "index");
     if (registries) {
       spn_toml_arr_for(registries, n) {
         toml_table_t* it = toml_array_table(registries, n);
         spn_index_t registry = {
           .location = spn_toml_str(it, "location"),
-          .kind = SPN_PACKAGE_KIND_INDEX
+          .kind = SPN_INDEX_WORKSPACE
         };
 
-        sp_dyn_array_push(spn.registries, registry);
+        sp_dyn_array_push(spn.indexes, registry);
       }
     }
   }
@@ -161,10 +161,10 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     SP_ASSERT(!spn_git_clone(url, spn.paths.spn));
   }
 
-  // Initialize builtin registry
-  spn.registry = (spn_index_t) {
+  // Initialize builtin index
+  spn.index = (spn_index_t) {
     .location = spn.paths.index,
-    .kind = SPN_PACKAGE_KIND_INDEX
+    .kind = SPN_INDEX_BUILTIN
   };
 
   // Find the cache directory after the config has been fully loaded
@@ -255,6 +255,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.paths.manifest = sp_fs_join_path(spn.paths.project, sp_str_lit("spn.toml"));
 
   app = SP_ZERO_STRUCT(spn_app_t);
+  spn_app_init(&app);
   spn_app_load(&app, spn.paths.manifest);
 
   switch (spn_cli_dispatch(&parser, cli)) {
@@ -280,9 +281,9 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
         break;
       }
       case SPN_EVENT_RESOLVE: {
-        sp_str_ht_for(app->resolver.resolved, it) {
-          sp_str_t name = *sp_str_ht_it_getkp(app->resolver.resolved, it);
-          spn_resolved_pkg_t resolved = *sp_str_ht_it_getp(app->resolver.resolved, it);
+        sp_str_ht_for(app->resolver->resolved, it) {
+          sp_str_t name = *sp_str_ht_it_getkp(app->resolver->resolved, it);
+          spn_resolved_pkg_t resolved = *sp_str_ht_it_getp(app->resolver->resolved, it);
           spn_build_ctx_log(event->io, sp_format(
             "Resolved {} to version {}",
             SP_FMT_STR(resolved.pkg->name),
@@ -305,7 +306,7 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
 
     // write to tui (filtered by verbosity)
     if (spn_build_event_get_verbosity(event->kind) <= spn.verbosity) {
-      sp_io_write_line(&spn.logger.err, spn_tui_render_build_event(event, spn.tui.info.max_name));
+      sp_io_write_line(&spn.logger.err, spn_tui_render_event(event, spn.tui.info.max_name));
     }
   }
 

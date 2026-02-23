@@ -4,13 +4,11 @@
 #include "sp.h"
 #include "spn.h"
 
-#include "event.h"
 #include "intern.h"
 #include "jit.h"
 #include "lock.h"
 #include "log.h"
-#include "registry.h"
-#include "resolve.h"
+#include "index.h"
 #include "session.h"
 #include "cli.h"
 #include "tui.h"
@@ -18,6 +16,9 @@
 
 #define SPN_VERSION "1.0.0"
 #define SPN_COMMIT "00c0fa98"
+
+typedef struct spn_event_buffer_t spn_event_buffer_t;
+typedef struct spn_resolver_t spn_resolver_t;
 
 typedef struct {
   sp_str_t dir;
@@ -44,14 +45,13 @@ typedef struct {
   bool force;
 } spn_app_config_t;
 
-struct spn_pkg_cache sp_om_body(spn_pkg_t);
-typedef struct spn_pkg_cache* spn_pkg_cache_t;
+typedef sp_om(spn_pkg_t) spn_pkg_cache_t;
 
 struct spn_app_t {
   spn_app_paths_t paths;
   spn_pkg_t package;
   sp_opt(spn_lock_file_t) lock;
-  spn_resolver_t resolver;
+  spn_resolver_t* resolver;
   spn_session_t session;
   spn_task_executor_t tasks;
 
@@ -92,8 +92,8 @@ typedef struct {
   spn_tui_t tui;
   sp_atomic_s32 control;
   sp_str_t tcc_error;
-  sp_da(spn_index_t) registries;
-  spn_index_t registry;
+  sp_da(spn_index_t) indexes;
+  spn_index_t index;
   spn_event_buffer_t* events;
   sp_app_t* sp;
   s32 num_args;
@@ -114,6 +114,7 @@ typedef struct {
 extern spn_app_t app;
 extern spn_ctx_t spn;
 
+void       spn_app_init(spn_app_t* app);
 void       spn_app_load(spn_app_t* app, sp_str_t manifest_path);
 void       spn_app_write_manifest(spn_pkg_t* package, sp_str_t path);
 spn_pkg_t* spn_app_find_package(spn_app_t* app, sp_str_t name);
@@ -130,7 +131,5 @@ sp_app_result_t spn_init(sp_app_t* app);
 sp_app_result_t spn_poll(sp_app_t* app);
 sp_app_result_t spn_update(sp_app_t* app);
 sp_app_result_t spn_deinit(sp_app_t* app);
-void            spn_push_event(spn_build_event_kind_t kind);
-void            spn_push_event_ex(spn_build_event_t event);
 
 #endif

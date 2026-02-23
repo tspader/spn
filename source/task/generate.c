@@ -1,5 +1,5 @@
 #include "app.h"
-
+#include "event.h"
 #include "gen.h"
 #include "external/cc.h"
 
@@ -19,7 +19,7 @@ spn_task_result_t spn_task_generate(spn_app_t* app) {
     .kind = SPN_GEN_SYSTEM_LIBS,
     .compiler = gen.compiler
   };
-  sp_dyn_array(sp_str_t) entries = sp_str_map(app->resolver.system_deps, sp_dyn_array_size(app->resolver.system_deps), &fmt, spn_gen_format_entry_kernel);
+  sp_dyn_array(sp_str_t) entries = sp_str_map(app->resolver->system_deps, sp_dyn_array_size(app->resolver->system_deps), &fmt, spn_gen_format_entry_kernel);
   gen.system_libs = sp_str_join_n(entries, sp_dyn_array_size(entries), sp_str_lit(" "));
 
   switch (gen.kind) {

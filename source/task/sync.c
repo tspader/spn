@@ -1,4 +1,5 @@
 #include "app.h"
+#include "event.h"
 #include "external/git.h"
 
 s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {

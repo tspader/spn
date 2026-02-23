@@ -3,7 +3,7 @@
 #include "app.h"
 #include "ctx.h"
 #include "intern.h"
-#include "registry.h"
+#include "index.h"
 #include "resolve.h"
 #include "external/cc.h"
 #include "sp/str.h"
@@ -146,7 +146,7 @@ void spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     toml_array_t* test;
     toml_table_t* deps;
     toml_array_t* profile;
-    toml_array_t* registry;
+    toml_array_t* index;
     toml_table_t* options;
     toml_table_t* config;
   } toml = SP_ZERO_INITIALIZE();
@@ -156,7 +156,7 @@ void spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   toml.bin = toml_table_array(toml.manifest, "bin");
   toml.test = toml_table_array(toml.manifest, "test");
   toml.profile = toml_table_array(toml.manifest, "profile");
-  toml.registry = toml_table_array(toml.manifest, "registry");
+  toml.index = toml_table_array(toml.manifest, "index");
   toml.deps = toml_table_table(toml.manifest, "deps");
   toml.options = toml_table_table(toml.manifest, "options");
   toml.config = toml_table_table(toml.manifest, "config");
@@ -219,9 +219,9 @@ void spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     spn_profile_set_mode(profile, spn_dep_build_mode_from_str(spn_toml_str_opt(it, "mode", "debug")));
   }
 
-  spn_toml_arr_for(toml.registry, n) {
-    toml_table_t* it = toml_array_table(toml.registry, n);
-    spn_pkg_add_registry(pkg, spn_toml_cstr(it, "name"), spn_toml_cstr(it, "location"));
+  spn_toml_arr_for(toml.index, n) {
+    toml_table_t* it = toml_array_table(toml.index, n);
+    spn_pkg_add_index(pkg, spn_toml_cstr(it, "name"), spn_toml_cstr(it, "location"));
   }
 
   spn_toml_arr_for(toml.bin, n) {
@@ -540,18 +540,18 @@ bool spn_pkg_has_lib_kind(spn_pkg_t* pkg, spn_linkage_t kind) {
   return false;
 }
 
-spn_index_t* spn_pkg_add_registry(spn_pkg_t* pkg, const c8* name, const c8* location) {
-  return spn_pkg_add_registry_ex(pkg, spn_intern_cstr(name), spn_intern_cstr(location));
+spn_index_t* spn_pkg_add_index(spn_pkg_t* pkg, const c8* name, const c8* location) {
+  return spn_pkg_add_index_ex(pkg, spn_intern_cstr(name), spn_intern_cstr(location));
 }
 
-spn_index_t* spn_pkg_add_registry_ex(spn_pkg_t* pkg, sp_str_t name, sp_str_t location) {
-  spn_index_t registry = {
+spn_index_t* spn_pkg_add_index_ex(spn_pkg_t* pkg, sp_str_t name, sp_str_t location) {
+  spn_index_t index = {
     .name = spn_intern(name),
     .location = spn_intern(location),
-    .kind = SPN_PACKAGE_KIND_WORKSPACE
+    .kind = SPN_INDEX_WORKSPACE
   };
-  sp_om_insert(pkg->registries, registry.name, registry);
-  return sp_om_get(pkg->registries, registry.name);
+  sp_om_insert(pkg->indexes, index.name, index);
+  return sp_om_get(pkg->indexes, index.name);
 }
 
 sp_str_t spn_pkg_get_url(spn_pkg_t* pkg) {

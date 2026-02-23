@@ -2,10 +2,10 @@
 #define SPN_TUI_H
 
 #include "sp.h"
-#include "event.h"
 #include "spinner.h"
 
 typedef struct spn_user_node_t spn_user_node_t;
+typedef struct spn_build_event_t spn_build_event_t;
 
 #if defined(SP_POSIX)
   #include <termios.h>
@@ -108,11 +108,9 @@ void            sp_tui_table_str(sp_tui_table_t* table, sp_str_t str);
 void            sp_tui_table_set_indent(sp_tui_table_t* table, u32 indent);
 void            sp_tui_table_end(sp_tui_table_t* table);
 sp_str_t        sp_tui_table_render(sp_tui_table_t* table);
-sp_str_t        spn_tui_render_build_event(spn_build_event_t* event, u32 max_name);
 void            spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode);
+sp_str_t        spn_tui_render_event(spn_build_event_t* event, u32 max_name);
 spn_tui_mode_t  spn_output_mode_from_str(sp_str_t str);
 sp_str_t        spn_output_mode_to_str(spn_tui_mode_t mode);
-sp_str_t        spn_build_event_kind_to_str(spn_build_event_kind_t kind);
-spn_verbosity_t spn_build_event_get_verbosity(spn_build_event_kind_t kind);
 
 #endif

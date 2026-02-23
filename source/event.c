@@ -57,14 +57,3 @@ sp_da(spn_build_event_t) spn_event_buffer_drain(spn_event_buffer_t* events) {
 
   return result;
 }
-
-
-void spn_push_event(spn_build_event_kind_t kind) {
-  spn_push_event_ex((spn_build_event_t) {
-    .kind = kind
-  });
-}
-
-void spn_push_event_ex(spn_build_event_t event) {
-  spn_event_buffer_push_ctx(spn.events, &spn_session_find_root(&app.session)->ctx, event);
-}
