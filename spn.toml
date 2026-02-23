@@ -43,7 +43,7 @@ mode = "debug"
 
 [[bin]]
 name = "spn"
-source = ["source/spn.c", "source/graph.c", "source/task.c", "source/tui.c", "source/ctx.c", "source/cli.c", "source/ordered_map.c", "source/spinner.c", "source/toml.c", "source/pty.c", "source/sp/str.c", "source/sp/color.c", "source/sp/os.c", "source/sp/ps.c", "source/sp/io.c"]
+source = ["source/spn.c", "source/main.c", "source/graph.c", "source/task.c", "source/tui.c", "source/ctx.c", "source/cli.c", "source/ordered_map.c", "source/spinner.c", "source/toml.c", "source/pty.c", "source/sp/str.c", "source/sp/color.c", "source/sp/os.c", "source/sp/ps.c", "source/sp/io.c"]
 include = ["include"]
 
 [[test]]
