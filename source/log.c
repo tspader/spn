@@ -4,6 +4,24 @@
 
 #include "sp/io.h"
 
+spn_log_level_t spn_log_level_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "ERROR")) {
+    return SPN_LOG_LEVEL_ERROR;
+  }
+  if (sp_str_equal_cstr(str, "WARN")) {
+    return SPN_LOG_LEVEL_WARN;
+  }
+  if (sp_str_equal_cstr(str, "INFO")) {
+    return SPN_LOG_LEVEL_INFO;
+  }
+  if (sp_str_equal_cstr(str, "DEBUG")) {
+    return SPN_LOG_LEVEL_DEBUG;
+  }
+
+  SP_FATAL("Unknown SPN_LOG_LEVEL {:fg brightyellow}; options are [ERROR, WARN, INFO, DEBUG]", SP_FMT_STR(str));
+  SP_UNREACHABLE_RETURN(SPN_LOG_LEVEL_INFO);
+}
+
 void spn_log_info(const c8* fmt, ...) {
   if (spn_ctx_get_log_level() < SPN_LOG_LEVEL_INFO) {
     return;

@@ -10,6 +10,8 @@ typedef enum {
   SPN_LOG_LEVEL_DEBUG,
 } spn_log_level_t;
 
+spn_log_level_t spn_log_level_from_str(sp_str_t str);
+
 void spn_log_info(const c8* fmt, ...);
 void spn_log_warn(const c8* fmt, ...);
 void spn_log_error(const c8* fmt, ...);

@@ -50,21 +50,25 @@
 #include "cc.h"
 #include "cmake.h"
 #include "ctx.h"
+#include "option.h"
+#include "lock.h"
 #include "make.h"
 #include "gen.h"
 #include "intern.h"
 #include "resolve.h"
+#include "registry.h"
 #include "target_filter.h"
 #include "log.h"
+#include "pkg.h"
 #include "profile.h"
 #include "semver.h"
-#include "external/git.h"
-#include "external/tcc.h"
 #include "graph.h"
 #include "ordered_map.h"
 #include "pty.h"
 #include "spinner.h"
 #include "stoml.h"
+#include "external/git.h"
+#include "external/tcc.h"
 #include "sp/color.h"
 #include "sp/ht.h"
 #include "sp/io.h"
@@ -107,203 +111,9 @@ typedef enum {
 } spn_dep_state_t;
 
 typedef enum {
-  SPN_DEP_OPTION_KIND_BOOL,
-  SPN_DEP_OPTION_KIND_S64,
-  SPN_DEP_OPTION_KIND_STR,
-} spn_dep_option_kind_t;
-
-typedef struct {
-  sp_str_t name;
-  spn_dep_option_kind_t kind;
-  union {
-    bool b;
-    s64 s;
-    sp_str_t str;
-  };
-} spn_dep_option_t;
-
-typedef sp_ht(sp_str_t, spn_dep_option_t) spn_dep_options_t;
-
-spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key);
-void             spn_toml_append_option(spn_toml_writer_t* writer, sp_str_t key, spn_dep_option_t option);
-void             spn_toml_append_option_cstr(spn_toml_writer_t* writer, const c8* key, spn_dep_option_t option);
-
-typedef enum {
   SPN_PACKAGE_STATE_UNLOADED,
   SPN_PACKAGE_STATE_LOADED,
 } spn_package_state_t;
-
-#define SPN_PACKAGE_KIND(X) \
-  X(SPN_PACKAGE_KIND_NONE, "none") \
-  X(SPN_PACKAGE_KIND_ROOT, "root") \
-  X(SPN_PACKAGE_KIND_WORKSPACE, "workspace") \
-  X(SPN_PACKAGE_KIND_FILE, "file") \
-  X(SPN_PACKAGE_KIND_INDEX, "index")
-
-typedef enum {
-  SPN_PACKAGE_KIND(SP_X_NAMED_ENUM_DEFINE)
-} spn_pkg_kind_t;
-
-spn_pkg_dir_t    spn_cache_dir_kind_from_str(sp_str_t str);
-spn_linkage_t spn_pkg_linkage_from_str(sp_str_t str);
-sp_os_lib_kind_t  spn_pkg_linkage_to_sp_os_lib_kind(spn_linkage_t kind);
-sp_str_t          spn_pkg_linkage_to_str(spn_linkage_t kind);
-
-typedef struct {
-  sp_str_t name;
-  spn_pkg_kind_t kind;
-  spn_visibility_t visibility;
-  union {
-    spn_semver_range_t range;
-    sp_str_t file;
-  };
-} spn_pkg_req_t;
-
-typedef struct {
-  spn_semver_t version;
-  sp_str_t commit;
-} spn_pkg_metadata_t;
-
-typedef enum {
-  SPN_DEP_IMPORT_KIND_EXPLICIT,
-  SPN_DEP_IMPORT_KIND_TRANSITIVE
-} spn_dep_import_kind_t;
-
-typedef struct {
-  sp_str_t name;
-  spn_semver_t version;
-  sp_str_t commit;
-  spn_dep_import_kind_t import_kind;
-  spn_visibility_t visibility;
-  spn_pkg_kind_t kind;
-  sp_da(sp_str_t) deps;
-  sp_da(sp_str_t) dependents;
-} spn_lock_entry_t;
-
-typedef struct {
-  spn_semver_t version;
-  sp_str_t commit;
-  sp_ht(sp_str_t, spn_lock_entry_t) entries;
-  sp_ht(sp_str_t, bool) system_deps;
-} spn_lock_file_t;
-
-struct spn_registry {
-  sp_str_t name;
-  sp_str_t location;
-  spn_pkg_kind_t kind;
-};
-
-sp_str_t       spn_registry_get_path(spn_registry_t* registry);
-spn_pkg_req_t  spn_pkg_req_from_str(sp_str_t str);
-sp_str_t       spn_pkg_req_to_str(spn_pkg_req_t request);
-
-
-/////////////
-// PACKAGE //
-/////////////
-typedef struct {
-  sp_str_t path;
-  spn_pkg_dir_t dir;
-} spn_pkg_include_t;
-
-struct spn_pkg {
-  sp_str_t name;
-  sp_str_t repo;
-  sp_str_t url;
-  sp_str_t author;
-  sp_str_t maintainer;
-  spn_semver_t version;
-  sp_om(spn_target_t) libs;
-  sp_om(spn_target_t) exes;
-  sp_om(spn_target_t) tests;
-  sp_om(spn_profile_t) profiles;
-  sp_om(spn_registry_t) registries;
-  sp_ht(sp_str_t, spn_pkg_req_t) deps;
-  sp_ht(sp_str_t, spn_dep_option_t) options;
-  sp_ht(sp_str_t, spn_dep_options_t) config;
-  sp_ht(spn_semver_t, spn_pkg_metadata_t) metadata;
-  sp_da(spn_semver_t) versions;
-  sp_da(sp_str_t) include;
-  sp_da(sp_str_t) define;
-  sp_da(sp_str_t) system_deps;
-  spn_pkg_kind_t kind;
-
-  sp_mem_arena_t* arena;
-
-  struct {
-    sp_str_t root;
-    sp_str_t manifest;
-    sp_str_t metadata;
-    sp_str_t script;
-    struct {
-      sp_str_t source;
-      sp_str_t work;
-      sp_str_t store;
-    } cache;
-  } paths;
-};
-
-spn_pkg_t       spn_pkg_new(sp_str_t path);
-spn_pkg_t       spn_pkg_from_default(sp_str_t path, sp_str_t name);
-void            spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path);
-void            spn_pkg_from_index(spn_pkg_t* pkg, sp_str_t index_path);
-void            spn_pkg_from_manifest(spn_pkg_t* pkg, sp_str_t manifest_path);
-void            spn_pkg_init(spn_pkg_t* pkg, sp_str_t name);
-void            spn_pkg_set_index(spn_pkg_t* pkg, sp_str_t path);
-void            spn_pkg_set_manifest(spn_pkg_t* pkg, sp_str_t path);
-void            spn_pkg_set_name(spn_pkg_t* pkg, const c8* name);
-void            spn_pkg_set_name_ex(spn_pkg_t* pkg, sp_str_t name);
-void            spn_pkg_set_repo(spn_pkg_t* pkg, const c8* repo);
-void            spn_pkg_set_repo_ex(spn_pkg_t* pkg, sp_str_t repo);
-void            spn_pkg_set_url(spn_pkg_t* pkg, const c8* url);
-void            spn_pkg_set_url_ex(spn_pkg_t* pkg, sp_str_t url);
-void            spn_pkg_set_author(spn_pkg_t* pkg, const c8* author);
-void            spn_pkg_set_author_ex(spn_pkg_t* pkg, sp_str_t author);
-void            spn_pkg_set_maintainer(spn_pkg_t* pkg, const c8* maintainer);
-void            spn_pkg_set_maintainer_ex(spn_pkg_t* pkg, sp_str_t maintainer);
-void            spn_pkg_add_version(spn_pkg_t* pkg, const c8* version, const c8* commit);
-void            spn_pkg_add_version_ex(spn_pkg_t* pkg, spn_semver_t version, sp_str_t commit);
-void            spn_pkg_add_include(spn_pkg_t* pkg, const c8* path);
-void            spn_pkg_add_include_ex(spn_pkg_t* pkg, sp_str_t path);
-void            spn_pkg_add_define(spn_pkg_t* pkg, const c8* define);
-void            spn_pkg_add_define_ex(spn_pkg_t* pkg, sp_str_t define);
-void            spn_pkg_add_system_dep(spn_pkg_t* pkg, const c8* dep);
-void            spn_pkg_add_system_dep_ex(spn_pkg_t* pkg, sp_str_t dep);
-void            spn_pkg_add_linkage(spn_pkg_t* pkg, spn_linkage_t linkage);
-spn_profile_t*  spn_pkg_add_profile_ex(spn_pkg_t* pkg, spn_profile_t profile);
-spn_registry_t* spn_pkg_add_registry(spn_pkg_t* pkg, const c8* name, const c8* location);
-spn_registry_t* spn_pkg_add_registry_ex(spn_pkg_t* pkg, sp_str_t name, sp_str_t location);
-spn_target_t*   spn_pkg_add_exe(spn_pkg_t* pkg, const c8* name);
-spn_target_t*   spn_pkg_add_exe_ex(spn_pkg_t* pkg, sp_str_t name);
-spn_target_t*   spn_pkg_add_test(spn_pkg_t* pkg, const c8* name);
-spn_target_t*   spn_pkg_add_test_ex(spn_pkg_t* pkg, sp_str_t name);
-spn_target_t*   spn_pkg_add_lib(spn_pkg_t* pkg, const c8* name, spn_linkage_t kind);
-spn_target_t*   spn_pkg_add_lib_ex(spn_pkg_t* pkg, sp_str_t name, spn_linkage_t kind);
-void            spn_pkg_add_dep(spn_pkg_t* pkg, sp_str_t name, sp_str_t version, spn_visibility_t viz);
-void            spn_pkg_add_dep_latest(spn_pkg_t* pkg, sp_str_t name, spn_visibility_t visibility);
-sp_str_t        spn_pkg_get_url(spn_pkg_t* build);
-spn_profile_t*  spn_pkg_get_profile_or_default(spn_pkg_t* pkg, sp_str_t name);
-spn_target_t*   spn_pkg_get_target(spn_pkg_t* pkg, const c8* name);
-spn_target_t*   spn_pkg_get_target_ex(spn_pkg_t* pkg, sp_str_t name);
-typedef struct {
-  sp_opt(u32) low;
-  sp_opt(u32) high;
-  spn_pkg_req_t source;
-} spn_resolve_range_t;
-
-typedef struct {
-  spn_pkg_t* pkg;
-  spn_pkg_kind_t kind;
-  spn_semver_t version;
-} spn_resolved_pkg_t;
-
-typedef struct {
-  sp_str_ht(sp_da(spn_resolve_range_t)) ranges;
-  sp_str_ht(bool) visited;
-  sp_str_ht(spn_resolved_pkg_t) resolved;
-  sp_da(sp_str_t) system_deps;
-} spn_resolver_t;
-
 
 ///////////////////
 // BUILD CONTEXT //
@@ -1235,51 +1045,12 @@ sp_app_result_t spn_deinit(sp_app_t* app);
 void            spn_push_event(spn_build_event_kind_t kind);
 void            spn_push_event_ex(spn_build_event_t event);
 sp_str_t        spn_get_config_path();
-spn_log_level_t spn_log_level_from_str(sp_str_t str);
 
 
 
 ////////////////////
 // IMPLEMENTATION //
 ////////////////////
-
-void spn_autoconf(spn_build_ctx_t* build) {
-  spn_autoconf_t* autoconf = spn_autoconf_new(build);
-  spn_autoconf_run(autoconf);
-}
-
-spn_autoconf_t* spn_autoconf_new(spn_build_ctx_t* dep) {
-  spn_autoconf_t* autoconf = SP_ALLOC(spn_autoconf_t);
-  autoconf->build = dep;
-  return autoconf;
-}
-
-void spn_autoconf_run(spn_autoconf_t* autoconf) {
-  spn_build_ctx_t* build = autoconf->build;
-
-  sp_ps_config_t config = {
-    .command = sp_fs_join_path(build->paths.source, SP_LIT("configure")),
-    .args = {
-      sp_format("--prefix={}", SP_FMT_STR(build->paths.store)),
-      build->linkage == SPN_LIB_KIND_SHARED ?
-        SP_LIT("--enable-shared") :
-        SP_LIT("--disable-shared"),
-      build->linkage == SPN_LIB_KIND_STATIC ?
-        SP_LIT("--enable-static") :
-        SP_LIT("--disable-static"),
-    },
-  };
-
-  sp_da_for(autoconf->flags, it) {
-    sp_ps_config_add_arg(&config, autoconf->flags[it]);
-  }
-
-  sp_ps_output_t result = spn_build_ctx_subprocess(build, config);
-}
-
-void spn_autoconf_add_flag(spn_autoconf_t* autoconf, const c8* flag) {
-  sp_da_push(autoconf->flags, sp_str_from_cstr(flag));
-}
 
 spn_user_node_t* spn_find_user_node(spn_node_t node) {
   SP_ASSERT(node.index < sp_da_size(node.ctx->nodes.all));
@@ -1580,34 +1351,6 @@ spn_verbosity_t spn_build_event_get_verbosity(spn_build_event_kind_t kind) {
   return event_info[kind].verbosity;
 }
 
-sp_str_t spn_visibility_to_str(spn_visibility_t kind) {
-  switch (kind) {
-    case SPN_VISIBILITY_PUBLIC: return spn_intern_cstr("public");
-    case SPN_VISIBILITY_TEST: return spn_intern_cstr("test");
-    case SPN_VISIBILITY_BUILD: return spn_intern_cstr("build");
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-spn_visibility_t spn_visibility_from_str(sp_str_t str) {
-  if (spn_intern_is_equal_cstr(str, "public")) return SPN_VISIBILITY_PUBLIC;
-  if (spn_intern_is_equal_cstr(str, "test"))   return SPN_VISIBILITY_TEST;
-  if (spn_intern_is_equal_cstr(str, "build"))  return SPN_VISIBILITY_BUILD;
-  SP_UNREACHABLE_RETURN(SPN_VISIBILITY_PUBLIC);
-}
-
-sp_str_t spn_package_kind_to_str(spn_pkg_kind_t kind) {
-  switch (kind) {
-    SPN_PACKAGE_KIND(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-spn_pkg_kind_t spn_package_kind_from_str(sp_str_t str) {
-  SPN_PACKAGE_KIND(SP_X_NAMED_ENUM_STR_TO_ENUM)
-  SP_UNREACHABLE_RETURN(SPN_PACKAGE_KIND_NONE);
-}
-
 spn_tui_mode_t spn_output_mode_from_str(sp_str_t str) {
   if      (sp_str_equal_cstr(str, "interactive"))    return SPN_OUTPUT_MODE_INTERACTIVE;
   else if (sp_str_equal_cstr(str, "noninteractive")) return SPN_OUTPUT_MODE_NONINTERACTIVE;
@@ -1616,96 +1359,6 @@ spn_tui_mode_t spn_output_mode_from_str(sp_str_t str) {
 
   SP_FATAL("Unknown output mode {:fg brightyellow}; options are [interactive, noninteractive, quiet, none]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_OUTPUT_MODE_NONE);
-}
-
-spn_log_level_t spn_log_level_from_str(sp_str_t str) {
-  if (sp_str_equal_cstr(str, "ERROR")) return SPN_LOG_LEVEL_ERROR;
-  if (sp_str_equal_cstr(str, "WARN")) return SPN_LOG_LEVEL_WARN;
-  if (sp_str_equal_cstr(str, "INFO")) return SPN_LOG_LEVEL_INFO;
-  if (sp_str_equal_cstr(str, "DEBUG")) return SPN_LOG_LEVEL_DEBUG;
-  return SPN_LOG_LEVEL_INFO;
-}
-
-spn_libc_kind_t spn_libc_kind_from_str(sp_str_t str) {
-  if      (sp_str_equal_cstr(str, "gnu"))          return SPN_LIBC_GNU;
-  else if (sp_str_equal_cstr(str, "musl"))         return SPN_LIBC_MUSL;
-  else if (sp_str_equal_cstr(str, "cosmopolitan")) return SPN_LIBC_COSMOPOLITAN;
-  else                                             return SPN_LIBC_CUSTOM;
-}
-
-sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc) {
-  switch (libc) {
-    case SPN_LIBC_GNU:          return sp_str_lit("gnu");
-    case SPN_LIBC_MUSL:         return sp_str_lit("musl");
-    case SPN_LIBC_COSMOPOLITAN: return sp_str_lit("cosmopolitan");
-    case SPN_LIBC_CUSTOM:       return sp_str_lit("custom");
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-spn_build_mode_t spn_dep_build_mode_from_str(sp_str_t str) {
-  if      (sp_str_equal_cstr(str, "debug"))   return SPN_DEP_BUILD_MODE_DEBUG;
-  else if (sp_str_equal_cstr(str, "release")) return SPN_DEP_BUILD_MODE_RELEASE;
-
-  SP_FATAL("Unknown build mode {:fg brightyellow}; options are [debug, release]", SP_FMT_STR(str));
-  SP_UNREACHABLE_RETURN(SPN_DEP_BUILD_MODE_DEBUG);
-}
-
-sp_str_t spn_dep_build_mode_to_str(spn_build_mode_t mode) {
-  switch (mode) {
-    case SPN_DEP_BUILD_MODE_DEBUG:   return sp_str_lit("debug");
-    case SPN_DEP_BUILD_MODE_RELEASE: return sp_str_lit("release");
-    default: SP_UNREACHABLE_RETURN(sp_str_lit(""));
-  }
-}
-
-spn_linkage_t spn_lib_kind_from_str(sp_str_t str) {
-  if      (sp_str_equal_cstr(str, "shared")) return SPN_LIB_KIND_SHARED;
-  else if (sp_str_equal_cstr(str, "static")) return SPN_LIB_KIND_STATIC;
-  else if (sp_str_equal_cstr(str, "source")) return SPN_LIB_KIND_SOURCE;
-
-  SP_FATAL("Unknown build kind {:fg brightyellow}; options are [shared, static, source]", SP_FMT_STR(str));
-  SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
-}
-
-spn_linkage_t spn_pkg_linkage_from_str(sp_str_t str) {
-  if (spn_intern_is_equal_cstr(str, "shared")) return SPN_LIB_KIND_SHARED;
-  if (spn_intern_is_equal_cstr(str, "static")) return SPN_LIB_KIND_STATIC;
-  return SPN_LIB_KIND_SHARED;
-}
-
-sp_str_t spn_pkg_linkage_to_str(spn_linkage_t kind) {
-  switch (kind) {
-    case SPN_LIB_KIND_SHARED: return sp_str_lit("shared");
-    case SPN_LIB_KIND_STATIC: return sp_str_lit("static");
-    case SPN_LIB_KIND_SOURCE: return sp_str_lit("source");
-    default: SP_UNREACHABLE_RETURN(sp_str_lit(""));
-  }
-}
-
-sp_os_lib_kind_t spn_lib_kind_to_sp_os_lib_kind(spn_linkage_t kind) {
-  switch (kind) {
-    case SPN_LIB_KIND_SHARED: return SP_OS_LIB_SHARED;
-    case SPN_LIB_KIND_STATIC: return SP_OS_LIB_STATIC;
-    case SPN_LIB_KIND_SOURCE: return 0;
-  }
-
-  SP_UNREACHABLE_RETURN(0);
-}
-
-spn_pkg_dir_t spn_cache_dir_kind_from_str(sp_str_t str) {
-  if      (sp_str_equal_cstr(str, ""))         return SPN_DIR_STORE;
-  else if (sp_str_equal_cstr(str, "cache"))    return SPN_DIR_CACHE;
-  else if (sp_str_equal_cstr(str, "store"))    return SPN_DIR_STORE;
-  else if (sp_str_equal_cstr(str, "include"))  return SPN_DIR_INCLUDE;
-  else if (sp_str_equal_cstr(str, "vendor"))   return SPN_DIR_VENDOR;
-  else if (sp_str_equal_cstr(str, "lib"))      return SPN_DIR_LIB;
-  else if (sp_str_equal_cstr(str, "source"))   return SPN_DIR_SOURCE;
-  else if (sp_str_equal_cstr(str, "work"))     return SPN_DIR_WORK;
-  else if (sp_str_equal_cstr(str, "project"))  return SPN_DIR_PROJECT;
-
-  SP_FATAL("Unknown dir kind {:fg brightyellow}; options are [cache, store, include, vendor, lib, source, work]", SP_FMT_STR(str));
-  SP_UNREACHABLE_RETURN(SPN_DIR_CACHE);
 }
 
 sp_str_t spn_cache_dir_kind_to_path(spn_pkg_dir_t kind) {
@@ -1768,6 +1421,22 @@ sp_io_writer_t* spn_ctx_get_log_err(void) {
   return &spn.logger.err;
 }
 
+sp_str_t spn_ctx_source_cache_root(void) {
+  return spn.paths.source;
+}
+
+sp_str_t spn_ctx_build_cache_root(void) {
+  return spn.paths.build;
+}
+
+sp_str_t spn_ctx_store_cache_root(void) {
+  return spn.paths.store;
+}
+
+sp_str_t spn_ctx_project_root(void) {
+  return spn.paths.project;
+}
+
 sp_str_t spn_ctx_build_source_dir(spn_build_ctx_t* build) {
   return build->paths.source;
 }
@@ -1816,6 +1485,22 @@ sp_da(spn_build_ctx_t*) spn_ctx_all_build_contexts(void) {
     sp_da_push(builds, &unit->ctx);
   }
   return builds;
+}
+
+spn_pkg_t* spn_ctx_ensure_package(spn_pkg_req_t req) {
+  return spn_app_ensure_package(&app, req);
+}
+
+void spn_ctx_bail_on_missing_package(sp_str_t name) {
+  spn_app_bail_on_missing_package(&app, name);
+}
+
+spn_pkg_t* spn_ctx_root_package(void) {
+  return &app.package;
+}
+
+spn_resolver_t* spn_ctx_resolver(void) {
+  return &app.resolver;
 }
 
 void spn_ctx_push_target_source_event(spn_target_t* target, sp_str_t source) {
@@ -1891,30 +1576,6 @@ void sp_sh_ls(sp_str_t path) {
   }
 }
 
-
-void spn_toml_append_option(spn_toml_writer_t* writer, sp_str_t key, spn_dep_option_t option) {
-  switch (option.kind) {
-    case SPN_DEP_OPTION_KIND_BOOL: {
-      spn_toml_append_bool(writer, key, option.b);
-      break;
-    }
-    case SPN_DEP_OPTION_KIND_S64: {
-      spn_toml_append_s64(writer, key, option.s);
-      break;
-    }
-    case SPN_DEP_OPTION_KIND_STR: {
-      spn_toml_append_str(writer, key, option.str);
-      break;
-    }
-    default: {
-      SP_UNREACHABLE_CASE();
-    }
-  }
-}
-
-void spn_toml_append_option_cstr(spn_toml_writer_t* writer, const c8* key, spn_dep_option_t option) {
-  spn_toml_append_option(writer, sp_str_view(key), option);
-}
 
 /////////
 // TUI //
@@ -2410,104 +2071,6 @@ sp_str_t sp_tui_table_render(sp_tui_table_t* table) {
   return sp_str_builder_to_str(&builder);
 }
 
-void spn_lock_file_init(spn_lock_file_t* lock) {
-  sp_ht_set_fns(lock->entries, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(lock->system_deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-}
-
-spn_lock_file_t spn_build_lock_file() {
-  spn_lock_file_t lock = SP_ZERO_INITIALIZE();
-  spn_lock_file_init(&lock);
-
-  sp_ht_for_kv(app.resolver.resolved, it) {
-    spn_resolved_pkg_t* resolved = it.val;
-    spn_pkg_t* pkg = resolved->pkg;
-    spn_pkg_metadata_t* metadata = sp_ht_getp(pkg->metadata, resolved->version);
-
-    spn_pkg_req_t* direct_req = sp_ht_getp(app.package.deps, resolved->pkg->name);
-    bool is_explicit = direct_req != SP_NULLPTR;
-
-    spn_lock_entry_t entry = {
-      .name = pkg->name,
-      .version = metadata->version,
-      .commit = metadata->commit,
-      .import_kind = is_explicit ?
-        SPN_DEP_IMPORT_KIND_EXPLICIT :
-        SPN_DEP_IMPORT_KIND_TRANSITIVE,
-      .visibility = is_explicit ?
-        direct_req->visibility :
-        SPN_VISIBILITY_PUBLIC,
-      .kind = resolved->kind,
-    };
-
-    sp_da_for(pkg->system_deps, i) {
-      sp_ht_insert(lock.system_deps, sp_str_copy(pkg->system_deps[i]), true);
-    }
-
-    sp_ht_for_kv(pkg->deps, n) {
-      sp_dyn_array_push(entry.deps, sp_str_copy(n.val->name));
-    }
-
-    sp_ht_insert(lock.entries, entry.name, entry);
-  }
-
-  // Now that everyone has a node, go back and add the reverse references
-  sp_ht_for_kv(lock.entries, it) {
-    sp_dyn_array_for(it.val->deps, n) {
-      spn_lock_entry_t* dep = sp_ht_getp(lock.entries, it.val->deps[n]);
-      if (dep) sp_dyn_array_push(dep->dependents, sp_str_copy(it.val->name));
-    }
-  }
-
-  return lock;
-}
-
-spn_lock_file_t spn_lock_file_load(sp_str_t path) {
-  spn_lock_file_t lock = SP_ZERO_INITIALIZE();
-  spn_lock_file_init(&lock);
-
-  SP_ASSERT(sp_fs_exists(path));
-
-  toml_table_t* root = spn_toml_parse(path);
-  SP_ASSERT(root);
-
-  toml_table_t* pkg_table = toml_table_table(root, "package");
-  if (pkg_table) {
-    sp_da(sp_str_t) sys_deps = spn_toml_arr_to_str_arr(toml_table_array(pkg_table, "system_deps"));
-    sp_da_for(sys_deps, i) {
-      sp_ht_insert(lock.system_deps, sys_deps[i], true);
-    }
-  }
-
-  toml_array_t* deps = toml_table_array(root, "dep");
-  if (!deps) return lock;
-
-  spn_toml_arr_for(deps, it) {
-    toml_table_t* pkg = toml_array_table(deps, it);
-    SP_ASSERT(pkg);
-
-    spn_lock_entry_t entry = {
-      .name = spn_toml_str(pkg, "name"),
-      .version = spn_semver_from_str(spn_toml_str(pkg, "version")),
-      .commit = spn_toml_str(pkg, "commit"),
-      .kind = spn_package_kind_from_str(spn_toml_str(pkg, "kind")),
-      .visibility = spn_visibility_from_str(spn_toml_str(pkg, "visibility")),
-      .deps = spn_toml_arr_to_str_arr(toml_table_array(pkg, "deps")),
-    };
-    sp_ht_insert(lock.entries, entry.name, entry);
-  }
-
-  sp_ht_for_kv(lock.entries, it) {
-    sp_dyn_array_for(it.val->deps, n) {
-      spn_lock_entry_t* dep = sp_ht_getp(lock.entries, it.val->deps[n]);
-      if (dep) sp_dyn_array_push(dep->dependents, it.val->name);
-    }
-  }
-
-  return lock;
-}
-
-
 ///////////
 // BUILD //
 ///////////
@@ -2578,343 +2141,6 @@ sp_str_t spn_get_tool_path(spn_target_t* bin) {
   return sp_fs_join_path(spn.paths.bin, bin->name);
 }
 
-spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key) {
-  toml_unparsed_t unparsed = toml_table_unparsed(toml, key);
-  SP_ASSERT(unparsed);
-
-  bool b;
-  s64 s;
-  f32 f;
-  c8* cstr;
-  s32 len;
-  void* ptr;
-
-  if (!toml_value_string(unparsed, &cstr, &len)) {
-    return (spn_dep_option_t) {
-      .kind = SPN_DEP_OPTION_KIND_STR,
-      .name = sp_str_from_cstr(key),
-      .str = sp_str_from_cstr(cstr)
-    };
-  }
-  else if (!toml_value_int(unparsed, &s)) {
-    return (spn_dep_option_t) {
-      .kind = SPN_DEP_OPTION_KIND_S64,
-      .name = sp_str_from_cstr(key),
-      .s = s
-    };
-  }
-  else if (!toml_value_bool(unparsed, &b)) {
-    return (spn_dep_option_t) {
-      .kind = SPN_DEP_OPTION_KIND_BOOL,
-      .name = sp_str_from_cstr(key),
-      .b = b
-    };
-  }
-
-  SP_UNREACHABLE_RETURN(SP_ZERO_STRUCT(spn_dep_option_t));
-}
-
-void spn_pkg_init(spn_pkg_t* pkg, sp_str_t name) {
-  pkg->arena = sp_mem_arena_new(4096);
-  pkg->name = spn_intern(name);
-  pkg->paths.cache.source = sp_fs_join_path(spn.paths.source, pkg->name);
-  pkg->paths.cache.work = sp_fs_join_path(spn.paths.build, pkg->name);
-  pkg->paths.cache.store = sp_fs_join_path(spn.paths.store, pkg->name);
-
-  sp_ht_set_fns(pkg->deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(pkg->options, sp_ht_on_hash_str_key,
-                sp_ht_on_compare_str_key);
-  sp_ht_set_fns(pkg->config, sp_ht_on_hash_str_key,
-                sp_ht_on_compare_str_key);
-}
-
-void spn_pkg_set_index(spn_pkg_t* pkg, sp_str_t path) {
-  sp_context_push_arena(pkg->arena);
-  pkg->kind = SPN_PACKAGE_KIND_INDEX;
-  pkg->paths.root = sp_str_copy(path);
-  pkg->paths.manifest = sp_fs_join_path(pkg->paths.root, sp_str_lit("spn.toml"));
-  pkg->paths.metadata = sp_fs_join_path(pkg->paths.root, sp_str_lit("metadata.toml"));
-  pkg->paths.script = sp_fs_join_path(pkg->paths.root, sp_str_lit("spn.c"));
-  sp_context_pop();
-}
-
-void spn_pkg_set_manifest(spn_pkg_t* pkg, sp_str_t path) {
-  sp_context_push_arena(pkg->arena);
-  pkg->kind = SPN_PACKAGE_KIND_FILE;
-  pkg->paths.root = sp_fs_parent_path(path);
-  pkg->paths.manifest = sp_str_copy(path);
-  pkg->paths.metadata = sp_fs_join_path(pkg->paths.root, sp_str_lit("metadata.toml"));
-  pkg->paths.script = sp_fs_join_path(pkg->paths.root, sp_str_lit("spn.c"));
-  sp_context_pop();
-}
-
-spn_pkg_t spn_pkg_new(sp_str_t name) {
-  spn_pkg_t package = SP_ZERO_INITIALIZE();
-  spn_pkg_init(&package, name);
-  return package;
-}
-
-spn_pkg_t spn_pkg_from_bare_default(sp_str_t path, sp_str_t name) {
-  spn_pkg_t package = spn_pkg_new(name);
-  spn_pkg_set_manifest(&package, sp_fs_join_path(path, sp_str_lit("spn.toml")));
-  package.version = (spn_semver_t){0, 1, 0};
-  sp_dyn_array_push(package.versions, package.version);
-  return package;
-}
-
-spn_pkg_t spn_pkg_from_default(sp_str_t path, sp_str_t name) {
-  spn_pkg_t pkg = spn_pkg_new(name);
-  spn_pkg_set_manifest(&pkg, sp_fs_join_path(path, sp_str_lit("spn.toml")));
-  spn_pkg_add_dep_latest(&pkg, sp_str_lit("sp"), SPN_VISIBILITY_PUBLIC);
-  spn_pkg_set_repo(&pkg, "");
-  spn_pkg_add_version(&pkg, "0.1.0", "");
-
-  spn_target_t* bin = spn_pkg_add_exe_ex(&pkg, pkg.name);
-  spn_target_add_source_ex(bin, sp_str_lit("main.c"));
-
-  return pkg;
-}
-
-void spn_pkg_from_index(spn_pkg_t* pkg, sp_str_t path) {
-  sp_str_t manifest = sp_fs_join_path(path, sp_str_lit("spn.toml"));
-  SP_ASSERT(sp_fs_exists(manifest));
-
-  spn_pkg_load(pkg, manifest);
-  spn_pkg_set_index(pkg, path);
-
-  toml_table_t *metadata = spn_toml_parse(pkg->paths.metadata);
-  if (metadata) {
-    toml_array_t *versions = toml_table_array(metadata, "versions");
-
-    const c8 *key = SP_NULLPTR;
-    spn_toml_arr_for(versions, it) {
-      toml_table_t *entry = toml_array_table(versions, it);
-
-      spn_semver_t version = spn_semver_from_str(spn_toml_str(entry, "version"));
-      spn_pkg_add_version_ex(pkg, version, spn_toml_str(entry, "commit"));
-    }
-
-    sp_dyn_array_sort(pkg->versions, spn_semver_sort_kernel);
-  }
-}
-
-void spn_pkg_from_manifest(spn_pkg_t* pkg, sp_str_t manifest) {
-  SP_ASSERT(sp_fs_exists(manifest));
-
-  spn_pkg_load(pkg, manifest);
-  spn_pkg_set_manifest(pkg, manifest);
-}
-
-void spn_pkg_set_name(spn_pkg_t* pkg, const c8* name) {
-  spn_pkg_set_name_ex(pkg, sp_str_view(name));
-}
-
-void spn_pkg_set_name_ex(spn_pkg_t* pkg, sp_str_t name) {
-  pkg->name = spn_intern(name);
-}
-
-void spn_pkg_set_repo(spn_pkg_t* pkg, const c8* repo) {
-  spn_pkg_set_repo_ex(pkg, sp_str_view(repo));
-}
-
-void spn_pkg_set_repo_ex(spn_pkg_t* pkg, sp_str_t repo) {
-  sp_context_push_arena(pkg->arena);
-  pkg->repo = sp_str_copy(repo);
-  sp_context_pop();
-}
-
-void spn_pkg_set_url(spn_pkg_t* pkg, const c8* url) {
-  spn_pkg_set_url_ex(pkg, sp_str_view(url));
-}
-
-void spn_pkg_set_url_ex(spn_pkg_t* pkg, sp_str_t url) {
-  sp_context_push_arena(pkg->arena);
-  pkg->url = sp_str_copy(url);
-  sp_context_pop();
-}
-
-void spn_pkg_set_author(spn_pkg_t* pkg, const c8* author) {
-  spn_pkg_set_author_ex(pkg, sp_str_view(author));
-}
-
-void spn_pkg_set_author_ex(spn_pkg_t* pkg, sp_str_t author) {
-  sp_context_push_arena(pkg->arena);
-  pkg->author = sp_str_copy(author);
-  sp_context_pop();
-}
-
-void spn_pkg_set_maintainer(spn_pkg_t* pkg, const c8* maintainer) {
-  spn_pkg_set_maintainer_ex(pkg, sp_str_view(maintainer));
-}
-
-void spn_pkg_set_maintainer_ex(spn_pkg_t* pkg, sp_str_t maintainer) {
-  sp_context_push_arena(pkg->arena);
-  pkg->maintainer = sp_str_copy(maintainer);
-  sp_context_pop();
-}
-
-void spn_pkg_add_version(spn_pkg_t* pkg, const c8* version, const c8* commit) {
-  spn_pkg_add_version_ex(pkg, spn_semver_from_str(sp_str_view(version)), sp_str_view(commit));
-}
-
-void spn_pkg_add_version_ex(spn_pkg_t* pkg, spn_semver_t version, sp_str_t commit) {
-  if (spn_semver_is_empty(pkg->version)) {
-    pkg->version = version;
-  }
-
-  sp_context_push_arena(pkg->arena);
-  sp_ht_insert(pkg->metadata, version, ((spn_pkg_metadata_t) {
-    .version = version,
-    .commit = sp_str_copy(commit)
-  }));
-  sp_da_push(pkg->versions, version);
-  sp_context_pop();
-}
-
-void spn_pkg_add_include(spn_pkg_t* pkg, const c8* include) {
-  spn_pkg_add_include_ex(pkg, sp_str_view(include));
-}
-
-void spn_pkg_add_include_ex(spn_pkg_t* pkg, sp_str_t path) {
-  sp_context_push_arena(pkg->arena);
-  sp_da_push(pkg->include, sp_str_copy(path));
-  sp_context_pop();
-}
-
-void spn_pkg_add_define(spn_pkg_t* pkg, const c8* define) {
-  spn_pkg_add_define_ex(pkg, sp_str_view(define));
-}
-
-void spn_pkg_add_define_ex(spn_pkg_t* pkg, sp_str_t define) {
-  sp_context_push_arena(pkg->arena);
-  sp_da_push(pkg->define, sp_str_copy(define));
-  sp_context_pop();
-}
-
-void spn_pkg_add_system_dep(spn_pkg_t* pkg, const c8* dep) {
-  spn_pkg_add_system_dep_ex(pkg, sp_str_view(dep));
-}
-
-void spn_pkg_add_system_dep_ex(spn_pkg_t* pkg, sp_str_t dep) {
-  sp_context_push_arena(pkg->arena);
-  sp_da_push(pkg->system_deps, sp_str_copy(dep));
-  sp_context_pop();
-}
-
-void spn_pkg_add_linkage(spn_pkg_t* pkg, spn_linkage_t linkage) {
-  (void)pkg;
-  (void)linkage;
-}
-
-spn_profile_t* spn_pkg_add_profile(spn_pkg_t* pkg, const c8* name) {
-  spn_profile_t profile = {
-    .name = spn_intern_cstr(name),
-    .cc.exe = spn_intern_cstr("gcc"),
-    .cc.kind = SPN_CC_GCC,
-    .linkage = SPN_LIB_KIND_SHARED,
-    .libc = SPN_LIBC_GNU,
-    .standard = SPN_C99,
-    .mode = SPN_DEP_BUILD_MODE_DEBUG,
-    .kind = SPN_PROFILE_USER,
-  };
-
-  return spn_pkg_add_profile_ex(pkg, profile);
-}
-
-spn_profile_t* spn_pkg_add_profile_ex(spn_pkg_t* pkg, spn_profile_t profile) {
-  sp_om_insert(pkg->profiles, profile.name, profile);
-  return sp_om_get(pkg->profiles, profile.name);
-}
-
-spn_target_t* spn_pkg_add_exe(spn_pkg_t* pkg, const c8* name) {
-  return spn_pkg_add_exe_ex(pkg, spn_intern_cstr(name));
-}
-
-spn_target_t* spn_pkg_add_exe_ex(spn_pkg_t* pkg, sp_str_t name) {
-  spn_target_t exe = {
-    .name = spn_intern(name),
-    .kind = SPN_TARGET_EXE,
-    .pkg = pkg,
-    .visibility = SPN_VISIBILITY_PUBLIC,
-  };
-  sp_om_insert(pkg->exes, exe.name, exe);
-  return sp_om_get(pkg->exes, exe.name);
-}
-
-spn_target_t* spn_pkg_add_test(spn_pkg_t* pkg, const c8* name) {
-  return spn_pkg_add_test_ex(pkg, spn_intern_cstr(name));
-}
-
-spn_target_t* spn_pkg_add_test_ex(spn_pkg_t* pkg, sp_str_t name) {
-  spn_target_t test = {
-    .name = spn_intern(name),
-    .kind = SPN_TARGET_EXE,
-    .pkg = pkg,
-    .visibility = SPN_VISIBILITY_TEST,
-  };
-  sp_om_insert(pkg->tests, test.name, test);
-  return sp_om_get(pkg->tests, test.name);
-}
-
-spn_target_t* spn_pkg_add_lib(spn_pkg_t* pkg, const c8* name, spn_linkage_t kind) {
-  return spn_pkg_add_lib_ex(pkg, spn_intern_cstr(name), kind);
-}
-
-spn_target_t* spn_pkg_add_lib_ex(spn_pkg_t* pkg, sp_str_t name, spn_linkage_t kind) {
-  spn_target_t lib = {
-    .name = spn_intern(name),
-    .kind = spn_pkg_linkage_to_target_kind(kind),
-    .pkg = pkg,
-    .visibility = SPN_VISIBILITY_PUBLIC,
-  };
-  sp_om_insert(pkg->libs, lib.name, lib);
-  return sp_om_get(pkg->libs, lib.name);
-}
-
-bool spn_pkg_has_lib_kind(spn_pkg_t* pkg, spn_linkage_t kind) {
-  if (kind == SPN_LIB_KIND_SOURCE) {
-    return sp_om_empty(pkg->libs);
-  }
-  spn_target_kind_t target_kind = spn_pkg_linkage_to_target_kind(kind);
-  sp_om_for(pkg->libs, it) {
-    spn_target_t* lib = sp_om_at(pkg->libs, it);
-    if (lib->kind == target_kind) {
-      return true;
-    }
-  }
-  return false;
-}
-
-spn_registry_t* spn_pkg_add_registry(spn_pkg_t* pkg, const c8* name, const c8* location) {
-  return spn_pkg_add_registry_ex(pkg, spn_intern_cstr(name), spn_intern_cstr(location));
-}
-
-spn_registry_t* spn_pkg_add_registry_ex(spn_pkg_t* pkg, sp_str_t name, sp_str_t location) {
-  spn_registry_t registry = {
-    .name = spn_intern(name),
-    .location = spn_intern(location),
-    .kind = SPN_PACKAGE_KIND_WORKSPACE
-  };
-  sp_om_insert(pkg->registries, registry.name, registry);
-  return sp_om_get(pkg->registries, registry.name);
-}
-
-sp_str_t spn_pkg_get_url(spn_pkg_t* pkg) {
-  return pkg->url;
-}
-
-spn_target_t* spn_pkg_get_target(spn_pkg_t* pkg, const c8* name) {
-  return spn_pkg_get_target_ex(pkg, sp_str_view(name));
-}
-
-spn_target_t* spn_pkg_get_target_ex(spn_pkg_t* pkg, sp_str_t name) {
-  if (sp_om_has(pkg->exes, name)) return sp_om_get(pkg->exes, name);
-  if (sp_om_has(pkg->tests, name)) return sp_om_get(pkg->tests, name);
-  if (sp_om_has(pkg->libs, name)) return sp_om_get(pkg->libs, name);
-
-  return SP_NULLPTR;
-}
-
 void spn_add_include(spn_build_ctx_t* b, spn_pkg_dir_t dir, const c8* path) {
   spn_pkg_add_include_ex(b->pkg, spn_build_ctx_resolve_dir(b, dir, sp_str_view(path)));
 }
@@ -2933,290 +2159,6 @@ void spn_add_linkage(spn_build_ctx_t* b, spn_linkage_t linkage) {
 
 spn_registry_t* spn_add_registry(spn_build_ctx_t* b, const c8* name, const c8* location) {
   return spn_pkg_add_registry(b->pkg, name, location);
-}
-
-void spn_pkg_load_deps(toml_table_t *toml, spn_pkg_t *package, spn_visibility_t visibility) {
-  if (!toml) return;
-
-  const c8 *key = SP_NULLPTR;
-  spn_toml_for(toml, n, key) {
-    sp_str_t version = spn_toml_str(toml, key);
-    spn_pkg_add_dep(package, sp_str_view(key), version, visibility);
-  }
-}
-
-void spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
-  struct {
-    toml_table_t* manifest;
-    toml_table_t*   package;
-    toml_array_t*   lib;
-    toml_array_t*   bin;
-    toml_array_t*   test;
-    toml_table_t*   deps;
-    toml_array_t*   profile;
-    toml_array_t*   registry;
-    toml_table_t*   options;
-    toml_table_t*   config;
-  } toml = SP_ZERO_INITIALIZE();
-  toml.manifest = spn_toml_parse(manifest_path);
-  toml.package = toml_table_table(toml.manifest, "package");
-  toml.lib = toml_table_array(toml.manifest, "lib");
-  toml.bin = toml_table_array(toml.manifest, "bin");
-  toml.test = toml_table_array(toml.manifest, "test");
-  toml.profile = toml_table_array(toml.manifest, "profile");
-  toml.registry = toml_table_array(toml.manifest, "registry");
-  toml.deps = toml_table_table(toml.manifest, "deps");
-  toml.options = toml_table_table(toml.manifest, "options");
-  toml.config = toml_table_table(toml.manifest, "config");
-
-  spn_pkg_init(pkg, spn_toml_str(toml.package, "name"));
-  spn_pkg_set_url(pkg, spn_toml_cstr_opt(toml.package, "url", ""));
-  spn_pkg_set_author(pkg, spn_toml_cstr_opt(toml.package, "author", ""));
-  spn_pkg_set_maintainer(pkg, spn_toml_cstr_opt(toml.package, "maintainer", ""));
-
-  const c8* version = spn_toml_cstr(toml.package, "version");
-  const c8* commit = spn_toml_cstr_opt(toml.package, "commit", "");
-  spn_pkg_add_version(pkg, version, commit);
-
-  toml_array_t* include = toml_table_array(toml.package, "include");
-  spn_toml_arr_for(include, it) {
-    sp_str_t path = sp_fs_join_path(spn.paths.project, spn_toml_arr_str(include, it));
-    spn_pkg_add_include_ex(pkg, path);
-  }
-
-  toml_array_t* define = toml_table_array(toml.package, "define");
-  spn_toml_arr_for(define, it) {
-    spn_pkg_add_define(pkg, spn_toml_arr_cstr(define, it));
-  }
-
-  toml_array_t* system_deps = toml_table_array(toml.package, "system_deps");
-  spn_toml_arr_for(system_deps, it) {
-    spn_pkg_add_system_dep(pkg, spn_toml_arr_cstr(system_deps, it));
-  }
-
-  spn_toml_arr_for(toml.lib, n) {
-    toml_table_t* it = toml_array_table(toml.lib, n);
-    sp_str_t kind_str = spn_toml_str_opt(it, "kind", "static");
-    spn_linkage_t kind = spn_pkg_linkage_from_str(kind_str);
-    spn_target_t* lib = spn_pkg_add_lib(pkg, spn_toml_cstr(it, "name"), kind);
-
-    toml_array_t* source = toml_table_array(it, "source");
-    spn_toml_arr_for(source, s) {
-      spn_target_add_source_ex(lib, spn_toml_arr_str(source, s));
-    }
-
-    toml_array_t* include = toml_table_array(it, "include");
-    spn_toml_arr_for(include, i) {
-      spn_target_add_include_ex(lib, spn_toml_arr_str(include, i));
-    }
-
-    toml_array_t* define = toml_table_array(it, "define");
-    spn_toml_arr_for(define, d) {
-      spn_target_add_define_ex(lib, spn_toml_arr_str(define, d));
-    }
-  }
-
-  spn_toml_arr_for(toml.profile, n) {
-    toml_table_t* it = toml_array_table(toml.profile, n);
-
-    spn_profile_t* profile = spn_pkg_add_profile(pkg, spn_toml_cstr(it, "name"));
-    spn_profile_set_cc(profile, spn_cc_kind_from_str(spn_toml_str_opt(it, "cc", "gcc")));
-    spn_profile_set_linkage(profile, spn_pkg_linkage_from_str(spn_toml_str_opt(it, "linkage", "shared")));
-    spn_profile_set_libc(profile, spn_libc_kind_from_str(spn_toml_str_opt(it, "libc", "gnu")));
-    spn_profile_set_standard(profile, spn_c_standard_from_str(spn_toml_str_opt(it, "standard", "c99")));
-    spn_profile_set_mode(profile, spn_dep_build_mode_from_str(spn_toml_str_opt(it, "mode", "debug")));
-  }
-
-  spn_toml_arr_for(toml.registry, n) {
-    toml_table_t *it = toml_array_table(toml.registry, n);
-    spn_pkg_add_registry(pkg, spn_toml_cstr(it, "name"), spn_toml_cstr(it, "location"));
-  }
-
-  spn_toml_arr_for(toml.bin, n) {
-    toml_table_t* it = toml_array_table(toml.bin, n);
-    spn_target_t* bin = spn_pkg_add_exe(pkg, spn_toml_cstr(it, "name"));
-
-    toml_array_t* source = toml_table_array(it, "source");
-    spn_toml_arr_for(source, s) {
-      spn_target_add_source_ex(bin, spn_toml_arr_str(source, s));
-    }
-
-    toml_array_t* include = toml_table_array(it, "include");
-    spn_toml_arr_for(include, i) {
-      spn_target_add_include_ex(bin, spn_toml_arr_str(include, i));
-    }
-
-    toml_array_t* define = toml_table_array(it, "define");
-    spn_toml_arr_for(define, d) {
-      spn_target_add_define_ex(bin, spn_toml_arr_str(define, d));
-    }
-
-    toml_value_t kind = toml_table_string(it, "kind");
-    if (kind.ok) {
-      spn_target_set_visibility(bin, spn_visibility_from_str(sp_str_view(kind.u.s)));
-    }
-  }
-
-  spn_toml_arr_for(toml.test, n) {
-    toml_table_t* it = toml_array_table(toml.test, n);
-    spn_target_t* test = spn_pkg_add_test(pkg, spn_toml_cstr(it, "name"));
-
-    toml_array_t* source = toml_table_array(it, "source");
-    spn_toml_arr_for(source, s) {
-      spn_target_add_source_ex(test, spn_toml_arr_str(source, s));
-    }
-
-    toml_array_t* include = toml_table_array(it, "include");
-    spn_toml_arr_for(include, i) {
-      spn_target_add_include_ex(test, spn_toml_arr_str(include, i));
-    }
-
-    toml_array_t* define = toml_table_array(it, "define");
-    spn_toml_arr_for(define, d) {
-      spn_target_add_define_ex(test, spn_toml_arr_str(define, d));
-    }
-  }
-
-  if (toml.deps) {
-    spn_pkg_load_deps(toml_table_table(toml.deps, "package"), pkg, SPN_VISIBILITY_PUBLIC);
-    spn_pkg_load_deps(toml_table_table(toml.deps, "test"), pkg, SPN_VISIBILITY_TEST);
-    spn_pkg_load_deps(toml_table_table(toml.deps, "build"), pkg, SPN_VISIBILITY_BUILD);
-  }
-
-  if (toml.options) {
-    const c8 *key = SP_NULLPTR;
-    spn_toml_for(toml.options, n, key) {
-      spn_dep_option_t option = spn_dep_option_from_toml(toml.options, key);
-      sp_ht_insert(pkg->options, option.name, option);
-    }
-  }
-
-  if (toml.config) {
-    sp_da(toml_table_t *) configs = SP_ZERO_INITIALIZE();
-    const c8 *key = SP_NULLPTR;
-    spn_toml_for(toml.config, n, key) {
-      sp_dyn_array_push(configs, toml_table_table(toml.config, key));
-    }
-
-    sp_dyn_array_for(configs, it) {
-      toml_table_t *config = configs[it];
-
-      sp_str_t name = sp_str_from_cstr(config->key);
-
-      spn_dep_options_t options = SP_NULLPTR;
-      sp_ht_set_fns(options, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-
-      const c8 *key = SP_NULLPTR;
-      spn_toml_for(config, n, key) {
-        spn_dep_option_t option = spn_dep_option_from_toml(config, key);
-        sp_ht_insert(options, option.name, option);
-      }
-
-      sp_ht_insert(pkg->config, name, options);
-    }
-  }
-}
-
-spn_pkg_req_t spn_pkg_req_from_str(sp_str_t str) {
-  spn_pkg_req_t dep = SP_ZERO_INITIALIZE();
-  if (sp_str_starts_with(str, sp_str_lit("file://"))) {
-    return (spn_pkg_req_t) {
-      .kind = SPN_PACKAGE_KIND_FILE,
-      .file = sp_str_copy(str)
-    };
-  }
-  else {
-    return (spn_pkg_req_t) {
-      .kind = SPN_PACKAGE_KIND_INDEX,
-      .range = spn_semver_range_from_str(str),
-    };
-  }
-
-  SP_UNREACHABLE_RETURN(SP_ZERO_STRUCT(spn_pkg_req_t));
-}
-
-sp_str_t spn_pkg_req_to_str(spn_pkg_req_t dep) {
-  switch (dep.kind) {
-    case SPN_PACKAGE_KIND_FILE: {
-      return dep.file;
-    }
-    case SPN_PACKAGE_KIND_INDEX: {
-      return spn_semver_range_to_str(dep.range);
-    }
-    case SPN_PACKAGE_KIND_ROOT:
-    case SPN_PACKAGE_KIND_WORKSPACE: {
-      SP_BROKEN();
-      break;
-    }
-    case SPN_PACKAGE_KIND_NONE: {
-      SP_UNREACHABLE_RETURN(sp_str_lit(""));
-    }
-  }
-
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-void spn_pkg_add_dep_latest(spn_pkg_t* pkg, sp_str_t name, spn_visibility_t visibility) {
-  spn_pkg_add_dep(pkg, name, sp_str_lit(""), visibility);
-}
-
-void spn_pkg_add_dep(spn_pkg_t* pkg, sp_str_t name, sp_str_t version, spn_visibility_t visibility) {
-  sp_require(pkg);
-
-  spn_pkg_req_t req = {
-    .name = spn_intern(name),
-    .visibility = visibility,
-  };
-
-  if (sp_str_empty(version)) {
-    req.kind = SPN_PACKAGE_KIND_INDEX;
-
-    spn_pkg_t* dep = spn_app_ensure_package(&app, req);
-    if (!dep) {
-      spn_app_bail_on_missing_package(&app, name);
-    }
-
-    if (sp_dyn_array_empty(dep->versions)) {
-      SP_FATAL("{:fg brightcyan} has no known versions", SP_FMT_STR(dep->name));
-    }
-
-    spn_semver_parsed_t parsed = {
-      .version = *sp_dyn_array_back(dep->versions),
-      .components = { true, true, true }
-    };
-    req.range = spn_semver_caret_to_range(parsed);
-  } else {
-    req = spn_pkg_req_from_str(version);
-    req.name = spn_intern(name);
-    req.visibility = visibility;
-  }
-
-  sp_ht_insert(pkg->deps, req.name, req);
-}
-
-spn_profile_t* spn_pkg_get_default_profile(spn_pkg_t* pkg) {
-  sp_om_for(pkg->profiles, it) {
-    return sp_om_at(pkg->profiles, it);
-  }
-
-  sp_unreachable_return(SP_NULLPTR);
-}
-
-spn_profile_t* spn_pkg_get_profile_or_default(spn_pkg_t* pkg, sp_str_t name) {
-  sp_require_as_null(!sp_om_empty(pkg->profiles));
-
-  spn_profile_t* profile = sp_om_get(pkg->profiles, name);
-  if (profile) {
-    return profile;
-  }
-
-  return spn_pkg_get_default_profile(pkg);
-}
-
-void spn_resolver_init(spn_resolver_t* resolver, spn_pkg_t* pkg) {
-  sp_ht_set_fns(resolver->ranges, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(resolver->resolved, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(resolver->visited, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
 }
 
 void spn_app_bail_on_missing_package(spn_app_t* app, sp_str_t name) {
@@ -4558,24 +3500,6 @@ void spn_app_write_manifest(spn_pkg_t* pkg, sp_str_t path) {
   sp_io_writer_close(&file);
 }
 
-sp_str_t spn_registry_get_path(spn_registry_t* registry) {
-  switch (registry->kind) {
-    case SPN_PACKAGE_KIND_WORKSPACE: {
-      return sp_fs_join_path(app.paths.dir, registry->location);
-    }
-    case SPN_PACKAGE_KIND_INDEX: {
-      return sp_str_copy(registry->location);
-    }
-    case SPN_PACKAGE_KIND_ROOT:
-    case SPN_PACKAGE_KIND_FILE:
-    case SPN_PACKAGE_KIND_NONE: {
-      SP_UNREACHABLE();
-    }
-  }
-
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
 spn_pkg_t* spn_app_find_package(spn_app_t* app, sp_str_t name) {
   return sp_om_get(app->cache, name);
 }
@@ -4678,7 +3602,8 @@ spn_app_t spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode
       break;
     }
     case SPN_APP_INIT_BARE: {
-      app.package = spn_pkg_from_bare_default(path, name);
+      app.package = spn_pkg_new(name);
+      spn_pkg_set_manifest(&app.package, sp_fs_join_path(path, SP_LIT("spn.toml")));
       spn_app_write_manifest(&app.package, app.package.paths.manifest);
 
       break;

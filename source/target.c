@@ -4,6 +4,94 @@
 #include "ctx.h"
 #include "intern.h"
 
+sp_str_t spn_visibility_to_str(spn_visibility_t kind) {
+  switch (kind) {
+    case SPN_VISIBILITY_PUBLIC: {
+      return spn_intern_cstr("public");
+    }
+    case SPN_VISIBILITY_TEST: {
+      return spn_intern_cstr("test");
+    }
+    case SPN_VISIBILITY_BUILD: {
+      return spn_intern_cstr("build");
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+spn_visibility_t spn_visibility_from_str(sp_str_t str) {
+  if (spn_intern_is_equal_cstr(str, "public")) {
+    return SPN_VISIBILITY_PUBLIC;
+  }
+  if (spn_intern_is_equal_cstr(str, "test")) {
+    return SPN_VISIBILITY_TEST;
+  }
+  if (spn_intern_is_equal_cstr(str, "build")) {
+    return SPN_VISIBILITY_BUILD;
+  }
+
+  SP_UNREACHABLE_RETURN(SPN_VISIBILITY_PUBLIC);
+}
+
+spn_linkage_t spn_lib_kind_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "shared")) {
+    return SPN_LIB_KIND_SHARED;
+  }
+  if (sp_str_equal_cstr(str, "static")) {
+    return SPN_LIB_KIND_STATIC;
+  }
+  if (sp_str_equal_cstr(str, "source")) {
+    return SPN_LIB_KIND_SOURCE;
+  }
+
+  SP_FATAL("Unknown lib kind {:fg brightyellow}; options are [shared, static, source]", SP_FMT_STR(str));
+  SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
+}
+
+spn_linkage_t spn_pkg_linkage_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "shared")) {
+    return SPN_LIB_KIND_SHARED;
+  }
+  if (sp_str_equal_cstr(str, "static")) {
+    return SPN_LIB_KIND_STATIC;
+  }
+
+  return SPN_LIB_KIND_SOURCE;
+}
+
+sp_str_t spn_pkg_linkage_to_str(spn_linkage_t kind) {
+  switch (kind) {
+    case SPN_LIB_KIND_SHARED: {
+      return sp_str_lit("shared");
+    }
+    case SPN_LIB_KIND_STATIC: {
+      return sp_str_lit("static");
+    }
+    case SPN_LIB_KIND_SOURCE: {
+      return sp_str_lit("source");
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+sp_os_lib_kind_t spn_lib_kind_to_sp_os_lib_kind(spn_linkage_t kind) {
+  switch (kind) {
+    case SPN_LIB_KIND_SHARED: {
+      return SP_OS_LIB_SHARED;
+    }
+    case SPN_LIB_KIND_STATIC: {
+      return SP_OS_LIB_STATIC;
+    }
+    case SPN_LIB_KIND_SOURCE: {
+      return 0;
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(0);
+}
+
 spn_target_kind_t spn_pkg_linkage_to_target_kind(spn_linkage_t kind) {
   switch (kind) {
     case SPN_LIB_KIND_SHARED: return SPN_TARGET_SHARED_LIB;
