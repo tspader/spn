@@ -63,7 +63,7 @@ SPN_SOURCES := \
 	source/external/tcc.c \
 	source/ordered_map.c \
 	source/spinner.c \
-	source/stoml.c \
+	source/external/toml.c \
 	source/pty.c \
 	source/sp/cli.c \
 	source/sp/it.c \

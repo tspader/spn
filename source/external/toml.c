@@ -1,4 +1,4 @@
-#include "stoml.h"
+#include "tom.h"
 
 u32 spn_toml_array_len(toml_array_t* array) {
   if (!array) {

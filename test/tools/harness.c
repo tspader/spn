@@ -2,7 +2,7 @@
 #include "utest.h"
 
 #include "toml.h"
-#include "stoml.h"
+#include "external/tom.h"
 
 static void fixture_write_file(sp_str_t path, sp_str_t content) {
   sp_str_t parent = sp_fs_parent_path(path);

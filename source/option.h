@@ -3,7 +3,7 @@
 
 #include "sp.h"
 
-#include "stoml.h"
+#include "external/tom.h"
 
 typedef enum {
   SPN_DEP_OPTION_KIND_BOOL,

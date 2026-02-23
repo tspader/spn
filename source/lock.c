@@ -1,7 +1,7 @@
 #include "lock.h"
 
 #include "ctx.h"
-#include "stoml.h"
+#include "external/tom.h"
 
 spn_lock_file_t spn_build_lock_file(void) {
   spn_lock_file_t lock = SP_ZERO_INITIALIZE();
