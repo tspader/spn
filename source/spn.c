@@ -54,7 +54,7 @@
 #include "intern.h"
 #include "resolve.h"
 #include "registry.h"
-#include "target_filter.h"
+#include "filter.h"
 #include "log.h"
 #include "pkg.h"
 #include "profile.h"
@@ -70,8 +70,8 @@
 #include "event_buffer.h"
 #define SPN_CLI_IMPLEMENTATION
 #define SPN_CLI_HELP
-#include "spn_cli.h"
-#include "spn_app.h"
+#include "app.h"
+#include "cli.h"
 #include "stoml.h"
 #include "external/git.h"
 #include "external/tcc.h"

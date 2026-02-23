@@ -11,7 +11,7 @@
 #include "registry.h"
 #include "resolve.h"
 #include "session.h"
-#include "spn_cli.h"
+#include "cli.h"
 #include "task.h"
 #include "tui.h"
 

@@ -9,7 +9,7 @@
 #include "profile.h"
 #include "resolve.h"
 #include "semver.h"
-#include "target_filter.h"
+#include "filter.h"
 #include "tui.h"
 #include "external/tcc.h"
 
