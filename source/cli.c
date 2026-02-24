@@ -482,23 +482,23 @@ sp_app_result_t spn_cli_copy(spn_cli_t* cli) {
 }
 
 sp_app_result_t spn_cli_ls(spn_cli_t* cli) {
-  spn_cli_ls_t* cmd = &cli->ls;
-
-  spn_app_resolve(&app);
-
-  if (sp_str_valid(cmd->package)) {
-    sp_str_t dir = spn_cli_get_resolved_pkg_source(cmd->package);
-    sp_sh_ls(dir);
-  }
-  else {
-    spn_pkg_dir_t kind = SPN_DIR_CACHE;
-    if (sp_str_valid(cmd->dir)) {
-      kind = spn_cache_dir_kind_from_str(cmd->dir);
-    }
-
-    sp_str_t dir = spn_cache_dir_kind_to_path(kind);
-    sp_sh_ls(dir);
-  }
+  // spn_cli_ls_t* cmd = &cli->ls;
+  //
+  // spn_app_resolve(&app);
+  //
+  // if (sp_str_valid(cmd->package)) {
+  //   sp_str_t dir = spn_cli_get_resolved_pkg_source(cmd->package);
+  //   sp_sh_ls(dir);
+  // }
+  // else {
+  //   spn_pkg_dir_t kind = SPN_DIR_CACHE;
+  //   if (sp_str_valid(cmd->dir)) {
+  //     kind = spn_cache_dir_kind_from_str(cmd->dir);
+  //   }
+  //
+  //   sp_str_t dir = spn_cache_dir_kind_to_path(kind);
+  //   sp_sh_ls(dir);
+  // }
   return SP_APP_QUIT;
 }
 
@@ -513,19 +513,19 @@ sp_app_result_t spn_cli_which(spn_cli_t* cli) {
 }
 
 sp_app_result_t spn_cli_manifest(spn_cli_t* cli) {
-  spn_cli_manifest_t* cmd = &cli->manifest;
-
-  spn_app_resolve(&app);
-
-  spn_pkg_unit_t* dep = spn_session_find_pkg_or_assert(&app.session, cmd->package);
-
-  sp_str_t path = dep->ctx.pkg->paths.manifest;
-  sp_str_t manifest = sp_io_read_file(path);
-  if (!sp_str_valid(manifest)) {
-    SP_FATAL("Failed to read manifest at {:fg brightyellow}", SP_FMT_STR(path));
-  }
-
-  sp_log(manifest);
+  // spn_cli_manifest_t* cmd = &cli->manifest;
+  //
+  // spn_app_resolve(&app);
+  //
+  // spn_pkg_unit_t* dep = spn_session_find_pkg_or_assert(&app.session, cmd->package);
+  //
+  // sp_str_t path = dep->ctx.pkg->paths.manifest;
+  // sp_str_t manifest = sp_io_read_file(path);
+  // if (!sp_str_valid(manifest)) {
+  //   SP_FATAL("Failed to read manifest at {:fg brightyellow}", SP_FMT_STR(path));
+  // }
+  //
+  // sp_log(manifest);
   return SP_APP_QUIT;
 }
 
@@ -568,7 +568,7 @@ sp_app_result_t spn_cli_add(spn_cli_t* cli) {
     SP_FATAL("{:fg brightyellow} is already in your project", SP_FMT_STR(cmd->package));
   }
   spn_pkg_add_dep_latest(&app.package, cmd->package, visibility);
-  spn_app_resolve_from_solver(&app);
+  spn_resolve_from_solver(&app);
   spn_app_update_lock_file(&app);
   spn_app_write_manifest(&app.package, app.package.paths.manifest);
   return SP_APP_QUIT;
@@ -583,7 +583,7 @@ sp_app_result_t spn_cli_update(spn_cli_t* cli) {
   }
 
   spn_pkg_add_dep_latest(&app.package, cmd->package, existing->visibility);
-  spn_app_resolve_from_solver(&app);
+  spn_resolve_from_solver(&app);
   spn_app_update_lock_file(&app);
   spn_app_write_manifest(&app.package, app.package.paths.manifest);
   return SP_APP_QUIT;

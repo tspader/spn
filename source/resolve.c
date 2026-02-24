@@ -42,19 +42,7 @@ void spn_resolver_init(spn_resolver_t* r, spn_pkg_t* pkg, spn_pkg_cache_t* cache
   r->registry = registry;
 }
 
-spn_resolve_strategy_t spn_resolve_strategy_from_str(sp_str_t str) {
-  SPN_RESOLVE_STRATEGY(SP_X_NAMED_ENUM_STR_TO_ENUM)
-  SP_UNREACHABLE_RETURN(SPN_RESOLVE_STRATEGY_SOLVER);
-}
-
-sp_str_t spn_resolve_strategy_to_str(spn_resolve_strategy_t strategy) {
-  switch (strategy) {
-    SPN_RESOLVE_STRATEGY(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-spn_err_t spn_app_add_pkg_constraints(spn_app_t* app, spn_pkg_t* pkg) {
+spn_err_t add_package_constraints(spn_app_t* app, spn_pkg_t* pkg) {
   spn_resolver_t* resolver = app->resolver;
 
   if (sp_ht_key_exists(resolver->visited, pkg->name)) {
@@ -98,7 +86,7 @@ spn_err_t spn_app_add_pkg_constraints(spn_app_t* app, spn_pkg_t* pkg) {
     }
 
     // recurse
-    sp_try(spn_app_add_pkg_constraints(app, dep));
+    sp_try(add_package_constraints(app, dep));
 
     // add the dependency itself
     if (!sp_ht_key_exists(resolver->ranges, dep->name)) {
@@ -205,8 +193,8 @@ void spn_app_resolve_from_lock_file(spn_app_t* app) {
   }
 }
 
-spn_err_t spn_app_resolve_from_solver(spn_app_t* app) {
-  sp_try(spn_app_add_pkg_constraints(app, &app->package));
+spn_err_t spn_resolve_from_solver(spn_app_t* app) {
+  sp_try(add_package_constraints(app, &app->package));
 
   sp_str_ht_for_kv(app->resolver->ranges, it) {
     sp_str_t name = *it.key;
@@ -257,8 +245,6 @@ spn_err_t spn_app_resolve_from_solver(spn_app_t* app) {
 }
 
 void spn_app_resolve(spn_app_t* app) {
-  spn_resolver_init(app->resolver, &app->package, &app->cache, &app->registry);
-
   switch (app->lock.some) {
     case SP_OPT_SOME: {
       spn_event_buffer_push_ctx(spn.events, &spn_session_find_root(&app->session)->ctx, (spn_build_event_t) {
@@ -279,7 +265,7 @@ void spn_app_resolve(spn_app_t* app) {
         }
       });
 
-      spn_app_resolve_from_solver(app);
+      spn_resolve_from_solver(app);
       break;
     }
   }

@@ -120,11 +120,8 @@ spn_pkg_t* spn_app_find_package(spn_app_t* app, sp_str_t name);
 spn_pkg_t* spn_app_find_package_from_request(spn_app_t* app, spn_pkg_req_t dep);
 spn_app_t  spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode_t mode);
 spn_pkg_t* spn_app_ensure_package(spn_app_t* app, spn_pkg_req_t dep);
-spn_err_t  spn_app_add_pkg_constraints(spn_app_t* app, spn_pkg_t* pkg);
 void       spn_app_update_lock_file(spn_app_t* app);
 void       spn_app_resolve(spn_app_t* app);
-spn_err_t  spn_app_resolve_from_solver(spn_app_t* app);
-void       spn_app_resolve_from_lock_file(spn_app_t* app);
 
 sp_app_result_t spn_init(sp_app_t* app);
 sp_app_result_t spn_poll(sp_app_t* app);
