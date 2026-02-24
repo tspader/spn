@@ -161,11 +161,11 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     SP_ASSERT(!spn_git_clone(url, spn.paths.spn));
   }
 
-  // Initialize builtin index
-  spn.index = (spn_index_t) {
+  // Add the builtin index
+  sp_dyn_array_push(spn.indexes, ((spn_index_t) {
     .location = spn.paths.index,
     .kind = SPN_INDEX_BUILTIN
-  };
+  }));
 
   // Find the cache directory after the config has been fully loaded
   spn.paths.runtime = sp_fs_join_path(spn.paths.storage, SP_LIT("runtime"));

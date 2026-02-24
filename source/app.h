@@ -3,7 +3,6 @@
 
 #include "sp.h"
 #include "spn.h"
-
 #include "intern.h"
 #include "jit.h"
 #include "lock.h"
@@ -11,7 +10,6 @@
 #include "index.h"
 #include "session.h"
 #include "cli.h"
-#include "tui.h"
 #include "task/task.h"
 
 #define SPN_VERSION "1.0.0"
@@ -46,6 +44,7 @@ typedef struct {
 } spn_app_config_t;
 
 typedef sp_om(spn_pkg_t) spn_pkg_cache_t;
+typedef sp_str_ht(sp_str_t) spn_pkg_registry_t;
 
 struct spn_app_t {
   spn_app_paths_t paths;
@@ -58,7 +57,8 @@ struct spn_app_t {
   spn_app_config_t config;
 
   sp_da(sp_str_t) search;
-  sp_str_ht(sp_str_t) registry;
+  //sp_str_ht(sp_str_t) registry;
+  spn_pkg_registry_t registry;
   spn_pkg_cache_t cache;
 };
 
@@ -93,7 +93,6 @@ typedef struct {
   sp_atomic_s32 control;
   sp_str_t tcc_error;
   sp_da(spn_index_t) indexes;
-  spn_index_t index;
   spn_event_buffer_t* events;
   sp_app_t* sp;
   s32 num_args;
