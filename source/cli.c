@@ -555,37 +555,37 @@ sp_app_result_t spn_cli_graph(spn_cli_t* cli) {
 }
 
 sp_app_result_t spn_cli_add(spn_cli_t* cli) {
-  spn_cli_add_t* cmd = &cli->add;
-
-  if (cmd->test && cmd->build) {
-    SP_FATAL("cannot specify both {:fg yellow} and {:fg yellow}", SP_FMT_CSTR("--test"), SP_FMT_CSTR("--build"));
-  }
-
-  spn_visibility_t visibility = cmd->test  ? SPN_VISIBILITY_TEST
-                              : cmd->build ? SPN_VISIBILITY_BUILD
-                              :              SPN_VISIBILITY_PUBLIC;
-  if (sp_ht_getp(app.package.deps, cmd->package)) {
-    SP_FATAL("{:fg brightyellow} is already in your project", SP_FMT_STR(cmd->package));
-  }
-  spn_pkg_add_dep_latest(&app.package, cmd->package, visibility);
-  spn_resolve_from_solver(&app);
-  spn_app_update_lock_file(&app);
-  spn_app_write_manifest(&app.package, app.package.paths.manifest);
+  // spn_cli_add_t* cmd = &cli->add;
+  //
+  // if (cmd->test && cmd->build) {
+  //   SP_FATAL("cannot specify both {:fg yellow} and {:fg yellow}", SP_FMT_CSTR("--test"), SP_FMT_CSTR("--build"));
+  // }
+  //
+  // spn_visibility_t visibility = cmd->test  ? SPN_VISIBILITY_TEST
+  //                             : cmd->build ? SPN_VISIBILITY_BUILD
+  //                             :              SPN_VISIBILITY_PUBLIC;
+  // if (sp_ht_getp(app.package.deps, cmd->package)) {
+  //   SP_FATAL("{:fg brightyellow} is already in your project", SP_FMT_STR(cmd->package));
+  // }
+  // spn_pkg_add_dep_latest(&app.package, cmd->package, visibility);
+  // spn_resolve_from_solver(&app);
+  // spn_app_update_lock_file(&app);
+  // spn_app_write_manifest(&app.package, app.package.paths.manifest);
   return SP_APP_QUIT;
 }
 
 sp_app_result_t spn_cli_update(spn_cli_t* cli) {
-  spn_cli_update_t* cmd = &cli->update;
-
-  spn_pkg_req_t* existing = sp_ht_getp(app.package.deps, cmd->package);
-  if (!existing) {
-    SP_FATAL("package {:fg brightcyan} is not a dependency", SP_FMT_STR(cmd->package));
-  }
-
-  spn_pkg_add_dep_latest(&app.package, cmd->package, existing->visibility);
-  spn_resolve_from_solver(&app);
-  spn_app_update_lock_file(&app);
-  spn_app_write_manifest(&app.package, app.package.paths.manifest);
+  // spn_cli_update_t* cmd = &cli->update;
+  //
+  // spn_pkg_req_t* existing = sp_ht_getp(app.package.deps, cmd->package);
+  // if (!existing) {
+  //   SP_FATAL("package {:fg brightcyan} is not a dependency", SP_FMT_STR(cmd->package));
+  // }
+  //
+  // spn_pkg_add_dep_latest(&app.package, cmd->package, existing->visibility);
+  // spn_resolve_from_solver(&app);
+  // spn_app_update_lock_file(&app);
+  // spn_app_write_manifest(&app.package, app.package.paths.manifest);
   return SP_APP_QUIT;
 }
 

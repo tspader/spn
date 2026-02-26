@@ -3,6 +3,7 @@
 
 #include "sp.h"
 #include "spn.h"
+#include "err.h"
 #include "graph.h"
 #include "pkg.h"
 #include "profile.h"

@@ -1,4 +1,5 @@
 #include "test.h"
+#include "err.h"
 
 void git_repo_run(sp_str_t repo, sp_str_t a, sp_str_t b, sp_str_t c, sp_str_t d, sp_str_t e) {
   sp_ps_output_t output = sp_ps_run((sp_ps_config_t) {

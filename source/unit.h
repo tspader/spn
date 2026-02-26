@@ -4,6 +4,7 @@
 #include "sp.h"
 #include "spn.h"
 
+#include "err.h"
 #include "graph.h"
 #include "node.h"
 #include "pkg.h"

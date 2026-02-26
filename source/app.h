@@ -3,6 +3,7 @@
 
 #include "sp.h"
 #include "spn.h"
+#include "err.h"
 #include "intern.h"
 #include "jit.h"
 #include "lock.h"
@@ -34,8 +35,6 @@ typedef struct {
   sp_str_t bin;
   sp_str_t lib;
 } spn_tool_paths_t;
-
-typedef struct spn_app_t spn_app_t;
 
 typedef struct {
   spn_target_filter_t filter;

@@ -3,6 +3,7 @@
 
 #include "sp.h"
 #include "spn.h"
+#include "err.h"
 #include "libtcc.h"
 
 typedef TCCState spn_tcc_t;

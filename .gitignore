@@ -48,3 +48,4 @@ build/bootstrap/bin
 test/tools/graph
 /.tmp
 /compile_commands.json.backup
+/.llm/reference

@@ -19,9 +19,6 @@
   typedef double   f64;
   typedef char     c8;
 #endif
-typedef s32 spn_err_t;
-#define SPN_OK 0
-#define SPN_ERROR 1
 
 typedef enum {
   SPN_DEP_BUILD_MODE_DEBUG = 0,
@@ -171,7 +168,7 @@ struct spn_node_ctx_t {
   void* user_data;
 };
 typedef struct spn_node_ctx_t spn_node_ctx_t;
-typedef spn_err_t (*spn_node_fn_t)(spn_node_ctx_t*);
+typedef s32 (*spn_node_fn_t)(spn_node_ctx_t*);
 
 spn_node_t spn_add_node(spn_build_ctx_t* b, const c8* tag);
 void spn_node_add_input(spn_node_t node, const c8* input);
