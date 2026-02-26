@@ -1,6 +1,6 @@
 #include "spn.h"
 
-spn_err_t doit(spn_node_ctx_t* c) {
+s32 doit(spn_node_ctx_t* c) {
   // spn_build_ctx_t* ctx = c->build;
   // spn_profile_t* profile = spn_get_profile(ctx);
   //
@@ -12,7 +12,7 @@ spn_err_t doit(spn_node_ctx_t* c) {
   // spn_autoconf_run(ac);
   // spn_make(ctx);
 
-  return SPN_OK;
+  return 0;
 }
 
 void configure(spn_build_ctx_t* ctx) {

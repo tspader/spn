@@ -1,5 +1,4 @@
 #include "git.h"
-#include "err.h"
 
 spn_err_t spn_git_clone(sp_str_t url, sp_str_t path) {
   sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {

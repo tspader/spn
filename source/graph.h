@@ -4,6 +4,7 @@
 #include "sp.h"
 #include "sp/it.h"
 #include "sp/tm.h"
+#include "err.h"
 
 typedef struct {
   u32 index;
@@ -62,9 +63,31 @@ typedef struct {
   sp_da(spn_bg_id_t) consumers;
 } spn_bg_file_t;
 
+typedef enum {
+  SPN_BG_OK,
+  SPN_BG_ERR_MISSING_INPUT,
+  SPN_BG_ERR_DUPLICATE_OUTPUT,
+} spn_bg_err_kind_t;
+
+struct spn_bg_err {
+  spn_bg_err_kind_t kind;
+  union {
+    struct { spn_bg_id_t file_id; } missing_input;
+    struct {
+      spn_bg_id_t file;
+      struct {
+        spn_bg_id_t a;
+        spn_bg_id_t b;
+      } cmds;
+    } duplicate_output;
+  };
+};
+typedef struct spn_bg_err spn_bg_err_t;
+
 typedef struct {
   sp_da(spn_bg_file_t) files;
   sp_da(spn_bg_cmd_t) commands;
+  sp_opt(spn_bg_err_t) error;
 } spn_build_graph_t;
 
 SP_TYPEDEF_FN(void, spn_bg_cmd_fn_t, spn_build_graph_t* graph, spn_bg_cmd_t* cmd, void* user_data);
@@ -74,18 +97,6 @@ typedef struct {
   sp_ht(spn_bg_id_t, bool) files;
   sp_ht(spn_bg_id_t, bool) commands;
 } spn_bg_visited_t;
-
-typedef enum {
-  SPN_BG_OK,
-  SPN_BG_ERR_MISSING_INPUT,
-} spn_bg_err_kind_t;
-
-typedef struct {
-  spn_bg_err_kind_t kind;
-  union {
-    struct { spn_bg_id_t file_id; } missing_input;
-  };
-} spn_bg_err_t;
 
 typedef struct {
   sp_tm_epoch_t in;
@@ -178,16 +189,17 @@ void               spn_bg_cmd_set_metadata_ex(spn_build_graph_t* graph, spn_bg_i
 sp_da(spn_bg_id_t) spn_bg_find_outputs(spn_build_graph_t* graph);
 spn_bg_file_t*     spn_bg_find_file(spn_build_graph_t* graph, spn_bg_id_t id);
 bool               spn_bg_is_file_input(spn_bg_file_t* file);
-void               spn_bg_file_set_producer(spn_build_graph_t* g, spn_bg_id_t file, spn_bg_id_t cmd);
+spn_err_t          spn_bg_file_set_producer(spn_build_graph_t* g, spn_bg_id_t file, spn_bg_id_t cmd);
 sp_str_t           spn_bg_file_id_to_str(spn_build_graph_t* graph, spn_bg_id_t id);
 sp_str_t           spn_bg_file_to_str(spn_bg_file_t* file);
 spn_bg_cmd_t*      spn_bg_find_command(spn_build_graph_t* graph, spn_bg_id_t id);
 void               spn_bg_tag_command_c(spn_build_graph_t* graph, spn_bg_id_t id, const c8* tag);
 void               spn_bg_cmd_set_fn(spn_build_graph_t* g, spn_bg_id_t id, spn_bg_fn_t fn, void* ud);
-void               spn_bg_cmd_add_output(spn_build_graph_t* g, spn_bg_id_t cmd, spn_bg_id_t file);
-void               spn_bg_cmd_add_input(spn_build_graph_t* g, spn_bg_id_t cmd, spn_bg_id_t file);
+spn_err_t          spn_bg_cmd_add_output(spn_build_graph_t* g, spn_bg_id_t cmd, spn_bg_id_t file);
+spn_err_t          spn_bg_cmd_add_input(spn_build_graph_t* g, spn_bg_id_t cmd, spn_bg_id_t file);
 sp_str_t           spn_bg_cmd_id_to_str(spn_build_graph_t* graph, spn_bg_id_t id);
 sp_str_t           spn_bg_cmd_to_str(spn_bg_cmd_t* cmd);
+sp_str_t           spn_bg_err_to_str(spn_build_graph_t* graph, spn_bg_err_t err);
 spn_bg_it_t        spn_bg_it_new(spn_bg_it_config_t config);
 spn_bg_node_t      spn_bg_it_next(spn_bg_it_t* it);
 void               spn_bg_it_add_children(spn_bg_it_t* it, spn_bg_node_t node);

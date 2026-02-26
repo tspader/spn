@@ -5,12 +5,14 @@
 #include "session.h"
 #include "external/cc.h"
 
-void add_link_edges(spn_session_t* session, spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
+spn_err_t add_link_edges(spn_session_t* session, spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   spn_pkg_t* pkg = unit->ctx.pkg;
   sp_ht_for(pkg->deps, it) {
     spn_pkg_unit_t* parent = spn_session_find_pkg(session, *sp_ht_it_getkp(pkg->deps, it));
-    spn_bg_cmd_add_input(graph, unit->nodes.build.main, parent->nodes.build.stamp.package);
+    sp_try(spn_bg_cmd_add_input(graph, unit->nodes.build.main, parent->nodes.build.stamp.package));
   }
+
+  return SPN_OK;
 }
 
 spn_bg_id_t get_or_put_user_file(spn_pkg_unit_t* ctx, spn_build_graph_t* graph, sp_str_t path) {
@@ -326,21 +328,23 @@ s32 run_user_fn(spn_bg_cmd_t* cmd, void* user_data) {
 // ┌ ─ ─ ─ ─ ─ ─ ┐    ┌─────────────┐                                    │
 //   user graph   ───▶│ user::exit  │────────────────────────────────────┘
 // └ ─ ─ ─ ─ ─ ─ ┘    └─────────────┘
-void add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_unit_t* unit) {
+spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_unit_t* unit) {
   spn_target_t* target = unit->info;
 
   unit->nodes.link = spn_bg_add_fn_ex(graph, link_target, unit, SPN_BG_VIZ_CMD, pkg->ctx.name, sp_format("link {}", SP_FMT_STR(target->name)));
   unit->nodes.output = spn_bg_add_file_ex(graph, sp_fs_join_path(pkg->ctx.paths.bin, target->name), SPN_BG_VIZ_BINARY, pkg->ctx.name);
 
-  spn_bg_cmd_add_output(graph, unit->nodes.link,  unit->nodes.output);
+  sp_try(spn_bg_cmd_add_output(graph, unit->nodes.link,  unit->nodes.output));
   //spn_bg_cmd_add_input(graph, unit->nodes.link, pkg->nodes.build.stamp.exit);
   //spn_bg_cmd_add_input(graph, unit->nodes.compile, pkg->nodes.build.stamp.main);
-  spn_bg_cmd_add_input(graph, pkg->nodes.build.package, unit->nodes.output);
+  sp_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.package, unit->nodes.output));
 
   sp_da_for(unit->objects, it) {
     spn_compile_unit_t* obj = unit->objects[it];
-    spn_bg_cmd_add_input(graph, unit->nodes.link, obj->nodes.object);
+    sp_try(spn_bg_cmd_add_input(graph, unit->nodes.link, obj->nodes.object));
   }
+
+  return SPN_OK;
 }
 
 // ┌──────────┐
@@ -351,7 +355,7 @@ void add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_unit_t
 // │  spn.c   │──┘         │                                       ▲
 // └──────────┘            └───────────────────────────────────────┘
 //
-void add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
+spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   spn_pkg_nodes_t* nodes = &unit->nodes.build;
   spn_pkg_t* pkg = unit->ctx.pkg;
 
@@ -364,13 +368,13 @@ void add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   nodes->main = spn_bg_add_fn_ex(graph, write_enter_stamp, unit, SPN_BG_VIZ_CMD, pkg->name, sp_str_lit("user::enter"));
   nodes->exit = spn_bg_add_fn_ex(graph, write_exit_stamp, unit, SPN_BG_VIZ_CMD, pkg->name, sp_str_lit("user::exit"));
 
-  spn_bg_cmd_add_input(graph, nodes->main, nodes->manifest);
-  spn_bg_cmd_add_input(graph, nodes->main, nodes->script);
-  spn_bg_cmd_add_output(graph, nodes->main, nodes->stamp.main);
-  spn_bg_cmd_add_input(graph, nodes->exit, nodes->stamp.main);
-  spn_bg_cmd_add_output(graph, nodes->exit, nodes->stamp.exit);
-  spn_bg_cmd_add_input(graph, nodes->package, nodes->stamp.exit);
-  spn_bg_cmd_add_output(graph, nodes->package, nodes->stamp.package);
+  sp_try(spn_bg_cmd_add_input(graph, nodes->main, nodes->manifest));
+  sp_try(spn_bg_cmd_add_input(graph, nodes->main, nodes->script));
+  sp_try(spn_bg_cmd_add_output(graph, nodes->main, nodes->stamp.main));
+  sp_try(spn_bg_cmd_add_input(graph, nodes->exit, nodes->stamp.main));
+  sp_try(spn_bg_cmd_add_output(graph, nodes->exit, nodes->stamp.exit));
+  sp_try(spn_bg_cmd_add_input(graph, nodes->package, nodes->stamp.exit));
+  sp_try(spn_bg_cmd_add_output(graph, nodes->package, nodes->stamp.package));
 
   // user nodes
   // pass 1: create all command nodes
@@ -391,18 +395,18 @@ void add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
 
     sp_da_for(node->outputs, o) {
       spn_bg_id_t file = get_or_put_user_file(unit, graph, node->outputs[o]);
-      spn_bg_cmd_add_output(graph, node->id, file);
-      spn_bg_cmd_add_input(graph, nodes->exit, file);
+      sp_try(spn_bg_cmd_add_output(graph, node->id, file));
+      sp_try(spn_bg_cmd_add_input(graph, nodes->exit, file));
     }
 
     // if no inputs, depend on the main node's stamp
     if (sp_da_empty(node->inputs) && sp_da_empty(node->deps)) {
-      spn_bg_cmd_add_input(graph, node->id, nodes->stamp.main);
+      sp_try(spn_bg_cmd_add_input(graph, node->id, nodes->stamp.main));
     }
 
     sp_da_for(node->inputs, i) {
       spn_bg_id_t file = get_or_put_user_file(unit, graph, node->inputs[i]);
-      spn_bg_cmd_add_input(graph, node->id, file);
+      sp_try(spn_bg_cmd_add_input(graph, node->id, file));
     }
   }
 
@@ -415,7 +419,7 @@ void add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
       spn_user_node_t* dep = spn_find_user_node(node->deps[dit]);
       sp_da_for(dep->outputs, oit) {
         spn_bg_id_t output = get_or_put_user_file(unit, graph, dep->outputs[oit]);
-        spn_bg_cmd_add_input(graph, node->id, output);
+        sp_try(spn_bg_cmd_add_input(graph, node->id, output));
       }
     }
   }
@@ -425,34 +429,58 @@ void add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   sp_om_for(unit->objects, it) {
     spn_compile_unit_t* obj = sp_om_at(unit->objects, it);
     obj->nodes.source = spn_bg_add_file_ex(graph, obj->paths.source, SPN_BG_VIZ_DEFAULT, pkg->name);
-    obj->nodes.compile = spn_bg_add_fn_ex(graph, compile_object, obj, SPN_BG_VIZ_CMD, pkg->name, sp_format("compile {}", SP_FMT_STR(sp_fs_get_name(obj->paths.object))));
+    obj->nodes.compile = spn_bg_add_fn_ex(graph, compile_object, obj, SPN_BG_VIZ_CMD, pkg->name, sp_format("compile::{}", SP_FMT_STR(obj->paths.source)));
     obj->nodes.object = spn_bg_add_file_ex(graph, obj->paths.object, SPN_BG_VIZ_DEFAULT, pkg->name);
-    spn_bg_cmd_add_output(graph, obj->nodes.compile, obj->nodes.object);
-    spn_bg_cmd_add_input(graph, obj->nodes.compile, unit->nodes.build.stamp.exit);
+    sp_try(spn_bg_cmd_add_output(graph, obj->nodes.compile, obj->nodes.object));
+    sp_try(spn_bg_cmd_add_input(graph, obj->nodes.compile, unit->nodes.build.stamp.exit));
   }
 
   sp_om_for(unit->targets, it) {
-    add_target(graph, unit, sp_om_at(unit->targets, it));
+    sp_try(add_target(graph, unit, sp_om_at(unit->targets, it)));
   }
+
+  return SPN_OK;
 }
 
-spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
+spn_err_t prepare_build_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->build.graph;
 
   // phase 1: add each package to the graph
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    add_package(graph, unit);
+    sp_try(add_package(graph, unit));
   }
-  add_package(graph, spn_session_find_root(session));
+  sp_try(add_package(graph, spn_session_find_root(session)));
 
   // phase 2: link dependent packages
   sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* parent = sp_om_at(session->units.packages, it);
-    add_link_edges(session, graph, sp_om_at(session->units.packages, it));
+    sp_try(add_link_edges(session, graph, sp_om_at(session->units.packages, it)));
   }
-  add_link_edges(session, graph, spn_session_find_root(session));
+  sp_try(add_link_edges(session, graph, spn_session_find_root(session)));
+
+  return SPN_OK;
+}
+
+spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
+  spn_session_t* session = &app->session;
+  spn_build_graph_t* graph = &session->build.graph;
+
+  graph->error.some = SP_OPT_NONE;
+  if (prepare_build_graph(app)) {
+    switch (graph->error.some) {
+      case SP_OPT_SOME: {
+        spn_log_error("{}", SP_FMT_STR(spn_bg_err_to_str(graph, graph->error.value)));
+        break;
+      }
+      case SP_OPT_NONE: {
+        spn_log_error("failed to prepare build graph");
+        break;
+      }
+    }
+
+    return SPN_TASK_ERROR;
+  }
 
   return SPN_TASK_DONE;
 }

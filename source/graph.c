@@ -278,11 +278,27 @@ bool spn_bg_is_file_input(spn_bg_file_t* file) {
   return !file->producer.occupied;
 }
 
-void spn_bg_file_set_producer(spn_build_graph_t* graph, spn_bg_id_t file_id, spn_bg_id_t cmd_id) {
+spn_err_t spn_bg_file_set_producer(spn_build_graph_t* graph, spn_bg_id_t file_id, spn_bg_id_t cmd_id) {
   spn_bg_file_t* file = spn_bg_find_file(graph, file_id);
   spn_bg_cmd_t* cmd = spn_bg_find_command(graph, cmd_id);
+
+  if (file->producer.occupied) {
+    if (!graph->error.some) {
+      sp_opt_set(graph->error, ((spn_bg_err_t) {
+        .kind = SPN_BG_ERR_DUPLICATE_OUTPUT,
+        .duplicate_output = {
+          .file = file_id,
+          .cmds = { file->producer, cmd_id }
+        }
+      }));
+    }
+
+    return SPN_ERROR;
+  }
+
   file->producer = cmd_id;
   sp_da_push(cmd->produces, file_id);
+  return SPN_OK;
 }
 
 void spn_bg_cmd_set_fn(spn_build_graph_t* graph, spn_bg_id_t id, spn_bg_fn_t fn, void* user_data) {
@@ -293,23 +309,21 @@ void spn_bg_cmd_set_fn(spn_build_graph_t* graph, spn_bg_id_t id, spn_bg_fn_t fn,
   cmd->fn.user_data = user_data;
 }
 
-void spn_bg_cmd_add_output(spn_build_graph_t* graph, spn_bg_id_t cmd_id, spn_bg_id_t file_id) {
+spn_err_t spn_bg_cmd_add_output(spn_build_graph_t* graph, spn_bg_id_t cmd_id, spn_bg_id_t file_id) {
   sp_assert(cmd_id.occupied);
   sp_assert(file_id.occupied);
-  spn_bg_file_t* file = spn_bg_find_file(graph, file_id);
-  spn_bg_cmd_t* cmd = spn_bg_find_command(graph, cmd_id);
-  SP_ASSERT(!file->producer.occupied);
-  file->producer = cmd_id;
-  sp_da_push(cmd->produces, file_id);
+  sp_try(spn_bg_file_set_producer(graph, file_id, cmd_id));
+  return SPN_OK;
 }
 
-void spn_bg_cmd_add_input(spn_build_graph_t* graph, spn_bg_id_t cmd_id, spn_bg_id_t file_id) {
+spn_err_t spn_bg_cmd_add_input(spn_build_graph_t* graph, spn_bg_id_t cmd_id, spn_bg_id_t file_id) {
   sp_assert(cmd_id.occupied);
   sp_assert(file_id.occupied);
   spn_bg_file_t* file = spn_bg_find_file(graph, file_id);
   spn_bg_cmd_t* cmd = spn_bg_find_command(graph, cmd_id);
   sp_da_push(cmd->consumes, file_id);
   sp_da_push(file->consumers, cmd_id);
+  return SPN_OK;
 }
 
 spn_bg_file_t* spn_bg_find_file(spn_build_graph_t* graph, spn_bg_id_t id) {
@@ -421,6 +435,29 @@ sp_str_t spn_bg_cmd_to_str(spn_bg_cmd_t* cmd) {
   } else {
     return sp_format("{}", SP_FMT_PTR(cmd));
   }
+}
+
+sp_str_t spn_bg_err_to_str(spn_build_graph_t* graph, spn_bg_err_t err) {
+  switch (err.kind) {
+    case SPN_BG_OK: {
+      return sp_str_lit("ok");
+    }
+    case SPN_BG_ERR_MISSING_INPUT: {
+      return sp_format("missing build graph input {}", SP_FMT_STR(spn_bg_file_id_to_str(graph, err.missing_input.file_id)));
+    }
+    case SPN_BG_ERR_DUPLICATE_OUTPUT: {
+      return sp_format(
+        "{:fg brightred}: {:fg brightblack}\nfile: {}\n{}\n{}",
+        SP_FMT_CSTR("error"),
+        SP_FMT_CSTR("two graph nodes output the same file"),
+        SP_FMT_STR(spn_bg_file_id_to_str(graph, err.duplicate_output.file)),
+        SP_FMT_STR(spn_bg_cmd_id_to_str(graph, err.duplicate_output.cmds.a)),
+        SP_FMT_STR(spn_bg_cmd_id_to_str(graph, err.duplicate_output.cmds.b))
+      );
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit("unknown build graph error"));
 }
 
 sp_str_t spn_bg_mermaid_class(sp_str_t name, sp_str_t fill, sp_str_t stroke, sp_str_t color) {

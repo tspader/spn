@@ -1,0 +1,64 @@
+{
+  "refs": {
+    "cargo": {
+      "kind": "url",
+      "name": "cargo",
+      "uri": "git@github.com:rust-lang/cargo.git",
+      "description": "The Rust package manager"
+    },
+    "uv": {
+      "kind": "url",
+      "name": "uv",
+      "uri": "git@github.com:astral-sh/uv.git",
+      "description": "An extremely fast Python package and project manager, written in Rust."
+    },
+    "pacman": {
+      "kind": "url",
+      "name": "pacman",
+      "uri": "https://gitlab.archlinux.org/pacman/pacman.git",
+      "description": ""
+    },
+    "docs": {
+      "kind": "file",
+      "name": "docs",
+      "uri": "/home/spader/source/docs",
+      "description": "My personal document repository"
+    },
+    "crates.io": {
+      "kind": "url",
+      "name": "crates.io",
+      "uri": "git@github.com:rust-lang/crates.io.git",
+      "description": "The Rust package registry"
+    },
+    "crates.io-index": {
+      "kind": "url",
+      "name": "crates.io-index",
+      "uri": "git@github.com:rust-lang/crates.io-index.git",
+      "description": "Registry index for crates.io"
+    },
+    "zod": {
+      "kind": "url",
+      "name": "zod",
+      "uri": "git@github.com:colinhacks/zod.git",
+      "description": "TypeScript-first schema validation with static type inference"
+    },
+    "jansson": {
+      "kind": "url",
+      "name": "jansson",
+      "uri": "git@github.com:akheron/jansson.git",
+      "description": "C library for encoding, decoding and manipulating JSON data"
+    },
+    "clay": {
+      "kind": "url",
+      "name": "clay",
+      "uri": "git@github.com:nicbarker/clay.git",
+      "description": "High performance UI layout library in C."
+    },
+    "mongoose": {
+      "kind": "url",
+      "name": "mongoose",
+      "uri": "git@github.com:cesanta/mongoose.git",
+      "description": "Embedded web server, with TCP/IP network stack, MQTT and Websocket"
+    }
+  }
+}
