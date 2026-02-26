@@ -41,6 +41,14 @@ spn_cc_t* make_cc_for_compile_or_link(spn_pkg_t* pkg, spn_target_t* target, sp_s
   return cc;
 }
 
+sp_str_t get_embed_object_path(spn_target_unit_t* unit) {
+  return sp_fs_join_path(unit->paths.generated, sp_format("{}.embed.o", SP_FMT_STR(unit->info->name)));
+}
+
+sp_str_t get_embed_header_path(spn_target_unit_t* unit) {
+  return sp_fs_join_path(unit->paths.generated, sp_format("{}.embed.h", SP_FMT_STR(unit->info->name)));
+}
+
 void setup_target_for_compile_or_link(spn_cc_t* cc, spn_cc_target_t* cc_target, spn_target_t* target, spn_pkg_t* pkg, spn_session_t* session) {
   sp_da_for(target->include, i) {
     spn_cc_target_add_relative_include(cc_target, target->include[i]);
@@ -138,9 +146,67 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   spn_cc_t* cc = make_cc_for_compile_or_link(unit->pkg, unit->target->info, object_dir, unit->profile);
   spn_cc_target_t* cc_target = spn_cc_add_target(cc, SPN_TARGET_OBJECT, file);
   setup_target_for_compile_or_link(cc, cc_target, unit->target->info, unit->pkg, unit->session);
+
+  if (!sp_da_empty(unit->target->info->embed)) {
+    spn_cc_target_add_absolute_include(cc_target, unit->target->paths.generated);
+  }
+
   spn_cc_target_add_absolute_source(cc_target, unit->paths.source);
 
   return run_cc(cc, cc_target, unit->target->paths.work, unit->pkg, &unit->target->logs);
+}
+
+s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
+  (void)cmd;
+  spn_target_unit_t* unit = (spn_target_unit_t*)user_data;
+  spn_target_t* target = unit->info;
+
+  spn_cc_embed_ctx_t embedder = SP_ZERO_INITIALIZE();
+  spn_cc_embed_ctx_init(&embedder);
+
+  sp_da_for(target->embed, it) {
+    spn_embed_t embed = target->embed[it];
+    sp_str_t symbol = embed.symbol;
+    spn_embed_types_t types = embed.types;
+    sp_io_reader_t io = SP_ZERO_INITIALIZE();
+
+    if (sp_str_empty(types.data)) {
+      types.data = spn_intern_cstr("unsigned char");
+    }
+
+    if (sp_str_empty(types.size)) {
+      types.size = spn_intern_cstr("unsigned long long");
+    }
+
+    switch (embed.kind) {
+      case SPN_EMBED_MEM: {
+        io = sp_io_reader_from_mem(embed.memory.buffer, embed.memory.size);
+        break;
+      }
+      case SPN_EMBED_FILE: {
+        if (!sp_fs_exists(embed.file.path)) {
+          return SPN_ERROR;
+        }
+
+        io = sp_io_reader_from_file(embed.file.path);
+
+        if (sp_str_empty(symbol)) {
+          symbol = spn_cc_symbol_from_embedded_file(embed.file.path);
+        }
+        break;
+      }
+    }
+
+    if (spn_cc_embed_ctx_add(&embedder, io, symbol, types.data, types.size)) {
+      return SPN_ERROR;
+    }
+  }
+
+  if (spn_cc_embed_ctx_write(&embedder, get_embed_object_path(unit), get_embed_header_path(unit))) {
+    return SPN_ERROR;
+  }
+
+  return SPN_OK;
 }
 
 s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
@@ -165,98 +231,11 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
     spn_cc_target_add_absolute_source(cc_target, unit->objects[it]->paths.object);
   }
 
-  return run_cc(cc, cc_target, unit->paths.work, unit->pkg, &unit->logs);
-
-
   if (!sp_da_empty(target->embed)) {
-    // spn_cc_embed_ctx_t embedder = SP_ZERO_INITIALIZE();
-    // spn_cc_embed_ctx_init(&embedder);
-    //
-    // sp_da_for(target->embed, it) {
-    //   spn_embed_t embed = target->embed[it];
-    //   sp_str_t symbol = embed.symbol;
-    //   spn_embed_types_t types = embed.types;
-    //   sp_io_reader_t io = SP_ZERO_INITIALIZE();
-    //
-    //   if (sp_str_empty(embed.types.size)) {
-    //     embed.types.data = spn_intern_cstr("unsigned char");
-    //     embed.types.size = spn_intern_cstr("unsigned long long");
-    //   }
-    //
-    //   switch (embed.kind) {
-    //     case SPN_EMBED_MEM: {
-    //       io = sp_io_reader_from_mem(embed.memory.buffer, embed.memory.size);
-    //       break;
-    //     }
-    //     case SPN_EMBED_FILE: {
-    //       if (!sp_fs_exists(embed.file.path)) {
-    //         return SPN_ERROR;
-    //       }
-    //
-    //       io = sp_io_reader_from_file(embed.file.path);
-    //
-    //       if (sp_str_empty(symbol)) {
-    //         symbol = spn_cc_symbol_from_embedded_file(embed.file.path);
-    //       }
-    //       break;
-    //     }
-    //   }
-    //
-    //   spn_cc_embed_ctx_add(&embedder, io, symbol, embed.types.data, embed.types.size);
-    // }
-    //
-    // sp_str_t object = sp_fs_join_path(unit->paths.generated, sp_format("{}.embed.o", SP_FMT_STR(unit->pkg->name)));
-    // sp_str_t header = sp_fs_join_path(unit->paths.generated, sp_format("{}.embed.h", SP_FMT_STR(unit->pkg->name)));
-    // spn_cc_embed_ctx_write(&embedder, object, header);
-    // spn_cc_target_add_lib(cc_target, object);
-    // spn_cc_target_add_include_abs(cc_target, unit->paths.generated);
+    spn_cc_target_add_absolute_source(cc_target, get_embed_object_path(unit));
   }
 
-    // sp_da_for(app.resolver.system_deps, i) {
-    //   sp_str_t arg = spn_gen_format_entry(app.resolver.system_deps[i], SPN_GEN_SYSTEM_LIBS, ctx->profile->cc.kind);
-    //   sp_ps_config_add_arg(&ps, arg);
-    // }
-
-
-
-
-
-  // sp_mem_scratch_t scratch = sp_mem_begin_scratch(); {
-  //   sp_str_builder_t log = SP_ZERO_INITIALIZE();
-  //   sp_str_builder_append(&log, ctx->profile->cc.exe);
-  //   sp_str_builder_append_c8(&log, ' ');
-  //
-  //   sp_da_for(ps.dyn_args, it) {
-  //     sp_str_builder_append(&log, ps.dyn_args[it]);
-  //     sp_str_builder_append_c8(&log, ' ');
-  //   }
-  //
-  //   spn_push_event_ex((spn_build_event_t) {
-  //     .kind = SPN_EVENT_TARGET_BUILD,
-  //     .target.build = {
-  //       .args = sp_str_builder_to_str(&log),
-  //     }
-  //   });
-  //
-  //   sp_mem_end_scratch(scratch);
-  // }
-  //
-  // sp_ps_output_t result = spn_build_ctx_subprocess(ctx, ps);
-  // if (result.status.exit_code) {
-  //   spn_event_buffer_push_ctx(spn.events, ctx, (spn_build_event_t) {
-  //     .kind = SPN_EVENT_TARGET_BUILD_FAILED,
-  //     .target.failed = {
-  //       .out = result.out,
-  //       .err = result.err,
-  //     }
-  //   });
-  //
-  //   return SPN_ERROR;
-  // } else {
-  //   spn_event_buffer_push(spn.events, ctx, SPN_EVENT_TARGET_BUILD_PASSED);
-  // }
-
-  return SPN_OK;
+  return run_cc(cc, cc_target, unit->paths.work, unit->pkg, &unit->logs);
 }
 
 s32 run_package_hook(spn_bg_cmd_t* cmd, void* user_data) {
@@ -344,6 +323,38 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
   sp_da_for(unit->objects, it) {
     spn_compile_unit_t* obj = unit->objects[it];
     sp_try(spn_bg_cmd_add_input(graph, unit->nodes.link, obj->nodes.object));
+  }
+
+  if (!sp_da_empty(target->embed)) {
+    unit->nodes.embed.run = spn_bg_add_fn_ex(graph, compile_embed, unit, SPN_BG_VIZ_CMD, pkg->ctx.name, sp_format("embed::{}", SP_FMT_STR(target->name)));
+    unit->nodes.embed.object = spn_bg_add_file_ex(graph, get_embed_object_path(unit), SPN_BG_VIZ_DEFAULT, pkg->ctx.name);
+    unit->nodes.embed.header = spn_bg_add_file_ex(graph, get_embed_header_path(unit), SPN_BG_VIZ_DEFAULT, pkg->ctx.name);
+
+    sp_try(spn_bg_cmd_add_output(graph, unit->nodes.embed.run, unit->nodes.embed.object));
+    sp_try(spn_bg_cmd_add_output(graph, unit->nodes.embed.run, unit->nodes.embed.header));
+    sp_try(spn_bg_cmd_add_input(graph, unit->nodes.embed.run, pkg->nodes.build.stamp.exit));
+
+    sp_da_for(target->embed, it) {
+      spn_embed_t* embed = &target->embed[it];
+
+      switch (embed->kind) {
+        case SPN_EMBED_FILE: {
+          spn_bg_id_t input = get_or_put_user_file(pkg, graph, embed->file.path);
+          sp_try(spn_bg_cmd_add_input(graph, unit->nodes.embed.run, input));
+          break;
+        }
+        case SPN_EMBED_MEM: {
+          break;
+        }
+      }
+    }
+
+    sp_try(spn_bg_cmd_add_input(graph, unit->nodes.link, unit->nodes.embed.object));
+
+    sp_da_for(unit->objects, it) {
+      spn_compile_unit_t* obj = unit->objects[it];
+      sp_try(spn_bg_cmd_add_input(graph, obj->nodes.compile, unit->nodes.embed.header));
+    }
   }
 
   return SPN_OK;

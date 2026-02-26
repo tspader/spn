@@ -123,6 +123,13 @@ void spn_bg_render_pkg_to_mermaid(spn_session_t* b, spn_bg_dirty_t* dirty, spn_p
       // sp_str_builder_append_fmt(&builder, "T_{}_{}({}):::title", SP_FMT_STR(ctx->name), SP_FMT_STR(target->target->name), SP_FMT_QSTR(target->target->name));
       spn_bg_render_cmd_id_to_builder(graph, &builder, target->nodes.link);
       spn_bg_render_file_id_to_builder(graph, &builder, target->nodes.output);
+
+      if (target->nodes.embed.run.occupied) {
+        spn_bg_render_cmd_id_to_builder(graph, &builder, target->nodes.embed.run);
+        spn_bg_render_file_id_to_builder(graph, &builder, target->nodes.embed.object);
+        spn_bg_render_file_id_to_builder(graph, &builder, target->nodes.embed.header);
+      }
+
       sp_da_for(target->nodes.source, s) {
         spn_bg_render_file_id_to_builder(graph, &builder, target->nodes.source[s]);
       }

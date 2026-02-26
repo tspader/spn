@@ -115,6 +115,11 @@ struct spn_target_unit {
   struct {
     spn_bg_id_t output;
     spn_bg_id_t link;
+    struct {
+      spn_bg_id_t run;
+      spn_bg_id_t object;
+      spn_bg_id_t header;
+    } embed;
     sp_da(spn_bg_id_t) source;
   } nodes;
 };
