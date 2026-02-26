@@ -132,8 +132,10 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   });
 
   sp_str_t file = sp_fs_get_name(unit->paths.object);
+  sp_str_t object_dir = sp_fs_parent_path(unit->paths.object);
+  sp_fs_create_dir(object_dir);
 
-  spn_cc_t* cc = make_cc_for_compile_or_link(unit->pkg, unit->target->info, unit->target->paths.object, unit->profile);
+  spn_cc_t* cc = make_cc_for_compile_or_link(unit->pkg, unit->target->info, object_dir, unit->profile);
   spn_cc_target_t* cc_target = spn_cc_add_target(cc, SPN_TARGET_OBJECT, file);
   setup_target_for_compile_or_link(cc, cc_target, unit->target->info, unit->pkg, unit->session);
   spn_cc_target_add_absolute_source(cc_target, unit->paths.source);

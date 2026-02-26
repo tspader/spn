@@ -4,7 +4,6 @@
 #include "sp.h"
 #include "spinner.h"
 
-typedef struct spn_user_node_t spn_user_node_t;
 typedef struct spn_build_event_t spn_build_event_t;
 
 #if defined(SP_POSIX)

@@ -16,7 +16,7 @@ s32 doit(spn_node_ctx_t* c) {
 }
 
 void configure(spn_build_ctx_t* ctx) {
-  spn_node_t node = spn_add_node(ctx, "hello");
+  spn_node_t* node = spn_add_node(ctx, "hello");
   spn_node_set_fn(node, doit);
 }
 

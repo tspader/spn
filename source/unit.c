@@ -17,9 +17,9 @@ sp_str_t spn_cache_dir_kind_to_path(spn_pkg_dir_t kind) {
   }
 }
 
-spn_user_node_t* spn_find_user_node(spn_node_t node) {
-  SP_ASSERT(node.index < sp_da_size(node.ctx->nodes.all));
-  return &node.ctx->nodes.all[node.index];
+spn_user_node_t* spn_find_user_node(spn_node_t* node) {
+  SP_ASSERT(node->index < sp_da_size(node->ctx->nodes.all));
+  return &node->ctx->nodes.all[node->index];
 }
 
 sp_str_t spn_pkg_unit_get_node_stamp_file(spn_pkg_unit_t* ctx, spn_user_node_t* node) {

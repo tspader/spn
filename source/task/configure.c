@@ -20,8 +20,16 @@ s32 configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   sp_om_for(pkg->targets, it) {
     spn_target_unit_t* target = sp_om_at(pkg->targets, it);
     sp_da_for(target->info->source, j) {
+      sp_str_t relative = target->info->source[j];
       sp_str_t file = sp_fs_join_path(pkg->ctx.paths.source, target->info->source[j]);
       sp_str_t name = spn_intern(sp_fs_get_stem(file));
+      sp_str_t extension = sp_fs_get_ext(relative);
+      sp_str_t stem = relative;
+      if (!sp_str_empty(extension)) {
+        stem = sp_str_prefix(relative, relative.len - extension.len - 1);
+      }
+
+      sp_str_t object_path = sp_fs_join_path(target->paths.object, sp_format("{}.o", SP_FMT_STR(stem)));
 
       if (!sp_om_has(pkg->objects, file)) {
         sp_om_insert(pkg->objects, file, ((spn_compile_unit_t) {
@@ -31,10 +39,7 @@ s32 configure_package(spn_bg_cmd_t* cmd, void* user_data) {
           .profile = pkg->ctx.profile,
           .session = target->session,
           .paths = {
-            .object = sp_fs_join_path(
-              target->paths.object,
-              sp_format("{}.o", SP_FMT_STR(name))
-            ),
+            .object = object_path,
             .source = file,
           },
         }));

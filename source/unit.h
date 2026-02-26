@@ -153,7 +153,7 @@ struct spn_pkg_unit_t {
   spn_build_fn_t on_package;
 };
 
-spn_user_node_t* spn_find_user_node(spn_node_t node);
+spn_user_node_t* spn_find_user_node(spn_node_t* node);
 
 spn_build_ctx_t spn_build_ctx_make(spn_build_ctx_config_t cfg);
 void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t cfg);
