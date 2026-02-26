@@ -63,6 +63,8 @@ static spn_tcc_symbol_t spn_tcc_symbol_table[] = {
   SPN_DEFINE_LIB_ENTRY(spn_node_link)
   SPN_DEFINE_LIB_ENTRY(spn_node_set_fn)
   SPN_DEFINE_LIB_ENTRY(spn_node_set_user_data)
+  SPN_DEFINE_LIB_ENTRY(spn_node_ctx_get_build)
+  SPN_DEFINE_LIB_ENTRY(spn_node_ctx_get_user_data)
   SPN_DEFINE_LIB_ENTRY(spn_write_file)
 };
 

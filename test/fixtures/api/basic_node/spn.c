@@ -1,8 +1,8 @@
 #include "spn.h"
 
-spn_err_t generate_header(spn_node_ctx_t* ctx) {
-  spn_log(ctx->build, "generating version.h...");
-  spn_write_file(ctx->build, "version.h",
+s32 generate_header(spn_node_ctx_t* ctx) {
+  spn_log(spn_node_ctx_get_build(ctx), "generating version.h...");
+  spn_write_file(spn_node_ctx_get_build(ctx), "version.h",
     "#ifndef VERSION_H\n"
     "#define VERSION_H\n"
     "#define VERSION_MAJOR 69\n"
@@ -10,13 +10,13 @@ spn_err_t generate_header(spn_node_ctx_t* ctx) {
     "#define VERSION_PATCH 3\n"
     "#endif\n"
   );
-  return SPN_OK;
+  return 0;
 }
 
 void configure(spn_build_ctx_t* ctx) {
   spn_add_include(ctx, SPN_DIR_WORK, "");
 
-  spn_node_t gen = spn_add_node(ctx, "gen_version");
+  spn_node_t* gen = spn_add_node(ctx, "gen_version");
   spn_node_set_fn(gen, generate_header);
 
   spn_node_add_output(gen, spn_get_subdir(ctx, SPN_DIR_WORK, "version.h"));

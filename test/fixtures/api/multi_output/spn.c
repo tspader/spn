@@ -1,9 +1,9 @@
 #include "spn.h"
 
-spn_err_t gen_all_headers(spn_node_ctx_t* ctx) {
-  spn_log(ctx->build, "gen_all_headers: creating 3 headers from single node");
+s32 gen_all_headers(spn_node_ctx_t* ctx) {
+  spn_log(spn_node_ctx_get_build(ctx), "gen_all_headers: creating 3 headers from single node");
 
-  spn_write_file(ctx->build, "types.h",
+  spn_write_file(spn_node_ctx_get_build(ctx), "types.h",
     "#ifndef TYPES_H\n"
     "#define TYPES_H\n"
     "typedef int my_int_t;\n"
@@ -11,7 +11,7 @@ spn_err_t gen_all_headers(spn_node_ctx_t* ctx) {
     "#endif\n"
   );
 
-  spn_write_file(ctx->build, "constants.h",
+  spn_write_file(spn_node_ctx_get_build(ctx), "constants.h",
     "#ifndef CONSTANTS_H\n"
     "#define CONSTANTS_H\n"
     "#define MAX_SIZE 1024\n"
@@ -19,7 +19,7 @@ spn_err_t gen_all_headers(spn_node_ctx_t* ctx) {
     "#endif\n"
   );
 
-  spn_write_file(ctx->build, "macros.h",
+  spn_write_file(spn_node_ctx_get_build(ctx), "macros.h",
     "#ifndef MACROS_H\n"
     "#define MACROS_H\n"
     "#define SQUARE(x) ((x) * (x))\n"
@@ -27,12 +27,12 @@ spn_err_t gen_all_headers(spn_node_ctx_t* ctx) {
     "#endif\n"
   );
 
-  return SPN_OK;
+  return 0;
 }
 
-spn_err_t gen_combined(spn_node_ctx_t* ctx) {
-  spn_log(ctx->build, "gen_combined: aggregating all headers");
-  spn_write_file(ctx->build, "all.h",
+s32 gen_combined(spn_node_ctx_t* ctx) {
+  spn_log(spn_node_ctx_get_build(ctx), "gen_combined: aggregating all headers");
+  spn_write_file(spn_node_ctx_get_build(ctx), "all.h",
     "#ifndef ALL_H\n"
     "#define ALL_H\n"
     "#include \"types.h\"\n"
@@ -40,7 +40,7 @@ spn_err_t gen_combined(spn_node_ctx_t* ctx) {
     "#include \"macros.h\"\n"
     "#endif\n"
   );
-  return SPN_OK;
+  return 0;
 }
 
 void configure(spn_build_ctx_t* ctx) {
@@ -51,13 +51,13 @@ void configure(spn_build_ctx_t* ctx) {
   const c8* macros_h = spn_get_subdir(ctx, SPN_DIR_WORK, "macros.h");
   const c8* all_h = spn_get_subdir(ctx, SPN_DIR_WORK, "all.h");
 
-  spn_node_t gen = spn_add_node(ctx, "gen_all_headers");
+  spn_node_t* gen = spn_add_node(ctx, "gen_all_headers");
   spn_node_set_fn(gen, gen_all_headers);
   spn_node_add_output(gen, types_h);
   spn_node_add_output(gen, constants_h);
   spn_node_add_output(gen, macros_h);
 
-  spn_node_t combined = spn_add_node(ctx, "gen_combined");
+  spn_node_t* combined = spn_add_node(ctx, "gen_combined");
   spn_node_set_fn(combined, gen_combined);
   spn_node_add_input(combined, types_h);
   spn_node_add_input(combined, constants_h);

@@ -19,9 +19,6 @@
   typedef double   f64;
   typedef char     c8;
 #endif
-typedef s32 spn_err_t;
-#define SPN_OK 0
-#define SPN_ERROR 1
 
 typedef enum {
   SPN_DEP_BUILD_MODE_DEBUG = 0,
@@ -159,26 +156,17 @@ void            spn_cmake_run(spn_cmake_t* cmake);
 
 typedef struct spn_node_t spn_node_t;
 typedef struct spn_pkg_unit_t spn_pkg_unit_t;
-
-struct spn_node_t {
-  spn_pkg_unit_t* ctx;
-  u32 index;
-};
-
-
-struct spn_node_ctx_t {
-  spn_build_ctx_t* build;
-  void* user_data;
-};
 typedef struct spn_node_ctx_t spn_node_ctx_t;
-typedef spn_err_t (*spn_node_fn_t)(spn_node_ctx_t*);
+typedef s32 (*spn_node_fn_t)(spn_node_ctx_t*);
 
-spn_node_t spn_add_node(spn_build_ctx_t* b, const c8* tag);
-void spn_node_add_input(spn_node_t node, const c8* input);
-void spn_node_add_output(spn_node_t node, const c8* output);
-void spn_node_link(spn_node_t parent, spn_node_t child);
-void spn_node_set_fn(spn_node_t node, spn_node_fn_t fn);
-void spn_node_set_user_data(spn_node_t node, void* user_data);
+spn_node_t* spn_add_node(spn_build_ctx_t* b, const c8* tag);
+void spn_node_add_input(spn_node_t* node, const c8* input);
+void spn_node_add_output(spn_node_t* node, const c8* output);
+void spn_node_link(spn_node_t* parent, spn_node_t* child);
+void spn_node_set_fn(spn_node_t* node, spn_node_fn_t fn);
+void spn_node_set_user_data(spn_node_t* node, void* user_data);
+spn_build_ctx_t* spn_node_ctx_get_build(spn_node_ctx_t* ctx);
+void* spn_node_ctx_get_user_data(spn_node_ctx_t* ctx);
 
 void spn_write_file(spn_build_ctx_t* b, const c8* path, const c8* content);
 

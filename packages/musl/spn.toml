@@ -7,6 +7,6 @@ author = "richfelker"
 maintainer = "tspader"
 description = "musl libc"
 
-[lib]
-kinds = ["static"]
+[[lib]]
 name = "c"
+kind = "static"

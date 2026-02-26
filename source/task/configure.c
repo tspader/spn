@@ -20,8 +20,16 @@ s32 configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   sp_om_for(pkg->targets, it) {
     spn_target_unit_t* target = sp_om_at(pkg->targets, it);
     sp_da_for(target->info->source, j) {
+      sp_str_t relative = target->info->source[j];
       sp_str_t file = sp_fs_join_path(pkg->ctx.paths.source, target->info->source[j]);
       sp_str_t name = spn_intern(sp_fs_get_stem(file));
+      sp_str_t extension = sp_fs_get_ext(relative);
+      sp_str_t stem = relative;
+      if (!sp_str_empty(extension)) {
+        stem = sp_str_prefix(relative, relative.len - extension.len - 1);
+      }
+
+      sp_str_t object_path = sp_fs_join_path(target->paths.object, sp_format("{}.o", SP_FMT_STR(stem)));
 
       if (!sp_om_has(pkg->objects, file)) {
         sp_om_insert(pkg->objects, file, ((spn_compile_unit_t) {
@@ -31,10 +39,7 @@ s32 configure_package(spn_bg_cmd_t* cmd, void* user_data) {
           .profile = pkg->ctx.profile,
           .session = target->session,
           .paths = {
-            .object = sp_fs_join_path(
-              target->paths.object,
-              sp_format("{}.o", SP_FMT_STR(name))
-            ),
+            .object = object_path,
             .source = file,
           },
         }));
@@ -60,24 +65,23 @@ spn_task_result_t spn_task_update_configure_graph(spn_app_t* app) {
   return SPN_TASK_CONTINUE;
 }
 
-spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
+spn_err_t init_configure_graph(spn_app_t* app) {
   spn_session_t* b = &app->session;
   spn_build_graph_t* graph = &b->configure.graph;
   spn_pkg_unit_t* root = spn_session_find_root(&app->session);
 
   root->nodes.configure.run = spn_bg_add_fn_ex(graph, configure_package, root, SPN_BG_VIZ_DEFAULT, app->package.name, sp_str_lit("configure"));
   root->nodes.configure.stamp = spn_bg_add_file(graph, root->paths.stamp.package);
-  spn_bg_cmd_add_output(graph, root->nodes.configure.run, root->nodes.configure.stamp);
+  sp_try(spn_bg_cmd_add_output(graph, root->nodes.configure.run, root->nodes.configure.stamp));
 
   sp_str_ht_for(app->resolver->resolved, it) {
     sp_str_t name = *sp_str_ht_it_getkp(app->resolver->resolved, it);
-    spn_resolved_pkg_t* resolved = sp_str_ht_it_getp(app->resolver->resolved, it);
     spn_pkg_unit_t* unit = sp_om_get(b->units.packages, name);
     sp_assert(unit);
     unit->nodes.configure.run = spn_bg_add_fn_ex(graph, configure_package, unit, SPN_BG_VIZ_DEFAULT, app->package.name, sp_str_lit("configure"));
     unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
-    spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp);
-    spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp);
+    sp_try(spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp));
+    sp_try(spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp));
   }
 
   sp_om_for(b->units.packages, it) {
@@ -88,8 +92,31 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
       sp_str_t parent_name = *sp_ht_it_getkp(pkg->deps, dit);
       spn_pkg_unit_t* parent = sp_om_get(b->units.packages, parent_name);
 
-      spn_bg_cmd_add_input(graph, dep->nodes.configure.run, parent->nodes.configure.stamp);
+      sp_try(spn_bg_cmd_add_input(graph, dep->nodes.configure.run, parent->nodes.configure.stamp));
     }
+  }
+
+  return SPN_OK;
+}
+
+spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
+  spn_session_t* b = &app->session;
+  spn_build_graph_t* graph = &b->configure.graph;
+
+  graph->error.some = SP_OPT_NONE;
+  if (init_configure_graph(app)) {
+    switch (graph->error.some) {
+      case SP_OPT_SOME: {
+        spn_log_error("{}", SP_FMT_STR(spn_bg_err_to_str(graph, graph->error.value)));
+        break;
+      }
+      case SP_OPT_NONE: {
+        spn_log_error("failed to prepare configure graph");
+        break;
+      }
+    }
+
+    return SPN_TASK_ERROR;
   }
 
   b->configure.dirty = spn_bg_compute_forced_dirty(graph);

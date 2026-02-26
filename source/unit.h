@@ -4,6 +4,7 @@
 #include "sp.h"
 #include "spn.h"
 
+#include "err.h"
 #include "graph.h"
 #include "node.h"
 #include "pkg.h"
@@ -114,6 +115,11 @@ struct spn_target_unit {
   struct {
     spn_bg_id_t output;
     spn_bg_id_t link;
+    struct {
+      spn_bg_id_t run;
+      spn_bg_id_t object;
+      spn_bg_id_t header;
+    } embed;
     sp_da(spn_bg_id_t) source;
   } nodes;
 };
@@ -152,7 +158,7 @@ struct spn_pkg_unit_t {
   spn_build_fn_t on_package;
 };
 
-spn_user_node_t* spn_find_user_node(spn_node_t node);
+spn_user_node_t* spn_find_user_node(spn_node_t* node);
 
 spn_build_ctx_t spn_build_ctx_make(spn_build_ctx_config_t cfg);
 void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t cfg);

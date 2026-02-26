@@ -2,7 +2,7 @@
 
 #include "unit.h"
 
-spn_node_t spn_add_node(spn_build_ctx_t* c, const c8* tag) {
+spn_node_t* spn_add_node(spn_build_ctx_t* c, const c8* tag) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)c;
   u32 index = sp_da_size(unit->nodes.all);
   spn_user_node_t node = {
@@ -11,35 +11,46 @@ spn_node_t spn_add_node(spn_build_ctx_t* c, const c8* tag) {
   };
   sp_da_push(unit->nodes.all, node);
 
-  return (spn_node_t) {
+  spn_node_t* out = SP_ALLOC(spn_node_t);
+  *out = (spn_node_t) {
     .ctx = unit,
     .index = index
   };
+
+  return out;
 }
 
-void spn_node_add_input(spn_node_t node, const c8* input) {
+void spn_node_add_input(spn_node_t* node, const c8* input) {
   spn_user_node_t* info = spn_find_user_node(node);
   sp_da_push(info->inputs, spn_intern_cstr(input));
 }
 
-void spn_node_add_output(spn_node_t node, const c8* output) {
+void spn_node_add_output(spn_node_t* node, const c8* output) {
   spn_user_node_t* info = spn_find_user_node(node);
   sp_da_push(info->outputs, spn_intern_cstr(output));
 }
 
-void spn_node_link(spn_node_t from, spn_node_t to) {
+void spn_node_link(spn_node_t* from, spn_node_t* to) {
   spn_user_node_t* info = spn_find_user_node(to);
   sp_da_push(info->deps, from);
 }
 
-void spn_node_set_fn(spn_node_t node, spn_node_fn_t fn) {
+void spn_node_set_fn(spn_node_t* node, spn_node_fn_t fn) {
   spn_user_node_t* info = spn_find_user_node(node);
   info->fn = fn;
 }
 
-void spn_node_set_user_data(spn_node_t node, void* user_data) {
+void spn_node_set_user_data(spn_node_t* node, void* user_data) {
   spn_user_node_t* info = spn_find_user_node(node);
   info->user_data = user_data;
+}
+
+spn_build_ctx_t* spn_node_ctx_get_build(spn_node_ctx_t* ctx) {
+  return ctx->build;
+}
+
+void* spn_node_ctx_get_user_data(spn_node_ctx_t* ctx) {
+  return ctx->user_data;
 }
 
 spn_pkg_t* spn_get_pkg(spn_build_ctx_t* b) {

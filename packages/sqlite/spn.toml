@@ -19,6 +19,6 @@ mode = "release"
 cc = "tcc"
 linkage = "static"
 
-[lib]
-kinds = ["static", "shared"]
-name = 'sqlite3'
+[[lib]]
+name = "sqlite3"
+kind = "static"
