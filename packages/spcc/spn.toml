@@ -6,9 +6,9 @@ commit = "06e307464b"
 author = "bellard"
 maintainer = "tspader"
 
-[lib]
-kinds = ["static"]
-name = 'tcc'
+[[lib]]
+name = "tcc"
+kind = "static"
 
 [[bin]]
 name = "tcc"

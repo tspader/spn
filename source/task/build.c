@@ -360,6 +360,23 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
   return SPN_OK;
 }
 
+bool should_build_target(spn_target_t* target) {
+  switch (target->kind) {
+    case SPN_TARGET_STATIC_LIB:
+    case SPN_TARGET_SHARED_LIB: {
+      return !sp_da_empty(target->source);
+    }
+    case SPN_TARGET_NONE:
+    case SPN_TARGET_OBJECT:
+    case SPN_TARGET_EXE:
+    case SPN_TARGET_JIT: {
+      return true;
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(false);
+}
+
 // ┌──────────┐
 // │ spn.toml │──┐
 // └──────────┘  │  ┌─────────────┐   ┌ ─ ─ ─ ─ ─ ─ ─ ─ ┐   ┌─────────────┐   ┌──────────────────┐
@@ -449,7 +466,12 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   }
 
   sp_om_for(unit->targets, it) {
-    sp_try(add_target(graph, unit, sp_om_at(unit->targets, it)));
+    spn_target_unit_t* target = sp_om_at(unit->targets, it);
+    if (!should_build_target(target->info)) {
+      continue;
+    }
+
+    sp_try(add_target(graph, unit, target));
   }
 
   return SPN_OK;
