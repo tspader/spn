@@ -213,7 +213,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         }
 
         sp_ps_output_t output = sp_ps_run(config);
-        EXPECT_EQ(0, output.status.exit_code);
+        EXPECT_EQ(action.cli.rc, output.status.exit_code);
         break;
       }
       case ACTION_VERIFY_LOCKED: {
@@ -453,6 +453,39 @@ UTEST_F(spn_build, consume_source_lib) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 69 } },
+    },
+  });
+}
+
+UTEST_F(spn_build, schema_missing_required_package_version) {
+  tmpfs_init_named(&uf->fixture.fs, "schema_missing_required_package_version");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/schema/missing_required_package_version",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+    },
+  });
+}
+
+UTEST_F(spn_build, schema_missing_required_package_name) {
+  tmpfs_init_named(&uf->fixture.fs, "schema_missing_required_package_name");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/schema/missing_required_package_name",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+    },
+  });
+}
+
+UTEST_F(spn_build, schema_wrong_type_required_package_version) {
+  tmpfs_init_named(&uf->fixture.fs, "schema_wrong_type_required_package_version");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/schema/wrong_type_required_package_version",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
     },
   });
 }

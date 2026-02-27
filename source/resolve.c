@@ -75,12 +75,14 @@ spn_err_t add_package_constraints(spn_app_t* app, spn_pkg_t* pkg) {
 
     spn_pkg_t* dep = spn_app_ensure_package(app, request);
     if (!dep) {
-      spn_push_event_ex((spn_build_event_t) {
-        .kind = SPN_EVENT_ERR_UNKNOWN_PKG,
-        .unknown = {
-          .request = request
-        }
-      });
+      if (request.kind == SPN_PACKAGE_KIND_INDEX && !sp_str_ht_get(app->registry, request.name)) {
+        spn_push_event_ex((spn_build_event_t) {
+          .kind = SPN_EVENT_ERR_UNKNOWN_PKG,
+          .unknown = {
+            .request = request
+          }
+        });
+      }
 
       return SPN_ERROR;
     }
@@ -152,7 +154,7 @@ spn_err_t add_package_constraints(spn_app_t* app, spn_pkg_t* pkg) {
   return SPN_OK;
 }
 
-void spn_app_resolve_from_lock_file(spn_app_t* app) {
+spn_err_t spn_app_resolve_from_lock_file(spn_app_t* app) {
   SP_ASSERT(app->lock.some);
 
   spn_lock_file_t* lock = &app->lock.value;
@@ -191,6 +193,8 @@ void spn_app_resolve_from_lock_file(spn_app_t* app) {
   sp_ht_for_kv(lock->system_deps, it) {
     sp_da_push(app->resolver->system_deps, *it.key);
   }
+
+  return SPN_OK;
 }
 
 spn_err_t spn_resolve_from_solver(spn_app_t* app) {
@@ -244,7 +248,7 @@ spn_err_t spn_resolve_from_solver(spn_app_t* app) {
   return SPN_OK;
 }
 
-void spn_app_resolve(spn_app_t* app) {
+spn_err_t spn_app_resolve(spn_app_t* app) {
   switch (app->lock.some) {
     case SP_OPT_SOME: {
       spn_event_buffer_push_ctx(spn.events, &spn_session_find_root(&app->session)->ctx, (spn_build_event_t) {
@@ -254,8 +258,7 @@ void spn_app_resolve(spn_app_t* app) {
         }
       });
 
-      spn_app_resolve_from_lock_file(app);
-      break;
+      return spn_app_resolve_from_lock_file(app);
     }
     case SP_OPT_NONE: {
       spn_event_buffer_push_ctx(spn.events, &spn_session_find_root(&app->session)->ctx, (spn_build_event_t) {
@@ -265,8 +268,9 @@ void spn_app_resolve(spn_app_t* app) {
         }
       });
 
-      spn_resolve_from_solver(app);
-      break;
+      return spn_resolve_from_solver(app);
     }
   }
+
+  SP_UNREACHABLE_RETURN(SPN_ERROR);
 }

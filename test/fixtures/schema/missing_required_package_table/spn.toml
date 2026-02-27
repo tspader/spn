@@ -1,0 +1,3 @@
+[[bin]]
+name = "main"
+source = ["main.c"]

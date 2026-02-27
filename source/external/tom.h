@@ -5,6 +5,13 @@
 #include "toml.h"
 
 typedef enum {
+  SPN_TOML_VALUE_KIND_NONE,
+  SPN_TOML_VALUE_KIND_SCALAR,
+  SPN_TOML_VALUE_KIND_ARRAY,
+  SPN_TOML_VALUE_KIND_TABLE,
+} spn_toml_value_kind_t;
+
+typedef enum {
   SPN_TOML_CONTEXT_ROOT,
   SPN_TOML_CONTEXT_TABLE,
   SPN_TOML_CONTEXT_ARRAY,

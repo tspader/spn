@@ -48,6 +48,7 @@ typedef sp_str_ht(sp_str_t) spn_pkg_registry_t;
 struct spn_app_t {
   spn_app_paths_t paths;
   spn_pkg_t package;
+  spn_err_t load_error;
   sp_opt(spn_lock_file_t) lock;
   spn_resolver_t* resolver;
   spn_session_t session;
@@ -113,14 +114,14 @@ extern spn_app_t app;
 extern spn_ctx_t spn;
 
 void       spn_app_init(spn_app_t* app);
-void       spn_app_load(spn_app_t* app, sp_str_t manifest_path);
+spn_err_t  spn_app_load(spn_app_t* app, sp_str_t manifest_path);
 void       spn_app_write_manifest(spn_pkg_t* package, sp_str_t path);
 spn_pkg_t* spn_app_find_package(spn_app_t* app, sp_str_t name);
 spn_pkg_t* spn_app_find_package_from_request(spn_app_t* app, spn_pkg_req_t dep);
 spn_app_t  spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode_t mode);
 spn_pkg_t* spn_app_ensure_package(spn_app_t* app, spn_pkg_req_t dep);
 void       spn_app_update_lock_file(spn_app_t* app);
-void       spn_app_resolve(spn_app_t* app);
+spn_err_t  spn_app_resolve(spn_app_t* app);
 
 sp_app_result_t spn_init(sp_app_t* app);
 sp_app_result_t spn_poll(sp_app_t* app);

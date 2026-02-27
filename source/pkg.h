@@ -9,6 +9,7 @@
 #include "profile.h"
 #include "semver.h"
 #include "target.h"
+#include "err.h"
 
 #define SPN_PACKAGE_KIND(X) \
   X(SPN_PACKAGE_KIND_NONE, "none") \
@@ -79,9 +80,9 @@ struct spn_pkg {
 
 spn_pkg_t spn_pkg_new(sp_str_t path);
 spn_pkg_t spn_pkg_from_default(sp_str_t path, sp_str_t name);
-void spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path);
-void spn_pkg_from_index(spn_pkg_t* pkg, sp_str_t index_path);
-void spn_pkg_from_manifest(spn_pkg_t* pkg, sp_str_t manifest_path);
+spn_err_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path);
+spn_err_t spn_pkg_from_index(spn_pkg_t* pkg, sp_str_t index_path);
+spn_err_t spn_pkg_from_manifest(spn_pkg_t* pkg, sp_str_t manifest_path);
 void spn_pkg_init(spn_pkg_t* pkg, sp_str_t name);
 void spn_pkg_set_index(spn_pkg_t* pkg, sp_str_t path);
 void spn_pkg_set_manifest(spn_pkg_t* pkg, sp_str_t path);

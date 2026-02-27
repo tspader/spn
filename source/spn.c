@@ -256,7 +256,10 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   app = SP_ZERO_STRUCT(spn_app_t);
   spn_app_init(&app);
-  spn_app_load(&app, spn.paths.manifest);
+  if (spn_app_load(&app, spn.paths.manifest)) {
+    spn_poll(sp);
+    SP_EXIT_FAILURE();
+  }
 
   switch (spn_cli_dispatch(&parser, cli)) {
     case SP_APP_CONTINUE: return SP_APP_CONTINUE;

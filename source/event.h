@@ -1,6 +1,7 @@
 #ifndef SPN_EVENT_H
 #define SPN_EVENT_H
 
+#include "err.h"
 #include "sp.h"
 #include "pkg.h"
 #include "node.h"
@@ -11,6 +12,7 @@ typedef struct spn_build_io_t spn_build_io_t;
 
 typedef enum {
   SPN_EVENT_FETCH,
+  SPN_EVENT_ERR,
   SPN_EVENT_ERR_CIRCULAR_DEP,
   SPN_EVENT_ERR_UNKNOWN_PKG,
   SPN_EVENT_RESOLVE,
@@ -56,6 +58,7 @@ typedef struct spn_build_event_t {
 
   union {
     sp_str_t tcc;
+    spn_err_union_t err;
     struct {
       spn_user_node_t* info;
     } node;

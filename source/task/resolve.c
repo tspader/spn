@@ -8,13 +8,19 @@ void add_pkg_unit(spn_session_t* session, spn_resolved_pkg_t resolved) {
 }
 
 spn_task_result_t spn_task_resolve(spn_app_t* app) {
+  if (app->load_error) {
+    return SPN_TASK_ERROR;
+  }
+
   spn_session_t* session = &app->session;
   spn_session_init(session, &app->package, app->config.profile, sp_str_lit("build"));
   spn_session_set_filter(session, app->config.filter);
 
   spn_init_pkg_unit_for_session(session, &session->units.root, &app->package, SPN_PACKAGE_KIND_ROOT, app->package.version);
 
-  spn_app_resolve(app);
+  if (spn_app_resolve(app)) {
+    return SPN_TASK_ERROR;
+  }
 
   sp_str_ht_for_kv(app->resolver->resolved, it) {
     add_pkg_unit(session, *it.val);

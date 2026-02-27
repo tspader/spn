@@ -14,6 +14,14 @@
     - e.g. `./bootstrap/bin/spn build -t integration -p debug -f`
 - `./build/debug/store/bin/$test`
     - e.g. `./build/debug/store/bin/integration`
+- aliases:
+    - `bspn` -> `./bootstrap/bin/spn`
+    - `dspn` -> `./build/debug/store/bin/spn`
+- the Full Process for testing changes:
+    - `make` (build a clean bootstrap binary)
+    - `bspn build -t spn -p debug -f` (build spn using itself)
+    - `dspn build -t integration -p debug -f` (build the tests with bootstrapped spn)
+    - `./build/debug/store/bin/integration` (run tests)
 
 # references
 - `source/`
