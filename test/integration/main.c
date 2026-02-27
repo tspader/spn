@@ -283,6 +283,20 @@ UTEST_F(spn_build, index_package_pinned_commit) {
   });
 }
 
+UTEST_F(spn_build, index_package_without_source) {
+  tmpfs_init_named(&uf->fixture.fs, "index_package_without_source");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/index_package_without_source",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_LOCKED },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+    },
+  });
+}
+
 // UTEST_F(spn_build, codeberg) {
 //   run_test(utest_result, &uf->fixture, (test_t) {
 //     .project = "test/manual/spn_build/codeberg",
@@ -372,6 +386,19 @@ UTEST_F(spn_build, add_bin) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_RUN_BIN, .bin.name = "foo" },
+    },
+  });
+}
+
+UTEST_F(spn_build, static_lib) {
+  tmpfs_init_named(&uf->fixture.fs, "static_lib");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/static_lib",
+    .copy = { "mylib.c" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-t", "mylib" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libmylib.a") },
     },
   });
 }
