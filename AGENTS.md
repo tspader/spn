@@ -33,7 +33,9 @@
 # tests
 - `test/core` is unit tests; build and run with `pspn test` or `pspn test --target $target`
 - `test/manual` is manual tests; each test has instructions in `test.md` and a clean project
-- use ./build/llm as your temporary directory when testing; do not use /tmp
+- use ./.llm/tmp as your temporary directory when testing; do not use /tmp
+
+our tests are a virtual machine; we do NOT write imperative tests. tests are data (bytecode) which get fed through the same executor. this ensures consistent setup and expectation, and lets us write many tests without breaking down. you may write new executors when a category of tests differs from existing categories; but you may NOT write imperative logic inside a test, and you may NOT make an "executor" for a single test
 
 # examples
 ## finding code in sp.h
@@ -51,13 +53,18 @@ assistant: Finds needed code, searches through our code for existing in-context 
 - always use SP_ZERO_INITIALIZE() instead of leaving variables uninitialized
 - always use braces for one liner scopes (e.g. `for`, `if`)
 - always use `foo()` instead of `foo(void)` for no-argument functions
+- always use `sp_for(it, 5)` instead of `for (u32 it = 0; it < 5; it++)`
+- always use `it` as your iterator variable (not e.g. `i`)
+- always use the following names in tests:
+  - `test` for the name of a project
+  - `main` for the name of a binary
+  - `spum` for the name of a consumed package
+  - `SPUM` when verifying a preprocessor define from a header in a package; `69` when a constant is needed
+- prefer `const c8*` for structs or functions that are mostly used with literals, even if you convert to sp_str_t immediately when using
 - prefer designated initializers to memberwise assignment
 - prefer to use a specific allocator instead of the general purpose global allocator:
   - a memory arena (several in the codebase)
   - string interner (on global spn_ctx_t)
   - scratch arena, if transient (see: sp.h docs)
-- always use `sp_for(it, 5)` instead of `for (u32 it = 0; it < 5; it++)`
-- always use `it` as your iterator variable (not e.g. `i`)
-- prefer `const c8*` for structs or functions that are mostly used with literals, even if you convert to sp_str_t immediately when using
 - never re-zero memory returned by sp_alloc()
 - never use the C standard library. always use `sp.h`
