@@ -102,8 +102,7 @@ static spn_err_t spn_pkg_toml_get_array_strict(spn_pkg_t* pkg, toml_table_t* tab
   }
 
   if (!required && kind == SPN_TOML_VALUE_KIND_TABLE) {
-    *out = SP_NULLPTR;
-    return SPN_OK;
+    return spn_pkg_toml_validate_field_type(pkg, field, sp_str_lit("array"), kind);
   }
 
   if (kind != SPN_TOML_VALUE_KIND_ARRAY) {
@@ -129,11 +128,6 @@ static spn_err_t spn_pkg_toml_get_string_strict(spn_pkg_t* pkg, toml_table_t* ta
     return spn_pkg_toml_validate_field_type(pkg, field, sp_str_lit("string"), kind);
   }
 
-  toml_unparsed_t raw = toml_table_unparsed(table, key);
-  if (!raw || (raw[0] != '\'' && raw[0] != '"')) {
-    return spn_pkg_toml_validate_field_type(pkg, field, sp_str_lit("string"), SPN_TOML_VALUE_KIND_SCALAR);
-  }
-
   toml_value_t value = toml_table_string(table, key);
   if (!value.ok) {
     return spn_pkg_toml_validate_field_type(pkg, field, sp_str_lit("string"), SPN_TOML_VALUE_KIND_SCALAR);
@@ -144,11 +138,6 @@ static spn_err_t spn_pkg_toml_get_string_strict(spn_pkg_t* pkg, toml_table_t* ta
 }
 
 static spn_err_t spn_pkg_toml_array_get_string_strict(spn_pkg_t* pkg, toml_array_t* array, u32 it, sp_str_t field, sp_str_t* out) {
-  toml_unparsed_t raw = toml_array_unparsed(array, it);
-  if (!raw || (raw[0] != '\'' && raw[0] != '"')) {
-    return spn_pkg_toml_validate_field_type(pkg, field, sp_str_lit("string"), SPN_TOML_VALUE_KIND_SCALAR);
-  }
-
   toml_value_t value = toml_array_string(array, it);
   if (!value.ok) {
     return spn_pkg_toml_validate_field_type(pkg, field, sp_str_lit("string"), SPN_TOML_VALUE_KIND_SCALAR);
@@ -252,7 +241,21 @@ spn_err_t spn_pkg_from_index(spn_pkg_t* pkg, sp_str_t path) {
   sp_try(spn_pkg_load(pkg, manifest));
   spn_pkg_set_index(pkg, path);
 
-  toml_table_t* metadata = spn_toml_parse(pkg->paths.metadata);
+  bool parse_error = false;
+  toml_table_t* metadata = spn_toml_parse_ex(pkg->paths.metadata, &parse_error);
+  if (parse_error) {
+    spn_event_buffer_push_ex(spn.events, pkg, SP_NULLPTR, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR,
+      .err = {
+        .code = SPN_ERROR,
+        .kind = SPN_ERR_KIND_MANIFEST_PARSE,
+        .manifest_parse = {
+          .path = pkg->paths.metadata,
+        },
+      },
+    });
+  }
+
   if (metadata) {
     toml_array_t* versions = toml_table_array(metadata, "versions");
 
@@ -308,18 +311,22 @@ spn_err_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   } toml = SP_ZERO_INITIALIZE();
 #define SPN_PKG_TRY(expr) sp_try_as((expr), SPN_ERROR)
 
-  toml.manifest = spn_toml_parse(manifest_path);
+  bool parse_error = false;
+  toml.manifest = spn_toml_parse_ex(manifest_path, &parse_error);
   if (!toml.manifest) {
-    spn_event_buffer_push_ex(spn.events, pkg, SP_NULLPTR, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR,
-      .err = {
-        .code = SPN_ERROR,
-        .kind = SPN_ERR_KIND_MANIFEST_PARSE,
-        .manifest_parse = {
-          .path = manifest_path,
+    if (parse_error) {
+      spn_event_buffer_push_ex(spn.events, pkg, SP_NULLPTR, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR,
+        .err = {
+          .code = SPN_ERROR,
+          .kind = SPN_ERR_KIND_MANIFEST_PARSE,
+          .manifest_parse = {
+            .path = manifest_path,
+          },
         },
-      },
-    });
+      });
+    }
+
     return SPN_ERROR;
   }
 

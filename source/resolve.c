@@ -182,6 +182,9 @@ spn_err_t spn_app_resolve_from_lock_file(spn_app_t* app) {
     }
 
     spn_pkg_t* pkg = spn_app_ensure_package(app, request);
+    if (!pkg) {
+      return SPN_ERROR;
+    }
 
     sp_str_ht_insert(app->resolver->resolved, entry->name, ((spn_resolved_pkg_t) {
       .pkg = pkg,
@@ -238,6 +241,10 @@ spn_err_t spn_resolve_from_solver(spn_app_t* app) {
 
 
     spn_pkg_t* pkg = spn_app_ensure_package(app, req_high);
+    if (!pkg) {
+      return SPN_ERROR;
+    }
+
     sp_str_ht_insert(app->resolver->resolved, name, ((spn_resolved_pkg_t) {
       .pkg = pkg,
       .version = pkg->versions[high],

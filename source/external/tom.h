@@ -30,6 +30,7 @@ typedef struct {
 
 u32               spn_toml_array_len(toml_array_t* array);
 toml_table_t*     spn_toml_parse(sp_str_t path);
+toml_table_t*     spn_toml_parse_ex(sp_str_t path, bool* parse_error);
 const c8*         spn_toml_cstr(toml_table_t* toml, const c8* key);
 const c8*         spn_toml_cstr_opt(toml_table_t* toml, const c8* key, const c8* fallback);
 const c8*         spn_toml_arr_cstr(toml_array_t* toml, u32 it);

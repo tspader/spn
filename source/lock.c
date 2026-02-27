@@ -1,5 +1,6 @@
 #include "lock.h"
 
+#include "app.h"
 #include "ctx.h"
 #include "external/tom.h"
 
@@ -65,8 +66,24 @@ spn_lock_file_t spn_lock_file_load(sp_str_t path) {
 
   SP_ASSERT(sp_fs_exists(path));
 
-  toml_table_t* root = spn_toml_parse(path);
-  SP_ASSERT(root);
+  bool parse_error = false;
+  toml_table_t* root = spn_toml_parse_ex(path, &parse_error);
+  if (!root) {
+    if (parse_error) {
+      spn_event_buffer_push_ex(spn.events, SP_NULLPTR, SP_NULLPTR, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR,
+        .err = {
+          .code = SPN_ERROR,
+          .kind = SPN_ERR_KIND_MANIFEST_PARSE,
+          .manifest_parse = {
+            .path = path,
+          },
+        },
+      });
+    }
+
+    return lock;
+  }
 
   toml_table_t* pkg_table = toml_table_table(root, "package");
   if (pkg_table) {

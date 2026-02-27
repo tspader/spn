@@ -325,7 +325,6 @@ spn_pkg_t* spn_app_ensure_package(spn_app_t* app, spn_pkg_req_t request) {
 }
 
 void spn_app_init(spn_app_t* app) {
-  app->load_error = SPN_OK;
   app->resolver = sp_alloc_type(spn_resolver_t);
   spn_resolver_init(app->resolver, &app->package, &app->cache, &app->registry);
 }

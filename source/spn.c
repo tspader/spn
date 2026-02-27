@@ -122,23 +122,38 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.paths.config = sp_fs_join_path(spn.paths.config_dir, SP_LIT("spn.toml"));
 
   if (sp_fs_exists(spn.paths.config)) {
-    toml_table_t* toml = spn_toml_parse(spn.paths.config);
-
-    toml_value_t dir = toml_table_string(toml, "spn");
-    if (dir.ok) {
-      spn.paths.spn = sp_str_view(dir.u.s);
+    bool parse_error = false;
+    toml_table_t* toml = spn_toml_parse_ex(spn.paths.config, &parse_error);
+    if (parse_error) {
+      spn_event_buffer_push_ex(spn.events, SP_NULLPTR, SP_NULLPTR, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR,
+        .err = {
+          .code = SPN_ERROR,
+          .kind = SPN_ERR_KIND_MANIFEST_PARSE,
+          .manifest_parse = {
+            .path = spn.paths.config,
+          },
+        },
+      });
     }
 
-    toml_array_t* registries = toml_table_array(toml, "index");
-    if (registries) {
-      spn_toml_arr_for(registries, n) {
-        toml_table_t* it = toml_array_table(registries, n);
-        spn_index_t registry = {
-          .location = spn_toml_str(it, "location"),
-          .kind = SPN_INDEX_WORKSPACE
-        };
+    if (toml) {
+      toml_value_t dir = toml_table_string(toml, "spn");
+      if (dir.ok) {
+        spn.paths.spn = sp_str_view(dir.u.s);
+      }
 
-        sp_dyn_array_push(spn.indexes, registry);
+      toml_array_t* registries = toml_table_array(toml, "index");
+      if (registries) {
+        spn_toml_arr_for(registries, n) {
+          toml_table_t* it = toml_array_table(registries, n);
+          spn_index_t registry = {
+            .location = spn_toml_str(it, "location"),
+            .kind = SPN_INDEX_WORKSPACE
+          };
+
+          sp_dyn_array_push(spn.indexes, registry);
+        }
       }
     }
   }
