@@ -403,6 +403,60 @@ UTEST_F(spn_build, static_lib) {
   });
 }
 
+UTEST_F(spn_build, shared_lib) {
+  tmpfs_init_named(&uf->fixture.fs, "shared_lib");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/shared_lib",
+    .copy = { "spum.c" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-t", "spum" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum.so") },
+    },
+  });
+}
+
+UTEST_F(spn_build, consume_static_lib) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_static_lib");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/consume_static_lib",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum.a") },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 69 } },
+    },
+  });
+}
+
+UTEST_F(spn_build, consume_shared_lib) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_shared_lib");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/consume_shared_lib",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum.so") },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 69 } },
+    },
+  });
+}
+
+UTEST_F(spn_build, consume_source_lib) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_source_lib");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/consume_source_lib",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 69 } },
+    },
+  });
+}
+
 UTEST_F(spn_build, add_define) {
   tmpfs_init_named(&uf->fixture.fs, "add_define");
 

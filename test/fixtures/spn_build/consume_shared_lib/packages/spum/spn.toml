@@ -1,0 +1,8 @@
+[package]
+name = "spum"
+version = "1.0.0"
+
+[[lib]]
+name = "spum"
+kind = "shared"
+source = ["spum.c"]
