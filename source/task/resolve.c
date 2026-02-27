@@ -14,7 +14,9 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
 
   spn_init_pkg_unit_for_session(session, &session->units.root, &app->package, SPN_PACKAGE_KIND_ROOT, app->package.version);
 
-  spn_app_resolve(app);
+  if (spn_app_resolve(app)) {
+    return SPN_TASK_ERROR;
+  }
 
   sp_str_ht_for_kv(app->resolver->resolved, it) {
     add_pkg_unit(session, *it.val);

@@ -1,0 +1,6 @@
+[package]
+name = "test"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

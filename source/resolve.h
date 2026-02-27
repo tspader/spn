@@ -35,7 +35,7 @@ typedef struct spn_resolver_t {
 
 void      spn_resolver_init(spn_resolver_t* r, spn_pkg_t* pkg, spn_pkg_cache_t* cache, spn_pkg_registry_t* registry);
 spn_err_t spn_resolve_from_solver(spn_app_t* app);
-void      spn_app_resolve_from_lock_file(spn_app_t* app);
+spn_err_t spn_app_resolve_from_lock_file(spn_app_t* app);
 
 spn_pkg_req_t          spn_pkg_req_from_str(sp_str_t str);
 sp_str_t               spn_pkg_req_to_str(spn_pkg_req_t dep);

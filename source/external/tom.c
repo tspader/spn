@@ -9,12 +9,26 @@ u32 spn_toml_array_len(toml_array_t* array) {
 }
 
 toml_table_t* spn_toml_parse(sp_str_t path) {
+  return spn_toml_parse_ex(path, SP_NULLPTR);
+}
+
+toml_table_t* spn_toml_parse_ex(sp_str_t path, bool* parse_error) {
+  if (parse_error) {
+    *parse_error = false;
+  }
+
   if (!sp_fs_exists(path)) {
     return SP_NULLPTR;
   }
 
   sp_str_t file = sp_io_read_file(path);
-  return toml_parse(sp_str_to_cstr(file), SP_NULLPTR, 0);
+  c8 parse_err[1024] = {0};
+  toml_table_t* toml = toml_parse(sp_str_to_cstr(file), parse_err, SP_CARR_LEN(parse_err));
+  if (!toml && parse_error) {
+    *parse_error = true;
+  }
+
+  return toml;
 }
 
 const c8* spn_toml_cstr(toml_table_t* toml, const c8* key) {

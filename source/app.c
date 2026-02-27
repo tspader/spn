@@ -272,6 +272,10 @@ spn_pkg_t* spn_app_find_package(spn_app_t* app, sp_str_t name) {
 
 spn_pkg_t* spn_app_find_package_from_request(spn_app_t* app, spn_pkg_req_t request) {
   spn_pkg_t* package = spn_app_find_package(app, request.name);
+  if (!package) {
+    return SP_NULLPTR;
+  }
+
   if (package->kind != request.kind) {
     return SP_NULLPTR;
   }
@@ -294,7 +298,7 @@ spn_pkg_t* spn_app_ensure_package(spn_app_t* app, spn_pkg_req_t request) {
           .data = request.file.data + prefix.len,
           .len = request.file.len - prefix.len
         };
-        spn_pkg_from_manifest(pkg, manifest);
+        sp_try_as_null(spn_pkg_from_manifest(pkg, manifest));
 
         break;
       }
@@ -302,7 +306,7 @@ spn_pkg_t* spn_app_ensure_package(spn_app_t* app, spn_pkg_req_t request) {
         sp_str_t* path = sp_str_ht_get(app->registry, name);
         if (!path) return SP_NULLPTR;
 
-        spn_pkg_from_index(pkg, *path);
+        sp_try_as_null(spn_pkg_from_index(pkg, *path));
 
         break;
       }
@@ -378,10 +382,10 @@ spn_app_t spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode
   return app;
 }
 
-void spn_app_load(spn_app_t* app, sp_str_t manifest_path) {
+spn_err_t spn_app_load(spn_app_t* app, sp_str_t manifest_path) {
   // Load the top level package
   if (sp_fs_exists(manifest_path)) {
-    spn_pkg_from_manifest(&app->package, manifest_path);
+    sp_try(spn_pkg_from_manifest(&app->package, manifest_path));
   }
 
   app->paths.dir = app->package.paths.root;
@@ -452,4 +456,6 @@ void spn_app_load(spn_app_t* app, sp_str_t manifest_path) {
       spn_pkg_add_profile_ex(&app->package, profiles[it]);
     }
   }
+
+  return SPN_OK;
 }

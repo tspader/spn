@@ -32,7 +32,7 @@ typedef struct {
     struct { sp_str_t file; } verify_include;
     struct { sp_str_t file; sp_str_t content; } verify_content;
     struct { const c8* name; } verify_locked;
-    struct { const c8* cmd; const c8* args [4]; } cli;
+    struct { const c8* cmd; const c8* args [4]; s32 rc; } cli;
   };
 } action_t;
 

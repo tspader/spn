@@ -46,6 +46,7 @@ typedef struct {
 
 static spn_build_event_display_t event_info[] = {
   [SPN_EVENT_FETCH]                         = { "fetch",          SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
+  [SPN_EVENT_ERR]                           = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
   [SPN_EVENT_ERR_CIRCULAR_DEP]              = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
   [SPN_EVENT_ERR_UNKNOWN_PKG]               = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
   [SPN_EVENT_RESOLVE]                       = { "resolve",        SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
@@ -388,6 +389,33 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
         "{:fg brightcyan} transitively includes itself",
         SP_FMT_STR(event->circular.pkg->name)
       );
+      break;
+    }
+    case SPN_EVENT_ERR: {
+      switch (event->err.kind) {
+        case SPN_ERR_KIND_MANIFEST_PARSE: {
+          sp_str_builder_append_fmt(
+            &builder,
+            "failed to parse manifest {:fg brightcyan}",
+            SP_FMT_STR(event->err.manifest_parse.path)
+          );
+          break;
+        }
+        case SPN_ERR_KIND_MANIFEST_FIELD: {
+          sp_str_builder_append_fmt(
+            &builder,
+            "invalid manifest field {:fg brightcyan}: expected {:fg brightyellow}, got {:fg brightred}",
+            SP_FMT_STR(event->err.manifest_field.path),
+            SP_FMT_STR(event->err.manifest_field.expected),
+            SP_FMT_STR(event->err.manifest_field.actual)
+          );
+          break;
+        }
+        case SPN_ERR_KIND_NONE: {
+          sp_str_builder_append_cstr(&builder, "unknown error");
+          break;
+        }
+      }
       break;
     }
     case SPN_EVENT_CLEAN: {
