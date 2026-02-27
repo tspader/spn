@@ -49,6 +49,29 @@ sp_str_t get_embed_header_path(spn_target_unit_t* unit) {
   return sp_fs_join_path(unit->paths.generated, sp_format("{}.embed.h", SP_FMT_STR(unit->info->name)));
 }
 
+sp_str_t get_target_output_path(spn_target_unit_t* unit) {
+  spn_target_t* target = unit->info;
+
+  switch (target->kind) {
+    case SPN_TARGET_EXE: {
+      return sp_fs_join_path(unit->paths.bin, target->name);
+    }
+    case SPN_TARGET_STATIC_LIB:
+    case SPN_TARGET_SHARED_LIB: {
+      spn_linkage_t linkage = spn_target_kind_to_pkg_linkage(target->kind);
+      sp_str_t file = sp_os_lib_to_file_name(target->name, spn_lib_kind_to_sp_os_lib_kind(linkage));
+      return sp_fs_join_path(unit->paths.lib, file);
+    }
+    case SPN_TARGET_NONE:
+    case SPN_TARGET_JIT:
+    case SPN_TARGET_OBJECT: {
+      SP_UNREACHABLE_CASE();
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 void setup_target_for_compile_or_link(spn_cc_t* cc, spn_cc_target_t* cc_target, spn_target_t* target, spn_pkg_t* pkg, spn_session_t* session) {
   sp_da_for(target->include, i) {
     spn_cc_target_add_relative_include(cc_target, target->include[i]);
@@ -123,6 +146,62 @@ spn_err_t run_cc(spn_cc_t* cc, spn_cc_target_t* cc_target, sp_str_t cwd, spn_pkg
       .kind = SPN_EVENT_TARGET_BUILD_PASSED
     });
   }
+
+  return SPN_OK;
+}
+
+spn_err_t run_ar(spn_target_unit_t* unit, sp_str_t output) {
+  sp_ps_config_t ps = {
+    .command = sp_str_lit("ar"),
+    .cwd = unit->paths.work,
+    .io = {
+      .in.mode = SP_PS_IO_MODE_NULL,
+      .err.mode = SP_PS_IO_MODE_REDIRECT,
+    },
+  };
+  sp_ps_config_add_arg(&ps, sp_str_lit("rcs"));
+  sp_ps_config_add_arg(&ps, output);
+
+  sp_da_for(unit->objects, it) {
+    sp_ps_config_add_arg(&ps, unit->objects[it]->paths.object);
+  }
+
+  sp_mem_scratch_t scratch = sp_mem_begin_scratch(); {
+    sp_str_builder_t log = SP_ZERO_INITIALIZE();
+    sp_str_builder_append(&log, ps.command);
+    sp_str_builder_append_c8(&log, ' ');
+
+    sp_da_for(ps.dyn_args, it) {
+      sp_str_builder_append(&log, ps.dyn_args[it]);
+      sp_str_builder_append_c8(&log, ' ');
+    }
+
+    spn_push_event_ex((spn_build_event_t) {
+      .kind = SPN_EVENT_TARGET_BUILD,
+      .target.build = {
+        .args = sp_str_builder_to_str(&log),
+      }
+    });
+
+    sp_mem_end_scratch(scratch);
+  }
+
+  sp_ps_output_t result = sp_ps_run(ps);
+  if (result.status.exit_code) {
+    spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
+      .kind = SPN_EVENT_TARGET_BUILD_FAILED,
+      .target.failed = {
+        .out = result.out,
+        .err = result.err,
+      }
+    });
+
+    return SPN_ERROR;
+  }
+
+  spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
+    .kind = SPN_EVENT_TARGET_BUILD_PASSED
+  });
 
   return SPN_OK;
 }
@@ -223,19 +302,37 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
 
   //spn_log_error("link: {}", SP_FMT_STR(unit->target->name));
 
-  spn_cc_t* cc = make_cc_for_compile_or_link(unit->pkg, unit->info, unit->paths.bin, unit->session->profile);
-  spn_cc_target_t* cc_target = spn_cc_add_target(cc, SPN_TARGET_EXE, target->name);
-  setup_target_for_compile_or_link(cc, cc_target, target, unit->pkg, unit->session);
+  sp_str_t output = get_target_output_path(unit);
+  sp_str_t output_name = sp_fs_get_name(output);
 
-  sp_da_for(unit->objects, it) {
-    spn_cc_target_add_absolute_source(cc_target, unit->objects[it]->paths.object);
+  switch (target->kind) {
+    case SPN_TARGET_STATIC_LIB: {
+      return run_ar(unit, output);
+    }
+    case SPN_TARGET_EXE:
+    case SPN_TARGET_SHARED_LIB: {
+      spn_cc_t* cc = make_cc_for_compile_or_link(unit->pkg, unit->info, sp_fs_parent_path(output), unit->session->profile);
+      spn_cc_target_t* cc_target = spn_cc_add_target(cc, target->kind, output_name);
+      setup_target_for_compile_or_link(cc, cc_target, target, unit->pkg, unit->session);
+
+      sp_da_for(unit->objects, it) {
+        spn_cc_target_add_absolute_source(cc_target, unit->objects[it]->paths.object);
+      }
+
+      if (!sp_da_empty(target->embed)) {
+        spn_cc_target_add_absolute_source(cc_target, get_embed_object_path(unit));
+      }
+
+      return run_cc(cc, cc_target, unit->paths.work, unit->pkg, &unit->logs);
+    }
+    case SPN_TARGET_NONE:
+    case SPN_TARGET_JIT:
+    case SPN_TARGET_OBJECT: {
+      SP_UNREACHABLE_CASE();
+    }
   }
 
-  if (!sp_da_empty(target->embed)) {
-    spn_cc_target_add_absolute_source(cc_target, get_embed_object_path(unit));
-  }
-
-  return run_cc(cc, cc_target, unit->paths.work, unit->pkg, &unit->logs);
+  SP_UNREACHABLE_RETURN(SPN_ERROR);
 }
 
 s32 run_package_hook(spn_bg_cmd_t* cmd, void* user_data) {
@@ -313,7 +410,7 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
   spn_target_t* target = unit->info;
 
   unit->nodes.link = spn_bg_add_fn_ex(graph, link_target, unit, SPN_BG_VIZ_CMD, pkg->ctx.name, sp_format("link {}", SP_FMT_STR(target->name)));
-  unit->nodes.output = spn_bg_add_file_ex(graph, sp_fs_join_path(pkg->ctx.paths.bin, target->name), SPN_BG_VIZ_BINARY, pkg->ctx.name);
+  unit->nodes.output = spn_bg_add_file_ex(graph, get_target_output_path(unit), SPN_BG_VIZ_BINARY, pkg->ctx.name);
 
   sp_try(spn_bg_cmd_add_output(graph, unit->nodes.link,  unit->nodes.output));
   //spn_bg_cmd_add_input(graph, unit->nodes.link, pkg->nodes.build.stamp.exit);

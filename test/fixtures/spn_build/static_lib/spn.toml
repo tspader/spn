@@ -1,0 +1,8 @@
+[package]
+name = "static_lib"
+version = "0.1.0"
+
+[[lib]]
+name = "mylib"
+kind = "static"
+source = ["mylib.c"]
