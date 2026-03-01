@@ -6,5 +6,6 @@ commit = "c859b25da02955fef659d658b8f324b5cde87be3"
 author = "DaveGamble"
 maintainer = "tspader"
 
-[lib]
+[[lib]]
+name = "cjson"
 kinds = ["source"]

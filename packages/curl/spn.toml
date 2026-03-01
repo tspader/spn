@@ -8,4 +8,4 @@ maintainer = "tspader"
 
 [[lib]]
 name = "curl"
-kind = "static"
+kinds = ["static"]

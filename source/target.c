@@ -49,9 +49,7 @@ spn_linkage_t spn_lib_kind_from_str(sp_str_t str) {
 }
 
 spn_linkage_t spn_pkg_linkage_from_str(sp_str_t str) {
-  if (spn_intern_is_equal_cstr(str, "shared")) return SPN_LIB_KIND_SHARED;
-  if (spn_intern_is_equal_cstr(str, "static")) return SPN_LIB_KIND_STATIC;
-  return SPN_LIB_KIND_SHARED;
+  return spn_lib_kind_from_str(str);
 }
 
 sp_str_t spn_pkg_linkage_to_str(spn_linkage_t kind) {
@@ -84,6 +82,55 @@ sp_os_lib_kind_t spn_lib_kind_to_sp_os_lib_kind(spn_linkage_t kind) {
   }
 
   SP_UNREACHABLE_RETURN(0);
+}
+
+void spn_linkage_set_add(spn_linkage_set_t* set, spn_linkage_t kind) {
+  switch (kind) {
+    case SPN_LIB_KIND_SOURCE: {
+      set->source = true;
+      break;
+    }
+    case SPN_LIB_KIND_SHARED: {
+      set->shared = true;
+      break;
+    }
+    case SPN_LIB_KIND_STATIC: {
+      set->static_lib = true;
+      break;
+    }
+  }
+}
+
+bool spn_linkage_set_has(spn_linkage_set_t set, spn_linkage_t kind) {
+  switch (kind) {
+    case SPN_LIB_KIND_SOURCE: {
+      return set.source;
+    }
+    case SPN_LIB_KIND_SHARED: {
+      return set.shared;
+    }
+    case SPN_LIB_KIND_STATIC: {
+      return set.static_lib;
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(false);
+}
+
+spn_linkage_t spn_linkage_set_default(spn_linkage_set_t set) {
+  if (set.source) {
+    return SPN_LIB_KIND_SOURCE;
+  }
+
+  if (set.static_lib) {
+    return SPN_LIB_KIND_STATIC;
+  }
+
+  if (set.shared) {
+    return SPN_LIB_KIND_SHARED;
+  }
+
+  SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
 }
 
 spn_target_kind_t spn_pkg_linkage_to_target_kind(spn_linkage_t kind) {

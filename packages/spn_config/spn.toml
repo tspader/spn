@@ -10,5 +10,6 @@ description = "config file loader"
 [deps.package]
 spn_json = "1.0.0"
 
-[lib]
+[[lib]]
+name = "spn_config"
 kinds = ["source"]

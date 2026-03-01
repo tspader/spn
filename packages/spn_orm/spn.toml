@@ -14,5 +14,6 @@ spn_log = "1.0.0"
 [deps.build]
 spn_codegen = "1.0.0"
 
-[lib]
+[[lib]]
+name = "spn_orm"
 kinds = ["source"]

@@ -4,5 +4,5 @@ version = "0.1.0"
 
 [[lib]]
 name = "mylib"
-kind = "static"
+kinds = ["static"]
 source = ["mylib.c"]

@@ -21,4 +21,4 @@ linkage = "static"
 
 [[lib]]
 name = "sqlite3"
-kind = "static"
+kinds = ["static"]

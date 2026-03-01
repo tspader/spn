@@ -6,5 +6,6 @@ commit = "236724ea2948396b4f83b68c366a169e795aa7ef"
 author = "cesanta"
 maintainer = "tspader"
 
-[lib]
+[[lib]]
+name = "mongoose"
 kinds = ["source"]

@@ -464,6 +464,7 @@ bool should_build_target(spn_target_t* target) {
       return !sp_da_empty(target->source);
     }
     case SPN_TARGET_NONE:
+      return false;
     case SPN_TARGET_OBJECT:
     case SPN_TARGET_EXE:
     case SPN_TARGET_JIT: {

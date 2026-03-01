@@ -164,8 +164,18 @@ void spn_app_write_manifest(spn_pkg_t* pkg, sp_str_t path) {
       spn_toml_append_array_table(&toml);
       spn_toml_append_str_cstr(&toml, "name", lib->name);
 
-      spn_linkage_t linkage = spn_target_kind_to_pkg_linkage(lib->kind);
-      spn_toml_append_str_cstr(&toml, "kind", spn_pkg_linkage_to_str(linkage));
+      sp_str_t kinds[3] = {0};
+      u32 kinds_len = 0;
+      if (lib->linkages.source) {
+        kinds[kinds_len++] = sp_str_lit("source");
+      }
+      if (lib->linkages.static_lib) {
+        kinds[kinds_len++] = sp_str_lit("static");
+      }
+      if (lib->linkages.shared) {
+        kinds[kinds_len++] = sp_str_lit("shared");
+      }
+      spn_toml_append_str_carr_cstr(&toml, "kinds", kinds, kinds_len);
 
       if (sp_dyn_array_size(lib->source)) {
         spn_toml_append_str_array_cstr(&toml, "source", lib->source);

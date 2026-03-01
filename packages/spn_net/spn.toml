@@ -11,5 +11,6 @@ description = "networking library"
 spn_log = "1.0.0"
 spn_json = "1.0.0"
 
-[lib]
+[[lib]]
+name = "spn_net"
 kinds = ["source"]

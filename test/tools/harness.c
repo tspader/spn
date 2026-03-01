@@ -56,14 +56,27 @@ static sp_str_t fixture_registry_manifest_from_source(toml_table_t* source, sp_s
   }
   spn_toml_end_table(&writer);
 
-  toml_table_t* lib = toml_table_table(source, "lib");
-  if (lib) {
-    toml_array_t* kinds = toml_table_array(lib, "kinds");
-    if (spn_toml_array_len(kinds)) {
-      spn_toml_begin_table_cstr(&writer, "lib");
+  toml_array_t* libs = toml_table_array(source, "lib");
+  if (spn_toml_array_len(libs)) {
+    spn_toml_begin_array_cstr(&writer, "lib");
+
+    spn_toml_arr_for(libs, it) {
+      toml_table_t* lib = toml_array_table(libs, it);
+      if (!lib) {
+        continue;
+      }
+
+      toml_array_t* kinds = toml_table_array(lib, "kinds");
+      if (!spn_toml_array_len(kinds)) {
+        continue;
+      }
+
+      spn_toml_append_array_table(&writer);
+      spn_toml_append_str_cstr(&writer, "name", spn_toml_str(lib, "name"));
       spn_toml_append_str_array_cstr(&writer, "kinds", spn_toml_arr_to_str_arr(kinds));
-      spn_toml_end_table(&writer);
     }
+
+    spn_toml_end_array(&writer);
   }
 
   return spn_toml_writer_write(&writer);

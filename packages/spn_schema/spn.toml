@@ -10,5 +10,6 @@ description = "JSON schema validation"
 [deps.package]
 spn_json = "1.0.0"
 
-[lib]
+[[lib]]
+name = "spn_schema"
 kinds = ["source"]

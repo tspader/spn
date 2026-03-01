@@ -7,5 +7,6 @@ author = "cktan"
 maintainer = "tspader"
 description = "A C99 and TOML 1.0.0 compliant TOML parser"
 
-[lib]
+[[lib]]
+name = "toml"
 kinds = ["source"]

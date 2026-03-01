@@ -8,7 +8,7 @@ maintainer = "tspader"
 
 [[lib]]
 name = "tcc"
-kind = "static"
+kinds = ["static"]
 
 [[bin]]
 name = "tcc"

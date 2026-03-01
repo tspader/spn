@@ -10,5 +10,6 @@ description = "logging library"
 [deps.package]
 spn_alloc = "1.0.0"
 
-[lib]
+[[lib]]
+name = "spn_log"
 kinds = ["source"]
