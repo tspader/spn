@@ -7,5 +7,6 @@ author = "tspader"
 maintainer = "tspader"
 description = "SIMD intrinsics"
 
-[lib]
+[[lib]]
+name = "spn_simd"
 kinds = ["source"]

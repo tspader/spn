@@ -220,7 +220,6 @@ void spn_cc_to_ps(spn_cc_t* cc, sp_ps_config_t* ps) {
 
   sp_ps_config_add_arg(ps, spn_cc_c_standard_to_switch(cc->standard));
   sp_ps_config_add_arg(ps, spn_cc_build_mode_to_switch(cc->mode));
-  sp_ps_config_add_arg(ps, spn_cc_lib_kind_to_switch(cc->linkage));
 }
 
 void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps) {
@@ -233,9 +232,12 @@ void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* 
       sp_ps_config_add_arg(ps, sp_str_lit("-shared"));
       break;
     }
+    case SPN_TARGET_EXE: {
+      sp_ps_config_add_arg(ps, spn_cc_lib_kind_to_switch(cc->linkage));
+      break;
+    }
     case SPN_TARGET_NONE:
     case SPN_TARGET_STATIC_LIB:
-    case SPN_TARGET_EXE:
     case SPN_TARGET_JIT: {
       break;
     }

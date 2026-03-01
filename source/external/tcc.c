@@ -12,6 +12,7 @@ typedef struct {
 static spn_tcc_symbol_t spn_tcc_symbol_table[] = {
   SPN_DEFINE_LIB_ENTRY(spn_get_pkg)
   SPN_DEFINE_LIB_ENTRY(spn_get_profile)
+  SPN_DEFINE_LIB_ENTRY(spn_get_linkage)
   SPN_DEFINE_LIB_ENTRY(spn_get_target)
   SPN_DEFINE_LIB_ENTRY(spn_get_dep)
   SPN_DEFINE_LIB_ENTRY(spn_get_dir)

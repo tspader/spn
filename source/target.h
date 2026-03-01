@@ -13,16 +13,26 @@ typedef enum {
   SPN_TARGET_OBJECT,
 } spn_target_kind_t;
 
+typedef struct {
+  bool source;
+  bool shared;
+  bool static_lib;
+} spn_linkage_set_t;
+
 sp_str_t spn_visibility_to_str(spn_visibility_t kind);
 spn_visibility_t spn_visibility_from_str(sp_str_t str);
 spn_linkage_t spn_lib_kind_from_str(sp_str_t str);
 spn_linkage_t spn_pkg_linkage_from_str(sp_str_t str);
 sp_str_t spn_pkg_linkage_to_str(spn_linkage_t kind);
 sp_os_lib_kind_t spn_lib_kind_to_sp_os_lib_kind(spn_linkage_t kind);
+void spn_linkage_set_add(spn_linkage_set_t* set, spn_linkage_t kind);
+bool spn_linkage_set_has(spn_linkage_set_t set, spn_linkage_t kind);
+spn_linkage_t spn_linkage_set_default(spn_linkage_set_t set);
 
 struct spn_target {
   sp_str_t name;
   spn_target_kind_t kind;
+  spn_linkage_set_t linkages;
   spn_pkg_t* pkg;
   spn_visibility_t visibility;
   sp_da(sp_str_t) source;

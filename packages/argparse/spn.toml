@@ -7,5 +7,6 @@ author = "cofyc"
 maintainer = "tspader"
 description = "A command line arguments parsing library inspired by Python's argparse module"
 
-[lib]
+[[lib]]
+name = "argparse"
 kinds = ["source"]

@@ -464,6 +464,7 @@ bool should_build_target(spn_target_t* target) {
       return !sp_da_empty(target->source);
     }
     case SPN_TARGET_NONE:
+      return false;
     case SPN_TARGET_OBJECT:
     case SPN_TARGET_EXE:
     case SPN_TARGET_JIT: {
@@ -638,7 +639,7 @@ void spn_task_init_build_graph(spn_app_t* app) {
     spn_bg_compute_dirty(&b->build.graph);
 
   b->build.executor = spn_bg_executor_new(&b->build.graph, b->build.dirty, (spn_bg_executor_config_t) {
-    .num_threads = 1,
+    .num_threads = 8,
     .enable_logging = false
   });
 

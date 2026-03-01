@@ -7,5 +7,6 @@ author = "sheredom"
 maintainer = "tspader"
 description = ""
 
-[lib]
+[[lib]]
+name = "utest"
 kinds = ["source"]

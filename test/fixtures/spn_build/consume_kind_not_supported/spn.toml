@@ -1,0 +1,13 @@
+[package]
+name = "test"
+version = "0.1.0"
+
+[deps.package]
+spum = "file://./packages/spum/spn.toml"
+
+[config.spum]
+kind = "shared"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

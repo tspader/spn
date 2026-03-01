@@ -9,4 +9,4 @@ description = "musl libc"
 
 [[lib]]
 name = "c"
-kind = "static"
+kinds = ["static"]

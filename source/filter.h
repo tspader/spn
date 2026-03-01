@@ -1,8 +1,8 @@
 #ifndef SPN_TARGET_FILTER_H
 #define SPN_TARGET_FILTER_H
 
+#include "spn.h"
 #include "sp.h"
-
 #include "target.h"
 
 typedef struct {

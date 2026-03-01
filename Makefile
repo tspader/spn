@@ -69,9 +69,11 @@ SPN_SOURCES := \
 	source/terminal.c \
 	source/external/autoconf.c \
 	source/external/cc.c \
+	source/external/cJSON.c \
 	source/external/cmake.c \
 	source/external/git.c \
 	source/external/make.c \
+	source/external/mz.c \
 	source/external/tcc.c \
 	source/external/tom.c \
 	source/sp/cli.c \
@@ -104,7 +106,7 @@ bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h: bootstrap/bin/embed boo
 
 bootstrap/bin/spn: $(SPN_SOURCES) bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h
 	@mkdir -p bootstrap/bin
-	$(CC) $(CFLAGS) -o $@ $(SPN_SOURCES) -Isource -Iinclude -Ibootstrap/include -lm bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o
+	$(CC) $(CFLAGS) -o $@ $(SPN_SOURCES) -Isource -Isource/external -Iinclude -Ibootstrap/include -lm bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o
 
 
 #############

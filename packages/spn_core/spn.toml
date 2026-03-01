@@ -7,5 +7,6 @@ author = "tspader"
 maintainer = "tspader"
 description = "base utilities"
 
-[lib]
+[[lib]]
+name = "spn_core"
 kinds = ["source"]

@@ -4,4 +4,4 @@ version = "1.0.1"
 
 [[lib]]
 name = "spum"
-kind = "source"
+kinds = ["source"]

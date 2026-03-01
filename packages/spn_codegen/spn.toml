@@ -10,5 +10,6 @@ description = "code generator"
 [deps.package]
 spn_schema = "1.0.0"
 
-[lib]
+[[lib]]
+name = "spn_codegen"
 kinds = ["source"]

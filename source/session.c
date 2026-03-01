@@ -5,6 +5,47 @@
 #include "sp/ht.h"
 #include "sp/macro.h"
 
+static spn_linkage_t spn_session_resolve_dep_linkage(spn_session_t* session, spn_pkg_t* pkg) {
+  sp_opt(spn_linkage_t) requested = SP_ZERO_INITIALIZE();
+
+  spn_dep_options_t* options = sp_ht_getp(session->pkg->config, pkg->name);
+  if (options) {
+    spn_dep_option_t* kind = sp_ht_getp(*options, sp_str_lit("kind"));
+    if (kind && kind->kind == SPN_DEP_OPTION_KIND_STR) {
+      sp_opt_set(requested, spn_lib_kind_from_str(kind->str));
+    }
+  }
+
+  if (requested.some) {
+    spn_linkage_t value = requested.value;
+    if (!spn_pkg_has_lib_kind(pkg, value)) {
+      SP_FATAL(
+        "{:fg brightcyan} does not support {:fg brightyellow}; requested from {:fg brightcyan}",
+        SP_FMT_STR(pkg->name),
+        SP_FMT_STR(spn_pkg_linkage_to_str(value)),
+        SP_FMT_STR(session->pkg->name)
+      );
+    }
+
+    return value;
+  }
+
+  if (spn_pkg_has_lib_kind(pkg, SPN_LIB_KIND_SOURCE)) {
+    return SPN_LIB_KIND_SOURCE;
+  }
+
+  if (spn_pkg_has_lib_kind(pkg, SPN_LIB_KIND_STATIC)) {
+    return SPN_LIB_KIND_STATIC;
+  }
+
+  if (spn_pkg_has_lib_kind(pkg, SPN_LIB_KIND_SHARED)) {
+    return SPN_LIB_KIND_SHARED;
+  }
+
+  SP_FATAL("{:fg brightcyan} has no consumable lib kinds", SP_FMT_STR(pkg->name));
+  SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
+}
+
 void spn_session_init(spn_session_t* session, spn_pkg_t* pkg, spn_profile_t* profile, sp_str_t dir) {
   session->pkg = pkg;
   session->profile = profile;
@@ -44,7 +85,7 @@ void spn_session_set_filter(spn_session_t* session, spn_target_filter_t filter) 
 void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit, spn_pkg_t* pkg, spn_pkg_kind_t kind, spn_semver_t version) {
   switch (kind) {
     case SPN_PACKAGE_KIND_ROOT:
-    case SPN_PACKAGE_KIND_FILE: {
+    {
       spn_pkg_unit_init(unit, (spn_pkg_unit_config_t)  {
         .ctx = {
           .name = pkg->name,
@@ -59,28 +100,26 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
       });
       break;
     }
+    case SPN_PACKAGE_KIND_FILE: {
+      spn_linkage_t linkage = spn_session_resolve_dep_linkage(session, pkg);
+
+      spn_pkg_unit_init(unit, (spn_pkg_unit_config_t)  {
+        .ctx = {
+          .name = pkg->name,
+          .package = pkg,
+          .session = session,
+          .linkage = linkage,
+          .paths = {
+            .store = sp_fs_join_path(session->paths.profile, sp_str_lit("store")),
+            .work = sp_fs_join_path(session->paths.profile, sp_format("work/{}", SP_FMT_STR(pkg->name))),
+            .source = sp_str_copy(pkg->paths.root),
+          }
+        }
+      });
+      break;
+    }
     case SPN_PACKAGE_KIND_INDEX: {
-      sp_opt(spn_linkage_t) linkage = SP_ZERO_INITIALIZE();
-
-      spn_dep_options_t* options = sp_ht_getp(pkg->config, pkg->name);
-      if (options) {
-        spn_dep_option_t* kind = sp_ht_getp(*options, sp_str_lit("kind"));
-        if (kind) {
-          sp_opt_set(linkage, spn_lib_kind_from_str(kind->str));
-        }
-      }
-
-      switch (linkage.some) {
-        case SP_OPT_SOME: {
-          break;
-        }
-        case SP_OPT_NONE: {
-          if (spn_pkg_has_lib_kind(pkg, SPN_LIB_KIND_SOURCE)) { sp_opt_set(linkage, SPN_LIB_KIND_SOURCE); break; }
-          if (spn_pkg_has_lib_kind(pkg, SPN_LIB_KIND_STATIC)) { sp_opt_set(linkage, SPN_LIB_KIND_STATIC); break; }
-          if (spn_pkg_has_lib_kind(pkg, SPN_LIB_KIND_SHARED)) { sp_opt_set(linkage, SPN_LIB_KIND_SHARED); break; }
-          sp_unreachable();
-        }
-      }
+      spn_linkage_t linkage = spn_session_resolve_dep_linkage(session, pkg);
 
       spn_pkg_metadata_t* metadata = sp_ht_getp(pkg->metadata, version);
       sp_assert(metadata);
@@ -91,7 +130,7 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
       sp_dyn_array_push(hashes, session->profile->cc.kind);
       sp_dyn_array_push(hashes, session->profile->libc);
       sp_dyn_array_push(hashes, session->profile->mode);
-      sp_dyn_array_push(hashes, linkage.value);
+      sp_dyn_array_push(hashes, linkage);
       sp_dyn_array_push(hashes, metadata->version.major);
       sp_dyn_array_push(hashes, metadata->version.minor);
       sp_dyn_array_push(hashes, metadata->version.patch);
@@ -103,10 +142,10 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
         .metadata = *metadata,
         .ctx = {
           .name = pkg->name,
-          .package = pkg,
-          .session = session,
-          .linkage = linkage.value,
-          .paths = {
+            .package = pkg,
+            .session = session,
+            .linkage = linkage,
+            .paths = {
             .work = sp_fs_join_path(pkg->paths.cache.work, build_str),
             .store = sp_fs_join_path(pkg->paths.cache.store, build_str),
             .source = pkg->paths.cache.source
@@ -134,6 +173,19 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
 
       sp_om_for(pkg->libs, it) {
         spn_target_t* target = sp_om_at(pkg->libs, it);
+        if (kind != SPN_PACKAGE_KIND_ROOT) {
+          spn_linkage_t linkage = unit->ctx.linkage;
+          if (!spn_linkage_set_has(target->linkages, linkage)) {
+            continue;
+          }
+
+          if (linkage == SPN_LIB_KIND_SOURCE) {
+            continue;
+          }
+
+          target->kind = spn_pkg_linkage_to_target_kind(linkage);
+        }
+
         if (spn_target_filter_pass(&session->filter, target)) {
           spn_pkg_unit_add_target(unit, target);
         }

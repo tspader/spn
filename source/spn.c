@@ -57,9 +57,11 @@
 #include "terminal.h"
 #include "tui.h"
 #include "event.h"
-#include "external/tom.h"
+#include "external/cJSON.h"
 #include "external/git.h"
+#include "external/mz.h"
 #include "external/tcc.h"
+#include "external/tom.h"
 #include "sp/color.h"
 #include "sp/ht.h"
 #include "sp/io.h"
@@ -413,7 +415,7 @@ sp_app_result_t spn_update(sp_app_t* sp) {
   sp_unreachable_return(SP_APP_ERR);
 }
 
-sp_app_result_t spn_deinit(sp_app_t* sp) {
+void spn_deinit(sp_app_t* sp) {
   spn_app_t* app = (spn_app_t*)sp->user_data;
 
   switch (spn.tui.mode) {
@@ -435,7 +437,7 @@ sp_app_result_t spn_deinit(sp_app_t* sp) {
     }
   }
 
-  if (!app->session.pkg) return SP_APP_QUIT;
+  if (!app->session.pkg) return;
 
   spn_pkg_unit_t* root = spn_session_find_root(&app->session);
   sp_om_for(app->session.units.packages, it) {
@@ -457,8 +459,6 @@ sp_app_result_t spn_deinit(sp_app_t* sp) {
 
   sp_io_writer_close(&root->ctx.logs.build);
   sp_io_writer_close(&root->ctx.logs.test);
-
-  return SP_APP_QUIT;
 }
 
 sp_app_config_t sp_main(s32 num_args, const c8** args) {

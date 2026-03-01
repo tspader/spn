@@ -10,5 +10,6 @@ description = "JSON parser"
 [deps.package]
 spn_simd = "1.0.0"
 
-[lib]
+[[lib]]
+name = "spn_json"
 kinds = ["source"]

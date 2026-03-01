@@ -10,5 +10,6 @@ description = "memory allocator"
 [deps.package]
 spn_core = "1.0.0"
 
-[lib]
+[[lib]]
+name = "spn_alloc"
 kinds = ["source"]
