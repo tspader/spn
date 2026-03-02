@@ -375,7 +375,52 @@ spn_err_t spn_pkg_from_manifest(spn_pkg_t* pkg, sp_str_t manifest) {
   return SPN_OK;
 }
 
-spn_err_t spn_pkg_load_deps(toml_table_t* toml, spn_pkg_t* package, spn_visibility_t visibility, sp_str_t path) {
+static bool spn_pkg_manifest_dep_is_abs(sp_str_t path) {
+  if (sp_str_starts_with(path, sp_str_lit("/"))) {
+    return true;
+  }
+
+  if (sp_str_starts_with(path, sp_str_lit("\\"))) {
+    return true;
+  }
+
+  if (path.len > 1 && path.data[1] == ':') {
+    return true;
+  }
+
+  return false;
+}
+
+static sp_str_t spn_pkg_manifest_dep_resolve_file(sp_str_t dep, sp_str_t manifest_dir) {
+  sp_str_t prefix = sp_str_lit("file://");
+  if (!sp_str_starts_with(dep, prefix)) {
+    return dep;
+  }
+
+  sp_str_t path = {
+    .data = dep.data + prefix.len,
+    .len = dep.len - prefix.len,
+  };
+
+  if (sp_str_empty(path)) {
+    return dep;
+  }
+
+  if (!spn_pkg_manifest_dep_is_abs(path)) {
+    path = sp_fs_join_path(manifest_dir, path);
+  }
+
+  path = sp_fs_normalize_path(path);
+  return sp_format("file://{}", SP_FMT_STR(path));
+}
+
+spn_err_t spn_pkg_load_deps(
+  toml_table_t* toml,
+  spn_pkg_t* package,
+  spn_visibility_t visibility,
+  sp_str_t path,
+  sp_str_t manifest_dir
+) {
   if (!toml) {
     return SPN_OK;
   }
@@ -386,6 +431,7 @@ spn_err_t spn_pkg_load_deps(toml_table_t* toml, spn_pkg_t* package, spn_visibili
   spn_toml_for(toml, n, key) {
     sp_str_t version = SP_ZERO_INITIALIZE();
     sp_try(toml_get_str_required(package, toml, key, deps_path, &version));
+    version = spn_pkg_manifest_dep_resolve_file(version, manifest_dir);
     spn_pkg_add_dep(package, sp_str_view(key), version, visibility);
   }
 
@@ -427,6 +473,7 @@ spn_err_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
 
   toml_path_t root_path = spn_pkg_toml_path(sp_str_lit(""));
   toml_path_t package_path = spn_pkg_toml_path(sp_str_lit("package"));
+  sp_str_t manifest_dir = sp_fs_parent_path(manifest_path);
 
   sp_try(toml_get_table_required(pkg, toml.manifest, "package", root_path, &toml.package));
   sp_try(toml_get_array_optional(pkg, toml.manifest, "lib", root_path, &toml.lib));
@@ -658,9 +705,9 @@ spn_err_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     sp_try(toml_get_table_optional(pkg, toml.deps, "test", deps_path, &test_deps));
     sp_try(toml_get_table_optional(pkg, toml.deps, "build", deps_path, &build_deps));
 
-    sp_try(spn_pkg_load_deps(package_deps, pkg, SPN_VISIBILITY_PUBLIC, sp_str_lit("deps.package")));
-    sp_try(spn_pkg_load_deps(test_deps, pkg, SPN_VISIBILITY_TEST, sp_str_lit("deps.test")));
-    sp_try(spn_pkg_load_deps(build_deps, pkg, SPN_VISIBILITY_BUILD, sp_str_lit("deps.build")));
+    sp_try(spn_pkg_load_deps(package_deps, pkg, SPN_VISIBILITY_PUBLIC, sp_str_lit("deps.package"), manifest_dir));
+    sp_try(spn_pkg_load_deps(test_deps, pkg, SPN_VISIBILITY_TEST, sp_str_lit("deps.test"), manifest_dir));
+    sp_try(spn_pkg_load_deps(build_deps, pkg, SPN_VISIBILITY_BUILD, sp_str_lit("deps.build"), manifest_dir));
   }
 
   if (toml.options) {

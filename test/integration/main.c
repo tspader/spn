@@ -457,6 +457,20 @@ UTEST_F(spn_build, consume_source_lib) {
   });
 }
 
+UTEST_F(spn_build, consume_multi_kind_shared) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_multi_kind_shared");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/consume_multi_kind_shared",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum.so") },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 69 } },
+    },
+  });
+}
+
 UTEST_F(spn_build, schema_missing_required_package_version) {
   tmpfs_init_named(&uf->fixture.fs, "schema_missing_required_package_version");
 
