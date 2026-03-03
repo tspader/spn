@@ -1,1 +1,0 @@
-int spum_value();

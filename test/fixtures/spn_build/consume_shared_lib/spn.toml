@@ -5,6 +5,13 @@ version = "0.1.0"
 [deps.package]
 spum = "file://./packages/spum/spn.toml"
 
+[[profile]]
+name = "debug"
+
+[[profile]]
+name = "static"
+linkage = "static"
+
 [[bin]]
 name = "main"
 source = ["main.c"]
