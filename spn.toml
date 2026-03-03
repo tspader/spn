@@ -71,9 +71,11 @@ source = [
   "source/terminal.c",
   "source/external/autoconf.c",
   "source/external/cc.c",
+  "source/external/cJSON.c",
   "source/external/cmake.c",
   "source/external/git.c",
   "source/external/make.c",
+  "source/external/mz.c",
   "source/external/tcc.c",
   "source/external/tom.c",
   "source/sp/cli.c",
@@ -94,7 +96,7 @@ source = [
   "source/task/test.c",
   "source/task/which.c",
 ]
-include = ["include", "source"]
+include = ["include", "source", "source/external"]
 
 [[test]]
 name = "cli"
