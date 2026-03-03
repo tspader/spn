@@ -297,6 +297,34 @@ UTEST_F(spn_build, index_package_without_source) {
   });
 }
 
+UTEST_F(spn_build, index_package_binary_static) {
+  tmpfs_init_named(&uf->fixture.fs, "index_package_binary_static");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/index_package_binary_static",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_LOCKED },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/bin/main") },
+    },
+  });
+}
+
+UTEST_F(spn_build, index_package_binary_shared) {
+  tmpfs_init_named(&uf->fixture.fs, "index_package_binary_shared");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/index_package_binary_shared",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_LOCKED },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/bin/main") },
+    },
+  });
+}
+
 // UTEST_F(spn_build, codeberg) {
 //   run_test(utest_result, &uf->fixture, (test_t) {
 //     .project = "test/manual/spn_build/codeberg",

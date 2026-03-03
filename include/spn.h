@@ -105,6 +105,7 @@ typedef void(*spn_build_fn_t)(spn_build_ctx_t*);
 
 spn_pkg_t*        spn_get_pkg(spn_build_ctx_t* b);
 spn_profile_t*    spn_get_profile(spn_build_ctx_t* b);
+spn_linkage_t     spn_get_linkage(spn_build_ctx_t* b);
 spn_target_t*     spn_get_target(spn_build_ctx_t* b, const c8* name);
 const spn_build_ctx_t* spn_get_dep(spn_build_ctx_t* b, const c8* name);
 const c8*         spn_get_dir(const spn_build_ctx_t* b, spn_pkg_dir_t kind);

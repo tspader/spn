@@ -61,6 +61,10 @@ spn_profile_t* spn_get_profile(spn_build_ctx_t* b) {
   return b->profile;
 }
 
+spn_linkage_t spn_get_linkage(spn_build_ctx_t* b) {
+  return b->linkage;
+}
+
 spn_target_t* spn_get_target(spn_build_ctx_t* b, const c8* name) {
   return spn_pkg_get_target(b->pkg, name);
 }
