@@ -639,7 +639,7 @@ void spn_task_init_build_graph(spn_app_t* app) {
     spn_bg_compute_dirty(&b->build.graph);
 
   b->build.executor = spn_bg_executor_new(&b->build.graph, b->build.dirty, (spn_bg_executor_config_t) {
-    .num_threads = 1,
+    .num_threads = 8,
     .enable_logging = false
   });
 

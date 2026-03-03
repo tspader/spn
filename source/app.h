@@ -125,6 +125,6 @@ spn_err_t  spn_app_resolve(spn_app_t* app);
 sp_app_result_t spn_init(sp_app_t* app);
 sp_app_result_t spn_poll(sp_app_t* app);
 sp_app_result_t spn_update(sp_app_t* app);
-sp_app_result_t spn_deinit(sp_app_t* app);
+void            spn_deinit(sp_app_t* app);
 
 #endif
