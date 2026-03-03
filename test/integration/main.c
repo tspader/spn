@@ -457,6 +457,61 @@ UTEST_F(spn_build, consume_source_lib) {
   });
 }
 
+UTEST_F(spn_build, consume_static_lib_static_profile) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_static_lib_static_profile");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/consume_static_lib_static_profile",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "static" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/static/store/lib/libspum.a") },
+      {
+        .kind = ACTION_SUBPROCESS,
+        .process = {
+          .config = {
+            .command = sp_str_lit("build/static/store/bin/main"),
+          },
+          .rc = 69,
+        },
+      },
+    },
+  });
+}
+
+UTEST_F(spn_build, consume_shared_lib_static_profile) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_shared_lib_static_profile");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/consume_shared_lib_static_profile",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "static" }, .rc = 1 } },
+    },
+  });
+}
+
+UTEST_F(spn_build, consume_source_lib_static_profile) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_source_lib_static_profile");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/consume_source_lib_static_profile",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "static" } } },
+      {
+        .kind = ACTION_SUBPROCESS,
+        .process = {
+          .config = {
+            .command = sp_str_lit("build/static/store/bin/main"),
+          },
+          .rc = 69,
+        },
+      },
+    },
+  });
+}
+
 UTEST_F(spn_build, consume_multi_kind_shared) {
   tmpfs_init_named(&uf->fixture.fs, "consume_multi_kind_shared");
 
@@ -467,6 +522,58 @@ UTEST_F(spn_build, consume_multi_kind_shared) {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum.so") },
       { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 69 } },
+    },
+  });
+}
+
+UTEST_F(spn_build, consume_multi_kind_static) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_multi_kind_static");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/consume_multi_kind_static",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum.a") },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 69 } },
+    },
+  });
+}
+
+UTEST_F(spn_build, consume_multi_kind_source) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_multi_kind_source");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/consume_multi_kind_source",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 69 } },
+    },
+  });
+}
+
+UTEST_F(spn_build, consume_multi_kind_default) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_multi_kind_default");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/consume_multi_kind_default",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 69 } },
+    },
+  });
+}
+
+UTEST_F(spn_build, consume_kind_not_supported) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_kind_not_supported");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/consume_kind_not_supported",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
     },
   });
 }
