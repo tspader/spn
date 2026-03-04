@@ -1,6 +1,8 @@
 #include "gen.h"
 
-#include "ctx.h"
+#include "ctx/ctx.h"
+#include "spn.h"
+#include "unit/build.h"
 
 spn_gen_entry_t spn_gen_entry_from_str(sp_str_t str) {
   if      (sp_str_equal_cstr(str, "")) return SPN_GEN_ALL;
@@ -159,9 +161,8 @@ sp_da(sp_str_t) spn_gen_build_entry(spn_build_ctx_t* build, spn_gen_entry_t kind
   return entries;
 }
 
-sp_str_t spn_gen_build_entries_for_all(spn_gen_entry_t kind, spn_cc_kind_t compiler) {
+sp_str_t spn_gen_build_entries_for_all(sp_da(spn_build_ctx_t*) builds, spn_gen_entry_t kind, spn_cc_kind_t compiler) {
   sp_da(sp_str_t) entries = SP_NULLPTR;
-  sp_da(spn_build_ctx_t*) builds = spn_ctx_all_build_contexts();
 
   sp_da_for(builds, it) {
     spn_build_ctx_t* build = builds[it];

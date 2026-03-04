@@ -1,16 +1,16 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
-
-#define SP_TEST_IMPLEMENTATION
 #include "test.h"
 #include "utest.h"
 #include "action.h"
 
 UTEST_MAIN()
 
-#define uf utest_fixture
+void copy_project_path(s32* utest_result, tmpfs_t* fs, sp_str_t project, sp_str_t relative);
+void setup_fixture_index_from_remote(s32* utest_result, tmpfs_t* fs, sp_str_t index, sp_str_t project);
+void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t config);
+void setup_fixture_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir);
 
-#define r(str) str "\n"
 
 
 typedef struct {
@@ -30,7 +30,7 @@ struct spn_build {
 };
 
 UTEST_INITIALIZER(spn_build_init_tmpfs_top_level) {
-  sp_str_t tmp = sp_os_get_env_as_path(sp_str_lit("SPN_TEST_TMP"));
+  sp_str_t tmp = sp_fs_normalize_path(sp_os_env_get(sp_str_lit("SPN_TEST_TMP")));
   if (sp_str_empty(tmp)) {
     tmp = sp_str_lit(".tmp");
   }
@@ -72,6 +72,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
   sp_fs_create_dir(fixture->paths.include);
   sp_fs_create_dir(fixture->paths.index);
   setup_fixture_envrc(&fixture->fs, fixture->paths.storage, fixture->paths.config);
+  setup_fixture_config(&fixture->fs, fixture->paths.config, fixture->paths.index, fixture->paths.root);
 
   sp_fs_copy(sp_fs_join_path(fixture->paths.root, sp_str_lit("include/spn.h")), fixture->paths.include);
 
@@ -262,11 +263,11 @@ UTEST_F(spn_build, index_package) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
       { .kind = ACTION_REMOVE_DIR, .rm = { .dir = "build" } },
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
     },
   });
 }
@@ -291,7 +292,7 @@ UTEST_F(spn_build, index_package_without_source) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
       { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
     },
   });
@@ -305,7 +306,7 @@ UTEST_F(spn_build, index_package_binary_static) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/bin/main") },
     },
   });
@@ -319,7 +320,7 @@ UTEST_F(spn_build, index_package_binary_shared) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/bin/main") },
     },
   });
@@ -345,7 +346,7 @@ UTEST_F(spn_build, file_package) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--force" } } },
       { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "spum" } },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
     },
   });
 }
@@ -386,7 +387,7 @@ UTEST_F(spn_build, editable_package) {
         },
       },
       { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "spum" },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "core/spum" },
     },
   });
 }
@@ -704,7 +705,7 @@ UTEST_F(spn_build, api_cross_package) {
     .project = "test/fixtures/api/cross_package",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "spum" },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "core/spum" },
       { .kind = ACTION_RUN_BIN, .bin.name = "cross_package" },
     },
   });
@@ -813,7 +814,7 @@ UTEST_F(spn_build, api_build_deps) {
     .project = "test/fixtures/api/build_deps",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "spum" },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "core/spum" },
       { .kind = ACTION_RUN_BIN, .bin.name = "build_deps" },
     },
   });

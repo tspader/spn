@@ -1,4 +1,8 @@
-#include "app.h"
+#include "app/app.h"
+#include "cli.h"
+#include "ctx/ctx.h"
+#include "session/session.h"
+#include "unit/build.h"
 
 spn_task_result_t spn_task_which(spn_app_t* app) {
   spn_cli_which_t* cmd = &spn.cli.which;

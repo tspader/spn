@@ -272,5 +272,6 @@ sp_str_t spn_toml_writer_write(spn_toml_writer_t* writer) {
   u32 depth = sp_dyn_array_size(writer->stack);
   SP_ASSERT(depth == 1);
 
-  return sp_str_builder_to_str(&writer->builder);
+  sp_mem_buffer_t buffer = sp_str_builder_into_buffer(&writer->builder);
+  return sp_mem_buffer_as_str(&buffer);
 }

@@ -1,6 +1,6 @@
 #include "cmake.h"
 
-#include "ctx.h"
+#include "unit/build.h"
 
 sp_str_t spn_cmake_gen_to_str(spn_cmake_gen_t gen) {
   switch (gen) {

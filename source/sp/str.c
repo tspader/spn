@@ -1,5 +1,45 @@
 #include "str.h"
 
+bool sp_str_line_it_valid(const sp_str_line_it_t* it) {
+  return !it->done;
+}
+
+void sp_str_line_it_next(sp_str_line_it_t* it) {
+  if (it->cursor >= it->str.len) {
+    it->done = true;
+    it->line = SP_ZERO_STRUCT(sp_str_t);
+    return;
+  }
+
+  u32 start = it->cursor;
+  while (it->cursor < it->str.len && it->str.data[it->cursor] != '\n') {
+    it->cursor++;
+  }
+
+  it->index = start;
+  it->line = sp_str_sub(it->str, start, it->cursor - start);
+
+  if (it->cursor < it->str.len) {
+    it->cursor++;
+  }
+}
+
+sp_str_line_it_t sp_str_line_it_begin(sp_str_t str) {
+  sp_str_line_it_t it = {
+    .str = str,
+    .line = SP_ZERO_STRUCT(sp_str_t),
+    .index = 0,
+    .cursor = 0,
+    .done = sp_str_empty(str),
+  };
+
+  if (!it.done) {
+    sp_str_line_it_next(&it);
+  }
+
+  return it;
+}
+
 sp_str_t sp_str_pad_ex(sp_str_t str, u32 n, c8 c) {
   if (str.len >= n) {
     return sp_str_copy(str);

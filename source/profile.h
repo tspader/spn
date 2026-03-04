@@ -4,15 +4,12 @@
 #include "sp.h"
 #include "spn.h"
 
+#include "enum/enum.h"
+
 typedef enum {
   SPN_PROFILE_BUILTIN,
   SPN_PROFILE_USER,
 } spn_profile_kind_t;
-
-spn_libc_kind_t spn_libc_kind_from_str(sp_str_t str);
-sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc);
-spn_build_mode_t spn_dep_build_mode_from_str(sp_str_t str);
-sp_str_t spn_dep_build_mode_to_str(spn_build_mode_t mode);
 
 struct spn_profile {
   sp_str_t name;

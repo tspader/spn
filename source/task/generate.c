@@ -1,19 +1,27 @@
-#include "app.h"
-#include "event.h"
+#include "app/app.h"
+#include "ctx/ctx.h"
+#include "event/event.h"
 #include "gen.h"
+#include "session/session.h"
 #include "external/cc.h"
 
 spn_task_result_t spn_task_generate(spn_app_t* app) {
   spn_cli_generate_t* command = &spn.cli.generate;
 
+  sp_da(spn_build_ctx_t*) builds = SP_NULLPTR;
+  sp_om_for(app->session.units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(app->session.units.packages, it);
+    sp_da_push(builds, &unit->ctx);
+  }
+
   spn_generator_t gen = {
     .kind = spn_gen_kind_from_str(command->generator),
     .compiler = spn_cc_kind_from_str(command->compiler)
   };
-  gen.include = spn_gen_build_entries_for_all(SPN_GEN_INCLUDE, gen.compiler);
-  gen.lib_include = spn_gen_build_entries_for_all(SPN_GEN_LIB_INCLUDE, gen.compiler);
-  gen.libs = spn_gen_build_entries_for_all(SPN_GEN_LIBS, gen.compiler);
-  gen.rpath = spn_gen_build_entries_for_all(SPN_GEN_RPATH, gen.compiler);
+  gen.include = spn_gen_build_entries_for_all(builds, SPN_GEN_INCLUDE, gen.compiler);
+  gen.lib_include = spn_gen_build_entries_for_all(builds, SPN_GEN_LIB_INCLUDE, gen.compiler);
+  gen.libs = spn_gen_build_entries_for_all(builds, SPN_GEN_LIBS, gen.compiler);
+  gen.rpath = spn_gen_build_entries_for_all(builds, SPN_GEN_RPATH, gen.compiler);
 
   spn_gen_format_context_t fmt = {
     .kind = SPN_GEN_SYSTEM_LIBS,

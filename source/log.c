@@ -1,6 +1,7 @@
 #include "log.h"
 
-#include "ctx.h"
+#include "ctx/ctx.h"
+#include "event/types.h"
 
 #include "sp/io.h"
 
@@ -20,6 +21,26 @@ spn_log_level_t spn_log_level_from_str(sp_str_t str) {
 
   SP_FATAL("Unknown SPN_LOG_LEVEL {:fg brightyellow}; options are [ERROR, WARN, INFO, DEBUG]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_LOG_LEVEL_INFO);
+}
+
+spn_log_level_t spn_trace_event_to_level(s32 kind) {
+  switch (kind) {
+    case SPN_EVENT_TRACE_DEBUG: return SPN_LOG_LEVEL_DEBUG;
+    case SPN_EVENT_TRACE_INFO:  return SPN_LOG_LEVEL_INFO;
+    case SPN_EVENT_TRACE_WARN:  return SPN_LOG_LEVEL_WARN;
+    case SPN_EVENT_TRACE_ERROR: return SPN_LOG_LEVEL_ERROR;
+    default: return SPN_LOG_LEVEL_INFO;
+  }
+}
+
+sp_str_t spn_log_level_to_str(spn_log_level_t level) {
+  switch (level) {
+    case SPN_LOG_LEVEL_ERROR: return sp_str_lit("error");
+    case SPN_LOG_LEVEL_WARN:  return sp_str_lit("warn ");
+    case SPN_LOG_LEVEL_INFO:  return sp_str_lit("info ");
+    case SPN_LOG_LEVEL_DEBUG: return sp_str_lit("debug");
+  }
+  return sp_str_lit("?????");
 }
 
 void spn_log_info(const c8* fmt, ...) {
@@ -66,15 +87,6 @@ void spn_log_debug(const c8* fmt, ...) {
     return;
   }
 
-  va_list args;
-  va_start(args, fmt);
-  sp_str_t str = sp_format_v(SP_CSTR(fmt), args);
-  va_end(args);
-
-  sp_io_write_line(spn_ctx_get_log_err(), str);
-}
-
-void spn_ctx_tui(const c8* fmt, ...) {
   va_list args;
   va_start(args, fmt);
   sp_str_t str = sp_format_v(SP_CSTR(fmt), args);

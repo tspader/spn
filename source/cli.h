@@ -17,7 +17,8 @@
   X(SPN_CLI_WHICH, "which") \
   X(SPN_CLI_LS, "ls") \
   X(SPN_CLI_MANIFEST, "manifest") \
-  X(SPN_CLI_TOOL, "tool")
+  X(SPN_CLI_TOOL, "tool") \
+  X(SPN_CLI_PUBLISH, "publish")
 
 typedef enum {
   SPN_CLI_COMMAND(SP_X_NAMED_ENUM_DEFINE)
@@ -112,6 +113,12 @@ typedef struct {
 } spn_cli_graph_t;
 
 typedef struct {
+  sp_str_t index;
+  sp_str_t source_url;
+  sp_str_t source_rev;
+} spn_cli_publish_t;
+
+typedef struct {
   sp_str_t profile;
 } spn_cli_clean_t;
 
@@ -139,6 +146,7 @@ struct spn_cli {
   spn_cli_copy_t copy;
   spn_cli_graph_t graph;
   spn_cli_clean_t clean;
+  spn_cli_publish_t publish;
 };
 
 sp_app_result_t spn_cli_clean(spn_cli_t* cli);
@@ -158,6 +166,7 @@ sp_app_result_t spn_cli_ls(spn_cli_t* cli);
 sp_app_result_t spn_cli_which(spn_cli_t* cli);
 sp_app_result_t spn_cli_manifest(spn_cli_t* cli);
 sp_app_result_t spn_cli_graph(spn_cli_t* cli);
+sp_app_result_t spn_cli_publish(spn_cli_t* cli);
 sp_app_result_t spn_cli_root(spn_cli_t* cli);
 sp_app_result_t spn_cli_help(spn_cli_parser_t* p);
 spn_cli_cmd_t spn_cli_command_from_str(sp_str_t str);

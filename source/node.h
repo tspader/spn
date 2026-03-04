@@ -15,7 +15,7 @@ struct spn_node_ctx_t {
   void* user_data;
 };
 
-typedef struct spn_user_node_t {
+struct spn_user_node_t {
   spn_pkg_unit_t* ctx;
   sp_str_t tag;
   spn_node_fn_t fn;
@@ -24,27 +24,6 @@ typedef struct spn_user_node_t {
   sp_da(sp_str_t) outputs;
   sp_da(spn_node_t*) deps;
   spn_bg_id_t id;
-} spn_user_node_t;
-
-typedef struct {
-  spn_bg_id_t build;
-  spn_bg_id_t bin;
-} spn_target_nodes_t;
-
-typedef struct {
-  spn_bg_id_t manifest;
-  spn_bg_id_t script;
-  spn_bg_id_t package;
-  spn_bg_id_t main;
-  spn_bg_id_t exit;
-  struct {
-    spn_bg_id_t package;
-    spn_bg_id_t main;
-    spn_bg_id_t exit;
-  } stamp;
-  sp_da(spn_bg_id_t) user;
-} spn_pkg_nodes_t;
-
-spn_user_node_t* spn_find_user_node(spn_node_t* node);
+};
 
 #endif
