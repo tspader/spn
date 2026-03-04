@@ -1,11 +1,12 @@
 [package]
+namespace = "spader"
 name = "spn"
-version = "0.1.0"
+version = "0.2.0"
 repo = "tspader/spn"
 
 [deps.package]
-spcc = "1.0.0"
-sp = "1.6.6"
+"spader/spcc" = "1.0.0"
+"spader/sp" = "1.6.8"
 toml = "1.2.1"
 
 [deps.test]
@@ -46,27 +47,37 @@ name = "spn"
 source = [
   "source/spn.c",
   "source/api.c",
-  "source/app.c",
-  "source/event.c",
-  "source/unit.c",
+  "source/app/app.c",
+  "source/cache.c",
+  "source/event/event.c",
+  "source/unit/build.c",
+  "source/unit/node.c",
+  "source/unit/package.c",
   "source/signal.c",
   "source/graph.c",
   "source/tui.c",
-  "source/ctx.c",
-  "source/session.c",
+  "source/ctx/ctx.c",
+  "source/session/session.c",
   "source/intern.c",
   "source/log.c",
-  "source/option.c",
-  "source/index.c",
-  "source/pkg.c",
-  "source/lock.c",
+  "source/enum/enum.c",
+  "source/index/index.c",
+  "source/index/cache.c",
+  "source/index/json.c",
+  "source/pkg/load.c",
+  "source/pkg/mutate.c",
+  "source/pkg/pkg.c",
+  "source/pkg/id.c",
+  "source/lock/lock.c",
   "source/profile.c",
   "source/cli.c",
+  "source/cli/publish.c",
   "source/gen.c",
-  "source/target.c",
   "source/filter.c",
-  "source/resolve.c",
-  "source/semver.c",
+  "source/resolve/resolve.c",
+  "source/semver/compare.c",
+  "source/semver/convert.c",
+  "source/semver/parser.c",
   "source/spinner.c",
   "source/terminal.c",
   "source/external/autoconf.c",
@@ -75,6 +86,8 @@ source = [
   "source/external/cmake.c",
   "source/external/git.c",
   "source/external/make.c",
+  "source/git/cache.c",
+  "source/git/key.c",
   "source/external/mz.c",
   "source/external/tcc.c",
   "source/external/tom.c",
@@ -86,6 +99,8 @@ source = [
   "source/sp/os.c",
   "source/sp/ps.c",
   "source/sp/io.c",
+  "source/target/target.c",
+  "source/target/mutate.c",
   "source/task/build.c",
   "source/task/configure.c",
   "source/task/graph.c",
@@ -111,6 +126,11 @@ include = ["include", "source", "test/tools"]
 [[test]]
 name = "om"
 source = ["test/core/ordered_map.c"]
+include = ["include", "source", "test/tools"]
+
+[[test]]
+name = "index"
+source = ["source/index.c", "source/semver.c", "source/external/cJSON.c", "source/external/mz.c", "source/external/git.c", "test/core/index/main.c", "test/core/index/harness.c", "test/core/index/query.c", "test/core/index/sync.c", "test/tools/test.c"]
 include = ["include", "source", "test/tools"]
 
 [[test]]

@@ -1,6 +1,16 @@
-#include "app.h"
+#include "app/app.h"
 
-#include "unit.h"
+#include "ctx/ctx.h"
+#include "event/event.h"
+#include "log.h"
+#include "node.h"
+#include "pkg/id.h"
+#include "pkg/mutate.h"
+#include "pkg/pkg.h"
+#include "ctx/types.h"
+#include "session/session.h"
+#include "unit/build.h"
+#include "unit/package.h"
 
 spn_node_t* spn_add_node(spn_build_ctx_t* c, const c8* tag) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)c;
@@ -66,12 +76,36 @@ spn_linkage_t spn_get_linkage(spn_build_ctx_t* b) {
 }
 
 spn_target_t* spn_get_target(spn_build_ctx_t* b, const c8* name) {
-  return spn_pkg_get_target(b->pkg, name);
+  spn_trace_debug(spn.events, b->pkg, &b->logs, "spn_get_target(\"{}\")", SP_FMT_CSTR(name));
+  spn_target_t* result = spn_pkg_get_target(b->pkg, name);
+  if (!result) {
+    spn_trace_error(spn.events, b->pkg, &b->logs, "spn_get_target: target \"{}\" not found", SP_FMT_CSTR(name));
+  }
+  return result;
 }
 
 const spn_build_ctx_t* spn_get_dep(spn_build_ctx_t* b, const c8* name) {
-  spn_pkg_unit_t* unit = sp_om_get(b->session->units.packages, spn_intern_cstr(name));
-  return &unit->ctx;
+  spn_trace_debug(spn.events, b->pkg, &b->logs, "spn_get_dep(\"{}\")", SP_FMT_CSTR(name));
+  sp_str_t key = spn_intern_cstr(name);
+
+  if (sp_om_has(b->session->units.packages, key)) {
+    spn_pkg_unit_t* unit = sp_om_get(b->session->units.packages, key);
+    return &unit->ctx;
+  }
+
+  sp_ht_for(b->pkg->deps, it) {
+    sp_str_t k = *sp_ht_it_getkp(b->pkg->deps, it);
+    if (sp_str_equal(spn_qualified_name_to_pkg_id(k).name, key)) {
+      if (sp_om_has(b->session->units.packages, k)) {
+        spn_pkg_unit_t* unit = sp_om_get(b->session->units.packages, k);
+        spn_trace_debug(spn.events, b->pkg, &b->logs, "spn_get_dep: found \"{}\" via {}", SP_FMT_CSTR(name), SP_FMT_STR(k));
+        return &unit->ctx;
+      }
+    }
+  }
+
+  spn_trace_error(spn.events, b->pkg, &b->logs, "spn_get_dep: dep \"{}\" not found", SP_FMT_CSTR(name));
+  return SP_NULLPTR;
 }
 
 const c8* spn_get_dir(const spn_build_ctx_t* b, spn_pkg_dir_t kind) {
@@ -79,6 +113,7 @@ const c8* spn_get_dir(const spn_build_ctx_t* b, spn_pkg_dir_t kind) {
 }
 
 const c8* spn_get_subdir(const spn_build_ctx_t* b, spn_pkg_dir_t kind, const c8* path) {
+  spn_trace_debug(spn.events, b->pkg, &((spn_build_ctx_t*)b)->logs, "spn_get_subdir(kind={}, \"{}\")", SP_FMT_S32(kind), SP_FMT_CSTR(path));
   sp_str_t result = sp_fs_join_path(spn_build_ctx_get_dir(b, kind), sp_str_view(path));
   return sp_str_to_cstr(result);
 }
@@ -105,12 +140,13 @@ spn_target_t* spn_add_lib(spn_config_t* c, const c8* name, spn_linkage_t kind) {
 }
 
 void spn_log(spn_build_ctx_t* ctx, const c8* message) {
-  spn_build_ctx_log(&ctx->logs, sp_str_view(message));
+  spn_trace_info(spn.events, ctx->pkg, &ctx->logs, "{}", SP_FMT_CSTR(message));
 }
 
 void spn_copy(spn_build_ctx_t* build, spn_pkg_dir_t from_kind, const c8* from_path, spn_pkg_dir_t to_kind, const c8* to_path) {
   sp_str_t from = sp_fs_join_path(spn_build_ctx_get_dir(build, from_kind), sp_str_view(from_path));
   sp_str_t to = sp_fs_join_path(spn_build_ctx_get_dir(build, to_kind), sp_str_view(to_path));
+  spn_trace_debug(spn.events, build->pkg, &build->logs, "spn_copy({} -> {})", SP_FMT_STR(from), SP_FMT_STR(to));
   sp_fs_copy(from, to);
 }
 

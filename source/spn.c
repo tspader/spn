@@ -2,6 +2,7 @@
 #define SP_MAIN
 #define SP_IMPLEMENTATION
 #include "sp.h"
+#include "sp/elf.h"
 
 #define TOML_IMPLEMENTATION
 #include "toml.h"
@@ -33,35 +34,39 @@
 #endif
 
 // SPN
-#include "app.h"
+#include "app/app.h"
 #include "cli.h"
-#include "ctx.h"
+#include "enum/enum.h"
+#include "ctx/ctx.h"
 #include "filter.h"
 #include "gen.h"
 #include "intern.h"
-#include "lock.h"
-#include "option.h"
-#include "index.h"
-#include "resolve.h"
+#include "lock/lock.h"
+#include "index/index.h"
+#include "resolve/resolve.h"
 #include "signal.spn.h"
 #include "spn.h"
 #include "log.h"
-#include "pkg.h"
+#include "pkg/load.h"
+#include "pkg/mutate.h"
+#include "pkg/pkg.h"
 #include "profile.h"
-#include "semver.h"
 #include "graph.h"
 #include "node.h"
-#include "session.h"
+#include "session/session.h"
 #include "ordered_map.h"
 #include "spinner.h"
 #include "terminal.h"
 #include "tui.h"
-#include "event.h"
+#include "event/event.h"
 #include "external/cJSON.h"
 #include "external/git.h"
+#include "git/key.h"
 #include "external/mz.h"
 #include "external/tcc.h"
 #include "external/tom.h"
+#include "semver/types.h"
+#include "semver/convert.h"
 #include "sp/color.h"
 #include "sp/ht.h"
 #include "sp/io.h"
@@ -70,6 +75,7 @@
 #include "sp/ps.h"
 #include "sp/str.h"
 #include "task/task.h"
+#include "unit/build.h"
 
 #include "spn.embed.h"
 
@@ -130,8 +136,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       spn_event_buffer_push_ex(spn.events, SP_NULLPTR, SP_NULLPTR, (spn_build_event_t) {
         .kind = SPN_EVENT_ERR,
         .err = {
-          .code = SPN_ERROR,
-          .kind = SPN_ERR_KIND_MANIFEST_PARSE,
+          .kind = SPN_ERR_MANIFEST_PARSE,
           .manifest_parse = {
             .path = spn.paths.config,
           },
@@ -145,16 +150,24 @@ sp_app_result_t spn_init(sp_app_t* sp) {
         spn.paths.spn = sp_str_view(dir.u.s);
       }
 
-      toml_array_t* registries = toml_table_array(toml, "index");
-      if (registries) {
-        spn_toml_arr_for(registries, n) {
-          toml_table_t* it = toml_array_table(registries, n);
-          spn_index_t registry = {
-            .location = spn_toml_str(it, "location"),
-            .kind = SPN_INDEX_WORKSPACE
-          };
-
-          sp_dyn_array_push(spn.indexes, registry);
+      toml_array_t* indexes = toml_table_array(toml, "index");
+      if (indexes) {
+        spn_toml_arr_for(indexes, n) {
+          toml_table_t* it = toml_array_table(indexes, n);
+          spn_index_t index = SP_ZERO_INITIALIZE();
+          spn_err_union_t idx_err = spn_index_load(it, sp_str_lit("index"), n, &index);
+          if (idx_err.kind == SPN_ERR_MANIFEST_FIELD) {
+            spn_log_error("invalid index in config: {:fg brightcyan} expected {:fg brightyellow}, got {:fg brightred}",
+              SP_FMT_STR(idx_err.manifest_field.path),
+              SP_FMT_STR(idx_err.manifest_field.expected),
+              SP_FMT_STR(idx_err.manifest_field.actual)
+            );
+            return SP_APP_ERR;
+          } else if (idx_err.kind) {
+            spn_log_error("failed to load index from config");
+            return SP_APP_ERR;
+          }
+          sp_da_push(spn.indexes, index);
         }
       }
     }
@@ -164,25 +177,51 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     spn.paths.spn = sp_fs_join_path(spn.paths.storage, sp_str_lit("spn"));
   }
 
-  spn.paths.index = sp_fs_join_path(spn.paths.spn, sp_str_lit("packages"));
   spn.paths.include = sp_fs_join_path(spn.paths.spn, sp_str_lit("include"));
 
   if (!sp_fs_exists(spn.paths.spn)) {
     sp_str_t url = SP_LIT("https://github.com/tspader/spn.git");
     SP_LOG(
-      "Cloning index from {:fg brightcyan} to {:fg brightcyan}",
+      "Cloning runtime from {:fg brightcyan} to {:fg brightcyan}",
       SP_FMT_STR(url),
       SP_FMT_STR(spn.paths.spn)
     );
 
-    SP_ASSERT(!spn_git_clone(url, spn.paths.spn));
+    sp_assert(!spn_git_clone(url, spn.paths.spn));
   }
 
-  // Add the builtin index
-  sp_dyn_array_push(spn.indexes, ((spn_index_t) {
-    .location = spn.paths.index,
-    .kind = SPN_INDEX_BUILTIN
-  }));
+  sp_str_t index_dir = sp_fs_join_path(spn.paths.storage, sp_str_lit("index"));
+  sp_fs_create_dir(index_dir);
+
+  bool has_core_index = false;
+  sp_da_for(spn.indexes, i) {
+    if (sp_str_equal(spn.indexes[i].name, sp_str_lit("core"))) {
+      has_core_index = true;
+      break;
+    }
+  }
+
+  if (!has_core_index) {
+    sp_da_push(spn.indexes, ((spn_index_t) {
+      .name = sp_str_lit("core"),
+      .url = sp_str_lit("https://github.com/tspader/spandex.git"),
+      .protocol = SPN_INDEX_PROTOCOL_GIT,
+      .kind = SPN_INDEX_BUILTIN,
+    }));
+  }
+
+  sp_da_for(spn.indexes, i) {
+    if (spn.indexes[i].protocol == SPN_INDEX_PROTOCOL_FILESYSTEM) {
+      spn.indexes[i].location = spn.indexes[i].url;
+    } else {
+      spn.indexes[i].location = sp_fs_join_path(index_dir, spn_git_db_key(spn.indexes[i].url));
+    }
+  }
+
+  sp_da_for(spn.indexes, idx) {
+    spn_index_init(&spn.indexes[idx]);
+    spn_index_sync(&spn.indexes[idx]);
+  }
 
   // Find the cache directory after the config has been fully loaded
   spn.paths.runtime = sp_fs_join_path(spn.paths.storage, SP_LIT("runtime"));
@@ -272,7 +311,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.paths.manifest = sp_fs_join_path(spn.paths.project, sp_str_lit("spn.toml"));
 
   app = SP_ZERO_STRUCT(spn_app_t);
-  spn_app_init(&app);
   if (spn_app_load(&app, spn.paths.manifest)) {
     spn_poll(sp);
     SP_EXIT_FAILURE();
@@ -288,37 +326,50 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 }
 
 sp_app_result_t spn_poll(sp_app_t* sp) {
-  spn_app_t* app = (spn_app_t*)sp->user_data;
   sp_da(spn_build_event_t) events = spn_event_buffer_drain(spn.events);
 
   sp_da_for(events, it) {
     spn_build_event_t* event = &events[it];
 
+    // map raw thread IDs to short sequential IDs
+    {
+      static sp_ht(u64, u32) thread_map = SP_NULLPTR;
+      static u32 next_thread_id = 0;
+      if (!sp_ht_key_exists(thread_map, event->thread_id)) {
+        sp_ht_insert(thread_map, event->thread_id, next_thread_id++);
+      }
+      event->thread_id = *sp_ht_getp(thread_map, event->thread_id);
+    }
+
     // process anything we need to do special per-event
     switch (event->kind) {
       case SPN_EVENT_TARGET_BUILD: {
-        spn_build_ctx_log(event->io, event->target.build.args);
+        spn_build_ctx_log_ex(event->io, SPN_LOG_LEVEL_INFO, event->thread_id, SP_ZERO_STRUCT(sp_str_t), event->target.build.args);
         break;
       }
       case SPN_EVENT_RESOLVE: {
-        sp_str_ht_for(app->resolver->resolved, it) {
-          sp_str_t name = *sp_str_ht_it_getkp(app->resolver->resolved, it);
-          spn_resolved_pkg_t resolved = *sp_str_ht_it_getp(app->resolver->resolved, it);
-          spn_build_ctx_log(event->io, sp_format(
-            "Resolved {} to version {}",
-            SP_FMT_STR(resolved.pkg->name),
-            SP_FMT_STR(spn_semver_to_str(resolved.version))
-          ));
-        }
         break;
       }
       case SPN_EVENT_ADD_TARGET: {
         spn.tui.info.max_name = sp_max(spn.tui.info.max_name, event->target.add.name.len);
         break;
       }
+      case SPN_EVENT_TRACE_DEBUG:
+      case SPN_EVENT_TRACE_INFO:
+      case SPN_EVENT_TRACE_WARN:
+      case SPN_EVENT_TRACE_ERROR: {
+        if (event->io) {
+          sp_str_t file = sp_str_strip_left(event->trace.file, spn.paths.project);
+          file = sp_str_strip_left(file, sp_str_lit("/"));
+          sp_str_t source = sp_format("{}:{}", SP_FMT_STR(file), SP_FMT_U32(event->trace.line));
+          spn_build_ctx_log_ex(event->io, spn_trace_event_to_level(event->kind), event->thread_id, source, event->trace.message);
+        }
+        break;
+      }
       default: {
         if (event->io) {
-          spn_build_ctx_log(event->io, sp_format("event: {}", SP_FMT_STR(spn_build_event_kind_to_str(event->kind))));
+          spn_build_ctx_log_ex(event->io, SPN_LOG_LEVEL_INFO, event->thread_id, SP_ZERO_STRUCT(sp_str_t),
+            sp_format("event: {}", SP_FMT_STR(spn_build_event_kind_to_str(event->kind))));
         }
         break;
       }
@@ -334,61 +385,55 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
 }
 
 sp_app_result_t spn_update(sp_app_t* sp) {
-  spn_app_t* app = (spn_app_t*)sp->user_data;
-
   if (sp_atomic_s32_get(&sp->shutdown)) {
     return SP_APP_QUIT;
   }
 
-  spn_task_executor_t* task = &app->tasks;
+  spn_task_executor_t* task = &app.tasks;
   s32 kind = task->data[task->index];
   spn_task_result_t result = SPN_TASK_DONE;
-
-  // if (!task->initted) {
-  //   spn_event_buffer_push_ex(spn.events, app->ev, spn_build_event_t event)
-  // }
 
   switch (kind) {
     case SPN_TASK_KIND_NONE: {
       return SP_APP_QUIT;
     }
     case SPN_TASK_KIND_RESOLVE: {
-      result = spn_task_resolve(app);
+      result = spn_task_resolve(&app);
       break;
     }
     case SPN_TASK_KIND_SYNC: {
-      if (!task->initted) spn_task_sync_init(app);
-      result = spn_task_sync_update(app);
+      if (!task->initted) spn_task_sync_init(&app);
+      result = spn_task_sync_update(&app);
       break;
     }
     case SPN_TASK_KIND_CONFIGURE: {
-      if (!task->initted) spn_task_init_configure_graph(app);
-      result = spn_task_update_configure_graph(app);
+      if (!task->initted) spn_task_init_configure_graph(&app);
+      result = spn_task_update_configure_graph(&app);
       break;
     }
     case SPN_TASK_KIND_PREPARE_BUILD_GRAPH: {
-      result = spn_task_prepare_build_graph(app);
+      result = spn_task_prepare_build_graph(&app);
       break;
     }
     case SPN_TASK_KIND_RUN_BUILD_GRAPH: {
-      if (!task->initted) spn_task_init_build_graph(app);
-      result = spn_task_run_build_graph(app);
+      if (!task->initted) spn_task_init_build_graph(&app);
+      result = spn_task_run_build_graph(&app);
       break;
     }
     case SPN_TASK_KIND_RENDER_BUILD_GRAPH: {
-      result = spn_task_graph(app);
+      result = spn_task_graph(&app);
       break;
     }
     case SPN_TASK_KIND_RUN: {
-      result = spn_task_run_tests(app);
+      result = spn_task_run_tests(&app);
       break;
     }
     case SPN_TASK_KIND_GENERATE: {
-      result = spn_task_generate(app);
+      result = spn_task_generate(&app);
       break;
     }
     case SPN_TASK_KIND_WHICH: {
-      result = spn_task_which(app);
+      result = spn_task_which(&app);
       break;
     }
     case SPN_TASK_KIND_COUNT: {
@@ -416,8 +461,6 @@ sp_app_result_t spn_update(sp_app_t* sp) {
 }
 
 void spn_deinit(sp_app_t* sp) {
-  spn_app_t* app = (spn_app_t*)sp->user_data;
-
   switch (spn.tui.mode) {
     case SPN_OUTPUT_MODE_INTERACTIVE: {
       // sp_tui_restore(&spn.tui);
@@ -437,11 +480,11 @@ void spn_deinit(sp_app_t* sp) {
     }
   }
 
-  if (!app->session.pkg) return;
+  if (!app.session.pkg) return;
 
-  spn_pkg_unit_t* root = spn_session_find_root(&app->session);
-  sp_om_for(app->session.units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(app->session.units.packages, it);
+  spn_pkg_unit_t* root = spn_session_find_root(&app.session);
+  sp_om_for(app.session.units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(app.session.units.packages, it);
 
     sp_fs_create_sym_link(
       unit->ctx.paths.logs.build,

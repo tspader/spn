@@ -1,9 +1,11 @@
 
-#include "ctx.h"
+#include "ctx/ctx.h"
 #include "gen.h"
 #include "intern.h"
 #include "log.h"
 #include "profile.h"
+#include "target/target.h"
+#include "unit/build.h"
 #include "external/cc.h"
 #include "sp/io.h"
 #include "sp/os.h"
@@ -26,7 +28,8 @@ void spn_cc_add_include(spn_cc_t* cc, sp_str_t dir) {
 }
 
 void spn_cc_add_relative_include(spn_cc_t* cc, sp_str_t dir) {
-  sp_da_push(cc->include, sp_fs_join_path(spn_app_project_dir(), dir));
+  sp_broken();
+  //sp_da_push(cc->include, sp_fs_join_path(spn_app_project_dir(), dir));
 }
 
 void spn_cc_add_define(spn_cc_t* cc, sp_str_t var) {
@@ -39,7 +42,8 @@ void spn_cc_add_pkg(spn_cc_t* cc, spn_pkg_t* pkg) {
 }
 
 void spn_cc_target_add_relative_source(spn_cc_target_t* target, sp_str_t file_path) {
-  sp_da_push(target->source, sp_fs_join_path(spn_app_project_dir(), file_path));
+  sp_broken();
+  //sp_da_push(target->source, sp_fs_join_path(spn_app_project_dir(), file_path));
 }
 
 void spn_cc_target_add_absolute_source(spn_cc_target_t* target, sp_str_t path) {
@@ -47,7 +51,8 @@ void spn_cc_target_add_absolute_source(spn_cc_target_t* target, sp_str_t path) {
 }
 
 void spn_cc_target_add_relative_include(spn_cc_target_t* target, sp_str_t dir) {
-  spn_cc_target_add_absolute_include(target, sp_fs_join_path(spn_app_project_dir(), dir));
+  sp_broken();
+  //spn_cc_target_add_absolute_include(target, sp_fs_join_path(spn_app_project_dir(), dir));
 }
 
 void spn_cc_target_add_absolute_include(spn_cc_target_t* target, sp_str_t dir) {
@@ -295,37 +300,4 @@ void spn_cc_target_to_tcc(spn_cc_t* cc, spn_cc_target_t* target, spn_tcc_t* tcc)
   }
 
   (void)result;
-}
-
-spn_cc_kind_t spn_cc_kind_from_str(sp_str_t str) {
-  if      (sp_str_equal_cstr(str, "")) return SPN_CC_NONE;
-  else if (sp_str_equal_cstr(str, "tcc")) return SPN_CC_TCC;
-  else if (sp_str_equal_cstr(str, "gcc")) return SPN_CC_GCC;
-  else if (sp_str_equal_cstr(str, "clang")) return SPN_CC_CLANG;
-  else if (sp_str_equal_cstr(str, "musl-gcc")) return SPN_CC_MUSL_GCC;
-  else if (sp_str_equal_cstr(str, "zcc")) return SPN_CC_ZIG;
-  else if (sp_str_equal_cstr(str, "zig cc")) return SPN_CC_ZIG;
-  else if (sp_str_equal_cstr(str, "cosmocc")) return SPN_CC_COSMOCC;
-
-  spn_log_warn("Unknown compiler {:fg brightyellow}; we'll assume a gcc command line when generating switches", SP_FMT_STR(str));
-  return SPN_CC_CUSTOM;
-}
-
-sp_str_t spn_c_standard_to_str(spn_c_standard_t standard) {
-  switch (standard) {
-    case SPN_C11: return sp_str_lit("c11");
-    case SPN_C99: return sp_str_lit("c99");
-    case SPN_C89: return sp_str_lit("c89");
-  }
-
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-spn_c_standard_t spn_c_standard_from_str(sp_str_t str) {
-  if      (sp_str_equal_cstr(str, "c89")) return SPN_C89;
-  else if (sp_str_equal_cstr(str, "c99")) return SPN_C99;
-  else if (sp_str_equal_cstr(str, "c11")) return SPN_C11;
-
-  SP_FATAL("Unknown C standard {:fg brightyellow}; options are [c89, c99, c11]", SP_FMT_STR(str));
-  SP_UNREACHABLE_RETURN(SPN_C99);
 }

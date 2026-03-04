@@ -3,22 +3,33 @@
 
 #include "sp.h"
 
-#ifndef SPN_ERR_T_DEFINED
-#define SPN_ERR_T_DEFINED
+#define spn_try(expr) sp_try(expr)
+
+#define spn_try_union(expr) do { \
+  spn_err_union_t _spn_result = (expr); \
+  if (_spn_result.kind) return _spn_result; \
+} while (0)
+
+#define spn_try_as_union(expr) do { \
+  spn_err_t _spn_result = (expr); \
+  if (_spn_result) return (spn_err_union_t) { .kind = _spn_result }; \
+} while (0)
+
+#define spn_result(status) (spn_err_union_t) { .kind = (status) }
+
 typedef enum {
   SPN_OK,
   SPN_ERROR,
+  SPN_ERR_MANIFEST_PARSE,
+  SPN_ERR_MANIFEST_FIELD,
+  SPN_ERR_NO_MANIFEST,
+  SPN_ERR_NOT_GIT_REPO,
+  SPN_ERR_GIT,
+  SPN_ERR_VERSION_EXISTS,
 } spn_err_t;
 
-typedef enum {
-  SPN_ERR_KIND_NONE,
-  SPN_ERR_KIND_MANIFEST_PARSE,
-  SPN_ERR_KIND_MANIFEST_FIELD,
-} spn_err_kind_t;
-
 typedef struct {
-  spn_err_t code;
-  spn_err_kind_t kind;
+  spn_err_t kind;
   union {
     struct {
       sp_str_t path;
@@ -28,8 +39,20 @@ typedef struct {
       sp_str_t expected;
       sp_str_t actual;
     } manifest_field;
+    struct {
+      sp_str_t path;
+    } no_manifest;
+    struct {
+      sp_str_t path;
+    } not_git_repo;
+    struct {
+      sp_str_t command;
+    } git;
+    struct {
+      sp_str_t name;
+      sp_str_t version;
+    } version_exists;
   };
 } spn_err_union_t;
-#endif
 
 #endif

@@ -3,9 +3,24 @@
 
 #include "sp.h"
 
+typedef struct {
+  sp_str_t str;
+  sp_str_t line;
+  u32 index;
+  u32 cursor;
+  bool done;
+} sp_str_line_it_t;
+
 sp_str_t sp_str_pad_ex(sp_str_t str, u32 n, c8 c);
 sp_str_t sp_str_repeat(c8 c, u32 len);
 sp_str_t sp_str_map_kernel_colorize(sp_str_map_context_t* context);
 sp_str_t sp_format_color_id_to_ansi_fg(sp_str_t id);
+
+bool             sp_str_line_it_valid(const sp_str_line_it_t* it);
+void             sp_str_line_it_next(sp_str_line_it_t* it);
+sp_str_line_it_t sp_str_line_it_begin(sp_str_t str);
+
+#define sp_str_for_line(str, it) \
+  for (sp_str_line_it_t it = sp_str_line_it_begin((str)); sp_str_line_it_valid(&(it)); sp_str_line_it_next(&(it)))
 
 #endif

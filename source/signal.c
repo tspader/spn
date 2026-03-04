@@ -1,13 +1,12 @@
 #include "sp.h"
-#include "app.h"
-#include "ctx.h"
+#include "app/app.h"
+#include "ctx/ctx.h"
 #include "sp/io.h"
 
 #ifdef SP_POSIX
 void spn_signal_handler(s32 kind) {
   switch (kind) {
     case SIGINT: {
-      printf("sigint\n");
       sp_atomic_s32_set(&spn.sp->shutdown, 1);
       sp_io_write_new_line(&spn.logger.out);
       sp_io_write_new_line(&spn.logger.err);

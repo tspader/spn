@@ -1,8 +1,12 @@
-#include "app.h"
+#include "app/app.h"
+#include "ctx/ctx.h"
 #include "err.h"
-#include "event.h"
+#include "event/event.h"
 #include "gen.h"
-#include "session.h"
+#include "log.h"
+#include "session/session.h"
+#include "target/target.h"
+#include "unit/package.h"
 #include "external/cc.h"
 
 spn_err_t add_link_edges(spn_session_t* session, spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
@@ -74,7 +78,7 @@ sp_str_t get_target_output_path(spn_target_unit_t* unit) {
 
 void setup_target_for_compile_or_link(spn_cc_t* cc, spn_cc_target_t* cc_target, spn_target_t* target, spn_pkg_t* pkg, spn_session_t* session) {
   sp_da_for(target->include, i) {
-    spn_cc_target_add_relative_include(cc_target, target->include[i]);
+    spn_cc_target_add_absolute_include(cc_target, sp_fs_join_path(pkg->paths.root, target->include[i]));
   }
 
   sp_da_for(target->define, i) {
@@ -118,7 +122,7 @@ spn_err_t run_cc(spn_cc_t* cc, spn_cc_target_t* cc_target, sp_str_t cwd, spn_pkg
       sp_str_builder_append_c8(&log, ' ');
     }
 
-    spn_push_event_ex((spn_build_event_t) {
+    spn_event_buffer_push_ex(spn.events, pkg, io, (spn_build_event_t) {
       .kind = SPN_EVENT_TARGET_BUILD,
       .target.build = {
         .args = sp_str_builder_to_str(&log),
@@ -130,6 +134,12 @@ spn_err_t run_cc(spn_cc_t* cc, spn_cc_target_t* cc_target, sp_str_t cwd, spn_pkg
 
   sp_ps_output_t result = sp_ps_run(ps);
   if (result.status.exit_code) {
+    spn_trace_error(spn.events, pkg, io,
+      "cc exited with code {}", SP_FMT_S32(result.status.exit_code));
+    if (sp_str_valid(result.err)) {
+      spn_trace_error(spn.events, pkg, io, "stderr: {}", SP_FMT_STR(result.err));
+    }
+
     spn_event_buffer_push_ex(spn.events, pkg, io, (spn_build_event_t) {
       .kind = SPN_EVENT_TARGET_BUILD_FAILED,
       .target.failed = {
@@ -176,7 +186,7 @@ spn_err_t run_ar(spn_target_unit_t* unit, sp_str_t output) {
       sp_str_builder_append_c8(&log, ' ');
     }
 
-    spn_push_event_ex((spn_build_event_t) {
+    spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
       .kind = SPN_EVENT_TARGET_BUILD,
       .target.build = {
         .args = sp_str_builder_to_str(&log),
@@ -209,14 +219,8 @@ spn_err_t run_ar(spn_target_unit_t* unit, sp_str_t output) {
 s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   spn_compile_unit_t* unit = (spn_compile_unit_t*)user_data;
 
-  //spn_log_error("compile: {}", SP_FMT_STR(unit->paths.object));
-
-  spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->target->logs, (spn_build_event_t) {
-    .kind = SPN_EVENT_DEBUG,
-    .debug = {
-      .message = unit->paths.object
-    }
-  });
+  spn_trace_debug(spn.events, unit->pkg, &unit->target->logs,
+    "compiling object {} from {}", SP_FMT_STR(unit->paths.object), SP_FMT_STR(unit->paths.source));
 
   sp_str_t file = sp_fs_get_name(unit->paths.object);
   sp_str_t object_dir = sp_fs_parent_path(unit->paths.object);
@@ -274,6 +278,18 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
         }
         break;
       }
+      case SPN_EMBED_DIR: {
+        sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(embed.dir.path);
+        sp_da_for(entries, e) {
+          if (!sp_fs_is_regular_file(entries[e].file_path)) continue;
+          sp_str_t rel = sp_str_suffix(entries[e].file_path, entries[e].file_path.len - embed.dir.path.len - 1);
+          sp_io_reader_t dir_io = sp_io_reader_from_file(entries[e].file_path);
+          if (spn_cc_embed_ctx_add(&embedder, dir_io, spn_cc_symbol_from_embedded_file(rel), types.data, types.size)) {
+            return SPN_ERROR;
+          }
+        }
+        continue;
+      }
     }
 
     if (spn_cc_embed_ctx_add(&embedder, io, symbol, types.data, types.size)) {
@@ -292,6 +308,10 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
   spn_target_unit_t* unit = (spn_target_unit_t*)user_data;
   spn_target_t* target = unit->info;
 
+  spn_trace_info(spn.events, unit->pkg, &unit->logs,
+    "linking target {} with {} objects, kind={}",
+    SP_FMT_STR(target->name), SP_FMT_U32(sp_da_size(unit->objects)), SP_FMT_S32(target->kind));
+
   spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_TARGET,
     .target_link = {
@@ -299,8 +319,6 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
       .objects = sp_da_size(unit->objects),
     }
   });
-
-  //spn_log_error("link: {}", SP_FMT_STR(unit->target->name));
 
   sp_str_t output = get_target_output_path(unit);
   sp_str_t output_name = sp_fs_get_name(output);
@@ -440,7 +458,8 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
           sp_try(spn_bg_cmd_add_input(graph, unit->nodes.embed.run, input));
           break;
         }
-        case SPN_EMBED_MEM: {
+        case SPN_EMBED_MEM:
+        case SPN_EMBED_DIR: {
           break;
         }
       }
@@ -560,6 +579,7 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
     obj->nodes.compile = spn_bg_add_fn_ex(graph, compile_object, obj, SPN_BG_VIZ_CMD, pkg->name, sp_format("compile::{}", SP_FMT_STR(obj->paths.source)));
     obj->nodes.object = spn_bg_add_file_ex(graph, obj->paths.object, SPN_BG_VIZ_DEFAULT, pkg->name);
     sp_try(spn_bg_cmd_add_output(graph, obj->nodes.compile, obj->nodes.object));
+    sp_try(spn_bg_cmd_add_input(graph, obj->nodes.compile, obj->nodes.source));
     sp_try(spn_bg_cmd_add_input(graph, obj->nodes.compile, unit->nodes.build.stamp.exit));
   }
 
@@ -598,15 +618,24 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
 spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->build.graph;
+  spn_pkg_unit_t* root = spn_session_find_root(session);
+
+  spn_trace_info(spn.events, root->ctx.pkg, &root->ctx.logs,
+    "preparing build graph", SP_FMT_U32(0));
 
   graph->error.some = SP_OPT_NONE;
   if (prepare_build_graph(app)) {
     switch (graph->error.some) {
       case SP_OPT_SOME: {
-        spn_log_error("{}", SP_FMT_STR(spn_bg_err_to_str(graph, graph->error.value)));
+        sp_str_t err_str = spn_bg_err_to_str(graph, graph->error.value);
+        spn_trace_error(spn.events, root->ctx.pkg, &root->ctx.logs,
+          "build graph error: {}", SP_FMT_STR(err_str));
+        spn_log_error("{}", SP_FMT_STR(err_str));
         break;
       }
       case SP_OPT_NONE: {
+        spn_trace_error(spn.events, root->ctx.pkg, &root->ctx.logs,
+          "failed to prepare build graph (unknown error)", SP_FMT_U32(0));
         spn_log_error("failed to prepare build graph");
         break;
       }
@@ -614,6 +643,9 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
 
     return SPN_TASK_ERROR;
   }
+
+  spn_trace_info(spn.events, root->ctx.pkg, &root->ctx.logs,
+    "build graph prepared successfully", SP_FMT_U32(0));
 
   return SPN_TASK_DONE;
 }
@@ -637,6 +669,56 @@ void spn_task_init_build_graph(spn_app_t* app) {
   b->build.dirty = app->config.force ?
     spn_bg_compute_forced_dirty(&b->build.graph) :
     spn_bg_compute_dirty(&b->build.graph);
+
+  spn_pkg_unit_t* root = spn_session_find_root(b);
+  u32 dirty_files = sp_ht_size(b->build.dirty->files);
+  u32 dirty_cmds = sp_ht_size(b->build.dirty->commands);
+  spn_trace_info(spn.events, root->ctx.pkg, &root->ctx.logs,
+    "dirty detection: force={} dirty_files={} dirty_commands={}",
+    SP_FMT_CSTR(app->config.force ? "true" : "false"),
+    SP_FMT_U32(dirty_files),
+    SP_FMT_U32(dirty_cmds));
+
+  if (dirty_cmds == 0 && dirty_files == 0) {
+    spn_trace_warn(spn.events, root->ctx.pkg, &root->ctx.logs,
+      "nothing is dirty — all files appear up to date", SP_FMT_U32(0));
+
+    // log commands and their input/output timestamps
+    sp_da_for(b->build.graph.commands, cit) {
+      spn_bg_cmd_t* cmd = &b->build.graph.commands[cit];
+      sp_tm_epoch_t newest_in = SP_LIMIT_EPOCH_MIN;
+      sp_tm_epoch_t oldest_out = SP_LIMIT_EPOCH_MAX;
+      bool missing_out = false;
+
+      sp_da_for(cmd->consumes, n) {
+        spn_bg_dirty_file_metadata_t* m = sp_ht_getp(b->build.dirty->metadata.files, cmd->consumes[n]);
+        if (m) newest_in = sp_tm_epoch_max(m->mod_time, newest_in);
+      }
+      sp_da_for(cmd->produces, n) {
+        spn_bg_dirty_file_metadata_t* m = sp_ht_getp(b->build.dirty->metadata.files, cmd->produces[n]);
+        if (m) {
+          oldest_out = sp_tm_epoch_min(m->mod_time, oldest_out);
+          missing_out |= !m->exists;
+        }
+      }
+
+      // find which source file this command compiles (first input)
+      sp_str_t src_path = sp_str_lit("?");
+      if (sp_da_size(cmd->consumes) > 0) {
+        spn_bg_file_t* src = spn_bg_find_file(&b->build.graph, cmd->consumes[0]);
+        if (src) src_path = src->path;
+      }
+
+      spn_trace_debug(spn.events, root->ctx.pkg, &root->ctx.logs,
+        "cmd id={} in={}.{}ns out={}.{}ns missing={} dirty={} src={}",
+        SP_FMT_U32(cmd->id.index),
+        SP_FMT_U64(newest_in.s), SP_FMT_U64(newest_in.ns),
+        SP_FMT_U64(oldest_out.s), SP_FMT_U64(oldest_out.ns),
+        SP_FMT_CSTR(missing_out ? "true" : "false"),
+        SP_FMT_CSTR(sp_ht_key_exists(b->build.dirty->commands, cmd->id) ? "true" : "false"),
+        SP_FMT_STR(src_path));
+    }
+  }
 
   b->build.executor = spn_bg_executor_new(&b->build.graph, b->build.dirty, (spn_bg_executor_config_t) {
     .num_threads = 8,

@@ -3,68 +3,6 @@
 #include "intern.h"
 #include "external/cc.h"
 
-spn_libc_kind_t spn_libc_kind_from_str(sp_str_t str) {
-  if (sp_str_equal_cstr(str, "gnu")) {
-    return SPN_LIBC_GNU;
-  }
-  if (sp_str_equal_cstr(str, "musl")) {
-    return SPN_LIBC_MUSL;
-  }
-  if (sp_str_equal_cstr(str, "cosmopolitan")) {
-    return SPN_LIBC_COSMOPOLITAN;
-  }
-  if (sp_str_equal_cstr(str, "custom")) {
-    return SPN_LIBC_CUSTOM;
-  }
-
-  SP_FATAL("Unknown libc {:fg brightyellow}; options are [gnu, musl, cosmopolitan, custom]", SP_FMT_STR(str));
-  SP_UNREACHABLE_RETURN(SPN_LIBC_GNU);
-}
-
-sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc) {
-  switch (libc) {
-    case SPN_LIBC_GNU: {
-      return SP_LIT("gnu");
-    }
-    case SPN_LIBC_MUSL: {
-      return SP_LIT("musl");
-    }
-    case SPN_LIBC_COSMOPOLITAN: {
-      return SP_LIT("cosmopolitan");
-    }
-    case SPN_LIBC_CUSTOM: {
-      return SP_LIT("custom");
-    }
-  }
-
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-spn_build_mode_t spn_dep_build_mode_from_str(sp_str_t str) {
-  if (sp_str_equal_cstr(str, "release")) {
-    return SPN_DEP_BUILD_MODE_RELEASE;
-  }
-  if (sp_str_equal_cstr(str, "debug")) {
-    return SPN_DEP_BUILD_MODE_DEBUG;
-  }
-
-  SP_FATAL("Unknown mode {:fg brightyellow}; options are [release, debug]", SP_FMT_STR(str));
-  SP_UNREACHABLE_RETURN(SPN_DEP_BUILD_MODE_RELEASE);
-}
-
-sp_str_t spn_dep_build_mode_to_str(spn_build_mode_t mode) {
-  switch (mode) {
-    case SPN_DEP_BUILD_MODE_RELEASE: {
-      return sp_str_lit("release");
-    }
-    case SPN_DEP_BUILD_MODE_DEBUG: {
-      return sp_str_lit("debug");
-    }
-  }
-
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
 spn_cc_kind_t spn_profile_get_cc(spn_profile_t* profile) {
   return profile->cc.kind;
 }

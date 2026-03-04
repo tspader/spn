@@ -1,7 +1,9 @@
-#include "app.h"
-#include "event.h"
+#include "app/app.h"
+#include "ctx/ctx.h"
+#include "event/event.h"
+#include "log.h"
 #include "task.h"
-#include "session.h"
+#include "session/session.h"
 
 spn_task_result_t spn_task_run_tests(spn_app_t* app) {
   spn_session_t* b = &app->session;
@@ -22,13 +24,17 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
     sp_fs_create_file(unit->paths.logs.test);
     unit->logs.test = sp_io_writer_from_file(unit->paths.logs.test, SP_IO_WRITE_MODE_OVERWRITE);
 
+    sp_str_t test_cmd = sp_fs_join_path(unit->paths.bin, target->name);
+    spn_trace_info(spn.events, unit->pkg, &unit->logs,
+      "running test {} cmd={}", SP_FMT_STR(target->name), SP_FMT_STR(test_cmd));
+
     spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
       .kind = SPN_EVENT_TEST_RUN
     });
     spn_poll(spn.sp);
 
     sp_ps_t ps = sp_ps_create((sp_ps_config_t) {
-      .command = sp_fs_join_path(unit->paths.bin, target->name),
+      .command = test_cmd,
       .io = {
         .in =  { .mode = SP_PS_IO_MODE_NULL },
         .out = { .mode = SP_PS_IO_MODE_EXISTING, .fd = unit->logs.test.file.fd },
@@ -42,6 +48,18 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
     // sp_tui_up(1);
     // sp_tui_home();
     // sp_tui_clear_line();
+    if (result.status.exit_code) {
+      spn_trace_error(spn.events, unit->pkg, &unit->logs,
+        "test {} failed with exit code {}", SP_FMT_STR(target->name), SP_FMT_S32(result.status.exit_code));
+      if (sp_str_valid(result.err)) {
+        spn_trace_error(spn.events, unit->pkg, &unit->logs,
+          "test stderr: {}", SP_FMT_STR(result.err));
+      }
+    } else {
+      spn_trace_info(spn.events, unit->pkg, &unit->logs,
+        "test {} passed", SP_FMT_STR(target->name));
+    }
+
     spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, result.status.exit_code ?
       (spn_build_event_t) { .kind = SPN_EVENT_TEST_FAILED } :
       (spn_build_event_t) { .kind = SPN_EVENT_TEST_PASSED }
@@ -74,4 +92,3 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
 
   return SPN_TASK_DONE;
 }
-

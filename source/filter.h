@@ -1,9 +1,9 @@
 #ifndef SPN_TARGET_FILTER_H
 #define SPN_TARGET_FILTER_H
 
-#include "spn.h"
 #include "sp.h"
-#include "target.h"
+#include "spn.h"
+#include "target/types.h"
 
 typedef struct {
   sp_str_t name;

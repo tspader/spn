@@ -1,6 +1,6 @@
 #include "ordered_map.h"
 #include "intern.h"
-#include "ctx.h"
+#include "ctx/ctx.h"
 
 sp_intern_t* sp_intern_new() {
   sp_intern_t* intern = sp_alloc_type(sp_intern_t);

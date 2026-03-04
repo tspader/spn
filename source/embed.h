@@ -10,6 +10,7 @@
 typedef enum {
   SPN_EMBED_FILE,
   SPN_EMBED_MEM,
+  SPN_EMBED_DIR,
 } spn_embed_kind_t;
 
 typedef struct {
@@ -24,6 +25,7 @@ typedef struct {
   union {
     struct { sp_str_t path; } file;
     struct { const u8* buffer; u64 size; } memory;
+    struct { sp_str_t path; } dir;
   };
 } spn_embed_t;
 

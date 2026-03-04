@@ -1,9 +1,12 @@
 #include "tui.h"
 
-#include "ctx.h"
+#include "ctx/ctx.h"
+#include "log.h"
 
+#include "semver/convert.h"
 #include "sp/color.h"
 #include "sp/ht.h"
+#include "sp/macro.h"
 #include "sp/str.h"
 
 #include <stdarg.h>
@@ -29,60 +32,67 @@
 #define SP_TUI_PRINT(command) sp_tui_print(sp_str_view(command))
 
 typedef enum {
-  SPN_EVENT_COLOR_NONE,
-  SPN_EVENT_COLOR_GREEN,
-  SPN_EVENT_COLOR_RED,
+  WHITE,
+  GREEN,
+  RED,
 } spn_build_event_color_t;
 
-#define SPN_EVENT_BOLD     true
-#define SPN_EVENT_NOT_BOLD false
+#define BOLD     true
+#define NOT_BOLD false
 
 typedef struct {
   const c8* name;
+  const c8* id;
   spn_build_event_color_t color;
   spn_verbosity_t verbosity;
   bool bold;
 } spn_build_event_display_t;
 
+#define EVENT(ID, NAME, COLOR, VERBOSITY, BOLD) [ID] = { NAME, sp_mstr(ID), COLOR, VERBOSITY, BOLD }
+
 static spn_build_event_display_t event_info[] = {
-  [SPN_EVENT_FETCH]                         = { "fetch",          SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_ERR]                           = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_ERR_CIRCULAR_DEP]              = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_ERR_UNKNOWN_PKG]               = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_RESOLVE]                       = { "resolve",        SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_SYNC]                          = { "sync",           SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_CHECKOUT]                      = { "checkout",       SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_BUILD_SCRIPT_COMPILE]          = { "compile",        SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED]   = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_BUILD_SCRIPT_CONFIGURE]        = { "configure",      SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_BUILD_SCRIPT_BUILD]            = { "build",          SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_BUILD_SCRIPT_PACKAGE]          = { "package",        SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_BUILD_SCRIPT_FAILED]           = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_BUILD_SCRIPT_CRASHED]          = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_BUILD_SCRIPT_CONFIGURE_FAILED] = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_BUILD_SCRIPT_BUILD_FAILED]     = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_BUILD_SCRIPT_PACKAGE_FAILED]   = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_DEP_BUILD]                     = { "dep::build",     SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_DEP_BUILD_PASSED]              = { "ok",             SPN_EVENT_COLOR_GREEN, SPN_VERBOSITY_NORMAL, SPN_EVENT_BOLD     },
-  [SPN_EVENT_DEP_BUILD_FAILED]              = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_TARGET_BUILD]                  = { "compile",        SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_TARGET_BUILD_PASSED]           = { "ok",             SPN_EVENT_COLOR_GREEN, SPN_VERBOSITY_NORMAL, SPN_EVENT_BOLD     },
-  [SPN_EVENT_TARGET_BUILD_FAILED]           = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_BUILD_PASSED]                  = { "built",          SPN_EVENT_COLOR_GREEN, SPN_VERBOSITY_NORMAL, SPN_EVENT_BOLD     },
-  [SPN_EVENT_TCC_ERROR]                     = { "error",          SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_TEST_RUN]                      = { "run",            SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_TEST_PASSED]                   = { "ok",             SPN_EVENT_COLOR_GREEN, SPN_VERBOSITY_NORMAL, SPN_EVENT_BOLD     },
-  [SPN_EVENT_TESTS_PASSED]                  = { "tested",         SPN_EVENT_COLOR_GREEN, SPN_VERBOSITY_NORMAL, SPN_EVENT_BOLD     },
-  [SPN_EVENT_TEST_FAILED]                   = { "failed",         SPN_EVENT_COLOR_RED,   SPN_VERBOSITY_QUIET,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_CLEAN]                         = { "clean",          SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_GENERATE]                      = { "generate",       SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_BUILD_SCRIPT_USER_FN]          = { "fn",             SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_ADD_TARGET]                    = { "add_unit",       SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_DEBUG,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_DEBUG]                         = { "debug",          SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_NORMAL, SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_ADD_SOURCE]                    = { "debug",          SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_DEBUG,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_INIT_BUILD_GRAPH]              = { "debug",          SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_DEBUG,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_LINK_TARGET]                   = { "debug",          SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_DEBUG,  SPN_EVENT_NOT_BOLD },
-  [SPN_EVENT_RUN_CONFIGURE]                 = { "debug",          SPN_EVENT_COLOR_NONE,  SPN_VERBOSITY_DEBUG,  SPN_EVENT_NOT_BOLD },
+  EVENT(SPN_EVENT_FETCH,                         "fetch", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_ERR,                           "failed", RED,   SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_ERR_CIRCULAR_DEP,              "failed", RED,   SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_ERR_UNKNOWN_PKG,               "failed", RED,   SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_RESOLVE,                       "resolve", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_SYNC,                          "sync", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_CHECKOUT,                      "checkout", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_COMPILE,          "compile", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,   "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_CONFIGURE,        "configure", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_BUILD,            "build", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_PACKAGE,          "package", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_FAILED,           "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_CRASHED,          "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_CONFIGURE_FAILED, "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_BUILD_FAILED,     "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_PACKAGE_FAILED,   "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
+  EVENT(SPN_EVENT_DEP_BUILD,                     "dep:build", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_DEP_BUILD_PASSED,              "ok", GREEN, SPN_VERBOSITY_NORMAL, BOLD    ),
+  EVENT(SPN_EVENT_DEP_BUILD_FAILED,              "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
+  EVENT(SPN_EVENT_TARGET_BUILD, "compile", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_TARGET_BUILD_PASSED, "ok", GREEN, SPN_VERBOSITY_NORMAL, BOLD    ),
+  EVENT(SPN_EVENT_TARGET_BUILD_FAILED, "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_PASSED, "built", GREEN, SPN_VERBOSITY_NORMAL, BOLD    ),
+  EVENT(SPN_EVENT_TCC_ERROR, "error", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
+  EVENT(SPN_EVENT_TEST_RUN, "run", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_TEST_PASSED, "ok", GREEN, SPN_VERBOSITY_NORMAL, BOLD    ),
+  EVENT(SPN_EVENT_TESTS_PASSED, "tested", GREEN, SPN_VERBOSITY_NORMAL, BOLD    ),
+  EVENT(SPN_EVENT_TEST_FAILED, "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
+  EVENT(SPN_EVENT_CLEAN, "clean", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_GENERATE, "generate", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_USER_FN, "fn", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_ADD_TARGET, "add_unit", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_DEBUG, "debug", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_ADD_SOURCE, "debug", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_INIT_BUILD_GRAPH, "debug", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_LINK_TARGET, "debug", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_RUN_CONFIGURE, "debug", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_TRACE_DEBUG,  "trace", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_TRACE_INFO,   "trace", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_TRACE_WARN,   "trace", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_TRACE_ERROR,  "trace", RED,    SPN_VERBOSITY_DEBUG,  NOT_BOLD),
 };
 
 static sp_str_t spn_tui_name_to_color(sp_str_t str);
@@ -282,15 +292,15 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
     sp_str_builder_append_cstr(&builder, SP_ANSI_BOLD);
   }
   switch (display.color) {
-    case SPN_EVENT_COLOR_NONE: {
+    case WHITE: {
       sp_str_builder_append_fmt(&builder, "{:fg brightblack :pad 9}", SP_FMT_STR(name));
       break;
     }
-    case SPN_EVENT_COLOR_GREEN: {
+    case GREEN: {
       sp_str_builder_append_fmt(&builder, "{:fg green :pad 9}", SP_FMT_STR(name));
       break;
     }
-    case SPN_EVENT_COLOR_RED: {
+    case RED: {
       sp_str_builder_append_fmt(&builder, "{:fg red :pad 9}", SP_FMT_STR(name));
       break;
     }
@@ -300,7 +310,11 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
   }
   sp_str_builder_append_c8(&builder, ' ');
 
-  sp_str_builder_append(&builder, spn_tui_decorate_name(event->pkg->name, max_name, ' '));
+  sp_str_t package = strl("root");
+  if (event->pkg) {
+    package = event->pkg->name;
+  }
+  sp_str_builder_append(&builder, spn_tui_decorate_name(package, max_name, ' '));
   sp_str_builder_append_c8(&builder, ' ');
 
   switch (event->kind) {
@@ -379,7 +393,7 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       sp_str_builder_append_fmt(
         &builder,
         "{:fg brightcyan} could not be located",
-        SP_FMT_STR(event->unknown.request.name)
+        SP_FMT_STR(event->unknown.request.id.name)
       );
       break;
     }
@@ -387,13 +401,13 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       sp_str_builder_append_fmt(
         &builder,
         "{:fg brightcyan} transitively includes itself",
-        SP_FMT_STR(event->circular.pkg->name)
+        SP_FMT_STR(event->circular.id.name)
       );
       break;
     }
     case SPN_EVENT_ERR: {
       switch (event->err.kind) {
-        case SPN_ERR_KIND_MANIFEST_PARSE: {
+        case SPN_ERR_MANIFEST_PARSE: {
           sp_str_builder_append_fmt(
             &builder,
             "failed to parse manifest {:fg brightcyan}",
@@ -401,7 +415,7 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
           );
           break;
         }
-        case SPN_ERR_KIND_MANIFEST_FIELD: {
+        case SPN_ERR_MANIFEST_FIELD: {
           sp_str_builder_append_fmt(
             &builder,
             "invalid manifest field {:fg brightcyan}: expected {:fg brightyellow}, got {:fg brightred}",
@@ -411,7 +425,7 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
           );
           break;
         }
-        case SPN_ERR_KIND_NONE: {
+        default: {
           sp_str_builder_append_cstr(&builder, "unknown error");
           break;
         }
@@ -464,6 +478,18 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
         SP_FMT_CSTR(event->configure.exists ? "true" : "false"),
         SP_FMT_S32(event->configure.result),
         SP_FMT_U64(event->configure.time)
+      );
+      break;
+    }
+    case SPN_EVENT_TRACE_DEBUG:
+    case SPN_EVENT_TRACE_INFO:
+    case SPN_EVENT_TRACE_WARN:
+    case SPN_EVENT_TRACE_ERROR: {
+      sp_str_builder_append_fmt(&builder, "{:fg brightblack} {:fg brightblack}:{} {}",
+        SP_FMT_STR(spn_log_level_to_str(spn_trace_event_to_level(event->kind))),
+        SP_FMT_STR(event->trace.file),
+        SP_FMT_U32(event->trace.line),
+        SP_FMT_STR(event->trace.message)
       );
       break;
     }

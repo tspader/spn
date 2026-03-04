@@ -2,9 +2,11 @@
 #define SPN_CC_H
 
 #include "sp.h"
+#include "sp/elf.h"
 #include "spn.h"
+#include "enum/enum.h"
 #include "embed.h"
-#include "target.h"
+#include "target/types.h"
 #include "external/tcc.h"
 
 typedef struct {
@@ -71,9 +73,6 @@ struct spn_cc {
 };
 
 void             spn_cc_set_profile(spn_cc_t* cc, spn_profile_t* profile);
-spn_cc_kind_t    spn_cc_kind_from_str(sp_str_t str);
-spn_c_standard_t spn_c_standard_from_str(sp_str_t str);
-sp_str_t         spn_c_standard_to_str(spn_c_standard_t standard);
 void             spn_cc_set_output_dir(spn_cc_t* cc, sp_str_t dir);
 void             spn_cc_add_include(spn_cc_t* cc, sp_str_t dir);
 void             spn_cc_add_relative_include(spn_cc_t* cc, sp_str_t dir);

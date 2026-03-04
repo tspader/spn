@@ -1,78 +1,138 @@
-#include "app.h"
-#include "event.h"
-#include "external/git.h"
+#include "app/app.h"
+#include "ctx/ctx.h"
+#include "event/event.h"
+#include "git/cache.h"
+#include "log.h"
+#include "pkg/id.h"
+#include "pkg/mutate.h"
+#include "pkg/pkg.h"
+#include "session/session.h"
 
-s32 spn_executor_sync_repo(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_pkg_unit_t* build = (spn_pkg_unit_t*)user_data;
-
-  spn_event_buffer_push_ctx(spn.events, &build->ctx, (spn_build_event_t) {
-    .kind = SPN_EVENT_SYNC,
-    .sync = {
-      .url = spn_pkg_get_url(build->ctx.pkg)
-    }
-  });
-  spn_pkg_unit_sync_remote(build);
-
-  sp_str_t message = spn_git_get_commit_message(build->ctx.paths.source, build->metadata.commit);
-  message = sp_str_truncate(message, 32, SP_LIT("..."));
-  message = sp_str_replace_c8(message, '\n', ' ');
-  message = sp_str_replace_c8(message, '{', '['); // @spader @hack
-  message = sp_str_replace_c8(message, '}', ']');
-  message = sp_str_pad(message, 32);
-
-  spn_event_buffer_push_ctx(spn.events, &build->ctx, (spn_build_event_t) {
-    .kind = SPN_EVENT_CHECKOUT,
-    .checkout = {
-      .commit = spn_intern(build->metadata.commit),
-      .version = build->metadata.version,
-      .message = spn_intern(message)
-    }
-  });
-  spn_pkg_unit_sync_local(build);
-
-  return SPN_OK;
+static void add_pkg_unit(spn_session_t* session, sp_str_t qualified_name, spn_resolved_pkg_t* resolved) {
+  sp_om_insert(session->units.packages, qualified_name, SP_ZERO_STRUCT(spn_pkg_unit_t));
+  spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
+  spn_init_pkg_unit_for_session(session, unit, resolved->pkg, resolved->kind, resolved->version);
 }
 
 void spn_task_sync_init(spn_app_t* app) {
-  spn_session_t* b = &app->session;
+  spn_session_t* session = &app->session;
+  spn_resolver_t* resolver = app->resolver;
+  spn_pkg_unit_t* root = spn_session_find_root(session);
 
-  spn_build_graph_t* graph = &b->sync.graph;
+  spn_event_buffer_push(spn.events, &root->ctx, SPN_EVENT_FETCH);
+  spn_trace_info(spn.events, root->ctx.pkg, &root->ctx.logs,
+    "syncing dependencies", SP_FMT_U32(0));
 
-  spn_event_buffer_push(spn.events, &spn_session_find_root(b)->ctx, SPN_EVENT_FETCH);
+  // Load file dependencies directly from their manifests
+  sp_ht_for_kv(app->package.deps, dep_it) {
+    spn_pkg_req_t* req = dep_it.val;
+    if (req->kind != SPN_PACKAGE_KIND_FILE) continue;
 
-  sp_om_for(b->units.packages, it) {
-    spn_pkg_unit_t* dep = sp_om_at(b->units.packages, it);
+    sp_str_t manifest = req->file;
+    if (sp_str_starts_with(manifest, SP_LIT("file://"))) {
+      manifest = sp_str_strip_left(manifest, SP_LIT("file://"));
+    }
 
-    if (dep->ctx.pkg->kind != SPN_PACKAGE_KIND_INDEX) {
+    if (!sp_fs_exists(manifest)) {
+      spn_event_buffer_push_ex(spn.events, &app->package, SP_NULLPTR, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR,
+        .err = { .kind = SPN_ERROR },
+      });
       continue;
     }
 
-    spn_bg_id_t sync = spn_bg_add_fn(graph, spn_executor_sync_repo, dep);
-    spn_bg_cmd_set_metadata(graph, sync, sp_format("sync ({})", SP_FMT_STR(dep->ctx.name)), sp_str_lit(""), SPN_BG_VIZ_DEFAULT);
+    spn_pkg_t* pkg = sp_alloc_type(spn_pkg_t);
+    spn_pkg_init(pkg, *dep_it.key);
+    spn_pkg_from_manifest(pkg, manifest);
+
+    spn_resolved_pkg_t file_resolved = {
+      .pkg = pkg,
+      .kind = SPN_PACKAGE_KIND_FILE,
+      .version = pkg->version,
+    };
+    add_pkg_unit(session, *dep_it.key, &file_resolved);
   }
 
-  if (!sp_da_empty(graph->commands)) {
-    b->sync.dirty = spn_bg_compute_forced_dirty(graph);
-    b->sync.executor = spn_bg_executor_new(graph, b->sync.dirty, (spn_bg_executor_config_t) {
-      .num_threads = 3,
-      .enable_logging = false
-    });
+  // Load index dependencies via git cache
+  spn_git_cache_t cache = SP_ZERO_INITIALIZE();
+  spn_git_cache_init(&cache, spn.paths.source);
 
-    spn_bg_executor_run(b->sync.executor);
+  sp_str_ht_for_kv(resolver->resolved, it) {
+    spn_resolved_pkg_t* resolved = it.val;
+
+    if (resolved->kind != SPN_PACKAGE_KIND_INDEX || !resolved->release) {
+      continue;
+    }
+
+    spn_index_rel_t* rel = resolved->release;
+
+    spn_git_checkout_t* checkout = SP_NULLPTR;
+    spn_err_t err = spn_git_cache_ensure_checkout(&cache, (spn_git_checkout_id_t) {
+      .url = rel->source.url,
+      .rev = rel->source.rev,
+      .dir = rel->source.dir,
+    }, &checkout);
+
+    if (err != SPN_OK) {
+      spn_event_buffer_push_ex(spn.events, &app->package, SP_NULLPTR, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR,
+        .err = { .kind = SPN_ERROR },
+      });
+      continue;
+    }
+
+    sp_str_t checkout_path = sp_str_copy(checkout->path);
+
+    sp_str_t manifest_base = checkout_path;
+    if (!sp_str_empty(rel->manifest.url)) {
+      spn_git_checkout_t* manifest_checkout = SP_NULLPTR;
+      err = spn_git_cache_ensure_checkout(&cache, (spn_git_checkout_id_t) {
+        .url = rel->manifest.url,
+        .rev = rel->manifest.rev,
+        .dir = rel->manifest.dir,
+      }, &manifest_checkout);
+
+      if (err != SPN_OK) {
+        spn_event_buffer_push_ex(spn.events, &app->package, SP_NULLPTR, (spn_build_event_t) {
+          .kind = SPN_EVENT_ERR,
+          .err = { .kind = SPN_ERROR },
+        });
+        continue;
+      }
+
+      manifest_base = sp_str_copy(manifest_checkout->path);
+    }
+
+    sp_str_t manifest_path = sp_fs_join_path(manifest_base, rel->paths.manifest);
+    sp_str_t script_path = sp_fs_join_path(manifest_base, rel->paths.script);
+
+    spn_pkg_t* pkg = sp_alloc_type(spn_pkg_t);
+    spn_pkg_init(pkg, rel->id.name);
+
+    if (sp_fs_exists(manifest_path)) {
+      spn_pkg_from_manifest(pkg, manifest_path);
+    }
+
+    pkg->kind = SPN_PACKAGE_KIND_INDEX;
+    pkg->paths.root = checkout_path;
+    pkg->paths.script = script_path;
+    pkg->paths.manifest = manifest_path;
+    pkg->paths.cache.source = checkout_path;
+    pkg->paths.cache.work = sp_fs_join_path(spn.paths.build, *it.key);
+    pkg->paths.cache.store = sp_fs_join_path(spn.paths.store, *it.key);
+
+    spn_pkg_add_version_ex(pkg, resolved->version, rel->source.rev);
+
+    resolved->pkg = pkg;
+    add_pkg_unit(session, *it.key, resolved);
+  }
+
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_t* pkg = sp_om_at(session->units.packages, it)->ctx.pkg;
+    spn.tui.info.max_name = SP_MAX(spn.tui.info.max_name, pkg->name.len);
   }
 }
 
 spn_task_result_t spn_task_sync_update(spn_app_t* app) {
-  spn_bg_ctx_t* sync = &app->session.sync;
-
-  if (!sync->executor) {
-    return SPN_TASK_DONE;
-  }
-
-  if (sp_atomic_s32_get(&sync->executor->shutdown)) {
-    spn_bg_executor_join(sync->executor);
-    return SPN_TASK_DONE;
-  }
-
-  return SPN_TASK_CONTINUE;
+  return SPN_TASK_DONE;
 }

@@ -1,0 +1,76 @@
+#include "event/event.h"
+
+#if defined(SP_POSIX)
+  #include <pthread.h>
+#endif
+
+static u64 spn_current_thread_id(void) {
+#if defined(_WIN32)
+  return (u64)GetCurrentThreadId();
+#elif defined(__linux__)
+  return (u64)pthread_self();
+#elif defined(__APPLE__)
+  u64 tid;
+  pthread_threadid_np(NULL, &tid);
+  return tid;
+#else
+  return (u64)pthread_self();
+#endif
+}
+
+void spn_build_event_init(spn_build_event_t* event, spn_build_event_kind_t kind, spn_build_ctx_t* ctx) {
+  event->kind = kind;
+  event->pkg = ctx->pkg;
+  event->io = &ctx->logs;
+}
+
+spn_build_event_t spn_build_event_make(spn_build_ctx_t* ctx, spn_build_event_kind_t kind) {
+  spn_build_event_t event = SP_ZERO_INITIALIZE();
+  spn_build_event_init(&event, kind, ctx);
+  return event;
+}
+
+spn_event_buffer_t* spn_event_buffer_new() {
+  spn_event_buffer_t* events = SP_ALLOC(spn_event_buffer_t);
+  return events;
+}
+
+void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_ctx_t* ctx, spn_build_event_kind_t kind) {
+  spn_event_buffer_push_ctx(events, ctx, spn_build_event_make(ctx, kind));
+}
+
+void spn_event_buffer_push_ctx(spn_event_buffer_t* events, spn_build_ctx_t* ctx, spn_build_event_t config) {
+  spn_build_event_t event = config;
+  spn_build_event_init(&event, event.kind, ctx);
+  event.thread_id = spn_current_thread_id();
+
+  sp_mutex_lock(&events->mutex);
+  sp_rb_push(events->buffer, event);
+  sp_mutex_unlock(&events->mutex);
+}
+
+void spn_event_buffer_push_ex(spn_event_buffer_t* events, spn_pkg_t* pkg, spn_build_io_t* io, spn_build_event_t e) {
+  spn_build_event_t event = e;
+  event.pkg = pkg;
+  event.io = io;
+  event.thread_id = spn_current_thread_id();
+
+  sp_mutex_lock(&events->mutex);
+  sp_rb_push(events->buffer, event);
+  sp_mutex_unlock(&events->mutex);
+}
+
+sp_da(spn_build_event_t) spn_event_buffer_drain(spn_event_buffer_t* events) {
+  sp_mutex_lock(&events->mutex);
+
+  sp_da(spn_build_event_t) result = SP_NULLPTR;
+  sp_rb_for(events->buffer, it) {
+    spn_build_event_t* event = &sp_rb_at(events->buffer, it);
+    sp_da_push(result, *event);
+  }
+
+  sp_rb_clear(events->buffer);
+  sp_mutex_unlock(&events->mutex);
+
+  return result;
+}

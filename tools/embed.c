@@ -1,6 +1,7 @@
 #define SP_IMPLEMENTATION
 #define SP_ELF
 #include "sp.h"
+#include "sp/elf.h"
 
 typedef struct {
   sp_str_t symbol;
@@ -16,19 +17,24 @@ sp_str_t symbol_from_path(sp_str_t path) {
 }
 
 s32 main(s32 argc, c8** argv) {
+  s32 rc = 0;
+
   if (argc != 4) {
     SP_LOG("usage: embed <src_dir> <output.o> <output.h>");
-    return 1;
+    rc = 1;
+    goto cleanup;
   }
 
   sp_str_t src_dir = sp_str_view(argv[1]);
   sp_str_t out_obj = sp_str_view(argv[2]);
   sp_str_t out_hdr = sp_str_view(argv[3]);
+  SP_LOG("scanning {}", SP_FMT_STR(src_dir));
 
-  sp_da(sp_os_dir_ent_t) files = sp_fs_collect_recursive(src_dir);
+  sp_da(sp_fs_entry_t) files = sp_fs_collect_recursive(src_dir);
   if (sp_da_empty(files)) {
     SP_LOG("no files found in {}", SP_FMT_STR(src_dir));
-    return 1;
+    rc = 1;
+    goto cleanup;
   }
 
   sp_elf_t* elf = sp_elf_new_with_null_section();
@@ -40,7 +46,7 @@ s32 main(s32 argc, c8** argv) {
   sp_da(embed_entry_t) entries = SP_NULLPTR;
 
   sp_da_for(files, it) {
-    sp_os_dir_ent_t ent = files[it];
+    sp_fs_entry_t ent = files[it];
     if (ent.attributes & SP_OS_FILE_ATTR_DIRECTORY) {
       continue;
     }
@@ -96,9 +102,10 @@ s32 main(s32 argc, c8** argv) {
   }
 
   sp_err_t err = sp_elf_write_to_file(elf, out_obj);
-  if (err != SP_ERR_OK) {
+  if (err != SP_OK) {
     SP_LOG("failed to write {}", SP_FMT_STR(out_obj));
-    return 1;
+    rc = 1;
+    goto cleanup;
   }
 
   sp_io_writer_t hdr = sp_io_writer_from_file(out_hdr, SP_IO_WRITE_MODE_OVERWRITE);
@@ -117,5 +124,7 @@ s32 main(s32 argc, c8** argv) {
   sp_io_writer_close(&hdr);
 
   SP_LOG("embedded {} files -> {} + {}", SP_FMT_U32(sp_da_size(entries)), SP_FMT_STR(out_obj), SP_FMT_STR(out_hdr));
-  return 0;
+
+cleanup:
+  return rc;
 }

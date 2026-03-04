@@ -1,21 +1,34 @@
-#include "app.h"
-#include "event.h"
+#include "app/app.h"
+#include "ctx/ctx.h"
+#include "event/event.h"
 #include "intern.h"
-#include "session.h"
+#include "log.h"
+#include "session/session.h"
 #include "task.h"
-#include "unit.h"
+#include "unit/package.h"
 
 s32 configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* pkg = (spn_pkg_unit_t*)user_data;
 
+  spn_trace_info(spn.events, pkg->ctx.pkg, &pkg->ctx.logs,
+    "configuring package {}", SP_FMT_STR(pkg->ctx.pkg->name));
+
   sp_try(spn_session_compile_pkg(pkg->ctx.session, pkg));
 
+  spn_trace_debug(spn.events, pkg->ctx.pkg, &pkg->ctx.logs,
+    "running configure hook for {}", SP_FMT_STR(pkg->ctx.pkg->name));
+
   if (spn_pkg_unit_run_configure_hook(pkg)) {
-    spn_push_event_ex((spn_build_event_t) {
+    spn_trace_error(spn.events, pkg->ctx.pkg, &pkg->ctx.logs,
+      "configure hook failed for {}", SP_FMT_STR(pkg->ctx.pkg->name));
+    spn_event_buffer_push_ctx(spn.events, &pkg->ctx, (spn_build_event_t) {
       .kind = SPN_EVENT_BUILD_SCRIPT_CONFIGURE_FAILED
     });
     return SPN_ERROR;
   }
+
+  spn_trace_debug(spn.events, pkg->ctx.pkg, &pkg->ctx.logs,
+    "registering sources for {} targets", SP_FMT_U32(sp_om_size(pkg->targets)));
 
   sp_om_for(pkg->targets, it) {
     spn_target_unit_t* target = sp_om_at(pkg->targets, it);
@@ -74,10 +87,8 @@ spn_err_t init_configure_graph(spn_app_t* app) {
   root->nodes.configure.stamp = spn_bg_add_file(graph, root->paths.stamp.package);
   sp_try(spn_bg_cmd_add_output(graph, root->nodes.configure.run, root->nodes.configure.stamp));
 
-  sp_str_ht_for(app->resolver->resolved, it) {
-    sp_str_t name = *sp_str_ht_it_getkp(app->resolver->resolved, it);
-    spn_pkg_unit_t* unit = sp_om_get(b->units.packages, name);
-    sp_assert(unit);
+  sp_om_for(b->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(b->units.packages, it);
     unit->nodes.configure.run = spn_bg_add_fn_ex(graph, configure_package, unit, SPN_BG_VIZ_DEFAULT, app->package.name, sp_str_lit("configure"));
     unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
     sp_try(spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp));
@@ -91,6 +102,7 @@ spn_err_t init_configure_graph(spn_app_t* app) {
     sp_ht_for(pkg->deps, dit) {
       sp_str_t parent_name = *sp_ht_it_getkp(pkg->deps, dit);
       spn_pkg_unit_t* parent = sp_om_get(b->units.packages, parent_name);
+      if (!parent) continue;
 
       sp_try(spn_bg_cmd_add_input(graph, dep->nodes.configure.run, parent->nodes.configure.stamp));
     }

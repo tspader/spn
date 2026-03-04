@@ -1,6 +1,6 @@
 #include "make.h"
 
-#include "ctx.h"
+#include "unit/build.h"
 
 void spn_make(spn_build_ctx_t* build) {
   spn_make_t* make = spn_make_new(build);

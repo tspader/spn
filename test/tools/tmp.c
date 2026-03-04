@@ -3,7 +3,7 @@
 static sp_str_t tmpfs_top_level = SP_ZERO_INITIALIZE();
 
 sp_str_t tmpfs_default_top_level() {
-  sp_str_t tmp = sp_os_get_env_as_path(sp_str_lit("SPN_TEST_TMP"));
+  sp_str_t tmp = sp_fs_normalize_path(sp_os_env_get(sp_str_lit("SPN_TEST_TMP")));
   if (sp_str_empty(tmp)) {
     tmp = sp_str_lit(".tmp");
   }
@@ -20,13 +20,10 @@ sp_str_t tmpfs_default_top_level() {
   tmp = sp_fs_canonicalize_path(tmp);
 
   sp_tm_epoch_t now = sp_tm_now_epoch();
-  sp_str_t iso = sp_tm_epoch_to_iso8601(now);
-  c8* sanitized = (c8*)sp_alloc(iso.len);
-  sp_for(it, iso.len) {
-    sanitized[it] = iso.data[it] == ':' ? '-' : iso.data[it];
-  }
-
-  return sp_fs_join_path(tmp, sp_str(sanitized, iso.len));
+  sp_str_t timestamp = sp_tm_epoch_to_iso8601(now);
+  u32 pid = (u32)sp_sys_getpid();
+  sp_str_t dirname = sp_format("{}-{}", SP_FMT_STR(sp_str_replace_c8(timestamp, ':', '-')), SP_FMT_U32(pid));
+  return sp_fs_join_path(tmp, dirname);
 }
 
 void tmpfs_set_top_level(sp_str_t root) {

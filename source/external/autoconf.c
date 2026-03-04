@@ -1,6 +1,6 @@
 #include "autoconf.h"
 
-#include "ctx.h"
+#include "unit/build.h"
 
 void spn_autoconf(spn_build_ctx_t* build) {
   spn_autoconf_t* autoconf = spn_autoconf_new(build);

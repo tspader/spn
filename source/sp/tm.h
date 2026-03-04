@@ -10,5 +10,6 @@ bool sp_tm_epoch_le(sp_tm_epoch_t a, sp_tm_epoch_t b);
 bool sp_tm_epoch_eq(sp_tm_epoch_t a, sp_tm_epoch_t b);
 sp_tm_epoch_t sp_tm_epoch_min(sp_tm_epoch_t a, sp_tm_epoch_t b);
 sp_tm_epoch_t sp_tm_epoch_max(sp_tm_epoch_t a, sp_tm_epoch_t b);
+sp_str_t sp_tm_epoch_to_iso8601_us(sp_tm_epoch_t time);
 
 #endif
