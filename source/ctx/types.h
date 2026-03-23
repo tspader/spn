@@ -6,7 +6,7 @@
 #include "event/types.h"
 #include "index/types.h"
 
-#include "cli.h"
+#include "cli/types.h"
 #include "intern.h"
 #include "jit.h"
 #include "log.h"

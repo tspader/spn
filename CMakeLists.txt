@@ -174,7 +174,23 @@ set(SPN_SOURCES
   source/pkg/pkg.c
   source/lock/lock.c
   source/profile.c
-  source/cli.c
+  source/cli/cli.c
+  source/cli/init.c
+  source/cli/add.c
+  source/cli/build.c
+  source/cli/run.c
+  source/cli/test.c
+  source/cli/clean.c
+  source/cli/copy.c
+  source/cli/generate.c
+  source/cli/graph.c
+  source/cli/list.c
+  source/cli/ls.c
+  source/cli/manifest.c
+  source/cli/which.c
+  source/cli/update.c
+  source/cli/tool.c
+  source/cli/dispatch_publish.c
   source/cli/publish.c
   source/gen.c
   source/filter.c

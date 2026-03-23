@@ -1,5 +1,5 @@
-#ifndef SPN_INTERNAL_CLI_H
-#define SPN_INTERNAL_CLI_H
+#ifndef SPN_CLI_TYPES_H
+#define SPN_CLI_TYPES_H
 
 #include "sp.h"
 #include "sp/cli.h"
@@ -155,30 +155,5 @@ struct spn_cli {
   spn_cli_clean_t clean;
   spn_cli_publish_t publish;
 };
-
-sp_app_result_t spn_cli_clean(spn_cli_t* cli);
-sp_app_result_t spn_cli_build(spn_cli_t* cli);
-sp_app_result_t spn_cli_run(spn_cli_t* cli);
-sp_app_result_t spn_cli_test(spn_cli_t* cli);
-sp_app_result_t spn_cli_generate(spn_cli_t* cli);
-sp_app_result_t spn_cli_copy(spn_cli_t* cli);
-sp_app_result_t spn_cli_init(spn_cli_t* cli);
-sp_app_result_t spn_cli_add(spn_cli_t* cli);
-sp_app_result_t spn_cli_update(spn_cli_t* cli);
-sp_app_result_t spn_cli_tool(spn_cli_t* cli);
-sp_app_result_t spn_cli_tool_install(spn_cli_t* cli);
-sp_app_result_t spn_cli_tool_uninstall(spn_cli_t* cli);
-sp_app_result_t spn_cli_tool_run(spn_cli_t* cli);
-sp_app_result_t spn_cli_list(spn_cli_t* cli);
-sp_app_result_t spn_cli_ls(spn_cli_t* cli);
-sp_app_result_t spn_cli_which(spn_cli_t* cli);
-sp_app_result_t spn_cli_manifest(spn_cli_t* cli);
-sp_app_result_t spn_cli_graph(spn_cli_t* cli);
-sp_app_result_t spn_cli_publish(spn_cli_t* cli);
-sp_app_result_t spn_cli_root(spn_cli_t* cli);
-sp_app_result_t spn_cli_help(spn_cli_parser_t* p);
-spn_cli_usage_t spn_cli(void);
-
-#define SPN_CLI_UNIMPLEMENTED() SP_LOG("unimplemented"); return SP_APP_ERR;
 
 #endif

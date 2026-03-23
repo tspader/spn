@@ -35,7 +35,7 @@
 
 // SPN
 #include "app/app.h"
-#include "cli.h"
+#include "cli/cli.h"
 #include "enum/enum.h"
 #include "ctx/ctx.h"
 #include "filter.h"

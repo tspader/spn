@@ -1,4 +1,4 @@
-#include "cli.h"
+#include "sp/cli.h"
 
 sp_app_result_t spn_cli_parser_err(spn_cli_parser_t* parser, sp_str_t err) {
   parser->err = sp_str_copy(err);

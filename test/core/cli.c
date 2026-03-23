@@ -1,8 +1,7 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
-#define SPN_CLI_IMPLEMENTATION
-#include "cli.h"
+#include "cli/types.h"
 
 #include "test.h"
 #include "utest.h"

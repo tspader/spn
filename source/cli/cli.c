@@ -1,14 +1,9 @@
-#include "app/app.h"
-#include "cli/publish.h"
-#include "ctx/types.h"
-#include "event/event.h"
+#include "cli/cli.h"
+
+#include "ctx/ctx.h"
 #include "log.h"
 #include "pkg/pkg.h"
-#include "sp/io.h"
 
-///////////
-// ENUMS //
-///////////
 static sp_str_t spn_cli_opt_kind_to_str(spn_cli_opt_kind_t kind) {
   switch (kind) {
     SPN_CLI_OPT_KIND(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
@@ -16,46 +11,6 @@ static sp_str_t spn_cli_opt_kind_to_str(spn_cli_opt_kind_t kind) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-static void sp_sh_ls(sp_str_t path) {
-  if (!sp_fs_exists(path)) {
-    SP_LOG("{:fg brightcyan} hasn't been built for your configuration", SP_FMT_STR(path));
-    return;
-  }
-
-  struct {
-    const c8* command;
-    const c8* args [4];
-  } tools [4] = {
-    { "lsd", "--tree", "--depth", "2" },
-    { "tree", "-L", "2" },
-    { "ls" },
-  };
-
-  SP_CARR_FOR(tools, i) {
-    if (sp_fs_is_on_path(sp_str_view(tools[i].command))) {
-      sp_ps_config_t config = SP_ZERO_INITIALIZE();
-      config.command = sp_str_view(tools[i].command);
-
-      SP_CARR_FOR(tools[i].args, j) {
-        const c8* arg = tools[i].args[j];
-        if (!arg) break;
-        sp_ps_config_add_arg(&config, sp_str_view(arg));
-      }
-
-      sp_ps_config_add_arg(&config, path);
-
-      sp_ps_output_t result = sp_ps_run(config);
-      SP_ASSERT(!result.status.exit_code);
-      SP_LOG("{}", SP_FMT_STR(sp_str_trim(result.out)));
-      return;
-    }
-  }
-}
-
-
-/////////
-// CLI //
-/////////
 spn_cli_command_info_t spn_cli_command_info_from_usage(spn_cli_usage_t cmd) {
   spn_cli_command_info_t info = {
     .name = sp_str_from_cstr(cmd.name),
@@ -63,7 +18,6 @@ spn_cli_command_info_t spn_cli_command_info_from_usage(spn_cli_usage_t cmd) {
     .summary = sp_str_from_cstr(cmd.summary),
   };
 
-  // Process options
   sp_carr_for(cmd.opts, it) {
     if (!cmd.opts[it].name) break;
 
@@ -77,7 +31,6 @@ spn_cli_command_info_t spn_cli_command_info_from_usage(spn_cli_usage_t cmd) {
     sp_da_push(info.opts, opt);
   }
 
-  // Process arguments
   sp_carr_for(cmd.args, it) {
     if (!cmd.args[it].name) break;
 
@@ -118,7 +71,6 @@ sp_str_t spn_cli_command_usage(spn_cli_usage_t cmd) {
     sp_dyn_array_for(info.opts, it) {
       spn_cli_opt_info_t opt = info.opts[it];
 
-      // Build short flag display
       sp_str_t short_display;
       if (!sp_str_empty(opt.brief)) {
         sp_str_t short_text = sp_format("-{}", SP_FMT_STR(opt.brief));
@@ -127,7 +79,6 @@ sp_str_t spn_cli_command_usage(spn_cli_usage_t cmd) {
         short_display = sp_str_lit("");
       }
 
-      // Build long flag display
       sp_str_t long_display;
       if (!sp_str_empty(opt.placeholder)) {
         sp_str_t long_text = sp_format("--{}", SP_FMT_STR(opt.name));
@@ -187,7 +138,6 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cmd) {
   spn_cli_command_info_t cmd_info = spn_cli_command_info_from_usage(*cmd);
   spn_cli_usage_info_t info = SP_ZERO_INITIALIZE();
 
-  // Collect subcommands
   if (cmd->commands) {
     for (spn_cli_usage_t* sub = cmd->commands; sub->name; sub++) {
       spn_cli_command_info_t sub_info = spn_cli_command_info_from_usage(*sub);
@@ -213,7 +163,6 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cmd) {
     sp_str_builder_new_line(&builder);
   }
 
-  // Render opts (from the command itself)
   if (!sp_dyn_array_empty(cmd_info.opts)) {
     sp_str_builder_append_fmt(&builder, "{:fg brightgreen}", SP_FMT_CSTR("options"));
     sp_str_builder_new_line(&builder);
@@ -260,7 +209,6 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cmd) {
     sp_str_builder_new_line(&builder);
   }
 
-  // Render subcommands
   if (!sp_dyn_array_empty(info.commands)) {
     sp_str_builder_append_fmt(&builder, "{:fg brightgreen}", SP_FMT_CSTR("commands"));
     sp_str_builder_new_line(&builder);
@@ -323,490 +271,13 @@ sp_app_result_t spn_cli_set_profile(spn_app_t* app, sp_str_t name) {
   return SP_APP_CONTINUE;
 }
 
-// Get resolved package path from resolver (doesn't require builder init)
-sp_str_t spn_cli_get_resolved_pkg_source(sp_str_t name) {
-  spn_resolved_pkg_t* resolved = sp_str_ht_get(app.resolver->resolved, name);
-  SP_ASSERT_FMT(resolved, "{:fg brightyellow} is not in this project", SP_FMT_STR(name));
-  return sp_fs_join_path(spn.paths.source, resolved->pkg->name);
-}
-
-sp_app_result_t spn_cli_init(spn_cli_t* cli) {
-  spn_cli_init_t* cmd = &cli->init;
-
-  spn_app_t app = spn_app_init_and_write(
-    spn.paths.cwd,
-    sp_fs_get_stem(spn.paths.cwd),
-    cmd->bare ? SPN_APP_INIT_BARE : SPN_APP_INIT_NORMAL
-  );
-
-  SP_LOG("Initialized project {:fg brightcyan}. Run {:fg brightyellow} to build.", SP_FMT_STR(app.package.name), SP_FMT_CSTR("spn build"));
-  return SP_APP_QUIT;
-}
-
 sp_app_result_t spn_cli_root(spn_cli_t* cli) {
   sp_str_t help = spn_cli_usage(&cli->usage);
   sp_log(help);
   return SP_APP_QUIT;
 }
 
-sp_app_result_t spn_cli_list(spn_cli_t* cli) {
-  return SP_APP_QUIT;
-}
-
-sp_app_result_t spn_cli_publish(spn_cli_t* cli) {
-  spn_cli_publish_t* cmd = &cli->publish;
-
-  sp_str_t index_name = sp_str_empty(cmd->index) ? sp_str_lit("core") : cmd->index;
-
-  spn_index_t* index = SP_NULLPTR;
-  sp_da_for(spn.indexes, it) {
-    if (sp_str_equal(spn.indexes[it].name, index_name)) {
-      index = &spn.indexes[it];
-      break;
-    }
-  }
-
-  if (!index) {
-    spn_log_error("index {:fg brightcyan} not found", SP_FMT_STR(index_name));
-    return SP_APP_QUIT;
-  }
-
-  spn_publish_opts_t opts = {
-    .cwd = spn.paths.cwd,
-    .index = index,
-    .url = cmd->source_url,
-    .revision = cmd->source_rev,
-  };
-
-  spn_err_union_t result = spn_publish(&opts);
-
-  if (result.kind) {
-    switch (result.kind) {
-      case SPN_ERR_NO_MANIFEST: {
-        spn_log_error("no manifest found at {:fg brightcyan}", SP_FMT_STR(result.no_manifest.path));
-        break;
-      }
-      case SPN_ERR_MANIFEST_PARSE: {
-        spn_log_error("failed to parse {:fg brightcyan}", SP_FMT_STR(result.manifest_parse.path));
-        break;
-      }
-      case SPN_ERR_MANIFEST_FIELD: {
-        spn_log_error("invalid field {:fg brightyellow} in manifest: expected {:fg brightgreen}, got {:fg brightred}",
-          SP_FMT_STR(result.manifest_field.path),
-          SP_FMT_STR(result.manifest_field.expected),
-          SP_FMT_STR(result.manifest_field.actual)
-        );
-        break;
-      }
-      case SPN_ERR_NOT_GIT_REPO: {
-        spn_log_error("{:fg brightcyan} is not inside a git repository", SP_FMT_STR(result.not_git_repo.path));
-        break;
-      }
-      case SPN_ERR_GIT: {
-        spn_log_error("git command failed: {:fg brightyellow}", SP_FMT_STR(result.git.command));
-        break;
-      }
-      case SPN_ERR_VERSION_EXISTS: {
-        spn_log_error("version {:fg brightyellow} of {:fg brightcyan} already exists in the index",
-          SP_FMT_STR(result.version_exists.version),
-          SP_FMT_STR(result.version_exists.name)
-        );
-        break;
-      }
-      default: {
-        spn_log_error("publish failed");
-        break;
-      }
-    }
-  } else {
-    SP_LOG("published successfully");
-  }
-
-  return SP_APP_QUIT;
-}
-
-sp_app_result_t spn_cli_clean(spn_cli_t* cli) {
-  spn_cli_clean_t* cmd = &cli->clean;
-
-  // Create a minimal context for clean events
-  spn_build_ctx_t ctx = SP_ZERO_INITIALIZE();
-  ctx.name = sp_str_lit("package");
-
-  sp_str_t build_dir = sp_fs_join_path(app.paths.dir, sp_str_lit("build"));
-
-  if (sp_str_valid(cmd->profile)) {
-    // Clean only the specified profile
-    sp_str_t profile_dir = sp_fs_join_path(build_dir, cmd->profile);
-    if (sp_fs_exists(profile_dir)) {
-      spn_event_buffer_push_ctx(spn.events, &ctx, (spn_build_event_t) {
-        .kind = SPN_EVENT_CLEAN,
-        .clean.path = profile_dir
-      });
-      sp_fs_remove_dir(profile_dir);
-    }
-  } else {
-    // Clean the entire build directory
-    if (sp_fs_exists(build_dir)) {
-      spn_event_buffer_push_ctx(spn.events, &ctx, (spn_build_event_t) {
-        .kind = SPN_EVENT_CLEAN,
-        .clean.path = build_dir
-      });
-      sp_fs_remove_dir(build_dir);
-    }
-
-    // Remove the lock file
-    if (sp_fs_exists(app.paths.lock)) {
-      spn_event_buffer_push_ctx(spn.events, &ctx, (spn_build_event_t) {
-        .kind = SPN_EVENT_CLEAN,
-        .clean.path = app.paths.lock
-      });
-      sp_fs_remove_file(app.paths.lock);
-    }
-  }
-
-  // Drain and render events
-  sp_da(spn_build_event_t) events = spn_event_buffer_drain(spn.events);
-  sp_da_for(events, it) {
-    spn_build_event_t* event = &events[it];
-    sp_io_write_line(&spn.logger.err, spn_tui_render_event(event, spn.tui.info.max_name));
-  }
-
-  return SP_APP_QUIT;
-}
-
-sp_app_result_t spn_cli_copy(spn_cli_t* cli) {
-  spn_cli_copy_t* cmd = &cli->copy;
-
-  sp_str_t destination = sp_fs_normalize_path(cmd->directory);
-  sp_str_t to = sp_fs_join_path(spn.paths.cwd, destination);
-  sp_fs_create_dir(to);
-
-  sp_om_for(app.session.units.packages, it) {
-    spn_pkg_unit_t* dep = sp_om_at(app.session.units.packages, it);
-    spn_build_ctx_t* ctx = &dep->ctx;
-
-    sp_dyn_array(sp_fs_entry_t) entries = sp_fs_collect(ctx->paths.lib);
-    sp_dyn_array_for(entries, i) {
-      sp_fs_entry_t* entry = entries + i;
-      sp_fs_copy_file(
-        entry->file_path,
-        sp_fs_join_path(to, sp_fs_get_name(entry->file_path))
-      );
-    }
-  }
-  return SP_APP_QUIT;
-}
-
-sp_app_result_t spn_cli_ls(spn_cli_t* cli) {
-  // spn_cli_ls_t* cmd = &cli->ls;
-  //
-  // spn_app_resolve(&app);
-  //
-  // if (sp_str_valid(cmd->package)) {
-  //   sp_str_t dir = spn_cli_get_resolved_pkg_source(cmd->package);
-  //   sp_sh_ls(dir);
-  // }
-  // else {
-  //   spn_pkg_dir_t kind = SPN_DIR_CACHE;
-  //   if (sp_str_valid(cmd->dir)) {
-  //     kind = spn_cache_dir_kind_from_str(cmd->dir);
-  //   }
-  //
-  //   sp_str_t dir = spn_cache_dir_kind_to_path(kind);
-  //   sp_sh_ls(dir);
-  // }
-  return SP_APP_QUIT;
-}
-
-sp_app_result_t spn_cli_which(spn_cli_t* cli) {
-  sp_try(spn_cli_set_profile(&app, sp_str_lit("")));
-
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_WHICH);
-  return SP_APP_CONTINUE;
-}
-
-sp_app_result_t spn_cli_manifest(spn_cli_t* cli) {
-  // spn_cli_manifest_t* cmd = &cli->manifest;
-  //
-  // spn_app_resolve(&app);
-  //
-  // spn_pkg_unit_t* dep = spn_session_find_pkg_or_assert(&app.session, cmd->package);
-  //
-  // sp_str_t path = dep->ctx.pkg->paths.manifest;
-  // sp_str_t manifest = sp_io_read_file(path);
-  // if (!sp_str_valid(manifest)) {
-  //   SP_FATAL("Failed to read manifest at {:fg brightyellow}", SP_FMT_STR(path));
-  // }
-  //
-  // sp_log(manifest);
-  return SP_APP_QUIT;
-}
-
-sp_app_result_t spn_cli_graph(spn_cli_t* cli) {
-  spn_cli_build_t* command = &cli->build;
-
-  app.config = (spn_app_config_t) {
-    .force = command->force,
-    .filter = (spn_target_filter_t) {
-      .name = command->target,
-      .disabled = {
-        .public = false,
-        .test = false,
-      }
-    },
-  };
-
-  sp_try(spn_cli_set_profile(&app, command->profile));
-
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PREPARE_BUILD_GRAPH);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RENDER_BUILD_GRAPH);
-
-  return SP_APP_CONTINUE;
-}
-
-sp_app_result_t spn_cli_add(spn_cli_t* cli) {
-  // spn_cli_add_t* cmd = &cli->add;
-  //
-  // if (cmd->test && cmd->build) {
-  //   SP_FATAL("cannot specify both {:fg yellow} and {:fg yellow}", SP_FMT_CSTR("--test"), SP_FMT_CSTR("--build"));
-  // }
-  //
-  // spn_visibility_t visibility = cmd->test  ? SPN_VISIBILITY_TEST
-  //                             : cmd->build ? SPN_VISIBILITY_BUILD
-  //                             :              SPN_VISIBILITY_PUBLIC;
-  // if (sp_ht_getp(app.package.deps, cmd->package)) {
-  //   SP_FATAL("{:fg brightyellow} is already in your project", SP_FMT_STR(cmd->package));
-  // }
-  // spn_pkg_add_dep_latest(&app.package, cmd->package, visibility);
-  // spn_resolve_from_solver(&app);
-  // spn_app_update_lock_file(&app);
-  // spn_app_write_manifest(&app.package, app.package.paths.manifest);
-  return SP_APP_QUIT;
-}
-
-sp_app_result_t spn_cli_update(spn_cli_t* cli) {
-  // spn_cli_update_t* cmd = &cli->update;
-  //
-  // spn_pkg_req_t* existing = sp_ht_getp(app.package.deps, cmd->package);
-  // if (!existing) {
-  //   SP_FATAL("package {:fg brightcyan} is not a dependency", SP_FMT_STR(cmd->package));
-  // }
-  //
-  // spn_pkg_add_dep_latest(&app.package, cmd->package, existing->visibility);
-  // spn_resolve_from_solver(&app);
-  // spn_app_update_lock_file(&app);
-  // spn_app_write_manifest(&app.package, app.package.paths.manifest);
-  return SP_APP_QUIT;
-}
-
-sp_app_result_t spn_cli_tool_install(spn_cli_t* cli) {
-  SPN_CLI_UNIMPLEMENTED();
-}
-
-sp_app_result_t spn_cli_tool_uninstall(spn_cli_t* cli) {
-  SPN_CLI_UNIMPLEMENTED();
-}
-
-sp_app_result_t spn_cli_tool_run(spn_cli_t* cli) {
-  SPN_CLI_UNIMPLEMENTED();
-}
-
-sp_app_result_t spn_cli_tool(spn_cli_t* cli) {
-  SPN_CLI_UNIMPLEMENTED();
-}
-
-sp_app_result_t spn_cli_generate(spn_cli_t* cli) {
-  spn_cli_generate_t* command = &cli->generate;
-
-  if (sp_str_valid(command->path) && !sp_str_valid(command->generator)) {
-    SP_FATAL(
-      "output path was specified, but no generator. try e.g.:\n  spn generate --path {} {:fg yellow}",
-      SP_FMT_STR(command->path),
-      SP_FMT_CSTR("--generator make")
-    );
-  }
-  if (!sp_str_valid(command->generator)) command->generator = sp_str_lit("");
-  if (!sp_str_valid(command->compiler)) command->compiler = sp_str_lit("gcc");
-
-  if (!app.lock.some) {
-    SP_FATAL("No lock file found. Run {:fg yellow} first.", SP_FMT_CSTR("spn build"));
-  }
-
-  sp_try(spn_cli_set_profile(&app, sp_str_lit("")));
-
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_GENERATE);
-
-  return SP_APP_CONTINUE;
-}
-
-static bool spn_cli_run_path_is_absolute(sp_str_t path) {
-  return sp_str_starts_with(path, sp_str_lit("/")) ||
-    sp_str_starts_with(path, sp_str_lit("\\")) ||
-    (path.len > 1 && path.data[1] == ':');
-}
-
-static bool spn_cli_run_path_is_explicit(sp_str_t path) {
-  return spn_cli_run_path_is_absolute(path) ||
-    sp_str_starts_with(path, sp_str_lit(".")) ||
-    sp_str_find_c8(path, '/') != SP_STR_NO_MATCH ||
-    sp_str_find_c8(path, '\\') != SP_STR_NO_MATCH;
-}
-
-static bool spn_cli_run_is_source_entry(sp_str_t entry, bool has_manifest) {
-  if (!sp_str_equal(sp_fs_get_ext(entry), sp_str_lit("c"))) {
-    return false;
-  }
-
-  if (!has_manifest) {
-    return true;
-  }
-
-  if (sp_om_has(app.package.scripts, entry)) {
-    return false;
-  }
-
-  if (spn_cli_run_path_is_explicit(entry)) {
-    return true;
-  }
-
-  return sp_fs_exists(sp_fs_join_path(spn.paths.project, entry));
-}
-
-sp_app_result_t spn_cli_run(spn_cli_t* cli) {
-  spn_cli_run_t* command = &cli->run;
-  bool has_manifest = sp_fs_exists(spn.paths.manifest);
-  bool source = spn_cli_run_is_source_entry(command->entry, has_manifest);
-
-  app.config = (spn_app_config_t) {
-    .filter = (spn_target_filter_t) {
-      .name = source ? sp_str_lit("") : command->entry,
-      .disabled = {
-        .public = source,
-        .test = source,
-        .script = source,
-      }
-    },
-    .run = {
-      .kind = source ? SPN_RUN_KIND_SOURCE : SPN_RUN_KIND_SCRIPT,
-      .target = command->entry,
-    },
-  };
-
-  sp_try_as(spn_cli_set_profile(&app, command->profile), SP_APP_ERR);
-
-  if (source) {
-    if (has_manifest) {
-      spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
-      spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
-      spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
-    }
-
-    spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN);
-    return SP_APP_CONTINUE;
-  }
-
-  if (!has_manifest) {
-    spn_log_error("no manifest found in {:fg brightcyan}; pass a relative {:fg brightyellow} file instead",
-      SP_FMT_STR(spn.paths.project),
-      SP_FMT_CSTR(".c")
-    );
-    return SP_APP_ERR;
-  }
-
-  if (!sp_om_has(app.package.scripts, command->entry)) {
-    spn_log_error("script target {:fg brightyellow} is not defined in {:fg brightcyan}",
-      SP_FMT_STR(command->entry),
-      SP_FMT_STR(app.package.paths.manifest)
-    );
-    return SP_APP_ERR;
-  }
-
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PREPARE_BUILD_GRAPH);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN_BUILD_GRAPH);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN);
-
-  return SP_APP_CONTINUE;
-}
-
-sp_app_result_t spn_cli_test(spn_cli_t* cli) {
-  spn_cli_test_t* command = &cli->test;
-
-  app.config = (spn_app_config_t) {
-    .filter = (spn_target_filter_t) {
-      .name = command->target,
-      .disabled = {
-        .public = true,
-        .script = true,
-      }
-    },
-    .run = {
-      .kind = SPN_RUN_KIND_TESTS,
-    },
-  };
-
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PREPARE_BUILD_GRAPH);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN_BUILD_GRAPH);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN);
-
-  sp_try_as(spn_cli_set_profile(&app, command->profile), SP_APP_ERR);
-
-  return SP_APP_CONTINUE;
-}
-
-sp_app_result_t spn_cli_build(spn_cli_t* cli) {
-  spn_cli_build_t* command = &cli->build;
-
-  app.config = (spn_app_config_t) {
-    .force = command->force,
-    .filter = (spn_target_filter_t) {
-      .name = command->target,
-      .disabled = {
-        .test = sp_str_empty(command->target) && !command->tests,
-        .script = sp_str_empty(command->target),
-      }
-    },
-  };
-
-  sp_try(spn_cli_set_profile(&app, command->profile));
-
-  spn_event_buffer_push_ex(spn.events, &app.package, SP_NULLPTR, (spn_build_event_t) {
-    .kind = SPN_EVENT_CLI_ENTRY,
-    .cli_entry = {
-      .command = sp_str_lit("build"),
-      .profile = app.config.profile ? app.config.profile->name : sp_str_lit(""),
-      .target = command->target,
-      .force = command->force,
-      .cwd = spn.paths.cwd,
-      .manifest = app.package.paths.manifest,
-    }
-  });
-
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PREPARE_BUILD_GRAPH);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN_BUILD_GRAPH);
-
-  return SP_APP_CONTINUE;
-}
-
 spn_cli_usage_t spn_cli() {
-  spn_cli_t* cli = &spn.cli;
   static spn_cli_usage_t tools [] = {
     {
       .name = "install",
