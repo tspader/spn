@@ -1,0 +1,9 @@
+#ifndef SPN_EVENT_LOG_H
+#define SPN_EVENT_LOG_H
+
+#include "event/types.h"
+
+void spn_event_log_init(void);
+void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event);
+
+#endif

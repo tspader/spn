@@ -125,17 +125,6 @@ static sp_str_t spn_pkg_toml_path_array_item(toml_path_t path, const c8* key, u3
   return sp_format("{}.{}[{}]", SP_FMT_STR(path.parent), SP_FMT_CSTR(key), SP_FMT_U32(it));
 }
 
-static spn_err_union_t field_error(sp_str_t path, sp_str_t expected, sp_str_t actual) {
-  return (spn_err_union_t) {
-    .kind = SPN_ERR_MANIFEST_FIELD,
-    .manifest_field = {
-      .path = path,
-      .expected = expected,
-      .actual = actual,
-    },
-  };
-}
-
 static spn_toml_value_kind_t toml_kind_from_field(toml_table_t* table, const c8* key) {
   if (toml_table_array(table, key)) {
     return SPN_TOML_VALUE_KIND_ARRAY;
@@ -171,12 +160,52 @@ static sp_str_t toml_kind_to_str(spn_toml_value_kind_t kind) {
   SP_UNREACHABLE_RETURN(sp_str_lit("unknown"));
 }
 
+// @spader
+// These are for generating rich error messages, but I don't like how it's done. It always feels wrong
+// to return purely aesthetic data far away from the place where we're building the mesage. We ought
+// to be returning structured data here, at the site of the error, and mapping it onto readable
+// strings at the place it's reported
 static spn_err_union_t field_missing_error(sp_str_t path, sp_str_t expected) {
-  return field_error(path, expected, sp_str_lit("missing"));
+  return (spn_err_union_t) {
+    .kind = SPN_ERR_MANIFEST_FIELD,
+    .manifest_field = {
+      .path = path,
+      .expected = expected,
+      .actual = sp_str_lit("missing"),
+    },
+  };
 }
 
 static spn_err_union_t field_type_error(sp_str_t path, sp_str_t expected, spn_toml_value_kind_t actual) {
-  return field_error(path, expected, toml_kind_to_str(actual));
+  return (spn_err_union_t) {
+    .kind = SPN_ERR_MANIFEST_FIELD,
+    .manifest_field = {
+      .path = path,
+      .expected = expected,
+      .actual = toml_kind_to_str(actual),
+    },
+  };
+}
+
+static spn_err_union_t ensure_unique_target_name(spn_pkg_t* pkg, toml_path_t path, sp_str_t name) {
+  bool exists =
+    sp_om_has(pkg->libs, name)    ||
+    sp_om_has(pkg->exes, name)    ||
+    sp_om_has(pkg->scripts, name) ||
+    sp_om_has(pkg->tests, name);
+
+  if (exists) {
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_MANIFEST_FIELD,
+      .manifest_field = {
+        .path = spn_pkg_toml_path_field(path, "name"),
+        .expected = sp_str_lit("unique target name"),
+        .actual = sp_format("{} is already defined", SP_FMT_STR(name)),
+      },
+    };
+  }
+
+  return spn_result(SPN_OK);
 }
 
 static spn_err_union_t toml_get_table_required(toml_table_t* table, const c8* key, toml_path_t path, toml_table_t** out) {
@@ -296,6 +325,35 @@ static spn_err_union_t toml_get_array_string_required(toml_array_t* array, u32 i
   return spn_result(SPN_OK);
 }
 
+static spn_err_union_t spn_pkg_load_targets(
+  toml_table_t* table,
+  toml_path_t path,
+  spn_target_t* target
+) {
+  toml_array_t* source = toml_table_array(table, "source");
+  spn_toml_arr_for(source, s) {
+    sp_str_t value = SP_ZERO_INITIALIZE();
+    spn_try_union(toml_get_array_string_required(source, s, path, "source", &value));
+    spn_target_add_source_ex(target, value);
+  }
+
+  toml_array_t* include = toml_table_array(table, "include");
+  spn_toml_arr_for(include, i) {
+    sp_str_t value = SP_ZERO_INITIALIZE();
+    spn_try_union(toml_get_array_string_required(include, i, path, "include", &value));
+    spn_target_add_include_ex(target, value);
+  }
+
+  toml_array_t* define = toml_table_array(table, "define");
+  spn_toml_arr_for(define, d) {
+    sp_str_t value = SP_ZERO_INITIALIZE();
+    spn_try_union(toml_get_array_string_required(define, d, path, "define", &value));
+    spn_target_add_define_ex(target, value);
+  }
+
+  return spn_result(SPN_OK);
+}
+
 static spn_err_union_t spn_pkg_load_deps(toml_table_t* toml, spn_pkg_t* package, spn_visibility_t visibility, sp_str_t path, sp_str_t manifest_dir) {
   if (!toml) {
     return spn_result(SPN_OK);
@@ -370,6 +428,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     toml_table_t* package;
     toml_array_t* lib;
     toml_array_t* bin;
+    toml_array_t* script;
     toml_array_t* test;
     toml_table_t* deps;
     toml_array_t* profile;
@@ -398,6 +457,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   spn_try_union(toml_get_table_required(toml.manifest, "package", root_path, &toml.package));
   spn_try_union(toml_get_array_optional(toml.manifest, "lib", root_path, &toml.lib));
   spn_try_union(toml_get_array_optional(toml.manifest, "bin", root_path, &toml.bin));
+  spn_try_union(toml_get_array_optional(toml.manifest, "script", root_path, &toml.script));
   spn_try_union(toml_get_array_optional(toml.manifest, "test", root_path, &toml.test));
   spn_try_union(toml_get_array_optional(toml.manifest, "profile", root_path, &toml.profile));
   spn_try_union(toml_get_array_optional(toml.manifest, "index", root_path, &toml.index));
@@ -457,44 +517,25 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   spn_toml_arr_for(toml.lib, n) {
     toml_table_t* it = SP_NULLPTR;
     spn_try_union(toml_get_array_table_required(toml.lib, n, sp_str_lit("lib"), &it));
-    toml_path_t lib_path = spn_pkg_toml_path_with_index(sp_str_lit("lib"), n);
+    toml_path_t path = spn_pkg_toml_path_with_index(sp_str_lit("lib"), n);
 
     sp_str_t name = SP_ZERO_INITIALIZE();
     toml_array_t* kinds = SP_NULLPTR;
-    spn_try_union(toml_get_str_required(it, "name", lib_path, &name));
-    spn_try_union(toml_get_array_required(it, "kinds", lib_path, &kinds));
+    spn_try_union(toml_get_str_required(it, "name", path, &name));
+    spn_try_union(toml_get_array_required(it, "kinds", path, &kinds));
 
-    spn_linkage_set_t linkage_set = SP_ZERO_INITIALIZE();
+    spn_linkage_set_t linkages = SP_ZERO_INITIALIZE();
     spn_toml_arr_for(kinds, k) {
       sp_str_t kind = SP_ZERO_INITIALIZE();
-      spn_try_union(toml_get_array_string_required(kinds, k, lib_path, "kinds", &kind));
-      spn_linkage_set_add(&linkage_set, spn_pkg_linkage_from_str(kind));
+      spn_try_union(toml_get_array_string_required(kinds, k, path, "kinds", &kind));
+      spn_linkage_set_add(&linkages, spn_pkg_linkage_from_str(kind));
     }
 
-    spn_linkage_t default_linkage = spn_linkage_set_default(linkage_set);
-    spn_target_t* lib = spn_pkg_add_lib_ex(pkg, name, default_linkage);
-    lib->linkages = linkage_set;
-
-    toml_array_t* source = toml_table_array(it, "source");
-    spn_toml_arr_for(source, s) {
-      sp_str_t value = SP_ZERO_INITIALIZE();
-      spn_try_union(toml_get_array_string_required(source, s, lib_path, "source", &value));
-      spn_target_add_source_ex(lib, value);
-    }
-
-    toml_array_t* include_arr = toml_table_array(it, "include");
-    spn_toml_arr_for(include_arr, i) {
-      sp_str_t value = SP_ZERO_INITIALIZE();
-      spn_try_union(toml_get_array_string_required(include_arr, i, lib_path, "include", &value));
-      spn_target_add_include_ex(lib, value);
-    }
-
-    toml_array_t* define_arr = toml_table_array(it, "define");
-    spn_toml_arr_for(define_arr, d) {
-      sp_str_t value = SP_ZERO_INITIALIZE();
-      spn_try_union(toml_get_array_string_required(define_arr, d, lib_path, "define", &value));
-      spn_target_add_define_ex(lib, value);
-    }
+    spn_try_union(ensure_unique_target_name(pkg, path, name));
+    spn_linkage_t linkage = spn_linkage_set_default(linkages);
+    spn_target_t* lib = spn_pkg_add_lib_ex(pkg, name, linkage);
+    lib->linkages = linkages;
+    spn_try_union(spn_pkg_load_targets(it, path, lib));
   }
 
   spn_toml_arr_for(toml.profile, n) {
@@ -540,69 +581,46 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   spn_toml_arr_for(toml.bin, n) {
     toml_table_t* it = SP_NULLPTR;
     spn_try_union(toml_get_array_table_required(toml.bin, n, sp_str_lit("bin"), &it));
-    toml_path_t bin_path = spn_pkg_toml_path_with_index(sp_str_lit("bin"), n);
+    toml_path_t path = spn_pkg_toml_path_with_index(sp_str_lit("bin"), n);
 
-    sp_str_t bin_name = SP_ZERO_INITIALIZE();
-    spn_try_union(toml_get_str_required(it, "name", bin_path, &bin_name));
-    spn_target_t* bin = spn_pkg_add_exe_ex(pkg, bin_name);
+    sp_str_t name = SP_ZERO_INITIALIZE();
+    spn_try_union(toml_get_str_required(it, "name", path, &name));
+    spn_try_union(ensure_unique_target_name(pkg, path, name));
 
-    toml_array_t* source = toml_table_array(it, "source");
-    spn_toml_arr_for(source, s) {
-      sp_str_t value = SP_ZERO_INITIALIZE();
-      spn_try_union(toml_get_array_string_required(source, s, bin_path, "source", &value));
-      spn_target_add_source_ex(bin, value);
-    }
-
-    toml_array_t* include_arr = toml_table_array(it, "include");
-    spn_toml_arr_for(include_arr, i) {
-      sp_str_t value = SP_ZERO_INITIALIZE();
-      spn_try_union(toml_get_array_string_required(include_arr, i, bin_path, "include", &value));
-      spn_target_add_include_ex(bin, value);
-    }
-
-    toml_array_t* define_arr = toml_table_array(it, "define");
-    spn_toml_arr_for(define_arr, d) {
-      sp_str_t value = SP_ZERO_INITIALIZE();
-      spn_try_union(toml_get_array_string_required(define_arr, d, bin_path, "define", &value));
-      spn_target_add_define_ex(bin, value);
-    }
+    spn_target_t* bin = spn_pkg_add_exe_ex(pkg, name);
+    spn_try_union(spn_pkg_load_targets(it, path, bin));
 
     sp_str_t kind = sp_str_lit("");
-    spn_try_union(toml_get_str_optional(it, "kind", bin_path, &kind));
+    spn_try_union(toml_get_str_optional(it, "kind", path, &kind));
     if (!sp_str_empty(kind)) {
       spn_target_set_visibility(bin, spn_visibility_from_str(kind));
     }
   }
 
+  spn_toml_arr_for(toml.script, n) {
+    toml_table_t* it = SP_NULLPTR;
+    spn_try_union(toml_get_array_table_required(toml.script, n, sp_str_lit("script"), &it));
+    toml_path_t path = spn_pkg_toml_path_with_index(sp_str_lit("script"), n);
+
+    sp_str_t name = SP_ZERO_INITIALIZE();
+    spn_try_union(toml_get_str_required(it, "name", path, &name));
+    spn_try_union(ensure_unique_target_name(pkg, path, name));
+
+    spn_target_t* script = spn_pkg_add_script_ex(pkg, name);
+    spn_try_union(spn_pkg_load_targets(it, path, script));
+  }
+
   spn_toml_arr_for(toml.test, n) {
     toml_table_t* it = SP_NULLPTR;
     spn_try_union(toml_get_array_table_required(toml.test, n, sp_str_lit("test"), &it));
-    toml_path_t test_path = spn_pkg_toml_path_with_index(sp_str_lit("test"), n);
+    toml_path_t path = spn_pkg_toml_path_with_index(sp_str_lit("test"), n);
 
-    sp_str_t test_name = SP_ZERO_INITIALIZE();
-    spn_try_union(toml_get_str_required(it, "name", test_path, &test_name));
-    spn_target_t* test = spn_pkg_add_test_ex(pkg, test_name);
+    sp_str_t name = SP_ZERO_INITIALIZE();
+    spn_try_union(toml_get_str_required(it, "name", path, &name));
+    spn_try_union(ensure_unique_target_name(pkg, path, name));
 
-    toml_array_t* source = toml_table_array(it, "source");
-    spn_toml_arr_for(source, s) {
-      sp_str_t value = SP_ZERO_INITIALIZE();
-      spn_try_union(toml_get_array_string_required(source, s, test_path, "source", &value));
-      spn_target_add_source_ex(test, value);
-    }
-
-    toml_array_t* include_arr = toml_table_array(it, "include");
-    spn_toml_arr_for(include_arr, i) {
-      sp_str_t value = SP_ZERO_INITIALIZE();
-      spn_try_union(toml_get_array_string_required(include_arr, i, test_path, "include", &value));
-      spn_target_add_include_ex(test, value);
-    }
-
-    toml_array_t* define_arr = toml_table_array(it, "define");
-    spn_toml_arr_for(define_arr, d) {
-      sp_str_t value = SP_ZERO_INITIALIZE();
-      spn_try_union(toml_get_array_string_required(define_arr, d, test_path, "define", &value));
-      spn_target_add_define_ex(test, value);
-    }
+    spn_target_t* test = spn_pkg_add_test_ex(pkg, name);
+    spn_try_union(spn_pkg_load_targets(it, path, test));
   }
 
   if (toml.deps) {

@@ -2,7 +2,6 @@
 #define SPN_TASK_H
 
 #include "sp.h"
-#include "graph.h"
 
 typedef struct spn_app_t spn_app_t;
 
@@ -47,6 +46,7 @@ void              spn_task_init_build_graph(spn_app_t* app);
 spn_task_result_t spn_task_run_build_graph(spn_app_t* app);
 spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app);
 spn_task_result_t spn_task_graph(spn_app_t* app);
+spn_task_result_t spn_task_run(spn_app_t* app);
 spn_task_result_t spn_task_run_tests(spn_app_t* app);
 spn_task_result_t spn_task_generate(spn_app_t* app);
 spn_task_result_t spn_task_which(spn_app_t* app);

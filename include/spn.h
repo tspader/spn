@@ -78,6 +78,7 @@ typedef enum {
 typedef enum {
   SPN_VISIBILITY_PUBLIC,
   SPN_VISIBILITY_TEST,
+  SPN_VISIBILITY_SCRIPT,
   SPN_VISIBILITY_BUILD,
 } spn_visibility_t;
 

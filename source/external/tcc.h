@@ -13,6 +13,7 @@ typedef struct {
   sp_str_t error;
 } spn_tcc_err_ctx_t;
 
+spn_err_t spn_tcc_prepare_script(spn_tcc_t* tcc, spn_tcc_err_ctx_t* error_context);
 spn_err_t spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path);
 spn_err_t spn_tcc_register(spn_tcc_t* tcc);
 s32 spn_tcc_backtrace(void* ud, void* pc, const c8* file, s32 line, const c8* fn, const c8* message);

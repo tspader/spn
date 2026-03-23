@@ -10,25 +10,20 @@
 s32 configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* pkg = (spn_pkg_unit_t*)user_data;
 
-  spn_trace_info(spn.events, pkg->ctx.pkg, &pkg->ctx.logs,
-    "configuring package {}", SP_FMT_STR(pkg->ctx.pkg->name));
-
   sp_try(spn_session_compile_pkg(pkg->ctx.session, pkg));
 
-  spn_trace_debug(spn.events, pkg->ctx.pkg, &pkg->ctx.logs,
-    "running configure hook for {}", SP_FMT_STR(pkg->ctx.pkg->name));
+  if (pkg->on_configure) {
+    spn_event_buffer_push(spn.events, &pkg->ctx, SPN_EVENT_BUILD_SCRIPT_CONFIGURE);
 
-  if (spn_pkg_unit_run_configure_hook(pkg)) {
-    spn_trace_error(spn.events, pkg->ctx.pkg, &pkg->ctx.logs,
-      "configure hook failed for {}", SP_FMT_STR(pkg->ctx.pkg->name));
+    sp_tm_timer_t timer = sp_tm_start_timer();
+    spn_try(spn_pkg_unit_call_hook(pkg, pkg->on_configure));
+    pkg->time.configure = sp_tm_read_timer(&timer);
+
     spn_event_buffer_push_ctx(spn.events, &pkg->ctx, (spn_build_event_t) {
-      .kind = SPN_EVENT_BUILD_SCRIPT_CONFIGURE_FAILED
+      .kind = SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK,
+      .configure.time = pkg->time.configure,
     });
-    return SPN_ERROR;
   }
-
-  spn_trace_debug(spn.events, pkg->ctx.pkg, &pkg->ctx.logs,
-    "registering sources for {} targets", SP_FMT_U32(sp_om_size(pkg->targets)));
 
   sp_om_for(pkg->targets, it) {
     spn_target_unit_t* target = sp_om_at(pkg->targets, it);

@@ -38,9 +38,17 @@ void spn_pkg_set_manifest(spn_pkg_t* pkg, sp_str_t path) {
   sp_context_pop();
 }
 
-void spn_pkg_set_name(spn_pkg_t* pkg, const c8* name) { spn_pkg_set_name_ex(pkg, sp_str_view(name)); }
-void spn_pkg_set_name_ex(spn_pkg_t* pkg, sp_str_t name) { pkg->name = spn_intern(name); }
-void spn_pkg_set_repo(spn_pkg_t* pkg, const c8* repo) { spn_pkg_set_repo_ex(pkg, sp_str_view(repo)); }
+void spn_pkg_set_name(spn_pkg_t* pkg, const c8* name) {
+  spn_pkg_set_name_ex(pkg, sp_str_view(name));
+}
+
+void spn_pkg_set_name_ex(spn_pkg_t* pkg, sp_str_t name) {
+  pkg->name = spn_intern(name);
+}
+
+void spn_pkg_set_repo(spn_pkg_t* pkg, const c8* repo) {
+  spn_pkg_set_repo_ex(pkg, sp_str_view(repo));
+}
 
 void spn_pkg_set_repo_ex(spn_pkg_t* pkg, sp_str_t repo) {
   sp_context_push_arena(pkg->arena);
@@ -48,7 +56,9 @@ void spn_pkg_set_repo_ex(spn_pkg_t* pkg, sp_str_t repo) {
   sp_context_pop();
 }
 
-void spn_pkg_set_url(spn_pkg_t* pkg, const c8* url) { spn_pkg_set_url_ex(pkg, sp_str_view(url)); }
+void spn_pkg_set_url(spn_pkg_t* pkg, const c8* url) {
+  spn_pkg_set_url_ex(pkg, sp_str_view(url));
+}
 
 void spn_pkg_set_url_ex(spn_pkg_t* pkg, sp_str_t url) {
   sp_context_push_arena(pkg->arena);
@@ -56,7 +66,9 @@ void spn_pkg_set_url_ex(spn_pkg_t* pkg, sp_str_t url) {
   sp_context_pop();
 }
 
-void spn_pkg_set_author(spn_pkg_t* pkg, const c8* author) { spn_pkg_set_author_ex(pkg, sp_str_view(author)); }
+void spn_pkg_set_author(spn_pkg_t* pkg, const c8* author) {
+  spn_pkg_set_author_ex(pkg, sp_str_view(author));
+}
 
 void spn_pkg_set_author_ex(spn_pkg_t* pkg, sp_str_t author) {
   sp_context_push_arena(pkg->arena);
@@ -64,7 +76,9 @@ void spn_pkg_set_author_ex(spn_pkg_t* pkg, sp_str_t author) {
   sp_context_pop();
 }
 
-void spn_pkg_set_maintainer(spn_pkg_t* pkg, const c8* maintainer) { spn_pkg_set_maintainer_ex(pkg, sp_str_view(maintainer)); }
+void spn_pkg_set_maintainer(spn_pkg_t* pkg, const c8* maintainer) {
+  spn_pkg_set_maintainer_ex(pkg, sp_str_view(maintainer));
+}
 
 void spn_pkg_set_maintainer_ex(spn_pkg_t* pkg, sp_str_t maintainer) {
   sp_context_push_arena(pkg->arena);
@@ -87,7 +101,9 @@ void spn_pkg_add_version_ex(spn_pkg_t* pkg, spn_semver_t version, sp_str_t commi
   sp_context_pop();
 }
 
-void spn_pkg_add_include(spn_pkg_t* pkg, const c8* include) { spn_pkg_add_include_ex(pkg, sp_str_view(include)); }
+void spn_pkg_add_include(spn_pkg_t* pkg, const c8* include) {
+  spn_pkg_add_include_ex(pkg, sp_str_view(include));
+}
 
 void spn_pkg_add_include_ex(spn_pkg_t* pkg, sp_str_t path) {
   sp_context_push_arena(pkg->arena);
@@ -95,7 +111,9 @@ void spn_pkg_add_include_ex(spn_pkg_t* pkg, sp_str_t path) {
   sp_context_pop();
 }
 
-void spn_pkg_add_define(spn_pkg_t* pkg, const c8* define) { spn_pkg_add_define_ex(pkg, sp_str_view(define)); }
+void spn_pkg_add_define(spn_pkg_t* pkg, const c8* define) {
+  spn_pkg_add_define_ex(pkg, sp_str_view(define));
+}
 
 void spn_pkg_add_define_ex(spn_pkg_t* pkg, sp_str_t define) {
   sp_context_push_arena(pkg->arena);
@@ -103,7 +121,9 @@ void spn_pkg_add_define_ex(spn_pkg_t* pkg, sp_str_t define) {
   sp_context_pop();
 }
 
-void spn_pkg_add_system_dep(spn_pkg_t* pkg, const c8* dep) { spn_pkg_add_system_dep_ex(pkg, sp_str_view(dep)); }
+void spn_pkg_add_system_dep(spn_pkg_t* pkg, const c8* dep) {
+  spn_pkg_add_system_dep_ex(pkg, sp_str_view(dep));
+}
 
 void spn_pkg_add_system_dep_ex(spn_pkg_t* pkg, sp_str_t dep) {
   sp_context_push_arena(pkg->arena);
@@ -136,7 +156,9 @@ spn_profile_t* spn_pkg_add_profile_ex(spn_pkg_t* pkg, spn_profile_t profile) {
   return sp_om_get(pkg->profiles, profile.name);
 }
 
-spn_target_t* spn_pkg_add_exe(spn_pkg_t* pkg, const c8* name) { return spn_pkg_add_exe_ex(pkg, spn_intern_cstr(name)); }
+spn_target_t* spn_pkg_add_exe(spn_pkg_t* pkg, const c8* name) {
+  return spn_pkg_add_exe_ex(pkg, spn_intern_cstr(name));
+}
 
 spn_target_t* spn_pkg_add_exe_ex(spn_pkg_t* pkg, sp_str_t name) {
   spn_target_t exe = {
@@ -149,7 +171,24 @@ spn_target_t* spn_pkg_add_exe_ex(spn_pkg_t* pkg, sp_str_t name) {
   return sp_om_get(pkg->exes, exe.name);
 }
 
-spn_target_t* spn_pkg_add_test(spn_pkg_t* pkg, const c8* name) { return spn_pkg_add_test_ex(pkg, spn_intern_cstr(name)); }
+spn_target_t* spn_pkg_add_script(spn_pkg_t* pkg, const c8* name) {
+  return spn_pkg_add_script_ex(pkg, spn_intern_cstr(name));
+}
+
+spn_target_t* spn_pkg_add_script_ex(spn_pkg_t* pkg, sp_str_t name) {
+  spn_target_t script = {
+    .name = spn_intern(name),
+    .kind = SPN_TARGET_EXE,
+    .pkg = pkg,
+    .visibility = SPN_VISIBILITY_SCRIPT,
+  };
+  sp_om_insert(pkg->scripts, script.name, script);
+  return sp_om_get(pkg->scripts, script.name);
+}
+
+spn_target_t* spn_pkg_add_test(spn_pkg_t* pkg, const c8* name) {
+  return spn_pkg_add_test_ex(pkg, spn_intern_cstr(name));
+}
 
 spn_target_t* spn_pkg_add_test_ex(spn_pkg_t* pkg, sp_str_t name) {
   spn_target_t test = {

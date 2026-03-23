@@ -4,6 +4,7 @@
 #include "sp.h"
 
 #define spn_try(expr) sp_try(expr)
+#define spn_try_as(expr, err) sp_try_as(expr, err)
 
 #define spn_try_union(expr) do { \
   spn_err_union_t _spn_result = (expr); \

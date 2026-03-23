@@ -65,9 +65,6 @@ static spn_build_event_display_t event_info[] = {
   EVENT(SPN_EVENT_BUILD_SCRIPT_PACKAGE,          "package", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_BUILD_SCRIPT_FAILED,           "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
   EVENT(SPN_EVENT_BUILD_SCRIPT_CRASHED,          "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_CONFIGURE_FAILED, "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_BUILD_FAILED,     "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_PACKAGE_FAILED,   "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
   EVENT(SPN_EVENT_DEP_BUILD,                     "dep:build", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_DEP_BUILD_PASSED,              "ok", GREEN, SPN_VERBOSITY_NORMAL, BOLD    ),
   EVENT(SPN_EVENT_DEP_BUILD_FAILED,              "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
@@ -87,12 +84,31 @@ static spn_build_event_display_t event_info[] = {
   EVENT(SPN_EVENT_DEBUG, "debug", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_ADD_SOURCE, "debug", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
   EVENT(SPN_EVENT_INIT_BUILD_GRAPH, "debug", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
-  EVENT(SPN_EVENT_LINK_TARGET, "debug", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
-  EVENT(SPN_EVENT_RUN_CONFIGURE, "debug", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_LINK_START,  "link",   WHITE, SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_LINK_PASSED, "ok",     GREEN, SPN_VERBOSITY_NORMAL, BOLD),
+  EVENT(SPN_EVENT_LINK_FAILED, "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK, "debug", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
   EVENT(SPN_EVENT_TRACE_DEBUG,  "trace", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
   EVENT(SPN_EVENT_TRACE_INFO,   "trace", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
   EVENT(SPN_EVENT_TRACE_WARN,   "trace", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
   EVENT(SPN_EVENT_TRACE_ERROR,  "trace", RED,    SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_CLI_ENTRY,    "entry", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_RESOLVE_START,   "resolve", WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
+  EVENT(SPN_EVENT_RESOLVE_PACKAGE, "resolve", WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
+  EVENT(SPN_EVENT_RESOLVE_END,     "resolve", WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
+  EVENT(SPN_EVENT_SYNC_START,      "sync",    WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
+  EVENT(SPN_EVENT_SYNC_PACKAGE,    "sync",    WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
+  EVENT(SPN_EVENT_SYNC_FAILED,     "sync",    RED,   SPN_VERBOSITY_DEBUG, NOT_BOLD),
+  EVENT(SPN_EVENT_SYNC_END,        "sync",    WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
+  EVENT(SPN_EVENT_API_CALL,        "api",     WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
+  EVENT(SPN_EVENT_USER_LOG,        "log",     WHITE, SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_EMBED_START,     "embed",   WHITE, SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_EMBED_PASSED,    "ok",      GREEN, SPN_VERBOSITY_NORMAL, BOLD),
+  EVENT(SPN_EVENT_EMBED_FAILED,    "failed",  RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
+  EVENT(SPN_EVENT_DIRTY_SUMMARY,   "dirty",   WHITE, SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_FAILED,    "failed",  RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SUMMARY,   "summary", WHITE, SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK, "debug", WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
 };
 
 static sp_str_t spn_tui_name_to_color(sp_str_t str);
@@ -444,17 +460,21 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       sp_str_builder_append(&builder, event->debug.message);
       break;
     }
+    case SPN_EVENT_USER_LOG: {
+      sp_str_builder_append(&builder, event->user_log.message);
+      break;
+    }
     case SPN_EVENT_ADD_TARGET: {
       sp_str_builder_append_fmt(&builder, "target={} kind={}",
-        SP_FMT_STR(event->target_add.target),
-        SP_FMT_S32(event->target_add.kind)
+        SP_FMT_STR(event->target.name),
+        SP_FMT_S32(event->target.add_debug.kind)
       );
       break;
     }
     case SPN_EVENT_ADD_SOURCE: {
       sp_str_builder_append_fmt(&builder, "target={} source={}",
-        SP_FMT_STR(event->target_source.target),
-        SP_FMT_STR(event->target_source.source)
+        SP_FMT_STR(event->target.name),
+        SP_FMT_STR(event->target.source.source)
       );
       break;
     }
@@ -466,17 +486,20 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       );
       break;
     }
-    case SPN_EVENT_LINK_TARGET: {
-      sp_str_builder_append_fmt(&builder, "target={} objects={}",
-        SP_FMT_STR(event->target_link.target),
-        SP_FMT_U32(event->target_link.objects)
+    case SPN_EVENT_LINK_START: {
+      sp_str_builder_append_fmt(&builder, "target={} objects={} output={}",
+        SP_FMT_STR(event->target.name),
+        SP_FMT_U32(event->target.link_start.num_objects),
+        SP_FMT_STR(event->target.link_start.output_path)
       );
       break;
     }
-    case SPN_EVENT_RUN_CONFIGURE: {
-      sp_str_builder_append_fmt(&builder, "has_hook={} result={} time_ns={}",
-        SP_FMT_CSTR(event->configure.exists ? "true" : "false"),
-        SP_FMT_S32(event->configure.result),
+    case SPN_EVENT_LINK_FAILED: {
+      sp_str_builder_append(&builder, event->target.link_failed.err);
+      break;
+    }
+    case SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK: {
+      sp_str_builder_append_fmt(&builder, "time_ns={}",
         SP_FMT_U64(event->configure.time)
       );
       break;
@@ -494,6 +517,17 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       break;
     }
     case SPN_EVENT_TARGET_BUILD: {
+      break;
+    }
+    case SPN_EVENT_EMBED_FAILED: {
+      sp_str_builder_append_fmt(&builder, "{}: {}",
+        SP_FMT_STR(event->embed_failed.path),
+        SP_FMT_STR(event->embed_failed.error)
+      );
+      break;
+    }
+    case SPN_EVENT_BUILD_FAILED: {
+      sp_str_builder_append(&builder, event->build_failed.first_error);
       break;
     }
     default: {

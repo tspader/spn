@@ -59,6 +59,7 @@
 #include "terminal.h"
 #include "tui.h"
 #include "event/event.h"
+#include "event/log.h"
 #include "external/cJSON.h"
 #include "external/git.h"
 #include "git/key.h"
@@ -232,6 +233,14 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.paths.store = sp_fs_join_path(spn.paths.cache, SP_LIT("store"));
 
   sp_fs_create_dir(spn.paths.log);
+
+  spn_event_log_init();
+  {
+    sp_str_t jsonl_path = sp_fs_join_path(spn.paths.log, sp_str_lit("build.jsonl"));
+    sp_fs_create_file(jsonl_path);
+    spn.logger.jsonl = sp_io_writer_from_file(jsonl_path, SP_IO_WRITE_MODE_OVERWRITE);
+  }
+
   sp_fs_create_dir(spn.paths.cache);
   sp_fs_create_dir(spn.paths.source);
   sp_fs_create_dir(spn.paths.build);
@@ -272,12 +281,12 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   spn_cli_t* cli = &spn.cli;
-  spn.cli.cmd = spn_cli();
+  spn.cli.usage = spn_cli();
 
   spn_cli_parser_t parser = {
     .args = spn.args + 1,
     .num_args = spn.num_args - 1,
-    .cmd = &cli->cmd
+    .cmd = &cli->usage
   };
 
   switch (spn_cli_parse(&parser)) {
@@ -343,36 +352,17 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
 
     // process anything we need to do special per-event
     switch (event->kind) {
-      case SPN_EVENT_TARGET_BUILD: {
-        spn_build_ctx_log_ex(event->io, SPN_LOG_LEVEL_INFO, event->thread_id, SP_ZERO_STRUCT(sp_str_t), event->target.build.args);
-        break;
-      }
-      case SPN_EVENT_RESOLVE: {
-        break;
-      }
       case SPN_EVENT_ADD_TARGET: {
-        spn.tui.info.max_name = sp_max(spn.tui.info.max_name, event->target.add.name.len);
+        spn.tui.info.max_name = sp_max(spn.tui.info.max_name, event->target.name.len);
         break;
       }
-      case SPN_EVENT_TRACE_DEBUG:
-      case SPN_EVENT_TRACE_INFO:
-      case SPN_EVENT_TRACE_WARN:
-      case SPN_EVENT_TRACE_ERROR: {
-        if (event->io) {
-          sp_str_t file = sp_str_strip_left(event->trace.file, spn.paths.project);
-          file = sp_str_strip_left(file, sp_str_lit("/"));
-          sp_str_t source = sp_format("{}:{}", SP_FMT_STR(file), SP_FMT_U32(event->trace.line));
-          spn_build_ctx_log_ex(event->io, spn_trace_event_to_level(event->kind), event->thread_id, source, event->trace.message);
-        }
-        break;
-      }
-      default: {
-        if (event->io) {
-          spn_build_ctx_log_ex(event->io, SPN_LOG_LEVEL_INFO, event->thread_id, SP_ZERO_STRUCT(sp_str_t),
-            sp_format("event: {}", SP_FMT_STR(spn_build_event_kind_to_str(event->kind))));
-        }
-        break;
-      }
+      default: break;
+    }
+
+    // write jsonl (all events, unfiltered)
+    spn_event_log_jsonl(&spn.logger.jsonl, event);
+    if (event->io) {
+      spn_event_log_jsonl(&event->io->jsonl, event);
     }
 
     // write to tui (filtered by verbosity)
@@ -425,7 +415,7 @@ sp_app_result_t spn_update(sp_app_t* sp) {
       break;
     }
     case SPN_TASK_KIND_RUN: {
-      result = spn_task_run_tests(&app);
+      result = spn_task_run(&app);
       break;
     }
     case SPN_TASK_KIND_GENERATE: {
@@ -490,18 +480,26 @@ void spn_deinit(sp_app_t* sp) {
       unit->ctx.paths.logs.build,
       sp_fs_join_path(root->ctx.paths.work, spn_build_ctx_get_build_log_name(&unit->ctx))
     );
+    sp_fs_create_sym_link(
+      unit->ctx.paths.logs.jsonl,
+      sp_fs_join_path(root->ctx.paths.work, spn_build_ctx_get_jsonl_log_name(&unit->ctx))
+    );
 
     sp_om_for(unit->targets, t) {
       spn_target_unit_t* target = sp_om_at(unit->targets, t);
       sp_io_writer_close(&target->logs.build);
       sp_io_writer_close(&target->logs.test);
+      sp_io_writer_close(&target->logs.jsonl);
     }
     sp_io_writer_close(&unit->ctx.logs.build);
     sp_io_writer_close(&unit->ctx.logs.test);
+    sp_io_writer_close(&unit->ctx.logs.jsonl);
   }
 
   sp_io_writer_close(&root->ctx.logs.build);
   sp_io_writer_close(&root->ctx.logs.test);
+  sp_io_writer_close(&root->ctx.logs.jsonl);
+  sp_io_writer_close(&spn.logger.jsonl);
 }
 
 sp_app_config_t sp_main(s32 num_args, const c8** args) {

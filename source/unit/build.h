@@ -18,6 +18,7 @@ sp_str_t spn_build_ctx_get_lib_path(spn_build_ctx_t* ctx, spn_target_t* lib_targ
 sp_str_t spn_build_ctx_get_rpath(spn_build_ctx_t* ctx);
 sp_str_t spn_build_ctx_get_build_log_name(spn_build_ctx_t* ctx);
 sp_str_t spn_build_ctx_get_test_log_name(spn_build_ctx_t* ctx);
+sp_str_t spn_build_ctx_get_jsonl_log_name(spn_build_ctx_t* ctx);
 sp_str_t spn_cache_dir_kind_to_path(spn_pkg_dir_t kind);
 sp_str_t spn_ctx_build_source_dir(spn_build_ctx_t* build);
 sp_str_t spn_ctx_build_work_dir(spn_build_ctx_t* build);

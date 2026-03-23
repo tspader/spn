@@ -168,6 +168,11 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         EXPECT_TRUE(sp_fs_exists(path));
         break;
       }
+      case ACTION_VERIFY_NOT_EXISTS: {
+        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_not_exists.file);
+        EXPECT_FALSE(sp_fs_exists(path));
+        break;
+      }
       case ACTION_VERIFY_INCLUDE: {
         sp_str_t path = tmpfs_get(
           &fixture->fs,
@@ -669,6 +674,63 @@ UTEST_F(spn_build, add_test) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_RUN_BIN, .bin.name = "test" },
+    },
+  });
+}
+
+UTEST_F(spn_build, run_script_manifest) {
+  tmpfs_init_named(&uf->fixture.fs, "run_script_manifest");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_run/manifest",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug/store/bin/main") },
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-t", "main" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/bin/main") },
+      { .kind = ACTION_REMOVE_DIR, .rm = { .dir = "build" } },
+      { .kind = ACTION_RUN_CLI, .cli = { "run", .args = { "main" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/bin/main") },
+      { .kind = ACTION_VERIFY_CONTENT, .verify_content = { .file = sp_str_lit("ran.txt"), .content = sp_str_lit("script\n") } },
+    },
+  });
+}
+
+UTEST_F(spn_build, run_script_name_c) {
+  tmpfs_init_named(&uf->fixture.fs, "run_script_name_c");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_run/script_name_c",
+    .copy = { "script.c" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "run", .args = { "main.c" } } },
+      { .kind = ACTION_VERIFY_CONTENT, .verify_content = { .file = sp_str_lit("ran.txt"), .content = sp_str_lit("script-name-c\n") } },
+    },
+  });
+}
+
+UTEST_F(spn_build, run_source_manifest_build_deps) {
+  tmpfs_init_named(&uf->fixture.fs, "run_source_manifest_build_deps");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_run/source_manifest",
+    .copy = { "scripts/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "run", .args = { "scripts/main.c" } } },
+      { .kind = ACTION_VERIFY_CONTENT, .verify_content = { .file = sp_str_lit("ran.txt"), .content = sp_str_lit("77\n") } },
+    },
+  });
+}
+
+UTEST_F(spn_build, run_source_without_manifest) {
+  tmpfs_init_named(&uf->fixture.fs, "run_source_without_manifest");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_run/source_no_manifest",
+    .copy = { "scripts/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "run", .args = { "scripts/main.c" } } },
+      { .kind = ACTION_VERIFY_CONTENT, .verify_content = { .file = sp_str_lit("ran.txt"), .content = sp_str_lit("source\n") } },
     },
   });
 }

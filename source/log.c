@@ -43,6 +43,7 @@ sp_str_t spn_log_level_to_str(spn_log_level_t level) {
   return sp_str_lit("?????");
 }
 
+
 void spn_log_info(const c8* fmt, ...) {
   if (spn_ctx_get_log_level() < SPN_LOG_LEVEL_INFO) {
     return;

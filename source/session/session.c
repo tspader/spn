@@ -195,6 +195,23 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
   }
 
   switch (kind) {
+    case SPN_PACKAGE_KIND_ROOT: {
+      sp_om_for(pkg->scripts, it) {
+        spn_target_t* target = sp_om_at(pkg->scripts, it);
+        if (spn_target_filter_pass(&session->filter, target)) {
+          spn_pkg_unit_add_target(unit, target);
+        }
+      }
+
+      break;
+    }
+    case SPN_PACKAGE_KIND_FILE:
+    case SPN_PACKAGE_KIND_INDEX: {
+      break;
+    }
+  }
+
+  switch (kind) {
     case SPN_PACKAGE_KIND_ROOT:
     case SPN_PACKAGE_KIND_FILE: {
       sp_om_for(pkg->tests, it) {
@@ -221,11 +238,6 @@ spn_err_t spn_session_compile_pkg(spn_session_t* session, spn_pkg_unit_t* unit) 
     return SPN_OK;
   }
 
-  spn_trace_info(spn.events, pkg, &unit->ctx.logs,
-    "compiling build script {}", SP_FMT_STR(pkg->paths.script));
-
-  spn_event_buffer_push(spn.events, &unit->ctx, SPN_EVENT_BUILD_SCRIPT_COMPILE);
-
   sp_tm_timer_t timer = sp_tm_start_timer();
   spn_tcc_err_ctx_t error_context = {
     .arena = unit->ctx.arena,
@@ -233,18 +245,9 @@ spn_err_t spn_session_compile_pkg(spn_session_t* session, spn_pkg_unit_t* unit) 
   };
 
   spn_tcc_t* tcc = tcc_new();
-  tcc_set_error_func(tcc, &error_context, spn_tcc_on_build_script_compile_error);
-  tcc_set_backtrace_func(tcc, &error_context, spn_tcc_backtrace);
-  tcc_set_lib_path(tcc, sp_str_to_cstr(spn.paths.runtime));
-  tcc_set_options(tcc, "-gdwarf -Wall -Werror");
-  tcc_set_output_type(tcc, TCC_OUTPUT_MEMORY);
-  tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include));
-  tcc_define_symbol(tcc, "SPN", "");
-  sp_try_goto(spn_tcc_register(tcc), fail);
-  sp_try_goto(tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include)), fail);
-  sp_try_goto(spn_tcc_register(tcc), fail);
+  sp_try_goto(spn_tcc_prepare_script(tcc, &error_context), fail);
 
-  spn_cc_t cc = SP_ZERO();
+  spn_cc_t cc = SP_ZERO_INITIALIZE();
   spn_cc_set_profile(&cc, session->profile);
   spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_TARGET_JIT, pkg->name);
   sp_ht_for_kv(pkg->deps, it) {
@@ -253,6 +256,7 @@ spn_err_t spn_session_compile_pkg(spn_session_t* session, spn_pkg_unit_t* unit) 
         spn_cc_target_add_dep(target, spn_session_find_pkg(session, *it.key));
         break;
       }
+      case SPN_VISIBILITY_SCRIPT:
       case SPN_VISIBILITY_TEST:
       case SPN_VISIBILITY_PUBLIC: {
         break;
@@ -271,22 +275,24 @@ spn_err_t spn_session_compile_pkg(spn_session_t* session, spn_pkg_unit_t* unit) 
 
   unit->time.compile = sp_tm_read_timer(&timer);
 
-  spn_trace_info(spn.events, pkg, &unit->ctx.logs,
-    "build script compiled in {}ns, configure={} package={}",
-    SP_FMT_U64(unit->time.compile),
-    SP_FMT_CSTR(unit->on_configure ? "found" : "none"),
-    SP_FMT_CSTR(unit->on_package ? "found" : "none"));
+  spn_event_buffer_push_ctx(spn.events, &unit->ctx, (spn_build_event_t) {
+    .kind = SPN_EVENT_BUILD_SCRIPT_COMPILE,
+    .script_compile = {
+      .script_path = pkg->paths.script,
+      .time = unit->time.compile,
+      .has_configure = unit->on_configure != SP_NULLPTR,
+      .has_package = unit->on_package != SP_NULLPTR,
+    }
+  });
 
   return SPN_OK;
 
 fail:
-  spn_trace_error(spn.events, pkg, &unit->ctx.logs,
-    "build script compilation failed: {}", SP_FMT_STR(error_context.error));
-
   spn_event_buffer_push_ctx(spn.events, &unit->ctx, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,
     .compile_failed = {
-      .error = error_context.error
+      .script_path = pkg->paths.script,
+      .error = error_context.error,
     }
   });
   return SPN_ERROR;

@@ -2,15 +2,14 @@
 #define SPN_CTX_TYPES_H
 
 #include "sp.h"
-#include "spn.h"
 
-#include "cli.h"
 #include "event/types.h"
 #include "index/types.h"
+
+#include "cli.h"
 #include "intern.h"
 #include "jit.h"
 #include "log.h"
-#include "task/task.h"
 #include "tui.h"
 
 typedef struct {
@@ -62,6 +61,7 @@ typedef struct {
   struct {
     sp_io_writer_t out;
     sp_io_writer_t err;
+    sp_io_writer_t jsonl;
   } logger;
   spn_verbosity_t verbosity;
   spn_log_level_t log_level;

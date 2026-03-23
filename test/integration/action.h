@@ -12,6 +12,7 @@ typedef enum {
   ACTION_SUBPROCESS,
   ACTION_RUN_BIN,
   ACTION_VERIFY_EXISTS,
+  ACTION_VERIFY_NOT_EXISTS,
   ACTION_VERIFY_INCLUDE,
   ACTION_VERIFY_CONTENT,
   ACTION_VERIFY_LOCKED,
@@ -29,6 +30,7 @@ typedef struct {
     struct { sp_ps_config_t config; s32 rc; } process;
     struct { const c8* name; s32 rc; } bin;
     struct { sp_str_t file; } verify_exists;
+    struct { sp_str_t file; } verify_not_exists;
     struct { sp_str_t file; } verify_include;
     struct { sp_str_t file; sp_str_t content; } verify_content;
     struct { const c8* name; } verify_locked;

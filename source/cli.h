@@ -8,6 +8,7 @@
   X(SPN_CLI_INIT, "init") \
   X(SPN_CLI_ADD, "add") \
   X(SPN_CLI_BUILD, "build") \
+  X(SPN_CLI_RUN, "run") \
   X(SPN_CLI_TEST, "test") \
   X(SPN_CLI_CLEAN, "clean") \
   X(SPN_CLI_GENERATE, "generate") \
@@ -79,6 +80,11 @@ typedef struct {
 } spn_cli_build_t;
 
 typedef struct {
+  sp_str_t entry;
+  sp_str_t profile;
+} spn_cli_run_t;
+
+typedef struct {
   sp_str_t target;
   sp_str_t profile;
 } spn_cli_test_t;
@@ -132,13 +138,14 @@ struct spn_cli {
   bool verbose;
   bool quiet;
 
-  spn_cli_command_usage_t cmd;
+  spn_cli_usage_t usage;
   spn_cli_add_t add;
   spn_cli_update_t update;
   spn_cli_tool_t tool;
   spn_cli_init_t init;
   spn_cli_generate_t generate;
   spn_cli_build_t build;
+  spn_cli_run_t run;
   spn_cli_test_t test;
   spn_cli_ls_t ls;
   spn_cli_which_t which;
@@ -151,6 +158,7 @@ struct spn_cli {
 
 sp_app_result_t spn_cli_clean(spn_cli_t* cli);
 sp_app_result_t spn_cli_build(spn_cli_t* cli);
+sp_app_result_t spn_cli_run(spn_cli_t* cli);
 sp_app_result_t spn_cli_test(spn_cli_t* cli);
 sp_app_result_t spn_cli_generate(spn_cli_t* cli);
 sp_app_result_t spn_cli_copy(spn_cli_t* cli);
@@ -169,11 +177,7 @@ sp_app_result_t spn_cli_graph(spn_cli_t* cli);
 sp_app_result_t spn_cli_publish(spn_cli_t* cli);
 sp_app_result_t spn_cli_root(spn_cli_t* cli);
 sp_app_result_t spn_cli_help(spn_cli_parser_t* p);
-spn_cli_cmd_t spn_cli_command_from_str(sp_str_t str);
-sp_str_t spn_cli_command_to_str(spn_cli_cmd_t cmd);
-spn_tool_cmd_t spn_tool_subcommand_from_str(sp_str_t str);
-sp_str_t spn_tool_subcommand_to_str(spn_tool_cmd_t cmd);
-spn_cli_command_usage_t spn_cli(void);
+spn_cli_usage_t spn_cli(void);
 
 #define SPN_CLI_UNIMPLEMENTED() SP_LOG("unimplemented"); return SP_APP_ERR;
 

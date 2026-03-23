@@ -71,6 +71,9 @@ sp_str_t spn_visibility_to_str(spn_visibility_t kind) {
     case SPN_VISIBILITY_TEST: {
       return strl("test");
     }
+    case SPN_VISIBILITY_SCRIPT: {
+      return strl("script");
+    }
     case SPN_VISIBILITY_BUILD: {
       return strl("build");
     }
@@ -85,6 +88,9 @@ spn_visibility_t spn_visibility_from_str(sp_str_t str) {
   }
   if (sp_str_equal_cstr(str, "test")) {
     return SPN_VISIBILITY_TEST;
+  }
+  if (sp_str_equal_cstr(str, "script")) {
+    return SPN_VISIBILITY_SCRIPT;
   }
   if (sp_str_equal_cstr(str, "build")) {
     return SPN_VISIBILITY_BUILD;
@@ -303,4 +309,3 @@ sp_os_lib_kind_t spn_lib_kind_to_sp_os_lib_kind(spn_linkage_t kind) {
 
   SP_UNREACHABLE_RETURN(0);
 }
-

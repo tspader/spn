@@ -1,9 +1,10 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
-#include "graph.h"
 
-#include "test.h"
 #include "utest.h"
+#include "test.h"
+
+#include "graph.h"
 
 
 void touch_file(sp_str_t path) {

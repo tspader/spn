@@ -9,19 +9,41 @@
 - we use a tiny game loop library from `sp.h`, so `sp_main` is the entry point
 
 # building
-- `cmake -S . -B bootstrap/work` (once) and `cmake --build bootstrap/work` to build `bootstrap/bin/spn` + tests
-- `./bootstrap/bin/spn build --target $test --profile debug --force`
-    - e.g. `./bootstrap/bin/spn build -t integration -p debug -f`
-- `./build/debug/store/bin/$test`
-    - e.g. `./build/debug/store/bin/integration`
-- aliases:
-    - `bspn` -> `./bootstrap/bin/spn`
-    - `dspn` -> `./build/debug/store/bin/spn`
-- the Full Process for testing changes:
-    - `make` (build a clean bootstrap binary)
-    - `bspn build -t spn -p debug -f` (build spn using itself)
-    - `dspn build -t integration -p debug -f` (build the tests with bootstrapped spn)
-    - `./build/debug/store/bin/integration` (run tests)
+CMake builds are used to bootstrap from nothing
+```
+cmake --build bootstrap/work
+```
+
+The bootstrapped binary can then build itself:
+```
+./bootstrap/bin/spn build -t spn -p debug
+```
+
+It is sometimes useful to run the binary thus produced:
+```
+./build/debug/store/bin/spn build -t spn -p debug
+```
+
+# testing
+## running
+Running the tests via CTest is easiest:
+```
+ctest --test-dir ./bootstrap/work
+```
+
+You can run the same tests using `spn` itself:
+```
+./bootstrap/bin/spn test
+```
+
+Test output is in an ISO timestamped directory in `.tmp`
+
+## writing
+- `test/core` is unit tests
+- `test/integration` is unit tests
+- use `.llm/tmp` as your temporary directory when testing; do not use /tmp
+
+All tests pass all the time. If a test fails but is unrelated to your code change, you fix it. There are no flaky tests; it is ALWAYS your responsibility to fix a broken test.
 
 # references
 - `source/`
@@ -39,13 +61,6 @@
 - `packages/tcc/spn.toml` is the package for `tcc` (example of a compiled spn package)
 
 # tests
-- `test/core` is unit tests; build and run with `pspn test` or `pspn test --target $target`
-- `test/manual` is manual tests; each test has instructions in `test.md` and a clean project
-- use ./.llm/tmp as your temporary directory when testing; do not use /tmp
-
-our tests are a virtual machine; we do NOT write imperative tests. tests are data (bytecode) which get fed through the same executor. this ensures consistent setup and expectation, and lets us write many tests without breaking down. you may write new executors when a category of tests differs from existing categories; but you may NOT write imperative logic inside a test, and you may NOT make an "executor" for a single test
-
-all tests pass all the time. if a test fails but is unrelated to your code change, you fix it. there are no flaky tests; it is ALWAYS your responsibility to fix a broken test.
 
 # compilation
 we used to build as a single C file; now, we split into very granular TUs for testing. some code has not been migrated. in general:
