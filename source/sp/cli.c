@@ -71,7 +71,7 @@ void spn_cli_assign(spn_cli_opt_usage_t opt, sp_str_t value) {
   }
 }
 
-sp_app_result_t spn_cli_parse_opts(spn_cli_parser_t* p, spn_cli_command_usage_t* cmd) {
+sp_app_result_t spn_cli_parse_opts(spn_cli_parser_t* p, spn_cli_usage_t* cmd) {
   while (true) {
     if (spn_cli_parser_is_done(p)) {
       break;
@@ -214,7 +214,7 @@ sp_app_result_t spn_cli_parse_opts(spn_cli_parser_t* p, spn_cli_command_usage_t*
 }
 
 sp_app_result_t spn_cli_parse(spn_cli_parser_t* p) {
-  spn_cli_command_usage_t* cmd = p->cmd;
+  spn_cli_usage_t* cmd = p->cmd;
 
   p->stop_at_non_option = (cmd->commands != SP_NULLPTR);
   s32 err = spn_cli_parse_opts(p, cmd);
@@ -223,7 +223,7 @@ sp_app_result_t spn_cli_parse(spn_cli_parser_t* p) {
   if (cmd->commands && (p->num_args - p->it) >= 1) {
     sp_str_t subcmd_name = sp_str_view(p->args[p->it]);
 
-    for (spn_cli_command_usage_t* subcmd = cmd->commands; subcmd->name; subcmd++) {
+    for (spn_cli_usage_t* subcmd = cmd->commands; subcmd->name; subcmd++) {
       if (sp_str_equal_cstr(subcmd_name, subcmd->name)) {
         p->it++;
         p->cmd = subcmd;
@@ -242,21 +242,5 @@ sp_app_result_t spn_cli_dispatch(spn_cli_parser_t* p, spn_cli_t* user_data) {
   if (p->resolved->handler) {
     return p->resolved->handler(user_data);
   }
-  return SP_APP_ERR;
-}
-
-sp_app_result_t spn_cli_run(spn_cli_command_usage_t* cmd, spn_cli_t* user_data, const c8** args, u32 num_args) {
-  spn_cli_parser_t parser = {
-    .args = args,
-    .num_args = num_args,
-    .cmd = cmd
-  };
-
-  sp_try(spn_cli_parse(&parser));
-
-  if (parser.resolved->handler) {
-    return parser.resolved->handler(user_data);
-  }
-
   return SP_APP_ERR;
 }

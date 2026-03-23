@@ -1,12 +1,19 @@
-#include "app/app.h"
-#include "ctx/ctx.h"
+#include "app/types.h"
+#include "ctx/types.h"
+#include "resolve/types.h"
+
 #include "event/event.h"
 #include "index/cache.h"
-#include "log.h"
 #include "resolve/resolve.h"
+#include "semver/convert.h"
 #include "session/session.h"
+#include "task/task.h"
 
 spn_task_result_t spn_task_resolve(spn_app_t* app) {
+  // @spader
+  // This initialization is part of the mess of how we decide whether we're
+  // doing simple synchronous work or asynchronous work. The RESOLVE task is
+  // the first one where we know we need to initialize everything.
   spn_session_t* session = &app->session;
   spn_session_init(session, &app->package, app->config.profile, sp_str_lit("build"));
   spn_session_set_filter(session, app->config.filter);
@@ -22,45 +29,45 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
 
   spn_pkg_unit_t* root = spn_session_find_root(session);
 
-  spn_trace_info(spn.events, root->ctx.pkg, &root->ctx.logs,
-    "resolving package {} with {} deps",
-    SP_FMT_STR(app->package.name),
-    SP_FMT_U32(sp_ht_size(app->package.deps)));
+  spn_resolve_strategy_t strategy = app->lock.some == SP_OPT_SOME ?
+    SPN_RESOLVE_STRATEGY_LOCK_FILE :
+    SPN_RESOLVE_STRATEGY_SOLVER;
 
-  if (app->lock.some == SP_OPT_SOME) {
-    spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
-      .kind = SPN_EVENT_RESOLVE,
-      .resolve = { .strategy = SPN_RESOLVE_STRATEGY_LOCK_FILE }
-    });
-
-    spn_trace_debug(spn.events, root->ctx.pkg, &root->ctx.logs,
-      "using lock file for resolution", SP_FMT_U32(0));
-
-    if (spn_resolve_from_lock_file(resolver, &app->lock.value)) {
-      spn_trace_error(spn.events, root->ctx.pkg, &root->ctx.logs,
-        "resolution from lock file failed", SP_FMT_U32(0));
-      return SPN_TASK_ERROR;
+  // Resolve
+  spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+    .kind = SPN_EVENT_RESOLVE_START,
+    .resolve_start = {
+      .strategy = strategy,
+      .num_deps = sp_ht_size(app->package.deps),
     }
-  }
-  else {
-    spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
-      .kind = SPN_EVENT_RESOLVE,
-      .resolve = { .strategy = SPN_RESOLVE_STRATEGY_SOLVER }
-    });
+  });
 
-    spn_trace_debug(spn.events, root->ctx.pkg, &root->ctx.logs,
-      "using solver for resolution", SP_FMT_U32(0));
-
-    if (spn_resolve_from_solver(resolver)) {
-      spn_trace_error(spn.events, root->ctx.pkg, &root->ctx.logs,
-        "resolution from solver failed", SP_FMT_U32(0));
-      return SPN_TASK_ERROR;
-    }
+  sp_tm_timer_t timer = sp_tm_start_timer();
+  switch (strategy) {
+    case SPN_RESOLVE_STRATEGY_LOCK_FILE: spn_try_as(spn_resolve_from_lock_file(resolver, &app->lock.value), SPN_TASK_ERROR); break;
+    case SPN_RESOLVE_STRATEGY_SOLVER:    spn_try_as(spn_resolve_from_solver(resolver), SPN_TASK_ERROR); break;
   }
 
-  spn_trace_info(spn.events, root->ctx.pkg, &root->ctx.logs,
-    "resolution complete, {} packages resolved",
-    SP_FMT_U32(sp_str_ht_size(resolver->resolved)));
+  // Emit events for the results of the resolve (per-package and overall)
+  spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+    .kind = SPN_EVENT_RESOLVE_END,
+    .resolve_end = {
+      .num_resolved = sp_str_ht_size(resolver->resolved),
+      .time = sp_tm_read_timer(&timer),
+    }
+  });
+
+  sp_str_ht_for_kv(resolver->resolved, it) {
+    spn_resolved_pkg_t* resolved = it.val;
+    spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+      .kind = SPN_EVENT_RESOLVE_PACKAGE,
+      .resolve_pkg = {
+        .name = *it.key,
+        .version = spn_semver_to_str(resolved->version),
+        .kind = resolved->kind,
+      }
+    });
+  }
 
   return SPN_TASK_DONE;
 }

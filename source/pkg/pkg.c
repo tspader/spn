@@ -39,7 +39,7 @@ spn_err_t spn_pkg_from_index(spn_pkg_t* pkg, sp_str_t path) {
 }
 
 spn_err_t spn_pkg_from_manifest(spn_pkg_t* pkg, sp_str_t manifest) {
-  SP_ASSERT(sp_fs_exists(manifest));
+  SP_ASSERT(sp_fs_exists(manifest)); // @spader Return an error code instead? Or is this an invariant?
 
   spn_err_union_t result = spn_pkg_load(pkg, manifest);
   if (result.kind) {
@@ -68,9 +68,15 @@ spn_target_t* spn_pkg_get_target(spn_pkg_t* pkg, const c8* name) {
   return spn_pkg_get_target_ex(pkg, sp_str_view(name));
 }
 
+// @spader
+// This doesn't look quite right. It's suspicious that we'd need to get a target without caring
+// where it came from specifically.
 spn_target_t* spn_pkg_get_target_ex(spn_pkg_t* pkg, sp_str_t name) {
   if (sp_om_has(pkg->exes, name)) {
     return sp_om_get(pkg->exes, name);
+  }
+  if (sp_om_has(pkg->scripts, name)) {
+    return sp_om_get(pkg->scripts, name);
   }
   if (sp_om_has(pkg->tests, name)) {
     return sp_om_get(pkg->tests, name);

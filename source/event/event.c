@@ -1,5 +1,7 @@
 #include "event/event.h"
 
+// @spader
+// We'll just put this in sp.h upstream
 #if defined(SP_POSIX)
   #include <pthread.h>
 #endif

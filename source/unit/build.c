@@ -2,6 +2,7 @@
 
 #include "app/app.h"
 #include "ctx/ctx.h"
+#include "event/event.h"
 #include "external/cc.h"
 #include "log.h"
 #include "target/target.h"
@@ -106,6 +107,10 @@ sp_str_t spn_build_ctx_get_lib_path(spn_build_ctx_t* ctx, spn_target_t* lib_targ
 }
 
 sp_ps_output_t spn_build_ctx_subprocess(spn_build_ctx_t* ctx, sp_ps_config_t config) {
+  spn_event_buffer_push_ex(spn.events, ctx->pkg, &ctx->logs, (spn_build_event_t) {
+    .kind = SPN_EVENT_API_CALL,
+    .api_call = { .fn = sp_str_lit("spn_build_ctx_subprocess"), .args = config.command }
+  });
   config.io = (sp_ps_io_config_t) {
     .in = { .mode = SP_PS_IO_MODE_NULL },
     .out = { .mode = SP_PS_IO_MODE_EXISTING, .fd = ctx->logs.build.file.fd },
@@ -158,6 +163,7 @@ void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t config) {
 
   ctx->paths.logs.build = sp_fs_join_path(ctx->paths.work, spn_build_ctx_get_build_log_name(ctx));
   ctx->paths.logs.test = sp_fs_join_path(ctx->paths.work, spn_build_ctx_get_test_log_name(ctx));
+  ctx->paths.logs.jsonl = sp_fs_join_path(ctx->paths.work, spn_build_ctx_get_jsonl_log_name(ctx));
 
   sp_fs_create_dir(ctx->paths.work);
   sp_fs_create_dir(ctx->paths.generated);
@@ -167,8 +173,10 @@ void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t config) {
   sp_fs_create_dir(ctx->paths.lib);
   sp_fs_create_dir(ctx->paths.vendor);
   sp_fs_create_file(ctx->paths.logs.build);
+  sp_fs_create_file(ctx->paths.logs.jsonl);
 
   ctx->logs.build = sp_io_writer_from_file(ctx->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
+  ctx->logs.jsonl = sp_io_writer_from_file(ctx->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
 }
 
 void spn_build_ctx_log_ex(spn_build_io_t* logs, spn_log_level_t level, u64 thread_id, sp_str_t source, sp_str_t message) {
@@ -198,6 +206,10 @@ sp_str_t spn_build_ctx_get_build_log_name(spn_build_ctx_t* ctx) {
 
 sp_str_t spn_build_ctx_get_test_log_name(spn_build_ctx_t* ctx) {
   return sp_format("{}.test.log", SP_FMT_STR(ctx->name));
+}
+
+sp_str_t spn_build_ctx_get_jsonl_log_name(spn_build_ctx_t* ctx) {
+  return sp_format("{}.build.jsonl", SP_FMT_STR(ctx->name));
 }
 
 sp_str_t spn_ctx_build_source_dir(spn_build_ctx_t* build) {

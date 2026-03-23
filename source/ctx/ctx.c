@@ -1,6 +1,5 @@
 #include "ctx/ctx.h"
 #include "event/event.h"
-#include "target/types.h"
 
 sp_intern_t* spn_ctx_get_intern(void) {
   return spn.intern;
@@ -37,9 +36,9 @@ sp_str_t spn_ctx_project_root(void) {
 void spn_ctx_push_target_source_event(spn_target_t* target, sp_str_t source) {
   spn_event_buffer_push_ex(spn.events, target->pkg, SP_NULLPTR, (spn_build_event_t) {
     .kind = SPN_EVENT_ADD_SOURCE,
-    .target_source = {
-      .target = target->name,
-      .source = source,
+    .target = {
+      .name = target->name,
+      .source = { .source = source },
     }
   });
 }

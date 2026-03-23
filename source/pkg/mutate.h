@@ -31,6 +31,8 @@ spn_index_t* spn_pkg_add_index(spn_pkg_t* pkg, const c8* name, const c8* locatio
 spn_index_t* spn_pkg_add_index_ex(spn_pkg_t* pkg, sp_str_t name, sp_str_t location);
 spn_target_t* spn_pkg_add_exe(spn_pkg_t* pkg, const c8* name);
 spn_target_t* spn_pkg_add_exe_ex(spn_pkg_t* pkg, sp_str_t name);
+spn_target_t* spn_pkg_add_script(spn_pkg_t* pkg, const c8* name);
+spn_target_t* spn_pkg_add_script_ex(spn_pkg_t* pkg, sp_str_t name);
 spn_target_t* spn_pkg_add_test(spn_pkg_t* pkg, const c8* name);
 spn_target_t* spn_pkg_add_test_ex(spn_pkg_t* pkg, sp_str_t name);
 spn_target_t* spn_pkg_add_lib(spn_pkg_t* pkg, const c8* name, spn_linkage_t kind);

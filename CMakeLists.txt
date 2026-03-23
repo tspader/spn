@@ -155,8 +155,8 @@ set(SPN_SOURCES
   source/spn.c
   source/api.c
   source/app/app.c
-  source/cache.c
   source/event/event.c
+  source/event/log.c
   source/unit/build.c
   source/unit/node.c
   source/unit/package.c

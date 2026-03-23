@@ -48,6 +48,7 @@ struct spn_pkg {
   spn_semver_t version;
   sp_om(spn_target_t) libs;
   sp_om(spn_target_t) exes;
+  sp_om(spn_target_t) scripts;
   sp_om(spn_target_t) tests;
   sp_om(spn_profile_t) profiles;
   sp_om(spn_index_t) indexes;
@@ -76,7 +77,6 @@ struct spn_pkg {
   } paths;
 };
 
-typedef sp_om(spn_pkg_t) spn_pkg_cache_t;
 typedef sp_str_ht(sp_str_t) spn_pkg_registry_t;
 
 #endif

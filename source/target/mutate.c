@@ -57,9 +57,6 @@ void spn_target_add_source(spn_target_t* target, const c8* source) {
 
 void spn_target_add_source_ex(spn_target_t* target, sp_str_t source) {
   sp_require(target);
-
-  // @refactor
-  //spn_ctx_push_target_source_event(target, source);
   source = spn_intern(source);
   sp_da_push(target->source, source);
 }

@@ -1,18 +1,10 @@
-#include "app/app.h"
-
 #include "ctx/types.h"
-#include "event/event.h"
-#include "external/cc.h"
-#include "external/tom.h"
+
+#include "app/app.h"
 #include "lock/lock.h"
-#include "pkg/load.h"
 #include "pkg/mutate.h"
 #include "pkg/pkg.h"
-#include "target/target.h"
 #include "semver/convert.h"
-#include "sp.h"
-#include "sp/ht.h"
-#include "sp/str.h"
 
 sp_str_t spn_pkg_req_to_str(spn_pkg_req_t dep) {
   switch (dep.kind) {
@@ -101,8 +93,16 @@ spn_app_t spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode
 }
 
 spn_err_t spn_app_load(spn_app_t* app, sp_str_t manifest_path) {
+  // @spader
+  // We switch here because most operations work on a project, and start by loading the manifest. But for
+  // `spn run`, you can point it at a loose C file. This feels kind of ad hoc, like we're throwing away
+  // the fact that we're not in a project for the sake of false uniformity.
+  //
   if (sp_fs_exists(manifest_path)) {
     sp_try(spn_pkg_from_manifest(&app->package, manifest_path));
+  } else {
+    app->package = spn_pkg_new(sp_str_lit(""));
+    spn_pkg_set_manifest(&app->package, manifest_path);
   }
 
   app->paths.dir = app->package.paths.root;

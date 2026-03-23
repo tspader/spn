@@ -14,6 +14,11 @@
 typedef struct spn_target_unit spn_target_unit_t;
 typedef struct spn_session_t spn_session_t;
 
+typedef enum {
+  SPN_HOOK_CONFIGURE,
+  SPN_HOOK_PACKAGE,
+} spn_hook_t;
+
 typedef struct {
   u64 compile;
   u64 configure;
@@ -53,6 +58,7 @@ typedef struct {
   struct {
     sp_str_t build;
     sp_str_t test;
+    sp_str_t jsonl;
   } logs;
 } spn_build_paths_t;
 
@@ -65,6 +71,7 @@ typedef struct {
 typedef struct spn_build_io_t {
   sp_io_writer_t build;
   sp_io_writer_t test;
+  sp_io_writer_t jsonl;
 } spn_build_io_t;
 
 struct spn_build_ctx {

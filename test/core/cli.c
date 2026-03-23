@@ -20,7 +20,7 @@ UTEST_MAIN()
 typedef struct {
   const c8* args[CLI_TEST_MAX_ARGS];
   u32 num_args;
-  spn_cli_command_usage_t cmd;
+  spn_cli_usage_t cmd;
   s32 expect_err;
 } cli_parse_test_t;
 
@@ -218,7 +218,7 @@ UTEST_F(spn_parse_cmd, unknown_opt_error) {
 UTEST_F(spn_parse_cmd, stop_at_non_option) {
   sp_str_t bound = SP_ZERO_INITIALIZE();
 
-  spn_cli_command_usage_t cmd = {
+  spn_cli_usage_t cmd = {
     .name = "test", .summary = "test",
     .args = {{ .name = "cmd", .kind = SPN_CLI_ARG_KIND_OPTIONAL, .ptr = &bound }},
   };
@@ -254,15 +254,31 @@ static sp_app_result_t stub_handler_err(spn_cli_t* cli) {
   return SP_APP_ERR;
 }
 
+sp_app_result_t run_cli(spn_cli_usage_t* cmd, spn_cli_t* user_data, const c8** args, u32 n) {
+  spn_cli_parser_t parser = {
+    .args = args,
+    .num_args = n,
+    .cmd = cmd
+  };
+
+  sp_try(spn_cli_parse(&parser));
+
+  if (parser.resolved->handler) {
+    return parser.resolved->handler(user_data);
+  }
+
+  return SP_APP_ERR;
+}
+
 typedef struct {
   const c8* args[CLI_TEST_MAX_ARGS];
   u32 num_args;
-  spn_cli_command_usage_t cmd;
+  spn_cli_usage_t cmd;
   sp_app_result_t expect_result;
 } cli_dispatch_test_t;
 
 void expect_dispatch(s32* utest_result, cli_dispatch_test_t t) {
-  sp_app_result_t result = spn_cli_run(&t.cmd, SP_NULLPTR, t.args, t.num_args);
+  sp_app_result_t result = run_cli(&t.cmd, SP_NULLPTR, t.args, t.num_args);
   EXPECT_EQ(t.expect_result, result);
 }
 
@@ -283,7 +299,7 @@ UTEST_F(spn_dispatch, known_command) {
     .args = { "build" },
     .num_args = 1,
     .cmd = {
-      .commands = (spn_cli_command_usage_t[]) {
+      .commands = (spn_cli_usage_t[]) {
         { .name = "build", .summary = "build project", .handler = stub_handler_done },
         { 0 },
       },
@@ -297,7 +313,7 @@ UTEST_F(spn_dispatch, unknown_command) {
     .args = { "bogus" },
     .num_args = 1,
     .cmd = {
-      .commands = (spn_cli_command_usage_t[]) {
+      .commands = (spn_cli_usage_t[]) {
         { .name = "build", .summary = "build project", .handler = stub_handler_done },
         { 0 },
       },
@@ -311,7 +327,7 @@ UTEST_F(spn_dispatch, handler_return_value) {
     .args = { "test" },
     .num_args = 1,
     .cmd = {
-      .commands = (spn_cli_command_usage_t[]) {
+      .commands = (spn_cli_usage_t[]) {
         { .name = "test", .summary = "run tests", .handler = stub_handler_continue },
         { 0 },
       },
@@ -320,7 +336,7 @@ UTEST_F(spn_dispatch, handler_return_value) {
   });
 }
 
-static spn_cli_command_usage_t tool_subcommands[] = {
+static spn_cli_usage_t tool_subcommands[] = {
   { .name = "install", .summary = "install tool", .handler = stub_handler_continue },
   { .name = "uninstall", .summary = "uninstall tool", .handler = stub_handler_done },
   { 0 },
@@ -331,7 +347,7 @@ UTEST_F(spn_dispatch, subcommand_found) {
     .args = { "tool", "install" },
     .num_args = 2,
     .cmd = {
-      .commands = (spn_cli_command_usage_t[]) {
+      .commands = (spn_cli_usage_t[]) {
         { .name = "tool", .summary = "manage tools", .commands = tool_subcommands },
         { 0 },
       },
@@ -345,7 +361,7 @@ UTEST_F(spn_dispatch, subcommand_missing) {
     .args = { "tool" },
     .num_args = 1,
     .cmd = {
-      .commands = (spn_cli_command_usage_t[]) {
+      .commands = (spn_cli_usage_t[]) {
         { .name = "tool", .summary = "manage tools", .commands = tool_subcommands },
         { 0 },
       },
@@ -361,19 +377,19 @@ UTEST_F(spn_dispatch, subcommand_missing) {
 // Test: root command has opts, parses them before dispatching to subcommand
 UTEST_F(spn_dispatch, cmd_with_opts) {
   bool verbose = false;
-  spn_cli_command_usage_t root = {
+  spn_cli_usage_t root = {
     .name = "root",
     .opts = {
       { .brief = "v", .name = "verbose", .kind = SPN_CLI_OPT_KIND_BOOLEAN, .ptr = &verbose },
     },
-    .commands = (spn_cli_command_usage_t[]) {
+    .commands = (spn_cli_usage_t[]) {
       { .name = "build", .handler = stub_handler_done },
       { 0 },
     },
   };
 
   const c8* args[] = { "--verbose", "build" };
-sp_app_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 2);
+sp_app_result_t result = run_cli(&root, SP_NULLPTR, args, 2);
 
   EXPECT_EQ(SP_APP_QUIT, result);
   EXPECT_TRUE(verbose);
@@ -381,12 +397,12 @@ sp_app_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 2);
 
 // Test: three levels deep (root -> tool -> install)
 UTEST_F(spn_dispatch, nested_commands) {
-  spn_cli_command_usage_t root = {
+  spn_cli_usage_t root = {
     .name = "root",
-    .commands = (spn_cli_command_usage_t[]) {
+    .commands = (spn_cli_usage_t[]) {
       {
         .name = "tool",
-        .commands = (spn_cli_command_usage_t[]) {
+        .commands = (spn_cli_usage_t[]) {
           { .name = "install", .handler = stub_handler_continue },
           { 0 },
         },
@@ -396,7 +412,7 @@ UTEST_F(spn_dispatch, nested_commands) {
   };
 
   const c8* args[] = { "tool", "install" };
-sp_app_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 2);
+sp_app_result_t result = run_cli(&root, SP_NULLPTR, args, 2);
 
   EXPECT_EQ(SP_APP_QUIT, result);
 }
@@ -406,12 +422,12 @@ UTEST_F(spn_dispatch, opts_at_each_level) {
   bool root_opt = false;
   bool sub_opt = false;
 
-  spn_cli_command_usage_t root = {
+  spn_cli_usage_t root = {
     .name = "root",
     .opts = {
       { .brief = "r", .name = "root-flag", .kind = SPN_CLI_OPT_KIND_BOOLEAN, .ptr = &root_opt },
     },
-    .commands = (spn_cli_command_usage_t[]) {
+    .commands = (spn_cli_usage_t[]) {
       {
         .name = "sub",
         .opts = {
@@ -424,7 +440,7 @@ UTEST_F(spn_dispatch, opts_at_each_level) {
   };
 
   const c8* args[] = { "--root-flag", "sub", "--sub-flag" };
-  sp_app_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 3);
+  sp_app_result_t result = run_cli(&root, SP_NULLPTR, args, 3);
 
   EXPECT_EQ(SP_APP_QUIT, result);
   EXPECT_TRUE(root_opt);
@@ -436,7 +452,7 @@ UTEST_F(spn_dispatch, root_handler) {
   bool flag = false;
   sp_str_t target = SP_ZERO_INITIALIZE();
 
-  spn_cli_command_usage_t root = {
+  spn_cli_usage_t root = {
     .name = "build",
     .opts = {
       { .brief = "f", .name = "flag", .kind = SPN_CLI_OPT_KIND_BOOLEAN, .ptr = &flag },
@@ -446,7 +462,7 @@ UTEST_F(spn_dispatch, root_handler) {
   };
 
   const c8* args[] = { "--flag", "--target", "foo" };
-  sp_app_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 3);
+  sp_app_result_t result = run_cli(&root, SP_NULLPTR, args, 3);
 
   EXPECT_EQ(SP_APP_QUIT, result);
   EXPECT_TRUE(flag);
@@ -499,25 +515,25 @@ UTEST_F(spn_dispatch, handler_receives_user_data) {
   captured_cli = SP_NULLPTR;
   int dummy_cli_data = 42;  // just need any pointer
 
-  spn_cli_command_usage_t root = {
+  spn_cli_usage_t root = {
     .name = "test",
     .handler = capture_handler,
   };
 
   const c8* args[] = {};
-  spn_cli_run(&root, (spn_cli_t*)&dummy_cli_data, args, 0);
+  run_cli(&root, (spn_cli_t*)&dummy_cli_data, args, 0);
 
   EXPECT_EQ((spn_cli_t*)&dummy_cli_data, captured_cli);
 }
 
 UTEST_F(spn_dispatch, no_handler_no_subcommands) {
-  spn_cli_command_usage_t root = {
+  spn_cli_usage_t root = {
     .name = "test",
     // no handler, no commands
   };
 
   const c8* args[] = {};
-  sp_app_result_t result = spn_cli_run(&root, SP_NULLPTR, args, 0);
+  sp_app_result_t result = run_cli(&root, SP_NULLPTR, args, 0);
 
   EXPECT_EQ(SP_APP_ERR, result);
 }

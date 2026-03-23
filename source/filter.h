@@ -10,6 +10,7 @@ typedef struct {
   struct {
     bool public;
     bool test;
+    bool script;
   } disabled;
 } spn_target_filter_t;
 

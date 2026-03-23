@@ -16,42 +16,6 @@ static sp_str_t spn_cli_opt_kind_to_str(spn_cli_opt_kind_t kind) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-spn_cli_arg_kind_t spn_cli_arg_kind_from_str(sp_str_t str) {
-  SPN_CLI_ARG_KIND(SP_X_NAMED_ENUM_STR_TO_ENUM)
-  SP_UNREACHABLE_RETURN(SPN_CLI_ARG_KIND_REQUIRED);
-}
-
-sp_str_t spn_cli_arg_kind_to_str(spn_cli_arg_kind_t kind) {
-  switch (kind) {
-    SPN_CLI_ARG_KIND(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-spn_cli_cmd_t spn_cli_command_from_str(sp_str_t str) {
-  SPN_CLI_COMMAND(SP_X_NAMED_ENUM_STR_TO_ENUM)
-  SP_UNREACHABLE_RETURN(SPN_CLI_LS);
-}
-
-sp_str_t spn_cli_command_to_str(spn_cli_cmd_t cmd) {
-  switch (cmd) {
-    SPN_CLI_COMMAND(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-spn_tool_cmd_t spn_tool_subcommand_from_str(sp_str_t str) {
-  SPN_TOOL_SUBCOMMAND(SP_X_NAMED_ENUM_STR_TO_ENUM)
-  SP_UNREACHABLE_RETURN(SPN_TOOL_LIST);
-}
-
-sp_str_t spn_tool_subcommand_to_str(spn_tool_cmd_t cmd) {
-  switch (cmd) {
-    SPN_TOOL_SUBCOMMAND(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
 static void sp_sh_ls(sp_str_t path) {
   if (!sp_fs_exists(path)) {
     SP_LOG("{:fg brightcyan} hasn't been built for your configuration", SP_FMT_STR(path));
@@ -92,7 +56,7 @@ static void sp_sh_ls(sp_str_t path) {
 /////////
 // CLI //
 /////////
-spn_cli_command_info_t spn_cli_command_info_from_usage(spn_cli_command_usage_t cmd) {
+spn_cli_command_info_t spn_cli_command_info_from_usage(spn_cli_usage_t cmd) {
   spn_cli_command_info_t info = {
     .name = sp_str_from_cstr(cmd.name),
     .usage = sp_str_from_cstr(cmd.usage),
@@ -129,7 +93,7 @@ spn_cli_command_info_t spn_cli_command_info_from_usage(spn_cli_command_usage_t c
   return info;
 }
 
-sp_str_t spn_cli_command_usage(spn_cli_command_usage_t cmd) {
+sp_str_t spn_cli_command_usage(spn_cli_usage_t cmd) {
   spn_cli_command_info_t info = spn_cli_command_info_from_usage(cmd);
 
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
@@ -219,13 +183,13 @@ sp_str_t spn_cli_command_usage(spn_cli_command_usage_t cmd) {
   return sp_str_builder_to_str(&builder);
 }
 
-sp_str_t spn_cli_usage(spn_cli_command_usage_t* cmd) {
+sp_str_t spn_cli_usage(spn_cli_usage_t* cmd) {
   spn_cli_command_info_t cmd_info = spn_cli_command_info_from_usage(*cmd);
   spn_cli_usage_info_t info = SP_ZERO_INITIALIZE();
 
   // Collect subcommands
   if (cmd->commands) {
-    for (spn_cli_command_usage_t* sub = cmd->commands; sub->name; sub++) {
+    for (spn_cli_usage_t* sub = cmd->commands; sub->name; sub++) {
       spn_cli_command_info_t sub_info = spn_cli_command_info_from_usage(*sub);
       sp_dyn_array_push(info.commands, sub_info);
     }
@@ -380,7 +344,7 @@ sp_app_result_t spn_cli_init(spn_cli_t* cli) {
 }
 
 sp_app_result_t spn_cli_root(spn_cli_t* cli) {
-  sp_str_t help = spn_cli_usage(&cli->cmd);
+  sp_str_t help = spn_cli_usage(&cli->usage);
   sp_log(help);
   return SP_APP_QUIT;
 }
@@ -684,6 +648,98 @@ sp_app_result_t spn_cli_generate(spn_cli_t* cli) {
   return SP_APP_CONTINUE;
 }
 
+static bool spn_cli_run_path_is_absolute(sp_str_t path) {
+  return sp_str_starts_with(path, sp_str_lit("/")) ||
+    sp_str_starts_with(path, sp_str_lit("\\")) ||
+    (path.len > 1 && path.data[1] == ':');
+}
+
+static bool spn_cli_run_path_is_explicit(sp_str_t path) {
+  return spn_cli_run_path_is_absolute(path) ||
+    sp_str_starts_with(path, sp_str_lit(".")) ||
+    sp_str_find_c8(path, '/') != SP_STR_NO_MATCH ||
+    sp_str_find_c8(path, '\\') != SP_STR_NO_MATCH;
+}
+
+static bool spn_cli_run_is_source_entry(sp_str_t entry, bool has_manifest) {
+  if (!sp_str_equal(sp_fs_get_ext(entry), sp_str_lit("c"))) {
+    return false;
+  }
+
+  if (!has_manifest) {
+    return true;
+  }
+
+  if (sp_om_has(app.package.scripts, entry)) {
+    return false;
+  }
+
+  if (spn_cli_run_path_is_explicit(entry)) {
+    return true;
+  }
+
+  return sp_fs_exists(sp_fs_join_path(spn.paths.project, entry));
+}
+
+sp_app_result_t spn_cli_run(spn_cli_t* cli) {
+  spn_cli_run_t* command = &cli->run;
+  bool has_manifest = sp_fs_exists(spn.paths.manifest);
+  bool source = spn_cli_run_is_source_entry(command->entry, has_manifest);
+
+  app.config = (spn_app_config_t) {
+    .filter = (spn_target_filter_t) {
+      .name = source ? sp_str_lit("") : command->entry,
+      .disabled = {
+        .public = source,
+        .test = source,
+        .script = source,
+      }
+    },
+    .run = {
+      .kind = source ? SPN_RUN_KIND_SOURCE : SPN_RUN_KIND_SCRIPT,
+      .target = command->entry,
+    },
+  };
+
+  sp_try_as(spn_cli_set_profile(&app, command->profile), SP_APP_ERR);
+
+  if (source) {
+    if (has_manifest) {
+      spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
+      spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
+      spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
+    }
+
+    spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN);
+    return SP_APP_CONTINUE;
+  }
+
+  if (!has_manifest) {
+    spn_log_error("no manifest found in {:fg brightcyan}; pass a relative {:fg brightyellow} file instead",
+      SP_FMT_STR(spn.paths.project),
+      SP_FMT_CSTR(".c")
+    );
+    return SP_APP_ERR;
+  }
+
+  if (!sp_om_has(app.package.scripts, command->entry)) {
+    spn_log_error("script target {:fg brightyellow} is not defined in {:fg brightcyan}",
+      SP_FMT_STR(command->entry),
+      SP_FMT_STR(app.package.paths.manifest)
+    );
+    return SP_APP_ERR;
+  }
+
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PREPARE_BUILD_GRAPH);
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN_BUILD_GRAPH);
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN);
+
+  return SP_APP_CONTINUE;
+}
+
 sp_app_result_t spn_cli_test(spn_cli_t* cli) {
   spn_cli_test_t* command = &cli->test;
 
@@ -691,9 +747,13 @@ sp_app_result_t spn_cli_test(spn_cli_t* cli) {
     .filter = (spn_target_filter_t) {
       .name = command->target,
       .disabled = {
-        .public = true
+        .public = true,
+        .script = true,
       }
-    }
+    },
+    .run = {
+      .kind = SPN_RUN_KIND_TESTS,
+    },
   };
 
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
@@ -716,12 +776,25 @@ sp_app_result_t spn_cli_build(spn_cli_t* cli) {
     .filter = (spn_target_filter_t) {
       .name = command->target,
       .disabled = {
-        .test = sp_str_empty(command->target) && !command->tests
+        .test = sp_str_empty(command->target) && !command->tests,
+        .script = sp_str_empty(command->target),
       }
     },
   };
 
   sp_try(spn_cli_set_profile(&app, command->profile));
+
+  spn_event_buffer_push_ex(spn.events, &app.package, SP_NULLPTR, (spn_build_event_t) {
+    .kind = SPN_EVENT_CLI_ENTRY,
+    .cli_entry = {
+      .command = sp_str_lit("build"),
+      .profile = app.config.profile ? app.config.profile->name : sp_str_lit(""),
+      .target = command->target,
+      .force = command->force,
+      .cwd = spn.paths.cwd,
+      .manifest = app.package.paths.manifest,
+    }
+  });
 
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
@@ -732,9 +805,9 @@ sp_app_result_t spn_cli_build(spn_cli_t* cli) {
   return SP_APP_CONTINUE;
 }
 
-spn_cli_command_usage_t spn_cli() {
+spn_cli_usage_t spn_cli() {
   spn_cli_t* cli = &spn.cli;
-  static spn_cli_command_usage_t tools [] = {
+  static spn_cli_usage_t tools [] = {
     {
       .name = "install",
       .opts = {
@@ -809,7 +882,7 @@ spn_cli_command_usage_t spn_cli() {
     SPN_CLI_ARGS_DONE,
   };
 
-  static spn_cli_command_usage_t commands [] = {
+  static spn_cli_usage_t commands [] = {
     {
       .name = "init",
       .handler = spn_cli_init,
@@ -889,6 +962,30 @@ spn_cli_command_usage_t spn_cli() {
       },
       .summary = "Build the project, including dependencies, from source",
       .handler = spn_cli_build
+    },
+
+    {
+      .name = "run",
+      .opts = {
+        {
+          .brief = "p",
+          .name = "profile",
+          .kind = SPN_CLI_OPT_KIND_STRING,
+          .summary = "Profile to use when resolving build dependencies",
+          .placeholder = "PROFILE",
+          .ptr = &spn.cli.run.profile
+        }
+      },
+      .args = {
+        {
+          .name = "entry",
+          .kind = SPN_CLI_ARG_KIND_REQUIRED,
+          .summary = "Script target name or relative .c file",
+          .ptr = &spn.cli.run.entry
+        }
+      },
+      .summary = "Run a manifest script target or a relative C source file",
+      .handler = spn_cli_run
     },
 
     {
@@ -1111,7 +1208,7 @@ spn_cli_command_usage_t spn_cli() {
     SPN_CLI_ARGS_DONE,
   };
 
-  return (spn_cli_command_usage_t) {
+  return (spn_cli_usage_t) {
     .name = "spn",
     .handler = spn_cli_root,
     .summary = "A package manager and build tool for C",

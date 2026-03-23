@@ -16,7 +16,6 @@
 #define strl(literal) sp_str_lit(literal)
 
 #define sp_try_goto(expr, label) do { s32 _sp_result = (expr); if (_sp_result) { goto label; }; } while (0)
-#define spn_try_as(expr) sp_try_as((expr), SPN_ERROR)
 
 #define sp_arena_alloc_type(arena, type) sp_mem_arena_alloc((arena), sizeof((type)))
 

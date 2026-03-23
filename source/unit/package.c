@@ -120,72 +120,19 @@ spn_err_t spn_pkg_unit_call_hook(spn_pkg_unit_t* ctx, spn_build_fn_t fn) {
     fn(&ctx->ctx);
   }
   else {
-    spn_trace_error(spn.events, ctx->ctx.pkg, &ctx->ctx.logs,
-      "build script crashed (longjmp status={})", SP_FMT_S32(status));
-    spn_event_buffer_push(spn.events, &ctx->ctx, SPN_EVENT_BUILD_SCRIPT_FAILED);
+    // @spader @log
+    // What else can we get from TCC here?
+    spn_event_buffer_push_ctx(spn.events, &ctx->ctx, (spn_build_event_t) {
+      .kind = SPN_EVENT_BUILD_SCRIPT_CRASHED,
+      .crashed.path = ctx->ctx.pkg->paths.script,
+    });
     return SPN_ERROR;
   }
 
   return SPN_OK;
 }
 
-spn_err_t spn_pkg_unit_run_configure_hook(spn_pkg_unit_t* ctx) {
-  spn_err_t result = SPN_OK;
-
-  spn_event_buffer_push(spn.events, &ctx->ctx, SPN_EVENT_BUILD_SCRIPT_CONFIGURE);
-
-  spn_trace_debug(spn.events, ctx->ctx.pkg, &ctx->ctx.logs,
-    "configure hook: has_hook={} tcc={} script={}",
-    SP_FMT_CSTR(ctx->on_configure ? "true" : "false"),
-    SP_FMT_CSTR(ctx->tcc ? "loaded" : "null"),
-    SP_FMT_STR(ctx->ctx.pkg->paths.script));
-
-  spn_event_buffer_push_ctx(spn.events, &ctx->ctx, (spn_build_event_t) {
-    .kind = SPN_EVENT_RUN_CONFIGURE,
-    .configure = {
-      .exists = ctx->on_configure,
-      .result = 0,
-      .time = 0,
-    }
-  });
-
-  if (ctx->on_configure) {
-    sp_tm_timer_t timer = sp_tm_start_timer();
-    result = spn_pkg_unit_call_hook(ctx, ctx->on_configure);
-    ctx->time.configure = sp_tm_read_timer(&timer);
-
-    spn_trace_debug(spn.events, ctx->ctx.pkg, &ctx->ctx.logs,
-      "configure hook completed: result={} time={}ns",
-      SP_FMT_S32(result), SP_FMT_U64(ctx->time.configure));
-  } else {
-    spn_trace_debug(spn.events, ctx->ctx.pkg, &ctx->ctx.logs,
-      "no configure hook, skipping", SP_FMT_U32(0));
-  }
-
-  return result;
-}
-
-spn_err_t spn_pkg_unit_run_package_hook(spn_pkg_unit_t* ctx) {
-  spn_err_t result = SPN_OK;
-
-  if (ctx->on_package) {
-    sp_tm_timer_t timer = sp_tm_start_timer();
-    result = spn_pkg_unit_call_hook(ctx, ctx->on_package);
-    ctx->time.package = sp_tm_read_timer(&timer);
-  }
-
-  return result;
-}
-
 void spn_pkg_unit_add_target(spn_pkg_unit_t* pkg, spn_target_t* target) {
-  spn_event_buffer_push_ex(spn.events, pkg->ctx.pkg, &pkg->ctx.logs, (spn_build_event_t) {
-    .kind = SPN_EVENT_ADD_TARGET,
-    .target_add = {
-      .target = target->name,
-      .kind = target->kind,
-    }
-  });
-
   sp_om_insert(pkg->targets, target->name, SP_ZERO_STRUCT(spn_target_unit_t));
   spn_target_unit_t* unit = sp_om_back(pkg->targets);
   unit->session = pkg->ctx.session;
@@ -209,6 +156,7 @@ void spn_pkg_unit_add_target(spn_pkg_unit_t* pkg, spn_target_t* target) {
   unit->paths.object = sp_fs_join_path(unit->paths.generated, sp_str_lit("object"));
   unit->paths.logs.build = sp_fs_join_path(unit->paths.work, sp_format("{}.build.log", SP_FMT_STR(target->name)));
   unit->paths.logs.test = sp_fs_join_path(unit->paths.work, sp_format("{}.test.log", SP_FMT_STR(target->name)));
+  unit->paths.logs.jsonl = sp_fs_join_path(unit->paths.work, sp_format("{}.build.jsonl", SP_FMT_STR(target->name)));
 
   sp_fs_create_dir(unit->paths.work);
   sp_fs_create_dir(unit->paths.generated);
@@ -219,13 +167,8 @@ void spn_pkg_unit_add_target(spn_pkg_unit_t* pkg, spn_target_t* target) {
   sp_fs_create_dir(unit->paths.lib);
   sp_fs_create_dir(unit->paths.vendor);
   sp_fs_create_file(unit->paths.logs.build);
+  sp_fs_create_file(unit->paths.logs.jsonl);
 
   unit->logs.build = sp_io_writer_from_file(unit->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
-
-  spn_event_buffer_push_ex(spn.events, pkg->ctx.pkg, &pkg->ctx.logs, (spn_build_event_t) {
-    .kind = SPN_EVENT_ADD_TARGET,
-    .target.add = {
-      .name = target->name
-    }
-  });
+  unit->logs.jsonl = sp_io_writer_from_file(unit->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
 }

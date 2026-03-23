@@ -1,11 +1,12 @@
-#include "index/index.h"
+#include "sp.h"
 
 #include "err.h"
-#include "index/json.h"
 #include "index/types.h"
-#include "external/mz.h"
-#include "sp.h"
+
 #include "external/git.h"
+#include "external/mz.h"
+#include "index/index.h"
+#include "index/json.h"
 #include "semver/compare.h"
 #include "sp/io.h"
 

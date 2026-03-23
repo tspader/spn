@@ -19,9 +19,26 @@ void spn_task_sync_init(spn_app_t* app) {
   spn_resolver_t* resolver = app->resolver;
   spn_pkg_unit_t* root = spn_session_find_root(session);
 
-  spn_event_buffer_push(spn.events, &root->ctx, SPN_EVENT_FETCH);
-  spn_trace_info(spn.events, root->ctx.pkg, &root->ctx.logs,
-    "syncing dependencies", SP_FMT_U32(0));
+  // count file vs index deps
+  u32 num_file = 0, num_index = 0;
+  sp_ht_for_kv(app->package.deps, count_it) {
+    if (count_it.val->kind == SPN_PACKAGE_KIND_FILE) num_file++;
+  }
+  sp_str_ht_for_kv(resolver->resolved, count_it2) {
+    if (count_it2.val->kind == SPN_PACKAGE_KIND_INDEX && count_it2.val->release) num_index++;
+  }
+
+  spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+    .kind = SPN_EVENT_SYNC_START,
+    .sync_start = {
+      .num_packages = num_file + num_index,
+      .num_index = num_index,
+      .num_file = num_file,
+    }
+  });
+
+  sp_tm_timer_t phase_timer = sp_tm_start_timer();
+  u32 num_synced = 0;
 
   // Load file dependencies directly from their manifests
   sp_ht_for_kv(app->package.deps, dep_it) {
@@ -33,10 +50,16 @@ void spn_task_sync_init(spn_app_t* app) {
       manifest = sp_str_strip_left(manifest, SP_LIT("file://"));
     }
 
+    sp_tm_timer_t pkg_timer = sp_tm_start_timer();
+
     if (!sp_fs_exists(manifest)) {
-      spn_event_buffer_push_ex(spn.events, &app->package, SP_NULLPTR, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR,
-        .err = { .kind = SPN_ERROR },
+      spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+        .kind = SPN_EVENT_SYNC_FAILED,
+        .sync_failed = {
+          .name = *dep_it.key,
+          .url = manifest,
+          .error = sp_str_lit("manifest not found"),
+        }
       });
       continue;
     }
@@ -51,6 +74,18 @@ void spn_task_sync_init(spn_app_t* app) {
       .version = pkg->version,
     };
     add_pkg_unit(session, *dep_it.key, &file_resolved);
+    num_synced++;
+
+    spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+      .kind = SPN_EVENT_SYNC_PACKAGE,
+      .sync_pkg = {
+        .name = *dep_it.key,
+        .kind = SPN_PACKAGE_KIND_FILE, // @spader Convert this to a string? Here, or can we express this in the schema?
+        .url = manifest,
+        .source_path = pkg->paths.root,
+        .time = sp_tm_read_timer(&pkg_timer),
+      }
+    });
   }
 
   // Load index dependencies via git cache
@@ -65,6 +100,7 @@ void spn_task_sync_init(spn_app_t* app) {
     }
 
     spn_index_rel_t* rel = resolved->release;
+    sp_tm_timer_t pkg_timer = sp_tm_start_timer();
 
     spn_git_checkout_t* checkout = SP_NULLPTR;
     spn_err_t err = spn_git_cache_ensure_checkout(&cache, (spn_git_checkout_id_t) {
@@ -74,9 +110,13 @@ void spn_task_sync_init(spn_app_t* app) {
     }, &checkout);
 
     if (err != SPN_OK) {
-      spn_event_buffer_push_ex(spn.events, &app->package, SP_NULLPTR, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR,
-        .err = { .kind = SPN_ERROR },
+      spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+        .kind = SPN_EVENT_SYNC_FAILED,
+        .sync_failed = {
+          .name = *it.key,
+          .url = rel->source.url,
+          .error = sp_str_lit("git checkout failed"),
+        }
       });
       continue;
     }
@@ -93,9 +133,13 @@ void spn_task_sync_init(spn_app_t* app) {
       }, &manifest_checkout);
 
       if (err != SPN_OK) {
-        spn_event_buffer_push_ex(spn.events, &app->package, SP_NULLPTR, (spn_build_event_t) {
-          .kind = SPN_EVENT_ERR,
-          .err = { .kind = SPN_ERROR },
+        spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+          .kind = SPN_EVENT_SYNC_FAILED,
+          .sync_failed = {
+            .name = *it.key,
+            .url = rel->manifest.url,
+            .error = sp_str_lit("manifest checkout failed"),
+          }
         });
         continue;
       }
@@ -125,7 +169,27 @@ void spn_task_sync_init(spn_app_t* app) {
 
     resolved->pkg = pkg;
     add_pkg_unit(session, *it.key, resolved);
+    num_synced++;
+
+    spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+      .kind = SPN_EVENT_SYNC_PACKAGE,
+      .sync_pkg = {
+        .name = *it.key,
+        .kind = SPN_PACKAGE_KIND_INDEX,
+        .url = rel->source.url,
+        .source_path = checkout_path,
+        .time = sp_tm_read_timer(&pkg_timer),
+      }
+    });
   }
+
+  spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+    .kind = SPN_EVENT_SYNC_END,
+    .sync_end = {
+      .num_synced = num_synced,
+      .time = sp_tm_read_timer(&phase_timer),
+    }
+  });
 
   sp_om_for(session->units.packages, it) {
     spn_pkg_t* pkg = sp_om_at(session->units.packages, it)->ctx.pkg;
