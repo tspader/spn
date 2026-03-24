@@ -1,4 +1,4 @@
-// EXTERNAL
+// SINGLE HEADER
 #define SP_MAIN
 #define SP_IMPLEMENTATION
 #include "sp.h"
@@ -8,8 +8,6 @@
 #include "toml.h"
 
 // STANDARD
-#include <setjmp.h>
-
 #ifdef _WIN32
   #ifndef WIN32_LEAN_AND_MEAN
     #define WIN32_LEAN_AND_MEAN
@@ -27,58 +25,29 @@
   #include <io.h>
 #endif
 
-#if defined(SP_POSIX)
-  #include <dlfcn.h>
-  #include <signal.h>
-  #include <unistd.h>
-#endif
-
 // SPN
+#include "spn.h"
+
 #include "app/app.h"
 #include "cli/cli.h"
-#include "enum/enum.h"
-#include "ctx/ctx.h"
-#include "filter/filter.h"
-#include "gen.h"
-#include "intern.h"
-#include "lock/lock.h"
-#include "index/index.h"
-#include "resolve/resolve.h"
-#include "signal.spn.h"
-#include "spn.h"
-#include "log/log.h"
-#include "pkg/load.h"
-#include "pkg/mutate.h"
-#include "pkg/pkg.h"
-#include "profile/profile.h"
-#include "graph/graph.h"
-#include "node.h"
-#include "session/session.h"
-#include "ordered_map.h"
-#include "tui/tui.h"
-#include "tui/spinner.h"
-#include "sp/terminal.h"
+#include "ctx/types.h"
 #include "event/event.h"
 #include "event/log.h"
-#include "external/cJSON.h"
 #include "external/git.h"
 #include "git/key.h"
-#include "external/mz.h"
-#include "external/tcc.h"
-#include "external/tom.h"
-#include "semver/types.h"
-#include "semver/convert.h"
-#include "sp/color.h"
-#include "sp/ht.h"
-#include "sp/io.h"
-#include "sp/macro.h"
-#include "sp/os.h"
-#include "sp/ps.h"
-#include "sp/str.h"
-#include "task/task.h"
-#include "unit/build.h"
-
+#include "index/index.h"
+#include "intern.h"
+#include "log/log.h"
+#include "ordered_map.h"
+#include "pkg/load.h"
+#include "session/session.h"
+#include "signal.spn.h"
 #include "spn.embed.h"
+#include "sp/io.h"
+#include "sp/os.h"
+#include "task/task.h"
+#include "tui/tui.h"
+#include "unit/build.h"
 
 spn_app_t app;
 spn_ctx_t spn;
