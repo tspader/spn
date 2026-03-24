@@ -3,7 +3,7 @@
 
 #include "sp.h"
 #include "spn.h"
-#include "graph.h"
+#include "graph/types.h"
 
 struct spn_node_t {
   spn_pkg_unit_t* ctx;

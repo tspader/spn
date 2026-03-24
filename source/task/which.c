@@ -1,5 +1,6 @@
 #include "app/app.h"
 #include "cli/types.h"
+#include "enum/enum.h"
 #include "ctx/ctx.h"
 #include "session/session.h"
 #include "unit/build.h"

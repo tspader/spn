@@ -4,9 +4,9 @@
 #include "sp.h"
 #include "spn.h"
 
-#include "filter.h"
-#include "graph.h"
-#include "profile.h"
+#include "filter/types.h"
+#include "graph/types.h"
+#include "profile/types.h"
 #include "semver/types.h"
 #include "unit/types.h"
 

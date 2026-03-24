@@ -1,4 +1,4 @@
-#include "profile.h"
+#include "profile/profile.h"
 
 #include "intern.h"
 #include "external/cc.h"

@@ -4,7 +4,7 @@
 #include "utest.h"
 #include "test.h"
 
-#include "graph.h"
+#include "graph/graph.h"
 
 
 void touch_file(sp_str_t path) {

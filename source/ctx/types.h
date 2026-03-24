@@ -10,7 +10,7 @@
 #include "intern.h"
 #include "jit.h"
 #include "log.h"
-#include "tui.h"
+#include "tui/types.h"
 
 typedef struct {
   sp_str_t dir;

@@ -2,6 +2,7 @@
 #include "ctx/ctx.h"
 #include "event/event.h"
 #include "external/cc.h"
+#include "filter/filter.h"
 #include "external/tcc.h"
 #include "log.h"
 #include "task.h"

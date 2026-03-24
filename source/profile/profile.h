@@ -1,28 +1,7 @@
-#ifndef SPN_PROFILE_H
-#define SPN_PROFILE_H
+#ifndef SPN_PROFILE_PROFILE_H
+#define SPN_PROFILE_PROFILE_H
 
-#include "sp.h"
-#include "spn.h"
-
-#include "enum/enum.h"
-
-typedef enum {
-  SPN_PROFILE_BUILTIN,
-  SPN_PROFILE_USER,
-} spn_profile_kind_t;
-
-struct spn_profile {
-  sp_str_t name;
-  spn_linkage_t linkage;
-  spn_libc_kind_t libc;
-  spn_c_standard_t standard;
-  spn_build_mode_t mode;
-  spn_profile_kind_t kind;
-  struct {
-    spn_cc_kind_t kind;
-    sp_str_t exe;
-  } cc;
-};
+#include "profile/types.h"
 
 spn_cc_kind_t spn_profile_get_cc(spn_profile_t* profile);
 void spn_profile_set_cc(spn_profile_t* profile, spn_cc_kind_t kind);

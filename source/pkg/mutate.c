@@ -1,8 +1,9 @@
 #include "pkg/mutate.h"
 
+#include "enum/enum.h"
 #include "intern.h"
 #include "index/types.h"
-#include "profile.h"
+#include "profile/profile.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
 #include "target/mutate.h"

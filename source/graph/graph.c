@@ -1,4 +1,6 @@
-#include "graph.h"
+#include "graph/graph.h"
+
+#include "sp/tm.h"
 
 spn_bg_it_t spn_bg_it_new(spn_bg_it_config_t config) {
   spn_bg_it_t it = {

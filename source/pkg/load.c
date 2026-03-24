@@ -2,7 +2,7 @@
 
 #include "enum/enum.h"
 #include "external/tom.h"
-#include "profile.h"
+#include "profile/profile.h"
 #include "intern.h"
 #include "pkg/id.h"
 #include "pkg/mutate.h"

@@ -1,4 +1,4 @@
-#include "filter.h"
+#include "filter/filter.h"
 
 bool spn_target_filter_pass(spn_target_filter_t* filter, spn_target_t* target) {
   if (!sp_str_empty(filter->name)) {

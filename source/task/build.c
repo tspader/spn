@@ -3,6 +3,8 @@
 
 #include "app/app.h"
 #include "err.h"
+#include "filter/filter.h"
+#include "graph/graph.h"
 #include "event/event.h"
 #include "gen.h"
 #include "log.h"

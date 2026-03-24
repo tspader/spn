@@ -160,6 +160,8 @@ typedef struct { sp_str_t profile; u64 time; u32 num_errors; sp_str_t first_erro
 typedef struct { bool success; u32 num_dirty; u32 total_commands; u64 time; sp_str_t profile; } spn_evt_build_summary_t;
 typedef struct { u64 time; } spn_evt_package_ok_t;
 
+typedef struct spn_build_event_t spn_build_event_t;
+
 struct spn_build_event_t {
   spn_build_event_kind_t kind;
   spn_pkg_t* pkg;

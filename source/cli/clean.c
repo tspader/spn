@@ -4,6 +4,7 @@
 #include "ctx/ctx.h"
 #include "event/event.h"
 #include "sp/io.h"
+#include "tui/tui.h"
 
 sp_app_result_t spn_cli_clean(spn_cli_t* cli) {
   spn_cli_clean_t* cmd = &cli->clean;

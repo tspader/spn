@@ -1,5 +1,6 @@
 #include "ctx/ctx.h"
 #include "event/event.h"
+#include "target/types.h"
 
 sp_intern_t* spn_ctx_get_intern(void) {
   return spn.intern;

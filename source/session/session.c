@@ -2,6 +2,7 @@
 
 #include "app/app.h"
 #include "ctx/types.h"
+#include "filter/filter.h"
 #include "event/event.h"
 #include "external/cc.h"
 #include "pkg/pkg.h"

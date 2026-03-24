@@ -161,8 +161,9 @@ set(SPN_SOURCES
   source/unit/node.c
   source/unit/package.c
   source/signal.c
-  source/graph.c
-  source/tui.c
+  source/graph/graph.c
+  source/tui/tui.c
+  source/tui/spinner.c
   source/ctx/ctx.c
   source/session/session.c
   source/intern.c
@@ -173,7 +174,7 @@ set(SPN_SOURCES
   source/pkg/mutate.c
   source/pkg/pkg.c
   source/lock/lock.c
-  source/profile.c
+  source/profile/profile.c
   source/cli/cli.c
   source/cli/init.c
   source/cli/add.c
@@ -193,10 +194,9 @@ set(SPN_SOURCES
   source/cli/dispatch_publish.c
   source/cli/publish.c
   source/gen.c
-  source/filter.c
+  source/filter/filter.c
   source/resolve/resolve.c
-  source/spinner.c
-  source/terminal.c
+  source/sp/terminal.c
   source/external/autoconf.c
   source/external/cc.c
   source/external/cJSON.c
@@ -313,7 +313,7 @@ add_executable(resolver
   source/pkg/id.c
   source/pkg/load.c
   source/pkg/mutate.c
-  source/profile.c
+  source/profile/profile.c
   source/resolve/resolve.c
   source/sp/str.c
   source/semver/compare.c
@@ -396,7 +396,7 @@ add_executable(publish
   source/pkg/id.c
   source/pkg/load.c
   source/pkg/mutate.c
-  source/profile.c
+  source/profile/profile.c
   source/semver/compare.c
   source/semver/convert.c
   source/semver/parser.c
@@ -488,7 +488,7 @@ add_dependencies(git bootstrap_headers)
 # GRAPH #
 #########
 add_executable(graph
-  source/graph.c
+  source/graph/graph.c
   source/sp/tm.c
   test/core/graph.c
   test/tools/tmp.c

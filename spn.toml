@@ -54,8 +54,9 @@ source = [
   "source/unit/node.c",
   "source/unit/package.c",
   "source/signal.c",
-  "source/graph.c",
-  "source/tui.c",
+  "source/graph/graph.c",
+  "source/tui/tui.c",
+  "source/tui/spinner.c",
   "source/ctx/ctx.c",
   "source/session/session.c",
   "source/intern.c",
@@ -69,7 +70,7 @@ source = [
   "source/pkg/pkg.c",
   "source/pkg/id.c",
   "source/lock/lock.c",
-  "source/profile.c",
+  "source/profile/profile.c",
   "source/cli/cli.c",
   "source/cli/init.c",
   "source/cli/add.c",
@@ -89,13 +90,12 @@ source = [
   "source/cli/dispatch_publish.c",
   "source/cli/publish.c",
   "source/gen.c",
-  "source/filter.c",
+  "source/filter/filter.c",
   "source/resolve/resolve.c",
   "source/semver/compare.c",
   "source/semver/convert.c",
   "source/semver/parser.c",
-  "source/spinner.c",
-  "source/terminal.c",
+  "source/sp/terminal.c",
   "source/external/autoconf.c",
   "source/external/cc.c",
   "source/external/cJSON.c",
@@ -151,7 +151,7 @@ include = ["include", "source", "test/tools"]
 
 [[test]]
 name = "graph"
-source = ["source/graph.c", "source/sp/tm.c", "test/core/graph.c", "test/tools/tmp.c"]
+source = ["source/graph/graph.c", "source/sp/tm.c", "test/core/graph.c", "test/tools/tmp.c"]
 include = ["include", "source", "test/tools"]
 
 [[test]]
@@ -196,7 +196,7 @@ source = [
   "source/pkg/id.c",
   "source/pkg/load.c",
   "source/pkg/mutate.c",
-  "source/profile.c",
+  "source/profile/profile.c",
   "source/resolve/resolve.c",
   "source/sp/str.c",
   "source/semver/compare.c",
@@ -228,7 +228,7 @@ source = [
   "source/pkg/id.c",
   "source/pkg/load.c",
   "source/pkg/mutate.c",
-  "source/profile.c",
+  "source/profile/profile.c",
   "source/semver/compare.c",
   "source/semver/convert.c",
   "source/semver/parser.c",

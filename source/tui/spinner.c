@@ -1,4 +1,4 @@
-#include "spinner.h"
+#include "tui/spinner.h"
 
 #include "sp/color.h"
 

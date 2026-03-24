@@ -1,4 +1,5 @@
-#include "tui.h"
+#include "tui/tui.h"
+#include "tui/spinner.h"
 
 #include "ctx/ctx.h"
 #include "log.h"

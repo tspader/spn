@@ -3,7 +3,7 @@
 #include "gen.h"
 #include "intern.h"
 #include "log.h"
-#include "profile.h"
+#include "profile/types.h"
 #include "target/target.h"
 #include "unit/build.h"
 #include "external/cc.h"
