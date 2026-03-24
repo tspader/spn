@@ -3,14 +3,14 @@
 
 #include "sp.h"
 
+#include "cli/types.h"
 #include "event/types.h"
 #include "index/types.h"
+#include "tui/types.h"
 
-#include "cli/types.h"
 #include "intern.h"
 #include "jit.h"
 #include "log.h"
-#include "tui/types.h"
 
 typedef struct {
   sp_str_t dir;

@@ -1,10 +1,7 @@
-#include "cli/cli.h"
+#include "ctx/types.h"
 
-#include "app/app.h"
-#include "ctx/ctx.h"
+#include "cli/cli.h"
 #include "event/event.h"
-#include "sp/io.h"
-#include "tui/tui.h"
 
 sp_app_result_t spn_cli_clean(spn_cli_t* cli) {
   spn_cli_clean_t* cmd = &cli->clean;
@@ -39,12 +36,6 @@ sp_app_result_t spn_cli_clean(spn_cli_t* cli) {
       });
       sp_fs_remove_file(app.paths.lock);
     }
-  }
-
-  sp_da(spn_build_event_t) events = spn_event_buffer_drain(spn.events);
-  sp_da_for(events, it) {
-    spn_build_event_t* event = &events[it];
-    sp_io_write_line(&spn.logger.err, spn_tui_render_event(event, spn.tui.info.max_name));
   }
 
   return SP_APP_QUIT;

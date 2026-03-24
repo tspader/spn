@@ -1,7 +1,6 @@
+#include "enum/enum.h"
 #include "profile/profile.h"
-
 #include "intern.h"
-#include "external/cc.h"
 
 spn_cc_kind_t spn_profile_get_cc(spn_profile_t* profile) {
   return profile->cc.kind;

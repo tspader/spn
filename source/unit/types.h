@@ -7,8 +7,6 @@
 #include "graph/types.h"
 #include "node.h"
 #include "pkg/types.h"
-#include "profile/types.h"
-#include "tui/types.h"
 #include "external/tcc.h"
 
 typedef struct spn_target_unit spn_target_unit_t;

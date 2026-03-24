@@ -1,5 +1,6 @@
 #include "app/app.h"
 #include "ctx/ctx.h"
+#include "enum/enum.h"
 #include "event/event.h"
 #include "gen.h"
 #include "session/session.h"

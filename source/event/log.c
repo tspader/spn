@@ -23,6 +23,7 @@ static s32 event_level(spn_build_event_kind_t kind) {
     case SPN_EVENT_SYNC_FAILED:
     case SPN_EVENT_LINK_FAILED:
     case SPN_EVENT_EMBED_FAILED:
+    case SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED:
     case SPN_EVENT_BUILD_FAILED: {
       return LOG_ERROR;
     }
@@ -242,6 +243,18 @@ static void build_schemas(void) {
       SP_BIND(&b, spn_evt_graph_init_t, packages, "packages", SP_BIND_U32);
     }
     schemas[SPN_EVENT_INIT_BUILD_GRAPH] = sp_bind_builder_end(&b);
+  }
+
+  // SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin();
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_err_build_graph_t, kind, "kind", SP_BIND_S32);
+      SP_BIND(&b, spn_err_build_graph_t, file, "file", SP_BIND_STR);
+      SP_BIND(&b, spn_err_build_graph_t, command_a, "command_a", SP_BIND_STR);
+      SP_BIND(&b, spn_err_build_graph_t, command_b, "command_b", SP_BIND_STR);
+    }
+    schemas[SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED] = sp_bind_builder_end(&b);
   }
 
   // SPN_EVENT_LINK_START
@@ -623,18 +636,19 @@ static void* event_variant_ptr(spn_build_event_t* event) {
     case SPN_EVENT_ADD_TARGET:                  return &event->target.add_debug;
     case SPN_EVENT_ADD_SOURCE:                  return &event->target.source;
     case SPN_EVENT_INIT_BUILD_GRAPH:            return &event->graph_init;
-    case SPN_EVENT_LINK_START:                   return &event->target.link_start;
-    case SPN_EVENT_LINK_PASSED:                  return &event->target.link_passed;
-    case SPN_EVENT_LINK_FAILED:                  return &event->target.link_failed;
+    case SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED:  return &event->err.build_graph;
+    case SPN_EVENT_LINK_START:                  return &event->target.link_start;
+    case SPN_EVENT_LINK_PASSED:                 return &event->target.link_passed;
+    case SPN_EVENT_LINK_FAILED:                 return &event->target.link_failed;
     case SPN_EVENT_TRACE_DEBUG:
     case SPN_EVENT_TRACE_INFO:
     case SPN_EVENT_TRACE_WARN:
     case SPN_EVENT_TRACE_ERROR:                 return &event->trace;
-    case SPN_EVENT_CLI_ENTRY:                    return &event->cli_entry;
+    case SPN_EVENT_CLI_ENTRY:                   return &event->cli_entry;
     case SPN_EVENT_RESOLVE_START:               return &event->resolve_start;
     case SPN_EVENT_RESOLVE_PACKAGE:             return &event->resolve_pkg;
     case SPN_EVENT_RESOLVE_END:                 return &event->resolve_end;
-    case SPN_EVENT_API_CALL:                     return &event->api_call;
+    case SPN_EVENT_API_CALL:                    return &event->api_call;
     case SPN_EVENT_USER_LOG:                    return &event->user_log;
     case SPN_EVENT_SYNC_START:                  return &event->sync_start;
     case SPN_EVENT_SYNC_PACKAGE:                return &event->sync_pkg;
@@ -693,6 +707,7 @@ static const c8* event_names[SPN_EVENT_COUNT] = {
   [SPN_EVENT_DEBUG]                         = "debug",
   [SPN_EVENT_ADD_SOURCE]                    = "add_source",
   [SPN_EVENT_INIT_BUILD_GRAPH]              = "init_build_graph",
+  [SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED]    = "prepare_build_graph_failed",
   [SPN_EVENT_LINK_START]                    = "link_start",
   [SPN_EVENT_LINK_PASSED]                   = "link_passed",
   [SPN_EVENT_LINK_FAILED]                   = "link_failed",

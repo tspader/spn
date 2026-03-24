@@ -4,8 +4,6 @@
 #include "sp.h"
 #include "sp/elf.h"
 #include "spn.h"
-#include "enum/enum.h"
-#include "embed.h"
 #include "target/types.h"
 #include "external/tcc.h"
 

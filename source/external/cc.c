@@ -2,6 +2,7 @@
 #include "ctx/ctx.h"
 #include "gen.h"
 #include "intern.h"
+#include "enum/enum.h"
 #include "log.h"
 #include "profile/types.h"
 #include "target/target.h"

@@ -7,6 +7,9 @@
 #include "pkg/types.h"
 #include "semver/types.h"
 
+#define SPN_VERSION "1.0.0"
+#define SPN_COMMIT "00c0fa98"
+
 typedef enum {
   SPN_DEP_IMPORT_KIND_EXPLICIT,
   SPN_DEP_IMPORT_KIND_TRANSITIVE

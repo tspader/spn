@@ -6,7 +6,6 @@
 #include "external/tom.h"
 #include "semver/convert.h"
 #include "sp/ht.h"
-#include "version.h"
 
 static void spn_lock_build_dependents(spn_lock_file_t* lock) {
   sp_ht_for_kv(lock->entries, it) {

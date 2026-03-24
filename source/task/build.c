@@ -3,14 +3,63 @@
 
 #include "app/app.h"
 #include "err.h"
+#include "enum/enum.h"
+#include "external/cc.h"
 #include "filter/filter.h"
+#include "gen.h"
 #include "graph/graph.h"
 #include "event/event.h"
-#include "gen.h"
-#include "log.h"
 #include "session/session.h"
 #include "unit/package.h"
-#include "external/cc.h"
+
+static spn_err_union_t spn_bg_error_to_union(spn_build_graph_t* graph) {
+  if (!graph->error.some) {
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_BUILD_GRAPH,
+      .build_graph = {
+        .kind = SPN_BUILD_GRAPH_ERR_UNKNOWN,
+      },
+    };
+  }
+
+  switch (graph->error.value.kind) {
+    case SPN_BG_OK: {
+      return (spn_err_union_t) {
+        .kind = SPN_ERR_BUILD_GRAPH,
+        .build_graph = {
+          .kind = SPN_BUILD_GRAPH_ERR_UNKNOWN,
+        },
+      };
+    }
+    case SPN_BG_ERR_MISSING_INPUT: {
+      return (spn_err_union_t) {
+        .kind = SPN_ERR_BUILD_GRAPH,
+        .build_graph = {
+          .kind = SPN_BUILD_GRAPH_ERR_MISSING_INPUT,
+          .file = spn_bg_file_id_to_str(graph, graph->error.value.missing_input.file_id),
+        },
+      };
+    }
+    case SPN_BG_ERR_DUPLICATE_OUTPUT: {
+      return (spn_err_union_t) {
+        .kind = SPN_ERR_BUILD_GRAPH,
+        .build_graph = {
+          .kind = SPN_BUILD_GRAPH_ERR_DUPLICATE_OUTPUT,
+          .file = spn_bg_file_id_to_str(graph, graph->error.value.duplicate_output.file),
+          .command_a = spn_bg_cmd_id_to_str(graph, graph->error.value.duplicate_output.cmds.a),
+          .command_b = spn_bg_cmd_id_to_str(graph, graph->error.value.duplicate_output.cmds.b),
+        },
+      };
+    }
+  }
+
+  return (spn_err_union_t) {
+    .kind = SPN_ERR_BUILD_GRAPH,
+    .build_graph = {
+      .kind = SPN_BUILD_GRAPH_ERR_UNKNOWN,
+    },
+  };
+}
 
 spn_err_t add_link_edges(spn_session_t* session, spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   spn_pkg_t* pkg = unit->ctx.pkg;
@@ -697,24 +746,32 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   return SPN_OK;
 }
 
-spn_err_t prepare_build_graph(spn_app_t* app) {
+static spn_err_union_t prepare_build_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->build.graph;
 
   // phase 1: add each package to the graph
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    sp_try(add_package(graph, unit));
+    if (add_package(graph, unit) != SPN_OK) {
+      return spn_bg_error_to_union(graph);
+    }
   }
-  sp_try(add_package(graph, spn_session_find_root(session)));
+  if (add_package(graph, spn_session_find_root(session)) != SPN_OK) {
+    return spn_bg_error_to_union(graph);
+  }
 
   // phase 2: link dependent packages
   sp_om_for(session->units.packages, it) {
-    sp_try(add_link_edges(session, graph, sp_om_at(session->units.packages, it)));
+    if (add_link_edges(session, graph, sp_om_at(session->units.packages, it)) != SPN_OK) {
+      return spn_bg_error_to_union(graph);
+    }
   }
-  sp_try(add_link_edges(session, graph, spn_session_find_root(session)));
+  if (add_link_edges(session, graph, spn_session_find_root(session)) != SPN_OK) {
+    return spn_bg_error_to_union(graph);
+  }
 
-  return SPN_OK;
+  return spn_result(SPN_OK);
 }
 
 spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
@@ -722,32 +779,15 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
   spn_build_graph_t* graph = &session->build.graph;
   spn_pkg_unit_t* root = spn_session_find_root(session);
 
-  spn_trace_info(spn.events, root->ctx.pkg, &root->ctx.logs,
-    "preparing build graph", SP_FMT_U32(0));
-
   graph->error.some = SP_OPT_NONE;
-  if (prepare_build_graph(app)) {
-    switch (graph->error.some) {
-      case SP_OPT_SOME: {
-        sp_str_t err_str = spn_bg_err_to_str(graph, graph->error.value);
-        spn_trace_error(spn.events, root->ctx.pkg, &root->ctx.logs,
-          "build graph error: {}", SP_FMT_STR(err_str));
-        spn_log_error("{}", SP_FMT_STR(err_str));
-        break;
-      }
-      case SP_OPT_NONE: {
-        spn_trace_error(spn.events, root->ctx.pkg, &root->ctx.logs,
-          "failed to prepare build graph (unknown error)", SP_FMT_U32(0));
-        spn_log_error("failed to prepare build graph");
-        break;
-      }
-    }
-
+  spn_err_union_t err = prepare_build_graph(app);
+  if (err.kind != SPN_OK) {
+    spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+      .kind = SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED,
+      .err = err,
+    });
     return SPN_TASK_ERROR;
   }
-
-  spn_trace_info(spn.events, root->ctx.pkg, &root->ctx.logs,
-    "build graph prepared successfully", SP_FMT_U32(0));
 
   return SPN_TASK_DONE;
 }

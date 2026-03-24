@@ -2,6 +2,7 @@
 #define SPN_EVENT_EVENT_H
 
 #include "event/types.h"
+#include "tui/types.h"
 
 void spn_build_event_init(spn_build_event_t* event, spn_build_event_kind_t kind, spn_build_ctx_t* ctx);
 spn_event_buffer_t* spn_event_buffer_new();

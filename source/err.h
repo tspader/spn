@@ -27,7 +27,21 @@ typedef enum {
   SPN_ERR_NOT_GIT_REPO,
   SPN_ERR_GIT,
   SPN_ERR_VERSION_EXISTS,
+  SPN_ERR_BUILD_GRAPH,
 } spn_err_t;
+
+typedef enum {
+  SPN_BUILD_GRAPH_ERR_UNKNOWN,
+  SPN_BUILD_GRAPH_ERR_MISSING_INPUT,
+  SPN_BUILD_GRAPH_ERR_DUPLICATE_OUTPUT,
+} spn_build_graph_err_kind_t;
+
+typedef struct {
+  spn_build_graph_err_kind_t kind;
+  sp_str_t file;
+  sp_str_t command_a;
+  sp_str_t command_b;
+} spn_err_build_graph_t;
 
 typedef struct {
   spn_err_t kind;
@@ -53,6 +67,7 @@ typedef struct {
       sp_str_t name;
       sp_str_t version;
     } version_exists;
+    spn_err_build_graph_t build_graph;
   };
 } spn_err_union_t;
 

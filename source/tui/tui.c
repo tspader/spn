@@ -1,14 +1,12 @@
-#include "tui/tui.h"
-#include "tui/spinner.h"
+#include "profile/types.h"
 
 #include "ctx/ctx.h"
-#include "log.h"
-
 #include "semver/convert.h"
 #include "sp/color.h"
-#include "sp/ht.h"
 #include "sp/macro.h"
 #include "sp/str.h"
+#include "tui/tui.h"
+#include "tui/spinner.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -85,6 +83,7 @@ static spn_build_event_display_t event_info[] = {
   EVENT(SPN_EVENT_DEBUG, "debug", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_ADD_SOURCE, "debug", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
   EVENT(SPN_EVENT_INIT_BUILD_GRAPH, "debug", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
+  EVENT(SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED, "failed", RED, SPN_VERBOSITY_QUIET, NOT_BOLD),
   EVENT(SPN_EVENT_LINK_START,  "link",   WHITE, SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_LINK_PASSED, "ok",     GREEN, SPN_VERBOSITY_NORMAL, BOLD),
   EVENT(SPN_EVENT_LINK_FAILED, "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
@@ -484,6 +483,39 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       );
       break;
     }
+    case SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED: {
+      switch (event->err.build_graph.kind) {
+        case SPN_BUILD_GRAPH_ERR_MISSING_INPUT: {
+          sp_str_builder_append_fmt(
+            &builder,
+            "missing build graph input {:fg brightcyan}",
+            SP_FMT_STR(event->err.build_graph.file)
+          );
+          break;
+        }
+        case SPN_BUILD_GRAPH_ERR_DUPLICATE_OUTPUT: {
+          sp_str_builder_append_fmt(
+            &builder,
+            "two graph nodes output the same file {:fg brightcyan}",
+            SP_FMT_STR(event->err.build_graph.file)
+          );
+          if (sp_str_valid(event->err.build_graph.command_a)) {
+            sp_str_builder_new_line(&builder);
+            sp_str_builder_append(&builder, event->err.build_graph.command_a);
+          }
+          if (sp_str_valid(event->err.build_graph.command_b)) {
+            sp_str_builder_new_line(&builder);
+            sp_str_builder_append(&builder, event->err.build_graph.command_b);
+          }
+          break;
+        }
+        case SPN_BUILD_GRAPH_ERR_UNKNOWN: {
+          sp_str_builder_append_cstr(&builder, "failed to prepare build graph");
+          break;
+        }
+      }
+      break;
+    }
     case SPN_EVENT_LINK_START: {
       sp_str_builder_append_fmt(&builder, "target={} objects={} output={}",
         SP_FMT_STR(event->target.name),
@@ -553,4 +585,3 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode) {
     }
   }
 }
-
