@@ -2,8 +2,8 @@
 #include "utest.h"
 #include "test.h"
 
-#include "cli/publish.h"
 #include "index/index.h"
+#include "index/publish.h"
 #include "semver/convert.h"
 
 #define ts(section) "[" q(section) "]\n"

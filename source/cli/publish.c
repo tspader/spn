@@ -1,102 +1,77 @@
-#include "cli/publish.h"
+#include "ctx/types.h"
 
-#include "err.h"
-#include "external/git.h"
-#include "index/index.h"
-#include "pkg/load.h"
-#include "semver/convert.h"
+#include "cli/cli.h"
+#include "index/publish.h"
+#include "log.h"
 
-spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
-  sp_str_t manifest_path = sp_fs_join_path(opts->cwd, sp_str_lit("spn.toml"));
+sp_app_result_t spn_cli_publish(spn_cli_t* cli) {
+  spn_cli_publish_t* cmd = &cli->publish;
 
-  if (!sp_fs_exists(manifest_path)) {
-    return (spn_err_union_t) {
-      .kind = SPN_ERR_NO_MANIFEST,
-      .no_manifest.path = manifest_path,
-    };
-  }
+  sp_str_t index_name = sp_str_empty(cmd->index) ? sp_str_lit("core") : cmd->index;
 
-  spn_pkg_t pkg = SP_ZERO_INITIALIZE();
-  spn_try_union(spn_pkg_load(&pkg, manifest_path));
-
-  sp_str_t repo = SP_ZERO_INITIALIZE();
-  if (spn_git_get_root(opts->cwd, &repo)) {
-    return (spn_err_union_t) {
-      .kind = SPN_ERR_NOT_GIT_REPO,
-      .not_git_repo.path = opts->cwd,
-    };
-  }
-
-  sp_str_t url = opts->url;
-  if (sp_str_empty(url)) {
-    if (spn_git_get_remote_url(repo, &url)) {
-      return (spn_err_union_t) {
-        .kind = SPN_ERR_GIT,
-        .git.command = sp_str_lit("git remote get-url origin"),
-      };
+  spn_index_t* index = SP_NULLPTR;
+  sp_da_for(spn.indexes, it) {
+    if (sp_str_equal(spn.indexes[it].name, index_name)) {
+      index = &spn.indexes[it];
+      break;
     }
   }
 
-  sp_str_t revision = opts->revision;
-  if (sp_str_empty(revision)) {
-    if (spn_git_get_commit(repo, sp_str_lit("HEAD"), &revision)) {
-      return (spn_err_union_t) {
-        .kind = SPN_ERR_GIT,
-        .git.command = sp_str_lit("git rev-parse HEAD"),
-      };
-    }
+  if (!index) {
+    spn_log_error("index {:fg brightcyan} not found", SP_FMT_STR(index_name));
+    return SP_APP_QUIT;
   }
 
-  sp_str_t subdir = sp_str_lit("");
-  if (!sp_str_equal(opts->cwd, repo) && sp_str_starts_with(opts->cwd, repo)) {
-    subdir = sp_str_suffix(opts->cwd, opts->cwd.len - repo.len - 1);
-  }
-
-  spn_index_rel_t rel = {
-    .id = {
-      .namespace = sp_str_empty(pkg.namespace) ? sp_str_lit("core") : pkg.namespace,
-      .name = pkg.name,
-    },
-    .version = pkg.version,
-    .source = { .url = url, .rev = revision, .dir = subdir },
-    .paths = {
-      .manifest = sp_str_lit("spn.toml"),
-      .script = sp_str_lit("spn.c"),
-    },
+  spn_publish_opts_t opts = {
+    .cwd = spn.paths.cwd,
+    .index = index,
+    .url = cmd->source_url,
+    .revision = cmd->source_rev,
   };
 
-  spn_pkg_metadata_t* meta = sp_ht_getp(pkg.metadata, pkg.version);
-  if (!sp_str_empty(pkg.url) && meta && !sp_str_empty(meta->commit)) {
-    rel.source = (spn_index_rel_source_t) { .url = pkg.url, .rev = meta->commit };
-    rel.manifest = (spn_index_rel_source_t) { .url = url, .rev = revision, .dir = subdir };
-  }
+  spn_err_union_t result = spn_publish(&opts);
 
-  sp_ht_for_kv(pkg.deps, it) {
-    spn_pkg_req_t* req = it.val;
-    if (req->kind != SPN_PACKAGE_KIND_INDEX) {
-      continue;
+  if (result.kind) {
+    switch (result.kind) {
+      case SPN_ERR_NO_MANIFEST: {
+        spn_log_error("no manifest found at {:fg brightcyan}", SP_FMT_STR(result.no_manifest.path));
+        break;
+      }
+      case SPN_ERR_MANIFEST_PARSE: {
+        spn_log_error("failed to parse {:fg brightcyan}", SP_FMT_STR(result.manifest_parse.path));
+        break;
+      }
+      case SPN_ERR_MANIFEST_FIELD: {
+        spn_log_error("invalid field {:fg brightyellow} in manifest: expected {:fg brightgreen}, got {:fg brightred}",
+          SP_FMT_STR(result.manifest_field.path),
+          SP_FMT_STR(result.manifest_field.expected),
+          SP_FMT_STR(result.manifest_field.actual)
+        );
+        break;
+      }
+      case SPN_ERR_NOT_GIT_REPO: {
+        spn_log_error("{:fg brightcyan} is not inside a git repository", SP_FMT_STR(result.not_git_repo.path));
+        break;
+      }
+      case SPN_ERR_GIT: {
+        spn_log_error("git command failed: {:fg brightyellow}", SP_FMT_STR(result.git.command));
+        break;
+      }
+      case SPN_ERR_VERSION_EXISTS: {
+        spn_log_error("version {:fg brightyellow} of {:fg brightcyan} already exists in the index",
+          SP_FMT_STR(result.version_exists.version),
+          SP_FMT_STR(result.version_exists.name)
+        );
+        break;
+      }
+      default: {
+        spn_log_error("publish failed");
+        break;
+      }
     }
-
-    spn_index_dep_t dep = {
-      .id = req->id,
-      .version = spn_semver_range_to_str(req->range),
-    };
-    sp_da_push(rel.deps, dep);
+  } else {
+    SP_LOG("published successfully");
   }
 
-  spn_err_t publish_err = spn_index_publish(opts->index, &rel);
-  if (publish_err == SPN_ERR_VERSION_EXISTS) {
-    return (spn_err_union_t) {
-      .kind = SPN_ERR_VERSION_EXISTS,
-      .version_exists = {
-        .name = rel.id.name,
-        .version = spn_semver_to_str(rel.version),
-      },
-    };
-  }
-  if (publish_err) {
-    return (spn_err_union_t) { .kind = publish_err };
-  }
-
-  return spn_result(SPN_OK);
+  return SP_APP_QUIT;
 }

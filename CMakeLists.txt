@@ -192,7 +192,6 @@ set(SPN_SOURCES
   source/cli/which.c
   source/cli/update.c
   source/cli/tool.c
-  source/cli/dispatch_publish.c
   source/cli/publish.c
   source/gen.c
   source/filter/filter.c
@@ -212,6 +211,7 @@ set(SPN_SOURCES
   source/index/cache.c
   source/index/index.c
   source/index/json.c
+  source/index/publish.c
   source/pkg/load.c
   source/pkg/mutate.c
   source/pkg/pkg.c
@@ -383,7 +383,6 @@ add_dependencies(index bootstrap_headers)
 # PUBLISH #
 ###########
 add_executable(publish
-  source/cli/publish.c
   source/ctx/ctx.c
   source/enum/enum.c
   source/event/event.c
@@ -393,6 +392,7 @@ add_executable(publish
   source/external/tom.c
   source/index/index.c
   source/index/json.c
+  source/index/publish.c
   source/intern.c
   source/pkg/id.c
   source/pkg/load.c
