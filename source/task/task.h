@@ -1,6 +1,7 @@
 #ifndef SPN_TASK_H
 #define SPN_TASK_H
 
+#include "cli/types.h"
 #include "sp.h"
 
 typedef struct spn_app_t spn_app_t;
@@ -49,6 +50,6 @@ spn_task_result_t spn_task_graph(spn_app_t* app);
 spn_task_result_t spn_task_run(spn_app_t* app);
 spn_task_result_t spn_task_run_tests(spn_app_t* app);
 spn_task_result_t spn_task_generate(spn_app_t* app);
-spn_task_result_t spn_task_which(spn_app_t* app);
+spn_task_result_t spn_task_which(spn_app_t* app, spn_cli_which_t* which);
 
 #endif

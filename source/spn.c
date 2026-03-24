@@ -423,7 +423,7 @@ sp_app_result_t spn_update(sp_app_t* sp) {
       break;
     }
     case SPN_TASK_KIND_WHICH: {
-      result = spn_task_which(&app);
+      result = spn_task_which(&app, &spn.cli.which);
       break;
     }
     case SPN_TASK_KIND_COUNT: {
