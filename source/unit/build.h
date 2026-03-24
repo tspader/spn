@@ -2,7 +2,7 @@
 #define SPN_UNIT_BUILD_H
 
 #include "err.h"
-#include "log.h"
+#include "log/types.h"
 #include "unit/types.h"
 
 spn_build_ctx_t spn_build_ctx_make(spn_build_ctx_config_t cfg);

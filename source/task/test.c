@@ -4,7 +4,7 @@
 #include "external/cc.h"
 #include "filter/filter.h"
 #include "external/tcc.h"
-#include "log.h"
+#include "log/log.h"
 #include "task.h"
 #include "session/session.h"
 

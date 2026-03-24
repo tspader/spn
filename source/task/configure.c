@@ -4,7 +4,7 @@
 #include "graph/graph.h"
 #include "intern.h"
 #include "target/types.h"
-#include "log.h"
+#include "log/log.h"
 #include "session/session.h"
 #include "task.h"
 #include "unit/package.h"

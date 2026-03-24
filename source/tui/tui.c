@@ -1,6 +1,7 @@
 #include "profile/types.h"
 
 #include "ctx/ctx.h"
+#include "log/log.h"
 #include "semver/convert.h"
 #include "sp/color.h"
 #include "sp/macro.h"
@@ -525,7 +526,12 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       break;
     }
     case SPN_EVENT_LINK_FAILED: {
-      sp_str_builder_append(&builder, event->target.link_failed.err);
+      if (sp_str_valid(event->target.link_failed.err)) {
+        sp_str_builder_append(&builder, event->target.link_failed.err);
+      }
+      if (sp_str_valid(event->target.link_failed.out)) {
+        sp_str_builder_append(&builder, event->target.link_failed.out);
+      }
       break;
     }
     case SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK: {

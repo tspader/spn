@@ -137,6 +137,7 @@ typedef struct {
 } spn_evt_link_passed_t;
 typedef struct {
   s32 exit_code;
+  sp_str_t out;
   sp_str_t err;
   sp_str_t linker;
   sp_str_t args;

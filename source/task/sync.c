@@ -2,7 +2,7 @@
 #include "ctx/ctx.h"
 #include "event/event.h"
 #include "git/cache.h"
-#include "log.h"
+#include "log/log.h"
 #include "pkg/id.h"
 #include "pkg/mutate.h"
 #include "pkg/pkg.h"

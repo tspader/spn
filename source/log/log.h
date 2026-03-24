@@ -1,27 +1,18 @@
-#ifndef SPN_LOG_H
-#define SPN_LOG_H
+#ifndef SPN_LOG_LOG_H
+#define SPN_LOG_LOG_H
 
-#include "sp.h"
-
-typedef enum {
-  SPN_LOG_LEVEL_ERROR,
-  SPN_LOG_LEVEL_WARN,
-  SPN_LOG_LEVEL_INFO,
-  SPN_LOG_LEVEL_DEBUG,
-} spn_log_level_t;
+#include "log/types.h"
+#include "event/types.h"
 
 spn_log_level_t spn_log_level_from_str(sp_str_t str);
+sp_str_t spn_log_level_to_str(spn_log_level_t level);
+spn_log_level_t spn_trace_event_to_level(s32 kind);
 
 void spn_log_info(const c8* fmt, ...);
 void spn_log_warn(const c8* fmt, ...);
 void spn_log_error(const c8* fmt, ...);
 void spn_log_debug(const c8* fmt, ...);
 
-sp_str_t spn_log_level_to_str(spn_log_level_t level);
-spn_log_level_t spn_trace_event_to_level(s32 kind);
-
-// Trace macros: emit trace events through the event buffer.
-// These write to the per-package build log, not to stderr.
 #define spn_trace_debug(events, pkg, io, fmt, ...) \
   spn_event_buffer_push_ex(events, pkg, io, (spn_build_event_t){ \
     .kind = SPN_EVENT_TRACE_DEBUG, \

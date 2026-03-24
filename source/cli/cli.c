@@ -2,7 +2,7 @@
 
 #include "ctx/types.h"
 #include "tui/table.h"
-#include "log.h"
+#include "log/log.h"
 #include "pkg/pkg.h"
 
 static sp_str_t spn_cli_opt_kind_to_str(spn_cli_opt_kind_t kind) {

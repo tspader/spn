@@ -6,7 +6,7 @@
 #include "external/cc.h"
 #include "external/git.h"
 #include "external/tom.h"
-#include "log.h"
+#include "log/log.h"
 #include "pkg/pkg.h"
 #include "target/target.h"
 #include "unit/build.h"

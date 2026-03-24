@@ -46,7 +46,7 @@
 #include "resolve/resolve.h"
 #include "signal.spn.h"
 #include "spn.h"
-#include "log.h"
+#include "log/log.h"
 #include "pkg/load.h"
 #include "pkg/mutate.h"
 #include "pkg/pkg.h"

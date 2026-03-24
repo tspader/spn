@@ -3,7 +3,7 @@
 
 #include "enum/enum.h"
 #include "event/event.h"
-#include "log.h"
+#include "log/log.h"
 #include "unit/build.h"
 #include "sp/io.h"
 #include "sp/tm.h"

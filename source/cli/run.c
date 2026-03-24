@@ -2,7 +2,7 @@
 
 #include "app/app.h"
 #include "ctx/ctx.h"
-#include "log.h"
+#include "log/log.h"
 
 static bool spn_cli_run_path_is_absolute(sp_str_t path) {
   return sp_str_starts_with(path, sp_str_lit("/")) ||

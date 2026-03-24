@@ -405,12 +405,13 @@ void emit_link_passed(spn_target_unit_t* unit, sp_str_t output, u64 elapsed) {
   });
 }
 
-void emit_link_failed(spn_target_unit_t* unit, sp_str_t linker, sp_str_t args, s32 exit_code, sp_str_t err) {
+void emit_link_failed(spn_target_unit_t* unit, sp_str_t linker, sp_str_t args, s32 exit_code, sp_str_t out, sp_str_t err) {
   spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_FAILED,
     .target.name = unit->info->name,
     .target.link_failed = {
       .exit_code = exit_code,
+      .out = out,
       .err = err,
       .linker = linker,
       .args = args,
@@ -444,7 +445,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
       });
 
       if (run.result.status.exit_code) {
-        emit_link_failed(unit, sp_str_lit("ar"), run.args, run.result.status.exit_code, run.result.err);
+        emit_link_failed(unit, sp_str_lit("ar"), run.args, run.result.status.exit_code, run.result.out, run.result.err);
         return SPN_ERROR;
       }
 
@@ -481,7 +482,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
       });
 
       if (run.result.status.exit_code) {
-        emit_link_failed(unit, cc->compiler.exe, run.args, run.result.status.exit_code, run.result.err);
+        emit_link_failed(unit, cc->compiler.exe, run.args, run.result.status.exit_code, run.result.out, run.result.err);
         return SPN_ERROR;
       }
 

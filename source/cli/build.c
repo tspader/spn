@@ -3,7 +3,7 @@
 #include "app/app.h"
 #include "ctx/ctx.h"
 #include "event/event.h"
-#include "log.h"
+#include "log/log.h"
 
 sp_app_result_t spn_cli_build(spn_cli_t* cli) {
   spn_cli_build_t* command = &cli->build;

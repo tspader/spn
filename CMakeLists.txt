@@ -168,7 +168,7 @@ set(SPN_SOURCES
   source/ctx/ctx.c
   source/session/session.c
   source/intern.c
-  source/log.c
+  source/log/log.c
   source/enum/enum.c
   source/index/index.c
   source/pkg/load.c

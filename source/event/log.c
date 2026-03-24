@@ -1,10 +1,7 @@
 #include "event/log.h"
 
+#include "log/types.h"
 #include "sp/bind.h"
-
-// Level constants matching spn_log_level_t (source/log.h) — duplicated here
-// because #include "log.h" resolves to event/log.h from this directory.
-enum { LOG_ERROR = 0, LOG_WARN = 1, LOG_INFO = 2, LOG_DEBUG = 3 };
 
 static s32 event_level(spn_build_event_kind_t kind) {
   switch (kind) {
@@ -25,10 +22,10 @@ static s32 event_level(spn_build_event_kind_t kind) {
     case SPN_EVENT_EMBED_FAILED:
     case SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED:
     case SPN_EVENT_BUILD_FAILED: {
-      return LOG_ERROR;
+      return SPN_LOG_LEVEL_ERROR;
     }
     case SPN_EVENT_TRACE_WARN: {
-      return LOG_WARN;
+      return SPN_LOG_LEVEL_WARN;
     }
     case SPN_EVENT_ADD_TARGET:
     case SPN_EVENT_ADD_SOURCE:
@@ -37,20 +34,20 @@ static s32 event_level(spn_build_event_kind_t kind) {
     case SPN_EVENT_DEBUG:
     case SPN_EVENT_TRACE_DEBUG:
     case SPN_EVENT_API_CALL: {
-      return LOG_DEBUG;
+      return SPN_LOG_LEVEL_DEBUG;
     }
     default: {
-      return LOG_INFO;
+      return SPN_LOG_LEVEL_INFO;
     }
   }
 }
 
 static const c8* level_name(s32 level) {
   switch (level) {
-    case LOG_ERROR: return "error";
-    case LOG_WARN:  return "warn";
-    case LOG_INFO:  return "info";
-    case LOG_DEBUG: return "debug";
+    case SPN_LOG_LEVEL_ERROR: return "error";
+    case SPN_LOG_LEVEL_WARN:  return "warn";
+    case SPN_LOG_LEVEL_INFO:  return "info";
+    case SPN_LOG_LEVEL_DEBUG: return "debug";
     default:        return "unknown";
   }
 }
@@ -286,6 +283,7 @@ static void build_schemas(void) {
     sp_bind_builder_t b = sp_bind_builder_begin();
     SP_BIND_SCHEMA(&b) {
       SP_BIND(&b, spn_evt_link_failed_t, exit_code, "exit_code", SP_BIND_S32);
+      SP_BIND(&b, spn_evt_link_failed_t, out, "out", SP_BIND_STR);
       SP_BIND(&b, spn_evt_link_failed_t, err, "err", SP_BIND_STR);
       SP_BIND(&b, spn_evt_link_failed_t, linker, "linker", SP_BIND_STR);
       SP_BIND(&b, spn_evt_link_failed_t, args, "args", SP_BIND_STR);

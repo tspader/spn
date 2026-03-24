@@ -3,7 +3,6 @@
 #include "ctx/ctx.h"
 #include "event/event.h"
 #include "intern.h"
-#include "log.h"
 
 void spn_target_embed_file(spn_target_t* target, const c8* file) {
   spn_target_embed_file_ex_s(target, sp_str_view(file), SP_EMBED_DEFAULT_SYMBOL_S, SP_EMBED_DEFAULT_DATA_T_S, SP_EMBED_DEFAULT_SIZE_T_S);

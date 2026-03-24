@@ -2,7 +2,7 @@
 
 #include "cli/cli.h"
 #include "index/publish.h"
-#include "log.h"
+#include "log/log.h"
 
 sp_app_result_t spn_cli_publish(spn_cli_t* cli) {
   spn_cli_publish_t* cmd = &cli->publish;

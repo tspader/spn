@@ -8,7 +8,7 @@
 #include "pkg/pkg.h"
 #include "sp/ht.h"
 #include "sp/macro.h"
-#include "log.h"
+#include "log/log.h"
 #include "target/mutate.h"
 #include "unit/package.h"
 
