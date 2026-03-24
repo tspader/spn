@@ -163,6 +163,7 @@ set(SPN_SOURCES
   source/signal.c
   source/graph/graph.c
   source/tui/tui.c
+  source/tui/table.c
   source/tui/spinner.c
   source/ctx/ctx.c
   source/session/session.c

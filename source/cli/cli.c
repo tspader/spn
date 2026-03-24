@@ -1,7 +1,7 @@
 #include "cli/cli.h"
 
 #include "ctx/types.h"
-#include "tui/tui.h"
+#include "tui/table.h"
 #include "log.h"
 #include "pkg/pkg.h"
 
