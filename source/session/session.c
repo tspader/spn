@@ -234,8 +234,6 @@ spn_err_t spn_session_compile_pkg(spn_session_t* session, spn_pkg_unit_t* unit) 
   spn_pkg_t* pkg = unit->ctx.pkg;
 
   if (!sp_fs_exists(pkg->paths.script)) {
-    spn_trace_debug(spn.events, pkg, &unit->ctx.logs,
-      "no build script at {}, skipping compilation", SP_FMT_STR(pkg->paths.script));
     return SPN_OK;
   }
 

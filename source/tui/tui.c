@@ -89,10 +89,6 @@ static spn_build_event_display_t event_info[] = {
   EVENT(SPN_EVENT_LINK_PASSED, "ok",     GREEN, SPN_VERBOSITY_NORMAL, BOLD),
   EVENT(SPN_EVENT_LINK_FAILED, "failed", RED,   SPN_VERBOSITY_QUIET,  NOT_BOLD),
   EVENT(SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK, "debug", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
-  EVENT(SPN_EVENT_TRACE_DEBUG,  "trace", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
-  EVENT(SPN_EVENT_TRACE_INFO,   "trace", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
-  EVENT(SPN_EVENT_TRACE_WARN,   "trace", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
-  EVENT(SPN_EVENT_TRACE_ERROR,  "trace", RED,    SPN_VERBOSITY_DEBUG,  NOT_BOLD),
   EVENT(SPN_EVENT_CLI_ENTRY,    "entry", WHITE,  SPN_VERBOSITY_DEBUG,  NOT_BOLD),
   EVENT(SPN_EVENT_RESOLVE_START,   "resolve", WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
   EVENT(SPN_EVENT_RESOLVE_PACKAGE, "resolve", WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
@@ -537,18 +533,6 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
     case SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK: {
       sp_str_builder_append_fmt(&builder, "time_ns={}",
         SP_FMT_U64(event->configure.time)
-      );
-      break;
-    }
-    case SPN_EVENT_TRACE_DEBUG:
-    case SPN_EVENT_TRACE_INFO:
-    case SPN_EVENT_TRACE_WARN:
-    case SPN_EVENT_TRACE_ERROR: {
-      sp_str_builder_append_fmt(&builder, "{:fg brightblack} {:fg brightblack}:{} {}",
-        SP_FMT_STR(spn_log_level_to_str(spn_trace_event_to_level(event->kind))),
-        SP_FMT_STR(event->trace.file),
-        SP_FMT_U32(event->trace.line),
-        SP_FMT_STR(event->trace.message)
       );
       break;
     }

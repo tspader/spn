@@ -87,11 +87,7 @@ spn_linkage_t spn_get_linkage(spn_build_ctx_t* b) {
 }
 
 spn_target_t* spn_get_target(spn_build_ctx_t* b, const c8* name) {
-  spn_target_t* result = spn_pkg_get_target(b->pkg, name);
-  if (!result) {
-    spn_trace_error(spn.events, b->pkg, &b->logs, "spn_get_target: target \"{}\" not found", SP_FMT_CSTR(name));
-  }
-  return result;
+  return spn_pkg_get_target(b->pkg, name);
 }
 
 const spn_build_ctx_t* spn_get_dep(spn_build_ctx_t* b, const c8* name) {
@@ -112,7 +108,6 @@ const spn_build_ctx_t* spn_get_dep(spn_build_ctx_t* b, const c8* name) {
     }
   }
 
-  spn_trace_error(spn.events, b->pkg, &b->logs, "spn_get_dep: dep \"{}\" not found", SP_FMT_CSTR(name));
   return SP_NULLPTR;
 }
 

@@ -22,16 +22,6 @@ spn_log_level_t spn_log_level_from_str(sp_str_t str) {
   SP_UNREACHABLE_RETURN(SPN_LOG_LEVEL_INFO);
 }
 
-spn_log_level_t spn_trace_event_to_level(s32 kind) {
-  switch (kind) {
-    case SPN_EVENT_TRACE_DEBUG: return SPN_LOG_LEVEL_DEBUG;
-    case SPN_EVENT_TRACE_INFO:  return SPN_LOG_LEVEL_INFO;
-    case SPN_EVENT_TRACE_WARN:  return SPN_LOG_LEVEL_WARN;
-    case SPN_EVENT_TRACE_ERROR: return SPN_LOG_LEVEL_ERROR;
-    default: return SPN_LOG_LEVEL_INFO;
-  }
-}
-
 sp_str_t spn_log_level_to_str(spn_log_level_t level) {
   switch (level) {
     case SPN_LOG_LEVEL_ERROR: return sp_str_lit("error");
@@ -39,7 +29,7 @@ sp_str_t spn_log_level_to_str(spn_log_level_t level) {
     case SPN_LOG_LEVEL_INFO:  return sp_str_lit("info ");
     case SPN_LOG_LEVEL_DEBUG: return sp_str_lit("debug");
   }
-  return sp_str_lit("?????");
+  return sp_str_lit("Unknown log level");
 }
 
 
