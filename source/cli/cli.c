@@ -278,126 +278,127 @@ sp_app_result_t spn_cli_root(spn_cli_t* cli) {
   return SP_APP_QUIT;
 }
 
-spn_cli_usage_t spn_cli() {
-  static spn_cli_usage_t tools [] = {
-    {
-      .name = "install",
-      .opts = {
-        {
-          .brief = "f",
-          .name = "force",
-          .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-          .summary = "Force reinstall even if already installed",
-          .ptr = &spn.cli.tool.install.force
-        },
-        {
-          .brief = "v",
-          .name = "version",
-          .kind = SPN_CLI_OPT_KIND_STRING,
-          .summary = "Version to install",
-          .placeholder = "VERSION",
-          .ptr = &spn.cli.tool.install.version
-        }
+static spn_cli_usage_t tools[] = {
+  {
+    .name = "install",
+    .opts = {
+      {
+        .brief = "f",
+        .name = "force",
+        .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+        .summary = "Force reinstall even if already installed",
+        .ptr = &spn.cli.tool.install.force
       },
-      .args = {
-        {
-          .name = "package",
-          .kind = SPN_CLI_ARG_KIND_REQUIRED,
-          .summary = "The package to install",
-          .ptr = &spn.cli.tool.install.package
-        }
-      },
-      .summary = "Install a package's binary targets to the PATH",
-      .handler = spn_cli_tool_install
+      {
+        .brief = "v",
+        .name = "version",
+        .kind = SPN_CLI_OPT_KIND_STRING,
+        .summary = "Version to install",
+        .placeholder = "VERSION",
+        .ptr = &spn.cli.tool.install.version
+      }
     },
-    {
-      .name = "uninstall",
-      .opts = {
-        {
-          .brief = "f",
-          .name = "force",
-          .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-          .summary = "Force removal even if not installed by spn",
-          .ptr = &spn.cli.tool.install.force
-        }
-      },
-      .args = {
-        {
-          .name = "package",
-          .kind = SPN_CLI_ARG_KIND_REQUIRED,
-          .summary = "The package to uninstall",
-          .ptr = &spn.cli.tool.install.package
-        }
-      },
-      .summary = "Uninstall a package's binary targets from the PATH",
-      .handler = spn_cli_tool_uninstall
+    .args = {
+      {
+        .name = "package",
+        .kind = SPN_CLI_ARG_KIND_REQUIRED,
+        .summary = "The package to install",
+        .ptr = &spn.cli.tool.install.package
+      }
     },
-    {
-      .name = "run",
-      .args = {
-        {
-          .name = "package",
-          .kind = SPN_CLI_ARG_KIND_REQUIRED,
-          .summary = "The package to run",
-          .ptr = &spn.cli.tool.run.package
-        },
-        {
-          .name = "command",
-          .kind = SPN_CLI_ARG_KIND_OPTIONAL,
-          .summary = "The command to run",
-          .ptr = &spn.cli.tool.run.command
-        }
-      },
-      .summary = "Run a binary from a package",
-      .handler = spn_cli_tool_run
+    .summary = "Install a package's binary targets to the PATH",
+    .handler = spn_cli_tool_install
+  },
+  {
+    .name = "uninstall",
+    .opts = {
+      {
+        .brief = "f",
+        .name = "force",
+        .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+        .summary = "Force removal even if not installed by spn",
+        .ptr = &spn.cli.tool.install.force
+      }
     },
-    SPN_CLI_ARGS_DONE,
-  };
+    .args = {
+      {
+        .name = "package",
+        .kind = SPN_CLI_ARG_KIND_REQUIRED,
+        .summary = "The package to uninstall",
+        .ptr = &spn.cli.tool.install.package
+      }
+    },
+    .summary = "Uninstall a package's binary targets from the PATH",
+    .handler = spn_cli_tool_uninstall
+  },
+  {
+    .name = "run",
+    .args = {
+      {
+        .name = "package",
+        .kind = SPN_CLI_ARG_KIND_REQUIRED,
+        .summary = "The package to run",
+        .ptr = &spn.cli.tool.run.package
+      },
+      {
+        .name = "command",
+        .kind = SPN_CLI_ARG_KIND_OPTIONAL,
+        .summary = "The command to run",
+        .ptr = &spn.cli.tool.run.command
+      }
+    },
+    .summary = "Run a binary from a package",
+    .handler = spn_cli_tool_run
+  },
+  {
+    0
+  },
+};
 
-  static spn_cli_usage_t commands [] = {
-    {
-      .name = "init",
-      .handler = spn_cli_init,
-      .summary = "Initialize a project in the current directory",
-      .opts = {
-        {
-          .brief = "b",
-          .name = "bare",
-          .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-          .summary = "Create minimal project without sp dependency or main.c",
-          .ptr = &spn.cli.init.bare
-        }
-      },
+static spn_cli_usage_t commands[] = {
+  {
+    .name = "init",
+    .handler = spn_cli_init,
+    .summary = "Initialize a project in the current directory",
+    .opts = {
+      {
+        .brief = "b",
+        .name = "bare",
+        .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+        .summary = "Create minimal project without sp dependency or main.c",
+        .ptr = &spn.cli.init.bare
+      }
     },
-    {
-      .name = "add",
-      .args = {
-        {
-          .name = "package",
-          .kind = SPN_CLI_ARG_KIND_REQUIRED,
-          .summary = "The package to add",
-          .ptr = &spn.cli.add.package
-        }
-      },
-      .opts = {
-        {
-          .brief = "t",
-          .name = "test",
-          .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-          .summary = "Add as a test dependency",
-          .ptr = &spn.cli.add.test
-        },
-        {
-          .brief = "b",
-          .name = "build",
-          .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-          .summary = "Add as a build dependency",
-          .ptr = &spn.cli.add.build
-        }
-      },
-      .summary = "Add the latest version of a package to the project",
-      .handler = spn_cli_add
+  },
+  {
+    .name = "add",
+    .args = {
+      {
+        .name = "package",
+        .kind = SPN_CLI_ARG_KIND_REQUIRED,
+        .summary = "The package to add",
+        .ptr = &spn.cli.add.package
+      }
     },
+    .opts = {
+      {
+        .brief = "t",
+        .name = "test",
+        .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+        .summary = "Add as a test dependency",
+        .ptr = &spn.cli.add.test
+      },
+      {
+        .brief = "b",
+        .name = "build",
+        .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+        .summary = "Add as a build dependency",
+        .ptr = &spn.cli.add.build
+      }
+    },
+    .summary = "Add the latest version of a package to the project",
+    .handler = spn_cli_add
+  },
 
     {
       .name = "build",
@@ -677,9 +678,10 @@ spn_cli_usage_t spn_cli() {
       },
       .handler = spn_cli_clean
     },
-    SPN_CLI_ARGS_DONE,
+    {0},
   };
 
+spn_cli_usage_t spn_cli() {
   return (spn_cli_usage_t) {
     .name = "spn",
     .handler = spn_cli_root,

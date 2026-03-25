@@ -75,6 +75,8 @@ spn_err_t spn_tcc_prepare_script(spn_tcc_t* tcc, spn_tcc_err_ctx_t* error_contex
   tcc_set_error_func(tcc, error_context, spn_tcc_on_build_script_compile_error);
   tcc_set_backtrace_func(tcc, error_context, spn_tcc_backtrace);
   tcc_set_lib_path(tcc, sp_str_to_cstr(spn.paths.runtime));
+  tcc_add_sysinclude_path(tcc, sp_str_to_cstr(spn.paths.include));
+  tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include));
   tcc_set_options(tcc, "-gdwarf -Wall -Werror");
   spn_try_as(tcc_set_output_type(tcc, TCC_OUTPUT_MEMORY), SPN_ERROR);
   spn_try_as(tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include)), SPN_ERROR);

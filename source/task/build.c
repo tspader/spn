@@ -353,7 +353,7 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
           if (!sp_fs_is_regular_file(entries[e].file_path)) continue;
           sp_str_t rel = sp_str_suffix(entries[e].file_path, entries[e].file_path.len - embed.dir.path.len - 1);
           sp_io_reader_t dir_io = sp_io_reader_from_file(entries[e].file_path);
-          if (spn_cc_embed_ctx_add(&embedder, dir_io, spn_cc_symbol_from_embedded_file(rel), types.data, types.size)) {
+          if (spn_cc_embed_ctx_add(&embedder, dir_io, spn_cc_symbol_from_embedded_file(rel), rel, types.data, types.size)) {
             spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
               .kind = SPN_EVENT_EMBED_FAILED,
               .embed_failed = { .path = entries[e].file_path, .error = sp_str_lit("embed add failed") },
@@ -365,7 +365,8 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
       }
     }
 
-    if (spn_cc_embed_ctx_add(&embedder, io, symbol, types.data, types.size)) {
+    sp_str_t path = embed.kind == SPN_EMBED_FILE ? embed.file.path : sp_str_lit("");
+    if (spn_cc_embed_ctx_add(&embedder, io, symbol, path, types.data, types.size)) {
       spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
         .kind = SPN_EVENT_EMBED_FAILED,
         .embed_failed = { .error = sp_str_lit("embed add failed") },

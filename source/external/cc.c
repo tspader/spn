@@ -1,5 +1,6 @@
 
 #include "ctx/ctx.h"
+#include "ctx/types.h"
 #include "gen.h"
 #include "intern.h"
 #include "enum/enum.h"
@@ -129,55 +130,30 @@ spn_cc_target_t* spn_cc_add_target(spn_cc_t* cc, spn_target_kind_t kind, sp_str_
 }
 
 void spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx) {
-  ctx->elf = sp_elf_new_with_null_section();
-  sp_elf_symtab_new(ctx->elf);
-  sp_elf_section_t* section = sp_elf_add_section(ctx->elf, sp_str_lit(".rodata"), SHT_PROGBITS, 8);
-  section->flags = SHF_ALLOC | SHF_WRITE;
+  spn_obj_init(&ctx->obj, spn_obj_get_native_format());
 }
 
+// @spader
+// Looking at the call stack, most of these strings are already interned. Reinterning is cheap, but it makes
+// me feel the same way as null checking everything you possible can. Maybe a separate type for strings that
+// have already been interned
 spn_err_t spn_cc_embed_ctx_add(
   spn_cc_embed_ctx_t* ctx,
   sp_io_reader_t io,
   sp_str_t symbol,
+  sp_str_t path,
   sp_str_t data_type,
   sp_str_t size_type
 ) {
-  sp_elf_section_t* symtab = sp_elf_find_section_by_name(ctx->elf, sp_str_lit(".symtab"));
-  sp_elf_section_t* section = sp_elf_find_section_by_name(ctx->elf, sp_str_lit(".rodata"));
+  sp_mem_buffer_t buffer = sp_io_read_all(&io);
 
-  u64 size = sp_io_reader_size(&io);
-  sp_io_reader_seek(&io, 0, SP_IO_SEEK_SET);
-
-  {
-    u64 offset = section->buffer.size;
-    u8* ptr = sp_elf_section_reserve_bytes(section, size);
-    sp_io_read(&io, ptr, size);
-
-    sp_elf_add_symbol(
-      symtab, ctx->elf,
-      symbol,
-      offset, size,
-      STB_GLOBAL, STT_OBJECT,
-      section->index
-    );
-  }
-
-  {
-    u64 offset = section->buffer.size;
-    u64* ptr = (u64*)sp_elf_section_reserve_bytes(section, sizeof(u64));
-    *ptr = size;
-    sp_elf_add_symbol(
-      symtab, ctx->elf,
-      spn_intern(sp_format("{}_size", SP_FMT_STR(symbol))),
-      offset, sizeof(u64),
-      STB_GLOBAL, STT_OBJECT,
-      section->index
-    );
-  }
+  spn_obj_add_symbol(&ctx->obj, symbol, buffer.data, buffer.len);
+  spn_obj_add_symbol(&ctx->obj, spn_intern(sp_format("{}_size", SP_FMT_STR(symbol))), &buffer.len, sizeof(u64));
 
   sp_da_push(ctx->entries, ((spn_cc_embed_t) {
+    .path = spn_intern(path),
     .symbol = spn_intern(symbol),
-    .size = size,
+    .size = buffer.len,
     .types = {
       .size = spn_intern(size_type),
       .data = spn_intern(data_type),
@@ -188,7 +164,7 @@ spn_err_t spn_cc_embed_ctx_add(
 }
 
 spn_err_t spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_str_t header) {
-  sp_try_as(sp_elf_write_to_file(ctx->elf, object), SPN_ERROR);
+  sp_try_as(spn_obj_write(&ctx->obj, object), SPN_ERROR);
 
   sp_io_writer_t io = sp_io_writer_from_file(header, SP_IO_WRITE_MODE_OVERWRITE);
   sp_da_for(ctx->entries, it) {
@@ -209,6 +185,30 @@ spn_err_t spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_st
     sp_io_write_new_line(&io);
     sp_io_write_new_line(&io);
   }
+
+  sp_io_write_str(&io, sp_str_lit("typedef struct {"));
+  sp_io_write_new_line(&io);
+  sp_io_write_str(&io, sp_str_lit("  const char* path;"));
+  sp_io_write_new_line(&io);
+  sp_io_write_str(&io, sp_str_lit("  const void* data;"));
+  sp_io_write_new_line(&io);
+  sp_io_write_str(&io, sp_str_lit("  unsigned long long size;"));
+  sp_io_write_new_line(&io);
+  sp_io_write_str(&io, sp_str_lit("} spn_embed_entry_t;"));
+  sp_io_write_new_line(&io);
+  sp_io_write_str(&io, sp_format("static const unsigned int spn_embed_count = {};", SP_FMT_U32(sp_da_size(ctx->entries))));
+  sp_io_write_new_line(&io);
+  sp_io_write_str(&io, sp_str_lit("static const spn_embed_entry_t spn_embed_manifest[] = {"));
+  sp_io_write_new_line(&io);
+  sp_da_for(ctx->entries, it) {
+    spn_cc_embed_t entry = ctx->entries[it];
+    sp_io_write_cstr(&io, "  { ");
+    sp_io_write_str(&io, sp_format("\"{}\", {}, {}", SP_FMT_STR(entry.path), SP_FMT_STR(entry.symbol), SP_FMT_U64(entry.size)));
+    sp_io_write_cstr(&io, " },");
+    sp_io_write_new_line(&io);
+  }
+  sp_io_write_str(&io, sp_str_lit("};"));
+  sp_io_write_new_line(&io);
 
   sp_io_writer_close(&io);
   return SPN_OK;

@@ -5,9 +5,30 @@
 #include "spn.h"
 
 #include "graph/types.h"
-#include "node.h"
 #include "pkg/types.h"
 #include "external/tcc.h"
+
+struct spn_node_t {
+  spn_pkg_unit_t* ctx;
+  u32 index;
+};
+
+struct spn_node_ctx_t {
+  spn_build_ctx_t* build;
+  void* user_data;
+};
+
+typedef struct spn_user_node_t spn_user_node_t;
+struct spn_user_node_t {
+  spn_pkg_unit_t* ctx;
+  sp_str_t tag;
+  spn_node_fn_t fn;
+  void* user_data;
+  sp_da(sp_str_t) inputs;
+  sp_da(sp_str_t) outputs;
+  sp_da(spn_node_t*) deps;
+  spn_bg_id_t id;
+};
 
 typedef struct spn_target_unit spn_target_unit_t;
 typedef struct spn_session_t spn_session_t;
@@ -179,5 +200,10 @@ struct spn_pkg_unit_t {
   spn_build_fn_t on_configure;
   spn_build_fn_t on_package;
 };
+
+static inline spn_user_node_t* spn_find_user_node(spn_node_t* node) {
+  SP_ASSERT(node->index < sp_da_size(node->ctx->nodes.all));
+  return &node->ctx->nodes.all[node->index];
+}
 
 #endif

@@ -4,7 +4,6 @@
 #include "err.h"
 #include "pkg/types.h"
 #include "sp.h"
-#include "node.h"
 #include "resolve/types.h"
 #include "unit/types.h"
 

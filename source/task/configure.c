@@ -3,11 +3,84 @@
 #include "event/event.h"
 #include "graph/graph.h"
 #include "intern.h"
+#include "sp/glob.h"
 #include "target/types.h"
 #include "log/log.h"
 #include "session/session.h"
 #include "task.h"
 #include "unit/package.h"
+
+static bool spn_configure_has_source(sp_da(sp_str_t) source, sp_str_t path) {
+  sp_da_for(source, it) {
+    if (sp_str_equal(source[it], path)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+static sp_str_t spn_configure_relative_source(sp_str_t root, sp_str_t path) {
+  sp_str_t relative = sp_str_strip_left(path, root);
+  relative = sp_str_strip_left(relative, sp_str_lit("/"));
+  return relative;
+}
+
+static void spn_configure_expand_glob(sp_str_t root, sp_str_t pattern, sp_da(sp_str_t)* source) {
+  sp_glob_t* glob = sp_glob_new_str(pattern);
+  if (!glob) {
+    return;
+  }
+
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(root);
+  sp_da(sp_str_t) matches = SP_NULLPTR;
+
+  sp_da_for(entries, it) {
+    sp_fs_entry_t* entry = &entries[it];
+    if (!sp_fs_is_regular_file(entry->file_path)) {
+      continue;
+    }
+
+    sp_str_t relative = spn_configure_relative_source(root, entry->file_path);
+    if (!sp_glob_match(glob, relative)) {
+      continue;
+    }
+    if (spn_configure_has_source(matches, relative)) {
+      continue;
+    }
+
+    sp_da_push(matches, relative);
+  }
+
+  sp_dyn_array_sort(matches, sp_str_sort_kernel_alphabetical);
+
+  sp_da_for(matches, it) {
+    if (spn_configure_has_source(*source, matches[it])) {
+      continue;
+    }
+
+    sp_da_push(*source, matches[it]);
+  }
+}
+
+static sp_da(sp_str_t) spn_configure_collect_source(spn_pkg_unit_t* pkg, spn_target_unit_t* target) {
+  sp_da(sp_str_t) source = SP_NULLPTR;
+
+  sp_da_for(target->info->source, it) {
+    sp_str_t path = target->info->source[it];
+    if (sp_fs_is_glob(path)) {
+      spn_configure_expand_glob(pkg->ctx.paths.source, path, &source);
+      continue;
+    }
+    if (spn_configure_has_source(source, path)) {
+      continue;
+    }
+
+    sp_da_push(source, path);
+  }
+
+  return source;
+}
 
 s32 configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* pkg = (spn_pkg_unit_t*)user_data;
@@ -29,9 +102,10 @@ s32 configure_package(spn_bg_cmd_t* cmd, void* user_data) {
 
   sp_om_for(pkg->targets, it) {
     spn_target_unit_t* target = sp_om_at(pkg->targets, it);
-    sp_da_for(target->info->source, j) {
-      sp_str_t relative = target->info->source[j];
-      sp_str_t file = sp_fs_join_path(pkg->ctx.paths.source, target->info->source[j]);
+    sp_da(sp_str_t) source = spn_configure_collect_source(pkg, target);
+    sp_da_for(source, j) {
+      sp_str_t relative = source[j];
+      sp_str_t file = sp_fs_join_path(pkg->ctx.paths.source, relative);
       sp_str_t name = spn_intern(sp_fs_get_stem(file));
       sp_str_t extension = sp_fs_get_ext(relative);
       sp_str_t stem = relative;

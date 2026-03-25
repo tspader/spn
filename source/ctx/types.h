@@ -37,8 +37,8 @@ typedef struct {
     sp_str_t bin;
     sp_str_t storage;
     sp_str_t runtime;
+    sp_str_t version;
     sp_str_t log;
-    sp_str_t spn;
     sp_str_t include;
     sp_str_t cache;
     sp_str_t build;
@@ -46,7 +46,7 @@ typedef struct {
     sp_str_t source;
   } paths;
   spn_tui_t tui;
-  sp_atomic_s32 control;
+  sp_atomic_s32_t control;
   sp_str_t tcc_error;
   spn_index_arr_t indexes;
   spn_event_buffer_t* events;

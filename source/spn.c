@@ -2,7 +2,10 @@
 #define SP_MAIN
 #define SP_IMPLEMENTATION
 #include "sp.h"
+#include "sp/coff.h"
 #include "sp/elf.h"
+#define SP_GLOB_IMPLEMENTATION
+#include "sp/glob.h"
 
 #define TOML_IMPLEMENTATION
 #include "toml.h"
@@ -41,16 +44,29 @@
 #include "ordered_map.h"
 #include "pkg/load.h"
 #include "session/session.h"
-#include "signal.spn.h"
 #include "spn.embed.h"
 #include "sp/io.h"
 #include "sp/os.h"
 #include "task/task.h"
 #include "tui/tui.h"
 #include "unit/build.h"
+#include "version.h"
 
 spn_app_t app;
 spn_ctx_t spn;
+
+void on_signal(sp_os_signal_t signal) {
+  switch (signal) {
+    case SP_OS_SIGNAL_INTERRUPT: {
+      sp_atomic_s32_set(&spn.sp->shutdown, 1);
+      break;
+    }
+    case SP_OS_SIGNAL_ABORT:
+    case SP_OS_SIGNAL_TERMINATE: {
+      break;
+    }
+  }
+}
 
 sp_app_result_t spn_init(sp_app_t* sp) {
   spn.sp = sp;
@@ -58,9 +74,10 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.intern = sp_intern_new();
   spn.arena = sp_mem_arena_new_ex(256, SP_MEM_ARENA_MODE_NO_REALLOC, 1);
 
-  spn_install_signal_handlers();
-  spn.logger.out = sp_io_writer_from_fd(STDOUT_FILENO, SP_IO_CLOSE_MODE_NONE);
-  spn.logger.err = sp_io_writer_from_fd(STDERR_FILENO, SP_IO_CLOSE_MODE_NONE);
+  sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal);
+
+  spn.logger.out = sp_io_writer_from_fd(1, SP_IO_CLOSE_MODE_NONE);
+  spn.logger.err = sp_io_writer_from_fd(2, SP_IO_CLOSE_MODE_NONE);
 
   spn.env = sp_alloc_type(sp_env_t);
   *spn.env = sp_env_capture();
@@ -79,7 +96,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
 
   spn.paths.cwd = sp_fs_get_cwd();
-  spn.paths.bin = sp_os_get_bin_path();
+  spn.paths.bin = sp_fs_get_bin_path();
 
   sp_str_t storage = sp_env_get(spn.env, sp_str_lit("SPN_STORAGE_DIR"));
   if (sp_str_empty(storage)) {
@@ -115,11 +132,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
 
     if (toml) {
-      toml_value_t dir = toml_table_string(toml, "spn");
-      if (dir.ok) {
-        spn.paths.spn = sp_str_view(dir.u.s);
-      }
-
       toml_array_t* indexes = toml_table_array(toml, "index");
       if (indexes) {
         spn_toml_arr_for(indexes, n) {
@@ -141,23 +153,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
         }
       }
     }
-  }
-
-  if (!sp_str_valid(spn.paths.spn)) {
-    spn.paths.spn = sp_fs_join_path(spn.paths.storage, sp_str_lit("spn"));
-  }
-
-  spn.paths.include = sp_fs_join_path(spn.paths.spn, sp_str_lit("include"));
-
-  if (!sp_fs_exists(spn.paths.spn)) {
-    sp_str_t url = SP_LIT("https://github.com/tspader/spn.git");
-    SP_LOG(
-      "Cloning runtime from {:fg brightcyan} to {:fg brightcyan}",
-      SP_FMT_STR(url),
-      SP_FMT_STR(spn.paths.spn)
-    );
-
-    sp_assert(!spn_git_clone(url, spn.paths.spn));
   }
 
   sp_str_t index_dir = sp_fs_join_path(spn.paths.storage, sp_str_lit("index"));
@@ -195,6 +190,8 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   // Find the cache directory after the config has been fully loaded
   spn.paths.runtime = sp_fs_join_path(spn.paths.storage, SP_LIT("runtime"));
+  spn.paths.include = sp_fs_join_path(spn.paths.runtime, sp_str_lit("include"));
+  spn.paths.version = sp_fs_join_path(spn.paths.runtime, SP_LIT("version.stamp"));
   spn.paths.log = sp_fs_join_path(spn.paths.storage, SP_LIT("log"));
   spn.paths.cache = sp_fs_join_path(spn.paths.storage, SP_LIT("cache"));
   spn.paths.source = sp_fs_join_path(spn.paths.cache, SP_LIT("source"));
@@ -219,34 +216,39 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   // @spader
   // spn_extract_runtime()
-  if (!sp_fs_exists(spn.paths.runtime)) {
-    sp_fs_create_dir(spn.paths.runtime);
-    sp_fs_create_dir(sp_fs_join_path(spn.paths.runtime, sp_str_lit("include")));
 
-    const struct { sp_str_t path; const u8* data; u64 size; } runtime [] = {
-      { sp_str_lit("bcheck.o"), bcheck_o, bcheck_o_size },
-      { sp_str_lit("bt-exe.o"), bt_exe_o, bt_exe_o_size },
-      { sp_str_lit("bt-log.o"), bt_log_o, bt_log_o_size },
-      { sp_str_lit("libtcc1.a"), libtcc1_a, libtcc1_a_size },
-      { sp_str_lit("runmain.o"), runmain_o, runmain_o_size },
-      { sp_str_lit("run_nostdlib.o"), run_nostdlib_o, run_nostdlib_o_size },
-      { sp_str_lit("include/float.h"), include_float_h, include_float_h_size },
-      { sp_str_lit("include/stdalign.h"), include_stdalign_h, include_stdalign_h_size },
-      { sp_str_lit("include/stdarg.h"), include_stdarg_h, include_stdarg_h_size },
-      { sp_str_lit("include/stdatomic.h"), include_stdatomic_h, include_stdatomic_h_size },
-      { sp_str_lit("include/stdbool.h"), include_stdbool_h, include_stdbool_h_size },
-      { sp_str_lit("include/stddef.h"), include_stddef_h, include_stddef_h_size },
-      { sp_str_lit("include/stdnoreturn.h"), include_stdnoreturn_h, include_stdnoreturn_h_size },
-      { sp_str_lit("include/tccdefs.h"), include_tccdefs_h, include_tccdefs_h_size },
-      { sp_str_lit("include/tcclib.h"), include_tcclib_h, include_tcclib_h_size },
-      { sp_str_lit("include/tgmath.h"), include_tgmath_h, include_tgmath_h_size },
-      { sp_str_lit("include/varargs.h"), include_varargs_h, include_varargs_h_size },
-    };
-    sp_carr_for(runtime, it) {
-      sp_str_t path = sp_fs_join_path(spn.paths.runtime, runtime[it].path);
-      sp_io_writer_t io = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_OVERWRITE);
-      sp_io_write(&io, runtime[it].data, runtime[it].size);
+  sp_str_t version = sp_zero_initialize();
+  if (sp_fs_exists(spn.paths.version)) {
+    version = sp_io_read_file(spn.paths.version);
+    version = sp_str_trim(version);
+  }
+
+  if (!sp_str_equal_cstr(version, SPN_VERSION)) {
+    sp_fs_remove_dir(spn.paths.runtime);
+    sp_fs_create_dir(spn.paths.runtime);
+    sp_fs_create_dir(spn.paths.include);
+    sp_fs_create_dir(sp_fs_join_path(spn.paths.runtime, sp_str_lit("lib")));
+
+    sp_glob_set_t* glob = sp_glob_set_new();
+    sp_glob_set_add(glob, "include/*");
+    sp_glob_set_add(glob, "*.o");
+    sp_glob_set_add(glob, "*.a");
+    sp_glob_set_build(glob);
+
+    sp_carr_for(spn_embed_manifest, it) {
+      spn_embed_entry_t entry = spn_embed_manifest[it];
+      sp_str_t path = sp_str_view(entry.path);
+      if (sp_glob_set_match(glob, path)) {
+        path = sp_fs_join_path(spn.paths.runtime, path);
+        sp_io_writer_t io = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_OVERWRITE);
+        sp_io_write(&io, entry.data, entry.size);
+        sp_io_writer_close(&io);
+      }
     }
+
+    sp_io_writer_t io = sp_io_writer_from_file(spn.paths.version, SP_IO_WRITE_MODE_OVERWRITE);
+    sp_io_write_cstr(&io, SPN_VERSION);
+    sp_io_writer_close(&io);
   }
 
   spn_cli_t* cli = &spn.cli;

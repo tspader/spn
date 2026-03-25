@@ -201,7 +201,7 @@ typedef struct {
   sp_da(spn_bg_exec_error_t) errors;
 
   s32 active_workers;
-  sp_atomic_s32 shutdown;
+  sp_atomic_s32_t shutdown;
 } spn_bg_executor_t;
 
 #endif

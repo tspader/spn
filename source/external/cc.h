@@ -2,10 +2,10 @@
 #define SPN_CC_H
 
 #include "sp.h"
-#include "sp/elf.h"
 #include "spn.h"
 #include "target/types.h"
 #include "external/tcc.h"
+#include "external/obj.h"
 
 typedef struct {
   sp_str_t name;
@@ -26,13 +26,14 @@ typedef struct {
 } spn_cc_target_paths_t;
 
 typedef struct {
+  sp_str_t path;
   sp_str_t symbol;
   u64 size;
   spn_embed_types_t types;
 } spn_cc_embed_t;
 
 typedef struct {
-  sp_elf_t* elf;
+  spn_obj_builder_t obj;
   sp_da(spn_cc_embed_t) entries;
 } spn_cc_embed_ctx_t;
 
@@ -91,7 +92,7 @@ void             spn_cc_to_ps(spn_cc_t* cc, sp_ps_config_t* ps);
 void             spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps);
 sp_str_t         spn_cc_symbol_from_embedded_file(sp_str_t file_path);
 void             spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx);
-spn_err_t        spn_cc_embed_ctx_add(spn_cc_embed_ctx_t* ctx, sp_io_reader_t reader, sp_str_t symbol, sp_str_t data_type, sp_str_t size_type);
+spn_err_t        spn_cc_embed_ctx_add(spn_cc_embed_ctx_t* ctx, sp_io_reader_t reader, sp_str_t symbol, sp_str_t path, sp_str_t data_type, sp_str_t size_type);
 spn_err_t        spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_str_t header);
 
 #endif

@@ -34,6 +34,7 @@ spn_build_event_t spn_build_event_make(spn_build_ctx_t* ctx, spn_build_event_kin
 
 spn_event_buffer_t* spn_event_buffer_new() {
   spn_event_buffer_t* events = SP_ALLOC(spn_event_buffer_t);
+  sp_mutex_init(&events->mutex, SP_MUTEX_PLAIN);
   return events;
 }
 

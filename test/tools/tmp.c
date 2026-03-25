@@ -21,7 +21,11 @@ sp_str_t tmpfs_default_top_level() {
 
   sp_tm_epoch_t now = sp_tm_now_epoch();
   sp_str_t timestamp = sp_tm_epoch_to_iso8601(now);
+#ifdef _WIN32
+  u32 pid = (u32)GetCurrentProcessId();
+#else
   u32 pid = (u32)sp_sys_getpid();
+#endif
   sp_str_t dirname = sp_format("{}-{}", SP_FMT_STR(sp_str_replace_c8(timestamp, ':', '-')), SP_FMT_U32(pid));
   return sp_fs_join_path(tmp, dirname);
 }

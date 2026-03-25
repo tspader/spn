@@ -101,8 +101,8 @@ bootstrap/bin/embed: tools/embed.c bootstrap/include/sp.h
 	@mkdir -p bootstrap/bin
 	$(CC) $(CFLAGS) -o $@ tools/embed.c -Ibootstrap/include -lm
 
-bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h: bootstrap/bin/embed bootstrap/lib/libtcc.a
-	./bootstrap/bin/embed bootstrap/lib/tcc bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h
+bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h: bootstrap/bin/embed bootstrap/lib/libtcc.a include/spn.h
+	./bootstrap/bin/embed bootstrap/lib/tcc bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h include/spn.h
 
 bootstrap/bin/spn: $(SPN_SOURCES) bootstrap/lib/libtcc.a bootstrap/lib/spn.embed.o bootstrap/include/spn.embed.h bootstrap/include/sp.h bootstrap/include/toml.h bootstrap/include/libtcc.h bootstrap/include/argparse.h
 	@mkdir -p bootstrap/bin

@@ -5,7 +5,14 @@ project(spn-bootstrap C)
 include(CTest)
 include(ExternalProject)
 
-set(CMAKE_C_STANDARD 99)
+if(MSVC)
+  set(CMAKE_C_STANDARD 11)
+  set(SPN_MSVC_COMPILE_OPTIONS
+    /utf-8
+  )
+else()
+  set(CMAKE_C_STANDARD 99)
+endif()
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
@@ -13,16 +20,16 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
 
-set(BOOTSTRAP_DIR "${CMAKE_SOURCE_DIR}/bootstrap")
+set(BOOTSTRAP_DIR "${CMAKE_BINARY_DIR}")
 set(BOOTSTRAP_BIN_DIR "${BOOTSTRAP_DIR}/bin")
 set(BOOTSTRAP_LIB_DIR "${BOOTSTRAP_DIR}/lib")
 set(BOOTSTRAP_INCLUDE_DIR "${BOOTSTRAP_DIR}/include")
 set(BOOTSTRAP_EXTERNAL_DIR "${BOOTSTRAP_DIR}/external")
-set(TINYCC_LIBRARY "${BOOTSTRAP_LIB_DIR}/libtcc.a")
 set(TINYCC_HEADER "${BOOTSTRAP_INCLUDE_DIR}/libtcc.h")
 
 file(MAKE_DIRECTORY "${BOOTSTRAP_DIR}")
 file(MAKE_DIRECTORY "${BOOTSTRAP_BIN_DIR}")
+file(MAKE_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test")
 file(MAKE_DIRECTORY "${BOOTSTRAP_LIB_DIR}")
 file(MAKE_DIRECTORY "${BOOTSTRAP_INCLUDE_DIR}")
 file(MAKE_DIRECTORY "${BOOTSTRAP_EXTERNAL_DIR}")
@@ -72,36 +79,225 @@ ExternalProject_Add(toml_external
   UPDATE_DISCONNECTED TRUE
 )
 
-ExternalProject_Add(tinycc_external
-  PREFIX "${CMAKE_BINARY_DIR}/tinycc_external"
-  GIT_REPOSITORY "https://github.com/tspader/tinycc.git"
-  GIT_TAG "spn"
-  GIT_PROGRESS TRUE
-  GIT_SHALLOW TRUE
-  GIT_SUBMODULES ""
-  GIT_SUBMODULES_RECURSE FALSE
-  SOURCE_DIR "${BOOTSTRAP_EXTERNAL_DIR}/tinycc"
-  BUILD_IN_SOURCE TRUE
-  CONFIGURE_COMMAND ./configure --enable-static --prefix=${BOOTSTRAP_DIR}
-  BUILD_COMMAND ${CMAKE_MAKE_PROGRAM}
-  INSTALL_COMMAND ${CMAKE_MAKE_PROGRAM} install
-  UPDATE_DISCONNECTED TRUE
-)
+##############
+# TINYCC     #
+##############
+# Detect Windows targets (including MSYS2 where cmake sees UNIX, not WIN32)
+if(WIN32 OR MINGW OR CMAKE_SYSTEM_NAME STREQUAL "MSYS")
+  set(SPN_WIN32 TRUE)
+else()
+  set(SPN_WIN32 FALSE)
+endif()
 
-add_custom_command(
-  OUTPUT "${TINYCC_LIBRARY}"
-  COMMAND "${CMAKE_COMMAND}" -E test -f "${TINYCC_LIBRARY}"
-  DEPENDS tinycc_external
-  COMMENT "Verifying bootstrap libtcc.a"
-)
+if(SPN_WIN32)
+  # Build libtcc as a CMake static library and build the TCC runtime
+  # via custom commands. Needed on Windows/MSYS (no fmemopen).
+  ExternalProject_Add(tinycc_external
+    PREFIX "${CMAKE_BINARY_DIR}/tinycc_external"
+    GIT_REPOSITORY "https://github.com/tspader/tinycc.git"
+    GIT_TAG "spn"
+    GIT_PROGRESS TRUE
+    GIT_SHALLOW TRUE
+    GIT_SUBMODULES ""
+    GIT_SUBMODULES_RECURSE FALSE
+    SOURCE_DIR "${BOOTSTRAP_EXTERNAL_DIR}/tinycc"
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND ""
+    INSTALL_COMMAND ""
+    UPDATE_DISCONNECTED TRUE
+  )
 
-add_custom_command(
-  OUTPUT "${TINYCC_HEADER}"
-  COMMAND "${CMAKE_COMMAND}" -E test -f "${TINYCC_HEADER}"
-  DEPENDS tinycc_external
-  COMMENT "Verifying bootstrap libtcc.h"
-)
+  set(TCC_SRC "${BOOTSTRAP_EXTERNAL_DIR}/tinycc")
+  set(TCC_CONFIG_H "${TCC_SRC}/config.h")
+  set(TCC_RUNTIME_DIR "${BOOTSTRAP_LIB_DIR}/tcc")
 
+  # Create placeholder sources so CMake configure succeeds before the clone.
+  # The real files arrive via ExternalProject at build time.
+  if(NOT EXISTS "${TCC_SRC}/libtcc.c")
+    file(MAKE_DIRECTORY "${TCC_SRC}")
+    file(WRITE "${TCC_SRC}/libtcc.c" "")
+    file(WRITE "${TCC_SRC}/tcc.c" "")
+  endif()
+
+  # Generate config.h for TCC after the clone.
+  # Provide a fmemopen stub for MSVC (tcc_output_relocated_elf_to_mem uses it
+  # but that function is not meaningful on PE targets).
+  file(WRITE "${CMAKE_BINARY_DIR}/tcc_config.h.in"
+"#define TCC_VERSION \"0.9.28rc\"\n\
+#ifndef fmemopen\n\
+#include <stdio.h>\n\
+static inline FILE* fmemopen(void* buf, size_t size, const char* mode) {\n\
+  (void)buf; (void)size; (void)mode;\n\
+  return NULL;\n\
+}\n\
+#endif\n"
+  )
+  add_custom_command(
+    OUTPUT "${TCC_CONFIG_H}"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+      "${CMAKE_BINARY_DIR}/tcc_config.h.in"
+      "${TCC_CONFIG_H}"
+    DEPENDS tinycc_external "${CMAKE_BINARY_DIR}/tcc_config.h.in"
+    COMMENT "Generating TCC config.h"
+  )
+  add_custom_target(tcc_config DEPENDS "${TCC_CONFIG_H}")
+
+  # Build libtcc as a static library with MSVC
+  add_library(libtcc STATIC "${TCC_SRC}/libtcc.c")
+  target_compile_definitions(libtcc PRIVATE
+    TCC_TARGET_PE
+    TCC_TARGET_X86_64
+    ONE_SOURCE=1
+    CONFIG_TCC_STATIC=1
+  )
+  target_include_directories(libtcc PRIVATE "${TCC_SRC}")
+  if(MSVC)
+    target_compile_options(libtcc PRIVATE
+      ${SPN_MSVC_COMPILE_OPTIONS}
+      /W2
+      /wd4244
+      /wd4267
+      /wd4996
+      /wd4018
+      /wd4146
+    )
+  endif()
+  add_dependencies(libtcc tinycc_external tcc_config)
+
+  # Build tcc.exe for compiling the TCC runtime
+  add_executable(tcc_bootstrap "${TCC_SRC}/tcc.c")
+  target_compile_definitions(tcc_bootstrap PRIVATE
+    TCC_TARGET_PE
+    TCC_TARGET_X86_64
+    ONE_SOURCE=0
+  )
+  target_include_directories(tcc_bootstrap PRIVATE "${TCC_SRC}")
+  target_link_libraries(tcc_bootstrap PRIVATE libtcc)
+  set_target_properties(tcc_bootstrap PROPERTIES
+    OUTPUT_NAME "tcc"
+    RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+  )
+  if(MSVC)
+    target_compile_options(tcc_bootstrap PRIVATE
+      ${SPN_MSVC_COMPILE_OPTIONS}
+      /W2
+      /wd4244
+      /wd4267
+      /wd4996
+      /wd4018
+    )
+  endif()
+
+  set(TINYCC_LIBRARY "$<TARGET_FILE:libtcc>")
+
+  # Copy libtcc.h to bootstrap include
+  add_custom_command(
+    OUTPUT "${TINYCC_HEADER}"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+      "${TCC_SRC}/libtcc.h"
+      "${TINYCC_HEADER}"
+    DEPENDS tinycc_external
+    COMMENT "Copying libtcc.h into bootstrap/include"
+  )
+
+  # Build TCC runtime and collect files for embedding
+  set(TCC_RUNTIME_STAMP "${CMAKE_BINARY_DIR}/tcc_runtime.stamp")
+  add_custom_command(
+    OUTPUT "${TCC_RUNTIME_STAMP}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${TCC_RUNTIME_DIR}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${TCC_RUNTIME_DIR}/include"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${TCC_RUNTIME_DIR}/lib"
+    # Build TCC runtime objects using tcc.exe
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/lib/libtcc1.c" -o "${TCC_RUNTIME_DIR}/lib/libtcc1.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/win32/lib/crt1.c" -o "${TCC_RUNTIME_DIR}/lib/crt1.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/win32/lib/crt1w.c" -o "${TCC_RUNTIME_DIR}/lib/crt1w.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/win32/lib/wincrt1.c" -o "${TCC_RUNTIME_DIR}/lib/wincrt1.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/win32/lib/wincrt1w.c" -o "${TCC_RUNTIME_DIR}/lib/wincrt1w.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/win32/lib/dllcrt1.c" -o "${TCC_RUNTIME_DIR}/lib/dllcrt1.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/win32/lib/dllmain.c" -o "${TCC_RUNTIME_DIR}/lib/dllmain.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/win32/lib/chkstk.S" -o "${TCC_RUNTIME_DIR}/lib/chkstk.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/lib/alloca.S" -o "${TCC_RUNTIME_DIR}/lib/alloca.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/lib/alloca-bt.S" -o "${TCC_RUNTIME_DIR}/lib/alloca-bt.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/lib/stdatomic.c" -o "${TCC_RUNTIME_DIR}/lib/stdatomic.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/lib/atomic.S" -o "${TCC_RUNTIME_DIR}/lib/atomic.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/lib/builtin.c" -o "${TCC_RUNTIME_DIR}/lib/builtin.o"
+    # Archive into libtcc1.a
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}" -ar "${TCC_RUNTIME_DIR}/lib/libtcc1.a"
+      "${TCC_RUNTIME_DIR}/lib/libtcc1.o"
+      "${TCC_RUNTIME_DIR}/lib/crt1.o"
+      "${TCC_RUNTIME_DIR}/lib/crt1w.o"
+      "${TCC_RUNTIME_DIR}/lib/wincrt1.o"
+      "${TCC_RUNTIME_DIR}/lib/wincrt1w.o"
+      "${TCC_RUNTIME_DIR}/lib/dllcrt1.o"
+      "${TCC_RUNTIME_DIR}/lib/dllmain.o"
+      "${TCC_RUNTIME_DIR}/lib/chkstk.o"
+      "${TCC_RUNTIME_DIR}/lib/alloca.o"
+      "${TCC_RUNTIME_DIR}/lib/alloca-bt.o"
+      "${TCC_RUNTIME_DIR}/lib/stdatomic.o"
+      "${TCC_RUNTIME_DIR}/lib/atomic.o"
+      "${TCC_RUNTIME_DIR}/lib/builtin.o"
+    # Build extra objects
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/lib/bcheck.c" -o "${TCC_RUNTIME_DIR}/lib/bcheck.o" -bt
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/lib/bt-exe.c" -o "${TCC_RUNTIME_DIR}/lib/bt-exe.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/lib/bt-log.c" -o "${TCC_RUNTIME_DIR}/lib/bt-log.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/lib/bt-dll.c" -o "${TCC_RUNTIME_DIR}/lib/bt-dll.o"
+    COMMAND "$<TARGET_FILE:tcc_bootstrap>" -B "${TCC_SRC}/win32" -I "${TCC_SRC}" -I "${TCC_SRC}/include" -c "${TCC_SRC}/lib/runmain.c" -o "${TCC_RUNTIME_DIR}/lib/runmain.o"
+    # Copy .def files
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${TCC_SRC}/win32/lib/kernel32.def" "${TCC_RUNTIME_DIR}/lib/kernel32.def"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${TCC_SRC}/win32/lib/msvcrt.def" "${TCC_RUNTIME_DIR}/lib/msvcrt.def"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${TCC_SRC}/win32/lib/user32.def" "${TCC_RUNTIME_DIR}/lib/user32.def"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${TCC_SRC}/win32/lib/gdi32.def" "${TCC_RUNTIME_DIR}/lib/gdi32.def"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${TCC_SRC}/win32/lib/ws2_32.def" "${TCC_RUNTIME_DIR}/lib/ws2_32.def"
+    # Copy TCC headers
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${TCC_SRC}/include" "${TCC_RUNTIME_DIR}/include"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${TCC_SRC}/tcclib.h" "${TCC_RUNTIME_DIR}/include/tcclib.h"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${TCC_SRC}/win32/include" "${TCC_RUNTIME_DIR}/include"
+    # Stamp file
+    COMMAND "${CMAKE_COMMAND}" -E touch "${TCC_RUNTIME_STAMP}"
+    DEPENDS tcc_bootstrap
+    COMMENT "Building TCC runtime for embedding"
+  )
+
+  add_custom_target(tcc_runtime ALL DEPENDS "${TCC_RUNTIME_STAMP}")
+
+else()
+  # Non-MSVC (Linux, macOS, MinGW): build TCC via configure+make
+  set(TINYCC_LIBRARY "${BOOTSTRAP_LIB_DIR}/libtcc.a")
+
+  ExternalProject_Add(tinycc_external
+    PREFIX "${CMAKE_BINARY_DIR}/tinycc_external"
+    GIT_REPOSITORY "https://github.com/tspader/tinycc.git"
+    GIT_TAG "spn"
+    GIT_PROGRESS TRUE
+    GIT_SHALLOW TRUE
+    GIT_SUBMODULES ""
+    GIT_SUBMODULES_RECURSE FALSE
+    SOURCE_DIR "${BOOTSTRAP_EXTERNAL_DIR}/tinycc"
+    BUILD_IN_SOURCE TRUE
+    CONFIGURE_COMMAND sh ./configure --enable-static --prefix=${BOOTSTRAP_DIR}
+    BUILD_COMMAND make
+    INSTALL_COMMAND make install
+    UPDATE_DISCONNECTED TRUE
+  )
+
+  add_custom_command(
+    OUTPUT "${TINYCC_LIBRARY}"
+    COMMAND "${CMAKE_COMMAND}" -E test -f "${TINYCC_LIBRARY}"
+    DEPENDS tinycc_external
+    COMMENT "Verifying bootstrap libtcc.a"
+  )
+
+  add_custom_command(
+    OUTPUT "${TINYCC_HEADER}"
+    COMMAND "${CMAKE_COMMAND}" -E test -f "${TINYCC_HEADER}"
+    DEPENDS tinycc_external
+    COMMENT "Verifying bootstrap libtcc.h"
+  )
+endif()
+
+####################
+# BOOTSTRAP HEADERS
+####################
 add_custom_command(
   OUTPUT "${BOOTSTRAP_INCLUDE_DIR}/sp.h"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${BOOTSTRAP_INCLUDE_DIR}"
@@ -113,6 +309,15 @@ add_custom_command(
 )
 
 add_custom_command(
+  OUTPUT "${BOOTSTRAP_INCLUDE_DIR}/sp/coff.h"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${BOOTSTRAP_INCLUDE_DIR}/sp"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+    "${CMAKE_SOURCE_DIR}/source/sp/coff.h"
+    "${BOOTSTRAP_INCLUDE_DIR}/sp/coff.h"
+  COMMENT "Copying sp/coff.h into bootstrap/include/sp"
+)
+
+add_custom_command(
   OUTPUT "${BOOTSTRAP_INCLUDE_DIR}/sp/elf.h"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${BOOTSTRAP_INCLUDE_DIR}/sp"
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different
@@ -120,6 +325,16 @@ add_custom_command(
     "${BOOTSTRAP_INCLUDE_DIR}/sp/elf.h"
   DEPENDS sp_external
   COMMENT "Copying sp/elf.h into bootstrap/include/sp"
+)
+
+add_custom_command(
+  OUTPUT "${BOOTSTRAP_INCLUDE_DIR}/sp/glob.h"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${BOOTSTRAP_INCLUDE_DIR}/sp"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+    "${BOOTSTRAP_EXTERNAL_DIR}/sp/sp/glob.h"
+    "${BOOTSTRAP_INCLUDE_DIR}/sp/glob.h"
+  DEPENDS sp_external
+  COMMENT "Copying sp/glob.h into bootstrap/include/sp"
 )
 
 add_custom_command(
@@ -146,11 +361,66 @@ add_custom_target(bootstrap_headers ALL
   DEPENDS
     "${BOOTSTRAP_INCLUDE_DIR}/sp.h"
     "${BOOTSTRAP_INCLUDE_DIR}/sp/elf.h"
+    "${BOOTSTRAP_INCLUDE_DIR}/sp/glob.h"
+    "${SP_OBJ_FORMAT_HEADER}"
+    "${BOOTSTRAP_INCLUDE_DIR}/sp/coff.h"
+    "${BOOTSTRAP_INCLUDE_DIR}/sp/elf.h"
     "${BOOTSTRAP_INCLUDE_DIR}/toml.h"
     "${BOOTSTRAP_INCLUDE_DIR}/argparse.h"
     "${TINYCC_HEADER}"
 )
 
+###############
+# EMBED TOOL  #
+###############
+if(MSVC)
+  set(EMBED_OBJ_EXT ".obj")
+else()
+  set(EMBED_OBJ_EXT ".o")
+endif()
+
+add_executable(embed tools/embed.c)
+set_target_properties(embed PROPERTIES
+  OUTPUT_NAME "embed"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+)
+target_include_directories(embed PRIVATE "${BOOTSTRAP_INCLUDE_DIR}")
+if(NOT MSVC)
+  target_compile_options(embed PRIVATE -fno-sanitize=address)
+  target_link_options(embed PRIVATE -fno-sanitize=address)
+  target_link_libraries(embed PRIVATE m)
+endif()
+add_dependencies(embed bootstrap_headers)
+
+add_custom_command(
+  OUTPUT
+    "${BOOTSTRAP_LIB_DIR}/spn.embed${EMBED_OBJ_EXT}"
+    "${BOOTSTRAP_INCLUDE_DIR}/spn.embed.h"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${BOOTSTRAP_LIB_DIR}"
+  COMMAND "$<TARGET_FILE:embed>"
+    "${BOOTSTRAP_LIB_DIR}/tcc"
+    "${BOOTSTRAP_LIB_DIR}/spn.embed${EMBED_OBJ_EXT}"
+    "${BOOTSTRAP_INCLUDE_DIR}/spn.embed.h"
+    "${CMAKE_SOURCE_DIR}/include/spn.h"
+  DEPENDS embed "${CMAKE_SOURCE_DIR}/include/spn.h" $<$<BOOL:${SPN_WIN32}>:tcc_runtime>
+  COMMENT "Generating TCC embed object and header"
+)
+
+if(NOT SPN_WIN32)
+  set_property(SOURCE "${BOOTSTRAP_LIB_DIR}/spn.embed${EMBED_OBJ_EXT}" APPEND PROPERTY
+    OBJECT_DEPENDS "${TINYCC_LIBRARY}"
+  )
+endif()
+
+add_custom_target(spn_embed ALL
+  DEPENDS
+    "${BOOTSTRAP_LIB_DIR}/spn.embed${EMBED_OBJ_EXT}"
+    "${BOOTSTRAP_INCLUDE_DIR}/spn.embed.h"
+)
+
+###############
+# SPN SOURCES #
+###############
 set(SPN_SOURCES
   source/spn.c
   source/api.c
@@ -158,7 +428,6 @@ set(SPN_SOURCES
   source/event/event.c
   source/event/log.c
   source/unit/build.c
-  source/unit/node.c
   source/unit/package.c
   source/signal.c
   source/graph/graph.c
@@ -199,6 +468,7 @@ set(SPN_SOURCES
   source/sp/terminal.c
   source/external/autoconf.c
   source/external/cc.c
+  source/external/obj.c
   source/external/cJSON.c
   source/external/cmake.c
   source/external/git.c
@@ -241,44 +511,26 @@ set(SPN_SOURCES
   source/task/which.c
 )
 
-add_executable(embed tools/embed.c)
-set_target_properties(embed PROPERTIES
-  OUTPUT_NAME "embed"
-  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
-)
-target_include_directories(embed PRIVATE "${BOOTSTRAP_INCLUDE_DIR}")
-target_compile_options(embed PRIVATE -fno-sanitize=address)
-target_link_options(embed PRIVATE -fno-sanitize=address)
-target_link_libraries(embed PRIVATE m)
-add_dependencies(embed bootstrap_headers)
-
-add_custom_command(
-  OUTPUT
-    "${BOOTSTRAP_LIB_DIR}/spn.embed.o"
-    "${BOOTSTRAP_INCLUDE_DIR}/spn.embed.h"
-  COMMAND "${CMAKE_COMMAND}" -E make_directory "${BOOTSTRAP_LIB_DIR}"
-  COMMAND "${BOOTSTRAP_BIN_DIR}/embed"
-    "${BOOTSTRAP_LIB_DIR}/tcc"
-    "${BOOTSTRAP_LIB_DIR}/spn.embed.o"
-    "${BOOTSTRAP_INCLUDE_DIR}/spn.embed.h"
-  DEPENDS embed "${TINYCC_LIBRARY}"
-  COMMENT "Generating TCC embed object and header"
-)
-
-add_custom_target(spn_embed ALL
-  DEPENDS
-    "${BOOTSTRAP_LIB_DIR}/spn.embed.o"
-    "${BOOTSTRAP_INCLUDE_DIR}/spn.embed.h"
-)
-
 add_executable(spn ${SPN_SOURCES})
 set_target_properties(spn PROPERTIES
   OUTPUT_NAME "spn"
   RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
 )
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  target_compile_options(spn PRIVATE -fno-sanitize=address -fno-sanitize=leak)
-  target_link_options(spn PRIVATE -fno-sanitize=address -fno-sanitize=leak)
+if(MSVC)
+  target_compile_options(spn PRIVATE
+    ${SPN_MSVC_COMPILE_OPTIONS}
+    /W3
+    /wd4244
+    /wd4267
+    /wd4996
+    /wd4018
+    /wd4146
+  )
+else()
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(spn PRIVATE -fno-sanitize=address -fno-sanitize=leak)
+    target_link_options(spn PRIVATE -fno-sanitize=address -fno-sanitize=leak)
+  endif()
 endif()
 target_include_directories(spn PRIVATE
   source
@@ -286,15 +538,19 @@ target_include_directories(spn PRIVATE
   include
   "${BOOTSTRAP_INCLUDE_DIR}"
 )
-target_link_libraries(spn PRIVATE
-  m
-  "${TINYCC_LIBRARY}"
-)
+if(SPN_WIN32)
+  target_link_libraries(spn PRIVATE "$<TARGET_FILE:libtcc>")
+else()
+  target_link_libraries(spn PRIVATE m "${TINYCC_LIBRARY}")
+endif()
+if(SPN_WIN32)
+  target_link_libraries(spn PRIVATE shlwapi advapi32 shell32)
+endif()
 add_dependencies(spn bootstrap_headers spn_embed)
-set_source_files_properties("${BOOTSTRAP_LIB_DIR}/spn.embed.o"
+set_source_files_properties("${BOOTSTRAP_LIB_DIR}/spn.embed${EMBED_OBJ_EXT}"
   PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE
 )
-target_sources(spn PRIVATE "${BOOTSTRAP_LIB_DIR}/spn.embed.o")
+target_sources(spn PRIVATE "${BOOTSTRAP_LIB_DIR}/spn.embed${EMBED_OBJ_EXT}")
 
 ############
 # RESOLVER #
@@ -329,7 +585,7 @@ add_executable(resolver
 )
 set_target_properties(resolver PROPERTIES
   OUTPUT_NAME "resolver"
-  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(resolver PRIVATE
   source
@@ -338,7 +594,12 @@ target_include_directories(resolver PRIVATE
   "${BOOTSTRAP_EXTERNAL_DIR}/sp/tools"
   "${BOOTSTRAP_INCLUDE_DIR}"
 )
-target_link_libraries(resolver PRIVATE m)
+if(MSVC)
+  target_compile_options(resolver PRIVATE ${SPN_MSVC_COMPILE_OPTIONS})
+endif()
+if(NOT MSVC)
+  target_link_libraries(resolver PRIVATE m)
+endif()
 add_dependencies(resolver bootstrap_headers)
 
 #########
@@ -367,7 +628,7 @@ add_executable(index
 )
 set_target_properties(index PROPERTIES
   OUTPUT_NAME "index"
-  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(index PRIVATE
   source
@@ -376,7 +637,12 @@ target_include_directories(index PRIVATE
   "${BOOTSTRAP_EXTERNAL_DIR}/sp/tools"
   "${BOOTSTRAP_INCLUDE_DIR}"
 )
-target_link_libraries(index PRIVATE m)
+if(MSVC)
+  target_compile_options(index PRIVATE ${SPN_MSVC_COMPILE_OPTIONS})
+endif()
+if(NOT MSVC)
+  target_link_libraries(index PRIVATE m)
+endif()
 add_dependencies(index bootstrap_headers)
 
 ###########
@@ -413,7 +679,7 @@ add_executable(publish
 )
 set_target_properties(publish PROPERTIES
   OUTPUT_NAME "publish"
-  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(publish PRIVATE
   source
@@ -422,7 +688,12 @@ target_include_directories(publish PRIVATE
   "${BOOTSTRAP_EXTERNAL_DIR}/sp/tools"
   "${BOOTSTRAP_INCLUDE_DIR}"
 )
-target_link_libraries(publish PRIVATE m)
+if(MSVC)
+  target_compile_options(publish PRIVATE ${SPN_MSVC_COMPILE_OPTIONS})
+endif()
+if(NOT MSVC)
+  target_link_libraries(publish PRIVATE m)
+endif()
 add_dependencies(publish bootstrap_headers)
 
 ########
@@ -443,7 +714,7 @@ add_executable(lock
 )
 set_target_properties(lock PROPERTIES
   OUTPUT_NAME "lock"
-  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(lock PRIVATE
   source
@@ -452,7 +723,12 @@ target_include_directories(lock PRIVATE
   "${BOOTSTRAP_EXTERNAL_DIR}/sp/tools"
   "${BOOTSTRAP_INCLUDE_DIR}"
 )
-target_link_libraries(lock PRIVATE m)
+if(MSVC)
+  target_compile_options(lock PRIVATE ${SPN_MSVC_COMPILE_OPTIONS})
+endif()
+if(NOT MSVC)
+  target_link_libraries(lock PRIVATE m)
+endif()
 add_dependencies(lock bootstrap_headers)
 
 #######
@@ -473,7 +749,7 @@ add_executable(git
 )
 set_target_properties(git PROPERTIES
   OUTPUT_NAME "git"
-  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(git PRIVATE
   source
@@ -482,7 +758,12 @@ target_include_directories(git PRIVATE
   "${BOOTSTRAP_EXTERNAL_DIR}/sp/tools"
   "${BOOTSTRAP_INCLUDE_DIR}"
 )
-target_link_libraries(git PRIVATE m)
+if(MSVC)
+  target_compile_options(git PRIVATE ${SPN_MSVC_COMPILE_OPTIONS})
+endif()
+if(NOT MSVC)
+  target_link_libraries(git PRIVATE m)
+endif()
 add_dependencies(git bootstrap_headers)
 
 #########
@@ -496,7 +777,7 @@ add_executable(graph
 )
 set_target_properties(graph PROPERTIES
   OUTPUT_NAME "graph"
-  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(graph PRIVATE
   source
@@ -505,7 +786,12 @@ target_include_directories(graph PRIVATE
   "${BOOTSTRAP_EXTERNAL_DIR}/sp/tools"
   "${BOOTSTRAP_INCLUDE_DIR}"
 )
-target_link_libraries(graph PRIVATE m)
+if(MSVC)
+  target_compile_options(graph PRIVATE ${SPN_MSVC_COMPILE_OPTIONS})
+endif()
+if(NOT MSVC)
+  target_link_libraries(graph PRIVATE m)
+endif()
 add_dependencies(graph bootstrap_headers)
 
 add_executable(integration
@@ -518,7 +804,7 @@ add_executable(integration
 )
 set_target_properties(integration PROPERTIES
   OUTPUT_NAME "integration"
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build/debug/store/bin"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(integration PRIVATE
   source
@@ -529,7 +815,12 @@ target_include_directories(integration PRIVATE
   "${BOOTSTRAP_EXTERNAL_DIR}/sp/tools"
   "${BOOTSTRAP_INCLUDE_DIR}"
 )
-target_link_libraries(integration PRIVATE m)
+if(MSVC)
+  target_compile_options(integration PRIVATE ${SPN_MSVC_COMPILE_OPTIONS})
+endif()
+if(NOT MSVC)
+  target_link_libraries(integration PRIVATE m)
+endif()
 add_dependencies(integration bootstrap_headers)
 
 if(BUILD_TESTING)

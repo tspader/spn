@@ -6,7 +6,7 @@ repo = "tspader/spn"
 
 [deps.package]
 "spader/spcc" = "1.0.0"
-"spader/sp" = "1.6.8"
+"spader/sp" = "1.8.1"
 toml = "1.2.1"
 
 [deps.test]
@@ -45,52 +45,12 @@ mode = "debug"
 [[bin]]
 name = "spn"
 source = [
-  "source/spn.c",
+  "source/*/*.c",
   "source/api.c",
-  "source/app/app.c",
-  "source/event/event.c",
-  "source/event/log.c",
-  "source/unit/build.c",
-  "source/unit/node.c",
-  "source/unit/package.c",
-  "source/signal.c",
-  "source/graph/graph.c",
-  "source/tui/tui.c",
-  "source/tui/table.c",
-  "source/tui/spinner.c",
-  "source/ctx/ctx.c",
-  "source/session/session.c",
-  "source/intern.c",
-  "source/log/log.c",
-  "source/enum/enum.c",
-  "source/index/index.c",
-  "source/index/cache.c",
-  "source/index/json.c",
-  "source/index/publish.c",
-  "source/pkg/load.c",
-  "source/pkg/mutate.c",
-  "source/pkg/pkg.c",
-  "source/pkg/id.c",
-  "source/lock/lock.c",
-  "source/profile/profile.c",
-  "source/cli/cli.c",
-  "source/cli/init.c",
-  "source/cli/add.c",
-  "source/cli/build.c",
-  "source/cli/run.c",
-  "source/cli/test.c",
-  "source/cli/clean.c",
-  "source/cli/copy.c",
-  "source/cli/generate.c",
-  "source/cli/graph.c",
-  "source/cli/list.c",
-  "source/cli/ls.c",
-  "source/cli/manifest.c",
-  "source/cli/which.c",
-  "source/cli/update.c",
-  "source/cli/tool.c",
-  "source/cli/publish.c",
   "source/gen.c",
+  "source/intern.c",
+  "source/signal.c",
+  "source/spn.c",
   "source/filter/filter.c",
   "source/resolve/resolve.c",
   "source/semver/compare.c",
@@ -99,6 +59,7 @@ source = [
   "source/sp/terminal.c",
   "source/external/autoconf.c",
   "source/external/cc.c",
+  "source/external/obj.c",
   "source/external/cJSON.c",
   "source/external/cmake.c",
   "source/external/git.c",

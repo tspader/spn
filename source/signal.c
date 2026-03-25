@@ -1,4 +1,7 @@
 #include "sp.h"
+#ifdef _WIN32
+  #include <windows.h>
+#endif
 #include "app/app.h"
 #include "ctx/ctx.h"
 #include "sp/io.h"
@@ -26,17 +29,15 @@ void spn_install_signal_handlers() {
   sigaction(SIGINT, &sa, NULL);
 }
 #else
-sp_win32_bool_t spn_windows_console_handler(sp_win32_dword_t ctrl_type) {
+BOOL WINAPI spn_windows_console_handler(DWORD ctrl_type) {
   if (ctrl_type == CTRL_C_EVENT || ctrl_type == CTRL_BREAK_EVENT) {
-    sp_atomic_s32_set(&app->control, 1);
-    printf("\n");
-    fflush(stdout);
+    sp_atomic_s32_set(&spn.sp->shutdown, 1);
     return TRUE;
   }
   return FALSE;
 }
 
 void spn_install_signal_handlers() {
-  SetConsoleCtrlHandler((PHANDLER_ROUTINE)spn_windows_console_handler, TRUE);
+  SetConsoleCtrlHandler(spn_windows_console_handler, TRUE);
 }
 #endif

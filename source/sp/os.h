@@ -3,6 +3,7 @@
 
 #include "sp.h"
 
-sp_str_t sp_os_get_bin_path();
+sp_str_t sp_fs_get_home_path();
+sp_str_t sp_fs_get_bin_path();
 
 #endif
