@@ -46,11 +46,13 @@ UTEST_INITIALIZER(spn_build_init_tmpfs_top_level) {
 }
 
 UTEST_F_SETUP(spn_build) {
-  //  $repo/build/$profile/store/bin/$test
-  //  │     │     │        │     │
-  //  4     3     2        1     0
   uf->fixture.paths.root = sp_fs_get_exe_path();
-  sp_for(it, 4) {
+  while (true) {
+    sp_assert(!sp_str_empty(uf->fixture.paths.root));
+    sp_str_t stem = sp_fs_get_stem(uf->fixture.paths.root);
+    if (sp_str_equal(stem, sp_str_lit("spn"))) {
+      break;
+    }
     uf->fixture.paths.root = sp_fs_parent_path(uf->fixture.paths.root);
   }
 
@@ -420,6 +422,19 @@ UTEST_F(spn_build, add_bin) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_RUN_BIN, .bin.name = "foo" },
+    },
+  });
+}
+
+UTEST_F(spn_build, source_glob) {
+  tmpfs_init_named(&uf->fixture.fs, "source_glob");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/source_glob",
+    .copy = { "src" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
     },
   });
 }

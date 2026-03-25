@@ -23,6 +23,7 @@ set(TINYCC_HEADER "${BOOTSTRAP_INCLUDE_DIR}/libtcc.h")
 
 file(MAKE_DIRECTORY "${BOOTSTRAP_DIR}")
 file(MAKE_DIRECTORY "${BOOTSTRAP_BIN_DIR}")
+file(MAKE_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test")
 file(MAKE_DIRECTORY "${BOOTSTRAP_LIB_DIR}")
 file(MAKE_DIRECTORY "${BOOTSTRAP_INCLUDE_DIR}")
 file(MAKE_DIRECTORY "${BOOTSTRAP_EXTERNAL_DIR}")
@@ -123,6 +124,16 @@ add_custom_command(
 )
 
 add_custom_command(
+  OUTPUT "${BOOTSTRAP_INCLUDE_DIR}/sp/glob.h"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${BOOTSTRAP_INCLUDE_DIR}/sp"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+    "${BOOTSTRAP_EXTERNAL_DIR}/sp/sp/glob.h"
+    "${BOOTSTRAP_INCLUDE_DIR}/sp/glob.h"
+  DEPENDS sp_external
+  COMMENT "Copying sp/glob.h into bootstrap/include/sp"
+)
+
+add_custom_command(
   OUTPUT "${BOOTSTRAP_INCLUDE_DIR}/toml.h"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${BOOTSTRAP_INCLUDE_DIR}"
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different
@@ -146,6 +157,7 @@ add_custom_target(bootstrap_headers ALL
   DEPENDS
     "${BOOTSTRAP_INCLUDE_DIR}/sp.h"
     "${BOOTSTRAP_INCLUDE_DIR}/sp/elf.h"
+    "${BOOTSTRAP_INCLUDE_DIR}/sp/glob.h"
     "${BOOTSTRAP_INCLUDE_DIR}/toml.h"
     "${BOOTSTRAP_INCLUDE_DIR}/argparse.h"
     "${TINYCC_HEADER}"
@@ -329,7 +341,7 @@ add_executable(resolver
 )
 set_target_properties(resolver PROPERTIES
   OUTPUT_NAME "resolver"
-  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(resolver PRIVATE
   source
@@ -367,7 +379,7 @@ add_executable(index
 )
 set_target_properties(index PROPERTIES
   OUTPUT_NAME "index"
-  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(index PRIVATE
   source
@@ -413,7 +425,7 @@ add_executable(publish
 )
 set_target_properties(publish PROPERTIES
   OUTPUT_NAME "publish"
-  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(publish PRIVATE
   source
@@ -443,7 +455,7 @@ add_executable(lock
 )
 set_target_properties(lock PROPERTIES
   OUTPUT_NAME "lock"
-  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(lock PRIVATE
   source
@@ -473,7 +485,7 @@ add_executable(git
 )
 set_target_properties(git PROPERTIES
   OUTPUT_NAME "git"
-  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(git PRIVATE
   source
@@ -496,7 +508,7 @@ add_executable(graph
 )
 set_target_properties(graph PROPERTIES
   OUTPUT_NAME "graph"
-  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(graph PRIVATE
   source
@@ -518,7 +530,7 @@ add_executable(integration
 )
 set_target_properties(integration PROPERTIES
   OUTPUT_NAME "integration"
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build/debug/store/bin"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
 )
 target_include_directories(integration PRIVATE
   source
