@@ -497,7 +497,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   spn_toml_arr_for(include, it) {
     sp_str_t value = SP_ZERO_INITIALIZE();
     spn_try_union(toml_get_array_string_required(include, it, package_path, "include", &value));
-    spn_pkg_add_include_ex(pkg, sp_fs_join_path(manifest_path, value));
+    spn_pkg_add_include_ex(pkg, sp_fs_join_path(manifest_dir, value));
   }
 
   toml_array_t* define = toml_table_array(toml.package, "define");
