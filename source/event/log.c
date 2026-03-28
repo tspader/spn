@@ -157,7 +157,6 @@ static void build_schemas(void) {
       SP_BIND(&b, spn_evt_target_build_t, source_file, "source_file", SP_BIND_STR);
       SP_BIND(&b, spn_evt_target_build_t, object_file, "object_file", SP_BIND_STR);
       SP_BIND(&b, spn_evt_target_build_t, compiler, "compiler", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_target_build_t, compiler_kind, "compiler_kind", SP_BIND_S32);
       SP_BIND(&b, spn_evt_target_build_t, args, "args", SP_BIND_STR);
     }
     sp_bind_t* s = sp_bind_builder_end(&b);

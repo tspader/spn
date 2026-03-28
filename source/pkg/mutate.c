@@ -141,10 +141,7 @@ void spn_pkg_add_linkage(spn_pkg_t* pkg, spn_linkage_t linkage) {
 spn_profile_t* spn_pkg_add_profile(spn_pkg_t* pkg, const c8* name) {
   spn_profile_t profile = {
     .name = spn_intern_cstr(name),
-    .cc.exe = spn_intern_cstr("gcc"),
-    .cc.kind = SPN_CC_GCC,
     .linkage = SPN_LIB_KIND_SHARED,
-    .libc = SPN_LIBC_GNU,
     .standard = SPN_C99,
     .mode = SPN_DEP_BUILD_MODE_DEBUG,
     .kind = SPN_PROFILE_USER,
@@ -158,7 +155,7 @@ spn_profile_t* spn_pkg_add_profile_ex(spn_pkg_t* pkg, spn_profile_t profile) {
   return sp_om_get(pkg->profiles, profile.name);
 }
 
-spn_toolchain_t* spn_pkg_add_toolchain_ex(spn_pkg_t* pkg, spn_toolchain_t toolchain) {
+spn_toolchain_info_t* spn_pkg_add_toolchain_ex(spn_pkg_t* pkg, spn_toolchain_info_t toolchain) {
   sp_om_insert(pkg->toolchains, toolchain.name, toolchain);
   return sp_om_get(pkg->toolchains, toolchain.name);
 }

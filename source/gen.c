@@ -2,6 +2,7 @@
 
 #include "ctx/ctx.h"
 #include "spn.h"
+#include "toolchain/types.h"
 #include "unit/build.h"
 
 spn_gen_entry_t spn_gen_entry_from_str(sp_str_t str) {
@@ -70,21 +71,13 @@ sp_str_t spn_cc_kind_to_executable(spn_cc_kind_t compiler) {
 
 sp_str_t spn_gen_format_entry_kernel(sp_str_map_context_t* context) {
   spn_gen_format_context_t* format = (spn_gen_format_context_t*)context->user_data;
-  return spn_gen_format_entry(context->str, format->kind, format->compiler);
+  return spn_gen_format_entry(context->str, format->kind, format->driver);
 }
 
-sp_str_t spn_gen_format_entry(sp_str_t entry, spn_gen_entry_t kind, spn_cc_kind_t compiler) {
-  switch (compiler) {
-    case SPN_CC_NONE: {
-      return entry;
-    }
-    case SPN_CC_CUSTOM:
-    case SPN_CC_TCC:
-    case SPN_CC_MUSL_GCC:
-    case SPN_CC_CLANG:
-    case SPN_CC_ZIG:
-    case SPN_CC_COSMOCC:
-    case SPN_CC_GCC: {
+sp_str_t spn_gen_format_entry(sp_str_t entry, spn_gen_entry_t kind, spn_cc_driver_t driver) {
+  switch (driver) {
+    case SPN_CC_DRIVER_NONE: // @toolchain
+    case SPN_CC_DRIVER_GCC: {
       switch (kind) {
         case SPN_GEN_INCLUDE: return sp_format("-I{}", SP_FMT_STR(entry));
         case SPN_GEN_LIB_INCLUDE: return sp_format("-L{}", SP_FMT_STR(entry));
@@ -97,6 +90,9 @@ sp_str_t spn_gen_format_entry(sp_str_t entry, spn_gen_entry_t kind, spn_cc_kind_
           sp_unreachable_case();
         }
       }
+      case SPN_CC_DRIVER_MSVC: {
+        sp_unreachable_case();
+      }
     }
   }
 
@@ -104,7 +100,7 @@ sp_str_t spn_gen_format_entry(sp_str_t entry, spn_gen_entry_t kind, spn_cc_kind_
   return sp_str_lit("");
 }
 
-sp_da(sp_str_t) spn_gen_build_entry(spn_build_ctx_t* build, spn_gen_entry_t kind, spn_cc_kind_t compiler) {
+sp_da(sp_str_t) spn_gen_build_entry(spn_build_ctx_t* build, spn_gen_entry_t kind, spn_cc_driver_t driver) {
   sp_da(sp_str_t) entries = SP_NULLPTR;
 
   switch (kind) {
@@ -153,7 +149,7 @@ sp_da(sp_str_t) spn_gen_build_entry(spn_build_ctx_t* build, spn_gen_entry_t kind
   }
 
   spn_gen_format_context_t context = {
-    .compiler = compiler,
+    .driver = driver,
     .kind = kind
   };
   entries = sp_str_map(entries, sp_da_size(entries), &context, spn_gen_format_entry_kernel);
@@ -161,12 +157,12 @@ sp_da(sp_str_t) spn_gen_build_entry(spn_build_ctx_t* build, spn_gen_entry_t kind
   return entries;
 }
 
-sp_str_t spn_gen_build_entries_for_all(sp_da(spn_build_ctx_t*) builds, spn_gen_entry_t kind, spn_cc_kind_t compiler) {
+sp_str_t spn_gen_build_entries_for_all(sp_da(spn_build_ctx_t*) builds, spn_gen_entry_t kind, spn_cc_driver_t driver) {
   sp_da(sp_str_t) entries = SP_NULLPTR;
 
   sp_da_for(builds, it) {
     spn_build_ctx_t* build = builds[it];
-    sp_da(sp_str_t) dep_entries = spn_gen_build_entry(build, kind, compiler);
+    sp_da(sp_str_t) dep_entries = spn_gen_build_entry(build, kind, driver);
     sp_str_t dep_flags = sp_str_join_n(dep_entries, sp_da_size(dep_entries), sp_str_lit(" "));
     if (!sp_str_empty(dep_flags)) {
       sp_da_push(entries, dep_flags);

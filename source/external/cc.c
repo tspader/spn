@@ -1,12 +1,13 @@
+#include "ctx/types.h"
+#include "profile/types.h"
+#include "target/target.h"
 
 #include "ctx/ctx.h"
-#include "ctx/types.h"
 #include "gen.h"
 #include "intern.h"
 #include "enum/enum.h"
 #include "log/log.h"
-#include "profile/types.h"
-#include "target/target.h"
+#include "toolchain/types.h"
 #include "unit/build.h"
 #include "external/cc.h"
 #include "sp/io.h"
@@ -17,8 +18,6 @@ void spn_cc_set_profile(spn_cc_t* cc, spn_profile_t* profile) {
   cc->standard = profile->standard;
   cc->mode = profile->mode;
   cc->linkage = profile->linkage;
-  cc->compiler.kind = profile->cc.kind;
-  cc->compiler.exe = spn_intern(profile->cc.exe);
 }
 
 void spn_cc_set_output_dir(spn_cc_t* cc, sp_str_t dir) {
@@ -215,13 +214,13 @@ spn_err_t spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_st
 }
 
 void spn_cc_to_ps(spn_cc_t* cc, sp_ps_config_t* ps) {
-  ps->command = sp_str_copy(cc->compiler.exe);
+  ps->command = cc->toolchain.compiler;
 
   sp_da_for(cc->include, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->include[it], SPN_GEN_INCLUDE, cc->compiler.kind));
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->include[it], SPN_GEN_INCLUDE, cc->toolchain.info->driver));
   }
   sp_da_for(cc->define, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->define[it], SPN_GEN_DEFINE, cc->compiler.kind));
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->define[it], SPN_GEN_DEFINE, cc->toolchain.info->driver));
   }
 
   sp_ps_config_add_arg(ps, spn_cc_c_standard_to_switch(cc->standard));
@@ -249,23 +248,24 @@ void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* 
     }
   }
 
+  spn_cc_driver_t driver = cc->toolchain.info->driver;
   sp_da_for(target->source, it) {
     sp_ps_config_add_arg(ps, target->source[it]);
   }
   sp_da_for(target->include, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->include[it], SPN_GEN_INCLUDE, cc->compiler.kind));
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->include[it], SPN_GEN_INCLUDE, driver));
   }
   sp_da_for(target->define, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->define[it], SPN_GEN_DEFINE, cc->compiler.kind));
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->define[it], SPN_GEN_DEFINE, driver));
   }
   sp_da_for(target->lib_dirs, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->lib_dirs[it], SPN_GEN_LIB_INCLUDE, cc->compiler.kind));
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->lib_dirs[it], SPN_GEN_LIB_INCLUDE, driver));
   }
   sp_da_for(target->libs, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->libs[it], SPN_GEN_LIBS, cc->compiler.kind));
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->libs[it], SPN_GEN_LIBS, driver));
   }
   sp_da_for(target->rpath, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->rpath[it], SPN_GEN_RPATH, cc->compiler.kind));
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->rpath[it], SPN_GEN_RPATH, driver));
   }
 
   sp_ps_config_add_arg(ps, sp_str_lit("-Werror=return-type"));

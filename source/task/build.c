@@ -10,6 +10,7 @@
 #include "graph/graph.h"
 #include "event/event.h"
 #include "session/session.h"
+#include "toolchain/toolchain.h"
 #include "unit/package.h"
 
 static spn_err_union_t spn_bg_error_to_union(spn_build_graph_t* graph) {
@@ -138,7 +139,7 @@ void setup_target_for_compile_or_link(spn_cc_t* cc, spn_cc_target_t* cc_target, 
   }
 
   sp_da_for(pkg->system_deps, i) {
-    spn_cc_target_add_lib(cc_target, spn_gen_format_entry(pkg->system_deps[i], SPN_GEN_SYSTEM_LIBS, cc->compiler.kind));
+    spn_cc_target_add_lib(cc_target, spn_gen_format_entry(pkg->system_deps[i], SPN_GEN_SYSTEM_LIBS, cc->toolchain.info->driver));
   }
 
   sp_ht_for_kv(pkg->deps, i) {
@@ -147,7 +148,7 @@ void setup_target_for_compile_or_link(spn_cc_t* cc, spn_cc_target_t* cc_target, 
       spn_cc_target_add_dep(cc_target, dep);
 
       sp_da_for(dep->ctx.pkg->system_deps, n) {
-        spn_cc_target_add_lib(cc_target, spn_gen_format_entry(dep->ctx.pkg->system_deps[n], SPN_GEN_SYSTEM_LIBS, cc->compiler.kind));
+        spn_cc_target_add_lib(cc_target, spn_gen_format_entry(dep->ctx.pkg->system_deps[n], SPN_GEN_SYSTEM_LIBS, cc->toolchain.info->driver));
       }
     }
   }
@@ -173,7 +174,7 @@ spn_cc_run_result_t run_cc_exec(spn_cc_t* cc, spn_cc_target_t* cc_target, sp_str
   // Build a string of the entire command line. Use the scratch arena because
   // these can legitimately get quite long!
   sp_str_builder_t log = SP_ZERO_INITIALIZE();
-  sp_str_builder_append(&log, cc->compiler.exe);
+  sp_str_builder_append(&log, cc->toolchain.compiler);
   sp_str_builder_append_c8(&log, ' ');
   sp_da_for(ps.dyn_args, it) {
     sp_str_builder_append(&log, ps.dyn_args[it]);
@@ -203,8 +204,7 @@ spn_err_t run_cc(spn_cc_t* cc, spn_cc_target_t* cc_target, sp_str_t cwd, spn_pkg
     .target.build = {
       .source_file = source,
       .object_file = object,
-      .compiler = cc->compiler.exe,
-      .compiler_kind = cc->compiler.kind,
+      .compiler = cc->toolchain.compiler,
       .args = run.args,
     }
   });
@@ -467,6 +467,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
         spn_cc_target_add_absolute_source(cc_target, get_embed_object_path(unit));
       }
 
+      sp_str_t linker = spn_toolchain_get_linker_driver(cc->toolchain.info);
       spn_cc_run_result_t run = run_cc_exec(cc, cc_target, unit->paths.work);
 
       spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
@@ -476,14 +477,15 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
           .kind = target->kind,
           .num_objects = sp_da_size(unit->objects),
           .output_path = output,
-          .linker = cc->compiler.exe,
+          .linker = linker,
           .args = run.args,
           .has_embeds = has_embeds,
         }
       });
 
-      if (run.result.status.exit_code) {
-        emit_link_failed(unit, cc->compiler.exe, run.args, run.result.status.exit_code, run.result.out, run.result.err);
+      s32 rc = run.result.status.exit_code;
+      if (rc) {
+        emit_link_failed(unit, linker, run.args, rc, run.result.out, run.result.err);
         return SPN_ERROR;
       }
 

@@ -1,5 +1,6 @@
 #include "profile/types.h"
 #include "spn.h"
+#include "toml.h"
 #include "toolchain/types.h"
 
 #include "enum/enum.h"
@@ -274,9 +275,22 @@ static spn_err_union_t toml_get_array_optional(toml_table_t* table, const c8* ke
 // @spader
 // A sketch to unfuck the errors a little
 //
-static spn_err_union_t add_error_path(spn_err_union_t err, toml_path_t path, const c8* key) {
-  err.toml.path = spn_pkg_toml_path_field(path, key);
-  return err;
+static spn_err_t get_bool_optional(toml_table_t* table, const c8* key, bool* b) {
+  spn_toml_value_kind_t kind = toml_kind_from_field(table, key);
+  switch (kind) {
+    case SPN_TOML_VALUE_KIND_NONE: return SPN_OK;
+    case SPN_TOML_VALUE_KIND_ARRAY:
+    case SPN_TOML_VALUE_KIND_TABLE: return SPN_ERR_TOML_TYPE;
+    case SPN_TOML_VALUE_KIND_SCALAR: {
+      toml_value_t value = toml_table_bool(table, key);
+      if (!value.ok) {
+        return SPN_ERR_TOML_TYPE;
+      }
+
+      *b = value.u.b;
+      return SPN_OK;
+    }
+  }
 }
 
 static spn_err_t get_str_optional(toml_table_t* table, const c8* key, sp_str_t* str) {
@@ -553,6 +567,9 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   sp_str_t package_commit = sp_str_lit("");
   spn_try_union(toml_get_str_optional(toml.package, "commit", package_path, &package_commit));
 
+  sp_str_t toolchain;
+  spn_try_union(toml_get_str_required(toml.package, "toolchain", package_path, &package_version));
+
   spn_pkg_init(pkg, package_name);
   pkg->namespace = package_namespace;
   spn_pkg_set_url_ex(pkg, package_url);
@@ -610,20 +627,25 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     spn_try_union(toml_get_array_table_required(toml.toolchain, n, sp_str_lit("toolchain"), &it));
     toml_path_t path = spn_pkg_toml_path_with_index(sp_str_lit("profile"), n);
 
-    spn_toolchain_t toolchain = sp_zero_initialize();
+    spn_toolchain_info_t toolchain = sp_zero_initialize();
     sp_str_t driver = sp_zero_initialize();
     sp_str_t abi = sp_zero_initialize();
+    sp_str_t version = sp_zero_initialize();
 
-    spn_try_as_union(get_str_required(it, "name", &toolchain.name));
+    spn_try_as_union(get_str_optional(it, "name", &toolchain.name));
+    spn_try_as_union(get_str_optional(it, "package", &toolchain.package));
     spn_try_as_union(get_str_optional(it, "compiler", &toolchain.compiler));
     spn_try_as_union(get_str_optional(it, "linker", &toolchain.linker));
     spn_try_as_union(get_str_optional(it, "archiver", &toolchain.archiver));
     spn_try_as_union(get_str_optional(it, "sysroot", &toolchain.sysroot));
+    spn_try_as_union(get_bool_optional(it, "export", &toolchain.export));
     spn_try_as_union(get_str_optional(it, "driver", &driver));
     spn_try_as_union(get_str_optional(it, "abi", &abi));
+    spn_try_as_union(get_str_optional(it, "version", &version));
 
     toolchain.abi = spn_abi_from_str(abi);
     toolchain.driver = spn_cc_driver_from_str(driver);
+    toolchain.version = spn_semver_parse_range(version),
 
     spn_pkg_add_toolchain_ex(pkg, toolchain);
   }
@@ -636,23 +658,22 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     sp_str_t profile_name = SP_ZERO_INITIALIZE();
     sp_str_t profile_cc = sp_str_lit("gcc");
     sp_str_t profile_linkage = sp_str_lit("shared");
-    sp_str_t profile_libc = sp_str_lit("gnu");
     sp_str_t profile_standard = sp_str_lit("c99");
+    sp_str_t toolchain = sp_str_lit("");
     sp_str_t profile_mode = sp_str_lit("debug");
 
     spn_try_union(toml_get_str_required(it, "name", profile_path, &profile_name));
     spn_try_union(toml_get_str_optional(it, "cc", profile_path, &profile_cc));
     spn_try_union(toml_get_str_optional(it, "linkage", profile_path, &profile_linkage));
-    spn_try_union(toml_get_str_optional(it, "libc", profile_path, &profile_libc));
     spn_try_union(toml_get_str_optional(it, "standard", profile_path, &profile_standard));
+    spn_try_union(toml_get_str_optional(it, "toolchain", profile_path, &toolchain));
     spn_try_union(toml_get_str_optional(it, "mode", profile_path, &profile_mode));
 
     spn_pkg_add_profile_ex(pkg, (spn_profile_t) {
       .name = profile_name,
-      .cc = { .exe = profile_cc, .kind = spn_cc_kind_from_str(profile_cc) },
       .linkage = spn_pkg_linkage_from_str(profile_linkage),
-      .libc = spn_libc_kind_from_str(profile_libc),
       .standard = spn_c_standard_from_str(profile_standard),
+      .toolchain = spn_intern(toolchain),
       .mode = spn_dep_build_mode_from_str(profile_mode),
       .kind = SPN_PROFILE_USER,
     });

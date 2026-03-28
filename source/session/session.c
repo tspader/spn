@@ -6,6 +6,7 @@
 #include "event/event.h"
 #include "external/cc.h"
 #include "pkg/pkg.h"
+#include "sp/hash.h"
 #include "sp/ht.h"
 #include "sp/macro.h"
 #include "log/log.h"
@@ -130,9 +131,13 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
 
       sp_da(sp_hash_t) hashes = SP_NULLPTR;
       sp_da_push(hashes, sp_hash_bytes(metadata->commit.data, metadata->commit.len, 0));
-      sp_da_push(hashes, sp_hash_bytes(session->profile->cc.exe.data, session->profile->cc.exe.len, 0));
-      sp_da_push(hashes, session->profile->cc.kind);
-      sp_da_push(hashes, session->profile->libc);
+      sp_da_push(hashes, sp_hash_str(session->toolchain.info->name));
+      sp_da_push(hashes, sp_hash_str(session->toolchain.info->compiler));
+      sp_da_push(hashes, sp_hash_str(session->toolchain.info->linker));
+      sp_da_push(hashes, sp_hash_str(session->toolchain.info->archiver));
+      sp_da_push(hashes, sp_hash_str(session->toolchain.info->sysroot));
+      sp_da_push(hashes, session->toolchain.info->driver);
+      sp_da_push(hashes, session->toolchain.info->abi);
       sp_da_push(hashes, session->profile->mode);
       sp_da_push(hashes, linkage);
       sp_da_push(hashes, metadata->version.major);

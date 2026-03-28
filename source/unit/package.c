@@ -62,9 +62,7 @@ void spn_pkg_unit_write_stamp(spn_pkg_unit_t* ctx, sp_str_t path) {
 
   spn_toml_begin_table_cstr(&writer, "profile");
   spn_toml_append_str_cstr(&writer, "name", ctx->ctx.profile->name);
-  spn_toml_append_str_cstr(&writer, "cc", ctx->ctx.profile->cc.exe);
   spn_toml_append_str_cstr(&writer, "linkage", spn_pkg_linkage_to_str(ctx->ctx.profile->linkage));
-  spn_toml_append_str_cstr(&writer, "libc", spn_libc_kind_to_str(ctx->ctx.profile->libc));
   spn_toml_append_str_cstr(&writer, "mode", spn_dep_build_mode_to_str(ctx->ctx.profile->mode));
   spn_toml_append_str_cstr(&writer, "standard", spn_c_standard_to_str(ctx->ctx.profile->standard));
   spn_toml_end_table(&writer);

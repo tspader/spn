@@ -105,37 +105,6 @@ sp_str_t spn_build_ctx_get_lib_path(spn_build_ctx_t* ctx, spn_target_t* lib_targ
   return lib;
 }
 
-sp_ps_output_t spn_build_ctx_subprocess(spn_build_ctx_t* ctx, sp_ps_config_t config) {
-  spn_event_buffer_push_ex(spn.events, ctx->pkg, &ctx->logs, (spn_build_event_t) {
-    .kind = SPN_EVENT_API_CALL,
-    .api_call = { .fn = sp_str_lit("spn_build_ctx_subprocess"), .args = config.command }
-  });
-  config.io = (sp_ps_io_config_t) {
-    .in = { .mode = SP_PS_IO_MODE_NULL },
-    .out = { .mode = SP_PS_IO_MODE_EXISTING, .fd = ctx->logs.build.file.fd },
-    .err = { .mode = SP_PS_IO_MODE_REDIRECT }
-  };
-  config.cwd = ctx->paths.work;
-
-  u32 it = 0;
-  for (; it < sp_carr_len(config.env.extra); it++) {
-    if (!sp_str_valid(config.env.extra[it].key)) {
-      break;
-    }
-  }
-  SP_ASSERT(it != sp_carr_len(config.env.extra));
-
-  config.env.extra[it] = (sp_env_var_t) {
-    .key = sp_str_lit("CC"),
-    .value = ctx->profile->cc.exe
-  };
-
-  sp_da_push(ctx->commands, sp_ps_config_copy(&config));
-
-  sp_ps_t ps = sp_ps_create(config);
-  return sp_ps_output(&ps);
-}
-
 spn_build_ctx_t spn_build_ctx_make(spn_build_ctx_config_t config) {
   spn_build_ctx_t ctx = SP_ZERO_INITIALIZE();
   spn_build_ctx_init(&ctx, config);
@@ -239,8 +208,38 @@ spn_build_mode_t spn_ctx_build_mode(spn_build_ctx_t* build) {
   return build->profile->mode;
 }
 
-sp_ps_output_t spn_ctx_build_subprocess(spn_build_ctx_t* build, sp_ps_config_t cfg) {
-  return spn_build_ctx_subprocess(build, cfg);
+sp_ps_output_t spn_ctx_build_subprocess(spn_build_ctx_t* ctx, sp_ps_config_t config) {
+  spn_event_buffer_push_ex(spn.events, ctx->pkg, &ctx->logs, (spn_build_event_t) {
+    .kind = SPN_EVENT_API_CALL,
+    .api_call = {
+      .fn = sp_str_lit("spn_ctx_build_subprocess"),
+      .args = config.command
+    }
+  });
+  config.io = (sp_ps_io_config_t) {
+    .in = { .mode = SP_PS_IO_MODE_NULL },
+    .out = { .mode = SP_PS_IO_MODE_EXISTING, .fd = ctx->logs.build.file.fd },
+    .err = { .mode = SP_PS_IO_MODE_REDIRECT }
+  };
+  config.cwd = ctx->paths.work;
+
+  u32 it = 0;
+  for (; it < sp_carr_len(config.env.extra); it++) {
+    if (!sp_str_valid(config.env.extra[it].key)) {
+      break;
+    }
+  }
+  SP_ASSERT(it != sp_carr_len(config.env.extra));
+
+  config.env.extra[it] = (sp_env_var_t) {
+    .key = sp_str_lit("CC"),
+    .value = ctx->session->toolchain.compiler
+  };
+
+  sp_da_push(ctx->commands, sp_ps_config_copy(&config));
+
+  sp_ps_t ps = sp_ps_create(config);
+  return sp_ps_output(&ps);
 }
 
 sp_da(sp_str_t) spn_ctx_build_lib_entries(spn_build_ctx_t* build) {

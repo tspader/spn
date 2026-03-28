@@ -50,7 +50,6 @@ All tests pass all the time. If a test fails but is unrelated to your code chang
   - `spn.c` is most of the code (large file; search, don't read)
     - `spn_app_t` is all data for one invocation
     - `spn_init` is the top level init function
-    - `spn_app_load` loads the package we're operating on
   - `graph.h` is the build DAG
   - `cli.h` is a generic CLI library
 - `include/`

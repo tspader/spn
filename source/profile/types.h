@@ -11,15 +11,11 @@ typedef enum {
 
 struct spn_profile {
   sp_str_t name;
+  sp_str_t toolchain;
   spn_linkage_t linkage;
-  spn_libc_kind_t libc;
   spn_c_standard_t standard;
   spn_build_mode_t mode;
   spn_profile_kind_t kind;
-  struct {
-    spn_cc_kind_t kind;
-    sp_str_t exe;
-  } cc;
 };
 
 #endif

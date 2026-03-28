@@ -3,6 +3,7 @@ namespace = "spader"
 name = "spn"
 version = "0.2.0"
 repo = "tspader/spn"
+toolchain = "zig"
 
 [deps.package]
 "spader/spcc" = "1.0.0"
@@ -19,6 +20,9 @@ linker = "ld"
 archiver = "ar"
 driver = "gcc"
 abi = "gnu"
+package = "zig"
+version = "^0.69.0"
+export = true
 
 [[profile]]
 name = "debug"
@@ -96,6 +100,7 @@ source = [
   "source/task/task.c",
   "source/task/test.c",
   "source/task/which.c",
+  "source/toolchain/toolchain.c",
 ]
 include = ["include", "source", "source/external"]
 

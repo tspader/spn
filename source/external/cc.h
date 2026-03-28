@@ -6,6 +6,7 @@
 #include "target/types.h"
 #include "external/tcc.h"
 #include "external/obj.h"
+#include "toolchain/types.h"
 
 typedef struct {
   sp_str_t name;
@@ -56,11 +57,7 @@ typedef struct {
 } spn_cc_target_t;
 
 struct spn_cc {
-  spn_profile_t* profile;
-  struct {
-    spn_cc_kind_t kind;
-    sp_str_t exe;
-  } compiler;
+  spn_toolchain_t toolchain;
   spn_c_standard_t standard;
   spn_build_mode_t mode;
   spn_linkage_t linkage;

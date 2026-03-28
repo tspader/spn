@@ -2,7 +2,6 @@
 #define SPN_ERR_H
 
 #include "sp.h"
-#include "tom.h"
 
 #define spn_try(expr) sp_try(expr)
 #define spn_try_as(expr, err) sp_try_as(expr, err)
@@ -67,11 +66,6 @@ typedef struct {
       sp_str_t expected;
       sp_str_t actual;
     } manifest_field;
-    struct {
-      spn_toml_value_kind_t kind;
-      spn_toml_value_kind_t expected;
-      sp_str_t path;
-    } toml;
     struct {
       sp_str_t path;
     } no_manifest;

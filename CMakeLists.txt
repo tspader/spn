@@ -509,6 +509,7 @@ set(SPN_SOURCES
   source/task/task.c
   source/task/test.c
   source/task/which.c
+  source/toolchain/toolchain.c
 )
 
 add_executable(spn ${SPN_SOURCES})

@@ -45,6 +45,7 @@ typedef struct {
 struct spn_session_t {
   spn_pkg_t* pkg;
   spn_profile_t* profile;
+  spn_toolchain_t toolchain;
   spn_target_filter_t filter;
 
   struct {

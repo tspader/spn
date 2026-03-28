@@ -7,6 +7,7 @@
 #include "ordered_map.h"
 #include "option/types.h"
 #include "semver/types.h"
+#include "toolchain/types.h"
 
 #define SPN_PACKAGE_KIND(X) \
   X(SPN_PACKAGE_KIND_ROOT, "root") \
@@ -45,13 +46,14 @@ struct spn_pkg {
   sp_str_t url;
   sp_str_t author;
   sp_str_t maintainer;
+  sp_str_t toolchain;
   spn_semver_t version;
   sp_om(spn_target_t) libs;
   sp_om(spn_target_t) exes;
   sp_om(spn_target_t) scripts;
   sp_om(spn_target_t) tests;
   sp_om(spn_profile_t) profiles;
-  sp_om(spn_toolchain_t) toolchains;
+  sp_om(spn_toolchain_info_t) toolchains;
   sp_om(spn_index_t) indexes;
   sp_ht(sp_str_t, spn_pkg_req_t) deps;
   sp_ht(sp_str_t, spn_dep_option_t) options;

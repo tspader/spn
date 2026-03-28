@@ -40,9 +40,12 @@
 #include "git/key.h"
 #include "index/index.h"
 #include "intern.h"
+#include "lock/lock.h"
 #include "log/log.h"
 #include "ordered_map.h"
 #include "pkg/load.h"
+#include "pkg/pkg.h"
+#include "pkg/mutate.h"
 #include "session/session.h"
 #include "spn.embed.h"
 #include "sp/io.h"
@@ -290,10 +293,50 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
   spn.paths.manifest = sp_fs_join_path(spn.paths.project, sp_str_lit("spn.toml"));
 
-  app = SP_ZERO_STRUCT(spn_app_t);
-  if (spn_app_load(&app, spn.paths.manifest)) {
-    spn_poll(sp);
-    SP_EXIT_FAILURE();
+  // @spader
+  // We switch here because most operations work on a project, and start by loading the manifest. But for
+  // `spn run`, you can point it at a loose C file. This feels kind of ad hoc, like we're throwing away
+  // the fact that we're not in a project for the sake of false uniformity.
+  //
+  if (sp_fs_exists(spn.paths.manifest)) {
+    if (spn_pkg_from_manifest(&app.package, spn.paths.manifest)) {
+      spn_poll(sp);
+      return SP_APP_ERR;
+    }
+  } else {
+    app.package = spn_pkg_new(sp_str_lit(""));
+    spn_pkg_set_manifest(&app.package, spn.paths.manifest);
+  }
+
+  app.paths.dir = app.package.paths.root;
+  app.paths.lock = sp_fs_join_path(app.paths.dir, SP_LIT("spn.lock"));
+
+  if (sp_fs_exists(app.paths.lock)) {
+    sp_opt_set(app.lock, spn_lock_file_load(app.paths.lock, spn.events));
+  }
+
+  if (sp_om_empty(app.package.profiles)) {
+    spn_profile_t profiles[] = {
+      {
+        .name = sp_str_lit("debug"),
+        .linkage = SPN_LIB_KIND_SHARED,
+        .standard = SPN_C11,
+        .mode = SPN_DEP_BUILD_MODE_DEBUG,
+        .kind = SPN_PROFILE_BUILTIN,
+        .toolchain = sp_str_lit("system")
+      },
+      {
+        .name = sp_str_lit("release"),
+        .linkage = SPN_LIB_KIND_SHARED,
+        .standard = SPN_C11,
+        .mode = SPN_DEP_BUILD_MODE_RELEASE,
+        .kind = SPN_PROFILE_BUILTIN,
+        .toolchain = sp_str_lit("system")
+      }
+    };
+    sp_carr_for(profiles, it) {
+      spn_pkg_add_profile_ex(&app.package, profiles[it]);
+    }
   }
 
   switch (spn_cli_dispatch(&parser, cli)) {

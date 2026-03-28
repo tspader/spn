@@ -81,7 +81,6 @@ typedef struct {
   sp_str_t source_file;
   sp_str_t object_file;
   sp_str_t compiler;
-  s32 compiler_kind;
   sp_str_t args;
 } spn_evt_target_build_t;
 typedef struct {
