@@ -1,9 +1,10 @@
-#include "pkg/mutate.h"
+#include "index/types.h"
+#include "profile/types.h"
+#include "toolchain/types.h"
 
 #include "enum/enum.h"
 #include "intern.h"
-#include "index/types.h"
-#include "profile/profile.h"
+#include "pkg/mutate.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
 #include "target/mutate.h"
@@ -155,6 +156,11 @@ spn_profile_t* spn_pkg_add_profile(spn_pkg_t* pkg, const c8* name) {
 spn_profile_t* spn_pkg_add_profile_ex(spn_pkg_t* pkg, spn_profile_t profile) {
   sp_om_insert(pkg->profiles, profile.name, profile);
   return sp_om_get(pkg->profiles, profile.name);
+}
+
+spn_toolchain_t* spn_pkg_add_toolchain_ex(spn_pkg_t* pkg, spn_toolchain_t toolchain) {
+  sp_om_insert(pkg->toolchains, toolchain.name, toolchain);
+  return sp_om_get(pkg->toolchains, toolchain.name);
 }
 
 spn_target_t* spn_pkg_add_exe(spn_pkg_t* pkg, const c8* name) {

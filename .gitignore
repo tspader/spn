@@ -10,3 +10,5 @@ build
 **/*.obj
 **/*.ilk
 compile_commands.json
+/doc
+/mutagen.yml.lock

@@ -92,6 +92,7 @@ typedef struct spn_make spn_make_t;
 typedef struct spn_cmake spn_cmake_t;
 typedef struct spn_cc spn_cc_t;
 typedef struct spn_profile spn_profile_t;
+typedef struct spn_toolchain spn_toolchain_t;
 typedef struct spn_target spn_target_t;
 typedef struct spn_index spn_index_t;
 typedef void* spn_config_t;

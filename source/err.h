@@ -2,9 +2,15 @@
 #define SPN_ERR_H
 
 #include "sp.h"
+#include "tom.h"
 
 #define spn_try(expr) sp_try(expr)
 #define spn_try_as(expr, err) sp_try_as(expr, err)
+
+#define spn_try_map(_expr, _err, _error_expr) do { \
+  spn_err_t _err = (_expr); \
+  if (_err) return _error_expr; \
+} while (0)
 
 #define spn_try_union(expr) do { \
   spn_err_union_t _spn_result = (expr); \
@@ -14,6 +20,11 @@
 #define spn_try_as_union(expr) do { \
   spn_err_t _spn_result = (expr); \
   if (_spn_result) return (spn_err_union_t) { .kind = _spn_result }; \
+} while (0)
+
+#define spn_try_map_union(_expr, _err, _error_expr) do { \
+  spn_err_union_t _err = (_expr); \
+  if (_err.kind) return _error_expr; \
 } while (0)
 
 #define spn_result(status) (spn_err_union_t) { .kind = (status) }
@@ -28,6 +39,8 @@ typedef enum {
   SPN_ERR_GIT,
   SPN_ERR_VERSION_EXISTS,
   SPN_ERR_BUILD_GRAPH,
+  SPN_ERR_TOML_MISSING,
+  SPN_ERR_TOML_TYPE,
 } spn_err_t;
 
 typedef enum {
@@ -54,6 +67,11 @@ typedef struct {
       sp_str_t expected;
       sp_str_t actual;
     } manifest_field;
+    struct {
+      spn_toml_value_kind_t kind;
+      spn_toml_value_kind_t expected;
+      sp_str_t path;
+    } toml;
     struct {
       sp_str_t path;
     } no_manifest;

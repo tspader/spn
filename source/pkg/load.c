@@ -1,10 +1,13 @@
-#include "pkg/load.h"
+#include "profile/types.h"
+#include "spn.h"
+#include "toolchain/types.h"
 
 #include "enum/enum.h"
+#include "err.h"
 #include "external/tom.h"
-#include "profile/profile.h"
 #include "intern.h"
 #include "pkg/id.h"
+#include "pkg/load.h"
 #include "pkg/mutate.h"
 #include "semver/convert.h"
 #include "semver/parser.h"
@@ -268,6 +271,50 @@ static spn_err_union_t toml_get_array_optional(toml_table_t* table, const c8* ke
   return spn_result(SPN_OK);
 }
 
+// @spader
+// A sketch to unfuck the errors a little
+//
+static spn_err_union_t add_error_path(spn_err_union_t err, toml_path_t path, const c8* key) {
+  err.toml.path = spn_pkg_toml_path_field(path, key);
+  return err;
+}
+
+static spn_err_t get_str_optional(toml_table_t* table, const c8* key, sp_str_t* str) {
+  spn_toml_value_kind_t kind = toml_kind_from_field(table, key);
+  switch (kind) {
+    case SPN_TOML_VALUE_KIND_NONE: return SPN_OK;
+    case SPN_TOML_VALUE_KIND_ARRAY:
+    case SPN_TOML_VALUE_KIND_TABLE: return SPN_ERR_TOML_TYPE;
+    case SPN_TOML_VALUE_KIND_SCALAR: {
+      toml_value_t value = toml_table_string(table, key);
+      if (!value.ok) {
+        return SPN_ERR_TOML_TYPE;
+      }
+
+      *str = sp_str_view(value.u.s);
+      return SPN_OK;
+    }
+  }
+}
+
+static spn_err_t get_str_required(toml_table_t* table, const c8* key, sp_str_t* str) {
+  spn_toml_value_kind_t kind = toml_kind_from_field(table, key);
+  switch (kind) {
+    case SPN_TOML_VALUE_KIND_NONE: return SPN_ERR_TOML_MISSING;
+    case SPN_TOML_VALUE_KIND_ARRAY:
+    case SPN_TOML_VALUE_KIND_TABLE: return SPN_ERR_TOML_TYPE;
+    case SPN_TOML_VALUE_KIND_SCALAR: {
+      toml_value_t value = toml_table_string(table, key);
+      if (!value.ok) {
+        return SPN_ERR_TOML_TYPE;
+      }
+
+      *str = sp_str_view(value.u.s);
+      return SPN_OK;
+    }
+  }
+}
+
 static spn_err_union_t toml_get_str_required(toml_table_t* table, const c8* key, toml_path_t path, sp_str_t* out) {
   spn_toml_value_kind_t kind = toml_kind_from_field(table, key);
   if (kind == SPN_TOML_VALUE_KIND_NONE) {
@@ -323,6 +370,17 @@ static spn_err_union_t toml_get_array_string_required(toml_array_t* array, u32 i
 
   *out = sp_str_view(value.u.s);
   return spn_result(SPN_OK);
+}
+
+static spn_err_t toml_get_array_string_required_2(toml_array_t* array, u32 it, sp_str_t* str) {
+  toml_value_t value = toml_array_string(array, it);
+  if (!value.ok) {
+    return SPN_ERR_TOML_TYPE;
+  }
+
+  *str = sp_str_view(value.u.s);
+  return SPN_OK;
+
 }
 
 static spn_err_union_t spn_pkg_load_targets(
@@ -432,6 +490,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     toml_array_t* test;
     toml_table_t* deps;
     toml_array_t* profile;
+    toml_array_t* toolchain;
     toml_array_t* index;
     toml_table_t* options;
     toml_table_t* config;
@@ -460,14 +519,22 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   spn_try_union(toml_get_array_optional(toml.manifest, "script", root_path, &toml.script));
   spn_try_union(toml_get_array_optional(toml.manifest, "test", root_path, &toml.test));
   spn_try_union(toml_get_array_optional(toml.manifest, "profile", root_path, &toml.profile));
+  spn_try_union(toml_get_array_optional(toml.manifest, "toolchain", root_path, &toml.toolchain));
   spn_try_union(toml_get_array_optional(toml.manifest, "index", root_path, &toml.index));
   spn_try_union(toml_get_table_optional(toml.manifest, "deps", root_path, &toml.deps));
   spn_try_union(toml_get_table_optional(toml.manifest, "options", root_path, &toml.options));
   spn_try_union(toml_get_table_optional(toml.manifest, "config", root_path, &toml.config));
 
+  spn_err_t result = SPN_OK;
+
   sp_str_t package_namespace = sp_str_lit("");
   spn_try_union(toml_get_str_optional(toml.package, "namespace", package_path, &package_namespace));
 
+  // spn_try_map_union(
+  //   get_str_required(toml.package, "name", &package_name),
+  //   it,
+  //   add_error_path(it, package_path, "name")
+  // );
   sp_str_t package_name = SP_ZERO_INITIALIZE();
   spn_try_union(toml_get_str_required(toml.package, "name", package_path, &package_name));
 
@@ -536,6 +603,29 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     spn_target_t* lib = spn_pkg_add_lib_ex(pkg, name, linkage);
     lib->linkages = linkages;
     spn_try_union(spn_pkg_load_targets(it, path, lib));
+  }
+
+  spn_toml_arr_for(toml.toolchain, n) {
+    toml_table_t* it = SP_NULLPTR;
+    spn_try_union(toml_get_array_table_required(toml.toolchain, n, sp_str_lit("toolchain"), &it));
+    toml_path_t path = spn_pkg_toml_path_with_index(sp_str_lit("profile"), n);
+
+    spn_toolchain_t toolchain = sp_zero_initialize();
+    sp_str_t driver = sp_zero_initialize();
+    sp_str_t abi = sp_zero_initialize();
+
+    spn_try_as_union(get_str_required(it, "name", &toolchain.name));
+    spn_try_as_union(get_str_optional(it, "compiler", &toolchain.compiler));
+    spn_try_as_union(get_str_optional(it, "linker", &toolchain.linker));
+    spn_try_as_union(get_str_optional(it, "archiver", &toolchain.archiver));
+    spn_try_as_union(get_str_optional(it, "sysroot", &toolchain.sysroot));
+    spn_try_as_union(get_str_optional(it, "driver", &driver));
+    spn_try_as_union(get_str_optional(it, "abi", &abi));
+
+    toolchain.abi = spn_abi_from_str(abi);
+    toolchain.driver = spn_cc_driver_from_str(driver);
+
+    spn_pkg_add_toolchain_ex(pkg, toolchain);
   }
 
   spn_toml_arr_for(toml.profile, n) {

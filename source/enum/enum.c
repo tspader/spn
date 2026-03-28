@@ -2,6 +2,66 @@
 
 #include "sp/macro.h"
 
+spn_cc_driver_t spn_cc_driver_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "gcc")) {
+    return SPN_CC_DRIVER_GCC;
+  }
+  if (sp_str_equal_cstr(str, "msvc")) {
+    return SPN_CC_DRIVER_MSVC;
+  }
+
+  return SPN_CC_DRIVER_NONE;
+}
+
+sp_str_t spn_cc_driver_to_str(spn_cc_driver_t driver) {
+  switch (driver) {
+    case SPN_CC_DRIVER_NONE: {
+      return sp_str_lit("");
+    }
+    case SPN_CC_DRIVER_GCC: {
+      return sp_str_lit("gcc");
+    }
+    case SPN_CC_DRIVER_MSVC: {
+      return sp_str_lit("msvc");
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+spn_abi_t spn_abi_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "gnu")) {
+    return SPN_ABI_GNU;
+  }
+  if (sp_str_equal_cstr(str, "musl")) {
+    return SPN_ABI_MUSL;
+  }
+  if (sp_str_equal_cstr(str, "msvc")) {
+    return SPN_ABI_MSVC;
+  }
+
+  return SPN_ABI_NONE;
+}
+
+sp_str_t spn_abi_to_str(spn_abi_t abi) {
+  switch (abi) {
+    case SPN_ABI_NONE: {
+      return sp_str_lit("");
+    }
+    case SPN_ABI_GNU: {
+      return sp_str_lit("gnu");
+    }
+    case SPN_ABI_MUSL: {
+      return sp_str_lit("musl");
+    }
+    case SPN_ABI_MSVC: {
+      return sp_str_lit("msvc");
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 spn_libc_kind_t spn_libc_kind_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "gnu")) {
     return SPN_LIBC_GNU;

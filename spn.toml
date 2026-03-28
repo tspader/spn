@@ -12,6 +12,14 @@ toml = "1.2.1"
 [deps.test]
 utest = "1.0.0"
 
+[[toolchain]]
+name = "system-gnu"
+compiler = "gcc"
+linker = "ld"
+archiver = "ar"
+driver = "gcc"
+abi = "gnu"
+
 [[profile]]
 name = "debug"
 mode = "debug"
