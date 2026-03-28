@@ -130,7 +130,7 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
       sp_assert(metadata);
 
       sp_da(sp_hash_t) hashes = SP_NULLPTR;
-      sp_da_push(hashes, sp_hash_bytes(metadata->commit.data, metadata->commit.len, 0));
+      sp_da_push(hashes, sp_hash_str(metadata->commit));
       sp_da_push(hashes, sp_hash_str(session->toolchain.info->name));
       sp_da_push(hashes, sp_hash_str(session->toolchain.info->compiler));
       sp_da_push(hashes, sp_hash_str(session->toolchain.info->linker));

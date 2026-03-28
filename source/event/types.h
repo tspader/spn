@@ -142,10 +142,10 @@ typedef struct { sp_str_t command; sp_str_t profile; sp_str_t target; bool force
 typedef struct { s32 strategy; u32 num_deps; } spn_evt_resolve_start_t;
 typedef struct { sp_str_t name; sp_str_t version; s32 kind; } spn_evt_resolve_pkg_t;
 typedef struct { u32 num_resolved; u64 time; } spn_evt_resolve_end_t;
-typedef struct { u32 num_packages; u32 num_index; u32 num_file; } spn_evt_sync_start_t;
+typedef struct { u32 num_packages; u32 num_index; u32 num_file; } spn_evt_sync_start_t; // @spader slop
 typedef struct { sp_str_t name; s32 kind; sp_str_t url; sp_str_t source_path; u64 time; } spn_evt_sync_pkg_t;
 typedef struct { sp_str_t name; sp_str_t url; sp_str_t error; } spn_evt_sync_failed_t;
-typedef struct { u32 num_synced; u64 time; } spn_evt_sync_end_t;
+typedef struct { u32 num_synced; u64 time; } spn_evt_sync_end_t; // @spader slop
 typedef struct { sp_str_t fn; sp_str_t args; } spn_evt_api_call_t;
 typedef struct { sp_str_t message; } spn_evt_user_log_t;
 typedef struct { u32 num_files; } spn_evt_embed_start_t;

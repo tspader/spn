@@ -406,7 +406,10 @@ sp_app_result_t spn_update(sp_app_t* sp) {
       break;
     }
     case SPN_TASK_KIND_SYNC: {
-      if (!task->initted) spn_task_sync_init(&app);
+      if (!task->initted) {
+        result = spn_task_sync_init(&app);
+        break;
+      }
       result = spn_task_sync_update(&app);
       break;
     }

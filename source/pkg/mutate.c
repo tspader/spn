@@ -36,7 +36,6 @@ void spn_pkg_set_manifest(spn_pkg_t* pkg, sp_str_t path) {
   pkg->paths.manifest = sp_str_copy(path);
   pkg->paths.root = sp_fs_parent_path(path);
   pkg->paths.script = sp_fs_join_path(pkg->paths.root, SP_LIT("spn.c"));
-  pkg->paths.metadata = sp_fs_join_path(pkg->paths.root, SP_LIT("metadata.toml"));
   sp_context_pop();
 }
 
@@ -155,10 +154,6 @@ spn_profile_t* spn_pkg_add_profile_ex(spn_pkg_t* pkg, spn_profile_t profile) {
   return sp_om_get(pkg->profiles, profile.name);
 }
 
-spn_toolchain_info_t* spn_pkg_add_toolchain_ex(spn_pkg_t* pkg, spn_toolchain_info_t toolchain) {
-  sp_om_insert(pkg->toolchains, toolchain.name, toolchain);
-  return sp_om_get(pkg->toolchains, toolchain.name);
-}
 
 spn_target_t* spn_pkg_add_exe(spn_pkg_t* pkg, const c8* name) {
   return spn_pkg_add_exe_ex(pkg, spn_intern_cstr(name));

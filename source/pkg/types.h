@@ -70,7 +70,6 @@ struct spn_pkg {
   struct {
     sp_str_t root;
     sp_str_t manifest;
-    sp_str_t metadata;
     sp_str_t script;
     struct {
       sp_str_t source;

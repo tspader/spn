@@ -39,7 +39,7 @@ void spn_task_enqueue(spn_task_executor_t* ex, s32 kind);
 
 
 spn_task_result_t spn_task_resolve(spn_app_t* app);
-void              spn_task_sync_init(spn_app_t* app);
+spn_task_result_t spn_task_sync_init(spn_app_t* app);
 spn_task_result_t spn_task_sync_update(spn_app_t* app);
 spn_task_result_t spn_task_init_configure_graph(spn_app_t* app);
 spn_task_result_t spn_task_update_configure_graph(spn_app_t* app);

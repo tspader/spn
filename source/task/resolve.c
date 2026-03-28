@@ -42,6 +42,7 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
     }
   });
 
+
   sp_tm_timer_t timer = sp_tm_start_timer();
   switch (strategy) {
     case SPN_RESOLVE_STRATEGY_LOCK_FILE: spn_try_as(spn_resolve_from_lock_file(resolver, &app->lock.value), SPN_TASK_ERROR); break;

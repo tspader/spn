@@ -19,6 +19,7 @@ typedef enum {
 
 typedef struct spn_toolchain_info {
   sp_str_t name;
+  sp_str_t url;
   sp_str_t compiler;
   sp_str_t linker;
   sp_str_t archiver;

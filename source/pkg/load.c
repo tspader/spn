@@ -494,6 +494,23 @@ spn_err_union_t spn_index_load(toml_table_t* toml, sp_str_t parent, u32 index, s
   return spn_result(SPN_OK);
 }
 
+static spn_err_t add_toolchain(spn_pkg_t* pkg, spn_toolchain_info_t info) {
+  sp_om_insert(pkg->toolchains, info.name, info);
+  spn_toolchain_info_t* toolchain = sp_om_get(pkg->toolchains, info.name);
+
+  if (sp_str_empty(toolchain->name)) {
+    spn_pkg_req_t req = {
+      .id = spn_qualified_name_to_pkg_id(toolchain->name),
+      .visibility = SPN_VISIBILITY_BUILD,
+      .kind = SPN_PACKAGE_KIND_INDEX,
+      .range = info.version
+    };
+    sp_ht_insert(pkg->deps, toolchain->name, req);
+  }
+
+  return SPN_OK;
+}
+
 spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   struct {
     toml_table_t* manifest;
@@ -630,8 +647,9 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     spn_toolchain_info_t toolchain = sp_zero_initialize();
     sp_str_t driver = sp_zero_initialize();
     sp_str_t abi = sp_zero_initialize();
-    sp_str_t version = sp_zero_initialize();
+    sp_str_t version = sp_str_lit("*");
 
+    spn_try_as_union(get_str_optional(it, "name", &toolchain.name));
     spn_try_as_union(get_str_optional(it, "name", &toolchain.name));
     spn_try_as_union(get_str_optional(it, "package", &toolchain.package));
     spn_try_as_union(get_str_optional(it, "compiler", &toolchain.compiler));
@@ -645,9 +663,9 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
 
     toolchain.abi = spn_abi_from_str(abi);
     toolchain.driver = spn_cc_driver_from_str(driver);
-    toolchain.version = spn_semver_parse_range(version),
+    toolchain.version = spn_semver_parse_range(version);
 
-    spn_pkg_add_toolchain_ex(pkg, toolchain);
+    spn_try_as_union(add_toolchain(pkg, toolchain));
   }
 
   spn_toml_arr_for(toml.profile, n) {
