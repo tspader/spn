@@ -571,13 +571,13 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   sp_str_t commit = sp_str_lit("");
   spn_try_union(toml_get_str_optional(toml.package, "commit", package_path, &commit));
 
-  sp_str_t toolchain;
+  sp_str_t toolchain = sp_zero_initialize();
   spn_try_union(toml_get_str_optional(toml.package, "toolchain", package_path, &toolchain));
 
   spn_pkg_init(pkg, name);
   pkg->namespace = package_namespace;
   pkg->qualified = spn_pkg_id_to_qualified_name((spn_pkg_id_t) { .name = pkg->name, .namespace = pkg->namespace });
-  pkg->toolchain = toolchain;
+  pkg->toolchain = spn_pkg_canonicalize_name(toolchain);
   spn_pkg_set_url_ex(pkg, url);
   spn_pkg_set_author_ex(pkg, author);
   spn_pkg_set_maintainer_ex(pkg, maintainer);

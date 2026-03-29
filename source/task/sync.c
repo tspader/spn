@@ -162,31 +162,31 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   // Download the toolchain; after this, we need build hashes
   timers.toolchain = sp_tm_start_timer();
 
-  // sp_assert(!sp_str_empty(session->pkg->toolchain));
-  // spn_toolchain_req_t* req = sp_om_get(session->pkg->toolchains.index, session->pkg->toolchain);
-  // spn_toolchain_info_t* info = sp_om_get(session->pkg->toolchains.manifest, session->pkg->toolchain);
-  // sp_assert(req || info);
-  //
-  // if (req) {
-  //   // The toolchain points at a package in the index
-  //   sp_str_t tid = session->pkg->toolchain;
-  //   checkout_t* toolchain = sp_str_ht_get(checkouts, tid);
-  //   spn_toolchain_info_t* info = sp_om_at(toolchain->pkg->toolchains.manifest, 0);
-  //   sp_assert(info);
-  //
-  //   // Read the URL and download the tarball (where?)
-  //   sp_ps_output_t output = sp_ps_run((sp_ps_config_t) {
-  //     .command = sp_str_lit("curl"),
-  //     .args = {
-  //       sp_str_lit("-fSL"),
-  //       sp_str_lit("-o"), sp_fs_join_path(toolchain->source, sp_str_lit("whatever")),
-  //       info->url
-  //     }
-  //   });
-  // }
-  // else {
-  //   // The toolchain is just data defined in the package's manifest
-  // }
+  sp_assert(!sp_str_empty(session->pkg->toolchain));
+  spn_toolchain_req_t* req = sp_om_get(session->pkg->toolchains.index, session->pkg->toolchain);
+  spn_toolchain_info_t* info = sp_om_get(session->pkg->toolchains.manifest, session->pkg->toolchain);
+  sp_assert(req || info);
+
+  if (req) {
+    // The toolchain points at a package in the index
+    sp_str_t tid = session->pkg->toolchain;
+    checkout_t* toolchain = sp_str_ht_get(checkouts, tid);
+    spn_toolchain_info_t* info = sp_om_at(toolchain->pkg->toolchains.manifest, 0);
+    sp_assert(info);
+
+    // Read the URL and download the tarball (where?)
+    // sp_ps_output_t output = sp_ps_run((sp_ps_config_t) {
+    //   .command = sp_str_lit("curl"),
+    //   .args = {
+    //     sp_str_lit("-fSL"),
+    //     sp_str_lit("-o"), sp_fs_join_path(toolchain->source, sp_str_lit("whatever")),
+    //     info->url
+    //   }
+    // });
+  }
+  else {
+    // The toolchain is just data defined in the package's manifest
+  }
   // Set session->toolchain
 
   // Load the manifests for each package and add a unit

@@ -3,6 +3,7 @@
 #include "sp/macro.h"
 
 sp_str_t spn_pkg_canonicalize_name(sp_str_t name) {
+  if (sp_str_empty(name)) return sp_zero_struct(sp_str_t);
   spn_pkg_id_t id = spn_qualified_name_to_pkg_id(name);
   return spn_pkg_id_to_qualified_name(id);
 }

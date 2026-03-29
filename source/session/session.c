@@ -51,8 +51,9 @@ static spn_linkage_t spn_session_resolve_dep_linkage(spn_session_t* session, spn
     return SPN_LIB_KIND_SHARED;
   }
 
-  SP_FATAL("{:fg brightcyan} has no consumable lib kinds", SP_FMT_STR(pkg->name));
-  SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
+  return SPN_LIB_KIND_SOURCE; // @spader: For toolchain, which doesn't have a lib entry
+  // SP_FATAL("{:fg brightcyan} has no consumable lib kinds", SP_FMT_STR(pkg->name));
+  // SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
 }
 
 void spn_session_init(spn_session_t* session, spn_pkg_t* pkg, spn_profile_t* profile, sp_str_t dir) {

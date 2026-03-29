@@ -15,7 +15,7 @@ utest = "1.0.0"
 
 [[toolchain]]
 package = "zig"
-version = "^0.69.0"
+version = "0.15.2"
 export = true
 
 [[profile]]
