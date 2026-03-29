@@ -27,6 +27,11 @@ typedef struct {
   spn_semver_range_t range;
 } spn_toolchain_req_t;
 
+typedef struct {
+  sp_str_t program;
+  sp_da(sp_str_t) args;
+} spn_toolchain_launcher_t;
+
 typedef struct spn_toolchain_info {
   sp_str_t name;
   sp_str_t url;
@@ -45,6 +50,7 @@ typedef struct spn_toolchain {
   sp_str_t compiler;
   sp_str_t linker;
   sp_str_t archiver;
+  sp_str_t stamp;
 } spn_toolchain_t;
 
 #endif

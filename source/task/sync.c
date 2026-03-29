@@ -147,6 +147,8 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     sp_str_ht_insert(checkouts, *it.key, checkout);
   }
 
+  // Resolve the toolchain — set session->toolchain.info before adding units,
+  // because build hashes for index packages depend on it.
   session->toolchain = (spn_toolchain_t) {
     .info = sp_alloc_type(spn_toolchain_info_t),
     .compiler = sp_str_lit("gcc"),
@@ -159,35 +161,29 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   session->toolchain.info->driver = SPN_CC_DRIVER_GCC;
   session->toolchain.info->abi = SPN_ABI_GNU;
 
-  // Download the toolchain; after this, we need build hashes
-  timers.toolchain = sp_tm_start_timer();
+  if (!sp_str_empty(session->pkg->toolchain)) {
+    spn_toolchain_req_t* tc_req = sp_om_get(session->pkg->toolchains.index, session->pkg->toolchain);
+    spn_toolchain_info_t* tc_info = sp_om_get(session->pkg->toolchains.manifest, session->pkg->toolchain);
+    sp_assert(tc_req || tc_info);
 
-  sp_assert(!sp_str_empty(session->pkg->toolchain));
-  spn_toolchain_req_t* req = sp_om_get(session->pkg->toolchains.index, session->pkg->toolchain);
-  spn_toolchain_info_t* info = sp_om_get(session->pkg->toolchains.manifest, session->pkg->toolchain);
-  sp_assert(req || info);
+    if (tc_req) {
+      sp_str_t tid = session->pkg->toolchain;
+      checkout_t* tc_checkout = sp_str_ht_get(checkouts, tid);
+      sp_assert(tc_checkout);
+      spn_toolchain_info_t* manifest_info = sp_om_at(tc_checkout->pkg->toolchains.manifest, 0);
+      sp_assert(manifest_info);
 
-  if (req) {
-    // The toolchain points at a package in the index
-    sp_str_t tid = session->pkg->toolchain;
-    checkout_t* toolchain = sp_str_ht_get(checkouts, tid);
-    spn_toolchain_info_t* info = sp_om_at(toolchain->pkg->toolchains.manifest, 0);
-    sp_assert(info);
+      *session->toolchain.info = *manifest_info;
+    }
+    else {
+      // The toolchain is defined inline in the package's manifest
+      *session->toolchain.info = *tc_info;
+    }
 
-    // Read the URL and download the tarball (where?)
-    // sp_ps_output_t output = sp_ps_run((sp_ps_config_t) {
-    //   .command = sp_str_lit("curl"),
-    //   .args = {
-    //     sp_str_lit("-fSL"),
-    //     sp_str_lit("-o"), sp_fs_join_path(toolchain->source, sp_str_lit("whatever")),
-    //     info->url
-    //   }
-    // });
+    session->toolchain.compiler = session->toolchain.info->compiler;
+    session->toolchain.linker = session->toolchain.info->linker;
+    session->toolchain.archiver = session->toolchain.info->archiver;
   }
-  else {
-    // The toolchain is just data defined in the package's manifest
-  }
-  // Set session->toolchain
 
   // Load the manifests for each package and add a unit
   sp_str_ht_for_kv(checkouts, it) {
@@ -208,6 +204,14 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
         .time = checkout.elapsed,
       }
     });
+  }
+
+  // Now that units exist, resolve the toolchain's store path from its build context
+  if (!sp_str_empty(session->pkg->toolchain) && !sp_str_empty(session->toolchain.info->url)) {
+    spn_pkg_unit_t* tc_unit = sp_om_get(session->units.packages, session->pkg->toolchain);
+    sp_assert(tc_unit);
+    session->toolchain.root = tc_unit->ctx.paths.store;
+    session->toolchain.stamp = sp_fs_join_path(tc_unit->ctx.paths.store, sp_str_lit(".toolchain.stamp"));
   }
 
   // Load file dependencies directly from their manifests
