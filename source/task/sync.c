@@ -13,6 +13,8 @@
 #include "resolve/types.h"
 #include "session/session.h"
 #include "task/task.h"
+#include "toolchain/types.h"
+#include <unistd.h>
 
 typedef struct {
   spn_resolved_pkg_t* resolved;
@@ -58,6 +60,7 @@ static spn_err_t sync_package(spn_session_t* session, spn_resolved_pkg_t* resolv
       .dir = release->source.dir
     };
     spn_try(spn_git_cache_ensure_checkout(cache, id, &checkouts.source));
+    checkout->source = checkouts.source->path;
   }
 
   if (checkouts.manifest) {
@@ -97,8 +100,8 @@ static spn_err_t load_package(spn_resolved_pkg_t* resolved, checkout_t* checkout
   pkg->paths.script = checkout->script;
   pkg->paths.manifest = checkout->manifest;
   pkg->paths.cache.source = checkout->source;
-  pkg->paths.cache.work = sp_fs_join_path(spn.paths.build, pkg->name);
-  pkg->paths.cache.store = sp_fs_join_path(spn.paths.store, pkg->name);
+  pkg->paths.cache.work = sp_fs_join_path(spn.paths.build, pkg->qualified);
+  pkg->paths.cache.store = sp_fs_join_path(spn.paths.store, pkg->qualified);
 
   resolved->pkg = pkg;
   checkout->pkg = pkg;
@@ -143,6 +146,18 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     spn_try_as(load_package(resolved, &checkout), SPN_TASK_ERROR);
     sp_str_ht_insert(checkouts, *it.key, checkout);
   }
+
+  session->toolchain = (spn_toolchain_t) {
+    .info = sp_alloc_type(spn_toolchain_info_t),
+    .compiler = sp_str_lit("gcc"),
+    .linker = sp_str_lit("ld"),
+    .archiver = sp_str_lit("ar"),
+  };
+  session->toolchain.info->compiler = sp_str_lit("gcc");
+  session->toolchain.info->linker = sp_str_lit("ld");
+  session->toolchain.info->archiver = sp_str_lit("ar");
+  session->toolchain.info->driver = SPN_CC_DRIVER_GCC;
+  session->toolchain.info->abi = SPN_ABI_GNU;
 
   // Download the toolchain; after this, we need build hashes
   timers.toolchain = sp_tm_start_timer();

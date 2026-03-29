@@ -14,5 +14,8 @@ sp_str_t spn_toolchain_get_linker_driver(spn_toolchain_info_t* toolchain) {
     case SPN_CC_DRIVER_MSVC: return toolchain->linker;
     case SPN_CC_DRIVER_NONE: return toolchain->linker;
   }
+
+  sp_str_t bad = sp_str_lit("");
+  sp_unreachable_return(bad);
 }
 

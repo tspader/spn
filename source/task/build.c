@@ -286,6 +286,7 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   sp_fs_create_dir(object_dir);
 
   spn_cc_t* cc = make_cc_for_compile_or_link(unit->pkg, unit->target->info, object_dir, unit->profile);
+  cc->toolchain = unit->session->toolchain;
   spn_cc_target_t* cc_target = spn_cc_add_target(cc, SPN_TARGET_OBJECT, file);
   setup_target_for_compile_or_link(cc, cc_target, unit->target->info, unit->pkg, unit->session);
 
@@ -456,6 +457,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
     case SPN_TARGET_EXE:
     case SPN_TARGET_SHARED_LIB: {
       spn_cc_t* cc = make_cc_for_compile_or_link(unit->pkg, unit->info, sp_fs_parent_path(output), unit->session->profile);
+      cc->toolchain = unit->session->toolchain;
       spn_cc_target_t* cc_target = spn_cc_add_target(cc, target->kind, output_name);
       setup_target_for_compile_or_link(cc, cc_target, target, unit->pkg, unit->session);
 

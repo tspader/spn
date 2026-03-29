@@ -291,6 +291,8 @@ static spn_err_t get_bool_optional(toml_table_t* table, const c8* key, bool* b) 
       return SPN_OK;
     }
   }
+
+  sp_unreachable_return(SPN_ERROR);
 }
 
 static spn_err_t get_str_optional(toml_table_t* table, const c8* key, sp_str_t* str) {
@@ -309,6 +311,7 @@ static spn_err_t get_str_optional(toml_table_t* table, const c8* key, sp_str_t* 
       return SPN_OK;
     }
   }
+  sp_unreachable_return(SPN_ERROR);
 }
 
 static spn_err_t get_str_required(toml_table_t* table, const c8* key, sp_str_t* str) {
@@ -327,6 +330,7 @@ static spn_err_t get_str_required(toml_table_t* table, const c8* key, sp_str_t* 
       return SPN_OK;
     }
   }
+  sp_unreachable_return(SPN_ERROR);
 }
 
 static spn_err_union_t toml_get_str_required(toml_table_t* table, const c8* key, toml_path_t path, sp_str_t* out) {
