@@ -42,6 +42,7 @@ typedef struct spn_pkg_req {
 struct spn_pkg {
   sp_str_t namespace;
   sp_str_t name;
+  sp_str_t qualified;
   sp_str_t repo;
   sp_str_t url;
   sp_str_t author;
@@ -53,7 +54,6 @@ struct spn_pkg {
   sp_om(spn_target_t) scripts;
   sp_om(spn_target_t) tests;
   sp_om(spn_profile_t) profiles;
-  sp_om(spn_toolchain_info_t) toolchains;
   sp_om(spn_index_t) indexes;
   sp_ht(sp_str_t, spn_pkg_req_t) deps;
   sp_ht(sp_str_t, spn_dep_option_t) options;
@@ -64,6 +64,10 @@ struct spn_pkg {
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) system_deps;
   spn_pkg_kind_t kind;
+  struct {
+    sp_om(spn_toolchain_info_t) manifest;
+    sp_om(spn_toolchain_req_t) index;
+  } toolchains;
 
   sp_mem_arena_t* arena;
 

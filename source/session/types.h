@@ -8,6 +8,7 @@
 #include "graph/types.h"
 #include "profile/types.h"
 #include "semver/types.h"
+#include "toolchain/types.h"
 #include "unit/types.h"
 
 typedef enum {
@@ -38,13 +39,13 @@ typedef enum {
 
 typedef struct {
   spn_build_graph_t graph;
-  spn_bg_dirty_t* dirty;
-  spn_bg_executor_t* executor;
+  spn_bg_dirty_t *dirty;
+  spn_bg_executor_t *executor;
 } spn_bg_ctx_t;
 
 struct spn_session_t {
-  spn_pkg_t* pkg;
-  spn_profile_t* profile;
+  spn_pkg_t *pkg;
+  spn_profile_t *profile;
   spn_toolchain_t toolchain;
   spn_target_filter_t filter;
 

@@ -2,6 +2,7 @@
 #define SPN_PKG_MUTATE_H
 
 #include "pkg/types.h"
+#include "err.h"
 
 void             spn_pkg_init(spn_pkg_t* pkg, sp_str_t name);
 void             spn_pkg_set_index(spn_pkg_t* pkg, sp_str_t path);
@@ -37,5 +38,7 @@ spn_target_t*    spn_pkg_add_test(spn_pkg_t* pkg, const c8* name);
 spn_target_t*    spn_pkg_add_test_ex(spn_pkg_t* pkg, sp_str_t name);
 spn_target_t*    spn_pkg_add_lib(spn_pkg_t* pkg, const c8* name, spn_linkage_t kind);
 spn_target_t*    spn_pkg_add_lib_ex(spn_pkg_t* pkg, sp_str_t name, spn_linkage_t kind);
+spn_err_t        spn_pkg_add_toolchain_req(spn_pkg_t* pkg, spn_toolchain_req_t req);
+spn_err_t        spn_pkg_add_toolchain(spn_pkg_t* pkg, spn_toolchain_info_t info);
 
 #endif

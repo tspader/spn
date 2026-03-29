@@ -14,12 +14,6 @@ toml = "1.2.1"
 utest = "1.0.0"
 
 [[toolchain]]
-name = "system-gnu"
-compiler = "gcc"
-linker = "ld"
-archiver = "ar"
-driver = "gcc"
-abi = "gnu"
 package = "zig"
 version = "^0.69.0"
 export = true

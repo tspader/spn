@@ -17,6 +17,16 @@ typedef enum {
   SPN_ABI_MSVC
 } spn_abi_t;
 
+typedef enum {
+  SPN_TOOLCHAIN_INLINE,
+  SPN_TOOLCHAIN_INDEX,
+} spn_toolchain_kind_t;
+
+typedef struct {
+  sp_str_t package;
+  spn_semver_range_t range;
+} spn_toolchain_req_t;
+
 typedef struct spn_toolchain_info {
   sp_str_t name;
   sp_str_t url;
@@ -27,8 +37,6 @@ typedef struct spn_toolchain_info {
   spn_cc_driver_t driver;
   spn_abi_t abi;
   bool export;
-  sp_str_t package;
-  spn_semver_range_t version;
 } spn_toolchain_info_t;
 
 typedef struct spn_toolchain {

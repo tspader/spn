@@ -1,3 +1,4 @@
+#include "spn.h"
 #include "filter/filter.h"
 
 bool spn_target_filter_pass(spn_target_filter_t* filter, spn_target_t* target) {
@@ -6,18 +7,10 @@ bool spn_target_filter_pass(spn_target_filter_t* filter, spn_target_t* target) {
   }
 
   switch (target->visibility) {
-    case SPN_VISIBILITY_PUBLIC: {
-      return !filter->disabled.public;
-    }
-    case SPN_VISIBILITY_TEST: {
-      return !filter->disabled.test;
-    }
-    case SPN_VISIBILITY_SCRIPT: {
-      return !filter->disabled.script;
-    }
-    case SPN_VISIBILITY_BUILD: {
-      return true;
-    }
+    case SPN_VISIBILITY_PUBLIC: return !filter->disabled.public;
+    case SPN_VISIBILITY_TEST: return !filter->disabled.test;
+    case SPN_VISIBILITY_SCRIPT: return !filter->disabled.script;
+    case SPN_VISIBILITY_BUILD: return true;
   }
   sp_unreachable_return(false);
 }
@@ -26,50 +19,26 @@ bool spn_is_visibility_linked(spn_visibility_t target, spn_visibility_t dep) {
   switch (target) {
     case SPN_VISIBILITY_PUBLIC: {
       switch (dep) {
-        case SPN_VISIBILITY_PUBLIC: {
-          return true;
-        }
-        case SPN_VISIBILITY_TEST: {
-          return false;
-        }
-        case SPN_VISIBILITY_SCRIPT: {
-          return false;
-        }
-        case SPN_VISIBILITY_BUILD: {
-          return false;
-        }
+        case SPN_VISIBILITY_PUBLIC: return true;
+        case SPN_VISIBILITY_TEST: return false;
+        case SPN_VISIBILITY_SCRIPT: return false;
+        case SPN_VISIBILITY_BUILD: return false;
       }
     }
     case SPN_VISIBILITY_TEST: {
       switch (dep) {
-        case SPN_VISIBILITY_PUBLIC: {
-          return true;
-        }
-        case SPN_VISIBILITY_TEST: {
-          return true;
-        }
-        case SPN_VISIBILITY_SCRIPT: {
-          return false;
-        }
-        case SPN_VISIBILITY_BUILD: {
-          return false;
-        }
+        case SPN_VISIBILITY_PUBLIC: return true;
+        case SPN_VISIBILITY_TEST: return true;
+        case SPN_VISIBILITY_SCRIPT: return false;
+        case SPN_VISIBILITY_BUILD: return false;
       }
     }
     case SPN_VISIBILITY_SCRIPT: {
       switch (dep) {
-        case SPN_VISIBILITY_PUBLIC: {
-          return true;
-        }
-        case SPN_VISIBILITY_TEST: {
-          return true;
-        }
-        case SPN_VISIBILITY_SCRIPT: {
-          return false;
-        }
-        case SPN_VISIBILITY_BUILD: {
-          return false;
-        }
+        case SPN_VISIBILITY_PUBLIC: return true;
+        case SPN_VISIBILITY_TEST: return true;
+        case SPN_VISIBILITY_SCRIPT: return false;
+        case SPN_VISIBILITY_BUILD: return false;
       }
     }
     case SPN_VISIBILITY_BUILD: {

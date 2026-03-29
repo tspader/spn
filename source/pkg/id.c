@@ -1,7 +1,11 @@
 #include "intern.h"
 #include "pkg/id.h"
-#include "semver/parser.h"
 #include "sp/macro.h"
+
+sp_str_t spn_pkg_canonicalize_name(sp_str_t name) {
+  spn_pkg_id_t id = spn_qualified_name_to_pkg_id(name);
+  return spn_pkg_id_to_qualified_name(id);
+}
 
 sp_str_t spn_pkg_id_to_qualified_name(spn_pkg_id_t id) {
   sp_str_t namespace = sp_str_empty(id.namespace) ? spn_intern_lit("core") : id.namespace;

@@ -49,5 +49,10 @@ typedef struct {
 } spn_semver_range_t;
 
 #define spn_semver_lit(major, minor, patch) (spn_semver_t) { major, minor, patch }
+#define spn_semver_any() (spn_semver_range_t) { \
+  .low  = { .op = SPN_SEMVER_OP_GEQ, .version = { 0, 0, 0 } }, \
+  .high = { .op = SPN_SEMVER_OP_LT,  .version = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF } }, \
+  .mod  = SPN_SEMVER_MOD_WILDCARD, \
+}
 
 #endif

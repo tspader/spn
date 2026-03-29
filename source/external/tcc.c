@@ -9,8 +9,10 @@ typedef struct {
 } spn_tcc_symbol_t;
 
 #define SPN_DEFINE_LIB_ENTRY(SYM) { .symbol = SP_MACRO_STR(SYM), .fn = SYM },
+spn_libc_kind_t   spn_profile_get_libc(spn_profile_t* profile) { return SPN_LIBC_GNU; }
 
 static spn_tcc_symbol_t spn_tcc_symbol_table[] = {
+  SPN_DEFINE_LIB_ENTRY(spn_profile_get_libc)
   SPN_DEFINE_LIB_ENTRY(spn_get_pkg)
   SPN_DEFINE_LIB_ENTRY(spn_get_profile)
   SPN_DEFINE_LIB_ENTRY(spn_get_linkage)

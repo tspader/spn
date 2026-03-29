@@ -117,6 +117,7 @@ void              spn_add_linkage(spn_build_ctx_t* b, spn_linkage_t linkage);
 spn_index_t*      spn_add_index(spn_build_ctx_t* b, const c8* name, const c8* location);
 void              spn_copy(spn_build_ctx_t* b, spn_pkg_dir_t from, const c8* pf, spn_pkg_dir_t to, const c8* pt);
 void              spn_log(spn_build_ctx_t* b, const c8* message);
+spn_libc_kind_t   spn_profile_get_libc(spn_profile_t* profile);
 spn_linkage_t spn_profile_get_linkage(spn_profile_t* profile);
 spn_c_standard_t  spn_profile_get_standard(spn_profile_t* profile);
 spn_build_mode_t  spn_profile_get_mode(spn_profile_t* profile);

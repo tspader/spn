@@ -1,3 +1,4 @@
+#include "err.h"
 #include "index/types.h"
 #include "profile/types.h"
 #include "toolchain/types.h"
@@ -5,6 +6,7 @@
 #include "enum/enum.h"
 #include "intern.h"
 #include "pkg/mutate.h"
+#include "pkg/id.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
 #include "target/mutate.h"
@@ -243,3 +245,18 @@ spn_index_t* spn_pkg_add_index_ex(spn_pkg_t* pkg, sp_str_t name, sp_str_t locati
   sp_om_insert(pkg->indexes, index.name, index);
   return sp_om_get(pkg->indexes, index.name);
 }
+
+spn_err_t spn_pkg_add_toolchain_req(spn_pkg_t* pkg, spn_toolchain_req_t req) {
+  sp_om_insert(pkg->toolchains.index, req.package, req);
+  spn_toolchain_req_t* toolchain = sp_om_get(pkg->toolchains.index, req.package);
+
+  return SPN_OK;
+}
+
+spn_err_t spn_pkg_add_toolchain(spn_pkg_t* pkg, spn_toolchain_info_t info) {
+  sp_om_insert(pkg->toolchains.manifest, info.name, info);
+  spn_toolchain_info_t* toolchain = sp_om_get(pkg->toolchains.manifest, info.name);
+
+  return SPN_OK;
+}
+

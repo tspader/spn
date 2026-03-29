@@ -1,10 +1,15 @@
+#include "app/types.h"
 #include "err.h"
 #include "event/event.h"
 #include "index/cache.h"
+#include "ordered_map.h"
 #include "pkg/id.h"
 #include "resolve/resolve.h"
+#include "pkg/types.h"
 #include "semver/compare.h"
 #include "semver/parser.h"
+#include "spn.h"
+#include "toolchain/types.h"
 
 void spn_resolver_init(spn_resolver_t* r, spn_index_cache_t* index, spn_pkg_t* pkg, spn_event_buffer_t* events) {
   *r = (spn_resolver_t){ .pkg = pkg, .index = index, .events = events };
@@ -188,10 +193,24 @@ spn_err_t spn_resolve_from_solver(spn_resolver_t* r) {
     .version = r->pkg->version,
     .deps = {
       .system = r->pkg->system_deps,
+      .pkg = {}
     }
   };
+
   sp_ht_for_kv(r->pkg->deps, it) {
     sp_da_push(node.deps.pkg, *it.val);
+  }
+
+  sp_om_for(r->pkg->toolchains.index, it) {
+    spn_toolchain_req_t* toolchain = sp_om_at(r->pkg->toolchains.index, it);
+    spn_pkg_req_t package = {
+      .id = spn_qualified_name_to_pkg_id(toolchain->package),
+      .visibility = SPN_VISIBILITY_BUILD,
+      .kind = SPN_PACKAGE_KIND_INDEX,
+      .range = toolchain->range,
+    };
+    sp_da_push(node.deps.pkg, package);
+
   }
 
   return resolve_node(r, node);

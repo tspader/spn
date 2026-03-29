@@ -125,18 +125,10 @@ sp_str_t spn_dep_build_mode_to_str(spn_build_mode_t mode) {
 
 sp_str_t spn_visibility_to_str(spn_visibility_t kind) {
   switch (kind) {
-    case SPN_VISIBILITY_PUBLIC: {
-      return strl("public");
-    }
-    case SPN_VISIBILITY_TEST: {
-      return strl("test");
-    }
-    case SPN_VISIBILITY_SCRIPT: {
-      return strl("script");
-    }
-    case SPN_VISIBILITY_BUILD: {
-      return strl("build");
-    }
+    case SPN_VISIBILITY_PUBLIC: return strl("public");
+    case SPN_VISIBILITY_TEST: return strl("test");
+    case SPN_VISIBILITY_SCRIPT: return strl("script");
+    case SPN_VISIBILITY_BUILD: return strl("build");
   }
 
   SP_UNREACHABLE_RETURN(sp_str_lit(""));

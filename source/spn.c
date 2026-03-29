@@ -46,6 +46,7 @@
 #include "pkg/load.h"
 #include "pkg/pkg.h"
 #include "pkg/mutate.h"
+#include "semver/types.h"
 #include "session/session.h"
 #include "spn.embed.h"
 #include "sp/io.h"
@@ -54,6 +55,8 @@
 #include "tui/tui.h"
 #include "unit/build.h"
 #include "version.h"
+
+#include <sys/stat.h>
 
 spn_app_t app;
 spn_ctx_t spn;
@@ -249,9 +252,11 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       }
     }
 
-    sp_io_writer_t io = sp_io_writer_from_file(spn.paths.version, SP_IO_WRITE_MODE_OVERWRITE);
-    sp_io_write_cstr(&io, SPN_VERSION);
-    sp_io_writer_close(&io);
+    {
+      sp_io_writer_t io = sp_io_writer_from_file(spn.paths.version, SP_IO_WRITE_MODE_OVERWRITE);
+      sp_io_write_cstr(&io, SPN_VERSION);
+      sp_io_writer_close(&io);
+    }
   }
 
   spn_cli_t* cli = &spn.cli;
@@ -313,6 +318,14 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   if (sp_fs_exists(app.paths.lock)) {
     sp_opt_set(app.lock, spn_lock_file_load(app.paths.lock, spn.events));
+  }
+
+  if (sp_str_empty(app.package.toolchain)) {
+    app.package.toolchain = sp_str_lit("core/zig");
+    spn_pkg_add_toolchain_req(&app.package, (spn_toolchain_req_t) {
+      .package = sp_str_lit("core/zig"),
+      .range = spn_semver_any()
+    });
   }
 
   if (sp_om_empty(app.package.profiles)) {
