@@ -10,6 +10,7 @@
 #include "pkg/id.h"
 #include "pkg/mutate.h"
 #include "pkg/pkg.h"
+#include "pkg/types.h"
 #include "resolve/types.h"
 #include "session/session.h"
 #include "task/task.h"
@@ -24,12 +25,6 @@ typedef struct {
   sp_str_t source;
   u64 elapsed;
 } checkout_t;
-
-static void add_pkg_unit(spn_session_t* session, sp_str_t qualified_name, spn_resolved_pkg_t* resolved) {
-  sp_om_insert(session->units.packages, qualified_name, SP_ZERO_STRUCT(spn_pkg_unit_t));
-  spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
-  spn_init_pkg_unit_for_session(session, unit, resolved->pkg, resolved->kind, resolved->version);
-}
 
 static spn_err_t sync_package(spn_session_t* session, spn_resolved_pkg_t* resolved, spn_git_cache_t* cache, checkout_t* checkout) {
   spn_err_t err = SPN_OK;
@@ -162,25 +157,42 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   session->toolchain.info->driver = SPN_CC_DRIVER_GCC;
   session->toolchain.info->abi = SPN_ABI_GNU;
 
-  if (!sp_str_empty(session->pkg->toolchain)) {
-    spn_toolchain_req_t* tc_req = sp_om_get(session->pkg->toolchains.index, session->pkg->toolchain);
-    spn_toolchain_info_t* tc_info = sp_om_get(session->pkg->toolchains.manifest, session->pkg->toolchain);
-    sp_assert(tc_req || tc_info);
+  spn_toolchain_entry_t* entry = app->config.toolchain;
+  if (app->config.toolchain->kind == SPN_TOOLCHAIN_INDEX) {
+    spn_toolchain_req_t* request = &app->config.toolchain->request;
+    checkout_t* checkout = sp_str_ht_get(checkouts, request->package);
+    sp_assert(checkout);
 
-    if (tc_req) {
-      sp_str_t tid = session->pkg->toolchain;
-      checkout_t* tc_checkout = sp_str_ht_get(checkouts, tid);
-      sp_assert(tc_checkout);
-      spn_toolchain_info_t* manifest_info = sp_om_at(tc_checkout->pkg->toolchains.manifest, 0);
-      sp_assert(manifest_info);
+    spn_pkg_t* pkg = checkout->pkg;
+    spn_toolchain_entry_t* entry = sp_om_at(checkout->pkg->toolchains, 0);
+    sp_assert(entry);
+    sp_assert(entry->kind == SPN_TOOLCHAIN_INLINE);
 
-      *session->toolchain.info = *manifest_info;
+    spn_index_rel_t* release = checkout->resolved->release;
+    sp_str_t store = sp_fs_join_path(pkg->paths.cache.store, release->source.rev);
+    sp_str_t work = sp_fs_join_path(pkg->paths.cache.work, release->source.rev);
+
+    spn_toolchain_info_t* info = &entry->info;
+
+    session->toolchain = (spn_toolchain_t) {
+      .info = info,
+      .compiler = { sp_fs_join_path(store, info->compiler.program), info->compiler.args },
+      .linker =   { sp_fs_join_path(store, info->linker.program), info->linker.args },
+      .archiver = { sp_fs_join_path(store, info->archiver.program), info->archiver.args },
+    };
+
+    if (!sp_str_empty(info->url)) {
+      session->units.toolchain = sp_alloc_type(spn_toolchain_unit_t);
+      session->units.toolchain->url = info->url;
+      session->units.toolchain->paths.store = store;
+      session->units.toolchain->paths.work = work;
+      session->units.toolchain->paths.stamp = sp_fs_join_path(work, sp_str_lit("download.stamp"));
+      sp_fs_create_dir(store);
+      sp_fs_create_dir(work);
     }
-    else {
-      // The toolchain is defined inline in the package's manifest
-      *session->toolchain.info = *tc_info;
-    }
-
+  }
+  else if (entry->kind == SPN_TOOLCHAIN_INLINE) {
+    *session->toolchain.info = entry->info;
     session->toolchain.compiler = session->toolchain.info->compiler;
     session->toolchain.linker = session->toolchain.info->linker;
     session->toolchain.archiver = session->toolchain.info->archiver;
@@ -193,7 +205,9 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     spn_index_rel_t* release = resolved->release;
 
     // Add a build unit to the session
-    add_pkg_unit(session, checkout.pkg->qualified, resolved);
+    sp_om_insert(session->units.packages, checkout.pkg->qualified, SP_ZERO_STRUCT(spn_pkg_unit_t));
+    spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
+    spn_init_pkg_unit_for_session(session, unit, resolved->pkg, resolved->kind);
 
     spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
       .kind = SPN_EVENT_SYNC_PACKAGE,
@@ -216,8 +230,8 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   }
 
   // Load file dependencies directly from their manifests
-  sp_ht_for_kv(app->package.deps, dep_it) {
-    spn_pkg_req_t* req = dep_it.val;
+  sp_ht_for_kv(app->package.deps, it) {
+    spn_pkg_req_t* req = it.val;
     if (req->kind != SPN_PACKAGE_KIND_FILE) continue;
 
     sp_str_t manifest = req->file;
@@ -231,7 +245,7 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
       spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
         .kind = SPN_EVENT_SYNC_FAILED,
         .sync_failed = {
-          .name = *dep_it.key,
+          .name = *it.key,
           .url = manifest,
           .error = sp_str_lit("manifest not found"),
         }
@@ -240,21 +254,17 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     }
 
     spn_pkg_t* pkg = sp_alloc_type(spn_pkg_t);
-    spn_pkg_init(pkg, *dep_it.key);
+    spn_pkg_init(pkg, *it.key);
     spn_pkg_from_manifest(pkg, manifest);
 
-    // @spader Why doesn't the resolver do this?
-    spn_resolved_pkg_t file_resolved = {
-      .pkg = pkg,
-      .kind = SPN_PACKAGE_KIND_FILE,
-      .version = pkg->version,
-    };
-    add_pkg_unit(session, *dep_it.key, &file_resolved);
+    sp_om_insert(session->units.packages, *it.key, SP_ZERO_STRUCT(spn_pkg_unit_t));
+    spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
+    spn_init_pkg_unit_for_session(session, unit, pkg, SPN_PACKAGE_KIND_FILE);
 
     spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
       .kind = SPN_EVENT_SYNC_PACKAGE,
       .sync_pkg = {
-        .name = *dep_it.key,
+        .name = *it.key,
         .kind = SPN_PACKAGE_KIND_FILE, // @spader Convert this to a string? Here, or can we express this in the schema?
         .url = manifest,
         .source_path = pkg->paths.root,

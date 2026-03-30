@@ -38,6 +38,7 @@ typedef struct spn_resolver_t {
   sp_str_ht(spn_resolved_pkg_t) resolved;
   sp_da(sp_str_t) system_deps;
   sp_da(sp_str_t) resolution_order;
+  sp_da(spn_pkg_req_t) reqs;
 } spn_resolver_t;
 
 #endif

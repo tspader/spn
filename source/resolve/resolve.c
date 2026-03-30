@@ -1,18 +1,20 @@
-#include "app/types.h"
 #include "err.h"
 #include "event/event.h"
 #include "index/cache.h"
-#include "ordered_map.h"
 #include "pkg/id.h"
 #include "resolve/resolve.h"
 #include "pkg/types.h"
+#include "resolve/types.h"
 #include "semver/compare.h"
 #include "semver/parser.h"
 #include "spn.h"
-#include "toolchain/types.h"
 
 void spn_resolver_init(spn_resolver_t* r, spn_index_cache_t* index, spn_pkg_t* pkg, spn_event_buffer_t* events) {
   *r = (spn_resolver_t){ .pkg = pkg, .index = index, .events = events };
+}
+
+void spn_resolver_add(spn_resolver_t* r, spn_pkg_req_t req) {
+  sp_da_push(r->reqs, req);
 }
 
 static bool version_in_range(spn_semver_t version, spn_semver_range_t range) {
@@ -31,29 +33,29 @@ static bool system_dep_exists(spn_resolver_t* r, sp_str_t dep) {
 
 static spn_err_t resolve_node(spn_resolver_t* r, spn_resolve_node_t node);
 
-static spn_err_t resolve_package(spn_resolver_t* r, spn_pkg_req_t req) {
-  sp_str_t qualified = spn_pkg_id_to_qualified_name(req.id);
+static spn_err_t resolve_package(spn_resolver_t* r, spn_pkg_req_t request) {
+  sp_str_t qualified = spn_pkg_id_to_qualified_name(request.id);
 
   spn_resolved_pkg_t* existing = sp_str_ht_get(r->resolved, qualified);
   if (existing) {
     if (sp_ht_key_exists(r->visited, qualified)) {
       spn_event_buffer_push_ex(r->events, r->pkg, SP_NULLPTR, (spn_build_event_t) {
         .kind = SPN_EVENT_ERR_CIRCULAR_DEP,
-        .circular.id = req.id
+        .circular.id = request.id
       });
       return SPN_ERROR;
     }
-    if (version_in_range(existing->version, req.range)) {
+    if (version_in_range(existing->version, request.range)) {
       return SPN_OK;
     }
     return SPN_ERROR;
   }
 
-  spn_index_pkg_t* pkg = spn_index_cache_get_package(r->index, req.id);
+  spn_index_pkg_t* pkg = spn_index_cache_get_package(r->index, request.id);
   if (!pkg) {
     spn_event_buffer_push_ex(r->events, r->pkg, SP_NULLPTR, (spn_build_event_t) {
       .kind = SPN_EVENT_ERR_UNKNOWN_PKG,
-      .unknown.request = req
+      .unknown.request = request
     });
     return SPN_ERROR;
   }
@@ -61,20 +63,22 @@ static spn_err_t resolve_package(spn_resolver_t* r, spn_pkg_req_t req) {
   u32 saved_resolutions = sp_da_size(r->resolution_order);
   u32 saved_system_deps = sp_da_size(r->system_deps);
 
-  for (s32 it = (s32)sp_da_size(pkg->releases) - 1; it >= 0; it--) {
+  sp_da_rfor(pkg->releases, it) {
     spn_index_rel_t* candidate = &pkg->releases[it];
 
-    if (!version_in_range(candidate->version, req.range)) {
+    if (!version_in_range(candidate->version, request.range)) {
       continue;
     }
 
+    // Mark the candidate in the resolved list
     sp_str_ht_insert(r->resolved, qualified, ((spn_resolved_pkg_t) {
       .version = candidate->version,
-      .kind = req.kind,
+      .kind = request.kind,
       .release = candidate,
     }));
     sp_da_push(r->resolution_order, qualified);
 
+    // Add all of the candidate's dependencies and keep going
     spn_resolve_node_t child = { .id = pkg->id };
     sp_da_for(candidate->deps, d) {
       sp_da_push(child.deps.pkg, ((spn_pkg_req_t) {
@@ -84,10 +88,7 @@ static spn_err_t resolve_package(spn_resolver_t* r, spn_pkg_req_t req) {
       }));
     }
 
-    spn_err_t err = resolve_node(r, child);
-    if (err == SPN_OK) {
-      return SPN_OK;
-    }
+    if (!resolve_node(r, child)) return SPN_OK;
 
     while (sp_da_size(r->resolution_order) > saved_resolutions) {
       sp_str_t key = *sp_da_back(r->resolution_order);
@@ -103,8 +104,8 @@ static spn_err_t resolve_package(spn_resolver_t* r, spn_pkg_req_t req) {
   spn_event_buffer_push_ex(r->events, r->pkg, SP_NULLPTR, (spn_build_event_t) {
     .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
     .unsatisfiable = {
-      .low = req,
-      .high = req
+      .low = request,
+      .high = request
     }
   });
   return SPN_ERROR;
@@ -113,6 +114,7 @@ static spn_err_t resolve_package(spn_resolver_t* r, spn_pkg_req_t req) {
 static spn_err_t resolve_node(spn_resolver_t* r, spn_resolve_node_t node) {
   sp_str_t qualified = spn_pkg_id_to_qualified_name(node.id);
 
+  // If we've already seen this package, it must transitively include itself.
   if (sp_ht_key_exists(r->visited, qualified)) {
     spn_event_buffer_push_ex(r->events, r->pkg, SP_NULLPTR, (spn_build_event_t) {
       .kind = SPN_EVENT_ERR_CIRCULAR_DEP,
@@ -193,25 +195,9 @@ spn_err_t spn_resolve_from_solver(spn_resolver_t* r) {
     .version = r->pkg->version,
     .deps = {
       .system = r->pkg->system_deps,
-      .pkg = {}
+      .pkg = r->reqs,
     }
   };
-
-  sp_ht_for_kv(r->pkg->deps, it) {
-    sp_da_push(node.deps.pkg, *it.val);
-  }
-
-  sp_om_for(r->pkg->toolchains.index, it) {
-    spn_toolchain_req_t* toolchain = sp_om_at(r->pkg->toolchains.index, it);
-    spn_pkg_req_t package = {
-      .id = spn_qualified_name_to_pkg_id(toolchain->package),
-      .visibility = SPN_VISIBILITY_BUILD,
-      .kind = SPN_PACKAGE_KIND_INDEX,
-      .range = toolchain->range,
-    };
-    sp_da_push(node.deps.pkg, package);
-
-  }
 
   return resolve_node(r, node);
 }

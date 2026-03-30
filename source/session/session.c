@@ -91,7 +91,7 @@ void spn_session_set_filter(spn_session_t* session, spn_target_filter_t filter) 
   session->filter = filter;
 }
 
-void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit, spn_pkg_t* pkg, spn_pkg_kind_t kind, spn_semver_t version) {
+void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit, spn_pkg_t* pkg, spn_pkg_kind_t kind) {
   switch (kind) {
     case SPN_PACKAGE_KIND_ROOT: {
       spn_pkg_unit_init(unit, (spn_pkg_unit_config_t) {
@@ -129,7 +129,7 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
     case SPN_PACKAGE_KIND_INDEX: {
       spn_linkage_t linkage = spn_session_resolve_dep_linkage(session, pkg);
 
-      spn_pkg_metadata_t* metadata = sp_ht_getp(pkg->metadata, version);
+      spn_pkg_metadata_t* metadata = sp_ht_getp(pkg->metadata, pkg->version);
       sp_assert(metadata);
 
       sp_da(sp_hash_t) hashes = SP_NULLPTR;

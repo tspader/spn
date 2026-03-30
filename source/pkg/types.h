@@ -64,10 +64,7 @@ struct spn_pkg {
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) system_deps;
   spn_pkg_kind_t kind;
-  struct {
-    sp_om(spn_toolchain_info_t) manifest;
-    sp_om(spn_toolchain_req_t) index;
-  } toolchains;
+  sp_om(spn_toolchain_entry_t) toolchains;
 
   sp_mem_arena_t* arena;
 

@@ -4,18 +4,17 @@
 
 #include "event/event.h"
 #include "index/cache.h"
+#include "pkg/id.h"
 #include "resolve/resolve.h"
 #include "semver/convert.h"
 #include "session/session.h"
 #include "task/task.h"
+#include "toolchain/types.h"
 
 spn_task_result_t spn_task_resolve(spn_app_t* app) {
-  // @spader
-  // This initialization is part of the mess of how we decide whether we're
-  // doing simple synchronous work or asynchronous work. The RESOLVE task is
-  // the first one where we know we need to initialize everything.
   spn_session_t* session = &app->session;
-  spn_session_init(session, &app->package, app->config.profile, sp_str_lit("build"));
+  session->profile = app->config.profile;
+  session->paths.profile = sp_fs_join_path(session->paths.build, session->profile->name);
   spn_session_set_filter(session, app->config.filter);
 
   spn_index_cache_t index = SP_ZERO_INITIALIZE();
@@ -25,7 +24,30 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_resolver_init(resolver, &index, &app->package, spn.events);
   app->resolver = resolver;
 
-  spn_init_pkg_unit_for_session(session, &session->units.root, &app->package, SPN_PACKAGE_KIND_ROOT, app->package.version);
+  sp_ht_for_kv(app->package.deps, it) {
+    spn_resolver_add(resolver, *it.val);
+  }
+
+  if (!app->config.toolchain) {
+    sp_str_ht_for_kv(session->toolchains, it) {
+      app->config.toolchain = it.val;
+      break;
+    }
+  }
+  sp_assert(app->config.toolchain);
+
+  spn_toolchain_entry_t toolchain = *app->config.toolchain;
+  if (toolchain.kind == SPN_TOOLCHAIN_INDEX) {
+    spn_resolver_add(resolver, (spn_pkg_req_t) {
+      .id = spn_qualified_name_to_pkg_id(toolchain.request.package),
+      .visibility = SPN_VISIBILITY_BUILD,
+      .kind = SPN_PACKAGE_KIND_INDEX,
+      .range = toolchain.request.range,
+    });
+
+  }
+
+  spn_init_pkg_unit_for_session(session, &session->units.root, &app->package, SPN_PACKAGE_KIND_ROOT);
 
   spn_pkg_unit_t* root = spn_session_find_root(session);
 

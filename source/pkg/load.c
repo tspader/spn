@@ -576,7 +576,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
 
   spn_pkg_init(pkg, name);
   pkg->namespace = package_namespace;
-  pkg->qualified = spn_pkg_id_to_qualified_name((spn_pkg_id_t) { .name = pkg->name, .namespace = pkg->namespace });
+  pkg->qualified = spn_pkg_canonicalize_pair(pkg->namespace, pkg->name);
   pkg->toolchain = spn_pkg_canonicalize_name(toolchain);
   spn_pkg_set_url_ex(pkg, url);
   spn_pkg_set_author_ex(pkg, author);
@@ -637,10 +637,6 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     sp_str_t driver = sp_zero_initialize();
     sp_str_t abi = sp_zero_initialize();
 
-    spn_toolchain_req_t request = sp_zero_initialize();
-    sp_str_t package = sp_str_lit("*");
-    sp_str_t version = sp_str_lit("*");
-
     spn_try_as_union(get_str_optional(it, "name", &toolchain.name));
     spn_try_as_union(get_str_optional(it, "url", &toolchain.url));
     sp_str_t compiler_str = sp_zero_initialize();
@@ -659,21 +655,38 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     toolchain.abi = spn_abi_from_str(abi);
     toolchain.driver = spn_cc_driver_from_str(driver);
 
-    spn_try_as_union(get_str_optional(it, "package", &package));
-    spn_try_as_union(get_str_optional(it, "version", &version));
-    request.package = spn_pkg_canonicalize_name(package);
-    request.range = spn_semver_parse_range(version);
-
     if (!sp_str_empty(toolchain.name)) {
       if (sp_str_empty(toolchain.compiler.program))  return spn_result(SPN_ERROR);
       if (sp_str_empty(toolchain.linker.program))    return spn_result(SPN_ERROR);
       if (sp_str_empty(toolchain.archiver.program))  return spn_result(SPN_ERROR);
       if (toolchain.driver == SPN_CC_DRIVER_NONE) return spn_result(SPN_ERROR);
-      spn_try_as_union(spn_pkg_add_toolchain(pkg, toolchain));
+      spn_try_as_union(spn_pkg_add_toolchain(pkg, (spn_toolchain_entry_t) {
+        .name = toolchain.name,
+        .kind = SPN_TOOLCHAIN_INLINE,
+        .info = toolchain,
+      }));
     }
     else {
-      if (sp_str_empty(request.package)) return spn_result(SPN_ERROR);
-      spn_pkg_add_toolchain_req(pkg, request);
+      sp_str_t package = sp_str_lit("*");
+      sp_str_t version = sp_str_lit("*");
+
+      spn_try_as_union(get_str_optional(it, "package", &package));
+      spn_try_as_union(get_str_optional(it, "version", &version));
+      if (sp_str_empty(package)) return spn_result(SPN_ERROR);
+
+      // Name and package are intentionally separate. If you write "foo", that
+      // resolves to "core/foo" as a package, but you don't want to have to type
+      // --toolchain "core/foo".
+      //
+      // In other words, .name is what the user named it
+      spn_pkg_add_toolchain(pkg, (spn_toolchain_entry_t) {
+        .name = package,
+        .kind = SPN_TOOLCHAIN_INDEX,
+        .request = {
+          .package = spn_pkg_canonicalize_name(package),
+          .range = spn_semver_parse_range(version)
+        },
+      });
     }
   }
 

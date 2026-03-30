@@ -3,8 +3,14 @@
 
 #include "sp.h"
 
-#define spn_try(expr) sp_try(expr)
-#define spn_try_as(expr, err) sp_try_as(expr, err)
+#define spn_try(expr) do { \
+  s32 _sp_result = (expr); \
+  if (_sp_result) return _sp_result; \
+} while (0)
+
+#define spn_try_as(expr, err) do { \
+  if (expr) return err; \
+} while (0)
 
 #define spn_try_map(_expr, _err, _error_expr) do { \
   spn_err_t _err = (_expr); \

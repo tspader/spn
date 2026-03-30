@@ -44,16 +44,19 @@ typedef struct {
 } spn_bg_ctx_t;
 
 struct spn_session_t {
-  spn_pkg_t *pkg;
-  spn_profile_t *profile;
+  spn_pkg_t* pkg;
+  spn_profile_t* profile;
   spn_toolchain_t toolchain;
   spn_target_filter_t filter;
   sp_env_t env;
+
+  sp_str_ht(spn_toolchain_entry_t) toolchains;
 
   struct {
     sp_om(spn_target_unit_t) targets;
     sp_om(spn_pkg_unit_t) packages;
     spn_pkg_unit_t root;
+    spn_toolchain_unit_t* toolchain;
   } units;
 
   struct {

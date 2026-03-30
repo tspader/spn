@@ -38,7 +38,6 @@ spn_target_t*    spn_pkg_add_test(spn_pkg_t* pkg, const c8* name);
 spn_target_t*    spn_pkg_add_test_ex(spn_pkg_t* pkg, sp_str_t name);
 spn_target_t*    spn_pkg_add_lib(spn_pkg_t* pkg, const c8* name, spn_linkage_t kind);
 spn_target_t*    spn_pkg_add_lib_ex(spn_pkg_t* pkg, sp_str_t name, spn_linkage_t kind);
-spn_err_t        spn_pkg_add_toolchain_req(spn_pkg_t* pkg, spn_toolchain_req_t req);
-spn_err_t        spn_pkg_add_toolchain(spn_pkg_t* pkg, spn_toolchain_info_t info);
+spn_err_t        spn_pkg_add_toolchain(spn_pkg_t* pkg, spn_toolchain_entry_t entry);
 
 #endif

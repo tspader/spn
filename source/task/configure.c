@@ -1,14 +1,14 @@
-#include "app/app.h"
-#include "ctx/ctx.h"
+#include "app/types.h"
+#include "ctx/types.h"
+#include "graph/types.h"
+#include "target/types.h"
+
 #include "event/event.h"
 #include "graph/graph.h"
 #include "intern.h"
 #include "sp/glob.h"
-#include "target/types.h"
-#include "log/log.h"
 #include "session/session.h"
 #include "task.h"
-#include "toolchain/toolchain.h"
 #include "unit/package.h"
 
 static bool spn_configure_has_source(sp_da(sp_str_t) source, sp_str_t path) {
@@ -85,32 +85,18 @@ static sp_da(sp_str_t) spn_configure_collect_source(spn_pkg_unit_t* pkg, spn_tar
 
 s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
   spn_session_t* session = (spn_session_t*)user_data;
-  spn_toolchain_t* tc = &session->toolchain;
-  spn_toolchain_info_t* info = tc->info;
+  spn_toolchain_unit_t* unit = session->units.toolchain;
 
-  if (sp_str_empty(info->url)) {
-    return SPN_OK;
-  }
-
-  sp_str_t store = tc->root;
-
-  tc->compiler = spn_toolchain_launcher_with_root(info->compiler, store);
-  tc->linker = spn_toolchain_launcher_with_root(info->linker, store);
-  tc->archiver = spn_toolchain_launcher_with_root(info->archiver, store);
-
-  // if (sp_fs_exists(store)) return 0;
-
-  sp_fs_create_dir(store);
-
-  sp_str_t tarball = sp_fs_join_path(store, sp_str_lit("toolchain.tar.xz"));
+  sp_str_t path = sp_fs_join_path(unit->paths.work, sp_fs_get_name(unit->url));
 
   sp_str_t curl = sp_env_get(&session->env, sp_str_lit("SPN_CURL"));
+  if (sp_str_empty(curl)) curl = sp_str_lit("curl");
   sp_ps_output_t dl = sp_ps_run((sp_ps_config_t) {
     .command = curl,
     .args = {
       sp_str_lit("-fSL"),
-      sp_str_lit("-o"), tarball,
-      info->url
+      sp_str_lit("-o"), path,
+      unit->url
     }
   });
   if (dl.status.exit_code) return SPN_ERROR;
@@ -118,15 +104,14 @@ s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
   sp_ps_output_t extract = sp_ps_run((sp_ps_config_t) {
     .command = sp_str_lit("tar"),
     .args = {
-      sp_str_lit("xf"), tarball,
+      sp_str_lit("xf"), path,
       sp_str_lit("--strip-components=1"),
-      sp_str_lit("-C"), store,
+      sp_str_lit("-C"), unit->paths.store,
     }
   });
   if (extract.status.exit_code) return SPN_ERROR;
 
-
-  sp_fs_create_file(tc->stamp);
+  sp_fs_create_file(unit->paths.stamp);
 
   return SPN_OK;
 }
@@ -198,78 +183,58 @@ spn_task_result_t spn_task_update_configure_graph(spn_app_t* app) {
   return SPN_TASK_CONTINUE;
 }
 
-spn_err_t init_configure_graph(spn_app_t* app) {
-  spn_session_t* b = &app->session;
-  spn_build_graph_t* graph = &b->configure.graph;
-  spn_pkg_unit_t* root = spn_session_find_root(&app->session);
-
-  // If the toolchain needs downloading, add a node that everything depends on
-  spn_bg_id_t toolchain_stamp = {0};
-  bool has_toolchain_download = !sp_str_empty(b->toolchain.stamp);
-  if (has_toolchain_download) {
-    spn_bg_id_t toolchain_run = spn_bg_add_fn_ex(
-      graph, download_toolchain, b,
-      SPN_BG_VIZ_DEFAULT, app->package.name, sp_str_lit("toolchain")
-    );
-    toolchain_stamp = spn_bg_add_file(graph, b->toolchain.stamp);
-    sp_try(spn_bg_cmd_add_output(graph, toolchain_run, toolchain_stamp));
-  }
-
-  root->nodes.configure.run = spn_bg_add_fn_ex(graph, configure_package, root, SPN_BG_VIZ_DEFAULT, app->package.name, sp_str_lit("configure"));
-  root->nodes.configure.stamp = spn_bg_add_file(graph, root->paths.stamp.package);
-  sp_try(spn_bg_cmd_add_output(graph, root->nodes.configure.run, root->nodes.configure.stamp));
-  if (has_toolchain_download) {
-    sp_try(spn_bg_cmd_add_input(graph, root->nodes.configure.run, toolchain_stamp));
-  }
-
-  sp_om_for(b->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(b->units.packages, it);
-    unit->nodes.configure.run = spn_bg_add_fn_ex(graph, configure_package, unit, SPN_BG_VIZ_DEFAULT, app->package.name, sp_str_lit("configure"));
-    unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
-    sp_try(spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp));
-    sp_try(spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp));
-    if (has_toolchain_download) {
-      sp_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, toolchain_stamp));
-    }
-  }
-
-  sp_om_for(b->units.packages, it) {
-    spn_pkg_unit_t* dep = sp_om_at(b->units.packages, it);
-    spn_pkg_t* pkg = dep->ctx.pkg;
-
-    sp_ht_for(pkg->deps, dit) {
-      sp_str_t parent_name = *sp_ht_it_getkp(pkg->deps, dit);
-      spn_pkg_unit_t* parent = sp_om_get(b->units.packages, parent_name);
-      if (!parent) continue;
-
-      sp_try(spn_bg_cmd_add_input(graph, dep->nodes.configure.run, parent->nodes.configure.stamp));
-    }
-  }
-
-  return SPN_OK;
-}
+#define try(expr) spn_try_as((expr), SPN_TASK_ERROR)
 
 spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   spn_session_t* b = &app->session;
   spn_build_graph_t* graph = &b->configure.graph;
+  spn_session_t* session = &app->session;
+  spn_pkg_unit_t* root = spn_session_find_root(&app->session);
+  spn_toolchain_unit_t* toolchain = session->units.toolchain;
 
   graph->error.some = SP_OPT_NONE;
-  if (init_configure_graph(app)) {
-    switch (graph->error.some) {
-      case SP_OPT_SOME: {
-        spn_log_error("{}", SP_FMT_STR(spn_bg_err_to_str(graph, graph->error.value)));
-        break;
-      }
-      case SP_OPT_NONE: {
-        spn_log_error("failed to prepare configure graph");
-        break;
-      }
-    }
 
-    return SPN_TASK_ERROR;
+  root->nodes.configure.run = spn_bg_add_fn(graph, configure_package, root);
+  root->nodes.configure.stamp = spn_bg_add_file(graph, root->paths.stamp.package);
+  try(spn_bg_cmd_add_output(graph, root->nodes.configure.run, root->nodes.configure.stamp));
+
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+
+    unit->nodes.configure.run = spn_bg_add_fn(graph, configure_package, unit);
+    unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
+    try(spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp));
+    try(spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp));
   }
 
-  b->configure.dirty = spn_bg_compute_forced_dirty(graph);
+  if (toolchain) {
+    toolchain->nodes.download = spn_bg_add_fn(graph, download_toolchain, session);
+    toolchain->nodes.stamp = spn_bg_add_file(graph, toolchain->paths.stamp);
+    try(spn_bg_cmd_add_output(graph, toolchain->nodes.download, toolchain->nodes.stamp));
+
+    try(spn_bg_cmd_add_input(graph, root->nodes.configure.run, toolchain->nodes.stamp));
+
+    sp_om_for(session->units.packages, it) {
+      spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+      try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, toolchain->nodes.stamp));
+    }
+  }
+
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    spn_pkg_t* pkg = unit->ctx.pkg;
+
+    sp_ht_for(pkg->deps, dit) {
+      sp_str_t parent_name = *sp_ht_it_getkp(pkg->deps, dit);
+      spn_pkg_unit_t* parent = sp_om_get(session->units.packages, parent_name);
+      if (!parent) continue;
+
+      try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, parent->nodes.configure.stamp));
+    }
+  }
+
+  b->configure.dirty = spn_bg_compute_dirty(graph);
+  //b->configure.dirty = spn_bg_compute_forced_dirty(graph);
   b->configure.executor = spn_bg_executor_new(
     graph,
     b->configure.dirty,

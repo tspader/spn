@@ -31,6 +31,9 @@
 // SPN
 #include "spn.h"
 
+#include "toolchain/types.h"
+#include "unit/types.h"
+
 #include "app/app.h"
 #include "cli/cli.h"
 #include "ctx/types.h"
@@ -50,6 +53,7 @@
 #include "session/session.h"
 #include "spn.embed.h"
 #include "sp/io.h"
+#include "sp/macro.h"
 #include "sp/os.h"
 #include "task/task.h"
 #include "tui/tui.h"
@@ -320,13 +324,26 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     sp_opt_set(app.lock, spn_lock_file_load(app.paths.lock, spn.events));
   }
 
-  if (sp_str_empty(app.package.toolchain)) {
-    app.package.toolchain = sp_str_lit("core/zig");
-    spn_pkg_add_toolchain_req(&app.package, (spn_toolchain_req_t) {
+  spn_session_t* session = &app.session;
+  session->pkg = &app.package;
+  session->paths.root = app.package.paths.root;
+  session->paths.build = sp_fs_join_path(session->paths.root, sp_str_lit("build"));
+  session->env = sp_env_capture();
+  sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
+
+  sp_om_for(app.package.toolchains, it) {
+    spn_toolchain_entry_t entry = *sp_om_at(app.package.toolchains, it);
+    sp_str_ht_insert(session->toolchains, entry.name, entry);
+  }
+  spn_toolchain_entry_t toolchain = (spn_toolchain_entry_t) {
+    .name = strl("system"),
+    .kind = SPN_TOOLCHAIN_INDEX,
+    .request = {
       .package = sp_str_lit("core/zig"),
       .range = spn_semver_any()
-    });
-  }
+    },
+  };
+  sp_str_ht_insert(session->toolchains, toolchain.name, toolchain);
 
   if (sp_om_empty(app.package.profiles)) {
     spn_profile_t profiles[] = {

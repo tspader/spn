@@ -1,6 +1,8 @@
 #include "cli/cli.h"
 
+#include "app/types.h"
 #include "ctx/types.h"
+#include "toolchain/types.h"
 #include "tui/table.h"
 #include "log/log.h"
 #include "pkg/pkg.h"
@@ -272,6 +274,23 @@ sp_app_result_t spn_cli_set_profile(spn_app_t* app, sp_str_t name) {
   return SP_APP_CONTINUE;
 }
 
+spn_err_t spn_cli_set_toolchain(spn_app_t* app, sp_str_t toolchain) {
+  if (sp_str_empty(toolchain)) {
+    return SPN_OK;
+  }
+
+  if (!sp_str_ht_exists(app->session.toolchains, toolchain)) {
+    spn_log_error("{:fg brightcyan} toolchain isn't defined in {:fg brightcyan}",
+      SP_FMT_STR(toolchain),
+      SP_FMT_STR(app->package.paths.manifest)
+    );
+    return SPN_ERROR;
+  }
+
+  app->config.toolchain = sp_str_ht_get(app->session.toolchains, toolchain);
+  return SPN_OK;
+}
+
 sp_app_result_t spn_cli_root(spn_cli_t* cli) {
   sp_str_t help = spn_cli_usage(&cli->usage);
   sp_log(help);
@@ -426,6 +445,15 @@ static spn_cli_usage_t commands[] = {
           .placeholder = "TARGET",
           .ptr = &spn.cli.build.target
         },
+        {
+          .brief = "c",
+          .name = "toolchain",
+          .kind = SPN_CLI_OPT_KIND_STRING,
+          .summary = "Toolchain to use",
+          .placeholder = "TOOLCHAIN",
+          .ptr = &spn.cli.build.toolchain
+        },
+
         {
           .name = "tests",
           .kind = SPN_CLI_OPT_KIND_BOOLEAN,

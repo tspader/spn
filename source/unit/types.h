@@ -201,6 +201,21 @@ struct spn_pkg_unit_t {
   spn_build_fn_t on_package;
 };
 
+typedef struct {
+  struct {
+    spn_bg_id_t download;
+    spn_bg_id_t stamp;
+  } nodes;
+
+  struct {
+    sp_str_t work;
+    sp_str_t store;
+    sp_str_t stamp;
+  } paths;
+
+  sp_str_t url;
+} spn_toolchain_unit_t;
+
 static inline spn_user_node_t* spn_find_user_node(spn_node_t* node) {
   SP_ASSERT(node->index < sp_da_size(node->ctx->nodes.all));
   return &node->ctx->nodes.all[node->index];

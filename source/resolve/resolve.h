@@ -6,6 +6,7 @@
 #include "resolve/types.h"
 
 void spn_resolver_init(spn_resolver_t* r, spn_index_cache_t* index, spn_pkg_t* pkg, spn_event_buffer_t* events);
+void spn_resolver_add(spn_resolver_t* r, spn_pkg_req_t req);
 spn_err_t spn_resolve_from_solver(spn_resolver_t* resolver);
 spn_err_t spn_resolve_from_lock_file(spn_resolver_t* resolver, spn_lock_file_t* lock);
 

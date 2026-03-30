@@ -44,6 +44,15 @@ typedef struct spn_toolchain_info {
   bool export;
 } spn_toolchain_info_t;
 
+typedef struct spn_toolchain_entry {
+  sp_str_t name;
+  spn_toolchain_kind_t kind;
+  union {
+    spn_toolchain_info_t info;
+    spn_toolchain_req_t request;
+  };
+} spn_toolchain_entry_t;
+
 typedef struct spn_toolchain {
   spn_toolchain_info_t* info;
   sp_str_t root;
