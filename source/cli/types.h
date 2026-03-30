@@ -76,7 +76,6 @@ typedef struct {
   bool force;
   bool tests;
   sp_str_t target;
-  sp_str_t toolchain;
   sp_str_t profile;
 } spn_cli_build_t;
 

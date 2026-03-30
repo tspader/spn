@@ -271,6 +271,7 @@ sp_app_result_t spn_cli_set_profile(spn_app_t* app, sp_str_t name) {
   }
 
   app->config.profile = spn_pkg_get_profile_or_default(&app->package, name);
+  spn_cli_set_toolchain(app, app->config.profile->toolchain);
   return SP_APP_CONTINUE;
 }
 
@@ -444,14 +445,6 @@ static spn_cli_usage_t commands[] = {
           .summary = "Target to build",
           .placeholder = "TARGET",
           .ptr = &spn.cli.build.target
-        },
-        {
-          .brief = "c",
-          .name = "toolchain",
-          .kind = SPN_CLI_OPT_KIND_STRING,
-          .summary = "Toolchain to use",
-          .placeholder = "TOOLCHAIN",
-          .ptr = &spn.cli.build.toolchain
         },
 
         {

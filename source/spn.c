@@ -331,12 +331,13 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   session->env = sp_env_capture();
   sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
 
+  // Build the list of available toolchains
   sp_om_for(app.package.toolchains, it) {
     spn_toolchain_entry_t entry = *sp_om_at(app.package.toolchains, it);
     sp_str_ht_insert(session->toolchains, entry.name, entry);
   }
   spn_toolchain_entry_t toolchain = (spn_toolchain_entry_t) {
-    .name = strl("system"),
+    .name = strl("builtin"),
     .kind = SPN_TOOLCHAIN_INDEX,
     .request = {
       .package = sp_str_lit("core/zig"),
@@ -345,6 +346,13 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   };
   sp_str_ht_insert(session->toolchains, toolchain.name, toolchain);
 
+  sp_str_ht_for_kv(session->toolchains, it) {
+    app.config.toolchain = it.val;
+    break;
+  }
+  sp_assert(app.config.toolchain);
+
+  // @spader These need to be done like toolchains
   if (sp_om_empty(app.package.profiles)) {
     spn_profile_t profiles[] = {
       {

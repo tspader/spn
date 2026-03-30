@@ -14,12 +14,25 @@ toml = "1.2.1"
 utest = "1.0.0"
 
 [[toolchain]]
-package = "zig"
-version = "0.15.2"
-export = true
+name = "gcc"
+compiler = "gcc"
+linker = "ld"
+archiver = "ar"
+driver = "gcc"
+abi = "gnu"
+
+# [[toolchain]]
+# package = "zig"
+# version = "0.15.2"
 
 [[profile]]
 name = "debug"
+mode = "debug"
+cc = "clang"
+
+[[profile]]
+name = "cum"
+toolchain = "gcc"
 mode = "debug"
 cc = "clang"
 

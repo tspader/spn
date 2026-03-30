@@ -28,14 +28,6 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
     spn_resolver_add(resolver, *it.val);
   }
 
-  if (!app->config.toolchain) {
-    sp_str_ht_for_kv(session->toolchains, it) {
-      app->config.toolchain = it.val;
-      break;
-    }
-  }
-  sp_assert(app->config.toolchain);
-
   spn_toolchain_entry_t toolchain = *app->config.toolchain;
   if (toolchain.kind == SPN_TOOLCHAIN_INDEX) {
     spn_resolver_add(resolver, (spn_pkg_req_t) {

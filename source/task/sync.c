@@ -13,6 +13,7 @@
 #include "pkg/types.h"
 #include "resolve/types.h"
 #include "session/session.h"
+#include "spn.h"
 #include "task/task.h"
 #include "toolchain/types.h"
 #include <unistd.h>
@@ -145,18 +146,6 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
 
   // Resolve the toolchain — set session->toolchain.info before adding units,
   // because build hashes for index packages depend on it.
-  session->toolchain = (spn_toolchain_t) {
-    .info = sp_alloc_type(spn_toolchain_info_t),
-    .compiler = { .program = sp_str_lit("gcc") },
-    .linker = { .program = sp_str_lit("ld") },
-    .archiver = { .program = sp_str_lit("ar") },
-  };
-  session->toolchain.info->compiler = (spn_toolchain_launcher_t) { .program = sp_str_lit("gcc") };
-  session->toolchain.info->linker = (spn_toolchain_launcher_t) { .program = sp_str_lit("ld") };
-  session->toolchain.info->archiver = (spn_toolchain_launcher_t) { .program = sp_str_lit("ar") };
-  session->toolchain.info->driver = SPN_CC_DRIVER_GCC;
-  session->toolchain.info->abi = SPN_ABI_GNU;
-
   spn_toolchain_entry_t* entry = app->config.toolchain;
   if (app->config.toolchain->kind == SPN_TOOLCHAIN_INDEX) {
     spn_toolchain_req_t* request = &app->config.toolchain->request;
@@ -182,17 +171,27 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     };
 
     if (!sp_str_empty(info->url)) {
-      session->units.toolchain = sp_alloc_type(spn_toolchain_unit_t);
-      session->units.toolchain->url = info->url;
-      session->units.toolchain->paths.store = store;
-      session->units.toolchain->paths.work = work;
-      session->units.toolchain->paths.stamp = sp_fs_join_path(work, sp_str_lit("download.stamp"));
+      spn_toolchain_unit_t* unit = sp_alloc_type(spn_toolchain_unit_t);
+      unit->session = session;
+      unit->pkg = pkg;
+      unit->url = info->url;
+      unit->paths.store = store;
+      unit->paths.work = work;
+      unit->paths.stamp = sp_fs_join_path(work, sp_str_lit("download.stamp"));
+      unit->paths.logs.build = sp_fs_join_path(work, sp_str_lit("build.log"));
+      unit->paths.logs.jsonl = sp_fs_join_path(work, sp_str_lit("build.jsonl"));
+
       sp_fs_create_dir(store);
       sp_fs_create_dir(work);
+
+      unit->logs.build = sp_io_writer_from_file(unit->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
+      unit->logs.jsonl = sp_io_writer_from_file(unit->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
+
+      session->units.toolchain = unit;
     }
   }
   else if (entry->kind == SPN_TOOLCHAIN_INLINE) {
-    *session->toolchain.info = entry->info;
+    session->toolchain.info = &entry->info;
     session->toolchain.compiler = session->toolchain.info->compiler;
     session->toolchain.linker = session->toolchain.info->linker;
     session->toolchain.archiver = session->toolchain.info->archiver;
@@ -219,14 +218,6 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
         .time = checkout.elapsed,
       }
     });
-  }
-
-  // Now that units exist, resolve the toolchain's store path from its build context
-  if (!sp_str_empty(session->pkg->toolchain) && !sp_str_empty(session->toolchain.info->url)) {
-    spn_pkg_unit_t* tc_unit = sp_om_get(session->units.packages, session->pkg->toolchain);
-    sp_assert(tc_unit);
-    session->toolchain.root = tc_unit->ctx.paths.store;
-    session->toolchain.stamp = sp_fs_join_path(tc_unit->ctx.paths.store, sp_str_lit(".toolchain.stamp"));
   }
 
   // Load file dependencies directly from their manifests

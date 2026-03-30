@@ -65,6 +65,12 @@ typedef struct {
 } spn_pkg_unit_config_t;
 
 typedef struct {
+  sp_str_t build;
+  sp_str_t test;
+  sp_str_t jsonl;
+} spn_build_log_paths_t;;
+
+typedef struct {
   sp_str_t source;
   sp_str_t work;
   sp_str_t generated;
@@ -74,11 +80,7 @@ typedef struct {
   sp_str_t lib;
   sp_str_t bin;
   sp_str_t vendor;
-  struct {
-    sp_str_t build;
-    sp_str_t test;
-    sp_str_t jsonl;
-  } logs;
+  spn_build_log_paths_t logs;
 } spn_build_paths_t;
 
 typedef struct {
@@ -202,6 +204,11 @@ struct spn_pkg_unit_t {
 };
 
 typedef struct {
+  spn_session_t* session;
+  spn_pkg_t* pkg;
+  sp_str_t url;
+  spn_build_io_t logs;
+
   struct {
     spn_bg_id_t download;
     spn_bg_id_t stamp;
@@ -211,9 +218,8 @@ typedef struct {
     sp_str_t work;
     sp_str_t store;
     sp_str_t stamp;
+    spn_build_log_paths_t logs;
   } paths;
-
-  sp_str_t url;
 } spn_toolchain_unit_t;
 
 static inline spn_user_node_t* spn_find_user_node(spn_node_t* node) {

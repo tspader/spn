@@ -1,5 +1,6 @@
 #include "app/types.h"
 #include "ctx/types.h"
+#include "event/types.h"
 #include "graph/types.h"
 #include "target/types.h"
 
@@ -10,6 +11,7 @@
 #include "session/session.h"
 #include "task.h"
 #include "unit/package.h"
+#include "unit/types.h"
 
 static bool spn_configure_has_source(sp_da(sp_str_t) source, sp_str_t path) {
   sp_da_for(source, it) {
@@ -84,8 +86,12 @@ static sp_da(sp_str_t) spn_configure_collect_source(spn_pkg_unit_t* pkg, spn_tar
 }
 
 s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_session_t* session = (spn_session_t*)user_data;
-  spn_toolchain_unit_t* unit = session->units.toolchain;
+  spn_toolchain_unit_t* unit = (spn_toolchain_unit_t*)user_data;
+  spn_session_t* session = unit->session;
+
+  spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
+    .kind = SPN_EVENT_TARGET_BUILD
+  });
 
   sp_str_t path = sp_fs_join_path(unit->paths.work, sp_fs_get_name(unit->url));
 
@@ -246,3 +252,4 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
 
   return SPN_TASK_DONE;
 }
+

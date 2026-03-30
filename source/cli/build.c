@@ -6,19 +6,16 @@
 sp_app_result_t spn_cli_build(spn_cli_t* cli) {
   spn_cli_build_t* command = &cli->build;
 
-  app.config = (spn_app_config_t) {
-    .force = command->force,
-    .filter = (spn_target_filter_t) {
-      .name = command->target,
-      .disabled = {
-        .test = sp_str_empty(command->target) && !command->tests,
-        .script = sp_str_empty(command->target),
-      }
-    },
+  app.config.force = command->force,
+  app.config.filter = (spn_target_filter_t) {
+    .name = command->target,
+    .disabled = {
+      .test = sp_str_empty(command->target) && !command->tests,
+      .script = sp_str_empty(command->target),
+    }
   };
 
   sp_try(spn_cli_set_profile(&app, command->profile));
-  sp_try_as(spn_cli_set_toolchain(&app, command->toolchain), SP_APP_ERR);
 
   spn_event_buffer_push_ex(spn.events, &app.package, SP_NULLPTR, (spn_build_event_t) {
     .kind = SPN_EVENT_CLI_ENTRY,
