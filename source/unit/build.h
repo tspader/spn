@@ -25,7 +25,6 @@ sp_str_t spn_ctx_build_store_dir(spn_build_ctx_t* build);
 sp_str_t spn_ctx_build_include_dir(spn_build_ctx_t* build);
 sp_str_t spn_ctx_build_lib_dir(spn_build_ctx_t* build);
 spn_linkage_t spn_ctx_build_linkage(spn_build_ctx_t* build);
-spn_build_mode_t spn_ctx_build_mode(spn_build_ctx_t* build);
 sp_ps_output_t spn_ctx_build_subprocess(spn_build_ctx_t* build, sp_ps_config_t cfg);
 sp_da(sp_str_t) spn_ctx_build_lib_entries(spn_build_ctx_t* build);
 

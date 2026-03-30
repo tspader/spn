@@ -8,10 +8,13 @@
 #include "target/types.h"
 #include "toolchain/types.h"
 
+spn_arch_t      spn_arch_from_str(sp_str_t str);
+spn_os_t        spn_os_from_sp_os(sp_os_kind_t os);
+spn_os_t        spn_os_from_str(sp_str_t str);
 spn_cc_driver_t spn_cc_driver_from_str(sp_str_t str);
-sp_str_t spn_cc_driver_to_str(spn_cc_driver_t driver);
-spn_abi_t spn_abi_from_str(sp_str_t str);
-sp_str_t spn_abi_to_str(spn_abi_t abi);
+sp_str_t        spn_cc_driver_to_str(spn_cc_driver_t driver);
+spn_abi_t       spn_abi_from_str(sp_str_t str);
+sp_str_t        spn_abi_to_str(spn_abi_t abi);
 
 spn_libc_kind_t spn_libc_kind_from_str(sp_str_t str);
 sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc);

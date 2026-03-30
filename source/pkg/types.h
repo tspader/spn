@@ -47,7 +47,6 @@ struct spn_pkg {
   sp_str_t url;
   sp_str_t author;
   sp_str_t maintainer;
-  sp_str_t toolchain;
   spn_semver_t version;
   sp_om(spn_target_t) libs;
   sp_om(spn_target_t) exes;

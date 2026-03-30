@@ -500,6 +500,14 @@ set(SPN_SOURCES
   source/sp/io.c
   source/target/target.c
   source/target/mutate.c
+  source/task/build/build.c
+  source/task/build/graph.c
+  source/task/build/nodes/embed.c
+  source/task/build/nodes/link.c
+  source/task/build/nodes/object.c
+  source/task/build/nodes/package.c
+  source/task/build/nodes/stamp.c
+  source/task/build/nodes/user.c
   source/task/build.c
   source/task/configure.c
   source/task/graph.c

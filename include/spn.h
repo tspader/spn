@@ -20,6 +20,24 @@
 #endif
 
 typedef enum {
+  SPN_ABI_NONE,
+  SPN_ABI_GNU,
+  SPN_ABI_MUSL,
+  SPN_ABI_MSVC
+} spn_abi_t;
+
+typedef enum {
+  SPN_OS_WINDOWS,
+  SPN_OS_LINUX,
+  SPN_OS_MACOS,
+} spn_os_t;
+
+typedef enum {
+  SPN_ARCH_X64,
+  SPN_ARCH_ARM64,
+} spn_arch_t;
+
+typedef enum {
   SPN_DEP_BUILD_MODE_DEBUG = 0,
   SPN_DEP_BUILD_MODE_RELEASE = 1,
 } spn_build_mode_t;

@@ -12,3 +12,4 @@ build
 compile_commands.json
 /doc
 /mutagen.yml.lock
+!source/task/build

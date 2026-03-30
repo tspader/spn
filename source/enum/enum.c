@@ -1,6 +1,46 @@
 #include "enum/enum.h"
 
 #include "sp/macro.h"
+#include "spn.h"
+
+spn_arch_t spn_arch_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "x86_64")) {
+    return SPN_ARCH_X64;
+  }
+  else if (sp_str_equal_cstr(str, "arm64")) {
+    return SPN_ARCH_ARM64;
+  }
+  else {
+    #if defined(SP_AMD64)
+    return SPN_ARCH_X64;
+    #elif defined (SP_ARM64)
+    return SPN_ARCH_ARM64;
+    #endif
+  }
+}
+
+spn_os_t spn_os_from_sp_os(sp_os_kind_t os) {
+  switch (os) {
+    case SP_OS_LINUX: return SPN_OS_LINUX;
+    case SP_OS_WIN32: return SPN_OS_WINDOWS;
+    case SP_OS_MACOS: return SPN_OS_MACOS;
+  }
+}
+
+spn_os_t spn_os_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "windows")) {
+    return SPN_OS_WINDOWS;
+  }
+  else if (sp_str_equal_cstr(str, "linux")) {
+    return SPN_OS_LINUX;
+  }
+  else if (sp_str_equal_cstr(str, "macos")) {
+    return SPN_OS_MACOS;
+  }
+  else {
+    return spn_os_from_sp_os(sp_os_get_kind());
+  }
+}
 
 spn_cc_driver_t spn_cc_driver_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "gcc")) {
@@ -98,6 +138,7 @@ sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+// @spader @error
 spn_build_mode_t spn_dep_build_mode_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "release")) {
     return SPN_DEP_BUILD_MODE_RELEASE;

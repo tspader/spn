@@ -2,6 +2,7 @@
 #define SPN_TOOLCHAIN_TYPES_H
 
 #include "sp.h"
+#include "spn.h"
 #include "semver/types.h"
 
 typedef enum {
@@ -9,13 +10,6 @@ typedef enum {
   SPN_CC_DRIVER_GCC,
   SPN_CC_DRIVER_MSVC,
 } spn_cc_driver_t;
-
-typedef enum {
-  SPN_ABI_NONE,
-  SPN_ABI_GNU,
-  SPN_ABI_MUSL,
-  SPN_ABI_MSVC
-} spn_abi_t;
 
 typedef enum {
   SPN_TOOLCHAIN_INLINE,

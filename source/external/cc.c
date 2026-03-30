@@ -1,23 +1,25 @@
 #include "ctx/types.h"
 #include "profile/types.h"
-#include "target/target.h"
 
 #include "ctx/ctx.h"
 #include "gen.h"
 #include "intern.h"
 #include "enum/enum.h"
-#include "log/log.h"
 #include "toolchain/types.h"
 #include "unit/build.h"
 #include "external/cc.h"
 #include "sp/io.h"
-#include "sp/os.h"
-#include "sp/str.h"
+
+void spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_t toolchain) {
+  cc->toolchain = toolchain;
+}
 
 void spn_cc_set_profile(spn_cc_t* cc, spn_profile_t* profile) {
-  cc->standard = profile->standard;
+  cc->arch = profile->arch;
+  cc->os = profile->os;
   cc->mode = profile->mode;
   cc->linkage = profile->linkage;
+  cc->standard = profile->standard;
 }
 
 void spn_cc_set_output_dir(spn_cc_t* cc, sp_str_t dir) {
@@ -35,11 +37,6 @@ void spn_cc_add_relative_include(spn_cc_t* cc, sp_str_t dir) {
 
 void spn_cc_add_define(spn_cc_t* cc, sp_str_t var) {
   sp_da_push(cc->define, var);
-}
-
-void spn_cc_add_pkg(spn_cc_t* cc, spn_pkg_t* pkg) {
-  (void)cc;
-  (void)pkg;
 }
 
 void spn_cc_target_add_relative_source(spn_cc_target_t* target, sp_str_t file_path) {
@@ -307,3 +304,36 @@ void spn_cc_target_to_tcc(spn_cc_t* cc, spn_cc_target_t* target, spn_tcc_t* tcc)
 
   (void)result;
 }
+
+spn_cc_run_t spn_cc_target_run(spn_cc_target_t* target, sp_str_t cwd) {
+  sp_ps_config_t ps = {
+    .cwd = cwd,
+    .io = {
+      .in.mode = SP_PS_IO_MODE_NULL,
+      .err.mode = SP_PS_IO_MODE_REDIRECT,
+    }
+  };
+  spn_cc_to_ps(target->cc, &ps);
+  spn_cc_target_to_ps(target->cc, target, &ps);
+
+  spn_toolchain_t toolchain = target->cc->toolchain;
+
+  sp_tm_timer_t timer = sp_tm_start_timer();
+  sp_ps_output_t result = sp_ps_run(ps);
+  u64 elapsed = sp_tm_read_timer(&timer);
+
+  sp_str_builder_t log = SP_ZERO_INITIALIZE();
+  sp_str_builder_append(&log, toolchain.compiler.program);
+  sp_str_builder_append_c8(&log, ' ');
+  sp_da_for(ps.dyn_args, it) {
+    sp_str_builder_append(&log, ps.dyn_args[it]);
+    sp_str_builder_append_c8(&log, ' ');
+  }
+
+  return (spn_cc_run_t) {
+    .result = result,
+    .elapsed = elapsed,
+    .args = sp_str_builder_to_str(&log),
+  };
+}
+

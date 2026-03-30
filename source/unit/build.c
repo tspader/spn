@@ -201,10 +201,6 @@ sp_str_t spn_ctx_build_lib_dir(spn_build_ctx_t* build) {
   return build->paths.lib;
 }
 
-spn_linkage_t spn_ctx_build_linkage(spn_build_ctx_t* build) {
-  return build->linkage;
-}
-
 spn_build_mode_t spn_ctx_build_mode(spn_build_ctx_t* build) {
   return build->profile->mode;
 }
@@ -251,3 +247,8 @@ sp_da(sp_str_t) spn_ctx_build_lib_entries(spn_build_ctx_t* build) {
   }
   return entries;
 }
+
+spn_linkage_t spn_ctx_build_linkage(spn_build_ctx_t* build) {
+  return build->linkage;
+}
+

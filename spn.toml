@@ -14,48 +14,57 @@ toml = "1.2.1"
 utest = "1.0.0"
 
 [[toolchain]]
-name = "gcc"
-compiler = "gcc"
-linker = "ld"
-archiver = "ar"
-driver = "gcc"
-abi = "gnu"
+package = "zig"
+version = "0.15.2"
 
-# [[toolchain]]
-# package = "zig"
-# version = "0.15.2"
+[[profile]]
+name = "linux"
+toolchain = "zig"
+linkage = "static"
+standard = "c99"
+mode = "debug"
+
+[[profile]]
+name = "w64"
+toolchain = "zig"
+os = "windows"
+arch = "x86_64"
+standard = "c99"
+mode = "debug"
+
+[[preset]]
+name = "macos"
+toolchain = "clang"
+linkage = "shared"
+standard = "c99"
+mode = "debug"
+
 
 [[profile]]
 name = "debug"
 mode = "debug"
-cc = "clang"
 
 [[profile]]
 name = "cum"
 toolchain = "gcc"
 mode = "debug"
-cc = "clang"
 
 [[profile]]
 name = "release"
 mode = "release"
-cc = "clang"
 
 [[profile]]
 name = "fast"
 mode = "debug"
-cc = "tcc"
 
 [[profile]]
 name = "static"
 mode = "debug"
-cc = "musl-gcc"
 libc = "musl"
 linkage = "static"
 
 [[profile]]
 name = "macos"
-cc = "clang"
 linkage = "shared"
 libc = "gnu"
 standard = "c99"

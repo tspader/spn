@@ -12,6 +12,8 @@ typedef enum {
 struct spn_profile {
   sp_str_t name;
   sp_str_t toolchain;
+  spn_os_t os;
+  spn_arch_t arch;
   spn_linkage_t linkage;
   spn_c_standard_t standard;
   spn_build_mode_t mode;

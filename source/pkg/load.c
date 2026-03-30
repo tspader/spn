@@ -1,10 +1,7 @@
+#include "err.h"
 #include "profile/types.h"
-#include "spn.h"
-#include "toml.h"
-#include "toolchain/toolchain.h"
 
 #include "enum/enum.h"
-#include "err.h"
 #include "external/tom.h"
 #include "intern.h"
 #include "pkg/id.h"
@@ -13,6 +10,7 @@
 #include "semver/convert.h"
 #include "semver/parser.h"
 #include "target/mutate.h"
+#include "toolchain/toolchain.h"
 
 spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key) {
   toml_unparsed_t unparsed = toml_table_unparsed(toml, key);
@@ -571,13 +569,9 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   sp_str_t commit = sp_str_lit("");
   spn_try_union(toml_get_str_optional(toml.package, "commit", package_path, &commit));
 
-  sp_str_t toolchain = sp_zero_initialize();
-  spn_try_union(toml_get_str_optional(toml.package, "toolchain", package_path, &toolchain));
-
   spn_pkg_init(pkg, name);
   pkg->namespace = package_namespace;
   pkg->qualified = spn_pkg_canonicalize_pair(pkg->namespace, pkg->name);
-  pkg->toolchain = spn_pkg_canonicalize_name(toolchain);
   spn_pkg_set_url_ex(pkg, url);
   spn_pkg_set_author_ex(pkg, author);
   spn_pkg_set_maintainer_ex(pkg, maintainer);
@@ -691,30 +685,31 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   }
 
   spn_toml_arr_for(toml.profile, n) {
-    toml_table_t* it = SP_NULLPTR;
-    spn_try_union(toml_get_array_table_required(toml.profile, n, sp_str_lit("profile"), &it));
-    toml_path_t profile_path = spn_pkg_toml_path_with_index(sp_str_lit("profile"), n);
-
-    sp_str_t profile_name = SP_ZERO_INITIALIZE();
-    sp_str_t profile_cc = sp_str_lit("gcc");
-    sp_str_t profile_linkage = sp_str_lit("shared");
-    sp_str_t profile_standard = sp_str_lit("c99");
+    toml_table_t* it = toml_array_table(toml.profile, n);
+    sp_str_t name = SP_ZERO_INITIALIZE();
+    sp_str_t linkage = sp_str_lit("shared");
+    sp_str_t standard = sp_str_lit("c99");
     sp_str_t toolchain = sp_str_lit("");
-    sp_str_t profile_mode = sp_str_lit("debug");
+    sp_str_t mode = sp_str_lit("debug");
+    sp_str_t os = sp_str_lit("");
+    sp_str_t arch = sp_str_lit("");
 
-    spn_try_union(toml_get_str_required(it, "name", profile_path, &profile_name));
-    spn_try_union(toml_get_str_optional(it, "cc", profile_path, &profile_cc));
-    spn_try_union(toml_get_str_optional(it, "linkage", profile_path, &profile_linkage));
-    spn_try_union(toml_get_str_optional(it, "standard", profile_path, &profile_standard));
-    spn_try_union(toml_get_str_optional(it, "toolchain", profile_path, &toolchain));
-    spn_try_union(toml_get_str_optional(it, "mode", profile_path, &profile_mode));
+    spn_try_as_union(get_str_required(it, "name", &name));
+    spn_try_as_union(get_str_optional(it, "linkage", &linkage));
+    spn_try_as_union(get_str_optional(it, "standard", &standard));
+    spn_try_as_union(get_str_optional(it, "toolchain", &toolchain));
+    spn_try_as_union(get_str_optional(it, "mode", &mode));
+    spn_try_as_union(get_str_optional(it, "os", &os));
+    spn_try_as_union(get_str_optional(it, "arch", &arch));
 
     spn_pkg_add_profile_ex(pkg, (spn_profile_t) {
-      .name = profile_name,
-      .linkage = spn_pkg_linkage_from_str(profile_linkage),
-      .standard = spn_c_standard_from_str(profile_standard),
+      .name = name,
       .toolchain = spn_intern(toolchain),
-      .mode = spn_dep_build_mode_from_str(profile_mode),
+      .linkage = spn_pkg_linkage_from_str(linkage),
+      .standard = spn_c_standard_from_str(standard),
+      .mode = spn_dep_build_mode_from_str(mode),
+      .os = spn_os_from_str(os),
+      .arch = spn_arch_from_str(arch),
       .kind = SPN_PROFILE_USER,
     });
   }
