@@ -174,7 +174,7 @@ spn_cc_run_result_t run_cc_exec(spn_cc_t* cc, spn_cc_target_t* cc_target, sp_str
   // Build a string of the entire command line. Use the scratch arena because
   // these can legitimately get quite long!
   sp_str_builder_t log = SP_ZERO_INITIALIZE();
-  sp_str_builder_append(&log, cc->toolchain.compiler);
+  sp_str_builder_append(&log, cc->toolchain.compiler.program);
   sp_str_builder_append_c8(&log, ' ');
   sp_da_for(ps.dyn_args, it) {
     sp_str_builder_append(&log, ps.dyn_args[it]);
@@ -204,7 +204,7 @@ spn_err_t run_cc(spn_cc_t* cc, spn_cc_target_t* cc_target, sp_str_t cwd, spn_pkg
     .target.build = {
       .source_file = source,
       .object_file = object,
-      .compiler = cc->toolchain.compiler,
+      .compiler = cc->toolchain.compiler.program,
       .args = run.args,
     }
   });
@@ -469,7 +469,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
         spn_cc_target_add_absolute_source(cc_target, get_embed_object_path(unit));
       }
 
-      sp_str_t linker = spn_toolchain_get_linker_driver(cc->toolchain.info);
+      sp_str_t linker = spn_toolchain_get_linker_driver(cc->toolchain.info).program;
       spn_cc_run_result_t run = run_cc_exec(cc, cc_target, unit->paths.work);
 
       spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {

@@ -214,7 +214,10 @@ spn_err_t spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_st
 }
 
 void spn_cc_to_ps(spn_cc_t* cc, sp_ps_config_t* ps) {
-  ps->command = cc->toolchain.compiler;
+  ps->command = cc->toolchain.compiler.program;
+  sp_da_for(cc->toolchain.compiler.args, ai) {
+    sp_ps_config_add_arg(ps, cc->toolchain.compiler.args[ai]);
+  }
 
   sp_da_for(cc->include, it) {
     sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->include[it], SPN_GEN_INCLUDE, cc->toolchain.info->driver));
@@ -258,14 +261,16 @@ void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* 
   sp_da_for(target->define, it) {
     sp_ps_config_add_arg(ps, spn_gen_format_entry(target->define[it], SPN_GEN_DEFINE, driver));
   }
-  sp_da_for(target->lib_dirs, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->lib_dirs[it], SPN_GEN_LIB_INCLUDE, driver));
-  }
-  sp_da_for(target->libs, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->libs[it], SPN_GEN_LIBS, driver));
-  }
-  sp_da_for(target->rpath, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->rpath[it], SPN_GEN_RPATH, driver));
+  if (target->kind != SPN_TARGET_OBJECT) {
+    sp_da_for(target->lib_dirs, it) {
+      sp_ps_config_add_arg(ps, spn_gen_format_entry(target->lib_dirs[it], SPN_GEN_LIB_INCLUDE, driver));
+    }
+    sp_da_for(target->libs, it) {
+      sp_ps_config_add_arg(ps, spn_gen_format_entry(target->libs[it], SPN_GEN_LIBS, driver));
+    }
+    sp_da_for(target->rpath, it) {
+      sp_ps_config_add_arg(ps, spn_gen_format_entry(target->rpath[it], SPN_GEN_RPATH, driver));
+    }
   }
 
   sp_ps_config_add_arg(ps, sp_str_lit("-Werror=return-type"));

@@ -578,6 +578,7 @@ add_executable(resolver
   source/semver/convert.c
   source/semver/parser.c
   source/target/mutate.c
+  source/toolchain/toolchain.c
   test/core/resolver/main.c
   test/tools/harness.c
   test/tools/tmp.c
@@ -671,6 +672,7 @@ add_executable(publish
   source/sp/io.c
   source/sp/str.c
   source/target/mutate.c
+  source/toolchain/toolchain.c
   test/core/publish/main.c
   test/core/publish/publish.c
   test/tools/harness.c

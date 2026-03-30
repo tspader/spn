@@ -127,7 +127,8 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
 
   timers.git = sp_tm_start_timer();
 
-  // Load index dependencies via git cache
+  // Load index dependencies via git cache. After this, we expect every dependency to
+  // be checked out in the cache, and manifests loaded.
   spn_git_cache_t cache = SP_ZERO_INITIALIZE();
   spn_git_cache_init(&cache, spn.paths.source);
 
@@ -151,13 +152,13 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   // because build hashes for index packages depend on it.
   session->toolchain = (spn_toolchain_t) {
     .info = sp_alloc_type(spn_toolchain_info_t),
-    .compiler = sp_str_lit("gcc"),
-    .linker = sp_str_lit("ld"),
-    .archiver = sp_str_lit("ar"),
+    .compiler = { .program = sp_str_lit("gcc") },
+    .linker = { .program = sp_str_lit("ld") },
+    .archiver = { .program = sp_str_lit("ar") },
   };
-  session->toolchain.info->compiler = sp_str_lit("gcc");
-  session->toolchain.info->linker = sp_str_lit("ld");
-  session->toolchain.info->archiver = sp_str_lit("ar");
+  session->toolchain.info->compiler = (spn_toolchain_launcher_t) { .program = sp_str_lit("gcc") };
+  session->toolchain.info->linker = (spn_toolchain_launcher_t) { .program = sp_str_lit("ld") };
+  session->toolchain.info->archiver = (spn_toolchain_launcher_t) { .program = sp_str_lit("ar") };
   session->toolchain.info->driver = SPN_CC_DRIVER_GCC;
   session->toolchain.info->abi = SPN_ABI_GNU;
 

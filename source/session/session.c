@@ -62,6 +62,7 @@ void spn_session_init(spn_session_t* session, spn_pkg_t* pkg, spn_profile_t* pro
   session->paths.root = sp_str_copy(pkg->paths.root);
   session->paths.build = sp_fs_join_path(session->paths.root, dir);
   session->paths.profile = sp_fs_join_path(session->paths.build, session->profile->name);
+  session->env = sp_env_capture();
 
   sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
 }
@@ -134,9 +135,9 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
       sp_da(sp_hash_t) hashes = SP_NULLPTR;
       sp_da_push(hashes, sp_hash_str(metadata->commit));
       // sp_da_push(hashes, sp_hash_str(session->toolchain.info->name));
-      // sp_da_push(hashes, sp_hash_str(session->toolchain.info->compiler));
-      // sp_da_push(hashes, sp_hash_str(session->toolchain.info->linker));
-      // sp_da_push(hashes, sp_hash_str(session->toolchain.info->archiver));
+      // sp_da_push(hashes, sp_hash_str(session->toolchain.info->compiler.program));
+      // sp_da_push(hashes, sp_hash_str(session->toolchain.info->linker.program));
+      // sp_da_push(hashes, sp_hash_str(session->toolchain.info->archiver.program));
       // sp_da_push(hashes, sp_hash_str(session->toolchain.info->sysroot));
       // sp_da_push(hashes, session->toolchain.info->driver);
       // sp_da_push(hashes, session->toolchain.info->abi);

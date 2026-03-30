@@ -35,9 +35,9 @@ typedef struct {
 typedef struct spn_toolchain_info {
   sp_str_t name;
   sp_str_t url;
-  sp_str_t compiler;
-  sp_str_t linker;
-  sp_str_t archiver;
+  spn_toolchain_launcher_t compiler;
+  spn_toolchain_launcher_t linker;
+  spn_toolchain_launcher_t archiver;
   sp_str_t sysroot;
   spn_cc_driver_t driver;
   spn_abi_t abi;
@@ -47,9 +47,9 @@ typedef struct spn_toolchain_info {
 typedef struct spn_toolchain {
   spn_toolchain_info_t* info;
   sp_str_t root;
-  sp_str_t compiler;
-  sp_str_t linker;
-  sp_str_t archiver;
+  spn_toolchain_launcher_t compiler;
+  spn_toolchain_launcher_t linker;
+  spn_toolchain_launcher_t archiver;
   sp_str_t stamp;
 } spn_toolchain_t;
 

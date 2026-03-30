@@ -1,5 +1,6 @@
 #include "err.h"
 #include "index/types.h"
+#include "pkg/types.h"
 #include "profile/types.h"
 #include "toolchain/types.h"
 
@@ -99,7 +100,8 @@ void spn_pkg_add_version_ex(spn_pkg_t* pkg, spn_semver_t version, sp_str_t commi
   }
 
   sp_context_push_arena(pkg->arena);
-  sp_ht_insert(pkg->metadata, version, ((spn_pkg_metadata_t) { .version = version, .commit = sp_str_copy(commit) }));
+  spn_pkg_metadata_t metadata = { version, sp_str_copy(commit) };
+  sp_ht_insert(pkg->metadata, version, metadata);
   sp_da_push(pkg->versions, version);
   sp_context_pop();
 }

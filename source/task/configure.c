@@ -8,7 +8,7 @@
 #include "log/log.h"
 #include "session/session.h"
 #include "task.h"
-#include "toolchain/types.h"
+#include "toolchain/toolchain.h"
 #include "unit/package.h"
 
 static bool spn_configure_has_source(sp_da(sp_str_t) source, sp_str_t path) {
@@ -94,18 +94,19 @@ s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
 
   sp_str_t store = tc->root;
 
-  tc->compiler = sp_fs_join_path(store, info->compiler);
-  tc->linker = sp_fs_join_path(store, info->linker);
-  tc->archiver = sp_fs_join_path(store, info->archiver);
+  tc->compiler = spn_toolchain_launcher_with_root(info->compiler, store);
+  tc->linker = spn_toolchain_launcher_with_root(info->linker, store);
+  tc->archiver = spn_toolchain_launcher_with_root(info->archiver, store);
 
-  if (sp_fs_exists(store)) return 0;
+  // if (sp_fs_exists(store)) return 0;
 
   sp_fs_create_dir(store);
 
   sp_str_t tarball = sp_fs_join_path(store, sp_str_lit("toolchain.tar.xz"));
 
+  sp_str_t curl = sp_env_get(&session->env, sp_str_lit("SPN_CURL"));
   sp_ps_output_t dl = sp_ps_run((sp_ps_config_t) {
-    .command = sp_str_lit("curl"),
+    .command = curl,
     .args = {
       sp_str_lit("-fSL"),
       sp_str_lit("-o"), tarball,

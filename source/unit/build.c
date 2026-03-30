@@ -4,6 +4,7 @@
 #include "enum/enum.h"
 #include "event/event.h"
 #include "log/log.h"
+#include "toolchain/toolchain.h"
 #include "unit/build.h"
 #include "sp/io.h"
 #include "sp/tm.h"
@@ -233,7 +234,7 @@ sp_ps_output_t spn_ctx_build_subprocess(spn_build_ctx_t* ctx, sp_ps_config_t con
 
   config.env.extra[it] = (sp_env_var_t) {
     .key = sp_str_lit("CC"),
-    .value = ctx->session->toolchain.compiler
+    .value = spn_toolchain_launcher_to_str(ctx->session->toolchain.compiler)
   };
 
   sp_da_push(ctx->commands, sp_ps_config_copy(&config));

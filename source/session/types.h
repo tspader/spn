@@ -48,6 +48,7 @@ struct spn_session_t {
   spn_profile_t *profile;
   spn_toolchain_t toolchain;
   spn_target_filter_t filter;
+  sp_env_t env;
 
   struct {
     sp_om(spn_target_unit_t) targets;

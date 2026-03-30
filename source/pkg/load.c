@@ -1,7 +1,7 @@
 #include "profile/types.h"
 #include "spn.h"
 #include "toml.h"
-#include "toolchain/types.h"
+#include "toolchain/toolchain.h"
 
 #include "enum/enum.h"
 #include "err.h"
@@ -643,9 +643,15 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
 
     spn_try_as_union(get_str_optional(it, "name", &toolchain.name));
     spn_try_as_union(get_str_optional(it, "url", &toolchain.url));
-    spn_try_as_union(get_str_optional(it, "compiler", &toolchain.compiler));
-    spn_try_as_union(get_str_optional(it, "linker", &toolchain.linker));
-    spn_try_as_union(get_str_optional(it, "archiver", &toolchain.archiver));
+    sp_str_t compiler_str = sp_zero_initialize();
+    sp_str_t linker_str = sp_zero_initialize();
+    sp_str_t archiver_str = sp_zero_initialize();
+    spn_try_as_union(get_str_optional(it, "compiler", &compiler_str));
+    spn_try_as_union(get_str_optional(it, "linker", &linker_str));
+    spn_try_as_union(get_str_optional(it, "archiver", &archiver_str));
+    toolchain.compiler = spn_toolchain_launcher_from_str(compiler_str);
+    toolchain.linker = spn_toolchain_launcher_from_str(linker_str);
+    toolchain.archiver = spn_toolchain_launcher_from_str(archiver_str);
     spn_try_as_union(get_str_optional(it, "sysroot", &toolchain.sysroot));
     spn_try_as_union(get_bool_optional(it, "export", &toolchain.export));
     spn_try_as_union(get_str_optional(it, "driver", &driver));
@@ -659,9 +665,9 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     request.range = spn_semver_parse_range(version);
 
     if (!sp_str_empty(toolchain.name)) {
-      if (sp_str_empty(toolchain.compiler))       return spn_result(SPN_ERROR);
-      if (sp_str_empty(toolchain.linker))         return spn_result(SPN_ERROR);
-      if (sp_str_empty(toolchain.archiver))       return spn_result(SPN_ERROR);
+      if (sp_str_empty(toolchain.compiler.program))  return spn_result(SPN_ERROR);
+      if (sp_str_empty(toolchain.linker.program))    return spn_result(SPN_ERROR);
+      if (sp_str_empty(toolchain.archiver.program))  return spn_result(SPN_ERROR);
       if (toolchain.driver == SPN_CC_DRIVER_NONE) return spn_result(SPN_ERROR);
       spn_try_as_union(spn_pkg_add_toolchain(pkg, toolchain));
     }
