@@ -15,14 +15,16 @@ utest = "1.0.0"
 
 [[toolchain]]
 package = "zig"
-version = "0.2.0"
+version = "1.0.0"
 
-[[profile]]
-name = "linux"
-toolchain = "toolchains"
+[profile.default]
+toolchain = "zig"
 linkage = "static"
 standard = "c99"
 mode = "debug"
+
+[profile.static]
+linkage = "shared"
 
 [[bin]]
 name = "spn"

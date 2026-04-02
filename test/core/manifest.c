@@ -1,3 +1,4 @@
+#include "spn.h"
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
@@ -37,10 +38,18 @@ UTEST_F_TEARDOWN(load) {}
 // EXECUTOR //
 //////////////
 typedef struct {
+  const c8* toolchain;
+  spn_linkage_t linkage;
+  spn_c_standard_t standard;
+  spn_build_mode_t mode;
+} profile_t;
+
+typedef struct {
   const c8* name;
   const c8* url;
-  spn_triple_t hosts [16];
-  spn_triple_t targets [16];
+  spn_triple_t hosts [4];
+  spn_triple_t targets [4];
+  profile_t profiles [4];
 } toolchain_t;
 
 typedef struct {
@@ -112,7 +121,7 @@ UTEST_F(load, smoke) {
   });
 }
 
-UTEST_F(load, basic_package) {
+UTEST_F(load, toolchain) {
   run_case(utest_result, utest_fixture, (test_t) {
     .manifest = {
       "[package]",
@@ -128,26 +137,26 @@ UTEST_F(load, basic_package) {
       tkv(archiver, "ar"),
       tkv(driver, "gcc"),
       tkv(export, true),
-      ""
+      "",
       "[[toolchain.host]]",
       tkv(arch, "x86_64"),
       tkv(os, "linux"),
       tkv(abi, "gnu"),
-      ""
+      "",
       "[[toolchain.host]]",
       tkv(arch, "x86_64"),
       tkv(os, "linux"),
       tkv(abi, "musl"),
-      ""
+      "",
       "[[toolchain.target]]",
       tkv(arch, "aarch64"),
       tkv(os, "linux"),
       tkv(abi, "gnu"),
-      ""
+      "",
       "[[toolchain.target]]",
       tkv(arch, "aarch64"),
       tkv(os, "macos"),
-      ""
+      "",
       "[[toolchain.target]]",
       tkv(arch, "x86_64"),
       tkv(os, "windows"),
@@ -156,7 +165,11 @@ UTEST_F(load, basic_package) {
     .toolchains = {
       {
         .name = "x86_64-w64-mingw32-cross",
-        .url =  "https://musl.cc/x86_64-w64-mingw32-cross.tgz",
+        .url =  "https://example.com/toolchain.tar.gz",
+        .hosts = {
+          { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
+          { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
+        },
         .targets = {
           { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU },
           { SPN_ARCH_ARM64, SPN_OS_MACOS, },
@@ -166,3 +179,33 @@ UTEST_F(load, basic_package) {
     }
   });
 }
+
+UTEST_F(load, profile) {
+  run_case(utest_result, utest_fixture, (test_t) {
+    .manifest = {
+      "[package]",
+      tkv(name, "spum"),
+      tkv(version, "1.0.0"),
+      "",
+      "[profile.default]",
+      tkv(toolchain, "zig"),
+      tkv(linkage, "static"),
+      tkv(standard, "c99"),
+      tkv(mode, "debug"),
+      "",
+      "[profile.shared]",
+      tkv(linkage, "shared"),
+    },
+    .toolchains = {
+      {
+        .name = "x86_64-w64-mingw32-cross",
+        .url =  "https://example.com/toolchain.tar.gz",
+        .profiles = {
+          { "zig", SPN_LIB_KIND_STATIC, SPN_C99, SPN_DEP_BUILD_MODE_DEBUG },
+          { "zig", SPN_LIB_KIND_SHARED, SPN_C99, SPN_DEP_BUILD_MODE_DEBUG },
+        },
+      }
+    }
+  });
+}
+
