@@ -2,6 +2,7 @@
 
 #include "app/types.h"
 #include "ctx/types.h"
+#include "sp/cli.h"
 #include "toolchain/types.h"
 #include "tui/table.h"
 #include "log/log.h"
@@ -14,22 +15,26 @@ static sp_str_t spn_cli_opt_kind_to_str(spn_cli_opt_kind_t kind) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+static sp_str_t cstr(const c8* cstr) {
+  return sp_str_from_cstr(cstr ? cstr : "");
+}
+
 spn_cli_command_info_t spn_cli_command_info_from_usage(spn_cli_usage_t cmd) {
   spn_cli_command_info_t info = {
-    .name = sp_str_from_cstr(cmd.name),
-    .usage = sp_str_from_cstr(cmd.usage),
-    .summary = sp_str_from_cstr(cmd.summary),
+    .name = cstr(cmd.name),
+    .usage = cstr(cmd.usage),
+    .summary = cstr(cmd.summary),
   };
 
   sp_carr_for(cmd.opts, it) {
     if (!cmd.opts[it].name) break;
 
     spn_cli_opt_info_t opt = {
-      .brief = sp_str_from_cstr(cmd.opts[it].brief),
-      .name = sp_str_from_cstr(cmd.opts[it].name),
+      .brief = cstr(cmd.opts[it].brief),
+      .name = cstr(cmd.opts[it].name),
       .kind = cmd.opts[it].kind,
-      .summary = sp_str_from_cstr(cmd.opts[it].summary),
-      .placeholder = sp_str_from_cstr(cmd.opts[it].placeholder ? cmd.opts[it].placeholder : ""),
+      .summary = cstr(cmd.opts[it].summary),
+      .placeholder = cstr(cmd.opts[it].placeholder ? cmd.opts[it].placeholder : ""),
     };
     sp_da_push(info.opts, opt);
   }
@@ -38,9 +43,9 @@ spn_cli_command_info_t spn_cli_command_info_from_usage(spn_cli_usage_t cmd) {
     if (!cmd.args[it].name) break;
 
     spn_cli_arg_info_t arg = {
-      .name = sp_str_from_cstr(cmd.args[it].name),
+      .name = cstr(cmd.args[it].name),
       .kind = cmd.args[it].kind,
-      .summary = sp_str_from_cstr(cmd.args[it].summary),
+      .summary = cstr(cmd.args[it].summary),
     };
     sp_da_push(info.args, arg);
     sp_da_push(info.brief, arg.name);
@@ -224,7 +229,10 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cmd) {
 
     sp_dyn_array_for(info.commands, it) {
       spn_cli_command_info_t command = info.commands[it];
-      sp_str_t args = sp_str_join_n(command.brief, sp_dyn_array_size(command.brief), sp_str_lit(", "));
+      sp_str_t args = sp_str_lit("");
+      if (!sp_da_empty(command.brief)) {
+        args = sp_str_join_n(command.brief, sp_dyn_array_size(command.brief), sp_str_lit(", "));
+      }
 
       sp_tui_table_next_row(&spn.tui.table);
       sp_tui_table_fmt(&spn.tui.table, "{:fg brightcyan}", SP_FMT_STR(command.name));

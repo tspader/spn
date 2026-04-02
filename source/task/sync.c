@@ -190,7 +190,7 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
       session->units.toolchain = unit;
     }
   }
-  else if (entry->kind == SPN_TOOLCHAIN_INLINE) {
+  else if (entry->kind == SPN_TOOLCHAIN_INLINE || entry->kind == SPN_TOOLCHAIN_BUILTIN) {
     session->toolchain.info = &entry->info;
     session->toolchain.compiler = session->toolchain.info->compiler;
     session->toolchain.linker = session->toolchain.info->linker;

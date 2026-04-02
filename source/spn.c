@@ -336,15 +336,53 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     spn_toolchain_entry_t entry = *sp_om_at(app.package.toolchains, it);
     sp_str_ht_insert(session->toolchains, entry.name, entry);
   }
-  spn_toolchain_entry_t toolchain = (spn_toolchain_entry_t) {
-    .name = strl("builtin"),
-    .kind = SPN_TOOLCHAIN_INDEX,
-    .request = {
-      .package = sp_str_lit("core/zig"),
-      .range = spn_semver_any()
+  spn_toolchain_entry_t builtin_toolchains[] = {
+    {
+      .name = sp_str_lit("builtin"),
+      .kind = SPN_TOOLCHAIN_INDEX,
+      .request = {
+        .package = sp_str_lit("core/zig"),
+        .range = spn_semver_any()
+      },
+    },
+    {
+      .name = sp_str_lit("gcc"),
+      .kind = SPN_TOOLCHAIN_BUILTIN,
+      .info = {
+        .name = sp_str_lit("gcc"),
+        .compiler = { .program = sp_str_lit("gcc") },
+        .linker = { .program = sp_str_lit("gcc") },
+        .archiver = { .program = sp_str_lit("ar") },
+        .driver = SPN_CC_DRIVER_GCC,
+      },
+    },
+    {
+      .name = sp_str_lit("clang"),
+      .kind = SPN_TOOLCHAIN_BUILTIN,
+      .info = {
+        .name = sp_str_lit("clang"),
+        .compiler = { .program = sp_str_lit("clang") },
+        .linker = { .program = sp_str_lit("clang") },
+        .archiver = { .program = sp_str_lit("ar") },
+        .driver = SPN_CC_DRIVER_GCC,
+      },
+    },
+    {
+      .name = sp_str_lit("tcc"),
+      .kind = SPN_TOOLCHAIN_BUILTIN,
+      .info = {
+        .name = sp_str_lit("tcc"),
+        .compiler = { .program = sp_str_lit("tcc") },
+        .linker = { .program = sp_str_lit("tcc") },
+        .archiver = { .program = sp_str_lit("ar") },
+        .driver = SPN_CC_DRIVER_GCC,
+      },
     },
   };
-  sp_str_ht_insert(session->toolchains, toolchain.name, toolchain);
+  sp_carr_for(builtin_toolchains, it) {
+    spn_toolchain_entry_t entry = builtin_toolchains[it];
+    sp_str_ht_insert(session->toolchains, entry.name, entry);
+  }
 
   sp_str_ht_for_kv(session->toolchains, it) {
     app.config.toolchain = it.val;

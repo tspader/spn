@@ -14,6 +14,7 @@ typedef enum {
 typedef enum {
   SPN_TOOLCHAIN_INLINE,
   SPN_TOOLCHAIN_INDEX,
+  SPN_TOOLCHAIN_BUILTIN,
 } spn_toolchain_kind_t;
 
 typedef struct {
@@ -26,6 +27,9 @@ typedef struct {
   sp_da(sp_str_t) args;
 } spn_toolchain_launcher_t;
 
+#define SPN_TOOLCHAIN_MAX_HOSTS 8
+#define SPN_TOOLCHAIN_MAX_TARGETS 16
+
 typedef struct spn_toolchain_info {
   sp_str_t name;
   sp_str_t url;
@@ -34,7 +38,8 @@ typedef struct spn_toolchain_info {
   spn_toolchain_launcher_t archiver;
   sp_str_t sysroot;
   spn_cc_driver_t driver;
-  spn_abi_t abi;
+  spn_triple_t hosts [8];
+  spn_triple_t targets [16];
   bool export;
 } spn_toolchain_info_t;
 

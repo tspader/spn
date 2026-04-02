@@ -9,8 +9,11 @@
 #include "pkg/mutate.h"
 #include "semver/convert.h"
 #include "semver/parser.h"
+#include "spn.h"
 #include "target/mutate.h"
+#include "toml.h"
 #include "toolchain/toolchain.h"
+#include "toolchain/types.h"
 
 spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key) {
   toml_unparsed_t unparsed = toml_table_unparsed(toml, key);
@@ -331,6 +334,34 @@ static spn_err_t get_str_required(toml_table_t* table, const c8* key, sp_str_t* 
   sp_unreachable_return(SPN_ERROR);
 }
 
+static spn_err_t get_arr_optional(toml_table_t* table, const c8* key, toml_array_t** arr) {
+  spn_toml_value_kind_t kind = toml_kind_from_field(table, key);
+  switch (kind) {
+    case SPN_TOML_VALUE_KIND_NONE: return SPN_OK;
+    case SPN_TOML_VALUE_KIND_SCALAR:
+    case SPN_TOML_VALUE_KIND_TABLE: return SPN_ERR_TOML_TYPE;
+    case SPN_TOML_VALUE_KIND_ARRAY: {
+      *arr = toml_table_array(table, key);
+      return SPN_OK;
+    }
+  }
+  sp_unreachable_return(SPN_ERROR);
+}
+
+static spn_err_t get_arr_required(toml_table_t* table, const c8* key, toml_array_t** arr) {
+  spn_toml_value_kind_t kind = toml_kind_from_field(table, key);
+  switch (kind) {
+    case SPN_TOML_VALUE_KIND_NONE:
+    case SPN_TOML_VALUE_KIND_SCALAR:
+    case SPN_TOML_VALUE_KIND_TABLE: return SPN_ERR_TOML_TYPE;
+    case SPN_TOML_VALUE_KIND_ARRAY: {
+      *arr = toml_table_array(table, key);
+      return SPN_OK;
+    }
+  }
+  sp_unreachable_return(SPN_ERROR);
+}
+
 static spn_err_union_t toml_get_str_required(toml_table_t* table, const c8* key, toml_path_t path, sp_str_t* out) {
   spn_toml_value_kind_t kind = toml_kind_from_field(table, key);
   if (kind == SPN_TOML_VALUE_KIND_NONE) {
@@ -428,27 +459,25 @@ static spn_err_union_t spn_pkg_load_targets(
   return spn_result(SPN_OK);
 }
 
-static spn_err_union_t spn_pkg_load_deps(toml_table_t* toml, spn_pkg_t* package, spn_visibility_t visibility, sp_str_t path, sp_str_t manifest_dir) {
+static spn_err_union_t load_deps(toml_table_t* toml, spn_pkg_t* pkg, spn_visibility_t vis, sp_str_t root) {
   if (!toml) {
     return spn_result(SPN_OK);
   }
 
-  toml_path_t deps_path = spn_pkg_toml_path(path);
-
   const c8* key = SP_NULLPTR;
   spn_toml_for(toml, n, key) {
     sp_str_t version = SP_ZERO_INITIALIZE();
-    spn_try_union(toml_get_str_required(toml, key, deps_path, &version));
+    spn_try_as_union(get_str_required(toml, key, &version));
 
     sp_str_t prefix = sp_str_lit("file://");
     if (sp_str_starts_with(version, prefix)) {
-      sp_str_t dep_path = sp_str_strip_left(version, prefix);
-      if (!sp_str_starts_with(dep_path, sp_str_lit("/"))) {
-        dep_path = sp_fs_join_path(manifest_dir, dep_path);
+      sp_str_t path = sp_str_strip_left(version, prefix);
+      if (!sp_str_starts_with(path, sp_str_lit("/"))) {
+        path = sp_fs_join_path(root, path);
       }
 
-      dep_path = sp_fs_normalize_path(dep_path);
-      version = sp_format("file://{}", SP_FMT_STR(dep_path));
+      path = sp_fs_normalize_path(path);
+      version = sp_format("file://{}", SP_FMT_STR(path));
     }
 
     spn_pkg_id_t id = spn_qualified_name_to_pkg_id(spn_intern_cstr(key));
@@ -457,24 +486,45 @@ static spn_err_union_t spn_pkg_load_deps(toml_table_t* toml, spn_pkg_t* package,
     if (sp_str_starts_with(version, file_prefix)) {
       spn_pkg_req_t req = {
         .id = id,
-        .visibility = visibility,
+        .visibility = vis,
         .kind = SPN_PACKAGE_KIND_FILE,
         .file = version,
       };
-      sp_ht_insert(package->deps, qualified, req);
+      sp_ht_insert(pkg->deps, qualified, req);
     }
     else {
       spn_pkg_req_t req = {
         .id = id,
-        .visibility = visibility,
+        .visibility = vis,
         .kind = SPN_PACKAGE_KIND_INDEX,
         .range = spn_semver_parse_range(version),
       };
-      sp_ht_insert(package->deps, qualified, req);
+      sp_ht_insert(pkg->deps, qualified, req);
     }
   }
 
   return spn_result(SPN_OK);
+}
+
+static spn_err_t load_triple_array(toml_array_t* toml, spn_triple_t* triples, u32 len) {
+  spn_toml_arr_for(toml, it) {
+    toml_table_t* triple = toml_array_table(toml, it);
+
+    sp_str_t arch = sp_zero_initialize();
+    spn_try(get_str_optional(triple, "arch", &arch));
+    sp_str_t os = sp_zero_initialize();
+    spn_try(get_str_optional(triple, "os", &os));
+    sp_str_t abi = sp_zero_initialize();
+    spn_try(get_str_optional(triple, "abi", &abi));
+
+    triples[it] = (spn_triple_t) {
+      .arch = spn_arch_from_str(arch),
+      .os = spn_os_from_str(os),
+      .abi = spn_abi_from_str(abi),
+    };
+  }
+
+  return SPN_OK;
 }
 
 spn_err_union_t spn_index_load(toml_table_t* toml, sp_str_t parent, u32 index, spn_index_t* result) {
@@ -629,7 +679,6 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
 
     spn_toolchain_info_t toolchain = sp_zero_initialize();
     sp_str_t driver = sp_zero_initialize();
-    sp_str_t abi = sp_zero_initialize();
 
     spn_try_as_union(get_str_optional(it, "name", &toolchain.name));
     spn_try_as_union(get_str_optional(it, "url", &toolchain.url));
@@ -645,8 +694,6 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     spn_try_as_union(get_str_optional(it, "sysroot", &toolchain.sysroot));
     spn_try_as_union(get_bool_optional(it, "export", &toolchain.export));
     spn_try_as_union(get_str_optional(it, "driver", &driver));
-    spn_try_as_union(get_str_optional(it, "abi", &abi));
-    toolchain.abi = spn_abi_from_str(abi);
     toolchain.driver = spn_cc_driver_from_str(driver);
 
     if (!sp_str_empty(toolchain.name)) {
@@ -654,6 +701,15 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
       if (sp_str_empty(toolchain.linker.program))    return spn_result(SPN_ERROR);
       if (sp_str_empty(toolchain.archiver.program))  return spn_result(SPN_ERROR);
       if (toolchain.driver == SPN_CC_DRIVER_NONE) return spn_result(SPN_ERROR);
+
+      toml_array_t* hosts = SP_NULLPTR;
+      spn_try_as_union(get_arr_required(it, "host", &hosts));
+      spn_try_as_union(load_triple_array(hosts, toolchain.hosts, SPN_TOOLCHAIN_MAX_HOSTS));
+
+      toml_array_t* target = SP_NULLPTR;
+      spn_try_as_union(get_arr_required(it, "target", &target));
+      spn_try_as_union(load_triple_array(target, toolchain.targets, SPN_TOOLCHAIN_MAX_TARGETS));
+
       spn_try_as_union(spn_pkg_add_toolchain(pkg, (spn_toolchain_entry_t) {
         .name = toolchain.name,
         .kind = SPN_TOOLCHAIN_INLINE,
@@ -668,11 +724,6 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
       spn_try_as_union(get_str_optional(it, "version", &version));
       if (sp_str_empty(package)) return spn_result(SPN_ERROR);
 
-      // Name and package are intentionally separate. If you write "foo", that
-      // resolves to "core/foo" as a package, but you don't want to have to type
-      // --toolchain "core/foo".
-      //
-      // In other words, .name is what the user named it
       spn_pkg_add_toolchain(pkg, (spn_toolchain_entry_t) {
         .name = package,
         .kind = SPN_TOOLCHAIN_INDEX,
@@ -770,18 +821,20 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   }
 
   if (toml.deps) {
-    toml_table_t* package_deps = SP_NULLPTR;
-    toml_table_t* test_deps = SP_NULLPTR;
-    toml_table_t* build_deps = SP_NULLPTR;
+    struct {
+      toml_table_t* package;
+      toml_table_t* test;
+      toml_table_t* build;
+    } deps = SP_ZERO_INITIALIZE();
     toml_path_t deps_path = spn_pkg_toml_path(sp_str_lit("deps"));
 
-    spn_try_union(toml_get_table_optional(toml.deps, "package", deps_path, &package_deps));
-    spn_try_union(toml_get_table_optional(toml.deps, "test", deps_path, &test_deps));
-    spn_try_union(toml_get_table_optional(toml.deps, "build", deps_path, &build_deps));
+    spn_try_union(toml_get_table_optional(toml.deps, "package", deps_path, &deps.package));
+    spn_try_union(toml_get_table_optional(toml.deps, "test", deps_path, &deps.test));
+    spn_try_union(toml_get_table_optional(toml.deps, "build", deps_path, &deps.build));
 
-    spn_try_union(spn_pkg_load_deps(package_deps, pkg, SPN_VISIBILITY_PUBLIC, sp_str_lit("deps.package"), manifest_dir));
-    spn_try_union(spn_pkg_load_deps(test_deps, pkg, SPN_VISIBILITY_TEST, sp_str_lit("deps.test"), manifest_dir));
-    spn_try_union(spn_pkg_load_deps(build_deps, pkg, SPN_VISIBILITY_BUILD, sp_str_lit("deps.build"), manifest_dir));
+    spn_try_union(load_deps(deps.package, pkg, SPN_VISIBILITY_PUBLIC, manifest_dir));
+    spn_try_union(load_deps(deps.test, pkg, SPN_VISIBILITY_TEST, manifest_dir));
+    spn_try_union(load_deps(deps.build, pkg, SPN_VISIBILITY_BUILD, manifest_dir));
   }
 
   if (toml.options) {

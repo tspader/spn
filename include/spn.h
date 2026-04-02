@@ -23,19 +23,28 @@ typedef enum {
   SPN_ABI_NONE,
   SPN_ABI_GNU,
   SPN_ABI_MUSL,
-  SPN_ABI_MSVC
+  SPN_ABI_MINGW,
+  SPN_ABI_MSVC,
 } spn_abi_t;
 
 typedef enum {
+  SPN_OS_NONE,
   SPN_OS_WINDOWS,
   SPN_OS_LINUX,
   SPN_OS_MACOS,
 } spn_os_t;
 
 typedef enum {
+  SPN_ARCH_NONE,
   SPN_ARCH_X64,
   SPN_ARCH_ARM64,
 } spn_arch_t;
+
+typedef struct {
+  spn_arch_t arch;
+  spn_os_t os;
+  spn_abi_t abi;
+} spn_triple_t;
 
 typedef enum {
   SPN_DEP_BUILD_MODE_DEBUG = 0,

@@ -11,6 +11,12 @@
 #define k(key) q(key) ": "
 #define kv(key, val) q(key) ": " #val
 
+#define ts(section) "[" q(section) "]\n"
+#define tk(key) q(key) " = "
+#define tkv(key, val) tk(key) #val
+#define tt(key, val) tk(key) #val
+
+
 
 
 // TMPFS

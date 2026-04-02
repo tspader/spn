@@ -3,7 +3,7 @@ namespace = "spader"
 name = "spn"
 version = "0.2.0"
 repo = "tspader/spn"
-toolchain = "zig"
+toolchain = "toolchains"
 
 [deps.package]
 "spader/spcc" = "1.0.0"
@@ -15,58 +15,12 @@ utest = "1.0.0"
 
 [[toolchain]]
 package = "zig"
-version = "0.15.2"
+version = "0.2.0"
 
 [[profile]]
 name = "linux"
-toolchain = "zig"
+toolchain = "toolchains"
 linkage = "static"
-standard = "c99"
-mode = "debug"
-
-[[profile]]
-name = "w64"
-toolchain = "zig"
-os = "windows"
-arch = "x86_64"
-standard = "c99"
-mode = "debug"
-
-[[preset]]
-name = "macos"
-toolchain = "clang"
-linkage = "shared"
-standard = "c99"
-mode = "debug"
-
-
-[[profile]]
-name = "debug"
-mode = "debug"
-
-[[profile]]
-name = "cum"
-toolchain = "gcc"
-mode = "debug"
-
-[[profile]]
-name = "release"
-mode = "release"
-
-[[profile]]
-name = "fast"
-mode = "debug"
-
-[[profile]]
-name = "static"
-mode = "debug"
-libc = "musl"
-linkage = "static"
-
-[[profile]]
-name = "macos"
-linkage = "shared"
-libc = "gnu"
 standard = "c99"
 mode = "debug"
 
@@ -166,6 +120,29 @@ source = [
   "test/tools/harness.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
+  "test/tools/toml.c",
+]
+include = ["include", "source", "test/tools"]
+
+[[test]]
+name = "load"
+source = [
+  "source/ctx/ctx.c",
+  "source/intern.c",
+  "source/enum/enum.c",
+  "source/event/event.c",
+  "source/external/tom.c",
+  "source/pkg/id.c",
+  "source/pkg/load.c",
+  "source/pkg/mutate.c",
+  "source/semver/compare.c",
+  "source/semver/convert.c",
+  "source/semver/parser.c",
+  "source/target/mutate.c",
+  "source/toolchain/toolchain.c",
+  "test/core/load/main.c",
+  "test/tools/harness.c",
+  "test/tools/tmp.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source", "test/tools"]

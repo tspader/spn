@@ -612,6 +612,48 @@ if(NOT MSVC)
 endif()
 add_dependencies(resolver bootstrap_headers)
 
+########
+# LOAD #
+########
+add_executable(load
+  source/ctx/ctx.c
+  source/intern.c
+  source/enum/enum.c
+  source/event/event.c
+  source/external/tom.c
+  source/pkg/id.c
+  source/pkg/load.c
+  source/pkg/mutate.c
+  source/semver/compare.c
+  source/semver/convert.c
+  source/semver/parser.c
+  source/target/mutate.c
+  source/toolchain/toolchain.c
+  test/core/manifest.c
+  test/tools/harness.c
+  test/tools/tmp.c
+  test/tools/toml.c
+)
+set_target_properties(load PROPERTIES
+  OUTPUT_NAME "load"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
+)
+target_include_directories(load PRIVATE
+  source
+  include
+  test/tools
+  "${BOOTSTRAP_EXTERNAL_DIR}/sp/tools"
+  "${BOOTSTRAP_INCLUDE_DIR}"
+)
+if(MSVC)
+  target_compile_options(load PRIVATE ${SPN_MSVC_COMPILE_OPTIONS})
+endif()
+if(NOT MSVC)
+  target_link_libraries(load PRIVATE m)
+endif()
+add_dependencies(load bootstrap_headers)
+add_test(NAME load COMMAND "$<TARGET_FILE:load>")
+
 #########
 # INDEX #
 #########
@@ -717,7 +759,7 @@ add_executable(lock
   source/semver/convert.c
   source/semver/parser.c
   source/sp/str.c
-  test/core/lock/main.c
+  test/core/lock.c
   test/tools/harness.c
   test/tools/tmp.c
   test/tools/git.c

@@ -6,9 +6,6 @@
 #include "index/publish.h"
 #include "semver/convert.h"
 
-#define ts(section) "[" q(section) "]\n"
-#define tkv(key, val) q(key) " = " #val "\n"
-
 typedef struct {
   const c8* name;
   git_repo_fixture_t repo;
@@ -162,10 +159,10 @@ UTEST_F(cmd_publish, native_package) {
           .message = "v1",
           .files = {
             { "spn.toml",
-              ts(package)
-              tkv(namespace, "core")
-              tkv(name, "spum")
-              tkv(version, "1.0.0")
+              ts(package) "\n"
+              tkv(namespace, "core") "\n"
+              tkv(name, "spum") "\n"
+              tkv(version, "1.0.0") "\n"
             },
             { "spn.c", "void build() {}" },
           },
@@ -193,10 +190,10 @@ UTEST_F(cmd_publish, monorepo_subdir) {
           .message = "initial",
           .files = {
             { "packages/spum/spn.toml",
-              ts(package)
-              tkv(namespace, "core")
-              tkv(name, "spum")
-              tkv(version, "2.0.0")
+              ts(package) "\n"
+              tkv(namespace, "core") "\n"
+              tkv(name, "spum") "\n"
+              tkv(version, "2.0.0") "\n"
             },
             { "packages/spum/spn.c", "void build() {}" },
           },
@@ -227,10 +224,10 @@ UTEST_F(cmd_publish, second_commit) {
           .message = "v1",
           .files = {
             { "spn.toml",
-              ts(package)
-              tkv(namespace, "core")
-              tkv(name, "spum")
-              tkv(version, "1.0.0")
+              ts(package) "\n"
+              tkv(namespace, "core") "\n"
+              tkv(name, "spum") "\n"
+              tkv(version, "1.0.0") "\n"
             },
             { "spn.c", "void build() {}" },
           },
@@ -239,10 +236,10 @@ UTEST_F(cmd_publish, second_commit) {
           .message = "v2",
           .files = {
             { "spn.toml",
-              ts(package)
-              tkv(namespace, "core")
-              tkv(name, "spum")
-              tkv(version, "2.0.0")
+              ts(package) "\n"
+              tkv(namespace, "core") "\n"
+              tkv(name, "spum") "\n"
+              tkv(version, "2.0.0") "\n"
             },
             { "spn.c", "void build() {}" },
           },

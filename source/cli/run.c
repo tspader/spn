@@ -42,19 +42,17 @@ sp_app_result_t spn_cli_run(spn_cli_t* cli) {
   bool has_manifest = sp_fs_exists(spn.paths.manifest);
   bool source = spn_cli_run_is_source_entry(command->entry, has_manifest);
 
-  app.config = (spn_app_config_t) {
-    .filter = (spn_target_filter_t) {
-      .name = source ? sp_str_lit("") : command->entry,
-      .disabled = {
-        .public = source,
-        .test = source,
-        .script = source,
-      }
-    },
-    .run = {
-      .kind = source ? SPN_RUN_KIND_SOURCE : SPN_RUN_KIND_SCRIPT,
-      .target = command->entry,
-    },
+  app.config.filter = (spn_target_filter_t) {
+    .name = source ? sp_str_lit("") : command->entry,
+    .disabled = {
+      .public = source,
+      .test = source,
+      .script = source,
+    }
+  };
+  app.config.run = (spn_run_config_t) {
+    .kind = source ? SPN_RUN_KIND_SOURCE : SPN_RUN_KIND_SCRIPT,
+    .target = command->entry,
   };
 
   sp_try_as(spn_cli_set_profile(&app, command->profile), SP_APP_ERR);

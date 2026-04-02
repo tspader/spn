@@ -7,16 +7,11 @@ spn_arch_t spn_arch_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "x86_64")) {
     return SPN_ARCH_X64;
   }
-  else if (sp_str_equal_cstr(str, "arm64")) {
+  else if (sp_str_equal_cstr(str, "aarch64")) {
     return SPN_ARCH_ARM64;
   }
-  else {
-    #if defined(SP_AMD64)
-    return SPN_ARCH_X64;
-    #elif defined (SP_ARM64)
-    return SPN_ARCH_ARM64;
-    #endif
-  }
+
+  return SPN_ARCH_NONE;
 }
 
 spn_os_t spn_os_from_sp_os(sp_os_kind_t os) {
@@ -37,9 +32,7 @@ spn_os_t spn_os_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "macos")) {
     return SPN_OS_MACOS;
   }
-  else {
-    return spn_os_from_sp_os(sp_os_get_kind());
-  }
+  return SPN_OS_NONE;
 }
 
 spn_cc_driver_t spn_cc_driver_from_str(sp_str_t str) {
@@ -79,15 +72,18 @@ spn_abi_t spn_abi_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "msvc")) {
     return SPN_ABI_MSVC;
   }
+  if (sp_str_equal_cstr(str, "mingw")) {
+    return SPN_ABI_MINGW;
+  }
+  if (sp_str_empty(str)) {
+    return SPN_ABI_NONE;
+  }
 
-  return SPN_ABI_NONE;
+  return SPN_ABI_GNU;
 }
 
 sp_str_t spn_abi_to_str(spn_abi_t abi) {
   switch (abi) {
-    case SPN_ABI_NONE: {
-      return sp_str_lit("");
-    }
     case SPN_ABI_GNU: {
       return sp_str_lit("gnu");
     }
@@ -96,6 +92,12 @@ sp_str_t spn_abi_to_str(spn_abi_t abi) {
     }
     case SPN_ABI_MSVC: {
       return sp_str_lit("msvc");
+    }
+    case SPN_ABI_MINGW: {
+      return sp_str_lit("mingw");
+    }
+    case SPN_ABI_NONE: {
+      return sp_str_lit("");
     }
   }
 

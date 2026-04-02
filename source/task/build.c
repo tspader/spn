@@ -3,19 +3,10 @@
 
 #include "app/app.h"
 #include "err.h"
-#include "enum/enum.h"
-#include "external/cc.h"
-#include "filter/filter.h"
-#include "gen.h"
 #include "graph/graph.h"
 #include "event/event.h"
 #include "session/session.h"
-#include "task/build/build.h"
 #include "task/build/graph.h"
-#include "toolchain/toolchain.h"
-#include "toolchain/types.h"
-#include "unit/package.h"
-#include <termios.h>
 
 spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
