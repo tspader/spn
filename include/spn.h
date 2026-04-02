@@ -47,8 +47,9 @@ typedef struct {
 } spn_triple_t;
 
 typedef enum {
-  SPN_DEP_BUILD_MODE_DEBUG = 0,
-  SPN_DEP_BUILD_MODE_RELEASE = 1,
+  SPN_BUILD_MODE_NONE,
+  SPN_BUILD_MODE_DEBUG,
+  SPN_BUILD_MODE_RELEASE,
 } spn_build_mode_t;
 
 typedef enum {
@@ -77,6 +78,7 @@ typedef enum {
 } spn_pkg_dir_t;
 
 typedef enum {
+  SPN_C_STANDARD_NONE,
   SPN_C11,
   SPN_C99,
   SPN_C89,

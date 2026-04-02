@@ -1,4 +1,3 @@
-#include "spn.h"
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
@@ -10,6 +9,7 @@
 #include "semver/compare.h"
 #include "ctx/types.h"
 #include "pkg/load.h"
+#include "profile/types.h"
 
 UTEST_STATE();
 
@@ -38,6 +38,7 @@ UTEST_F_TEARDOWN(load) {}
 // EXECUTOR //
 //////////////
 typedef struct {
+  const c8* name;
   const c8* toolchain;
   spn_linkage_t linkage;
   spn_c_standard_t standard;
@@ -49,7 +50,6 @@ typedef struct {
   const c8* url;
   spn_triple_t hosts [4];
   spn_triple_t targets [4];
-  profile_t profiles [4];
 } toolchain_t;
 
 typedef struct {
@@ -58,6 +58,7 @@ typedef struct {
   const c8* name;
   spn_semver_t version;
   toolchain_t toolchains [4];
+  profile_t profiles [4];
 } test_t;
 
 void run_case(s32* utest_result, struct load* utest_fixture, test_t test) {
@@ -86,11 +87,20 @@ void run_case(s32* utest_result, struct load* utest_fixture, test_t test) {
     EXPECT_EQ(test.version.patch, pkg.version.patch);
   }
 
-  u32 num_toolchains = sp_om_size(pkg.toolchains);
+  struct {
+    struct { u32 actual; u32 expected; } toolchains;
+    struct { u32 actual; u32 expected; } profiles;
+  } num = SP_ZERO_INITIALIZE();
+
+  num.toolchains.actual = sp_om_size(pkg.toolchains);
+
   sp_carr_for(test.toolchains, it) {
     if (!test.toolchains[it].name) break;
+    num.toolchains.expected++;
+  }
+  EXPECT_EQ(num.toolchains.expected, num.toolchains.actual);
 
-    EXPECT_GT(num_toolchains, it);
+  sp_for(it, num.toolchains.expected) {
     spn_toolchain_entry_t* toolchain = sp_om_at(pkg.toolchains, it);
 
     if (test.toolchains[it].url) SP_EXPECT_STR_EQ_CSTR(toolchain->info.url, test.toolchains[it].url);
@@ -104,6 +114,26 @@ void run_case(s32* utest_result, struct load* utest_fixture, test_t test) {
       EXPECT_EQ(expected.os, actual.os);
       EXPECT_EQ(expected.abi, actual.abi);
     }
+  }
+
+  num.profiles.actual = sp_om_size(pkg.profiles);
+
+  sp_carr_for(test.profiles, it) {
+    if (!test.profiles[it].name) break;
+    num.profiles.expected++;
+  }
+  EXPECT_EQ(num.profiles.expected, num.profiles.actual);
+
+  sp_for(it, num.profiles.expected) {
+    profile_t expected = test.profiles[it];
+    spn_profile_t* actual = sp_om_at(pkg.profiles, it);
+
+    if (expected.name) SP_EXPECT_STR_EQ_CSTR(actual->name, expected.name);
+    if (expected.toolchain) SP_EXPECT_STR_EQ_CSTR(actual->toolchain, expected.toolchain);
+    EXPECT_EQ(actual->linkage, expected.linkage);
+    if (expected.standard) EXPECT_EQ(actual->standard, expected.standard);
+    if (expected.mode) EXPECT_EQ(actual->mode, expected.mode);
+    EXPECT_EQ(actual->kind, SPN_PROFILE_USER);
   }
 }
 
@@ -196,16 +226,10 @@ UTEST_F(load, profile) {
       "[profile.shared]",
       tkv(linkage, "shared"),
     },
-    .toolchains = {
-      {
-        .name = "x86_64-w64-mingw32-cross",
-        .url =  "https://example.com/toolchain.tar.gz",
-        .profiles = {
-          { "zig", SPN_LIB_KIND_STATIC, SPN_C99, SPN_DEP_BUILD_MODE_DEBUG },
-          { "zig", SPN_LIB_KIND_SHARED, SPN_C99, SPN_DEP_BUILD_MODE_DEBUG },
-        },
-      }
-    }
+    .profiles = {
+      { "default", "zig", SPN_LIB_KIND_STATIC, SPN_C99, SPN_BUILD_MODE_DEBUG },
+      { "shared", "", SPN_LIB_KIND_SHARED, SPN_C_STANDARD_NONE, SPN_BUILD_MODE_NONE },
+    },
   });
 }
 

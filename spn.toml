@@ -23,7 +23,7 @@ linkage = "static"
 standard = "c99"
 mode = "debug"
 
-[profile.static]
+[profile.shared]
 linkage = "shared"
 
 [[bin]]

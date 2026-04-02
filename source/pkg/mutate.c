@@ -146,7 +146,7 @@ spn_profile_t* spn_pkg_add_profile(spn_pkg_t* pkg, const c8* name) {
     .name = spn_intern_cstr(name),
     .linkage = SPN_LIB_KIND_SHARED,
     .standard = SPN_C99,
-    .mode = SPN_DEP_BUILD_MODE_DEBUG,
+    .mode = SPN_BUILD_MODE_DEBUG,
     .kind = SPN_PROFILE_USER,
   };
 

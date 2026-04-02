@@ -43,15 +43,15 @@ sp_str_t spn_cc_c_standard_to_switch(spn_c_standard_t standard) {
     case SPN_C89: return sp_str_lit("-std=c89");
     case SPN_C99: return sp_str_lit("-std=c99");
     case SPN_C11: return sp_str_lit("-std=c11");
-    default: return sp_str_lit("");
+    case SPN_C_STANDARD_NONE: return sp_str_lit("-std=c99");
   }
 }
 
 sp_str_t spn_cc_build_mode_to_switch(spn_build_mode_t mode) {
   switch (mode) {
-    case SPN_DEP_BUILD_MODE_DEBUG: return sp_str_lit("-g");
-    case SPN_DEP_BUILD_MODE_RELEASE:
-    default: return sp_str_lit("");
+    case SPN_BUILD_MODE_DEBUG: return sp_str_lit("-g");
+    case SPN_BUILD_MODE_RELEASE:
+    case SPN_BUILD_MODE_NONE: return sp_str_lit("");
   }
 }
 

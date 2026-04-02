@@ -397,7 +397,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
         .name = sp_str_lit("debug"),
         .linkage = SPN_LIB_KIND_SHARED,
         .standard = SPN_C11,
-        .mode = SPN_DEP_BUILD_MODE_DEBUG,
+        .mode = SPN_BUILD_MODE_DEBUG,
         .kind = SPN_PROFILE_BUILTIN,
         .toolchain = sp_str_lit("system")
       },
@@ -405,7 +405,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
         .name = sp_str_lit("release"),
         .linkage = SPN_LIB_KIND_SHARED,
         .standard = SPN_C11,
-        .mode = SPN_DEP_BUILD_MODE_RELEASE,
+        .mode = SPN_BUILD_MODE_RELEASE,
         .kind = SPN_PROFILE_BUILTIN,
         .toolchain = sp_str_lit("system")
       }

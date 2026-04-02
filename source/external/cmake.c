@@ -87,7 +87,7 @@ void spn_cmake_configure(spn_cmake_t* cmake) {
 
   sp_ps_config_add_arg(&config, spn_cmake_format_define(
     SP_LIT("CMAKE_BUILD_TYPE"),
-    build->profile->mode == SPN_DEP_BUILD_MODE_RELEASE ? SP_LIT("Release") : SP_LIT("Debug"))
+    build->profile->mode == SPN_BUILD_MODE_RELEASE ? SP_LIT("Release") : SP_LIT("Debug"))
   );
 
   sp_da_for(cmake->defines, it) {

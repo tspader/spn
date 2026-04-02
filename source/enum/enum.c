@@ -143,23 +143,29 @@ sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc) {
 // @spader @error
 spn_build_mode_t spn_dep_build_mode_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "release")) {
-    return SPN_DEP_BUILD_MODE_RELEASE;
+    return SPN_BUILD_MODE_RELEASE;
   }
   if (sp_str_equal_cstr(str, "debug")) {
-    return SPN_DEP_BUILD_MODE_DEBUG;
+    return SPN_BUILD_MODE_DEBUG;
+  }
+  if (sp_str_empty(str)) {
+    return SPN_BUILD_MODE_NONE;
   }
 
   SP_FATAL("Unknown mode {:fg brightyellow}; options are [release, debug]", SP_FMT_STR(str));
-  SP_UNREACHABLE_RETURN(SPN_DEP_BUILD_MODE_RELEASE);
+  SP_UNREACHABLE_RETURN(SPN_BUILD_MODE_RELEASE);
 }
 
 sp_str_t spn_dep_build_mode_to_str(spn_build_mode_t mode) {
   switch (mode) {
-    case SPN_DEP_BUILD_MODE_RELEASE: {
+    case SPN_BUILD_MODE_RELEASE: {
       return sp_str_lit("release");
     }
-    case SPN_DEP_BUILD_MODE_DEBUG: {
+    case SPN_BUILD_MODE_DEBUG: {
       return sp_str_lit("debug");
+    }
+    case SPN_BUILD_MODE_NONE: {
+      return sp_str_lit("");
     }
   }
 
@@ -300,6 +306,9 @@ sp_str_t spn_c_standard_to_str(spn_c_standard_t standard) {
     case SPN_C89: {
       return sp_str_lit("c89");
     }
+    case SPN_C_STANDARD_NONE: {
+      return sp_str_lit("");
+    }
   }
 
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
@@ -314,6 +323,9 @@ spn_c_standard_t spn_c_standard_from_str(sp_str_t str) {
   }
   if (sp_str_equal_cstr(str, "c11")) {
     return SPN_C11;
+  }
+  if (sp_str_empty(str)) {
+    return SPN_C_STANDARD_NONE;
   }
 
   SP_UNREACHABLE_RETURN(SPN_C99);

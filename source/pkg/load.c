@@ -15,7 +15,7 @@
 #include "toolchain/toolchain.h"
 #include "toolchain/types.h"
 
-spn_dep_option_t spn_dep_option_from_toml(toml_table_t* toml, const c8* key) {
+spn_dep_option_t parse_option(toml_table_t* toml, const c8* key) {
   toml_unparsed_t unparsed = toml_table_unparsed(toml, key);
   SP_ASSERT(unparsed);
 
@@ -334,6 +334,34 @@ static spn_err_t get_str_required(toml_table_t* table, const c8* key, sp_str_t* 
   sp_unreachable_return(SPN_ERROR);
 }
 
+static spn_err_t get_table_optional(toml_table_t* toml, const c8* key, toml_table_t** table) {
+  spn_toml_value_kind_t kind = toml_kind_from_field(toml, key);
+  switch (kind) {
+    case SPN_TOML_VALUE_KIND_NONE: return SPN_OK;
+    case SPN_TOML_VALUE_KIND_SCALAR:
+    case SPN_TOML_VALUE_KIND_ARRAY: return SPN_ERR_TOML_TYPE;
+    case SPN_TOML_VALUE_KIND_TABLE: {
+      *table = toml_table_table(toml, key);
+      return SPN_OK;
+    }
+  }
+  sp_unreachable_return(SPN_ERROR);
+}
+
+static spn_err_t get_table_required(toml_table_t* toml, const c8* key, toml_table_t** table) {
+  spn_toml_value_kind_t kind = toml_kind_from_field(toml, key);
+  switch (kind) {
+    case SPN_TOML_VALUE_KIND_NONE:
+    case SPN_TOML_VALUE_KIND_SCALAR:
+    case SPN_TOML_VALUE_KIND_ARRAY: return SPN_ERR_TOML_TYPE;
+    case SPN_TOML_VALUE_KIND_TABLE: {
+      *table = toml_table_table(toml, key);
+      return SPN_OK;
+    }
+  }
+  sp_unreachable_return(SPN_ERROR);
+}
+
 static spn_err_t get_arr_optional(toml_table_t* table, const c8* key, toml_array_t** arr) {
   spn_toml_value_kind_t kind = toml_kind_from_field(table, key);
   switch (kind) {
@@ -527,6 +555,35 @@ static spn_err_t load_triple_array(toml_array_t* toml, spn_triple_t* triples, u3
   return SPN_OK;
 }
 
+static spn_err_t load_profile(toml_table_t* toml, spn_pkg_t* pkg, sp_str_t name) {
+  sp_str_t linkage = sp_str_lit("shared");
+  sp_str_t standard = sp_str_lit("c99");
+  sp_str_t toolchain = sp_str_lit("");
+  sp_str_t mode = sp_str_lit("debug");
+  sp_str_t os = sp_str_lit("");
+  sp_str_t arch = sp_str_lit("");
+
+  spn_try(get_str_optional(toml, "linkage", &linkage));
+  spn_try(get_str_optional(toml, "standard", &standard));
+  spn_try(get_str_optional(toml, "toolchain", &toolchain));
+  spn_try(get_str_optional(toml, "mode", &mode));
+  spn_try(get_str_optional(toml, "os", &os));
+  spn_try(get_str_optional(toml, "arch", &arch));
+
+  spn_pkg_add_profile_ex(pkg, (spn_profile_t) {
+    .name = spn_intern(name),
+    .toolchain = spn_intern(toolchain),
+    .linkage = spn_pkg_linkage_from_str(linkage),
+    .standard = spn_c_standard_from_str(standard),
+    .mode = spn_dep_build_mode_from_str(mode),
+    .os = spn_os_from_str(os),
+    .arch = spn_arch_from_str(arch),
+    .kind = SPN_PROFILE_USER,
+  });
+
+  return SPN_OK;
+}
+
 spn_err_union_t spn_index_load(toml_table_t* toml, sp_str_t parent, u32 index, spn_index_t* result) {
   toml_path_t path = spn_pkg_toml_path_with_index(parent, index);
   sp_str_t name = SP_ZERO_INITIALIZE();
@@ -555,7 +612,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     toml_array_t* script;
     toml_array_t* test;
     toml_table_t* deps;
-    toml_array_t* profile;
+    toml_table_t* profile;
     toml_array_t* toolchain;
     toml_array_t* index;
     toml_table_t* options;
@@ -584,7 +641,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   spn_try_union(toml_get_array_optional(toml.manifest, "bin", root_path, &toml.bin));
   spn_try_union(toml_get_array_optional(toml.manifest, "script", root_path, &toml.script));
   spn_try_union(toml_get_array_optional(toml.manifest, "test", root_path, &toml.test));
-  spn_try_union(toml_get_array_optional(toml.manifest, "profile", root_path, &toml.profile));
+  spn_try_union(toml_get_table_optional(toml.manifest, "profile", root_path, &toml.profile));
   spn_try_union(toml_get_array_optional(toml.manifest, "toolchain", root_path, &toml.toolchain));
   spn_try_union(toml_get_array_optional(toml.manifest, "index", root_path, &toml.index));
   spn_try_union(toml_get_table_optional(toml.manifest, "deps", root_path, &toml.deps));
@@ -735,34 +792,13 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     }
   }
 
-  spn_toml_arr_for(toml.profile, n) {
-    toml_table_t* it = toml_array_table(toml.profile, n);
-    sp_str_t name = SP_ZERO_INITIALIZE();
-    sp_str_t linkage = sp_str_lit("shared");
-    sp_str_t standard = sp_str_lit("c99");
-    sp_str_t toolchain = sp_str_lit("");
-    sp_str_t mode = sp_str_lit("debug");
-    sp_str_t os = sp_str_lit("");
-    sp_str_t arch = sp_str_lit("");
-
-    spn_try_as_union(get_str_required(it, "name", &name));
-    spn_try_as_union(get_str_optional(it, "linkage", &linkage));
-    spn_try_as_union(get_str_optional(it, "standard", &standard));
-    spn_try_as_union(get_str_optional(it, "toolchain", &toolchain));
-    spn_try_as_union(get_str_optional(it, "mode", &mode));
-    spn_try_as_union(get_str_optional(it, "os", &os));
-    spn_try_as_union(get_str_optional(it, "arch", &arch));
-
-    spn_pkg_add_profile_ex(pkg, (spn_profile_t) {
-      .name = name,
-      .toolchain = spn_intern(toolchain),
-      .linkage = spn_pkg_linkage_from_str(linkage),
-      .standard = spn_c_standard_from_str(standard),
-      .mode = spn_dep_build_mode_from_str(mode),
-      .os = spn_os_from_str(os),
-      .arch = spn_arch_from_str(arch),
-      .kind = SPN_PROFILE_USER,
-    });
+  if (toml.profile) {
+    const c8* key = SP_NULLPTR;
+    spn_toml_for(toml.profile, it, key) {
+      toml_table_t* profile = SP_NULLPTR;
+      spn_try_as_union(get_table_required(toml.profile, key, &profile));
+      spn_try_as_union(load_profile(profile, pkg, sp_str_view(key)));
+    }
   }
 
   spn_toml_arr_for(toml.index, n) {
@@ -840,7 +876,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
   if (toml.options) {
     const c8* key = SP_NULLPTR;
     spn_toml_for(toml.options, n, key) {
-      spn_dep_option_t option = spn_dep_option_from_toml(toml.options, key);
+      spn_dep_option_t option = parse_option(toml.options, key);
       sp_ht_insert(pkg->options, option.name, option);
     }
   }
@@ -864,7 +900,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
 
       const c8* option_key = SP_NULLPTR;
       spn_toml_for(config, n, option_key) {
-        spn_dep_option_t option = spn_dep_option_from_toml(config, option_key);
+        spn_dep_option_t option = parse_option(config, option_key);
         sp_ht_insert(options, option.name, option);
       }
 
