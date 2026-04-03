@@ -11,6 +11,35 @@ void setup_fixture_index_from_remote(s32* utest_result, tmpfs_t* fs, sp_str_t in
 void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t config);
 void setup_fixture_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir);
 
+void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, const c8* file, u32 line) {
+  if (!sp_fs_exists((path))) {
+    sp_str_builder_t b = SP_ZERO_INITIALIZE();
+    sp_str_builder_append_fmt(&b, "{}:{}", SP_FMT_CSTR(file), SP_FMT_U32(line));
+
+    b.indent.word = sp_format("{:fg brightred}", SP_FMT_CSTR("\u2590 "));
+    sp_str_builder_indent(&b);
+
+    if (fs) {
+      sp_str_builder_new_line(&b);
+      sp_str_builder_append_fmt(&b, "{:fg brightblack} is the root", SP_FMT_STR(fs->root));
+
+      path = sp_str_strip_left(path,  fs->root);
+      path = sp_str_concat(sp_str_lit("$test"), path);
+    }
+    sp_str_builder_new_line(&b);
+    sp_str_builder_append_fmt(&b, "{:fg brightblack} does not exist", SP_FMT_STR((path)));
+
+    SP_TEST_REPORT(sp_str_builder_to_str(&b));
+    *utest_result = UTEST_TEST_FAILURE;
+  }
+}
+
+void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, const c8* file, u32 line);
+
+#define SP_EXPECT_CONTAINS(haystack, needle)
+#define SP_EXPECT_EXISTS(path) expect_exists(utest_result, SP_NULLPTR, path, __FILE__, __LINE__)
+#define SP_EXPECT_EXISTS_TMPFS(fs, path) expect_exists(utest_result, fs, path, __FILE__, __LINE__)
+
 typedef struct {
   tmpfs_t fs;
   struct {
@@ -153,7 +182,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
           "build/debug/store/bin/{}",
           SP_FMT_CSTR(action.bin.name)
         ));
-        SP_EXPECT_EXISTS(bin);
+        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, bin);
 
         sp_ps_output_t output = sp_ps_run((sp_ps_config_t) {
           .command = bin,

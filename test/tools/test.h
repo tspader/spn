@@ -1,6 +1,7 @@
 #ifndef SPN_TEST_H
 #define SPN_TEST_H
 #include "sp.h"
+#include "utest.h"
 
 #define ut (*utest_fixture)
 #define uf utest_fixture
@@ -147,24 +148,6 @@ sp_str_t          git_repo_file_at(sp_str_t repo, sp_str_t commit, sp_str_t path
 #define SP_EXPECT_STR_EQ_CSTR(a, b) SP_TEST_STREQ((a), SP_CSTR(b), false)
 #define SP_EXPECT_STR_EQ(a, b) SP_TEST_STREQ((a), (b), false)
 #define SP_EXPECT_ERR(err) EXPECT_EQ(sp_err_get(), err)
-
-#define SP_EXPECT_CONTAINS(haystack, needle)
-#define SP_EXPECT_EXISTS(path) \
-  UTEST_SURPRESS_WARNING_BEGIN do { \
-    if (!sp_fs_exists((path))) { \
-      const c8* __file = __FILE__; \
-      const u32 __line = __LINE__; \
-      sp_str_builder_t __b = SP_ZERO_INITIALIZE(); \
-      sp_str_builder_append_fmt(&__b, "{:fg brightblack}:{}", SP_FMT_CSTR(__file), SP_FMT_U32(__line)); \
-      sp_str_builder_indent(&__b); \
-      sp_str_builder_new_line(&__b); \
-      sp_str_builder_append_fmt(&__b, "{:fg red} does not exist", SP_FMT_STR((path))); \
-      SP_TEST_REPORT(sp_str_builder_to_str(&__b)); \
-      *utest_result = UTEST_TEST_FAILURE; \
-    } \
-  } while (0) \
-  UTEST_SURPRESS_WARNING_END
-
 
 
 #endif

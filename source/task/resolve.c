@@ -29,7 +29,7 @@ static spn_err_t resolve_profile(spn_app_t* app, spn_profile_t* result) {
   spn_profile_info_t info = {
     .name = sp_str_lit("debug"),
     .toolchain = sp_str_lit("builtin"),
-    .linkage = SPN_LIB_KIND_STATIC,
+    .linkage = SPN_LIB_KIND_SHARED,
     .standard = SPN_C11,
     .mode = SPN_BUILD_MODE_DEBUG,
   };

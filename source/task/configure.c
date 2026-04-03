@@ -239,8 +239,7 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
     }
   }
 
-  b->configure.dirty = spn_bg_compute_dirty(graph);
-  //b->configure.dirty = spn_bg_compute_forced_dirty(graph);
+  b->configure.dirty = spn_bg_compute_forced_dirty(graph);
   b->configure.executor = spn_bg_executor_new(
     graph,
     b->configure.dirty,
