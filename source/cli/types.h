@@ -84,6 +84,10 @@ typedef struct {
   sp_str_t profile;
   sp_str_t toolchain;
   sp_str_t mode;
+  sp_str_t target;
+  sp_str_t os;
+  sp_str_t arch;
+  sp_str_t abi;
 } spn_cli_build_t;
 
 typedef struct {

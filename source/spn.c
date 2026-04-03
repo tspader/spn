@@ -49,6 +49,7 @@
 #include "pkg/load.h"
 #include "pkg/pkg.h"
 #include "pkg/mutate.h"
+#include "profile/profile.h"
 #include "semver/types.h"
 #include "session/session.h"
 #include "spn.embed.h"
@@ -351,6 +352,48 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   sp_carr_for(builtin_toolchains, it) {
     spn_toolchain_entry_t entry = builtin_toolchains[it];
     sp_str_ht_insert(session->toolchains, entry.name, entry);
+  }
+
+  // Build the list of available profiles
+  // 1. Seed the default profile with hardcoded base values
+  spn_profile_info_t default_profile = {
+    .name      = sp_str_lit("default"),
+    .toolchain = sp_str_lit("builtin"),
+    .linkage   = SPN_LIB_KIND_SHARED,
+    .standard  = SPN_C11,
+    .mode      = SPN_BUILD_MODE_DEBUG,
+  };
+  sp_str_ht_insert(session->profiles, default_profile.name, default_profile);
+
+  // 2. Apply user's [profile.default] if present
+  sp_str_t default_name = sp_str_lit("default");
+  spn_profile_info_t* user_default = sp_om_get(app.package.profiles, default_name);
+  if (user_default) {
+    spn_profile_overlay(sp_str_ht_get(session->profiles, default_name), user_default);
+  }
+
+  // 3. Derive debug and release from default
+  spn_profile_info_t base = *sp_str_ht_get(session->profiles, default_name);
+
+  spn_profile_info_t debug_profile = base;
+  debug_profile.name = sp_str_lit("debug");
+  sp_str_ht_insert(session->profiles, debug_profile.name, debug_profile);
+
+  spn_profile_info_t release_profile = base;
+  release_profile.name = sp_str_lit("release");
+  release_profile.mode = SPN_BUILD_MODE_RELEASE;
+  sp_str_ht_insert(session->profiles, release_profile.name, release_profile);
+
+  // 4. Overlay remaining user profiles
+  sp_om_for(app.package.profiles, it) {
+    spn_profile_info_t* user = sp_om_at(app.package.profiles, it);
+    if (sp_str_equal(user->name, sp_str_lit("default"))) continue;
+    spn_profile_info_t* entry = sp_str_ht_get(session->profiles, user->name);
+    if (entry) {
+      spn_profile_overlay(entry, user);
+    } else {
+      sp_str_ht_insert(session->profiles, user->name, *user);
+    }
   }
 
   switch (spn_cli_dispatch(&parser, cli)) {

@@ -449,6 +449,34 @@ static spn_cli_usage_t commands[] = {
           .summary = "Override build mode (debug, release)",
           .placeholder = "MODE",
           .ptr = &spn.cli.build.mode
+        },
+        {
+          .name = "target",
+          .kind = SPN_CLI_OPT_KIND_STRING,
+          .summary = "Target triple (e.g. aarch64-linux-gnu)",
+          .placeholder = "TRIPLE",
+          .ptr = &spn.cli.build.target
+        },
+        {
+          .name = "os",
+          .kind = SPN_CLI_OPT_KIND_STRING,
+          .summary = "Override target OS (linux, macos, windows)",
+          .placeholder = "OS",
+          .ptr = &spn.cli.build.os
+        },
+        {
+          .name = "arch",
+          .kind = SPN_CLI_OPT_KIND_STRING,
+          .summary = "Override target architecture (x86_64, aarch64)",
+          .placeholder = "ARCH",
+          .ptr = &spn.cli.build.arch
+        },
+        {
+          .name = "abi",
+          .kind = SPN_CLI_OPT_KIND_STRING,
+          .summary = "Override target ABI (gnu, musl, mingw)",
+          .placeholder = "ABI",
+          .ptr = &spn.cli.build.abi
         }
       },
       .args = {

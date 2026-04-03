@@ -69,6 +69,7 @@ struct spn_cc {
   spn_toolchain_t toolchain;
   spn_os_t os;
   spn_arch_t arch;
+  spn_abi_t abi;
   spn_linkage_t linkage;
   spn_c_standard_t standard;
   spn_build_mode_t mode;

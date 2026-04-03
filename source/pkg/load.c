@@ -581,6 +581,7 @@ static spn_err_t load_profile(toml_table_t* toml, spn_pkg_t* pkg, sp_str_t name)
   sp_str_t mode = sp_str_lit("");
   sp_str_t os = sp_str_lit("");
   sp_str_t arch = sp_str_lit("");
+  sp_str_t abi = sp_str_lit("");
 
   spn_try(get_str_optional(toml, "linkage", &linkage));
   spn_try(get_str_optional(toml, "standard", &standard));
@@ -588,6 +589,7 @@ static spn_err_t load_profile(toml_table_t* toml, spn_pkg_t* pkg, sp_str_t name)
   spn_try(get_str_optional(toml, "mode", &mode));
   spn_try(get_str_optional(toml, "os", &os));
   spn_try(get_str_optional(toml, "arch", &arch));
+  spn_try(get_str_optional(toml, "abi", &abi));
 
   spn_pkg_add_profile_ex(pkg, (spn_profile_info_t) {
     .name = spn_intern(name),
@@ -597,6 +599,7 @@ static spn_err_t load_profile(toml_table_t* toml, spn_pkg_t* pkg, sp_str_t name)
     .mode = sp_str_empty(mode) ? 0 : spn_dep_build_mode_from_str(mode),
     .os = sp_str_empty(os) ? 0 : spn_os_from_str(os),
     .arch = sp_str_empty(arch) ? 0 : spn_arch_from_str(arch),
+    .abi = sp_str_empty(abi) ? 0 : spn_abi_from_str(abi),
   });
 
   return SPN_OK;

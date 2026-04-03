@@ -518,6 +518,7 @@ set(SPN_SOURCES
   source/task/test.c
   source/task/which.c
   source/toolchain/toolchain.c
+  source/triple/triple.c
 )
 
 add_executable(spn ${SPN_SOURCES})
@@ -846,6 +847,33 @@ if(NOT MSVC)
 endif()
 add_dependencies(graph bootstrap_headers)
 
+##########
+# TRIPLE #
+##########
+add_executable(triple
+  source/enum/enum.c
+  source/triple/triple.c
+  test/core/triple.c
+)
+set_target_properties(triple PROPERTIES
+  OUTPUT_NAME "triple"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
+)
+target_include_directories(triple PRIVATE
+  source
+  include
+  test/tools
+  "${BOOTSTRAP_EXTERNAL_DIR}/sp/tools"
+  "${BOOTSTRAP_INCLUDE_DIR}"
+)
+if(MSVC)
+  target_compile_options(triple PRIVATE ${SPN_MSVC_COMPILE_OPTIONS})
+endif()
+if(NOT MSVC)
+  target_link_libraries(triple PRIVATE m)
+endif()
+add_dependencies(triple bootstrap_headers)
+
 add_executable(integration
   source/external/tom.c
   test/integration/main.c
@@ -882,6 +910,7 @@ if(BUILD_TESTING)
   add_test(NAME lock COMMAND "$<TARGET_FILE:lock>")
   add_test(NAME git COMMAND "$<TARGET_FILE:git>")
   add_test(NAME graph COMMAND "$<TARGET_FILE:graph>")
+  add_test(NAME triple COMMAND "$<TARGET_FILE:triple>")
   add_test(NAME integration COMMAND "$<TARGET_FILE:integration>")
 endif()
 

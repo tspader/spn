@@ -200,6 +200,15 @@ source = [
 include = ["include", "source", "test/tools"]
 
 [[test]]
+name = "triple"
+source = [
+  "source/enum/enum.c",
+  "source/triple/triple.c",
+  "test/core/triple.c",
+]
+include = ["include", "source", "test/tools"]
+
+[[test]]
 name = "integration"
 source = [
   "source/external/tom.c",

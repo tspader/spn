@@ -2,65 +2,42 @@
 #include "ctx/types.h"
 #include "resolve/types.h"
 
-#include "cli/cli.h"
 #include "enum/enum.h"
 #include "event/event.h"
 #include "log/log.h"
 #include "index/cache.h"
 #include "pkg/id.h"
 #include "pkg/pkg.h"
+#include "profile/profile.h"
 #include "resolve/resolve.h"
 #include "semver/convert.h"
 #include "session/session.h"
 #include "task/task.h"
 #include "toolchain/types.h"
 
-static void overlay_profile(spn_profile_info_t* dst, spn_profile_info_t* src) {
-  if (!sp_str_empty(src->name))      dst->name = src->name;
-  if (!sp_str_empty(src->toolchain)) dst->toolchain = src->toolchain;
-  if (src->linkage)                  dst->linkage = src->linkage;
-  if (src->standard)                 dst->standard = src->standard;
-  if (src->mode)                     dst->mode = src->mode;
-  if (src->os)                       dst->os = src->os;
-  if (src->arch)                     dst->arch = src->arch;
-}
-
 static spn_err_t resolve_profile(spn_app_t* app, spn_profile_t* result) {
-  spn_profile_info_t info = {
-    .name = sp_str_lit("debug"),
-    .toolchain = sp_str_lit("builtin"),
-    .linkage = SPN_LIB_KIND_SHARED,
-    .standard = SPN_C11,
-    .mode = SPN_BUILD_MODE_DEBUG,
-  };
+  sp_str_t name = spn_profile_select_name(&app->config.overrides);
 
-  if (!sp_om_empty(app->package.profiles)) {
-    spn_profile_info_t* def = spn_pkg_get_default_profile(&app->package);
-    overlay_profile(&info, def);
+  spn_profile_info_t* info = sp_str_ht_get(app->session.profiles, name);
+  if (!info) {
+    spn_log_error("{:fg brightcyan} profile isn't defined",
+      SP_FMT_STR(name)
+    );
+    return SPN_ERROR;
   }
 
-  if (!sp_str_empty(app->config.overrides.name)) {
-    if (!sp_om_has(app->package.profiles, app->config.overrides.name)) {
-      spn_log_error("{:fg brightcyan} profile isn't defined in {:fg brightcyan}",
-        SP_FMT_STR(app->config.overrides.name),
-        SP_FMT_STR(app->package.paths.manifest)
-      );
-      return SPN_ERROR;
-    }
-    spn_profile_info_t* named = sp_om_get(app->package.profiles, app->config.overrides.name);
-    overlay_profile(&info, named);
-  }
-
-  overlay_profile(&info, &app->config.overrides);
+  spn_profile_info_t merged = *info;
+  spn_profile_overlay(&merged, &app->config.overrides);
 
   *result = (spn_profile_t) {
-    .name = info.name,
-    .toolchain = info.toolchain,
-    .os = info.os,
-    .arch = info.arch,
-    .linkage = info.linkage,
-    .standard = info.standard,
-    .mode = info.mode,
+    .name      = merged.name,
+    .toolchain = merged.toolchain,
+    .os        = merged.os,
+    .arch      = merged.arch,
+    .abi       = merged.abi,
+    .linkage   = merged.linkage,
+    .standard  = merged.standard,
+    .mode      = merged.mode,
   };
   return SPN_OK;
 }
@@ -76,13 +53,16 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
     return SPN_TASK_ERROR;
   }
 
-  // spn_log_info("{:fg brightgreen}", SP_FMT_CSTR("resolved profile:"));
-  // spn_log_info("  name:      {}", SP_FMT_STR(session->profile.name));
-  // spn_log_info("  toolchain: {}", SP_FMT_STR(session->profile.toolchain));
-  // spn_log_info("  linkage:   {}", SP_FMT_STR(spn_pkg_linkage_to_str(session->profile.linkage)));
-  // spn_log_info("  standard:  {}", SP_FMT_STR(spn_c_standard_to_str(session->profile.standard)));
-  // spn_log_info("  mode:      {}", SP_FMT_STR(spn_dep_build_mode_to_str(session->profile.mode)));
-  // exit(0);
+  spn_log_info("{:fg brightgreen}", SP_FMT_CSTR("resolved profile:"));
+  spn_log_info("  name:      {}", SP_FMT_STR(session->profile.name));
+  spn_log_info("  toolchain: {}", SP_FMT_STR(session->profile.toolchain));
+  spn_log_info("  linkage:   {}", SP_FMT_STR(spn_pkg_linkage_to_str(session->profile.linkage)));
+  spn_log_info("  standard:  {}", SP_FMT_STR(spn_c_standard_to_str(session->profile.standard)));
+  spn_log_info("  mode:      {}", SP_FMT_STR(spn_dep_build_mode_to_str(session->profile.mode)));
+  spn_log_info("  os:        {}", SP_FMT_STR(spn_os_to_str(session->profile.os)));
+  spn_log_info("  arch:      {}", SP_FMT_STR(spn_arch_to_str(session->profile.arch)));
+  spn_log_info("  abi:       {}", SP_FMT_STR(spn_abi_to_str(session->profile.abi)));
+  exit(0);
 
   session->paths.profile = sp_fs_join_path(session->paths.build, session->profile.name);
   session->events = spn.events;

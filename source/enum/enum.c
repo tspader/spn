@@ -14,6 +14,15 @@ spn_arch_t spn_arch_from_str(sp_str_t str) {
   return SPN_ARCH_NONE;
 }
 
+sp_str_t spn_arch_to_str(spn_arch_t arch) {
+  switch (arch) {
+    case SPN_ARCH_X64:   return sp_str_lit("x86_64");
+    case SPN_ARCH_ARM64: return sp_str_lit("aarch64");
+    case SPN_ARCH_NONE:  return sp_str_lit("");
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 spn_os_t spn_os_from_sp_os(sp_os_kind_t os) {
   switch (os) {
     case SP_OS_LINUX: return SPN_OS_LINUX;
@@ -35,6 +44,16 @@ spn_os_t spn_os_from_str(sp_str_t str) {
     return SPN_OS_MACOS;
   }
   return SPN_OS_NONE;
+}
+
+sp_str_t spn_os_to_str(spn_os_t os) {
+  switch (os) {
+    case SPN_OS_LINUX:   return sp_str_lit("linux");
+    case SPN_OS_WINDOWS: return sp_str_lit("windows");
+    case SPN_OS_MACOS:   return sp_str_lit("macos");
+    case SPN_OS_NONE:    return sp_str_lit("");
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
 spn_cc_driver_t spn_cc_driver_from_str(sp_str_t str) {

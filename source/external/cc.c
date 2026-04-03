@@ -17,6 +17,7 @@ void spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_t toolchain) {
 void spn_cc_set_profile(spn_cc_t* cc, spn_profile_t* profile) {
   cc->arch = profile->arch;
   cc->os = profile->os;
+  cc->abi = profile->abi;
   cc->mode = profile->mode;
   cc->linkage = profile->linkage;
   cc->standard = profile->standard;
