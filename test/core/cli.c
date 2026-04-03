@@ -512,7 +512,7 @@ static sp_app_result_t capture_handler(spn_cli_t* cli) {
 
 UTEST_F(spn_dispatch, handler_receives_user_data) {
   captured_cli = SP_NULLPTR;
-  int dummy_cli_data = 42;  // just need any pointer
+  u64 dummy_cli_data = 42;  // just need any pointer
 
   spn_cli_usage_t root = {
     .name = "test",
@@ -522,7 +522,8 @@ UTEST_F(spn_dispatch, handler_receives_user_data) {
   const c8* args[] = {};
   run_cli(&root, (spn_cli_t*)&dummy_cli_data, args, 0);
 
-  EXPECT_EQ((spn_cli_t*)&dummy_cli_data, captured_cli);
+  u64 captured = (u64)captured_cli;
+  EXPECT_EQ(dummy_cli_data, captured);
 }
 
 UTEST_F(spn_dispatch, no_handler_no_subcommands) {
