@@ -11,34 +11,40 @@ void setup_fixture_index_from_remote(s32* utest_result, tmpfs_t* fs, sp_str_t in
 void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t config);
 void setup_fixture_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir);
 
-void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, const c8* file, u32 line) {
-  if (!sp_fs_exists((path))) {
-    sp_str_builder_t b = SP_ZERO_INITIALIZE();
-    sp_str_builder_append_fmt(&b, "{}:{}", SP_FMT_CSTR(file), SP_FMT_U32(line));
+void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, bool expected, const c8* file, u32 line) {
+  bool exists = sp_fs_exists(path);
+  if (exists == expected) return;
 
-    b.indent.word = sp_format("{:fg brightred}", SP_FMT_CSTR("\u2590 "));
-    sp_str_builder_indent(&b);
+  sp_str_builder_t b = SP_ZERO_INITIALIZE();
+  sp_str_builder_append_fmt(&b, "{}:{}", SP_FMT_CSTR(file), SP_FMT_U32(line));
 
-    if (fs) {
-      sp_str_builder_new_line(&b);
-      sp_str_builder_append_fmt(&b, "{:fg brightblack} is the root", SP_FMT_STR(fs->root));
+  b.indent.word = sp_format("{:fg brightred}", SP_FMT_CSTR("\u2590 "));
+  sp_str_builder_indent(&b);
 
-      path = sp_str_strip_left(path,  fs->root);
-      path = sp_str_concat(sp_str_lit("$test"), path);
-    }
+  if (fs) {
     sp_str_builder_new_line(&b);
-    sp_str_builder_append_fmt(&b, "{:fg brightblack} does not exist", SP_FMT_STR((path)));
+    sp_str_builder_append_fmt(&b, "{:fg brightblack} is the root", SP_FMT_STR(fs->root));
 
-    SP_TEST_REPORT(sp_str_builder_to_str(&b));
-    *utest_result = UTEST_TEST_FAILURE;
+    path = sp_str_strip_left(path, fs->root);
+    path = sp_str_concat(sp_str_lit("$test"), path);
   }
+  sp_str_builder_new_line(&b);
+  if (expected) {
+    sp_str_builder_append_fmt(&b, "{:fg brightblack} does not exist", SP_FMT_STR(path));
+  } else {
+    sp_str_builder_append_fmt(&b, "{:fg brightblack} exists (expected not to)", SP_FMT_STR(path));
+  }
+
+  SP_TEST_REPORT(sp_str_builder_to_str(&b));
+  *utest_result = UTEST_TEST_FAILURE;
 }
 
-void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, const c8* file, u32 line);
+void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, bool expected, const c8* file, u32 line);
 
 #define SP_EXPECT_CONTAINS(haystack, needle)
-#define SP_EXPECT_EXISTS(path) expect_exists(utest_result, SP_NULLPTR, path, __FILE__, __LINE__)
-#define SP_EXPECT_EXISTS_TMPFS(fs, path) expect_exists(utest_result, fs, path, __FILE__, __LINE__)
+#define SP_EXPECT_EXISTS(path) expect_exists(utest_result, SP_NULLPTR, path, true, __FILE__, __LINE__)
+#define SP_EXPECT_EXISTS_TMPFS(fs, path) expect_exists(utest_result, fs, path, true, __FILE__, __LINE__)
+#define SP_EXPECT_NOT_EXISTS_TMPFS(fs, path) expect_exists(utest_result, fs, path, false, __FILE__, __LINE__)
 
 typedef struct {
   tmpfs_t fs;
@@ -152,7 +158,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
       case ACTION_REMOVE_FILE: {
         sp_str_t path = tmpfs_get(&fixture->fs, sp_str_view(action.rm.file));
         sp_fs_remove_file(path);
-        EXPECT_FALSE(sp_fs_exists(path));
+        SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
         break;
       }
       case ACTION_MOVE_FILE: {
@@ -163,8 +169,8 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         tmpfs_create(&fixture->fs, action.mv.to, content);
         sp_fs_remove_file(from);
 
-        EXPECT_FALSE(sp_fs_exists(from));
-        EXPECT_TRUE(sp_fs_exists(to));
+        SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, from);
+        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, to);
         break;
       }
       case ACTION_SUBPROCESS: {
@@ -194,12 +200,12 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
       }
       case ACTION_VERIFY_EXISTS: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_exists.file);
-        EXPECT_TRUE(sp_fs_exists(path));
+        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
         break;
       }
       case ACTION_VERIFY_NOT_EXISTS: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_not_exists.file);
-        EXPECT_FALSE(sp_fs_exists(path));
+        SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
         break;
       }
       case ACTION_VERIFY_INCLUDE: {
@@ -207,7 +213,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
           &fixture->fs,
           sp_fs_join_path(sp_str_lit("build/debug/store/include"), action.verify_include.file)
         );
-        EXPECT_TRUE(sp_fs_exists(path));
+        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
         break;
       }
       case ACTION_VERIFY_CONTENT: {
@@ -219,7 +225,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
       case ACTION_REMOVE_DIR: {
         sp_str_t path = tmpfs_get(&fixture->fs, sp_str_view(action.rm.dir));
         sp_fs_remove_dir(path);
-        EXPECT_FALSE(sp_fs_exists(path));
+        SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
         break;
       }
       case ACTION_RUN_CLI: {
@@ -253,7 +259,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
       }
       case ACTION_VERIFY_LOCKED: {
         sp_str_t path = tmpfs_get(&fixture->fs, sp_str_lit("spn.lock"));
-        EXPECT_TRUE(sp_fs_exists(path));
+        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
 
         sp_str_t lock = sp_io_read_file(path);
         EXPECT_TRUE(sp_str_contains(lock, sp_str_lit("[[dep]]")));
@@ -261,7 +267,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
       }
       case ACTION_VERIFY_PKG_LOCKED: {
         sp_str_t path = tmpfs_get(&fixture->fs, sp_str_lit("spn.lock"));
-        EXPECT_TRUE(sp_fs_exists(path));
+        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
 
         sp_str_t lock = sp_io_read_file(path);
         sp_str_t needle = sp_format("name = \"{}\"", SP_FMT_CSTR(action.verify_locked.name));

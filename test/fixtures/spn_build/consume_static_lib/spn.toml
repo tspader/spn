@@ -5,11 +5,9 @@ version = "0.1.0"
 [deps.package]
 spum = "file://./packages/spum/spn.toml"
 
-[[profile]]
-name = "debug"
+[profile.debug]
 
-[[profile]]
-name = "static"
+[profile.static]
 linkage = "static"
 
 [[bin]]
