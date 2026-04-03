@@ -13,8 +13,7 @@ spn_err_t spn_pkg_from_manifest(spn_pkg_t* pkg, sp_str_t manifest_path);
 
 bool spn_pkg_has_lib_kind(spn_pkg_t* pkg, spn_linkage_t kind);
 sp_str_t spn_pkg_get_url(spn_pkg_t* pkg);
-spn_profile_t* spn_pkg_get_default_profile(spn_pkg_t* pkg);
-spn_profile_t* spn_pkg_get_profile_or_default(spn_pkg_t* pkg, sp_str_t name);
+spn_profile_info_t* spn_pkg_get_default_profile(spn_pkg_t* pkg);
 spn_target_t* spn_pkg_get_target(spn_pkg_t* pkg, const c8* name);
 spn_target_t* spn_pkg_get_target_ex(spn_pkg_t* pkg, sp_str_t name);
 

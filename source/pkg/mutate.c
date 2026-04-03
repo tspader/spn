@@ -141,19 +141,15 @@ void spn_pkg_add_linkage(spn_pkg_t* pkg, spn_linkage_t linkage) {
   (void)linkage;
 }
 
-spn_profile_t* spn_pkg_add_profile(spn_pkg_t* pkg, const c8* name) {
-  spn_profile_t profile = {
+spn_profile_info_t* spn_pkg_add_profile(spn_pkg_t* pkg, const c8* name) {
+  spn_profile_info_t profile = {
     .name = spn_intern_cstr(name),
-    .linkage = SPN_LIB_KIND_SHARED,
-    .standard = SPN_C99,
-    .mode = SPN_BUILD_MODE_DEBUG,
-    .kind = SPN_PROFILE_USER,
   };
 
   return spn_pkg_add_profile_ex(pkg, profile);
 }
 
-spn_profile_t* spn_pkg_add_profile_ex(spn_pkg_t* pkg, spn_profile_t profile) {
+spn_profile_info_t* spn_pkg_add_profile_ex(spn_pkg_t* pkg, spn_profile_info_t profile) {
   sp_om_insert(pkg->profiles, profile.name, profile);
   return sp_om_get(pkg->profiles, profile.name);
 }
@@ -211,6 +207,7 @@ spn_target_t* spn_pkg_add_lib(spn_pkg_t* pkg, const c8* name, spn_linkage_t kind
 spn_target_t* spn_pkg_add_lib_ex(spn_pkg_t* pkg, sp_str_t name, spn_linkage_t kind) {
   spn_target_kind_t target_kind = SPN_TARGET_NONE;
   switch (kind) {
+    case SPN_LIB_KIND_NONE:
     case SPN_LIB_KIND_SOURCE: {
       target_kind = SPN_TARGET_NONE;
       break;

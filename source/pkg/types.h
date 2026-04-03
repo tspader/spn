@@ -6,6 +6,7 @@
 
 #include "ordered_map.h"
 #include "option/types.h"
+#include "profile/types.h"
 #include "semver/types.h"
 #include "toolchain/types.h"
 
@@ -52,7 +53,7 @@ struct spn_pkg {
   sp_om(spn_target_t) exes;
   sp_om(spn_target_t) scripts;
   sp_om(spn_target_t) tests;
-  sp_om(spn_profile_t) profiles;
+  sp_om(spn_profile_info_t) profiles;
   sp_om(spn_index_t) indexes;
   sp_ht(sp_str_t, spn_pkg_req_t) deps;
   sp_ht(sp_str_t, spn_dep_option_t) options;

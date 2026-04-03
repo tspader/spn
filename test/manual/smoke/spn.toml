@@ -1,0 +1,30 @@
+[package]
+name = "smoke"
+version = "1.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+
+[[toolchain]]
+name = "foo"
+url = "https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz"
+compiler = "zig cc"
+linker = "zig cc"
+archiver = "zig ar"
+driver = "gcc"
+host = [
+  { arch = "x86_64", os = "linux", abi = "gnu" },
+  { arch = "x86_64", os = "linux", abi = "musl" }
+]
+target = [
+  { arch = "x86_64", os = "linux", abi = "gnu" },
+  { arch = "x86_64", os = "linux", abi = "musl" },
+  { arch = "aarch64", os = "linux", abi = "gnu" },
+  { arch = "aarch64", os = "linux", abi = "musl" },
+  { arch = "x86_64", os = "macos" },
+  { arch = "aarch64", os = "macos" },
+  { arch = "x86_64", os = "windows", abi = "mingw" },
+  { arch = "aarch64", os = "windows", abi = "mingw" },
+]
+export = true

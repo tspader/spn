@@ -1,6 +1,7 @@
 #include "ctx/types.h"
 
 #include "cli/cli.h"
+#include "enum/enum.h"
 #include "event/event.h"
 
 sp_app_result_t spn_cli_build(spn_cli_t* cli) {
@@ -15,9 +16,11 @@ sp_app_result_t spn_cli_build(spn_cli_t* cli) {
     }
   };
 
-  sp_try(spn_cli_set_profile(&app, command->profile));
-  app.config.overrides.toolchain = command->toolchain;
-  app.config.overrides.mode = command->mode;
+  app.config.overrides = (spn_profile_info_t) {
+    .name = command->profile,
+    .toolchain = command->toolchain,
+    .mode = sp_str_empty(command->mode) ? 0 : spn_dep_build_mode_from_str(command->mode),
+  };
 
   spn_event_buffer_push_ex(spn.events, &app.package, SP_NULLPTR, (spn_build_event_t) {
     .kind = SPN_EVENT_CLI_ENTRY,

@@ -7,9 +7,6 @@
 
 #define SPN_CLI_UNIMPLEMENTED() SP_LOG("unimplemented"); return SP_APP_ERR;
 
-sp_app_result_t spn_cli_set_profile(spn_app_t* app, sp_str_t name);
-spn_err_t spn_cli_set_toolchain(spn_app_t* app, sp_str_t name);
-
 spn_cli_command_info_t spn_cli_command_info_from_usage(spn_cli_usage_t cmd);
 
 sp_app_result_t spn_cli_help(spn_cli_parser_t* p);

@@ -1,21 +1,25 @@
 #include "cli/cli.h"
 
 #include "app/app.h"
+#include "enum/enum.h"
 
 sp_app_result_t spn_cli_test(spn_cli_t* cli) {
   spn_cli_test_t* command = &cli->test;
 
-  app.config = (spn_app_config_t) {
-    .filter = (spn_target_filter_t) {
-      .name = command->target,
-      .disabled = {
-        .public = true,
-        .script = true,
-      }
-    },
-    .run = {
-      .kind = SPN_RUN_KIND_TESTS,
-    },
+  app.config.filter = (spn_target_filter_t) {
+    .name = command->target,
+    .disabled = {
+      .public = true,
+      .script = true,
+    }
+  };
+  app.config.run = (spn_run_config_t) {
+    .kind = SPN_RUN_KIND_TESTS,
+  };
+  app.config.overrides = (spn_profile_info_t) {
+    .name = command->profile,
+    .toolchain = command->toolchain,
+    .mode = sp_str_empty(command->mode) ? 0 : spn_dep_build_mode_from_str(command->mode),
   };
 
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
@@ -24,10 +28,6 @@ sp_app_result_t spn_cli_test(spn_cli_t* cli) {
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PREPARE_BUILD_GRAPH);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN_BUILD_GRAPH);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN);
-
-  sp_try_as(spn_cli_set_profile(&app, command->profile), SP_APP_ERR);
-  app.config.overrides.toolchain = command->toolchain;
-  app.config.overrides.mode = command->mode;
 
   return SP_APP_CONTINUE;
 }

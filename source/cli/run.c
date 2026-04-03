@@ -2,6 +2,7 @@
 
 #include "app/app.h"
 #include "ctx/ctx.h"
+#include "enum/enum.h"
 #include "log/log.h"
 
 static bool spn_cli_run_path_is_absolute(sp_str_t path) {
@@ -55,9 +56,11 @@ sp_app_result_t spn_cli_run(spn_cli_t* cli) {
     .target = command->entry,
   };
 
-  sp_try_as(spn_cli_set_profile(&app, command->profile), SP_APP_ERR);
-  app.config.overrides.toolchain = command->toolchain;
-  app.config.overrides.mode = command->mode;
+  app.config.overrides = (spn_profile_info_t) {
+    .name = command->profile,
+    .toolchain = command->toolchain,
+    .mode = sp_str_empty(command->mode) ? 0 : spn_dep_build_mode_from_str(command->mode),
+  };
 
   if (source) {
     if (has_manifest) {

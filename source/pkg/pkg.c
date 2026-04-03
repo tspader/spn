@@ -88,7 +88,7 @@ spn_target_t* spn_pkg_get_target_ex(spn_pkg_t* pkg, sp_str_t name) {
   return SP_NULLPTR;
 }
 
-spn_profile_t* spn_pkg_get_default_profile(spn_pkg_t* pkg) {
+spn_profile_info_t* spn_pkg_get_default_profile(spn_pkg_t* pkg) {
   sp_om_for(pkg->profiles, it) {
     return sp_om_at(pkg->profiles, it);
   }
@@ -96,13 +96,4 @@ spn_profile_t* spn_pkg_get_default_profile(spn_pkg_t* pkg) {
   SP_UNREACHABLE_RETURN(SP_NULLPTR);
 }
 
-spn_profile_t* spn_pkg_get_profile_or_default(spn_pkg_t* pkg, sp_str_t name) {
-  sp_require_as_null(!sp_om_empty(pkg->profiles));
 
-  spn_profile_t* profile = sp_om_get(pkg->profiles, name);
-  if (profile) {
-    return profile;
-  }
-
-  return spn_pkg_get_default_profile(pkg);
-}

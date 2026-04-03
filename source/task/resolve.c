@@ -15,7 +15,7 @@
 #include "task/task.h"
 #include "toolchain/types.h"
 
-static void overlay_profile(spn_profile_t* dst, spn_profile_t* src) {
+static void overlay_profile(spn_profile_info_t* dst, spn_profile_info_t* src) {
   if (!sp_str_empty(src->name))      dst->name = src->name;
   if (!sp_str_empty(src->toolchain)) dst->toolchain = src->toolchain;
   if (src->linkage)                  dst->linkage = src->linkage;
@@ -25,52 +25,64 @@ static void overlay_profile(spn_profile_t* dst, spn_profile_t* src) {
   if (src->arch)                     dst->arch = src->arch;
 }
 
-static spn_profile_t resolve_profile(spn_app_t* app) {
-  spn_profile_t profile = {
+static spn_err_t resolve_profile(spn_app_t* app, spn_profile_t* result) {
+  spn_profile_info_t info = {
     .name = sp_str_lit("default"),
-    .linkage = SPN_LIB_KIND_SHARED,
+    .toolchain = sp_str_lit("builtin"),
+    .linkage = SPN_LIB_KIND_STATIC,
     .standard = SPN_C11,
     .mode = SPN_BUILD_MODE_DEBUG,
   };
 
   if (!sp_om_empty(app->package.profiles)) {
-    spn_profile_t* def = spn_pkg_get_default_profile(&app->package);
-    overlay_profile(&profile, def);
+    spn_profile_info_t* def = spn_pkg_get_default_profile(&app->package);
+    overlay_profile(&info, def);
   }
 
-  if (!sp_str_empty(app->config.overrides.profile)) {
-    spn_profile_t* named = sp_om_get(app->package.profiles, app->config.overrides.profile);
-    if (named) {
-      overlay_profile(&profile, named);
-    }
-  }
-
-  if (!sp_str_empty(app->config.overrides.toolchain)) {
-    if (!sp_str_ht_exists(app->session.toolchains, app->config.overrides.toolchain)) {
-      spn_log_error("{:fg brightcyan} toolchain isn't defined",
-        SP_FMT_STR(app->config.overrides.toolchain)
+  if (!sp_str_empty(app->config.overrides.name)) {
+    if (!sp_om_has(app->package.profiles, app->config.overrides.name)) {
+      spn_log_error("{:fg brightcyan} profile isn't defined in {:fg brightcyan}",
+        SP_FMT_STR(app->config.overrides.name),
+        SP_FMT_STR(app->package.paths.manifest)
       );
-      return (spn_profile_t) { .mode = SPN_BUILD_MODE_NONE };
+      return SPN_ERROR;
     }
-    profile.toolchain = app->config.overrides.toolchain;
+    spn_profile_info_t* named = sp_om_get(app->package.profiles, app->config.overrides.name);
+    overlay_profile(&info, named);
   }
 
-  if (!sp_str_empty(app->config.overrides.mode)) {
-    profile.mode = spn_dep_build_mode_from_str(app->config.overrides.mode);
-  }
+  overlay_profile(&info, &app->config.overrides);
 
-  return profile;
+  *result = (spn_profile_t) {
+    .name = info.name,
+    .toolchain = info.toolchain,
+    .os = info.os,
+    .arch = info.arch,
+    .linkage = info.linkage,
+    .standard = info.standard,
+    .mode = info.mode,
+  };
+  return SPN_OK;
 }
 
 spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_session_t* session = &app->session;
-  session->profile = resolve_profile(app);
-  if (session->profile.mode == SPN_BUILD_MODE_NONE) {
+  spn_try_as(resolve_profile(app, &session->profile), SPN_TASK_ERROR);
+
+  if (!sp_str_ht_exists(app->session.toolchains, session->profile.toolchain)) {
+    spn_log_error("{:fg brightcyan} toolchain isn't defined",
+      SP_FMT_STR(session->profile.toolchain)
+    );
     return SPN_TASK_ERROR;
   }
-  if (!sp_str_empty(session->profile.toolchain)) {
-    spn_cli_set_toolchain(app, session->profile.toolchain);
-  }
+
+  // spn_log_info("{:fg brightgreen}", SP_FMT_CSTR("resolved profile:"));
+  // spn_log_info("  name:      {}", SP_FMT_STR(session->profile.name));
+  // spn_log_info("  toolchain: {}", SP_FMT_STR(session->profile.toolchain));
+  // spn_log_info("  linkage:   {}", SP_FMT_STR(spn_pkg_linkage_to_str(session->profile.linkage)));
+  // spn_log_info("  standard:  {}", SP_FMT_STR(spn_c_standard_to_str(session->profile.standard)));
+  // spn_log_info("  mode:      {}", SP_FMT_STR(spn_dep_build_mode_to_str(session->profile.mode)));
+  // exit(0);
 
   session->paths.profile = sp_fs_join_path(session->paths.build, session->profile.name);
   spn_session_set_filter(session, app->config.filter);
@@ -86,7 +98,12 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
     spn_resolver_add(resolver, *it.val);
   }
 
-  spn_toolchain_entry_t toolchain = *app->config.toolchain;
+  spn_toolchain_entry_t* tc_entry = sp_str_ht_get(app->session.toolchains, session->profile.toolchain);
+  if (!tc_entry) {
+    spn_log_error("toolchain {:fg brightcyan} not in session toolchains", SP_FMT_STR(session->profile.toolchain));
+    return SPN_TASK_ERROR;
+  }
+  spn_toolchain_entry_t toolchain = *tc_entry;
   if (toolchain.kind == SPN_TOOLCHAIN_INDEX) {
     spn_resolver_add(resolver, (spn_pkg_req_t) {
       .id = spn_qualified_name_to_pkg_id(toolchain.request.package),
@@ -105,7 +122,6 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
     SPN_RESOLVE_STRATEGY_LOCK_FILE :
     SPN_RESOLVE_STRATEGY_SOLVER;
 
-  // Resolve
   spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
     .kind = SPN_EVENT_RESOLVE_START,
     .resolve_start = {
@@ -127,7 +143,6 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
     }
   }
 
-  // Emit events for the results of the resolve (per-package and overall)
   spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
     .kind = SPN_EVENT_RESOLVE_END,
     .resolve_end = {

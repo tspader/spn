@@ -146,11 +146,16 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
 
   // Resolve the toolchain — set session->toolchain.info before adding units,
   // because build hashes for index packages depend on it.
-  spn_toolchain_entry_t* entry = app->config.toolchain;
-  if (app->config.toolchain->kind == SPN_TOOLCHAIN_INDEX) {
-    spn_toolchain_req_t* request = &app->config.toolchain->request;
+  spn_toolchain_entry_t* entry = sp_str_ht_get(session->toolchains, session->profile.toolchain);
+  sp_assert(entry);
+  if (entry->kind == SPN_TOOLCHAIN_INDEX) {
+    spn_toolchain_req_t* request = &entry->request;
+
     checkout_t* checkout = sp_str_ht_get(checkouts, request->package);
-    sp_assert(checkout);
+    if (!checkout) {
+      spn_log_error("toolchain package {:fg brightcyan} not found in checkouts", SP_FMT_STR(request->package));
+      return SPN_TASK_ERROR;
+    }
 
     spn_pkg_t* pkg = checkout->pkg;
     spn_toolchain_entry_t* entry = sp_om_at(checkout->pkg->toolchains, 0);

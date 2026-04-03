@@ -540,13 +540,13 @@ static spn_toolchain_launcher_t split_launcher(sp_str_t str) {
 
   if (sp_str_contains(str, sp_str_lit(" "))) {
     sp_da(sp_str_t) parts = sp_str_split_c8(str, ' ');
-    launcher.program = parts[0];
+    launcher.program = spn_intern(parts[0]);
     for (u32 i = 1; i < sp_da_size(parts); i++) {
-      sp_da_push(launcher.args, parts[i]);
+      sp_da_push(launcher.args, spn_intern(parts[i]));
     }
   }
   else {
-    launcher.program = str;
+    launcher.program = spn_intern(str);
   }
 
   return launcher;
@@ -575,10 +575,10 @@ static spn_err_t load_triple_array(toml_array_t* toml, spn_triple_t* triples, u3
 }
 
 static spn_err_t load_profile(toml_table_t* toml, spn_pkg_t* pkg, sp_str_t name) {
-  sp_str_t linkage = sp_str_lit("shared");
-  sp_str_t standard = sp_str_lit("c99");
+  sp_str_t linkage = sp_str_lit("");
+  sp_str_t standard = sp_str_lit("");
   sp_str_t toolchain = sp_str_lit("");
-  sp_str_t mode = sp_str_lit("debug");
+  sp_str_t mode = sp_str_lit("");
   sp_str_t os = sp_str_lit("");
   sp_str_t arch = sp_str_lit("");
 
@@ -589,15 +589,14 @@ static spn_err_t load_profile(toml_table_t* toml, spn_pkg_t* pkg, sp_str_t name)
   spn_try(get_str_optional(toml, "os", &os));
   spn_try(get_str_optional(toml, "arch", &arch));
 
-  spn_pkg_add_profile_ex(pkg, (spn_profile_t) {
+  spn_pkg_add_profile_ex(pkg, (spn_profile_info_t) {
     .name = spn_intern(name),
     .toolchain = spn_intern(toolchain),
-    .linkage = spn_pkg_linkage_from_str(linkage),
-    .standard = spn_c_standard_from_str(standard),
-    .mode = spn_dep_build_mode_from_str(mode),
-    .os = spn_os_from_str(os),
-    .arch = spn_arch_from_str(arch),
-    .kind = SPN_PROFILE_USER,
+    .linkage = sp_str_empty(linkage) ? 0 : spn_pkg_linkage_from_str(linkage),
+    .standard = sp_str_empty(standard) ? 0 : spn_c_standard_from_str(standard),
+    .mode = sp_str_empty(mode) ? 0 : spn_dep_build_mode_from_str(mode),
+    .os = sp_str_empty(os) ? 0 : spn_os_from_str(os),
+    .arch = sp_str_empty(arch) ? 0 : spn_arch_from_str(arch),
   });
 
   return SPN_OK;
@@ -757,7 +756,9 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     sp_str_t driver = sp_zero_initialize();
 
     spn_try_as_union(get_str_optional(it, "name", &toolchain.name));
+    toolchain.name = spn_intern(toolchain.name);
     spn_try_as_union(get_str_optional(it, "url", &toolchain.url));
+    toolchain.url = spn_intern(toolchain.url);
     sp_str_t compiler_str = sp_zero_initialize();
     sp_str_t linker_str = sp_zero_initialize();
     sp_str_t archiver_str = sp_zero_initialize();
@@ -768,6 +769,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     toolchain.linker = split_launcher(linker_str);
     toolchain.archiver = split_launcher(archiver_str);
     spn_try_as_union(get_str_optional(it, "sysroot", &toolchain.sysroot));
+    toolchain.sysroot = spn_intern(toolchain.sysroot);
     spn_try_as_union(get_bool_optional(it, "export", &toolchain.export));
     spn_try_as_union(get_str_optional(it, "driver", &driver));
     toolchain.driver = spn_cc_driver_from_str(driver);

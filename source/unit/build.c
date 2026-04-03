@@ -116,7 +116,6 @@ void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t config) {
   ctx->arena = sp_mem_arena_new_ex(256, SP_MEM_ARENA_MODE_NO_REALLOC, 1);
 
   ctx->name = sp_str_copy(config.name);
-  ctx->profile = &config.session->profile;
   ctx->linkage = config.linkage;
   ctx->pkg = config.package;
   ctx->session = config.session;

@@ -126,14 +126,13 @@ void run_case(s32* utest_result, struct load* utest_fixture, test_t test) {
 
   sp_for(it, num.profiles.expected) {
     profile_t expected = test.profiles[it];
-    spn_profile_t* actual = sp_om_at(pkg.profiles, it);
+    spn_profile_info_t* actual = sp_om_at(pkg.profiles, it);
 
     if (expected.name) SP_EXPECT_STR_EQ_CSTR(actual->name, expected.name);
     if (expected.toolchain) SP_EXPECT_STR_EQ_CSTR(actual->toolchain, expected.toolchain);
     EXPECT_EQ(actual->linkage, expected.linkage);
     if (expected.standard) EXPECT_EQ(actual->standard, expected.standard);
     if (expected.mode) EXPECT_EQ(actual->mode, expected.mode);
-    EXPECT_EQ(actual->kind, SPN_PROFILE_USER);
   }
 }
 

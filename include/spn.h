@@ -53,9 +53,10 @@ typedef enum {
 } spn_build_mode_t;
 
 typedef enum {
-  SPN_LIB_KIND_SHARED = 0,
-  SPN_LIB_KIND_STATIC = 1,
-  SPN_LIB_KIND_SOURCE = 2,
+  SPN_LIB_KIND_NONE,
+  SPN_LIB_KIND_SHARED,
+  SPN_LIB_KIND_STATIC,
+  SPN_LIB_KIND_SOURCE,
 } spn_linkage_t;
 
 typedef enum {

@@ -264,35 +264,6 @@ sp_app_result_t spn_cli_help(spn_cli_parser_t* p) {
   return SP_APP_QUIT;
 }
 
-sp_app_result_t spn_cli_set_profile(spn_app_t* app, sp_str_t name) {
-  if (!sp_str_empty(name) && !sp_om_empty(app->package.profiles) && !sp_om_has(app->package.profiles, name)) {
-    spn_log_error("{:fg brightcyan} profile isn't defined in {:fg brightcyan}",
-      SP_FMT_STR(name),
-      SP_FMT_STR(app->package.paths.manifest)
-    );
-    return SP_APP_ERR;
-  }
-
-  app->config.overrides.profile = name;
-  return SP_APP_CONTINUE;
-}
-
-spn_err_t spn_cli_set_toolchain(spn_app_t* app, sp_str_t toolchain) {
-  if (sp_str_empty(toolchain)) {
-    return SPN_OK;
-  }
-
-  if (!sp_str_ht_exists(app->session.toolchains, toolchain)) {
-    spn_log_error("{:fg brightcyan} toolchain isn't defined in {:fg brightcyan}",
-      SP_FMT_STR(toolchain),
-      SP_FMT_STR(app->package.paths.manifest)
-    );
-    return SPN_ERROR;
-  }
-
-  app->config.toolchain = sp_str_ht_get(app->session.toolchains, toolchain);
-  return SPN_OK;
-}
 
 sp_app_result_t spn_cli_root(spn_cli_t* cli) {
   sp_str_t help = spn_cli_usage(&cli->usage);

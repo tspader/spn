@@ -99,7 +99,6 @@ struct spn_build_ctx {
   sp_str_t name;
   spn_session_t* session;
   spn_pkg_t* pkg;
-  spn_profile_t* profile;
   spn_linkage_t linkage;
   spn_build_paths_t paths;
   spn_build_io_t logs;

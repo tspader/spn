@@ -351,13 +351,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     sp_str_ht_insert(session->toolchains, entry.name, entry);
   }
 
-  sp_str_ht_for_kv(session->toolchains, it) {
-    app.config.toolchain = it.val;
-    break;
-  }
-  sp_assert(app.config.toolchain);
-
-
   switch (spn_cli_dispatch(&parser, cli)) {
     case SP_APP_CONTINUE: return SP_APP_CONTINUE;
     case SP_APP_QUIT: return SP_APP_QUIT;

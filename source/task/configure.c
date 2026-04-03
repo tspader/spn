@@ -214,7 +214,7 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   }
 
   if (toolchain) {
-    toolchain->nodes.download = spn_bg_add_fn(graph, download_toolchain, session);
+    toolchain->nodes.download = spn_bg_add_fn(graph, download_toolchain, toolchain);
     toolchain->nodes.stamp = spn_bg_add_file(graph, toolchain->paths.stamp);
     try(spn_bg_cmd_add_output(graph, toolchain->nodes.download, toolchain->nodes.stamp));
 
