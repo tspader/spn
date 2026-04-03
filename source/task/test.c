@@ -15,7 +15,7 @@ static spn_err_t spn_task_add_build_deps_to_tcc(spn_app_t* app, spn_tcc_t* tcc) 
   }
 
   spn_cc_t cc = SP_ZERO_INITIALIZE();
-  spn_cc_set_profile(&cc, app->config.profile);
+  spn_cc_set_profile(&cc, &app->session.profile);
 
   spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_TARGET_JIT, sp_str_lit("run"));
   sp_ht_for_kv(app->package.deps, it) {
@@ -238,7 +238,7 @@ spn_task_result_t spn_task_run_tests(spn_app_t* app) {
     .test.passed = {
       .time = elapsed,
       .n = sp_ht_size(tests),
-      .profile = app->session.profile
+      .profile = &app->session.profile
     }
   });
 

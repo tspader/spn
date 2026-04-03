@@ -16,12 +16,14 @@ sp_app_result_t spn_cli_build(spn_cli_t* cli) {
   };
 
   sp_try(spn_cli_set_profile(&app, command->profile));
+  app.config.overrides.toolchain = command->toolchain;
+  app.config.overrides.mode = command->mode;
 
   spn_event_buffer_push_ex(spn.events, &app.package, SP_NULLPTR, (spn_build_event_t) {
     .kind = SPN_EVENT_CLI_ENTRY,
     .cli_entry = {
       .command = sp_str_lit("build"),
-      .profile = app.config.profile ? app.config.profile->name : sp_str_lit(""),
+      .profile = command->profile,
       .target = command->target,
       .force = command->force,
       .cwd = spn.paths.cwd,

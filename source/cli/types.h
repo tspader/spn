@@ -77,16 +77,22 @@ typedef struct {
   bool tests;
   sp_str_t target;
   sp_str_t profile;
+  sp_str_t toolchain;
+  sp_str_t mode;
 } spn_cli_build_t;
 
 typedef struct {
   sp_str_t entry;
   sp_str_t profile;
+  sp_str_t toolchain;
+  sp_str_t mode;
 } spn_cli_run_t;
 
 typedef struct {
   sp_str_t target;
   sp_str_t profile;
+  sp_str_t toolchain;
+  sp_str_t mode;
 } spn_cli_test_t;
 
 typedef struct {

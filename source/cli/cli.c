@@ -265,12 +265,7 @@ sp_app_result_t spn_cli_help(spn_cli_parser_t* p) {
 }
 
 sp_app_result_t spn_cli_set_profile(spn_app_t* app, sp_str_t name) {
-  if (sp_str_empty(name)) {
-    app->config.profile = spn_pkg_get_default_profile(&app->package);
-    return SP_APP_CONTINUE;
-  }
-
-  if (!sp_om_has(app->package.profiles, name)) {
+  if (!sp_str_empty(name) && !sp_om_empty(app->package.profiles) && !sp_om_has(app->package.profiles, name)) {
     spn_log_error("{:fg brightcyan} profile isn't defined in {:fg brightcyan}",
       SP_FMT_STR(name),
       SP_FMT_STR(app->package.paths.manifest)
@@ -278,8 +273,7 @@ sp_app_result_t spn_cli_set_profile(spn_app_t* app, sp_str_t name) {
     return SP_APP_ERR;
   }
 
-  app->config.profile = spn_pkg_get_profile_or_default(&app->package, name);
-  spn_cli_set_toolchain(app, app->config.profile->toolchain);
+  app->config.overrides.profile = name;
   return SP_APP_CONTINUE;
 }
 
@@ -460,6 +454,21 @@ static spn_cli_usage_t commands[] = {
           .kind = SPN_CLI_OPT_KIND_BOOLEAN,
           .summary = "Include test targets",
           .ptr = &spn.cli.build.tests
+        },
+        {
+          .name = "toolchain",
+          .kind = SPN_CLI_OPT_KIND_STRING,
+          .summary = "Override toolchain",
+          .placeholder = "NAME",
+          .ptr = &spn.cli.build.toolchain
+        },
+        {
+          .brief = "m",
+          .name = "mode",
+          .kind = SPN_CLI_OPT_KIND_STRING,
+          .summary = "Override build mode (debug, release)",
+          .placeholder = "MODE",
+          .ptr = &spn.cli.build.mode
         }
       },
       .summary = "Build the project, including dependencies, from source",
@@ -476,6 +485,21 @@ static spn_cli_usage_t commands[] = {
           .summary = "Profile to use when resolving build dependencies",
           .placeholder = "PROFILE",
           .ptr = &spn.cli.run.profile
+        },
+        {
+          .name = "toolchain",
+          .kind = SPN_CLI_OPT_KIND_STRING,
+          .summary = "Override toolchain",
+          .placeholder = "NAME",
+          .ptr = &spn.cli.run.toolchain
+        },
+        {
+          .brief = "m",
+          .name = "mode",
+          .kind = SPN_CLI_OPT_KIND_STRING,
+          .summary = "Override build mode (debug, release)",
+          .placeholder = "MODE",
+          .ptr = &spn.cli.run.mode
         }
       },
       .args = {
@@ -508,6 +532,21 @@ static spn_cli_usage_t commands[] = {
           .summary = "Test target to run",
           .placeholder = "TARGET",
           .ptr = &spn.cli.test.target
+        },
+        {
+          .name = "toolchain",
+          .kind = SPN_CLI_OPT_KIND_STRING,
+          .summary = "Override toolchain",
+          .placeholder = "NAME",
+          .ptr = &spn.cli.test.toolchain
+        },
+        {
+          .brief = "m",
+          .name = "mode",
+          .kind = SPN_CLI_OPT_KIND_STRING,
+          .summary = "Override build mode (debug, release)",
+          .placeholder = "MODE",
+          .ptr = &spn.cli.test.mode
         }
       },
       .summary = "Build and run tests",

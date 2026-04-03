@@ -54,7 +54,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
     case SPN_TARGET_EXE:
     case SPN_TARGET_SHARED_LIB: {
       spn_cc_t* cc = sp_alloc_type(spn_cc_t);
-      spn_cc_set_profile(cc, unit->session->profile);
+      spn_cc_set_profile(cc, &unit->session->profile);
       spn_cc_set_output_dir(cc, sp_fs_parent_path(output));
       spn_cc_set_toolchain(cc, unit->session->toolchain);
       add_pkg_to_cc(cc, unit->pkg);

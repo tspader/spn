@@ -56,6 +56,8 @@ sp_app_result_t spn_cli_run(spn_cli_t* cli) {
   };
 
   sp_try_as(spn_cli_set_profile(&app, command->profile), SP_APP_ERR);
+  app.config.overrides.toolchain = command->toolchain;
+  app.config.overrides.mode = command->mode;
 
   if (source) {
     if (has_manifest) {

@@ -534,6 +534,25 @@ static spn_err_union_t load_deps(toml_table_t* toml, spn_pkg_t* pkg, spn_visibil
   return spn_result(SPN_OK);
 }
 
+static spn_toolchain_launcher_t split_launcher(sp_str_t str) {
+  spn_toolchain_launcher_t launcher = sp_zero_initialize();
+  if (sp_str_empty(str)) return launcher;
+
+  if (sp_str_contains(str, sp_str_lit(" "))) {
+    sp_da(sp_str_t) parts = sp_str_split_c8(str, ' ');
+    launcher.program = parts[0];
+    for (u32 i = 1; i < sp_da_size(parts); i++) {
+      sp_da_push(launcher.args, parts[i]);
+    }
+  }
+  else {
+    launcher.program = str;
+  }
+
+  return launcher;
+}
+
+
 static spn_err_t load_triple_array(toml_array_t* toml, spn_triple_t* triples, u32 len) {
   spn_toml_arr_for(toml, it) {
     toml_table_t* triple = toml_array_table(toml, it);
@@ -745,9 +764,9 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     spn_try_as_union(get_str_optional(it, "compiler", &compiler_str));
     spn_try_as_union(get_str_optional(it, "linker", &linker_str));
     spn_try_as_union(get_str_optional(it, "archiver", &archiver_str));
-    toolchain.compiler = spn_toolchain_launcher_from_str(compiler_str);
-    toolchain.linker = spn_toolchain_launcher_from_str(linker_str);
-    toolchain.archiver = spn_toolchain_launcher_from_str(archiver_str);
+    toolchain.compiler = split_launcher(compiler_str);
+    toolchain.linker = split_launcher(linker_str);
+    toolchain.archiver = split_launcher(archiver_str);
     spn_try_as_union(get_str_optional(it, "sysroot", &toolchain.sysroot));
     spn_try_as_union(get_bool_optional(it, "export", &toolchain.export));
     spn_try_as_union(get_str_optional(it, "driver", &driver));

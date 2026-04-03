@@ -29,10 +29,15 @@ typedef struct {
 
 typedef struct {
   spn_target_filter_t filter;
-  spn_profile_t* profile;
   spn_toolchain_entry_t* toolchain;
   bool force;
   spn_run_config_t run;
+
+  struct {
+    sp_str_t profile;
+    sp_str_t toolchain;
+    sp_str_t mode;
+  } overrides;
 } spn_app_config_t;
 
 struct spn_app_t {

@@ -37,7 +37,7 @@ void spn_task_init_build_graph(spn_app_t* app) {
   spn_event_buffer_push_ctx(spn.events, &spn_session_find_root(b)->ctx, (spn_build_event_t) {
     .kind = SPN_EVENT_INIT_BUILD_GRAPH,
     .graph_init = {
-      .profile = b->profile->name,
+      .profile = b->profile.name,
       .force = app->config.force,
       .packages = num_packages,
     }
@@ -100,7 +100,7 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
         spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
           .kind = SPN_EVENT_BUILD_FAILED,
           .build_failed = {
-            .profile = app->session.profile->name,
+            .profile = app->session.profile.name,
             .time = b->build.executor->elapsed,
             .num_errors = num_errors,
             .first_error = first_error,
@@ -114,7 +114,7 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
             .num_dirty = dirty_cmds,
             .total_commands = sp_da_size(b->build.graph.commands),
             .time = b->build.executor->elapsed,
-            .profile = app->session.profile->name,
+            .profile = app->session.profile.name,
           }
         });
 
@@ -128,7 +128,7 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
         spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
           .kind = SPN_EVENT_BUILD_PASSED,
           .build.passed = {
-            .profile = app->session.profile,
+            .profile = &app->session.profile,
             .time = b->build.executor->elapsed
           }
         });
@@ -140,7 +140,7 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
             .num_dirty = dirty_cmds,
             .total_commands = sp_da_size(b->build.graph.commands),
             .time = b->build.executor->elapsed,
-            .profile = app->session.profile->name,
+            .profile = app->session.profile.name,
           }
         });
 

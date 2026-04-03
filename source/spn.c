@@ -345,39 +345,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
         .range = spn_semver_any()
       },
     },
-    {
-      .name = sp_str_lit("gcc"),
-      .kind = SPN_TOOLCHAIN_BUILTIN,
-      .info = {
-        .name = sp_str_lit("gcc"),
-        .compiler = { .program = sp_str_lit("gcc") },
-        .linker = { .program = sp_str_lit("gcc") },
-        .archiver = { .program = sp_str_lit("ar") },
-        .driver = SPN_CC_DRIVER_GCC,
-      },
-    },
-    {
-      .name = sp_str_lit("clang"),
-      .kind = SPN_TOOLCHAIN_BUILTIN,
-      .info = {
-        .name = sp_str_lit("clang"),
-        .compiler = { .program = sp_str_lit("clang") },
-        .linker = { .program = sp_str_lit("clang") },
-        .archiver = { .program = sp_str_lit("ar") },
-        .driver = SPN_CC_DRIVER_GCC,
-      },
-    },
-    {
-      .name = sp_str_lit("tcc"),
-      .kind = SPN_TOOLCHAIN_BUILTIN,
-      .info = {
-        .name = sp_str_lit("tcc"),
-        .compiler = { .program = sp_str_lit("tcc") },
-        .linker = { .program = sp_str_lit("tcc") },
-        .archiver = { .program = sp_str_lit("ar") },
-        .driver = SPN_CC_DRIVER_GCC,
-      },
-    },
   };
   sp_carr_for(builtin_toolchains, it) {
     spn_toolchain_entry_t entry = builtin_toolchains[it];
@@ -390,30 +357,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
   sp_assert(app.config.toolchain);
 
-  // @spader These need to be done like toolchains
-  if (sp_om_empty(app.package.profiles)) {
-    spn_profile_t profiles[] = {
-      {
-        .name = sp_str_lit("debug"),
-        .linkage = SPN_LIB_KIND_SHARED,
-        .standard = SPN_C11,
-        .mode = SPN_BUILD_MODE_DEBUG,
-        .kind = SPN_PROFILE_BUILTIN,
-        .toolchain = sp_str_lit("system")
-      },
-      {
-        .name = sp_str_lit("release"),
-        .linkage = SPN_LIB_KIND_SHARED,
-        .standard = SPN_C11,
-        .mode = SPN_BUILD_MODE_RELEASE,
-        .kind = SPN_PROFILE_BUILTIN,
-        .toolchain = sp_str_lit("system")
-      }
-    };
-    sp_carr_for(profiles, it) {
-      spn_pkg_add_profile_ex(&app.package, profiles[it]);
-    }
-  }
 
   switch (spn_cli_dispatch(&parser, cli)) {
     case SP_APP_CONTINUE: return SP_APP_CONTINUE;

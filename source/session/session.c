@@ -58,10 +58,10 @@ static spn_linkage_t spn_session_resolve_dep_linkage(spn_session_t* session, spn
 
 void spn_session_init(spn_session_t* session, spn_pkg_t* pkg, spn_profile_t* profile, sp_str_t dir) {
   session->pkg = pkg;
-  session->profile = profile;
+  session->profile = *profile;
   session->paths.root = sp_str_copy(pkg->paths.root);
   session->paths.build = sp_fs_join_path(session->paths.root, dir);
-  session->paths.profile = sp_fs_join_path(session->paths.build, session->profile->name);
+  session->paths.profile = sp_fs_join_path(session->paths.build, session->profile.name);
   session->env = sp_env_capture();
 
   sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
@@ -141,7 +141,7 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
       // sp_da_push(hashes, sp_hash_str(session->toolchain.info->sysroot));
       // sp_da_push(hashes, session->toolchain.info->driver);
       // sp_da_push(hashes, session->toolchain.info->abi);
-      sp_da_push(hashes, session->profile->mode);
+      sp_da_push(hashes, session->profile.mode);
       sp_da_push(hashes, linkage);
       sp_da_push(hashes, metadata->version.major);
       sp_da_push(hashes, metadata->version.minor);
@@ -255,7 +255,7 @@ spn_err_t spn_session_compile_pkg(spn_session_t* session, spn_pkg_unit_t* unit) 
   sp_try_goto(spn_tcc_prepare_script(tcc, &error_context), fail);
 
   spn_cc_t cc = SP_ZERO_INITIALIZE();
-  spn_cc_set_profile(&cc, session->profile);
+  spn_cc_set_profile(&cc, &session->profile);
   spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_TARGET_JIT, pkg->name);
   sp_ht_for_kv(pkg->deps, it) {
     switch (it.val->visibility) {

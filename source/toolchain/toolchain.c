@@ -19,24 +19,6 @@ spn_toolchain_launcher_t spn_toolchain_get_linker_driver(spn_toolchain_info_t* t
   sp_unreachable_return(bad);
 }
 
-spn_toolchain_launcher_t spn_toolchain_launcher_from_str(sp_str_t str) {
-  spn_toolchain_launcher_t launcher = sp_zero_initialize();
-  if (sp_str_empty(str)) return launcher;
-
-  if (sp_str_contains(str, sp_str_lit(" "))) {
-    sp_da(sp_str_t) parts = sp_str_split_c8(str, ' ');
-    launcher.program = parts[0];
-    for (u32 i = 1; i < sp_da_size(parts); i++) {
-      sp_da_push(launcher.args, parts[i]);
-    }
-  }
-  else {
-    launcher.program = str;
-  }
-
-  return launcher;
-}
-
 spn_toolchain_launcher_t spn_toolchain_launcher_with_root(spn_toolchain_launcher_t launcher, sp_str_t root) {
   spn_toolchain_launcher_t result = launcher;
   result.program = sp_fs_join_path(root, launcher.program);

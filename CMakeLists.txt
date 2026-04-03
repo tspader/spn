@@ -628,7 +628,6 @@ add_executable(load
   source/semver/convert.c
   source/semver/parser.c
   source/target/mutate.c
-  source/toolchain/toolchain.c
   test/core/manifest.c
   test/tools/harness.c
   test/tools/tmp.c

@@ -2,19 +2,85 @@
 #include "ctx/types.h"
 #include "resolve/types.h"
 
+#include "cli/cli.h"
+#include "enum/enum.h"
 #include "event/event.h"
+#include "log/log.h"
 #include "index/cache.h"
 #include "pkg/id.h"
+#include "pkg/pkg.h"
 #include "resolve/resolve.h"
 #include "semver/convert.h"
 #include "session/session.h"
 #include "task/task.h"
 #include "toolchain/types.h"
 
+static void overlay_profile(spn_profile_t* dst, spn_profile_t* src) {
+  if (!sp_str_empty(src->name))      dst->name = src->name;
+  if (!sp_str_empty(src->toolchain)) dst->toolchain = src->toolchain;
+  if (src->linkage)                  dst->linkage = src->linkage;
+  if (src->standard)                 dst->standard = src->standard;
+  if (src->mode)                     dst->mode = src->mode;
+  if (src->os)                       dst->os = src->os;
+  if (src->arch)                     dst->arch = src->arch;
+}
+
+static spn_profile_t resolve_profile(spn_app_t* app) {
+  spn_profile_t profile = {
+    .name = sp_str_lit("default"),
+    .linkage = SPN_LIB_KIND_SHARED,
+    .standard = SPN_C11,
+    .mode = SPN_BUILD_MODE_DEBUG,
+  };
+
+  if (!sp_om_empty(app->package.profiles)) {
+    spn_profile_t* def = spn_pkg_get_default_profile(&app->package);
+    overlay_profile(&profile, def);
+  }
+
+  if (!sp_str_empty(app->config.overrides.profile)) {
+    spn_profile_t* named = sp_om_get(app->package.profiles, app->config.overrides.profile);
+    if (named) {
+      overlay_profile(&profile, named);
+    }
+  }
+
+  if (!sp_str_empty(app->config.overrides.toolchain)) {
+    if (!sp_str_ht_exists(app->session.toolchains, app->config.overrides.toolchain)) {
+      spn_log_error("{:fg brightcyan} toolchain isn't defined",
+        SP_FMT_STR(app->config.overrides.toolchain)
+      );
+      return (spn_profile_t) { .mode = SPN_BUILD_MODE_NONE };
+    }
+    profile.toolchain = app->config.overrides.toolchain;
+  }
+
+  if (!sp_str_empty(app->config.overrides.mode)) {
+    profile.mode = spn_dep_build_mode_from_str(app->config.overrides.mode);
+  }
+
+  return profile;
+}
+
 spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_session_t* session = &app->session;
-  session->profile = app->config.profile;
-  session->paths.profile = sp_fs_join_path(session->paths.build, session->profile->name);
+  session->profile = resolve_profile(app);
+  if (session->profile.mode == SPN_BUILD_MODE_NONE) {
+    return SPN_TASK_ERROR;
+  }
+ SP_LOG("resolved profile: name={} toolchain={} mode={} linkage={} standard={}",
+        SP_FMT_STR(session->profile.name),
+        SP_FMT_STR(session->profile.toolchain),
+        SP_FMT_STR(spn_dep_build_mode_to_str(session->profile.mode)),
+        SP_FMT_STR(spn_pkg_linkage_to_str(session->profile.linkage)),
+        SP_FMT_STR(spn_c_standard_to_str(session->profile.standard))
+      );
+      exit(0);
+  if (!sp_str_empty(session->profile.toolchain)) {
+    spn_cli_set_toolchain(app, session->profile.toolchain);
+  }
+
+  session->paths.profile = sp_fs_join_path(session->paths.build, session->profile.name);
   spn_session_set_filter(session, app->config.filter);
 
   spn_index_cache_t index = SP_ZERO_INITIALIZE();
