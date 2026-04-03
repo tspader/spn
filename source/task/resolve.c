@@ -68,14 +68,6 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   if (session->profile.mode == SPN_BUILD_MODE_NONE) {
     return SPN_TASK_ERROR;
   }
- SP_LOG("resolved profile: name={} toolchain={} mode={} linkage={} standard={}",
-        SP_FMT_STR(session->profile.name),
-        SP_FMT_STR(session->profile.toolchain),
-        SP_FMT_STR(spn_dep_build_mode_to_str(session->profile.mode)),
-        SP_FMT_STR(spn_pkg_linkage_to_str(session->profile.linkage)),
-        SP_FMT_STR(spn_c_standard_to_str(session->profile.standard))
-      );
-      exit(0);
   if (!sp_str_empty(session->profile.toolchain)) {
     spn_cli_set_toolchain(app, session->profile.toolchain);
   }

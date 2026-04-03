@@ -9,6 +9,7 @@
 #include "index/json.h"
 #include "semver/compare.h"
 #include "sp/io.h"
+#include "sp/tm.h"
 
 void spn_index_init(spn_index_t* index) {
   index->arena = sp_mem_arena_new(4096);
@@ -40,7 +41,12 @@ spn_err_t spn_index_sync(spn_index_t* index) {
   switch (index->protocol) {
     case SPN_INDEX_PROTOCOL_GIT: {
       if (sp_fs_exists(index->location)) {
-        spn_try(spn_git_pull(index->location));
+        sp_str_t head = sp_fs_join_path(index->location, sp_str_lit(".git/FETCH_HEAD"));
+        sp_tm_epoch_t mod_time = sp_fs_get_mod_time(head);
+        sp_tm_epoch_t now = sp_tm_now_epoch();
+        if (mod_time.s + 600 <= now.s) {
+          spn_try(spn_git_pull(index->location));
+        }
         return SPN_OK;
       }
 
