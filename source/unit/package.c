@@ -60,12 +60,6 @@ void spn_pkg_unit_write_stamp(spn_pkg_unit_t* ctx, sp_str_t path) {
   spn_toml_append_str_cstr(&writer, "work", ctx->ctx.paths.work);
   spn_toml_end_table(&writer);
 
-  spn_toml_begin_table_cstr(&writer, "profile");
-  spn_toml_append_str_cstr(&writer, "name", ctx->ctx.profile->name);
-  spn_toml_append_str_cstr(&writer, "linkage", spn_pkg_linkage_to_str(ctx->ctx.profile->linkage));
-  spn_toml_append_str_cstr(&writer, "standard", spn_c_standard_to_str(ctx->ctx.profile->standard));
-  spn_toml_end_table(&writer);
-
   spn_toml_begin_array_cstr(&writer, "command");
   sp_da_for(ctx->ctx.commands, it) {
     sp_ps_config_t command = ctx->ctx.commands[it];

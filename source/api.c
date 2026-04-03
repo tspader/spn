@@ -79,7 +79,7 @@ spn_pkg_t* spn_get_pkg(spn_build_ctx_t* b) {
 }
 
 spn_profile_t* spn_get_profile(spn_build_ctx_t* b) {
-  return b->profile;
+  return &b->session->profile;
 }
 
 spn_linkage_t spn_get_linkage(spn_build_ctx_t* b) {

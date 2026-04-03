@@ -160,7 +160,7 @@ s32 configure_package(spn_bg_cmd_t* cmd, void* user_data) {
           .name = name,
           .target = target,
           .pkg = target->pkg,
-          .profile = pkg->ctx.profile,
+          .profile = &target->session->profile,
           .session = target->session,
           .paths = {
             .object = object_path,

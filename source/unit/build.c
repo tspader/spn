@@ -201,10 +201,6 @@ sp_str_t spn_ctx_build_lib_dir(spn_build_ctx_t* build) {
   return build->paths.lib;
 }
 
-spn_build_mode_t spn_ctx_build_mode(spn_build_ctx_t* build) {
-  return build->profile->mode;
-}
-
 sp_ps_output_t spn_ctx_build_subprocess(spn_build_ctx_t* ctx, sp_ps_config_t config) {
   spn_event_buffer_push_ex(spn.events, ctx->pkg, &ctx->logs, (spn_build_event_t) {
     .kind = SPN_EVENT_API_CALL,
