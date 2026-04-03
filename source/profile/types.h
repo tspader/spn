@@ -15,6 +15,8 @@ typedef struct {
   spn_build_mode_t mode;
 } spn_profile_info_t;
 
+typedef sp_str_ht(spn_profile_info_t) spn_profile_table_t;
+
 struct spn_profile {
   sp_str_t name;
   sp_str_t toolchain;

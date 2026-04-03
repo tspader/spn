@@ -11,18 +11,15 @@
 UTEST_MAIN();
 
 
-///////////////
-// from_str //
-//////////////
 typedef struct {
   const c8* triple;
   spn_arch_t arch;
   spn_os_t os;
   spn_abi_t abi;
-} from_str_test_t;
+} from_str_t;
 
 UTEST(triple, from_str) {
-  from_str_test_t tests [] = {
+  from_str_t tests [] = {
     // full triples
     { "x86_64-linux-gnu",      SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_GNU },
     { "x86_64-linux-musl",     SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_MUSL },
@@ -54,16 +51,13 @@ UTEST(triple, from_str) {
 }
 
 
-//////////////
-// to_str  //
-/////////////
 typedef struct {
   spn_triple_t triple;
   const c8* expected;
-} to_str_test_t;
+} to_str_t;
 
 UTEST(triple, to_str) {
-  to_str_test_t tests [] = {
+  to_str_t tests [] = {
     // full triples
     { { SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_GNU },   "x86_64-linux-gnu" },
     { { SPN_ARCH_ARM64, SPN_OS_LINUX,   SPN_ABI_MUSL },  "aarch64-linux-musl" },
@@ -87,9 +81,6 @@ UTEST(triple, to_str) {
 }
 
 
-/////////////
-// merge  //
-////////////
 UTEST(triple, merge) {
   spn_triple_t host = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU };
 
@@ -131,9 +122,6 @@ UTEST(triple, merge) {
 }
 
 
-//////////////
-// host    //
-/////////////
 UTEST(triple, host) {
   spn_triple_t host = spn_triple_host();
 

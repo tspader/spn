@@ -52,7 +52,7 @@ struct spn_session_t {
   sp_env_t env;
   spn_event_buffer_t* events;
 
-  sp_str_ht(spn_profile_info_t) profiles;
+  spn_profile_table_t profiles;
   sp_str_ht(spn_toolchain_entry_t) toolchains;
 
   struct {

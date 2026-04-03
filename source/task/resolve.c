@@ -15,36 +15,13 @@
 #include "task/task.h"
 #include "toolchain/types.h"
 
-static spn_err_t resolve_profile(spn_app_t* app, spn_profile_t* result) {
-  sp_str_t name = spn_profile_select_name(&app->config.overrides);
-
-  spn_profile_info_t* info = sp_str_ht_get(app->session.profiles, name);
-  if (!info) {
-    spn_log_error("{:fg brightcyan} profile isn't defined",
-      SP_FMT_STR(name)
-    );
-    return SPN_ERROR;
-  }
-
-  spn_profile_info_t merged = *info;
-  spn_profile_overlay(&merged, &app->config.overrides);
-
-  *result = (spn_profile_t) {
-    .name      = merged.name,
-    .toolchain = merged.toolchain,
-    .os        = merged.os,
-    .arch      = merged.arch,
-    .abi       = merged.abi,
-    .linkage   = merged.linkage,
-    .standard  = merged.standard,
-    .mode      = merged.mode,
-  };
-  return SPN_OK;
-}
-
 spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_session_t* session = &app->session;
-  spn_try_as(resolve_profile(app, &session->profile), SPN_TASK_ERROR);
+  if (spn_profile_resolve(session->profiles, &app->config.overrides, &session->profile)) {
+    sp_str_t name = spn_profile_select_name(&app->config.overrides);
+    spn_log_error("{:fg brightcyan} profile isn't defined", SP_FMT_STR(name));
+    return SPN_TASK_ERROR;
+  }
 
   if (!sp_str_ht_exists(app->session.toolchains, session->profile.toolchain)) {
     spn_log_error("{:fg brightcyan} toolchain isn't defined",
