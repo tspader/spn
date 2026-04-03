@@ -6,6 +6,12 @@
 typedef struct {
   sp_str_t name;
   struct {
+    bool bin;
+    bool lib;
+    bool test;
+    bool script;
+  } only;
+  struct {
     bool public;
     bool test;
     bool script;

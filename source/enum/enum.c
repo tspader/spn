@@ -20,6 +20,8 @@ spn_os_t spn_os_from_sp_os(sp_os_kind_t os) {
     case SP_OS_WIN32: return SPN_OS_WINDOWS;
     case SP_OS_MACOS: return SPN_OS_MACOS;
   }
+
+  sp_unreachable_return(SPN_OS_LINUX);
 }
 
 spn_os_t spn_os_from_str(sp_str_t str) {

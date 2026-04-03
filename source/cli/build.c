@@ -9,10 +9,16 @@ sp_app_result_t spn_cli_build(spn_cli_t* cli) {
 
   app.config.force = command->force,
   app.config.filter = (spn_target_filter_t) {
-    .name = command->target,
+    .name = command->name,
+    .only = {
+      .bin = command->only.bin,
+      .lib = command->only.lib,
+      .test = command->only.test,
+      .script = command->only.script,
+    },
     .disabled = {
-      .test = sp_str_empty(command->target) && !command->tests,
-      .script = sp_str_empty(command->target),
+      .test = sp_str_empty(command->name) && !command->only.test,
+      .script = sp_str_empty(command->name) && !command->only.script,
     }
   };
 
@@ -27,7 +33,7 @@ sp_app_result_t spn_cli_build(spn_cli_t* cli) {
     .cli_entry = {
       .command = sp_str_lit("build"),
       .profile = command->profile,
-      .target = command->target,
+      .target = command->name,
       .force = command->force,
       .cwd = spn.paths.cwd,
       .manifest = app.package.paths.manifest,

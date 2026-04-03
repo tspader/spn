@@ -412,19 +412,28 @@ static spn_cli_usage_t commands[] = {
           .ptr = &spn.cli.build.profile
         },
         {
-          .brief = "t",
-          .name = "target",
-          .kind = SPN_CLI_OPT_KIND_STRING,
-          .summary = "Target to build",
-          .placeholder = "TARGET",
-          .ptr = &spn.cli.build.target
-        },
-
-        {
-          .name = "tests",
+          .name = "bin",
           .kind = SPN_CLI_OPT_KIND_BOOLEAN,
-          .summary = "Include test targets",
-          .ptr = &spn.cli.build.tests
+          .summary = "Build only binary targets",
+          .ptr = &spn.cli.build.only.bin
+        },
+        {
+          .name = "lib",
+          .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+          .summary = "Build only library targets",
+          .ptr = &spn.cli.build.only.lib
+        },
+        {
+          .name = "test",
+          .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+          .summary = "Build only test targets",
+          .ptr = &spn.cli.build.only.test
+        },
+        {
+          .name = "script",
+          .kind = SPN_CLI_OPT_KIND_BOOLEAN,
+          .summary = "Build only script targets",
+          .ptr = &spn.cli.build.only.script
         },
         {
           .name = "toolchain",
@@ -440,6 +449,14 @@ static spn_cli_usage_t commands[] = {
           .summary = "Override build mode (debug, release)",
           .placeholder = "MODE",
           .ptr = &spn.cli.build.mode
+        }
+      },
+      .args = {
+        {
+          .name = "name",
+          .kind = SPN_CLI_ARG_KIND_OPTIONAL,
+          .summary = "Target name to build",
+          .ptr = &spn.cli.build.name
         }
       },
       .summary = "Build the project, including dependencies, from source",
@@ -497,14 +514,6 @@ static spn_cli_usage_t commands[] = {
           .ptr = &spn.cli.test.profile
         },
         {
-          .brief = "t",
-          .name = "target",
-          .kind = SPN_CLI_OPT_KIND_STRING,
-          .summary = "Test target to run",
-          .placeholder = "TARGET",
-          .ptr = &spn.cli.test.target
-        },
-        {
           .name = "toolchain",
           .kind = SPN_CLI_OPT_KIND_STRING,
           .summary = "Override toolchain",
@@ -518,6 +527,14 @@ static spn_cli_usage_t commands[] = {
           .summary = "Override build mode (debug, release)",
           .placeholder = "MODE",
           .ptr = &spn.cli.test.mode
+        }
+      },
+      .args = {
+        {
+          .name = "name",
+          .kind = SPN_CLI_ARG_KIND_OPTIONAL,
+          .summary = "Test target name to run",
+          .ptr = &spn.cli.test.name
         }
       },
       .summary = "Build and run tests",

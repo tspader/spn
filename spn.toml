@@ -3,7 +3,6 @@ namespace = "spader"
 name = "spn"
 version = "0.2.0"
 repo = "tspader/spn"
-toolchain = "toolchains"
 
 [deps.package]
 "spader/spcc" = "1.0.0"
@@ -13,12 +12,7 @@ toml = "1.2.1"
 [deps.test]
 utest = "1.0.0"
 
-[[toolchain]]
-package = "zig"
-version = "1.0.0"
-
 [profile.default]
-toolchain = "zig"
 linkage = "static"
 standard = "c99"
 mode = "debug"
@@ -63,6 +57,7 @@ source = [
   "source/sp/io.c",
   "source/target/target.c",
   "source/target/mutate.c",
+  "source/task/build/**/*.c",
   "source/task/build.c",
   "source/task/configure.c",
   "source/task/graph.c",

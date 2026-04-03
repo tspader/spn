@@ -4,6 +4,7 @@
 #include "sp.h"
 #include "spn.h"
 
+#include "event/types.h"
 #include "filter/types.h"
 #include "graph/types.h"
 #include "profile/types.h"
@@ -49,6 +50,7 @@ struct spn_session_t {
   spn_toolchain_t toolchain;
   spn_target_filter_t filter;
   sp_env_t env;
+  spn_event_buffer_t* events;
 
   sp_str_ht(spn_toolchain_entry_t) toolchains;
 

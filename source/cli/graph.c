@@ -8,7 +8,7 @@ sp_app_result_t spn_cli_graph(spn_cli_t* cli) {
 
   app.config.force = command->force;
   app.config.filter = (spn_target_filter_t) {
-    .name = command->target,
+    .name = command->name,
     .disabled = {
       .public = false,
       .test = false,

@@ -74,8 +74,13 @@ typedef struct {
 
 typedef struct {
   bool force;
-  bool tests;
-  sp_str_t target;
+  struct {
+    bool test;
+    bool bin;
+    bool lib;
+    bool script;
+  } only;
+  sp_str_t name;
   sp_str_t profile;
   sp_str_t toolchain;
   sp_str_t mode;
@@ -89,7 +94,7 @@ typedef struct {
 } spn_cli_run_t;
 
 typedef struct {
-  sp_str_t target;
+  sp_str_t name;
   sp_str_t profile;
   sp_str_t toolchain;
   sp_str_t mode;

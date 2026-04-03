@@ -6,6 +6,24 @@ bool spn_target_filter_pass(spn_target_filter_t* filter, spn_target_t* target) {
     return sp_str_equal(filter->name, target->name);
   }
 
+  bool has_only = filter->only.bin || filter->only.lib || filter->only.test || filter->only.script;
+  if (has_only) {
+    switch (target->visibility) {
+      case SPN_VISIBILITY_PUBLIC: {
+        switch (target->kind) {
+          case SPN_TARGET_EXE:        return filter->only.bin;
+          case SPN_TARGET_STATIC_LIB:
+          case SPN_TARGET_SHARED_LIB: return filter->only.lib;
+          default:                    return false;
+        }
+      }
+      case SPN_VISIBILITY_TEST:   return filter->only.test;
+      case SPN_VISIBILITY_SCRIPT: return filter->only.script;
+      case SPN_VISIBILITY_BUILD:  return true;
+    }
+    sp_unreachable_return(false);
+  }
+
   switch (target->visibility) {
     case SPN_VISIBILITY_PUBLIC: return !filter->disabled.public;
     case SPN_VISIBILITY_TEST: return !filter->disabled.test;

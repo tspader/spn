@@ -479,7 +479,7 @@ UTEST_F(spn_build, static_lib) {
     .project = "test/fixtures/spn_build/static_lib",
     .copy = { "mylib.c" },
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-t", "mylib" } } },
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "mylib" } } },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libmylib.a") },
     },
   });
@@ -492,7 +492,7 @@ UTEST_F(spn_build, shared_lib) {
     .project = "test/fixtures/spn_build/shared_lib",
     .copy = { "spum.c" },
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-t", "spum" } } },
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "spum" } } },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum.so") },
     },
   });
@@ -734,7 +734,7 @@ UTEST_F(spn_build, run_script_manifest) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug/store/bin/main") },
-      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-t", "main" } } },
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "main" } } },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/bin/main") },
       { .kind = ACTION_REMOVE_DIR, .rm = { .dir = "build" } },
       { .kind = ACTION_RUN_CLI, .cli = { "run", .args = { "main" } } },

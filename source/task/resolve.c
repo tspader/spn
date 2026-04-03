@@ -85,6 +85,7 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   // exit(0);
 
   session->paths.profile = sp_fs_join_path(session->paths.build, session->profile.name);
+  session->events = spn.events;
   spn_session_set_filter(session, app->config.filter);
 
   spn_index_cache_t index = SP_ZERO_INITIALIZE();

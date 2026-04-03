@@ -30,6 +30,7 @@ spn_gen_kind_t spn_gen_kind_from_str(sp_str_t str) {
 sp_str_t spn_cc_lib_kind_to_switch(spn_linkage_t kind) {
   switch (kind) {
     case SPN_LIB_KIND_STATIC: return sp_str_lit("-static");
+    case SPN_LIB_KIND_NONE:
     case SPN_LIB_KIND_SHARED:
     case SPN_LIB_KIND_SOURCE: {
       return sp_str_lit("");
@@ -45,6 +46,7 @@ sp_str_t spn_cc_c_standard_to_switch(spn_c_standard_t standard) {
     case SPN_C11: return sp_str_lit("-std=c11");
     case SPN_C_STANDARD_NONE: return sp_str_lit("-std=c99");
   }
+  sp_unreachable(); return sp_str_lit("");
 }
 
 sp_str_t spn_cc_build_mode_to_switch(spn_build_mode_t mode) {
@@ -53,6 +55,7 @@ sp_str_t spn_cc_build_mode_to_switch(spn_build_mode_t mode) {
     case SPN_BUILD_MODE_RELEASE:
     case SPN_BUILD_MODE_NONE: return sp_str_lit("");
   }
+  sp_unreachable(); return sp_str_lit("");
 }
 
 sp_str_t spn_cc_kind_to_executable(spn_cc_kind_t compiler) {
@@ -66,7 +69,7 @@ sp_str_t spn_cc_kind_to_executable(spn_cc_kind_t compiler) {
     case SPN_CC_CUSTOM: SP_FALLTHROUGH();
     case SPN_CC_NONE: return sp_str_lit("gcc");
   }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+  sp_unreachable(); return sp_str_lit("");
 }
 
 sp_str_t spn_gen_format_entry_kernel(sp_str_map_context_t* context) {
@@ -96,8 +99,7 @@ sp_str_t spn_gen_format_entry(sp_str_t entry, spn_gen_entry_t kind, spn_cc_drive
     }
   }
 
-  sp_unreachable();
-  return sp_str_lit("");
+  sp_unreachable(); return sp_str_lit("");
 }
 
 sp_da(sp_str_t) spn_gen_build_entry(spn_build_ctx_t* build, spn_gen_entry_t kind, spn_cc_driver_t driver) {
@@ -114,6 +116,7 @@ sp_da(sp_str_t) spn_gen_build_entry(spn_build_ctx_t* build, spn_gen_entry_t kind
           sp_da_push(entries, spn_ctx_build_lib_dir(build));
           break;
         }
+        case SPN_LIB_KIND_NONE:
         case SPN_LIB_KIND_STATIC:
         case SPN_LIB_KIND_SOURCE: {
           return entries;
@@ -127,6 +130,7 @@ sp_da(sp_str_t) spn_gen_build_entry(spn_build_ctx_t* build, spn_gen_entry_t kind
           sp_da_push(entries, spn_ctx_build_lib_dir(build));
           break;
         }
+        case SPN_LIB_KIND_NONE:
         case SPN_LIB_KIND_STATIC:
         case SPN_LIB_KIND_SOURCE: {
           return entries;

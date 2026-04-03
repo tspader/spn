@@ -7,7 +7,7 @@ sp_app_result_t spn_cli_test(spn_cli_t* cli) {
   spn_cli_test_t* command = &cli->test;
 
   app.config.filter = (spn_target_filter_t) {
-    .name = command->target,
+    .name = command->name,
     .disabled = {
       .public = true,
       .script = true,
