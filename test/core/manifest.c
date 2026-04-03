@@ -11,11 +11,16 @@
 #include "pkg/load.h"
 #include "profile/types.h"
 
+///////////
+// STATE //
+///////////
 UTEST_STATE();
 
 spn_ctx_t spn;
 
-// MAIN
+//////////
+// MAIN //
+//////////
 int main(int argc, const char *const argv[]) {
   ctx_t* ctx = ctx_get();
   ctx_init(ctx);
@@ -28,11 +33,6 @@ int main(int argc, const char *const argv[]) {
   ctx_deinit(ctx);
   return result;
 }
-
-// FIXTURE
-struct load {};
-UTEST_F_SETUP(load) {}
-UTEST_F_TEARDOWN(load) {}
 
 ///////////////
 // EXECUTOR //
@@ -61,7 +61,7 @@ typedef struct {
   profile_t profiles [4];
 } test_t;
 
-void run_case(s32* utest_result, struct load* utest_fixture, test_t test) {
+void run_case(s32* utest_result, test_t test) {
   tmpfs_t* fs = &ctx_get()->fs;
 
   sp_str_builder_t builder = SP_ZERO_INITIALIZE();
@@ -136,8 +136,8 @@ void run_case(s32* utest_result, struct load* utest_fixture, test_t test) {
   }
 }
 
-UTEST_F(load, smoke) {
-  run_case(utest_result, utest_fixture, (test_t) {
+UTEST(load, smoke) {
+  run_case(utest_result, (test_t) {
     .manifest = {
       "[package]",
       tkv(namespace, "spn"),
@@ -150,8 +150,8 @@ UTEST_F(load, smoke) {
   });
 }
 
-UTEST_F(load, toolchain) {
-  run_case(utest_result, utest_fixture, (test_t) {
+UTEST(load, toolchain) {
+  run_case(utest_result, (test_t) {
     .manifest = {
       "[package]",
       tkv(namespace, "core"),
@@ -209,8 +209,8 @@ UTEST_F(load, toolchain) {
   });
 }
 
-UTEST_F(load, profile) {
-  run_case(utest_result, utest_fixture, (test_t) {
+UTEST(load, profile) {
+  run_case(utest_result, (test_t) {
     .manifest = {
       "[package]",
       tkv(name, "spum"),
