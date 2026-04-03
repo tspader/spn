@@ -339,12 +339,14 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn_toolchain_entry_t builtin_toolchains[] = {
     {
       .name = sp_str_lit("builtin"),
-      .kind = SPN_TOOLCHAIN_INDEX,
-      .request = {
-        .package = sp_str_lit("core/zig"),
-        .range = spn_semver_any()
+      .kind = SPN_TOOLCHAIN_BUILTIN,
+      .info = {
+        .compiler = { .program = sp_str_lit("cc") },
+        .linker   = { .program = sp_str_lit("cc") },
+        .archiver = { .program = sp_str_lit("ar") },
+        .driver = SPN_CC_DRIVER_GCC,
       },
-    },
+    }
   };
   sp_carr_for(builtin_toolchains, it) {
     spn_toolchain_entry_t entry = builtin_toolchains[it];

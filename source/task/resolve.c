@@ -27,7 +27,7 @@ static void overlay_profile(spn_profile_info_t* dst, spn_profile_info_t* src) {
 
 static spn_err_t resolve_profile(spn_app_t* app, spn_profile_t* result) {
   spn_profile_info_t info = {
-    .name = sp_str_lit("default"),
+    .name = sp_str_lit("debug"),
     .toolchain = sp_str_lit("builtin"),
     .linkage = SPN_LIB_KIND_STATIC,
     .standard = SPN_C11,

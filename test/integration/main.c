@@ -11,8 +11,6 @@ void setup_fixture_index_from_remote(s32* utest_result, tmpfs_t* fs, sp_str_t in
 void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t config);
 void setup_fixture_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir);
 
-
-
 typedef struct {
   tmpfs_t fs;
   struct {
@@ -155,7 +153,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
           "build/debug/store/bin/{}",
           SP_FMT_CSTR(action.bin.name)
         ));
-        ASSERT_TRUE(sp_fs_exists(bin));
+        SP_EXPECT_EXISTS(bin);
 
         sp_ps_output_t output = sp_ps_run((sp_ps_config_t) {
           .command = bin,
