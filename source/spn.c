@@ -329,7 +329,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   session->pkg = &app.package;
   session->paths.root = app.package.paths.root;
   session->paths.build = sp_fs_join_path(session->paths.root, sp_str_lit("build"));
-  session->env = sp_env_capture();
   sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
 
   // Build the list of available toolchains

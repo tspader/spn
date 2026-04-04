@@ -60,6 +60,9 @@ spn_cc_driver_t spn_cc_driver_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "gcc")) {
     return SPN_CC_DRIVER_GCC;
   }
+  if (sp_str_equal_cstr(str, "clang")) {
+    return SPN_CC_DRIVER_CLANG;
+  }
   if (sp_str_equal_cstr(str, "msvc")) {
     return SPN_CC_DRIVER_MSVC;
   }
@@ -74,6 +77,9 @@ sp_str_t spn_cc_driver_to_str(spn_cc_driver_t driver) {
     }
     case SPN_CC_DRIVER_GCC: {
       return sp_str_lit("gcc");
+    }
+    case SPN_CC_DRIVER_CLANG: {
+      return sp_str_lit("clang");
     }
     case SPN_CC_DRIVER_MSVC: {
       return sp_str_lit("msvc");

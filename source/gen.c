@@ -80,6 +80,7 @@ sp_str_t spn_gen_format_entry_kernel(sp_str_map_context_t* context) {
 sp_str_t spn_gen_format_entry(sp_str_t entry, spn_gen_entry_t kind, spn_cc_driver_t driver) {
   switch (driver) {
     case SPN_CC_DRIVER_NONE: // @toolchain
+    case SPN_CC_DRIVER_CLANG:
     case SPN_CC_DRIVER_GCC: {
       switch (kind) {
         case SPN_GEN_INCLUDE: return sp_format("-I{}", SP_FMT_STR(entry));
