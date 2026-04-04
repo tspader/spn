@@ -2,9 +2,9 @@
 
 #include "unit/build.h"
 
-void spn_make(spn_build_ctx_t* build) {
+s32 spn_make(spn_build_ctx_t* build) {
   spn_make_t* make = spn_make_new(build);
-  spn_make_run(make);
+  return spn_make_run(make);
 }
 
 spn_make_t* spn_make_new(spn_build_ctx_t* build) {
@@ -17,7 +17,7 @@ void spn_make_add_target(spn_make_t* make, const c8* target) {
   make->target = sp_str_from_cstr(target);
 }
 
-void spn_make_run(spn_make_t* make) {
+s32 spn_make_run(spn_make_t* make) {
   spn_build_ctx_t* build = make->build;
 
   sp_ps_config_t ps = SP_ZERO_INITIALIZE();
@@ -29,5 +29,6 @@ void spn_make_run(spn_make_t* make) {
     sp_ps_config_add_arg(&ps, make->target);
   }
 
-  spn_ctx_build_subprocess(build, ps);
+  sp_ps_output_t result = spn_ctx_build_subprocess(build, ps);
+  return result.status.exit_code;
 }

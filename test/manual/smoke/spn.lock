@@ -2,15 +2,4 @@
 version = "1.0.0"
 commit = "00c0fa98"
 
-[[dep]]
-name = "core/zig"
-version = "1.0.0"
-commit = "fc18642605"
-kind = "index"
-visibility = "public"
-source_url = "git@github.com:tspader/spam.git"
-source_rev = "fc18642605"
-source_dir = "zig"
-manifest_file = "spn.toml"
-script_file = "spn.c"
 

@@ -2,9 +2,9 @@
 
 #include "unit/build.h"
 
-void spn_autoconf(spn_build_ctx_t* build) {
+s32 spn_autoconf(spn_build_ctx_t* build) {
   spn_autoconf_t* autoconf = spn_autoconf_new(build);
-  spn_autoconf_run(autoconf);
+  return spn_autoconf_run(autoconf);
 }
 
 spn_autoconf_t* spn_autoconf_new(spn_build_ctx_t* build) {
@@ -13,7 +13,7 @@ spn_autoconf_t* spn_autoconf_new(spn_build_ctx_t* build) {
   return autoconf;
 }
 
-void spn_autoconf_run(spn_autoconf_t* autoconf) {
+s32 spn_autoconf_run(spn_autoconf_t* autoconf) {
   spn_build_ctx_t* build = autoconf->build;
 
   sp_ps_config_t config = {
@@ -33,7 +33,8 @@ void spn_autoconf_run(spn_autoconf_t* autoconf) {
     sp_ps_config_add_arg(&config, autoconf->flags[it]);
   }
 
-  spn_ctx_build_subprocess(build, config);
+  sp_ps_output_t result = spn_ctx_build_subprocess(build, config);
+  return result.status.exit_code;
 }
 
 void spn_autoconf_add_flag(spn_autoconf_t* autoconf, const c8* flag) {

@@ -23,8 +23,7 @@ s32 run_make(spn_node_ctx_t* ctx) {
     }
   }
 
-  spn_make_run(make);
-  return 0;
+  return spn_make_run(make);
 }
 
 void configure(spn_build_ctx_t* dep) {

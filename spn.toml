@@ -17,12 +17,12 @@ linkage = "static"
 standard = "c99"
 mode = "debug"
 
-[profile.shared]
-linkage = "shared"
+[profile.musl]
+toolchain = "musl-gcc"
 
 [[toolchain]]
 package = "musl-gcc"
-version = "1.0.2"
+version = "1.0.0"
 
 [[toolchain]]
 name = "system"

@@ -12,26 +12,22 @@ s32 run_user_fn(spn_bg_cmd_t* cmd, void* user_data) {
     .node = { .info = node }
   });
 
-  spn_err_t err = SPN_OK;
   if (node->fn) {
     spn_node_ctx_t ctx = {
       .build = &node->ctx->ctx,
       .user_data = node->user_data
     };
 
-    switch (node->fn(&ctx)) {
-      case SPN_OK: {
-        spn_pkg_unit_write_stamp(node->ctx, spn_pkg_unit_get_node_stamp_file(node->ctx, node));
-        sp_str_t stamp = sp_fs_join_path(node->ctx->paths.stamp.dir, node->tag);
-        sp_fs_create_file(stamp);
-        break;
-      }
-      default: {
-        break;
-      }
+    s32 result = node->fn(&ctx);
+    if (result) {
+      return result;
     }
+
+    spn_pkg_unit_write_stamp(node->ctx, spn_pkg_unit_get_node_stamp_file(node->ctx, node));
+    sp_str_t stamp = sp_fs_join_path(node->ctx->paths.stamp.dir, node->tag);
+    sp_fs_create_file(stamp);
   }
 
-  return err;
+  return SPN_OK;
 }
 

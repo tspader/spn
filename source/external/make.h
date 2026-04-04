@@ -9,9 +9,9 @@ struct spn_make {
   sp_str_t target;
 };
 
-void spn_make(spn_build_ctx_t* build);
+s32 spn_make(spn_build_ctx_t* build);
 spn_make_t* spn_make_new(spn_build_ctx_t* build);
 void spn_make_add_target(spn_make_t* make, const c8* target);
-void spn_make_run(spn_make_t* make);
+s32 spn_make_run(spn_make_t* make);
 
 #endif

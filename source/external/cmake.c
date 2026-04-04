@@ -32,9 +32,9 @@ static sp_str_t spn_cmake_format_define(sp_str_t name, sp_str_t value) {
   return sp_format("-D{}={}", SP_FMT_STR(name), SP_FMT_STR(value));
 }
 
-void spn_cmake(spn_build_ctx_t* build) {
+s32 spn_cmake(spn_build_ctx_t* build) {
   spn_cmake_t* cmake = spn_cmake_new(build);
-  spn_cmake_run(cmake);
+  return spn_cmake_run(cmake);
 }
 
 spn_cmake_t* spn_cmake_new(spn_build_ctx_t* build) {
@@ -60,7 +60,7 @@ void spn_cmake_add_arg(spn_cmake_t* cmake, const c8* arg) {
   sp_da_push(cmake->args, sp_str_from_cstr(arg));
 }
 
-void spn_cmake_configure(spn_cmake_t* cmake) {
+s32 spn_cmake_configure(spn_cmake_t* cmake) {
   spn_build_ctx_t* build = cmake->build;
 
   sp_ps_config_t config = {
@@ -100,34 +100,40 @@ void spn_cmake_configure(spn_cmake_t* cmake) {
     sp_ps_config_add_arg(&config, cmake->args[it]);
   }
 
-  spn_ctx_build_subprocess(build, config);
+  sp_ps_output_t result = spn_ctx_build_subprocess(build, config);
+  return result.status.exit_code;
 }
 
-void spn_cmake_build(spn_cmake_t* cmake) {
+s32 spn_cmake_build(spn_cmake_t* cmake) {
   spn_build_ctx_t* build = cmake->build;
 
-  spn_ctx_build_subprocess(build, (sp_ps_config_t) {
+  sp_ps_output_t result = spn_ctx_build_subprocess(build, (sp_ps_config_t) {
     .command = SP_LIT("cmake"),
     .args = {
       SP_LIT("--build"),
       spn_ctx_build_work_dir(build)
     }
   });
+  return result.status.exit_code;
 }
 
-void spn_cmake_install(spn_cmake_t* cmake) {
+s32 spn_cmake_install(spn_cmake_t* cmake) {
   spn_build_ctx_t* build = cmake->build;
 
-  spn_ctx_build_subprocess(build, (sp_ps_config_t) {
+  sp_ps_output_t result = spn_ctx_build_subprocess(build, (sp_ps_config_t) {
     .command = SP_LIT("cmake"),
     .args = {
       SP_LIT("--install"),
       spn_ctx_build_work_dir(build)
     }
   });
+  return result.status.exit_code;
 }
 
-void spn_cmake_run(spn_cmake_t* cmake) {
-  spn_cmake_configure(cmake);
-  spn_cmake_build(cmake);
+s32 spn_cmake_run(spn_cmake_t* cmake) {
+  s32 err = spn_cmake_configure(cmake);
+  if (err) {
+    return err;
+  }
+  return spn_cmake_build(cmake);
 }

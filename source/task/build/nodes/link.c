@@ -133,7 +133,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
       spn_cc_run_t run = spn_cc_target_run(cc_target, unit->paths.work);
       s32 rc = run.result.status.exit_code;
 
-      sp_str_t linker = spn_toolchain_get_linker_driver(cc->toolchain.info).program;
+      sp_str_t linker = spn_toolchain_get_linker_driver(&cc->toolchain.info).program;
       spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
         .kind = SPN_EVENT_LINK_START,
         .target.name = target->name,

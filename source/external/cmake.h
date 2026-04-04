@@ -17,14 +17,14 @@ struct spn_cmake {
 };
 
 sp_str_t     spn_cmake_gen_to_str(spn_cmake_gen_t gen);
-void         spn_cmake(spn_build_ctx_t* build);
+s32          spn_cmake(spn_build_ctx_t* build);
 spn_cmake_t* spn_cmake_new(spn_build_ctx_t* build);
 void         spn_cmake_set_generator(spn_cmake_t* cmake, spn_cmake_gen_t gen);
 void         spn_cmake_add_define(spn_cmake_t* cmake, const c8* name, const c8* value);
 void         spn_cmake_add_arg(spn_cmake_t* cmake, const c8* arg);
-void         spn_cmake_configure(spn_cmake_t* cmake);
-void         spn_cmake_build(spn_cmake_t* cmake);
-void         spn_cmake_install(spn_cmake_t* cmake);
-void         spn_cmake_run(spn_cmake_t* cmake);
+s32          spn_cmake_configure(spn_cmake_t* cmake);
+s32          spn_cmake_build(spn_cmake_t* cmake);
+s32          spn_cmake_install(spn_cmake_t* cmake);
+s32          spn_cmake_run(spn_cmake_t* cmake);
 
 #endif

@@ -218,10 +218,10 @@ void spn_cc_to_ps(spn_cc_t* cc, sp_ps_config_t* ps) {
   }
 
   sp_da_for(cc->include, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->include[it], SPN_GEN_INCLUDE, cc->toolchain.info->driver));
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->include[it], SPN_GEN_INCLUDE, cc->toolchain.info.driver));
   }
   sp_da_for(cc->define, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->define[it], SPN_GEN_DEFINE, cc->toolchain.info->driver));
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->define[it], SPN_GEN_DEFINE, cc->toolchain.info.driver));
   }
 
   sp_ps_config_add_arg(ps, spn_cc_c_standard_to_switch(cc->standard));
@@ -249,7 +249,7 @@ void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* 
     }
   }
 
-  spn_cc_driver_t driver = cc->toolchain.info->driver;
+  spn_cc_driver_t driver = cc->toolchain.info.driver;
   sp_da_for(target->source, it) {
     sp_ps_config_add_arg(ps, target->source[it]);
   }

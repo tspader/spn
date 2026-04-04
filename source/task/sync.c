@@ -12,6 +12,7 @@
 #include "pkg/pkg.h"
 #include "pkg/types.h"
 #include "resolve/types.h"
+#include "semver/convert.h"
 #include "session/session.h"
 #include "spn.h"
 #include "task/task.h"
@@ -27,6 +28,64 @@ typedef struct {
   sp_str_t source;
   u64 elapsed;
 } checkout_t;
+
+static bool match_toolchain(spn_toolchain_entry_t* toolchain, spn_triple_t host, spn_triple_t target) {
+  spn_toolchain_info_t* info = &toolchain->info;
+  if (toolchain->kind != SPN_TOOLCHAIN_INLINE) return false;
+
+  struct {
+    bool host;
+    bool target;
+  } match = SP_ZERO_INITIALIZE();
+
+  // If a toolchain supports both the host and the target, use it. We store
+  // the supported triples in a fixed size target and use a sentinel
+  sp_carr_for(info->hosts, h) {
+    if (!info->hosts[h].arch) break;
+
+    if (spn_triple_match(info->hosts[h], host)) {
+      match.host = true;
+      break;
+    }
+  }
+  if (!match.host) return false;
+
+  sp_carr_for(info->targets, t) {
+    if (!info->targets[t].arch) break;
+
+    if (spn_triple_match(info->targets[t], target)) {
+      match.target = true;
+      break;
+    }
+  }
+  if (!match.target) return false;
+
+  return true;
+}
+
+static spn_toolchain_entry_t* find_toolchain(spn_pkg_t* pkg, spn_triple_t host, spn_triple_t target) {
+  sp_om_for(pkg->toolchains, it) {
+    spn_toolchain_entry_t* toolchain = sp_om_at(pkg->toolchains, it);
+
+    if (match_toolchain(toolchain, host, target)) {
+      return toolchain;
+    }
+  }
+
+  return SP_NULLPTR;
+}
+
+static void log_toolchain_error(spn_pkg_t* pkg, spn_triple_t host, spn_triple_t target) {
+  sp_str_builder_t b = SP_ZERO_INITIALIZE();
+  sp_str_builder_append_fmt(
+    &b,
+    "selected toolchain ({}, {}) does not support this host + target ({}, {})",
+    SP_FMT_STR(pkg->name),
+    SP_FMT_STR(spn_semver_to_str(pkg->version)),
+    SP_FMT_STR(spn_triple_to_str(host)),
+    SP_FMT_STR(spn_triple_to_str(target))
+  );
+}
 
 static spn_err_t sync_package(spn_session_t* session, spn_resolved_pkg_t* resolved, spn_git_cache_t* cache, checkout_t* checkout) {
   spn_err_t err = SPN_OK;
@@ -145,116 +204,66 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     sp_str_ht_insert(checkouts, *it.key, checkout);
   }
 
-  // Resolve the toolchain — set session->toolchain.info before adding units,
-  // because build hashes for index packages depend on it.
+  // The toolchain can be specified as either a package which exports toolchains
+  // or as a block of TOML inline in the manifest.
+  //
+  // Inline toolchains are straightforward, but toolchains that are fetched from
+  // a package can specify a URL which points to a tarball. Packages can also
+  // export several toolchains.
+  //
+  // All we're doing here is finding the package manifest for the package that
+  // defines the toolchain we want, grabbing the specific toolchain entry that
+  // matches our host + target, and marking down any needed download.
   spn_triple_t host = spn_triple_host();
   spn_triple_t target = { session->profile.arch, session->profile.os, session->profile.abi };
-
   spn_toolchain_entry_t* entry = sp_str_ht_get(session->toolchains, session->profile.toolchain);
   sp_assert(entry);
-  if (entry->kind == SPN_TOOLCHAIN_INDEX) {
-    spn_toolchain_req_t* request = &entry->request;
 
-    checkout_t* checkout = sp_str_ht_get(checkouts, request->package);
-    if (!checkout) {
-      spn_log_error("toolchain package {:fg brightcyan} not found in checkouts", SP_FMT_STR(request->package));
-      return SPN_TASK_ERROR;
-    }
-
-    // Find the toolchain entry that matches our host and target.
-    spn_pkg_t* pkg = checkout->pkg;
-    spn_toolchain_entry_t* matched = SP_NULLPTR;
-    sp_om_for(pkg->toolchains, it) {
-      spn_toolchain_entry_t* candidate = sp_om_at(pkg->toolchains, it);
-      if (candidate->kind != SPN_TOOLCHAIN_INLINE) continue;
-
-      spn_toolchain_info_t* info = &candidate->info;
-      bool host_ok = !info->hosts[0].arch && !info->hosts[0].os;
-      for (u32 h = 0; !host_ok && h < SPN_TOOLCHAIN_MAX_HOSTS && (info->hosts[h].arch || info->hosts[h].os); h++) {
-        host_ok = spn_triple_match(info->hosts[h], host);
-      }
-      if (!host_ok) continue;
-
-      bool target_ok = !info->targets[0].arch && !info->targets[0].os;
-      for (u32 t = 0; !target_ok && t < SPN_TOOLCHAIN_MAX_TARGETS && (info->targets[t].arch || info->targets[t].os); t++) {
-        target_ok = spn_triple_match(info->targets[t], target);
-      }
-      if (!target_ok) continue;
-
-      matched = candidate;
-      break;
-    }
-
-    if (!matched) {
-      spn_log_error("toolchain package {:fg brightcyan} has no entry for host {:fg brightcyan} targeting {:fg brightcyan}",
-        SP_FMT_STR(request->package),
-        SP_FMT_STR(spn_triple_to_str(host)),
-        SP_FMT_STR(spn_triple_to_str(target))
-      );
-      return SPN_TASK_ERROR;
-    }
-
-    spn_index_rel_t* release = checkout->resolved->release;
-    sp_str_t store = sp_fs_join_path(pkg->paths.cache.store, release->source.rev);
-    sp_str_t work = sp_fs_join_path(pkg->paths.cache.work, release->source.rev);
-
-    spn_toolchain_info_t* info = &matched->info;
-
-    session->toolchain = (spn_toolchain_t) {
-      .info = info,
-      .compiler = { sp_fs_join_path(store, info->compiler.program), info->compiler.args },
-      .linker =   { sp_fs_join_path(store, info->linker.program), info->linker.args },
-      .archiver = { sp_fs_join_path(store, info->archiver.program), info->archiver.args },
-    };
-
-    if (!sp_str_empty(info->url)) {
-      spn_toolchain_unit_t* unit = sp_alloc_type(spn_toolchain_unit_t);
-      unit->session = session;
-      unit->pkg = pkg;
-      unit->url = info->url;
-      unit->paths.store = store;
-      unit->paths.work = work;
-      unit->paths.stamp = sp_fs_join_path(work, sp_str_lit("download.stamp"));
-      unit->paths.logs.build = sp_fs_join_path(work, sp_str_lit("build.log"));
-      unit->paths.logs.jsonl = sp_fs_join_path(work, sp_str_lit("build.jsonl"));
-
-      sp_fs_create_dir(store);
-      sp_fs_create_dir(work);
-
-      unit->logs.build = sp_io_writer_from_file(unit->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
-      unit->logs.jsonl = sp_io_writer_from_file(unit->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
-
-      session->units.toolchain = unit;
-    }
-  }
-  else if (entry->kind == SPN_TOOLCHAIN_INLINE) {
-    spn_toolchain_info_t* info = &entry->info;
-    bool host_ok = !info->hosts[0].arch && !info->hosts[0].os;
-    for (u32 h = 0; !host_ok && h < SPN_TOOLCHAIN_MAX_HOSTS && (info->hosts[h].arch || info->hosts[h].os); h++) {
-      host_ok = spn_triple_match(info->hosts[h], host);
-    }
-    bool target_ok = !info->targets[0].arch && !info->targets[0].os;
-    for (u32 t = 0; !target_ok && t < SPN_TOOLCHAIN_MAX_TARGETS && (info->targets[t].arch || info->targets[t].os); t++) {
-      target_ok = spn_triple_match(info->targets[t], target);
-    }
-    if (!host_ok || !target_ok) {
-      spn_log_error("toolchain {:fg brightcyan} doesn't support host {:fg brightcyan} targeting {:fg brightcyan}",
+  if (entry->kind == SPN_TOOLCHAIN_INLINE) {
+    if (!match_toolchain(entry, host, target)) {
+      spn_log_error(
+        "toolchain {:fg brightcyan} doesn't support host {:fg brightcyan} targeting {:fg brightcyan}",
         SP_FMT_STR(entry->name),
         SP_FMT_STR(spn_triple_to_str(host)),
         SP_FMT_STR(spn_triple_to_str(target))
       );
       return SPN_TASK_ERROR;
     }
-    session->toolchain.info = info;
-    session->toolchain.compiler = info->compiler;
-    session->toolchain.linker = info->linker;
-    session->toolchain.archiver = info->archiver;
+
+    session->toolchain.info = entry->info;
+    session->toolchain.compiler = session->toolchain.info.compiler;
+    session->toolchain.linker = session->toolchain.info.linker;
+    session->toolchain.archiver = session->toolchain.info.archiver;
   }
   else if (entry->kind == SPN_TOOLCHAIN_BUILTIN) {
-    session->toolchain.info = &entry->info;
-    session->toolchain.compiler = session->toolchain.info->compiler;
-    session->toolchain.linker = session->toolchain.info->linker;
-    session->toolchain.archiver = session->toolchain.info->archiver;
+    session->toolchain.info = entry->info;
+    session->toolchain.compiler = session->toolchain.info.compiler;
+    session->toolchain.linker = session->toolchain.info.linker;
+    session->toolchain.archiver = session->toolchain.info.archiver;
+  }
+  else if (entry->kind == SPN_TOOLCHAIN_INDEX) {
+    checkout_t* checkout = sp_str_ht_get(checkouts, entry->request.package);
+    sp_assert(checkout);
+
+    spn_toolchain_entry_t* toolchain = find_toolchain(checkout->pkg, host, target);
+    sp_assert(toolchain->kind == SPN_TOOLCHAIN_INDEX);
+    if (!toolchain) {
+      log_toolchain_error(checkout->pkg, host, target);
+      return SPN_TASK_ERROR;
+    }
+
+    // Add a unit for the data we need to download the tarball
+    if (!sp_str_empty(toolchain->info.url)) {
+      spn_toolchain_unit_t* unit = sp_alloc_type(spn_toolchain_unit_t);
+      unit->session = session;
+      unit->pkg = checkout->pkg;
+      unit->url = toolchain->info.url;
+
+      session->units.toolchain = unit;
+    }
+
+    // Mark down the toolchain for the session
+    session->toolchain.info = toolchain->info;
   }
 
   // Load the manifests for each package and add a unit
@@ -263,7 +272,6 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     spn_resolved_pkg_t* resolved = checkout.resolved;
     spn_index_rel_t* release = resolved->release;
 
-    // Add a build unit to the session
     sp_om_insert(session->units.packages, checkout.pkg->qualified, SP_ZERO_STRUCT(spn_pkg_unit_t));
     spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
     spn_init_pkg_unit_for_session(session, unit, resolved->pkg, resolved->kind);
@@ -278,6 +286,38 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
         .time = checkout.elapsed,
       }
     });
+  }
+
+  // If we need to download a toolchain, point it at the unit for the corresponding
+  // package. This is separate from where we resolve the toolchain because we don't
+  // want to special case the toolchain's package unit.
+  //
+  // By setting up the paths here, the toolchain can be downloaded to the package's
+  // work dir and decompressed to the store dir with no special paths.
+  if (session->units.toolchain) {
+    spn_toolchain_info_t toolchain = session->toolchain.info;
+    spn_toolchain_unit_t* unit = session->units.toolchain;
+    spn_pkg_unit_t* pkg = sp_om_get(session->units.packages, unit->pkg->qualified);
+
+    sp_str_t store = pkg->ctx.paths.store;
+    sp_str_t work = pkg->ctx.paths.work;
+
+    // These are places in the cache
+    unit->paths.store = store;
+    unit->paths.work = work;
+    unit->paths.stamp = sp_fs_join_path(work, sp_str_lit("download.stamp"));
+    unit->paths.logs.build = sp_fs_join_path(work, sp_str_lit("build.log"));
+    unit->paths.logs.jsonl = sp_fs_join_path(work, sp_str_lit("build.jsonl"));
+    unit->logs.build = sp_io_writer_from_file(unit->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
+    unit->logs.jsonl = sp_io_writer_from_file(unit->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
+
+    // These are the paths used to refer to the toolchain during compilation
+    session->toolchain.compiler.program = sp_fs_join_path(store, toolchain.compiler.program);
+    session->toolchain.compiler.args = toolchain.compiler.args;
+    session->toolchain.linker.program = sp_fs_join_path(store, toolchain.linker.program);
+    session->toolchain.linker.args = toolchain.linker.args;
+    session->toolchain.archiver.program = sp_fs_join_path(store, toolchain.archiver.program);
+    session->toolchain.archiver.args = toolchain.archiver.args;
   }
 
   // Load file dependencies directly from their manifests
@@ -331,10 +371,6 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
       .time = sp_tm_read_timer(&timers.git),
     }
   });
-
-
-
-
 
   // @spader Elsewhere?
   sp_om_for(session->units.packages, it) {

@@ -93,10 +93,20 @@ s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
     .kind = SPN_EVENT_TARGET_BUILD
   });
 
-  sp_str_t path = sp_fs_join_path(unit->paths.work, sp_fs_get_name(unit->url));
+  sp_str_t output = sp_fs_join_path(unit->paths.work, sp_fs_get_name(unit->url));
 
+  // This function runs as part of the configure graph, which is a DAG ordered
+  // by dependency traversal. Normally, we'd model checks like this in the structure
+  // of the graph. However, the configure graph is only a graph for the ordering
+  // properties. We don't actually want to gate its execution on dirtiness, because
+  // all of its nodes need to run every time (e.g. calling script::configure())
+  //
+  // But we ALSO need to have the toolchain before we configure. It's probably best
+  // to just download outside of the graph, but I figured that if there was *any*
+  // work that could be done while we're downloading, it's worthwhile.
+  //
+  // I hard gate everything on this node, though, so it's functionally sync.
   if (sp_fs_exists(unit->paths.stamp)) return 0;
-
 
   sp_str_t curl = sp_env_get(&session->env, sp_str_lit("SPN_CURL"));
   if (sp_str_empty(curl)) curl = sp_str_lit("curl");
@@ -104,7 +114,7 @@ s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
     .command = curl,
     .args = {
       sp_str_lit("-fSL"),
-      sp_str_lit("-o"), path,
+      sp_str_lit("-o"), output,
       unit->url
     }
   });
@@ -113,7 +123,7 @@ s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
   sp_ps_output_t extract = sp_ps_run((sp_ps_config_t) {
     .command = sp_str_lit("tar"),
     .args = {
-      sp_str_lit("xf"), path,
+      sp_str_lit("xf"), output,
       sp_str_lit("--strip-components=1"),
       sp_str_lit("-C"), unit->paths.store,
     }
