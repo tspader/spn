@@ -581,6 +581,7 @@ add_executable(resolver
   source/pkg/load.c
   source/pkg/mutate.c
   source/profile/profile.c
+  source/triple/triple.c
   source/resolve/resolve.c
   source/sp/str.c
   source/semver/compare.c
@@ -716,6 +717,7 @@ add_executable(publish
   source/pkg/load.c
   source/pkg/mutate.c
   source/profile/profile.c
+  source/triple/triple.c
   source/semver/compare.c
   source/semver/convert.c
   source/semver/parser.c

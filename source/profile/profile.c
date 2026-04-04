@@ -1,6 +1,7 @@
 #include "profile/profile.h"
 #include "pkg/types.h"
 #include "spn.h"
+#include "triple/triple.h"
 
 void spn_profile_overlay(spn_profile_info_t* dst, spn_profile_info_t* src) {
   if (!sp_str_empty(src->name))      dst->name = src->name;
@@ -78,12 +79,17 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* 
   spn_profile_info_t merged = *info;
   spn_profile_overlay(&merged, overrides);
 
+  // Resolve the target triple: fill empty fields with host values.
+  spn_triple_t host = spn_triple_host();
+  spn_triple_t target = { merged.arch, merged.os, merged.abi };
+  target = spn_triple_merge(host, target);
+
   *result = (spn_profile_t) {
     .name      = merged.name,
     .toolchain = merged.toolchain,
-    .os        = merged.os,
-    .arch      = merged.arch,
-    .abi       = merged.abi,
+    .os        = target.os,
+    .arch      = target.arch,
+    .abi       = target.abi,
     .linkage   = merged.linkage,
     .standard  = merged.standard,
     .mode      = merged.mode,

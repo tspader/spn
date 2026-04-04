@@ -18,4 +18,7 @@ spn_triple_t spn_triple_host(void);
 // Fill NONE fields in `partial` with values from `base`.
 spn_triple_t spn_triple_merge(spn_triple_t base, spn_triple_t partial);
 
+// Check if `entry` matches `target`. NONE fields in `entry` are wildcards.
+bool spn_triple_match(spn_triple_t entry, spn_triple_t target);
+
 #endif

@@ -20,6 +20,40 @@ mode = "debug"
 [profile.shared]
 linkage = "shared"
 
+[[toolchain]]
+package = "musl-gcc"
+version = "1.0.2"
+
+[[toolchain]]
+name = "system"
+compiler = "gcc"
+linker = "ld"
+archiver = "ar"
+driver = "gcc"
+export = true
+host = [
+  { arch = "x86_64", os = "linux", abi = "gnu" },
+  { arch = "x86_64", os = "linux", abi = "musl" }
+]
+target = [
+  { arch = "x86_64", os = "linux", abi = "gnu" }
+]
+
+[[toolchain]]
+name = "mingw"
+compiler = "x86_64-w64-mingw32-gcc"
+linker = "x86_64-w64-mingw32-ld"
+archiver = "x86_64-w64-mingw32-ar"
+driver = "gcc"
+export = true
+host = [
+  { arch = "x86_64", os = "linux", abi = "gnu" },
+  { arch = "x86_64", os = "linux", abi = "musl" }
+]
+target = [
+  { arch = "x86_64", os = "windows", abi = "mingw" }
+]
+
 [[bin]]
 name = "spn"
 source = ["source/**/*.c"]
@@ -116,6 +150,7 @@ source = [
   "source/pkg/load.c",
   "source/pkg/mutate.c",
   "source/profile/profile.c",
+  "source/triple/triple.c",
   "source/resolve/resolve.c",
   "source/sp/str.c",
   "source/semver/compare.c",
@@ -150,6 +185,7 @@ source = [
   "source/pkg/load.c",
   "source/pkg/mutate.c",
   "source/profile/profile.c",
+  "source/triple/triple.c",
   "source/semver/compare.c",
   "source/semver/convert.c",
   "source/semver/parser.c",

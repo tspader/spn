@@ -95,6 +95,9 @@ s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
 
   sp_str_t path = sp_fs_join_path(unit->paths.work, sp_fs_get_name(unit->url));
 
+  if (sp_fs_exists(unit->paths.stamp)) return 0;
+
+
   sp_str_t curl = sp_env_get(&session->env, sp_str_lit("SPN_CURL"));
   if (sp_str_empty(curl)) curl = sp_str_lit("curl");
   sp_ps_output_t dl = sp_ps_run((sp_ps_config_t) {

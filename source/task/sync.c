@@ -16,6 +16,7 @@
 #include "spn.h"
 #include "task/task.h"
 #include "toolchain/types.h"
+#include "triple/triple.h"
 #include <unistd.h>
 
 typedef struct {
@@ -146,6 +147,9 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
 
   // Resolve the toolchain — set session->toolchain.info before adding units,
   // because build hashes for index packages depend on it.
+  spn_triple_t host = spn_triple_host();
+  spn_triple_t target = { session->profile.arch, session->profile.os, session->profile.abi };
+
   spn_toolchain_entry_t* entry = sp_str_ht_get(session->toolchains, session->profile.toolchain);
   sp_assert(entry);
   if (entry->kind == SPN_TOOLCHAIN_INDEX) {
@@ -157,16 +161,44 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
       return SPN_TASK_ERROR;
     }
 
+    // Find the toolchain entry that matches our host and target.
     spn_pkg_t* pkg = checkout->pkg;
-    spn_toolchain_entry_t* entry = sp_om_at(checkout->pkg->toolchains, 0);
-    sp_assert(entry);
-    sp_assert(entry->kind == SPN_TOOLCHAIN_INLINE);
+    spn_toolchain_entry_t* matched = SP_NULLPTR;
+    sp_om_for(pkg->toolchains, it) {
+      spn_toolchain_entry_t* candidate = sp_om_at(pkg->toolchains, it);
+      if (candidate->kind != SPN_TOOLCHAIN_INLINE) continue;
+
+      spn_toolchain_info_t* info = &candidate->info;
+      bool host_ok = !info->hosts[0].arch && !info->hosts[0].os;
+      for (u32 h = 0; !host_ok && h < SPN_TOOLCHAIN_MAX_HOSTS && (info->hosts[h].arch || info->hosts[h].os); h++) {
+        host_ok = spn_triple_match(info->hosts[h], host);
+      }
+      if (!host_ok) continue;
+
+      bool target_ok = !info->targets[0].arch && !info->targets[0].os;
+      for (u32 t = 0; !target_ok && t < SPN_TOOLCHAIN_MAX_TARGETS && (info->targets[t].arch || info->targets[t].os); t++) {
+        target_ok = spn_triple_match(info->targets[t], target);
+      }
+      if (!target_ok) continue;
+
+      matched = candidate;
+      break;
+    }
+
+    if (!matched) {
+      spn_log_error("toolchain package {:fg brightcyan} has no entry for host {:fg brightcyan} targeting {:fg brightcyan}",
+        SP_FMT_STR(request->package),
+        SP_FMT_STR(spn_triple_to_str(host)),
+        SP_FMT_STR(spn_triple_to_str(target))
+      );
+      return SPN_TASK_ERROR;
+    }
 
     spn_index_rel_t* release = checkout->resolved->release;
     sp_str_t store = sp_fs_join_path(pkg->paths.cache.store, release->source.rev);
     sp_str_t work = sp_fs_join_path(pkg->paths.cache.work, release->source.rev);
 
-    spn_toolchain_info_t* info = &entry->info;
+    spn_toolchain_info_t* info = &matched->info;
 
     session->toolchain = (spn_toolchain_t) {
       .info = info,
@@ -195,7 +227,30 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
       session->units.toolchain = unit;
     }
   }
-  else if (entry->kind == SPN_TOOLCHAIN_INLINE || entry->kind == SPN_TOOLCHAIN_BUILTIN) {
+  else if (entry->kind == SPN_TOOLCHAIN_INLINE) {
+    spn_toolchain_info_t* info = &entry->info;
+    bool host_ok = !info->hosts[0].arch && !info->hosts[0].os;
+    for (u32 h = 0; !host_ok && h < SPN_TOOLCHAIN_MAX_HOSTS && (info->hosts[h].arch || info->hosts[h].os); h++) {
+      host_ok = spn_triple_match(info->hosts[h], host);
+    }
+    bool target_ok = !info->targets[0].arch && !info->targets[0].os;
+    for (u32 t = 0; !target_ok && t < SPN_TOOLCHAIN_MAX_TARGETS && (info->targets[t].arch || info->targets[t].os); t++) {
+      target_ok = spn_triple_match(info->targets[t], target);
+    }
+    if (!host_ok || !target_ok) {
+      spn_log_error("toolchain {:fg brightcyan} doesn't support host {:fg brightcyan} targeting {:fg brightcyan}",
+        SP_FMT_STR(entry->name),
+        SP_FMT_STR(spn_triple_to_str(host)),
+        SP_FMT_STR(spn_triple_to_str(target))
+      );
+      return SPN_TASK_ERROR;
+    }
+    session->toolchain.info = info;
+    session->toolchain.compiler = info->compiler;
+    session->toolchain.linker = info->linker;
+    session->toolchain.archiver = info->archiver;
+  }
+  else if (entry->kind == SPN_TOOLCHAIN_BUILTIN) {
     session->toolchain.info = &entry->info;
     session->toolchain.compiler = session->toolchain.info->compiler;
     session->toolchain.linker = session->toolchain.info->linker;

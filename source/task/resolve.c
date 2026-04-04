@@ -30,17 +30,6 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
     return SPN_TASK_ERROR;
   }
 
-  spn_log_info("{:fg brightgreen}", SP_FMT_CSTR("resolved profile:"));
-  spn_log_info("  name:      {}", SP_FMT_STR(session->profile.name));
-  spn_log_info("  toolchain: {}", SP_FMT_STR(session->profile.toolchain));
-  spn_log_info("  linkage:   {}", SP_FMT_STR(spn_pkg_linkage_to_str(session->profile.linkage)));
-  spn_log_info("  standard:  {}", SP_FMT_STR(spn_c_standard_to_str(session->profile.standard)));
-  spn_log_info("  mode:      {}", SP_FMT_STR(spn_dep_build_mode_to_str(session->profile.mode)));
-  spn_log_info("  os:        {}", SP_FMT_STR(spn_os_to_str(session->profile.os)));
-  spn_log_info("  arch:      {}", SP_FMT_STR(spn_arch_to_str(session->profile.arch)));
-  spn_log_info("  abi:       {}", SP_FMT_STR(spn_abi_to_str(session->profile.abi)));
-  exit(0);
-
   session->paths.profile = sp_fs_join_path(session->paths.build, session->profile.name);
   session->events = spn.events;
   spn_session_set_filter(session, app->config.filter);

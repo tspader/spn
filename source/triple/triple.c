@@ -83,3 +83,10 @@ spn_triple_t spn_triple_merge(spn_triple_t base, spn_triple_t partial) {
     .abi  = partial.abi  ? partial.abi  : base.abi,
   };
 }
+
+bool spn_triple_match(spn_triple_t entry, spn_triple_t target) {
+  if (entry.arch && entry.arch != target.arch) return false;
+  if (entry.os   && entry.os   != target.os)   return false;
+  if (entry.abi  && entry.abi  != target.abi)   return false;
+  return true;
+}

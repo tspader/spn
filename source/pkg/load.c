@@ -777,11 +777,30 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     spn_try_as_union(get_str_optional(it, "driver", &driver));
     toolchain.driver = spn_cc_driver_from_str(driver);
 
-    if (!sp_str_empty(toolchain.name)) {
+    sp_str_t package = sp_zero_initialize();
+    spn_try_as_union(get_str_optional(it, "package", &package));
+
+    if (!sp_str_empty(package)) {
+      // INDEX toolchain: references a dependency
+      sp_str_t version = sp_str_lit("*");
+      spn_try_as_union(get_str_optional(it, "version", &version));
+
+      spn_pkg_add_toolchain(pkg, (spn_toolchain_entry_t) {
+        .name = package,
+        .kind = SPN_TOOLCHAIN_INDEX,
+        .request = {
+          .package = spn_pkg_canonicalize_name(package),
+          .range = spn_semver_parse_range(version)
+        },
+      });
+    }
+    else {
+      // INLINE toolchain: defined in this manifest
+      if (sp_str_empty(toolchain.name))              return spn_result(SPN_ERROR);
       if (sp_str_empty(toolchain.compiler.program))  return spn_result(SPN_ERROR);
       if (sp_str_empty(toolchain.linker.program))    return spn_result(SPN_ERROR);
       if (sp_str_empty(toolchain.archiver.program))  return spn_result(SPN_ERROR);
-      if (toolchain.driver == SPN_CC_DRIVER_NONE) return spn_result(SPN_ERROR);
+      if (toolchain.driver == SPN_CC_DRIVER_NONE)    return spn_result(SPN_ERROR);
 
       toml_array_t* hosts = SP_NULLPTR;
       spn_try_as_union(get_arr_required(it, "host", &hosts));
@@ -796,23 +815,6 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
         .kind = SPN_TOOLCHAIN_INLINE,
         .info = toolchain,
       }));
-    }
-    else {
-      sp_str_t package = sp_str_lit("*");
-      sp_str_t version = sp_str_lit("*");
-
-      spn_try_as_union(get_str_optional(it, "package", &package));
-      spn_try_as_union(get_str_optional(it, "version", &version));
-      if (sp_str_empty(package)) return spn_result(SPN_ERROR);
-
-      spn_pkg_add_toolchain(pkg, (spn_toolchain_entry_t) {
-        .name = package,
-        .kind = SPN_TOOLCHAIN_INDEX,
-        .request = {
-          .package = spn_pkg_canonicalize_name(package),
-          .range = spn_semver_parse_range(version)
-        },
-      });
     }
   }
 
