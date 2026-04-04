@@ -5,6 +5,7 @@
 #include "spn.h"
 
 #include "profile/types.h"
+#include "session/types.h"
 #include "target/types.h"
 #include "toolchain/types.h"
 

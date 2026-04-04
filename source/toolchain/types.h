@@ -52,11 +52,4 @@ typedef struct spn_toolchain_entry {
   };
 } spn_toolchain_entry_t;
 
-typedef struct spn_toolchain {
-  spn_toolchain_info_t info;
-  spn_toolchain_launcher_t compiler;
-  spn_toolchain_launcher_t linker;
-  spn_toolchain_launcher_t archiver;
-} spn_toolchain_t;
-
 #endif

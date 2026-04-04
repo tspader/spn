@@ -1,5 +1,6 @@
 #include "ctx/types.h"
 #include "unit/types.h"
+#include "session/types.h"
 #include "target/types.h"
 
 #include "external/cc.h"

@@ -6,6 +6,8 @@
 #include "event/event.h"
 #include "external/cc.h"
 #include "pkg/pkg.h"
+#include "semver/types.h"
+#include "sp.h"
 #include "sp/hash.h"
 #include "sp/ht.h"
 #include "sp/macro.h"
@@ -14,7 +16,7 @@
 #include "target/mutate.h"
 #include "unit/package.h"
 
-static spn_linkage_t spn_session_resolve_dep_linkage(spn_session_t* session, spn_pkg_t* pkg) {
+static spn_linkage_t resolve_linkage(spn_session_t* session, spn_pkg_t* pkg) {
   sp_opt(spn_linkage_t) requested = SP_ZERO_INITIALIZE();
 
   spn_dep_options_t* options = sp_ht_getp(session->pkg->config, pkg->name);
@@ -54,6 +56,65 @@ static spn_linkage_t spn_session_resolve_dep_linkage(spn_session_t* session, spn
   return SPN_LIB_KIND_SOURCE; // @spader: For toolchain, which doesn't have a lib entry
   // SP_FATAL("{:fg brightcyan} has no consumable lib kinds", SP_FMT_STR(pkg->name));
   // SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
+}
+
+typedef struct {
+  sp_hash_t commit;
+  spn_semver_t version;
+  spn_build_mode_t mode;
+  spn_linkage_t linkage;
+  spn_c_standard_t standard;
+  spn_arch_t arch;
+  spn_os_t os;
+  spn_abi_t abi;
+  struct {
+    sp_hash_t name;
+    sp_hash_t cc;
+    sp_hash_t ld;
+    sp_hash_t ar;
+    sp_hash_t url;
+    spn_semver_t version;
+  } toolchain;
+} fingerprint_input_t;
+
+typedef struct {
+  sp_hash_t hash;
+  sp_str_t str;
+} fingerprint_t;
+
+
+fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_t* pkg) {
+  spn_pkg_metadata_t* metadata = sp_ht_getp(pkg->metadata, pkg->version);
+  sp_assert(metadata);
+
+  fingerprint_input_t fingerprint = SP_ZERO_INITIALIZE();
+  sp_mem_zero(&fingerprint, sizeof(fingerprint));
+  fingerprint.commit = sp_hash_str(metadata->commit);
+  fingerprint.version = metadata->version;
+
+  bool compiled = sp_om_size(pkg->libs) > 0 || sp_om_size(pkg->exes) > 0;
+  if (compiled) {
+    fingerprint.mode = session->profile.mode;
+    fingerprint.linkage = resolve_linkage(session, pkg);
+    fingerprint.standard = session->profile.standard;
+    fingerprint.arch = session->profile.arch;
+    fingerprint.os = session->profile.os;
+    fingerprint.abi = session->profile.abi;
+
+    if (session->toolchain.source == SPN_TOOLCHAIN_INDEX) {
+      fingerprint.toolchain.name = sp_hash_str(session->toolchain.pkg->qualified);
+      fingerprint.toolchain.version = session->toolchain.pkg->version;
+    }
+    fingerprint.toolchain.cc = sp_hash_str(session->toolchain.info.compiler.program);
+    fingerprint.toolchain.ld = sp_hash_str(session->toolchain.info.linker.program);
+    fingerprint.toolchain.ar = sp_hash_str(session->toolchain.info.archiver.program);
+    fingerprint.toolchain.url = sp_hash_str(session->toolchain.info.url);
+  }
+
+  fingerprint_t id = SP_ZERO_INITIALIZE();
+  id.hash = sp_hash_bytes(&fingerprint, sizeof(fingerprint), 0);
+  id.str = sp_format("{}", SP_FMT_HASH(id.hash));
+  return id;
 }
 
 void spn_session_init(spn_session_t* session, spn_pkg_t* pkg, spn_profile_t* profile, sp_str_t dir) {
@@ -109,7 +170,7 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
       break;
     }
     case SPN_PACKAGE_KIND_FILE: {
-      spn_linkage_t linkage = spn_session_resolve_dep_linkage(session, pkg);
+      spn_linkage_t linkage = resolve_linkage(session, pkg);
 
       spn_pkg_unit_init(unit, (spn_pkg_unit_config_t) {
         .ctx = {
@@ -127,39 +188,22 @@ void spn_init_pkg_unit_for_session(spn_session_t* session, spn_pkg_unit_t* unit,
       break;
     }
     case SPN_PACKAGE_KIND_INDEX: {
-      spn_linkage_t linkage = spn_session_resolve_dep_linkage(session, pkg);
-
       spn_pkg_metadata_t* metadata = sp_ht_getp(pkg->metadata, pkg->version);
       sp_assert(metadata);
 
-      sp_da(sp_hash_t) hashes = SP_NULLPTR;
-      sp_da_push(hashes, sp_hash_str(metadata->commit));
-      // sp_da_push(hashes, sp_hash_str(session->toolchain.info->name));
-      // sp_da_push(hashes, sp_hash_str(session->toolchain.info->compiler.program));
-      // sp_da_push(hashes, sp_hash_str(session->toolchain.info->linker.program));
-      // sp_da_push(hashes, sp_hash_str(session->toolchain.info->archiver.program));
-      // sp_da_push(hashes, sp_hash_str(session->toolchain.info->sysroot));
-      // sp_da_push(hashes, session->toolchain.info->driver);
-      // sp_da_push(hashes, session->toolchain.info->abi);
-      sp_da_push(hashes, session->profile.mode);
-      sp_da_push(hashes, linkage);
-      sp_da_push(hashes, metadata->version.major);
-      sp_da_push(hashes, metadata->version.minor);
-      sp_da_push(hashes, metadata->version.patch);
-      sp_hash_t build_id = sp_hash_combine(hashes, sp_dyn_array_size(hashes));
-      sp_str_t build_str = sp_format("{}", SP_FMT_SHORT_HASH(build_id));
+      fingerprint_t id = fingerprint_package(session, pkg);
 
       spn_pkg_unit_init(unit, (spn_pkg_unit_config_t) {
-        .build_id = build_id,
+        .build_id = id.hash,
         .metadata = *metadata,
         .ctx = {
           .name = pkg->name,
           .package = pkg,
           .session = session,
-          .linkage = linkage,
+          .linkage = resolve_linkage(session, pkg),
           .paths = {
-            .work = sp_fs_join_path(pkg->paths.cache.work, build_str),
-            .store = sp_fs_join_path(pkg->paths.cache.store, build_str),
+            .work = sp_fs_join_path(pkg->paths.cache.work, id.str),
+            .store = sp_fs_join_path(pkg->paths.cache.store, id.str),
             .source = pkg->paths.cache.source
           }
         }

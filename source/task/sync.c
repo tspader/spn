@@ -76,10 +76,8 @@ static spn_toolchain_entry_t* find_toolchain(spn_pkg_t* pkg, spn_triple_t host, 
 }
 
 static void log_toolchain_error(spn_pkg_t* pkg, spn_triple_t host, spn_triple_t target) {
-  sp_str_builder_t b = SP_ZERO_INITIALIZE();
-  sp_str_builder_append_fmt(
-    &b,
-    "selected toolchain ({}, {}) does not support this host + target ({}, {})",
+  spn_log_error(
+    "selected toolchain ({:fg cyan}, {}) does not support this host + target ({:fg yellow}, {:fg yellow})",
     SP_FMT_STR(pkg->name),
     SP_FMT_STR(spn_semver_to_str(pkg->version)),
     SP_FMT_STR(spn_triple_to_str(host)),
@@ -230,16 +228,20 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
       return SPN_TASK_ERROR;
     }
 
+    session->toolchain.source = SPN_TOOLCHAIN_INLINE;
     session->toolchain.info = entry->info;
     session->toolchain.compiler = session->toolchain.info.compiler;
     session->toolchain.linker = session->toolchain.info.linker;
     session->toolchain.archiver = session->toolchain.info.archiver;
+    session->toolchain.pkg = session->pkg;
   }
   else if (entry->kind == SPN_TOOLCHAIN_BUILTIN) {
+    session->toolchain.source = SPN_TOOLCHAIN_BUILTIN;
     session->toolchain.info = entry->info;
     session->toolchain.compiler = session->toolchain.info.compiler;
     session->toolchain.linker = session->toolchain.info.linker;
     session->toolchain.archiver = session->toolchain.info.archiver;
+    session->toolchain.pkg = session->pkg;
   }
   else if (entry->kind == SPN_TOOLCHAIN_INDEX) {
     checkout_t* checkout = sp_str_ht_get(checkouts, entry->request.package);
@@ -262,8 +264,11 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
       session->units.toolchain = unit;
     }
 
-    // Mark down the toolchain for the session
+    // Mark down the toolchain for the session; we'll fill in the launchers
+    // once we know where the toolchain's gonna be installed in the store
+    session->toolchain.source = SPN_TOOLCHAIN_INDEX;
     session->toolchain.info = toolchain->info;
+    session->toolchain.pkg = checkout->pkg;
   }
 
   // Load the manifests for each package and add a unit
