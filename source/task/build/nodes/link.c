@@ -16,14 +16,18 @@ typedef struct {
 } ar_result_t;
 
 ar_result_t run_ar_exec(spn_target_unit_t* unit, sp_str_t output) {
+  spn_toolchain_t* toolchain = &unit->session->toolchain;
   sp_ps_config_t ps = {
-    .command = sp_str_lit("ar"),
+    .command = toolchain->archiver.program,
     .cwd = unit->paths.work,
     .io = {
       .in.mode = SP_PS_IO_MODE_NULL,
       .err.mode = SP_PS_IO_MODE_REDIRECT,
     },
   };
+  sp_da_for(toolchain->archiver.args, ai) {
+    sp_ps_config_add_arg(&ps, toolchain->archiver.args[ai]);
+  }
   sp_ps_config_add_arg(&ps, sp_str_lit("rcs"));
   sp_ps_config_add_arg(&ps, output);
 
@@ -97,14 +101,14 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
           .kind = target->kind,
           .num_objects = sp_da_size(unit->objects),
           .output_path = output,
-          .linker = sp_str_lit("ar"),
+          .linker = unit->session->toolchain.archiver.program,
           .args = run.args,
           .has_embeds = has_embeds,
         }
       });
 
       if (run.result.status.exit_code) {
-        emit_failure(unit, sp_str_lit("ar"), run.args, run.result.status.exit_code, run.result.out, run.result.err);
+        emit_failure(unit, unit->session->toolchain.archiver.program, run.args, run.result.status.exit_code, run.result.out, run.result.err);
         return SPN_ERROR;
       }
 

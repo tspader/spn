@@ -79,16 +79,17 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
 
 
   sp_tm_timer_t timer = sp_tm_start_timer();
-  switch (strategy) {
-    case SPN_RESOLVE_STRATEGY_LOCK_FILE: {
-      spn_try_as(spn_resolve_from_lock_file(resolver, &app->lock.value), SPN_TASK_ERROR);
-      break;
-    }
-    case SPN_RESOLVE_STRATEGY_SOLVER: {
-      spn_try_as(spn_resolve_from_solver(resolver), SPN_TASK_ERROR);
-      break;
-    }
-  }
+  spn_try_as(spn_resolve_from_solver(resolver), SPN_TASK_ERROR);
+  // switch (strategy) {
+  //   case SPN_RESOLVE_STRATEGY_LOCK_FILE: {
+  //     spn_try_as(spn_resolve_from_lock_file(resolver, &app->lock.value), SPN_TASK_ERROR);
+  //     break;
+  //   }
+  //   case SPN_RESOLVE_STRATEGY_SOLVER: {
+  //     spn_try_as(spn_resolve_from_solver(resolver), SPN_TASK_ERROR);
+  //     break;
+  //   }
+  // }
 
   spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
     .kind = SPN_EVENT_RESOLVE_END,

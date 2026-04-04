@@ -123,6 +123,7 @@ void spn_session_init(spn_session_t* session, spn_pkg_t* pkg, spn_profile_t* pro
   session->paths.root = sp_str_copy(pkg->paths.root);
   session->paths.build = sp_fs_join_path(session->paths.root, dir);
   session->paths.profile = sp_fs_join_path(session->paths.build, session->profile.name);
+  session->env = sp_env_capture();
 
   sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
 }

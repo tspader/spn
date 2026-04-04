@@ -90,3 +90,58 @@ bool spn_triple_match(spn_triple_t entry, spn_triple_t target) {
   if (entry.abi  && entry.abi  != target.abi)   return false;
   return true;
 }
+
+sp_str_t spn_triple_to_cc_target(spn_triple_t triple) {
+  sp_str_t arch = spn_arch_to_str(triple.arch);
+  sp_str_t os = spn_os_to_str(triple.os);
+
+  // Clang/Zig use "gnu" where spn uses "mingw"
+  sp_str_t abi;
+  switch (triple.abi) {
+    case SPN_ABI_MINGW: abi = sp_str_lit("gnu"); break;
+    default:            abi = spn_abi_to_str(triple.abi); break;
+  }
+
+  if (triple.abi) {
+    return sp_format("{}-{}-{}", SP_FMT_STR(arch), SP_FMT_STR(os), SP_FMT_STR(abi));
+  }
+  if (triple.os) {
+    return sp_format("{}-{}", SP_FMT_STR(arch), SP_FMT_STR(os));
+  }
+  return arch;
+}
+
+sp_str_t spn_triple_to_autoconf(spn_triple_t triple) {
+  sp_str_t arch = spn_arch_to_str(triple.arch);
+
+  // Autoconf uses GNU 4-part triples: arch-vendor-os-abi
+  // For mingw: x86_64-w64-mingw32
+  // For linux: x86_64-unknown-linux-gnu
+  // For macos: x86_64-apple-darwin
+  switch (triple.os) {
+    case SPN_OS_LINUX: {
+      sp_str_t abi = spn_abi_to_str(triple.abi);
+      return sp_format("{}-unknown-linux-{}", SP_FMT_STR(arch), SP_FMT_STR(abi));
+    }
+    case SPN_OS_WINDOWS: {
+      return sp_format("{}-w64-mingw32", SP_FMT_STR(arch));
+    }
+    case SPN_OS_MACOS: {
+      return sp_format("{}-apple-darwin", SP_FMT_STR(arch));
+    }
+    case SPN_OS_NONE: {
+      return arch;
+    }
+  }
+  return arch;
+}
+
+sp_str_t spn_os_to_cmake_system_name(spn_os_t os) {
+  switch (os) {
+    case SPN_OS_LINUX:   return sp_str_lit("Linux");
+    case SPN_OS_WINDOWS: return sp_str_lit("Windows");
+    case SPN_OS_MACOS:   return sp_str_lit("Darwin");
+    case SPN_OS_NONE:    return sp_str_lit("");
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}

@@ -215,18 +215,31 @@ sp_ps_output_t spn_ctx_build_subprocess(spn_build_ctx_t* ctx, sp_ps_config_t con
   };
   config.cwd = ctx->paths.work;
 
-  u32 it = 0;
-  for (; it < sp_carr_len(config.env.extra); it++) {
-    if (!sp_str_valid(config.env.extra[it].key)) {
-      break;
-    }
+  // Inject toolchain env vars from session. We use extra[] slots on top
+  // of the default SP_PS_ENV_INHERIT so the subprocess gets the full process
+  // environment plus our toolchain overrides.
+  u32 ei = 0;
+  for (; ei < sp_carr_len(config.env.extra); ei++) {
+    if (!sp_str_valid(config.env.extra[ei].key)) break;
   }
-  SP_ASSERT(it != sp_carr_len(config.env.extra));
 
-  config.env.extra[it] = (sp_env_var_t) {
-    .key = sp_str_lit("CC"),
-    .value = spn_toolchain_launcher_to_str(ctx->session->toolchain.compiler)
-  };
+  sp_str_t cc_key = sp_str_lit("CC");
+  sp_str_t ar_key = sp_str_lit("AR");
+  sp_str_t ld_key = sp_str_lit("LD");
+
+  sp_str_t cc_val = sp_env_get(&ctx->session->env, cc_key);
+  sp_str_t ar_val = sp_env_get(&ctx->session->env, ar_key);
+  sp_str_t ld_val = sp_env_get(&ctx->session->env, ld_key);
+
+  if (!sp_str_empty(cc_val) && ei < sp_carr_len(config.env.extra)) {
+    config.env.extra[ei++] = (sp_env_var_t) { .key = cc_key, .value = cc_val };
+  }
+  if (!sp_str_empty(ar_val) && ei < sp_carr_len(config.env.extra)) {
+    config.env.extra[ei++] = (sp_env_var_t) { .key = ar_key, .value = ar_val };
+  }
+  if (!sp_str_empty(ld_val) && ei < sp_carr_len(config.env.extra)) {
+    config.env.extra[ei++] = (sp_env_var_t) { .key = ld_key, .value = ld_val };
+  }
 
   sp_da_push(ctx->commands, sp_ps_config_copy(&config));
 

@@ -16,6 +16,7 @@
 #include "session/session.h"
 #include "spn.h"
 #include "task/task.h"
+#include "toolchain/toolchain.h"
 #include "toolchain/types.h"
 #include "triple/triple.h"
 #include <unistd.h>
@@ -324,6 +325,12 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     session->toolchain.archiver.program = sp_fs_join_path(store, toolchain.archiver.program);
     session->toolchain.archiver.args = toolchain.archiver.args;
   }
+
+  // Populate session env with toolchain vars so that external build tools
+  // (autoconf, make, cmake) automatically pick up the right compiler.
+  sp_env_insert(&session->env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(session->toolchain.compiler));
+  sp_env_insert(&session->env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(session->toolchain.archiver));
+  sp_env_insert(&session->env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(session->toolchain.linker));
 
   // Load file dependencies directly from their manifests
   sp_ht_for_kv(app->package.deps, it) {

@@ -1,5 +1,7 @@
 #include "autoconf.h"
 
+#include "session/types.h"
+#include "triple/triple.h"
 #include "unit/build.h"
 
 s32 spn_autoconf(spn_build_ctx_t* build) {
@@ -28,6 +30,14 @@ s32 spn_autoconf_run(spn_autoconf_t* autoconf) {
         SP_LIT("--disable-static"),
     },
   };
+
+  // Pass --build and --host when cross-compiling
+  spn_triple_t host = spn_triple_host();
+  spn_triple_t target = { build->session->profile.arch, build->session->profile.os, build->session->profile.abi };
+  if (!spn_triple_match(target, host) || !spn_triple_match(host, target)) {
+    sp_ps_config_add_arg(&config, sp_format("--build={}", SP_FMT_STR(spn_triple_to_autoconf(host))));
+    sp_ps_config_add_arg(&config, sp_format("--host={}", SP_FMT_STR(spn_triple_to_autoconf(target))));
+  }
 
   sp_da_for(autoconf->flags, it) {
     sp_ps_config_add_arg(&config, autoconf->flags[it]);

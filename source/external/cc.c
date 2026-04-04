@@ -9,6 +9,7 @@
 #include "enum/enum.h"
 #include "unit/build.h"
 #include "external/cc.h"
+#include "triple/triple.h"
 #include "sp/io.h"
 
 void spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_t toolchain) {
@@ -127,8 +128,14 @@ spn_cc_target_t* spn_cc_add_target(spn_cc_t* cc, spn_target_kind_t kind, sp_str_
   return sp_da_back(cc->targets);
 }
 
-void spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx) {
-  spn_obj_init(&ctx->obj, spn_obj_get_native_format());
+void spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx, spn_os_t target_os) {
+  spn_obj_kind_t format;
+  switch (target_os) {
+    case SPN_OS_WINDOWS: format = SPN_OBJ_COFF; break;
+    case SPN_OS_MACOS:   format = SPN_OBJ_MACHO; break;
+    default:             format = SPN_OBJ_ELF; break;
+  }
+  spn_obj_init(&ctx->obj, format);
 }
 
 // @spader
@@ -216,6 +223,16 @@ void spn_cc_to_ps(spn_cc_t* cc, sp_ps_config_t* ps) {
   ps->command = cc->toolchain.compiler.program;
   sp_da_for(cc->toolchain.compiler.args, ai) {
     sp_ps_config_add_arg(ps, cc->toolchain.compiler.args[ai]);
+  }
+
+  // Clang and Zig require an explicit --target flag for cross-compilation.
+  // GCC cross-compilers bake the target into the binary name (e.g. x86_64-w64-mingw32-gcc).
+  if (cc->toolchain.info.driver == SPN_CC_DRIVER_CLANG) {
+    spn_triple_t target = { cc->arch, cc->os, cc->abi };
+    sp_str_t target_str = spn_triple_to_cc_target(target);
+    if (!sp_str_empty(target_str)) {
+      sp_ps_config_add_arg(ps, sp_format("--target={}", SP_FMT_STR(target_str)));
+    }
   }
 
   sp_da_for(cc->include, it) {

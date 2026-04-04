@@ -25,6 +25,10 @@ package = "musl-gcc"
 version = "1.0.0"
 
 [[toolchain]]
+package = "zig"
+version = "0.15.2"
+
+[[toolchain]]
 name = "system"
 compiler = "gcc"
 linker = "ld"

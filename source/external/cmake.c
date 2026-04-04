@@ -1,8 +1,12 @@
 #include "cmake.h"
 
-#include "unit/build.h"
+#include "enum/enum.h"
 #include "session/types.h"
 #include "profile/types.h"
+#include "toolchain/toolchain.h"
+#include "triple/triple.h"
+#include "unit/build.h"
+#include "sp/io.h"
 
 sp_str_t spn_cmake_gen_to_str(spn_cmake_gen_t gen) {
   switch (gen) {
@@ -60,6 +64,30 @@ void spn_cmake_add_arg(spn_cmake_t* cmake, const c8* arg) {
   sp_da_push(cmake->args, sp_str_from_cstr(arg));
 }
 
+static sp_str_t spn_cmake_generate_toolchain_file(spn_build_ctx_t* build) {
+  spn_session_t* session = build->session;
+  spn_toolchain_t* tc = &session->toolchain;
+
+  sp_str_t tools_dir = sp_fs_join_path(build->paths.generated, sp_str_lit("tools"));
+  sp_fs_create_dir(tools_dir);
+  sp_str_t path = sp_fs_join_path(tools_dir, sp_str_lit("spn.cmake"));
+
+  sp_io_writer_t io = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_OVERWRITE);
+
+  spn_triple_t target = { session->profile.arch, session->profile.os, session->profile.abi };
+
+  sp_str_t system_name = spn_os_to_cmake_system_name(session->profile.os);
+  sp_io_write_str(&io, sp_format("set(CMAKE_SYSTEM_NAME {})\n", SP_FMT_STR(system_name)));
+  sp_io_write_str(&io, sp_format("set(CMAKE_SYSTEM_PROCESSOR {})\n", SP_FMT_STR(spn_arch_to_str(session->profile.arch))));
+  sp_io_write_str(&io, sp_format("set(CMAKE_C_COMPILER {})\n", SP_FMT_STR(spn_toolchain_launcher_to_str(tc->compiler))));
+  sp_io_write_str(&io, sp_format("set(CMAKE_C_COMPILER_TARGET {})\n", SP_FMT_STR(spn_triple_to_cc_target(target))));
+  sp_io_write_str(&io, sp_format("set(CMAKE_LINKER {})\n", SP_FMT_STR(spn_toolchain_launcher_to_str(tc->linker))));
+  sp_io_write_str(&io, sp_format("set(CMAKE_AR {})\n", SP_FMT_STR(tc->archiver.program)));
+
+  sp_io_writer_close(&io);
+  return path;
+}
+
 s32 spn_cmake_configure(spn_cmake_t* cmake) {
   spn_build_ctx_t* build = cmake->build;
 
@@ -75,6 +103,13 @@ s32 spn_cmake_configure(spn_cmake_t* cmake) {
     sp_ps_config_add_arg(&config, SP_LIT("-G"));
     sp_ps_config_add_arg(&config, spn_cmake_gen_to_str(cmake->generator));
   }
+
+  // Generate and pass a CMake toolchain file for cross-compilation support.
+  // Even for native builds this is useful: it tells CMake exactly which
+  // compiler, linker, and archiver to use.
+  sp_str_t toolchain_file = spn_cmake_generate_toolchain_file(build);
+  sp_ps_config_add_arg(&config, spn_cmake_format_define(
+    SP_LIT("CMAKE_TOOLCHAIN_FILE"), toolchain_file));
 
   sp_ps_config_add_arg(&config, spn_cmake_format_define(
     SP_LIT("CMAKE_INSTALL_PREFIX"),
