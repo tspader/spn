@@ -318,23 +318,33 @@ add_custom_command(
 )
 
 add_custom_command(
-  OUTPUT "${BOOTSTRAP_INCLUDE_DIR}/sp/elf.h"
+  OUTPUT "${BOOTSTRAP_INCLUDE_DIR}/sp/sp_math.h"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${BOOTSTRAP_INCLUDE_DIR}/sp"
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-    "${BOOTSTRAP_EXTERNAL_DIR}/sp/sp/elf.h"
-    "${BOOTSTRAP_INCLUDE_DIR}/sp/elf.h"
+    "${BOOTSTRAP_EXTERNAL_DIR}/sp/sp/sp_math.h"
+    "${BOOTSTRAP_INCLUDE_DIR}/sp/sp_math.h"
   DEPENDS sp_external
-  COMMENT "Copying sp/elf.h into bootstrap/include/sp"
+  COMMENT "Copying sp/sp_math.h into bootstrap/include/sp"
 )
 
 add_custom_command(
-  OUTPUT "${BOOTSTRAP_INCLUDE_DIR}/sp/glob.h"
+  OUTPUT "${BOOTSTRAP_INCLUDE_DIR}/sp/sp_elf.h"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${BOOTSTRAP_INCLUDE_DIR}/sp"
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-    "${BOOTSTRAP_EXTERNAL_DIR}/sp/sp/glob.h"
-    "${BOOTSTRAP_INCLUDE_DIR}/sp/glob.h"
+    "${BOOTSTRAP_EXTERNAL_DIR}/sp/sp/sp_elf.h"
+    "${BOOTSTRAP_INCLUDE_DIR}/sp/sp_elf.h"
   DEPENDS sp_external
-  COMMENT "Copying sp/glob.h into bootstrap/include/sp"
+  COMMENT "Copying sp/sp_elf.h into bootstrap/include/sp"
+)
+
+add_custom_command(
+  OUTPUT "${BOOTSTRAP_INCLUDE_DIR}/sp/sp_glob.h"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${BOOTSTRAP_INCLUDE_DIR}/sp"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+    "${BOOTSTRAP_EXTERNAL_DIR}/sp/sp/sp_glob.h"
+    "${BOOTSTRAP_INCLUDE_DIR}/sp/sp_glob.h"
+  DEPENDS sp_external
+  COMMENT "Copying sp/sp_glob.h into bootstrap/include/sp"
 )
 
 add_custom_command(
@@ -360,11 +370,11 @@ add_custom_command(
 add_custom_target(bootstrap_headers ALL
   DEPENDS
     "${BOOTSTRAP_INCLUDE_DIR}/sp.h"
-    "${BOOTSTRAP_INCLUDE_DIR}/sp/elf.h"
-    "${BOOTSTRAP_INCLUDE_DIR}/sp/glob.h"
+    "${BOOTSTRAP_INCLUDE_DIR}/sp/sp_elf.h"
+    "${BOOTSTRAP_INCLUDE_DIR}/sp/sp_glob.h"
     "${SP_OBJ_FORMAT_HEADER}"
     "${BOOTSTRAP_INCLUDE_DIR}/sp/coff.h"
-    "${BOOTSTRAP_INCLUDE_DIR}/sp/elf.h"
+    "${BOOTSTRAP_INCLUDE_DIR}/sp/sp_elf.h"
     "${BOOTSTRAP_INCLUDE_DIR}/toml.h"
     "${BOOTSTRAP_INCLUDE_DIR}/argparse.h"
     "${TINYCC_HEADER}"
@@ -422,21 +432,21 @@ add_custom_target(spn_embed ALL
 # SPN SOURCES #
 ###############
 set(SPN_SOURCES
-  source/spn.c
   source/api.c
+  source/intern.c
+  source/signal.c
+  source/spn.c
   source/app/app.c
   source/event/event.c
   source/event/log.c
   source/unit/build.c
   source/unit/package.c
-  source/signal.c
   source/graph/graph.c
   source/tui/tui.c
   source/tui/table.c
   source/tui/spinner.c
   source/ctx/ctx.c
   source/session/session.c
-  source/intern.c
   source/log/log.c
   source/enum/enum.c
   source/index/index.c
@@ -495,9 +505,9 @@ set(SPN_SOURCES
   source/sp/tm.c
   source/sp/str.c
   source/sp/color.c
+  source/sp/io.c
   source/sp/os.c
   source/sp/ps.c
-  source/sp/io.c
   source/target/target.c
   source/target/mutate.c
   source/task/build/build.c

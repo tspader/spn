@@ -104,18 +104,18 @@ void spn_pkg_unit_write_stamp(spn_pkg_unit_t* ctx, sp_str_t path) {
   sp_io_writer_close(&io);
 }
 
-spn_err_t spn_pkg_unit_call_hook(spn_pkg_unit_t* ctx, spn_build_fn_t fn) {
+spn_err_t spn_pkg_unit_call_hook(spn_pkg_unit_t* unit, spn_build_fn_t fn) {
   jmp_buf jump;
-  int status = tcc_setjmp(ctx->tcc, jump, fn);
+  int status = tcc_setjmp(unit->tcc, jump, fn);
   if (!status) {
-    fn(&ctx->ctx);
+    fn(&unit->ctx);
   }
   else {
     // @spader @log
     // What else can we get from TCC here?
-    spn_event_buffer_push_ctx(spn.events, &ctx->ctx, (spn_build_event_t) {
+    spn_event_buffer_push_ctx(spn.events, &unit->ctx, (spn_build_event_t) {
       .kind = SPN_EVENT_BUILD_SCRIPT_CRASHED,
-      .crashed.path = ctx->ctx.pkg->paths.script,
+      .crashed.path = unit->ctx.pkg->paths.script,
     });
     return SPN_ERROR;
   }

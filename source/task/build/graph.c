@@ -244,10 +244,10 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
     spn_user_node_t* node = &unit->nodes.all[it];
 
     // depend on the outputs of your command inputs
-    sp_da_for(node->deps, dit) {
-      spn_user_node_t* dep = spn_find_user_node(node->deps[dit]);
-      sp_da_for(dep->outputs, oit) {
-        spn_bg_id_t output = get_or_put_user_file(unit, graph, dep->outputs[oit]);
+    sp_da_for(node->deps, j) {
+      spn_user_node_t* dep = spn_find_user_node(node->deps[j]);
+      sp_da_for(dep->outputs, k) {
+        spn_bg_id_t output = get_or_put_user_file(unit, graph, dep->outputs[k]);
         sp_try(spn_bg_cmd_add_input(graph, node->id, output));
       }
     }

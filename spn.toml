@@ -6,8 +6,8 @@ repo = "tspader/spn"
 
 [deps.package]
 "spader/spcc" = "1.0.0"
-"spader/sp" = "1.8.1"
-toml = "1.2.1"
+"spader/sp" = "1.9.0"
+toml = "1.3.0"
 
 [deps.test]
 utest = "1.0.0"

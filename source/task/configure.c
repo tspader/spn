@@ -40,7 +40,7 @@ static void spn_configure_expand_glob(sp_str_t root, sp_str_t pattern, sp_da(sp_
 
   sp_da_for(entries, it) {
     sp_fs_entry_t* entry = &entries[it];
-    if (!sp_fs_is_regular_file(entry->file_path)) {
+    if (!sp_fs_is_file(entry->file_path)) {
       continue;
     }
 

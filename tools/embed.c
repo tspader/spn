@@ -1,7 +1,7 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 #include "sp/coff.h"
-#include "sp/elf.h"
+#include "sp/sp_elf.h"
 
 typedef struct {
   sp_str_t path;
@@ -52,7 +52,7 @@ s32 main(s32 argc, c8** argv) {
 
   sp_da_for(files, it) {
     sp_fs_entry_t ent = files[it];
-    if (ent.attributes & SP_OS_FILE_ATTR_DIRECTORY) {
+    if (ent.kind == SP_FS_KIND_DIR) {
       continue;
     }
 
@@ -174,7 +174,7 @@ s32 main(s32 argc, c8** argv) {
 
   sp_da_for(files, it) {
     sp_fs_entry_t ent = files[it];
-    if (ent.attributes & SP_OS_FILE_ATTR_DIRECTORY) {
+    if (ent.kind == SP_FS_KIND_DIR) {
       continue;
     }
 

@@ -2,6 +2,7 @@
 #define SPN_TUI_TYPES_H
 
 #include "sp.h"
+#include "sp/sp_math.h"
 
 #if defined(SP_POSIX)
   #include <termios.h>

@@ -1,14 +1,4 @@
-// SINGLE HEADER
-#define SP_MAIN
-#define SP_IMPLEMENTATION
 #include "sp.h"
-#include "sp/coff.h"
-#include "sp/elf.h"
-#define SP_GLOB_IMPLEMENTATION
-#include "sp/glob.h"
-
-#define TOML_IMPLEMENTATION
-#include "toml.h"
 
 // STANDARD
 #ifdef _WIN32
@@ -56,12 +46,30 @@
 #include "sp/io.h"
 #include "sp/macro.h"
 #include "sp/os.h"
+#include "sp/sp_glob.h"
 #include "task/task.h"
 #include "tui/tui.h"
 #include "unit/build.h"
 #include "version.h"
 
 #include <sys/stat.h>
+
+// SINGLE HEADER
+#define SP_MAIN
+#define SP_IMPLEMENTATION
+#include "sp.h"
+#include "sp/coff.h"
+#include "sp/sp_elf.h"
+
+#define SP_MATH_IMPLEMENTATION
+#include "sp/sp_math.h"
+
+#define SP_GLOB_IMPLEMENTATION
+#include "sp/glob.h"
+
+#define TOML_IMPLEMENTATION
+#include "toml.h"
+
 
 spn_app_t app;
 spn_ctx_t spn;

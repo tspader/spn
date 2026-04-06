@@ -148,7 +148,7 @@ spn_index_t*      spn_add_index(spn_build_ctx_t* b, const c8* name, const c8* lo
 void              spn_copy(spn_build_ctx_t* b, spn_pkg_dir_t from, const c8* pf, spn_pkg_dir_t to, const c8* pt);
 void              spn_log(spn_build_ctx_t* b, const c8* message);
 spn_libc_kind_t   spn_profile_get_libc(spn_profile_t* profile);
-spn_linkage_t spn_profile_get_linkage(spn_profile_t* profile);
+spn_linkage_t     spn_profile_get_linkage(spn_profile_t* profile);
 spn_c_standard_t  spn_profile_get_standard(spn_profile_t* profile);
 spn_build_mode_t  spn_profile_get_mode(spn_profile_t* profile);
 
@@ -165,6 +165,8 @@ void            spn_target_embed_mem(spn_target_t* target, const c8* symbol, con
 void            spn_target_embed_mem_ex(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size, const c8* data_type, const c8* size_type);
 void            spn_target_embed_dir(spn_target_t* target, const c8* dir);
 void            spn_target_embed_dir_ex(spn_target_t* target, const c8* dir, const c8* data_type, const c8* size_type);
+
+
 s32             spn_make(spn_build_ctx_t* build);
 spn_make_t*     spn_make_new(spn_build_ctx_t* build);
 void            spn_make_add_target(spn_make_t* make, const c8* target);

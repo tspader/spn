@@ -67,6 +67,7 @@ spn_err_t spn_git_db_ensure_rev(spn_git_db_t* db, sp_str_t rev) {
       SP_LIT("-C"), db->path,
       SP_LIT("fetch"), SP_LIT("--quiet"), SP_LIT("origin")
     },
+    .io.err.mode = SP_PS_IO_MODE_NULL,
   });
 
   if (result.status.exit_code) return SPN_ERROR;
@@ -77,6 +78,7 @@ spn_err_t spn_git_db_ensure_rev(spn_git_db_t* db, sp_str_t rev) {
       SP_LIT("-C"), db->path,
       SP_LIT("cat-file"), SP_LIT("-t"), rev
     },
+    .io.err.mode = SP_PS_IO_MODE_NULL,
   });
 
   if (result.status.exit_code) return SPN_ERROR;

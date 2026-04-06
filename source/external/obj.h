@@ -3,8 +3,7 @@
 
 #include "sp.h"
 #include "sp/coff.h"
-#include "sp/elf.h"
-#include "spn.h"
+#include "sp/sp_elf.h"
 #include "err.h"
 
 typedef enum {
