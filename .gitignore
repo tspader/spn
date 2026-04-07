@@ -14,3 +14,4 @@ compile_commands.json
 /mutagen.yml.lock
 !source/task/build
 /test/manual/hermetic
+/.llm/dotllm.json
