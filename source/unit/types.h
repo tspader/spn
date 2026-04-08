@@ -42,7 +42,7 @@ typedef struct {
 } spn_build_time_t;
 
 typedef struct {
-  spn_pkg_t* package;
+  spn_pkg_info_t* package;
   spn_session_t* session;
   struct {
     sp_str_t source;
@@ -123,8 +123,8 @@ struct spn_target_unit {
   spn_build_paths_t paths;
   spn_build_io_t logs;
   spn_session_t* session;
-  spn_pkg_t* pkg;
-  spn_target_t* info;
+  spn_pkg_info_t* pkg;
+  spn_target_info_t* info;
   spn_cc_t* cc;
   spn_target_kind_t kind;
 
@@ -150,7 +150,7 @@ struct spn_target_unit {
 
 struct spn_pkg_unit_t {
   spn_session_t* session;
-  spn_pkg_t* pkg;
+  spn_pkg_info_t* pkg;
 
   sp_om(spn_compile_unit_t) objects;
   sp_str_ht(spn_target_unit_t*) targets;
@@ -212,7 +212,7 @@ struct spn_pkg_unit_t {
 
 typedef struct {
   spn_session_t* session;
-  spn_pkg_t* pkg;
+  spn_pkg_info_t* pkg;
   sp_str_t url;
   spn_build_io_t logs;
 

@@ -58,7 +58,7 @@ static bool match_toolchain(spn_toolchain_entry_t* toolchain, spn_triple_t host,
   return true;
 }
 
-static spn_toolchain_entry_t* find_toolchain(spn_pkg_t* pkg, spn_triple_t host, spn_triple_t target) {
+static spn_toolchain_entry_t* find_toolchain(spn_pkg_info_t* pkg, spn_triple_t host, spn_triple_t target) {
   sp_om_for(pkg->toolchains, it) {
     spn_toolchain_entry_t* toolchain = sp_om_at(pkg->toolchains, it);
 
@@ -70,7 +70,7 @@ static spn_toolchain_entry_t* find_toolchain(spn_pkg_t* pkg, spn_triple_t host, 
   return SP_NULLPTR;
 }
 
-static void log_toolchain_error(spn_pkg_t* pkg, spn_triple_t host, spn_triple_t target) {
+static void log_toolchain_error(spn_pkg_info_t* pkg, spn_triple_t host, spn_triple_t target) {
   spn_log_error(
     "selected toolchain ({:fg cyan}, {}) does not support this host + target ({:fg yellow}, {:fg yellow})",
     SP_FMT_STR(pkg->name),
@@ -141,7 +141,7 @@ spn_err_t load_index_packages(spn_session_t* session, spn_resolver_t* resolver) 
     }
 
     loaded->kind = SPN_PACKAGE_KIND_INDEX;
-    loaded->pkg = sp_alloc_type(spn_pkg_t);
+    loaded->pkg = sp_alloc_type(spn_pkg_info_t);
     spn_pkg_load(loaded->pkg, loaded->paths.manifest);
 
     loaded->elapsed = sp_tm_read_timer(&timer);
@@ -150,7 +150,7 @@ spn_err_t load_index_packages(spn_session_t* session, spn_resolver_t* resolver) 
   return SPN_OK;
 }
 
-spn_err_t load_file_packages(spn_session_t* session, spn_pkg_t* pkg) {
+spn_err_t load_file_packages(spn_session_t* session, spn_pkg_info_t* pkg) {
   // Load file dependencies directly from their manifests
   sp_ht_for_kv(pkg->deps, it) {
     spn_requested_pkg_t* requested = it.val;
@@ -179,14 +179,14 @@ spn_err_t load_file_packages(spn_session_t* session, spn_pkg_t* pkg) {
     spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, *it.key);
 
     loaded->kind = SPN_PACKAGE_KIND_FILE;
-    loaded->pkg = sp_alloc_type(spn_pkg_t);
+    loaded->pkg = sp_alloc_type(spn_pkg_info_t);
     spn_pkg_load(loaded->pkg, manifest);
   }
 
   return SPN_OK;
 }
 
-spn_err_t load_root_package(spn_session_t* session, spn_pkg_t* pkg) {
+spn_err_t load_root_package(spn_session_t* session, spn_pkg_info_t* pkg) {
   sp_str_ht_insert(session->packages, pkg->name, sp_zero_struct(spn_loaded_pkg_t));
   spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, pkg->name);
 

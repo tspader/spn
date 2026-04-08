@@ -17,9 +17,9 @@
   typedef char     c8;
 #endif
 
-typedef struct spn_pkg spn_pkg_t;
-typedef struct spn_target spn_target_t;
-typedef struct spn_profile spn_profile_t;
+typedef struct spn_pkg spn_pkg_info_t;
+typedef struct spn_target spn_target_info_t;
+typedef struct spn_profile spn_profile_info_t;
 typedef struct spn_index spn_index_t;
 typedef struct spn_autoconf spn_autoconf_t;
 typedef struct spn_make spn_make_t;

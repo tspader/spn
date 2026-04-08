@@ -9,7 +9,7 @@
 #include "semver/parser.h"
 #include "spn.h"
 
-void spn_resolver_init(spn_resolver_t* r, spn_index_cache_t* index, spn_pkg_t* pkg, spn_event_buffer_t* events) {
+void spn_resolver_init(spn_resolver_t* r, spn_index_cache_t* index, spn_pkg_info_t* pkg, spn_event_buffer_t* events) {
   *r = (spn_resolver_t){ .pkg = pkg, .index = index, .events = events };
 }
 

@@ -82,7 +82,7 @@ spn_err_t emit_failure(spn_target_unit_t* unit, sp_str_t args, s32 rc, sp_str_t 
 
 s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
   spn_target_unit_t* target = (spn_target_unit_t*)user_data;
-  spn_target_t* info = target->info;
+  spn_target_info_t* info = target->info;
 
   if (sp_da_empty(target->objects)) return 0;
 

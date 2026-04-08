@@ -50,12 +50,12 @@ typedef struct spn_toolchain {
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
-  spn_pkg_t* pkg;
+  spn_pkg_info_t* pkg;
 } spn_toolchain_t;
 
 typedef struct {
   spn_pkg_kind_t kind;
-  spn_pkg_t* pkg;
+  spn_pkg_info_t* pkg;
   struct {
     sp_str_t manifest;
     sp_str_t script;
@@ -65,8 +65,8 @@ typedef struct {
 } spn_loaded_pkg_t;
 
 struct spn_session_t {
-  spn_pkg_t* pkg;
-  spn_profile_t profile;
+  spn_pkg_info_t* pkg;
+  spn_profile_info_t profile;
   spn_toolchain_t toolchain;
   spn_target_filter_t filter;
   sp_env_t env;

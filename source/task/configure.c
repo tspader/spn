@@ -67,7 +67,7 @@ s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
 }
 
 spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
-  spn_pkg_t* pkg = unit->pkg;
+  spn_pkg_info_t* pkg = unit->pkg;
 
   if (!sp_fs_exists(unit->paths.script)) {
     return SPN_OK;

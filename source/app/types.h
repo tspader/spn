@@ -36,7 +36,7 @@ typedef struct {
 
 struct spn_app_t {
   spn_app_paths_t paths;
-  spn_pkg_t package;
+  spn_pkg_info_t package;
   sp_opt(spn_lock_file_t) lock;
   spn_resolver_t* resolver;
   spn_session_t session;

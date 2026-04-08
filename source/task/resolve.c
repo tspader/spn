@@ -16,7 +16,7 @@
 #include "toolchain/types.h"
 #include "unit/types.h"
 
-spn_err_t init_session(spn_session_t* session, spn_pkg_t* root) {
+spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
   // Build the list of available toolchains
   sp_om_for(root->toolchains, it) {
     spn_toolchain_entry_t entry = *sp_om_at(root->toolchains, it);
@@ -108,7 +108,7 @@ void emit_resolved(spn_resolver_t* resolver) {
 
 spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_session_t* session = &app->session;
-  spn_pkg_t* pkg = &app->package;
+  spn_pkg_info_t* pkg = &app->package;
 
   spn_try_as(init_session(session, pkg), SPN_TASK_ERROR);
   spn_try_as(apply_config(session, app->config), SPN_TASK_ERROR);

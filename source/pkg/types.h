@@ -6,7 +6,6 @@
 #include "forward/types.h"
 #include "ordered_map.h"
 #include "option/types.h"
-#include "profile/types.h"
 #include "semver/types.h"
 #include "toolchain/types.h"
 
@@ -49,10 +48,10 @@ struct spn_pkg {
   sp_str_t author;
   sp_str_t maintainer;
   spn_semver_t version;
-  sp_om(spn_target_t) libs;
-  sp_om(spn_target_t) exes;
-  sp_om(spn_target_t) scripts;
-  sp_om(spn_target_t) tests;
+  sp_om(spn_target_info_t) libs;
+  sp_om(spn_target_info_t) exes;
+  sp_om(spn_target_info_t) scripts;
+  sp_om(spn_target_info_t) tests;
   sp_om(spn_profile_info_t) profiles;
   sp_om(spn_index_t) indexes;
   sp_ht(sp_str_t, spn_requested_pkg_t) deps;

@@ -171,7 +171,7 @@ static void build_cache(fixture_t* fixture) {
   }
 }
 
-static void build_manifest(fixture_t* fixture, spn_pkg_t* manifest) {
+static void build_manifest(fixture_t* fixture, spn_pkg_info_t* manifest) {
   sp_carr_for(fixture->manifest.deps.package, i) {
     manifest_dep_t* dep = &fixture->manifest.deps.package[i];
     if (!dep->name) break;
@@ -198,7 +198,7 @@ static void build_manifest(fixture_t* fixture, spn_pkg_t* manifest) {
 void run_fixture(s32* utest_result, fixture_t fixture) {
   build_cache(&fixture);
 
-  spn_pkg_t manifest = sp_zero;
+  spn_pkg_info_t manifest = sp_zero;
   build_manifest(&fixture, &manifest);
 
   spn_event_buffer_t* events = spn_event_buffer_new();

@@ -1,7 +1,7 @@
 #include "spn.h"
 #include "filter/filter.h"
 
-bool spn_target_filter_pass(spn_target_filter_t* filter, spn_target_t* target) {
+bool spn_target_filter_pass(spn_target_filter_t* filter, spn_target_info_t* target) {
   if (!sp_str_empty(filter->name)) {
     return sp_str_equal(filter->name, target->name);
   }

@@ -84,7 +84,7 @@ void run_case(s32* utest_result, test_t test) {
   tmpfs_create(fs, sp_str_lit("spn.toml"),  sp_str_builder_to_str(&builder));
 
   sp_str_t path = tmpfs_get(fs, sp_str_lit("spn.toml"));
-  spn_pkg_t pkg = SP_ZERO_INITIALIZE();
+  spn_pkg_info_t pkg = SP_ZERO_INITIALIZE();
   spn_err_union_t err = spn_pkg_load(&pkg, path);
 
   if (test.namespace) SP_EXPECT_STR_EQ_CSTR(pkg.namespace, test.namespace);
@@ -158,7 +158,7 @@ void run_case(s32* utest_result, test_t test) {
   EXPECT_EQ(num.exes.expected, num.exes.actual);
 
   sp_for(it, num.exes.expected) {
-    spn_target_t* target = sp_om_at(pkg.exes, it);
+    spn_target_info_t* target = sp_om_at(pkg.exes, it);
 
     SP_EXPECT_STR_EQ_CSTR(target->name, test.exes[it].name);
 
@@ -188,7 +188,7 @@ void run_case(s32* utest_result, test_t test) {
   EXPECT_EQ(num.libs.expected, num.libs.actual);
 
   sp_for(it, num.libs.expected) {
-    spn_target_t* target = sp_om_at(pkg.libs, it);
+    spn_target_info_t* target = sp_om_at(pkg.libs, it);
     SP_EXPECT_STR_EQ_CSTR(target->name, test.libs[it].name);
   }
 }

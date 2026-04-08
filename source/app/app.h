@@ -3,7 +3,7 @@
 
 #include "app/types.h"
 
-void spn_app_write_manifest(spn_pkg_t* package, sp_str_t path);
+void spn_app_write_manifest(spn_pkg_info_t* package, sp_str_t path);
 void spn_app_update_lock_file(spn_app_t* app);
 spn_err_t spn_app_resolve(spn_resolver_t* resolver);
 

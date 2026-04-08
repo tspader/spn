@@ -18,7 +18,7 @@ static void spn_lock_build_dependents(spn_lock_file_t* lock) {
   }
 }
 
-spn_lock_file_t spn_build_lock_file(spn_resolver_t* resolver, spn_pkg_t* root) {
+spn_lock_file_t spn_build_lock_file(spn_resolver_t* resolver, spn_pkg_info_t* root) {
   spn_lock_file_t lock = SP_ZERO_INITIALIZE();
   spn_lock_file_init(&lock);
   return lock;
@@ -37,7 +37,7 @@ spn_lock_file_t spn_lock_file_parse(sp_str_t toml, spn_event_buffer_t* events) {
   toml_table_t* root = toml_parse(sp_str_to_cstr(toml), parse_err, SP_CARR_LEN(parse_err));
   if (!root) {
     if (events) {
-      spn_event_buffer_push_ex(events, SP_NULLPTR, SP_NULLPTR, (spn_build_event_t) {
+      spn_event_buffer_push(events, (spn_build_event_t) {
         .kind = SPN_EVENT_ERR,
         .err = {
           .kind = SPN_ERR_MANIFEST_PARSE,

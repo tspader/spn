@@ -24,7 +24,7 @@ sp_str_t spn_profile_select_name(spn_profile_info_t* overrides) {
   return sp_str_lit("debug");
 }
 
-void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_t* pkg) {
+void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   // 1. Seed the default profile with hardcoded base values
   spn_profile_info_t default_profile = {
     .name      = sp_str_lit("default"),
@@ -68,7 +68,7 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_t* pkg) {
   }
 }
 
-spn_err_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* overrides, spn_profile_t* result) {
+spn_err_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* overrides, spn_profile_info_t* result) {
   sp_str_t name = spn_profile_select_name(overrides);
 
   spn_profile_info_t* info = sp_str_ht_get(profiles, name);
@@ -84,7 +84,7 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* 
   spn_triple_t target = { merged.arch, merged.os, merged.abi };
   target = spn_triple_merge(host, target);
 
-  *result = (spn_profile_t) {
+  *result = (spn_profile_info_t) {
     .name      = merged.name,
     .toolchain = merged.toolchain,
     .os        = target.os,

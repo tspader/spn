@@ -37,5 +37,5 @@ void spn_app_update_lock_file(spn_app_t* app) {
   sp_io_writer_close(&file);
 }
 
-void spn_app_write_manifest(spn_pkg_t* pkg, sp_str_t path) {
+void spn_app_write_manifest(spn_pkg_info_t* pkg, sp_str_t path) {
 }

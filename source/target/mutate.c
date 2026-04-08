@@ -50,47 +50,47 @@ spn_linkage_t spn_linkage_set_default(spn_linkage_set_t set) {
 }
 
 
-void spn_target_add_source(spn_target_t* target, const c8* source) {
+void spn_target_add_source(spn_target_info_t* target, const c8* source) {
   sp_require(target);
   spn_target_add_source_ex(target, sp_str_view(source));
 }
 
-void spn_target_add_source_ex(spn_target_t* target, sp_str_t source) {
+void spn_target_add_source_ex(spn_target_info_t* target, sp_str_t source) {
   sp_require(target);
   source = spn_intern(source);
   sp_da_push(target->source, source);
 }
 
-void spn_target_add_include(spn_target_t* target, const c8* include) {
+void spn_target_add_include(spn_target_info_t* target, const c8* include) {
   sp_require(target);
   spn_target_add_include_ex(target, sp_str_view(include));
 }
 
-void spn_target_add_include_ex(spn_target_t* target, sp_str_t include) {
+void spn_target_add_include_ex(spn_target_info_t* target, sp_str_t include) {
   sp_require(target);
   sp_da_push(target->include, spn_intern(include));
 }
 
-void spn_target_add_define(spn_target_t* target, const c8* define) {
+void spn_target_add_define(spn_target_info_t* target, const c8* define) {
   sp_require(target);
   spn_target_add_define_ex(target, sp_str_view(define));
 }
 
-void spn_target_add_define_ex(spn_target_t* target, sp_str_t define) {
+void spn_target_add_define_ex(spn_target_info_t* target, sp_str_t define) {
   sp_require(target);
   sp_da_push(target->define, spn_intern(define));
 }
 
-void spn_target_add_dep(spn_target_t* target, const c8* dep) {
+void spn_target_add_dep(spn_target_info_t* target, const c8* dep) {
   spn_target_add_dep_ex(target, sp_str_view(dep));
 }
 
-void spn_target_add_dep_ex(spn_target_t* target, sp_str_t dep) {
+void spn_target_add_dep_ex(spn_target_info_t* target, sp_str_t dep) {
   sp_require(target);
   sp_da_push(target->deps, spn_intern(dep));
 }
 
-void spn_target_set_visibility(spn_target_t* target, spn_visibility_t visibility) {
+void spn_target_set_visibility(spn_target_info_t* target, spn_visibility_t visibility) {
   sp_require(target);
   target->visibility = visibility;
 }

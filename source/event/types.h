@@ -99,9 +99,9 @@ typedef struct {
   u64 time;
 } spn_evt_target_failed_t;
 
-typedef struct { spn_profile_t* profile; u64 time; } spn_evt_build_passed_t;
+typedef struct { spn_profile_info_t* profile; u64 time; } spn_evt_build_passed_t;
 
-typedef struct { u32 n; spn_profile_t* profile; u64 time; } spn_evt_tests_passed_t;
+typedef struct { u32 n; spn_profile_info_t* profile; u64 time; } spn_evt_tests_passed_t;
 
 typedef struct { sp_str_t commit; spn_semver_t version; sp_str_t message; } spn_evt_checkout_t;
 typedef struct { spn_resolve_strategy_t strategy; } spn_evt_resolve_t;
@@ -162,7 +162,7 @@ typedef struct spn_build_event_t spn_build_event_t;
 
 struct spn_build_event_t {
   spn_build_event_kind_t kind;
-  spn_pkg_t* pkg;
+  spn_pkg_info_t* pkg;
   spn_build_io_t* io;
   u64 thread_id;
 

@@ -15,7 +15,7 @@ void spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_t toolchain) {
   cc->toolchain = toolchain;
 }
 
-void spn_cc_set_profile(spn_cc_t* cc, spn_profile_t profile) {
+void spn_cc_set_profile(spn_cc_t* cc, spn_profile_info_t profile) {
   cc->arch = profile.arch;
   cc->os = profile.os;
   cc->abi = profile.abi;

@@ -9,6 +9,6 @@ spn_verbosity_t          spn_build_event_get_verbosity(spn_build_event_kind_t ki
 spn_event_buffer_t*      spn_event_buffer_new();
 sp_da(spn_build_event_t) spn_event_buffer_drain(spn_event_buffer_t* events);
 void                     spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event);
-void                     spn_event_buffer_push_ex(spn_event_buffer_t* evs, spn_pkg_t* pkg, spn_build_io_t* io, spn_build_event_t e);
+void                     spn_event_buffer_push_ex(spn_event_buffer_t* evs, spn_pkg_info_t* pkg, spn_build_io_t* io, spn_build_event_t e);
 
 #endif

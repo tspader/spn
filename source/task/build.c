@@ -142,7 +142,7 @@ spn_bg_id_t get_or_put_user_file(spn_pkg_unit_t* ctx, spn_build_graph_t* graph, 
 //   user graph   ───▶│ user::exit  │────────────────────────────────────┘
 // └ ─ ─ ─ ─ ─ ─ ┘    └─────────────┘
 spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_unit_t* target) {
-  spn_target_t* info = target->info;
+  spn_target_info_t* info = target->info;
 
   target->nodes.link = spn_bg_add_fn(graph, link_target, target);
   target->nodes.output = spn_bg_add_file(graph, get_target_output_path(target));
@@ -201,7 +201,7 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
 //
 spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   spn_pkg_nodes_t* nodes = &unit->nodes.build;
-  spn_pkg_t* pkg = unit->pkg;
+  spn_pkg_info_t* pkg = unit->pkg;
 
   nodes->manifest = spn_bg_add_file(graph, unit->paths.manifest);
   nodes->script = spn_bg_add_file(graph, unit->paths.script);

@@ -17,8 +17,7 @@ UTEST_STATE();
 ///////////
 // MOCKS //
 ///////////
-void spn_event_buffer_push_ex(spn_event_buffer_t* evs, spn_pkg_t* pkg, spn_build_io_t* io, spn_build_event_t e) {
-}
+void spn_event_buffer_push(spn_event_buffer_t* evs, spn_build_event_t e) {}
 
 // MAIN
 int main(int argc, const char *const argv[]) {

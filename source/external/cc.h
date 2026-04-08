@@ -83,7 +83,7 @@ struct spn_cc {
 };
 
 void             spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_t toolchain);
-void             spn_cc_set_profile(spn_cc_t* cc, spn_profile_t profile);
+void             spn_cc_set_profile(spn_cc_t* cc, spn_profile_info_t profile);
 void             spn_cc_set_output_dir(spn_cc_t* cc, sp_str_t dir);
 void             spn_cc_add_include(spn_cc_t* cc, sp_str_t dir);
 void             spn_cc_add_relative_include(spn_cc_t* cc, sp_str_t dir);

@@ -1,24 +1,14 @@
-#include "session/session.h"
-
-#include "app/app.h"
 #include "ctx/types.h"
-#include "filter/filter.h"
-#include "event/event.h"
-#include "external/cc.h"
-#include "pkg/pkg.h"
 #include "semver/types.h"
-#include "session/types.h"
-#include "sp.h"
-#include "sp/hash.h"
-#include "sp/ht.h"
-#include "sp/macro.h"
-#include "log/log.h"
-#include "spn.h"
-#include "target/mutate.h"
-#include "unit/package.h"
 #include "unit/types.h"
 
-static spn_linkage_t resolve_linkage(spn_session_t* session, spn_pkg_t* pkg) {
+#include "enum/enum.h"
+#include "filter/filter.h"
+#include "pkg/pkg.h"
+#include "session/session.h"
+#include "sp/hash.h"
+
+static spn_linkage_t resolve_linkage(spn_session_t* session, spn_pkg_info_t* pkg) {
   sp_opt(spn_linkage_t) requested = SP_ZERO_INITIALIZE();
 
   spn_dep_options_t* options = sp_ht_getp(session->pkg->config, pkg->name);
@@ -85,7 +75,7 @@ typedef struct {
 } fingerprint_t;
 
 
-fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_t* pkg) {
+fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_info_t* pkg) {
   spn_pkg_metadata_t* metadata = sp_ht_getp(pkg->metadata, pkg->version);
   sp_assert(metadata);
 
@@ -139,7 +129,7 @@ spn_pkg_unit_t* spn_session_find_root(spn_session_t* s) {
   return spn_session_find_pkg(s, s->pkg->name);
 }
 
-spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_t* info) {
+spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
   sp_om_insert(session->units.targets, info->name, SP_ZERO_STRUCT(spn_target_unit_t));
   spn_target_unit_t* target = sp_om_back(session->units.targets);
   target->session = session;
@@ -184,32 +174,32 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
   return target;
 }
 
-spn_target_unit_t* spn_session_add_exe(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_t* info) {
+spn_target_unit_t* spn_session_add_exe(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
   spn_target_unit_t* target = spn_session_add_target(session, pkg, info);
   sp_str_ht_insert(pkg->exes, info->name, target);
   return target;
 }
 
-spn_target_unit_t* spn_session_add_lib(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_t* info) {
+spn_target_unit_t* spn_session_add_lib(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
   spn_target_unit_t* target = spn_session_add_target(session, pkg, info);
   sp_str_ht_insert(pkg->libs, info->name, target);
   return target;
 }
 
-spn_target_unit_t* spn_session_add_script(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_t* info) {
+spn_target_unit_t* spn_session_add_script(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
   spn_target_unit_t* target = spn_session_add_target(session, pkg, info);
   sp_str_ht_insert(pkg->scripts, info->name, target);
   return target;
 }
 
-spn_target_unit_t* spn_session_add_test(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_t* info) {
+spn_target_unit_t* spn_session_add_test(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
   spn_target_unit_t* target = spn_session_add_target(session, pkg, info);
   sp_str_ht_insert(pkg->tests, info->name, target);
   return target;
 }
 
 spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* loaded) {
-  spn_pkg_t* pkg = loaded->pkg;
+  spn_pkg_info_t* pkg = loaded->pkg;
 
   sp_om_insert(session->units.packages, loaded->pkg->qualified, SP_ZERO_STRUCT(spn_pkg_unit_t));
   spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
@@ -278,14 +268,14 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   sp_fs_create_dir(unit->paths.stamp.dir);
 
   sp_om_for(pkg->exes, it) {
-    spn_target_t* info = sp_om_at(pkg->exes, it);
+    spn_target_info_t* info = sp_om_at(pkg->exes, it);
     if (spn_target_filter_pass(&session->filter, info)) {
       spn_session_add_exe(session, unit, info);
     }
   }
 
   sp_om_for(pkg->libs, it) {
-    spn_target_t* info = sp_om_at(pkg->libs, it);
+    spn_target_info_t* info = sp_om_at(pkg->libs, it);
     if (spn_target_filter_pass(&session->filter, info)) {
       spn_session_add_lib(session, unit, info);
     }
@@ -293,14 +283,14 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
 
   if (loaded->kind == SPN_PACKAGE_KIND_ROOT) {
     sp_om_for(pkg->scripts, it) {
-      spn_target_t* info = sp_om_at(pkg->scripts, it);
+      spn_target_info_t* info = sp_om_at(pkg->scripts, it);
       if (spn_target_filter_pass(&session->filter, info)) {
         spn_session_add_script(session, unit, info);
       }
     }
 
     sp_om_for(pkg->tests, it) {
-      spn_target_t* info = sp_om_at(pkg->tests, it);
+      spn_target_info_t* info = sp_om_at(pkg->tests, it);
       if (spn_target_filter_pass(&session->filter, info)) {
         spn_session_add_test(session, unit, info);
       }

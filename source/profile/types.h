@@ -3,19 +3,7 @@
 
 #include "sp.h"
 #include "spn.h"
-
-typedef struct {
-  sp_str_t name;
-  sp_str_t toolchain;
-  spn_os_t os;
-  spn_arch_t arch;
-  spn_abi_t abi;
-  spn_linkage_t linkage;
-  spn_c_standard_t standard;
-  spn_build_mode_t mode;
-} spn_profile_info_t;
-
-typedef sp_str_ht(spn_profile_info_t) spn_profile_table_t;
+#include "forward/types.h"
 
 struct spn_profile {
   sp_str_t name;
@@ -27,5 +15,7 @@ struct spn_profile {
   spn_c_standard_t standard;
   spn_build_mode_t mode;
 };
+
+typedef sp_str_ht(spn_profile_info_t) spn_profile_table_t;
 
 #endif

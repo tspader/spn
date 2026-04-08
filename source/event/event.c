@@ -24,7 +24,7 @@ spn_event_buffer_t* spn_event_buffer_new() {
   return events;
 }
 
-void spn_event_buffer_push_ex(spn_event_buffer_t* events, spn_pkg_t* pkg, spn_build_io_t* io, spn_build_event_t e) {
+void spn_event_buffer_push_ex(spn_event_buffer_t* events, spn_pkg_info_t* pkg, spn_build_io_t* io, spn_build_event_t e) {
   spn_build_event_t event = e;
   event.pkg = pkg;
   event.io = io;

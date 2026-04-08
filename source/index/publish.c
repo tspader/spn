@@ -15,7 +15,7 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
     };
   }
 
-  spn_pkg_t pkg = SP_ZERO_INITIALIZE();
+  spn_pkg_info_t pkg = SP_ZERO_INITIALIZE();
   spn_try_union(spn_pkg_load(&pkg, manifest_path));
 
   sp_str_t repo = SP_ZERO_INITIALIZE();

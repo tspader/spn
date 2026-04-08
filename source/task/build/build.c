@@ -7,7 +7,7 @@
 #include "session/session.h"
 #include "task/build/build.h"
 
-void add_pkg_to_cc(spn_cc_t* cc, spn_pkg_t* pkg) {
+void add_pkg_to_cc(spn_cc_t* cc, spn_pkg_info_t* pkg) {
   sp_da_for(pkg->include, it) {
     spn_cc_add_include(cc, pkg->include[it]);
   }
@@ -17,7 +17,7 @@ void add_pkg_to_cc(spn_cc_t* cc, spn_pkg_t* pkg) {
   }
 }
 
-void add_pkg_to_cc_target(spn_cc_target_t* target, spn_pkg_unit_t* pkg, spn_target_t* info) {
+void add_pkg_to_cc_target(spn_cc_target_t* target, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
   sp_da_for(info->include, i) {
     spn_cc_target_add_absolute_include(target, sp_fs_join_path(pkg->paths.source, info->include[i]));
   }
@@ -29,8 +29,8 @@ void add_pkg_to_cc_target(spn_cc_target_t* target, spn_pkg_unit_t* pkg, spn_targ
 
 void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
   spn_session_t* s = target->session;
-  spn_target_t* info = target->info;
-  spn_pkg_t* pkg = target->pkg;
+  spn_target_info_t* info = target->info;
+  spn_pkg_info_t* pkg = target->pkg;
   spn_cc_driver_t driver = cc->cc->toolchain.info.driver;
 
   sp_da_for(pkg->system_deps, i) {
@@ -40,7 +40,7 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
   sp_da_for(info->deps, it) {
     sp_str_t name = info->deps[it];
     if (sp_om_has(pkg->libs, name)) {
-      spn_target_t* lib = sp_om_get(pkg->libs, name);
+      spn_target_info_t* lib = sp_om_get(pkg->libs, name);
     }
     else {
       spn_pkg_unit_t* dep = spn_session_find_pkg(s, name);
@@ -62,7 +62,7 @@ sp_str_t get_embed_header_path(spn_target_unit_t* unit) {
 }
 
 sp_str_t get_target_output_path(spn_target_unit_t* unit) {
-  spn_target_t* target = unit->info;
+  spn_target_info_t* target = unit->info;
 
   switch (target->kind) {
     case SPN_TARGET_EXE: {

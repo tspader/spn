@@ -29,7 +29,7 @@ typedef struct {
 typedef struct spn_event_buffer_t spn_event_buffer_t;
 
 typedef struct spn_resolver_t {
-  spn_pkg_t* pkg;
+  spn_pkg_info_t* pkg;
   spn_index_cache_t* index;
   spn_event_buffer_t* events;
   sp_str_ht(bool) visited;

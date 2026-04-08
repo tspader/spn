@@ -4,13 +4,13 @@
 #include "pkg/mutate.h"
 #include "target/mutate.h"
 
-spn_pkg_t spn_pkg_new(sp_str_t name) {
-  spn_pkg_t pkg = SP_ZERO_INITIALIZE();
+spn_pkg_info_t spn_pkg_new(sp_str_t name) {
+  spn_pkg_info_t pkg = SP_ZERO_INITIALIZE();
   spn_pkg_init(&pkg, name);
   return pkg;
 }
 
-spn_err_t spn_pkg_from_manifest(spn_pkg_t* pkg, sp_str_t manifest) {
+spn_err_t spn_pkg_from_manifest(spn_pkg_info_t* pkg, sp_str_t manifest) {
   SP_ASSERT(sp_fs_exists(manifest)); // @spader Return an error code instead? Or is this an invariant?
 
   spn_err_union_t result = spn_pkg_load(pkg, manifest);
@@ -20,9 +20,9 @@ spn_err_t spn_pkg_from_manifest(spn_pkg_t* pkg, sp_str_t manifest) {
   return SPN_OK;
 }
 
-bool spn_pkg_has_lib_kind(spn_pkg_t* pkg, spn_linkage_t kind) {
+bool spn_pkg_has_lib_kind(spn_pkg_info_t* pkg, spn_linkage_t kind) {
   sp_om_for(pkg->libs, it) {
-    spn_target_t* lib = sp_om_at(pkg->libs, it);
+    spn_target_info_t* lib = sp_om_at(pkg->libs, it);
     if (spn_linkage_set_has(lib->linkages, kind)) {
       return true;
     }
@@ -31,18 +31,18 @@ bool spn_pkg_has_lib_kind(spn_pkg_t* pkg, spn_linkage_t kind) {
   return false;
 }
 
-sp_str_t spn_pkg_get_url(spn_pkg_t* pkg) {
+sp_str_t spn_pkg_get_url(spn_pkg_info_t* pkg) {
   return pkg->url;
 }
 
-spn_target_t* spn_pkg_get_target(spn_pkg_t* pkg, const c8* name) {
+spn_target_info_t* spn_pkg_get_target(spn_pkg_info_t* pkg, const c8* name) {
   return spn_pkg_get_target_ex(pkg, sp_str_view(name));
 }
 
 // @spader
 // This doesn't look quite right. It's suspicious that we'd need to get a target without caring
 // where it came from specifically.
-spn_target_t* spn_pkg_get_target_ex(spn_pkg_t* pkg, sp_str_t name) {
+spn_target_info_t* spn_pkg_get_target_ex(spn_pkg_info_t* pkg, sp_str_t name) {
   if (sp_om_has(pkg->exes, name)) {
     return sp_om_get(pkg->exes, name);
   }
@@ -59,7 +59,7 @@ spn_target_t* spn_pkg_get_target_ex(spn_pkg_t* pkg, sp_str_t name) {
   return SP_NULLPTR;
 }
 
-spn_profile_info_t* spn_pkg_get_default_profile(spn_pkg_t* pkg) {
+spn_profile_info_t* spn_pkg_get_default_profile(spn_pkg_info_t* pkg) {
   sp_om_for(pkg->profiles, it) {
     return sp_om_at(pkg->profiles, it);
   }
