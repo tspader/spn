@@ -1,5 +1,6 @@
 #include "app/types.h"
 #include "ctx/types.h"
+#include "err.h"
 #include "event/types.h"
 #include "graph/types.h"
 #include "spn.h"
@@ -66,17 +67,14 @@ s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
 }
 
 spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
-  spn_pkg_t* pkg = unit->ctx.pkg;
+  spn_pkg_t* pkg = unit->pkg;
 
   if (!sp_fs_exists(unit->paths.script)) {
     return SPN_OK;
   }
 
   sp_tm_timer_t timer = sp_tm_start_timer();
-  spn_tcc_err_ctx_t error_context = {
-    .arena = unit->ctx.arena,
-    .error = sp_str_lit("")
-  };
+  spn_tcc_err_ctx_t error_context = SP_ZERO_INITIALIZE();
 
   spn_tcc_t* tcc = tcc_new();
   sp_try_goto(spn_tcc_prepare_script(tcc, &error_context), fail);
@@ -105,12 +103,13 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
   unit->tcc = tcc;
   unit->on_configure = tcc_get_symbol(tcc, "configure");
   unit->on_package = tcc_get_symbol(tcc, "package");
-  sp_assert_fmt(!tcc_get_symbol(tcc, "build"), "{} still has build()", SP_FMT_STR(unit->ctx.name));
 
   unit->time.compile = sp_tm_read_timer(&timer);
 
-  spn_event_buffer_push_ctx(spn.events, &unit->ctx, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SCRIPT_COMPILE,
+    .pkg = unit->pkg,
+    .io = &unit->logs.io,
     .script_compile = {
       .script_path = unit->paths.script,
       .time = unit->time.compile,
@@ -122,8 +121,10 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
   return SPN_OK;
 
 fail:
-  spn_event_buffer_push_ctx(spn.events, &unit->ctx, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,
+    .pkg = unit->pkg,
+    .io = &unit->logs.io,
     .compile_failed = {
       .script_path = unit->paths.script,
       .error = error_context.error,
@@ -134,14 +135,20 @@ fail:
 
 spn_err_t configure_package(spn_pkg_unit_t* pkg) {
   if (pkg->on_configure) {
-    spn_event_buffer_push_kind(spn.events, &pkg->ctx, SPN_EVENT_BUILD_SCRIPT_CONFIGURE);
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_BUILD_SCRIPT_CONFIGURE,
+      .pkg = pkg->pkg,
+      .io = &pkg->logs.io
+    });
 
     sp_tm_timer_t timer = sp_tm_start_timer();
     spn_try(spn_pkg_unit_call_hook(pkg, pkg->on_configure));
     pkg->time.configure = sp_tm_read_timer(&timer);
 
-    spn_event_buffer_push_ctx(spn.events, &pkg->ctx, (spn_build_event_t) {
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK,
+      .pkg = pkg->pkg,
+      .io = &pkg->logs.io,
       .configure.time = pkg->time.configure,
     });
   }
@@ -150,11 +157,10 @@ spn_err_t configure_package(spn_pkg_unit_t* pkg) {
 }
 
 s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_pkg_unit_t* pkg = (spn_pkg_unit_t*)user_data;
+  spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
-  spn_try(compile_package(pkg->ctx.session, pkg));
-  spn_try(configure_package(pkg));
-
+  spn_try(compile_package(unit->session, unit));
+  spn_try(configure_package(unit));
   return SPN_OK;
 }
 

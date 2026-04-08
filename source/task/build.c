@@ -201,7 +201,7 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
 //
 spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   spn_pkg_nodes_t* nodes = &unit->nodes.build;
-  spn_pkg_t* pkg = unit->ctx.pkg;
+  spn_pkg_t* pkg = unit->pkg;
 
   nodes->manifest = spn_bg_add_file(graph, unit->paths.manifest);
   nodes->script = spn_bg_add_file(graph, unit->paths.script);
@@ -361,7 +361,7 @@ static sp_da(sp_str_t) collect_target_source(spn_pkg_unit_t* pkg, spn_target_uni
   sp_da_for(target->info->source, it) {
     sp_str_t path = target->info->source[it];
     if (sp_fs_is_glob(path)) {
-      collect_source_glob(pkg->ctx.paths.source, path, &source);
+      collect_source_glob(pkg->paths.source, path, &source);
       continue;
     }
     if (has_source_file(source, path)) {
@@ -382,12 +382,12 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
   // to be compiled.
   sp_om_for(session->units.targets, it) {
     spn_target_unit_t* target = sp_om_at(session->units.targets, it);
-    spn_pkg_unit_t* package = target->parent;
+    spn_pkg_unit_t* pkg = target->parent;
 
-    sp_da(sp_str_t) source = collect_target_source(package, target);
+    sp_da(sp_str_t) source = collect_target_source(pkg, target);
     sp_da_for(source, j) {
       sp_str_t relative = source[j];
-      sp_str_t file = sp_fs_join_path(package->ctx.paths.source, relative);
+      sp_str_t file = sp_fs_join_path(pkg->paths.source, relative);
       sp_str_t name = spn_intern(sp_fs_get_stem(file));
       sp_str_t extension = sp_fs_get_ext(relative);
       sp_str_t stem = relative;
@@ -397,10 +397,10 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
 
       sp_str_t object_path = sp_fs_join_path(target->paths.object, sp_format("{}.o", SP_FMT_STR(stem)));
 
-      if (!sp_om_has(package->objects, file)) {
-        sp_om_insert(package->objects, file, ((spn_compile_unit_t) {
+      if (!sp_om_has(pkg->objects, file)) {
+        sp_om_insert(pkg->objects, file, ((spn_compile_unit_t) {
           .name = name,
-          .package = package,
+          .package = pkg,
           .target = target,
           .session = target->session,
           .paths = {
@@ -410,7 +410,7 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
         }));
       }
 
-      spn_compile_unit_t* object = sp_om_get(package->objects, file);
+      spn_compile_unit_t* object = sp_om_get(pkg->objects, file);
       sp_da_push(target->objects, object);
     }
   }
@@ -423,6 +423,11 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
 
 void spn_task_init_build_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
+
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    spn.tui.info.max_name = SP_MAX(spn.tui.info.max_name, unit->pkg->name.len);
+  }
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_INIT_BUILD_GRAPH,
@@ -486,8 +491,10 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
           first_error = err_cmd->tag;
         }
 
-        spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
           .kind = SPN_EVENT_BUILD_FAILED,
+          .pkg = root->pkg,
+          .io = &root->logs.io,
           .build_failed = {
             .profile = app->session.profile.name,
             .time = b->build.executor->elapsed,
@@ -496,8 +503,10 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
           }
         });
 
-        spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
           .kind = SPN_EVENT_BUILD_SUMMARY,
+          .pkg = root->pkg,
+          .io = &root->logs.io,
           .build_summary = {
             .success = false,
             .num_dirty = dirty_cmds,
@@ -514,16 +523,20 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
           spn_app_update_lock_file(app);
         }
 
-        spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
           .kind = SPN_EVENT_BUILD_PASSED,
+          .pkg = root->pkg,
+          .io = &root->logs.io,
           .build.passed = {
             .profile = &app->session.profile,
             .time = b->build.executor->elapsed
           }
         });
 
-        spn_event_buffer_push_ctx(spn.events, &root->ctx, (spn_build_event_t) {
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
           .kind = SPN_EVENT_BUILD_SUMMARY,
+          .pkg = root->pkg,
+          .io = &root->logs.io,
           .build_summary = {
             .success = true,
             .num_dirty = dirty_cmds,

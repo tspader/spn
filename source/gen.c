@@ -1,9 +1,7 @@
 #include "gen.h"
 
-#include "ctx/ctx.h"
 #include "spn.h"
 #include "toolchain/types.h"
-#include "unit/build.h"
 
 spn_gen_entry_t spn_gen_entry_from_str(sp_str_t str) {
   if      (sp_str_equal_cstr(str, "")) return SPN_GEN_ALL;
@@ -103,76 +101,3 @@ sp_str_t spn_gen_format_entry(sp_str_t entry, spn_gen_entry_t kind, spn_cc_drive
   sp_unreachable(); return sp_str_lit("");
 }
 
-sp_da(sp_str_t) spn_gen_build_entry(spn_build_ctx_t* build, spn_gen_entry_t kind, spn_cc_driver_t driver) {
-  sp_da(sp_str_t) entries = SP_NULLPTR;
-
-  switch (kind) {
-    case SPN_GEN_INCLUDE: {
-      sp_da_push(entries, spn_ctx_build_include_dir(build));
-      break;
-    }
-    case SPN_GEN_RPATH: {
-      switch (spn_ctx_build_linkage(build)) {
-        case SPN_LIB_KIND_SHARED: {
-          sp_da_push(entries, spn_ctx_build_lib_dir(build));
-          break;
-        }
-        case SPN_LIB_KIND_NONE:
-        case SPN_LIB_KIND_STATIC:
-        case SPN_LIB_KIND_SOURCE: {
-          return entries;
-        }
-      }
-      break;
-    }
-    case SPN_GEN_LIB_INCLUDE: {
-      switch (spn_ctx_build_linkage(build)) {
-        case SPN_LIB_KIND_SHARED: {
-          sp_da_push(entries, spn_ctx_build_lib_dir(build));
-          break;
-        }
-        case SPN_LIB_KIND_NONE:
-        case SPN_LIB_KIND_STATIC:
-        case SPN_LIB_KIND_SOURCE: {
-          return entries;
-        }
-      }
-      break;
-    }
-    case SPN_GEN_LIBS: {
-      entries = spn_ctx_build_lib_entries(build);
-      break;
-    }
-    case SPN_GEN_SYSTEM_LIBS: {
-      break;
-    }
-    case SPN_GEN_NONE:
-    case SPN_GEN_DEFINE:
-    case SPN_GEN_ALL: {
-      SP_UNREACHABLE_CASE();
-    }
-  }
-
-  spn_gen_format_context_t context = {
-    .driver = driver,
-    .kind = kind
-  };
-  entries = sp_str_map(entries, sp_da_size(entries), &context, spn_gen_format_entry_kernel);
-
-  return entries;
-}
-
-sp_str_t spn_gen_build_entries_for_all(sp_da(spn_build_ctx_t*) builds, spn_gen_entry_t kind, spn_cc_driver_t driver) {
-  sp_da(sp_str_t) entries = SP_NULLPTR;
-
-  sp_da_for(builds, it) {
-    spn_build_ctx_t* build = builds[it];
-    sp_da(sp_str_t) dep_entries = spn_gen_build_entry(build, kind, driver);
-    sp_str_t dep_flags = sp_str_join_n(dep_entries, sp_da_size(dep_entries), sp_str_lit(" "));
-    if (!sp_str_empty(dep_flags)) {
-      sp_da_push(entries, dep_flags);
-    }
-  }
-
-  return sp_str_join_n(entries, sp_da_size(entries), sp_str_lit(" "));
-}

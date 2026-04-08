@@ -51,7 +51,5 @@ sp_str_t spn_cc_lib_kind_to_switch(spn_linkage_t kind);
 sp_str_t spn_cc_build_mode_to_switch(spn_build_mode_t mode);
 sp_str_t spn_gen_format_entry(sp_str_t entry, spn_gen_entry_t kind, spn_cc_driver_t driver);
 sp_str_t spn_gen_format_entry_kernel(sp_str_map_context_t* context);
-sp_da(sp_str_t) spn_gen_build_entry(spn_build_ctx_t* dep, spn_gen_entry_t kind, spn_cc_driver_t driver);
-sp_str_t spn_gen_build_entries_for_all(sp_da(spn_build_ctx_t*) builds, spn_gen_entry_t kind, spn_cc_driver_t driver);
 
 #endif

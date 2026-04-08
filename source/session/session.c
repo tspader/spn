@@ -150,9 +150,9 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
   sp_str_ht_insert(pkg->targets, info->name, target);
 
   spn_bp_config_t config = {
-    .source = pkg->ctx.paths.source,
-    .store = pkg->ctx.paths.store,
-    .work = pkg->ctx.paths.work,
+    .source = pkg->paths.source,
+    .store = pkg->paths.store,
+    .work = pkg->paths.work,
   };
 
   target->paths.source = sp_str_copy(config.source);
@@ -214,6 +214,7 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   sp_om_insert(session->units.packages, loaded->pkg->qualified, SP_ZERO_STRUCT(spn_pkg_unit_t));
   spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
   unit->pkg = pkg;
+  unit->session = session;
   unit->paths.manifest = loaded->paths.manifest;
   unit->paths.script = loaded->paths.script;
   unit->paths.source = loaded->paths.source;
@@ -221,17 +222,10 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   switch (loaded->kind) {
     case SPN_PACKAGE_KIND_ROOT:
     case SPN_PACKAGE_KIND_FILE: {
-      spn_pkg_unit_init(unit, (spn_pkg_unit_config_t) {
-        .ctx = {
-          .package = pkg,
-          .session = session,
-          .paths = {
-            .store = sp_fs_join_path(session->paths.profile, sp_str_lit("store")),
-            .work = sp_fs_join_path(session->paths.profile, sp_format("work/{}", SP_FMT_STR(pkg->name))),
-            .source = loaded->paths.source,
-          }
-        }
-      });
+      sp_str_t work = sp_fs_join_path(session->paths.profile, sp_str_lit("work"));
+      unit->paths.work = sp_fs_join_path(work, pkg->name);
+      unit->paths.store = sp_fs_join_path(session->paths.profile, sp_str_lit("store"));
+      unit->paths.source = loaded->paths.source;
       break;
     }
     case SPN_PACKAGE_KIND_INDEX: {
@@ -239,23 +233,49 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
       sp_assert(metadata);
 
       fingerprint_t id = fingerprint_package(session, pkg);
-
-      spn_pkg_unit_init(unit, (spn_pkg_unit_config_t) {
-        .build_id = id.hash,
-        .metadata = *metadata,
-        .ctx = {
-          .package = pkg,
-          .session = session,
-          .paths = {
-            .work = sp_fs_join_path(sp_fs_join_path(spn.paths.build, pkg->qualified), id.str),
-            .store = sp_fs_join_path(sp_fs_join_path(spn.paths.store, pkg->qualified), id.str),
-            .source = loaded->paths.source
-          }
-        }
-      });
+      unit->paths.work = sp_fs_join_path(sp_fs_join_path(spn.paths.build, pkg->qualified), id.str);
+      unit->paths.store = sp_fs_join_path(sp_fs_join_path(spn.paths.store, pkg->qualified), id.str);
+      unit->paths.source = loaded->paths.source;
       break;
     }
   }
+
+  unit->paths.include = sp_fs_join_path(unit->paths.store, SP_LIT("include"));
+  unit->paths.bin = sp_fs_join_path(unit->paths.store, SP_LIT("bin"));
+  unit->paths.lib = sp_fs_join_path(unit->paths.store, SP_LIT("lib"));
+  unit->paths.vendor = sp_fs_join_path(unit->paths.store, SP_LIT("vendor"));
+
+  unit->paths.generated = sp_fs_join_path(unit->paths.work, SP_LIT("spn"));
+
+  unit->logs.build = sp_format("{}.build.log", SP_FMT_STR(unit->pkg->name));
+  unit->logs.test = sp_format("{}.test.log", SP_FMT_STR(unit->pkg->name));
+  unit->logs.jsonl = sp_format("{}.jsonl", SP_FMT_STR(unit->pkg->name));
+
+  unit->paths.logs.build = sp_fs_join_path(unit->paths.work, unit->logs.build);
+  unit->paths.logs.test = sp_fs_join_path(unit->paths.work, unit->logs.test);
+  unit->paths.logs.jsonl = sp_fs_join_path(unit->paths.work, unit->logs.jsonl);
+
+  sp_fs_create_dir(unit->paths.work);
+  sp_fs_create_dir(unit->paths.generated);
+  sp_fs_create_dir(unit->paths.store);
+  sp_fs_create_dir(unit->paths.bin);
+  sp_fs_create_dir(unit->paths.include);
+  sp_fs_create_dir(unit->paths.lib);
+  sp_fs_create_dir(unit->paths.vendor);
+  sp_fs_create_file(unit->paths.logs.build);
+  sp_fs_create_file(unit->paths.logs.jsonl);
+
+  unit->logs.io.build = sp_io_writer_from_file(unit->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
+  unit->logs.io.jsonl = sp_io_writer_from_file(unit->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
+
+  unit->paths.stamp.dir = sp_fs_join_path(unit->paths.generated, SP_LIT("stamp"));
+  unit->paths.stamp.main = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("main.stamp"));
+  unit->paths.stamp.exit = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("user.stamp"));
+  unit->paths.stamp.configure = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("configure.stamp"));
+  unit->paths.stamp.build = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("build.stamp"));
+  unit->paths.stamp.package = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("package.stamp"));
+
+  sp_fs_create_dir(unit->paths.stamp.dir);
 
   sp_om_for(pkg->exes, it) {
     spn_target_t* info = sp_om_at(pkg->exes, it);
@@ -265,15 +285,9 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   }
 
   sp_om_for(pkg->libs, it) {
-    spn_target_t* target = sp_om_at(pkg->libs, it);
-    spn_linkage_t linkage = unit->ctx.linkage;
-    if (linkage == SPN_LIB_KIND_SOURCE) {
-      continue;
-    }
-    target->kind = spn_pkg_linkage_to_target_kind(linkage);
-
-    if (spn_target_filter_pass(&session->filter, target)) {
-      spn_session_add_lib(session, unit, target);
+    spn_target_t* info = sp_om_at(pkg->libs, it);
+    if (spn_target_filter_pass(&session->filter, info)) {
+      spn_session_add_lib(session, unit, info);
     }
   }
 

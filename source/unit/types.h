@@ -15,13 +15,12 @@ struct spn_node_t {
 };
 
 struct spn_node_ctx_t {
-  spn_build_ctx_t* build;
   void* user_data;
 };
 
 typedef struct spn_user_node_t spn_user_node_t;
 struct spn_user_node_t {
-  spn_pkg_unit_t* ctx;
+  spn_pkg_unit_t* pkg;
   sp_str_t tag;
   spn_node_fn_t fn;
   void* user_data;
@@ -51,12 +50,6 @@ typedef struct {
     sp_str_t work;
   } paths;
 } spn_build_ctx_config_t;
-
-typedef struct {
-  u64 build_id;
-  spn_pkg_metadata_t metadata;
-  spn_build_ctx_config_t ctx;
-} spn_pkg_unit_config_t;
 
 typedef struct {
   sp_str_t build;
@@ -169,7 +162,7 @@ struct spn_target_unit {
 };
 
 struct spn_pkg_unit_t {
-  spn_build_ctx_t ctx;
+  spn_session_t* session;
   spn_pkg_t* pkg;
 
   sp_om(spn_compile_unit_t) objects;
@@ -200,11 +193,19 @@ struct spn_pkg_unit_t {
       sp_str_t exit;
     } stamp;
 
+    spn_build_log_paths_t logs;
+
     sp_str_t manifest;
     sp_str_t script;
     sp_str_t source;
-
-    spn_build_log_paths_t logs;
+    sp_str_t work;
+    sp_str_t generated;
+    sp_str_t object;
+    sp_str_t store;
+    sp_str_t include;
+    sp_str_t lib;
+    sp_str_t bin;
+    sp_str_t vendor;
   } paths;
 
   struct {

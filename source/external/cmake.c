@@ -89,13 +89,13 @@ static sp_str_t spn_cmake_generate_toolchain_file(spn_build_ctx_t* build) {
 }
 
 s32 spn_cmake_configure(spn_cmake_t* cmake) {
-  spn_build_ctx_t* build = cmake->build;
+  // spn_build_ctx_t* build = cmake->build;
 
   sp_ps_config_t config = {
     .command = SP_LIT("cmake"),
     .args = {
-      SP_LIT("-S"), spn_ctx_build_source_dir(build),
-      SP_LIT("-B"), spn_ctx_build_work_dir(build),
+      // SP_LIT("-S"), spn_ctx_build_source_dir(build),
+      // SP_LIT("-B"), spn_ctx_build_work_dir(build),
     }
   };
 
@@ -107,24 +107,24 @@ s32 spn_cmake_configure(spn_cmake_t* cmake) {
   // Generate and pass a CMake toolchain file for cross-compilation support.
   // Even for native builds this is useful: it tells CMake exactly which
   // compiler, linker, and archiver to use.
-  sp_str_t toolchain_file = spn_cmake_generate_toolchain_file(build);
-  sp_ps_config_add_arg(&config, spn_cmake_format_define(
-    SP_LIT("CMAKE_TOOLCHAIN_FILE"), toolchain_file));
+  // sp_str_t toolchain_file = spn_cmake_generate_toolchain_file(build);
+  // sp_ps_config_add_arg(&config, spn_cmake_format_define(
+  //   SP_LIT("CMAKE_TOOLCHAIN_FILE"), toolchain_file));
 
-  sp_ps_config_add_arg(&config, spn_cmake_format_define(
-    SP_LIT("CMAKE_INSTALL_PREFIX"),
-    spn_ctx_build_store_dir(build))
-  );
+  // sp_ps_config_add_arg(&config, spn_cmake_format_define(
+  //   SP_LIT("CMAKE_INSTALL_PREFIX"),
+  //   spn_ctx_build_store_dir(build))
+  // );
 
-  sp_ps_config_add_arg(&config, spn_cmake_format_define(
-    SP_LIT("BUILD_SHARED_LIBS"),
-    spn_ctx_build_linkage(build) == SPN_LIB_KIND_SHARED ? SP_LIT("ON") : SP_LIT("OFF"))
-  );
+  // sp_ps_config_add_arg(&config, spn_cmake_format_define(
+  //   SP_LIT("BUILD_SHARED_LIBS"),
+  //   spn_ctx_build_linkage(build) == SPN_LIB_KIND_SHARED ? SP_LIT("ON") : SP_LIT("OFF"))
+  // );
 
-  sp_ps_config_add_arg(&config, spn_cmake_format_define(
-    SP_LIT("CMAKE_BUILD_TYPE"),
-    build->session->profile.mode == SPN_BUILD_MODE_RELEASE ? SP_LIT("Release") : SP_LIT("Debug"))
-  );
+  // sp_ps_config_add_arg(&config, spn_cmake_format_define(
+  //   SP_LIT("CMAKE_BUILD_TYPE"),
+  //   build->session->profile.mode == SPN_BUILD_MODE_RELEASE ? SP_LIT("Release") : SP_LIT("Debug"))
+  // );
 
   sp_da_for(cmake->defines, it) {
     spn_cmake_define_t define = cmake->defines[it];
@@ -135,40 +135,44 @@ s32 spn_cmake_configure(spn_cmake_t* cmake) {
     sp_ps_config_add_arg(&config, cmake->args[it]);
   }
 
-  sp_ps_output_t result = spn_ctx_build_subprocess(build, config);
-  return result.status.exit_code;
+  return 1;
+  // sp_ps_output_t result = spn_ctx_build_subprocess(build, config);
+  // return result.status.exit_code;
 }
 
 s32 spn_cmake_build(spn_cmake_t* cmake) {
-  spn_build_ctx_t* build = cmake->build;
-
-  sp_ps_output_t result = spn_ctx_build_subprocess(build, (sp_ps_config_t) {
-    .command = SP_LIT("cmake"),
-    .args = {
-      SP_LIT("--build"),
-      spn_ctx_build_work_dir(build)
-    }
-  });
-  return result.status.exit_code;
+  return 1;
+  // spn_build_ctx_t* build = cmake->build;
+  //
+  // sp_ps_output_t result = spn_ctx_build_subprocess(build, (sp_ps_config_t) {
+  //   .command = SP_LIT("cmake"),
+  //   .args = {
+  //     SP_LIT("--build"),
+  //     spn_ctx_build_work_dir(build)
+  //   }
+  // });
+  // return result.status.exit_code;
 }
 
 s32 spn_cmake_install(spn_cmake_t* cmake) {
-  spn_build_ctx_t* build = cmake->build;
-
-  sp_ps_output_t result = spn_ctx_build_subprocess(build, (sp_ps_config_t) {
-    .command = SP_LIT("cmake"),
-    .args = {
-      SP_LIT("--install"),
-      spn_ctx_build_work_dir(build)
-    }
-  });
-  return result.status.exit_code;
+  return 1;
+  // spn_build_ctx_t* build = cmake->build;
+  //
+  // sp_ps_output_t result = spn_ctx_build_subprocess(build, (sp_ps_config_t) {
+  //   .command = SP_LIT("cmake"),
+  //   .args = {
+  //     SP_LIT("--install"),
+  //     spn_ctx_build_work_dir(build)
+  //   }
+  // });
+  // return result.status.exit_code;
 }
 
 s32 spn_cmake_run(spn_cmake_t* cmake) {
-  s32 err = spn_cmake_configure(cmake);
-  if (err) {
-    return err;
-  }
-  return spn_cmake_build(cmake);
+  return 1;
+  // s32 err = spn_cmake_configure(cmake);
+  // if (err) {
+  //   return err;
+  // }
+  // return spn_cmake_build(cmake);
 }

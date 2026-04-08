@@ -304,8 +304,8 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     spn_toolchain_unit_t* unit = session->units.toolchain;
     spn_pkg_unit_t* pkg = sp_om_get(session->units.packages, unit->pkg->qualified);
 
-    sp_str_t store = pkg->ctx.paths.store;
-    sp_str_t work = pkg->ctx.paths.work;
+    sp_str_t store = pkg->paths.store;
+    sp_str_t work = pkg->paths.work;
 
     // These are places in the cache
     unit->paths.store = store;
@@ -330,11 +330,6 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   sp_env_insert(env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(session->toolchain.archiver));
   sp_env_insert(env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(session->toolchain.linker));
 
-  // @spader Elsewhere?
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_t* pkg = sp_om_at(session->units.packages, it)->ctx.pkg;
-    spn.tui.info.max_name = SP_MAX(spn.tui.info.max_name, pkg->name.len);
-  }
   return SPN_TASK_CONTINUE;
 }
 

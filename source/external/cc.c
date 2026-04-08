@@ -85,37 +85,9 @@ sp_str_t spn_cc_symbol_from_embedded_file(sp_str_t file_path) {
 }
 
 void spn_cc_target_add_dep(spn_cc_target_t* target, spn_pkg_unit_t* unit) {
-  spn_cc_target_add_absolute_include(target, spn_pkg_unit_get_include_dir(unit));
+  spn_cc_target_add_absolute_include(target, unit->paths.include);
 
-  switch (unit->ctx.linkage) {
-    case SPN_LIB_KIND_SOURCE: {
-      break;
-    }
-    case SPN_LIB_KIND_STATIC:
-    case SPN_LIB_KIND_SHARED: {
-      sp_om_for(unit->pkg->libs, it) {
-        spn_target_t* lib = sp_om_at(unit->pkg->libs, it);
-        if (spn_target_kind_to_pkg_linkage(lib->kind) == unit->ctx.linkage) {
-          sp_str_t file = sp_os_lib_to_file_name(lib->name, spn_lib_kind_to_sp_os_lib_kind(unit->ctx.linkage));
-          sp_str_t dir = sp_fs_join_path(unit->ctx.paths.lib, lib->name);
-          sp_str_t path = sp_fs_join_path(dir, file);
-
-          if (!sp_fs_exists(path)) {
-            path = spn_build_ctx_get_lib_path(&unit->ctx, lib);
-          }
-
-          spn_cc_target_add_lib(target, path);
-
-          if (unit->ctx.linkage == SPN_LIB_KIND_SHARED) {
-            sp_str_t runtime_dir = sp_fs_parent_path(path);
-            spn_cc_target_add_lib_dir(target, runtime_dir);
-            spn_cc_target_add_rpath(target, runtime_dir);
-          }
-        }
-      }
-      break;
-    }
-  }
+  // @spader @refactor Add libraries
 }
 
 spn_cc_target_t* spn_cc_add_target(spn_cc_t* cc, spn_target_kind_t kind, sp_str_t output) {

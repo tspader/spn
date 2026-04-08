@@ -486,11 +486,11 @@ void spn_deinit(sp_app_t* sp) {
 
     sp_fs_create_sym_link(
       unit->paths.logs.build,
-      sp_fs_join_path(root->ctx.paths.work, unit->logs.build)
+      sp_fs_join_path(root->paths.work, unit->logs.build)
     );
     sp_fs_create_sym_link(
       unit->paths.logs.jsonl,
-      sp_fs_join_path(root->ctx.paths.work, unit->logs.jsonl)
+      sp_fs_join_path(root->paths.work, unit->logs.jsonl)
     );
 
     sp_io_writer_close(&unit->logs.io.build);
