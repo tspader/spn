@@ -8,6 +8,7 @@
 
 #include "ctx/types.h"
 #include "event/event.h"
+#include "intern/intern.h"
 
 UTEST_STATE();
 

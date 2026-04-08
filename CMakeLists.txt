@@ -474,7 +474,7 @@ set(SPN_SOURCES
   source/index/index.c
   source/index/json.c
   source/index/publish.c
-  source/intern.c
+  source/intern/intern.c
   source/lock/lock.c
   source/log/log.c
   source/pkg/id.c
@@ -570,7 +570,7 @@ target_sources(spn PRIVATE "${BOOTSTRAP_LIB_DIR}/spn.embed${EMBED_OBJ_EXT}")
 ############
 add_executable(resolver
   source/ctx/ctx.c
-  source/intern.c
+  source/intern/intern.c
   source/enum/enum.c
   source/event/event.c
   source/external/cJSON.c
@@ -622,7 +622,7 @@ add_dependencies(resolver bootstrap_headers)
 ########
 add_executable(load
   source/ctx/ctx.c
-  source/intern.c
+  source/intern/intern.c
   source/enum/enum.c
   source/event/event.c
   source/external/tom.c
@@ -715,7 +715,7 @@ add_executable(publish
   source/index/index.c
   source/index/json.c
   source/index/publish.c
-  source/intern.c
+  source/intern/intern.c
   source/pkg/id.c
   source/pkg/load.c
   source/pkg/mutate.c

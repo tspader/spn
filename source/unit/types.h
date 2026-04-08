@@ -206,8 +206,8 @@ struct spn_pkg_unit_t {
   spn_build_time_t time;
 
   spn_tcc_t* tcc;
-  spn_build_fn_t on_configure;
-  spn_build_fn_t on_package;
+  spn_configure_fn_t on_configure;
+  spn_package_fn_t on_package;
 };
 
 typedef struct {

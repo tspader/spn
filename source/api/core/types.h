@@ -6,10 +6,6 @@
 
 #include "forward/types.h"
 
-struct spn {
-  u32 foo;
-};
-
 struct spn_target {
   spn_t* spn;
   spn_target_info_t* info;

@@ -49,31 +49,15 @@ spn_linkage_t spn_linkage_set_default(spn_linkage_set_t set) {
   SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
 }
 
-
-void spn_target_add_source(spn_target_info_t* target, const c8* source) {
-  sp_require(target);
-  spn_target_add_source_ex(target, sp_str_view(source));
-}
-
 void spn_target_add_source_ex(spn_target_info_t* target, sp_str_t source) {
   sp_require(target);
   source = spn_intern(source);
   sp_da_push(target->source, source);
 }
 
-void spn_target_add_include(spn_target_info_t* target, const c8* include) {
-  sp_require(target);
-  spn_target_add_include_ex(target, sp_str_view(include));
-}
-
 void spn_target_add_include_ex(spn_target_info_t* target, sp_str_t include) {
   sp_require(target);
   sp_da_push(target->include, spn_intern(include));
-}
-
-void spn_target_add_define(spn_target_info_t* target, const c8* define) {
-  sp_require(target);
-  spn_target_add_define_ex(target, sp_str_view(define));
 }
 
 void spn_target_add_define_ex(spn_target_info_t* target, sp_str_t define) {

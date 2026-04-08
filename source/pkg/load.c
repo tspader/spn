@@ -12,7 +12,6 @@
 #include "spn.h"
 #include "target/mutate.h"
 #include "toml.h"
-#include "toolchain/toolchain.h"
 #include "toolchain/types.h"
 
 spn_dep_option_t parse_option(toml_table_t* toml, const c8* key) {

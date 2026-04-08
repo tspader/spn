@@ -22,7 +22,7 @@ void spn_pkg_unit_write_stamp(spn_pkg_unit_t* unit, sp_str_t path) {
   sp_fs_create_file_str(path, unit->pkg->name);
 }
 
-spn_err_t spn_pkg_unit_call_hook(spn_pkg_unit_t* unit, spn_build_fn_t fn) {
+spn_err_t spn_pkg_unit_call_hook(spn_pkg_unit_t* unit, spn_configure_fn_t fn) {
   jmp_buf jump;
   int status = tcc_setjmp(unit->tcc, jump, fn);
   if (!status) {

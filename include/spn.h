@@ -128,7 +128,9 @@ typedef struct spn_cmake        spn_cmake_t;
 typedef struct spn_make         spn_make_t;
 typedef struct spn_autoconf     spn_autoconf_t;
 
-typedef void (*spn_build_fn_t) (spn_t*);
+typedef spn_err_t (*spn_configure_fn_t) (spn_t*, spn_config_t*);
+typedef spn_err_t (*spn_build_fn_t)     (spn_t*, spn_build_t*);
+typedef spn_err_t (*spn_package_fn_t)   (spn_t*);
 
 
 #define SP_EMBED_DEFAULT_SYMBOL SP_NULLPTR

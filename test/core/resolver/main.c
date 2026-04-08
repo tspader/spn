@@ -13,6 +13,7 @@
 #include "error/types.h"
 #include "event/event.h"
 #include "index/cache.h"
+#include "intern/intern.h"
 #include "pkg/id.h"
 #include "resolve/resolve.h"
 #include "resolve/types.h"

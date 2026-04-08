@@ -4,11 +4,8 @@
 #include "forward/types.h"
 #include "target/types.h"
 
-void spn_target_add_source(spn_target_info_t* target, const c8* source);
 void spn_target_add_source_ex(spn_target_info_t* target, sp_str_t source);
-void spn_target_add_include(spn_target_info_t* target, const c8* include);
 void spn_target_add_include_ex(spn_target_info_t* target, sp_str_t include);
-void spn_target_add_define(spn_target_info_t* target, const c8* define);
 void spn_target_add_define_ex(spn_target_info_t* target, sp_str_t define);
 void spn_target_add_dep(spn_target_info_t* target, const c8* dep);
 void spn_target_add_dep_ex(spn_target_info_t* target, sp_str_t dep);

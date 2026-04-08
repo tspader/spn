@@ -1,8 +1,10 @@
+#include "api/core/types.h"
 #include "app/types.h"
 #include "ctx/types.h"
 #include "error/types.h"
 #include "event/types.h"
 #include "graph/types.h"
+#include "spn.h"
 #include "target/types.h"
 
 #include "event/event.h"
@@ -14,6 +16,8 @@
 #include "task/task.h"
 #include "unit/package.h"
 #include "unit/types.h"
+
+#include <setjmp.h>
 
 s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
   spn_toolchain_unit_t* unit = (spn_toolchain_unit_t*)user_data;
@@ -66,8 +70,6 @@ s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
 }
 
 spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
-  spn_pkg_info_t* pkg = unit->pkg;
-
   if (!sp_fs_exists(unit->paths.script)) {
     return SPN_OK;
   }
@@ -80,8 +82,8 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
 
   spn_cc_t cc = SP_ZERO_INITIALIZE();
   spn_cc_set_profile(&cc, session->profile);
-  spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_TARGET_JIT, pkg->name);
-  sp_ht_for_kv(pkg->deps, it) {
+  spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_TARGET_JIT, unit->pkg->name);
+  sp_ht_for_kv(unit->pkg->deps, it) {
     switch (it.val->visibility) {
       case SPN_VISIBILITY_BUILD: {
         spn_cc_target_add_dep(target, spn_session_find_pkg(session, *it.key));
@@ -132,25 +134,43 @@ fail:
   return SPN_ERROR;
 }
 
-spn_err_t configure_package(spn_pkg_unit_t* pkg) {
-  if (pkg->on_configure) {
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_BUILD_SCRIPT_CONFIGURE,
-      .pkg = pkg->pkg,
-      .io = &pkg->logs.io
-    });
+spn_err_t configure_package(spn_pkg_unit_t* unit) {
+  if (!unit->on_configure) return SPN_OK;
 
-    sp_tm_timer_t timer = sp_tm_start_timer();
-    spn_try(spn_pkg_unit_call_hook(pkg, pkg->on_configure));
-    pkg->time.configure = sp_tm_read_timer(&timer);
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    .kind = SPN_EVENT_BUILD_SCRIPT_CONFIGURE,
+    .pkg = unit->pkg,
+    .io = &unit->logs.io
+  });
 
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK,
-      .pkg = pkg->pkg,
-      .io = &pkg->logs.io,
-      .configure.time = pkg->time.configure,
-    });
+  sp_tm_timer_t timer = sp_tm_start_timer();
+  jmp_buf jump;
+  int status = tcc_setjmp(unit->tcc, jump, unit->on_configure);
+  if (!status) {
+    spn_t* spn = (spn_t*)unit;
+    spn_config_t* configure = (spn_config_t*)unit;
+    unit->on_configure(spn, configure);
   }
+  else {
+    // @spader @log
+    // What else can we get from TCC here?
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_BUILD_SCRIPT_CRASHED,
+      .pkg = unit->pkg,
+      .io = &unit->logs.io,
+      .crashed.path = sp_str_lit("")
+    });
+    return SPN_ERROR;
+  }
+
+  unit->time.configure = sp_tm_read_timer(&timer);
+
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    .kind = SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK,
+    .pkg = unit->pkg,
+    .io = &unit->logs.io,
+    .configure.time = unit->time.configure,
+  });
 
   return SPN_OK;
 }

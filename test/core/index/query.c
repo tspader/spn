@@ -84,7 +84,7 @@ static void run_index_query_case(s32* utest_result, struct index_query* fixture,
 
   write_index_files(harness, c.name, c.fixture.files);
 
-  spn_index_t index = {
+  spn_index_info_t index = {
     .location = index_root,
   };
   spn_index_init(&index);
