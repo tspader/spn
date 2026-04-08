@@ -2,6 +2,7 @@
 
 #include "app/app.h"
 #include "ctx/ctx.h"
+#include "err.h"
 #include "event/event.h"
 #include "external/cc.h"
 #include "external/git.h"
@@ -10,6 +11,7 @@
 #include "pkg/pkg.h"
 #include "target/target.h"
 #include "unit/build.h"
+#include "unit/types.h"
 
 #include <setjmp.h>
 
@@ -21,87 +23,54 @@ sp_str_t spn_pkg_unit_get_node_stamp_file(spn_pkg_unit_t* ctx, spn_user_node_t* 
   return sp_fs_join_path(ctx->paths.stamp.dir, node->tag);
 }
 
-void spn_pkg_unit_init(spn_pkg_unit_t* ctx, spn_pkg_unit_config_t config) {
-  spn_build_ctx_init(&ctx->ctx, config.ctx);
-  ctx->metadata = config.metadata;
-  ctx->paths.stamp.dir = sp_fs_join_path(ctx->ctx.paths.generated, SP_LIT("stamp"));
-  ctx->paths.stamp.main = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("main.stamp"));
-  ctx->paths.stamp.exit = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("user.stamp"));
-  ctx->paths.stamp.configure = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("configure.stamp"));
-  ctx->paths.stamp.build = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("build.stamp"));
-  ctx->paths.stamp.package = sp_fs_join_path(ctx->paths.stamp.dir, SP_LIT("package.stamp"));
+void spn_pkg_unit_init(spn_pkg_unit_t* unit, spn_pkg_unit_config_t config) {
+  unit->ctx.arena = sp_mem_arena_new_ex(256, SP_MEM_ARENA_MODE_NO_REALLOC, 1);
 
-  sp_fs_create_dir(ctx->paths.stamp.dir);
+  unit->ctx.pkg = config.ctx.package;
+  unit->ctx.session = config.ctx.session;
+  unit->ctx.paths.source = config.ctx.paths.source;
+  unit->ctx.paths.store = config.ctx.paths.store;
+  unit->ctx.paths.include = sp_fs_join_path(unit->ctx.paths.store, SP_LIT("include"));
+  unit->ctx.paths.bin = sp_fs_join_path(unit->ctx.paths.store, SP_LIT("bin"));
+  unit->ctx.paths.lib = sp_fs_join_path(unit->ctx.paths.store, SP_LIT("lib"));
+  unit->ctx.paths.vendor = sp_fs_join_path(unit->ctx.paths.store, SP_LIT("vendor"));
+
+  unit->ctx.paths.work = config.ctx.paths.work;
+  unit->ctx.paths.generated = sp_fs_join_path(unit->ctx.paths.work, SP_LIT("spn"));
+
+  unit->logs.build = sp_format("{}.build.log", SP_FMT_STR(unit->pkg->name));
+  unit->logs.test = sp_format("{}.test.log", SP_FMT_STR(unit->pkg->name));
+  unit->logs.jsonl = sp_format("{}.jsonl", SP_FMT_STR(unit->pkg->name));
+
+  unit->paths.logs.build = sp_fs_join_path(unit->ctx.paths.work, unit->logs.build);
+  unit->paths.logs.test = sp_fs_join_path(unit->ctx.paths.work, unit->logs.test);
+  unit->paths.logs.jsonl = sp_fs_join_path(unit->ctx.paths.work, unit->logs.jsonl);
+
+  sp_fs_create_dir(unit->ctx.paths.work);
+  sp_fs_create_dir(unit->ctx.paths.generated);
+  sp_fs_create_dir(unit->ctx.paths.store);
+  sp_fs_create_dir(unit->ctx.paths.bin);
+  sp_fs_create_dir(unit->ctx.paths.include);
+  sp_fs_create_dir(unit->ctx.paths.lib);
+  sp_fs_create_dir(unit->ctx.paths.vendor);
+  sp_fs_create_file(unit->paths.logs.build);
+  sp_fs_create_file(unit->paths.logs.jsonl);
+
+  unit->logs.io.build = sp_io_writer_from_file(unit->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
+  unit->logs.io.jsonl = sp_io_writer_from_file(unit->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
+
+  unit->paths.stamp.dir = sp_fs_join_path(unit->ctx.paths.generated, SP_LIT("stamp"));
+  unit->paths.stamp.main = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("main.stamp"));
+  unit->paths.stamp.exit = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("user.stamp"));
+  unit->paths.stamp.configure = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("configure.stamp"));
+  unit->paths.stamp.build = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("build.stamp"));
+  unit->paths.stamp.package = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("package.stamp"));
+
+  sp_fs_create_dir(unit->paths.stamp.dir);
 }
 
-spn_err_t spn_pkg_unit_sync_remote(spn_pkg_unit_t* ctx) {
-  if (!sp_fs_exists(ctx->ctx.paths.source)) {
-    sp_str_t url = spn_pkg_get_url(ctx->ctx.pkg);
-    sp_try(spn_git_clone(url, ctx->ctx.paths.source));
-  }
-  else {
-    sp_try(spn_git_fetch(ctx->ctx.paths.source));
-  }
-
-  return SPN_OK;
-}
-
-spn_err_t spn_pkg_unit_sync_local(spn_pkg_unit_t* ctx) {
-  return spn_git_checkout(ctx->ctx.paths.source, ctx->metadata.commit);
-}
-
-void spn_pkg_unit_write_stamp(spn_pkg_unit_t* ctx, sp_str_t path) {
-  sp_io_writer_t io = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_OVERWRITE);
-
-  spn_toml_writer_t writer = spn_toml_writer_new();
-  spn_toml_begin_table_cstr(&writer, "package");
-  spn_toml_append_str_cstr(&writer, "name", ctx->ctx.pkg->name);
-  spn_toml_append_str_cstr(&writer, "source", ctx->ctx.paths.source);
-  spn_toml_append_str_cstr(&writer, "work", ctx->ctx.paths.work);
-  spn_toml_end_table(&writer);
-
-  spn_toml_begin_array_cstr(&writer, "command");
-  sp_da_for(ctx->ctx.commands, it) {
-    sp_ps_config_t command = ctx->ctx.commands[it];
-    spn_toml_append_array_table(&writer);
-    spn_toml_append_str(&writer, sp_str_lit("command"), command.command);
-
-    u32 num_args = 0;
-    for (; num_args < sp_carr_len(command.args); num_args++) {
-      if (!sp_str_valid(command.args[num_args])) {
-        break;
-      }
-    }
-    if (num_args) {
-      spn_toml_append_str_carr_cstr(&writer, "args", command.args, num_args);
-    }
-
-    bool has_env = !sp_ht_empty(command.env.env.vars);
-    bool has_extra = sp_str_valid(command.env.extra[0].key);
-    if (has_env || has_extra) {
-      spn_toml_begin_table_cstr(&writer, "env");
-
-      sp_ht_for_kv(command.env.env.vars, it) {
-        spn_toml_append_str(&writer, *it.key, *it.val);
-      }
-
-      sp_carr_for(command.env.extra, it) {
-        sp_env_var_t var = command.env.extra[it];
-        if (sp_str_empty(var.key)) {
-          break;
-        }
-
-        spn_toml_append_str(&writer, var.key, var.value);
-      }
-
-      spn_toml_end_table(&writer);
-    }
-  }
-
-  spn_toml_end_array(&writer);
-
-  sp_io_write_str(&io, spn_toml_writer_write(&writer));
-  sp_io_writer_close(&io);
+void spn_pkg_unit_write_stamp(spn_pkg_unit_t* unit, sp_str_t path) {
+  sp_fs_create_file_str(path, unit->pkg->name);
 }
 
 spn_err_t spn_pkg_unit_call_hook(spn_pkg_unit_t* unit, spn_build_fn_t fn) {
@@ -115,51 +84,10 @@ spn_err_t spn_pkg_unit_call_hook(spn_pkg_unit_t* unit, spn_build_fn_t fn) {
     // What else can we get from TCC here?
     spn_event_buffer_push_ctx(spn.events, &unit->ctx, (spn_build_event_t) {
       .kind = SPN_EVENT_BUILD_SCRIPT_CRASHED,
-      .crashed.path = unit->ctx.pkg->paths.script,
+      .crashed.path = sp_str_lit("")
     });
     return SPN_ERROR;
   }
 
   return SPN_OK;
-}
-
-void spn_pkg_unit_add_target(spn_pkg_unit_t* pkg, spn_target_t* target) {
-  sp_om_insert(pkg->targets, target->name, SP_ZERO_STRUCT(spn_target_unit_t));
-  spn_target_unit_t* unit = sp_om_back(pkg->targets);
-  unit->session = pkg->ctx.session;
-  unit->pkg = pkg->ctx.pkg;
-  unit->info = target;
-
-  spn_bp_config_t config = {
-    .source = pkg->ctx.paths.source,
-    .store = pkg->ctx.paths.store,
-    .work = pkg->ctx.paths.work,
-  };
-
-  unit->paths.source = sp_str_copy(config.source);
-  unit->paths.work = sp_str_copy(config.work);
-  unit->paths.store = sp_str_copy(config.store);
-  unit->paths.include = sp_fs_join_path(unit->paths.store, SP_LIT("include"));
-  unit->paths.bin = sp_fs_join_path(unit->paths.store, SP_LIT("bin"));
-  unit->paths.lib = sp_fs_join_path(unit->paths.store, SP_LIT("lib"));
-  unit->paths.vendor = sp_fs_join_path(unit->paths.store, SP_LIT("vendor"));
-  unit->paths.generated = sp_fs_join_path(unit->paths.work, SP_LIT("spn"));
-  unit->paths.object = sp_fs_join_path(unit->paths.generated, sp_str_lit("object"));
-  unit->paths.logs.build = sp_fs_join_path(unit->paths.work, sp_format("{}.build.log", SP_FMT_STR(target->name)));
-  unit->paths.logs.test = sp_fs_join_path(unit->paths.work, sp_format("{}.test.log", SP_FMT_STR(target->name)));
-  unit->paths.logs.jsonl = sp_fs_join_path(unit->paths.work, sp_format("{}.build.jsonl", SP_FMT_STR(target->name)));
-
-  sp_fs_create_dir(unit->paths.work);
-  sp_fs_create_dir(unit->paths.generated);
-  sp_fs_create_dir(unit->paths.object);
-  sp_fs_create_dir(unit->paths.store);
-  sp_fs_create_dir(unit->paths.bin);
-  sp_fs_create_dir(unit->paths.include);
-  sp_fs_create_dir(unit->paths.lib);
-  sp_fs_create_dir(unit->paths.vendor);
-  sp_fs_create_file(unit->paths.logs.build);
-  sp_fs_create_file(unit->paths.logs.jsonl);
-
-  unit->logs.build = sp_io_writer_from_file(unit->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
-  unit->logs.jsonl = sp_io_writer_from_file(unit->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
 }

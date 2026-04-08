@@ -106,47 +106,6 @@ sp_str_t spn_build_ctx_get_lib_path(spn_build_ctx_t* ctx, spn_target_t* lib_targ
   return lib;
 }
 
-spn_build_ctx_t spn_build_ctx_make(spn_build_ctx_config_t config) {
-  spn_build_ctx_t ctx = SP_ZERO_INITIALIZE();
-  spn_build_ctx_init(&ctx, config);
-  return ctx;
-}
-
-void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t config) {
-  ctx->arena = sp_mem_arena_new_ex(256, SP_MEM_ARENA_MODE_NO_REALLOC, 1);
-
-  ctx->name = sp_str_copy(config.name);
-  ctx->linkage = config.linkage;
-  ctx->pkg = config.package;
-  ctx->session = config.session;
-  ctx->paths.source = config.paths.source;
-  ctx->paths.store = config.paths.store;
-  ctx->paths.include = sp_fs_join_path(ctx->paths.store, SP_LIT("include"));
-  ctx->paths.bin = sp_fs_join_path(ctx->paths.store, SP_LIT("bin"));
-  ctx->paths.lib = sp_fs_join_path(ctx->paths.store, SP_LIT("lib"));
-  ctx->paths.vendor = sp_fs_join_path(ctx->paths.store, SP_LIT("vendor"));
-
-  ctx->paths.work = config.paths.work;
-  ctx->paths.generated = sp_fs_join_path(ctx->paths.work, SP_LIT("spn"));
-
-  ctx->paths.logs.build = sp_fs_join_path(ctx->paths.work, spn_build_ctx_get_build_log_name(ctx));
-  ctx->paths.logs.test = sp_fs_join_path(ctx->paths.work, spn_build_ctx_get_test_log_name(ctx));
-  ctx->paths.logs.jsonl = sp_fs_join_path(ctx->paths.work, spn_build_ctx_get_jsonl_log_name(ctx));
-
-  sp_fs_create_dir(ctx->paths.work);
-  sp_fs_create_dir(ctx->paths.generated);
-  sp_fs_create_dir(ctx->paths.store);
-  sp_fs_create_dir(ctx->paths.bin);
-  sp_fs_create_dir(ctx->paths.include);
-  sp_fs_create_dir(ctx->paths.lib);
-  sp_fs_create_dir(ctx->paths.vendor);
-  sp_fs_create_file(ctx->paths.logs.build);
-  sp_fs_create_file(ctx->paths.logs.jsonl);
-
-  ctx->logs.build = sp_io_writer_from_file(ctx->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
-  ctx->logs.jsonl = sp_io_writer_from_file(ctx->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
-}
-
 void spn_build_ctx_log_ex(spn_build_io_t* logs, spn_log_level_t level, u64 thread_id, sp_str_t source, sp_str_t message) {
   sp_io_writer_t* io = &logs->build;
   sp_tm_epoch_t now = sp_tm_now_epoch();

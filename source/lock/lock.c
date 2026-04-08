@@ -21,61 +21,6 @@ static void spn_lock_build_dependents(spn_lock_file_t* lock) {
 spn_lock_file_t spn_build_lock_file(spn_resolver_t* resolver, spn_pkg_t* root) {
   spn_lock_file_t lock = SP_ZERO_INITIALIZE();
   spn_lock_file_init(&lock);
-
-  sp_str_ht_for_kv(resolver->resolved, it) {
-    spn_resolved_pkg_t* resolved = it.val;
-
-    spn_pkg_req_t* direct_req = sp_ht_getp(root->deps, *it.key);
-    bool is_explicit = direct_req != SP_NULLPTR;
-
-    spn_lock_entry_t entry = {
-      .name = *it.key,
-      .version = resolved->version,
-      .kind = resolved->kind,
-      .import_kind = is_explicit ? SPN_DEP_IMPORT_KIND_EXPLICIT : SPN_DEP_IMPORT_KIND_TRANSITIVE,
-      .visibility = is_explicit ? direct_req->visibility : SPN_VISIBILITY_PUBLIC,
-    };
-
-    if (resolved->release) {
-      entry.commit = resolved->release->source.rev;
-      entry.source.url = resolved->release->source.url;
-      entry.source.rev = resolved->release->source.rev;
-      entry.source.dir = resolved->release->source.dir;
-      entry.manifest.url = resolved->release->manifest.url;
-      entry.manifest.rev = resolved->release->manifest.rev;
-      entry.manifest.dir = resolved->release->manifest.dir;
-      entry.paths.manifest = resolved->release->paths.manifest;
-      entry.paths.script = resolved->release->paths.script;
-    }
-
-    if (resolved->pkg) {
-      sp_ht_for_kv(resolved->pkg->deps, dep_it) {
-        sp_da_push(entry.deps, *dep_it.key);
-      }
-      sp_da_for(resolved->pkg->system_deps, dep_it) {
-        sp_ht_insert(lock.system_deps, sp_str_copy(resolved->pkg->system_deps[dep_it]), true);
-      }
-    }
-
-    sp_ht_insert(lock.entries, entry.name, entry);
-  }
-
-  sp_ht_for_kv(root->deps, it) {
-    spn_pkg_req_t* req = it.val;
-    if (req->kind != SPN_PACKAGE_KIND_FILE) continue;
-
-    spn_lock_entry_t entry = {
-      .name = *it.key,
-      .kind = SPN_PACKAGE_KIND_FILE,
-      .import_kind = SPN_DEP_IMPORT_KIND_EXPLICIT,
-      .visibility = req->visibility,
-    };
-
-    sp_ht_insert(lock.entries, entry.name, entry);
-  }
-
-  spn_lock_build_dependents(&lock);
-
   return lock;
 }
 

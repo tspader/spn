@@ -6,7 +6,7 @@
 #include "pkg/pkg.h"
 #include "semver/convert.h"
 
-sp_str_t spn_pkg_req_to_str(spn_pkg_req_t dep) {
+sp_str_t spn_pkg_req_to_str(spn_requested_pkg_t dep) {
   switch (dep.kind) {
     case SPN_PACKAGE_KIND_FILE: {
       return dep.file;
@@ -38,56 +38,4 @@ void spn_app_update_lock_file(spn_app_t* app) {
 }
 
 void spn_app_write_manifest(spn_pkg_t* pkg, sp_str_t path) {
-}
-
-spn_app_t spn_app_init_and_write(sp_str_t path, sp_str_t name, spn_app_init_mode_t mode) {
-  sp_str_t paths[] = {
-    sp_fs_join_path(path, sp_str_lit("spn.toml")),
-    sp_fs_join_path(path, sp_str_lit("spn.c")),
-  };
-  sp_carr_for(paths, it) {
-    if (sp_fs_exists(paths[it])) {
-      SP_FATAL("{:fg brightcyan} already exists; bailing", SP_FMT_STR(paths[it]));
-    }
-  }
-
-  spn_app_t app = SP_ZERO_INITIALIZE();
-
-  switch (mode) {
-    case SPN_APP_INIT_NORMAL: {
-      app.package = spn_pkg_from_default(path, name);
-
-      sp_str_t main = sp_fs_join_path(path, sp_str_lit("main.c"));
-      sp_io_writer_t io = sp_io_writer_from_file(main, SP_IO_WRITE_MODE_OVERWRITE);
-
-      sp_str_t content = sp_str_lit(
-        "#define SP_IMPLEMENTATION\n"
-        "#include \"sp.h\"\n"
-        "\n"
-        "s32 main(s32 num_args, const c8** args) {\n"
-        "  SP_LOG(\"hello, {:fg brightcyan}\", SP_FMT_CSTR(\"world\"));\n"
-        "  SP_EXIT_SUCCESS();\n"
-        "}\n"
-      );
-
-      if (sp_io_write_str(&io, content) != content.len) {
-        SP_FATAL("Failed to write {:fg brightyellow}", SP_FMT_STR(main));
-      }
-
-      sp_io_writer_close(&io);
-
-      spn_app_write_manifest(&app.package, app.package.paths.manifest);
-
-      break;
-    }
-    case SPN_APP_INIT_BARE: {
-      app.package = spn_pkg_new(name);
-      spn_pkg_set_manifest(&app.package, sp_fs_join_path(path, SP_LIT("spn.toml")));
-      spn_app_write_manifest(&app.package, app.package.paths.manifest);
-
-      break;
-    }
-  }
-
-  return app;
 }

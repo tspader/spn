@@ -16,13 +16,13 @@ void spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_t toolchain) {
   cc->toolchain = toolchain;
 }
 
-void spn_cc_set_profile(spn_cc_t* cc, spn_profile_t* profile) {
-  cc->arch = profile->arch;
-  cc->os = profile->os;
-  cc->abi = profile->abi;
-  cc->mode = profile->mode;
-  cc->linkage = profile->linkage;
-  cc->standard = profile->standard;
+void spn_cc_set_profile(spn_cc_t* cc, spn_profile_t profile) {
+  cc->arch = profile.arch;
+  cc->os = profile.os;
+  cc->abi = profile.abi;
+  cc->mode = profile.mode;
+  cc->linkage = profile.linkage;
+  cc->standard = profile.standard;
 }
 
 void spn_cc_set_output_dir(spn_cc_t* cc, sp_str_t dir) {
@@ -93,8 +93,8 @@ void spn_cc_target_add_dep(spn_cc_target_t* target, spn_pkg_unit_t* unit) {
     }
     case SPN_LIB_KIND_STATIC:
     case SPN_LIB_KIND_SHARED: {
-      sp_om_for(unit->ctx.pkg->libs, it) {
-        spn_target_t* lib = sp_om_at(unit->ctx.pkg->libs, it);
+      sp_om_for(unit->pkg->libs, it) {
+        spn_target_t* lib = sp_om_at(unit->pkg->libs, it);
         if (spn_target_kind_to_pkg_linkage(lib->kind) == unit->ctx.linkage) {
           sp_str_t file = sp_os_lib_to_file_name(lib->name, spn_lib_kind_to_sp_os_lib_kind(unit->ctx.linkage));
           sp_str_t dir = sp_fs_join_path(unit->ctx.paths.lib, lib->name);

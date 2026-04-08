@@ -179,7 +179,7 @@ static void build_manifest(fixture_t* fixture, spn_pkg_t* manifest) {
     spn_pkg_id_t id = spn_qualified_name_to_pkg_id(sp_str_view(dep->name));
     sp_str_t qualified = spn_pkg_id_to_qualified_name(id);
 
-    spn_pkg_req_t req = {
+    spn_requested_pkg_t req = {
       .id = id,
       .kind = SPN_PACKAGE_KIND_INDEX,
       .range = spn_semver_parse_range(sp_str_view(dep->version)),

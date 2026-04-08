@@ -10,8 +10,8 @@
 #include "task/task.h"
 
 
+// @spader @nuke
 typedef struct {
-  sp_str_t dir;
   sp_str_t lock;
 } spn_app_paths_t;
 

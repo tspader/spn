@@ -1,3 +1,4 @@
+#include "err.h"
 #include "sp.h"
 
 // STANDARD
@@ -294,7 +295,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
   }
 
-  // Initialize verbosity from CLI flags
   if (cli->quiet) {
     spn.verbosity = SPN_VERBOSITY_QUIET;
   } else if (cli->verbose) {
@@ -311,58 +311,24 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
   spn.paths.manifest = sp_fs_join_path(spn.paths.project, sp_str_lit("spn.toml"));
 
-  // @spader
-  // We switch here because most operations work on a project, and start by loading the manifest. But for
-  // `spn run`, you can point it at a loose C file. This feels kind of ad hoc, like we're throwing away
-  // the fact that we're not in a project for the sake of false uniformity.
-  //
-  if (sp_fs_exists(spn.paths.manifest)) {
-    if (spn_pkg_from_manifest(&app.package, spn.paths.manifest)) {
-      spn_poll(sp);
-      return SP_APP_ERR;
-    }
-  } else {
-    app.package = spn_pkg_new(sp_str_lit(""));
-    spn_pkg_set_manifest(&app.package, spn.paths.manifest);
+  if (!sp_fs_exists(spn.paths.manifest)) {
+    spn_log_error("no manifest found at {:fg cyan}", SP_FMT_STR(spn.paths.manifest));
+    return SP_APP_ERR;
   }
 
-  app.paths.dir = app.package.paths.root;
-  app.paths.lock = sp_fs_join_path(app.paths.dir, SP_LIT("spn.lock"));
+  spn_err_union_t error = spn_pkg_load(&app.package, spn.paths.manifest);
+  if (error.kind) {
+    spn_log_error("bad manifest");
+    spn_poll(sp);
+    return SP_APP_ERR;
+  }
+
+  app.paths.lock = sp_fs_join_path(spn.paths.project, SP_LIT("spn.lock"));
 
   if (sp_fs_exists(app.paths.lock)) {
     sp_opt_set(app.lock, spn_lock_file_load(app.paths.lock, spn.events));
   }
 
-  spn_session_t* session = &app.session;
-  session->pkg = &app.package;
-  session->paths.root = app.package.paths.root;
-  session->paths.build = sp_fs_join_path(session->paths.root, sp_str_lit("build"));
-  sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
-
-  // Build the list of available toolchains
-  sp_om_for(app.package.toolchains, it) {
-    spn_toolchain_entry_t entry = *sp_om_at(app.package.toolchains, it);
-    sp_str_ht_insert(session->toolchains, entry.name, entry);
-  }
-  spn_toolchain_entry_t builtin_toolchains[] = {
-    {
-      .name = sp_str_lit("builtin"),
-      .kind = SPN_TOOLCHAIN_BUILTIN,
-      .info = {
-        .compiler = { .program = sp_str_lit("cc") },
-        .linker   = { .program = sp_str_lit("cc") },
-        .archiver = { .program = sp_str_lit("ar") },
-        .driver = SPN_CC_DRIVER_GCC,
-      },
-    }
-  };
-  sp_carr_for(builtin_toolchains, it) {
-    spn_toolchain_entry_t entry = builtin_toolchains[it];
-    sp_str_ht_insert(session->toolchains, entry.name, entry);
-  }
-
-  // Build the list of available profiles
-  spn_profile_populate(&session->profiles, &app.package);
 
   switch (spn_cli_dispatch(&parser, cli)) {
     case SP_APP_CONTINUE: return SP_APP_CONTINUE;
@@ -519,28 +485,29 @@ void spn_deinit(sp_app_t* sp) {
     spn_pkg_unit_t* unit = sp_om_at(app.session.units.packages, it);
 
     sp_fs_create_sym_link(
-      unit->ctx.paths.logs.build,
-      sp_fs_join_path(root->ctx.paths.work, spn_build_ctx_get_build_log_name(&unit->ctx))
+      unit->paths.logs.build,
+      sp_fs_join_path(root->ctx.paths.work, unit->logs.build)
     );
     sp_fs_create_sym_link(
-      unit->ctx.paths.logs.jsonl,
-      sp_fs_join_path(root->ctx.paths.work, spn_build_ctx_get_jsonl_log_name(&unit->ctx))
+      unit->paths.logs.jsonl,
+      sp_fs_join_path(root->ctx.paths.work, unit->logs.jsonl)
     );
 
-    sp_om_for(unit->targets, t) {
-      spn_target_unit_t* target = sp_om_at(unit->targets, t);
-      sp_io_writer_close(&target->logs.build);
-      sp_io_writer_close(&target->logs.test);
-      sp_io_writer_close(&target->logs.jsonl);
-    }
-    sp_io_writer_close(&unit->ctx.logs.build);
-    sp_io_writer_close(&unit->ctx.logs.test);
-    sp_io_writer_close(&unit->ctx.logs.jsonl);
+    sp_io_writer_close(&unit->logs.io.build);
+    sp_io_writer_close(&unit->logs.io.test);
+    sp_io_writer_close(&unit->logs.io.jsonl);
   }
 
-  sp_io_writer_close(&root->ctx.logs.build);
-  sp_io_writer_close(&root->ctx.logs.test);
-  sp_io_writer_close(&root->ctx.logs.jsonl);
+  sp_om_for(app.session.units.targets, it) {
+    spn_target_unit_t* target = sp_om_at(app.session.units.targets, it);
+    sp_io_writer_close(&target->logs.build);
+    sp_io_writer_close(&target->logs.test);
+    sp_io_writer_close(&target->logs.jsonl);
+  }
+
+  sp_io_writer_close(&root->logs.io.build);
+  sp_io_writer_close(&root->logs.io.test);
+  sp_io_writer_close(&root->logs.io.jsonl);
   sp_io_writer_close(&spn.logger.jsonl);
 }
 

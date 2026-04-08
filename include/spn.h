@@ -152,10 +152,6 @@ spn_linkage_t     spn_profile_get_linkage(spn_profile_t* profile);
 spn_c_standard_t  spn_profile_get_standard(spn_profile_t* profile);
 spn_build_mode_t  spn_profile_get_mode(spn_profile_t* profile);
 
-spn_target_t*   spn_add_exe(spn_config_t* b, const c8* name);
-spn_target_t*   spn_add_test(spn_config_t* c, const c8* name);
-spn_target_t*   spn_add_lib(spn_config_t* c, const c8* name, spn_linkage_t kind);
-
 void            spn_target_add_source(spn_target_t* target, const c8* source);
 void            spn_target_add_include(spn_target_t* target, const c8* include);
 void            spn_target_add_define(spn_target_t* target, const c8* define);

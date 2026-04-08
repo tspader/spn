@@ -46,18 +46,6 @@ sp_app_result_t spn_cli_build(spn_cli_t* cli) {
     .abi = target_triple.abi,
   };
 
-  spn_event_buffer_push_ex(spn.events, &app.package, SP_NULLPTR, (spn_build_event_t) {
-    .kind = SPN_EVENT_CLI_ENTRY,
-    .cli_entry = {
-      .command = sp_str_lit("build"),
-      .profile = command->profile,
-      .target = command->name,
-      .force = command->force,
-      .cwd = spn.paths.cwd,
-      .manifest = app.package.paths.manifest,
-    }
-  });
-
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);

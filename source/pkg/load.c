@@ -458,7 +458,7 @@ static spn_err_t toml_get_array_string_required_2(toml_array_t* array, u32 it, s
 
 }
 
-static spn_err_union_t spn_pkg_load_targets(
+static spn_err_union_t load_target(
   toml_table_t* table,
   toml_path_t path,
   spn_target_t* target
@@ -483,6 +483,14 @@ static spn_err_union_t spn_pkg_load_targets(
     spn_try_union(toml_get_array_string_required(define, d, path, "define", &value));
     spn_target_add_define_ex(target, value);
   }
+
+  toml_array_t* deps = toml_table_array(table, "deps");
+  spn_toml_arr_for(deps, it) {
+    sp_str_t value = SP_ZERO_INITIALIZE();
+    spn_try_union(toml_get_array_string_required(deps, it, path, "deps", &value));
+    spn_target_add_dep_ex(target, value);
+  }
+
 
   return spn_result(SPN_OK);
 }
@@ -512,7 +520,7 @@ static spn_err_union_t load_deps(toml_table_t* toml, spn_pkg_t* pkg, spn_visibil
     sp_str_t qualified = spn_pkg_id_to_qualified_name(id);
     sp_str_t file_prefix = sp_str_lit("file://");
     if (sp_str_starts_with(version, file_prefix)) {
-      spn_pkg_req_t req = {
+      spn_requested_pkg_t req = {
         .id = id,
         .visibility = vis,
         .kind = SPN_PACKAGE_KIND_FILE,
@@ -521,7 +529,7 @@ static spn_err_union_t load_deps(toml_table_t* toml, spn_pkg_t* pkg, spn_visibil
       sp_ht_insert(pkg->deps, qualified, req);
     }
     else {
-      spn_pkg_req_t req = {
+      spn_requested_pkg_t req = {
         .id = id,
         .visibility = vis,
         .kind = SPN_PACKAGE_KIND_INDEX,
@@ -747,7 +755,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     spn_linkage_t linkage = spn_linkage_set_default(linkages);
     spn_target_t* lib = spn_pkg_add_lib_ex(pkg, name, linkage);
     lib->linkages = linkages;
-    spn_try_union(spn_pkg_load_targets(it, path, lib));
+    spn_try_union(load_target(it, path, lib));
   }
 
   spn_toml_arr_for(toml.toolchain, n) {
@@ -847,7 +855,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     spn_try_union(ensure_unique_target_name(pkg, path, name));
 
     spn_target_t* bin = spn_pkg_add_exe_ex(pkg, name);
-    spn_try_union(spn_pkg_load_targets(it, path, bin));
+    spn_try_union(load_target(it, path, bin));
 
     sp_str_t kind = sp_str_lit("");
     spn_try_union(toml_get_str_optional(it, "kind", path, &kind));
@@ -866,7 +874,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     spn_try_union(ensure_unique_target_name(pkg, path, name));
 
     spn_target_t* script = spn_pkg_add_script_ex(pkg, name);
-    spn_try_union(spn_pkg_load_targets(it, path, script));
+    spn_try_union(load_target(it, path, script));
   }
 
   spn_toml_arr_for(toml.test, n) {
@@ -879,7 +887,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_t* pkg, sp_str_t manifest_path) {
     spn_try_union(ensure_unique_target_name(pkg, path, name));
 
     spn_target_t* test = spn_pkg_add_test_ex(pkg, name);
-    spn_try_union(spn_pkg_load_targets(it, path, test));
+    spn_try_union(load_target(it, path, test));
   }
 
   if (toml.deps) {

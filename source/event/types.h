@@ -104,8 +104,8 @@ typedef struct { u32 n; spn_profile_t* profile; u64 time; } spn_evt_tests_passed
 typedef struct { sp_str_t commit; spn_semver_t version; sp_str_t message; } spn_evt_checkout_t;
 typedef struct { spn_resolve_strategy_t strategy; } spn_evt_resolve_t;
 typedef struct { spn_pkg_id_t id; } spn_evt_circular_t;
-typedef struct { spn_pkg_req_t low; spn_pkg_req_t high; } spn_evt_unsatisfiable_t;
-typedef struct { spn_pkg_req_t request; } spn_evt_unknown_t;
+typedef struct { spn_requested_pkg_t low; spn_requested_pkg_t high; } spn_evt_unsatisfiable_t;
+typedef struct { spn_requested_pkg_t request; } spn_evt_unknown_t;
 typedef struct { sp_str_t path; } spn_evt_clean_t;
 typedef struct { sp_str_t path; } spn_evt_generate_t;
 typedef struct { sp_str_t script_path; u64 time; bool has_configure; bool has_package; } spn_evt_script_compile_t;

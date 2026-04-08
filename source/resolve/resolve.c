@@ -13,7 +13,7 @@ void spn_resolver_init(spn_resolver_t* r, spn_index_cache_t* index, spn_pkg_t* p
   *r = (spn_resolver_t){ .pkg = pkg, .index = index, .events = events };
 }
 
-void spn_resolver_add(spn_resolver_t* r, spn_pkg_req_t req) {
+void spn_resolver_add(spn_resolver_t* r, spn_requested_pkg_t req) {
   sp_da_push(r->reqs, req);
 }
 
@@ -33,7 +33,7 @@ static bool system_dep_exists(spn_resolver_t* r, sp_str_t dep) {
 
 static spn_err_t resolve_node(spn_resolver_t* r, spn_resolve_node_t node);
 
-static spn_err_t resolve_package(spn_resolver_t* r, spn_pkg_req_t request) {
+static spn_err_t resolve_index_package(spn_resolver_t* r, spn_requested_pkg_t request) {
   sp_str_t qualified = spn_pkg_id_to_qualified_name(request.id);
 
   spn_resolved_pkg_t* existing = sp_str_ht_get(r->resolved, qualified);
@@ -73,7 +73,6 @@ static spn_err_t resolve_package(spn_resolver_t* r, spn_pkg_req_t request) {
     // Mark the candidate in the resolved list
     sp_str_ht_insert(r->resolved, qualified, ((spn_resolved_pkg_t) {
       .version = candidate->version,
-      .kind = request.kind,
       .release = candidate,
     }));
     sp_da_push(r->resolution_order, qualified);
@@ -81,7 +80,7 @@ static spn_err_t resolve_package(spn_resolver_t* r, spn_pkg_req_t request) {
     // Add all of the candidate's dependencies and keep going
     spn_resolve_node_t child = { .id = pkg->id };
     sp_da_for(candidate->deps, d) {
-      sp_da_push(child.deps.pkg, ((spn_pkg_req_t) {
+      sp_da_push(child.deps.pkg, ((spn_requested_pkg_t) {
         .id = candidate->deps[d].id,
         .kind = SPN_PACKAGE_KIND_INDEX,
         .range = spn_semver_parse_range(candidate->deps[d].version)
@@ -132,10 +131,10 @@ static spn_err_t resolve_node(spn_resolver_t* r, spn_resolve_node_t node) {
   sp_str_ht_insert(r->visited, qualified, true);
 
   sp_da_for(node.deps.pkg, it) {
-    spn_pkg_req_t req = node.deps.pkg[it];
+    spn_requested_pkg_t req = node.deps.pkg[it];
     switch (req.kind) {
       case SPN_PACKAGE_KIND_INDEX: {
-        spn_err_t err = resolve_package(r, req);
+        spn_err_t err = resolve_index_package(r, req);
         if (err != SPN_OK) {
           sp_str_ht_erase(r->visited, qualified);
           return err;
@@ -177,7 +176,6 @@ spn_err_t spn_resolve_from_lock_file(spn_resolver_t* resolver, spn_lock_file_t* 
 
     sp_str_ht_insert(resolver->resolved, qualified, ((spn_resolved_pkg_t) {
       .version = entry->version,
-      .kind = entry->kind,
       .release = release,
     }));
   }
@@ -190,6 +188,8 @@ spn_err_t spn_resolve_from_lock_file(spn_resolver_t* resolver, spn_lock_file_t* 
 }
 
 spn_err_t spn_resolve_from_solver(spn_resolver_t* r) {
+  r->timer = sp_tm_start_timer();
+
   spn_resolve_node_t node = {
     .id.name = r->pkg->name,
     .version = r->pkg->version,

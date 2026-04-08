@@ -6,7 +6,8 @@
 
 #include "graph/types.h"
 #include "pkg/types.h"
-#include "external/tcc.h"
+#include "target/types.h"
+#include "external/tcc/types.h"
 
 struct spn_node_t {
   spn_pkg_unit_t* ctx;
@@ -33,11 +34,6 @@ struct spn_user_node_t {
 typedef struct spn_target_unit spn_target_unit_t;
 typedef struct spn_session_t spn_session_t;
 
-typedef enum {
-  SPN_HOOK_CONFIGURE,
-  SPN_HOOK_PACKAGE,
-} spn_hook_t;
-
 typedef struct {
   u64 compile;
   u64 configure;
@@ -47,10 +43,8 @@ typedef struct {
 } spn_build_time_t;
 
 typedef struct {
-  sp_str_t name;
   spn_pkg_t* package;
   spn_session_t* session;
-  spn_linkage_t linkage;
   struct {
     sp_str_t source;
     sp_str_t store;
@@ -68,7 +62,7 @@ typedef struct {
   sp_str_t build;
   sp_str_t test;
   sp_str_t jsonl;
-} spn_build_log_paths_t;;
+} spn_build_log_paths_t;
 
 typedef struct {
   sp_str_t source;
@@ -111,9 +105,8 @@ struct spn_build_ctx {
 typedef struct {
   sp_str_t name;
   spn_target_unit_t* target;
-  spn_profile_t* profile;
+  spn_pkg_unit_t* package;
   spn_session_t* session;
-  spn_pkg_t* pkg;
 
   struct {
     spn_bg_id_t source;
@@ -121,8 +114,9 @@ typedef struct {
     spn_bg_id_t object;
   } nodes;
   struct {
-    sp_str_t source;
+    sp_str_t file;
     sp_str_t object;
+    sp_str_t source;
   } paths;
 } spn_compile_unit_t;
 
@@ -148,13 +142,19 @@ typedef struct {
 struct spn_target_unit {
   spn_build_paths_t paths;
   spn_build_io_t logs;
-  spn_build_ctx_t ctx;
   spn_session_t* session;
   spn_pkg_t* pkg;
   spn_target_t* info;
   spn_cc_t* cc;
+  spn_target_kind_t kind;
 
   sp_da(spn_compile_unit_t*) objects;
+  spn_pkg_unit_t* parent;
+
+  struct {
+    sp_da(spn_target_unit_t*) target;
+    sp_da(spn_target_unit_t*) package;
+  } deps;
 
   struct {
     spn_bg_id_t output;
@@ -170,9 +170,15 @@ struct spn_target_unit {
 
 struct spn_pkg_unit_t {
   spn_build_ctx_t ctx;
-  spn_pkg_metadata_t metadata;
-  sp_om(spn_target_unit_t) targets;
+  spn_pkg_t* pkg;
+
   sp_om(spn_compile_unit_t) objects;
+  sp_str_ht(spn_target_unit_t*) targets;
+  sp_str_ht(spn_target_unit_t*) libs;
+  sp_str_ht(spn_target_unit_t*) exes;
+  sp_str_ht(spn_target_unit_t*) scripts;
+  sp_str_ht(spn_target_unit_t*) tests;
+  sp_str_ht(spn_pkg_unit_t*) deps;
 
   struct {
     struct {
@@ -180,7 +186,7 @@ struct spn_pkg_unit_t {
       spn_bg_id_t stamp;
     } configure;
     spn_pkg_nodes_t build;
-    sp_da(spn_user_node_t) all;
+    sp_da(spn_user_node_t) user;
     sp_str_ht(spn_bg_id_t) files;
   } nodes;
 
@@ -193,7 +199,21 @@ struct spn_pkg_unit_t {
       sp_str_t main;
       sp_str_t exit;
     } stamp;
+
+    sp_str_t manifest;
+    sp_str_t script;
+    sp_str_t source;
+
+    spn_build_log_paths_t logs;
   } paths;
+
+  struct {
+    sp_str_t build;
+    sp_str_t test;
+    sp_str_t jsonl;
+    spn_build_io_t io;
+  } logs;
+
 
   spn_build_time_t time;
 
@@ -222,8 +242,8 @@ typedef struct {
 } spn_toolchain_unit_t;
 
 static inline spn_user_node_t* spn_find_user_node(spn_node_t* node) {
-  SP_ASSERT(node->index < sp_da_size(node->ctx->nodes.all));
-  return &node->ctx->nodes.all[node->index];
+  SP_ASSERT(node->index < sp_da_size(node->ctx->nodes.user));
+  return &node->ctx->nodes.user[node->index];
 }
 
 #endif

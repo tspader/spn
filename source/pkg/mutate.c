@@ -15,31 +15,10 @@
 void spn_pkg_init(spn_pkg_t* pkg, sp_str_t name) {
   pkg->arena = sp_mem_arena_new(4096);
   pkg->name = spn_intern(name);
-  pkg->paths.cache.source = sp_fs_join_path(sp_str_lit(""), pkg->name);
-  pkg->paths.cache.work = sp_fs_join_path(sp_str_lit(""), pkg->name);
-  pkg->paths.cache.store = sp_fs_join_path(sp_str_lit(""), pkg->name);
 
   sp_ht_set_fns(pkg->deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(pkg->options, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
   sp_ht_set_fns(pkg->config, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-}
-
-void spn_pkg_set_index(spn_pkg_t* pkg, sp_str_t path) {
-  sp_context_push_arena(pkg->arena);
-  pkg->kind = SPN_PACKAGE_KIND_INDEX;
-  pkg->paths.root = sp_str_copy(path);
-  pkg->paths.manifest = sp_fs_join_path(pkg->paths.root, sp_str_lit("spn.toml"));
-  pkg->paths.script = sp_fs_join_path(pkg->paths.root, sp_str_lit("spn.c"));
-  sp_context_pop();
-}
-
-void spn_pkg_set_manifest(spn_pkg_t* pkg, sp_str_t path) {
-  sp_context_push_arena(pkg->arena);
-  pkg->kind = SPN_PACKAGE_KIND_FILE;
-  pkg->paths.manifest = sp_str_copy(path);
-  pkg->paths.root = sp_fs_parent_path(path);
-  pkg->paths.script = sp_fs_join_path(pkg->paths.root, SP_LIT("spn.c"));
-  sp_context_pop();
 }
 
 void spn_pkg_set_name(spn_pkg_t* pkg, const c8* name) {

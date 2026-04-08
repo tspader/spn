@@ -2,16 +2,8 @@
 #define SPN_EXTERNAL_TCC_H
 
 #include "sp.h"
-#include "spn.h"
 #include "err.h"
-#include "libtcc.h"
-
-typedef TCCState spn_tcc_t;
-
-typedef struct {
-  sp_mem_arena_t* arena;
-  sp_str_t error;
-} spn_tcc_err_ctx_t;
+#include "external/tcc/types.h"
 
 spn_err_t spn_tcc_prepare_script(spn_tcc_t* tcc, spn_tcc_err_ctx_t* error_context);
 spn_err_t spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path);

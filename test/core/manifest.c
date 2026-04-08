@@ -10,6 +10,7 @@
 #include "ctx/types.h"
 #include "pkg/load.h"
 #include "profile/types.h"
+#include "target/types.h"
 
 ///////////
 // STATE //
@@ -53,12 +54,19 @@ typedef struct {
 } toolchain_t;
 
 typedef struct {
+  const c8* name;
+  const c8* deps [4];
+} target_t;
+
+typedef struct {
   const c8* manifest [64];
   const c8* namespace;
   const c8* name;
   spn_semver_t version;
   toolchain_t toolchains [4];
   profile_t profiles [4];
+  target_t exes [8];
+  target_t libs [8];
 } test_t;
 
 void run_case(s32* utest_result, test_t test) {
@@ -90,8 +98,12 @@ void run_case(s32* utest_result, test_t test) {
   struct {
     struct { u32 actual; u32 expected; } toolchains;
     struct { u32 actual; u32 expected; } profiles;
+    struct { u32 actual; u32 expected; } exes;
+    struct { u32 actual; u32 expected; } libs;
+    struct { u32 actual; u32 expected; } deps;
   } num = SP_ZERO_INITIALIZE();
 
+  // Toolchains
   num.toolchains.actual = sp_om_size(pkg.toolchains);
 
   sp_carr_for(test.toolchains, it) {
@@ -116,6 +128,7 @@ void run_case(s32* utest_result, test_t test) {
     }
   }
 
+  // Profiles
   num.profiles.actual = sp_om_size(pkg.profiles);
 
   sp_carr_for(test.profiles, it) {
@@ -133,6 +146,50 @@ void run_case(s32* utest_result, test_t test) {
     EXPECT_EQ(actual->linkage, expected.linkage);
     if (expected.standard) EXPECT_EQ(actual->standard, expected.standard);
     if (expected.mode) EXPECT_EQ(actual->mode, expected.mode);
+  }
+
+  // Executables
+  num.exes.actual = sp_om_size(pkg.exes);
+
+  sp_carr_for(test.exes, it) {
+    if (!test.exes[it].name) break;
+    num.exes.expected++;
+  }
+  EXPECT_EQ(num.exes.expected, num.exes.actual);
+
+  sp_for(it, num.exes.expected) {
+    spn_target_t* target = sp_om_at(pkg.exes, it);
+
+    SP_EXPECT_STR_EQ_CSTR(target->name, test.exes[it].name);
+
+    num.deps.expected = 0;
+    sp_carr_for(test.exes[it].deps, j) {
+      if (!test.exes[it].deps[j]) break;
+      num.deps.expected++;
+    }
+    num.deps.actual = sp_da_size(target->deps);
+    ASSERT_EQ(num.deps.expected, num.deps.actual);
+
+    sp_carr_for(test.exes[it].deps, j) {
+      const c8* expected = test.exes[it].deps[j];
+      if (!expected) break;
+
+      SP_EXPECT_STR_EQ_CSTR(target->deps[j], expected);
+    }
+  }
+
+  // Libs
+  num.libs.actual = sp_om_size(pkg.libs);
+
+  sp_carr_for(test.libs, it) {
+    if (!test.libs[it].name) break;
+    num.libs.expected++;
+  }
+  EXPECT_EQ(num.libs.expected, num.libs.actual);
+
+  sp_for(it, num.libs.expected) {
+    spn_target_t* target = sp_om_at(pkg.libs, it);
+    SP_EXPECT_STR_EQ_CSTR(target->name, test.libs[it].name);
   }
 }
 
@@ -228,6 +285,41 @@ UTEST(load, profile) {
     .profiles = {
       { "default", "zig", SPN_LIB_KIND_STATIC, SPN_C99, SPN_BUILD_MODE_DEBUG },
       { "shared", "", SPN_LIB_KIND_SHARED, SPN_C_STANDARD_NONE, SPN_BUILD_MODE_NONE },
+    },
+  });
+}
+
+UTEST(load, target_deps) {
+  run_case(utest_result, (test_t) {
+    .manifest = {
+      "[package]",
+      tkv(name, "test"),
+      tkv(version, "1.0.0"),
+      "",
+      "[[lib]]",
+      tkv(name, "spum"),
+      tk(kinds) "["
+        q("static")
+      "]",
+      tk(source) "["
+        q("spum.c")
+      "]",
+      "",
+      "[[bin]]",
+      tkv(name, "main"),
+      tk(source) "["
+        q("main.c")
+      "]",
+      tk(deps) "["
+        q("spum")
+      "]",
+    },
+    .name = "test",
+    .exes = {
+      { .name = "main", .deps = { "spum" } },
+    },
+    .libs = {
+      { .name = "spum" },
     },
   });
 }

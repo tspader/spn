@@ -2,6 +2,19 @@
 name = "smoke"
 version = "1.0.0"
 
+[[deps.package]]
+
+
+[[lib]]
+name = "spum"
+source = ["spum.c"]
+kinds = ["static"]
+
 [[bin]]
-name = "main"
-source = ["main.c"]
+name = "foo"
+source = ["foo.c"]
+deps = ["spum"]
+
+[[bin]]
+name = "bar"
+source = ["bar.c"]

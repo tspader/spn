@@ -48,13 +48,14 @@ typedef struct {
 
 struct spn_target {
   sp_str_t name;
-  spn_target_kind_t kind;
+  spn_target_kind_t kind; // @spader @nuke
   spn_linkage_set_t linkages;
   spn_pkg_t* pkg;
   spn_visibility_t visibility;
   sp_da(sp_str_t) source;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
+  sp_da(sp_str_t) deps;
   sp_da(spn_embed_t) embed;
 };
 

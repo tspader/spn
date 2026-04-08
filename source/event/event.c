@@ -38,24 +38,24 @@ spn_event_buffer_t* spn_event_buffer_new() {
   return events;
 }
 
-void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_ctx_t* ctx, spn_build_event_kind_t kind) {
+void spn_event_buffer_push_kind(spn_event_buffer_t* events, spn_build_ctx_t* ctx, spn_build_event_kind_t kind) {
   spn_event_buffer_push_ctx(events, ctx, spn_build_event_make(ctx, kind));
 }
 
 void spn_event_buffer_push_ctx(spn_event_buffer_t* events, spn_build_ctx_t* ctx, spn_build_event_t config) {
   spn_build_event_t event = config;
   spn_build_event_init(&event, event.kind, ctx);
-  event.thread_id = spn_current_thread_id();
-
-  sp_mutex_lock(&events->mutex);
-  sp_rb_push(events->buffer, event);
-  sp_mutex_unlock(&events->mutex);
+  spn_event_buffer_push(events, event);
 }
 
 void spn_event_buffer_push_ex(spn_event_buffer_t* events, spn_pkg_t* pkg, spn_build_io_t* io, spn_build_event_t e) {
   spn_build_event_t event = e;
   event.pkg = pkg;
   event.io = io;
+  spn_event_buffer_push(events, event);
+}
+
+void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event) {
   event.thread_id = spn_current_thread_id();
 
   sp_mutex_lock(&events->mutex);

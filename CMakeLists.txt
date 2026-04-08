@@ -511,7 +511,6 @@ set(SPN_SOURCES
   source/target/target.c
   source/target/mutate.c
   source/task/build/build.c
-  source/task/build/graph.c
   source/task/build/nodes/embed.c
   source/task/build/nodes/link.c
   source/task/build/nodes/object.c

@@ -9,7 +9,7 @@ s32 run_package_hook(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* ctx = (spn_pkg_unit_t*)user_data;
 
   if (ctx->on_package) {
-    spn_event_buffer_push(spn.events, &ctx->ctx, SPN_EVENT_BUILD_SCRIPT_PACKAGE);
+    spn_event_buffer_push_kind(spn.events, &ctx->ctx, SPN_EVENT_BUILD_SCRIPT_PACKAGE);
 
     sp_tm_timer_t timer = sp_tm_start_timer();
     spn_try(spn_pkg_unit_call_hook(ctx, ctx->on_package));

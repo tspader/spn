@@ -71,7 +71,7 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
   }
 
   sp_ht_for_kv(pkg.deps, it) {
-    spn_pkg_req_t* req = it.val;
+    spn_requested_pkg_t* req = it.val;
     if (req->kind != SPN_PACKAGE_KIND_INDEX) {
       continue;
     }

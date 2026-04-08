@@ -1,6 +1,8 @@
+#include "err.h"
 #include "gen.h"
 #include "enum/enum.h"
 #include "filter/filter.h"
+#include "pkg/types.h"
 #include "session/session.h"
 #include "task/build/build.h"
 
@@ -14,9 +16,9 @@ void add_pkg_to_cc(spn_cc_t* cc, spn_pkg_t* pkg) {
   }
 }
 
-void add_pkg_to_cc_target(spn_cc_target_t* target, spn_pkg_t* pkg, spn_target_t* info) {
+void add_pkg_to_cc_target(spn_cc_target_t* target, spn_pkg_unit_t* pkg, spn_target_t* info) {
   sp_da_for(info->include, i) {
-    spn_cc_target_add_absolute_include(target, sp_fs_join_path(pkg->paths.root, info->include[i]));
+    spn_cc_target_add_absolute_include(target, sp_fs_join_path(pkg->paths.source, info->include[i]));
   }
 
   sp_da_for(info->define, i) {
@@ -24,19 +26,27 @@ void add_pkg_to_cc_target(spn_cc_target_t* target, spn_pkg_t* pkg, spn_target_t*
   }
 }
 
-void add_deps_to_cc_target(spn_cc_target_t* target, spn_pkg_t* pkg, spn_target_t* info, spn_session_t* s) {
-  spn_cc_driver_t driver = target->cc->toolchain.info.driver;
+void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
+  spn_session_t* s = target->session;
+  spn_target_t* info = target->info;
+  spn_pkg_t* pkg = target->pkg;
+  spn_cc_driver_t driver = cc->cc->toolchain.info.driver;
+
   sp_da_for(pkg->system_deps, i) {
-    spn_cc_target_add_lib(target, spn_gen_format_entry(pkg->system_deps[i], SPN_GEN_SYSTEM_LIBS, driver));
+    spn_cc_target_add_lib(cc, spn_gen_format_entry(pkg->system_deps[i], SPN_GEN_SYSTEM_LIBS, driver));
   }
 
-  sp_ht_for_kv(pkg->deps, i) {
-    if (spn_is_visibility_linked(info->visibility, i.val->visibility)) {
-      spn_pkg_unit_t* dep = spn_session_find_pkg(s, *i.key);
-      spn_cc_target_add_dep(target, dep);
-
-      sp_da_for(dep->ctx.pkg->system_deps, n) {
-        spn_cc_target_add_lib(target, spn_gen_format_entry(dep->ctx.pkg->system_deps[n], SPN_GEN_SYSTEM_LIBS, driver));
+  sp_da_for(info->deps, it) {
+    sp_str_t name = info->deps[it];
+    if (sp_om_has(pkg->libs, name)) {
+      spn_target_t* lib = sp_om_get(pkg->libs, name);
+    }
+    else {
+      spn_pkg_unit_t* dep = spn_session_find_pkg(s, name);
+      spn_cc_target_add_dep(cc, dep);
+      sp_da_for(dep->pkg->system_deps, j) {
+        sp_str_t system_dep = dep->pkg->system_deps[j];
+        spn_cc_target_add_lib(cc, spn_gen_format_entry(system_dep, SPN_GEN_SYSTEM_LIBS, driver));
       }
     }
   }

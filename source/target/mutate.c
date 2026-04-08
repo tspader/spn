@@ -81,6 +81,15 @@ void spn_target_add_define_ex(spn_target_t* target, sp_str_t define) {
   sp_da_push(target->define, spn_intern(define));
 }
 
+void spn_target_add_dep(spn_target_t* target, const c8* dep) {
+  spn_target_add_dep_ex(target, sp_str_view(dep));
+}
+
+void spn_target_add_dep_ex(spn_target_t* target, sp_str_t dep) {
+  sp_require(target);
+  sp_da_push(target->deps, spn_intern(dep));
+}
+
 void spn_target_set_visibility(spn_target_t* target, spn_visibility_t visibility) {
   sp_require(target);
   target->visibility = visibility;

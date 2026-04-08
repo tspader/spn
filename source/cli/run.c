@@ -82,9 +82,8 @@ sp_app_result_t spn_cli_run(spn_cli_t* cli) {
   }
 
   if (!sp_om_has(app.package.scripts, command->entry)) {
-    spn_log_error("script target {:fg brightyellow} is not defined in {:fg brightcyan}",
-      SP_FMT_STR(command->entry),
-      SP_FMT_STR(app.package.paths.manifest)
+    spn_log_error("script target {:fg brightyellow} is not defined",
+      SP_FMT_STR(command->entry)
     );
     return SP_APP_ERR;
   }

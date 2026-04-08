@@ -20,8 +20,6 @@ static spn_tcc_symbol_t spn_tcc_symbol_table[] = {
   SPN_DEFINE_LIB_ENTRY(spn_get_dep)
   SPN_DEFINE_LIB_ENTRY(spn_get_dir)
   SPN_DEFINE_LIB_ENTRY(spn_get_subdir)
-  SPN_DEFINE_LIB_ENTRY(spn_add_exe)
-  SPN_DEFINE_LIB_ENTRY(spn_add_test)
   SPN_DEFINE_LIB_ENTRY(spn_add_include)
   SPN_DEFINE_LIB_ENTRY(spn_add_define)
   SPN_DEFINE_LIB_ENTRY(spn_add_system_dep)

@@ -17,14 +17,12 @@ typedef struct {
   spn_semver_t version;
   struct {
     sp_da(sp_str_t) system;
-    sp_da(spn_pkg_req_t) pkg;
+    sp_da(spn_requested_pkg_t) pkg;
   } deps;
 } spn_resolve_node_t;
 
 typedef struct {
-  spn_pkg_t* pkg;
   spn_index_rel_t* release;
-  spn_pkg_kind_t kind;
   spn_semver_t version;
 } spn_resolved_pkg_t;
 
@@ -38,7 +36,8 @@ typedef struct spn_resolver_t {
   sp_str_ht(spn_resolved_pkg_t) resolved;
   sp_da(sp_str_t) system_deps;
   sp_da(sp_str_t) resolution_order;
-  sp_da(spn_pkg_req_t) reqs;
+  sp_da(spn_requested_pkg_t) reqs;
+  sp_tm_timer_t timer;
 } spn_resolver_t;
 
 #endif

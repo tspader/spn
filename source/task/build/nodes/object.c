@@ -22,20 +22,24 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   sp_fs_create_dir(dir);
 
   spn_cc_t* cc = sp_alloc_type(spn_cc_t);
-  spn_cc_set_profile(cc, unit->profile);
+  spn_cc_set_profile(cc, session->profile);
   spn_cc_set_output_dir(cc, dir);
   spn_cc_set_toolchain(cc, unit->session->toolchain);
-  add_pkg_to_cc(cc, unit->pkg);
+  add_pkg_to_cc(cc, unit->package->pkg);
 
   spn_cc_target_t* target = spn_cc_add_target(cc, SPN_TARGET_OBJECT, file);
-  add_pkg_to_cc_target(target, unit->pkg, unit->target->info);
-  add_deps_to_cc_target(target, unit->pkg, unit->target->info, unit->session);
+  add_pkg_to_cc_target(target, unit->package, unit->target->info);
+
+  // Add the include paths for your dependencies. Save the linker flags for linking.
+
+  // unit->target->deps
+  //add_deps_to_cc_target(target, unit->pkg, unit->target->info, unit->session);
 
   if (!sp_da_empty(unit->target->info->embed)) {
     spn_cc_target_add_absolute_include(target, unit->target->paths.generated);
   }
 
-  spn_cc_target_add_absolute_source(target, unit->paths.source);
+  spn_cc_target_add_absolute_source(target, unit->paths.file);
 
   // Convert it into a subprocess
   sp_ps_config_t config = {
@@ -54,10 +58,10 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   u64 elapsed = sp_tm_read_timer(&timer);
 
   if (result.status.exit_code) {
-    spn_event_buffer_push_ex(session->events, unit->pkg, &unit->target->logs, (spn_build_event_t) {
+    spn_event_buffer_push_ex(session->events, unit->package->pkg, &unit->target->logs, (spn_build_event_t) {
       .kind = SPN_EVENT_TARGET_BUILD_FAILED,
       .target.failed = {
-        .source_file = unit->paths.source,
+        .source_file = unit->paths.file,
         .object_file = unit->paths.object,
         .rc = result.status.exit_code,
         .out = result.err,
@@ -66,10 +70,10 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
       }
     });
   } else {
-    spn_event_buffer_push_ex(session->events, unit->pkg, &unit->target->logs, (spn_build_event_t) {
+    spn_event_buffer_push_ex(session->events, unit->package->pkg, &unit->target->logs, (spn_build_event_t) {
       .kind = SPN_EVENT_TARGET_BUILD_PASSED,
       .target.passed = {
-        .source_file = unit->paths.source,
+        .source_file = unit->paths.file,
         .object_file = unit->paths.object,
         .time = elapsed
       }

@@ -5,8 +5,6 @@
 #include "log/types.h"
 #include "unit/types.h"
 
-spn_build_ctx_t spn_build_ctx_make(spn_build_ctx_config_t cfg);
-void spn_build_ctx_init(spn_build_ctx_t* ctx, spn_build_ctx_config_t cfg);
 void spn_build_ctx_log(spn_build_io_t* logs, sp_str_t message);
 void spn_build_ctx_log_ex(spn_build_io_t* logs, spn_log_level_t level, u64 thread_id, sp_str_t source, sp_str_t message);
 sp_str_t spn_build_ctx_resolve_dir(const spn_build_ctx_t* ctx, spn_pkg_dir_t kind, sp_str_t sub);

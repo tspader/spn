@@ -38,7 +38,7 @@ typedef struct spn_pkg_req {
     spn_semver_range_t range;
     sp_str_t file;
   };
-} spn_pkg_req_t;
+} spn_requested_pkg_t;
 
 struct spn_pkg {
   sp_str_t namespace;
@@ -55,7 +55,7 @@ struct spn_pkg {
   sp_om(spn_target_t) tests;
   sp_om(spn_profile_info_t) profiles;
   sp_om(spn_index_t) indexes;
-  sp_ht(sp_str_t, spn_pkg_req_t) deps;
+  sp_ht(sp_str_t, spn_requested_pkg_t) deps;
   sp_ht(sp_str_t, spn_dep_option_t) options;
   sp_ht(sp_str_t, spn_dep_options_t) config;
   sp_ht(spn_semver_t, spn_pkg_metadata_t) metadata;
@@ -63,21 +63,9 @@ struct spn_pkg {
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) system_deps;
-  spn_pkg_kind_t kind;
   sp_om(spn_toolchain_entry_t) toolchains;
 
   sp_mem_arena_t* arena;
-
-  struct {
-    sp_str_t root;
-    sp_str_t manifest;
-    sp_str_t script;
-    struct {
-      sp_str_t source;
-      sp_str_t work;
-      sp_str_t store;
-    } cache;
-  } paths;
 };
 
 typedef sp_str_ht(sp_str_t) spn_pkg_registry_t;
