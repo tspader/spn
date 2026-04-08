@@ -1,7 +1,7 @@
 #ifndef SPN_SESSION_SESSION_H
 #define SPN_SESSION_SESSION_H
 
-#include "err.h"
+#include "error/types.h"
 #include "pkg/types.h"
 #include "session/types.h"
 

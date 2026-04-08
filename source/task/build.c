@@ -5,7 +5,7 @@
 #include "unit/types.h"
 
 #include "app/app.h"
-#include "err.h"
+#include "error/types.h"
 #include "graph/graph.h"
 #include "event/event.h"
 #include "session/session.h"

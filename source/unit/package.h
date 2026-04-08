@@ -1,7 +1,7 @@
 #ifndef SPN_UNIT_PACKAGE_H
 #define SPN_UNIT_PACKAGE_H
 
-#include "err.h"
+#include "error/types.h"
 #include "unit/types.h"
 
 void               spn_pkg_unit_write_stamp(spn_pkg_unit_t* ctx, sp_str_t path);

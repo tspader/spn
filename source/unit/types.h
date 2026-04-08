@@ -82,19 +82,6 @@ typedef struct spn_build_io_t {
   sp_io_writer_t jsonl;
 } spn_build_io_t;
 
-struct spn_build_ctx {
-  sp_str_t name;
-  spn_session_t* session;
-  spn_pkg_t* pkg;
-  spn_linkage_t linkage;
-  spn_build_paths_t paths;
-  spn_build_io_t logs;
-  sp_mem_arena_t* arena;
-  sp_str_t error;
-  sp_da(sp_ps_config_t) commands;
-  sp_ps_t ps;
-};
-
 typedef struct {
   sp_str_t name;
   spn_target_unit_t* target;

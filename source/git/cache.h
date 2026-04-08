@@ -2,7 +2,7 @@
 #define SPN_GIT_CACHE_H
 
 #include "git/types.h"
-#include "err.h"
+#include "error/types.h"
 
 void      spn_git_cache_init(spn_git_cache_t* cache, sp_str_t root);
 spn_err_t spn_git_cache_ensure_db(spn_git_cache_t* cache, sp_str_t url, spn_git_db_t** db);

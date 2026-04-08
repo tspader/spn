@@ -1,13 +1,12 @@
 #include "make.h"
 
-#include "unit/build.h"
 
-s32 spn_make(spn_build_ctx_t* build) {
+s32 spn_make(spn_t* build) {
   spn_make_t* make = spn_make_new(build);
   return spn_make_run(make);
 }
 
-spn_make_t* spn_make_new(spn_build_ctx_t* build) {
+spn_make_t* spn_make_new(spn_t* build) {
   spn_make_t* make = SP_ALLOC(spn_make_t);
   make->build = build;
   return make;

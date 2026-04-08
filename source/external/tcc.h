@@ -2,7 +2,7 @@
 #define SPN_EXTERNAL_TCC_H
 
 #include "sp.h"
-#include "err.h"
+#include "error/types.h"
 #include "external/tcc/types.h"
 
 spn_err_t spn_tcc_prepare_script(spn_tcc_t* tcc, spn_tcc_err_ctx_t* error_context);

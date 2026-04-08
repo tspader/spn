@@ -433,83 +433,74 @@ add_custom_target(spn_embed ALL
 ###############
 set(SPN_SOURCES
   source/api.c
-  source/intern.c
-  source/signal.c
-  source/spn.c
+  source/api/autoconf/autoconf.c
+  source/api/cmake/cmake.c
+  source/api/make/make.c
   source/app/app.c
-  source/event/event.c
-  source/event/log.c
-  source/unit/build.c
-  source/unit/package.c
-  source/graph/graph.c
-  source/tui/tui.c
-  source/tui/table.c
-  source/tui/spinner.c
-  source/ctx/ctx.c
-  source/session/session.c
-  source/log/log.c
-  source/enum/enum.c
-  source/index/index.c
-  source/pkg/load.c
-  source/pkg/mutate.c
-  source/pkg/pkg.c
-  source/lock/lock.c
-  source/profile/profile.c
-  source/cli/cli.c
-  source/cli/init.c
   source/cli/add.c
   source/cli/build.c
-  source/cli/run.c
-  source/cli/test.c
   source/cli/clean.c
+  source/cli/cli.c
   source/cli/copy.c
   source/cli/generate.c
   source/cli/graph.c
+  source/cli/init.c
   source/cli/list.c
   source/cli/ls.c
   source/cli/manifest.c
-  source/cli/which.c
-  source/cli/update.c
-  source/cli/tool.c
   source/cli/publish.c
-  source/gen.c
-  source/filter/filter.c
-  source/resolve/resolve.c
-  source/sp/terminal.c
-  source/external/autoconf.c
+  source/cli/run.c
+  source/cli/test.c
+  source/cli/tool.c
+  source/cli/update.c
+  source/cli/which.c
+  source/ctx/ctx.c
+  source/enum/enum.c
+  source/event/event.c
+  source/event/log.c
   source/external/cc.c
-  source/external/obj.c
   source/external/cJSON.c
-  source/external/cmake.c
   source/external/git.c
-  source/external/make.c
-  source/git/cache.c
-  source/git/key.c
   source/external/mz.c
+  source/external/obj.c
   source/external/tcc.c
   source/external/tom.c
+  source/filter/filter.c
+  source/gen.c
+  source/git/cache.c
+  source/git/key.c
+  source/graph/graph.c
   source/index/cache.c
   source/index/index.c
   source/index/json.c
   source/index/publish.c
+  source/intern.c
+  source/lock/lock.c
+  source/log/log.c
+  source/pkg/id.c
   source/pkg/load.c
   source/pkg/mutate.c
   source/pkg/pkg.c
-  source/pkg/id.c
+  source/profile/profile.c
   source/resolve/resolve.c
   source/semver/compare.c
   source/semver/convert.c
   source/semver/parser.c
+  source/session/session.c
+  source/signal.c
   source/sp/cli.c
-  source/sp/it.c
-  source/sp/tm.c
-  source/sp/str.c
   source/sp/color.c
   source/sp/io.c
+  source/sp/it.c
   source/sp/os.c
   source/sp/ps.c
-  source/target/target.c
+  source/sp/str.c
+  source/sp/terminal.c
+  source/sp/tm.c
+  source/spn.c
   source/target/mutate.c
+  source/target/target.c
+  source/task/build.c
   source/task/build/build.c
   source/task/build/nodes/embed.c
   source/task/build/nodes/link.c
@@ -517,10 +508,9 @@ set(SPN_SOURCES
   source/task/build/nodes/package.c
   source/task/build/nodes/stamp.c
   source/task/build/nodes/user.c
-  source/task/build.c
   source/task/configure.c
-  source/task/graph.c
   source/task/generate.c
+  source/task/graph.c
   source/task/resolve.c
   source/task/sync.c
   source/task/task.c
@@ -528,6 +518,10 @@ set(SPN_SOURCES
   source/task/which.c
   source/toolchain/toolchain.c
   source/triple/triple.c
+  source/tui/spinner.c
+  source/tui/table.c
+  source/tui/tui.c
+  source/unit/package.c
 )
 
 add_executable(spn ${SPN_SOURCES})

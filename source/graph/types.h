@@ -2,7 +2,7 @@
 #define SPN_GRAPH_TYPES_H
 
 #include "sp.h"
-#include "err.h"
+#include "error/types.h"
 
 typedef struct {
   u32 index;

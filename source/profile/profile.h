@@ -1,7 +1,8 @@
 #ifndef SPN_PROFILE_PROFILE_H
 #define SPN_PROFILE_PROFILE_H
 
-#include "err.h"
+#include "error/types.h"
+#include "forward/types.h"
 #include "profile/types.h"
 
 void      spn_profile_overlay(spn_profile_info_t* dst, spn_profile_info_t* src);

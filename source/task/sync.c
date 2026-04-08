@@ -2,7 +2,7 @@
 #include "app/types.h"
 #include "ctx/ctx.h"
 #include "ctx/types.h"
-#include "err.h"
+#include "error/types.h"
 #include "event/event.h"
 #include "git/cache.h"
 #include "index/types.h"

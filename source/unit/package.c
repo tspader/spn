@@ -2,7 +2,7 @@
 
 #include "app/app.h"
 #include "ctx/ctx.h"
-#include "err.h"
+#include "error/types.h"
 #include "event/event.h"
 #include "external/cc.h"
 #include "external/git.h"
@@ -10,7 +10,6 @@
 #include "log/log.h"
 #include "pkg/pkg.h"
 #include "target/target.h"
-#include "unit/build.h"
 #include "unit/types.h"
 
 #include <setjmp.h>

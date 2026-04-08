@@ -3,7 +3,7 @@
 
 #include "app/types.h"
 #include "cli/types.h"
-#include "err.h"
+#include "error/types.h"
 
 #define SPN_CLI_UNIMPLEMENTED() SP_LOG("unimplemented"); return SP_APP_ERR;
 

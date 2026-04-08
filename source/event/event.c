@@ -1,7 +1,5 @@
 #include "event/event.h"
 
-// @spader
-// We'll just put this in sp.h upstream
 #if defined(SP_POSIX)
   #include <pthread.h>
 #endif
@@ -20,32 +18,10 @@ static u64 spn_current_thread_id(void) {
 #endif
 }
 
-void spn_build_event_init(spn_build_event_t* event, spn_build_event_kind_t kind, spn_build_ctx_t* ctx) {
-  event->kind = kind;
-  event->pkg = ctx->pkg;
-  event->io = &ctx->logs;
-}
-
-spn_build_event_t spn_build_event_make(spn_build_ctx_t* ctx, spn_build_event_kind_t kind) {
-  spn_build_event_t event = SP_ZERO_INITIALIZE();
-  spn_build_event_init(&event, kind, ctx);
-  return event;
-}
-
 spn_event_buffer_t* spn_event_buffer_new() {
   spn_event_buffer_t* events = SP_ALLOC(spn_event_buffer_t);
   sp_mutex_init(&events->mutex, SP_MUTEX_PLAIN);
   return events;
-}
-
-void spn_event_buffer_push_kind(spn_event_buffer_t* events, spn_build_ctx_t* ctx, spn_build_event_kind_t kind) {
-  spn_event_buffer_push_ctx(events, ctx, spn_build_event_make(ctx, kind));
-}
-
-void spn_event_buffer_push_ctx(spn_event_buffer_t* events, spn_build_ctx_t* ctx, spn_build_event_t config) {
-  spn_build_event_t event = config;
-  spn_build_event_init(&event, event.kind, ctx);
-  spn_event_buffer_push(events, event);
 }
 
 void spn_event_buffer_push_ex(spn_event_buffer_t* events, spn_pkg_t* pkg, spn_build_io_t* io, spn_build_event_t e) {

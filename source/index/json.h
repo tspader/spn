@@ -1,7 +1,7 @@
 #ifndef SPN_INDEX_JSON_H
 #define SPN_INDEX_JSON_H
 
-#include "err.h"
+#include "error/types.h"
 #include "index/types.h"
 
 mz_schema_t* spn_index_build_schema(mz_ctx_t* ctx);

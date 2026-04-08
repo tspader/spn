@@ -1,6 +1,7 @@
 #ifndef SPN_TARGET_MUTATE_H
 #define SPN_TARGET_MUTATE_H
 
+#include "forward/types.h"
 #include "target/types.h"
 
 void spn_target_add_source(spn_target_t* target, const c8* source);

@@ -2,8 +2,8 @@
 #define SPN_PKG_TYPES_H
 
 #include "sp.h"
-#include "spn.h"
 
+#include "forward/types.h"
 #include "ordered_map.h"
 #include "option/types.h"
 #include "profile/types.h"

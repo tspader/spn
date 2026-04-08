@@ -4,7 +4,7 @@
 #include "sp.h"
 #include "sp/coff.h"
 #include "sp/sp_elf.h"
-#include "err.h"
+#include "error/types.h"
 
 typedef enum {
   SPN_OBJ_COFF,

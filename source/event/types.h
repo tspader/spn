@@ -1,9 +1,11 @@
 #ifndef SPN_EVENT_TYPES_H
 #define SPN_EVENT_TYPES_H
 
-#include "err.h"
-#include "pkg/types.h"
 #include "sp.h"
+
+#include "error/types.h"
+#include "forward/types.h"
+#include "pkg/types.h"
 #include "resolve/types.h"
 #include "unit/types.h"
 

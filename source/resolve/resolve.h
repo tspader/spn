@@ -1,7 +1,7 @@
 #ifndef SPN_RESOLVE_RESOLVE_H
 #define SPN_RESOLVE_RESOLVE_H
 
-#include "err.h"
+#include "error/types.h"
 #include "lock/types.h"
 #include "resolve/types.h"
 

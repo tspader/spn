@@ -10,7 +10,7 @@
 #include "index/types.h"
 #include "sp/macro.h"
 
-#include "err.h"
+#include "error/types.h"
 #include "event/event.h"
 #include "index/cache.h"
 #include "pkg/id.h"

@@ -1,4 +1,4 @@
-#include "err.h"
+#include "error/types.h"
 #include "index/types.h"
 #include "pkg/types.h"
 #include "profile/types.h"
@@ -142,7 +142,6 @@ spn_target_t* spn_pkg_add_exe_ex(spn_pkg_t* pkg, sp_str_t name) {
   spn_target_t exe = {
     .name = spn_intern(name),
     .kind = SPN_TARGET_EXE,
-    .pkg = pkg,
     .visibility = SPN_VISIBILITY_PUBLIC,
   };
   sp_om_insert(pkg->exes, exe.name, exe);
@@ -157,7 +156,6 @@ spn_target_t* spn_pkg_add_script_ex(spn_pkg_t* pkg, sp_str_t name) {
   spn_target_t script = {
     .name = spn_intern(name),
     .kind = SPN_TARGET_EXE,
-    .pkg = pkg,
     .visibility = SPN_VISIBILITY_SCRIPT,
   };
   sp_om_insert(pkg->scripts, script.name, script);
@@ -172,7 +170,6 @@ spn_target_t* spn_pkg_add_test_ex(spn_pkg_t* pkg, sp_str_t name) {
   spn_target_t test = {
     .name = spn_intern(name),
     .kind = SPN_TARGET_EXE,
-    .pkg = pkg,
     .visibility = SPN_VISIBILITY_TEST,
   };
   sp_om_insert(pkg->tests, test.name, test);
@@ -202,7 +199,6 @@ spn_target_t* spn_pkg_add_lib_ex(spn_pkg_t* pkg, sp_str_t name, spn_linkage_t ki
     .name = spn_intern(name),
     .kind = target_kind,
     .linkages = SP_ZERO_INITIALIZE(),
-    .pkg = pkg,
     .visibility = SPN_VISIBILITY_PUBLIC,
   };
   spn_linkage_set_add(&lib.linkages, kind);

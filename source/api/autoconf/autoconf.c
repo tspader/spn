@@ -1,15 +1,14 @@
-#include "autoconf.h"
-
+#include "api/autoconf/autoconf.h"
+#include "api/types.h"
 #include "session/types.h"
 #include "triple/triple.h"
-#include "unit/build.h"
 
-s32 spn_autoconf(spn_build_ctx_t* build) {
+s32 spn_autoconf(spn_t* build) {
   spn_autoconf_t* autoconf = spn_autoconf_new(build);
   return spn_autoconf_run(autoconf);
 }
 
-spn_autoconf_t* spn_autoconf_new(spn_build_ctx_t* build) {
+spn_autoconf_t* spn_autoconf_new(spn_t* build) {
   spn_autoconf_t* autoconf = SP_ALLOC(spn_autoconf_t);
   // autoconf->build = build;
   return autoconf;

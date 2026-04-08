@@ -15,7 +15,5 @@ sp_str_t spn_ctx_source_cache_root(void);
 sp_str_t spn_ctx_build_cache_root(void);
 sp_str_t spn_ctx_store_cache_root(void);
 sp_str_t spn_ctx_project_root(void);
-sp_da(spn_build_ctx_t*) spn_ctx_all_build_contexts(void);
-void spn_ctx_push_target_source_event(spn_target_t* target, sp_str_t source);
 
 #endif

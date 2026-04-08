@@ -2,7 +2,7 @@
 #define SPN_PKG_PKG_H
 
 #include "enum/enum.h"
-#include "err.h"
+#include "error/types.h"
 #include "pkg/types.h"
 
 spn_pkg_t spn_pkg_new(sp_str_t name);

@@ -4,6 +4,8 @@
 #include "sp.h"
 #include "spn.h"
 
+#include "forward/types.h"
+
 #define SP_EMBED_DEFAULT_SYMBOL_S sp_str_lit("")
 #define SP_EMBED_DEFAULT_DATA_T_S sp_str_lit("")
 #define SP_EMBED_DEFAULT_SIZE_T_S sp_str_lit("")
@@ -50,7 +52,6 @@ struct spn_target {
   sp_str_t name;
   spn_target_kind_t kind; // @spader @nuke
   spn_linkage_set_t linkages;
-  spn_pkg_t* pkg;
   spn_visibility_t visibility;
   sp_da(sp_str_t) source;
   sp_da(sp_str_t) include;

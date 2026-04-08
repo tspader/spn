@@ -2,8 +2,9 @@
 #define SPN_PUBLISH_H
 
 #include "sp.h"
-#include "spn.h"
-#include "err.h"
+
+#include "error/types.h"
+#include "forward/types.h"
 
 typedef struct {
   sp_str_t cwd;

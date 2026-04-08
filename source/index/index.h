@@ -1,7 +1,7 @@
 #ifndef SPN_INDEX_INDEX_H
 #define SPN_INDEX_INDEX_H
 
-#include "err.h"
+#include "error/types.h"
 #include "index/types.h"
 
 void             spn_index_init(spn_index_t* index);

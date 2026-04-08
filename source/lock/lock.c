@@ -1,5 +1,5 @@
 #include "enum/enum.h"
-#include "err.h"
+#include "error/types.h"
 #include "event/event.h"
 #include "external/tom.h"
 #include "lock/lock.h"

@@ -1,6 +1,6 @@
 #include "sp.h"
 
-#include "err.h"
+#include "error/types.h"
 #include "index/types.h"
 
 #include "external/git.h"
