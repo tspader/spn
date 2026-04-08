@@ -43,11 +43,8 @@ typedef struct {
 typedef struct {
   sp_str_t repo;
   struct {
-    struct {
-      sp_str_t fixtures;
-      sp_str_t dir;
-    } resolver;
     sp_str_t dir;
+    sp_str_t fixtures;
   } test;
 } ctx_paths_t;
 

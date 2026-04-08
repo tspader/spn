@@ -21,8 +21,7 @@ ctx_paths_t ctx_get_paths(ctx_t* ctx) {
   }
 
   paths.test.dir = sp_fs_join_path(paths.repo, strl("test"));
-  paths.test.resolver.dir = sp_fs_join_path(paths.test.dir, strl("core/resolver"));
-  paths.test.resolver.fixtures = sp_fs_join_path(paths.test.resolver.dir, strl("fixtures"));
+  paths.test.fixtures = sp_fs_join_path(paths.test.dir, strl("fixtures"));
 
   return paths;
 }

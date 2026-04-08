@@ -61,7 +61,7 @@ typedef struct {
 } target_t;
 
 typedef struct {
-  const c8* manifest [64];
+  const c8* fixture;
   const c8* namespace;
   const c8* name;
   spn_semver_t version;
@@ -72,20 +72,10 @@ typedef struct {
 } test_t;
 
 void run_case(s32* utest_result, test_t test) {
-  tmpfs_t* fs = &ctx_get()->fs;
+  ctx_paths_t paths = ctx_get_paths(ctx_get());
+  sp_str_t dir = sp_fs_join_path(paths.test.fixtures, sp_str_lit("manifest"));
+  sp_str_t path = sp_fs_join_path(dir, sp_str_view(test.fixture));
 
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
-  sp_for(it, sp_carr_len(test.manifest)) {
-    const c8* line = test.manifest[it];
-    if (!line) break;
-
-    sp_str_builder_append(&builder, sp_str_view(line));
-    sp_str_builder_new_line(&builder);
-  }
-
-  tmpfs_create(fs, sp_str_lit("spn.toml"),  sp_str_builder_to_str(&builder));
-
-  sp_str_t path = tmpfs_get(fs, sp_str_lit("spn.toml"));
   spn_pkg_info_t pkg = SP_ZERO_INITIALIZE();
   spn_err_union_t err = spn_pkg_load(&pkg, path);
 
@@ -197,59 +187,16 @@ void run_case(s32* utest_result, test_t test) {
 
 UTEST(load, smoke) {
   run_case(utest_result, (test_t) {
-    .manifest = {
-      "[package]",
-      tkv(namespace, "spn"),
-      tkv(name, "test"),
-      tkv(version, "1.0.0")
-    },
+    .fixture = "smoke.toml",
     .namespace = "spn",
     .name = "test",
-    .version = spn_semver_lit(1, 0, 0)
+    .version = spn_semver_lit(1, 0, 0),
   });
 }
 
 UTEST(load, toolchain) {
   run_case(utest_result, (test_t) {
-    .manifest = {
-      "[package]",
-      tkv(namespace, "core"),
-      tkv(name, "zig"),
-      tkv(version, "1.0.0"),
-      "",
-      "[[toolchain]]",
-      tkv(name, "x86_64-linux"),
-      tkv(url, "https://example.com/toolchain.tar.gz"),
-      tkv(compiler, "cc"),
-      tkv(linker, "ld"),
-      tkv(archiver, "ar"),
-      tkv(driver, "gcc"),
-      tkv(export, true),
-      "",
-      "[[toolchain.host]]",
-      tkv(arch, "x86_64"),
-      tkv(os, "linux"),
-      tkv(abi, "gnu"),
-      "",
-      "[[toolchain.host]]",
-      tkv(arch, "x86_64"),
-      tkv(os, "linux"),
-      tkv(abi, "musl"),
-      "",
-      "[[toolchain.target]]",
-      tkv(arch, "aarch64"),
-      tkv(os, "linux"),
-      tkv(abi, "gnu"),
-      "",
-      "[[toolchain.target]]",
-      tkv(arch, "aarch64"),
-      tkv(os, "macos"),
-      "",
-      "[[toolchain.target]]",
-      tkv(arch, "x86_64"),
-      tkv(os, "windows"),
-      tkv(abi, "mingw"),
-    },
+    .fixture = "toolchain.toml",
     .toolchains = {
       {
         .name = "x86_64-w64-mingw32-cross",
@@ -262,28 +209,15 @@ UTEST(load, toolchain) {
           { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU },
           { SPN_ARCH_ARM64, SPN_OS_MACOS, },
           { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_MINGW },
-        }
-      }
-    }
+        },
+      },
+    },
   });
 }
 
 UTEST(load, profile) {
   run_case(utest_result, (test_t) {
-    .manifest = {
-      "[package]",
-      tkv(name, "spum"),
-      tkv(version, "1.0.0"),
-      "",
-      "[profile.default]",
-      tkv(toolchain, "zig"),
-      tkv(linkage, "static"),
-      tkv(standard, "c99"),
-      tkv(mode, "debug"),
-      "",
-      "[profile.shared]",
-      tkv(linkage, "shared"),
-    },
+    .fixture = "profile.toml",
     .profiles = {
       { "default", "zig", SPN_LIB_KIND_STATIC, SPN_C99, SPN_BUILD_MODE_DEBUG },
       { "shared", "", SPN_LIB_KIND_SHARED, SPN_C_STANDARD_NONE, SPN_BUILD_MODE_NONE },
@@ -293,29 +227,7 @@ UTEST(load, profile) {
 
 UTEST(load, target_deps) {
   run_case(utest_result, (test_t) {
-    .manifest = {
-      "[package]",
-      tkv(name, "test"),
-      tkv(version, "1.0.0"),
-      "",
-      "[[lib]]",
-      tkv(name, "spum"),
-      tk(kinds) "["
-        q("static")
-      "]",
-      tk(source) "["
-        q("spum.c")
-      "]",
-      "",
-      "[[bin]]",
-      tkv(name, "main"),
-      tk(source) "["
-        q("main.c")
-      "]",
-      tk(deps) "["
-        q("spum")
-      "]",
-    },
+    .fixture = "target_deps.toml",
     .name = "test",
     .exes = {
       { .name = "main", .deps = { "spum" } },

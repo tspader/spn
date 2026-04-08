@@ -1,0 +1,12 @@
+[package]
+name = "spum"
+version = "1.0.0"
+
+[profile.default]
+toolchain = "zig"
+linkage = "static"
+standard = "c99"
+mode = "debug"
+
+[profile.shared]
+linkage = "shared"

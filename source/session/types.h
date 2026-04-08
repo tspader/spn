@@ -23,15 +23,6 @@ typedef struct {
   spn_bg_executor_t *executor;
 } spn_bg_ctx_t;
 
-typedef struct spn_toolchain {
-  spn_toolchain_kind_t source;
-  spn_toolchain_info_t info;
-  spn_toolchain_launcher_t compiler;
-  spn_toolchain_launcher_t linker;
-  spn_toolchain_launcher_t archiver;
-  spn_pkg_info_t* pkg;
-} spn_toolchain_t;
-
 typedef struct {
   spn_pkg_kind_t kind;
   spn_pkg_info_t* info;
