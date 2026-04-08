@@ -31,7 +31,7 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
   spn_session_t* s = target->session;
   spn_target_info_t* info = target->info;
   spn_pkg_info_t* pkg = target->pkg;
-  spn_cc_driver_t driver = cc->cc->toolchain.info.driver;
+  spn_cc_driver_t driver = cc->cc->driver;
 
   sp_da_for(pkg->system_deps, i) {
     spn_cc_target_add_lib(cc, spn_gen_format_entry(pkg->system_deps[i], SPN_GEN_SYSTEM_LIBS, driver));

@@ -15,7 +15,7 @@ typedef struct {
 } ar_result_t;
 
 ar_result_t archive_objects(spn_target_unit_t* unit, sp_str_t output) {
-  spn_toolchain_t* toolchain = &unit->session->toolchain;
+  spn_toolchain_unit_t* toolchain = unit->session->units.toolchain;
   sp_ps_config_t ps = {
     .command = toolchain->archiver.program,
     .cwd = unit->paths.work,
@@ -101,7 +101,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
           .kind = info->kind,
           .num_objects = sp_da_size(target->objects),
           .output_path = output,
-          .linker = target->session->toolchain.archiver.program,
+          .linker = target->session->units.toolchain->archiver.program,
           .args = run.args,
           .has_embeds = has_embeds,
         }
@@ -120,7 +120,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
       spn_cc_t* cc = sp_alloc_type(spn_cc_t);
       spn_cc_set_profile(cc, target->session->profile);
       spn_cc_set_output_dir(cc, sp_fs_parent_path(output));
-      spn_cc_set_toolchain(cc, target->session->toolchain);
+      spn_cc_set_toolchain(cc, target->session->units.toolchain);
       add_pkg_to_cc(cc, target->pkg);
 
       spn_cc_target_t* cc_target = spn_cc_add_target(cc, info->kind, output_name);

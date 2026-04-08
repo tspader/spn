@@ -8,6 +8,7 @@
 #include "target/types.h"
 
 #include "external/obj.h"
+#include "toolchain/types.h"
 
 typedef struct {
   sp_str_t name;
@@ -64,7 +65,10 @@ typedef struct {
 } spn_cc_target_t;
 
 struct spn_cc {
-  spn_toolchain_t toolchain;
+  spn_toolchain_launcher_t compiler;
+  spn_toolchain_launcher_t linker;
+  spn_toolchain_launcher_t archiver;
+  spn_cc_driver_t driver;
   spn_os_t os;
   spn_arch_t arch;
   spn_abi_t abi;
@@ -79,7 +83,7 @@ struct spn_cc {
   sp_ps_config_t config;
 };
 
-void             spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_t toolchain);
+void             spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_unit_t* toolchain);
 void             spn_cc_set_profile(spn_cc_t* cc, spn_profile_info_t profile);
 void             spn_cc_set_output_dir(spn_cc_t* cc, sp_str_t dir);
 void             spn_cc_add_include(spn_cc_t* cc, sp_str_t dir);

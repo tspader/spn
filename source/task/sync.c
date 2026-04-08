@@ -141,8 +141,8 @@ spn_err_t load_index_packages(spn_session_t* session, spn_resolver_t* resolver) 
     }
 
     loaded->kind = SPN_PACKAGE_KIND_INDEX;
-    loaded->pkg = sp_alloc_type(spn_pkg_info_t);
-    spn_pkg_load(loaded->pkg, loaded->paths.manifest);
+    loaded->info = sp_alloc_type(spn_pkg_info_t);
+    spn_pkg_load(loaded->info, loaded->paths.manifest);
 
     loaded->elapsed = sp_tm_read_timer(&timer);
   }
@@ -179,8 +179,8 @@ spn_err_t load_file_packages(spn_session_t* session, spn_pkg_info_t* pkg) {
     spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, *it.key);
 
     loaded->kind = SPN_PACKAGE_KIND_FILE;
-    loaded->pkg = sp_alloc_type(spn_pkg_info_t);
-    spn_pkg_load(loaded->pkg, manifest);
+    loaded->info = sp_alloc_type(spn_pkg_info_t);
+    spn_pkg_load(loaded->info, manifest);
   }
 
   return SPN_OK;
@@ -190,7 +190,7 @@ spn_err_t load_root_package(spn_session_t* session, spn_pkg_info_t* pkg) {
   sp_str_ht_insert(session->packages, pkg->name, sp_zero_struct(spn_loaded_pkg_t));
   spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, pkg->name);
 
-  loaded->pkg = pkg;
+  loaded->info = pkg;
   loaded->kind = SPN_PACKAGE_KIND_ROOT;
   loaded->paths.manifest = spn.paths.manifest;
   loaded->paths.script = sp_fs_join_path(spn.paths.project, sp_str_lit("spn.c"));
@@ -237,6 +237,10 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   spn_toolchain_entry_t* entry = sp_str_ht_get(session->toolchains, session->profile.toolchain);
   sp_assert(entry);
 
+  session->units.toolchain = sp_alloc_type(spn_toolchain_unit_t);
+  spn_toolchain_unit_t* toolchain = session->units.toolchain;
+  toolchain->session = session;
+
   if (entry->kind == SPN_TOOLCHAIN_INLINE) {
     if (!match_toolchain(entry, host, target)) {
       spn_log_error(
@@ -248,48 +252,29 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
       return SPN_TASK_ERROR;
     }
 
-    session->toolchain.source = SPN_TOOLCHAIN_INLINE;
-    session->toolchain.info = entry->info;
-    session->toolchain.compiler = session->toolchain.info.compiler;
-    session->toolchain.linker = session->toolchain.info.linker;
-    session->toolchain.archiver = session->toolchain.info.archiver;
-    session->toolchain.pkg = session->pkg;
+    toolchain->source = SPN_TOOLCHAIN_INLINE;
+    toolchain->pkg = session->pkg;
   }
   else if (entry->kind == SPN_TOOLCHAIN_BUILTIN) {
-    session->toolchain.source = SPN_TOOLCHAIN_BUILTIN;
-    session->toolchain.info = entry->info;
-    session->toolchain.compiler = session->toolchain.info.compiler;
-    session->toolchain.linker = session->toolchain.info.linker;
-    session->toolchain.archiver = session->toolchain.info.archiver;
-    session->toolchain.pkg = session->pkg;
+    toolchain->source = SPN_TOOLCHAIN_BUILTIN;
+    toolchain->pkg = session->pkg;
   }
   else if (entry->kind == SPN_TOOLCHAIN_INDEX) {
-    spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, entry->request.package);
-    sp_assert(loaded);
+    spn_loaded_pkg_t* pkg = sp_str_ht_get(session->packages, entry->request.package);
+    sp_assert(pkg);
 
-    spn_toolchain_entry_t* toolchain = find_toolchain(loaded->pkg, host, target);
-    sp_assert(toolchain->kind == SPN_TOOLCHAIN_INDEX);
-    if (!toolchain) {
-      log_toolchain_error(loaded->pkg, host, target);
+    entry = find_toolchain(pkg->info, host, target);
+    if (!entry) {
+      log_toolchain_error(pkg->info, host, target);
       return SPN_TASK_ERROR;
     }
+    sp_assert(entry->kind == SPN_TOOLCHAIN_INDEX);
 
-    // Add a unit for the data we need to download the tarball
-    if (!sp_str_empty(toolchain->info.url)) {
-      spn_toolchain_unit_t* unit = sp_alloc_type(spn_toolchain_unit_t);
-      unit->session = session;
-      unit->pkg = loaded->pkg;
-      unit->url = toolchain->info.url;
-
-      session->units.toolchain = unit;
-    }
-
-    // Mark down the toolchain for the session; we'll fill in the launchers
-    // once we know where the toolchain's gonna be installed in the store
-    session->toolchain.source = SPN_TOOLCHAIN_INDEX;
-    session->toolchain.info = toolchain->info;
-    session->toolchain.pkg = loaded->pkg;
+    toolchain->source = SPN_TOOLCHAIN_INDEX;
+    toolchain->pkg = pkg->info;
   }
+
+  toolchain->info = entry->info;
 
   add_compilation_units(session);
 
@@ -299,36 +284,45 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   //
   // By setting up the paths here, the toolchain can be downloaded to the package's
   // work dir and decompressed to the store dir with no special paths.
-  if (session->units.toolchain) {
-    spn_toolchain_info_t toolchain = session->toolchain.info;
-    spn_toolchain_unit_t* unit = session->units.toolchain;
-    spn_pkg_unit_t* pkg = sp_om_get(session->units.packages, unit->pkg->qualified);
+  switch (toolchain->source) {
+    case SPN_TOOLCHAIN_BUILTIN:
+    case SPN_TOOLCHAIN_INLINE: {
+      toolchain->compiler = entry->info.compiler;
+      toolchain->linker = entry->info.linker;
+      toolchain->archiver = entry->info.archiver;
+      break;
+    }
+    case SPN_TOOLCHAIN_INDEX: {
+      spn_toolchain_unit_t* unit = session->units.toolchain;
+      spn_pkg_unit_t* pkg = sp_om_get(session->units.packages, unit->pkg->qualified);
 
-    sp_str_t store = pkg->paths.store;
-    sp_str_t work = pkg->paths.work;
+      sp_str_t store = pkg->paths.store;
+      sp_str_t work = pkg->paths.work;
 
-    // These are places in the cache
-    unit->paths.store = store;
-    unit->paths.work = work;
-    unit->paths.stamp = sp_fs_join_path(work, sp_str_lit("download.stamp"));
-    unit->paths.logs.build = sp_fs_join_path(work, sp_str_lit("build.log"));
-    unit->paths.logs.jsonl = sp_fs_join_path(work, sp_str_lit("build.jsonl"));
-    unit->logs.build = sp_io_writer_from_file(unit->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
-    unit->logs.jsonl = sp_io_writer_from_file(unit->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
+      // These are places in the cache
+      unit->paths.store = store;
+      unit->paths.work = work;
+      unit->paths.stamp = sp_fs_join_path(work, sp_str_lit("download.stamp"));
+      unit->paths.logs.build = sp_fs_join_path(work, sp_str_lit("build.log"));
+      unit->paths.logs.jsonl = sp_fs_join_path(work, sp_str_lit("build.jsonl"));
+      unit->logs.build = sp_io_writer_from_file(unit->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
+      unit->logs.jsonl = sp_io_writer_from_file(unit->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
 
-    // These are the paths used to refer to the toolchain during compilation
-    session->toolchain.compiler.program = sp_fs_join_path(store, toolchain.compiler.program);
-    session->toolchain.compiler.args = toolchain.compiler.args;
-    session->toolchain.linker.program = sp_fs_join_path(store, toolchain.linker.program);
-    session->toolchain.linker.args = toolchain.linker.args;
-    session->toolchain.archiver.program = sp_fs_join_path(store, toolchain.archiver.program);
-    session->toolchain.archiver.args = toolchain.archiver.args;
+      // These are the paths used to refer to the toolchain during compilation
+      unit->compiler.program = sp_fs_join_path(store, unit->info.compiler.program);
+      unit->compiler.args = unit->info.compiler.args;
+      unit->linker.program = sp_fs_join_path(store, unit->info.linker.program);
+      unit->linker.args = unit->info.linker.args;
+      unit->archiver.program = sp_fs_join_path(store, unit->info.archiver.program);
+      unit->archiver.args = unit->info.archiver.args;
+      break;
+    }
   }
 
   sp_env_t* env = &session->env;
-  sp_env_insert(env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(session->toolchain.compiler));
-  sp_env_insert(env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(session->toolchain.archiver));
-  sp_env_insert(env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(session->toolchain.linker));
+  sp_env_insert(env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(session->units.toolchain->compiler));
+  sp_env_insert(env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(session->units.toolchain->archiver));
+  sp_env_insert(env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(session->units.toolchain->linker));
 
   return SPN_TASK_CONTINUE;
 }

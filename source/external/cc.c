@@ -8,8 +8,11 @@
 #include "triple/triple.h"
 #include "sp/io.h"
 
-void spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_t toolchain) {
-  cc->toolchain = toolchain;
+void spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_unit_t* toolchain) {
+  cc->driver = toolchain->info.driver;
+  cc->compiler = toolchain->compiler;
+  cc->archiver = toolchain->archiver;
+  cc->linker = toolchain->linker;
 }
 
 void spn_cc_set_profile(spn_cc_t* cc, spn_profile_info_t profile) {
@@ -188,14 +191,14 @@ spn_err_t spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_st
 }
 
 void spn_cc_to_ps(spn_cc_t* cc, sp_ps_config_t* ps) {
-  ps->command = cc->toolchain.compiler.program;
-  sp_da_for(cc->toolchain.compiler.args, ai) {
-    sp_ps_config_add_arg(ps, cc->toolchain.compiler.args[ai]);
+  ps->command = cc->compiler.program;
+  sp_da_for(cc->compiler.args, ai) {
+    sp_ps_config_add_arg(ps, cc->compiler.args[ai]);
   }
 
   // Clang and Zig require an explicit --target flag for cross-compilation.
   // GCC cross-compilers bake the target into the binary name (e.g. x86_64-w64-mingw32-gcc).
-  if (cc->toolchain.info.driver == SPN_CC_DRIVER_CLANG) {
+  if (cc->driver == SPN_CC_DRIVER_CLANG) {
     spn_triple_t target = { cc->arch, cc->os, cc->abi };
     sp_str_t target_str = spn_triple_to_cc_target(target);
     if (!sp_str_empty(target_str)) {
@@ -204,10 +207,10 @@ void spn_cc_to_ps(spn_cc_t* cc, sp_ps_config_t* ps) {
   }
 
   sp_da_for(cc->include, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->include[it], SPN_GEN_INCLUDE, cc->toolchain.info.driver));
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->include[it], SPN_GEN_INCLUDE, cc->driver));
   }
   sp_da_for(cc->define, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->define[it], SPN_GEN_DEFINE, cc->toolchain.info.driver));
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->define[it], SPN_GEN_DEFINE, cc->driver));
   }
 
   sp_ps_config_add_arg(ps, spn_cc_c_standard_to_switch(cc->standard));
@@ -235,7 +238,7 @@ void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* 
     }
   }
 
-  spn_cc_driver_t driver = cc->toolchain.info.driver;
+  spn_cc_driver_t driver = cc->driver;
   sp_da_for(target->source, it) {
     sp_ps_config_add_arg(ps, target->source[it]);
   }
@@ -303,14 +306,12 @@ spn_cc_run_t spn_cc_target_run(spn_cc_target_t* target, sp_str_t cwd) {
   spn_cc_to_ps(target->cc, &ps);
   spn_cc_target_to_ps(target->cc, target, &ps);
 
-  spn_toolchain_t toolchain = target->cc->toolchain;
-
   sp_tm_timer_t timer = sp_tm_start_timer();
   sp_ps_output_t result = sp_ps_run(ps);
   u64 elapsed = sp_tm_read_timer(&timer);
 
   sp_str_builder_t log = SP_ZERO_INITIALIZE();
-  sp_str_builder_append(&log, toolchain.compiler.program);
+  sp_str_builder_append(&log, target->cc->compiler.program);
   sp_str_builder_append_c8(&log, ' ');
   sp_da_for(ps.dyn_args, it) {
     sp_str_builder_append(&log, ps.dyn_args[it]);

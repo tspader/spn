@@ -211,8 +211,11 @@ struct spn_pkg_unit_t {
 };
 
 typedef struct {
-  spn_session_t* session;
+  spn_toolchain_kind_t source;
+  spn_toolchain_info_t info;
   spn_pkg_info_t* pkg;
+
+  spn_session_t* session;
   sp_str_t url;
   spn_build_io_t logs;
 
@@ -227,6 +230,10 @@ typedef struct {
     sp_str_t stamp;
     spn_build_log_paths_t logs;
   } paths;
+
+  spn_toolchain_launcher_t compiler;
+  spn_toolchain_launcher_t linker;
+  spn_toolchain_launcher_t archiver;
 } spn_toolchain_unit_t;
 
 static inline spn_user_node_t* spn_find_user_node(spn_node_t* node) {

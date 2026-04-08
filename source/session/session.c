@@ -80,7 +80,6 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_info_t* pkg) {
   sp_assert(metadata);
 
   fingerprint_input_t fingerprint = SP_ZERO_INITIALIZE();
-  sp_mem_zero(&fingerprint, sizeof(fingerprint));
   fingerprint.commit = sp_hash_str(metadata->commit);
   fingerprint.version = metadata->version;
 
@@ -93,14 +92,15 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_info_t* pkg) {
     fingerprint.os = session->profile.os;
     fingerprint.abi = session->profile.abi;
 
-    if (session->toolchain.source == SPN_TOOLCHAIN_INDEX) {
-      fingerprint.toolchain.name = sp_hash_str(session->toolchain.pkg->qualified);
-      fingerprint.toolchain.version = session->toolchain.pkg->version;
+    spn_toolchain_unit_t* toolchain = session->units.toolchain;
+    if (toolchain->source == SPN_TOOLCHAIN_INDEX) {
+      fingerprint.toolchain.name = sp_hash_str(toolchain->pkg->qualified);
+      fingerprint.toolchain.version = toolchain->pkg->version;
     }
-    fingerprint.toolchain.cc = sp_hash_str(session->toolchain.info.compiler.program);
-    fingerprint.toolchain.ld = sp_hash_str(session->toolchain.info.linker.program);
-    fingerprint.toolchain.ar = sp_hash_str(session->toolchain.info.archiver.program);
-    fingerprint.toolchain.url = sp_hash_str(session->toolchain.info.url);
+    fingerprint.toolchain.cc = sp_hash_str(toolchain->info.compiler.program);
+    fingerprint.toolchain.ld = sp_hash_str(toolchain->info.linker.program);
+    fingerprint.toolchain.ar = sp_hash_str(toolchain->info.archiver.program);
+    fingerprint.toolchain.url = sp_hash_str(toolchain->info.url);
   }
 
   fingerprint_t id = SP_ZERO_INITIALIZE();
@@ -197,9 +197,9 @@ spn_target_unit_t* spn_session_add_test(spn_session_t* session, spn_pkg_unit_t* 
 }
 
 spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* loaded) {
-  spn_pkg_info_t* pkg = loaded->pkg;
+  spn_pkg_info_t* pkg = loaded->info;
 
-  sp_om_insert(session->units.packages, loaded->pkg->qualified, SP_ZERO_STRUCT(spn_pkg_unit_t));
+  sp_om_insert(session->units.packages, loaded->info->qualified, SP_ZERO_STRUCT(spn_pkg_unit_t));
   spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
   unit->pkg = pkg;
   unit->session = session;

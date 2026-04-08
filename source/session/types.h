@@ -34,7 +34,7 @@ typedef struct spn_toolchain {
 
 typedef struct {
   spn_pkg_kind_t kind;
-  spn_pkg_info_t* pkg;
+  spn_pkg_info_t* info;
   struct {
     sp_str_t manifest;
     sp_str_t script;
@@ -42,6 +42,13 @@ typedef struct {
   } paths;
   u64 elapsed;
 } spn_loaded_pkg_t;
+
+typedef struct {
+  spn_profile_info_t profile;
+  sp_om(spn_target_unit_t) targets;
+  sp_om(spn_pkg_unit_t) packages;
+  spn_toolchain_unit_t* toolchain;
+} spn_build_units_t;
 
 struct spn_session_t {
   spn_pkg_info_t* pkg;
@@ -53,8 +60,9 @@ struct spn_session_t {
   sp_str_ht(spn_toolchain_entry_t) toolchains;
   sp_str_ht(spn_loaded_pkg_t) packages;
 
+  spn_build_units_t host;
+  spn_build_units_t target;
   spn_profile_info_t profile;
-  spn_toolchain_t toolchain;
   struct {
     sp_om(spn_target_unit_t) targets;
     sp_om(spn_pkg_unit_t) packages;

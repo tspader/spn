@@ -27,6 +27,10 @@ s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
     .kind = SPN_EVENT_TARGET_BUILD
   });
 
+  if (sp_str_empty(unit->url)) {
+    return SPN_OK;
+  }
+
   sp_str_t output = sp_fs_join_path(unit->paths.work, sp_fs_get_name(unit->url));
 
   // This function runs as part of the configure graph, which is a DAG ordered

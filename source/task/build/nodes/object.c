@@ -24,7 +24,7 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   spn_cc_t* cc = sp_alloc_type(spn_cc_t);
   spn_cc_set_profile(cc, session->profile);
   spn_cc_set_output_dir(cc, dir);
-  spn_cc_set_toolchain(cc, unit->session->toolchain);
+  spn_cc_set_toolchain(cc, unit->session->units.toolchain);
   add_pkg_to_cc(cc, unit->package->pkg);
 
   spn_cc_target_t* target = spn_cc_add_target(cc, SPN_TARGET_OBJECT, file);
