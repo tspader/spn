@@ -12,7 +12,9 @@
 
 #include "intern/intern.h"
 #include "pkg/load.h"
+#include "pkg/types.h"
 #include "semver/compare.h"
+#include "semver/convert.h"
 
 ///////////
 // STATE //
@@ -61,6 +63,16 @@ typedef struct {
 } target_t;
 
 typedef struct {
+  const c8* name;
+  spn_pkg_kind_t kind;
+  const c8* version;
+  const c8* file;
+  u8 build;
+  u8 test;
+  u8 package;
+} dep_t;
+
+typedef struct {
   const c8* fixture;
   const c8* namespace;
   const c8* name;
@@ -69,6 +81,7 @@ typedef struct {
   profile_t profiles [4];
   target_t exes [8];
   target_t libs [8];
+  dep_t deps [8];
 } test_t;
 
 void run_case(s32* utest_result, test_t test) {
@@ -183,6 +196,33 @@ void run_case(s32* utest_result, test_t test) {
     spn_target_info_t* target = sp_om_at(pkg.libs, it);
     SP_EXPECT_STR_EQ_CSTR(target->name, test.libs[it].name);
   }
+
+  // Deps
+  struct { u32 actual; u32 expected; } num_deps = SP_ZERO_INITIALIZE();
+  num_deps.actual = sp_ht_size(pkg.deps);
+
+  sp_carr_for(test.deps, it) {
+    if (!test.deps[it].name) break;
+    num_deps.expected++;
+  }
+  EXPECT_EQ(num_deps.expected, num_deps.actual);
+
+  sp_for(it, num_deps.expected) {
+    dep_t expected = test.deps[it];
+    spn_requested_pkg_t* actual = sp_ht_getp(pkg.deps, sp_str_view(expected.name));
+    ASSERT_TRUE(actual);
+
+    EXPECT_EQ(expected.kind, actual->kind);
+    EXPECT_EQ(expected.build, actual->build);
+    EXPECT_EQ(expected.test, actual->test);
+    EXPECT_EQ(expected.package, actual->package);
+
+    if (expected.kind == SPN_PACKAGE_KIND_FILE) {
+      if (expected.file) SP_EXPECT_STR_EQ_CSTR(actual->file, expected.file);
+    } else {
+      if (expected.version) SP_EXPECT_STR_EQ_CSTR(spn_semver_range_to_str(actual->range), expected.version);
+    }
+  }
 }
 
 UTEST(load, smoke) {
@@ -221,6 +261,18 @@ UTEST(load, profile) {
     .profiles = {
       { "default", "zig", SPN_LIB_KIND_STATIC, SPN_C99, SPN_BUILD_MODE_DEBUG },
       { "shared", "", SPN_LIB_KIND_SHARED, SPN_C_STANDARD_NONE, SPN_BUILD_MODE_NONE },
+    },
+  });
+}
+
+UTEST(load, deps) {
+  run_case(utest_result, (test_t) {
+    .fixture = "deps.toml",
+    .name = "test",
+    .deps = {
+      { .name = "kram",  .kind = SPN_PACKAGE_KIND_INDEX, .version = "1.6.9", .package = 1 },
+      { .name = "baz",   .kind = SPN_PACKAGE_KIND_FILE,  .file = "file://baz/spn.toml", .package = 1 },
+      { .name = "spum",  .kind = SPN_PACKAGE_KIND_INDEX, .version = "1.0.0", .build = 1, .package = 1 },
     },
   });
 }

@@ -211,7 +211,7 @@ struct spn_pkg_unit_t {
 };
 
 typedef struct {
-  spn_toolchain_kind_t source;
+  spn_toolchain_kind_t kind;
   spn_toolchain_info_t info;
   spn_pkg_info_t* pkg;
 

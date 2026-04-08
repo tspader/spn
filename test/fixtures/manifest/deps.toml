@@ -1,3 +1,11 @@
 [package]
 name = "test"
 version = "1.0.0"
+
+[deps]
+kram = "1.6.9"
+baz = "file://baz/spn.toml"
+
+[deps.spum]
+version = "1.0.0"
+build = true

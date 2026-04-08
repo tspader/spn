@@ -93,7 +93,7 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_info_t* pkg) {
     fingerprint.abi = session->profile.abi;
 
     spn_toolchain_unit_t* toolchain = session->units.toolchain;
-    if (toolchain->source == SPN_TOOLCHAIN_INDEX) {
+    if (toolchain->kind == SPN_TOOLCHAIN_INDEX) {
       fingerprint.toolchain.name = sp_hash_str(toolchain->pkg->qualified);
       fingerprint.toolchain.version = toolchain->pkg->version;
     }

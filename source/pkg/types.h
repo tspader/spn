@@ -32,6 +32,9 @@ typedef struct {
 typedef struct spn_pkg_req {
   spn_pkg_id_t id;
   spn_pkg_kind_t kind;
+  u8 test;
+  u8 build;
+  u8 package;
   spn_visibility_t visibility;
   union {
     spn_semver_range_t range;

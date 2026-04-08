@@ -252,11 +252,11 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
       return SPN_TASK_ERROR;
     }
 
-    toolchain->source = SPN_TOOLCHAIN_INLINE;
+    toolchain->kind = SPN_TOOLCHAIN_INLINE;
     toolchain->pkg = session->pkg;
   }
   else if (entry->kind == SPN_TOOLCHAIN_BUILTIN) {
-    toolchain->source = SPN_TOOLCHAIN_BUILTIN;
+    toolchain->kind = SPN_TOOLCHAIN_BUILTIN;
     toolchain->pkg = session->pkg;
   }
   else if (entry->kind == SPN_TOOLCHAIN_INDEX) {
@@ -270,7 +270,7 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     }
     sp_assert(entry->kind == SPN_TOOLCHAIN_INDEX);
 
-    toolchain->source = SPN_TOOLCHAIN_INDEX;
+    toolchain->kind = SPN_TOOLCHAIN_INDEX;
     toolchain->pkg = pkg->info;
   }
 
@@ -284,7 +284,7 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   //
   // By setting up the paths here, the toolchain can be downloaded to the package's
   // work dir and decompressed to the store dir with no special paths.
-  switch (toolchain->source) {
+  switch (toolchain->kind) {
     case SPN_TOOLCHAIN_BUILTIN:
     case SPN_TOOLCHAIN_INLINE: {
       toolchain->compiler = entry->info.compiler;
