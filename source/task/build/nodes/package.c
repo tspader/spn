@@ -9,7 +9,7 @@
 static void emit_run(spn_pkg_unit_t* unit) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SCRIPT_PACKAGE,
-    .pkg = unit->pkg,
+    .pkg = unit->info,
     .io = &unit->logs.io,
   });
 }
@@ -17,7 +17,7 @@ static void emit_run(spn_pkg_unit_t* unit) {
 static void emit_crash(spn_pkg_unit_t* unit) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SCRIPT_CRASHED,
-    .pkg = unit->pkg,
+    .pkg = unit->info,
     .io = &unit->logs.io,
     .crashed.path = sp_str_lit(""),
   });
@@ -26,7 +26,7 @@ static void emit_crash(spn_pkg_unit_t* unit) {
 static void emit_success(spn_pkg_unit_t* unit) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK,
-    .pkg = unit->pkg,
+    .pkg = unit->info,
     .io = &unit->logs.io,
     .package_ok = {
       .time = unit->time.package

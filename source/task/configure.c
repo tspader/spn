@@ -86,8 +86,8 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
 
   spn_cc_t cc = SP_ZERO_INITIALIZE();
   spn_cc_set_profile(&cc, session->profile);
-  spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_TARGET_JIT, unit->pkg->name);
-  sp_ht_for_kv(unit->pkg->deps, it) {
+  spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_TARGET_JIT, unit->info->name);
+  sp_ht_for_kv(unit->info->deps, it) {
     switch (it.val->visibility) {
       case SPN_VISIBILITY_BUILD: {
         spn_cc_target_add_dep(target, spn_session_find_pkg(session, *it.key));
@@ -113,7 +113,7 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SCRIPT_COMPILE,
-    .pkg = unit->pkg,
+    .pkg = unit->info,
     .io = &unit->logs.io,
     .script_compile = {
       .script_path = unit->paths.script,
@@ -128,7 +128,7 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
 fail:
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,
-    .pkg = unit->pkg,
+    .pkg = unit->info,
     .io = &unit->logs.io,
     .compile_failed = {
       .script_path = unit->paths.script,
@@ -143,7 +143,7 @@ spn_err_t configure_package(spn_pkg_unit_t* unit) {
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SCRIPT_CONFIGURE,
-    .pkg = unit->pkg,
+    .pkg = unit->info,
     .io = &unit->logs.io
   });
 
@@ -160,7 +160,7 @@ spn_err_t configure_package(spn_pkg_unit_t* unit) {
     // What else can we get from TCC here?
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_BUILD_SCRIPT_CRASHED,
-      .pkg = unit->pkg,
+      .pkg = unit->info,
       .io = &unit->logs.io,
       .crashed.path = sp_str_lit("")
     });
@@ -171,7 +171,7 @@ spn_err_t configure_package(spn_pkg_unit_t* unit) {
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK,
-    .pkg = unit->pkg,
+    .pkg = unit->info,
     .io = &unit->logs.io,
     .configure.time = unit->time.configure,
   });

@@ -4,6 +4,7 @@
 #include "ctx/types.h"
 #include "error/types.h"
 #include "event/event.h"
+#include "forward/types.h"
 #include "git/cache.h"
 #include "index/types.h"
 #include "log/log.h"
@@ -150,9 +151,9 @@ spn_err_t load_index_packages(spn_session_t* session, spn_resolver_t* resolver) 
   return SPN_OK;
 }
 
-spn_err_t load_file_packages(spn_session_t* session, spn_pkg_info_t* pkg) {
+spn_err_t load_file_packages(spn_session_t* session) {
   // Load file dependencies directly from their manifests
-  sp_ht_for_kv(pkg->deps, it) {
+  sp_ht_for_kv(session->pkg->deps, it) {
     spn_requested_pkg_t* requested = it.val;
     if (requested->kind != SPN_PACKAGE_KIND_FILE) continue;
 
@@ -186,11 +187,11 @@ spn_err_t load_file_packages(spn_session_t* session, spn_pkg_info_t* pkg) {
   return SPN_OK;
 }
 
-spn_err_t load_root_package(spn_session_t* session, spn_pkg_info_t* pkg) {
-  sp_str_ht_insert(session->packages, pkg->name, sp_zero_struct(spn_loaded_pkg_t));
-  spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, pkg->name);
+spn_err_t load_root_package(spn_session_t* session) {
+  sp_str_ht_insert(session->packages, session->pkg->qualified, sp_zero_struct(spn_loaded_pkg_t));
+  spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, session->pkg->qualified);
 
-  loaded->info = pkg;
+  loaded->info = session->pkg;
   loaded->kind = SPN_PACKAGE_KIND_ROOT;
   loaded->paths.manifest = spn.paths.manifest;
   loaded->paths.script = sp_fs_join_path(spn.paths.project, sp_str_lit("spn.c"));
@@ -199,17 +200,39 @@ spn_err_t load_root_package(spn_session_t* session, spn_pkg_info_t* pkg) {
   return SPN_OK;
 }
 
+typedef struct {
+  u8 package;
+  u8 build;
+  u8 test;
+} scope_t;
 
 void add_compilation_units(spn_session_t* session) {
+  sp_str_ht(scope_t) scopes = SP_ZERO_INITIALIZE();
+  sp_str_ht_for_kv(session->packages, it) {
+    spn_pkg_info_t* info = it.val->info;
+    sp_str_ht_for_kv(info->deps, dep) {
+      if (!sp_str_ht_exists(scopes, *dep.key)) {
+        sp_str_ht_insert(scopes, *dep.key, sp_zero_struct(scope_t));
+      }
+      scope_t* scope = sp_str_ht_get(scopes, *dep.key);
+      // I was going to do it this way, but it needs to be more of a tree traversal, because when
+      // you're on any given dependency right now you don't know how you got there. If I just need
+      // sqlite at build-time, and sqlite lists foobar as a package dep, foobar is a build-time
+      // dependency of me.
+      //scope->package =
+    }
+    spn_session_add_pkg(session, it.val);
+  }
+
   sp_str_ht_for_kv(session->packages, it) {
     spn_session_add_pkg(session, it.val);
   }
 
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    sp_ht_for_kv(unit->pkg->deps, j) {
-      spn_pkg_unit_t* dep = spn_session_find_pkg(session, unit->pkg->qualified);
-      sp_str_ht_insert(unit->deps, unit->pkg->qualified, dep);
+    sp_ht_for_kv(unit->info->deps, j) {
+      spn_pkg_unit_t* dep = spn_session_find_pkg(session, unit->info->qualified);
+      sp_str_ht_insert(unit->deps, unit->info->qualified, dep);
     }
   }
 }
@@ -218,9 +241,9 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   spn_session_t* session = &app->session;
 
   // Locate every package that we need and load their manifests
-  spn_try_as(load_root_package(session, &app->package), SPN_TASK_ERROR);
+  spn_try_as(load_root_package(session), SPN_TASK_ERROR);
   spn_try_as(load_index_packages(session, app->resolver), SPN_TASK_ERROR);
-  spn_try_as(load_file_packages(session, &app->package), SPN_TASK_ERROR);
+  spn_try_as(load_file_packages(session), SPN_TASK_ERROR);
 
   // The toolchain can be specified as either a package which exports toolchains
   // or as a block of TOML inline in the manifest.

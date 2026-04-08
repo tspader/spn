@@ -150,7 +150,7 @@ struct spn_target_unit {
 
 struct spn_pkg_unit_t {
   spn_session_t* session;
-  spn_pkg_info_t* pkg;
+  spn_pkg_info_t* info;
 
   sp_om(spn_compile_unit_t) objects;
   sp_str_ht(spn_target_unit_t*) targets;

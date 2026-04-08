@@ -68,3 +68,8 @@ void ctx_deinit(ctx_t* harness) {
   sp_mem_arena_destroy(harness->arena);
   *harness = SP_ZERO_STRUCT(ctx_t);
 }
+
+bool str_equal(sp_str_t a, sp_str_t b) {
+  if (!a.len && !b.len) return true;
+  return sp_str_equal(a, b);
+}

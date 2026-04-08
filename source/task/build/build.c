@@ -45,8 +45,8 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
     else {
       spn_pkg_unit_t* dep = spn_session_find_pkg(s, name);
       spn_cc_target_add_dep(cc, dep);
-      sp_da_for(dep->pkg->system_deps, j) {
-        sp_str_t system_dep = dep->pkg->system_deps[j];
+      sp_da_for(dep->info->system_deps, j) {
+        sp_str_t system_dep = dep->info->system_deps[j];
         spn_cc_target_add_lib(cc, spn_gen_format_entry(system_dep, SPN_GEN_SYSTEM_LIBS, driver));
       }
     }

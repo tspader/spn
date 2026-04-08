@@ -115,6 +115,8 @@ typedef struct {
 git_repo_result_t git_repo_build(tmpfs_t* fs, const c8* name, git_repo_fixture_t* fixture);
 sp_str_t          git_repo_file_at(sp_str_t repo, sp_str_t commit, sp_str_t path);
 
+bool str_equal(sp_str_t a, sp_str_t b);
+
 // UTEST
 #define SP_TEST_REPORT(fmt, ...) \
   do { \
@@ -124,7 +126,7 @@ sp_str_t          git_repo_file_at(sp_str_t repo, sp_str_t commit, sp_str_t path
 
 #define SP_TEST_STREQ(a, b, is_assert) \
   UTEST_SURPRESS_WARNING_BEGIN do { \
-    if (!sp_str_equal((a), (b))) { \
+    if (!str_equal((a), (b))) { \
       const c8* __file = __FILE__; \
       const u32 __line = __LINE__; \
       sp_str_builder_t __builder = SP_ZERO_INITIALIZE(); \

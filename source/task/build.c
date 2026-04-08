@@ -202,7 +202,7 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
 //
 spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   spn_pkg_nodes_t* nodes = &unit->nodes.build;
-  spn_pkg_info_t* pkg = unit->pkg;
+  spn_pkg_info_t* pkg = unit->info;
 
   nodes->manifest = spn_bg_add_file(graph, unit->paths.manifest);
   nodes->script = spn_bg_add_file(graph, unit->paths.script);
@@ -427,7 +427,7 @@ void spn_task_init_build_graph(spn_app_t* app) {
 
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    spn.tui.info.max_name = SP_MAX(spn.tui.info.max_name, unit->pkg->name.len);
+    spn.tui.info.max_name = SP_MAX(spn.tui.info.max_name, unit->info->name.len);
   }
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
@@ -494,7 +494,7 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
 
         spn_event_buffer_push(spn.events, (spn_build_event_t) {
           .kind = SPN_EVENT_BUILD_FAILED,
-          .pkg = root->pkg,
+          .pkg = root->info,
           .io = &root->logs.io,
           .build_failed = {
             .profile = session->profile.name,
@@ -506,7 +506,7 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
 
         spn_event_buffer_push(spn.events, (spn_build_event_t) {
           .kind = SPN_EVENT_BUILD_SUMMARY,
-          .pkg = root->pkg,
+          .pkg = root->info,
           .io = &root->logs.io,
           .build_summary = {
             .success = false,
@@ -526,7 +526,7 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
 
         spn_event_buffer_push(spn.events, (spn_build_event_t) {
           .kind = SPN_EVENT_BUILD_PASSED,
-          .pkg = root->pkg,
+          .pkg = root->info,
           .io = &root->logs.io,
           .build.passed = {
             .profile = &session->profile,
@@ -536,7 +536,7 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
 
         spn_event_buffer_push(spn.events, (spn_build_event_t) {
           .kind = SPN_EVENT_BUILD_SUMMARY,
-          .pkg = root->pkg,
+          .pkg = root->info,
           .io = &root->logs.io,
           .build_summary = {
             .success = true,

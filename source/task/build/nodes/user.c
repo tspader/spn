@@ -8,7 +8,7 @@ s32 run_user_fn(spn_bg_cmd_t* cmd, void* user_data) {
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SCRIPT_USER_FN,
-    .pkg = node->pkg->pkg,
+    .pkg = node->pkg->info,
     .io = &node->pkg->logs.io,
     .node = { .info = node }
   });

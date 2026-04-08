@@ -132,7 +132,7 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
   spn_target_unit_t* target = sp_om_back(session->units.targets);
   target->session = session;
   target->parent = pkg;
-  target->pkg = pkg->pkg;
+  target->pkg = pkg->info;
   target->info = info;
 
   sp_str_ht_insert(pkg->targets, info->name, target);
@@ -201,7 +201,7 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
 
   sp_om_insert(session->units.packages, loaded->info->qualified, SP_ZERO_STRUCT(spn_pkg_unit_t));
   spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
-  unit->pkg = pkg;
+  unit->info = pkg;
   unit->session = session;
   unit->paths.manifest = loaded->paths.manifest;
   unit->paths.script = loaded->paths.script;
@@ -235,9 +235,9 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
 
   unit->paths.generated = sp_fs_join_path(unit->paths.work, SP_LIT("spn"));
 
-  unit->logs.build = sp_format("{}.build.log", SP_FMT_STR(unit->pkg->name));
-  unit->logs.test = sp_format("{}.test.log", SP_FMT_STR(unit->pkg->name));
-  unit->logs.jsonl = sp_format("{}.jsonl", SP_FMT_STR(unit->pkg->name));
+  unit->logs.build = sp_format("{}.build.log", SP_FMT_STR(unit->info->name));
+  unit->logs.test = sp_format("{}.test.log", SP_FMT_STR(unit->info->name));
+  unit->logs.jsonl = sp_format("{}.jsonl", SP_FMT_STR(unit->info->name));
 
   unit->paths.logs.build = sp_fs_join_path(unit->paths.work, unit->logs.build);
   unit->paths.logs.test = sp_fs_join_path(unit->paths.work, unit->logs.test);
