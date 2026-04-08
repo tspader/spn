@@ -111,9 +111,7 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_info_t* pkg) {
 
 spn_pkg_unit_t* spn_session_find_pkg(spn_session_t* session, sp_str_t name) {
   sp_mutex_lock(&session->mutex);
-  spn_pkg_unit_t* pkg = sp_str_equal(name, session->pkg->name) ?
-    &session->units.root :
-    sp_om_get(session->units.packages, name);
+  spn_pkg_unit_t* pkg = sp_om_get(session->units.packages, name);
   sp_mutex_unlock(&session->mutex);
 
   return pkg;

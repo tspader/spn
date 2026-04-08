@@ -466,8 +466,8 @@ void spn_task_init_build_graph(spn_app_t* app) {
 }
 
 spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
-  spn_session_t* b = &app->session;
-  spn_bg_ctx_t* build = &b->build;
+  spn_session_t* session = &app->session;
+  spn_bg_ctx_t* build = &session->build;
 
   if (sp_atomic_s32_get(&build->executor->shutdown)) {
     spn_bg_executor_join(build->executor);
@@ -480,14 +480,14 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
       sp_opt_set(error, build->executor->errors[0]);
     }
 
-    spn_pkg_unit_t* root = spn_session_find_root(b);
+    spn_pkg_unit_t* root = spn_session_find_root(session);
     u32 num_errors = sp_da_size(build->executor->errors);
-    u32 dirty_cmds = sp_ht_size(b->build.dirty->commands);
+    u32 dirty_cmds = sp_ht_size(session->build.dirty->commands);
 
     switch (error.some) {
       case SP_OPT_SOME: {
         sp_str_t first_error = sp_str_lit("");
-        spn_bg_cmd_t* err_cmd = spn_bg_find_command(&b->build.graph, error.value.cmd_id);
+        spn_bg_cmd_t* err_cmd = spn_bg_find_command(&session->build.graph, error.value.cmd_id);
         if (err_cmd) {
           first_error = err_cmd->tag;
         }
@@ -497,8 +497,8 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
           .pkg = root->pkg,
           .io = &root->logs.io,
           .build_failed = {
-            .profile = app->session.profile.name,
-            .time = b->build.executor->elapsed,
+            .profile = session->profile.name,
+            .time = session->build.executor->elapsed,
             .num_errors = num_errors,
             .first_error = first_error,
           }
@@ -511,9 +511,9 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
           .build_summary = {
             .success = false,
             .num_dirty = dirty_cmds,
-            .total_commands = sp_da_size(b->build.graph.commands),
-            .time = b->build.executor->elapsed,
-            .profile = app->session.profile.name,
+            .total_commands = sp_da_size(session->build.graph.commands),
+            .time = session->build.executor->elapsed,
+            .profile = session->profile.name,
           }
         });
 
@@ -529,8 +529,8 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
           .pkg = root->pkg,
           .io = &root->logs.io,
           .build.passed = {
-            .profile = &app->session.profile,
-            .time = b->build.executor->elapsed
+            .profile = &session->profile,
+            .time = session->build.executor->elapsed
           }
         });
 
@@ -541,9 +541,9 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
           .build_summary = {
             .success = true,
             .num_dirty = dirty_cmds,
-            .total_commands = sp_da_size(b->build.graph.commands),
-            .time = b->build.executor->elapsed,
-            .profile = app->session.profile.name,
+            .total_commands = sp_da_size(session->build.graph.commands),
+            .time = session->build.executor->elapsed,
+            .profile = session->profile.name,
           }
         });
 

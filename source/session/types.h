@@ -13,27 +13,6 @@
 #include "unit/types.h"
 
 typedef enum {
-  SPN_DEP_REPO_STATE_NOT_CLONED,
-  SPN_DEP_REPO_STATE_UNLOCKED,
-  SPN_DEP_REPO_STATE_LOCKED,
-} spn_dep_repo_state_t;
-
-typedef enum {
-  SPN_DEP_BUILD_STATE_NONE,
-  SPN_DEP_BUILD_STATE_IDLE,
-  SPN_DEP_BUILD_STATE_CLONING,
-  SPN_DEP_BUILD_STATE_FETCHING,
-  SPN_DEP_BUILD_STATE_CHECKING_OUT,
-  SPN_DEP_BUILD_STATE_RESOLVING,
-  SPN_DEP_BUILD_STATE_BUILDING,
-  SPN_DEP_BUILD_STATE_PACKAGING,
-  SPN_DEP_BUILD_STATE_STAMPING,
-  SPN_DEP_BUILD_STATE_DONE,
-  SPN_DEP_BUILD_STATE_CANCELED,
-  SPN_DEP_BUILD_STATE_FAILED
-} spn_dep_state_t;
-
-typedef enum {
   SPN_PACKAGE_STATE_UNLOADED,
   SPN_PACKAGE_STATE_LOADED,
 } spn_package_state_t;
@@ -66,8 +45,6 @@ typedef struct {
 
 struct spn_session_t {
   spn_pkg_info_t* pkg;
-  spn_profile_info_t profile;
-  spn_toolchain_t toolchain;
   spn_target_filter_t filter;
   sp_env_t env;
   spn_event_buffer_t* events;
@@ -76,10 +53,11 @@ struct spn_session_t {
   sp_str_ht(spn_toolchain_entry_t) toolchains;
   sp_str_ht(spn_loaded_pkg_t) packages;
 
+  spn_profile_info_t profile;
+  spn_toolchain_t toolchain;
   struct {
     sp_om(spn_target_unit_t) targets;
     sp_om(spn_pkg_unit_t) packages;
-    spn_pkg_unit_t root;
     spn_toolchain_unit_t* toolchain;
   } units;
 
@@ -89,9 +67,8 @@ struct spn_session_t {
     sp_str_t profile;
   } paths;
 
-  spn_bg_ctx_t build;
-  spn_bg_ctx_t sync;
   spn_bg_ctx_t configure;
+  spn_bg_ctx_t build;
   sp_mutex_t mutex;
 };
 
