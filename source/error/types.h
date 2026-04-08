@@ -2,6 +2,7 @@
 #define SPN_ERR_H
 
 #include "sp.h"
+#include "spn.h"
 
 #define spn_try(expr) do { \
   s32 _sp_result = (expr); \
@@ -34,9 +35,7 @@
 
 #define spn_result(status) (spn_err_union_t) { .kind = (status) }
 
-typedef enum {
-  SPN_OK,
-  SPN_ERROR,
+enum {
   SPN_ERR_MANIFEST_PARSE,
   SPN_ERR_MANIFEST_FIELD,
   SPN_ERR_NO_MANIFEST,
@@ -46,7 +45,7 @@ typedef enum {
   SPN_ERR_BUILD_GRAPH,
   SPN_ERR_TOML_MISSING,
   SPN_ERR_TOML_TYPE,
-} spn_err_t;
+};
 
 typedef enum {
   SPN_BUILD_GRAPH_ERR_UNKNOWN,

@@ -9,9 +9,8 @@
 #include "index/json.h"
 #include "semver/compare.h"
 #include "sp/io.h"
-#include "sp/tm.h"
 
-void spn_index_init(spn_index_t* index) {
+void spn_index_init(spn_index_info_t* index) {
   index->arena = sp_mem_arena_new(4096);
   mz_ctx_init_ex(&index->json.ctx, sp_mem_arena_as_allocator(index->arena));
 
@@ -22,7 +21,7 @@ void spn_index_init(spn_index_t* index) {
   }
 }
 
-void spn_index_deinit(spn_index_t* index) {
+void spn_index_deinit(spn_index_info_t* index) {
   index->json.schema = SP_NULLPTR;
   index->json.ctx = SP_ZERO_STRUCT(mz_ctx_t);
 
@@ -32,12 +31,12 @@ void spn_index_deinit(spn_index_t* index) {
   }
 }
 
-sp_str_t spn_index_get_package_path(spn_index_t* index, spn_pkg_id_t id) {
+sp_str_t spn_index_get_package_path(spn_index_info_t* index, spn_pkg_id_t id) {
   sp_str_t relative = sp_fs_join_path(id.namespace, sp_format("{}.jsonl", SP_FMT_STR(id.name)));
   return sp_fs_join_path(index->location, relative);
 }
 
-spn_err_t spn_index_sync(spn_index_t* index) {
+spn_err_t spn_index_sync(spn_index_info_t* index) {
   switch (index->protocol) {
     case SPN_INDEX_PROTOCOL_GIT: {
       if (sp_fs_exists(index->location)) {
@@ -63,7 +62,7 @@ spn_err_t spn_index_sync(spn_index_t* index) {
   return SPN_ERROR;
 }
 
-spn_index_pkg_t* spn_index_get_package(spn_index_t* index, spn_pkg_id_t id) {
+spn_index_pkg_t* spn_index_get_package(spn_index_info_t* index, spn_pkg_id_t id) {
   spn_index_pkg_t* package = SP_NULLPTR;
 
   sp_context_push_arena(index->arena);
@@ -89,7 +88,7 @@ cleanup:
   return package;
 }
 
-spn_err_t spn_index_publish(spn_index_t* index, spn_index_rel_t* rel) {
+spn_err_t spn_index_publish(spn_index_info_t* index, spn_index_rel_t* rel) {
   spn_index_pkg_t* existing = spn_index_get_package(index, rel->id);
   if (existing) {
     sp_da_for(existing->releases, it) {
@@ -113,7 +112,7 @@ spn_err_t spn_index_publish(spn_index_t* index, spn_index_rel_t* rel) {
   return SPN_OK;
 }
 
-spn_index_rel_t* spn_index_get_release(spn_index_t* index, spn_pkg_id_t id, spn_semver_t version) {
+spn_index_rel_t* spn_index_get_release(spn_index_info_t* index, spn_pkg_id_t id, spn_semver_t version) {
   spn_index_pkg_t* package = spn_index_get_package(index, id);
   if (!package) return SP_NULLPTR;
 

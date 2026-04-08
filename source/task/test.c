@@ -6,7 +6,7 @@
 #include "filter/filter.h"
 #include "external/tcc.h"
 #include "log/log.h"
-#include "task.h"
+#include "task/task.h"
 #include "session/session.h"
 
 spn_task_result_t spn_task_run(spn_app_t* app) {

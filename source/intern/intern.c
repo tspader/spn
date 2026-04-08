@@ -1,5 +1,5 @@
 #include "ordered_map.h"
-#include "intern.h"
+#include "intern/intern.h"
 #include "ctx/ctx.h"
 
 sp_intern_t* sp_intern_new() {

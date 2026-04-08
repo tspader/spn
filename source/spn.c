@@ -32,7 +32,7 @@
 #include "external/tom.h"
 #include "git/key.h"
 #include "index/index.h"
-#include "intern.h"
+#include "intern/intern.h"
 #include "lock/lock.h"
 #include "log/log.h"
 #include "ordered_map.h"
@@ -153,7 +153,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       if (indexes) {
         spn_toml_arr_for(indexes, n) {
           toml_table_t* it = toml_array_table(indexes, n);
-          spn_index_t index = SP_ZERO_INITIALIZE();
+          spn_index_info_t index = SP_ZERO_INITIALIZE();
           spn_err_union_t idx_err = spn_index_load(it, sp_str_lit("index"), n, &index);
           if (idx_err.kind == SPN_ERR_MANIFEST_FIELD) {
             spn_log_error("invalid index in config: {:fg brightcyan} expected {:fg brightyellow}, got {:fg brightred}",
@@ -184,7 +184,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   if (!has_core_index) {
-    sp_da_push(spn.indexes, ((spn_index_t) {
+    sp_da_push(spn.indexes, ((spn_index_info_t) {
       .name = sp_str_lit("core"),
       .url = sp_str_lit("https://github.com/tspader/spandex.git"),
       .protocol = SPN_INDEX_PROTOCOL_GIT,

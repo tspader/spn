@@ -48,7 +48,7 @@ typedef struct {
   bool static_lib;
 } spn_linkage_set_t;
 
-struct spn_target {
+struct spn_target_info {
   sp_str_t name;
   spn_target_kind_t kind; // @spader @nuke
   spn_linkage_set_t linkages;

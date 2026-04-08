@@ -8,7 +8,7 @@
 
 typedef struct {
   sp_str_t cwd;
-  spn_index_t* index;
+  spn_index_info_t* index;
   sp_str_t url;
   sp_str_t revision;
 } spn_publish_opts_t;

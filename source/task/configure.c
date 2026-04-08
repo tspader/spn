@@ -3,16 +3,15 @@
 #include "error/types.h"
 #include "event/types.h"
 #include "graph/types.h"
-#include "spn.h"
 #include "target/types.h"
 
 #include "event/event.h"
 #include "external/cc.h"
+#include "external/tcc.h"
 #include "graph/graph.h"
-#include "intern.h"
 #include "sp/glob.h"
 #include "session/session.h"
-#include "task.h"
+#include "task/task.h"
 #include "unit/package.h"
 #include "unit/types.h"
 

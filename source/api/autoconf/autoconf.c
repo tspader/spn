@@ -1,5 +1,5 @@
 #include "api/autoconf/autoconf.h"
-#include "api/types.h"
+#include "api/core/types.h"
 #include "session/types.h"
 #include "triple/triple.h"
 

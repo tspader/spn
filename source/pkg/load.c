@@ -3,7 +3,7 @@
 
 #include "enum/enum.h"
 #include "external/tom.h"
-#include "intern.h"
+#include "intern/intern.h"
 #include "pkg/id.h"
 #include "pkg/load.h"
 #include "pkg/mutate.h"
@@ -613,7 +613,7 @@ static spn_err_t load_profile(toml_table_t* toml, spn_pkg_info_t* pkg, sp_str_t 
   return SPN_OK;
 }
 
-spn_err_union_t spn_index_load(toml_table_t* toml, sp_str_t parent, u32 index, spn_index_t* result) {
+spn_err_union_t spn_index_load(toml_table_t* toml, sp_str_t parent, u32 index, spn_index_info_t* result) {
   toml_path_t path = spn_pkg_toml_path_with_index(parent, index);
   sp_str_t name = SP_ZERO_INITIALIZE();
   sp_str_t url = SP_ZERO_INITIALIZE();
@@ -623,7 +623,7 @@ spn_err_union_t spn_index_load(toml_table_t* toml, sp_str_t parent, u32 index, s
   spn_try_union(toml_get_str_required(toml, "url", path, &url));
   spn_try_union(toml_get_str_required(toml, "protocol", path, &protocol_str));
 
-  *result = (spn_index_t) {
+  *result = (spn_index_info_t) {
     .name = name,
     .url = url,
     .protocol = spn_index_protocol_from_str(protocol_str),
@@ -839,7 +839,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
     toml_table_t* it = SP_NULLPTR;
     spn_try_union(toml_get_array_table_required(toml.index, n, sp_str_lit("index"), &it));
 
-    spn_index_t index = SP_ZERO_INITIALIZE();
+    spn_index_info_t index = SP_ZERO_INITIALIZE();
     spn_try_union(spn_index_load(it, sp_str_lit("index"), n, &index));
     index.kind = SPN_INDEX_WORKSPACE;
     sp_om_insert(pkg->indexes, index.name, index);

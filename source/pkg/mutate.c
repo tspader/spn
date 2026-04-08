@@ -5,9 +5,8 @@
 #include "toolchain/types.h"
 
 #include "enum/enum.h"
-#include "intern.h"
+#include "intern/intern.h"
 #include "pkg/mutate.h"
-#include "pkg/id.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
 #include "target/mutate.h"
@@ -206,12 +205,12 @@ spn_target_info_t* spn_pkg_add_lib_ex(spn_pkg_info_t* pkg, sp_str_t name, spn_li
   return sp_om_get(pkg->libs, lib.name);
 }
 
-spn_index_t* spn_pkg_add_index(spn_pkg_info_t* pkg, const c8* name, const c8* location) {
+spn_index_info_t* spn_pkg_add_index(spn_pkg_info_t* pkg, const c8* name, const c8* location) {
   return spn_pkg_add_index_ex(pkg, spn_intern_cstr(name), spn_intern_cstr(location));
 }
 
-spn_index_t* spn_pkg_add_index_ex(spn_pkg_info_t* pkg, sp_str_t name, sp_str_t location) {
-  spn_index_t index = {
+spn_index_info_t* spn_pkg_add_index_ex(spn_pkg_info_t* pkg, sp_str_t name, sp_str_t location) {
+  spn_index_info_t index = {
     .name = spn_intern(name),
     .location = spn_intern(location),
     .kind = SPN_INDEX_WORKSPACE,

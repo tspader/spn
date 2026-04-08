@@ -4,12 +4,9 @@
 #include "sp.h"
 #include "spn.h"
 
-#include "profile/types.h"
 #include "session/types.h"
 #include "target/types.h"
-#include "toolchain/types.h"
 
-#include "external/tcc.h"
 #include "external/obj.h"
 
 typedef struct {

@@ -70,7 +70,7 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
     sp_format("{}_index", SP_FMT_CSTR(c.name)));
   sp_fs_create_dir(index_root);
 
-  spn_index_t index = { .location = index_root };
+  spn_index_info_t index = { .location = index_root };
   spn_index_init(&index);
 
   sp_str_t cwd = repo.path;

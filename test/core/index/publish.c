@@ -67,7 +67,7 @@ static void run_roundtrip_case(s32* utest_result, struct index_roundtrip* fixtur
   sp_str_t json = spn_index_rel_to_json(&rel);
   EXPECT_TRUE(!sp_str_empty(json));
 
-  spn_index_t index = SP_ZERO_INITIALIZE();
+  spn_index_info_t index = SP_ZERO_INITIALIZE();
   spn_index_init(&index);
 
   spn_index_pkg_t pkg = SP_ZERO_INITIALIZE();
@@ -238,7 +238,7 @@ static void run_publish_case(s32* utest_result, struct index_publish* fixture, p
 
   write_publish_fixtures(harness, c.name, c.fixture.files);
 
-  spn_index_t index = {
+  spn_index_info_t index = {
     .location = index_root,
   };
   spn_index_init(&index);

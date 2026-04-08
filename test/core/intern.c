@@ -3,7 +3,7 @@
 
 #include "utest.h"
 
-#include "intern.h"
+#include "intern/intern.h"
 #include "ctx/types.h"
 
 spn_ctx_t spn;

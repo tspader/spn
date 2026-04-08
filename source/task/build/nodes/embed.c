@@ -4,18 +4,17 @@
 #include "target/types.h"
 
 #include "external/cc.h"
-#include "enum/enum.h"
 #include "event/event.h"
-#include "toolchain/toolchain.h"
+#include "intern/intern.h"
 #include "task/build/build.h"
 
 s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
   spn_target_unit_t* unit = (spn_target_unit_t*)user_data;
-  spn_target_t* target = unit->info;
+  spn_target_info_t* info = unit->info;
 
   spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
     .kind = SPN_EVENT_EMBED_START,
-    .embed_start = { .num_files = sp_da_size(target->embed) },
+    .embed_start = { .num_files = sp_da_size(info->embed) },
   });
 
   sp_tm_timer_t timer = sp_tm_start_timer();
@@ -23,8 +22,8 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
   spn_cc_embed_ctx_t embedder = SP_ZERO_INITIALIZE();
   spn_cc_embed_ctx_init(&embedder, unit->session->profile.os);
 
-  sp_da_for(target->embed, it) {
-    spn_embed_t embed = target->embed[it];
+  sp_da_for(info->embed, it) {
+    spn_embed_t embed = info->embed[it];
     sp_str_t symbol = embed.symbol;
     spn_embed_types_t types = embed.types;
     sp_io_reader_t io = SP_ZERO_INITIALIZE();

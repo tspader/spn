@@ -2,7 +2,7 @@
 #define SPN_CTX_CTX_H
 
 #include "ctx/types.h"
-#include "intern.h"
+#include "intern/types.h"
 #include "log/types.h"
 
 sp_str_t spn_pkg_unit_get_include_dir(spn_pkg_unit_t* unit);

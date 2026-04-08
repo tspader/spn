@@ -8,6 +8,7 @@
 #include "error/types.h"
 #include "graph/graph.h"
 #include "event/event.h"
+#include "intern/intern.h"
 #include "session/session.h"
 #include "sp/glob.h"
 #include "task/build/build.h"

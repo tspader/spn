@@ -261,7 +261,7 @@ sp_str_t spn_pkg_linkage_to_str(spn_linkage_t kind) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-spn_pkg_dir_t spn_cache_dir_kind_from_str(sp_str_t str) {
+spn_dir_t spn_cache_dir_kind_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "")) {
     return SPN_DIR_STORE;
   }

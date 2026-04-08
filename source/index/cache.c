@@ -18,7 +18,7 @@ spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_i
   }
 
   sp_da_for(*cache->indexes, it) {
-    spn_index_t* index = &(*cache->indexes)[it];
+    spn_index_info_t* index = &(*cache->indexes)[it];
     spn_index_pkg_t* package = spn_index_get_package(index, id);
     if (!package) {
       continue;

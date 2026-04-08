@@ -76,7 +76,7 @@ typedef enum {
   SPN_DIR_SOURCE = 6,
   SPN_DIR_WORK = 7,
   SPN_DIR_PROJECT = 8,
-} spn_pkg_dir_t;
+} spn_dir_t;
 
 typedef enum {
   SPN_C_STANDARD_NONE,
@@ -112,10 +112,21 @@ typedef enum {
   SPN_VISIBILITY_BUILD,
 } spn_visibility_t;
 
-typedef struct spn          spn_t;
-typedef struct spn_cmake    spn_cmake_t;
-typedef struct spn_make     spn_make_t;
-typedef struct spn_autoconf spn_autoconf_t;
+typedef enum {
+  SPN_OK = 0,
+  SPN_ERROR = 1,
+} spn_err_t;
+
+typedef struct spn              spn_t;
+typedef struct spn_config       spn_config_t;
+typedef struct spn_build        spn_build_t;
+typedef struct spn_pkg          spn_pkg_t;
+typedef struct spn_target       spn_target_t;
+typedef struct spn_profile      spn_profile_t;
+typedef struct spn_index        spn_index_t;
+typedef struct spn_cmake        spn_cmake_t;
+typedef struct spn_make         spn_make_t;
+typedef struct spn_autoconf     spn_autoconf_t;
 
 typedef void (*spn_build_fn_t) (spn_t*);
 
@@ -123,6 +134,19 @@ typedef void (*spn_build_fn_t) (spn_t*);
 #define SP_EMBED_DEFAULT_SYMBOL SP_NULLPTR
 #define SP_EMBED_DEFAULT_DATA_T SP_NULLPTR
 #define SP_EMBED_DEFAULT_SIZE_T SP_NULLPTR
+
+spn_target_t* spn_get_target(spn_t* spn, const c8* name);
+const spn_t*  spn_get_dep(const spn_t* spn, const c8* name);
+const c8*     spn_get_subdir(const spn_t* spn, spn_dir_t base, const c8* path);
+void          spn_target_add_source(spn_target_t* target, const c8* source);
+void          spn_target_add_include(spn_target_t* target, const c8* include);
+void          spn_target_add_define(spn_target_t* target, const c8* define);
+void          spn_target_embed_file(spn_target_t* target, const c8* file);
+void          spn_target_embed_file_ex(spn_target_t* target, const c8* file, const c8* symbol, const c8* data_type, const c8* size_type);
+void          spn_target_embed_mem(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size);
+void          spn_target_embed_mem_ex(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size, const c8* data_type, const c8* size_type);
+void          spn_target_embed_dir(spn_target_t* target, const c8* dir);
+void          spn_target_embed_dir_ex(spn_target_t* target, const c8* dir, const c8* data_type, const c8* size_type);
 
 // spn_pkg_t*        spn_get_pkg(spn_build_ctx_t* b);
 // spn_profile_t*    spn_get_profile(spn_build_ctx_t* b);
@@ -143,15 +167,6 @@ typedef void (*spn_build_fn_t) (spn_t*);
 // spn_c_standard_t  spn_profile_get_standard(spn_profile_t* profile);
 // spn_build_mode_t  spn_profile_get_mode(spn_profile_t* profile);
 
-// void            spn_target_add_source(spn_target_t* target, const c8* source);
-// void            spn_target_add_include(spn_target_t* target, const c8* include);
-// void            spn_target_add_define(spn_target_t* target, const c8* define);
-// void            spn_target_embed_file(spn_target_t* target, const c8* file);
-// void            spn_target_embed_file_ex(spn_target_t* target, const c8* file, const c8* symbol, const c8* data_type, const c8* size_type);
-// void            spn_target_embed_mem(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size);
-// void            spn_target_embed_mem_ex(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size, const c8* data_type, const c8* size_type);
-// void            spn_target_embed_dir(spn_target_t* target, const c8* dir);
-// void            spn_target_embed_dir_ex(spn_target_t* target, const c8* dir, const c8* data_type, const c8* size_type);
 
 
 // s32             spn_make(spn_build_ctx_t* build);

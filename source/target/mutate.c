@@ -1,6 +1,6 @@
 #include "target/mutate.h"
 
-#include "intern.h"
+#include "intern/intern.h"
 
 void spn_linkage_set_add(spn_linkage_set_t* set, spn_linkage_t kind) {
   switch (kind) {

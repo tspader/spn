@@ -39,7 +39,7 @@ typedef struct spn_pkg_req {
   };
 } spn_requested_pkg_t;
 
-struct spn_pkg {
+struct spn_pkg_info {
   sp_str_t namespace;
   sp_str_t name;
   sp_str_t qualified;
@@ -53,7 +53,7 @@ struct spn_pkg {
   sp_om(spn_target_info_t) scripts;
   sp_om(spn_target_info_t) tests;
   sp_om(spn_profile_info_t) profiles;
-  sp_om(spn_index_t) indexes;
+  sp_om(spn_index_info_t) indexes;
   sp_ht(sp_str_t, spn_requested_pkg_t) deps;
   sp_ht(sp_str_t, spn_dep_option_t) options;
   sp_ht(sp_str_t, spn_dep_options_t) config;

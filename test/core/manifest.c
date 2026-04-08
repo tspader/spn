@@ -6,11 +6,13 @@
 
 #include "test.h"
 
-#include "semver/compare.h"
 #include "ctx/types.h"
-#include "pkg/load.h"
 #include "profile/types.h"
 #include "target/types.h"
+
+#include "intern/intern.h"
+#include "pkg/load.h"
+#include "semver/compare.h"
 
 ///////////
 // STATE //

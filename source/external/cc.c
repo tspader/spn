@@ -1,12 +1,9 @@
 #include "ctx/types.h"
-#include "profile/types.h"
 #include "session/types.h"
 #include "toolchain/types.h"
 
-#include "ctx/ctx.h"
 #include "gen.h"
-#include "intern.h"
-#include "enum/enum.h"
+#include "intern/intern.h"
 #include "external/cc.h"
 #include "triple/triple.h"
 #include "sp/io.h"

@@ -2,7 +2,6 @@
 #define SPN_TASK_H
 
 #include "cli/types.h"
-#include "sp.h"
 
 typedef struct spn_app_t spn_app_t;
 

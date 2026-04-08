@@ -1,5 +1,5 @@
 #include "api/cmake/cmake.h"
-#include "api/types.h"
+#include "api/core/types.h"
 #include "enum/enum.h"
 #include "session/types.h"
 #include "profile/types.h"

@@ -29,7 +29,7 @@ spn_linkage_t spn_lib_kind_from_str(sp_str_t str);
 spn_linkage_t spn_pkg_linkage_from_str(sp_str_t str);
 sp_str_t spn_pkg_linkage_to_str(spn_linkage_t kind);
 
-spn_pkg_dir_t spn_cache_dir_kind_from_str(sp_str_t str);
+spn_dir_t spn_cache_dir_kind_from_str(sp_str_t str);
 
 spn_cc_kind_t spn_cc_kind_from_str(sp_str_t str);
 spn_c_standard_t spn_c_standard_from_str(sp_str_t str);

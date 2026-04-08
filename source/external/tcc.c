@@ -1,7 +1,6 @@
 #include "ctx/types.h"
-#include "tcc.h"
 
-#include "sp/macro.h"
+#include "external/tcc.h"
 
 typedef struct {
   const c8* symbol;

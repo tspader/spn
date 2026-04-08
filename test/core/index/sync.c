@@ -64,7 +64,7 @@ static void run_index_sync_case(s32* utest_result, struct index_sync_fixture* fi
 
   // Optionally sync
   if (c.setup != INDEX_SYNC_SETUP_REMOTE_ONLY) {
-    spn_index_t setup_index = {
+    spn_index_info_t setup_index = {
       .url = remote,
       .location = cache,
       .protocol = SPN_INDEX_PROTOCOL_GIT,
@@ -77,7 +77,7 @@ static void run_index_sync_case(s32* utest_result, struct index_sync_fixture* fi
     modify_index(remote);
   }
 
-  spn_index_t index = {
+  spn_index_info_t index = {
     .name = sp_str_lit("test"),
     .url = remote,
     .location = cache,

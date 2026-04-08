@@ -1,4 +1,4 @@
-#include "intern.h"
+#include "intern/intern.h"
 #include "pkg/id.h"
 #include "sp/macro.h"
 

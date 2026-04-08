@@ -63,7 +63,7 @@ typedef struct {
   sp_da(spn_index_rel_t) releases;
 } spn_index_pkg_t;
 
-struct spn_index {
+struct spn_index_info {
   sp_str_t name;
   sp_str_t url;
   sp_str_t location;
@@ -80,7 +80,7 @@ struct spn_index {
   } json;
 };
 
-typedef sp_da(spn_index_t) spn_index_arr_t;
+typedef sp_da(spn_index_info_t) spn_index_arr_t;
 
 typedef struct {
   spn_index_arr_t* indexes;

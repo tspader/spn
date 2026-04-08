@@ -9,7 +9,7 @@ sp_app_result_t spn_cli_publish(spn_cli_t* cli) {
 
   sp_str_t index_name = sp_str_empty(cmd->index) ? sp_str_lit("core") : cmd->index;
 
-  spn_index_t* index = SP_NULLPTR;
+  spn_index_info_t* index = SP_NULLPTR;
   sp_da_for(spn.indexes, it) {
     if (sp_str_equal(spn.indexes[it].name, index_name)) {
       index = &spn.indexes[it];

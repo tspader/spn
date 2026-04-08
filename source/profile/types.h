@@ -5,7 +5,7 @@
 #include "spn.h"
 #include "forward/types.h"
 
-struct spn_profile {
+struct spn_profile_info {
   sp_str_t name;
   sp_str_t toolchain;
   spn_os_t os;
