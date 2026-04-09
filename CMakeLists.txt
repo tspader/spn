@@ -853,6 +853,56 @@ endif()
 add_dependencies(graph bootstrap_headers)
 
 ##########
+# ORDERED MAP #
+##########
+add_executable(stable_map
+  test/core/stable_map.c
+)
+set_target_properties(stable_map PROPERTIES
+  OUTPUT_NAME "stable_map"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
+)
+target_include_directories(stable_map PRIVATE
+  source
+  include
+  test/tools
+  "${BOOTSTRAP_EXTERNAL_DIR}/sp/tools"
+  "${BOOTSTRAP_INCLUDE_DIR}"
+)
+if(MSVC)
+  target_compile_options(stable_map PRIVATE ${SPN_MSVC_COMPILE_OPTIONS})
+endif()
+if(NOT MSVC)
+  target_link_libraries(stable_map PRIVATE m)
+endif()
+add_dependencies(stable_map bootstrap_headers)
+
+##########
+# ORDERED MAP #
+##########
+add_executable(ordered_map
+  test/core/ordered_map.c
+)
+set_target_properties(ordered_map PROPERTIES
+  OUTPUT_NAME "ordered_map"
+  RUNTIME_OUTPUT_DIRECTORY "${BOOTSTRAP_BIN_DIR}/test"
+)
+target_include_directories(ordered_map PRIVATE
+  source
+  include
+  test/tools
+  "${BOOTSTRAP_EXTERNAL_DIR}/sp/tools"
+  "${BOOTSTRAP_INCLUDE_DIR}"
+)
+if(MSVC)
+  target_compile_options(ordered_map PRIVATE ${SPN_MSVC_COMPILE_OPTIONS})
+endif()
+if(NOT MSVC)
+  target_link_libraries(ordered_map PRIVATE m)
+endif()
+add_dependencies(ordered_map bootstrap_headers)
+
+##########
 # TRIPLE #
 ##########
 add_executable(triple
