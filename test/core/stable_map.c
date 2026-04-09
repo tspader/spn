@@ -26,18 +26,20 @@
 
 #define sp_sm_new(sm)                                                          \
   sp_sm_new_ex(sm,                                                             \
-    sp_mem_arena_new_ex(4096, SP_MEM_ARENA_MODE_NO_REALLOC, 0),               \
+    sp_mem_arena_new_ex(4096, SP_MEM_ARENA_MODE_NO_REALLOC, 0),                \
     sp_mem_arena_new(4096))
 
 #define sp_sm_ensure(sm)                                                       \
-  if (!(sm)) { sp_sm_new(sm); }
+  if (!(sm)) {      \
+    sp_sm_new(sm);  \
+  }
 
-#define sp_sm_set_fns(sm, hash_fn, cmp_fn)                                     \
-  do {                                                                         \
-    sp_sm_ensure(sm);                                                          \
-    sp_context_push_allocator(sp_mem_arena_as_allocator((sm)->arenas.metadata));\
-    sp_ht_set_fns((sm)->index, hash_fn, cmp_fn);                               \
-    sp_context_pop();                                                          \
+#define sp_sm_set_fns(sm, hash_fn, cmp_fn)                                       \
+  do {                                                                           \
+    sp_sm_ensure(sm);                                                            \
+    sp_context_push_allocator(sp_mem_arena_as_allocator((sm)->arenas.metadata)); \
+    sp_ht_set_fns((sm)->index, hash_fn, cmp_fn);                                 \
+    sp_context_pop();                                                            \
   } while (0)
 
 #define sp_sm_alloc_entry(sm)                                                  \
@@ -382,6 +384,19 @@ typedef struct {
   s32 priority;
 } pkg_value_t;
 
+typedef struct {
+  pkg_key_t key;
+  pkg_value_t value;
+} kvp_t;
+
+#define strl(_lit) sp_str_lit(_lit)
+#define LOADED true
+#define UNLOADED false
+#define LOW_PRIORITY 1
+#define MID_PRIORITY 2
+#define HIGH_PRIORITY 3
+
+
 static sp_hash_t pkg_key_hash(void* key, u64 size) {
   (void)size;
   pkg_key_t* k = (pkg_key_t*)key;
@@ -400,25 +415,7 @@ static bool pkg_key_compare(void* ka, void* kb, u64 size) {
       && sp_str_equal(a->triple, b->triple);
 }
 
-struct sm_pkg {};
-
-UTEST_F_SETUP(sm_pkg) {}
-UTEST_F_TEARDOWN(sm_pkg) {}
-
-
-typedef struct {
-  pkg_key_t key;
-  pkg_value_t value;
-} kvp_t;
-
-#define strl(_lit) sp_str_lit(_lit)
-#define LOADED true
-#define UNLOADED false
-#define LOW_PRIORITY 1
-#define MID_PRIORITY 2
-#define HIGH_PRIORITY 3
-
-UTEST_F(sm_pkg, custom_hash_compare) {
+UTEST(sm_pkg, custom_hash_compare) {
   sp_sm(pkg_key_t, pkg_value_t) map = SP_NULLPTR;
   sp_sm_set_fns(map, pkg_key_hash, pkg_key_compare);
 
@@ -458,15 +455,15 @@ UTEST_F(sm_pkg, custom_hash_compare) {
   sp_sm_free(map);
 }
 
-UTEST_F(sm_pkg, same_name_different_version_and_triple) {
+UTEST(sm_pkg, same_name_different_version_and_triple) {
   sp_sm(pkg_key_t, pkg_value_t) map = SP_NULLPTR;
   sp_sm_set_fns(map, pkg_key_hash, pkg_key_compare);
 
   pkg_key_t keys[] = {
-    { .name = strl("zlib"), .version = 100, .triple = strl("x86_64-linux-gnu") },
-    { .name = strl("zlib"), .version = 100, .triple = strl("aarch64-linux-gnu") },
-    { .name = strl("zlib"), .version = 200, .triple = strl("x86_64-linux-gnu") },
-    { .name = strl("zlib"), .version = 200, .triple = strl("aarch64-linux-gnu") },
+    { strl("zlib"), 100, strl("x86_64-linux-gnu") },
+    { strl("zlib"), 100, strl("aarch64-linux-gnu") },
+    { strl("zlib"), 200, strl("x86_64-linux-gnu") },
+    { strl("zlib"), 200, strl("aarch64-linux-gnu") },
   };
 
   for (s32 i = 0; i < 4; i++) {
@@ -484,7 +481,7 @@ UTEST_F(sm_pkg, same_name_different_version_and_triple) {
   sp_sm_free(map);
 }
 
-UTEST_F(sm_pkg, duplicate_with_custom_fns) {
+UTEST(sm_pkg, duplicate_with_custom_fns) {
   sp_sm(pkg_key_t, pkg_value_t) map = SP_NULLPTR;
   sp_sm_set_fns(map, pkg_key_hash, pkg_key_compare);
 
@@ -500,7 +497,7 @@ UTEST_F(sm_pkg, duplicate_with_custom_fns) {
   sp_sm_free(map);
 }
 
-UTEST_F(sm_pkg, stable_pointers_with_custom_fns) {
+UTEST(sm_pkg, stable_pointers_with_custom_fns) {
   sp_sm(pkg_key_t, pkg_value_t) map = SP_NULLPTR;
   sp_sm_set_fns(map, pkg_key_hash, pkg_key_compare);
 
@@ -521,7 +518,7 @@ UTEST_F(sm_pkg, stable_pointers_with_custom_fns) {
   sp_sm_free(map);
 }
 
-UTEST_F(sm_pkg, iteration_order_preserved) {
+UTEST(sm_pkg, iteration_order_preserved) {
   sp_sm(pkg_key_t, pkg_value_t) map = SP_NULLPTR;
   sp_sm_set_fns(map, pkg_key_hash, pkg_key_compare);
 
