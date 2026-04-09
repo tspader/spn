@@ -10,6 +10,7 @@ typedef struct {
   const c8* namespace;
   const c8* name;
   const c8* version;
+  spn_index_dep_kind_t kind;
 } dep_input_t;
 
 typedef struct {
@@ -61,6 +62,7 @@ static void run_roundtrip_case(s32* utest_result, struct index_roundtrip* fixtur
         .name = sp_str_view(dep.name),
       },
       .version = sp_str_view(dep.version),
+      .kind = dep.kind,
     }));
   }
 
@@ -106,6 +108,7 @@ static void run_roundtrip_case(s32* utest_result, struct index_roundtrip* fixtur
       SP_EXPECT_STR_EQ_CSTR(parsed->deps[it].id.namespace, c.input.deps[it].namespace);
       SP_EXPECT_STR_EQ_CSTR(parsed->deps[it].id.name, c.input.deps[it].name);
       SP_EXPECT_STR_EQ_CSTR(parsed->deps[it].version, c.input.deps[it].version);
+      EXPECT_EQ(c.input.deps[it].kind, parsed->deps[it].kind);
     }
   }
 
@@ -158,8 +161,58 @@ UTEST_F(index_roundtrip, with_deps) {
       .source = { .url = "https://github.com/example/spum", .rev = "def456" },
       .paths = { .manifest = "spn.toml", .script = "spn.c" },
       .deps = {
-        { .namespace = "core", .name = "curl", .version = "^1.0.0" },
-        { .namespace = "core", .name = "zlib", .version = "^2.0.0" },
+        { .namespace = "core", .name = "curl", .version = "^1.0.0", .kind = SPN_INDEX_DEP_NORMAL },
+        { .namespace = "core", .name = "zlib", .version = "^2.0.0", .kind = SPN_INDEX_DEP_NORMAL },
+      },
+    },
+  });
+}
+
+UTEST_F(index_roundtrip, with_build_deps) {
+  run_roundtrip_case(utest_result, uf, (roundtrip_case_t) {
+    .name = "with_build_deps",
+    .input = {
+      .namespace = "core",
+      .name = "spum",
+      .version = spn_semver_lit(1, 0, 0),
+      .source = { .url = "https://github.com/example/spum", .rev = "abc123" },
+      .paths = { .manifest = "spn.toml", .script = "spn.c" },
+      .deps = {
+        { .namespace = "core", .name = "cmake", .version = "^3.0.0", .kind = SPN_INDEX_DEP_BUILD },
+      },
+    },
+  });
+}
+
+UTEST_F(index_roundtrip, with_test_deps) {
+  run_roundtrip_case(utest_result, uf, (roundtrip_case_t) {
+    .name = "with_test_deps",
+    .input = {
+      .namespace = "core",
+      .name = "spum",
+      .version = spn_semver_lit(1, 0, 0),
+      .source = { .url = "https://github.com/example/spum", .rev = "abc123" },
+      .paths = { .manifest = "spn.toml", .script = "spn.c" },
+      .deps = {
+        { .namespace = "core", .name = "utest", .version = "^1.0.0", .kind = SPN_INDEX_DEP_TEST },
+      },
+    },
+  });
+}
+
+UTEST_F(index_roundtrip, with_mixed_dep_kinds) {
+  run_roundtrip_case(utest_result, uf, (roundtrip_case_t) {
+    .name = "with_mixed_dep_kinds",
+    .input = {
+      .namespace = "core",
+      .name = "spum",
+      .version = spn_semver_lit(3, 0, 0),
+      .source = { .url = "https://github.com/example/spum", .rev = "fff999" },
+      .paths = { .manifest = "spn.toml", .script = "spn.c" },
+      .deps = {
+        { .namespace = "core", .name = "curl", .version = "^1.0.0", .kind = SPN_INDEX_DEP_NORMAL },
+        { .namespace = "core", .name = "cmake", .version = "^3.0.0", .kind = SPN_INDEX_DEP_BUILD },
+        { .namespace = "core", .name = "utest", .version = "^1.0.0", .kind = SPN_INDEX_DEP_TEST },
       },
     },
   });

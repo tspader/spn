@@ -28,29 +28,6 @@ void add_pkg_to_cc_target(spn_cc_target_t* target, spn_pkg_unit_t* pkg, spn_targ
 }
 
 void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
-  spn_session_t* s = target->session;
-  spn_target_info_t* info = target->info;
-  spn_pkg_info_t* pkg = target->pkg;
-  spn_cc_driver_t driver = cc->cc->driver;
-
-  sp_da_for(pkg->system_deps, i) {
-    spn_cc_target_add_lib(cc, spn_gen_format_entry(pkg->system_deps[i], SPN_GEN_SYSTEM_LIBS, driver));
-  }
-
-  sp_da_for(info->deps, it) {
-    sp_str_t name = info->deps[it];
-    if (sp_om_has(pkg->libs, name)) {
-      spn_target_info_t* lib = sp_om_get(pkg->libs, name);
-    }
-    else {
-      spn_pkg_unit_t* dep = spn_session_find_pkg(s, name);
-      spn_cc_target_add_dep(cc, dep);
-      sp_da_for(dep->info->system_deps, j) {
-        sp_str_t system_dep = dep->info->system_deps[j];
-        spn_cc_target_add_lib(cc, spn_gen_format_entry(system_dep, SPN_GEN_SYSTEM_LIBS, driver));
-      }
-    }
-  }
 }
 
 sp_str_t get_embed_object_path(spn_target_unit_t* unit) {

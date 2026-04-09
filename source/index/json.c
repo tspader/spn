@@ -32,6 +32,28 @@ static mz_err_t on_parse_semver(mz_ctx_t* ctx, void* parent, mz_key_t key, void*
   return MZ_OK;
 }
 
+static const c8* dep_kind_strings[] = {
+  [SPN_INDEX_DEP_NORMAL] = "normal",
+  [SPN_INDEX_DEP_BUILD]  = "build",
+  [SPN_INDEX_DEP_TEST]   = "test",
+};
+
+static const c8* spn_index_dep_kind_to_cstr(spn_index_dep_kind_t kind) {
+  sp_assert(kind <= SPN_INDEX_DEP_TEST);
+  return dep_kind_strings[kind];
+}
+
+static mz_err_t on_parse_dep_kind(mz_ctx_t* ctx, void* parent, mz_key_t key, void* ptr, const void* value) {
+  sp_str_t str = sp_str_view(mz_deref(spn_cstr, value));
+  sp_for(it, sp_carr_len(dep_kind_strings)) {
+    if (sp_str_equal_cstr(str, dep_kind_strings[it])) {
+      mz_assign(spn_index_dep_kind_t, ptr, (spn_index_dep_kind_t)it);
+      return MZ_OK;
+    }
+  }
+  return MZ_ERR_RANGE;
+}
+
 static mz_err_t on_alloc_dep(mz_ctx_t* ctx, void* parent, mz_key_t key, u32 size, void** ptr) {
   sp_da(spn_index_dep_t)* deps = parent;
   sp_da_push(*deps, SP_ZERO_STRUCT(spn_index_dep_t));
@@ -88,6 +110,7 @@ mz_schema_t* spn_index_build_schema(mz_ctx_t* ctx) {
         MZ_BIND_PARSE(&b, spn_index_dep_t, id.namespace, "namespace", mz_schema_string(), on_parse_str);
         MZ_BIND_PARSE(&b, spn_index_dep_t, id.name, "name", mz_schema_string(), on_parse_str);
         MZ_BIND_PARSE(&b, spn_index_dep_t, version, "version", mz_schema_string(), on_parse_str);
+        MZ_BIND_PARSE(&b, spn_index_dep_t, kind, "kind", mz_schema_string(), on_parse_dep_kind);
       }
     }
   }
@@ -167,6 +190,8 @@ sp_str_t spn_index_rel_to_json(spn_index_rel_t* rel) {
       json_append_str(&b, "name", rel->deps[it].id.name);
       sp_str_builder_append_cstr(&b, ", ");
       json_append_str(&b, "version", rel->deps[it].version);
+      sp_str_builder_append_cstr(&b, ", ");
+      json_append_str(&b, "kind", sp_str_view(spn_index_dep_kind_to_cstr(rel->deps[it].kind)));
       sp_str_builder_append_cstr(&b, "}");
     }
     sp_str_builder_append_cstr(&b, "]");

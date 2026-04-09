@@ -386,7 +386,8 @@ UTEST_F(index_query, query_package_parses_deps_smoke) {
               k("deps") "[{"
                 kv("namespace", "core") ","
                 kv("name", "curl") ","
-                kv("version", "^1.0.0")
+                kv("version", "^1.0.0") ","
+                kv("kind", "normal")
               "}]"
             "}",
           },

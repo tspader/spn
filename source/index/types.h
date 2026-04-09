@@ -28,7 +28,14 @@ typedef enum {
   SPN_INDEX_AUTH_NEVER,
 } spn_index_auth_t;
 
+typedef enum {
+  SPN_INDEX_DEP_NORMAL,
+  SPN_INDEX_DEP_BUILD,
+  SPN_INDEX_DEP_TEST,
+} spn_index_dep_kind_t;
+
 typedef struct {
+  spn_index_dep_kind_t kind;
   spn_pkg_id_t id;
   sp_str_t version;
 } spn_index_dep_t;
