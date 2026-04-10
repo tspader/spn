@@ -1,3 +1,4 @@
+#include "err.h"
 #include "error/types.h"
 #include "event/event.h"
 #include "index/cache.h"
@@ -8,14 +9,21 @@
 #include "semver/compare.h"
 #include "semver/parser.h"
 #include "semver/types.h"
+#include "session/registry/types.h"
 #include "spn.h"
 
-void spn_resolver_init(spn_resolver_t* r, spn_index_cache_t* index, spn_pkg_info_t* pkg, spn_event_buffer_t* events) {
-  *r = (spn_resolver_t){ .pkg = pkg, .index = index, .events = events };
+static spn_err_t resolve_deps(spn_resolver_t* r, spn_resolve_run_t* resolve, spn_resolved_pkg_t node);
+
+void spn_resolver_init(spn_resolver_t* r, spn_index_cache_t* index, spn_pkg_registry_t* registry, spn_event_buffer_t* events) {
+  *r = (spn_resolver_t){
+    .index = index,
+    .events = events,
+    .registry = registry,
+  };
 }
 
-void spn_resolver_add(spn_resolver_t* r, spn_requested_pkg_t req) {
-  sp_da_push(r->reqs, req);
+void spn_resolve_query_add(spn_resolve_query_t* query, spn_requested_pkg_t req) {
+  sp_da_push(query->reqs, req);
 }
 
 static bool version_in_range(spn_semver_t version, spn_semver_range_t range) {
@@ -24,29 +32,49 @@ static bool version_in_range(spn_semver_t version, spn_semver_range_t range) {
     spn_semver_satisfies(version, range.high.version, range.high.op);
 }
 
-static spn_err_t resolve_deps(spn_resolver_t* r, spn_resolved_pkg_t node);
+static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_requested_pkg_t* request) {
+  spn_loaded_pkg_t* pkg = sp_str_ht_get(*resolver->registry, request->qualified);
 
-static spn_err_t resolve_file_package(spn_resolver_t* r, spn_requested_pkg_t request) {
+  spn_resolved_pkg_t resolved = {
+    .qualified = pkg->info->qualified,
+    .source = pkg->source,
+    .version = pkg->info->version,
+  };
 
+  // Looks frivolous, but the point here is that the list of dependencies defined in the manifest is
+  // not the same as the list of dependencies we're actually using for this build.
+  //
+  // Pretty much any  conditional compilation feature will run into this, and this is the place to
+  // filter dependencies (e.g. if pkg is only a dependency on aarch64, it would get cut here). The
+  // reason it's done here is that:
+  //   - It's the earliest place we *can* do it, because resolve is the first place where we have
+  //     package dependencies rather than just a list of requested package names
+  //   - We don't want to do it later, because then we'd fetch index data for packages that aren't
+  //     even going to be included in the build
+  sp_str_ht_for_kv(pkg->info->deps, it) {
+    sp_da_push(resolved.deps, *it.val);
+  }
+
+  sp_str_ht_insert(run->query->result, resolved.qualified, resolved);
+
+  return SPN_OK;
 }
 
-static spn_err_t resolve_index_package(spn_resolver_t* r, spn_requested_pkg_t request) {
-
+static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_requested_pkg_t* request) {
   // If we already resolved a version for this package elsewhere, check if the
   // version we found there satisfies this request, too. If not, backtrack.
-  spn_resolved_pkg_t* existing = sp_str_ht_get(r->packages, request.qualified);
+  spn_resolved_pkg_t* existing = sp_str_ht_get(run->query->result, request->qualified);
   if (existing) {
-    return version_in_range(existing->version, request.index.range) ?
+    return version_in_range(existing->version, request->index.range) ?
       SPN_OK :
       SPN_ERROR;
   }
 
-  spn_pkg_id_t id = spn_qualified_name_to_pkg_id(request.qualified);
-  spn_index_pkg_t* pkg = spn_index_cache_get_package(r->index, id);
+  spn_index_pkg_t* pkg = spn_index_cache_get_package(resolver->index, spn_qualified_name_to_pkg_id(request->qualified));
   if (!pkg) {
-    spn_event_buffer_push_ex(r->events, r->pkg, SP_NULLPTR, (spn_build_event_t) {
+    spn_event_buffer_push(resolver->events, (spn_build_event_t) {
       .kind = SPN_EVENT_ERR_UNKNOWN_PKG,
-      .unknown.request = request
+      .unknown.request = *request
     });
     return SPN_ERROR;
   }
@@ -54,7 +82,7 @@ static spn_err_t resolve_index_package(spn_resolver_t* r, spn_requested_pkg_t re
   // Try this package's versions in reverse order; no other heuristics.
   sp_da_rfor(pkg->releases, it) {
     spn_index_rel_t* release = &pkg->releases[it];
-    if (!version_in_range(release->version, request.index.range)) {
+    if (!version_in_range(release->version, request->index.range)) {
       continue;
     }
 
@@ -77,56 +105,54 @@ static spn_err_t resolve_index_package(spn_resolver_t* r, spn_requested_pkg_t re
       };
       sp_da_push(node.deps, dep);
     }
-    sp_str_ht_insert(r->packages, node.qualified, node);
+    sp_str_ht_insert(run->query->result, node.qualified, node);
 
     // Resolve the subtree rooted at this package
-    if (resolve_deps(r, node)) {
-      sp_str_ht_erase(r->packages, node.qualified);
+    if (resolve_deps(resolver, run, node)) {
+      sp_str_ht_erase(run->query->result, node.qualified);
       return SPN_ERROR;
     }
 
     return SPN_OK;
   }
 
-  spn_event_buffer_push_ex(r->events, r->pkg, SP_NULLPTR, (spn_build_event_t) {
+  spn_event_buffer_push(resolver->events, (spn_build_event_t) {
     .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
     .unsatisfiable = {
-      .low = request,
-      .high = request
+      .low = *request,
+      .high = *request
     }
   });
   return SPN_ERROR;
 }
 
-static spn_err_t resolve_deps(spn_resolver_t* r, spn_resolved_pkg_t node) {
+static spn_err_t resolve_deps(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t node) {
   // If we've already seen this package, it must transitively include itself.
-  if (sp_str_ht_exists(r->visited, node.qualified)) {
-    spn_event_buffer_push_ex(r->events, r->pkg, SP_NULLPTR, (spn_build_event_t) {
+  if (sp_str_ht_exists(run->visited, node.qualified)) {
+    spn_event_buffer_push(resolver->events, (spn_build_event_t) {
       .kind = SPN_EVENT_ERR_CIRCULAR_DEP,
-      .circular.id = node.id,
+      .circular.id = spn_qualified_name_to_pkg_id(node.qualified),
     });
     return SPN_ERROR;
   }
 
-  sp_str_ht_insert(r->visited, node.qualified, true);
+  sp_str_ht_insert(run->visited, node.qualified, true);
 
   spn_err_t result = SPN_OK;
   sp_da_for(node.deps, it) {
-    spn_requested_pkg_t dep = node.deps[it];
+    spn_requested_pkg_t* dep = &node.deps[it];
 
-    switch (dep.source) {
-      case SPN_PKG_SOURCE_INDEX: result = resolve_index_package(r, dep); break;
-      case SPN_PKG_SOURCE_FILE:  result = resolve_file_package(r, dep); break;
-      case SPN_PKG_SOURCE_ROOT: {
-        break;
-      }
+    switch (dep->source) {
+      case SPN_PKG_SOURCE_INDEX: result = resolve_index_package(resolver, run, dep); break;
+      case SPN_PKG_SOURCE_ROOT:
+      case SPN_PKG_SOURCE_FILE:  result = resolve_local_package(resolver, run, dep); break;
     }
 
     if (result) goto done;
   }
 
 done:
-  sp_str_ht_erase(r->visited, node.qualified);
+  sp_str_ht_erase(run->visited, node.qualified);
   return result;
 }
 
@@ -134,20 +160,16 @@ spn_err_t spn_resolve_from_lock_file(spn_resolver_t* resolver, spn_lock_file_t* 
   return SPN_OK;
 }
 
-spn_err_t spn_resolve_from_solver(spn_resolver_t* r) {
-  r->timer = sp_tm_start_timer();
+spn_err_t spn_resolve_from_solver(spn_resolver_t* resolver, spn_resolve_query_t* query) {
+  spn_resolve_run_t run = sp_zero_initialize();
 
   spn_resolved_pkg_t node = {
-    .id = spn_qualified_name_to_pkg_id(r->pkg->qualified),
-    .qualified = r->pkg->qualified,
-    .source = SPN_PKG_SOURCE_ROOT,
-    .version = r->pkg->version,
-    .deps = r->reqs,
-    .root = {
-      .info = r->pkg
-    }
+    .qualified = sp_str_lit(""),
+    .deps = query->reqs,
   };
-  sp_str_ht_insert(r->packages, node.qualified, node);
 
-  return resolve_deps(r, node);
+  sp_tm_timer_t timer = sp_tm_start_timer();
+  spn_err_t err = resolve_deps(resolver, &run, node);
+  query->time = sp_tm_read_timer(&timer);
+  return err;
 }

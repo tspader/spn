@@ -208,7 +208,7 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
   spn_resolver_init(&resolver, &cache, &manifest, events);
 
   sp_ht_for_kv(manifest.deps, it) {
-    spn_resolver_add(&resolver, *it.val);
+    spn_resolve_query_add(&resolver, *it.val);
   }
 
   spn_err_t resolve = spn_resolve_from_solver(&resolver);
@@ -227,7 +227,7 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
     };
     sp_str_t qualified = spn_pkg_id_to_qualified_name(id);
 
-    spn_resolved_pkg_t* resolved = sp_str_ht_get(resolver.packages, qualified);
+    spn_resolved_pkg_t* resolved = sp_str_ht_get(resolver.result, qualified);
     ASSERT_NE(resolved, SP_NULLPTR);
     ASSERT_TRUE(spn_semver_eq(resolved->version, expected.version));
   }

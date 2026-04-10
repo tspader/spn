@@ -4,6 +4,8 @@
 #include "error/types.h"
 #include "event/types.h"
 #include "graph/types.h"
+#include "pkg/types.h"
+#include "session/registry/types.h"
 #include "target/types.h"
 #include "unit/types.h"
 
@@ -181,12 +183,13 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   // Add a graph node for each package
   sp_str_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
+    spn_loaded_pkg_t* pkg = sp_str_ht_get(session->packages, unit->id);
 
     unit->nodes.configure.run = spn_bg_add_fn(graph, on_configure_package, unit);
     unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
     spn_try(spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp));
 
-    if (unit != root) {
+    if (pkg->source != SPN_PKG_SOURCE_ROOT) {
       spn_try(spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp));
     }
   }

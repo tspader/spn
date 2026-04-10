@@ -94,6 +94,4 @@ struct spn_pkg_info {
   sp_mem_arena_t* arena;
 };
 
-typedef sp_str_ht(sp_str_t) spn_pkg_registry_t;
-
 #endif

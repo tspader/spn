@@ -71,23 +71,29 @@ spn_err_t apply_config(spn_session_t* session, spn_app_config_t config) {
   return SPN_OK;
 }
 
-spn_err_t add_toolchain(spn_session_t* session, spn_resolver_t* resolver) {
+void add_toolchain(spn_session_t* session, spn_resolve_query_t* query) {
   spn_toolchain_entry_t* toolchain = sp_str_ht_get(session->toolchains, session->profile.toolchain);
   sp_intern_str_t qualified = spn_pkg_canonicalize_name(toolchain->request.package);
 
   if (toolchain->kind == SPN_TOOLCHAIN_INDEX) {
-    spn_resolver_add(resolver, (spn_requested_pkg_t) {
+    spn_resolve_query_add(query, (spn_requested_pkg_t) {
       .qualified = qualified,
       .source = SPN_PKG_SOURCE_INDEX,
       .index.range = toolchain->request.range,
     });
   }
-
-  return SPN_OK;
 }
 
-void emit_resolved(spn_resolver_t* resolver) {
-  sp_str_ht_for_kv(resolver->packages, it) {
+void add_root(spn_session_t* session, spn_resolve_query_t* query) {
+  spn_resolve_query_add(query, (spn_requested_pkg_t) {
+    .qualified = session->pkg->qualified,
+    .source = SPN_PKG_SOURCE_ROOT,
+  });
+
+}
+
+void emit_resolved(spn_resolve_query_t* query) {
+  sp_str_ht_for_kv(query->result, it) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_RESOLVE_PACKAGE,
       .resolve_pkg = {
@@ -100,8 +106,8 @@ void emit_resolved(spn_resolver_t* resolver) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_RESOLVE_END,
     .resolve_end = {
-      .num_resolved = sp_str_ht_size(resolver->packages),
-      .time = sp_tm_read_timer(&resolver->timer),
+      .num_resolved = sp_str_ht_size(query->result),
+      .time = query->time,
     }
   });
 
@@ -118,22 +124,20 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_index_cache_init(&index, &spn.indexes);
 
   spn_resolver_t* resolver = sp_alloc_type(spn_resolver_t);
-  spn_resolver_init(resolver, &index, &app->package, spn.events);
+  spn_resolver_init(resolver, &index, &session->packages, spn.events);
   app->resolver = resolver;
 
-  // Add any packages which need to be resolved from an index
-  sp_ht_for_kv(app->package.deps, it) {
-    spn_resolver_add(resolver, *it.val);
-  }
-
-  spn_try_as(add_toolchain(session, resolver), SPN_TASK_ERROR);
+  spn_resolve_query_t query = sp_zero_initialize();
+  add_root(session, &query);
+  add_toolchain(session, &query);
 
   // Resolve
   spn_resolve_strategy_t strategy = app->lock.some == SP_OPT_SOME ?
     SPN_RESOLVE_STRATEGY_LOCK_FILE :
     SPN_RESOLVE_STRATEGY_SOLVER;
 
-  spn_try_as(spn_resolve_from_solver(resolver), SPN_TASK_ERROR);
+  spn_try_as(spn_resolve_from_solver(resolver, &query), SPN_TASK_ERROR);
+  session->resolve = query.result;
 
   // switch (strategy) {
   //   case SPN_RESOLVE_STRATEGY_LOCK_FILE: {
@@ -146,7 +150,7 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   //   }
   // }
 
-  emit_resolved(resolver);
+  emit_resolved(&query);
 
   return SPN_TASK_DONE;
 }

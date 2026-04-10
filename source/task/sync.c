@@ -146,8 +146,6 @@ spn_err_t load_index_package(spn_session_t* session, spn_resolved_pkg_t* resolve
 }
 
 spn_err_t load_file_package(spn_session_t* session, spn_resolved_pkg_t* pkg) {
-  sp_str_t qualified = spn_pkg_id_to_qualified_name(pkg->id);
-
   sp_str_t manifest = pkg->file.path;
   if (sp_str_starts_with(manifest, SP_LIT("file://"))) {
     manifest = sp_str_strip_left(manifest, SP_LIT("file://"));
@@ -159,7 +157,7 @@ spn_err_t load_file_package(spn_session_t* session, spn_resolved_pkg_t* pkg) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_SYNC_FAILED,
       .sync_failed = {
-        .name = qualified,
+        .name = pkg->qualified,
         .url = manifest,
         .error = sp_str_lit("manifest not found"),
       }
@@ -167,8 +165,8 @@ spn_err_t load_file_package(spn_session_t* session, spn_resolved_pkg_t* pkg) {
     return SPN_ERROR;
   }
 
-  sp_str_ht_insert(session->packages, qualified, sp_zero_struct(spn_loaded_pkg_t));
-  spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, qualified);
+  sp_str_ht_insert(session->packages, pkg->qualified, sp_zero_struct(spn_loaded_pkg_t));
+  spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, pkg->qualified);
 
   loaded->source = SPN_PKG_SOURCE_FILE;
   loaded->info = sp_alloc_type(spn_pkg_info_t);
@@ -195,7 +193,7 @@ void add_compilation_units(spn_session_t* session, spn_resolver_t* resolver) {
     spn_session_add_pkg(session, it.val);
   }
 
-  sp_str_ht_for_kv(resolver->packages, it) {
+  sp_str_ht_for_kv(session->resolve, it) {
     spn_resolved_pkg_t* pkg = it.val;
     spn_pkg_unit_t* unit = spn_session_find_pkg(session, pkg->qualified);
 
@@ -216,7 +214,7 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   spn_git_cache_init(session->git, spn.paths.source);
 
   // Load every package's manifest, checking out source code if needed
-  sp_str_ht_for_kv(app->resolver->packages, it) {
+  sp_str_ht_for_kv(session->resolve, it) {
     spn_resolved_pkg_t* pkg = it.val;
     switch (pkg->source) {
       case SPN_PKG_SOURCE_ROOT: load_root_package(session); break;

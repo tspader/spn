@@ -11,6 +11,7 @@
 #include "intern/types.h"
 #include "profile/types.h"
 #include "semver/types.h"
+#include "session/registry/types.h"
 #include "toolchain/types.h"
 #include "unit/types.h"
 
@@ -25,17 +26,6 @@ typedef struct {
   spn_bg_executor_t *executor;
 } spn_bg_ctx_t;
 
-typedef struct {
-  spn_pkg_source_t source;
-  spn_pkg_info_t* info;
-  struct {
-    sp_str_t manifest;
-    sp_str_t script;
-    sp_str_t source;
-  } paths;
-  u64 elapsed;
-} spn_loaded_pkg_t;
-
 typedef sp_str_ht(sp_da(spn_pkg_unit_t*)) spn_unit_graph_t;
 
 struct spn_session_t {
@@ -48,7 +38,8 @@ struct spn_session_t {
   spn_profile_table_t profiles;
   sp_str_ht(spn_toolchain_entry_t) toolchains;
 
-  sp_str_ht(spn_loaded_pkg_t) packages;
+  spn_resolve_t resolve;
+  spn_pkg_registry_t packages;
 
   spn_profile_info_t profile;
   struct {

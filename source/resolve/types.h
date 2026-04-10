@@ -6,6 +6,7 @@
 #include "intern/types.h"
 #include "pkg/types.h"
 #include "semver/types.h"
+#include "session/registry/types.h"
 
 typedef enum {
   SPN_RESOLVE_STRATEGY_LOCK_FILE,
@@ -13,7 +14,6 @@ typedef enum {
 } spn_resolve_strategy_t;
 
 typedef struct {
-  spn_pkg_id_t id;
   sp_intern_str_t qualified;
   spn_pkg_source_t source;
   spn_semver_t version;
@@ -25,16 +25,23 @@ typedef struct {
   };
 } spn_resolved_pkg_t;
 
-typedef struct spn_event_buffer_t spn_event_buffer_t;
+typedef sp_str_ht(spn_resolved_pkg_t) spn_resolve_t;
+
+typedef struct {
+  sp_da(spn_requested_pkg_t) reqs;
+  spn_resolve_t result;
+  u64 time;
+} spn_resolve_query_t;
+
+typedef struct {
+  spn_resolve_query_t* query;
+  sp_str_ht(u8) visited;
+} spn_resolve_run_t;
 
 typedef struct spn_resolver_t {
-  spn_pkg_info_t* pkg;
   spn_index_cache_t* index;
+  spn_pkg_registry_t* registry;
   spn_event_buffer_t* events;
-  sp_str_ht(u8) visited;
-  sp_da(spn_requested_pkg_t) reqs;
-  sp_str_ht(spn_resolved_pkg_t) packages;
-  sp_tm_timer_t timer;
 } spn_resolver_t;
 
 #endif
