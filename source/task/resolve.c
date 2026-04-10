@@ -47,6 +47,7 @@ spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
   session->paths.root = spn.paths.project;
   session->paths.build = sp_fs_join_path(spn.paths.project, sp_str_lit("build"));
   session->events = spn.events;
+  session->intern = spn.intern;
   sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
 
   return SPN_OK;

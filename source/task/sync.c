@@ -195,15 +195,15 @@ void add_compilation_units(spn_session_t* session, spn_resolver_t* resolver) {
 
   sp_str_ht_for_kv(session->resolve, it) {
     spn_resolved_pkg_t* pkg = it.val;
-    spn_pkg_unit_t* unit = spn_session_find_pkg(session, pkg->qualified);
+    spn_pkg_unit_t* unit = spn_session_find_pkg_by_qualified(session, pkg->qualified);
 
     sp_da(spn_pkg_unit_t*) deps = sp_zero;
     sp_da_for(pkg->deps, j) {
-      spn_pkg_unit_t* dep = spn_session_find_pkg(session, pkg->deps[j].qualified);
+      spn_pkg_unit_t* dep = spn_session_find_pkg_by_qualified(session, pkg->deps[j].qualified);
       sp_da_push(deps, dep);
     }
 
-    sp_str_ht_insert(session->units.graph, pkg->qualified, deps);
+    sp_om_insert(session->units.graph, unit->id, deps);
   }
 }
 

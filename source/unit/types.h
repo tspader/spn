@@ -1,11 +1,12 @@
 #ifndef SPN_UNIT_TYPES_H
 #define SPN_UNIT_TYPES_H
 
-#include "intern/types.h"
+#include "forward/types.h"
 #include "sp.h"
 #include "spn.h"
 
 #include "graph/types.h"
+#include "intern/types.h"
 #include "pkg/types.h"
 #include "target/types.h"
 #include "external/tcc/types.h"
@@ -13,6 +14,16 @@
 typedef struct spn_target_unit spn_target_unit_t;
 typedef struct spn_session_t spn_session_t;
 typedef struct spn_user_node_t spn_user_node_t;
+
+typedef struct {
+  sp_intern_id_t pkg;
+} spn_pkg_unit_id_t;
+
+typedef struct {
+  spn_pkg_unit_id_t pkg;
+  sp_intern_id_t target;
+} spn_target_unit_id_t;
+
 
 struct spn_node_t {
   spn_pkg_unit_t* ctx;
@@ -98,6 +109,7 @@ typedef struct {
 } spn_pkg_nodes_t;
 
 struct spn_target_unit {
+  spn_target_unit_id_t id;
   spn_session_t* session;
   spn_pkg_unit_t* pkg;
   spn_target_info_t* info;
@@ -106,7 +118,7 @@ struct spn_target_unit {
 
   struct {
     sp_da(spn_target_unit_t*) target;
-    sp_da(spn_target_unit_t*) package;
+    sp_da(spn_pkg_unit_t*) package;
   } deps;
 
   struct {
@@ -124,16 +136,19 @@ struct spn_target_unit {
   spn_build_io_t logs;
 };
 
+/////////////
+// PACKAGE //
+/////////////
 struct spn_pkg_unit_t {
-  sp_intern_str_t id;
+  spn_pkg_unit_id_t id;
   spn_session_t* session;
   spn_pkg_info_t* info;
 
   sp_str_om(spn_compile_unit_t) objects;
-  sp_str_ht(spn_target_unit_t*) libs;
-  sp_str_ht(spn_target_unit_t*) exes;
-  sp_str_ht(spn_target_unit_t*) scripts;
-  sp_str_ht(spn_target_unit_t*) tests;
+  sp_da(spn_target_unit_t*) libs;
+  sp_da(spn_target_unit_t*) exes;
+  sp_da(spn_target_unit_t*) scripts;
+  sp_da(spn_target_unit_t*) tests;
   sp_da(spn_target_unit_t*) targets;
 
   struct {

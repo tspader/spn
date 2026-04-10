@@ -204,14 +204,16 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
 
   spn_event_buffer_t* events = spn_event_buffer_new();
   spn_index_cache_t cache = sp_zero;
+  spn_pkg_registry_t registry = sp_zero;
   spn_resolver_t resolver = sp_zero;
-  spn_resolver_init(&resolver, &cache, &manifest, events);
+  spn_resolver_init(&resolver, &cache, &registry, events);
 
+  spn_resolve_query_t query = sp_zero;
   sp_ht_for_kv(manifest.deps, it) {
-    spn_resolve_query_add(&resolver, *it.val);
+    spn_resolve_query_add(&query, *it.val);
   }
 
-  spn_err_t resolve = spn_resolve_from_solver(&resolver);
+  spn_err_t resolve = spn_resolve_from_solver(&resolver, &query);
   ASSERT_EQ(resolve, fixture.err);
   if (resolve != SPN_OK) {
     return;
@@ -227,7 +229,7 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
     };
     sp_str_t qualified = spn_pkg_id_to_qualified_name(id);
 
-    spn_resolved_pkg_t* resolved = sp_str_ht_get(resolver.result, qualified);
+    spn_resolved_pkg_t* resolved = sp_str_ht_get(query.result, qualified);
     ASSERT_NE(resolved, SP_NULLPTR);
     ASSERT_TRUE(spn_semver_eq(resolved->version, expected.version));
   }

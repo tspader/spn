@@ -27,7 +27,7 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   spn_cc_set_toolchain(cc, unit->session->units.toolchain);
   add_pkg_to_cc(cc, unit->package->info);
 
-  spn_cc_target_t* target = spn_cc_add_target(cc, SPN_TARGET_OBJECT, file);
+  spn_cc_target_t* target = spn_cc_add_target(cc, SPN_CC_OUTPUT_OBJECT, file);
   add_pkg_to_cc_target(target, unit->package, unit->target->info);
 
   // Add the include paths for your dependencies. Save the linker flags for linking.

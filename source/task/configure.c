@@ -11,7 +11,7 @@
 
 #include "event/event.h"
 #include "external/cc.h"
-#include "external/tcc.h"
+#include "external/tcc/tcc.h"
 #include "graph/graph.h"
 #include "sp/glob.h"
 #include "session/session.h"
@@ -82,20 +82,19 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
   sp_tm_timer_t timer = sp_tm_start_timer();
   spn_tcc_err_ctx_t error_context = SP_ZERO_INITIALIZE();
 
-  spn_tcc_t* tcc = tcc_new();
-  sp_try_goto(spn_tcc_prepare_script(tcc, &error_context), fail);
-
   spn_cc_t cc = SP_ZERO_INITIALIZE();
+  spn_cc_add_runtime(&cc, spn.paths.runtime, spn.paths.include);
   spn_cc_set_profile(&cc, session->profile);
-  spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_TARGET_JIT, unit->info->name);
+  spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_CC_OUTPUT_JIT, unit->info->name);
+  spn_cc_target_add_absolute_source(target, unit->paths.script);
 
-  spn_cc_target_to_tcc(&cc, target, tcc);
-  sp_try_goto(spn_tcc_add_file(tcc, unit->paths.script), fail);
-  sp_try_goto(tcc_relocate(tcc), fail);
+  unit->tcc = sp_alloc_type(spn_tcc_t);
+  spn_tcc_init(unit->tcc);
+  sp_try_goto(spn_cc_target_to_tcc(&cc, target, unit->tcc), fail);
+  sp_try_goto(tcc_relocate(unit->tcc->s), fail);
 
-  unit->tcc = tcc;
-  unit->on_configure = tcc_get_symbol(tcc, "configure");
-  unit->on_package = tcc_get_symbol(tcc, "package");
+  unit->on_configure = tcc_get_symbol(unit->tcc->s, "configure");
+  unit->on_package = tcc_get_symbol(unit->tcc->s, "package");
 
   unit->time.compile = sp_tm_read_timer(&timer);
 
@@ -137,7 +136,7 @@ spn_err_t configure_package(spn_pkg_unit_t* unit) {
 
   sp_tm_timer_t timer = sp_tm_start_timer();
   jmp_buf jump;
-  int status = tcc_setjmp(unit->tcc, jump, unit->on_configure);
+  int status = tcc_setjmp(unit->tcc->s, jump, unit->on_configure);
   if (!status) {
     spn_t* spn = (spn_t*)unit;
     spn_config_t* configure = (spn_config_t*)unit;
@@ -181,9 +180,9 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   spn_pkg_unit_t* root = spn_session_find_root(&app->session);
 
   // Add a graph node for each package
-  sp_str_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
-    spn_loaded_pkg_t* pkg = sp_str_ht_get(session->packages, unit->id);
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    spn_loaded_pkg_t* pkg = sp_str_ht_get(session->packages, unit->info->qualified);
 
     unit->nodes.configure.run = spn_bg_add_fn(graph, on_configure_package, unit);
     unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
@@ -195,12 +194,12 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   }
 
   // Add links between packages
-  sp_str_om_for(session->units.packages, p) {
-    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, p);
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
 
-    sp_da(spn_pkg_unit_t*) deps = *sp_str_ht_get(session->units.graph, unit->id);
-    sp_da_for(deps, it) {
-      spn_pkg_unit_t* parent = deps[it];
+    sp_da(spn_pkg_unit_t*) deps = *sp_om_get(session->units.graph, unit->id);
+    sp_da_for(deps, j) {
+      spn_pkg_unit_t* parent = deps[j];
       spn_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, parent->nodes.configure.stamp));
     }
   }

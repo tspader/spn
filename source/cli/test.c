@@ -22,10 +22,10 @@ sp_app_result_t spn_cli_test(spn_cli_t* cli) {
     .mode = sp_str_empty(command->mode) ? 0 : spn_dep_build_mode_from_str(command->mode),
   };
 
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PREPARE_BUILD_GRAPH);
+  spn_task_enqueue(&app.tasks, SPN_TASK_RESOLVE);
+  spn_task_enqueue(&app.tasks, SPN_TASK_SYNC_PACKAGES);
+  spn_task_enqueue(&app.tasks, SPN_TASK_RUN_CONFIGURE_GRAPH);
+  spn_task_enqueue(&app.tasks, SPN_TASK_CREATE_UNITS);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN_BUILD_GRAPH);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN);
 

@@ -2,15 +2,13 @@
 #define SPN_SESSION_TYPES_H
 
 #include "sp.h"
-#include "spn.h"
 
 #include "git/types.h"
-#include "event/types.h"
 #include "filter/types.h"
 #include "graph/types.h"
 #include "intern/types.h"
 #include "profile/types.h"
-#include "semver/types.h"
+#include "resolve/types.h"
 #include "session/registry/types.h"
 #include "toolchain/types.h"
 #include "unit/types.h"
@@ -26,9 +24,10 @@ typedef struct {
   spn_bg_executor_t *executor;
 } spn_bg_ctx_t;
 
-typedef sp_str_ht(sp_da(spn_pkg_unit_t*)) spn_unit_graph_t;
+typedef sp_om(spn_pkg_unit_id_t, sp_da(spn_pkg_unit_t*)) spn_unit_graph_t;
 
 struct spn_session_t {
+  sp_intern_t* intern;
   spn_pkg_info_t* pkg;
   spn_event_buffer_t* events;
   spn_git_cache_t* git;
@@ -45,8 +44,8 @@ struct spn_session_t {
   struct {
     spn_unit_graph_t graph;
     sp_str_om(spn_compile_unit_t) objects;
-    sp_str_om(spn_target_unit_t) targets;
-    sp_str_om(spn_pkg_unit_t) packages;
+    sp_om(spn_target_unit_id_t, spn_target_unit_t) targets;
+    sp_om(spn_pkg_unit_id_t, spn_pkg_unit_t) packages;
     spn_toolchain_unit_t* toolchain;
   } units;
 

@@ -1,5 +1,7 @@
 #include "ctx/types.h"
 #include "event/types.h"
+#include "forward/types.h"
+#include "ordered_map.h"
 #include "spn.h"
 #include "target/types.h"
 #include "unit/types.h"
@@ -16,23 +18,161 @@
 #include "task/task.h"
 #include "unit/package.h"
 
-
 static spn_err_union_t spn_bg_error_to_union(spn_build_graph_t* graph);
 static spn_bg_id_t get_or_put_user_file(spn_pkg_unit_t* ctx, spn_build_graph_t* graph, sp_str_t path);
 static spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit);
+static spn_err_t prepare_build_graph(spn_app_t* app);
+
+void spn_task_init_build_graph(spn_app_t* app) {
+  spn_session_t* session = &app->session;
+
+  prepare_build_graph(app);
+
+  sp_str_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
+    spn.tui.info.max_name = SP_MAX(spn.tui.info.max_name, unit->info->name.len);
+  }
+
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    .kind = SPN_EVENT_INIT_BUILD_GRAPH,
+    .graph_init = {
+      .profile = session->profile.name,
+      .force = app->config.force,
+    }
+  });
+
+  session->build.dirty = app->config.force ?
+    spn_bg_compute_forced_dirty(&session->build.graph) :
+    spn_bg_compute_dirty(&session->build.graph);
+
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    .kind = SPN_EVENT_DIRTY_SUMMARY,
+    .dirty_summary = {
+      .total_commands = sp_da_size(session->build.graph.commands),
+      .dirty_commands = sp_ht_size(session->build.dirty->commands),
+      .total_files = sp_da_size(session->build.graph.files),
+      .dirty_files = sp_ht_size(session->build.dirty->files),
+      .forced = app->config.force,
+    }
+  });
+
+  session->build.executor = spn_bg_executor_new(
+    &session->build.graph,
+    session->build.dirty,
+    (spn_bg_executor_config_t) {
+      .num_threads = 1,
+      .enable_logging = false
+    }
+  );
+
+  spn_bg_executor_run(app->session.build.executor);
+}
+
+spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
+  spn_session_t* session = &app->session;
+  spn_bg_ctx_t* build = &session->build;
+
+  if (sp_atomic_s32_get(&build->executor->shutdown)) {
+    spn_bg_executor_join(build->executor);
+
+    // sp_tui_home();
+    // sp_tui_clear_line();
+
+    sp_opt(spn_bg_exec_error_t) error = SP_ZERO_INITIALIZE();
+    if (sp_da_size(build->executor->errors)) {
+      sp_opt_set(error, build->executor->errors[0]);
+    }
+
+    spn_pkg_unit_t* root = spn_session_find_root(session);
+    u32 num_errors = sp_da_size(build->executor->errors);
+    u32 dirty_cmds = sp_ht_size(session->build.dirty->commands);
+
+    switch (error.some) {
+      case SP_OPT_SOME: {
+        sp_str_t first_error = sp_str_lit("");
+        spn_bg_cmd_t* err_cmd = spn_bg_find_command(&session->build.graph, error.value.cmd_id);
+        if (err_cmd) {
+          first_error = err_cmd->tag;
+        }
+
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
+          .kind = SPN_EVENT_BUILD_FAILED,
+          .pkg = root->info,
+          .io = &root->logs.io,
+          .build_failed = {
+            .profile = session->profile.name,
+            .time = session->build.executor->elapsed,
+            .num_errors = num_errors,
+            .first_error = first_error,
+          }
+        });
+
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
+          .kind = SPN_EVENT_BUILD_SUMMARY,
+          .pkg = root->info,
+          .io = &root->logs.io,
+          .build_summary = {
+            .success = false,
+            .num_dirty = dirty_cmds,
+            .total_commands = sp_da_size(session->build.graph.commands),
+            .time = session->build.executor->elapsed,
+            .profile = session->profile.name,
+          }
+        });
+
+        return SPN_TASK_ERROR;
+      }
+      case SP_OPT_NONE: {
+        if (!app->lock.some) {
+          spn_app_update_lock_file(app);
+        }
+
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
+          .kind = SPN_EVENT_BUILD_PASSED,
+          .pkg = root->info,
+          .io = &root->logs.io,
+          .build.passed = {
+            .profile = &session->profile,
+            .time = session->build.executor->elapsed
+          }
+        });
+
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
+          .kind = SPN_EVENT_BUILD_SUMMARY,
+          .pkg = root->info,
+          .io = &root->logs.io,
+          .build_summary = {
+            .success = true,
+            .num_dirty = dirty_cmds,
+            .total_commands = sp_da_size(session->build.graph.commands),
+            .time = session->build.executor->elapsed,
+            .profile = session->profile.name,
+          }
+        });
+
+        return SPN_TASK_DONE;
+      }
+    }
+
+    return SPN_TASK_DONE;
+  }
+
+  return SPN_TASK_CONTINUE;
+}
+
 
 spn_err_t prepare_build_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->build.graph;
 
   // Add all nodes to the build graph
-  sp_str_om_for(session->units.packages, it) {
+  sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
     spn_try(add_package(graph, unit));
   }
 
   // Link intra-package dependencies
-  sp_str_om_for(session->units.targets, it) {
+  sp_om_for(session->units.targets, it) {
     spn_target_unit_t* target = sp_str_om_at(session->units.targets, it);
     sp_da_for(target->deps.target, it) {
 
@@ -40,15 +180,13 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
   }
 
   // Link inter-package dependencies; we don't do anything more granular than entire packages
-  sp_str_om_for(session->units.packages, it) {
+  sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* pkg = sp_str_om_at(session->units.packages, it);
-    sp_da_for(pkg->deps, it) {
-
-    }
   }
 
   return SPN_OK;
 }
+
 
 spn_err_union_t spn_bg_error_to_union(spn_build_graph_t* graph) {
   if (!graph->error.some) {
@@ -285,20 +423,17 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
     spn_target_unit_t* target = unit->targets[it];
 
     switch (target->info->kind) {
-      case SPN_TARGET_STATIC_LIB:
-      case SPN_TARGET_SHARED_LIB: {
+      case SPN_CC_OUTPUT_STATIC_LIB:
+      case SPN_CC_OUTPUT_SHARED_LIB: {
         if (!sp_da_empty(target->info->source)) {
           sp_try(add_target(graph, unit, target));
         }
         break;
       }
-      case SPN_TARGET_OBJECT:
-      case SPN_TARGET_EXE:
-      case SPN_TARGET_JIT: {
+      case SPN_CC_OUTPUT_OBJECT:
+      case SPN_CC_OUTPUT_EXE:
+      case SPN_CC_OUTPUT_JIT: {
         sp_try(add_target(graph, unit, target));
-        break;
-      }
-      case SPN_TARGET_NONE: {
         break;
       }
     }
@@ -307,250 +442,3 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   return SPN_OK;
 }
 
-
-static bool has_source_file(sp_da(sp_str_t) source, sp_str_t path) {
-  sp_da_for(source, it) {
-    if (sp_str_equal(source[it], path)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-static void collect_source_glob(sp_str_t root, sp_str_t pattern, sp_da(sp_str_t)* source) {
-  sp_glob_t* glob = sp_glob_new_str(pattern);
-  if (!glob) {
-    return;
-  }
-
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(root);
-  sp_da(sp_str_t) matches = SP_NULLPTR;
-
-  sp_da_for(entries, it) {
-    sp_fs_entry_t* entry = &entries[it];
-    if (!sp_fs_is_file(entry->file_path)) {
-      continue;
-    }
-
-    sp_str_t relative = sp_str_strip_left(entry->file_path, root);
-    relative = sp_str_strip_left(relative, sp_str_lit("/"));
-    if (!sp_glob_match(glob, relative)) {
-      continue;
-    }
-    if (has_source_file(matches, relative)) {
-      continue;
-    }
-
-    sp_da_push(matches, relative);
-  }
-
-  sp_dyn_array_sort(matches, sp_str_sort_kernel_alphabetical);
-
-  sp_da_for(matches, it) {
-    if (has_source_file(*source, matches[it])) {
-      continue;
-    }
-
-    sp_da_push(*source, matches[it]);
-  }
-}
-
-static sp_da(sp_str_t) collect_target_source(spn_pkg_unit_t* pkg, spn_target_unit_t* target) {
-  sp_da(sp_str_t) source = SP_NULLPTR;
-
-  sp_da_for(target->info->source, it) {
-    sp_str_t path = target->info->source[it];
-    if (sp_fs_is_glob(path)) {
-      collect_source_glob(pkg->paths.source, path, &source);
-      continue;
-    }
-    if (has_source_file(source, path)) {
-      continue;
-    }
-
-    sp_da_push(source, path);
-  }
-
-  return source;
-}
-
-spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
-  spn_session_t* session = &app->session;
-
-  // Now that the configure phase is done, everything about the build is static. We
-  // can go through every target and resolve file globs into object files which need
-  // to be compiled.
-  sp_str_om_for(session->units.targets, it) {
-    spn_target_unit_t* target = sp_str_om_at(session->units.targets, it);
-    spn_pkg_unit_t* pkg = target->pkg;
-
-    sp_da(sp_str_t) source = collect_target_source(pkg, target);
-    sp_da_for(source, j) {
-      sp_str_t relative = source[j];
-      sp_str_t file = sp_fs_join_path(pkg->paths.source, relative);
-      sp_str_t extension = sp_fs_get_ext(relative);
-      sp_str_t stem = relative;
-      if (!sp_str_empty(extension)) {
-        stem = sp_str_prefix(relative, relative.len - extension.len - 1);
-      }
-
-      sp_str_t object_path = sp_fs_join_path(target->paths.object, sp_format("{}.o", SP_FMT_STR(stem)));
-
-      if (!sp_str_om_has(pkg->objects, file)) {
-        sp_str_om_insert(pkg->objects, file, ((spn_compile_unit_t) {
-          .package = pkg,
-          .target = target,
-          .session = target->session,
-          .paths = {
-            .object = object_path,
-            .file = file,
-          },
-        }));
-      }
-
-      spn_compile_unit_t* object = sp_str_om_get(pkg->objects, file);
-      sp_da_push(target->objects, object);
-    }
-  }
-
-  spn_try_as(prepare_build_graph(app), SPN_TASK_ERROR);
-
-  return SPN_TASK_DONE;
-}
-
-
-void spn_task_init_build_graph(spn_app_t* app) {
-  spn_session_t* session = &app->session;
-
-  sp_str_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
-    spn.tui.info.max_name = SP_MAX(spn.tui.info.max_name, unit->info->name.len);
-  }
-
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
-    .kind = SPN_EVENT_INIT_BUILD_GRAPH,
-    .graph_init = {
-      .profile = session->profile.name,
-      .force = app->config.force,
-    }
-  });
-
-  session->build.dirty = app->config.force ?
-    spn_bg_compute_forced_dirty(&session->build.graph) :
-    spn_bg_compute_dirty(&session->build.graph);
-
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
-    .kind = SPN_EVENT_DIRTY_SUMMARY,
-    .dirty_summary = {
-      .total_commands = sp_da_size(session->build.graph.commands),
-      .dirty_commands = sp_ht_size(session->build.dirty->commands),
-      .total_files = sp_da_size(session->build.graph.files),
-      .dirty_files = sp_ht_size(session->build.dirty->files),
-      .forced = app->config.force,
-    }
-  });
-
-  session->build.executor = spn_bg_executor_new(
-    &session->build.graph,
-    session->build.dirty,
-    (spn_bg_executor_config_t) {
-      .num_threads = 1,
-      .enable_logging = false
-    }
-  );
-
-  spn_bg_executor_run(app->session.build.executor);
-}
-
-spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
-  spn_session_t* session = &app->session;
-  spn_bg_ctx_t* build = &session->build;
-
-  if (sp_atomic_s32_get(&build->executor->shutdown)) {
-    spn_bg_executor_join(build->executor);
-
-    // sp_tui_home();
-    // sp_tui_clear_line();
-
-    sp_opt(spn_bg_exec_error_t) error = SP_ZERO_INITIALIZE();
-    if (sp_da_size(build->executor->errors)) {
-      sp_opt_set(error, build->executor->errors[0]);
-    }
-
-    spn_pkg_unit_t* root = spn_session_find_root(session);
-    u32 num_errors = sp_da_size(build->executor->errors);
-    u32 dirty_cmds = sp_ht_size(session->build.dirty->commands);
-
-    switch (error.some) {
-      case SP_OPT_SOME: {
-        sp_str_t first_error = sp_str_lit("");
-        spn_bg_cmd_t* err_cmd = spn_bg_find_command(&session->build.graph, error.value.cmd_id);
-        if (err_cmd) {
-          first_error = err_cmd->tag;
-        }
-
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
-          .kind = SPN_EVENT_BUILD_FAILED,
-          .pkg = root->info,
-          .io = &root->logs.io,
-          .build_failed = {
-            .profile = session->profile.name,
-            .time = session->build.executor->elapsed,
-            .num_errors = num_errors,
-            .first_error = first_error,
-          }
-        });
-
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
-          .kind = SPN_EVENT_BUILD_SUMMARY,
-          .pkg = root->info,
-          .io = &root->logs.io,
-          .build_summary = {
-            .success = false,
-            .num_dirty = dirty_cmds,
-            .total_commands = sp_da_size(session->build.graph.commands),
-            .time = session->build.executor->elapsed,
-            .profile = session->profile.name,
-          }
-        });
-
-        return SPN_TASK_ERROR;
-      }
-      case SP_OPT_NONE: {
-        if (!app->lock.some) {
-          spn_app_update_lock_file(app);
-        }
-
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
-          .kind = SPN_EVENT_BUILD_PASSED,
-          .pkg = root->info,
-          .io = &root->logs.io,
-          .build.passed = {
-            .profile = &session->profile,
-            .time = session->build.executor->elapsed
-          }
-        });
-
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
-          .kind = SPN_EVENT_BUILD_SUMMARY,
-          .pkg = root->info,
-          .io = &root->logs.io,
-          .build_summary = {
-            .success = true,
-            .num_dirty = dirty_cmds,
-            .total_commands = sp_da_size(session->build.graph.commands),
-            .time = session->build.executor->elapsed,
-            .profile = session->profile.name,
-          }
-        });
-
-        return SPN_TASK_DONE;
-      }
-    }
-
-    return SPN_TASK_DONE;
-  }
-
-  return SPN_TASK_CONTINUE;
-}

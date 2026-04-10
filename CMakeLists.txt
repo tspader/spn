@@ -502,6 +502,7 @@ set(SPN_SOURCES
   source/target/target.c
   source/task/build.c
   source/task/build/build.c
+  source/task/build/prepare.c
   source/task/build/nodes/embed.c
   source/task/build/nodes/link.c
   source/task/build/nodes/object.c

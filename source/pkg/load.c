@@ -1,4 +1,3 @@
-#include "err.h"
 #include "error/types.h"
 #include "pkg/types.h"
 #include "profile/types.h"

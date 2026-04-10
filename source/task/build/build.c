@@ -60,5 +60,3 @@ sp_str_t get_target_output_path(spn_target_unit_t* unit) {
 
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
-
-void invoke_compiler();

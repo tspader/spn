@@ -1,4 +1,3 @@
-#include "err.h"
 #include "error/types.h"
 #include "event/event.h"
 #include "index/cache.h"
@@ -108,12 +107,11 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
     sp_str_ht_insert(run->query->result, node.qualified, node);
 
     // Resolve the subtree rooted at this package
-    if (resolve_deps(resolver, run, node)) {
-      sp_str_ht_erase(run->query->result, node.qualified);
-      return SPN_ERROR;
+    if (!resolve_deps(resolver, run, node)) {
+      return SPN_OK;
     }
 
-    return SPN_OK;
+    sp_str_ht_erase(run->query->result, node.qualified);
   }
 
   spn_event_buffer_push(resolver->events, (spn_build_event_t) {
@@ -161,7 +159,9 @@ spn_err_t spn_resolve_from_lock_file(spn_resolver_t* resolver, spn_lock_file_t* 
 }
 
 spn_err_t spn_resolve_from_solver(spn_resolver_t* resolver, spn_resolve_query_t* query) {
-  spn_resolve_run_t run = sp_zero_initialize();
+  spn_resolve_run_t run = {
+    .query = query,
+  };
 
   spn_resolved_pkg_t node = {
     .qualified = sp_str_lit(""),

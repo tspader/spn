@@ -1,6 +1,8 @@
 #include "ctx/types.h"
 
-#include "external/tcc.h"
+#include "external/tcc/tcc.h"
+#include "external/tcc/error.h"
+#include "external/tcc/backtrace.h"
 
 typedef struct {
   const c8* symbol;
@@ -66,34 +68,69 @@ static spn_tcc_symbol_t spn_tcc_symbol_table[] = {
   // SPN_DEFINE_LIB_ENTRY(spn_write_file)
 };
 
-// @spader What does "prepare script" mean? This is just setting up the context?
-spn_err_t spn_tcc_prepare_script(spn_tcc_t* tcc, spn_tcc_err_ctx_t* error_context) {
-  tcc_set_error_func(tcc, error_context, spn_tcc_on_build_script_compile_error);
-  tcc_set_backtrace_func(tcc, error_context, spn_tcc_backtrace);
-  tcc_set_lib_path(tcc, sp_str_to_cstr(spn.paths.runtime));
-  tcc_add_sysinclude_path(tcc, sp_str_to_cstr(spn.paths.include));
-  tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include));
-  tcc_set_options(tcc, "-gdwarf -Wall -Werror");
-  spn_try_as(tcc_set_output_type(tcc, TCC_OUTPUT_MEMORY), SPN_ERROR);
-  spn_try_as(tcc_add_include_path(tcc, sp_str_to_cstr(spn.paths.include)), SPN_ERROR);
-  tcc_define_symbol(tcc, "SPN", "");
-  sp_try(spn_tcc_register(tcc));
+spn_err_t spn_tcc_init(spn_tcc_t* tcc) {
+  tcc->s = tcc_new();
+  tcc_set_error_func(tcc->s, tcc, on_tcc_error);
+  tcc_set_backtrace_func(tcc->s, tcc, on_tcc_backtrace);
   return SPN_OK;
+}
+
+void spn_tcc_set_runtime(spn_tcc_t* tcc, sp_str_t path) {
+  tcc_set_lib_path(tcc->s, sp_str_to_cstr(path));
+}
+
+spn_err_t spn_tcc_add_sys_include(spn_tcc_t* tcc, sp_str_t path) {
+  sp_mem_scratch_t scratch = sp_mem_begin_scratch();
+  s32 result = tcc_add_sysinclude_path(tcc->s, sp_str_to_cstr(path));
+  sp_mem_end_scratch(scratch);
+  return result ? SPN_ERROR : SPN_OK;
+}
+
+spn_err_t spn_tcc_add_include(spn_tcc_t* tcc, sp_str_t path) {
+  sp_mem_scratch_t scratch = sp_mem_begin_scratch();
+  s32 result = tcc_add_include_path(tcc->s, sp_str_to_cstr(path));
+  sp_mem_end_scratch(scratch);
+  return result ? SPN_ERROR : SPN_OK;
+}
+
+void spn_tcc_add_library_path(spn_tcc_t* tcc, sp_str_t path) {
+  sp_mem_scratch_t scratch = sp_mem_begin_scratch();
+  tcc_add_library_path(tcc->s, sp_str_to_cstr(path));
+  sp_mem_end_scratch(scratch);
+}
+
+void spn_tcc_define_symbol(spn_tcc_t* tcc, sp_str_t symbol, sp_str_t value) {
+  sp_mem_scratch_t scratch = sp_mem_begin_scratch();
+  tcc_define_symbol(tcc->s, sp_str_to_cstr(value), "");
+  sp_mem_end_scratch(scratch);
 }
 
 spn_err_t spn_tcc_register(spn_tcc_t* tcc) {
   sp_carr_for(spn_tcc_symbol_table, it) {
-    sp_try_as(tcc_add_symbol(tcc, spn_tcc_symbol_table[it].symbol, spn_tcc_symbol_table[it].fn), SPN_ERROR);
+    sp_try_as(tcc_add_symbol(tcc->s, spn_tcc_symbol_table[it].symbol, spn_tcc_symbol_table[it].fn), SPN_ERROR);
   }
   return SPN_OK;
 }
 
-spn_err_t spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file_path) {
-  sp_try_as(tcc_add_file(tcc, sp_str_to_cstr(file_path)), SPN_ERROR);
-  return SPN_OK;
+spn_err_t spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file) {
+  sp_mem_scratch_t scratch = sp_mem_begin_scratch();
+  s32 error = tcc_add_file(tcc->s, sp_str_to_cstr(file));
+  sp_mem_end_scratch(scratch);
+  return error ? SPN_ERROR : SPN_OK;
 }
 
-s32 spn_tcc_backtrace(void* ud, void* pc, const c8* file, s32 line, const c8* fn, const c8* message) {
+void spn_tcc_list_fn(void* opaque, const c8* name, const void* value) {
+  (void)value;
+  sp_da(sp_str_t) syms = (sp_da(sp_str_t))opaque;
+  sp_dyn_array_push(syms, sp_str_from_cstr(name));
+}
+
+void on_tcc_error(void* user_data, const c8* message) {
+  spn_tcc_t* tcc = (spn_tcc_t*)user_data;
+  tcc->error = sp_str_from_cstr(message);
+}
+
+s32 on_tcc_backtrace(void* ud, void* pc, const c8* file, s32 line, const c8* fn, const c8* message) {
   (void)ud;
   (void)pc;
   (void)file;
@@ -101,15 +138,4 @@ s32 spn_tcc_backtrace(void* ud, void* pc, const c8* file, s32 line, const c8* fn
   (void)fn;
   (void)message;
   return 0;
-}
-
-void spn_tcc_on_build_script_compile_error(void* user_data, const c8* message) {
-  spn_tcc_err_ctx_t* e = (spn_tcc_err_ctx_t*)user_data;
-  e->error = sp_str_from_cstr(message);
-}
-
-void spn_tcc_list_fn(void* opaque, const c8* name, const void* value) {
-  (void)value;
-  sp_da(sp_str_t) syms = (sp_da(sp_str_t))opaque;
-  sp_dyn_array_push(syms, sp_str_from_cstr(name));
 }

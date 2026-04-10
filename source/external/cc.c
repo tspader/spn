@@ -1,12 +1,19 @@
 #include "ctx/types.h"
 #include "session/types.h"
+#include "tcc/tcc.h"
 #include "toolchain/types.h"
 
 #include "gen.h"
 #include "intern/intern.h"
+#include "external/tcc/tcc.h"
 #include "external/cc.h"
 #include "triple/triple.h"
 #include "sp/io.h"
+
+void spn_cc_add_runtime(spn_cc_t* cc, sp_str_t runtime, sp_str_t include) {
+  cc->spn.runtime = runtime;
+  cc->spn.include = include;
+}
 
 void spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_unit_t* toolchain) {
   cc->driver = toolchain->info.driver;
@@ -89,7 +96,7 @@ void spn_cc_target_add_dep(spn_cc_target_t* target, spn_pkg_unit_t* unit) {
   // @spader @refactor Add libraries
 }
 
-spn_cc_target_t* spn_cc_add_target(spn_cc_t* cc, spn_target_kind_t kind, sp_str_t output) {
+spn_cc_target_t* spn_cc_add_target(spn_cc_t* cc, spn_cc_output_kind_t kind, sp_str_t output) {
   spn_cc_target_t target = {
     .output = sp_str_copy(output),
     .kind = kind,
@@ -219,21 +226,20 @@ void spn_cc_to_ps(spn_cc_t* cc, sp_ps_config_t* ps) {
 
 void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps) {
   switch (target->kind) {
-    case SPN_TARGET_OBJECT: {
+    case SPN_CC_OUTPUT_OBJECT: {
       sp_ps_config_add_arg(ps, sp_str_lit("-c"));
       break;
     }
-    case SPN_TARGET_SHARED_LIB: {
+    case SPN_CC_OUTPUT_SHARED_LIB: {
       sp_ps_config_add_arg(ps, sp_str_lit("-shared"));
       break;
     }
-    case SPN_TARGET_EXE: {
+    case SPN_CC_OUTPUT_EXE: {
       sp_ps_config_add_arg(ps, spn_cc_lib_kind_to_switch(cc->linkage));
       break;
     }
-    case SPN_TARGET_NONE:
-    case SPN_TARGET_STATIC_LIB:
-    case SPN_TARGET_JIT: {
+    case SPN_CC_OUTPUT_STATIC_LIB:
+    case SPN_CC_OUTPUT_JIT: {
       break;
     }
   }
@@ -248,7 +254,7 @@ void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* 
   sp_da_for(target->define, it) {
     sp_ps_config_add_arg(ps, spn_gen_format_entry(target->define[it], SPN_GEN_DEFINE, driver));
   }
-  if (target->kind != SPN_TARGET_OBJECT) {
+  if (target->kind != SPN_CC_OUTPUT_OBJECT) {
     sp_da_for(target->lib_dirs, it) {
       sp_ps_config_add_arg(ps, spn_gen_format_entry(target->lib_dirs[it], SPN_GEN_LIB_INCLUDE, driver));
     }
@@ -265,34 +271,49 @@ void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* 
   sp_ps_config_add_arg(ps, sp_fs_join_path(cc->dir, target->output));
 }
 
-void spn_cc_target_to_tcc(spn_cc_t* cc, spn_cc_target_t* target, spn_tcc_t* tcc) {
-  s32 result = 0;
+spn_err_t spn_cc_target_to_tcc(spn_cc_t* cc, spn_cc_target_t* target, spn_tcc_t* tcc) {
+  if (!sp_str_empty(cc->spn.runtime)) {
+    spn_tcc_set_runtime(tcc, cc->spn.runtime);
+  }
+
+  if (!sp_str_empty(cc->spn.include)) {
+    spn_try(spn_tcc_add_sys_include(tcc, cc->spn.include));
+  }
+
+  tcc_set_options(tcc->s, "-gdwarf -Wall -Werror");
+  spn_try_as(tcc_set_output_type(tcc->s, TCC_OUTPUT_MEMORY), SPN_ERROR);
+  tcc_define_symbol(tcc->s, "SPN", "");
+  sp_try(spn_tcc_register(tcc));
 
   sp_da_for(cc->include, it) {
-    result = tcc_add_include_path(tcc, sp_str_to_cstr(cc->include[it]));
+    spn_try(spn_tcc_add_include(tcc, cc->include[it]));
   }
 
   sp_da_for(cc->define, it) {
-    tcc_define_symbol(tcc, sp_str_to_cstr(cc->define[it]), "");
+    spn_tcc_define_symbol(tcc, cc->define[it], sp_str_lit(""));
   }
 
   sp_da_for(target->include, it) {
-    tcc_add_include_path(tcc, sp_str_to_cstr(target->include[it]));
+    spn_try(spn_tcc_add_include(tcc, target->include[it]));
   }
 
   sp_da_for(target->define, it) {
-    tcc_define_symbol(tcc, sp_str_to_cstr(target->define[it]), "");
+    spn_tcc_define_symbol(tcc, target->define[it], sp_str_lit(""));
   }
 
   sp_da_for(target->lib_dirs, it) {
-    result = tcc_add_library_path(tcc, sp_str_to_cstr(target->lib_dirs[it]));
+    spn_tcc_add_library_path(tcc, target->lib_dirs[it]);
   }
 
   sp_da_for(target->libs, it) {
-    result = tcc_add_file(tcc, sp_str_to_cstr(target->libs[it]));
+    spn_try(spn_tcc_add_file(tcc, target->libs[it]));
   }
 
-  (void)result;
+  sp_da_for(target->source, it) {
+    spn_try(spn_tcc_add_file(tcc, target->source[it]));
+  }
+
+  return SPN_OK;
 }
 
 spn_cc_run_t spn_cc_target_run(spn_cc_target_t* target, sp_str_t cwd) {

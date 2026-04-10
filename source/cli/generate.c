@@ -19,9 +19,9 @@ sp_app_result_t spn_cli_generate(spn_cli_t* cli) {
     SP_FATAL("No lock file found. Run {:fg yellow} first.", SP_FMT_CSTR("spn build"));
   }
 
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RESOLVE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_SYNC);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_CONFIGURE);
+  spn_task_enqueue(&app.tasks, SPN_TASK_RESOLVE);
+  spn_task_enqueue(&app.tasks, SPN_TASK_SYNC_PACKAGES);
+  spn_task_enqueue(&app.tasks, SPN_TASK_RUN_CONFIGURE_GRAPH);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_GENERATE);
 
   return SP_APP_CONTINUE;

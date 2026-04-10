@@ -389,11 +389,11 @@ sp_app_result_t spn_update(sp_app_t* sp) {
     case SPN_TASK_KIND_NONE: {
       return SP_APP_QUIT;
     }
-    case SPN_TASK_KIND_RESOLVE: {
+    case SPN_TASK_RESOLVE: {
       result = spn_task_resolve(&app);
       break;
     }
-    case SPN_TASK_KIND_SYNC: {
+    case SPN_TASK_SYNC_PACKAGES: {
       if (!task->initted) {
         result = spn_task_sync_init(&app);
         break;
@@ -401,13 +401,13 @@ sp_app_result_t spn_update(sp_app_t* sp) {
       result = spn_task_sync_update(&app);
       break;
     }
-    case SPN_TASK_KIND_CONFIGURE: {
+    case SPN_TASK_RUN_CONFIGURE_GRAPH: {
       if (!task->initted) spn_task_init_configure_graph(&app);
       result = spn_task_update_configure_graph(&app);
       break;
     }
-    case SPN_TASK_KIND_PREPARE_BUILD_GRAPH: {
-      result = spn_task_prepare_build_graph(&app);
+    case SPN_TASK_CREATE_UNITS: {
+      result = spn_task_create_units(&app);
       break;
     }
     case SPN_TASK_KIND_RUN_BUILD_GRAPH: {

@@ -3,6 +3,7 @@
 
 #include "sp.h"
 
+typedef struct spn_app_t spn_app_t;
 typedef struct spn_event_buffer_t spn_event_buffer_t;
 typedef struct spn_index_info spn_index_info_t;
 typedef struct spn_pkg_info spn_pkg_info_t;
