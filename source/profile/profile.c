@@ -37,7 +37,7 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
 
   // 2. Apply user's [profile.default] if present
   sp_str_t default_name = sp_str_lit("default");
-  spn_profile_info_t* user_default = sp_om_get(pkg->profiles, default_name);
+  spn_profile_info_t* user_default = sp_str_om_get(pkg->profiles, default_name);
   if (user_default) {
     spn_profile_overlay(sp_str_ht_get(*profiles, default_name), user_default);
   }
@@ -56,8 +56,8 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   sp_str_ht_insert(*profiles, release_profile.name, release_profile);
 
   // 4. Overlay remaining user profiles
-  sp_om_for(pkg->profiles, it) {
-    spn_profile_info_t* user = sp_om_at(pkg->profiles, it);
+  sp_str_om_for(pkg->profiles, it) {
+    spn_profile_info_t* user = sp_str_om_at(pkg->profiles, it);
     if (sp_str_equal(user->name, sp_str_lit("default"))) continue;
     spn_profile_info_t* entry = sp_str_ht_get(*profiles, user->name);
     if (entry) {

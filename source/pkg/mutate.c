@@ -9,7 +9,6 @@
 #include "pkg/mutate.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
-#include "target/mutate.h"
 
 void spn_pkg_init(spn_pkg_info_t* pkg, sp_str_t name) {
   pkg->arena = sp_mem_arena_new(4096);
@@ -128,8 +127,8 @@ spn_profile_info_t* spn_pkg_add_profile(spn_pkg_info_t* pkg, const c8* name) {
 }
 
 spn_profile_info_t* spn_pkg_add_profile_ex(spn_pkg_info_t* pkg, spn_profile_info_t profile) {
-  sp_om_insert(pkg->profiles, profile.name, profile);
-  return sp_om_get(pkg->profiles, profile.name);
+  sp_str_om_insert(pkg->profiles, profile.name, profile);
+  return sp_str_om_get(pkg->profiles, profile.name);
 }
 
 
@@ -141,10 +140,9 @@ spn_target_info_t* spn_pkg_add_exe_ex(spn_pkg_info_t* pkg, sp_str_t name) {
   spn_target_info_t exe = {
     .name = spn_intern(name),
     .kind = SPN_TARGET_EXE,
-    .visibility = SPN_VISIBILITY_PUBLIC,
   };
-  sp_om_insert(pkg->exes, exe.name, exe);
-  return sp_om_get(pkg->exes, exe.name);
+  sp_str_om_insert(pkg->exes, exe.name, exe);
+  return sp_str_om_get(pkg->exes, exe.name);
 }
 
 spn_target_info_t* spn_pkg_add_script(spn_pkg_info_t* pkg, const c8* name) {
@@ -155,10 +153,9 @@ spn_target_info_t* spn_pkg_add_script_ex(spn_pkg_info_t* pkg, sp_str_t name) {
   spn_target_info_t script = {
     .name = spn_intern(name),
     .kind = SPN_TARGET_EXE,
-    .visibility = SPN_VISIBILITY_SCRIPT,
   };
-  sp_om_insert(pkg->scripts, script.name, script);
-  return sp_om_get(pkg->scripts, script.name);
+  sp_str_om_insert(pkg->scripts, script.name, script);
+  return sp_str_om_get(pkg->scripts, script.name);
 }
 
 spn_target_info_t* spn_pkg_add_test(spn_pkg_info_t* pkg, const c8* name) {
@@ -168,41 +165,20 @@ spn_target_info_t* spn_pkg_add_test(spn_pkg_info_t* pkg, const c8* name) {
 spn_target_info_t* spn_pkg_add_test_ex(spn_pkg_info_t* pkg, sp_str_t name) {
   spn_target_info_t test = {
     .name = spn_intern(name),
-    .kind = SPN_TARGET_EXE,
-    .visibility = SPN_VISIBILITY_TEST,
+    .kind = SPN_TARGET_TEST,
   };
-  sp_om_insert(pkg->tests, test.name, test);
-  return sp_om_get(pkg->tests, test.name);
+  sp_str_om_insert(pkg->tests, test.name, test);
+  return sp_str_om_get(pkg->tests, test.name);
 }
 
-spn_target_info_t* spn_pkg_add_lib(spn_pkg_info_t* pkg, const c8* name, spn_linkage_t kind) {
-  return spn_pkg_add_lib_ex(pkg, spn_intern_cstr(name), kind);
-}
-
-spn_target_info_t* spn_pkg_add_lib_ex(spn_pkg_info_t* pkg, sp_str_t name, spn_linkage_t kind) {
-  spn_target_kind_t target_kind = SPN_TARGET_NONE;
-  switch (kind) {
-    case SPN_LIB_KIND_NONE:
-    case SPN_LIB_KIND_SOURCE: {
-      target_kind = SPN_TARGET_NONE;
-      break;
-    }
-    case SPN_LIB_KIND_STATIC:
-    case SPN_LIB_KIND_SHARED: {
-      target_kind = spn_pkg_linkage_to_target_kind(kind);
-      break;
-    }
-  }
-
+spn_target_info_t* spn_pkg_add_lib_ex(spn_pkg_info_t* pkg, sp_str_t name, spn_linkage_set_t linkage) {
   spn_target_info_t lib = {
     .name = spn_intern(name),
-    .kind = target_kind,
-    .linkages = SP_ZERO_INITIALIZE(),
-    .visibility = SPN_VISIBILITY_PUBLIC,
+    .kind = SPN_TARGET_LIB,
+    .linkages = linkage
   };
-  spn_linkage_set_add(&lib.linkages, kind);
-  sp_om_insert(pkg->libs, lib.name, lib);
-  return sp_om_get(pkg->libs, lib.name);
+  sp_str_om_insert(pkg->libs, lib.name, lib);
+  return sp_str_om_get(pkg->libs, lib.name);
 }
 
 spn_index_info_t* spn_pkg_add_index(spn_pkg_info_t* pkg, const c8* name, const c8* location) {
@@ -215,12 +191,12 @@ spn_index_info_t* spn_pkg_add_index_ex(spn_pkg_info_t* pkg, sp_str_t name, sp_st
     .location = spn_intern(location),
     .kind = SPN_INDEX_WORKSPACE,
   };
-  sp_om_insert(pkg->indexes, index.name, index);
-  return sp_om_get(pkg->indexes, index.name);
+  sp_str_om_insert(pkg->indexes, index.name, index);
+  return sp_str_om_get(pkg->indexes, index.name);
 }
 
 spn_err_t spn_pkg_add_toolchain(spn_pkg_info_t* pkg, spn_toolchain_entry_t entry) {
-  sp_om_insert(pkg->toolchains, entry.name, entry);
+  sp_str_om_insert(pkg->toolchains, entry.name, entry);
   return SPN_OK;
 }
 

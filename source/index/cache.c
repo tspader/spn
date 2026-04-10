@@ -5,7 +5,7 @@
 
 void spn_index_cache_init(spn_index_cache_t* cache, spn_index_arr_t* indexes) {
   cache->indexes = indexes;
-  sp_om_new(cache->packages);
+  sp_str_om_new(cache->packages);
 }
 
 spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_id_t id) {
@@ -13,8 +13,8 @@ spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_i
 
   sp_str_t qualified = spn_pkg_id_to_qualified_name(id);
 
-  if (sp_om_has(cache->packages, qualified)) {
-    return sp_om_get(cache->packages, qualified);
+  if (sp_str_om_has(cache->packages, qualified)) {
+    return sp_str_om_get(cache->packages, qualified);
   }
 
   sp_da_for(*cache->indexes, it) {
@@ -24,8 +24,8 @@ spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_i
       continue;
     }
 
-    sp_om_insert(cache->packages, qualified, *package);
-    return sp_om_get(cache->packages, qualified);
+    sp_str_om_insert(cache->packages, qualified, *package);
+    return sp_str_om_get(cache->packages, qualified);
   }
 
   return SP_NULLPTR;

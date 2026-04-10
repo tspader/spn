@@ -92,16 +92,16 @@
 // const spn_build_ctx_t* spn_get_dep(spn_build_ctx_t* b, const c8* name) {
 //   sp_str_t key = spn_intern_cstr(name);
 //
-//   if (sp_om_has(b->session->units.packages, key)) {
-//     spn_pkg_unit_t* unit = sp_om_get(b->session->units.packages, key);
+//   if (sp_str_om_has(b->session->units.packages, key)) {
+//     spn_pkg_unit_t* unit = sp_str_om_get(b->session->units.packages, key);
 //     return &unit->ctx;
 //   }
 //
 //   sp_ht_for(b->pkg->deps, it) {
 //     sp_str_t k = *sp_ht_it_getkp(b->pkg->deps, it);
 //     if (sp_str_equal(spn_qualified_name_to_pkg_id(k).name, key)) {
-//       if (sp_om_has(b->session->units.packages, k)) {
-//         spn_pkg_unit_t* unit = sp_om_get(b->session->units.packages, k);
+//       if (sp_str_om_has(b->session->units.packages, k)) {
+//         spn_pkg_unit_t* unit = sp_str_om_get(b->session->units.packages, k);
 //         return &unit->ctx;
 //       }
 //     }

@@ -403,7 +403,7 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       sp_str_builder_append_fmt(
         &builder,
         "{:fg brightcyan} could not be located",
-        SP_FMT_STR(event->unknown.request.id.name)
+        SP_FMT_STR(event->unknown.request.qualified)
       );
       break;
     }

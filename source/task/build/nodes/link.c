@@ -54,8 +54,10 @@ ar_result_t archive_objects(spn_target_unit_t* unit, sp_str_t output) {
 }
 
 spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, u64 elapsed) {
-  spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_PASSED,
+    .pkg = unit->pkg->info,
+    .io = &unit->logs,
     .target.name = unit->info->name,
     .target.link_passed = {
       .output_path = output,
@@ -66,8 +68,10 @@ spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, u64 elapsed) {
 }
 
 spn_err_t emit_failure(spn_target_unit_t* unit, sp_str_t args, s32 rc, sp_str_t out, sp_str_t err) {
-  spn_event_buffer_push_ex(spn.events, unit->pkg, &unit->logs, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_FAILED,
+    .pkg = unit->pkg->info,
+    .io = &unit->logs,
     .target.name = unit->info->name,
     .target.link_failed = {
       .exit_code = rc,
@@ -94,8 +98,10 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
     case SPN_TARGET_STATIC_LIB: {
       ar_result_t run = archive_objects(target, output);
 
-      spn_event_buffer_push_ex(spn.events, target->pkg, &target->logs, (spn_build_event_t) {
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_LINK_START,
+        .pkg = target->parent->info,
+        .io = &target->logs,
         .target.name = info->name,
         .target.link_start = {
           .kind = info->kind,
@@ -138,8 +144,10 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
       spn_cc_run_t run = spn_cc_target_run(cc_target, target->paths.work);
       s32 rc = run.result.status.exit_code;
 
-      spn_event_buffer_push_ex(spn.events, target->pkg, &target->logs, (spn_build_event_t) {
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_LINK_START,
+        .pkg = target->parent->info,
+        .io = &target->logs,
         .target.name = info->name,
         .target.link_start = {
           .kind = info->kind,

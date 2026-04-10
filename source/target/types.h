@@ -34,12 +34,10 @@ typedef struct {
 
 
 typedef enum {
-  SPN_TARGET_NONE,
-  SPN_TARGET_SHARED_LIB,
-  SPN_TARGET_STATIC_LIB,
+  SPN_TARGET_LIB,
   SPN_TARGET_EXE,
-  SPN_TARGET_JIT,
-  SPN_TARGET_OBJECT,
+  SPN_TARGET_SCRIPT,
+  SPN_TARGET_TEST,
 } spn_target_kind_t;
 
 typedef struct {
@@ -50,9 +48,8 @@ typedef struct {
 
 struct spn_target_info {
   sp_str_t name;
-  spn_target_kind_t kind; // @spader @nuke
+  spn_target_kind_t kind;
   spn_linkage_set_t linkages;
-  spn_visibility_t visibility;
   sp_da(sp_str_t) source;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;

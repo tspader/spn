@@ -2,6 +2,7 @@
 #include "external/git.h"
 #include "index/index.h"
 #include "index/publish.h"
+#include "pkg/id.h"
 #include "pkg/load.h"
 #include "semver/convert.h"
 
@@ -15,8 +16,8 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
     };
   }
 
-  spn_pkg_info_t pkg = SP_ZERO_INITIALIZE();
-  spn_try_union(spn_pkg_load(&pkg, manifest_path));
+  spn_pkg_info_t info = SP_ZERO_INITIALIZE();
+  spn_try_union(spn_pkg_load(&info, manifest_path));
 
   sp_str_t repo = SP_ZERO_INITIALIZE();
   if (spn_git_get_root(opts->cwd, &repo)) {
@@ -51,12 +52,12 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
     subdir = sp_str_suffix(opts->cwd, opts->cwd.len - repo.len - 1);
   }
 
-  spn_index_rel_t rel = {
+  spn_index_rel_t release = {
     .id = {
-      .namespace = sp_str_empty(pkg.namespace) ? sp_str_lit("core") : pkg.namespace,
-      .name = pkg.name,
+      .namespace = sp_str_empty(info.namespace) ? sp_str_lit("core") : info.namespace,
+      .name = info.name,
     },
-    .version = pkg.version,
+    .version = info.version,
     .source = { .url = url, .rev = revision, .dir = subdir },
     .paths = {
       .manifest = sp_str_lit("spn.toml"),
@@ -64,32 +65,31 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
     },
   };
 
-  spn_pkg_metadata_t* meta = sp_ht_getp(pkg.metadata, pkg.version);
-  if (!sp_str_empty(pkg.url) && meta && !sp_str_empty(meta->commit)) {
-    rel.source = (spn_index_rel_source_t) { .url = pkg.url, .rev = meta->commit };
-    rel.manifest = (spn_index_rel_source_t) { .url = url, .rev = revision, .dir = subdir };
+  spn_pkg_metadata_t* meta = sp_ht_getp(info.metadata, info.version);
+  if (!sp_str_empty(info.url) && meta && !sp_str_empty(meta->commit)) {
+    release.source = (spn_index_rel_source_t) { .url = info.url, .rev = meta->commit };
+    release.manifest = (spn_index_rel_source_t) { .url = url, .rev = revision, .dir = subdir };
   }
 
-  sp_ht_for_kv(pkg.deps, it) {
+  sp_ht_for_kv(info.deps, it) {
     spn_requested_pkg_t* req = it.val;
-    if (req->kind != SPN_PACKAGE_KIND_INDEX) {
+    if (req->source != SPN_PKG_SOURCE_INDEX) {
       continue;
     }
 
-    spn_index_dep_t dep = {
-      .id = req->id,
-      .version = spn_semver_range_to_str(req->range),
-    };
-    sp_da_push(rel.deps, dep);
+    sp_da_push(release.deps, ((spn_index_dep_t) {
+      .id = spn_qualified_name_to_pkg_id(req->qualified),
+      .version = spn_semver_range_to_str(req->index.range),
+    }));
   }
 
-  spn_err_t publish_err = spn_index_publish(opts->index, &rel);
+  spn_err_t publish_err = spn_index_publish(opts->index, &release);
   if (publish_err == SPN_ERR_VERSION_EXISTS) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_VERSION_EXISTS,
       .version_exists = {
-        .name = rel.id.name,
-        .version = spn_semver_to_str(rel.version),
+        .name = release.id.name,
+        .version = spn_semver_to_str(release.version),
       },
     };
   }

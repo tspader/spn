@@ -17,8 +17,7 @@ typedef struct {
   spn_semver_t version;
   sp_str_t commit;
   spn_dep_import_kind_t import_kind;
-  spn_visibility_t visibility;
-  spn_pkg_kind_t kind;
+  spn_pkg_source_t kind;
   struct {
     sp_str_t url;
     sp_str_t rev;

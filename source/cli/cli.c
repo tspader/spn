@@ -483,7 +483,7 @@ static spn_cli_usage_t commands[] = {
         {
           .name = "name",
           .kind = SPN_CLI_ARG_KIND_OPTIONAL,
-          .summary = "Target name to build",
+          .summary = "Name of entry to build",
           .ptr = &spn.cli.build.name
         }
       },

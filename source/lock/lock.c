@@ -69,8 +69,7 @@ spn_lock_file_t spn_lock_file_parse(sp_str_t toml, spn_event_buffer_t* events) {
       .name = spn_toml_str(pkg, "name"),
       .version = spn_semver_from_str(spn_toml_str(pkg, "version")),
       .commit = spn_toml_str(pkg, "commit"),
-      .kind = spn_package_kind_from_str(spn_toml_str(pkg, "kind")),
-      .visibility = spn_visibility_from_str(spn_toml_str(pkg, "visibility")),
+      .kind = spn_pkg_source_from_str(spn_toml_str(pkg, "kind")),
       .deps = spn_toml_arr_to_str_arr(toml_table_array(pkg, "deps")),
       .source = {
         .url = spn_toml_str_opt(pkg, "source_url", ""),
@@ -130,8 +129,7 @@ sp_str_t spn_lock_file_to_str(spn_lock_file_t* lock) {
     spn_toml_append_str_cstr(&toml, "name", entry->name);
     spn_toml_append_str_cstr(&toml, "version", spn_semver_to_str(entry->version));
     spn_toml_append_str_cstr(&toml, "commit", entry->commit);
-    spn_toml_append_str_cstr(&toml, "kind", spn_package_kind_to_str(entry->kind));
-    spn_toml_append_str_cstr(&toml, "visibility", spn_visibility_to_str(entry->visibility));
+    spn_toml_append_str_cstr(&toml, "kind", spn_pkg_source_to_str(entry->kind));
 
     if (!sp_str_empty(entry->source.url)) {
       spn_toml_append_str_cstr(&toml, "source_url", entry->source.url);

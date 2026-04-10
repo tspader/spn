@@ -27,7 +27,7 @@ static bool spn_cli_run_is_source_entry(sp_str_t entry, bool has_manifest) {
     return true;
   }
 
-  if (sp_om_has(app.package.scripts, entry)) {
+  if (sp_str_om_has(app.package.scripts, entry)) {
     return false;
   }
 
@@ -81,7 +81,7 @@ sp_app_result_t spn_cli_run(spn_cli_t* cli) {
     return SP_APP_ERR;
   }
 
-  if (!sp_om_has(app.package.scripts, command->entry)) {
+  if (!sp_str_om_has(app.package.scripts, command->entry)) {
     spn_log_error("script target {:fg brightyellow} is not defined",
       SP_FMT_STR(command->entry)
     );

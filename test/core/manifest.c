@@ -64,13 +64,13 @@ typedef struct {
 
 typedef struct {
   const c8* name;
-  spn_pkg_kind_t kind;
+  spn_pkg_source_t source;
   const c8* version;
   const c8* file;
   u8 build;
   u8 test;
   u8 package;
-} dep_t;
+} resolved_dep_t;
 
 typedef struct {
   const c8* fixture;
@@ -81,7 +81,7 @@ typedef struct {
   profile_t profiles [4];
   target_t exes [8];
   target_t libs [8];
-  dep_t deps [8];
+  resolved_dep_t deps [8];
 } test_t;
 
 void run_case(s32* utest_result, test_t test) {
@@ -109,7 +109,7 @@ void run_case(s32* utest_result, test_t test) {
   } num = SP_ZERO_INITIALIZE();
 
   // Toolchains
-  num.toolchains.actual = sp_om_size(pkg.toolchains);
+  num.toolchains.actual = sp_str_om_size(pkg.toolchains);
 
   sp_carr_for(test.toolchains, it) {
     if (!test.toolchains[it].name) break;
@@ -118,7 +118,7 @@ void run_case(s32* utest_result, test_t test) {
   EXPECT_EQ(num.toolchains.expected, num.toolchains.actual);
 
   sp_for(it, num.toolchains.expected) {
-    spn_toolchain_entry_t* toolchain = sp_om_at(pkg.toolchains, it);
+    spn_toolchain_entry_t* toolchain = sp_str_om_at(pkg.toolchains, it);
 
     if (test.toolchains[it].url) SP_EXPECT_STR_EQ_CSTR(toolchain->info.url, test.toolchains[it].url);
 
@@ -134,7 +134,7 @@ void run_case(s32* utest_result, test_t test) {
   }
 
   // Profiles
-  num.profiles.actual = sp_om_size(pkg.profiles);
+  num.profiles.actual = sp_str_om_size(pkg.profiles);
 
   sp_carr_for(test.profiles, it) {
     if (!test.profiles[it].name) break;
@@ -144,7 +144,7 @@ void run_case(s32* utest_result, test_t test) {
 
   sp_for(it, num.profiles.expected) {
     profile_t expected = test.profiles[it];
-    spn_profile_info_t* actual = sp_om_at(pkg.profiles, it);
+    spn_profile_info_t* actual = sp_str_om_at(pkg.profiles, it);
 
     if (expected.name) SP_EXPECT_STR_EQ_CSTR(actual->name, expected.name);
     if (expected.toolchain) SP_EXPECT_STR_EQ_CSTR(actual->toolchain, expected.toolchain);
@@ -154,7 +154,7 @@ void run_case(s32* utest_result, test_t test) {
   }
 
   // Executables
-  num.exes.actual = sp_om_size(pkg.exes);
+  num.exes.actual = sp_str_om_size(pkg.exes);
 
   sp_carr_for(test.exes, it) {
     if (!test.exes[it].name) break;
@@ -163,7 +163,7 @@ void run_case(s32* utest_result, test_t test) {
   EXPECT_EQ(num.exes.expected, num.exes.actual);
 
   sp_for(it, num.exes.expected) {
-    spn_target_info_t* target = sp_om_at(pkg.exes, it);
+    spn_target_info_t* target = sp_str_om_at(pkg.exes, it);
 
     SP_EXPECT_STR_EQ_CSTR(target->name, test.exes[it].name);
 
@@ -184,7 +184,7 @@ void run_case(s32* utest_result, test_t test) {
   }
 
   // Libs
-  num.libs.actual = sp_om_size(pkg.libs);
+  num.libs.actual = sp_str_om_size(pkg.libs);
 
   sp_carr_for(test.libs, it) {
     if (!test.libs[it].name) break;
@@ -193,7 +193,7 @@ void run_case(s32* utest_result, test_t test) {
   EXPECT_EQ(num.libs.expected, num.libs.actual);
 
   sp_for(it, num.libs.expected) {
-    spn_target_info_t* target = sp_om_at(pkg.libs, it);
+    spn_target_info_t* target = sp_str_om_at(pkg.libs, it);
     SP_EXPECT_STR_EQ_CSTR(target->name, test.libs[it].name);
   }
 
@@ -208,19 +208,16 @@ void run_case(s32* utest_result, test_t test) {
   EXPECT_EQ(num_deps.expected, num_deps.actual);
 
   sp_for(it, num_deps.expected) {
-    dep_t expected = test.deps[it];
+    resolved_dep_t expected = test.deps[it];
     spn_requested_pkg_t* actual = sp_ht_getp(pkg.deps, sp_str_view(expected.name));
     ASSERT_TRUE(actual);
 
-    EXPECT_EQ(expected.kind, actual->kind);
-    EXPECT_EQ(expected.build, actual->build);
-    EXPECT_EQ(expected.test, actual->test);
-    EXPECT_EQ(expected.package, actual->package);
+    EXPECT_EQ(expected.source, actual->source);
 
-    if (expected.kind == SPN_PACKAGE_KIND_FILE) {
-      if (expected.file) SP_EXPECT_STR_EQ_CSTR(actual->file, expected.file);
+    if (expected.source == SPN_PKG_SOURCE_FILE) {
+      if (expected.file) SP_EXPECT_STR_EQ_CSTR(actual->file.path, expected.file);
     } else {
-      if (expected.version) SP_EXPECT_STR_EQ_CSTR(spn_semver_range_to_str(actual->range), expected.version);
+      if (expected.version) SP_EXPECT_STR_EQ_CSTR(spn_semver_range_to_str(actual->index.range), expected.version);
     }
   }
 }
@@ -270,9 +267,9 @@ UTEST(load, deps) {
     .fixture = "deps.toml",
     .name = "test",
     .deps = {
-      { .name = "kram",  .kind = SPN_PACKAGE_KIND_INDEX, .version = "1.6.9", .package = 1 },
-      { .name = "baz",   .kind = SPN_PACKAGE_KIND_FILE,  .file = "file://baz/spn.toml", .package = 1 },
-      { .name = "spum",  .kind = SPN_PACKAGE_KIND_INDEX, .version = "1.0.0", .build = 1, .package = 1 },
+      { .name = "kram",  .source = SPN_PKG_SOURCE_INDEX, .version = "1.6.9", .package = 1 },
+      { .name = "baz",   .source = SPN_PKG_SOURCE_FILE,  .file = "file://baz/spn.toml", .package = 1 },
+      { .name = "spum",  .source = SPN_PKG_SOURCE_INDEX, .version = "1.0.0", .build = 1, .package = 1 },
     },
   });
 }

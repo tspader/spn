@@ -3,67 +3,78 @@
 
 #include "sp.h"
 
-#define sp_om_body(T)                                                                   \
-  {                                                                         \
-    struct { sp_mem_arena_t* data; sp_mem_arena_t* metadata; } arenas; \
-    sp_da(T*) order;                                                               \
-    sp_str_ht(T*) index;                                                           \
-    T* temp;                                                                       \
+#define sp_om_body(K, V)                                                       \
+  {                                                                            \
+    struct { sp_mem_arena_t* data; sp_mem_arena_t* metadata; } arenas;         \
+    sp_da(V*) order;                                                           \
+    sp_ht(K, V*) index;                                                        \
+    V* temp;                                                                   \
   }
 
-#define sp_om(T) struct sp_om_body(T)*
+#define sp_om(K, V) struct sp_om_body(K, V)*
 
-#define sp_om_new_ex(om, darena, marena)                                           \
-  do {                                                                             \
-    (om) = sp_alloc_hint(&(om), sizeof(*(om)));                                    \
-    (om)->arenas.data = darena;                                                    \
-    (om)->arenas.metadata = marena;                                                \
+#define sp_om_new_ex(sm, darena, marena)                                       \
+  do {                                                                         \
+    (sm) = sp_alloc_hint(&(sm), sizeof(*(sm)));                                \
+    (sm)->arenas.data = darena;                                                \
+    (sm)->arenas.metadata = marena;                                            \
   } while (0)
 
-#define sp_om_new(om)                                                              \
-  sp_om_new_ex(om, sp_mem_arena_new_ex(4096, SP_MEM_ARENA_MODE_NO_REALLOC, 0), sp_mem_arena_new(4096))
+#define sp_om_new(sm)                                                          \
+  sp_om_new_ex(sm,                                                             \
+    sp_mem_arena_new_ex(4096, SP_MEM_ARENA_MODE_NO_REALLOC, 0),                \
+    sp_mem_arena_new(4096))
 
+#define sp_om_ensure(sm)                                                       \
+  if (!(sm)) {      \
+    sp_om_new(sm);  \
+  }
 
-#define sp_om_ensure(om)                                                           \
-  if (!(om)) { sp_om_new(om); }
-
-#define sp_om_alloc_entry(om)                                                      \
-  sp_alloc_hint(&(om)->temp, sizeof(*(om)->temp))
-
-#define sp_om_insert(om, key, val)                                                 \
-  do {                                                                             \
-    sp_om_ensure(om);                                                              \
-    if (sp_str_ht_exists((om)->index, (key))) {                                    \
-      break;                                                                       \
-    }                                                                              \
-    sp_context_push_allocator(sp_mem_arena_as_allocator((om)->arenas.data));             \
-    (om)->temp = sp_om_alloc_entry(om);                                            \
-    sp_context_pop();                                                              \
-    sp_context_push_allocator(sp_mem_arena_as_allocator((om)->arenas.metadata));   \
-    *(om)->temp = (val);                                                           \
-    sp_da_push((om)->order, (om)->temp);                                           \
-    sp_str_ht_insert((om)->index, sp_str_copy(key), (om)->temp);                   \
-    sp_context_pop();                                                              \
+#define sp_om_set_fns(sm, hash_fn, cmp_fn)                                       \
+  do {                                                                           \
+    sp_om_ensure(sm);                                                            \
+    sp_context_push_allocator(sp_mem_arena_as_allocator((sm)->arenas.metadata)); \
+    sp_ht_set_fns((sm)->index, hash_fn, cmp_fn);                                 \
+    sp_context_pop();                                                            \
   } while (0)
 
-#define sp_om_free(om)                                                             \
-  do {                                                                             \
-    if ((om)) {                                                                    \
-      sp_mem_arena_destroy((om)->arenas.data);                                     \
-      sp_mem_arena_destroy((om)->arenas.metadata);                                 \
-      sp_free(om);                                                                 \
-      (om) = SP_NULLPTR;                                                           \
-    }                                                                              \
+#define sp_om_alloc_entry(sm)                                                  \
+  sp_alloc_hint(&(sm)->temp, sizeof(*(sm)->temp))
+
+#define sp_om_insert(sm, key, val)                                             \
+  do {                                                                         \
+    sp_om_ensure(sm);                                                          \
+    if (sp_ht_exists((sm)->index, (key))) {                                    \
+      break;                                                                   \
+    }                                                                          \
+    sp_context_push_allocator(sp_mem_arena_as_allocator((sm)->arenas.data));    \
+    (sm)->temp = sp_om_alloc_entry(sm);                                        \
+    sp_context_pop();                                                          \
+    sp_context_push_allocator(sp_mem_arena_as_allocator((sm)->arenas.metadata));\
+    *(sm)->temp = (val);                                                       \
+    sp_da_push((sm)->order, (sm)->temp);                                       \
+    sp_ht_insert((sm)->index, (key), (sm)->temp);                              \
+    sp_context_pop();                                                          \
   } while (0)
 
-#define sp_om_get(om, key)        (!(om) ? SP_NULLPTR : *sp_str_ht_get((om)->index, (key)))
-#define sp_om_getp(om, key)       (!(om) ? SP_NULLPTR : sp_str_ht_get((om)->index, (key)))
-#define sp_om_has(om, key)        ((om) && sp_str_ht_exists((om)->index, (key)))
-#define sp_om_at(om, n)           ((om)->order[(n)])
-#define sp_om_size(om)            (!(om) ? 0 : sp_da_size((om)->order))
-#define sp_om_empty(om)           (!(om) ? true : (sp_da_size((om)->order) == 0))
-#define sp_om_for(om, it)         for (u32 it = 0; it < sp_om_size(om); it++)
-#define sp_om_back(om)            (*sp_da_back((om)->order))
+#define sp_om_free(sm)                                                         \
+  do {                                                                         \
+    if ((sm)) {                                                                \
+      sp_mem_arena_destroy((sm)->arenas.data);                                 \
+      sp_mem_arena_destroy((sm)->arenas.metadata);                             \
+      sp_free(sm);                                                             \
+      (sm) = SP_NULLPTR;                                                       \
+    }                                                                          \
+  } while (0)
+
+#define sp_om_get(sm, key)        (!(sm) ? SP_NULLPTR : *sp_ht_getp((sm)->index, (key)))
+#define sp_om_getp(sm, key)       (!(sm) ? SP_NULLPTR : sp_ht_getp((sm)->index, (key)))
+#define sp_om_has(sm, key)        ((sm) && sp_ht_exists((sm)->index, (key)))
+#define sp_om_at(sm, n)           ((sm)->order[(n)])
+#define sp_om_size(sm)            (!(sm) ? 0 : sp_da_size((sm)->order))
+#define sp_om_empty(sm)           (!(sm) ? true : (sp_da_size((sm)->order) == 0))
+#define sp_om_for(sm, it)         for (u32 it = 0; it < sp_om_size(sm); it++)
+#define sp_om_back(sm)            (*sp_da_back((sm)->order))
 
 #if defined(SP_CPP)
 SP_END_EXTERN_C()
@@ -75,5 +86,39 @@ SP_BEGIN_EXTERN_C()
 #else
 #define sp_alloc_hint(dummy, size) sp_alloc(size)
 #endif
+
+
+////////////
+// STR_OM //
+////////////
+#define sp_str_om(T) sp_om(sp_str_t, T)
+
+#define sp_str_om_ensure(om) \
+  if (!(om)) { \
+    sp_str_om_init(om); \
+  }
+
+#define sp_str_om_init(om) \
+  sp_om_new(om); \
+  sp_om_set_fns(om, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key)
+
+#define sp_str_om_insert(om, key, val)                                             \
+  do { \
+    sp_om_ensure(om); \
+    sp_om_insert(om, (key), (val)); \
+  } while (0)
+
+#define sp_str_om_new(om)           sp_str_om_init(om);
+#define sp_str_om_free(om)          sp_om_free(om)
+#define sp_str_om_get(om, key)      sp_om_get(om, (key))
+#define sp_str_om_getp(om, key)     sp_om_getp(om, (key))
+#define sp_str_om_has(om, key)      sp_om_has(om, (key))
+#define sp_str_om_at(om, n)         sp_om_at(om, n)
+#define sp_str_om_size(om)          sp_om_size(om)
+#define sp_str_om_empty(om)         sp_om_empty(om)
+#define sp_str_om_for(om, it)       sp_om_for(om, it)
+#define sp_str_om_back(om)          sp_om_back(om)
+
+
 
 #endif

@@ -1,4 +1,6 @@
+#include "err.h"
 #include "error/types.h"
+#include "pkg/types.h"
 #include "profile/types.h"
 
 #include "enum/enum.h"
@@ -13,6 +15,27 @@
 #include "target/mutate.h"
 #include "toml.h"
 #include "toolchain/types.h"
+
+typedef struct {
+  toml_table_t* manifest;
+  toml_table_t* package;
+  toml_array_t* lib;
+  toml_array_t* bin;
+  toml_array_t* script;
+  toml_array_t* test;
+  toml_table_t* deps;
+  toml_table_t* profile;
+  toml_array_t* toolchain;
+  toml_array_t* index;
+  toml_table_t* options;
+  toml_table_t* config;
+
+  spn_pkg_info_t* pkg;
+  struct {
+    sp_str_t dir;
+    sp_str_t manifest;
+  } paths;
+} toml_loader_t;
 
 spn_dep_option_t parse_option(toml_table_t* toml, const c8* key) {
   toml_unparsed_t unparsed = toml_table_unparsed(toml, key);
@@ -193,10 +216,10 @@ static spn_err_union_t field_type_error(sp_str_t path, sp_str_t expected, spn_to
 
 static spn_err_union_t ensure_unique_target_name(spn_pkg_info_t* pkg, toml_path_t path, sp_str_t name) {
   bool exists =
-    sp_om_has(pkg->libs, name)    ||
-    sp_om_has(pkg->exes, name)    ||
-    sp_om_has(pkg->scripts, name) ||
-    sp_om_has(pkg->tests, name);
+    sp_str_om_has(pkg->libs, name)    ||
+    sp_str_om_has(pkg->exes, name)    ||
+    sp_str_om_has(pkg->scripts, name) ||
+    sp_str_om_has(pkg->tests, name);
 
   if (exists) {
     return (spn_err_union_t) {
@@ -494,7 +517,11 @@ static spn_err_union_t load_target(
   return spn_result(SPN_OK);
 }
 
-static spn_err_union_t load_deps(toml_table_t* toml, spn_pkg_info_t* pkg, spn_visibility_t vis, sp_str_t root) {
+static bool is_path_absolute(sp_str_t path) {
+  return path.len && (path.data[0] == '/' || (path.len >= 2 && path.data[1] == ':'));
+}
+
+static spn_err_union_t load_deps(toml_loader_t* loader, toml_table_t* toml) {
   if (!toml) {
     return spn_result(SPN_OK);
   }
@@ -504,38 +531,26 @@ static spn_err_union_t load_deps(toml_table_t* toml, spn_pkg_info_t* pkg, spn_vi
     sp_str_t version = SP_ZERO_INITIALIZE();
     spn_try_as_union(get_str_required(toml, key, &version));
 
+    spn_requested_pkg_t req = {
+      .qualified = spn_pkg_canonicalize_name(spn_intern_cstr(key))
+    };
+
     sp_str_t prefix = sp_str_lit("file://");
     if (sp_str_starts_with(version, prefix)) {
       sp_str_t path = sp_str_strip_left(version, prefix);
-      if (!sp_str_starts_with(path, sp_str_lit("/"))) {
-        path = sp_fs_join_path(root, path);
+      if (!is_path_absolute(path)) {
+        path = sp_fs_join_path(loader->paths.dir, path);
       }
 
-      path = sp_fs_normalize_path(path);
-      version = sp_format("file://{}", SP_FMT_STR(path));
-    }
-
-    spn_pkg_id_t id = spn_qualified_name_to_pkg_id(spn_intern_cstr(key));
-    sp_str_t qualified = spn_pkg_id_to_qualified_name(id);
-    sp_str_t file_prefix = sp_str_lit("file://");
-    if (sp_str_starts_with(version, file_prefix)) {
-      spn_requested_pkg_t req = {
-        .id = id,
-        .visibility = vis,
-        .kind = SPN_PACKAGE_KIND_FILE,
-        .file = version,
-      };
-      sp_ht_insert(pkg->deps, qualified, req);
+      req.source = SPN_PKG_SOURCE_FILE;
+      req.file.path = sp_fs_canonicalize_path(path);
     }
     else {
-      spn_requested_pkg_t req = {
-        .id = id,
-        .visibility = vis,
-        .kind = SPN_PACKAGE_KIND_INDEX,
-        .range = spn_semver_parse_range(version),
-      };
-      sp_ht_insert(pkg->deps, qualified, req);
+      req.source = SPN_PKG_SOURCE_INDEX;
+      req.index.range = spn_semver_parse_range(version);
     }
+
+    sp_ht_insert(loader->pkg->deps, req.qualified, req);
   }
 
   return spn_result(SPN_OK);
@@ -632,20 +647,13 @@ spn_err_union_t spn_index_load(toml_table_t* toml, sp_str_t parent, u32 index, s
 }
 
 spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
-  struct {
-    toml_table_t* manifest;
-    toml_table_t* package;
-    toml_array_t* lib;
-    toml_array_t* bin;
-    toml_array_t* script;
-    toml_array_t* test;
-    toml_table_t* deps;
-    toml_table_t* profile;
-    toml_array_t* toolchain;
-    toml_array_t* index;
-    toml_table_t* options;
-    toml_table_t* config;
-  } toml = SP_ZERO_INITIALIZE();
+  toml_loader_t toml = {
+    .pkg = pkg,
+    .paths = {
+      .manifest = manifest_path,
+      .dir = sp_fs_parent_path(manifest_path),
+    },
+  };
 
   bool parse_error = false;
   toml.manifest = spn_toml_parse_ex(manifest_path, &parse_error);
@@ -662,7 +670,6 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
 
   toml_path_t root_path = spn_pkg_toml_path(sp_str_lit(""));
   toml_path_t package_path = spn_pkg_toml_path(sp_str_lit("package"));
-  sp_str_t manifest_dir = sp_fs_parent_path(manifest_path);
 
   spn_try_union(toml_get_table_required(toml.manifest, "package", root_path, &toml.package));
   spn_try_union(toml_get_array_optional(toml.manifest, "lib", root_path, &toml.lib));
@@ -716,7 +723,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
   spn_toml_arr_for(include, it) {
     sp_str_t value = SP_ZERO_INITIALIZE();
     spn_try_union(toml_get_array_string_required(include, it, package_path, "include", &value));
-    spn_pkg_add_include_ex(pkg, sp_fs_join_path(manifest_dir, value));
+    spn_pkg_add_include_ex(pkg, sp_fs_join_path(toml.paths.dir, value));
   }
 
   toml_array_t* define = toml_table_array(toml.package, "define");
@@ -751,9 +758,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
     }
 
     spn_try_union(ensure_unique_target_name(pkg, path, name));
-    spn_linkage_t linkage = spn_linkage_set_default(linkages);
-    spn_target_info_t* lib = spn_pkg_add_lib_ex(pkg, name, linkage);
-    lib->linkages = linkages;
+    spn_target_info_t* lib = spn_pkg_add_lib_ex(pkg, name, linkages);
     spn_try_union(load_target(it, path, lib));
   }
 
@@ -792,6 +797,14 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
       sp_str_t version = sp_str_lit("*");
       spn_try_as_union(get_str_optional(it, "version", &version));
 
+      spn_pkg_add_toolchain(pkg, (spn_toolchain_entry_t) {
+        .name = package,
+        .kind = SPN_TOOLCHAIN_INDEX,
+        .request = {
+          .package = spn_pkg_canonicalize_name(package),
+          .range = spn_semver_parse_range(version)
+        },
+      });
       spn_pkg_add_toolchain(pkg, (spn_toolchain_entry_t) {
         .name = package,
         .kind = SPN_TOOLCHAIN_INDEX,
@@ -841,7 +854,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
     spn_index_info_t index = SP_ZERO_INITIALIZE();
     spn_try_union(spn_index_load(it, sp_str_lit("index"), n, &index));
     index.kind = SPN_INDEX_WORKSPACE;
-    sp_om_insert(pkg->indexes, index.name, index);
+    sp_str_om_insert(pkg->indexes, index.name, index);
   }
 
   spn_toml_arr_for(toml.bin, n) {
@@ -855,12 +868,6 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
 
     spn_target_info_t* bin = spn_pkg_add_exe_ex(pkg, name);
     spn_try_union(load_target(it, path, bin));
-
-    sp_str_t kind = sp_str_lit("");
-    spn_try_union(toml_get_str_optional(it, "kind", path, &kind));
-    if (!sp_str_empty(kind)) {
-      spn_target_set_visibility(bin, spn_visibility_from_str(kind));
-    }
   }
 
   spn_toml_arr_for(toml.script, n) {
@@ -901,9 +908,10 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
     spn_try_union(toml_get_table_optional(toml.deps, "test", deps_path, &deps.test));
     spn_try_union(toml_get_table_optional(toml.deps, "build", deps_path, &deps.build));
 
-    spn_try_union(load_deps(deps.package, pkg, SPN_VISIBILITY_PUBLIC, manifest_dir));
-    spn_try_union(load_deps(deps.test, pkg, SPN_VISIBILITY_TEST, manifest_dir));
-    spn_try_union(load_deps(deps.build, pkg, SPN_VISIBILITY_BUILD, manifest_dir));
+    spn_try_union(load_deps(&toml, deps.package));
+    // spn_try_union(load_deps(&toml, deps.package, SPN_DEP_KIND_PACKAGE));
+    // spn_try_union(load_deps(&toml, deps.test, SPN_DEP_KIND_TEST));
+    // spn_try_union(load_deps(&toml, deps.build, SPN_DEP_KIND_BUILD));
   }
 
   if (toml.options) {

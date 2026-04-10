@@ -83,8 +83,8 @@
 spn_task_result_t spn_task_generate(spn_app_t* app) {
   // spn_cli_generate_t* command = &spn.cli.generate;
   //
-  // sp_om_for(app->session.units.packages, it) {
-  //   spn_pkg_unit_t* unit = sp_om_at(app->session.units.packages, it);
+  // sp_str_om_for(app->session.units.packages, it) {
+  //   spn_pkg_unit_t* unit = sp_str_om_at(app->session.units.packages, it);
   //   sp_da_push(builds, &unit->ctx);
   // }
   //

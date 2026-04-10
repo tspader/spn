@@ -4,8 +4,8 @@
 #include "error/types.h"
 #include "event/types.h"
 #include "graph/types.h"
-#include "spn.h"
 #include "target/types.h"
+#include "unit/types.h"
 
 #include "event/event.h"
 #include "external/cc.h"
@@ -15,7 +15,6 @@
 #include "session/session.h"
 #include "task/task.h"
 #include "unit/package.h"
-#include "unit/types.h"
 
 #include <setjmp.h>
 
@@ -87,19 +86,6 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
   spn_cc_t cc = SP_ZERO_INITIALIZE();
   spn_cc_set_profile(&cc, session->profile);
   spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_TARGET_JIT, unit->info->name);
-  sp_ht_for_kv(unit->info->deps, it) {
-    switch (it.val->visibility) {
-      case SPN_VISIBILITY_BUILD: {
-        spn_cc_target_add_dep(target, spn_session_find_pkg(session, *it.key));
-        break;
-      }
-      case SPN_VISIBILITY_SCRIPT:
-      case SPN_VISIBILITY_TEST:
-      case SPN_VISIBILITY_PUBLIC: {
-        break;
-      }
-    }
-  }
 
   spn_cc_target_to_tcc(&cc, target, tcc);
   sp_try_goto(spn_tcc_add_file(tcc, unit->paths.script), fail);
@@ -188,15 +174,13 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
 }
 
 spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
-  spn_session_t* b = &app->session;
-  spn_build_graph_t* graph = &b->configure.graph;
   spn_session_t* session = &app->session;
+  spn_build_graph_t* graph = &session->configure.graph;
   spn_pkg_unit_t* root = spn_session_find_root(&app->session);
 
-  graph->error.some = SP_OPT_NONE;
-
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+  // Add a graph node for each package
+  sp_str_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
 
     unit->nodes.configure.run = spn_bg_add_fn(graph, on_configure_package, unit);
     unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
@@ -207,6 +191,17 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
     }
   }
 
+  // Add links between packages
+  sp_str_om_for(session->units.packages, p) {
+    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, p);
+
+    sp_da(spn_pkg_unit_t*) deps = *sp_str_ht_get(session->units.graph, unit->id);
+    sp_da_for(deps, it) {
+      spn_pkg_unit_t* parent = deps[it];
+      spn_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, parent->nodes.configure.stamp));
+    }
+  }
+
   // If we're downloading a toolchain, it needs a node which everything depends on
   if (session->units.toolchain) {
     spn_toolchain_unit_t* toolchain = session->units.toolchain;
@@ -214,31 +209,21 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
     toolchain->nodes.stamp = spn_bg_add_file(graph, toolchain->paths.stamp);
     spn_try(spn_bg_cmd_add_output(graph, toolchain->nodes.download, toolchain->nodes.stamp));
 
-    sp_om_for(session->units.packages, it) {
-      spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    sp_str_om_for(session->units.packages, it) {
+      spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
       spn_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, toolchain->nodes.stamp));
     }
   }
 
-  // Add links between packages
-  sp_om_for(session->units.packages, p) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, p);
-
-    sp_str_ht_for_kv(unit->deps, it) {
-      spn_pkg_unit_t* parent = *it.val;
-      spn_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, parent->nodes.configure.stamp));
-    }
-  }
-
-  b->configure.dirty = spn_bg_compute_forced_dirty(graph);
-  b->configure.executor = spn_bg_executor_new(
+  session->configure.dirty = spn_bg_compute_forced_dirty(graph);
+  session->configure.executor = spn_bg_executor_new(
     graph,
-    b->configure.dirty,
+    session->configure.dirty,
     (spn_bg_executor_config_t) {
       .num_threads = 1
     }
   );
-  spn_bg_executor_run(b->configure.executor);
+  spn_bg_executor_run(session->configure.executor);
 
   return SPN_TASK_DONE;
 }

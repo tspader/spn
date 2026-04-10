@@ -199,34 +199,6 @@ sp_str_t spn_dep_build_mode_to_str(spn_build_mode_t mode) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-sp_str_t spn_visibility_to_str(spn_visibility_t kind) {
-  switch (kind) {
-    case SPN_VISIBILITY_PUBLIC: return strl("public");
-    case SPN_VISIBILITY_TEST: return strl("test");
-    case SPN_VISIBILITY_SCRIPT: return strl("script");
-    case SPN_VISIBILITY_BUILD: return strl("build");
-  }
-
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-spn_visibility_t spn_visibility_from_str(sp_str_t str) {
-  if (sp_str_equal_cstr(str, "public")) {
-    return SPN_VISIBILITY_PUBLIC;
-  }
-  if (sp_str_equal_cstr(str, "test")) {
-    return SPN_VISIBILITY_TEST;
-  }
-  if (sp_str_equal_cstr(str, "script")) {
-    return SPN_VISIBILITY_SCRIPT;
-  }
-  if (sp_str_equal_cstr(str, "build")) {
-    return SPN_VISIBILITY_BUILD;
-  }
-
-  SP_UNREACHABLE_RETURN(SPN_VISIBILITY_PUBLIC);
-}
-
 spn_linkage_t spn_lib_kind_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "shared")) {
     return SPN_LIB_KIND_SHARED;
@@ -358,17 +330,34 @@ spn_c_standard_t spn_c_standard_from_str(sp_str_t str) {
   SP_UNREACHABLE_RETURN(SPN_C99);
 }
 
-sp_str_t spn_package_kind_to_str(spn_pkg_kind_t kind) {
+sp_str_t spn_pkg_source_to_str(spn_pkg_source_t kind) {
   switch (kind) {
-    SPN_PACKAGE_KIND(SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER)
+    case SPN_PKG_SOURCE_ROOT: {
+      return sp_str_lit("root");
+    }
+    case SPN_PKG_SOURCE_FILE: {
+      return sp_str_lit("file");
+    }
+    case SPN_PKG_SOURCE_INDEX: {
+      return sp_str_lit("index");
+    }
   }
 
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-spn_pkg_kind_t spn_package_kind_from_str(sp_str_t str) {
-  SPN_PACKAGE_KIND(SP_X_NAMED_ENUM_STR_TO_ENUM)
-  sp_unreachable_return(SPN_PACKAGE_KIND_INDEX);
+spn_pkg_source_t spn_pkg_source_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "root")) {
+    return SPN_PKG_SOURCE_ROOT;
+  }
+  if (sp_str_equal_cstr(str, "file")) {
+    return SPN_PKG_SOURCE_FILE;
+  }
+  if (sp_str_equal_cstr(str, "index")) {
+    return SPN_PKG_SOURCE_INDEX;
+  }
+
+  SP_UNREACHABLE_RETURN(SPN_PKG_SOURCE_INDEX);
 }
 
 sp_str_t spn_index_protocol_to_str(spn_index_protocol_t protocol) {
@@ -401,33 +390,6 @@ spn_index_protocol_t spn_index_protocol_from_str(sp_str_t str) {
   SP_UNREACHABLE_RETURN(SPN_INDEX_PROTOCOL_GIT);
 }
 
-spn_target_kind_t spn_pkg_linkage_to_target_kind(spn_linkage_t kind) {
-  switch (kind) {
-    case SPN_LIB_KIND_SHARED: { return SPN_TARGET_SHARED_LIB; }
-    case SPN_LIB_KIND_STATIC: { return SPN_TARGET_STATIC_LIB; }
-    case SPN_LIB_KIND_SOURCE: {
-      SP_UNREACHABLE_CASE();
-    }
-  }
-
-  SP_UNREACHABLE_RETURN(SPN_TARGET_EXE);
-}
-
-spn_linkage_t spn_target_kind_to_pkg_linkage(spn_target_kind_t kind) {
-  switch (kind) {
-    case SPN_TARGET_SHARED_LIB: { return SPN_LIB_KIND_SHARED; }
-    case SPN_TARGET_STATIC_LIB: { return SPN_LIB_KIND_STATIC; }
-    case SPN_TARGET_NONE:
-    case SPN_TARGET_EXE:
-    case SPN_TARGET_JIT:
-    case SPN_TARGET_OBJECT: {
-      SP_UNREACHABLE_CASE();
-    }
-  }
-
-  SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
-}
-
 sp_os_lib_kind_t spn_lib_kind_to_sp_os_lib_kind(spn_linkage_t kind) {
   switch (kind) {
     case SPN_LIB_KIND_SHARED: {
@@ -436,6 +398,7 @@ sp_os_lib_kind_t spn_lib_kind_to_sp_os_lib_kind(spn_linkage_t kind) {
     case SPN_LIB_KIND_STATIC: {
       return SP_OS_LIB_STATIC;
     }
+    case SPN_LIB_KIND_NONE:
     case SPN_LIB_KIND_SOURCE: {
       return 0;
     }

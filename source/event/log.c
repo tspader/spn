@@ -420,10 +420,7 @@ static void build_schemas(void) {
     sp_bind_builder_t b = sp_bind_builder_begin();
     SP_BIND_SCHEMA(&b) {
       SP_BIND_OBJECT(&b, spn_evt_unknown_t, request, "request") {
-        SP_BIND_OBJECT(&b, spn_requested_pkg_t, id, "id") {
-          SP_BIND(&b, spn_pkg_id_t, namespace, "namespace", SP_BIND_STR);
-          SP_BIND(&b, spn_pkg_id_t, name, "name", SP_BIND_STR);
-        }
+        SP_BIND(&b, spn_requested_pkg_t, qualified, "qualified", SP_BIND_STR);
       }
     }
     schemas[SPN_EVENT_ERR_UNKNOWN_PKG] = sp_bind_builder_end(&b);

@@ -18,6 +18,7 @@
 #include "session/session.h"
 #include "session/types.h"
 #include "spn.h"
+#include "sp/macro.h"
 #include "task/task.h"
 #include "toolchain/toolchain.h"
 #include "toolchain/types.h"
@@ -60,8 +61,8 @@ static bool match_toolchain(spn_toolchain_entry_t* toolchain, spn_triple_t host,
 }
 
 static spn_toolchain_entry_t* find_toolchain(spn_pkg_info_t* pkg, spn_triple_t host, spn_triple_t target) {
-  sp_om_for(pkg->toolchains, it) {
-    spn_toolchain_entry_t* toolchain = sp_om_at(pkg->toolchains, it);
+  sp_str_om_for(pkg->toolchains, it) {
+    spn_toolchain_entry_t* toolchain = sp_str_om_at(pkg->toolchains, it);
 
     if (match_toolchain(toolchain, host, target)) {
       return toolchain;
@@ -82,107 +83,96 @@ static void log_toolchain_error(spn_pkg_info_t* pkg, spn_triple_t host, spn_trip
 }
 
 
-spn_err_t load_index_packages(spn_session_t* session, spn_resolver_t* resolver) {
-  spn_git_cache_t cache = SP_ZERO_INITIALIZE();
-  spn_git_cache_init(&cache, spn.paths.source);
+spn_err_t load_index_package(spn_session_t* session, spn_resolved_pkg_t* resolved) {
+  sp_str_ht_insert(session->packages, resolved->qualified, sp_zero_struct(spn_loaded_pkg_t));
+  spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, resolved->qualified);
 
-  sp_str_ht_for_kv(resolver->resolved, it) {
-    spn_resolved_pkg_t* resolved = it.val;
+  spn_index_rel_t* release = resolved->index.release;
 
-    sp_str_ht_insert(session->packages, *it.key, sp_zero_struct(spn_loaded_pkg_t));
-    spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, *it.key);
+  struct {
+    spn_git_checkout_t* manifest;
+    spn_git_checkout_t* source;
+  } checkouts = sp_zero_initialize();
 
-    spn_index_rel_t* release = resolved->release;
+  sp_tm_timer_t timer = sp_tm_start_timer();
 
-    struct {
-      spn_git_checkout_t* manifest;
-      spn_git_checkout_t* source;
-    } checkouts = sp_zero_initialize();
-
-    sp_tm_timer_t timer = sp_tm_start_timer();
-
-    // If the manifest is in a different repo than the source, check that out first
-    if (!sp_str_empty(release->manifest.url)) {
-      spn_git_checkout_id_t id = {
-        .url = release->manifest.url,
-        .rev = release->manifest.rev,
-        .dir = release->manifest.dir
-      };
-      spn_try(spn_git_cache_ensure_checkout(&cache, id, &checkouts.manifest));
-    }
-
-    // If the package has source code, clone it
-    if (!sp_str_empty(release->source.url)) {
-      spn_git_checkout_id_t id = {
-        .url = release->source.url,
-        .rev = release->source.rev,
-        .dir = release->source.dir
-      };
-      spn_try(spn_git_cache_ensure_checkout(&cache, id, &checkouts.source));
-      loaded->paths.source = checkouts.source->path;
-    }
-
-    if (checkouts.manifest) {
-      loaded->paths.manifest = sp_fs_join_path(checkouts.manifest->path, release->paths.manifest);
-      loaded->paths.script = sp_fs_join_path(checkouts.manifest->path, release->paths.script);
-    }
-    else {
-      loaded->paths.manifest = sp_fs_join_path(checkouts.source->path, release->paths.manifest);
-      loaded->paths.script = sp_fs_join_path(checkouts.source->path, release->paths.script);
-    }
-
-    if (sp_fs_exists(loaded->paths.manifest)) {
-      sp_assert_fmt(
-        sp_fs_exists(loaded->paths.manifest),
-        "manifest didn't exist; pkg = {}, path = {}, checkout = {}",
-        SP_FMT_STR(spn_pkg_id_to_qualified_name(release->id)),
-        SP_FMT_STR(loaded->paths.manifest),
-        SP_FMT_PTR(checkouts.manifest)
-      );
-    }
-
-    loaded->kind = SPN_PACKAGE_KIND_INDEX;
-    loaded->info = sp_alloc_type(spn_pkg_info_t);
-    spn_pkg_load(loaded->info, loaded->paths.manifest);
-
-    loaded->elapsed = sp_tm_read_timer(&timer);
+  // If the manifest is in a different repo than the source, check that out first
+  if (!sp_str_empty(release->manifest.url)) {
+    spn_git_checkout_id_t id = {
+      .url = release->manifest.url,
+      .rev = release->manifest.rev,
+      .dir = release->manifest.dir
+    };
+    spn_try(spn_git_cache_ensure_checkout(session->git, id, &checkouts.manifest));
   }
+
+  // If the package has source code, clone it
+  if (!sp_str_empty(release->source.url)) {
+    spn_git_checkout_id_t id = {
+      .url = release->source.url,
+      .rev = release->source.rev,
+      .dir = release->source.dir
+    };
+    spn_try(spn_git_cache_ensure_checkout(session->git, id, &checkouts.source));
+    loaded->paths.source = checkouts.source->path;
+  }
+
+  if (checkouts.manifest) {
+    loaded->paths.manifest = sp_fs_join_path(checkouts.manifest->path, release->paths.manifest);
+    loaded->paths.script = sp_fs_join_path(checkouts.manifest->path, release->paths.script);
+  }
+  else {
+    loaded->paths.manifest = sp_fs_join_path(checkouts.source->path, release->paths.manifest);
+    loaded->paths.script = sp_fs_join_path(checkouts.source->path, release->paths.script);
+  }
+
+  if (sp_fs_exists(loaded->paths.manifest)) {
+    sp_assert_fmt(
+      sp_fs_exists(loaded->paths.manifest),
+      "manifest didn't exist; pkg = {}, path = {}, checkout = {}",
+      SP_FMT_STR(spn_pkg_id_to_qualified_name(release->id)),
+      SP_FMT_STR(loaded->paths.manifest),
+      SP_FMT_PTR(checkouts.manifest)
+    );
+  }
+
+  loaded->source = SPN_PKG_SOURCE_INDEX;
+  loaded->info = sp_alloc_type(spn_pkg_info_t);
+  spn_pkg_load(loaded->info, loaded->paths.manifest);
+
+  loaded->elapsed = sp_tm_read_timer(&timer);
 
   return SPN_OK;
 }
 
-spn_err_t load_file_packages(spn_session_t* session) {
-  // Load file dependencies directly from their manifests
-  sp_ht_for_kv(session->pkg->deps, it) {
-    spn_requested_pkg_t* requested = it.val;
-    if (requested->kind != SPN_PACKAGE_KIND_FILE) continue;
+spn_err_t load_file_package(spn_session_t* session, spn_resolved_pkg_t* pkg) {
+  sp_str_t qualified = spn_pkg_id_to_qualified_name(pkg->id);
 
-    sp_str_t manifest = requested->file;
-    if (sp_str_starts_with(manifest, SP_LIT("file://"))) {
-      manifest = sp_str_strip_left(manifest, SP_LIT("file://"));
-    }
-
-    sp_tm_timer_t timer = sp_tm_start_timer();
-
-    if (!sp_fs_exists(manifest)) {
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_SYNC_FAILED,
-        .sync_failed = {
-          .name = *it.key,
-          .url = manifest,
-          .error = sp_str_lit("manifest not found"),
-        }
-      });
-      return SPN_ERROR;
-    }
-
-    sp_str_ht_insert(session->packages, *it.key, sp_zero_struct(spn_loaded_pkg_t));
-    spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, *it.key);
-
-    loaded->kind = SPN_PACKAGE_KIND_FILE;
-    loaded->info = sp_alloc_type(spn_pkg_info_t);
-    spn_pkg_load(loaded->info, manifest);
+  sp_str_t manifest = pkg->file.path;
+  if (sp_str_starts_with(manifest, SP_LIT("file://"))) {
+    manifest = sp_str_strip_left(manifest, SP_LIT("file://"));
   }
+
+  sp_tm_timer_t timer = sp_tm_start_timer();
+
+  if (!sp_fs_exists(manifest)) {
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_SYNC_FAILED,
+      .sync_failed = {
+        .name = qualified,
+        .url = manifest,
+        .error = sp_str_lit("manifest not found"),
+      }
+    });
+    return SPN_ERROR;
+  }
+
+  sp_str_ht_insert(session->packages, qualified, sp_zero_struct(spn_loaded_pkg_t));
+  spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, qualified);
+
+  loaded->source = SPN_PKG_SOURCE_FILE;
+  loaded->info = sp_alloc_type(spn_pkg_info_t);
+  spn_pkg_load(loaded->info, manifest);
 
   return SPN_OK;
 }
@@ -192,7 +182,7 @@ spn_err_t load_root_package(spn_session_t* session) {
   spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, session->pkg->qualified);
 
   loaded->info = session->pkg;
-  loaded->kind = SPN_PACKAGE_KIND_ROOT;
+  loaded->source = SPN_PKG_SOURCE_ROOT;
   loaded->paths.manifest = spn.paths.manifest;
   loaded->paths.script = sp_fs_join_path(spn.paths.project, sp_str_lit("spn.c"));
   loaded->paths.source = spn.paths.project;
@@ -200,50 +190,40 @@ spn_err_t load_root_package(spn_session_t* session) {
   return SPN_OK;
 }
 
-typedef struct {
-  u8 package;
-  u8 build;
-  u8 test;
-} scope_t;
-
-void add_compilation_units(spn_session_t* session) {
-  sp_str_ht(scope_t) scopes = SP_ZERO_INITIALIZE();
-  sp_str_ht_for_kv(session->packages, it) {
-    spn_pkg_info_t* info = it.val->info;
-    sp_str_ht_for_kv(info->deps, dep) {
-      if (!sp_str_ht_exists(scopes, *dep.key)) {
-        sp_str_ht_insert(scopes, *dep.key, sp_zero_struct(scope_t));
-      }
-      scope_t* scope = sp_str_ht_get(scopes, *dep.key);
-      // I was going to do it this way, but it needs to be more of a tree traversal, because when
-      // you're on any given dependency right now you don't know how you got there. If I just need
-      // sqlite at build-time, and sqlite lists foobar as a package dep, foobar is a build-time
-      // dependency of me.
-      //scope->package =
-    }
-    spn_session_add_pkg(session, it.val);
-  }
-
+void add_compilation_units(spn_session_t* session, spn_resolver_t* resolver) {
   sp_str_ht_for_kv(session->packages, it) {
     spn_session_add_pkg(session, it.val);
   }
 
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    sp_ht_for_kv(unit->info->deps, j) {
-      spn_pkg_unit_t* dep = spn_session_find_pkg(session, unit->info->qualified);
-      sp_str_ht_insert(unit->deps, unit->info->qualified, dep);
+  sp_str_ht_for_kv(resolver->packages, it) {
+    spn_resolved_pkg_t* pkg = it.val;
+    spn_pkg_unit_t* unit = spn_session_find_pkg(session, pkg->qualified);
+
+    sp_da(spn_pkg_unit_t*) deps = sp_zero;
+    sp_da_for(pkg->deps, j) {
+      spn_pkg_unit_t* dep = spn_session_find_pkg(session, pkg->deps[j].qualified);
+      sp_da_push(deps, dep);
     }
+
+    sp_str_ht_insert(session->units.graph, pkg->qualified, deps);
   }
 }
 
 spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   spn_session_t* session = &app->session;
 
-  // Locate every package that we need and load their manifests
-  spn_try_as(load_root_package(session), SPN_TASK_ERROR);
-  spn_try_as(load_index_packages(session, app->resolver), SPN_TASK_ERROR);
-  spn_try_as(load_file_packages(session), SPN_TASK_ERROR);
+  session->git = sp_alloc_type(spn_git_cache_t);
+  spn_git_cache_init(session->git, spn.paths.source);
+
+  // Load every package's manifest, checking out source code if needed
+  sp_str_ht_for_kv(app->resolver->packages, it) {
+    spn_resolved_pkg_t* pkg = it.val;
+    switch (pkg->source) {
+      case SPN_PKG_SOURCE_ROOT: load_root_package(session); break;
+      case SPN_PKG_SOURCE_INDEX: load_index_package(session, pkg); break;
+      case SPN_PKG_SOURCE_FILE: load_file_package(session, pkg); break;
+    }
+  }
 
   // The toolchain can be specified as either a package which exports toolchains
   // or as a block of TOML inline in the manifest.
@@ -299,7 +279,7 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
 
   toolchain->info = entry->info;
 
-  add_compilation_units(session);
+  add_compilation_units(session, app->resolver);
 
   // If we need to download a toolchain, point it at the unit for the corresponding
   // package. This is separate from where we resolve the toolchain because we don't
@@ -317,7 +297,7 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     }
     case SPN_TOOLCHAIN_INDEX: {
       spn_toolchain_unit_t* unit = session->units.toolchain;
-      spn_pkg_unit_t* pkg = sp_om_get(session->units.packages, unit->pkg->qualified);
+      spn_pkg_unit_t* pkg = sp_str_om_get(session->units.packages, unit->pkg->qualified);
 
       sp_str_t store = pkg->paths.store;
       sp_str_t work = pkg->paths.work;

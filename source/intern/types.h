@@ -6,6 +6,7 @@
 #define SP_INTERN_INVALID_ID 0
 #define SP_INTERN_INVALID_STR SP_ZERO_STRUCT(sp_str_t)
 typedef u32 sp_intern_id_t;
+typedef sp_str_t sp_intern_str_t;
 
 typedef struct {
   struct {

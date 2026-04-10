@@ -181,9 +181,9 @@ static void build_manifest(fixture_t* fixture, spn_pkg_info_t* manifest) {
     sp_str_t qualified = spn_pkg_id_to_qualified_name(id);
 
     spn_requested_pkg_t req = {
-      .id = id,
-      .kind = SPN_PACKAGE_KIND_INDEX,
-      .range = spn_semver_parse_range(sp_str_view(dep->version)),
+      .qualified = spn_pkg_canonicalize_name(sp_str_view(dep->name)),
+      .source = SPN_PKG_SOURCE_INDEX,
+      .index.range = spn_semver_parse_range(sp_str_view(dep->version)),
     };
 
     sp_ht_insert(manifest->deps, qualified, req);
@@ -227,7 +227,7 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
     };
     sp_str_t qualified = spn_pkg_id_to_qualified_name(id);
 
-    spn_resolved_pkg_t* resolved = sp_str_ht_get(resolver.resolved, qualified);
+    spn_resolved_pkg_t* resolved = sp_str_ht_get(resolver.packages, qualified);
     ASSERT_NE(resolved, SP_NULLPTR);
     ASSERT_TRUE(spn_semver_eq(resolved->version, expected.version));
   }

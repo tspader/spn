@@ -26,22 +26,22 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
   spn_build_graph_t* graph = &session->build.graph;
 
   // Add all nodes to the build graph
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+  sp_str_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
     spn_try(add_package(graph, unit));
   }
 
   // Link intra-package dependencies
-  sp_om_for(session->units.targets, it) {
-    spn_target_unit_t* target = sp_om_at(session->units.targets, it);
+  sp_str_om_for(session->units.targets, it) {
+    spn_target_unit_t* target = sp_str_om_at(session->units.targets, it);
     sp_da_for(target->deps.target, it) {
 
     }
   }
 
   // Link inter-package dependencies; we don't do anything more granular than entire packages
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
+  sp_str_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* pkg = sp_str_om_at(session->units.packages, it);
     sp_da_for(pkg->deps, it) {
 
     }
@@ -104,7 +104,7 @@ spn_err_union_t spn_bg_error_to_union(spn_build_graph_t* graph) {
 // - then from the units we set up the graph
 // - might need various views over the base data of "what units exist"
 // - the session should probably own every single unit, when a unit wants to refer to another
-//   unit for ergonomics it should hold a pointer, or sp_om(unit*)
+//   unit for ergonomics it should hold a pointer, or sp_str_om(unit*)
 // - working on taking deps = ["spum", "sqlite"] and resolving those into the units for the spum target and the sqlite package
 // - if it's a target in your package, add the specific link
 // - but if it's a whole package just use the package-to-package links
@@ -271,8 +271,8 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   }
 
   // object files
-  sp_om_for(unit->objects, it) {
-    spn_compile_unit_t* object = sp_om_at(unit->objects, it);
+  sp_str_om_for(unit->objects, it) {
+    spn_compile_unit_t* object = sp_str_om_at(unit->objects, it);
     object->nodes.source = spn_bg_add_file(graph, object->paths.file);
     object->nodes.compile = spn_bg_add_fn(graph, compile_object, object);
     object->nodes.object = spn_bg_add_file(graph, object->paths.object);
@@ -281,8 +281,8 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
     spn_bg_cmd_add_input(graph, object->nodes.compile, unit->nodes.build.stamp.exit);
   }
 
-  sp_str_ht_for_kv(unit->targets, it) {
-    spn_target_unit_t* target = *it.val;
+  sp_da_for(unit->targets, it) {
+    spn_target_unit_t* target = unit->targets[it];
 
     switch (target->info->kind) {
       case SPN_TARGET_STATIC_LIB:
@@ -381,15 +381,14 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
   // Now that the configure phase is done, everything about the build is static. We
   // can go through every target and resolve file globs into object files which need
   // to be compiled.
-  sp_om_for(session->units.targets, it) {
-    spn_target_unit_t* target = sp_om_at(session->units.targets, it);
-    spn_pkg_unit_t* pkg = target->parent;
+  sp_str_om_for(session->units.targets, it) {
+    spn_target_unit_t* target = sp_str_om_at(session->units.targets, it);
+    spn_pkg_unit_t* pkg = target->pkg;
 
     sp_da(sp_str_t) source = collect_target_source(pkg, target);
     sp_da_for(source, j) {
       sp_str_t relative = source[j];
       sp_str_t file = sp_fs_join_path(pkg->paths.source, relative);
-      sp_str_t name = spn_intern(sp_fs_get_stem(file));
       sp_str_t extension = sp_fs_get_ext(relative);
       sp_str_t stem = relative;
       if (!sp_str_empty(extension)) {
@@ -398,9 +397,8 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
 
       sp_str_t object_path = sp_fs_join_path(target->paths.object, sp_format("{}.o", SP_FMT_STR(stem)));
 
-      if (!sp_om_has(pkg->objects, file)) {
-        sp_om_insert(pkg->objects, file, ((spn_compile_unit_t) {
-          .name = name,
+      if (!sp_str_om_has(pkg->objects, file)) {
+        sp_str_om_insert(pkg->objects, file, ((spn_compile_unit_t) {
           .package = pkg,
           .target = target,
           .session = target->session,
@@ -411,7 +409,7 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
         }));
       }
 
-      spn_compile_unit_t* object = sp_om_get(pkg->objects, file);
+      spn_compile_unit_t* object = sp_str_om_get(pkg->objects, file);
       sp_da_push(target->objects, object);
     }
   }
@@ -425,8 +423,8 @@ spn_task_result_t spn_task_prepare_build_graph(spn_app_t* app) {
 void spn_task_init_build_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
 
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+  sp_str_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
     spn.tui.info.max_name = SP_MAX(spn.tui.info.max_name, unit->info->name.len);
   }
 

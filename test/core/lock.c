@@ -88,8 +88,7 @@ static void build_lock(fixture_t* fixture, spn_lock_file_t* lock) {
       .name = sp_str_view(d->name),
       .version = spn_semver_from_str(sp_str_view(d->version)),
       .commit = sp_str_view(d->commit),
-      .kind = spn_package_kind_from_str(sp_str_view(d->kind)),
-      .visibility = spn_visibility_from_str(sp_str_view(d->visibility)),
+      .kind = spn_pkg_source_from_str(sp_str_view(d->kind)),
       .source = {
         .url = d->source_url ? sp_str_view(d->source_url) : SP_LIT(""),
         .rev = d->source_rev ? sp_str_view(d->source_rev) : SP_LIT(""),
@@ -147,7 +146,6 @@ static void run_fixture(s32* utest_result, fixture_t fixture) {
     EXPECT_EQ(orig->version.patch, got->version.patch);
     SP_EXPECT_STR_EQ(orig->commit, got->commit);
     EXPECT_EQ(orig->kind, got->kind);
-    EXPECT_EQ(orig->visibility, got->visibility);
     SP_EXPECT_STR_EQ(orig->source.url, got->source.url);
     SP_EXPECT_STR_EQ(orig->source.rev, got->source.rev);
     SP_EXPECT_STR_EQ(orig->source.dir, got->source.dir);

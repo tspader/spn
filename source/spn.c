@@ -478,8 +478,8 @@ void spn_deinit(sp_app_t* sp) {
   if (!app.session.pkg) return;
 
   spn_pkg_unit_t* root = spn_session_find_root(&app.session);
-  sp_om_for(app.session.units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(app.session.units.packages, it);
+  sp_str_om_for(app.session.units.packages, it) {
+    spn_pkg_unit_t* unit = sp_str_om_at(app.session.units.packages, it);
 
     sp_fs_create_sym_link(
       unit->paths.logs.build,
@@ -495,8 +495,8 @@ void spn_deinit(sp_app_t* sp) {
     sp_io_writer_close(&unit->logs.io.jsonl);
   }
 
-  sp_om_for(app.session.units.targets, it) {
-    spn_target_unit_t* target = sp_om_at(app.session.units.targets, it);
+  sp_str_om_for(app.session.units.targets, it) {
+    spn_target_unit_t* target = sp_str_om_at(app.session.units.targets, it);
     sp_io_writer_close(&target->logs.build);
     sp_io_writer_close(&target->logs.test);
     sp_io_writer_close(&target->logs.jsonl);

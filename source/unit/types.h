@@ -1,6 +1,7 @@
 #ifndef SPN_UNIT_TYPES_H
 #define SPN_UNIT_TYPES_H
 
+#include "intern/types.h"
 #include "sp.h"
 #include "spn.h"
 
@@ -8,6 +9,10 @@
 #include "pkg/types.h"
 #include "target/types.h"
 #include "external/tcc/types.h"
+
+typedef struct spn_target_unit spn_target_unit_t;
+typedef struct spn_session_t spn_session_t;
+typedef struct spn_user_node_t spn_user_node_t;
 
 struct spn_node_t {
   spn_pkg_unit_t* ctx;
@@ -18,7 +23,6 @@ struct spn_node_ctx_t {
   void* user_data;
 };
 
-typedef struct spn_user_node_t spn_user_node_t;
 struct spn_user_node_t {
   spn_pkg_unit_t* pkg;
   sp_str_t tag;
@@ -30,26 +34,6 @@ struct spn_user_node_t {
   spn_bg_id_t id;
 };
 
-typedef struct spn_target_unit spn_target_unit_t;
-typedef struct spn_session_t spn_session_t;
-
-typedef struct {
-  u64 compile;
-  u64 configure;
-  u64 build;
-  u64 package;
-  u64 total;
-} spn_build_time_t;
-
-typedef struct {
-  spn_pkg_info_t* package;
-  spn_session_t* session;
-  struct {
-    sp_str_t source;
-    sp_str_t store;
-    sp_str_t work;
-  } paths;
-} spn_build_ctx_config_t;
 
 typedef struct {
   sp_str_t build;
@@ -70,12 +54,6 @@ typedef struct {
   spn_build_log_paths_t logs;
 } spn_build_paths_t;
 
-typedef struct {
-  sp_str_t source;
-  sp_str_t work;
-  sp_str_t store;
-} spn_bp_config_t;
-
 typedef struct spn_build_io_t {
   sp_io_writer_t build;
   sp_io_writer_t test;
@@ -83,16 +61,16 @@ typedef struct spn_build_io_t {
 } spn_build_io_t;
 
 typedef struct {
-  sp_str_t name;
-  spn_target_unit_t* target;
-  spn_pkg_unit_t* package;
   spn_session_t* session;
+  spn_pkg_unit_t* package;
+  spn_target_unit_t* target;
 
   struct {
     spn_bg_id_t source;
     spn_bg_id_t compile;
     spn_bg_id_t object;
   } nodes;
+
   struct {
     sp_str_t file;
     sp_str_t object;
@@ -120,16 +98,11 @@ typedef struct {
 } spn_pkg_nodes_t;
 
 struct spn_target_unit {
-  spn_build_paths_t paths;
-  spn_build_io_t logs;
   spn_session_t* session;
-  spn_pkg_info_t* pkg;
+  spn_pkg_unit_t* pkg;
   spn_target_info_t* info;
-  spn_cc_t* cc;
-  spn_target_kind_t kind;
 
   sp_da(spn_compile_unit_t*) objects;
-  spn_pkg_unit_t* parent;
 
   struct {
     sp_da(spn_target_unit_t*) target;
@@ -146,19 +119,22 @@ struct spn_target_unit {
     } embed;
     sp_da(spn_bg_id_t) source;
   } nodes;
+
+  spn_build_paths_t paths;
+  spn_build_io_t logs;
 };
 
 struct spn_pkg_unit_t {
+  sp_intern_str_t id;
   spn_session_t* session;
   spn_pkg_info_t* info;
 
-  sp_om(spn_compile_unit_t) objects;
-  sp_str_ht(spn_target_unit_t*) targets;
+  sp_str_om(spn_compile_unit_t) objects;
   sp_str_ht(spn_target_unit_t*) libs;
   sp_str_ht(spn_target_unit_t*) exes;
   sp_str_ht(spn_target_unit_t*) scripts;
   sp_str_ht(spn_target_unit_t*) tests;
-  sp_str_ht(spn_pkg_unit_t*) deps;
+  sp_da(spn_target_unit_t*) targets;
 
   struct {
     struct {
@@ -203,7 +179,13 @@ struct spn_pkg_unit_t {
   } logs;
 
 
-  spn_build_time_t time;
+  struct {
+    u64 compile;
+    u64 configure;
+    u64 build;
+    u64 package;
+    u64 total;
+  } time;
 
   spn_tcc_t* tcc;
   spn_configure_fn_t on_configure;

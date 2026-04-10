@@ -1,5 +1,6 @@
 #include "app/types.h"
 #include "ctx/types.h"
+#include "intern/types.h"
 #include "resolve/types.h"
 
 #include "enum/enum.h"
@@ -18,8 +19,8 @@
 
 spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
   // Build the list of available toolchains
-  sp_om_for(root->toolchains, it) {
-    spn_toolchain_entry_t entry = *sp_om_at(root->toolchains, it);
+  sp_str_om_for(root->toolchains, it) {
+    spn_toolchain_entry_t entry = *sp_str_om_at(root->toolchains, it);
     sp_str_ht_insert(session->toolchains, entry.name, entry);
   }
   spn_toolchain_entry_t builtin_toolchains[] = {
@@ -72,13 +73,13 @@ spn_err_t apply_config(spn_session_t* session, spn_app_config_t config) {
 
 spn_err_t add_toolchain(spn_session_t* session, spn_resolver_t* resolver) {
   spn_toolchain_entry_t* toolchain = sp_str_ht_get(session->toolchains, session->profile.toolchain);
+  sp_intern_str_t qualified = spn_pkg_canonicalize_name(toolchain->request.package);
 
   if (toolchain->kind == SPN_TOOLCHAIN_INDEX) {
     spn_resolver_add(resolver, (spn_requested_pkg_t) {
-      .id = spn_qualified_name_to_pkg_id(toolchain->request.package),
-      .visibility = SPN_VISIBILITY_BUILD,
-      .kind = SPN_PACKAGE_KIND_INDEX,
-      .range = toolchain->request.range,
+      .qualified = qualified,
+      .source = SPN_PKG_SOURCE_INDEX,
+      .index.range = toolchain->request.range,
     });
   }
 
@@ -86,7 +87,7 @@ spn_err_t add_toolchain(spn_session_t* session, spn_resolver_t* resolver) {
 }
 
 void emit_resolved(spn_resolver_t* resolver) {
-  sp_str_ht_for_kv(resolver->resolved, it) {
+  sp_str_ht_for_kv(resolver->packages, it) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_RESOLVE_PACKAGE,
       .resolve_pkg = {
@@ -99,7 +100,7 @@ void emit_resolved(spn_resolver_t* resolver) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_RESOLVE_END,
     .resolve_end = {
-      .num_resolved = sp_str_ht_size(resolver->resolved),
+      .num_resolved = sp_str_ht_size(resolver->packages),
       .time = sp_tm_read_timer(&resolver->timer),
     }
   });

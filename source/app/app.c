@@ -6,24 +6,6 @@
 #include "pkg/pkg.h"
 #include "semver/convert.h"
 
-sp_str_t spn_pkg_req_to_str(spn_requested_pkg_t dep) {
-  switch (dep.kind) {
-    case SPN_PACKAGE_KIND_FILE: {
-      return dep.file;
-    }
-    case SPN_PACKAGE_KIND_INDEX: {
-      return spn_semver_range_to_str(dep.range);
-    }
-    case SPN_PACKAGE_KIND_ROOT: {
-      SP_BROKEN();
-      break;
-    }
-  }
-
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-
 void spn_app_update_lock_file(spn_app_t* app) {
   spn_lock_file_t lock = spn_build_lock_file(app->resolver, &app->package);
 

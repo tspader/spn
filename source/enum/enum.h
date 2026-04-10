@@ -23,8 +23,6 @@ sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc);
 spn_build_mode_t spn_dep_build_mode_from_str(sp_str_t str);
 sp_str_t spn_dep_build_mode_to_str(spn_build_mode_t mode);
 
-sp_str_t spn_visibility_to_str(spn_visibility_t kind);
-spn_visibility_t spn_visibility_from_str(sp_str_t str);
 spn_linkage_t spn_lib_kind_from_str(sp_str_t str);
 spn_linkage_t spn_pkg_linkage_from_str(sp_str_t str);
 sp_str_t spn_pkg_linkage_to_str(spn_linkage_t kind);
@@ -35,8 +33,8 @@ spn_cc_kind_t spn_cc_kind_from_str(sp_str_t str);
 spn_c_standard_t spn_c_standard_from_str(sp_str_t str);
 sp_str_t spn_c_standard_to_str(spn_c_standard_t standard);
 
-sp_str_t spn_package_kind_to_str(spn_pkg_kind_t kind);
-spn_pkg_kind_t spn_package_kind_from_str(sp_str_t str);
+sp_str_t spn_pkg_source_to_str(spn_pkg_source_t kind);
+spn_pkg_source_t spn_pkg_source_from_str(sp_str_t str);
 
 sp_str_t spn_index_protocol_to_str(spn_index_protocol_t protocol);
 spn_index_protocol_t spn_index_protocol_from_str(sp_str_t str);

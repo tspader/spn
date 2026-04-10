@@ -106,13 +106,6 @@ typedef enum {
 } spn_cmake_gen_t;
 
 typedef enum {
-  SPN_VISIBILITY_PUBLIC,
-  SPN_VISIBILITY_TEST,
-  SPN_VISIBILITY_SCRIPT,
-  SPN_VISIBILITY_BUILD,
-} spn_visibility_t;
-
-typedef enum {
   SPN_OK = 0,
   SPN_ERROR = 1,
 } spn_err_t;
