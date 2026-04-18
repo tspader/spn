@@ -4,7 +4,6 @@
 #include "event/event.h"
 #include "external/cc.h"
 #include "filter/filter.h"
-#include "external/tcc.h"
 #include "log/log.h"
 #include "task/task.h"
 #include "session/session.h"

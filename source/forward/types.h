@@ -16,6 +16,10 @@ typedef struct spn_cc spn_cc_t;
 typedef struct spn_node_t spn_node_t;
 typedef struct spn_pkg_unit_t spn_pkg_unit_t;
 typedef struct spn_node_ctx_t spn_node_ctx_t;
+typedef struct spn_toolchain_unit_t spn_toolchain_unit_t;
+typedef struct spn_target_unit spn_target_unit_t;
+typedef struct spn_session_t spn_session_t;
+typedef struct spn_user_node_t spn_user_node_t;
 
 typedef struct toml_table_t toml_table_t;
 

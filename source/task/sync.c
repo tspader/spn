@@ -7,6 +7,7 @@
 #include "forward/types.h"
 #include "git/cache.h"
 #include "index/types.h"
+#include "intern/intern.h"
 #include "log/log.h"
 #include "pkg/id.h"
 #include "pkg/load.h"
@@ -295,7 +296,8 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     }
     case SPN_TOOLCHAIN_INDEX: {
       spn_toolchain_unit_t* unit = session->units.toolchain;
-      spn_pkg_unit_t* pkg = sp_str_om_get(session->units.packages, unit->pkg->qualified);
+      spn_pkg_unit_id_t id = { sp_intern_get_or_insert(session->intern, unit->pkg->qualified) };
+      spn_pkg_unit_t* pkg = sp_om_get(session->units.packages, id);
 
       sp_str_t store = pkg->paths.store;
       sp_str_t work = pkg->paths.work;

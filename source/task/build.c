@@ -10,7 +10,6 @@
 #include "error/types.h"
 #include "graph/graph.h"
 #include "event/event.h"
-#include "intern/intern.h"
 #include "session/session.h"
 #include "sp/glob.h"
 #include "task/build/build.h"
@@ -409,8 +408,8 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   }
 
   // object files
-  sp_str_om_for(unit->objects, it) {
-    spn_compile_unit_t* object = sp_str_om_at(unit->objects, it);
+  sp_da_for(unit->objects, it) {
+    spn_compile_unit_t* object = unit->objects[it];
     object->nodes.source = spn_bg_add_file(graph, object->paths.file);
     object->nodes.compile = spn_bg_add_fn(graph, compile_object, object);
     object->nodes.object = spn_bg_add_file(graph, object->paths.object);
@@ -421,21 +420,8 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
 
   sp_da_for(unit->targets, it) {
     spn_target_unit_t* target = unit->targets[it];
-
-    switch (target->info->kind) {
-      case SPN_CC_OUTPUT_STATIC_LIB:
-      case SPN_CC_OUTPUT_SHARED_LIB: {
-        if (!sp_da_empty(target->info->source)) {
-          sp_try(add_target(graph, unit, target));
-        }
-        break;
-      }
-      case SPN_CC_OUTPUT_OBJECT:
-      case SPN_CC_OUTPUT_EXE:
-      case SPN_CC_OUTPUT_JIT: {
-        sp_try(add_target(graph, unit, target));
-        break;
-      }
+    if (!sp_da_empty(target->info->source)) {
+      sp_try(add_target(graph, unit, target));
     }
   }
 

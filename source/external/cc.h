@@ -5,11 +5,11 @@
 #include "spn.h"
 
 #include "external/tcc/types.h"
-#include "session/types.h"
+#include "forward/types.h"
 #include "target/types.h"
+#include "toolchain/types.h"
 
 #include "external/obj.h"
-#include "toolchain/types.h"
 
 typedef enum {
   SPN_CC_OUTPUT_OBJECT,

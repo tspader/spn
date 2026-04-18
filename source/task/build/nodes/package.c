@@ -43,7 +43,7 @@ s32 run_package_hook(spn_bg_cmd_t* cmd, void* user_data) {
     sp_tm_timer_t timer = sp_tm_start_timer();
 
     jmp_buf jump;
-    s32 status = tcc_setjmp(unit->tcc, jump, unit->on_package);
+    s32 status = tcc_setjmp(unit->tcc->s, jump, unit->on_package);
     if (!status) {
       spn_t* spn = (spn_t*)unit;
       unit->on_package(spn);

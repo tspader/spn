@@ -1,6 +1,7 @@
 #include "app/types.h"
 #include "forward/types.h"
 #include "intern/intern.h"
+#include "log/log.h"
 #include "ordered_map.h"
 #include "session/types.h"
 #include "target/types.h"
@@ -83,30 +84,30 @@ static sp_da(sp_str_t) collect_target_source(spn_pkg_unit_t* pkg, spn_target_uni
 spn_task_result_t spn_task_create_units(spn_app_t* app) {
   spn_session_t* session = &app->session;
   sp_str_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
-    spn_pkg_info_t* pkg = unit->info;
-    spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, pkg->qualified);
+    spn_pkg_unit_t* pkg = sp_str_om_at(session->units.packages, it);
+    spn_pkg_info_t* info = pkg->info;
+    spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, info->qualified);
 
     sp_da(spn_target_info_t*) targets;
-    sp_str_om_for(pkg->exes, it) {
-      sp_da_push(targets, sp_str_om_at(pkg->exes, it));
+    sp_str_om_for(info->exes, it) {
+      sp_da_push(targets, sp_str_om_at(info->exes, it));
     }
-    sp_str_om_for(pkg->libs, it) {
-      sp_da_push(targets, sp_str_om_at(pkg->libs, it));
+    sp_str_om_for(info->libs, it) {
+      sp_da_push(targets, sp_str_om_at(info->libs, it));
     }
     if (loaded->source == SPN_PKG_SOURCE_ROOT) {
-      sp_str_om_for(pkg->scripts, it) {
-        sp_da_push(targets, sp_str_om_at(pkg->scripts, it));
+      sp_str_om_for(info->scripts, it) {
+        sp_da_push(targets, sp_str_om_at(info->scripts, it));
       }
-      sp_str_om_for(pkg->tests, it) {
-        sp_da_push(targets, sp_str_om_at(pkg->tests, it));
+      sp_str_om_for(info->tests, it) {
+        sp_da_push(targets, sp_str_om_at(info->tests, it));
       }
     }
 
     sp_da_for(targets, it) {
-      spn_target_info_t* target = targets[it];
-      if (spn_target_filter_pass(&session->filter, target)) {
-        spn_session_add_target(session, unit, target);
+      if (spn_target_filter_pass(&session->filter, targets[it])) {
+        spn_target_unit_t* target =spn_session_add_target(session, pkg, targets[it]);
+        sp_da(sp_str_t) source = collect_target_source(pkg, target);
       }
     }
   }
@@ -115,43 +116,24 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
     spn_target_unit_t* unit = sp_om_at(session->units.targets, it);
     sp_da_for(unit->info->deps, j) {
       sp_str_t qualified = spn_pkg_canonicalize_name(unit->info->deps[j]);
-      spn_pkg_unit_t* pkg = spn_session_find_pkg_by_qualified(session, qualified);
-      spn_target_unit_t* target = spn_session_find_target_in_pkg(session, unit->pkg, unit->info->deps[j]);
-      sp_intern_id_t id = sp_intern_get_or_insert(session->intern, qualified);
       struct {
-        spn_pkg_unit_id_t pkg;
-        spn_target_unit_id_t target;
-      } ids = {
-        .pkg = { id },
-        .target = { unit->pkg->id, id },
+        spn_pkg_unit_t* pkg;
+        spn_target_unit_t* target;
+      } candidates = {
+        .pkg = spn_session_find_pkg_by_qualified(session, qualified),
+        .target = spn_session_find_target_in_pkg(session, unit->pkg, unit->info->deps[j])
       };
 
-      if (sp_om_has(session->units.packages, ids.pkg)) {
-        spn_pkg_unit_t* pkg = sp_om_get(session->units.packages, ids.pkg);
-        sp_da_push(unit->deps.package, pkg);
+      if (candidates.pkg) {
+        sp_da_push(unit->deps.package, candidates.pkg);
       }
-      else if (sp_om_has(session))
-    }
-  }
-
-  sp_str_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
-    spn_pkg_info_t* info = unit->info;
-    spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, info->qualified);
-
-    switch (loaded->source) {
-      case SPN_PKG_SOURCE_ROOT: {
-        sp_str_om_for(info->exes, it) {
-          spn_target_info_t* target = sp_str_om_at(info->exes, it);
-          if (!spn_target_filter_pass(&session->filter, target)) {
-            continue;
-          }
-
-
-        }
+      else if (candidates.target) {
+        sp_da_push(unit->deps.target, candidates.target);
+      }
+      else {
+        spn_log_error("failed to find {:fg cyan} as a package or target", SP_FMT_STR(unit->info->deps[j]));
       }
     }
-
   }
 
 
@@ -174,8 +156,8 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
 
       sp_str_t object_path = sp_fs_join_path(target->paths.object, sp_format("{}.o", SP_FMT_STR(stem)));
 
-      if (!sp_str_om_has(pkg->objects, file)) {
-        sp_str_om_insert(pkg->objects, file, ((spn_compile_unit_t) {
+      if (!sp_str_om_has(session->units.objects, file)) {
+        sp_str_om_insert(session->units.objects, file, ((spn_compile_unit_t) {
           .package = pkg,
           .target = target,
           .session = target->session,
@@ -186,7 +168,8 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
         }));
       }
 
-      spn_compile_unit_t* object = sp_str_om_get(pkg->objects, file);
+      spn_compile_unit_t* object = sp_str_om_get(session->units.objects, file);
+      sp_da_push(pkg->objects, object);
       sp_da_push(target->objects, object);
     }
   }

@@ -1,19 +1,14 @@
 #ifndef SPN_UNIT_TYPES_H
 #define SPN_UNIT_TYPES_H
 
+#include "external/cc.h"
 #include "forward/types.h"
 #include "sp.h"
 #include "spn.h"
 
 #include "graph/types.h"
 #include "intern/types.h"
-#include "pkg/types.h"
-#include "target/types.h"
 #include "external/tcc/types.h"
-
-typedef struct spn_target_unit spn_target_unit_t;
-typedef struct spn_session_t spn_session_t;
-typedef struct spn_user_node_t spn_user_node_t;
 
 typedef struct {
   sp_intern_id_t pkg;
@@ -113,6 +108,7 @@ struct spn_target_unit {
   spn_session_t* session;
   spn_pkg_unit_t* pkg;
   spn_target_info_t* info;
+  spn_cc_output_kind_t kind;
 
   sp_da(spn_compile_unit_t*) objects;
 
@@ -144,7 +140,7 @@ struct spn_pkg_unit_t {
   spn_session_t* session;
   spn_pkg_info_t* info;
 
-  sp_str_om(spn_compile_unit_t) objects;
+  sp_da(spn_compile_unit_t*) objects;
   sp_da(spn_target_unit_t*) libs;
   sp_da(spn_target_unit_t*) exes;
   sp_da(spn_target_unit_t*) scripts;
@@ -207,9 +203,12 @@ struct spn_pkg_unit_t {
   spn_package_fn_t on_package;
 };
 
-typedef struct {
+struct spn_toolchain_unit_t {
   spn_toolchain_kind_t kind;
   spn_toolchain_info_t info;
+  spn_toolchain_launcher_t compiler;
+  spn_toolchain_launcher_t linker;
+  spn_toolchain_launcher_t archiver;
   spn_pkg_info_t* pkg;
 
   spn_session_t* session;
@@ -227,11 +226,7 @@ typedef struct {
     sp_str_t stamp;
     spn_build_log_paths_t logs;
   } paths;
-
-  spn_toolchain_launcher_t compiler;
-  spn_toolchain_launcher_t linker;
-  spn_toolchain_launcher_t archiver;
-} spn_toolchain_unit_t;
+};
 
 static inline spn_user_node_t* spn_find_user_node(spn_node_t* node) {
   SP_ASSERT(node->index < sp_da_size(node->ctx->nodes.user));

@@ -500,15 +500,14 @@ set(SPN_SOURCES
   source/spn.c
   source/target/mutate.c
   source/target/target.c
-  source/task/build.c
   source/task/build/build.c
-  source/task/build/prepare.c
   source/task/build/nodes/embed.c
   source/task/build/nodes/link.c
   source/task/build/nodes/object.c
   source/task/build/nodes/package.c
   source/task/build/nodes/stamp.c
   source/task/build/nodes/user.c
+  source/task/build.c
   source/task/configure.c
   source/task/generate.c
   source/task/graph.c
@@ -516,6 +515,7 @@ set(SPN_SOURCES
   source/task/sync.c
   source/task/task.c
   source/task/test.c
+  source/task/unit.c
   source/task/which.c
   source/toolchain/toolchain.c
   source/triple/triple.c

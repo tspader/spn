@@ -94,13 +94,13 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
   sp_str_t output_name = sp_fs_get_name(output);
   bool has_embeds = !sp_da_empty(info->embed);
 
-  switch (info->kind) {
-    case SPN_TARGET_STATIC_LIB: {
+  switch (target->kind) {
+    case SPN_CC_OUTPUT_STATIC_LIB: {
       ar_result_t run = archive_objects(target, output);
 
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_LINK_START,
-        .pkg = target->parent->info,
+        .pkg = target->pkg->info,
         .io = &target->logs,
         .target.name = info->name,
         .target.link_start = {
@@ -121,16 +121,16 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
       emit_success(target, output, run.elapsed);
       return SPN_OK;
     }
-    case SPN_TARGET_EXE:
-    case SPN_TARGET_SHARED_LIB: {
+    case SPN_CC_OUTPUT_EXE:
+    case SPN_CC_OUTPUT_SHARED_LIB: {
       spn_cc_t* cc = sp_alloc_type(spn_cc_t);
       spn_cc_set_profile(cc, target->session->profile);
       spn_cc_set_output_dir(cc, sp_fs_parent_path(output));
       spn_cc_set_toolchain(cc, target->session->units.toolchain);
-      add_pkg_to_cc(cc, target->pkg);
+      add_pkg_to_cc(cc, target->pkg->info);
 
-      spn_cc_target_t* cc_target = spn_cc_add_target(cc, info->kind, output_name);
-      add_pkg_to_cc_target(cc_target, target->parent, info);
+      spn_cc_target_t* cc_target = spn_cc_add_target(cc, target->kind, output_name);
+      add_pkg_to_cc_target(cc_target, target->pkg, info);
       add_deps_to_cc_target(cc_target, target);
 
       sp_da_for(target->objects, it) {
@@ -146,7 +146,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
 
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_LINK_START,
-        .pkg = target->parent->info,
+        .pkg = target->pkg->info,
         .io = &target->logs,
         .target.name = info->name,
         .target.link_start = {
@@ -167,9 +167,8 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
 
       sp_unreachable_return(69);
     }
-    case SPN_TARGET_NONE:
-    case SPN_TARGET_JIT:
-    case SPN_TARGET_OBJECT: {
+    case SPN_CC_OUTPUT_JIT:
+    case SPN_CC_OUTPUT_OBJECT: {
       SP_UNREACHABLE_CASE();
     }
   }
