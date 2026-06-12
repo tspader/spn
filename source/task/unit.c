@@ -188,8 +188,8 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
   // Now that the configure phase is done, everything about the build is static. We
   // can go through every target and resolve file globs into object files which need
   // to be compiled.
-  sp_str_om_for(session->units.targets, it) {
-    spn_target_unit_t* target = sp_str_om_at(session->units.targets, it);
+  sp_om_for(session->units.targets, it) {
+    spn_target_unit_t* target = sp_om_at(session->units.targets, it);
     spn_pkg_unit_t* pkg = target->pkg;
 
     // Source libs are consumed as source; we never compile them ourselves

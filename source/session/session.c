@@ -120,8 +120,8 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
     .target = sp_intern_get_or_insert(session->intern, info->name),
   };
 
-  sp_str_om_insert(session->units.targets, id, SP_ZERO_STRUCT(spn_target_unit_t));
-  spn_target_unit_t* target = sp_str_om_back(session->units.targets);
+  sp_om_insert(session->units.targets, id, SP_ZERO_STRUCT(spn_target_unit_t));
+  spn_target_unit_t* target = sp_om_back(session->units.targets);
   target->id = id;
   target->session = session;
   target->pkg = pkg;

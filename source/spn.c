@@ -501,8 +501,8 @@ void spn_deinit(sp_app_t* sp) {
     sp_io_writer_close(&unit->logs.io.jsonl);
   }
 
-  sp_str_om_for(app.session.units.targets, it) {
-    spn_target_unit_t* target = sp_str_om_at(app.session.units.targets, it);
+  sp_om_for(app.session.units.targets, it) {
+    spn_target_unit_t* target = sp_om_at(app.session.units.targets, it);
     sp_io_writer_close(&target->logs.build);
     sp_io_writer_close(&target->logs.test);
     sp_io_writer_close(&target->logs.jsonl);

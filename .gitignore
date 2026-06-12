@@ -1,6 +1,7 @@
 .cache
 .llm
 .tmp
+.build
 bootstrap
 build
 **/*.mmd

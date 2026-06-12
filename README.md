@@ -23,11 +23,12 @@ I'm also trying a new project structure, if it looks weird. Every module (rough 
 I did this because I can't find a better way to actually unit test stuff otherwise. If you mix types and functions, you end up pulling in tons of headers just for the symbols. You lose the natural dependency graph that ought to come with one TU `#include`ing another's header. By doing it like this, if `foo.c` does `#include "bar.h"`, I know that `test/foo.c` needs to either link or mock `bar.c`. (There are downsides to my approach and I'm doing it pretty naively, but since C is so fast to compile it's mostly fine)
 
 ## build
-Bootstrap it with `cmake`, and then it self hosts.
+Bootstrap it with `make` (a thin wrapper over CMake + `zig cc`), and then it self hosts.
 ```bash
-mkdir bootstrap
-cmake -S . -B build
+make
 ./bootstrap/bin/spn build
 ./build/debug/store/bin/spn build
 ```
+
+Dependencies are pinned by SHA in `tools/cmake/fetch.cmake` and fetched into `.build/source`. Build artifacts land in `.build/store/$TRIPLE`; `bootstrap` is a symlink to the host triple's store.
 

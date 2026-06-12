@@ -79,19 +79,9 @@ UTEST_INITIALIZER(spn_build_init_tmpfs_top_level) {
 }
 
 UTEST_F_SETUP(spn_build) {
-  uf->fixture.paths.root = sp_fs_get_exe_path();
-  while (true) {
-    sp_assert(!sp_str_empty(uf->fixture.paths.root));
-    sp_str_t stem = sp_fs_get_stem(uf->fixture.paths.root);
-    if (sp_str_equal(stem, sp_str_lit("spn"))) {
-      break;
-    }
-    uf->fixture.paths.root = sp_fs_parent_path(uf->fixture.paths.root);
-  }
-
-  uf->fixture.paths.spn = sp_fs_join_path(uf->fixture.paths.root, sp_str_lit("bootstrap/bin/spn"));
+  uf->fixture.paths.root = sp_str_lit(SPN_TEST_ROOT);
+  uf->fixture.paths.spn = sp_str_lit(SPN_TEST_BIN);
   ASSERT_TRUE(sp_fs_exists(uf->fixture.paths.spn));
-
 }
 
 UTEST_F_TEARDOWN(spn_build) {

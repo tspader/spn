@@ -9,10 +9,12 @@
 - we use a tiny game loop library from `sp.h`, so `sp_main` is the entry point
 
 # building
-CMake builds are used to bootstrap from nothing
+The top-level Makefile wraps CMake (fetch pinned deps, configure, build with `zig cc`):
 ```
-cmake --build bootstrap/work
+make
 ```
+
+Layout: deps are pinned by SHA in `tools/cmake/fetch.cmake` and checked out into `.build/source`; the CMake work dir is `.build/work/$TRIPLE`; final artifacts go to `.build/store/$TRIPLE/{bin,lib,include,test}`. `bootstrap` is a symlink to the host store, so the binary is at `./bootstrap/bin/spn`.
 
 The bootstrapped binary can then build itself:
 ```
@@ -28,8 +30,9 @@ It is sometimes useful to run the binary thus produced:
 ## running
 Running the tests via CTest is easiest:
 ```
-ctest --test-dir ./bootstrap/work
+make test
 ```
+or, equivalently, `ctest --test-dir .build/work/$TRIPLE --output-on-failure`.
 
 You can run the same tests using `spn` itself:
 ```

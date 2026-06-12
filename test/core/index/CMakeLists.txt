@@ -1,0 +1,23 @@
+add_executable(index
+  ${SRC}/enum/enum.c
+  ${SRC}/index/index.c
+  ${SRC}/index/json.c
+  ${SRC}/sp/io.c
+  ${SRC}/sp/str.c
+  ${SRC}/semver/compare.c
+  ${SRC}/semver/convert.c
+  ${SRC}/semver/parser.c
+  ${SRC}/external/cJSON.c
+  ${SRC}/external/mz.c
+  ${SRC}/external/git.c
+  main.c
+  query.c
+  publish.c
+  sync.c
+  ${TEST_TOOLS}/harness.c
+  ${TEST_TOOLS}/tmp.c
+  ${TEST_TOOLS}/git.c
+  ${TEST_TOOLS}/toml.c
+)
+spn_test_binary(index)
+add_test(NAME index COMMAND "$<TARGET_FILE:index>")

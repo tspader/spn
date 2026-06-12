@@ -1,0 +1,33 @@
+add_executable(resolver
+  ${SRC}/ctx/ctx.c
+  ${SRC}/intern/intern.c
+  ${SRC}/enum/enum.c
+  ${SRC}/event/event.c
+  ${SRC}/external/cJSON.c
+  ${SRC}/external/mz.c
+  ${SRC}/external/git.c
+  ${SRC}/external/tom.c
+  ${SRC}/index/index.c
+  ${SRC}/index/json.c
+  ${SRC}/sp/io.c
+  ${SRC}/pkg/id.c
+  ${SRC}/pkg/load.c
+  ${SRC}/pkg/mutate.c
+  ${SRC}/profile/profile.c
+  ${SRC}/session/registry/registry.c
+  ${SRC}/triple/triple.c
+  ${SRC}/resolve/resolve.c
+  ${SRC}/sp/str.c
+  ${SRC}/semver/compare.c
+  ${SRC}/semver/convert.c
+  ${SRC}/semver/parser.c
+  ${SRC}/target/mutate.c
+  ${SRC}/toolchain/toolchain.c
+  main.c
+  ${TEST_TOOLS}/harness.c
+  ${TEST_TOOLS}/tmp.c
+  ${TEST_TOOLS}/git.c
+  ${TEST_TOOLS}/toml.c
+)
+spn_test_binary(resolver)
+add_test(NAME resolver COMMAND "$<TARGET_FILE:resolver>")

@@ -1,0 +1,33 @@
+add_executable(publish
+  ${SRC}/ctx/ctx.c
+  ${SRC}/enum/enum.c
+  ${SRC}/event/event.c
+  ${SRC}/external/cJSON.c
+  ${SRC}/external/git.c
+  ${SRC}/external/mz.c
+  ${SRC}/external/tom.c
+  ${SRC}/index/index.c
+  ${SRC}/index/json.c
+  ${SRC}/index/publish.c
+  ${SRC}/intern/intern.c
+  ${SRC}/pkg/id.c
+  ${SRC}/pkg/load.c
+  ${SRC}/pkg/mutate.c
+  ${SRC}/profile/profile.c
+  ${SRC}/triple/triple.c
+  ${SRC}/semver/compare.c
+  ${SRC}/semver/convert.c
+  ${SRC}/semver/parser.c
+  ${SRC}/sp/io.c
+  ${SRC}/sp/str.c
+  ${SRC}/target/mutate.c
+  ${SRC}/toolchain/toolchain.c
+  main.c
+  publish.c
+  ${TEST_TOOLS}/harness.c
+  ${TEST_TOOLS}/tmp.c
+  ${TEST_TOOLS}/git.c
+  ${TEST_TOOLS}/toml.c
+)
+spn_test_binary(publish)
+add_test(NAME publish COMMAND "$<TARGET_FILE:publish>")

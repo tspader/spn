@@ -104,7 +104,7 @@ SP_BEGIN_EXTERN_C()
 
 #define sp_str_om_insert(om, key, val)                                             \
   do { \
-    sp_om_ensure(om); \
+    sp_str_om_ensure(om); \
     sp_om_insert(om, (key), (val)); \
   } while (0)
 
