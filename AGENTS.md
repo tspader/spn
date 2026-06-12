@@ -26,28 +26,6 @@ It is sometimes useful to run the binary thus produced:
 ./build/debug/store/bin/spn build -t spn -p debug
 ```
 
-# testing
-## running
-Running the tests via CTest is easiest:
-```
-make test
-```
-or, equivalently, `ctest --test-dir .build/work/$TRIPLE --output-on-failure`.
-
-You can run the same tests using `spn` itself:
-```
-./bootstrap/bin/spn test
-```
-
-Test output is in an ISO timestamped directory in `.tmp`
-
-## writing
-- `test/core` is unit tests
-- `test/integration` is unit tests
-- use `.llm/tmp` as your temporary directory when testing; do not use /tmp
-
-All tests pass all the time. If a test fails but is unrelated to your code change, you fix it. There are no flaky tests; it is ALWAYS your responsibility to fix a broken test.
-
 # references
 - `source/`
   - `spn.c` is most of the code (large file; search, don't read)
@@ -63,6 +41,69 @@ All tests pass all the time. If a test fails but is unrelated to your code chang
 - `packages/tcc/spn.toml` is the package for `tcc` (example of a compiled spn package)
 
 # tests
+
+Tests must be written declaratively, by expressing test cases as pure data which are run through a test executor. The executor does setup, execution, expectation, and teardown according to the data in the test case. Imperative logic lives in the executor.
+- You can (and should, for larger suites) have multiple executors. Testing a feature does not mean jamming every test into one executor.
+- You can drop into imperative logic only when there is a single test which does not conform to the pattern
+
+## running
+Running the tests via CTest is easiest, and outputs to an ISO timestamped directory in `.tmp`:
+```sh
+make test
+```
+or, equivalently, `ctest --test-dir .build/work/$TRIPLE --output-on-failure`.
+
+## notes
+
+- Use literal friendly types, like `const c8*` and `T [N]` (i.e. fixed size C arrays)
+- Use `sp_carr_for()` + zero-as-sentinel (when possible) to avoid typing sentinels or lengths at the test site
+- Use a separate struct for `.expect`
+- Never explicitly initialize fields which are zero initialized (e.g. do not set `.err = SP_OK`)
+- When test cases need multistep, ordered setup, used a tagged union of actions (see: `fs_setup_t`)
+- One class of tests per C file. If a suite has multiple, write the individual C files in `test/$module/`, and then have `test/module.c` `#include` all the C files (see: `test/fs.c`)
+
+## example
+
+Follow this structure when adding new tests.
+
+```c
+#define FOO_TEST_MAX_BAZ 8
+
+typedef struct {
+  bool spum;
+  sp_err_t err;
+  const c8* kram;
+} foo_expect_t;
+
+typedef struct {
+  u32 bar;
+  const c8* baz [FOO_TEST_MAX_BAZ]
+  foo_expect_t expect;
+} foo_test_t;
+
+UTEST_EMPTY_FIXTURE(foo)
+
+void run_foo_test(s32* utest_result, foo_test_t t) {
+  sp_carr_for(it, t.baz) {
+    if (!t.baz[it]) break;
+    // ...do something with baz[it]
+  }
+
+  EXPECT_TRUE(t.spum);
+  // ...verify expectations
+}
+
+UTEST_F(foo, large_bar_ok) {
+  run_foo_test(&ur, (foo_test_t) {
+    .bar = 69,
+    .baz = { "skam", "grum", "qux" },
+    .expect = {
+      .spum = 69
+    }
+  });
+}
+```
+
 
 # compilation
 we used to build as a single C file; now, we split into very granular TUs for testing. some code has not been migrated. in general:
@@ -168,5 +209,4 @@ assistant: Finds needed code, searches through our code for existing in-context 
 - never comment your code, under any circumstances
   - a single explanatory comment per test case is permissible if such comments exist on other tests in file
 - never name out parameters "out"; name them as you normally would
-
 
