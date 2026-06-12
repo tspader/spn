@@ -1,0 +1,56 @@
+[spn]
+version = "1.0.0"
+commit = "00c0fa98"
+
+[[dep]]
+name = "core/toml"
+version = "1.3.0"
+commit = "2e8ffdfa215c"
+kind = "index"
+source_url = "https://github.com/tspader/toml.git"
+source_rev = "2e8ffdfa215c"
+manifest_url = "git@github.com:tspader/spam.git"
+manifest_rev = "03bc668a28"
+manifest_dir = "toml"
+manifest_file = "spn.toml"
+script_file = "spn.c"
+
+[[dep]]
+name = "core/utest"
+version = "1.0.0"
+commit = "fb622dc480a5"
+kind = "index"
+source_url = "https://github.com/sheredom/utest.h.git"
+source_rev = "fb622dc480a5"
+manifest_url = "git@github.com:tspader/spam.git"
+manifest_rev = "6d0c8a36d6"
+manifest_dir = "utest"
+manifest_file = "spn.toml"
+script_file = "spn.c"
+
+[[dep]]
+name = "spader/sp"
+version = "1.9.0"
+commit = "76e98a35a6bf"
+kind = "index"
+source_url = "https://github.com/tspader/sp.git"
+source_rev = "76e98a35a6bf"
+manifest_url = "git@github.com:tspader/spam.git"
+manifest_rev = "9e161f900d"
+manifest_dir = "sp"
+manifest_file = "spn.toml"
+script_file = "spn.c"
+
+[[dep]]
+name = "spader/spcc"
+version = "1.0.1"
+commit = "06e307464b"
+kind = "index"
+source_url = "https://github.com/tspader/tinycc.git"
+source_rev = "06e307464b"
+manifest_url = "git@github.com:tspader/spam.git"
+manifest_rev = "6b00baa8a1"
+manifest_dir = "spcc"
+manifest_file = "spn.toml"
+script_file = "spn.c"
+

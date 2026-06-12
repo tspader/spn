@@ -241,7 +241,21 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     version = sp_str_trim(version);
   }
 
-  if (!sp_str_equal_cstr(version, SPN_VERSION)) {
+  // The stamp must change whenever the embedded runtime does, not just on
+  // release; otherwise dev builds compile scripts against a stale extraction
+  sp_hash_t runtime_hash = 0;
+  sp_carr_for(spn_embed_manifest, it) {
+    spn_embed_entry_t entry = spn_embed_manifest[it];
+    sp_hash_t hashes [] = {
+      runtime_hash,
+      sp_hash_cstr(entry.path),
+      sp_hash_bytes(entry.data, entry.size, 0),
+    };
+    runtime_hash = sp_hash_combine(hashes, sp_carr_len(hashes));
+  }
+  sp_str_t stamp = sp_format("{}:{}", SP_FMT_CSTR(SPN_VERSION), SP_FMT_U64(runtime_hash));
+
+  if (!sp_str_equal(version, stamp)) {
     sp_fs_remove_dir(spn.paths.runtime);
     sp_fs_create_dir(spn.paths.runtime);
     sp_fs_create_dir(spn.paths.include);
@@ -266,7 +280,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
     {
       sp_io_writer_t io = sp_io_writer_from_file(spn.paths.version, SP_IO_WRITE_MODE_OVERWRITE);
-      sp_io_write_cstr(&io, SPN_VERSION);
+      sp_io_write_str(&io, stamp);
       sp_io_writer_close(&io);
     }
   }

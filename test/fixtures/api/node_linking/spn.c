@@ -2,15 +2,15 @@
 
 static int setup_ran = 0;
 
-s32 setup_fn(spn_node_ctx_t* ctx) {
-  spn_log(spn_node_ctx_get_build(ctx), "setup: initializing...");
+s32 setup_fn(spn_t* spn, spn_node_ctx_t* ctx) {
+  spn_log(spn, "setup: initializing...");
   setup_ran = 1;
   return 0;
 }
 
-s32 codegen_fn(spn_node_ctx_t* ctx) {
-  spn_log(spn_node_ctx_get_build(ctx), "codegen: generating header...");
-  spn_write_file(spn_node_ctx_get_build(ctx), "generated.h",
+s32 codegen_fn(spn_t* spn, spn_node_ctx_t* ctx) {
+  spn_log(spn, "codegen: generating header...");
+  spn_write_file(spn, "generated.h",
     "#ifndef GENERATED_H\n"
     "#define GENERATED_H\n"
     "#define SETUP_COMPLETE 1\n"
@@ -20,16 +20,15 @@ s32 codegen_fn(spn_node_ctx_t* ctx) {
   return 0;
 }
 
-void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, SPN_DIR_WORK, "");
+spn_err_t configure(spn_t* spn, spn_config_t* config) {
+  spn_add_include(config, spn_get_dir(spn, SPN_DIR_WORK));
 
-  spn_node_t* setup = spn_add_node(ctx, "setup");
+  spn_node_t* setup = spn_add_node(config, "setup");
   spn_node_set_fn(setup, setup_fn);
 
-  spn_node_t* codegen = spn_add_node(ctx, "codegen");
+  spn_node_t* codegen = spn_add_node(config, "codegen");
   spn_node_set_fn(codegen, codegen_fn);
-  spn_node_add_output(codegen, spn_get_subdir(ctx, SPN_DIR_WORK, "generated.h"));
+  spn_node_add_output(codegen, spn_get_subdir(spn, SPN_DIR_WORK, "generated.h"));
   spn_node_link(setup, codegen);
+  return SPN_OK;
 }
-
-void package(spn_build_ctx_t* ctx) { (void)ctx; }

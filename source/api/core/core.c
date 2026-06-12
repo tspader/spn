@@ -1,18 +1,78 @@
 #include "sp.h"
 #include "spn.h"
 
+#include "api/api.h"
 #include "api/core/types.h"
+#include "ctx/types.h"
+#include "event/types.h"
+#include "pkg/types.h"
+#include "session/types.h"
 #include "target/types.h"
 #include "unit/types.h"
 
+#include "event/event.h"
 #include "intern/intern.h"
+#include "pkg/id.h"
 #include "pkg/mutate.h"
 #include "pkg/pkg.h"
+#include "session/session.h"
+#include "sp/io.h"
 #include "target/target.h"
 
-// Build scripts get opaque pointers; both spn_t and spn_config_t are the package unit
-static spn_pkg_unit_t* to_unit(const void* spn) {
-  return (spn_pkg_unit_t*)spn;
+spn_pkg_unit_t* spn_api_unit(const void* opaque) {
+  return (spn_pkg_unit_t*)opaque;
+}
+
+sp_str_t spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir) {
+  switch (dir) {
+    case SPN_DIR_NONE:    return sp_str_lit("");
+    // Units have no distinct cache dir; CACHE aliases the store
+    case SPN_DIR_CACHE:   return unit->paths.store;
+    case SPN_DIR_STORE:   return unit->paths.store;
+    case SPN_DIR_INCLUDE: return unit->paths.include;
+    case SPN_DIR_VENDOR:  return unit->paths.vendor;
+    case SPN_DIR_LIB:     return unit->paths.lib;
+    case SPN_DIR_SOURCE:  return unit->paths.source;
+    case SPN_DIR_WORK:    return unit->paths.work;
+    case SPN_DIR_PROJECT: return unit->session->paths.root;
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+sp_ps_output_t spn_api_subprocess(spn_pkg_unit_t* unit, sp_ps_config_t config) {
+  SPN_API_LOG(unit, "spn_api_subprocess", "{}", SP_FMT_STR(config.command));
+
+  if (sp_str_empty(config.cwd)) {
+    config.cwd = unit->paths.work;
+  }
+
+  config.io = (sp_ps_io_config_t) {
+    .in =  { .mode = SP_PS_IO_MODE_NULL },
+    .out = { .mode = SP_PS_IO_MODE_CREATE },
+    .err = { .mode = SP_PS_IO_MODE_REDIRECT },
+  };
+
+  // The session env holds only our overrides (e.g. the toolchain's CC/AR/LD);
+  // layer them on top of the default SP_PS_ENV_INHERIT. Empty keys are the
+  // terminator for extra[], so scan with the same sentinel.
+  spn_session_t* session = unit->session;
+  u32 slot = 0;
+  for (; slot < sp_carr_len(config.env.extra); slot++) {
+    if (sp_str_empty(config.env.extra[slot].key)) break;
+  }
+
+  sp_ht_for_kv(session->env.vars, it) {
+    if (slot >= sp_carr_len(config.env.extra)) break;
+    if (sp_str_empty(*it.val)) continue;
+    config.env.extra[slot++] = (sp_env_var_t) { .key = *it.key, .value = *it.val };
+  }
+
+  sp_ps_output_t result = sp_ps_run(config);
+  if (!sp_str_empty(result.out)) {
+    sp_io_write_str(&unit->logs.io.build, result.out);
+  }
+  return result;
 }
 
 static spn_target_t* wrap_target(const void* spn, spn_target_info_t* info) {
@@ -25,35 +85,105 @@ static spn_target_t* wrap_target(const void* spn, spn_target_info_t* info) {
 }
 
 spn_target_t* spn_get_target(spn_t* spn, const c8* name) {
-  return wrap_target(spn, spn_pkg_get_target(to_unit(spn)->info, name));
+  return wrap_target(spn, spn_pkg_get_target(spn_api_unit(spn)->info, name));
 }
 
 spn_target_t* spn_add_exe(spn_config_t* config, const c8* name) {
-  return wrap_target(config, spn_pkg_add_exe(to_unit(config)->info, name));
+  return wrap_target(config, spn_pkg_add_exe(spn_api_unit(config)->info, name));
 }
 
 spn_target_t* spn_add_test(spn_config_t* config, const c8* name) {
-  return wrap_target(config, spn_pkg_add_test(to_unit(config)->info, name));
+  return wrap_target(config, spn_pkg_add_test(spn_api_unit(config)->info, name));
 }
 
 void spn_add_include(spn_config_t* config, const c8* path) {
-  spn_pkg_add_include(to_unit(config)->info, path);
+  spn_pkg_add_include(spn_api_unit(config)->info, path);
 }
 
 void spn_add_define(spn_config_t* config, const c8* define) {
-  spn_pkg_add_define(to_unit(config)->info, define);
+  spn_pkg_add_define(spn_api_unit(config)->info, define);
 }
 
 void spn_add_system_dep(spn_config_t* config, const c8* dep) {
-  spn_pkg_add_system_dep(to_unit(config)->info, dep);
+  spn_pkg_add_system_dep(spn_api_unit(config)->info, dep);
 }
 
-const spn_t* spn_get_dep(const spn_t* spn, const c8* name) {
+const spn_t* spn_get_dep(const spn_t* s, const c8* name) {
+  spn_pkg_unit_t* unit = spn_api_unit(s);
+  sp_str_t key = sp_str_view(name);
+
+  sp_ht_for_kv(unit->info->deps, it) {
+    spn_requested_pkg_t* dep = it.val;
+    if (!sp_str_equal(spn_qualified_name_to_pkg_id(dep->qualified).name, key)) continue;
+
+    spn_pkg_unit_t* dep_unit = spn_session_find_pkg_by_qualified(unit->session, dep->qualified);
+    if (dep_unit) return (const spn_t*)dep_unit;
+  }
+
   return SP_NULLPTR;
 }
 
-const c8* spn_get_subdir(const spn_t* spn, spn_dir_t base, const c8* path) {
-  return "";
+const c8* spn_get_dir(const spn_t* s, spn_dir_t dir) {
+  return sp_str_to_cstr(spn_api_dir(spn_api_unit(s), dir));
+}
+
+const c8* spn_get_subdir(const spn_t* s, spn_dir_t base, const c8* path) {
+  return sp_str_to_cstr(sp_fs_join_path(spn_api_dir(spn_api_unit(s), base), sp_str_view(path)));
+}
+
+void spn_log(spn_t* s, const c8* message) {
+  spn_pkg_unit_t* unit = spn_api_unit(s);
+  spn_event_buffer_push_ex(spn.events, unit->info, &unit->logs.io, (spn_build_event_t) {
+    .kind = SPN_EVENT_USER_LOG,
+    .user_log = { .message = sp_str_from_cstr(message) },
+  });
+}
+
+void spn_write_file(spn_t* s, const c8* path, const c8* content) {
+  spn_pkg_unit_t* unit = spn_api_unit(s);
+  SPN_API_LOG(unit, "spn_write_file", "{}", SP_FMT_CSTR(path));
+
+  sp_str_t full_path = sp_fs_join_path(unit->paths.work, sp_str_view(path));
+  sp_str_t parent = sp_fs_parent_path(full_path);
+  if (!sp_str_empty(parent)) {
+    sp_fs_create_dir(parent);
+  }
+
+  sp_io_writer_t io = sp_io_writer_from_file(full_path, SP_IO_WRITE_MODE_OVERWRITE);
+  sp_io_write_cstr(&io, content);
+  sp_io_writer_close(&io);
+}
+
+void spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir, const c8* to_path) {
+  spn_pkg_unit_t* unit = spn_api_unit(s);
+  sp_str_t from = sp_fs_join_path(spn_api_dir(unit, from_dir), sp_str_view(from_path));
+  sp_str_t to = sp_fs_join_path(spn_api_dir(unit, to_dir), sp_str_view(to_path));
+  SPN_API_LOG(unit, "spn_copy", "{} -> {}", SP_FMT_STR(from), SP_FMT_STR(to));
+  sp_fs_copy(from, to);
+}
+
+spn_profile_t* spn_get_profile(spn_t* s) {
+  return (spn_profile_t*)&spn_api_unit(s)->session->profile;
+}
+
+spn_libc_kind_t spn_profile_get_libc(spn_profile_t* profile) {
+  spn_profile_info_t* info = (spn_profile_info_t*)profile;
+  switch (info->abi) {
+    case SPN_ABI_MUSL: return SPN_LIBC_MUSL;
+    default:           return SPN_LIBC_GNU;
+  }
+}
+
+spn_linkage_t spn_profile_get_linkage(spn_profile_t* profile) {
+  return ((spn_profile_info_t*)profile)->linkage;
+}
+
+spn_c_standard_t spn_profile_get_standard(spn_profile_t* profile) {
+  return ((spn_profile_info_t*)profile)->standard;
+}
+
+spn_build_mode_t spn_profile_get_mode(spn_profile_t* profile) {
+  return ((spn_profile_info_t*)profile)->mode;
 }
 
 void spn_target_add_source(spn_target_t* target, const c8* source) {

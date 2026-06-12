@@ -1,5 +1,5 @@
 #include "spn.h"
 
-void package(spn_build_ctx_t* build) {
-  (void)build;
+spn_err_t package(spn_t* spn) {
+  return SPN_OK;
 }
