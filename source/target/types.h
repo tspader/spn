@@ -44,6 +44,7 @@ typedef struct {
   bool source;
   bool shared;
   bool static_lib;
+  bool object;
 } spn_linkage_set_t;
 
 typedef sp_opt(spn_linkage_t) sp_opt_spn_linkage_t;
@@ -52,10 +53,14 @@ struct spn_target_info {
   sp_str_t name;
   spn_target_kind_t kind;
   spn_linkage_set_t linkages;
+  // An unlinked lib still builds and installs, but consumers don't link it;
+  // think runtime data that happens to be an archive (e.g. tcc's libtcc1.a)
+  bool no_link;
   sp_da(sp_str_t) source;
   sp_da(sp_str_t) headers;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
+  sp_da(sp_str_t) flags;
   sp_da(sp_str_t) deps;
   sp_da(spn_embed_t) embed;
 };

@@ -85,11 +85,10 @@ static void log_toolchain_error(spn_pkg_info_t* pkg, spn_triple_t host, spn_trip
 }
 
 
-// SPN_PATCH_DIR points at a directory of packages (e.g. a checkout of the package
-// repo). Any resolved index package whose name matches a subdirectory containing a
-// manifest is loaded from there instead of its pinned checkout. Resolution still
-// uses the index; only the package contents are swapped. Builds against patched
-// packages should be forced, since the store is keyed by the published release.
+// We need a way to point to local copies of packages while developing; for a quick
+// and dirty, just use SPN_PATCH_DIR as the package manifest repo if set.
+//
+// I don't intend for this to stick around forever, but works great now
 static bool load_patched_package(spn_session_t* session, spn_loaded_pkg_t* loaded, spn_index_rel_t* release) {
   sp_str_t patches = sp_env_get(spn.env, sp_str_lit("SPN_PATCH_DIR"));
   if (sp_str_empty(patches)) return false;
@@ -105,8 +104,7 @@ static bool load_patched_package(spn_session_t* session, spn_loaded_pkg_t* loade
   loaded->info = sp_alloc_type(spn_pkg_info_t);
   spn_pkg_load(loaded->info, loaded->paths.manifest);
 
-  // Packages whose source lives in a separate repo still need it checked out;
-  // use the patched manifest's pin, not the published release's
+  // Packages whose source lives in a separate repo still need it checked out
   spn_pkg_info_t* info = loaded->info;
   spn_pkg_metadata_t* meta = sp_ht_getp(info->metadata, info->version);
   if (!sp_str_empty(info->url) && meta && !sp_str_empty(meta->commit)) {

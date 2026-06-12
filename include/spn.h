@@ -57,6 +57,9 @@ typedef enum {
   SPN_LIB_KIND_SHARED,
   SPN_LIB_KIND_STATIC,
   SPN_LIB_KIND_SOURCE,
+  // Compiles its sources and publishes the bare objects to the package's lib
+  // dir, preserving source-relative paths. Never linked into consumers.
+  SPN_LIB_KIND_OBJECT,
 } spn_linkage_t;
 
 typedef enum {
@@ -144,6 +147,7 @@ typedef s32       (*spn_node_fn_t)      (spn_t*, spn_node_ctx_t*);
 
 spn_target_t* spn_get_target(spn_t* spn, const c8* name);
 spn_target_t* spn_add_exe(spn_config_t* config, const c8* name);
+spn_target_t* spn_add_lib(spn_config_t* config, const c8* name, spn_linkage_t kind);
 spn_target_t* spn_add_test(spn_config_t* config, const c8* name);
 void          spn_add_include(spn_config_t* config, const c8* path);
 void          spn_add_define(spn_config_t* config, const c8* define);
@@ -153,6 +157,11 @@ const c8*     spn_get_subdir(const spn_t* spn, spn_dir_t base, const c8* path);
 void          spn_target_add_source(spn_target_t* target, const c8* source);
 void          spn_target_add_include(spn_target_t* target, const c8* include);
 void          spn_target_add_define(spn_target_t* target, const c8* define);
+// flags are passed verbatim to the compiler when this target's sources compile
+void          spn_target_add_flag(spn_target_t* target, const c8* flag);
+// a lib that isn't linked builds and installs its artifact, but consumers
+// neither link it nor depend on it; its linkage ignores the profile
+void          spn_target_set_linked(spn_target_t* target, s32 linked);
 void          spn_target_embed_file(spn_target_t* target, const c8* file);
 void          spn_target_embed_file_ex(spn_target_t* target, const c8* file, const c8* symbol, const c8* data_type, const c8* size_type);
 void          spn_target_embed_mem(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size);
@@ -162,8 +171,14 @@ void          spn_target_embed_dir_ex(spn_target_t* target, const c8* dir, const
 
 const c8*     spn_get_dir(const spn_t* spn, spn_dir_t dir);
 void          spn_write_file(spn_t* spn, const c8* path, const c8* content);
-void          spn_copy(spn_t* spn, spn_dir_t from, const c8* from_path, spn_dir_t to, const c8* to_path);
+s32           spn_copy(spn_t* spn, spn_dir_t from, const c8* from_path, spn_dir_t to, const c8* to_path);
 void          spn_log(spn_t* spn, const c8* message);
+
+// args are a null terminated argv; spn_exec takes the program in args[0], while
+// spn_cc and spn_ar run the profile's toolchain. cwd is the package's work dir.
+s32           spn_exec(spn_t* spn, const c8** args);
+s32           spn_cc(spn_t* spn, const c8** args);
+s32           spn_ar(spn_t* spn, const c8** args);
 
 spn_node_t*   spn_add_node(spn_config_t* config, const c8* tag);
 void          spn_node_add_input(spn_node_t* node, const c8* input);

@@ -188,6 +188,8 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
 
         sp_da_for(dep->libs, l) {
           spn_target_unit_t* lib = dep->libs[l];
+          if (lib->info->no_link) continue;
+
           switch (lib->lib_kind) {
             case SPN_LIB_KIND_STATIC:
             case SPN_LIB_KIND_SHARED: {
@@ -197,6 +199,7 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
               break;
             }
             case SPN_LIB_KIND_SOURCE:
+            case SPN_LIB_KIND_OBJECT:
             case SPN_LIB_KIND_NONE: break;
           }
         }
@@ -303,13 +306,24 @@ spn_bg_id_t get_or_put_user_file(spn_pkg_unit_t* ctx, spn_build_graph_t* graph, 
 spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_unit_t* target) {
   spn_target_info_t* info = target->info;
 
-  // Source libs don't link an artifact; the package step just waits on their objects, which
-  // consumers compile against directly.
-  if (target->kind == SPN_CC_OUTPUT_OBJECT) {
-    sp_da_for(target->objects, it) {
-      sp_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.package, target->objects[it]->nodes.object));
+  switch (target->lib_kind) {
+    // Source libs build nothing; consumers compile against their sources directly
+    case SPN_LIB_KIND_SOURCE: {
+      return SPN_OK;
     }
-    return SPN_OK;
+    // Object libs have no link step; their objects are the artifacts, so the
+    // package step waits on them directly
+    case SPN_LIB_KIND_OBJECT: {
+      sp_da_for(target->objects, it) {
+        sp_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.package, target->objects[it]->nodes.object));
+      }
+      return SPN_OK;
+    }
+    case SPN_LIB_KIND_STATIC:
+    case SPN_LIB_KIND_SHARED:
+    case SPN_LIB_KIND_NONE: {
+      break;
+    }
   }
 
   target->nodes.link = spn_bg_add_fn(graph, link_target, target);

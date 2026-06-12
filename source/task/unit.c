@@ -13,6 +13,7 @@
 #include "pkg/id.h"
 #include "session/session.h"
 #include "sp/sp_glob.h"
+#include "target/mutate.h"
 #include "target/select.h"
 #include "unit/types.h"
 
@@ -95,27 +96,40 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
       return SPN_OK;
     }
     case SPN_TARGET_LIB: {
-      spn_kind_query_t query = {
-        .config = spn_session_config_kind(session, target->pkg->info->name),
-        .linkage = session->profile.linkage,
-      };
+      // Unlinked libs don't participate in linkage selection: nothing consumes
+      // them at link time, so the profile has no say in what they produce. A
+      // multi-kind unlinked lib resolves by spn_linkage_set_default's
+      // preference order, not the profile. Object libs are always unlinked;
+      // the manifest loader rejects object mixed with linkable kinds.
+      if (spn_linkage_set_has(info->linkages, SPN_LIB_KIND_OBJECT) || info->no_link) {
+        target->lib_kind = spn_linkage_set_default(info->linkages);
+      }
+      else {
+        spn_kind_query_t query = {
+          .config = spn_session_config_kind(session, target->pkg->info->name),
+          .linkage = session->profile.linkage,
+        };
 
-      if (spn_target_select_lib_kind(info, query, &target->lib_kind)) {
-        sp_str_t requested = spn_pkg_linkage_to_str(query.config.some ? query.config.value : query.linkage);
-        sp_str_t requester = query.config.some ? sp_str_lit("the root manifest") : sp_str_lit("the profile");
-        spn_log_error(
-          "{:fg brightcyan} doesn't support {:fg brightyellow} ({} requested it)",
-          SP_FMT_STR(target->pkg->info->name),
-          SP_FMT_STR(requested),
-          SP_FMT_STR(requester)
-        );
-        return SPN_ERROR;
+        if (spn_target_select_lib_kind(info, query, &target->lib_kind)) {
+          sp_str_t requested = spn_pkg_linkage_to_str(query.config.some ? query.config.value : query.linkage);
+          sp_str_t requester = query.config.some ? sp_str_lit("the root manifest") : sp_str_lit("the profile");
+          spn_log_error(
+            "{:fg brightcyan} doesn't support {:fg brightyellow} ({} requested it)",
+            SP_FMT_STR(target->pkg->info->name),
+            SP_FMT_STR(requested),
+            SP_FMT_STR(requester)
+          );
+          return SPN_ERROR;
+        }
       }
 
       switch (target->lib_kind) {
         case SPN_LIB_KIND_STATIC: target->kind = SPN_CC_OUTPUT_STATIC_LIB; break;
         case SPN_LIB_KIND_SHARED: target->kind = SPN_CC_OUTPUT_SHARED_LIB; break;
-        case SPN_LIB_KIND_SOURCE: target->kind = SPN_CC_OUTPUT_OBJECT; break;
+        // Source and object libs share an output kind; anything that needs to
+        // tell them apart must branch on lib_kind, not kind
+        case SPN_LIB_KIND_SOURCE:
+        case SPN_LIB_KIND_OBJECT: target->kind = SPN_CC_OUTPUT_OBJECT; break;
         case SPN_LIB_KIND_NONE: break;
       }
       return SPN_OK;
@@ -205,7 +219,13 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
         stem = sp_str_prefix(relative, relative.len - extension.len - 1);
       }
 
-      sp_str_t object_path = sp_fs_join_path(target->paths.object, sp_format("{}.o", SP_FMT_STR(stem)));
+      // Object libs publish their objects as artifacts; everyone else keeps
+      // them as intermediates. Source-relative paths are preserved either way
+      // so colliding stems (a/foo.c, b/foo.c) stay distinct.
+      sp_str_t object_dir = target->lib_kind == SPN_LIB_KIND_OBJECT ?
+        target->paths.lib :
+        target->paths.object;
+      sp_str_t object_path = sp_fs_join_path(object_dir, sp_format("{}.o", SP_FMT_STR(stem)));
 
       if (!sp_str_om_has(session->units.objects, file)) {
         sp_str_om_insert(session->units.objects, file, ((spn_compile_unit_t) {

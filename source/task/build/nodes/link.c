@@ -127,10 +127,11 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
       spn_cc_set_profile(cc, target->session->profile);
       spn_cc_set_output_dir(cc, sp_fs_parent_path(output));
       spn_cc_set_toolchain(cc, target->session->units.toolchain);
-      add_pkg_to_cc(cc, target->pkg);
 
+      // The link consumes only objects, so the package's compile-stage data
+      // (includes, defines, flags) stays off the command line; that's
+      // add_pkg_to_cc_target's job in the compile node
       spn_cc_target_t* cc_target = spn_cc_add_target(cc, target->kind, output_name);
-      add_pkg_to_cc_target(cc_target, target->pkg, info);
       add_deps_to_cc_target(cc_target, target);
 
       sp_da_for(target->objects, it) {
