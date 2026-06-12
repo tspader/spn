@@ -7,10 +7,13 @@
 #include "target/types.h"
 #include "task/types.h"
 
+#include "enum/enum.h"
+#include "error/types.h"
 #include "filter/filter.h"
 #include "pkg/id.h"
 #include "session/session.h"
 #include "sp/sp_glob.h"
+#include "target/select.h"
 #include "unit/types.h"
 
 static bool has_source_file(sp_da(sp_str_t) source, sp_str_t path) {
@@ -81,6 +84,47 @@ static sp_da(sp_str_t) collect_target_source(spn_pkg_unit_t* pkg, spn_target_uni
 }
 
 
+static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* target) {
+  spn_target_info_t* info = target->info;
+
+  switch (info->kind) {
+    case SPN_TARGET_EXE:
+    case SPN_TARGET_SCRIPT:
+    case SPN_TARGET_TEST: {
+      target->kind = SPN_CC_OUTPUT_EXE;
+      return SPN_OK;
+    }
+    case SPN_TARGET_LIB: {
+      spn_kind_query_t query = {
+        .config = spn_session_config_kind(session, target->pkg->info->name),
+        .linkage = session->profile.linkage,
+      };
+
+      if (spn_target_select_lib_kind(info, query, &target->lib_kind)) {
+        sp_str_t requested = spn_pkg_linkage_to_str(query.config.some ? query.config.value : query.linkage);
+        sp_str_t requester = query.config.some ? sp_str_lit("the root manifest") : sp_str_lit("the profile");
+        spn_log_error(
+          "{:fg brightcyan} doesn't support {:fg brightyellow} ({} requested it)",
+          SP_FMT_STR(target->pkg->info->name),
+          SP_FMT_STR(requested),
+          SP_FMT_STR(requester)
+        );
+        return SPN_ERROR;
+      }
+
+      switch (target->lib_kind) {
+        case SPN_LIB_KIND_STATIC: target->kind = SPN_CC_OUTPUT_STATIC_LIB; break;
+        case SPN_LIB_KIND_SHARED: target->kind = SPN_CC_OUTPUT_SHARED_LIB; break;
+        case SPN_LIB_KIND_SOURCE: target->kind = SPN_CC_OUTPUT_OBJECT; break;
+        case SPN_LIB_KIND_NONE: break;
+      }
+      return SPN_OK;
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(SPN_ERROR);
+}
+
 spn_task_result_t spn_task_create_units(spn_app_t* app) {
   spn_session_t* session = &app->session;
   sp_str_om_for(session->units.packages, it) {
@@ -88,14 +132,16 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
     spn_pkg_info_t* info = pkg->info;
     spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, info->qualified);
 
-    sp_da(spn_target_info_t*) targets;
-    sp_str_om_for(info->exes, it) {
-      sp_da_push(targets, sp_str_om_at(info->exes, it));
-    }
+    // The target filter only applies to the root package; dependencies contribute
+    // exactly their lib targets no matter what we were asked to build.
+    sp_da(spn_target_info_t*) targets = SP_NULLPTR;
     sp_str_om_for(info->libs, it) {
       sp_da_push(targets, sp_str_om_at(info->libs, it));
     }
     if (loaded->source == SPN_PKG_SOURCE_ROOT) {
+      sp_str_om_for(info->exes, it) {
+        sp_da_push(targets, sp_str_om_at(info->exes, it));
+      }
       sp_str_om_for(info->scripts, it) {
         sp_da_push(targets, sp_str_om_at(info->scripts, it));
       }
@@ -105,10 +151,12 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
     }
 
     sp_da_for(targets, it) {
-      if (spn_target_filter_pass(&session->filter, targets[it])) {
-        spn_target_unit_t* target =spn_session_add_target(session, pkg, targets[it]);
-        sp_da(sp_str_t) source = collect_target_source(pkg, target);
+      if (loaded->source == SPN_PKG_SOURCE_ROOT && !spn_target_filter_pass(&session->filter, targets[it])) {
+        continue;
       }
+
+      spn_target_unit_t* target = spn_session_add_target(session, pkg, targets[it]);
+      spn_try_as(set_target_kind(session, target), SPN_TASK_ERROR);
     }
   }
 
@@ -143,6 +191,9 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
   sp_str_om_for(session->units.targets, it) {
     spn_target_unit_t* target = sp_str_om_at(session->units.targets, it);
     spn_pkg_unit_t* pkg = target->pkg;
+
+    // Source libs are consumed as source; we never compile them ourselves
+    if (target->lib_kind == SPN_LIB_KIND_SOURCE) continue;
 
     sp_da(sp_str_t) source = collect_target_source(pkg, target);
     sp_da_for(source, j) {

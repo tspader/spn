@@ -309,21 +309,25 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.paths.manifest = sp_fs_join_path(spn.paths.project, sp_str_lit("spn.toml"));
 
   if (!sp_fs_exists(spn.paths.manifest)) {
-    spn_log_error("no manifest found at {:fg cyan}", SP_FMT_STR(spn.paths.manifest));
-    return SP_APP_ERR;
+    // spn run can execute a lone source file without a project
+    if (!sp_str_equal_cstr(sp_str_view(parser.resolved->name), "run")) {
+      spn_log_error("no manifest found at {:fg cyan}", SP_FMT_STR(spn.paths.manifest));
+      return SP_APP_ERR;
+    }
   }
+  else {
+    spn_err_union_t error = spn_pkg_load(&app.package, spn.paths.manifest);
+    if (error.kind) {
+      spn_log_error("bad manifest");
+      spn_poll(sp);
+      return SP_APP_ERR;
+    }
 
-  spn_err_union_t error = spn_pkg_load(&app.package, spn.paths.manifest);
-  if (error.kind) {
-    spn_log_error("bad manifest");
-    spn_poll(sp);
-    return SP_APP_ERR;
-  }
+    app.paths.lock = sp_fs_join_path(spn.paths.project, SP_LIT("spn.lock"));
 
-  app.paths.lock = sp_fs_join_path(spn.paths.project, SP_LIT("spn.lock"));
-
-  if (sp_fs_exists(app.paths.lock)) {
-    sp_opt_set(app.lock, spn_lock_file_load(app.paths.lock, spn.events));
+    if (sp_fs_exists(app.paths.lock)) {
+      sp_opt_set(app.lock, spn_lock_file_load(app.paths.lock, spn.events));
+    }
   }
 
 
@@ -478,6 +482,8 @@ void spn_deinit(sp_app_t* sp) {
   if (!app.session.pkg) return;
 
   spn_pkg_unit_t* root = spn_session_find_root(&app.session);
+  if (!root) return;
+
   sp_str_om_for(app.session.units.packages, it) {
     spn_pkg_unit_t* unit = sp_str_om_at(app.session.units.packages, it);
 

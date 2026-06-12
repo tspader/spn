@@ -55,6 +55,11 @@ void spn_target_add_source_ex(spn_target_info_t* target, sp_str_t source) {
   sp_da_push(target->source, source);
 }
 
+void spn_target_add_header_ex(spn_target_info_t* target, sp_str_t header) {
+  sp_require(target);
+  sp_da_push(target->headers, spn_intern(header));
+}
+
 void spn_target_add_include_ex(spn_target_info_t* target, sp_str_t include) {
   sp_require(target);
   sp_da_push(target->include, spn_intern(include));

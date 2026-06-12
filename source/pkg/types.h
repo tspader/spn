@@ -22,9 +22,16 @@ typedef struct {
   sp_str_t name;
 } spn_pkg_id_t;
 
+typedef enum {
+  SPN_DEP_KIND_PACKAGE,
+  SPN_DEP_KIND_BUILD,
+  SPN_DEP_KIND_TEST,
+} spn_dep_kind_t;
+
 typedef struct spn_pkg_req {
   sp_intern_str_t qualified;
   spn_pkg_source_t source;
+  spn_dep_kind_t kind;
   union {
     struct { spn_semver_range_t range; } index;
     struct { sp_str_t path; } file;

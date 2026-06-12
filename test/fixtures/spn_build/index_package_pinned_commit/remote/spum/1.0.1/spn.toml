@@ -5,3 +5,4 @@ version = "1.0.1"
 [[lib]]
 name = "spum"
 kinds = ["source"]
+headers = ["spum.h"]

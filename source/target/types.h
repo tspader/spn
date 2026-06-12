@@ -46,11 +46,14 @@ typedef struct {
   bool static_lib;
 } spn_linkage_set_t;
 
+typedef sp_opt(spn_linkage_t) sp_opt_spn_linkage_t;
+
 struct spn_target_info {
   sp_str_t name;
   spn_target_kind_t kind;
   spn_linkage_set_t linkages;
   sp_da(sp_str_t) source;
+  sp_da(sp_str_t) headers;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) deps;

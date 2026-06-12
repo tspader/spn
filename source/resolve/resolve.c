@@ -8,6 +8,7 @@
 #include "semver/compare.h"
 #include "semver/parser.h"
 #include "semver/types.h"
+#include "session/registry/registry.h"
 #include "session/registry/types.h"
 #include "spn.h"
 
@@ -31,14 +32,49 @@ static bool version_in_range(spn_semver_t version, spn_semver_range_t range) {
     spn_semver_satisfies(version, range.high.version, range.high.op);
 }
 
+static spn_err_t check_cycle(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_requested_pkg_t* request) {
+  if (sp_str_ht_exists(run->visited, request->qualified)) {
+    spn_event_buffer_push(resolver->events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR_CIRCULAR_DEP,
+      .circular.id = spn_qualified_name_to_pkg_id(request->qualified),
+    });
+    return SPN_ERROR;
+  }
+
+  return SPN_OK;
+}
+
 static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_requested_pkg_t* request) {
+  sp_try(check_cycle(resolver, run, request));
+
+  if (sp_str_ht_exists(run->query->result, request->qualified)) {
+    return SPN_OK;
+  }
+
   spn_loaded_pkg_t* pkg = sp_str_ht_get(*resolver->registry, request->qualified);
+
+  // If the package is local, just load it
+  if (!pkg && request->source == SPN_PKG_SOURCE_FILE) {
+    pkg = spn_registry_load_file_pkg(resolver->registry, request->qualified, request->file.path);
+  }
+
+  if (!pkg) {
+    spn_event_buffer_push(resolver->events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR_UNKNOWN_PKG,
+      .unknown.request = *request
+    });
+    return SPN_ERROR;
+  }
 
   spn_resolved_pkg_t resolved = {
     .qualified = pkg->info->qualified,
     .source = pkg->source,
     .version = pkg->info->version,
   };
+
+  if (pkg->source == SPN_PKG_SOURCE_FILE) {
+    resolved.file.path = request->file.path;
+  }
 
   // Looks frivolous, but the point here is that the list of dependencies defined in the manifest is
   // not the same as the list of dependencies we're actually using for this build.
@@ -56,10 +92,12 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
 
   sp_str_ht_insert(run->query->result, resolved.qualified, resolved);
 
-  return SPN_OK;
+  return resolve_deps(resolver, run, resolved);
 }
 
 static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_requested_pkg_t* request) {
+  sp_try(check_cycle(resolver, run, request));
+
   // If we already resolved a version for this package elsewhere, check if the
   // version we found there satisfies this request, too. If not, backtrack.
   spn_resolved_pkg_t* existing = sp_str_ht_get(run->query->result, request->qualified);

@@ -152,7 +152,7 @@ spn_target_info_t* spn_pkg_add_script(spn_pkg_info_t* pkg, const c8* name) {
 spn_target_info_t* spn_pkg_add_script_ex(spn_pkg_info_t* pkg, sp_str_t name) {
   spn_target_info_t script = {
     .name = spn_intern(name),
-    .kind = SPN_TARGET_EXE,
+    .kind = SPN_TARGET_SCRIPT,
   };
   sp_str_om_insert(pkg->scripts, script.name, script);
   return sp_str_om_get(pkg->scripts, script.name);

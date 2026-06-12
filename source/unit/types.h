@@ -109,6 +109,7 @@ struct spn_target_unit {
   spn_pkg_unit_t* pkg;
   spn_target_info_t* info;
   spn_cc_output_kind_t kind;
+  spn_linkage_t lib_kind;
 
   sp_da(spn_compile_unit_t*) objects;
 

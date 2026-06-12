@@ -3,12 +3,49 @@
 
 #include "api/core/types.h"
 #include "target/types.h"
+#include "unit/types.h"
 
-#include "target/target.h"
 #include "intern/intern.h"
+#include "pkg/mutate.h"
+#include "pkg/pkg.h"
+#include "target/target.h"
+
+// Build scripts get opaque pointers; both spn_t and spn_config_t are the package unit
+static spn_pkg_unit_t* to_unit(const void* spn) {
+  return (spn_pkg_unit_t*)spn;
+}
+
+static spn_target_t* wrap_target(const void* spn, spn_target_info_t* info) {
+  if (!info) return SP_NULLPTR;
+
+  spn_target_t* target = sp_alloc_type(spn_target_t);
+  target->spn = (spn_t*)spn;
+  target->info = info;
+  return target;
+}
 
 spn_target_t* spn_get_target(spn_t* spn, const c8* name) {
-  return SP_NULLPTR;
+  return wrap_target(spn, spn_pkg_get_target(to_unit(spn)->info, name));
+}
+
+spn_target_t* spn_add_exe(spn_config_t* config, const c8* name) {
+  return wrap_target(config, spn_pkg_add_exe(to_unit(config)->info, name));
+}
+
+spn_target_t* spn_add_test(spn_config_t* config, const c8* name) {
+  return wrap_target(config, spn_pkg_add_test(to_unit(config)->info, name));
+}
+
+void spn_add_include(spn_config_t* config, const c8* path) {
+  spn_pkg_add_include(to_unit(config)->info, path);
+}
+
+void spn_add_define(spn_config_t* config, const c8* define) {
+  spn_pkg_add_define(to_unit(config)->info, define);
+}
+
+void spn_add_system_dep(spn_config_t* config, const c8* dep) {
+  spn_pkg_add_system_dep(to_unit(config)->info, dep);
 }
 
 const spn_t* spn_get_dep(const spn_t* spn, const c8* name) {

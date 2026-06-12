@@ -1,4 +1,5 @@
 #include "profile/profile.h"
+#include "intern/intern.h"
 #include "pkg/types.h"
 #include "spn.h"
 #include "triple/triple.h"
@@ -36,8 +37,10 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   sp_str_ht_insert(*profiles, default_profile.name, default_profile);
 
   // 2. Apply user's [profile.default] if present
-  sp_str_t default_name = sp_str_lit("default");
-  spn_profile_info_t* user_default = sp_str_om_get(pkg->profiles, default_name);
+  sp_str_t default_name = spn_intern(sp_str_lit("default"));
+  spn_profile_info_t* user_default = sp_str_om_has(pkg->profiles, default_name) ?
+    sp_str_om_get(pkg->profiles, default_name) :
+    SP_NULLPTR;
   if (user_default) {
     spn_profile_overlay(sp_str_ht_get(*profiles, default_name), user_default);
   }

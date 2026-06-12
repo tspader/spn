@@ -61,6 +61,7 @@ typedef struct {
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) libs;
+  sp_da(sp_str_t) system_libs;
   sp_da(sp_str_t) lib_dirs;
   sp_da(sp_str_t) rpath;
 
@@ -111,6 +112,7 @@ void             spn_cc_target_add_define(spn_cc_target_t* cc, sp_str_t var);
 void             spn_cc_target_add_relative_include(spn_cc_target_t* cc, sp_str_t dir);
 void             spn_cc_target_add_absolute_include(spn_cc_target_t* cc, sp_str_t dir);
 void             spn_cc_target_add_lib(spn_cc_target_t* cc, sp_str_t lib);
+void             spn_cc_target_add_system_lib(spn_cc_target_t* cc, sp_str_t name);
 void             spn_cc_target_add_lib_dir(spn_cc_target_t* cc, sp_str_t dir);
 void             spn_cc_target_add_rpath(spn_cc_target_t* cc, sp_str_t dir);
 void             spn_cc_target_add_dep(spn_cc_target_t* target, spn_pkg_unit_t* dep);

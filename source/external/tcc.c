@@ -13,6 +13,23 @@ typedef struct {
 spn_libc_kind_t   spn_profile_get_libc(spn_profile_info_t* profile) { return SPN_LIBC_GNU; }
 
 static spn_tcc_symbol_t spn_tcc_symbol_table[] = {
+  SPN_DEFINE_LIB_ENTRY(spn_get_target)
+  SPN_DEFINE_LIB_ENTRY(spn_get_dep)
+  SPN_DEFINE_LIB_ENTRY(spn_get_subdir)
+  SPN_DEFINE_LIB_ENTRY(spn_add_exe)
+  SPN_DEFINE_LIB_ENTRY(spn_add_test)
+  SPN_DEFINE_LIB_ENTRY(spn_add_include)
+  SPN_DEFINE_LIB_ENTRY(spn_add_define)
+  SPN_DEFINE_LIB_ENTRY(spn_add_system_dep)
+  SPN_DEFINE_LIB_ENTRY(spn_target_add_source)
+  SPN_DEFINE_LIB_ENTRY(spn_target_add_include)
+  SPN_DEFINE_LIB_ENTRY(spn_target_add_define)
+  SPN_DEFINE_LIB_ENTRY(spn_target_embed_file)
+  SPN_DEFINE_LIB_ENTRY(spn_target_embed_file_ex)
+  SPN_DEFINE_LIB_ENTRY(spn_target_embed_mem)
+  SPN_DEFINE_LIB_ENTRY(spn_target_embed_mem_ex)
+  SPN_DEFINE_LIB_ENTRY(spn_target_embed_dir)
+  SPN_DEFINE_LIB_ENTRY(spn_target_embed_dir_ex)
   // SPN_DEFINE_LIB_ENTRY(spn_profile_get_libc)
   // SPN_DEFINE_LIB_ENTRY(spn_get_pkg)
   // SPN_DEFINE_LIB_ENTRY(spn_get_profile)

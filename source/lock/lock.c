@@ -2,6 +2,7 @@
 #include "error/types.h"
 #include "event/event.h"
 #include "external/tom.h"
+#include "index/types.h"
 #include "lock/lock.h"
 #include "semver/convert.h"
 #include "sp/ht.h"
@@ -18,9 +19,42 @@ static void spn_lock_build_dependents(spn_lock_file_t* lock) {
   }
 }
 
-spn_lock_file_t spn_build_lock_file(spn_resolver_t* resolver, spn_pkg_info_t* root) {
+spn_lock_file_t spn_build_lock_file(spn_resolve_t resolve, spn_pkg_info_t* root) {
   spn_lock_file_t lock = SP_ZERO_INITIALIZE();
   spn_lock_file_init(&lock);
+
+  sp_str_ht_for_kv(resolve, it) {
+    spn_resolved_pkg_t* pkg = it.val;
+    if (pkg->source == SPN_PKG_SOURCE_ROOT) continue;
+
+    spn_lock_entry_t entry = {
+      .name = pkg->qualified,
+      .version = pkg->version,
+      .kind = pkg->source,
+    };
+
+    sp_da_for(pkg->deps, d) {
+      sp_da_push(entry.deps, pkg->deps[d].qualified);
+    }
+
+    if (pkg->source == SPN_PKG_SOURCE_INDEX) {
+      spn_index_rel_t* release = pkg->index.release;
+      entry.commit = release->source.rev;
+      entry.source.url = release->source.url;
+      entry.source.rev = release->source.rev;
+      entry.source.dir = release->source.dir;
+      entry.manifest.url = release->manifest.url;
+      entry.manifest.rev = release->manifest.rev;
+      entry.manifest.dir = release->manifest.dir;
+      entry.paths.manifest = release->paths.manifest;
+      entry.paths.script = release->paths.script;
+    }
+
+    sp_ht_insert(lock.entries, entry.name, entry);
+  }
+
+  spn_lock_build_dependents(&lock);
+
   return lock;
 }
 

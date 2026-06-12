@@ -16,6 +16,7 @@
 #include "pkg/types.h"
 #include "resolve/types.h"
 #include "semver/convert.h"
+#include "session/registry/registry.h"
 #include "session/session.h"
 #include "session/types.h"
 #include "spn.h"
@@ -147,36 +148,26 @@ spn_err_t load_index_package(spn_session_t* session, spn_resolved_pkg_t* resolve
 }
 
 spn_err_t load_file_package(spn_session_t* session, spn_resolved_pkg_t* pkg) {
-  sp_str_t manifest = pkg->file.path;
-  if (sp_str_starts_with(manifest, SP_LIT("file://"))) {
-    manifest = sp_str_strip_left(manifest, SP_LIT("file://"));
-  }
-
-  sp_tm_timer_t timer = sp_tm_start_timer();
-
-  if (!sp_fs_exists(manifest)) {
+  spn_loaded_pkg_t* loaded = spn_registry_load_file_pkg(&session->packages, pkg->qualified, pkg->file.path);
+  if (!loaded) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_SYNC_FAILED,
       .sync_failed = {
         .name = pkg->qualified,
-        .url = manifest,
+        .url = pkg->file.path,
         .error = sp_str_lit("manifest not found"),
       }
     });
     return SPN_ERROR;
   }
 
-  sp_str_ht_insert(session->packages, pkg->qualified, sp_zero_struct(spn_loaded_pkg_t));
-  spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, pkg->qualified);
-
-  loaded->source = SPN_PKG_SOURCE_FILE;
-  loaded->info = sp_alloc_type(spn_pkg_info_t);
-  spn_pkg_load(loaded->info, manifest);
-
   return SPN_OK;
 }
 
 spn_err_t load_root_package(spn_session_t* session) {
+  spn_loaded_pkg_t* existing = sp_str_ht_get(session->packages, session->pkg->qualified);
+  if (existing) return SPN_OK;
+
   sp_str_ht_insert(session->packages, session->pkg->qualified, sp_zero_struct(spn_loaded_pkg_t));
   spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, session->pkg->qualified);
 

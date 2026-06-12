@@ -4,6 +4,7 @@
 #include "unit/types.h"
 
 #include "external/cc.h"
+#include "session/session.h"
 #include "task/build/build.h"
 #include "task/build/nodes/nodes.h"
 
@@ -25,15 +26,17 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   spn_cc_set_profile(cc, session->profile);
   spn_cc_set_output_dir(cc, dir);
   spn_cc_set_toolchain(cc, unit->session->units.toolchain);
-  add_pkg_to_cc(cc, unit->package->info);
+  add_pkg_to_cc(cc, unit->package);
 
   spn_cc_target_t* target = spn_cc_add_target(cc, SPN_CC_OUTPUT_OBJECT, file);
   add_pkg_to_cc_target(target, unit->package, unit->target->info);
 
-  // Add the include paths for your dependencies. Save the linker flags for linking.
-
-  // unit->target->deps
-  //add_deps_to_cc_target(target, unit->pkg, unit->target->info, unit->session);
+  // Dependencies publish their headers into their store; compile against them
+  sp_da(spn_pkg_unit_t*) deps = spn_session_pkg_deps(session, unit->package);
+  sp_da_for(deps, it) {
+    if (!deps[it]) continue;
+    spn_cc_target_add_absolute_include(target, deps[it]->paths.include);
+  }
 
   if (!sp_da_empty(unit->target->info->embed)) {
     spn_cc_target_add_absolute_include(target, unit->target->paths.generated);

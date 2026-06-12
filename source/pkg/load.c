@@ -491,6 +491,13 @@ static spn_err_union_t load_target(
     spn_target_add_source_ex(target, value);
   }
 
+  toml_array_t* headers = toml_table_array(table, "headers");
+  spn_toml_arr_for(headers, h) {
+    sp_str_t value = SP_ZERO_INITIALIZE();
+    spn_try_union(toml_get_array_string_required(headers, h, path, "headers", &value));
+    spn_target_add_header_ex(target, value);
+  }
+
   toml_array_t* include = toml_table_array(table, "include");
   spn_toml_arr_for(include, i) {
     sp_str_t value = SP_ZERO_INITIALIZE();
@@ -520,7 +527,7 @@ static bool is_path_absolute(sp_str_t path) {
   return path.len && (path.data[0] == '/' || (path.len >= 2 && path.data[1] == ':'));
 }
 
-static spn_err_union_t load_deps(toml_loader_t* loader, toml_table_t* toml) {
+static spn_err_union_t load_deps(toml_loader_t* loader, toml_table_t* toml, spn_dep_kind_t kind) {
   if (!toml) {
     return spn_result(SPN_OK);
   }
@@ -531,7 +538,8 @@ static spn_err_union_t load_deps(toml_loader_t* loader, toml_table_t* toml) {
     spn_try_as_union(get_str_required(toml, key, &version));
 
     spn_requested_pkg_t req = {
-      .qualified = spn_pkg_canonicalize_name(spn_intern_cstr(key))
+      .qualified = spn_pkg_canonicalize_name(spn_intern_cstr(key)),
+      .kind = kind,
     };
 
     sp_str_t prefix = sp_str_lit("file://");
@@ -542,7 +550,7 @@ static spn_err_union_t load_deps(toml_loader_t* loader, toml_table_t* toml) {
       }
 
       req.source = SPN_PKG_SOURCE_FILE;
-      req.file.path = sp_fs_canonicalize_path(path);
+      req.file.path = sp_fs_normalize_path(path);
     }
     else {
       req.source = SPN_PKG_SOURCE_INDEX;
@@ -907,10 +915,9 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
     spn_try_union(toml_get_table_optional(toml.deps, "test", deps_path, &deps.test));
     spn_try_union(toml_get_table_optional(toml.deps, "build", deps_path, &deps.build));
 
-    spn_try_union(load_deps(&toml, deps.package));
-    // spn_try_union(load_deps(&toml, deps.package, SPN_DEP_KIND_PACKAGE));
-    // spn_try_union(load_deps(&toml, deps.test, SPN_DEP_KIND_TEST));
-    // spn_try_union(load_deps(&toml, deps.build, SPN_DEP_KIND_BUILD));
+    spn_try_union(load_deps(&toml, deps.package, SPN_DEP_KIND_PACKAGE));
+    spn_try_union(load_deps(&toml, deps.test, SPN_DEP_KIND_TEST));
+    spn_try_union(load_deps(&toml, deps.build, SPN_DEP_KIND_BUILD));
   }
 
   if (toml.options) {

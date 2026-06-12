@@ -1,6 +1,7 @@
 #include "graph/types.h"
 
 #include "ctx/ctx.h"
+#include "error/types.h"
 #include "event/event.h"
 #include "unit/package.h"
 
@@ -34,8 +35,27 @@ static void emit_success(spn_pkg_unit_t* unit) {
   });
 }
 
+static spn_err_t publish_headers(spn_pkg_unit_t* unit) {
+  sp_da_for(unit->targets, t) {
+    spn_target_unit_t* target = unit->targets[t];
+
+    sp_da_for(target->info->headers, h) {
+      sp_str_t header = target->info->headers[h];
+      sp_str_t from = sp_fs_join_path(unit->paths.source, header);
+      sp_str_t to = sp_fs_join_path(unit->paths.include, header);
+
+      sp_fs_create_dir(sp_fs_parent_path(to));
+      spn_try_as(sp_fs_copy(from, to), SPN_ERROR);
+    }
+  }
+
+  return SPN_OK;
+}
+
 s32 run_package_hook(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
+
+  sp_try(publish_headers(unit));
 
   if (unit->on_package) {
     emit_run(unit);

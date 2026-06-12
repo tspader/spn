@@ -3,6 +3,7 @@
 #include "app/app.h"
 #include "ctx/ctx.h"
 #include "enum/enum.h"
+#include "intern/intern.h"
 #include "log/log.h"
 
 static bool spn_cli_run_path_is_absolute(sp_str_t path) {
@@ -27,7 +28,7 @@ static bool spn_cli_run_is_source_entry(sp_str_t entry, bool has_manifest) {
     return true;
   }
 
-  if (sp_str_om_has(app.package.scripts, entry)) {
+  if (sp_str_om_has(app.package.scripts, spn_intern(entry))) {
     return false;
   }
 
@@ -81,7 +82,7 @@ sp_app_result_t spn_cli_run(spn_cli_t* cli) {
     return SP_APP_ERR;
   }
 
-  if (!sp_str_om_has(app.package.scripts, command->entry)) {
+  if (!sp_str_om_has(app.package.scripts, spn_intern(command->entry))) {
     spn_log_error("script target {:fg brightyellow} is not defined",
       SP_FMT_STR(command->entry)
     );

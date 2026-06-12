@@ -11,6 +11,7 @@
 #include "target/types.h"
 
 #include "intern/intern.h"
+#include "pkg/id.h"
 #include "pkg/load.h"
 #include "pkg/types.h"
 #include "semver/compare.h"
@@ -209,13 +210,17 @@ void run_case(s32* utest_result, test_t test) {
 
   sp_for(it, num_deps.expected) {
     resolved_dep_t expected = test.deps[it];
-    spn_requested_pkg_t* actual = sp_ht_getp(pkg.deps, sp_str_view(expected.name));
+    spn_requested_pkg_t* actual = sp_ht_getp(pkg.deps, spn_pkg_canonicalize_name(sp_str_view(expected.name)));
     ASSERT_TRUE(actual);
 
     EXPECT_EQ(expected.source, actual->source);
 
+    spn_dep_kind_t kind = expected.build ? SPN_DEP_KIND_BUILD : expected.test ? SPN_DEP_KIND_TEST : SPN_DEP_KIND_PACKAGE;
+    EXPECT_EQ(kind, actual->kind);
+
     if (expected.source == SPN_PKG_SOURCE_FILE) {
-      if (expected.file) SP_EXPECT_STR_EQ_CSTR(actual->file.path, expected.file);
+      // The loader resolves file deps to absolute paths
+      if (expected.file) EXPECT_TRUE(sp_str_ends_with(actual->file.path, sp_str_view(expected.file)));
     } else {
       if (expected.version) SP_EXPECT_STR_EQ_CSTR(spn_semver_range_to_str(actual->index.range), expected.version);
     }
@@ -267,9 +272,9 @@ UTEST(load, deps) {
     .fixture = "deps.toml",
     .name = "test",
     .deps = {
-      { .name = "kram",  .source = SPN_PKG_SOURCE_INDEX, .version = "1.6.9", .package = 1 },
-      { .name = "baz",   .source = SPN_PKG_SOURCE_FILE,  .file = "file://baz/spn.toml", .package = 1 },
-      { .name = "spum",  .source = SPN_PKG_SOURCE_INDEX, .version = "1.0.0", .build = 1, .package = 1 },
+      { .name = "kram",  .source = SPN_PKG_SOURCE_INDEX, .version = "^1.6.9", .package = 1 },
+      { .name = "baz",   .source = SPN_PKG_SOURCE_FILE,  .file = "baz/spn.toml", .package = 1 },
+      { .name = "spum",  .source = SPN_PKG_SOURCE_INDEX, .version = "^1.0.0", .build = 1, .package = 1 },
     },
   });
 }

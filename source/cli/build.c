@@ -18,7 +18,6 @@ sp_app_result_t spn_cli_build(spn_cli_t* cli) {
       .script = command->only.script,
     },
     .disabled = {
-      .test = sp_str_empty(command->name) && !command->only.test,
       .script = sp_str_empty(command->name) && !command->only.script,
     }
   };

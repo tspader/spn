@@ -1,3 +1,4 @@
+#include "cc.h"
 #include "ctx/types.h"
 #include "event/types.h"
 #include "forward/types.h"
@@ -170,17 +171,37 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
     spn_try(add_package(graph, unit));
   }
 
-  // Link intra-package dependencies
-  sp_om_for(session->units.targets, it) {
-    spn_target_unit_t* target = sp_str_om_at(session->units.targets, it);
-    sp_da_for(target->deps.target, it) {
-
-    }
-  }
-
-  // Link inter-package dependencies; we don't do anything more granular than entire packages
+  // Link inter-package dependencies; we don't do anything more granular than entire packages.
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* pkg = sp_str_om_at(session->units.packages, it);
+    sp_da(spn_pkg_unit_t*) deps = spn_session_pkg_deps(session, pkg);
+
+    sp_da_for(deps, d) {
+      spn_pkg_unit_t* dep = deps[d];
+      if (!dep || dep == pkg) continue;
+
+      sp_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.main, dep->nodes.build.stamp.package));
+
+      sp_da_for(pkg->targets, t) {
+        spn_target_unit_t* target = pkg->targets[t];
+        if (!target->nodes.link.occupied) continue;
+
+        sp_da_for(dep->libs, l) {
+          spn_target_unit_t* lib = dep->libs[l];
+          switch (lib->lib_kind) {
+            case SPN_LIB_KIND_STATIC:
+            case SPN_LIB_KIND_SHARED: {
+              if (lib->nodes.output.occupied) {
+                sp_try(spn_bg_cmd_add_input(graph, target->nodes.link, lib->nodes.output));
+              }
+              break;
+            }
+            case SPN_LIB_KIND_SOURCE:
+            case SPN_LIB_KIND_NONE: break;
+          }
+        }
+      }
+    }
   }
 
   return SPN_OK;
@@ -281,6 +302,15 @@ spn_bg_id_t get_or_put_user_file(spn_pkg_unit_t* ctx, spn_build_graph_t* graph, 
 // └ ─ ─ ─ ─ ─ ─ ┘    └─────────────┘
 spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_unit_t* target) {
   spn_target_info_t* info = target->info;
+
+  // Source libs don't link an artifact; the package step just waits on their objects, which
+  // consumers compile against directly.
+  if (target->kind == SPN_CC_OUTPUT_OBJECT) {
+    sp_da_for(target->objects, it) {
+      sp_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.package, target->objects[it]->nodes.object));
+    }
+    return SPN_OK;
+  }
 
   target->nodes.link = spn_bg_add_fn(graph, link_target, target);
   target->nodes.output = spn_bg_add_file(graph, get_target_output_path(target));

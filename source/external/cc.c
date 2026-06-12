@@ -82,6 +82,10 @@ void spn_cc_target_add_rpath(spn_cc_target_t* target, sp_str_t dir) {
   sp_da_push(target->rpath, sp_str_copy(dir));
 }
 
+void spn_cc_target_add_system_lib(spn_cc_target_t* target, sp_str_t name) {
+  sp_da_push(target->system_libs, sp_str_copy(name));
+}
+
 sp_str_t spn_cc_symbol_from_embedded_file(sp_str_t file_path) {
   sp_str_t symbol = file_path;
   symbol = sp_str_replace_c8(symbol, '/', '_');
@@ -260,6 +264,9 @@ void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* 
     }
     sp_da_for(target->libs, it) {
       sp_ps_config_add_arg(ps, spn_gen_format_entry(target->libs[it], SPN_GEN_LIBS, driver));
+    }
+    sp_da_for(target->system_libs, it) {
+      sp_ps_config_add_arg(ps, spn_gen_format_entry(target->system_libs[it], SPN_GEN_SYSTEM_LIBS, driver));
     }
     sp_da_for(target->rpath, it) {
       sp_ps_config_add_arg(ps, spn_gen_format_entry(target->rpath[it], SPN_GEN_RPATH, driver));

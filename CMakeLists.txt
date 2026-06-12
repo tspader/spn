@@ -435,6 +435,7 @@ set(SPN_SOURCES
   source/api.c
   source/api/autoconf/autoconf.c
   source/api/cmake/cmake.c
+  source/api/core/core.c
   source/api/make/make.c
   source/app/app.c
   source/cli/add.c
@@ -486,6 +487,7 @@ set(SPN_SOURCES
   source/semver/compare.c
   source/semver/convert.c
   source/semver/parser.c
+  source/session/registry/registry.c
   source/session/session.c
   source/signal.c
   source/sp/cli.c
@@ -499,6 +501,7 @@ set(SPN_SOURCES
   source/sp/tm.c
   source/spn.c
   source/target/mutate.c
+  source/target/select.c
   source/target/target.c
   source/task/build/build.c
   source/task/build/nodes/embed.c
@@ -585,6 +588,7 @@ add_executable(resolver
   source/pkg/load.c
   source/pkg/mutate.c
   source/profile/profile.c
+  source/session/registry/registry.c
   source/triple/triple.c
   source/resolve/resolve.c
   source/sp/str.c

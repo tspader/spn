@@ -114,12 +114,18 @@ void emit_resolved(spn_resolve_query_t* query) {
 
 }
 
+spn_err_t load_root_package(spn_session_t* session);
+
 spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_pkg_info_t* pkg = &app->package;
 
   spn_try_as(init_session(session, pkg), SPN_TASK_ERROR);
   spn_try_as(apply_config(session, app->config), SPN_TASK_ERROR);
+
+  // The solver reads local packages' deps from the registry, so the root must
+  // be registered before we resolve.
+  spn_try_as(load_root_package(session), SPN_TASK_ERROR);
 
   spn_index_cache_t index = SP_ZERO_INITIALIZE();
   spn_index_cache_init(&index, &spn.indexes);

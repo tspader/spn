@@ -7,7 +7,7 @@
 #include "semver/convert.h"
 
 void spn_app_update_lock_file(spn_app_t* app) {
-  spn_lock_file_t lock = spn_build_lock_file(app->resolver, &app->package);
+  spn_lock_file_t lock = spn_build_lock_file(app->session.resolve, &app->package);
 
   sp_da_for(app->package.system_deps, i) {
     sp_ht_insert(lock.system_deps, sp_str_copy(app->package.system_deps[i]), true);

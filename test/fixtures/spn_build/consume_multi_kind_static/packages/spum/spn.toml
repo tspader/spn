@@ -6,3 +6,4 @@ version = "1.0.0"
 name = "spum"
 kinds = ["static", "shared", "source"]
 source = ["spum.c"]
+headers = ["spum.h"]

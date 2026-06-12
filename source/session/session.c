@@ -12,10 +12,11 @@
 #include "session/session.h"
 #include "sp/hash.h"
 
-static spn_linkage_t resolve_linkage(spn_session_t* session, spn_pkg_info_t* pkg) {
-  sp_opt(spn_linkage_t) requested = SP_ZERO_INITIALIZE();
+// The root manifest can pin the lib kind of any package in the build with [config.<pkg>] kind
+sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pkg_name) {
+  sp_opt_spn_linkage_t requested = SP_ZERO_INITIALIZE();
 
-  spn_dep_options_t* options = sp_ht_getp(session->pkg->config, pkg->name);
+  spn_dep_options_t* options = sp_ht_getp(session->pkg->config, pkg_name);
   if (options) {
     spn_dep_option_t* kind = sp_ht_getp(*options, sp_str_lit("kind"));
     if (kind && kind->kind == SPN_DEP_OPTION_KIND_STR) {
@@ -23,35 +24,7 @@ static spn_linkage_t resolve_linkage(spn_session_t* session, spn_pkg_info_t* pkg
     }
   }
 
-  if (requested.some) {
-    spn_linkage_t value = requested.value;
-    if (!spn_pkg_has_lib_kind(pkg, value)) {
-      SP_FATAL(
-        "{:fg brightcyan} does not support {:fg brightyellow}; requested from {:fg brightcyan}",
-        SP_FMT_STR(pkg->name),
-        SP_FMT_STR(spn_pkg_linkage_to_str(value)),
-        SP_FMT_STR(session->pkg->name)
-      );
-    }
-
-    return value;
-  }
-
-  if (spn_pkg_has_lib_kind(pkg, SPN_LIB_KIND_SOURCE)) {
-    return SPN_LIB_KIND_SOURCE;
-  }
-
-  if (spn_pkg_has_lib_kind(pkg, SPN_LIB_KIND_STATIC)) {
-    return SPN_LIB_KIND_STATIC;
-  }
-
-  if (spn_pkg_has_lib_kind(pkg, SPN_LIB_KIND_SHARED)) {
-    return SPN_LIB_KIND_SHARED;
-  }
-
-  return SPN_LIB_KIND_SOURCE; // @spader: For toolchain, which doesn't have a lib entry
-  // SP_FATAL("{:fg brightcyan} has no consumable lib kinds", SP_FMT_STR(pkg->name));
-  // SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
+  return requested;
 }
 
 typedef struct {
@@ -90,7 +63,8 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_info_t* pkg) {
   bool compiled = sp_str_om_size(pkg->libs) > 0 || sp_str_om_size(pkg->exes) > 0;
   if (compiled) {
     fingerprint.mode = session->profile.mode;
-    fingerprint.linkage = resolve_linkage(session, pkg);
+    sp_opt_spn_linkage_t config = spn_session_config_kind(session, pkg->name);
+    fingerprint.linkage = config.some ? config.value : session->profile.linkage;
     fingerprint.standard = session->profile.standard;
     fingerprint.arch = session->profile.arch;
     fingerprint.os = session->profile.os;
@@ -132,7 +106,12 @@ spn_target_unit_t* spn_session_find_target_in_pkg(spn_session_t* session, spn_pk
 }
 
 spn_pkg_unit_t* spn_session_find_root(spn_session_t* s) {
-  return spn_session_find_pkg_by_qualified(s, s->pkg->name);
+  return spn_session_find_pkg_by_qualified(s, s->pkg->qualified);
+}
+
+sp_da(spn_pkg_unit_t*) spn_session_pkg_deps(spn_session_t* session, spn_pkg_unit_t* pkg) {
+  if (!sp_om_has(session->units.graph, pkg->id)) return SP_NULLPTR;
+  return *sp_om_get(session->units.graph, pkg->id);
 }
 
 spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
