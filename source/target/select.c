@@ -39,6 +39,8 @@ spn_err_t spn_target_select_lib_kind(spn_target_info_t* info, spn_kind_query_t q
       static const spn_linkage_t order [] = { SPN_LIB_KIND_SOURCE, SPN_LIB_KIND_STATIC, SPN_LIB_KIND_SHARED };
       return select_first_supported(supported, order, SP_CARR_LEN(order), out);
     }
+    // A profile can't request object linkage; object libs never reach selection
+    case SPN_LIB_KIND_OBJECT: sp_unreachable_case();
   }
 
   SP_UNREACHABLE_RETURN(SPN_ERROR);

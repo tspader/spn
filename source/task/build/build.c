@@ -34,6 +34,10 @@ void add_pkg_to_cc_target(spn_cc_target_t* target, spn_pkg_unit_t* pkg, spn_targ
   sp_da_for(info->define, i) {
     spn_cc_target_add_define(target, info->define[i]);
   }
+
+  sp_da_for(info->flags, i) {
+    spn_cc_target_add_flag(target, info->flags[i]);
+  }
 }
 
 void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
@@ -55,6 +59,8 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
 
     sp_da_for(dep->libs, l) {
       spn_target_unit_t* lib = dep->libs[l];
+      if (lib->info->no_link) continue;
+
       switch (lib->lib_kind) {
         case SPN_LIB_KIND_STATIC: {
           spn_cc_target_add_lib_dir(cc, dep->paths.lib);
@@ -68,6 +74,7 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
           break;
         }
         case SPN_LIB_KIND_SOURCE:
+        case SPN_LIB_KIND_OBJECT:
         case SPN_LIB_KIND_NONE: break;
       }
     }

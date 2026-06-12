@@ -209,6 +209,9 @@ spn_linkage_t spn_lib_kind_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "source")) {
     return SPN_LIB_KIND_SOURCE;
   }
+  if (sp_str_equal_cstr(str, "object")) {
+    return SPN_LIB_KIND_OBJECT;
+  }
 
   SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
 }
@@ -227,6 +230,9 @@ sp_str_t spn_pkg_linkage_to_str(spn_linkage_t kind) {
     }
     case SPN_LIB_KIND_SOURCE: {
       return sp_str_lit("source");
+    }
+    case SPN_LIB_KIND_OBJECT: {
+      return sp_str_lit("object");
     }
     case SPN_LIB_KIND_NONE: sp_unreachable_case();
   }
@@ -400,7 +406,8 @@ sp_os_lib_kind_t spn_lib_kind_to_sp_os_lib_kind(spn_linkage_t kind) {
       return SP_OS_LIB_STATIC;
     }
     case SPN_LIB_KIND_NONE:
-    case SPN_LIB_KIND_SOURCE: {
+    case SPN_LIB_KIND_SOURCE:
+    case SPN_LIB_KIND_OBJECT: {
       return 0;
     }
   }

@@ -1,0 +1,10 @@
+[package]
+name = "object_lib"
+version = "0.0.1"
+
+[deps.package]
+spum = "file://./packages/spum/spn.toml"
+
+[[bin]]
+name = "object_lib"
+source = ["main.c"]

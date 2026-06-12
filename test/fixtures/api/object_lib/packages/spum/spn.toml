@@ -1,0 +1,24 @@
+[package]
+name = "spum"
+version = "1.0.0"
+
+# A normal lib; the root binary links it
+[[lib]]
+name = "spum"
+kinds = ["static"]
+source = ["spum.c"]
+headers = ["spum.h"]
+
+# An object lib: its objects are published to lib/ and never linked
+[[lib]]
+name = "runtime"
+kinds = ["object"]
+source = ["rt/extra.c"]
+flags = ["-DVIA_FLAG=7"]
+
+# An unlinked archive: built and installed, but consumers don't link it
+[[lib]]
+name = "blob"
+kinds = ["static"]
+link = false
+source = ["rt/blob.c"]

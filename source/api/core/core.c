@@ -14,6 +14,7 @@
 #include "intern/intern.h"
 #include "pkg/id.h"
 #include "pkg/mutate.h"
+#include "target/mutate.h"
 #include "pkg/pkg.h"
 #include "session/session.h"
 #include "sp/io.h"
@@ -75,6 +76,42 @@ sp_ps_output_t spn_api_subprocess(spn_pkg_unit_t* unit, sp_ps_config_t config) {
   return result;
 }
 
+static s32 run_argv(spn_pkg_unit_t* unit, spn_toolchain_launcher_t* launcher, const c8** args) {
+  sp_ps_config_t config = SP_ZERO_INITIALIZE();
+
+  if (launcher) {
+    config.command = launcher->program;
+    sp_da_for(launcher->args, it) {
+      sp_ps_config_add_arg(&config, launcher->args[it]);
+    }
+  }
+  else {
+    config.command = sp_str_view(args[0]);
+    args++;
+  }
+
+  for (const c8** arg = args; *arg; arg++) {
+    sp_ps_config_add_arg(&config, sp_str_view(*arg));
+  }
+
+  sp_ps_output_t result = spn_api_subprocess(unit, config);
+  return result.status.exit_code;
+}
+
+s32 spn_exec(spn_t* s, const c8** args) {
+  return run_argv(spn_api_unit(s), SP_NULLPTR, args);
+}
+
+s32 spn_cc(spn_t* s, const c8** args) {
+  spn_pkg_unit_t* unit = spn_api_unit(s);
+  return run_argv(unit, &unit->session->units.toolchain->compiler, args);
+}
+
+s32 spn_ar(spn_t* s, const c8** args) {
+  spn_pkg_unit_t* unit = spn_api_unit(s);
+  return run_argv(unit, &unit->session->units.toolchain->archiver, args);
+}
+
 static spn_target_t* wrap_target(const void* spn, spn_target_info_t* info) {
   if (!info) return SP_NULLPTR;
 
@@ -90,6 +127,12 @@ spn_target_t* spn_get_target(spn_t* spn, const c8* name) {
 
 spn_target_t* spn_add_exe(spn_config_t* config, const c8* name) {
   return wrap_target(config, spn_pkg_add_exe(spn_api_unit(config)->info, name));
+}
+
+spn_target_t* spn_add_lib(spn_config_t* config, const c8* name, spn_linkage_t kind) {
+  spn_linkage_set_t linkages = SP_ZERO_INITIALIZE();
+  spn_linkage_set_add(&linkages, kind);
+  return wrap_target(config, spn_pkg_add_lib_ex(spn_api_unit(config)->info, spn_intern_cstr(name), linkages));
 }
 
 spn_target_t* spn_add_test(spn_config_t* config, const c8* name) {
@@ -154,12 +197,12 @@ void spn_write_file(spn_t* s, const c8* path, const c8* content) {
   sp_io_writer_close(&io);
 }
 
-void spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir, const c8* to_path) {
+s32 spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir, const c8* to_path) {
   spn_pkg_unit_t* unit = spn_api_unit(s);
   sp_str_t from = sp_fs_join_path(spn_api_dir(unit, from_dir), sp_str_view(from_path));
   sp_str_t to = sp_fs_join_path(spn_api_dir(unit, to_dir), sp_str_view(to_path));
   SPN_API_LOG(unit, "spn_copy", "{} -> {}", SP_FMT_STR(from), SP_FMT_STR(to));
-  sp_fs_copy(from, to);
+  return sp_fs_copy(from, to);
 }
 
 spn_profile_t* spn_get_profile(spn_t* s) {
@@ -196,6 +239,14 @@ void spn_target_add_include(spn_target_t* target, const c8* include) {
 
 void spn_target_add_define(spn_target_t* target, const c8* define) {
   sp_da_push(target->info->define, spn_intern_cstr(define));
+}
+
+void spn_target_add_flag(spn_target_t* target, const c8* flag) {
+  sp_da_push(target->info->flags, spn_intern_cstr(flag));
+}
+
+void spn_target_set_linked(spn_target_t* target, s32 linked) {
+  target->info->no_link = !linked;
 }
 
 // Channel a little bit of Arthur himself to get these wrappers to fit on one line on my editor

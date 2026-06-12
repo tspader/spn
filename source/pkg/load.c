@@ -512,6 +512,32 @@ static spn_err_union_t load_target(
     spn_target_add_define_ex(target, value);
   }
 
+  toml_array_t* flags = toml_table_array(table, "flags");
+  spn_toml_arr_for(flags, f) {
+    sp_str_t value = SP_ZERO_INITIALIZE();
+    spn_try_union(toml_get_array_string_required(flags, f, path, "flags", &value));
+    spn_target_add_flag_ex(target, value);
+  }
+
+  // link only means something for libs; reject it elsewhere instead of
+  // silently parsing a field that can't do anything
+  if (toml_kind_from_field(table, "link") != SPN_TOML_VALUE_KIND_NONE) {
+    if (target->kind != SPN_TARGET_LIB) {
+      return (spn_err_union_t) {
+        .kind = SPN_ERR_MANIFEST_FIELD,
+        .manifest_field = {
+          .path = spn_pkg_toml_path_field(path, "link"),
+          .expected = sp_str_lit("link on a lib"),
+          .actual = sp_str_lit("link on a target that's never linked into consumers"),
+        },
+      };
+    }
+
+    bool link = true;
+    spn_try_as_union(get_bool_optional(table, "link", &link));
+    target->no_link = !link;
+  }
+
   toml_array_t* deps = toml_table_array(table, "deps");
   spn_toml_arr_for(deps, it) {
     sp_str_t value = SP_ZERO_INITIALIZE();
@@ -762,6 +788,19 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
       sp_str_t kind = SP_ZERO_INITIALIZE();
       spn_try_union(toml_get_array_string_required(kinds, k, path, "kinds", &kind));
       spn_linkage_set_add(&linkages, spn_pkg_linkage_from_str(kind));
+    }
+
+    // Object libs are never linked, so a lib that's sometimes object and
+    // sometimes linkable is incoherent; consumers couldn't know what they get
+    if (linkages.object && (linkages.source || linkages.shared || linkages.static_lib)) {
+      return (spn_err_union_t) {
+        .kind = SPN_ERR_MANIFEST_FIELD,
+        .manifest_field = {
+          .path = spn_pkg_toml_path_field(path, "kinds"),
+          .expected = sp_str_lit("object as the only kind"),
+          .actual = sp_str_lit("object mixed with linkable kinds"),
+        },
+      };
     }
 
     spn_try_union(ensure_unique_target_name(pkg, path, name));

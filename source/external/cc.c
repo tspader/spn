@@ -70,6 +70,10 @@ void spn_cc_target_add_define(spn_cc_target_t* target, sp_str_t var) {
   sp_da_push(target->define, sp_str_copy(var));
 }
 
+void spn_cc_target_add_flag(spn_cc_target_t* target, sp_str_t flag) {
+  sp_da_push(target->flags, sp_str_copy(flag));
+}
+
 void spn_cc_target_add_lib(spn_cc_target_t* target, sp_str_t lib) {
   sp_da_push(target->libs, sp_str_copy(lib));
 }
@@ -258,19 +262,21 @@ void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* 
   sp_da_for(target->define, it) {
     sp_ps_config_add_arg(ps, spn_gen_format_entry(target->define[it], SPN_GEN_DEFINE, driver));
   }
-  if (target->kind != SPN_CC_OUTPUT_OBJECT) {
-    sp_da_for(target->lib_dirs, it) {
-      sp_ps_config_add_arg(ps, spn_gen_format_entry(target->lib_dirs[it], SPN_GEN_LIB_INCLUDE, driver));
-    }
-    sp_da_for(target->libs, it) {
-      sp_ps_config_add_arg(ps, spn_gen_format_entry(target->libs[it], SPN_GEN_LIBS, driver));
-    }
-    sp_da_for(target->system_libs, it) {
-      sp_ps_config_add_arg(ps, spn_gen_format_entry(target->system_libs[it], SPN_GEN_SYSTEM_LIBS, driver));
-    }
-    sp_da_for(target->rpath, it) {
-      sp_ps_config_add_arg(ps, spn_gen_format_entry(target->rpath[it], SPN_GEN_RPATH, driver));
-    }
+
+  sp_da_for(target->flags, it) {
+    sp_ps_config_add_arg(ps, target->flags[it]);
+  }
+  sp_da_for(target->lib_dirs, it) {
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->lib_dirs[it], SPN_GEN_LIB_INCLUDE, driver));
+  }
+  sp_da_for(target->libs, it) {
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->libs[it], SPN_GEN_LIBS, driver));
+  }
+  sp_da_for(target->system_libs, it) {
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->system_libs[it], SPN_GEN_SYSTEM_LIBS, driver));
+  }
+  sp_da_for(target->rpath, it) {
+    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->rpath[it], SPN_GEN_RPATH, driver));
   }
 
   sp_ps_config_add_arg(ps, sp_str_lit("-Werror=return-type"));

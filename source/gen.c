@@ -30,7 +30,8 @@ sp_str_t spn_cc_lib_kind_to_switch(spn_linkage_t kind) {
     case SPN_LIB_KIND_STATIC: return sp_str_lit("-static");
     case SPN_LIB_KIND_NONE:
     case SPN_LIB_KIND_SHARED:
-    case SPN_LIB_KIND_SOURCE: {
+    case SPN_LIB_KIND_SOURCE:
+    case SPN_LIB_KIND_OBJECT: {
       return sp_str_lit("");
     }
   }

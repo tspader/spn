@@ -16,6 +16,10 @@ void spn_linkage_set_add(spn_linkage_set_t* set, spn_linkage_t kind) {
       set->static_lib = true;
       break;
     }
+    case SPN_LIB_KIND_OBJECT: {
+      set->object = true;
+      break;
+    }
     case SPN_LIB_KIND_NONE: sp_unreachable_case();
   }
 }
@@ -31,6 +35,9 @@ bool spn_linkage_set_has(spn_linkage_set_t set, spn_linkage_t kind) {
     case SPN_LIB_KIND_STATIC: {
       return set.static_lib;
     }
+    case SPN_LIB_KIND_OBJECT: {
+      return set.object;
+    }
     case SPN_LIB_KIND_NONE: sp_unreachable_case();
   }
 
@@ -38,6 +45,9 @@ bool spn_linkage_set_has(spn_linkage_set_t set, spn_linkage_t kind) {
 }
 
 spn_linkage_t spn_linkage_set_default(spn_linkage_set_t set) {
+  if (set.object) {
+    return SPN_LIB_KIND_OBJECT;
+  }
   if (set.source) {
     return SPN_LIB_KIND_SOURCE;
   }
@@ -70,6 +80,11 @@ void spn_target_add_include_ex(spn_target_info_t* target, sp_str_t include) {
 void spn_target_add_define_ex(spn_target_info_t* target, sp_str_t define) {
   sp_require(target);
   sp_da_push(target->define, spn_intern(define));
+}
+
+void spn_target_add_flag_ex(spn_target_info_t* target, sp_str_t flag) {
+  sp_require(target);
+  sp_da_push(target->flags, spn_intern(flag));
 }
 
 void spn_target_add_dep(spn_target_info_t* target, const c8* dep) {
