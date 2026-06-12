@@ -85,11 +85,52 @@ static void log_toolchain_error(spn_pkg_info_t* pkg, spn_triple_t host, spn_trip
 }
 
 
+// SPN_PATCH_DIR points at a directory of packages (e.g. a checkout of the package
+// repo). Any resolved index package whose name matches a subdirectory containing a
+// manifest is loaded from there instead of its pinned checkout. Resolution still
+// uses the index; only the package contents are swapped. Builds against patched
+// packages should be forced, since the store is keyed by the published release.
+static bool load_patched_package(spn_session_t* session, spn_loaded_pkg_t* loaded, spn_index_rel_t* release) {
+  sp_str_t patches = sp_env_get(spn.env, sp_str_lit("SPN_PATCH_DIR"));
+  if (sp_str_empty(patches)) return false;
+
+  sp_str_t dir = sp_fs_join_path(patches, release->id.name);
+  sp_str_t manifest = sp_fs_join_path(dir, release->paths.manifest);
+  if (!sp_fs_exists(manifest)) return false;
+
+  loaded->source = SPN_PKG_SOURCE_INDEX;
+  loaded->paths.manifest = manifest;
+  loaded->paths.script = sp_fs_join_path(dir, release->paths.script);
+  loaded->paths.source = dir;
+  loaded->info = sp_alloc_type(spn_pkg_info_t);
+  spn_pkg_load(loaded->info, loaded->paths.manifest);
+
+  // Packages whose source lives in a separate repo still need it checked out;
+  // use the patched manifest's pin, not the published release's
+  spn_pkg_info_t* info = loaded->info;
+  spn_pkg_metadata_t* meta = sp_ht_getp(info->metadata, info->version);
+  if (!sp_str_empty(info->url) && meta && !sp_str_empty(meta->commit)) {
+    spn_git_checkout_t* checkout = SP_NULLPTR;
+    spn_git_checkout_id_t id = {
+      .url = info->url,
+      .rev = meta->commit,
+    };
+    if (spn_git_cache_ensure_checkout(session->git, id, &checkout)) return false;
+    loaded->paths.source = checkout->path;
+  }
+
+  return true;
+}
+
 spn_err_t load_index_package(spn_session_t* session, spn_resolved_pkg_t* resolved) {
   sp_str_ht_insert(session->packages, resolved->qualified, sp_zero_struct(spn_loaded_pkg_t));
   spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, resolved->qualified);
 
   spn_index_rel_t* release = resolved->index.release;
+
+  if (load_patched_package(session, loaded, release)) {
+    return SPN_OK;
+  }
 
   struct {
     spn_git_checkout_t* manifest;

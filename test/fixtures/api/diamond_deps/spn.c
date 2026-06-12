@@ -1,8 +1,8 @@
 #include "spn.h"
 
-s32 gen_base(spn_node_ctx_t* ctx) {
-  spn_log(spn_node_ctx_get_build(ctx), "gen_base: creating base.h");
-  spn_write_file(spn_node_ctx_get_build(ctx), "base.h",
+s32 gen_base(spn_t* spn, spn_node_ctx_t* ctx) {
+  spn_log(spn, "gen_base: creating base.h");
+  spn_write_file(spn, "base.h",
     "#ifndef BASE_H\n"
     "#define BASE_H\n"
     "#define BASE_VAL 10\n"
@@ -11,9 +11,9 @@ s32 gen_base(spn_node_ctx_t* ctx) {
   return 0;
 }
 
-s32 gen_left(spn_node_ctx_t* ctx) {
-  spn_log(spn_node_ctx_get_build(ctx), "gen_left: creating left.h");
-  spn_write_file(spn_node_ctx_get_build(ctx), "left.h",
+s32 gen_left(spn_t* spn, spn_node_ctx_t* ctx) {
+  spn_log(spn, "gen_left: creating left.h");
+  spn_write_file(spn, "left.h",
     "#ifndef LEFT_H\n"
     "#define LEFT_H\n"
     "#include \"base.h\"\n"
@@ -23,9 +23,9 @@ s32 gen_left(spn_node_ctx_t* ctx) {
   return 0;
 }
 
-s32 gen_right(spn_node_ctx_t* ctx) {
-  spn_log(spn_node_ctx_get_build(ctx), "gen_right: creating right.h");
-  spn_write_file(spn_node_ctx_get_build(ctx), "right.h",
+s32 gen_right(spn_t* spn, spn_node_ctx_t* ctx) {
+  spn_log(spn, "gen_right: creating right.h");
+  spn_write_file(spn, "right.h",
     "#ifndef RIGHT_H\n"
     "#define RIGHT_H\n"
     "#include \"base.h\"\n"
@@ -35,9 +35,9 @@ s32 gen_right(spn_node_ctx_t* ctx) {
   return 0;
 }
 
-s32 gen_final(spn_node_ctx_t* ctx) {
-  spn_log(spn_node_ctx_get_build(ctx), "gen_final: creating final.h");
-  spn_write_file(spn_node_ctx_get_build(ctx), "final.h",
+s32 gen_final(spn_t* spn, spn_node_ctx_t* ctx) {
+  spn_log(spn, "gen_final: creating final.h");
+  spn_write_file(spn, "final.h",
     "#ifndef FINAL_H\n"
     "#define FINAL_H\n"
     "#include \"left.h\"\n"
@@ -48,33 +48,32 @@ s32 gen_final(spn_node_ctx_t* ctx) {
   return 0;
 }
 
-void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, SPN_DIR_WORK, "");
+spn_err_t configure(spn_t* spn, spn_config_t* config) {
+  spn_add_include(config, spn_get_dir(spn, SPN_DIR_WORK));
 
-  const c8* base_h = spn_get_subdir(ctx, SPN_DIR_WORK, "base.h");
-  const c8* left_h = spn_get_subdir(ctx, SPN_DIR_WORK, "left.h");
-  const c8* right_h = spn_get_subdir(ctx, SPN_DIR_WORK, "right.h");
-  const c8* final_h = spn_get_subdir(ctx, SPN_DIR_WORK, "final.h");
+  const c8* base_h = spn_get_subdir(spn, SPN_DIR_WORK, "base.h");
+  const c8* left_h = spn_get_subdir(spn, SPN_DIR_WORK, "left.h");
+  const c8* right_h = spn_get_subdir(spn, SPN_DIR_WORK, "right.h");
+  const c8* final_h = spn_get_subdir(spn, SPN_DIR_WORK, "final.h");
 
-  spn_node_t* base = spn_add_node(ctx, "gen_base");
+  spn_node_t* base = spn_add_node(config, "gen_base");
   spn_node_set_fn(base, gen_base);
   spn_node_add_output(base, base_h);
 
-  spn_node_t* left = spn_add_node(ctx, "gen_left");
+  spn_node_t* left = spn_add_node(config, "gen_left");
   spn_node_set_fn(left, gen_left);
   spn_node_add_input(left, base_h);
   spn_node_add_output(left, left_h);
 
-  spn_node_t* right = spn_add_node(ctx, "gen_right");
+  spn_node_t* right = spn_add_node(config, "gen_right");
   spn_node_set_fn(right, gen_right);
   spn_node_add_input(right, base_h);
   spn_node_add_output(right, right_h);
 
-  spn_node_t* final = spn_add_node(ctx, "gen_final");
+  spn_node_t* final = spn_add_node(config, "gen_final");
   spn_node_set_fn(final, gen_final);
   spn_node_add_input(final, left_h);
   spn_node_add_input(final, right_h);
   spn_node_add_output(final, final_h);
+  return SPN_OK;
 }
-
-void package(spn_build_ctx_t* ctx) { (void)ctx; }

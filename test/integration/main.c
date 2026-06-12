@@ -79,8 +79,15 @@ UTEST_INITIALIZER(spn_build_init_tmpfs_top_level) {
 }
 
 UTEST_F_SETUP(spn_build) {
+  // CMake passes these as compile definitions; under spn, derive them from the
+  // repo root, which is where you'd run the suite from anyway
+#if defined(SPN_TEST_ROOT) && defined(SPN_TEST_BIN)
   uf->fixture.paths.root = sp_str_lit(SPN_TEST_ROOT);
   uf->fixture.paths.spn = sp_str_lit(SPN_TEST_BIN);
+#else
+  uf->fixture.paths.root = sp_fs_get_cwd();
+  uf->fixture.paths.spn = sp_fs_join_path(uf->fixture.paths.root, sp_str_lit("build/debug/store/bin/spn"));
+#endif
   ASSERT_TRUE(sp_fs_exists(uf->fixture.paths.spn));
 }
 

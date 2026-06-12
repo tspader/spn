@@ -88,6 +88,18 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
   spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_CC_OUTPUT_JIT, unit->info->name);
   spn_cc_target_add_absolute_source(target, unit->paths.script);
 
+  // Build deps are usable from the build script itself, so compile against them
+  sp_ht_for_kv(unit->info->deps, it) {
+    spn_requested_pkg_t* dep = it.val;
+    if (dep->kind != SPN_DEP_KIND_BUILD) continue;
+
+    spn_pkg_unit_t* dep_unit = spn_session_find_pkg_by_qualified(session, dep->qualified);
+    if (!dep_unit) continue;
+
+    spn_cc_target_add_absolute_include(target, dep_unit->paths.include);
+    spn_cc_target_add_absolute_include(target, dep_unit->paths.source);
+  }
+
   unit->tcc = sp_alloc_type(spn_tcc_t);
   spn_tcc_init(unit->tcc);
   sp_try_goto(spn_cc_target_to_tcc(&cc, target, unit->tcc), fail);
@@ -182,11 +194,17 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   // Add a graph node for each package
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    spn_loaded_pkg_t* pkg = sp_str_ht_get(session->packages, unit->info->qualified);
 
     unit->nodes.configure.run = spn_bg_add_fn(graph, on_configure_package, unit);
     unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
     spn_try(spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp));
+  }
+
+  // The root configures last, after every other package; only now do all units
+  // have their nodes, so this can't be folded into the loop above
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    spn_loaded_pkg_t* pkg = sp_str_ht_get(session->packages, unit->info->qualified);
 
     if (pkg->source != SPN_PKG_SOURCE_ROOT) {
       spn_try(spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp));

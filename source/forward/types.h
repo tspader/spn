@@ -3,6 +3,7 @@
 
 #include "sp.h"
 
+typedef struct spn spn_t;
 typedef struct spn_app_t spn_app_t;
 typedef struct spn_event_buffer_t spn_event_buffer_t;
 typedef struct spn_index_info spn_index_info_t;
@@ -23,6 +24,6 @@ typedef struct spn_user_node_t spn_user_node_t;
 
 typedef struct toml_table_t toml_table_t;
 
-typedef s32  (*spn_node_fn_t)(spn_node_ctx_t*);
+typedef s32  (*spn_node_fn_t)(spn_t*, spn_node_ctx_t*);
 
 #endif

@@ -1,9 +1,9 @@
 #include "spn.h"
 
-s32 gen_all_headers(spn_node_ctx_t* ctx) {
-  spn_log(spn_node_ctx_get_build(ctx), "gen_all_headers: creating 3 headers from single node");
+s32 gen_all_headers(spn_t* spn, spn_node_ctx_t* ctx) {
+  spn_log(spn, "gen_all_headers: creating 3 headers from single node");
 
-  spn_write_file(spn_node_ctx_get_build(ctx), "types.h",
+  spn_write_file(spn, "types.h",
     "#ifndef TYPES_H\n"
     "#define TYPES_H\n"
     "typedef int my_int_t;\n"
@@ -11,7 +11,7 @@ s32 gen_all_headers(spn_node_ctx_t* ctx) {
     "#endif\n"
   );
 
-  spn_write_file(spn_node_ctx_get_build(ctx), "constants.h",
+  spn_write_file(spn, "constants.h",
     "#ifndef CONSTANTS_H\n"
     "#define CONSTANTS_H\n"
     "#define MAX_SIZE 1024\n"
@@ -19,7 +19,7 @@ s32 gen_all_headers(spn_node_ctx_t* ctx) {
     "#endif\n"
   );
 
-  spn_write_file(spn_node_ctx_get_build(ctx), "macros.h",
+  spn_write_file(spn, "macros.h",
     "#ifndef MACROS_H\n"
     "#define MACROS_H\n"
     "#define SQUARE(x) ((x) * (x))\n"
@@ -30,9 +30,9 @@ s32 gen_all_headers(spn_node_ctx_t* ctx) {
   return 0;
 }
 
-s32 gen_combined(spn_node_ctx_t* ctx) {
-  spn_log(spn_node_ctx_get_build(ctx), "gen_combined: aggregating all headers");
-  spn_write_file(spn_node_ctx_get_build(ctx), "all.h",
+s32 gen_combined(spn_t* spn, spn_node_ctx_t* ctx) {
+  spn_log(spn, "gen_combined: aggregating all headers");
+  spn_write_file(spn, "all.h",
     "#ifndef ALL_H\n"
     "#define ALL_H\n"
     "#include \"types.h\"\n"
@@ -43,26 +43,25 @@ s32 gen_combined(spn_node_ctx_t* ctx) {
   return 0;
 }
 
-void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, SPN_DIR_WORK, "");
+spn_err_t configure(spn_t* spn, spn_config_t* config) {
+  spn_add_include(config, spn_get_dir(spn, SPN_DIR_WORK));
 
-  const c8* types_h = spn_get_subdir(ctx, SPN_DIR_WORK, "types.h");
-  const c8* constants_h = spn_get_subdir(ctx, SPN_DIR_WORK, "constants.h");
-  const c8* macros_h = spn_get_subdir(ctx, SPN_DIR_WORK, "macros.h");
-  const c8* all_h = spn_get_subdir(ctx, SPN_DIR_WORK, "all.h");
+  const c8* types_h = spn_get_subdir(spn, SPN_DIR_WORK, "types.h");
+  const c8* constants_h = spn_get_subdir(spn, SPN_DIR_WORK, "constants.h");
+  const c8* macros_h = spn_get_subdir(spn, SPN_DIR_WORK, "macros.h");
+  const c8* all_h = spn_get_subdir(spn, SPN_DIR_WORK, "all.h");
 
-  spn_node_t* gen = spn_add_node(ctx, "gen_all_headers");
+  spn_node_t* gen = spn_add_node(config, "gen_all_headers");
   spn_node_set_fn(gen, gen_all_headers);
   spn_node_add_output(gen, types_h);
   spn_node_add_output(gen, constants_h);
   spn_node_add_output(gen, macros_h);
 
-  spn_node_t* combined = spn_add_node(ctx, "gen_combined");
+  spn_node_t* combined = spn_add_node(config, "gen_combined");
   spn_node_set_fn(combined, gen_combined);
   spn_node_add_input(combined, types_h);
   spn_node_add_input(combined, constants_h);
   spn_node_add_input(combined, macros_h);
   spn_node_add_output(combined, all_h);
+  return SPN_OK;
 }
-
-void package(spn_build_ctx_t* ctx) { (void)ctx; }

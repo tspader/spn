@@ -10,9 +10,15 @@
 #include "session/session.h"
 #include "task/build/build.h"
 
+// Manifest includes are source-relative; the build script API hands us absolute paths
+static sp_str_t resolve_pkg_include(spn_pkg_unit_t* pkg, sp_str_t include) {
+  if (sp_str_starts_with(include, sp_str_lit("/"))) return include;
+  return sp_fs_join_path(pkg->paths.source, include);
+}
+
 void add_pkg_to_cc(spn_cc_t* cc, spn_pkg_unit_t* pkg) {
   sp_da_for(pkg->info->include, it) {
-    spn_cc_add_include(cc, sp_fs_join_path(pkg->paths.source, pkg->info->include[it]));
+    spn_cc_add_include(cc, resolve_pkg_include(pkg, pkg->info->include[it]));
   }
 
   sp_da_for(pkg->info->define, it) {
@@ -22,7 +28,7 @@ void add_pkg_to_cc(spn_cc_t* cc, spn_pkg_unit_t* pkg) {
 
 void add_pkg_to_cc_target(spn_cc_target_t* target, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
   sp_da_for(info->include, i) {
-    spn_cc_target_add_absolute_include(target, sp_fs_join_path(pkg->paths.source, info->include[i]));
+    spn_cc_target_add_absolute_include(target, resolve_pkg_include(pkg, info->include[i]));
   }
 
   sp_da_for(info->define, i) {

@@ -5,21 +5,21 @@ typedef struct {
   s32 multiplier;
 } codegen_config_t;
 
-s32 generate_with_config(spn_node_ctx_t* ctx) {
+s32 generate_with_config(spn_t* spn, spn_node_ctx_t* ctx) {
   codegen_config_t* cfg = (codegen_config_t*)spn_node_ctx_get_user_data(ctx);
   if (!cfg) {
-    spn_log(spn_node_ctx_get_build(ctx), "ERROR: user_data is null!");
+    spn_log(spn, "ERROR: user_data is null!");
     return 1;
   }
 
   s32 result = cfg->base_value * cfg->multiplier;
 
   if (result != 42) {
-    spn_log(spn_node_ctx_get_build(ctx), "ERROR: expected result 42");
+    spn_log(spn, "ERROR: expected result 42");
     return 1;
   }
 
-  spn_write_file(spn_node_ctx_get_build(ctx), "config.h",
+  spn_write_file(spn, "config.h",
     "#ifndef CONFIG_H\n"
     "#define CONFIG_H\n"
     "#define MY_BASE 7\n"
@@ -27,7 +27,7 @@ s32 generate_with_config(spn_node_ctx_t* ctx) {
     "#define MY_RESULT 42\n"
     "#endif\n"
   );
-  spn_log(spn_node_ctx_get_build(ctx), "generated config.h with user_data");
+  spn_log(spn, "generated config.h with user_data");
   return 0;
 }
 
@@ -36,13 +36,12 @@ static codegen_config_t g_config = {
   .multiplier = 6,
 };
 
-void configure(spn_build_ctx_t* ctx) {
-  spn_add_include(ctx, SPN_DIR_WORK, "");
+spn_err_t configure(spn_t* spn, spn_config_t* config) {
+  spn_add_include(config, spn_get_dir(spn, SPN_DIR_WORK));
 
-  spn_node_t* gen = spn_add_node(ctx, "gen_config");
+  spn_node_t* gen = spn_add_node(config, "gen_config");
   spn_node_set_fn(gen, generate_with_config);
   spn_node_set_user_data(gen, &g_config);
-  spn_node_add_output(gen, spn_get_subdir(ctx, SPN_DIR_WORK, "config.h"));
+  spn_node_add_output(gen, spn_get_subdir(spn, SPN_DIR_WORK, "config.h"));
+  return SPN_OK;
 }
-
-void package(spn_build_ctx_t* ctx) { (void)ctx; }
