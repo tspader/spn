@@ -7,7 +7,7 @@ WORK  := $(BUILD)/work/$(TRIPLE)
 STORE := $(BUILD)/store/$(TRIPLE)
 BIN   := $(STORE)/bin/spn
 
-.PHONY: all build configure fetch test install uninstall clean
+.PHONY: all build configure fetch test install uninstall clean nuke
 all: build
 ifeq ($(TRIPLE),$(HOST_TRIPLE))
 	@ln -sfn .build/store/$(TRIPLE) $(ROOT)/bootstrap
@@ -37,4 +37,7 @@ uninstall:
 	rm -f $(HOME)/.local/bin/spn
 
 clean:
-	rm -rf $(BUILD) $(ROOT)/bootstrap $(ROOT)/compile_commands.json
+	rm -rf $(BUILD)/work $(BUILD)/store $(ROOT)/bootstrap $(ROOT)/compile_commands.json
+
+nuke: clean
+	rm -rf $(BUILD) $(ROOT)/.cache/zig

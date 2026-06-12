@@ -108,6 +108,15 @@ typedef enum {
 typedef enum {
   SPN_OK = 0,
   SPN_ERROR = 1,
+  SPN_ERR_MANIFEST_PARSE,
+  SPN_ERR_MANIFEST_FIELD,
+  SPN_ERR_NO_MANIFEST,
+  SPN_ERR_NOT_GIT_REPO,
+  SPN_ERR_GIT,
+  SPN_ERR_VERSION_EXISTS,
+  SPN_ERR_BUILD_GRAPH,
+  SPN_ERR_TOML_MISSING,
+  SPN_ERR_TOML_TYPE,
 } spn_err_t;
 
 typedef struct spn              spn_t;

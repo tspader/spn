@@ -417,6 +417,9 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
     }
     case SPN_EVENT_ERR: {
       switch (event->err.kind) {
+        // case SPN_ERR_OK: {
+        //   break;
+        // }
         case SPN_ERR_MANIFEST_PARSE: {
           sp_str_builder_append_fmt(
             &builder,

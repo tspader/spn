@@ -228,6 +228,7 @@ sp_str_t spn_pkg_linkage_to_str(spn_linkage_t kind) {
     case SPN_LIB_KIND_SOURCE: {
       return sp_str_lit("source");
     }
+    case SPN_LIB_KIND_NONE: sp_unreachable_case();
   }
 
   SP_UNREACHABLE_RETURN(sp_str_lit(""));

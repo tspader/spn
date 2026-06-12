@@ -16,6 +16,7 @@ void spn_linkage_set_add(spn_linkage_set_t* set, spn_linkage_t kind) {
       set->static_lib = true;
       break;
     }
+    case SPN_LIB_KIND_NONE: sp_unreachable_case();
   }
 }
 
@@ -30,6 +31,7 @@ bool spn_linkage_set_has(spn_linkage_set_t set, spn_linkage_t kind) {
     case SPN_LIB_KIND_STATIC: {
       return set.static_lib;
     }
+    case SPN_LIB_KIND_NONE: sp_unreachable_case();
   }
 
   SP_UNREACHABLE_RETURN(false);

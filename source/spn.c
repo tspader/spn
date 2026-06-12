@@ -82,6 +82,7 @@ void on_signal(sp_os_signal_t signal) {
     case SP_OS_SIGNAL_TERMINATE: {
       break;
     }
+    case SP_OS_SIGNAL_COUNT_: sp_unreachable_case();
   }
 }
 

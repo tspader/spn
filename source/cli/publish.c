@@ -32,7 +32,9 @@ sp_app_result_t spn_cli_publish(spn_cli_t* cli) {
   spn_err_union_t result = spn_publish(&opts);
 
   if (result.kind) {
-    switch (result.kind) {
+    // SPN_ERR_* kinds are not members of spn_err_t, so switching on the enum
+    // type trips -Wswitch on every case
+    switch ((s32) result.kind) {
       case SPN_ERR_NO_MANIFEST: {
         spn_log_error("no manifest found at {:fg brightcyan}", SP_FMT_STR(result.no_manifest.path));
         break;
