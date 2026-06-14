@@ -1,0 +1,1 @@
+{ "discriminator": "kind", "mapping": { "a": { "optionalProperties": { "kind": { "type": "string" } } } } }

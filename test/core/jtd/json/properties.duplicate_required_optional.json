@@ -1,0 +1,1 @@
+{ "properties": { "name": { "type": "string" } }, "optionalProperties": { "name": { "type": "string" } } }

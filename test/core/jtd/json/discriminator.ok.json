@@ -1,0 +1,1 @@
+{ "discriminator": "kind", "mapping": { "a": {"properties": {"x": {"type":"string"}}}, "b": {"properties": {"y": {"type":"int32"}}} } }

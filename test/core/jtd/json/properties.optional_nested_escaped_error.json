@@ -1,0 +1,1 @@
+{ "optionalProperties": { "a~b": { "type": "nope" } } }

@@ -1,0 +1,1 @@
+{ "properties": {"name": {"type":"string"}, "count": {"type":"int32"}}, "optionalProperties": {"age": {"type":"int32"}, "label": {"type":"string"}}, "additionalProperties": true }

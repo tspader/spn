@@ -1,0 +1,1 @@
+{ "properties": { "boolean": {"type":"boolean"}, "float32": {"type":"float32"}, "float64": {"type":"float64"}, "int8": {"type":"int8"}, "uint8": {"type":"uint8"}, "int16": {"type":"int16"}, "uint16": {"type":"uint16"}, "int32": {"type":"int32"}, "uint32": {"type":"uint32"}, "string": {"type":"string"}, "timestamp": {"type":"timestamp"} } }

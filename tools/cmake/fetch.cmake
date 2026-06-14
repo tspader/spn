@@ -5,6 +5,7 @@ set(DEPS
   "toml|https://github.com/tspader/toml.git|2e8ffdfa215cfe184fd06f8f48b47fbd04a4a678"
   "argparse|https://github.com/tspader/argparse.git|f71ed6c7b11cdbe75ffa0b42170530cc8610cbbf"
   "tinycc|https://github.com/tspader/tinycc.git|64fbf9ff080fac639b09b9a65c70499bcf41b581"
+  "yyjson|https://github.com/ibireme/yyjson.git|ad58f21bee1213a8fdd614c2a11b4453815a73e9"
 )
 
 if(NOT DEFINED SOURCE_DIR)

@@ -1,0 +1,1 @@
+{ "discriminator": "k", "mapping": {"a": {"properties": {"x": {"type":"string"}}, "nullable": true}} }
