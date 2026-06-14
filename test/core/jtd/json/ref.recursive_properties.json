@@ -1,0 +1,1 @@
+{ "definitions": { "node": { "optionalProperties": { "next": { "ref": "node" } } } }, "ref": "node" }

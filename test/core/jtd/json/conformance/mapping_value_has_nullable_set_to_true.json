@@ -1,0 +1,1 @@
+{"discriminator": "foo", "mapping": {"x": {"nullable": true, "properties": {"bar": {}}}}}

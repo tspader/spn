@@ -46,3 +46,7 @@ add_custom_command(
   COMMENT "staging headers"
   VERBATIM)
 add_custom_target(headers ALL DEPENDS ${HEADERS_STAMP})
+
+add_library(yyjson STATIC ${SOURCE_ROOT}/yyjson/src/yyjson.c)
+target_include_directories(yyjson PUBLIC ${SOURCE_ROOT}/yyjson/src)
+set_target_properties(yyjson PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${STORE}/lib)

@@ -1,0 +1,1 @@
+{ "properties": { "x": { "definitions": { "foo": { "type": "string" } } } } }

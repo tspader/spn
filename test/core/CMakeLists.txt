@@ -62,6 +62,16 @@ add_executable(triple
 spn_test_binary(triple)
 add_test(NAME triple COMMAND "$<TARGET_FILE:triple>")
 
+add_executable(jtd
+  ${CMAKE_SOURCE_DIR}/tools/jtd.c
+  jtd/main.c
+)
+spn_test_binary(jtd)
+target_include_directories(jtd PRIVATE ${CMAKE_SOURCE_DIR}/tools ${CMAKE_CURRENT_SOURCE_DIR}/jtd)
+target_compile_definitions(jtd PRIVATE JTD_TEST_JSON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/jtd/json")
+target_link_libraries(jtd PRIVATE yyjson)
+add_test(NAME jtd COMMAND "$<TARGET_FILE:jtd>")
+
 add_subdirectory(resolver)
 add_subdirectory(index)
 add_subdirectory(publish)

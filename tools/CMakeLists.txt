@@ -15,3 +15,7 @@ add_custom_command(
   COMMENT "spn.embed.o"
   VERBATIM)
 add_custom_target(spn_embed ALL DEPENDS ${EMBED_OBJ} ${EMBED_HDR})
+
+add_executable(yyjson_stub yyjson_stub.c)
+set_target_properties(yyjson_stub PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(yyjson_stub PRIVATE yyjson)
