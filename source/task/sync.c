@@ -9,6 +9,7 @@
 #include "index/types.h"
 #include "intern/intern.h"
 #include "log/log.h"
+#include "log/lazy/lazy.h"
 #include "pkg/id.h"
 #include "pkg/load.h"
 #include "pkg/mutate.h"
@@ -338,8 +339,8 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
       unit->paths.stamp = sp_fs_join_path(work, sp_str_lit("download.stamp"));
       unit->paths.logs.build = sp_fs_join_path(work, sp_str_lit("build.log"));
       unit->paths.logs.jsonl = sp_fs_join_path(work, sp_str_lit("build.jsonl"));
-      unit->logs.build = sp_io_writer_from_file(unit->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
-      unit->logs.jsonl = sp_io_writer_from_file(unit->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
+      spn_lazy_log_init(&unit->logs.build, unit->paths.logs.build, SP_IO_WRITE_MODE_OVERWRITE);
+      spn_lazy_log_init(&unit->logs.jsonl, unit->paths.logs.jsonl, SP_IO_WRITE_MODE_OVERWRITE);
 
       // These are the paths used to refer to the toolchain during compilation
       unit->compiler.program = sp_fs_join_path(store, unit->info.compiler.program);

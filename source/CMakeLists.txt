@@ -44,6 +44,7 @@ set(SPN_SOURCES
   index/publish.c
   intern/intern.c
   lock/lock.c
+  log/lazy/lazy.c
   log/log.c
   pkg/id.c
   pkg/load.c

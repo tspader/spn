@@ -138,6 +138,9 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
     setup_fixture_index_from_remote(utest_result, &fixture->fs, fixture->paths.index, project);
   }
 
+  struct { sp_str_t path; sp_tm_epoch_t mtime; } mtime_snaps[8];
+  s32 num_mtime_snaps = 0;
+
   sp_for(it, SPN_TEST_MAX_ACTIONS) {
     action_t action = test.actions[it];
     if (action.kind == ACTION_NONE) {
@@ -217,6 +220,54 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_content.file);
         sp_str_t content = sp_io_read_file(path);
         EXPECT_TRUE(sp_str_equal(content, action.verify_content.content));
+        break;
+      }
+      case ACTION_VERIFY_FILE_NONEMPTY: {
+        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_nonempty.file);
+        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+        EXPECT_FALSE(sp_str_empty(sp_io_read_file(path)));
+        break;
+      }
+      case ACTION_VERIFY_FILE_CONTAINS: {
+        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_contains.file);
+        sp_str_t content = sp_io_read_file(path);
+        EXPECT_TRUE(sp_str_contains(content, action.verify_file_contains.needle));
+        break;
+      }
+      case ACTION_VERIFY_FILE_NOT_CONTAINS: {
+        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_not_contains.file);
+        sp_str_t content = sp_io_read_file(path);
+        EXPECT_FALSE(sp_str_contains(content, action.verify_file_not_contains.needle));
+        break;
+      }
+      case ACTION_SNAPSHOT_MTIME: {
+        sp_str_t path = tmpfs_get(&fixture->fs, action.snapshot_mtime.file);
+        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+        ASSERT_TRUE(num_mtime_snaps < (s32)sp_carr_len(mtime_snaps));
+        mtime_snaps[num_mtime_snaps].path = path;
+        mtime_snaps[num_mtime_snaps].mtime = sp_fs_get_mod_time(path);
+        num_mtime_snaps++;
+        break;
+      }
+      case ACTION_VERIFY_MTIME_UNCHANGED:
+      case ACTION_VERIFY_MTIME_CHANGED: {
+        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_mtime.file);
+        sp_tm_epoch_t before = SP_ZERO_INITIALIZE();
+        bool found = false;
+        sp_for(s, (u32)num_mtime_snaps) {
+          if (sp_str_equal(mtime_snaps[s].path, path)) {
+            before = mtime_snaps[s].mtime;
+            found = true;
+          }
+        }
+        ASSERT_TRUE(found);
+        sp_tm_epoch_t now = sp_fs_get_mod_time(path);
+        bool unchanged = before.s == now.s && before.ns == now.ns;
+        if (action.kind == ACTION_VERIFY_MTIME_UNCHANGED) {
+          EXPECT_TRUE(unchanged);
+        } else {
+          EXPECT_FALSE(unchanged);
+        }
         break;
       }
       case ACTION_REMOVE_DIR: {
@@ -955,6 +1006,122 @@ UTEST_F(spn_build, embed) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+    },
+  });
+}
+
+struct build_log {
+  fixture_t fixture;
+};
+
+UTEST_F_SETUP(build_log) {
+#if defined(SPN_TEST_ROOT) && defined(SPN_TEST_BIN)
+  uf->fixture.paths.root = sp_str_lit(SPN_TEST_ROOT);
+  uf->fixture.paths.spn = sp_str_lit(SPN_TEST_BIN);
+#else
+  uf->fixture.paths.root = sp_fs_get_cwd();
+  uf->fixture.paths.spn = sp_fs_join_path(uf->fixture.paths.root, sp_str_lit("build/debug/store/bin/spn"));
+#endif
+  ASSERT_TRUE(sp_fs_exists(uf->fixture.paths.spn));
+}
+
+UTEST_F_TEARDOWN(build_log) {
+}
+
+UTEST_F(build_log, clean) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_clean");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/clean",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug/work/log_clean/log_clean.build.log") },
+    },
+  });
+}
+
+UTEST_F(build_log, warn) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_warn");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/warn",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_FILE_NONEMPTY, .verify_file_nonempty.file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log") },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log"), .needle = sp_str_lit("spn-log-probe-warn") } },
+    },
+  });
+}
+
+UTEST_F(build_log, error) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_error");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/error",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_FILE_NONEMPTY, .verify_file_nonempty.file = sp_str_lit("build/debug/work/log_error/log_error.build.log") },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_error/log_error.build.log"), .needle = sp_str_lit("spn-log-probe-error") } },
+    },
+  });
+}
+
+UTEST_F(build_log, link_error) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_link_error");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/link_error",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_FILE_NONEMPTY, .verify_file_nonempty.file = sp_str_lit("build/debug/work/log_link_error/log_link_error.build.log") },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_link_error/log_link_error.build.log"), .needle = sp_str_lit("spn_log_missing_symbol") } },
+    },
+  });
+}
+
+UTEST_F(build_log, warn_multi) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_warn_multi");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/warn_multi",
+    .copy = { "a.c", "b.c" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_warn_multi/log_warn_multi.build.log"), .needle = sp_str_lit("spn-log-probe-main") } },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_warn_multi/log_warn_multi.build.log"), .needle = sp_str_lit("spn-log-probe-a") } },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_warn_multi/log_warn_multi.build.log"), .needle = sp_str_lit("spn-log-probe-b") } },
+    },
+  });
+}
+
+UTEST_F(build_log, preserved_on_cache_hit) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_preserved");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/warn",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log"), .needle = sp_str_lit("spn-log-probe-warn") } },
+      { .kind = ACTION_SNAPSHOT_MTIME, .snapshot_mtime.file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log") },
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_MTIME_UNCHANGED, .verify_mtime.file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log") },
+    },
+  });
+}
+
+UTEST_F(build_log, rewritten_on_rebuild) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_rewritten");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/warn",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_SNAPSHOT_MTIME, .snapshot_mtime.file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log") },
+      { .kind = ACTION_CREATE_FILE, .create = { .file = sp_str_lit("main.c"), .content = sp_str_lit("#warning \"spn-log-probe-rebuilt\"\nint main(void) { return 0; }\n") } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--force" } } },
+      { .kind = ACTION_VERIFY_MTIME_CHANGED, .verify_mtime.file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log") },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log"), .needle = sp_str_lit("spn-log-probe-rebuilt") } },
+      { .kind = ACTION_VERIFY_FILE_NOT_CONTAINS, .verify_file_not_contains = { .file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log"), .needle = sp_str_lit("spn-log-probe-warn") } },
     },
   });
 }

@@ -71,7 +71,7 @@ sp_ps_output_t spn_api_subprocess(spn_pkg_unit_t* unit, sp_ps_config_t config) {
 
   sp_ps_output_t result = sp_ps_run(config);
   if (!sp_str_empty(result.out)) {
-    sp_io_write_str(&unit->logs.io.build, result.out);
+    sp_io_write_str(&unit->logs.io.build.writer, result.out);
   }
   return result;
 }

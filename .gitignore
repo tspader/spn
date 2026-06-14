@@ -16,3 +16,5 @@ compile_commands.json
 !source/task/build
 /test/manual/hermetic
 /.llm/dotllm.json
+/PORT_PLAN.md
+/tools/update

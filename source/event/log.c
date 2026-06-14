@@ -771,3 +771,25 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
   sp_str_builder_append_cstr(&b, "}\n");
   sp_io_write_str(out, sp_str_builder_to_str(&b));
 }
+
+void spn_event_log_build(sp_io_writer_t* out, spn_build_event_t* event) {
+  sp_str_t args = SP_ZERO_INITIALIZE();
+  sp_str_t transcript = SP_ZERO_INITIALIZE();
+
+  switch (event->kind) {
+    case SPN_EVENT_TARGET_BUILD_PASSED: args = event->target.passed.args;      transcript = event->target.passed.out;      break;
+    case SPN_EVENT_TARGET_BUILD_FAILED: args = event->target.failed.args;      transcript = event->target.failed.out;      break;
+    case SPN_EVENT_LINK_PASSED:         args = event->target.link_passed.args; transcript = event->target.link_passed.out; break;
+    case SPN_EVENT_LINK_FAILED:         args = event->target.link_failed.args; transcript = event->target.link_failed.out; break;
+    default: return;
+  }
+
+  if (sp_str_empty(transcript)) return;
+
+  sp_str_builder_t b = SP_ZERO_INITIALIZE();
+  sp_str_builder_append(&b, args);
+  sp_str_builder_append_c8(&b, '\n');
+  sp_str_builder_append(&b, transcript);
+  sp_str_builder_append_c8(&b, '\n');
+  sp_io_write_str(out, sp_str_builder_to_str(&b));
+}

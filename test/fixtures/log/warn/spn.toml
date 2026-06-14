@@ -1,0 +1,7 @@
+[package]
+name = "log_warn"
+version = "0.0.1"
+
+[[bin]]
+name = "log_warn"
+source = ["main.c"]

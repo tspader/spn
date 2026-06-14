@@ -53,7 +53,7 @@ ar_result_t archive_objects(spn_target_unit_t* unit, sp_str_t output) {
   };
 }
 
-spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, u64 elapsed) {
+spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, sp_str_t args, sp_str_t out, u64 elapsed) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_PASSED,
     .pkg = unit->pkg->info,
@@ -61,6 +61,8 @@ spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, u64 elapsed) {
     .target.name = unit->info->name,
     .target.link_passed = {
       .output_path = output,
+      .args = args,
+      .out = out,
       .time = elapsed,
     }
   });
@@ -118,7 +120,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
         return SPN_ERROR;
       }
 
-      emit_success(target, output, run.elapsed);
+      emit_success(target, output, run.args, run.result.out, run.elapsed);
       return SPN_OK;
     }
     case SPN_CC_OUTPUT_EXE:
@@ -163,7 +165,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
         return emit_failure(target, run.args, rc, run.result.out, run.result.err);
       }
       else {
-        return emit_success(target, output, run.elapsed);
+        return emit_success(target, output, run.args, run.result.out, run.elapsed);
       }
 
       sp_unreachable_return(69);

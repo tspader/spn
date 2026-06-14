@@ -8,6 +8,7 @@
 #include "enum/enum.h"
 #include "filter/filter.h"
 #include "intern/intern.h"
+#include "log/lazy/lazy.h"
 #include "pkg/pkg.h"
 #include "session/session.h"
 #include "sp/hash.h"
@@ -156,11 +157,8 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
   sp_fs_create_dir(target->paths.include);
   sp_fs_create_dir(target->paths.lib);
   sp_fs_create_dir(target->paths.vendor);
-  sp_fs_create_file(target->paths.logs.build);
-  sp_fs_create_file(target->paths.logs.jsonl);
-
-  target->logs.build = sp_io_writer_from_file(target->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
-  target->logs.jsonl = sp_io_writer_from_file(target->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
+  spn_lazy_log_init(&target->logs.build, target->paths.logs.build, SP_IO_WRITE_MODE_OVERWRITE);
+  spn_lazy_log_init(&target->logs.jsonl, target->paths.logs.jsonl, SP_IO_WRITE_MODE_OVERWRITE);
   return target;
 }
 
@@ -216,11 +214,8 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   sp_fs_create_dir(unit->paths.include);
   sp_fs_create_dir(unit->paths.lib);
   sp_fs_create_dir(unit->paths.vendor);
-  sp_fs_create_file(unit->paths.logs.build);
-  sp_fs_create_file(unit->paths.logs.jsonl);
-
-  unit->logs.io.build = sp_io_writer_from_file(unit->paths.logs.build, SP_IO_WRITE_MODE_APPEND);
-  unit->logs.io.jsonl = sp_io_writer_from_file(unit->paths.logs.jsonl, SP_IO_WRITE_MODE_APPEND);
+  spn_lazy_log_init(&unit->logs.io.build, unit->paths.logs.build, SP_IO_WRITE_MODE_OVERWRITE);
+  spn_lazy_log_init(&unit->logs.io.jsonl, unit->paths.logs.jsonl, SP_IO_WRITE_MODE_OVERWRITE);
 
   unit->paths.stamp.dir = sp_fs_join_path(unit->paths.generated, SP_LIT("stamp"));
   unit->paths.stamp.main = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("main.stamp"));

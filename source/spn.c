@@ -383,7 +383,8 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
     // write jsonl (all events, unfiltered)
     spn_event_log_jsonl(&spn.logger.jsonl, event);
     if (event->io) {
-      spn_event_log_jsonl(&event->io->jsonl, event);
+      spn_event_log_jsonl(&event->io->jsonl.writer, event);
+      spn_event_log_build(&event->io->build.writer, event);
     }
 
     // write to tui (filtered by verbosity)
@@ -511,21 +512,21 @@ void spn_deinit(sp_app_t* sp) {
       sp_fs_join_path(root->paths.work, unit->logs.jsonl)
     );
 
-    sp_io_writer_close(&unit->logs.io.build);
-    sp_io_writer_close(&unit->logs.io.test);
-    sp_io_writer_close(&unit->logs.io.jsonl);
+    sp_io_writer_close(&unit->logs.io.build.writer);
+    sp_io_writer_close(&unit->logs.io.test.writer);
+    sp_io_writer_close(&unit->logs.io.jsonl.writer);
   }
 
   sp_om_for(app.session.units.targets, it) {
     spn_target_unit_t* target = sp_om_at(app.session.units.targets, it);
-    sp_io_writer_close(&target->logs.build);
-    sp_io_writer_close(&target->logs.test);
-    sp_io_writer_close(&target->logs.jsonl);
+    sp_io_writer_close(&target->logs.build.writer);
+    sp_io_writer_close(&target->logs.test.writer);
+    sp_io_writer_close(&target->logs.jsonl.writer);
   }
 
-  sp_io_writer_close(&root->logs.io.build);
-  sp_io_writer_close(&root->logs.io.test);
-  sp_io_writer_close(&root->logs.io.jsonl);
+  sp_io_writer_close(&root->logs.io.build.writer);
+  sp_io_writer_close(&root->logs.io.test.writer);
+  sp_io_writer_close(&root->logs.io.jsonl.writer);
   sp_io_writer_close(&spn.logger.jsonl);
 }
 

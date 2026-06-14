@@ -44,6 +44,14 @@ add_executable(graph
 spn_test_binary(graph)
 add_test(NAME graph COMMAND "$<TARGET_FILE:graph>")
 
+add_executable(lazy
+  ${SRC}/log/lazy/lazy.c
+  lazy.c
+  ${TEST_TOOLS}/tmp.c
+)
+spn_test_binary(lazy)
+add_test(NAME lazy COMMAND "$<TARGET_FILE:lazy>")
+
 add_executable(stable_map
   stable_map.c
 )
