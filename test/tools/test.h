@@ -121,7 +121,7 @@ bool str_equal(sp_str_t a, sp_str_t b);
 #define SP_TEST_REPORT(fmt, ...) \
   do { \
     sp_str_t formatted = sp_format_str(fmt, ##__VA_ARGS__); \
-    UTEST_PRINTF("%s\n", sp_str_to_cstr(formatted)); \
+    UTEST_PRINTF("%s\n", sp_str_to_cstr(spn_allocator, formatted)); \
   } while (0)
 
 #define SP_TEST_STREQ(a, b, is_assert) \

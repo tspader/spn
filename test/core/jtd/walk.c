@@ -13,7 +13,7 @@ static bool walk_collect_visit(jtd_schema_t* s, sp_str_t path, void* user) {
 
 static void compare_walk_preorder(s32* utest_result, const jtd_root_t* root, const void* expect) {
   (void)expect;
-  walk_collect_t c = { .paths = sp_da_new(sp_str_t) };
+  walk_collect_t c = { .paths = SP_NULLPTR };
   jtd_walk(root, walk_collect_visit, &c);
 
   EXPECT_EQ((u64)4, (u64)sp_da_size(c.paths));
@@ -49,7 +49,7 @@ static void compare_walk_stops(s32* utest_result, const jtd_root_t* root, const 
 
 static void compare_walk_escaped_paths(s32* utest_result, const jtd_root_t* root, const void* expect) {
   (void)expect;
-  walk_collect_t c = { .paths = sp_da_new(sp_str_t) };
+  walk_collect_t c = { .paths = SP_NULLPTR };
   jtd_walk(root, walk_collect_visit, &c);
 
   EXPECT_EQ((u64)3, (u64)sp_da_size(c.paths));

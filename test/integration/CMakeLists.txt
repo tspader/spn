@@ -1,5 +1,6 @@
 add_executable(integration
   ${SRC}/external/tom.c
+  ${SRC}/sp/str.c
   main.c
   harness.c
   ${TEST_TOOLS}/tmp.c

@@ -6,11 +6,11 @@
 // specific error code/path is an implementation detail and is not checked here.
 
 static void run_conformance_reject(s32* utest_result, const c8* file) {
-  sp_mem_arena_t* arena = sp_mem_arena_new(4096);
+  sp_mem_arena_t* arena = sp_mem_arena_new(spn_allocator);
   sp_context_push_arena(arena);
 
   sp_str_t path = sp_format("{}/conformance/{}", SP_FMT_CSTR(JTD_TEST_JSON_DIR), SP_FMT_CSTR(file));
-  sp_str_t json = sp_io_read_file(path);
+  sp_str_t json = sp_zero; sp_io_read_file(spn_allocator, path, &json);
 
   if (sp_str_empty(json)) {
     EXPECT_TRUE(sp_str_equal_cstr(path, "<conformance fixture exists and is non-empty>"));

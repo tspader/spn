@@ -34,7 +34,7 @@
 typedef struct {
   sp_str_t name;
   u32 flags;
-  sp_io_writer_t writer;
+  sp_io_dyn_mem_writer_t writer;
 } sp_coff_section_t;
 
 typedef struct {
@@ -49,7 +49,7 @@ typedef struct {
 typedef struct {
   sp_da(sp_coff_section_t) sections;
   sp_da(sp_coff_sym_entry_t) symbols;
-  sp_io_writer_t strtab;
+  sp_io_dyn_mem_writer_t strtab;
   sp_mem_arena_t* arena;
 } sp_coff_t;
 
@@ -66,25 +66,22 @@ sp_err_t            sp_coff_write_to_file(sp_coff_t* coff, sp_str_t path);
 
 #if defined(SP_IMPLEMENTATION)
 
-static void sp_coff_write_u8(sp_io_writer_t* w, u8 v)   { sp_io_write(w, &v, 1); }
-static void sp_coff_write_u16(sp_io_writer_t* w, u16 v)  { sp_io_write(w, &v, 2); }
-static void sp_coff_write_u32(sp_io_writer_t* w, u32 v)  { sp_io_write(w, &v, 4); }
-static void sp_coff_write_s16(sp_io_writer_t* w, s16 v)  { sp_io_write(w, &v, 2); }
+static void sp_coff_write_u8(sp_io_writer_t* w, u8 v)   { sp_io_write(w, &v, 1, SP_NULLPTR); }
+static void sp_coff_write_u16(sp_io_writer_t* w, u16 v)  { sp_io_write(w, &v, 2, SP_NULLPTR); }
+static void sp_coff_write_u32(sp_io_writer_t* w, u32 v)  { sp_io_write(w, &v, 4, SP_NULLPTR); }
+static void sp_coff_write_s16(sp_io_writer_t* w, s16 v)  { sp_io_write(w, &v, 2, SP_NULLPTR); }
 
 sp_coff_t* sp_coff_new() {
-  sp_mem_arena_t* arena = sp_mem_arena_new(4096);
-  sp_context_push_arena(arena);
+  sp_mem_arena_t* arena = sp_mem_arena_new(spn_allocator);
 
-  sp_coff_t* coff = sp_alloc_type(sp_coff_t);
+  sp_coff_t* coff = sp_alloc_type(spn_allocator, sp_coff_t);
   coff->arena = arena;
 
   // The string table needs a u32 total size at the start of the buffer. We obviously
   // don't know the total size yet, but reserve and zero the four bytes up front.
-  sp_allocator_t alloc = sp_mem_arena_as_allocator(arena);
-  coff->strtab = sp_io_writer_from_dyn_mem_ex(SP_NULLPTR, 0, alloc);
-  sp_coff_write_u32(&coff->strtab, 0);
+  sp_io_dyn_mem_writer_init(sp_mem_arena_as_allocator(arena), &coff->strtab);
+  sp_coff_write_u32(&coff->strtab.base, 0);
 
-  sp_context_pop();
   return coff;
 }
 
@@ -94,9 +91,9 @@ void sp_coff_free(sp_coff_t* coff) {
 }
 
 static u32 sp_coff_add_string(sp_coff_t* coff, sp_str_t str) {
-  u64 offset = sp_io_writer_size(&coff->strtab);
-  sp_io_write(&coff->strtab, str.data, str.len);
-  sp_io_pad(&coff->strtab, 1);
+  u64 offset = coff->strtab.storage.len;
+  sp_io_write(&coff->strtab.base, str.data, str.len, SP_NULLPTR);
+  sp_io_pad(&coff->strtab.base, 1, SP_NULLPTR);
   return (u32)offset;
 }
 
@@ -104,21 +101,21 @@ static u32 sp_coff_add_string(sp_coff_t* coff, sp_str_t str) {
 static void sp_coff_write_section_name(sp_coff_t* coff, sp_io_writer_t* out, sp_str_t name) {
   c8 buf[8] = {0};
   if (name.len <= 8) {
-    sp_mem_copy(name.data, buf, name.len);
+    sp_mem_copy(buf, name.data, name.len);
   } else {
     u32 offset = sp_coff_add_string(coff, name);
     sp_str_t s = sp_format("/{}", SP_FMT_U32(offset));
-    sp_mem_copy(s.data, buf, SP_MIN(s.len, 8));
+    sp_mem_copy(buf, s.data, SP_MIN(s.len, 8));
   }
-  sp_io_write(out, buf, 8);
+  sp_io_write(out, buf, 8, SP_NULLPTR);
 }
 
 // Write an 8-byte symbol name. Long names use binary {0, 0, 0, 0, offset_u32}.
 static void sp_coff_write_symbol_name(sp_coff_t* coff, sp_io_writer_t* out, sp_str_t name) {
   if (name.len <= 8) {
     c8 buf[8] = {0};
-    sp_mem_copy(name.data, buf, name.len);
-    sp_io_write(out, buf, 8);
+    sp_mem_copy(buf, name.data, name.len);
+    sp_io_write(out, buf, 8, SP_NULLPTR);
   } else {
     sp_coff_write_u32(out, 0);
     sp_coff_write_u32(out, sp_coff_add_string(coff, name));
@@ -126,14 +123,13 @@ static void sp_coff_write_symbol_name(sp_coff_t* coff, sp_io_writer_t* out, sp_s
 }
 
 sp_coff_section_t* sp_coff_add_section(sp_coff_t* coff, sp_str_t name, u32 flags) {
-  sp_context_push_arena(coff->arena);
-  sp_allocator_t alloc = sp_mem_arena_as_allocator(coff->arena);
-  sp_da_push(coff->sections, ((sp_coff_section_t) {
-    .name = sp_str_copy(name),
+  sp_mem_t alloc = sp_mem_arena_as_allocator(coff->arena);
+  sp_coff_section_t section = {
+    .name = sp_str_copy(spn_allocator, name),
     .flags = flags,
-    .writer = sp_io_writer_from_dyn_mem_ex(SP_NULLPTR, 0, alloc),
-  }));
-  sp_context_pop();
+  };
+  sp_io_dyn_mem_writer_init(alloc, &section.writer);
+  sp_da_push(coff->sections, section);
   return sp_da_back(coff->sections);
 }
 
@@ -149,7 +145,7 @@ sp_coff_section_t* sp_coff_find_section(sp_coff_t* coff, sp_str_t name) {
 void sp_coff_add_symbol(sp_coff_t* coff, sp_str_t name, u32 value, s16 section_number, u8 storage_class) {
   sp_context_push_arena(coff->arena);
   sp_da_push(coff->symbols, ((sp_coff_sym_entry_t) {
-    .name = sp_str_copy(name),
+    .name = sp_str_copy(spn_allocator, name),
     .value = value,
     .section_number = section_number,
     .storage_class = storage_class,
@@ -168,7 +164,7 @@ sp_err_t sp_coff_write(sp_coff_t* coff, sp_io_writer_t* out) {
   sp_context_push_arena(coff->arena);
   sp_da(u32) offsets = SP_NULLPTR;
   sp_da_for(coff->sections, i) {
-    u32 data_len = (u32)coff->sections[i].writer.dyn_mem.buffer.len;
+    u32 data_len = (u32)coff->sections[i].writer.storage.len;
     u32 align_bits = (coff->sections[i].flags >> 20) & 0xF;
     u32 alignment = align_bits ? (1u << (align_bits - 1)) : 4;
     pos = (pos + alignment - 1) & ~(alignment - 1);
@@ -189,7 +185,7 @@ sp_err_t sp_coff_write(sp_coff_t* coff, sp_io_writer_t* out) {
   // Section headers (40 bytes each)
   sp_da_for(coff->sections, i) {
     sp_coff_section_t* sec = &coff->sections[i];
-    u32 sz = (u32)sec->writer.dyn_mem.buffer.len;
+    u32 sz = (u32)sec->writer.storage.len;
 
     sp_coff_write_section_name(coff, out, sec->name);
     sp_coff_write_u32(out, 0);                      // virtual_size
@@ -206,14 +202,14 @@ sp_err_t sp_coff_write(sp_coff_t* coff, sp_io_writer_t* out) {
   // Section data
   u32 written = headers_end;
   sp_da_for(coff->sections, i) {
-    sp_mem_buffer_t buf = coff->sections[i].writer.dyn_mem.buffer;
+    sp_mem_buffer_t buf = coff->sections[i].writer.storage;
     if (buf.len) {
-      if (offsets[i] > written) sp_io_pad(out, offsets[i] - written);
-      sp_io_write(out, buf.data, buf.len);
+      if (offsets[i] > written) sp_io_pad(out, offsets[i] - written, SP_NULLPTR);
+      sp_io_write(out, buf.data, buf.len, SP_NULLPTR);
       written = offsets[i] + (u32)buf.len;
     }
   }
-  if (symtab_offset > written) sp_io_pad(out, symtab_offset - written);
+  if (symtab_offset > written) sp_io_pad(out, symtab_offset - written, SP_NULLPTR);
 
   // Symbol table (18 bytes each)
   sp_da_for(coff->symbols, i) {
@@ -229,19 +225,20 @@ sp_err_t sp_coff_write(sp_coff_t* coff, sp_io_writer_t* out) {
   }
 
   // String table (patch total size into first 4 bytes, then write)
-  sp_mem_buffer_t strtab = coff->strtab.dyn_mem.buffer;
+  sp_mem_buffer_t strtab = coff->strtab.storage;
   u32 strtab_size = (u32)strtab.len;
-  sp_mem_copy(&strtab_size, strtab.data, 4);
-  sp_io_write(out, strtab.data, strtab.len);
+  sp_mem_copy(strtab.data, &strtab_size, 4);
+  sp_io_write(out, strtab.data, strtab.len, SP_NULLPTR);
 
-  sp_context_pop();
   return SP_OK;
 }
 
 sp_err_t sp_coff_write_to_file(sp_coff_t* coff, sp_str_t path) {
-  sp_io_writer_t f = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_OVERWRITE);
-  sp_err_t err = sp_coff_write(coff, &f);
-  sp_io_writer_close(&f);
+  sp_io_file_writer_t f = sp_zero;
+  sp_err_t err = sp_io_file_writer_from_path(&f, path);
+  if (err != SP_OK) return err;
+  err = sp_coff_write(coff, &f.base);
+  sp_io_file_writer_close(&f);
   return err;
 }
 

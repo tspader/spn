@@ -13,11 +13,11 @@ void jtd_expect_str(s32* utest_result, sp_str_t actual, const c8* expected) {
 }
 
 void run_jtd_case(s32* utest_result, jtd_case_t c) {
-  sp_mem_arena_t* arena = sp_mem_arena_new(4096);
+  sp_mem_arena_t* arena = sp_mem_arena_new(spn_allocator);
   sp_context_push_arena(arena);
 
   sp_str_t path = sp_format("{}/{}", SP_FMT_CSTR(JTD_TEST_JSON_DIR), SP_FMT_CSTR(c.json));
-  sp_str_t json = sp_io_read_file(path);
+  sp_str_t json = sp_zero; sp_io_read_file(spn_allocator, path, &json);
 
   if (sp_str_empty(json)) {
     EXPECT_TRUE(sp_str_equal_cstr(path, "<fixture exists and is non-empty>"));

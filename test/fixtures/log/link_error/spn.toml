@@ -1,0 +1,7 @@
+[package]
+name = "log_link_error"
+version = "0.0.1"
+
+[[bin]]
+name = "log_link_error"
+source = ["main.c"]

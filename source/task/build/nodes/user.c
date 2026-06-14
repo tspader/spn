@@ -21,7 +21,7 @@ s32 run_user_fn(spn_bg_cmd_t* cmd, void* user_data) {
 
   sp_try(node->fn((spn_t*)node->pkg, &ctx));
 
-  sp_str_t stamp = sp_fs_join_path(node->pkg->paths.stamp.dir, node->tag);
+  sp_str_t stamp = sp_fs_join_path(spn_allocator, node->pkg->paths.stamp.dir, node->tag);
   sp_fs_create_file(stamp);
 
   return SPN_OK;

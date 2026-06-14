@@ -60,7 +60,7 @@ static void run_fixture(s32* utest_result, git_repo_fixture_t fixture) {
       }
 
       sp_str_t spec = sp_format("{}:{}", SP_FMT_STR(repo.commits[c]), SP_FMT_CSTR(path));
-      sp_ps_output_t check = sp_ps_run((sp_ps_config_t) {
+      sp_ps_output_t check = sp_ps_run(spn_allocator, (sp_ps_config_t) {
         .command = sp_str_lit("git"),
         .args = { sp_str_lit("-C"), repo.path, sp_str_lit("show"), spec },
       });

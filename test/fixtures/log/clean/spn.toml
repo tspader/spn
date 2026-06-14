@@ -1,0 +1,7 @@
+[package]
+name = "log_clean"
+version = "0.0.1"
+
+[[bin]]
+name = "log_clean"
+source = ["main.c"]

@@ -10,7 +10,7 @@ spn_gen_entry_t spn_gen_entry_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "libs")) return SPN_GEN_LIBS;
   else if (sp_str_equal_cstr(str, "system-libs")) return SPN_GEN_SYSTEM_LIBS;
 
-  SP_FATAL("Unknown flag {:fg brightyellow}; options are [include, lib-include, libs, system-libs]", SP_FMT_QUOTED_STR(str));
+  SP_FATAL("Unknown flag {.fg brightyellow}; options are [include, lib-include, libs, system-libs]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_GEN_ALL);
 }
 
@@ -21,7 +21,7 @@ spn_gen_kind_t spn_gen_kind_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "cmake")) return SPN_GEN_KIND_CMAKE;
   else if (sp_str_equal_cstr(str, "pkgconfig")) return SPN_GEN_KIND_PKGCONFIG;
 
-  SP_FATAL("Unknown generator {:fg brightyellow}; options are [[empty], shell, make, cmake, pkgconfig]", SP_FMT_STR(str));
+  SP_FATAL("Unknown generator {.fg brightyellow}; options are [[empty], shell, make, cmake, pkgconfig]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_GEN_KIND_RAW);
 }
 

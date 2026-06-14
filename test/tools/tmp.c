@@ -1,9 +1,12 @@
 #include "test.h"
+#if !defined(_WIN32)
+  #include <unistd.h>
+#endif
 
 static sp_str_t tmpfs_top_level = SP_ZERO_INITIALIZE();
 
 sp_str_t tmpfs_default_top_level() {
-  sp_str_t tmp = sp_fs_normalize_path(sp_os_env_get(sp_str_lit("SPN_TEST_TMP")));
+  sp_str_t tmp = sp_fs_normalize_path(spn_allocator, sp_os_env_get(sp_str_lit("SPN_TEST_TMP")));
   if (sp_str_empty(tmp)) {
     tmp = sp_str_lit(".tmp");
   }
@@ -17,17 +20,17 @@ sp_str_t tmpfs_default_top_level() {
     sp_fs_create_dir(tmp);
   }
 
-  tmp = sp_fs_canonicalize_path(tmp);
+  tmp = sp_fs_canonicalize_path(spn_allocator, tmp);
 
   sp_tm_epoch_t now = sp_tm_now_epoch();
-  sp_str_t timestamp = sp_tm_epoch_to_iso8601(now);
+  sp_str_t timestamp = sp_tm_epoch_to_iso8601(spn_allocator, now);
 #ifdef _WIN32
   u32 pid = (u32)GetCurrentProcessId();
 #else
-  u32 pid = (u32)sp_sys_getpid();
+  u32 pid = (u32)getpid();
 #endif
-  sp_str_t dirname = sp_format("{}-{}", SP_FMT_STR(sp_str_replace_c8(timestamp, ':', '-')), SP_FMT_U32(pid));
-  return sp_fs_join_path(tmp, dirname);
+  sp_str_t dirname = sp_format("{}-{}", SP_FMT_STR(sp_str_replace_c8(spn_allocator, timestamp, ':', '-')), SP_FMT_U32(pid));
+  return sp_fs_join_path(spn_allocator, tmp, dirname);
 }
 
 void tmpfs_set_top_level(sp_str_t root) {
@@ -40,7 +43,7 @@ void tmpfs_set_top_level(sp_str_t root) {
     sp_fs_create_dir(root);
   }
 
-  tmpfs_top_level = sp_fs_canonicalize_path(root);
+  tmpfs_top_level = sp_fs_canonicalize_path(spn_allocator, root);
 }
 
 void tmpfs_init_named(tmpfs_t* fs, const c8* test) {
@@ -53,7 +56,7 @@ void tmpfs_init_named(tmpfs_t* fs, const c8* test) {
     test_name = sp_str_lit("tmpfs");
   }
 
-  sp_str_t root = sp_fs_join_path(tmpfs_top_level, test_name);
+  sp_str_t root = sp_fs_join_path(spn_allocator, tmpfs_top_level, test_name);
 
   SP_ASSERT(!sp_fs_exists(root));
   sp_fs_create_dir(root);
@@ -65,7 +68,7 @@ void tmpfs_init(tmpfs_t* fs) {
 }
 
 sp_str_t tmpfs_get(tmpfs_t* fs, sp_str_t name) {
-  return sp_fs_join_path(fs->root, name);
+  return sp_fs_join_path(spn_allocator, fs->root, name);
 }
 
 void tmpfs_create(tmpfs_t* fs, sp_str_t relative, sp_str_t content) {
@@ -74,15 +77,12 @@ void tmpfs_create(tmpfs_t* fs, sp_str_t relative, sp_str_t content) {
 
   sp_fs_remove_file(path);
 
-  sp_io_writer_t io = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_OVERWRITE);
-  SP_ASSERT(io.file.fd != 0);
-
+  sp_io_file_writer_t f = sp_zero;
+  sp_io_file_writer_from_path(&f, path);
   if (!sp_str_empty(content)) {
-    u64 bytes_written = sp_io_write(&io, content.data, content.len);
-    SP_ASSERT(bytes_written == content.len);
+    sp_io_write(&f.base, content.data, content.len, SP_NULLPTR);
   }
-
-  sp_io_writer_close(&io);
+  sp_io_file_writer_close(&f);
 }
 
 sp_str_t tmpfs_touch(tmpfs_t* fs, sp_str_t relative) {

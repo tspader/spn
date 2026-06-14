@@ -62,7 +62,7 @@ static mz_err_t on_alloc_dep(mz_ctx_t* ctx, void* parent, mz_key_t key, u32 size
 }
 
 static spn_err_t spn_index_parse_rel(mz_ctx_t* ctx, mz_schema_t* schema, spn_pkg_id_t id, sp_str_t json, spn_index_rel_t* release) {
-  c8* source = sp_str_to_cstr(json);
+  c8* source = sp_str_to_cstr(spn_allocator, json);
 
   mz_ctx_clear(ctx);
   sp_try_as(mz_parse_str_ex(schema, source, release, ctx), SPN_ERROR);

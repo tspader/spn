@@ -18,21 +18,21 @@ void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, bool expected,
   sp_str_builder_t b = SP_ZERO_INITIALIZE();
   sp_str_builder_append_fmt(&b, "{}:{}", SP_FMT_CSTR(file), SP_FMT_U32(line));
 
-  b.indent.word = sp_format("{:fg brightred}", SP_FMT_CSTR("\u2590 "));
+  b.indent.word = sp_format("{.fg brightred}", SP_FMT_CSTR("\u2590 "));
   sp_str_builder_indent(&b);
 
   if (fs) {
     sp_str_builder_new_line(&b);
-    sp_str_builder_append_fmt(&b, "{:fg brightblack} is the root", SP_FMT_STR(fs->root));
+    sp_str_builder_append_fmt(&b, "{.fg brightblack} is the root", SP_FMT_STR(fs->root));
 
     path = sp_str_strip_left(path, fs->root);
-    path = sp_str_concat(sp_str_lit("$test"), path);
+    path = sp_str_concat(spn_allocator, sp_str_lit("$test"), path);
   }
   sp_str_builder_new_line(&b);
   if (expected) {
-    sp_str_builder_append_fmt(&b, "{:fg brightblack} does not exist", SP_FMT_STR(path));
+    sp_str_builder_append_fmt(&b, "{.fg brightblack} does not exist", SP_FMT_STR(path));
   } else {
-    sp_str_builder_append_fmt(&b, "{:fg brightblack} exists (expected not to)", SP_FMT_STR(path));
+    sp_str_builder_append_fmt(&b, "{.fg brightblack} exists (expected not to)", SP_FMT_STR(path));
   }
 
   SP_TEST_REPORT(sp_str_builder_to_str(&b));
@@ -63,19 +63,19 @@ struct spn_build {
 };
 
 UTEST_INITIALIZER(spn_build_init_tmpfs_top_level) {
-  sp_str_t tmp = sp_fs_normalize_path(sp_os_env_get(sp_str_lit("SPN_TEST_TMP")));
+  sp_str_t tmp = sp_fs_normalize_path(spn_allocator, sp_os_env_get(sp_str_lit("SPN_TEST_TMP")));
   if (sp_str_empty(tmp)) {
     tmp = sp_str_lit(".tmp");
   }
 
   sp_tm_epoch_t now = sp_tm_now_epoch();
-  sp_str_t iso = sp_tm_epoch_to_iso8601(now);
-  c8* sanitized = (c8*)sp_alloc(iso.len);
+  sp_str_t iso = sp_tm_epoch_to_iso8601(spn_allocator, now);
+  c8* sanitized = (c8*)sp_alloc(spn_allocator, iso.len);
   sp_for(it, iso.len) {
     sanitized[it] = iso.data[it] == ':' ? '-' : iso.data[it];
   }
 
-  tmpfs_set_top_level(sp_fs_join_path(tmp, sp_str(sanitized, iso.len)));
+  tmpfs_set_top_level(sp_fs_join_path(spn_allocator, tmp, sp_str(sanitized, iso.len)));
 }
 
 UTEST_F_SETUP(spn_build) {
@@ -85,8 +85,8 @@ UTEST_F_SETUP(spn_build) {
   uf->fixture.paths.root = sp_str_lit(SPN_TEST_ROOT);
   uf->fixture.paths.spn = sp_str_lit(SPN_TEST_BIN);
 #else
-  uf->fixture.paths.root = sp_fs_get_cwd();
-  uf->fixture.paths.spn = sp_fs_join_path(uf->fixture.paths.root, sp_str_lit("build/debug/store/bin/spn"));
+  uf->fixture.paths.root = sp_fs_get_cwd(spn_allocator);
+  uf->fixture.paths.spn = sp_fs_join_path(spn_allocator, uf->fixture.paths.root, sp_str_lit("build/debug/store/bin/spn"));
 #endif
   ASSERT_TRUE(sp_fs_exists(uf->fixture.paths.spn));
 }
@@ -97,8 +97,8 @@ UTEST_F_TEARDOWN(spn_build) {
 void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
   fixture->paths.config = tmpfs_get(&fixture->fs, sp_str_lit(".home/config"));
   fixture->paths.storage = tmpfs_get(&fixture->fs, sp_str_lit(".home/storage"));
-  fixture->paths.include = sp_fs_join_path(fixture->paths.storage, sp_str_lit("spn/include"));
-  fixture->paths.index = sp_fs_join_path(fixture->paths.storage, sp_str_lit("spn/packages"));
+  fixture->paths.include = sp_fs_join_path(spn_allocator, fixture->paths.storage, sp_str_lit("spn/include"));
+  fixture->paths.index = sp_fs_join_path(spn_allocator, fixture->paths.storage, sp_str_lit("spn/packages"));
   sp_fs_create_dir(fixture->paths.config);
   sp_fs_create_dir(fixture->paths.storage);
   sp_fs_create_dir(fixture->paths.include);
@@ -106,11 +106,11 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
   setup_fixture_envrc(&fixture->fs, fixture->paths.storage, fixture->paths.config);
   setup_fixture_config(&fixture->fs, fixture->paths.config, fixture->paths.index, fixture->paths.root);
 
-  sp_fs_copy(sp_fs_join_path(fixture->paths.root, sp_str_lit("include/spn.h")), fixture->paths.include);
+  sp_fs_copy(sp_fs_join_path(spn_allocator, fixture->paths.root, sp_str_lit("include/spn.h")), fixture->paths.include);
 
   //
   if (test.project) {
-    sp_str_t project = sp_fs_join_path(fixture->paths.root, sp_str_view(test.project));
+    sp_str_t project = sp_fs_join_path(spn_allocator, fixture->paths.root, sp_str_view(test.project));
     ASSERT_TRUE(sp_fs_exists(project));
 
     // copy the files that nearly always exist automatically, for ergonomics
@@ -121,7 +121,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
     };
 
     sp_carr_for(copy, it) {
-      sp_str_t from = sp_fs_join_path(project, sp_str_view(copy[it]));
+      sp_str_t from = sp_fs_join_path(spn_allocator, project, sp_str_view(copy[it]));
       if (sp_fs_exists(from)) {
         sp_fs_copy(from, fixture->fs.root);
       }
@@ -137,6 +137,9 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
 
     setup_fixture_index_from_remote(utest_result, &fixture->fs, fixture->paths.index, project);
   }
+
+  struct { sp_str_t path; sp_tm_epoch_t mtime; } mtime_snaps[8];
+  s32 num_mtime_snaps = 0;
 
   sp_for(it, SPN_TEST_MAX_ACTIONS) {
     action_t action = test.actions[it];
@@ -161,7 +164,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
       case ACTION_MOVE_FILE: {
         sp_str_t from = tmpfs_get(&fixture->fs, action.mv.from);
         sp_str_t to = tmpfs_get(&fixture->fs, action.mv.to);
-        sp_str_t content = sp_io_read_file(from);
+        sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, from, &content);
 
         tmpfs_create(&fixture->fs, action.mv.to, content);
         sp_fs_remove_file(from);
@@ -176,7 +179,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
           config.cwd = fixture->fs.root;
         }
 
-        sp_ps_output_t output = sp_ps_run(config);
+        sp_ps_output_t output = sp_ps_run(spn_allocator, config);
         EXPECT_EQ(action.process.rc, output.status.exit_code);
         break;
       }
@@ -187,7 +190,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         ));
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, bin);
 
-        sp_ps_output_t output = sp_ps_run((sp_ps_config_t) {
+        sp_ps_output_t output = sp_ps_run(spn_allocator, (sp_ps_config_t) {
           .command = bin,
           .cwd = fixture->fs.root,
         });
@@ -208,15 +211,63 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
       case ACTION_VERIFY_INCLUDE: {
         sp_str_t path = tmpfs_get(
           &fixture->fs,
-          sp_fs_join_path(sp_str_lit("build/debug/store/include"), action.verify_include.file)
+          sp_fs_join_path(spn_allocator, sp_str_lit("build/debug/store/include"), action.verify_include.file)
         );
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
         break;
       }
       case ACTION_VERIFY_CONTENT: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_content.file);
-        sp_str_t content = sp_io_read_file(path);
+        sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, path, &content);
         EXPECT_TRUE(sp_str_equal(content, action.verify_content.content));
+        break;
+      }
+      case ACTION_VERIFY_FILE_NONEMPTY: {
+        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_nonempty.file);
+        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+        EXPECT_FALSE(spn_test_read_empty(path));
+        break;
+      }
+      case ACTION_VERIFY_FILE_CONTAINS: {
+        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_contains.file);
+        sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, path, &content);
+        EXPECT_TRUE(sp_str_contains(content, action.verify_file_contains.needle));
+        break;
+      }
+      case ACTION_VERIFY_FILE_NOT_CONTAINS: {
+        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_not_contains.file);
+        sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, path, &content);
+        EXPECT_FALSE(sp_str_contains(content, action.verify_file_not_contains.needle));
+        break;
+      }
+      case ACTION_SNAPSHOT_MTIME: {
+        sp_str_t path = tmpfs_get(&fixture->fs, action.snapshot_mtime.file);
+        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+        ASSERT_TRUE(num_mtime_snaps < (s32)sp_carr_len(mtime_snaps));
+        mtime_snaps[num_mtime_snaps].path = path;
+        mtime_snaps[num_mtime_snaps].mtime = sp_fs_get_mod_time(path);
+        num_mtime_snaps++;
+        break;
+      }
+      case ACTION_VERIFY_MTIME_UNCHANGED:
+      case ACTION_VERIFY_MTIME_CHANGED: {
+        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_mtime.file);
+        sp_tm_epoch_t before = SP_ZERO_INITIALIZE();
+        bool found = false;
+        sp_for(s, (u32)num_mtime_snaps) {
+          if (sp_str_equal(mtime_snaps[s].path, path)) {
+            before = mtime_snaps[s].mtime;
+            found = true;
+          }
+        }
+        ASSERT_TRUE(found);
+        sp_tm_epoch_t now = sp_fs_get_mod_time(path);
+        bool unchanged = before.s == now.s && before.ns == now.ns;
+        if (action.kind == ACTION_VERIFY_MTIME_UNCHANGED) {
+          EXPECT_TRUE(unchanged);
+        } else {
+          EXPECT_FALSE(unchanged);
+        }
         break;
       }
       case ACTION_REMOVE_DIR: {
@@ -238,7 +289,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         };
 
         if (action.cli.cmd) {
-          sp_ps_config_add_arg(&config, sp_str_view(action.cli.cmd));
+          sp_ps_config_add_arg(spn_allocator, &config, sp_str_view(action.cli.cmd));
         }
 
         sp_carr_for(action.cli.args, arg_it) {
@@ -247,10 +298,10 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
             break;
           }
 
-          sp_ps_config_add_arg(&config, sp_str_view(arg));
+          sp_ps_config_add_arg(spn_allocator, &config, sp_str_view(arg));
         }
 
-        sp_ps_output_t output = sp_ps_run(config);
+        sp_ps_output_t output = sp_ps_run(spn_allocator, config);
         EXPECT_EQ(action.cli.rc, output.status.exit_code);
         break;
       }
@@ -258,7 +309,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         sp_str_t path = tmpfs_get(&fixture->fs, sp_str_lit("spn.lock"));
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
 
-        sp_str_t lock = sp_io_read_file(path);
+        sp_str_t lock = sp_zero; sp_io_read_file(spn_allocator, path, &lock);
         EXPECT_TRUE(sp_str_contains(lock, sp_str_lit("[[dep]]")));
         break;
       }
@@ -266,7 +317,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
         sp_str_t path = tmpfs_get(&fixture->fs, sp_str_lit("spn.lock"));
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
 
-        sp_str_t lock = sp_io_read_file(path);
+        sp_str_t lock = sp_zero; sp_io_read_file(spn_allocator, path, &lock);
         sp_str_t needle = sp_format("name = \"{}\"", SP_FMT_CSTR(action.verify_locked.name));
         EXPECT_TRUE(sp_str_contains(lock, needle));
         break;
@@ -284,7 +335,7 @@ UTEST_F(spn_build, tmpfs) {
   EXPECT_TRUE(sp_fs_exists(path));
   EXPECT_TRUE(sp_str_starts_with(path, uf->fixture.fs.root));
 
-  sp_str_t content = sp_io_read_file(path);
+  sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, path, &content);
   EXPECT_TRUE(sp_str_equal(content, sp_str_lit("hello")));
 
   sp_str_t touched = tmpfs_touch(&uf->fixture.fs, sp_str_lit("nested/empty.txt"));
@@ -955,6 +1006,122 @@ UTEST_F(spn_build, embed) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+    },
+  });
+}
+
+struct build_log {
+  fixture_t fixture;
+};
+
+UTEST_F_SETUP(build_log) {
+#if defined(SPN_TEST_ROOT) && defined(SPN_TEST_BIN)
+  uf->fixture.paths.root = sp_str_lit(SPN_TEST_ROOT);
+  uf->fixture.paths.spn = sp_str_lit(SPN_TEST_BIN);
+#else
+  uf->fixture.paths.root = sp_fs_get_cwd(spn_allocator);
+  uf->fixture.paths.spn = sp_fs_join_path(spn_allocator, uf->fixture.paths.root, sp_str_lit("build/debug/store/bin/spn"));
+#endif
+  ASSERT_TRUE(sp_fs_exists(uf->fixture.paths.spn));
+}
+
+UTEST_F_TEARDOWN(build_log) {
+}
+
+UTEST_F(build_log, clean) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_clean");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/clean",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug/work/log_clean/log_clean.build.log") },
+    },
+  });
+}
+
+UTEST_F(build_log, warn) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_warn");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/warn",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_FILE_NONEMPTY, .verify_file_nonempty.file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log") },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log"), .needle = sp_str_lit("spn-log-probe-warn") } },
+    },
+  });
+}
+
+UTEST_F(build_log, error) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_error");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/error",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_FILE_NONEMPTY, .verify_file_nonempty.file = sp_str_lit("build/debug/work/log_error/log_error.build.log") },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_error/log_error.build.log"), .needle = sp_str_lit("spn-log-probe-error") } },
+    },
+  });
+}
+
+UTEST_F(build_log, link_error) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_link_error");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/link_error",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_FILE_NONEMPTY, .verify_file_nonempty.file = sp_str_lit("build/debug/work/log_link_error/log_link_error.build.log") },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_link_error/log_link_error.build.log"), .needle = sp_str_lit("spn_log_missing_symbol") } },
+    },
+  });
+}
+
+UTEST_F(build_log, warn_multi) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_warn_multi");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/warn_multi",
+    .copy = { "a.c", "b.c" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_warn_multi/log_warn_multi.build.log"), .needle = sp_str_lit("spn-log-probe-main") } },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_warn_multi/log_warn_multi.build.log"), .needle = sp_str_lit("spn-log-probe-a") } },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_warn_multi/log_warn_multi.build.log"), .needle = sp_str_lit("spn-log-probe-b") } },
+    },
+  });
+}
+
+UTEST_F(build_log, preserved_on_cache_hit) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_preserved");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/warn",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log"), .needle = sp_str_lit("spn-log-probe-warn") } },
+      { .kind = ACTION_SNAPSHOT_MTIME, .snapshot_mtime.file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log") },
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_MTIME_UNCHANGED, .verify_mtime.file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log") },
+    },
+  });
+}
+
+UTEST_F(build_log, rewritten_on_rebuild) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_rewritten");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/warn",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_SNAPSHOT_MTIME, .snapshot_mtime.file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log") },
+      { .kind = ACTION_CREATE_FILE, .create = { .file = sp_str_lit("main.c"), .content = sp_str_lit("#warning \"spn-log-probe-rebuilt\"\nint main(void) { return 0; }\n") } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--force" } } },
+      { .kind = ACTION_VERIFY_MTIME_CHANGED, .verify_mtime.file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log") },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log"), .needle = sp_str_lit("spn-log-probe-rebuilt") } },
+      { .kind = ACTION_VERIFY_FILE_NOT_CONTAINS, .verify_file_not_contains = { .file = sp_str_lit("build/debug/work/log_warn/log_warn.build.log"), .needle = sp_str_lit("spn-log-probe-warn") } },
     },
   });
 }

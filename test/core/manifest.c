@@ -31,8 +31,8 @@ int main(int argc, const char *const argv[]) {
   ctx_t* ctx = ctx_get();
   ctx_init(ctx);
 
-  spn.intern = sp_intern_new();
-  spn.arena = sp_mem_arena_new_ex(256, SP_MEM_ARENA_MODE_NO_REALLOC, 1);
+  spn.intern = sp_intern_new(spn_allocator);
+  spn.arena = sp_mem_arena_new_ex(spn_allocator, 256, 1);
 
   s32 result = utest_main(argc, argv);
 
@@ -87,8 +87,8 @@ typedef struct {
 
 void run_case(s32* utest_result, test_t test) {
   ctx_paths_t paths = ctx_get_paths(ctx_get());
-  sp_str_t dir = sp_fs_join_path(paths.test.fixtures, sp_str_lit("manifest"));
-  sp_str_t path = sp_fs_join_path(dir, sp_str_view(test.fixture));
+  sp_str_t dir = sp_fs_join_path(spn_allocator, paths.test.fixtures, sp_str_lit("manifest"));
+  sp_str_t path = sp_fs_join_path(spn_allocator, dir, sp_str_view(test.fixture));
 
   spn_pkg_info_t pkg = SP_ZERO_INITIALIZE();
   spn_err_union_t err = spn_pkg_load(&pkg, path);

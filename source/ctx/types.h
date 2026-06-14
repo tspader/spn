@@ -59,9 +59,9 @@ typedef struct {
   sp_env_t* env;
 
   struct {
-    sp_io_writer_t out;
-    sp_io_writer_t err;
-    sp_io_writer_t jsonl;
+    sp_io_writer_t* out;
+    sp_io_writer_t* err;
+    sp_io_writer_t* jsonl;
   } logger;
   spn_verbosity_t verbosity;
   spn_log_level_t log_level;

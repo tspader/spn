@@ -9,6 +9,7 @@
 #include "graph/types.h"
 #include "intern/types.h"
 #include "external/tcc/types.h"
+#include "log/lazy/types.h"
 
 typedef struct {
   sp_intern_id_t pkg;
@@ -61,9 +62,9 @@ typedef struct {
 } spn_build_paths_t;
 
 typedef struct spn_build_io_t {
-  sp_io_writer_t build;
-  sp_io_writer_t test;
-  sp_io_writer_t jsonl;
+  spn_lazy_log_t build;
+  spn_lazy_log_t test;
+  spn_lazy_log_t jsonl;
 } spn_build_io_t;
 
 typedef struct {

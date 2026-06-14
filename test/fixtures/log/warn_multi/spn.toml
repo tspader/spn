@@ -1,0 +1,7 @@
+[package]
+name = "log_warn_multi"
+version = "0.0.1"
+
+[[bin]]
+name = "log_warn_multi"
+source = ["main.c", "a.c", "b.c"]

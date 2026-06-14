@@ -3,7 +3,7 @@
 
 #include "utest.h"
 
-#include "ordered_map.h"
+#include "sp/sp_om.h"
 
 ///////////
 // TESTS //

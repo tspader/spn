@@ -122,7 +122,7 @@ spn_tui_mode_t spn_output_mode_from_str(sp_str_t str) {
     return SPN_OUTPUT_MODE_NONE;
   }
 
-  SP_FATAL("Unknown output mode {:fg brightyellow}; options are [interactive, noninteractive, quiet, none]", SP_FMT_STR(str));
+  SP_FATAL("Unknown output mode {.fg brightyellow}; options are [interactive, noninteractive, quiet, none]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_OUTPUT_MODE_NONE);
 }
 
@@ -134,7 +134,7 @@ sp_str_t spn_output_mode_to_str(spn_tui_mode_t mode) {
 }
 
 sp_str_t spn_build_event_kind_to_str(spn_build_event_kind_t kind) {
-  return sp_str_from_cstr(event_info[kind].name);
+  return sp_str_from_cstr(spn_allocator, event_info[kind].name);
 }
 
 spn_verbosity_t spn_build_event_get_verbosity(spn_build_event_kind_t kind) {
@@ -142,7 +142,7 @@ spn_verbosity_t spn_build_event_get_verbosity(spn_build_event_kind_t kind) {
 }
 
 void sp_tui_print(sp_str_t str) {
-  sp_io_write_str(spn_ctx_get_log_err(), str);
+  sp_io_write_str(spn_ctx_get_log_err(), str, SP_NULLPTR);
 }
 
 void sp_tui_up(u32 n) {
@@ -256,7 +256,7 @@ static sp_str_t spn_tui_name_to_color(sp_str_t str) {
 
   static sp_ht(u32, sp_hash_t) buckets = SP_NULLPTR;
 
-  sp_hash_t hash = sp_hash_cstr(sp_str_to_cstr(str));
+  sp_hash_t hash = sp_hash_cstr(sp_str_to_cstr(spn_allocator, str));
   u32 lo = (u32)hash;
 
   static const f32 bucket_hues[] = {
@@ -303,15 +303,15 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
   }
   switch (display.color) {
     case WHITE: {
-      sp_str_builder_append_fmt(&builder, "{:fg brightblack :pad 9}", SP_FMT_STR(name));
+      sp_str_builder_append_fmt(&builder, "{:<9 .fg brightblack}", SP_FMT_STR(name));
       break;
     }
     case GREEN: {
-      sp_str_builder_append_fmt(&builder, "{:fg green :pad 9}", SP_FMT_STR(name));
+      sp_str_builder_append_fmt(&builder, "{:<9 .fg green}", SP_FMT_STR(name));
       break;
     }
     case RED: {
-      sp_str_builder_append_fmt(&builder, "{:fg red :pad 9}", SP_FMT_STR(name));
+      sp_str_builder_append_fmt(&builder, "{:<9 .fg red}", SP_FMT_STR(name));
       break;
     }
   }
@@ -329,16 +329,16 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
 
   switch (event->kind) {
     case SPN_EVENT_SYNC: {
-      sp_str_builder_append_fmt(&builder, "{:fg brightblack} ", SP_FMT_STR(event->sync.url));
+      sp_str_builder_append_fmt(&builder, "{.fg brightblack} ", SP_FMT_STR(event->sync.url));
       break;
     }
     case SPN_EVENT_CHECKOUT: {
       sp_str_builder_append_fmt(&builder,
-        "{} {:fg brightblack} {}{}{}",
+        "{} {.fg brightblack} {}{}{}",
         SP_FMT_STR(spn_semver_to_str(event->checkout.version)),
-        SP_FMT_STR(sp_str_truncate(event->checkout.commit, 8, SP_ZERO_STRUCT(sp_str_t))),
+        SP_FMT_STR(sp_str_truncate(spn_allocator, event->checkout.commit, 8, SP_ZERO_STRUCT(sp_str_t))),
         SP_FMT_CSTR(SP_ANSI_ITALIC),
-        SP_FMT_STR(sp_str_truncate(event->checkout.message, 32, sp_str_lit("..."))),
+        SP_FMT_STR(sp_str_truncate(spn_allocator, event->checkout.message, 32, sp_str_lit("..."))),
         SP_FMT_CSTR(SP_ANSI_RESET)
       );
       break;
@@ -346,11 +346,11 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
     case SPN_EVENT_RESOLVE: {
       switch (event->resolve.strategy) {
         case SPN_RESOLVE_STRATEGY_SOLVER: {
-          sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_CSTR("using solver"));
+          sp_str_builder_append_fmt(&builder, "{.fg brightblack}", SP_FMT_CSTR("using solver"));
           break;
         }
         case SPN_RESOLVE_STRATEGY_LOCK_FILE: {
-          sp_str_builder_append_fmt(&builder, "{:fg brightblack}", SP_FMT_CSTR("using lockfile"));
+          sp_str_builder_append_fmt(&builder, "{.fg brightblack}", SP_FMT_CSTR("using lockfile"));
           break;
         }
       }
@@ -359,7 +359,7 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
     case SPN_EVENT_TESTS_PASSED: {
       sp_str_builder_append_fmt(
         &builder,
-        "Ran {} tests for profile {:fg brightcyan} in {:fg brightcyan}s",
+        "Ran {} tests for profile {.fg brightcyan} in {.fg brightcyan}s",
         SP_FMT_U32(event->test.passed.n),
         SP_FMT_STR(event->test.passed.profile->name),
         SP_FMT_F32(sp_tm_ns_to_s_f(event->test.passed.time))
@@ -372,14 +372,14 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
     }
     case SPN_EVENT_DEP_BUILD_PASSED: {
       sp_str_builder_append_fmt(&builder,
-        "built in {:fg brightcyan}s",
+        "built in {.fg brightcyan}s",
         SP_FMT_F32(sp_tm_ns_to_s_f(event->dep.passed.time))
       );
       break;
     }
     case SPN_EVENT_BUILD_PASSED: {
       sp_str_builder_append_fmt(&builder,
-        "Built profile {:fg brightcyan} in {:fg brightcyan}s",
+        "Built profile {.fg brightcyan} in {.fg brightcyan}s",
         SP_FMT_STR(event->build.passed.profile->name),
         SP_FMT_F32(sp_tm_ns_to_s_f(event->build.passed.time))
       );
@@ -402,7 +402,7 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
     case SPN_EVENT_ERR_UNKNOWN_PKG: {
       sp_str_builder_append_fmt(
         &builder,
-        "{:fg brightcyan} could not be located",
+        "{.fg brightcyan} could not be located",
         SP_FMT_STR(event->unknown.request.qualified)
       );
       break;
@@ -410,7 +410,7 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
     case SPN_EVENT_ERR_CIRCULAR_DEP: {
       sp_str_builder_append_fmt(
         &builder,
-        "{:fg brightcyan} transitively includes itself",
+        "{.fg brightcyan} transitively includes itself",
         SP_FMT_STR(event->circular.id.name)
       );
       break;
@@ -423,7 +423,7 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
         case SPN_ERR_MANIFEST_PARSE: {
           sp_str_builder_append_fmt(
             &builder,
-            "failed to parse manifest {:fg brightcyan}",
+            "failed to parse manifest {.fg brightcyan}",
             SP_FMT_STR(event->err.manifest_parse.path)
           );
           break;
@@ -431,7 +431,7 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
         case SPN_ERR_MANIFEST_FIELD: {
           sp_str_builder_append_fmt(
             &builder,
-            "invalid manifest field {:fg brightcyan}: expected {:fg brightyellow}, got {:fg brightred}",
+            "invalid manifest field {.fg brightcyan}: expected {.fg brightyellow}, got {.fg brightred}",
             SP_FMT_STR(event->err.manifest_field.path),
             SP_FMT_STR(event->err.manifest_field.expected),
             SP_FMT_STR(event->err.manifest_field.actual)
@@ -446,11 +446,11 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       break;
     }
     case SPN_EVENT_CLEAN: {
-      sp_str_builder_append_fmt(&builder, "{:fg brightcyan}", SP_FMT_STR(event->clean.path));
+      sp_str_builder_append_fmt(&builder, "{.fg brightcyan}", SP_FMT_STR(event->clean.path));
       break;
     }
     case SPN_EVENT_GENERATE: {
-      sp_str_builder_append_fmt(&builder, "{:fg brightcyan}", SP_FMT_STR(event->generate.path));
+      sp_str_builder_append_fmt(&builder, "{.fg brightcyan}", SP_FMT_STR(event->generate.path));
       break;
     }
     case SPN_EVENT_DEBUG: {
@@ -488,7 +488,7 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
         case SPN_BUILD_GRAPH_ERR_MISSING_INPUT: {
           sp_str_builder_append_fmt(
             &builder,
-            "missing build graph input {:fg brightcyan}",
+            "missing build graph input {.fg brightcyan}",
             SP_FMT_STR(event->err.build_graph.file)
           );
           break;
@@ -496,7 +496,7 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
         case SPN_BUILD_GRAPH_ERR_DUPLICATE_OUTPUT: {
           sp_str_builder_append_fmt(
             &builder,
-            "two graph nodes output the same file {:fg brightcyan}",
+            "two graph nodes output the same file {.fg brightcyan}",
             SP_FMT_STR(event->err.build_graph.file)
           );
           if (sp_str_valid(event->err.build_graph.command_a)) {

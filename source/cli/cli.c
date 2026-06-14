@@ -16,7 +16,7 @@ static sp_str_t spn_cli_opt_kind_to_str(spn_cli_opt_kind_t kind) {
 }
 
 static sp_str_t cstr(const c8* cstr) {
-  return sp_str_from_cstr(cstr ? cstr : "");
+  return sp_str_from_cstr(spn_allocator, cstr ? cstr : "");
 }
 
 spn_cli_command_info_t spn_cli_command_info_from_usage(spn_cli_usage_t cmd) {
@@ -66,7 +66,7 @@ sp_str_t spn_cli_command_usage(spn_cli_usage_t cmd) {
   if (!sp_dyn_array_empty(info.opts)) {
     sp_str_builder_new_line(&builder);
 
-    sp_str_builder_append_fmt(&builder, "{:fg brightgreen}", SP_FMT_CSTR("options"));
+    sp_str_builder_append_fmt(&builder, "{.fg brightgreen}", SP_FMT_CSTR("options"));
     sp_str_builder_new_line(&builder);
 
     sp_tui_begin_table(&spn.tui.table);
@@ -82,7 +82,7 @@ sp_str_t spn_cli_command_usage(spn_cli_usage_t cmd) {
       sp_str_t short_display;
       if (!sp_str_empty(opt.brief)) {
         sp_str_t short_text = sp_format("-{}", SP_FMT_STR(opt.brief));
-        short_display = sp_format("{:fg brightyellow}", SP_FMT_STR(short_text));
+        short_display = sp_format("{.fg brightyellow}", SP_FMT_STR(short_text));
       } else {
         short_display = sp_str_lit("");
       }
@@ -90,13 +90,13 @@ sp_str_t spn_cli_command_usage(spn_cli_usage_t cmd) {
       sp_str_t long_display;
       if (!sp_str_empty(opt.placeholder)) {
         sp_str_t long_text = sp_format("--{}", SP_FMT_STR(opt.name));
-        long_display = sp_format("{:fg brightyellow}={:fg white}", SP_FMT_STR(long_text), SP_FMT_STR(opt.placeholder));
+        long_display = sp_format("{.fg brightyellow}={.fg white}", SP_FMT_STR(long_text), SP_FMT_STR(opt.placeholder));
       } else {
         sp_str_t long_text = sp_format("--{}", SP_FMT_STR(opt.name));
-        long_display = sp_format("{:fg brightyellow}", SP_FMT_STR(long_text));
+        long_display = sp_format("{.fg brightyellow}", SP_FMT_STR(long_text));
       }
 
-      sp_str_t kind_str = sp_format("{:fg brightblack}", SP_FMT_STR(spn_cli_opt_kind_to_str(opt.kind)));
+      sp_str_t kind_str = sp_format("{.fg brightblack}", SP_FMT_STR(spn_cli_opt_kind_to_str(opt.kind)));
 
       sp_tui_table_next_row(&spn.tui.table);
       sp_tui_table_str(&spn.tui.table, short_display);
@@ -114,7 +114,7 @@ sp_str_t spn_cli_command_usage(spn_cli_usage_t cmd) {
   if (!sp_dyn_array_empty(info.args)) {
     sp_str_builder_new_line(&builder);
 
-    sp_str_builder_append_fmt(&builder, "{:fg brightgreen}", SP_FMT_CSTR("arguments"));
+    sp_str_builder_append_fmt(&builder, "{.fg brightgreen}", SP_FMT_CSTR("arguments"));
     sp_str_builder_new_line(&builder);
 
     sp_tui_begin_table(&spn.tui.table);
@@ -127,7 +127,7 @@ sp_str_t spn_cli_command_usage(spn_cli_usage_t cmd) {
       spn_cli_arg_info_t arg = info.args[it];
 
       sp_tui_table_next_row(&spn.tui.table);
-      sp_tui_table_fmt(&spn.tui.table, "{:fg brightyellow}", SP_FMT_STR(arg.name));
+      sp_tui_table_fmt(&spn.tui.table, "{.fg brightyellow}", SP_FMT_STR(arg.name));
       sp_tui_table_str(&spn.tui.table, sp_str_lit("str"));
       sp_tui_table_str(&spn.tui.table, arg.summary);
     }
@@ -162,17 +162,17 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cmd) {
   }
 
   if (cmd->usage) {
-    sp_str_builder_append_fmt(&builder, "{:fg brightgreen}", SP_FMT_CSTR("usage"));
+    sp_str_builder_append_fmt(&builder, "{.fg brightgreen}", SP_FMT_CSTR("usage"));
     sp_str_builder_indent(&builder);
     sp_str_builder_new_line(&builder);
-    sp_str_builder_append_fmt(&builder, "{:fg brightcyan}", SP_FMT_CSTR(cmd->usage));
+    sp_str_builder_append_fmt(&builder, "{.fg brightcyan}", SP_FMT_CSTR(cmd->usage));
     sp_str_builder_dedent(&builder);
     sp_str_builder_new_line(&builder);
     sp_str_builder_new_line(&builder);
   }
 
   if (!sp_dyn_array_empty(cmd_info.opts)) {
-    sp_str_builder_append_fmt(&builder, "{:fg brightgreen}", SP_FMT_CSTR("options"));
+    sp_str_builder_append_fmt(&builder, "{.fg brightgreen}", SP_FMT_CSTR("options"));
     sp_str_builder_new_line(&builder);
 
     sp_tui_begin_table(&spn.tui.table);
@@ -188,7 +188,7 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cmd) {
       sp_str_t short_display;
       if (!sp_str_empty(opt.brief)) {
         sp_str_t short_text = sp_format("-{}", SP_FMT_STR(opt.brief));
-        short_display = sp_format("{:fg brightyellow}", SP_FMT_STR(short_text));
+        short_display = sp_format("{.fg brightyellow}", SP_FMT_STR(short_text));
       } else {
         short_display = sp_str_lit("");
       }
@@ -196,13 +196,13 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cmd) {
       sp_str_t long_display;
       if (!sp_str_empty(opt.placeholder)) {
         sp_str_t long_text = sp_format("--{}", SP_FMT_STR(opt.name));
-        long_display = sp_format("{:fg brightyellow}={:fg white}", SP_FMT_STR(long_text), SP_FMT_STR(opt.placeholder));
+        long_display = sp_format("{.fg brightyellow}={.fg white}", SP_FMT_STR(long_text), SP_FMT_STR(opt.placeholder));
       } else {
         sp_str_t long_text = sp_format("--{}", SP_FMT_STR(opt.name));
-        long_display = sp_format("{:fg brightyellow}", SP_FMT_STR(long_text));
+        long_display = sp_format("{.fg brightyellow}", SP_FMT_STR(long_text));
       }
 
-      sp_str_t kind_str = sp_format("{:fg brightblack}", SP_FMT_STR(spn_cli_opt_kind_to_str(opt.kind)));
+      sp_str_t kind_str = sp_format("{.fg brightblack}", SP_FMT_STR(spn_cli_opt_kind_to_str(opt.kind)));
 
       sp_tui_table_next_row(&spn.tui.table);
       sp_tui_table_str(&spn.tui.table, short_display);
@@ -218,7 +218,7 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cmd) {
   }
 
   if (!sp_dyn_array_empty(info.commands)) {
-    sp_str_builder_append_fmt(&builder, "{:fg brightgreen}", SP_FMT_CSTR("commands"));
+    sp_str_builder_append_fmt(&builder, "{.fg brightgreen}", SP_FMT_CSTR("commands"));
     sp_str_builder_new_line(&builder);
 
     sp_tui_begin_table(&spn.tui.table);
@@ -231,12 +231,12 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cmd) {
       spn_cli_command_info_t command = info.commands[it];
       sp_str_t args = sp_str_lit("");
       if (!sp_da_empty(command.brief)) {
-        args = sp_str_join_n(command.brief, sp_dyn_array_size(command.brief), sp_str_lit(", "));
+        args = sp_str_join_n(spn_allocator, command.brief, sp_dyn_array_size(command.brief), sp_str_lit(", "));
       }
 
       sp_tui_table_next_row(&spn.tui.table);
-      sp_tui_table_fmt(&spn.tui.table, "{:fg brightcyan}", SP_FMT_STR(command.name));
-      sp_tui_table_fmt(&spn.tui.table, "{:fg brightyellow}", SP_FMT_STR(args));
+      sp_tui_table_fmt(&spn.tui.table, "{.fg brightcyan}", SP_FMT_STR(command.name));
+      sp_tui_table_fmt(&spn.tui.table, "{.fg brightyellow}", SP_FMT_STR(args));
       sp_tui_table_str(&spn.tui.table, command.summary);
     }
 
@@ -250,15 +250,15 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cmd) {
 
 sp_app_result_t spn_cli_help(spn_cli_parser_t* p) {
   if (!p->resolved) {
-    sp_log(spn_cli_command_usage(*p->cmd));
+    sp_log("{}", sp_fmt_str(spn_cli_command_usage(*p->cmd)));
     return SP_APP_QUIT;
   }
   else if (!p->resolved->commands) {
-    sp_log(spn_cli_command_usage(*p->resolved));
+    sp_log("{}", sp_fmt_str(spn_cli_command_usage(*p->resolved)));
     return SP_APP_QUIT;
   }
   else {
-    sp_log(spn_cli_command_usage(*p->resolved->commands));
+    sp_log("{}", sp_fmt_str(spn_cli_command_usage(*p->resolved->commands)));
     return SP_APP_QUIT;
   }
   return SP_APP_QUIT;
@@ -267,7 +267,7 @@ sp_app_result_t spn_cli_help(spn_cli_parser_t* p) {
 
 sp_app_result_t spn_cli_root(spn_cli_t* cli) {
   sp_str_t help = spn_cli_usage(&cli->usage);
-  sp_log(help);
+  sp_log("{}", sp_fmt_str(help));
   return SP_APP_QUIT;
 }
 

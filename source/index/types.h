@@ -4,7 +4,7 @@
 #include "sp.h"
 #include "spn.h"
 
-#include "ordered_map.h"
+#include "sp/sp_om.h"
 #include "pkg/types.h"
 #include "semver/types.h"
 

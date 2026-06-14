@@ -29,8 +29,9 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E make_directory ${STORE}/include/sp
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SOURCE_ROOT}/sp/sp.h         ${STORE}/include/sp.h
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SOURCE_ROOT}/sp/sp/sp_math.h ${STORE}/include/sp/sp_math.h
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SOURCE_ROOT}/sp/sp/sp_elf.h  ${STORE}/include/sp/sp_elf.h
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SOURCE_ROOT}/sp/sp/sp_glob.h ${STORE}/include/sp/sp_glob.h
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SOURCE_ROOT}/sp/sp/sp_cli.h  ${STORE}/include/sp/sp_cli.h
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SRC}/sp/sp_elf.h             ${STORE}/include/sp/sp_elf.h
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SRC}/sp/coff.h               ${STORE}/include/sp/coff.h
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SOURCE_ROOT}/toml/toml.h     ${STORE}/include/toml.h
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SOURCE_ROOT}/argparse/argparse.h ${STORE}/include/argparse.h
@@ -38,8 +39,9 @@ add_custom_command(
   DEPENDS
     ${SOURCE_ROOT}/sp/sp.h
     ${SOURCE_ROOT}/sp/sp/sp_math.h
-    ${SOURCE_ROOT}/sp/sp/sp_elf.h
     ${SOURCE_ROOT}/sp/sp/sp_glob.h
+    ${SOURCE_ROOT}/sp/sp/sp_cli.h
+    ${SRC}/sp/sp_elf.h
     ${SRC}/sp/coff.h
     ${SOURCE_ROOT}/toml/toml.h
     ${SOURCE_ROOT}/argparse/argparse.h

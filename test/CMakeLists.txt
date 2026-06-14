@@ -6,10 +6,12 @@ function(spn_test_binary target)
     ${SRC}
     ${CMAKE_SOURCE_DIR}/include
     ${TEST_TOOLS}
+    ${CMAKE_SOURCE_DIR}/test/sp_test
     ${SOURCE_ROOT}/sp/tools
     ${STORE}/include
   )
   target_link_libraries(${target} PRIVATE m)
+  target_compile_options(${target} PRIVATE -include ${SRC}/sp/compat.h)
   add_dependencies(${target} headers)
 endfunction()
 

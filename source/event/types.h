@@ -88,6 +88,8 @@ typedef struct {
 typedef struct {
   sp_str_t source_file;
   sp_str_t object_file;
+  sp_str_t args;
+  sp_str_t out;
   u64 time;
 } spn_evt_target_passed_t;
 typedef struct {
@@ -96,6 +98,7 @@ typedef struct {
   s32 rc;
   sp_str_t out;
   sp_str_t err;
+  sp_str_t args;
   u64 time;
 } spn_evt_target_failed_t;
 
@@ -129,6 +132,8 @@ typedef struct {
 } spn_evt_link_start_t;
 typedef struct {
   sp_str_t output_path;
+  sp_str_t args;
+  sp_str_t out;
   u64 time;
 } spn_evt_link_passed_t;
 typedef struct {

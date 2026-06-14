@@ -2,7 +2,7 @@
 #include "forward/types.h"
 #include "intern/intern.h"
 #include "log/log.h"
-#include "ordered_map.h"
+#include "sp/sp_om.h"
 #include "session/types.h"
 #include "target/types.h"
 #include "task/types.h"
@@ -28,21 +28,21 @@ static bool has_source_file(sp_da(sp_str_t) source, sp_str_t path) {
 }
 
 static void collect_source_glob(sp_str_t root, sp_str_t pattern, sp_da(sp_str_t)* source) {
-  sp_glob_t* glob = sp_glob_new_str(pattern);
+  sp_glob_t* glob = sp_glob_new_str(spn_allocator, pattern);
   if (!glob) {
     return;
   }
 
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(root);
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(spn_allocator, root);
   sp_da(sp_str_t) matches = SP_NULLPTR;
 
   sp_da_for(entries, it) {
     sp_fs_entry_t* entry = &entries[it];
-    if (!sp_fs_is_file(entry->file_path)) {
+    if (!sp_fs_is_file(entry->path)) {
       continue;
     }
 
-    sp_str_t relative = sp_str_strip_left(entry->file_path, root);
+    sp_str_t relative = sp_str_strip_left(entry->path, root);
     relative = sp_str_strip_left(relative, sp_str_lit("/"));
     if (!sp_glob_match(glob, relative)) {
       continue;
@@ -114,7 +114,7 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
           sp_str_t requested = spn_pkg_linkage_to_str(query.config.some ? query.config.value : query.linkage);
           sp_str_t requester = query.config.some ? sp_str_lit("the root manifest") : sp_str_lit("the profile");
           spn_log_error(
-            "{:fg brightcyan} doesn't support {:fg brightyellow} ({} requested it)",
+            "{.fg brightcyan} doesn't support {.fg brightyellow} ({} requested it)",
             SP_FMT_STR(target->pkg->info->name),
             SP_FMT_STR(requested),
             SP_FMT_STR(requester)
@@ -193,7 +193,7 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
         sp_da_push(unit->deps.target, candidates.target);
       }
       else {
-        spn_log_error("failed to find {:fg cyan} as a package or target", SP_FMT_STR(unit->info->deps[j]));
+        spn_log_error("failed to find {.fg cyan} as a package or target", SP_FMT_STR(unit->info->deps[j]));
       }
     }
   }
@@ -212,7 +212,7 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
     sp_da(sp_str_t) source = collect_target_source(pkg, target);
     sp_da_for(source, j) {
       sp_str_t relative = source[j];
-      sp_str_t file = sp_fs_join_path(pkg->paths.source, relative);
+      sp_str_t file = sp_fs_join_path(spn_allocator, pkg->paths.source, relative);
       sp_str_t extension = sp_fs_get_ext(relative);
       sp_str_t stem = relative;
       if (!sp_str_empty(extension)) {
@@ -225,7 +225,7 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
       sp_str_t object_dir = target->lib_kind == SPN_LIB_KIND_OBJECT ?
         target->paths.lib :
         target->paths.object;
-      sp_str_t object_path = sp_fs_join_path(object_dir, sp_format("{}.o", SP_FMT_STR(stem)));
+      sp_str_t object_path = sp_fs_join_path(spn_allocator, object_dir, sp_format("{}.o", SP_FMT_STR(stem)));
 
       if (!sp_str_om_has(session->units.objects, file)) {
         sp_str_om_insert(session->units.objects, file, ((spn_compile_unit_t) {

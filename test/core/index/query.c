@@ -67,7 +67,7 @@ static void write_index_files(ctx_t* harness, const c8* name, const index_file_t
 
     tmpfs_create(
       &harness->fs,
-      sp_fs_join_path(prefix, sp_fs_join_path(sp_str_lit("index"), sp_str_view(file.path))),
+      sp_fs_join_path(spn_allocator, prefix, sp_fs_join_path(spn_allocator, sp_str_lit("index"), sp_str_view(file.path))),
       sp_str_builder_to_str(&builder)
     );
   }
@@ -79,7 +79,7 @@ static void run_index_query_case(s32* utest_result, struct index_query* fixture,
   ctx_t* harness = ctx_get();
   sp_str_t case_root = tmpfs_get(&harness->fs, sp_str_view(c.name));
 
-  sp_str_t index_root = sp_fs_join_path(case_root, sp_str_lit("index"));
+  sp_str_t index_root = sp_fs_join_path(spn_allocator, case_root, sp_str_lit("index"));
   sp_fs_create_dir(index_root);
 
   write_index_files(harness, c.name, c.fixture.files);

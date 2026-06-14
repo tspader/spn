@@ -28,7 +28,7 @@ SP_BEGIN_EXTERN_C()
 
 typedef sp_str_t mz_str_t;
 typedef sp_mem_buffer_t mz_buf_t;
-#define mz_alloc_n(t, n) sp_alloc_n(t, n)
+#define mz_alloc_n(t, n) sp_alloc_n(spn_allocator, t, n)
 #define mz_zero SP_ZERO_INITIALIZE()
 #define mz_zero_s(s) SP_ZERO_STRUCT(s)
 #define mz_null 0
@@ -125,7 +125,7 @@ typedef struct {
 } mz_diag_part_t;
 
 struct mz_ctx_t {
-  sp_allocator_t allocator;
+  sp_mem_t allocator;
   sp_mem_arena_t* arena;
   mz_diag_t diag;
   mz_diag_part_t diag_parts[64];
@@ -217,9 +217,9 @@ SP_API void mz_builder_add_field_ptr_ex(mz_builder_t* builder, const c8* key, mz
 SP_API void mz_builder_pop(mz_builder_t* builder);
 
 SP_API mz_ctx_t* mz_ctx_create();
-SP_API mz_ctx_t* mz_ctx_create_ex(sp_allocator_t allocator);
+SP_API mz_ctx_t* mz_ctx_create_ex(sp_mem_t allocator);
 SP_API void mz_ctx_init(mz_ctx_t* ctx);
-SP_API void mz_ctx_init_ex(mz_ctx_t* ctx, sp_allocator_t allocator);
+SP_API void mz_ctx_init_ex(mz_ctx_t* ctx, sp_mem_t allocator);
 SP_API void mz_ctx_deinit(mz_ctx_t* ctx);
 SP_API void mz_ctx_destroy(mz_ctx_t* ctx);
 SP_API void mz_ctx_clear(mz_ctx_t* ctx);

@@ -14,7 +14,7 @@ utest = "1.0.0"
 
 [profile.default]
 linkage = "static"
-standard = "c99"
+standard = "c11"
 mode = "debug"
 
 [profile.musl]
@@ -62,11 +62,13 @@ target = [
 name = "spn"
 source = ["source/**/*.c"]
 include = ["include", "source", "source/external"]
+flags = ["-include", "sp/compat.h"]
 
 [[test]]
 name = "om"
 source = ["test/core/ordered_map.c"]
 include = ["include", "source"]
+flags = ["-include", "sp/compat.h"]
 
 [[test]]
 name = "intern"
@@ -77,16 +79,19 @@ source = [
   "test/core/intern.c"
 ]
 include = ["include", "source"]
+flags = ["-include", "sp/compat.h"]
 
 [[test]]
 name = "cli"
 source = ["source/sp/cli.c", "test/core/cli.c", "test/tools/tmp.c"]
 include = ["include", "source", "test/tools"]
+flags = ["-include", "sp/compat.h"]
 
 [[test]]
 name = "graph"
-source = ["source/graph/graph.c", "source/sp/tm.c", "test/core/graph.c", "test/tools/tmp.c"]
-include = ["include", "source", "test/tools"]
+source = ["test/core/graph.c"]
+include = ["test/sp_test", "include", "source", "test/core"]
+flags = ["-include", "sp/compat.h", "-DSP_IMPLEMENTATION", "-DSP_TEST_IMPLEMENTATION", "-DSP_GRAPH_IMPLEMENTATION"]
 
 [[test]]
 name = "index"
@@ -112,6 +117,7 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "test/tools"]
+flags = ["-include", "sp/compat.h"]
 
 [[test]]
 name = "load"
@@ -129,12 +135,14 @@ source = [
   "source/semver/parser.c",
   "source/target/mutate.c",
   "source/toolchain/toolchain.c",
+  "source/sp/str.c",
   "test/core/manifest.c",
   "test/tools/harness.c",
   "test/tools/tmp.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source", "test/tools"]
+flags = ["-include", "sp/compat.h"]
 
 [[test]]
 name = "resolver"
@@ -169,6 +177,7 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "test/tools"]
+flags = ["-include", "sp/compat.h"]
 
 [[test]]
 name = "publish"
@@ -205,6 +214,7 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "test/tools"]
+flags = ["-include", "sp/compat.h"]
 
 [[test]]
 name = "lock"
@@ -222,6 +232,7 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "test/tools"]
+flags = ["-include", "sp/compat.h"]
 
 [[test]]
 name = "git"
@@ -229,6 +240,7 @@ source = [
   "source/git/cache.c",
   "source/git/key.c",
   "source/external/git.c",
+  "source/sp/str.c",
   "test/core/git/main.c",
   "test/core/git/fixture.c",
   "test/core/git/cache.c",
@@ -239,20 +251,24 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "test/tools"]
+flags = ["-include", "sp/compat.h"]
 
 [[test]]
 name = "triple"
 source = [
   "source/enum/enum.c",
   "source/triple/triple.c",
+  "source/sp/str.c",
   "test/core/triple.c",
 ]
 include = ["include", "source", "test/tools"]
+flags = ["-include", "sp/compat.h"]
 
 [[test]]
 name = "integration"
 source = [
   "source/external/tom.c",
+  "source/sp/str.c",
   "test/integration/main.c",
   "test/integration/harness.c",
   "test/tools/tmp.c",
@@ -260,3 +276,4 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "source/external", "test/integration", "test/tools"]
+flags = ["-include", "sp/compat.h"]

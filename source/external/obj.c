@@ -20,10 +20,13 @@ void spn_obj_init(spn_obj_builder_t* obj, spn_obj_kind_t kind) {
         SP_COFF_SCN_MEM_READ);
     } break;
     case SPN_OBJ_ELF: {
-      obj->elf.elf = sp_elf_new_with_null_section();
-      sp_elf_symtab_new(obj->elf.elf);
-      sp_elf_section_t* section = sp_elf_add_section(obj->elf.elf, sp_str_lit(".rodata"), SHT_PROGBITS, 8);
-      section->flags = SHF_ALLOC | SHF_WRITE;
+      obj->elf.elf = sp_elf_new(spn_allocator);
+      obj->elf.rodata = sp_elf_add_section(obj->elf.elf, (sp_elf_section_t){
+        .name = sp_str_lit(".rodata"),
+        .type = SHT_PROGBITS,
+        .flags = SHF_ALLOC | SHF_WRITE,
+        .align = 8,
+      });
     } break;
     default: SP_ASSERT(false); break;
   }
@@ -32,17 +35,20 @@ void spn_obj_init(spn_obj_builder_t* obj, spn_obj_kind_t kind) {
 void spn_obj_add_symbol(spn_obj_builder_t* obj, sp_str_t name, const void* data, u64 size) {
   switch (obj->kind) {
     case SPN_OBJ_COFF: {
-      u64 offset = sp_io_writer_size(&obj->coff.section->writer);
-      sp_io_write(&obj->coff.section->writer, data, size);
+      u64 offset = obj->coff.section->writer.storage.len;
+      sp_io_write(&obj->coff.section->writer.base, data, size, SP_NULLPTR);
       sp_coff_add_symbol(obj->coff.coff, name, (u32)offset, 1, SP_COFF_SYM_CLASS_EXTERNAL);
     } break;
     case SPN_OBJ_ELF: {
-      sp_elf_section_t* symtab = sp_elf_find_section_by_name(obj->elf.elf, sp_str_lit(".symtab"));
-      sp_elf_section_t* section = sp_elf_find_section_by_name(obj->elf.elf, sp_str_lit(".rodata"));
-      u64 offset = section->buffer.size;
-      u8* ptr = sp_elf_section_reserve_bytes(section, size);
-      sp_mem_copy(data, ptr, size);
-      sp_elf_add_symbol(symtab, obj->elf.elf, name, offset, size, STB_GLOBAL, STT_OBJECT, section->index);
+      u64 offset = sp_elf_append_aligned(obj->elf.elf, obj->elf.rodata, data, size, 8);
+      sp_elf_add_symbol(obj->elf.elf, (sp_elf_symbol_t){
+        .name = name,
+        .section = obj->elf.rodata,
+        .value = offset,
+        .size = size,
+        .bind = STB_GLOBAL,
+        .type = STT_OBJECT,
+      });
     } break;
     default: SP_ASSERT(false); break;
   }

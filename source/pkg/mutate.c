@@ -11,7 +11,7 @@
 #include "semver/convert.h"
 
 void spn_pkg_init(spn_pkg_info_t* pkg, sp_str_t name) {
-  pkg->arena = sp_mem_arena_new(4096);
+  pkg->arena = sp_mem_arena_new(spn_allocator);
   pkg->name = spn_intern(name);
 
   sp_ht_set_fns(pkg->deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
@@ -33,7 +33,7 @@ void spn_pkg_set_repo(spn_pkg_info_t* pkg, const c8* repo) {
 
 void spn_pkg_set_repo_ex(spn_pkg_info_t* pkg, sp_str_t repo) {
   sp_context_push_arena(pkg->arena);
-  pkg->repo = sp_str_copy(repo);
+  pkg->repo = sp_str_copy(spn_allocator, repo);
   sp_context_pop();
 }
 
@@ -43,7 +43,7 @@ void spn_pkg_set_url(spn_pkg_info_t* pkg, const c8* url) {
 
 void spn_pkg_set_url_ex(spn_pkg_info_t* pkg, sp_str_t url) {
   sp_context_push_arena(pkg->arena);
-  pkg->url = sp_str_copy(url);
+  pkg->url = sp_str_copy(spn_allocator, url);
   sp_context_pop();
 }
 
@@ -53,7 +53,7 @@ void spn_pkg_set_author(spn_pkg_info_t* pkg, const c8* author) {
 
 void spn_pkg_set_author_ex(spn_pkg_info_t* pkg, sp_str_t author) {
   sp_context_push_arena(pkg->arena);
-  pkg->author = sp_str_copy(author);
+  pkg->author = sp_str_copy(spn_allocator, author);
   sp_context_pop();
 }
 
@@ -63,7 +63,7 @@ void spn_pkg_set_maintainer(spn_pkg_info_t* pkg, const c8* maintainer) {
 
 void spn_pkg_set_maintainer_ex(spn_pkg_info_t* pkg, sp_str_t maintainer) {
   sp_context_push_arena(pkg->arena);
-  pkg->maintainer = sp_str_copy(maintainer);
+  pkg->maintainer = sp_str_copy(spn_allocator, maintainer);
   sp_context_pop();
 }
 
@@ -77,7 +77,7 @@ void spn_pkg_add_version_ex(spn_pkg_info_t* pkg, spn_semver_t version, sp_str_t 
   }
 
   sp_context_push_arena(pkg->arena);
-  spn_pkg_metadata_t metadata = { version, sp_str_copy(commit) };
+  spn_pkg_metadata_t metadata = { version, sp_str_copy(spn_allocator, commit) };
   sp_ht_insert(pkg->metadata, version, metadata);
   sp_da_push(pkg->versions, version);
   sp_context_pop();
@@ -89,7 +89,7 @@ void spn_pkg_add_include(spn_pkg_info_t* pkg, const c8* include) {
 
 void spn_pkg_add_include_ex(spn_pkg_info_t* pkg, sp_str_t path) {
   sp_context_push_arena(pkg->arena);
-  sp_da_push(pkg->include, sp_str_copy(path));
+  sp_da_push(pkg->include, sp_str_copy(spn_allocator, path));
   sp_context_pop();
 }
 
@@ -99,7 +99,7 @@ void spn_pkg_add_define(spn_pkg_info_t* pkg, const c8* define) {
 
 void spn_pkg_add_define_ex(spn_pkg_info_t* pkg, sp_str_t define) {
   sp_context_push_arena(pkg->arena);
-  sp_da_push(pkg->define, sp_str_copy(define));
+  sp_da_push(pkg->define, sp_str_copy(spn_allocator, define));
   sp_context_pop();
 }
 
@@ -109,7 +109,7 @@ void spn_pkg_add_system_dep(spn_pkg_info_t* pkg, const c8* dep) {
 
 void spn_pkg_add_system_dep_ex(spn_pkg_info_t* pkg, sp_str_t dep) {
   sp_context_push_arena(pkg->arena);
-  sp_da_push(pkg->system_deps, sp_str_copy(dep));
+  sp_da_push(pkg->system_deps, sp_str_copy(spn_allocator, dep));
   sp_context_pop();
 }
 
