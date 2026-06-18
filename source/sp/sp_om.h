@@ -1,3 +1,4 @@
+
 #ifndef SP_OM_H
 #define SP_OM_H
 
@@ -15,15 +16,17 @@
 
 #define sp_om_new_ex(sm, darena, marena)                                       \
   do {                                                                         \
-    (sm) = sp_alloc_hint(&(sm), sizeof(*(sm)));                                \
+    (sm) = sp_alloc_hint(sp_mem_os_new(), &(sm), sizeof(*(sm)));               \
     (sm)->arenas.data = darena;                                                \
-    (sm)->arenas.metadata = marena;                                            \
+    (sm)->arenas.metadata = marena;                                           \
+    sp_da_init(sp_mem_arena_as_allocator((sm)->arenas.metadata), (sm)->order); \
+    sp_ht_init(sp_mem_arena_as_allocator((sm)->arenas.metadata), (sm)->index); \
   } while (0)
 
 #define sp_om_new(sm)                                                          \
   sp_om_new_ex(sm,                                                             \
-    sp_mem_arena_new_ex(4096, SP_MEM_ARENA_MODE_NO_REALLOC, 0),                \
-    sp_mem_arena_new(4096))
+    sp_mem_arena_new_ex(sp_mem_os_new(), 4096, 0), \
+    sp_mem_arena_new_ex(sp_mem_os_new(), 4096, 0))
 
 #define sp_om_ensure(sm)                                                       \
   if (!(sm)) {      \
@@ -33,28 +36,25 @@
 #define sp_om_set_fns(sm, hash_fn, cmp_fn)                                       \
   do {                                                                           \
     sp_om_ensure(sm);                                                            \
-    sp_context_push_allocator(sp_mem_arena_as_allocator((sm)->arenas.metadata)); \
     sp_ht_set_fns((sm)->index, hash_fn, cmp_fn);                                 \
-    sp_context_pop();                                                            \
   } while (0)
 
 #define sp_om_alloc_entry(sm)                                                  \
-  sp_alloc_hint(&(sm)->temp, sizeof(*(sm)->temp))
+  sp_alloc_hint(sp_mem_arena_as_allocator((sm)->arenas.data),                  \
+    &(sm)->temp, sizeof(*(sm)->temp))
 
 #define sp_om_insert(sm, key, val)                                             \
   do {                                                                         \
     sp_om_ensure(sm);                                                          \
-    if (sp_ht_exists((sm)->index, (key))) {                                    \
+    /* getp evaluates (key) once and leaves it in index->tmp_key; reuse that  \
+       slot for the insert so (key) is never expanded a second time. */        \
+    if (sp_ht_getp((sm)->index, (key)) != SP_NULLPTR) {                        \
       break;                                                                   \
     }                                                                          \
-    sp_context_push_allocator(sp_mem_arena_as_allocator((sm)->arenas.data));    \
     (sm)->temp = sp_om_alloc_entry(sm);                                        \
-    sp_context_pop();                                                          \
-    sp_context_push_allocator(sp_mem_arena_as_allocator((sm)->arenas.metadata));\
     *(sm)->temp = (val);                                                       \
     sp_da_push((sm)->order, (sm)->temp);                                       \
-    sp_ht_insert((sm)->index, (key), (sm)->temp);                              \
-    sp_context_pop();                                                          \
+    sp_ht_insert((sm)->index, (sm)->index->tmp_key, (sm)->temp);              \
   } while (0)
 
 #define sp_om_free(sm)                                                         \
@@ -62,30 +62,21 @@
     if ((sm)) {                                                                \
       sp_mem_arena_destroy((sm)->arenas.data);                                 \
       sp_mem_arena_destroy((sm)->arenas.metadata);                             \
-      sp_free(sm);                                                             \
+      sp_free(sp_mem_os_new(), sm, sizeof(*(sm)));                             \
       (sm) = SP_NULLPTR;                                                       \
     }                                                                          \
   } while (0)
 
 #define sp_om_get(sm, key)        (!(sm) ? SP_NULLPTR : *sp_ht_getp((sm)->index, (key)))
 #define sp_om_getp(sm, key)       (!(sm) ? SP_NULLPTR : sp_ht_getp((sm)->index, (key)))
-#define sp_om_has(sm, key)        ((sm) && sp_ht_exists((sm)->index, (key)))
+#define sp_om_has(sm, key)        ((sm) && sp_ht_getp((sm)->index, (key)) != SP_NULLPTR)
 #define sp_om_at(sm, n)           ((sm)->order[(n)])
 #define sp_om_size(sm)            (!(sm) ? 0 : sp_da_size((sm)->order))
 #define sp_om_empty(sm)           (!(sm) ? true : (sp_da_size((sm)->order) == 0))
 #define sp_om_for(sm, it)         for (u32 it = 0; it < sp_om_size(sm); it++)
 #define sp_om_back(sm)            (*sp_da_back((sm)->order))
 
-#if defined(SP_CPP)
-SP_END_EXTERN_C()
-template<typename T> static T* sp_alloc_hint(T** dummy, size_t size) {
-  (void)dummy;
-  return (T*)sp_alloc(size);
-}
-SP_BEGIN_EXTERN_C()
-#else
-#define sp_alloc_hint(dummy, size) sp_alloc(size)
-#endif
+#define sp_alloc_hint(mem, dummy, size) sp_alloc(mem, size)
 
 
 ////////////

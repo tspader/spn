@@ -32,7 +32,7 @@ void spn_cc_set_profile(spn_cc_t* cc, spn_profile_info_t profile) {
 }
 
 void spn_cc_set_output_dir(spn_cc_t* cc, sp_str_t dir) {
-  cc->dir = sp_str_copy(dir);
+  cc->dir = sp_str_copy(spn_allocator, dir);
 }
 
 void spn_cc_add_include(spn_cc_t* cc, sp_str_t dir) {
@@ -41,7 +41,7 @@ void spn_cc_add_include(spn_cc_t* cc, sp_str_t dir) {
 
 void spn_cc_add_relative_include(spn_cc_t* cc, sp_str_t dir) {
   sp_broken();
-  //sp_da_push(cc->include, sp_fs_join_path(spn_app_project_dir(), dir));
+  //sp_da_push(cc->include, sp_fs_join_path(spn_allocator, spn_app_project_dir(), dir));
 }
 
 void spn_cc_add_define(spn_cc_t* cc, sp_str_t var) {
@@ -50,16 +50,16 @@ void spn_cc_add_define(spn_cc_t* cc, sp_str_t var) {
 
 void spn_cc_target_add_relative_source(spn_cc_target_t* target, sp_str_t file_path) {
   sp_broken();
-  //sp_da_push(target->source, sp_fs_join_path(spn_app_project_dir(), file_path));
+  //sp_da_push(target->source, sp_fs_join_path(spn_allocator, spn_app_project_dir(), file_path));
 }
 
 void spn_cc_target_add_absolute_source(spn_cc_target_t* target, sp_str_t path) {
-  sp_da_push(target->source, sp_str_copy(path));
+  sp_da_push(target->source, sp_str_copy(spn_allocator, path));
 }
 
 void spn_cc_target_add_relative_include(spn_cc_target_t* target, sp_str_t dir) {
   sp_broken();
-  //spn_cc_target_add_absolute_include(target, sp_fs_join_path(spn_app_project_dir(), dir));
+  //spn_cc_target_add_absolute_include(target, sp_fs_join_path(spn_allocator, spn_app_project_dir(), dir));
 }
 
 void spn_cc_target_add_absolute_include(spn_cc_target_t* target, sp_str_t dir) {
@@ -67,34 +67,34 @@ void spn_cc_target_add_absolute_include(spn_cc_target_t* target, sp_str_t dir) {
 }
 
 void spn_cc_target_add_define(spn_cc_target_t* target, sp_str_t var) {
-  sp_da_push(target->define, sp_str_copy(var));
+  sp_da_push(target->define, sp_str_copy(spn_allocator, var));
 }
 
 void spn_cc_target_add_flag(spn_cc_target_t* target, sp_str_t flag) {
-  sp_da_push(target->flags, sp_str_copy(flag));
+  sp_da_push(target->flags, sp_str_copy(spn_allocator, flag));
 }
 
 void spn_cc_target_add_lib(spn_cc_target_t* target, sp_str_t lib) {
-  sp_da_push(target->libs, sp_str_copy(lib));
+  sp_da_push(target->libs, sp_str_copy(spn_allocator, lib));
 }
 
 void spn_cc_target_add_lib_dir(spn_cc_target_t* target, sp_str_t dir) {
-  sp_da_push(target->lib_dirs, sp_str_copy(dir));
+  sp_da_push(target->lib_dirs, sp_str_copy(spn_allocator, dir));
 }
 
 void spn_cc_target_add_rpath(spn_cc_target_t* target, sp_str_t dir) {
-  sp_da_push(target->rpath, sp_str_copy(dir));
+  sp_da_push(target->rpath, sp_str_copy(spn_allocator, dir));
 }
 
 void spn_cc_target_add_system_lib(spn_cc_target_t* target, sp_str_t name) {
-  sp_da_push(target->system_libs, sp_str_copy(name));
+  sp_da_push(target->system_libs, sp_str_copy(spn_allocator, name));
 }
 
 sp_str_t spn_cc_symbol_from_embedded_file(sp_str_t file_path) {
   sp_str_t symbol = file_path;
-  symbol = sp_str_replace_c8(symbol, '/', '_');
-  symbol = sp_str_replace_c8(symbol, '.', '_');
-  symbol = sp_str_replace_c8(symbol, '-', '_');
+  symbol = sp_str_replace_c8(spn_allocator, symbol, '/', '_');
+  symbol = sp_str_replace_c8(spn_allocator, symbol, '.', '_');
+  symbol = sp_str_replace_c8(spn_allocator, symbol, '-', '_');
   return symbol;
 }
 
@@ -106,7 +106,7 @@ void spn_cc_target_add_dep(spn_cc_target_t* target, spn_pkg_unit_t* unit) {
 
 spn_cc_target_t* spn_cc_add_target(spn_cc_t* cc, spn_cc_output_kind_t kind, sp_str_t output) {
   spn_cc_target_t target = {
-    .output = sp_str_copy(output),
+    .output = sp_str_copy(spn_allocator, output),
     .kind = kind,
     .cc = cc
   };
@@ -130,13 +130,13 @@ void spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx, spn_os_t target_os) {
 // have already been interned
 spn_err_t spn_cc_embed_ctx_add(
   spn_cc_embed_ctx_t* ctx,
-  sp_io_reader_t io,
+  sp_io_reader_t* io,
   sp_str_t symbol,
   sp_str_t path,
   sp_str_t data_type,
   sp_str_t size_type
 ) {
-  sp_mem_buffer_t buffer = sp_io_read_all(&io);
+  sp_mem_buffer_t buffer = sp_io_read_all(io);
 
   spn_obj_add_symbol(&ctx->obj, symbol, buffer.data, buffer.len);
   spn_obj_add_symbol(&ctx->obj, spn_intern(sp_format("{}_size", SP_FMT_STR(symbol))), &buffer.len, sizeof(u64));
@@ -157,58 +157,58 @@ spn_err_t spn_cc_embed_ctx_add(
 spn_err_t spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_str_t header) {
   sp_try_as(spn_obj_write(&ctx->obj, object), SPN_ERROR);
 
-  sp_io_writer_t io = sp_io_writer_from_file(header, SP_IO_WRITE_MODE_OVERWRITE);
+  sp_io_writer_t* io = sp_io_writer_from_file(header, SP_IO_WRITE_MODE_OVERWRITE);
   sp_da_for(ctx->entries, it) {
     spn_cc_embed_t entry = ctx->entries[it];
-    sp_io_write_str(&io, sp_format(
+    sp_fmt_io(io,
       "extern const {} {} [{}];",
       SP_FMT_STR(entry.types.data),
       SP_FMT_STR(entry.symbol),
       SP_FMT_U64(entry.size)
-    ));
-    sp_io_write_new_line(&io);
+    );
+    sp_io_write_new_line(io);
 
-    sp_io_write_str(&io, sp_format(
+    sp_fmt_io(io,
       "extern const {} {}_size;",
       SP_FMT_STR(entry.types.size),
       SP_FMT_STR(entry.symbol)
-    ));
-    sp_io_write_new_line(&io);
-    sp_io_write_new_line(&io);
+    );
+    sp_io_write_new_line(io);
+    sp_io_write_new_line(io);
   }
 
-  sp_io_write_str(&io, sp_str_lit("typedef struct {"));
-  sp_io_write_new_line(&io);
-  sp_io_write_str(&io, sp_str_lit("  const char* path;"));
-  sp_io_write_new_line(&io);
-  sp_io_write_str(&io, sp_str_lit("  const void* data;"));
-  sp_io_write_new_line(&io);
-  sp_io_write_str(&io, sp_str_lit("  unsigned long long size;"));
-  sp_io_write_new_line(&io);
-  sp_io_write_str(&io, sp_str_lit("} spn_embed_entry_t;"));
-  sp_io_write_new_line(&io);
-  sp_io_write_str(&io, sp_format("static const unsigned int spn_embed_count = {};", SP_FMT_U32(sp_da_size(ctx->entries))));
-  sp_io_write_new_line(&io);
-  sp_io_write_str(&io, sp_str_lit("static const spn_embed_entry_t spn_embed_manifest[] = {"));
-  sp_io_write_new_line(&io);
+  sp_io_write_str(io, sp_str_lit("typedef struct {"), SP_NULLPTR);
+  sp_io_write_new_line(io);
+  sp_io_write_str(io, sp_str_lit("  const char* path;"), SP_NULLPTR);
+  sp_io_write_new_line(io);
+  sp_io_write_str(io, sp_str_lit("  const void* data;"), SP_NULLPTR);
+  sp_io_write_new_line(io);
+  sp_io_write_str(io, sp_str_lit("  unsigned long long size;"), SP_NULLPTR);
+  sp_io_write_new_line(io);
+  sp_io_write_str(io, sp_str_lit("} spn_embed_entry_t;"), SP_NULLPTR);
+  sp_io_write_new_line(io);
+  sp_fmt_io(io, "static const unsigned int spn_embed_count = {};", SP_FMT_U32(sp_da_size(ctx->entries)));
+  sp_io_write_new_line(io);
+  sp_io_write_str(io, sp_str_lit("static const spn_embed_entry_t spn_embed_manifest[] = {"), SP_NULLPTR);
+  sp_io_write_new_line(io);
   sp_da_for(ctx->entries, it) {
     spn_cc_embed_t entry = ctx->entries[it];
-    sp_io_write_cstr(&io, "  { ");
-    sp_io_write_str(&io, sp_format("\"{}\", {}, {}", SP_FMT_STR(entry.path), SP_FMT_STR(entry.symbol), SP_FMT_U64(entry.size)));
-    sp_io_write_cstr(&io, " },");
-    sp_io_write_new_line(&io);
+    sp_io_write_cstr(io, "  { ", SP_NULLPTR);
+    sp_fmt_io(io, "\"{}\", {}, {}", SP_FMT_STR(entry.path), SP_FMT_STR(entry.symbol), SP_FMT_U64(entry.size));
+    sp_io_write_cstr(io, " },", SP_NULLPTR);
+    sp_io_write_new_line(io);
   }
-  sp_io_write_str(&io, sp_str_lit("};"));
-  sp_io_write_new_line(&io);
+  sp_io_write_str(io, sp_str_lit("};"), SP_NULLPTR);
+  sp_io_write_new_line(io);
 
-  sp_io_writer_close(&io);
+  sp_io_writer_close(io);
   return SPN_OK;
 }
 
 void spn_cc_to_ps(spn_cc_t* cc, sp_ps_config_t* ps) {
   ps->command = cc->compiler.program;
   sp_da_for(cc->compiler.args, ai) {
-    sp_ps_config_add_arg(ps, cc->compiler.args[ai]);
+    sp_ps_config_add_arg(spn_allocator, ps, cc->compiler.args[ai]);
   }
 
   // Clang and Zig require an explicit --target flag for cross-compilation.
@@ -217,33 +217,33 @@ void spn_cc_to_ps(spn_cc_t* cc, sp_ps_config_t* ps) {
     spn_triple_t target = { cc->arch, cc->os, cc->abi };
     sp_str_t target_str = spn_triple_to_cc_target(target);
     if (!sp_str_empty(target_str)) {
-      sp_ps_config_add_arg(ps, sp_format("--target={}", SP_FMT_STR(target_str)));
+      sp_ps_config_add_arg(spn_allocator, ps, sp_format("--target={}", SP_FMT_STR(target_str)));
     }
   }
 
   sp_da_for(cc->include, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->include[it], SPN_GEN_INCLUDE, cc->driver));
+    sp_ps_config_add_arg(spn_allocator, ps, spn_gen_format_entry(cc->include[it], SPN_GEN_INCLUDE, cc->driver));
   }
   sp_da_for(cc->define, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(cc->define[it], SPN_GEN_DEFINE, cc->driver));
+    sp_ps_config_add_arg(spn_allocator, ps, spn_gen_format_entry(cc->define[it], SPN_GEN_DEFINE, cc->driver));
   }
 
-  sp_ps_config_add_arg(ps, spn_cc_c_standard_to_switch(cc->standard));
-  sp_ps_config_add_arg(ps, spn_cc_build_mode_to_switch(cc->mode));
+  sp_ps_config_add_arg(spn_allocator, ps, spn_cc_c_standard_to_switch(cc->standard));
+  sp_ps_config_add_arg(spn_allocator, ps, spn_cc_build_mode_to_switch(cc->mode));
 }
 
 void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps) {
   switch (target->kind) {
     case SPN_CC_OUTPUT_OBJECT: {
-      sp_ps_config_add_arg(ps, sp_str_lit("-c"));
+      sp_ps_config_add_arg(spn_allocator, ps, sp_str_lit("-c"));
       break;
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
-      sp_ps_config_add_arg(ps, sp_str_lit("-shared"));
+      sp_ps_config_add_arg(spn_allocator, ps, sp_str_lit("-shared"));
       break;
     }
     case SPN_CC_OUTPUT_EXE: {
-      sp_ps_config_add_arg(ps, spn_cc_lib_kind_to_switch(cc->linkage));
+      sp_ps_config_add_arg(spn_allocator, ps, spn_cc_lib_kind_to_switch(cc->linkage));
       break;
     }
     case SPN_CC_OUTPUT_STATIC_LIB:
@@ -254,34 +254,34 @@ void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* 
 
   spn_cc_driver_t driver = cc->driver;
   sp_da_for(target->source, it) {
-    sp_ps_config_add_arg(ps, target->source[it]);
+    sp_ps_config_add_arg(spn_allocator, ps, target->source[it]);
   }
   sp_da_for(target->include, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->include[it], SPN_GEN_INCLUDE, driver));
+    sp_ps_config_add_arg(spn_allocator, ps, spn_gen_format_entry(target->include[it], SPN_GEN_INCLUDE, driver));
   }
   sp_da_for(target->define, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->define[it], SPN_GEN_DEFINE, driver));
+    sp_ps_config_add_arg(spn_allocator, ps, spn_gen_format_entry(target->define[it], SPN_GEN_DEFINE, driver));
   }
 
   sp_da_for(target->flags, it) {
-    sp_ps_config_add_arg(ps, target->flags[it]);
+    sp_ps_config_add_arg(spn_allocator, ps, target->flags[it]);
   }
   sp_da_for(target->lib_dirs, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->lib_dirs[it], SPN_GEN_LIB_INCLUDE, driver));
+    sp_ps_config_add_arg(spn_allocator, ps, spn_gen_format_entry(target->lib_dirs[it], SPN_GEN_LIB_INCLUDE, driver));
   }
   sp_da_for(target->libs, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->libs[it], SPN_GEN_LIBS, driver));
+    sp_ps_config_add_arg(spn_allocator, ps, spn_gen_format_entry(target->libs[it], SPN_GEN_LIBS, driver));
   }
   sp_da_for(target->system_libs, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->system_libs[it], SPN_GEN_SYSTEM_LIBS, driver));
+    sp_ps_config_add_arg(spn_allocator, ps, spn_gen_format_entry(target->system_libs[it], SPN_GEN_SYSTEM_LIBS, driver));
   }
   sp_da_for(target->rpath, it) {
-    sp_ps_config_add_arg(ps, spn_gen_format_entry(target->rpath[it], SPN_GEN_RPATH, driver));
+    sp_ps_config_add_arg(spn_allocator, ps, spn_gen_format_entry(target->rpath[it], SPN_GEN_RPATH, driver));
   }
 
-  sp_ps_config_add_arg(ps, sp_str_lit("-Werror=return-type"));
-  sp_ps_config_add_arg(ps, sp_str_lit("-o"));
-  sp_ps_config_add_arg(ps, sp_fs_join_path(cc->dir, target->output));
+  sp_ps_config_add_arg(spn_allocator, ps, sp_str_lit("-Werror=return-type"));
+  sp_ps_config_add_arg(spn_allocator, ps, sp_str_lit("-o"));
+  sp_ps_config_add_arg(spn_allocator, ps, sp_fs_join_path(spn_allocator, cc->dir, target->output));
 }
 
 spn_err_t spn_cc_target_to_tcc(spn_cc_t* cc, spn_cc_target_t* target, spn_tcc_t* tcc) {
@@ -341,7 +341,7 @@ spn_cc_run_t spn_cc_target_run(spn_cc_target_t* target, sp_str_t cwd) {
   spn_cc_target_to_ps(target->cc, target, &ps);
 
   sp_tm_timer_t timer = sp_tm_start_timer();
-  sp_ps_output_t result = sp_ps_run(ps);
+  sp_ps_output_t result = sp_ps_run(spn_allocator, ps);
   u64 elapsed = sp_tm_read_timer(&timer);
 
   sp_str_builder_t log = SP_ZERO_INITIALIZE();

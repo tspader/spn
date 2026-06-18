@@ -7,7 +7,7 @@
 #include "semver/convert.h"
 
 spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
-  sp_str_t manifest_path = sp_fs_join_path(opts->cwd, sp_str_lit("spn.toml"));
+  sp_str_t manifest_path = sp_fs_join_path(spn_allocator, opts->cwd, sp_str_lit("spn.toml"));
 
   if (!sp_fs_exists(manifest_path)) {
     return (spn_err_union_t) {

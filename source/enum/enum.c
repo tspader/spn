@@ -179,7 +179,7 @@ spn_build_mode_t spn_dep_build_mode_from_str(sp_str_t str) {
     return SPN_BUILD_MODE_NONE;
   }
 
-  SP_FATAL("Unknown mode {:fg brightyellow}; options are [release, debug]", SP_FMT_STR(str));
+  SP_FATAL("Unknown mode {.fg brightyellow}; options are [release, debug]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_BUILD_MODE_RELEASE);
 }
 

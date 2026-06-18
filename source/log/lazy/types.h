@@ -5,6 +5,7 @@
 
 typedef struct {
   sp_io_writer_t     writer;
+  sp_io_writer_t*    file;
   sp_str_t           path;
   sp_io_write_mode_t mode;
   bool               opened;

@@ -27,12 +27,12 @@ static bool run_path_is_absolute(sp_str_t path) {
 
 static sp_str_t run_resolve_source_path(sp_str_t path) {
   if (run_path_is_absolute(path) && sp_fs_exists(path)) {
-    return sp_fs_canonicalize_path(path);
+    return sp_fs_canonicalize_path(spn_allocator, path);
   }
 
-  sp_str_t project_path = sp_fs_join_path(spn.paths.project, path);
+  sp_str_t project_path = sp_fs_join_path(spn_allocator, spn.paths.project, path);
   if (sp_fs_exists(project_path)) {
-    return sp_fs_canonicalize_path(project_path);
+    return sp_fs_canonicalize_path(spn_allocator, project_path);
   }
 
   return sp_str_lit("");
@@ -43,23 +43,23 @@ static spn_task_result_t run_script(spn_app_t* app) {
 
   spn_pkg_unit_t* root = spn_session_find_root(session);
   if (!root) {
-    spn_log_error("script {:fg brightyellow} was not built", SP_FMT_STR(app->config.run.target));
+    spn_log_error("script {.fg brightyellow} was not built", SP_FMT_STR(app->config.run.target));
     return SPN_TASK_ERROR;
   }
 
   spn_target_unit_t* unit = spn_session_find_target_in_pkg(session, root, app->config.run.target);
   if (!unit) {
-    spn_log_error("script {:fg brightyellow} was not built", SP_FMT_STR(app->config.run.target));
+    spn_log_error("script {.fg brightyellow} was not built", SP_FMT_STR(app->config.run.target));
     return SPN_TASK_ERROR;
   }
 
   sp_str_t command = get_target_output_path(unit);
   if (!sp_fs_exists(command)) {
-    spn_log_error("script binary {:fg brightyellow} does not exist", SP_FMT_STR(command));
+    spn_log_error("script binary {.fg brightyellow} does not exist", SP_FMT_STR(command));
     return SPN_TASK_ERROR;
   }
 
-  sp_ps_output_t result = sp_ps_run((sp_ps_config_t) {
+  sp_ps_output_t result = sp_ps_run(spn_allocator, (sp_ps_config_t) {
     .command = command,
     .cwd = root->paths.source,
     .io = {
@@ -70,7 +70,7 @@ static spn_task_result_t run_script(spn_app_t* app) {
   });
 
   if (result.status.exit_code) {
-    spn_log_error("script {:fg brightyellow} failed with exit code {}",
+    spn_log_error("script {.fg brightyellow} failed with exit code {}",
       SP_FMT_STR(unit->info->name),
       SP_FMT_S32(result.status.exit_code)
     );
@@ -99,7 +99,7 @@ static void add_build_deps(spn_app_t* app, spn_cc_target_t* target) {
 static spn_task_result_t run_source(spn_app_t* app) {
   sp_str_t path = run_resolve_source_path(app->config.run.target);
   if (sp_str_empty(path) || !sp_fs_exists(path)) {
-    spn_log_error("source file {:fg brightyellow} does not exist", SP_FMT_STR(app->config.run.target));
+    spn_log_error("source file {.fg brightyellow} does not exist", SP_FMT_STR(app->config.run.target));
     return SPN_TASK_ERROR;
   }
 
@@ -111,29 +111,29 @@ static spn_task_result_t run_source(spn_app_t* app) {
   add_build_deps(app, target);
   spn_cc_target_add_absolute_source(target, path);
 
-  spn_tcc_t* tcc = sp_alloc_type(spn_tcc_t);
+  spn_tcc_t* tcc = sp_alloc_type(spn_allocator, spn_tcc_t);
   spn_tcc_init(tcc);
   if (spn_cc_target_to_tcc(&cc, target, tcc)) {
-    spn_log_error("failed to compile {:fg brightyellow}", SP_FMT_STR(path));
+    spn_log_error("failed to compile {.fg brightyellow}", SP_FMT_STR(path));
     return SPN_TASK_ERROR;
   }
 
   c8* argv[] = {
-    (c8*)sp_str_to_cstr(path),
+    (c8*)sp_str_to_cstr(spn_allocator, path),
     SP_NULLPTR,
   };
 
-  sp_str_t cwd = sp_fs_get_cwd();
-  if (sp_chdir(sp_str_to_cstr(spn.paths.project))) {
-    spn_log_error("failed to change directory to {:fg brightyellow}", SP_FMT_STR(spn.paths.project));
+  sp_str_t cwd = sp_fs_get_cwd(spn_allocator);
+  if (sp_sys_chdir_s(spn.paths.project)) {
+    spn_log_error("failed to change directory to {.fg brightyellow}", SP_FMT_STR(spn.paths.project));
     return SPN_TASK_ERROR;
   }
 
   s32 result = tcc_run(tcc->s, 1, argv);
-  sp_chdir(sp_str_to_cstr(cwd));
+  sp_sys_chdir_s(cwd);
 
   if (result) {
-    spn_log_error("source run failed for {:fg brightyellow} with exit code {}",
+    spn_log_error("source run failed for {.fg brightyellow} with exit code {}",
       SP_FMT_STR(path),
       SP_FMT_S32(result)
     );

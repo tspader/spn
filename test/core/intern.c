@@ -34,8 +34,8 @@ UTEST_F(intern, hello) {
     u64 f;
   } markers = SP_ZERO_INITIALIZE();
 
-  sp_intern_t* intern = sp_alloc_type(sp_intern_t);
-  sp_intern_init(intern);
+  sp_intern_t* intern = sp_alloc_type(spn_allocator, sp_intern_t);
+  sp_intern_init(intern, spn_allocator);
   EXPECT_EQ(sp_intern_size(intern), 1);
 
   sp_str_t a = intern_and_mark(intern, "a", &markers.a);

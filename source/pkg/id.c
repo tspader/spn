@@ -19,7 +19,7 @@ sp_intern_str_t spn_pkg_canonicalize_pair(sp_str_t namespace, sp_str_t name) {
 
 sp_intern_str_t spn_pkg_id_to_qualified_name(spn_pkg_id_t id) {
   sp_str_t namespace = sp_str_empty(id.namespace) ? spn_intern_lit("core") : id.namespace;
-  sp_str_t qualified = sp_str_join(namespace, id.name, strl("/"));
+  sp_str_t qualified = sp_str_join(spn_allocator, namespace, id.name, strl("/"));
   return spn_intern(qualified);
 }
 

@@ -32,12 +32,12 @@ typedef struct {
 void modify_index(sp_str_t dir) {
   static u32 it = 0;
 
-  sp_str_t file = sp_fs_join_path(dir, sp_str_lit("seed.txt"));
+  sp_str_t file = sp_fs_join_path(spn_allocator, dir, sp_str_lit("seed.txt"));
   sp_str_t content = sp_format("{}", SP_FMT_U32(it++));
 
-  sp_io_writer_t io = sp_io_writer_from_file(file, SP_IO_WRITE_MODE_OVERWRITE);
-  sp_io_write_str(&io, content);
-  sp_io_writer_close(&io);
+  sp_io_writer_t* io = sp_io_writer_from_file(file, SP_IO_WRITE_MODE_OVERWRITE);
+  sp_io_write_str(io, content, SP_NULLPTR);
+  sp_io_writer_close(io);
 
   git_repo_stage_all(dir);
   git_repo_commit(dir, sp_str_lit("seed"));
@@ -53,8 +53,8 @@ static void run_index_sync_case(s32* utest_result, struct index_sync_fixture* fi
   ctx_t* harness = ctx_get();
   sp_str_t tmp = tmpfs_get(&harness->fs, sp_str_view(c.name));
 
-  sp_str_t remote = sp_fs_join_path(tmp, sp_str_lit("remote/index"));
-  sp_str_t cache = sp_fs_join_path(tmp, sp_str_lit("cache/index"));
+  sp_str_t remote = sp_fs_join_path(spn_allocator, tmp, sp_str_lit("remote/index"));
+  sp_str_t cache = sp_fs_join_path(spn_allocator, tmp, sp_str_lit("cache/index"));
 
   sp_fs_create_dir(remote);
   git_repo_init(remote);

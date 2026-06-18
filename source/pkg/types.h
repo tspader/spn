@@ -5,7 +5,7 @@
 
 #include "forward/types.h"
 #include "intern/types.h"
-#include "ordered_map.h"
+#include "sp/sp_om.h"
 #include "option/types.h"
 #include "semver/types.h"
 #include "toolchain/types.h"

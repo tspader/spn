@@ -303,14 +303,14 @@ SP_PRIVATE void sp_bind_free_field(sp_bind_field_t* field) {
     case SP_BIND_ARRAY: {
       if (field->as.array.element) {
         sp_bind_free_field(field->as.array.element);
-        sp_free(field->as.array.element);
+        spn_free(field->as.array.element);
       }
       break;
     }
     case SP_BIND_MAP: {
       if (field->as.map.value) {
         sp_bind_free_field(field->as.map.value);
-        sp_free(field->as.map.value);
+        spn_free(field->as.map.value);
       }
       break;
     }
@@ -330,7 +330,7 @@ SP_PRIVATE void sp_bind_free_field(sp_bind_field_t* field) {
 void sp_bind_free(sp_bind_t* bind) {
   SP_ASSERT(bind);
   sp_bind_free_field(bind);
-  sp_free(bind);
+  spn_free(bind);
 }
 
 #endif // SPN_BIND_H

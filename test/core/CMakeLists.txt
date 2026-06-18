@@ -11,6 +11,7 @@ add_executable(load
   ${SRC}/semver/convert.c
   ${SRC}/semver/parser.c
   ${SRC}/target/mutate.c
+  ${SRC}/sp/str.c
   manifest.c
   ${TEST_TOOLS}/harness.c
   ${TEST_TOOLS}/tmp.c
@@ -36,16 +37,17 @@ spn_test_binary(lock)
 add_test(NAME lock COMMAND "$<TARGET_FILE:lock>")
 
 add_executable(graph
-  ${SRC}/graph/graph.c
-  ${SRC}/sp/tm.c
   graph.c
-  ${TEST_TOOLS}/tmp.c
 )
 spn_test_binary(graph)
+target_include_directories(graph BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/test/sp_test ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(graph PRIVATE SP_IMPLEMENTATION SP_TEST_IMPLEMENTATION SP_GRAPH_IMPLEMENTATION)
 add_test(NAME graph COMMAND "$<TARGET_FILE:graph>")
 
 add_executable(lazy
   ${SRC}/log/lazy/lazy.c
+  ${SRC}/sp/io.c
+  ${SRC}/sp/str.c
   lazy.c
   ${TEST_TOOLS}/tmp.c
 )

@@ -48,15 +48,15 @@ spn_dep_option_t parse_option(toml_table_t* toml, const c8* key) {
   if (!toml_value_string(unparsed, &cstr, &len)) {
     return (spn_dep_option_t) {
       .kind = SPN_DEP_OPTION_KIND_STR,
-      .name = sp_str_from_cstr(key),
-      .str = sp_str_from_cstr(cstr)
+      .name = sp_str_from_cstr(spn_allocator, key),
+      .str = sp_str_from_cstr(spn_allocator, cstr)
     };
   }
 
   if (!toml_value_int(unparsed, &s)) {
     return (spn_dep_option_t) {
       .kind = SPN_DEP_OPTION_KIND_S64,
-      .name = sp_str_from_cstr(key),
+      .name = sp_str_from_cstr(spn_allocator, key),
       .s = s
     };
   }
@@ -64,7 +64,7 @@ spn_dep_option_t parse_option(toml_table_t* toml, const c8* key) {
   if (!toml_value_bool(unparsed, &b)) {
     return (spn_dep_option_t) {
       .kind = SPN_DEP_OPTION_KIND_BOOL,
-      .name = sp_str_from_cstr(key),
+      .name = sp_str_from_cstr(spn_allocator, key),
       .b = b
     };
   }
@@ -572,11 +572,11 @@ static spn_err_union_t load_deps(toml_loader_t* loader, toml_table_t* toml, spn_
     if (sp_str_starts_with(version, prefix)) {
       sp_str_t path = sp_str_strip_left(version, prefix);
       if (!is_path_absolute(path)) {
-        path = sp_fs_join_path(loader->paths.dir, path);
+        path = sp_fs_join_path(spn_allocator, loader->paths.dir, path);
       }
 
       req.source = SPN_PKG_SOURCE_FILE;
-      req.file.path = sp_fs_normalize_path(path);
+      req.file.path = sp_fs_normalize_path(spn_allocator, path);
     }
     else {
       req.source = SPN_PKG_SOURCE_INDEX;
@@ -594,7 +594,7 @@ static spn_toolchain_launcher_t split_launcher(sp_str_t str) {
   if (sp_str_empty(str)) return launcher;
 
   if (sp_str_contains(str, sp_str_lit(" "))) {
-    sp_da(sp_str_t) parts = sp_str_split_c8(str, ' ');
+    sp_da(sp_str_t) parts = sp_str_split_c8(spn_allocator, str, ' ');
     launcher.program = spn_intern(parts[0]);
     for (u32 i = 1; i < sp_da_size(parts); i++) {
       sp_da_push(launcher.args, spn_intern(parts[i]));
@@ -756,7 +756,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
   spn_toml_arr_for(include, it) {
     sp_str_t value = SP_ZERO_INITIALIZE();
     spn_try_union(toml_get_array_string_required(include, it, package_path, "include", &value));
-    spn_pkg_add_include_ex(pkg, sp_fs_join_path(toml.paths.dir, value));
+    spn_pkg_add_include_ex(pkg, sp_fs_join_path(spn_allocator, toml.paths.dir, value));
   }
 
   toml_array_t* define = toml_table_array(toml.package, "define");
@@ -979,7 +979,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
 
     sp_da_for(configs, it) {
       toml_table_t* config = configs[it];
-      sp_str_t name = sp_str_from_cstr(config->key);
+      sp_str_t name = sp_str_from_cstr(spn_allocator, config->key);
 
       spn_dep_options_t options = SP_NULLPTR;
       sp_ht_set_fns(options, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);

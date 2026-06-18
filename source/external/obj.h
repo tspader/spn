@@ -16,7 +16,7 @@ typedef struct {
   spn_obj_kind_t kind;
   union {
     struct { sp_coff_t* coff; sp_coff_section_t* section; } coff;
-    struct { sp_elf_t* elf; } elf;
+    struct { sp_elf_t* elf; u32 rodata; } elf;
   };
 } spn_obj_builder_t;
 

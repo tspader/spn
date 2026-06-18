@@ -276,7 +276,7 @@ static void write_publish_fixtures(ctx_t* harness, const c8* name, const publish
 
     tmpfs_create(
       &harness->fs,
-      sp_fs_join_path(prefix, sp_fs_join_path(sp_str_lit("index"), sp_str_view(file.path))),
+      sp_fs_join_path(spn_allocator, prefix, sp_fs_join_path(spn_allocator, sp_str_lit("index"), sp_str_view(file.path))),
       sp_str_builder_to_str(&builder)
     );
   }
@@ -286,7 +286,7 @@ static void run_publish_case(s32* utest_result, struct index_publish* fixture, p
   ctx_t* harness = ctx_get();
   sp_str_t case_root = tmpfs_get(&harness->fs, sp_str_view(c.name));
 
-  sp_str_t index_root = sp_fs_join_path(case_root, sp_str_lit("index"));
+  sp_str_t index_root = sp_fs_join_path(spn_allocator, case_root, sp_str_lit("index"));
   sp_fs_create_dir(index_root);
 
   write_publish_fixtures(harness, c.name, c.fixture.files);
@@ -312,14 +312,14 @@ static void run_publish_case(s32* utest_result, struct index_publish* fixture, p
   if (c.expect.lines > 0) {
     sp_str_t ns = sp_str_view(c.release.namespace);
     sp_str_t nm = sp_str_view(c.release.name);
-    sp_str_t pkg_path = sp_fs_join_path(
-      sp_fs_join_path(index_root, ns),
+    sp_str_t pkg_path = sp_fs_join_path(spn_allocator, 
+      sp_fs_join_path(spn_allocator, index_root, ns),
       sp_format("{}.jsonl", SP_FMT_STR(nm))
     );
 
     EXPECT_TRUE(sp_fs_exists(pkg_path));
     if (sp_fs_exists(pkg_path)) {
-      sp_str_t content = sp_io_read_file(pkg_path);
+      sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, pkg_path, &content);
       u32 count = 0;
       sp_str_for_line(content, line_it) {
         sp_str_t line = sp_str_trim(line_it.line);

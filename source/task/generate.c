@@ -71,13 +71,13 @@
 //   sp_da_for(builds, it) {
 //     spn_build_ctx_t* build = builds[it];
 //     sp_da(sp_str_t) dep_entries = spn_gen_build_entry(build, kind, driver);
-//     sp_str_t dep_flags = sp_str_join_n(dep_entries, sp_da_size(dep_entries), sp_str_lit(" "));
+//     sp_str_t dep_flags = sp_str_join_n(spn_allocator, dep_entries, sp_da_size(dep_entries), sp_str_lit(" "));
 //     if (!sp_str_empty(dep_flags)) {
 //       sp_da_push(entries, dep_flags);
 //     }
 //   }
 //
-//   return sp_str_join_n(entries, sp_da_size(entries), sp_str_lit(" "));
+//   return sp_str_join_n(spn_allocator, entries, sp_da_size(entries), sp_str_lit(" "));
 // }
 
 spn_task_result_t spn_task_generate(spn_app_t* app) {
@@ -102,7 +102,7 @@ spn_task_result_t spn_task_generate(spn_app_t* app) {
   //   .driver = gen.compiler
   // };
   // sp_dyn_array(sp_str_t) entries = sp_str_map(app->resolver->system_deps, sp_dyn_array_size(app->resolver->system_deps), &fmt, spn_gen_format_entry_kernel);
-  // gen.system_libs = sp_str_join_n(entries, sp_dyn_array_size(entries), sp_str_lit(" "));
+  // gen.system_libs = sp_str_join_n(spn_allocator, entries, sp_dyn_array_size(entries), sp_str_lit(" "));
   //
   // switch (gen.kind) {
   //   case SPN_GEN_KIND_RAW: {
@@ -177,7 +177,7 @@ spn_task_result_t spn_task_generate(spn_app_t* app) {
   //       SP_FMT_STR(gen.system_libs),
   //       SP_FMT_STR(gen.rpath)
   //     );
-  //     gen.output = sp_str_concat(formatted, template_end);
+  //     gen.output = sp_str_concat(spn_allocator, formatted, template_end);
   //     break;
   //   }
   //
@@ -210,15 +210,15 @@ spn_task_result_t spn_task_generate(spn_app_t* app) {
   // }
   //
   // if (sp_str_valid(command->path)) {
-  //   sp_str_t destination = sp_fs_normalize_path(command->path);
+  //   sp_str_t destination = sp_fs_normalize_path(spn_allocator, command->path);
   //   if (!sp_str_starts_with(destination, sp_str_lit("/"))) {
-  //     destination = sp_fs_join_path(spn.paths.cwd, destination);
+  //     destination = sp_fs_join_path(spn_allocator, spn.paths.cwd, destination);
   //   }
   //   sp_fs_create_dir(destination);
   //
-  //   sp_str_t file_path = sp_fs_join_path(destination, gen.file_name);
+  //   sp_str_t file_path = sp_fs_join_path(spn_allocator, destination, gen.file_name);
   //   sp_io_writer_t file = sp_io_writer_from_file(file_path, SP_IO_WRITE_MODE_OVERWRITE);
-  //   if (sp_io_write_str(&file, gen.output) != gen.output.len) {
+  //   if (sp_io_write_str(&file, gen.output, SP_NULLPTR) != gen.output.len) {
   //     SP_FATAL("Failed to write {}", SP_FMT_STR(file_path));
   //   }
   //   sp_io_writer_close(&file);
@@ -230,7 +230,7 @@ spn_task_result_t spn_task_generate(spn_app_t* app) {
   // }
   // else {
   //   // Write directly to stdout without treating as format string
-  //   sp_io_write_str(&spn.logger.out, gen.output);
+  //   sp_io_write_str(&spn.logger.out, gen.output, SP_NULLPTR);
   // }
   //
   return SPN_TASK_DONE;

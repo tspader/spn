@@ -37,7 +37,6 @@ set(SPN_SOURCES
   gen.c
   git/cache.c
   git/key.c
-  graph/graph.c
   index/cache.c
   index/index.c
   index/json.c
@@ -57,7 +56,6 @@ set(SPN_SOURCES
   semver/parser.c
   session/registry/registry.c
   session/session.c
-  signal.c
   sp/cli.c
   sp/color.c
   sp/io.c
@@ -104,6 +102,7 @@ target_include_directories(spn PRIVATE
   ${STORE}/include
 )
 target_link_libraries(spn PRIVATE m ${TCC_LIB})
+target_compile_options(spn PRIVATE -include ${SRC}/sp/compat.h)
 add_dependencies(spn headers tcc spn_embed)
 
 set_source_files_properties(${EMBED_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)

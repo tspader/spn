@@ -40,14 +40,14 @@ void run_lazy_log_test(s32* utest_result, tmpfs_t* fs, lazy_log_test_t t) {
 
   sp_carr_for(t.writes, it) {
     if (!t.writes[it]) break;
-    sp_io_write_str(&log.writer, sp_str_view(t.writes[it]));
+    sp_io_write_str(&log.writer, sp_str_view(t.writes[it]), SP_NULLPTR);
   }
 
   sp_io_writer_close(&log.writer);
 
   if (t.expect.content) {
     EXPECT_TRUE(sp_fs_exists(path));
-    EXPECT_TRUE(sp_str_equal(sp_io_read_file(path), sp_str_view(t.expect.content)));
+    EXPECT_TRUE(spn_test_read_eq(path, t.expect.content));
   } else {
     EXPECT_FALSE(sp_fs_exists(path));
   }

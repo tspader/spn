@@ -68,7 +68,7 @@ spn_lock_file_t spn_lock_file_parse(sp_str_t toml, spn_event_buffer_t* events) {
   spn_lock_file_init(&lock);
 
   c8 parse_err[1024] = {0};
-  toml_table_t* root = toml_parse(sp_str_to_cstr(toml), parse_err, SP_CARR_LEN(parse_err));
+  toml_table_t* root = toml_parse(sp_str_to_cstr(spn_allocator, toml), parse_err, SP_CARR_LEN(parse_err));
   if (!root) {
     if (events) {
       spn_event_buffer_push(events, (spn_build_event_t) {
@@ -130,7 +130,7 @@ spn_lock_file_t spn_lock_file_parse(sp_str_t toml, spn_event_buffer_t* events) {
 
 spn_lock_file_t spn_lock_file_load(sp_str_t path, spn_event_buffer_t* events) {
   SP_ASSERT(sp_fs_exists(path));
-  sp_str_t contents = sp_io_read_file(path);
+  sp_str_t contents = sp_zero; sp_io_read_file(spn_allocator, path, &contents);
   return spn_lock_file_parse(contents, events);
 }
 

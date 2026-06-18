@@ -523,7 +523,7 @@ UTEST_F(spn_dispatch, handler_receives_user_data) {
   run_cli(&root, (spn_cli_t*)&dummy_cli_data, args, 0);
 
   u64 captured = (u64)captured_cli;
-  EXPECT_EQ(dummy_cli_data, captured);
+  EXPECT_EQ((u64)&dummy_cli_data, captured);
 }
 
 UTEST_F(spn_dispatch, no_handler_no_subcommands) {

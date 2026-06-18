@@ -28,7 +28,7 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
     spn_embed_t embed = info->embed[it];
     sp_str_t symbol = embed.symbol;
     spn_embed_types_t types = embed.types;
-    sp_io_reader_t io = SP_ZERO_INITIALIZE();
+    sp_io_reader_t* io = SP_NULLPTR;
 
     if (sp_str_empty(types.data)) {
       types.data = spn_intern_cstr("unsigned char");
@@ -40,7 +40,8 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
 
     switch (embed.kind) {
       case SPN_EMBED_MEM: {
-        io = sp_io_reader_from_mem(embed.memory.buffer, embed.memory.size);
+        io = sp_alloc_type(spn_allocator, sp_io_reader_t);
+        sp_io_reader_from_mem(io, embed.memory.buffer, embed.memory.size);
         break;
       }
       case SPN_EMBED_FILE: {
@@ -62,17 +63,17 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
         break;
       }
       case SPN_EMBED_DIR: {
-        sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(embed.dir.path);
+        sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(spn_allocator, embed.dir.path);
         sp_da_for(entries, e) {
-          if (!sp_fs_is_file(entries[e].file_path)) continue;
-          sp_str_t rel = sp_str_suffix(entries[e].file_path, entries[e].file_path.len - embed.dir.path.len - 1);
-          sp_io_reader_t dir_io = sp_io_reader_from_file(entries[e].file_path);
+          if (!sp_fs_is_file(entries[e].path)) continue;
+          sp_str_t rel = sp_str_suffix(entries[e].path, entries[e].path.len - embed.dir.path.len - 1);
+          sp_io_reader_t* dir_io = sp_io_reader_from_file(entries[e].path);
           if (spn_cc_embed_ctx_add(&embedder, dir_io, spn_cc_symbol_from_embedded_file(rel), rel, types.data, types.size)) {
             spn_event_buffer_push(spn.events, (spn_build_event_t) {
               .kind = SPN_EVENT_EMBED_FAILED,
               .pkg = unit->pkg->info,
               .io = &unit->logs,
-              .embed_failed = { .path = entries[e].file_path, .error = sp_str_lit("embed add failed") },
+              .embed_failed = { .path = entries[e].path, .error = sp_str_lit("embed add failed") },
             });
             return SPN_ERROR;
           }

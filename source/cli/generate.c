@@ -7,7 +7,7 @@ sp_app_result_t spn_cli_generate(spn_cli_t* cli) {
 
   if (sp_str_valid(command->path) && !sp_str_valid(command->generator)) {
     SP_FATAL(
-      "output path was specified, but no generator. try e.g.:\n  spn generate --path {} {:fg yellow}",
+      "output path was specified, but no generator. try e.g.:\n  spn generate --path {} {.fg yellow}",
       SP_FMT_STR(command->path),
       SP_FMT_CSTR("--generator make")
     );
@@ -16,7 +16,7 @@ sp_app_result_t spn_cli_generate(spn_cli_t* cli) {
   if (!sp_str_valid(command->compiler)) command->compiler = sp_str_lit("gcc");
 
   if (!app.lock.some) {
-    SP_FATAL("No lock file found. Run {:fg yellow} first.", SP_FMT_CSTR("spn build"));
+    SP_FATAL("No lock file found. Run {.fg yellow} first.", SP_FMT_CSTR("spn build"));
   }
 
   spn_task_enqueue(&app.tasks, SPN_TASK_RESOLVE);

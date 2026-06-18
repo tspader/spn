@@ -86,7 +86,7 @@ sp_str_t sp_msvc_bin_subdir(sp_msvc_arch_t arch) {
 
 sp_msvc_version_t sp_msvc_parse_version(sp_str_t str) {
   sp_msvc_version_t v = SP_ZERO_INITIALIZE();
-  v.str = sp_str_copy(str);
+  v.str = sp_str_copy(spn_allocator, str);
 
   u32 parts[4] = SP_ZERO_INITIALIZE();
   u32 part = 0;
@@ -175,8 +175,8 @@ sp_msvc_err_t sp_msvc_find_sdks(sp_msvc_arch_t arch, sp_da(sp_msvc_sdk_t)* out) 
 
   if (rc != ERROR_SUCCESS || type != REG_SZ) return SP_MSVC_ERR_SDK_NOT_FOUND;
 
-  sp_str_t sdk_root = sp_fs_normalize_path(sp_str_view(root_buf));
-  sp_str_t lib_dir = sp_fs_join_path(sdk_root, SP_LIT("Lib"));
+  sp_str_t sdk_root = sp_fs_normalize_path(spn_allocator, sp_str_view(root_buf));
+  sp_str_t lib_dir = sp_fs_join_path(spn_allocator, sdk_root, SP_LIT("Lib"));
   sp_str_t arch_str = sp_msvc_arch_str(arch);
 
   for (sp_fs_it_t it = sp_fs_it_new(lib_dir); sp_fs_it_valid(&it); sp_fs_it_next(&it)) {
@@ -184,25 +184,25 @@ sp_msvc_err_t sp_msvc_find_sdks(sp_msvc_arch_t arch, sp_da(sp_msvc_sdk_t)* out) 
     sp_str_t name = it.entry.file_name;
     if (!sp_str_starts_with(name, SP_LIT("10."))) continue;
 
-    sp_str_t ucrt_lib = sp_fs_join_path(
-      sp_fs_join_path(it.entry.file_path, SP_LIT("ucrt")), arch_str
+    sp_str_t ucrt_lib = sp_fs_join_path(spn_allocator, 
+      sp_fs_join_path(spn_allocator, it.entry.file_path, SP_LIT("ucrt")), arch_str
     );
     if (!sp_fs_is_dir(ucrt_lib)) continue;
 
     sp_str_t ver_root = it.entry.file_path;
     sp_msvc_sdk_t sdk = {
       .version     = sp_msvc_parse_version(name),
-      .root        = sp_str_copy(sdk_root),
-      .lib_um      = sp_fs_join_path(sp_fs_join_path(ver_root, SP_LIT("um")), arch_str),
-      .lib_ucrt    = sp_str_copy(ucrt_lib),
-      .include_ucrt   = sp_fs_join_path(
-        sp_fs_join_path(sp_fs_join_path(sdk_root, SP_LIT("Include")), name), SP_LIT("ucrt")
+      .root        = sp_str_copy(spn_allocator, sdk_root),
+      .lib_um      = sp_fs_join_path(spn_allocator, sp_fs_join_path(spn_allocator, ver_root, SP_LIT("um")), arch_str),
+      .lib_ucrt    = sp_str_copy(spn_allocator, ucrt_lib),
+      .include_ucrt   = sp_fs_join_path(spn_allocator, 
+        sp_fs_join_path(spn_allocator, sp_fs_join_path(spn_allocator, sdk_root, SP_LIT("Include")), name), SP_LIT("ucrt")
       ),
-      .include_um     = sp_fs_join_path(
-        sp_fs_join_path(sp_fs_join_path(sdk_root, SP_LIT("Include")), name), SP_LIT("um")
+      .include_um     = sp_fs_join_path(spn_allocator, 
+        sp_fs_join_path(spn_allocator, sp_fs_join_path(spn_allocator, sdk_root, SP_LIT("Include")), name), SP_LIT("um")
       ),
-      .include_shared = sp_fs_join_path(
-        sp_fs_join_path(sp_fs_join_path(sdk_root, SP_LIT("Include")), name), SP_LIT("shared")
+      .include_shared = sp_fs_join_path(spn_allocator, 
+        sp_fs_join_path(spn_allocator, sp_fs_join_path(spn_allocator, sdk_root, SP_LIT("Include")), name), SP_LIT("shared")
       ),
     };
     sp_da_push(*out, sdk);
@@ -226,7 +226,7 @@ sp_msvc_err_t sp_msvc_find_installations(sp_msvc_arch_t arch, sp_da(sp_msvc_vs_t
   sp_str_t program_data = sp_os_env_get(SP_LIT("ProgramData"));
   if (!sp_str_valid(program_data)) return SP_MSVC_ERR_VS_NOT_FOUND;
 
-  sp_str_t instances_dir = sp_fs_join_path(
+  sp_str_t instances_dir = sp_fs_join_path(spn_allocator, 
     program_data, SP_LIT("Microsoft/VisualStudio/Packages/_Instances")
   );
   if (!sp_fs_is_dir(instances_dir)) return SP_MSVC_ERR_VS_NOT_FOUND;
@@ -236,7 +236,7 @@ sp_msvc_err_t sp_msvc_find_installations(sp_msvc_arch_t arch, sp_da(sp_msvc_vs_t
   for (sp_fs_it_t it = sp_fs_it_new(instances_dir); sp_fs_it_valid(&it); sp_fs_it_next(&it)) {
     if (!(it.entry.kind == SP_FS_KIND_DIR)) continue;
 
-    sp_str_t state_path = sp_fs_join_path(it.entry.file_path, SP_LIT("state.json"));
+    sp_str_t state_path = sp_fs_join_path(spn_allocator, it.entry.file_path, SP_LIT("state.json"));
     if (!sp_fs_exists(state_path)) continue;
 
     sp_str_t json = sp_io_read_file(state_path);
@@ -245,14 +245,14 @@ sp_msvc_err_t sp_msvc_find_installations(sp_msvc_arch_t arch, sp_da(sp_msvc_vs_t
     sp_str_t install_path = sp_msvc_json_get_str(json, SP_LIT("installationPath"));
     if (sp_str_empty(install_path)) continue;
 
-    install_path = sp_fs_normalize_path(install_path);
+    install_path = sp_fs_normalize_path(spn_allocator, install_path);
 
     sp_str_t build_version_str = sp_msvc_json_get_str(json, SP_LIT("buildVersion"));
     if (sp_str_empty(build_version_str)) continue;
 
     sp_str_t product_line = sp_msvc_json_get_str(json, SP_LIT("productLineVersion"));
 
-    sp_str_t tools_file = sp_fs_join_path(
+    sp_str_t tools_file = sp_fs_join_path(spn_allocator, 
       install_path, SP_LIT("VC/Auxiliary/Build/Microsoft.VCToolsVersion.default.txt")
     );
     sp_str_t tools_version_str = sp_io_read_file(tools_file);
@@ -260,28 +260,28 @@ sp_msvc_err_t sp_msvc_find_installations(sp_msvc_arch_t arch, sp_da(sp_msvc_vs_t
 
     tools_version_str = sp_str_trim(tools_version_str);
 
-    sp_str_t tools_base = sp_fs_join_path(
-      sp_fs_join_path(install_path, SP_LIT("VC/Tools/MSVC")), tools_version_str
+    sp_str_t tools_base = sp_fs_join_path(spn_allocator, 
+      sp_fs_join_path(spn_allocator, install_path, SP_LIT("VC/Tools/MSVC")), tools_version_str
     );
 
-    sp_str_t lib_dir = sp_fs_join_path(
-      sp_fs_join_path(tools_base, SP_LIT("Lib")), arch_str
+    sp_str_t lib_dir = sp_fs_join_path(spn_allocator, 
+      sp_fs_join_path(spn_allocator, tools_base, SP_LIT("Lib")), arch_str
     );
 
-    sp_str_t vcruntime = sp_fs_join_path(lib_dir, SP_LIT("vcruntime.lib"));
+    sp_str_t vcruntime = sp_fs_join_path(spn_allocator, lib_dir, SP_LIT("vcruntime.lib"));
     if (!sp_fs_exists(vcruntime)) continue;
 
     sp_msvc_vs_t vs = {
       .version = {
-        .product = sp_str_copy(product_line),
+        .product = sp_str_copy(spn_allocator, product_line),
         .build   = sp_msvc_parse_version(build_version_str),
         .tools   = sp_msvc_parse_version(tools_version_str),
       },
-      .install_path = sp_str_copy(install_path),
-      .lib          = sp_str_copy(lib_dir),
-      .include      = sp_fs_join_path(tools_base, SP_LIT("include")),
-      .bin          = sp_fs_join_path(
-        sp_fs_join_path(tools_base, SP_LIT("bin")), sp_msvc_bin_subdir(arch)
+      .install_path = sp_str_copy(spn_allocator, install_path),
+      .lib          = sp_str_copy(spn_allocator, lib_dir),
+      .include      = sp_fs_join_path(spn_allocator, tools_base, SP_LIT("include")),
+      .bin          = sp_fs_join_path(spn_allocator, 
+        sp_fs_join_path(spn_allocator, tools_base, SP_LIT("bin")), sp_msvc_bin_subdir(arch)
       ),
     };
     sp_da_push(*out, vs);

@@ -2,7 +2,7 @@
 #include "ctx/types.h"
 #include "event/types.h"
 #include "forward/types.h"
-#include "ordered_map.h"
+#include "sp/sp_om.h"
 #include "spn.h"
 #include "target/types.h"
 #include "unit/types.h"
@@ -12,7 +12,7 @@
 #include "graph/graph.h"
 #include "event/event.h"
 #include "session/session.h"
-#include "sp/glob.h"
+#include "sp/sp_glob.h"
 #include "task/build/build.h"
 #include "task/build/nodes/nodes.h"
 #include "task/task.h"
@@ -26,6 +26,7 @@ static spn_err_t prepare_build_graph(spn_app_t* app);
 void spn_task_init_build_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
 
+  spn_bg_init(&session->build.graph, spn_allocator);
   prepare_build_graph(app);
 
   sp_str_om_for(session->units.packages, it) {
@@ -60,7 +61,7 @@ void spn_task_init_build_graph(spn_app_t* app) {
     &session->build.graph,
     session->build.dirty,
     (spn_bg_executor_config_t) {
-      .num_threads = 1,
+      .num_threads = 16,
       .enable_logging = false
     }
   );

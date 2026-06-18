@@ -30,8 +30,8 @@ int main(int argc, const char *const argv[]) {
   ctx_t* ctx = ctx_get();
   ctx_init(ctx_get());
 
-  spn.intern = sp_intern_new();
-  spn.arena = sp_mem_arena_new_ex(256, SP_MEM_ARENA_MODE_NO_REALLOC, 1);
+  spn.intern = sp_intern_new(spn_allocator);
+  spn.arena = sp_mem_arena_new_ex(spn_allocator, 256, 1);
 
   s32 result = utest_main(argc, argv);
 

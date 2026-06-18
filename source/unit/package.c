@@ -15,7 +15,7 @@
 #include <setjmp.h>
 
 sp_str_t spn_pkg_unit_get_node_stamp_file(spn_pkg_unit_t* ctx, spn_user_node_t* node) {
-  return sp_fs_join_path(ctx->paths.stamp.dir, node->tag);
+  return sp_fs_join_path(spn_allocator, ctx->paths.stamp.dir, node->tag);
 }
 
 void spn_pkg_unit_write_stamp(spn_pkg_unit_t* unit, sp_str_t path) {

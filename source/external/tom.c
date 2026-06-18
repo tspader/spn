@@ -21,9 +21,9 @@ toml_table_t* spn_toml_parse_ex(sp_str_t path, bool* parse_error) {
     return SP_NULLPTR;
   }
 
-  sp_str_t file = sp_io_read_file(path);
+  sp_str_t file = sp_zero; sp_io_read_file(spn_allocator, path, &file);
   c8 parse_err[1024] = {0};
-  toml_table_t* toml = toml_parse(sp_str_to_cstr(file), parse_err, SP_CARR_LEN(parse_err));
+  toml_table_t* toml = toml_parse(sp_str_to_cstr(spn_allocator, file), parse_err, SP_CARR_LEN(parse_err));
   if (!toml && parse_error) {
     *parse_error = true;
   }
@@ -33,7 +33,7 @@ toml_table_t* spn_toml_parse_ex(sp_str_t path, bool* parse_error) {
 
 const c8* spn_toml_cstr(toml_table_t* toml, const c8* key) {
   toml_value_t value = toml_table_string(toml, key);
-  SP_ASSERT_FMT(value.ok, "missing string key: {:fg brightcyan}", SP_FMT_CSTR(key));
+  SP_ASSERT_FMT(value.ok, "missing string key: {.fg brightcyan}", SP_FMT_CSTR(key));
   return value.u.s;
 }
 
@@ -104,7 +104,7 @@ void spn_toml_ensure_header_written(spn_toml_writer_t* writer) {
     sp_dyn_array_push(path_parts, writer->stack[it].key);
   }
 
-  sp_str_t path = sp_str_join_n(path_parts, sp_dyn_array_size(path_parts), sp_str_lit("."));
+  sp_str_t path = sp_str_join_n(spn_allocator, path_parts, sp_dyn_array_size(path_parts), sp_str_lit("."));
   if (top->kind == SPN_TOML_CONTEXT_TABLE) {
     sp_str_builder_append_fmt(&writer->builder, "[{}]", SP_FMT_STR(path));
   }
@@ -177,7 +177,7 @@ void spn_toml_append_array_table(spn_toml_writer_t* writer) {
     sp_dyn_array_push(path_parts, writer->stack[it].key);
   }
 
-  sp_str_t path = sp_str_join_n(path_parts, sp_dyn_array_size(path_parts), sp_str_lit("."));
+  sp_str_t path = sp_str_join_n(spn_allocator, path_parts, sp_dyn_array_size(path_parts), sp_str_lit("."));
   sp_str_builder_append_fmt(&writer->builder, "[[{}]]", SP_FMT_STR(path));
   sp_str_builder_new_line(&writer->builder);
 
@@ -188,9 +188,9 @@ void spn_toml_append_str(spn_toml_writer_t* writer, sp_str_t key, sp_str_t value
   spn_toml_ensure_header_written(writer);
   sp_str_builder_append_fmt(
     &writer->builder,
-    "{} = {}",
+    "{} = {.quote}",
     SP_FMT_STR(key),
-    SP_FMT_QUOTED_STR(value)
+    SP_FMT_STR(value)
   );
   sp_str_builder_new_line(&writer->builder);
 }
@@ -235,7 +235,7 @@ void spn_toml_append_str_array(spn_toml_writer_t* writer, sp_str_t key, sp_da(sp
 
   u32 count = sp_dyn_array_size(values);
   for (u32 it = 0; it < count; it++) {
-    sp_str_builder_append_fmt(&writer->builder, "{}", SP_FMT_QUOTED_STR(values[it]));
+    sp_str_builder_append_fmt(&writer->builder, "{.quote}", SP_FMT_STR(values[it]));
     if (it < count - 1) {
       sp_str_builder_append_cstr(&writer->builder, ", ");
     }
@@ -254,7 +254,7 @@ void spn_toml_append_str_carr(spn_toml_writer_t* writer, sp_str_t key, sp_str_t*
   sp_str_builder_append_fmt(&writer->builder, "{} = [", SP_FMT_STR(key));
 
   for (u32 it = 0; it < len; it++) {
-    sp_str_builder_append_fmt(&writer->builder, "{}", SP_FMT_QUOTED_STR(values[it]));
+    sp_str_builder_append_fmt(&writer->builder, "{.quote}", SP_FMT_STR(values[it]));
     if (it < len - 1) {
       sp_str_builder_append_cstr(&writer->builder, ", ");
     }

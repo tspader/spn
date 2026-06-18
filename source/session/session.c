@@ -139,15 +139,15 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
   target->paths.source = pkg->paths.source;
   target->paths.work = pkg->paths.work;
   target->paths.store = pkg->paths.store;
-  target->paths.include = sp_fs_join_path(target->paths.store, SP_LIT("include"));
-  target->paths.bin = sp_fs_join_path(target->paths.store, SP_LIT("bin"));
-  target->paths.lib = sp_fs_join_path(target->paths.store, SP_LIT("lib"));
-  target->paths.vendor = sp_fs_join_path(target->paths.store, SP_LIT("vendor"));
-  target->paths.generated = sp_fs_join_path(target->paths.work, SP_LIT("spn"));
-  target->paths.object = sp_fs_join_path(target->paths.generated, sp_str_lit("object"));
-  target->paths.logs.build = sp_fs_join_path(target->paths.work, sp_format("{}.build.log", SP_FMT_STR(info->name)));
-  target->paths.logs.test = sp_fs_join_path(target->paths.work, sp_format("{}.test.log", SP_FMT_STR(info->name)));
-  target->paths.logs.jsonl = sp_fs_join_path(target->paths.work, sp_format("{}.build.jsonl", SP_FMT_STR(info->name)));
+  target->paths.include = sp_fs_join_path(spn_allocator, target->paths.store, SP_LIT("include"));
+  target->paths.bin = sp_fs_join_path(spn_allocator, target->paths.store, SP_LIT("bin"));
+  target->paths.lib = sp_fs_join_path(spn_allocator, target->paths.store, SP_LIT("lib"));
+  target->paths.vendor = sp_fs_join_path(spn_allocator, target->paths.store, SP_LIT("vendor"));
+  target->paths.generated = sp_fs_join_path(spn_allocator, target->paths.work, SP_LIT("spn"));
+  target->paths.object = sp_fs_join_path(spn_allocator, target->paths.generated, sp_str_lit("object"));
+  target->paths.logs.build = sp_fs_join_path(spn_allocator, target->paths.work, sp_format("{}.build.log", SP_FMT_STR(info->name)));
+  target->paths.logs.test = sp_fs_join_path(spn_allocator, target->paths.work, sp_format("{}.test.log", SP_FMT_STR(info->name)));
+  target->paths.logs.jsonl = sp_fs_join_path(spn_allocator, target->paths.work, sp_format("{}.build.jsonl", SP_FMT_STR(info->name)));
 
   sp_fs_create_dir(target->paths.work);
   sp_fs_create_dir(target->paths.generated);
@@ -177,35 +177,35 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   switch (loaded->source) {
     case SPN_PKG_SOURCE_ROOT:
     case SPN_PKG_SOURCE_FILE: {
-      sp_str_t work = sp_fs_join_path(session->paths.profile, sp_str_lit("work"));
-      unit->paths.work = sp_fs_join_path(work, loaded->info->name);
-      unit->paths.store = sp_fs_join_path(session->paths.profile, sp_str_lit("store"));
+      sp_str_t work = sp_fs_join_path(spn_allocator, session->paths.profile, sp_str_lit("work"));
+      unit->paths.work = sp_fs_join_path(spn_allocator, work, loaded->info->name);
+      unit->paths.store = sp_fs_join_path(spn_allocator, session->paths.profile, sp_str_lit("store"));
       unit->paths.source = loaded->paths.source;
       break;
     }
     case SPN_PKG_SOURCE_INDEX: {
       fingerprint_t id = fingerprint_package(session, loaded->info);
-      unit->paths.work = sp_fs_join_path(sp_fs_join_path(spn.paths.build, loaded->info->qualified), id.str);
-      unit->paths.store = sp_fs_join_path(sp_fs_join_path(spn.paths.store, loaded->info->qualified), id.str);
+      unit->paths.work = sp_fs_join_path(spn_allocator, sp_fs_join_path(spn_allocator, spn.paths.build, loaded->info->qualified), id.str);
+      unit->paths.store = sp_fs_join_path(spn_allocator, sp_fs_join_path(spn_allocator, spn.paths.store, loaded->info->qualified), id.str);
       unit->paths.source = loaded->paths.source;
       break;
     }
   }
 
-  unit->paths.include = sp_fs_join_path(unit->paths.store, SP_LIT("include"));
-  unit->paths.bin = sp_fs_join_path(unit->paths.store, SP_LIT("bin"));
-  unit->paths.lib = sp_fs_join_path(unit->paths.store, SP_LIT("lib"));
-  unit->paths.vendor = sp_fs_join_path(unit->paths.store, SP_LIT("vendor"));
+  unit->paths.include = sp_fs_join_path(spn_allocator, unit->paths.store, SP_LIT("include"));
+  unit->paths.bin = sp_fs_join_path(spn_allocator, unit->paths.store, SP_LIT("bin"));
+  unit->paths.lib = sp_fs_join_path(spn_allocator, unit->paths.store, SP_LIT("lib"));
+  unit->paths.vendor = sp_fs_join_path(spn_allocator, unit->paths.store, SP_LIT("vendor"));
 
-  unit->paths.generated = sp_fs_join_path(unit->paths.work, SP_LIT("spn"));
+  unit->paths.generated = sp_fs_join_path(spn_allocator, unit->paths.work, SP_LIT("spn"));
 
   unit->logs.build = sp_format("{}.build.log", SP_FMT_STR(unit->info->name));
   unit->logs.test = sp_format("{}.test.log", SP_FMT_STR(unit->info->name));
   unit->logs.jsonl = sp_format("{}.jsonl", SP_FMT_STR(unit->info->name));
 
-  unit->paths.logs.build = sp_fs_join_path(unit->paths.work, unit->logs.build);
-  unit->paths.logs.test = sp_fs_join_path(unit->paths.work, unit->logs.test);
-  unit->paths.logs.jsonl = sp_fs_join_path(unit->paths.work, unit->logs.jsonl);
+  unit->paths.logs.build = sp_fs_join_path(spn_allocator, unit->paths.work, unit->logs.build);
+  unit->paths.logs.test = sp_fs_join_path(spn_allocator, unit->paths.work, unit->logs.test);
+  unit->paths.logs.jsonl = sp_fs_join_path(spn_allocator, unit->paths.work, unit->logs.jsonl);
 
   sp_fs_create_dir(unit->paths.work);
   sp_fs_create_dir(unit->paths.generated);
@@ -217,12 +217,12 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   spn_lazy_log_init(&unit->logs.io.build, unit->paths.logs.build, SP_IO_WRITE_MODE_OVERWRITE);
   spn_lazy_log_init(&unit->logs.io.jsonl, unit->paths.logs.jsonl, SP_IO_WRITE_MODE_OVERWRITE);
 
-  unit->paths.stamp.dir = sp_fs_join_path(unit->paths.generated, SP_LIT("stamp"));
-  unit->paths.stamp.main = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("main.stamp"));
-  unit->paths.stamp.exit = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("user.stamp"));
-  unit->paths.stamp.configure = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("configure.stamp"));
-  unit->paths.stamp.build = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("build.stamp"));
-  unit->paths.stamp.package = sp_fs_join_path(unit->paths.stamp.dir, SP_LIT("package.stamp"));
+  unit->paths.stamp.dir = sp_fs_join_path(spn_allocator, unit->paths.generated, SP_LIT("stamp"));
+  unit->paths.stamp.main = sp_fs_join_path(spn_allocator, unit->paths.stamp.dir, SP_LIT("main.stamp"));
+  unit->paths.stamp.exit = sp_fs_join_path(spn_allocator, unit->paths.stamp.dir, SP_LIT("user.stamp"));
+  unit->paths.stamp.configure = sp_fs_join_path(spn_allocator, unit->paths.stamp.dir, SP_LIT("configure.stamp"));
+  unit->paths.stamp.build = sp_fs_join_path(spn_allocator, unit->paths.stamp.dir, SP_LIT("build.stamp"));
+  unit->paths.stamp.package = sp_fs_join_path(spn_allocator, unit->paths.stamp.dir, SP_LIT("package.stamp"));
 
   sp_fs_create_dir(unit->paths.stamp.dir);
 

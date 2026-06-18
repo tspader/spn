@@ -59,7 +59,7 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
           SP_FMT_STR(source_repo.path),
           SP_FMT_STR(source_repo.commits[0])
         );
-        file->content = sp_str_to_cstr(content);
+        file->content = sp_str_to_cstr(spn_allocator, content);
       }
     }
   }
@@ -75,7 +75,7 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
 
   sp_str_t cwd = repo.path;
   if (c.opts.subdir) {
-    cwd = sp_fs_join_path(repo.path, sp_str_view(c.opts.subdir));
+    cwd = sp_fs_join_path(spn_allocator, repo.path, sp_str_view(c.opts.subdir));
   }
 
   u32 rev_idx = c.opts.source_rev ? sp_parse_u32(sp_str_view(c.opts.source_rev)) : 0;

@@ -41,8 +41,8 @@ static spn_err_t publish_headers(spn_pkg_unit_t* unit) {
 
     sp_da_for(target->info->headers, h) {
       sp_str_t header = target->info->headers[h];
-      sp_str_t from = sp_fs_join_path(unit->paths.source, header);
-      sp_str_t to = sp_fs_join_path(unit->paths.include, header);
+      sp_str_t from = sp_fs_join_path(spn_allocator, unit->paths.source, header);
+      sp_str_t to = sp_fs_join_path(spn_allocator, unit->paths.include, header);
 
       sp_fs_create_dir(sp_fs_parent_path(to));
       spn_try_as(sp_fs_copy(from, to), SPN_ERROR);

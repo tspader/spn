@@ -80,7 +80,7 @@ static const struct {
 };
 
 static sp_str_t jtd_yj_str(yyjson_val* v) {
-  return sp_str_copy(sp_str((c8*)yyjson_get_str(v), (u32)yyjson_get_len(v)));
+  return sp_str_copy(spn_allocator, sp_str((c8*)yyjson_get_str(v), (u32)yyjson_get_len(v)));
 }
 
 static sp_str_t jtd_path_escape(sp_str_t seg) {
@@ -95,7 +95,7 @@ static sp_str_t jtd_path_escape(sp_str_t seg) {
     return seg;
   }
 
-  c8* data = sp_alloc(len);
+  c8* data = sp_alloc(spn_allocator, len);
   u32 pos = 0;
   sp_for(it, seg.len) {
     switch (seg.data[it]) {
@@ -212,8 +212,8 @@ static bool jtd_validate_root_keys(yyjson_val* v, sp_str_t path, jtd_diagnostic_
 
 static jtd_schema_t* jtd_parse_properties(jtd_schema_t* s, yyjson_val* props, yyjson_val* oprops, yyjson_val* aprops, sp_str_t path, jtd_diagnostic_t* diag) {
   s->form = JTD_FORM_PROPERTIES;
-  s->as.properties.required = sp_da_new(jtd_property_t);
-  s->as.properties.optional = sp_da_new(jtd_property_t);
+  s->as.properties.required = SP_NULLPTR;
+  s->as.properties.optional = SP_NULLPTR;
 
   if (aprops && !yyjson_is_bool(aprops)) {
     jtd_fail(diag, JTD_ERR_ADDITIONAL_PROPERTIES_NOT_BOOL, jtd_path_seg(path, sp_str_lit("additionalProperties")), sp_str_lit("additionalProperties must be a boolean"));
@@ -264,7 +264,7 @@ static jtd_schema_t* jtd_parse_properties(jtd_schema_t* s, yyjson_val* props, yy
 }
 
 static jtd_schema_t* jtd_parse_schema_object(yyjson_val* v, sp_str_t path, jtd_diagnostic_t* diag) {
-  jtd_schema_t* s = sp_alloc_type(jtd_schema_t);
+  jtd_schema_t* s = sp_alloc_type(spn_allocator, jtd_schema_t);
   *s = SP_ZERO_STRUCT(jtd_schema_t);
 
   if (!jtd_parse_shared(s, v, path, diag)) {
@@ -318,7 +318,7 @@ static jtd_schema_t* jtd_parse_schema_object(yyjson_val* v, sp_str_t path, jtd_d
   if (k_enum) {
     if (!yyjson_is_arr(k_enum)) { jtd_fail(diag, JTD_ERR_ENUM_NOT_STRING, path, sp_str_lit("enum must be an array of strings")); return SP_NULLPTR; }
     s->form = JTD_FORM_ENUM;
-    s->as.enumeration.values = sp_da_new(sp_str_t);
+    s->as.enumeration.values = SP_NULLPTR;
 
     size_t idx, max;
     yyjson_val* ev;
@@ -367,7 +367,7 @@ static jtd_schema_t* jtd_parse_schema_object(yyjson_val* v, sp_str_t path, jtd_d
     if (!k_mapping || !yyjson_is_obj(k_mapping)) { jtd_fail(diag, JTD_ERR_MAPPING_NOT_OBJECT, path, sp_str_lit("mapping must be an object")); return SP_NULLPTR; }
 
     s->as.discriminator.tag = jtd_yj_str(k_disc);
-    s->as.discriminator.mapping = sp_da_new(jtd_mapping_t);
+    s->as.discriminator.mapping = SP_NULLPTR;
 
     size_t idx, max;
     yyjson_val *k, *mv;
@@ -538,7 +538,7 @@ jtd_schema_t* jtd_resolve_deep(const jtd_root_t* root, jtd_schema_t* schema, jtd
     return schema;
   }
 
-  sp_da(jtd_schema_t*) seen = sp_da_new(jtd_schema_t*);
+  sp_da(jtd_schema_t*) seen = SP_NULLPTR;
   jtd_schema_t* current = schema;
   while (current && current->form == JTD_FORM_REF) {
     sp_da_for(seen, it) {
@@ -587,7 +587,7 @@ static bool jtd_validate_refs(const jtd_root_t* root, jtd_diagnostic_t* diag) {
 
 bool jtd_parse_val(yyjson_val* root, jtd_root_t* out, jtd_diagnostic_t* diag) {
   *out = (jtd_root_t){0};
-  out->definitions = sp_da_new(jtd_definition_t);
+  out->definitions = SP_NULLPTR;
 
   if (!yyjson_is_obj(root)) {
     return jtd_fail(diag, JTD_ERR_SCHEMA_NOT_OBJECT, sp_str_lit("#"), sp_str_lit("root schema must be an object"));

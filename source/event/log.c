@@ -531,7 +531,7 @@ static void json_write_object(sp_str_builder_t* b, sp_bind_t* schema, void* data
   sp_da_for(schema->as.object.fields, i) {
     sp_bind_field_t* f = &schema->as.object.fields[i];
     if (i > 0) sp_str_builder_append_cstr(b, ", ");
-    json_write_str(b, sp_str_from_cstr(f->key));
+    json_write_str(b, sp_str_from_cstr(spn_allocator, f->key));
     sp_str_builder_append_cstr(b, ": ");
     json_write_value(b, f, data);
   }
@@ -769,7 +769,7 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
   }
 
   sp_str_builder_append_cstr(&b, "}\n");
-  sp_io_write_str(out, sp_str_builder_to_str(&b));
+  sp_io_write_str(out, sp_str_builder_to_str(&b), SP_NULLPTR);
 }
 
 void spn_event_log_build(sp_io_writer_t* out, spn_build_event_t* event) {
@@ -791,5 +791,5 @@ void spn_event_log_build(sp_io_writer_t* out, spn_build_event_t* event) {
   sp_str_builder_append_c8(&b, '\n');
   sp_str_builder_append(&b, transcript);
   sp_str_builder_append_c8(&b, '\n');
-  sp_io_write_str(out, sp_str_builder_to_str(&b));
+  sp_io_write_str(out, sp_str_builder_to_str(&b), SP_NULLPTR);
 }

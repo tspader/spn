@@ -123,11 +123,11 @@ static void run_fixture(s32* utest_result, fixture_t fixture) {
         break;
       }
 
-      sp_str_t path = sp_fs_join_path(checkout->path, sp_str_view(file->file));
+      sp_str_t path = sp_fs_join_path(spn_allocator, checkout->path, sp_str_view(file->file));
       EXPECT_TRUE(sp_fs_exists(path));
 
       if (sp_fs_exists(path)) {
-        sp_str_t content = sp_io_read_file(path);
+        sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, path, &content);
         SP_EXPECT_STR_EQ_CSTR(content, file->content);
       }
     }

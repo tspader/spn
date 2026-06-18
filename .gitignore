@@ -18,3 +18,6 @@ compile_commands.json
 /.llm/dotllm.json
 /PORT_PLAN.md
 /tools/update
+/HANDOFF.md
+/PORT_CHANGELOG.md
+/build_errs.log

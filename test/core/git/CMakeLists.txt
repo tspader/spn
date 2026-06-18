@@ -2,6 +2,7 @@ add_executable(git
   ${SRC}/git/cache.c
   ${SRC}/git/key.c
   ${SRC}/external/git.c
+  ${SRC}/sp/str.c
   main.c
   fixture.c
   cache.c

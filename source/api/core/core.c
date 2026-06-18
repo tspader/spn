@@ -1,5 +1,6 @@
 #include "sp.h"
 #include "spn.h"
+#include "sp/sp_glob.h"
 
 #include "api/api.h"
 #include "api/core/types.h"
@@ -69,9 +70,9 @@ sp_ps_output_t spn_api_subprocess(spn_pkg_unit_t* unit, sp_ps_config_t config) {
     config.env.extra[slot++] = (sp_env_var_t) { .key = *it.key, .value = *it.val };
   }
 
-  sp_ps_output_t result = sp_ps_run(config);
+  sp_ps_output_t result = sp_ps_run(spn_allocator, config);
   if (!sp_str_empty(result.out)) {
-    sp_io_write_str(&unit->logs.io.build.writer, result.out);
+    sp_io_write_str(&unit->logs.io.build.writer, result.out, SP_NULLPTR);
   }
   return result;
 }
@@ -82,7 +83,7 @@ static s32 run_argv(spn_pkg_unit_t* unit, spn_toolchain_launcher_t* launcher, co
   if (launcher) {
     config.command = launcher->program;
     sp_da_for(launcher->args, it) {
-      sp_ps_config_add_arg(&config, launcher->args[it]);
+      sp_ps_config_add_arg(spn_allocator, &config, launcher->args[it]);
     }
   }
   else {
@@ -91,7 +92,7 @@ static s32 run_argv(spn_pkg_unit_t* unit, spn_toolchain_launcher_t* launcher, co
   }
 
   for (const c8** arg = args; *arg; arg++) {
-    sp_ps_config_add_arg(&config, sp_str_view(*arg));
+    sp_ps_config_add_arg(spn_allocator, &config, sp_str_view(*arg));
   }
 
   sp_ps_output_t result = spn_api_subprocess(unit, config);
@@ -115,7 +116,7 @@ s32 spn_ar(spn_t* s, const c8** args) {
 static spn_target_t* wrap_target(const void* spn, spn_target_info_t* info) {
   if (!info) return SP_NULLPTR;
 
-  spn_target_t* target = sp_alloc_type(spn_target_t);
+  spn_target_t* target = sp_alloc_type(spn_allocator, spn_target_t);
   target->spn = (spn_t*)spn;
   target->info = info;
   return target;
@@ -167,18 +168,18 @@ const spn_t* spn_get_dep(const spn_t* s, const c8* name) {
 }
 
 const c8* spn_get_dir(const spn_t* s, spn_dir_t dir) {
-  return sp_str_to_cstr(spn_api_dir(spn_api_unit(s), dir));
+  return sp_str_to_cstr(spn_allocator, spn_api_dir(spn_api_unit(s), dir));
 }
 
 const c8* spn_get_subdir(const spn_t* s, spn_dir_t base, const c8* path) {
-  return sp_str_to_cstr(sp_fs_join_path(spn_api_dir(spn_api_unit(s), base), sp_str_view(path)));
+  return sp_str_to_cstr(spn_allocator, sp_fs_join_path(spn_allocator, spn_api_dir(spn_api_unit(s), base), sp_str_view(path)));
 }
 
 void spn_log(spn_t* s, const c8* message) {
   spn_pkg_unit_t* unit = spn_api_unit(s);
   spn_event_buffer_push_ex(spn.events, unit->info, &unit->logs.io, (spn_build_event_t) {
     .kind = SPN_EVENT_USER_LOG,
-    .user_log = { .message = sp_str_from_cstr(message) },
+    .user_log = { .message = sp_str_from_cstr(spn_allocator, message) },
   });
 }
 
@@ -186,22 +187,43 @@ void spn_write_file(spn_t* s, const c8* path, const c8* content) {
   spn_pkg_unit_t* unit = spn_api_unit(s);
   SPN_API_LOG(unit, "spn_write_file", "{}", SP_FMT_CSTR(path));
 
-  sp_str_t full_path = sp_fs_join_path(unit->paths.work, sp_str_view(path));
+  sp_str_t full_path = sp_fs_join_path(spn_allocator, unit->paths.work, sp_str_view(path));
   sp_str_t parent = sp_fs_parent_path(full_path);
   if (!sp_str_empty(parent)) {
     sp_fs_create_dir(parent);
   }
 
-  sp_io_writer_t io = sp_io_writer_from_file(full_path, SP_IO_WRITE_MODE_OVERWRITE);
-  sp_io_write_cstr(&io, content);
-  sp_io_writer_close(&io);
+  sp_io_writer_t* io = sp_io_writer_from_file(full_path, SP_IO_WRITE_MODE_OVERWRITE);
+  sp_io_write_cstr(io, content, SP_NULLPTR);
+  sp_io_writer_close(io);
 }
 
 s32 spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir, const c8* to_path) {
   spn_pkg_unit_t* unit = spn_api_unit(s);
-  sp_str_t from = sp_fs_join_path(spn_api_dir(unit, from_dir), sp_str_view(from_path));
-  sp_str_t to = sp_fs_join_path(spn_api_dir(unit, to_dir), sp_str_view(to_path));
+  sp_str_t from = sp_fs_join_path(spn_allocator, spn_api_dir(unit, from_dir), sp_str_view(from_path));
+  sp_str_t to = sp_fs_join_path(spn_allocator, spn_api_dir(unit, to_dir), sp_str_view(to_path));
   SPN_API_LOG(unit, "spn_copy", "{} -> {}", SP_FMT_STR(from), SP_FMT_STR(to));
+
+  // sp_fs_copy only understands a bare "*" or an exact name; expand real glob
+  // patterns (e.g. "lib/*.o") ourselves against the source directory.
+  sp_str_t pattern = sp_fs_get_name(from);
+  if (sp_fs_is_glob(from) && !sp_str_equal(pattern, sp_str_lit("*"))) {
+    sp_str_t dir = sp_fs_parent_path(from);
+    sp_fs_create_dir(to);
+
+    sp_glob_set_t* glob = sp_glob_set_new(spn_allocator);
+    sp_glob_set_add(glob, sp_str_to_cstr(spn_allocator, pattern));
+    sp_glob_set_build(glob);
+
+    sp_da(sp_fs_entry_t) entries = sp_fs_collect(spn_allocator, dir);
+    sp_da_for(entries, i) {
+      if (sp_glob_set_match(glob, entries[i].name)) {
+        sp_fs_copy(sp_fs_join_path(spn_allocator, dir, entries[i].name), to);
+      }
+    }
+    return SPN_OK;
+  }
+
   return sp_fs_copy(from, to);
 }
 

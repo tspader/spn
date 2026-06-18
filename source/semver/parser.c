@@ -157,7 +157,7 @@ spn_semver_range_t spn_semver_parse_range(sp_str_t str) {
     range = spn_semver_comparison_to_range(op, parsed.version);
   }
   else {
-    SP_FATAL("failed to parse version: {:fg brightred}", sp_fmt_qstr(str));
+    SP_FATAL("failed to parse version: {.fg brightred}", sp_fmt_qstr(str));
   }
 
   return range;

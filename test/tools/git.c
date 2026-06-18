@@ -1,7 +1,7 @@
 #include "test.h"
 
 void git_repo_run(sp_str_t repo, sp_str_t a, sp_str_t b, sp_str_t c, sp_str_t d, sp_str_t e) {
-  sp_ps_output_t output = sp_ps_run((sp_ps_config_t) {
+  sp_ps_output_t output = sp_ps_run(spn_allocator, (sp_ps_config_t) {
     .command = sp_str_lit("git"),
     .args = {
       sp_str_lit("-C"), repo,
@@ -13,18 +13,18 @@ void git_repo_run(sp_str_t repo, sp_str_t a, sp_str_t b, sp_str_t c, sp_str_t d,
 }
 
 void git_repo_copy_dir(sp_str_t source, sp_str_t repo) {
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(source);
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(spn_allocator, source);
   sp_dyn_array_for(entries, it) {
     sp_fs_entry_t* entry = &entries[it];
-    if (sp_fs_is_dir(entry->file_path)) {
+    if (sp_fs_is_dir(entry->path)) {
       continue;
     }
 
-    sp_str_t relative = sp_str_strip_left(entry->file_path, source);
+    sp_str_t relative = sp_str_strip_left(entry->path, source);
     relative = sp_str_strip_left(relative, sp_str_lit("/"));
-    sp_str_t target = sp_fs_join_path(repo, relative);
+    sp_str_t target = sp_fs_join_path(spn_allocator, repo, relative);
     sp_fs_create_dir(sp_fs_parent_path(target));
-    sp_fs_copy_file(entry->file_path, target);
+    sp_fs_copy_file(entry->path, target);
   }
 }
 
@@ -46,7 +46,7 @@ void git_repo_init(sp_str_t repo) {
 }
 
 void git_repo_stage_all(sp_str_t repo) {
-  sp_ps_output_t add = sp_ps_run((sp_ps_config_t) {
+  sp_ps_output_t add = sp_ps_run(spn_allocator, (sp_ps_config_t) {
     .command = sp_str_lit("git"),
     .args = {
       sp_str_lit("-C"), repo,
@@ -57,7 +57,7 @@ void git_repo_stage_all(sp_str_t repo) {
 }
 
 void git_repo_commit(sp_str_t repo, sp_str_t message) {
-  sp_ps_output_t add = sp_ps_run((sp_ps_config_t) {
+  sp_ps_output_t add = sp_ps_run(spn_allocator, (sp_ps_config_t) {
     .command = sp_str_lit("git"),
     .args = {
       sp_str_lit("-C"), repo,
@@ -83,7 +83,7 @@ void git_repo_commit_from_dir(sp_str_t source, sp_str_t repo, sp_str_t message) 
 }
 
 sp_str_t git_repo_head(sp_str_t repo) {
-  sp_ps_output_t output = sp_ps_run((sp_ps_config_t) {
+  sp_ps_output_t output = sp_ps_run(spn_allocator, (sp_ps_config_t) {
     .command = sp_str_lit("git"),
     .args = {
       sp_str_lit("-C"), repo,
@@ -98,21 +98,21 @@ sp_str_t git_repo_head(sp_str_t repo) {
 }
 
 static void git_repo_write_file(sp_str_t repo, const c8* path, const c8* content) {
-  sp_str_t full = sp_fs_join_path(repo, sp_str_view(path));
+  sp_str_t full = sp_fs_join_path(spn_allocator, repo, sp_str_view(path));
   sp_str_t parent = sp_fs_parent_path(full);
   if (!sp_str_empty(parent)) {
     sp_fs_create_dir(parent);
   }
 
-  sp_io_writer_t io = sp_io_writer_from_file(full, SP_IO_WRITE_MODE_OVERWRITE);
-  SP_ASSERT(io.file.fd != 0);
+  sp_io_file_writer_t f = sp_zero;
+  sp_io_file_writer_from_path(&f, full);
 
   sp_str_t str = sp_str_view(content);
   if (!sp_str_empty(str)) {
-    sp_io_write_str(&io, str);
+    sp_io_write_str(&f.base, str, SP_NULLPTR);
   }
 
-  sp_io_writer_close(&io);
+  sp_io_file_writer_close(&f);
 }
 
 git_repo_result_t git_repo_build(tmpfs_t* fs, const c8* name, git_repo_fixture_t* fixture) {
@@ -152,7 +152,7 @@ git_repo_result_t git_repo_build(tmpfs_t* fs, const c8* name, git_repo_fixture_t
 sp_str_t git_repo_file_at(sp_str_t repo, sp_str_t commit, sp_str_t path) {
   sp_str_t spec = sp_format("{}:{}", SP_FMT_STR(commit), SP_FMT_STR(path));
 
-  sp_ps_output_t output = sp_ps_run((sp_ps_config_t) {
+  sp_ps_output_t output = sp_ps_run(spn_allocator, (sp_ps_config_t) {
     .command = sp_str_lit("git"),
     .args = {
       sp_str_lit("-C"), repo,
