@@ -94,15 +94,15 @@ static bool load_patched_package(spn_session_t* session, spn_loaded_pkg_t* loade
   sp_str_t patches = sp_env_get(spn.env, sp_str_lit("SPN_PATCH_DIR"));
   if (sp_str_empty(patches)) return false;
 
-  sp_str_t dir = sp_fs_join_path(spn_allocator, patches, release->id.name);
-  sp_str_t manifest = sp_fs_join_path(spn_allocator, dir, release->paths.manifest);
+  sp_str_t dir = sp_fs_join_path(session->mem, patches, release->id.name);
+  sp_str_t manifest = sp_fs_join_path(session->mem, dir, release->paths.manifest);
   if (!sp_fs_exists(manifest)) return false;
 
   loaded->source = SPN_PKG_SOURCE_INDEX;
   loaded->paths.manifest = manifest;
-  loaded->paths.script = sp_fs_join_path(spn_allocator, dir, release->paths.script);
+  loaded->paths.script = sp_fs_join_path(session->mem, dir, release->paths.script);
   loaded->paths.source = dir;
-  loaded->info = sp_alloc_type(spn_allocator, spn_pkg_info_t);
+  loaded->info = sp_alloc_type(session->mem, spn_pkg_info_t);
   spn_pkg_load(loaded->info, loaded->paths.manifest);
 
   // Packages whose source lives in a separate repo still need it checked out
@@ -160,12 +160,12 @@ spn_err_t load_index_package(spn_session_t* session, spn_resolved_pkg_t* resolve
   }
 
   if (checkouts.manifest) {
-    loaded->paths.manifest = sp_fs_join_path(spn_allocator, checkouts.manifest->path, release->paths.manifest);
-    loaded->paths.script = sp_fs_join_path(spn_allocator, checkouts.manifest->path, release->paths.script);
+    loaded->paths.manifest = sp_fs_join_path(session->mem, checkouts.manifest->path, release->paths.manifest);
+    loaded->paths.script = sp_fs_join_path(session->mem, checkouts.manifest->path, release->paths.script);
   }
   else {
-    loaded->paths.manifest = sp_fs_join_path(spn_allocator, checkouts.source->path, release->paths.manifest);
-    loaded->paths.script = sp_fs_join_path(spn_allocator, checkouts.source->path, release->paths.script);
+    loaded->paths.manifest = sp_fs_join_path(session->mem, checkouts.source->path, release->paths.manifest);
+    loaded->paths.script = sp_fs_join_path(session->mem, checkouts.source->path, release->paths.script);
   }
 
   if (sp_fs_exists(loaded->paths.manifest)) {
@@ -179,7 +179,7 @@ spn_err_t load_index_package(spn_session_t* session, spn_resolved_pkg_t* resolve
   }
 
   loaded->source = SPN_PKG_SOURCE_INDEX;
-  loaded->info = sp_alloc_type(spn_allocator, spn_pkg_info_t);
+  loaded->info = sp_alloc_type(session->mem, spn_pkg_info_t);
   spn_pkg_load(loaded->info, loaded->paths.manifest);
 
   loaded->elapsed = sp_tm_read_timer(&timer);
@@ -214,7 +214,7 @@ spn_err_t load_root_package(spn_session_t* session) {
   loaded->info = session->pkg;
   loaded->source = SPN_PKG_SOURCE_ROOT;
   loaded->paths.manifest = spn.paths.manifest;
-  loaded->paths.script = sp_fs_join_path(spn_allocator, spn.paths.project, sp_str_lit("spn.c"));
+  loaded->paths.script = sp_fs_join_path(session->mem, spn.paths.project, sp_str_lit("spn.c"));
   loaded->paths.source = spn.paths.project;
 
   return SPN_OK;
@@ -242,7 +242,7 @@ void add_compilation_units(spn_session_t* session, spn_resolver_t* resolver) {
 spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   spn_session_t* session = &app->session;
 
-  session->git = sp_alloc_type(spn_allocator, spn_git_cache_t);
+  session->git = sp_alloc_type(app->session.mem, spn_git_cache_t);
   spn_git_cache_init(session->git, spn.paths.source);
 
   // Load every package's manifest, checking out source code if needed
@@ -270,12 +270,12 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   spn_toolchain_entry_t* entry = sp_str_ht_get(session->toolchains, session->profile.toolchain);
   sp_assert(entry);
 
-  session->units.toolchain = sp_alloc_type(spn_allocator, spn_toolchain_unit_t);
+  session->units.toolchain = sp_alloc_type(app->session.mem, spn_toolchain_unit_t);
   spn_toolchain_unit_t* toolchain = session->units.toolchain;
   toolchain->session = session;
-  spn_lazy_log_init(&toolchain->logs.build, sp_fs_join_path(spn_allocator, spn.paths.log, sp_str_lit("toolchain.build.log")), SP_IO_WRITE_MODE_OVERWRITE);
-  spn_lazy_log_init(&toolchain->logs.test,  sp_fs_join_path(spn_allocator, spn.paths.log, sp_str_lit("toolchain.test.log")),  SP_IO_WRITE_MODE_OVERWRITE);
-  spn_lazy_log_init(&toolchain->logs.jsonl, sp_fs_join_path(spn_allocator, spn.paths.log, sp_str_lit("toolchain.jsonl")),     SP_IO_WRITE_MODE_OVERWRITE);
+  spn_lazy_log_init(&toolchain->logs.build, sp_fs_join_path(app->session.mem, spn.paths.log, sp_str_lit("toolchain.build.log")), SP_IO_WRITE_MODE_OVERWRITE);
+  spn_lazy_log_init(&toolchain->logs.test,  sp_fs_join_path(app->session.mem, spn.paths.log, sp_str_lit("toolchain.test.log")),  SP_IO_WRITE_MODE_OVERWRITE);
+  spn_lazy_log_init(&toolchain->logs.jsonl, sp_fs_join_path(app->session.mem, spn.paths.log, sp_str_lit("toolchain.jsonl")),     SP_IO_WRITE_MODE_OVERWRITE);
 
   if (entry->kind == SPN_TOOLCHAIN_INLINE) {
     if (!match_toolchain(entry, host, target)) {
@@ -339,25 +339,25 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
       // These are places in the cache
       unit->paths.store = store;
       unit->paths.work = work;
-      unit->paths.stamp = sp_fs_join_path(spn_allocator, work, sp_str_lit("download.stamp"));
-      unit->paths.logs.build = sp_fs_join_path(spn_allocator, work, sp_str_lit("build.log"));
-      unit->paths.logs.jsonl = sp_fs_join_path(spn_allocator, work, sp_str_lit("build.jsonl"));
+      unit->paths.stamp = sp_fs_join_path(app->session.mem, work, sp_str_lit("download.stamp"));
+      unit->paths.logs.build = sp_fs_join_path(app->session.mem, work, sp_str_lit("build.log"));
+      unit->paths.logs.jsonl = sp_fs_join_path(app->session.mem, work, sp_str_lit("build.jsonl"));
       spn_lazy_log_init(&unit->logs.build, unit->paths.logs.build, SP_IO_WRITE_MODE_OVERWRITE);
       spn_lazy_log_init(&unit->logs.jsonl, unit->paths.logs.jsonl, SP_IO_WRITE_MODE_OVERWRITE);
 
       // These are the paths used to refer to the toolchain during compilation
-      unit->compiler.program = sp_fs_join_path(spn_allocator, store, unit->info.compiler.program);
+      unit->compiler.program = sp_fs_join_path(app->session.mem, store, unit->info.compiler.program);
       unit->compiler.args = unit->info.compiler.args;
-      unit->linker.program = sp_fs_join_path(spn_allocator, store, unit->info.linker.program);
+      unit->linker.program = sp_fs_join_path(app->session.mem, store, unit->info.linker.program);
       unit->linker.args = unit->info.linker.args;
-      unit->archiver.program = sp_fs_join_path(spn_allocator, store, unit->info.archiver.program);
+      unit->archiver.program = sp_fs_join_path(app->session.mem, store, unit->info.archiver.program);
       unit->archiver.args = unit->info.archiver.args;
       break;
     }
   }
 
   sp_env_t* env = &session->env;
-  sp_env_init(spn_allocator, env);
+  sp_env_init(app->session.mem, env);
   sp_env_insert(env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(session->units.toolchain->compiler));
   sp_env_insert(env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(session->units.toolchain->archiver));
   sp_env_insert(env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(session->units.toolchain->linker));

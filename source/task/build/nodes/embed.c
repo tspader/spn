@@ -40,7 +40,7 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
 
     switch (embed.kind) {
       case SPN_EMBED_MEM: {
-        io = sp_alloc_type(spn_allocator, sp_io_reader_t);
+        io = sp_alloc_type(spn.mem, sp_io_reader_t);
         sp_io_reader_from_mem(io, embed.memory.buffer, embed.memory.size);
         break;
       }
@@ -63,7 +63,7 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
         break;
       }
       case SPN_EMBED_DIR: {
-        sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(spn_allocator, embed.dir.path);
+        sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(spn.mem, embed.dir.path);
         sp_da_for(entries, e) {
           if (!sp_fs_is_file(entries[e].path)) continue;
           sp_str_t rel = sp_str_suffix(entries[e].path, entries[e].path.len - embed.dir.path.len - 1);

@@ -36,7 +36,7 @@ static bool spn_cli_run_is_source_entry(sp_str_t entry, bool has_manifest) {
     return true;
   }
 
-  return sp_fs_exists(sp_fs_join_path(spn_allocator, spn.paths.project, entry));
+  return sp_fs_exists(sp_fs_join_path(spn.mem, spn.paths.project, entry));
 }
 
 sp_app_result_t spn_cli_run(spn_cli_t* cli) {

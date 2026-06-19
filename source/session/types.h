@@ -27,6 +27,7 @@ typedef struct {
 typedef sp_om(spn_pkg_unit_id_t, sp_da(spn_pkg_unit_t*)) spn_unit_graph_t;
 
 struct spn_session_t {
+  sp_mem_t mem;
   sp_intern_t* intern;
   spn_pkg_info_t* pkg;
   spn_event_buffer_t* events;

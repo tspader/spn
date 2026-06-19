@@ -13,13 +13,13 @@ spn_loaded_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_st
     manifest = sp_str_strip_left(manifest, SP_LIT("file://"));
   }
   if (!sp_str_starts_with(manifest, SP_LIT("/"))) {
-    manifest = sp_fs_join_path(spn_allocator, spn.paths.project, manifest);
+    manifest = sp_fs_join_path(spn.mem, spn.paths.project, manifest);
   }
-  manifest = sp_fs_normalize_path(spn_allocator, manifest);
+  manifest = sp_fs_normalize_path(spn.mem, manifest);
 
   if (!sp_fs_exists(manifest)) return SP_NULLPTR;
 
-  spn_pkg_info_t* info = sp_alloc_type(spn_allocator, spn_pkg_info_t);
+  spn_pkg_info_t* info = sp_alloc_type(spn.mem, spn_pkg_info_t);
   spn_err_union_t result = spn_pkg_load(info, manifest);
   if (result.kind) return SP_NULLPTR;
 
@@ -29,7 +29,7 @@ spn_loaded_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_st
   loaded->info = info;
   loaded->paths.manifest = manifest;
   loaded->paths.source = sp_fs_parent_path(manifest);
-  loaded->paths.script = sp_fs_join_path(spn_allocator, loaded->paths.source, sp_str_lit("spn.c"));
+  loaded->paths.script = sp_fs_join_path(spn.mem, loaded->paths.source, sp_str_lit("spn.c"));
 
   return loaded;
 }

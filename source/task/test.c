@@ -27,12 +27,12 @@ static bool run_path_is_absolute(sp_str_t path) {
 
 static sp_str_t run_resolve_source_path(sp_str_t path) {
   if (run_path_is_absolute(path) && sp_fs_exists(path)) {
-    return sp_fs_canonicalize_path(spn_allocator, path);
+    return sp_fs_canonicalize_path(spn.mem, path);
   }
 
-  sp_str_t project_path = sp_fs_join_path(spn_allocator, spn.paths.project, path);
+  sp_str_t project_path = sp_fs_join_path(spn.mem, spn.paths.project, path);
   if (sp_fs_exists(project_path)) {
-    return sp_fs_canonicalize_path(spn_allocator, project_path);
+    return sp_fs_canonicalize_path(spn.mem, project_path);
   }
 
   return sp_str_lit("");
@@ -59,7 +59,7 @@ static spn_task_result_t run_script(spn_app_t* app) {
     return SPN_TASK_ERROR;
   }
 
-  sp_ps_output_t result = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+  sp_ps_output_t result = sp_ps_run(app->session.mem, (sp_ps_config_t) {
     .command = command,
     .cwd = root->paths.source,
     .io = {
@@ -111,7 +111,7 @@ static spn_task_result_t run_source(spn_app_t* app) {
   add_build_deps(app, target);
   spn_cc_target_add_absolute_source(target, path);
 
-  spn_tcc_t* tcc = sp_alloc_type(spn_allocator, spn_tcc_t);
+  spn_tcc_t* tcc = sp_alloc_type(app->session.mem, spn_tcc_t);
   spn_tcc_init(tcc);
   if (spn_cc_target_to_tcc(&cc, target, tcc)) {
     spn_log_error("failed to compile {.fg brightyellow}", SP_FMT_STR(path));
@@ -119,11 +119,11 @@ static spn_task_result_t run_source(spn_app_t* app) {
   }
 
   c8* argv[] = {
-    (c8*)sp_str_to_cstr(spn_allocator, path),
+    (c8*)sp_str_to_cstr(app->session.mem, path),
     SP_NULLPTR,
   };
 
-  sp_str_t cwd = sp_fs_get_cwd(spn_allocator);
+  sp_str_t cwd = sp_fs_get_cwd(app->session.mem);
   if (sp_sys_chdir_s(spn.paths.project)) {
     spn_log_error("failed to change directory to {.fg brightyellow}", SP_FMT_STR(spn.paths.project));
     return SPN_TASK_ERROR;

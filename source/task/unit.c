@@ -28,12 +28,12 @@ static bool has_source_file(sp_da(sp_str_t) source, sp_str_t path) {
 }
 
 static void collect_source_glob(sp_str_t root, sp_str_t pattern, sp_da(sp_str_t)* source) {
-  sp_glob_t* glob = sp_glob_new_str(spn_allocator, pattern);
+  sp_glob_t* glob = sp_glob_new_str(spn_mem_todo, pattern);
   if (!glob) {
     return;
   }
 
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(spn_allocator, root);
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(spn_mem_todo, root);
   sp_da(sp_str_t) matches = SP_NULLPTR;
 
   sp_da_for(entries, it) {
@@ -212,7 +212,7 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
     sp_da(sp_str_t) source = collect_target_source(pkg, target);
     sp_da_for(source, j) {
       sp_str_t relative = source[j];
-      sp_str_t file = sp_fs_join_path(spn_allocator, pkg->paths.source, relative);
+      sp_str_t file = sp_fs_join_path(app->session.mem, pkg->paths.source, relative);
       sp_str_t extension = sp_fs_get_ext(relative);
       sp_str_t stem = relative;
       if (!sp_str_empty(extension)) {
@@ -225,7 +225,7 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
       sp_str_t object_dir = target->lib_kind == SPN_LIB_KIND_OBJECT ?
         target->paths.lib :
         target->paths.object;
-      sp_str_t object_path = sp_fs_join_path(spn_allocator, object_dir, sp_format("{}.o", SP_FMT_STR(stem)));
+      sp_str_t object_path = sp_fs_join_path(app->session.mem, object_dir, sp_format("{}.o", SP_FMT_STR(stem)));
 
       if (!sp_str_om_has(session->units.objects, file)) {
         sp_str_om_insert(session->units.objects, file, ((spn_compile_unit_t) {

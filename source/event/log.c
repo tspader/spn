@@ -531,7 +531,7 @@ static void json_write_object(sp_str_builder_t* b, sp_bind_t* schema, void* data
   sp_da_for(schema->as.object.fields, i) {
     sp_bind_field_t* f = &schema->as.object.fields[i];
     if (i > 0) sp_str_builder_append_cstr(b, ", ");
-    json_write_str(b, sp_str_from_cstr(spn_allocator, f->key));
+    json_write_str(b, sp_str_from_cstr(spn_mem_todo, f->key));
     sp_str_builder_append_cstr(b, ": ");
     json_write_value(b, f, data);
   }

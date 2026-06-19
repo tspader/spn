@@ -32,7 +32,7 @@ s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
     return SPN_OK;
   }
 
-  sp_str_t output = sp_fs_join_path(spn_allocator, unit->paths.work, sp_fs_get_name(unit->url));
+  sp_str_t output = sp_fs_join_path(spn.mem, unit->paths.work, sp_fs_get_name(unit->url));
 
   // This function runs as part of the configure graph, which is a DAG ordered
   // by dependency traversal. Normally, we'd model checks like this in the structure
@@ -49,7 +49,7 @@ s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
 
   sp_str_t curl = sp_env_get(&session->env, sp_str_lit("SPN_CURL"));
   if (sp_str_empty(curl)) curl = sp_str_lit("curl");
-  sp_ps_output_t dl = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+  sp_ps_output_t dl = sp_ps_run(spn.mem, (sp_ps_config_t) {
     .command = curl,
     .args = {
       sp_str_lit("-fSL"),
@@ -59,7 +59,7 @@ s32 download_toolchain(spn_bg_cmd_t* cmd, void* user_data) {
   });
   if (dl.status.exit_code) return SPN_ERROR;
 
-  sp_ps_output_t extract = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+  sp_ps_output_t extract = sp_ps_run(spn.mem, (sp_ps_config_t) {
     .command = sp_str_lit("tar"),
     .args = {
       sp_str_lit("xf"), output,
@@ -100,7 +100,7 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
     spn_cc_target_add_absolute_include(target, dep_unit->paths.source);
   }
 
-  unit->tcc = sp_alloc_type(spn_allocator, spn_tcc_t);
+  unit->tcc = sp_alloc_type(session->mem, spn_tcc_t);
   spn_tcc_init(unit->tcc);
   s32 try_err = 0;
   sp_try_goto(spn_cc_target_to_tcc(&cc, target, unit->tcc), try_err, fail);
@@ -190,7 +190,7 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
 spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->configure.graph;
-  spn_bg_init(graph, spn_allocator);
+  spn_bg_init(graph, app->session.mem);
   spn_pkg_unit_t* root = spn_session_find_root(&app->session);
 
   // Add a graph node for each package

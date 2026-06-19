@@ -45,7 +45,7 @@ spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
 
   session->pkg = root;
   session->paths.root = spn.paths.project;
-  session->paths.build = sp_fs_join_path(spn_allocator, spn.paths.project, sp_str_lit("build"));
+  session->paths.build = sp_fs_join_path(session->mem, spn.paths.project, sp_str_lit("build"));
   session->events = spn.events;
   session->intern = spn.intern;
   sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
@@ -66,7 +66,7 @@ spn_err_t apply_config(spn_session_t* session, spn_app_config_t config) {
     return SPN_ERROR;
   }
 
-  session->paths.profile = sp_fs_join_path(spn_allocator, session->paths.build, session->profile.name);
+  session->paths.profile = sp_fs_join_path(session->mem, session->paths.build, session->profile.name);
   session->filter = config.filter;
 
   return SPN_OK;
@@ -130,7 +130,7 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_index_cache_t index = SP_ZERO_INITIALIZE();
   spn_index_cache_init(&index, &spn.indexes);
 
-  spn_resolver_t* resolver = sp_alloc_type(spn_allocator, spn_resolver_t);
+  spn_resolver_t* resolver = sp_alloc_type(app->session.mem, spn_resolver_t);
   spn_resolver_init(resolver, &index, &session->packages, spn.events);
   app->resolver = resolver;
 

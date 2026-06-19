@@ -21,9 +21,9 @@ toml_table_t* spn_toml_parse_ex(sp_str_t path, bool* parse_error) {
     return SP_NULLPTR;
   }
 
-  sp_str_t file = sp_zero; sp_io_read_file(spn_allocator, path, &file);
+  sp_str_t file = sp_zero; sp_io_read_file(spn_mem_todo, path, &file);
   c8 parse_err[1024] = {0};
-  toml_table_t* toml = toml_parse(sp_str_to_cstr(spn_allocator, file), parse_err, SP_CARR_LEN(parse_err));
+  toml_table_t* toml = toml_parse(sp_str_to_cstr(spn_mem_todo, file), parse_err, SP_CARR_LEN(parse_err));
   if (!toml && parse_error) {
     *parse_error = true;
   }
@@ -104,7 +104,7 @@ void spn_toml_ensure_header_written(spn_toml_writer_t* writer) {
     sp_dyn_array_push(path_parts, writer->stack[it].key);
   }
 
-  sp_str_t path = sp_str_join_n(spn_allocator, path_parts, sp_dyn_array_size(path_parts), sp_str_lit("."));
+  sp_str_t path = sp_str_join_n(spn_mem_todo, path_parts, sp_dyn_array_size(path_parts), sp_str_lit("."));
   if (top->kind == SPN_TOML_CONTEXT_TABLE) {
     sp_str_builder_append_fmt(&writer->builder, "[{}]", SP_FMT_STR(path));
   }
@@ -177,7 +177,7 @@ void spn_toml_append_array_table(spn_toml_writer_t* writer) {
     sp_dyn_array_push(path_parts, writer->stack[it].key);
   }
 
-  sp_str_t path = sp_str_join_n(spn_allocator, path_parts, sp_dyn_array_size(path_parts), sp_str_lit("."));
+  sp_str_t path = sp_str_join_n(spn_mem_todo, path_parts, sp_dyn_array_size(path_parts), sp_str_lit("."));
   sp_str_builder_append_fmt(&writer->builder, "[[{}]]", SP_FMT_STR(path));
   sp_str_builder_new_line(&writer->builder);
 

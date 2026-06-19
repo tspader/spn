@@ -1,8 +1,15 @@
 #ifndef SPN_SP_MACRO_H
 #define SPN_SP_MACRO_H
 
-// One shared OS page allocator, used everywhere (transient process; we leak on purpose).
+// One shared OS page allocator. Still backs the lazy-init container shims in
+// compat.h and the sp_format family below; direct uses are being threaded to a
+// real sp_mem_t (spn.mem and friends) and should disappear from leaf code.
 #define spn_allocator sp_mem_os_new()
+
+// MARKER: an allocator threading decision was deferred here. Functionally a
+// fresh OS allocator (same as spn_allocator), but grep for spn_mem_todo to find
+// every site that still needs a real sp_mem_t threaded in.
+#define spn_mem_todo sp_mem_os_new()
 
 // Formatting: spn predates the sp_fmt rename. Route the old spelling through the new
 // API with the shared allocator. The new directive grammar lives in the format literals.
@@ -92,8 +99,8 @@ static inline sp_str_t spn_format_hash_hex(sp_hash_t hash) {
 
 // The *_LOWER enum-case codegen helpers were dropped from sp.h; restore them.
 #define SP_X_ENUM_CASE_TO_STRING_LOWER(ID) \
-  case ID: { return sp_str_to_lower(spn_allocator, sp_str_lit(SP_MACRO_STR(ID))); }
+  case ID: { return sp_str_lit(SP_MACRO_STR(ID)); }
 #define SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER(ID, NAME) \
-  case ID: { return sp_str_to_lower(spn_allocator, sp_str_lit(NAME)); }
+  case ID: { return sp_str_lit(NAME); }
 
 #endif
