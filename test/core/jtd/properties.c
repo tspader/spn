@@ -1,6 +1,6 @@
 #include "jtd_test.h"
 
-static void compare_properties_ok(s32* utest_result, const jtd_root_t* root, const void* expect) {
+static void compare_properties_ok(s32* utest_result, const jtd_result_t* root, const void* expect) {
   (void)expect;
   EXPECT_EQ((s32)JTD_FORM_PROPERTIES, (s32)root->root->form);
   EXPECT_EQ((u64)2, (u64)sp_da_size(root->root->as.properties.required));
@@ -21,7 +21,7 @@ static void compare_properties_ok(s32* utest_result, const jtd_root_t* root, con
   }
 }
 
-static void compare_properties_additional_false(s32* utest_result, const jtd_root_t* root, const void* expect) {
+static void compare_properties_additional_false(s32* utest_result, const jtd_result_t* root, const void* expect) {
   (void)expect;
   EXPECT_EQ((s32)JTD_FORM_PROPERTIES, (s32)root->root->form);
   EXPECT_EQ((u64)1, (u64)sp_da_size(root->root->as.properties.required));

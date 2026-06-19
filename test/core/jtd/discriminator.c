@@ -1,6 +1,6 @@
 #include "jtd_test.h"
 
-static void compare_discriminator_ok(s32* utest_result, const jtd_root_t* root, const void* expect) {
+static void compare_discriminator_ok(s32* utest_result, const jtd_result_t* root, const void* expect) {
   (void)expect;
   EXPECT_EQ((s32)JTD_FORM_DISCRIMINATOR, (s32)root->root->form);
   jtd_expect_str(utest_result, root->root->as.discriminator.tag, "kind");

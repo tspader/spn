@@ -1,6 +1,6 @@
 #include "jtd_test.h"
 
-static void compare_type_primitives(s32* utest_result, const jtd_root_t* root, const void* expect) {
+static void compare_type_primitives(s32* utest_result, const jtd_result_t* root, const void* expect) {
   (void)expect;
   EXPECT_EQ((s32)JTD_FORM_PROPERTIES, (s32)root->root->form);
   EXPECT_EQ((u64)11, (u64)sp_da_size(root->root->as.properties.required));

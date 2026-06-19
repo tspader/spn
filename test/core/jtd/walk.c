@@ -11,10 +11,10 @@ static bool walk_collect_visit(jtd_schema_t* s, sp_str_t path, void* user) {
   return true;
 }
 
-static void compare_walk_preorder(s32* utest_result, const jtd_root_t* root, const void* expect) {
+static void compare_walk_preorder(s32* utest_result, const jtd_result_t* root, const void* expect) {
   (void)expect;
-  walk_collect_t c = { .paths = SP_NULLPTR };
-  jtd_walk(root, walk_collect_visit, &c);
+  walk_collect_t c = { .paths = sp_da_new(sp_mem_get_scratch(), sp_str_t) };
+  jtd_walk(sp_mem_get_scratch(), root, walk_collect_visit, &c);
 
   EXPECT_EQ((u64)4, (u64)sp_da_size(c.paths));
   if (sp_da_size(c.paths) == 4) {
@@ -40,17 +40,17 @@ static bool walk_stop_visit(jtd_schema_t* s, sp_str_t path, void* user) {
   return w->seen < w->stop;
 }
 
-static void compare_walk_stops(s32* utest_result, const jtd_root_t* root, const void* expect) {
+static void compare_walk_stops(s32* utest_result, const jtd_result_t* root, const void* expect) {
   (void)expect;
   walk_stop_t w = { .stop = 2, .seen = 0 };
-  jtd_walk(root, walk_stop_visit, &w);
+  jtd_walk(sp_mem_get_scratch(), root, walk_stop_visit, &w);
   EXPECT_EQ((u64)2, (u64)w.seen);
 }
 
-static void compare_walk_escaped_paths(s32* utest_result, const jtd_root_t* root, const void* expect) {
+static void compare_walk_escaped_paths(s32* utest_result, const jtd_result_t* root, const void* expect) {
   (void)expect;
-  walk_collect_t c = { .paths = SP_NULLPTR };
-  jtd_walk(root, walk_collect_visit, &c);
+  walk_collect_t c = { .paths = sp_da_new(sp_mem_get_scratch(), sp_str_t) };
+  jtd_walk(sp_mem_get_scratch(), root, walk_collect_visit, &c);
 
   EXPECT_EQ((u64)3, (u64)sp_da_size(c.paths));
   if (sp_da_size(c.paths) == 3) {

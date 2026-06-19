@@ -5,7 +5,7 @@ typedef struct {
   u32       count;
 } enum_expect_t;
 
-static void compare_enum(s32* utest_result, const jtd_root_t* root, const void* expect_v) {
+static void compare_enum(s32* utest_result, const jtd_result_t* root, const void* expect_v) {
   const enum_expect_t* expect = (const enum_expect_t*)expect_v;
   EXPECT_EQ((s32)JTD_FORM_ENUM, (s32)root->root->form);
   u32 actual = (u32)sp_da_size(root->root->as.enumeration.values);
