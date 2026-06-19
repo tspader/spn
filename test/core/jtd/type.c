@@ -21,7 +21,7 @@ UTEST(type, primitives) {
 UTEST(type, value_not_string) {
   run_jtd_case(utest_result, (jtd_case_t){
     .json       = "type.value_not_string.json",
-    .error      = JTD_ERR_INVALID_TYPE,
+    .error      = JTD_ERR_TYPE_NOT_STRING,
     .error_path = "#",
   });
 }
@@ -29,7 +29,7 @@ UTEST(type, value_not_string) {
 UTEST(type, unknown) {
   run_jtd_case(utest_result, (jtd_case_t){
     .json       = "type.unknown.json",
-    .error      = JTD_ERR_INVALID_TYPE,
+    .error      = JTD_ERR_UNKNOWN_TYPE,
     .error_path = "#",
   });
 }
@@ -45,7 +45,7 @@ UTEST(type, metadata_not_object) {
 UTEST(type, unknown_key) {
   run_jtd_case(utest_result, (jtd_case_t){
     .json       = "type.unknown_key.json",
-    .error      = JTD_ERR_UNSUPPORTED,
+    .error      = JTD_ERR_UNKNOWN_MEMBER,
     .error_path = "#/foo",
   });
 }

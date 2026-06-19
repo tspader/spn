@@ -7,12 +7,11 @@ const c8* jtd_err_name(jtd_err_t err) {
     case JTD_ERR_JSON: return "invalid-json";
     case JTD_ERR_SCHEMA_NOT_OBJECT: return "schema-not-object";
     case JTD_ERR_MULTIPLE_FORMS: return "multiple-forms";
-    case JTD_ERR_INVALID_TYPE: return "invalid-type";
+    case JTD_ERR_TYPE_NOT_STRING: return "type-not-string";
+    case JTD_ERR_UNKNOWN_TYPE: return "unknown-type";
     case JTD_ERR_ENUM_EMPTY: return "enum-empty";
     case JTD_ERR_ENUM_NOT_STRING: return "enum-not-string";
     case JTD_ERR_ENUM_DUPLICATE: return "enum-duplicate";
-    case JTD_ERR_ELEMENTS_NOT_SCHEMA: return "elements-not-schema";
-    case JTD_ERR_VALUES_NOT_SCHEMA: return "values-not-schema";
     case JTD_ERR_PROPERTIES_NOT_OBJECT: return "properties-not-object";
     case JTD_ERR_DISCRIMINATOR_NOT_STRING: return "discriminator-not-string";
     case JTD_ERR_MAPPING_NOT_OBJECT: return "mapping-not-object";
@@ -27,7 +26,8 @@ const c8* jtd_err_name(jtd_err_t err) {
     case JTD_ERR_DEFINITIONS_NOT_ROOT: return "definitions-not-root";
     case JTD_ERR_REF_UNRESOLVED: return "ref-unresolved";
     case JTD_ERR_REF_CYCLE: return "ref-cycle";
-    case JTD_ERR_UNSUPPORTED: return "unsupported";
+    case JTD_ERR_UNKNOWN_MEMBER: return "unknown-member";
+    case JTD_ERR_UNRECOGNIZED_FORM: return "unrecognized-form";
   }
   return "unknown";
 }
@@ -131,19 +131,37 @@ static sp_str_t jtd_path_seg(sp_mem_t mem, sp_str_t base, sp_str_t seg) {
   return sp_fmt(mem, "{}/{}", sp_fmt_str(base), sp_fmt_str(jtd_path_escape(mem, seg))).value;
 }
 
-static bool jtd_diag_set(sp_mem_t mem, jtd_diagnostic_t* diag, jtd_err_t code, sp_str_t path, sp_str_t msg) {
+static bool jtd_diag(sp_mem_t mem, jtd_diagnostic_t* diag, jtd_err_t code, sp_str_t path) {
   if (diag) {
+    *diag = sp_zero_s(jtd_diagnostic_t);
     diag->code = code;
     diag->path = sp_str_copy(mem, path);
-    diag->message = sp_fmt(
-      mem, "{} at {}: {}",
-      sp_fmt_cstr(jtd_err_name(code)), sp_fmt_str(path), sp_fmt_str(msg)).value;
   }
   return false;
 }
 
-static bool jtd_fail(jtd_ctx_t* ctx, jtd_err_t code, sp_str_t path, sp_str_t msg) {
-  return jtd_diag_set(ctx->result, &ctx->out->diag, code, path, msg);
+static bool jtd_diag_str(sp_mem_t mem, jtd_diagnostic_t* diag, jtd_err_t code, sp_str_t path, sp_str_t str) {
+  jtd_diag(mem, diag, code, path);
+  if (diag) {
+    sp_str_t v = sp_str_copy(mem, str);
+    switch (code) {
+      case JTD_ERR_UNKNOWN_TYPE: diag->as.unknown_type.name = v; break;
+      case JTD_ERR_ENUM_DUPLICATE: diag->as.enum_duplicate.value = v; break;
+      case JTD_ERR_REF_UNRESOLVED: diag->as.ref_unresolved.name = v; break;
+      case JTD_ERR_REF_CYCLE: diag->as.ref_cycle.name = v; break;
+      case JTD_ERR_UNKNOWN_MEMBER: diag->as.unknown_member.key = v; break;
+      default: break;
+    }
+  }
+  return false;
+}
+
+static bool jtd_fail(jtd_ctx_t* ctx, jtd_err_t code, sp_str_t path) {
+  return jtd_diag(ctx->result, &ctx->out->diag, code, path);
+}
+
+static bool jtd_fail_str(jtd_ctx_t* ctx, jtd_err_t code, sp_str_t path, sp_str_t str) {
+  return jtd_diag_str(ctx->result, &ctx->out->diag, code, path, str);
 }
 
 static jtd_schema_t* jtd_parse_schema(jtd_ctx_t* ctx, yyjson_val* v, sp_str_t path);
@@ -151,13 +169,13 @@ static jtd_schema_t* jtd_parse_schema(jtd_ctx_t* ctx, yyjson_val* v, sp_str_t pa
 static bool jtd_parse_shared(jtd_ctx_t* ctx, jtd_schema_t* s, yyjson_val* v, sp_str_t path) {
   yyjson_val* metadata = yyjson_obj_get(v, "metadata");
   if (metadata && !yyjson_is_obj(metadata)) {
-    return jtd_fail(ctx, JTD_ERR_METADATA_NOT_OBJECT, jtd_path_seg(ctx->temp, path, sp_str_lit("metadata")), sp_str_lit("metadata must be an object"));
+    return jtd_fail(ctx, JTD_ERR_METADATA_NOT_OBJECT, jtd_path_seg(ctx->temp, path, sp_str_lit("metadata")));
   }
 
   yyjson_val* nullable = yyjson_obj_get(v, "nullable");
   if (nullable) {
     if (!yyjson_is_bool(nullable)) {
-      return jtd_fail(ctx, JTD_ERR_NULLABLE_NOT_BOOL, path, sp_str_lit("nullable must be a boolean"));
+      return jtd_fail(ctx, JTD_ERR_NULLABLE_NOT_BOOL, path);
     }
     s->nullable = yyjson_get_bool(nullable);
   }
@@ -201,7 +219,7 @@ static bool jtd_validate_keys(jtd_ctx_t* ctx, yyjson_val* v, sp_str_t path) {
   yyjson_obj_foreach(v, idx, max, k, mv) {
     sp_str_t key = jtd_yj_str(ctx->temp, k);
     if (!jtd_schema_key(key)) {
-      return jtd_fail(ctx, JTD_ERR_UNSUPPORTED, jtd_path_seg(ctx->temp, path, key), sp_fmt(ctx->temp, "unknown schema member {}", sp_fmt_str(key)).value);
+      return jtd_fail_str(ctx, JTD_ERR_UNKNOWN_MEMBER, jtd_path_seg(ctx->temp, path, key), key);
     }
   }
 
@@ -215,7 +233,7 @@ static bool jtd_validate_root_keys(jtd_ctx_t* ctx, yyjson_val* v, sp_str_t path)
   yyjson_obj_foreach(v, idx, max, k, mv) {
     sp_str_t key = jtd_yj_str(ctx->temp, k);
     if (!jtd_root_key(key)) {
-      return jtd_fail(ctx, JTD_ERR_UNSUPPORTED, jtd_path_seg(ctx->temp, path, key), sp_fmt(ctx->temp, "unknown schema member {}", sp_fmt_str(key)).value);
+      return jtd_fail_str(ctx, JTD_ERR_UNKNOWN_MEMBER, jtd_path_seg(ctx->temp, path, key), key);
     }
   }
 
@@ -228,12 +246,12 @@ static jtd_schema_t* jtd_parse_properties(jtd_ctx_t* ctx, jtd_schema_t* s, yyjso
   s->as.properties.optional = sp_da_new(ctx->result, jtd_property_t);
 
   if (aprops && !yyjson_is_bool(aprops)) {
-    jtd_fail(ctx, JTD_ERR_ADDITIONAL_PROPERTIES_NOT_BOOL, jtd_path_seg(ctx->temp, path, sp_str_lit("additionalProperties")), sp_str_lit("additionalProperties must be a boolean"));
+    jtd_fail(ctx, JTD_ERR_ADDITIONAL_PROPERTIES_NOT_BOOL, jtd_path_seg(ctx->temp, path, sp_str_lit("additionalProperties")));
     return SP_NULLPTR;
   }
 
   if (aprops && !props && !oprops) {
-    jtd_fail(ctx, JTD_ERR_ADDITIONAL_PROPERTIES_WITHOUT_PROPERTIES, jtd_path_seg(ctx->temp, path, sp_str_lit("additionalProperties")), sp_str_lit("additionalProperties requires properties or optionalProperties"));
+    jtd_fail(ctx, JTD_ERR_ADDITIONAL_PROPERTIES_WITHOUT_PROPERTIES, jtd_path_seg(ctx->temp, path, sp_str_lit("additionalProperties")));
     return SP_NULLPTR;
   }
 
@@ -241,7 +259,7 @@ static jtd_schema_t* jtd_parse_properties(jtd_ctx_t* ctx, jtd_schema_t* s, yyjso
   yyjson_val *k, *mv;
 
   if (props) {
-    if (!yyjson_is_obj(props)) { jtd_fail(ctx, JTD_ERR_PROPERTIES_NOT_OBJECT, path, sp_str_lit("properties must be an object")); return SP_NULLPTR; }
+    if (!yyjson_is_obj(props)) { jtd_fail(ctx, JTD_ERR_PROPERTIES_NOT_OBJECT, path); return SP_NULLPTR; }
     yyjson_obj_foreach(props, idx, max, k, mv) {
       sp_str_t key = jtd_yj_str(ctx->result, k);
       jtd_schema_t* child = jtd_parse_schema(ctx, mv, jtd_path_seg(ctx->temp, jtd_path_seg(ctx->temp, path, sp_str_lit("properties")), key));
@@ -252,12 +270,12 @@ static jtd_schema_t* jtd_parse_properties(jtd_ctx_t* ctx, jtd_schema_t* s, yyjso
   }
 
   if (oprops) {
-    if (!yyjson_is_obj(oprops)) { jtd_fail(ctx, JTD_ERR_PROPERTIES_NOT_OBJECT, path, sp_str_lit("optionalProperties must be an object")); return SP_NULLPTR; }
+    if (!yyjson_is_obj(oprops)) { jtd_fail(ctx, JTD_ERR_PROPERTIES_NOT_OBJECT, path); return SP_NULLPTR; }
     yyjson_obj_foreach(oprops, idx, max, k, mv) {
       sp_str_t key = jtd_yj_str(ctx->result, k);
       sp_da_for(s->as.properties.required, it) {
         if (sp_str_equal(key, s->as.properties.required[it].key)) {
-          jtd_fail(ctx, JTD_ERR_PROPERTIES_DUPLICATE, jtd_path_seg(ctx->temp, jtd_path_seg(ctx->temp, path, sp_str_lit("optionalProperties")), key), sp_str_lit("property cannot be both required and optional"));
+          jtd_fail(ctx, JTD_ERR_PROPERTIES_DUPLICATE, jtd_path_seg(ctx->temp, jtd_path_seg(ctx->temp, path, sp_str_lit("optionalProperties")), key));
           return SP_NULLPTR;
         }
       }
@@ -321,7 +339,7 @@ static jtd_schema_t* jtd_parse_schema_object(jtd_ctx_t* ctx, yyjson_val* v, sp_s
     (o.ref != SP_NULLPTR);
 
   if (forms > 1) {
-    jtd_fail(ctx, JTD_ERR_MULTIPLE_FORMS, path, sp_str_lit("schema uses keywords from more than one form"));
+    jtd_fail(ctx, JTD_ERR_MULTIPLE_FORMS, path);
     return SP_NULLPTR;
   }
 
@@ -331,7 +349,7 @@ static jtd_schema_t* jtd_parse_schema_object(jtd_ctx_t* ctx, yyjson_val* v, sp_s
   }
 
   if (o.type) {
-    if (!yyjson_is_str(o.type)) { jtd_fail(ctx, JTD_ERR_INVALID_TYPE, path, sp_str_lit("type must be a string")); return SP_NULLPTR; }
+    if (!yyjson_is_str(o.type)) { jtd_fail(ctx, JTD_ERR_TYPE_NOT_STRING, path); return SP_NULLPTR; }
     sp_str_t name = sp_str((c8*)yyjson_get_str(o.type), (u32)yyjson_get_len(o.type));
     sp_carr_for(JTD_PRIMITIVES, i) {
       if (sp_str_equal_cstr(name, JTD_PRIMITIVES[i].name)) {
@@ -340,23 +358,23 @@ static jtd_schema_t* jtd_parse_schema_object(jtd_ctx_t* ctx, yyjson_val* v, sp_s
         return s;
       }
     }
-    jtd_fail(ctx, JTD_ERR_INVALID_TYPE, path, sp_fmt(ctx->temp, "unknown type {}", sp_fmt_str(name)).value);
+    jtd_fail_str(ctx, JTD_ERR_UNKNOWN_TYPE, path, name);
     return SP_NULLPTR;
   }
 
   if (o.enumeration) {
-    if (!yyjson_is_arr(o.enumeration)) { jtd_fail(ctx, JTD_ERR_ENUM_NOT_STRING, path, sp_str_lit("enum must be an array of strings")); return SP_NULLPTR; }
+    if (!yyjson_is_arr(o.enumeration)) { jtd_fail(ctx, JTD_ERR_ENUM_NOT_STRING, path); return SP_NULLPTR; }
     s->form = JTD_FORM_ENUM;
     s->as.enumeration.values = sp_da_new(ctx->result, sp_str_t);
 
     size_t idx, max;
     yyjson_val* ev;
     yyjson_arr_foreach(o.enumeration, idx, max, ev) {
-      if (!yyjson_is_str(ev)) { jtd_fail(ctx, JTD_ERR_ENUM_NOT_STRING, path, sp_str_lit("enum values must be strings")); return SP_NULLPTR; }
+      if (!yyjson_is_str(ev)) { jtd_fail(ctx, JTD_ERR_ENUM_NOT_STRING, path); return SP_NULLPTR; }
       sp_str_t val = jtd_yj_str(ctx->result, ev);
       sp_da_for(s->as.enumeration.values, j) {
         if (sp_str_equal(val, s->as.enumeration.values[j])) {
-          jtd_fail(ctx, JTD_ERR_ENUM_DUPLICATE, path, sp_fmt(ctx->temp, "duplicate enum value {}", sp_fmt_str(val)).value);
+          jtd_fail_str(ctx, JTD_ERR_ENUM_DUPLICATE, path, val);
           return SP_NULLPTR;
         }
       }
@@ -364,7 +382,7 @@ static jtd_schema_t* jtd_parse_schema_object(jtd_ctx_t* ctx, yyjson_val* v, sp_s
     }
 
     if (sp_da_size(s->as.enumeration.values) == 0) {
-      jtd_fail(ctx, JTD_ERR_ENUM_EMPTY, path, sp_str_lit("enum must be non-empty"));
+      jtd_fail(ctx, JTD_ERR_ENUM_EMPTY, path);
       return SP_NULLPTR;
     }
     return s;
@@ -392,8 +410,8 @@ static jtd_schema_t* jtd_parse_schema_object(jtd_ctx_t* ctx, yyjson_val* v, sp_s
 
   if (o.discriminator || o.mapping) {
     s->form = JTD_FORM_DISCRIMINATOR;
-    if (!o.discriminator || !yyjson_is_str(o.discriminator)) { jtd_fail(ctx, JTD_ERR_DISCRIMINATOR_NOT_STRING, path, sp_str_lit("discriminator must be a string")); return SP_NULLPTR; }
-    if (!o.mapping || !yyjson_is_obj(o.mapping)) { jtd_fail(ctx, JTD_ERR_MAPPING_NOT_OBJECT, path, sp_str_lit("mapping must be an object")); return SP_NULLPTR; }
+    if (!o.discriminator || !yyjson_is_str(o.discriminator)) { jtd_fail(ctx, JTD_ERR_DISCRIMINATOR_NOT_STRING, path); return SP_NULLPTR; }
+    if (!o.mapping || !yyjson_is_obj(o.mapping)) { jtd_fail(ctx, JTD_ERR_MAPPING_NOT_OBJECT, path); return SP_NULLPTR; }
 
     s->as.discriminator.tag = jtd_yj_str(ctx->result, o.discriminator);
     s->as.discriminator.mapping = sp_da_new(ctx->result, jtd_mapping_t);
@@ -406,20 +424,20 @@ static jtd_schema_t* jtd_parse_schema_object(jtd_ctx_t* ctx, yyjson_val* v, sp_s
       jtd_schema_t* child = jtd_parse_schema(ctx, mv, cpath);
       if (!child) return SP_NULLPTR;
       if (child->form != JTD_FORM_PROPERTIES || child->nullable) {
-        jtd_fail(ctx, JTD_ERR_MAPPING_NOT_PROPERTIES, cpath, sp_str_lit("mapping value must be a non-nullable properties schema"));
+        jtd_fail(ctx, JTD_ERR_MAPPING_NOT_PROPERTIES, cpath);
         return SP_NULLPTR;
       }
       sp_da_for(child->as.properties.required, it) {
         jtd_property_t* p = &child->as.properties.required[it];
         if (sp_str_equal(p->key, s->as.discriminator.tag)) {
-          jtd_fail(ctx, JTD_ERR_DISCRIMINATOR_TAG_REDEFINED, jtd_path_seg(ctx->temp, jtd_path_seg(ctx->temp, cpath, sp_str_lit("properties")), p->key), sp_str_lit("mapping schema cannot redefine discriminator tag"));
+          jtd_fail(ctx, JTD_ERR_DISCRIMINATOR_TAG_REDEFINED, jtd_path_seg(ctx->temp, jtd_path_seg(ctx->temp, cpath, sp_str_lit("properties")), p->key));
           return SP_NULLPTR;
         }
       }
       sp_da_for(child->as.properties.optional, it) {
         jtd_property_t* p = &child->as.properties.optional[it];
         if (sp_str_equal(p->key, s->as.discriminator.tag)) {
-          jtd_fail(ctx, JTD_ERR_DISCRIMINATOR_TAG_REDEFINED, jtd_path_seg(ctx->temp, jtd_path_seg(ctx->temp, cpath, sp_str_lit("optionalProperties")), p->key), sp_str_lit("mapping schema cannot redefine discriminator tag"));
+          jtd_fail(ctx, JTD_ERR_DISCRIMINATOR_TAG_REDEFINED, jtd_path_seg(ctx->temp, jtd_path_seg(ctx->temp, cpath, sp_str_lit("optionalProperties")), p->key));
           return SP_NULLPTR;
         }
       }
@@ -430,24 +448,24 @@ static jtd_schema_t* jtd_parse_schema_object(jtd_ctx_t* ctx, yyjson_val* v, sp_s
   }
 
   if (o.ref) {
-    if (!yyjson_is_str(o.ref)) { jtd_fail(ctx, JTD_ERR_REF_NOT_STRING, path, sp_str_lit("ref must be a string")); return SP_NULLPTR; }
+    if (!yyjson_is_str(o.ref)) { jtd_fail(ctx, JTD_ERR_REF_NOT_STRING, path); return SP_NULLPTR; }
     s->form = JTD_FORM_REF;
     s->as.ref.name = jtd_yj_str(ctx->result, o.ref);
     return s;
   }
 
-  jtd_fail(ctx, JTD_ERR_UNSUPPORTED, path, sp_str_lit("unrecognized schema form"));
+  jtd_fail(ctx, JTD_ERR_UNRECOGNIZED_FORM, path);
   return SP_NULLPTR;
 }
 
 static jtd_schema_t* jtd_parse_schema(jtd_ctx_t* ctx, yyjson_val* v, sp_str_t path) {
   if (!yyjson_is_obj(v)) {
-    jtd_fail(ctx, JTD_ERR_SCHEMA_NOT_OBJECT, path, sp_str_lit("schema must be an object"));
+    jtd_fail(ctx, JTD_ERR_SCHEMA_NOT_OBJECT, path);
     return SP_NULLPTR;
   }
 
   if (yyjson_obj_get(v, "definitions")) {
-    jtd_fail(ctx, JTD_ERR_DEFINITIONS_NOT_ROOT, jtd_path_seg(ctx->temp, path, sp_str_lit("definitions")), sp_str_lit("definitions is only valid at the document root"));
+    jtd_fail(ctx, JTD_ERR_DEFINITIONS_NOT_ROOT, jtd_path_seg(ctx->temp, path, sp_str_lit("definitions")));
     return SP_NULLPTR;
   }
 
@@ -460,7 +478,7 @@ static jtd_schema_t* jtd_parse_schema(jtd_ctx_t* ctx, yyjson_val* v, sp_str_t pa
 
 static jtd_schema_t* jtd_parse_root_schema(jtd_ctx_t* ctx, yyjson_val* v, sp_str_t path) {
   if (!yyjson_is_obj(v)) {
-    jtd_fail(ctx, JTD_ERR_SCHEMA_NOT_OBJECT, path, sp_str_lit("schema must be an object"));
+    jtd_fail(ctx, JTD_ERR_SCHEMA_NOT_OBJECT, path);
     return SP_NULLPTR;
   }
 
@@ -564,8 +582,7 @@ jtd_schema_t* jtd_resolve_deep(sp_mem_t mem, const jtd_result_t* result, jtd_sch
   while (current && current->form == JTD_FORM_REF) {
     sp_da_for(seen, it) {
       if (seen[it] == current) {
-        jtd_diag_set(mem, diag, JTD_ERR_REF_CYCLE, jtd_schema_path(mem, result, current),
-          sp_fmt(mem, "ref cycle through {}", sp_fmt_str(current->as.ref.name)).value);
+        jtd_diag_str(mem, diag, JTD_ERR_REF_CYCLE, jtd_schema_path(mem, result, current), current->as.ref.name);
         return SP_NULLPTR;
       }
     }
@@ -573,8 +590,7 @@ jtd_schema_t* jtd_resolve_deep(sp_mem_t mem, const jtd_result_t* result, jtd_sch
     sp_da_push(seen, current);
     jtd_schema_t* next = jtd_definition(result, current->as.ref.name);
     if (!next) {
-      jtd_diag_set(mem, diag, JTD_ERR_REF_UNRESOLVED, jtd_schema_path(mem, result, current),
-        sp_fmt(mem, "ref to unknown definition {}", sp_fmt_str(current->as.ref.name)).value);
+      jtd_diag_str(mem, diag, JTD_ERR_REF_UNRESOLVED, jtd_schema_path(mem, result, current), current->as.ref.name);
       return SP_NULLPTR;
     }
 
@@ -592,8 +608,7 @@ typedef struct {
 static bool jtd_refcheck_visit(jtd_schema_t* s, sp_str_t path, void* user) {
   jtd_refcheck_t* c = (jtd_refcheck_t*)user;
   if (s->form == JTD_FORM_REF && !jtd_definition(c->ctx->out, s->as.ref.name)) {
-    c->ok = jtd_fail(c->ctx, JTD_ERR_REF_UNRESOLVED, path,
-      sp_fmt(c->ctx->temp, "ref to unknown definition {}", sp_fmt_str(s->as.ref.name)).value);
+    c->ok = jtd_fail_str(c->ctx, JTD_ERR_REF_UNRESOLVED, path, s->as.ref.name);
     return false;
   }
   return true;
@@ -607,13 +622,13 @@ static bool jtd_validate_refs(jtd_ctx_t* ctx) {
 
 static bool jtd_run(jtd_ctx_t* ctx, yyjson_val* root) {
   if (!yyjson_is_obj(root)) {
-    return jtd_fail(ctx, JTD_ERR_SCHEMA_NOT_OBJECT, sp_str_lit("#"), sp_str_lit("root schema must be an object"));
+    return jtd_fail(ctx, JTD_ERR_SCHEMA_NOT_OBJECT, sp_str_lit("#"));
   }
 
   yyjson_val* defs = yyjson_obj_get(root, "definitions");
   if (defs) {
     if (!yyjson_is_obj(defs)) {
-      return jtd_fail(ctx, JTD_ERR_SCHEMA_NOT_OBJECT, sp_str_lit("#/definitions"), sp_str_lit("definitions must be an object"));
+      return jtd_fail(ctx, JTD_ERR_SCHEMA_NOT_OBJECT, sp_str_lit("#/definitions"));
     }
     size_t idx, max;
     yyjson_val *k, *v;
@@ -655,7 +670,7 @@ jtd_result_t jtd_parse(sp_mem_t mem, sp_str_t json) {
     jtd_result_t out = sp_zero_s(jtd_result_t);
     out.arena = sp_mem_arena_new(mem);
     out.ok = false;
-    jtd_diag_set(sp_mem_arena_as_allocator(out.arena), &out.diag, JTD_ERR_JSON, sp_str_lit("#"), sp_str_lit("input is not valid JSON"));
+    jtd_diag(sp_mem_arena_as_allocator(out.arena), &out.diag, JTD_ERR_JSON, sp_str_lit("#"));
     return out;
   }
 
@@ -669,4 +684,36 @@ void jtd_free(jtd_result_t* result) {
     sp_mem_arena_destroy(result->arena);
     *result = sp_zero_s(jtd_result_t);
   }
+}
+
+sp_str_t jtd_diagnostic_message(sp_mem_t mem, const jtd_diagnostic_t* diag) {
+  sp_str_t detail;
+  switch (diag->code) {
+    case JTD_OK: detail = sp_str_lit("ok"); break;
+    case JTD_ERR_JSON: detail = sp_str_lit("input is not valid JSON"); break;
+    case JTD_ERR_SCHEMA_NOT_OBJECT: detail = sp_str_lit("schema must be an object"); break;
+    case JTD_ERR_MULTIPLE_FORMS: detail = sp_str_lit("schema uses keywords from more than one form"); break;
+    case JTD_ERR_TYPE_NOT_STRING: detail = sp_str_lit("type must be a string"); break;
+    case JTD_ERR_UNKNOWN_TYPE: detail = sp_fmt(mem, "unknown type {}", sp_fmt_str(diag->as.unknown_type.name)).value; break;
+    case JTD_ERR_ENUM_EMPTY: detail = sp_str_lit("enum must be non-empty"); break;
+    case JTD_ERR_ENUM_NOT_STRING: detail = sp_str_lit("enum must be an array of strings"); break;
+    case JTD_ERR_ENUM_DUPLICATE: detail = sp_fmt(mem, "duplicate enum value {}", sp_fmt_str(diag->as.enum_duplicate.value)).value; break;
+    case JTD_ERR_PROPERTIES_NOT_OBJECT: detail = sp_str_lit("properties must be an object"); break;
+    case JTD_ERR_DISCRIMINATOR_NOT_STRING: detail = sp_str_lit("discriminator must be a string"); break;
+    case JTD_ERR_MAPPING_NOT_OBJECT: detail = sp_str_lit("mapping must be an object"); break;
+    case JTD_ERR_MAPPING_NOT_PROPERTIES: detail = sp_str_lit("mapping value must be a non-nullable properties schema"); break;
+    case JTD_ERR_REF_NOT_STRING: detail = sp_str_lit("ref must be a string"); break;
+    case JTD_ERR_METADATA_NOT_OBJECT: detail = sp_str_lit("metadata must be an object"); break;
+    case JTD_ERR_NULLABLE_NOT_BOOL: detail = sp_str_lit("nullable must be a boolean"); break;
+    case JTD_ERR_ADDITIONAL_PROPERTIES_NOT_BOOL: detail = sp_str_lit("additionalProperties must be a boolean"); break;
+    case JTD_ERR_ADDITIONAL_PROPERTIES_WITHOUT_PROPERTIES: detail = sp_str_lit("additionalProperties requires properties or optionalProperties"); break;
+    case JTD_ERR_PROPERTIES_DUPLICATE: detail = sp_str_lit("property cannot be both required and optional"); break;
+    case JTD_ERR_DISCRIMINATOR_TAG_REDEFINED: detail = sp_str_lit("mapping schema cannot redefine discriminator tag"); break;
+    case JTD_ERR_DEFINITIONS_NOT_ROOT: detail = sp_str_lit("definitions is only valid at the document root"); break;
+    case JTD_ERR_REF_UNRESOLVED: detail = sp_fmt(mem, "ref to unknown definition {}", sp_fmt_str(diag->as.ref_unresolved.name)).value; break;
+    case JTD_ERR_REF_CYCLE: detail = sp_fmt(mem, "ref cycle through {}", sp_fmt_str(diag->as.ref_cycle.name)).value; break;
+    case JTD_ERR_UNKNOWN_MEMBER: detail = sp_fmt(mem, "unknown schema member {}", sp_fmt_str(diag->as.unknown_member.key)).value; break;
+    case JTD_ERR_UNRECOGNIZED_FORM: detail = sp_str_lit("unrecognized schema form"); break;
+  }
+  return sp_fmt(mem, "{} at {}: {}", sp_fmt_cstr(jtd_err_name(diag->code)), sp_fmt_str(diag->path), sp_fmt_str(detail)).value;
 }

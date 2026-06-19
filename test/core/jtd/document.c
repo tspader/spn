@@ -60,7 +60,7 @@ UTEST(document, multiple_forms) {
 UTEST(document, unknown_key) {
   run_jtd_case(utest_result, (jtd_case_t){
     .json       = "document.unknown_key.json",
-    .error      = JTD_ERR_UNSUPPORTED,
+    .error      = JTD_ERR_UNKNOWN_MEMBER,
     .error_path = "#/foo",
   });
 }

@@ -85,7 +85,7 @@ UTEST(properties, duplicate_required_optional) {
 UTEST(properties, nested_field_error_path) {
   run_jtd_case(utest_result, (jtd_case_t){
     .json       = "properties.nested_error.json",
-    .error      = JTD_ERR_INVALID_TYPE,
+    .error      = JTD_ERR_UNKNOWN_TYPE,
     .error_path = "#/properties/x",
   });
 }
@@ -93,7 +93,7 @@ UTEST(properties, nested_field_error_path) {
 UTEST(properties, nested_field_escaped_path) {
   run_jtd_case(utest_result, (jtd_case_t){
     .json       = "properties.nested_escaped_error.json",
-    .error      = JTD_ERR_INVALID_TYPE,
+    .error      = JTD_ERR_UNKNOWN_TYPE,
     .error_path = "#/properties/a~1b",
   });
 }
@@ -101,7 +101,7 @@ UTEST(properties, nested_field_escaped_path) {
 UTEST(properties, nested_optional_error_path) {
   run_jtd_case(utest_result, (jtd_case_t){
     .json       = "properties.optional_nested_error.json",
-    .error      = JTD_ERR_INVALID_TYPE,
+    .error      = JTD_ERR_UNKNOWN_TYPE,
     .error_path = "#/optionalProperties/x",
   });
 }
@@ -109,7 +109,7 @@ UTEST(properties, nested_optional_error_path) {
 UTEST(properties, nested_optional_escaped_path) {
   run_jtd_case(utest_result, (jtd_case_t){
     .json       = "properties.optional_nested_escaped_error.json",
-    .error      = JTD_ERR_INVALID_TYPE,
+    .error      = JTD_ERR_UNKNOWN_TYPE,
     .error_path = "#/optionalProperties/a~0b",
   });
 }

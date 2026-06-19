@@ -30,12 +30,11 @@ UTEST(names, errors) {
   jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_JSON)),                   "invalid-json");
   jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_SCHEMA_NOT_OBJECT)),      "schema-not-object");
   jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_MULTIPLE_FORMS)),         "multiple-forms");
-  jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_INVALID_TYPE)),           "invalid-type");
+  jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_TYPE_NOT_STRING)),        "type-not-string");
+  jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_UNKNOWN_TYPE)),           "unknown-type");
   jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_ENUM_EMPTY)),             "enum-empty");
   jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_ENUM_NOT_STRING)),        "enum-not-string");
   jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_ENUM_DUPLICATE)),         "enum-duplicate");
-  jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_ELEMENTS_NOT_SCHEMA)),    "elements-not-schema");
-  jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_VALUES_NOT_SCHEMA)),      "values-not-schema");
   jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_PROPERTIES_NOT_OBJECT)),  "properties-not-object");
   jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_DISCRIMINATOR_NOT_STRING)),"discriminator-not-string");
   jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_MAPPING_NOT_OBJECT)),     "mapping-not-object");
@@ -50,5 +49,6 @@ UTEST(names, errors) {
   jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_DEFINITIONS_NOT_ROOT)),   "definitions-not-root");
   jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_REF_UNRESOLVED)),         "ref-unresolved");
   jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_REF_CYCLE)),              "ref-cycle");
-  jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_UNSUPPORTED)),            "unsupported");
+  jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_UNKNOWN_MEMBER)),         "unknown-member");
+  jtd_expect_str(utest_result, sp_str_view(jtd_err_name(JTD_ERR_UNRECOGNIZED_FORM)),      "unrecognized-form");
 }
