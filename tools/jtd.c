@@ -131,6 +131,18 @@ static sp_str_t jtd_path_seg(sp_mem_t mem, sp_str_t base, sp_str_t seg) {
   return sp_fmt(mem, "{}/{}", sp_fmt_str(base), sp_fmt_str(jtd_path_escape(mem, seg))).value;
 }
 
+static sp_str_t jtd_path_seg_cstr(sp_mem_t mem, sp_str_t base, const c8* seg) {
+  return jtd_path_seg(mem, base, sp_str_view(seg));
+}
+
+static sp_str_t jtd_path_seg_cstr_cstr(sp_mem_t mem, sp_str_t base, const c8* a, const c8* b) {
+  return jtd_path_seg_cstr(mem, jtd_path_seg_cstr(mem, base, a), b);
+}
+
+static sp_str_t jtd_path_seg_cstr_str(sp_mem_t mem, sp_str_t base, const c8* a, sp_str_t b) {
+  return jtd_path_seg(mem, jtd_path_seg_cstr(mem, base, a), b);
+}
+
 static bool jtd_diag(sp_mem_t mem, jtd_diagnostic_t* diag, jtd_err_t code, sp_str_t path) {
   if (diag) {
     *diag = sp_zero_s(jtd_diagnostic_t);
@@ -169,7 +181,7 @@ static jtd_schema_t* jtd_parse_schema(jtd_ctx_t* ctx, yyjson_val* v, sp_str_t pa
 static bool jtd_parse_shared(jtd_ctx_t* ctx, jtd_schema_t* s, yyjson_val* v, sp_str_t path) {
   yyjson_val* metadata = yyjson_obj_get(v, "metadata");
   if (metadata && !yyjson_is_obj(metadata)) {
-    return jtd_fail(ctx, JTD_ERR_METADATA_NOT_OBJECT, jtd_path_seg(ctx->temp, path, sp_str_lit("metadata")));
+    return jtd_fail(ctx, JTD_ERR_METADATA_NOT_OBJECT, jtd_path_seg_cstr(ctx->temp, path, "metadata"));
   }
 
   yyjson_val* nullable = yyjson_obj_get(v, "nullable");
@@ -246,12 +258,12 @@ static jtd_schema_t* jtd_parse_properties(jtd_ctx_t* ctx, jtd_schema_t* s, yyjso
   s->as.properties.optional = sp_da_new(ctx->result, jtd_property_t);
 
   if (aprops && !yyjson_is_bool(aprops)) {
-    jtd_fail(ctx, JTD_ERR_ADDITIONAL_PROPERTIES_NOT_BOOL, jtd_path_seg(ctx->temp, path, sp_str_lit("additionalProperties")));
+    jtd_fail(ctx, JTD_ERR_ADDITIONAL_PROPERTIES_NOT_BOOL, jtd_path_seg_cstr(ctx->temp, path, "additionalProperties"));
     return SP_NULLPTR;
   }
 
   if (aprops && !props && !oprops) {
-    jtd_fail(ctx, JTD_ERR_ADDITIONAL_PROPERTIES_WITHOUT_PROPERTIES, jtd_path_seg(ctx->temp, path, sp_str_lit("additionalProperties")));
+    jtd_fail(ctx, JTD_ERR_ADDITIONAL_PROPERTIES_WITHOUT_PROPERTIES, jtd_path_seg_cstr(ctx->temp, path, "additionalProperties"));
     return SP_NULLPTR;
   }
 
@@ -262,7 +274,7 @@ static jtd_schema_t* jtd_parse_properties(jtd_ctx_t* ctx, jtd_schema_t* s, yyjso
     if (!yyjson_is_obj(props)) { jtd_fail(ctx, JTD_ERR_PROPERTIES_NOT_OBJECT, path); return SP_NULLPTR; }
     yyjson_obj_foreach(props, idx, max, k, mv) {
       sp_str_t key = jtd_yj_str(ctx->result, k);
-      jtd_schema_t* child = jtd_parse_schema(ctx, mv, jtd_path_seg(ctx->temp, jtd_path_seg(ctx->temp, path, sp_str_lit("properties")), key));
+      jtd_schema_t* child = jtd_parse_schema(ctx, mv, jtd_path_seg_cstr_str(ctx->temp, path, "properties", key));
       if (!child) return SP_NULLPTR;
       jtd_property_t p = { .key = key, .schema = child };
       sp_da_push(s->as.properties.required, p);
@@ -275,11 +287,11 @@ static jtd_schema_t* jtd_parse_properties(jtd_ctx_t* ctx, jtd_schema_t* s, yyjso
       sp_str_t key = jtd_yj_str(ctx->result, k);
       sp_da_for(s->as.properties.required, it) {
         if (sp_str_equal(key, s->as.properties.required[it].key)) {
-          jtd_fail(ctx, JTD_ERR_PROPERTIES_DUPLICATE, jtd_path_seg(ctx->temp, jtd_path_seg(ctx->temp, path, sp_str_lit("optionalProperties")), key));
+          jtd_fail(ctx, JTD_ERR_PROPERTIES_DUPLICATE, jtd_path_seg_cstr_str(ctx->temp, path, "optionalProperties", key));
           return SP_NULLPTR;
         }
       }
-      jtd_schema_t* child = jtd_parse_schema(ctx, mv, jtd_path_seg(ctx->temp, jtd_path_seg(ctx->temp, path, sp_str_lit("optionalProperties")), key));
+      jtd_schema_t* child = jtd_parse_schema(ctx, mv, jtd_path_seg_cstr_str(ctx->temp, path, "optionalProperties", key));
       if (!child) return SP_NULLPTR;
       jtd_property_t p = { .key = key, .schema = child };
       sp_da_push(s->as.properties.optional, p);
@@ -390,7 +402,7 @@ static jtd_schema_t* jtd_parse_schema_object(jtd_ctx_t* ctx, yyjson_val* v, sp_s
 
   if (o.elements) {
     s->form = JTD_FORM_ELEMENTS;
-    jtd_schema_t* child = jtd_parse_schema(ctx, o.elements, jtd_path_seg(ctx->temp, path, sp_str_lit("elements")));
+    jtd_schema_t* child = jtd_parse_schema(ctx, o.elements, jtd_path_seg_cstr(ctx->temp, path, "elements"));
     if (!child) return SP_NULLPTR;
     s->as.elements.schema = child;
     return s;
@@ -402,7 +414,7 @@ static jtd_schema_t* jtd_parse_schema_object(jtd_ctx_t* ctx, yyjson_val* v, sp_s
 
   if (o.values) {
     s->form = JTD_FORM_VALUES;
-    jtd_schema_t* child = jtd_parse_schema(ctx, o.values, jtd_path_seg(ctx->temp, path, sp_str_lit("values")));
+    jtd_schema_t* child = jtd_parse_schema(ctx, o.values, jtd_path_seg_cstr(ctx->temp, path, "values"));
     if (!child) return SP_NULLPTR;
     s->as.values.schema = child;
     return s;
@@ -420,7 +432,7 @@ static jtd_schema_t* jtd_parse_schema_object(jtd_ctx_t* ctx, yyjson_val* v, sp_s
     yyjson_val *k, *mv;
     yyjson_obj_foreach(o.mapping, idx, max, k, mv) {
       sp_str_t tag = jtd_yj_str(ctx->result, k);
-      sp_str_t cpath = jtd_path_seg(ctx->temp, jtd_path_seg(ctx->temp, path, sp_str_lit("mapping")), tag);
+      sp_str_t cpath = jtd_path_seg_cstr_str(ctx->temp, path, "mapping", tag);
       jtd_schema_t* child = jtd_parse_schema(ctx, mv, cpath);
       if (!child) return SP_NULLPTR;
       if (child->form != JTD_FORM_PROPERTIES || child->nullable) {
@@ -430,14 +442,14 @@ static jtd_schema_t* jtd_parse_schema_object(jtd_ctx_t* ctx, yyjson_val* v, sp_s
       sp_da_for(child->as.properties.required, it) {
         jtd_property_t* p = &child->as.properties.required[it];
         if (sp_str_equal(p->key, s->as.discriminator.tag)) {
-          jtd_fail(ctx, JTD_ERR_DISCRIMINATOR_TAG_REDEFINED, jtd_path_seg(ctx->temp, jtd_path_seg(ctx->temp, cpath, sp_str_lit("properties")), p->key));
+          jtd_fail(ctx, JTD_ERR_DISCRIMINATOR_TAG_REDEFINED, jtd_path_seg_cstr_str(ctx->temp, cpath, "properties", p->key));
           return SP_NULLPTR;
         }
       }
       sp_da_for(child->as.properties.optional, it) {
         jtd_property_t* p = &child->as.properties.optional[it];
         if (sp_str_equal(p->key, s->as.discriminator.tag)) {
-          jtd_fail(ctx, JTD_ERR_DISCRIMINATOR_TAG_REDEFINED, jtd_path_seg(ctx->temp, jtd_path_seg(ctx->temp, cpath, sp_str_lit("optionalProperties")), p->key));
+          jtd_fail(ctx, JTD_ERR_DISCRIMINATOR_TAG_REDEFINED, jtd_path_seg_cstr_str(ctx->temp, cpath, "optionalProperties", p->key));
           return SP_NULLPTR;
         }
       }
@@ -465,7 +477,7 @@ static jtd_schema_t* jtd_parse_schema(jtd_ctx_t* ctx, yyjson_val* v, sp_str_t pa
   }
 
   if (yyjson_obj_get(v, "definitions")) {
-    jtd_fail(ctx, JTD_ERR_DEFINITIONS_NOT_ROOT, jtd_path_seg(ctx->temp, path, sp_str_lit("definitions")));
+    jtd_fail(ctx, JTD_ERR_DEFINITIONS_NOT_ROOT, jtd_path_seg_cstr(ctx->temp, path, "definitions"));
     return SP_NULLPTR;
   }
 
@@ -496,23 +508,23 @@ static bool jtd_walk_schema(sp_mem_t mem, jtd_schema_t* s, sp_str_t path, jtd_vi
     case JTD_FORM_PROPERTIES: {
       sp_da_for(s->as.properties.required, i) {
         jtd_property_t* p = &s->as.properties.required[i];
-        if (!jtd_walk_schema(mem, p->schema, jtd_path_seg(mem, jtd_path_seg(mem, path, sp_str_lit("properties")), p->key), fn, user)) return false;
+        if (!jtd_walk_schema(mem, p->schema, jtd_path_seg_cstr_str(mem, path, "properties", p->key), fn, user)) return false;
       }
       sp_da_for(s->as.properties.optional, i) {
         jtd_property_t* p = &s->as.properties.optional[i];
-        if (!jtd_walk_schema(mem, p->schema, jtd_path_seg(mem, jtd_path_seg(mem, path, sp_str_lit("optionalProperties")), p->key), fn, user)) return false;
+        if (!jtd_walk_schema(mem, p->schema, jtd_path_seg_cstr_str(mem, path, "optionalProperties", p->key), fn, user)) return false;
       }
       return true;
     }
     case JTD_FORM_DISCRIMINATOR: {
       sp_da_for(s->as.discriminator.mapping, i) {
         jtd_mapping_t* m = &s->as.discriminator.mapping[i];
-        if (!jtd_walk_schema(mem, m->schema, jtd_path_seg(mem, jtd_path_seg(mem, path, sp_str_lit("mapping")), m->tag), fn, user)) return false;
+        if (!jtd_walk_schema(mem, m->schema, jtd_path_seg_cstr_str(mem, path, "mapping", m->tag), fn, user)) return false;
       }
       return true;
     }
-    case JTD_FORM_ELEMENTS: return jtd_walk_schema(mem, s->as.elements.schema, jtd_path_seg(mem, path, sp_str_lit("elements")), fn, user);
-    case JTD_FORM_VALUES: return jtd_walk_schema(mem, s->as.values.schema, jtd_path_seg(mem, path, sp_str_lit("values")), fn, user);
+    case JTD_FORM_ELEMENTS: return jtd_walk_schema(mem, s->as.elements.schema, jtd_path_seg_cstr(mem, path, "elements"), fn, user);
+    case JTD_FORM_VALUES: return jtd_walk_schema(mem, s->as.values.schema, jtd_path_seg_cstr(mem, path, "values"), fn, user);
     case JTD_FORM_EMPTY:
     case JTD_FORM_TYPE:
     case JTD_FORM_ENUM:
