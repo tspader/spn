@@ -119,7 +119,7 @@ UTEST(ref, definitions_not_object) {
 UTEST(ref, definition_nested_error_path) {
   run_jtd_case(utest_result, (jtd_case_t){
     .json       = "ref.definition_nested_error.json",
-    .error      = JTD_ERR_INVALID_TYPE,
+    .error      = JTD_ERR_UNKNOWN_TYPE,
     .error_path = "#/definitions/foo",
   });
 }
@@ -127,7 +127,7 @@ UTEST(ref, definition_nested_error_path) {
 UTEST(ref, definition_escaped_error_path) {
   run_jtd_case(utest_result, (jtd_case_t){
     .json       = "ref.definition_escaped_error.json",
-    .error      = JTD_ERR_INVALID_TYPE,
+    .error      = JTD_ERR_UNKNOWN_TYPE,
     .error_path = "#/definitions/a~1b",
   });
 }

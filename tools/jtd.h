@@ -86,12 +86,11 @@ typedef enum {
   JTD_ERR_JSON,
   JTD_ERR_SCHEMA_NOT_OBJECT,
   JTD_ERR_MULTIPLE_FORMS,
-  JTD_ERR_INVALID_TYPE,
+  JTD_ERR_TYPE_NOT_STRING,
+  JTD_ERR_UNKNOWN_TYPE,
   JTD_ERR_ENUM_EMPTY,
   JTD_ERR_ENUM_NOT_STRING,
   JTD_ERR_ENUM_DUPLICATE,
-  JTD_ERR_ELEMENTS_NOT_SCHEMA,
-  JTD_ERR_VALUES_NOT_SCHEMA,
   JTD_ERR_PROPERTIES_NOT_OBJECT,
   JTD_ERR_DISCRIMINATOR_NOT_STRING,
   JTD_ERR_MAPPING_NOT_OBJECT,
@@ -106,13 +105,20 @@ typedef enum {
   JTD_ERR_DEFINITIONS_NOT_ROOT,
   JTD_ERR_REF_UNRESOLVED,
   JTD_ERR_REF_CYCLE,
-  JTD_ERR_UNSUPPORTED,
+  JTD_ERR_UNKNOWN_MEMBER,
+  JTD_ERR_UNRECOGNIZED_FORM,
 } jtd_err_t;
 
 typedef struct {
   jtd_err_t code;
-  sp_str_t message;
   sp_str_t path;
+  union {
+    struct { sp_str_t name; } unknown_type;
+    struct { sp_str_t value; } enum_duplicate;
+    struct { sp_str_t name; } ref_unresolved;
+    struct { sp_str_t name; } ref_cycle;
+    struct { sp_str_t key; } unknown_member;
+  } as;
 } jtd_diagnostic_t;
 
 typedef struct {
@@ -132,6 +138,8 @@ SP_API jtd_schema_t* jtd_resolve_deep(sp_mem_t mem, const jtd_result_t* result, 
 
 typedef bool (*jtd_visit_fn)(jtd_schema_t* schema, sp_str_t path, void* user);
 SP_API void jtd_walk(sp_mem_t mem, const jtd_result_t* result, jtd_visit_fn fn, void* user);
+
+SP_API sp_str_t jtd_diagnostic_message(sp_mem_t mem, const jtd_diagnostic_t* diag);
 
 SP_API const c8* jtd_err_name(jtd_err_t err);
 SP_API const c8* jtd_form_name(jtd_form_t form);
