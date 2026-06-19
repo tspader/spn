@@ -1,7 +1,7 @@
 #include "git.h"
 
 spn_err_t spn_git_clone(sp_str_t url, sp_str_t path) {
-  sp_ps_output_t result = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("clone"), SP_LIT("--quiet"),
@@ -17,7 +17,7 @@ spn_err_t spn_git_clone(sp_str_t url, sp_str_t path) {
 }
 
 spn_err_t spn_git_pull(sp_str_t repo) {
-  sp_ps_output_t result = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
@@ -30,7 +30,7 @@ spn_err_t spn_git_pull(sp_str_t repo) {
 }
 
 spn_err_t spn_git_fetch(sp_str_t repo) {
-  sp_ps_output_t result = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
@@ -43,7 +43,7 @@ spn_err_t spn_git_fetch(sp_str_t repo) {
 }
 
 u32 spn_git_num_updates(sp_str_t repo, sp_str_t from, sp_str_t to) {
-  sp_ps_output_t result = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
@@ -58,7 +58,7 @@ u32 spn_git_num_updates(sp_str_t repo, sp_str_t from, sp_str_t to) {
 }
 
 spn_err_t spn_git_get_remote_url(sp_str_t repo, sp_str_t* url) {
-  sp_ps_output_t result = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
@@ -72,7 +72,7 @@ spn_err_t spn_git_get_remote_url(sp_str_t repo, sp_str_t* url) {
 }
 
 spn_err_t spn_git_get_commit(sp_str_t repo, sp_str_t id, sp_str_t* sha) {
-  sp_ps_output_t result = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
@@ -88,7 +88,7 @@ spn_err_t spn_git_get_commit(sp_str_t repo, sp_str_t id, sp_str_t* sha) {
 }
 
 sp_str_t spn_git_get_commit_message(sp_str_t repo, sp_str_t id) {
-  sp_ps_output_t result = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
@@ -105,7 +105,7 @@ sp_str_t spn_git_get_commit_message(sp_str_t repo, sp_str_t id) {
 }
 
 spn_err_t spn_git_get_root(sp_str_t cwd, sp_str_t* root) {
-  sp_ps_output_t result = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), cwd,
@@ -122,7 +122,7 @@ spn_err_t spn_git_checkout(sp_str_t repo, sp_str_t id) {
   if (sp_str_empty(id)) return SPN_ERROR;
   if (!sp_fs_exists(repo)) return SPN_ERROR;
 
-  sp_ps_output_t result = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,

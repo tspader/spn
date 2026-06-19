@@ -25,13 +25,13 @@ ar_result_t archive_objects(spn_target_unit_t* unit, sp_str_t output) {
     },
   };
   sp_da_for(toolchain->archiver.args, ai) {
-    sp_ps_config_add_arg(spn_allocator, &ps, toolchain->archiver.args[ai]);
+    sp_ps_config_add_arg(spn.mem, &ps, toolchain->archiver.args[ai]);
   }
-  sp_ps_config_add_arg(spn_allocator, &ps, sp_str_lit("rcs"));
-  sp_ps_config_add_arg(spn_allocator, &ps, output);
+  sp_ps_config_add_arg(spn.mem, &ps, sp_str_lit("rcs"));
+  sp_ps_config_add_arg(spn.mem, &ps, output);
 
   sp_da_for(unit->objects, it) {
-    sp_ps_config_add_arg(spn_allocator, &ps, unit->objects[it]->paths.object);
+    sp_ps_config_add_arg(spn.mem, &ps, unit->objects[it]->paths.object);
   }
 
   sp_str_builder_t log = SP_ZERO_INITIALIZE();
@@ -43,7 +43,7 @@ ar_result_t archive_objects(spn_target_unit_t* unit, sp_str_t output) {
   }
 
   sp_tm_timer_t timer = sp_tm_start_timer();
-  sp_ps_output_t result = sp_ps_run(spn_allocator, ps);
+  sp_ps_output_t result = sp_ps_run(spn.mem, ps);
   u64 elapsed = sp_tm_read_timer(&timer);
 
   return (ar_result_t) {
@@ -125,7 +125,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
     }
     case SPN_CC_OUTPUT_EXE:
     case SPN_CC_OUTPUT_SHARED_LIB: {
-      spn_cc_t* cc = sp_alloc_type(spn_allocator, spn_cc_t);
+      spn_cc_t* cc = sp_alloc_type(spn.mem, spn_cc_t);
       spn_cc_set_profile(cc, target->session->profile);
       spn_cc_set_output_dir(cc, sp_fs_parent_path(output));
       spn_cc_set_toolchain(cc, target->session->units.toolchain);

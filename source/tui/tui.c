@@ -134,7 +134,7 @@ sp_str_t spn_output_mode_to_str(spn_tui_mode_t mode) {
 }
 
 sp_str_t spn_build_event_kind_to_str(spn_build_event_kind_t kind) {
-  return sp_str_from_cstr(spn_allocator, event_info[kind].name);
+  return sp_str_from_cstr(spn_mem_todo, event_info[kind].name);
 }
 
 spn_verbosity_t spn_build_event_get_verbosity(spn_build_event_kind_t kind) {
@@ -256,7 +256,7 @@ static sp_str_t spn_tui_name_to_color(sp_str_t str) {
 
   static sp_ht(u32, sp_hash_t) buckets = SP_NULLPTR;
 
-  sp_hash_t hash = sp_hash_cstr(sp_str_to_cstr(spn_allocator, str));
+  sp_hash_t hash = sp_hash_cstr(sp_str_to_cstr(spn_mem_todo, str));
   u32 lo = (u32)hash;
 
   static const f32 bucket_hues[] = {
@@ -336,9 +336,9 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       sp_str_builder_append_fmt(&builder,
         "{} {.fg brightblack} {}{}{}",
         SP_FMT_STR(spn_semver_to_str(event->checkout.version)),
-        SP_FMT_STR(sp_str_truncate(spn_allocator, event->checkout.commit, 8, SP_ZERO_STRUCT(sp_str_t))),
+        SP_FMT_STR(sp_str_truncate(spn_mem_todo, event->checkout.commit, 8, SP_ZERO_STRUCT(sp_str_t))),
         SP_FMT_CSTR(SP_ANSI_ITALIC),
-        SP_FMT_STR(sp_str_truncate(spn_allocator, event->checkout.message, 32, sp_str_lit("..."))),
+        SP_FMT_STR(sp_str_truncate(spn_mem_todo, event->checkout.message, 32, sp_str_lit("..."))),
         SP_FMT_CSTR(SP_ANSI_RESET)
       );
       break;

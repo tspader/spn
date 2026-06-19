@@ -28,7 +28,7 @@ SP_BEGIN_EXTERN_C()
 
 typedef sp_str_t mz_str_t;
 typedef sp_mem_buffer_t mz_buf_t;
-#define mz_alloc_n(t, n) sp_alloc_n(spn_allocator, t, n)
+#define mz_alloc_n(t, n) sp_alloc_n(spn_mem_todo, t, n)
 #define mz_zero SP_ZERO_INITIALIZE()
 #define mz_zero_s(s) SP_ZERO_STRUCT(s)
 #define mz_null 0

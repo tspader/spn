@@ -190,7 +190,7 @@ static mz_err_t mz_backend_load_str(mz_nstr_t json, mz_json_doc_t** result) {
     return MZ_ERR_JSON;
   }
 
-  mz_json_doc_t* doc = sp_alloc_type(spn_allocator, mz_json_doc_t);
+  mz_json_doc_t* doc = sp_alloc_type(spn_mem_todo, mz_json_doc_t);
   doc->root = root;
   *result = doc;
   return MZ_OK;
@@ -203,7 +203,7 @@ static mz_err_t mz_backend_load_file(mz_nstr_t path, mz_json_doc_t** result) {
     return MZ_ERR_JSON;
   }
 
-  mz_json_doc_t* doc = sp_alloc_type(spn_allocator, mz_json_doc_t);
+  mz_json_doc_t* doc = sp_alloc_type(spn_mem_todo, mz_json_doc_t);
   doc->root = root;
   *result = doc;
   return MZ_OK;
@@ -409,7 +409,7 @@ static mz_err_t mz_json_cjson_read_file(const c8* path, c8** result) {
   }
 
   u32 size = (u32)file_size;
-  c8* buffer = (c8*)sp_alloc(spn_allocator, size + 1);
+  c8* buffer = (c8*)sp_alloc(spn_mem_todo, size + 1);
   size_t read_len = fread(buffer, 1, size, file);
   fclose(file);
   if (read_len != size) {
@@ -428,7 +428,7 @@ static mz_err_t mz_backend_load_str(mz_nstr_t json, mz_json_doc_t** result) {
     return MZ_ERR_JSON;
   }
 
-  mz_json_doc_t* doc = sp_alloc_type(spn_allocator, mz_json_doc_t);
+  mz_json_doc_t* doc = sp_alloc_type(spn_mem_todo, mz_json_doc_t);
   doc->root = root;
   *result = doc;
   return MZ_OK;
@@ -444,7 +444,7 @@ static mz_err_t mz_backend_load_file(mz_nstr_t path, mz_json_doc_t** result) {
     return MZ_ERR_JSON;
   }
 
-  mz_json_doc_t* doc = sp_alloc_type(spn_allocator, mz_json_doc_t);
+  mz_json_doc_t* doc = sp_alloc_type(spn_mem_todo, mz_json_doc_t);
   doc->root = root;
   *result = doc;
   return MZ_OK;
@@ -609,7 +609,7 @@ static mz_err_t mz_backend_load_str(mz_nstr_t json, mz_json_doc_t** result) {
     return MZ_ERR_JSON;
   }
 
-  *result = sp_alloc_type(spn_allocator, mz_json_doc_t);
+  *result = sp_alloc_type(spn_mem_todo, mz_json_doc_t);
   (*result)->root = root;
   return MZ_OK;
 }
@@ -620,7 +620,7 @@ static mz_err_t mz_backend_load_file(mz_nstr_t path, mz_json_doc_t** result) {
     return MZ_ERR_JSON;
   }
 
-  *result = sp_alloc_type(spn_allocator, mz_json_doc_t);
+  *result = sp_alloc_type(spn_mem_todo, mz_json_doc_t);
   (*result)->root = root;
   return MZ_OK;
 }
@@ -1556,7 +1556,7 @@ static void mz_object_rebuild_index(mz_schema_t* schema) {
     cap <<= 1;
   }
 
-  schema->as.object.slots = (mz_object_slot_t*)sp_alloc(spn_allocator, sizeof(mz_object_slot_t) * cap);
+  schema->as.object.slots = (mz_object_slot_t*)sp_alloc(spn_mem_todo, sizeof(mz_object_slot_t) * cap);
   if (!schema->as.object.slots) {
     schema->as.object.slots_cap = 0;
     return;
@@ -2518,7 +2518,7 @@ static mz_err_t mz_eval_tagged(mz_ctx_t* ctx, mz_schema_t* schema, const mz_json
 }
 
 static mz_schema_t* mz_schema_map_internal(mz_schema_t* value, mz_on_alloc_fn_t on_alloc, mz_on_parse_fn_t on_parse) {
-  mz_schema_t* schema = sp_alloc_type(spn_allocator, mz_schema_t);
+  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
   *schema = mz_schema_make_map_value(value, on_alloc, on_parse);
   return schema;
 }
@@ -2702,31 +2702,31 @@ void mz_schema_free(mz_schema_t* schema) {
 }
 
 mz_schema_t* mz_schema_object(mz_object_mode_t mode) {
-  mz_schema_t* schema = sp_alloc_type(spn_allocator, mz_schema_t);
+  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
   *schema = mz_schema_make_object_value(mode);
   return schema;
 }
 
 mz_schema_t* mz_schema_string() {
-  mz_schema_t* schema = sp_alloc_type(spn_allocator, mz_schema_t);
+  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
   *schema = (mz_schema_t) { .kind = MZ_SCHEMA_STRING };
   return schema;
 }
 
 mz_schema_t* mz_schema_any() {
-  mz_schema_t* schema = sp_alloc_type(spn_allocator, mz_schema_t);
+  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
   *schema = (mz_schema_t) { .kind = MZ_SCHEMA_ANY };
   return schema;
 }
 
 mz_schema_t* mz_schema_bool() {
-  mz_schema_t* schema = sp_alloc_type(spn_allocator, mz_schema_t);
+  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
   *schema = (mz_schema_t) { .kind = MZ_SCHEMA_BOOL };
   return schema;
 }
 
 mz_schema_t* mz_schema_s32_ex(s32 min, s32 max) {
-  mz_schema_t* schema = sp_alloc_type(spn_allocator, mz_schema_t);
+  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
   *schema = mz_schema_make_s32_value(min, max);
   return schema;
 }
@@ -2736,7 +2736,7 @@ mz_schema_t* mz_schema_s32() {
 }
 
 mz_schema_t* mz_schema_u64_ex(u64 min, u64 max) {
-  mz_schema_t* schema = sp_alloc_type(spn_allocator, mz_schema_t);
+  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
   *schema = mz_schema_make_u64_value(min, max);
   return schema;
 }
@@ -2746,7 +2746,7 @@ mz_schema_t* mz_schema_u64() {
 }
 
 mz_schema_t* mz_schema_f64_ex(f64 min, f64 max) {
-  mz_schema_t* schema = sp_alloc_type(spn_allocator, mz_schema_t);
+  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
   *schema = mz_schema_make_f64_value(min, max);
   return schema;
 }
@@ -2756,7 +2756,7 @@ mz_schema_t* mz_schema_f64() {
 }
 
 mz_schema_t* mz_schema_array_ex(mz_schema_t* element, mz_on_alloc_fn_t on_alloc, mz_on_parse_fn_t on_parse, u32 min_len, u32 max_len) {
-  mz_schema_t* schema = sp_alloc_type(spn_allocator, mz_schema_t);
+  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
   *schema = mz_schema_make_array_value(element, on_alloc, on_parse, min_len, max_len);
   return schema;
 }
@@ -2778,8 +2778,8 @@ mz_schema_t* mz_schema_map_ex(mz_schema_t* value, mz_on_alloc_fn_t on_alloc, mz_
 mz_schema_t* mz_schema_tagged_union(const c8* key, mz_tag_kind_t kind) {
   mz_assert(key);
 
-  mz_schema_t* schema = sp_alloc_type(spn_allocator, mz_schema_t);
-  *schema = mz_schema_make_tagged_value(sp_cstr_copy(spn_allocator, key), kind);
+  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
+  *schema = mz_schema_make_tagged_value(sp_cstr_copy(spn_mem_todo, key), kind);
   return schema;
 }
 
@@ -2808,7 +2808,7 @@ void mz_tagged_union_add(mz_schema_t* tagged, mz_tag_value_t tag, mz_schema_t* s
 
   switch (tag.kind) {
     case MZ_TAG_KIND_STR: {
-      tag.as.str = sp_cstr_copy(spn_allocator, tag.as.str); break;
+      tag.as.str = sp_cstr_copy(spn_mem_todo, tag.as.str); break;
     }
     case MZ_TAG_KIND_U64:
     case MZ_TAG_KIND_S32: {
@@ -2829,7 +2829,7 @@ void mz_object_add_field_ex(mz_schema_t* object, const c8* key, mz_schema_t* fie
   mz_assert(field);
 
   mz_field_t entry = SP_ZERO_STRUCT(mz_field_t);
-  entry.key = sp_cstr_copy(spn_allocator, key);
+  entry.key = sp_cstr_copy(spn_mem_todo, key);
   entry.schema = field;
   entry.required = opts.required;
   entry.offset = opts.offset;
@@ -2849,7 +2849,7 @@ void mz_object_add_field_ptr_ex(mz_schema_t* object, const c8* key, mz_schema_t*
   mz_assert(opts.ptr_size > 0);
 
   mz_field_t entry = SP_ZERO_STRUCT(mz_field_t);
-  entry.key = sp_cstr_copy(spn_allocator, key);
+  entry.key = sp_cstr_copy(spn_mem_todo, key);
   entry.schema = field;
   entry.required = opts.required;
   entry.offset = opts.offset;
@@ -3011,12 +3011,12 @@ void mz_builder_pop(mz_builder_t* builder) {
 }
 
 mz_ctx_t* mz_ctx_create() {
-  mz_ctx_t* ctx = sp_alloc_type(spn_allocator, mz_ctx_t);
+  mz_ctx_t* ctx = sp_alloc_type(spn_mem_todo, mz_ctx_t);
   mz_ctx_init(ctx);
   return ctx;
 }
 mz_ctx_t* mz_ctx_create_ex(sp_mem_t allocator) {
-  mz_ctx_t* ctx = sp_alloc_type(spn_allocator, mz_ctx_t);
+  mz_ctx_t* ctx = sp_alloc_type(spn_mem_todo, mz_ctx_t);
   mz_ctx_init_ex(ctx, allocator);
   return ctx;
 
@@ -3028,12 +3028,12 @@ void mz_ctx_init_ex(mz_ctx_t* ctx, sp_mem_t allocator) {
   ctx->diag.kind = MZ_OK;
 
   sp_context_push_allocator(ctx->allocator);
-  ctx->arena = sp_mem_arena_new(spn_allocator);
+  ctx->arena = sp_mem_arena_new(spn_mem_todo);
   sp_context_pop();
 }
 
 void mz_ctx_init(mz_ctx_t* ctx) {
-  mz_ctx_init_ex(ctx, spn_allocator);
+  mz_ctx_init_ex(ctx, spn_mem_todo);
 }
 
 void mz_ctx_clear(mz_ctx_t* ctx) {
@@ -3105,7 +3105,7 @@ mz_nstr_t mz_nstr_view(const c8* cstr) {
 
 mz_buf_t mz_read_file(mz_str_t path) {
   sp_str_t content = sp_zero;
-  if (sp_io_read_file(spn_allocator, path, &content) != SP_OK || content.len == 0) {
+  if (sp_io_read_file(spn_mem_todo, path, &content) != SP_OK || content.len == 0) {
     return mz_zero_s(mz_buf_t);
   }
 

@@ -26,7 +26,7 @@ static spn_err_t prepare_build_graph(spn_app_t* app);
 void spn_task_init_build_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
 
-  spn_bg_init(&session->build.graph, spn_allocator);
+  spn_bg_init(&session->build.graph, app->session.mem);
   prepare_build_graph(app);
 
   sp_str_om_for(session->units.packages, it) {

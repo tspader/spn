@@ -20,7 +20,7 @@ spn_node_t* spn_add_node(spn_config_t* config, const c8* tag) {
   };
   sp_da_push(unit->nodes.user, node);
 
-  spn_node_t* out = sp_alloc_type(spn_allocator, spn_node_t);
+  spn_node_t* out = sp_alloc_type(spn_mem_todo, spn_node_t);
   *out = (spn_node_t) {
     .ctx = unit,
     .index = index,

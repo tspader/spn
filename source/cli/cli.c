@@ -16,7 +16,7 @@ static sp_str_t spn_cli_opt_kind_to_str(spn_cli_opt_kind_t kind) {
 }
 
 static sp_str_t cstr(const c8* cstr) {
-  return sp_str_from_cstr(spn_allocator, cstr ? cstr : "");
+  return sp_str_from_cstr(spn.mem, cstr ? cstr : "");
 }
 
 spn_cli_command_info_t spn_cli_command_info_from_usage(spn_cli_usage_t cmd) {
@@ -231,7 +231,7 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cmd) {
       spn_cli_command_info_t command = info.commands[it];
       sp_str_t args = sp_str_lit("");
       if (!sp_da_empty(command.brief)) {
-        args = sp_str_join_n(spn_allocator, command.brief, sp_dyn_array_size(command.brief), sp_str_lit(", "));
+        args = sp_str_join_n(spn.mem, command.brief, sp_dyn_array_size(command.brief), sp_str_lit(", "));
       }
 
       sp_tui_table_next_row(&spn.tui.table);

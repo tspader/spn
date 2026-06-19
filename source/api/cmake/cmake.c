@@ -57,14 +57,14 @@ void spn_cmake_set_generator(spn_cmake_t* cmake, spn_cmake_gen_t gen) {
 
 void spn_cmake_add_define(spn_cmake_t* cmake, const c8* name, const c8* value) {
   spn_cmake_define_t define = {
-    .name = sp_str_from_cstr(spn_allocator, name),
-    .value = sp_str_from_cstr(spn_allocator, value),
+    .name = sp_str_from_cstr(spn_mem_todo, name),
+    .value = sp_str_from_cstr(spn_mem_todo, value),
   };
   sp_da_push(cmake->defines, define);
 }
 
 void spn_cmake_add_arg(spn_cmake_t* cmake, const c8* arg) {
-  sp_da_push(cmake->args, sp_str_from_cstr(spn_allocator, arg));
+  sp_da_push(cmake->args, sp_str_from_cstr(spn_mem_todo, arg));
 }
 
 static sp_str_t spn_cmake_generate_toolchain_file(spn_pkg_unit_t* unit) {
@@ -72,9 +72,9 @@ static sp_str_t spn_cmake_generate_toolchain_file(spn_pkg_unit_t* unit) {
   spn_toolchain_unit_t* tc = session->units.toolchain;
   if (!tc) return sp_str_lit("");
 
-  sp_str_t tools_dir = sp_fs_join_path(spn_allocator, unit->paths.generated, sp_str_lit("tools"));
+  sp_str_t tools_dir = sp_fs_join_path(spn_mem_todo, unit->paths.generated, sp_str_lit("tools"));
   sp_fs_create_dir(tools_dir);
-  sp_str_t path = sp_fs_join_path(spn_allocator, tools_dir, sp_str_lit("spn.cmake"));
+  sp_str_t path = sp_fs_join_path(spn_mem_todo, tools_dir, sp_str_lit("spn.cmake"));
 
   sp_io_writer_t* io = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_OVERWRITE);
 
@@ -104,8 +104,8 @@ s32 spn_cmake_configure(spn_cmake_t* cmake) {
   };
 
   if (cmake->generator != SPN_CMAKE_GEN_DEFAULT) {
-    sp_ps_config_add_arg(spn_allocator, &config, sp_str_lit("-G"));
-    sp_ps_config_add_arg(spn_allocator, &config, spn_cmake_gen_to_str(cmake->generator));
+    sp_ps_config_add_arg(spn_mem_todo, &config, sp_str_lit("-G"));
+    sp_ps_config_add_arg(spn_mem_todo, &config, spn_cmake_gen_to_str(cmake->generator));
   }
 
   // Generate and pass a CMake toolchain file for cross-compilation support.
@@ -113,32 +113,32 @@ s32 spn_cmake_configure(spn_cmake_t* cmake) {
   // compiler, linker, and archiver to use.
   sp_str_t toolchain_file = spn_cmake_generate_toolchain_file(unit);
   if (!sp_str_empty(toolchain_file)) {
-    sp_ps_config_add_arg(spn_allocator, &config, spn_cmake_format_define(
+    sp_ps_config_add_arg(spn_mem_todo, &config, spn_cmake_format_define(
       sp_str_lit("CMAKE_TOOLCHAIN_FILE"), toolchain_file));
   }
 
-  sp_ps_config_add_arg(spn_allocator, &config, spn_cmake_format_define(
+  sp_ps_config_add_arg(spn_mem_todo, &config, spn_cmake_format_define(
     sp_str_lit("CMAKE_INSTALL_PREFIX"),
     unit->paths.store)
   );
 
-  sp_ps_config_add_arg(spn_allocator, &config, spn_cmake_format_define(
+  sp_ps_config_add_arg(spn_mem_todo, &config, spn_cmake_format_define(
     sp_str_lit("BUILD_SHARED_LIBS"),
     profile->linkage == SPN_LIB_KIND_SHARED ? sp_str_lit("ON") : sp_str_lit("OFF"))
   );
 
-  sp_ps_config_add_arg(spn_allocator, &config, spn_cmake_format_define(
+  sp_ps_config_add_arg(spn_mem_todo, &config, spn_cmake_format_define(
     sp_str_lit("CMAKE_BUILD_TYPE"),
     profile->mode == SPN_BUILD_MODE_RELEASE ? sp_str_lit("Release") : sp_str_lit("Debug"))
   );
 
   sp_da_for(cmake->defines, it) {
     spn_cmake_define_t define = cmake->defines[it];
-    sp_ps_config_add_arg(spn_allocator, &config, spn_cmake_format_define(define.name, define.value));
+    sp_ps_config_add_arg(spn_mem_todo, &config, spn_cmake_format_define(define.name, define.value));
   }
 
   sp_da_for(cmake->args, it) {
-    sp_ps_config_add_arg(spn_allocator, &config, cmake->args[it]);
+    sp_ps_config_add_arg(spn_mem_todo, &config, cmake->args[it]);
   }
 
   sp_ps_output_t result = spn_api_subprocess(unit, config);

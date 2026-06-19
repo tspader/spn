@@ -20,7 +20,7 @@ void spn_obj_init(spn_obj_builder_t* obj, spn_obj_kind_t kind) {
         SP_COFF_SCN_MEM_READ);
     } break;
     case SPN_OBJ_ELF: {
-      obj->elf.elf = sp_elf_new(spn_allocator);
+      obj->elf.elf = sp_elf_new(spn_mem_todo);
       obj->elf.rodata = sp_elf_add_section(obj->elf.elf, (sp_elf_section_t){
         .name = sp_str_lit(".rodata"),
         .type = SHT_PROGBITS,

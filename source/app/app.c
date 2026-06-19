@@ -10,7 +10,7 @@ void spn_app_update_lock_file(spn_app_t* app) {
   spn_lock_file_t lock = spn_build_lock_file(app->session.resolve, &app->package);
 
   sp_da_for(app->package.system_deps, i) {
-    sp_ht_insert(lock.system_deps, sp_str_copy(spn_allocator, app->package.system_deps[i]), true);
+    sp_ht_insert(lock.system_deps, sp_str_copy(app->session.mem, app->package.system_deps[i]), true);
   }
 
   sp_str_t output = spn_lock_file_to_str(&lock);

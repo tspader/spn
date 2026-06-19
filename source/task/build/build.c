@@ -13,7 +13,7 @@
 // Manifest includes are source-relative; the build script API hands us absolute paths
 static sp_str_t resolve_pkg_include(spn_pkg_unit_t* pkg, sp_str_t include) {
   if (sp_str_starts_with(include, sp_str_lit("/"))) return include;
-  return sp_fs_join_path(spn_allocator, pkg->paths.source, include);
+  return sp_fs_join_path(spn_mem_todo, pkg->paths.source, include);
 }
 
 void add_pkg_to_cc(spn_cc_t* cc, spn_pkg_unit_t* pkg) {
@@ -82,11 +82,11 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
 }
 
 sp_str_t get_embed_object_path(spn_target_unit_t* unit) {
-  return sp_fs_join_path(spn_allocator, unit->paths.generated, sp_format("{}.embed.o", SP_FMT_STR(unit->info->name)));
+  return sp_fs_join_path(spn_mem_todo, unit->paths.generated, sp_format("{}.embed.o", SP_FMT_STR(unit->info->name)));
 }
 
 sp_str_t get_embed_header_path(spn_target_unit_t* unit) {
-  return sp_fs_join_path(spn_allocator, unit->paths.generated, sp_format("{}.embed.h", SP_FMT_STR(unit->info->name)));
+  return sp_fs_join_path(spn_mem_todo, unit->paths.generated, sp_format("{}.embed.h", SP_FMT_STR(unit->info->name)));
 }
 
 sp_str_t get_target_output_path(spn_target_unit_t* target) {
@@ -96,13 +96,13 @@ sp_str_t get_target_output_path(spn_target_unit_t* target) {
   spn_profile_info_t profile = target->session->profile;
   switch (target->kind) {
     case SPN_CC_OUTPUT_EXE: {
-      return sp_fs_join_path(spn_allocator, target->paths.bin, info->name);
+      return sp_fs_join_path(spn_mem_todo, target->paths.bin, info->name);
     }
     case SPN_CC_OUTPUT_STATIC_LIB: {
-      return sp_fs_join_path(spn_allocator, target->paths.lib, sp_os_lib_to_file_name(spn_allocator, info->name, SP_OS_LIB_STATIC));
+      return sp_fs_join_path(spn_mem_todo, target->paths.lib, sp_os_lib_to_file_name(spn_mem_todo, info->name, SP_OS_LIB_STATIC));
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
-      return sp_fs_join_path(spn_allocator, target->paths.lib, sp_os_lib_to_file_name(spn_allocator, info->name, SP_OS_LIB_SHARED));
+      return sp_fs_join_path(spn_mem_todo, target->paths.lib, sp_os_lib_to_file_name(spn_mem_todo, info->name, SP_OS_LIB_SHARED));
     }
     case SPN_CC_OUTPUT_JIT:
     case SPN_CC_OUTPUT_OBJECT: break;
