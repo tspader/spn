@@ -1,11 +1,11 @@
 #include "jtd_test.h"
 
-static void compare_empty(s32* utest_result, const jtd_root_t* root, const void* expect) {
+static void compare_empty(s32* utest_result, const jtd_result_t* root, const void* expect) {
   (void)expect;
   EXPECT_EQ((s32)JTD_FORM_EMPTY, (s32)root->root->form);
 }
 
-static void compare_nullable(s32* utest_result, const jtd_root_t* root, const void* expect) {
+static void compare_nullable(s32* utest_result, const jtd_result_t* root, const void* expect) {
   (void)expect;
   EXPECT_EQ((s32)JTD_FORM_TYPE, (s32)root->root->form);
   EXPECT_EQ((s32)JTD_TYPE_STRING, (s32)root->root->as.type);

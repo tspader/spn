@@ -13,37 +13,36 @@ void jtd_expect_str(s32* utest_result, sp_str_t actual, const c8* expected) {
 }
 
 void run_jtd_case(s32* utest_result, jtd_case_t c) {
-  sp_mem_arena_t* arena = sp_mem_arena_new(spn_allocator);
-  sp_context_push_arena(arena);
+  sp_mem_t mem = sp_mem_os_new();
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
-  sp_str_t path = sp_format("{}/{}", SP_FMT_CSTR(JTD_TEST_JSON_DIR), SP_FMT_CSTR(c.json));
-  sp_str_t json = sp_zero; sp_io_read_file(spn_allocator, path, &json);
+  sp_str_t path = sp_fmt(sp_mem_get_scratch(), "{}/{}", sp_fmt_cstr(JTD_TEST_JSON_DIR), sp_fmt_cstr(c.json)).value;
+  sp_str_t json = sp_zero; sp_io_read_file(sp_mem_get_scratch(), path, &json);
 
   if (sp_str_empty(json)) {
     EXPECT_TRUE(sp_str_equal_cstr(path, "<fixture exists and is non-empty>"));
   }
   else {
-    jtd_root_t       root = SP_ZERO_INITIALIZE();
-    jtd_diagnostic_t diag = SP_ZERO_INITIALIZE();
-    bool ok = jtd_parse(json, &root, &diag);
+    jtd_result_t result = jtd_parse(mem, json);
 
     if (c.error == JTD_OK) {
-      EXPECT_TRUE(ok);
-      if (ok && c.compare) {
-        c.compare(utest_result, &root, c.expect);
+      EXPECT_TRUE(result.ok);
+      if (result.ok && c.compare) {
+        c.compare(utest_result, &result, c.expect);
       }
     }
     else {
-      EXPECT_FALSE(ok);
-      EXPECT_EQ((s32)c.error, (s32)diag.code);
+      EXPECT_FALSE(result.ok);
+      EXPECT_EQ((s32)c.error, (s32)result.diag.code);
       if (c.error_path) {
-        EXPECT_TRUE(sp_str_equal_cstr(diag.path, c.error_path));
+        EXPECT_TRUE(sp_str_equal_cstr(result.diag.path, c.error_path));
       }
     }
+
+    jtd_free(&result);
   }
 
-  sp_context_pop();
-  sp_mem_arena_destroy(arena);
+  sp_mem_end_scratch(scratch);
 }
 
 #include "names.c"

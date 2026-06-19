@@ -4,7 +4,7 @@
 #include "utest.h"
 #include "jtd.h"
 
-typedef void (*jtd_compare_fn)(s32* utest_result, const jtd_root_t* root, const void* expect);
+typedef void (*jtd_compare_fn)(s32* utest_result, const jtd_result_t* root, const void* expect);
 
 typedef struct {
   const c8*      json;

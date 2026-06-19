@@ -6,24 +6,22 @@
 // specific error code/path is an implementation detail and is not checked here.
 
 static void run_conformance_reject(s32* utest_result, const c8* file) {
-  sp_mem_arena_t* arena = sp_mem_arena_new(spn_allocator);
-  sp_context_push_arena(arena);
+  sp_mem_t mem = sp_mem_os_new();
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
-  sp_str_t path = sp_format("{}/conformance/{}", SP_FMT_CSTR(JTD_TEST_JSON_DIR), SP_FMT_CSTR(file));
-  sp_str_t json = sp_zero; sp_io_read_file(spn_allocator, path, &json);
+  sp_str_t path = sp_fmt(sp_mem_get_scratch(), "{}/conformance/{}", sp_fmt_cstr(JTD_TEST_JSON_DIR), sp_fmt_cstr(file)).value;
+  sp_str_t json = sp_zero; sp_io_read_file(sp_mem_get_scratch(), path, &json);
 
   if (sp_str_empty(json)) {
     EXPECT_TRUE(sp_str_equal_cstr(path, "<conformance fixture exists and is non-empty>"));
   }
   else {
-    jtd_root_t       root = SP_ZERO_INITIALIZE();
-    jtd_diagnostic_t diag = SP_ZERO_INITIALIZE();
-    bool ok = jtd_parse(json, &root, &diag);
-    EXPECT_FALSE(ok);
+    jtd_result_t result = jtd_parse(mem, json);
+    EXPECT_FALSE(result.ok);
+    jtd_free(&result);
   }
 
-  sp_context_pop();
-  sp_mem_arena_destroy(arena);
+  sp_mem_end_scratch(scratch);
 }
 
 UTEST(conformance, null_schema) { run_conformance_reject(utest_result, "null_schema.json"); }

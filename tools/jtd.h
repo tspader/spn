@@ -2,7 +2,6 @@
 #define JTD_H
 
 #include "sp.h"
-#include "yyjson.h"
 
 typedef enum {
   JTD_FORM_EMPTY,
@@ -32,23 +31,23 @@ typedef enum {
 typedef struct jtd_schema jtd_schema_t;
 
 typedef struct {
-  sp_str_t      key;
+  sp_str_t key;
   jtd_schema_t* schema;
 } jtd_property_t;
 
 typedef struct {
-  sp_str_t      tag;
+  sp_str_t tag;
   jtd_schema_t* schema;
 } jtd_mapping_t;
 
 typedef struct {
-  sp_str_t      name;
+  sp_str_t name;
   jtd_schema_t* schema;
 } jtd_definition_t;
 
 struct jtd_schema {
   jtd_form_t form;
-  bool       nullable;
+  bool nullable;
 
   union {
     jtd_type_t type;
@@ -64,7 +63,7 @@ struct jtd_schema {
     struct {
       sp_da(jtd_property_t) required;
       sp_da(jtd_property_t) optional;
-      bool                  additional;
+      bool additional;
     } properties;
 
     struct {
@@ -72,7 +71,7 @@ struct jtd_schema {
     } values;
 
     struct {
-      sp_str_t             tag;
+      sp_str_t tag;
       sp_da(jtd_mapping_t) mapping;
     } discriminator;
 
@@ -81,11 +80,6 @@ struct jtd_schema {
     } ref;
   } as;
 };
-
-typedef struct {
-  jtd_schema_t*           root;
-  sp_da(jtd_definition_t) definitions;
-} jtd_root_t;
 
 typedef enum {
   JTD_OK = 0,
@@ -117,22 +111,30 @@ typedef enum {
 
 typedef struct {
   jtd_err_t code;
-  sp_str_t  message;
-  sp_str_t  path;
+  sp_str_t message;
+  sp_str_t path;
 } jtd_diagnostic_t;
 
-bool jtd_parse(sp_str_t json, jtd_root_t* out, jtd_diagnostic_t* diag);
-bool jtd_parse_val(yyjson_val* root, jtd_root_t* out, jtd_diagnostic_t* diag);
+typedef struct {
+  sp_mem_arena_t* arena;
+  bool ok;
+  jtd_schema_t* root;
+  sp_da(jtd_definition_t) definitions;
+  jtd_diagnostic_t diag;
+} jtd_result_t;
 
-jtd_schema_t* jtd_definition(const jtd_root_t* root, sp_str_t name);
-jtd_schema_t* jtd_resolve(const jtd_root_t* root, jtd_schema_t* schema);
-jtd_schema_t* jtd_resolve_deep(const jtd_root_t* root, jtd_schema_t* schema, jtd_diagnostic_t* diag);
+SP_API jtd_result_t jtd_parse(sp_mem_t mem, sp_str_t json);
+SP_API void jtd_free(jtd_result_t* result);
+
+SP_API jtd_schema_t* jtd_definition(const jtd_result_t* result, sp_str_t name);
+SP_API jtd_schema_t* jtd_resolve(const jtd_result_t* result, jtd_schema_t* schema);
+SP_API jtd_schema_t* jtd_resolve_deep(sp_mem_t mem, const jtd_result_t* result, jtd_schema_t* schema, jtd_diagnostic_t* diag);
 
 typedef bool (*jtd_visit_fn)(jtd_schema_t* schema, sp_str_t path, void* user);
-void jtd_walk(const jtd_root_t* root, jtd_visit_fn fn, void* user);
+SP_API void jtd_walk(sp_mem_t mem, const jtd_result_t* result, jtd_visit_fn fn, void* user);
 
-const c8* jtd_err_name(jtd_err_t err);
-const c8* jtd_form_name(jtd_form_t form);
-const c8* jtd_type_name(jtd_type_t type);
+SP_API const c8* jtd_err_name(jtd_err_t err);
+SP_API const c8* jtd_form_name(jtd_form_t form);
+SP_API const c8* jtd_type_name(jtd_type_t type);
 
 #endif
