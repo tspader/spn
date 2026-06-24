@@ -1,0 +1,12 @@
+[package]
+name = "depsall"
+version = "1.0.0"
+
+[deps.build]
+cmake = "3.20"
+
+[deps.package]
+libfoo = "1.0.0"
+
+[deps.test]
+utest = "1.0.0"

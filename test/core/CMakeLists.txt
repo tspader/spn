@@ -82,6 +82,24 @@ target_compile_definitions(jtd PRIVATE JTD_TEST_JSON_DIR="${CMAKE_CURRENT_SOURCE
 target_link_libraries(jtd PRIVATE yyjson)
 add_test(NAME jtd COMMAND "$<TARGET_FILE:jtd>")
 
+add_executable(manifest_gen
+  manifest_gen/main.c
+  ${SRC}/codegen/codegen.c
+  ${SRC}/external/tom.c
+  ${SRC}/sp/str.c
+  ${SRC}/sp/io.c
+  ${TEST_TOOLS}/toml.c
+)
+spn_test_binary(manifest_gen)
+target_include_directories(manifest_gen PRIVATE
+  ${CMAKE_BINARY_DIR}/gen/manifest
+  ${CMAKE_CURRENT_SOURCE_DIR}/manifest_gen)
+target_compile_definitions(manifest_gen PRIVATE
+  MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest_gen/manifests"
+  GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest_gen/golden")
+add_dependencies(manifest_gen manifest_gen_header)
+add_test(NAME manifest_gen COMMAND "$<TARGET_FILE:manifest_gen>")
+
 add_subdirectory(resolver)
 add_subdirectory(index)
 add_subdirectory(publish)

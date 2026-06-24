@@ -1,0 +1,14 @@
+[package]
+name = "richtarget"
+version = "1.0.0"
+
+[[bin]]
+name = "rich"
+kinds = ["executable"]
+source = ["a.c", "b.c"]
+headers = ["a.h"]
+include = ["inc"]
+define = ["X=1"]
+flags = ["-O2"]
+deps = ["libfoo"]
+link = true

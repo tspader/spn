@@ -1,0 +1,12 @@
+[package]
+name = "prof"
+version = "1.0.0"
+
+[profile.debug]
+linkage = "static"
+standard = "c11"
+toolchain = "gcc"
+mode = "debug"
+os = "linux"
+arch = "x86_64"
+abi = "gnu"

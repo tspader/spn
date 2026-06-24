@@ -1,0 +1,7 @@
+[package]
+name = "depspkg"
+version = "1.0.0"
+
+[deps.package]
+libfoo = "^1.2.0"
+libbar = "2.0.0"

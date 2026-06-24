@@ -1,0 +1,19 @@
+[package]
+name = "alltargets"
+version = "1.0.0"
+
+[[lib]]
+name = "core"
+source = ["lib.c"]
+
+[[bin]]
+name = "cli"
+source = ["main.c"]
+
+[[script]]
+name = "gen"
+source = ["gen.sh"]
+
+[[test]]
+name = "unit"
+source = ["test.c"]

@@ -1,0 +1,8 @@
+[package]
+name = "nolink"
+version = "1.0.0"
+
+[[bin]]
+name = "nolink"
+source = ["main.c"]
+link = false

@@ -1,0 +1,24 @@
+  {
+    toml_table_t* child = toml_table_table(table, "{{ .key }}");
+    if (child) {
+      out->{{ .key }} = sp_da_new(ctx->mem, {{ .entry_type }});
+      spn_codegen_push_key(ctx, "{{ .key }}");
+      sp_for(it, (u32)toml_table_len(child)) {
+        s32 len = 0;
+        const c8* name = toml_table_key(child, (s32)it, &len);
+        if (!name) {
+          break;
+        }
+        {{ .entry_type }} entry = sp_zero;
+        entry.key = sp_str_copy(ctx->mem, sp_str(name, (u32)len));
+        toml_table_t* value = toml_table_table(child, name);
+        if (value) {
+          spn_codegen_push_key(ctx, name);
+          spn_cg_{{ .object }}_read(ctx, value, &entry.value);
+          spn_codegen_pop(ctx);
+        }
+        sp_da_push(out->{{ .key }}, entry);
+      }
+      spn_codegen_pop(ctx);
+    }
+  }

@@ -33,6 +33,7 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SOURCE_ROOT}/sp/sp/sp_cli.h  ${STORE}/include/sp/sp_cli.h
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SRC}/sp/sp_elf.h             ${STORE}/include/sp/sp_elf.h
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SRC}/sp/coff.h               ${STORE}/include/sp/coff.h
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SRC}/sp/atomic_file.h        ${STORE}/include/sp/atomic_file.h
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SOURCE_ROOT}/toml/toml.h     ${STORE}/include/toml.h
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SOURCE_ROOT}/argparse/argparse.h ${STORE}/include/argparse.h
   COMMAND ${CMAKE_COMMAND} -E touch ${HEADERS_STAMP}
@@ -43,6 +44,7 @@ add_custom_command(
     ${SOURCE_ROOT}/sp/sp/sp_cli.h
     ${SRC}/sp/sp_elf.h
     ${SRC}/sp/coff.h
+    ${SRC}/sp/atomic_file.h
     ${SOURCE_ROOT}/toml/toml.h
     ${SOURCE_ROOT}/argparse/argparse.h
   COMMENT "staging headers"

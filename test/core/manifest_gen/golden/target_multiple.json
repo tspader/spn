@@ -1,0 +1,1 @@
+{"package":{"name":"multi","version":"1.0.0"},"bin":[{"name":"first","source":["first.c"]},{"name":"second","source":["second.c"]}]}

@@ -1,0 +1,72 @@
+#define SP_IMPLEMENTATION
+#include "sp.h"
+
+#define UTEST_IMPLEMENTATION
+#include "utest.h"
+
+#include "external/tom.h"
+#include "codegen/codegen.h"
+#include "manifest.gen.h"
+
+UTEST_MAIN();
+
+static s32 manifest_gen_sort_entries(const void* a, const void* b) {
+  const sp_fs_entry_t* ea = (const sp_fs_entry_t*)a;
+  const sp_fs_entry_t* eb = (const sp_fs_entry_t*)b;
+  return sp_str_sort_kernel_alphabetical(&ea->name, &eb->name);
+}
+
+static sp_str_t manifest_gen_render(sp_mem_t mem, sp_fs_entry_t* entry) {
+  spn_codegen_ctx_t ctx = sp_zero;
+  spn_codegen_ctx_init(&ctx, mem);
+
+  spn_cg_root_t manifest = sp_zero;
+  bool parse_error = false;
+  toml_table_t* table = spn_toml_parse_ex(entry->path, &parse_error);
+  if (table) {
+    spn_cg_root_read(&ctx, table, &manifest);
+  }
+  return spn_cg_root_write(mem, &manifest);
+}
+
+UTEST(manifest_gen, corpus) {
+  sp_mem_t mem = sp_mem_os_new();
+
+  struct {
+    sp_str_t toml;
+    sp_str_t json;
+  } paths = {
+    .toml = sp_cstr_as_str(MANIFEST_DIR),
+    .json = sp_cstr_as_str(GOLDEN_DIR)
+  };
+
+  sp_env_t env = sp_env_capture(mem);
+  bool regen = sp_env_contains_c(&env, "SPN_GOLDEN_REGEN");
+
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, paths.toml);
+  sp_da_sort(entries, manifest_gen_sort_entries);
+
+  sp_da_for(entries, it) {
+    sp_fs_entry_t* entry = &entries[it];
+
+    struct {
+      sp_str_t name;
+      sp_str_t file;
+      sp_str_t path;
+    } golden = sp_zero;
+    golden.name = sp_fs_get_stem(entry->name);
+    golden.file = sp_fmt(mem, "{}.json", sp_fmt_str(golden.name)).value;
+    golden.path = sp_fs_join_path(mem, paths.json, golden.file);
+
+    sp_str_t expected = manifest_gen_render(mem, entry);
+
+    if (regen) {
+      sp_fs_create_file_str(golden.path, expected);
+      continue;
+    }
+
+    sp_str_t actual = sp_zero;
+    sp_io_read_file(mem, golden.path, &actual);
+    EXPECT_TRUE(sp_str_equal(actual, expected));
+  }
+}

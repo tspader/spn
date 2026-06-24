@@ -1,0 +1,8 @@
+[package]
+name = "depsmix"
+version = "1.0.0"
+
+[deps.build]
+
+[deps.package]
+libfoo = "1.0.0"

@@ -1,0 +1,56 @@
+#ifndef SPN_CODEGEN_H
+#define SPN_CODEGEN_H
+
+#include "sp.h"
+#include "toml.h"
+
+typedef enum {
+  SPN_CODEGEN_OK = 0,
+  SPN_CODEGEN_ERR_EXPECTED_BOOL,
+  SPN_CODEGEN_ERR_EXPECTED_STR,
+  SPN_CODEGEN_ERR_EXPECTED_OBJECT,
+  SPN_CODEGEN_ERR_MISSING_KEY,
+} spn_codegen_err_t;
+
+typedef struct {
+  spn_codegen_err_t code;
+  sp_str_t path;
+  sp_str_t detail;
+} spn_codegen_issue_t;
+
+#define SPN_CODEGEN_PATH_MAX 32
+
+typedef enum {
+  SPN_CODEGEN_PATH_KEY,
+  SPN_CODEGEN_PATH_INDEX,
+} spn_codegen_path_kind_t;
+
+typedef struct {
+  spn_codegen_path_kind_t kind;
+  const c8* key;
+  u32 index;
+} spn_codegen_path_seg_t;
+
+typedef struct {
+  sp_mem_t mem;
+  spn_codegen_path_seg_t path[SPN_CODEGEN_PATH_MAX];
+  u32 depth;
+  sp_da(spn_codegen_issue_t) issues;
+} spn_codegen_ctx_t;
+
+void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem);
+
+void spn_codegen_push_key(spn_codegen_ctx_t* ctx, const c8* key);
+void spn_codegen_push_index(spn_codegen_ctx_t* ctx, u32 index);
+void spn_codegen_pop(spn_codegen_ctx_t* ctx);
+void spn_codegen_issue(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, const c8* key);
+
+bool spn_codegen_read_str(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, sp_str_t* value);
+bool spn_codegen_read_bool(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, bool* value);
+sp_da(sp_str_t) spn_codegen_read_str_array(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key);
+
+void spn_codegen_json_str(sp_da(c8)* out, sp_str_t value);
+void spn_codegen_json_bool(sp_da(c8)* out, bool value);
+void spn_codegen_json_str_array(sp_da(c8)* out, sp_da(sp_str_t) values);
+
+#endif

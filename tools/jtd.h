@@ -33,6 +33,7 @@ typedef struct jtd_schema jtd_schema_t;
 typedef struct {
   sp_str_t key;
   jtd_schema_t* schema;
+  bool required;
 } jtd_property_t;
 
 typedef struct {
@@ -44,6 +45,11 @@ typedef struct {
   sp_str_t name;
   jtd_schema_t* schema;
 } jtd_definition_t;
+
+typedef struct {
+  sp_str_t name;
+  jtd_schema_t* target;
+} jtd_ref_t;
 
 struct jtd_schema {
   jtd_form_t form;
@@ -63,6 +69,7 @@ struct jtd_schema {
     struct {
       sp_da(jtd_property_t) required;
       sp_da(jtd_property_t) optional;
+      sp_da(jtd_property_t) all;
       bool additional;
     } properties;
 
@@ -75,14 +82,14 @@ struct jtd_schema {
       sp_da(jtd_mapping_t) mapping;
     } discriminator;
 
-    struct {
-      sp_str_t name;
-    } ref;
+    jtd_ref_t ref;
   } as;
 };
 
 typedef enum {
   JTD_OK = 0,
+  JTD_ERR,
+  JTD_ERR_IO,
   JTD_ERR_JSON,
   JTD_ERR_SCHEMA_NOT_OBJECT,
   JTD_ERR_MULTIPLE_FORMS,
@@ -130,6 +137,8 @@ typedef struct {
 } jtd_result_t;
 
 SP_API jtd_result_t jtd_parse(sp_mem_t mem, sp_str_t json);
+SP_API jtd_err_t jtd_parse_2(sp_mem_t mem, sp_str_t json, jtd_result_t* jtd);
+SP_API jtd_err_t jtd_parse_file(sp_mem_t mem, sp_str_t file, jtd_result_t* jtd);
 SP_API void jtd_free(jtd_result_t* result);
 
 SP_API jtd_schema_t* jtd_definition(const jtd_result_t* result, sp_str_t name);

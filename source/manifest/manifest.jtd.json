@@ -1,0 +1,107 @@
+{
+  "ref": "manifest",
+  "definitions": {
+    "manifest": {
+      "properties": {
+        "package": { "ref": "package" }
+      },
+      "optionalProperties": {
+        "lib": { "elements": { "ref": "target" } },
+        "bin": { "elements": { "ref": "target" } },
+        "script": { "elements": { "ref": "target" } },
+        "test": { "elements": { "ref": "target" } },
+        "toolchain": { "elements": { "ref": "toolchain" } },
+        "index": { "elements": { "ref": "index" } },
+        "profile": { "values": { "ref": "profile" } },
+        "deps": { "ref": "deps" }
+      }
+    },
+
+    "package": {
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" }
+      },
+      "optionalProperties": {
+        "namespace": { "type": "string" },
+        "url": { "type": "string" },
+        "repo": { "type": "string" },
+        "author": { "type": "string" },
+        "maintainer": { "type": "string" },
+        "commit": { "type": "string" },
+        "include": { "elements": { "type": "string" } },
+        "define": { "elements": { "type": "string" } },
+        "system_deps": { "elements": { "type": "string" } }
+      }
+    },
+
+    "target": {
+      "properties": {
+        "name": { "type": "string" }
+      },
+      "optionalProperties": {
+        "kinds": { "elements": { "type": "string" } },
+        "source": { "elements": { "type": "string" } },
+        "headers": { "elements": { "type": "string" } },
+        "include": { "elements": { "type": "string" } },
+        "define": { "elements": { "type": "string" } },
+        "flags": { "elements": { "type": "string" } },
+        "deps": { "elements": { "type": "string" } },
+        "link": { "type": "boolean" }
+      }
+    },
+
+    "triple": {
+      "optionalProperties": {
+        "arch": { "type": "string" },
+        "os": { "type": "string" },
+        "abi": { "type": "string" }
+      }
+    },
+
+    "toolchain": {
+      "optionalProperties": {
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "compiler": { "type": "string" },
+        "linker": { "type": "string" },
+        "archiver": { "type": "string" },
+        "sysroot": { "type": "string" },
+        "driver": { "type": "string" },
+        "package": { "type": "string" },
+        "version": { "type": "string" },
+        "export": { "type": "boolean" },
+        "host": { "elements": { "ref": "triple" } },
+        "target": { "elements": { "ref": "triple" } }
+      }
+    },
+
+    "profile": {
+      "optionalProperties": {
+        "linkage": { "type": "string" },
+        "standard": { "type": "string" },
+        "toolchain": { "type": "string" },
+        "mode": { "type": "string" },
+        "os": { "type": "string" },
+        "arch": { "type": "string" },
+        "abi": { "type": "string" }
+      }
+    },
+
+    "index": {
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "protocol": { "type": "string" }
+      }
+    },
+
+    "deps": {
+      "optionalProperties": {
+        "package": { "values": { "type": "string" } },
+        "test": { "values": { "type": "string" } },
+        "build": { "values": { "type": "string" } }
+      }
+    }
+  }
+}

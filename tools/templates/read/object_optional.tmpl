@@ -1,0 +1,8 @@
+  {
+    toml_table_t* child = toml_table_table(table, "{{ .key }}");
+    if (child) {
+      spn_codegen_push_key(ctx, "{{ .key }}");
+      spn_cg_{{ .object }}_read(ctx, child, &out->{{ .key }});
+      spn_codegen_pop(ctx);
+    }
+  }
