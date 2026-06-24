@@ -1,0 +1,80 @@
+[package]
+name = "everything"
+version = "1.0.0"
+namespace = "core"
+url = "https://example.com/everything"
+repo = "https://github.com/acme/everything"
+author = "Ada"
+maintainer = "Grace"
+commit = "cafef00d"
+include = ["include"]
+define = ["BUILD=1"]
+system_deps = ["m"]
+
+[[lib]]
+name = "everything"
+kinds = ["static", "shared"]
+source = ["lib.c"]
+headers = ["everything.h"]
+include = ["include"]
+define = ["LIB=1"]
+flags = ["-Wall"]
+deps = ["libfoo"]
+link = true
+
+[[bin]]
+name = "everything-cli"
+source = ["main.c"]
+deps = ["everything"]
+link = false
+
+[[script]]
+name = "postbuild"
+source = ["post.sh"]
+
+[[test]]
+name = "everything-test"
+source = ["test.c"]
+deps = ["everything"]
+
+[[toolchain]]
+name = "host-gcc"
+compiler = "gcc"
+version = "13.2"
+export = true
+
+[[toolchain.host]]
+arch = "x86_64"
+os = "linux"
+abi = "gnu"
+
+[[toolchain.target]]
+arch = "aarch64"
+os = "linux"
+
+[[index]]
+name = "core"
+url = "https://packages.example.com"
+protocol = "https"
+
+[[index]]
+name = "local"
+url = "/srv/pkgs"
+protocol = "filesystem"
+
+[profile.debug]
+mode = "debug"
+standard = "c11"
+
+[profile.release]
+mode = "release"
+linkage = "static"
+
+[deps.package]
+libfoo = "^1.0.0"
+
+[deps.test]
+utest = "1.0.0"
+
+[deps.build]
+cmake = "3.20"

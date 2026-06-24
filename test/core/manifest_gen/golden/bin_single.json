@@ -1,0 +1,1 @@
+{"package":{"name":"app","version":"1.0.0"},"bin":[{"name":"app","source":["main.c"]}]}

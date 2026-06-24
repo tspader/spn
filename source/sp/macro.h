@@ -57,7 +57,6 @@ static inline sp_str_t spn_format_hash_hex(sp_hash_t hash) {
 
 #define _SP_MSTR(x) #x
 #define SP_MSTR(x) _SP_MSTR(x)
-#define sp_mstr(x) _SP_MSTR(x)
 #define _SP_MCAT(x, y) x##y
 #define SP_MCAT(x, y) _SP_MCAT(x, y)
 #define strl(literal) sp_str_lit(literal)

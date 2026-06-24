@@ -1,0 +1,7 @@
+[package]
+name = "idxbad"
+version = "1.0.0"
+
+[[index]]
+name = "core"
+protocol = "https"

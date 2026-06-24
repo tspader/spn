@@ -1,0 +1,9 @@
+  if ({{ .present }}) {
+    if (!first) {
+      sp_da_push(*out, ',');
+    }
+    first = false;
+    spn_codegen_json_str(out, sp_str_lit("{{ .key }}"));
+    sp_da_push(*out, ':');
+{{ $write }}
+  }

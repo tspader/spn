@@ -1,0 +1,9 @@
+static void spn_cg_{{ .name }}_write(const {{ .type }}* in, sp_da(c8)* out) {
+  sp_da_push(*out, '{');
+  bool first = true;
+{{ for .fields }}
+{{ $write_field }}
+{{ end }}
+  sp_da_push(*out, '}');
+}
+

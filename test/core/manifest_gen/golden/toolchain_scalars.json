@@ -1,0 +1,1 @@
+{"package":{"name":"tc","version":"1.0.0"},"toolchain":[{"name":"gcc","url":"https://gcc.example.com","compiler":"gcc","linker":"ld","archiver":"ar","sysroot":"/opt/sysroot","driver":"gcc","package":"gcc-pkg","version":"13.2","export":true}]}

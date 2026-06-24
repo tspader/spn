@@ -1,0 +1,6 @@
+[package]
+commit = "deadbeef"
+name = "ordered"
+namespace = "core"
+version = "9.9.9"
+author = "Zed"

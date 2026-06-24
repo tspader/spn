@@ -1,0 +1,18 @@
+  {
+    toml_array_t* array = toml_table_array(table, "{{ .key }}");
+    if (array) {
+      out->{{ .key }} = sp_da_new(ctx->mem, {{ .type }});
+      spn_codegen_push_key(ctx, "{{ .key }}");
+      sp_for(it, (u32)toml_array_len(array)) {
+        spn_codegen_push_index(ctx, it);
+        toml_table_t* element = toml_array_table(array, (s32)it);
+        if (element) {
+          {{ .type }} entry = sp_zero;
+          spn_cg_{{ .object }}_read(ctx, element, &entry);
+          sp_da_push(out->{{ .key }}, entry);
+        }
+        spn_codegen_pop(ctx);
+      }
+      spn_codegen_pop(ctx);
+    }
+  }

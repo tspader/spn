@@ -1,0 +1,7 @@
+[package]
+name = "tcexport"
+version = "1.0.0"
+
+[[toolchain]]
+name = "clang"
+export = false

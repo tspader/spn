@@ -1,0 +1,9 @@
+[package]
+name = "tcsubset"
+version = "1.0.0"
+
+[[toolchain]]
+name = "partial"
+
+[[toolchain.host]]
+os = "linux"

@@ -1,0 +1,6 @@
+[package]
+name = "depsempty"
+version = "1.0.0"
+
+[deps.package]
+libfoo = ""

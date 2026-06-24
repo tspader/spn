@@ -1,0 +1,13 @@
+[package]
+name = "multiindex"
+version = "1.0.0"
+
+[[index]]
+name = "core"
+url = "https://a.example.com"
+protocol = "https"
+
+[[index]]
+name = "local"
+url = "/srv/packages"
+protocol = "filesystem"

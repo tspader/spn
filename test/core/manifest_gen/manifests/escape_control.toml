@@ -1,0 +1,4 @@
+[package]
+name = "ctrl"
+version = "1.0.0"
+author = "line1\nline2\ttab"

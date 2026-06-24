@@ -1,0 +1,13 @@
+typedef {{ .root_type }} spn_cg_root_t;
+
+static void spn_cg_root_read(spn_codegen_ctx_t* ctx, toml_table_t* table, spn_cg_root_t* out) {
+  spn_cg_{{ .root_name }}_read(ctx, table, out);
+}
+
+static sp_str_t spn_cg_root_write(sp_mem_t mem, const spn_cg_root_t* in) {
+  sp_da(c8) out = sp_da_new(mem, c8);
+  spn_cg_{{ .root_name }}_write(in, &out);
+  return sp_str(out, (u32)sp_da_size(out));
+}
+
+#endif

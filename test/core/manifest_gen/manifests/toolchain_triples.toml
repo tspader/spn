@@ -1,0 +1,16 @@
+[package]
+name = "tctriples"
+version = "1.0.0"
+
+[[toolchain]]
+name = "cross"
+
+[[toolchain.host]]
+arch = "x86_64"
+os = "linux"
+abi = "gnu"
+
+[[toolchain.target]]
+arch = "aarch64"
+os = "linux"
+abi = "musl"
