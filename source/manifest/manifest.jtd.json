@@ -1,8 +1,9 @@
 {
   "ref": "manifest",
+  "metadata": {
+    "semver": { "as": "spn_semver_t", "from": "spn_semver_from_str", "to": "spn_semver_to_str" }
+  },
   "definitions": {
-    "semver": { "type": "string", "metadata": { "as": "spn_semver_t", "from": "spn_semver_from_str", "to": "spn_semver_to_str" } },
-
     "arch": { "enum": ["x86_64", "aarch64"] },
     "os": { "enum": ["windows", "linux", "macos"] },
     "abi": { "enum": ["gnu", "musl", "msvc", "mingw"] },
@@ -31,7 +32,7 @@
     "package": {
       "properties": {
         "name": { "type": "string" },
-        "version": { "ref": "semver" }
+        "version": { "type": "string", "metadata": { "convert": "semver" } }
       },
       "optionalProperties": {
         "namespace": { "type": "string" },
