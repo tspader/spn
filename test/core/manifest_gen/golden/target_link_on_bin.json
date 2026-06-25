@@ -1,0 +1,9 @@
+{
+  "issues": [
+    {
+      "code": "invalid",
+      "path": "bin[0].link",
+      "detail": "link"
+    }
+  ]
+}

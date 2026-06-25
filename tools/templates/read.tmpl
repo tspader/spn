@@ -1,6 +1,5 @@
 static void spn_cg_{{ .name }}_read(spn_codegen_ctx_t* ctx, toml_table_t* table, {{ .type }}* out) {
 {{ for .fields }}
 {{ $read }}
-{{ end }}
-}
+{{ end }}{{ .object_validate }}}
 

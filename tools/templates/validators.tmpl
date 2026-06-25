@@ -1,0 +1,3 @@
+{{ for .validators }}
+void {{ .fn }}(spn_codegen_ctx_t* ctx, {{ .params }});
+{{ end }}

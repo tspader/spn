@@ -309,6 +309,7 @@ const c8* spn_codegen_err_name(spn_codegen_err_t code) {
     case SPN_CODEGEN_ERR_DUPLICATE_KEY:  return "duplicate_key";
     case SPN_CODEGEN_ERR_PARSE:          return "parse";
     case SPN_CODEGEN_ERR_FILE_MISSING:   return "file_missing";
+    case SPN_CODEGEN_ERR_INVALID:        return "invalid";
   }
   return "unknown";
 }
@@ -357,7 +358,7 @@ void spn_codegen_json_str_array(sp_io_writer_t* out, sp_da(sp_str_t) values) {
   sp_io_write_c8(out, ']');
 }
 
-static void spn_codegen_validate_toolchain(spn_codegen_ctx_t* ctx, const spn_cg_toolchain_t* toolchain) {
+void spn_codegen_validate_toolchain(spn_codegen_ctx_t* ctx, spn_cg_toolchain_t* toolchain) {
   if (!sp_str_empty(toolchain->package)) {
     return;
   }
@@ -384,14 +385,67 @@ static void spn_codegen_validate_toolchain(spn_codegen_ctx_t* ctx, const spn_cg_
   }
 }
 
-static void spn_codegen_validate(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* manifest) {
-  spn_codegen_push_key(ctx, "toolchain");
-  sp_da_for(manifest->toolchain, it) {
-    spn_codegen_push_index(ctx, it);
-    spn_codegen_validate_toolchain(ctx, &manifest->toolchain[it]);
-    spn_codegen_pop(ctx);
+void spn_codegen_validate_lib(spn_codegen_ctx_t* ctx, const c8* key, spn_cg_target_om_t* libs) {
+  spn_codegen_push_key(ctx, key);
+  sp_om_for(*libs, it) {
+    spn_cg_target_t* target = sp_om_at(*libs, it);
+    bool object = false;
+    bool linkable = false;
+    sp_da_for(target->kinds, k) {
+      sp_str_t kind = target->kinds[k];
+      object |= sp_str_equal(kind, sp_str_lit("object"));
+      linkable |= sp_str_equal(kind, sp_str_lit("source"))
+               || sp_str_equal(kind, sp_str_lit("shared"))
+               || sp_str_equal(kind, sp_str_lit("static"));
+    }
+    if (object && linkable) {
+      spn_codegen_push_index(ctx, it);
+      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_INVALID, "kinds");
+      spn_codegen_pop(ctx);
+    }
   }
   spn_codegen_pop(ctx);
+}
+
+void spn_codegen_validate_no_link(spn_codegen_ctx_t* ctx, const c8* key, spn_cg_target_om_t* targets) {
+  spn_codegen_push_key(ctx, key);
+  sp_om_for(*targets, it) {
+    spn_cg_target_t* target = sp_om_at(*targets, it);
+    if (!sp_opt_is_null(target->link)) {
+      spn_codegen_push_index(ctx, it);
+      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_INVALID, "link");
+      spn_codegen_pop(ctx);
+    }
+  }
+  spn_codegen_pop(ctx);
+}
+
+void spn_codegen_validate_manifest(spn_codegen_ctx_t* ctx, spn_cg_manifest_t* manifest) {
+  sp_ht(sp_str_t, u8) seen;
+  sp_str_ht_init(ctx->mem, seen);
+  struct {
+    const c8* key;
+    spn_cg_target_om_t targets;
+  } groups [] = {
+    { "lib", manifest->lib },
+    { "bin", manifest->bin },
+    { "script", manifest->script },
+    { "test", manifest->test },
+  };
+  sp_for(g, SP_CARR_LEN(groups)) {
+    spn_codegen_push_key(ctx, groups[g].key);
+    sp_om_for(groups[g].targets, it) {
+      spn_cg_target_t* target = sp_om_at(groups[g].targets, it);
+      if (sp_ht_getp(seen, target->name)) {
+        spn_codegen_push_index(ctx, it);
+        spn_codegen_issue_at(ctx, SPN_CODEGEN_ERR_DUPLICATE_KEY, target->name);
+        spn_codegen_pop(ctx);
+      } else {
+        sp_ht_insert(seen, target->name, 1);
+      }
+    }
+    spn_codegen_pop(ctx);
+  }
 }
 
 bool spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, spn_cg_manifest_t* out) {
@@ -404,8 +458,5 @@ bool spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, spn_cg_manifest_t* 
     return spn_codegen_issue_at(ctx, SPN_CODEGEN_ERR_PARSE, sp_str_lit("invalid toml"));
   }
   spn_cg_root_read(ctx, table, out);
-  if (sp_da_empty(ctx->issues)) {
-    spn_codegen_validate(ctx, out);
-  }
   return sp_da_size(ctx->issues) > 0;
 }

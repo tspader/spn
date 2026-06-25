@@ -1,0 +1,11 @@
+[package]
+name = "dupcross"
+version = "1.0.0"
+
+[[lib]]
+name = "shared"
+source = ["lib.c"]
+
+[[bin]]
+name = "shared"
+source = ["main.c"]

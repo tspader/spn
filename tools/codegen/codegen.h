@@ -44,11 +44,13 @@ typedef struct {
   node_t* node;
   sp_str_t entry;
   sp_str_t key_field;
+  sp_str_t validate;
 } field_t;
 
 struct type_t {
   sp_str_t name;
   sp_da(field_t) fields;
+  sp_str_t validate;
 };
 
 typedef struct {

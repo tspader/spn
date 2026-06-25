@@ -15,15 +15,16 @@
         "package": { "ref": "package" }
       },
       "optionalProperties": {
-        "lib": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
-        "bin": { "elements": { "ref": "target" }, "metadata": { "key": "name", "validate": "spn_codegen_validate_target" } },
-        "script": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
-        "test": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
+        "lib": { "elements": { "ref": "target" }, "metadata": { "key": "name", "validate": "spn_codegen_validate_lib" } },
+        "bin": { "elements": { "ref": "target" }, "metadata": { "key": "name", "validate": "spn_codegen_validate_no_link" } },
+        "script": { "elements": { "ref": "target" }, "metadata": { "key": "name", "validate": "spn_codegen_validate_no_link" } },
+        "test": { "elements": { "ref": "target" }, "metadata": { "key": "name", "validate": "spn_codegen_validate_no_link" } },
         "toolchain": { "elements": { "ref": "toolchain" } },
         "index": { "elements": { "ref": "index" }, "metadata": { "key": "name" } },
         "profile": { "values": { "ref": "profile" } },
         "deps": { "ref": "deps" }
-      }
+      },
+      "metadata": { "validate": "spn_codegen_validate_manifest" }
     },
 
     "package": {
@@ -82,7 +83,8 @@
         "export": { "type": "boolean" },
         "host": { "elements": { "ref": "triple" } },
         "target": { "elements": { "ref": "triple" } }
-      }
+      },
+      "metadata": { "validate": "spn_codegen_validate_toolchain" }
     },
 
     "profile": {

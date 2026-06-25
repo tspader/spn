@@ -2,7 +2,7 @@
 name = "richtarget"
 version = "1.0.0"
 
-[[bin]]
+[[lib]]
 name = "rich"
 kinds = ["executable"]
 source = ["a.c", "b.c"]

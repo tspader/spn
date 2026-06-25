@@ -14,6 +14,7 @@ typedef enum {
   SPN_CODEGEN_ERR_DUPLICATE_KEY,
   SPN_CODEGEN_ERR_PARSE,
   SPN_CODEGEN_ERR_FILE_MISSING,
+  SPN_CODEGEN_ERR_INVALID,
 } spn_codegen_err_t;
 
 typedef struct {
