@@ -12,6 +12,8 @@ typedef enum {
   SPN_CODEGEN_ERR_EXPECTED_OBJECT,
   SPN_CODEGEN_ERR_MISSING_KEY,
   SPN_CODEGEN_ERR_DUPLICATE_KEY,
+  SPN_CODEGEN_ERR_PARSE,
+  SPN_CODEGEN_ERR_FILE_MISSING,
 } spn_codegen_err_t;
 
 typedef struct {
@@ -47,8 +49,8 @@ void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_intern_t* int
 void spn_codegen_push_key(spn_codegen_ctx_t* ctx, const c8* key);
 void spn_codegen_push_index(spn_codegen_ctx_t* ctx, u32 index);
 void spn_codegen_pop(spn_codegen_ctx_t* ctx);
-void spn_codegen_issue(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, const c8* key);
-void spn_codegen_issue_at(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, sp_str_t detail);
+bool spn_codegen_issue(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, const c8* key);
+bool spn_codegen_issue_at(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, sp_str_t detail);
 
 sp_str_t spn_codegen_intern(spn_codegen_ctx_t* ctx, sp_str_t value);
 sp_str_t spn_codegen_path_join(spn_codegen_ctx_t* ctx, sp_str_t raw);
@@ -83,9 +85,7 @@ void spn_codegen_json_issues(sp_io_writer_t* out, sp_da(spn_codegen_issue_t) iss
 sp_str_t spn_codegen_issues_to_str(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues);
 
 struct spn_cg_manifest;
-struct spn_cg_toolchain;
 
 bool spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, struct spn_cg_manifest* out);
-void spn_codegen_validate_toolchain(spn_codegen_ctx_t* ctx, const struct spn_cg_toolchain* toolchain);
 
 #endif

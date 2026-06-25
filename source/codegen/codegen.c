@@ -1,6 +1,7 @@
 #include "codegen/codegen.h"
 #include "external/tom.h"
 #include "manifest.gen.h"
+#include "sp/compat.h"
 
 void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_intern_t* intern) {
   ctx->mem = mem;
@@ -50,14 +51,16 @@ static void spn_codegen_record(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, s
   sp_da_push(ctx->issues, issue);
 }
 
-void spn_codegen_issue(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, const c8* key) {
+bool spn_codegen_issue(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, const c8* key) {
   spn_codegen_push_key(ctx, key);
   spn_codegen_record(ctx, code, sp_cstr_as_str(key));
   spn_codegen_pop(ctx);
+  return true;
 }
 
-void spn_codegen_issue_at(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, sp_str_t detail) {
+bool spn_codegen_issue_at(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, sp_str_t detail) {
   spn_codegen_record(ctx, code, detail);
+  return true;
 }
 
 sp_str_t spn_codegen_intern(spn_codegen_ctx_t* ctx, sp_str_t value) {
@@ -304,6 +307,8 @@ const c8* spn_codegen_err_name(spn_codegen_err_t code) {
     case SPN_CODEGEN_ERR_EXPECTED_OBJECT:return "expected_object";
     case SPN_CODEGEN_ERR_MISSING_KEY:    return "missing_key";
     case SPN_CODEGEN_ERR_DUPLICATE_KEY:  return "duplicate_key";
+    case SPN_CODEGEN_ERR_PARSE:          return "parse";
+    case SPN_CODEGEN_ERR_FILE_MISSING:   return "file_missing";
   }
   return "unknown";
 }
@@ -352,7 +357,7 @@ void spn_codegen_json_str_array(sp_io_writer_t* out, sp_da(sp_str_t) values) {
   sp_io_write_c8(out, ']');
 }
 
-void spn_codegen_validate_toolchain(spn_codegen_ctx_t* ctx, const struct spn_cg_toolchain* toolchain) {
+static void spn_codegen_validate_toolchain(spn_codegen_ctx_t* ctx, const spn_cg_toolchain_t* toolchain) {
   if (!sp_str_empty(toolchain->package)) {
     return;
   }
@@ -371,6 +376,12 @@ void spn_codegen_validate_toolchain(spn_codegen_ctx_t* ctx, const struct spn_cg_
   if (sp_opt_is_null(toolchain->driver) || toolchain->driver.value == SPN_CC_DRIVER_NONE) {
     spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "driver");
   }
+  if (sp_da_empty(toolchain->host)) {
+    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "host");
+  }
+  if (sp_da_empty(toolchain->target)) {
+    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "target");
+  }
 }
 
 static void spn_codegen_validate(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* manifest) {
@@ -383,14 +394,18 @@ static void spn_codegen_validate(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t
   spn_codegen_pop(ctx);
 }
 
-bool spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, struct spn_cg_manifest* out) {
-  bool parse_error = false;
-  toml_table_t* table = spn_toml_parse_ex(path, &parse_error);
-  if (table) {
-    spn_cg_root_read(ctx, table, out);
-    if (sp_da_empty(ctx->issues)) {
-      spn_codegen_validate(ctx, out);
-    }
+bool spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, spn_cg_manifest_t* out) {
+  if (!sp_fs_exists(path)) {
+    return spn_codegen_issue_at(ctx, SPN_CODEGEN_ERR_FILE_MISSING, sp_str_lit("missing file"));
+  }
+
+  toml_table_t* table = spn_toml_parse_ex(path, SP_NULLPTR);
+  if (!table) {
+    return spn_codegen_issue_at(ctx, SPN_CODEGEN_ERR_PARSE, sp_str_lit("invalid toml"));
+  }
+  spn_cg_root_read(ctx, table, out);
+  if (sp_da_empty(ctx->issues)) {
+    spn_codegen_validate(ctx, out);
   }
   return sp_da_size(ctx->issues) > 0;
 }

@@ -43,6 +43,21 @@ UTEST(manifest_gen, path_join) {
   EXPECT_TRUE(sp_str_equal(manifest.package.include[1], sp_str_lit("/base/vendor/include")));
 }
 
+UTEST(manifest_gen, missing_file) {
+  sp_mem_t mem = sp_mem_os_new();
+
+  spn_codegen_ctx_t ctx = sp_zero;
+  spn_codegen_ctx_init(&ctx, mem, sp_intern_new(mem));
+
+  spn_cg_root_t manifest = sp_zero;
+  bool failed = spn_codegen_load(&ctx, sp_str_lit("/nonexistent/missing.toml"), &manifest);
+
+  ASSERT_TRUE(failed);
+  ASSERT_EQ((u32)1, (u32)sp_da_size(ctx.issues));
+  EXPECT_EQ(SPN_CODEGEN_ERR_FILE_MISSING, ctx.issues[0].code);
+  EXPECT_TRUE(sp_str_equal(ctx.issues[0].detail, sp_str_lit("missing file")));
+}
+
 UTEST(manifest_gen, corpus) {
   sp_mem_t mem = sp_mem_os_new();
 

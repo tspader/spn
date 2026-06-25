@@ -16,7 +16,19 @@
         "program": "ar"
       },
       "driver": "clang",
-      "export": false
+      "export": false,
+      "host": [
+        {
+          "arch": "x86_64",
+          "os": "linux"
+        }
+      ],
+      "target": [
+        {
+          "arch": "x86_64",
+          "os": "linux"
+        }
+      ]
     }
   ]
 }

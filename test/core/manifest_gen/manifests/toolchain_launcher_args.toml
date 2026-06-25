@@ -8,3 +8,11 @@ compiler = "zig cc -target x86_64-linux-gnu"
 linker = "zig cc"
 archiver = "ar"
 driver = "clang"
+
+[[toolchain.host]]
+arch = "x86_64"
+os = "linux"
+
+[[toolchain.target]]
+arch = "x86_64"
+os = "linux"
