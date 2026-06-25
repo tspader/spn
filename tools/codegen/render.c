@@ -17,11 +17,18 @@ type_t* find_type(gen_t* g, sp_str_t name) {
   return sp_str_om_get(g->types, name);
 }
 
+static sp_str_t conversion_c_type(gen_t* g, node_t* node) {
+  switch (node->as.conversion) {
+    case CONVERSION_ENUM: return sp_fmt(g->mem, "spn_{}_t", sp_fmt_str(node->name)).value;
+  }
+  return sp_str_lit("");
+}
+
 sp_str_t node_c_type(gen_t* g, node_t* node) {
   switch (node->kind) {
     case NODE_STR:        return sp_str_lit("sp_str_t");
     case NODE_BOOL:       return sp_str_lit("bool");
-    case NODE_CONVERSION: return node->as.conversion->c_type;
+    case NODE_CONVERSION: return conversion_c_type(g, node);
     case NODE_STRUCT:     return type_name(g, node->name);
   }
   return sp_str_lit("");
@@ -43,7 +50,7 @@ static sp_str_t get_struct_type(gen_t* g, field_t* field) {
       if (field_by_pointer(field)) {
         return sp_fmt(g->mem, "{}*", sp_fmt_str(t)).value;
       }
-      if (!field->required && field->node->opt_wraps) {
+      if (!field->required && field->node->use_optional) {
         return sp_fmt(g->mem, "sp_opt({})", sp_fmt_str(t)).value;
       }
       return t;
@@ -117,13 +124,21 @@ static void field_templates(field_t* field, sp_str_t* read, sp_str_t* write) {
   }
 }
 
+static void bind_conversion(gen_t* g, sp_template_scope_t* scope, node_t* node) {
+  switch (node->as.conversion) {
+    case CONVERSION_ENUM:
+      sp_template_set(scope, sp_str_lit("from"), sp_fmt(g->mem, "spn_{}_from_str", sp_fmt_str(node->name)).value);
+      sp_template_set(scope, sp_str_lit("to"), sp_fmt(g->mem, "spn_{}_to_str", sp_fmt_str(node->name)).value);
+      return;
+  }
+}
+
 static void bind_field(gen_t* g, sp_template_scope_t* scope, field_t* field) {
   node_t* node = field->node;
   sp_template_set(scope, sp_str_lit("key"), field->key);
 
   if (node->kind == NODE_CONVERSION) {
-    sp_template_set(scope, sp_str_lit("from"), node->as.conversion->from);
-    sp_template_set(scope, sp_str_lit("to"), node->as.conversion->to);
+    bind_conversion(g, scope, node);
   }
   if (node->kind == NODE_STRUCT) {
     sp_template_set(scope, sp_str_lit("object"), node->name);

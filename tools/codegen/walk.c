@@ -9,20 +9,6 @@ static jtd_schema_t* resolve_ref(jtd_schema_t* schema) {
   return schema;
 }
 
-static conversion_t* add_conversion(gen_t* g, sp_str_t name) {
-  if (sp_str_om_has(g->conversions, name)) {
-    return sp_str_om_get(g->conversions, name);
-  }
-  conversion_t c = {
-    .name = sp_str_copy(g->mem, name),
-    .c_type = sp_fmt(g->mem, "spn_{}_t", sp_fmt_str(name)).value,
-    .from = sp_fmt(g->mem, "spn_{}_from_str", sp_fmt_str(name)).value,
-    .to = sp_fmt(g->mem, "spn_{}_to_str", sp_fmt_str(name)).value,
-  };
-  sp_str_om_insert(g->conversions, c.name, c);
-  return sp_str_om_get(g->conversions, c.name);
-}
-
 static node_t* add_node(gen_t* g, node_t node) {
   if (sp_str_om_has(g->nodes, node.name)) {
     return sp_str_om_get(g->nodes, node.name);
@@ -49,55 +35,33 @@ static void register_entry(gen_t* g, sp_str_t name, sp_str_t value_type) {
   sp_da_push(g->entries, entry);
 }
 
-walk_result_t load_conversions(gen_t* g, const jtd_result_t* jtd) {
-  if (!jtd->root) return OK;
-  sp_da_for(jtd->root->metadata, it) {
-    const jtd_metadata_t* meta = &jtd->root->metadata[it];
-    if (!meta->object) continue;
+static walk_result_t resolve_conversion(gen_t* g, jtd_schema_t* schema, sp_str_t name, sp_str_t owner, sp_str_t key, node_t** out) {
+  sp_str_t convert = jtd_metadata(schema, "convert");
 
-    sp_str_t as = jtd_meta_obj(meta, "as");
-    sp_str_t from = jtd_meta_obj(meta, "from");
-    sp_str_t to = jtd_meta_obj(meta, "to");
-    if (sp_str_empty(as) || sp_str_empty(from) || sp_str_empty(to)) {
-      return (walk_result_t) { .err = WALK_ERR_CONV_DECL, .name = meta->key };
+  if (sp_str_equal_cstr(convert, "enum")) {
+    sp_str_t named = jtd_metadata(schema, "enum");
+    if (!sp_str_empty(named)) {
+      name = named;
     }
-
-    conversion_t conv = {
-      .name = sp_str_copy(g->mem, meta->key),
-      .c_type = sp_str_copy(g->mem, as),
-      .from = sp_str_copy(g->mem, from),
-      .to = sp_str_copy(g->mem, to),
-    };
-    sp_str_om_insert(g->conversions, conv.name, conv);
   }
+  else if (!sp_str_empty(convert)) {
+    return (walk_result_t) { .err = WALK_ERR_CONV_UNKNOWN, .type = owner, .key = key, .name = convert };
+  }
+
+  *out = add_node(g, (node_t) {
+    .kind = NODE_CONVERSION,
+    .name = name,
+    .use_optional = true,
+    .as.conversion = CONVERSION_ENUM,
+  });
   return OK;
 }
 
 static walk_result_t resolve_node(gen_t* g, jtd_schema_t* schema, sp_str_t name, sp_str_t owner, sp_str_t key, node_t** out) {
   schema = resolve_ref(schema);
 
-  sp_str_t convert = jtd_metadata(schema, "convert");
-  if (!sp_str_empty(convert)) {
-    if (!sp_str_om_has(g->conversions, convert)) {
-      return (walk_result_t) { .err = WALK_ERR_CONV_UNKNOWN, .type = owner, .key = key, .name = convert };
-    }
-    *out = add_node(g, (node_t) {
-      .kind = NODE_CONVERSION,
-      .name = convert,
-      .opt_wraps = true,
-      .as.conversion = sp_str_om_get(g->conversions, convert),
-    });
-    return OK;
-  }
-
-  if (schema->form == JTD_FORM_ENUM) {
-    *out = add_node(g, (node_t) {
-      .kind = NODE_CONVERSION,
-      .name = name,
-      .opt_wraps = true,
-      .as.conversion = add_conversion(g, name),
-    });
-    return OK;
+  if (!sp_str_empty(jtd_metadata(schema, "convert")) || schema->form == JTD_FORM_ENUM) {
+    return resolve_conversion(g, schema, name, owner, key, out);
   }
 
   if (schema->form == JTD_FORM_TYPE) {
@@ -106,7 +70,7 @@ static walk_result_t resolve_node(gen_t* g, jtd_schema_t* schema, sp_str_t name,
       return OK;
     }
     if (schema->as.type == JTD_TYPE_BOOLEAN) {
-      *out = add_node(g, (node_t) { .kind = NODE_BOOL, .name = sp_str_lit("bool"), .opt_wraps = true });
+      *out = add_node(g, (node_t) { .kind = NODE_BOOL, .name = sp_str_lit("bool"), .use_optional = true });
       return OK;
     }
     return (walk_result_t) { .err = WALK_ERR_SCALAR_TYPE, .type = owner, .key = key, .as.scalar_type = schema->as.type };
@@ -198,9 +162,6 @@ sp_str_t walk_result_to_str(sp_mem_t mem, walk_result_t result) {
     case WALK_ERR_SCALAR_TYPE:
       return sp_fmt(mem, "{.cyan}.{.cyan}: unsupported scalar type {.red}",
         sp_fmt_str(result.type), sp_fmt_str(result.key), sp_fmt_cstr(jtd_type_name(result.as.scalar_type))).value;
-    case WALK_ERR_CONV_DECL:
-      return sp_fmt(mem, "conversion {.cyan}: declaration requires metadata as/from/to",
-        sp_fmt_str(result.name)).value;
     case WALK_ERR_CONV_UNKNOWN:
       return sp_fmt(mem, "{.cyan}.{.cyan}: unknown conversion {.red}",
         sp_fmt_str(result.type), sp_fmt_str(result.key), sp_fmt_str(result.name)).value;

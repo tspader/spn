@@ -21,19 +21,16 @@ typedef enum {
 
 typedef struct type_t type_t;
 
-typedef struct {
-  sp_str_t name;
-  sp_str_t c_type;
-  sp_str_t from;
-  sp_str_t to;
-} conversion_t;
+typedef enum {
+  CONVERSION_ENUM,
+} conversion_kind_t;
 
 typedef struct {
   node_kind_t kind;
   sp_str_t name;
   bool use_optional;
   union {
-    conversion_t* conversion;
+    conversion_kind_t conversion;
     type_t* type;
   } as;
 } node_t;
@@ -63,7 +60,6 @@ typedef struct {
   sp_da(entry_t) entries;
   sp_str_om(type_t*) array_types;
   sp_str_om(node_t) nodes;
-  sp_str_om(conversion_t) conversions;
   sp_ht(sp_str_t, u8) visited;
   type_t* root;
 } gen_t;
@@ -72,7 +68,6 @@ typedef struct {
 typedef enum {
   WALK_OK = 0,
   WALK_ERR_SCALAR_TYPE,
-  WALK_ERR_CONV_DECL,
   WALK_ERR_CONV_UNKNOWN,
   WALK_ERR_UNSUPPORTED_FORM,
 } walk_err_t;
@@ -88,7 +83,6 @@ typedef struct {
   } as;
 } walk_result_t;
 
-walk_result_t load_conversions(gen_t* g, const jtd_result_t* jtd);
 walk_result_t register_type(gen_t* g, sp_str_t name, jtd_schema_t* schema);
 sp_str_t      walk_result_to_str(sp_mem_t mem, walk_result_t result);
 
