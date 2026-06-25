@@ -1,0 +1,19 @@
+{
+  "issues": [
+    {
+      "code": "missing_key",
+      "path": "toolchain[0].linker",
+      "detail": "linker"
+    },
+    {
+      "code": "missing_key",
+      "path": "toolchain[0].archiver",
+      "detail": "archiver"
+    },
+    {
+      "code": "missing_key",
+      "path": "toolchain[0].driver",
+      "detail": "driver"
+    }
+  ]
+}

@@ -1,10 +1,10 @@
-    sp_da_push(*out, '{');
+    sp_io_write_c8(out, '{');
     sp_da_for(in->{{ .key }}, it) {
       if (it) {
-        sp_da_push(*out, ',');
+        sp_io_write_c8(out, ',');
       }
       spn_codegen_json_str(out, in->{{ .key }}[it].key);
-      sp_da_push(*out, ':');
+      sp_io_write_c8(out, ':');
       spn_cg_{{ .object }}_write(&in->{{ .key }}[it].value, out);
     }
-    sp_da_push(*out, '}');
+    sp_io_write_c8(out, '}');

@@ -1,1 +1,22 @@
-{"package":{"name":"tcexport","version":"1.0.0"},"toolchain":[{"name":"clang","export":false}]}
+{
+  "package": {
+    "name": "tcexport",
+    "version": "1.0.0"
+  },
+  "toolchain": [
+    {
+      "name": "clang",
+      "compiler": {
+        "program": "clang"
+      },
+      "linker": {
+        "program": "ld"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "driver": "clang",
+      "export": false
+    }
+  ]
+}

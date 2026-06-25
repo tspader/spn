@@ -4,6 +4,10 @@ version = "1.0.0"
 
 [[toolchain]]
 name = "partial"
+compiler = "cc"
+linker = "ld"
+archiver = "ar"
+driver = "gcc"
 
 [[toolchain.host]]
 os = "linux"

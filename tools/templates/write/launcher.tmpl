@@ -1,4 +1,4 @@
-    sp_da_push(*out, '{');
+    sp_io_write_c8(out, '{');
     {
       bool launcher_first = true;
       spn_codegen_json_key(out, &launcher_first, sp_str_lit("program"));
@@ -8,4 +8,4 @@
         spn_codegen_json_str_array(out, in->{{ .key }}.args);
       }
     }
-    sp_da_push(*out, '}');
+    sp_io_write_c8(out, '}');

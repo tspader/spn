@@ -1,1 +1,11 @@
-{"package":{"name":"depsmix","version":"1.0.0"},"deps":{"package":{"libfoo":"1.0.0"}}}
+{
+  "package": {
+    "name": "depsmix",
+    "version": "1.0.0"
+  },
+  "deps": {
+    "package": {
+      "libfoo": "1.0.0"
+    }
+  }
+}

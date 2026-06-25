@@ -1,1 +1,26 @@
-{"package":{"name":"sorted","version":"1.0.0"},"bin":{"zeta":{"name":"zeta","source":["z.c"]},"alpha":{"name":"alpha","source":["a.c"]},"mu":{"name":"mu","source":["m.c"]}}}
+{
+  "package": {
+    "name": "sorted",
+    "version": "1.0.0"
+  },
+  "bin": {
+    "zeta": {
+      "name": "zeta",
+      "source": [
+        "z.c"
+      ]
+    },
+    "alpha": {
+      "name": "alpha",
+      "source": [
+        "a.c"
+      ]
+    },
+    "mu": {
+      "name": "mu",
+      "source": [
+        "m.c"
+      ]
+    }
+  }
+}

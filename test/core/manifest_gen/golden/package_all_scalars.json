@@ -1,1 +1,12 @@
-{"package":{"name":"fullpkg","version":"2.3.4","namespace":"core","url":"https://example.com/fullpkg","repo":"https://github.com/acme/fullpkg","author":"Ada Lovelace","maintainer":"Grace Hopper","commit":"abc123def456"}}
+{
+  "package": {
+    "name": "fullpkg",
+    "version": "2.3.4",
+    "namespace": "core",
+    "url": "https://example.com/fullpkg",
+    "repo": "https://github.com/acme/fullpkg",
+    "author": "Ada Lovelace",
+    "maintainer": "Grace Hopper",
+    "commit": "abc123def456"
+  }
+}

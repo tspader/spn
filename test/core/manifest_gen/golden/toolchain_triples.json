@@ -1,1 +1,35 @@
-{"package":{"name":"tctriples","version":"1.0.0"},"toolchain":[{"name":"cross","host":[{"arch":"x86_64","os":"linux","abi":"gnu"}],"target":[{"arch":"aarch64","os":"linux","abi":"musl"}]}]}
+{
+  "package": {
+    "name": "tctriples",
+    "version": "1.0.0"
+  },
+  "toolchain": [
+    {
+      "name": "cross",
+      "compiler": {
+        "program": "cc"
+      },
+      "linker": {
+        "program": "ld"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "driver": "gcc",
+      "host": [
+        {
+          "arch": "x86_64",
+          "os": "linux",
+          "abi": "gnu"
+        }
+      ],
+      "target": [
+        {
+          "arch": "aarch64",
+          "os": "linux",
+          "abi": "musl"
+        }
+      ]
+    }
+  ]
+}

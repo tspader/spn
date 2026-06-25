@@ -1,1 +1,6 @@
-{"package":{"name":"emptyarr","version":"1.0.0"}}
+{
+  "package": {
+    "name": "emptyarr",
+    "version": "1.0.0"
+  }
+}

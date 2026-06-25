@@ -1,1 +1,38 @@
-{"package":{"name":"alltargets","version":"1.0.0"},"lib":{"core":{"name":"core","source":["lib.c"]}},"bin":{"cli":{"name":"cli","source":["main.c"]}},"script":{"gen":{"name":"gen","source":["gen.sh"]}},"test":{"unit":{"name":"unit","source":["test.c"]}}}
+{
+  "package": {
+    "name": "alltargets",
+    "version": "1.0.0"
+  },
+  "lib": {
+    "core": {
+      "name": "core",
+      "source": [
+        "lib.c"
+      ]
+    }
+  },
+  "bin": {
+    "cli": {
+      "name": "cli",
+      "source": [
+        "main.c"
+      ]
+    }
+  },
+  "script": {
+    "gen": {
+      "name": "gen",
+      "source": [
+        "gen.sh"
+      ]
+    }
+  },
+  "test": {
+    "unit": {
+      "name": "unit",
+      "source": [
+        "test.c"
+      ]
+    }
+  }
+}

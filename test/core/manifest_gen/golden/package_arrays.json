@@ -1,1 +1,18 @@
-{"package":{"name":"arrpkg","version":"1.0.0","include":["include","vendor/include"],"define":["DEBUG=1","FEATURE"],"system_deps":["m","pthread"]}}
+{
+  "package": {
+    "name": "arrpkg",
+    "version": "1.0.0",
+    "include": [
+      "include",
+      "vendor/include"
+    ],
+    "define": [
+      "DEBUG=1",
+      "FEATURE"
+    ],
+    "system_deps": [
+      "m",
+      "pthread"
+    ]
+  }
+}
