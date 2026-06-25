@@ -1,1 +1,7 @@
-{"package":{"name":"uni","version":"1.0.0","author":"café — naïve 日本語"}}
+{
+  "package": {
+    "name": "uni",
+    "version": "1.0.0",
+    "author": "café — naïve 日本語"
+  }
+}

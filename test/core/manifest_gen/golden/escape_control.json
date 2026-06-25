@@ -1,1 +1,7 @@
-{"package":{"name":"ctrl","version":"1.0.0","author":"line1\u000aline2\u0009tab"}}
+{
+  "package": {
+    "name": "ctrl",
+    "version": "1.0.0",
+    "author": "line1\u000aline2\u0009tab"
+  }
+}

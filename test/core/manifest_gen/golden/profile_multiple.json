@@ -1,1 +1,14 @@
-{"package":{"name":"profs","version":"1.0.0"},"profile":{"debug":{"mode":"debug"},"release":{"mode":"release"}}}
+{
+  "package": {
+    "name": "profs",
+    "version": "1.0.0"
+  },
+  "profile": {
+    "debug": {
+      "mode": "debug"
+    },
+    "release": {
+      "mode": "release"
+    }
+  }
+}

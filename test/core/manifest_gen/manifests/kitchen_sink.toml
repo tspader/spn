@@ -40,6 +40,9 @@ deps = ["everything"]
 [[toolchain]]
 name = "host-gcc"
 compiler = "gcc"
+linker = "ld"
+archiver = "ar"
+driver = "gcc"
 version = "13.2"
 export = true
 

@@ -1,1 +1,11 @@
-{"package":{"name":"depsempty","version":"1.0.0"},"deps":{"package":{"libfoo":""}}}
+{
+  "package": {
+    "name": "depsempty",
+    "version": "1.0.0"
+  },
+  "deps": {
+    "package": {
+      "libfoo": ""
+    }
+  }
+}

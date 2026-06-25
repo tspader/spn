@@ -1,1 +1,9 @@
-{"issues":[{"code":"missing_key","path":"index[0].url","detail":"url"}]}
+{
+  "issues": [
+    {
+      "code": "missing_key",
+      "path": "index[0].url",
+      "detail": "url"
+    }
+  ]
+}

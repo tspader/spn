@@ -1,1 +1,26 @@
-{"package":{"name":"tc","version":"1.0.0"},"toolchain":[{"name":"gcc","url":"https://gcc.example.com","compiler":{"program":"gcc"},"linker":{"program":"ld"},"archiver":{"program":"ar"},"sysroot":"/opt/sysroot","driver":"gcc","package":"gcc-pkg","version":"13.2","export":true}]}
+{
+  "package": {
+    "name": "tc",
+    "version": "1.0.0"
+  },
+  "toolchain": [
+    {
+      "name": "gcc",
+      "url": "https://gcc.example.com",
+      "compiler": {
+        "program": "gcc"
+      },
+      "linker": {
+        "program": "ld"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "sysroot": "/opt/sysroot",
+      "driver": "gcc",
+      "package": "gcc-pkg",
+      "version": "13.2",
+      "export": true
+    }
+  ]
+}

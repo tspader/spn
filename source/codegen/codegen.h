@@ -64,10 +64,28 @@ void     spn_codegen_launcher_from_str(spn_codegen_ctx_t* ctx, sp_str_t raw, sp_
 
 const c8* spn_codegen_err_name(spn_codegen_err_t code);
 
-void spn_codegen_json_key(sp_da(c8)* out, bool* first, sp_str_t key);
-void spn_codegen_json_str(sp_da(c8)* out, sp_str_t value);
-void spn_codegen_json_bool(sp_da(c8)* out, bool value);
-void spn_codegen_json_str_array(sp_da(c8)* out, sp_da(sp_str_t) values);
-void spn_codegen_json_issues(sp_da(c8)* out, sp_da(spn_codegen_issue_t) issues);
+typedef struct {
+  sp_io_writer_t base;
+  sp_io_writer_t* inner;
+  u32 depth;
+  bool in_string;
+  bool escape;
+  bool pending;
+} spn_codegen_json_writer_t;
+
+void spn_codegen_json_writer_init(spn_codegen_json_writer_t* writer, sp_io_writer_t* inner);
+
+void spn_codegen_json_key(sp_io_writer_t* out, bool* first, sp_str_t key);
+void spn_codegen_json_str(sp_io_writer_t* out, sp_str_t value);
+void spn_codegen_json_bool(sp_io_writer_t* out, bool value);
+void spn_codegen_json_str_array(sp_io_writer_t* out, sp_da(sp_str_t) values);
+void spn_codegen_json_issues(sp_io_writer_t* out, sp_da(spn_codegen_issue_t) issues);
+sp_str_t spn_codegen_issues_to_str(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues);
+
+struct spn_cg_manifest;
+struct spn_cg_toolchain;
+
+bool spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, struct spn_cg_manifest* out);
+void spn_codegen_validate_toolchain(spn_codegen_ctx_t* ctx, const struct spn_cg_toolchain* toolchain);
 
 #endif

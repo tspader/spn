@@ -4,4 +4,8 @@ version = "1.0.0"
 
 [[toolchain]]
 name = "clang"
+compiler = "clang"
+linker = "ld"
+archiver = "ar"
+driver = "clang"
 export = false

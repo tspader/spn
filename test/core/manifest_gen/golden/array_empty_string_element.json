@@ -1,1 +1,10 @@
-{"package":{"name":"emptyelem","version":"1.0.0","define":["","KEEP"]}}
+{
+  "package": {
+    "name": "emptyelem",
+    "version": "1.0.0",
+    "define": [
+      "",
+      "KEEP"
+    ]
+  }
+}
