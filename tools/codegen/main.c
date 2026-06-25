@@ -34,12 +34,6 @@ sp_cli_result_t parse_schema(ctx_t* c) {
 }
 
 sp_cli_result_t walk_schema(ctx_t* c) {
-  walk_result_t conversions = load_conversions(c->gen, &c->jtd);
-  if (conversions.err) {
-    sp_cli_log_error("{}", sp_fmt_str(walk_result_to_str(c->mem, conversions)));
-    return SP_CLI_ERR;
-  }
-
   jtd_ref_t root = c->jtd.root->as.ref;
   walk_result_t walked = register_type(c->gen, root.name, root.target);
   if (walked.err) {
@@ -93,7 +87,6 @@ gen_t* gen_new(sp_mem_t mem) {
   sp_str_om_init(gen->types);
   sp_str_om_init(gen->array_types);
   sp_str_om_init(gen->nodes);
-  sp_str_om_init(gen->conversions);
   sp_str_ht_init(mem, gen->visited);
   return gen;
 }
