@@ -54,5 +54,6 @@ void run_jtd_case(s32* utest_result, jtd_case_t c) {
 #include "discriminator.c"
 #include "ref.c"
 #include "document.c"
+#include "metadata.c"
 #include "walk.c"
 #include "conformance.c"

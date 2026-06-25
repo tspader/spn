@@ -111,7 +111,7 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
         };
 
         if (spn_target_select_lib_kind(info, query, &target->lib_kind)) {
-          sp_str_t requested = spn_pkg_linkage_to_str(query.config.some ? query.config.value : query.linkage);
+          sp_str_t requested = spn_linkage_to_str(query.config.some ? query.config.value : query.linkage);
           sp_str_t requester = query.config.some ? sp_str_lit("the root manifest") : sp_str_lit("the profile");
           spn_log_error(
             "{.fg brightcyan} doesn't support {.fg brightyellow} ({} requested it)",

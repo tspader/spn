@@ -10,7 +10,7 @@
           break;
         }
         {{ .entry_type }} entry = sp_zero;
-        entry.key = sp_str_copy(ctx->mem, sp_str(name, (u32)len));
+        entry.key = spn_codegen_intern(ctx, sp_str(name, (u32)len));
         toml_table_t* value = toml_table_table(child, name);
         if (value) {
           spn_codegen_push_key(ctx, name);

@@ -41,6 +41,7 @@ set(SPN_SOURCES
   index/index.c
   index/json.c
   index/publish.c
+  intern/context.c
   intern/intern.c
   lock/lock.c
   log/lazy/lazy.c

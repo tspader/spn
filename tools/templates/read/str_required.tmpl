@@ -1,3 +1,1 @@
-  if (!spn_codegen_read_str(ctx, table, "{{ .key }}", &out->{{ .key }})) {
-    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "{{ .key }}");
-  }
+  out->{{ .key }} = spn_codegen_str_required(ctx, table, "{{ .key }}");

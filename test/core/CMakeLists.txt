@@ -1,5 +1,6 @@
 add_executable(load
   ${SRC}/ctx/ctx.c
+  ${SRC}/intern/context.c
   ${SRC}/intern/intern.c
   ${SRC}/enum/enum.c
   ${SRC}/event/event.c
@@ -85,7 +86,12 @@ add_test(NAME jtd COMMAND "$<TARGET_FILE:jtd>")
 add_executable(manifest_gen
   manifest_gen/main.c
   ${SRC}/codegen/codegen.c
+  ${SRC}/enum/enum.c
   ${SRC}/external/tom.c
+  ${SRC}/intern/intern.c
+  ${SRC}/semver/compare.c
+  ${SRC}/semver/convert.c
+  ${SRC}/semver/parser.c
   ${SRC}/sp/str.c
   ${SRC}/sp/io.c
   ${TEST_TOOLS}/toml.c

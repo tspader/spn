@@ -39,7 +39,7 @@ sp_app_result_t spn_cli_build(spn_cli_t* cli) {
   app.config.overrides = (spn_profile_info_t) {
     .name = command->profile,
     .toolchain = command->toolchain,
-    .mode = sp_str_empty(command->mode) ? 0 : spn_dep_build_mode_from_str(command->mode),
+    .mode = sp_str_empty(command->mode) ? 0 : spn_build_mode_from_str(command->mode),
     .os = target_triple.os,
     .arch = target_triple.arch,
     .abi = target_triple.abi,

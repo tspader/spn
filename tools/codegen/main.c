@@ -94,15 +94,17 @@ static sp_cli_result_t jtd_gen_run(sp_cli_t* cli) {
   ctx.mem = sp_mem_heap_as_allocator(ctx.heap);
   ctx.gen = sp_alloc_type(ctx.mem, gen_t);
   ctx.gen->mem = ctx.mem;
-  ctx.gen->types = sp_da_new(ctx.mem, type_t);
+  sp_str_om_new(ctx.gen->types);
   ctx.gen->entries = sp_da_new(ctx.mem, entry_t);
+  sp_str_om_new(ctx.gen->array_types);
+  sp_str_om_new(ctx.gen->convs);
   sp_str_ht_init(ctx.mem, ctx.gen->visited);
 
   try(parse_schema(&ctx));
   try(walk_schema(&ctx));
   try(render_template(&ctx));
 
-  sp_log("wrote {} types to {.cyan}", sp_fmt_uint(sp_da_size(ctx.gen->types)), sp_fmt_str(ctx.args.out));
+  sp_log("wrote {} types to {.cyan}", sp_fmt_uint(sp_str_om_size(ctx.gen->types)), sp_fmt_str(ctx.args.out));
   return SP_CLI_OK;
 }
 

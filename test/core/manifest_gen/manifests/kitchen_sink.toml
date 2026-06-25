@@ -55,7 +55,7 @@ os = "linux"
 [[index]]
 name = "core"
 url = "https://packages.example.com"
-protocol = "https"
+protocol = "http"
 
 [[index]]
 name = "local"

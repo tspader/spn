@@ -10,8 +10,8 @@
           break;
         }
         {{ .entry_type }} entry = sp_zero;
-        entry.key = sp_str_copy(ctx->mem, sp_str(name, (u32)len));
-        spn_codegen_read_str(ctx, child, name, &entry.value);
+        entry.key = spn_codegen_intern(ctx, sp_str(name, (u32)len));
+        spn_codegen_str_optional(ctx, child, name, &entry.value);
         sp_da_push(out->{{ .key }}, entry);
       }
       spn_codegen_pop(ctx);

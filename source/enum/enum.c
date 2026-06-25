@@ -168,7 +168,7 @@ sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc) {
 }
 
 // @spader @error
-spn_build_mode_t spn_dep_build_mode_from_str(sp_str_t str) {
+spn_build_mode_t spn_build_mode_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "release")) {
     return SPN_BUILD_MODE_RELEASE;
   }
@@ -183,7 +183,7 @@ spn_build_mode_t spn_dep_build_mode_from_str(sp_str_t str) {
   SP_UNREACHABLE_RETURN(SPN_BUILD_MODE_RELEASE);
 }
 
-sp_str_t spn_dep_build_mode_to_str(spn_build_mode_t mode) {
+sp_str_t spn_build_mode_to_str(spn_build_mode_t mode) {
   switch (mode) {
     case SPN_BUILD_MODE_RELEASE: {
       return sp_str_lit("release");
@@ -216,11 +216,11 @@ spn_linkage_t spn_lib_kind_from_str(sp_str_t str) {
   SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
 }
 
-spn_linkage_t spn_pkg_linkage_from_str(sp_str_t str) {
+spn_linkage_t spn_linkage_from_str(sp_str_t str) {
   return spn_lib_kind_from_str(str);
 }
 
-sp_str_t spn_pkg_linkage_to_str(spn_linkage_t kind) {
+sp_str_t spn_linkage_to_str(spn_linkage_t kind) {
   switch (kind) {
     case SPN_LIB_KIND_SHARED: {
       return sp_str_lit("shared");

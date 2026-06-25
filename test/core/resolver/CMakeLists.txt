@@ -1,5 +1,6 @@
 add_executable(resolver
   ${SRC}/ctx/ctx.c
+  ${SRC}/intern/context.c
   ${SRC}/intern/intern.c
   ${SRC}/enum/enum.c
   ${SRC}/event/event.c

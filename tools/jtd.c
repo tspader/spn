@@ -182,8 +182,29 @@ static jtd_schema_t* jtd_parse_schema(jtd_ctx_t* ctx, yyjson_val* v, sp_str_t pa
 
 static bool jtd_parse_shared(jtd_ctx_t* ctx, jtd_schema_t* s, yyjson_val* v, sp_str_t path) {
   yyjson_val* metadata = yyjson_obj_get(v, "metadata");
-  if (metadata && !yyjson_is_obj(metadata)) {
-    return jtd_fail(ctx, JTD_ERR_METADATA_NOT_OBJECT, jtd_path_seg_cstr(ctx->temp, path, "metadata"));
+  if (metadata) {
+    if (!yyjson_is_obj(metadata)) {
+      return jtd_fail(ctx, JTD_ERR_METADATA_NOT_OBJECT, jtd_path_seg_cstr(ctx->temp, path, "metadata"));
+    }
+
+    s->metadata = sp_da_new(ctx->result, jtd_metadata_t);
+    size_t idx, max;
+    yyjson_val *k, *mv;
+    yyjson_obj_foreach(metadata, idx, max, k, mv) {
+      sp_str_t value = sp_zero;
+      if (yyjson_is_str(mv)) {
+        value = jtd_yj_str(ctx->result, mv);
+      }
+      else if (yyjson_is_bool(mv)) {
+        value = yyjson_get_bool(mv) ? sp_str_lit("true") : sp_str_lit("false");
+      }
+      else {
+        continue;
+      }
+
+      jtd_metadata_t entry = { .key = jtd_yj_str(ctx->result, k), .value = value };
+      sp_da_push(s->metadata, entry);
+    }
   }
 
   yyjson_val* nullable = yyjson_obj_get(v, "nullable");
@@ -554,6 +575,26 @@ void jtd_walk(sp_mem_t mem, const jtd_result_t* result, jtd_visit_fn fn, void* u
     jtd_definition_t* d = &result->definitions[i];
     if (!jtd_walk_schema(mem, d->schema, jtd_path_seg(mem, sp_str_lit("#/definitions"), d->name), fn, user)) return;
   }
+}
+
+sp_str_t jtd_metadata(const jtd_schema_t* schema, const c8* key) {
+  if (!schema) return sp_zero_s(sp_str_t);
+  sp_da_for(schema->metadata, it) {
+    if (sp_str_equal_cstr(schema->metadata[it].key, key)) {
+      return schema->metadata[it].value;
+    }
+  }
+  return sp_zero_s(sp_str_t);
+}
+
+bool jtd_metadata_has(const jtd_schema_t* schema, const c8* key) {
+  if (!schema) return false;
+  sp_da_for(schema->metadata, it) {
+    if (sp_str_equal_cstr(schema->metadata[it].key, key)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 jtd_schema_t* jtd_definition(const jtd_result_t* result, sp_str_t name) {
