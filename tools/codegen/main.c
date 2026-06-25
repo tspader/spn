@@ -86,6 +86,8 @@ gen_t* gen_new(sp_mem_t mem) {
   gen->entries = sp_da_new(mem, entry_t);
   sp_str_om_init(gen->types);
   sp_str_om_init(gen->array_types);
+  sp_str_om_init(gen->om_types);
+  sp_str_om_init(gen->object_types);
   sp_str_om_init(gen->nodes);
   sp_str_ht_init(mem, gen->visited);
   return gen;

@@ -15,12 +15,12 @@
         "package": { "ref": "package" }
       },
       "optionalProperties": {
-        "lib": { "elements": { "ref": "target" } },
-        "bin": { "elements": { "ref": "target" } },
-        "script": { "elements": { "ref": "target" } },
-        "test": { "elements": { "ref": "target" } },
+        "lib": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
+        "bin": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
+        "script": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
+        "test": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
         "toolchain": { "elements": { "ref": "toolchain" } },
-        "index": { "elements": { "ref": "index" } },
+        "index": { "elements": { "ref": "index" }, "metadata": { "key": "name" } },
         "profile": { "values": { "ref": "profile" } },
         "deps": { "ref": "deps" }
       }
@@ -38,7 +38,7 @@
         "author": { "type": "string" },
         "maintainer": { "type": "string" },
         "commit": { "type": "string" },
-        "include": { "elements": { "type": "string" } },
+        "include": { "elements": { "type": "string", "metadata": { "convert": "path" } } },
         "define": { "elements": { "type": "string" } },
         "system_deps": { "elements": { "type": "string" } }
       }
@@ -72,9 +72,9 @@
       "optionalProperties": {
         "name": { "type": "string" },
         "url": { "type": "string" },
-        "compiler": { "type": "string" },
-        "linker": { "type": "string" },
-        "archiver": { "type": "string" },
+        "compiler": { "type": "string", "metadata": { "convert": "launcher" } },
+        "linker": { "type": "string", "metadata": { "convert": "launcher" } },
+        "archiver": { "type": "string", "metadata": { "convert": "launcher" } },
         "sysroot": { "type": "string" },
         "driver": { "ref": "cc_driver" },
         "package": { "type": "string" },

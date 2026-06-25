@@ -87,6 +87,7 @@ set(SPN_SOURCES
   task/test.c
   task/unit.c
   task/which.c
+  toolchain/launcher.c
   toolchain/toolchain.c
   triple/triple.c
   tui/spinner.c

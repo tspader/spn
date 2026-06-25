@@ -1,1 +1,1 @@
-{"package":{"name":"idxbad","version":"1.0.0"},"index":[{"name":"core","url":"","protocol":"http"}]}
+{"issues":[{"code":"missing_key","path":"index[0].url","detail":"url"}]}

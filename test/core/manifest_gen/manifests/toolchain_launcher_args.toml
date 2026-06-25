@@ -1,0 +1,10 @@
+[package]
+name = "tcargs"
+version = "1.0.0"
+
+[[toolchain]]
+name = "zig"
+compiler = "zig cc -target x86_64-linux-gnu"
+linker = "zig cc"
+archiver = "ar"
+driver = "clang"
