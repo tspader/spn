@@ -1,7 +1,13 @@
 {
   "package": {
     "name": "app",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "qualified": "core/app",
+    "versions": [
+      {
+        "version": "1.0.0"
+      }
+    ]
   },
   "bin": {
     "app": {

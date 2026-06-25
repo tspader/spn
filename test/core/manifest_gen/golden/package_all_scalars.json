@@ -7,6 +7,13 @@
     "repo": "https://github.com/acme/fullpkg",
     "author": "Ada Lovelace",
     "maintainer": "Grace Hopper",
-    "commit": "abc123def456"
+    "commit": "abc123def456",
+    "qualified": "core/fullpkg",
+    "versions": [
+      {
+        "version": "2.3.4",
+        "commit": "abc123def456"
+      }
+    ]
   }
 }

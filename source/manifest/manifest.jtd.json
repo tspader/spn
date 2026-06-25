@@ -9,6 +9,7 @@
     "c_standard": { "enum": ["c89", "c99", "c11"] },
     "build_mode": { "enum": ["release", "debug"] },
     "index_protocol": { "enum": ["git", "http", "filesystem"] },
+    "index_kind": { "enum": ["workspace", "builtin", "user"] },
 
     "launcher": {
       "type": "string",
@@ -54,7 +55,18 @@
         "commit": { "type": "string" },
         "include": { "elements": { "ref": "path" } },
         "define": { "elements": { "type": "string" } },
-        "system_deps": { "elements": { "type": "string" } }
+        "system_deps": { "elements": { "type": "string" } },
+        "qualified": { "type": "string", "metadata": { "compute": "spn_codegen_compute_qualified" } },
+        "versions": { "elements": { "ref": "version_metadata" }, "metadata": { "compute": "spn_codegen_compute_versions" } }
+      }
+    },
+
+    "version_metadata": {
+      "properties": {
+        "version": { "ref": "semver" }
+      },
+      "optionalProperties": {
+        "commit": { "type": "string" }
       }
     },
 
@@ -116,7 +128,8 @@
       "properties": {
         "name": { "type": "string" },
         "url": { "type": "string" },
-        "protocol": { "ref": "index_protocol" }
+        "protocol": { "ref": "index_protocol" },
+        "kind": { "ref": "index_kind", "metadata": { "compute": "spn_codegen_compute_index_kind" } }
       }
     },
 

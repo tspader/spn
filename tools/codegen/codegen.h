@@ -47,6 +47,7 @@ typedef struct {
   sp_str_t entry;
   sp_str_t key_field;
   sp_str_t validate;
+  sp_str_t compute;
 } field_t;
 
 struct type_t {

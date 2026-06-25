@@ -16,6 +16,13 @@
     ],
     "system_deps": [
       "m"
+    ],
+    "qualified": "core/everything",
+    "versions": [
+      {
+        "version": "1.0.0",
+        "commit": "cafef00d"
+      }
     ]
   },
   "lib": {
@@ -110,12 +117,14 @@
     "core": {
       "name": "core",
       "url": "https://packages.example.com",
-      "protocol": "http"
+      "protocol": "http",
+      "kind": "workspace"
     },
     "local": {
       "name": "local",
       "url": "/srv/pkgs",
-      "protocol": "filesystem"
+      "protocol": "filesystem",
+      "kind": "workspace"
     }
   },
   "profile": {

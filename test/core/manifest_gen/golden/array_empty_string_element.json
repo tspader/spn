@@ -5,6 +5,12 @@
     "define": [
       "",
       "KEEP"
+    ],
+    "qualified": "core/emptyelem",
+    "versions": [
+      {
+        "version": "1.0.0"
+      }
     ]
   }
 }

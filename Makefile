@@ -7,7 +7,7 @@ WORK  := $(BUILD)/work/$(TRIPLE)
 STORE := $(BUILD)/store/$(TRIPLE)
 BIN   := $(STORE)/bin/spn
 
-.PHONY: all build configure fetch test install uninstall clean nuke
+.PHONY: all build configure fetch test smoke install uninstall clean nuke
 all: build
 ifeq ($(TRIPLE),$(HOST_TRIPLE))
 	@ln -sfn .build/store/$(TRIPLE) $(ROOT)/bootstrap
@@ -28,6 +28,9 @@ fetch:
 
 test: build
 	@ctest --test-dir $(WORK) --output-on-failure
+
+smoke: build
+	@ctest --test-dir $(WORK) --output-on-failure -E 'graph|integration'
 
 install: build
 	@mkdir -p $(HOME)/.local/bin

@@ -448,6 +448,22 @@ void spn_codegen_validate_manifest(spn_codegen_ctx_t* ctx, spn_cg_manifest_t* ma
   }
 }
 
+void spn_codegen_compute_qualified(spn_codegen_ctx_t* ctx, spn_cg_package_t* out) {
+  sp_str_t namespace = sp_str_empty(out->namespace) ? sp_str_lit("core") : out->namespace;
+  out->qualified = spn_codegen_intern(ctx, sp_str_join(ctx->mem, namespace, out->name, sp_str_lit("/")));
+}
+
+void spn_codegen_compute_versions(spn_codegen_ctx_t* ctx, spn_cg_package_t* out) {
+  out->versions = sp_da_new(ctx->mem, spn_cg_version_metadata_t);
+  spn_cg_version_metadata_t entry = { .version = out->version, .commit = out->commit };
+  sp_da_push(out->versions, entry);
+}
+
+void spn_codegen_compute_index_kind(spn_codegen_ctx_t* ctx, spn_cg_index_t* out) {
+  (void)ctx;
+  out->kind = SPN_INDEX_WORKSPACE;
+}
+
 bool spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, spn_cg_manifest_t* out) {
   if (!sp_fs_exists(path)) {
     return spn_codegen_issue_at(ctx, SPN_CODEGEN_ERR_FILE_MISSING, sp_str_lit("missing file"));
