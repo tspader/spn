@@ -21,18 +21,20 @@ typedef enum {
 
 typedef struct type_t type_t;
 
-typedef enum {
-  CONVERSION_ENUM,
-  CONVERSION_LAUNCHER,
-  CONVERSION_PATH,
-} conversion_kind_t;
+typedef struct {
+  sp_str_t c_type;
+  sp_str_t from;
+  sp_str_t to;
+  sp_str_t present;
+  bool custom;
+} converter_t;
 
 typedef struct {
   node_kind_t kind;
   sp_str_t name;
   bool use_optional;
   union {
-    conversion_kind_t conversion;
+    converter_t conv;
     type_t* type;
   } as;
 } node_t;

@@ -1,6 +1,0 @@
-  {
-    sp_str_t raw = sp_zero;
-    if (spn_codegen_raw_optional(ctx, table, "{{ .key }}", &raw)) {
-      out->{{ .key }} = spn_codegen_path_join(ctx, raw);
-    }
-  }
