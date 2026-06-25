@@ -23,6 +23,8 @@ typedef struct type_t type_t;
 
 typedef enum {
   CONVERSION_ENUM,
+  CONVERSION_LAUNCHER,
+  CONVERSION_PATH,
 } conversion_kind_t;
 
 typedef struct {
@@ -41,24 +43,32 @@ typedef struct {
   cardinality_t card;
   node_t* node;
   sp_str_t entry;
+  sp_str_t key_field;
 } field_t;
 
 struct type_t {
   sp_str_t name;
   sp_da(field_t) fields;
-  bool has_required;
 };
 
 typedef struct {
   sp_str_t name;
   sp_str_t value_type;
+  sp_str_t object;
 } entry_t;
+
+typedef struct {
+  type_t* type;
+  sp_str_t key_field;
+} om_type_t;
 
 typedef struct {
   sp_mem_t mem;
   sp_str_om(type_t) types;
   sp_da(entry_t) entries;
   sp_str_om(type_t*) array_types;
+  sp_str_om(om_type_t) om_types;
+  sp_str_om(type_t*) object_types;
   sp_str_om(node_t) nodes;
   sp_ht(sp_str_t, u8) visited;
   type_t* root;

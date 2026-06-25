@@ -22,7 +22,15 @@ static void register_array_type(gen_t* g, type_t* type) {
   sp_str_om_insert(g->array_types, type->name, type);
 }
 
-static void register_entry(gen_t* g, sp_str_t name, sp_str_t value_type) {
+static void register_om_type(gen_t* g, type_t* type, sp_str_t key_field) {
+  sp_str_om_insert(g->om_types, type->name, ((om_type_t) { .type = type, .key_field = key_field }));
+}
+
+static void register_object_type(gen_t* g, type_t* type) {
+  sp_str_om_insert(g->object_types, type->name, type);
+}
+
+static void register_entry(gen_t* g, sp_str_t name, sp_str_t value_type, sp_str_t object) {
   sp_da_for(g->entries, it) {
     if (sp_str_equal(g->entries[it].name, name)) {
       return;
@@ -32,17 +40,30 @@ static void register_entry(gen_t* g, sp_str_t name, sp_str_t value_type) {
   entry_t entry = sp_zero;
   entry.name = sp_str_copy(g->mem, name);
   entry.value_type = value_type;
+  entry.object = object;
   sp_da_push(g->entries, entry);
 }
 
 static walk_result_t resolve_conversion(gen_t* g, jtd_schema_t* schema, sp_str_t name, sp_str_t owner, sp_str_t key, node_t** out) {
   sp_str_t convert = jtd_metadata(schema, "convert");
+  conversion_kind_t kind = CONVERSION_ENUM;
+  bool use_optional = true;
 
   if (sp_str_equal_cstr(convert, "enum")) {
     sp_str_t named = jtd_metadata(schema, "enum");
     if (!sp_str_empty(named)) {
       name = named;
     }
+  }
+  else if (sp_str_equal_cstr(convert, "launcher")) {
+    kind = CONVERSION_LAUNCHER;
+    name = sp_str_lit("launcher");
+    use_optional = false;
+  }
+  else if (sp_str_equal_cstr(convert, "path")) {
+    kind = CONVERSION_PATH;
+    name = sp_str_lit("path");
+    use_optional = false;
   }
   else if (!sp_str_empty(convert)) {
     return (walk_result_t) { .err = WALK_ERR_CONV_UNKNOWN, .type = owner, .key = key, .name = convert };
@@ -51,8 +72,8 @@ static walk_result_t resolve_conversion(gen_t* g, jtd_schema_t* schema, sp_str_t
   *out = add_node(g, (node_t) {
     .kind = NODE_CONVERSION,
     .name = name,
-    .use_optional = true,
-    .as.conversion = CONVERSION_ENUM,
+    .use_optional = use_optional,
+    .as.conversion = kind,
   });
   return OK;
 }
@@ -104,7 +125,6 @@ walk_result_t register_type(gen_t* g, sp_str_t name, jtd_schema_t* schema) {
   type_t type = {
     .name = sp_str_copy(g->mem, name),
     .fields = sp_da_new(g->mem, field_t),
-    .has_required = sp_da_size(schema->as.properties.required) > 0,
   };
 
   sp_da_for(schema->as.properties.all, it) {
@@ -129,23 +149,35 @@ walk_result_t register_type(gen_t* g, sp_str_t name, jtd_schema_t* schema) {
     result = resolve_node(g, value, value_name, name, property.key, &node);
     if (result.err) return result;
 
-    if (card != CARD_SCALAR && node->kind != NODE_STR && node->kind != NODE_STRUCT) {
+    bool path_element = card == CARD_ARRAY && node->kind == NODE_CONVERSION && node->as.conversion == CONVERSION_PATH;
+    if (card != CARD_SCALAR && node->kind != NODE_STR && node->kind != NODE_STRUCT && !path_element) {
       return (walk_result_t) { .err = WALK_ERR_UNSUPPORTED_FORM, .type = name, .key = property.key, .as.form = value->form };
     }
+
+    sp_str_t key_field = card == CARD_ARRAY ? jtd_metadata(sub, "key") : sp_str_lit("");
 
     field_t field = {
       .key = property.key,
       .required = property.required,
       .card = card,
       .node = node,
+      .key_field = key_field,
     };
 
     if (card == CARD_ARRAY && node->kind == NODE_STRUCT) {
-      register_array_type(g, node->as.type);
+      if (!sp_str_empty(key_field)) {
+        register_om_type(g, node->as.type, key_field);
+      } else {
+        register_array_type(g, node->as.type);
+      }
+    }
+    if (card == CARD_SCALAR && node->kind == NODE_STRUCT) {
+      register_object_type(g, node->as.type);
     }
     if (card == CARD_MAP) {
       field.entry = sp_fmt(g->mem, "{}_{}_entry", sp_fmt_str(name), sp_fmt_str(property.key)).value;
-      register_entry(g, field.entry, node_c_type(g, node));
+      sp_str_t object = node->kind == NODE_STRUCT ? node->name : sp_str_lit("");
+      register_entry(g, field.entry, node_c_type(g, node), object);
     }
 
     sp_da_push(type.fields, field);

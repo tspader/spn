@@ -54,8 +54,38 @@ void spn_codegen_issue(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, const c8*
   spn_codegen_pop(ctx);
 }
 
+void spn_codegen_issue_at(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, sp_str_t detail) {
+  spn_codegen_record(ctx, code, detail);
+}
+
 sp_str_t spn_codegen_intern(spn_codegen_ctx_t* ctx, sp_str_t value) {
   return sp_intern_get_or_insert_str(ctx->intern, value);
+}
+
+sp_str_t spn_codegen_path_join(spn_codegen_ctx_t* ctx, sp_str_t raw) {
+  return spn_codegen_intern(ctx, sp_fs_join_path(ctx->mem, ctx->dir, raw));
+}
+
+sp_da(sp_str_t) spn_codegen_read_path_array(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key) {
+  toml_array_t* array = toml_table_array(table, key);
+  if (!array) {
+    return SP_NULLPTR;
+  }
+
+  sp_da(sp_str_t) values = sp_da_new(ctx->mem, sp_str_t);
+  spn_codegen_push_key(ctx, key);
+  sp_for(it, (u32)toml_array_len(array)) {
+    spn_codegen_push_index(ctx, it);
+    toml_value_t element = toml_array_string(array, (s32)it);
+    if (element.ok) {
+      sp_da_push(values, spn_codegen_path_join(ctx, sp_str(element.u.s, (u32)element.u.sl)));
+    } else {
+      spn_codegen_record(ctx, SPN_CODEGEN_ERR_EXPECTED_STR, sp_str_lit(""));
+    }
+    spn_codegen_pop(ctx);
+  }
+  spn_codegen_pop(ctx);
+  return values;
 }
 
 static bool spn_codegen_read_raw_value(toml_table_t* table, const c8* key, sp_str_t* value) {
@@ -128,6 +158,23 @@ sp_da(sp_str_t) spn_codegen_read_str_array(spn_codegen_ctx_t* ctx, toml_table_t*
   return values;
 }
 
+void spn_codegen_launcher_from_str(spn_codegen_ctx_t* ctx, sp_str_t raw, sp_str_t* program, sp_da(sp_str_t)* args) {
+  if (sp_str_empty(raw)) {
+    return;
+  }
+  if (sp_str_contains(raw, sp_str_lit(" "))) {
+    sp_da(sp_str_t) parts = sp_str_split_c8(ctx->mem, raw, ' ');
+    *program = sp_intern_get_or_insert_str(ctx->intern, parts[0]);
+    *args = sp_da_new(ctx->mem, sp_str_t);
+    for (u32 i = 1; i < sp_da_size(parts); i++) {
+      sp_da_push(*args, sp_intern_get_or_insert_str(ctx->intern, parts[i]));
+    }
+  }
+  else {
+    *program = sp_intern_get_or_insert_str(ctx->intern, raw);
+  }
+}
+
 static void spn_codegen_push(sp_da(c8)* out, sp_str_t raw) {
   sp_for(it, raw.len) {
     sp_da_push(*out, raw.data[it]);
@@ -164,6 +211,42 @@ void spn_codegen_json_str(sp_da(c8)* out, sp_str_t value) {
 
 void spn_codegen_json_bool(sp_da(c8)* out, bool value) {
   spn_codegen_push(out, value ? sp_str_lit("true") : sp_str_lit("false"));
+}
+
+const c8* spn_codegen_err_name(spn_codegen_err_t code) {
+  switch (code) {
+    case SPN_CODEGEN_OK:                 return "ok";
+    case SPN_CODEGEN_ERR_EXPECTED_BOOL:  return "expected_bool";
+    case SPN_CODEGEN_ERR_EXPECTED_STR:   return "expected_str";
+    case SPN_CODEGEN_ERR_EXPECTED_OBJECT:return "expected_object";
+    case SPN_CODEGEN_ERR_MISSING_KEY:    return "missing_key";
+    case SPN_CODEGEN_ERR_DUPLICATE_KEY:  return "duplicate_key";
+  }
+  return "unknown";
+}
+
+void spn_codegen_json_issues(sp_da(c8)* out, sp_da(spn_codegen_issue_t) issues) {
+  sp_da_push(*out, '{');
+  bool first = true;
+  spn_codegen_json_key(out, &first, sp_str_lit("issues"));
+  sp_da_push(*out, '[');
+  sp_da_for(issues, it) {
+    if (it) {
+      sp_da_push(*out, ',');
+    }
+    spn_codegen_issue_t* issue = &issues[it];
+    sp_da_push(*out, '{');
+    bool ifirst = true;
+    spn_codegen_json_key(out, &ifirst, sp_str_lit("code"));
+    spn_codegen_json_str(out, sp_cstr_as_str(spn_codegen_err_name(issue->code)));
+    spn_codegen_json_key(out, &ifirst, sp_str_lit("path"));
+    spn_codegen_json_str(out, issue->path);
+    spn_codegen_json_key(out, &ifirst, sp_str_lit("detail"));
+    spn_codegen_json_str(out, issue->detail);
+    sp_da_push(*out, '}');
+  }
+  sp_da_push(*out, ']');
+  sp_da_push(*out, '}');
 }
 
 void spn_codegen_json_str_array(sp_da(c8)* out, sp_da(sp_str_t) values) {

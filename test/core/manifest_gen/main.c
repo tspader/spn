@@ -26,7 +26,34 @@ static sp_str_t manifest_gen_render(sp_mem_t mem, sp_fs_entry_t* entry) {
   if (table) {
     spn_cg_root_read(&ctx, table, &manifest);
   }
+
+  if (sp_da_size(ctx.issues) > 0) {
+    sp_da(c8) out = sp_da_new(mem, c8);
+    spn_codegen_json_issues(&out, ctx.issues);
+    return sp_str(out, (u32)sp_da_size(out));
+  }
+
   return spn_cg_root_write(mem, &manifest);
+}
+
+UTEST(manifest_gen, path_join) {
+  sp_mem_t mem = sp_mem_os_new();
+
+  spn_codegen_ctx_t ctx = sp_zero;
+  spn_codegen_ctx_init(&ctx, mem, sp_intern_new(mem));
+  ctx.dir = sp_str_lit("/base");
+
+  sp_str_t path = sp_fs_join_path(mem, sp_cstr_as_str(MANIFEST_DIR), sp_str_lit("package_arrays.toml"));
+  bool parse_error = false;
+  toml_table_t* table = spn_toml_parse_ex(path, &parse_error);
+  ASSERT_TRUE(table);
+
+  spn_cg_root_t manifest = sp_zero;
+  spn_cg_root_read(&ctx, table, &manifest);
+
+  ASSERT_EQ((u32)2, (u32)sp_da_size(manifest.package.include));
+  EXPECT_TRUE(sp_str_equal(manifest.package.include[0], sp_str_lit("/base/include")));
+  EXPECT_TRUE(sp_str_equal(manifest.package.include[1], sp_str_lit("/base/vendor/include")));
 }
 
 UTEST(manifest_gen, corpus) {

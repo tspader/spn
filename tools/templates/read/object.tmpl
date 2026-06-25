@@ -1,0 +1,10 @@
+static void spn_cg_{{ .object }}_read_object(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, {{ .type }}* out, bool required) {
+  toml_table_t* child = toml_table_table(table, key);
+  if (child) {
+    spn_codegen_push_key(ctx, key);
+    spn_cg_{{ .object }}_read(ctx, child, out);
+    spn_codegen_pop(ctx);
+  } else if (required) {
+    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, key);
+  }
+}

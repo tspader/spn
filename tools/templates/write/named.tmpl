@@ -1,0 +1,11 @@
+    sp_da_push(*out, '{');
+    sp_om_for(in->{{ .key }}, it) {
+      const {{ .type }}* entry = sp_om_at(in->{{ .key }}, it);
+      if (it) {
+        sp_da_push(*out, ',');
+      }
+      spn_codegen_json_str(out, entry->{{ .key_field }});
+      sp_da_push(*out, ':');
+      spn_cg_{{ .object }}_write(entry, out);
+    }
+    sp_da_push(*out, '}');

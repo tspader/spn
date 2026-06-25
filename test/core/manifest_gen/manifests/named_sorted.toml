@@ -1,0 +1,15 @@
+[package]
+name = "sorted"
+version = "1.0.0"
+
+[[bin]]
+name = "zeta"
+source = ["z.c"]
+
+[[bin]]
+name = "alpha"
+source = ["a.c"]
+
+[[bin]]
+name = "mu"
+source = ["m.c"]
