@@ -161,6 +161,7 @@ walk_result_t register_type(gen_t* g, sp_str_t name, jtd_schema_t* schema) {
       .node = node,
       .key_field = key_field,
       .validate = jtd_metadata(sub, "validate"),
+      .compute = jtd_metadata(sub, "compute"),
     };
 
     if (card == CARD_ARRAY && node->kind == NODE_STRUCT) {

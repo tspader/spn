@@ -367,6 +367,36 @@ spn_pkg_source_t spn_pkg_source_from_str(sp_str_t str) {
   SP_UNREACHABLE_RETURN(SPN_PKG_SOURCE_INDEX);
 }
 
+sp_str_t spn_index_kind_to_str(spn_index_kind_t kind) {
+  switch (kind) {
+    case SPN_INDEX_WORKSPACE: {
+      return sp_str_lit("workspace");
+    }
+    case SPN_INDEX_BUILTIN: {
+      return sp_str_lit("builtin");
+    }
+    case SPN_INDEX_USER: {
+      return sp_str_lit("user");
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+spn_index_kind_t spn_index_kind_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "workspace")) {
+    return SPN_INDEX_WORKSPACE;
+  }
+  if (sp_str_equal_cstr(str, "builtin")) {
+    return SPN_INDEX_BUILTIN;
+  }
+  if (sp_str_equal_cstr(str, "user")) {
+    return SPN_INDEX_USER;
+  }
+
+  SP_UNREACHABLE_RETURN(SPN_INDEX_WORKSPACE);
+}
+
 sp_str_t spn_index_protocol_to_str(spn_index_protocol_t protocol) {
   switch (protocol) {
     case SPN_INDEX_PROTOCOL_GIT: {

@@ -13,6 +13,12 @@
     "system_deps": [
       "m",
       "pthread"
+    ],
+    "qualified": "core/arrpkg",
+    "versions": [
+      {
+        "version": "1.0.0"
+      }
     ]
   }
 }

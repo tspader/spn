@@ -1,18 +1,26 @@
 {
   "package": {
     "name": "multiindex",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "qualified": "core/multiindex",
+    "versions": [
+      {
+        "version": "1.0.0"
+      }
+    ]
   },
   "index": {
     "core": {
       "name": "core",
       "url": "https://a.example.com",
-      "protocol": "http"
+      "protocol": "http",
+      "kind": "workspace"
     },
     "local": {
       "name": "local",
       "url": "/srv/packages",
-      "protocol": "filesystem"
+      "protocol": "filesystem",
+      "kind": "workspace"
     }
   }
 }

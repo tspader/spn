@@ -1,7 +1,13 @@
 {
   "package": {
     "name": "profempty",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "qualified": "core/profempty",
+    "versions": [
+      {
+        "version": "1.0.0"
+      }
+    ]
   },
   "profile": {
     "bare": {}
