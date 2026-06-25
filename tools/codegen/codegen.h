@@ -7,37 +7,50 @@
 #include "sp_template.h"
 
 typedef enum {
-  FIELD_STR,
-  FIELD_BOOL,
-  FIELD_CONV,
-  FIELD_STR_ARRAY,
-  FIELD_OBJECT_ARRAY,
-  FIELD_OBJECT,
-  FIELD_OBJECT_PTR,
-  FIELD_MAP_STR,
-  FIELD_MAP_OBJECT,
-} field_kind_t;
+  CARD_SCALAR,
+  CARD_ARRAY,
+  CARD_MAP,
+} cardinality_t;
+
+typedef enum {
+  NODE_STR,
+  NODE_BOOL,
+  NODE_CONVERSION,
+  NODE_STRUCT,
+} node_kind_t;
+
+typedef struct type_t type_t;
 
 typedef struct {
   sp_str_t name;
-  sp_str_t type;
+  sp_str_t c_type;
   sp_str_t from;
   sp_str_t to;
-} conv_t;
+} conversion_t;
+
+typedef struct {
+  node_kind_t kind;
+  sp_str_t name;
+  bool use_optional;
+  union {
+    conversion_t* conversion;
+    type_t* type;
+  } as;
+} node_t;
 
 typedef struct {
   sp_str_t key;
-  field_kind_t kind;
   bool required;
-  sp_str_t object;
+  cardinality_t card;
+  node_t* node;
   sp_str_t entry;
-  conv_t* conv;
 } field_t;
 
-typedef struct {
+struct type_t {
   sp_str_t name;
   sp_da(field_t) fields;
-} type_t;
+  bool has_required;
+};
 
 typedef struct {
   sp_str_t name;
@@ -49,7 +62,8 @@ typedef struct {
   sp_str_om(type_t) types;
   sp_da(entry_t) entries;
   sp_str_om(type_t*) array_types;
-  sp_str_om(conv_t) convs;
+  sp_str_om(node_t) nodes;
+  sp_str_om(conversion_t) conversions;
   sp_ht(sp_str_t, u8) visited;
   type_t* root;
 } gen_t;
@@ -58,23 +72,24 @@ typedef struct {
 typedef enum {
   WALK_OK = 0,
   WALK_ERR_SCALAR_TYPE,
-  WALK_ERR_ELEMENT_FORM,
-  WALK_ERR_MAP_VALUE_FORM,
-  WALK_ERR_SCHEMA_FORM,
-  WALK_ERR_CONV_BINDING,
+  WALK_ERR_CONV_DECL,
+  WALK_ERR_CONV_UNKNOWN,
+  WALK_ERR_UNSUPPORTED_FORM,
 } walk_err_t;
 
 typedef struct {
   walk_err_t err;
   sp_str_t type;
   sp_str_t key;
+  sp_str_t name;
   union {
     jtd_type_t scalar_type;
     jtd_form_t form;
   } as;
 } walk_result_t;
 
-walk_result_t register_type(gen_t* g, jtd_ref_t ref);
+walk_result_t load_conversions(gen_t* g, const jtd_result_t* jtd);
+walk_result_t register_type(gen_t* g, sp_str_t name, jtd_schema_t* schema);
 sp_str_t      walk_result_to_str(sp_mem_t mem, walk_result_t result);
 
 // render.c
@@ -91,6 +106,7 @@ typedef struct {
 } render_result_t;
 
 type_t*         find_type(gen_t* g, sp_str_t name);
+sp_str_t        node_c_type(gen_t* g, node_t* node);
 render_result_t render_file(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg);
 sp_str_t        render_result_to_str(sp_mem_t mem, render_result_t result);
 

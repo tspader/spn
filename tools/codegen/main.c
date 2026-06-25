@@ -34,8 +34,14 @@ sp_cli_result_t parse_schema(ctx_t* c) {
 }
 
 sp_cli_result_t walk_schema(ctx_t* c) {
+  walk_result_t conversions = load_conversions(c->gen, &c->jtd);
+  if (conversions.err) {
+    sp_cli_log_error("{}", sp_fmt_str(walk_result_to_str(c->mem, conversions)));
+    return SP_CLI_ERR;
+  }
+
   jtd_ref_t root = c->jtd.root->as.ref;
-  walk_result_t walked = register_type(c->gen, c->jtd.root->as.ref);
+  walk_result_t walked = register_type(c->gen, root.name, root.target);
   if (walked.err) {
     sp_cli_log_error("{}", sp_fmt_str(walk_result_to_str(c->mem, walked)));
     return SP_CLI_ERR;
@@ -43,6 +49,10 @@ sp_cli_result_t walk_schema(ctx_t* c) {
 
   c->gen->root = find_type(c->gen, root.name);
 
+  return SP_CLI_OK;
+}
+
+sp_cli_result_t render_template(ctx_t* c) {
   sp_str_t dir = c->args.templates;
   c->registry = sp_template_registry_create(c->mem);
   if (sp_template_load_dir(c->registry, dir)) {
@@ -50,10 +60,6 @@ sp_cli_result_t walk_schema(ctx_t* c) {
     return SP_CLI_ERR;
   }
 
-  return SP_CLI_OK;
-}
-
-sp_cli_result_t render_template(ctx_t* c) {
   // Open the output file, which we'll atomically rename to the final output
   sp_fs_atomic_t file = sp_zero;
   if (sp_fs_atomic_open(&file, c->args.out)) {
@@ -80,25 +86,33 @@ sp_cli_result_t render_template(ctx_t* c) {
   return SP_CLI_OK;
 }
 
-static sp_cli_result_t jtd_gen_run(sp_cli_t* cli) {
+gen_t* gen_new(sp_mem_t mem) {
+  gen_t* gen = sp_alloc_type(mem, gen_t);
+  gen->mem = mem;
+  gen->entries = sp_da_new(mem, entry_t);
+  sp_str_om_init(gen->types);
+  sp_str_om_init(gen->array_types);
+  sp_str_om_init(gen->nodes);
+  sp_str_om_init(gen->conversions);
+  sp_str_ht_init(mem, gen->visited);
+  return gen;
+}
+
+static sp_cli_result_t run_cli(sp_cli_t* cli) {
   jtd_gen_args_desc_t* parsed = sp_cast(jtd_gen_args_desc_t*, cli->user_data);
 
+  sp_mem_heap_t* heap = sp_mem_heap_new();
+  sp_mem_t mem = sp_mem_heap_as_allocator(heap);
   ctx_t ctx = {
-    .heap = sp_mem_heap_new(),
+    .heap = heap,
+    .mem = mem,
     .args = {
       .schema = sp_cstr_as_str(parsed->schema),
       .out = sp_cstr_as_str(parsed->out),
       .templates = sp_cstr_as_str(parsed->templates),
-    }
+    },
+    .gen = gen_new(mem)
   };
-  ctx.mem = sp_mem_heap_as_allocator(ctx.heap);
-  ctx.gen = sp_alloc_type(ctx.mem, gen_t);
-  ctx.gen->mem = ctx.mem;
-  sp_str_om_new(ctx.gen->types);
-  ctx.gen->entries = sp_da_new(ctx.mem, entry_t);
-  sp_str_om_new(ctx.gen->array_types);
-  sp_str_om_new(ctx.gen->convs);
-  sp_str_ht_init(ctx.mem, ctx.gen->visited);
 
   try(parse_schema(&ctx));
   try(walk_schema(&ctx));
@@ -131,7 +145,7 @@ s32 main(s32 num_args, const c8** args) {
         .ptr = &parsed.templates,
       },
     },
-    .handler = jtd_gen_run,
+    .handler = run_cli,
   };
 
   return sp_cli_main(&root, num_args, args, &parsed);

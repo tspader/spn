@@ -191,18 +191,29 @@ static bool jtd_parse_shared(jtd_ctx_t* ctx, jtd_schema_t* s, yyjson_val* v, sp_
     size_t idx, max;
     yyjson_val *k, *mv;
     yyjson_obj_foreach(metadata, idx, max, k, mv) {
-      sp_str_t value = sp_zero;
+      jtd_metadata_t entry = { .key = jtd_yj_str(ctx->result, k) };
       if (yyjson_is_str(mv)) {
-        value = jtd_yj_str(ctx->result, mv);
+        entry.value = jtd_yj_str(ctx->result, mv);
       }
       else if (yyjson_is_bool(mv)) {
-        value = yyjson_get_bool(mv) ? sp_str_lit("true") : sp_str_lit("false");
+        entry.value = yyjson_get_bool(mv) ? sp_str_lit("true") : sp_str_lit("false");
+      }
+      else if (yyjson_is_obj(mv)) {
+        entry.object = sp_da_new(ctx->result, jtd_metadata_t);
+        size_t oidx, omax;
+        yyjson_val *ok, *ov;
+        yyjson_obj_foreach(mv, oidx, omax, ok, ov) {
+          if (!yyjson_is_str(ov)) {
+            continue;
+          }
+          jtd_metadata_t inner = { .key = jtd_yj_str(ctx->result, ok), .value = jtd_yj_str(ctx->result, ov) };
+          sp_da_push(entry.object, inner);
+        }
       }
       else {
         continue;
       }
 
-      jtd_metadata_t entry = { .key = jtd_yj_str(ctx->result, k), .value = value };
       sp_da_push(s->metadata, entry);
     }
   }
@@ -595,6 +606,26 @@ bool jtd_metadata_has(const jtd_schema_t* schema, const c8* key) {
     }
   }
   return false;
+}
+
+const jtd_metadata_t* jtd_metadata_entry(const jtd_schema_t* schema, const c8* key) {
+  if (!schema) return SP_NULLPTR;
+  sp_da_for(schema->metadata, it) {
+    if (sp_str_equal_cstr(schema->metadata[it].key, key)) {
+      return &schema->metadata[it];
+    }
+  }
+  return SP_NULLPTR;
+}
+
+sp_str_t jtd_meta_obj(const jtd_metadata_t* meta, const c8* key) {
+  if (!meta) return sp_zero_s(sp_str_t);
+  sp_da_for(meta->object, it) {
+    if (sp_str_equal_cstr(meta->object[it].key, key)) {
+      return meta->object[it].value;
+    }
+  }
+  return sp_zero_s(sp_str_t);
 }
 
 jtd_schema_t* jtd_definition(const jtd_result_t* result, sp_str_t name) {
