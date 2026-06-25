@@ -2,12 +2,14 @@
 #define CODEGEN_H
 
 #include "sp.h"
+#include "sp_om.h"
 #include "jtd.h"
 #include "sp_template.h"
 
 typedef enum {
   FIELD_STR,
   FIELD_BOOL,
+  FIELD_CONV,
   FIELD_STR_ARRAY,
   FIELD_OBJECT_ARRAY,
   FIELD_OBJECT,
@@ -17,11 +19,19 @@ typedef enum {
 } field_kind_t;
 
 typedef struct {
+  sp_str_t name;
+  sp_str_t type;
+  sp_str_t from;
+  sp_str_t to;
+} conv_t;
+
+typedef struct {
   sp_str_t key;
   field_kind_t kind;
   bool required;
   sp_str_t object;
   sp_str_t entry;
+  conv_t* conv;
 } field_t;
 
 typedef struct {
@@ -36,8 +46,10 @@ typedef struct {
 
 typedef struct {
   sp_mem_t mem;
-  sp_da(type_t) types;
+  sp_str_om(type_t) types;
   sp_da(entry_t) entries;
+  sp_str_om(type_t*) array_types;
+  sp_str_om(conv_t) convs;
   sp_ht(sp_str_t, u8) visited;
   type_t* root;
 } gen_t;
@@ -49,6 +61,7 @@ typedef enum {
   WALK_ERR_ELEMENT_FORM,
   WALK_ERR_MAP_VALUE_FORM,
   WALK_ERR_SCHEMA_FORM,
+  WALK_ERR_CONV_BINDING,
 } walk_err_t;
 
 typedef struct {

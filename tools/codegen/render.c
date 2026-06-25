@@ -11,18 +11,17 @@ static sp_str_t type_name(gen_t* g, sp_str_t name) {
 }
 
 type_t* find_type(gen_t* g, sp_str_t name) {
-  sp_da_for(g->types, it) {
-    if (sp_str_equal(g->types[it].name, name)) {
-      return &g->types[it];
-    }
+  if (!sp_str_om_has(g->types, name)) {
+    return SP_NULLPTR;
   }
-  return SP_NULLPTR;
+  return sp_str_om_get(g->types, name);
 }
 
 static sp_str_t get_struct_type(gen_t* g, field_t* field) {
   switch (field->kind) {
     case FIELD_STR:          return sp_str_lit("sp_str_t");
     case FIELD_BOOL:         return field->required ? sp_str_lit("bool") : sp_str_lit("sp_opt(bool)");
+    case FIELD_CONV:         return field->required ? field->conv->type : sp_fmt(g->mem, "sp_opt({})", sp_fmt_str(field->conv->type)).value;
     case FIELD_STR_ARRAY:    return sp_str_lit("sp_da(sp_str_t)");
     case FIELD_OBJECT:       return type_name(g, field->object);
     case FIELD_OBJECT_PTR:   return sp_fmt(g->mem, "{}*", sp_fmt_str(type_name(g, field->object))).value;
@@ -41,7 +40,8 @@ static sp_str_t get_is_present(gen_t* g, field_t* field, sp_str_t recv) {
     case FIELD_STR: {
       return sp_fmt(g->mem, "!sp_str_empty({}{})", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
     }
-    case FIELD_BOOL: {
+    case FIELD_BOOL:
+    case FIELD_CONV: {
       return sp_fmt(g->mem, "!sp_opt_is_null({}{})", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
     }
     case FIELD_STR_ARRAY:
@@ -81,6 +81,13 @@ static void bind_field(gen_t* g, sp_template_scope_t* scope, field_t* field) {
     case FIELD_BOOL: {
       read = field->required ? sp_str_lit("read/bool_required") : sp_str_lit("read/bool_optional");
       write = field->required ? sp_str_lit("write/bool_required") : sp_str_lit("write/bool_optional");
+      break;
+    }
+    case FIELD_CONV: {
+      read = field->required ? sp_str_lit("read/conv_required") : sp_str_lit("read/conv_optional");
+      write = field->required ? sp_str_lit("write/conv_required") : sp_str_lit("write/conv_optional");
+      sp_template_set(scope, sp_str_lit("from"), field->conv->from);
+      sp_template_set(scope, sp_str_lit("to"), field->conv->to);
       break;
     }
     case FIELD_STR_ARRAY: {
@@ -194,9 +201,9 @@ render_result_t render_file(gen_t* g, sp_io_writer_t* out, sp_template_registry_
   render_try(render(out, reg, "header", sp_template_scope_create(g->mem)));
 
   sp_template_scope_t* tags = sp_template_scope_create(g->mem);
-  sp_da_for(g->types, it) {
+  sp_om_for(g->types, it) {
     sp_template_scope_t* child = sp_template_push(tags, sp_str_lit("tags"));
-    sp_template_set(child, sp_str_lit("name"), undecorated_name(g, g->types[it].name));
+    sp_template_set(child, sp_str_lit("name"), undecorated_name(g, sp_str_om_at(g->types, it)->name));
   }
   sp_da_for(g->entries, it) {
     sp_template_scope_t* child = sp_template_push(tags, sp_str_lit("tags"));
@@ -205,24 +212,34 @@ render_result_t render_file(gen_t* g, sp_io_writer_t* out, sp_template_registry_
   render_try(render(out, reg, "tags", tags));
   sp_fmt_io(out, "\n");
 
-  sp_da_for(g->types, it) {
-    render_try(render_object_struct(g, out, &g->types[it], reg));
+  sp_om_for(g->types, it) {
+    render_try(render_object_struct(g, out, sp_str_om_at(g->types, it), reg));
   }
   sp_da_for(g->entries, it) {
     render_try(render_entry_struct(g, out, &g->entries[it], reg));
   }
 
   sp_template_scope_t* objects = sp_template_scope_create(g->mem);
-  sp_da_for(g->types, it) {
+  sp_om_for(g->types, it) {
+    type_t* type = sp_str_om_at(g->types, it);
     sp_template_scope_t* child = sp_template_push(objects, sp_str_lit("objects"));
-    sp_template_set(child, sp_str_lit("name"), g->types[it].name);
-    sp_template_set(child, sp_str_lit("type"), type_name(g, g->types[it].name));
+    sp_template_set(child, sp_str_lit("name"), type->name);
+    sp_template_set(child, sp_str_lit("type"), type_name(g, type->name));
   }
   render_try(render(out, reg, "forward", objects));
   sp_fmt_io(out, "\n");
 
-  sp_da_for(g->types, it) {
-    render_try(render_object(g, out, &g->types[it], reg));
+  sp_om_for(g->array_types, it) {
+    type_t* type = *sp_str_om_at(g->array_types, it);
+    sp_template_scope_t* scope = sp_template_scope_create(g->mem);
+    sp_template_set(scope, sp_str_lit("object"), type->name);
+    sp_template_set(scope, sp_str_lit("type"), type_name(g, type->name));
+    render_try(render(out, reg, "read/array", scope));
+  }
+  sp_fmt_io(out, "\n");
+
+  sp_om_for(g->types, it) {
+    render_try(render_object(g, out, sp_str_om_at(g->types, it), reg));
   }
 
   sp_template_scope_t* root = sp_template_scope_create(g->mem);

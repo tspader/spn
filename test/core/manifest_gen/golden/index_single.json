@@ -1,1 +1,1 @@
-{"package":{"name":"withindex","version":"1.0.0"},"index":[{"name":"core","url":"https://packages.example.com","protocol":"https"}]}
+{"package":{"name":"withindex","version":"1.0.0"},"index":[{"name":"core","url":"https://packages.example.com","protocol":"http"}]}

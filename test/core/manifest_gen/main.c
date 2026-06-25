@@ -18,7 +18,7 @@ static s32 manifest_gen_sort_entries(const void* a, const void* b) {
 
 static sp_str_t manifest_gen_render(sp_mem_t mem, sp_fs_entry_t* entry) {
   spn_codegen_ctx_t ctx = sp_zero;
-  spn_codegen_ctx_init(&ctx, mem);
+  spn_codegen_ctx_init(&ctx, mem, sp_intern_new(mem));
 
   spn_cg_root_t manifest = sp_zero;
   bool parse_error = false;

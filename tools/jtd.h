@@ -51,9 +51,15 @@ typedef struct {
   jtd_schema_t* target;
 } jtd_ref_t;
 
+typedef struct {
+  sp_str_t key;
+  sp_str_t value;
+} jtd_metadata_t;
+
 struct jtd_schema {
   jtd_form_t form;
   bool nullable;
+  sp_da(jtd_metadata_t) metadata;
 
   union {
     jtd_type_t type;
@@ -140,6 +146,9 @@ SP_API jtd_result_t jtd_parse(sp_mem_t mem, sp_str_t json);
 SP_API jtd_err_t jtd_parse_2(sp_mem_t mem, sp_str_t json, jtd_result_t* jtd);
 SP_API jtd_err_t jtd_parse_file(sp_mem_t mem, sp_str_t file, jtd_result_t* jtd);
 SP_API void jtd_free(jtd_result_t* result);
+
+SP_API sp_str_t jtd_metadata(const jtd_schema_t* schema, const c8* key);
+SP_API bool jtd_metadata_has(const jtd_schema_t* schema, const c8* key);
 
 SP_API jtd_schema_t* jtd_definition(const jtd_result_t* result, sp_str_t name);
 SP_API jtd_schema_t* jtd_resolve(const jtd_result_t* result, jtd_schema_t* schema);

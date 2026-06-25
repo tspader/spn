@@ -3,6 +3,7 @@
 
 #include "sp.h"
 #include "toml.h"
+#include "intern/intern.h"
 
 typedef enum {
   SPN_CODEGEN_OK = 0,
@@ -33,22 +34,29 @@ typedef struct {
 
 typedef struct {
   sp_mem_t mem;
+  sp_intern_t* intern;
   spn_codegen_path_seg_t path[SPN_CODEGEN_PATH_MAX];
   u32 depth;
   sp_da(spn_codegen_issue_t) issues;
 } spn_codegen_ctx_t;
 
-void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem);
+void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_intern_t* intern);
 
 void spn_codegen_push_key(spn_codegen_ctx_t* ctx, const c8* key);
 void spn_codegen_push_index(spn_codegen_ctx_t* ctx, u32 index);
 void spn_codegen_pop(spn_codegen_ctx_t* ctx);
 void spn_codegen_issue(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, const c8* key);
 
-bool spn_codegen_read_str(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, sp_str_t* value);
-bool spn_codegen_read_bool(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, bool* value);
+sp_str_t spn_codegen_intern(spn_codegen_ctx_t* ctx, sp_str_t value);
+
+sp_str_t spn_codegen_str_required(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key);
+bool     spn_codegen_str_optional(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, sp_str_t* value);
+sp_str_t spn_codegen_raw_required(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key);
+bool     spn_codegen_raw_optional(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, sp_str_t* value);
+bool     spn_codegen_read_bool(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, bool* value);
 sp_da(sp_str_t) spn_codegen_read_str_array(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key);
 
+void spn_codegen_json_key(sp_da(c8)* out, bool* first, sp_str_t key);
 void spn_codegen_json_str(sp_da(c8)* out, sp_str_t value);
 void spn_codegen_json_bool(sp_da(c8)* out, bool value);
 void spn_codegen_json_str_array(sp_da(c8)* out, sp_da(sp_str_t) values);

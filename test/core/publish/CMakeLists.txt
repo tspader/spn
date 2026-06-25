@@ -9,6 +9,7 @@ add_executable(publish
   ${SRC}/index/index.c
   ${SRC}/index/json.c
   ${SRC}/index/publish.c
+  ${SRC}/intern/context.c
   ${SRC}/intern/intern.c
   ${SRC}/pkg/id.c
   ${SRC}/pkg/load.c

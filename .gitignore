@@ -21,3 +21,5 @@ compile_commands.json
 /HANDOFF.md
 /PORT_CHANGELOG.md
 /build_errs.log
+.claude
+.mcp.json

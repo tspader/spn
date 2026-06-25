@@ -22,7 +22,7 @@ target_link_libraries(yyjson_stub PRIVATE yyjson)
 
 add_executable(jtd_gen codegen/main.c codegen/walk.c codegen/render.c jtd.c)
 set_target_properties(jtd_gen PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(jtd_gen PRIVATE ${STORE}/include ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(jtd_gen PRIVATE ${STORE}/include ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/source/sp)
 target_link_libraries(jtd_gen PRIVATE yyjson m)
 add_dependencies(jtd_gen headers)
 

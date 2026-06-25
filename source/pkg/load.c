@@ -649,9 +649,9 @@ static spn_err_t load_profile(toml_table_t* toml, spn_pkg_info_t* pkg, sp_str_t 
   spn_pkg_add_profile_ex(pkg, (spn_profile_info_t) {
     .name = spn_intern(name),
     .toolchain = spn_intern(toolchain),
-    .linkage = sp_str_empty(linkage) ? 0 : spn_pkg_linkage_from_str(linkage),
+    .linkage = sp_str_empty(linkage) ? 0 : spn_linkage_from_str(linkage),
     .standard = sp_str_empty(standard) ? 0 : spn_c_standard_from_str(standard),
-    .mode = sp_str_empty(mode) ? 0 : spn_dep_build_mode_from_str(mode),
+    .mode = sp_str_empty(mode) ? 0 : spn_build_mode_from_str(mode),
     .os = sp_str_empty(os) ? 0 : spn_os_from_str(os),
     .arch = sp_str_empty(arch) ? 0 : spn_arch_from_str(arch),
     .abi = sp_str_empty(abi) ? 0 : spn_abi_from_str(abi),
@@ -787,7 +787,7 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
     spn_toml_arr_for(kinds, k) {
       sp_str_t kind = SP_ZERO_INITIALIZE();
       spn_try_union(toml_get_array_string_required(kinds, k, path, "kinds", &kind));
-      spn_linkage_set_add(&linkages, spn_pkg_linkage_from_str(kind));
+      spn_linkage_set_add(&linkages, spn_linkage_from_str(kind));
     }
 
     // Object libs are never linked, so a lib that's sometimes object and

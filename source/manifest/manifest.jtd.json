@@ -1,6 +1,17 @@
 {
   "ref": "manifest",
   "definitions": {
+    "semver": { "type": "string", "metadata": { "as": "spn_semver_t", "from": "spn_semver_from_str", "to": "spn_semver_to_str" } },
+
+    "arch": { "enum": ["x86_64", "aarch64"] },
+    "os": { "enum": ["windows", "linux", "macos"] },
+    "abi": { "enum": ["gnu", "musl", "msvc", "mingw"] },
+    "cc_driver": { "enum": ["gcc", "clang", "msvc"] },
+    "linkage": { "enum": ["shared", "static", "source", "object"] },
+    "c_standard": { "enum": ["c89", "c99", "c11"] },
+    "build_mode": { "enum": ["release", "debug"] },
+    "index_protocol": { "enum": ["git", "http", "filesystem"] },
+
     "manifest": {
       "properties": {
         "package": { "ref": "package" }
@@ -20,7 +31,7 @@
     "package": {
       "properties": {
         "name": { "type": "string" },
-        "version": { "type": "string" }
+        "version": { "ref": "semver" }
       },
       "optionalProperties": {
         "namespace": { "type": "string" },
@@ -53,9 +64,9 @@
 
     "triple": {
       "optionalProperties": {
-        "arch": { "type": "string" },
-        "os": { "type": "string" },
-        "abi": { "type": "string" }
+        "arch": { "ref": "arch" },
+        "os": { "ref": "os" },
+        "abi": { "ref": "abi" }
       }
     },
 
@@ -67,7 +78,7 @@
         "linker": { "type": "string" },
         "archiver": { "type": "string" },
         "sysroot": { "type": "string" },
-        "driver": { "type": "string" },
+        "driver": { "ref": "cc_driver" },
         "package": { "type": "string" },
         "version": { "type": "string" },
         "export": { "type": "boolean" },
@@ -78,13 +89,13 @@
 
     "profile": {
       "optionalProperties": {
-        "linkage": { "type": "string" },
-        "standard": { "type": "string" },
+        "linkage": { "ref": "linkage" },
+        "standard": { "ref": "c_standard" },
         "toolchain": { "type": "string" },
-        "mode": { "type": "string" },
-        "os": { "type": "string" },
-        "arch": { "type": "string" },
-        "abi": { "type": "string" }
+        "mode": { "ref": "build_mode" },
+        "os": { "ref": "os" },
+        "arch": { "ref": "arch" },
+        "abi": { "ref": "abi" }
       }
     },
 
@@ -92,7 +103,7 @@
       "properties": {
         "name": { "type": "string" },
         "url": { "type": "string" },
-        "protocol": { "type": "string" }
+        "protocol": { "ref": "index_protocol" }
       }
     },
 

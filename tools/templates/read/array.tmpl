@@ -1,0 +1,19 @@
+static void spn_cg_{{ .object }}_read_array(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, sp_da({{ .type }})* out) {
+  toml_array_t* array = toml_table_array(table, key);
+  if (!array) {
+    return;
+  }
+  *out = sp_da_new(ctx->mem, {{ .type }});
+  spn_codegen_push_key(ctx, key);
+  sp_for(it, (u32)toml_array_len(array)) {
+    spn_codegen_push_index(ctx, it);
+    toml_table_t* element = toml_array_table(array, (s32)it);
+    if (element) {
+      {{ .type }} entry = sp_zero;
+      spn_cg_{{ .object }}_read(ctx, element, &entry);
+      sp_da_push(*out, entry);
+    }
+    spn_codegen_pop(ctx);
+  }
+  spn_codegen_pop(ctx);
+}

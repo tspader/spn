@@ -14,6 +14,49 @@ static bool has_required(jtd_schema_t* schema) {
   return false;
 }
 
+static jtd_schema_t* resolve_ref(jtd_schema_t* schema) {
+  while (schema && schema->form == JTD_FORM_REF) {
+    schema = schema->as.ref.target;
+  }
+  return schema;
+}
+
+static bool schema_is_conv(jtd_schema_t* schema) {
+  if (!schema) {
+    return false;
+  }
+  return schema->form == JTD_FORM_ENUM || jtd_metadata_has(schema, "as");
+}
+
+static conv_t* register_conv(gen_t* g, sp_str_t name, jtd_schema_t* schema) {
+  if (sp_str_om_has(g->convs, name)) {
+    return sp_str_om_get(g->convs, name);
+  }
+
+  conv_t conv = { .name = sp_str_copy(g->mem, name) };
+  if (schema->form == JTD_FORM_ENUM) {
+    conv.type = sp_fmt(g->mem, "spn_{}_t", sp_fmt_str(name)).value;
+    conv.from = sp_fmt(g->mem, "spn_{}_from_str", sp_fmt_str(name)).value;
+    conv.to = sp_fmt(g->mem, "spn_{}_to_str", sp_fmt_str(name)).value;
+  } else {
+    sp_str_t from = jtd_metadata(schema, "from");
+    sp_str_t to = jtd_metadata(schema, "to");
+    if (sp_str_empty(from) || sp_str_empty(to)) {
+      return SP_NULLPTR;
+    }
+    conv.type = sp_str_copy(g->mem, jtd_metadata(schema, "as"));
+    conv.from = sp_str_copy(g->mem, from);
+    conv.to = sp_str_copy(g->mem, to);
+  }
+
+  sp_str_om_insert(g->convs, conv.name, conv);
+  return sp_str_om_get(g->convs, conv.name);
+}
+
+static void register_array_type(gen_t* g, type_t* type) {
+  sp_str_om_insert(g->array_types, type->name, type);
+}
+
 static void register_entry(gen_t* g, sp_str_t name, sp_str_t value_type) {
   sp_da_for(g->entries, it) {
     if (sp_str_equal(g->entries[it].name, name)) {
@@ -47,6 +90,18 @@ walk_result_t register_type(gen_t* g, jtd_ref_t ref) {
     field.key = property.key;
     field.required = property.required;
 
+    jtd_schema_t* resolved = resolve_ref(sub);
+    if (schema_is_conv(resolved)) {
+      sp_str_t name = sub->form == JTD_FORM_REF ? sub->as.ref.name : property.key;
+      field.conv = register_conv(g, name, resolved);
+      if (!field.conv) {
+        return (walk_result_t) { .err = WALK_ERR_CONV_BINDING, .type = ref.name, .key = property.key };
+      }
+      field.kind = FIELD_CONV;
+      sp_da_push(type.fields, field);
+      continue;
+    }
+
     switch (sub->form) {
       case JTD_FORM_TYPE: {
         switch (sub->as.type) {
@@ -73,6 +128,7 @@ walk_result_t register_type(gen_t* g, jtd_ref_t ref) {
           if (err.err) return err;
           field.kind = FIELD_OBJECT_ARRAY;
           field.object = sp_str_copy(g->mem, element->as.ref.name);
+          register_array_type(g, find_type(g, element->as.ref.name));
           break;
         }
         return (walk_result_t) {
@@ -110,6 +166,7 @@ walk_result_t register_type(gen_t* g, jtd_ref_t ref) {
       }
       case JTD_FORM_REF: {
         jtd_ref_t field_ref = sub->as.ref;
+
         walk_result_t err = register_type(g, field_ref);
         if (err.err) return err;
 
@@ -133,7 +190,7 @@ walk_result_t register_type(gen_t* g, jtd_ref_t ref) {
     sp_da_push(type.fields, field);
   }
 
-  sp_da_push(g->types, type);
+  sp_str_om_insert(g->types, type.name, type);
   return (walk_result_t) { .err = WALK_OK };
 }
 
@@ -153,6 +210,9 @@ sp_str_t walk_result_to_str(sp_mem_t mem, walk_result_t result) {
     case WALK_ERR_SCHEMA_FORM:
       return sp_fmt(mem, "{.cyan}.{.cyan}: unsupported schema form {.red}",
         sp_fmt_str(result.type), sp_fmt_str(result.key), sp_fmt_cstr(jtd_form_name(result.as.form))).value;
+    case WALK_ERR_CONV_BINDING:
+      return sp_fmt(mem, "{.cyan}.{.cyan}: converter requires metadata as/from/to",
+        sp_fmt_str(result.type), sp_fmt_str(result.key)).value;
   }
   return sp_str_lit("unknown error");
 }

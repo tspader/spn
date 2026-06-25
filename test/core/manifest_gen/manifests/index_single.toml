@@ -5,4 +5,4 @@ version = "1.0.0"
 [[index]]
 name = "core"
 url = "https://packages.example.com"
-protocol = "https"
+protocol = "http"
