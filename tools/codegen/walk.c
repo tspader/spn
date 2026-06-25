@@ -125,6 +125,7 @@ walk_result_t register_type(gen_t* g, sp_str_t name, jtd_schema_t* schema) {
   type_t type = {
     .name = sp_str_copy(g->mem, name),
     .fields = sp_da_new(g->mem, field_t),
+    .validate = jtd_metadata(schema, "validate"),
   };
 
   sp_da_for(schema->as.properties.all, it) {
@@ -162,6 +163,7 @@ walk_result_t register_type(gen_t* g, sp_str_t name, jtd_schema_t* schema) {
       .card = card,
       .node = node,
       .key_field = key_field,
+      .validate = jtd_metadata(sub, "validate"),
     };
 
     if (card == CARD_ARRAY && node->kind == NODE_STRUCT) {

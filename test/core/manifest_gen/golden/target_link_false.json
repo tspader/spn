@@ -3,7 +3,7 @@
     "name": "nolink",
     "version": "1.0.0"
   },
-  "bin": {
+  "lib": {
     "nolink": {
       "name": "nolink",
       "source": [

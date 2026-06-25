@@ -1,0 +1,9 @@
+{
+  "issues": [
+    {
+      "code": "missing_key",
+      "path": "package",
+      "detail": "package"
+    }
+  ]
+}

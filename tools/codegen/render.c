@@ -245,6 +245,21 @@ static render_result_t render_object(gen_t* g, sp_io_writer_t* out, type_t* obje
   sp_template_scope_t* scope = sp_template_scope_create(g->mem);
   sp_template_set(scope, sp_str_lit("name"), object->name);
   sp_template_set(scope, sp_str_lit("type"), type_name(g, object->name));
+
+  sp_io_dyn_mem_writer_t validators;
+  sp_io_dyn_mem_writer_init(g->mem, &validators);
+  sp_da_for(object->fields, it) {
+    field_t* field = &object->fields[it];
+    if (!sp_str_empty(field->validate)) {
+      sp_fmt_io(&validators.base, "  {}(ctx, \"{}\", &out->{});\n",
+        sp_fmt_str(field->validate), sp_fmt_str(field->key), sp_fmt_str(field->key));
+    }
+  }
+  if (!sp_str_empty(object->validate)) {
+    sp_fmt_io(&validators.base, "  {}(ctx, out);\n", sp_fmt_str(object->validate));
+  }
+  sp_template_set(scope, sp_str_lit("object_validate"), sp_io_dyn_mem_writer_as_str(&validators));
+
   sp_da_for(object->fields, it) {
     sp_template_scope_t* child = sp_template_push(scope, sp_str_lit("fields"));
     bind_field(g, child, &object->fields[it]);
@@ -294,6 +309,37 @@ render_result_t render_file(gen_t* g, sp_io_writer_t* out, sp_template_registry_
   }
   render_try(render(out, reg, "forward", objects));
   sp_fmt_io(out, "\n");
+
+  sp_str_om(u8) seen_validators = SP_NULLPTR;
+  sp_str_om_init(seen_validators);
+  sp_template_scope_t* validators = sp_template_scope_create(g->mem);
+  bool any_validators = false;
+  sp_om_for(g->types, it) {
+    type_t* type = sp_str_om_at(g->types, it);
+    if (!sp_str_empty(type->validate) && !sp_str_om_has(seen_validators, type->validate)) {
+      sp_str_om_insert(seen_validators, type->validate, 1);
+      any_validators = true;
+      sp_template_scope_t* child = sp_template_push(validators, sp_str_lit("validators"));
+      sp_template_set(child, sp_str_lit("fn"), type->validate);
+      sp_template_set(child, sp_str_lit("params"),
+        sp_fmt(g->mem, "{}* value", sp_fmt_str(type_name(g, type->name))).value);
+    }
+    sp_da_for(type->fields, f) {
+      field_t* field = &type->fields[f];
+      if (!sp_str_empty(field->validate) && !sp_str_om_has(seen_validators, field->validate)) {
+        sp_str_om_insert(seen_validators, field->validate, 1);
+        any_validators = true;
+        sp_template_scope_t* child = sp_template_push(validators, sp_str_lit("validators"));
+        sp_template_set(child, sp_str_lit("fn"), field->validate);
+        sp_template_set(child, sp_str_lit("params"),
+          sp_fmt(g->mem, "const c8* key, {}* value", sp_fmt_str(get_struct_type(g, field))).value);
+      }
+    }
+  }
+  if (any_validators) {
+    render_try(render(out, reg, "validators", validators));
+    sp_fmt_io(out, "\n");
+  }
 
   sp_om_for(g->array_types, it) {
     type_t* type = *sp_str_om_at(g->array_types, it);
