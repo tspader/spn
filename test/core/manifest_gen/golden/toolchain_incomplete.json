@@ -14,6 +14,16 @@
       "code": "missing_key",
       "path": "toolchain[0].driver",
       "detail": "driver"
+    },
+    {
+      "code": "missing_key",
+      "path": "toolchain[0].host",
+      "detail": "host"
+    },
+    {
+      "code": "missing_key",
+      "path": "toolchain[0].target",
+      "detail": "target"
     }
   ]
 }

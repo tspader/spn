@@ -16,7 +16,7 @@
       },
       "optionalProperties": {
         "lib": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
-        "bin": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
+        "bin": { "elements": { "ref": "target" }, "metadata": { "key": "name", "validate": "spn_codegen_validate_target" } },
         "script": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
         "test": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
         "toolchain": { "elements": { "ref": "toolchain" } },

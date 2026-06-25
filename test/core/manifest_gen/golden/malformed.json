@@ -1,0 +1,9 @@
+{
+  "issues": [
+    {
+      "code": "parse",
+      "path": "",
+      "detail": "invalid toml"
+    }
+  ]
+}

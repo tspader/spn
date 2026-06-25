@@ -20,6 +20,11 @@
         {
           "os": "linux"
         }
+      ],
+      "target": [
+        {
+          "os": "linux"
+        }
       ]
     }
   ]
