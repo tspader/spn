@@ -10,6 +10,19 @@
     "build_mode": { "enum": ["release", "debug"] },
     "index_protocol": { "enum": ["git", "http", "filesystem"] },
 
+    "launcher": {
+      "type": "string",
+      "metadata": { "type": "spn_toolchain_launcher_t", "present": "program" }
+    },
+    "semver": {
+      "type": "string",
+      "metadata": { "type": "spn_semver_t" }
+    },
+    "path": {
+      "type": "string",
+      "metadata": { "type": "sp_str_t" }
+    },
+
     "manifest": {
       "properties": {
         "package": { "ref": "package" }
@@ -30,7 +43,7 @@
     "package": {
       "properties": {
         "name": { "type": "string" },
-        "version": { "type": "string", "metadata": { "convert": "enum", "enum": "semver" } }
+        "version": { "ref": "semver" }
       },
       "optionalProperties": {
         "namespace": { "type": "string" },
@@ -39,7 +52,7 @@
         "author": { "type": "string" },
         "maintainer": { "type": "string" },
         "commit": { "type": "string" },
-        "include": { "elements": { "type": "string", "metadata": { "convert": "path" } } },
+        "include": { "elements": { "ref": "path" } },
         "define": { "elements": { "type": "string" } },
         "system_deps": { "elements": { "type": "string" } }
       }
@@ -73,9 +86,9 @@
       "optionalProperties": {
         "name": { "type": "string" },
         "url": { "type": "string" },
-        "compiler": { "type": "string", "metadata": { "convert": "launcher" } },
-        "linker": { "type": "string", "metadata": { "convert": "launcher" } },
-        "archiver": { "type": "string", "metadata": { "convert": "launcher" } },
+        "compiler": { "ref": "launcher" },
+        "linker": { "ref": "launcher" },
+        "archiver": { "ref": "launcher" },
         "sysroot": { "type": "string" },
         "driver": { "ref": "cc_driver" },
         "package": { "type": "string" },

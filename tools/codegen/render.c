@@ -17,20 +17,11 @@ type_t* find_type(gen_t* g, sp_str_t name) {
   return sp_str_om_get(g->types, name);
 }
 
-static sp_str_t conversion_c_type(gen_t* g, node_t* node) {
-  switch (node->as.conversion) {
-    case CONVERSION_ENUM:     return sp_fmt(g->mem, "spn_{}_t", sp_fmt_str(node->name)).value;
-    case CONVERSION_LAUNCHER: return sp_str_lit("spn_toolchain_launcher_t");
-    case CONVERSION_PATH:     return sp_str_lit("sp_str_t");
-  }
-  return sp_str_lit("");
-}
-
 sp_str_t node_c_type(gen_t* g, node_t* node) {
   switch (node->kind) {
     case NODE_STR:        return sp_str_lit("sp_str_t");
     case NODE_BOOL:       return sp_str_lit("bool");
-    case NODE_CONVERSION: return conversion_c_type(g, node);
+    case NODE_CONVERSION: return node->as.conv.c_type;
     case NODE_STRUCT:     return type_name(g, node->name);
   }
   return sp_str_lit("");
@@ -72,10 +63,11 @@ static sp_str_t get_is_present(gen_t* g, field_t* field, sp_str_t recv) {
       return sp_fmt(g->mem, "!sp_str_empty({}{})", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
     }
     case NODE_CONVERSION: {
-      if (field->node->as.conversion == CONVERSION_LAUNCHER) {
-        return sp_fmt(g->mem, "!sp_str_empty({}{}.program)", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
-      }
-      if (field->node->as.conversion == CONVERSION_PATH) {
+      converter_t* conv = &field->node->as.conv;
+      if (conv->custom) {
+        if (!sp_str_empty(conv->present)) {
+          return sp_fmt(g->mem, "!sp_str_empty({}{}.{})", sp_fmt_str(recv), sp_fmt_str(field->key), sp_fmt_str(conv->present)).value;
+        }
         return sp_fmt(g->mem, "!sp_str_empty({}{})", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
       }
       return sp_fmt(g->mem, "!sp_opt_is_null({}{})", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
@@ -97,15 +89,15 @@ static sp_str_t get_is_present(gen_t* g, field_t* field, sp_str_t recv) {
   return sp_str_lit("true");
 }
 
-static void field_templates(field_t* field, sp_str_t* read, sp_str_t* write) {
+static void field_templates(gen_t* g, field_t* field, sp_str_t* read, sp_str_t* write) {
   if (field_is_named(field)) {
     *read = sp_str_lit("read/named_field");
     *write = sp_str_lit("write/named");
     return;
   }
   if (field->card == CARD_ARRAY) {
-    if (field->node->kind == NODE_CONVERSION && field->node->as.conversion == CONVERSION_PATH) {
-      *read = sp_str_lit("read/path_array");
+    if (field->node->kind == NODE_CONVERSION && field->node->as.conv.custom) {
+      *read = sp_fmt(g->mem, "read/{}/array", sp_fmt_str(field->node->name)).value;
       *write = sp_str_lit("write/str_array");
       return;
     }
@@ -130,14 +122,9 @@ static void field_templates(field_t* field, sp_str_t* read, sp_str_t* write) {
       *write = field->required ? sp_str_lit("write/bool_required") : sp_str_lit("write/bool_optional");
       return;
     case NODE_CONVERSION:
-      if (field->node->as.conversion == CONVERSION_LAUNCHER) {
-        *read = sp_str_lit("read/launcher");
-        *write = sp_str_lit("write/launcher");
-        return;
-      }
-      if (field->node->as.conversion == CONVERSION_PATH) {
-        *read = sp_str_lit("read/path");
-        *write = sp_str_lit("write/str");
+      if (field->node->as.conv.custom) {
+        *read = sp_fmt(g->mem, "read/{}", sp_fmt_str(field->node->name)).value;
+        *write = sp_fmt(g->mem, "write/{}", sp_fmt_str(field->node->name)).value;
         return;
       }
       *read = field->required ? sp_str_lit("read/conv_required") : sp_str_lit("read/conv_optional");
@@ -151,15 +138,13 @@ static void field_templates(field_t* field, sp_str_t* read, sp_str_t* write) {
 }
 
 static void bind_conversion(gen_t* g, sp_template_scope_t* scope, node_t* node) {
-  switch (node->as.conversion) {
-    case CONVERSION_ENUM:
-      sp_template_set(scope, sp_str_lit("from"), sp_fmt(g->mem, "spn_{}_from_str", sp_fmt_str(node->name)).value);
-      sp_template_set(scope, sp_str_lit("to"), sp_fmt(g->mem, "spn_{}_to_str", sp_fmt_str(node->name)).value);
-      return;
-    case CONVERSION_LAUNCHER:
-      return;
-    case CONVERSION_PATH:
-      return;
+  (void)g;
+  converter_t* conv = &node->as.conv;
+  if (!sp_str_empty(conv->from)) {
+    sp_template_set(scope, sp_str_lit("from"), conv->from);
+  }
+  if (!sp_str_empty(conv->to)) {
+    sp_template_set(scope, sp_str_lit("to"), conv->to);
   }
 }
 
@@ -185,7 +170,7 @@ static void bind_field(gen_t* g, sp_template_scope_t* scope, field_t* field) {
 
   sp_str_t read = sp_zero;
   sp_str_t write = sp_zero;
-  field_templates(field, &read, &write);
+  field_templates(g, field, &read, &write);
   sp_template_set(scope, sp_str_lit("read"), read);
   sp_template_set(scope, sp_str_lit("write"), write);
   bool guarded = !field->required || field_is_named(field);

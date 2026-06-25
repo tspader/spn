@@ -44,36 +44,33 @@ static void register_entry(gen_t* g, sp_str_t name, sp_str_t value_type, sp_str_
   sp_da_push(g->entries, entry);
 }
 
+static converter_t converter_make(gen_t* g, jtd_schema_t* schema, sp_str_t name) {
+  sp_str_t type = jtd_metadata(schema, "type");
+  if (!sp_str_empty(type)) {
+    return (converter_t) {
+      .c_type = type,
+      .present = jtd_metadata(schema, "present"),
+      .custom = true,
+    };
+  }
+
+  return (converter_t) {
+    .c_type = sp_fmt(g->mem, "spn_{}_t", sp_fmt_str(name)).value,
+    .from = sp_fmt(g->mem, "spn_{}_from_str", sp_fmt_str(name)).value,
+    .to = sp_fmt(g->mem, "spn_{}_to_str", sp_fmt_str(name)).value,
+  };
+}
+
 static walk_result_t resolve_conversion(gen_t* g, jtd_schema_t* schema, sp_str_t name, sp_str_t owner, sp_str_t key, node_t** out) {
-  sp_str_t convert = jtd_metadata(schema, "convert");
-  conversion_kind_t kind = CONVERSION_ENUM;
-  bool use_optional = true;
+  (void)owner;
+  (void)key;
 
-  if (sp_str_equal_cstr(convert, "enum")) {
-    sp_str_t named = jtd_metadata(schema, "enum");
-    if (!sp_str_empty(named)) {
-      name = named;
-    }
-  }
-  else if (sp_str_equal_cstr(convert, "launcher")) {
-    kind = CONVERSION_LAUNCHER;
-    name = sp_str_lit("launcher");
-    use_optional = false;
-  }
-  else if (sp_str_equal_cstr(convert, "path")) {
-    kind = CONVERSION_PATH;
-    name = sp_str_lit("path");
-    use_optional = false;
-  }
-  else if (!sp_str_empty(convert)) {
-    return (walk_result_t) { .err = WALK_ERR_CONV_UNKNOWN, .type = owner, .key = key, .name = convert };
-  }
-
+  converter_t conv = converter_make(g, schema, name);
   *out = add_node(g, (node_t) {
     .kind = NODE_CONVERSION,
     .name = name,
-    .use_optional = use_optional,
-    .as.conversion = kind,
+    .use_optional = !conv.custom,
+    .as.conv = conv,
   });
   return OK;
 }
@@ -81,7 +78,7 @@ static walk_result_t resolve_conversion(gen_t* g, jtd_schema_t* schema, sp_str_t
 static walk_result_t resolve_node(gen_t* g, jtd_schema_t* schema, sp_str_t name, sp_str_t owner, sp_str_t key, node_t** out) {
   schema = resolve_ref(schema);
 
-  if (!sp_str_empty(jtd_metadata(schema, "convert")) || schema->form == JTD_FORM_ENUM) {
+  if (schema->form == JTD_FORM_ENUM || !sp_str_empty(jtd_metadata(schema, "type"))) {
     return resolve_conversion(g, schema, name, owner, key, out);
   }
 
@@ -150,7 +147,7 @@ walk_result_t register_type(gen_t* g, sp_str_t name, jtd_schema_t* schema) {
     result = resolve_node(g, value, value_name, name, property.key, &node);
     if (result.err) return result;
 
-    bool path_element = card == CARD_ARRAY && node->kind == NODE_CONVERSION && node->as.conversion == CONVERSION_PATH;
+    bool path_element = card == CARD_ARRAY && node->kind == NODE_CONVERSION && node->as.conv.custom;
     if (card != CARD_SCALAR && node->kind != NODE_STR && node->kind != NODE_STRUCT && !path_element) {
       return (walk_result_t) { .err = WALK_ERR_UNSUPPORTED_FORM, .type = name, .key = property.key, .as.form = value->form };
     }
