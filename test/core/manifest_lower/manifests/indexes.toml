@@ -1,0 +1,8 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[index]]
+name = "main"
+url = "https://x"
+protocol = "http"

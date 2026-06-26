@@ -1,0 +1,6 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[deps.package]
+foo = "file:///abs/foo"

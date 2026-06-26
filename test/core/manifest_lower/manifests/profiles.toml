@@ -1,0 +1,11 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[profile.release]
+toolchain = "zig"
+linkage = "shared"
+standard = "c99"
+mode = "release"
+os = "linux"
+arch = "x86_64"

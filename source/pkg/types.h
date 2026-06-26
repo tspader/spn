@@ -81,6 +81,11 @@ typedef struct {
   spn_pkg_config_t value;
 } spn_pkg_config_entry_t;
 
+typedef sp_str_om(spn_target_info_t)     spn_target_info_om_t;
+typedef sp_str_om(spn_profile_info_t)    spn_profile_info_om_t;
+typedef sp_str_om(spn_index_info_t)      spn_index_info_om_t;
+typedef sp_str_om(spn_toolchain_entry_t) spn_toolchain_entry_om_t;
+
 struct spn_pkg_info {
   sp_str_t namespace;
   sp_str_t name;
@@ -90,12 +95,12 @@ struct spn_pkg_info {
   sp_str_t author;
   sp_str_t maintainer;
   spn_semver_t version;
-  sp_str_om(spn_target_info_t) libs;
-  sp_str_om(spn_target_info_t) exes;
-  sp_str_om(spn_target_info_t) scripts;
-  sp_str_om(spn_target_info_t) tests;
-  sp_str_om(spn_profile_info_t) profiles;
-  sp_str_om(spn_index_info_t) indexes;
+  spn_target_info_om_t libs;
+  spn_target_info_om_t exes;
+  spn_target_info_om_t scripts;
+  spn_target_info_om_t tests;
+  spn_profile_info_om_t profiles;
+  spn_index_info_om_t indexes;
   sp_ht(sp_str_t, spn_requested_pkg_t) deps;
   sp_da(spn_pkg_config_entry_t) config;
   sp_ht(spn_semver_t, spn_pkg_metadata_t) metadata;
@@ -103,7 +108,7 @@ struct spn_pkg_info {
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) system_deps;
-  sp_str_om(spn_toolchain_entry_t) toolchains;
+  spn_toolchain_entry_om_t toolchains;
 
   sp_mem_arena_t* arena;
 };

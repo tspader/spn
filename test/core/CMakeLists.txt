@@ -106,6 +106,29 @@ target_compile_definitions(manifest_gen PRIVATE
 add_dependencies(manifest_gen manifest_gen_header)
 add_test(NAME manifest_gen COMMAND "$<TARGET_FILE:manifest_gen>")
 
+add_executable(manifest_lower
+  manifest_lower/main.c
+  ${SRC}/codegen/codegen.c
+  ${SRC}/codegen/lower.c
+  ${SRC}/enum/enum.c
+  ${SRC}/external/tom.c
+  ${SRC}/intern/intern.c
+  ${SRC}/semver/compare.c
+  ${SRC}/semver/convert.c
+  ${SRC}/semver/parser.c
+  ${SRC}/sp/str.c
+  ${SRC}/sp/io.c
+  ${TEST_TOOLS}/toml.c
+)
+spn_test_binary(manifest_lower)
+target_include_directories(manifest_lower PRIVATE
+  ${CMAKE_BINARY_DIR}/gen/manifest
+  ${CMAKE_CURRENT_SOURCE_DIR}/manifest_lower)
+target_compile_definitions(manifest_lower PRIVATE
+  MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest_lower/manifests")
+add_dependencies(manifest_lower manifest_gen_header)
+add_test(NAME manifest_lower COMMAND "$<TARGET_FILE:manifest_lower>")
+
 add_subdirectory(resolver)
 add_subdirectory(index)
 add_subdirectory(publish)
