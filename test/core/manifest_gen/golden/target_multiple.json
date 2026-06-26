@@ -1,12 +1,8 @@
 {
-  "name": "multi",
-  "version": "1.0.0",
-  "qualified": "core/multi",
-  "versions": [
-    {
-      "version": "1.0.0"
-    }
-  ],
+  "package": {
+    "name": "multi",
+    "version": "1.0.0"
+  },
   "bin": {
     "first": {
       "name": "first",

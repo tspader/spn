@@ -1,9 +1,0 @@
-{
-  "issues": [
-    {
-      "code": "invalid",
-      "path": "lib[0].kinds",
-      "detail": "kinds"
-    }
-  ]
-}

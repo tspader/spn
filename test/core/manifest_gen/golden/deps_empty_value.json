@@ -1,12 +1,8 @@
 {
-  "name": "depsempty",
-  "version": "1.0.0",
-  "qualified": "core/depsempty",
-  "versions": [
-    {
-      "version": "1.0.0"
-    }
-  ],
+  "package": {
+    "name": "depsempty",
+    "version": "1.0.0"
+  },
   "deps": {
     "package": {
       "libfoo": ""

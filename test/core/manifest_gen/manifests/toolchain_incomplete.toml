@@ -1,7 +1,0 @@
-[package]
-name = "tcbad"
-version = "1.0.0"
-
-[[toolchain]]
-name = "broken"
-compiler = "gcc"

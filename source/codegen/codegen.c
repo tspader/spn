@@ -67,32 +67,6 @@ sp_str_t spn_codegen_intern(spn_codegen_ctx_t* ctx, sp_str_t value) {
   return sp_intern_get_or_insert_str(ctx->intern, value);
 }
 
-sp_str_t spn_codegen_path_join(spn_codegen_ctx_t* ctx, sp_str_t raw) {
-  return spn_codegen_intern(ctx, sp_fs_join_path(ctx->mem, ctx->dir, raw));
-}
-
-sp_da(sp_str_t) spn_codegen_read_path_array(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key) {
-  toml_array_t* array = toml_table_array(table, key);
-  if (!array) {
-    return SP_NULLPTR;
-  }
-
-  sp_da(sp_str_t) values = sp_da_new(ctx->mem, sp_str_t);
-  spn_codegen_push_key(ctx, key);
-  sp_for(it, (u32)toml_array_len(array)) {
-    spn_codegen_push_index(ctx, it);
-    toml_value_t element = toml_array_string(array, (s32)it);
-    if (element.ok) {
-      sp_da_push(values, spn_codegen_path_join(ctx, sp_str(element.u.s, (u32)element.u.sl)));
-    } else {
-      spn_codegen_record(ctx, SPN_CODEGEN_ERR_EXPECTED_STR, sp_str_lit(""));
-    }
-    spn_codegen_pop(ctx);
-  }
-  spn_codegen_pop(ctx);
-  return values;
-}
-
 static bool spn_codegen_read_raw_value(toml_table_t* table, const c8* key, sp_str_t* value) {
   toml_value_t found = toml_table_string(table, key);
   if (!found.ok) {
@@ -161,23 +135,6 @@ sp_da(sp_str_t) spn_codegen_read_str_array(spn_codegen_ctx_t* ctx, toml_table_t*
   }
   spn_codegen_pop(ctx);
   return values;
-}
-
-void spn_codegen_launcher_from_str(spn_codegen_ctx_t* ctx, sp_str_t raw, sp_str_t* program, sp_da(sp_str_t)* args) {
-  if (sp_str_empty(raw)) {
-    return;
-  }
-  if (sp_str_contains(raw, sp_str_lit(" "))) {
-    sp_da(sp_str_t) parts = sp_str_split_c8(ctx->mem, raw, ' ');
-    *program = sp_intern_get_or_insert_str(ctx->intern, parts[0]);
-    *args = sp_da_new(ctx->mem, sp_str_t);
-    for (u32 i = 1; i < sp_da_size(parts); i++) {
-      sp_da_push(*args, sp_intern_get_or_insert_str(ctx->intern, parts[i]));
-    }
-  }
-  else {
-    *program = sp_intern_get_or_insert_str(ctx->intern, raw);
-  }
 }
 
 static void spn_codegen_json_writer_newline(spn_codegen_json_writer_t* w) {
@@ -356,112 +313,6 @@ void spn_codegen_json_str_array(sp_io_writer_t* out, sp_da(sp_str_t) values) {
     spn_codegen_json_str(out, values[it]);
   }
   sp_io_write_c8(out, ']');
-}
-
-void spn_codegen_validate_toolchain(spn_codegen_ctx_t* ctx, spn_cg_toolchain_t* toolchain) {
-  if (!sp_str_empty(toolchain->package)) {
-    return;
-  }
-  if (sp_str_empty(toolchain->name)) {
-    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "name");
-  }
-  if (sp_str_empty(toolchain->compiler.program)) {
-    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "compiler");
-  }
-  if (sp_str_empty(toolchain->linker.program)) {
-    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "linker");
-  }
-  if (sp_str_empty(toolchain->archiver.program)) {
-    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "archiver");
-  }
-  if (sp_opt_is_null(toolchain->driver) || toolchain->driver.value == SPN_CC_DRIVER_NONE) {
-    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "driver");
-  }
-  if (sp_da_empty(toolchain->host)) {
-    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "host");
-  }
-  if (sp_da_empty(toolchain->target)) {
-    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "target");
-  }
-}
-
-void spn_codegen_validate_lib(spn_codegen_ctx_t* ctx, const c8* key, spn_cg_target_om_t* libs) {
-  spn_codegen_push_key(ctx, key);
-  sp_om_for(*libs, it) {
-    spn_cg_target_t* target = sp_om_at(*libs, it);
-    bool object = false;
-    bool linkable = false;
-    sp_da_for(target->kinds, k) {
-      sp_str_t kind = target->kinds[k];
-      object |= sp_str_equal(kind, sp_str_lit("object"));
-      linkable |= sp_str_equal(kind, sp_str_lit("source"))
-               || sp_str_equal(kind, sp_str_lit("shared"))
-               || sp_str_equal(kind, sp_str_lit("static"));
-    }
-    if (object && linkable) {
-      spn_codegen_push_index(ctx, it);
-      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_INVALID, "kinds");
-      spn_codegen_pop(ctx);
-    }
-  }
-  spn_codegen_pop(ctx);
-}
-
-void spn_codegen_validate_no_link(spn_codegen_ctx_t* ctx, const c8* key, spn_cg_target_om_t* targets) {
-  spn_codegen_push_key(ctx, key);
-  sp_om_for(*targets, it) {
-    spn_cg_target_t* target = sp_om_at(*targets, it);
-    if (!sp_opt_is_null(target->link)) {
-      spn_codegen_push_index(ctx, it);
-      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_INVALID, "link");
-      spn_codegen_pop(ctx);
-    }
-  }
-  spn_codegen_pop(ctx);
-}
-
-void spn_codegen_validate_manifest(spn_codegen_ctx_t* ctx, spn_cg_manifest_t* manifest) {
-  sp_ht(sp_str_t, u8) seen;
-  sp_str_ht_init(ctx->mem, seen);
-  struct {
-    const c8* key;
-    spn_cg_target_om_t targets;
-  } groups [] = {
-    { "lib", manifest->lib },
-    { "bin", manifest->bin },
-    { "script", manifest->script },
-    { "test", manifest->test },
-  };
-  sp_for(g, SP_CARR_LEN(groups)) {
-    spn_codegen_push_key(ctx, groups[g].key);
-    sp_om_for(groups[g].targets, it) {
-      spn_cg_target_t* target = sp_om_at(groups[g].targets, it);
-      if (sp_ht_getp(seen, target->name)) {
-        spn_codegen_push_index(ctx, it);
-        spn_codegen_issue_at(ctx, SPN_CODEGEN_ERR_DUPLICATE_KEY, target->name);
-        spn_codegen_pop(ctx);
-      } else {
-        sp_ht_insert(seen, target->name, 1);
-      }
-    }
-    spn_codegen_pop(ctx);
-  }
-}
-
-void spn_codegen_compute_qualified(spn_codegen_ctx_t* ctx, spn_cg_manifest_t* out) {
-  sp_str_t namespace = sp_str_empty(out->namespace) ? sp_str_lit("core") : out->namespace;
-  out->qualified = spn_codegen_intern(ctx, sp_str_join(ctx->mem, namespace, out->name, sp_str_lit("/")));
-}
-
-void spn_codegen_compute_versions(spn_codegen_ctx_t* ctx, spn_cg_manifest_t* out) {
-  out->versions = sp_da_new(ctx->mem, spn_cg_version_metadata_t);
-  spn_cg_version_metadata_t entry = { .version = out->version, .commit = out->commit };
-  sp_da_push(out->versions, entry);
-}
-
-void spn_codegen_compute_index_kind(spn_codegen_ctx_t* ctx, spn_cg_index_t* out) {
-  (void)ctx;
-  out->kind = SPN_INDEX_WORKSPACE;
 }
 
 bool spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, spn_cg_manifest_t* out) {

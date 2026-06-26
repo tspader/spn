@@ -25,8 +25,6 @@ typedef struct {
   sp_str_t c_type;
   sp_str_t from;
   sp_str_t to;
-  sp_str_t present;
-  bool custom;
 } converter_t;
 
 typedef struct {
@@ -42,19 +40,15 @@ typedef struct {
 typedef struct {
   sp_str_t key;
   bool required;
-  bool flatten;
   cardinality_t card;
   node_t* node;
   sp_str_t entry;
   sp_str_t key_field;
-  sp_str_t validate;
-  sp_str_t compute;
 } field_t;
 
 struct type_t {
   sp_str_t name;
   sp_da(field_t) fields;
-  sp_str_t validate;
 };
 
 typedef struct {
@@ -69,27 +63,13 @@ typedef struct {
 } om_type_t;
 
 typedef struct {
-  type_t* target;
-  sp_str_t parent;
-} flatten_t;
-
-typedef struct {
   sp_str_t object;
   sp_str_t owner;
 } object_read_t;
 
 typedef struct {
-  sp_str_t fn;
-  field_t* field;
-  sp_str_t owner;
-} validator_t;
-
-typedef struct {
   sp_mem_t mem;
   sp_str_om(type_t) types;
-  sp_str_om(type_t) flatten_types;
-  sp_da(flatten_t) flattens;
-  sp_da(validator_t) validators;
   sp_da(entry_t) entries;
   sp_str_om(type_t*) array_types;
   sp_str_om(om_type_t) om_types;
@@ -103,7 +83,6 @@ typedef struct {
 typedef enum {
   WALK_OK = 0,
   WALK_ERR_SCALAR_TYPE,
-  WALK_ERR_CONV_UNKNOWN,
   WALK_ERR_UNSUPPORTED_FORM,
 } walk_err_t;
 
@@ -111,7 +90,6 @@ typedef struct {
   walk_err_t err;
   sp_str_t type;
   sp_str_t key;
-  sp_str_t name;
   union {
     jtd_type_t scalar_type;
     jtd_form_t form;

@@ -1,8 +1,0 @@
-[package]
-name = "linkbin"
-version = "1.0.0"
-
-[[bin]]
-name = "tool"
-source = ["main.c"]
-link = true

@@ -1,10 +1,6 @@
 {
-  "name": "emptyopt",
-  "version": "1.0.0",
-  "qualified": "core/emptyopt",
-  "versions": [
-    {
-      "version": "1.0.0"
-    }
-  ]
+  "package": {
+    "name": "emptyopt",
+    "version": "1.0.0"
+  }
 }

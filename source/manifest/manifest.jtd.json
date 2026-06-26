@@ -9,43 +9,28 @@
     "c_standard": { "enum": ["c89", "c99", "c11"] },
     "build_mode": { "enum": ["release", "debug"] },
     "index_protocol": { "enum": ["git", "http", "filesystem"] },
-    "index_kind": { "enum": ["workspace", "builtin", "user"] },
-
-    "launcher": {
-      "type": "string",
-      "metadata": { "type": "spn_toolchain_launcher_t", "present": "program" }
-    },
-    "semver": {
-      "type": "string",
-      "metadata": { "type": "spn_semver_t" }
-    },
-    "path": {
-      "type": "string",
-      "metadata": { "type": "sp_str_t" }
-    },
 
     "manifest": {
       "properties": {
-        "package": { "ref": "package", "metadata": { "flatten": true } }
+        "package": { "ref": "package" }
       },
       "optionalProperties": {
-        "lib": { "elements": { "ref": "target" }, "metadata": { "key": "name", "validate": "spn_codegen_validate_lib" } },
-        "bin": { "elements": { "ref": "target" }, "metadata": { "key": "name", "validate": "spn_codegen_validate_no_link" } },
-        "script": { "elements": { "ref": "target" }, "metadata": { "key": "name", "validate": "spn_codegen_validate_no_link" } },
-        "test": { "elements": { "ref": "target" }, "metadata": { "key": "name", "validate": "spn_codegen_validate_no_link" } },
+        "lib": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
+        "bin": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
+        "script": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
+        "test": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
         "toolchain": { "elements": { "ref": "toolchain" } },
         "index": { "elements": { "ref": "index" }, "metadata": { "key": "name" } },
         "profile": { "values": { "ref": "profile" } },
         "deps": { "ref": "deps" },
         "config": { "values": { "ref": "config_entry" } }
-      },
-      "metadata": { "validate": "spn_codegen_validate_manifest" }
+      }
     },
 
     "package": {
       "properties": {
         "name": { "type": "string" },
-        "version": { "ref": "semver" }
+        "version": { "type": "string" }
       },
       "optionalProperties": {
         "namespace": { "type": "string" },
@@ -54,20 +39,9 @@
         "author": { "type": "string" },
         "maintainer": { "type": "string" },
         "commit": { "type": "string" },
-        "include": { "elements": { "ref": "path" } },
+        "include": { "elements": { "type": "string" } },
         "define": { "elements": { "type": "string" } },
-        "system_deps": { "elements": { "type": "string" } },
-        "qualified": { "type": "string", "metadata": { "compute": "spn_codegen_compute_qualified" } },
-        "versions": { "elements": { "ref": "version_metadata" }, "metadata": { "compute": "spn_codegen_compute_versions" } }
-      }
-    },
-
-    "version_metadata": {
-      "properties": {
-        "version": { "ref": "semver" }
-      },
-      "optionalProperties": {
-        "commit": { "type": "string" }
+        "system_deps": { "elements": { "type": "string" } }
       }
     },
 
@@ -99,9 +73,9 @@
       "optionalProperties": {
         "name": { "type": "string" },
         "url": { "type": "string" },
-        "compiler": { "ref": "launcher" },
-        "linker": { "ref": "launcher" },
-        "archiver": { "ref": "launcher" },
+        "compiler": { "type": "string" },
+        "linker": { "type": "string" },
+        "archiver": { "type": "string" },
         "sysroot": { "type": "string" },
         "driver": { "ref": "cc_driver" },
         "package": { "type": "string" },
@@ -109,8 +83,7 @@
         "export": { "type": "boolean" },
         "host": { "elements": { "ref": "triple" } },
         "target": { "elements": { "ref": "triple" } }
-      },
-      "metadata": { "validate": "spn_codegen_validate_toolchain" }
+      }
     },
 
     "profile": {
@@ -129,8 +102,7 @@
       "properties": {
         "name": { "type": "string" },
         "url": { "type": "string" },
-        "protocol": { "ref": "index_protocol" },
-        "kind": { "ref": "index_kind", "metadata": { "compute": "spn_codegen_compute_index_kind" } }
+        "protocol": { "ref": "index_protocol" }
       }
     },
 

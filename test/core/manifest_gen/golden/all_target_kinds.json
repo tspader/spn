@@ -1,12 +1,8 @@
 {
-  "name": "alltargets",
-  "version": "1.0.0",
-  "qualified": "core/alltargets",
-  "versions": [
-    {
-      "version": "1.0.0"
-    }
-  ],
+  "package": {
+    "name": "alltargets",
+    "version": "1.0.0"
+  },
   "lib": {
     "core": {
       "name": "core",

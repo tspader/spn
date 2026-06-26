@@ -62,16 +62,7 @@ static sp_str_t get_is_present(gen_t* g, field_t* field, sp_str_t recv) {
     case NODE_STR: {
       return sp_fmt(g->mem, "!sp_str_empty({}{})", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
     }
-    case NODE_CONVERSION: {
-      converter_t* conv = &field->node->as.conv;
-      if (conv->custom) {
-        if (!sp_str_empty(conv->present)) {
-          return sp_fmt(g->mem, "!sp_str_empty({}{}.{})", sp_fmt_str(recv), sp_fmt_str(field->key), sp_fmt_str(conv->present)).value;
-        }
-        return sp_fmt(g->mem, "!sp_str_empty({}{})", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
-      }
-      return sp_fmt(g->mem, "!sp_opt_is_null({}{})", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
-    }
+    case NODE_CONVERSION:
     case NODE_BOOL: {
       return sp_fmt(g->mem, "!sp_opt_is_null({}{})", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
     }
@@ -89,23 +80,13 @@ static sp_str_t get_is_present(gen_t* g, field_t* field, sp_str_t recv) {
   return sp_str_lit("true");
 }
 
-static void field_templates(gen_t* g, field_t* field, sp_str_t* read, sp_str_t* write) {
-  if (field->flatten) {
-    *read = sp_str_lit("read/flatten_field");
-    *write = sp_str_lit("write/object");
-    return;
-  }
+static void field_templates(field_t* field, sp_str_t* read, sp_str_t* write) {
   if (field_is_named(field)) {
     *read = sp_str_lit("read/named_field");
     *write = sp_str_lit("write/named");
     return;
   }
   if (field->card == CARD_ARRAY) {
-    if (field->node->kind == NODE_CONVERSION && field->node->as.conv.custom) {
-      *read = sp_fmt(g->mem, "read/{}/array", sp_fmt_str(field->node->name)).value;
-      *write = sp_str_lit("write/str_array");
-      return;
-    }
     bool object = field->node->kind == NODE_STRUCT;
     *read = object ? sp_str_lit("read/object_array") : sp_str_lit("read/str_array");
     *write = object ? sp_str_lit("write/object_array") : sp_str_lit("write/str_array");
@@ -127,11 +108,6 @@ static void field_templates(gen_t* g, field_t* field, sp_str_t* read, sp_str_t* 
       *write = field->required ? sp_str_lit("write/bool_required") : sp_str_lit("write/bool_optional");
       return;
     case NODE_CONVERSION:
-      if (field->node->as.conv.custom) {
-        *read = sp_fmt(g->mem, "read/{}", sp_fmt_str(field->node->name)).value;
-        *write = sp_fmt(g->mem, "write/{}", sp_fmt_str(field->node->name)).value;
-        return;
-      }
       *read = field->required ? sp_str_lit("read/conv_required") : sp_str_lit("read/conv_optional");
       *write = field->required ? sp_str_lit("write/conv_required") : sp_str_lit("write/conv_optional");
       return;
@@ -142,15 +118,10 @@ static void field_templates(gen_t* g, field_t* field, sp_str_t* read, sp_str_t* 
   }
 }
 
-static void bind_conversion(gen_t* g, sp_template_scope_t* scope, node_t* node) {
-  (void)g;
+static void bind_conversion(sp_template_scope_t* scope, node_t* node) {
   converter_t* conv = &node->as.conv;
-  if (!sp_str_empty(conv->from)) {
-    sp_template_set(scope, sp_str_lit("from"), conv->from);
-  }
-  if (!sp_str_empty(conv->to)) {
-    sp_template_set(scope, sp_str_lit("to"), conv->to);
-  }
+  sp_template_set(scope, sp_str_lit("from"), conv->from);
+  sp_template_set(scope, sp_str_lit("to"), conv->to);
 }
 
 static void bind_field(gen_t* g, sp_template_scope_t* scope, field_t* field) {
@@ -158,7 +129,7 @@ static void bind_field(gen_t* g, sp_template_scope_t* scope, field_t* field) {
   sp_template_set(scope, sp_str_lit("key"), field->key);
 
   if (node->kind == NODE_CONVERSION) {
-    bind_conversion(g, scope, node);
+    bind_conversion(scope, node);
   }
   if (node->kind == NODE_STRUCT) {
     sp_template_set(scope, sp_str_lit("object"), node->name);
@@ -175,7 +146,7 @@ static void bind_field(gen_t* g, sp_template_scope_t* scope, field_t* field) {
 
   sp_str_t read = sp_zero;
   sp_str_t write = sp_zero;
-  field_templates(g, field, &read, &write);
+  field_templates(field, &read, &write);
   sp_template_set(scope, sp_str_lit("read"), read);
   sp_template_set(scope, sp_str_lit("write"), write);
   bool guarded = !field->required || field_is_named(field);
@@ -216,15 +187,7 @@ static render_result_t render_object_struct(gen_t* g, sp_io_writer_t* out, type_
   sp_template_scope_t* scope = sp_template_scope_create(g->mem);
   sp_template_set(scope, sp_str_lit("name"), object->name);
   sp_da_for(object->fields, it) {
-    field_t* field = &object->fields[it];
-    if (field->flatten) {
-      type_t* inner = field->node->as.type;
-      sp_da_for(inner->fields, f) {
-        push_struct_field(g, scope, &inner->fields[f]);
-      }
-    } else {
-      push_struct_field(g, scope, field);
-    }
+    push_struct_field(g, scope, &object->fields[it]);
   }
   return render(out, reg, "struct", scope);
 }
@@ -243,33 +206,11 @@ static render_result_t render_entry_struct(gen_t* g, sp_io_writer_t* out, entry_
   return render(out, reg, "struct", scope);
 }
 
-static render_result_t render_object_read(gen_t* g, sp_io_writer_t* out, type_t* object, sp_str_t out_type, sp_template_registry_t* reg) {
-  sp_io_dyn_mem_writer_t post;
-  sp_io_dyn_mem_writer_init(g->mem, &post);
-  sp_da_for(object->fields, it) {
-    field_t* field = &object->fields[it];
-    if (!sp_str_empty(field->compute)) {
-      sp_fmt_io(&post.base, "  {}(ctx, out);\n", sp_fmt_str(field->compute));
-    }
-  }
-  sp_da_for(object->fields, it) {
-    field_t* field = &object->fields[it];
-    if (!sp_str_empty(field->validate)) {
-      sp_fmt_io(&post.base, "  {}(ctx, \"{}\", &out->{});\n",
-        sp_fmt_str(field->validate), sp_fmt_str(field->key), sp_fmt_str(field->key));
-    }
-  }
-  if (!sp_str_empty(object->validate)) {
-    sp_fmt_io(&post.base, "  {}(ctx, out);\n", sp_fmt_str(object->validate));
-  }
-  sp_str_t post_read = sp_io_dyn_mem_writer_as_str(&post);
-
+static render_result_t render_object_read(gen_t* g, sp_io_writer_t* out, type_t* object, sp_template_registry_t* reg) {
   sp_template_scope_t* read_scope = sp_template_scope_create(g->mem);
   sp_template_set(read_scope, sp_str_lit("name"), object->name);
-  sp_template_set(read_scope, sp_str_lit("type"), out_type);
-  sp_template_set(read_scope, sp_str_lit("post_read"), post_read);
+  sp_template_set(read_scope, sp_str_lit("type"), type_name(g, object->name));
   sp_da_for(object->fields, it) {
-    if (!sp_str_empty(object->fields[it].compute)) continue;
     sp_template_scope_t* child = sp_template_push(read_scope, sp_str_lit("fields"));
     bind_field(g, child, &object->fields[it]);
   }
@@ -281,17 +222,8 @@ static render_result_t render_object_write(gen_t* g, sp_io_writer_t* out, type_t
   sp_template_set(write_scope, sp_str_lit("name"), object->name);
   sp_template_set(write_scope, sp_str_lit("type"), type_name(g, object->name));
   sp_da_for(object->fields, it) {
-    field_t* field = &object->fields[it];
-    if (field->flatten) {
-      type_t* inner = field->node->as.type;
-      sp_da_for(inner->fields, f) {
-        sp_template_scope_t* child = sp_template_push(write_scope, sp_str_lit("fields"));
-        bind_field(g, child, &inner->fields[f]);
-      }
-    } else {
-      sp_template_scope_t* child = sp_template_push(write_scope, sp_str_lit("fields"));
-      bind_field(g, child, field);
-    }
+    sp_template_scope_t* child = sp_template_push(write_scope, sp_str_lit("fields"));
+    bind_field(g, child, &object->fields[it]);
   }
   return render(out, reg, "write", write_scope);
 }
@@ -334,28 +266,8 @@ render_result_t render_file(gen_t* g, sp_io_writer_t* out, sp_template_registry_
     sp_template_set(child, sp_str_lit("name"), type->name);
     sp_template_set(child, sp_str_lit("type"), type_name(g, type->name));
   }
-  sp_da_for(g->flattens, i) {
-    sp_template_scope_t* child = sp_template_push(objects, sp_str_lit("reads"));
-    sp_template_set(child, sp_str_lit("name"), g->flattens[i].target->name);
-    sp_template_set(child, sp_str_lit("type"), type_name(g, g->flattens[i].parent));
-  }
   render_try(render(out, reg, "forward", objects));
   sp_fmt_io(out, "\n");
-
-  if (sp_da_size(g->validators) > 0) {
-    sp_template_scope_t* validators = sp_template_scope_create(g->mem);
-    sp_da_for(g->validators, it) {
-      validator_t* validator = &g->validators[it];
-      sp_str_t params = validator->field
-        ? sp_fmt(g->mem, "const c8* key, {}* value", sp_fmt_str(get_struct_type(g, validator->field))).value
-        : sp_fmt(g->mem, "{}* value", sp_fmt_str(type_name(g, validator->owner))).value;
-      sp_template_scope_t* child = sp_template_push(validators, sp_str_lit("validators"));
-      sp_template_set(child, sp_str_lit("fn"), validator->fn);
-      sp_template_set(child, sp_str_lit("params"), params);
-    }
-    render_try(render(out, reg, "validators", validators));
-    sp_fmt_io(out, "\n");
-  }
 
   sp_om_for(g->array_types, it) {
     type_t* type = *sp_str_om_at(g->array_types, it);
@@ -394,11 +306,8 @@ render_result_t render_file(gen_t* g, sp_io_writer_t* out, sp_template_registry_
 
   sp_om_for(g->types, it) {
     type_t* type = sp_str_om_at(g->types, it);
-    render_try(render_object_read(g, out, type, type_name(g, type->name), reg));
+    render_try(render_object_read(g, out, type, reg));
     render_try(render_object_write(g, out, type, reg));
-  }
-  sp_da_for(g->flattens, i) {
-    render_try(render_object_read(g, out, g->flattens[i].target, type_name(g, g->flattens[i].parent), reg));
   }
 
   sp_template_scope_t* root = sp_template_scope_create(g->mem);

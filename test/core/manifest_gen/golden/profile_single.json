@@ -1,12 +1,8 @@
 {
-  "name": "prof",
-  "version": "1.0.0",
-  "qualified": "core/prof",
-  "versions": [
-    {
-      "version": "1.0.0"
-    }
-  ],
+  "package": {
+    "name": "prof",
+    "version": "1.0.0"
+  },
   "profile": {
     "debug": {
       "linkage": "static",

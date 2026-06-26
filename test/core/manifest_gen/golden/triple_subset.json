@@ -1,24 +1,14 @@
 {
-  "name": "tcsubset",
-  "version": "1.0.0",
-  "qualified": "core/tcsubset",
-  "versions": [
-    {
-      "version": "1.0.0"
-    }
-  ],
+  "package": {
+    "name": "tcsubset",
+    "version": "1.0.0"
+  },
   "toolchain": [
     {
       "name": "partial",
-      "compiler": {
-        "program": "cc"
-      },
-      "linker": {
-        "program": "ld"
-      },
-      "archiver": {
-        "program": "ar"
-      },
+      "compiler": "cc",
+      "linker": "ld",
+      "archiver": "ar",
       "driver": "gcc",
       "host": [
         {

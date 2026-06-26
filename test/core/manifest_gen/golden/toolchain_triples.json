@@ -1,24 +1,14 @@
 {
-  "name": "tctriples",
-  "version": "1.0.0",
-  "qualified": "core/tctriples",
-  "versions": [
-    {
-      "version": "1.0.0"
-    }
-  ],
+  "package": {
+    "name": "tctriples",
+    "version": "1.0.0"
+  },
   "toolchain": [
     {
       "name": "cross",
-      "compiler": {
-        "program": "cc"
-      },
-      "linker": {
-        "program": "ld"
-      },
-      "archiver": {
-        "program": "ar"
-      },
+      "compiler": "cc",
+      "linker": "ld",
+      "archiver": "ar",
       "driver": "gcc",
       "host": [
         {

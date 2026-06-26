@@ -1,32 +1,14 @@
 {
-  "name": "tcargs",
-  "version": "1.0.0",
-  "qualified": "core/tcargs",
-  "versions": [
-    {
-      "version": "1.0.0"
-    }
-  ],
+  "package": {
+    "name": "tcargs",
+    "version": "1.0.0"
+  },
   "toolchain": [
     {
       "name": "zig",
-      "compiler": {
-        "program": "zig",
-        "args": [
-          "cc",
-          "-target",
-          "x86_64-linux-gnu"
-        ]
-      },
-      "linker": {
-        "program": "zig",
-        "args": [
-          "cc"
-        ]
-      },
-      "archiver": {
-        "program": "ar"
-      },
+      "compiler": "zig cc -target x86_64-linux-gnu",
+      "linker": "zig cc",
+      "archiver": "ar",
       "driver": "clang",
       "host": [
         {
