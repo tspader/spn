@@ -518,6 +518,16 @@ UTEST(lower, validate_toolchain_incomplete) {
   });
 }
 
+UTEST(lower, validate_toolchain_no_host) {
+  run_case(utest_result, (test_t) {
+    .manifest = "toolchain_no_host",
+    .issues = {
+      { SPN_CODEGEN_ERR_MISSING_KEY, "toolchain[0].host" },
+      { SPN_CODEGEN_ERR_MISSING_KEY, "toolchain[0].target" }
+    }
+  });
+}
+
 UTEST(lower, validate_duplicate_name) {
   run_case(utest_result, (test_t) {
     .manifest = "validate_duplicate_name",

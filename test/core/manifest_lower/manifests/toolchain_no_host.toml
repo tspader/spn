@@ -1,0 +1,10 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "zig"
+compiler = "zig cc"
+linker = "zig cc"
+archiver = "ar"
+driver = "clang"
