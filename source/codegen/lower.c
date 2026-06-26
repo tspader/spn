@@ -121,7 +121,10 @@ static void lower_package(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, s
   out->maintainer = p->maintainer;
   out->qualified = lower_qualify(ctx, p->namespace, p->name);
   out->version = spn_semver_from_str(p->version);
-  out->include = p->include;
+  out->include = sp_da_new(ctx->mem, sp_str_t);
+  sp_da_for(p->include, it) {
+    sp_da_push(out->include, sp_fs_join_path(ctx->mem, ctx->dir, p->include[it]));
+  }
   out->define = p->define;
   out->system_deps = p->system_deps;
 }
@@ -294,6 +297,29 @@ static void validate_unique_targets(spn_codegen_ctx_t* ctx, spn_pkg_info_t* out)
   }
 }
 
+static void validate_inline_toolchains(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg) {
+  spn_codegen_push_key(ctx, "toolchain");
+  sp_da_for(cg->toolchain, it) {
+    const spn_cg_toolchain_t* t = &cg->toolchain[it];
+    if (!sp_str_empty(t->package)) {
+      continue;
+    }
+
+    spn_codegen_push_index(ctx, it);
+    if (sp_str_empty(t->name))     { spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "name"); }
+    if (sp_str_empty(t->compiler)) { spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "compiler"); }
+    if (sp_str_empty(t->linker))   { spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "linker"); }
+    if (sp_str_empty(t->archiver)) { spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "archiver"); }
+    if (sp_opt_is_null(t->driver) || sp_opt_get(t->driver) == SPN_CC_DRIVER_NONE) {
+      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "driver");
+    }
+    if (!sp_da_size(t->host))   { spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "host"); }
+    if (!sp_da_size(t->target)) { spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "target"); }
+    spn_codegen_pop(ctx);
+  }
+  spn_codegen_pop(ctx);
+}
+
 void spn_pkg_lower(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   lower_package(ctx, cg, out);
   lower_versions(ctx, cg, out);
@@ -307,4 +333,5 @@ void spn_pkg_lower(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_
   validate_lib_linkages(ctx, out);
   validate_links(ctx, cg);
   validate_unique_targets(ctx, out);
+  validate_inline_toolchains(ctx, cg);
 }
