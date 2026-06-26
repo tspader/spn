@@ -903,13 +903,16 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
       toml_table_t* config = SP_NULLPTR;
       spn_try_union(toml_get_table_required(toml.config, key, config_path, &config));
 
+      spn_pkg_config_entry_t entry = SP_ZERO_INITIALIZE();
+      entry.key = spn_intern_cstr(key);
+
       sp_str_t kind = sp_str_lit("");
       spn_try_as_union(get_str_optional(config, "kind", &kind));
-      if (sp_str_empty(kind)) {
-        continue;
+      if (!sp_str_empty(kind)) {
+        sp_opt_set(entry.value.kind, spn_linkage_from_str(kind));
       }
 
-      sp_ht_insert(pkg->config, sp_str_from_cstr(spn_mem_todo, key), spn_lib_kind_from_str(kind));
+      sp_da_push(pkg->config, entry);
     }
   }
 

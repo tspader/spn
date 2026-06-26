@@ -36,7 +36,8 @@
         "toolchain": { "elements": { "ref": "toolchain" } },
         "index": { "elements": { "ref": "index" }, "metadata": { "key": "name" } },
         "profile": { "values": { "ref": "profile" } },
-        "deps": { "ref": "deps" }
+        "deps": { "ref": "deps" },
+        "config": { "values": { "ref": "config_entry" } }
       },
       "metadata": { "validate": "spn_codegen_validate_manifest" }
     },
@@ -138,6 +139,12 @@
         "package": { "values": { "type": "string" } },
         "test": { "values": { "type": "string" } },
         "build": { "values": { "type": "string" } }
+      }
+    },
+
+    "config_entry": {
+      "optionalProperties": {
+        "kind": { "ref": "linkage" }
       }
     }
   }
