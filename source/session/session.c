@@ -17,12 +17,9 @@
 sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pkg_name) {
   sp_opt_spn_linkage_t requested = SP_ZERO_INITIALIZE();
 
-  spn_dep_options_t* options = sp_ht_getp(session->pkg->config, pkg_name);
-  if (options) {
-    spn_dep_option_t* kind = sp_ht_getp(*options, sp_str_lit("kind"));
-    if (kind && kind->kind == SPN_DEP_OPTION_KIND_STR) {
-      sp_opt_set(requested, spn_lib_kind_from_str(kind->str));
-    }
+  spn_linkage_t* kind = sp_ht_getp(session->pkg->config, pkg_name);
+  if (kind) {
+    sp_opt_set(requested, *kind);
   }
 
   return requested;

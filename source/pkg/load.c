@@ -26,7 +26,6 @@ typedef struct {
   toml_table_t* profile;
   toml_array_t* toolchain;
   toml_array_t* index;
-  toml_table_t* options;
   toml_table_t* config;
 
   spn_pkg_info_t* pkg;
@@ -35,67 +34,6 @@ typedef struct {
     sp_str_t manifest;
   } paths;
 } toml_loader_t;
-
-spn_dep_option_t parse_option(toml_table_t* toml, const c8* key) {
-  toml_unparsed_t unparsed = toml_table_unparsed(toml, key);
-  SP_ASSERT(unparsed);
-
-  bool b;
-  s64 s;
-  c8* cstr;
-  s32 len;
-
-  if (!toml_value_string(unparsed, &cstr, &len)) {
-    return (spn_dep_option_t) {
-      .kind = SPN_DEP_OPTION_KIND_STR,
-      .name = sp_str_from_cstr(spn_mem_todo, key),
-      .str = sp_str_from_cstr(spn_mem_todo, cstr)
-    };
-  }
-
-  if (!toml_value_int(unparsed, &s)) {
-    return (spn_dep_option_t) {
-      .kind = SPN_DEP_OPTION_KIND_S64,
-      .name = sp_str_from_cstr(spn_mem_todo, key),
-      .s = s
-    };
-  }
-
-  if (!toml_value_bool(unparsed, &b)) {
-    return (spn_dep_option_t) {
-      .kind = SPN_DEP_OPTION_KIND_BOOL,
-      .name = sp_str_from_cstr(spn_mem_todo, key),
-      .b = b
-    };
-  }
-
-  SP_UNREACHABLE_RETURN(SP_ZERO_STRUCT(spn_dep_option_t));
-}
-
-void spn_toml_append_option(spn_toml_writer_t* writer, sp_str_t key, spn_dep_option_t option) {
-  switch (option.kind) {
-    case SPN_DEP_OPTION_KIND_BOOL: {
-      spn_toml_append_bool(writer, key, option.b);
-      break;
-    }
-    case SPN_DEP_OPTION_KIND_S64: {
-      spn_toml_append_s64(writer, key, option.s);
-      break;
-    }
-    case SPN_DEP_OPTION_KIND_STR: {
-      spn_toml_append_str(writer, key, option.str);
-      break;
-    }
-    default: {
-      SP_UNREACHABLE_CASE();
-    }
-  }
-}
-
-void spn_toml_append_option_cstr(spn_toml_writer_t* writer, const c8* key, spn_dep_option_t option) {
-  spn_toml_append_option(writer, sp_str_view(key), option);
-}
-
 
 typedef struct {
   sp_str_t parent;
@@ -713,7 +651,6 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
   spn_try_union(toml_get_array_optional(toml.manifest, "toolchain", root_path, &toml.toolchain));
   spn_try_union(toml_get_array_optional(toml.manifest, "index", root_path, &toml.index));
   spn_try_union(toml_get_table_optional(toml.manifest, "deps", root_path, &toml.deps));
-  spn_try_union(toml_get_table_optional(toml.manifest, "options", root_path, &toml.options));
   spn_try_union(toml_get_table_optional(toml.manifest, "config", root_path, &toml.config));
 
   spn_err_t result = SPN_OK;
@@ -959,38 +896,20 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
     spn_try_union(load_deps(&toml, deps.build, SPN_DEP_KIND_BUILD));
   }
 
-  if (toml.options) {
-    const c8* key = SP_NULLPTR;
-    spn_toml_for(toml.options, n, key) {
-      spn_dep_option_t option = parse_option(toml.options, key);
-      sp_ht_insert(pkg->options, option.name, option);
-    }
-  }
-
   if (toml.config) {
-    sp_da(toml_table_t*) configs = SP_ZERO_INITIALIZE();
     toml_path_t config_path = spn_pkg_toml_path(sp_str_lit("config"));
     const c8* key = SP_NULLPTR;
     spn_toml_for(toml.config, n, key) {
       toml_table_t* config = SP_NULLPTR;
       spn_try_union(toml_get_table_required(toml.config, key, config_path, &config));
-      sp_da_push(configs, config);
-    }
 
-    sp_da_for(configs, it) {
-      toml_table_t* config = configs[it];
-      sp_str_t name = sp_str_from_cstr(spn_mem_todo, config->key);
-
-      spn_dep_options_t options = SP_NULLPTR;
-      sp_ht_set_fns(options, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-
-      const c8* option_key = SP_NULLPTR;
-      spn_toml_for(config, n, option_key) {
-        spn_dep_option_t option = parse_option(config, option_key);
-        sp_ht_insert(options, option.name, option);
+      sp_str_t kind = sp_str_lit("");
+      spn_try_as_union(get_str_optional(config, "kind", &kind));
+      if (sp_str_empty(kind)) {
+        continue;
       }
 
-      sp_ht_insert(pkg->config, name, options);
+      sp_ht_insert(pkg->config, sp_str_from_cstr(spn_mem_todo, key), spn_lib_kind_from_str(kind));
     }
   }
 
