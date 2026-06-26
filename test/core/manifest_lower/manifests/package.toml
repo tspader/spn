@@ -8,5 +8,5 @@ author = "a"
 maintainer = "m"
 commit = "abc"
 include = ["inc"]
-define = ["D=1"]
+define = ["SPUM"]
 system_deps = ["z"]

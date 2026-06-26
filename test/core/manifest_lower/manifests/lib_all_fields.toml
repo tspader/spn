@@ -1,0 +1,13 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[lib]]
+name = "t"
+kinds = ["static"]
+source = ["main.c"]
+headers = ["header.h"]
+include = ["include/dir"]
+define = ["SPUM"]
+flags = ["-flag"]
+deps = ["spum"]

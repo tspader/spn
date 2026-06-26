@@ -1,0 +1,9 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "zig"
+linker = "ld"
+archiver = "ar"
+driver = "clang"

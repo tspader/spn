@@ -24,6 +24,12 @@ typedef struct {
   const c8* name;
   spn_linkage_set_t linkages;
   bool no_link;
+  const c8* source [4];
+  const c8* headers [4];
+  const c8* include [4];
+  const c8* define [4];
+  const c8* flags [4];
+  const c8* deps [4];
 } target_t;
 
 typedef struct {
@@ -37,6 +43,8 @@ typedef struct {
 typedef struct {
   const c8* name;
   spn_toolchain_kind_t kind;
+  const c8* url;
+  const c8* sysroot;
   const c8* compiler;
   const c8* args [8];
   const c8* linker;
@@ -56,6 +64,7 @@ typedef struct {
   spn_build_mode_t mode;
   spn_os_t os;
   spn_arch_t arch;
+  spn_abi_t abi;
 } profile_t;
 
 typedef struct {
@@ -87,6 +96,7 @@ typedef struct {
   spn_semver_t version;
   const c8* commit;
   const c8* include [8];
+  const c8* include_resolved;
   const c8* define [8];
   const c8* system_deps [8];
   issue_t issues [4];
@@ -104,6 +114,17 @@ typedef struct {
 //////////////
 // EXECUTOR //
 //////////////
+static void check_strings(s32* utest_result, sp_da(sp_str_t) actual, const c8* const* expected, u32 cap) {
+  u32 n = 0;
+  for (u32 i = 0; i < cap; i++) {
+    if (!expected[i]) break;
+    n++;
+  }
+  if (!n) return;
+  ASSERT_EQ(n, (u32)sp_da_size(actual));
+  sp_for(i, n) EXPECT_STR(actual[i], expected[i]);
+}
+
 static void check_targets(s32* utest_result, spn_target_info_om_t om, const target_t* arr, u32 n, spn_target_kind_t kind) {
   for (u32 i = 0; i < n; i++) {
     if (!arr[i].name) break;
@@ -115,18 +136,13 @@ static void check_targets(s32* utest_result, spn_target_info_om_t om, const targ
     EXPECT_EQ(arr[i].linkages.static_lib, t->linkages.static_lib);
     EXPECT_EQ(arr[i].linkages.object, t->linkages.object);
     EXPECT_EQ(arr[i].no_link, t->no_link);
+    check_strings(utest_result, t->source,  arr[i].source,  SP_CARR_LEN(arr[i].source));
+    check_strings(utest_result, t->headers, arr[i].headers, SP_CARR_LEN(arr[i].headers));
+    check_strings(utest_result, t->include, arr[i].include, SP_CARR_LEN(arr[i].include));
+    check_strings(utest_result, t->define,  arr[i].define,  SP_CARR_LEN(arr[i].define));
+    check_strings(utest_result, t->flags,   arr[i].flags,   SP_CARR_LEN(arr[i].flags));
+    check_strings(utest_result, t->deps,    arr[i].deps,    SP_CARR_LEN(arr[i].deps));
   }
-}
-
-static void check_strings(s32* utest_result, sp_da(sp_str_t) actual, const c8* const* expected, u32 cap) {
-  u32 n = 0;
-  for (u32 i = 0; i < cap; i++) {
-    if (!expected[i]) break;
-    n++;
-  }
-  if (!n) return;
-  ASSERT_EQ(n, (u32)sp_da_size(actual));
-  sp_for(i, n) EXPECT_STR(actual[i], expected[i]);
 }
 
 static void run_case(s32* utest_result, test_t test) {
@@ -186,6 +202,11 @@ static void run_case(s32* utest_result, test_t test) {
   check_strings(utest_result, pkg.define,      test.define,      SP_CARR_LEN(test.define));
   check_strings(utest_result, pkg.system_deps, test.system_deps, SP_CARR_LEN(test.system_deps));
 
+  if (test.include_resolved) {
+    ASSERT_EQ((u32)1, (u32)sp_da_size(pkg.include));
+    EXPECT_TRUE(sp_str_ends_with(pkg.include[0], sp_str_view(test.include_resolved)));
+  }
+
   // Targets
   check_targets(utest_result, pkg.libs,    test.libs,    SP_CARR_LEN(test.libs),    SPN_TARGET_LIB);
   check_targets(utest_result, pkg.exes,    test.exes,    SP_CARR_LEN(test.exes),    SPN_TARGET_EXE);
@@ -221,6 +242,8 @@ static void run_case(s32* utest_result, test_t test) {
       continue;
     }
 
+    if (expected.url)      EXPECT_STR(tc->info.url, expected.url);
+    if (expected.sysroot)  EXPECT_STR(tc->info.sysroot, expected.sysroot);
     if (expected.compiler) EXPECT_STR(tc->info.compiler.program, expected.compiler);
     if (expected.linker)   EXPECT_STR(tc->info.linker.program, expected.linker);
     if (expected.archiver) EXPECT_STR(tc->info.archiver.program, expected.archiver);
@@ -268,6 +291,7 @@ static void run_case(s32* utest_result, test_t test) {
     if (expected.mode) EXPECT_EQ((u32)expected.mode, (u32)p->mode);
     EXPECT_EQ((u32)expected.os, (u32)p->os);
     EXPECT_EQ((u32)expected.arch, (u32)p->arch);
+    if (expected.abi) EXPECT_EQ((u32)expected.abi, (u32)p->abi);
   }
 
   // Indexes
@@ -346,6 +370,24 @@ UTEST(lower, lib_link_true) {
     .manifest = "link_true_lib",
     .libs = {
       { .name = "t", .linkages = { .static_lib = true }, .no_link = false }
+    }
+  });
+}
+
+UTEST(lower, lib_all_fields) {
+  run_case(utest_result, (test_t) {
+    .manifest = "lib_all_fields",
+    .libs = {
+      {
+        .name = "t",
+        .linkages = { .static_lib = true },
+        .source = { "main.c" },
+        .headers = { "header.h" },
+        .include = { "include/dir" },
+        .define = { "SPUM" },
+        .flags = { "-flag" },
+        .deps = { "spum" },
+      }
     }
   });
 }
@@ -467,6 +509,15 @@ UTEST(lower, validate_link_on_test) {
   });
 }
 
+UTEST(lower, validate_toolchain_incomplete) {
+  run_case(utest_result, (test_t) {
+    .manifest = "toolchain_incomplete",
+    .issues = {
+      { SPN_CODEGEN_ERR_MISSING_KEY, "toolchain[0].compiler" }
+    }
+  });
+}
+
 UTEST(lower, validate_duplicate_name) {
   run_case(utest_result, (test_t) {
     .manifest = "validate_duplicate_name",
@@ -488,9 +539,15 @@ UTEST(lower, package) {
     .maintainer = "m",
     .version = spn_semver_lit(1, 2, 3),
     .commit = "abc",
-    .include = { "inc" },
-    .define = { "D=1" },
+    .define = { "SPUM" },
     .system_deps = { "z" },
+  });
+}
+
+UTEST(lower, package_include_resolved) {
+  run_case(utest_result, (test_t) {
+    .manifest = "package",
+    .include_resolved = "/inc",
   });
 }
 
@@ -508,6 +565,8 @@ UTEST(lower, toolchain_inline) {
       {
         .name = "zig",
         .kind = SPN_TOOLCHAIN_INLINE,
+        .url = "https://tc",
+        .sysroot = "/sys",
         .compiler = "zig",
         .args = { "cc", "-target", "x86_64-linux-gnu" },
         .linker = "zig",
@@ -546,6 +605,7 @@ UTEST(lower, profile) {
         .mode = SPN_BUILD_MODE_RELEASE,
         .os = SPN_OS_LINUX,
         .arch = SPN_ARCH_X64,
+        .abi = SPN_ABI_GNU,
       },
     },
   });
