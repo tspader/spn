@@ -602,15 +602,18 @@ spn_err_union_t spn_index_load(toml_table_t* toml, sp_str_t parent, u32 index, s
   toml_path_t path = spn_pkg_toml_path_with_index(parent, index);
   sp_str_t name = SP_ZERO_INITIALIZE();
   sp_str_t url = SP_ZERO_INITIALIZE();
+  sp_str_t rev = SP_ZERO_INITIALIZE();
   sp_str_t protocol_str = SP_ZERO_INITIALIZE();
 
   spn_try_union(toml_get_str_required(toml, "name", path, &name));
   spn_try_union(toml_get_str_required(toml, "url", path, &url));
   spn_try_union(toml_get_str_required(toml, "protocol", path, &protocol_str));
+  spn_try_union(toml_get_str_optional(toml, "rev", path, &rev));
 
   *result = (spn_index_info_t) {
     .name = name,
     .url = url,
+    .rev = rev,
     .protocol = spn_index_protocol_from_str(protocol_str),
   };
 

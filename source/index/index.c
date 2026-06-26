@@ -39,7 +39,14 @@ sp_str_t spn_index_get_package_path(spn_index_info_t* index, spn_pkg_id_t id) {
 spn_err_t spn_index_sync(spn_index_info_t* index) {
   switch (index->protocol) {
     case SPN_INDEX_PROTOCOL_GIT: {
+      bool pinned = !sp_str_empty(index->rev);
+
       if (sp_fs_exists(index->location)) {
+        if (pinned) {
+          spn_try(spn_git_checkout(index->location, index->rev));
+          return SPN_OK;
+        }
+
         sp_str_t head = sp_fs_join_path(spn_mem_todo, index->location, sp_str_lit(".git/FETCH_HEAD"));
         sp_tm_epoch_t mod_time = sp_fs_get_mod_time(head);
         sp_tm_epoch_t now = sp_tm_now_epoch();
@@ -50,6 +57,9 @@ spn_err_t spn_index_sync(spn_index_info_t* index) {
       }
 
       spn_try(spn_git_clone(index->url, index->location));
+      if (pinned) {
+        spn_try(spn_git_checkout(index->location, index->rev));
+      }
       return SPN_OK;
     }
     case SPN_INDEX_PROTOCOL_HTTP: {

@@ -73,6 +73,7 @@ typedef struct {
 struct spn_index_info {
   sp_str_t name;
   sp_str_t url;
+  sp_str_t rev;
   sp_str_t location;
   sp_str_t publish_url;
   spn_index_kind_t kind;

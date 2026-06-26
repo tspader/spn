@@ -90,9 +90,9 @@ spn_err_t spn_git_cache_ensure_checkout(spn_git_cache_t* cache, spn_git_checkout
 
   sp_str_t key = spn_git_checkout_key(id.url, id.rev, id.dir);
 
-  spn_git_checkout_t* existing = sp_str_ht_get(cache->checkouts.entries, key);
+  spn_git_checkout_t** existing = sp_str_om_getp(cache->checkouts.entries, key);
   if (existing) {
-    *out = existing;
+    *out = *existing;
     return SPN_OK;
   }
 
@@ -126,11 +126,11 @@ spn_err_t spn_git_cache_ensure_checkout(spn_git_cache_t* cache, spn_git_checkout
     checkout_root = sp_fs_join_path(spn_mem_todo, path, id.dir);
   }
 
-  sp_str_ht_insert(cache->checkouts.entries, key, ((spn_git_checkout_t) {
+  sp_str_om_insert(cache->checkouts.entries, key, ((spn_git_checkout_t) {
     .id = id,
     .path = checkout_root,
   }));
 
-  *out = sp_str_ht_get(cache->checkouts.entries, key);
+  *out = sp_str_om_get(cache->checkouts.entries, key);
   return SPN_OK;
 }
