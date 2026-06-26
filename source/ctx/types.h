@@ -60,6 +60,16 @@ typedef struct {
   sp_env_t* env;
 
   struct {
+    struct {
+      u64 level;
+    } log;
+    struct {
+      const c8* config;
+      const c8* storage;
+    } dir;
+  } config;
+
+  struct {
     sp_io_writer_t* out;
     sp_io_writer_t* err;
     sp_io_writer_t* jsonl;

@@ -1,0 +1,12 @@
+[package]
+name = "p"
+namespace = "ns"
+version = "1.2.3"
+url = "u"
+repo = "r"
+author = "a"
+maintainer = "m"
+commit = "abc"
+include = ["inc"]
+define = ["D=1"]
+system_deps = ["z"]

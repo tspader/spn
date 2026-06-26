@@ -1,0 +1,13 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "zig"
+compiler = "zig cc -target x86_64-linux-gnu"
+linker = "zig cc"
+archiver = "ar"
+driver = "clang"
+export = true
+host = [{ arch = "x86_64", os = "linux", abi = "gnu" }]
+target = [{ arch = "aarch64", os = "macos" }]
