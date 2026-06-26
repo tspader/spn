@@ -1,13 +1,11 @@
 {
-  "package": {
-    "name": "ctrl",
-    "version": "1.0.0",
-    "author": "line1\u000aline2\u0009tab",
-    "qualified": "core/ctrl",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  }
+  "name": "ctrl",
+  "version": "1.0.0",
+  "author": "line1\u000aline2\u0009tab",
+  "qualified": "core/ctrl",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ]
 }

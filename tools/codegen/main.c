@@ -84,10 +84,13 @@ gen_t* gen_new(sp_mem_t mem) {
   gen_t* gen = sp_alloc_type(mem, gen_t);
   gen->mem = mem;
   gen->entries = sp_da_new(mem, entry_t);
+  gen->flattens = sp_da_new(mem, flatten_t);
+  gen->validators = sp_da_new(mem, validator_t);
   sp_str_om_init(gen->types);
+  sp_str_om_init(gen->flatten_types);
   sp_str_om_init(gen->array_types);
   sp_str_om_init(gen->om_types);
-  sp_str_om_init(gen->object_types);
+  gen->object_reads = sp_da_new(mem, object_read_t);
   sp_str_om_init(gen->nodes);
   sp_str_ht_init(mem, gen->visited);
   return gen;

@@ -1,14 +1,12 @@
 {
-  "package": {
-    "name": "tcargs",
-    "version": "1.0.0",
-    "qualified": "core/tcargs",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  },
+  "name": "tcargs",
+  "version": "1.0.0",
+  "qualified": "core/tcargs",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ],
   "toolchain": [
     {
       "name": "zig",

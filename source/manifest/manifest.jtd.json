@@ -26,7 +26,7 @@
 
     "manifest": {
       "properties": {
-        "package": { "ref": "package" }
+        "package": { "ref": "package", "metadata": { "flatten": true } }
       },
       "optionalProperties": {
         "lib": { "elements": { "ref": "target" }, "metadata": { "key": "name", "validate": "spn_codegen_validate_lib" } },

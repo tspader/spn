@@ -38,9 +38,9 @@ UTEST(manifest_gen, path_join) {
   spn_cg_root_t manifest = sp_zero;
   spn_codegen_load(&ctx, path, &manifest);
 
-  ASSERT_EQ((u32)2, (u32)sp_da_size(manifest.package.include));
-  EXPECT_TRUE(sp_str_equal(manifest.package.include[0], sp_str_lit("/base/include")));
-  EXPECT_TRUE(sp_str_equal(manifest.package.include[1], sp_str_lit("/base/vendor/include")));
+  ASSERT_EQ((u32)2, (u32)sp_da_size(manifest.include));
+  EXPECT_TRUE(sp_str_equal(manifest.include[0], sp_str_lit("/base/include")));
+  EXPECT_TRUE(sp_str_equal(manifest.include[1], sp_str_lit("/base/vendor/include")));
 }
 
 UTEST(manifest_gen, missing_file) {

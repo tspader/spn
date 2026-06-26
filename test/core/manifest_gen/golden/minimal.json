@@ -1,12 +1,10 @@
 {
-  "package": {
-    "name": "minimal",
-    "version": "0.1.0",
-    "qualified": "core/minimal",
-    "versions": [
-      {
-        "version": "0.1.0"
-      }
-    ]
-  }
+  "name": "minimal",
+  "version": "0.1.0",
+  "qualified": "core/minimal",
+  "versions": [
+    {
+      "version": "0.1.0"
+    }
+  ]
 }

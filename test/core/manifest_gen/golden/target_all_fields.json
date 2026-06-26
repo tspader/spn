@@ -1,14 +1,12 @@
 {
-  "package": {
-    "name": "richtarget",
-    "version": "1.0.0",
-    "qualified": "core/richtarget",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  },
+  "name": "richtarget",
+  "version": "1.0.0",
+  "qualified": "core/richtarget",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ],
   "lib": {
     "rich": {
       "name": "rich",

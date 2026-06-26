@@ -1,14 +1,12 @@
 {
-  "package": {
-    "name": "tcsubset",
-    "version": "1.0.0",
-    "qualified": "core/tcsubset",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  },
+  "name": "tcsubset",
+  "version": "1.0.0",
+  "qualified": "core/tcsubset",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ],
   "toolchain": [
     {
       "name": "partial",

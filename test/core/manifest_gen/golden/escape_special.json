@@ -1,13 +1,11 @@
 {
-  "package": {
-    "name": "esc",
-    "version": "1.0.0",
-    "author": "He said \"hi\" \\ done / ok",
-    "qualified": "core/esc",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  }
+  "name": "esc",
+  "version": "1.0.0",
+  "author": "He said \"hi\" \\ done / ok",
+  "qualified": "core/esc",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ]
 }

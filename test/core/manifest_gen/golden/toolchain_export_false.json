@@ -1,14 +1,12 @@
 {
-  "package": {
-    "name": "tcexport",
-    "version": "1.0.0",
-    "qualified": "core/tcexport",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  },
+  "name": "tcexport",
+  "version": "1.0.0",
+  "qualified": "core/tcexport",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ],
   "toolchain": [
     {
       "name": "clang",

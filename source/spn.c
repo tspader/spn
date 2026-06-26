@@ -68,6 +68,32 @@
 #define TOML_IMPLEMENTATION
 #include "toml.h"
 
+typedef enum {
+  SP_ENV_KIND_CSTR,
+  SP_ENV_KIND_STR,
+  SP_ENV_KIND_U64,
+  SP_ENV_KIND_S64,
+  SP_ENV_KIND_F64,
+} sp_env_kind_t;
+
+typedef union {
+  const c8* cstr;
+  sp_str_t str;
+  u64 u;
+  s64 s;
+  f64 f;
+} sp_env_value_t;
+
+typedef struct {
+  const c8* name;
+  sp_env_kind_t kind;
+  sp_env_value_t value;
+  void* target;
+} sp_env_field_t;
+
+typedef struct {
+  sp_env_field_t fields [16];
+} sp_env_load_t;
 
 spn_app_t app;
 spn_ctx_t spn;

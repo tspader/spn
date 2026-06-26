@@ -1,14 +1,12 @@
 {
-  "package": {
-    "name": "nolink",
-    "version": "1.0.0",
-    "qualified": "core/nolink",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  },
+  "name": "nolink",
+  "version": "1.0.0",
+  "qualified": "core/nolink",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ],
   "lib": {
     "nolink": {
       "name": "nolink",

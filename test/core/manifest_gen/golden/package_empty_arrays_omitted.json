@@ -1,12 +1,10 @@
 {
-  "package": {
-    "name": "emptyarr",
-    "version": "1.0.0",
-    "qualified": "core/emptyarr",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  }
+  "name": "emptyarr",
+  "version": "1.0.0",
+  "qualified": "core/emptyarr",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ]
 }
