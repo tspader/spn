@@ -27,9 +27,15 @@ set(STORE       ${CMAKE_SOURCE_DIR}/.build/store/${TRIPLE})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${STORE}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${STORE}/lib)
 
-# @spader We should nuke this ASAP
-add_compile_options(-fno-sanitize=undefined)
-add_link_options(-fno-sanitize=undefined)
+option(SPN_UBSAN "Enable UndefinedBehaviorSanitizer" OFF)
+if(SPN_UBSAN)
+  add_compile_options(-fsanitize=undefined -fno-sanitize-recover=undefined)
+  add_link_options(-fsanitize=undefined)
+else()
+  # @spader We should nuke this ASAP
+  add_compile_options(-fno-sanitize=undefined)
+  add_link_options(-fno-sanitize=undefined)
+endif()
 
 set(EMBED_OBJ ${STORE}/lib/spn.embed.o)
 set(EMBED_HDR ${STORE}/include/spn.embed.h)

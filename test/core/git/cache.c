@@ -101,7 +101,7 @@ static void run_fixture(s32* utest_result, fixture_t fixture) {
 
   // assert db and checkout counts
   EXPECT_EQ(fixture.expect.dbs, sp_ht_size(cache.db.entries));
-  EXPECT_EQ(fixture.expect.checkouts, sp_ht_size(cache.checkouts.entries));
+  EXPECT_EQ(fixture.expect.checkouts, sp_str_om_size(cache.checkouts.entries));
 
   // verify each checkout's expected files on disk
   sp_carr_for(fixture.expect.detail, it) {

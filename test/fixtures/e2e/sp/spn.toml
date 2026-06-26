@@ -1,0 +1,10 @@
+[package]
+name = "smoke"
+version = "0.0.1"
+
+[deps.package]
+"spader/sp" = "1.9.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

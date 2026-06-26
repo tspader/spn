@@ -1,0 +1,37 @@
+#ifndef SPN_TEST_INTEGRATION_HARNESS_H
+#define SPN_TEST_INTEGRATION_HARNESS_H
+
+#include "sp.h"
+#include "test.h"
+#include "action.h"
+
+typedef struct {
+  tmpfs_t fs;
+  struct {
+    sp_str_t root;
+    sp_str_t spn;
+    sp_str_t storage;
+    sp_str_t config;
+    sp_str_t index;
+    sp_str_t include;
+  } paths;
+} fixture_t;
+
+void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, bool expected, const c8* file, u32 line);
+
+#define SP_EXPECT_CONTAINS(haystack, needle)
+#define SP_EXPECT_EXISTS(path) expect_exists(utest_result, SP_NULLPTR, path, true, __FILE__, __LINE__)
+#define SP_EXPECT_EXISTS_TMPFS(fs, path) expect_exists(utest_result, fs, path, true, __FILE__, __LINE__)
+#define SP_EXPECT_NOT_EXISTS_TMPFS(fs, path) expect_exists(utest_result, fs, path, false, __FILE__, __LINE__)
+
+void copy_project_path(s32* utest_result, tmpfs_t* fs, sp_str_t project, sp_str_t relative);
+void setup_fixture_index_from_remote(s32* utest_result, tmpfs_t* fs, sp_str_t index, sp_str_t project);
+void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t config);
+void setup_fixture_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir);
+void setup_e2e_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t spn_dir, sp_str_t index_url, sp_str_t index_rev);
+
+void fixture_copy_project(s32* utest_result, fixture_t* fixture, sp_str_t project, const c8* const* copy);
+void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions);
+void run_test(s32* utest_result, fixture_t* fixture, test_t test);
+
+#endif

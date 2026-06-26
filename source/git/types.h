@@ -2,6 +2,7 @@
 #define SPN_GIT_TYPES_H
 
 #include "sp.h"
+#include "sp/sp_om.h"
 
 typedef struct {
   sp_str_t url;
@@ -27,7 +28,7 @@ typedef struct {
   } db;
   struct {
     sp_str_t dir;
-    sp_str_ht(spn_git_checkout_t) entries;
+    sp_str_om(spn_git_checkout_t) entries;
   } checkouts;
 } spn_git_cache_t;
 
