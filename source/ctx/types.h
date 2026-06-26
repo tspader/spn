@@ -63,9 +63,9 @@ typedef struct {
     sp_io_writer_t* out;
     sp_io_writer_t* err;
     sp_io_writer_t* jsonl;
+    spn_log_level_t level;
+    spn_verbosity_t verbosity;
   } logger;
-  spn_verbosity_t verbosity;
-  spn_log_level_t log_level;
 } spn_ctx_t;
 
 extern spn_ctx_t spn;

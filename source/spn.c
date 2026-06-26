@@ -93,20 +93,18 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   spn.intern = sp_intern_new(spn.mem);
   spn.arena = sp_mem_arena_new_ex(spn.mem, 256, 1);
-
-  sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
-
   spn.logger.out = sp_io_writer_from_fd(1, SP_IO_CLOSE_MODE_NONE);
   spn.logger.err = sp_io_writer_from_fd(2, SP_IO_CLOSE_MODE_NONE);
-
   spn.env = sp_alloc_type(spn.mem, sp_env_t);
   *spn.env = sp_env_capture(spn.mem);
 
-  spn.log_level = SPN_LOG_LEVEL_INFO;
+  spn.logger.level = SPN_LOG_LEVEL_INFO;
   sp_str_t log_level = sp_env_get(spn.env, sp_str_lit("SPN_LOG_LEVEL"));
   if (!sp_str_empty(log_level)) {
-    spn.log_level = spn_log_level_from_str(log_level);
+    spn.logger.level = spn_log_level_from_str(log_level);
   }
+
+  sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
   spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_INTERACTIVE);
 
@@ -310,11 +308,11 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   if (cli->quiet) {
-    spn.verbosity = SPN_VERBOSITY_QUIET;
+    spn.logger.verbosity = SPN_VERBOSITY_QUIET;
   } else if (cli->verbose) {
-    spn.verbosity = SPN_VERBOSITY_VERBOSE;
+    spn.logger.verbosity = SPN_VERBOSITY_VERBOSE;
   } else {
-    spn.verbosity = SPN_VERBOSITY_NORMAL;
+    spn.logger.verbosity = SPN_VERBOSITY_NORMAL;
   }
 
   if (sp_str_valid(cli->project_dir)) {
@@ -390,7 +388,7 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
     }
 
     // write to tui (filtered by verbosity)
-    if (spn_build_event_get_verbosity(event->kind) <= spn.verbosity) {
+    if (spn_build_event_get_verbosity(event->kind) <= spn.logger.verbosity) {
       sp_io_write_line(spn.logger.err, spn_tui_render_event(event, spn.tui.info.max_name));
     }
   }

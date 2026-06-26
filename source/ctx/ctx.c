@@ -5,7 +5,7 @@ sp_intern_t* spn_ctx_get_intern(void) {
 }
 
 spn_log_level_t spn_ctx_get_log_level(void) {
-  return spn.log_level;
+  return spn.logger.level;
 }
 
 sp_io_writer_t* spn_ctx_get_log_out(void) {
