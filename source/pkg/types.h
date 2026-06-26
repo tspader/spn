@@ -6,7 +6,6 @@
 #include "forward/types.h"
 #include "intern/types.h"
 #include "sp/sp_om.h"
-#include "option/types.h"
 #include "semver/types.h"
 #include "toolchain/types.h"
 
@@ -89,8 +88,7 @@ struct spn_pkg_info {
   sp_str_om(spn_profile_info_t) profiles;
   sp_str_om(spn_index_info_t) indexes;
   sp_ht(sp_str_t, spn_requested_pkg_t) deps;
-  sp_ht(sp_str_t, spn_dep_option_t) options;
-  sp_ht(sp_str_t, spn_dep_options_t) config;
+  sp_ht(sp_str_t, spn_linkage_t) config;
   sp_ht(spn_semver_t, spn_pkg_metadata_t) metadata;
   sp_da(spn_semver_t) versions;
   sp_da(sp_str_t) include;
