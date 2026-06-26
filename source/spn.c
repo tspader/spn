@@ -26,6 +26,8 @@
 #include "unit/types.h"
 
 #include "app/app.h"
+#include "codegen/codegen.h"
+#include "codegen/lower.h"
 #include "cli/cli.h"
 #include "event/event.h"
 #include "event/log.h"
@@ -37,9 +39,6 @@
 #include "log/log.h"
 #include "sp/sp_om.h"
 #include "pkg/load.h"
-#include "pkg/pkg.h"
-#include "pkg/mutate.h"
-#include "profile/profile.h"
 #include "session/session.h"
 #include "spn.embed.h"
 #include "sp/io.h"
@@ -91,7 +90,10 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   app.session.mem = spn.mem;
 
   spn.intern = sp_intern_new(spn.mem);
-  spn.arena = sp_mem_arena_new_ex(spn.mem, 256, 1);
+  spn.heap = sp_mem_heap_new();
+  spn.allocators.heap = sp_mem_heap_as_allocator(spn.heap);
+  spn.arenas.bulk = sp_mem_arena_new(spn.mem);
+  spn.allocators.bulk = sp_mem_arena_as_allocator(spn.arenas.bulk);
   spn.logger.out = sp_io_writer_from_fd(1, SP_IO_CLOSE_MODE_NONE);
   spn.logger.err = sp_io_writer_from_fd(2, SP_IO_CLOSE_MODE_NONE);
   spn.env = sp_alloc_type(spn.mem, sp_env_t);
@@ -330,6 +332,11 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
   }
   else {
+    spn_codegen_ctx_t ctx = sp_zero;
+    spn_codegen_ctx_init(&ctx, spn.allocators.heap, spn.allocators.bulk, spn.intern);
+    spn_cg_manifest_t manifest = sp_zero;
+    spn_codegen_load(&ctx, spn.paths.manifest, &manifest);
+    spn_pkg_lower(&ctx, &manifest, &app.package);
     spn_err_union_t error = spn_pkg_load(&app.package, spn.paths.manifest);
     if (error.kind) {
       spn_log_error("bad manifest");
