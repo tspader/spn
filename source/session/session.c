@@ -17,9 +17,11 @@
 sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pkg_name) {
   sp_opt_spn_linkage_t requested = SP_ZERO_INITIALIZE();
 
-  spn_linkage_t* kind = sp_ht_getp(session->pkg->config, pkg_name);
-  if (kind) {
-    sp_opt_set(requested, *kind);
+  sp_da_for(session->pkg->config, it) {
+    spn_pkg_config_entry_t* entry = &session->pkg->config[it];
+    if (sp_str_equal(entry->key, pkg_name) && !sp_opt_is_null(entry->value.kind)) {
+      sp_opt_set(requested, entry->value.kind.value);
+    }
   }
 
   return requested;

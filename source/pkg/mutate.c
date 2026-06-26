@@ -15,7 +15,6 @@ void spn_pkg_init(spn_pkg_info_t* pkg, sp_str_t name) {
   pkg->name = spn_intern(name);
 
   sp_ht_set_fns(pkg->deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
-  sp_ht_set_fns(pkg->config, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
 }
 
 void spn_pkg_set_name(spn_pkg_info_t* pkg, const c8* name) {

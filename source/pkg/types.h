@@ -72,6 +72,15 @@ typedef struct {
   sp_str_t commit;
 } spn_pkg_metadata_t;
 
+typedef struct {
+  sp_opt(spn_linkage_t) kind;
+} spn_pkg_config_t;
+
+typedef struct {
+  sp_str_t key;
+  spn_pkg_config_t value;
+} spn_pkg_config_entry_t;
+
 struct spn_pkg_info {
   sp_str_t namespace;
   sp_str_t name;
@@ -88,7 +97,7 @@ struct spn_pkg_info {
   sp_str_om(spn_profile_info_t) profiles;
   sp_str_om(spn_index_info_t) indexes;
   sp_ht(sp_str_t, spn_requested_pkg_t) deps;
-  sp_ht(sp_str_t, spn_linkage_t) config; // Originally meant to be generic per-dep options; for now, just how to link
+  sp_da(spn_pkg_config_entry_t) config;
   sp_ht(spn_semver_t, spn_pkg_metadata_t) metadata;
   sp_da(spn_semver_t) versions;
   sp_da(sp_str_t) include;
