@@ -1,30 +1,28 @@
 {
-  "package": {
-    "name": "everything",
-    "version": "1.0.0",
-    "namespace": "core",
-    "url": "https://example.com/everything",
-    "repo": "https://github.com/acme/everything",
-    "author": "Ada",
-    "maintainer": "Grace",
-    "commit": "cafef00d",
-    "include": [
-      "include"
-    ],
-    "define": [
-      "BUILD=1"
-    ],
-    "system_deps": [
-      "m"
-    ],
-    "qualified": "core/everything",
-    "versions": [
-      {
-        "version": "1.0.0",
-        "commit": "cafef00d"
-      }
-    ]
-  },
+  "name": "everything",
+  "version": "1.0.0",
+  "namespace": "core",
+  "url": "https://example.com/everything",
+  "repo": "https://github.com/acme/everything",
+  "author": "Ada",
+  "maintainer": "Grace",
+  "commit": "cafef00d",
+  "include": [
+    "include"
+  ],
+  "define": [
+    "BUILD=1"
+  ],
+  "system_deps": [
+    "m"
+  ],
+  "qualified": "core/everything",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "commit": "cafef00d"
+    }
+  ],
   "lib": {
     "everything": {
       "name": "everything",

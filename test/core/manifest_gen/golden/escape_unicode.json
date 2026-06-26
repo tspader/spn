@@ -1,13 +1,11 @@
 {
-  "package": {
-    "name": "uni",
-    "version": "1.0.0",
-    "author": "café — naïve 日本語",
-    "qualified": "core/uni",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  }
+  "name": "uni",
+  "version": "1.0.0",
+  "author": "café — naïve 日本語",
+  "qualified": "core/uni",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ]
 }

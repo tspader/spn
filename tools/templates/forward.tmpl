@@ -1,4 +1,6 @@
 {{ for .objects }}
 static void spn_cg_{{ .name }}_read(spn_codegen_ctx_t* ctx, toml_table_t* table, {{ .type }}* out);
 static void spn_cg_{{ .name }}_write(const {{ .type }}* in, sp_io_writer_t* out);
+{{ end }}{{ for .reads }}
+static void spn_cg_{{ .name }}_read(spn_codegen_ctx_t* ctx, toml_table_t* table, {{ .type }}* out);
 {{ end }}

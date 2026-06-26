@@ -1,14 +1,12 @@
 {
-  "package": {
-    "name": "depspkg",
-    "version": "1.0.0",
-    "qualified": "core/depspkg",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  },
+  "name": "depspkg",
+  "version": "1.0.0",
+  "qualified": "core/depspkg",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ],
   "deps": {
     "package": {
       "libfoo": "^1.2.0",

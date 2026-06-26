@@ -1,16 +1,14 @@
 {
-  "package": {
-    "name": "ordered",
-    "version": "9.9.9",
-    "namespace": "core",
-    "author": "Zed",
-    "commit": "deadbeef",
-    "qualified": "core/ordered",
-    "versions": [
-      {
-        "version": "9.9.9",
-        "commit": "deadbeef"
-      }
-    ]
-  }
+  "name": "ordered",
+  "version": "9.9.9",
+  "namespace": "core",
+  "author": "Zed",
+  "commit": "deadbeef",
+  "qualified": "core/ordered",
+  "versions": [
+    {
+      "version": "9.9.9",
+      "commit": "deadbeef"
+    }
+  ]
 }

@@ -1,24 +1,22 @@
 {
-  "package": {
-    "name": "arrpkg",
-    "version": "1.0.0",
-    "include": [
-      "include",
-      "vendor/include"
-    ],
-    "define": [
-      "DEBUG=1",
-      "FEATURE"
-    ],
-    "system_deps": [
-      "m",
-      "pthread"
-    ],
-    "qualified": "core/arrpkg",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  }
+  "name": "arrpkg",
+  "version": "1.0.0",
+  "include": [
+    "include",
+    "vendor/include"
+  ],
+  "define": [
+    "DEBUG=1",
+    "FEATURE"
+  ],
+  "system_deps": [
+    "m",
+    "pthread"
+  ],
+  "qualified": "core/arrpkg",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ]
 }

@@ -1,14 +1,12 @@
 {
-  "package": {
-    "name": "withindex",
-    "version": "1.0.0",
-    "qualified": "core/withindex",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  },
+  "name": "withindex",
+  "version": "1.0.0",
+  "qualified": "core/withindex",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ],
   "index": {
     "core": {
       "name": "core",

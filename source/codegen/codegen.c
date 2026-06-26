@@ -448,12 +448,12 @@ void spn_codegen_validate_manifest(spn_codegen_ctx_t* ctx, spn_cg_manifest_t* ma
   }
 }
 
-void spn_codegen_compute_qualified(spn_codegen_ctx_t* ctx, spn_cg_package_t* out) {
+void spn_codegen_compute_qualified(spn_codegen_ctx_t* ctx, spn_cg_manifest_t* out) {
   sp_str_t namespace = sp_str_empty(out->namespace) ? sp_str_lit("core") : out->namespace;
   out->qualified = spn_codegen_intern(ctx, sp_str_join(ctx->mem, namespace, out->name, sp_str_lit("/")));
 }
 
-void spn_codegen_compute_versions(spn_codegen_ctx_t* ctx, spn_cg_package_t* out) {
+void spn_codegen_compute_versions(spn_codegen_ctx_t* ctx, spn_cg_manifest_t* out) {
   out->versions = sp_da_new(ctx->mem, spn_cg_version_metadata_t);
   spn_cg_version_metadata_t entry = { .version = out->version, .commit = out->commit };
   sp_da_push(out->versions, entry);

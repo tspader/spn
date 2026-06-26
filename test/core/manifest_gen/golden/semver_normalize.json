@@ -1,12 +1,10 @@
 {
-  "package": {
-    "name": "normalize",
-    "version": "2.1.0",
-    "qualified": "core/normalize",
-    "versions": [
-      {
-        "version": "2.1.0"
-      }
-    ]
-  }
+  "name": "normalize",
+  "version": "2.1.0",
+  "qualified": "core/normalize",
+  "versions": [
+    {
+      "version": "2.1.0"
+    }
+  ]
 }

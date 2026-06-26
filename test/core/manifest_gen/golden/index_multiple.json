@@ -1,14 +1,12 @@
 {
-  "package": {
-    "name": "multiindex",
-    "version": "1.0.0",
-    "qualified": "core/multiindex",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  },
+  "name": "multiindex",
+  "version": "1.0.0",
+  "qualified": "core/multiindex",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ],
   "index": {
     "core": {
       "name": "core",

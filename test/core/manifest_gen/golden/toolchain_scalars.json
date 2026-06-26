@@ -1,14 +1,12 @@
 {
-  "package": {
-    "name": "tc",
-    "version": "1.0.0",
-    "qualified": "core/tc",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  },
+  "name": "tc",
+  "version": "1.0.0",
+  "qualified": "core/tc",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ],
   "toolchain": [
     {
       "name": "gcc",

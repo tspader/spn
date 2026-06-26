@@ -1,12 +1,10 @@
 {
-  "package": {
-    "name": "depsnone",
-    "version": "1.0.0",
-    "qualified": "core/depsnone",
-    "versions": [
-      {
-        "version": "1.0.0"
-      }
-    ]
-  }
+  "name": "depsnone",
+  "version": "1.0.0",
+  "qualified": "core/depsnone",
+  "versions": [
+    {
+      "version": "1.0.0"
+    }
+  ]
 }
