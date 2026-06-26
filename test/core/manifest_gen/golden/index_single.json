@@ -1,18 +1,13 @@
 {
-  "name": "withindex",
-  "version": "1.0.0",
-  "qualified": "core/withindex",
-  "versions": [
-    {
-      "version": "1.0.0"
-    }
-  ],
+  "package": {
+    "name": "withindex",
+    "version": "1.0.0"
+  },
   "index": {
     "core": {
       "name": "core",
       "url": "https://packages.example.com",
-      "protocol": "http",
-      "kind": "workspace"
+      "protocol": "http"
     }
   }
 }

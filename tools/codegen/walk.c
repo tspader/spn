@@ -53,30 +53,7 @@ static void register_entry(gen_t* g, sp_str_t name, sp_str_t value_type, sp_str_
   sp_da_push(g->entries, entry);
 }
 
-static void register_validator(gen_t* g, sp_str_t fn, field_t* field, sp_str_t owner) {
-  sp_da_for(g->validators, it) {
-    if (sp_str_equal(g->validators[it].fn, fn)) {
-      return;
-    }
-  }
-
-  validator_t validator = sp_zero;
-  validator.fn = sp_str_copy(g->mem, fn);
-  validator.field = field;
-  validator.owner = sp_str_copy(g->mem, owner);
-  sp_da_push(g->validators, validator);
-}
-
-static converter_t converter_make(gen_t* g, jtd_schema_t* schema, sp_str_t name) {
-  sp_str_t type = jtd_metadata(schema, "type");
-  if (!sp_str_empty(type)) {
-    return (converter_t) {
-      .c_type = type,
-      .present = jtd_metadata(schema, "present"),
-      .custom = true,
-    };
-  }
-
+static converter_t converter_make(gen_t* g, sp_str_t name) {
   return (converter_t) {
     .c_type = sp_fmt(g->mem, "spn_{}_t", sp_fmt_str(name)).value,
     .from = sp_fmt(g->mem, "spn_{}_from_str", sp_fmt_str(name)).value,
@@ -84,16 +61,12 @@ static converter_t converter_make(gen_t* g, jtd_schema_t* schema, sp_str_t name)
   };
 }
 
-static walk_result_t resolve_conversion(gen_t* g, jtd_schema_t* schema, sp_str_t name, sp_str_t owner, sp_str_t key, node_t** out) {
-  (void)owner;
-  (void)key;
-
-  converter_t conv = converter_make(g, schema, name);
+static walk_result_t resolve_conversion(gen_t* g, sp_str_t name, node_t** out) {
   *out = add_node(g, (node_t) {
     .kind = NODE_CONVERSION,
     .name = name,
-    .use_optional = !conv.custom,
-    .as.conv = conv,
+    .use_optional = true,
+    .as.conv = converter_make(g, name),
   });
   return OK;
 }
@@ -101,8 +74,8 @@ static walk_result_t resolve_conversion(gen_t* g, jtd_schema_t* schema, sp_str_t
 static walk_result_t resolve_node(gen_t* g, jtd_schema_t* schema, sp_str_t name, sp_str_t owner, sp_str_t key, node_t** out) {
   schema = resolve_ref(schema);
 
-  if (schema->form == JTD_FORM_ENUM || !sp_str_empty(jtd_metadata(schema, "type"))) {
-    return resolve_conversion(g, schema, name, owner, key, out);
+  if (schema->form == JTD_FORM_ENUM) {
+    return resolve_conversion(g, name, out);
   }
 
   if (schema->form == JTD_FORM_TYPE) {
@@ -138,14 +111,13 @@ static bool visit_type(gen_t* g, sp_str_t name) {
   return false;
 }
 
-static walk_result_t register_type_into(gen_t* g, sp_str_t name, jtd_schema_t* schema, sp_str_t owner) {
+walk_result_t register_type(gen_t* g, sp_str_t name, jtd_schema_t* schema) {
   walk_result_t result = sp_zero;
   if (visit_type(g, name)) return result;
 
   type_t type = {
     .name = sp_str_copy(g->mem, name),
     .fields = sp_da_new(g->mem, field_t),
-    .validate = jtd_metadata(schema, "validate"),
   };
 
   sp_da_for(schema->as.properties.all, it) {
@@ -166,29 +138,12 @@ static walk_result_t register_type_into(gen_t* g, sp_str_t name, jtd_schema_t* s
     }
 
     sp_str_t value_name = value->form == JTD_FORM_REF ? value->as.ref.name : property.key;
-    bool flatten = card == CARD_SCALAR
-      && !sp_str_empty(jtd_metadata(sub, "flatten"))
-      && resolve_ref(value)->form == JTD_FORM_PROPERTIES;
 
     node_t* node = SP_NULLPTR;
-    if (flatten) {
-      result = register_type_into(g, value_name, resolve_ref(value), name);
-      if (result.err) return result;
-      type_t* target = sp_str_om_get(g->flatten_types, value_name);
-      node = add_node(g, (node_t) {
-        .kind = NODE_STRUCT,
-        .name = value_name,
-        .as.type = target,
-      });
-      sp_da_push(g->flattens, ((flatten_t) { target, sp_str_copy(g->mem, name) }));
-      register_object_read(g, value_name, name);
-    } else {
-      result = resolve_node(g, value, value_name, name, property.key, &node);
-      if (result.err) return result;
-    }
+    result = resolve_node(g, value, value_name, name, property.key, &node);
+    if (result.err) return result;
 
-    bool path_element = card == CARD_ARRAY && node->kind == NODE_CONVERSION && node->as.conv.custom;
-    if (card != CARD_SCALAR && node->kind != NODE_STR && node->kind != NODE_STRUCT && !path_element) {
+    if (card != CARD_SCALAR && node->kind != NODE_STR && node->kind != NODE_STRUCT) {
       return (walk_result_t) { .err = WALK_ERR_UNSUPPORTED_FORM, .type = name, .key = property.key, .as.form = value->form };
     }
 
@@ -197,12 +152,9 @@ static walk_result_t register_type_into(gen_t* g, sp_str_t name, jtd_schema_t* s
     field_t field = {
       .key = property.key,
       .required = property.required,
-      .flatten = flatten,
       .card = card,
       .node = node,
       .key_field = key_field,
-      .validate = jtd_metadata(sub, "validate"),
-      .compute = jtd_metadata(sub, "compute"),
     };
 
     if (card == CARD_ARRAY && node->kind == NODE_STRUCT) {
@@ -212,7 +164,7 @@ static walk_result_t register_type_into(gen_t* g, sp_str_t name, jtd_schema_t* s
         register_array_type(g, node->as.type);
       }
     }
-    if (card == CARD_SCALAR && node->kind == NODE_STRUCT && !flatten) {
+    if (card == CARD_SCALAR && node->kind == NODE_STRUCT) {
       register_object_read(g, node->as.type->name, node->as.type->name);
     }
     if (card == CARD_MAP) {
@@ -224,34 +176,8 @@ static walk_result_t register_type_into(gen_t* g, sp_str_t name, jtd_schema_t* s
     sp_da_push(type.fields, field);
   }
 
-  bool flattened = !sp_str_equal(owner, name);
-  type_t* stored;
-  if (flattened) {
-    sp_str_om_insert(g->flatten_types, type.name, type);
-    stored = sp_str_om_get(g->flatten_types, type.name);
-  } else {
-    sp_str_om_insert(g->types, type.name, type);
-    stored = sp_str_om_get(g->types, type.name);
-  }
-
-  if (!sp_str_empty(stored->validate)) {
-    register_validator(g, stored->validate, SP_NULLPTR, owner);
-  }
-  sp_da_for(stored->fields, f) {
-    field_t* field = &stored->fields[f];
-    if (!sp_str_empty(field->validate)) {
-      register_validator(g, field->validate, field, sp_str_lit(""));
-    }
-    if (!sp_str_empty(field->compute)) {
-      register_validator(g, field->compute, SP_NULLPTR, owner);
-    }
-  }
-
+  sp_str_om_insert(g->types, type.name, type);
   return (walk_result_t) { .err = WALK_OK };
-}
-
-walk_result_t register_type(gen_t* g, sp_str_t name, jtd_schema_t* schema) {
-  return register_type_into(g, name, schema, name);
 }
 
 sp_str_t walk_result_to_str(sp_mem_t mem, walk_result_t result) {
@@ -261,9 +187,6 @@ sp_str_t walk_result_to_str(sp_mem_t mem, walk_result_t result) {
     case WALK_ERR_SCALAR_TYPE:
       return sp_fmt(mem, "{.cyan}.{.cyan}: unsupported scalar type {.red}",
         sp_fmt_str(result.type), sp_fmt_str(result.key), sp_fmt_cstr(jtd_type_name(result.as.scalar_type))).value;
-    case WALK_ERR_CONV_UNKNOWN:
-      return sp_fmt(mem, "{.cyan}.{.cyan}: unknown conversion {.red}",
-        sp_fmt_str(result.type), sp_fmt_str(result.key), sp_fmt_str(result.name)).value;
     case WALK_ERR_UNSUPPORTED_FORM:
       return sp_fmt(mem, "{.cyan}.{.cyan}: unsupported schema form {.red}",
         sp_fmt_str(result.type), sp_fmt_str(result.key), sp_fmt_cstr(jtd_form_name(result.as.form))).value;

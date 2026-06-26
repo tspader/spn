@@ -1,25 +1,15 @@
 {
-  "name": "tc",
-  "version": "1.0.0",
-  "qualified": "core/tc",
-  "versions": [
-    {
-      "version": "1.0.0"
-    }
-  ],
+  "package": {
+    "name": "tc",
+    "version": "1.0.0"
+  },
   "toolchain": [
     {
       "name": "gcc",
       "url": "https://gcc.example.com",
-      "compiler": {
-        "program": "gcc"
-      },
-      "linker": {
-        "program": "ld"
-      },
-      "archiver": {
-        "program": "ar"
-      },
+      "compiler": "gcc",
+      "linker": "ld",
+      "archiver": "ar",
       "sysroot": "/opt/sysroot",
       "driver": "gcc",
       "package": "gcc-pkg",

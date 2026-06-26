@@ -54,8 +54,6 @@ bool spn_codegen_issue(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, const c8*
 bool spn_codegen_issue_at(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, sp_str_t detail);
 
 sp_str_t spn_codegen_intern(spn_codegen_ctx_t* ctx, sp_str_t value);
-sp_str_t spn_codegen_path_join(spn_codegen_ctx_t* ctx, sp_str_t raw);
-sp_da(sp_str_t) spn_codegen_read_path_array(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key);
 
 sp_str_t spn_codegen_str_required(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key);
 bool     spn_codegen_str_optional(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, sp_str_t* value);
@@ -63,7 +61,6 @@ sp_str_t spn_codegen_raw_required(spn_codegen_ctx_t* ctx, toml_table_t* table, c
 bool     spn_codegen_raw_optional(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, sp_str_t* value);
 bool     spn_codegen_read_bool(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, bool* value);
 sp_da(sp_str_t) spn_codegen_read_str_array(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key);
-void     spn_codegen_launcher_from_str(spn_codegen_ctx_t* ctx, sp_str_t raw, sp_str_t* program, sp_da(sp_str_t)* args);
 
 const c8* spn_codegen_err_name(spn_codegen_err_t code);
 

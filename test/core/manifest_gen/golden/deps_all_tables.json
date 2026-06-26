@@ -1,12 +1,8 @@
 {
-  "name": "depsall",
-  "version": "1.0.0",
-  "qualified": "core/depsall",
-  "versions": [
-    {
-      "version": "1.0.0"
-    }
-  ],
+  "package": {
+    "name": "depsall",
+    "version": "1.0.0"
+  },
   "deps": {
     "package": {
       "libfoo": "1.0.0"

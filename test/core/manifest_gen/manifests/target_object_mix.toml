@@ -1,8 +1,0 @@
-[package]
-name = "objmix"
-version = "1.0.0"
-
-[[lib]]
-name = "mixed"
-kinds = ["object", "static"]
-source = ["a.c"]

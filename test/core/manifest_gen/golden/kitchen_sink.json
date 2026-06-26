@@ -1,28 +1,23 @@
 {
-  "name": "everything",
-  "version": "1.0.0",
-  "namespace": "core",
-  "url": "https://example.com/everything",
-  "repo": "https://github.com/acme/everything",
-  "author": "Ada",
-  "maintainer": "Grace",
-  "commit": "cafef00d",
-  "include": [
-    "include"
-  ],
-  "define": [
-    "BUILD=1"
-  ],
-  "system_deps": [
-    "m"
-  ],
-  "qualified": "core/everything",
-  "versions": [
-    {
-      "version": "1.0.0",
-      "commit": "cafef00d"
-    }
-  ],
+  "package": {
+    "name": "everything",
+    "version": "1.0.0",
+    "namespace": "core",
+    "url": "https://example.com/everything",
+    "repo": "https://github.com/acme/everything",
+    "author": "Ada",
+    "maintainer": "Grace",
+    "commit": "cafef00d",
+    "include": [
+      "include"
+    ],
+    "define": [
+      "BUILD=1"
+    ],
+    "system_deps": [
+      "m"
+    ]
+  },
   "lib": {
     "everything": {
       "name": "everything",
@@ -84,15 +79,9 @@
   "toolchain": [
     {
       "name": "host-gcc",
-      "compiler": {
-        "program": "gcc"
-      },
-      "linker": {
-        "program": "ld"
-      },
-      "archiver": {
-        "program": "ar"
-      },
+      "compiler": "gcc",
+      "linker": "ld",
+      "archiver": "ar",
       "driver": "gcc",
       "version": "13.2",
       "export": true,
@@ -115,14 +104,12 @@
     "core": {
       "name": "core",
       "url": "https://packages.example.com",
-      "protocol": "http",
-      "kind": "workspace"
+      "protocol": "http"
     },
     "local": {
       "name": "local",
       "url": "/srv/pkgs",
-      "protocol": "filesystem",
-      "kind": "workspace"
+      "protocol": "filesystem"
     }
   },
   "profile": {

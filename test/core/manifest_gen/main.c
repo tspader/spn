@@ -27,22 +27,6 @@ static sp_str_t manifest_gen_render(sp_mem_t mem, sp_fs_entry_t* entry) {
   return spn_cg_root_write(mem, &manifest);
 }
 
-UTEST(manifest_gen, path_join) {
-  sp_mem_t mem = sp_mem_os_new();
-
-  spn_codegen_ctx_t ctx = sp_zero;
-  spn_codegen_ctx_init(&ctx, mem, sp_intern_new(mem));
-  ctx.dir = sp_str_lit("/base");
-
-  sp_str_t path = sp_fs_join_path(mem, sp_cstr_as_str(MANIFEST_DIR), sp_str_lit("package_arrays.toml"));
-  spn_cg_root_t manifest = sp_zero;
-  spn_codegen_load(&ctx, path, &manifest);
-
-  ASSERT_EQ((u32)2, (u32)sp_da_size(manifest.include));
-  EXPECT_TRUE(sp_str_equal(manifest.include[0], sp_str_lit("/base/include")));
-  EXPECT_TRUE(sp_str_equal(manifest.include[1], sp_str_lit("/base/vendor/include")));
-}
-
 UTEST(manifest_gen, missing_file) {
   sp_mem_t mem = sp_mem_os_new();
 
