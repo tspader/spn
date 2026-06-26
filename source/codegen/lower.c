@@ -1,6 +1,6 @@
 #include "codegen/lower.h"
 
-#include "manifest.gen.h"
+#include "manifest.gen.types.h"
 #include "enum/enum.h"
 #include "semver/convert.h"
 #include "semver/parser.h"

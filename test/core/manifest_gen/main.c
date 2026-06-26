@@ -15,9 +15,18 @@ static s32 manifest_gen_sort_entries(const void* a, const void* b) {
   return sp_str_sort_kernel_alphabetical(&ea->name, &eb->name);
 }
 
-static sp_str_t manifest_gen_render(sp_mem_t mem, sp_fs_entry_t* entry) {
+static sp_mem_t manifest_gen_mem(void) {
+  return sp_mem_heap_as_allocator(sp_mem_heap_new());
+}
+
+static spn_codegen_ctx_t manifest_gen_ctx(sp_mem_t mem) {
   spn_codegen_ctx_t ctx = sp_zero;
-  spn_codegen_ctx_init(&ctx, mem, sp_intern_new(mem));
+  spn_codegen_ctx_init(&ctx, mem, mem, sp_intern_new(mem));
+  return ctx;
+}
+
+static sp_str_t manifest_gen_render(sp_mem_t mem, sp_fs_entry_t* entry) {
+  spn_codegen_ctx_t ctx = manifest_gen_ctx(mem);
 
   spn_cg_root_t manifest = sp_zero;
   if (spn_codegen_load(&ctx, entry->path, &manifest)) {
@@ -28,13 +37,8 @@ static sp_str_t manifest_gen_render(sp_mem_t mem, sp_fs_entry_t* entry) {
 }
 
 UTEST(manifest_gen, missing_file) {
-  sp_mem_heap_t* heap = sp_mem_heap_new();
-  sp_mem_t mem = sp_mem_heap_as_allocator(heap);
-  sp_mem_t bulk = sp_mem_heap_as_allocator(heap);
-  sp_intern_t* interner = sp_intern_new(mem);
-
-  spn_codegen_ctx_t ctx = sp_zero;
-  spn_codegen_ctx_init(&ctx, mem, bulk, interner);
+  sp_mem_t mem = manifest_gen_mem();
+  spn_codegen_ctx_t ctx = manifest_gen_ctx(mem);
 
   spn_cg_root_t manifest = sp_zero;
   bool failed = spn_codegen_load(&ctx, sp_str_lit("/nonexistent/missing.toml"), &manifest);
@@ -46,7 +50,7 @@ UTEST(manifest_gen, missing_file) {
 }
 
 UTEST(manifest_gen, corpus) {
-  sp_mem_t mem = sp_mem_os_new();
+  sp_mem_t mem = manifest_gen_mem();
 
   struct {
     sp_str_t toml;

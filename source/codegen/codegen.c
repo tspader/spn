@@ -4,8 +4,9 @@
 #include "sp/compat.h"
 #include "spn.h"
 
-void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_intern_t* intern) {
+void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_mem_t bulk, sp_intern_t* intern) {
   ctx->mem = mem;
+  ctx->bulk = bulk;
   ctx->intern = intern;
   ctx->depth = 0;
   ctx->issues = sp_da_new(mem, spn_codegen_issue_t);
@@ -47,19 +48,19 @@ static sp_str_t spn_codegen_path(spn_codegen_ctx_t* ctx) {
   return sp_io_dyn_mem_writer_as_str(&writer);
 }
 
-static void spn_codegen_record(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, sp_str_t detail) {
+static void spn_codegen_record(spn_codegen_ctx_t* ctx, spn_err_t code, sp_str_t detail) {
   spn_codegen_issue_t issue = { .code = code, .path = spn_codegen_path(ctx), .detail = detail };
   sp_da_push(ctx->issues, issue);
 }
 
-bool spn_codegen_issue(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, const c8* key) {
+bool spn_codegen_issue(spn_codegen_ctx_t* ctx, spn_err_t code, const c8* key) {
   spn_codegen_push_key(ctx, key);
   spn_codegen_record(ctx, code, sp_cstr_as_str(key));
   spn_codegen_pop(ctx);
   return true;
 }
 
-bool spn_codegen_issue_at(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, sp_str_t detail) {
+bool spn_codegen_issue_at(spn_codegen_ctx_t* ctx, spn_err_t code, sp_str_t detail) {
   spn_codegen_record(ctx, code, detail);
   return true;
 }
@@ -257,9 +258,9 @@ void spn_codegen_json_bool(sp_io_writer_t* out, bool value) {
   sp_io_write_str(out, value ? sp_str_lit("true") : sp_str_lit("false"), SP_NULLPTR);
 }
 
-const c8* spn_codegen_err_name(spn_codegen_err_t code) {
+const c8* spn_codegen_err_name(spn_err_t code) {
   switch (code) {
-    case SPN_CODEGEN_OK:                 return "ok";
+    case SPN_OK:                         return "ok";
     case SPN_CODEGEN_ERR_EXPECTED_BOOL:  return "expected_bool";
     case SPN_CODEGEN_ERR_EXPECTED_STR:   return "expected_str";
     case SPN_CODEGEN_ERR_EXPECTED_OBJECT:return "expected_object";
@@ -268,8 +269,8 @@ const c8* spn_codegen_err_name(spn_codegen_err_t code) {
     case SPN_CODEGEN_ERR_PARSE:          return "parse";
     case SPN_CODEGEN_ERR_FILE_MISSING:   return "file_missing";
     case SPN_CODEGEN_ERR_INVALID:        return "invalid";
+    default:                             return "unknown";
   }
-  return "unknown";
 }
 
 void spn_codegen_json_issues(sp_io_writer_t* out, sp_da(spn_codegen_issue_t) issues) {

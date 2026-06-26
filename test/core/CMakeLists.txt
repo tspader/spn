@@ -85,6 +85,7 @@ add_test(NAME jtd COMMAND "$<TARGET_FILE:jtd>")
 
 add_executable(manifest_gen
   manifest_gen/main.c
+  ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.c
   ${SRC}/codegen/codegen.c
   ${SRC}/enum/enum.c
   ${SRC}/external/tom.c
@@ -108,6 +109,7 @@ add_test(NAME manifest_gen COMMAND "$<TARGET_FILE:manifest_gen>")
 
 add_executable(manifest_lower
   manifest_lower/main.c
+  ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.c
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/lower.c
   ${SRC}/enum/enum.c

@@ -114,7 +114,9 @@ typedef struct {
 
 type_t*         find_type(gen_t* g, sp_str_t name);
 sp_str_t        node_c_type(gen_t* g, node_t* node);
-render_result_t render_file(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg);
+render_result_t render_types(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg);
+render_result_t render_decls(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg);
+render_result_t render_impl(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg);
 sp_str_t        render_result_to_str(sp_mem_t mem, render_result_t result);
 
 #endif // CODEGEN_H

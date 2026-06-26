@@ -22,6 +22,8 @@ set(SPN_SOURCES
   cli/tool.c
   cli/update.c
   cli/which.c
+  codegen/codegen.c
+  codegen/lower.c
   ctx/ctx.c
   enum/enum.c
   event/event.c
@@ -96,16 +98,17 @@ set(SPN_SOURCES
   unit/package.c
 )
 
-add_executable(spn ${SPN_SOURCES})
+add_executable(spn ${SPN_SOURCES} ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.c)
 target_include_directories(spn PRIVATE
   ${SRC}
   ${SRC}/external
   ${CMAKE_SOURCE_DIR}/include
+  ${CMAKE_BINARY_DIR}/gen/manifest
   ${STORE}/include
 )
 target_link_libraries(spn PRIVATE m ${TCC_LIB})
 target_compile_options(spn PRIVATE -include ${SRC}/sp/compat.h)
-add_dependencies(spn headers tcc spn_embed)
+add_dependencies(spn headers tcc spn_embed manifest_gen_header)
 
 set_source_files_properties(${EMBED_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 target_sources(spn PRIVATE ${EMBED_OBJ})

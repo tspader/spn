@@ -29,13 +29,19 @@ add_dependencies(jtd_gen headers)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/gen/manifest)
 file(GLOB_RECURSE JTD_GEN_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/templates/*.tmpl)
 add_custom_command(
-  OUTPUT ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.h
+  OUTPUT
+    ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.types.h
+    ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.h
+    ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.c
   COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/gen/manifest
   COMMAND $<TARGET_FILE:jtd_gen>
     ${CMAKE_SOURCE_DIR}/source/manifest/manifest.jtd.json
-    ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.h
+    ${CMAKE_BINARY_DIR}/gen/manifest
     ${CMAKE_CURRENT_SOURCE_DIR}/templates
   DEPENDS jtd_gen ${CMAKE_SOURCE_DIR}/source/manifest/manifest.jtd.json ${JTD_GEN_TEMPLATES}
-  COMMENT "manifest.gen.h"
+  COMMENT "manifest.gen.{types.h,h,c}"
   VERBATIM)
-add_custom_target(manifest_gen_header ALL DEPENDS ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.h)
+add_custom_target(manifest_gen_header ALL DEPENDS
+  ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.types.h
+  ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.h
+  ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.c)

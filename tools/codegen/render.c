@@ -228,7 +228,7 @@ static render_result_t render_object_write(gen_t* g, sp_io_writer_t* out, type_t
   return render(out, reg, "write", write_scope);
 }
 
-render_result_t render_file(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
+render_result_t render_types(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
   render_try(render(out, reg, "header", sp_template_scope_create(g->mem)));
 
   sp_template_scope_t* tags = sp_template_scope_create(g->mem);
@@ -258,6 +258,27 @@ render_result_t render_file(gen_t* g, sp_io_writer_t* out, sp_template_registry_
   sp_da_for(g->entries, it) {
     render_try(render_entry_struct(g, out, &g->entries[it], reg));
   }
+
+  sp_template_scope_t* root = sp_template_scope_create(g->mem);
+  sp_template_set(root, sp_str_lit("root_type"), type_name(g, g->root->name));
+  render_try(render(out, reg, "root_type", root));
+
+  sp_fmt_io(out, "\n#endif\n");
+  return (render_result_t) { .err = RENDER_OK };
+}
+
+render_result_t render_decls(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
+  render_try(render(out, reg, "header_fns", sp_template_scope_create(g->mem)));
+
+  sp_template_scope_t* root = sp_template_scope_create(g->mem);
+  render_try(render(out, reg, "root_decl", root));
+
+  sp_fmt_io(out, "\n#endif\n");
+  return (render_result_t) { .err = RENDER_OK };
+}
+
+render_result_t render_impl(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
+  render_try(render(out, reg, "header_impl", sp_template_scope_create(g->mem)));
 
   sp_template_scope_t* objects = sp_template_scope_create(g->mem);
   sp_om_for(g->types, it) {
@@ -311,9 +332,8 @@ render_result_t render_file(gen_t* g, sp_io_writer_t* out, sp_template_registry_
   }
 
   sp_template_scope_t* root = sp_template_scope_create(g->mem);
-  sp_template_set(root, sp_str_lit("root_type"), type_name(g, g->root->name));
   sp_template_set(root, sp_str_lit("root_name"), g->root->name);
-  return render(out, reg, "root", root);
+  return render(out, reg, "root_impl", root);
 }
 
 sp_str_t render_result_to_str(sp_mem_t mem, render_result_t result) {
