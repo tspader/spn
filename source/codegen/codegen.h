@@ -1,7 +1,9 @@
 #ifndef SPN_CODEGEN_H
 #define SPN_CODEGEN_H
 
+#include "intern/types.h"
 #include "sp.h"
+#include "spn.h"
 #include "toml.h"
 #include "intern/intern.h"
 
@@ -38,6 +40,7 @@ typedef struct {
 
 typedef struct {
   sp_mem_t mem;
+  sp_mem_t bulk;
   sp_intern_t* intern;
   sp_str_t dir;
   spn_codegen_path_seg_t path[SPN_CODEGEN_PATH_MAX];
@@ -45,7 +48,7 @@ typedef struct {
   sp_da(spn_codegen_issue_t) issues;
 } spn_codegen_ctx_t;
 
-void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_intern_t* intern);
+void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_mem_t bulk, sp_intern_t* intern);
 
 void spn_codegen_push_key(spn_codegen_ctx_t* ctx, const c8* key);
 void spn_codegen_push_index(spn_codegen_ctx_t* ctx, u32 index);
@@ -82,8 +85,8 @@ void spn_codegen_json_str_array(sp_io_writer_t* out, sp_da(sp_str_t) values);
 void spn_codegen_json_issues(sp_io_writer_t* out, sp_da(spn_codegen_issue_t) issues);
 sp_str_t spn_codegen_issues_to_str(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues);
 
-struct spn_cg_manifest;
+typedef struct spn_cg_manifest spn_cg_manifest_t;
 
-bool spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, struct spn_cg_manifest* out);
+spn_err_t spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, spn_cg_manifest_t* out);
 
 #endif

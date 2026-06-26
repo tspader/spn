@@ -28,10 +28,13 @@ static sp_str_t manifest_gen_render(sp_mem_t mem, sp_fs_entry_t* entry) {
 }
 
 UTEST(manifest_gen, missing_file) {
-  sp_mem_t mem = sp_mem_os_new();
+  sp_mem_heap_t* heap = sp_mem_heap_new();
+  sp_mem_t mem = sp_mem_heap_as_allocator(heap);
+  sp_mem_t bulk = sp_mem_heap_as_allocator(heap);
+  sp_intern_t* interner = sp_intern_new(mem);
 
   spn_codegen_ctx_t ctx = sp_zero;
-  spn_codegen_ctx_init(&ctx, mem, sp_intern_new(mem));
+  spn_codegen_ctx_init(&ctx, mem, bulk, interner);
 
   spn_cg_root_t manifest = sp_zero;
   bool failed = spn_codegen_load(&ctx, sp_str_lit("/nonexistent/missing.toml"), &manifest);

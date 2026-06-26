@@ -2,6 +2,7 @@
 #include "external/tom.h"
 #include "manifest.gen.h"
 #include "sp/compat.h"
+#include "spn.h"
 
 void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_intern_t* intern) {
   ctx->mem = mem;
@@ -315,7 +316,7 @@ void spn_codegen_json_str_array(sp_io_writer_t* out, sp_da(sp_str_t) values) {
   sp_io_write_c8(out, ']');
 }
 
-bool spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, spn_cg_manifest_t* out) {
+spn_err_t spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, spn_cg_manifest_t* out) {
   if (!sp_fs_exists(path)) {
     return spn_codegen_issue_at(ctx, SPN_CODEGEN_ERR_FILE_MISSING, sp_str_lit("missing file"));
   }
@@ -325,5 +326,5 @@ bool spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, spn_cg_manifest_t* 
     return spn_codegen_issue_at(ctx, SPN_CODEGEN_ERR_PARSE, sp_str_lit("invalid toml"));
   }
   spn_cg_root_read(ctx, table, out);
-  return sp_da_size(ctx->issues) > 0;
+  return (sp_da_empty(ctx->issues)) ? SPN_OK : SPN_ERROR;
 }

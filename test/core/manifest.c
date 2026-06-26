@@ -32,7 +32,6 @@ int main(int argc, const char *const argv[]) {
   ctx_init(ctx);
 
   spn.intern = sp_intern_new(spn_allocator);
-  spn.arena = sp_mem_arena_new_ex(spn_allocator, 256, 1);
 
   s32 result = utest_main(argc, argv);
 

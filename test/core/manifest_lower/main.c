@@ -1,3 +1,4 @@
+#include "intern/intern.h"
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
@@ -146,13 +147,17 @@ static void check_targets(s32* utest_result, spn_target_info_om_t om, const targ
 }
 
 static void run_case(s32* utest_result, test_t test) {
-  sp_mem_t mem = sp_mem_os_new();
+  sp_mem_heap_t* heap = sp_mem_heap_new();
+  sp_mem_t mem = sp_mem_heap_as_allocator(heap);
+  sp_mem_t bulk = sp_mem_heap_as_allocator(heap);
+  sp_intern_t* interner = sp_intern_new(mem);
+
+  spn_codegen_ctx_t ctx = sp_zero;
+  spn_codegen_ctx_init(&ctx, mem, bulk, interner);
 
   sp_str_t file = sp_fmt(mem, "{}.toml", sp_fmt_cstr(test.manifest)).value;
   sp_str_t path = sp_fs_join_path(mem, sp_cstr_as_str(MANIFEST_DIR), file);
 
-  spn_codegen_ctx_t ctx = sp_zero;
-  spn_codegen_ctx_init(&ctx, mem, sp_intern_new(mem));
   ctx.dir = sp_cstr_as_str(MANIFEST_DIR);
 
   spn_cg_manifest_t cg = sp_zero;
