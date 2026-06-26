@@ -7,20 +7,8 @@
 #include "toml.h"
 #include "intern/intern.h"
 
-typedef enum {
-  SPN_CODEGEN_OK = 0,
-  SPN_CODEGEN_ERR_EXPECTED_BOOL,
-  SPN_CODEGEN_ERR_EXPECTED_STR,
-  SPN_CODEGEN_ERR_EXPECTED_OBJECT,
-  SPN_CODEGEN_ERR_MISSING_KEY,
-  SPN_CODEGEN_ERR_DUPLICATE_KEY,
-  SPN_CODEGEN_ERR_PARSE,
-  SPN_CODEGEN_ERR_FILE_MISSING,
-  SPN_CODEGEN_ERR_INVALID,
-} spn_codegen_err_t;
-
 typedef struct {
-  spn_codegen_err_t code;
+  spn_err_t code;
   sp_str_t path;
   sp_str_t detail;
 } spn_codegen_issue_t;
@@ -53,8 +41,8 @@ void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_mem_t bulk, s
 void spn_codegen_push_key(spn_codegen_ctx_t* ctx, const c8* key);
 void spn_codegen_push_index(spn_codegen_ctx_t* ctx, u32 index);
 void spn_codegen_pop(spn_codegen_ctx_t* ctx);
-bool spn_codegen_issue(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, const c8* key);
-bool spn_codegen_issue_at(spn_codegen_ctx_t* ctx, spn_codegen_err_t code, sp_str_t detail);
+bool spn_codegen_issue(spn_codegen_ctx_t* ctx, spn_err_t code, const c8* key);
+bool spn_codegen_issue_at(spn_codegen_ctx_t* ctx, spn_err_t code, sp_str_t detail);
 
 sp_str_t spn_codegen_intern(spn_codegen_ctx_t* ctx, sp_str_t value);
 
@@ -65,7 +53,7 @@ bool     spn_codegen_raw_optional(spn_codegen_ctx_t* ctx, toml_table_t* table, c
 bool     spn_codegen_read_bool(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, bool* value);
 sp_da(sp_str_t) spn_codegen_read_str_array(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key);
 
-const c8* spn_codegen_err_name(spn_codegen_err_t code);
+const c8* spn_codegen_err_name(spn_err_t code);
 
 typedef struct {
   sp_io_writer_t base;

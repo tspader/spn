@@ -1,10 +1,10 @@
-#include "intern/intern.h"
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
 #define UTEST_IMPLEMENTATION
 #include "utest.h"
 
+#include "intern/intern.h"
 #include "codegen/codegen.h"
 #include "codegen/lower.h"
 #include "manifest.gen.h"
@@ -81,7 +81,7 @@ typedef struct {
 } config_t;
 
 typedef struct {
-  spn_codegen_err_t code;
+  spn_err_t code;
   const c8* path;
 } issue_t;
 

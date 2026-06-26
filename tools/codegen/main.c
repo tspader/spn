@@ -46,6 +46,34 @@ sp_cli_result_t walk_schema(ctx_t* c) {
   return SP_CLI_OK;
 }
 
+typedef render_result_t (*render_fn_t)(gen_t*, sp_io_writer_t*, sp_template_registry_t*);
+
+static sp_cli_result_t render_one(ctx_t* c, sp_str_t path, render_fn_t fn) {
+  sp_fs_atomic_t file = sp_zero;
+  if (sp_fs_atomic_open(&file, path)) {
+    sp_cli_log_error("failed to open {.cyan}", sp_fmt_str(path));
+    return SP_CLI_ERR;
+  }
+
+  u8 buffer [64 * 1024];
+  sp_io_writer_t* io = sp_fs_atomic_writer(&file);
+  sp_io_writer_set_buffer(io, buffer, sizeof(buffer));
+
+  render_result_t rendered = fn(c->gen, io, c->registry);
+  if (rendered.err) {
+    sp_fs_atomic_abort(&file);
+    sp_cli_log_error("{}", sp_fmt_str(render_result_to_str(c->mem, rendered)));
+    return SP_CLI_ERR;
+  }
+
+  if (sp_fs_atomic_commit(&file, SP_FS_ATOMIC_REPLACE)) {
+    sp_cli_log_error("failed to write {.cyan}", sp_fmt_str(path));
+    return SP_CLI_ERR;
+  }
+
+  return SP_CLI_OK;
+}
+
 sp_cli_result_t render_template(ctx_t* c) {
   sp_str_t dir = c->args.templates;
   c->registry = sp_template_registry_create(c->mem);
@@ -54,28 +82,14 @@ sp_cli_result_t render_template(ctx_t* c) {
     return SP_CLI_ERR;
   }
 
-  // Open the output file, which we'll atomically rename to the final output
-  sp_fs_atomic_t file = sp_zero;
-  if (sp_fs_atomic_open(&file, c->args.out)) {
-    sp_cli_log_error("failed to open {.cyan}", sp_fmt_str(c->args.out));
-    return SP_CLI_ERR;
-  }
+  sp_str_t stem = sp_str_cleave_c8(sp_fs_get_name(c->args.schema), '.').first;
+  sp_str_t types = sp_fs_join_path(c->mem, c->args.out, sp_fmt(c->mem, "{}.gen.types.h", sp_fmt_str(stem)).value);
+  sp_str_t fns   = sp_fs_join_path(c->mem, c->args.out, sp_fmt(c->mem, "{}.gen.h", sp_fmt_str(stem)).value);
+  sp_str_t impl  = sp_fs_join_path(c->mem, c->args.out, sp_fmt(c->mem, "{}.gen.c", sp_fmt_str(stem)).value);
 
-  u8 buffer [64 * 1024];
-  sp_io_writer_t* io = sp_fs_atomic_writer(&file);
-  sp_io_writer_set_buffer(io, buffer, sizeof(buffer));
-
-  render_result_t rendered = render_file(c->gen, io, c->registry);
-  if (rendered.err) {
-    sp_fs_atomic_abort(&file);
-    sp_cli_log_error("{}", sp_fmt_str(render_result_to_str(c->mem, rendered)));
-    return SP_CLI_ERR;
-  }
-
-  if (sp_fs_atomic_commit(&file, SP_FS_ATOMIC_REPLACE)) {
-    sp_cli_log_error("failed to write {.cyan}", sp_fmt_str(c->args.out));
-    return SP_CLI_ERR;
-  }
+  try(render_one(c, types, render_types));
+  try(render_one(c, fns, render_decls));
+  try(render_one(c, impl, render_impl));
 
   return SP_CLI_OK;
 }
