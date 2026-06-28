@@ -168,21 +168,21 @@ void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, bool expected,
   sp_str_builder_t b = SP_ZERO_INITIALIZE();
   sp_str_builder_append_fmt(&b, "{}:{}", SP_FMT_CSTR(file), SP_FMT_U32(line));
 
-  b.indent.word = sp_format("{.fg brightred}", SP_FMT_CSTR("▐ "));
+  b.indent.word = sp_format("{.red}", SP_FMT_CSTR("▐ "));
   sp_str_builder_indent(&b);
 
   if (fs) {
     sp_str_builder_new_line(&b);
-    sp_str_builder_append_fmt(&b, "{.fg brightblack} is the root", SP_FMT_STR(fs->root));
+    sp_str_builder_append_fmt(&b, "{.black} is the root", SP_FMT_STR(fs->root));
 
     path = sp_str_strip_left(path, fs->root);
     path = sp_str_concat(spn_allocator, sp_str_lit("$test"), path);
   }
   sp_str_builder_new_line(&b);
   if (expected) {
-    sp_str_builder_append_fmt(&b, "{.fg brightblack} does not exist", SP_FMT_STR(path));
+    sp_str_builder_append_fmt(&b, "{.black} does not exist", SP_FMT_STR(path));
   } else {
-    sp_str_builder_append_fmt(&b, "{.fg brightblack} exists (expected not to)", SP_FMT_STR(path));
+    sp_str_builder_append_fmt(&b, "{.black} exists (expected not to)", SP_FMT_STR(path));
   }
 
   SP_TEST_REPORT(sp_str_builder_to_str(&b));

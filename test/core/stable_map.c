@@ -303,7 +303,6 @@ typedef struct {
   pkg_value_t value;
 } kvp_t;
 
-#define strl(_lit) sp_str_lit(_lit)
 #define LOADED true
 #define UNLOADED false
 #define LOW_PRIORITY 1

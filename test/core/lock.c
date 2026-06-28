@@ -20,9 +20,9 @@ UTEST_STATE();
 void spn_event_buffer_push(spn_event_buffer_t* evs, spn_build_event_t e) {}
 
 // MAIN
-int main(int argc, const char *const argv[]) {
+s32 main(s32 num_args, const c8** args) {
   ctx_init(ctx_get());
-  s32 result = utest_main(argc, argv);
+  s32 result = utest_main(num_args, args);
   ctx_deinit(ctx_get());
   return result;
 }

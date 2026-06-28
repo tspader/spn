@@ -43,19 +43,19 @@ static spn_task_result_t run_script(spn_app_t* app) {
 
   spn_pkg_unit_t* root = spn_session_find_root(session);
   if (!root) {
-    spn_log_error("script {.fg brightyellow} was not built", SP_FMT_STR(app->config.run.target));
+    spn_log_error("script {.yellow} was not built", SP_FMT_STR(app->config.run.target));
     return SPN_TASK_ERROR;
   }
 
   spn_target_unit_t* unit = spn_session_find_target_in_pkg(session, root, app->config.run.target);
   if (!unit) {
-    spn_log_error("script {.fg brightyellow} was not built", SP_FMT_STR(app->config.run.target));
+    spn_log_error("script {.yellow} was not built", SP_FMT_STR(app->config.run.target));
     return SPN_TASK_ERROR;
   }
 
   sp_str_t command = get_target_output_path(unit);
   if (!sp_fs_exists(command)) {
-    spn_log_error("script binary {.fg brightyellow} does not exist", SP_FMT_STR(command));
+    spn_log_error("script binary {.yellow} does not exist", SP_FMT_STR(command));
     return SPN_TASK_ERROR;
   }
 
@@ -70,7 +70,7 @@ static spn_task_result_t run_script(spn_app_t* app) {
   });
 
   if (result.status.exit_code) {
-    spn_log_error("script {.fg brightyellow} failed with exit code {}",
+    spn_log_error("script {.yellow} failed with exit code {}",
       SP_FMT_STR(unit->info->name),
       SP_FMT_S32(result.status.exit_code)
     );
@@ -99,7 +99,7 @@ static void add_build_deps(spn_app_t* app, spn_cc_target_t* target) {
 static spn_task_result_t run_source(spn_app_t* app) {
   sp_str_t path = run_resolve_source_path(app->config.run.target);
   if (sp_str_empty(path) || !sp_fs_exists(path)) {
-    spn_log_error("source file {.fg brightyellow} does not exist", SP_FMT_STR(app->config.run.target));
+    spn_log_error("source file {.yellow} does not exist", SP_FMT_STR(app->config.run.target));
     return SPN_TASK_ERROR;
   }
 
@@ -114,7 +114,7 @@ static spn_task_result_t run_source(spn_app_t* app) {
   spn_tcc_t* tcc = sp_alloc_type(app->session.mem, spn_tcc_t);
   spn_tcc_init(tcc);
   if (spn_cc_target_to_tcc(&cc, target, tcc)) {
-    spn_log_error("failed to compile {.fg brightyellow}", SP_FMT_STR(path));
+    spn_log_error("failed to compile {.yellow}", SP_FMT_STR(path));
     return SPN_TASK_ERROR;
   }
 
@@ -125,7 +125,7 @@ static spn_task_result_t run_source(spn_app_t* app) {
 
   sp_str_t cwd = sp_fs_get_cwd(app->session.mem);
   if (sp_sys_chdir_s(spn.paths.project)) {
-    spn_log_error("failed to change directory to {.fg brightyellow}", SP_FMT_STR(spn.paths.project));
+    spn_log_error("failed to change directory to {.yellow}", SP_FMT_STR(spn.paths.project));
     return SPN_TASK_ERROR;
   }
 
@@ -133,7 +133,7 @@ static spn_task_result_t run_source(spn_app_t* app) {
   sp_sys_chdir_s(cwd);
 
   if (result) {
-    spn_log_error("source run failed for {.fg brightyellow} with exit code {}",
+    spn_log_error("source run failed for {.yellow} with exit code {}",
       SP_FMT_STR(path),
       SP_FMT_S32(result)
     );

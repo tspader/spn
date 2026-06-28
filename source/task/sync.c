@@ -280,7 +280,7 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   if (entry->kind == SPN_TOOLCHAIN_INLINE) {
     if (!match_toolchain(entry, host, target)) {
       spn_log_error(
-        "toolchain {.fg brightcyan} doesn't support host {.fg brightcyan} targeting {.fg brightcyan}",
+        "toolchain {.cyan} doesn't support host {.cyan} targeting {.cyan}",
         SP_FMT_STR(entry->name),
         SP_FMT_STR(spn_triple_to_str(host)),
         SP_FMT_STR(spn_triple_to_str(target))

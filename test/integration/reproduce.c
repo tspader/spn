@@ -7,7 +7,7 @@
 
 s32 main(s32 num_args, const c8** args) {
   if (num_args != 2) {
-    sp_log(sp_str_lit("usage: {.fg brightyellow} $path"), SP_FMT_CSTR("reproduce"));
+    sp_log(sp_str_lit("usage: {.yellow} $path"), SP_FMT_CSTR("reproduce"));
     return 1;
   }
 
