@@ -120,7 +120,8 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       case SPN_ERR_WASM_MODULE_INSTANCE_FAILED: { sp_log("SPN_ERR_WASM_MODULE_INSTANCE_FAILED"); return 1; }
       case SPN_ERR_WASM_CTX_FAILED: { sp_log("SPN_ERR_WASM_CTX_FAILED"); return 1; }
       case SPN_ERR_WASM_MODULE_CALL_FAILED: { sp_log("SPN_ERR_WASM_MODULE_CALL_FAILED"); return 1; }
-      default: break;
+      case SPN_OK: break;
+      default: { sp_log("fuck"); return 1; }
     }
   }
 
@@ -175,7 +176,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
           spn_index_info_t index = SP_ZERO_INITIALIZE();
           spn_err_union_t idx_err = spn_index_load(it, sp_str_lit("index"), n, &index);
           if (idx_err.kind == SPN_ERR_MANIFEST_FIELD) {
-            spn_log_error("invalid index in config: {.fg brightcyan} expected {.fg brightyellow}, got {.fg brightred}",
+            spn_log_error("invalid index in config: {.cyan} expected {.yellow}, got {.red}",
               SP_FMT_STR(idx_err.manifest_field.path),
               SP_FMT_STR(idx_err.manifest_field.expected),
               SP_FMT_STR(idx_err.manifest_field.actual)

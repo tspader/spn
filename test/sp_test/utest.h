@@ -1027,7 +1027,7 @@ s32 utest_main(s32 argc, const c8 **argv) {
   #endif
 
   sp_log(
-    "> running {.fg brightblack} test cases on {}-{}-{}",
+    "> running {.black} test cases on {}-{}-{}",
     sp_fmt_uint(ran_tests),
     sp_fmt_str(arch), sp_fmt_str(os), sp_fmt_str(abi)
   );
@@ -1087,7 +1087,7 @@ s32 utest_main(s32 argc, const c8 **argv) {
       } else {
         sp_print("{.fg green} ", sp_fmt_cstr("ok"));
       }
-      sp_log("{.fg brightblack}{.fg brightblack}", sp_fmt_int(time), sp_fmt_cstr(units[unit_index]));
+      sp_log("{.black}{.black}", sp_fmt_int(time), sp_fmt_cstr(units[unit_index]));
     }
   }
 

@@ -18,7 +18,7 @@ spn_log_level_t spn_log_level_from_str(sp_str_t str) {
     return SPN_LOG_LEVEL_DEBUG;
   }
 
-  SP_FATAL("Unknown SPN_LOG_LEVEL {.fg brightyellow}; options are [ERROR, WARN, INFO, DEBUG]", SP_FMT_STR(str));
+  SP_FATAL("Unknown SPN_LOG_LEVEL {.yellow}; options are [ERROR, WARN, INFO, DEBUG]", SP_FMT_STR(str));
   SP_UNREACHABLE_RETURN(SPN_LOG_LEVEL_INFO);
 }
 

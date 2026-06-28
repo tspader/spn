@@ -18,7 +18,7 @@ sp_app_result_t spn_cli_publish(spn_cli_t* cli) {
   }
 
   if (!index) {
-    spn_log_error("index {.fg brightcyan} not found", SP_FMT_STR(index_name));
+    spn_log_error("index {.cyan} not found", SP_FMT_STR(index_name));
     return SP_APP_QUIT;
   }
 
@@ -36,15 +36,15 @@ sp_app_result_t spn_cli_publish(spn_cli_t* cli) {
     // type trips -Wswitch on every case
     switch ((s32) result.kind) {
       case SPN_ERR_NO_MANIFEST: {
-        spn_log_error("no manifest found at {.fg brightcyan}", SP_FMT_STR(result.no_manifest.path));
+        spn_log_error("no manifest found at {.cyan}", SP_FMT_STR(result.no_manifest.path));
         break;
       }
       case SPN_ERR_MANIFEST_PARSE: {
-        spn_log_error("failed to parse {.fg brightcyan}", SP_FMT_STR(result.manifest_parse.path));
+        spn_log_error("failed to parse {.cyan}", SP_FMT_STR(result.manifest_parse.path));
         break;
       }
       case SPN_ERR_MANIFEST_FIELD: {
-        spn_log_error("invalid field {.fg brightyellow} in manifest: expected {.fg brightgreen}, got {.fg brightred}",
+        spn_log_error("invalid field {.yellow} in manifest: expected {.green}, got {.red}",
           SP_FMT_STR(result.manifest_field.path),
           SP_FMT_STR(result.manifest_field.expected),
           SP_FMT_STR(result.manifest_field.actual)
@@ -52,15 +52,15 @@ sp_app_result_t spn_cli_publish(spn_cli_t* cli) {
         break;
       }
       case SPN_ERR_NOT_GIT_REPO: {
-        spn_log_error("{.fg brightcyan} is not inside a git repository", SP_FMT_STR(result.not_git_repo.path));
+        spn_log_error("{.cyan} is not inside a git repository", SP_FMT_STR(result.not_git_repo.path));
         break;
       }
       case SPN_ERR_GIT: {
-        spn_log_error("git command failed: {.fg brightyellow}", SP_FMT_STR(result.git.command));
+        spn_log_error("git command failed: {.yellow}", SP_FMT_STR(result.git.command));
         break;
       }
       case SPN_ERR_VERSION_EXISTS: {
-        spn_log_error("version {.fg brightyellow} of {.fg brightcyan} already exists in the index",
+        spn_log_error("version {.yellow} of {.cyan} already exists in the index",
           SP_FMT_STR(result.version_exists.version),
           SP_FMT_STR(result.version_exists.name)
         );

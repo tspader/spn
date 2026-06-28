@@ -73,7 +73,7 @@ static void e2e_prepare(s32* utest_result, fixture_t* fixture, const c8* project
 
 UTEST_F(e2e, sp) {
   if (!e2e_enabled()) {
-    sp_log("{.fg brightyellow} (set SPN_TEST_LIVE=1 to run)", SP_FMT_CSTR("skipped e2e.sp"));
+    sp_log("{.yellow} (set SPN_TEST_LIVE=1 to run)", SP_FMT_CSTR("skipped e2e.sp"));
     return;
   }
 

@@ -5,6 +5,6 @@ s32 main(s32 num_args, const c8** args) {
   (void)num_args;
   (void)args;
 
-  SP_LOG("hello, {.fg brightcyan}", SP_FMT_CSTR("world"));
+  SP_LOG("hello, {.cyan}", SP_FMT_CSTR("world"));
   SP_EXIT_SUCCESS();
 }

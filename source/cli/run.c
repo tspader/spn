@@ -75,7 +75,7 @@ sp_app_result_t spn_cli_run(spn_cli_t* cli) {
   }
 
   if (!has_manifest) {
-    spn_log_error("no manifest found in {.fg brightcyan}; pass a relative {.fg brightyellow} file instead",
+    spn_log_error("no manifest found in {.cyan}; pass a relative {.yellow} file instead",
       SP_FMT_STR(spn.paths.project),
       SP_FMT_CSTR(".c")
     );
@@ -83,7 +83,7 @@ sp_app_result_t spn_cli_run(spn_cli_t* cli) {
   }
 
   if (!sp_str_om_has(app.package.scripts, spn_intern(command->entry))) {
-    spn_log_error("script target {.fg brightyellow} is not defined",
+    spn_log_error("script target {.yellow} is not defined",
       SP_FMT_STR(command->entry)
     );
     return SP_APP_ERR;

@@ -33,7 +33,7 @@ toml_table_t* spn_toml_parse_ex(sp_str_t path, bool* parse_error) {
 
 const c8* spn_toml_cstr(toml_table_t* toml, const c8* key) {
   toml_value_t value = toml_table_string(toml, key);
-  SP_ASSERT_FMT(value.ok, "missing string key: {.fg brightcyan}", SP_FMT_CSTR(key));
+  SP_ASSERT_FMT(value.ok, "missing string key: {.cyan}", SP_FMT_CSTR(key));
   return value.u.s;
 }
 
