@@ -25,12 +25,13 @@ typedef struct {
   u32 capacity;
 } sp_intern_index_t;
 
-typedef struct {
+typedef struct sp_intern_t sp_intern_t;
+struct sp_intern_t {
   sp_mem_t mem;
   sp_mem_arena_t* data;
   sp_intern_index_t index;
   sp_intern_hash_fn_t hash;
   u32 next_id;
-} sp_intern_t;
+};
 
 #endif
