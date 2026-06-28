@@ -6,6 +6,7 @@
 #include "graph/types.h"
 #include "pkg/types.h"
 #include "session/registry/types.h"
+#include "spn.h"
 #include "target/types.h"
 #include "unit/types.h"
 
@@ -17,6 +18,9 @@
 #include "session/session.h"
 #include "task/task.h"
 #include "unit/package.h"
+
+#include "wasm/wasm.h"
+#include "wasm/types.h"
 
 #include <setjmp.h>
 
@@ -150,23 +154,85 @@ spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
 
   sp_tm_timer_t timer = sp_tm_start_timer();
   spn_tcc_err_ctx_t error_context = SP_ZERO_INITIALIZE();
+  spn_cc_t* cc = sp_alloc_type(spn_mem_todo, spn_cc_t);
 
-  spn_cc_t cc = SP_ZERO_INITIALIZE();
-  spn_cc_add_runtime(&cc, spn.paths.runtime, spn.paths.include);
-  spn_cc_set_profile(&cc, session->profile);
-  spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_CC_OUTPUT_JIT, unit->info->name);
-  spn_cc_target_add_absolute_source(target, unit->paths.script);
+  sp_da(sp_str_t) cc_args = sp_da_new(session->mem, sp_str_t);
+  sp_da_push(cc_args, (sp_str_lit("cc")));
+  sp_da(sp_str_t) ar_args = sp_da_new(session->mem, sp_str_t);
+  sp_da_push(ar_args, (sp_str_lit("ar")));
 
-  unit->tcc = sp_alloc_type(session->mem, spn_tcc_t);
-  spn_tcc_init(unit->tcc);
-  s32 try_err = 0;
-  spn_try_goto(spn_cc_target_to_tcc(&cc, target, unit->tcc), try_err, fail);
-  spn_try_goto(tcc_relocate(unit->tcc->s), try_err, fail);
+  spn_profile_info_t profile = {
+    .arch = SPN_ARCH_WASM32,
+    .os = SPN_OS_WASI,
+    .abi = SPN_ABI_NONE,
+    .mode = SPN_BUILD_MODE_DEBUG,
+    .linkage = SPN_LIB_KIND_SHARED,
+    .standard = SPN_C99
+  };
+  cc->driver = SPN_CC_DRIVER_CLANG;
+  cc->compiler = (spn_toolchain_launcher_t) { sp_str_lit("zig"), cc_args };
+  cc->linker = (spn_toolchain_launcher_t) { sp_str_lit("zig"), cc_args };
+  cc->archiver = (spn_toolchain_launcher_t) { sp_str_lit("zig"), ar_args };
 
-  unit->on_configure = tcc_get_symbol(unit->tcc->s, "configure");
-  unit->on_package = tcc_get_symbol(unit->tcc->s, "package");
+
+  spn_cc_set_profile(cc, profile);
+  spn_cc_set_output_dir(cc, unit->paths.generated);
+  //spn_cc_set_toolchain(cc, unit->session->units.toolchain);
+  sp_da_for(unit->info->include, it) {
+    sp_str_t path = sp_fs_join_path(session->mem, unit->paths.source, unit->info->include[it]);
+    spn_cc_add_include(cc, path);
+  }
+
+  sp_da_for(unit->info->define, it) {
+    spn_cc_add_define(cc, unit->info->define[it]);
+  }
+
+  spn_cc_target_t* target = spn_cc_add_target(cc, SPN_CC_OUTPUT_WASM, sp_str_lit("configure.wasm"));
+  spn_cc_target_add_absolute_source(target, unit->paths.configure);
+
+  spn_cc_run_t run = spn_cc_target_run(target, unit->paths.work);
+  spn_wasm_init_stupid_global_runtime();
+
+  sp_str_t output = sp_fs_join_path(session->mem, unit->paths.generated, sp_str_lit("configure.wasm"));
+  switch (spn_wasm_smoke(spn.mem, spn.intern, output)) {
+    case SPN_ERR_WASM_INIT_FAILED: { sp_log("SPN_ERR_WASM_INIT_FAILED"); return 1; }
+    case SPN_ERR_WASM_REGISTER_FAILED: { sp_log("SPN_ERR_WASM_REGISTER_FAILED"); return 1; }
+    case SPN_ERR_WASM_MODULE_LOAD_FAILED: { sp_log("SPN_ERR_WASM_MODULE_LOAD_FAILED"); return 1; }
+    case SPN_ERR_WASM_MODULE_INSTANCE_FAILED: { sp_log("SPN_ERR_WASM_MODULE_INSTANCE_FAILED"); return 1; }
+    case SPN_ERR_WASM_CTX_FAILED: { sp_log("SPN_ERR_WASM_CTX_FAILED"); return 1; }
+    case SPN_ERR_WASM_MODULE_CALL_FAILED: { sp_log("SPN_ERR_WASM_MODULE_CALL_FAILED"); return 1; }
+    case SPN_OK: break;
+    default: { sp_log("fuck"); return 1; }
+  }
+
+
 
   unit->time.compile = sp_tm_read_timer(&timer);
+
+  if (run.result.status.exit_code) {
+    spn_event_buffer_push_ex(session->events, unit->info, &unit->logs.io, (spn_build_event_t) {
+      .kind = SPN_EVENT_TARGET_BUILD_FAILED,
+      .target.failed = {
+        .source_file = unit->paths.configure,
+        .object_file = unit->paths.object,
+        .rc = run.result.status.exit_code,
+        .out = run.result.out,
+        .args = run.args,
+        .time = run.elapsed,
+      }
+    });
+  } else {
+    spn_event_buffer_push_ex(session->events, unit->info, &unit->logs.io, (spn_build_event_t) {
+      .kind = SPN_EVENT_TARGET_BUILD_PASSED,
+      .target.passed = {
+        .source_file = unit->paths.configure,
+        .object_file = unit->paths.object,
+        .args = run.args,
+        .out = run.result.out,
+        .time = run.elapsed,
+      }
+    });
+  }
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SCRIPT_COMPILE,

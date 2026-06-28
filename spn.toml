@@ -23,12 +23,13 @@ mode = "debug"
 toolchain = "musl-gcc"
 
 [[toolchain]]
+package = "zig"
+version = "0.15.2"
+
+[[toolchain]]
 package = "musl-gcc"
 version = "1.0.0"
 
-[[toolchain]]
-package = "zig"
-version = "0.15.2"
 
 [[toolchain]]
 name = "system"

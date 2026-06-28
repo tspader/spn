@@ -32,12 +32,14 @@ typedef enum {
   SPN_OS_WINDOWS,
   SPN_OS_LINUX,
   SPN_OS_MACOS,
+  SPN_OS_WASI,
 } spn_os_t;
 
 typedef enum {
   SPN_ARCH_NONE,
   SPN_ARCH_X64,
   SPN_ARCH_ARM64,
+  SPN_ARCH_WASM32,
 } spn_arch_t;
 
 typedef struct {

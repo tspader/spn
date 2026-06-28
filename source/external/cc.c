@@ -246,6 +246,11 @@ void spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* 
       sp_ps_config_add_arg(spn_mem_todo, ps, spn_cc_lib_kind_to_switch(cc->linkage));
       break;
     }
+    case SPN_CC_OUTPUT_WASM: {
+      sp_ps_config_add_arg(spn_mem_todo, ps, sp_str_lit("-mexec-model=reactor"));
+      sp_ps_config_add_arg(spn_mem_todo, ps, sp_str_lit("-Wl,--no-entry"));
+      break;
+    }
     case SPN_CC_OUTPUT_STATIC_LIB:
     case SPN_CC_OUTPUT_JIT: {
       break;
