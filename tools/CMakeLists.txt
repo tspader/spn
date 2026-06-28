@@ -7,11 +7,12 @@ add_dependencies(embed headers)
 add_custom_command(
   OUTPUT ${EMBED_OBJ} ${EMBED_HDR}
   COMMAND $<TARGET_FILE:embed>
-    ${STORE}/lib/tcc
+    --header ${EMBED_HDR}
     ${EMBED_OBJ}
-    ${EMBED_HDR}
-    ${CMAKE_SOURCE_DIR}/include/spn.h
-  DEPENDS embed tcc ${CMAKE_SOURCE_DIR}/include/spn.h
+    ${STORE}/lib/tcc
+    ${CMAKE_SOURCE_DIR}/include/spn.h=include/spn.h
+    ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.json=toolchains.json
+  DEPENDS embed tcc ${CMAKE_SOURCE_DIR}/include/spn.h ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.json
   COMMENT "spn.embed.o"
   VERBATIM)
 add_custom_target(spn_embed ALL DEPENDS ${EMBED_OBJ} ${EMBED_HDR})
