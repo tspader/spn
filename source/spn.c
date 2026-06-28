@@ -46,17 +46,18 @@
 #include "sp/macro.h"
 #include "sp/os.h"
 #include "sp/sp_glob.h"
+#include "external/wasm/wasm.h"
 #include "task/task.h"
 #include "tui/tui.h"
 #include "version.h"
-
-#include <sys/stat.h>
 
 // SINGLE HEADER
 #define SP_IMPLEMENTATION
 #include "sp.h"
 #include "sp/coff.h"
 #include "sp/sp_elf.h"
+
+#define SP_GRAPH_IMPLEMENTATION
 #include "sp/sp_graph.h"
 
 #define SP_MATH_IMPLEMENTATION
@@ -88,6 +89,7 @@ void on_signal(sp_os_signal_t signal, void* userdata) {
 sp_app_result_t spn_init(sp_app_t* sp) {
   spn.sp = sp;
   spn.mem = sp_mem_os_new();
+
   app.session.mem = spn.mem;
 
   spn.intern = sp_intern_new(spn.mem);
@@ -107,6 +109,20 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
+
+  if (getenv("SPN_WASM_SMOKE")) {
+    spn_wasm_init_stupid_global_runtime();
+
+    switch (spn_wasm_smoke(spn.mem, spn.intern, "tools/module.wasm")) {
+      case SPN_ERR_WASM_INIT_FAILED: { sp_log("SPN_ERR_WASM_INIT_FAILED"); return 1; }
+      case SPN_ERR_WASM_REGISTER_FAILED: { sp_log("SPN_ERR_WASM_REGISTER_FAILED"); return 1; }
+      case SPN_ERR_WASM_MODULE_LOAD_FAILED: { sp_log("SPN_ERR_WASM_MODULE_LOAD_FAILED"); return 1; }
+      case SPN_ERR_WASM_MODULE_INSTANCE_FAILED: { sp_log("SPN_ERR_WASM_MODULE_INSTANCE_FAILED"); return 1; }
+      case SPN_ERR_WASM_CTX_FAILED: { sp_log("SPN_ERR_WASM_CTX_FAILED"); return 1; }
+      case SPN_ERR_WASM_MODULE_CALL_FAILED: { sp_log("SPN_ERR_WASM_MODULE_CALL_FAILED"); return 1; }
+      default: break;
+    }
+  }
 
   spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_INTERACTIVE);
 
