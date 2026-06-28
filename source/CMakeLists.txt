@@ -35,6 +35,7 @@ set(SPN_SOURCES
   external/obj.c
   external/tcc.c
   external/tom.c
+  external/wasm/wasm.c
   filter/filter.c
   gen.c
   git/cache.c
@@ -106,7 +107,7 @@ target_include_directories(spn PRIVATE
   ${CMAKE_BINARY_DIR}/gen/manifest
   ${STORE}/include
 )
-target_link_libraries(spn PRIVATE m ${TCC_LIB})
+target_link_libraries(spn PRIVATE m vmlib ${TCC_LIB})
 target_compile_options(spn PRIVATE -include ${SRC}/sp/compat.h)
 add_dependencies(spn headers tcc spn_embed manifest_gen_header)
 
