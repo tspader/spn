@@ -43,5 +43,5 @@ foreach(src ${WAMR_RUNTIME_LIB_SOURCE})
 endforeach()
 
 add_library(vmlib STATIC ${WAMR_RUNTIME_LIB_SOURCE})
-target_include_directories(vmlib PUBLIC ${WAMR_ROOT_DIR}/core/iwasm/include)
+target_include_directories(vmlib INTERFACE ${WAMR_ROOT_DIR}/core/iwasm/include)
 set_target_properties(vmlib PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${STORE}/lib)
