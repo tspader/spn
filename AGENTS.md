@@ -122,15 +122,15 @@ we return errors up the call stack in an error union (by which we mean error cod
 ## try macros
 try macros are very important, to keep the code concise. prefer them, but it's OK to use regular conditional statements rather than a mess of macros. rule of thumb: if the error-producing code is a single function call, use a try macro
 
-### sp_try()
-sp_try() returns an error code if nonzero
+### spn_try()
+spn_try() returns an error code if nonzero
 ```c
 spn_err_t err = fn();
 if (err != SPN_OK) {
   return err;
 }
 
-sp_try(fn());
+spn_try(fn());
 ```
 
 ### spn_try_as()
@@ -192,7 +192,7 @@ assistant: Finds needed code, searches through our code for existing in-context 
 - always use the `sp_da` alias of `sp_dyn_array`
 - always use `lower_snake` macros, regardless of surrounding code
 - always use `spn_err_t` as the return type of a function which can fail; errors are returned up the call stack, go-style
-  - prefer the `sp_try(expr)` family of macros for a zig-style try instead of `err = expr; if (err) { return err; }`
+  - prefer the `spn_try(expr)` family of macros for a zig-style try instead of `err = expr; if (err) { return err; }`
 - prefer `const c8*` for structs or functions that are mostly used with literals, even if you convert to sp_str_t immediately when using
 - prefer designated initializers to memberwise assignment
 - prefer to use a specific allocator instead of the general purpose global allocator:
