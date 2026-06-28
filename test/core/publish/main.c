@@ -14,14 +14,14 @@ UTEST_STATE();
 
 spn_ctx_t spn;
 
-int main(int argc, const char *const argv[]) {
+s32 main(s32 num_args, const c8** args) {
   ctx_t* ctx = ctx_get();
   ctx_init(ctx);
 
   spn.intern = sp_intern_new(spn_allocator);
   spn.events = spn_event_buffer_new();
 
-  s32 result = utest_main(argc, argv);
+  s32 result = utest_main(num_args, args);
 
   ctx_deinit(ctx);
   return result;
