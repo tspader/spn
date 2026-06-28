@@ -85,7 +85,7 @@ add_test(NAME jtd COMMAND "$<TARGET_FILE:jtd>")
 
 add_executable(manifest_gen
   manifest_gen/main.c
-  ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.c
+  ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/codegen.c
   ${SRC}/enum/enum.c
   ${SRC}/external/tom.c
@@ -99,7 +99,7 @@ add_executable(manifest_gen
 )
 spn_test_binary(manifest_gen)
 target_include_directories(manifest_gen PRIVATE
-  ${CMAKE_BINARY_DIR}/gen/manifest
+  ${SRC}/codegen/gen
   ${CMAKE_CURRENT_SOURCE_DIR}/manifest_gen)
 target_compile_definitions(manifest_gen PRIVATE
   MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest_gen/manifests"
@@ -109,7 +109,7 @@ add_test(NAME manifest_gen COMMAND "$<TARGET_FILE:manifest_gen>")
 
 add_executable(manifest_lower
   manifest_lower/main.c
-  ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.c
+  ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/lower.c
   ${SRC}/enum/enum.c
@@ -124,7 +124,7 @@ add_executable(manifest_lower
 )
 spn_test_binary(manifest_lower)
 target_include_directories(manifest_lower PRIVATE
-  ${CMAKE_BINARY_DIR}/gen/manifest
+  ${SRC}/codegen/gen
   ${CMAKE_CURRENT_SOURCE_DIR}/manifest_lower)
 target_compile_definitions(manifest_lower PRIVATE
   MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest_lower/manifests")

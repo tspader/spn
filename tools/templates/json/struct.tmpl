@@ -1,0 +1,6 @@
+typedef struct spn_cg_{{ .name }} {
+{{ for .fields }}
+  {{ .type }} {{ .name }};
+{{ end }}
+} spn_cg_{{ .name }}_t;
+

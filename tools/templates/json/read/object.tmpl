@@ -1,0 +1,6 @@
+static void spn_cg_{{ .object }}_read_object(yyjson_val* obj, const c8* key, {{ .type }}* out, sp_mem_t mem) {
+  yyjson_val* child = yyjson_obj_get(obj, key);
+  if (yyjson_is_obj(child)) {
+    spn_cg_{{ .object }}_read(child, out, mem);
+  }
+}

@@ -1,0 +1,4 @@
+{{ for .objects }}
+static void spn_cg_{{ .name }}_read(yyjson_val* obj, {{ .type }}* out, sp_mem_t mem);
+static void spn_cg_{{ .name }}_write(const {{ .type }}* in, sp_io_writer_t* out);
+{{ end }}
