@@ -65,7 +65,7 @@ static spn_err_t spn_index_parse_rel(mz_ctx_t* ctx, mz_schema_t* schema, spn_pkg
   c8* source = sp_str_to_cstr(spn_mem_todo, json);
 
   mz_ctx_clear(ctx);
-  sp_try_as(mz_parse_str_ex(schema, source, release, ctx), SPN_ERROR);
+  spn_try_as(mz_parse_str_ex(schema, source, release, ctx), SPN_ERROR);
 
   if (!sp_str_equal(release->id.namespace, id.namespace)) {
     return SPN_ERROR;
@@ -210,7 +210,7 @@ spn_err_t spn_index_parse_pkg(mz_ctx_t* ctx, mz_schema_t* schema, spn_pkg_id_t i
     }
 
     spn_index_rel_t release = SP_ZERO_INITIALIZE();
-    sp_try(spn_index_parse_rel(ctx, schema, id, line, &release));
+    spn_try(spn_index_parse_rel(ctx, schema, id, line, &release));
 
     sp_da_for(pkg->releases, n) {
       if (spn_semver_eq(pkg->releases[n].version, release.version)) {

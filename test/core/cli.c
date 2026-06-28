@@ -5,6 +5,7 @@
 
 #include "test.h"
 #include "utest.h"
+#include "error/types.h"
 
 UTEST_MAIN()
 
@@ -260,7 +261,7 @@ sp_app_result_t run_cli(spn_cli_usage_t* cmd, spn_cli_t* user_data, const c8** a
     .cmd = cmd
   };
 
-  sp_try(spn_cli_parse(&parser));
+  spn_try(spn_cli_parse(&parser));
 
   if (parser.resolved->handler) {
     return parser.resolved->handler(user_data);

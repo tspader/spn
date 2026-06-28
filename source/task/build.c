@@ -181,7 +181,7 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
       spn_pkg_unit_t* dep = deps[d];
       if (!dep || dep == pkg) continue;
 
-      sp_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.main, dep->nodes.build.stamp.package));
+      spn_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.main, dep->nodes.build.stamp.package));
 
       sp_da_for(pkg->targets, t) {
         spn_target_unit_t* target = pkg->targets[t];
@@ -195,7 +195,7 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
             case SPN_LIB_KIND_STATIC:
             case SPN_LIB_KIND_SHARED: {
               if (lib->nodes.output.occupied) {
-                sp_try(spn_bg_cmd_add_input(graph, target->nodes.link, lib->nodes.output));
+                spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, lib->nodes.output));
               }
               break;
             }
@@ -316,7 +316,7 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
     // package step waits on them directly
     case SPN_LIB_KIND_OBJECT: {
       sp_da_for(target->objects, it) {
-        sp_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.package, target->objects[it]->nodes.object));
+        spn_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.package, target->objects[it]->nodes.object));
       }
       return SPN_OK;
     }
@@ -331,11 +331,11 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
   target->nodes.output = spn_bg_add_file(graph, get_target_output_path(target));
 
   spn_bg_cmd_add_output(graph, target->nodes.link,  target->nodes.output);
-  sp_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.package, target->nodes.output));
+  spn_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.package, target->nodes.output));
 
   sp_da_for(target->objects, it) {
     spn_compile_unit_t* object = target->objects[it];
-    sp_try(spn_bg_cmd_add_input(graph, target->nodes.link, object->nodes.object));
+    spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, object->nodes.object));
   }
 
   if (!sp_da_empty(info->embed)) {
@@ -343,9 +343,9 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
     target->nodes.embed.object = spn_bg_add_file(graph, get_embed_object_path(target));
     target->nodes.embed.header = spn_bg_add_file(graph, get_embed_header_path(target));
 
-    sp_try(spn_bg_cmd_add_output(graph, target->nodes.embed.run, target->nodes.embed.object));
-    sp_try(spn_bg_cmd_add_output(graph, target->nodes.embed.run, target->nodes.embed.header));
-    sp_try(spn_bg_cmd_add_input(graph, target->nodes.embed.run, pkg->nodes.build.stamp.exit));
+    spn_try(spn_bg_cmd_add_output(graph, target->nodes.embed.run, target->nodes.embed.object));
+    spn_try(spn_bg_cmd_add_output(graph, target->nodes.embed.run, target->nodes.embed.header));
+    spn_try(spn_bg_cmd_add_input(graph, target->nodes.embed.run, pkg->nodes.build.stamp.exit));
 
     sp_da_for(info->embed, it) {
       spn_embed_t* embed = &info->embed[it];
@@ -353,7 +353,7 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
       switch (embed->kind) {
         case SPN_EMBED_FILE: {
           spn_bg_id_t input = get_or_put_user_file(pkg, graph, embed->file.path);
-          sp_try(spn_bg_cmd_add_input(graph, target->nodes.embed.run, input));
+          spn_try(spn_bg_cmd_add_input(graph, target->nodes.embed.run, input));
           break;
         }
         case SPN_EMBED_MEM:
@@ -363,11 +363,11 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
       }
     }
 
-    sp_try(spn_bg_cmd_add_input(graph, target->nodes.link, target->nodes.embed.object));
+    spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, target->nodes.embed.object));
 
     sp_da_for(target->objects, it) {
       spn_compile_unit_t* obj = target->objects[it];
-      sp_try(spn_bg_cmd_add_input(graph, obj->nodes.compile, target->nodes.embed.header));
+      spn_try(spn_bg_cmd_add_input(graph, obj->nodes.compile, target->nodes.embed.header));
     }
   }
 
@@ -395,13 +395,13 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   nodes->main = spn_bg_add_fn(graph, stamp_enter, unit);
   nodes->exit = spn_bg_add_fn(graph, stamp_exit, unit);
 
-  sp_try(spn_bg_cmd_add_input(graph, nodes->main, nodes->manifest));
-  sp_try(spn_bg_cmd_add_input(graph, nodes->main, nodes->script));
-  sp_try(spn_bg_cmd_add_output(graph, nodes->main, nodes->stamp.main));
-  sp_try(spn_bg_cmd_add_input(graph, nodes->exit, nodes->stamp.main));
-  sp_try(spn_bg_cmd_add_output(graph, nodes->exit, nodes->stamp.exit));
-  sp_try(spn_bg_cmd_add_input(graph, nodes->package, nodes->stamp.exit));
-  sp_try(spn_bg_cmd_add_output(graph, nodes->package, nodes->stamp.package));
+  spn_try(spn_bg_cmd_add_input(graph, nodes->main, nodes->manifest));
+  spn_try(spn_bg_cmd_add_input(graph, nodes->main, nodes->script));
+  spn_try(spn_bg_cmd_add_output(graph, nodes->main, nodes->stamp.main));
+  spn_try(spn_bg_cmd_add_input(graph, nodes->exit, nodes->stamp.main));
+  spn_try(spn_bg_cmd_add_output(graph, nodes->exit, nodes->stamp.exit));
+  spn_try(spn_bg_cmd_add_input(graph, nodes->package, nodes->stamp.exit));
+  spn_try(spn_bg_cmd_add_output(graph, nodes->package, nodes->stamp.package));
 
 
   // user nodes
@@ -423,18 +423,18 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
 
     sp_da_for(node->outputs, o) {
       spn_bg_id_t file = get_or_put_user_file(unit, graph, node->outputs[o]);
-      sp_try(spn_bg_cmd_add_output(graph, node->id, file));
-      sp_try(spn_bg_cmd_add_input(graph, nodes->exit, file));
+      spn_try(spn_bg_cmd_add_output(graph, node->id, file));
+      spn_try(spn_bg_cmd_add_input(graph, nodes->exit, file));
     }
 
     // if no inputs, depend on the main node's stamp
     if (sp_da_empty(node->inputs) && sp_da_empty(node->deps)) {
-      sp_try(spn_bg_cmd_add_input(graph, node->id, nodes->stamp.main));
+      spn_try(spn_bg_cmd_add_input(graph, node->id, nodes->stamp.main));
     }
 
     sp_da_for(node->inputs, i) {
       spn_bg_id_t file = get_or_put_user_file(unit, graph, node->inputs[i]);
-      sp_try(spn_bg_cmd_add_input(graph, node->id, file));
+      spn_try(spn_bg_cmd_add_input(graph, node->id, file));
     }
   }
 
@@ -447,7 +447,7 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
       spn_user_node_t* dep = spn_find_user_node(node->deps[j]);
       sp_da_for(dep->outputs, k) {
         spn_bg_id_t output = get_or_put_user_file(unit, graph, dep->outputs[k]);
-        sp_try(spn_bg_cmd_add_input(graph, node->id, output));
+        spn_try(spn_bg_cmd_add_input(graph, node->id, output));
       }
     }
   }
@@ -466,7 +466,7 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   sp_da_for(unit->targets, it) {
     spn_target_unit_t* target = unit->targets[it];
     if (!sp_da_empty(target->info->source)) {
-      sp_try(add_target(graph, unit, target));
+      spn_try(add_target(graph, unit, target));
     }
   }
 

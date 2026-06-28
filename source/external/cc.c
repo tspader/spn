@@ -155,7 +155,7 @@ spn_err_t spn_cc_embed_ctx_add(
 }
 
 spn_err_t spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_str_t header) {
-  sp_try_as(spn_obj_write(&ctx->obj, object), SPN_ERROR);
+  spn_try_as(spn_obj_write(&ctx->obj, object), SPN_ERROR);
 
   sp_io_writer_t* io = sp_io_writer_from_file(header, SP_IO_WRITE_MODE_OVERWRITE);
   sp_da_for(ctx->entries, it) {
@@ -296,7 +296,7 @@ spn_err_t spn_cc_target_to_tcc(spn_cc_t* cc, spn_cc_target_t* target, spn_tcc_t*
   tcc_set_options(tcc->s, "-gdwarf -Wall -Werror");
   spn_try_as(tcc_set_output_type(tcc->s, TCC_OUTPUT_MEMORY), SPN_ERROR);
   tcc_define_symbol(tcc->s, "SPN", "");
-  sp_try(spn_tcc_register(tcc));
+  spn_try(spn_tcc_register(tcc));
 
   sp_da_for(cc->include, it) {
     spn_try(spn_tcc_add_include(tcc, cc->include[it]));
