@@ -26,7 +26,7 @@ UTEST_STATE();
 
 spn_ctx_t spn;
 
-int main(int argc, const char *const argv[]) {
+s32 main(s32 argc, const c8** argv) {
   ctx_t* ctx = ctx_get();
   ctx_init(ctx_get());
 

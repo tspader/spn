@@ -18,6 +18,7 @@ sp_str_t spn_arch_to_str(spn_arch_t arch) {
   switch (arch) {
     case SPN_ARCH_X64:   return sp_str_lit("x86_64");
     case SPN_ARCH_ARM64: return sp_str_lit("aarch64");
+    case SPN_ARCH_WASM32: return sp_str_lit("wasm32");
     case SPN_ARCH_NONE:  return sp_str_lit("");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
@@ -51,6 +52,7 @@ sp_str_t spn_os_to_str(spn_os_t os) {
     case SPN_OS_LINUX:   return sp_str_lit("linux");
     case SPN_OS_WINDOWS: return sp_str_lit("windows");
     case SPN_OS_MACOS:   return sp_str_lit("macos");
+    case SPN_OS_WASI:   return sp_str_lit("wasi");
     case SPN_OS_NONE:    return sp_str_lit("");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));

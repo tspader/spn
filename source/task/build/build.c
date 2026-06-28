@@ -105,6 +105,7 @@ sp_str_t get_target_output_path(spn_target_unit_t* target) {
       return sp_fs_join_path(spn_mem_todo, target->paths.lib, sp_os_lib_to_file_name(spn_mem_todo, info->name, SP_OS_LIB_SHARED));
     }
     case SPN_CC_OUTPUT_JIT:
+    case SPN_CC_OUTPUT_WASM:
     case SPN_CC_OUTPUT_OBJECT: break;
   }
 

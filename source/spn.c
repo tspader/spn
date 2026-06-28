@@ -111,20 +111,20 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
-  if (getenv("SPN_WASM_SMOKE")) {
-    spn_wasm_init_stupid_global_runtime();
-
-    switch (spn_wasm_smoke(spn.mem, spn.intern, "tools/module.wasm")) {
-      case SPN_ERR_WASM_INIT_FAILED: { sp_log("SPN_ERR_WASM_INIT_FAILED"); return 1; }
-      case SPN_ERR_WASM_REGISTER_FAILED: { sp_log("SPN_ERR_WASM_REGISTER_FAILED"); return 1; }
-      case SPN_ERR_WASM_MODULE_LOAD_FAILED: { sp_log("SPN_ERR_WASM_MODULE_LOAD_FAILED"); return 1; }
-      case SPN_ERR_WASM_MODULE_INSTANCE_FAILED: { sp_log("SPN_ERR_WASM_MODULE_INSTANCE_FAILED"); return 1; }
-      case SPN_ERR_WASM_CTX_FAILED: { sp_log("SPN_ERR_WASM_CTX_FAILED"); return 1; }
-      case SPN_ERR_WASM_MODULE_CALL_FAILED: { sp_log("SPN_ERR_WASM_MODULE_CALL_FAILED"); return 1; }
-      case SPN_OK: break;
-      default: { sp_log("fuck"); return 1; }
-    }
-  }
+  // if (getenv("SPN_WASM_SMOKE")) {
+  //   spn_wasm_init_stupid_global_runtime();
+  //
+  //   switch (spn_wasm_smoke(spn.mem, spn.intern, "tools/module.wasm")) {
+  //     case SPN_ERR_WASM_INIT_FAILED: { sp_log("SPN_ERR_WASM_INIT_FAILED"); return 1; }
+  //     case SPN_ERR_WASM_REGISTER_FAILED: { sp_log("SPN_ERR_WASM_REGISTER_FAILED"); return 1; }
+  //     case SPN_ERR_WASM_MODULE_LOAD_FAILED: { sp_log("SPN_ERR_WASM_MODULE_LOAD_FAILED"); return 1; }
+  //     case SPN_ERR_WASM_MODULE_INSTANCE_FAILED: { sp_log("SPN_ERR_WASM_MODULE_INSTANCE_FAILED"); return 1; }
+  //     case SPN_ERR_WASM_CTX_FAILED: { sp_log("SPN_ERR_WASM_CTX_FAILED"); return 1; }
+  //     case SPN_ERR_WASM_MODULE_CALL_FAILED: { sp_log("SPN_ERR_WASM_MODULE_CALL_FAILED"); return 1; }
+  //     case SPN_OK: break;
+  //     default: { sp_log("fuck"); return 1; }
+  //   }
+  // }
 
   spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_INTERACTIVE);
 

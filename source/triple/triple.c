@@ -98,8 +98,14 @@ sp_str_t spn_triple_to_cc_target(spn_triple_t triple) {
   // Clang/Zig use "gnu" where spn uses "mingw"
   sp_str_t abi;
   switch (triple.abi) {
-    case SPN_ABI_MINGW: abi = sp_str_lit("gnu"); break;
-    default:            abi = spn_abi_to_str(triple.abi); break;
+    case SPN_ABI_MINGW: {
+      abi = sp_str_lit("gnu");
+      break;
+    }
+    default: {
+      abi = spn_abi_to_str(triple.abi);
+      break;
+    }
   }
 
   if (triple.abi) {
@@ -129,6 +135,9 @@ sp_str_t spn_triple_to_autoconf(spn_triple_t triple) {
     case SPN_OS_MACOS: {
       return sp_format("{}-apple-darwin", SP_FMT_STR(arch));
     }
+    case SPN_OS_WASI: {
+      return sp_format("{}-wasi", SP_FMT_STR(arch));
+    }
     case SPN_OS_NONE: {
       return arch;
     }
@@ -141,6 +150,7 @@ sp_str_t spn_os_to_cmake_system_name(spn_os_t os) {
     case SPN_OS_LINUX:   return sp_str_lit("Linux");
     case SPN_OS_WINDOWS: return sp_str_lit("Windows");
     case SPN_OS_MACOS:   return sp_str_lit("Darwin");
+    case SPN_OS_WASI:   return sp_str_lit("WASI"); // @spader ? p much dead code
     case SPN_OS_NONE:    return sp_str_lit("");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));

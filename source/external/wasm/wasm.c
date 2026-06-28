@@ -107,12 +107,12 @@ spn_err_t spn_wasm_init_stupid_global_runtime() {
   return SPN_OK;
 }
 
-spn_err_t spn_wasm_smoke(sp_mem_t mem, sp_intern_t* interner, const c8* path) {
+spn_err_t spn_wasm_smoke(sp_mem_t mem, sp_intern_t* interner, sp_str_t path) {
   spn_wasm_t* wasm = sp_alloc_type(mem, spn_wasm_t);
   spn_wasm_init(wasm, mem, interner);
 
   spn_wasm_module_t* module = sp_zero;
-  spn_try(spn_wasm_load_module(wasm, sp_cstr_as_str(path), &module));
+  spn_try(spn_wasm_load_module(wasm, path, &module));
 
   spn_wasm_pkg_t pkg = sp_zero;
   spn_try(spn_wasm_instantiate_module(wasm, module, &pkg));

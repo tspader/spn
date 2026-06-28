@@ -17,6 +17,7 @@ typedef enum {
   SPN_CC_OUTPUT_STATIC_LIB,
   SPN_CC_OUTPUT_EXE,
   SPN_CC_OUTPUT_JIT,
+  SPN_CC_OUTPUT_WASM,
 } spn_cc_output_kind_t;
 
 typedef struct {
