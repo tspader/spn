@@ -1,0 +1,6 @@
+  {
+    yyjson_val* v = yyjson_obj_get(obj, "{{ .key }}");
+    if (v) {
+      sp_opt_set(out->{{ .key }}, {{ .from }}(spn_cg_json_str(obj, "{{ .key }}", mem)));
+    }
+  }

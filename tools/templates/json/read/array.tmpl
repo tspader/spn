@@ -1,0 +1,13 @@
+static void spn_cg_{{ .object }}_read_array(yyjson_val* obj, const c8* key, sp_da({{ .type }})* out, sp_mem_t mem) {
+  yyjson_val* arr = yyjson_obj_get(obj, key);
+  *out = sp_da_new(mem, {{ .type }});
+  size_t i, n;
+  yyjson_val* v;
+  yyjson_arr_foreach(arr, i, n, v) {
+    if (yyjson_is_obj(v)) {
+      {{ .type }} entry = sp_zero;
+      spn_cg_{{ .object }}_read(v, &entry, mem);
+      sp_da_push(*out, entry);
+    }
+  }
+}

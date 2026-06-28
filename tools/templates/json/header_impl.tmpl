@@ -1,0 +1,14 @@
+#include "toolchains.gen.h"
+#include "codegen/codegen.h"
+#include "enum/enum.h"
+#include "yyjson.h"
+
+static sp_str_t spn_cg_json_str(yyjson_val* obj, const c8* key, sp_mem_t mem) {
+  yyjson_val* v = yyjson_obj_get(obj, key);
+  const c8* s = yyjson_get_str(v);
+  if (!s) {
+    return sp_str_lit("");
+  }
+  return sp_str_from_cstr_n(mem, s, (u32)yyjson_get_len(v));
+}
+

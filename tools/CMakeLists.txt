@@ -32,22 +32,46 @@ target_include_directories(jtd_gen PRIVATE ${STORE}/include ${CMAKE_CURRENT_SOUR
 target_link_libraries(jtd_gen PRIVATE yyjson m)
 add_dependencies(jtd_gen headers)
 
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/gen/manifest)
-file(GLOB_RECURSE JTD_GEN_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/templates/*.tmpl)
+set(GEN_DIR ${CMAKE_SOURCE_DIR}/source/codegen/gen)
+file(MAKE_DIRECTORY ${GEN_DIR})
+
+file(GLOB JTD_GEN_TEMPLATES CONFIGURE_DEPENDS
+  ${CMAKE_CURRENT_SOURCE_DIR}/templates/*.tmpl
+  ${CMAKE_CURRENT_SOURCE_DIR}/templates/read/*.tmpl
+  ${CMAKE_CURRENT_SOURCE_DIR}/templates/write/*.tmpl)
 add_custom_command(
   OUTPUT
-    ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.types.h
-    ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.h
-    ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.c
-  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/gen/manifest
+    ${GEN_DIR}/manifest.gen.types.h
+    ${GEN_DIR}/manifest.gen.h
+    ${GEN_DIR}/manifest.gen.c
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${GEN_DIR}
   COMMAND $<TARGET_FILE:jtd_gen>
     ${CMAKE_SOURCE_DIR}/source/manifest/manifest.jtd.json
-    ${CMAKE_BINARY_DIR}/gen/manifest
+    ${GEN_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/templates
   DEPENDS jtd_gen ${CMAKE_SOURCE_DIR}/source/manifest/manifest.jtd.json ${JTD_GEN_TEMPLATES}
   COMMENT "manifest.gen.{types.h,h,c}"
   VERBATIM)
 add_custom_target(manifest_gen_header ALL DEPENDS
-  ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.types.h
-  ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.h
-  ${CMAKE_BINARY_DIR}/gen/manifest/manifest.gen.c)
+  ${GEN_DIR}/manifest.gen.types.h
+  ${GEN_DIR}/manifest.gen.h
+  ${GEN_DIR}/manifest.gen.c)
+
+file(GLOB_RECURSE JTD_GEN_JSON_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/templates/json/*.tmpl)
+add_custom_command(
+  OUTPUT
+    ${GEN_DIR}/toolchains.gen.types.h
+    ${GEN_DIR}/toolchains.gen.h
+    ${GEN_DIR}/toolchains.gen.c
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${GEN_DIR}
+  COMMAND $<TARGET_FILE:jtd_gen>
+    ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.jtd.json
+    ${GEN_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/templates/json
+  DEPENDS jtd_gen ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.jtd.json ${JTD_GEN_JSON_TEMPLATES}
+  COMMENT "toolchains.gen.{types.h,h,c}"
+  VERBATIM)
+add_custom_target(toolchains_gen_header ALL DEPENDS
+  ${GEN_DIR}/toolchains.gen.types.h
+  ${GEN_DIR}/toolchains.gen.h
+  ${GEN_DIR}/toolchains.gen.c)
