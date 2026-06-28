@@ -171,6 +171,8 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   unit->session = session;
   unit->paths.manifest = loaded->paths.manifest;
   unit->paths.script = loaded->paths.script;
+  unit->paths.configure = loaded->paths.configure;
+  unit->paths.build = loaded->paths.build;
   unit->paths.source = loaded->paths.source;
 
   switch (loaded->source) {
