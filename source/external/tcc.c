@@ -109,7 +109,7 @@ void spn_tcc_define_symbol(spn_tcc_t* tcc, sp_str_t symbol, sp_str_t value) {
 
 spn_err_t spn_tcc_register(spn_tcc_t* tcc) {
   sp_carr_for(spn_tcc_symbol_table, it) {
-    sp_try_as(tcc_add_symbol(tcc->s, spn_tcc_symbol_table[it].symbol, spn_tcc_symbol_table[it].fn), SPN_ERROR);
+    spn_try_as(tcc_add_symbol(tcc->s, spn_tcc_symbol_table[it].symbol, spn_tcc_symbol_table[it].fn), SPN_ERROR);
   }
   return SPN_OK;
 }

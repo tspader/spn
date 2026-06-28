@@ -55,7 +55,7 @@ static spn_err_t publish_headers(spn_pkg_unit_t* unit) {
 s32 run_package_hook(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
-  sp_try(publish_headers(unit));
+  spn_try(publish_headers(unit));
 
   if (unit->on_package) {
     emit_run(unit);

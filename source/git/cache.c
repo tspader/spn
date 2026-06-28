@@ -97,8 +97,8 @@ spn_err_t spn_git_cache_ensure_checkout(spn_git_cache_t* cache, spn_git_checkout
   }
 
   spn_git_db_t* db = SP_NULLPTR;
-  sp_try(spn_git_cache_ensure_db(cache, id.url, &db));
-  sp_try(spn_git_db_ensure_rev(db, id.rev));
+  spn_try(spn_git_cache_ensure_db(cache, id.url, &db));
+  spn_try(spn_git_db_ensure_rev(db, id.rev));
 
   sp_str_t path = sp_fs_join_path(spn_mem_todo, cache->checkouts.dir, key);
 
@@ -113,7 +113,7 @@ spn_err_t spn_git_cache_ensure_checkout(spn_git_cache_t* cache, spn_git_checkout
     });
     if (result.status.exit_code) return SPN_ERROR;
 
-    sp_try(spn_git_checkout(path, id.rev));
+    spn_try(spn_git_checkout(path, id.rev));
 
     if (!sp_str_empty(id.dir)) {
       sp_str_t subdir_path = sp_fs_join_path(spn_mem_todo, path, id.dir);

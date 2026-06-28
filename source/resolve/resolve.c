@@ -45,7 +45,7 @@ static spn_err_t check_cycle(spn_resolver_t* resolver, spn_resolve_run_t* run, s
 }
 
 static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_requested_pkg_t* request) {
-  sp_try(check_cycle(resolver, run, request));
+  spn_try(check_cycle(resolver, run, request));
 
   if (sp_str_ht_exists(run->query->result, request->qualified)) {
     return SPN_OK;
@@ -96,7 +96,7 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
 }
 
 static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_requested_pkg_t* request) {
-  sp_try(check_cycle(resolver, run, request));
+  spn_try(check_cycle(resolver, run, request));
 
   // If we already resolved a version for this package elsewhere, check if the
   // version we found there satisfies this request, too. If not, backtrack.

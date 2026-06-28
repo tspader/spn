@@ -103,8 +103,8 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
   unit->tcc = sp_alloc_type(session->mem, spn_tcc_t);
   spn_tcc_init(unit->tcc);
   s32 try_err = 0;
-  sp_try_goto(spn_cc_target_to_tcc(&cc, target, unit->tcc), try_err, fail);
-  sp_try_goto(tcc_relocate(unit->tcc->s), try_err, fail);
+  spn_try_goto(spn_cc_target_to_tcc(&cc, target, unit->tcc), try_err, fail);
+  spn_try_goto(tcc_relocate(unit->tcc->s), try_err, fail);
 
   unit->on_configure = tcc_get_symbol(unit->tcc->s, "configure");
   unit->on_package = tcc_get_symbol(unit->tcc->s, "package");

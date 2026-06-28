@@ -9,6 +9,12 @@
   if (_sp_result) return _sp_result; \
 } while (0)
 
+#define spn_try_goto(expr, err, label) \
+  do { \
+    err = (expr); \
+    if (err) goto label; \
+  } while (0)
+
 #define spn_try_as(expr, err) do { \
   if (expr) return err; \
 } while (0)
