@@ -16,6 +16,12 @@ add_custom_command(
   VERBATIM)
 add_custom_target(spn_embed ALL DEPENDS ${EMBED_OBJ} ${EMBED_HDR})
 
+add_executable(toolchain toolchain.c)
+set_target_properties(toolchain PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${STORE}/bin)
+target_include_directories(toolchain PRIVATE ${STORE}/include)
+target_link_libraries(toolchain PRIVATE yyjson m)
+add_dependencies(toolchain headers)
+
 add_executable(yyjson_stub yyjson_stub.c)
 set_target_properties(yyjson_stub PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(yyjson_stub PRIVATE yyjson)
