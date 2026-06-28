@@ -30,6 +30,8 @@ spn_loaded_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_st
   loaded->paths.manifest = manifest;
   loaded->paths.source = sp_fs_parent_path(manifest);
   loaded->paths.script = sp_fs_join_path(spn.mem, loaded->paths.source, sp_str_lit("spn.c"));
+  loaded->paths.build = sp_fs_join_path(spn.mem, loaded->paths.source, info->build);
+  loaded->paths.configure = sp_fs_join_path(spn.mem, loaded->paths.source, info->configure);
 
   return loaded;
 }

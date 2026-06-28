@@ -12,6 +12,8 @@ typedef struct {
   struct {
     sp_str_t manifest;
     sp_str_t script;
+    sp_str_t configure;
+    sp_str_t build;
     sp_str_t source;
   } paths;
   u64 elapsed;

@@ -41,7 +41,9 @@
         "commit": { "type": "string" },
         "include": { "elements": { "type": "string" } },
         "define": { "elements": { "type": "string" } },
-        "system_deps": { "elements": { "type": "string" } }
+        "system_deps": { "elements": { "type": "string" } },
+        "build": { "type": "string" },
+        "configure": { "type": "string" }
       }
     },
 

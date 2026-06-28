@@ -138,6 +138,63 @@ fail:
   return SPN_ERROR;
 }
 
+spn_err_t compile_shim(spn_session_t* session, spn_pkg_unit_t* unit) {
+  spn_try(compile_wasm(session, unit));
+  spn_try(compile_package(session, unit));
+  return SPN_OK;
+}
+
+spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
+  if (!sp_fs_is_file(unit->paths.configure)) return SPN_OK;
+  if (!sp_fs_is_file(unit->paths.build)) return SPN_OK;
+
+  sp_tm_timer_t timer = sp_tm_start_timer();
+  spn_tcc_err_ctx_t error_context = SP_ZERO_INITIALIZE();
+
+  spn_cc_t cc = SP_ZERO_INITIALIZE();
+  spn_cc_add_runtime(&cc, spn.paths.runtime, spn.paths.include);
+  spn_cc_set_profile(&cc, session->profile);
+  spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_CC_OUTPUT_JIT, unit->info->name);
+  spn_cc_target_add_absolute_source(target, unit->paths.script);
+
+  unit->tcc = sp_alloc_type(session->mem, spn_tcc_t);
+  spn_tcc_init(unit->tcc);
+  s32 try_err = 0;
+  spn_try_goto(spn_cc_target_to_tcc(&cc, target, unit->tcc), try_err, fail);
+  spn_try_goto(tcc_relocate(unit->tcc->s), try_err, fail);
+
+  unit->on_configure = tcc_get_symbol(unit->tcc->s, "configure");
+  unit->on_package = tcc_get_symbol(unit->tcc->s, "package");
+
+  unit->time.compile = sp_tm_read_timer(&timer);
+
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    .kind = SPN_EVENT_BUILD_SCRIPT_COMPILE,
+    .pkg = unit->info,
+    .io = &unit->logs.io,
+    .script_compile = {
+      .script_path = unit->paths.script,
+      .time = unit->time.compile,
+      .has_configure = unit->on_configure != SP_NULLPTR,
+      .has_package = unit->on_package != SP_NULLPTR,
+    }
+  });
+
+  return SPN_OK;
+
+fail:
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    .kind = SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,
+    .pkg = unit->info,
+    .io = &unit->logs.io,
+    .compile_failed = {
+      .script_path = unit->paths.script,
+      .error = error_context.error,
+    }
+  });
+  return SPN_ERROR;
+}
+
 spn_err_t configure_package(spn_pkg_unit_t* unit) {
   if (!unit->on_configure) return SPN_OK;
 
@@ -182,7 +239,7 @@ spn_err_t configure_package(spn_pkg_unit_t* unit) {
 s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
-  spn_try(compile_package(unit->session, unit));
+  spn_try(compile_shim(unit->session, unit));
   spn_try(configure_package(unit));
   return SPN_OK;
 }

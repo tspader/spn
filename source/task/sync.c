@@ -215,6 +215,8 @@ spn_err_t load_root_package(spn_session_t* session) {
   loaded->source = SPN_PKG_SOURCE_ROOT;
   loaded->paths.manifest = spn.paths.manifest;
   loaded->paths.script = sp_fs_join_path(session->mem, spn.paths.project, sp_str_lit("spn.c"));
+  loaded->paths.build = sp_fs_join_path(spn.mem, spn.paths.project, session->pkg->build);
+  loaded->paths.configure = sp_fs_join_path(spn.mem, spn.paths.project, session->pkg->configure);
   loaded->paths.source = spn.paths.project;
 
   return SPN_OK;

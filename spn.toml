@@ -3,6 +3,8 @@ namespace = "spader"
 name = "spn"
 version = "0.2.0"
 repo = "tspader/spn"
+build = "tools/spn/build.c"
+configure = "tools/spn/configure.c"
 
 [deps.package]
 "spader/spcc" = "1.0.0"

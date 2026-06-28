@@ -109,6 +109,8 @@ struct spn_pkg_info {
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) system_deps;
   spn_toolchain_entry_om_t toolchains;
+  sp_str_t build;
+  sp_str_t configure;
 
   sp_mem_arena_t* arena;
 };
