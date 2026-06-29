@@ -8,6 +8,9 @@ add_executable(resolver
   ${SRC}/external/mz.c
   ${SRC}/external/git.c
   ${SRC}/external/tom.c
+  ${SRC}/codegen/codegen.c
+  ${SRC}/codegen/lower.c
+  ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/index/index.c
   ${SRC}/index/json.c
   ${SRC}/sp/io.c
@@ -31,4 +34,6 @@ add_executable(resolver
   ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(resolver)
+target_include_directories(resolver PRIVATE ${SRC}/codegen/gen)
+add_dependencies(resolver spn_codegen_gen)
 add_test(NAME resolver COMMAND "$<TARGET_FILE:resolver>")

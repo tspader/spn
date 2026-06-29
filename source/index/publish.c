@@ -1,4 +1,6 @@
 #include "error/types.h"
+#include "codegen/codegen.h"
+#include "codegen/lower.h"
 #include "external/git.h"
 #include "index/index.h"
 #include "index/publish.h"
@@ -17,7 +19,11 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
   }
 
   spn_pkg_info_t info = SP_ZERO_INITIALIZE();
-  spn_try_union(spn_pkg_load(&info, manifest_path));
+  spn_codegen_ctx_t ctx = sp_zero;
+  spn_codegen_ctx_init(&ctx, opts->mem, opts->mem, opts->intern);
+  if (spn_codegen_load_pkg(&ctx, manifest_path, &info)) {
+    return spn_codegen_err(&ctx);
+  }
 
   sp_str_t repo = SP_ZERO_INITIALIZE();
   if (spn_git_get_root(opts->cwd, &repo)) {

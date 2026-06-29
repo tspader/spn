@@ -1,26 +1,3 @@
-add_executable(load
-  ${SRC}/ctx/ctx.c
-  ${SRC}/intern/context.c
-  ${SRC}/intern/intern.c
-  ${SRC}/enum/enum.c
-  ${SRC}/event/event.c
-  ${SRC}/external/tom.c
-  ${SRC}/pkg/id.c
-  ${SRC}/pkg/load.c
-  ${SRC}/pkg/mutate.c
-  ${SRC}/semver/compare.c
-  ${SRC}/semver/convert.c
-  ${SRC}/semver/parser.c
-  ${SRC}/target/mutate.c
-  ${SRC}/sp/str.c
-  manifest.c
-  ${TEST_TOOLS}/harness.c
-  ${TEST_TOOLS}/tmp.c
-  ${TEST_TOOLS}/toml.c
-)
-spn_test_binary(load)
-add_test(NAME load COMMAND "$<TARGET_FILE:load>")
-
 add_executable(lock
   ${SRC}/lock/lock.c
   ${SRC}/external/tom.c

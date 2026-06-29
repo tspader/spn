@@ -317,6 +317,8 @@ static void validate_inline_toolchains(spn_codegen_ctx_t* ctx, const spn_cg_mani
 }
 
 spn_err_t spn_pkg_lower(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
+  out->arena = sp_mem_arena_new(ctx->mem);
+
   lower_package(ctx, cg, out);
   lower_versions(ctx, cg, out);
   lower_targets(cg, out);
@@ -332,4 +334,16 @@ spn_err_t spn_pkg_lower(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn
   validate_inline_toolchains(ctx, cg);
 
   return sp_da_empty(ctx->issues) ? SPN_OK : SPN_ERROR;
+}
+
+spn_err_t spn_codegen_load_pkg(spn_codegen_ctx_t* ctx, sp_str_t manifest, spn_pkg_info_t* out) {
+  ctx->dir = sp_fs_parent_path(manifest);
+
+  spn_cg_manifest_t cg = sp_zero;
+  spn_err_t err = spn_codegen_load(ctx, manifest, &cg);
+  if (err) {
+    return err;
+  }
+
+  return spn_pkg_lower(ctx, &cg, out);
 }
