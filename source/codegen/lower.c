@@ -1,6 +1,6 @@
 #include "codegen/lower.h"
 
-#include "manifest.gen.types.h"
+#include "types.gen.h"
 #include "enum/enum.h"
 #include "semver/convert.h"
 #include "semver/parser.h"
@@ -150,7 +150,7 @@ static void lower_targets(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
 static void lower_toolchains(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   sp_str_om_init(out->toolchains);
   sp_da_for(cg->toolchain, n) {
-    const spn_cg_toolchain_t* t = &cg->toolchain[n];
+    const spn_cg_manifest_toolchain_t* t = &cg->toolchain[n];
     spn_toolchain_entry_t entry = sp_zero;
 
     if (!sp_str_empty(t->package)) {
@@ -302,7 +302,7 @@ static void validate_unique_targets(spn_codegen_ctx_t* ctx, spn_pkg_info_t* out)
 static void validate_inline_toolchains(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg) {
   spn_codegen_push_key(ctx, "toolchain");
   sp_da_for(cg->toolchain, it) {
-    const spn_cg_toolchain_t* t = &cg->toolchain[it];
+    const spn_cg_manifest_toolchain_t* t = &cg->toolchain[it];
     if (!sp_str_empty(t->package)) {
       continue;
     }

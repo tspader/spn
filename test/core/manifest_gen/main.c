@@ -28,19 +28,19 @@ static spn_codegen_ctx_t manifest_gen_ctx(sp_mem_t mem) {
 static sp_str_t manifest_gen_render(sp_mem_t mem, sp_fs_entry_t* entry) {
   spn_codegen_ctx_t ctx = manifest_gen_ctx(mem);
 
-  spn_cg_root_t manifest = sp_zero;
+  spn_cg_manifest_t manifest = sp_zero;
   if (spn_codegen_load(&ctx, entry->path, &manifest)) {
     return spn_codegen_issues_to_str(mem, ctx.issues);
   }
 
-  return spn_cg_root_write(mem, &manifest);
+  return spn_manifest_write(mem, &manifest);
 }
 
 UTEST(manifest_gen, missing_file) {
   sp_mem_t mem = manifest_gen_mem();
   spn_codegen_ctx_t ctx = manifest_gen_ctx(mem);
 
-  spn_cg_root_t manifest = sp_zero;
+  spn_cg_manifest_t manifest = sp_zero;
   bool failed = spn_codegen_load(&ctx, sp_str_lit("/nonexistent/missing.toml"), &manifest);
 
   ASSERT_TRUE(failed);

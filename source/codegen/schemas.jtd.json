@@ -1,5 +1,4 @@
 {
-  "ref": "manifest",
   "definitions": {
     "arch": { "enum": ["x86_64", "aarch64"] },
     "os": { "enum": ["windows", "linux", "macos"] },
@@ -10,7 +9,16 @@
     "build_mode": { "enum": ["release", "debug"] },
     "index_protocol": { "enum": ["git", "http", "filesystem"] },
 
+    "triple": {
+      "optionalProperties": {
+        "arch": { "ref": "arch" },
+        "os": { "ref": "os" },
+        "abi": { "ref": "abi" }
+      }
+    },
+
     "manifest": {
+      "metadata": { "renderer": "toml" },
       "properties": {
         "package": { "ref": "package" }
       },
@@ -19,7 +27,7 @@
         "bin": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
         "script": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
         "test": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
-        "toolchain": { "elements": { "ref": "toolchain" } },
+        "toolchain": { "elements": { "ref": "manifest_toolchain" } },
         "index": { "elements": { "ref": "index" }, "metadata": { "key": "name" } },
         "profile": { "values": { "ref": "profile" } },
         "deps": { "ref": "deps" },
@@ -63,15 +71,7 @@
       }
     },
 
-    "triple": {
-      "optionalProperties": {
-        "arch": { "ref": "arch" },
-        "os": { "ref": "os" },
-        "abi": { "ref": "abi" }
-      }
-    },
-
-    "toolchain": {
+    "manifest_toolchain": {
       "optionalProperties": {
         "name": { "type": "string" },
         "url": { "type": "string" },
@@ -119,6 +119,42 @@
     "config_entry": {
       "optionalProperties": {
         "kind": { "ref": "linkage" }
+      }
+    },
+
+    "toolchains": {
+      "metadata": { "renderer": "json" },
+      "optionalProperties": {
+        "toolchain": { "elements": { "ref": "toolchain" }, "metadata": { "key": "name" } }
+      }
+    },
+
+    "launcher": {
+      "properties":         { "program": { "type": "string" } },
+      "optionalProperties": { "args": { "elements": { "type": "string" } } }
+    },
+
+    "download": {
+      "properties": {
+        "url":    { "type": "string" },
+        "sha256": { "type": "string" }
+      }
+    },
+
+    "toolchain": {
+      "properties": {
+        "name":     { "type": "string" },
+        "version":  { "type": "string" },
+        "driver":   { "ref": "cc_driver" },
+        "compiler": { "ref": "launcher" },
+        "linker":   { "ref": "launcher" },
+        "archiver": { "ref": "launcher" },
+        "host":     { "values": { "ref": "download" } },
+        "target":   { "elements": { "ref": "triple" } }
+      },
+      "optionalProperties": {
+        "sysroot": { "type": "string" },
+        "mirrors": { "type": "string" }
       }
     }
   }

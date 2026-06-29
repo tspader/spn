@@ -259,18 +259,14 @@ render_result_t render_types(gen_t* g, sp_io_writer_t* out, sp_template_registry
     render_try(render_entry_struct(g, out, &g->entries[it], reg));
   }
 
-  sp_template_scope_t* root = sp_template_scope_create(g->mem);
-  sp_template_set(root, sp_str_lit("root_type"), type_name(g, g->root->name));
-  render_try(render(out, reg, "root_type", root));
-
   sp_fmt_io(out, "\n#endif\n");
   return (render_result_t) { .err = RENDER_OK };
 }
 
 render_result_t render_decls(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
-  render_try(render(out, reg, "header_fns", sp_template_scope_create(g->mem)));
-
   sp_template_scope_t* root = sp_template_scope_create(g->mem);
+  sp_template_set(root, sp_str_lit("root_name"), g->root->name);
+  render_try(render(out, reg, "header_fns", root));
   render_try(render(out, reg, "root_decl", root));
 
   sp_fmt_io(out, "\n#endif\n");
@@ -278,7 +274,9 @@ render_result_t render_decls(gen_t* g, sp_io_writer_t* out, sp_template_registry
 }
 
 render_result_t render_impl(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
-  render_try(render(out, reg, "header_impl", sp_template_scope_create(g->mem)));
+  sp_template_scope_t* head = sp_template_scope_create(g->mem);
+  sp_template_set(head, sp_str_lit("root_name"), g->root->name);
+  render_try(render(out, reg, "header_impl", head));
 
   sp_template_scope_t* objects = sp_template_scope_create(g->mem);
   sp_om_for(g->types, it) {

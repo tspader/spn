@@ -326,6 +326,6 @@ spn_err_t spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, spn_cg_manifes
   if (!table) {
     return spn_codegen_issue_at(ctx, SPN_CODEGEN_ERR_PARSE, sp_str_lit("invalid toml"));
   }
-  spn_cg_root_read(ctx, table, out);
+  spn_manifest_read(ctx, table, out);
   return (sp_da_empty(ctx->issues)) ? SPN_OK : SPN_ERROR;
 }
