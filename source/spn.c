@@ -365,10 +365,12 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     spn_codegen_ctx_t ctx = sp_zero;
     spn_codegen_ctx_init(&ctx, spn.allocators.heap, spn.allocators.bulk, spn.intern);
     spn_cg_manifest_t manifest = sp_zero;
-    spn_codegen_load(&ctx, spn.paths.manifest, &manifest);
-    spn_pkg_lower(&ctx, &manifest, &app.package);
+    spn_err_t load_err = spn_codegen_load(&ctx, spn.paths.manifest, &manifest);
+    if (!load_err) {
+      load_err = spn_pkg_lower(&ctx, &manifest, &app.package);
+    }
 
-    if (!sp_da_empty(ctx.issues)) {
+    if (load_err) {
       spn_log_error("{.red}: failed to parse manifest because of the following:", sp_fmt_cstr("error"));
       sp_da_for(ctx.issues, it) {
         spn_log_error("- {}", SP_FMT_STR(spn_codegen_issue_message(spn.mem, &ctx.issues[it])));

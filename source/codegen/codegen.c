@@ -9,7 +9,7 @@ void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_mem_t bulk, s
   ctx->bulk = bulk;
   ctx->intern = intern;
   ctx->depth = 0;
-  ctx->issues = sp_da_new(mem, spn_codegen_issue_t);
+  ctx->issues = sp_da_new(bulk, spn_codegen_issue_t);
 }
 
 void spn_codegen_push_key(spn_codegen_ctx_t* ctx, const c8* key) {
@@ -36,7 +36,7 @@ void spn_codegen_pop(spn_codegen_ctx_t* ctx) {
 
 static sp_str_t spn_codegen_path(spn_codegen_ctx_t* ctx) {
   sp_io_dyn_mem_writer_t writer;
-  sp_io_dyn_mem_writer_init(ctx->mem, &writer);
+  sp_io_dyn_mem_writer_init(ctx->bulk, &writer);
   sp_for(it, ctx->depth) {
     spn_codegen_path_seg_t* seg = &ctx->path[it];
     if (seg->kind == SPN_CODEGEN_PATH_KEY) {
@@ -359,4 +359,15 @@ spn_err_t spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, spn_cg_manifes
   }
   spn_manifest_read(ctx, table, out);
   return (sp_da_empty(ctx->issues)) ? SPN_OK : SPN_ERROR;
+}
+
+spn_err_union_t spn_codegen_err(spn_codegen_ctx_t* ctx) {
+  if (sp_da_empty(ctx->issues)) {
+    return spn_result(SPN_OK);
+  }
+
+  return (spn_err_union_t) {
+    .kind = SPN_ERR_MANIFEST_ISSUES,
+    .issues = ctx->issues,
+  };
 }

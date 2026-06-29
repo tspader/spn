@@ -54,6 +54,8 @@ typedef struct {
   sp_str_t command_b;
 } spn_err_build_graph_t;
 
+typedef struct spn_codegen_issue spn_codegen_issue_t;
+
 typedef struct {
   spn_err_t kind;
   union {
@@ -79,6 +81,7 @@ typedef struct {
       sp_str_t version;
     } version_exists;
     spn_err_build_graph_t build_graph;
+    sp_da(spn_codegen_issue_t) issues;
   };
 } spn_err_union_t;
 

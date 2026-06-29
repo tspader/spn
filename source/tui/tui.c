@@ -1,5 +1,6 @@
 #include "profile/types.h"
 
+#include "codegen/codegen.h"
 #include "ctx/ctx.h"
 #include "log/log.h"
 #include "semver/convert.h"
@@ -446,6 +447,17 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
             SP_FMT_STR(event->err.manifest_field.expected),
             SP_FMT_STR(event->err.manifest_field.actual)
           );
+          break;
+        }
+        case SPN_ERR_MANIFEST_ISSUES: {
+          sp_str_builder_append_cstr(&builder, "invalid manifest:");
+          sp_da_for(event->err.issues, it) {
+            sp_str_builder_append_fmt(
+              &builder,
+              "\n  - {}",
+              SP_FMT_STR(spn_codegen_issue_message(spn_mem_todo, &event->err.issues[it]))
+            );
+          }
           break;
         }
         default: {

@@ -316,7 +316,7 @@ static void validate_inline_toolchains(spn_codegen_ctx_t* ctx, const spn_cg_mani
   spn_codegen_pop(ctx);
 }
 
-void spn_pkg_lower(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
+spn_err_t spn_pkg_lower(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   lower_package(ctx, cg, out);
   lower_versions(ctx, cg, out);
   lower_targets(cg, out);
@@ -330,4 +330,6 @@ void spn_pkg_lower(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_
   validate_links(ctx, cg);
   validate_unique_targets(ctx, out);
   validate_inline_toolchains(ctx, cg);
+
+  return sp_da_empty(ctx->issues) ? SPN_OK : SPN_ERROR;
 }
