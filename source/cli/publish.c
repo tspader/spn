@@ -4,8 +4,8 @@
 #include "index/publish.h"
 #include "log/log.h"
 
-sp_app_result_t spn_cli_publish(spn_cli_t* cli) {
-  spn_cli_publish_t* cmd = &cli->publish;
+sp_cli_result_t spn_cli_publish(sp_cli_t* cli) {
+  spn_cli_publish_t* cmd = &spn.cli.publish;
 
   sp_str_t index_name = sp_str_empty(cmd->index) ? sp_str_lit("core") : cmd->index;
 
@@ -19,7 +19,7 @@ sp_app_result_t spn_cli_publish(spn_cli_t* cli) {
 
   if (!index) {
     spn_log_error("index {.cyan} not found", SP_FMT_STR(index_name));
-    return SP_APP_QUIT;
+    return SP_CLI_OK;
   }
 
   spn_publish_opts_t opts = {
@@ -75,5 +75,5 @@ sp_app_result_t spn_cli_publish(spn_cli_t* cli) {
     SP_LOG("published successfully");
   }
 
-  return SP_APP_QUIT;
+  return SP_CLI_OK;
 }

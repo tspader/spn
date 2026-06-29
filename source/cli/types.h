@@ -2,7 +2,9 @@
 #define SPN_CLI_TYPES_H
 
 #include "sp.h"
-#include "sp/cli.h"
+#include "sp/sp_cli.h"
+
+typedef struct spn_cli spn_cli_t;
 
 #define SPN_CLI_COMMAND(X) \
   X(SPN_CLI_INIT, "init") \
@@ -149,11 +151,9 @@ struct spn_cli {
   sp_str_t project_dir;
   sp_str_t project_file;
   sp_str_t output;
-  bool help;
   bool verbose;
   bool quiet;
 
-  spn_cli_usage_t usage;
   spn_cli_add_t add;
   spn_cli_update_t update;
   spn_cli_tool_t tool;
@@ -170,5 +170,77 @@ struct spn_cli {
   spn_cli_clean_t clean;
   spn_cli_publish_t publish;
 };
+
+typedef struct {
+  const c8* project_dir;
+  const c8* project_file;
+  const c8* output;
+  struct {
+    const c8* package;
+  } add;
+  struct {
+    const c8* package;
+  } update;
+  struct {
+    const c8* package;
+    const c8* version;
+  } tool_install;
+  struct {
+    const c8* package;
+    const c8* command;
+  } tool_run;
+  struct {
+    const c8* name;
+    const c8* profile;
+    const c8* toolchain;
+    const c8* mode;
+    const c8* target;
+    const c8* os;
+    const c8* arch;
+    const c8* abi;
+  } build;
+  struct {
+    const c8* entry;
+    const c8* profile;
+    const c8* toolchain;
+    const c8* mode;
+  } run;
+  struct {
+    const c8* name;
+    const c8* profile;
+    const c8* toolchain;
+    const c8* mode;
+  } test;
+  struct {
+    const c8* generator;
+    const c8* compiler;
+    const c8* path;
+  } generate;
+  struct {
+    const c8* dir;
+    const c8* package;
+  } which;
+  struct {
+    const c8* dir;
+    const c8* package;
+  } ls;
+  struct {
+    const c8* package;
+  } manifest;
+  struct {
+    const c8* directory;
+  } copy;
+  struct {
+    const c8* output;
+  } graph;
+  struct {
+    const c8* index;
+    const c8* source_url;
+    const c8* source_rev;
+  } publish;
+  struct {
+    const c8* profile;
+  } clean;
+} spn_cli_raw_t;
 
 #endif

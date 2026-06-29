@@ -56,6 +56,7 @@
 // SINGLE HEADER
 #define SP_IMPLEMENTATION
 #include "sp.h"
+#include "sp/sp_cli.h"
 #include "sp/coff.h"
 #include "sp/sp_elf.h"
 
@@ -315,26 +316,26 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   spn_cli_t* cli = &spn.cli;
-  spn.cli.usage = spn_cli();
 
-  spn_cli_parser_t parser = {
-    .args = spn.args + 1,
-    .num_args = spn.num_args - 1,
-    .cmd = &cli->usage
-  };
+  sp_cli_t parsed = sp_cli_parse((sp_cli_desc_t) {
+    .root = spn_cli(),
+    .args = spn.args,
+    .num_args = spn.num_args,
+    .user_data = &spn.cli,
+  });
 
-  switch (spn_cli_parse(&parser)) {
-    case SP_APP_CONTINUE: break;
-    case SP_APP_QUIT: spn_cli_help(&parser); return SP_APP_QUIT;
-    case SP_APP_ERR: {
-      if (sp_str_valid(parser.err)) {
-        sp_io_write_line(spn.logger.err, parser.err);
-      }
-
-      spn_cli_help(&parser);
-      return SP_APP_ERR;
-    }
+  if (parsed.status == SP_CLI_HELP) {
+    sp_cli_write_help(spn.logger.out, &parsed);
+    return SP_APP_QUIT;
   }
+  if (parsed.status == SP_CLI_ERR) {
+    sp_fmt_io(spn.logger.err, "{.red}: ", sp_fmt_cstr("error"));
+    sp_cli_err_print(spn.logger.err, parsed.err);
+    sp_fmt_io(spn.logger.err, "\n");
+    return SP_APP_ERR;
+  }
+
+  spn_cli_commit();
 
   if (cli->quiet) {
     spn.logger.verbosity = SPN_VERBOSITY_QUIET;
@@ -354,7 +355,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   if (!sp_fs_exists(spn.paths.manifest)) {
     // spn run can execute a lone source file without a project
-    if (!sp_str_equal_cstr(sp_str_view(parser.resolved->name), "run")) {
+    if (!sp_str_equal_cstr(sp_cstr_as_str(parsed.cmd->name), "run")) {
       spn_log_error("no manifest found at {.cyan}", SP_FMT_STR(spn.paths.manifest));
       return SP_APP_ERR;
     }
@@ -381,10 +382,11 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
 
-  switch (spn_cli_dispatch(&parser, cli)) {
-    case SP_APP_CONTINUE: return SP_APP_CONTINUE;
-    case SP_APP_QUIT: return SP_APP_QUIT;
-    case SP_APP_ERR: return SP_APP_ERR;
+  switch (sp_cli_dispatch(&parsed)) {
+    case SP_CLI_CONTINUE: return SP_APP_CONTINUE;
+    case SP_CLI_OK: return SP_APP_QUIT;
+    case SP_CLI_HELP: sp_cli_write_help(spn.logger.out, &parsed); return SP_APP_QUIT;
+    case SP_CLI_ERR: return SP_APP_ERR;
   }
 
   sp_unreachable_return(SP_APP_ERR);

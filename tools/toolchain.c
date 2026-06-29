@@ -12,7 +12,7 @@ typedef struct {
 
 #define try(expr) do { sp_cli_result_t _e = (expr); if (_e) return _e; } while (0)
 
-sp_cli_result_t fetch(sp_mem_t mem, sp_str_t url, sp_str_t out) {
+sp_cli_result_t fetch(sp_cli_t* cli, sp_mem_t mem, sp_str_t url, sp_str_t out) {
   if (sp_fs_exists(out)) return SP_CLI_OK;
 
   sp_ps_output_t r = sp_ps_run_c(mem, (sp_ps_config_cstr_t) {
@@ -24,13 +24,12 @@ sp_cli_result_t fetch(sp_mem_t mem, sp_str_t url, sp_str_t out) {
     }
   });
   if (r.status.exit_code) {
-    sp_cli_log_error("download failed: {.cyan}", sp_fmt_str(url));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(cli, sp_fmt(mem, "download failed: {.cyan}", sp_fmt_str(url)).value);
   }
   return SP_CLI_OK;
 }
 
-sp_cli_result_t pin(sp_mem_t mem, sp_str_t work, sp_str_t mirror, yyjson_mut_doc* doc, sp_str_t hostkey, yyjson_mut_val* dist) {
+sp_cli_result_t pin(sp_cli_t* cli, sp_mem_t mem, sp_str_t work, sp_str_t mirror, yyjson_mut_doc* doc, sp_str_t hostkey, yyjson_mut_val* dist) {
   sp_str_t url = sp_str_view(yyjson_mut_get_str(yyjson_mut_obj_get(dist, "url")));
   sp_str_t filename = sp_fs_get_name(url);
 
@@ -41,8 +40,8 @@ sp_cli_result_t pin(sp_mem_t mem, sp_str_t work, sp_str_t mirror, yyjson_mut_doc
   sp_str_t src_sig = sp_fmt(mem, "{}.minisig", sp_fmt_str(src)).value;
 
   sp_log("{.cyan}: fetching {}", sp_fmt_str(hostkey), sp_fmt_str(filename));
-  try(fetch(mem, src, tarball));
-  try(fetch(mem, src_sig, sig));
+  try(fetch(cli, mem, src, tarball));
+  try(fetch(cli, mem, src_sig, sig));
 
 
   sp_ps_output_t verify = sp_ps_run_c(mem, (sp_ps_config_cstr_t) {
@@ -54,15 +53,13 @@ sp_cli_result_t pin(sp_mem_t mem, sp_str_t work, sp_str_t mirror, yyjson_mut_doc
     }
   });
   if (verify.status.exit_code) {
-    sp_cli_log_error("minisign verification failed for {} (is minisign installed?)", sp_fmt_str(filename));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(cli, sp_fmt(mem, "minisign verification failed for {} (is minisign installed?)", sp_fmt_str(filename)).value);
   }
 
   sp_str_t sigtext = sp_zero;
   sp_io_read_file(mem, sig, &sigtext);
   if (!sp_str_contains(sigtext, filename)) {
-    sp_cli_log_error("trusted comment does not reference {} (possible downgrade)", sp_fmt_str(filename));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(cli, sp_fmt(mem, "trusted comment does not reference {} (possible downgrade)", sp_fmt_str(filename)).value);
   }
 
   sp_ps_output_t digest = sp_ps_run(mem, (sp_ps_config_t) {
@@ -70,8 +67,7 @@ sp_cli_result_t pin(sp_mem_t mem, sp_str_t work, sp_str_t mirror, yyjson_mut_doc
     .args = { tarball },
   });
   if (digest.status.exit_code) {
-    sp_cli_log_error("sha256sum failed for {}", sp_fmt_str(filename));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(cli, sp_fmt(mem, "sha256sum failed for {}", sp_fmt_str(filename)).value);
   }
   sp_str_t hash = sp_str_sub(sp_str_trim(digest.out), 0, 64);
   const c8* hash_cstr = sp_str_to_cstr(mem, hash);
@@ -98,14 +94,12 @@ static sp_cli_result_t run(sp_cli_t* cli) {
 
   sp_str_t content = sp_zero;
   if (sp_io_read_file(mem, manifest_path, &content) != SP_OK) {
-    sp_cli_log_error("failed to read {.cyan}", sp_fmt_str(manifest_path));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(cli, sp_fmt(mem, "failed to read {.cyan}", sp_fmt_str(manifest_path)).value);
   }
 
   yyjson_doc* idoc = yyjson_read(content.data, content.len, 0);
   if (!idoc) {
-    sp_cli_log_error("invalid JSON in {.cyan}", sp_fmt_str(manifest_path));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(cli, sp_fmt(mem, "invalid JSON in {.cyan}", sp_fmt_str(manifest_path)).value);
   }
   yyjson_mut_doc* doc = yyjson_doc_mut_copy(idoc, SP_NULLPTR);
   yyjson_mut_val* root = yyjson_mut_doc_get_root(doc);
@@ -124,13 +118,12 @@ static sp_cli_result_t run(sp_cli_t* cli) {
     yyjson_mut_val* dist;
     yyjson_mut_obj_foreach(host, hi, hn, key, dist) {
       sp_str_t hostkey = sp_str_view(yyjson_mut_get_str(key));
-      try(pin(mem, work, mirror, doc, hostkey, dist));
+      try(pin(cli, mem, work, mirror, doc, hostkey, dist));
     }
   }
 
   if (!yyjson_mut_write_file(a->manifest, doc, YYJSON_WRITE_PRETTY_TWO_SPACES, SP_NULLPTR, SP_NULLPTR)) {
-    sp_cli_log_error("failed to write {.cyan}", sp_fmt_str(manifest_path));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(cli, sp_fmt(mem, "failed to write {.cyan}", sp_fmt_str(manifest_path)).value);
   }
 
   sp_log("wrote {.cyan}", sp_fmt_str(manifest_path));
@@ -163,5 +156,10 @@ s32 main(s32 num_args, const c8** args) {
     .handler = run,
   };
 
-  return sp_cli_main(&root, num_args, args, &parsed);
+  return sp_cli_main((sp_cli_desc_t) {
+    .root = &root,
+    .num_args = num_args,
+    .args = args,
+    .user_data = &parsed,
+  });
 }

@@ -31,6 +31,7 @@ static sp_str_t embed_header_path(sp_mem_t mem, sp_str_t path) {
 }
 
 static sp_cli_result_t embed_one(
+  sp_cli_t* cli,
   sp_mem_t mem,
   sp_elf_t* elf,
   u32 rodata,
@@ -40,8 +41,7 @@ static sp_cli_result_t embed_one(
 ) {
   sp_str_t content = sp_zero;
   if (sp_io_read_file(mem, src_path, &content) != SP_OK) {
-    sp_cli_log_error("failed to read {.red}", sp_fmt_str(src_path));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(cli, sp_fmt(mem, "failed to read {.red}", sp_fmt_str(src_path)).value);
   }
 
   sp_str_t symbol = embed_symbol_from_path(mem, embed_path);
@@ -80,8 +80,7 @@ sp_cli_result_t embed_run(sp_cli_t* cli) {
   embed_t* embed = sp_cast(embed_t*, cli->user_data);
 
   if (!cli->num_rest) {
-    sp_cli_log_error("no input files");
-    return SP_CLI_ERR;
+    return sp_cli_set_error_c(cli, "no input files");
   }
 
   sp_mem_t mem = sp_mem_os_new();
@@ -118,14 +117,14 @@ sp_cli_result_t embed_run(sp_cli_t* cli) {
         if (ent.kind == SP_FS_KIND_DIR) continue;
         sp_str_t rel = sp_str_sub(ent.path, skip, ent.path.len - skip);
         sp_str_t embed_path = sp_str_empty(dest) ? rel : sp_fs_join_path(mem, dest, rel);
-        if (embed_one(mem, elf, rodata, &entries, ent.path, embed_path) != SP_CLI_OK) {
+        if (embed_one(cli, mem, elf, rodata, &entries, ent.path, embed_path) != SP_CLI_OK) {
           return SP_CLI_ERR;
         }
       }
     }
     else {
       sp_str_t embed_path = sp_str_empty(dest) ? sp_fs_get_name(src) : dest;
-      if (embed_one(mem, elf, rodata, &entries, src, embed_path) != SP_CLI_OK) {
+      if (embed_one(cli, mem, elf, rodata, &entries, src, embed_path) != SP_CLI_OK) {
         return SP_CLI_ERR;
       }
     }
@@ -150,30 +149,25 @@ sp_cli_result_t embed_run(sp_cli_t* cli) {
   sp_io_dyn_mem_writer_t object;
   sp_io_dyn_mem_writer_init(mem, &object);
   if (sp_elf_write(elf, &object.base) != SP_OK) {
-    sp_cli_log_error("failed to encode {.red}", sp_fmt_str(obj_path));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(cli, sp_fmt(mem, "failed to encode {.red}", sp_fmt_str(obj_path)).value);
   }
 
   sp_str_t obj_dir = sp_fs_parent_path(obj_path);
   if (!sp_str_empty(obj_dir) && sp_fs_create_dir(obj_dir) != SP_OK) {
-    sp_cli_log_error("failed to create {.red}", sp_fmt_str(obj_dir));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(cli, sp_fmt(mem, "failed to create {.red}", sp_fmt_str(obj_dir)).value);
   }
 
   sp_str_t hdr_dir = sp_fs_parent_path(hdr_path);
   if (!sp_str_empty(hdr_dir) && sp_fs_create_dir(hdr_dir) != SP_OK) {
-    sp_cli_log_error("failed to create {.red}", sp_fmt_str(hdr_dir));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(cli, sp_fmt(mem, "failed to create {.red}", sp_fmt_str(hdr_dir)).value);
   }
 
   if (sp_fs_create_file_slice(obj_path, (sp_mem_slice_t){ object.storage.data, object.storage.len }) != SP_OK) {
-    sp_cli_log_error("failed to write {.red}", sp_fmt_str(obj_path));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(cli, sp_fmt(mem, "failed to write {.red}", sp_fmt_str(obj_path)).value);
   }
 
   if (sp_fs_create_file_slice(hdr_path, (sp_mem_slice_t){ header.storage.data, header.storage.len }) != SP_OK) {
-    sp_cli_log_error("failed to write {.red}", sp_fmt_str(hdr_path));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(cli, sp_fmt(mem, "failed to write {.red}", sp_fmt_str(hdr_path)).value);
   }
 
   sp_log("embedded {.yellow} files -> {.gray} ({} bytes), {.gray} ({} bytes)", sp_fmt_uint(sp_da_size(entries)), sp_fmt_str(obj_path), sp_fmt_uint(object.storage.len), sp_fmt_str(hdr_path), sp_fmt_uint(header.storage.len));
@@ -212,6 +206,11 @@ s32 embed_main(s32 num_args, const c8** args) {
     .handler = embed_run,
   };
 
-  return sp_cli_main(&root, num_args, args, &embed);
+  return sp_cli_main((sp_cli_desc_t) {
+    .root = &root,
+    .num_args = num_args,
+    .args = args,
+    .user_data = &embed,
+  });
 }
 SP_MAIN(embed_main)

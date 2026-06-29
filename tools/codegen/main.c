@@ -19,6 +19,7 @@ typedef struct {
 } root_t;
 
 typedef struct {
+  sp_cli_t* cli;
   sp_mem_t mem;
   sp_mem_heap_t* heap;
   struct {
@@ -45,8 +46,7 @@ gen_t* gen_new(sp_mem_t mem) {
 
 sp_cli_result_t parse_schema(ctx_t* c) {
   if (jtd_parse_file(c->mem, c->args.schema, &c->jtd)) {
-    sp_cli_log_error("failed to parse schema ({})", sp_fmt_str(jtd_diagnostic_message(c->mem, &c->jtd.diag)));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(c->cli, sp_fmt(c->mem, "failed to parse schema ({})", sp_fmt_str(jtd_diagnostic_message(c->mem, &c->jtd.diag))).value);
   }
   return SP_CLI_OK;
 }
@@ -67,8 +67,7 @@ sp_cli_result_t collect_roots(ctx_t* c) {
   }
 
   if (sp_da_empty(c->roots)) {
-    sp_cli_log_error("schema has no roots (a definition with metadata.renderer)");
-    return SP_CLI_ERR;
+    return sp_cli_set_error_c(c->cli, "schema has no roots (a definition with metadata.renderer)");
   }
   return SP_CLI_OK;
 }
@@ -76,8 +75,7 @@ sp_cli_result_t collect_roots(ctx_t* c) {
 static sp_cli_result_t walk_root(ctx_t* c, gen_t* gen, root_t* root) {
   walk_result_t walked = register_type(gen, root->name, root->schema);
   if (walked.err) {
-    sp_cli_log_error("{}", sp_fmt_str(walk_result_to_str(c->mem, walked)));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(c->cli, sp_fmt(c->mem, "{}", sp_fmt_str(walk_result_to_str(c->mem, walked))).value);
   }
   return SP_CLI_OK;
 }
@@ -87,8 +85,7 @@ typedef render_result_t (*render_fn_t)(gen_t*, sp_io_writer_t*, sp_template_regi
 static sp_cli_result_t render_one(ctx_t* c, sp_str_t path, gen_t* gen, sp_template_registry_t* reg, render_fn_t fn) {
   sp_fs_atomic_t file = sp_zero;
   if (sp_fs_atomic_open(&file, path)) {
-    sp_cli_log_error("failed to open {.cyan}", sp_fmt_str(path));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(c->cli, sp_fmt(c->mem, "failed to open {.cyan}", sp_fmt_str(path)).value);
   }
 
   u8 buffer [64 * 1024];
@@ -98,13 +95,11 @@ static sp_cli_result_t render_one(ctx_t* c, sp_str_t path, gen_t* gen, sp_templa
   render_result_t rendered = fn(gen, io, reg);
   if (rendered.err) {
     sp_fs_atomic_abort(&file);
-    sp_cli_log_error("{}", sp_fmt_str(render_result_to_str(c->mem, rendered)));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(c->cli, sp_fmt(c->mem, "{}", sp_fmt_str(render_result_to_str(c->mem, rendered))).value);
   }
 
   if (sp_fs_atomic_commit(&file, SP_FS_ATOMIC_REPLACE)) {
-    sp_cli_log_error("failed to write {.cyan}", sp_fmt_str(path));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(c->cli, sp_fmt(c->mem, "failed to write {.cyan}", sp_fmt_str(path)).value);
   }
 
   return SP_CLI_OK;
@@ -114,8 +109,7 @@ static sp_cli_result_t load_registry(ctx_t* c, sp_str_t name, sp_template_regist
   sp_str_t dir = sp_fs_join_path(c->mem, c->args.templates, name);
   sp_template_registry_t* reg = sp_template_registry_create(c->mem);
   if (sp_template_load_dir(reg, dir)) {
-    sp_cli_log_error("failed to load templates from {.cyan}", sp_fmt_str(dir));
-    return SP_CLI_ERR;
+    return sp_cli_set_error(c->cli, sp_fmt(c->mem, "failed to load templates from {.cyan}", sp_fmt_str(dir)).value);
   }
   *out = reg;
   return SP_CLI_OK;
@@ -161,6 +155,7 @@ static sp_cli_result_t run_cli(sp_cli_t* cli) {
   sp_mem_heap_t* heap = sp_mem_heap_new();
   sp_mem_t mem = sp_mem_heap_as_allocator(heap);
   ctx_t ctx = {
+    .cli = cli,
     .heap = heap,
     .mem = mem,
     .args = {
@@ -206,5 +201,10 @@ s32 main(s32 num_args, const c8** args) {
     .handler = run_cli,
   };
 
-  return sp_cli_main(&root, num_args, args, &parsed);
+  return sp_cli_main((sp_cli_desc_t) {
+    .root = &root,
+    .num_args = num_args,
+    .args = args,
+    .user_data = &parsed,
+  });
 }

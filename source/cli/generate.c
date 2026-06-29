@@ -1,9 +1,10 @@
 #include "cli/cli.h"
 
+#include "ctx/types.h"
 #include "app/app.h"
 
-sp_app_result_t spn_cli_generate(spn_cli_t* cli) {
-  spn_cli_generate_t* command = &cli->generate;
+sp_cli_result_t spn_cli_generate(sp_cli_t* cli) {
+  spn_cli_generate_t* command = &spn.cli.generate;
 
   if (sp_str_valid(command->path) && !sp_str_valid(command->generator)) {
     SP_FATAL(
@@ -24,5 +25,5 @@ sp_app_result_t spn_cli_generate(spn_cli_t* cli) {
   spn_task_enqueue(&app.tasks, SPN_TASK_RUN_CONFIGURE_GRAPH);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_GENERATE);
 
-  return SP_APP_CONTINUE;
+  return SP_CLI_CONTINUE;
 }

@@ -9,10 +9,10 @@ typedef enum {
 } sp_fs_atomic_mode_t;
 
 typedef struct {
-  sp_sys_fd_t         dir;
-  sp_str_t            path;
-  sp_str_t            temp;
-  c8                  temp_buf[SP_PATH_MAX];
+  sp_sys_fd_t dir;
+  sp_str_t path;
+  sp_str_t temp;
+  c8 temp_buf [SP_PATH_MAX];
   sp_io_file_writer_t writer;
 } sp_fs_atomic_t;
 
@@ -41,11 +41,15 @@ static void sp_fs_atomic_temp_name(sp_fs_atomic_t* af) {
   u64 sequence = (u64)(u32)sp_atomic_s32_add(&sp_fs_atomic_sequence, 1);
   sp_str_t parent = sp_fs_parent_path(af->path);
   sp_str_t name = sp_fs_get_name(af->path);
+
+  sp_io_mem_writer_t io = sp_zero;
+  sp_io_mem_writer_from_buffer(&io, af->temp_buf, sizeof(af->temp_buf));
   if (sp_str_empty(parent)) {
-    af->temp = sp_fmt_buf(af->temp_buf, SP_PATH_MAX, ".{}.{}.{}.tmp", sp_fmt_str(name), sp_fmt_uint(stamp), sp_fmt_uint(sequence)).value;
+    sp_fmt_io(&io.base, ".{}.{}.{}.tmp", sp_fmt_str(name), sp_fmt_uint(stamp), sp_fmt_uint(sequence));
   } else {
-    af->temp = sp_fmt_buf(af->temp_buf, SP_PATH_MAX, "{}/.{}.{}.{}.tmp", sp_fmt_str(parent), sp_fmt_str(name), sp_fmt_uint(stamp), sp_fmt_uint(sequence)).value;
+    sp_fmt_io(&io.base, "{}/.{}.{}.{}.tmp", sp_fmt_str(parent), sp_fmt_str(name), sp_fmt_uint(stamp), sp_fmt_uint(sequence));
   }
+  af->temp = sp_io_mem_writer_as_str(&io);
 }
 
 static void sp_fs_atomic_make_parents(sp_sys_fd_t dir, sp_str_t path) {
