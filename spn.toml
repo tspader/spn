@@ -85,12 +85,6 @@ include = ["include", "source"]
 flags = ["-include", "sp/compat.h"]
 
 [[test]]
-name = "cli"
-source = ["source/sp/cli.c", "test/core/cli.c", "test/tools/tmp.c"]
-include = ["include", "source", "test/tools"]
-flags = ["-include", "sp/compat.h"]
-
-[[test]]
 name = "graph"
 source = ["test/core/graph.c"]
 include = ["test/sp_test", "include", "source", "test/core"]

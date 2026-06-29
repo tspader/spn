@@ -308,11 +308,9 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
     }
   }
 
-  // @spader This smells like denormalized data. Why am I checking a random string here? I should
-  // know exactly whether I need to download this
   spn_toolchain_unit_t* toolchains [] = { session->units.zig, session->units.toolchain };
   sp_carr_for(toolchains, it) {
-    if (!sp_str_empty(toolchains[it]->url)) {
+    if (toolchains[it]->kind == SPN_TOOLCHAIN_REMOTE) {
       spn_try(add_toolchain_download(graph, session, toolchains[it]));
     }
   }

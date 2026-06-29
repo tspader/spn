@@ -5,8 +5,8 @@
 #include "event/event.h"
 #include "triple/triple.h"
 
-sp_app_result_t spn_cli_build(spn_cli_t* cli) {
-  spn_cli_build_t* command = &cli->build;
+sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
+  spn_cli_build_t* command = &spn.cli.build;
 
   app.config.force = command->force,
   app.config.filter = (spn_target_filter_t) {
@@ -51,5 +51,5 @@ sp_app_result_t spn_cli_build(spn_cli_t* cli) {
   spn_task_enqueue(&app.tasks, SPN_TASK_CREATE_UNITS);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN_BUILD_GRAPH);
 
-  return SP_APP_CONTINUE;
+  return SP_CLI_CONTINUE;
 }

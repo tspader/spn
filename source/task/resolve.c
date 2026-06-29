@@ -18,7 +18,6 @@
 #include "unit/types.h"
 
 spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
-  // @spader Clean this up
   sp_str_om_for(root->toolchains, it) {
     spn_toolchain_entry_t entry = *sp_str_om_at(root->toolchains, it);
     sp_str_ht_insert(session->toolchains, entry.name, entry);

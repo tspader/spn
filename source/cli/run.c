@@ -39,8 +39,8 @@ static bool spn_cli_run_is_source_entry(sp_str_t entry, bool has_manifest) {
   return sp_fs_exists(sp_fs_join_path(spn.mem, spn.paths.project, entry));
 }
 
-sp_app_result_t spn_cli_run(spn_cli_t* cli) {
-  spn_cli_run_t* command = &cli->run;
+sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
+  spn_cli_run_t* command = &spn.cli.run;
   bool has_manifest = sp_fs_exists(spn.paths.manifest);
   bool source = spn_cli_run_is_source_entry(command->entry, has_manifest);
 
@@ -71,7 +71,7 @@ sp_app_result_t spn_cli_run(spn_cli_t* cli) {
     }
 
     spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN);
-    return SP_APP_CONTINUE;
+    return SP_CLI_CONTINUE;
   }
 
   if (!has_manifest) {
@@ -79,14 +79,14 @@ sp_app_result_t spn_cli_run(spn_cli_t* cli) {
       SP_FMT_STR(spn.paths.project),
       SP_FMT_CSTR(".c")
     );
-    return SP_APP_ERR;
+    return SP_CLI_ERR;
   }
 
   if (!sp_str_om_has(app.package.scripts, spn_intern(command->entry))) {
     spn_log_error("script target {.yellow} is not defined",
       SP_FMT_STR(command->entry)
     );
-    return SP_APP_ERR;
+    return SP_CLI_ERR;
   }
 
   spn_task_enqueue(&app.tasks, SPN_TASK_RESOLVE);
@@ -96,5 +96,5 @@ sp_app_result_t spn_cli_run(spn_cli_t* cli) {
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN_BUILD_GRAPH);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN);
 
-  return SP_APP_CONTINUE;
+  return SP_CLI_CONTINUE;
 }

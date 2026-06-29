@@ -60,7 +60,6 @@ set(SPN_SOURCES
   semver/parser.c
   session/registry/registry.c
   session/session.c
-  sp/cli.c
   sp/color.c
   sp/io.c
   sp/it.c

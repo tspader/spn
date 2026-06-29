@@ -1,10 +1,11 @@
 #include "cli/cli.h"
 
+#include "ctx/types.h"
 #include "app/app.h"
 #include "enum/enum.h"
 
-sp_app_result_t spn_cli_test(spn_cli_t* cli) {
-  spn_cli_test_t* command = &cli->test;
+sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
+  spn_cli_test_t* command = &spn.cli.test;
 
   app.config.filter = (spn_target_filter_t) {
     .name = command->name,
@@ -29,5 +30,5 @@ sp_app_result_t spn_cli_test(spn_cli_t* cli) {
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN_BUILD_GRAPH);
   spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN);
 
-  return SP_APP_CONTINUE;
+  return SP_CLI_CONTINUE;
 }
