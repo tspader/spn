@@ -156,6 +156,21 @@ UTEST_F(spn_build, file_package) {
   });
 }
 
+UTEST_F(spn_build, path_dep_remote_source) {
+  tmpfs_init_named(&uf->fixture.fs, "path_dep_remote_source");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/path_dep_remote_source",
+    .copy = { "vendor/spum/spn.toml" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_LOCKED },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+    },
+  });
+}
+
 UTEST_F(spn_build, editable_package) {
   tmpfs_init_named(&uf->fixture.fs, "editable_package");
 
