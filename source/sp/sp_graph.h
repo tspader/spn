@@ -182,6 +182,7 @@ typedef struct {
 
   s32 active_workers;
   sp_atomic_s32_t shutdown;
+  sp_atomic_s32_t num_completed;
 } spn_bg_executor_t;
 
 SP_API spn_build_graph_t*  spn_bg_new(sp_mem_t mem);
@@ -901,6 +902,7 @@ s32 spn_bg_worker_fn(void* user_data) {
     sp_mutex_lock(&ex->mutex);
     ex->active_workers--;
     sp_ht_insert(ex->completed, cmd_id, true);
+    sp_atomic_s32_add(&ex->num_completed, 1);
     sp_da_push(ex->ran, cmd_id);
 
     switch (error.some) {

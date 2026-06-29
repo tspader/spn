@@ -56,6 +56,7 @@
 // SINGLE HEADER
 #define SP_IMPLEMENTATION
 #include "sp.h"
+#include "sp/prompt.h"
 #include "sp/sp_cli.h"
 #include "sp/coff.h"
 #include "sp/sp_elf.h"
@@ -393,7 +394,63 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   sp_unreachable_return(SP_APP_ERR);
 }
 
+static void spn_prompt_start(void) {
+  spn_tui_t* tui = &spn.tui;
+  if (tui->prompt.started) return;
+  tui->prompt.started = true;
+
+  if (tui->mode != SPN_OUTPUT_MODE_INTERACTIVE) return;
+  if (!sp_os_is_tty(sp_sys_stdout)) return;
+
+  tui->prompt.ctx = sp_prompt_begin(spn.mem);
+  if (!tui->prompt.ctx) return;
+
+  sp_prompt_widget_t widget = sp_prompt_progress_widget(tui->prompt.ctx, (sp_prompt_progress_t) {
+    .prompt = "building",
+    .color = { .rgb = { .r = 99, .g = 160, .b = 136 } },
+  });
+  sp_prompt_app(tui->prompt.ctx, widget);
+  tui->prompt.app = (sp_app_t) { .user_data = tui->prompt.ctx };
+  sp_prompt_app_on_init(&tui->prompt.app);
+  tui->prompt.on = true;
+}
+
+static void spn_prompt_pump(void) {
+  spn_tui_t* tui = &spn.tui;
+  if (!tui->prompt.on) return;
+
+  spn_bg_ctx_t* build = &app.session.build;
+  f32 value = 0.f;
+  if (build->executor && build->dirty) {
+    u32 total = sp_ht_size(build->dirty->commands);
+    u32 done = (u32)sp_atomic_s32_get(&build->executor->num_completed);
+    if (total) value = (f32)done / (f32)total;
+
+    sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+    sp_prompt_send_status_str(tui->prompt.ctx, sp_fmt(s.mem,
+      "{}/{} units", sp_fmt_uint(done), sp_fmt_uint(total)).value);
+    sp_mem_end_scratch(s);
+  }
+
+  sp_prompt_send_progress_f32(tui->prompt.ctx, value);
+  sp_prompt_app_on_poll(&tui->prompt.app);
+
+  if (sp_prompt_is_aborted(tui->prompt.ctx)) {
+    sp_atomic_s32_set(&spn.sp->shutdown, 1);
+  }
+}
+
 sp_app_result_t spn_poll(sp_app_t* sp) {
+  spn_prompt_start();
+
+  sp_str_t root_qualified = sp_str_lit("");
+  if (app.session.pkg) {
+    spn_pkg_unit_t* root = spn_session_find_root(&app.session);
+    if (root && root->info) {
+      root_qualified = root->info->qualified;
+    }
+  }
+
   sp_da(spn_build_event_t) events = spn_event_buffer_drain(spn.events);
 
   sp_da_for(events, it) {
@@ -427,9 +484,18 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
 
     // write to tui (filtered by verbosity)
     if (spn_build_event_get_verbosity(event->kind) <= spn.logger.verbosity) {
-      sp_io_write_line(spn.logger.err, spn_tui_render_event(event, spn.tui.info.max_name));
+      sp_str_t line = spn_tui_render_coarse_event(event, spn.tui.info.max_name, root_qualified);
+      if (!sp_str_empty(line)) {
+        if (spn.tui.prompt.on) {
+          sp_prompt_log_str(spn.tui.prompt.ctx, line);
+        } else {
+          sp_io_write_line(spn.logger.err, line);
+        }
+      }
     }
   }
+
+  spn_prompt_pump();
 
   return SP_APP_CONTINUE;
 }
@@ -516,9 +582,11 @@ sp_app_result_t spn_update(sp_app_t* sp) {
 void spn_deinit(sp_app_t* sp) {
   switch (spn.tui.mode) {
     case SPN_OUTPUT_MODE_INTERACTIVE: {
-      // sp_tui_restore(&spn.tui);
-      // sp_tui_show_cursor();
-      // sp_tui_home();
+      if (spn.tui.prompt.on) {
+        sp_prompt_complete(spn.tui.prompt.ctx);
+        sp_prompt_end(spn.tui.prompt.ctx);
+        spn.tui.prompt.on = false;
+      }
       sp_tui_flush();
       break;
     }
