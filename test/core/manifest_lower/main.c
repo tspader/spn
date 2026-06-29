@@ -242,11 +242,6 @@ static void run_case(s32* utest_result, test_t test) {
     ASSERT_TRUE(tc);
     EXPECT_EQ((u32)expected.kind, (u32)tc->kind);
 
-    if (expected.kind == SPN_TOOLCHAIN_INDEX) {
-      if (expected.package) EXPECT_STR(tc->request.package, expected.package);
-      continue;
-    }
-
     if (expected.url)      EXPECT_STR(tc->info.url, expected.url);
     if (expected.sysroot)  EXPECT_STR(tc->info.sysroot, expected.sysroot);
     if (expected.compiler) EXPECT_STR(tc->info.compiler.program, expected.compiler);
@@ -579,7 +574,7 @@ UTEST(lower, toolchain_inline) {
     .toolchains = {
       {
         .name = "zig",
-        .kind = SPN_TOOLCHAIN_INLINE,
+        .kind = SPN_TOOLCHAIN_REMOTE,
         .url = "https://tc",
         .sysroot = "/sys",
         .compiler = "zig",
@@ -590,19 +585,6 @@ UTEST(lower, toolchain_inline) {
         .export = true,
         .hosts = { { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU } },
         .targets = { { SPN_ARCH_ARM64, SPN_OS_MACOS } },
-      },
-    },
-  });
-}
-
-UTEST(lower, toolchain_index) {
-  run_case(utest_result, (test_t) {
-    .manifest = "toolchain_index",
-    .toolchains = {
-      {
-        .name = "zig",
-        .kind = SPN_TOOLCHAIN_INDEX,
-        .package = "core/zig",
       },
     },
   });

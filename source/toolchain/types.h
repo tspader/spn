@@ -13,15 +13,9 @@ typedef enum {
 } spn_cc_driver_t;
 
 typedef enum {
-  SPN_TOOLCHAIN_INLINE,
-  SPN_TOOLCHAIN_INDEX,
-  SPN_TOOLCHAIN_BUILTIN,
+  SPN_TOOLCHAIN_SYSTEM,
+  SPN_TOOLCHAIN_REMOTE,
 } spn_toolchain_kind_t;
-
-typedef struct {
-  sp_str_t package;
-  spn_semver_range_t range;
-} spn_toolchain_req_t;
 
 typedef struct {
   sp_str_t program;
@@ -49,10 +43,7 @@ typedef struct spn_toolchain_info {
 typedef struct spn_toolchain_entry {
   sp_str_t name;
   spn_toolchain_kind_t kind;
-  union {
-    spn_toolchain_info_t info;
-    spn_toolchain_req_t request;
-  };
+  spn_toolchain_info_t info;
 } spn_toolchain_entry_t;
 
 #endif
