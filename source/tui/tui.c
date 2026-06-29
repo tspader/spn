@@ -55,6 +55,7 @@ static spn_build_event_display_t event_info[] = {
   EVENT(SPN_EVENT_ERR,                           "failed", RED,   SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_ERR_CIRCULAR_DEP,              "failed", RED,   SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_ERR_UNKNOWN_PKG,               "failed", RED,   SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_ERR_UNSATISFIABLE_VERSION,     "failed", RED,   SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_RESOLVE,                       "resolve", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_SYNC,                          "sync", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_CHECKOUT,                      "checkout", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
@@ -407,6 +408,15 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       );
       break;
     }
+    case SPN_EVENT_ERR_UNSATISFIABLE_VERSION: {
+      sp_str_builder_append_fmt(
+        &builder,
+        "no version of {.cyan} satisfies {.yellow}",
+        SP_FMT_STR(event->unsatisfiable.low.qualified),
+        SP_FMT_STR(spn_semver_range_to_str(event->unsatisfiable.low.index.range))
+      );
+      break;
+    }
     case SPN_EVENT_ERR_CIRCULAR_DEP: {
       sp_str_builder_append_fmt(
         &builder,
@@ -561,6 +571,88 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
   return sp_str_builder_to_str(&builder);
 }
 
+static sp_str_t spn_tui_render_coarse_line(sp_str_t verb, sp_str_t pkg_name, sp_str_t detail) {
+  return sp_format(
+    "{:>12 .bold .green} {} {}",
+    SP_FMT_STR(verb),
+    SP_FMT_STR(spn_tui_decorate_name(pkg_name, 0, ' ')),
+    SP_FMT_STR(detail)
+  );
+}
+
+sp_str_t spn_tui_render_coarse_event(spn_build_event_t* event, u32 max_name, sp_str_t root_qualified) {
+  static sp_str_ht(bool) seen_pkg = SP_NULLPTR;
+  static sp_str_ht(bool) seen_target = SP_NULLPTR;
+
+  switch (event->kind) {
+    case SPN_EVENT_CHECKOUT: {
+      if (!event->pkg) {
+        return sp_str_lit("");
+      }
+      return spn_tui_render_coarse_line(
+        sp_str_lit("Downloaded"),
+        event->pkg->name,
+        sp_format("v{}", SP_FMT_STR(spn_semver_to_str(event->checkout.version)))
+      );
+    }
+
+    case SPN_EVENT_TARGET_BUILD:
+    case SPN_EVENT_TARGET_BUILD_PASSED:
+    case SPN_EVENT_BUILD_SCRIPT_COMPILE:
+    case SPN_EVENT_EMBED_START:
+    case SPN_EVENT_LINK_START: {
+      if (!event->pkg) {
+        return sp_str_lit("");
+      }
+
+      if (!sp_str_ht_get(seen_pkg, event->pkg->qualified)) {
+        sp_str_ht_insert(seen_pkg, event->pkg->qualified, true);
+        return spn_tui_render_coarse_line(
+          sp_str_lit("Compiling"),
+          event->pkg->name,
+          sp_format("v{}", SP_FMT_STR(spn_semver_to_str(event->pkg->version)))
+        );
+      }
+
+      bool is_root = sp_str_valid(root_qualified) && sp_str_equal(event->pkg->qualified, root_qualified);
+      if (is_root && event->kind == SPN_EVENT_LINK_START && sp_str_valid(event->target.name)) {
+        sp_str_t key = sp_format("{}::{}", SP_FMT_STR(event->pkg->qualified), SP_FMT_STR(event->target.name));
+        if (!sp_str_ht_get(seen_target, key)) {
+          sp_str_ht_insert(seen_target, key, true);
+          return spn_tui_render_coarse_line(sp_str_lit("Compiling"), event->pkg->name, event->target.name);
+        }
+      }
+
+      return sp_str_lit("");
+    }
+
+    case SPN_EVENT_ERR:
+    case SPN_EVENT_ERR_CIRCULAR_DEP:
+    case SPN_EVENT_ERR_UNKNOWN_PKG:
+    case SPN_EVENT_ERR_UNSATISFIABLE_VERSION:
+    case SPN_EVENT_SYNC_FAILED:
+    case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED:
+    case SPN_EVENT_BUILD_SCRIPT_FAILED:
+    case SPN_EVENT_BUILD_SCRIPT_CRASHED:
+    case SPN_EVENT_DEP_BUILD_FAILED:
+    case SPN_EVENT_TARGET_BUILD_FAILED:
+    case SPN_EVENT_TCC_ERROR:
+    case SPN_EVENT_TEST_FAILED:
+    case SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED:
+    case SPN_EVENT_LINK_FAILED:
+    case SPN_EVENT_EMBED_FAILED:
+    case SPN_EVENT_BUILD_FAILED:
+    case SPN_EVENT_BUILD_PASSED:
+    case SPN_EVENT_TESTS_PASSED: {
+      return spn_tui_render_event(event, max_name);
+    }
+
+    default: {
+      return sp_str_lit("");
+    }
+  }
+}
+
 void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode) {
   tui->mode = mode;
   tui->info.max_name = 16;
@@ -578,3 +670,4 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode) {
     }
   }
 }
+

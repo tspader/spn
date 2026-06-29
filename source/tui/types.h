@@ -3,6 +3,7 @@
 
 #include "sp.h"
 #include "sp/sp_math.h"
+#include "sp/prompt.h"
 
 #if defined(SP_POSIX)
   #include <termios.h>
@@ -76,6 +77,13 @@ typedef struct {
   sp_ht(sp_str_t, s32) state;
   void* build;
   spn_spinner_t spinner;
+
+  struct {
+    sp_prompt_ctx_t* ctx;
+    sp_app_t app;
+    bool started;
+    bool on;
+  } prompt;
 
   struct {
     u32 max_name;
