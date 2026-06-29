@@ -104,7 +104,7 @@ target_include_directories(manifest_gen PRIVATE
 target_compile_definitions(manifest_gen PRIVATE
   MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest_gen/manifests"
   GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest_gen/golden")
-add_dependencies(manifest_gen manifest_gen_header)
+add_dependencies(manifest_gen spn_codegen_gen)
 add_test(NAME manifest_gen COMMAND "$<TARGET_FILE:manifest_gen>")
 
 add_executable(manifest_lower
@@ -128,7 +128,7 @@ target_include_directories(manifest_lower PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/manifest_lower)
 target_compile_definitions(manifest_lower PRIVATE
   MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest_lower/manifests")
-add_dependencies(manifest_lower manifest_gen_header)
+add_dependencies(manifest_lower spn_codegen_gen)
 add_test(NAME manifest_lower COMMAND "$<TARGET_FILE:manifest_lower>")
 
 add_subdirectory(resolver)

@@ -7,6 +7,7 @@
 #include "event/types.h"
 #include "index/types.h"
 #include "intern/types.h"
+#include "toolchain/types.h"
 #include "tui/types.h"
 
 #include "jit.h"
@@ -44,11 +45,13 @@ typedef struct {
     sp_str_t build;
     sp_str_t store;
     sp_str_t source;
+    sp_str_t toolchain;
   } paths;
   spn_tui_t tui;
   sp_atomic_s32_t control;
   sp_str_t tcc_error;
   spn_index_arr_t indexes;
+  sp_da(spn_toolchain_entry_t) toolchains;
   spn_event_buffer_t* events;
   sp_app_t* sp;
   s32 num_args;

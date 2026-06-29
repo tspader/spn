@@ -112,12 +112,14 @@ void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, s
   }
 }
 
-void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t config) {
+void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t toolchain, sp_str_t config) {
   sp_str_t path = tmpfs_get(fs, sp_str_lit(".envrc"));
   sp_str_t content = sp_format(
     "export SPN_STORAGE_DIR={}\n"
+    "export SPN_TOOLCHAIN_DIR={}\n"
     "export SPN_CONFIG_DIR={}\n",
     SP_FMT_STR(storage),
+    SP_FMT_STR(toolchain),
     SP_FMT_STR(config)
   );
   fixture_write_file(path, content);
@@ -358,6 +360,7 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
           .env = {
             .extra = {
               { sp_str_lit("SPN_STORAGE_DIR"), fixture->paths.storage },
+              { sp_str_lit("SPN_TOOLCHAIN_DIR"), fixture->paths.toolchain },
               { sp_str_lit("SPN_CONFIG_DIR"), fixture->paths.config },
             },
           },
@@ -401,16 +404,28 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
   }
 }
 
+// The toolchain cache is content-addressed and immutable, so every hermetic
+// test can share one copy instead of re-downloading zig. Prefer the developer's
+// global cache when it's already populated; otherwise use a fixed repo-level dir
+// that CI can cache across runs.
+static sp_str_t pick_shared_toolchain_dir(sp_str_t root) {
+  sp_str_t global = sp_fs_join_path(spn_allocator, sp_fs_get_storage_path(spn_allocator), sp_str_lit("spn/cache/toolchain"));
+  if (sp_fs_exists(global)) return global;
+  return sp_fs_join_path(spn_allocator, root, sp_str_lit(".cache/toolchain"));
+}
+
 void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
   fixture->paths.config = tmpfs_get(&fixture->fs, sp_str_lit(".home/config"));
   fixture->paths.storage = tmpfs_get(&fixture->fs, sp_str_lit(".home/storage"));
+  fixture->paths.toolchain = pick_shared_toolchain_dir(fixture->paths.root);
   fixture->paths.include = sp_fs_join_path(spn_allocator, fixture->paths.storage, sp_str_lit("spn/include"));
   fixture->paths.index = sp_fs_join_path(spn_allocator, fixture->paths.storage, sp_str_lit("spn/packages"));
   sp_fs_create_dir(fixture->paths.config);
   sp_fs_create_dir(fixture->paths.storage);
+  sp_fs_create_dir(fixture->paths.toolchain);
   sp_fs_create_dir(fixture->paths.include);
   sp_fs_create_dir(fixture->paths.index);
-  setup_fixture_envrc(&fixture->fs, fixture->paths.storage, fixture->paths.config);
+  setup_fixture_envrc(&fixture->fs, fixture->paths.storage, fixture->paths.toolchain, fixture->paths.config);
   setup_fixture_config(&fixture->fs, fixture->paths.config, fixture->paths.index, fixture->paths.root);
 
   sp_fs_copy(sp_fs_join_path(spn_allocator, fixture->paths.root, sp_str_lit("include/spn.h")), fixture->paths.include);

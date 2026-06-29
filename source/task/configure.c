@@ -3,9 +3,11 @@
 #include "ctx/types.h"
 #include "error/types.h"
 #include "event/types.h"
+#include "forward/types.h"
 #include "graph/types.h"
 #include "pkg/types.h"
 #include "session/registry/types.h"
+#include "sp/compat.h"
 #include "spn.h"
 #include "target/types.h"
 #include "unit/types.h"
@@ -18,9 +20,6 @@
 #include "session/session.h"
 #include "task/task.h"
 #include "unit/package.h"
-
-#include "wasm/wasm.h"
-#include "wasm/types.h"
 
 #include <setjmp.h>
 
@@ -150,16 +149,9 @@ spn_err_t compile_shim(spn_session_t* session, spn_pkg_unit_t* unit) {
 
 spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
   if (!sp_fs_is_file(unit->paths.configure)) return SPN_OK;
-  if (!sp_fs_is_file(unit->paths.build)) return SPN_OK;
 
   sp_tm_timer_t timer = sp_tm_start_timer();
-  spn_tcc_err_ctx_t error_context = SP_ZERO_INITIALIZE();
   spn_cc_t* cc = sp_alloc_type(spn_mem_todo, spn_cc_t);
-
-  sp_da(sp_str_t) cc_args = sp_da_new(session->mem, sp_str_t);
-  sp_da_push(cc_args, (sp_str_lit("cc")));
-  sp_da(sp_str_t) ar_args = sp_da_new(session->mem, sp_str_t);
-  sp_da_push(ar_args, (sp_str_lit("ar")));
 
   spn_profile_info_t profile = {
     .arch = SPN_ARCH_WASM32,
@@ -169,15 +161,10 @@ spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
     .linkage = SPN_LIB_KIND_SHARED,
     .standard = SPN_C99
   };
-  cc->driver = SPN_CC_DRIVER_CLANG;
-  cc->compiler = (spn_toolchain_launcher_t) { sp_str_lit("zig"), cc_args };
-  cc->linker = (spn_toolchain_launcher_t) { sp_str_lit("zig"), cc_args };
-  cc->archiver = (spn_toolchain_launcher_t) { sp_str_lit("zig"), ar_args };
-
 
   spn_cc_set_profile(cc, profile);
   spn_cc_set_output_dir(cc, unit->paths.generated);
-  //spn_cc_set_toolchain(cc, unit->session->units.toolchain);
+  spn_cc_set_toolchain(cc, session->units.zig);
   sp_da_for(unit->info->include, it) {
     sp_str_t path = sp_fs_join_path(session->mem, unit->paths.source, unit->info->include[it]);
     spn_cc_add_include(cc, path);
@@ -191,21 +178,6 @@ spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
   spn_cc_target_add_absolute_source(target, unit->paths.configure);
 
   spn_cc_run_t run = spn_cc_target_run(target, unit->paths.work);
-  spn_wasm_init_stupid_global_runtime();
-
-  sp_str_t output = sp_fs_join_path(session->mem, unit->paths.generated, sp_str_lit("configure.wasm"));
-  switch (spn_wasm_smoke(spn.mem, spn.intern, output)) {
-    case SPN_ERR_WASM_INIT_FAILED: { sp_log("SPN_ERR_WASM_INIT_FAILED"); return 1; }
-    case SPN_ERR_WASM_REGISTER_FAILED: { sp_log("SPN_ERR_WASM_REGISTER_FAILED"); return 1; }
-    case SPN_ERR_WASM_MODULE_LOAD_FAILED: { sp_log("SPN_ERR_WASM_MODULE_LOAD_FAILED"); return 1; }
-    case SPN_ERR_WASM_MODULE_INSTANCE_FAILED: { sp_log("SPN_ERR_WASM_MODULE_INSTANCE_FAILED"); return 1; }
-    case SPN_ERR_WASM_CTX_FAILED: { sp_log("SPN_ERR_WASM_CTX_FAILED"); return 1; }
-    case SPN_ERR_WASM_MODULE_CALL_FAILED: { sp_log("SPN_ERR_WASM_MODULE_CALL_FAILED"); return 1; }
-    case SPN_OK: break;
-    default: { sp_log("fuck"); return 1; }
-  }
-
-
 
   unit->time.compile = sp_tm_read_timer(&timer);
 
@@ -234,31 +206,7 @@ spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
     });
   }
 
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
-    .kind = SPN_EVENT_BUILD_SCRIPT_COMPILE,
-    .pkg = unit->info,
-    .io = &unit->logs.io,
-    .script_compile = {
-      .script_path = unit->paths.script,
-      .time = unit->time.compile,
-      .has_configure = unit->on_configure != SP_NULLPTR,
-      .has_package = unit->on_package != SP_NULLPTR,
-    }
-  });
-
   return SPN_OK;
-
-fail:
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
-    .kind = SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,
-    .pkg = unit->info,
-    .io = &unit->logs.io,
-    .compile_failed = {
-      .script_path = unit->paths.script,
-      .error = error_context.error,
-    }
-  });
-  return SPN_ERROR;
 }
 
 spn_err_t configure_package(spn_pkg_unit_t* unit) {
@@ -310,6 +258,19 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   return SPN_OK;
 }
 
+static spn_err_t add_toolchain_download(spn_build_graph_t* graph, spn_session_t* session, spn_toolchain_unit_t* t) {
+  t->nodes.download = spn_bg_add_fn(graph, download_toolchain, t);
+  t->nodes.stamp = spn_bg_add_file(graph, t->paths.stamp);
+  spn_try(spn_bg_cmd_add_output(graph, t->nodes.download, t->nodes.stamp));
+
+  sp_str_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
+    spn_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, t->nodes.stamp));
+  }
+
+  return SPN_OK;
+}
+
 spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->configure.graph;
@@ -347,16 +308,12 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
     }
   }
 
-  // If we're downloading a toolchain, it needs a node which everything depends on
-  if (session->units.toolchain) {
-    spn_toolchain_unit_t* toolchain = session->units.toolchain;
-    toolchain->nodes.download = spn_bg_add_fn(graph, download_toolchain, toolchain);
-    toolchain->nodes.stamp = spn_bg_add_file(graph, toolchain->paths.stamp);
-    spn_try(spn_bg_cmd_add_output(graph, toolchain->nodes.download, toolchain->nodes.stamp));
-
-    sp_str_om_for(session->units.packages, it) {
-      spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
-      spn_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, toolchain->nodes.stamp));
+  // @spader This smells like denormalized data. Why am I checking a random string here? I should
+  // know exactly whether I need to download this
+  spn_toolchain_unit_t* toolchains [] = { session->units.zig, session->units.toolchain };
+  sp_carr_for(toolchains, it) {
+    if (!sp_str_empty(toolchains[it]->url)) {
+      spn_try(add_toolchain_download(graph, session, toolchains[it]));
     }
   }
 

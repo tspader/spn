@@ -117,7 +117,7 @@ spn_err_t spn_wasm_smoke(sp_mem_t mem, sp_intern_t* interner, sp_str_t path) {
   spn_wasm_pkg_t pkg = sp_zero;
   spn_try(spn_wasm_instantiate_module(wasm, module, &pkg));
 
-  spn_wasm_fn_t** fn = sp_str_om_get(pkg.functions, sp_str_lit("run"));
+  spn_wasm_fn_t** fn = sp_str_om_get(pkg.functions, sp_str_lit("configure"));
   wasm_val_t results [1] = sp_zero;
   if (!wasm_runtime_call_wasm_a(pkg.ctx, *fn, 1, results, 0, SP_NULLPTR)) {
     return SPN_ERR_WASM_MODULE_CALL_FAILED;

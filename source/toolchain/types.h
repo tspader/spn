@@ -33,7 +33,9 @@ typedef struct {
 
 typedef struct spn_toolchain_info {
   sp_str_t name;
+  sp_str_t version;
   sp_str_t url;
+  sp_str_t sha;
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;

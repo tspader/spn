@@ -64,7 +64,7 @@ target = [
 [[bin]]
 name = "spn"
 source = ["source/**/*.c"]
-include = ["include", "source", "source/external"]
+include = ["include", "source", "source/external", "source/codegen/gen"]
 flags = ["-include", "sp/compat.h"]
 
 [[test]]

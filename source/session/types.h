@@ -48,6 +48,7 @@ struct spn_session_t {
     sp_om(spn_target_unit_id_t, spn_target_unit_t) targets;
     sp_om(spn_pkg_unit_id_t, spn_pkg_unit_t) packages;
     spn_toolchain_unit_t* toolchain;
+    spn_toolchain_unit_t* zig;
   } units;
 
   struct {

@@ -90,6 +90,7 @@ set(SPN_SOURCES
   task/test.c
   task/unit.c
   task/which.c
+  toolchain/builtins.c
   toolchain/launcher.c
   toolchain/toolchain.c
   triple/triple.c
@@ -111,7 +112,7 @@ target_include_directories(spn PRIVATE
 )
 target_link_libraries(spn PRIVATE m vmlib ${TCC_LIB} yyjson)
 target_compile_options(spn PRIVATE -include ${SRC}/sp/compat.h)
-add_dependencies(spn headers tcc spn_embed manifest_gen_header toolchains_gen_header)
+add_dependencies(spn headers tcc spn_embed spn_codegen_gen)
 
 set_source_files_properties(${EMBED_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 target_sources(spn PRIVATE ${EMBED_OBJ})

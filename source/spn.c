@@ -28,8 +28,7 @@
 #include "app/app.h"
 #include "codegen/codegen.h"
 #include "codegen/lower.h"
-#include "codegen/gen/manifest.gen.types.h"
-#include "codegen/gen/toolchains.gen.types.h"
+#include "codegen/gen/types.gen.h"
 #include "cli/cli.h"
 #include "event/event.h"
 #include "event/log.h"
@@ -43,6 +42,8 @@
 #include "pkg/load.h"
 #include "session/session.h"
 #include "spn.embed.h"
+#include "toolchain/toolchain.h"
+#include "triple/triple.h"
 #include "sp/io.h"
 #include "sp/macro.h"
 #include "sp/os.h"
@@ -236,6 +237,13 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.paths.build = sp_fs_join_path(spn.mem, spn.paths.cache, SP_LIT("build"));
   spn.paths.store = sp_fs_join_path(spn.mem, spn.paths.cache, SP_LIT("store"));
 
+  spn.paths.toolchain = sp_env_get(spn.env, sp_str_lit("SPN_TOOLCHAIN_DIR"));
+  if (sp_str_empty(spn.paths.toolchain)) {
+    spn.paths.toolchain = sp_fs_join_path(spn.mem, spn.paths.cache, SP_LIT("toolchain"));
+  }
+
+  spn.toolchains = spn_toolchain_load_builtins(spn_triple_host(), spn.mem);
+
   sp_fs_create_dir(spn.paths.log);
 
   spn_event_log_init();
@@ -249,6 +257,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   sp_fs_create_dir(spn.paths.source);
   sp_fs_create_dir(spn.paths.build);
   sp_fs_create_dir(spn.paths.store);
+  sp_fs_create_dir(spn.paths.toolchain);
   sp_fs_create_dir(spn.paths.bin);
   sp_fs_create_dir(spn.paths.tools.dir);
 

@@ -684,8 +684,16 @@ spn_err_union_t spn_pkg_load(spn_pkg_info_t* pkg, sp_str_t manifest_path) {
   sp_str_t commit = sp_str_lit("");
   spn_try_union(toml_get_str_optional(toml.package, "commit", package_path, &commit));
 
+  sp_str_t configure = sp_str_lit("");
+  spn_try_union(toml_get_str_optional(toml.package, "configure", package_path, &configure));
+
+  sp_str_t build = sp_str_lit("");
+  spn_try_union(toml_get_str_optional(toml.package, "build", package_path, &build));
+
   spn_pkg_init(pkg, name);
   pkg->namespace = package_namespace;
+  pkg->configure = configure;
+  pkg->build = build;
   pkg->qualified = spn_pkg_canonicalize_pair(pkg->namespace, pkg->name);
   spn_pkg_set_url_ex(pkg, url);
   spn_pkg_set_author_ex(pkg, author);
