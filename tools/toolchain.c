@@ -83,7 +83,7 @@ sp_cli_result_t pin(sp_mem_t mem, sp_str_t work, sp_str_t mirror, yyjson_mut_doc
     yyjson_mut_obj_add_strcpy(doc, dist, "sha256", hash_cstr);
   }
 
-  sp_log("{.cyan}: {.fg green}", sp_fmt_str(hostkey), sp_fmt_str(hash));
+  sp_log("{.cyan}: {.green}", sp_fmt_str(hostkey), sp_fmt_str(hash));
   return SP_CLI_OK;
 }
 

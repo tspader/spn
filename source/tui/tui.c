@@ -307,11 +307,11 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       break;
     }
     case GREEN: {
-      sp_str_builder_append_fmt(&builder, "{:<9 .fg green}", SP_FMT_STR(name));
+      sp_str_builder_append_fmt(&builder, "{:<9 .green}", SP_FMT_STR(name));
       break;
     }
     case RED: {
-      sp_str_builder_append_fmt(&builder, "{:<9 .fg red}", SP_FMT_STR(name));
+      sp_str_builder_append_fmt(&builder, "{:<9 .red}", SP_FMT_STR(name));
       break;
     }
   }

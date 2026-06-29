@@ -1081,17 +1081,17 @@ s32 utest_main(s32 argc, const c8 **argv) {
       }
 
       if (UTEST_TEST_FAILURE == result) {
-        sp_print("{.fg red} ", sp_fmt_cstr("failed"));
+        sp_print("{.red} ", sp_fmt_cstr("failed"));
       } else if (UTEST_TEST_SKIPPED == result) {
-        sp_print("{.fg yellow} ", sp_fmt_cstr("skipped"));
+        sp_print("{.yellow} ", sp_fmt_cstr("skipped"));
       } else {
-        sp_print("{.fg green} ", sp_fmt_cstr("ok"));
+        sp_print("{.green} ", sp_fmt_cstr("ok"));
       }
       sp_log("{.black}{.black}", sp_fmt_int(time), sp_fmt_cstr(units[unit_index]));
     }
   }
 
-  sp_log("{.fg green} {} test cases ran.",
+  sp_log("{.green} {} test cases ran.",
          sp_fmt_cstr("[==========]"),
          sp_fmt_uint(ran_tests));
   sp_log("{}[  PASSED  ]{} {} tests.",

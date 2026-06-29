@@ -90,7 +90,7 @@ sp_str_t spn_cli_command_usage(spn_cli_usage_t cmd) {
       sp_str_t long_display;
       if (!sp_str_empty(opt.placeholder)) {
         sp_str_t long_text = sp_format("--{}", SP_FMT_STR(opt.name));
-        long_display = sp_format("{.yellow}={.fg white}", SP_FMT_STR(long_text), SP_FMT_STR(opt.placeholder));
+        long_display = sp_format("{.yellow}={.white}", SP_FMT_STR(long_text), SP_FMT_STR(opt.placeholder));
       } else {
         sp_str_t long_text = sp_format("--{}", SP_FMT_STR(opt.name));
         long_display = sp_format("{.yellow}", SP_FMT_STR(long_text));
@@ -196,7 +196,7 @@ sp_str_t spn_cli_usage(spn_cli_usage_t* cmd) {
       sp_str_t long_display;
       if (!sp_str_empty(opt.placeholder)) {
         sp_str_t long_text = sp_format("--{}", SP_FMT_STR(opt.name));
-        long_display = sp_format("{.yellow}={.fg white}", SP_FMT_STR(long_text), SP_FMT_STR(opt.placeholder));
+        long_display = sp_format("{.yellow}={.white}", SP_FMT_STR(long_text), SP_FMT_STR(opt.placeholder));
       } else {
         sp_str_t long_text = sp_format("--{}", SP_FMT_STR(opt.name));
         long_display = sp_format("{.yellow}", SP_FMT_STR(long_text));

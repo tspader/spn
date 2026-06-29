@@ -193,7 +193,7 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
         sp_da_push(unit->deps.target, candidates.target);
       }
       else {
-        spn_log_error("failed to find {.fg cyan} as a package or target", SP_FMT_STR(unit->info->deps[j]));
+        spn_log_error("failed to find {.cyan} as a package or target", SP_FMT_STR(unit->info->deps[j]));
       }
     }
   }
