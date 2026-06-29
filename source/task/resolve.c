@@ -18,11 +18,17 @@
 #include "unit/types.h"
 
 spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
-  // Build the list of available toolchains
+  // @spader Clean this up
   sp_str_om_for(root->toolchains, it) {
     spn_toolchain_entry_t entry = *sp_str_om_at(root->toolchains, it);
+    if (entry.kind == SPN_TOOLCHAIN_INDEX) continue;
     sp_str_ht_insert(session->toolchains, entry.name, entry);
   }
+
+  sp_da_for(spn.toolchains, it) {
+    sp_str_ht_insert(session->toolchains, spn.toolchains[it].name, spn.toolchains[it]);
+  }
+
   spn_toolchain_entry_t builtin_toolchains[] = {
     {
       .name = sp_str_lit("builtin"),
@@ -70,19 +76,6 @@ spn_err_t apply_config(spn_session_t* session, spn_app_config_t config) {
   session->filter = config.filter;
 
   return SPN_OK;
-}
-
-void add_toolchain(spn_session_t* session, spn_resolve_query_t* query) {
-  spn_toolchain_entry_t* toolchain = sp_str_ht_get(session->toolchains, session->profile.toolchain);
-  sp_intern_str_t qualified = spn_pkg_canonicalize_name(toolchain->request.package);
-
-  if (toolchain->kind == SPN_TOOLCHAIN_INDEX) {
-    spn_resolve_query_add(query, (spn_requested_pkg_t) {
-      .qualified = qualified,
-      .source = SPN_PKG_SOURCE_INDEX,
-      .index.range = toolchain->request.range,
-    });
-  }
 }
 
 void add_root(spn_session_t* session, spn_resolve_query_t* query) {
@@ -136,7 +129,6 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
 
   spn_resolve_query_t query = sp_zero_initialize();
   add_root(session, &query);
-  add_toolchain(session, &query);
 
   // Resolve
   spn_resolve_strategy_t strategy = app->lock.some == SP_OPT_SOME ?

@@ -11,16 +11,6 @@ spn_pkg_info_t spn_pkg_new(sp_str_t name) {
   return pkg;
 }
 
-spn_err_t spn_pkg_from_manifest(spn_pkg_info_t* pkg, sp_str_t manifest) {
-  SP_ASSERT(sp_fs_exists(manifest)); // @spader Return an error code instead? Or is this an invariant?
-
-  spn_err_union_t result = spn_pkg_load(pkg, manifest);
-  if (result.kind) {
-    return result.kind;
-  }
-  return SPN_OK;
-}
-
 bool spn_pkg_has_lib_kind(spn_pkg_info_t* pkg, spn_linkage_t kind) {
   sp_str_om_for(pkg->libs, it) {
     spn_target_info_t* lib = sp_str_om_at(pkg->libs, it);

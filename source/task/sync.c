@@ -29,62 +29,40 @@
 #include "unit/types.h"
 #include <unistd.h>
 
-static bool match_toolchain(spn_toolchain_entry_t* toolchain, spn_triple_t host, spn_triple_t target) {
-  spn_toolchain_info_t* info = &toolchain->info;
-  if (toolchain->kind != SPN_TOOLCHAIN_INLINE) return false;
+SP_PRIVATE spn_toolchain_unit_t* setup_toolchain_unit(spn_session_t* session, spn_toolchain_entry_t* entry) {
+  spn_toolchain_unit_t* unit = sp_alloc_type(session->mem, spn_toolchain_unit_t);
+  unit->session = session;
+  unit->kind = entry->kind;
+  unit->info = entry->info;
+  unit->pkg = session->pkg;
 
-  struct {
-    bool host;
-    bool target;
-  } match = SP_ZERO_INITIALIZE();
+  sp_str_t name = entry->name;
+  spn_lazy_log_init(&unit->logs.build, sp_fs_join_path(session->mem, spn.paths.log, sp_format("toolchain.{}.build.log", SP_FMT_STR(name))), SP_IO_WRITE_MODE_OVERWRITE);
+  spn_lazy_log_init(&unit->logs.test,  sp_fs_join_path(session->mem, spn.paths.log, sp_format("toolchain.{}.test.log",  SP_FMT_STR(name))), SP_IO_WRITE_MODE_OVERWRITE);
+  spn_lazy_log_init(&unit->logs.jsonl, sp_fs_join_path(session->mem, spn.paths.log, sp_format("toolchain.{}.jsonl",     SP_FMT_STR(name))), SP_IO_WRITE_MODE_OVERWRITE);
 
-  // If a toolchain supports both the host and the target, use it. We store
-  // the supported triples in a fixed size target and use a sentinel
-  sp_carr_for(info->hosts, h) {
-    if (!info->hosts[h].arch) break;
-
-    if (spn_triple_match(info->hosts[h], host)) {
-      match.host = true;
-      break;
-    }
-  }
-  if (!match.host) return false;
-
-  sp_carr_for(info->targets, t) {
-    if (!info->targets[t].arch) break;
-
-    if (spn_triple_match(info->targets[t], target)) {
-      match.target = true;
-      break;
-    }
-  }
-  if (!match.target) return false;
-
-  return true;
-}
-
-static spn_toolchain_entry_t* find_toolchain(spn_pkg_info_t* pkg, spn_triple_t host, spn_triple_t target) {
-  sp_str_om_for(pkg->toolchains, it) {
-    spn_toolchain_entry_t* toolchain = sp_str_om_at(pkg->toolchains, it);
-
-    if (match_toolchain(toolchain, host, target)) {
-      return toolchain;
-    }
+  if (sp_str_empty(entry->info.url)) {
+    unit->compiler = entry->info.compiler;
+    unit->linker = entry->info.linker;
+    unit->archiver = entry->info.archiver;
+    return unit;
   }
 
-  return SP_NULLPTR;
-}
+  sp_str_t key = sp_format("{}-{}-{}", SP_FMT_STR(name), SP_FMT_STR(entry->info.version), SP_FMT_STR(entry->info.sha));
+  sp_str_t store = sp_fs_join_path(session->mem, spn.paths.toolchain, key);
+  sp_fs_create_dir(store);
 
-static void log_toolchain_error(spn_pkg_info_t* pkg, spn_triple_t host, spn_triple_t target) {
-  spn_log_error(
-    "selected toolchain ({.fg cyan}, {}) does not support this host + target ({.fg yellow}, {.fg yellow})",
-    SP_FMT_STR(pkg->name),
-    SP_FMT_STR(spn_semver_to_str(pkg->version)),
-    SP_FMT_STR(spn_triple_to_str(host)),
-    SP_FMT_STR(spn_triple_to_str(target))
-  );
-}
+  unit->url = entry->info.url;
+  unit->paths.store = store;
+  unit->paths.work = store;
+  unit->paths.stamp = sp_fs_join_path(session->mem, store, sp_str_lit("download.stamp"));
 
+  unit->compiler = spn_toolchain_launcher_with_root(entry->info.compiler, store);
+  unit->linker   = spn_toolchain_launcher_with_root(entry->info.linker, store);
+  unit->archiver = spn_toolchain_launcher_with_root(entry->info.archiver, store);
+
+  return unit;
+}
 
 // We need a way to point to local copies of packages while developing; for a quick
 // and dirty, just use SPN_PATCH_DIR as the package manifest repo if set.
@@ -257,106 +235,15 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     }
   }
 
-  // The toolchain can be specified as either a package which exports toolchains
-  // or as a block of TOML inline in the manifest.
-  //
-  // Inline toolchains are straightforward, but toolchains that are fetched from
-  // a package can specify a URL which points to a tarball. Packages can also
-  // export several toolchains.
-  //
-  // All we're doing here is finding the package manifest for the package that
-  // defines the toolchain we want, grabbing the specific toolchain entry that
-  // matches our host + target, and marking down any needed download.
-  spn_triple_t host = spn_triple_host();
-  spn_triple_t target = { session->profile.arch, session->profile.os, session->profile.abi };
   spn_toolchain_entry_t* entry = sp_str_ht_get(session->toolchains, session->profile.toolchain);
   sp_assert(entry);
+  session->units.toolchain = setup_toolchain_unit(session, entry);
 
-  session->units.toolchain = sp_alloc_type(app->session.mem, spn_toolchain_unit_t);
-  spn_toolchain_unit_t* toolchain = session->units.toolchain;
-  toolchain->session = session;
-  spn_lazy_log_init(&toolchain->logs.build, sp_fs_join_path(app->session.mem, spn.paths.log, sp_str_lit("toolchain.build.log")), SP_IO_WRITE_MODE_OVERWRITE);
-  spn_lazy_log_init(&toolchain->logs.test,  sp_fs_join_path(app->session.mem, spn.paths.log, sp_str_lit("toolchain.test.log")),  SP_IO_WRITE_MODE_OVERWRITE);
-  spn_lazy_log_init(&toolchain->logs.jsonl, sp_fs_join_path(app->session.mem, spn.paths.log, sp_str_lit("toolchain.jsonl")),     SP_IO_WRITE_MODE_OVERWRITE);
-
-  if (entry->kind == SPN_TOOLCHAIN_INLINE) {
-    if (!match_toolchain(entry, host, target)) {
-      spn_log_error(
-        "toolchain {.cyan} doesn't support host {.cyan} targeting {.cyan}",
-        SP_FMT_STR(entry->name),
-        SP_FMT_STR(spn_triple_to_str(host)),
-        SP_FMT_STR(spn_triple_to_str(target))
-      );
-      return SPN_TASK_ERROR;
-    }
-
-    toolchain->kind = SPN_TOOLCHAIN_INLINE;
-    toolchain->pkg = session->pkg;
-  }
-  else if (entry->kind == SPN_TOOLCHAIN_BUILTIN) {
-    toolchain->kind = SPN_TOOLCHAIN_BUILTIN;
-    toolchain->pkg = session->pkg;
-  }
-  else if (entry->kind == SPN_TOOLCHAIN_INDEX) {
-    spn_loaded_pkg_t* pkg = sp_str_ht_get(session->packages, entry->request.package);
-    sp_assert(pkg);
-
-    entry = find_toolchain(pkg->info, host, target);
-    if (!entry) {
-      log_toolchain_error(pkg->info, host, target);
-      return SPN_TASK_ERROR;
-    }
-    sp_assert(entry->kind == SPN_TOOLCHAIN_INDEX);
-
-    toolchain->kind = SPN_TOOLCHAIN_INDEX;
-    toolchain->pkg = pkg->info;
-  }
-
-  toolchain->info = entry->info;
+  spn_toolchain_entry_t* zig = sp_str_ht_get(session->toolchains, sp_str_lit("zig"));
+  sp_assert(zig);
+  session->units.zig = setup_toolchain_unit(session, zig);
 
   add_compilation_units(session, app->resolver);
-
-  // If we need to download a toolchain, point it at the unit for the corresponding
-  // package. This is separate from where we resolve the toolchain because we don't
-  // want to special case the toolchain's package unit.
-  //
-  // By setting up the paths here, the toolchain can be downloaded to the package's
-  // work dir and decompressed to the store dir with no special paths.
-  switch (toolchain->kind) {
-    case SPN_TOOLCHAIN_BUILTIN:
-    case SPN_TOOLCHAIN_INLINE: {
-      toolchain->compiler = entry->info.compiler;
-      toolchain->linker = entry->info.linker;
-      toolchain->archiver = entry->info.archiver;
-      break;
-    }
-    case SPN_TOOLCHAIN_INDEX: {
-      spn_toolchain_unit_t* unit = session->units.toolchain;
-      spn_pkg_unit_id_t id = { sp_intern_get_or_insert(session->intern, unit->pkg->qualified) };
-      spn_pkg_unit_t* pkg = sp_om_get(session->units.packages, id);
-
-      sp_str_t store = pkg->paths.store;
-      sp_str_t work = pkg->paths.work;
-
-      // These are places in the cache
-      unit->paths.store = store;
-      unit->paths.work = work;
-      unit->paths.stamp = sp_fs_join_path(app->session.mem, work, sp_str_lit("download.stamp"));
-      unit->paths.logs.build = sp_fs_join_path(app->session.mem, work, sp_str_lit("build.log"));
-      unit->paths.logs.jsonl = sp_fs_join_path(app->session.mem, work, sp_str_lit("build.jsonl"));
-      spn_lazy_log_init(&unit->logs.build, unit->paths.logs.build, SP_IO_WRITE_MODE_OVERWRITE);
-      spn_lazy_log_init(&unit->logs.jsonl, unit->paths.logs.jsonl, SP_IO_WRITE_MODE_OVERWRITE);
-
-      // These are the paths used to refer to the toolchain during compilation
-      unit->compiler.program = sp_fs_join_path(app->session.mem, store, unit->info.compiler.program);
-      unit->compiler.args = unit->info.compiler.args;
-      unit->linker.program = sp_fs_join_path(app->session.mem, store, unit->info.linker.program);
-      unit->linker.args = unit->info.linker.args;
-      unit->archiver.program = sp_fs_join_path(app->session.mem, store, unit->info.archiver.program);
-      unit->archiver.args = unit->info.archiver.args;
-      break;
-    }
-  }
 
   sp_env_t* env = &session->env;
   sp_env_init(app->session.mem, env);
