@@ -14,8 +14,10 @@
 
 static spn_err_t resolve_deps(spn_resolver_t* r, spn_resolve_run_t* resolve, spn_resolved_pkg_t node);
 
-void spn_resolver_init(spn_resolver_t* r, spn_index_cache_t* index, spn_pkg_registry_t* registry, spn_event_buffer_t* events) {
+void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn_index_cache_t* index, spn_pkg_registry_t* registry, spn_event_buffer_t* events) {
   *r = (spn_resolver_t){
+    .mem = mem,
+    .intern = intern,
     .index = index,
     .events = events,
     .registry = registry,
@@ -55,7 +57,7 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
 
   // If the package is local, just load it
   if (!pkg && request->source == SPN_PKG_SOURCE_FILE) {
-    pkg = spn_registry_load_file_pkg(resolver->registry, request->qualified, request->file.path);
+    pkg = spn_registry_load_file_pkg(resolver->registry, resolver->mem, resolver->intern, request->qualified, request->file.path);
   }
 
   if (!pkg) {

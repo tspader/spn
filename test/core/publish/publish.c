@@ -2,6 +2,7 @@
 #include "utest.h"
 #include "test.h"
 
+#include "ctx/types.h"
 #include "index/index.h"
 #include "index/publish.h"
 #include "semver/convert.h"
@@ -81,6 +82,8 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
   u32 rev_idx = c.opts.source_rev ? sp_parse_u32(sp_str_view(c.opts.source_rev)) : 0;
 
   spn_publish_opts_t opts = {
+    .mem = spn_allocator,
+    .intern = spn.intern,
     .cwd = cwd,
     .index = &index,
     .url = repo.path,

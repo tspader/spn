@@ -91,6 +91,8 @@ struct spn_index_info {
 typedef sp_da(spn_index_info_t) spn_index_arr_t;
 
 typedef struct {
+  sp_mem_t mem;
+  sp_intern_t* intern;
   spn_index_arr_t* indexes;
   sp_str_om(spn_index_pkg_t) packages;
 } spn_index_cache_t;

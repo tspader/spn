@@ -18,6 +18,8 @@
 #include "unit/types.h"
 
 spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
+  sp_str_ht_init(session->mem, session->toolchains);
+
   sp_str_om_for(root->toolchains, it) {
     spn_toolchain_entry_t entry = *sp_str_om_at(root->toolchains, it);
     sp_str_ht_insert(session->toolchains, entry.name, entry);
@@ -52,6 +54,7 @@ spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
   session->paths.build = sp_fs_join_path(session->mem, spn.paths.project, sp_str_lit("build"));
   session->events = spn.events;
   session->intern = spn.intern;
+  sp_str_ht_init(session->mem, session->packages);
   sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
 
   return SPN_OK;
@@ -119,13 +122,14 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_try_as(load_root_package(session), SPN_TASK_ERROR);
 
   spn_index_cache_t index = SP_ZERO_INITIALIZE();
-  spn_index_cache_init(&index, &spn.indexes);
+  spn_index_cache_init(&index, session->mem, session->intern, &spn.indexes);
 
   spn_resolver_t* resolver = sp_alloc_type(app->session.mem, spn_resolver_t);
-  spn_resolver_init(resolver, &index, &session->packages, spn.events);
+  spn_resolver_init(resolver, session->mem, session->intern, &index, &session->packages, spn.events);
   app->resolver = resolver;
 
   spn_resolve_query_t query = sp_zero_initialize();
+  sp_str_ht_init(session->mem, query.result);
   add_root(session, &query);
 
   // Resolve

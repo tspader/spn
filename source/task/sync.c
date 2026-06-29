@@ -166,7 +166,7 @@ spn_err_t load_index_package(spn_session_t* session, spn_resolved_pkg_t* resolve
 }
 
 spn_err_t load_file_package(spn_session_t* session, spn_resolved_pkg_t* pkg) {
-  spn_loaded_pkg_t* loaded = spn_registry_load_file_pkg(&session->packages, pkg->qualified, pkg->file.path);
+  spn_loaded_pkg_t* loaded = spn_registry_load_file_pkg(&session->packages, session->mem, session->intern, pkg->qualified, pkg->file.path);
   if (!loaded) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_SYNC_FAILED,
@@ -231,7 +231,7 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   spn_session_t* session = &app->session;
 
   session->git = sp_alloc_type(app->session.mem, spn_git_cache_t);
-  spn_git_cache_init(session->git, spn.paths.source);
+  spn_git_cache_init(session->git, session->mem, session->intern, spn.paths.source);
 
   // Load every package's manifest, checking out source code if needed
   sp_str_ht_for_kv(session->resolve, it) {

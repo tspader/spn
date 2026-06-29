@@ -3,7 +3,9 @@
 #include "pkg/id.h"
 #include "semver/compare.h"
 
-void spn_index_cache_init(spn_index_cache_t* cache, spn_index_arr_t* indexes) {
+void spn_index_cache_init(spn_index_cache_t* cache, sp_mem_t mem, sp_intern_t* intern, spn_index_arr_t* indexes) {
+  cache->mem = mem;
+  cache->intern = intern;
   cache->indexes = indexes;
   sp_str_om_new(cache->packages);
 }

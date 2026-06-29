@@ -74,7 +74,7 @@ static void run_fixture(s32* utest_result, fixture_t fixture) {
   sp_fs_create_dir(cache_root);
 
   spn_git_cache_t cache = SP_ZERO_INITIALIZE();
-  spn_git_cache_init(&cache, cache_root);
+  spn_git_cache_init(&cache, spn_allocator, SP_NULLPTR, cache_root);
 
   // for each checkout request: ensure db, ensure rev, ensure checkout
   sp_carr_for(fixture.checkouts, it) {

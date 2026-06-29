@@ -109,7 +109,7 @@ UTEST_F_TEARDOWN(resolver) {
 ///////////
 // MOCKS //
 ///////////
-void spn_index_cache_init(spn_index_cache_t* cache, spn_index_arr_t* indexes) {
+void spn_index_cache_init(spn_index_cache_t* cache, sp_mem_t mem, sp_intern_t* intern, spn_index_arr_t* indexes) {
 
 }
 
@@ -205,7 +205,7 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
   spn_index_cache_t cache = sp_zero;
   spn_pkg_registry_t registry = sp_zero;
   spn_resolver_t resolver = sp_zero;
-  spn_resolver_init(&resolver, &cache, &registry, events);
+  spn_resolver_init(&resolver, spn_allocator, spn.intern, &cache, &registry, events);
 
   spn_resolve_query_t query = sp_zero;
   sp_ht_for_kv(manifest.deps, it) {
