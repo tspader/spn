@@ -151,31 +151,25 @@ static void lower_toolchains(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg
   sp_str_om_init(out->toolchains);
   sp_da_for(cg->toolchain, n) {
     const spn_cg_manifest_toolchain_t* t = &cg->toolchain[n];
-    spn_toolchain_entry_t entry = sp_zero;
 
-    if (!sp_str_empty(t->package)) {
-      sp_str_t version = sp_str_empty(t->version) ? sp_str_lit("*") : t->version;
-      entry.name = t->package;
-      entry.kind = SPN_TOOLCHAIN_INDEX;
-      entry.request.package = lower_canonicalize(ctx, t->package);
-      entry.request.range = spn_semver_parse_range(version);
-    } else {
-      entry.name = t->name;
-      entry.kind = SPN_TOOLCHAIN_INLINE;
-      entry.info.name = t->name;
-      entry.info.url = t->url;
-      entry.info.compiler = lower_launcher(ctx, t->compiler);
-      entry.info.linker = lower_launcher(ctx, t->linker);
-      entry.info.archiver = lower_launcher(ctx, t->archiver);
-      entry.info.sysroot = t->sysroot;
-      entry.info.driver = sp_opt_is_null(t->driver) ? SPN_CC_DRIVER_NONE : sp_opt_get(t->driver);
-      entry.info.export = sp_opt_is_null(t->export) ? false : sp_opt_get(t->export);
-      for (u32 i = 0; i < sp_da_size(t->host) && i < SPN_TOOLCHAIN_MAX_HOSTS; i++) {
-        entry.info.hosts[i] = lower_triple(&t->host[i]);
-      }
-      for (u32 i = 0; i < sp_da_size(t->target) && i < SPN_TOOLCHAIN_MAX_TARGETS; i++) {
-        entry.info.targets[i] = lower_triple(&t->target[i]);
-      }
+    if (!sp_str_empty(t->package)) continue;
+
+    spn_toolchain_entry_t entry = sp_zero;
+    entry.name = t->name;
+    entry.kind = sp_str_empty(t->url) ? SPN_TOOLCHAIN_SYSTEM : SPN_TOOLCHAIN_REMOTE;
+    entry.info.name = t->name;
+    entry.info.url = t->url;
+    entry.info.compiler = lower_launcher(ctx, t->compiler);
+    entry.info.linker = lower_launcher(ctx, t->linker);
+    entry.info.archiver = lower_launcher(ctx, t->archiver);
+    entry.info.sysroot = t->sysroot;
+    entry.info.driver = sp_opt_is_null(t->driver) ? SPN_CC_DRIVER_NONE : sp_opt_get(t->driver);
+    entry.info.export = sp_opt_is_null(t->export) ? false : sp_opt_get(t->export);
+    for (u32 i = 0; i < sp_da_size(t->host) && i < SPN_TOOLCHAIN_MAX_HOSTS; i++) {
+      entry.info.hosts[i] = lower_triple(&t->host[i]);
+    }
+    for (u32 i = 0; i < sp_da_size(t->target) && i < SPN_TOOLCHAIN_MAX_TARGETS; i++) {
+      entry.info.targets[i] = lower_triple(&t->target[i]);
     }
 
     sp_str_om_insert(out->toolchains, entry.name, entry);

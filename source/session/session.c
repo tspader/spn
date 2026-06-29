@@ -71,10 +71,6 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_info_t* pkg) {
     fingerprint.abi = session->profile.abi;
 
     spn_toolchain_unit_t* toolchain = session->units.toolchain;
-    if (toolchain->kind == SPN_TOOLCHAIN_INDEX) {
-      fingerprint.toolchain.name = sp_hash_str(toolchain->pkg->qualified);
-      fingerprint.toolchain.version = toolchain->pkg->version;
-    }
     fingerprint.toolchain.cc = sp_hash_str(toolchain->info.compiler.program);
     fingerprint.toolchain.ld = sp_hash_str(toolchain->info.linker.program);
     fingerprint.toolchain.ar = sp_hash_str(toolchain->info.archiver.program);

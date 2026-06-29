@@ -44,7 +44,7 @@ sp_da(spn_toolchain_entry_t) spn_toolchain_load_builtins(spn_triple_t host, sp_m
 
     spn_toolchain_entry_t entry = SP_ZERO_INITIALIZE();
     entry.name = spn_intern(t->name);
-    entry.kind = SPN_TOOLCHAIN_INLINE;
+    entry.kind = sp_str_empty(download.url) ? SPN_TOOLCHAIN_SYSTEM : SPN_TOOLCHAIN_REMOTE;
     entry.info.name = entry.name;
     entry.info.version = t->version;
     entry.info.url = download.url;

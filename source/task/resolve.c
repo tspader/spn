@@ -21,7 +21,6 @@ spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
   // @spader Clean this up
   sp_str_om_for(root->toolchains, it) {
     spn_toolchain_entry_t entry = *sp_str_om_at(root->toolchains, it);
-    if (entry.kind == SPN_TOOLCHAIN_INDEX) continue;
     sp_str_ht_insert(session->toolchains, entry.name, entry);
   }
 
@@ -32,7 +31,7 @@ spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
   spn_toolchain_entry_t builtin_toolchains[] = {
     {
       .name = sp_str_lit("builtin"),
-      .kind = SPN_TOOLCHAIN_BUILTIN,
+      .kind = SPN_TOOLCHAIN_SYSTEM,
       .info = {
         .compiler = { .program = sp_str_lit("cc") },
         .linker   = { .program = sp_str_lit("cc") },
