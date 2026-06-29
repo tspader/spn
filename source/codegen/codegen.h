@@ -5,9 +5,10 @@
 #include "sp.h"
 #include "spn.h"
 #include "toml.h"
+#include "error/types.h"
 #include "intern/intern.h"
 
-typedef struct {
+typedef struct spn_codegen_issue {
   spn_err_t code;
   sp_str_t path;
   sp_str_t detail;
@@ -77,5 +78,6 @@ sp_str_t spn_codegen_issue_message(sp_mem_t mem, const spn_codegen_issue_t* issu
 typedef struct spn_cg_manifest spn_cg_manifest_t;
 
 spn_err_t spn_codegen_load(spn_codegen_ctx_t* ctx, sp_str_t path, spn_cg_manifest_t* out);
+spn_err_union_t spn_codegen_err(spn_codegen_ctx_t* ctx);
 
 #endif
