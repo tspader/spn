@@ -4,6 +4,7 @@
 #include "sp.h"
 
 #include "forward/types.h"
+#include "git/types.h"
 #include "intern/types.h"
 #include "sp/sp_om.h"
 #include "semver/types.h"
@@ -14,6 +15,23 @@ typedef enum {
   SPN_PKG_SOURCE_FILE,
   SPN_PKG_SOURCE_INDEX,
 } spn_pkg_source_t;
+
+// A tree spn can place on disk: a path that already exists, or a git repo to
+// check out. Manifests and source code are each one of these, materialized
+// independently, so "local recipe + remote source" is just LOCAL + GIT.
+typedef enum {
+  SPN_PKG_TREE_NONE,
+  SPN_PKG_TREE_LOCAL,
+  SPN_PKG_TREE_GIT,
+} spn_pkg_tree_kind_t;
+
+typedef struct {
+  spn_pkg_tree_kind_t kind;
+  union {
+    sp_str_t local;
+    spn_git_checkout_id_t git;
+  };
+} spn_pkg_tree_t;
 
 
 typedef struct {

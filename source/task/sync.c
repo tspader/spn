@@ -65,104 +65,103 @@ SP_PRIVATE spn_toolchain_unit_t* setup_toolchain_unit(spn_session_t* session, sp
   return unit;
 }
 
-// We need a way to point to local copies of packages while developing; for a quick
-// and dirty, just use SPN_PATCH_DIR as the package manifest repo if set.
-//
-// I don't intend for this to stick around forever, but works great now
-static bool load_patched_package(spn_session_t* session, spn_loaded_pkg_t* loaded, spn_index_rel_t* release) {
-  sp_str_t patches = sp_env_get(spn.env, sp_str_lit("SPN_PATCH_DIR"));
-  if (sp_str_empty(patches)) return false;
+static spn_pkg_tree_t tree_local(sp_str_t path) {
+  return (spn_pkg_tree_t) { .kind = SPN_PKG_TREE_LOCAL, .local = path };
+}
 
-  sp_str_t dir = sp_fs_join_path(session->mem, patches, release->id.name);
-  sp_str_t manifest = sp_fs_join_path(session->mem, dir, release->paths.manifest);
-  if (!sp_fs_exists(manifest)) return false;
+static spn_pkg_tree_t tree_git(spn_index_rel_source_t source) {
+  return (spn_pkg_tree_t) {
+    .kind = SPN_PKG_TREE_GIT,
+    .git = { .url = source.url, .rev = source.rev, .dir = source.dir },
+  };
+}
 
-  loaded->source = SPN_PKG_SOURCE_INDEX;
-  loaded->paths.manifest = manifest;
-  loaded->paths.script = sp_fs_join_path(session->mem, dir, release->paths.script);
-  loaded->paths.source = dir;
+// Place a tree on disk and hand back its root: a local path is already there;
+// a git tree is checked out through the cache.
+static sp_str_t materialize_tree(spn_session_t* session, spn_pkg_tree_t tree) {
+  switch (tree.kind) {
+    case SPN_PKG_TREE_LOCAL: return tree.local;
+    case SPN_PKG_TREE_GIT: {
+      spn_git_checkout_t* checkout = SP_NULLPTR;
+      if (spn_git_cache_ensure_checkout(session->git, tree.git, &checkout)) return sp_str_lit("");
+      return checkout->path;
+    }
+    case SPN_PKG_TREE_NONE: return sp_str_lit("");
+  }
+
+  sp_unreachable_return(sp_str_lit(""));
+}
+
+// Materialize a recipe (manifest + build script), parse it, then materialize
+// its source. When `derive_source` is set the source tree is read from the
+// freshly parsed manifest (the local-recipe case: file deps, patched index
+// packages); otherwise the caller supplies it (the published-release case).
+// An empty/NONE source means the code lives alongside the manifest.
+static void load_from_tree(
+  spn_session_t* session,
+  spn_loaded_pkg_t* loaded,
+  spn_pkg_tree_t manifest_tree,
+  spn_index_rel_paths_t paths,
+  bool derive_source,
+  spn_pkg_tree_t source_tree
+) {
+  sp_tm_timer_t timer = sp_tm_start_timer();
+
+  sp_str_t root = materialize_tree(session, manifest_tree);
+  loaded->paths.manifest = sp_fs_join_path(session->mem, root, paths.manifest);
+  loaded->paths.script = sp_fs_join_path(session->mem, root, paths.script);
+
   loaded->info = sp_alloc_type(session->mem, spn_pkg_info_t);
   spn_pkg_load(loaded->info, loaded->paths.manifest);
 
-  // Packages whose source lives in a separate repo still need it checked out
-  spn_pkg_info_t* info = loaded->info;
-  spn_pkg_metadata_t* meta = sp_ht_getp(info->metadata, info->version);
-  if (!sp_str_empty(info->url) && meta && !sp_str_empty(meta->commit)) {
-    spn_git_checkout_t* checkout = SP_NULLPTR;
-    spn_git_checkout_id_t id = {
-      .url = info->url,
-      .rev = meta->commit,
-    };
-    if (spn_git_cache_ensure_checkout(session->git, id, &checkout)) return false;
-    loaded->paths.source = checkout->path;
+  if (derive_source) {
+    source_tree = spn_pkg_manifest_source_tree(loaded->info);
   }
+  loaded->paths.source = source_tree.kind == SPN_PKG_TREE_NONE
+    ? root
+    : materialize_tree(session, source_tree);
 
-  return true;
+  loaded->elapsed = sp_tm_read_timer(&timer);
+}
+
+// While developing a recipe you don't want to publish on every edit, so
+// SPN_PATCH_DIR/<name> stands in for the manifest repo. It's a plain tree
+// substitution: the recipe comes from disk, the source is derived from that
+// local manifest just like any other local recipe.
+static sp_str_t patch_dir(spn_session_t* session, spn_index_rel_t* release) {
+  sp_str_t patches = sp_env_get(spn.env, sp_str_lit("SPN_PATCH_DIR"));
+  if (sp_str_empty(patches)) return sp_str_lit("");
+
+  sp_str_t dir = sp_fs_join_path(session->mem, patches, release->id.name);
+  sp_str_t manifest = sp_fs_join_path(session->mem, dir, release->paths.manifest);
+  if (!sp_fs_exists(manifest)) return sp_str_lit("");
+
+  return dir;
 }
 
 spn_err_t load_index_package(spn_session_t* session, spn_resolved_pkg_t* resolved) {
   sp_str_ht_insert(session->packages, resolved->qualified, sp_zero_struct(spn_loaded_pkg_t));
   spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, resolved->qualified);
+  loaded->source = SPN_PKG_SOURCE_INDEX;
 
   spn_index_rel_t* release = resolved->index.release;
 
-  if (load_patched_package(session, loaded, release)) {
+  sp_str_t patch = patch_dir(session, release);
+  if (!sp_str_empty(patch)) {
+    load_from_tree(session, loaded, tree_local(patch), release->paths, true, (spn_pkg_tree_t) { 0 });
     return SPN_OK;
   }
 
-  struct {
-    spn_git_checkout_t* manifest;
-    spn_git_checkout_t* source;
-  } checkouts = sp_zero_initialize();
+  // The recipe lives in the manifest repo if there is one, otherwise the
+  // source repo carries it. The source is whatever the release pinned.
+  spn_pkg_tree_t manifest_tree = !sp_str_empty(release->manifest.url)
+    ? tree_git(release->manifest)
+    : tree_git(release->source);
+  spn_pkg_tree_t source_tree = !sp_str_empty(release->source.url)
+    ? tree_git(release->source)
+    : (spn_pkg_tree_t) { .kind = SPN_PKG_TREE_NONE };
 
-  sp_tm_timer_t timer = sp_tm_start_timer();
-
-  // If the manifest is in a different repo than the source, check that out first
-  if (!sp_str_empty(release->manifest.url)) {
-    spn_git_checkout_id_t id = {
-      .url = release->manifest.url,
-      .rev = release->manifest.rev,
-      .dir = release->manifest.dir
-    };
-    spn_try(spn_git_cache_ensure_checkout(session->git, id, &checkouts.manifest));
-  }
-
-  // If the package has source code, clone it
-  if (!sp_str_empty(release->source.url)) {
-    spn_git_checkout_id_t id = {
-      .url = release->source.url,
-      .rev = release->source.rev,
-      .dir = release->source.dir
-    };
-    spn_try(spn_git_cache_ensure_checkout(session->git, id, &checkouts.source));
-    loaded->paths.source = checkouts.source->path;
-  }
-
-  if (checkouts.manifest) {
-    loaded->paths.manifest = sp_fs_join_path(session->mem, checkouts.manifest->path, release->paths.manifest);
-    loaded->paths.script = sp_fs_join_path(session->mem, checkouts.manifest->path, release->paths.script);
-  }
-  else {
-    loaded->paths.manifest = sp_fs_join_path(session->mem, checkouts.source->path, release->paths.manifest);
-    loaded->paths.script = sp_fs_join_path(session->mem, checkouts.source->path, release->paths.script);
-  }
-
-  if (sp_fs_exists(loaded->paths.manifest)) {
-    sp_assert_fmt(
-      sp_fs_exists(loaded->paths.manifest),
-      "manifest didn't exist; pkg = {}, path = {}, checkout = {}",
-      SP_FMT_STR(spn_pkg_id_to_qualified_name(release->id)),
-      SP_FMT_STR(loaded->paths.manifest),
-      SP_FMT_PTR(checkouts.manifest)
-    );
-  }
-
-  loaded->source = SPN_PKG_SOURCE_INDEX;
-  loaded->info = sp_alloc_type(session->mem, spn_pkg_info_t);
-  spn_pkg_load(loaded->info, loaded->paths.manifest);
-
-  loaded->elapsed = sp_tm_read_timer(&timer);
-
+  load_from_tree(session, loaded, manifest_tree, release->paths, false, source_tree);
   return SPN_OK;
 }
 
@@ -178,6 +177,14 @@ spn_err_t load_file_package(spn_session_t* session, spn_resolved_pkg_t* pkg) {
       }
     });
     return SPN_ERROR;
+  }
+
+  // A local recipe can pin its source to a separate repo just like a published
+  // one. The registry can't check it out (it runs before the git cache exists),
+  // so do it here where the source tree is materialized like every other.
+  spn_pkg_tree_t source = spn_pkg_manifest_source_tree(loaded->info);
+  if (source.kind != SPN_PKG_TREE_NONE) {
+    loaded->paths.source = materialize_tree(session, source);
   }
 
   return SPN_OK;
