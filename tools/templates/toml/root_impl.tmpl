@@ -1,8 +1,8 @@
-void spn_cg_root_read(spn_codegen_ctx_t* ctx, toml_table_t* table, spn_cg_root_t* out) {
+void spn_{{ .root_name }}_read(spn_codegen_ctx_t* ctx, toml_table_t* table, spn_cg_{{ .root_name }}_t* out) {
   spn_cg_{{ .root_name }}_read(ctx, table, out);
 }
 
-sp_str_t spn_cg_root_write(sp_mem_t mem, const spn_cg_root_t* in) {
+sp_str_t spn_{{ .root_name }}_write(sp_mem_t mem, const spn_cg_{{ .root_name }}_t* in) {
   sp_io_dyn_mem_writer_t sink;
   sp_io_dyn_mem_writer_init(mem, &sink);
   spn_codegen_json_writer_t pretty;

@@ -1,4 +1,4 @@
-bool spn_toolchains_read(sp_str_t json, spn_cg_root_t* out, sp_mem_t mem) {
+bool spn_{{ .root_name }}_read(sp_str_t json, spn_cg_{{ .root_name }}_t* out, sp_mem_t mem) {
   yyjson_doc* doc = yyjson_read(json.data, json.len, 0);
   if (!doc) {
     return false;
@@ -8,7 +8,7 @@ bool spn_toolchains_read(sp_str_t json, spn_cg_root_t* out, sp_mem_t mem) {
   return true;
 }
 
-sp_str_t spn_toolchains_write(sp_mem_t mem, const spn_cg_root_t* in) {
+sp_str_t spn_{{ .root_name }}_write(sp_mem_t mem, const spn_cg_{{ .root_name }}_t* in) {
   sp_io_dyn_mem_writer_t sink;
   sp_io_dyn_mem_writer_init(mem, &sink);
   spn_codegen_json_writer_t pretty;

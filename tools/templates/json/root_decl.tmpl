@@ -1,2 +1,2 @@
-bool spn_toolchains_read(sp_str_t json, spn_cg_root_t* out, sp_mem_t mem);
-sp_str_t spn_toolchains_write(sp_mem_t mem, const spn_cg_root_t* in);
+bool spn_{{ .root_name }}_read(sp_str_t json, spn_cg_{{ .root_name }}_t* out, sp_mem_t mem);
+sp_str_t spn_{{ .root_name }}_write(sp_mem_t mem, const spn_cg_{{ .root_name }}_t* in);
