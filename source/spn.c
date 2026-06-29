@@ -364,15 +364,16 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     spn_codegen_ctx_t ctx = sp_zero;
     spn_codegen_ctx_init(&ctx, spn.allocators.heap, spn.allocators.bulk, spn.intern);
     spn_cg_manifest_t manifest = sp_zero;
-    spn_pkg_info_t lowered = sp_zero;
     spn_codegen_load(&ctx, spn.paths.manifest, &manifest);
     spn_pkg_lower(&ctx, &manifest, &app.package);
-    // spn_err_union_t error = spn_pkg_load(&app.package, spn.paths.manifest);
-    // if (error.kind) {
-    //   spn_log_error("bad manifest");
-    //   spn_poll(sp);
-    //   return SP_APP_ERR;
-    // }
+
+    if (!sp_da_empty(ctx.issues)) {
+      spn_log_error("{.red}: failed to parse manifest because of the following:", sp_fmt_cstr("error"));
+      sp_da_for(ctx.issues, it) {
+        spn_log_error("- {}", SP_FMT_STR(spn_codegen_issue_message(spn.mem, &ctx.issues[it])));
+      }
+      return SP_APP_ERR;
+    }
 
     app.paths.lock = sp_fs_join_path(spn.mem, spn.paths.project, SP_LIT("spn.lock"));
 
