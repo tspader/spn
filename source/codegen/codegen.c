@@ -78,10 +78,18 @@ static bool spn_codegen_read_raw_value(toml_table_t* table, const c8* key, sp_st
   return true;
 }
 
+static bool spn_codegen_field_present(toml_table_t* table, const c8* key) {
+  return toml_table_array(table, key) || toml_table_table(table, key) || toml_table_unparsed(table, key);
+}
+
+static spn_err_t spn_codegen_required_str_err(toml_table_t* table, const c8* key) {
+  return spn_codegen_field_present(table, key) ? SPN_CODEGEN_ERR_EXPECTED_STR : SPN_CODEGEN_ERR_MISSING_KEY;
+}
+
 sp_str_t spn_codegen_str_required(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key) {
   sp_str_t value = sp_zero;
   if (!spn_codegen_read_raw_value(table, key, &value)) {
-    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, key);
+    spn_codegen_issue(ctx, spn_codegen_required_str_err(table, key), key);
     return value;
   }
   return sp_intern_get_or_insert_str(ctx->intern, value);
@@ -98,7 +106,7 @@ bool spn_codegen_str_optional(spn_codegen_ctx_t* ctx, toml_table_t* table, const
 sp_str_t spn_codegen_raw_required(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key) {
   sp_str_t value = sp_zero;
   if (!spn_codegen_read_raw_value(table, key, &value)) {
-    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, key);
+    spn_codegen_issue(ctx, spn_codegen_required_str_err(table, key), key);
   }
   return value;
 }
@@ -270,6 +278,29 @@ const c8* spn_codegen_err_name(spn_err_t code) {
     case SPN_CODEGEN_ERR_FILE_MISSING:   return "file_missing";
     case SPN_CODEGEN_ERR_INVALID:        return "invalid";
     default:                             return "unknown";
+  }
+}
+
+sp_str_t spn_codegen_issue_message(sp_mem_t mem, const spn_codegen_issue_t* issue) {
+  switch (issue->code) {
+    case SPN_CODEGEN_ERR_MISSING_KEY:
+      return sp_fmt(mem, "missing required field {.cyan}", SP_FMT_STR(issue->path)).value;
+    case SPN_CODEGEN_ERR_EXPECTED_STR:
+      return sp_fmt(mem, "{.cyan} must be a string", SP_FMT_STR(issue->path)).value;
+    case SPN_CODEGEN_ERR_EXPECTED_BOOL:
+      return sp_fmt(mem, "{.cyan} must be a boolean", SP_FMT_STR(issue->path)).value;
+    case SPN_CODEGEN_ERR_EXPECTED_OBJECT:
+      return sp_fmt(mem, "{.cyan} must be a table", SP_FMT_STR(issue->path)).value;
+    case SPN_CODEGEN_ERR_DUPLICATE_KEY:
+      return sp_fmt(mem, "duplicate {.yellow} at {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path)).value;
+    case SPN_CODEGEN_ERR_INVALID:
+      return sp_fmt(mem, "invalid value at {.cyan}", SP_FMT_STR(issue->path)).value;
+    case SPN_CODEGEN_ERR_PARSE:
+      return sp_str_lit("manifest is not valid toml");
+    case SPN_CODEGEN_ERR_FILE_MISSING:
+      return sp_str_lit("manifest file is missing");
+    default:
+      return sp_fmt(mem, "invalid manifest at {.cyan}", SP_FMT_STR(issue->path)).value;
   }
 }
 
