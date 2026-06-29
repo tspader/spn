@@ -27,13 +27,26 @@ static bool has_source_file(sp_da(sp_str_t) source, sp_str_t path) {
   return false;
 }
 
+static sp_str_t glob_literal_dir(sp_str_t pattern) {
+  u32 cut = 0;
+  for (u32 i = 0; i < pattern.len; i++) {
+    c8 c = pattern.data[i];
+    if (c == '*' || c == '?' || c == '[' || c == '{') break;
+    if (c == '/') cut = i;
+  }
+  return sp_str_sub(pattern, 0, cut);
+}
+
 static void collect_source_glob(sp_str_t root, sp_str_t pattern, sp_da(sp_str_t)* source) {
   sp_glob_t* glob = sp_glob_new_str(spn_mem_todo, pattern);
   if (!glob) {
     return;
   }
 
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(spn_mem_todo, root);
+  sp_str_t sub = glob_literal_dir(pattern);
+  sp_str_t scan = sp_str_empty(sub) ? root : sp_fs_join_path(spn_mem_todo, root, sub);
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(spn_mem_todo, scan);
+  // sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(spn_mem_todo, root);
   sp_da(sp_str_t) matches = SP_NULLPTR;
 
   sp_da_for(entries, it) {
