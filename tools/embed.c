@@ -40,7 +40,7 @@ static sp_cli_result_t embed_one(
 ) {
   sp_str_t content = sp_zero;
   if (sp_io_read_file(mem, src_path, &content) != SP_OK) {
-    sp_cli_log_error("failed to read {.fg red}", sp_fmt_str(src_path));
+    sp_cli_log_error("failed to read {.red}", sp_fmt_str(src_path));
     return SP_CLI_ERR;
   }
 
@@ -150,29 +150,29 @@ sp_cli_result_t embed_run(sp_cli_t* cli) {
   sp_io_dyn_mem_writer_t object;
   sp_io_dyn_mem_writer_init(mem, &object);
   if (sp_elf_write(elf, &object.base) != SP_OK) {
-    sp_cli_log_error("failed to encode {.fg red}", sp_fmt_str(obj_path));
+    sp_cli_log_error("failed to encode {.red}", sp_fmt_str(obj_path));
     return SP_CLI_ERR;
   }
 
   sp_str_t obj_dir = sp_fs_parent_path(obj_path);
   if (!sp_str_empty(obj_dir) && sp_fs_create_dir(obj_dir) != SP_OK) {
-    sp_cli_log_error("failed to create {.fg red}", sp_fmt_str(obj_dir));
+    sp_cli_log_error("failed to create {.red}", sp_fmt_str(obj_dir));
     return SP_CLI_ERR;
   }
 
   sp_str_t hdr_dir = sp_fs_parent_path(hdr_path);
   if (!sp_str_empty(hdr_dir) && sp_fs_create_dir(hdr_dir) != SP_OK) {
-    sp_cli_log_error("failed to create {.fg red}", sp_fmt_str(hdr_dir));
+    sp_cli_log_error("failed to create {.red}", sp_fmt_str(hdr_dir));
     return SP_CLI_ERR;
   }
 
   if (sp_fs_create_file_slice(obj_path, (sp_mem_slice_t){ object.storage.data, object.storage.len }) != SP_OK) {
-    sp_cli_log_error("failed to write {.fg red}", sp_fmt_str(obj_path));
+    sp_cli_log_error("failed to write {.red}", sp_fmt_str(obj_path));
     return SP_CLI_ERR;
   }
 
   if (sp_fs_create_file_slice(hdr_path, (sp_mem_slice_t){ header.storage.data, header.storage.len }) != SP_OK) {
-    sp_cli_log_error("failed to write {.fg red}", sp_fmt_str(hdr_path));
+    sp_cli_log_error("failed to write {.red}", sp_fmt_str(hdr_path));
     return SP_CLI_ERR;
   }
 

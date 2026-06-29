@@ -355,7 +355,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   if (!sp_fs_exists(spn.paths.manifest)) {
     // spn run can execute a lone source file without a project
     if (!sp_str_equal_cstr(sp_str_view(parser.resolved->name), "run")) {
-      spn_log_error("no manifest found at {.fg cyan}", SP_FMT_STR(spn.paths.manifest));
+      spn_log_error("no manifest found at {.cyan}", SP_FMT_STR(spn.paths.manifest));
       return SP_APP_ERR;
     }
   }
