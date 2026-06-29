@@ -23,6 +23,7 @@
 #include "spn.h"
 #include "sp/macro.h"
 #include "task/task.h"
+#include "task/types.h"
 #include "toolchain/toolchain.h"
 #include "toolchain/types.h"
 #include "triple/triple.h"
@@ -229,9 +230,9 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
   sp_str_ht_for_kv(session->resolve, it) {
     spn_resolved_pkg_t* pkg = it.val;
     switch (pkg->source) {
-      case SPN_PKG_SOURCE_ROOT: load_root_package(session); break;
-      case SPN_PKG_SOURCE_INDEX: load_index_package(session, pkg); break;
-      case SPN_PKG_SOURCE_FILE: load_file_package(session, pkg); break;
+      case SPN_PKG_SOURCE_ROOT: spn_try_as(load_root_package(session), SPN_TASK_ERROR); break;
+      case SPN_PKG_SOURCE_INDEX: spn_try_as(load_index_package(session, pkg), SPN_TASK_ERROR); break;
+      case SPN_PKG_SOURCE_FILE: spn_try_as(load_file_package(session, pkg), SPN_TASK_ERROR); break;
     }
   }
 
