@@ -39,6 +39,8 @@ typedef struct {
 } spn_resolve_run_t;
 
 typedef struct spn_resolver_t {
+  sp_mem_t mem;
+  sp_intern_t* intern;
   spn_index_cache_t* index;
   spn_pkg_registry_t* registry;
   spn_event_buffer_t* events;

@@ -23,6 +23,8 @@ sp_cli_result_t spn_cli_publish(sp_cli_t* cli) {
   }
 
   spn_publish_opts_t opts = {
+    .mem = spn.mem,
+    .intern = spn.intern,
     .cwd = spn.paths.cwd,
     .index = index,
     .url = cmd->source_url,

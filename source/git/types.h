@@ -4,6 +4,8 @@
 #include "sp.h"
 #include "sp/sp_om.h"
 
+#include "intern/types.h"
+
 typedef struct {
   sp_str_t url;
   sp_str_t path;
@@ -21,6 +23,8 @@ typedef struct {
 } spn_git_checkout_t;
 
 typedef struct {
+  sp_mem_t mem;
+  sp_intern_t* intern;
   sp_str_t root;
   struct {
     sp_str_t dir;

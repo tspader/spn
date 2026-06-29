@@ -3,11 +3,13 @@
 #include "external/git.h"
 #include "git/key.h"
 
-void spn_git_cache_init(spn_git_cache_t* cache, sp_str_t root) {
+void spn_git_cache_init(spn_git_cache_t* cache, sp_mem_t mem, sp_intern_t* intern, sp_str_t root) {
   *cache = (spn_git_cache_t) {
+    .mem = mem,
+    .intern = intern,
     .root = root,
-    .db.dir = sp_fs_join_path(spn_mem_todo, root, SP_LIT("db")),
-    .checkouts.dir = sp_fs_join_path(spn_mem_todo, root, SP_LIT("checkouts")),
+    .db.dir = sp_fs_join_path(mem, root, SP_LIT("db")),
+    .checkouts.dir = sp_fs_join_path(mem, root, SP_LIT("checkouts")),
   };
 
   sp_fs_create_dir(cache->db.dir);
@@ -25,10 +27,10 @@ spn_err_t spn_git_cache_ensure_db(spn_git_cache_t* cache, sp_str_t url, spn_git_
     return SPN_OK;
   }
 
-  sp_str_t path = sp_fs_join_path(spn_mem_todo, cache->db.dir, key);
+  sp_str_t path = sp_fs_join_path(cache->mem, cache->db.dir, key);
 
   if (!sp_fs_is_dir(path)) {
-    sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
+    sp_ps_output_t result = sp_ps_run(cache->mem, (sp_ps_config_t) {
       .command = SP_LIT("git"),
       .args = {
         SP_LIT("clone"), SP_LIT("--bare"), SP_LIT("--quiet"),
@@ -100,10 +102,10 @@ spn_err_t spn_git_cache_ensure_checkout(spn_git_cache_t* cache, spn_git_checkout
   spn_try(spn_git_cache_ensure_db(cache, id.url, &db));
   spn_try(spn_git_db_ensure_rev(db, id.rev));
 
-  sp_str_t path = sp_fs_join_path(spn_mem_todo, cache->checkouts.dir, key);
+  sp_str_t path = sp_fs_join_path(cache->mem, cache->checkouts.dir, key);
 
   if (!sp_fs_is_dir(path)) {
-    sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
+    sp_ps_output_t result = sp_ps_run(cache->mem, (sp_ps_config_t) {
       .command = SP_LIT("git"),
       .args = {
         SP_LIT("clone"), SP_LIT("--shared"), SP_LIT("--quiet"),
@@ -116,14 +118,14 @@ spn_err_t spn_git_cache_ensure_checkout(spn_git_cache_t* cache, spn_git_checkout
     spn_try(spn_git_checkout(path, id.rev));
 
     if (!sp_str_empty(id.dir)) {
-      sp_str_t subdir_path = sp_fs_join_path(spn_mem_todo, path, id.dir);
+      sp_str_t subdir_path = sp_fs_join_path(cache->mem, path, id.dir);
       if (!sp_fs_is_dir(subdir_path)) return SPN_ERROR;
     }
   }
 
   sp_str_t checkout_root = path;
   if (!sp_str_empty(id.dir)) {
-    checkout_root = sp_fs_join_path(spn_mem_todo, path, id.dir);
+    checkout_root = sp_fs_join_path(cache->mem, path, id.dir);
   }
 
   sp_str_om_insert(cache->checkouts.entries, key, ((spn_git_checkout_t) {
