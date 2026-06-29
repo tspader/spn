@@ -1,5 +1,7 @@
 #include "app/app.h"
 #include "app/types.h"
+#include "codegen/codegen.h"
+#include "codegen/lower.h"
 #include "ctx/ctx.h"
 #include "ctx/types.h"
 #include "error/types.h"
@@ -112,7 +114,9 @@ static void load_from_tree(
   loaded->paths.script = sp_fs_join_path(session->mem, root, paths.script);
 
   loaded->info = sp_alloc_type(session->mem, spn_pkg_info_t);
-  spn_pkg_load(loaded->info, loaded->paths.manifest);
+  spn_codegen_ctx_t ctx = sp_zero;
+  spn_codegen_ctx_init(&ctx, session->mem, session->mem, session->intern);
+  spn_codegen_load_pkg(&ctx, loaded->paths.manifest, loaded->info);
 
   if (derive_source) {
     source_tree = spn_pkg_manifest_source_tree(loaded->info);

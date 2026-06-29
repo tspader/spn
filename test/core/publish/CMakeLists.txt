@@ -6,6 +6,9 @@ add_executable(publish
   ${SRC}/external/git.c
   ${SRC}/external/mz.c
   ${SRC}/external/tom.c
+  ${SRC}/codegen/codegen.c
+  ${SRC}/codegen/lower.c
+  ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/index/index.c
   ${SRC}/index/json.c
   ${SRC}/index/publish.c
@@ -31,4 +34,6 @@ add_executable(publish
   ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(publish)
+target_include_directories(publish PRIVATE ${SRC}/codegen/gen)
+add_dependencies(publish spn_codegen_gen)
 add_test(NAME publish COMMAND "$<TARGET_FILE:publish>")

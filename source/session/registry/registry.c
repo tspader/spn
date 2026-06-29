@@ -2,9 +2,9 @@
 
 #include "ctx/types.h"
 
-#include "pkg/load.h"
+#include "codegen/codegen.h"
+#include "codegen/lower.h"
 
-// @spader @mem
 spn_loaded_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_mem_t mem, sp_intern_t* intern, sp_str_t qualified, sp_str_t path) {
   spn_loaded_pkg_t* existing = sp_str_ht_get(*registry, qualified);
   if (existing) return existing;
@@ -21,8 +21,9 @@ spn_loaded_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_me
   if (!sp_fs_exists(manifest)) return SP_NULLPTR;
 
   spn_pkg_info_t* info = sp_alloc_type(mem, spn_pkg_info_t);
-  spn_err_union_t result = spn_pkg_load(info, manifest);
-  if (result.kind) return SP_NULLPTR;
+  spn_codegen_ctx_t ctx = sp_zero;
+  spn_codegen_ctx_init(&ctx, mem, mem, intern);
+  if (spn_codegen_load_pkg(&ctx, manifest, info)) return SP_NULLPTR;
 
   sp_str_ht_insert(*registry, qualified, sp_zero_struct(spn_loaded_pkg_t));
   spn_loaded_pkg_t* loaded = sp_str_ht_get(*registry, qualified);

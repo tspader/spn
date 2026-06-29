@@ -1,6 +1,7 @@
 #include "ctx/types.h"
 
 #include "cli/cli.h"
+#include "codegen/codegen.h"
 #include "index/publish.h"
 #include "log/log.h"
 
@@ -51,6 +52,13 @@ sp_cli_result_t spn_cli_publish(sp_cli_t* cli) {
           SP_FMT_STR(result.manifest_field.expected),
           SP_FMT_STR(result.manifest_field.actual)
         );
+        break;
+      }
+      case SPN_ERR_MANIFEST_ISSUES: {
+        spn_log_error("invalid manifest:");
+        sp_da_for(result.issues, it) {
+          spn_log_error("- {}", SP_FMT_STR(spn_codegen_issue_message(spn.mem, &result.issues[it])));
+        }
         break;
       }
       case SPN_ERR_NOT_GIT_REPO: {
