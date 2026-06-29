@@ -112,6 +112,85 @@ void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, s
   }
 }
 
+static sp_str_t str_replace_all(sp_str_t str, sp_str_t needle, sp_str_t repl) {
+  sp_str_builder_t b = SP_ZERO_INITIALIZE();
+  while (true) {
+    s32 at = sp_str_find(str, needle);
+    if (at == SP_STR_NO_MATCH) {
+      sp_str_builder_append(&b, str);
+      break;
+    }
+    sp_str_builder_append(&b, sp_str(str.data, at));
+    sp_str_builder_append(&b, repl);
+    str = sp_str(str.data + at + needle.len, str.len - at - needle.len);
+  }
+  return sp_str_builder_to_str(&b);
+}
+
+// @spader use sp_template.h
+void setup_fixture_source_repos(s32* result, fixture_t* fixture, sp_str_t project) {
+  UTEST_RESULT(result);
+
+  sp_str_t source = sp_fs_join_path(spn_allocator, project, sp_str_lit("source"));
+  if (!sp_fs_exists(source)) {
+    return;
+  }
+
+  ASSERT_TRUE(sp_fs_is_dir(source));
+
+  struct { sp_str_t token; sp_str_t value; } subs[16];
+  s32 num_subs = 0;
+
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect(spn_allocator, source);
+  sp_da_for(entries, it) {
+    sp_fs_entry_t* entry = &entries[it];
+    if (!sp_fs_is_dir(entry->path)) {
+      continue;
+    }
+
+    sp_str_t repo = tmpfs_get(&fixture->fs, sp_fs_join_path(spn_allocator, sp_str_lit("source"), entry->name));
+    git_repo_init(repo);
+    git_repo_commit_from_dir(entry->path, repo, sp_str_lit("source"));
+    sp_str_t commit = git_repo_head(repo);
+    sp_str_t url = sp_str_replace_c8(spn_allocator, repo, '\\', '/');
+
+    ASSERT_TRUE(num_subs + 2 <= (s32)sp_carr_len(subs));
+    subs[num_subs].token = sp_format("@{}.url@", SP_FMT_STR(entry->name));
+    subs[num_subs].value = url;
+    num_subs++;
+    subs[num_subs].token = sp_format("@{}.commit@", SP_FMT_STR(entry->name));
+    subs[num_subs].value = commit;
+    num_subs++;
+  }
+
+  if (num_subs == 0) {
+    return;
+  }
+
+  sp_da(sp_fs_entry_t) files = sp_fs_collect_recursive(spn_allocator, fixture->fs.root);
+  sp_da_for(files, it) {
+    sp_fs_entry_t* file = &files[it];
+    if (sp_fs_is_dir(file->path)) {
+      continue;
+    }
+
+    sp_str_t content = SP_ZERO_INITIALIZE();
+    sp_io_read_file(spn_allocator, file->path, &content);
+
+    bool changed = false;
+    sp_for(s, num_subs) {
+      if (sp_str_contains(content, subs[s].token)) {
+        content = str_replace_all(content, subs[s].token, subs[s].value);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      fixture_write_file(file->path, content);
+    }
+  }
+}
+
 void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t toolchain, sp_str_t config) {
   sp_str_t path = tmpfs_get(fs, sp_str_lit(".envrc"));
   sp_str_t content = sp_format(
@@ -434,6 +513,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
     sp_str_t project = sp_fs_join_path(spn_allocator, fixture->paths.root, sp_str_view(test.project));
     fixture_copy_project(utest_result, fixture, project, test.copy);
     setup_fixture_index_from_remote(utest_result, &fixture->fs, fixture->paths.index, project);
+    setup_fixture_source_repos(utest_result, fixture, project);
   }
 
   run_actions(utest_result, fixture, test.actions);
