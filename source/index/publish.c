@@ -65,9 +65,9 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
     },
   };
 
-  spn_pkg_metadata_t* meta = sp_ht_getp(info.metadata, info.version);
-  if (!sp_str_empty(info.url) && meta && !sp_str_empty(meta->commit)) {
-    release.source = (spn_index_rel_source_t) { .url = info.url, .rev = meta->commit };
+  spn_pkg_tree_t source = spn_pkg_manifest_source_tree(&info);
+  if (source.kind == SPN_PKG_TREE_GIT) {
+    release.source = (spn_index_rel_source_t) { .url = source.git.url, .rev = source.git.rev };
     release.manifest = (spn_index_rel_source_t) { .url = url, .rev = revision, .dir = subdir };
   }
 
