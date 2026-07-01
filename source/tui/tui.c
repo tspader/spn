@@ -5,6 +5,7 @@
 #include "log/log.h"
 #include "semver/convert.h"
 #include "sp/color.h"
+#include "sp/compat.h"
 #include "sp/macro.h"
 #include "sp/str.h"
 #include "tui/tui.h"
@@ -380,10 +381,12 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       break;
     }
     case SPN_EVENT_BUILD_PASSED: {
+      c8 buffer [64] = sp_zero;
+      sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->build.passed.time);
       sp_str_builder_append_fmt(&builder,
-        "Built profile {.cyan} in {.cyan}s",
+        "Built profile {.cyan} in {.cyan}",
         SP_FMT_STR(event->build.passed.profile->name),
-        SP_FMT_F32(sp_tm_ns_to_s_f(event->build.passed.time))
+        SP_FMT_CSTR(buffer)
       );
       break;
     }

@@ -224,6 +224,13 @@ s32 spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir
     return SPN_OK;
   }
 
+  // @spader This bit me so I just patched it over like this, but
+  // I need to think about how this should work
+  sp_str_t parent = sp_fs_parent_path(to);
+  if (!sp_str_empty(parent)) {
+    sp_fs_create_dir(parent);
+  }
+
   return sp_fs_copy(from, to);
 }
 

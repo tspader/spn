@@ -142,7 +142,7 @@ fail:
 }
 
 spn_err_t compile_shim(spn_session_t* session, spn_pkg_unit_t* unit) {
-  spn_try(compile_wasm(session, unit));
+  // spn_try(compile_wasm(session, unit));
   spn_try(compile_package(session, unit));
   return SPN_OK;
 }
