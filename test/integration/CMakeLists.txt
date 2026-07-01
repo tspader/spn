@@ -16,6 +16,7 @@ target_compile_definitions(integration PRIVATE
   SPN_TEST_ROOT="${CMAKE_SOURCE_DIR}"
   SPN_TEST_BIN="${STORE}/bin/spn"
 )
+target_link_libraries(integration PRIVATE yyjson)
 add_dependencies(integration spn)
 add_test(NAME integration COMMAND "$<TARGET_FILE:integration>")
 
@@ -37,6 +38,7 @@ target_compile_definitions(spam PRIVATE
   SPN_TEST_ROOT="${CMAKE_SOURCE_DIR}"
   SPN_TEST_BIN="${STORE}/bin/spn"
 )
+target_link_libraries(spam PRIVATE yyjson)
 add_dependencies(spam spn)
 add_test(NAME e2e COMMAND "$<TARGET_FILE:spam>")
 set_tests_properties(e2e PROPERTIES LABELS e2e)

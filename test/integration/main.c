@@ -171,6 +171,45 @@ UTEST_F(spn_build, path_dep_remote_source) {
   });
 }
 
+UTEST_F(spn_build, index_package_fetch_fails) {
+  tmpfs_init_named(&uf->fixture.fs, "index_package_fetch_fails");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/index_package_fetch_fails",
+    .actions = {
+      { .kind = ACTION_REMOVE_DIR, .rm = { .dir = "remote/spum" } },
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "sync_failed", .key = "name", .value = "core/spum" } },
+    },
+  });
+}
+
+UTEST_F(spn_build, index_package_invalid_manifest) {
+  tmpfs_init_named(&uf->fixture.fs, "index_package_invalid_manifest");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/index_package_invalid_manifest",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_manifest", .key = "name", .value = "core/spum" } },
+    },
+  });
+}
+
+UTEST_F(spn_build, file_dep_invalid_manifest) {
+  tmpfs_init_named(&uf->fixture.fs, "file_dep_invalid_manifest");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/file_dep_invalid_manifest",
+    .copy = { "vendor/spum/spn.toml" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_manifest", .key = "name", .value = "core/spum" } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unknown_pkg" } },
+    },
+  });
+}
+
 UTEST_F(spn_build, editable_package) {
   tmpfs_init_named(&uf->fixture.fs, "editable_package");
 

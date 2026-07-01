@@ -15,6 +15,7 @@ typedef enum {
   SPN_EVENT_ERR_CIRCULAR_DEP,
   SPN_EVENT_ERR_UNKNOWN_PKG,
   SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+  SPN_EVENT_ERR_MANIFEST,
   SPN_EVENT_RESOLVE,
   SPN_EVENT_SYNC,
   SPN_EVENT_CHECKOUT,
@@ -152,6 +153,7 @@ typedef struct { u32 num_resolved; u64 time; } spn_evt_resolve_end_t;
 typedef struct { u32 num_packages; u32 num_index; u32 num_file; } spn_evt_sync_start_t; // @spader slop
 typedef struct { sp_str_t name; s32 kind; sp_str_t url; sp_str_t source_path; u64 time; } spn_evt_sync_pkg_t;
 typedef struct { sp_str_t name; sp_str_t url; sp_str_t error; } spn_evt_sync_failed_t;
+typedef struct { sp_str_t name; sp_str_t path; sp_str_t error; } spn_evt_manifest_err_t;
 typedef struct { u32 num_synced; u64 time; } spn_evt_sync_end_t; // @spader slop
 typedef struct { sp_str_t fn; sp_str_t args; } spn_evt_api_call_t;
 typedef struct { sp_str_t message; } spn_evt_user_log_t;
@@ -222,6 +224,7 @@ struct spn_build_event_t {
     spn_evt_sync_start_t sync_start;
     spn_evt_sync_pkg_t sync_pkg;
     spn_evt_sync_failed_t sync_failed;
+    spn_evt_manifest_err_t manifest_err;
     spn_evt_sync_end_t sync_end;
     spn_evt_api_call_t api_call;
     spn_evt_user_log_t user_log;

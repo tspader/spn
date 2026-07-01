@@ -56,35 +56,6 @@ typedef struct spn_pkg_req {
 } spn_requested_pkg_t;
 
 
-#define spn_pkg_map(T) sp_om(sp_str_t, T)
-
-#define spn_pkg_map_ensure(om) \
-  if (!(om)) { \
-    spn_pkg_map_init(om); \
-  }
-
-#define spn_pkg_map_init(om) \
-  sp_om_new(om); \
-  sp_om_set_fns(om, spn_pkg_key_hash, spn_pkg_key_compare)
-
-#define spn_pkg_map_insert(om, key, val)                                             \
-  do { \
-    sp_om_ensure(om); \
-    sp_om_insert(om, (key), (val)); \
-  } while (0)
-
-#define spn_pkg_map_new(om)           spn_pkg_map_init(om);
-#define spn_pkg_map_free(om)          sp_om_free(om)
-#define spn_pkg_map_get(om, key)      sp_om_get(om, (key))
-#define spn_pkg_map_getp(om, key)     sp_om_getp(om, (key))
-#define spn_pkg_map_has(om, key)      sp_om_has(om, (key))
-#define spn_pkg_map_at(om, n)         sp_om_at(om, n)
-#define spn_pkg_map_size(om)          sp_om_size(om)
-#define spn_pkg_map_empty(om)         sp_om_empty(om)
-#define spn_pkg_map_for(om, it)       sp_om_for(om, it)
-#define spn_pkg_map_back(om)          sp_om_back(om)
-
-
 typedef struct {
   spn_semver_t version;
   sp_str_t commit;

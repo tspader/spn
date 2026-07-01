@@ -304,6 +304,18 @@ sp_str_t spn_codegen_issue_message(sp_mem_t mem, const spn_codegen_issue_t* issu
   }
 }
 
+sp_str_t spn_codegen_issues_message(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues) {
+  sp_io_dyn_mem_writer_t b = sp_zero;
+  sp_io_dyn_mem_writer_init(mem, &b);
+  sp_da_for(issues, it) {
+    if (it) {
+      sp_fmt_io(&b.base, "; ");
+    }
+    sp_fmt_io(&b.base, "{}", sp_fmt_str(spn_codegen_issue_message(mem, &issues[it])));
+  }
+  return sp_io_dyn_mem_writer_as_str(&b);
+}
+
 void spn_codegen_json_issues(sp_io_writer_t* out, sp_da(spn_codegen_issue_t) issues) {
   sp_io_write_c8(out, '{');
   bool first = true;

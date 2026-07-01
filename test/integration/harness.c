@@ -3,6 +3,7 @@
 #include "test.h"
 #include "action.h"
 #include "harness.h"
+#include "yyjson.h"
 
 static void fixture_write_file(sp_str_t path, sp_str_t content) {
   sp_str_t parent = sp_fs_parent_path(path);
@@ -270,6 +271,58 @@ void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, bool expected,
   *utest_result = UTEST_TEST_FAILURE;
 }
 
+static bool event_matches(yyjson_val* line, const c8* event, const c8* key, const c8* value) {
+  const c8* name = yyjson_get_str(yyjson_obj_get(line, "event"));
+  if (!name || !sp_cstr_equal(name, event)) return false;
+  if (!key) return true;
+
+  yyjson_val* field = yyjson_obj_get(line, key);
+  if (!field) {
+    field = yyjson_obj_get(yyjson_obj_get(line, "data"), key);
+  }
+
+  const c8* str = yyjson_get_str(field);
+  return str && sp_cstr_equal(str, value);
+}
+
+static void expect_event(s32* utest_result, fixture_t* fixture, action_t action, bool expected, const c8* file, u32 line) {
+  sp_str_t path = sp_fs_join_path(spn_allocator, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
+
+  sp_str_t content = sp_zero;
+  sp_io_read_file(spn_allocator, path, &content);
+
+  bool found = false;
+  sp_da(sp_str_t) lines = sp_str_split_c8(spn_allocator, content, '\n');
+  sp_da_for(lines, it) {
+    if (sp_str_empty(lines[it])) continue;
+
+    yyjson_doc* doc = yyjson_read(lines[it].data, lines[it].len, 0);
+    if (!doc) continue;
+
+    found = event_matches(yyjson_doc_get_root(doc), action.verify_event.event, action.verify_event.key, action.verify_event.value);
+    yyjson_doc_free(doc);
+    if (found) break;
+  }
+
+  if (found == expected) return;
+
+  sp_io_dyn_mem_writer_t b = sp_zero;
+  sp_io_dyn_mem_writer_init(spn_allocator, &b);
+  sp_fmt_io(&b.base, "{}:{}\n", sp_fmt_cstr(file), sp_fmt_uint(line));
+  sp_fmt_io(&b.base, "{.red}event {.cyan}", sp_fmt_cstr("▐ "), sp_fmt_cstr(action.verify_event.event));
+  if (action.verify_event.key) {
+    sp_fmt_io(&b.base, " with {.cyan} = {.cyan}", sp_fmt_cstr(action.verify_event.key), sp_fmt_cstr(action.verify_event.value));
+  }
+  if (expected) {
+    sp_fmt_io(&b.base, " not found in {.black}", sp_fmt_str(path));
+  } else {
+    sp_fmt_io(&b.base, " found in {.black} (expected not to be)", sp_fmt_str(path));
+  }
+
+  UTEST_PRINTF("{}\n", sp_fmt_str(sp_io_dyn_mem_writer_as_str(&b)));
+  *utest_result = UTEST_TEST_FAILURE;
+}
+
 void fixture_copy_project(s32* utest_result, fixture_t* fixture, sp_str_t project, const c8* const* copy) {
   ASSERT_TRUE(sp_fs_exists(project));
 
@@ -460,6 +513,11 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
 
         sp_ps_output_t output = sp_ps_run(spn_allocator, config);
         EXPECT_EQ(action.cli.rc, output.status.exit_code);
+        break;
+      }
+      case ACTION_VERIFY_EVENT:
+      case ACTION_VERIFY_NO_EVENT: {
+        expect_event(utest_result, fixture, action, action.kind == ACTION_VERIFY_EVENT, __FILE__, __LINE__);
         break;
       }
       case ACTION_VERIFY_LOCKED: {
