@@ -1,0 +1,9 @@
+[package]
+name = "root_source_pin"
+version = "0.1.0"
+url = "https://invalid.invalid/root_source_pin.git"
+commit = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

@@ -127,8 +127,8 @@ static void lower_package(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, s
   }
   out->define = p->define;
   out->system_deps = p->system_deps;
-  out->build = p->build;
-  out->configure = p->configure;
+  out->build = sp_str_empty(p->build) ? sp_str_lit("build.c") : p->build;
+  out->configure = sp_str_empty(p->configure) ? sp_str_lit("configure.c") : p->configure;
 }
 
 static void lower_versions(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {

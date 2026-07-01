@@ -5,8 +5,8 @@
 #include "codegen/codegen.h"
 #include "codegen/lower.h"
 
-spn_loaded_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_mem_t mem, sp_intern_t* intern, sp_str_t qualified, sp_str_t path, spn_registry_err_t* err) {
-  spn_loaded_pkg_t* existing = sp_str_ht_get(*registry, qualified);
+spn_registry_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_mem_t mem, sp_intern_t* intern, sp_str_t qualified, sp_str_t path, spn_registry_err_t* err) {
+  spn_registry_pkg_t* existing = sp_str_ht_get(*registry, qualified);
   if (existing) return existing;
 
   sp_str_t manifest = path;
@@ -32,15 +32,11 @@ spn_loaded_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_me
     return SP_NULLPTR;
   }
 
-  sp_str_ht_insert(*registry, qualified, sp_zero_struct(spn_loaded_pkg_t));
-  spn_loaded_pkg_t* loaded = sp_str_ht_get(*registry, qualified);
-  loaded->source = SPN_PKG_SOURCE_FILE;
-  loaded->info = info;
-  loaded->paths.manifest = manifest;
-  loaded->paths.source = sp_fs_parent_path(manifest);
-  loaded->paths.script = sp_fs_join_path(mem, loaded->paths.source, sp_str_lit("spn.c"));
-  loaded->paths.build = sp_fs_join_path(mem, loaded->paths.source, info->build);
-  loaded->paths.configure = sp_fs_join_path(mem, loaded->paths.source, info->configure);
+  sp_str_ht_insert(*registry, qualified, ((spn_registry_pkg_t) {
+    .source = SPN_PKG_SOURCE_FILE,
+    .info = info,
+    .manifest = manifest,
+  }));
 
-  return loaded;
+  return sp_str_ht_get(*registry, qualified);
 }

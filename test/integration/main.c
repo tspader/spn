@@ -171,6 +171,70 @@ UTEST_F(spn_build, path_dep_remote_source) {
   });
 }
 
+UTEST_F(spn_build, index_package_split_recipe) {
+  tmpfs_init_named(&uf->fixture.fs, "index_package_split_recipe");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/index_package_split_recipe",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+    },
+  });
+}
+
+UTEST_F(spn_build, index_package_patched) {
+  tmpfs_init_named(&uf->fixture.fs, "index_package_patched");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/index_package_patched",
+    .copy = { "patches/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+    },
+  });
+}
+
+UTEST_F(spn_build, file_dep_missing_manifest) {
+  tmpfs_init_named(&uf->fixture.fs, "file_dep_missing_manifest");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/file_dep_missing_manifest",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_manifest", .key = "name", .value = "core/spum" } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unknown_pkg" } },
+    },
+  });
+}
+
+UTEST_F(spn_build, file_dep_custom_manifest_name) {
+  tmpfs_init_named(&uf->fixture.fs, "file_dep_custom_manifest_name");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/file_dep_custom_manifest_name",
+    .copy = { "vendor/spum/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+    },
+  });
+}
+
+UTEST_F(spn_build, root_source_pin) {
+  tmpfs_init_named(&uf->fixture.fs, "root_source_pin");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/root_source_pin",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+    },
+  });
+}
+
 UTEST_F(spn_build, index_package_fetch_fails) {
   tmpfs_init_named(&uf->fixture.fs, "index_package_fetch_fails");
 

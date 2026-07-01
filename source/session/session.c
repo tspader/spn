@@ -169,7 +169,7 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   unit->paths.script = loaded->paths.script;
   unit->paths.configure = loaded->paths.configure;
   unit->paths.build = loaded->paths.build;
-  unit->paths.source = loaded->paths.source;
+  unit->paths.source = loaded->roots.source;
 
   switch (loaded->source) {
     case SPN_PKG_SOURCE_ROOT:
@@ -177,14 +177,12 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
       sp_str_t work = sp_fs_join_path(session->mem, session->paths.profile, sp_str_lit("work"));
       unit->paths.work = sp_fs_join_path(session->mem, work, loaded->info->name);
       unit->paths.store = sp_fs_join_path(session->mem, session->paths.profile, sp_str_lit("store"));
-      unit->paths.source = loaded->paths.source;
       break;
     }
     case SPN_PKG_SOURCE_INDEX: {
       fingerprint_t id = fingerprint_package(session, loaded->info);
       unit->paths.work = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, spn.paths.build, loaded->info->qualified), id.str);
       unit->paths.store = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, spn.paths.store, loaded->info->qualified), id.str);
-      unit->paths.source = loaded->paths.source;
       break;
     }
   }

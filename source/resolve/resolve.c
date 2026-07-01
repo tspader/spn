@@ -53,7 +53,7 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
     return SPN_OK;
   }
 
-  spn_loaded_pkg_t* pkg = sp_str_ht_get(*resolver->registry, request->qualified);
+  spn_registry_pkg_t* pkg = sp_str_ht_get(*resolver->registry, request->qualified);
 
   // If the package is local, just load it
   if (!pkg && request->source == SPN_PKG_SOURCE_FILE) {
