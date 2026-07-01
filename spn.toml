@@ -5,12 +5,14 @@ version = "0.2.0"
 repo = "tspader/spn"
 build = "tools/spn/build.c"
 configure = "tools/spn/configure.c"
-include = ["source/codegen/gen", ".build/source/wamr/core/iwasm/include"]
+include = ["source/codegen/gen"]
 
 [deps.package]
-"spader/spcc" = "1.0.0"
+"spader/spcc" = "1.0.2"
 "spader/sp" = "3.0.0"
-toml = "1.3.0"
+"spader/wamr" = "file://./vendor/wamr/spn.toml"
+toml = "1.4.0"
+yyjson = "0.12.0"
 
 [deps.test]
 utest = "1.0.0"
@@ -118,36 +120,13 @@ include = ["include", "source", "test/tools"]
 flags = ["-include", "sp/compat.h"]
 
 [[test]]
-name = "load"
-source = [
-  "source/ctx/ctx.c",
-  "source/intern/intern.c",
-  "source/intern/context.c",
-  "source/enum/enum.c",
-  "source/event/event.c",
-  "source/external/tom.c",
-  "source/pkg/id.c",
-  "source/pkg/load.c",
-  "source/pkg/mutate.c",
-  "source/semver/compare.c",
-  "source/semver/convert.c",
-  "source/semver/parser.c",
-  "source/target/mutate.c",
-  "source/toolchain/toolchain.c",
-  "source/sp/str.c",
-  "test/core/manifest.c",
-  "test/tools/harness.c",
-  "test/tools/tmp.c",
-  "test/tools/toml.c",
-]
-include = ["include", "source", "test/tools"]
-flags = ["-include", "sp/compat.h"]
-
-[[test]]
 name = "resolver"
 source = [
   "source/ctx/ctx.c",
   "source/intern/intern.c",
+  "source/codegen/codegen.c",
+  "source/codegen/lower.c",
+  "source/codegen/gen/manifest.gen.c",
   "source/enum/enum.c",
   "source/event/event.c",
   "source/external/cJSON.c",
@@ -183,6 +162,9 @@ name = "publish"
 source = [
   "source/cli/publish.c",
   "source/ctx/ctx.c",
+  "source/codegen/codegen.c",
+  "source/codegen/lower.c",
+  "source/codegen/gen/manifest.gen.c",
   "source/enum/enum.c",
   "source/event/event.c",
   "source/external/cJSON.c",

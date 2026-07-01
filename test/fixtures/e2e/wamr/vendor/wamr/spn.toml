@@ -1,0 +1,69 @@
+[package]
+namespace = "spader"
+name = "wamr"
+url = "https://github.com/bytecodealliance/wasm-micro-runtime.git"
+version = "2.4.1"
+commit = "e571797fbdf498d9ac4edb495205ea0f01370091"
+system_deps = ["m"]
+
+[[lib]]
+name = "vmlib"
+kinds = ["static"]
+define = [
+  "BH_PLATFORM_LINUX",
+  "BUILD_TARGET_X86_64",
+  "BH_MALLOC=wasm_runtime_malloc",
+  "BH_FREE=wasm_runtime_free",
+  "WASM_ENABLE_INTERP=1",
+  "WASM_ENABLE_FAST_INTERP=1",
+  "WASM_ENABLE_AOT=0",
+  "WASM_ENABLE_JIT=0",
+  "WASM_ENABLE_LIBC_BUILTIN=0",
+  "WASM_ENABLE_LIBC_WASI=1",
+  "WASM_ENABLE_MULTI_MODULE=0",
+  "WASM_ENABLE_REF_TYPES=1",
+  "WASM_ENABLE_MODULE_INST_CONTEXT=1",
+  "WASM_ENABLE_BULK_MEMORY=1",
+  "WASM_DISABLE_HW_BOUND_CHECK=1",
+  "_GNU_SOURCE",
+]
+include = [
+  "core/iwasm/include",
+  "core/iwasm/common",
+  "core/iwasm/interpreter",
+  "core/shared/platform/linux",
+  "core/shared/platform/include",
+  "core/shared/platform/common/libc-util",
+  "core/shared/mem-alloc",
+  "core/shared/utils",
+  "core/iwasm/libraries/libc-wasi",
+  "core/iwasm/libraries/libc-wasi/sandboxed-system-primitives/include",
+  "core/iwasm/libraries/libc-wasi/sandboxed-system-primitives/src",
+]
+headers = [
+  "core/iwasm/include/wasm_export.h",
+  "core/iwasm/include/lib_export.h",
+]
+source = [
+  "core/iwasm/common/*.c",
+  "core/iwasm/common/arch/invokeNative_general.c",
+  "core/iwasm/interpreter/wasm_runtime.c",
+  "core/iwasm/interpreter/wasm_loader.c",
+  "core/iwasm/interpreter/wasm_interp_fast.c",
+  "core/shared/platform/linux/*.c",
+  "core/shared/platform/common/posix/*.c",
+  "core/shared/platform/common/libc-util/*.c",
+  "core/shared/platform/common/memory/*.c",
+  "core/shared/mem-alloc/mem_alloc.c",
+  "core/shared/mem-alloc/ems/*.c",
+  "core/shared/mem-alloc/tlsf/*.c",
+  "core/shared/utils/*.c",
+  "core/iwasm/libraries/libc-wasi/libc_wasi_wrapper.c",
+  "core/iwasm/libraries/libc-wasi/sandboxed-system-primitives/src/*.c",
+]
+flags = [
+  "-std=gnu11",
+  "-Wno-unused-function",
+  "-Wno-unused-variable",
+  "-Wno-unused-parameter",
+]

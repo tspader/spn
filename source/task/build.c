@@ -205,6 +205,22 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
           }
         }
       }
+
+      // A directory embed reads a dep's store directory wholesale. Unlike a file
+      // embed it declares no per-file graph input, so order its embed node after
+      // the dep's package step that populates the directory.
+      sp_da_for(pkg->targets, t) {
+        spn_target_unit_t* target = pkg->targets[t];
+        if (!target->nodes.embed.run.occupied) continue;
+
+        sp_da_for(target->info->embed, e) {
+          spn_embed_t* embed = &target->info->embed[e];
+          if (embed->kind != SPN_EMBED_DIR) continue;
+          if (!sp_str_starts_with(embed->dir.path, dep->paths.store)) continue;
+
+          spn_try(spn_bg_cmd_add_input(graph, target->nodes.embed.run, dep->nodes.build.stamp.package));
+        }
+      }
     }
   }
 
