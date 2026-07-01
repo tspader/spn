@@ -57,7 +57,19 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
 
   // If the package is local, just load it
   if (!pkg && request->source == SPN_PKG_SOURCE_FILE) {
-    pkg = spn_registry_load_file_pkg(resolver->registry, resolver->mem, resolver->intern, request->qualified, request->file.path);
+    spn_registry_err_t err = sp_zero;
+    pkg = spn_registry_load_file_pkg(resolver->registry, resolver->mem, resolver->intern, request->qualified, request->file.path, &err);
+    if (!pkg) {
+      spn_event_buffer_push(resolver->events, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR_MANIFEST,
+        .manifest_err = {
+          .name = request->qualified,
+          .path = err.manifest,
+          .error = err.error,
+        }
+      });
+      return SPN_ERROR;
+    }
   }
 
   if (!pkg) {

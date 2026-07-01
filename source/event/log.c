@@ -9,6 +9,7 @@ static s32 event_level(spn_build_event_kind_t kind) {
     case SPN_EVENT_ERR_CIRCULAR_DEP:
     case SPN_EVENT_ERR_UNKNOWN_PKG:
     case SPN_EVENT_ERR_UNSATISFIABLE_VERSION:
+    case SPN_EVENT_ERR_MANIFEST:
     case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED:
     case SPN_EVENT_BUILD_SCRIPT_FAILED:
     case SPN_EVENT_BUILD_SCRIPT_CRASHED:
@@ -393,6 +394,17 @@ static void build_schemas(void) {
     schemas[SPN_EVENT_SYNC_FAILED] = sp_bind_builder_end(&b);
   }
 
+  // SPN_EVENT_ERR_MANIFEST
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin();
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_manifest_err_t, name, "name", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_manifest_err_t, path, "path", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_manifest_err_t, error, "error", SP_BIND_STR);
+    }
+    schemas[SPN_EVENT_ERR_MANIFEST] = sp_bind_builder_end(&b);
+  }
+
   // SPN_EVENT_SYNC_END
   {
     sp_bind_builder_t b = sp_bind_builder_begin();
@@ -623,6 +635,7 @@ static void* event_variant_ptr(spn_build_event_t* event) {
     case SPN_EVENT_SYNC_START:                  return &event->sync_start;
     case SPN_EVENT_SYNC_PACKAGE:                return &event->sync_pkg;
     case SPN_EVENT_SYNC_FAILED:                 return &event->sync_failed;
+    case SPN_EVENT_ERR_MANIFEST:                return &event->manifest_err;
     case SPN_EVENT_SYNC_END:                    return &event->sync_end;
     case SPN_EVENT_ERR_CIRCULAR_DEP:            return &event->circular;
     case SPN_EVENT_ERR_UNKNOWN_PKG:             return &event->unknown;
@@ -647,6 +660,7 @@ static const c8* event_names[SPN_EVENT_COUNT] = {
   [SPN_EVENT_ERR_CIRCULAR_DEP]              = "err_circular_dep",
   [SPN_EVENT_ERR_UNKNOWN_PKG]               = "err_unknown_pkg",
   [SPN_EVENT_ERR_UNSATISFIABLE_VERSION]     = "err_unsatisfiable_version",
+  [SPN_EVENT_ERR_MANIFEST]                  = "err_manifest",
   [SPN_EVENT_RESOLVE]                       = "resolve",
   [SPN_EVENT_SYNC]                          = "sync",
   [SPN_EVENT_CHECKOUT]                      = "checkout",

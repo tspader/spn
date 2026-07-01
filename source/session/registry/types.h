@@ -21,4 +21,9 @@ typedef struct {
 
 typedef sp_str_ht(spn_loaded_pkg_t) spn_pkg_registry_t;
 
+typedef struct {
+  sp_str_t manifest;
+  sp_str_t error;
+} spn_registry_err_t;
+
 #endif

@@ -74,6 +74,7 @@ void spn_codegen_json_str_array(sp_io_writer_t* out, sp_da(sp_str_t) values);
 void spn_codegen_json_issues(sp_io_writer_t* out, sp_da(spn_codegen_issue_t) issues);
 sp_str_t spn_codegen_issues_to_str(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues);
 sp_str_t spn_codegen_issue_message(sp_mem_t mem, const spn_codegen_issue_t* issue);
+sp_str_t spn_codegen_issues_message(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues);
 
 typedef struct spn_cg_manifest spn_cg_manifest_t;
 

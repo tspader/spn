@@ -23,6 +23,8 @@ typedef enum {
   ACTION_VERIFY_MTIME_CHANGED,
   ACTION_VERIFY_LOCKED,
   ACTION_VERIFY_PKG_LOCKED,
+  ACTION_VERIFY_EVENT,
+  ACTION_VERIFY_NO_EVENT,
   ACTION_RUN_CLI,
 } action_kind_t;
 
@@ -45,6 +47,7 @@ typedef struct {
     struct { sp_str_t file; } snapshot_mtime;
     struct { sp_str_t file; } verify_mtime;
     struct { const c8* name; } verify_locked;
+    struct { const c8* event; const c8* key; const c8* value; } verify_event;
     struct { const c8* cmd; const c8* args [4]; s32 rc; } cli;
   };
 } action_t;

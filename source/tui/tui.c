@@ -58,6 +58,7 @@ static spn_build_event_display_t event_info[] = {
   EVENT(SPN_EVENT_ERR_CIRCULAR_DEP,              "failed", RED,   SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_ERR_UNKNOWN_PKG,               "failed", RED,   SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_ERR_UNSATISFIABLE_VERSION,     "failed", RED,   SPN_VERBOSITY_NORMAL, NOT_BOLD),
+  EVENT(SPN_EVENT_ERR_MANIFEST,                  "failed", RED,   SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_RESOLVE,                       "resolve", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_SYNC,                          "sync", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_CHECKOUT,                      "checkout", WHITE,  SPN_VERBOSITY_NORMAL, NOT_BOLD),
@@ -98,7 +99,7 @@ static spn_build_event_display_t event_info[] = {
   EVENT(SPN_EVENT_RESOLVE_END,     "resolve", WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
   EVENT(SPN_EVENT_SYNC_START,      "sync",    WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
   EVENT(SPN_EVENT_SYNC_PACKAGE,    "sync",    WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
-  EVENT(SPN_EVENT_SYNC_FAILED,     "sync",    RED,   SPN_VERBOSITY_DEBUG, NOT_BOLD),
+  EVENT(SPN_EVENT_SYNC_FAILED,     "failed",  RED,   SPN_VERBOSITY_NORMAL, NOT_BOLD),
   EVENT(SPN_EVENT_SYNC_END,        "sync",    WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
   EVENT(SPN_EVENT_API_CALL,        "api",     WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
   EVENT(SPN_EVENT_USER_LOG,        "log",     WHITE, SPN_VERBOSITY_NORMAL, NOT_BOLD),
@@ -429,6 +430,26 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       );
       break;
     }
+    case SPN_EVENT_ERR_MANIFEST: {
+      sp_str_builder_append_fmt(
+        &builder,
+        "{.cyan} has an invalid manifest ({.black}): {}",
+        SP_FMT_STR(event->manifest_err.name),
+        SP_FMT_STR(event->manifest_err.path),
+        SP_FMT_STR(event->manifest_err.error)
+      );
+      break;
+    }
+    case SPN_EVENT_SYNC_FAILED: {
+      sp_str_builder_append_fmt(
+        &builder,
+        "{.cyan} failed to sync from {.black}: {}",
+        SP_FMT_STR(event->sync_failed.name),
+        SP_FMT_STR(event->sync_failed.url),
+        SP_FMT_STR(event->sync_failed.error)
+      );
+      break;
+    }
     case SPN_EVENT_ERR: {
       switch (event->err.kind) {
         // case SPN_ERR_OK: {
@@ -645,6 +666,7 @@ sp_str_t spn_tui_render_coarse_event(spn_build_event_t* event, u32 max_name, sp_
     case SPN_EVENT_ERR_CIRCULAR_DEP:
     case SPN_EVENT_ERR_UNKNOWN_PKG:
     case SPN_EVENT_ERR_UNSATISFIABLE_VERSION:
+    case SPN_EVENT_ERR_MANIFEST:
     case SPN_EVENT_SYNC_FAILED:
     case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED:
     case SPN_EVENT_BUILD_SCRIPT_FAILED:
