@@ -48,18 +48,18 @@ s32 sort_dirs_by_name(const void* a, const void* b) {
   return sp_str_sort_kernel_alphabetical(&lhs->name, &rhs->name);
 }
 
-static sp_str_t build_release_json(sp_str_t name, sp_str_t version, sp_str_t repo_url, sp_str_t commit) {
-  sp_str_builder_t b = SP_ZERO_INITIALIZE();
-  sp_str_builder_append_cstr(&b, "{\"namespace\":\"core\",\"name\":\"");
-  sp_str_builder_append(&b, name);
-  sp_str_builder_append_cstr(&b, "\",\"version\":\"");
-  sp_str_builder_append(&b, version);
-  sp_str_builder_append_cstr(&b, "\",\"yanked\":false,\"source\":{\"url\":\"");
-  sp_str_builder_append(&b, sp_str_replace_c8(spn_allocator, repo_url, '\\', '/'));
-  sp_str_builder_append_cstr(&b, "\",\"rev\":\"");
-  sp_str_builder_append(&b, commit);
-  sp_str_builder_append_cstr(&b, "\",\"dir\":\"\"},\"paths\":{\"manifest\":\"spn.toml\",\"script\":\"spn.c\"},\"deps\":[]}");
-  return sp_str_builder_to_str(&b);
+static sp_str_t build_release_json(sp_str_t name, sp_str_t version, sp_str_t repo_url, sp_str_t commit, sp_str_t manifest_url, sp_str_t manifest_rev) {
+  sp_io_dyn_mem_writer_t b = sp_zero;
+  sp_io_dyn_mem_writer_init(spn_allocator, &b);
+
+  sp_fmt_io(&b.base, "{{\"namespace\":\"core\",\"name\":\"{}\",\"version\":\"{}\",\"yanked\":false", sp_fmt_str(name), sp_fmt_str(version));
+  sp_fmt_io(&b.base, ",\"source\":{{\"url\":\"{}\",\"rev\":\"{}\",\"dir\":\"\"}}", sp_fmt_str(sp_str_replace_c8(spn_allocator, repo_url, '\\', '/')), sp_fmt_str(commit));
+  if (!sp_str_empty(manifest_url)) {
+    sp_fmt_io(&b.base, ",\"manifest\":{{\"url\":\"{}\",\"rev\":\"{}\",\"dir\":\"\"}}", sp_fmt_str(sp_str_replace_c8(spn_allocator, manifest_url, '\\', '/')), sp_fmt_str(manifest_rev));
+  }
+  sp_fmt_io(&b.base, ",\"paths\":{{\"manifest\":\"spn.toml\",\"script\":\"spn.c\"}},\"deps\":[]}}");
+
+  return sp_io_dyn_mem_writer_as_str(&b);
 }
 
 void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, sp_str_t project) {
@@ -75,6 +75,8 @@ void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, s
   // create core/ namespace directory under index
   sp_str_t core_dir = sp_fs_join_path(spn_allocator, index, sp_str_lit("core"));
   sp_fs_create_dir(core_dir);
+
+  sp_str_t recipes = sp_fs_join_path(spn_allocator, project, sp_str_lit("recipes"));
 
   sp_da(sp_fs_entry_t) entries = sp_fs_collect(spn_allocator, remote);
   sp_da_for(entries, it) {
@@ -92,24 +94,45 @@ void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, s
 
     git_repo_init(repo);
 
-    sp_str_builder_t jsonl = SP_ZERO_INITIALIZE();
+    // recipes/<pkg>/<version>/ holds a separate manifest repo for packages
+    // whose recipe is published apart from their source
+    sp_str_t recipe_versions = sp_fs_join_path(spn_allocator, recipes, entry->name);
+    bool split = sp_fs_is_dir(recipe_versions);
+    sp_str_t recipe_repo = sp_str_lit("");
+    if (split) {
+      recipe_repo = tmpfs_get(fs, sp_fs_join_path(spn_allocator, sp_str_lit("recipes"), entry->name));
+      git_repo_init(recipe_repo);
+    }
+
+    sp_io_dyn_mem_writer_t jsonl = sp_zero;
+    sp_io_dyn_mem_writer_init(spn_allocator, &jsonl);
 
     sp_da_for(versions, v) {
       sp_fs_entry_t* dir = &versions[v];
       ASSERT_TRUE(sp_fs_is_dir(dir->path));
 
-      sp_str_t source_manifest = sp_fs_join_path(spn_allocator, dir->path, sp_str_lit("spn.toml"));
-      ASSERT_TRUE(sp_fs_exists(source_manifest));
+      sp_str_t manifest_url = sp_str_lit("");
+      sp_str_t manifest_rev = sp_str_lit("");
+      if (split) {
+        sp_str_t recipe_dir = sp_fs_join_path(spn_allocator, recipe_versions, dir->name);
+        ASSERT_TRUE(sp_fs_exists(sp_fs_join_path(spn_allocator, recipe_dir, sp_str_lit("spn.toml"))));
+
+        git_repo_commit_from_dir(recipe_dir, recipe_repo, dir->name);
+        manifest_url = recipe_repo;
+        manifest_rev = git_repo_head(recipe_repo);
+      }
+      else {
+        sp_str_t source_manifest = sp_fs_join_path(spn_allocator, dir->path, sp_str_lit("spn.toml"));
+        ASSERT_TRUE(sp_fs_exists(source_manifest));
+      }
 
       git_repo_commit_from_dir(dir->path, repo, dir->name);
       sp_str_t commit = git_repo_head(repo);
 
-      sp_str_t line = build_release_json(entry->name, dir->name, repo, commit);
-      sp_str_builder_append(&jsonl, line);
-      sp_str_builder_new_line(&jsonl);
+      sp_fmt_io(&jsonl.base, "{}\n", sp_fmt_str(build_release_json(entry->name, dir->name, repo, commit, manifest_url, manifest_rev)));
     }
 
-    fixture_write_file(jsonl_path, sp_str_builder_to_str(&jsonl));
+    fixture_write_file(jsonl_path, sp_io_dyn_mem_writer_as_str(&jsonl));
   }
 }
 
@@ -494,6 +517,7 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
               { sp_str_lit("SPN_STORAGE_DIR"), fixture->paths.storage },
               { sp_str_lit("SPN_TOOLCHAIN_DIR"), fixture->paths.toolchain },
               { sp_str_lit("SPN_CONFIG_DIR"), fixture->paths.config },
+              { sp_str_lit("SPN_PATCH_DIR"), fixture->paths.patches },
             },
           },
         };
@@ -554,6 +578,7 @@ static sp_str_t pick_shared_toolchain_dir(sp_str_t root) {
 void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
   fixture->paths.config = tmpfs_get(&fixture->fs, sp_str_lit(".home/config"));
   fixture->paths.storage = tmpfs_get(&fixture->fs, sp_str_lit(".home/storage"));
+  fixture->paths.patches = tmpfs_get(&fixture->fs, sp_str_lit("patches"));
   fixture->paths.toolchain = pick_shared_toolchain_dir(fixture->paths.root);
   fixture->paths.include = sp_fs_join_path(spn_allocator, fixture->paths.storage, sp_str_lit("spn/include"));
   fixture->paths.index = sp_fs_join_path(spn_allocator, fixture->paths.storage, sp_str_lit("spn/packages"));

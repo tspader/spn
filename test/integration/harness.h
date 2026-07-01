@@ -15,6 +15,7 @@ typedef struct {
     sp_str_t config;
     sp_str_t index;
     sp_str_t include;
+    sp_str_t patches;
   } paths;
 } fixture_t;
 

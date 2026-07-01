@@ -19,6 +19,22 @@ typedef enum {
 } spn_package_state_t;
 
 typedef struct {
+  spn_pkg_source_t source;
+  spn_pkg_info_t* info;
+  struct {
+    sp_str_t recipe;
+    sp_str_t source;
+  } roots;
+  struct {
+    sp_str_t manifest;
+    sp_str_t script;
+    sp_str_t configure;
+    sp_str_t build;
+  } paths;
+  u64 elapsed;
+} spn_loaded_pkg_t;
+
+typedef struct {
   spn_build_graph_t graph;
   spn_bg_dirty_t *dirty;
   spn_bg_executor_t *executor;
@@ -39,7 +55,8 @@ struct spn_session_t {
   sp_str_ht(spn_toolchain_entry_t) toolchains;
 
   spn_resolve_t resolve;
-  spn_pkg_registry_t packages;
+  spn_pkg_registry_t registry;
+  sp_str_ht(spn_loaded_pkg_t) packages;
 
   spn_profile_info_t profile;
   struct {

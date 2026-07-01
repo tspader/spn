@@ -54,6 +54,7 @@ spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
   session->paths.build = sp_fs_join_path(session->mem, spn.paths.project, sp_str_lit("build"));
   session->events = spn.events;
   session->intern = spn.intern;
+  sp_str_ht_init(session->mem, session->registry);
   sp_str_ht_init(session->mem, session->packages);
   sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
 
@@ -108,8 +109,6 @@ void emit_resolved(spn_resolve_query_t* query) {
 
 }
 
-spn_err_t load_root_package(spn_session_t* session);
-
 spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_pkg_info_t* pkg = &app->package;
@@ -119,13 +118,17 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
 
   // The solver reads local packages' deps from the registry, so the root must
   // be registered before we resolve.
-  spn_try_as(load_root_package(session), SPN_TASK_ERROR);
+  sp_str_ht_insert(session->registry, session->pkg->qualified, ((spn_registry_pkg_t) {
+    .source = SPN_PKG_SOURCE_ROOT,
+    .info = session->pkg,
+    .manifest = spn.paths.manifest,
+  }));
 
   spn_index_cache_t index = SP_ZERO_INITIALIZE();
   spn_index_cache_init(&index, session->mem, session->intern, &spn.indexes);
 
   spn_resolver_t* resolver = sp_alloc_type(app->session.mem, spn_resolver_t);
-  spn_resolver_init(resolver, session->mem, session->intern, &index, &session->packages, spn.events);
+  spn_resolver_init(resolver, session->mem, session->intern, &index, &session->registry, spn.events);
   app->resolver = resolver;
 
   spn_resolve_query_t query = sp_zero_initialize();
