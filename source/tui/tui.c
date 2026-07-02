@@ -34,57 +34,61 @@
 
 #define SP_TUI_PRINT(command) sp_tui_print(sp_str_view(command))
 
-#define ERROR_VERB     true
-#define NOT_ERROR_VERB false
+#define ERROR_VERB        true
+#define NOT_ERROR_VERB    false
+#define TERMINAL_VERB     true
+#define NOT_TERMINAL_VERB false
 
 typedef struct {
   const c8* name;
   const c8* id;
   spn_verbosity_t verbosity;
   bool error;
+  bool terminal;
 } spn_build_event_display_t;
 
-#define EVENT(ID, NAME, VERBOSITY, ERROR) [ID] = { NAME, sp_mstr(ID), VERBOSITY, ERROR }
+#define EVENT(ID, NAME, VERBOSITY, ERROR, TERMINAL) [ID] = { NAME, sp_mstr(ID), VERBOSITY, ERROR, TERMINAL }
 
 static spn_build_event_display_t event_info[] = {
-  EVENT(SPN_EVENT_ERR,                           "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB    ),
-  EVENT(SPN_EVENT_ERR_CIRCULAR_DEP,              "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB    ),
-  EVENT(SPN_EVENT_ERR_UNKNOWN_PKG,               "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB    ),
-  EVENT(SPN_EVENT_ERR_UNSATISFIABLE_VERSION,     "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB    ),
-  EVENT(SPN_EVENT_ERR_MANIFEST,                  "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB    ),
-  EVENT(SPN_EVENT_RESOLVE_PACKAGE,               "Resolving",   SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_RESOLVE_END,                   "Resolved",    SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_SYNC,                          "Downloading", SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_SYNC_START,                    "Syncing",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_SYNC_PACKAGE,                  "Synced",      SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_SYNC_FAILED,                   "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB    ),
-  EVENT(SPN_EVENT_SYNC_END,                      "Downloaded",  SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_COMPILE,          "Compiling",   SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,   "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB    ),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_CONFIGURE,        "Configuring", SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK,     "Configured",  SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_PACKAGE,          "Packaging",   SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK,       "Packaged",    SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_CRASHED,          "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB    ),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_USER_FN,          "Running",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_COMPILE_START,                 "Compiling",   SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_TARGET_BUILD_PASSED,           "Compiled",    SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_TARGET_BUILD_FAILED,           "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB    ),
-  EVENT(SPN_EVENT_TARGET_RUN,                    "Running",     SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_LINK_START,                    "Linking",     SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_LINK_PASSED,                   "Linked",      SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_LINK_FAILED,                   "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB    ),
-  EVENT(SPN_EVENT_EMBED_START,                   "Embedding",   SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_EMBED_PASSED,                  "Embedded",    SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_EMBED_FAILED,                  "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB    ),
-  EVENT(SPN_EVENT_INIT_BUILD_GRAPH,              "Planning",    SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED,    "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB    ),
-  EVENT(SPN_EVENT_DIRTY_SUMMARY,                 "Planned",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_BUILD_PASSED,                  "Finished",    SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_BUILD_FAILED,                  "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB    ),
-  EVENT(SPN_EVENT_BUILD_SUMMARY,                 "Summary",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_API_CALL,                      "Calling",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB),
-  EVENT(SPN_EVENT_USER_LOG,                      "",            SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB),
+  EVENT(SPN_EVENT_ERR,                           "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
+  EVENT(SPN_EVENT_ERR_CIRCULAR_DEP,              "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
+  EVENT(SPN_EVENT_ERR_UNKNOWN_PKG,               "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
+  EVENT(SPN_EVENT_ERR_UNSATISFIABLE_VERSION,     "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
+  EVENT(SPN_EVENT_ERR_MANIFEST,                  "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
+  EVENT(SPN_EVENT_RESOLVE_START,                 "Resolving",   SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_RESOLVE_PACKAGE,               "Resolving",   SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_RESOLVE_END,                   "Resolved",    SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_SYNC,                          "Downloading", SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_SYNC_START,                    "Syncing",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_SYNC_PACKAGE,                  "Synced",      SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_SYNC_FAILED,                   "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
+  EVENT(SPN_EVENT_SYNC_END,                      "Downloaded",  SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_COMPILE,          "Compiling",   SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,   "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_CONFIGURE,        "Configuring", SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK,     "Configured",  SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_PACKAGE,          "Packaging",   SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK,       "Packaged",    SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_CRASHED,          "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
+  EVENT(SPN_EVENT_BUILD_SCRIPT_USER_FN,          "Running",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_COMPILE_START,                 "Compiling",   SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_TARGET_BUILD_PASSED,           "Compiled",    SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_TARGET_BUILD_FAILED,           "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_TARGET_RUN,                    "Running",     SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_LINK_START,                    "Linking",     SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_LINK_PASSED,                   "Linked",      SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_LINK_FAILED,                   "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_EMBED_START,                   "Embedding",   SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_EMBED_PASSED,                  "Embedded",    SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_EMBED_FAILED,                  "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_INIT_BUILD_GRAPH,              "Planning",    SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED,    "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
+  EVENT(SPN_EVENT_DIRTY_SUMMARY,                 "Planned",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_BUILD_PASSED,                  "Finished",    SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_BUILD_FAILED,                  "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
+  EVENT(SPN_EVENT_BUILD_SUMMARY,                 "Summary",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_API_CALL,                      "Calling",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_USER_LOG,                      "",            SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB, NOT_TERMINAL_VERB),
 };
 
 static sp_str_t spn_tui_name_to_color(sp_mem_t mem, sp_str_t str);
@@ -267,6 +271,27 @@ static sp_str_t spn_tui_name_to_color(sp_mem_t mem, sp_str_t str) {
   return sp_color_to_tui_rgb_f(mem, r, g, b);
 }
 
+static sp_str_t spn_tui_colored_name(sp_mem_t mem, sp_str_t name) {
+  return sp_fmt(mem, "{}{}" SP_ANSI_RESET, SP_FMT_STR(spn_tui_name_to_color(mem, name)), SP_FMT_STR(name)).value;
+}
+
+static sp_str_t spn_tui_contextual_path(sp_mem_t mem, sp_str_t path) {
+  if (!sp_str_empty(spn.paths.cache) && sp_str_starts_with(path, spn.paths.cache)) {
+    sp_str_t rel = sp_str_strip_left(path, spn.paths.cache);
+    rel = sp_str_strip_left(rel, sp_str_lit("/"));
+    return sp_fmt(mem, "$SPN_CACHE/{}", SP_FMT_STR(rel)).value;
+  }
+
+  if (!sp_str_empty(spn.paths.project) && sp_str_starts_with(path, spn.paths.project)) {
+    sp_str_t rel = sp_str_strip_left(path, spn.paths.project);
+    rel = sp_str_strip_left(rel, sp_str_lit("/"));
+    rel = sp_str_strip_left(rel, sp_str_lit("./"));
+    return sp_fmt(mem, "./{}", SP_FMT_STR(rel)).value;
+  }
+
+  return path;
+}
+
 static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
   sp_io_dyn_mem_writer_t w = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &w);
@@ -387,7 +412,7 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
     case SPN_EVENT_RESOLVE_END: {
       c8 buffer [64] = sp_zero;
       sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->resolve_end.time);
-      sp_fmt_io(&w.base, "{} packages in {.cyan}",
+      sp_fmt_io(&w.base, "Resolved {} packages in {.cyan}",
         SP_FMT_U32(event->resolve_end.num_resolved),
         SP_FMT_CSTR(buffer)
       );
@@ -412,26 +437,26 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
       break;
     }
     case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED: {
-      sp_fmt_io(&w.base, "{.cyan} failed to compile", SP_FMT_STR(event->compile_failed.script_path));
+      sp_fmt_io(&w.base, "{.cyan} failed to compile", SP_FMT_STR(spn_tui_contextual_path(mem, event->compile_failed.script_path)));
       break;
     }
     case SPN_EVENT_TARGET_BUILD_FAILED: {
-      sp_fmt_io(&w.base, "{.cyan} failed to compile", SP_FMT_STR(event->target.failed.source_file));
+      sp_fmt_io(&w.base, "{.cyan} failed to compile", SP_FMT_STR(spn_tui_contextual_path(mem, event->target.failed.source_file)));
       break;
     }
     case SPN_EVENT_ERR_UNKNOWN_PKG: {
       sp_fmt_io(
         &w.base,
-        "{.cyan} could not be located",
-        SP_FMT_STR(event->unknown.request.qualified)
+        "{} could not be located",
+        SP_FMT_STR(spn_tui_colored_name(mem, event->unknown.request.qualified))
       );
       break;
     }
     case SPN_EVENT_ERR_UNSATISFIABLE_VERSION: {
       sp_fmt_io(
         &w.base,
-        "no version of {.cyan} satisfies {.yellow}",
-        SP_FMT_STR(event->unsatisfiable.low.qualified),
+        "no version of {} satisfies {.yellow}",
+        SP_FMT_STR(spn_tui_colored_name(mem, event->unsatisfiable.low.qualified)),
         SP_FMT_STR(spn_semver_range_to_str(mem, event->unsatisfiable.low.index.range))
       );
       break;
@@ -439,17 +464,17 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
     case SPN_EVENT_ERR_CIRCULAR_DEP: {
       sp_fmt_io(
         &w.base,
-        "{.cyan} transitively includes itself",
-        SP_FMT_STR(event->circular.id.name)
+        "{} transitively includes itself",
+        SP_FMT_STR(spn_tui_colored_name(mem, event->circular.id.name))
       );
       break;
     }
     case SPN_EVENT_ERR_MANIFEST: {
       sp_fmt_io(
         &w.base,
-        "{.cyan} has an invalid manifest ({.gray})",
-        SP_FMT_STR(event->manifest_err.name),
-        SP_FMT_STR(event->manifest_err.path)
+        "{} has an invalid manifest ({.gray})",
+        SP_FMT_STR(spn_tui_colored_name(mem, event->manifest_err.name)),
+        SP_FMT_STR(spn_tui_contextual_path(mem, event->manifest_err.path))
       );
       if (sp_da_empty(event->manifest_err.issues)) {
         sp_fmt_io(&w.base, ": {}", SP_FMT_STR(event->manifest_err.error));
@@ -459,8 +484,8 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
     case SPN_EVENT_SYNC_FAILED: {
       sp_fmt_io(
         &w.base,
-        "{.cyan} failed to sync from {.gray}: {}",
-        SP_FMT_STR(event->sync_failed.name),
+        "{} failed to sync from {.gray}: {}",
+        SP_FMT_STR(spn_tui_colored_name(mem, event->sync_failed.name)),
         SP_FMT_STR(event->sync_failed.url),
         SP_FMT_STR(event->sync_failed.error)
       );
@@ -475,7 +500,7 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
           sp_fmt_io(
             &w.base,
             "failed to parse manifest {.cyan}",
-            SP_FMT_STR(event->err.manifest_parse.path)
+            SP_FMT_STR(spn_tui_contextual_path(mem, event->err.manifest_parse.path))
           );
           break;
         }
@@ -496,8 +521,8 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
         case SPN_ERR_TOOLCHAIN_FETCH: {
           sp_fmt_io(
             &w.base,
-            "toolchain {.cyan} failed to download from {.gray}",
-            SP_FMT_STR(event->err.artifact.name),
+            "toolchain {} failed to download from {.gray}",
+            SP_FMT_STR(spn_tui_colored_name(mem, event->err.artifact.name)),
             SP_FMT_STR(event->err.artifact.url)
           );
           break;
@@ -505,8 +530,8 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
         case SPN_ERR_TOOLCHAIN_NO_SHA: {
           sp_fmt_io(
             &w.base,
-            "toolchain {.cyan} has no sha256 for {.gray}",
-            SP_FMT_STR(event->err.artifact.name),
+            "toolchain {} has no sha256 for {.gray}",
+            SP_FMT_STR(spn_tui_colored_name(mem, event->err.artifact.name)),
             SP_FMT_STR(event->err.artifact.url)
           );
           break;
@@ -514,8 +539,8 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
         case SPN_ERR_TOOLCHAIN_SHA: {
           sp_fmt_io(
             &w.base,
-            "toolchain {.cyan} sha256 mismatch for {.gray}: expected {.yellow}, got {.red}",
-            SP_FMT_STR(event->err.artifact.name),
+            "toolchain {} sha256 mismatch for {.gray}: expected {.yellow}, got {.red}",
+            SP_FMT_STR(spn_tui_colored_name(mem, event->err.artifact.name)),
             SP_FMT_STR(event->err.artifact.url),
             SP_FMT_STR(event->err.artifact.expected),
             SP_FMT_STR(event->err.artifact.actual)
@@ -525,8 +550,8 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
         case SPN_ERR_TOOLCHAIN_EXTRACT: {
           sp_fmt_io(
             &w.base,
-            "toolchain {.cyan} failed to extract archive from {.gray}",
-            SP_FMT_STR(event->err.artifact.name),
+            "toolchain {} failed to extract archive from {.gray}",
+            SP_FMT_STR(spn_tui_colored_name(mem, event->err.artifact.name)),
             SP_FMT_STR(event->err.artifact.url)
           );
           break;
@@ -534,8 +559,8 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
         case SPN_ERR_TOOLCHAIN_UNKNOWN: {
           sp_fmt_io(
             &w.base,
-            "toolchain {.cyan} isn't defined",
-            SP_FMT_STR(event->err.toolchain.name)
+            "toolchain {} isn't defined",
+            SP_FMT_STR(spn_tui_colored_name(mem, event->err.toolchain.name))
           );
           break;
         }
@@ -545,8 +570,8 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
             case SPN_TOOLCHAIN_ROLE_BUILD: {
               sp_fmt_io(
                 &w.base,
-                "toolchain {.cyan} can't target {.yellow}",
-                SP_FMT_STR(event->err.toolchain.name),
+                "toolchain {} can't target {.yellow}",
+                SP_FMT_STR(spn_tui_colored_name(mem, event->err.toolchain.name)),
                 SP_FMT_STR(target)
               );
               break;
@@ -554,9 +579,9 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
             case SPN_TOOLCHAIN_ROLE_SCRIPT: {
               sp_fmt_io(
                 &w.base,
-                "build scripts compile to {.yellow}, but toolchain {.cyan} can't target it",
+                "build scripts compile to {.yellow}, but toolchain {} can't target it",
                 SP_FMT_STR(target),
-                SP_FMT_STR(event->err.toolchain.name)
+                SP_FMT_STR(spn_tui_colored_name(mem, event->err.toolchain.name))
               );
               break;
             }
@@ -595,7 +620,7 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
           sp_fmt_io(
             &w.base,
             "missing build graph input {.cyan}",
-            SP_FMT_STR(event->err.build_graph.file)
+            SP_FMT_STR(spn_tui_contextual_path(mem, event->err.build_graph.file))
           );
           break;
         }
@@ -603,7 +628,7 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
           sp_fmt_io(
             &w.base,
             "two graph nodes output the same file {.cyan}",
-            SP_FMT_STR(event->err.build_graph.file)
+            SP_FMT_STR(spn_tui_contextual_path(mem, event->err.build_graph.file))
           );
           break;
         }
@@ -634,7 +659,7 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
     }
     case SPN_EVENT_EMBED_FAILED: {
       sp_fmt_io(&w.base, "{}: {}",
-        SP_FMT_STR(event->embed_failed.path),
+        SP_FMT_STR(spn_tui_contextual_path(mem, event->embed_failed.path)),
         SP_FMT_STR(event->embed_failed.error)
       );
       break;
@@ -668,19 +693,45 @@ static sp_str_t spn_tui_short_name(sp_str_t qualified) {
   return qualified;
 }
 
-static void spn_tui_write_event_line(sp_io_writer_t* w, sp_mem_t mem, sp_str_t verb, bool error, sp_str_t pkg_name, sp_str_t detail) {
-  if (error) {
-    sp_fmt_io(w, "{:>12 .bold .red}", SP_FMT_STR(verb));
+static void spn_tui_write_event_tail(sp_io_writer_t* w, sp_mem_t mem, sp_str_t pkg_name, sp_str_t detail) {
+  if (sp_str_empty(pkg_name)) {
+    sp_fmt_io(w, " {.gray}", SP_FMT_CSTR("▐"));
   } else {
-    sp_fmt_io(w, "{:>12 .bold .green}", SP_FMT_STR(verb));
-  }
-  if (!sp_str_empty(pkg_name)) {
     sp_fmt_io(w, " {}", SP_FMT_STR(spn_tui_decorate_name(mem, pkg_name, 0, ' ')));
   }
   if (!sp_str_empty(detail)) {
     sp_fmt_io(w, " {}", SP_FMT_STR(detail));
   }
   sp_io_write_c8(w, '\n');
+}
+
+static void spn_tui_write_event_line(sp_io_writer_t* w, sp_mem_t mem, sp_str_t verb, bool error, sp_str_t pkg_name, sp_str_t detail) {
+  if (error) {
+    sp_fmt_io(w, "{:>12 .bold .red}", SP_FMT_STR(verb));
+  } else {
+    sp_fmt_io(w, "{:>12 .bold .green}", SP_FMT_STR(verb));
+  }
+  spn_tui_write_event_tail(w, mem, pkg_name, detail);
+}
+
+static void spn_tui_write_terminal_error_line(sp_io_writer_t* w, sp_mem_t mem, sp_str_t verb, sp_str_t detail) {
+  sp_str_t label = sp_fmt(mem, "{}:", SP_FMT_STR(verb)).value;
+  sp_fmt_io(w, "{.bold .red}", SP_FMT_STR(label));
+  if (!sp_str_empty(detail)) {
+    sp_fmt_io(w, " {}", SP_FMT_STR(detail));
+  }
+  sp_io_write_c8(w, '\n');
+}
+
+static sp_str_t spn_tui_event_subject(spn_build_event_t* event) {
+  switch (event->kind) {
+    case SPN_EVENT_ERR_MANIFEST:              return event->manifest_err.name;
+    case SPN_EVENT_SYNC_FAILED:               return event->sync_failed.name;
+    case SPN_EVENT_ERR_UNKNOWN_PKG:           return event->unknown.request.qualified;
+    case SPN_EVENT_ERR_CIRCULAR_DEP:          return event->circular.id.name;
+    case SPN_EVENT_ERR_UNSATISFIABLE_VERSION: return event->unsatisfiable.low.qualified;
+    default:                                  return event->pkg ? event->pkg->name : sp_str_lit("");
+  }
 }
 
 static void spn_tui_render_event_extra(sp_io_writer_t* w, spn_build_event_t* event) {
@@ -793,8 +844,15 @@ void spn_tui_log_event(spn_build_event_t* event) {
     }
     sp_da_clear(buffered_logs);
 
-    sp_str_t name = event->pkg ? event->pkg->name : sp_str_lit("");
-    spn_tui_write_event_line(w, mem, verb, true, name, spn_tui_render_event_detail(mem, event));
+    sp_str_t detail = spn_tui_render_event_detail(mem, event);
+    if (display.terminal) {
+      spn_tui_write_event_line(w, mem, sp_str_lit("Failed"), true, spn_tui_event_subject(event), sp_str_lit(""));
+      sp_io_write_c8(w, '\n');
+      spn_tui_write_terminal_error_line(w, mem, verb, detail);
+    } else {
+      sp_str_t name = event->pkg ? event->pkg->name : sp_str_lit("");
+      spn_tui_write_event_line(w, mem, verb, true, name, detail);
+    }
     spn_tui_render_event_extra(w, event);
     spn_tui_line_writer_flush(&spn.tui.line_writer);
     sp_mem_end_scratch(scratch);

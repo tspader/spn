@@ -528,6 +528,7 @@ static const c8* event_names[SPN_EVENT_COUNT] = {
   [SPN_EVENT_ERR_UNKNOWN_PKG]               = "err_unknown_pkg",
   [SPN_EVENT_ERR_UNSATISFIABLE_VERSION]     = "err_unsatisfiable_version",
   [SPN_EVENT_ERR_MANIFEST]                  = "err_manifest",
+  [SPN_EVENT_RESOLVE_START]                 = "resolve_start",
   [SPN_EVENT_RESOLVE_PACKAGE]               = "resolve_package",
   [SPN_EVENT_RESOLVE_END]                   = "resolve_end",
   [SPN_EVENT_SYNC]                          = "sync",
