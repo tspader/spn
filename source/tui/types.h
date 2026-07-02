@@ -74,6 +74,7 @@ typedef struct {
   struct {
     sp_prompt_ctx_t* ctx;
     sp_app_t app;
+    sp_prompt_widget_t widget;
     bool started;
     bool on;
   } prompt;

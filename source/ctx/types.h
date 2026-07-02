@@ -49,6 +49,7 @@ typedef struct {
   } paths;
   spn_tui_t tui;
   sp_atomic_s32_t control;
+  sp_atomic_s32_t aborted;
   sp_str_t tcc_error;
   spn_index_arr_t indexes;
   spn_event_buffer_t* events;

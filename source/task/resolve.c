@@ -106,6 +106,11 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_pkg_info_t* pkg = &app->package;
 
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    .kind = SPN_EVENT_RESOLVE_START,
+    .pkg = pkg,
+  });
+
   spn_try_as(init_session(session, pkg), SPN_TASK_ERROR);
   spn_try_as(apply_config(session, app->config), SPN_TASK_ERROR);
 
