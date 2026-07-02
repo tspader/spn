@@ -143,7 +143,6 @@ typedef struct {
 } jtd_result_t;
 
 SP_API jtd_result_t jtd_parse(sp_mem_t mem, sp_str_t json);
-SP_API jtd_err_t jtd_parse_2(sp_mem_t mem, sp_str_t json, jtd_result_t* jtd);
 SP_API jtd_err_t jtd_parse_file(sp_mem_t mem, sp_str_t file, jtd_result_t* jtd);
 SP_API void jtd_free(jtd_result_t* result);
 

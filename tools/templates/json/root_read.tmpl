@@ -1,0 +1,9 @@
+bool spn_{{ .root_name }}_read(sp_str_t json, spn_cg_{{ .root_name }}_t* out, sp_mem_t mem) {
+  yyjson_doc* doc = yyjson_read(json.data, json.len, 0);
+  if (!doc) {
+    return false;
+  }
+  spn_cg_{{ .root_name }}_read(yyjson_doc_get_root(doc), out, mem);
+  yyjson_doc_free(doc);
+  return true;
+}
