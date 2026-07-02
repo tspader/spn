@@ -12,9 +12,25 @@ typedef struct {
   const c8* templates;
 } args_t;
 
+typedef bool (*render_fn_t)(gen_t*, sp_io_writer_t*, sp_template_registry_t*);
+
+typedef struct {
+  const c8* name;
+  render_fn_t decls;
+  render_fn_t impl;
+  bool types;
+  bool combined;
+} renderer_t;
+
+static const renderer_t renderers [] = {
+  { .name = "toml", .decls = render_decls,     .impl = render_impl,     .types = true },
+  { .name = "json", .decls = render_decls,     .impl = render_impl,     .types = true },
+  { .name = "abi",  .decls = render_abi_decls, .impl = render_abi_impl, .combined = true },
+};
+
 typedef struct {
   sp_str_t name;
-  sp_str_t renderer;
+  const renderer_t* renderer;
   jtd_schema_t* schema;
 } root_t;
 
@@ -30,13 +46,20 @@ typedef struct {
   sp_da(root_t) roots;
 } ctx_t;
 
-typedef bool (*render_fn_t)(gen_t*, sp_io_writer_t*, sp_template_registry_t*);
-
 static sp_cli_result_t parse_schema(ctx_t* c) {
   if (jtd_parse_file(c->mem, c->args.schema, &c->jtd)) {
     return sp_cli_set_error(c->cli, sp_fmt(c->mem, "failed to parse schema ({})", sp_fmt_str(jtd_diagnostic_message(c->mem, &c->jtd.diag))).value);
   }
   return SP_CLI_OK;
+}
+
+static const renderer_t* find_renderer(sp_str_t name) {
+  sp_carr_for(renderers, it) {
+    if (sp_str_equal_cstr(name, renderers[it].name)) {
+      return &renderers[it];
+    }
+  }
+  return SP_NULLPTR;
 }
 
 static sp_cli_result_t collect_roots(ctx_t* c) {
@@ -46,9 +69,14 @@ static sp_cli_result_t collect_roots(ctx_t* c) {
     if (!jtd_metadata_has(def->schema, "renderer")) {
       continue;
     }
+    sp_str_t name = jtd_metadata(def->schema, "renderer");
+    const renderer_t* renderer = find_renderer(name);
+    if (!renderer) {
+      return sp_cli_set_error(c->cli, sp_fmt(c->mem, "{.cyan}: unknown renderer {.red}", sp_fmt_str(def->name), sp_fmt_str(name)).value);
+    }
     root_t root = {
       .name = def->name,
-      .renderer = jtd_metadata(def->schema, "renderer"),
+      .renderer = renderer,
       .schema = def->schema,
     };
     sp_da_push(c->roots, root);
@@ -113,6 +141,9 @@ static sp_cli_result_t render_types_header(ctx_t* c) {
 
   gen_t* gen = gen_new(c->mem);
   sp_da_for(c->roots, it) {
+    if (!c->roots[it].renderer->types) {
+      continue;
+    }
     try(extract_root(c, gen, &c->roots[it]));
   }
 
@@ -124,15 +155,37 @@ static sp_cli_result_t render_types_header(ctx_t* c) {
 
 static sp_cli_result_t render_root(ctx_t* c, root_t* root) {
   sp_template_registry_t* reg = SP_NULLPTR;
-  try(load_registry(c, root->renderer, &reg));
+  try(load_registry(c, sp_cstr_as_str(root->renderer->name), &reg));
 
   gen_t* gen = gen_new(c->mem);
   try(extract_root(c, gen, root));
   gen->root = gen_type(gen, root->name);
 
-  try(render_one(c, out_path(c, root->name, ".gen.h"), gen, reg, render_decls));
-  try(render_one(c, out_path(c, root->name, ".gen.c"), gen, reg, render_impl));
-  sp_log("wrote {.cyan} ({.cyan})", sp_fmt_str(root->name), sp_fmt_str(root->renderer));
+  try(render_one(c, out_path(c, root->name, ".gen.h"), gen, reg, root->renderer->decls));
+  try(render_one(c, out_path(c, root->name, ".gen.c"), gen, reg, root->renderer->impl));
+  sp_log("wrote {.cyan} ({.cyan})", sp_fmt_str(root->name), sp_fmt_cstr(root->renderer->name));
+  return SP_CLI_OK;
+}
+
+static sp_cli_result_t render_combined(ctx_t* c, const renderer_t* renderer) {
+  gen_t* gen = gen_new(c->mem);
+  sp_da_for(c->roots, it) {
+    root_t* root = &c->roots[it];
+    if (root->renderer != renderer) continue;
+    try(extract_root(c, gen, root));
+    sp_da_push(gen->roots, root->name);
+  }
+  if (sp_da_empty(gen->roots)) {
+    return SP_CLI_OK;
+  }
+
+  sp_template_registry_t* reg = SP_NULLPTR;
+  sp_str_t name = sp_cstr_as_str(renderer->name);
+  try(load_registry(c, name, &reg));
+
+  try(render_one(c, out_path(c, name, ".gen.h"), gen, reg, renderer->decls));
+  try(render_one(c, out_path(c, name, ".gen.c"), gen, reg, renderer->impl));
+  sp_log("wrote {.cyan} ({} roots)", sp_fmt_str(name), sp_fmt_uint(sp_da_size(gen->roots)));
   return SP_CLI_OK;
 }
 
@@ -153,7 +206,15 @@ static sp_cli_result_t run_cli(sp_cli_t* cli) {
   try(collect_roots(&ctx));
   try(render_types_header(&ctx));
   sp_da_for(ctx.roots, it) {
+    if (ctx.roots[it].renderer->combined) {
+      continue;
+    }
     try(render_root(&ctx, &ctx.roots[it]));
+  }
+  sp_carr_for(renderers, it) {
+    if (renderers[it].combined) {
+      try(render_combined(&ctx, &renderers[it]));
+    }
   }
 
   return SP_CLI_OK;

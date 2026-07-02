@@ -83,7 +83,7 @@ typedef struct { spn_requested_pkg_t request; } spn_evt_unknown_t;
 typedef struct { sp_str_t script_path; u64 time; bool has_configure; bool has_package; } spn_evt_script_compile_t;
 typedef struct { u64 time; } spn_evt_script_package_t;
 typedef struct { sp_str_t script_path; sp_str_t error; } spn_evt_compile_failed_t;
-typedef struct { sp_str_t path; } spn_evt_script_crashed_t;
+typedef struct { sp_str_t path; sp_str_t error; } spn_evt_script_crashed_t;
 typedef struct { sp_str_t name; sp_str_t url; } spn_evt_sync_t;
 typedef struct { sp_str_t profile; bool force; u32 packages; } spn_evt_graph_init_t;
 typedef struct {
