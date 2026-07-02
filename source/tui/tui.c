@@ -249,7 +249,7 @@ static sp_str_t spn_tui_name_to_color(sp_mem_t mem, sp_str_t str) {
 
   static sp_ht(u32, sp_hash_t) buckets = SP_NULLPTR;
   if (!buckets) {
-    sp_ht_init(spn.persistent, buckets);
+    sp_ht_init(spn.heap, buckets);
   }
 
   sp_hash_t hash = sp_hash_str(str);
@@ -614,10 +614,10 @@ sp_str_t spn_tui_render_coarse_event(sp_mem_t mem, spn_build_event_t* event, u32
   static sp_str_ht(bool) seen_pkg = SP_NULLPTR;
   static sp_str_ht(bool) seen_target = SP_NULLPTR;
   if (!seen_pkg) {
-    sp_str_ht_init(spn.persistent, seen_pkg);
+    sp_str_ht_init(spn.heap, seen_pkg);
   }
   if (!seen_target) {
-    sp_str_ht_init(spn.persistent, seen_target);
+    sp_str_ht_init(spn.heap, seen_target);
   }
 
   switch (event->kind) {
@@ -656,7 +656,7 @@ sp_str_t spn_tui_render_coarse_event(sp_mem_t mem, spn_build_event_t* event, u32
       if (is_root && event->kind == SPN_EVENT_LINK_START && sp_str_valid(event->target.name)) {
         sp_str_t key = sp_fmt(mem, "{}::{}", SP_FMT_STR(event->pkg->qualified), SP_FMT_STR(event->target.name)).value;
         if (!sp_str_ht_get(seen_target, key)) {
-          sp_str_ht_insert(seen_target, sp_str_copy(spn.persistent, key), true);
+          sp_str_ht_insert(seen_target, sp_str_copy(spn.heap, key), true);
           return spn_tui_render_coarse_line(mem, sp_str_lit("Compiling"), event->pkg->name, event->target.name);
         }
       }
