@@ -7,6 +7,8 @@
 #include "sp/color.h"
 #include "sp/macro.h"
 #include "sp/str.h"
+#include "toolchain/select.h"
+#include "triple/triple.h"
 #include "tui/tui.h"
 
 #include <stdarg.h>
@@ -474,6 +476,84 @@ sp_str_t spn_tui_render_event(sp_mem_t mem, spn_build_event_t* event, u32 max_na
               "\n  - {}",
               SP_FMT_STR(spn_codegen_issue_message(mem, &event->err.issues[it]))
             );
+          }
+          break;
+        }
+        case SPN_ERR_TOOLCHAIN_FETCH: {
+          sp_fmt_io(
+            &w.base,
+            "toolchain {.cyan} failed to download from {.black}",
+            SP_FMT_STR(event->err.artifact.name),
+            SP_FMT_STR(event->err.artifact.url)
+          );
+          break;
+        }
+        case SPN_ERR_TOOLCHAIN_NO_SHA: {
+          sp_fmt_io(
+            &w.base,
+            "toolchain {.cyan} has no sha256 for {.black}",
+            SP_FMT_STR(event->err.artifact.name),
+            SP_FMT_STR(event->err.artifact.url)
+          );
+          break;
+        }
+        case SPN_ERR_TOOLCHAIN_SHA: {
+          sp_fmt_io(
+            &w.base,
+            "toolchain {.cyan} sha256 mismatch for {.black}: expected {.yellow}, got {.red}",
+            SP_FMT_STR(event->err.artifact.name),
+            SP_FMT_STR(event->err.artifact.url),
+            SP_FMT_STR(event->err.artifact.expected),
+            SP_FMT_STR(event->err.artifact.actual)
+          );
+          break;
+        }
+        case SPN_ERR_TOOLCHAIN_EXTRACT: {
+          sp_fmt_io(
+            &w.base,
+            "toolchain {.cyan} failed to extract archive from {.black}",
+            SP_FMT_STR(event->err.artifact.name),
+            SP_FMT_STR(event->err.artifact.url)
+          );
+          break;
+        }
+        case SPN_ERR_TOOLCHAIN_UNKNOWN: {
+          sp_fmt_io(
+            &w.base,
+            "toolchain {.cyan} isn't defined",
+            SP_FMT_STR(event->err.toolchain.name)
+          );
+          break;
+        }
+        case SPN_ERR_TOOLCHAIN_TARGET: {
+          sp_str_t target = spn_triple_to_str(mem, event->err.toolchain.target);
+          switch (event->err.toolchain.role) {
+            case SPN_TOOLCHAIN_ROLE_BUILD: {
+              sp_fmt_io(
+                &w.base,
+                "toolchain {.cyan} can't target {.yellow}",
+                SP_FMT_STR(event->err.toolchain.name),
+                SP_FMT_STR(target)
+              );
+              break;
+            }
+            case SPN_TOOLCHAIN_ROLE_SCRIPT: {
+              sp_fmt_io(
+                &w.base,
+                "build scripts compile to {.yellow}, but toolchain {.cyan} can't target it",
+                SP_FMT_STR(target),
+                SP_FMT_STR(event->err.toolchain.name)
+              );
+              break;
+            }
+          }
+          bool first = true;
+          sp_str_ht_for_kv(event->err.toolchain.catalog->entries, it) {
+            spn_toolchain_t* toolchain = *it.val;
+            if (!spn_toolchain_supports(toolchain, event->err.toolchain.target, event->err.toolchain.host)) continue;
+            sp_io_write_str(&w.base, first ? sp_str_lit("\ntoolchains that can: ") : sp_str_lit(", "), SP_NULLPTR);
+            sp_fmt_io(&w.base, "{.green}", SP_FMT_STR(toolchain->name));
+            first = false;
           }
           break;
         }

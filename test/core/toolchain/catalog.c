@@ -16,6 +16,8 @@ UTEST(catalog, builtin_with_host_match) {
   EXPECT_STR(zig->compiler.program, "zig");
   ASSERT_EQ(1u, (u32)sp_da_size(zig->compiler.args));
   EXPECT_STR(zig->compiler.args[0], "cc");
+  ASSERT_EQ(1u, (u32)sp_da_size(zig->linker.args));
+  EXPECT_STR(zig->linker.args[0], "cc");
   EXPECT_STR(zig->archiver.args[0], "ar");
 
   ASSERT_FALSE(sp_opt_is_null(zig->artifact));

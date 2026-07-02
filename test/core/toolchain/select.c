@@ -3,154 +3,262 @@
 
 #include "fixture.h"
 
-static void fixture_selection(
-  s32* utest_result,
-  spn_toolchain_catalog_t* catalog,
-  const c8* build,
-  spn_triple_t target,
-  spn_triple_t host,
-  spn_toolchain_selection_t* out,
-  spn_toolchain_select_err_t* err
-) {
+typedef struct {
+  const c8* name;
+  const c8* compiler;
+  spn_triple_t targets [2];
+} select_toolchain_t;
+
+typedef struct {
+  spn_err_t kind;
+  const c8* build;
+  const c8* script;
+  u32 required;
+  bool dedup;
+  struct {
+    const c8* name;
+    spn_toolchain_role_t role;
+    spn_triple_t target;
+  } err;
+} select_expect_t;
+
+typedef struct {
+  const c8* build;
+  spn_triple_t target;
+  select_toolchain_t toolchains [2];
+  select_expect_t expect;
+} select_test_t;
+
+typedef struct {
+  spn_triple_t target;
+  bool supported;
+} supports_check_t;
+
+typedef struct {
+  spn_triple_t targets [2];
+  supports_check_t checks [4];
+} supports_test_t;
+
+static bool triple_empty(spn_triple_t triple) {
+  return !triple.arch && !triple.os && !triple.abi;
+}
+
+static void fixture_targets(sp_mem_t mem, spn_toolchain_t* toolchain, const spn_triple_t* targets, u32 len) {
+  sp_for(it, len) {
+    if (triple_empty(targets[it])) {
+      break;
+    }
+    if (!toolchain->targets) {
+      toolchain->targets = sp_da_new(mem, spn_triple_t);
+    }
+    sp_da_push(toolchain->targets, targets[it]);
+  }
+}
+
+static void run_select_test(s32* utest_result, select_test_t t) {
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+
+  spn_toolchain_catalog_t catalog = sp_zero;
+  fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
+
+  sp_carr_for(t.toolchains, it) {
+    select_toolchain_t desc = t.toolchains[it];
+    if (!desc.name) {
+      break;
+    }
+    spn_toolchain_t toolchain = fixture_local_toolchain(desc.name, desc.compiler);
+    fixture_targets(mem, &toolchain, desc.targets, SP_CARR_LEN(desc.targets));
+    spn_toolchain_catalog_add(&catalog, toolchain);
+  }
+
   spn_toolchain_query_t query = {
-    .build = sp_str_view(build),
+    .build = sp_str_view(t.build),
     .script = sp_str_lit("zig"),
-    .target = target,
-    .host = host,
+    .target = t.target,
+    .host = HOST_X64_LINUX,
   };
-  *err = spn_toolchain_select(catalog, query, mem, out);
+
+  spn_toolchain_selection_t selection = sp_zero;
+  spn_err_union_t err = spn_toolchain_select(&catalog, query, mem, &selection);
+
+  ASSERT_EQ((u32)t.expect.kind, (u32)err.kind);
+
+  if (t.expect.kind != SPN_OK) {
+    EXPECT_STR(err.toolchain.name, t.expect.err.name);
+    EXPECT_EQ((u32)t.expect.err.role, (u32)err.toolchain.role);
+    EXPECT_TRUE(err.toolchain.catalog == &catalog);
+    EXPECT_EQ((u32)HOST_X64_LINUX.arch, (u32)err.toolchain.host.arch);
+    EXPECT_EQ((u32)HOST_X64_LINUX.os, (u32)err.toolchain.host.os);
+    EXPECT_EQ((u32)HOST_X64_LINUX.abi, (u32)err.toolchain.host.abi);
+    if (!triple_empty(t.expect.err.target)) {
+      EXPECT_EQ((u32)t.expect.err.target.arch, (u32)err.toolchain.target.arch);
+      EXPECT_EQ((u32)t.expect.err.target.os, (u32)err.toolchain.target.os);
+      EXPECT_EQ((u32)t.expect.err.target.abi, (u32)err.toolchain.target.abi);
+    }
+    return;
+  }
+
+  ASSERT_TRUE(selection.build);
+  ASSERT_TRUE(selection.script);
+  EXPECT_STR(selection.build->name, t.expect.build);
+  EXPECT_STR(selection.script->name, t.expect.script);
+  EXPECT_EQ(t.expect.required, (u32)sp_da_size(selection.required));
+
+  if (t.expect.dedup) {
+    EXPECT_TRUE(selection.build == selection.script);
+    EXPECT_TRUE(selection.build == selection.required[0]);
+  }
+}
+
+static void run_supports_test(s32* utest_result, supports_test_t t) {
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+
+  spn_toolchain_t toolchain = fixture_local_toolchain("system", "cc");
+  fixture_targets(mem, &toolchain, t.targets, SP_CARR_LEN(t.targets));
+
+  sp_carr_for(t.checks, it) {
+    supports_check_t check = t.checks[it];
+    if (triple_empty(check.target)) {
+      break;
+    }
+    EXPECT_EQ(check.supported, spn_toolchain_supports(&toolchain, check.target, HOST_X64_LINUX));
+  }
 }
 
 UTEST(select, system_for_host_pulls_zig_for_scripts) {
-  spn_toolchain_catalog_t catalog = sp_zero;
-  fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
-
-  spn_toolchain_selection_t selection = sp_zero;
-  spn_toolchain_select_err_t err = sp_zero;
-  fixture_selection(utest_result, &catalog, "system", HOST_X64_LINUX, HOST_X64_LINUX, &selection, &err);
-
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_SELECT_OK, (u32)err.status);
-  ASSERT_TRUE(selection.build);
-  ASSERT_TRUE(selection.script);
-  EXPECT_STR(selection.build->name, "system");
-  EXPECT_STR(selection.script->name, "zig");
-  EXPECT_EQ(2u, (u32)sp_da_size(selection.required));
+  run_select_test(utest_result, (select_test_t) {
+    .build = "system",
+    .target = HOST_X64_LINUX,
+    .expect = {
+      .build = "system",
+      .script = "zig",
+      .required = 2,
+    },
+  });
 }
 
 UTEST(select, zig_as_build_toolchain_dedups) {
-  spn_toolchain_catalog_t catalog = sp_zero;
-  fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
-
-  spn_toolchain_selection_t selection = sp_zero;
-  spn_toolchain_select_err_t err = sp_zero;
-  fixture_selection(utest_result, &catalog, "zig", HOST_X64_LINUX, HOST_X64_LINUX, &selection, &err);
-
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_SELECT_OK, (u32)err.status);
-  ASSERT_EQ(1u, (u32)sp_da_size(selection.required));
-  EXPECT_TRUE(selection.build == selection.script);
-  EXPECT_TRUE(selection.build == selection.required[0]);
+  run_select_test(utest_result, (select_test_t) {
+    .build = "zig",
+    .target = HOST_X64_LINUX,
+    .expect = {
+      .build = "zig",
+      .script = "zig",
+      .required = 1,
+      .dedup = true,
+    },
+  });
 }
 
 UTEST(select, unknown_build_toolchain) {
-  spn_toolchain_catalog_t catalog = sp_zero;
-  fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
-
-  spn_toolchain_selection_t selection = sp_zero;
-  spn_toolchain_select_err_t err = sp_zero;
-  fixture_selection(utest_result, &catalog, "gcc-13", HOST_X64_LINUX, HOST_X64_LINUX, &selection, &err);
-
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_SELECT_ERR_UNKNOWN, (u32)err.status);
-  EXPECT_STR(err.name, "gcc-13");
+  run_select_test(utest_result, (select_test_t) {
+    .build = "gcc-13",
+    .target = HOST_X64_LINUX,
+    .expect = {
+      .kind = SPN_ERR_TOOLCHAIN_UNKNOWN,
+      .err = { .name = "gcc-13" },
+    },
+  });
 }
 
 UTEST(select, undeclared_targets_are_host_only) {
-  spn_toolchain_catalog_t catalog = sp_zero;
-  fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
-
-  spn_toolchain_selection_t selection = sp_zero;
-  spn_toolchain_select_err_t err = sp_zero;
-  fixture_selection(utest_result, &catalog, "system", TARGET_WIN_GNU, HOST_X64_LINUX, &selection, &err);
-
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_SELECT_ERR_TARGET, (u32)err.status);
-  EXPECT_STR(err.name, "system");
-  EXPECT_EQ((u32)SPN_TOOLCHAIN_ROLE_BUILD, (u32)err.role);
-  EXPECT_EQ((u32)SPN_OS_WINDOWS, (u32)err.target.os);
+  run_select_test(utest_result, (select_test_t) {
+    .build = "system",
+    .target = TARGET_WIN_GNU,
+    .expect = {
+      .kind = SPN_ERR_TOOLCHAIN_TARGET,
+      .err = {
+        .name = "system",
+        .target = TARGET_WIN_GNU,
+      },
+    },
+  });
 }
 
 UTEST(select, declared_target_allows_cross) {
-  spn_toolchain_catalog_t catalog = sp_zero;
-  fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
-
-  spn_toolchain_t mingw = fixture_local_toolchain("mingw", "x86_64-w64-mingw32-gcc");
-  spn_triple_t targets [] = { TARGET_WIN_GNU };
-  mingw.targets = SP_NULLPTR;
-  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-  mingw.targets = sp_da_new(mem, spn_triple_t);
-  sp_da_push(mingw.targets, targets[0]);
-  spn_toolchain_catalog_add(&catalog, mingw);
-
-  spn_toolchain_selection_t selection = sp_zero;
-  spn_toolchain_select_err_t err = sp_zero;
-  fixture_selection(utest_result, &catalog, "mingw", TARGET_WIN_GNU, HOST_X64_LINUX, &selection, &err);
-
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_SELECT_OK, (u32)err.status);
-  EXPECT_STR(selection.build->name, "mingw");
-  EXPECT_STR(selection.script->name, "zig");
-  EXPECT_EQ(2u, (u32)sp_da_size(selection.required));
+  run_select_test(utest_result, (select_test_t) {
+    .build = "mingw",
+    .target = TARGET_WIN_GNU,
+    .toolchains = {
+      { .name = "mingw", .compiler = "x86_64-w64-mingw32-gcc", .targets = { TARGET_WIN_GNU } },
+    },
+    .expect = {
+      .build = "mingw",
+      .script = "zig",
+      .required = 2,
+    },
+  });
 }
 
 UTEST(select, cross_toolchain_rejects_other_targets) {
-  spn_toolchain_catalog_t catalog = sp_zero;
-  fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
-
-  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-  spn_toolchain_t mingw = fixture_local_toolchain("mingw", "x86_64-w64-mingw32-gcc");
-  mingw.targets = sp_da_new(mem, spn_triple_t);
-  sp_da_push(mingw.targets, TARGET_WIN_GNU);
-  spn_toolchain_catalog_add(&catalog, mingw);
-
-  spn_toolchain_selection_t selection = sp_zero;
-  spn_toolchain_select_err_t err = sp_zero;
-  fixture_selection(utest_result, &catalog, "mingw", HOST_X64_LINUX, HOST_X64_LINUX, &selection, &err);
-
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_SELECT_ERR_TARGET, (u32)err.status);
-  EXPECT_STR(err.name, "mingw");
+  run_select_test(utest_result, (select_test_t) {
+    .build = "mingw",
+    .target = HOST_X64_LINUX,
+    .toolchains = {
+      { .name = "mingw", .compiler = "x86_64-w64-mingw32-gcc", .targets = { TARGET_WIN_GNU } },
+    },
+    .expect = {
+      .kind = SPN_ERR_TOOLCHAIN_TARGET,
+      .err = {
+        .name = "mingw",
+        .target = HOST_X64_LINUX,
+      },
+    },
+  });
 }
 
 UTEST(select, script_toolchain_must_target_wasm) {
-  spn_toolchain_catalog_t catalog = sp_zero;
-  fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
+  run_select_test(utest_result, (select_test_t) {
+    .build = "system",
+    .target = HOST_X64_LINUX,
+    .toolchains = {
+      { .name = "zig", .compiler = "/opt/zig/zig" },
+    },
+    .expect = {
+      .kind = SPN_ERR_TOOLCHAIN_TARGET,
+      .err = {
+        .name = "zig",
+        .role = SPN_TOOLCHAIN_ROLE_SCRIPT,
+        .target = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI },
+      },
+    },
+  });
+}
 
-  spn_toolchain_catalog_add(&catalog, fixture_local_toolchain("zig", "/opt/zig/zig"));
-
-  spn_toolchain_selection_t selection = sp_zero;
-  spn_toolchain_select_err_t err = sp_zero;
-  fixture_selection(utest_result, &catalog, "system", HOST_X64_LINUX, HOST_X64_LINUX, &selection, &err);
-
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_SELECT_ERR_TARGET, (u32)err.status);
-  EXPECT_STR(err.name, "zig");
-  EXPECT_EQ((u32)SPN_TOOLCHAIN_ROLE_SCRIPT, (u32)err.role);
-  EXPECT_EQ((u32)SPN_ARCH_WASM32, (u32)err.target.arch);
+UTEST(select, build_target_failure_reports_build_role_for_zig) {
+  run_select_test(utest_result, (select_test_t) {
+    .build = "zig",
+    .target = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
+    .expect = {
+      .kind = SPN_ERR_TOOLCHAIN_TARGET,
+      .err = {
+        .name = "zig",
+        .target = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
+      },
+    },
+  });
 }
 
 UTEST(select, supports_empty_targets_match_host_only) {
-  spn_toolchain_t local = fixture_local_toolchain("system", "cc");
-  EXPECT_TRUE(spn_toolchain_supports(&local, HOST_X64_LINUX, HOST_X64_LINUX));
-  EXPECT_FALSE(spn_toolchain_supports(&local, TARGET_WIN_GNU, HOST_X64_LINUX));
+  run_supports_test(utest_result, (supports_test_t) {
+    .checks = {
+      { .target = HOST_X64_LINUX, .supported = true },
+      { .target = TARGET_WIN_GNU },
+    },
+  });
 }
 
 UTEST(select, supports_wildcard_target_fields) {
-  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-  spn_toolchain_t toolchain = fixture_local_toolchain("cross", "cc");
-  toolchain.targets = sp_da_new(mem, spn_triple_t);
-  sp_da_push(toolchain.targets, ((spn_triple_t) { .os = SPN_OS_LINUX }));
-
-  spn_triple_t x64_musl = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL };
-  spn_triple_t arm_gnu = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU };
-  EXPECT_TRUE(spn_toolchain_supports(&toolchain, x64_musl, HOST_X64_LINUX));
-  EXPECT_TRUE(spn_toolchain_supports(&toolchain, arm_gnu, HOST_X64_LINUX));
-  EXPECT_FALSE(spn_toolchain_supports(&toolchain, TARGET_WIN_GNU, HOST_X64_LINUX));
+  run_supports_test(utest_result, (supports_test_t) {
+    .targets = {
+      { .os = SPN_OS_LINUX },
+    },
+    .checks = {
+      { .target = { .arch = SPN_ARCH_X64, .os = SPN_OS_LINUX, .abi = SPN_ABI_MUSL }, .supported = true },
+      { .target = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_LINUX, .abi = SPN_ABI_GNU }, .supported = true },
+      { .target = TARGET_WIN_GNU },
+    },
+  });
 }
 
 UTEST(select, script_target_is_wasm_wasi) {

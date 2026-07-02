@@ -116,65 +116,56 @@ if you find that you are mocking anything more than a very small, focused set of
 
 if you find that you are pulling in tons and tons of unrelated TUs for a unit test, break up the modules causing all the transitive dependencies!
 
-# error handling
-we return errors up the call stack in an error union (by which we mean error code + rich error data, not a union of error code and function result). it's OK to return just the status when the rich data isn't needed.
+# Errors
 
-## try macros
-try macros are very important, to keep the code concise. prefer them, but it's OK to use regular conditional statements rather than a mess of macros. rule of thumb: if the error-producing code is a single function call, use a try macro
+We return errors up the call stack as a return code or an error union, which is just a return code + structured error data. Prefer a plain return code. If your error has associated data (e.g. a name used in its rendered error message), use `spn_err_union_t`.
+- Add a kind to `spn_err_t` in `include/spn.h`
+- Optionally, dd a payload struct to `spn_err_union_t` in `source/error/types.h`
 
-### spn_try()
-spn_try() returns an error code if nonzero
 ```c
-spn_err_t err = fn();
-if (err != SPN_OK) {
-  return err;
+spn_err_union_t spum(kram_t kram) {
+  if (!kram.gaz) {
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_EXPECTED_KRAM_IN_SPUM,
+      .qux = { .slurf = kram.slurf }
+    };
+  }
+  return spn_result(SPN_OK);
 }
-
-spn_try(fn());
 ```
 
-### spn_try_as()
-spn_try_as() returns a foreign error code as SPN_ERROR if nonzero
+The caller emits the error as an event and propagates the status:
+
 ```c
-foo_err_t err = library_fn_that_doesnt_return_spn_error_t();
-if (err != FOO_OK) {
+spn_err_union_t err = spn_toolchain_select(&session->catalog, query, session->mem, &session->selection);
+if (err.kind) {
+  spn_event_buffer_push(session->events, (spn_build_event_t) { .kind = SPN_EVENT_ERR, .err = err });
   return SPN_ERROR;
 }
-
-spn_try_as(fn());
 ```
 
-### spn_try_union()
-spn_try_union returns an error union if nonzero
+The reporting layer (`tui.c`, `spn_tui_render_event`) is the only place messages are built:
+
 ```c
-spn_err_union_t err = fn();
-if (err.kind != SPN_OK) {
+case SPN_ERR_TOOLCHAIN_UNKNOWN: {
+  sp_fmt_io(&w.base, "toolchain {.cyan} isn't defined", SP_FMT_STR(event->err.toolchain.name));
+  break;
+}
+```
+
+## `try()` macros
+
+We use `try()` macros to keep code concise. There is a family of them (`spn_try()`, `spn_try_as()`, `spn_try_union()`, `spn_try_union_as()`). Prefer them, unless a conditional reads more simply.
+
+```c
+spn_try(expr());
+
+// ...expands to
+spn_err_t err = fn();
+if (err != SPN_OK) {
   return err;
 }
 
-spn_try_union(fn());
-```
-
-### spn_try_union()
-spn_try_as_union() returns an error code as a union if nonzero
-```c
-spn_err_t err = fn();
-if (err != SPN_OK) {
-  return (spn_err_union_t) { .kind = err };
-}
-
-spn_try_as_union(fn());
-```
-
-# examples
-## finding code in sp.h
-```xml
-<example>
-user: Write a function that reads a file and logs its contents
-assistant: Invokes sp skill
-assistant: Reads reference at the beginning of sp.h
-assistant: Finds needed code, searches through our code for existing in-context examples
-</example>
 ```
 
 ## Rules
