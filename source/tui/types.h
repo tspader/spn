@@ -69,10 +69,6 @@ typedef struct {
   } prompt;
 
   struct {
-    u32 max_name;
-  } info;
-
-  struct {
     sp_tm_timer_t timer;
     u64 accumulated;
   } frame;

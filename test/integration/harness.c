@@ -382,6 +382,7 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
 
   struct { sp_str_t path; sp_tm_epoch_t mtime; } mtime_snaps[8];
   s32 num_mtime_snaps = 0;
+  sp_str_t cli_output = sp_zero;
 
   sp_for(it, SPN_TEST_MAX_ACTIONS) {
     action_t action = actions[it];
@@ -523,6 +524,10 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         sp_ps_config_t config = {
           .command = fixture->paths.spn,
           .cwd = fixture->fs.root,
+          .io = {
+            .in.mode = SP_PS_IO_MODE_NULL,
+            .err.mode = SP_PS_IO_MODE_REDIRECT,
+          },
           .env = {
             .extra = {
               { sp_str_lit("SPN_STORAGE_DIR"), fixture->paths.storage },
@@ -548,6 +553,15 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
 
         sp_ps_output_t output = sp_ps_run(mem, config);
         EXPECT_EQ(action.cli.rc, output.status.exit_code);
+        cli_output = output.out;
+        break;
+      }
+      case ACTION_VERIFY_CLI_CONTAINS: {
+        EXPECT_TRUE(sp_str_contains(cli_output, action.verify_cli.needle));
+        break;
+      }
+      case ACTION_VERIFY_CLI_NOT_CONTAINS: {
+        EXPECT_FALSE(sp_str_contains(cli_output, action.verify_cli.needle));
         break;
       }
       case ACTION_VERIFY_EVENT:

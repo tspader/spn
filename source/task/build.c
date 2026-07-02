@@ -29,11 +29,6 @@ void spn_task_init_build_graph(spn_app_t* app) {
   spn_bg_init(&session->build.graph, spn.mem);
   prepare_build_graph(app);
 
-  sp_str_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
-    spn.tui.info.max_name = SP_MAX(spn.tui.info.max_name, unit->info->name.len);
-  }
-
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_INIT_BUILD_GRAPH,
     .graph_init = {
@@ -61,7 +56,7 @@ void spn_task_init_build_graph(spn_app_t* app) {
     &session->build.graph,
     session->build.dirty,
     (spn_bg_executor_config_t) {
-      .num_threads = 1,
+      .num_threads = 16,
       .enable_logging = false
     }
   );

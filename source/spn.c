@@ -475,10 +475,10 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
       spn_event_log_build(&event->io->build.writer, event);
     }
 
-    // write to tui (filtered by verbosity)
-    if (spn_build_event_get_verbosity(event->kind) <= spn.logger.verbosity) {
+    // write to tui (filtered by verbosity inside the renderer)
+    {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      sp_str_t rendered = spn_tui_render_coarse_event(s.mem, event, spn.tui.info.max_name, app.session.pkg);
+      sp_str_t rendered = spn_tui_render_coarse_event(s.mem, event);
       if (!sp_str_empty(rendered)) {
         sp_da(sp_str_t) lines = sp_str_split_c8(s.mem, sp_str_trim_right(rendered), '\n');
         sp_da_for(lines, it) {

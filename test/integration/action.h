@@ -26,6 +26,8 @@ typedef enum {
   ACTION_VERIFY_EVENT,
   ACTION_VERIFY_NO_EVENT,
   ACTION_RUN_CLI,
+  ACTION_VERIFY_CLI_CONTAINS,
+  ACTION_VERIFY_CLI_NOT_CONTAINS,
 } action_kind_t;
 
 typedef struct {
@@ -49,6 +51,7 @@ typedef struct {
     struct { const c8* name; } verify_locked;
     struct { const c8* event; const c8* key; const c8* value; } verify_event;
     struct { const c8* cmd; const c8* args [4]; s32 rc; } cli;
+    struct { sp_str_t needle; } verify_cli;
   };
 } action_t;
 

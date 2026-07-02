@@ -7,6 +7,7 @@
 #include "external/cc.h"
 #include "event/event.h"
 #include "task/build/build.h"
+#include "unit/package.h"
 
 typedef struct {
   sp_ps_output_t result;
@@ -96,6 +97,8 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
   spn_target_info_t* info = target->info;
 
   if (sp_da_empty(target->objects)) return 0;
+
+  spn_pkg_unit_announce_compile(target->pkg);
 
   sp_str_t output = get_target_output_path(spn.mem, target);
   sp_str_t output_name = sp_fs_get_name(output);

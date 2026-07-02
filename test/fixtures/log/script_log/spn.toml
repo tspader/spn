@@ -1,0 +1,7 @@
+[package]
+name = "script_log"
+version = "0.0.1"
+
+[[bin]]
+name = "script_log"
+source = ["main.c"]
