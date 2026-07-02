@@ -4,6 +4,8 @@
 #include "sp.h"
 #include "spn.h"
 
+#include "forward/types.h"
+
 #define spn_try(expr) do { \
   s32 _sp_result = (expr); \
   if (_sp_result) return _sp_result; \
@@ -54,6 +56,26 @@ typedef struct {
   sp_str_t command_b;
 } spn_err_build_graph_t;
 
+typedef enum {
+  SPN_TOOLCHAIN_ROLE_BUILD,
+  SPN_TOOLCHAIN_ROLE_SCRIPT,
+} spn_toolchain_role_t;
+
+typedef struct {
+  spn_toolchain_role_t role;
+  sp_str_t name;
+  spn_triple_t target;
+  spn_triple_t host;
+  spn_toolchain_catalog_t* catalog;
+} spn_err_toolchain_t;
+
+typedef struct {
+  sp_str_t name;
+  sp_str_t url;
+  sp_str_t expected;
+  sp_str_t actual;
+} spn_err_artifact_t;
+
 typedef struct spn_codegen_issue spn_codegen_issue_t;
 
 typedef struct {
@@ -81,6 +103,8 @@ typedef struct {
       sp_str_t version;
     } version_exists;
     spn_err_build_graph_t build_graph;
+    spn_err_toolchain_t toolchain;
+    spn_err_artifact_t artifact;
     sp_da(spn_codegen_issue_t) issues;
   };
 } spn_err_union_t;

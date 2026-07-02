@@ -4,6 +4,8 @@
 #include "sp.h"
 #include "spn.h"
 
+#include "forward/types.h"
+
 typedef enum {
   SPN_CC_DRIVER_NONE,
   SPN_CC_DRIVER_GCC,
@@ -40,9 +42,9 @@ typedef struct spn_toolchain {
   sp_opt_spn_artifact_t artifact;
 } spn_toolchain_t;
 
-typedef struct {
+struct spn_toolchain_catalog_t {
   sp_str_ht(spn_toolchain_t*) entries;
   sp_mem_t mem;
-} spn_toolchain_catalog_t;
+};
 
 #endif

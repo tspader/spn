@@ -5,6 +5,57 @@
 #include "toolchain/sha256.h"
 
 typedef struct {
+  const c8* data;
+  u64 fill;
+  bool file;
+  bool missing;
+  const c8* expect;
+} sha256_case_t;
+
+typedef struct {
+  const c8* name;
+  sha256_case_t cases [4];
+} sha256_test_t;
+
+typedef enum {
+  PROVISION_TARBALL_TREE,
+  PROVISION_TARBALL_GARBAGE,
+  PROVISION_TARBALL_LOOSE,
+} provision_tarball_t;
+
+typedef struct {
+  spn_err_t kind;
+  u32 calls;
+  const c8* last_url;
+  bool root_empty;
+  bool root_in_store;
+  bool extracted;
+  bool no_store_entry;
+  bool err_reports_sha;
+} provision_expect_t;
+
+typedef struct {
+  const c8* name;
+  const c8* toolchains [2];
+  bool local;
+  provision_tarball_t tarball;
+  const c8* sha;
+  bool no_sha;
+  const c8* mirror;
+  bool fetch_fail;
+  const c8* fail_url_containing;
+  const c8* store_dir;
+  bool stale_temp;
+  provision_expect_t expect;
+} provision_test_t;
+
+typedef struct {
+  const c8* url;
+  const c8* mirror;
+  const c8* expect;
+} resolve_test_t;
+
+typedef struct {
   u32 calls;
   sp_str_t tarball;
   sp_str_t last_url;
@@ -22,239 +73,390 @@ static spn_err_t fetch_stub(sp_str_t url, sp_str_t dest, void* user_data) {
   return SPN_OK;
 }
 
-typedef struct {
-  tmpfs_t fs;
-  sp_mem_t mem;
-  fetch_stub_t stub;
-  spn_toolchain_store_t store;
-  sp_str_t sha;
-} provision_fixture_t;
+static void run_sha256_test(s32* utest_result, sha256_test_t t) {
+  tmpfs_t fs = sp_zero;
+  tmpfs_init_named(&fs, t.name);
+  sp_mem_t mem = fs.mem;
 
-static void provision_fixture_init(s32* utest_result, provision_fixture_t* fixture, const c8* name) {
-  tmpfs_init_named(&fixture->fs, name);
-  fixture->mem = fixture->fs.mem;
-
-  tmpfs_create(&fixture->fs, sp_str_lit("tree/zig-fixture/zig"), sp_str_lit("#!/bin/sh\necho zig\n"));
-  tmpfs_create(&fixture->fs, sp_str_lit("tree/zig-fixture/lib/std.zig"), sp_str_lit("std"));
-
-  sp_str_t tree = tmpfs_get(&fixture->fs, sp_str_lit("tree"));
-  fixture->stub.tarball = tmpfs_get(&fixture->fs, sp_str_lit("zig-fixture.tar.gz"));
-
-  sp_ps_output_t tar = sp_ps_run(fixture->mem, (sp_ps_config_t) {
-    .command = sp_str_lit("tar"),
-    .args = {
-      sp_str_lit("czf"), fixture->stub.tarball,
-      sp_str_lit("-C"), tree,
-      sp_str_lit("zig-fixture"),
+  sp_carr_for(t.cases, it) {
+    sha256_case_t c = t.cases[it];
+    if (!c.data && !c.fill && !c.missing) {
+      break;
     }
-  });
-  ASSERT_EQ(0, tar.status.exit_code);
 
-  ASSERT_EQ(SPN_OK, spn_sha256_file(fixture->mem, fixture->stub.tarball, &fixture->sha));
-  ASSERT_EQ(64u, fixture->sha.len);
+    if (c.missing) {
+      sp_str_t hex = sp_zero;
+      EXPECT_EQ(SPN_ERROR, spn_sha256_file(mem, tmpfs_get(&fs, sp_str_lit("missing.bin")), &hex));
+      continue;
+    }
 
-  fixture->store = (spn_toolchain_store_t) {
-    .mem = fixture->mem,
-    .dir = tmpfs_get(&fixture->fs, sp_str_lit("store")),
-    .fetch = fetch_stub,
-    .fetch_user_data = &fixture->stub,
-  };
-  sp_fs_create_dir(fixture->store.dir);
+    sp_str_t data = sp_zero;
+    if (c.fill) {
+      c8* bytes = (c8*)sp_alloc(mem, c.fill);
+      sp_mem_fill_u8(bytes, c.fill, (u8)0x61);
+      data = sp_str(bytes, (u32)c.fill);
+    } else {
+      data = sp_str_view(c.data);
+    }
+
+    EXPECT_STR(spn_sha256_hex(mem, data.data, data.len), c.expect);
+
+    if (c.file) {
+      sp_str_t path = sp_fmt(mem, "{}.bin", sp_fmt_uint(it)).value;
+      tmpfs_create(&fs, path, data);
+      sp_str_t hex = sp_zero;
+      ASSERT_EQ(SPN_OK, spn_sha256_file(mem, tmpfs_get(&fs, path), &hex));
+      EXPECT_STR(hex, c.expect);
+    }
+  }
 }
 
-static spn_toolchain_t provision_fixture_toolchain(provision_fixture_t* fixture) {
-  spn_toolchain_t toolchain = fixture_local_toolchain("zig", "zig");
-  sp_opt_set(toolchain.artifact, ((spn_artifact_t) {
-    .url = sp_str_lit("https://tc.example.com/zig-fixture.tar.gz"),
-    .sha256 = fixture->sha,
-  }));
-  return toolchain;
+static void run_provision_test(s32* utest_result, provision_test_t t) {
+  tmpfs_t fs = sp_zero;
+  tmpfs_init_named(&fs, t.name);
+  sp_mem_t mem = fs.mem;
+
+  fetch_stub_t stub = sp_zero;
+  stub.fail = t.fetch_fail;
+  if (t.fail_url_containing) {
+    stub.fail_url_containing = sp_str_view(t.fail_url_containing);
+  }
+
+  switch (t.tarball) {
+    case PROVISION_TARBALL_TREE: {
+      tmpfs_create(&fs, sp_str_lit("tree/zig-fixture/zig"), sp_str_lit("#!/bin/sh\necho zig\n"));
+      tmpfs_create(&fs, sp_str_lit("tree/zig-fixture/lib/std.zig"), sp_str_lit("std"));
+      stub.tarball = tmpfs_get(&fs, sp_str_lit("zig-fixture.tar.gz"));
+      sp_ps_output_t tar = sp_ps_run(mem, (sp_ps_config_t) {
+        .command = sp_str_lit("tar"),
+        .args = {
+          sp_str_lit("czf"), stub.tarball,
+          sp_str_lit("-C"), tmpfs_get(&fs, sp_str_lit("tree")),
+          sp_str_lit("zig-fixture"),
+        }
+      });
+      ASSERT_EQ(0, tar.status.exit_code);
+      break;
+    }
+    case PROVISION_TARBALL_GARBAGE: {
+      tmpfs_create(&fs, sp_str_lit("garbage.tar.gz"), sp_str_lit("this is not a tarball"));
+      stub.tarball = tmpfs_get(&fs, sp_str_lit("garbage.tar.gz"));
+      break;
+    }
+    case PROVISION_TARBALL_LOOSE: {
+      tmpfs_create(&fs, sp_str_lit("loose.txt"), sp_str_lit("loose"));
+      stub.tarball = tmpfs_get(&fs, sp_str_lit("loose.tar.gz"));
+      sp_ps_output_t tar = sp_ps_run(mem, (sp_ps_config_t) {
+        .command = sp_str_lit("tar"),
+        .args = {
+          sp_str_lit("czf"), stub.tarball,
+          sp_str_lit("-C"), fs.root,
+          sp_str_lit("loose.txt"),
+        }
+      });
+      ASSERT_EQ(0, tar.status.exit_code);
+      break;
+    }
+  }
+
+  sp_str_t sha = sp_zero;
+  ASSERT_EQ(SPN_OK, spn_sha256_file(mem, stub.tarball, &sha));
+  ASSERT_EQ(64u, sha.len);
+
+  spn_toolchain_store_t store = {
+    .mem = mem,
+    .dir = tmpfs_get(&fs, sp_str_view(t.store_dir ? t.store_dir : "store")),
+    .fetch = fetch_stub,
+    .fetch_user_data = &stub,
+  };
+  if (t.mirror) {
+    store.mirror = sp_str_view(t.mirror);
+  }
+  if (!t.store_dir) {
+    sp_fs_create_dir(store.dir);
+  }
+
+  sp_str_t artifact_sha = t.no_sha ? sp_str_lit("") : (t.sha ? sp_str_view(t.sha) : sha);
+  sp_str_t url = sp_fmt(mem, "https://tc.example.com/{}", sp_fmt_str(sp_fs_get_name(stub.tarball))).value;
+
+  if (t.stale_temp) {
+    sp_fs_create_dir(sp_fmt(mem, "{}/{}.123.tmp", sp_fmt_str(store.dir), sp_fmt_str(artifact_sha)).value);
+    sp_fs_create_file(sp_fmt(mem, "{}/{}.123.download", sp_fmt_str(store.dir), sp_fmt_str(artifact_sha)).value);
+  }
+
+  sp_str_t roots [2] = sp_zero;
+  u32 provisions = 0;
+  spn_err_union_t err = sp_zero;
+
+  sp_carr_for(t.toolchains, it) {
+    const c8* name = t.toolchains[it];
+    if (!name && !it) {
+      name = "zig";
+    }
+    if (!name) {
+      break;
+    }
+
+    spn_toolchain_t toolchain = fixture_local_toolchain(name, name);
+    if (!t.local) {
+      sp_opt_set(toolchain.artifact, ((spn_artifact_t) {
+        .url = url,
+        .sha256 = artifact_sha,
+      }));
+    }
+
+    roots[it] = sp_str_lit("sentinel");
+    err = spn_toolchain_provision(&store, &toolchain, &roots[it]);
+    ASSERT_EQ((u32)t.expect.kind, (u32)err.kind);
+    if (err.kind) {
+      EXPECT_STR(err.artifact.name, name);
+    }
+    provisions++;
+  }
+
+  EXPECT_EQ(t.expect.calls, stub.calls);
+
+  if (t.expect.last_url) {
+    EXPECT_STR(stub.last_url, t.expect.last_url);
+  }
+  if (t.expect.root_empty) {
+    EXPECT_TRUE(sp_str_empty(roots[0]));
+  }
+  if (t.expect.root_in_store) {
+    EXPECT_TRUE(sp_str_equal(roots[0], sp_fs_join_path(mem, store.dir, sha)));
+  }
+  if (t.expect.extracted) {
+    EXPECT_TRUE(sp_fs_is_dir(roots[0]));
+    EXPECT_TRUE(sp_fs_is_file(sp_fs_join_path(mem, roots[0], sp_str_lit("zig"))));
+    EXPECT_TRUE(sp_fs_is_file(sp_fs_join_path(mem, roots[0], sp_str_lit("lib/std.zig"))));
+  }
+  if (t.expect.no_store_entry) {
+    EXPECT_FALSE(sp_fs_exists(sp_fs_join_path(mem, store.dir, artifact_sha)));
+  }
+  if (t.expect.err_reports_sha) {
+    EXPECT_TRUE(sp_str_equal(err.artifact.expected, artifact_sha));
+    EXPECT_TRUE(sp_str_equal(err.artifact.actual, sha));
+  }
+  if (provisions > 1) {
+    EXPECT_TRUE(sp_str_equal(roots[0], roots[1]));
+  }
+}
+
+static void run_resolve_test(s32* utest_result, resolve_test_t t) {
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  spn_artifact_t artifact = {
+    .url = sp_str_view(t.url),
+    .sha256 = sp_str_lit("aaaa"),
+  };
+  EXPECT_STR(spn_artifact_resolve_url(mem, artifact, sp_str_view(t.mirror)), t.expect);
 }
 
 UTEST(sha256, known_vectors) {
-  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  run_sha256_test(utest_result, (sha256_test_t) {
+    .name = "sha256_vectors",
+    .cases = {
+      { .data = "abc", .expect = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" },
+      { .data = "", .expect = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" },
+      { .data = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", .expect = "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1" },
+    },
+  });
+}
 
-  sp_str_t abc = spn_sha256_hex(mem, "abc", 3);
-  EXPECT_STR(abc, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+UTEST(sha256, padding_boundaries) {
+  run_sha256_test(utest_result, (sha256_test_t) {
+    .name = "sha256_padding",
+    .cases = {
+      { .fill = 55, .expect = "9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318" },
+      { .fill = 56, .expect = "b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a" },
+      { .fill = 64, .expect = "ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb" },
+      { .fill = 65, .expect = "635361c48bb9eab14198e76ea8ab7f1a41685d6ad62aa9146d301d4f17eb0ae0" },
+    },
+  });
+}
 
-  sp_str_t empty = spn_sha256_hex(mem, "", 0);
-  EXPECT_STR(empty, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
-
-  sp_str_t longer = spn_sha256_hex(mem, "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", 56);
-  EXPECT_STR(longer, "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
+UTEST(sha256, file_larger_than_chunk) {
+  run_sha256_test(utest_result, (sha256_test_t) {
+    .name = "sha256_large",
+    .cases = {
+      { .fill = 1000000, .file = true, .expect = "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0" },
+    },
+  });
 }
 
 UTEST(sha256, file_matches_bytes) {
-  tmpfs_t fs;
-  tmpfs_init_named(&fs, "sha256_file");
-  sp_mem_t mem = fs.mem;
-
-  tmpfs_create(&fs, sp_str_lit("data.bin"), sp_str_lit("abc"));
-
-  sp_str_t hex = sp_zero;
-  ASSERT_EQ(SPN_OK, spn_sha256_file(mem, tmpfs_get(&fs, sp_str_lit("data.bin")), &hex));
-  EXPECT_STR(hex, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-
-  sp_str_t missing = sp_zero;
-  EXPECT_EQ(SPN_ERROR, spn_sha256_file(mem, tmpfs_get(&fs, sp_str_lit("nope.bin")), &missing));
+  run_sha256_test(utest_result, (sha256_test_t) {
+    .name = "sha256_file",
+    .cases = {
+      { .data = "abc", .file = true, .expect = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" },
+      { .missing = true },
+    },
+  });
 }
 
 UTEST(provision, local_toolchain_is_noop) {
-  provision_fixture_t fixture = sp_zero;
-  provision_fixture_init(utest_result, &fixture, "provision_local");
-
-  spn_toolchain_t local = fixture_local_toolchain("system", "cc");
-  sp_str_t root = sp_str_lit("sentinel");
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &local, &root).status);
-  EXPECT_TRUE(sp_str_empty(root));
-  EXPECT_EQ(0u, fixture.stub.calls);
+  run_provision_test(utest_result, (provision_test_t) {
+    .name = "provision_local",
+    .toolchains = { "system" },
+    .local = true,
+    .expect = { .root_empty = true },
+  });
 }
 
 UTEST(provision, fresh_artifact_downloads_and_extracts) {
-  provision_fixture_t fixture = sp_zero;
-  provision_fixture_init(utest_result, &fixture, "provision_fresh");
-  spn_toolchain_t toolchain = provision_fixture_toolchain(&fixture);
-
-  sp_str_t root = sp_zero;
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &toolchain, &root).status);
-
-  sp_str_t expected = sp_fs_join_path(fixture.mem, fixture.store.dir, fixture.sha);
-  EXPECT_TRUE(sp_str_equal(root, expected));
-  EXPECT_TRUE(sp_fs_is_dir(root));
-  EXPECT_TRUE(sp_fs_is_file(sp_fs_join_path(fixture.mem, root, sp_str_lit("zig"))));
-  EXPECT_TRUE(sp_fs_is_file(sp_fs_join_path(fixture.mem, root, sp_str_lit("lib/std.zig"))));
-  EXPECT_EQ(1u, fixture.stub.calls);
+  run_provision_test(utest_result, (provision_test_t) {
+    .name = "provision_fresh",
+    .expect = {
+      .calls = 1,
+      .root_in_store = true,
+      .extracted = true,
+    },
+  });
 }
 
 UTEST(provision, cached_artifact_skips_fetch) {
-  provision_fixture_t fixture = sp_zero;
-  provision_fixture_init(utest_result, &fixture, "provision_cached");
-  spn_toolchain_t toolchain = provision_fixture_toolchain(&fixture);
-
-  sp_str_t first = sp_zero;
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &toolchain, &first).status);
-  ASSERT_EQ(1u, fixture.stub.calls);
-
-  sp_str_t second = sp_zero;
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &toolchain, &second).status);
-  EXPECT_EQ(1u, fixture.stub.calls);
-  EXPECT_TRUE(sp_str_equal(first, second));
+  run_provision_test(utest_result, (provision_test_t) {
+    .name = "provision_cached",
+    .toolchains = { "zig", "zig" },
+    .expect = { .calls = 1 },
+  });
 }
 
 UTEST(provision, artifacts_share_store_by_sha) {
-  provision_fixture_t fixture = sp_zero;
-  provision_fixture_init(utest_result, &fixture, "provision_shared");
-
-  spn_toolchain_t zig = provision_fixture_toolchain(&fixture);
-  spn_toolchain_t fork = provision_fixture_toolchain(&fixture);
-  fork.name = sp_str_lit("zag");
-
-  sp_str_t zig_root = sp_zero;
-  sp_str_t fork_root = sp_zero;
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &zig, &zig_root).status);
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &fork, &fork_root).status);
-
-  EXPECT_TRUE(sp_str_equal(zig_root, fork_root));
-  EXPECT_EQ(1u, fixture.stub.calls);
+  run_provision_test(utest_result, (provision_test_t) {
+    .name = "provision_shared",
+    .toolchains = { "zig", "zag" },
+    .expect = { .calls = 1 },
+  });
 }
 
 UTEST(provision, sha_mismatch_fails_and_leaves_no_store_entry) {
-  provision_fixture_t fixture = sp_zero;
-  provision_fixture_init(utest_result, &fixture, "provision_mismatch");
-
-  spn_toolchain_t toolchain = provision_fixture_toolchain(&fixture);
-  sp_str_t lie = sp_str_lit("beefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef");
-  sp_opt_set(toolchain.artifact, ((spn_artifact_t) {
-    .url = sp_str_lit("https://tc.example.com/zig-fixture.tar.gz"),
-    .sha256 = lie,
-  }));
-
-  sp_str_t root = sp_zero;
-  spn_toolchain_provision_err_t err = spn_toolchain_provision(&fixture.store, &toolchain, &root);
-  EXPECT_EQ((u32)SPN_TOOLCHAIN_PROVISION_ERR_SHA, (u32)err.status);
-  EXPECT_TRUE(sp_str_equal(err.expected, lie));
-  EXPECT_TRUE(sp_str_equal(err.actual, fixture.sha));
-  EXPECT_FALSE(sp_fs_exists(sp_fs_join_path(fixture.mem, fixture.store.dir, lie)));
-  EXPECT_EQ(1u, fixture.stub.calls);
+  run_provision_test(utest_result, (provision_test_t) {
+    .name = "provision_mismatch",
+    .sha = "beefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef",
+    .expect = {
+      .kind = SPN_ERR_TOOLCHAIN_SHA,
+      .calls = 1,
+      .no_store_entry = true,
+      .err_reports_sha = true,
+    },
+  });
 }
 
 UTEST(provision, corrupt_archive_fails_and_leaves_no_store_entry) {
-  provision_fixture_t fixture = sp_zero;
-  provision_fixture_init(utest_result, &fixture, "provision_corrupt");
-
-  tmpfs_create(&fixture.fs, sp_str_lit("garbage.tar.gz"), sp_str_lit("this is not a tarball"));
-  fixture.stub.tarball = tmpfs_get(&fixture.fs, sp_str_lit("garbage.tar.gz"));
-
-  sp_str_t garbage_sha = sp_zero;
-  ASSERT_EQ(SPN_OK, spn_sha256_file(fixture.mem, fixture.stub.tarball, &garbage_sha));
-
-  spn_toolchain_t toolchain = fixture_local_toolchain("zig", "zig");
-  sp_opt_set(toolchain.artifact, ((spn_artifact_t) {
-    .url = sp_str_lit("https://tc.example.com/garbage.tar.gz"),
-    .sha256 = garbage_sha,
-  }));
-
-  sp_str_t root = sp_zero;
-  EXPECT_EQ((u32)SPN_TOOLCHAIN_PROVISION_ERR_EXTRACT, (u32)spn_toolchain_provision(&fixture.store, &toolchain, &root).status);
-  EXPECT_FALSE(sp_fs_exists(sp_fs_join_path(fixture.mem, fixture.store.dir, garbage_sha)));
+  run_provision_test(utest_result, (provision_test_t) {
+    .name = "provision_corrupt",
+    .tarball = PROVISION_TARBALL_GARBAGE,
+    .expect = {
+      .kind = SPN_ERR_TOOLCHAIN_EXTRACT,
+      .calls = 1,
+      .no_store_entry = true,
+    },
+  });
 }
 
 UTEST(provision, fetch_failure_propagates) {
-  provision_fixture_t fixture = sp_zero;
-  provision_fixture_init(utest_result, &fixture, "provision_fetch_fail");
-  fixture.stub.fail = true;
-
-  spn_toolchain_t toolchain = provision_fixture_toolchain(&fixture);
-  sp_str_t root = sp_zero;
-  spn_toolchain_provision_err_t err = spn_toolchain_provision(&fixture.store, &toolchain, &root);
-  EXPECT_EQ((u32)SPN_TOOLCHAIN_PROVISION_ERR_FETCH, (u32)err.status);
-  EXPECT_FALSE(sp_fs_exists(sp_fs_join_path(fixture.mem, fixture.store.dir, fixture.sha)));
+  run_provision_test(utest_result, (provision_test_t) {
+    .name = "provision_fetch_fail",
+    .fetch_fail = true,
+    .expect = {
+      .kind = SPN_ERR_TOOLCHAIN_FETCH,
+      .calls = 1,
+      .no_store_entry = true,
+    },
+  });
 }
 
 UTEST(provision, mirror_override_rewrites_url) {
-  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-  spn_artifact_t artifact = {
-    .url = sp_str_lit("https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz"),
-    .sha256 = sp_str_lit("aaaa"),
-  };
-
-  sp_str_t resolved = spn_artifact_resolve_url(mem, artifact, sp_str_lit("https://mirror.example.com/zig"));
-  EXPECT_STR(resolved, "https://mirror.example.com/zig/zig-x86_64-linux-0.15.2.tar.xz");
-
-  sp_str_t canonical = spn_artifact_resolve_url(mem, artifact, sp_str_lit(""));
-  EXPECT_STR(canonical, "https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz");
+  run_resolve_test(utest_result, (resolve_test_t) {
+    .url = "https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz",
+    .mirror = "https://mirror.example.com/zig",
+    .expect = "https://mirror.example.com/zig/zig-x86_64-linux-0.15.2.tar.xz",
+  });
+  run_resolve_test(utest_result, (resolve_test_t) {
+    .url = "https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz",
+    .mirror = "https://mirror.example.com/zig/",
+    .expect = "https://mirror.example.com/zig/zig-x86_64-linux-0.15.2.tar.xz",
+  });
+  run_resolve_test(utest_result, (resolve_test_t) {
+    .url = "https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz",
+    .mirror = "",
+    .expect = "https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz",
+  });
+  run_resolve_test(utest_result, (resolve_test_t) {
+    .url = "https://tc.example.com/",
+    .mirror = "https://mirror.example.com",
+    .expect = "https://tc.example.com/",
+  });
 }
 
 UTEST(provision, mirror_used_for_fetch) {
-  provision_fixture_t fixture = sp_zero;
-  provision_fixture_init(utest_result, &fixture, "provision_mirror");
-  fixture.store.mirror = sp_str_lit("https://mirror.example.com/zig");
-
-  spn_toolchain_t toolchain = provision_fixture_toolchain(&fixture);
-  sp_str_t root = sp_zero;
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &toolchain, &root).status);
-  EXPECT_STR(fixture.stub.last_url, "https://mirror.example.com/zig/zig-fixture.tar.gz");
-  EXPECT_EQ(1u, fixture.stub.calls);
+  run_provision_test(utest_result, (provision_test_t) {
+    .name = "provision_mirror",
+    .mirror = "https://mirror.example.com/zig",
+    .expect = {
+      .calls = 1,
+      .last_url = "https://mirror.example.com/zig/zig-fixture.tar.gz",
+    },
+  });
 }
 
 UTEST(provision, broken_mirror_falls_back_to_canonical) {
-  provision_fixture_t fixture = sp_zero;
-  provision_fixture_init(utest_result, &fixture, "provision_mirror_fallback");
-  fixture.store.mirror = sp_str_lit("https://mirror.example.com/zig");
-  fixture.stub.fail_url_containing = sp_str_lit("mirror.example.com");
+  run_provision_test(utest_result, (provision_test_t) {
+    .name = "provision_mirror_fallback",
+    .mirror = "https://mirror.example.com/zig",
+    .fail_url_containing = "mirror.example.com",
+    .expect = {
+      .calls = 2,
+      .last_url = "https://tc.example.com/zig-fixture.tar.gz",
+    },
+  });
+}
 
-  spn_toolchain_t toolchain = provision_fixture_toolchain(&fixture);
-  sp_str_t root = sp_zero;
-  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &toolchain, &root).status);
-  EXPECT_STR(fixture.stub.last_url, "https://tc.example.com/zig-fixture.tar.gz");
-  EXPECT_EQ(2u, fixture.stub.calls);
+UTEST(provision, single_file_archive_fails_extract) {
+  run_provision_test(utest_result, (provision_test_t) {
+    .name = "provision_single_file",
+    .tarball = PROVISION_TARBALL_LOOSE,
+    .expect = {
+      .kind = SPN_ERR_TOOLCHAIN_EXTRACT,
+      .calls = 1,
+      .no_store_entry = true,
+    },
+  });
+}
+
+UTEST(provision, empty_sha_is_rejected) {
+  run_provision_test(utest_result, (provision_test_t) {
+    .name = "provision_empty_sha",
+    .no_sha = true,
+    .expect = { .kind = SPN_ERR_TOOLCHAIN_NO_SHA },
+  });
+}
+
+UTEST(provision, missing_store_dir_is_created) {
+  run_provision_test(utest_result, (provision_test_t) {
+    .name = "provision_no_store_dir",
+    .store_dir = "store/nested/deeper",
+    .expect = {
+      .calls = 1,
+      .extracted = true,
+    },
+  });
+}
+
+UTEST(provision, stale_temp_files_are_ignored) {
+  run_provision_test(utest_result, (provision_test_t) {
+    .name = "provision_stale_temp",
+    .expect = {
+      .calls = 1,
+      .extracted = true,
+    },
+    .stale_temp = true,
+  });
 }
 
 UTEST(provision, store_path_is_content_addressed) {
-  provision_fixture_t fixture = sp_zero;
-  provision_fixture_init(utest_result, &fixture, "provision_store_path");
-
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  spn_toolchain_store_t store = { .mem = mem, .dir = sp_str_lit("/store") };
   spn_artifact_t artifact = { .url = sp_str_lit("https://x/y.tar.gz"), .sha256 = sp_str_lit("cafe") };
-  sp_str_t path = spn_toolchain_store_path(&fixture.store, artifact);
-  EXPECT_TRUE(sp_str_equal(path, sp_fs_join_path(fixture.mem, fixture.store.dir, sp_str_lit("cafe"))));
+  EXPECT_TRUE(sp_str_equal(spn_toolchain_store_path(&store, artifact), sp_fs_join_path(mem, store.dir, sp_str_lit("cafe"))));
 }

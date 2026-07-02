@@ -161,7 +161,12 @@ spn_err_t spn_sha256_file(sp_mem_t mem, sp_str_t path, sp_str_t* hex) {
     u64 bytes_read = 0;
     sp_err_t err = sp_io_read(&reader.base, chunk, sizeof(chunk), &bytes_read);
     if (bytes_read) spn_sha256_update(&ctx, chunk, bytes_read);
-    if (err || bytes_read < sizeof(chunk)) break;
+    if (err == SP_ERR_IO_EOF) break;
+    if (err) {
+      sp_io_file_reader_close(&reader);
+      return SPN_ERROR;
+    }
+    if (!bytes_read) break;
   }
 
   sp_io_file_reader_close(&reader);

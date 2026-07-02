@@ -31,9 +31,13 @@ static spn_toolchain_launcher_t lower_launcher(spn_codegen_ctx_t* ctx, sp_str_t 
 
   if (sp_str_contains(str, sp_str_lit(" "))) {
     sp_da(sp_str_t) parts = sp_str_split_c8(ctx->mem, str, ' ');
-    launcher.program = spn_codegen_intern(ctx, parts[0]);
     launcher.args = sp_da_new(ctx->mem, sp_str_t);
-    for (u32 i = 1; i < sp_da_size(parts); i++) {
+    for (u32 i = 0; i < sp_da_size(parts); i++) {
+      if (sp_str_empty(parts[i])) continue;
+      if (sp_str_empty(launcher.program)) {
+        launcher.program = spn_codegen_intern(ctx, parts[i]);
+        continue;
+      }
       sp_da_push(launcher.args, spn_codegen_intern(ctx, parts[i]));
     }
   } else {

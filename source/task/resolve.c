@@ -58,44 +58,13 @@ spn_err_t apply_config(spn_session_t* session, spn_app_config_t config) {
     .target = { session->profile.arch, session->profile.os, session->profile.abi },
     .host = spn_triple_host(),
   };
-  spn_toolchain_select_err_t select_err = spn_toolchain_select(&session->catalog, query, session->mem, &session->selection);
-  switch (select_err.status) {
-    case SPN_TOOLCHAIN_SELECT_OK: break;
-    case SPN_TOOLCHAIN_SELECT_ERR_UNKNOWN: {
-      spn_log_error("toolchain {.cyan} isn't defined", SP_FMT_STR(select_err.name));
-      return SPN_ERROR;
-    }
-    case SPN_TOOLCHAIN_SELECT_ERR_TARGET: {
-      sp_str_t target = spn_triple_to_str(session->mem, select_err.target);
-
-      sp_io_dyn_mem_writer_t capable;
-      sp_io_dyn_mem_writer_init(session->mem, &capable);
-      bool first = true;
-      sp_str_ht_for_kv(session->catalog.entries, it) {
-        spn_toolchain_t* toolchain = *it.val;
-        if (!spn_toolchain_supports(toolchain, select_err.target, query.host)) continue;
-        if (!first) sp_io_write_str(&capable.base, sp_str_lit(", "), SP_NULLPTR);
-        sp_io_write_str(&capable.base, toolchain->name, SP_NULLPTR);
-        first = false;
-      }
-
-      switch (select_err.role) {
-        case SPN_TOOLCHAIN_ROLE_BUILD: {
-          spn_log_error("toolchain {.cyan} can't target {.yellow}", SP_FMT_STR(select_err.name), SP_FMT_STR(target));
-          break;
-        }
-        case SPN_TOOLCHAIN_ROLE_SCRIPT: {
-          spn_log_error("build scripts compile to {.yellow}, but toolchain {.cyan} can't target it", SP_FMT_STR(target), SP_FMT_STR(select_err.name));
-          break;
-        }
-      }
-
-      if (!first) {
-        sp_str_t names = sp_io_dyn_mem_writer_take_str(&capable);
-        spn_log_error("toolchains that can: {.green}", SP_FMT_STR(names));
-      }
-      return SPN_ERROR;
-    }
+  spn_err_union_t select_err = spn_toolchain_select(&session->catalog, query, session->mem, &session->selection);
+  if (select_err.kind) {
+    spn_event_buffer_push(session->events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR,
+      .err = select_err,
+    });
+    return SPN_ERROR;
   }
 
   session->paths.profile = sp_fs_join_path(session->mem, session->paths.build, session->profile.name);
