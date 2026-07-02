@@ -739,13 +739,12 @@ static jtd_result_t jtd_parse_val(sp_mem_t mem, yyjson_val* root) {
 jtd_err_t jtd_parse_file(sp_mem_t mem, sp_str_t file, jtd_result_t* jtd) {
   sp_str_t json = sp_zero;
   if (sp_io_read_file(mem, file, &json)) {
+    *jtd = sp_zero_s(jtd_result_t);
+    jtd->arena = sp_mem_arena_new(mem);
+    jtd_diag(sp_mem_arena_as_allocator(jtd->arena), &jtd->diag, JTD_ERR_IO, file);
     return JTD_ERR_IO;
   }
 
-  return jtd_parse_2(mem, json, jtd);
-}
-
-jtd_err_t jtd_parse_2(sp_mem_t mem, sp_str_t json, jtd_result_t* jtd) {
   *jtd = jtd_parse(mem, json);
   return jtd->ok ? JTD_OK : JTD_ERR;
 }

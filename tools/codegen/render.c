@@ -1,55 +1,54 @@
 #include "codegen.h"
 
-#define render_try(expr) do { render_result_t _result = (expr); if (_result.err) return _result; } while (0)
-
-static sp_str_t undecorated_name(gen_t* g, sp_str_t name) {
+static sp_str_t undecorated(gen_t* g, sp_str_t name) {
   return sp_fmt(g->mem, "spn_cg_{}", sp_fmt_str(name)).value;
 }
 
-static sp_str_t type_name(gen_t* g, sp_str_t name) {
+static sp_str_t struct_type(gen_t* g, sp_str_t name) {
   return sp_fmt(g->mem, "spn_cg_{}_t", sp_fmt_str(name)).value;
 }
 
-type_t* find_type(gen_t* g, sp_str_t name) {
-  if (!sp_str_om_has(g->types, name)) {
-    return SP_NULLPTR;
-  }
-  return sp_str_om_get(g->types, name);
+static sp_str_t om_type(gen_t* g, sp_str_t name) {
+  return sp_fmt(g->mem, "spn_cg_{}_om_t", sp_fmt_str(name)).value;
 }
 
-sp_str_t node_c_type(gen_t* g, node_t* node) {
-  switch (node->kind) {
-    case NODE_STR:        return sp_str_lit("sp_str_t");
-    case NODE_BOOL:       return sp_str_lit("bool");
-    case NODE_CONVERSION: return node->as.conv.c_type;
-    case NODE_STRUCT:     return type_name(g, node->name);
-  }
-  return sp_str_lit("");
-}
-
-static bool field_is_named(field_t* field) {
+static bool field_named(field_t* field) {
   return !sp_str_empty(field->key_field);
 }
 
-static sp_str_t get_struct_type(gen_t* g, field_t* field) {
-  sp_str_t t = node_c_type(g, field->node);
-  if (field_is_named(field)) {
-    return sp_fmt(g->mem, "spn_cg_{}_om_t", sp_fmt_str(field->node->name)).value;
-  }
-  switch (field->card) {
-    case CARD_ARRAY: return sp_fmt(g->mem, "sp_da({})", sp_fmt_str(t)).value;
-    case CARD_MAP:   return sp_fmt(g->mem, "sp_da({})", sp_fmt_str(type_name(g, field->entry))).value;
-    case CARD_SCALAR:
-      if (!field->required && field->node->use_optional) {
-        return sp_fmt(g->mem, "sp_opt({})", sp_fmt_str(t)).value;
-      }
-      return t;
+static bool field_uses_opt(field_t* field) {
+  return field->kind == FIELD_BOOL || field->kind == FIELD_ENUM;
+}
+
+static sp_str_t value_type(gen_t* g, field_t* field) {
+  switch (field->kind) {
+    case FIELD_STR:    return sp_str_lit("sp_str_t");
+    case FIELD_BOOL:   return sp_str_lit("bool");
+    case FIELD_ENUM:   return sp_fmt(g->mem, "spn_{}_t", sp_fmt_str(field->type_name)).value;
+    case FIELD_STRUCT: return struct_type(g, field->type_name);
   }
   return sp_str_lit("");
 }
 
-static sp_str_t get_is_present(gen_t* g, field_t* field, sp_str_t recv) {
-  if (field_is_named(field)) {
+static sp_str_t field_type(gen_t* g, field_t* field) {
+  if (field_named(field)) {
+    return om_type(g, field->type_name);
+  }
+  switch (field->card) {
+    case CARD_ARRAY: return sp_fmt(g->mem, "sp_da({})", sp_fmt_str(value_type(g, field))).value;
+    case CARD_MAP:   return sp_fmt(g->mem, "sp_da({})", sp_fmt_str(struct_type(g, field->entry))).value;
+    case CARD_SCALAR: {
+      if (!field->required && field_uses_opt(field)) {
+        return sp_fmt(g->mem, "sp_opt({})", sp_fmt_str(value_type(g, field))).value;
+      }
+      return value_type(g, field);
+    }
+  }
+  return sp_str_lit("");
+}
+
+static sp_str_t present_expr(gen_t* g, field_t* field, sp_str_t recv) {
+  if (field_named(field)) {
     return sp_fmt(g->mem, "sp_om_size({}{}) > 0", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
   }
   if (field->required) {
@@ -58,21 +57,21 @@ static sp_str_t get_is_present(gen_t* g, field_t* field, sp_str_t recv) {
   if (field->card == CARD_ARRAY || field->card == CARD_MAP) {
     return sp_fmt(g->mem, "sp_da_size({}{}) > 0", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
   }
-  switch (field->node->kind) {
-    case NODE_STR: {
+  switch (field->kind) {
+    case FIELD_STR: {
       return sp_fmt(g->mem, "!sp_str_empty({}{})", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
     }
-    case NODE_CONVERSION:
-    case NODE_BOOL: {
+    case FIELD_BOOL:
+    case FIELD_ENUM: {
       return sp_fmt(g->mem, "!sp_opt_is_null({}{})", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
     }
-    case NODE_STRUCT: {
-      type_t* object = field->node->as.type;
+    case FIELD_STRUCT: {
+      type_t* object = gen_type(g, field->type_name);
       sp_str_t inner = sp_fmt(g->mem, "{}{}.", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
       sp_io_dyn_mem_writer_t terms;
       sp_io_dyn_mem_writer_init(g->mem, &terms);
       sp_da_for(object->fields, it) {
-        sp_fmt_io(&terms.base, it ? " || {}" : "{}", sp_fmt_str(get_is_present(g, &object->fields[it], inner)));
+        sp_fmt_io(&terms.base, it ? " || {}" : "{}", sp_fmt_str(present_expr(g, &object->fields[it], inner)));
       }
       return sp_fmt(g->mem, "({})", sp_fmt_str(sp_io_dyn_mem_writer_as_str(&terms))).value;
     }
@@ -81,66 +80,63 @@ static sp_str_t get_is_present(gen_t* g, field_t* field, sp_str_t recv) {
 }
 
 static void field_templates(field_t* field, sp_str_t* read, sp_str_t* write) {
-  if (field_is_named(field)) {
+  if (field_named(field)) {
     *read = sp_str_lit("read/named_field");
     *write = sp_str_lit("write/named");
     return;
   }
   if (field->card == CARD_ARRAY) {
-    bool object = field->node->kind == NODE_STRUCT;
+    bool object = field->kind == FIELD_STRUCT;
     *read = object ? sp_str_lit("read/object_array") : sp_str_lit("read/str_array");
     *write = object ? sp_str_lit("write/object_array") : sp_str_lit("write/str_array");
     return;
   }
   if (field->card == CARD_MAP) {
-    bool object = field->node->kind == NODE_STRUCT;
     *read = sp_str_lit("read/map_field");
-    *write = object ? sp_str_lit("write/map_object") : sp_str_lit("write/map_str");
+    *write = field->kind == FIELD_STRUCT ? sp_str_lit("write/map_object") : sp_str_lit("write/map_str");
     return;
   }
-  switch (field->node->kind) {
-    case NODE_STR:
+  switch (field->kind) {
+    case FIELD_STR: {
       *read = field->required ? sp_str_lit("read/str_required") : sp_str_lit("read/str_optional");
       *write = sp_str_lit("write/str");
       return;
-    case NODE_BOOL:
+    }
+    case FIELD_BOOL: {
       *read = field->required ? sp_str_lit("read/bool_required") : sp_str_lit("read/bool_optional");
       *write = field->required ? sp_str_lit("write/bool_required") : sp_str_lit("write/bool_optional");
       return;
-    case NODE_CONVERSION:
+    }
+    case FIELD_ENUM: {
       *read = field->required ? sp_str_lit("read/conv_required") : sp_str_lit("read/conv_optional");
       *write = field->required ? sp_str_lit("write/conv_required") : sp_str_lit("write/conv_optional");
       return;
-    case NODE_STRUCT:
+    }
+    case FIELD_STRUCT: {
       *read = sp_str_lit("read/object_field");
       *write = sp_str_lit("write/object");
       return;
+    }
   }
-}
-
-static void bind_conversion(sp_template_scope_t* scope, node_t* node) {
-  converter_t* conv = &node->as.conv;
-  sp_template_set(scope, sp_str_lit("from"), conv->from);
-  sp_template_set(scope, sp_str_lit("to"), conv->to);
 }
 
 static void bind_field(gen_t* g, sp_template_scope_t* scope, field_t* field) {
-  node_t* node = field->node;
   sp_template_set(scope, sp_str_lit("key"), field->key);
 
-  if (node->kind == NODE_CONVERSION) {
-    bind_conversion(scope, node);
+  if (field->kind == FIELD_ENUM) {
+    sp_template_set(scope, sp_str_lit("from"), sp_fmt(g->mem, "spn_{}_from_str", sp_fmt_str(field->type_name)).value);
+    sp_template_set(scope, sp_str_lit("to"), sp_fmt(g->mem, "spn_{}_to_str", sp_fmt_str(field->type_name)).value);
   }
-  if (node->kind == NODE_STRUCT) {
-    sp_template_set(scope, sp_str_lit("object"), node->name);
-    sp_template_set(scope, sp_str_lit("type"), node_c_type(g, node));
+  if (field->kind == FIELD_STRUCT) {
+    sp_template_set(scope, sp_str_lit("object"), field->type_name);
+    sp_template_set(scope, sp_str_lit("type"), struct_type(g, field->type_name));
     sp_template_set(scope, sp_str_lit("required"), field->required ? sp_str_lit("true") : sp_str_lit("false"));
   }
   if (field->card == CARD_MAP) {
     sp_template_set(scope, sp_str_lit("entry"), field->entry);
-    sp_template_set(scope, sp_str_lit("entry_type"), type_name(g, field->entry));
+    sp_template_set(scope, sp_str_lit("entry_type"), struct_type(g, field->entry));
   }
-  if (field_is_named(field)) {
+  if (field_named(field)) {
     sp_template_set(scope, sp_str_lit("key_field"), field->key_field);
   }
 
@@ -149,200 +145,192 @@ static void bind_field(gen_t* g, sp_template_scope_t* scope, field_t* field) {
   field_templates(field, &read, &write);
   sp_template_set(scope, sp_str_lit("read"), read);
   sp_template_set(scope, sp_str_lit("write"), write);
-  bool guarded = !field->required || field_is_named(field);
+
+  bool guarded = !field->required || field_named(field);
   sp_template_set(scope, sp_str_lit("write_field"), guarded ? sp_str_lit("write_opt") : sp_str_lit("write_req"));
   if (guarded) {
-    sp_template_set(scope, sp_str_lit("present"), get_is_present(g, field, sp_str_lit("in->")));
+    sp_template_set(scope, sp_str_lit("present"), present_expr(g, field, sp_str_lit("in->")));
   }
 }
 
-static render_result_t render(sp_io_writer_t* out, sp_template_registry_t* reg, const c8* key, sp_template_scope_t* scope) {
+static bool render(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg, const c8* name, sp_template_scope_t* scope) {
   sp_str_t source = sp_zero;
-  if (!sp_template_get(reg, sp_cstr_as_str(key), &source)) {
-    return (render_result_t) {
-      .err = RENDER_ERR_TEMPLATE_MISSING,
-      .tmpl = sp_cstr_as_str(key),
-    };
+  if (!sp_template_get(reg, sp_cstr_as_str(name), &source)) {
+    g->err = sp_fmt(g->mem, "failed to find template {.cyan}", sp_fmt_cstr(name)).value;
+    return false;
   }
 
   sp_template_err_t err = sp_template_render(out, source, scope, reg);
   if (err) {
-    return (render_result_t) {
-      .err = RENDER_ERR_TEMPLATE_RENDER,
-      .tmpl = sp_cstr_as_str(key),
-      .code = err,
-    };
+    g->err = sp_fmt(g->mem, "failed to render template {.cyan} with code {.red}", sp_fmt_cstr(name), sp_fmt_int(err)).value;
+    return false;
   }
 
-  return (render_result_t) { .err = RENDER_OK };
+  return true;
 }
 
-static void push_struct_field(gen_t* g, sp_template_scope_t* scope, field_t* field) {
+static void bind_struct_field(sp_template_scope_t* scope, sp_str_t type, sp_str_t name) {
   sp_template_scope_t* child = sp_template_push(scope, sp_str_lit("fields"));
-  sp_template_set(child, sp_str_lit("type"), get_struct_type(g, field));
-  sp_template_set(child, sp_str_lit("name"), field->key);
+  sp_template_set(child, sp_str_lit("type"), type);
+  sp_template_set(child, sp_str_lit("name"), name);
 }
 
-static render_result_t render_object_struct(gen_t* g, sp_io_writer_t* out, type_t* object, sp_template_registry_t* reg) {
+static bool render_struct(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg, type_t* type) {
   sp_template_scope_t* scope = sp_template_scope_create(g->mem);
-  sp_template_set(scope, sp_str_lit("name"), object->name);
-  sp_da_for(object->fields, it) {
-    push_struct_field(g, scope, &object->fields[it]);
+  sp_template_set(scope, sp_str_lit("name"), type->name);
+  sp_da_for(type->fields, it) {
+    field_t* field = &type->fields[it];
+    bind_struct_field(scope, field_type(g, field), field->key);
   }
-  return render(out, reg, "struct", scope);
+  return render(g, out, reg, "struct", scope);
 }
 
-static render_result_t render_entry_struct(gen_t* g, sp_io_writer_t* out, entry_t* entry, sp_template_registry_t* reg) {
+static bool render_entry_struct(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg, entry_t* entry) {
   sp_template_scope_t* scope = sp_template_scope_create(g->mem);
   sp_template_set(scope, sp_str_lit("name"), entry->name);
-
-  sp_template_scope_t* key = sp_template_push(scope, sp_str_lit("fields"));
-  sp_template_set(key, sp_str_lit("type"), sp_str_lit("sp_str_t"));
-  sp_template_set(key, sp_str_lit("name"), sp_str_lit("key"));
-  sp_template_scope_t* value = sp_template_push(scope, sp_str_lit("fields"));
-  sp_template_set(value, sp_str_lit("type"), entry->value_type);
-  sp_template_set(value, sp_str_lit("name"), sp_str_lit("value"));
-
-  return render(out, reg, "struct", scope);
+  bind_struct_field(scope, sp_str_lit("sp_str_t"), sp_str_lit("key"));
+  bind_struct_field(scope, entry->kind == FIELD_STRUCT ? struct_type(g, entry->object) : sp_str_lit("sp_str_t"), sp_str_lit("value"));
+  return render(g, out, reg, "struct", scope);
 }
 
-static render_result_t render_object_read(gen_t* g, sp_io_writer_t* out, type_t* object, sp_template_registry_t* reg) {
-  sp_template_scope_t* read_scope = sp_template_scope_create(g->mem);
-  sp_template_set(read_scope, sp_str_lit("name"), object->name);
-  sp_template_set(read_scope, sp_str_lit("type"), type_name(g, object->name));
-  sp_da_for(object->fields, it) {
-    sp_template_scope_t* child = sp_template_push(read_scope, sp_str_lit("fields"));
-    bind_field(g, child, &object->fields[it]);
+static bool render_object(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg, type_t* type, const c8* tmpl) {
+  sp_template_scope_t* scope = sp_template_scope_create(g->mem);
+  sp_template_set(scope, sp_str_lit("name"), type->name);
+  sp_template_set(scope, sp_str_lit("type"), struct_type(g, type->name));
+  sp_da_for(type->fields, it) {
+    bind_field(g, sp_template_push(scope, sp_str_lit("fields")), &type->fields[it]);
   }
-  return render(out, reg, "read", read_scope);
+  return render(g, out, reg, tmpl, scope);
 }
 
-static render_result_t render_object_write(gen_t* g, sp_io_writer_t* out, type_t* object, sp_template_registry_t* reg) {
-  sp_template_scope_t* write_scope = sp_template_scope_create(g->mem);
-  sp_template_set(write_scope, sp_str_lit("name"), object->name);
-  sp_template_set(write_scope, sp_str_lit("type"), type_name(g, object->name));
-  sp_da_for(object->fields, it) {
-    sp_template_scope_t* child = sp_template_push(write_scope, sp_str_lit("fields"));
-    bind_field(g, child, &object->fields[it]);
+bool render_types(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
+  if (!render(g, out, reg, "header", sp_template_scope_create(g->mem))) {
+    return false;
   }
-  return render(out, reg, "write", write_scope);
-}
-
-render_result_t render_types(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
-  render_try(render(out, reg, "header", sp_template_scope_create(g->mem)));
 
   sp_template_scope_t* tags = sp_template_scope_create(g->mem);
   sp_om_for(g->types, it) {
-    sp_template_scope_t* child = sp_template_push(tags, sp_str_lit("tags"));
-    sp_template_set(child, sp_str_lit("name"), undecorated_name(g, sp_str_om_at(g->types, it)->name));
+    sp_template_set(sp_template_push(tags, sp_str_lit("tags")), sp_str_lit("name"), undecorated(g, sp_str_om_at(g->types, it)->name));
   }
   sp_da_for(g->entries, it) {
-    sp_template_scope_t* child = sp_template_push(tags, sp_str_lit("tags"));
-    sp_template_set(child, sp_str_lit("name"), undecorated_name(g, g->entries[it].name));
+    sp_template_set(sp_template_push(tags, sp_str_lit("tags")), sp_str_lit("name"), undecorated(g, g->entries[it].name));
   }
-  render_try(render(out, reg, "tags", tags));
+  if (!render(g, out, reg, "tags", tags)) {
+    return false;
+  }
   sp_fmt_io(out, "\n");
 
-  sp_om_for(g->om_types, it) {
-    om_type_t* om = sp_str_om_at(g->om_types, it);
+  sp_da_for(g->containers.map, it) {
     sp_template_scope_t* scope = sp_template_scope_create(g->mem);
-    sp_template_set(scope, sp_str_lit("object"), om->type->name);
-    sp_template_set(scope, sp_str_lit("type"), type_name(g, om->type->name));
-    render_try(render(out, reg, "named_type", scope));
+    sp_template_set(scope, sp_str_lit("object"), g->containers.map[it].object);
+    sp_template_set(scope, sp_str_lit("type"), struct_type(g, g->containers.map[it].object));
+    if (!render(g, out, reg, "named_type", scope)) {
+      return false;
+    }
   }
   sp_fmt_io(out, "\n");
 
   sp_om_for(g->types, it) {
-    render_try(render_object_struct(g, out, sp_str_om_at(g->types, it), reg));
+    if (!render_struct(g, out, reg, sp_str_om_at(g->types, it))) {
+      return false;
+    }
   }
   sp_da_for(g->entries, it) {
-    render_try(render_entry_struct(g, out, &g->entries[it], reg));
+    if (!render_entry_struct(g, out, reg, &g->entries[it])) {
+      return false;
+    }
   }
 
   sp_fmt_io(out, "\n#endif\n");
-  return (render_result_t) { .err = RENDER_OK };
+  return true;
 }
 
-render_result_t render_decls(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
+bool render_decls(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
   sp_template_scope_t* root = sp_template_scope_create(g->mem);
   sp_template_set(root, sp_str_lit("root_name"), g->root->name);
-  render_try(render(out, reg, "header_fns", root));
-  render_try(render(out, reg, "root_decl", root));
+  if (!render(g, out, reg, "header_fns", root)) {
+    return false;
+  }
+  if (!render(g, out, reg, "root_decl", root)) {
+    return false;
+  }
 
   sp_fmt_io(out, "\n#endif\n");
-  return (render_result_t) { .err = RENDER_OK };
+  return true;
 }
 
-render_result_t render_impl(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
-  sp_template_scope_t* head = sp_template_scope_create(g->mem);
-  sp_template_set(head, sp_str_lit("root_name"), g->root->name);
-  render_try(render(out, reg, "header_impl", head));
+bool render_impl(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
+  sp_template_scope_t* root = sp_template_scope_create(g->mem);
+  sp_template_set(root, sp_str_lit("root_name"), g->root->name);
+  if (!render(g, out, reg, "header_impl", root)) {
+    return false;
+  }
 
   sp_template_scope_t* objects = sp_template_scope_create(g->mem);
   sp_om_for(g->types, it) {
     type_t* type = sp_str_om_at(g->types, it);
     sp_template_scope_t* child = sp_template_push(objects, sp_str_lit("objects"));
     sp_template_set(child, sp_str_lit("name"), type->name);
-    sp_template_set(child, sp_str_lit("type"), type_name(g, type->name));
+    sp_template_set(child, sp_str_lit("type"), struct_type(g, type->name));
   }
-  render_try(render(out, reg, "forward", objects));
+  if (!render(g, out, reg, "forward", objects)) {
+    return false;
+  }
   sp_fmt_io(out, "\n");
 
-  sp_om_for(g->array_types, it) {
-    type_t* type = *sp_str_om_at(g->array_types, it);
+  sp_da_for(g->containers.array, it) {
     sp_template_scope_t* scope = sp_template_scope_create(g->mem);
-    sp_template_set(scope, sp_str_lit("object"), type->name);
-    sp_template_set(scope, sp_str_lit("type"), type_name(g, type->name));
-    render_try(render(out, reg, "read/array", scope));
+    sp_template_set(scope, sp_str_lit("object"), g->containers.array[it]);
+    sp_template_set(scope, sp_str_lit("type"), struct_type(g, g->containers.array[it]));
+    if (!render(g, out, reg, "read/array", scope)) {
+      return false;
+    }
   }
-  sp_om_for(g->om_types, it) {
-    om_type_t* om = sp_str_om_at(g->om_types, it);
+  sp_da_for(g->containers.map, it) {
+    om_type_t* om = &g->containers.map[it];
     sp_template_scope_t* scope = sp_template_scope_create(g->mem);
-    sp_template_set(scope, sp_str_lit("object"), om->type->name);
-    sp_template_set(scope, sp_str_lit("type"), type_name(g, om->type->name));
+    sp_template_set(scope, sp_str_lit("object"), om->object);
+    sp_template_set(scope, sp_str_lit("type"), struct_type(g, om->object));
     sp_template_set(scope, sp_str_lit("key_field"), om->key_field);
-    render_try(render(out, reg, "read/named", scope));
+    if (!render(g, out, reg, "read/named", scope)) {
+      return false;
+    }
   }
-  sp_da_for(g->object_reads, it) {
-    object_read_t* read = &g->object_reads[it];
+  sp_da_for(g->containers.object, it) {
     sp_template_scope_t* scope = sp_template_scope_create(g->mem);
-    sp_template_set(scope, sp_str_lit("object"), read->object);
-    sp_template_set(scope, sp_str_lit("type"), type_name(g, read->owner));
-    render_try(render(out, reg, "read/object", scope));
+    sp_template_set(scope, sp_str_lit("object"), g->containers.object[it]);
+    sp_template_set(scope, sp_str_lit("type"), struct_type(g, g->containers.object[it]));
+    if (!render(g, out, reg, "read/object", scope)) {
+      return false;
+    }
   }
   sp_da_for(g->entries, it) {
     entry_t* entry = &g->entries[it];
-    bool object = !sp_str_empty(entry->object);
     sp_template_scope_t* scope = sp_template_scope_create(g->mem);
     sp_template_set(scope, sp_str_lit("entry"), entry->name);
-    sp_template_set(scope, sp_str_lit("entry_type"), type_name(g, entry->name));
-    if (object) {
+    sp_template_set(scope, sp_str_lit("entry_type"), struct_type(g, entry->name));
+    if (entry->kind == FIELD_STRUCT) {
       sp_template_set(scope, sp_str_lit("object"), entry->object);
     }
-    render_try(render(out, reg, object ? "read/map_object" : "read/map_str", scope));
+    if (!render(g, out, reg, entry->kind == FIELD_STRUCT ? "read/map_object" : "read/map_str", scope)) {
+      return false;
+    }
   }
   sp_fmt_io(out, "\n");
 
   sp_om_for(g->types, it) {
     type_t* type = sp_str_om_at(g->types, it);
-    render_try(render_object_read(g, out, type, reg));
-    render_try(render_object_write(g, out, type, reg));
+    if (!render_object(g, out, reg, type, "read")) {
+      return false;
+    }
+    if (!render_object(g, out, reg, type, "write")) {
+      return false;
+    }
   }
 
-  sp_template_scope_t* root = sp_template_scope_create(g->mem);
-  sp_template_set(root, sp_str_lit("root_name"), g->root->name);
-  return render(out, reg, "root_impl", root);
-}
-
-sp_str_t render_result_to_str(sp_mem_t mem, render_result_t result) {
-  switch (result.err) {
-    case RENDER_OK:
-      return sp_str_lit("ok");
-    case RENDER_ERR_TEMPLATE_MISSING:
-      return sp_fmt(mem, "failed to find template {.cyan}", sp_fmt_str(result.tmpl)).value;
-    case RENDER_ERR_TEMPLATE_RENDER:
-      return sp_fmt(mem, "failed to render template {.cyan} with code {.red}",
-        sp_fmt_str(result.tmpl), sp_fmt_int(result.code)).value;
+  if (!render(g, out, reg, "root_read", root)) {
+    return false;
   }
-  return sp_str_lit("unknown error");
+  sp_fmt_io(out, "\n");
+  return render(g, out, reg, "root_write", root);
 }
