@@ -180,6 +180,7 @@ static spn_err_t load_package(
           .name = name,
           .path = loaded->paths.manifest,
           .error = spn_codegen_issues_message(spn.mem, ctx.issues),
+          .issues = ctx.issues,
         }});
       return SPN_ERROR;
     }

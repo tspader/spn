@@ -14,9 +14,12 @@ typedef struct {
 
 typedef sp_str_ht(spn_registry_pkg_t) spn_pkg_registry_t;
 
+typedef struct spn_codegen_issue spn_codegen_issue_t;
+
 typedef struct {
   sp_str_t manifest;
   sp_str_t error;
+  sp_da(spn_codegen_issue_t) issues;
 } spn_registry_err_t;
 
 #endif

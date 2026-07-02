@@ -21,6 +21,7 @@
 // SPN
 #include "spn.h"
 
+#include "ctx/ctx.h"
 #include "ctx/types.h"
 #include "forward/types.h"
 #include "unit/types.h"
@@ -378,8 +379,13 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
     if (load_err) {
       spn_log_error("{.red}: failed to parse manifest because of the following:", sp_fmt_cstr("error"));
-      sp_da_for(ctx.issues, it) {
-        spn_log_error("- {}", SP_FMT_STR(spn_codegen_issue_message(spn.mem, &ctx.issues[it])));
+      if (spn_ctx_get_log_level() >= SPN_LOG_LEVEL_ERROR) {
+        sp_io_writer_t* err = spn_ctx_get_log_err();
+        sp_da_for(ctx.issues, it) {
+          sp_io_write_str(err, sp_str_lit("- "), SP_NULLPTR);
+          spn_codegen_issue_write(err, &ctx.issues[it]);
+          sp_io_write_new_line(err);
+        }
       }
       return SP_APP_ERR;
     }
@@ -421,6 +427,7 @@ static void spn_prompt_start(void) {
   tui->prompt.app = (sp_app_t) { .user_data = tui->prompt.ctx };
   sp_prompt_app_on_init(&tui->prompt.app);
   tui->prompt.on = true;
+  spn_tui_attach_prompt(tui, tui->prompt.ctx);
 }
 
 static void spn_prompt_pump(void) {
@@ -476,21 +483,7 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
     }
 
     // write to tui (filtered by verbosity inside the renderer)
-    {
-      sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      sp_str_t rendered = spn_tui_render_coarse_event(s.mem, event);
-      if (!sp_str_empty(rendered)) {
-        sp_da(sp_str_t) lines = sp_str_split_c8(s.mem, sp_str_trim_right(rendered), '\n');
-        sp_da_for(lines, it) {
-          if (spn.tui.prompt.on) {
-            sp_prompt_log_str(spn.tui.prompt.ctx, lines[it]);
-          } else {
-            sp_io_write_line(&spn.logger.err.base, lines[it]);
-          }
-        }
-      }
-      sp_mem_end_scratch(s);
-    }
+    spn_tui_log_event(event);
   }
 
   sp_mem_end_scratch(scratch);
@@ -586,6 +579,7 @@ void spn_deinit(sp_app_t* sp) {
         sp_prompt_complete(spn.tui.prompt.ctx);
         sp_prompt_end(spn.tui.prompt.ctx);
         spn.tui.prompt.on = false;
+        spn_tui_detach_prompt(&spn.tui);
       }
       sp_tui_flush();
       break;

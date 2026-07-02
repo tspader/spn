@@ -1,11 +1,13 @@
 #include "sp.h"
 #include "sp/macro.h"
+#include "ctx/ctx.h"
 #include "ctx/types.h"
 
 #include "cli/cli.h"
 #include "codegen/codegen.h"
 #include "index/publish.h"
 #include "log/log.h"
+#include "sp/io.h"
 
 sp_cli_result_t spn_cli_publish(sp_cli_t* cli) {
   spn_cli_publish_t* cmd = &spn.cli.publish;
@@ -58,8 +60,13 @@ sp_cli_result_t spn_cli_publish(sp_cli_t* cli) {
       }
       case SPN_ERR_MANIFEST_ISSUES: {
         spn_log_error("invalid manifest:");
-        sp_da_for(result.issues, it) {
-          spn_log_error("- {}", SP_FMT_STR(spn_codegen_issue_message(spn.mem, &result.issues[it])));
+        if (spn_ctx_get_log_level() >= SPN_LOG_LEVEL_ERROR) {
+          sp_io_writer_t* err = spn_ctx_get_log_err();
+          sp_da_for(result.issues, it) {
+            sp_io_write_str(err, sp_str_lit("- "), SP_NULLPTR);
+            spn_codegen_issue_write(err, &result.issues[it]);
+            sp_io_write_new_line(err);
+          }
         }
         break;
       }
