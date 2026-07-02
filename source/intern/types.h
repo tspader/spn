@@ -32,6 +32,7 @@ struct sp_intern_t {
   sp_intern_index_t index;
   sp_intern_hash_fn_t hash;
   u32 next_id;
+  sp_mutex_t mutex;
 };
 
 #endif
