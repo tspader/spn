@@ -42,13 +42,6 @@ compiler = "gcc"
 linker = "ld"
 archiver = "ar"
 driver = "gcc"
-version = "13.2"
-export = true
-
-[[toolchain.host]]
-arch = "x86_64"
-os = "linux"
-abi = "gnu"
 
 [[toolchain.target]]
 arch = "aarch64"

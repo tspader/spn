@@ -15,37 +15,18 @@
 #include "resolve/resolve.h"
 #include "semver/convert.h"
 #include "session/session.h"
+#include "spn.embed.h"
 #include "task/task.h"
-#include "toolchain/types.h"
+#include "toolchain/toolchain.h"
+#include "triple/triple.h"
 #include "unit/types.h"
 
 spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
-  sp_str_ht_init(session->mem, session->toolchains);
+  sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
+  spn_try(spn_toolchain_catalog_init(&session->toolchains, builtins, spn_triple_host(), session->mem));
 
   sp_str_om_for(root->toolchains, it) {
-    spn_toolchain_entry_t entry = *sp_str_om_at(root->toolchains, it);
-    sp_str_ht_insert(session->toolchains, entry.name, entry);
-  }
-
-  sp_da_for(spn.toolchains, it) {
-    sp_str_ht_insert(session->toolchains, spn.toolchains[it].name, spn.toolchains[it]);
-  }
-
-  spn_toolchain_entry_t builtin_toolchains[] = {
-    {
-      .name = sp_str_lit("builtin"),
-      .kind = SPN_TOOLCHAIN_SYSTEM,
-      .info = {
-        .compiler = { .program = sp_str_lit("cc") },
-        .linker   = { .program = sp_str_lit("cc") },
-        .archiver = { .program = sp_str_lit("ar") },
-        .driver = SPN_CC_DRIVER_GCC,
-      },
-    }
-  };
-  sp_carr_for(builtin_toolchains, it) {
-    spn_toolchain_entry_t entry = builtin_toolchains[it];
-    sp_str_ht_insert(session->toolchains, entry.name, entry);
+    spn_toolchain_catalog_add(&session->toolchains, *sp_str_om_at(root->toolchains, it));
   }
 
   // Build the list of available profiles
@@ -71,10 +52,24 @@ spn_err_t apply_config(spn_session_t* session, spn_app_config_t config) {
     return SPN_ERROR;
   }
 
-  if (!sp_str_ht_exists(session->toolchains, session->profile.toolchain)) {
-    sp_str_t name = session->profile.toolchain;
-    spn_log_error("toolchain {.cyan} isn't defined", SP_FMT_STR(name));
-    return SPN_ERROR;
+  spn_toolchain_query_t query = {
+    .build = session->profile.toolchain,
+    .script = sp_str_lit("zig"),
+    .target = { session->profile.arch, session->profile.os, session->profile.abi },
+    .host = spn_triple_host(),
+  };
+  spn_toolchain_select_err_t select_err = spn_toolchain_select(&session->toolchains, query, session->mem, &session->selection);
+  switch (select_err.status) {
+    case SPN_TOOLCHAIN_SELECT_OK: break;
+    case SPN_TOOLCHAIN_SELECT_ERR_UNKNOWN: {
+      spn_log_error("toolchain {.cyan} isn't defined", SP_FMT_STR(select_err.name));
+      return SPN_ERROR;
+    }
+    case SPN_TOOLCHAIN_SELECT_ERR_TARGET: {
+      sp_str_t target = spn_triple_to_str(session->mem, select_err.target);
+      spn_log_error("toolchain {.cyan} can't target {.yellow}", SP_FMT_STR(select_err.name), SP_FMT_STR(target));
+      return SPN_ERROR;
+    }
   }
 
   session->paths.profile = sp_fs_join_path(session->mem, session->paths.build, session->profile.name);

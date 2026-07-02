@@ -23,31 +23,8 @@ standard = "c11"
 mode = "debug"
 
 [profile.musl]
-toolchain = "musl-gcc"
-
-[[toolchain]]
-package = "zig"
-version = "0.15.2"
-
-[[toolchain]]
-package = "musl-gcc"
-version = "1.0.0"
-
-
-[[toolchain]]
-name = "system"
-compiler = "gcc"
-linker = "ld"
-archiver = "ar"
-driver = "gcc"
-export = true
-host = [
-  { arch = "x86_64", os = "linux", abi = "gnu" },
-  { arch = "x86_64", os = "linux", abi = "musl" }
-]
-target = [
-  { arch = "x86_64", os = "linux", abi = "gnu" }
-]
+toolchain = "zig"
+abi = "musl"
 
 [[toolchain]]
 name = "mingw"
@@ -55,11 +32,6 @@ compiler = "x86_64-w64-mingw32-gcc"
 linker = "x86_64-w64-mingw32-ld"
 archiver = "x86_64-w64-mingw32-ar"
 driver = "gcc"
-export = true
-host = [
-  { arch = "x86_64", os = "linux", abi = "gnu" },
-  { arch = "x86_64", os = "linux", abi = "musl" }
-]
 target = [
   { arch = "x86_64", os = "windows", abi = "mingw" }
 ]

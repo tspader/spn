@@ -3,7 +3,6 @@
 
 #include "sp.h"
 #include "spn.h"
-#include "semver/types.h"
 
 typedef enum {
   SPN_CC_DRIVER_NONE,
@@ -12,38 +11,28 @@ typedef enum {
   SPN_CC_DRIVER_MSVC,
 } spn_cc_driver_t;
 
-typedef enum {
-  SPN_TOOLCHAIN_SYSTEM,
-  SPN_TOOLCHAIN_REMOTE,
-} spn_toolchain_kind_t;
-
 typedef struct {
   sp_str_t program;
   sp_da(sp_str_t) args;
 } spn_toolchain_launcher_t;
 
-#define SPN_TOOLCHAIN_MAX_HOSTS 8
-#define SPN_TOOLCHAIN_MAX_TARGETS 16
+typedef struct {
+  sp_str_t url;
+  sp_str_t sha256;
+  sp_str_t mirrors;
+} spn_artifact_t;
 
-typedef struct spn_toolchain_info {
+typedef struct spn_toolchain {
   sp_str_t name;
   sp_str_t version;
-  sp_str_t url;
-  sp_str_t sha;
+  spn_cc_driver_t driver;
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
-  sp_str_t sysroot;
-  spn_cc_driver_t driver;
-  spn_triple_t hosts [8];
-  spn_triple_t targets [16];
-  bool export;
-} spn_toolchain_info_t;
+  sp_da(spn_triple_t) targets;
+  sp_opt(spn_artifact_t) artifact;
+} spn_toolchain_t;
 
-typedef struct spn_toolchain_entry {
-  sp_str_t name;
-  spn_toolchain_kind_t kind;
-  spn_toolchain_info_t info;
-} spn_toolchain_entry_t;
+typedef sp_str_ht(spn_toolchain_t) spn_toolchain_catalog_t;
 
 #endif

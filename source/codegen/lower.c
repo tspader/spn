@@ -155,27 +155,27 @@ static void lower_toolchains(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg
   sp_da_for(cg->toolchain, n) {
     const spn_cg_manifest_toolchain_t* t = &cg->toolchain[n];
 
-    if (!sp_str_empty(t->package)) continue;
+    spn_toolchain_t toolchain = sp_zero;
+    toolchain.name = t->name;
+    toolchain.driver = sp_opt_is_null(t->driver) ? SPN_CC_DRIVER_NONE : sp_opt_get(t->driver);
+    toolchain.compiler = lower_launcher(ctx, t->compiler);
+    toolchain.linker = lower_launcher(ctx, t->linker);
+    toolchain.archiver = lower_launcher(ctx, t->archiver);
 
-    spn_toolchain_entry_t entry = sp_zero;
-    entry.name = t->name;
-    entry.kind = sp_str_empty(t->url) ? SPN_TOOLCHAIN_SYSTEM : SPN_TOOLCHAIN_REMOTE;
-    entry.info.name = t->name;
-    entry.info.url = t->url;
-    entry.info.compiler = lower_launcher(ctx, t->compiler);
-    entry.info.linker = lower_launcher(ctx, t->linker);
-    entry.info.archiver = lower_launcher(ctx, t->archiver);
-    entry.info.sysroot = t->sysroot;
-    entry.info.driver = sp_opt_is_null(t->driver) ? SPN_CC_DRIVER_NONE : sp_opt_get(t->driver);
-    entry.info.export = sp_opt_is_null(t->export) ? false : sp_opt_get(t->export);
-    for (u32 i = 0; i < sp_da_size(t->host) && i < SPN_TOOLCHAIN_MAX_HOSTS; i++) {
-      entry.info.hosts[i] = lower_triple(&t->host[i]);
-    }
-    for (u32 i = 0; i < sp_da_size(t->target) && i < SPN_TOOLCHAIN_MAX_TARGETS; i++) {
-      entry.info.targets[i] = lower_triple(&t->target[i]);
+    if (!sp_str_empty(t->url)) {
+      sp_opt_set(toolchain.artifact, ((spn_artifact_t) {
+        .url = t->url,
+        .sha256 = t->sha256,
+        .mirrors = t->mirrors,
+      }));
     }
 
-    sp_str_om_insert(out->toolchains, entry.name, entry);
+    toolchain.targets = sp_da_new(ctx->mem, spn_triple_t);
+    sp_da_for(t->target, i) {
+      sp_da_push(toolchain.targets, lower_triple(&t->target[i]));
+    }
+
+    sp_str_om_insert(out->toolchains, toolchain.name, toolchain);
   }
 }
 
@@ -300,9 +300,6 @@ static void validate_inline_toolchains(spn_codegen_ctx_t* ctx, const spn_cg_mani
   spn_codegen_push_key(ctx, "toolchain");
   sp_da_for(cg->toolchain, it) {
     const spn_cg_manifest_toolchain_t* t = &cg->toolchain[it];
-    if (!sp_str_empty(t->package)) {
-      continue;
-    }
 
     spn_codegen_push_index(ctx, it);
     if (sp_str_empty(t->name))     { spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "name"); }
@@ -312,8 +309,9 @@ static void validate_inline_toolchains(spn_codegen_ctx_t* ctx, const spn_cg_mani
     if (sp_opt_is_null(t->driver) || sp_opt_get(t->driver) == SPN_CC_DRIVER_NONE) {
       spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "driver");
     }
-    if (!sp_da_size(t->host))   { spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "host"); }
-    if (!sp_da_size(t->target)) { spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "target"); }
+    if (!sp_str_empty(t->url) && sp_str_empty(t->sha256)) {
+      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "sha256");
+    }
     spn_codegen_pop(ctx);
   }
   spn_codegen_pop(ctx);

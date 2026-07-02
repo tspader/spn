@@ -72,11 +72,13 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_info_t* pkg) {
     fingerprint.os = session->profile.os;
     fingerprint.abi = session->profile.abi;
 
-    spn_toolchain_unit_t* toolchain = session->units.toolchain;
-    fingerprint.toolchain.cc = sp_hash_str(toolchain->info.compiler.program);
-    fingerprint.toolchain.ld = sp_hash_str(toolchain->info.linker.program);
-    fingerprint.toolchain.ar = sp_hash_str(toolchain->info.archiver.program);
-    fingerprint.toolchain.url = sp_hash_str(toolchain->info.url);
+    spn_toolchain_t* toolchain = session->units.toolchain->toolchain;
+    fingerprint.toolchain.cc = sp_hash_str(toolchain->compiler.program);
+    fingerprint.toolchain.ld = sp_hash_str(toolchain->linker.program);
+    fingerprint.toolchain.ar = sp_hash_str(toolchain->archiver.program);
+    if (!sp_opt_is_null(toolchain->artifact)) {
+      fingerprint.toolchain.url = sp_hash_str(sp_opt_get(toolchain->artifact).sha256);
+    }
   }
 
   fingerprint_t id = SP_ZERO_INITIALIZE();

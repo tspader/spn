@@ -1,7 +1,7 @@
 {
   "definitions": {
-    "arch": { "enum": ["x86_64", "aarch64"] },
-    "os": { "enum": ["windows", "linux", "macos"] },
+    "arch": { "enum": ["x86_64", "aarch64", "wasm32"] },
+    "os": { "enum": ["windows", "linux", "macos", "wasi"] },
     "abi": { "enum": ["gnu", "musl", "msvc", "mingw"] },
     "cc_driver": { "enum": ["gcc", "clang", "msvc"] },
     "linkage": { "enum": ["shared", "static", "source", "object"] },
@@ -75,15 +75,12 @@
       "optionalProperties": {
         "name": { "type": "string" },
         "url": { "type": "string" },
+        "sha256": { "type": "string" },
+        "mirrors": { "type": "string" },
         "compiler": { "type": "string" },
         "linker": { "type": "string" },
         "archiver": { "type": "string" },
-        "sysroot": { "type": "string" },
         "driver": { "ref": "cc_driver" },
-        "package": { "type": "string" },
-        "version": { "type": "string" },
-        "export": { "type": "boolean" },
-        "host": { "elements": { "ref": "triple" } },
         "target": { "elements": { "ref": "triple" } }
       }
     },
@@ -144,17 +141,16 @@
     "toolchain": {
       "properties": {
         "name":     { "type": "string" },
-        "version":  { "type": "string" },
         "driver":   { "ref": "cc_driver" },
         "compiler": { "ref": "launcher" },
         "linker":   { "ref": "launcher" },
-        "archiver": { "ref": "launcher" },
-        "host":     { "values": { "ref": "download" } },
-        "target":   { "elements": { "ref": "triple" } }
+        "archiver": { "ref": "launcher" }
       },
       "optionalProperties": {
-        "sysroot": { "type": "string" },
-        "mirrors": { "type": "string" }
+        "version":  { "type": "string" },
+        "host":     { "values": { "ref": "download" } },
+        "target":   { "elements": { "ref": "triple" } },
+        "mirrors":  { "type": "string" }
       }
     }
   }

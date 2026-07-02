@@ -32,39 +32,38 @@
 #include "unit/types.h"
 #include <unistd.h>
 
-SP_PRIVATE spn_toolchain_unit_t* setup_toolchain_unit(spn_session_t* session, spn_toolchain_entry_t* entry) {
+SP_PRIVATE spn_toolchain_unit_t* setup_toolchain_unit(spn_session_t* session, spn_toolchain_store_t* store, spn_toolchain_t* toolchain) {
   spn_toolchain_unit_t* unit = sp_alloc_type(session->mem, spn_toolchain_unit_t);
   unit->session = session;
-  unit->kind = entry->kind;
-  unit->info = entry->info;
-  unit->pkg = session->pkg;
+  unit->toolchain = toolchain;
 
-  sp_str_t name = entry->name;
+  sp_str_t name = toolchain->name;
   spn_lazy_log_init(&unit->logs.build, sp_fs_join_path(session->mem, spn.paths.log, sp_fmt(session->mem, "toolchain.{}.build.log", sp_fmt_str(name)).value));
   spn_lazy_log_init(&unit->logs.test,  sp_fs_join_path(session->mem, spn.paths.log, sp_fmt(session->mem, "toolchain.{}.test.log",  sp_fmt_str(name)).value));
   spn_lazy_log_init(&unit->logs.jsonl, sp_fs_join_path(session->mem, spn.paths.log, sp_fmt(session->mem, "toolchain.{}.jsonl",     sp_fmt_str(name)).value));
 
-  if (sp_str_empty(entry->info.url)) {
-    unit->compiler = entry->info.compiler;
-    unit->linker = entry->info.linker;
-    unit->archiver = entry->info.archiver;
-    return unit;
+  if (spn_toolchain_provision(store, toolchain, &unit->root)) {
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_SYNC_FAILED,
+      .sync_failed = {
+        .name = name,
+        .url = sp_opt_is_null(toolchain->artifact) ? sp_str_lit("") : sp_opt_get(toolchain->artifact).url,
+        .error = sp_str_lit("failed to provision toolchain"),
+      }
+    });
+    return SP_NULLPTR;
   }
 
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_str_t key = sp_fmt(scratch.mem, "{}-{}-{}", sp_fmt_str(name), sp_fmt_str(entry->info.version), sp_fmt_str(entry->info.sha)).value;
-  sp_str_t store = sp_fs_join_path(session->mem, spn.paths.toolchain, key);
-  sp_mem_end_scratch(scratch);
-  sp_fs_create_dir(store);
-
-  unit->url = entry->info.url;
-  unit->paths.store = store;
-  unit->paths.work = store;
-  unit->paths.stamp = sp_fs_join_path(session->mem, store, sp_str_lit("download.stamp"));
-
-  unit->compiler = spn_toolchain_launcher_with_root(session->mem, entry->info.compiler, store);
-  unit->linker   = spn_toolchain_launcher_with_root(session->mem, entry->info.linker, store);
-  unit->archiver = spn_toolchain_launcher_with_root(session->mem, entry->info.archiver, store);
+  if (sp_str_empty(unit->root)) {
+    unit->compiler = toolchain->compiler;
+    unit->linker = toolchain->linker;
+    unit->archiver = toolchain->archiver;
+  }
+  else {
+    unit->compiler = spn_toolchain_launcher_with_root(session->mem, toolchain->compiler, unit->root);
+    unit->linker   = spn_toolchain_launcher_with_root(session->mem, toolchain->linker, unit->root);
+    unit->archiver = spn_toolchain_launcher_with_root(session->mem, toolchain->archiver, unit->root);
+  }
 
   return unit;
 }
@@ -272,13 +271,22 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     sp_str_ht_insert(session->packages, pkg->qualified, loaded);
   }
 
-  spn_toolchain_entry_t* entry = sp_str_ht_get(session->toolchains, session->profile.toolchain);
-  sp_assert(entry);
-  session->units.toolchain = setup_toolchain_unit(session, entry);
+  spn_toolchain_store_t store = {
+    .mem = session->mem,
+    .dir = spn.paths.toolchain,
+    .mirror = sp_env_get(spn.env, sp_str_lit("SPN_MIRROR")),
+    .fetch = spn_fetch_curl,
+  };
 
-  spn_toolchain_entry_t* zig = sp_str_ht_get(session->toolchains, sp_str_lit("zig"));
-  sp_assert(zig);
-  session->units.zig = setup_toolchain_unit(session, zig);
+  sp_da_for(session->selection.required, it) {
+    spn_toolchain_t* toolchain = session->selection.required[it];
+    spn_toolchain_unit_t* unit = setup_toolchain_unit(session, &store, toolchain);
+    if (!unit) return SPN_TASK_ERROR;
+
+    sp_da_push(session->units.toolchains, unit);
+    if (toolchain == session->selection.build)  session->units.toolchain = unit;
+    if (toolchain == session->selection.script) session->units.script = unit;
+  }
 
   add_compilation_units(session, app->resolver);
 

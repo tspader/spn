@@ -51,6 +51,10 @@
       },
       "target": [
         {
+          "arch": "wasm32",
+          "os": "wasi"
+        },
+        {
           "arch": "x86_64",
           "os": "linux",
           "abi": "gnu"
@@ -89,6 +93,19 @@
           "abi": "gnu"
         }
       ]
+    },
+    {
+      "name": "system",
+      "driver": "gcc",
+      "compiler": {
+        "program": "cc"
+      },
+      "linker": {
+        "program": "cc"
+      },
+      "archiver": {
+        "program": "ar"
+      }
     }
   ]
 }

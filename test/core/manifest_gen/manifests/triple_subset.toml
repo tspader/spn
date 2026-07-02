@@ -9,8 +9,5 @@ linker = "ld"
 archiver = "ar"
 driver = "gcc"
 
-[[toolchain.host]]
-os = "linux"
-
 [[toolchain.target]]
 os = "linux"

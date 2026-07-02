@@ -10,13 +10,6 @@
       "linker": "ld",
       "archiver": "ar",
       "driver": "gcc",
-      "host": [
-        {
-          "arch": "x86_64",
-          "os": "linux",
-          "abi": "gnu"
-        }
-      ],
       "target": [
         {
           "arch": "aarch64",

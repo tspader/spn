@@ -73,7 +73,7 @@ typedef struct {
 typedef sp_str_om(spn_target_info_t)     spn_target_info_om_t;
 typedef sp_str_om(spn_profile_info_t)    spn_profile_info_om_t;
 typedef sp_str_om(spn_index_info_t)      spn_index_info_om_t;
-typedef sp_str_om(spn_toolchain_entry_t) spn_toolchain_entry_om_t;
+typedef sp_str_om(spn_toolchain_t) spn_toolchain_om_t;
 
 struct spn_pkg_info {
   sp_str_t namespace;
@@ -97,7 +97,7 @@ struct spn_pkg_info {
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) system_deps;
-  spn_toolchain_entry_om_t toolchains;
+  spn_toolchain_om_t toolchains;
   sp_str_t build;
   sp_str_t configure;
 

@@ -9,11 +9,6 @@ linker = "ld"
 archiver = "ar"
 driver = "gcc"
 
-[[toolchain.host]]
-arch = "x86_64"
-os = "linux"
-abi = "gnu"
-
 [[toolchain.target]]
 arch = "aarch64"
 os = "linux"
