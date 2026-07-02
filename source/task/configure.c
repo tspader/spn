@@ -30,7 +30,6 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
   }
 
   sp_tm_timer_t timer = sp_tm_start_timer();
-  spn_tcc_err_ctx_t error_context = SP_ZERO_INITIALIZE();
 
   spn_cc_t cc;
   spn_cc_init(&cc, spn.mem);
@@ -83,7 +82,7 @@ fail:
     .io = &unit->logs.io,
     .compile_failed = {
       .script_path = unit->paths.script,
-      .error = error_context.error,
+      .error = unit->tcc->error,
     }
   });
   return SPN_ERROR;

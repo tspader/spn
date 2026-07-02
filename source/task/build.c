@@ -61,7 +61,7 @@ void spn_task_init_build_graph(spn_app_t* app) {
     &session->build.graph,
     session->build.dirty,
     (spn_bg_executor_config_t) {
-      .num_threads = 16,
+      .num_threads = 1,
       .enable_logging = false
     }
   );

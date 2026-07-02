@@ -61,7 +61,17 @@ static spn_task_result_t run_script(spn_app_t* app) {
     return SPN_TASK_ERROR;
   }
 
-  sp_ps_output_t result = sp_ps_run(app->session.mem, (sp_ps_config_t) {
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    .kind = SPN_EVENT_TARGET_RUN,
+    .pkg = root->info,
+    .run = {
+      .name = unit->info->name,
+      .command = command,
+    }
+  });
+  spn_poll(spn.sp);
+
+  sp_ps_t ps = sp_ps_create(app->session.mem, (sp_ps_config_t) {
     .command = command,
     .cwd = root->paths.source,
     .io = {
@@ -70,11 +80,12 @@ static spn_task_result_t run_script(spn_app_t* app) {
       .err = { .mode = SP_PS_IO_MODE_INHERIT },
     },
   });
+  sp_ps_status_t status = sp_ps_wait(&ps);
 
-  if (result.status.exit_code) {
+  if (status.exit_code) {
     spn_log_error("script {.yellow} failed with exit code {}",
       SP_FMT_STR(unit->info->name),
-      SP_FMT_S32(result.status.exit_code)
+      SP_FMT_S32(status.exit_code)
     );
     return SPN_TASK_ERROR;
   }
@@ -125,6 +136,14 @@ static spn_task_result_t run_source(spn_app_t* app) {
     (c8*)sp_str_to_cstr(app->session.mem, path),
     SP_NULLPTR,
   };
+
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    .kind = SPN_EVENT_TARGET_RUN,
+    .run = {
+      .command = path,
+    }
+  });
+  spn_poll(spn.sp);
 
   sp_str_t cwd = sp_fs_get_cwd(app->session.mem);
   if (sp_sys_chdir_s(spn.paths.project)) {

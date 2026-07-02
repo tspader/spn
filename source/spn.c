@@ -476,15 +476,6 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
       event->thread_id = *sp_ht_getp(thread_map, event->thread_id);
     }
 
-    // process anything we need to do special per-event
-    switch (event->kind) {
-      case SPN_EVENT_ADD_TARGET: {
-        spn.tui.info.max_name = sp_max(spn.tui.info.max_name, event->target.name.len);
-        break;
-      }
-      default: break;
-    }
-
     // write jsonl (all events, unfiltered)
     spn_event_log_jsonl(&spn.logger.jsonl.base, event);
     if (event->io) {
@@ -495,12 +486,15 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
     // write to tui (filtered by verbosity)
     if (spn_build_event_get_verbosity(event->kind) <= spn.logger.verbosity) {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      sp_str_t line = spn_tui_render_coarse_event(s.mem, event, spn.tui.info.max_name, root_qualified);
-      if (!sp_str_empty(line)) {
-        if (spn.tui.prompt.on) {
-          sp_prompt_log_str(spn.tui.prompt.ctx, line);
-        } else {
-          sp_io_write_line(&spn.logger.err.base, line);
+      sp_str_t rendered = spn_tui_render_coarse_event(s.mem, event, spn.tui.info.max_name, root_qualified);
+      if (!sp_str_empty(rendered)) {
+        sp_da(sp_str_t) lines = sp_str_split_c8(s.mem, sp_str_trim_right(rendered), '\n');
+        sp_da_for(lines, it) {
+          if (spn.tui.prompt.on) {
+            sp_prompt_log_str(spn.tui.prompt.ctx, lines[it]);
+          } else {
+            sp_io_write_line(&spn.logger.err.base, lines[it]);
+          }
         }
       }
       sp_mem_end_scratch(s);

@@ -47,4 +47,14 @@ struct spn_toolchain_catalog_t {
   sp_mem_t mem;
 };
 
+typedef spn_err_t (*spn_fetch_fn)(sp_str_t url, sp_str_t dest, void* user_data);
+
+typedef struct {
+  sp_mem_t mem;
+  sp_str_t dir;
+  sp_str_t mirror;
+  spn_fetch_fn fetch;
+  void* fetch_user_data;
+} spn_toolchain_store_t;
+
 #endif

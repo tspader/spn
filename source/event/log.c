@@ -13,12 +13,8 @@ static s32 event_level(spn_build_event_kind_t kind) {
     case SPN_EVENT_ERR_UNSATISFIABLE_VERSION:
     case SPN_EVENT_ERR_MANIFEST:
     case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED:
-    case SPN_EVENT_BUILD_SCRIPT_FAILED:
     case SPN_EVENT_BUILD_SCRIPT_CRASHED:
-    case SPN_EVENT_DEP_BUILD_FAILED:
     case SPN_EVENT_TARGET_BUILD_FAILED:
-    case SPN_EVENT_TCC_ERROR:
-    case SPN_EVENT_TEST_FAILED:
     case SPN_EVENT_SYNC_FAILED:
     case SPN_EVENT_LINK_FAILED:
     case SPN_EVENT_EMBED_FAILED:
@@ -26,11 +22,8 @@ static s32 event_level(spn_build_event_kind_t kind) {
     case SPN_EVENT_BUILD_FAILED: {
       return SPN_LOG_LEVEL_ERROR;
     }
-    case SPN_EVENT_ADD_TARGET:
-    case SPN_EVENT_ADD_SOURCE:
     case SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK:
     case SPN_EVENT_BUILD_SCRIPT_USER_FN:
-    case SPN_EVENT_DEBUG:
     case SPN_EVENT_API_CALL: {
       return SPN_LOG_LEVEL_DEBUG;
     }
@@ -57,51 +50,10 @@ static void build_schemas(sp_mem_t mem) {
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_sync_t, name, "name", SP_BIND_STR);
       SP_BIND(&b, spn_evt_sync_t, url, "url", SP_BIND_STR);
     }
     schemas[SPN_EVENT_SYNC] = sp_bind_builder_end(&b);
-  }
-
-  // SPN_EVENT_CHECKOUT
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_checkout_t, commit, "commit", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_checkout_t, message, "message", SP_BIND_STR);
-      SP_BIND_OBJECT(&b, spn_evt_checkout_t, version, "version") {
-        SP_BIND(&b, spn_semver_t, major, "major", SP_BIND_U32);
-        SP_BIND(&b, spn_semver_t, minor, "minor", SP_BIND_U32);
-        SP_BIND(&b, spn_semver_t, patch, "patch", SP_BIND_U32);
-      }
-    }
-    schemas[SPN_EVENT_CHECKOUT] = sp_bind_builder_end(&b);
-  }
-
-  // SPN_EVENT_RESOLVE
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_resolve_t, strategy, "strategy", SP_BIND_S32);
-    }
-    schemas[SPN_EVENT_RESOLVE] = sp_bind_builder_end(&b);
-  }
-
-  // SPN_EVENT_CLEAN
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_clean_t, path, "path", SP_BIND_STR);
-    }
-    schemas[SPN_EVENT_CLEAN] = sp_bind_builder_end(&b);
-  }
-
-  // SPN_EVENT_GENERATE
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_generate_t, path, "path", SP_BIND_STR);
-    }
-    schemas[SPN_EVENT_GENERATE] = sp_bind_builder_end(&b);
   }
 
   // SPN_EVENT_BUILD_SCRIPT_PACKAGE
@@ -144,28 +96,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_DEBUG
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_debug_t, message, "message", SP_BIND_STR);
-    }
-    schemas[SPN_EVENT_DEBUG] = sp_bind_builder_end(&b);
-  }
-
-  // SPN_EVENT_TARGET_BUILD (the compile event that carries args)
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_target_build_t, source_file, "source_file", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_target_build_t, object_file, "object_file", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_target_build_t, compiler, "compiler", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_target_build_t, args, "args", SP_BIND_STR);
-    }
-    sp_bind_t* s = sp_bind_builder_end(&b);
-    schemas[SPN_EVENT_TARGET_BUILD] = s;
-  }
-
   // SPN_EVENT_TARGET_BUILD_PASSED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
@@ -191,41 +121,14 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_TARGET_BUILD_FAILED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_DEP_BUILD_FAILED
+  // SPN_EVENT_TARGET_RUN
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_dep_failed_t, out, "out", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_dep_failed_t, err, "err", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_run_t, name, "name", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_run_t, command, "command", SP_BIND_STR);
     }
-    schemas[SPN_EVENT_DEP_BUILD_FAILED] = sp_bind_builder_end(&b);
-  }
-
-  // SPN_EVENT_DEP_BUILD_PASSED
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_dep_passed_t, time, "time_ns", SP_BIND_U64);
-    }
-    schemas[SPN_EVENT_DEP_BUILD_PASSED] = sp_bind_builder_end(&b);
-  }
-
-  // SPN_EVENT_ADD_TARGET (debug: target name + kind)
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_target_add_debug_t, kind, "kind", SP_BIND_S32);
-    }
-    schemas[SPN_EVENT_ADD_TARGET] = sp_bind_builder_end(&b);
-  }
-
-  // SPN_EVENT_ADD_SOURCE
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_target_source_t, source, "source", SP_BIND_STR);
-    }
-    schemas[SPN_EVENT_ADD_SOURCE] = sp_bind_builder_end(&b);
+    schemas[SPN_EVENT_TARGET_RUN] = sp_bind_builder_end(&b);
   }
 
   // SPN_EVENT_INIT_BUILD_GRAPH
@@ -297,30 +200,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_CLI_ENTRY
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_cli_entry_t, command, "command", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_cli_entry_t, profile, "profile", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_cli_entry_t, target, "target", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_cli_entry_t, force, "force", SP_BIND_BOOL);
-      SP_BIND(&b, spn_evt_cli_entry_t, cwd, "cwd", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_cli_entry_t, manifest, "manifest", SP_BIND_STR);
-    }
-    schemas[SPN_EVENT_CLI_ENTRY] = sp_bind_builder_end(&b);
-  }
-
-  // SPN_EVENT_RESOLVE_START
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_resolve_start_t, strategy, "strategy", SP_BIND_S32);
-      SP_BIND(&b, spn_evt_resolve_start_t, num_deps, "num_deps", SP_BIND_U32);
-    }
-    schemas[SPN_EVENT_RESOLVE_START] = sp_bind_builder_end(&b);
-  }
-
   // SPN_EVENT_RESOLVE_PACKAGE
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
@@ -377,10 +256,10 @@ static void build_schemas(sp_mem_t mem) {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
       SP_BIND(&b, spn_evt_sync_pkg_t, name, "name", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_sync_pkg_t, kind, "kind", SP_BIND_S32);
       SP_BIND(&b, spn_evt_sync_pkg_t, url, "url", SP_BIND_STR);
       SP_BIND(&b, spn_evt_sync_pkg_t, source_path, "source_path", SP_BIND_STR);
       SP_BIND(&b, spn_evt_sync_pkg_t, time, "time_ns", SP_BIND_U64);
+      SP_BIND(&b, spn_evt_sync_pkg_t, fetched, "fetched", SP_BIND_BOOL);
     }
     schemas[SPN_EVENT_SYNC_PACKAGE] = sp_bind_builder_end(&b);
   }
@@ -601,44 +480,31 @@ static void json_write_value(sp_io_writer_t* out, sp_bind_field_t* field, void* 
 // Variant pointer — switch on tag, return pointer into the union
 // ============================================================================
 
-// @spader
-// Why is every single one of these not the same
 static void* event_variant_ptr(spn_build_event_t* event) {
   switch (event->kind) {
     case SPN_EVENT_SYNC:                        return &event->sync;
-    case SPN_EVENT_CHECKOUT:                    return &event->checkout;
-    case SPN_EVENT_RESOLVE:                     return &event->resolve;
-    case SPN_EVENT_CLEAN:                       return &event->clean;
-    case SPN_EVENT_GENERATE:                    return &event->generate;
     case SPN_EVENT_BUILD_SCRIPT_COMPILE:        return &event->script_compile;
     case SPN_EVENT_BUILD_SCRIPT_CRASHED:        return &event->crashed;
     case SPN_EVENT_BUILD_SCRIPT_PACKAGE:        return &event->script_package;
     case SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK:   return &event->configure;
     case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED: return &event->compile_failed;
-    case SPN_EVENT_DEBUG:                       return &event->debug;
-    case SPN_EVENT_TARGET_BUILD:                return &event->target.build;
     case SPN_EVENT_TARGET_BUILD_PASSED:         return &event->target.passed;
     case SPN_EVENT_TARGET_BUILD_FAILED:         return &event->target.failed;
-    case SPN_EVENT_DEP_BUILD_PASSED:            return &event->dep.passed;
-    case SPN_EVENT_DEP_BUILD_FAILED:            return &event->dep.failed;
-    case SPN_EVENT_ADD_TARGET:                  return &event->target.add_debug;
-    case SPN_EVENT_ADD_SOURCE:                  return &event->target.source;
+    case SPN_EVENT_TARGET_RUN:                  return &event->run;
     case SPN_EVENT_INIT_BUILD_GRAPH:            return &event->graph_init;
     case SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED:  return &event->err.build_graph;
     case SPN_EVENT_LINK_START:                  return &event->target.link_start;
     case SPN_EVENT_LINK_PASSED:                 return &event->target.link_passed;
     case SPN_EVENT_LINK_FAILED:                 return &event->target.link_failed;
-    case SPN_EVENT_CLI_ENTRY:                   return &event->cli_entry;
-    case SPN_EVENT_RESOLVE_START:               return &event->resolve_start;
     case SPN_EVENT_RESOLVE_PACKAGE:             return &event->resolve_pkg;
     case SPN_EVENT_RESOLVE_END:                 return &event->resolve_end;
-    case SPN_EVENT_API_CALL:                    return &event->api_call;
     case SPN_EVENT_USER_LOG:                    return &event->user_log;
     case SPN_EVENT_SYNC_START:                  return &event->sync_start;
     case SPN_EVENT_SYNC_PACKAGE:                return &event->sync_pkg;
     case SPN_EVENT_SYNC_FAILED:                 return &event->sync_failed;
     case SPN_EVENT_ERR_MANIFEST:                return &event->manifest_err;
     case SPN_EVENT_SYNC_END:                    return &event->sync_end;
+    case SPN_EVENT_API_CALL:                    return &event->api_call;
     case SPN_EVENT_ERR_CIRCULAR_DEP:            return &event->circular;
     case SPN_EVENT_ERR_UNKNOWN_PKG:             return &event->unknown;
     case SPN_EVENT_EMBED_START:                 return &event->embed_start;
@@ -657,63 +523,43 @@ static void* event_variant_ptr(spn_build_event_t* event) {
 // ============================================================================
 
 static const c8* event_names[SPN_EVENT_COUNT] = {
-  [SPN_EVENT_FETCH]                         = "fetch",
   [SPN_EVENT_ERR]                           = "err",
   [SPN_EVENT_ERR_CIRCULAR_DEP]              = "err_circular_dep",
   [SPN_EVENT_ERR_UNKNOWN_PKG]               = "err_unknown_pkg",
   [SPN_EVENT_ERR_UNSATISFIABLE_VERSION]     = "err_unsatisfiable_version",
   [SPN_EVENT_ERR_MANIFEST]                  = "err_manifest",
-  [SPN_EVENT_RESOLVE]                       = "resolve",
-  [SPN_EVENT_SYNC]                          = "sync",
-  [SPN_EVENT_CHECKOUT]                      = "checkout",
-  [SPN_EVENT_BUILD_SCRIPT_COMPILE]          = "script_compile",
-  [SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED]   = "script_compile_failed",
-  [SPN_EVENT_BUILD_SCRIPT_CONFIGURE]        = "configure",
-  [SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK]     = "configure_ok",
-  [SPN_EVENT_BUILD_SCRIPT_BUILD]            = "script_build",
-  [SPN_EVENT_BUILD_SCRIPT_PACKAGE]          = "script_package",
-  [SPN_EVENT_BUILD_SCRIPT_FAILED]           = "script_failed",
-  [SPN_EVENT_BUILD_SCRIPT_CRASHED]          = "script_crashed",
-  [SPN_EVENT_BUILD_SCRIPT_USER_FN]          = "script_user_fn",
-  [SPN_EVENT_DEP_BUILD]                     = "dep_build",
-  [SPN_EVENT_DEP_BUILD_PASSED]              = "dep_build_passed",
-  [SPN_EVENT_DEP_BUILD_FAILED]              = "dep_build_failed",
-  [SPN_EVENT_TARGET_BUILD]                  = "target_build",
-  [SPN_EVENT_TARGET_BUILD_PASSED]           = "target_build_passed",
-  [SPN_EVENT_TARGET_BUILD_FAILED]           = "target_build_failed",
-  [SPN_EVENT_BUILD_PASSED]                  = "build_passed",
-  [SPN_EVENT_TCC_ERROR]                     = "tcc_error",
-  [SPN_EVENT_TEST_RUN]                      = "test_run",
-  [SPN_EVENT_TEST_PASSED]                   = "test_passed",
-  [SPN_EVENT_TESTS_PASSED]                  = "tests_passed",
-  [SPN_EVENT_TEST_FAILED]                   = "test_failed",
-  [SPN_EVENT_CLEAN]                         = "clean",
-  [SPN_EVENT_GENERATE]                      = "generate",
-  [SPN_EVENT_ADD_TARGET]                    = "add_target",
-  [SPN_EVENT_DEBUG]                         = "debug",
-  [SPN_EVENT_ADD_SOURCE]                    = "add_source",
-  [SPN_EVENT_INIT_BUILD_GRAPH]              = "init_build_graph",
-  [SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED]    = "prepare_build_graph_failed",
-  [SPN_EVENT_LINK_START]                    = "link_start",
-  [SPN_EVENT_LINK_PASSED]                   = "link_passed",
-  [SPN_EVENT_LINK_FAILED]                   = "link_failed",
-  [SPN_EVENT_CLI_ENTRY]                     = "cli_entry",
-  [SPN_EVENT_RESOLVE_START]                 = "resolve_start",
   [SPN_EVENT_RESOLVE_PACKAGE]               = "resolve_package",
   [SPN_EVENT_RESOLVE_END]                   = "resolve_end",
+  [SPN_EVENT_SYNC]                          = "sync",
   [SPN_EVENT_SYNC_START]                    = "sync_start",
   [SPN_EVENT_SYNC_PACKAGE]                  = "sync_package",
   [SPN_EVENT_SYNC_FAILED]                   = "sync_failed",
   [SPN_EVENT_SYNC_END]                      = "sync_end",
-  [SPN_EVENT_API_CALL]                      = "api_call",
-  [SPN_EVENT_USER_LOG]                      = "user_log",
+  [SPN_EVENT_BUILD_SCRIPT_COMPILE]          = "script_compile",
+  [SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED]   = "script_compile_failed",
+  [SPN_EVENT_BUILD_SCRIPT_CONFIGURE]        = "configure",
+  [SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK]     = "configure_ok",
+  [SPN_EVENT_BUILD_SCRIPT_PACKAGE]          = "script_package",
+  [SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK]       = "package_ok",
+  [SPN_EVENT_BUILD_SCRIPT_CRASHED]          = "script_crashed",
+  [SPN_EVENT_BUILD_SCRIPT_USER_FN]          = "script_user_fn",
+  [SPN_EVENT_TARGET_BUILD_PASSED]           = "target_build_passed",
+  [SPN_EVENT_TARGET_BUILD_FAILED]           = "target_build_failed",
+  [SPN_EVENT_TARGET_RUN]                    = "target_run",
+  [SPN_EVENT_LINK_START]                    = "link_start",
+  [SPN_EVENT_LINK_PASSED]                   = "link_passed",
+  [SPN_EVENT_LINK_FAILED]                   = "link_failed",
   [SPN_EVENT_EMBED_START]                   = "embed_start",
   [SPN_EVENT_EMBED_PASSED]                  = "embed_passed",
   [SPN_EVENT_EMBED_FAILED]                  = "embed_failed",
+  [SPN_EVENT_INIT_BUILD_GRAPH]              = "init_build_graph",
+  [SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED]    = "prepare_build_graph_failed",
   [SPN_EVENT_DIRTY_SUMMARY]                 = "dirty_summary",
+  [SPN_EVENT_BUILD_PASSED]                  = "build_passed",
   [SPN_EVENT_BUILD_FAILED]                  = "build_failed",
   [SPN_EVENT_BUILD_SUMMARY]                 = "build_summary",
-  [SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK]       = "package_ok",
+  [SPN_EVENT_API_CALL]                      = "api_call",
+  [SPN_EVENT_USER_LOG]                      = "user_log",
 };
 
 // ============================================================================
@@ -750,11 +596,8 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
   }
 
   switch (event->kind) {
-    case SPN_EVENT_TARGET_BUILD:
     case SPN_EVENT_TARGET_BUILD_PASSED:
     case SPN_EVENT_TARGET_BUILD_FAILED:
-    case SPN_EVENT_ADD_TARGET:
-    case SPN_EVENT_ADD_SOURCE:
     case SPN_EVENT_LINK_START:
     case SPN_EVENT_LINK_PASSED:
     case SPN_EVENT_LINK_FAILED: {

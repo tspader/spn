@@ -5,11 +5,6 @@
 #include "libtcc.h"
 
 typedef struct {
-  sp_mem_arena_t* arena;
-  sp_str_t error;
-} spn_tcc_err_ctx_t;
-
-typedef struct {
   TCCState* s;
   sp_mem_t mem;
   sp_str_t error;

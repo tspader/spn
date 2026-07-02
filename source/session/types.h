@@ -77,6 +77,7 @@ struct spn_session_t {
     sp_str_t profile;
   } paths;
 
+  spn_bg_ctx_t sync;
   spn_bg_ctx_t configure;
   spn_bg_ctx_t build;
   sp_mutex_t mutex;
