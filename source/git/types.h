@@ -5,10 +5,15 @@
 #include "sp/sp_om.h"
 
 #include "intern/types.h"
+#include "spn.h"
 
 typedef struct {
   sp_str_t url;
   sp_str_t path;
+  sp_mutex_t mutex;
+  bool ready;
+  spn_err_t err;
+  sp_str_t error;
 } spn_git_db_t;
 
 typedef struct {
@@ -20,19 +25,25 @@ typedef struct {
 typedef struct {
   spn_git_checkout_id_t id;
   sp_str_t path;
+  sp_mutex_t mutex;
+  bool ready;
+  bool fetched;
+  spn_err_t err;
+  sp_str_t error;
 } spn_git_checkout_t;
 
 typedef struct {
   sp_mem_t mem;
   sp_intern_t* intern;
   sp_str_t root;
+  sp_mutex_t mutex;
   struct {
     sp_str_t dir;
-    sp_str_ht(spn_git_db_t) entries;
+    sp_str_ht(spn_git_db_t*) entries;
   } db;
   struct {
     sp_str_t dir;
-    sp_str_om(spn_git_checkout_t) entries;
+    sp_str_om(spn_git_checkout_t*) entries;
   } checkouts;
 } spn_git_cache_t;
 

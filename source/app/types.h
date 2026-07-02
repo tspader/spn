@@ -34,6 +34,19 @@ typedef struct {
   spn_profile_info_t overrides;
 } spn_app_config_t;
 
+typedef struct {
+  spn_session_t* session;
+  spn_resolved_pkg_t* pkg;
+  spn_loaded_pkg_t loaded;
+} spn_sync_pkg_job_t;
+
+typedef struct {
+  spn_session_t* session;
+  spn_toolchain_store_t* store;
+  spn_toolchain_t* toolchain;
+  spn_toolchain_unit_t* unit;
+} spn_sync_toolchain_job_t;
+
 struct spn_app_t {
   spn_app_paths_t paths;
   spn_pkg_info_t package;
@@ -43,6 +56,12 @@ struct spn_app_t {
   spn_task_executor_t tasks;
 
   spn_app_config_t config;
+
+  struct {
+    spn_toolchain_store_t store;
+    sp_da(spn_sync_pkg_job_t*) packages;
+    sp_da(spn_sync_toolchain_job_t*) toolchains;
+  } sync;
 
   sp_da(sp_str_t) search;
 };
