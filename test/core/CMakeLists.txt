@@ -90,6 +90,8 @@ add_executable(manifest_lower
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/lower.c
   ${SRC}/enum/enum.c
+  ${SRC}/toolchain/catalog.c
+  ${SRC}/triple/triple.c
   ${SRC}/external/tom.c
   ${SRC}/intern/intern.c
   ${SRC}/semver/compare.c

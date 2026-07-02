@@ -3,6 +3,11 @@
 
 #include "toolchain/types.h"
 
+typedef enum {
+  SPN_TOOLCHAIN_ROLE_BUILD,
+  SPN_TOOLCHAIN_ROLE_SCRIPT,
+} spn_toolchain_role_t;
+
 typedef struct {
   sp_str_t build;
   sp_str_t script;
@@ -24,10 +29,12 @@ typedef enum {
 
 typedef struct {
   spn_toolchain_select_status_t status;
+  spn_toolchain_role_t role;
   sp_str_t name;
   spn_triple_t target;
 } spn_toolchain_select_err_t;
 
+sp_str_t     spn_toolchain_script_default(void);
 spn_triple_t spn_toolchain_script_target(void);
 bool         spn_toolchain_supports(spn_toolchain_t* toolchain, spn_triple_t target, spn_triple_t host);
 spn_toolchain_select_err_t spn_toolchain_select(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, sp_mem_t mem, spn_toolchain_selection_t* out);

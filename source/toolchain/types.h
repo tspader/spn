@@ -19,8 +19,15 @@ typedef struct {
 typedef struct {
   sp_str_t url;
   sp_str_t sha256;
-  sp_str_t mirrors;
+  sp_str_t mirror_list;
 } spn_artifact_t;
+
+typedef sp_opt(spn_artifact_t) sp_opt_spn_artifact_t;
+
+typedef struct {
+  spn_triple_t triple;
+  spn_artifact_t artifact;
+} spn_toolchain_host_t;
 
 typedef struct spn_toolchain {
   sp_str_t name;
@@ -30,9 +37,12 @@ typedef struct spn_toolchain {
   spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
   sp_da(spn_triple_t) targets;
-  sp_opt(spn_artifact_t) artifact;
+  sp_opt_spn_artifact_t artifact;
 } spn_toolchain_t;
 
-typedef sp_str_ht(spn_toolchain_t) spn_toolchain_catalog_t;
+typedef struct {
+  sp_str_ht(spn_toolchain_t*) entries;
+  sp_mem_t mem;
+} spn_toolchain_catalog_t;
 
 #endif

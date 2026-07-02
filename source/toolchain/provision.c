@@ -1,7 +1,7 @@
 #include "toolchain/provision.h"
 #include "toolchain/sha256.h"
 
-spn_err_t spn_fetch_curl(void* user_data, sp_str_t url, sp_str_t dest) {
+spn_err_t spn_fetch_curl(sp_str_t url, sp_str_t dest, void* user_data) {
   return SPN_ERROR;
 }
 
@@ -13,7 +13,7 @@ sp_str_t spn_artifact_resolve_url(sp_mem_t mem, spn_artifact_t artifact, sp_str_
   return artifact.url;
 }
 
-spn_err_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolchain_t* toolchain, sp_str_t* root) {
+spn_toolchain_provision_err_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolchain_t* toolchain, sp_str_t* root) {
   *root = sp_str_lit("");
-  return SPN_ERROR;
+  return (spn_toolchain_provision_err_t) { .status = SPN_TOOLCHAIN_PROVISION_ERR_FETCH };
 }

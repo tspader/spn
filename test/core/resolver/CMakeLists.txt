@@ -10,6 +10,7 @@ add_executable(resolver
   ${SRC}/external/tom.c
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/lower.c
+  ${SRC}/toolchain/catalog.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/index/index.c
   ${SRC}/index/json.c

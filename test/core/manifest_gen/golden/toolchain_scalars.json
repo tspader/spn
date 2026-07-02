@@ -6,13 +6,17 @@
   "toolchain": [
     {
       "name": "gcc",
-      "url": "https://gcc.example.com",
-      "sha256": "deadbeef",
-      "mirrors": "https://mirrors.example.com",
       "compiler": "gcc",
       "linker": "ld",
       "archiver": "ar",
-      "driver": "gcc"
+      "driver": "gcc",
+      "host": {
+        "x86_64-linux": {
+          "url": "https://gcc.example.com",
+          "sha256": "deadbeef"
+        }
+      },
+      "mirrors": "https://mirrors.example.com"
     }
   ]
 }

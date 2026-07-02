@@ -4,8 +4,10 @@ version = "1.0.0"
 
 [[toolchain]]
 name = "zig"
-url = "https://tc"
 compiler = "zig cc"
 linker = "zig cc"
 archiver = "ar"
 driver = "clang"
+
+[toolchain.host.x86_64]
+url = "https://tc"

@@ -8,14 +8,16 @@ typedef struct {
   u32 calls;
   sp_str_t tarball;
   sp_str_t last_url;
+  sp_str_t fail_url_containing;
   bool fail;
 } fetch_stub_t;
 
-static spn_err_t fetch_stub(void* user_data, sp_str_t url, sp_str_t dest) {
+static spn_err_t fetch_stub(sp_str_t url, sp_str_t dest, void* user_data) {
   fetch_stub_t* stub = (fetch_stub_t*)user_data;
   stub->calls++;
   stub->last_url = sp_str_copy(sp_mem_arena_as_allocator(ctx_get()->arena), url);
   if (stub->fail) return SPN_ERROR;
+  if (!sp_str_empty(stub->fail_url_containing) && sp_str_contains(url, stub->fail_url_containing)) return SPN_ERROR;
   if (sp_fs_copy(stub->tarball, dest)) return SPN_ERROR;
   return SPN_OK;
 }
@@ -103,7 +105,7 @@ UTEST(provision, local_toolchain_is_noop) {
 
   spn_toolchain_t local = fixture_local_toolchain("system", "cc");
   sp_str_t root = sp_str_lit("sentinel");
-  ASSERT_EQ(SPN_OK, spn_toolchain_provision(&fixture.store, &local, &root));
+  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &local, &root).status);
   EXPECT_TRUE(sp_str_empty(root));
   EXPECT_EQ(0u, fixture.stub.calls);
 }
@@ -114,7 +116,7 @@ UTEST(provision, fresh_artifact_downloads_and_extracts) {
   spn_toolchain_t toolchain = provision_fixture_toolchain(&fixture);
 
   sp_str_t root = sp_zero;
-  ASSERT_EQ(SPN_OK, spn_toolchain_provision(&fixture.store, &toolchain, &root));
+  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &toolchain, &root).status);
 
   sp_str_t expected = sp_fs_join_path(fixture.mem, fixture.store.dir, fixture.sha);
   EXPECT_TRUE(sp_str_equal(root, expected));
@@ -130,11 +132,11 @@ UTEST(provision, cached_artifact_skips_fetch) {
   spn_toolchain_t toolchain = provision_fixture_toolchain(&fixture);
 
   sp_str_t first = sp_zero;
-  ASSERT_EQ(SPN_OK, spn_toolchain_provision(&fixture.store, &toolchain, &first));
+  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &toolchain, &first).status);
   ASSERT_EQ(1u, fixture.stub.calls);
 
   sp_str_t second = sp_zero;
-  ASSERT_EQ(SPN_OK, spn_toolchain_provision(&fixture.store, &toolchain, &second));
+  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &toolchain, &second).status);
   EXPECT_EQ(1u, fixture.stub.calls);
   EXPECT_TRUE(sp_str_equal(first, second));
 }
@@ -149,8 +151,8 @@ UTEST(provision, artifacts_share_store_by_sha) {
 
   sp_str_t zig_root = sp_zero;
   sp_str_t fork_root = sp_zero;
-  ASSERT_EQ(SPN_OK, spn_toolchain_provision(&fixture.store, &zig, &zig_root));
-  ASSERT_EQ(SPN_OK, spn_toolchain_provision(&fixture.store, &fork, &fork_root));
+  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &zig, &zig_root).status);
+  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &fork, &fork_root).status);
 
   EXPECT_TRUE(sp_str_equal(zig_root, fork_root));
   EXPECT_EQ(1u, fixture.stub.calls);
@@ -168,7 +170,10 @@ UTEST(provision, sha_mismatch_fails_and_leaves_no_store_entry) {
   }));
 
   sp_str_t root = sp_zero;
-  EXPECT_EQ(SPN_ERROR, spn_toolchain_provision(&fixture.store, &toolchain, &root));
+  spn_toolchain_provision_err_t err = spn_toolchain_provision(&fixture.store, &toolchain, &root);
+  EXPECT_EQ((u32)SPN_TOOLCHAIN_PROVISION_ERR_SHA, (u32)err.status);
+  EXPECT_TRUE(sp_str_equal(err.expected, lie));
+  EXPECT_TRUE(sp_str_equal(err.actual, fixture.sha));
   EXPECT_FALSE(sp_fs_exists(sp_fs_join_path(fixture.mem, fixture.store.dir, lie)));
   EXPECT_EQ(1u, fixture.stub.calls);
 }
@@ -190,7 +195,7 @@ UTEST(provision, corrupt_archive_fails_and_leaves_no_store_entry) {
   }));
 
   sp_str_t root = sp_zero;
-  EXPECT_EQ(SPN_ERROR, spn_toolchain_provision(&fixture.store, &toolchain, &root));
+  EXPECT_EQ((u32)SPN_TOOLCHAIN_PROVISION_ERR_EXTRACT, (u32)spn_toolchain_provision(&fixture.store, &toolchain, &root).status);
   EXPECT_FALSE(sp_fs_exists(sp_fs_join_path(fixture.mem, fixture.store.dir, garbage_sha)));
 }
 
@@ -201,7 +206,8 @@ UTEST(provision, fetch_failure_propagates) {
 
   spn_toolchain_t toolchain = provision_fixture_toolchain(&fixture);
   sp_str_t root = sp_zero;
-  EXPECT_EQ(SPN_ERROR, spn_toolchain_provision(&fixture.store, &toolchain, &root));
+  spn_toolchain_provision_err_t err = spn_toolchain_provision(&fixture.store, &toolchain, &root);
+  EXPECT_EQ((u32)SPN_TOOLCHAIN_PROVISION_ERR_FETCH, (u32)err.status);
   EXPECT_FALSE(sp_fs_exists(sp_fs_join_path(fixture.mem, fixture.store.dir, fixture.sha)));
 }
 
@@ -226,8 +232,22 @@ UTEST(provision, mirror_used_for_fetch) {
 
   spn_toolchain_t toolchain = provision_fixture_toolchain(&fixture);
   sp_str_t root = sp_zero;
-  ASSERT_EQ(SPN_OK, spn_toolchain_provision(&fixture.store, &toolchain, &root));
+  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &toolchain, &root).status);
   EXPECT_STR(fixture.stub.last_url, "https://mirror.example.com/zig/zig-fixture.tar.gz");
+  EXPECT_EQ(1u, fixture.stub.calls);
+}
+
+UTEST(provision, broken_mirror_falls_back_to_canonical) {
+  provision_fixture_t fixture = sp_zero;
+  provision_fixture_init(utest_result, &fixture, "provision_mirror_fallback");
+  fixture.store.mirror = sp_str_lit("https://mirror.example.com/zig");
+  fixture.stub.fail_url_containing = sp_str_lit("mirror.example.com");
+
+  spn_toolchain_t toolchain = provision_fixture_toolchain(&fixture);
+  sp_str_t root = sp_zero;
+  ASSERT_EQ((u32)SPN_TOOLCHAIN_PROVISION_OK, (u32)spn_toolchain_provision(&fixture.store, &toolchain, &root).status);
+  EXPECT_STR(fixture.stub.last_url, "https://tc.example.com/zig-fixture.tar.gz");
+  EXPECT_EQ(2u, fixture.stub.calls);
 }
 
 UTEST(provision, store_path_is_content_addressed) {

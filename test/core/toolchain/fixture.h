@@ -50,6 +50,10 @@ static void fixture_catalog(s32* utest_result, spn_toolchain_catalog_t* catalog,
   ASSERT_EQ(SPN_OK, err);
 }
 
+static u32 fixture_catalog_size(spn_toolchain_catalog_t* catalog) {
+  return (u32)sp_str_ht_size(catalog->entries);
+}
+
 static spn_toolchain_t fixture_local_toolchain(const c8* name, const c8* compiler) {
   return (spn_toolchain_t) {
     .name = sp_str_view(name),

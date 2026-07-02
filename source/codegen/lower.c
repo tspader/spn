@@ -6,7 +6,9 @@
 #include "semver/parser.h"
 #include "target/types.h"
 #include "target/mutate.h"
+#include "toolchain/catalog.h"
 #include "toolchain/types.h"
+#include "triple/triple.h"
 #include "profile/types.h"
 #include "index/types.h"
 
@@ -162,13 +164,18 @@ static void lower_toolchains(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg
     toolchain.linker = lower_launcher(ctx, t->linker);
     toolchain.archiver = lower_launcher(ctx, t->archiver);
 
-    if (!sp_str_empty(t->url)) {
-      sp_opt_set(toolchain.artifact, ((spn_artifact_t) {
-        .url = t->url,
-        .sha256 = t->sha256,
-        .mirrors = t->mirrors,
+    sp_da(spn_toolchain_host_t) hosts = sp_da_new(ctx->mem, spn_toolchain_host_t);
+    sp_da_for(t->host, i) {
+      sp_da_push(hosts, ((spn_toolchain_host_t) {
+        .triple = spn_triple_from_str(t->host[i].key),
+        .artifact = {
+          .url = t->host[i].value.url,
+          .sha256 = t->host[i].value.sha256,
+          .mirror_list = t->mirrors,
+        },
       }));
     }
+    toolchain.artifact = spn_toolchain_select_artifact(hosts, spn_triple_host());
 
     toolchain.targets = sp_da_new(ctx->mem, spn_triple_t);
     sp_da_for(t->target, i) {
@@ -309,8 +316,10 @@ static void validate_inline_toolchains(spn_codegen_ctx_t* ctx, const spn_cg_mani
     if (sp_opt_is_null(t->driver) || sp_opt_get(t->driver) == SPN_CC_DRIVER_NONE) {
       spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "driver");
     }
-    if (!sp_str_empty(t->url) && sp_str_empty(t->sha256)) {
-      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "sha256");
+    sp_da_for(t->host, h) {
+      if (sp_str_empty(t->host[h].value.sha256)) {
+        spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "sha256");
+      }
     }
     spn_codegen_pop(ctx);
   }
