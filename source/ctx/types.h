@@ -60,7 +60,7 @@ typedef struct {
   spn_jit_entry_t jit;
   sp_mem_t mem;
   sp_mem_arena_t* arena;
-  sp_mem_t persistent;
+  sp_mem_t heap;
   sp_env_t* env;
 
   struct {
