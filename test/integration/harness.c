@@ -361,6 +361,8 @@ void fixture_copy_project(s32* utest_result, fixture_t* fixture, sp_str_t projec
     "main.c",
     "spn.c",
     "spn.toml",
+    "configure.c",
+    "build.c",
   };
 
   sp_carr_for(defaults, it) {

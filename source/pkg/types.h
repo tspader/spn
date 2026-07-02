@@ -8,6 +8,7 @@
 #include "intern/types.h"
 #include "sp/sp_om.h"
 #include "semver/types.h"
+#include "target/types.h"
 #include "toolchain/types.h"
 
 typedef enum {
@@ -98,8 +99,8 @@ struct spn_pkg_info {
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) system_deps;
   spn_toolchain_om_t toolchains;
-  sp_str_t build;
-  sp_str_t configure;
+  spn_target_info_t build;
+  spn_target_info_t configure;
 
   sp_mem_arena_t* arena;
 };

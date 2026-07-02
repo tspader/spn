@@ -821,6 +821,31 @@ UTEST_F(spn_build, api_user_data) {
   });
 }
 
+UTEST_F(spn_build, api_configure_table) {
+  tmpfs_init_named(&uf->fixture.fs, "api_configure_table");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/configure_table",
+    .copy = { "scripts" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_RUN_BIN, .bin.name = "configure_table" },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_configure_error) {
+  tmpfs_init_named(&uf->fixture.fs, "api_configure_error");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/configure_error",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "script_crashed" } },
+    },
+  });
+}
+
 UTEST_F(spn_build, api_build_deps) {
   tmpfs_init_named(&uf->fixture.fs, "api_build_deps");
 

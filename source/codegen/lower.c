@@ -98,6 +98,22 @@ static void lower_collection(spn_codegen_ctx_t* ctx, spn_cg_target_om_t cg, spn_
   }
 }
 
+static spn_target_info_t lower_script(spn_codegen_ctx_t* ctx, const spn_cg_build_script_t* cg, sp_str_t name, sp_str_t default_source) {
+  spn_target_info_t script = {
+    .name = name,
+    .kind = SPN_TARGET_SCRIPT,
+    .source = cg->source,
+    .include = cg->include,
+    .define = cg->define,
+    .flags = cg->flags,
+  };
+  spn_target_info_init(ctx->mem, &script);
+  if (sp_da_empty(script.source)) {
+    sp_da_push(script.source, default_source);
+  }
+  return script;
+}
+
 static void lower_dep(spn_codegen_ctx_t* ctx, sp_str_t name, sp_str_t version, spn_dep_kind_t kind, spn_pkg_info_t* out) {
   spn_requested_pkg_t req = {
     .qualified = lower_canonicalize(ctx, name),
@@ -136,8 +152,8 @@ static void lower_package(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, s
   }
   out->define = p->define ? p->define : sp_da_new(ctx->mem, sp_str_t);
   out->system_deps = p->system_deps ? p->system_deps : sp_da_new(ctx->mem, sp_str_t);
-  out->build = sp_str_empty(p->build) ? sp_str_lit("build.c") : p->build;
-  out->configure = sp_str_empty(p->configure) ? sp_str_lit("configure.c") : p->configure;
+  out->build = lower_script(ctx, &p->build, sp_str_lit("build"), sp_str_lit("build.c"));
+  out->configure = lower_script(ctx, &p->configure, sp_str_lit("configure"), sp_str_lit("configure.c"));
 }
 
 static void lower_versions(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {

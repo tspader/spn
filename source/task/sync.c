@@ -152,6 +152,20 @@ static spn_err_t materialize_tree(spn_session_t *session, sp_str_t name,
   sp_unreachable_return(SPN_ERROR);
 }
 
+static sp_str_t resolve_script(spn_target_info_t* script, sp_str_t root) {
+  sp_da_for(script->source, it) {
+    if (!sp_fs_is_absolute(script->source[it])) {
+      script->source[it] = sp_fs_join_path(spn.mem, root, script->source[it]);
+    }
+  }
+  sp_da_for(script->include, it) {
+    if (!sp_fs_is_absolute(script->include[it])) {
+      script->include[it] = sp_fs_join_path(spn.mem, root, script->include[it]);
+    }
+  }
+  return sp_da_empty(script->source) ? sp_str_lit("") : script->source[0];
+}
+
 // @spader this is junk
 static spn_err_t load_package(
   spn_session_t *session, spn_loaded_pkg_t *loaded,
@@ -187,8 +201,8 @@ static spn_err_t load_package(
   }
 
   loaded->info = info;
-  loaded->paths.configure = sp_fs_join_path(spn.mem, loaded->roots.recipe, info->configure);
-  loaded->paths.build = sp_fs_join_path(spn.mem, loaded->roots.recipe, info->build);
+  loaded->paths.configure = resolve_script(&info->configure, loaded->roots.recipe);
+  loaded->paths.build = resolve_script(&info->build, loaded->roots.recipe);
 
   if (derive_source) {
     source_tree = spn_pkg_manifest_source_tree(info);
