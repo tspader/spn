@@ -6,11 +6,11 @@ version = "0.1.0"
 spum = "file://./packages/spum/spn.toml"
 
 [profile.default]
-toolchain = "builtin"
+toolchain = "system"
 linkage = "static"
 
 [profile.static]
-toolchain = "builtin"
+toolchain = "system"
 linkage = "static"
 
 [[bin]]

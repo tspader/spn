@@ -9,6 +9,7 @@ add_executable(publish
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/lower.c
   ${SRC}/toolchain/catalog.c
+  ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/index/index.c
   ${SRC}/index/json.c
@@ -36,5 +37,6 @@ add_executable(publish
 )
 spn_test_binary(publish)
 target_include_directories(publish PRIVATE ${SRC}/codegen/gen)
+target_link_libraries(publish PRIVATE yyjson)
 add_dependencies(publish spn_codegen_gen)
 add_test(NAME publish COMMAND "$<TARGET_FILE:publish>")

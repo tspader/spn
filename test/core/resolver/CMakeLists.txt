@@ -11,6 +11,7 @@ add_executable(resolver
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/lower.c
   ${SRC}/toolchain/catalog.c
+  ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/index/index.c
   ${SRC}/index/json.c
@@ -36,5 +37,6 @@ add_executable(resolver
 )
 spn_test_binary(resolver)
 target_include_directories(resolver PRIVATE ${SRC}/codegen/gen)
+target_link_libraries(resolver PRIVATE yyjson)
 add_dependencies(resolver spn_codegen_gen)
 add_test(NAME resolver COMMAND "$<TARGET_FILE:resolver>")

@@ -296,6 +296,7 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
     .fetch = spn_fetch_curl,
   };
 
+  session->units.toolchains = sp_da_new(session->mem, spn_toolchain_unit_t*);
   sp_da_for(session->selection.required, it) {
     spn_toolchain_t* toolchain = session->selection.required[it];
     spn_toolchain_unit_t* unit = setup_toolchain_unit(session, &store, toolchain);
