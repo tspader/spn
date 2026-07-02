@@ -281,26 +281,35 @@ const c8* spn_codegen_err_name(spn_err_t code) {
   }
 }
 
-sp_str_t spn_codegen_issue_message(sp_mem_t mem, const spn_codegen_issue_t* issue) {
+void spn_codegen_issue_write(sp_io_writer_t* w, const spn_codegen_issue_t* issue) {
   switch (issue->code) {
     case SPN_CODEGEN_ERR_MISSING_KEY:
-      return sp_fmt(mem, "missing required field {.cyan}", SP_FMT_STR(issue->path)).value;
+      sp_fmt_io(w, "missing required field {.cyan}", SP_FMT_STR(issue->path));
+      break;
     case SPN_CODEGEN_ERR_EXPECTED_STR:
-      return sp_fmt(mem, "{.cyan} must be a string", SP_FMT_STR(issue->path)).value;
+      sp_fmt_io(w, "{.cyan} must be a string", SP_FMT_STR(issue->path));
+      break;
     case SPN_CODEGEN_ERR_EXPECTED_BOOL:
-      return sp_fmt(mem, "{.cyan} must be a boolean", SP_FMT_STR(issue->path)).value;
+      sp_fmt_io(w, "{.cyan} must be a boolean", SP_FMT_STR(issue->path));
+      break;
     case SPN_CODEGEN_ERR_EXPECTED_OBJECT:
-      return sp_fmt(mem, "{.cyan} must be a table", SP_FMT_STR(issue->path)).value;
+      sp_fmt_io(w, "{.cyan} must be a table", SP_FMT_STR(issue->path));
+      break;
     case SPN_CODEGEN_ERR_DUPLICATE_KEY:
-      return sp_fmt(mem, "duplicate {.yellow} at {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path)).value;
+      sp_fmt_io(w, "duplicate {.yellow} at {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
+      break;
     case SPN_CODEGEN_ERR_INVALID:
-      return sp_fmt(mem, "invalid value at {.cyan}", SP_FMT_STR(issue->path)).value;
+      sp_fmt_io(w, "invalid value at {.cyan}", SP_FMT_STR(issue->path));
+      break;
     case SPN_CODEGEN_ERR_PARSE:
-      return sp_str_lit("manifest is not valid toml");
+      sp_io_write_str(w, sp_str_lit("manifest is not valid toml"), SP_NULLPTR);
+      break;
     case SPN_CODEGEN_ERR_FILE_MISSING:
-      return sp_str_lit("manifest file is missing");
+      sp_io_write_str(w, sp_str_lit("manifest file is missing"), SP_NULLPTR);
+      break;
     default:
-      return sp_fmt(mem, "invalid manifest at {.cyan}", SP_FMT_STR(issue->path)).value;
+      sp_fmt_io(w, "invalid manifest at {.cyan}", SP_FMT_STR(issue->path));
+      break;
   }
 }
 
@@ -311,7 +320,7 @@ sp_str_t spn_codegen_issues_message(sp_mem_t mem, sp_da(spn_codegen_issue_t) iss
     if (it) {
       sp_fmt_io(&b.base, "; ");
     }
-    sp_fmt_io(&b.base, "{}", sp_fmt_str(spn_codegen_issue_message(mem, &issues[it])));
+    spn_codegen_issue_write(&b.base, &issues[it]);
   }
   return sp_io_dyn_mem_writer_as_str(&b);
 }

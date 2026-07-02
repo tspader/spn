@@ -74,6 +74,7 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
           .name = request->qualified,
           .path = err.manifest,
           .error = err.error,
+          .issues = err.issues,
         }
       });
       return SPN_ERROR;

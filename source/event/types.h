@@ -112,7 +112,7 @@ typedef struct { u32 num_resolved; u64 time; } spn_evt_resolve_end_t;
 typedef struct { u32 num_packages; u32 num_index; u32 num_file; } spn_evt_sync_start_t;
 typedef struct { sp_str_t name; sp_str_t url; sp_str_t source_path; u64 time; bool fetched; } spn_evt_sync_pkg_t;
 typedef struct { sp_str_t name; sp_str_t url; sp_str_t error; } spn_evt_sync_failed_t;
-typedef struct { sp_str_t name; sp_str_t path; sp_str_t error; } spn_evt_manifest_err_t;
+typedef struct { sp_str_t name; sp_str_t path; sp_str_t error; sp_da(spn_codegen_issue_t) issues; } spn_evt_manifest_err_t;
 typedef struct { u32 num_synced; u64 time; } spn_evt_sync_end_t;
 typedef struct { sp_str_t fn; sp_str_t args; } spn_evt_api_call_t;
 typedef struct { sp_str_t message; } spn_evt_user_log_t;

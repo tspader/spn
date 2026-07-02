@@ -89,6 +89,7 @@ static spn_build_event_display_t event_info[] = {
 
 static sp_str_t spn_tui_name_to_color(sp_mem_t mem, sp_str_t str);
 static sp_str_t spn_tui_decorate_name(sp_mem_t mem, sp_str_t name, u32 padded_len, c8 pad);
+static void     spn_tui_line_writer_flush(spn_tui_line_writer_t* writer);
 
 spn_tui_mode_t spn_output_mode_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "interactive")) {
@@ -266,23 +267,6 @@ static sp_str_t spn_tui_name_to_color(sp_mem_t mem, sp_str_t str) {
   return sp_color_to_tui_rgb_f(mem, r, g, b);
 }
 
-static void spn_tui_write_transcript(sp_io_writer_t* w, sp_str_t lead, sp_str_t out, sp_str_t err) {
-  sp_str_t parts[] = { lead, out, err };
-  bool first = true;
-  sp_carr_for(parts, it) {
-    if (!sp_str_valid(parts[it])) continue;
-
-    sp_str_t part = sp_str_trim_right(parts[it]);
-    if (sp_str_empty(part)) continue;
-
-    if (!first) {
-      sp_io_write_new_line(w);
-    }
-    sp_io_write_str(w, part, SP_NULLPTR);
-    first = false;
-  }
-}
-
 static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
   sp_io_dyn_mem_writer_t w = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &w);
@@ -428,13 +412,11 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
       break;
     }
     case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED: {
-      sp_str_t lead = sp_fmt(mem, "{.cyan} failed to compile", SP_FMT_STR(event->compile_failed.script_path)).value;
-      spn_tui_write_transcript(&w.base, lead, event->compile_failed.error, sp_str_lit(""));
+      sp_fmt_io(&w.base, "{.cyan} failed to compile", SP_FMT_STR(event->compile_failed.script_path));
       break;
     }
     case SPN_EVENT_TARGET_BUILD_FAILED: {
-      sp_str_t lead = sp_fmt(mem, "{.cyan} failed to compile", SP_FMT_STR(event->target.failed.source_file)).value;
-      spn_tui_write_transcript(&w.base, lead, event->target.failed.out, event->target.failed.err);
+      sp_fmt_io(&w.base, "{.cyan} failed to compile", SP_FMT_STR(event->target.failed.source_file));
       break;
     }
     case SPN_EVENT_ERR_UNKNOWN_PKG: {
@@ -465,11 +447,13 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
     case SPN_EVENT_ERR_MANIFEST: {
       sp_fmt_io(
         &w.base,
-        "{.cyan} has an invalid manifest ({.gray}): {}",
+        "{.cyan} has an invalid manifest ({.gray})",
         SP_FMT_STR(event->manifest_err.name),
-        SP_FMT_STR(event->manifest_err.path),
-        SP_FMT_STR(event->manifest_err.error)
+        SP_FMT_STR(event->manifest_err.path)
       );
+      if (sp_da_empty(event->manifest_err.issues)) {
+        sp_fmt_io(&w.base, ": {}", SP_FMT_STR(event->manifest_err.error));
+      }
       break;
     }
     case SPN_EVENT_SYNC_FAILED: {
@@ -506,14 +490,7 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
           break;
         }
         case SPN_ERR_MANIFEST_ISSUES: {
-          sp_io_write_str(&w.base, sp_str_lit("invalid manifest:"), SP_NULLPTR);
-          sp_da_for(event->err.issues, it) {
-            sp_fmt_io(
-              &w.base,
-              "\n  - {}",
-              SP_FMT_STR(spn_codegen_issue_message(mem, &event->err.issues[it]))
-            );
-          }
+          sp_io_write_str(&w.base, sp_str_lit("invalid manifest"), SP_NULLPTR);
           break;
         }
         case SPN_ERR_TOOLCHAIN_FETCH: {
@@ -584,14 +561,6 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
               break;
             }
           }
-          bool first = true;
-          sp_str_ht_for_kv(event->err.toolchain.catalog->entries, it) {
-            spn_toolchain_t* toolchain = *it.val;
-            if (!spn_toolchain_supports(toolchain, event->err.toolchain.target, event->err.toolchain.host)) continue;
-            sp_io_write_str(&w.base, first ? sp_str_lit("\ntoolchains that can: ") : sp_str_lit(", "), SP_NULLPTR);
-            sp_fmt_io(&w.base, "{.green}", SP_FMT_STR(toolchain->name));
-            first = false;
-          }
           break;
         }
         default: {
@@ -636,14 +605,6 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
             "two graph nodes output the same file {.cyan}",
             SP_FMT_STR(event->err.build_graph.file)
           );
-          if (sp_str_valid(event->err.build_graph.command_a)) {
-            sp_io_write_c8(&w.base, '\n');
-            sp_io_write_str(&w.base, event->err.build_graph.command_a, SP_NULLPTR);
-          }
-          if (sp_str_valid(event->err.build_graph.command_b)) {
-            sp_io_write_c8(&w.base, '\n');
-            sp_io_write_str(&w.base, event->err.build_graph.command_b, SP_NULLPTR);
-          }
           break;
         }
         case SPN_BUILD_GRAPH_ERR_UNKNOWN: {
@@ -662,8 +623,7 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
       break;
     }
     case SPN_EVENT_LINK_FAILED: {
-      sp_str_t lead = sp_fmt(mem, "{.cyan} failed to link", SP_FMT_STR(event->target.name)).value;
-      spn_tui_write_transcript(&w.base, lead, event->target.link_failed.err, event->target.link_failed.out);
+      sp_fmt_io(&w.base, "{.cyan} failed to link", SP_FMT_STR(event->target.name));
       break;
     }
     case SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK: {
@@ -708,32 +668,92 @@ static sp_str_t spn_tui_short_name(sp_str_t qualified) {
   return qualified;
 }
 
-static sp_str_t spn_tui_render_coarse_line(sp_mem_t mem, sp_str_t verb, sp_str_t pkg_name, sp_str_t detail) {
-  sp_io_dyn_mem_writer_t w = sp_zero;
-  sp_io_dyn_mem_writer_init(mem, &w);
-
-  sp_fmt_io(&w.base, "{:>12 .bold .green}", SP_FMT_STR(verb));
+static void spn_tui_write_event_line(sp_io_writer_t* w, sp_mem_t mem, sp_str_t verb, bool error, sp_str_t pkg_name, sp_str_t detail) {
+  if (error) {
+    sp_fmt_io(w, "{:>12 .bold .red}", SP_FMT_STR(verb));
+  } else {
+    sp_fmt_io(w, "{:>12 .bold .green}", SP_FMT_STR(verb));
+  }
   if (!sp_str_empty(pkg_name)) {
-    sp_fmt_io(&w.base, " {}", SP_FMT_STR(spn_tui_decorate_name(mem, pkg_name, 0, ' ')));
+    sp_fmt_io(w, " {}", SP_FMT_STR(spn_tui_decorate_name(mem, pkg_name, 0, ' ')));
   }
   if (!sp_str_empty(detail)) {
-    sp_fmt_io(&w.base, " {}", SP_FMT_STR(detail));
+    sp_fmt_io(w, " {}", SP_FMT_STR(detail));
   }
-
-  return sp_io_dyn_mem_writer_take_str(&w);
+  sp_io_write_c8(w, '\n');
 }
 
-static sp_str_t spn_tui_render_coarse_error(sp_mem_t mem, spn_build_event_t* event) {
-  sp_io_dyn_mem_writer_t w = sp_zero;
-  sp_io_dyn_mem_writer_init(mem, &w);
-
-  sp_fmt_io(&w.base, "{:>12 .bold .red}", SP_FMT_CSTR("error"));
-  if (event->pkg) {
-    sp_fmt_io(&w.base, " {}", SP_FMT_STR(spn_tui_decorate_name(mem, event->pkg->name, 0, ' ')));
+static void spn_tui_render_event_extra(sp_io_writer_t* w, spn_build_event_t* event) {
+  switch (event->kind) {
+    case SPN_EVENT_TARGET_BUILD_FAILED: {
+      sp_io_write_str(w, event->target.failed.out, SP_NULLPTR);
+      sp_io_write_str(w, event->target.failed.err, SP_NULLPTR);
+      break;
+    }
+    case SPN_EVENT_LINK_FAILED: {
+      sp_io_write_str(w, event->target.link_failed.err, SP_NULLPTR);
+      sp_io_write_str(w, event->target.link_failed.out, SP_NULLPTR);
+      break;
+    }
+    case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED: {
+      sp_io_write_str(w, event->compile_failed.error, SP_NULLPTR);
+      break;
+    }
+    case SPN_EVENT_ERR_MANIFEST: {
+      sp_da_for(event->manifest_err.issues, it) {
+        sp_io_write_str(w, sp_str_lit("  - "), SP_NULLPTR);
+        spn_codegen_issue_write(w, &event->manifest_err.issues[it]);
+        sp_io_write_c8(w, '\n');
+      }
+      break;
+    }
+    case SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED: {
+      if (event->err.build_graph.kind == SPN_BUILD_GRAPH_ERR_DUPLICATE_OUTPUT) {
+        if (sp_str_valid(event->err.build_graph.command_a)) {
+          sp_io_write_str(w, event->err.build_graph.command_a, SP_NULLPTR);
+          sp_io_write_c8(w, '\n');
+        }
+        if (sp_str_valid(event->err.build_graph.command_b)) {
+          sp_io_write_str(w, event->err.build_graph.command_b, SP_NULLPTR);
+          sp_io_write_c8(w, '\n');
+        }
+      }
+      break;
+    }
+    case SPN_EVENT_ERR: {
+      switch (event->err.kind) {
+        case SPN_ERR_MANIFEST_ISSUES: {
+          sp_da_for(event->err.issues, it) {
+            sp_io_write_str(w, sp_str_lit("  - "), SP_NULLPTR);
+            spn_codegen_issue_write(w, &event->err.issues[it]);
+            sp_io_write_c8(w, '\n');
+          }
+          break;
+        }
+        case SPN_ERR_TOOLCHAIN_TARGET: {
+          bool first = true;
+          sp_str_ht_for_kv(event->err.toolchain.catalog->entries, it) {
+            spn_toolchain_t* toolchain = *it.val;
+            if (!spn_toolchain_supports(toolchain, event->err.toolchain.target, event->err.toolchain.host)) continue;
+            sp_io_write_str(w, first ? sp_str_lit("toolchains that can: ") : sp_str_lit(", "), SP_NULLPTR);
+            sp_fmt_io(w, "{.green}", SP_FMT_STR(toolchain->name));
+            first = false;
+          }
+          if (!first) {
+            sp_io_write_c8(w, '\n');
+          }
+          break;
+        }
+        default: {
+          break;
+        }
+      }
+      break;
+    }
+    default: {
+      break;
+    }
   }
-  sp_fmt_io(&w.base, " {}", SP_FMT_STR(spn_tui_render_event_detail(mem, event)));
-
-  return sp_io_dyn_mem_writer_take_str(&w);
 }
 
 typedef struct {
@@ -741,7 +761,7 @@ typedef struct {
   sp_str_t message;
 } spn_tui_buffered_log_t;
 
-sp_str_t spn_tui_render_coarse_event(sp_mem_t mem, spn_build_event_t* event) {
+void spn_tui_log_event(spn_build_event_t* event) {
   static sp_str_ht(bool) seen_url = SP_NULLPTR;
   static sp_da(spn_tui_buffered_log_t) buffered_logs = SP_NULLPTR;
   static u32 num_downloads = 0;
@@ -751,55 +771,57 @@ sp_str_t spn_tui_render_coarse_event(sp_mem_t mem, spn_build_event_t* event) {
   }
 
   spn_build_event_display_t display = event_info[event->kind];
-  bool visible = display.verbosity <= spn.logger.verbosity;
-
-  if (!visible) {
+  if (display.verbosity > spn.logger.verbosity) {
     if (event->kind == SPN_EVENT_USER_LOG) {
       sp_da_push(buffered_logs, ((spn_tui_buffered_log_t) {
         .pkg = event->pkg ? sp_str_copy(spn.heap, event->pkg->name) : sp_str_lit(""),
         .message = sp_str_copy(spn.heap, event->user_log.message),
       }));
     }
-    return sp_str_lit("");
+    return;
   }
 
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_mem_t mem = scratch.mem;
+  sp_io_writer_t* w = spn.tui.out;
+  sp_str_t verb = sp_str_view(display.name);
+
   if (display.error) {
-    sp_io_dyn_mem_writer_t w = sp_zero;
-    sp_io_dyn_mem_writer_init(mem, &w);
     sp_da_for(buffered_logs, it) {
       spn_tui_buffered_log_t* log = &buffered_logs[it];
-      sp_io_write_str(&w.base, spn_tui_render_coarse_line(mem, sp_str_lit(""), log->pkg, log->message), SP_NULLPTR);
-      sp_io_write_c8(&w.base, '\n');
+      spn_tui_write_event_line(w, mem, sp_str_lit(""), false, log->pkg, log->message);
     }
     sp_da_clear(buffered_logs);
-    sp_io_write_str(&w.base, spn_tui_render_coarse_error(mem, event), SP_NULLPTR);
-    return sp_io_dyn_mem_writer_take_str(&w);
+
+    sp_str_t name = event->pkg ? event->pkg->name : sp_str_lit("");
+    spn_tui_write_event_line(w, mem, verb, true, name, spn_tui_render_event_detail(mem, event));
+    spn_tui_render_event_extra(w, event);
+    spn_tui_line_writer_flush(&spn.tui.line_writer);
+    sp_mem_end_scratch(scratch);
+    return;
   }
 
   switch (event->kind) {
     case SPN_EVENT_SYNC: {
-      if (sp_str_ht_get(seen_url, event->sync.url)) {
-        return sp_str_lit("");
+      if (!sp_str_ht_get(seen_url, event->sync.url)) {
+        sp_str_ht_insert(seen_url, sp_str_copy(spn.heap, event->sync.url), true);
+        num_downloads++;
+        spn_tui_write_event_line(
+          w, mem, verb, false,
+          spn_tui_short_name(event->sync.name),
+          sp_fmt(mem, "{.gray}", SP_FMT_STR(event->sync.url)).value
+        );
       }
-      sp_str_ht_insert(seen_url, sp_str_copy(spn.heap, event->sync.url), true);
-      num_downloads++;
-      return spn_tui_render_coarse_line(
-        mem,
-        sp_str_lit("Downloading"),
-        spn_tui_short_name(event->sync.name),
-        sp_fmt(mem, "{.gray}", SP_FMT_STR(event->sync.url)).value
-      );
+      break;
     }
 
     case SPN_EVENT_SYNC_END: {
-      if (!num_downloads) {
-        return sp_str_lit("");
-      }
+      if (!num_downloads) break;
+
       c8 buffer [64] = sp_zero;
       sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->sync_end.time);
-      return spn_tui_render_coarse_line(
-        mem,
-        sp_str_lit("Downloaded"),
+      spn_tui_write_event_line(
+        w, mem, verb, false,
         sp_str_lit(""),
         sp_fmt(mem, "{} {} in {.cyan}",
           SP_FMT_U32(num_downloads),
@@ -807,16 +829,13 @@ sp_str_t spn_tui_render_coarse_event(sp_mem_t mem, spn_build_event_t* event) {
           SP_FMT_CSTR(buffer)
         ).value
       );
+      break;
     }
 
     case SPN_EVENT_RESOLVE_END:
     case SPN_EVENT_BUILD_PASSED: {
-      return spn_tui_render_coarse_line(
-        mem,
-        sp_str_view(display.name),
-        sp_str_lit(""),
-        spn_tui_render_event_detail(mem, event)
-      );
+      spn_tui_write_event_line(w, mem, verb, false, sp_str_lit(""), spn_tui_render_event_detail(mem, event));
+      break;
     }
 
     case SPN_EVENT_TARGET_RUN: {
@@ -824,33 +843,96 @@ sp_str_t spn_tui_render_coarse_event(sp_mem_t mem, spn_build_event_t* event) {
       if (sp_str_empty(name) && event->pkg) {
         name = event->pkg->name;
       }
-      return spn_tui_render_coarse_line(
-        mem,
-        sp_str_view(display.name),
-        name,
-        spn_tui_render_event_detail(mem, event)
-      );
+      spn_tui_write_event_line(w, mem, verb, false, name, spn_tui_render_event_detail(mem, event));
+      break;
     }
 
     case SPN_EVENT_USER_LOG: {
       sp_str_t name = event->pkg ? event->pkg->name : sp_str_lit("");
-      return spn_tui_render_coarse_line(mem, sp_str_lit(""), name, event->user_log.message);
+      spn_tui_write_event_line(w, mem, sp_str_lit(""), false, name, event->user_log.message);
+      break;
     }
 
     default: {
       sp_str_t name = event->pkg ? event->pkg->name : sp_str_lit("");
-      return spn_tui_render_coarse_line(
-        mem,
-        sp_str_view(display.name),
-        name,
-        spn_tui_render_event_detail(mem, event)
-      );
+      spn_tui_write_event_line(w, mem, verb, false, name, spn_tui_render_event_detail(mem, event));
+      break;
     }
   }
+
+  spn_tui_line_writer_flush(&spn.tui.line_writer);
+  sp_mem_end_scratch(scratch);
+}
+
+static void spn_tui_line_writer_emit(spn_tui_line_writer_t* writer, sp_str_t line) {
+  if (writer->prompt) {
+    sp_prompt_log_str(writer->prompt, line);
+  } else {
+    sp_io_write_str(writer->downstream, line, SP_NULLPTR);
+    sp_io_write_c8(writer->downstream, '\n');
+  }
+}
+
+static void spn_tui_line_writer_complete_line(spn_tui_line_writer_t* writer) {
+  sp_str_t line = sp_str_trim_right(sp_str(writer->partial, sp_da_size(writer->partial)));
+
+  if (sp_str_empty(line)) {
+    writer->deferred_blanks++;
+  } else {
+    sp_for(it, writer->deferred_blanks) {
+      spn_tui_line_writer_emit(writer, sp_str_lit(""));
+    }
+    writer->deferred_blanks = 0;
+    spn_tui_line_writer_emit(writer, line);
+  }
+
+  sp_da_clear(writer->partial);
+}
+
+static sp_err_t spn_tui_line_writer_write(sp_io_writer_t* w, const void* ptr, u64 size, u64* bytes_written) {
+  spn_tui_line_writer_t* writer = (spn_tui_line_writer_t*)w;
+  const c8* bytes = (const c8*)ptr;
+
+  sp_for(it, size) {
+    c8 c = bytes[it];
+    if (c == '\n') {
+      spn_tui_line_writer_complete_line(writer);
+    } else {
+      sp_da_push(writer->partial, c);
+    }
+  }
+
+  if (bytes_written) {
+    *bytes_written = size;
+  }
+  return SP_OK;
+}
+
+static void spn_tui_line_writer_flush(spn_tui_line_writer_t* writer) {
+  if (!sp_da_empty(writer->partial)) {
+    spn_tui_line_writer_complete_line(writer);
+  }
+  writer->deferred_blanks = 0;
+}
+
+void spn_tui_attach_prompt(spn_tui_t* tui, sp_prompt_ctx_t* ctx) {
+  spn_tui_line_writer_flush(&tui->line_writer);
+  tui->line_writer.prompt = ctx;
+}
+
+void spn_tui_detach_prompt(spn_tui_t* tui) {
+  tui->line_writer.prompt = SP_NULLPTR;
+  spn_tui_line_writer_flush(&tui->line_writer);
 }
 
 void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode) {
   tui->mode = mode;
+  tui->line_writer = (spn_tui_line_writer_t) {
+    .base.write = spn_tui_line_writer_write,
+    .downstream = &spn.logger.err.base,
+  };
+  sp_da_init(spn.heap, tui->line_writer.partial);
+  tui->out = &tui->line_writer.base;
 
   switch (tui->mode) {
     case SPN_OUTPUT_MODE_INTERACTIVE: {
