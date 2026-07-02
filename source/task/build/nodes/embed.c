@@ -9,10 +9,13 @@
 #include "event/event.h"
 #include "intern/intern.h"
 #include "task/build/build.h"
+#include "unit/package.h"
 
 s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
   spn_target_unit_t* unit = (spn_target_unit_t*)user_data;
   spn_target_info_t* info = unit->info;
+
+  spn_pkg_unit_announce_compile(unit->pkg);
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_EMBED_START,

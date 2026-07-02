@@ -8,10 +8,13 @@
 #include "session/session.h"
 #include "task/build/build.h"
 #include "task/build/nodes/nodes.h"
+#include "unit/package.h"
 
 s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   spn_compile_unit_t* unit = (spn_compile_unit_t*)user_data;
   spn_session_t* session = unit->session;
+
+  spn_pkg_unit_announce_compile(unit->package);
 
   sp_str_t file = sp_fs_get_name(unit->paths.object);
   sp_str_t dir = sp_fs_parent_path(unit->paths.object);

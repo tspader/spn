@@ -543,6 +543,7 @@ static const c8* event_names[SPN_EVENT_COUNT] = {
   [SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK]       = "package_ok",
   [SPN_EVENT_BUILD_SCRIPT_CRASHED]          = "script_crashed",
   [SPN_EVENT_BUILD_SCRIPT_USER_FN]          = "script_user_fn",
+  [SPN_EVENT_COMPILE_START]                 = "compile_start",
   [SPN_EVENT_TARGET_BUILD_PASSED]           = "target_build_passed",
   [SPN_EVENT_TARGET_BUILD_FAILED]           = "target_build_failed",
   [SPN_EVENT_TARGET_RUN]                    = "target_run",

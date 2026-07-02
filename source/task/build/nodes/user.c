@@ -2,9 +2,12 @@
 
 #include "ctx/ctx.h"
 #include "event/event.h"
+#include "unit/package.h"
 
 s32 run_user_fn(spn_bg_cmd_t* cmd, void* user_data) {
   spn_user_node_t* node = (spn_user_node_t*)user_data;
+
+  spn_pkg_unit_announce_compile(node->pkg);
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SCRIPT_USER_FN,

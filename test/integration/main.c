@@ -947,6 +947,42 @@ UTEST_F(build_log, preserved_on_cache_hit) {
   });
 }
 
+UTEST_F(build_log, script_log_hidden_normally) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_script_log_hidden");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/script_log",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_CLI_NOT_CONTAINS, .verify_cli.needle = sp_str_lit("spn-script-probe-log") },
+    },
+  });
+}
+
+UTEST_F(build_log, script_log_shown_verbose) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_script_log_verbose");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/script_log",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--verbose" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("spn-script-probe-log") },
+    },
+  });
+}
+
+UTEST_F(build_log, script_log_shown_on_failure) {
+  tmpfs_init_named(&uf->fixture.fs, "build_log_script_log_failure");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/log/script_log_fail",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("spn-script-probe-fail") },
+    },
+  });
+}
+
 UTEST_F(build_log, rewritten_on_rebuild) {
   tmpfs_init_named(&uf->fixture.fs, "build_log_rewritten");
 
