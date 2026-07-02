@@ -91,6 +91,7 @@ add_executable(manifest_lower
   ${SRC}/codegen/lower.c
   ${SRC}/enum/enum.c
   ${SRC}/toolchain/catalog.c
+  ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/triple/triple.c
   ${SRC}/external/tom.c
   ${SRC}/intern/intern.c
@@ -108,6 +109,7 @@ target_include_directories(manifest_lower PRIVATE
 target_compile_definitions(manifest_lower PRIVATE
   MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest_lower/manifests")
 add_dependencies(manifest_lower spn_codegen_gen)
+target_link_libraries(manifest_lower PRIVATE yyjson)
 add_test(NAME manifest_lower COMMAND "$<TARGET_FILE:manifest_lower>")
 
 add_subdirectory(resolver)
