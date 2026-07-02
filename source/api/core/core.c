@@ -117,13 +117,12 @@ s32 spn_ar(spn_t* s, const c8** args) {
   return run_argv(unit, &unit->session->units.toolchain->archiver, args);
 }
 
-static spn_target_t* wrap_target(const void* spn, spn_target_info_t* info) {
+static spn_target_t* wrap_target(const void* opaque, spn_target_info_t* info) {
   if (!info) return SP_NULLPTR;
 
-  sp_mem_t mem = spn_api_unit(spn)->session->mem;
-  spn_target_t* target = sp_alloc_type(mem, spn_target_t);
+  spn_target_t* target = sp_alloc_type(spn.mem, spn_target_t);
   *target = (spn_target_t) {
-    .spn = (spn_t*)spn,
+    .spn = (spn_t*)opaque,
     .info = info,
   };
   return target;
@@ -176,14 +175,14 @@ const spn_t* spn_get_dep(const spn_t* s, const c8* name) {
 
 const c8* spn_get_dir(const spn_t* s, spn_dir_t dir) {
   spn_pkg_unit_t* unit = spn_api_unit(s);
-  return sp_str_to_cstr(unit->session->mem, spn_api_dir(unit, dir));
+  return sp_str_to_cstr(spn.mem, spn_api_dir(unit, dir));
 }
 
 const c8* spn_get_subdir(const spn_t* s, spn_dir_t base, const c8* path) {
   spn_pkg_unit_t* unit = spn_api_unit(s);
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_str_t joined = sp_fs_join_path(scratch.mem, spn_api_dir(unit, base), sp_str_view(path));
-  const c8* result = sp_str_to_cstr(unit->session->mem, joined);
+  const c8* result = sp_str_to_cstr(spn.mem, joined);
   sp_mem_end_scratch(scratch);
   return result;
 }
@@ -192,7 +191,7 @@ void spn_log(spn_t* s, const c8* message) {
   spn_pkg_unit_t* unit = spn_api_unit(s);
   spn_event_buffer_push_ex(spn.events, unit->info, &unit->logs.io, (spn_build_event_t) {
     .kind = SPN_EVENT_USER_LOG,
-    .user_log = { .message = sp_str_from_cstr(unit->session->mem, message) },
+    .user_log = { .message = sp_str_from_cstr(spn.mem, message) },
   });
 }
 

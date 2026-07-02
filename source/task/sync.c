@@ -143,7 +143,7 @@ static spn_err_t load_package(
   if (!info) {
     info = sp_alloc_type(session->mem, spn_pkg_info_t);
     spn_codegen_ctx_t ctx = sp_zero;
-    spn_codegen_ctx_init(&ctx, session->mem, session->mem, session->intern);
+    spn_codegen_ctx_init(&ctx, spn.mem, session->intern);
     if (spn_codegen_load_pkg(&ctx, loaded->paths.manifest, info)) {
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_ERR_MANIFEST,

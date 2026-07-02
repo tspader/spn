@@ -4,6 +4,7 @@
 
 #include "api/api.h"
 #include "api/core/types.h"
+#include "ctx/types.h"
 #include "enum/enum.h"
 #include "session/types.h"
 #include "profile/types.h"
@@ -47,7 +48,7 @@ s32 spn_cmake(spn_t* build) {
 }
 
 spn_cmake_t* spn_cmake_new(spn_t* build) {
-  sp_mem_t mem = spn_api_unit(build)->session->mem;
+  sp_mem_t mem = spn.mem;
   spn_cmake_t* cmake = sp_alloc_type(mem, spn_cmake_t);
   *cmake = (spn_cmake_t) {
     .mem = mem,

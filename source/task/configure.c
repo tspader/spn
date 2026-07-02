@@ -87,7 +87,7 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
   spn_tcc_err_ctx_t error_context = SP_ZERO_INITIALIZE();
 
   spn_cc_t cc;
-  spn_cc_init(&cc, session->mem);
+  spn_cc_init(&cc, spn.mem);
   spn_cc_add_runtime(&cc, spn.paths.runtime, spn.paths.include);
   spn_cc_set_profile(&cc, session->profile);
   spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_CC_OUTPUT_JIT, unit->info->name);
@@ -105,8 +105,8 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
     spn_cc_target_add_absolute_include(target, dep_unit->paths.source);
   }
 
-  unit->tcc = sp_alloc_type(session->mem, spn_tcc_t);
-  spn_tcc_init(session->mem, unit->tcc);
+  unit->tcc = sp_alloc_type(spn.mem, spn_tcc_t);
+  spn_tcc_init(spn.mem, unit->tcc);
   s32 try_err = 0;
   spn_try_goto(spn_cc_target_to_tcc(&cc, target, unit->tcc), try_err, fail);
   spn_try_goto(tcc_relocate(unit->tcc->s), try_err, fail);
@@ -153,8 +153,8 @@ spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
   if (!sp_fs_is_file(unit->paths.configure)) return SPN_OK;
 
   sp_tm_timer_t timer = sp_tm_start_timer();
-  spn_cc_t* cc = sp_alloc_type(session->mem, spn_cc_t);
-  spn_cc_init(cc, session->mem);
+  spn_cc_t* cc = sp_alloc_type(spn.mem, spn_cc_t);
+  spn_cc_init(cc, spn.mem);
 
   spn_profile_info_t profile = {
     .arch = SPN_ARCH_WASM32,
@@ -169,7 +169,7 @@ spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
   spn_cc_set_output_dir(cc, unit->paths.generated);
   spn_cc_set_toolchain(cc, session->units.zig);
   sp_da_for(unit->info->include, it) {
-    sp_str_t path = sp_fs_join_path(session->mem, unit->paths.source, unit->info->include[it]);
+    sp_str_t path = sp_fs_join_path(spn.mem, unit->paths.source, unit->info->include[it]);
     spn_cc_add_include(cc, path);
   }
 
@@ -277,7 +277,7 @@ static spn_err_t add_toolchain_download(spn_build_graph_t* graph, spn_session_t*
 spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->configure.graph;
-  spn_bg_init(graph, app->session.mem);
+  spn_bg_init(graph, spn.mem);
   spn_pkg_unit_t* root = spn_session_find_root(&app->session);
 
   // Add a graph node for each package

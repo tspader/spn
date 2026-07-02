@@ -59,17 +59,9 @@ typedef struct {
   sp_intern_t* intern;
   spn_jit_entry_t jit;
   sp_mem_t mem;
+  sp_mem_arena_t* arena;
+  sp_mem_t persistent;
   sp_env_t* env;
-
-  struct {
-    sp_mem_arena_t* bulk;
-  } arenas;
-  sp_mem_heap_t* heap;
-
-  struct {
-    sp_mem_t bulk;
-    sp_mem_t heap;
-  } allocators;
 
   struct {
     struct {

@@ -21,7 +21,7 @@ static sp_mem_t manifest_gen_mem(void) {
 
 static spn_codegen_ctx_t manifest_gen_ctx(sp_mem_t mem) {
   spn_codegen_ctx_t ctx = sp_zero;
-  spn_codegen_ctx_init(&ctx, mem, mem, sp_intern_new(mem));
+  spn_codegen_ctx_init(&ctx, mem, sp_intern_new(mem));
   return ctx;
 }
 

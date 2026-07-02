@@ -28,7 +28,7 @@ spn_registry_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_
 
   spn_pkg_info_t* info = sp_alloc_type(mem, spn_pkg_info_t);
   spn_codegen_ctx_t ctx = sp_zero;
-  spn_codegen_ctx_init(&ctx, mem, mem, intern);
+  spn_codegen_ctx_init(&ctx, mem, intern);
   if (spn_codegen_load_pkg(&ctx, manifest, info)) {
     err->error = spn_codegen_issues_message(mem, ctx.issues);
     return SP_NULLPTR;
