@@ -451,14 +451,6 @@ static void spn_prompt_pump(void) {
 sp_app_result_t spn_poll(sp_app_t* sp) {
   spn_prompt_start();
 
-  sp_str_t root_qualified = sp_str_lit("");
-  if (app.session.pkg) {
-    spn_pkg_unit_t* root = spn_session_find_root(&app.session);
-    if (root && root->info) {
-      root_qualified = root->info->qualified;
-    }
-  }
-
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_da(spn_build_event_t) events = spn_event_buffer_drain(scratch.mem, spn.events);
 
@@ -486,7 +478,7 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
     // write to tui (filtered by verbosity)
     if (spn_build_event_get_verbosity(event->kind) <= spn.logger.verbosity) {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      sp_str_t rendered = spn_tui_render_coarse_event(s.mem, event, spn.tui.info.max_name, root_qualified);
+      sp_str_t rendered = spn_tui_render_coarse_event(s.mem, event, spn.tui.info.max_name, app.session.pkg);
       if (!sp_str_empty(rendered)) {
         sp_da(sp_str_t) lines = sp_str_split_c8(s.mem, sp_str_trim_right(rendered), '\n');
         sp_da_for(lines, it) {

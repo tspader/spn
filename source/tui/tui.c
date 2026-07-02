@@ -706,7 +706,7 @@ static sp_str_t spn_tui_render_coarse_error(sp_mem_t mem, spn_build_event_t* eve
   return sp_io_dyn_mem_writer_take_str(&w);
 }
 
-sp_str_t spn_tui_render_coarse_event(sp_mem_t mem, spn_build_event_t* event, u32 max_name, sp_str_t root_qualified) {
+sp_str_t spn_tui_render_coarse_event(sp_mem_t mem, spn_build_event_t* event, u32 max_name, spn_pkg_info_t* root) {
   static sp_str_ht(bool) seen_pkg = SP_NULLPTR;
   static sp_str_ht(bool) seen_target = SP_NULLPTR;
   static sp_str_ht(bool) seen_url = SP_NULLPTR;
@@ -800,11 +800,9 @@ sp_str_t spn_tui_render_coarse_event(sp_mem_t mem, spn_build_event_t* event, u32
         );
       }
 
-      bool is_root = sp_str_valid(root_qualified) && sp_str_equal(event->pkg->qualified, root_qualified);
-      if (is_root && event->kind == SPN_EVENT_LINK_START && sp_str_valid(event->target.name)) {
-        sp_str_t key = sp_fmt(mem, "{}::{}", SP_FMT_STR(event->pkg->qualified), SP_FMT_STR(event->target.name)).value;
-        if (!sp_str_ht_get(seen_target, key)) {
-          sp_str_ht_insert(seen_target, sp_str_copy(spn.heap, key), true);
+      if (event->kind == SPN_EVENT_LINK_START && event->pkg == root) {
+        if (!sp_str_ht_get(seen_target, event->target.name)) {
+          sp_str_ht_insert(seen_target, event->target.name, true);
           return spn_tui_render_coarse_line(mem, sp_str_lit("Compiling"), event->pkg->name, event->target.name);
         }
       }
