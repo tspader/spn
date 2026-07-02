@@ -3,6 +3,7 @@
 #include "make.h"
 
 #include "api/api.h"
+#include "ctx/types.h"
 #include "session/types.h"
 #include "unit/types.h"
 
@@ -12,7 +13,7 @@ s32 spn_make(spn_t* build) {
 }
 
 spn_make_t* spn_make_new(spn_t* build) {
-  sp_mem_t mem = spn_api_unit(build)->session->mem;
+  sp_mem_t mem = spn.mem;
   spn_make_t* make = sp_alloc_type(mem, spn_make_t);
   *make = (spn_make_t) {
     .mem = mem,

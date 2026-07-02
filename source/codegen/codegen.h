@@ -29,7 +29,6 @@ typedef struct {
 
 typedef struct {
   sp_mem_t mem;
-  sp_mem_t bulk;
   sp_intern_t* intern;
   sp_str_t dir;
   spn_codegen_path_seg_t path[SPN_CODEGEN_PATH_MAX];
@@ -37,7 +36,7 @@ typedef struct {
   sp_da(spn_codegen_issue_t) issues;
 } spn_codegen_ctx_t;
 
-void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_mem_t bulk, sp_intern_t* intern);
+void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_intern_t* intern);
 
 void spn_codegen_push_key(spn_codegen_ctx_t* ctx, const c8* key);
 void spn_codegen_push_index(spn_codegen_ctx_t* ctx, u32 index);

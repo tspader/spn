@@ -131,7 +131,7 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_index_cache_init(&index, session->mem, session->intern, &spn.indexes);
 
   spn_resolver_t* resolver = sp_alloc_type(app->session.mem, spn_resolver_t);
-  spn_resolver_init(resolver, session->mem, session->intern, &index, &session->registry, spn.events);
+  spn_resolver_init(resolver, spn.mem, session->intern, &index, &session->registry, spn.events);
   app->resolver = resolver;
 
   spn_resolve_query_t query = sp_zero_initialize();

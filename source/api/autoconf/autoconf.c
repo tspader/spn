@@ -2,6 +2,7 @@
 
 #include "api/api.h"
 #include "api/core/types.h"
+#include "ctx/types.h"
 #include "session/types.h"
 #include "unit/types.h"
 
@@ -13,7 +14,7 @@ s32 spn_autoconf(spn_t* build) {
 }
 
 spn_autoconf_t* spn_autoconf_new(spn_t* build) {
-  sp_mem_t mem = spn_api_unit(build)->session->mem;
+  sp_mem_t mem = spn.mem;
   spn_autoconf_t* autoconf = sp_alloc_type(mem, spn_autoconf_t);
   *autoconf = (spn_autoconf_t) {
     .mem = mem,

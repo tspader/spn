@@ -5,12 +5,11 @@
 #include "sp/macro.h"
 #include "spn.h"
 
-void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_mem_t bulk, sp_intern_t* intern) {
+void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_intern_t* intern) {
   ctx->mem = mem;
-  ctx->bulk = bulk;
   ctx->intern = intern;
   ctx->depth = 0;
-  ctx->issues = sp_da_new(bulk, spn_codegen_issue_t);
+  ctx->issues = sp_da_new(mem, spn_codegen_issue_t);
 }
 
 void spn_codegen_push_key(spn_codegen_ctx_t* ctx, const c8* key) {
@@ -37,7 +36,7 @@ void spn_codegen_pop(spn_codegen_ctx_t* ctx) {
 
 static sp_str_t spn_codegen_path(spn_codegen_ctx_t* ctx) {
   sp_io_dyn_mem_writer_t writer;
-  sp_io_dyn_mem_writer_init(ctx->bulk, &writer);
+  sp_io_dyn_mem_writer_init(ctx->mem, &writer);
   sp_for(it, ctx->depth) {
     spn_codegen_path_seg_t* seg = &ctx->path[it];
     if (seg->kind == SPN_CODEGEN_PATH_KEY) {

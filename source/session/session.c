@@ -177,7 +177,7 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   sp_da_init(session->mem, unit->scripts);
   sp_da_init(session->mem, unit->tests);
   sp_da_init(session->mem, unit->targets);
-  sp_da_init(session->mem, unit->nodes.user);
+  sp_da_init(spn.mem, unit->nodes.user);
   sp_da_init(session->mem, unit->nodes.build.user);
   sp_str_ht_init(session->mem, unit->nodes.files);
   unit->paths.manifest = loaded->paths.manifest;

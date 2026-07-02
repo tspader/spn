@@ -22,7 +22,7 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
 
   spn_pkg_info_t info = SP_ZERO_INITIALIZE();
   spn_codegen_ctx_t ctx = sp_zero;
-  spn_codegen_ctx_init(&ctx, opts->mem, opts->mem, opts->intern);
+  spn_codegen_ctx_init(&ctx, opts->mem, opts->intern);
   if (spn_codegen_load_pkg(&ctx, manifest_path, &info)) {
     return spn_codegen_err(&ctx);
   }
