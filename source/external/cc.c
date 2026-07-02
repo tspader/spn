@@ -26,7 +26,7 @@ void spn_cc_add_runtime(spn_cc_t* cc, sp_str_t runtime, sp_str_t include) {
 }
 
 void spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_unit_t* toolchain) {
-  cc->driver = toolchain->info.driver;
+  cc->driver = toolchain->toolchain->driver;
   cc->compiler = toolchain->compiler;
   cc->archiver = toolchain->archiver;
   cc->linker = toolchain->linker;

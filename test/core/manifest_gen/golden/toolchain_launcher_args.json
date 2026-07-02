@@ -10,12 +10,6 @@
       "linker": "zig cc",
       "archiver": "ar",
       "driver": "clang",
-      "host": [
-        {
-          "arch": "x86_64",
-          "os": "linux"
-        }
-      ],
       "target": [
         {
           "arch": "x86_64",

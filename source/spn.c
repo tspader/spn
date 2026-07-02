@@ -244,8 +244,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     spn.paths.toolchain = sp_fs_join_path(spn.heap, spn.paths.cache, SP_LIT("toolchain"));
   }
 
-  spn.toolchains = spn_toolchain_load_builtins(spn_triple_host(), spn.heap);
-
   sp_fs_create_dir(spn.paths.log);
 
   spn_event_log_init(spn.heap);

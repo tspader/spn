@@ -43,17 +43,15 @@ typedef struct {
 
 typedef struct {
   const c8* name;
-  spn_toolchain_kind_t kind;
+  bool remote;
   const c8* url;
-  const c8* sysroot;
+  const c8* sha256;
+  const c8* mirrors;
   const c8* compiler;
   const c8* args [8];
   const c8* linker;
   const c8* archiver;
   spn_cc_driver_t driver;
-  bool export;
-  const c8* package;
-  spn_triple_t hosts [4];
   spn_triple_t targets [4];
 } toolchain_t;
 
@@ -237,17 +235,17 @@ static void run_case(s32* utest_result, test_t test) {
     toolchain_t expected = test.toolchains[it];
     if (!expected.name) break;
 
-    spn_toolchain_entry_t* tc = sp_str_om_get(pkg.toolchains, sp_str_view(expected.name));
+    spn_toolchain_t* tc = sp_str_om_get(pkg.toolchains, sp_str_view(expected.name));
     ASSERT_TRUE(tc);
-    EXPECT_EQ((u32)expected.kind, (u32)tc->kind);
+    EXPECT_EQ(expected.remote, !sp_opt_is_null(tc->artifact));
 
-    if (expected.url)      EXPECT_STR(tc->info.url, expected.url);
-    if (expected.sysroot)  EXPECT_STR(tc->info.sysroot, expected.sysroot);
-    if (expected.compiler) EXPECT_STR(tc->info.compiler.program, expected.compiler);
-    if (expected.linker)   EXPECT_STR(tc->info.linker.program, expected.linker);
-    if (expected.archiver) EXPECT_STR(tc->info.archiver.program, expected.archiver);
-    if (expected.driver)   EXPECT_EQ((u32)expected.driver, (u32)tc->info.driver);
-    EXPECT_EQ(expected.export, tc->info.export);
+    if (expected.url)     EXPECT_STR(sp_opt_get(tc->artifact).url, expected.url);
+    if (expected.sha256)  EXPECT_STR(sp_opt_get(tc->artifact).sha256, expected.sha256);
+    if (expected.mirrors) EXPECT_STR(sp_opt_get(tc->artifact).mirrors, expected.mirrors);
+    if (expected.compiler) EXPECT_STR(tc->compiler.program, expected.compiler);
+    if (expected.linker)   EXPECT_STR(tc->linker.program, expected.linker);
+    if (expected.archiver) EXPECT_STR(tc->archiver.program, expected.archiver);
+    if (expected.driver)   EXPECT_EQ((u32)expected.driver, (u32)tc->driver);
 
     u32 num_args = 0;
     sp_carr_for(expected.args, a) {
@@ -255,24 +253,17 @@ static void run_case(s32* utest_result, test_t test) {
       num_args++;
     }
     if (num_args) {
-      ASSERT_EQ(num_args, (u32)sp_da_size(tc->info.compiler.args));
-      sp_for(a, num_args) EXPECT_STR(tc->info.compiler.args[a], expected.args[a]);
-    }
-
-    sp_carr_for(expected.hosts, h) {
-      spn_triple_t triple = expected.hosts[h];
-      if (triple.arch == SPN_ARCH_NONE) break;
-      EXPECT_EQ((u32)triple.arch, (u32)tc->info.hosts[h].arch);
-      EXPECT_EQ((u32)triple.os, (u32)tc->info.hosts[h].os);
-      EXPECT_EQ((u32)triple.abi, (u32)tc->info.hosts[h].abi);
+      ASSERT_EQ(num_args, (u32)sp_da_size(tc->compiler.args));
+      sp_for(a, num_args) EXPECT_STR(tc->compiler.args[a], expected.args[a]);
     }
 
     sp_carr_for(expected.targets, t) {
       spn_triple_t triple = expected.targets[t];
       if (triple.arch == SPN_ARCH_NONE) break;
-      EXPECT_EQ((u32)triple.arch, (u32)tc->info.targets[t].arch);
-      EXPECT_EQ((u32)triple.os, (u32)tc->info.targets[t].os);
-      EXPECT_EQ((u32)triple.abi, (u32)tc->info.targets[t].abi);
+      ASSERT_TRUE(t < sp_da_size(tc->targets));
+      EXPECT_EQ((u32)triple.arch, (u32)tc->targets[t].arch);
+      EXPECT_EQ((u32)triple.os, (u32)tc->targets[t].os);
+      EXPECT_EQ((u32)triple.abi, (u32)tc->targets[t].abi);
     }
   }
 
@@ -517,12 +508,11 @@ UTEST(lower, validate_toolchain_incomplete) {
   });
 }
 
-UTEST(lower, validate_toolchain_no_host) {
+UTEST(lower, validate_toolchain_url_without_sha) {
   run_case(utest_result, (test_t) {
-    .manifest = "toolchain_no_host",
+    .manifest = "toolchain_no_sha",
     .issues = {
-      { SPN_CODEGEN_ERR_MISSING_KEY, "toolchain[0].host" },
-      { SPN_CODEGEN_ERR_MISSING_KEY, "toolchain[0].target" }
+      { SPN_CODEGEN_ERR_MISSING_KEY, "toolchain[0].sha256" }
     }
   });
 }
@@ -573,16 +563,15 @@ UTEST(lower, toolchain_inline) {
     .toolchains = {
       {
         .name = "zig",
-        .kind = SPN_TOOLCHAIN_REMOTE,
+        .remote = true,
         .url = "https://tc",
-        .sysroot = "/sys",
+        .sha256 = "deadbeef",
+        .mirrors = "https://mirrors",
         .compiler = "zig",
         .args = { "cc", "-target", "x86_64-linux-gnu" },
         .linker = "zig",
         .archiver = "ar",
         .driver = SPN_CC_DRIVER_CLANG,
-        .export = true,
-        .hosts = { { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU } },
         .targets = { { SPN_ARCH_ARM64, SPN_OS_MACOS } },
       },
     },

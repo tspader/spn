@@ -29,7 +29,7 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   // 1. Seed the default profile with hardcoded base values
   spn_profile_info_t default_profile = {
     .name      = sp_str_lit("default"),
-    .toolchain = sp_str_lit("builtin"),
+    .toolchain = sp_str_lit("system"),
     .linkage   = SPN_LIB_KIND_SHARED,
     .standard  = SPN_C11,
     .mode      = SPN_BUILD_MODE_DEBUG,

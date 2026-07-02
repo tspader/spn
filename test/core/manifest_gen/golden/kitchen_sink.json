@@ -83,15 +83,6 @@
       "linker": "ld",
       "archiver": "ar",
       "driver": "gcc",
-      "version": "13.2",
-      "export": true,
-      "host": [
-        {
-          "arch": "x86_64",
-          "os": "linux",
-          "abi": "gnu"
-        }
-      ],
       "target": [
         {
           "arch": "aarch64",

@@ -11,6 +11,7 @@
 #include "resolve/types.h"
 #include "session/registry/types.h"
 #include "toolchain/types.h"
+#include "toolchain/select.h"
 #include "unit/types.h"
 
 typedef enum {
@@ -52,7 +53,8 @@ struct spn_session_t {
   sp_env_t env;
 
   spn_profile_table_t profiles;
-  sp_str_ht(spn_toolchain_entry_t) toolchains;
+  spn_toolchain_catalog_t toolchains;
+  spn_toolchain_selection_t selection;
 
   spn_resolve_t resolve;
   spn_pkg_registry_t registry;
@@ -65,7 +67,8 @@ struct spn_session_t {
     sp_om(spn_target_unit_id_t, spn_target_unit_t) targets;
     sp_om(spn_pkg_unit_id_t, spn_pkg_unit_t) packages;
     spn_toolchain_unit_t* toolchain;
-    spn_toolchain_unit_t* zig;
+    spn_toolchain_unit_t* script;
+    sp_da(spn_toolchain_unit_t*) toolchains;
   } units;
 
   struct {

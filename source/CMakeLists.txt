@@ -87,8 +87,10 @@ set(SPN_SOURCES
   task/test.c
   task/unit.c
   task/which.c
-  toolchain/builtins.c
-  toolchain/launcher.c
+  toolchain/catalog.c
+  toolchain/provision.c
+  toolchain/select.c
+  toolchain/sha256.c
   toolchain/toolchain.c
   triple/triple.c
   tui/table.c

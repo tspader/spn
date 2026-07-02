@@ -10,6 +10,9 @@ spn_arch_t spn_arch_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "aarch64")) {
     return SPN_ARCH_ARM64;
   }
+  else if (sp_str_equal_cstr(str, "wasm32")) {
+    return SPN_ARCH_WASM32;
+  }
 
   return SPN_ARCH_NONE;
 }
@@ -43,6 +46,9 @@ spn_os_t spn_os_from_str(sp_str_t str) {
   }
   else if (sp_str_equal_cstr(str, "macos")) {
     return SPN_OS_MACOS;
+  }
+  else if (sp_str_equal_cstr(str, "wasi")) {
+    return SPN_OS_WASI;
   }
   return SPN_OS_NONE;
 }

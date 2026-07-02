@@ -204,8 +204,4 @@ spn_index_info_t* spn_pkg_add_index_ex(spn_pkg_info_t* pkg, sp_str_t name, sp_st
   return sp_str_om_get(pkg->indexes, index.name);
 }
 
-spn_err_t spn_pkg_add_toolchain(spn_pkg_info_t* pkg, spn_toolchain_entry_t entry) {
-  sp_str_om_insert(pkg->toolchains, entry.name, entry);
-  return SPN_OK;
-}
 

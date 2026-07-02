@@ -1,7 +1,0 @@
-[package]
-name = "p"
-version = "1.0.0"
-
-[[toolchain]]
-package = "zig"
-version = "^0.13.0"
