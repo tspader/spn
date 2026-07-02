@@ -3,8 +3,14 @@ namespace = "spader"
 name = "spn"
 version = "0.2.0"
 repo = "tspader/spn"
-build = "tools/spn/build.c"
-configure = "tools/spn/configure.c"
+include = ["include", "source/codegen/gen"]
+
+[package.configure]
+source = ["tools/spn/configure.c"]
+include = ["include", "source/codegen/gen"]
+
+[package.build]
+source = ["tools/spn/build.c"]
 include = ["include", "source/codegen/gen"]
 
 [deps.package]

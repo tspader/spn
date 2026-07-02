@@ -50,8 +50,17 @@
         "include": { "elements": { "type": "string" } },
         "define": { "elements": { "type": "string" } },
         "system_deps": { "elements": { "type": "string" } },
-        "build": { "type": "string" },
-        "configure": { "type": "string" }
+        "build": { "ref": "build_script" },
+        "configure": { "ref": "build_script" }
+      }
+    },
+
+    "build_script": {
+      "optionalProperties": {
+        "source": { "elements": { "type": "string" } },
+        "include": { "elements": { "type": "string" } },
+        "define": { "elements": { "type": "string" } },
+        "flags": { "elements": { "type": "string" } }
       }
     },
 

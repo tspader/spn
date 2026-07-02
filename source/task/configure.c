@@ -96,6 +96,7 @@ spn_err_t compile_shim(spn_session_t* session, spn_pkg_unit_t* unit) {
 }
 
 spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
+  spn_target_info_t* script = &unit->info->configure;
   if (!sp_fs_is_file(unit->paths.configure)) return SPN_OK;
 
   sp_tm_timer_t timer = sp_tm_start_timer();
@@ -114,17 +115,21 @@ spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
   spn_cc_set_profile(cc, profile);
   spn_cc_set_output_dir(cc, unit->paths.generated);
   spn_cc_set_toolchain(cc, session->units.script);
-  sp_da_for(unit->info->include, it) {
-    sp_str_t path = sp_fs_join_path(spn.mem, unit->paths.source, unit->info->include[it]);
-    spn_cc_add_include(cc, path);
-  }
-
-  sp_da_for(unit->info->define, it) {
-    spn_cc_add_define(cc, unit->info->define[it]);
-  }
+  spn_cc_add_include(cc, spn.paths.include);
 
   spn_cc_target_t* target = spn_cc_add_target(cc, SPN_CC_OUTPUT_WASM, sp_str_lit("configure.wasm"));
-  spn_cc_target_add_absolute_source(target, unit->paths.configure);
+  sp_da_for(script->source, it) {
+    spn_cc_target_add_absolute_source(target, script->source[it]);
+  }
+  sp_da_for(script->include, it) {
+    spn_cc_target_add_absolute_include(target, script->include[it]);
+  }
+  sp_da_for(script->define, it) {
+    spn_cc_target_add_define(target, script->define[it]);
+  }
+  sp_da_for(script->flags, it) {
+    spn_cc_target_add_flag(target, script->flags[it]);
+  }
 
   spn_cc_run_t run = spn_cc_target_run(target, unit->paths.work);
 

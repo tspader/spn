@@ -1,0 +1,15 @@
+[package]
+name = "configure_table"
+version = "0.0.1"
+
+[package.configure]
+source = ["tools/configure.c"]
+include = ["include"]
+define = ["DEFINE_FROM_TOML"]
+
+[package.build]
+source = ["tools/build.c"]
+
+[[bin]]
+name = "configure_table"
+source = ["main.c"]

@@ -1,0 +1,7 @@
+[package]
+name = "configure_error"
+version = "0.0.1"
+
+[[bin]]
+name = "configure_error"
+source = ["main.c"]

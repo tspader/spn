@@ -184,10 +184,7 @@ const c8*     spn_get_subdir(const spn_t* spn, spn_dir_t base, const c8* path);
 void          spn_target_add_source(spn_target_t* target, const c8* source);
 void          spn_target_add_include(spn_target_t* target, const c8* include);
 void          spn_target_add_define(spn_target_t* target, const c8* define);
-// flags are passed verbatim to the compiler when this target's sources compile
 void          spn_target_add_flag(spn_target_t* target, const c8* flag);
-// a lib that isn't linked builds and installs its artifact, but consumers
-// neither link it nor depend on it; its linkage ignores the profile
 void          spn_target_set_linked(spn_target_t* target, s32 linked);
 void          spn_target_embed_file(spn_target_t* target, const c8* file);
 void          spn_target_embed_file_ex(spn_target_t* target, const c8* file, const c8* symbol, const c8* data_type, const c8* size_type);
