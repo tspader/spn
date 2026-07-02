@@ -1,6 +1,8 @@
 #ifndef SPN_TUI_TYPES_H
 #define SPN_TUI_TYPES_H
 
+#include "sp/macro.h"
+
 #include "sp.h"
 #include "sp/sp_math.h"
 #include "sp/prompt.h"
@@ -8,25 +10,6 @@
 #if defined(SP_POSIX)
   #include <termios.h>
 #endif
-
-#define SPN_SPINNER_TRAIL_LEN 6
-#define SPN_SPINNER_CYCLE_MS 500.0f
-#define SPN_SPINNER_HOLD_START_MS 500.0f
-#define SPN_SPINNER_HOLD_END_MS 100.0f
-
-#define SPN_SPINNER_ACTIVE "\u25A0"
-#define SPN_SPINNER_INACTIVE "\u2B1D"
-
-typedef struct spn_spinner_t {
-  sp_interp_t interp;
-  bool forward;
-  bool render_forward;
-  f32 hold_ms;
-  f32 hold_total_ms;
-  f32 value;
-  u32 width;
-  sp_color_t color;
-} spn_spinner_t;
 
 #define SPN_OUTPUT_MODE(X) \
   X(SPN_OUTPUT_MODE_INTERACTIVE) \
@@ -62,6 +45,7 @@ typedef struct {
 } sp_tui_column_t;
 
 typedef struct {
+  sp_mem_t mem;
   sp_da(sp_tui_column_t) cols;
   sp_da(sp_da(sp_str_t)) rows;
   sp_tui_cursor_t cursor;
@@ -76,7 +60,6 @@ typedef struct {
   u32 width;
   sp_ht(sp_str_t, s32) state;
   void* build;
-  spn_spinner_t spinner;
 
   struct {
     sp_prompt_ctx_t* ctx;

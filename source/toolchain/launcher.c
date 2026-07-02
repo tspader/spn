@@ -1,15 +1,16 @@
 #include "toolchain/launcher.h"
 
-sp_str_t spn_toolchain_launcher_to_str(spn_toolchain_launcher_t launcher) {
+sp_str_t spn_toolchain_launcher_to_str(sp_mem_t mem, spn_toolchain_launcher_t launcher) {
   if (sp_da_empty(launcher.args)) {
-    return launcher.program;
+    return sp_str_copy(mem, launcher.program);
   }
 
-  sp_str_builder_t b = SP_ZERO_INITIALIZE();
-  sp_str_builder_append(&b, launcher.program);
+  sp_io_dyn_mem_writer_t w;
+  sp_io_dyn_mem_writer_init(mem, &w);
+  sp_io_write_str(&w.base, launcher.program, SP_NULLPTR);
   sp_da_for(launcher.args, i) {
-    sp_str_builder_append_c8(&b, ' ');
-    sp_str_builder_append(&b, launcher.args[i]);
+    sp_io_write_c8(&w.base, ' ');
+    sp_io_write_str(&w.base, launcher.args[i], SP_NULLPTR);
   }
-  return sp_str_builder_to_str(&b);
+  return sp_io_dyn_mem_writer_take_str(&w);
 }

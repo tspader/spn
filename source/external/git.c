@@ -1,7 +1,10 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "git.h"
 
 spn_err_t spn_git_clone(sp_str_t url, sp_str_t path) {
-  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("clone"), SP_LIT("--quiet"),
@@ -9,6 +12,7 @@ spn_err_t spn_git_clone(sp_str_t url, sp_str_t path) {
       path
     },
   });
+  sp_mem_end_scratch(scratch);
 
   if (result.status.exit_code) return SPN_ERROR;
   if (!sp_fs_is_dir(path)) return SPN_ERROR;
@@ -17,48 +21,54 @@ spn_err_t spn_git_clone(sp_str_t url, sp_str_t path) {
 }
 
 spn_err_t spn_git_pull(sp_str_t repo) {
-  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
       SP_LIT("pull"), SP_LIT("--ff-only"), SP_LIT("--quiet")
     },
   });
+  sp_mem_end_scratch(scratch);
 
   if (result.status.exit_code) return SPN_ERROR;
   return SPN_OK;
 }
 
 spn_err_t spn_git_fetch(sp_str_t repo) {
-  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
       SP_LIT("fetch"), SP_LIT("--quiet")
     },
   });
+  sp_mem_end_scratch(scratch);
 
   if (result.status.exit_code) return SPN_ERROR;
   return SPN_OK;
 }
 
 u32 spn_git_num_updates(sp_str_t repo, sp_str_t from, sp_str_t to) {
-  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
-      SP_LIT("rev-list"), sp_format("{}..{}", SP_FMT_STR(from), SP_FMT_STR(to)),
+      SP_LIT("rev-list"), sp_fmt(scratch.mem, "{}..{}", sp_fmt_str(from), sp_fmt_str(to)).value,
       SP_LIT("--count")
     },
   });
   SP_ASSERT_FMT(!result.status.exit_code, "Failed to get commit delta for {.cyan}", SP_FMT_STR(repo));
 
-  sp_str_t trimmed = sp_str_trim_right(result.out);
-  return sp_parse_u32(trimmed);
+  u32 count = sp_parse_u32(sp_str_trim_right(result.out));
+  sp_mem_end_scratch(scratch);
+  return count;
 }
 
-spn_err_t spn_git_get_remote_url(sp_str_t repo, sp_str_t* url) {
-  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
+spn_err_t spn_git_get_remote_url(sp_mem_t mem, sp_str_t repo, sp_str_t* url) {
+  sp_ps_output_t result = sp_ps_run(mem, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
@@ -71,8 +81,8 @@ spn_err_t spn_git_get_remote_url(sp_str_t repo, sp_str_t* url) {
   return SPN_OK;
 }
 
-spn_err_t spn_git_get_commit(sp_str_t repo, sp_str_t id, sp_str_t* sha) {
-  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
+spn_err_t spn_git_get_commit(sp_mem_t mem, sp_str_t repo, sp_str_t id, sp_str_t* sha) {
+  sp_ps_output_t result = sp_ps_run(mem, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
@@ -87,8 +97,8 @@ spn_err_t spn_git_get_commit(sp_str_t repo, sp_str_t id, sp_str_t* sha) {
   return SPN_OK;
 }
 
-sp_str_t spn_git_get_commit_message(sp_str_t repo, sp_str_t id) {
-  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
+sp_str_t spn_git_get_commit_message(sp_mem_t mem, sp_str_t repo, sp_str_t id) {
+  sp_ps_output_t result = sp_ps_run(mem, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
@@ -104,8 +114,8 @@ sp_str_t spn_git_get_commit_message(sp_str_t repo, sp_str_t id) {
   return sp_str_trim_right(result.out);
 }
 
-spn_err_t spn_git_get_root(sp_str_t cwd, sp_str_t* root) {
-  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
+spn_err_t spn_git_get_root(sp_mem_t mem, sp_str_t cwd, sp_str_t* root) {
+  sp_ps_output_t result = sp_ps_run(mem, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), cwd,
@@ -122,7 +132,8 @@ spn_err_t spn_git_checkout(sp_str_t repo, sp_str_t id) {
   if (sp_str_empty(id)) return SPN_ERROR;
   if (!sp_fs_exists(repo)) return SPN_ERROR;
 
-  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), repo,
@@ -131,6 +142,7 @@ spn_err_t spn_git_checkout(sp_str_t repo, sp_str_t id) {
       id
     }
   });
+  sp_mem_end_scratch(scratch);
 
   if (result.status.exit_code) return SPN_ERROR;
   return SPN_OK;

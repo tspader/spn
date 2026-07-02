@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "cc.h"
 #include "error/types.h"
 #include "forward/types.h"
@@ -11,14 +13,14 @@
 #include "task/build/build.h"
 
 // Manifest includes are source-relative; the build script API hands us absolute paths
-static sp_str_t resolve_pkg_include(spn_pkg_unit_t* pkg, sp_str_t include) {
+static sp_str_t resolve_pkg_include(sp_mem_t mem, spn_pkg_unit_t* pkg, sp_str_t include) {
   if (sp_str_starts_with(include, sp_str_lit("/"))) return include;
-  return sp_fs_join_path(spn_mem_todo, pkg->paths.source, include);
+  return sp_fs_join_path(mem, pkg->paths.source, include);
 }
 
 void add_pkg_to_cc(spn_cc_t* cc, spn_pkg_unit_t* pkg) {
   sp_da_for(pkg->info->include, it) {
-    spn_cc_add_include(cc, resolve_pkg_include(pkg, pkg->info->include[it]));
+    spn_cc_add_include(cc, resolve_pkg_include(cc->mem, pkg, pkg->info->include[it]));
   }
 
   sp_da_for(pkg->info->define, it) {
@@ -28,7 +30,7 @@ void add_pkg_to_cc(spn_cc_t* cc, spn_pkg_unit_t* pkg) {
 
 void add_pkg_to_cc_target(spn_cc_target_t* target, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
   sp_da_for(info->include, i) {
-    spn_cc_target_add_absolute_include(target, resolve_pkg_include(pkg, info->include[i]));
+    spn_cc_target_add_absolute_include(target, resolve_pkg_include(target->cc->mem, pkg, info->include[i]));
   }
 
   sp_da_for(info->define, i) {
@@ -81,28 +83,44 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
   }
 }
 
-sp_str_t get_embed_object_path(spn_target_unit_t* unit) {
-  return sp_fs_join_path(spn_mem_todo, unit->paths.generated, sp_format("{}.embed.o", SP_FMT_STR(unit->info->name)));
+sp_str_t get_embed_object_path(sp_mem_t mem, spn_target_unit_t* unit) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t name = sp_fmt(scratch.mem, "{}.embed.o", SP_FMT_STR(unit->info->name)).value;
+  sp_str_t path = sp_fs_join_path(mem, unit->paths.generated, name);
+  sp_mem_end_scratch(scratch);
+  return path;
 }
 
-sp_str_t get_embed_header_path(spn_target_unit_t* unit) {
-  return sp_fs_join_path(spn_mem_todo, unit->paths.generated, sp_format("{}.embed.h", SP_FMT_STR(unit->info->name)));
+sp_str_t get_embed_header_path(sp_mem_t mem, spn_target_unit_t* unit) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t name = sp_fmt(scratch.mem, "{}.embed.h", SP_FMT_STR(unit->info->name)).value;
+  sp_str_t path = sp_fs_join_path(mem, unit->paths.generated, name);
+  sp_mem_end_scratch(scratch);
+  return path;
 }
 
-sp_str_t get_target_output_path(spn_target_unit_t* target) {
+sp_str_t get_target_output_path(sp_mem_t mem, spn_target_unit_t* target) {
   spn_target_info_t* info = target->info;
 
   spn_toolchain_unit_t* toolchain = target->session->units.toolchain;
   spn_profile_info_t profile = target->session->profile;
   switch (target->kind) {
     case SPN_CC_OUTPUT_EXE: {
-      return sp_fs_join_path(spn_mem_todo, target->paths.bin, info->name);
+      return sp_fs_join_path(mem, target->paths.bin, info->name);
     }
     case SPN_CC_OUTPUT_STATIC_LIB: {
-      return sp_fs_join_path(spn_mem_todo, target->paths.lib, sp_os_lib_to_file_name(spn_mem_todo, info->name, SP_OS_LIB_STATIC));
+      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+      sp_str_t file_name = sp_os_lib_to_file_name(scratch.mem, info->name, SP_OS_LIB_STATIC);
+      sp_str_t path = sp_fs_join_path(mem, target->paths.lib, file_name);
+      sp_mem_end_scratch(scratch);
+      return path;
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
-      return sp_fs_join_path(spn_mem_todo, target->paths.lib, sp_os_lib_to_file_name(spn_mem_todo, info->name, SP_OS_LIB_SHARED));
+      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+      sp_str_t file_name = sp_os_lib_to_file_name(scratch.mem, info->name, SP_OS_LIB_SHARED);
+      sp_str_t path = sp_fs_join_path(mem, target->paths.lib, file_name);
+      sp_mem_end_scratch(scratch);
+      return path;
     }
     case SPN_CC_OUTPUT_JIT:
     case SPN_CC_OUTPUT_WASM:

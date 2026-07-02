@@ -45,10 +45,11 @@ UTEST_F(om, insertion_order) {
 }
 
 UTEST_F(om, iteration) {
+  sp_mem_t mem = sp_mem_os_new();
   sp_str_om(s32) map = SP_NULLPTR;
 
   for (s32 i = 0; i < 5; i++) {
-    sp_str_t key = sp_format("{}", SP_FMT_S32(i));
+    sp_str_t key = sp_fmt(mem, "{}", sp_fmt_int(i)).value;
     sp_str_om_insert(map, key, i * 10);
   }
 
@@ -75,13 +76,14 @@ UTEST_F(om, has_key) {
 }
 
 UTEST_F(om, stable_pointers) {
+  sp_mem_t mem = sp_mem_os_new();
   sp_str_om(s32) map = SP_NULLPTR;
 
   sp_str_om_insert(map, sp_str_lit("first"), 100);
   s32* first = sp_str_om_at(map, 0);
 
   for (s32 i = 0; i < 100; i++) {
-    sp_str_t key = sp_format("key{}", SP_FMT_S32(i));
+    sp_str_t key = sp_fmt(mem, "key{}", sp_fmt_int(i)).value;
     sp_str_om_insert(map, key, i);
   }
 

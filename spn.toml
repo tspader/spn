@@ -68,13 +68,13 @@ target = [
 name = "spn"
 source = ["source/**/*.c"]
 include = ["include", "source", "source/external", "source/codegen/gen"]
-flags = ["-include", "sp/compat.h"]
+flags = []
 
 [[test]]
 name = "om"
 source = ["test/core/ordered_map.c"]
 include = ["include", "source"]
-flags = ["-include", "sp/compat.h"]
+flags = []
 
 [[test]]
 name = "intern"
@@ -85,13 +85,13 @@ source = [
   "test/core/intern.c"
 ]
 include = ["include", "source"]
-flags = ["-include", "sp/compat.h"]
+flags = []
 
 [[test]]
 name = "graph"
 source = ["test/core/graph.c"]
 include = ["test/sp_test", "include", "source", "test/core"]
-flags = ["-include", "sp/compat.h", "-DSP_IMPLEMENTATION", "-DSP_TEST_IMPLEMENTATION", "-DSP_GRAPH_IMPLEMENTATION"]
+flags = ["-DSP_IMPLEMENTATION", "-DSP_TEST_IMPLEMENTATION", "-DSP_GRAPH_IMPLEMENTATION"]
 
 [[test]]
 name = "index"
@@ -117,7 +117,7 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "test/tools"]
-flags = ["-include", "sp/compat.h"]
+flags = []
 
 [[test]]
 name = "resolver"
@@ -155,7 +155,7 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "test/tools"]
-flags = ["-include", "sp/compat.h"]
+flags = []
 
 [[test]]
 name = "publish"
@@ -195,7 +195,7 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "test/tools"]
-flags = ["-include", "sp/compat.h"]
+flags = []
 
 [[test]]
 name = "lock"
@@ -213,7 +213,7 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "test/tools"]
-flags = ["-include", "sp/compat.h"]
+flags = []
 
 [[test]]
 name = "git"
@@ -232,7 +232,7 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "test/tools"]
-flags = ["-include", "sp/compat.h"]
+flags = []
 
 [[test]]
 name = "triple"
@@ -243,7 +243,7 @@ source = [
   "test/core/triple.c",
 ]
 include = ["include", "source", "test/tools"]
-flags = ["-include", "sp/compat.h"]
+flags = []
 
 [[test]]
 name = "integration"
@@ -257,4 +257,4 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "source/external", "test/integration", "test/tools"]
-flags = ["-include", "sp/compat.h"]
+flags = []

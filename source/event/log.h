@@ -3,7 +3,7 @@
 
 #include "event/types.h"
 
-void spn_event_log_init(void);
+void spn_event_log_init(sp_mem_t mem);
 void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event);
 void spn_event_log_build(sp_io_writer_t* out, spn_build_event_t* event);
 

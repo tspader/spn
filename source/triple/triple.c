@@ -32,16 +32,16 @@ spn_triple_t spn_triple_from_str(sp_str_t str) {
   return result;
 }
 
-sp_str_t spn_triple_to_str(spn_triple_t triple) {
+sp_str_t spn_triple_to_str(sp_mem_t mem, spn_triple_t triple) {
   sp_str_t arch = spn_arch_to_str(triple.arch);
   sp_str_t os = spn_os_to_str(triple.os);
   sp_str_t abi = spn_abi_to_str(triple.abi);
 
   if (triple.abi) {
-    return sp_format("{}-{}-{}", SP_FMT_STR(arch), SP_FMT_STR(os), SP_FMT_STR(abi));
+    return sp_fmt(mem, "{}-{}-{}", sp_fmt_str(arch), sp_fmt_str(os), sp_fmt_str(abi)).value;
   }
   if (triple.os) {
-    return sp_format("{}-{}", SP_FMT_STR(arch), SP_FMT_STR(os));
+    return sp_fmt(mem, "{}-{}", sp_fmt_str(arch), sp_fmt_str(os)).value;
   }
   return arch;
 }
@@ -91,7 +91,7 @@ bool spn_triple_match(spn_triple_t entry, spn_triple_t target) {
   return true;
 }
 
-sp_str_t spn_triple_to_cc_target(spn_triple_t triple) {
+sp_str_t spn_triple_to_cc_target(sp_mem_t mem, spn_triple_t triple) {
   sp_str_t arch = spn_arch_to_str(triple.arch);
   sp_str_t os = spn_os_to_str(triple.os);
 
@@ -109,15 +109,15 @@ sp_str_t spn_triple_to_cc_target(spn_triple_t triple) {
   }
 
   if (triple.abi) {
-    return sp_format("{}-{}-{}", SP_FMT_STR(arch), SP_FMT_STR(os), SP_FMT_STR(abi));
+    return sp_fmt(mem, "{}-{}-{}", sp_fmt_str(arch), sp_fmt_str(os), sp_fmt_str(abi)).value;
   }
   if (triple.os) {
-    return sp_format("{}-{}", SP_FMT_STR(arch), SP_FMT_STR(os));
+    return sp_fmt(mem, "{}-{}", sp_fmt_str(arch), sp_fmt_str(os)).value;
   }
   return arch;
 }
 
-sp_str_t spn_triple_to_autoconf(spn_triple_t triple) {
+sp_str_t spn_triple_to_autoconf(sp_mem_t mem, spn_triple_t triple) {
   sp_str_t arch = spn_arch_to_str(triple.arch);
 
   // Autoconf uses GNU 4-part triples: arch-vendor-os-abi
@@ -127,16 +127,16 @@ sp_str_t spn_triple_to_autoconf(spn_triple_t triple) {
   switch (triple.os) {
     case SPN_OS_LINUX: {
       sp_str_t abi = spn_abi_to_str(triple.abi);
-      return sp_format("{}-unknown-linux-{}", SP_FMT_STR(arch), SP_FMT_STR(abi));
+      return sp_fmt(mem, "{}-unknown-linux-{}", sp_fmt_str(arch), sp_fmt_str(abi)).value;
     }
     case SPN_OS_WINDOWS: {
-      return sp_format("{}-w64-mingw32", SP_FMT_STR(arch));
+      return sp_fmt(mem, "{}-w64-mingw32", sp_fmt_str(arch)).value;
     }
     case SPN_OS_MACOS: {
-      return sp_format("{}-apple-darwin", SP_FMT_STR(arch));
+      return sp_fmt(mem, "{}-apple-darwin", sp_fmt_str(arch)).value;
     }
     case SPN_OS_WASI: {
-      return sp_format("{}-wasi", SP_FMT_STR(arch));
+      return sp_fmt(mem, "{}-wasi", sp_fmt_str(arch)).value;
     }
     case SPN_OS_NONE: {
       return arch;

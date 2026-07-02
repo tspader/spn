@@ -1,3 +1,4 @@
+#include "sp/macro.h"
 #include "sp.h"
 #include "spn.h"
 #include "sp/sp_glob.h"
@@ -42,7 +43,7 @@ sp_str_t spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-sp_ps_output_t spn_api_subprocess(spn_pkg_unit_t* unit, sp_ps_config_t config) {
+sp_ps_output_t spn_api_subprocess(sp_mem_t mem, spn_pkg_unit_t* unit, sp_ps_config_t config) {
   SPN_API_LOG(unit, "spn_api_subprocess", "{}", SP_FMT_STR(config.command));
 
   if (sp_str_empty(config.cwd)) {
@@ -70,7 +71,7 @@ sp_ps_output_t spn_api_subprocess(spn_pkg_unit_t* unit, sp_ps_config_t config) {
     config.env.extra[slot++] = (sp_env_var_t) { .key = *it.key, .value = *it.val };
   }
 
-  sp_ps_output_t result = sp_ps_run(spn_mem_todo, config);
+  sp_ps_output_t result = sp_ps_run(mem, config);
   if (!sp_str_empty(result.out)) {
     sp_io_write_str(&unit->logs.io.build.writer, result.out, SP_NULLPTR);
   }
@@ -78,12 +79,13 @@ sp_ps_output_t spn_api_subprocess(spn_pkg_unit_t* unit, sp_ps_config_t config) {
 }
 
 static s32 run_argv(spn_pkg_unit_t* unit, spn_toolchain_launcher_t* launcher, const c8** args) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_ps_config_t config = SP_ZERO_INITIALIZE();
 
   if (launcher) {
     config.command = launcher->program;
     sp_da_for(launcher->args, it) {
-      sp_ps_config_add_arg(spn_mem_todo, &config, launcher->args[it]);
+      sp_ps_config_add_arg(scratch.mem, &config, launcher->args[it]);
     }
   }
   else {
@@ -92,11 +94,13 @@ static s32 run_argv(spn_pkg_unit_t* unit, spn_toolchain_launcher_t* launcher, co
   }
 
   for (const c8** arg = args; *arg; arg++) {
-    sp_ps_config_add_arg(spn_mem_todo, &config, sp_str_view(*arg));
+    sp_ps_config_add_arg(scratch.mem, &config, sp_str_view(*arg));
   }
 
-  sp_ps_output_t result = spn_api_subprocess(unit, config);
-  return result.status.exit_code;
+  sp_ps_output_t result = spn_api_subprocess(scratch.mem, unit, config);
+  s32 exit_code = result.status.exit_code;
+  sp_mem_end_scratch(scratch);
+  return exit_code;
 }
 
 s32 spn_exec(spn_t* s, const c8** args) {
@@ -116,9 +120,12 @@ s32 spn_ar(spn_t* s, const c8** args) {
 static spn_target_t* wrap_target(const void* spn, spn_target_info_t* info) {
   if (!info) return SP_NULLPTR;
 
-  spn_target_t* target = sp_alloc_type(spn_mem_todo, spn_target_t);
-  target->spn = (spn_t*)spn;
-  target->info = info;
+  sp_mem_t mem = spn_api_unit(spn)->session->mem;
+  spn_target_t* target = sp_alloc_type(mem, spn_target_t);
+  *target = (spn_target_t) {
+    .spn = (spn_t*)spn,
+    .info = info,
+  };
   return target;
 }
 
@@ -168,18 +175,24 @@ const spn_t* spn_get_dep(const spn_t* s, const c8* name) {
 }
 
 const c8* spn_get_dir(const spn_t* s, spn_dir_t dir) {
-  return sp_str_to_cstr(spn_mem_todo, spn_api_dir(spn_api_unit(s), dir));
+  spn_pkg_unit_t* unit = spn_api_unit(s);
+  return sp_str_to_cstr(unit->session->mem, spn_api_dir(unit, dir));
 }
 
 const c8* spn_get_subdir(const spn_t* s, spn_dir_t base, const c8* path) {
-  return sp_str_to_cstr(spn_mem_todo, sp_fs_join_path(spn_mem_todo, spn_api_dir(spn_api_unit(s), base), sp_str_view(path)));
+  spn_pkg_unit_t* unit = spn_api_unit(s);
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t joined = sp_fs_join_path(scratch.mem, spn_api_dir(unit, base), sp_str_view(path));
+  const c8* result = sp_str_to_cstr(unit->session->mem, joined);
+  sp_mem_end_scratch(scratch);
+  return result;
 }
 
 void spn_log(spn_t* s, const c8* message) {
   spn_pkg_unit_t* unit = spn_api_unit(s);
   spn_event_buffer_push_ex(spn.events, unit->info, &unit->logs.io, (spn_build_event_t) {
     .kind = SPN_EVENT_USER_LOG,
-    .user_log = { .message = sp_str_from_cstr(spn_mem_todo, message) },
+    .user_log = { .message = sp_str_from_cstr(unit->session->mem, message) },
   });
 }
 
@@ -187,22 +200,28 @@ void spn_write_file(spn_t* s, const c8* path, const c8* content) {
   spn_pkg_unit_t* unit = spn_api_unit(s);
   SPN_API_LOG(unit, "spn_write_file", "{}", SP_FMT_CSTR(path));
 
-  sp_str_t full_path = sp_fs_join_path(spn_mem_todo, unit->paths.work, sp_str_view(path));
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t full_path = sp_fs_join_path(scratch.mem, unit->paths.work, sp_str_view(path));
   sp_str_t parent = sp_fs_parent_path(full_path);
   if (!sp_str_empty(parent)) {
     sp_fs_create_dir(parent);
   }
 
-  sp_io_writer_t* io = sp_io_writer_from_file(full_path, SP_IO_WRITE_MODE_OVERWRITE);
-  sp_io_write_cstr(io, content, SP_NULLPTR);
-  sp_io_writer_close(io);
+  sp_io_file_writer_t writer;
+  sp_io_file_writer_from_path(&writer, full_path);
+  sp_io_write_cstr(&writer.base, content, SP_NULLPTR);
+  sp_io_file_writer_close(&writer);
+  sp_mem_end_scratch(scratch);
 }
 
 s32 spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir, const c8* to_path) {
   spn_pkg_unit_t* unit = spn_api_unit(s);
-  sp_str_t from = sp_fs_join_path(spn_mem_todo, spn_api_dir(unit, from_dir), sp_str_view(from_path));
-  sp_str_t to = sp_fs_join_path(spn_mem_todo, spn_api_dir(unit, to_dir), sp_str_view(to_path));
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t from = sp_fs_join_path(scratch.mem, spn_api_dir(unit, from_dir), sp_str_view(from_path));
+  sp_str_t to = sp_fs_join_path(scratch.mem, spn_api_dir(unit, to_dir), sp_str_view(to_path));
   SPN_API_LOG(unit, "spn_copy", "{} -> {}", SP_FMT_STR(from), SP_FMT_STR(to));
+
+  s32 err = SPN_OK;
 
   // sp_fs_copy only understands a bare "*" or an exact name; expand real glob
   // patterns (e.g. "lib/*.o") ourselves against the source directory.
@@ -211,27 +230,30 @@ s32 spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir
     sp_str_t dir = sp_fs_parent_path(from);
     sp_fs_create_dir(to);
 
-    sp_glob_set_t* glob = sp_glob_set_new(spn_mem_todo);
-    sp_glob_set_add(glob, sp_str_to_cstr(spn_mem_todo, pattern));
+    sp_glob_set_t* glob = sp_glob_set_new(scratch.mem);
+    sp_glob_set_add(glob, sp_str_to_cstr(scratch.mem, pattern));
     sp_glob_set_build(glob);
 
-    sp_da(sp_fs_entry_t) entries = sp_fs_collect(spn_mem_todo, dir);
+    sp_da(sp_fs_entry_t) entries = sp_fs_collect(scratch.mem, dir);
     sp_da_for(entries, i) {
       if (sp_glob_set_match(glob, entries[i].name)) {
-        sp_fs_copy(sp_fs_join_path(spn_mem_todo, dir, entries[i].name), to);
+        sp_fs_copy(sp_fs_join_path(scratch.mem, dir, entries[i].name), to);
       }
     }
-    return SPN_OK;
+  }
+  else {
+    // @spader This bit me so I just patched it over like this, but
+    // I need to think about how this should work
+    sp_str_t parent = sp_fs_parent_path(to);
+    if (!sp_str_empty(parent)) {
+      sp_fs_create_dir(parent);
+    }
+
+    err = sp_fs_copy(from, to);
   }
 
-  // @spader This bit me so I just patched it over like this, but
-  // I need to think about how this should work
-  sp_str_t parent = sp_fs_parent_path(to);
-  if (!sp_str_empty(parent)) {
-    sp_fs_create_dir(parent);
-  }
-
-  return sp_fs_copy(from, to);
+  sp_mem_end_scratch(scratch);
+  return err;
 }
 
 spn_profile_t* spn_get_profile(spn_t* s) {

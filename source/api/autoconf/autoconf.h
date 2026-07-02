@@ -5,6 +5,7 @@
 #include "spn.h"
 
 struct spn_autoconf {
+  sp_mem_t mem;
   spn_t* build;
   sp_da(sp_str_t) flags;
 };

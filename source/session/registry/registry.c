@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "session/registry/registry.h"
 
 #include "ctx/types.h"

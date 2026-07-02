@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "git/key.h"
 
 sp_str_t spn_git_url_name(sp_str_t url) {
@@ -19,13 +21,13 @@ sp_str_t spn_git_url_name(sp_str_t url) {
   return sp_str_suffix(url, url.len - last_sep);
 }
 
-sp_str_t spn_git_db_key(sp_str_t url) {
+sp_str_t spn_git_db_key(sp_mem_t mem, sp_str_t url) {
   sp_str_t name = spn_git_url_name(url);
   sp_hash_t hash = sp_hash_bytes(url.data, url.len, 0);
-  return sp_format("{}-{}", SP_FMT_STR(name), SP_FMT_HASH(hash));
+  return sp_fmt(mem, "{}-{:0>16x}", sp_fmt_str(name), sp_fmt_uint(hash)).value;
 }
 
-sp_str_t spn_git_checkout_key(sp_str_t url, sp_str_t rev, sp_str_t dir) {
+sp_str_t spn_git_checkout_key(sp_mem_t mem, sp_str_t url, sp_str_t rev, sp_str_t dir) {
   sp_str_t name = spn_git_url_name(url);
 
   sp_hash_t parts[] = {
@@ -35,5 +37,5 @@ sp_str_t spn_git_checkout_key(sp_str_t url, sp_str_t rev, sp_str_t dir) {
   };
   sp_hash_t hash = sp_hash_combine(parts, SP_CARR_LEN(parts));
 
-  return sp_format("{}-{}", SP_FMT_STR(name), SP_FMT_HASH(hash));
+  return sp_fmt(mem, "{}-{:0>16x}", sp_fmt_str(name), sp_fmt_uint(hash)).value;
 }

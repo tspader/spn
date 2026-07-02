@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "git/cache.h"
 
 #include "external/git.h"
@@ -12,6 +14,9 @@ void spn_git_cache_init(spn_git_cache_t* cache, sp_mem_t mem, sp_intern_t* inter
     .checkouts.dir = sp_fs_join_path(mem, root, SP_LIT("checkouts")),
   };
 
+  sp_str_ht_init(mem, cache->db.entries);
+  sp_str_om_init(cache->checkouts.entries);
+
   sp_fs_create_dir(cache->db.dir);
   sp_fs_create_dir(cache->checkouts.dir);
 }
@@ -19,7 +24,7 @@ void spn_git_cache_init(spn_git_cache_t* cache, sp_mem_t mem, sp_intern_t* inter
 spn_err_t spn_git_cache_ensure_db(spn_git_cache_t* cache, sp_str_t url, spn_git_db_t** out) {
   *out = SP_NULLPTR;
 
-  sp_str_t key = spn_git_db_key(url);
+  sp_str_t key = spn_git_db_key(cache->mem, url);
 
   spn_git_db_t* existing = sp_str_ht_get(cache->db.entries, key);
   if (existing) {
@@ -30,7 +35,8 @@ spn_err_t spn_git_cache_ensure_db(spn_git_cache_t* cache, sp_str_t url, spn_git_
   sp_str_t path = sp_fs_join_path(cache->mem, cache->db.dir, key);
 
   if (!sp_fs_is_dir(path)) {
-    sp_ps_output_t result = sp_ps_run(cache->mem, (sp_ps_config_t) {
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
       .command = SP_LIT("git"),
       .args = {
         SP_LIT("clone"), SP_LIT("--bare"), SP_LIT("--quiet"),
@@ -38,6 +44,7 @@ spn_err_t spn_git_cache_ensure_db(spn_git_cache_t* cache, sp_str_t url, spn_git_
         path
       },
     });
+    sp_mem_end_scratch(scratch);
 
     if (result.status.exit_code) return SPN_ERROR;
   }
@@ -52,45 +59,42 @@ spn_err_t spn_git_cache_ensure_db(spn_git_cache_t* cache, sp_str_t url, spn_git_
 }
 
 spn_err_t spn_git_db_ensure_rev(spn_git_db_t* db, sp_str_t rev) {
-  sp_ps_output_t result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+
+  sp_ps_config_t cat_file = {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("-C"), db->path,
       SP_LIT("cat-file"), SP_LIT("-t"), rev
     },
     .io.err.mode = SP_PS_IO_MODE_NULL,
-  });
+  };
 
-  if (!result.status.exit_code) return SPN_OK;
+  sp_ps_output_t result = sp_ps_run(scratch.mem, cat_file);
 
-  result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
-    .command = SP_LIT("git"),
-    .args = {
-      SP_LIT("-C"), db->path,
-      SP_LIT("fetch"), SP_LIT("--quiet"), SP_LIT("origin")
-    },
-    .io.err.mode = SP_PS_IO_MODE_NULL,
-  });
+  if (result.status.exit_code) {
+    result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
+      .command = SP_LIT("git"),
+      .args = {
+        SP_LIT("-C"), db->path,
+        SP_LIT("fetch"), SP_LIT("--quiet"), SP_LIT("origin")
+      },
+      .io.err.mode = SP_PS_IO_MODE_NULL,
+    });
 
-  if (result.status.exit_code) return SPN_ERROR;
+    if (!result.status.exit_code) {
+      result = sp_ps_run(scratch.mem, cat_file);
+    }
+  }
 
-  result = sp_ps_run(spn_mem_todo, (sp_ps_config_t) {
-    .command = SP_LIT("git"),
-    .args = {
-      SP_LIT("-C"), db->path,
-      SP_LIT("cat-file"), SP_LIT("-t"), rev
-    },
-    .io.err.mode = SP_PS_IO_MODE_NULL,
-  });
-
-  if (result.status.exit_code) return SPN_ERROR;
-  return SPN_OK;
+  sp_mem_end_scratch(scratch);
+  return result.status.exit_code ? SPN_ERROR : SPN_OK;
 }
 
 spn_err_t spn_git_cache_ensure_checkout(spn_git_cache_t* cache, spn_git_checkout_id_t id, spn_git_checkout_t** out) {
   *out = SP_NULLPTR;
 
-  sp_str_t key = spn_git_checkout_key(id.url, id.rev, id.dir);
+  sp_str_t key = spn_git_checkout_key(cache->mem, id.url, id.rev, id.dir);
 
   spn_git_checkout_t** existing = sp_str_om_getp(cache->checkouts.entries, key);
   if (existing) {
@@ -105,7 +109,8 @@ spn_err_t spn_git_cache_ensure_checkout(spn_git_cache_t* cache, spn_git_checkout
   sp_str_t path = sp_fs_join_path(cache->mem, cache->checkouts.dir, key);
 
   if (!sp_fs_is_dir(path)) {
-    sp_ps_output_t result = sp_ps_run(cache->mem, (sp_ps_config_t) {
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
       .command = SP_LIT("git"),
       .args = {
         SP_LIT("clone"), SP_LIT("--shared"), SP_LIT("--quiet"),
@@ -113,6 +118,7 @@ spn_err_t spn_git_cache_ensure_checkout(spn_git_cache_t* cache, spn_git_checkout
         path
       },
     });
+    sp_mem_end_scratch(scratch);
     if (result.status.exit_code) return SPN_ERROR;
 
     spn_try(spn_git_checkout(path, id.rev));

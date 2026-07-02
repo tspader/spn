@@ -54,12 +54,13 @@ typedef sp_bind_field_t sp_bind_t;
 #define SP_BIND_STACK_MAX 32
 
 typedef struct {
+  sp_mem_t mem;
   sp_bind_t* root;
   sp_bind_field_t* stack[SP_BIND_STACK_MAX];
   u32 depth;
 } sp_bind_builder_t;
 
-sp_bind_builder_t  sp_bind_builder_begin();
+sp_bind_builder_t  sp_bind_builder_begin(sp_mem_t mem);
 sp_bind_t*         sp_bind_builder_end(sp_bind_builder_t* b);
 void               sp_bind_builder_push_object(sp_bind_builder_t* b, const c8* key, u32 offset);
 void               sp_bind_builder_push_array(sp_bind_builder_t* b, const c8* key, u32 offset, u32 element_size);
@@ -77,7 +78,6 @@ sp_bind_field_t*   sp_bind_find(sp_bind_t* bind, const c8* key);
 u32                sp_bind_field_count(sp_bind_t* bind);
 void*              sp_bind_field_ptr(sp_bind_field_t* field, void* base);
 u32                sp_bind_kind_size(sp_bind_kind_t kind);
-void               sp_bind_free(sp_bind_t* bind);
 
 // ============================================================================
 // Macros
@@ -111,8 +111,9 @@ void               sp_bind_free(sp_bind_t* bind);
 // Implementation
 // ============================================================================
 
-sp_bind_builder_t sp_bind_builder_begin() {
-  sp_bind_builder_t b = SP_ZERO_INITIALIZE();
+sp_bind_builder_t sp_bind_builder_begin(sp_mem_t mem) {
+  sp_bind_builder_t b = sp_zero;
+  b.mem = mem;
   return b;
 }
 
@@ -137,12 +138,13 @@ void sp_bind_builder_push_object(sp_bind_builder_t* b, const c8* key, u32 offset
     .kind = SP_BIND_OBJECT,
     .offset = offset,
   };
+  sp_da_init(b->mem, field.as.object.fields);
 
   if (b->depth == 0) {
-    sp_bind_field_t* heap = SP_ALLOC(sp_bind_field_t);
-    *heap = field;
-    b->root = heap;
-    sp_bind_builder_push(b, heap);
+    sp_bind_field_t* root = sp_alloc_type(b->mem, sp_bind_field_t);
+    *root = field;
+    b->root = root;
+    sp_bind_builder_push(b, root);
   } else {
     sp_bind_field_t* parent = sp_bind_builder_current(b);
     SP_ASSERT(parent->kind == SP_BIND_OBJECT);
@@ -186,11 +188,12 @@ void sp_bind_builder_push_map(sp_bind_builder_t* b, const c8* key, u32 offset, u
 void sp_bind_builder_push_entry_object(sp_bind_builder_t* b) {
   sp_bind_field_t* parent = sp_bind_builder_current(b);
 
-  sp_bind_field_t* entry = SP_ALLOC(sp_bind_field_t);
+  sp_bind_field_t* entry = sp_alloc_type(b->mem, sp_bind_field_t);
   *entry = (sp_bind_field_t) {
     .kind = SP_BIND_OBJECT,
     .offset = SP_BIND_NO_OFFSET,
   };
+  sp_da_init(b->mem, entry->as.object.fields);
 
   if (parent->kind == SP_BIND_ARRAY) {
     parent->as.array.element = entry;
@@ -206,7 +209,7 @@ void sp_bind_builder_push_entry_object(sp_bind_builder_t* b) {
 void sp_bind_builder_add_entry(sp_bind_builder_t* b, sp_bind_kind_t kind) {
   sp_bind_field_t* parent = sp_bind_builder_current(b);
 
-  sp_bind_field_t* entry = SP_ALLOC(sp_bind_field_t);
+  sp_bind_field_t* entry = sp_alloc_type(b->mem, sp_bind_field_t);
   *entry = (sp_bind_field_t) {
     .kind = kind,
     .offset = SP_BIND_NO_OFFSET,
@@ -283,54 +286,6 @@ u32 sp_bind_kind_size(sp_bind_kind_t kind) {
   }
   SP_ASSERT(false);
   return 0;
-}
-
-SP_PRIVATE void sp_bind_free_field(sp_bind_field_t* field);
-
-SP_PRIVATE void sp_bind_free_fields(sp_da(sp_bind_field_t) fields) {
-  sp_da_for(fields, i) {
-    sp_bind_free_field(&fields[i]);
-  }
-  sp_da_free(fields);
-}
-
-SP_PRIVATE void sp_bind_free_field(sp_bind_field_t* field) {
-  switch (field->kind) {
-    case SP_BIND_OBJECT: {
-      sp_bind_free_fields(field->as.object.fields);
-      break;
-    }
-    case SP_BIND_ARRAY: {
-      if (field->as.array.element) {
-        sp_bind_free_field(field->as.array.element);
-        spn_free(field->as.array.element);
-      }
-      break;
-    }
-    case SP_BIND_MAP: {
-      if (field->as.map.value) {
-        sp_bind_free_field(field->as.map.value);
-        spn_free(field->as.map.value);
-      }
-      break;
-    }
-    case SP_BIND_NONE:
-    case SP_BIND_STR:
-    case SP_BIND_BOOL:
-    case SP_BIND_S32:
-    case SP_BIND_S64:
-    case SP_BIND_U32:
-    case SP_BIND_U64:
-    case SP_BIND_F64: {
-      break;
-    }
-  }
-}
-
-void sp_bind_free(sp_bind_t* bind) {
-  SP_ASSERT(bind);
-  sp_bind_free_field(bind);
-  spn_free(bind);
 }
 
 #endif // SPN_BIND_H

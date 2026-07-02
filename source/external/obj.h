@@ -21,7 +21,7 @@ typedef struct {
 } spn_obj_builder_t;
 
 spn_obj_kind_t spn_obj_get_native_format();
-void           spn_obj_init(spn_obj_builder_t* obj, spn_obj_kind_t kind);
+void           spn_obj_init(spn_obj_builder_t* obj, sp_mem_t mem, spn_obj_kind_t kind);
 void           spn_obj_add_symbol(spn_obj_builder_t* obj, sp_str_t name, const void* data, u64 size);
 spn_err_t      spn_obj_write(spn_obj_builder_t* obj, sp_str_t path);
 

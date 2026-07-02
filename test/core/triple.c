@@ -75,7 +75,7 @@ UTEST(triple, to_str) {
   };
 
   sp_carr_for(tests, it) {
-    sp_str_t result = spn_triple_to_str(tests[it].triple);
+    sp_str_t result = spn_triple_to_str(sp_mem_os_new(), tests[it].triple);
     EXPECT_TRUE(sp_str_equal_cstr(result, tests[it].expected));
   }
 }
@@ -130,7 +130,7 @@ UTEST(triple, host) {
   EXPECT_NE(host.os, SPN_OS_NONE);
 
   // roundtrip: to_str then from_str should match
-  sp_str_t str = spn_triple_to_str(host);
+  sp_str_t str = spn_triple_to_str(sp_mem_os_new(), host);
   spn_triple_t roundtrip = spn_triple_from_str(str);
   EXPECT_EQ(roundtrip.arch, host.arch);
   EXPECT_EQ(roundtrip.os, host.os);

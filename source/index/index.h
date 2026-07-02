@@ -4,7 +4,7 @@
 #include "error/types.h"
 #include "index/types.h"
 
-void             spn_index_init(spn_index_info_t* index);
+void             spn_index_init(spn_index_info_t* index, sp_mem_t mem);
 void             spn_index_deinit(spn_index_info_t* index);
 spn_err_t        spn_index_sync(spn_index_info_t* index);
 spn_index_pkg_t* spn_index_get_package(spn_index_info_t* index, spn_pkg_id_t pkg);

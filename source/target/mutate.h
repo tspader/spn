@@ -4,6 +4,15 @@
 #include "forward/types.h"
 #include "target/types.h"
 
+static inline void spn_target_info_init(sp_mem_t mem, spn_target_info_t* target) {
+  if (!target->source)  sp_da_init(mem, target->source);
+  if (!target->headers) sp_da_init(mem, target->headers);
+  if (!target->include) sp_da_init(mem, target->include);
+  if (!target->define)  sp_da_init(mem, target->define);
+  if (!target->flags)   sp_da_init(mem, target->flags);
+  if (!target->deps)    sp_da_init(mem, target->deps);
+  if (!target->embed)   sp_da_init(mem, target->embed);
+}
 void spn_target_add_source_ex(spn_target_info_t* target, sp_str_t source);
 void spn_target_add_header_ex(spn_target_info_t* target, sp_str_t header);
 void spn_target_add_include_ex(spn_target_info_t* target, sp_str_t include);

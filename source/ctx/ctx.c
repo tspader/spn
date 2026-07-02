@@ -10,11 +10,11 @@ spn_log_level_t spn_ctx_get_log_level(void) {
 }
 
 sp_io_writer_t* spn_ctx_get_log_out(void) {
-  return spn.logger.out;
+  return &spn.logger.out.base;
 }
 
 sp_io_writer_t* spn_ctx_get_log_err(void) {
-  return spn.logger.err;
+  return &spn.logger.err.base;
 }
 
 sp_str_t spn_ctx_source_cache_root(void) {

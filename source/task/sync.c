@@ -40,9 +40,9 @@ SP_PRIVATE spn_toolchain_unit_t* setup_toolchain_unit(spn_session_t* session, sp
   unit->pkg = session->pkg;
 
   sp_str_t name = entry->name;
-  spn_lazy_log_init(&unit->logs.build, sp_fs_join_path(session->mem, spn.paths.log, sp_format("toolchain.{}.build.log", SP_FMT_STR(name))), SP_IO_WRITE_MODE_OVERWRITE);
-  spn_lazy_log_init(&unit->logs.test,  sp_fs_join_path(session->mem, spn.paths.log, sp_format("toolchain.{}.test.log",  SP_FMT_STR(name))), SP_IO_WRITE_MODE_OVERWRITE);
-  spn_lazy_log_init(&unit->logs.jsonl, sp_fs_join_path(session->mem, spn.paths.log, sp_format("toolchain.{}.jsonl",     SP_FMT_STR(name))), SP_IO_WRITE_MODE_OVERWRITE);
+  spn_lazy_log_init(&unit->logs.build, sp_fs_join_path(session->mem, spn.paths.log, sp_fmt(session->mem, "toolchain.{}.build.log", sp_fmt_str(name)).value));
+  spn_lazy_log_init(&unit->logs.test,  sp_fs_join_path(session->mem, spn.paths.log, sp_fmt(session->mem, "toolchain.{}.test.log",  sp_fmt_str(name)).value));
+  spn_lazy_log_init(&unit->logs.jsonl, sp_fs_join_path(session->mem, spn.paths.log, sp_fmt(session->mem, "toolchain.{}.jsonl",     sp_fmt_str(name)).value));
 
   if (sp_str_empty(entry->info.url)) {
     unit->compiler = entry->info.compiler;
@@ -51,8 +51,10 @@ SP_PRIVATE spn_toolchain_unit_t* setup_toolchain_unit(spn_session_t* session, sp
     return unit;
   }
 
-  sp_str_t key = sp_format("{}-{}-{}", SP_FMT_STR(name), SP_FMT_STR(entry->info.version), SP_FMT_STR(entry->info.sha));
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t key = sp_fmt(scratch.mem, "{}-{}-{}", sp_fmt_str(name), sp_fmt_str(entry->info.version), sp_fmt_str(entry->info.sha)).value;
   sp_str_t store = sp_fs_join_path(session->mem, spn.paths.toolchain, key);
+  sp_mem_end_scratch(scratch);
   sp_fs_create_dir(store);
 
   unit->url = entry->info.url;
@@ -60,9 +62,9 @@ SP_PRIVATE spn_toolchain_unit_t* setup_toolchain_unit(spn_session_t* session, sp
   unit->paths.work = store;
   unit->paths.stamp = sp_fs_join_path(session->mem, store, sp_str_lit("download.stamp"));
 
-  unit->compiler = spn_toolchain_launcher_with_root(entry->info.compiler, store);
-  unit->linker   = spn_toolchain_launcher_with_root(entry->info.linker, store);
-  unit->archiver = spn_toolchain_launcher_with_root(entry->info.archiver, store);
+  unit->compiler = spn_toolchain_launcher_with_root(session->mem, entry->info.compiler, store);
+  unit->linker   = spn_toolchain_launcher_with_root(session->mem, entry->info.linker, store);
+  unit->archiver = spn_toolchain_launcher_with_root(session->mem, entry->info.archiver, store);
 
   return unit;
 }
@@ -238,7 +240,7 @@ void add_compilation_units(spn_session_t* session, spn_resolver_t* resolver) {
     spn_resolved_pkg_t* pkg = it.val;
     spn_pkg_unit_t* unit = spn_session_find_pkg_by_qualified(session, pkg->qualified);
 
-    sp_da(spn_pkg_unit_t*) deps = sp_zero;
+    sp_da(spn_pkg_unit_t*) deps = sp_da_new(session->mem, spn_pkg_unit_t*);
     sp_da_for(pkg->deps, j) {
       spn_pkg_unit_t* dep = spn_session_find_pkg_by_qualified(session, pkg->deps[j].qualified);
       sp_da_push(deps, dep);
@@ -282,9 +284,9 @@ spn_task_result_t spn_task_sync_init(spn_app_t* app) {
 
   sp_env_t* env = &session->env;
   sp_env_init(app->session.mem, env);
-  sp_env_insert(env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(session->units.toolchain->compiler));
-  sp_env_insert(env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(session->units.toolchain->archiver));
-  sp_env_insert(env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(session->units.toolchain->linker));
+  sp_env_insert(env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(session->mem, session->units.toolchain->compiler));
+  sp_env_insert(env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(session->mem, session->units.toolchain->archiver));
+  sp_env_insert(env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(session->mem, session->units.toolchain->linker));
 
   return SPN_TASK_CONTINUE;
 }

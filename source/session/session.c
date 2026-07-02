@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "ctx/types.h"
 #include "forward/types.h"
 #include "resolve/types.h"
@@ -11,7 +13,7 @@
 #include "log/lazy/lazy.h"
 #include "pkg/pkg.h"
 #include "session/session.h"
-#include "sp/hash.h"
+#include "sp/str.h"
 
 // The root manifest can pin the lib kind of any package in the build with [config.<pkg>] kind
 sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pkg_name) {
@@ -79,7 +81,7 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_info_t* pkg) {
 
   fingerprint_t id = SP_ZERO_INITIALIZE();
   id.hash = sp_hash_bytes(&fingerprint, sizeof(fingerprint), 0);
-  id.str = sp_format("{}", SP_FMT_HASH(id.hash));
+  id.str = sp_fmt(session->mem, "{:0>16x}", sp_fmt_uint(id.hash)).value;
   return id;
 }
 
@@ -122,6 +124,10 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
   target->session = session;
   target->pkg = pkg;
   target->info = info;
+  sp_da_init(session->mem, target->objects);
+  sp_da_init(session->mem, target->deps.target);
+  sp_da_init(session->mem, target->deps.package);
+  sp_da_init(session->mem, target->nodes.source);
 
   sp_da_push(pkg->targets, target);
   switch (info->kind) {
@@ -140,9 +146,9 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
   target->paths.vendor = sp_fs_join_path(session->mem, target->paths.store, SP_LIT("vendor"));
   target->paths.generated = sp_fs_join_path(session->mem, target->paths.work, SP_LIT("spn"));
   target->paths.object = sp_fs_join_path(session->mem, target->paths.generated, sp_str_lit("object"));
-  target->paths.logs.build = sp_fs_join_path(session->mem, target->paths.work, sp_format("{}.build.log", SP_FMT_STR(info->name)));
-  target->paths.logs.test = sp_fs_join_path(session->mem, target->paths.work, sp_format("{}.test.log", SP_FMT_STR(info->name)));
-  target->paths.logs.jsonl = sp_fs_join_path(session->mem, target->paths.work, sp_format("{}.build.jsonl", SP_FMT_STR(info->name)));
+  target->paths.logs.build = sp_fs_join_path(session->mem, target->paths.work, sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(info->name)).value);
+  target->paths.logs.test = sp_fs_join_path(session->mem, target->paths.work, sp_fmt(session->mem, "{}.test.log", SP_FMT_STR(info->name)).value);
+  target->paths.logs.jsonl = sp_fs_join_path(session->mem, target->paths.work, sp_fmt(session->mem, "{}.build.jsonl", SP_FMT_STR(info->name)).value);
 
   sp_fs_create_dir(target->paths.work);
   sp_fs_create_dir(target->paths.generated);
@@ -152,8 +158,8 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
   sp_fs_create_dir(target->paths.include);
   sp_fs_create_dir(target->paths.lib);
   sp_fs_create_dir(target->paths.vendor);
-  spn_lazy_log_init(&target->logs.build, target->paths.logs.build, SP_IO_WRITE_MODE_OVERWRITE);
-  spn_lazy_log_init(&target->logs.jsonl, target->paths.logs.jsonl, SP_IO_WRITE_MODE_OVERWRITE);
+  spn_lazy_log_init(&target->logs.build, target->paths.logs.build);
+  spn_lazy_log_init(&target->logs.jsonl, target->paths.logs.jsonl);
   return target;
 }
 
@@ -165,6 +171,15 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   unit->id = id;
   unit->info = loaded->info;
   unit->session = session;
+  sp_da_init(session->mem, unit->objects);
+  sp_da_init(session->mem, unit->libs);
+  sp_da_init(session->mem, unit->exes);
+  sp_da_init(session->mem, unit->scripts);
+  sp_da_init(session->mem, unit->tests);
+  sp_da_init(session->mem, unit->targets);
+  sp_da_init(session->mem, unit->nodes.user);
+  sp_da_init(session->mem, unit->nodes.build.user);
+  sp_str_ht_init(session->mem, unit->nodes.files);
   unit->paths.manifest = loaded->paths.manifest;
   unit->paths.script = loaded->paths.script;
   unit->paths.configure = loaded->paths.configure;
@@ -194,9 +209,9 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
 
   unit->paths.generated = sp_fs_join_path(session->mem, unit->paths.work, SP_LIT("spn"));
 
-  unit->logs.build = sp_format("{}.build.log", SP_FMT_STR(unit->info->name));
-  unit->logs.test = sp_format("{}.test.log", SP_FMT_STR(unit->info->name));
-  unit->logs.jsonl = sp_format("{}.jsonl", SP_FMT_STR(unit->info->name));
+  unit->logs.build = sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(unit->info->name)).value;
+  unit->logs.test = sp_fmt(session->mem, "{}.test.log", SP_FMT_STR(unit->info->name)).value;
+  unit->logs.jsonl = sp_fmt(session->mem, "{}.jsonl", SP_FMT_STR(unit->info->name)).value;
 
   unit->paths.logs.build = sp_fs_join_path(session->mem, unit->paths.work, unit->logs.build);
   unit->paths.logs.test = sp_fs_join_path(session->mem, unit->paths.work, unit->logs.test);
@@ -209,8 +224,8 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   sp_fs_create_dir(unit->paths.include);
   sp_fs_create_dir(unit->paths.lib);
   sp_fs_create_dir(unit->paths.vendor);
-  spn_lazy_log_init(&unit->logs.io.build, unit->paths.logs.build, SP_IO_WRITE_MODE_OVERWRITE);
-  spn_lazy_log_init(&unit->logs.io.jsonl, unit->paths.logs.jsonl, SP_IO_WRITE_MODE_OVERWRITE);
+  spn_lazy_log_init(&unit->logs.io.build, unit->paths.logs.build);
+  spn_lazy_log_init(&unit->logs.io.jsonl, unit->paths.logs.jsonl);
 
   unit->paths.stamp.dir = sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("stamp"));
   unit->paths.stamp.main = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("main.stamp"));

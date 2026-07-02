@@ -60,12 +60,9 @@ struct lock_roundtrip {
 };
 
 UTEST_F_SETUP(lock_roundtrip) {
-  ctx_t* harness = ctx_get();
-  sp_context_push_allocator(sp_mem_arena_as_allocator(harness->arena));
 }
 
 UTEST_F_TEARDOWN(lock_roundtrip) {
-  sp_context_pop();
 }
 
 
@@ -73,7 +70,8 @@ UTEST_F_TEARDOWN(lock_roundtrip) {
 // EXECUTOR //
 //////////////
 static void build_lock(fixture_t* fixture, spn_lock_file_t* lock) {
-  spn_lock_file_init(lock);
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  spn_lock_file_init(mem, lock);
 
   sp_carr_for(fixture->system_deps, i) {
     if (!fixture->system_deps[i]) break;
@@ -101,6 +99,7 @@ static void build_lock(fixture_t* fixture, spn_lock_file_t* lock) {
       },
     };
 
+    sp_da_init(mem, entry.deps);
     sp_carr_for(d->deps, j) {
       if (!d->deps[j]) break;
       sp_da_push(entry.deps, sp_str_view(d->deps[j]));
@@ -114,8 +113,9 @@ static void run_fixture(s32* utest_result, fixture_t fixture) {
   spn_lock_file_t lock = SP_ZERO_INITIALIZE();
   build_lock(&fixture, &lock);
 
-  sp_str_t toml = spn_lock_file_to_str(&lock);
-  spn_lock_file_t loaded = spn_lock_file_parse(toml, SP_NULLPTR);
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  sp_str_t toml = spn_lock_file_to_str(mem, &lock);
+  spn_lock_file_t loaded = spn_lock_file_parse(mem, toml, SP_NULLPTR);
 
   // compare system deps
   EXPECT_EQ(sp_ht_size(lock.system_deps), sp_ht_size(loaded.system_deps));
@@ -154,7 +154,7 @@ static void run_fixture(s32* utest_result, fixture_t fixture) {
     SP_EXPECT_STR_EQ(orig->manifest.dir, got->manifest.dir);
 
     // compare deps
-    EXPECT_EQ(sp_dyn_array_size(orig->deps), sp_dyn_array_size(got->deps));
+    EXPECT_EQ(sp_da_size(orig->deps), sp_da_size(got->deps));
     sp_da_for(orig->deps, j) {
       SP_EXPECT_STR_EQ(orig->deps[j], got->deps[j]);
     }

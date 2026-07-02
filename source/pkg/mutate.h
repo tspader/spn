@@ -5,7 +5,7 @@
 #include "pkg/types.h"
 #include "target/types.h"
 
-void                spn_pkg_init(spn_pkg_info_t* pkg, sp_str_t name);
+void                spn_pkg_init(sp_mem_t mem, spn_pkg_info_t* pkg, sp_str_t name);
 void                spn_pkg_set_name(spn_pkg_info_t* pkg, const c8* name);
 void                spn_pkg_set_name_ex(spn_pkg_info_t* pkg, sp_str_t name);
 void                spn_pkg_set_repo(spn_pkg_info_t* pkg, const c8* repo);

@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "gen.h"
 
 #include "spn.h"
@@ -73,21 +75,21 @@ sp_str_t spn_cc_kind_to_executable(spn_cc_kind_t compiler) {
 
 sp_str_t spn_gen_format_entry_kernel(sp_str_map_context_t* context) {
   spn_gen_format_context_t* format = (spn_gen_format_context_t*)context->user_data;
-  return spn_gen_format_entry(context->str, format->kind, format->driver);
+  return spn_gen_format_entry(context->mem, context->str, format->kind, format->driver);
 }
 
-sp_str_t spn_gen_format_entry(sp_str_t entry, spn_gen_entry_t kind, spn_cc_driver_t driver) {
+sp_str_t spn_gen_format_entry(sp_mem_t mem, sp_str_t entry, spn_gen_entry_t kind, spn_cc_driver_t driver) {
   switch (driver) {
     case SPN_CC_DRIVER_NONE: // @toolchain
     case SPN_CC_DRIVER_CLANG:
     case SPN_CC_DRIVER_GCC: {
       switch (kind) {
-        case SPN_GEN_INCLUDE: return sp_format("-I{}", SP_FMT_STR(entry));
-        case SPN_GEN_LIB_INCLUDE: return sp_format("-L{}", SP_FMT_STR(entry));
-        case SPN_GEN_LIBS: return sp_format("{}", SP_FMT_STR(entry));
-        case SPN_GEN_SYSTEM_LIBS: return sp_format("-l{}", SP_FMT_STR(entry));
-        case SPN_GEN_RPATH: return sp_format("-Wl,-rpath,{}", SP_FMT_STR(entry));
-        case SPN_GEN_DEFINE: return sp_format("-D{}", SP_FMT_STR(entry));
+        case SPN_GEN_INCLUDE: return sp_fmt(mem, "-I{}", SP_FMT_STR(entry)).value;
+        case SPN_GEN_LIB_INCLUDE: return sp_fmt(mem, "-L{}", SP_FMT_STR(entry)).value;
+        case SPN_GEN_LIBS: return sp_fmt(mem, "{}", SP_FMT_STR(entry)).value;
+        case SPN_GEN_SYSTEM_LIBS: return sp_fmt(mem, "-l{}", SP_FMT_STR(entry)).value;
+        case SPN_GEN_RPATH: return sp_fmt(mem, "-Wl,-rpath,{}", SP_FMT_STR(entry)).value;
+        case SPN_GEN_DEFINE: return sp_fmt(mem, "-D{}", SP_FMT_STR(entry)).value;
         case SPN_GEN_NONE:
         case SPN_GEN_ALL: {
           sp_unreachable_case();

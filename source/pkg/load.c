@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "error/types.h"
 #include "pkg/types.h"
 
@@ -21,16 +23,16 @@ static toml_path_t spn_pkg_toml_path_with_index(sp_str_t parent, u32 index) {
   };
 }
 
-static sp_str_t spn_pkg_toml_path_field(toml_path_t path, const c8* key) {
+static sp_str_t spn_pkg_toml_path_field(sp_mem_t mem, toml_path_t path, const c8* key) {
   if (sp_str_empty(path.parent)) {
     return sp_str_view(key);
   }
 
   if (path.has_index) {
-    return sp_format("{}[{}].{}", SP_FMT_STR(path.parent), SP_FMT_U32(path.index), SP_FMT_CSTR(key));
+    return sp_fmt(mem, "{}[{}].{}", SP_FMT_STR(path.parent), SP_FMT_U32(path.index), SP_FMT_CSTR(key)).value;
   }
 
-  return sp_format("{}.{}", SP_FMT_STR(path.parent), SP_FMT_CSTR(key));
+  return sp_fmt(mem, "{}.{}", SP_FMT_STR(path.parent), SP_FMT_CSTR(key)).value;
 }
 
 static spn_toml_value_kind_t toml_kind_from_field(toml_table_t* table, const c8* key) {
@@ -90,55 +92,55 @@ static spn_err_union_t field_type_error(sp_str_t path, sp_str_t expected, spn_to
   };
 }
 
-static spn_err_union_t toml_get_str_required(toml_table_t* table, const c8* key, toml_path_t path, sp_str_t* out) {
+static spn_err_union_t toml_get_str_required(sp_mem_t mem, toml_table_t* table, const c8* key, toml_path_t path, sp_str_t* out) {
   spn_toml_value_kind_t kind = toml_kind_from_field(table, key);
   if (kind == SPN_TOML_VALUE_KIND_NONE) {
-    return field_missing_error(spn_pkg_toml_path_field(path, key), sp_str_lit("string"));
+    return field_missing_error(spn_pkg_toml_path_field(mem, path, key), sp_str_lit("string"));
   }
 
   if (kind != SPN_TOML_VALUE_KIND_SCALAR) {
-    return field_type_error(spn_pkg_toml_path_field(path, key), sp_str_lit("string"), kind);
+    return field_type_error(spn_pkg_toml_path_field(mem, path, key), sp_str_lit("string"), kind);
   }
 
   toml_value_t value = toml_table_string(table, key);
   if (!value.ok) {
-    return field_type_error(spn_pkg_toml_path_field(path, key), sp_str_lit("string"), SPN_TOML_VALUE_KIND_SCALAR);
+    return field_type_error(spn_pkg_toml_path_field(mem, path, key), sp_str_lit("string"), SPN_TOML_VALUE_KIND_SCALAR);
   }
 
   *out = sp_str_view(value.u.s);
   return spn_result(SPN_OK);
 }
 
-static spn_err_union_t toml_get_str_optional(toml_table_t* table, const c8* key, toml_path_t path, sp_str_t* out) {
+static spn_err_union_t toml_get_str_optional(sp_mem_t mem, toml_table_t* table, const c8* key, toml_path_t path, sp_str_t* out) {
   spn_toml_value_kind_t kind = toml_kind_from_field(table, key);
   if (kind == SPN_TOML_VALUE_KIND_NONE) {
     return spn_result(SPN_OK);
   }
 
   if (kind != SPN_TOML_VALUE_KIND_SCALAR) {
-    return field_type_error(spn_pkg_toml_path_field(path, key), sp_str_lit("string"), kind);
+    return field_type_error(spn_pkg_toml_path_field(mem, path, key), sp_str_lit("string"), kind);
   }
 
   toml_value_t value = toml_table_string(table, key);
   if (!value.ok) {
-    return field_type_error(spn_pkg_toml_path_field(path, key), sp_str_lit("string"), SPN_TOML_VALUE_KIND_SCALAR);
+    return field_type_error(spn_pkg_toml_path_field(mem, path, key), sp_str_lit("string"), SPN_TOML_VALUE_KIND_SCALAR);
   }
 
   *out = sp_str_view(value.u.s);
   return spn_result(SPN_OK);
 }
 
-spn_err_union_t spn_index_load(toml_table_t* toml, sp_str_t parent, u32 index, spn_index_info_t* result) {
+spn_err_union_t spn_index_load(sp_mem_t mem, toml_table_t* toml, sp_str_t parent, u32 index, spn_index_info_t* result) {
   toml_path_t path = spn_pkg_toml_path_with_index(parent, index);
   sp_str_t name = SP_ZERO_INITIALIZE();
   sp_str_t url = SP_ZERO_INITIALIZE();
   sp_str_t rev = SP_ZERO_INITIALIZE();
   sp_str_t protocol_str = SP_ZERO_INITIALIZE();
 
-  spn_try_union(toml_get_str_required(toml, "name", path, &name));
-  spn_try_union(toml_get_str_required(toml, "url", path, &url));
-  spn_try_union(toml_get_str_required(toml, "protocol", path, &protocol_str));
-  spn_try_union(toml_get_str_optional(toml, "rev", path, &rev));
+  spn_try_union(toml_get_str_required(mem, toml, "name", path, &name));
+  spn_try_union(toml_get_str_required(mem, toml, "url", path, &url));
+  spn_try_union(toml_get_str_required(mem, toml, "protocol", path, &protocol_str));
+  spn_try_union(toml_get_str_optional(mem, toml, "rev", path, &rev));
 
   *result = (spn_index_info_t) {
     .name = name,

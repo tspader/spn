@@ -53,7 +53,7 @@ typedef struct {
   sp_mem_arena_t* arena;
 } sp_coff_t;
 
-sp_coff_t*          sp_coff_new();
+sp_coff_t*          sp_coff_new(sp_mem_t mem);
 void                sp_coff_free(sp_coff_t* coff);
 sp_coff_section_t*  sp_coff_add_section(sp_coff_t* coff, sp_str_t name, u32 flags);
 sp_coff_section_t*  sp_coff_find_section(sp_coff_t* coff, sp_str_t name);
@@ -71,15 +71,18 @@ static void sp_coff_write_u16(sp_io_writer_t* w, u16 v)  { sp_io_write(w, &v, 2,
 static void sp_coff_write_u32(sp_io_writer_t* w, u32 v)  { sp_io_write(w, &v, 4, SP_NULLPTR); }
 static void sp_coff_write_s16(sp_io_writer_t* w, s16 v)  { sp_io_write(w, &v, 2, SP_NULLPTR); }
 
-sp_coff_t* sp_coff_new() {
-  sp_mem_arena_t* arena = sp_mem_arena_new(spn_allocator);
+sp_coff_t* sp_coff_new(sp_mem_t mem) {
+  sp_mem_arena_t* arena = sp_mem_arena_new(mem);
+  sp_mem_t alloc = sp_mem_arena_as_allocator(arena);
 
-  sp_coff_t* coff = sp_alloc_type(spn_allocator, sp_coff_t);
+  sp_coff_t* coff = sp_alloc_type(alloc, sp_coff_t);
   coff->arena = arena;
+  sp_da_init(alloc, coff->sections);
+  sp_da_init(alloc, coff->symbols);
 
   // The string table needs a u32 total size at the start of the buffer. We obviously
   // don't know the total size yet, but reserve and zero the four bytes up front.
-  sp_io_dyn_mem_writer_init(sp_mem_arena_as_allocator(arena), &coff->strtab);
+  sp_io_dyn_mem_writer_init(alloc, &coff->strtab);
   sp_coff_write_u32(&coff->strtab.base, 0);
 
   return coff;
@@ -104,8 +107,10 @@ static void sp_coff_write_section_name(sp_coff_t* coff, sp_io_writer_t* out, sp_
     sp_mem_copy(buf, name.data, name.len);
   } else {
     u32 offset = sp_coff_add_string(coff, name);
-    sp_str_t s = sp_format("/{}", SP_FMT_U32(offset));
-    sp_mem_copy(buf, s.data, SP_MIN(s.len, 8));
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    sp_str_t s = sp_fmt(scratch.mem, "/{}", sp_fmt_uint(offset)).value;
+    sp_mem_copy(buf, s.data, sp_min(s.len, 8));
+    sp_mem_end_scratch(scratch);
   }
   sp_io_write(out, buf, 8, SP_NULLPTR);
 }
@@ -125,7 +130,7 @@ static void sp_coff_write_symbol_name(sp_coff_t* coff, sp_io_writer_t* out, sp_s
 sp_coff_section_t* sp_coff_add_section(sp_coff_t* coff, sp_str_t name, u32 flags) {
   sp_mem_t alloc = sp_mem_arena_as_allocator(coff->arena);
   sp_coff_section_t section = {
-    .name = sp_str_copy(spn_allocator, name),
+    .name = sp_str_copy(alloc, name),
     .flags = flags,
   };
   sp_io_dyn_mem_writer_init(alloc, &section.writer);
@@ -143,14 +148,12 @@ sp_coff_section_t* sp_coff_find_section(sp_coff_t* coff, sp_str_t name) {
 }
 
 void sp_coff_add_symbol(sp_coff_t* coff, sp_str_t name, u32 value, s16 section_number, u8 storage_class) {
-  sp_context_push_arena(coff->arena);
   sp_da_push(coff->symbols, ((sp_coff_sym_entry_t) {
-    .name = sp_str_copy(spn_allocator, name),
+    .name = sp_str_copy(sp_mem_arena_as_allocator(coff->arena), name),
     .value = value,
     .section_number = section_number,
     .storage_class = storage_class,
   }));
-  sp_context_pop();
 }
 
 sp_err_t sp_coff_write(sp_coff_t* coff, sp_io_writer_t* out) {
@@ -161,8 +164,8 @@ sp_err_t sp_coff_write(sp_coff_t* coff, sp_io_writer_t* out) {
   u32 pos = headers_end;
 
   // Calculate per-section file offsets (respecting declared alignment)
-  sp_context_push_arena(coff->arena);
-  sp_da(u32) offsets = SP_NULLPTR;
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_da(u32) offsets = sp_da_new(scratch.mem, u32);
   sp_da_for(coff->sections, i) {
     u32 data_len = (u32)coff->sections[i].writer.storage.len;
     u32 align_bits = (coff->sections[i].flags >> 20) & 0xF;
@@ -230,6 +233,7 @@ sp_err_t sp_coff_write(sp_coff_t* coff, sp_io_writer_t* out) {
   sp_mem_copy(strtab.data, &strtab_size, 4);
   sp_io_write(out, strtab.data, strtab.len, SP_NULLPTR);
 
+  sp_mem_end_scratch(scratch);
   return SP_OK;
 }
 

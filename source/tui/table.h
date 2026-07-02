@@ -3,7 +3,7 @@
 
 #include "tui/types.h"
 
-void     sp_tui_begin_table(sp_tui_table_t* table);
+void     sp_tui_begin_table(sp_mem_t mem, sp_tui_table_t* table);
 void     sp_tui_table_setup_column(sp_tui_table_t* table, sp_str_t name);
 void     sp_tui_table_setup_column_ex(sp_tui_table_t* table, sp_str_t name, u32 min_width);
 void     sp_tui_table_header_row(sp_tui_table_t* table);

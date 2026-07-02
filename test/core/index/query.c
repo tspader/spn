@@ -46,6 +46,7 @@ static bool semver_is_zero(spn_semver_t version) {
 }
 
 static void write_index_files(ctx_t* harness, const c8* name, const index_file_t files[4]) {
+  sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
   sp_str_t prefix = sp_str_view(name);
 
   sp_for(it, 4) {
@@ -54,21 +55,22 @@ static void write_index_files(ctx_t* harness, const c8* name, const index_file_t
       break;
     }
 
-    sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+    sp_io_dyn_mem_writer_t builder = sp_zero;
+    sp_io_dyn_mem_writer_init(mem, &builder);
     sp_for(line_it, sp_carr_len(file.lines)) {
       const c8* line = file.lines[line_it];
       if (!line) {
         break;
       }
 
-      sp_str_builder_append(&builder, sp_str_view(line));
-      sp_str_builder_new_line(&builder);
+      sp_io_write_str(&builder.base, sp_str_view(line), SP_NULLPTR);
+      sp_io_write_c8(&builder.base, '\n');
     }
 
     tmpfs_create(
       &harness->fs,
-      sp_fs_join_path(spn_allocator, prefix, sp_fs_join_path(spn_allocator, sp_str_lit("index"), sp_str_view(file.path))),
-      sp_str_builder_to_str(&builder)
+      sp_fs_join_path(mem, prefix, sp_fs_join_path(mem, sp_str_lit("index"), sp_str_view(file.path))),
+      sp_io_dyn_mem_writer_take_str(&builder)
     );
   }
 }
@@ -77,9 +79,10 @@ static void run_index_query_case(s32* utest_result, struct index_query* fixture,
   SP_UNUSED(fixture);
 
   ctx_t* harness = ctx_get();
+  sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
   sp_str_t case_root = tmpfs_get(&harness->fs, sp_str_view(c.name));
 
-  sp_str_t index_root = sp_fs_join_path(spn_allocator, case_root, sp_str_lit("index"));
+  sp_str_t index_root = sp_fs_join_path(mem, case_root, sp_str_lit("index"));
   sp_fs_create_dir(index_root);
 
   write_index_files(harness, c.name, c.fixture.files);
@@ -87,7 +90,7 @@ static void run_index_query_case(s32* utest_result, struct index_query* fixture,
   spn_index_info_t index = {
     .location = index_root,
   };
-  spn_index_init(&index);
+  spn_index_init(&index, mem);
 
   spn_index_pkg_t* pkg = spn_index_get_package(&index, (spn_pkg_id_t) {
     .namespace = sp_str_lit("core"),
@@ -135,12 +138,9 @@ static void run_index_query_case(s32* utest_result, struct index_query* fixture,
 }
 
 UTEST_F_SETUP(index_query) {
-  ctx_t* harness = ctx_get();
-  sp_context_push_allocator(sp_mem_arena_as_allocator(harness->arena));
 }
 
 UTEST_F_TEARDOWN(index_query) {
-  sp_context_pop();
 }
 
 UTEST_F(index_query, query_package_parses_and_sorts_versions) {

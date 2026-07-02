@@ -4,7 +4,7 @@
 #define sp_ht_collect_keys(ht, da) \
   do { \
     sp_ht_for_kv((ht), __it) { \
-      sp_dyn_array_push((da), *__it.key); \
+      sp_da_push((da), *__it.key); \
     } \
   } while (0)
 

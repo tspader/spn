@@ -5,6 +5,7 @@
 #include "spn.h"
 
 struct spn_make {
+  sp_mem_t mem;
   spn_t* build;
   sp_str_t target;
 };

@@ -1,5 +1,6 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
+#include "sp/macro.h"
 
 #include "utest.h"
 
@@ -34,8 +35,9 @@ UTEST_F(intern, hello) {
     u64 f;
   } markers = SP_ZERO_INITIALIZE();
 
-  sp_intern_t* intern = sp_alloc_type(spn_allocator, sp_intern_t);
-  sp_intern_init(intern, spn_allocator);
+  sp_mem_t mem = sp_mem_os_new();
+  sp_intern_t* intern = sp_alloc_type(mem, sp_intern_t);
+  sp_intern_init(intern, mem);
   EXPECT_EQ(sp_intern_size(intern), 1);
 
   sp_str_t a = intern_and_mark(intern, "a", &markers.a);
@@ -59,7 +61,7 @@ UTEST_F(intern, hello) {
 
   u64 bytes_used = sp_intern_bytes_used(intern);
   sp_for(it, 4096) {
-    sp_str_t str = sp_format("entry_{}", SP_FMT_U32(it));
+    sp_str_t str = sp_fmt(mem, "entry_{}", sp_fmt_uint(it)).value;
     sp_intern_get_or_insert(intern, str);
     bytes_used = sp_intern_bytes_used(intern);
   }

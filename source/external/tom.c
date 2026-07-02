@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "tom.h"
 
 u32 spn_toml_array_len(toml_array_t* array) {
@@ -21,9 +23,13 @@ toml_table_t* spn_toml_parse_ex(sp_str_t path, bool* parse_error) {
     return SP_NULLPTR;
   }
 
-  sp_str_t file = sp_zero; sp_io_read_file(spn_mem_todo, path, &file);
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t file = sp_zero;
+  sp_io_read_file(scratch.mem, path, &file);
   c8 parse_err[1024] = {0};
-  toml_table_t* toml = toml_parse(sp_str_to_cstr(spn_mem_todo, file), parse_err, SP_CARR_LEN(parse_err));
+  toml_table_t* toml = toml_parse(sp_str_to_cstr(scratch.mem, file), parse_err, SP_CARR_LEN(parse_err));
+  sp_mem_end_scratch(scratch);
+
   if (!toml && parse_error) {
     *parse_error = true;
   }
@@ -64,34 +70,36 @@ sp_str_t spn_toml_str_opt(toml_table_t* toml, const c8* key, const c8* fallback)
   return sp_str_view(spn_toml_cstr_opt(toml, key, fallback));
 }
 
-sp_da(sp_str_t) spn_toml_arr_to_str_arr(toml_array_t* toml) {
+sp_da(sp_str_t) spn_toml_arr_to_str_arr(sp_mem_t mem, toml_array_t* toml) {
   if (!toml) {
     return SP_NULLPTR;
   }
 
-  sp_da(sp_str_t) strs = SP_NULLPTR;
+  sp_da(sp_str_t) strs = sp_da_new(mem, sp_str_t);
   spn_toml_arr_for(toml, it) {
-    sp_dyn_array_push(strs, spn_toml_arr_str(toml, it));
+    sp_da_push(strs, spn_toml_arr_str(toml, it));
   }
 
   return strs;
 }
 
-spn_toml_writer_t spn_toml_writer_new(void) {
-  spn_toml_writer_t writer = SP_ZERO_INITIALIZE();
+spn_toml_writer_t spn_toml_writer_new(sp_mem_t mem) {
+  spn_toml_writer_t writer = sp_zero;
+  sp_io_dyn_mem_writer_init(mem, &writer.writer);
+  sp_da_init(mem, writer.stack);
 
   spn_toml_context_t root = {
     .kind = SPN_TOML_CONTEXT_ROOT,
     .key = sp_str_lit(""),
     .header_written = true,
   };
-  sp_dyn_array_push(writer.stack, root);
+  sp_da_push(writer.stack, root);
 
   return writer;
 }
 
 void spn_toml_ensure_header_written(spn_toml_writer_t* writer) {
-  u32 depth = sp_dyn_array_size(writer->stack);
+  u32 depth = sp_da_size(writer->stack);
   SP_ASSERT(depth > 0);
 
   spn_toml_context_t* top = &writer->stack[depth - 1];
@@ -99,17 +107,19 @@ void spn_toml_ensure_header_written(spn_toml_writer_t* writer) {
     return;
   }
 
-  sp_dyn_array(sp_str_t) path_parts = SP_NULLPTR;
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(writer->writer.allocator);
+  sp_da(sp_str_t) path_parts = sp_da_new(scratch.mem, sp_str_t);
   for (u32 it = 1; it < depth; it++) {
-    sp_dyn_array_push(path_parts, writer->stack[it].key);
+    sp_da_push(path_parts, writer->stack[it].key);
   }
 
-  sp_str_t path = sp_str_join_n(spn_mem_todo, path_parts, sp_dyn_array_size(path_parts), sp_str_lit("."));
+  sp_str_t path = sp_str_join_n(scratch.mem, path_parts, sp_da_size(path_parts), sp_str_lit("."));
   if (top->kind == SPN_TOML_CONTEXT_TABLE) {
-    sp_str_builder_append_fmt(&writer->builder, "[{}]", SP_FMT_STR(path));
+    sp_fmt_io(&writer->writer.base, "[{}]", sp_fmt_str(path));
   }
+  sp_mem_end_scratch(scratch);
 
-  sp_str_builder_new_line(&writer->builder);
+  sp_io_write_c8(&writer->writer.base, '\n');
   top->header_written = true;
 }
 
@@ -119,7 +129,7 @@ void spn_toml_begin_table(spn_toml_writer_t* writer, sp_str_t key) {
     .key = key,
     .header_written = false,
   };
-  sp_dyn_array_push(writer->stack, context);
+  sp_da_push(writer->stack, context);
 }
 
 void spn_toml_begin_table_cstr(spn_toml_writer_t* writer, const c8* key) {
@@ -127,14 +137,14 @@ void spn_toml_begin_table_cstr(spn_toml_writer_t* writer, const c8* key) {
 }
 
 void spn_toml_end_table(spn_toml_writer_t* writer) {
-  u32 depth = sp_dyn_array_size(writer->stack);
+  u32 depth = sp_da_size(writer->stack);
   SP_ASSERT(depth > 1);
 
   spn_toml_context_t* top = &writer->stack[depth - 1];
   SP_ASSERT(top->kind == SPN_TOML_CONTEXT_TABLE);
 
-  sp_dyn_array_pop(writer->stack);
-  sp_str_builder_new_line(&writer->builder);
+  sp_da_pop(writer->stack);
+  sp_io_write_c8(&writer->writer.base, '\n');
 }
 
 void spn_toml_begin_array(spn_toml_writer_t* writer, sp_str_t key) {
@@ -143,7 +153,7 @@ void spn_toml_begin_array(spn_toml_writer_t* writer, sp_str_t key) {
     .key = key,
     .header_written = false,
   };
-  sp_dyn_array_push(writer->stack, context);
+  sp_da_push(writer->stack, context);
 }
 
 void spn_toml_begin_array_cstr(spn_toml_writer_t* writer, const c8* key) {
@@ -151,48 +161,50 @@ void spn_toml_begin_array_cstr(spn_toml_writer_t* writer, const c8* key) {
 }
 
 void spn_toml_end_array(spn_toml_writer_t* writer) {
-  u32 depth = sp_dyn_array_size(writer->stack);
+  u32 depth = sp_da_size(writer->stack);
   SP_ASSERT(depth > 1);
 
   spn_toml_context_t* top = &writer->stack[depth - 1];
   SP_ASSERT(top->kind == SPN_TOML_CONTEXT_ARRAY);
 
-  sp_dyn_array_pop(writer->stack);
-  sp_str_builder_new_line(&writer->builder);
+  sp_da_pop(writer->stack);
+  sp_io_write_c8(&writer->writer.base, '\n');
 }
 
 void spn_toml_append_array_table(spn_toml_writer_t* writer) {
-  u32 depth = sp_dyn_array_size(writer->stack);
+  u32 depth = sp_da_size(writer->stack);
   SP_ASSERT(depth > 1);
 
   spn_toml_context_t* top = &writer->stack[depth - 1];
   SP_ASSERT(top->kind == SPN_TOML_CONTEXT_ARRAY);
 
   if (top->header_written) {
-    sp_str_builder_new_line(&writer->builder);
+    sp_io_write_c8(&writer->writer.base, '\n');
   }
 
-  sp_dyn_array(sp_str_t) path_parts = SP_NULLPTR;
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(writer->writer.allocator);
+  sp_da(sp_str_t) path_parts = sp_da_new(scratch.mem, sp_str_t);
   for (u32 it = 1; it < depth; it++) {
-    sp_dyn_array_push(path_parts, writer->stack[it].key);
+    sp_da_push(path_parts, writer->stack[it].key);
   }
 
-  sp_str_t path = sp_str_join_n(spn_mem_todo, path_parts, sp_dyn_array_size(path_parts), sp_str_lit("."));
-  sp_str_builder_append_fmt(&writer->builder, "[[{}]]", SP_FMT_STR(path));
-  sp_str_builder_new_line(&writer->builder);
+  sp_str_t path = sp_str_join_n(scratch.mem, path_parts, sp_da_size(path_parts), sp_str_lit("."));
+  sp_fmt_io(&writer->writer.base, "[[{}]]", sp_fmt_str(path));
+  sp_mem_end_scratch(scratch);
+  sp_io_write_c8(&writer->writer.base, '\n');
 
   top->header_written = true;
 }
 
 void spn_toml_append_str(spn_toml_writer_t* writer, sp_str_t key, sp_str_t value) {
   spn_toml_ensure_header_written(writer);
-  sp_str_builder_append_fmt(
-    &writer->builder,
+  sp_fmt_io(
+    &writer->writer.base,
     "{} = {.quote}",
-    SP_FMT_STR(key),
-    SP_FMT_STR(value)
+    sp_fmt_str(key),
+    sp_fmt_str(value)
   );
-  sp_str_builder_new_line(&writer->builder);
+  sp_io_write_c8(&writer->writer.base, '\n');
 }
 
 void spn_toml_append_str_cstr(spn_toml_writer_t* writer, const c8* key, sp_str_t value) {
@@ -201,13 +213,13 @@ void spn_toml_append_str_cstr(spn_toml_writer_t* writer, const c8* key, sp_str_t
 
 void spn_toml_append_s64(spn_toml_writer_t* writer, sp_str_t key, s64 value) {
   spn_toml_ensure_header_written(writer);
-  sp_str_builder_append_fmt(
-    &writer->builder,
+  sp_fmt_io(
+    &writer->writer.base,
     "{} = {}",
-    SP_FMT_STR(key),
-    SP_FMT_S64(value)
+    sp_fmt_str(key),
+    sp_fmt_int(value)
   );
-  sp_str_builder_new_line(&writer->builder);
+  sp_io_write_c8(&writer->writer.base, '\n');
 }
 
 void spn_toml_append_s64_cstr(spn_toml_writer_t* writer, const c8* key, s64 value) {
@@ -216,13 +228,13 @@ void spn_toml_append_s64_cstr(spn_toml_writer_t* writer, const c8* key, s64 valu
 
 void spn_toml_append_bool(spn_toml_writer_t* writer, sp_str_t key, bool value) {
   spn_toml_ensure_header_written(writer);
-  sp_str_builder_append_fmt(
-    &writer->builder,
+  sp_fmt_io(
+    &writer->writer.base,
     "{} = {}",
-    SP_FMT_STR(key),
-    SP_FMT_CSTR(value ? "true" : "false")
+    sp_fmt_str(key),
+    sp_fmt_cstr(value ? "true" : "false")
   );
-  sp_str_builder_new_line(&writer->builder);
+  sp_io_write_c8(&writer->writer.base, '\n');
 }
 
 void spn_toml_append_bool_cstr(spn_toml_writer_t* writer, const c8* key, bool value) {
@@ -230,19 +242,7 @@ void spn_toml_append_bool_cstr(spn_toml_writer_t* writer, const c8* key, bool va
 }
 
 void spn_toml_append_str_array(spn_toml_writer_t* writer, sp_str_t key, sp_da(sp_str_t) values) {
-  spn_toml_ensure_header_written(writer);
-  sp_str_builder_append_fmt(&writer->builder, "{} = [", SP_FMT_STR(key));
-
-  u32 count = sp_dyn_array_size(values);
-  for (u32 it = 0; it < count; it++) {
-    sp_str_builder_append_fmt(&writer->builder, "{.quote}", SP_FMT_STR(values[it]));
-    if (it < count - 1) {
-      sp_str_builder_append_cstr(&writer->builder, ", ");
-    }
-  }
-
-  sp_str_builder_append_c8(&writer->builder, ']');
-  sp_str_builder_new_line(&writer->builder);
+  spn_toml_append_str_carr(writer, key, values, sp_da_size(values));
 }
 
 void spn_toml_append_str_array_cstr(spn_toml_writer_t* writer, const c8* key, sp_da(sp_str_t) values) {
@@ -251,17 +251,17 @@ void spn_toml_append_str_array_cstr(spn_toml_writer_t* writer, const c8* key, sp
 
 void spn_toml_append_str_carr(spn_toml_writer_t* writer, sp_str_t key, sp_str_t* values, u32 len) {
   spn_toml_ensure_header_written(writer);
-  sp_str_builder_append_fmt(&writer->builder, "{} = [", SP_FMT_STR(key));
+  sp_fmt_io(&writer->writer.base, "{} = [", sp_fmt_str(key));
 
   for (u32 it = 0; it < len; it++) {
-    sp_str_builder_append_fmt(&writer->builder, "{.quote}", SP_FMT_STR(values[it]));
+    sp_fmt_io(&writer->writer.base, "{.quote}", sp_fmt_str(values[it]));
     if (it < len - 1) {
-      sp_str_builder_append_cstr(&writer->builder, ", ");
+      sp_io_write_str(&writer->writer.base, sp_str_lit(", "), SP_NULLPTR);
     }
   }
 
-  sp_str_builder_append_c8(&writer->builder, ']');
-  sp_str_builder_new_line(&writer->builder);
+  sp_io_write_c8(&writer->writer.base, ']');
+  sp_io_write_c8(&writer->writer.base, '\n');
 }
 
 void spn_toml_append_str_carr_cstr(spn_toml_writer_t* writer, const c8* key, sp_str_t* values, u32 len) {
@@ -269,9 +269,8 @@ void spn_toml_append_str_carr_cstr(spn_toml_writer_t* writer, const c8* key, sp_
 }
 
 sp_str_t spn_toml_writer_write(spn_toml_writer_t* writer) {
-  u32 depth = sp_dyn_array_size(writer->stack);
+  u32 depth = sp_da_size(writer->stack);
   SP_ASSERT(depth == 1);
 
-  sp_mem_buffer_t buffer = sp_str_builder_into_buffer(&writer->builder);
-  return sp_mem_buffer_as_str(&buffer);
+  return sp_io_dyn_mem_writer_take_str(&writer->writer);
 }

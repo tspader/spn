@@ -1,9 +1,11 @@
+#include "sp/macro.h"
 #include "sp.h"
 #include "spn.h"
 
 #include "api/api.h"
 #include "ctx/types.h"
 #include "event/types.h"
+#include "session/types.h"
 #include "unit/types.h"
 
 #include "event/event.h"
@@ -13,14 +15,18 @@ spn_node_t* spn_add_node(spn_config_t* config, const c8* tag) {
   spn_pkg_unit_t* unit = spn_api_unit(config);
   SPN_API_LOG(unit, "spn_add_node", "{}", SP_FMT_CSTR(tag));
 
+  sp_mem_t mem = unit->session->mem;
   u32 index = sp_da_size(unit->nodes.user);
   spn_user_node_t node = {
     .pkg = unit,
     .tag = spn_intern_cstr(tag),
   };
+  sp_da_init(mem, node.inputs);
+  sp_da_init(mem, node.outputs);
+  sp_da_init(mem, node.deps);
   sp_da_push(unit->nodes.user, node);
 
-  spn_node_t* out = sp_alloc_type(spn_mem_todo, spn_node_t);
+  spn_node_t* out = sp_alloc_type(mem, spn_node_t);
   *out = (spn_node_t) {
     .ctx = unit,
     .index = index,

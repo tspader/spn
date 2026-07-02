@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "app/types.h"
 #include "forward/types.h"
 #include "intern/intern.h"
@@ -37,17 +39,16 @@ static sp_str_t glob_literal_dir(sp_str_t pattern) {
   return sp_str_sub(pattern, 0, cut);
 }
 
-static void collect_source_glob(sp_str_t root, sp_str_t pattern, sp_da(sp_str_t)* source) {
-  sp_glob_t* glob = sp_glob_new_str(spn_mem_todo, pattern);
+static void collect_source_glob(sp_mem_t mem, sp_str_t root, sp_str_t pattern, sp_da(sp_str_t)* source) {
+  sp_glob_t* glob = sp_glob_new_str(mem, pattern);
   if (!glob) {
     return;
   }
 
   sp_str_t sub = glob_literal_dir(pattern);
-  sp_str_t scan = sp_str_empty(sub) ? root : sp_fs_join_path(spn_mem_todo, root, sub);
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(spn_mem_todo, scan);
-  // sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(spn_mem_todo, root);
-  sp_da(sp_str_t) matches = SP_NULLPTR;
+  sp_str_t scan = sp_str_empty(sub) ? root : sp_fs_join_path(mem, root, sub);
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(mem, scan);
+  sp_da(sp_str_t) matches = sp_da_new(mem, sp_str_t);
 
   sp_da_for(entries, it) {
     sp_fs_entry_t* entry = &entries[it];
@@ -67,7 +68,7 @@ static void collect_source_glob(sp_str_t root, sp_str_t pattern, sp_da(sp_str_t)
     sp_da_push(matches, relative);
   }
 
-  sp_dyn_array_sort(matches, sp_str_sort_kernel_alphabetical);
+  sp_da_sort(matches, sp_str_sort_kernel_alphabetical);
 
   sp_da_for(matches, it) {
     if (has_source_file(*source, matches[it])) {
@@ -78,13 +79,13 @@ static void collect_source_glob(sp_str_t root, sp_str_t pattern, sp_da(sp_str_t)
   }
 }
 
-static sp_da(sp_str_t) collect_target_source(spn_pkg_unit_t* pkg, spn_target_unit_t* target) {
-  sp_da(sp_str_t) source = SP_NULLPTR;
+static sp_da(sp_str_t) collect_target_source(sp_mem_t mem, spn_pkg_unit_t* pkg, spn_target_unit_t* target) {
+  sp_da(sp_str_t) source = sp_da_new(mem, sp_str_t);
 
   sp_da_for(target->info->source, it) {
     sp_str_t path = target->info->source[it];
     if (sp_fs_is_glob(path)) {
-      collect_source_glob(pkg->paths.source, path, &source);
+      collect_source_glob(mem, pkg->paths.source, path, &source);
       continue;
     }
     if (has_source_file(source, path)) {
@@ -161,7 +162,7 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
 
     // The target filter only applies to the root package; dependencies contribute
     // exactly their lib targets no matter what we were asked to build.
-    sp_da(spn_target_info_t*) targets = SP_NULLPTR;
+    sp_da(spn_target_info_t*) targets = sp_da_new(session->mem, spn_target_info_t*);
     sp_str_om_for(info->libs, it) {
       sp_da_push(targets, sp_str_om_at(info->libs, it));
     }
@@ -222,7 +223,8 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
     // Source libs are consumed as source; we never compile them ourselves
     if (target->lib_kind == SPN_LIB_KIND_SOURCE) continue;
 
-    sp_da(sp_str_t) source = collect_target_source(pkg, target);
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    sp_da(sp_str_t) source = collect_target_source(scratch.mem, pkg, target);
     sp_da_for(source, j) {
       sp_str_t relative = source[j];
       sp_str_t file = sp_fs_join_path(app->session.mem, pkg->paths.source, relative);
@@ -238,7 +240,7 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
       sp_str_t object_dir = target->lib_kind == SPN_LIB_KIND_OBJECT ?
         target->paths.lib :
         target->paths.object;
-      sp_str_t object_path = sp_fs_join_path(app->session.mem, object_dir, sp_format("{}.o", SP_FMT_STR(stem)));
+      sp_str_t object_path = sp_fs_join_path(app->session.mem, object_dir, sp_fmt(scratch.mem, "{}.o", SP_FMT_STR(stem)).value);
 
       if (!sp_str_om_has(session->units.objects, file)) {
         sp_str_om_insert(session->units.objects, file, ((spn_compile_unit_t) {
@@ -256,6 +258,7 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
       sp_da_push(pkg->objects, object);
       sp_da_push(target->objects, object);
     }
+    sp_mem_end_scratch(scratch);
   }
 
   return SPN_TASK_DONE;

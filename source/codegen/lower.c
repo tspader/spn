@@ -5,6 +5,7 @@
 #include "semver/convert.h"
 #include "semver/parser.h"
 #include "target/types.h"
+#include "target/mutate.h"
 #include "toolchain/types.h"
 #include "profile/types.h"
 #include "index/types.h"
@@ -66,8 +67,8 @@ static bool is_path_absolute(sp_str_t path) {
   return path.len && (path.data[0] == '/' || (path.len >= 2 && path.data[1] == ':'));
 }
 
-static spn_target_info_t lower_target(const spn_cg_target_t* cg, spn_target_kind_t kind) {
-  return (spn_target_info_t) {
+static spn_target_info_t lower_target(spn_codegen_ctx_t* ctx, const spn_cg_target_t* cg, spn_target_kind_t kind) {
+  spn_target_info_t target = {
     .name = cg->name,
     .kind = kind,
     .linkages = lower_linkages(cg->kinds),
@@ -79,12 +80,14 @@ static spn_target_info_t lower_target(const spn_cg_target_t* cg, spn_target_kind
     .flags = cg->flags,
     .deps = cg->deps,
   };
+  spn_target_info_init(ctx->mem, &target);
+  return target;
 }
 
-static void lower_collection(spn_cg_target_om_t cg, spn_target_info_om_t* out, spn_target_kind_t kind) {
+static void lower_collection(spn_codegen_ctx_t* ctx, spn_cg_target_om_t cg, spn_target_info_om_t* out, spn_target_kind_t kind) {
   sp_str_om_init(*out);
   sp_om_for(cg, it) {
-    spn_target_info_t target = lower_target(sp_str_om_at(cg, it), kind);
+    spn_target_info_t target = lower_target(ctx, sp_str_om_at(cg, it), kind);
     sp_str_om_insert(*out, target.name, target);
   }
 }
@@ -125,8 +128,8 @@ static void lower_package(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, s
   sp_da_for(p->include, it) {
     sp_da_push(out->include, sp_fs_join_path(ctx->mem, ctx->dir, p->include[it]));
   }
-  out->define = p->define;
-  out->system_deps = p->system_deps;
+  out->define = p->define ? p->define : sp_da_new(ctx->mem, sp_str_t);
+  out->system_deps = p->system_deps ? p->system_deps : sp_da_new(ctx->mem, sp_str_t);
   out->build = sp_str_empty(p->build) ? sp_str_lit("build.c") : p->build;
   out->configure = sp_str_empty(p->configure) ? sp_str_lit("configure.c") : p->configure;
 }
@@ -140,11 +143,11 @@ static void lower_versions(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, 
   sp_ht_insert(out->metadata, version, ((spn_pkg_metadata_t) { version, cg->package.commit }));
 }
 
-static void lower_targets(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
-  lower_collection(cg->lib, &out->libs, SPN_TARGET_LIB);
-  lower_collection(cg->bin, &out->exes, SPN_TARGET_EXE);
-  lower_collection(cg->script, &out->scripts, SPN_TARGET_SCRIPT);
-  lower_collection(cg->test, &out->tests, SPN_TARGET_TEST);
+static void lower_targets(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
+  lower_collection(ctx, cg->lib, &out->libs, SPN_TARGET_LIB);
+  lower_collection(ctx, cg->bin, &out->exes, SPN_TARGET_EXE);
+  lower_collection(ctx, cg->script, &out->scripts, SPN_TARGET_SCRIPT);
+  lower_collection(ctx, cg->test, &out->tests, SPN_TARGET_TEST);
 }
 
 static void lower_toolchains(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
@@ -321,7 +324,7 @@ spn_err_t spn_pkg_lower(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn
 
   lower_package(ctx, cg, out);
   lower_versions(ctx, cg, out);
-  lower_targets(cg, out);
+  lower_targets(ctx, cg, out);
   lower_toolchains(ctx, cg, out);
   lower_profiles(cg, out);
   lower_indexes(cg, out);

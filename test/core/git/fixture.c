@@ -11,12 +11,9 @@ struct git_fixture {
 };
 
 UTEST_F_SETUP(git_fixture) {
-  ctx_t* harness = ctx_get();
-  sp_context_push_allocator(sp_mem_arena_as_allocator(harness->arena));
 }
 
 UTEST_F_TEARDOWN(git_fixture) {
-  sp_context_pop();
 }
 
 
@@ -25,6 +22,7 @@ UTEST_F_TEARDOWN(git_fixture) {
 //////////////
 static void run_fixture(s32* utest_result, git_repo_fixture_t fixture) {
   ctx_t* harness = ctx_get();
+  sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
 
   // build repo from fixture
   git_repo_result_t repo = git_repo_build(&harness->fs, fixture.name, &fixture);
@@ -59,8 +57,8 @@ static void run_fixture(s32* utest_result, git_repo_fixture_t fixture) {
         break;
       }
 
-      sp_str_t spec = sp_format("{}:{}", SP_FMT_STR(repo.commits[c]), SP_FMT_CSTR(path));
-      sp_ps_output_t check = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+      sp_str_t spec = sp_fmt(mem, "{}:{}", sp_fmt_str(repo.commits[c]), sp_fmt_cstr(path)).value;
+      sp_ps_output_t check = sp_ps_run(mem, (sp_ps_config_t) {
         .command = sp_str_lit("git"),
         .args = { sp_str_lit("-C"), repo.path, sp_str_lit("show"), spec },
       });

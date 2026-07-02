@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "toolchain/toolchain.h"
 
 #include "intern/intern.h"
@@ -32,7 +34,7 @@ SP_PRIVATE spn_cg_download_t find_host(const spn_cg_toolchain_t* t, spn_triple_t
 }
 
 sp_da(spn_toolchain_entry_t) spn_toolchain_load_builtins(spn_triple_t host, sp_mem_t mem) {
-  sp_da(spn_toolchain_entry_t) out = SP_NULLPTR;
+  sp_da(spn_toolchain_entry_t) out = sp_da_new(mem, spn_toolchain_entry_t);
   sp_str_t json = sp_str((const c8*)toolchains_json, toolchains_json_size);
 
   spn_cg_toolchains_t root = sp_zero;

@@ -19,8 +19,10 @@ sp_intern_str_t spn_pkg_canonicalize_pair(sp_str_t namespace, sp_str_t name) {
 
 sp_intern_str_t spn_pkg_id_to_qualified_name(spn_pkg_id_t id) {
   sp_str_t namespace = sp_str_empty(id.namespace) ? spn_intern_lit("core") : id.namespace;
-  sp_str_t qualified = sp_str_join(spn_mem_todo, namespace, id.name, strl("/"));
-  return spn_intern(qualified);
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t qualified = spn_intern(sp_str_join(scratch.mem, namespace, id.name, strl("/")));
+  sp_mem_end_scratch(scratch);
+  return qualified;
 }
 
 spn_pkg_id_t spn_qualified_name_to_pkg_id(sp_str_t qualified) {

@@ -1,5 +1,6 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
+#include "sp/macro.h"
 
 #include "utest.h"
 
@@ -411,6 +412,7 @@ UTEST(sm_pkg, duplicate_with_custom_fns) {
 }
 
 UTEST(sm_pkg, stable_pointers_with_custom_fns) {
+  sp_mem_t mem = sp_mem_os_new();
   sp_om(pkg_key_t, pkg_value_t) map = SP_NULLPTR;
   sp_om_set_fns(map, pkg_key_hash, pkg_key_compare);
 
@@ -419,7 +421,7 @@ UTEST(sm_pkg, stable_pointers_with_custom_fns) {
   pkg_value_t* first = sp_om_at(map, 0);
 
   for (s32 i = 1; i <= 100; i++) {
-    sp_str_t name = sp_format("pkg{}", SP_FMT_S32(i));
+    sp_str_t name = sp_fmt(mem, "pkg{}", sp_fmt_int(i)).value;
     pkg_key_t k = { .name = name, .version = (u32)i, .triple = sp_str_lit("x86_64") };
     sp_om_insert(map, k, ((pkg_value_t){ .path = sp_str_lit(""), .loaded = false, .priority = i }));
   }
@@ -432,11 +434,12 @@ UTEST(sm_pkg, stable_pointers_with_custom_fns) {
 }
 
 UTEST(sm_pkg, iteration_order_preserved) {
+  sp_mem_t mem = sp_mem_os_new();
   sp_om(pkg_key_t, pkg_value_t) map = SP_NULLPTR;
   sp_om_set_fns(map, pkg_key_hash, pkg_key_compare);
 
   for (s32 i = 0; i < 10; i++) {
-    sp_str_t name = sp_format("pkg{}", SP_FMT_S32(i));
+    sp_str_t name = sp_fmt(mem, "pkg{}", sp_fmt_int(i)).value;
     pkg_key_t k = { .name = name, .version = (u32)i, .triple = sp_str_lit("any") };
     sp_om_insert(map, k, ((pkg_value_t){ .path = sp_str_lit(""), .loaded = false, .priority = i }));
   }
@@ -554,13 +557,14 @@ UTEST(om, has_key) {
 }
 
 UTEST(om, stable_pointers) {
+  sp_mem_t mem = sp_mem_os_new();
   sp_str_om(s32) map = SP_NULLPTR;
 
   sp_str_om_insert(map, strl("first"), 100);
   s32* first = sp_str_om_at(map, 0);
 
   for (s32 i = 0; i < 100; i++) {
-    sp_str_t key = sp_format("key{}", SP_FMT_S32(i));
+    sp_str_t key = sp_fmt(mem, "key{}", sp_fmt_int(i)).value;
     sp_str_om_insert(map, key, i);
   }
 

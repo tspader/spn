@@ -28,7 +28,6 @@ SP_BEGIN_EXTERN_C()
 
 typedef sp_str_t mz_str_t;
 typedef sp_mem_buffer_t mz_buf_t;
-#define mz_alloc_n(t, n) sp_alloc_n(spn_mem_todo, t, n)
 #define mz_zero SP_ZERO_INITIALIZE()
 #define mz_zero_s(s) SP_ZERO_STRUCT(s)
 #define mz_null 0
@@ -126,7 +125,6 @@ typedef struct {
 
 struct mz_ctx_t {
   sp_mem_t allocator;
-  sp_mem_arena_t* arena;
   mz_diag_t diag;
   mz_diag_part_t diag_parts[64];
   u32 diag_parts_len;
@@ -155,6 +153,7 @@ typedef struct {
 } mz_entry_opts_t;
 
 typedef struct {
+  sp_mem_t mem;
   mz_schema_t* root;
   mz_schema_t* stack[32];
   u32 depth;
@@ -177,21 +176,21 @@ typedef enum {
 #define MZ_DEFAULT_ALLOC mz_nullptr
 #define MZ_DEFAULT_PARSE mz_nullptr
 
-SP_API mz_schema_t* mz_schema_object(mz_object_mode_t mode);
-SP_API mz_schema_t* mz_schema_string();
-SP_API mz_schema_t* mz_schema_any();
-SP_API mz_schema_t* mz_schema_bool();
-SP_API mz_schema_t* mz_schema_s32();
-SP_API mz_schema_t* mz_schema_s32_ex(s32 min, s32 max);
-SP_API mz_schema_t* mz_schema_u64();
-SP_API mz_schema_t* mz_schema_u64_ex(u64 min, u64 max);
-SP_API mz_schema_t* mz_schema_f64();
-SP_API mz_schema_t* mz_schema_f64_ex(f64 min, f64 max);
-SP_API mz_schema_t* mz_schema_array(mz_schema_t* element, mz_on_alloc_fn_t on_alloc);
-SP_API mz_schema_t* mz_schema_array_ex(mz_schema_t* element, mz_on_alloc_fn_t on_alloc, mz_on_parse_fn_t on_parse, u32 min_len, u32 max_len);
-SP_API mz_schema_t* mz_schema_map(mz_schema_t* value, mz_on_alloc_fn_t on_alloc);
-SP_API mz_schema_t* mz_schema_map_ex(mz_schema_t* value, mz_on_alloc_fn_t on_alloc, mz_on_parse_fn_t on_parse);
-SP_API mz_schema_t* mz_schema_tagged_union(const c8* key, mz_tag_kind_t kind);
+SP_API mz_schema_t* mz_schema_object(sp_mem_t mem, mz_object_mode_t mode);
+SP_API mz_schema_t* mz_schema_string(sp_mem_t mem);
+SP_API mz_schema_t* mz_schema_any(sp_mem_t mem);
+SP_API mz_schema_t* mz_schema_bool(sp_mem_t mem);
+SP_API mz_schema_t* mz_schema_s32(sp_mem_t mem);
+SP_API mz_schema_t* mz_schema_s32_ex(sp_mem_t mem, s32 min, s32 max);
+SP_API mz_schema_t* mz_schema_u64(sp_mem_t mem);
+SP_API mz_schema_t* mz_schema_u64_ex(sp_mem_t mem, u64 min, u64 max);
+SP_API mz_schema_t* mz_schema_f64(sp_mem_t mem);
+SP_API mz_schema_t* mz_schema_f64_ex(sp_mem_t mem, f64 min, f64 max);
+SP_API mz_schema_t* mz_schema_array(sp_mem_t mem, mz_schema_t* element, mz_on_alloc_fn_t on_alloc);
+SP_API mz_schema_t* mz_schema_array_ex(sp_mem_t mem, mz_schema_t* element, mz_on_alloc_fn_t on_alloc, mz_on_parse_fn_t on_parse, u32 min_len, u32 max_len);
+SP_API mz_schema_t* mz_schema_map(sp_mem_t mem, mz_schema_t* value, mz_on_alloc_fn_t on_alloc);
+SP_API mz_schema_t* mz_schema_map_ex(sp_mem_t mem, mz_schema_t* value, mz_on_alloc_fn_t on_alloc, mz_on_parse_fn_t on_parse);
+SP_API mz_schema_t* mz_schema_tagged_union(sp_mem_t mem, const c8* key, mz_tag_kind_t kind);
 
 SP_API mz_tag_value_t mz_tag_str(const c8* str);
 SP_API mz_tag_value_t mz_tag_s32(s32 s32);
@@ -202,7 +201,7 @@ SP_API void mz_object_add_field_ex(mz_schema_t* object, const c8* key, mz_schema
 SP_API void mz_object_add_field_ptr_ex(mz_schema_t* object, const c8* key, mz_schema_t* field, mz_bind_opts_t opts);
 SP_API void mz_schema_free(mz_schema_t* schema);
 
-SP_API mz_builder_t mz_builder_begin();
+SP_API mz_builder_t mz_builder_begin(sp_mem_t mem);
 SP_API mz_schema_t* mz_builder_end(mz_builder_t* builder);
 SP_API void mz_builder_push_object_ex(mz_builder_t* builder, const c8* key, mz_object_mode_t mode, mz_bind_opts_t opts);
 SP_API void mz_builder_push_object_ptr_ex(mz_builder_t* builder, const c8* key, mz_object_mode_t mode, mz_bind_opts_t opts);
@@ -216,11 +215,8 @@ SP_API void mz_builder_add_field_ex(mz_builder_t* builder, const c8* key, mz_sch
 SP_API void mz_builder_add_field_ptr_ex(mz_builder_t* builder, const c8* key, mz_schema_t* field, mz_bind_opts_t opts);
 SP_API void mz_builder_pop(mz_builder_t* builder);
 
-SP_API mz_ctx_t* mz_ctx_create();
-SP_API mz_ctx_t* mz_ctx_create_ex(sp_mem_t allocator);
-SP_API void mz_ctx_init(mz_ctx_t* ctx);
-SP_API void mz_ctx_init_ex(mz_ctx_t* ctx, sp_mem_t allocator);
-SP_API void mz_ctx_deinit(mz_ctx_t* ctx);
+SP_API mz_ctx_t* mz_ctx_create(sp_mem_t allocator);
+SP_API void mz_ctx_init(mz_ctx_t* ctx, sp_mem_t allocator);
 SP_API void mz_ctx_destroy(mz_ctx_t* ctx);
 SP_API void mz_ctx_clear(mz_ctx_t* ctx);
 

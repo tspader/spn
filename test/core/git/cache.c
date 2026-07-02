@@ -41,12 +41,9 @@ struct git_cache {
 };
 
 UTEST_F_SETUP(git_cache) {
-  ctx_t* harness = ctx_get();
-  sp_context_push_allocator(sp_mem_arena_as_allocator(harness->arena));
 }
 
 UTEST_F_TEARDOWN(git_cache) {
-  sp_context_pop();
 }
 
 
@@ -64,17 +61,18 @@ static spn_git_checkout_id_t build_id(git_repo_result_t* repo, checkout_req_t* r
 
 static void run_fixture(s32* utest_result, fixture_t fixture) {
   ctx_t* harness = ctx_get();
+  sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
 
   // build git repo fixture as "remote"
   git_repo_result_t repo = git_repo_build(&harness->fs, fixture.repo.name, &fixture.repo);
 
   // init cache in tmpfs
   sp_str_t cache_root = tmpfs_get(&harness->fs,
-    sp_format("{}_cache", SP_FMT_CSTR(fixture.repo.name)));
+    sp_fmt(mem, "{}_cache", sp_fmt_cstr(fixture.repo.name)).value);
   sp_fs_create_dir(cache_root);
 
   spn_git_cache_t cache = SP_ZERO_INITIALIZE();
-  spn_git_cache_init(&cache, spn_allocator, SP_NULLPTR, cache_root);
+  spn_git_cache_init(&cache, mem, SP_NULLPTR, cache_root);
 
   // for each checkout request: ensure db, ensure rev, ensure checkout
   sp_carr_for(fixture.checkouts, it) {
@@ -123,11 +121,11 @@ static void run_fixture(s32* utest_result, fixture_t fixture) {
         break;
       }
 
-      sp_str_t path = sp_fs_join_path(spn_allocator, checkout->path, sp_str_view(file->file));
+      sp_str_t path = sp_fs_join_path(mem, checkout->path, sp_str_view(file->file));
       EXPECT_TRUE(sp_fs_exists(path));
 
       if (sp_fs_exists(path)) {
-        sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, path, &content);
+        sp_str_t content = test_read_file(mem, path);
         SP_EXPECT_STR_EQ_CSTR(content, file->content);
       }
     }

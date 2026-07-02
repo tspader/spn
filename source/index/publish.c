@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "error/types.h"
 #include "codegen/codegen.h"
 #include "codegen/lower.h"
@@ -26,7 +28,7 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
   }
 
   sp_str_t repo = SP_ZERO_INITIALIZE();
-  if (spn_git_get_root(opts->cwd, &repo)) {
+  if (spn_git_get_root(opts->mem, opts->cwd, &repo)) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_NOT_GIT_REPO,
       .not_git_repo.path = opts->cwd,
@@ -35,7 +37,7 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
 
   sp_str_t url = opts->url;
   if (sp_str_empty(url)) {
-    if (spn_git_get_remote_url(repo, &url)) {
+    if (spn_git_get_remote_url(opts->mem, repo, &url)) {
       return (spn_err_union_t) {
         .kind = SPN_ERR_GIT,
         .git.command = sp_str_lit("git remote get-url origin"),
@@ -45,7 +47,7 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
 
   sp_str_t revision = opts->revision;
   if (sp_str_empty(revision)) {
-    if (spn_git_get_commit(repo, sp_str_lit("HEAD"), &revision)) {
+    if (spn_git_get_commit(opts->mem, repo, sp_str_lit("HEAD"), &revision)) {
       return (spn_err_union_t) {
         .kind = SPN_ERR_GIT,
         .git.command = sp_str_lit("git rev-parse HEAD"),
@@ -71,6 +73,8 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
     },
   };
 
+  sp_da_init(opts->mem, release.deps);
+
   spn_pkg_tree_t source = spn_pkg_manifest_source_tree(&info);
   if (source.kind == SPN_PKG_TREE_GIT) {
     release.source = (spn_index_rel_source_t) { .url = source.git.url, .rev = source.git.rev };
@@ -85,7 +89,7 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
 
     sp_da_push(release.deps, ((spn_index_dep_t) {
       .id = spn_qualified_name_to_pkg_id(req->qualified),
-      .version = spn_semver_range_to_str(req->index.range),
+      .version = spn_semver_range_to_str(opts->mem, req->index.range),
     }));
   }
 
@@ -95,7 +99,7 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
       .kind = SPN_ERR_VERSION_EXISTS,
       .version_exists = {
         .name = release.id.name,
-        .version = spn_semver_to_str(release.version),
+        .version = spn_semver_to_str(opts->mem, release.version),
       },
     };
   }

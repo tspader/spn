@@ -3,10 +3,12 @@
   #include <unistd.h>
 #endif
 
-static sp_str_t tmpfs_top_level = SP_ZERO_INITIALIZE();
+static sp_str_t tmpfs_top_level = sp_zero;
 
 sp_str_t tmpfs_default_top_level() {
-  sp_str_t tmp = sp_fs_normalize_path(spn_allocator, sp_os_env_get(sp_str_lit("SPN_TEST_TMP")));
+  sp_mem_t mem = sp_mem_os_new();
+
+  sp_str_t tmp = sp_fs_normalize_path(mem, sp_os_env_get(sp_str_lit("SPN_TEST_TMP")));
   if (sp_str_empty(tmp)) {
     tmp = sp_str_lit(".tmp");
   }
@@ -20,17 +22,17 @@ sp_str_t tmpfs_default_top_level() {
     sp_fs_create_dir(tmp);
   }
 
-  tmp = sp_fs_canonicalize_path(spn_allocator, tmp);
+  tmp = sp_fs_canonicalize_path(mem, tmp);
 
   sp_tm_epoch_t now = sp_tm_now_epoch();
-  sp_str_t timestamp = sp_tm_epoch_to_iso8601(spn_allocator, now);
+  sp_str_t timestamp = sp_tm_epoch_to_iso8601(mem, now);
 #ifdef _WIN32
   u32 pid = (u32)GetCurrentProcessId();
 #else
   u32 pid = (u32)getpid();
 #endif
-  sp_str_t dirname = sp_format("{}-{}", SP_FMT_STR(sp_str_replace_c8(spn_allocator, timestamp, ':', '-')), SP_FMT_U32(pid));
-  return sp_fs_join_path(spn_allocator, tmp, dirname);
+  sp_str_t dirname = sp_fmt(mem, "{}-{}", sp_fmt_str(sp_str_replace_c8(mem, timestamp, ':', '-')), sp_fmt_uint(pid)).value;
+  return sp_fs_join_path(mem, tmp, dirname);
 }
 
 void tmpfs_set_top_level(sp_str_t root) {
@@ -43,10 +45,12 @@ void tmpfs_set_top_level(sp_str_t root) {
     sp_fs_create_dir(root);
   }
 
-  tmpfs_top_level = sp_fs_canonicalize_path(spn_allocator, root);
+  tmpfs_top_level = sp_fs_canonicalize_path(sp_mem_os_new(), root);
 }
 
 void tmpfs_init_named(tmpfs_t* fs, const c8* test) {
+  fs->mem = sp_mem_os_new();
+
   if (sp_str_empty(tmpfs_top_level)) {
     tmpfs_set_top_level(tmpfs_default_top_level());
   }
@@ -56,7 +60,7 @@ void tmpfs_init_named(tmpfs_t* fs, const c8* test) {
     test_name = sp_str_lit("tmpfs");
   }
 
-  sp_str_t root = sp_fs_join_path(spn_allocator, tmpfs_top_level, test_name);
+  sp_str_t root = sp_fs_join_path(fs->mem, tmpfs_top_level, test_name);
 
   SP_ASSERT(!sp_fs_exists(root));
   sp_fs_create_dir(root);
@@ -68,7 +72,7 @@ void tmpfs_init(tmpfs_t* fs) {
 }
 
 sp_str_t tmpfs_get(tmpfs_t* fs, sp_str_t name) {
-  return sp_fs_join_path(spn_allocator, fs->root, name);
+  return sp_fs_join_path(fs->mem, fs->root, name);
 }
 
 void tmpfs_create(tmpfs_t* fs, sp_str_t relative, sp_str_t content) {

@@ -1,8 +1,9 @@
+#include "sp.h"
 #include "external/wasm/wasm.h"
 #include "error/types.h"
 #include "intern/intern.h"
 
-#include "sp/compat.h"
+#include "sp/macro.h"
 #include "spn.h"
 #include "sp/sp_om.h"
 #include "wasm/types.h"

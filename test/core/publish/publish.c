@@ -36,6 +36,7 @@ struct cmd_publish {
 
 static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
   ctx_t* harness = ctx_get();
+  sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
 
   git_repo_result_t source_repo = SP_ZERO_INITIALIZE();
   if (c.source_repo.name) {
@@ -49,18 +50,19 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
         if (!sp_str_ends_with(sp_str_view(file->path), SP_LIT("spn.toml"))) continue;
         if (!sp_str_contains(sp_str_view(file->content), SP_LIT("PLACEHOLDER"))) continue;
 
-        sp_str_t content = sp_format(
+        sp_str_t content = sp_fmt(
+          mem,
           ts(package)
           "name = \"{}\"\n"
           "version = \"{}\"\n"
           "url = \"{}\"\n"
           "commit = \"{}\"\n",
-          SP_FMT_CSTR(c.expect.name),
-          SP_FMT_STR(spn_semver_to_str(c.expect.version)),
-          SP_FMT_STR(source_repo.path),
-          SP_FMT_STR(source_repo.commits[0])
-        );
-        file->content = sp_str_to_cstr(spn_allocator, content);
+          sp_fmt_cstr(c.expect.name),
+          sp_fmt_str(spn_semver_to_str(mem, c.expect.version)),
+          sp_fmt_str(source_repo.path),
+          sp_fmt_str(source_repo.commits[0])
+        ).value;
+        file->content = sp_str_to_cstr(mem, content);
       }
     }
   }
@@ -68,21 +70,21 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
   git_repo_result_t repo = git_repo_build(&harness->fs, c.repo.name, &c.repo);
 
   sp_str_t index_root = tmpfs_get(&harness->fs,
-    sp_format("{}_index", SP_FMT_CSTR(c.name)));
+    sp_fmt(mem, "{}_index", sp_fmt_cstr(c.name)).value);
   sp_fs_create_dir(index_root);
 
   spn_index_info_t index = { .location = index_root };
-  spn_index_init(&index);
+  spn_index_init(&index, mem);
 
   sp_str_t cwd = repo.path;
   if (c.opts.subdir) {
-    cwd = sp_fs_join_path(spn_allocator, repo.path, sp_str_view(c.opts.subdir));
+    cwd = sp_fs_join_path(mem, repo.path, sp_str_view(c.opts.subdir));
   }
 
   u32 rev_idx = c.opts.source_rev ? sp_parse_u32(sp_str_view(c.opts.source_rev)) : 0;
 
   spn_publish_opts_t opts = {
-    .mem = spn_allocator,
+    .mem = mem,
     .intern = spn.intern,
     .cwd = cwd,
     .index = &index,
@@ -144,12 +146,9 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
 }
 
 UTEST_F_SETUP(cmd_publish) {
-  ctx_t* harness = ctx_get();
-  sp_context_push_allocator(sp_mem_arena_as_allocator(harness->arena));
 }
 
 UTEST_F_TEARDOWN(cmd_publish) {
-  sp_context_pop();
 }
 
 UTEST_F(cmd_publish, native_package) {

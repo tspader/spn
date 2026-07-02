@@ -11,7 +11,7 @@ typedef struct {
 
 typedef struct {
   TCCState* s;
-  sp_mem_arena_t* arena;
+  sp_mem_t mem;
   sp_str_t error;
 } spn_tcc_t;
 
