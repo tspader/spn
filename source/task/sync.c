@@ -42,13 +42,31 @@ SP_PRIVATE spn_toolchain_unit_t* setup_toolchain_unit(spn_session_t* session, sp
   spn_lazy_log_init(&unit->logs.test,  sp_fs_join_path(session->mem, spn.paths.log, sp_fmt(session->mem, "toolchain.{}.test.log",  sp_fmt_str(name)).value));
   spn_lazy_log_init(&unit->logs.jsonl, sp_fs_join_path(session->mem, spn.paths.log, sp_fmt(session->mem, "toolchain.{}.jsonl",     sp_fmt_str(name)).value));
 
-  if (spn_toolchain_provision(store, toolchain, &unit->root)) {
+  spn_toolchain_provision_err_t err = spn_toolchain_provision(store, toolchain, &unit->root);
+  if (err.status != SPN_TOOLCHAIN_PROVISION_OK) {
+    sp_str_t message = sp_zero;
+    switch (err.status) {
+      case SPN_TOOLCHAIN_PROVISION_OK: break;
+      case SPN_TOOLCHAIN_PROVISION_ERR_FETCH: {
+        message = sp_str_lit("download failed");
+        break;
+      }
+      case SPN_TOOLCHAIN_PROVISION_ERR_SHA: {
+        message = sp_fmt(session->mem, "sha256 mismatch: expected {}, got {}", sp_fmt_str(err.expected), sp_fmt_str(err.actual)).value;
+        break;
+      }
+      case SPN_TOOLCHAIN_PROVISION_ERR_EXTRACT: {
+        message = sp_str_lit("archive extraction failed");
+        break;
+      }
+    }
+
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_SYNC_FAILED,
       .sync_failed = {
         .name = name,
-        .url = sp_opt_is_null(toolchain->artifact) ? sp_str_lit("") : sp_opt_get(toolchain->artifact).url,
-        .error = sp_str_lit("failed to provision toolchain"),
+        .url = err.url,
+        .error = message,
       }
     });
     return SP_NULLPTR;

@@ -4,7 +4,7 @@
 #include "fixture.h"
 
 UTEST(catalog, builtin_with_host_match) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
   spn_toolchain_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
@@ -22,7 +22,7 @@ UTEST(catalog, builtin_with_host_match) {
   spn_artifact_t artifact = sp_opt_get(zig->artifact);
   EXPECT_STR(artifact.url, "https://tc.example.com/zig-x86_64-linux.tar.xz");
   EXPECT_STR(artifact.sha256, "aaaa");
-  EXPECT_STR(artifact.mirrors, "https://mirrors.example.com/list.txt");
+  EXPECT_STR(artifact.mirror_list, "https://mirrors.example.com/list.txt");
 
   ASSERT_EQ(4u, (u32)sp_da_size(zig->targets));
   EXPECT_EQ((u32)SPN_ARCH_WASM32, (u32)zig->targets[0].arch);
@@ -30,7 +30,7 @@ UTEST(catalog, builtin_with_host_match) {
 }
 
 UTEST(catalog, host_selects_matching_artifact) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_ARM_MACOS);
 
   spn_toolchain_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
@@ -41,7 +41,7 @@ UTEST(catalog, host_selects_matching_artifact) {
 }
 
 UTEST(catalog, unmatched_host_has_no_artifact) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_ARM_LINUX);
 
   spn_toolchain_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
@@ -50,7 +50,7 @@ UTEST(catalog, unmatched_host_has_no_artifact) {
 }
 
 UTEST(catalog, system_entry_is_local) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
   spn_toolchain_t* system = spn_toolchain_catalog_get(&catalog, sp_str_lit("system"));
@@ -62,7 +62,7 @@ UTEST(catalog, system_entry_is_local) {
 }
 
 UTEST(catalog, add_overrides_builtin) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
   spn_toolchain_catalog_add(&catalog, fixture_local_toolchain("zig", "/opt/zig/zig"));
@@ -74,7 +74,7 @@ UTEST(catalog, add_overrides_builtin) {
 }
 
 UTEST(catalog, add_new_entry) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
   spn_toolchain_catalog_add(&catalog, fixture_local_toolchain("mingw", "x86_64-w64-mingw32-gcc"));
@@ -88,7 +88,7 @@ UTEST(catalog, add_new_entry) {
 }
 
 UTEST(catalog, unknown_name_is_null) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
   EXPECT_FALSE(spn_toolchain_catalog_get(&catalog, sp_str_lit("gcc-13")));
@@ -102,7 +102,7 @@ UTEST(catalog, embedded_builtins_parse) {
   sp_str_t json = sp_zero;
   ASSERT_EQ(0, (s32)sp_io_read_file(mem, path, &json));
 
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   ASSERT_EQ(SPN_OK, spn_toolchain_catalog_init(&catalog, json, HOST_X64_LINUX, mem));
 
   spn_toolchain_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
@@ -124,6 +124,6 @@ UTEST(catalog, embedded_builtins_parse) {
 
 UTEST(catalog, malformed_json_errors) {
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   EXPECT_EQ(SPN_ERROR, spn_toolchain_catalog_init(&catalog, sp_str_lit("{ not json"), HOST_X64_LINUX, mem));
 }

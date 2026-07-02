@@ -23,7 +23,7 @@ static void fixture_selection(
 }
 
 UTEST(select, system_for_host_pulls_zig_for_scripts) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
   spn_toolchain_selection_t selection = sp_zero;
@@ -39,7 +39,7 @@ UTEST(select, system_for_host_pulls_zig_for_scripts) {
 }
 
 UTEST(select, zig_as_build_toolchain_dedups) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
   spn_toolchain_selection_t selection = sp_zero;
@@ -53,7 +53,7 @@ UTEST(select, zig_as_build_toolchain_dedups) {
 }
 
 UTEST(select, unknown_build_toolchain) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
   spn_toolchain_selection_t selection = sp_zero;
@@ -65,7 +65,7 @@ UTEST(select, unknown_build_toolchain) {
 }
 
 UTEST(select, undeclared_targets_are_host_only) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
   spn_toolchain_selection_t selection = sp_zero;
@@ -74,11 +74,12 @@ UTEST(select, undeclared_targets_are_host_only) {
 
   ASSERT_EQ((u32)SPN_TOOLCHAIN_SELECT_ERR_TARGET, (u32)err.status);
   EXPECT_STR(err.name, "system");
+  EXPECT_EQ((u32)SPN_TOOLCHAIN_ROLE_BUILD, (u32)err.role);
   EXPECT_EQ((u32)SPN_OS_WINDOWS, (u32)err.target.os);
 }
 
 UTEST(select, declared_target_allows_cross) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
   spn_toolchain_t mingw = fixture_local_toolchain("mingw", "x86_64-w64-mingw32-gcc");
@@ -100,7 +101,7 @@ UTEST(select, declared_target_allows_cross) {
 }
 
 UTEST(select, cross_toolchain_rejects_other_targets) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
@@ -118,7 +119,7 @@ UTEST(select, cross_toolchain_rejects_other_targets) {
 }
 
 UTEST(select, script_toolchain_must_target_wasm) {
-  spn_toolchain_catalog_t catalog = SP_NULLPTR;
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
   spn_toolchain_catalog_add(&catalog, fixture_local_toolchain("zig", "/opt/zig/zig"));
@@ -129,6 +130,7 @@ UTEST(select, script_toolchain_must_target_wasm) {
 
   ASSERT_EQ((u32)SPN_TOOLCHAIN_SELECT_ERR_TARGET, (u32)err.status);
   EXPECT_STR(err.name, "zig");
+  EXPECT_EQ((u32)SPN_TOOLCHAIN_ROLE_SCRIPT, (u32)err.role);
   EXPECT_EQ((u32)SPN_ARCH_WASM32, (u32)err.target.arch);
 }
 

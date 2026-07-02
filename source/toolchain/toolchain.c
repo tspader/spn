@@ -3,6 +3,8 @@
 #include "toolchain/toolchain.h"
 
 spn_toolchain_launcher_t spn_toolchain_launcher_with_root(sp_mem_t mem, spn_toolchain_launcher_t launcher, sp_str_t root) {
+  if (sp_str_empty(root)) return launcher;
+
   spn_toolchain_launcher_t result = launcher;
   result.program = sp_fs_join_path(mem, root, launcher.program);
   return result;

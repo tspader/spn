@@ -1,6 +1,10 @@
 #include "toolchain/select.h"
 #include "toolchain/catalog.h"
 
+sp_str_t spn_toolchain_script_default(void) {
+  return sp_str_lit("zig");
+}
+
 spn_triple_t spn_toolchain_script_target(void) {
   return (spn_triple_t) { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI, .abi = SPN_ABI_NONE };
 }

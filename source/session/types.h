@@ -53,7 +53,7 @@ struct spn_session_t {
   sp_env_t env;
 
   spn_profile_table_t profiles;
-  spn_toolchain_catalog_t toolchains;
+  spn_toolchain_catalog_t catalog;
   spn_toolchain_selection_t selection;
 
   spn_resolve_t resolve;

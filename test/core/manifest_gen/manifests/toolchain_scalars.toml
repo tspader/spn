@@ -4,10 +4,12 @@ version = "1.0.0"
 
 [[toolchain]]
 name = "gcc"
-url = "https://gcc.example.com"
-sha256 = "deadbeef"
 mirrors = "https://mirrors.example.com"
 compiler = "gcc"
 linker = "ld"
 archiver = "ar"
 driver = "gcc"
+
+[toolchain.host.x86_64-linux]
+url = "https://gcc.example.com"
+sha256 = "deadbeef"

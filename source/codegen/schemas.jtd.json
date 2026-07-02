@@ -74,13 +74,12 @@
     "manifest_toolchain": {
       "optionalProperties": {
         "name": { "type": "string" },
-        "url": { "type": "string" },
-        "sha256": { "type": "string" },
-        "mirrors": { "type": "string" },
         "compiler": { "type": "string" },
         "linker": { "type": "string" },
         "archiver": { "type": "string" },
         "driver": { "ref": "cc_driver" },
+        "host": { "values": { "ref": "artifact" } },
+        "mirrors": { "type": "string" },
         "target": { "elements": { "ref": "triple" } }
       }
     },
@@ -131,9 +130,11 @@
       "optionalProperties": { "args": { "elements": { "type": "string" } } }
     },
 
-    "download": {
+    "artifact": {
       "properties": {
-        "url":    { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "optionalProperties": {
         "sha256": { "type": "string" }
       }
     },
@@ -148,7 +149,7 @@
       },
       "optionalProperties": {
         "version":  { "type": "string" },
-        "host":     { "values": { "ref": "download" } },
+        "host":     { "values": { "ref": "artifact" } },
         "target":   { "elements": { "ref": "triple" } },
         "mirrors":  { "type": "string" }
       }

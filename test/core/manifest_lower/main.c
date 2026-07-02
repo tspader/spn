@@ -241,7 +241,7 @@ static void run_case(s32* utest_result, test_t test) {
 
     if (expected.url)     EXPECT_STR(sp_opt_get(tc->artifact).url, expected.url);
     if (expected.sha256)  EXPECT_STR(sp_opt_get(tc->artifact).sha256, expected.sha256);
-    if (expected.mirrors) EXPECT_STR(sp_opt_get(tc->artifact).mirrors, expected.mirrors);
+    if (expected.mirrors) EXPECT_STR(sp_opt_get(tc->artifact).mirror_list, expected.mirrors);
     if (expected.compiler) EXPECT_STR(tc->compiler.program, expected.compiler);
     if (expected.linker)   EXPECT_STR(tc->linker.program, expected.linker);
     if (expected.archiver) EXPECT_STR(tc->archiver.program, expected.archiver);
