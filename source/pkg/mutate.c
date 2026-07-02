@@ -9,12 +9,31 @@
 #include "pkg/mutate.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
+#include "target/mutate.h"
 
-void spn_pkg_init(spn_pkg_info_t* pkg, sp_str_t name) {
-  pkg->arena = sp_mem_arena_new(spn_mem_todo);
+static sp_mem_t spn_pkg_mem(spn_pkg_info_t* pkg) {
+  return sp_mem_arena_as_allocator(pkg->arena);
+}
+
+void spn_pkg_init(sp_mem_t mem, spn_pkg_info_t* pkg, sp_str_t name) {
+  pkg->arena = sp_mem_arena_new(mem);
   pkg->name = spn_intern(name);
 
-  sp_ht_set_fns(pkg->deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+  sp_mem_t a = spn_pkg_mem(pkg);
+  sp_str_om_init(pkg->libs);
+  sp_str_om_init(pkg->exes);
+  sp_str_om_init(pkg->scripts);
+  sp_str_om_init(pkg->tests);
+  sp_str_om_init(pkg->profiles);
+  sp_str_om_init(pkg->indexes);
+  sp_str_om_init(pkg->toolchains);
+  sp_str_ht_init(a, pkg->deps);
+  sp_ht_init(a, pkg->metadata);
+  sp_da_init(a, pkg->config);
+  sp_da_init(a, pkg->versions);
+  sp_da_init(a, pkg->include);
+  sp_da_init(a, pkg->define);
+  sp_da_init(a, pkg->system_deps);
 }
 
 void spn_pkg_set_name(spn_pkg_info_t* pkg, const c8* name) {
@@ -30,9 +49,7 @@ void spn_pkg_set_repo(spn_pkg_info_t* pkg, const c8* repo) {
 }
 
 void spn_pkg_set_repo_ex(spn_pkg_info_t* pkg, sp_str_t repo) {
-  sp_context_push_arena(pkg->arena);
-  pkg->repo = sp_str_copy(spn_mem_todo, repo);
-  sp_context_pop();
+  pkg->repo = sp_str_copy(spn_pkg_mem(pkg), repo);
 }
 
 void spn_pkg_set_url(spn_pkg_info_t* pkg, const c8* url) {
@@ -40,9 +57,7 @@ void spn_pkg_set_url(spn_pkg_info_t* pkg, const c8* url) {
 }
 
 void spn_pkg_set_url_ex(spn_pkg_info_t* pkg, sp_str_t url) {
-  sp_context_push_arena(pkg->arena);
-  pkg->url = sp_str_copy(spn_mem_todo, url);
-  sp_context_pop();
+  pkg->url = sp_str_copy(spn_pkg_mem(pkg), url);
 }
 
 void spn_pkg_set_author(spn_pkg_info_t* pkg, const c8* author) {
@@ -50,9 +65,7 @@ void spn_pkg_set_author(spn_pkg_info_t* pkg, const c8* author) {
 }
 
 void spn_pkg_set_author_ex(spn_pkg_info_t* pkg, sp_str_t author) {
-  sp_context_push_arena(pkg->arena);
-  pkg->author = sp_str_copy(spn_mem_todo, author);
-  sp_context_pop();
+  pkg->author = sp_str_copy(spn_pkg_mem(pkg), author);
 }
 
 void spn_pkg_set_maintainer(spn_pkg_info_t* pkg, const c8* maintainer) {
@@ -60,9 +73,7 @@ void spn_pkg_set_maintainer(spn_pkg_info_t* pkg, const c8* maintainer) {
 }
 
 void spn_pkg_set_maintainer_ex(spn_pkg_info_t* pkg, sp_str_t maintainer) {
-  sp_context_push_arena(pkg->arena);
-  pkg->maintainer = sp_str_copy(spn_mem_todo, maintainer);
-  sp_context_pop();
+  pkg->maintainer = sp_str_copy(spn_pkg_mem(pkg), maintainer);
 }
 
 void spn_pkg_add_version(spn_pkg_info_t* pkg, const c8* version, const c8* commit) {
@@ -74,11 +85,9 @@ void spn_pkg_add_version_ex(spn_pkg_info_t* pkg, spn_semver_t version, sp_str_t 
     pkg->version = version;
   }
 
-  sp_context_push_arena(pkg->arena);
-  spn_pkg_metadata_t metadata = { version, sp_str_copy(spn_mem_todo, commit) };
+  spn_pkg_metadata_t metadata = { version, sp_str_copy(spn_pkg_mem(pkg), commit) };
   sp_ht_insert(pkg->metadata, version, metadata);
   sp_da_push(pkg->versions, version);
-  sp_context_pop();
 }
 
 void spn_pkg_add_include(spn_pkg_info_t* pkg, const c8* include) {
@@ -86,9 +95,7 @@ void spn_pkg_add_include(spn_pkg_info_t* pkg, const c8* include) {
 }
 
 void spn_pkg_add_include_ex(spn_pkg_info_t* pkg, sp_str_t path) {
-  sp_context_push_arena(pkg->arena);
-  sp_da_push(pkg->include, sp_str_copy(spn_mem_todo, path));
-  sp_context_pop();
+  sp_da_push(pkg->include, sp_str_copy(spn_pkg_mem(pkg), path));
 }
 
 void spn_pkg_add_define(spn_pkg_info_t* pkg, const c8* define) {
@@ -96,9 +103,7 @@ void spn_pkg_add_define(spn_pkg_info_t* pkg, const c8* define) {
 }
 
 void spn_pkg_add_define_ex(spn_pkg_info_t* pkg, sp_str_t define) {
-  sp_context_push_arena(pkg->arena);
-  sp_da_push(pkg->define, sp_str_copy(spn_mem_todo, define));
-  sp_context_pop();
+  sp_da_push(pkg->define, sp_str_copy(spn_pkg_mem(pkg), define));
 }
 
 void spn_pkg_add_system_dep(spn_pkg_info_t* pkg, const c8* dep) {
@@ -106,9 +111,7 @@ void spn_pkg_add_system_dep(spn_pkg_info_t* pkg, const c8* dep) {
 }
 
 void spn_pkg_add_system_dep_ex(spn_pkg_info_t* pkg, sp_str_t dep) {
-  sp_context_push_arena(pkg->arena);
-  sp_da_push(pkg->system_deps, sp_str_copy(spn_mem_todo, dep));
-  sp_context_pop();
+  sp_da_push(pkg->system_deps, sp_str_copy(spn_pkg_mem(pkg), dep));
 }
 
 void spn_pkg_add_linkage(spn_pkg_info_t* pkg, spn_linkage_t linkage) {
@@ -140,7 +143,9 @@ spn_target_info_t* spn_pkg_add_exe_ex(spn_pkg_info_t* pkg, sp_str_t name) {
     .kind = SPN_TARGET_EXE,
   };
   sp_str_om_insert(pkg->exes, exe.name, exe);
-  return sp_str_om_get(pkg->exes, exe.name);
+  spn_target_info_t* target = sp_str_om_get(pkg->exes, exe.name);
+  spn_target_info_init(spn_pkg_mem(pkg), target);
+  return target;
 }
 
 spn_target_info_t* spn_pkg_add_script(spn_pkg_info_t* pkg, const c8* name) {
@@ -153,7 +158,9 @@ spn_target_info_t* spn_pkg_add_script_ex(spn_pkg_info_t* pkg, sp_str_t name) {
     .kind = SPN_TARGET_SCRIPT,
   };
   sp_str_om_insert(pkg->scripts, script.name, script);
-  return sp_str_om_get(pkg->scripts, script.name);
+  spn_target_info_t* target = sp_str_om_get(pkg->scripts, script.name);
+  spn_target_info_init(spn_pkg_mem(pkg), target);
+  return target;
 }
 
 spn_target_info_t* spn_pkg_add_test(spn_pkg_info_t* pkg, const c8* name) {
@@ -166,7 +173,9 @@ spn_target_info_t* spn_pkg_add_test_ex(spn_pkg_info_t* pkg, sp_str_t name) {
     .kind = SPN_TARGET_TEST,
   };
   sp_str_om_insert(pkg->tests, test.name, test);
-  return sp_str_om_get(pkg->tests, test.name);
+  spn_target_info_t* target = sp_str_om_get(pkg->tests, test.name);
+  spn_target_info_init(spn_pkg_mem(pkg), target);
+  return target;
 }
 
 spn_target_info_t* spn_pkg_add_lib_ex(spn_pkg_info_t* pkg, sp_str_t name, spn_linkage_set_t linkage) {
@@ -176,7 +185,9 @@ spn_target_info_t* spn_pkg_add_lib_ex(spn_pkg_info_t* pkg, sp_str_t name, spn_li
     .linkages = linkage
   };
   sp_str_om_insert(pkg->libs, lib.name, lib);
-  return sp_str_om_get(pkg->libs, lib.name);
+  spn_target_info_t* target = sp_str_om_get(pkg->libs, lib.name);
+  spn_target_info_init(spn_pkg_mem(pkg), target);
+  return target;
 }
 
 spn_index_info_t* spn_pkg_add_index(spn_pkg_info_t* pkg, const c8* name, const c8* location) {

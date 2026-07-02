@@ -46,6 +46,8 @@ typedef struct {
 } spn_cc_embed_t;
 
 typedef struct {
+  sp_mem_arena_t* arena;
+  sp_mem_t mem;
   spn_obj_builder_t obj;
   sp_da(spn_cc_embed_t) entries;
 } spn_cc_embed_ctx_t;
@@ -77,6 +79,7 @@ typedef struct {
 } spn_cc_target_t;
 
 struct spn_cc {
+  sp_mem_t mem;
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
@@ -100,6 +103,7 @@ struct spn_cc {
   sp_ps_config_t config;
 };
 
+void             spn_cc_init(spn_cc_t* cc, sp_mem_t mem);
 void             spn_cc_add_runtime(spn_cc_t* cc, sp_str_t runtime, sp_str_t include);
 void             spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_unit_t* toolchain);
 void             spn_cc_set_profile(spn_cc_t* cc, spn_profile_info_t profile);
@@ -121,11 +125,12 @@ void             spn_cc_target_add_rpath(spn_cc_target_t* cc, sp_str_t dir);
 void             spn_cc_target_add_dep(spn_cc_target_t* target, spn_pkg_unit_t* dep);
 spn_err_t        spn_cc_target_to_tcc(spn_cc_t* cc, spn_cc_target_t* target, spn_tcc_t* tcc);
 spn_cc_run_t     spn_cc_target_run(spn_cc_target_t* target, sp_str_t cwd);
-void             spn_cc_to_ps(spn_cc_t* cc, sp_ps_config_t* ps);
-void             spn_cc_target_to_ps(spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps);
-sp_str_t         spn_cc_symbol_from_embedded_file(sp_str_t file_path);
-void             spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx, spn_os_t target_os);
-spn_err_t        spn_cc_embed_ctx_add(spn_cc_embed_ctx_t* ctx, sp_io_reader_t* reader, sp_str_t symbol, sp_str_t path, sp_str_t data_type, sp_str_t size_type);
+void             spn_cc_to_ps(sp_mem_t mem, spn_cc_t* cc, sp_ps_config_t* ps);
+void             spn_cc_target_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps);
+sp_str_t         spn_cc_symbol_from_embedded_file(sp_mem_t mem, sp_str_t file_path);
+void             spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx, sp_mem_t mem, spn_os_t target_os);
+void             spn_cc_embed_ctx_free(spn_cc_embed_ctx_t* ctx);
+spn_err_t        spn_cc_embed_ctx_add(spn_cc_embed_ctx_t* ctx, sp_mem_buffer_t data, sp_str_t symbol, sp_str_t path, sp_str_t data_type, sp_str_t size_type);
 spn_err_t        spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_str_t header);
 
 #endif

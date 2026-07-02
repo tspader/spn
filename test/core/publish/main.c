@@ -18,8 +18,8 @@ s32 main(s32 num_args, const c8** args) {
   ctx_t* ctx = ctx_get();
   ctx_init(ctx);
 
-  spn.intern = sp_intern_new(spn_allocator);
-  spn.events = spn_event_buffer_new();
+  spn.intern = sp_intern_new(sp_mem_os_new());
+  spn.events = spn_event_buffer_new(sp_mem_os_new());
 
   s32 result = utest_main(num_args, args);
 

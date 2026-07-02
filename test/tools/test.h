@@ -1,6 +1,7 @@
 #ifndef SPN_TEST_H
 #define SPN_TEST_H
 #include "sp.h"
+#include "sp/macro.h"
 #include "utest.h"
 
 #define ut (*utest_fixture)
@@ -22,6 +23,7 @@
 
 // TMPFS
 typedef struct {
+  sp_mem_t mem;
   sp_str_t root;
 } tmpfs_t;
 
@@ -117,24 +119,43 @@ sp_str_t          git_repo_file_at(sp_str_t repo, sp_str_t commit, sp_str_t path
 
 bool str_equal(sp_str_t a, sp_str_t b);
 
+static inline sp_str_t test_read_file(sp_mem_t mem, sp_str_t path) {
+  sp_str_t content = sp_zero;
+  sp_io_read_file(mem, path, &content);
+  return content;
+}
+
+static inline bool test_read_eq(sp_mem_t mem, sp_str_t path, const c8* expect) {
+  return sp_str_equal(test_read_file(mem, path), sp_str_view(expect));
+}
+
+static inline bool test_read_empty(sp_mem_t mem, sp_str_t path) {
+  return sp_str_empty(test_read_file(mem, path));
+}
+
 // UTEST
 #define SP_TEST_REPORT(fmt, ...) \
   do { \
-    sp_str_t formatted = sp_format_str(fmt, ##__VA_ARGS__); \
-    UTEST_PRINTF("%s\n", sp_str_to_cstr(spn_allocator, formatted)); \
+    sp_str_t formatted = sp_fmt(sp_mem_get_scratch(), fmt, ##__VA_ARGS__).value; \
+    UTEST_PRINTF("{}\n", sp_fmt_str(formatted)); \
+  } while (0)
+
+#define SP_TEST_REPORT_STR(str) \
+  do { \
+    UTEST_PRINTF("{}\n", sp_fmt_str(str)); \
   } while (0)
 
 #define SP_TEST_STREQ(a, b, is_assert) \
   UTEST_SURPRESS_WARNING_BEGIN do { \
     if (!str_equal((a), (b))) { \
-      const c8* __file = __FILE__; \
-      const u32 __line = __LINE__; \
-      sp_str_builder_t __builder = SP_ZERO_INITIALIZE(); \
-      sp_str_builder_append_fmt_str(&__builder, SP_LIT("{}:{} Failure:"), SP_FMT_CSTR(__file), SP_FMT_U32(__line)); \
-      sp_str_builder_new_line(&__builder); \
-      sp_str_builder_indent(&__builder); \
-      sp_str_builder_append_fmt_str(&__builder, SP_LIT("{} != {}"), SP_FMT_QUOTED_STR((a)), SP_FMT_QUOTED_STR((b))); \
-      SP_TEST_REPORT(sp_str_builder_to_str(&__builder)); \
+      sp_str_t __msg = sp_fmt( \
+        sp_mem_get_scratch(), \
+        "{}:{} Failure:\n  {.quote} != {.quote}", \
+        sp_fmt_cstr(__FILE__), sp_fmt_uint(__LINE__), \
+        sp_fmt_str((a)), \
+        sp_fmt_str((b)) \
+      ).value; \
+      SP_TEST_REPORT_STR(__msg); \
       *utest_result = UTEST_TEST_FAILURE; \
  \
       if (is_assert) { \

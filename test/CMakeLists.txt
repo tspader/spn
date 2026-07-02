@@ -11,7 +11,6 @@ function(spn_test_binary target)
     ${STORE}/include
   )
   target_link_libraries(${target} PRIVATE m)
-  target_compile_options(${target} PRIVATE -include ${SRC}/sp/compat.h)
   add_dependencies(${target} headers)
 endfunction()
 

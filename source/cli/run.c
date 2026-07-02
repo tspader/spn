@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "cli/cli.h"
 
 #include "app/app.h"

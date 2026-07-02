@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "mz.h"
 
 #include <string.h>
@@ -23,8 +25,8 @@ typedef struct mz_arr_it_t mz_arr_it_t;
 #define MZ_ZERO_LOCAL(type) (type){0}
 #endif
 
-static mz_err_t mz_backend_load_file(mz_nstr_t path, mz_json_doc_t** result);
-static mz_err_t mz_backend_load_str(mz_nstr_t json, mz_json_doc_t** result);
+static mz_err_t mz_backend_load_file(sp_mem_t mem, mz_nstr_t path, mz_json_doc_t** result);
+static mz_err_t mz_backend_load_str(sp_mem_t mem, mz_nstr_t json, mz_json_doc_t** result);
 static void mz_backend_free_document(mz_json_doc_t* doc);
 static mz_json_cursor_t mz_backend_get_root(const mz_json_doc_t* doc);
 static mz_json_kind_t mz_backend_get_value_kind(const mz_json_cursor_t* cursor);
@@ -183,27 +185,27 @@ static bool mz_backend_arr_it_next(mz_arr_it_t* it, mz_json_cursor_t* cursor, u3
   return true;
 }
 
-static mz_err_t mz_backend_load_str(mz_nstr_t json, mz_json_doc_t** result) {
+static mz_err_t mz_backend_load_str(sp_mem_t mem, mz_nstr_t json, mz_json_doc_t** result) {
   json_error_t error = SP_ZERO_INITIALIZE();
   json_t* root = json_loadb(json.data, (size_t)json.len, 0, &error);
   if (!root) {
     return MZ_ERR_JSON;
   }
 
-  mz_json_doc_t* doc = sp_alloc_type(spn_mem_todo, mz_json_doc_t);
+  mz_json_doc_t* doc = sp_alloc_type(mem, mz_json_doc_t);
   doc->root = root;
   *result = doc;
   return MZ_OK;
 }
 
-static mz_err_t mz_backend_load_file(mz_nstr_t path, mz_json_doc_t** result) {
+static mz_err_t mz_backend_load_file(sp_mem_t mem, mz_nstr_t path, mz_json_doc_t** result) {
   json_error_t error = SP_ZERO_INITIALIZE();
   json_t* root = json_load_file(path.data, 0, &error);
   if (!root) {
     return MZ_ERR_JSON;
   }
 
-  mz_json_doc_t* doc = sp_alloc_type(spn_mem_todo, mz_json_doc_t);
+  mz_json_doc_t* doc = sp_alloc_type(mem, mz_json_doc_t);
   doc->root = root;
   *result = doc;
   return MZ_OK;
@@ -213,7 +215,6 @@ static void mz_backend_free_document(mz_json_doc_t* doc) {
   if (doc->root) {
     json_decref(doc->root);
   }
-  spn_free(doc);
 }
 
 #elif defined(MZ_BACKEND_CJSON)
@@ -386,7 +387,7 @@ static bool mz_backend_arr_it_next(mz_arr_it_t* it, mz_json_cursor_t* cursor, u3
   return true;
 }
 
-static mz_err_t mz_json_cjson_read_file(const c8* path, c8** result) {
+static mz_err_t mz_json_cjson_read_file(sp_mem_t mem, const c8* path, c8** result) {
   FILE* file = fopen(path, "rb");
   if (!file) {
     return MZ_ERR_JSON;
@@ -409,11 +410,10 @@ static mz_err_t mz_json_cjson_read_file(const c8* path, c8** result) {
   }
 
   u32 size = (u32)file_size;
-  c8* buffer = (c8*)sp_alloc(spn_mem_todo, size + 1);
+  c8* buffer = sp_alloc_n(mem, c8, size + 1);
   size_t read_len = fread(buffer, 1, size, file);
   fclose(file);
   if (read_len != size) {
-    spn_free(buffer);
     return MZ_ERR_JSON;
   }
 
@@ -422,29 +422,31 @@ static mz_err_t mz_json_cjson_read_file(const c8* path, c8** result) {
   return MZ_OK;
 }
 
-static mz_err_t mz_backend_load_str(mz_nstr_t json, mz_json_doc_t** result) {
+static mz_err_t mz_backend_load_str(sp_mem_t mem, mz_nstr_t json, mz_json_doc_t** result) {
   cJSON* root = cJSON_ParseWithOpts(json.data, mz_nullptr, true);
   if (!root) {
     return MZ_ERR_JSON;
   }
 
-  mz_json_doc_t* doc = sp_alloc_type(spn_mem_todo, mz_json_doc_t);
+  mz_json_doc_t* doc = sp_alloc_type(mem, mz_json_doc_t);
   doc->root = root;
   *result = doc;
   return MZ_OK;
 }
 
-static mz_err_t mz_backend_load_file(mz_nstr_t path, mz_json_doc_t** result) {
+static mz_err_t mz_backend_load_file(sp_mem_t mem, mz_nstr_t path, mz_json_doc_t** result) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
   c8* json = mz_nullptr;
-  mz_try(mz_json_cjson_read_file(path.data, &json));
+  mz_err_t err = mz_json_cjson_read_file(scratch.mem, path.data, &json);
+  cJSON* root = err == MZ_OK ? cJSON_ParseWithOpts(json, mz_nullptr, true) : mz_nullptr;
+  sp_mem_end_scratch(scratch);
 
-  cJSON* root = cJSON_ParseWithOpts(json, mz_nullptr, true);
-  spn_free(json);
+  mz_try(err);
   if (!root) {
     return MZ_ERR_JSON;
   }
 
-  mz_json_doc_t* doc = sp_alloc_type(spn_mem_todo, mz_json_doc_t);
+  mz_json_doc_t* doc = sp_alloc_type(mem, mz_json_doc_t);
   doc->root = root;
   *result = doc;
   return MZ_OK;
@@ -454,8 +456,6 @@ static void mz_backend_free_document(mz_json_doc_t* doc) {
   if (doc->root) {
     cJSON_Delete(doc->root);
   }
-
-  spn_free(doc);
 }
 
 #elif defined(MZ_BACKEND_YYJSON)
@@ -603,24 +603,24 @@ static bool mz_backend_arr_it_next(mz_arr_it_t* it, mz_json_cursor_t* cursor, u3
   return true;
 }
 
-static mz_err_t mz_backend_load_str(mz_nstr_t json, mz_json_doc_t** result) {
+static mz_err_t mz_backend_load_str(sp_mem_t mem, mz_nstr_t json, mz_json_doc_t** result) {
   yyjson_doc* root = yyjson_read(json.data, json.len, 0);
   if (!root) {
     return MZ_ERR_JSON;
   }
 
-  *result = sp_alloc_type(spn_mem_todo, mz_json_doc_t);
+  *result = sp_alloc_type(mem, mz_json_doc_t);
   (*result)->root = root;
   return MZ_OK;
 }
 
-static mz_err_t mz_backend_load_file(mz_nstr_t path, mz_json_doc_t** result) {
+static mz_err_t mz_backend_load_file(sp_mem_t mem, mz_nstr_t path, mz_json_doc_t** result) {
   yyjson_doc* root = yyjson_read_file(path.data, 0, mz_nullptr, mz_nullptr);
   if (!root) {
     return MZ_ERR_JSON;
   }
 
-  *result = sp_alloc_type(spn_mem_todo, mz_json_doc_t);
+  *result = sp_alloc_type(mem, mz_json_doc_t);
   (*result)->root = root;
   return MZ_OK;
 }
@@ -629,8 +629,6 @@ static void mz_backend_free_document(mz_json_doc_t* doc) {
   if (doc->root) {
     yyjson_doc_free(doc->root);
   }
-
-  spn_free(doc);
 }
 
 #elif defined(MZ_BACKEND_RAPIDJSON)
@@ -814,7 +812,8 @@ static bool mz_backend_arr_it_next(mz_arr_it_t* it, mz_json_cursor_t* cursor, u3
   return true;
 }
 
-static mz_err_t mz_backend_load_str(mz_nstr_t json, mz_json_doc_t** result) {
+static mz_err_t mz_backend_load_str(sp_mem_t mem, mz_nstr_t json, mz_json_doc_t** result) {
+  SP_UNUSED(mem);
   mz_json_doc_t* doc = new (std::nothrow) mz_json_doc_t();
   if (!doc) {
     return MZ_ERR_JSON;
@@ -831,7 +830,8 @@ static mz_err_t mz_backend_load_str(mz_nstr_t json, mz_json_doc_t** result) {
   return MZ_OK;
 }
 
-static mz_err_t mz_backend_load_file(mz_nstr_t path, mz_json_doc_t** result) {
+static mz_err_t mz_backend_load_file(sp_mem_t mem, mz_nstr_t path, mz_json_doc_t** result) {
+  SP_UNUSED(mem);
   mz_json_doc_t* doc = new (std::nothrow) mz_json_doc_t();
   if (!doc) {
     return MZ_ERR_JSON;
@@ -1016,7 +1016,8 @@ static bool mz_backend_arr_it_next(mz_arr_it_t* it, mz_json_cursor_t* cursor, u3
   return true;
 }
 
-static mz_err_t mz_backend_load_str(mz_nstr_t json, mz_json_doc_t** result) {
+static mz_err_t mz_backend_load_str(sp_mem_t mem, mz_nstr_t json, mz_json_doc_t** result) {
+  SP_UNUSED(mem);
   mz_json_doc_t* doc = new (std::nothrow) mz_json_doc_t();
   if (!doc) {
     return MZ_ERR_JSON;
@@ -1035,7 +1036,8 @@ static mz_err_t mz_backend_load_str(mz_nstr_t json, mz_json_doc_t** result) {
   return MZ_OK;
 }
 
-static mz_err_t mz_backend_load_file(mz_nstr_t path, mz_json_doc_t** result) {
+static mz_err_t mz_backend_load_file(sp_mem_t mem, mz_nstr_t path, mz_json_doc_t** result) {
+  SP_UNUSED(mem);
   mz_json_doc_t* doc = new (std::nothrow) mz_json_doc_t();
   if (!doc) {
     return MZ_ERR_JSON;
@@ -1203,7 +1205,8 @@ static bool mz_backend_arr_it_next(mz_arr_it_t* it, mz_json_cursor_t* cursor, u3
   return true;
 }
 
-static mz_err_t mz_backend_load_str(mz_nstr_t json, mz_json_doc_t** result) {
+static mz_err_t mz_backend_load_str(sp_mem_t mem, mz_nstr_t json, mz_json_doc_t** result) {
+  SP_UNUSED(mem);
   mz_json_doc_t* doc = new (std::nothrow) mz_json_doc_t();
   if (!doc) {
     return MZ_ERR_JSON;
@@ -1219,7 +1222,8 @@ static mz_err_t mz_backend_load_str(mz_nstr_t json, mz_json_doc_t** result) {
   return MZ_OK;
 }
 
-static mz_err_t mz_backend_load_file(mz_nstr_t path, mz_json_doc_t** result) {
+static mz_err_t mz_backend_load_file(sp_mem_t mem, mz_nstr_t path, mz_json_doc_t** result) {
+  SP_UNUSED(mem);
   mz_json_doc_t* doc = new (std::nothrow) mz_json_doc_t();
   if (!doc) {
     return MZ_ERR_JSON;
@@ -1293,6 +1297,7 @@ typedef struct {
 } mz_object_slot_t;
 
 struct mz_schema_t {
+  sp_mem_t mem;
   mz_schema_kind_t kind;
   union {
     struct {
@@ -1541,7 +1546,7 @@ static void mz_object_rebuild_index(mz_schema_t* schema) {
   }
 
   if (schema->as.object.slots) {
-    spn_free(schema->as.object.slots);
+    sp_free(schema->mem, schema->as.object.slots, sizeof(mz_object_slot_t) * schema->as.object.slots_cap);
     schema->as.object.slots = mz_nullptr;
     schema->as.object.slots_cap = 0;
   }
@@ -1556,7 +1561,7 @@ static void mz_object_rebuild_index(mz_schema_t* schema) {
     cap <<= 1;
   }
 
-  schema->as.object.slots = (mz_object_slot_t*)sp_alloc(spn_mem_todo, sizeof(mz_object_slot_t) * cap);
+  schema->as.object.slots = (mz_object_slot_t*)sp_alloc(schema->mem, sizeof(mz_object_slot_t) * cap);
   if (!schema->as.object.slots) {
     schema->as.object.slots_cap = 0;
     return;
@@ -1657,7 +1662,13 @@ static mz_field_t* mz_object_find_field(mz_schema_t* schema, const c8* key) {
   return mz_nullptr;
 }
 
-#define mz_free(ptr) spn_free((void*)(ptr))
+static void mz_free_cstr(sp_mem_t mem, const c8* value) {
+  if (!value) {
+    return;
+  }
+
+  sp_free(mem, (void*)value, sp_cstr_len(value) + 1);
+}
 
 static c8* mz_alloc_cstr(sp_mem_t allocator, const c8* value) {
   u32 len = sp_cstr_len(value);
@@ -1850,9 +1861,7 @@ static mz_err_t mz_eval_object_member(mz_ctx_t* ctx, mz_schema_t* schema, const 
   if (out && field->is_ptr) {
     void* ptr_value = mz_nullptr;
     if (field->on_alloc) {
-      sp_context_push_allocator(ctx->allocator);
       mz_err_t alloc_err = field->on_alloc(ctx, out, mz_key, alloc_size, &ptr_value);
-      sp_context_pop();
       if (alloc_err != MZ_OK) {
         mz_diag_set(ctx, alloc_err);
         mz_diag_push_key(ctx, field->key);
@@ -1889,9 +1898,7 @@ static mz_err_t mz_eval_object_member(mz_ctx_t* ctx, mz_schema_t* schema, const 
     field_out = ptr_value;
   }
   else if (out && field->on_alloc) {
-    sp_context_push_allocator(ctx->allocator);
     mz_err_t alloc_err = field->on_alloc(ctx, out, mz_key, alloc_size, &field_out);
-    sp_context_pop();
     if (alloc_err != MZ_OK) {
       mz_diag_set(ctx, alloc_err);
       mz_diag_push_key(ctx, field->key);
@@ -1933,7 +1940,6 @@ static mz_err_t mz_eval_object_member(mz_ctx_t* ctx, mz_schema_t* schema, const 
 static mz_err_t mz_eval_string_tag(mz_ctx_t* ctx, const c8* value, void* out) {
   if (out) {
     mz_assert(ctx);
-    mz_assert(ctx->arena);
 
     c8* copy = mz_alloc_cstr(ctx->allocator, value);
 
@@ -2065,9 +2071,7 @@ static mz_err_t mz_eval_object_tag_member(mz_ctx_t* ctx, mz_schema_t* schema, co
   if (out && field->is_ptr) {
     void* ptr_value = mz_nullptr;
     if (field->on_alloc) {
-      sp_context_push_allocator(ctx->allocator);
       mz_err_t alloc_err = field->on_alloc(ctx, out, mz_key, alloc_size, &ptr_value);
-      sp_context_pop();
       if (alloc_err != MZ_OK) {
         mz_diag_set(ctx, alloc_err);
         mz_diag_push_key(ctx, field->key);
@@ -2101,9 +2105,7 @@ static mz_err_t mz_eval_object_tag_member(mz_ctx_t* ctx, mz_schema_t* schema, co
     field_out = ptr_value;
   }
   else if (out && field->on_alloc) {
-    sp_context_push_allocator(ctx->allocator);
     mz_err_t alloc_err = field->on_alloc(ctx, out, mz_key, alloc_size, &field_out);
-    sp_context_pop();
     if (alloc_err != MZ_OK) {
       mz_diag_set(ctx, alloc_err);
       mz_diag_push_key(ctx, field->key);
@@ -2141,7 +2143,7 @@ static mz_err_t mz_eval_object_tag_member(mz_ctx_t* ctx, mz_schema_t* schema, co
   return MZ_OK;
 }
 
-static mz_err_t mz_eval_object_from_iter(
+static mz_err_t mz_eval_object_fields(
   mz_ctx_t* ctx,
   mz_schema_t* schema,
   mz_obj_it_t* iter,
@@ -2149,20 +2151,9 @@ static mz_err_t mz_eval_object_from_iter(
   const c8* first_key,
   const mz_json_cursor_t* first_child,
   const mz_tag_value_t* first_tag,
-  void* out
+  void* out,
+  u32* seen
 ) {
-  u32 field_count = sp_da_size(schema->as.object.fields);
-  u32 seen_inline[2] = {0};
-  u32 seen_words = (field_count + 31) / 32;
-  u32* seen = seen_words <= SP_CARR_LEN(seen_inline) ? seen_inline : mz_nullptr;
-  if (!seen && seen_words > 0) {
-    seen = sp_mem_allocator_alloc_n(ctx->allocator, u32, seen_words);
-    if (!seen) {
-      return mz_diag_set(ctx, MZ_ERR_TYPE);
-    }
-    sp_mem_zero(seen, sizeof(u32) * seen_words);
-  }
-
   if (has_first) {
     mz_try(first_tag ?
       mz_eval_object_tag_member(ctx, schema, first_key, *first_tag, out, seen) :
@@ -2191,6 +2182,31 @@ static mz_err_t mz_eval_object_from_iter(
   return MZ_OK;
 }
 
+static mz_err_t mz_eval_object_from_iter(
+  mz_ctx_t* ctx,
+  mz_schema_t* schema,
+  mz_obj_it_t* iter,
+  bool has_first,
+  const c8* first_key,
+  const mz_json_cursor_t* first_child,
+  const mz_tag_value_t* first_tag,
+  void* out
+) {
+  u32 field_count = sp_da_size(schema->as.object.fields);
+  u32 seen_inline[2] = {0};
+  u32 seen_words = (field_count + 31) / 32;
+  if (seen_words <= SP_CARR_LEN(seen_inline)) {
+    return mz_eval_object_fields(ctx, schema, iter, has_first, first_key, first_child, first_tag, out, seen_inline);
+  }
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(ctx->allocator);
+  u32* seen = sp_alloc_n(scratch.mem, u32, seen_words);
+  sp_mem_zero(seen, sizeof(u32) * seen_words);
+  mz_err_t err = mz_eval_object_fields(ctx, schema, iter, has_first, first_key, first_child, first_tag, out, seen);
+  sp_mem_end_scratch(scratch);
+  return err;
+}
+
 static mz_err_t mz_eval_object(mz_ctx_t* ctx, mz_schema_t* schema, const mz_json_cursor_t* cursor, void* out) {
   switch (mz_backend_get_value_kind(cursor)) {
     case MZ_JSON_KIND_OBJECT: {
@@ -2216,7 +2232,6 @@ static mz_err_t mz_eval_string(mz_ctx_t* ctx, const mz_json_cursor_t* cursor, vo
 
   if (out) {
     mz_assert(ctx);
-    mz_assert(ctx->arena);
 
     c8* copy = mz_alloc_cstr(ctx->allocator, json_value);
 
@@ -2347,9 +2362,7 @@ static mz_err_t mz_eval_array(mz_ctx_t* ctx, mz_schema_t* schema, const mz_json_
     void* parsed_out = mz_nullptr;
     mz_field_temp_t temp = SP_ZERO_INITIALIZE();
     if (out && on_alloc) {
-      sp_context_push_allocator(ctx->allocator);
       mz_err_t alloc_err = on_alloc(ctx, out, key, mz_schema_parse_out_size(element_schema), &elem_out);
-      sp_context_pop();
       if (alloc_err != MZ_OK) {
         mz_diag_set(ctx, alloc_err);
         mz_diag_push_index(ctx, index);
@@ -2517,9 +2530,10 @@ static mz_err_t mz_eval_tagged(mz_ctx_t* ctx, mz_schema_t* schema, const mz_json
   return mz_eval_object_from_iter(ctx, selected, &iter, false, mz_nullptr, mz_nullptr, mz_nullptr, out);
 }
 
-static mz_schema_t* mz_schema_map_internal(mz_schema_t* value, mz_on_alloc_fn_t on_alloc, mz_on_parse_fn_t on_parse) {
-  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
+static mz_schema_t* mz_schema_map_internal(sp_mem_t mem, mz_schema_t* value, mz_on_alloc_fn_t on_alloc, mz_on_parse_fn_t on_parse) {
+  mz_schema_t* schema = sp_alloc_type(mem, mz_schema_t);
   *schema = mz_schema_make_map_value(value, on_alloc, on_parse);
+  schema->mem = mem;
   return schema;
 }
 
@@ -2577,9 +2591,7 @@ static mz_err_t mz_eval_map(mz_ctx_t* ctx, mz_schema_t* schema, const mz_json_cu
     void* parsed_out = mz_nullptr;
     mz_field_temp_t temp = SP_ZERO_INITIALIZE();
     mz_key_t mz_key = { .str = key };
-    sp_context_push_allocator(ctx->allocator);
     mz_err_t err = schema->as.map.on_alloc(ctx, out, mz_key, mz_schema_parse_out_size(value_schema), &value_out);
-    sp_context_pop();
     if (err != MZ_OK) {
       mz_diag_set(ctx, err);
       mz_diag_push_key(ctx, key);
@@ -2667,14 +2679,12 @@ void mz_schema_free(mz_schema_t* schema) {
 
   if (schema->kind == MZ_SCHEMA_OBJECT) {
     sp_da_for(schema->as.object.fields, it) {
-      if (schema->as.object.fields[it].key) {
-        mz_free(schema->as.object.fields[it].key);
-      }
+      mz_free_cstr(schema->mem, schema->as.object.fields[it].key);
       mz_schema_free(schema->as.object.fields[it].schema);
     }
     sp_da_free(schema->as.object.fields);
     if (schema->as.object.slots) {
-      spn_free(schema->as.object.slots);
+      sp_free(schema->mem, schema->as.object.slots, sizeof(mz_object_slot_t) * schema->as.object.slots_cap);
       schema->as.object.slots = mz_nullptr;
       schema->as.object.slots_cap = 0;
     }
@@ -2686,100 +2696,106 @@ void mz_schema_free(mz_schema_t* schema) {
     mz_schema_free(schema->as.map.value);
   }
   if (schema->kind == MZ_SCHEMA_TAGGED) {
-    if (schema->as.tagged.key) {
-      mz_free(schema->as.tagged.key);
-    }
+    mz_free_cstr(schema->mem, schema->as.tagged.key);
     sp_da_for(schema->as.tagged.cases, it) {
-      if (schema->as.tagged.cases[it].tag.kind == MZ_TAG_KIND_STR && schema->as.tagged.cases[it].tag.as.str) {
-        mz_free(schema->as.tagged.cases[it].tag.as.str);
+      if (schema->as.tagged.cases[it].tag.kind == MZ_TAG_KIND_STR) {
+        mz_free_cstr(schema->mem, schema->as.tagged.cases[it].tag.as.str);
       }
       mz_schema_free(schema->as.tagged.cases[it].schema);
     }
     sp_da_free(schema->as.tagged.cases);
   }
 
-  spn_free(schema);
+  sp_free(schema->mem, schema, sizeof(mz_schema_t));
 }
 
-mz_schema_t* mz_schema_object(mz_object_mode_t mode) {
-  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
+mz_schema_t* mz_schema_object(sp_mem_t mem, mz_object_mode_t mode) {
+  mz_schema_t* schema = sp_alloc_type(mem, mz_schema_t);
   *schema = mz_schema_make_object_value(mode);
+  schema->mem = mem;
+  sp_da_init(mem, schema->as.object.fields);
   return schema;
 }
 
-mz_schema_t* mz_schema_string() {
-  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
-  *schema = (mz_schema_t) { .kind = MZ_SCHEMA_STRING };
+mz_schema_t* mz_schema_string(sp_mem_t mem) {
+  mz_schema_t* schema = sp_alloc_type(mem, mz_schema_t);
+  *schema = (mz_schema_t) { .mem = mem, .kind = MZ_SCHEMA_STRING };
   return schema;
 }
 
-mz_schema_t* mz_schema_any() {
-  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
-  *schema = (mz_schema_t) { .kind = MZ_SCHEMA_ANY };
+mz_schema_t* mz_schema_any(sp_mem_t mem) {
+  mz_schema_t* schema = sp_alloc_type(mem, mz_schema_t);
+  *schema = (mz_schema_t) { .mem = mem, .kind = MZ_SCHEMA_ANY };
   return schema;
 }
 
-mz_schema_t* mz_schema_bool() {
-  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
-  *schema = (mz_schema_t) { .kind = MZ_SCHEMA_BOOL };
+mz_schema_t* mz_schema_bool(sp_mem_t mem) {
+  mz_schema_t* schema = sp_alloc_type(mem, mz_schema_t);
+  *schema = (mz_schema_t) { .mem = mem, .kind = MZ_SCHEMA_BOOL };
   return schema;
 }
 
-mz_schema_t* mz_schema_s32_ex(s32 min, s32 max) {
-  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
+mz_schema_t* mz_schema_s32_ex(sp_mem_t mem, s32 min, s32 max) {
+  mz_schema_t* schema = sp_alloc_type(mem, mz_schema_t);
   *schema = mz_schema_make_s32_value(min, max);
+  schema->mem = mem;
   return schema;
 }
 
-mz_schema_t* mz_schema_s32() {
-  return mz_schema_s32_ex(SP_LIMIT_S32_MIN, SP_LIMIT_S32_MAX);
+mz_schema_t* mz_schema_s32(sp_mem_t mem) {
+  return mz_schema_s32_ex(mem, SP_LIMIT_S32_MIN, SP_LIMIT_S32_MAX);
 }
 
-mz_schema_t* mz_schema_u64_ex(u64 min, u64 max) {
-  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
+mz_schema_t* mz_schema_u64_ex(sp_mem_t mem, u64 min, u64 max) {
+  mz_schema_t* schema = sp_alloc_type(mem, mz_schema_t);
   *schema = mz_schema_make_u64_value(min, max);
+  schema->mem = mem;
   return schema;
 }
 
-mz_schema_t* mz_schema_u64() {
-  return mz_schema_u64_ex(0, SP_LIMIT_U64_MAX);
+mz_schema_t* mz_schema_u64(sp_mem_t mem) {
+  return mz_schema_u64_ex(mem, 0, SP_LIMIT_U64_MAX);
 }
 
-mz_schema_t* mz_schema_f64_ex(f64 min, f64 max) {
-  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
+mz_schema_t* mz_schema_f64_ex(sp_mem_t mem, f64 min, f64 max) {
+  mz_schema_t* schema = sp_alloc_type(mem, mz_schema_t);
   *schema = mz_schema_make_f64_value(min, max);
+  schema->mem = mem;
   return schema;
 }
 
-mz_schema_t* mz_schema_f64() {
-  return mz_schema_f64_ex(-SP_LIMIT_F64_MAX, SP_LIMIT_F64_MAX);
+mz_schema_t* mz_schema_f64(sp_mem_t mem) {
+  return mz_schema_f64_ex(mem, -SP_LIMIT_F64_MAX, SP_LIMIT_F64_MAX);
 }
 
-mz_schema_t* mz_schema_array_ex(mz_schema_t* element, mz_on_alloc_fn_t on_alloc, mz_on_parse_fn_t on_parse, u32 min_len, u32 max_len) {
-  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
+mz_schema_t* mz_schema_array_ex(sp_mem_t mem, mz_schema_t* element, mz_on_alloc_fn_t on_alloc, mz_on_parse_fn_t on_parse, u32 min_len, u32 max_len) {
+  mz_schema_t* schema = sp_alloc_type(mem, mz_schema_t);
   *schema = mz_schema_make_array_value(element, on_alloc, on_parse, min_len, max_len);
+  schema->mem = mem;
   return schema;
 }
 
-mz_schema_t* mz_schema_array(mz_schema_t* element, mz_on_alloc_fn_t on_alloc) {
-  return mz_schema_array_ex(element, on_alloc, mz_nullptr, 0, SP_LIMIT_U32_MAX);
+mz_schema_t* mz_schema_array(sp_mem_t mem, mz_schema_t* element, mz_on_alloc_fn_t on_alloc) {
+  return mz_schema_array_ex(mem, element, on_alloc, mz_nullptr, 0, SP_LIMIT_U32_MAX);
 }
 
-mz_schema_t* mz_schema_map(mz_schema_t* value, mz_on_alloc_fn_t on_alloc) {
+mz_schema_t* mz_schema_map(sp_mem_t mem, mz_schema_t* value, mz_on_alloc_fn_t on_alloc) {
   mz_assert(value);
-  return mz_schema_map_internal(value, on_alloc, mz_nullptr);
+  return mz_schema_map_internal(mem, value, on_alloc, mz_nullptr);
 }
 
-mz_schema_t* mz_schema_map_ex(mz_schema_t* value, mz_on_alloc_fn_t on_alloc, mz_on_parse_fn_t on_parse) {
+mz_schema_t* mz_schema_map_ex(sp_mem_t mem, mz_schema_t* value, mz_on_alloc_fn_t on_alloc, mz_on_parse_fn_t on_parse) {
   mz_assert(value);
-  return mz_schema_map_internal(value, on_alloc, on_parse);
+  return mz_schema_map_internal(mem, value, on_alloc, on_parse);
 }
 
-mz_schema_t* mz_schema_tagged_union(const c8* key, mz_tag_kind_t kind) {
+mz_schema_t* mz_schema_tagged_union(sp_mem_t mem, const c8* key, mz_tag_kind_t kind) {
   mz_assert(key);
 
-  mz_schema_t* schema = sp_alloc_type(spn_mem_todo, mz_schema_t);
-  *schema = mz_schema_make_tagged_value(sp_cstr_copy(spn_mem_todo, key), kind);
+  mz_schema_t* schema = sp_alloc_type(mem, mz_schema_t);
+  *schema = mz_schema_make_tagged_value(sp_cstr_copy(mem, key), kind);
+  schema->mem = mem;
+  sp_da_init(mem, schema->as.tagged.cases);
   return schema;
 }
 
@@ -2808,7 +2824,7 @@ void mz_tagged_union_add(mz_schema_t* tagged, mz_tag_value_t tag, mz_schema_t* s
 
   switch (tag.kind) {
     case MZ_TAG_KIND_STR: {
-      tag.as.str = sp_cstr_copy(spn_mem_todo, tag.as.str); break;
+      tag.as.str = sp_cstr_copy(tagged->mem, tag.as.str); break;
     }
     case MZ_TAG_KIND_U64:
     case MZ_TAG_KIND_S32: {
@@ -2829,7 +2845,7 @@ void mz_object_add_field_ex(mz_schema_t* object, const c8* key, mz_schema_t* fie
   mz_assert(field);
 
   mz_field_t entry = SP_ZERO_STRUCT(mz_field_t);
-  entry.key = sp_cstr_copy(spn_mem_todo, key);
+  entry.key = sp_cstr_copy(object->mem, key);
   entry.schema = field;
   entry.required = opts.required;
   entry.offset = opts.offset;
@@ -2849,7 +2865,7 @@ void mz_object_add_field_ptr_ex(mz_schema_t* object, const c8* key, mz_schema_t*
   mz_assert(opts.ptr_size > 0);
 
   mz_field_t entry = SP_ZERO_STRUCT(mz_field_t);
-  entry.key = sp_cstr_copy(spn_mem_todo, key);
+  entry.key = sp_cstr_copy(object->mem, key);
   entry.schema = field;
   entry.required = opts.required;
   entry.offset = opts.offset;
@@ -2861,8 +2877,9 @@ void mz_object_add_field_ptr_ex(mz_schema_t* object, const c8* key, mz_schema_t*
   mz_object_rebuild_index(object);
 }
 
-mz_builder_t mz_builder_begin() {
+mz_builder_t mz_builder_begin(sp_mem_t mem) {
   mz_builder_t builder = SP_ZERO_INITIALIZE();
+  builder.mem = mem;
   return builder;
 }
 
@@ -2876,7 +2893,7 @@ void mz_builder_push_object_ex(mz_builder_t* builder, const c8* key, mz_object_m
   mz_assert(builder);
   mz_assert(builder->depth < SP_CARR_LEN(builder->stack));
 
-  mz_schema_t* object = mz_schema_object(mode);
+  mz_schema_t* object = mz_schema_object(builder->mem, mode);
   if (builder->depth == 0) {
     builder->root = object;
   }
@@ -2892,7 +2909,7 @@ void mz_builder_push_object_ptr_ex(mz_builder_t* builder, const c8* key, mz_obje
   mz_assert(builder);
   mz_assert(builder->depth < SP_CARR_LEN(builder->stack));
 
-  mz_schema_t* object = mz_schema_object(mode);
+  mz_schema_t* object = mz_schema_object(builder->mem, mode);
   if (builder->depth == 0) {
     builder->root = object;
   }
@@ -2909,7 +2926,7 @@ void mz_builder_push_tagged_union_ex(mz_builder_t* builder, const c8* key, const
   mz_assert(builder->depth < SP_CARR_LEN(builder->stack));
   mz_assert(tag_key);
 
-  mz_schema_t* tagged = mz_schema_tagged_union(tag_key, kind);
+  mz_schema_t* tagged = mz_schema_tagged_union(builder->mem, tag_key, kind);
   if (builder->depth == 0) {
     builder->root = tagged;
   }
@@ -2929,7 +2946,7 @@ void mz_builder_push_tagged_case_ex(mz_builder_t* builder, mz_tag_value_t tag, m
   mz_schema_t* current = builder->stack[builder->depth - 1];
   mz_assert(current->kind == MZ_SCHEMA_TAGGED);
 
-  mz_schema_t* object = mz_schema_object(mode);
+  mz_schema_t* object = mz_schema_object(builder->mem, mode);
   mz_tagged_union_add(current, tag, object);
   builder->stack[builder->depth++] = object;
 }
@@ -2940,7 +2957,7 @@ void mz_builder_push_array_ex(mz_builder_t* builder, const c8* key, mz_bind_opts
   mz_assert(builder->depth < SP_CARR_LEN(builder->stack));
   mz_assert(key);
 
-  mz_schema_t* array_schema = mz_schema_array_ex(mz_nullptr, opts.on_alloc, mz_nullptr, 0, SP_LIMIT_U32_MAX);
+  mz_schema_t* array_schema = mz_schema_array_ex(builder->mem, mz_nullptr, opts.on_alloc, mz_nullptr, 0, SP_LIMIT_U32_MAX);
   mz_bind_opts_t bind_opts = SP_ZERO_STRUCT(mz_bind_opts_t);
   bind_opts.required = opts.required;
   bind_opts.offset = opts.offset;
@@ -2954,7 +2971,7 @@ void mz_builder_push_map_ex(mz_builder_t* builder, const c8* key, mz_bind_opts_t
   mz_assert(builder->depth < SP_CARR_LEN(builder->stack));
   mz_assert(key);
 
-  mz_schema_t* map_schema = mz_schema_map_internal(mz_nullptr, opts.on_alloc, mz_nullptr);
+  mz_schema_t* map_schema = mz_schema_map_internal(builder->mem, mz_nullptr, opts.on_alloc, mz_nullptr);
   mz_bind_opts_t bind_opts = SP_ZERO_STRUCT(mz_bind_opts_t);
   bind_opts.required = opts.required;
   bind_opts.offset = opts.offset;
@@ -2977,7 +2994,7 @@ void mz_builder_push_entry_object_ex(mz_builder_t* builder, mz_object_mode_t mod
   mz_assert(builder->depth > 0);
   mz_assert(builder->depth < SP_CARR_LEN(builder->stack));
 
-  mz_schema_t* object = mz_schema_object(mode);
+  mz_schema_t* object = mz_schema_object(builder->mem, mode);
   mz_builder_add_entry_ex(builder, object, opts);
   builder->stack[builder->depth++] = object;
 }
@@ -3010,50 +3027,24 @@ void mz_builder_pop(mz_builder_t* builder) {
   builder->depth--;
 }
 
-mz_ctx_t* mz_ctx_create() {
-  mz_ctx_t* ctx = sp_alloc_type(spn_mem_todo, mz_ctx_t);
-  mz_ctx_init(ctx);
+mz_ctx_t* mz_ctx_create(sp_mem_t allocator) {
+  mz_ctx_t* ctx = sp_alloc_type(allocator, mz_ctx_t);
+  mz_ctx_init(ctx, allocator);
   return ctx;
 }
-mz_ctx_t* mz_ctx_create_ex(sp_mem_t allocator) {
-  mz_ctx_t* ctx = sp_alloc_type(spn_mem_todo, mz_ctx_t);
-  mz_ctx_init_ex(ctx, allocator);
-  return ctx;
 
-}
-
-void mz_ctx_init_ex(mz_ctx_t* ctx, sp_mem_t allocator) {
+void mz_ctx_init(mz_ctx_t* ctx, sp_mem_t allocator) {
   *ctx = mz_zero_s(mz_ctx_t);
   ctx->allocator = allocator;
   ctx->diag.kind = MZ_OK;
-
-  sp_context_push_allocator(ctx->allocator);
-  ctx->arena = sp_mem_arena_new(spn_mem_todo);
-  sp_context_pop();
-}
-
-void mz_ctx_init(mz_ctx_t* ctx) {
-  mz_ctx_init_ex(ctx, spn_mem_todo);
 }
 
 void mz_ctx_clear(mz_ctx_t* ctx) {
-  sp_mem_arena_clear(ctx->arena);
   mz_diag_reset(ctx);
 }
 
-void mz_ctx_deinit(mz_ctx_t* ctx) {
-  mz_assert(ctx);
-  if (!ctx->arena) {
-    return;
-  }
-
-  sp_mem_arena_destroy(ctx->arena);
-  ctx->arena = mz_nullptr;
-}
-
 void mz_ctx_destroy(mz_ctx_t* ctx) {
-  mz_ctx_deinit(ctx);
-  spn_free(ctx);
+  sp_free(ctx->allocator, ctx, sizeof(mz_ctx_t));
 }
 
 static void mz_diag_reset(mz_ctx_t* ctx) {
@@ -3085,9 +3076,7 @@ static mz_err_t mz_eval_document(mz_ctx_t* ctx, mz_json_doc_t* doc, mz_schema_t*
     return err;
   }
 
-  sp_context_push_allocator(sp_mem_arena_as_allocator(ctx->arena));
   mz_err_t err = mz_eval_schema(ctx, schema, &cursor, out);
-  sp_context_pop();
 
   if (err != MZ_OK) {
     mz_diag_finalize(ctx);
@@ -3103,24 +3092,6 @@ mz_nstr_t mz_nstr_view(const c8* cstr) {
   };
 }
 
-mz_buf_t mz_read_file(mz_str_t path) {
-  sp_str_t content = sp_zero;
-  if (sp_io_read_file(spn_mem_todo, path, &content) != SP_OK || content.len == 0) {
-    return mz_zero_s(mz_buf_t);
-  }
-
-  u64 size = content.len;
-  u8* data = mz_alloc_n(u8, size + 1);
-  sp_mem_copy(data, content.data, size);
-  data[size] = 0;
-
-  return (mz_buf_t) {
-    .data = data,
-    .len = size,
-    .capacity = size + 1
-  };
-}
-
 static mz_err_t mz_run(mz_ctx_t* ctx, mz_schema_t* schema, mz_json_doc_t* doc, void* out) {
   mz_err_t err = mz_eval_document(ctx, doc, schema, out);
   mz_backend_free_document(doc);
@@ -3128,15 +3099,25 @@ static mz_err_t mz_run(mz_ctx_t* ctx, mz_schema_t* schema, mz_json_doc_t* doc, v
 }
 
 static mz_err_t mz_run_file_ex(mz_ctx_t* ctx, mz_schema_t* schema, mz_nstr_t file, void* out) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(ctx->allocator);
   mz_json_doc_t* doc = mz_nullptr;
-  mz_try(mz_backend_load_file(file, &doc));
-  return mz_run(ctx, schema, doc, out);
+  mz_err_t err = mz_backend_load_file(scratch.mem, file, &doc);
+  if (err == MZ_OK) {
+    err = mz_run(ctx, schema, doc, out);
+  }
+  sp_mem_end_scratch(scratch);
+  return err;
 }
 
 static mz_err_t mz_run_str_ex(mz_ctx_t* ctx, mz_schema_t* schema, mz_nstr_t json, void* out) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(ctx->allocator);
   mz_json_doc_t* doc = mz_nullptr;
-  mz_try(mz_backend_load_str(json, &doc));
-  return mz_run(ctx, schema, doc, out);
+  mz_err_t err = mz_backend_load_str(scratch.mem, json, &doc);
+  if (err == MZ_OK) {
+    err = mz_run(ctx, schema, doc, out);
+  }
+  sp_mem_end_scratch(scratch);
+  return err;
 }
 
 mz_err_t mz_validate_str_ex(mz_schema_t* schema, const c8* json, mz_ctx_t* ctx) {

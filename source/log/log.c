@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "log/log.h"
 
 #include "ctx/ctx.h"
@@ -40,10 +42,9 @@ void spn_log_info(const c8* fmt, ...) {
 
   va_list args;
   va_start(args, fmt);
-  sp_str_t str = sp_format_v(SP_CSTR(fmt), args);
+  sp_fmt_io_v(spn_ctx_get_log_out(), sp_str_view(fmt), args);
   va_end(args);
-
-  sp_io_write_line(spn_ctx_get_log_out(), str);
+  sp_io_write_new_line(spn_ctx_get_log_out());
 }
 
 void spn_log_warn(const c8* fmt, ...) {
@@ -53,10 +54,9 @@ void spn_log_warn(const c8* fmt, ...) {
 
   va_list args;
   va_start(args, fmt);
-  sp_str_t str = sp_format_v(SP_CSTR(fmt), args);
+  sp_fmt_io_v(spn_ctx_get_log_err(), sp_str_view(fmt), args);
   va_end(args);
-
-  sp_io_write_line(spn_ctx_get_log_err(), str);
+  sp_io_write_new_line(spn_ctx_get_log_err());
 }
 
 void spn_log_error(const c8* fmt, ...) {
@@ -66,10 +66,9 @@ void spn_log_error(const c8* fmt, ...) {
 
   va_list args;
   va_start(args, fmt);
-  sp_str_t str = sp_format_v(SP_CSTR(fmt), args);
+  sp_fmt_io_v(spn_ctx_get_log_err(), sp_str_view(fmt), args);
   va_end(args);
-
-  sp_io_write_line(spn_ctx_get_log_err(), str);
+  sp_io_write_new_line(spn_ctx_get_log_err());
 }
 
 void spn_log_debug(const c8* fmt, ...) {
@@ -79,8 +78,7 @@ void spn_log_debug(const c8* fmt, ...) {
 
   va_list args;
   va_start(args, fmt);
-  sp_str_t str = sp_format_v(SP_CSTR(fmt), args);
+  sp_fmt_io_v(spn_ctx_get_log_err(), sp_str_view(fmt), args);
   va_end(args);
-
-  sp_io_write_line(spn_ctx_get_log_err(), str);
+  sp_io_write_new_line(spn_ctx_get_log_err());
 }

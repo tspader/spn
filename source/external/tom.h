@@ -24,7 +24,7 @@ typedef struct {
 } spn_toml_context_t;
 
 typedef struct {
-  sp_str_builder_t builder;
+  sp_io_dyn_mem_writer_t writer;
   sp_da(spn_toml_context_t) stack;
 } spn_toml_writer_t;
 
@@ -37,8 +37,8 @@ const c8*         spn_toml_arr_cstr(toml_array_t* toml, u32 it);
 sp_str_t          spn_toml_arr_str(toml_array_t* toml, u32 it);
 sp_str_t          spn_toml_str(toml_table_t* toml, const c8* key);
 sp_str_t          spn_toml_str_opt(toml_table_t* toml, const c8* key, const c8* fallback);
-sp_da(sp_str_t)   spn_toml_arr_to_str_arr(toml_array_t* toml);
-spn_toml_writer_t spn_toml_writer_new(void);
+sp_da(sp_str_t)   spn_toml_arr_to_str_arr(sp_mem_t mem, toml_array_t* toml);
+spn_toml_writer_t spn_toml_writer_new(sp_mem_t mem);
 sp_str_t          spn_toml_writer_write(spn_toml_writer_t* writer);
 void              spn_toml_ensure_header_written(spn_toml_writer_t* writer);
 void              spn_toml_begin_table(spn_toml_writer_t* writer, sp_str_t key);

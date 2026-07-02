@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "ctx/types.h"
 
 #include "cli/cli.h"

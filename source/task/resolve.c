@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "app/types.h"
 #include "ctx/types.h"
 #include "intern/types.h"
@@ -47,6 +49,7 @@ spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
   }
 
   // Build the list of available profiles
+  sp_str_ht_init(session->mem, session->profiles);
   spn_profile_populate(&session->profiles, root);
 
   session->pkg = root;
@@ -88,13 +91,13 @@ void add_root(spn_session_t* session, spn_resolve_query_t* query) {
 
 }
 
-void emit_resolved(spn_resolve_query_t* query) {
+void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
   sp_str_ht_for_kv(query->result, it) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_RESOLVE_PACKAGE,
       .resolve_pkg = {
         .name = *it.key,
-        .version = spn_semver_to_str(it.val->version),
+        .version = spn_semver_to_str(mem, it.val->version),
       }
     });
   }
@@ -132,7 +135,7 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   app->resolver = resolver;
 
   spn_resolve_query_t query = sp_zero_initialize();
-  sp_str_ht_init(session->mem, query.result);
+  spn_resolve_query_init(session->mem, &query);
   add_root(session, &query);
 
   // Resolve
@@ -154,7 +157,7 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   //   }
   // }
 
-  emit_resolved(&query);
+  emit_resolved(session->mem, &query);
 
   return SPN_TASK_DONE;
 }

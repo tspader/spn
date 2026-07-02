@@ -32,12 +32,14 @@ typedef struct {
 void modify_index(sp_str_t dir) {
   static u32 it = 0;
 
-  sp_str_t file = sp_fs_join_path(spn_allocator, dir, sp_str_lit("seed.txt"));
-  sp_str_t content = sp_format("{}", SP_FMT_U32(it++));
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  sp_str_t file = sp_fs_join_path(mem, dir, sp_str_lit("seed.txt"));
+  sp_str_t content = sp_fmt(mem, "{}", sp_fmt_uint(it++)).value;
 
-  sp_io_writer_t* io = sp_io_writer_from_file(file, SP_IO_WRITE_MODE_OVERWRITE);
-  sp_io_write_str(io, content, SP_NULLPTR);
-  sp_io_writer_close(io);
+  sp_io_file_writer_t io = sp_zero;
+  sp_io_file_writer_from_path(&io, file);
+  sp_io_write_str(&io.base, content, SP_NULLPTR);
+  sp_io_file_writer_close(&io);
 
   git_repo_stage_all(dir);
   git_repo_commit(dir, sp_str_lit("seed"));
@@ -51,10 +53,11 @@ static void run_index_sync_case(s32* utest_result, struct index_sync_fixture* fi
   SP_UNUSED(fixture);
 
   ctx_t* harness = ctx_get();
+  sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
   sp_str_t tmp = tmpfs_get(&harness->fs, sp_str_view(c.name));
 
-  sp_str_t remote = sp_fs_join_path(spn_allocator, tmp, sp_str_lit("remote/index"));
-  sp_str_t cache = sp_fs_join_path(spn_allocator, tmp, sp_str_lit("cache/index"));
+  sp_str_t remote = sp_fs_join_path(mem, tmp, sp_str_lit("remote/index"));
+  sp_str_t cache = sp_fs_join_path(mem, tmp, sp_str_lit("cache/index"));
 
   sp_fs_create_dir(remote);
   git_repo_init(remote);
@@ -90,13 +93,9 @@ static void run_index_sync_case(s32* utest_result, struct index_sync_fixture* fi
 
 UTEST_F_SETUP(index_sync_fixture) {
   uf->unused = 0;
-
-  ctx_t* harness = ctx_get();
-  sp_context_push_allocator(sp_mem_arena_as_allocator(harness->arena));
 }
 
 UTEST_F_TEARDOWN(index_sync_fixture) {
-  sp_context_pop();
 }
 
 UTEST_F(index_sync_fixture, sync_clone_when_missing) {

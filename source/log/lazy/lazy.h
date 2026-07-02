@@ -3,6 +3,7 @@
 
 #include "log/lazy/types.h"
 
-void spn_lazy_log_init(spn_lazy_log_t* log, sp_str_t path, sp_io_write_mode_t mode);
+void spn_lazy_log_init(spn_lazy_log_t* log, sp_str_t path);
+void spn_lazy_log_close(spn_lazy_log_t* log);
 
 #endif

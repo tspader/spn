@@ -177,21 +177,23 @@ spn_semver_t spn_semver_from_str(sp_str_t str) {
   return parsed.version;
 }
 
-sp_str_t spn_semver_to_str(spn_semver_t version) {
-  return sp_format(
+sp_str_t spn_semver_to_str(sp_mem_t mem, spn_semver_t version) {
+  return sp_fmt(
+    mem,
     "{}.{}.{}",
     SP_FMT_U32(version.major),
     SP_FMT_U32(version.minor),
     SP_FMT_U32(version.patch)
-  );
+  ).value;
 }
 
-sp_str_t spn_semver_range_to_str(spn_semver_range_t range) {
-  return sp_format(
+sp_str_t spn_semver_range_to_str(sp_mem_t mem, spn_semver_range_t range) {
+  return sp_fmt(
+    mem,
     "{}{}",
     SP_FMT_STR(spn_semver_mod_to_str(range.mod, range.low.op)),
-    SP_FMT_STR(spn_semver_to_str(range.low.version))
-  );
+    SP_FMT_STR(spn_semver_to_str(mem, range.low.version))
+  ).value;
 }
 
 

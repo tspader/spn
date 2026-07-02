@@ -20,7 +20,7 @@ static void fixture_write_file(sp_str_t path, sp_str_t content) {
 void copy_project_path(s32* result, tmpfs_t* fs, sp_str_t project, sp_str_t relative) {
   UTEST_RESULT(result);
 
-  sp_str_t from = sp_fs_join_path(spn_allocator, project, relative);
+  sp_str_t from = sp_fs_join_path(fs->mem, project, relative);
 
   // there is no reason to specify something that does not exist
   if (sp_fs_is_glob(from)) {
@@ -48,24 +48,25 @@ s32 sort_dirs_by_name(const void* a, const void* b) {
   return sp_str_sort_kernel_alphabetical(&lhs->name, &rhs->name);
 }
 
-static sp_str_t build_release_json(sp_str_t name, sp_str_t version, sp_str_t repo_url, sp_str_t commit, sp_str_t manifest_url, sp_str_t manifest_rev) {
+static sp_str_t build_release_json(sp_mem_t mem, sp_str_t name, sp_str_t version, sp_str_t repo_url, sp_str_t commit, sp_str_t manifest_url, sp_str_t manifest_rev) {
   sp_io_dyn_mem_writer_t b = sp_zero;
-  sp_io_dyn_mem_writer_init(spn_allocator, &b);
+  sp_io_dyn_mem_writer_init(mem, &b);
 
   sp_fmt_io(&b.base, "{{\"namespace\":\"core\",\"name\":\"{}\",\"version\":\"{}\",\"yanked\":false", sp_fmt_str(name), sp_fmt_str(version));
-  sp_fmt_io(&b.base, ",\"source\":{{\"url\":\"{}\",\"rev\":\"{}\",\"dir\":\"\"}}", sp_fmt_str(sp_str_replace_c8(spn_allocator, repo_url, '\\', '/')), sp_fmt_str(commit));
+  sp_fmt_io(&b.base, ",\"source\":{{\"url\":\"{}\",\"rev\":\"{}\",\"dir\":\"\"}}", sp_fmt_str(sp_str_replace_c8(mem, repo_url, '\\', '/')), sp_fmt_str(commit));
   if (!sp_str_empty(manifest_url)) {
-    sp_fmt_io(&b.base, ",\"manifest\":{{\"url\":\"{}\",\"rev\":\"{}\",\"dir\":\"\"}}", sp_fmt_str(sp_str_replace_c8(spn_allocator, manifest_url, '\\', '/')), sp_fmt_str(manifest_rev));
+    sp_fmt_io(&b.base, ",\"manifest\":{{\"url\":\"{}\",\"rev\":\"{}\",\"dir\":\"\"}}", sp_fmt_str(sp_str_replace_c8(mem, manifest_url, '\\', '/')), sp_fmt_str(manifest_rev));
   }
   sp_fmt_io(&b.base, ",\"paths\":{{\"manifest\":\"spn.toml\",\"script\":\"spn.c\"}},\"deps\":[]}}");
 
-  return sp_io_dyn_mem_writer_as_str(&b);
+  return sp_io_dyn_mem_writer_take_str(&b);
 }
 
 void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, sp_str_t project) {
   UTEST_RESULT(result);
+  sp_mem_t mem = fs->mem;
 
-  sp_str_t remote = sp_fs_join_path(spn_allocator, project, sp_str_lit("remote"));
+  sp_str_t remote = sp_fs_join_path(mem, project, sp_str_lit("remote"));
   if (!sp_fs_exists(remote)) {
     return;
   }
@@ -73,39 +74,39 @@ void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, s
   ASSERT_TRUE(sp_fs_is_dir(remote));
 
   // create core/ namespace directory under index
-  sp_str_t core_dir = sp_fs_join_path(spn_allocator, index, sp_str_lit("core"));
+  sp_str_t core_dir = sp_fs_join_path(mem, index, sp_str_lit("core"));
   sp_fs_create_dir(core_dir);
 
-  sp_str_t recipes = sp_fs_join_path(spn_allocator, project, sp_str_lit("recipes"));
+  sp_str_t recipes = sp_fs_join_path(mem, project, sp_str_lit("recipes"));
 
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(spn_allocator, remote);
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, remote);
   sp_da_for(entries, it) {
     sp_fs_entry_t* entry = &entries[it];
     if (!sp_fs_is_dir(entry->path)) {
       continue;
     }
 
-    sp_da(sp_fs_entry_t) versions = sp_fs_collect(spn_allocator, entry->path);
+    sp_da(sp_fs_entry_t) versions = sp_fs_collect(mem, entry->path);
     ASSERT_FALSE(sp_da_empty(versions));
-    sp_dyn_array_sort(versions, sort_dirs_by_name);
+    sp_da_sort(versions, sort_dirs_by_name);
 
-    sp_str_t repo = tmpfs_get(fs, sp_fs_join_path(spn_allocator, sp_str_lit("remote"), entry->name));
-    sp_str_t jsonl_path = sp_fs_join_path(spn_allocator, core_dir, sp_format("{}.jsonl", SP_FMT_STR(entry->name)));
+    sp_str_t repo = tmpfs_get(fs, sp_fs_join_path(mem, sp_str_lit("remote"), entry->name));
+    sp_str_t jsonl_path = sp_fs_join_path(mem, core_dir, sp_fmt(mem, "{}.jsonl", sp_fmt_str(entry->name)).value);
 
     git_repo_init(repo);
 
     // recipes/<pkg>/<version>/ holds a separate manifest repo for packages
     // whose recipe is published apart from their source
-    sp_str_t recipe_versions = sp_fs_join_path(spn_allocator, recipes, entry->name);
+    sp_str_t recipe_versions = sp_fs_join_path(mem, recipes, entry->name);
     bool split = sp_fs_is_dir(recipe_versions);
     sp_str_t recipe_repo = sp_str_lit("");
     if (split) {
-      recipe_repo = tmpfs_get(fs, sp_fs_join_path(spn_allocator, sp_str_lit("recipes"), entry->name));
+      recipe_repo = tmpfs_get(fs, sp_fs_join_path(mem, sp_str_lit("recipes"), entry->name));
       git_repo_init(recipe_repo);
     }
 
     sp_io_dyn_mem_writer_t jsonl = sp_zero;
-    sp_io_dyn_mem_writer_init(spn_allocator, &jsonl);
+    sp_io_dyn_mem_writer_init(mem, &jsonl);
 
     sp_da_for(versions, v) {
       sp_fs_entry_t* dir = &versions[v];
@@ -114,48 +115,50 @@ void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, s
       sp_str_t manifest_url = sp_str_lit("");
       sp_str_t manifest_rev = sp_str_lit("");
       if (split) {
-        sp_str_t recipe_dir = sp_fs_join_path(spn_allocator, recipe_versions, dir->name);
-        ASSERT_TRUE(sp_fs_exists(sp_fs_join_path(spn_allocator, recipe_dir, sp_str_lit("spn.toml"))));
+        sp_str_t recipe_dir = sp_fs_join_path(mem, recipe_versions, dir->name);
+        ASSERT_TRUE(sp_fs_exists(sp_fs_join_path(mem, recipe_dir, sp_str_lit("spn.toml"))));
 
         git_repo_commit_from_dir(recipe_dir, recipe_repo, dir->name);
         manifest_url = recipe_repo;
         manifest_rev = git_repo_head(recipe_repo);
       }
       else {
-        sp_str_t source_manifest = sp_fs_join_path(spn_allocator, dir->path, sp_str_lit("spn.toml"));
+        sp_str_t source_manifest = sp_fs_join_path(mem, dir->path, sp_str_lit("spn.toml"));
         ASSERT_TRUE(sp_fs_exists(source_manifest));
       }
 
       git_repo_commit_from_dir(dir->path, repo, dir->name);
       sp_str_t commit = git_repo_head(repo);
 
-      sp_fmt_io(&jsonl.base, "{}\n", sp_fmt_str(build_release_json(entry->name, dir->name, repo, commit, manifest_url, manifest_rev)));
+      sp_fmt_io(&jsonl.base, "{}\n", sp_fmt_str(build_release_json(mem, entry->name, dir->name, repo, commit, manifest_url, manifest_rev)));
     }
 
     fixture_write_file(jsonl_path, sp_io_dyn_mem_writer_as_str(&jsonl));
   }
 }
 
-static sp_str_t str_replace_all(sp_str_t str, sp_str_t needle, sp_str_t repl) {
-  sp_str_builder_t b = SP_ZERO_INITIALIZE();
+static sp_str_t str_replace_all(sp_mem_t mem, sp_str_t str, sp_str_t needle, sp_str_t repl) {
+  sp_io_dyn_mem_writer_t b = sp_zero;
+  sp_io_dyn_mem_writer_init(mem, &b);
   while (true) {
     s32 at = sp_str_find(str, needle);
     if (at == SP_STR_NO_MATCH) {
-      sp_str_builder_append(&b, str);
+      sp_io_write_str(&b.base, str, SP_NULLPTR);
       break;
     }
-    sp_str_builder_append(&b, sp_str(str.data, at));
-    sp_str_builder_append(&b, repl);
+    sp_io_write_str(&b.base, sp_str(str.data, at), SP_NULLPTR);
+    sp_io_write_str(&b.base, repl, SP_NULLPTR);
     str = sp_str(str.data + at + needle.len, str.len - at - needle.len);
   }
-  return sp_str_builder_to_str(&b);
+  return sp_io_dyn_mem_writer_take_str(&b);
 }
 
 // @spader use sp_template.h
 void setup_fixture_source_repos(s32* result, fixture_t* fixture, sp_str_t project) {
   UTEST_RESULT(result);
+  sp_mem_t mem = fixture->fs.mem;
 
-  sp_str_t source = sp_fs_join_path(spn_allocator, project, sp_str_lit("source"));
+  sp_str_t source = sp_fs_join_path(mem, project, sp_str_lit("source"));
   if (!sp_fs_exists(source)) {
     return;
   }
@@ -165,24 +168,24 @@ void setup_fixture_source_repos(s32* result, fixture_t* fixture, sp_str_t projec
   struct { sp_str_t token; sp_str_t value; } subs[16];
   s32 num_subs = 0;
 
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(spn_allocator, source);
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, source);
   sp_da_for(entries, it) {
     sp_fs_entry_t* entry = &entries[it];
     if (!sp_fs_is_dir(entry->path)) {
       continue;
     }
 
-    sp_str_t repo = tmpfs_get(&fixture->fs, sp_fs_join_path(spn_allocator, sp_str_lit("source"), entry->name));
+    sp_str_t repo = tmpfs_get(&fixture->fs, sp_fs_join_path(mem, sp_str_lit("source"), entry->name));
     git_repo_init(repo);
     git_repo_commit_from_dir(entry->path, repo, sp_str_lit("source"));
     sp_str_t commit = git_repo_head(repo);
-    sp_str_t url = sp_str_replace_c8(spn_allocator, repo, '\\', '/');
+    sp_str_t url = sp_str_replace_c8(mem, repo, '\\', '/');
 
     ASSERT_TRUE(num_subs + 2 <= (s32)sp_carr_len(subs));
-    subs[num_subs].token = sp_format("@{}.url@", SP_FMT_STR(entry->name));
+    subs[num_subs].token = sp_fmt(mem, "@{}.url@", sp_fmt_str(entry->name)).value;
     subs[num_subs].value = url;
     num_subs++;
-    subs[num_subs].token = sp_format("@{}.commit@", SP_FMT_STR(entry->name));
+    subs[num_subs].token = sp_fmt(mem, "@{}.commit@", sp_fmt_str(entry->name)).value;
     subs[num_subs].value = commit;
     num_subs++;
   }
@@ -191,20 +194,20 @@ void setup_fixture_source_repos(s32* result, fixture_t* fixture, sp_str_t projec
     return;
   }
 
-  sp_da(sp_fs_entry_t) files = sp_fs_collect_recursive(spn_allocator, fixture->fs.root);
+  sp_da(sp_fs_entry_t) files = sp_fs_collect_recursive(mem, fixture->fs.root);
   sp_da_for(files, it) {
     sp_fs_entry_t* file = &files[it];
     if (sp_fs_is_dir(file->path)) {
       continue;
     }
 
-    sp_str_t content = SP_ZERO_INITIALIZE();
-    sp_io_read_file(spn_allocator, file->path, &content);
+    sp_str_t content = sp_zero;
+    sp_io_read_file(mem, file->path, &content);
 
     bool changed = false;
     sp_for(s, num_subs) {
       if (sp_str_contains(content, subs[s].token)) {
-        content = str_replace_all(content, subs[s].token, subs[s].value);
+        content = str_replace_all(mem, content, subs[s].token, subs[s].value);
         changed = true;
       }
     }
@@ -217,41 +220,46 @@ void setup_fixture_source_repos(s32* result, fixture_t* fixture, sp_str_t projec
 
 void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t toolchain, sp_str_t config) {
   sp_str_t path = tmpfs_get(fs, sp_str_lit(".envrc"));
-  sp_str_t content = sp_format(
+  sp_str_t content = sp_fmt(
+    fs->mem,
     "export SPN_STORAGE_DIR={}\n"
     "export SPN_TOOLCHAIN_DIR={}\n"
     "export SPN_CONFIG_DIR={}\n",
-    SP_FMT_STR(storage),
-    SP_FMT_STR(toolchain),
-    SP_FMT_STR(config)
-  );
+    sp_fmt_str(storage),
+    sp_fmt_str(toolchain),
+    sp_fmt_str(config)
+  ).value;
   fixture_write_file(path, content);
 }
 
 void setup_fixture_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir) {
-  sp_str_t spn_config_dir = sp_fs_join_path(spn_allocator, config_dir, sp_str_lit("spn"));
+  sp_mem_t mem = fs->mem;
+  sp_str_t spn_config_dir = sp_fs_join_path(mem, config_dir, sp_str_lit("spn"));
   sp_fs_create_dir(spn_config_dir);
 
-  sp_str_t config_path = sp_fs_join_path(spn_allocator, spn_config_dir, sp_str_lit("spn.toml"));
-  sp_str_t content = sp_format(
+  sp_str_t config_path = sp_fs_join_path(mem, spn_config_dir, sp_str_lit("spn.toml"));
+  sp_str_t content = sp_fmt(
+    mem,
     "spn = \"{}\"\n"
     "\n"
     "[[index]]\n"
     "name = \"core\"\n"
     "url = \"{}\"\n"
     "protocol = \"filesystem\"\n",
-    SP_FMT_STR(sp_str_replace_c8(spn_allocator, spn_dir, '\\', '/')),
-    SP_FMT_STR(sp_str_replace_c8(spn_allocator, index_dir, '\\', '/'))
-  );
+    sp_fmt_str(sp_str_replace_c8(mem, spn_dir, '\\', '/')),
+    sp_fmt_str(sp_str_replace_c8(mem, index_dir, '\\', '/'))
+  ).value;
   fixture_write_file(config_path, content);
 }
 
 void setup_e2e_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t spn_dir, sp_str_t index_url, sp_str_t index_rev) {
-  sp_str_t spn_config_dir = sp_fs_join_path(spn_allocator, config_dir, sp_str_lit("spn"));
+  sp_mem_t mem = fs->mem;
+  sp_str_t spn_config_dir = sp_fs_join_path(mem, config_dir, sp_str_lit("spn"));
   sp_fs_create_dir(spn_config_dir);
 
-  sp_str_t config_path = sp_fs_join_path(spn_allocator, spn_config_dir, sp_str_lit("spn.toml"));
-  sp_str_t content = sp_format(
+  sp_str_t config_path = sp_fs_join_path(mem, spn_config_dir, sp_str_lit("spn.toml"));
+  sp_str_t content = sp_fmt(
+    mem,
     "spn = \"{}\"\n"
     "\n"
     "[[index]]\n"
@@ -259,10 +267,10 @@ void setup_e2e_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t spn_dir, sp_str
     "url = \"{}\"\n"
     "protocol = \"git\"\n"
     "rev = \"{}\"\n",
-    SP_FMT_STR(sp_str_replace_c8(spn_allocator, spn_dir, '\\', '/')),
-    SP_FMT_STR(index_url),
-    SP_FMT_STR(index_rev)
-  );
+    sp_fmt_str(sp_str_replace_c8(mem, spn_dir, '\\', '/')),
+    sp_fmt_str(index_url),
+    sp_fmt_str(index_rev)
+  ).value;
   fixture_write_file(config_path, content);
 }
 
@@ -270,27 +278,26 @@ void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, bool expected,
   bool exists = sp_fs_exists(path);
   if (exists == expected) return;
 
-  sp_str_builder_t b = SP_ZERO_INITIALIZE();
-  sp_str_builder_append_fmt(&b, "{}:{}", SP_FMT_CSTR(file), SP_FMT_U32(line));
+  sp_mem_t mem = sp_mem_get_scratch();
+  sp_str_t bar = sp_fmt(mem, "{.red}", sp_fmt_cstr("▐ ")).value;
 
-  b.indent.word = sp_format("{.red}", SP_FMT_CSTR("▐ "));
-  sp_str_builder_indent(&b);
+  sp_io_dyn_mem_writer_t b = sp_zero;
+  sp_io_dyn_mem_writer_init(mem, &b);
+  sp_fmt_io(&b.base, "{}:{}", sp_fmt_cstr(file), sp_fmt_uint(line));
 
   if (fs) {
-    sp_str_builder_new_line(&b);
-    sp_str_builder_append_fmt(&b, "{.black} is the root", SP_FMT_STR(fs->root));
+    sp_fmt_io(&b.base, "\n{}{.black} is the root", sp_fmt_str(bar), sp_fmt_str(fs->root));
 
     path = sp_str_strip_left(path, fs->root);
-    path = sp_str_concat(spn_allocator, sp_str_lit("$test"), path);
+    path = sp_str_concat(mem, sp_str_lit("$test"), path);
   }
-  sp_str_builder_new_line(&b);
   if (expected) {
-    sp_str_builder_append_fmt(&b, "{.black} does not exist", SP_FMT_STR(path));
+    sp_fmt_io(&b.base, "\n{}{.black} does not exist", sp_fmt_str(bar), sp_fmt_str(path));
   } else {
-    sp_str_builder_append_fmt(&b, "{.black} exists (expected not to)", SP_FMT_STR(path));
+    sp_fmt_io(&b.base, "\n{}{.black} exists (expected not to)", sp_fmt_str(bar), sp_fmt_str(path));
   }
 
-  SP_TEST_REPORT(sp_str_builder_to_str(&b));
+  SP_TEST_REPORT_STR(sp_io_dyn_mem_writer_as_str(&b));
   *utest_result = UTEST_TEST_FAILURE;
 }
 
@@ -309,13 +316,14 @@ static bool event_matches(yyjson_val* line, const c8* event, const c8* key, cons
 }
 
 static void expect_event(s32* utest_result, fixture_t* fixture, action_t action, bool expected, const c8* file, u32 line) {
-  sp_str_t path = sp_fs_join_path(spn_allocator, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
+  sp_mem_t mem = fixture->fs.mem;
+  sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
 
   sp_str_t content = sp_zero;
-  sp_io_read_file(spn_allocator, path, &content);
+  sp_io_read_file(mem, path, &content);
 
   bool found = false;
-  sp_da(sp_str_t) lines = sp_str_split_c8(spn_allocator, content, '\n');
+  sp_da(sp_str_t) lines = sp_str_split_c8(mem, content, '\n');
   sp_da_for(lines, it) {
     if (sp_str_empty(lines[it])) continue;
 
@@ -330,7 +338,7 @@ static void expect_event(s32* utest_result, fixture_t* fixture, action_t action,
   if (found == expected) return;
 
   sp_io_dyn_mem_writer_t b = sp_zero;
-  sp_io_dyn_mem_writer_init(spn_allocator, &b);
+  sp_io_dyn_mem_writer_init(mem, &b);
   sp_fmt_io(&b.base, "{}:{}\n", sp_fmt_cstr(file), sp_fmt_uint(line));
   sp_fmt_io(&b.base, "{.red}event {.cyan}", sp_fmt_cstr("▐ "), sp_fmt_cstr(action.verify_event.event));
   if (action.verify_event.key) {
@@ -356,7 +364,7 @@ void fixture_copy_project(s32* utest_result, fixture_t* fixture, sp_str_t projec
   };
 
   sp_carr_for(defaults, it) {
-    sp_str_t from = sp_fs_join_path(spn_allocator, project, sp_str_view(defaults[it]));
+    sp_str_t from = sp_fs_join_path(fixture->fs.mem, project, sp_str_view(defaults[it]));
     if (sp_fs_exists(from)) {
       sp_fs_copy(from, fixture->fs.root);
     }
@@ -370,6 +378,8 @@ void fixture_copy_project(s32* utest_result, fixture_t* fixture, sp_str_t projec
 }
 
 void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions) {
+  sp_mem_t mem = fixture->fs.mem;
+
   struct { sp_str_t path; sp_tm_epoch_t mtime; } mtime_snaps[8];
   s32 num_mtime_snaps = 0;
 
@@ -396,7 +406,7 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
       case ACTION_MOVE_FILE: {
         sp_str_t from = tmpfs_get(&fixture->fs, action.mv.from);
         sp_str_t to = tmpfs_get(&fixture->fs, action.mv.to);
-        sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, from, &content);
+        sp_str_t content = test_read_file(mem, from);
 
         tmpfs_create(&fixture->fs, action.mv.to, content);
         sp_fs_remove_file(from);
@@ -411,18 +421,19 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
           config.cwd = fixture->fs.root;
         }
 
-        sp_ps_output_t output = sp_ps_run(spn_allocator, config);
+        sp_ps_output_t output = sp_ps_run(mem, config);
         EXPECT_EQ(action.process.rc, output.status.exit_code);
         break;
       }
       case ACTION_RUN_BIN: {
-        sp_str_t bin = tmpfs_get(&fixture->fs, sp_format(
+        sp_str_t bin = tmpfs_get(&fixture->fs, sp_fmt(
+          mem,
           "build/debug/store/bin/{}",
-          SP_FMT_CSTR(action.bin.name)
-        ));
+          sp_fmt_cstr(action.bin.name)
+        ).value);
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, bin);
 
-        sp_ps_output_t output = sp_ps_run(spn_allocator, (sp_ps_config_t) {
+        sp_ps_output_t output = sp_ps_run(mem, (sp_ps_config_t) {
           .command = bin,
           .cwd = fixture->fs.root,
         });
@@ -443,32 +454,32 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
       case ACTION_VERIFY_INCLUDE: {
         sp_str_t path = tmpfs_get(
           &fixture->fs,
-          sp_fs_join_path(spn_allocator, sp_str_lit("build/debug/store/include"), action.verify_include.file)
+          sp_fs_join_path(mem, sp_str_lit("build/debug/store/include"), action.verify_include.file)
         );
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
         break;
       }
       case ACTION_VERIFY_CONTENT: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_content.file);
-        sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, path, &content);
+        sp_str_t content = test_read_file(mem, path);
         EXPECT_TRUE(sp_str_equal(content, action.verify_content.content));
         break;
       }
       case ACTION_VERIFY_FILE_NONEMPTY: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_nonempty.file);
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
-        EXPECT_FALSE(spn_test_read_empty(path));
+        EXPECT_FALSE(test_read_empty(mem, path));
         break;
       }
       case ACTION_VERIFY_FILE_CONTAINS: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_contains.file);
-        sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, path, &content);
+        sp_str_t content = test_read_file(mem, path);
         EXPECT_TRUE(sp_str_contains(content, action.verify_file_contains.needle));
         break;
       }
       case ACTION_VERIFY_FILE_NOT_CONTAINS: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_not_contains.file);
-        sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, path, &content);
+        sp_str_t content = test_read_file(mem, path);
         EXPECT_FALSE(sp_str_contains(content, action.verify_file_not_contains.needle));
         break;
       }
@@ -484,7 +495,7 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
       case ACTION_VERIFY_MTIME_UNCHANGED:
       case ACTION_VERIFY_MTIME_CHANGED: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_mtime.file);
-        sp_tm_epoch_t before = SP_ZERO_INITIALIZE();
+        sp_tm_epoch_t before = sp_zero;
         bool found = false;
         sp_for(s, (u32)num_mtime_snaps) {
           if (sp_str_equal(mtime_snaps[s].path, path)) {
@@ -523,7 +534,7 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         };
 
         if (action.cli.cmd) {
-          sp_ps_config_add_arg(spn_allocator, &config, sp_str_view(action.cli.cmd));
+          sp_ps_config_add_arg(mem, &config, sp_str_view(action.cli.cmd));
         }
 
         sp_carr_for(action.cli.args, arg_it) {
@@ -532,10 +543,10 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
             break;
           }
 
-          sp_ps_config_add_arg(spn_allocator, &config, sp_str_view(arg));
+          sp_ps_config_add_arg(mem, &config, sp_str_view(arg));
         }
 
-        sp_ps_output_t output = sp_ps_run(spn_allocator, config);
+        sp_ps_output_t output = sp_ps_run(mem, config);
         EXPECT_EQ(action.cli.rc, output.status.exit_code);
         break;
       }
@@ -548,7 +559,7 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         sp_str_t path = tmpfs_get(&fixture->fs, sp_str_lit("spn.lock"));
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
 
-        sp_str_t lock = sp_zero; sp_io_read_file(spn_allocator, path, &lock);
+        sp_str_t lock = test_read_file(mem, path);
         EXPECT_TRUE(sp_str_contains(lock, sp_str_lit("[[dep]]")));
         break;
       }
@@ -556,8 +567,8 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         sp_str_t path = tmpfs_get(&fixture->fs, sp_str_lit("spn.lock"));
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
 
-        sp_str_t lock = sp_zero; sp_io_read_file(spn_allocator, path, &lock);
-        sp_str_t needle = sp_format("name = \"{}\"", SP_FMT_CSTR(action.verify_locked.name));
+        sp_str_t lock = test_read_file(mem, path);
+        sp_str_t needle = sp_fmt(mem, "name = \"{}\"", sp_fmt_cstr(action.verify_locked.name)).value;
         EXPECT_TRUE(sp_str_contains(lock, needle));
         break;
       }
@@ -569,19 +580,21 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
 // test can share one copy instead of re-downloading zig. Prefer the developer's
 // global cache when it's already populated; otherwise use a fixed repo-level dir
 // that CI can cache across runs.
-static sp_str_t pick_shared_toolchain_dir(sp_str_t root) {
-  sp_str_t global = sp_fs_join_path(spn_allocator, sp_fs_get_storage_path(spn_allocator), sp_str_lit("spn/cache/toolchain"));
+static sp_str_t pick_shared_toolchain_dir(sp_mem_t mem, sp_str_t root) {
+  sp_str_t global = sp_fs_join_path(mem, sp_fs_get_storage_path(mem), sp_str_lit("spn/cache/toolchain"));
   if (sp_fs_exists(global)) return global;
-  return sp_fs_join_path(spn_allocator, root, sp_str_lit(".cache/toolchain"));
+  return sp_fs_join_path(mem, root, sp_str_lit(".cache/toolchain"));
 }
 
 void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
+  sp_mem_t mem = fixture->fs.mem;
+
   fixture->paths.config = tmpfs_get(&fixture->fs, sp_str_lit(".home/config"));
   fixture->paths.storage = tmpfs_get(&fixture->fs, sp_str_lit(".home/storage"));
   fixture->paths.patches = tmpfs_get(&fixture->fs, sp_str_lit("patches"));
-  fixture->paths.toolchain = pick_shared_toolchain_dir(fixture->paths.root);
-  fixture->paths.include = sp_fs_join_path(spn_allocator, fixture->paths.storage, sp_str_lit("spn/include"));
-  fixture->paths.index = sp_fs_join_path(spn_allocator, fixture->paths.storage, sp_str_lit("spn/packages"));
+  fixture->paths.toolchain = pick_shared_toolchain_dir(mem, fixture->paths.root);
+  fixture->paths.include = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("spn/include"));
+  fixture->paths.index = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("spn/packages"));
   sp_fs_create_dir(fixture->paths.config);
   sp_fs_create_dir(fixture->paths.storage);
   sp_fs_create_dir(fixture->paths.toolchain);
@@ -590,10 +603,10 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
   setup_fixture_envrc(&fixture->fs, fixture->paths.storage, fixture->paths.toolchain, fixture->paths.config);
   setup_fixture_config(&fixture->fs, fixture->paths.config, fixture->paths.index, fixture->paths.root);
 
-  sp_fs_copy(sp_fs_join_path(spn_allocator, fixture->paths.root, sp_str_lit("include/spn.h")), fixture->paths.include);
+  sp_fs_copy(sp_fs_join_path(mem, fixture->paths.root, sp_str_lit("include/spn.h")), fixture->paths.include);
 
   if (test.project) {
-    sp_str_t project = sp_fs_join_path(spn_allocator, fixture->paths.root, sp_str_view(test.project));
+    sp_str_t project = sp_fs_join_path(mem, fixture->paths.root, sp_str_view(test.project));
     fixture_copy_project(utest_result, fixture, project, test.copy);
     setup_fixture_index_from_remote(utest_result, &fixture->fs, fixture->paths.index, project);
     setup_fixture_source_repos(utest_result, fixture, project);

@@ -5,11 +5,9 @@
 #include "log/log.h"
 #include "semver/convert.h"
 #include "sp/color.h"
-#include "sp/compat.h"
 #include "sp/macro.h"
 #include "sp/str.h"
 #include "tui/tui.h"
-#include "tui/spinner.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -112,8 +110,8 @@ static spn_build_event_display_t event_info[] = {
   EVENT(SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK, "debug", WHITE, SPN_VERBOSITY_DEBUG, NOT_BOLD),
 };
 
-static sp_str_t spn_tui_name_to_color(sp_str_t str);
-static sp_str_t spn_tui_decorate_name(sp_str_t name, u32 padded_len, c8 pad);
+static sp_str_t spn_tui_name_to_color(sp_mem_t mem, sp_str_t str);
+static sp_str_t spn_tui_decorate_name(sp_mem_t mem, sp_str_t name, u32 padded_len, c8 pad);
 
 spn_tui_mode_t spn_output_mode_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "interactive")) {
@@ -138,7 +136,7 @@ sp_str_t spn_output_mode_to_str(spn_tui_mode_t mode) {
 }
 
 sp_str_t spn_build_event_kind_to_str(spn_build_event_kind_t kind) {
-  return sp_str_from_cstr(spn_mem_todo, event_info[kind].name);
+  return sp_str_view(event_info[kind].name);
 }
 
 spn_verbosity_t spn_build_event_get_verbosity(spn_build_event_kind_t kind) {
@@ -150,13 +148,11 @@ void sp_tui_print(sp_str_t str) {
 }
 
 void sp_tui_up(u32 n) {
-  sp_str_t command = sp_format("\033[{}A", SP_FMT_U32(n));
-  sp_tui_print(command);
+  sp_fmt_io(spn_ctx_get_log_err(), "\033[{}A", sp_fmt_uint(n));
 }
 
 void sp_tui_down(u32 n) {
-  sp_str_t command = sp_format("\033[{}B", SP_FMT_U32(n));
-  sp_tui_print(command);
+  sp_fmt_io(spn_ctx_get_log_err(), "\033[{}B", sp_fmt_uint(n));
 }
 
 void sp_tui_clear_line(void) {
@@ -231,36 +227,32 @@ void sp_tui_setup_raw_mode(spn_tui_t* tui) {
 }
 #endif
 
-static sp_str_t spn_tui_color_name(sp_str_t name) {
-  return sp_format("{}{}{}",
-    SP_FMT_STR(spn_tui_name_to_color(name)),
-    SP_FMT_STR(name),
-    SP_FMT_CSTR(SP_ANSI_RESET)
-  );
-}
-
-static sp_str_t spn_tui_decorate_name(sp_str_t name, u32 padded_len, c8 pad) {
-  sp_str_builder_t b = SP_ZERO_INITIALIZE();
-  sp_str_builder_append(&b, spn_tui_name_to_color(name));
-  sp_str_builder_append_cstr(&b, "\u2590 ");
-  sp_str_builder_append(&b, name);
-  sp_str_builder_append_cstr(&b, SP_ANSI_RESET);
+static sp_str_t spn_tui_decorate_name(sp_mem_t mem, sp_str_t name, u32 padded_len, c8 pad) {
+  sp_io_dyn_mem_writer_t w = sp_zero;
+  sp_io_dyn_mem_writer_init(mem, &w);
+  sp_io_write_str(&w.base, spn_tui_name_to_color(mem, name), SP_NULLPTR);
+  sp_io_write_str(&w.base, sp_str_lit("\u2590 "), SP_NULLPTR);
+  sp_io_write_str(&w.base, name, SP_NULLPTR);
+  sp_io_write_str(&w.base, sp_str_lit(SP_ANSI_RESET), SP_NULLPTR);
 
   if (padded_len > name.len) {
-    sp_str_builder_append(&b, sp_str_repeat(pad, padded_len - name.len));
+    sp_io_write_str(&w.base, sp_str_repeat(mem, pad, padded_len - name.len), SP_NULLPTR);
   }
 
-  return sp_str_builder_to_str(&b);
+  return sp_io_dyn_mem_writer_take_str(&w);
 }
 
-static sp_str_t spn_tui_name_to_color(sp_str_t str) {
+static sp_str_t spn_tui_name_to_color(sp_mem_t mem, sp_str_t str) {
   if (sp_str_equal_cstr(str, "package")) {
     return sp_str_lit(SP_ANSI_FG_WHITE);
   }
 
   static sp_ht(u32, sp_hash_t) buckets = SP_NULLPTR;
+  if (!buckets) {
+    sp_ht_init(spn.allocators.heap, buckets);
+  }
 
-  sp_hash_t hash = sp_hash_cstr(sp_str_to_cstr(spn_mem_todo, str));
+  sp_hash_t hash = sp_hash_str(str);
   u32 lo = (u32)hash;
 
   static const f32 bucket_hues[] = {
@@ -294,55 +286,56 @@ static sp_str_t spn_tui_name_to_color(sp_str_t str) {
   u8 g = (u8)(rgb.g * 255.0f);
   u8 b = (u8)(rgb.b * 255.0f);
 
-  return sp_color_to_tui_rgb_f(r, g, b);
+  return sp_color_to_tui_rgb_f(mem, r, g, b);
 }
 
-sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
-  sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+sp_str_t spn_tui_render_event(sp_mem_t mem, spn_build_event_t* event, u32 max_name) {
+  sp_io_dyn_mem_writer_t w = sp_zero;
+  sp_io_dyn_mem_writer_init(mem, &w);
 
   spn_build_event_display_t display = event_info[event->kind];
   sp_str_t name = spn_build_event_kind_to_str(event->kind);
   if (display.bold) {
-    sp_str_builder_append_cstr(&builder, SP_ANSI_BOLD);
+    sp_io_write_str(&w.base, sp_str_lit(SP_ANSI_BOLD), SP_NULLPTR);
   }
   switch (display.color) {
     case WHITE: {
-      sp_str_builder_append_fmt(&builder, "{:<9 .black}", SP_FMT_STR(name));
+      sp_fmt_io(&w.base, "{:<9 .black}", SP_FMT_STR(name));
       break;
     }
     case GREEN: {
-      sp_str_builder_append_fmt(&builder, "{:<9 .green}", SP_FMT_STR(name));
+      sp_fmt_io(&w.base, "{:<9 .green}", SP_FMT_STR(name));
       break;
     }
     case RED: {
-      sp_str_builder_append_fmt(&builder, "{:<9 .red}", SP_FMT_STR(name));
+      sp_fmt_io(&w.base, "{:<9 .red}", SP_FMT_STR(name));
       break;
     }
   }
   if (display.bold) {
-    sp_str_builder_append_cstr(&builder, SP_ANSI_RESET);
+    sp_io_write_str(&w.base, sp_str_lit(SP_ANSI_RESET), SP_NULLPTR);
   }
-  sp_str_builder_append_c8(&builder, ' ');
+  sp_io_write_c8(&w.base, ' ');
 
   sp_str_t package = strl("root");
   if (event->pkg) {
     package = event->pkg->name;
   }
-  sp_str_builder_append(&builder, spn_tui_decorate_name(package, max_name, ' '));
-  sp_str_builder_append_c8(&builder, ' ');
+  sp_io_write_str(&w.base, spn_tui_decorate_name(mem, package, max_name, ' '), SP_NULLPTR);
+  sp_io_write_c8(&w.base, ' ');
 
   switch (event->kind) {
     case SPN_EVENT_SYNC: {
-      sp_str_builder_append_fmt(&builder, "{.black} ", SP_FMT_STR(event->sync.url));
+      sp_fmt_io(&w.base, "{.black} ", SP_FMT_STR(event->sync.url));
       break;
     }
     case SPN_EVENT_CHECKOUT: {
-      sp_str_builder_append_fmt(&builder,
+      sp_fmt_io(&w.base,
         "{} {.black} {}{}{}",
-        SP_FMT_STR(spn_semver_to_str(event->checkout.version)),
-        SP_FMT_STR(sp_str_truncate(spn_mem_todo, event->checkout.commit, 8, SP_ZERO_STRUCT(sp_str_t))),
+        SP_FMT_STR(spn_semver_to_str(mem, event->checkout.version)),
+        SP_FMT_STR(sp_str_truncate(mem, event->checkout.commit, 8, SP_ZERO_STRUCT(sp_str_t))),
         SP_FMT_CSTR(SP_ANSI_ITALIC),
-        SP_FMT_STR(sp_str_truncate(spn_mem_todo, event->checkout.message, 32, sp_str_lit("..."))),
+        SP_FMT_STR(sp_str_truncate(mem, event->checkout.message, 32, sp_str_lit("..."))),
         SP_FMT_CSTR(SP_ANSI_RESET)
       );
       break;
@@ -350,19 +343,19 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
     case SPN_EVENT_RESOLVE: {
       switch (event->resolve.strategy) {
         case SPN_RESOLVE_STRATEGY_SOLVER: {
-          sp_str_builder_append_fmt(&builder, "{.black}", SP_FMT_CSTR("using solver"));
+          sp_fmt_io(&w.base, "{.black}", SP_FMT_CSTR("using solver"));
           break;
         }
         case SPN_RESOLVE_STRATEGY_LOCK_FILE: {
-          sp_str_builder_append_fmt(&builder, "{.black}", SP_FMT_CSTR("using lockfile"));
+          sp_fmt_io(&w.base, "{.black}", SP_FMT_CSTR("using lockfile"));
           break;
         }
       }
       break;
     }
     case SPN_EVENT_TESTS_PASSED: {
-      sp_str_builder_append_fmt(
-        &builder,
+      sp_fmt_io(
+        &w.base,
         "Ran {} tests for profile {.cyan} in {.cyan}s",
         SP_FMT_U32(event->test.passed.n),
         SP_FMT_STR(event->test.passed.profile->name),
@@ -371,11 +364,11 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       break;
     }
     case SPN_EVENT_TEST_FAILED: {
-      sp_str_builder_append_fmt(&builder, "returned code {}", SP_FMT_S32(1));
+      sp_fmt_io(&w.base, "returned code {}", SP_FMT_S32(1));
       break;
     }
     case SPN_EVENT_DEP_BUILD_PASSED: {
-      sp_str_builder_append_fmt(&builder,
+      sp_fmt_io(&w.base,
         "built in {.cyan}s",
         SP_FMT_F32(sp_tm_ns_to_s_f(event->dep.passed.time))
       );
@@ -384,7 +377,7 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
     case SPN_EVENT_BUILD_PASSED: {
       c8 buffer [64] = sp_zero;
       sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->build.passed.time);
-      sp_str_builder_append_fmt(&builder,
+      sp_fmt_io(&w.base,
         "Built profile {.cyan} in {.cyan}",
         SP_FMT_STR(event->build.passed.profile->name),
         SP_FMT_CSTR(buffer)
@@ -392,47 +385,47 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       break;
     }
     case SPN_EVENT_BUILD_SCRIPT_CRASHED: {
-      sp_str_builder_append_cstr(&builder, "crashed");
+      sp_io_write_str(&w.base, sp_str_lit("crashed"), SP_NULLPTR);
       break;
     }
     case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED: {
-      sp_str_builder_append(&builder, event->compile_failed.error);
+      sp_io_write_str(&w.base, event->compile_failed.error, SP_NULLPTR);
       break;
     }
     case SPN_EVENT_TARGET_BUILD_FAILED: {
-      sp_str_builder_append(&builder, event->target.failed.out);
-      sp_str_builder_new_line(&builder);
-      sp_str_builder_append(&builder, event->target.failed.err);
+      sp_io_write_str(&w.base, event->target.failed.out, SP_NULLPTR);
+      sp_io_write_c8(&w.base, '\n');
+      sp_io_write_str(&w.base, event->target.failed.err, SP_NULLPTR);
       break;
     }
     case SPN_EVENT_ERR_UNKNOWN_PKG: {
-      sp_str_builder_append_fmt(
-        &builder,
+      sp_fmt_io(
+        &w.base,
         "{.cyan} could not be located",
         SP_FMT_STR(event->unknown.request.qualified)
       );
       break;
     }
     case SPN_EVENT_ERR_UNSATISFIABLE_VERSION: {
-      sp_str_builder_append_fmt(
-        &builder,
+      sp_fmt_io(
+        &w.base,
         "no version of {.cyan} satisfies {.yellow}",
         SP_FMT_STR(event->unsatisfiable.low.qualified),
-        SP_FMT_STR(spn_semver_range_to_str(event->unsatisfiable.low.index.range))
+        SP_FMT_STR(spn_semver_range_to_str(mem, event->unsatisfiable.low.index.range))
       );
       break;
     }
     case SPN_EVENT_ERR_CIRCULAR_DEP: {
-      sp_str_builder_append_fmt(
-        &builder,
+      sp_fmt_io(
+        &w.base,
         "{.cyan} transitively includes itself",
         SP_FMT_STR(event->circular.id.name)
       );
       break;
     }
     case SPN_EVENT_ERR_MANIFEST: {
-      sp_str_builder_append_fmt(
-        &builder,
+      sp_fmt_io(
+        &w.base,
         "{.cyan} has an invalid manifest ({.black}): {}",
         SP_FMT_STR(event->manifest_err.name),
         SP_FMT_STR(event->manifest_err.path),
@@ -441,8 +434,8 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       break;
     }
     case SPN_EVENT_SYNC_FAILED: {
-      sp_str_builder_append_fmt(
-        &builder,
+      sp_fmt_io(
+        &w.base,
         "{.cyan} failed to sync from {.black}: {}",
         SP_FMT_STR(event->sync_failed.name),
         SP_FMT_STR(event->sync_failed.url),
@@ -456,16 +449,16 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
         //   break;
         // }
         case SPN_ERR_MANIFEST_PARSE: {
-          sp_str_builder_append_fmt(
-            &builder,
+          sp_fmt_io(
+            &w.base,
             "failed to parse manifest {.cyan}",
             SP_FMT_STR(event->err.manifest_parse.path)
           );
           break;
         }
         case SPN_ERR_MANIFEST_FIELD: {
-          sp_str_builder_append_fmt(
-            &builder,
+          sp_fmt_io(
+            &w.base,
             "invalid manifest field {.cyan}: expected {.yellow}, got {.red}",
             SP_FMT_STR(event->err.manifest_field.path),
             SP_FMT_STR(event->err.manifest_field.expected),
@@ -474,55 +467,55 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
           break;
         }
         case SPN_ERR_MANIFEST_ISSUES: {
-          sp_str_builder_append_cstr(&builder, "invalid manifest:");
+          sp_io_write_str(&w.base, sp_str_lit("invalid manifest:"), SP_NULLPTR);
           sp_da_for(event->err.issues, it) {
-            sp_str_builder_append_fmt(
-              &builder,
+            sp_fmt_io(
+              &w.base,
               "\n  - {}",
-              SP_FMT_STR(spn_codegen_issue_message(spn_mem_todo, &event->err.issues[it]))
+              SP_FMT_STR(spn_codegen_issue_message(mem, &event->err.issues[it]))
             );
           }
           break;
         }
         default: {
-          sp_str_builder_append_cstr(&builder, "unknown error");
+          sp_io_write_str(&w.base, sp_str_lit("unknown error"), SP_NULLPTR);
           break;
         }
       }
       break;
     }
     case SPN_EVENT_CLEAN: {
-      sp_str_builder_append_fmt(&builder, "{.cyan}", SP_FMT_STR(event->clean.path));
+      sp_fmt_io(&w.base, "{.cyan}", SP_FMT_STR(event->clean.path));
       break;
     }
     case SPN_EVENT_GENERATE: {
-      sp_str_builder_append_fmt(&builder, "{.cyan}", SP_FMT_STR(event->generate.path));
+      sp_fmt_io(&w.base, "{.cyan}", SP_FMT_STR(event->generate.path));
       break;
     }
     case SPN_EVENT_DEBUG: {
-      sp_str_builder_append(&builder, event->debug.message);
+      sp_io_write_str(&w.base, event->debug.message, SP_NULLPTR);
       break;
     }
     case SPN_EVENT_USER_LOG: {
-      sp_str_builder_append(&builder, event->user_log.message);
+      sp_io_write_str(&w.base, event->user_log.message, SP_NULLPTR);
       break;
     }
     case SPN_EVENT_ADD_TARGET: {
-      sp_str_builder_append_fmt(&builder, "target={} kind={}",
+      sp_fmt_io(&w.base, "target={} kind={}",
         SP_FMT_STR(event->target.name),
         SP_FMT_S32(event->target.add_debug.kind)
       );
       break;
     }
     case SPN_EVENT_ADD_SOURCE: {
-      sp_str_builder_append_fmt(&builder, "target={} source={}",
+      sp_fmt_io(&w.base, "target={} source={}",
         SP_FMT_STR(event->target.name),
         SP_FMT_STR(event->target.source.source)
       );
       break;
     }
     case SPN_EVENT_INIT_BUILD_GRAPH: {
-      sp_str_builder_append_fmt(&builder, "profile={} force={} packages={}",
+      sp_fmt_io(&w.base, "profile={} force={} packages={}",
         SP_FMT_STR(event->graph_init.profile),
         SP_FMT_CSTR(event->graph_init.force ? "true" : "false"),
         SP_FMT_U32(event->graph_init.packages)
@@ -532,38 +525,38 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
     case SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED: {
       switch (event->err.build_graph.kind) {
         case SPN_BUILD_GRAPH_ERR_MISSING_INPUT: {
-          sp_str_builder_append_fmt(
-            &builder,
+          sp_fmt_io(
+            &w.base,
             "missing build graph input {.cyan}",
             SP_FMT_STR(event->err.build_graph.file)
           );
           break;
         }
         case SPN_BUILD_GRAPH_ERR_DUPLICATE_OUTPUT: {
-          sp_str_builder_append_fmt(
-            &builder,
+          sp_fmt_io(
+            &w.base,
             "two graph nodes output the same file {.cyan}",
             SP_FMT_STR(event->err.build_graph.file)
           );
           if (sp_str_valid(event->err.build_graph.command_a)) {
-            sp_str_builder_new_line(&builder);
-            sp_str_builder_append(&builder, event->err.build_graph.command_a);
+            sp_io_write_c8(&w.base, '\n');
+            sp_io_write_str(&w.base, event->err.build_graph.command_a, SP_NULLPTR);
           }
           if (sp_str_valid(event->err.build_graph.command_b)) {
-            sp_str_builder_new_line(&builder);
-            sp_str_builder_append(&builder, event->err.build_graph.command_b);
+            sp_io_write_c8(&w.base, '\n');
+            sp_io_write_str(&w.base, event->err.build_graph.command_b, SP_NULLPTR);
           }
           break;
         }
         case SPN_BUILD_GRAPH_ERR_UNKNOWN: {
-          sp_str_builder_append_cstr(&builder, "failed to prepare build graph");
+          sp_io_write_str(&w.base, sp_str_lit("failed to prepare build graph"), SP_NULLPTR);
           break;
         }
       }
       break;
     }
     case SPN_EVENT_LINK_START: {
-      sp_str_builder_append_fmt(&builder, "target={} objects={} output={}",
+      sp_fmt_io(&w.base, "target={} objects={} output={}",
         SP_FMT_STR(event->target.name),
         SP_FMT_U32(event->target.link_start.num_objects),
         SP_FMT_STR(event->target.link_start.output_path)
@@ -572,15 +565,15 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
     }
     case SPN_EVENT_LINK_FAILED: {
       if (sp_str_valid(event->target.link_failed.err)) {
-        sp_str_builder_append(&builder, event->target.link_failed.err);
+        sp_io_write_str(&w.base, event->target.link_failed.err, SP_NULLPTR);
       }
       if (sp_str_valid(event->target.link_failed.out)) {
-        sp_str_builder_append(&builder, event->target.link_failed.out);
+        sp_io_write_str(&w.base, event->target.link_failed.out, SP_NULLPTR);
       }
       break;
     }
     case SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK: {
-      sp_str_builder_append_fmt(&builder, "time_ns={}",
+      sp_fmt_io(&w.base, "time_ns={}",
         SP_FMT_U64(event->configure.time)
       );
       break;
@@ -589,14 +582,14 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
       break;
     }
     case SPN_EVENT_EMBED_FAILED: {
-      sp_str_builder_append_fmt(&builder, "{}: {}",
+      sp_fmt_io(&w.base, "{}: {}",
         SP_FMT_STR(event->embed_failed.path),
         SP_FMT_STR(event->embed_failed.error)
       );
       break;
     }
     case SPN_EVENT_BUILD_FAILED: {
-      sp_str_builder_append(&builder, event->build_failed.first_error);
+      sp_io_write_str(&w.base, event->build_failed.first_error, SP_NULLPTR);
       break;
     }
     default: {
@@ -604,21 +597,28 @@ sp_str_t spn_tui_render_event(spn_build_event_t* event, u32 max_name) {
     }
   }
 
-  return sp_str_builder_to_str(&builder);
+  return sp_io_dyn_mem_writer_take_str(&w);
 }
 
-static sp_str_t spn_tui_render_coarse_line(sp_str_t verb, sp_str_t pkg_name, sp_str_t detail) {
-  return sp_format(
+static sp_str_t spn_tui_render_coarse_line(sp_mem_t mem, sp_str_t verb, sp_str_t pkg_name, sp_str_t detail) {
+  return sp_fmt(
+    mem,
     "{:>12 .bold .green} {} {}",
     SP_FMT_STR(verb),
-    SP_FMT_STR(spn_tui_decorate_name(pkg_name, 0, ' ')),
+    SP_FMT_STR(spn_tui_decorate_name(mem, pkg_name, 0, ' ')),
     SP_FMT_STR(detail)
-  );
+  ).value;
 }
 
-sp_str_t spn_tui_render_coarse_event(spn_build_event_t* event, u32 max_name, sp_str_t root_qualified) {
+sp_str_t spn_tui_render_coarse_event(sp_mem_t mem, spn_build_event_t* event, u32 max_name, sp_str_t root_qualified) {
   static sp_str_ht(bool) seen_pkg = SP_NULLPTR;
   static sp_str_ht(bool) seen_target = SP_NULLPTR;
+  if (!seen_pkg) {
+    sp_str_ht_init(spn.allocators.heap, seen_pkg);
+  }
+  if (!seen_target) {
+    sp_str_ht_init(spn.allocators.heap, seen_target);
+  }
 
   switch (event->kind) {
     case SPN_EVENT_CHECKOUT: {
@@ -626,9 +626,10 @@ sp_str_t spn_tui_render_coarse_event(spn_build_event_t* event, u32 max_name, sp_
         return sp_str_lit("");
       }
       return spn_tui_render_coarse_line(
+        mem,
         sp_str_lit("Downloaded"),
         event->pkg->name,
-        sp_format("v{}", SP_FMT_STR(spn_semver_to_str(event->checkout.version)))
+        sp_fmt(mem, "v{}", SP_FMT_STR(spn_semver_to_str(mem, event->checkout.version))).value
       );
     }
 
@@ -644,18 +645,19 @@ sp_str_t spn_tui_render_coarse_event(spn_build_event_t* event, u32 max_name, sp_
       if (!sp_str_ht_get(seen_pkg, event->pkg->qualified)) {
         sp_str_ht_insert(seen_pkg, event->pkg->qualified, true);
         return spn_tui_render_coarse_line(
+          mem,
           sp_str_lit("Compiling"),
           event->pkg->name,
-          sp_format("v{}", SP_FMT_STR(spn_semver_to_str(event->pkg->version)))
+          sp_fmt(mem, "v{}", SP_FMT_STR(spn_semver_to_str(mem, event->pkg->version))).value
         );
       }
 
       bool is_root = sp_str_valid(root_qualified) && sp_str_equal(event->pkg->qualified, root_qualified);
       if (is_root && event->kind == SPN_EVENT_LINK_START && sp_str_valid(event->target.name)) {
-        sp_str_t key = sp_format("{}::{}", SP_FMT_STR(event->pkg->qualified), SP_FMT_STR(event->target.name));
+        sp_str_t key = sp_fmt(mem, "{}::{}", SP_FMT_STR(event->pkg->qualified), SP_FMT_STR(event->target.name)).value;
         if (!sp_str_ht_get(seen_target, key)) {
-          sp_str_ht_insert(seen_target, key, true);
-          return spn_tui_render_coarse_line(sp_str_lit("Compiling"), event->pkg->name, event->target.name);
+          sp_str_ht_insert(seen_target, sp_str_copy(spn.allocators.heap, key), true);
+          return spn_tui_render_coarse_line(mem, sp_str_lit("Compiling"), event->pkg->name, event->target.name);
         }
       }
 
@@ -681,7 +683,7 @@ sp_str_t spn_tui_render_coarse_event(spn_build_event_t* event, u32 max_name, sp_
     case SPN_EVENT_BUILD_FAILED:
     case SPN_EVENT_BUILD_PASSED:
     case SPN_EVENT_TESTS_PASSED: {
-      return spn_tui_render_event(event, max_name);
+      return spn_tui_render_event(mem, event, max_name);
     }
 
     default: {
@@ -693,8 +695,6 @@ sp_str_t spn_tui_render_coarse_event(spn_build_event_t* event, u32 max_name, sp_
 void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode) {
   tui->mode = mode;
   tui->info.max_name = 16;
-
-  spn_spinner_init(&tui->spinner, sp_color_rgb_255(99, 160, 136));
 
   switch (tui->mode) {
     case SPN_OUTPUT_MODE_INTERACTIVE: {

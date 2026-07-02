@@ -1,3 +1,4 @@
+#include "sp/macro.h"
 #include "sp.h"
 
 #include "error/types.h"
@@ -10,15 +11,10 @@
 #include "semver/compare.h"
 #include "sp/io.h"
 
-void spn_index_init(spn_index_info_t* index) {
-  index->arena = sp_mem_arena_new(spn_mem_todo);
-  mz_ctx_init_ex(&index->json.ctx, sp_mem_arena_as_allocator(index->arena));
-
-  sp_context_push_arena(index->arena); {
-    index->json.schema = spn_index_build_schema(&index->json.ctx);
-
-    sp_context_pop();
-  }
+void spn_index_init(spn_index_info_t* index, sp_mem_t mem) {
+  index->arena = sp_mem_arena_new(mem);
+  mz_ctx_init(&index->json.ctx, sp_mem_arena_as_allocator(index->arena));
+  index->json.schema = spn_index_build_schema(&index->json.ctx);
 }
 
 void spn_index_deinit(spn_index_info_t* index) {
@@ -31,9 +27,13 @@ void spn_index_deinit(spn_index_info_t* index) {
   }
 }
 
-sp_str_t spn_index_get_package_path(spn_index_info_t* index, spn_pkg_id_t id) {
-  sp_str_t relative = sp_fs_join_path(spn_mem_todo, id.namespace, sp_format("{}.jsonl", SP_FMT_STR(id.name)));
-  return sp_fs_join_path(spn_mem_todo, index->location, relative);
+sp_str_t spn_index_get_package_path(sp_mem_t mem, spn_index_info_t* index, spn_pkg_id_t id) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
+  sp_str_t file = sp_fmt(scratch.mem, "{}.jsonl", sp_fmt_str(id.name)).value;
+  sp_str_t relative = sp_fs_join_path(scratch.mem, id.namespace, file);
+  sp_str_t path = sp_fs_join_path(mem, index->location, relative);
+  sp_mem_end_scratch(scratch);
+  return path;
 }
 
 spn_err_t spn_index_sync(spn_index_info_t* index) {
@@ -47,8 +47,11 @@ spn_err_t spn_index_sync(spn_index_info_t* index) {
           return SPN_OK;
         }
 
-        sp_str_t head = sp_fs_join_path(spn_mem_todo, index->location, sp_str_lit(".git/FETCH_HEAD"));
+        sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+        sp_str_t head = sp_fs_join_path(scratch.mem, index->location, sp_str_lit(".git/FETCH_HEAD"));
         sp_tm_epoch_t mod_time = sp_fs_get_mod_time(head);
+        sp_mem_end_scratch(scratch);
+
         sp_tm_epoch_t now = sp_tm_now_epoch();
         if (mod_time.s + 600 <= now.s) {
           spn_try(spn_git_pull(index->location));
@@ -75,26 +78,28 @@ spn_err_t spn_index_sync(spn_index_info_t* index) {
 spn_index_pkg_t* spn_index_get_package(spn_index_info_t* index, spn_pkg_id_t id) {
   spn_index_pkg_t* package = SP_NULLPTR;
 
-  sp_context_push_arena(index->arena);
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
-  sp_str_t path = spn_index_get_package_path(index, id);
+  sp_str_t path = spn_index_get_package_path(scratch.mem, index, id);
   if (!sp_fs_exists(path)) {
     goto cleanup;
   }
 
-  sp_str_t blob = sp_zero; sp_io_read_file(spn_mem_todo, path, &blob);
+  sp_str_t blob = sp_zero;
+  sp_io_read_file(scratch.mem, path, &blob);
   if (sp_str_empty(blob)) {
     goto cleanup;
   }
 
-  package = sp_alloc_type(spn_mem_todo, spn_index_pkg_t);
+  package = sp_alloc_type(sp_mem_arena_as_allocator(index->arena), spn_index_pkg_t);
+  *package = SP_ZERO_STRUCT(spn_index_pkg_t);
   if (spn_index_parse_pkg(&index->json.ctx, index->json.schema, id, blob, package) != SPN_OK) {
     package = SP_NULLPTR;
     goto cleanup;
   }
 
 cleanup:
-  sp_context_pop();
+  sp_mem_end_scratch(scratch);
   return package;
 }
 
@@ -108,16 +113,23 @@ spn_err_t spn_index_publish(spn_index_info_t* index, spn_index_rel_t* rel) {
     }
   }
 
-  sp_str_t path = spn_index_get_package_path(index, rel->id);
-  sp_str_t parent = sp_fs_join_path(spn_mem_todo, index->location, rel->id.namespace);
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+
+  sp_str_t path = spn_index_get_package_path(scratch.mem, index, rel->id);
+  sp_str_t parent = sp_fs_join_path(scratch.mem, index->location, rel->id.namespace);
   if (!sp_fs_exists(parent)) {
     sp_fs_create_dir(parent);
   }
 
-  sp_str_t json = spn_index_rel_to_json(rel);
-  sp_io_writer_t* io = sp_io_writer_from_file(path, SP_IO_WRITE_MODE_APPEND);
-  sp_io_write_line(io, json);
-  sp_io_writer_close(io);
+  sp_str_t json = spn_index_rel_to_json(scratch.mem, rel);
+
+  sp_sys_fd_t fd = sp_sys_open_s(sp_sys_get_root(0), path, SP_O_WRONLY | SP_O_CREAT | SP_O_APPEND | SP_O_BINARY, 0644);
+  sp_io_file_writer_t io;
+  sp_io_file_writer_from_fd(&io, fd, SP_IO_CLOSE_MODE_AUTO);
+  sp_io_write_line(&io.base, json);
+  sp_io_file_writer_close(&io);
+
+  sp_mem_end_scratch(scratch);
 
   return SPN_OK;
 }

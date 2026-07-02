@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "spn.h"
 #include "app/app.h"
 #include "ctx/types.h"
@@ -53,7 +55,7 @@ static spn_task_result_t run_script(spn_app_t* app) {
     return SPN_TASK_ERROR;
   }
 
-  sp_str_t command = get_target_output_path(unit);
+  sp_str_t command = get_target_output_path(session->mem, unit);
   if (!sp_fs_exists(command)) {
     spn_log_error("script binary {.yellow} does not exist", SP_FMT_STR(command));
     return SPN_TASK_ERROR;
@@ -103,7 +105,8 @@ static spn_task_result_t run_source(spn_app_t* app) {
     return SPN_TASK_ERROR;
   }
 
-  spn_cc_t cc = SP_ZERO_INITIALIZE();
+  spn_cc_t cc;
+  spn_cc_init(&cc, app->session.mem);
   spn_cc_add_runtime(&cc, spn.paths.runtime, spn.paths.include);
   spn_cc_set_profile(&cc, app->session.profile);
 
@@ -112,7 +115,7 @@ static spn_task_result_t run_source(spn_app_t* app) {
   spn_cc_target_add_absolute_source(target, path);
 
   spn_tcc_t* tcc = sp_alloc_type(app->session.mem, spn_tcc_t);
-  spn_tcc_init(tcc);
+  spn_tcc_init(app->session.mem, tcc);
   if (spn_cc_target_to_tcc(&cc, target, tcc)) {
     spn_log_error("failed to compile {.yellow}", SP_FMT_STR(path));
     return SPN_TASK_ERROR;

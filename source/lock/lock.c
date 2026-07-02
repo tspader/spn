@@ -19,9 +19,9 @@ static void spn_lock_build_dependents(spn_lock_file_t* lock) {
   }
 }
 
-spn_lock_file_t spn_build_lock_file(spn_resolve_t resolve, spn_pkg_info_t* root) {
-  spn_lock_file_t lock = SP_ZERO_INITIALIZE();
-  spn_lock_file_init(&lock);
+spn_lock_file_t spn_build_lock_file(sp_mem_t mem, spn_resolve_t resolve, spn_pkg_info_t* root) {
+  spn_lock_file_t lock = sp_zero;
+  spn_lock_file_init(mem, &lock);
 
   sp_str_ht_for_kv(resolve, it) {
     spn_resolved_pkg_t* pkg = it.val;
@@ -31,6 +31,8 @@ spn_lock_file_t spn_build_lock_file(spn_resolve_t resolve, spn_pkg_info_t* root)
       .name = pkg->qualified,
       .version = pkg->version,
       .kind = pkg->source,
+      .deps = sp_da_new(mem, sp_str_t),
+      .dependents = sp_da_new(mem, sp_str_t),
     };
 
     sp_da_for(pkg->deps, d) {
@@ -58,17 +60,22 @@ spn_lock_file_t spn_build_lock_file(spn_resolve_t resolve, spn_pkg_info_t* root)
   return lock;
 }
 
-void spn_lock_file_init(spn_lock_file_t* lock) {
+void spn_lock_file_init(sp_mem_t mem, spn_lock_file_t* lock) {
+  lock->mem = mem;
+  sp_ht_init(mem, lock->entries);
   sp_ht_set_fns(lock->entries, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
+  sp_ht_init(mem, lock->system_deps);
   sp_ht_set_fns(lock->system_deps, sp_ht_on_hash_str_key, sp_ht_on_compare_str_key);
 }
 
-spn_lock_file_t spn_lock_file_parse(sp_str_t toml, spn_event_buffer_t* events) {
-  spn_lock_file_t lock = SP_ZERO_INITIALIZE();
-  spn_lock_file_init(&lock);
+spn_lock_file_t spn_lock_file_parse(sp_mem_t mem, sp_str_t toml, spn_event_buffer_t* events) {
+  spn_lock_file_t lock = sp_zero;
+  spn_lock_file_init(mem, &lock);
 
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
   c8 parse_err[1024] = {0};
-  toml_table_t* root = toml_parse(sp_str_to_cstr(spn_mem_todo, toml), parse_err, SP_CARR_LEN(parse_err));
+  toml_table_t* root = toml_parse(sp_str_to_cstr(scratch.mem, toml), parse_err, SP_CARR_LEN(parse_err));
+  sp_mem_end_scratch(scratch);
   if (!root) {
     if (events) {
       spn_event_buffer_push(events, (spn_build_event_t) {
@@ -84,10 +91,12 @@ spn_lock_file_t spn_lock_file_parse(sp_str_t toml, spn_event_buffer_t* events) {
 
   toml_table_t* pkg_table = toml_table_table(root, "package");
   if (pkg_table) {
-    sp_da(sp_str_t) sys_deps = spn_toml_arr_to_str_arr(toml_table_array(pkg_table, "system_deps"));
+    scratch = sp_mem_begin_scratch_for(mem);
+    sp_da(sp_str_t) sys_deps = spn_toml_arr_to_str_arr(scratch.mem, toml_table_array(pkg_table, "system_deps"));
     sp_da_for(sys_deps, it) {
       sp_ht_insert(lock.system_deps, sys_deps[it], true);
     }
+    sp_mem_end_scratch(scratch);
   }
 
   toml_array_t* deps = toml_table_array(root, "dep");
@@ -104,7 +113,8 @@ spn_lock_file_t spn_lock_file_parse(sp_str_t toml, spn_event_buffer_t* events) {
       .version = spn_semver_from_str(spn_toml_str(pkg, "version")),
       .commit = spn_toml_str(pkg, "commit"),
       .kind = spn_pkg_source_from_str(spn_toml_str(pkg, "kind")),
-      .deps = spn_toml_arr_to_str_arr(toml_table_array(pkg, "deps")),
+      .deps = spn_toml_arr_to_str_arr(mem, toml_table_array(pkg, "deps")),
+      .dependents = sp_da_new(mem, sp_str_t),
       .source = {
         .url = spn_toml_str_opt(pkg, "source_url", ""),
         .rev = spn_toml_str_opt(pkg, "source_rev", ""),
@@ -128,18 +138,23 @@ spn_lock_file_t spn_lock_file_parse(sp_str_t toml, spn_event_buffer_t* events) {
   return lock;
 }
 
-spn_lock_file_t spn_lock_file_load(sp_str_t path, spn_event_buffer_t* events) {
+spn_lock_file_t spn_lock_file_load(sp_mem_t mem, sp_str_t path, spn_event_buffer_t* events) {
   SP_ASSERT(sp_fs_exists(path));
-  sp_str_t contents = sp_zero; sp_io_read_file(spn_mem_todo, path, &contents);
-  return spn_lock_file_parse(contents, events);
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
+  sp_str_t contents = sp_zero;
+  sp_io_read_file(scratch.mem, path, &contents);
+  spn_lock_file_t lock = spn_lock_file_parse(mem, contents, events);
+  sp_mem_end_scratch(scratch);
+  return lock;
 }
 
-sp_str_t spn_lock_file_to_str(spn_lock_file_t* lock) {
-  sp_da(sp_str_t) keys = SP_NULLPTR;
+sp_str_t spn_lock_file_to_str(sp_mem_t mem, spn_lock_file_t* lock) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
+  sp_da(sp_str_t) keys = sp_da_new(scratch.mem, sp_str_t);
   sp_ht_collect_keys(lock->entries, keys);
-  sp_dyn_array_sort(keys, sp_str_sort_kernel_alphabetical);
+  sp_da_sort(keys, sp_str_sort_kernel_alphabetical);
 
-  spn_toml_writer_t toml = spn_toml_writer_new();
+  spn_toml_writer_t toml = spn_toml_writer_new(mem);
 
   spn_toml_begin_table_cstr(&toml, "spn");
   spn_toml_append_str_cstr(&toml, "version", sp_str_lit(SPN_VERSION));
@@ -148,20 +163,20 @@ sp_str_t spn_lock_file_to_str(spn_lock_file_t* lock) {
 
   if (sp_ht_size(lock->system_deps)) {
     spn_toml_begin_table_cstr(&toml, "package");
-    sp_da(sp_str_t) sys_deps = SP_NULLPTR;
+    sp_da(sp_str_t) sys_deps = sp_da_new(scratch.mem, sp_str_t);
     sp_ht_collect_keys(lock->system_deps, sys_deps);
-    sp_dyn_array_sort(sys_deps, sp_str_sort_kernel_alphabetical);
+    sp_da_sort(sys_deps, sp_str_sort_kernel_alphabetical);
     spn_toml_append_str_array_cstr(&toml, "system_deps", sys_deps);
     spn_toml_end_table(&toml);
   }
 
   spn_toml_begin_array_cstr(&toml, "dep");
-  sp_dyn_array_for(keys, it) {
+  sp_da_for(keys, it) {
     spn_lock_entry_t* entry = sp_ht_getp(lock->entries, keys[it]);
 
     spn_toml_append_array_table(&toml);
     spn_toml_append_str_cstr(&toml, "name", entry->name);
-    spn_toml_append_str_cstr(&toml, "version", spn_semver_to_str(entry->version));
+    spn_toml_append_str_cstr(&toml, "version", spn_semver_to_str(scratch.mem, entry->version));
     spn_toml_append_str_cstr(&toml, "commit", entry->commit);
     spn_toml_append_str_cstr(&toml, "kind", spn_pkg_source_to_str(entry->kind));
 
@@ -188,11 +203,12 @@ sp_str_t spn_lock_file_to_str(spn_lock_file_t* lock) {
       spn_toml_append_str_cstr(&toml, "script_file", entry->paths.script);
     }
 
-    if (sp_dyn_array_size(entry->deps)) {
+    if (sp_da_size(entry->deps)) {
       spn_toml_append_str_array_cstr(&toml, "deps", entry->deps);
     }
   }
   spn_toml_end_array(&toml);
 
+  sp_mem_end_scratch(scratch);
   return spn_toml_writer_write(&toml);
 }

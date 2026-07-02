@@ -33,12 +33,9 @@ struct git_key {
 };
 
 UTEST_F_SETUP(git_key) {
-  ctx_t* harness = ctx_get();
-  sp_context_push_allocator(sp_mem_arena_as_allocator(harness->arena));
 }
 
 UTEST_F_TEARDOWN(git_key) {
-  sp_context_pop();
 }
 
 
@@ -51,7 +48,8 @@ static void run_url_name(s32* utest_result, url_name_case_t c) {
 }
 
 static void run_db_key_format(s32* utest_result, const c8* url) {
-  sp_str_t key = spn_git_db_key(sp_str_view(url));
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  sp_str_t key = spn_git_db_key(mem, sp_str_view(url));
   sp_str_t name = spn_git_url_name(sp_str_view(url));
 
   ASSERT_TRUE(key.len > name.len + 1);
@@ -68,19 +66,22 @@ static void run_db_key_format(s32* utest_result, const c8* url) {
 }
 
 static void run_db_key_determinism(s32* utest_result, const c8* url) {
-  sp_str_t a = spn_git_db_key(sp_str_view(url));
-  sp_str_t b = spn_git_db_key(sp_str_view(url));
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  sp_str_t a = spn_git_db_key(mem, sp_str_view(url));
+  sp_str_t b = spn_git_db_key(mem, sp_str_view(url));
   SP_EXPECT_STR_EQ(a, b);
 }
 
 static void run_db_key_uniqueness(s32* utest_result, uniqueness_case_t c) {
-  sp_str_t a = spn_git_db_key(sp_str_view(c.url_a));
-  sp_str_t b = spn_git_db_key(sp_str_view(c.url_b));
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  sp_str_t a = spn_git_db_key(mem, sp_str_view(c.url_a));
+  sp_str_t b = spn_git_db_key(mem, sp_str_view(c.url_b));
   EXPECT_FALSE(sp_str_equal(a, b));
 }
 
 static void run_checkout_key_format(s32* utest_result, checkout_key_input_t c) {
-  sp_str_t key = spn_git_checkout_key(sp_str_view(c.url), sp_str_view(c.rev), sp_str_view(c.dir));
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  sp_str_t key = spn_git_checkout_key(mem, sp_str_view(c.url), sp_str_view(c.rev), sp_str_view(c.dir));
   sp_str_t name = spn_git_url_name(sp_str_view(c.url));
 
   ASSERT_TRUE(key.len > name.len + 1);
@@ -92,8 +93,9 @@ static void run_checkout_key_format(s32* utest_result, checkout_key_input_t c) {
 }
 
 static void run_checkout_key_uniqueness(s32* utest_result, checkout_key_input_t a, checkout_key_input_t b) {
-  sp_str_t ka = spn_git_checkout_key(sp_str_view(a.url), sp_str_view(a.rev), sp_str_view(a.dir));
-  sp_str_t kb = spn_git_checkout_key(sp_str_view(b.url), sp_str_view(b.rev), sp_str_view(b.dir));
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  sp_str_t ka = spn_git_checkout_key(mem, sp_str_view(a.url), sp_str_view(a.rev), sp_str_view(a.dir));
+  sp_str_t kb = spn_git_checkout_key(mem, sp_str_view(b.url), sp_str_view(b.rev), sp_str_view(b.dir));
   EXPECT_FALSE(sp_str_equal(ka, kb));
 }
 

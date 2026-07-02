@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "cc.h"
 #include "ctx/types.h"
 #include "event/types.h"
@@ -344,7 +346,7 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
   }
 
   target->nodes.link = spn_bg_add_fn(graph, link_target, target);
-  target->nodes.output = spn_bg_add_file(graph, get_target_output_path(target));
+  target->nodes.output = spn_bg_add_file(graph, get_target_output_path(target->session->mem, target));
 
   spn_bg_cmd_add_output(graph, target->nodes.link,  target->nodes.output);
   spn_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.package, target->nodes.output));
@@ -356,8 +358,8 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
 
   if (!sp_da_empty(info->embed)) {
     target->nodes.embed.run = spn_bg_add_fn(graph, compile_embed, target);
-    target->nodes.embed.object = spn_bg_add_file(graph, get_embed_object_path(target));
-    target->nodes.embed.header = spn_bg_add_file(graph, get_embed_header_path(target));
+    target->nodes.embed.object = spn_bg_add_file(graph, get_embed_object_path(target->session->mem, target));
+    target->nodes.embed.header = spn_bg_add_file(graph, get_embed_header_path(target->session->mem, target));
 
     spn_try(spn_bg_cmd_add_output(graph, target->nodes.embed.run, target->nodes.embed.object));
     spn_try(spn_bg_cmd_add_output(graph, target->nodes.embed.run, target->nodes.embed.header));

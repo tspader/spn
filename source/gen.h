@@ -49,7 +49,7 @@ sp_str_t spn_cc_kind_to_executable(spn_cc_kind_t compiler);
 sp_str_t spn_cc_c_standard_to_switch(spn_c_standard_t standard);
 sp_str_t spn_cc_lib_kind_to_switch(spn_linkage_t kind);
 sp_str_t spn_cc_build_mode_to_switch(spn_build_mode_t mode);
-sp_str_t spn_gen_format_entry(sp_str_t entry, spn_gen_entry_t kind, spn_cc_driver_t driver);
+sp_str_t spn_gen_format_entry(sp_mem_t mem, sp_str_t entry, spn_gen_entry_t kind, spn_cc_driver_t driver);
 sp_str_t spn_gen_format_entry_kernel(sp_str_map_context_t* context);
 
 #endif

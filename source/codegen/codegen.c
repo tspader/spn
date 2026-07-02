@@ -1,7 +1,8 @@
 #include "codegen/codegen.h"
 #include "external/tom.h"
 #include "manifest.gen.h"
-#include "sp/compat.h"
+#include "sp.h"
+#include "sp/macro.h"
 #include "spn.h"
 
 void spn_codegen_ctx_init(spn_codegen_ctx_t* ctx, sp_mem_t mem, sp_mem_t bulk, sp_intern_t* intern) {

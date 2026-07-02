@@ -64,10 +64,8 @@ set(SPN_SOURCES
   sp/io.c
   sp/it.c
   sp/os.c
-  sp/ps.c
   sp/str.c
   sp/terminal.c
-  sp/tm.c
   spn.c
   target/mutate.c
   target/select.c
@@ -93,7 +91,6 @@ set(SPN_SOURCES
   toolchain/launcher.c
   toolchain/toolchain.c
   triple/triple.c
-  tui/spinner.c
   tui/table.c
   tui/tui.c
   unit/package.c
@@ -110,7 +107,6 @@ target_include_directories(spn PRIVATE
   ${STORE}/include
 )
 target_link_libraries(spn PRIVATE m vmlib ${TCC_LIB} yyjson)
-target_compile_options(spn PRIVATE -include ${SRC}/sp/compat.h)
 add_dependencies(spn headers tcc spn_embed spn_codegen_gen)
 
 set_source_files_properties(${EMBED_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)

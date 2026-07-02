@@ -12,19 +12,20 @@ struct spn_build {
 };
 
 UTEST_INITIALIZER(spn_build_init_tmpfs_top_level) {
-  sp_str_t tmp = sp_fs_normalize_path(spn_allocator, sp_os_env_get(sp_str_lit("SPN_TEST_TMP")));
+  sp_mem_t mem = sp_mem_os_new();
+  sp_str_t tmp = sp_fs_normalize_path(mem, sp_os_env_get(sp_str_lit("SPN_TEST_TMP")));
   if (sp_str_empty(tmp)) {
     tmp = sp_str_lit(".tmp");
   }
 
   sp_tm_epoch_t now = sp_tm_now_epoch();
-  sp_str_t iso = sp_tm_epoch_to_iso8601(spn_allocator, now);
-  c8* sanitized = (c8*)sp_alloc(spn_allocator, iso.len);
+  sp_str_t iso = sp_tm_epoch_to_iso8601(mem, now);
+  c8* sanitized = (c8*)sp_alloc(mem, iso.len);
   sp_for(it, iso.len) {
     sanitized[it] = iso.data[it] == ':' ? '-' : iso.data[it];
   }
 
-  tmpfs_set_top_level(sp_fs_join_path(spn_allocator, tmp, sp_str(sanitized, iso.len)));
+  tmpfs_set_top_level(sp_fs_join_path(mem, tmp, sp_str(sanitized, iso.len)));
 }
 
 UTEST_F_SETUP(spn_build) {
@@ -34,8 +35,9 @@ UTEST_F_SETUP(spn_build) {
   uf->fixture.paths.root = sp_str_lit(SPN_TEST_ROOT);
   uf->fixture.paths.spn = sp_str_lit(SPN_TEST_BIN);
 #else
-  uf->fixture.paths.root = sp_fs_get_cwd(spn_allocator);
-  uf->fixture.paths.spn = sp_fs_join_path(spn_allocator, uf->fixture.paths.root, sp_str_lit("build/debug/store/bin/spn"));
+  sp_mem_t mem = sp_mem_os_new();
+  uf->fixture.paths.root = sp_fs_get_cwd(mem);
+  uf->fixture.paths.spn = sp_fs_join_path(mem, uf->fixture.paths.root, sp_str_lit("build/debug/store/bin/spn"));
 #endif
   ASSERT_TRUE(sp_fs_exists(uf->fixture.paths.spn));
 }
@@ -52,7 +54,7 @@ UTEST_F(spn_build, tmpfs) {
   EXPECT_TRUE(sp_fs_exists(path));
   EXPECT_TRUE(sp_str_starts_with(path, uf->fixture.fs.root));
 
-  sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, path, &content);
+  sp_str_t content = test_read_file(sp_mem_os_new(), path);
   EXPECT_TRUE(sp_str_equal(content, sp_str_lit("hello")));
 
   sp_str_t touched = tmpfs_touch(&uf->fixture.fs, sp_str_lit("nested/empty.txt"));
@@ -854,8 +856,9 @@ UTEST_F_SETUP(build_log) {
   uf->fixture.paths.root = sp_str_lit(SPN_TEST_ROOT);
   uf->fixture.paths.spn = sp_str_lit(SPN_TEST_BIN);
 #else
-  uf->fixture.paths.root = sp_fs_get_cwd(spn_allocator);
-  uf->fixture.paths.spn = sp_fs_join_path(spn_allocator, uf->fixture.paths.root, sp_str_lit("build/debug/store/bin/spn"));
+  sp_mem_t mem = sp_mem_os_new();
+  uf->fixture.paths.root = sp_fs_get_cwd(mem);
+  uf->fixture.paths.spn = sp_fs_join_path(mem, uf->fixture.paths.root, sp_str_lit("build/debug/store/bin/spn"));
 #endif
   ASSERT_TRUE(sp_fs_exists(uf->fixture.paths.spn));
 }

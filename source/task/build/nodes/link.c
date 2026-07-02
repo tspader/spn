@@ -16,6 +16,7 @@ typedef struct {
 
 ar_result_t archive_objects(spn_target_unit_t* unit, sp_str_t output) {
   spn_toolchain_unit_t* toolchain = unit->session->units.toolchain;
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_ps_config_t ps = {
     .command = toolchain->archiver.program,
     .cwd = unit->paths.work,
@@ -25,31 +26,35 @@ ar_result_t archive_objects(spn_target_unit_t* unit, sp_str_t output) {
     },
   };
   sp_da_for(toolchain->archiver.args, ai) {
-    sp_ps_config_add_arg(spn.mem, &ps, toolchain->archiver.args[ai]);
+    sp_ps_config_add_arg(scratch.mem, &ps, toolchain->archiver.args[ai]);
   }
-  sp_ps_config_add_arg(spn.mem, &ps, sp_str_lit("rcs"));
-  sp_ps_config_add_arg(spn.mem, &ps, output);
+  sp_ps_config_add_arg(scratch.mem, &ps, sp_str_lit("rcs"));
+  sp_ps_config_add_arg(scratch.mem, &ps, output);
 
   sp_da_for(unit->objects, it) {
-    sp_ps_config_add_arg(spn.mem, &ps, unit->objects[it]->paths.object);
+    sp_ps_config_add_arg(scratch.mem, &ps, unit->objects[it]->paths.object);
   }
 
-  sp_str_builder_t log = SP_ZERO_INITIALIZE();
-  sp_str_builder_append(&log, ps.command);
-  sp_str_builder_append_c8(&log, ' ');
+  sp_io_dyn_mem_writer_t log;
+  sp_io_dyn_mem_writer_init(spn.mem, &log);
+  sp_io_write_str(&log.base, ps.command, SP_NULLPTR);
+  sp_io_write_c8(&log.base, ' ');
   sp_da_for(ps.dyn_args, it) {
-    sp_str_builder_append(&log, ps.dyn_args[it]);
-    sp_str_builder_append_c8(&log, ' ');
+    sp_io_write_str(&log.base, ps.dyn_args[it], SP_NULLPTR);
+    sp_io_write_c8(&log.base, ' ');
   }
+  sp_str_t args = sp_io_dyn_mem_writer_take_str(&log);
 
   sp_tm_timer_t timer = sp_tm_start_timer();
   sp_ps_output_t result = sp_ps_run(spn.mem, ps);
   u64 elapsed = sp_tm_read_timer(&timer);
 
+  sp_mem_end_scratch(scratch);
+
   return (ar_result_t) {
     .result = result,
     .elapsed = elapsed,
-    .args = sp_str_builder_to_str(&log),
+    .args = args,
   };
 }
 
@@ -92,7 +97,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
 
   if (sp_da_empty(target->objects)) return 0;
 
-  sp_str_t output = get_target_output_path(target);
+  sp_str_t output = get_target_output_path(spn.mem, target);
   sp_str_t output_name = sp_fs_get_name(output);
   bool has_embeds = !sp_da_empty(info->embed);
 
@@ -126,6 +131,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
     case SPN_CC_OUTPUT_EXE:
     case SPN_CC_OUTPUT_SHARED_LIB: {
       spn_cc_t* cc = sp_alloc_type(spn.mem, spn_cc_t);
+      spn_cc_init(cc, spn.mem);
       spn_cc_set_profile(cc, target->session->profile);
       spn_cc_set_output_dir(cc, sp_fs_parent_path(output));
       spn_cc_set_toolchain(cc, target->session->units.toolchain);
@@ -141,7 +147,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
       }
 
       if (has_embeds) {
-        spn_cc_target_add_absolute_source(cc_target, get_embed_object_path(target));
+        spn_cc_target_add_absolute_source(cc_target, get_embed_object_path(spn.mem, target));
       }
 
       spn_cc_run_t run = spn_cc_target_run(cc_target, target->paths.work);

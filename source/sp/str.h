@@ -11,10 +11,8 @@ typedef struct {
   bool done;
 } sp_str_line_it_t;
 
-sp_str_t sp_str_pad_ex(sp_str_t str, u32 n, c8 c);
-sp_str_t sp_str_repeat(c8 c, u32 len);
-sp_str_t sp_str_map_kernel_colorize(sp_str_map_context_t* context);
-sp_str_t sp_format_color_id_to_ansi_fg(sp_str_t id);
+sp_str_t  sp_str_repeat(sp_mem_t mem, c8 c, u32 len);
+sp_hash_t sp_hash_str(sp_str_t str);
 
 bool             sp_str_line_it_valid(const sp_str_line_it_t* it);
 void             sp_str_line_it_next(sp_str_line_it_t* it);

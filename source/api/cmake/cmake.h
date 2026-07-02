@@ -10,6 +10,7 @@ typedef struct {
 } spn_cmake_define_t;
 
 struct spn_cmake {
+  sp_mem_t mem;
   spn_t* build;
   spn_cmake_gen_t generator;
   sp_da(spn_cmake_define_t) defines;

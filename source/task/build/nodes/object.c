@@ -16,7 +16,8 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   sp_str_t dir = sp_fs_parent_path(unit->paths.object);
   sp_fs_create_dir(dir);
 
-  spn_cc_t* cc = sp_alloc_type(spn_mem_todo, spn_cc_t);
+  spn_cc_t* cc = sp_alloc_type(session->mem, spn_cc_t);
+  spn_cc_init(cc, session->mem);
   spn_cc_set_profile(cc, session->profile);
   spn_cc_set_output_dir(cc, dir);
   spn_cc_set_toolchain(cc, unit->session->units.toolchain);

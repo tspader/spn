@@ -70,7 +70,9 @@ static spn_tcc_symbol_t spn_tcc_symbol_table[] = {
   SPN_DEFINE_LIB_ENTRY(spn_cmake_run)
 };
 
-spn_err_t spn_tcc_init(spn_tcc_t* tcc) {
+spn_err_t spn_tcc_init(sp_mem_t mem, spn_tcc_t* tcc) {
+  tcc->mem = mem;
+  tcc->error = sp_str_lit("");
   tcc->s = tcc_new();
   tcc_set_error_func(tcc->s, tcc, on_tcc_error);
   tcc_set_backtrace_func(tcc->s, tcc, on_tcc_backtrace);
@@ -78,32 +80,34 @@ spn_err_t spn_tcc_init(spn_tcc_t* tcc) {
 }
 
 void spn_tcc_set_runtime(spn_tcc_t* tcc, sp_str_t path) {
-  tcc_set_lib_path(tcc->s, sp_str_to_cstr(spn_mem_todo, path));
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  tcc_set_lib_path(tcc->s, sp_str_to_cstr(scratch.mem, path));
+  sp_mem_end_scratch(scratch);
 }
 
 spn_err_t spn_tcc_add_sys_include(spn_tcc_t* tcc, sp_str_t path) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  s32 result = tcc_add_sysinclude_path(tcc->s, sp_str_to_cstr(spn_mem_todo, path));
+  s32 result = tcc_add_sysinclude_path(tcc->s, sp_str_to_cstr(scratch.mem, path));
   sp_mem_end_scratch(scratch);
   return result ? SPN_ERROR : SPN_OK;
 }
 
 spn_err_t spn_tcc_add_include(spn_tcc_t* tcc, sp_str_t path) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  s32 result = tcc_add_include_path(tcc->s, sp_str_to_cstr(spn_mem_todo, path));
+  s32 result = tcc_add_include_path(tcc->s, sp_str_to_cstr(scratch.mem, path));
   sp_mem_end_scratch(scratch);
   return result ? SPN_ERROR : SPN_OK;
 }
 
 void spn_tcc_add_library_path(spn_tcc_t* tcc, sp_str_t path) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  tcc_add_library_path(tcc->s, sp_str_to_cstr(spn_mem_todo, path));
+  tcc_add_library_path(tcc->s, sp_str_to_cstr(scratch.mem, path));
   sp_mem_end_scratch(scratch);
 }
 
 void spn_tcc_define_symbol(spn_tcc_t* tcc, sp_str_t symbol, sp_str_t value) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  tcc_define_symbol(tcc->s, sp_str_to_cstr(spn_mem_todo, value), "");
+  tcc_define_symbol(tcc->s, sp_str_to_cstr(scratch.mem, value), "");
   sp_mem_end_scratch(scratch);
 }
 
@@ -116,20 +120,14 @@ spn_err_t spn_tcc_register(spn_tcc_t* tcc) {
 
 spn_err_t spn_tcc_add_file(spn_tcc_t* tcc, sp_str_t file) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  s32 error = tcc_add_file(tcc->s, sp_str_to_cstr(spn_mem_todo, file));
+  s32 error = tcc_add_file(tcc->s, sp_str_to_cstr(scratch.mem, file));
   sp_mem_end_scratch(scratch);
   return error ? SPN_ERROR : SPN_OK;
 }
 
-void spn_tcc_list_fn(void* opaque, const c8* name, const void* value) {
-  (void)value;
-  sp_da(sp_str_t) syms = (sp_da(sp_str_t))opaque;
-  sp_dyn_array_push(syms, sp_str_from_cstr(spn_mem_todo, name));
-}
-
 void on_tcc_error(void* user_data, const c8* message) {
   spn_tcc_t* tcc = (spn_tcc_t*)user_data;
-  tcc->error = sp_str_from_cstr(spn_mem_todo, message);
+  tcc->error = sp_str_from_cstr(tcc->mem, message);
 }
 
 s32 on_tcc_backtrace(void* ud, void* pc, const c8* file, s32 line, const c8* fn, const c8* message) {

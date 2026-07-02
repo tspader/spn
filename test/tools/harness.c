@@ -4,16 +4,17 @@
 #endif
 #include "sp/macro.h"
 
-static ctx_t g_ctx = SP_ZERO_INITIALIZE();
+static ctx_t g_ctx = sp_zero;
 
 ctx_t* ctx_get() {
   return &g_ctx;
 }
 
 ctx_paths_t ctx_get_paths(ctx_t* ctx) {
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx->arena);
   ctx_paths_t paths = sp_zero;
 
-  paths.repo = sp_fs_get_exe_path(spn_allocator);
+  paths.repo = sp_fs_get_exe_path(mem);
   while (true) {
     sp_assert(!sp_str_empty(paths.repo));
     sp_str_t stem = sp_fs_get_stem(paths.repo);
@@ -23,14 +24,14 @@ ctx_paths_t ctx_get_paths(ctx_t* ctx) {
     paths.repo = sp_fs_parent_path(paths.repo);
   }
 
-  paths.test.dir = sp_fs_join_path(spn_allocator, paths.repo, strl("test"));
-  paths.test.fixtures = sp_fs_join_path(spn_allocator, paths.test.dir, strl("fixtures"));
+  paths.test.dir = sp_fs_join_path(mem, paths.repo, strl("test"));
+  paths.test.fixtures = sp_fs_join_path(mem, paths.test.dir, strl("fixtures"));
 
   return paths;
 }
 
-static sp_str_t get_run_tmpdir() {
-  sp_str_t tmp = sp_fs_normalize_path(spn_allocator, sp_os_env_get(sp_str_lit("SPN_TEST_TMP")));
+static sp_str_t get_run_tmpdir(sp_mem_t mem) {
+  sp_str_t tmp = sp_fs_normalize_path(mem, sp_os_env_get(sp_str_lit("SPN_TEST_TMP")));
   if (sp_str_empty(tmp)) {
     tmp = sp_str_lit(".tmp");
   }
@@ -44,32 +45,30 @@ static sp_str_t get_run_tmpdir() {
     sp_fs_create_dir(tmp);
   }
 
-  tmp = sp_fs_canonicalize_path(spn_allocator, tmp);
+  tmp = sp_fs_canonicalize_path(mem, tmp);
 
   sp_tm_epoch_t now = sp_tm_now_epoch();
-  sp_str_t timestamp = sp_tm_epoch_to_iso8601(spn_allocator, now);
+  sp_str_t timestamp = sp_tm_epoch_to_iso8601(mem, now);
 #ifdef _WIN32
   u32 pid = (u32)GetCurrentProcessId();
 #else
   u32 pid = (u32)getpid();
 #endif
-  sp_str_t dirname = sp_format("{}-{}", SP_FMT_STR(sp_str_replace_c8(spn_allocator, timestamp, ':', '-')), SP_FMT_U32(pid));
-  return sp_fs_join_path(spn_allocator, tmp, dirname);
+  sp_str_t dirname = sp_fmt(mem, "{}-{}", sp_fmt_str(sp_str_replace_c8(mem, timestamp, ':', '-')), sp_fmt_uint(pid)).value;
+  return sp_fs_join_path(mem, tmp, dirname);
 }
 
 void ctx_init(ctx_t* ctx) {
-  ctx->arena = sp_mem_arena_new(spn_allocator);
+  ctx->arena = sp_mem_arena_new(sp_mem_os_new());
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx->arena);
 
-  sp_context_push_arena(ctx->arena); {
-    tmpfs_set_top_level(get_run_tmpdir());
-    tmpfs_init_named(&ctx->fs, "index");
-  }
-  sp_context_pop();
+  tmpfs_set_top_level(get_run_tmpdir(mem));
+  tmpfs_init_named(&ctx->fs, "index");
 }
 
 void ctx_deinit(ctx_t* harness) {
   sp_mem_arena_destroy(harness->arena);
-  *harness = SP_ZERO_STRUCT(ctx_t);
+  *harness = sp_zero_s(ctx_t);
 }
 
 bool str_equal(sp_str_t a, sp_str_t b) {

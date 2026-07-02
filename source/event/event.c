@@ -18,8 +18,9 @@ static u64 spn_current_thread_id(void) {
 #endif
 }
 
-spn_event_buffer_t* spn_event_buffer_new() {
-  spn_event_buffer_t* events = SP_ALLOC(spn_event_buffer_t);
+spn_event_buffer_t* spn_event_buffer_new(sp_mem_t mem) {
+  spn_event_buffer_t* events = sp_alloc_type(mem, spn_event_buffer_t);
+  sp_rb_init(mem, events->buffer);
   sp_mutex_init(&events->mutex, SP_MUTEX_PLAIN);
   return events;
 }
@@ -39,10 +40,10 @@ void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event) 
   sp_mutex_unlock(&events->mutex);
 }
 
-sp_da(spn_build_event_t) spn_event_buffer_drain(spn_event_buffer_t* events) {
+sp_da(spn_build_event_t) spn_event_buffer_drain(sp_mem_t mem, spn_event_buffer_t* events) {
   sp_mutex_lock(&events->mutex);
 
-  sp_da(spn_build_event_t) result = SP_NULLPTR;
+  sp_da(spn_build_event_t) result = sp_da_new(mem, spn_build_event_t);
   sp_rb_for(events->buffer, it) {
     spn_build_event_t* event = &sp_rb_at(events->buffer, it);
     sp_da_push(result, *event);

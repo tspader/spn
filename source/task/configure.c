@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "api/core/types.h"
 #include "app/types.h"
 #include "ctx/types.h"
@@ -7,7 +9,6 @@
 #include "graph/types.h"
 #include "pkg/types.h"
 #include "session/registry/types.h"
-#include "sp/compat.h"
 #include "spn.h"
 #include "target/types.h"
 #include "unit/types.h"
@@ -85,7 +86,8 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
   sp_tm_timer_t timer = sp_tm_start_timer();
   spn_tcc_err_ctx_t error_context = SP_ZERO_INITIALIZE();
 
-  spn_cc_t cc = SP_ZERO_INITIALIZE();
+  spn_cc_t cc;
+  spn_cc_init(&cc, session->mem);
   spn_cc_add_runtime(&cc, spn.paths.runtime, spn.paths.include);
   spn_cc_set_profile(&cc, session->profile);
   spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_CC_OUTPUT_JIT, unit->info->name);
@@ -104,7 +106,7 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
   }
 
   unit->tcc = sp_alloc_type(session->mem, spn_tcc_t);
-  spn_tcc_init(unit->tcc);
+  spn_tcc_init(session->mem, unit->tcc);
   s32 try_err = 0;
   spn_try_goto(spn_cc_target_to_tcc(&cc, target, unit->tcc), try_err, fail);
   spn_try_goto(tcc_relocate(unit->tcc->s), try_err, fail);
@@ -151,7 +153,8 @@ spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
   if (!sp_fs_is_file(unit->paths.configure)) return SPN_OK;
 
   sp_tm_timer_t timer = sp_tm_start_timer();
-  spn_cc_t* cc = sp_alloc_type(spn_mem_todo, spn_cc_t);
+  spn_cc_t* cc = sp_alloc_type(session->mem, spn_cc_t);
+  spn_cc_init(cc, session->mem);
 
   spn_profile_info_t profile = {
     .arch = SPN_ARCH_WASM32,

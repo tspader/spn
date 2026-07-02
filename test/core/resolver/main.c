@@ -30,7 +30,7 @@ s32 main(s32 argc, const c8** argv) {
   ctx_t* ctx = ctx_get();
   ctx_init(ctx_get());
 
-  spn.intern = sp_intern_new(spn_allocator);
+  spn.intern = sp_intern_new(sp_mem_os_new());
 
   s32 result = utest_main(argc, argv);
 
@@ -100,6 +100,7 @@ struct resolver {
 
 UTEST_F_SETUP(resolver) {
   state = sp_zero_s(state_t);
+  sp_str_ht_init(sp_mem_arena_as_allocator(ctx_get()->arena), state.cache);
 }
 
 UTEST_F_TEARDOWN(resolver) {
@@ -126,7 +127,7 @@ spn_index_rel_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_i
 ///////////////
 // EXECUTOR //
 //////////////
-static void build_cache(fixture_t* fixture) {
+static void build_cache(sp_mem_t mem, fixture_t* fixture) {
   sp_carr_for(fixture->index, i) {
     index_pkg_t* desc = &fixture->index[i];
     if (!desc->name) break;
@@ -137,6 +138,7 @@ static void build_cache(fixture_t* fixture) {
     };
 
     spn_index_pkg_t pkg = { .id = id };
+    sp_da_init(mem, pkg.releases);
 
     sp_carr_for(desc->releases, r) {
       index_rel_t* rel_desc = &desc->releases[r];
@@ -149,6 +151,7 @@ static void build_cache(fixture_t* fixture) {
         .id = id,
         .version = rel_desc->version,
       };
+      sp_da_init(mem, rel.deps);
 
       sp_carr_for(rel_desc->deps, d) {
         index_dep_t* dep_desc = &rel_desc->deps[d];
@@ -171,7 +174,10 @@ static void build_cache(fixture_t* fixture) {
   }
 }
 
-static void build_manifest(fixture_t* fixture, spn_pkg_info_t* manifest) {
+static void build_manifest(sp_mem_t mem, fixture_t* fixture, spn_pkg_info_t* manifest) {
+  sp_str_ht_init(mem, manifest->deps);
+  sp_da_init(mem, manifest->system_deps);
+
   sp_carr_for(fixture->manifest.deps.package, i) {
     manifest_dep_t* dep = &fixture->manifest.deps.package[i];
     if (!dep->name) break;
@@ -196,18 +202,20 @@ static void build_manifest(fixture_t* fixture, spn_pkg_info_t* manifest) {
 }
 
 void run_fixture(s32* utest_result, fixture_t fixture) {
-  build_cache(&fixture);
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  build_cache(mem, &fixture);
 
   spn_pkg_info_t manifest = sp_zero;
-  build_manifest(&fixture, &manifest);
+  build_manifest(mem, &fixture, &manifest);
 
-  spn_event_buffer_t* events = spn_event_buffer_new();
+  spn_event_buffer_t* events = spn_event_buffer_new(sp_mem_os_new());
   spn_index_cache_t cache = sp_zero;
   spn_pkg_registry_t registry = sp_zero;
   spn_resolver_t resolver = sp_zero;
-  spn_resolver_init(&resolver, spn_allocator, spn.intern, &cache, &registry, events);
+  spn_resolver_init(&resolver, mem, spn.intern, &cache, &registry, events);
 
   spn_resolve_query_t query = sp_zero;
+  spn_resolve_query_init(mem, &query);
   sp_ht_for_kv(manifest.deps, it) {
     spn_resolve_query_add(&query, *it.val);
   }

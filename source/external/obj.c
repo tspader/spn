@@ -9,18 +9,18 @@ spn_obj_kind_t spn_obj_get_native_format() {
   return SPN_OBJ_ELF;
 }
 
-void spn_obj_init(spn_obj_builder_t* obj, spn_obj_kind_t kind) {
+void spn_obj_init(spn_obj_builder_t* obj, sp_mem_t mem, spn_obj_kind_t kind) {
   obj->kind = kind;
   switch (kind) {
     case SPN_OBJ_COFF: {
-      obj->coff.coff = sp_coff_new();
+      obj->coff.coff = sp_coff_new(mem);
       obj->coff.section = sp_coff_add_section(obj->coff.coff, sp_str_lit(".rdata"),
         SP_COFF_SCN_CNT_INITIALIZED_DATA |
         SP_COFF_SCN_ALIGN_8BYTES |
         SP_COFF_SCN_MEM_READ);
     } break;
     case SPN_OBJ_ELF: {
-      obj->elf.elf = sp_elf_new(spn_mem_todo);
+      obj->elf.elf = sp_elf_new(mem);
       obj->elf.rodata = sp_elf_add_section(obj->elf.elf, (sp_elf_section_t){
         .name = sp_str_lit(".rodata"),
         .type = SHT_PROGBITS,

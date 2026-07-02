@@ -1,11 +1,13 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "toolchain/toolchain.h"
 
-sp_str_t spn_toolchain_resolve_path(spn_toolchain_info_t* toolchain, sp_str_t path) {
+sp_str_t spn_toolchain_resolve_path(sp_mem_t mem, spn_toolchain_info_t* toolchain, sp_str_t path) {
   if (sp_str_empty(toolchain->sysroot)) {
-    return sp_str_copy(spn_mem_todo, path);
+    return sp_str_copy(mem, path);
   }
 
-  return sp_fs_join_path(spn_mem_todo, toolchain->sysroot, path);
+  return sp_fs_join_path(mem, toolchain->sysroot, path);
 }
 
 spn_toolchain_launcher_t spn_toolchain_get_linker_driver(spn_toolchain_info_t* toolchain) {
@@ -20,9 +22,8 @@ spn_toolchain_launcher_t spn_toolchain_get_linker_driver(spn_toolchain_info_t* t
   sp_unreachable_return(bad);
 }
 
-spn_toolchain_launcher_t spn_toolchain_launcher_with_root(spn_toolchain_launcher_t launcher, sp_str_t root) {
+spn_toolchain_launcher_t spn_toolchain_launcher_with_root(sp_mem_t mem, spn_toolchain_launcher_t launcher, sp_str_t root) {
   spn_toolchain_launcher_t result = launcher;
-  result.program = sp_fs_join_path(spn_mem_todo, root, launcher.program);
+  result.program = sp_fs_join_path(mem, root, launcher.program);
   return result;
 }
-

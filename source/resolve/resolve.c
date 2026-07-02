@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/macro.h"
 #include "error/types.h"
 #include "event/event.h"
 #include "index/cache.h"
@@ -22,6 +24,12 @@ void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn
     .events = events,
     .registry = registry,
   };
+}
+
+void spn_resolve_query_init(sp_mem_t mem, spn_resolve_query_t* query) {
+  *query = (spn_resolve_query_t) sp_zero_initialize();
+  sp_da_init(mem, query->reqs);
+  sp_str_ht_init(mem, query->result);
 }
 
 void spn_resolve_query_add(spn_resolve_query_t* query, spn_requested_pkg_t req) {
@@ -90,6 +98,8 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
     resolved.file.path = request->file.path;
   }
 
+  sp_da_init(resolver->mem, resolved.deps);
+
   // Looks frivolous, but the point here is that the list of dependencies defined in the manifest is
   // not the same as the list of dependencies we're actually using for this build.
   //
@@ -146,6 +156,7 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
         .release = release,
       }
     };
+    sp_da_init(resolver->mem, node.deps);
     sp_da_for(release->deps, d) {
       spn_requested_pkg_t dep = {
         .qualified = spn_pkg_id_to_qualified_name(release->deps[d].id),
@@ -214,6 +225,7 @@ spn_err_t spn_resolve_from_solver(spn_resolver_t* resolver, spn_resolve_query_t*
   spn_resolve_run_t run = {
     .query = query,
   };
+  sp_str_ht_init(resolver->mem, run.visited);
 
   spn_resolved_pkg_t node = {
     .qualified = sp_str_lit(""),

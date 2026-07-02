@@ -33,6 +33,7 @@ struct index_roundtrip {
 };
 
 static void run_roundtrip_case(s32* utest_result, struct index_roundtrip* fixture, roundtrip_case_t c) {
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
   spn_index_rel_t rel = {
     .id = {
       .namespace = sp_str_view(c.input.namespace),
@@ -53,6 +54,7 @@ static void run_roundtrip_case(s32* utest_result, struct index_roundtrip* fixtur
   if (c.input.paths.manifest) { rel.paths.manifest = sp_str_view(c.input.paths.manifest); }
   if (c.input.paths.script) { rel.paths.script = sp_str_view(c.input.paths.script); }
 
+  sp_da_init(mem, rel.deps);
   sp_for(it, sp_carr_len(c.input.deps)) {
     dep_input_t dep = c.input.deps[it];
     if (!dep.namespace) { break; }
@@ -66,11 +68,11 @@ static void run_roundtrip_case(s32* utest_result, struct index_roundtrip* fixtur
     }));
   }
 
-  sp_str_t json = spn_index_rel_to_json(&rel);
+  sp_str_t json = spn_index_rel_to_json(mem, &rel);
   EXPECT_TRUE(!sp_str_empty(json));
 
   spn_index_info_t index = SP_ZERO_INITIALIZE();
-  spn_index_init(&index);
+  spn_index_init(&index, mem);
 
   spn_index_pkg_t pkg = SP_ZERO_INITIALIZE();
   spn_err_t err = spn_index_parse_pkg(&index.json.ctx, index.json.schema, rel.id, json, &pkg);
@@ -116,12 +118,9 @@ static void run_roundtrip_case(s32* utest_result, struct index_roundtrip* fixtur
 }
 
 UTEST_F_SETUP(index_roundtrip) {
-  ctx_t* harness = ctx_get();
-  sp_context_push_allocator(sp_mem_arena_as_allocator(harness->arena));
 }
 
 UTEST_F_TEARDOWN(index_roundtrip) {
-  sp_context_pop();
 }
 
 UTEST_F(index_roundtrip, basic_source_only) {
@@ -261,32 +260,35 @@ struct index_publish {
 };
 
 static void write_publish_fixtures(ctx_t* harness, const c8* name, const publish_file_t files[4]) {
+  sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
   sp_str_t prefix = sp_str_view(name);
 
   sp_for(it, 4) {
     publish_file_t file = files[it];
     if (!file.path) { break; }
 
-    sp_str_builder_t builder = SP_ZERO_INITIALIZE();
+    sp_io_dyn_mem_writer_t builder = sp_zero;
+    sp_io_dyn_mem_writer_init(mem, &builder);
     sp_for(line_it, sp_carr_len(file.lines)) {
       if (!file.lines[line_it]) { break; }
-      sp_str_builder_append(&builder, sp_str_view(file.lines[line_it]));
-      sp_str_builder_new_line(&builder);
+      sp_io_write_str(&builder.base, sp_str_view(file.lines[line_it]), SP_NULLPTR);
+      sp_io_write_c8(&builder.base, '\n');
     }
 
     tmpfs_create(
       &harness->fs,
-      sp_fs_join_path(spn_allocator, prefix, sp_fs_join_path(spn_allocator, sp_str_lit("index"), sp_str_view(file.path))),
-      sp_str_builder_to_str(&builder)
+      sp_fs_join_path(mem, prefix, sp_fs_join_path(mem, sp_str_lit("index"), sp_str_view(file.path))),
+      sp_io_dyn_mem_writer_take_str(&builder)
     );
   }
 }
 
 static void run_publish_case(s32* utest_result, struct index_publish* fixture, publish_case_t c) {
   ctx_t* harness = ctx_get();
+  sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
   sp_str_t case_root = tmpfs_get(&harness->fs, sp_str_view(c.name));
 
-  sp_str_t index_root = sp_fs_join_path(spn_allocator, case_root, sp_str_lit("index"));
+  sp_str_t index_root = sp_fs_join_path(mem, case_root, sp_str_lit("index"));
   sp_fs_create_dir(index_root);
 
   write_publish_fixtures(harness, c.name, c.fixture.files);
@@ -294,7 +296,7 @@ static void run_publish_case(s32* utest_result, struct index_publish* fixture, p
   spn_index_info_t index = {
     .location = index_root,
   };
-  spn_index_init(&index);
+  spn_index_init(&index, mem);
 
   spn_index_rel_t rel = {
     .id = {
@@ -312,14 +314,14 @@ static void run_publish_case(s32* utest_result, struct index_publish* fixture, p
   if (c.expect.lines > 0) {
     sp_str_t ns = sp_str_view(c.release.namespace);
     sp_str_t nm = sp_str_view(c.release.name);
-    sp_str_t pkg_path = sp_fs_join_path(spn_allocator, 
-      sp_fs_join_path(spn_allocator, index_root, ns),
-      sp_format("{}.jsonl", SP_FMT_STR(nm))
+    sp_str_t pkg_path = sp_fs_join_path(mem,
+      sp_fs_join_path(mem, index_root, ns),
+      sp_fmt(mem, "{}.jsonl", sp_fmt_str(nm)).value
     );
 
     EXPECT_TRUE(sp_fs_exists(pkg_path));
     if (sp_fs_exists(pkg_path)) {
-      sp_str_t content = sp_zero; sp_io_read_file(spn_allocator, pkg_path, &content);
+      sp_str_t content = test_read_file(mem, pkg_path);
       u32 count = 0;
       sp_str_for_line(content, line_it) {
         sp_str_t line = sp_str_trim(line_it.line);
@@ -333,12 +335,9 @@ static void run_publish_case(s32* utest_result, struct index_publish* fixture, p
 }
 
 UTEST_F_SETUP(index_publish) {
-  ctx_t* harness = ctx_get();
-  sp_context_push_allocator(sp_mem_arena_as_allocator(harness->arena));
 }
 
 UTEST_F_TEARDOWN(index_publish) {
-  sp_context_pop();
 }
 
 UTEST_F(index_publish, publish_to_empty_index) {

@@ -37,6 +37,7 @@ typedef struct {
 } spn_lock_entry_t;
 
 typedef struct {
+  sp_mem_t mem;
   spn_semver_t version;
   sp_str_t commit;
   sp_ht(sp_str_t, spn_lock_entry_t) entries;
