@@ -27,7 +27,7 @@ add_executable(yyjson_stub yyjson_stub.c)
 set_target_properties(yyjson_stub PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(yyjson_stub PRIVATE yyjson)
 
-add_executable(jtd_gen codegen/main.c codegen/extract.c codegen/render.c jtd.c)
+add_executable(jtd_gen codegen/main.c codegen/extract.c codegen/render.c codegen/abi.c jtd.c)
 set_target_properties(jtd_gen PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(jtd_gen PRIVATE ${STORE}/include ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/source/sp)
 target_link_libraries(jtd_gen PRIVATE yyjson m)
@@ -37,25 +37,23 @@ set(GEN_DIR ${CMAKE_SOURCE_DIR}/source/codegen/gen)
 file(MAKE_DIRECTORY ${GEN_DIR})
 
 set(SCHEMA ${CMAKE_SOURCE_DIR}/source/codegen/schemas.jtd.json)
+set(GEN_FILES
+  ${GEN_DIR}/types.gen.h
+  ${GEN_DIR}/manifest.gen.h
+  ${GEN_DIR}/manifest.gen.c
+  ${GEN_DIR}/toolchains.gen.h
+  ${GEN_DIR}/toolchains.gen.c
+  ${GEN_DIR}/abi.gen.h
+  ${GEN_DIR}/abi.gen.c)
 file(GLOB_RECURSE JTD_GEN_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/templates/*.tmpl)
 add_custom_command(
-  OUTPUT
-    ${GEN_DIR}/types.gen.h
-    ${GEN_DIR}/manifest.gen.h
-    ${GEN_DIR}/manifest.gen.c
-    ${GEN_DIR}/toolchains.gen.h
-    ${GEN_DIR}/toolchains.gen.c
+  OUTPUT ${GEN_FILES}
   COMMAND ${CMAKE_COMMAND} -E make_directory ${GEN_DIR}
   COMMAND $<TARGET_FILE:jtd_gen>
     ${SCHEMA}
     ${GEN_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/templates
   DEPENDS jtd_gen ${SCHEMA} ${JTD_GEN_TEMPLATES}
-  COMMENT "codegen: types.gen.h, {manifest,toolchains}.gen.{h,c}"
+  COMMENT "codegen: types.gen.h, {manifest,toolchains,abi}.gen.{h,c}"
   VERBATIM)
-add_custom_target(spn_codegen_gen ALL DEPENDS
-  ${GEN_DIR}/types.gen.h
-  ${GEN_DIR}/manifest.gen.h
-  ${GEN_DIR}/manifest.gen.c
-  ${GEN_DIR}/toolchains.gen.h
-  ${GEN_DIR}/toolchains.gen.c)
+add_custom_target(spn_codegen_gen ALL DEPENDS ${GEN_FILES})

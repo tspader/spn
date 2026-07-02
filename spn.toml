@@ -5,7 +5,7 @@ version = "0.2.0"
 repo = "tspader/spn"
 build = "tools/spn/build.c"
 configure = "tools/spn/configure.c"
-include = ["source/codegen/gen"]
+include = ["include", "source/codegen/gen"]
 
 [deps.package]
 "spader/spcc" = "1.0.2"

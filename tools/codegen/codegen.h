@@ -11,6 +11,7 @@ typedef enum {
   FIELD_BOOL,
   FIELD_ENUM,
   FIELD_STRUCT,
+  FIELD_HANDLE,
 } field_kind_t;
 
 typedef enum {
@@ -27,6 +28,7 @@ typedef struct {
   sp_str_t type_name;
   sp_str_t key_field;
   sp_str_t entry;
+  u32 cap;
 } field_t;
 
 typedef struct {
@@ -56,6 +58,7 @@ typedef struct {
   } containers;
   sp_ht(sp_str_t, u8) visited;
   type_t* root;
+  sp_da(sp_str_t) roots;
   sp_str_t err;
 } gen_t;
 
@@ -65,8 +68,13 @@ bool    gen_extract(gen_t* g, sp_str_t name, jtd_schema_t* schema);
 type_t* gen_type(gen_t* g, sp_str_t name);
 
 // render.c
+bool gen_render(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg, const c8* name, sp_template_scope_t* scope);
 bool render_types(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg);
 bool render_decls(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg);
 bool render_impl(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg);
+
+// abi.c
+bool render_abi_decls(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg);
+bool render_abi_impl(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg);
 
 #endif // CODEGEN_H

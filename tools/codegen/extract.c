@@ -9,6 +9,7 @@ gen_t* gen_new(sp_mem_t mem) {
   gen->containers.array = sp_da_new(mem, sp_str_t);
   gen->containers.map = sp_da_new(mem, om_type_t);
   gen->containers.object = sp_da_new(mem, sp_str_t);
+  gen->roots = sp_da_new(mem, sp_str_t);
   sp_str_ht_init(mem, gen->visited);
   return gen;
 }
@@ -88,6 +89,10 @@ static bool extract_field(gen_t* g, type_t* type, jtd_property_t property) {
   if (property.schema->form == JTD_FORM_ELEMENTS) {
     field.card = CARD_ARRAY;
     value = property.schema->as.elements.schema;
+    sp_str_t cap = jtd_metadata(property.schema, "cap");
+    if (!sp_str_empty(cap) && !sp_parse_u32_ex(cap, &field.cap)) {
+      return fail(g, type->name, property.key, sp_str_lit("cap must be a decimal string"));
+    }
   }
   else if (property.schema->form == JTD_FORM_VALUES) {
     field.card = CARD_MAP;
@@ -106,6 +111,10 @@ static bool extract_field(gen_t* g, type_t* type, jtd_property_t property) {
   }
   else if (target->form == JTD_FORM_TYPE && target->as.type == JTD_TYPE_BOOLEAN) {
     field.kind = FIELD_BOOL;
+  }
+  else if (target->form == JTD_FORM_TYPE && target->as.type == JTD_TYPE_UINT32 && jtd_metadata_has(target, "handle")) {
+    field.kind = FIELD_HANDLE;
+    field.type_name = jtd_metadata(target, "handle");
   }
   else if (target->form == JTD_FORM_TYPE) {
     return fail_scalar(g, type->name, property.key, target->as.type);

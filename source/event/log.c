@@ -70,6 +70,7 @@ static void build_schemas(sp_mem_t mem) {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
       SP_BIND(&b, spn_evt_script_crashed_t, path, "script_path", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_script_crashed_t, error, "error", SP_BIND_STR);
     }
     schemas[SPN_EVENT_BUILD_SCRIPT_CRASHED] = sp_bind_builder_end(&b);
   }

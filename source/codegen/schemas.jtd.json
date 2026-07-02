@@ -118,6 +118,21 @@
       }
     },
 
+    "run_std": {
+      "optionalProperties": {
+        "out": { "type": "string" }
+      }
+    },
+
+    "run": {
+      "metadata": { "renderer": "abi" },
+      "optionalProperties": {
+        "target": { "type": "uint32", "metadata": { "handle": "target" } },
+        "args": { "elements": { "type": "string" }, "metadata": { "cap": "16" } },
+        "std": { "ref": "run_std" }
+      }
+    },
+
     "toolchains": {
       "metadata": { "renderer": "json" },
       "optionalProperties": {

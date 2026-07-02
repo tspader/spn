@@ -272,6 +272,7 @@ void spn_cc_target_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp
     case SPN_CC_OUTPUT_WASM: {
       sp_ps_config_add_arg(mem, ps, sp_str_lit("-mexec-model=reactor"));
       sp_ps_config_add_arg(mem, ps, sp_str_lit("-Wl,--no-entry"));
+      sp_ps_config_add_arg(mem, ps, sp_str_lit("-Wl,--import-symbols"));
       break;
     }
     case SPN_CC_OUTPUT_STATIC_LIB:

@@ -1,0 +1,54 @@
+#include "sp.h"
+#include "abi.gen.h"
+#include "external/wasm/abi.h"
+
+{{ for .types }}
+typedef struct {
+{{ for .fields }}
+  {{ .wire_decl }};
+{{ end }}
+} {{ .wire_type }};
+
+{{ end }}
+{{ for .types }}
+typedef c8 spn_abi_assert_wire_{{ .name }} [(sizeof({{ .wire_type }}) == {{ .size }}) ? 1 : -1];
+{{ end }}
+
+{{ for .types }}
+static bool spn_wire_{{ .name }}_read(spn_abi_ctx_t* abi, const spn_wire_{{ .name }}_t* wire, {{ .type }}* out) {
+{{ for .fields }}
+{{ $read }}
+{{ end }}
+  return true;
+}
+
+{{ end }}
+{{ for .functions }}
+static s32 spn_abi_thunk_{{ .name }}(wasm_exec_env_t env, u32 ctx, u32 addr) {
+  spn_abi_ctx_t abi = {
+    .inst = wasm_runtime_get_module_inst(env),
+    .table = wasm_runtime_get_user_data(env),
+  };
+
+  spn_t* spn = spn_abi_table_get(abi.table, ctx, SPN_ABI_KIND_CTX);
+  if (!spn) return SPN_ERROR;
+
+  const spn_wire_{{ .name }}_t* wire = spn_abi_deref(&abi, addr, sizeof(spn_wire_{{ .name }}_t));
+  if (!wire) return SPN_ERROR;
+
+  {{ .type }} {{ .name }} = sp_zero;
+  if (!spn_wire_{{ .name }}_read(&abi, wire, &{{ .name }})) return SPN_ERROR;
+
+  return spn_{{ .name }}_ex(spn, {{ .name }});
+}
+
+{{ end }}
+bool spn_abi_register(void) {
+  static NativeSymbol natives [] = {
+    { "spn_get_target", spn_abi_thunk_get_target, "(ii)i", SP_NULLPTR },
+{{ for .functions }}
+    { "spn_{{ .name }}_ex", spn_abi_thunk_{{ .name }}, "(ii)i", SP_NULLPTR },
+{{ end }}
+  };
+  return wasm_runtime_register_natives("env", natives, sp_carr_len(natives));
+}

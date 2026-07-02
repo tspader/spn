@@ -1,4 +1,5 @@
 set(SPN_SOURCES
+  api/api.c
   api/autoconf/autoconf.c
   api/cmake/cmake.c
   api/core/core.c
@@ -35,6 +36,7 @@ set(SPN_SOURCES
   external/obj.c
   external/tcc.c
   external/tom.c
+  external/wasm/abi.c
   external/wasm/wasm.c
   filter/filter.c
   gen.c
@@ -100,7 +102,8 @@ set(SPN_SOURCES
 
 add_executable(spn ${SPN_SOURCES}
   ${SRC}/codegen/gen/manifest.gen.c
-  ${SRC}/codegen/gen/toolchains.gen.c)
+  ${SRC}/codegen/gen/toolchains.gen.c
+  ${SRC}/codegen/gen/abi.gen.c)
 target_include_directories(spn PRIVATE
   ${SRC}
   ${SRC}/external

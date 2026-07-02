@@ -156,6 +156,12 @@ typedef struct spn_autoconf     spn_autoconf_t;
 typedef struct spn_node_t       spn_node_t;
 typedef struct spn_node_ctx_t   spn_node_ctx_t;
 
+#ifdef __wasm32__
+  #define SPN_API __attribute__((import_module("env")))
+#else
+  #define SPN_API
+#endif
+
 typedef spn_err_t (*spn_configure_fn_t) (spn_t*, spn_config_t*);
 typedef spn_err_t (*spn_build_fn_t)     (spn_t*, spn_build_t*);
 typedef spn_err_t (*spn_package_fn_t)   (spn_t*);

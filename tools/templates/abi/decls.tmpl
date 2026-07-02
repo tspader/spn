@@ -1,0 +1,18 @@
+#ifndef SPN_ABI_H
+#define SPN_ABI_H
+
+#include "spn.h"
+
+{{ for .types }}
+typedef struct {
+{{ for .fields }}
+  {{ .decl }};
+{{ end }}
+} {{ .type }};
+
+{{ end }}
+{{ for .functions }}
+SPN_API s32 spn_{{ .name }}_ex(spn_t* spn, {{ .type }} {{ .name }});
+{{ end }}
+
+#endif

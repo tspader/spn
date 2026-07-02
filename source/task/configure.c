@@ -16,6 +16,7 @@
 #include "event/event.h"
 #include "external/cc.h"
 #include "external/tcc/tcc.h"
+#include "external/wasm/wasm.h"
 #include "graph/graph.h"
 #include "sp/sp_glob.h"
 #include "session/session.h"
@@ -89,7 +90,7 @@ fail:
 }
 
 spn_err_t compile_shim(spn_session_t* session, spn_pkg_unit_t* unit) {
-  // spn_try(compile_wasm(session, unit));
+  spn_try(compile_wasm(session, unit));
   spn_try(compile_package(session, unit));
   return SPN_OK;
 }
@@ -141,6 +142,7 @@ spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
         .time = run.elapsed,
       }
     });
+    return SPN_ERROR;
   } else {
     spn_event_buffer_push_ex(session->events, unit->info, &unit->logs.io, (spn_build_event_t) {
       .kind = SPN_EVENT_TARGET_BUILD_PASSED,
@@ -202,6 +204,9 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
   spn_try(compile_shim(unit->session, unit));
+  if (sp_fs_is_file(unit->paths.configure)) {
+    spn_try(spn_wasm_run_configure(unit));
+  }
   spn_try(configure_package(unit));
   return SPN_OK;
 }
@@ -211,6 +216,10 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   spn_build_graph_t* graph = &session->configure.graph;
   spn_bg_init(graph, spn.mem);
   spn_pkg_unit_t* root = spn_session_find_root(&app->session);
+
+  if (spn_wasm_init_stupid_global_runtime()) {
+    return SPN_TASK_ERROR;
+  }
 
   // Add a graph node for each package
   sp_om_for(session->units.packages, it) {

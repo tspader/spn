@@ -426,14 +426,19 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
       c8 buffer [64] = sp_zero;
       sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->build.passed.time);
       sp_fmt_io(&w.base,
-        "profile {.cyan} in {.cyan}",
+        "Compiled for profile {.cyan} in {.cyan}",
         SP_FMT_STR(event->build.passed.profile->name),
         SP_FMT_CSTR(buffer)
       );
       break;
     }
     case SPN_EVENT_BUILD_SCRIPT_CRASHED: {
-      sp_io_write_str(&w.base, sp_str_lit("build script crashed"), SP_NULLPTR);
+      if (sp_str_empty(event->crashed.error)) {
+        sp_io_write_str(&w.base, sp_str_lit("build script crashed"), SP_NULLPTR);
+      }
+      else {
+        sp_fmt_io(&w.base, "build script crashed: {.red}", SP_FMT_STR(event->crashed.error));
+      }
       break;
     }
     case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED: {
