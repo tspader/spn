@@ -182,7 +182,6 @@ sp_str_t get_target_output_path(sp_mem_t mem, spn_target_unit_t* target) {
       sp_mem_end_scratch(scratch);
       return path;
     }
-    case SPN_CC_OUTPUT_JIT:
     case SPN_CC_OUTPUT_WASM:
     case SPN_CC_OUTPUT_OBJECT: break;
   }

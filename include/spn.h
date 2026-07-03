@@ -150,7 +150,6 @@ typedef enum {
 
 typedef struct spn              spn_t;
 typedef struct spn_config       spn_config_t;
-typedef struct spn_build        spn_build_t;
 typedef struct spn_pkg          spn_pkg_t;
 typedef struct spn_target       spn_target_t;
 typedef struct spn_profile      spn_profile_t;
@@ -171,8 +170,6 @@ typedef struct spn_node_ctx_t   spn_node_ctx_t;
 #endif
 
 typedef spn_err_t (*spn_configure_fn_t) (spn_t*, spn_config_t*);
-typedef spn_err_t (*spn_build_fn_t)     (spn_t*, spn_build_t*);
-typedef spn_err_t (*spn_package_fn_t)   (spn_t*);
 typedef s32       (*spn_node_fn_t)      (spn_t*, spn_node_ctx_t*);
 
 
@@ -181,14 +178,27 @@ typedef s32       (*spn_node_fn_t)      (spn_t*, spn_node_ctx_t*);
 #define SP_EMBED_DEFAULT_SIZE_T SP_NULLPTR
 
 spn_target_t* spn_get_target(spn_t* spn, const c8* name);
+const spn_t*  spn_get_dep(const spn_t* spn, const c8* name);
+const c8*     spn_get_dir(const spn_t* spn, spn_dir_t dir);
+const c8*     spn_get_subdir(const spn_t* spn, spn_dir_t base, const c8* path);
+void          spn_write_file(spn_t* spn, const c8* path, const c8* content);
+s32           spn_copy(spn_t* spn, spn_dir_t from, const c8* from_path, spn_dir_t to, const c8* to_path);
+void          spn_log(spn_t* spn, const c8* message);
+
 spn_target_t* spn_add_exe(spn_config_t* config, const c8* name);
 spn_target_t* spn_add_lib(spn_config_t* config, const c8* name, spn_linkage_t kind);
 spn_target_t* spn_add_test(spn_config_t* config, const c8* name);
 void          spn_add_include(spn_config_t* config, const c8* path);
 void          spn_add_define(spn_config_t* config, const c8* define);
 void          spn_add_system_dep(spn_config_t* config, const c8* dep);
-const spn_t*  spn_get_dep(const spn_t* spn, const c8* name);
-const c8*     spn_get_subdir(const spn_t* spn, spn_dir_t base, const c8* path);
+spn_node_t*   spn_add_node(spn_config_t* config, const c8* tag);
+void          spn_node_add_input(spn_node_t* node, const c8* input);
+void          spn_node_add_output(spn_node_t* node, const c8* output);
+void          spn_node_link(spn_node_t* from, spn_node_t* to);
+void          spn_node_set_fn(spn_node_t* node, const c8* fn);
+void          spn_node_set_user_data(spn_node_t* node, void* user_data);
+void*         spn_node_ctx_get_user_data(spn_node_ctx_t* ctx);
+
 void          spn_target_add_source(spn_target_t* target, const c8* source);
 void          spn_target_add_include(spn_target_t* target, const c8* include);
 void          spn_target_add_define(spn_target_t* target, const c8* define);
@@ -200,19 +210,6 @@ void          spn_target_embed_mem(spn_target_t* target, const c8* symbol, const
 void          spn_target_embed_mem_ex(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size, const c8* data_type, const c8* size_type);
 void          spn_target_embed_dir(spn_target_t* target, const c8* dir);
 void          spn_target_embed_dir_ex(spn_target_t* target, const c8* dir, const c8* data_type, const c8* size_type);
-
-const c8*     spn_get_dir(const spn_t* spn, spn_dir_t dir);
-void          spn_write_file(spn_t* spn, const c8* path, const c8* content);
-s32           spn_copy(spn_t* spn, spn_dir_t from, const c8* from_path, spn_dir_t to, const c8* to_path);
-void          spn_log(spn_t* spn, const c8* message);
-
-spn_node_t*   spn_add_node(spn_config_t* config, const c8* tag);
-void          spn_node_add_input(spn_node_t* node, const c8* input);
-void          spn_node_add_output(spn_node_t* node, const c8* output);
-void          spn_node_link(spn_node_t* from, spn_node_t* to);
-void          spn_node_set_fn(spn_node_t* node, const c8* fn);
-void          spn_node_set_user_data(spn_node_t* node, void* user_data);
-void*         spn_node_ctx_get_user_data(spn_node_ctx_t* ctx);
 
 spn_profile_t*   spn_get_profile(spn_t* spn);
 spn_libc_kind_t  spn_profile_get_libc(spn_profile_t* profile);

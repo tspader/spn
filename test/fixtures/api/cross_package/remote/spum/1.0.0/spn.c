@@ -1,6 +1,6 @@
 #include "spn.h"
 
 SPN_EXPORT
-spn_err_t package(spn_t* spn) {
-  return SPN_OK;
+s32 package(spn_t* spn, spn_node_ctx_t* ctx) {
+  return 0;
 }

@@ -687,32 +687,6 @@ UTEST_F(spn_build, run_script_name_c) {
   });
 }
 
-UTEST_F(spn_build, run_source_manifest_build_deps) {
-  tmpfs_init_named(&uf->fixture.fs, "run_source_manifest_build_deps");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
-    .project = "test/fixtures/spn_run/source_manifest",
-    .copy = { "scripts/*" },
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "run", .args = { "scripts/main.c" } } },
-      { .kind = ACTION_VERIFY_CONTENT, .verify_content = { .file = sp_str_lit("ran.txt"), .content = sp_str_lit("77\n") } },
-    },
-  });
-}
-
-UTEST_F(spn_build, run_source_without_manifest) {
-  tmpfs_init_named(&uf->fixture.fs, "run_source_without_manifest");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
-    .project = "test/fixtures/spn_run/source_no_manifest",
-    .copy = { "scripts/*" },
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "run", .args = { "scripts/main.c" } } },
-      { .kind = ACTION_VERIFY_CONTENT, .verify_content = { .file = sp_str_lit("ran.txt"), .content = sp_str_lit("source\n") } },
-    },
-  });
-}
-
 UTEST_F(spn_build, api_basic_node) {
   tmpfs_init_named(&uf->fixture.fs, "api_basic_node");
 
@@ -887,6 +861,30 @@ UTEST_F(spn_build, api_configure_error) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err" } },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_wrong_handle) {
+  tmpfs_init_named(&uf->fixture.fs, "api_wrong_handle");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/wrong_handle",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_RUN_BIN, .bin.name = "wrong_handle" },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_stale_config) {
+  tmpfs_init_named(&uf->fixture.fs, "api_stale_config");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/stale_config",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_RUN_BIN, .bin.name = "stale_config" },
     },
   });
 }

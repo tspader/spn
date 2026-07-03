@@ -102,12 +102,6 @@ spn_err_t spn_wasm_init_stupid_global_runtime() {
   return SPN_OK;
 }
 
-// Package scripts run as wasm, period. SPN_USE_TCC resurrects the TCC JIT
-// path for the transition; it dies with the TCC script machinery.
-bool spn_wasm_enabled(void) {
-  return sp_str_empty(sp_env_get(spn.env, sp_str_lit("SPN_USE_TCC")));
-}
-
 static spn_err_t spn_wasm_script_fail(spn_pkg_unit_t* unit, spn_err_t err, spn_err_wasm_t wasm) {
   wasm.path = sp_str_copy(spn.mem, wasm.path);
   wasm.error = sp_str_copy(spn.mem, wasm.error);
@@ -210,9 +204,16 @@ spn_err_t spn_wasm_script_call_hook(spn_wasm_script_t* script, spn_pkg_unit_t* u
 
   spn_err_t err = SPN_OK;
 
-  wasm_val_t args [1] = { { .kind = WASM_I32, .of.i32 = (s32)script->ctx } };
+  // The phase capability only resolves while its hook is on the stack; a
+  // stashed token fails handle resolution once the hook returns
+  u32 token = spn_wasm_add_handle(script->table, unit, SPN_ABI_KIND_CONFIG);
+
+  wasm_val_t args [2] = {
+    { .kind = WASM_I32, .of.i32 = (s32)script->ctx },
+    { .kind = WASM_I32, .of.i32 = (s32)token },
+  };
   wasm_val_t results [1] = sp_zero;
-  if (!wasm_runtime_call_wasm_a(env, fn, 1, results, 1, args)) {
+  if (!wasm_runtime_call_wasm_a(env, fn, 1, results, sp_carr_len(args), args)) {
     err = spn_wasm_script_fail(unit, SPN_ERR_WASM_MODULE_CALL_FAILED, (spn_err_wasm_t) {
       .path = script->path,
       .error = sp_cstr_as_str(wasm_runtime_get_exception(script->instance)),
@@ -225,6 +226,7 @@ spn_err_t spn_wasm_script_call_hook(spn_wasm_script_t* script, spn_pkg_unit_t* u
     });
   }
 
+  spn_wasm_remove_handle(script->table, token);
   spn_wasm_script_exit(script, env);
   return err;
 }

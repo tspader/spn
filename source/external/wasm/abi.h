@@ -11,6 +11,7 @@
 typedef enum {
   SPN_ABI_KIND_NONE = 0,
   SPN_ABI_KIND_CTX,
+  SPN_ABI_KIND_CONFIG,
   SPN_ABI_KIND_TARGET,
   SPN_ABI_KIND_NODE,
   SPN_ABI_KIND_NODE_CTX,
@@ -45,7 +46,6 @@ const void*    spn_wasm_resolve_guest_ptr(spn_wasm_ctx_t* abi, u32 addr, u64 siz
 bool           spn_wasm_read_str(spn_wasm_ctx_t* abi, u32 offset, const c8** out);
 bool           spn_wasm_read_handle(spn_wasm_ctx_t* abi, u32 token, spn_abi_kind_t kind, void** out);
 spn_wasm_ptr_t spn_wasm_copy_str(spn_wasm_ctx_t* abi, const c8* str);
-spn_node_t* spn_abi_add_node(spn_config_t* config, const c8* tag);
 void        spn_abi_node_set_user_data(spn_node_t* node, s32 data);
 s32         spn_abi_node_ctx_get_user_data(spn_node_ctx_t* ctx);
 bool        spn_wasm_register_api(void);

@@ -8,7 +8,6 @@
 
 #include "graph/types.h"
 #include "intern/types.h"
-#include "external/tcc/types.h"
 #include "external/wasm/types.h"
 #include "log/lazy/types.h"
 
@@ -35,7 +34,6 @@ struct spn_user_node_t {
   spn_pkg_unit_t* pkg;
   sp_str_t tag;
   sp_str_t fn;
-  bool wasm;
   void* user_data;
   sp_da(sp_str_t) inputs;
   sp_da(sp_str_t) outputs;
@@ -212,10 +210,6 @@ struct spn_pkg_unit_t {
     u64 package;
     u64 total;
   } time;
-
-  spn_tcc_t* tcc;
-  spn_configure_fn_t on_configure;
-  spn_package_fn_t on_package;
 
   struct {
     spn_wasm_script_t* configure;

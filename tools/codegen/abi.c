@@ -5,6 +5,7 @@ typedef enum {
   ABI_VAL_S32,
   ABI_VAL_STR,
   ABI_VAL_CTX,
+  ABI_VAL_CONFIG,
   ABI_VAL_TARGET,
   ABI_VAL_NODE,
   ABI_VAL_NODE_CTX,
@@ -33,12 +34,12 @@ static const abi_fn_t abi_fns [] = {
   { .name = "spn_profile_get_linkage",  .ret = ABI_VAL_S32,     .args = { ABI_VAL_PROFILE } },
   { .name = "spn_profile_get_standard", .ret = ABI_VAL_S32,     .args = { ABI_VAL_PROFILE } },
   { .name = "spn_profile_get_mode",     .ret = ABI_VAL_S32,     .args = { ABI_VAL_PROFILE } },
-  { .name = "spn_add_exe",              .ret = ABI_VAL_TARGET,  .args = { ABI_VAL_CTX, ABI_VAL_STR } },
-  { .name = "spn_add_lib",              .ret = ABI_VAL_TARGET,  .args = { ABI_VAL_CTX, ABI_VAL_STR, ABI_VAL_S32 } },
-  { .name = "spn_add_test",             .ret = ABI_VAL_TARGET,  .args = { ABI_VAL_CTX, ABI_VAL_STR } },
-  { .name = "spn_add_include",          .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CTX, ABI_VAL_STR } },
-  { .name = "spn_add_define",           .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CTX, ABI_VAL_STR } },
-  { .name = "spn_add_system_dep",       .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CTX, ABI_VAL_STR } },
+  { .name = "spn_add_exe",              .ret = ABI_VAL_TARGET,  .args = { ABI_VAL_CONFIG, ABI_VAL_STR } },
+  { .name = "spn_add_lib",              .ret = ABI_VAL_TARGET,  .args = { ABI_VAL_CONFIG, ABI_VAL_STR, ABI_VAL_S32 } },
+  { .name = "spn_add_test",             .ret = ABI_VAL_TARGET,  .args = { ABI_VAL_CONFIG, ABI_VAL_STR } },
+  { .name = "spn_add_include",          .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CONFIG, ABI_VAL_STR } },
+  { .name = "spn_add_define",           .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CONFIG, ABI_VAL_STR } },
+  { .name = "spn_add_system_dep",       .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CONFIG, ABI_VAL_STR } },
   { .name = "spn_log",                  .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CTX, ABI_VAL_STR } },
   { .name = "spn_target_add_source",    .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR } },
   { .name = "spn_target_add_include",   .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR } },
@@ -49,7 +50,7 @@ static const abi_fn_t abi_fns [] = {
   { .name = "spn_target_embed_file_ex", .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR, ABI_VAL_STR, ABI_VAL_STR, ABI_VAL_STR } },
   { .name = "spn_target_embed_dir",     .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR } },
   { .name = "spn_target_embed_dir_ex",  .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR, ABI_VAL_STR, ABI_VAL_STR } },
-  { .name = "spn_add_node",             .ret = ABI_VAL_NODE,    .args = { ABI_VAL_CTX, ABI_VAL_STR }, .host = "spn_abi_add_node" },
+  { .name = "spn_add_node",             .ret = ABI_VAL_NODE,    .args = { ABI_VAL_CONFIG, ABI_VAL_STR } },
   { .name = "spn_node_set_fn",          .ret = ABI_VAL_VOID,    .args = { ABI_VAL_NODE, ABI_VAL_STR } },
   { .name = "spn_node_set_user_data",   .ret = ABI_VAL_VOID,    .args = { ABI_VAL_NODE, ABI_VAL_S32 }, .host = "spn_abi_node_set_user_data" },
   { .name = "spn_node_add_input",       .ret = ABI_VAL_VOID,    .args = { ABI_VAL_NODE, ABI_VAL_STR } },
@@ -84,6 +85,7 @@ static bool abi_val_is_handle(abi_val_t val) {
 static const c8* abi_val_kind(abi_val_t val) {
   switch (val) {
     case ABI_VAL_CTX:      return "SPN_ABI_KIND_CTX";
+    case ABI_VAL_CONFIG:   return "SPN_ABI_KIND_CONFIG";
     case ABI_VAL_TARGET:   return "SPN_ABI_KIND_TARGET";
     case ABI_VAL_NODE:     return "SPN_ABI_KIND_NODE";
     case ABI_VAL_NODE_CTX: return "SPN_ABI_KIND_NODE_CTX";

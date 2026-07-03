@@ -10,7 +10,6 @@
 #include "toolchain/types.h"
 #include "tui/types.h"
 
-#include "jit.h"
 #include "log/types.h"
 
 typedef struct {
@@ -50,14 +49,12 @@ typedef struct {
   spn_tui_t tui;
   sp_atomic_s32_t control;
   sp_atomic_s32_t aborted;
-  sp_str_t tcc_error;
   spn_index_arr_t indexes;
   spn_event_buffer_t* events;
   sp_app_t* sp;
   s32 num_args;
   const c8** args;
   sp_intern_t* intern;
-  spn_jit_entry_t jit;
   sp_mem_t mem;
   sp_mem_arena_t* arena;
   sp_mem_t heap;

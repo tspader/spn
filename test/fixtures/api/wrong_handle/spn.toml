@@ -1,0 +1,7 @@
+[package]
+name = "wrong_handle"
+version = "0.0.1"
+
+[[bin]]
+name = "wrong_handle"
+source = ["main.c"]

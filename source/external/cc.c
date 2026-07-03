@@ -2,12 +2,10 @@
 #include "sp/macro.h"
 #include "ctx/types.h"
 #include "session/types.h"
-#include "tcc/tcc.h"
 #include "toolchain/types.h"
 
 #include "gen.h"
 #include "intern/intern.h"
-#include "external/tcc/tcc.h"
 #include "external/cc.h"
 #include "triple/triple.h"
 #include "sp/io.h"
@@ -305,8 +303,7 @@ void spn_cc_target_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp
       sp_ps_config_add_arg(mem, ps, sp_str_lit("-Wl,--import-symbols"));
       break;
     }
-    case SPN_CC_OUTPUT_STATIC_LIB:
-    case SPN_CC_OUTPUT_JIT: {
+    case SPN_CC_OUTPUT_STATIC_LIB: {
       break;
     }
   }
@@ -341,51 +338,6 @@ void spn_cc_target_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp
   sp_ps_config_add_arg(mem, ps, sp_str_lit("-Werror=return-type"));
   sp_ps_config_add_arg(mem, ps, sp_str_lit("-o"));
   sp_ps_config_add_arg(mem, ps, sp_fs_join_path(mem, cc->dir, target->output));
-}
-
-spn_err_t spn_cc_target_to_tcc(spn_cc_t* cc, spn_cc_target_t* target, spn_tcc_t* tcc) {
-  if (!sp_str_empty(cc->spn.runtime)) {
-    spn_tcc_set_runtime(tcc, cc->spn.runtime);
-  }
-
-  if (!sp_str_empty(cc->spn.include)) {
-    spn_try(spn_tcc_add_sys_include(tcc, cc->spn.include));
-  }
-
-  tcc_set_options(tcc->s, "-gdwarf -Wall -Werror");
-  spn_try_as(tcc_set_output_type(tcc->s, TCC_OUTPUT_MEMORY), SPN_ERROR);
-  tcc_define_symbol(tcc->s, "SPN", "");
-  spn_try(spn_tcc_register(tcc));
-
-  sp_da_for(cc->include, it) {
-    spn_try(spn_tcc_add_include(tcc, cc->include[it]));
-  }
-
-  sp_da_for(cc->define, it) {
-    spn_tcc_define_symbol(tcc, cc->define[it], sp_str_lit(""));
-  }
-
-  sp_da_for(target->include, it) {
-    spn_try(spn_tcc_add_include(tcc, target->include[it]));
-  }
-
-  sp_da_for(target->define, it) {
-    spn_tcc_define_symbol(tcc, target->define[it], sp_str_lit(""));
-  }
-
-  sp_da_for(target->lib_dirs, it) {
-    spn_tcc_add_library_path(tcc, target->lib_dirs[it]);
-  }
-
-  sp_da_for(target->libs, it) {
-    spn_try(spn_tcc_add_file(tcc, target->libs[it]));
-  }
-
-  sp_da_for(target->source, it) {
-    spn_try(spn_tcc_add_file(tcc, target->source[it]));
-  }
-
-  return SPN_OK;
 }
 
 spn_cc_run_t spn_cc_target_run(spn_cc_target_t* target, sp_str_t cwd) {

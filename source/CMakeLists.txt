@@ -34,7 +34,6 @@ set(SPN_SOURCES
   external/git.c
   external/mz.c
   external/obj.c
-  external/tcc.c
   external/tom.c
   external/wasm/abi.c
   external/wasm/wasm.c
