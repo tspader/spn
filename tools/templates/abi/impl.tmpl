@@ -15,7 +15,7 @@ typedef c8 spn_abi_assert_wire_{{ .name }} [(sizeof({{ .wire_type }}) == {{ .siz
 {{ end }}
 
 {{ for .types }}
-static bool spn_wire_{{ .name }}_read(spn_abi_ctx_t* abi, const spn_wire_{{ .name }}_t* wire, {{ .type }}* out) {
+static bool spn_wire_{{ .name }}_read(spn_wasm_ctx_t* abi, const spn_wire_{{ .name }}_t* wire, {{ .type }}* out) {
 {{ for .fields }}
 {{ $read }}
 {{ end }}
@@ -25,15 +25,15 @@ static bool spn_wire_{{ .name }}_read(spn_abi_ctx_t* abi, const spn_wire_{{ .nam
 {{ end }}
 {{ for .functions }}
 static s32 spn_abi_thunk_{{ .name }}(wasm_exec_env_t env, u32 ctx, u32 addr) {
-  spn_abi_ctx_t abi = {
-    .inst = wasm_runtime_get_module_inst(env),
-    .table = wasm_runtime_get_user_data(env),
+  spn_wasm_ctx_t abi = {
+    .instance = wasm_runtime_get_module_inst(env),
+    .handles = wasm_runtime_get_user_data(env),
   };
 
-  spn_t* spn = spn_abi_table_get(abi.table, ctx, SPN_ABI_KIND_CTX);
+  spn_t* spn = spn_wasm_resolve_handle(abi.handles, ctx, SPN_ABI_KIND_CTX);
   if (!spn) return SPN_ERROR;
 
-  const spn_wire_{{ .name }}_t* wire = spn_abi_deref(&abi, addr, sizeof(spn_wire_{{ .name }}_t));
+  const spn_wire_{{ .name }}_t* wire = spn_wasm_resolve_guest_ptr(&abi, addr, sizeof(spn_wire_{{ .name }}_t));
   if (!wire) return SPN_ERROR;
 
   {{ .type }} {{ .name }} = sp_zero;
@@ -46,7 +46,7 @@ static s32 spn_abi_thunk_{{ .name }}(wasm_exec_env_t env, u32 ctx, u32 addr) {
 {{ for .fns }}
 {{ .thunk }}
 {{ end }}
-bool spn_abi_register(void) {
+bool spn_wasm_register_api(void) {
   static NativeSymbol natives [] = {
 {{ for .fns }}
     { "{{ .name }}", spn_abi_thunk_{{ .short }}, "{{ .sig }}", SP_NULLPTR },

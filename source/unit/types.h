@@ -34,8 +34,8 @@ struct spn_node_ctx_t {
 struct spn_user_node_t {
   spn_pkg_unit_t* pkg;
   sp_str_t tag;
-  spn_node_fn_t fn;
-  u32 wasm_fn;
+  sp_str_t fn;
+  bool wasm;
   void* user_data;
   sp_da(sp_str_t) inputs;
   sp_da(sp_str_t) outputs;
@@ -220,6 +220,7 @@ struct spn_pkg_unit_t {
   struct {
     spn_wasm_script_t* configure;
     spn_wasm_script_t* build;
+    sp_mutex_t mutex;
   } wasm;
 
   sp_atomic_s32_t compile_announced;

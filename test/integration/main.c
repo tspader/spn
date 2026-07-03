@@ -873,7 +873,7 @@ UTEST_F(spn_build, api_configure_table) {
     .project = "test/fixtures/api/configure_table",
     .copy = { "tools", "include" },
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .env = { "SPN_USE_WASM=1" } } },
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_RUN_BIN, .bin.name = "configure_table" },
     },
   });
@@ -885,7 +885,7 @@ UTEST_F(spn_build, api_configure_error) {
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/fixtures/api/configure_error",
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .env = { "SPN_USE_WASM=1" }, .rc = 1 } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err" } },
     },
   });
@@ -898,9 +898,27 @@ UTEST_F(spn_build, api_build_script) {
     .project = "test/fixtures/api/build_script",
     .copy = { "tools", "include", "vendor" },
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .env = { "SPN_USE_WASM=1" } } },
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("version.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "build_script" },
+      // The node fn lives in the build module; when only the node's output is
+      // stale, the module compile is skipped and the fn must still resolve
+      { .kind = ACTION_REMOVE_FILE, .rm.file = "build/debug/work/build_script/version.h" },
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/build_script/version.h") },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_default_script) {
+  tmpfs_init_named(&uf->fixture.fs, "api_default_script");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/default_script",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("version.h") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "default_script" },
     },
   });
 }

@@ -28,25 +28,21 @@ spn_wasm_module_t* spn_wasm_get_module(spn_wasm_t* wasm, sp_str_t path) {
 }
 
 spn_err_t spn_wasm_load_module(spn_wasm_t* wasm, sp_str_t path, spn_wasm_module_t** module) {
-  spn_err_t err = SPN_OK;
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-
+  // WAMR keeps referencing the module blob after load in interpreter mode, so
+  // it has to live as long as the module does
   sp_str_t blob = sp_zero;
-  if (sp_io_read_file(s.mem, path, &blob)) {
-    err = SPN_ERR_WASM_MODULE_LOAD_FAILED; goto done;
+  if (sp_io_read_file(wasm->mem, path, &blob)) {
+    return SPN_ERR_WASM_MODULE_LOAD_FAILED;
   }
 
   c8 error [128] = sp_zero;
   *module = wasm_runtime_load((u8*)blob.data, blob.len, error, sizeof(error));
   if (!*module) {
-    err = SPN_ERR_WASM_MODULE_LOAD_FAILED; goto done;
+    return SPN_ERR_WASM_MODULE_LOAD_FAILED;
   }
 
   sp_om_insert(wasm->modules, path, *module);
-
-done:
-  sp_mem_end_scratch(s);
-  return err;
+  return SPN_OK;
 }
 
 void spn_wasm_pkg_init(spn_wasm_pkg_t* wasm) {
@@ -62,8 +58,8 @@ spn_err_t spn_wasm_instantiate_module(spn_wasm_t* wasm, spn_wasm_module_t* modul
   pkg.instance = wasm_runtime_instantiate(module, SPN_WASM_STACK_SIZE, SPN_WASM_HEAP_SIZE, error, sizeof(error));
   if (!pkg.instance) return SPN_ERR_WASM_MODULE_INSTANCE_FAILED;
 
-  pkg.ctx = wasm_runtime_create_exec_env(pkg.instance, SPN_WASM_STACK_SIZE);
-  if (!pkg.ctx) return SPN_ERR_WASM_CTX_FAILED;
+  pkg.exec = wasm_runtime_create_exec_env(pkg.instance, SPN_WASM_STACK_SIZE);
+  if (!pkg.exec) return SPN_ERR_WASM_CTX_FAILED;
 
   s32 count = wasm_runtime_get_export_count(module);
   if (count < 0) return SPN_ERR_WASM_CTX_FAILED;
@@ -99,15 +95,17 @@ spn_err_t spn_wasm_init_stupid_global_runtime() {
     return SPN_ERR_WASM_INIT_FAILED;
   }
 
-  if (!spn_abi_register()) {
+  if (!spn_wasm_register_api()) {
     return SPN_ERR_WASM_REGISTER_FAILED;
   }
 
   return SPN_OK;
 }
 
+// Package scripts run as wasm, period. SPN_USE_TCC resurrects the TCC JIT
+// path for the transition; it dies with the TCC script machinery.
 bool spn_wasm_enabled(void) {
-  return !sp_str_empty(sp_env_get(spn.env, sp_str_lit("SPN_USE_WASM")));
+  return sp_str_empty(sp_env_get(spn.env, sp_str_lit("SPN_USE_TCC")));
 }
 
 static spn_err_t spn_wasm_script_fail(spn_pkg_unit_t* unit, spn_err_t err, spn_err_wasm_t wasm) {
@@ -151,22 +149,24 @@ spn_err_t spn_wasm_script_open(spn_wasm_script_t** out, spn_pkg_unit_t* unit, sp
 
   spn_err_t err = SPN_OK;
   c8 error [128] = sp_zero;
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
   spn_wasm_script_t* script = sp_alloc_type(spn.mem, spn_wasm_script_t);
-  *script = sp_zero_s(spn_wasm_script_t);
   script->path = sp_str_copy(spn.mem, path);
   sp_mutex_init(&script->mutex, SP_MUTEX_PLAIN);
-  script->table = sp_alloc_type(spn.mem, spn_abi_table_t);
-  spn_abi_table_init(script->table, spn.mem);
-  script->ctx = spn_abi_table_add(script->table, unit, SPN_ABI_KIND_CTX);
+  script->table = sp_alloc_type(spn.mem, spn_wasm_handles_t);
+  script->table->next = 0;
+  sp_ht_init(spn.mem, script->table->map);
+
+  script->ctx = spn_wasm_add_handle(script->table, unit, SPN_ABI_KIND_CTX);
 
   if (!wasm_runtime_init_thread_env()) {
     err = SPN_ERR_WASM_THREAD_ENV_FAILED; goto done;
   }
 
+  // WAMR keeps referencing the module blob after load in interpreter mode, so
+  // it has to live as long as the module does
   sp_str_t blob = sp_zero;
-  if (sp_io_read_file(scratch.mem, path, &blob)) {
+  if (sp_io_read_file(spn.mem, path, &blob)) {
     err = SPN_ERR_WASM_READ_FAILED; goto done;
   }
 
@@ -183,7 +183,6 @@ spn_err_t spn_wasm_script_open(spn_wasm_script_t** out, spn_pkg_unit_t* unit, sp
   }
 
 done:
-  sp_mem_end_scratch(scratch);
   if (err) {
     if (script->module) wasm_runtime_unload(script->module);
     return spn_wasm_script_fail(unit, err, (spn_err_wasm_t) {
@@ -230,10 +229,29 @@ spn_err_t spn_wasm_script_call_hook(spn_wasm_script_t* script, spn_pkg_unit_t* u
   return err;
 }
 
+bool spn_wasm_script_has_node_fn(spn_wasm_script_t* script, spn_user_node_t* node) {
+  if (!script || sp_str_empty(node->fn)) return false;
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  bool has = spn_wasm_script_has(script, sp_str_to_cstr(scratch.mem, node->fn));
+  sp_mem_end_scratch(scratch);
+  return has;
+}
+
 spn_err_t spn_wasm_script_call_node(spn_wasm_script_t* script, spn_user_node_t* node) {
   spn_pkg_unit_t* unit = node->pkg;
   if (!script) {
-    return spn_wasm_script_fail(unit, SPN_ERR_WASM_NO_SCRIPT, (spn_err_wasm_t) sp_zero);
+    return spn_wasm_script_fail(unit, SPN_ERR_WASM_NO_SCRIPT, (spn_err_wasm_t) { .error = node->fn });
+  }
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  wasm_function_inst_t fn = wasm_runtime_lookup_function(script->instance, sp_str_to_cstr(scratch.mem, node->fn));
+  sp_mem_end_scratch(scratch);
+  if (!fn) {
+    return spn_wasm_script_fail(unit, SPN_ERR_WASM_EXPORT_NOT_FOUND, (spn_err_wasm_t) {
+      .path = script->path,
+      .error = node->fn,
+    });
   }
 
   wasm_exec_env_t env = spn_wasm_script_enter(script);
@@ -243,20 +261,29 @@ spn_err_t spn_wasm_script_call_node(spn_wasm_script_t* script, spn_user_node_t* 
 
   spn_err_t err = SPN_OK;
 
-  u32 argv [2] = { script->ctx, 0 };
-  if (!wasm_runtime_call_indirect(env, node->wasm_fn, sp_carr_len(argv), argv)) {
+  // The script mutex is held, so the table add can't race other script calls
+  spn_node_ctx_t node_ctx = { .user_data = node->user_data };
+  u32 token = spn_wasm_add_handle(script->table, &node_ctx, SPN_ABI_KIND_NODE_CTX);
+
+  wasm_val_t args [2] = {
+    { .kind = WASM_I32, .of.i32 = (s32)script->ctx },
+    { .kind = WASM_I32, .of.i32 = (s32)token },
+  };
+  wasm_val_t results [1] = sp_zero;
+  if (!wasm_runtime_call_wasm_a(env, fn, 1, results, sp_carr_len(args), args)) {
     err = spn_wasm_script_fail(unit, SPN_ERR_WASM_MODULE_CALL_FAILED, (spn_err_wasm_t) {
       .path = script->path,
       .error = sp_cstr_as_str(wasm_runtime_get_exception(script->instance)),
     });
   }
-  else if ((s32)argv[0]) {
+  else if (results[0].of.i32) {
     err = spn_wasm_script_fail(unit, SPN_ERR_WASM_SCRIPT_ERROR, (spn_err_wasm_t) {
       .path = script->path,
-      .rc = (s32)argv[0],
+      .rc = results[0].of.i32,
     });
   }
 
+  spn_wasm_remove_handle(script->table, token);
   spn_wasm_script_exit(script, env);
   return err;
 }
@@ -273,7 +300,7 @@ spn_err_t spn_wasm_smoke(sp_mem_t mem, sp_intern_t* interner, sp_str_t path) {
 
   spn_wasm_fn_t** fn = sp_str_om_get(pkg.functions, sp_str_lit("configure"));
   wasm_val_t results [1] = sp_zero;
-  if (!wasm_runtime_call_wasm_a(pkg.ctx, *fn, 1, results, 0, SP_NULLPTR)) {
+  if (!wasm_runtime_call_wasm_a(pkg.exec, *fn, 1, results, 0, SP_NULLPTR)) {
     return SPN_ERR_WASM_MODULE_CALL_FAILED;
   }
 

@@ -212,6 +212,7 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   unit->paths.generated = sp_fs_join_path(session->mem, unit->paths.work, SP_LIT("spn"));
   unit->paths.wasm.configure = sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("configure.wasm"));
   unit->paths.wasm.build = sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("build.wasm"));
+  sp_mutex_init(&unit->wasm.mutex, SP_MUTEX_PLAIN);
 
   unit->logs.build = sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(unit->info->name)).value;
   unit->logs.test = sp_fmt(session->mem, "{}.test.log", SP_FMT_STR(unit->info->name)).value;

@@ -1,3 +1,4 @@
+#include "forward/types.h"
 #include "sp/macro.h"
 #include "sp.h"
 #include "spn.h"
@@ -101,20 +102,6 @@ static s32 run_argv(spn_pkg_unit_t* unit, spn_toolchain_launcher_t* launcher, co
   s32 exit_code = result.status.exit_code;
   sp_mem_end_scratch(scratch);
   return exit_code;
-}
-
-s32 spn_exec(spn_t* s, const c8** args) {
-  return run_argv(spn_api_unit(s), SP_NULLPTR, args);
-}
-
-s32 spn_cc(spn_t* s, const c8** args) {
-  spn_pkg_unit_t* unit = spn_api_unit(s);
-  return run_argv(unit, &unit->session->units.toolchain->compiler, args);
-}
-
-s32 spn_ar(spn_t* s, const c8** args) {
-  spn_pkg_unit_t* unit = spn_api_unit(s);
-  return run_argv(unit, &unit->session->units.toolchain->archiver, args);
 }
 
 static spn_target_t* wrap_target(const void* opaque, spn_target_info_t* info) {
@@ -256,7 +243,8 @@ s32 spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir
 }
 
 spn_profile_t* spn_get_profile(spn_t* s) {
-  return (spn_profile_t*)&spn_api_unit(s)->session->profile;
+  spn_pkg_unit_t* unit = sp_ptr_cast(spn_pkg_unit_t*, s);
+  return sp_ptr_cast(spn_profile_t*, &unit->session->profile);
 }
 
 spn_libc_kind_t spn_profile_get_libc(spn_profile_t* profile) {

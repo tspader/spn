@@ -10,13 +10,13 @@ typedef struct wasm_trap_t wasm_trap_t;
 typedef struct wasm_extern_vec_t wasm_extern_vec_t;
 typedef struct WASMModuleCommon spn_wasm_module_t;
 typedef struct WASMModuleInstanceCommon spn_wasm_module_instance_t;
-typedef struct WASMExecEnv spn_wasm_ctx_t;
+typedef struct WASMExecEnv spn_wasm_exec_t;
 typedef struct WASMFunctionInstanceCommon spn_wasm_fn_t;
 
-typedef struct spn_abi_table_t spn_abi_table_t;
+typedef struct spn_wasm_handles_t spn_wasm_handles_t;
 
 typedef struct {
-  spn_wasm_ctx_t* ctx;
+  spn_wasm_exec_t* exec;
   spn_wasm_module_instance_t* instance;
   sp_om(sp_str_t, spn_wasm_fn_t*) functions;
 } spn_wasm_pkg_t;
@@ -24,7 +24,7 @@ typedef struct {
 typedef struct {
   spn_wasm_module_t* module;
   spn_wasm_module_instance_t* instance;
-  spn_abi_table_t* table;
+  spn_wasm_handles_t* table;
   u32 ctx;
   sp_str_t path;
   sp_mutex_t mutex;

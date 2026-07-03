@@ -65,3 +65,8 @@ flags = [
   "-Wno-unused-variable",
   "-Wno-unused-parameter",
 ]
+
+[publish]
+copy = [
+  { from = "source/core/iwasm/include/*.h", to = "include" },
+]
