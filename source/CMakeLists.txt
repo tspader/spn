@@ -112,8 +112,8 @@ target_include_directories(spn PRIVATE
   ${SRC}/codegen/gen
   ${STORE}/include
 )
-target_link_libraries(spn PRIVATE m vmlib ${TCC_LIB} yyjson)
-add_dependencies(spn headers tcc spn_embed spn_codegen_gen)
+target_link_libraries(spn PRIVATE m vmlib yyjson)
+add_dependencies(spn headers spn_embed spn_codegen_gen)
 
 set_source_files_properties(${EMBED_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 target_sources(spn PRIVATE ${EMBED_OBJ})

@@ -14,7 +14,6 @@ source = ["tools/spn/build.c"]
 include = ["include", "source/codegen/gen"]
 
 [deps.package]
-"spader/spcc" = "1.0.2"
 "spader/sp" = "3.0.0"
 "spader/wamr" = "file://./vendor/wamr/spn.toml"
 toml = "1.4.0"
