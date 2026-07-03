@@ -158,6 +158,22 @@ UTEST_F(spn_build, file_package) {
   });
 }
 
+UTEST_F(spn_build, publish) {
+  tmpfs_init_named(&uf->fixture.fs, "publish");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/publish",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit.h") },
+      { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit/a.h") },
+      { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit/b.h") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "publish" },
+    },
+  });
+}
+
 UTEST_F(spn_build, path_dep_remote_source) {
   tmpfs_init_named(&uf->fixture.fs, "path_dep_remote_source");
 

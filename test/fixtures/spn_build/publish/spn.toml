@@ -1,0 +1,10 @@
+[package]
+name = "publish"
+version = "0.1.0"
+
+[deps.package]
+kit = "file://./packages/kit/spn.toml"
+
+[[bin]]
+name = "publish"
+source = ["main.c"]
