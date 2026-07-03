@@ -169,6 +169,15 @@ spn_err_t spn_wasm_script_open(spn_wasm_script_t** out, spn_pkg_unit_t* unit, sp
     err = SPN_ERR_WASM_MODULE_LOAD_FAILED; goto done;
   }
 
+  sp_fs_create_dir(unit->paths.work);
+  sp_fs_create_dir(unit->paths.store);
+
+  const c8** preopens = (const c8**)sp_alloc(spn.mem, 3 * sizeof(c8*));
+  preopens[0] = sp_str_to_cstr(spn.mem, sp_fmt(spn.mem, "/work::{}", sp_fmt_str(unit->paths.work)).value);
+  preopens[1] = sp_str_to_cstr(spn.mem, sp_fmt(spn.mem, "/source::{}", sp_fmt_str(unit->paths.source)).value);
+  preopens[2] = sp_str_to_cstr(spn.mem, sp_fmt(spn.mem, "/store::{}", sp_fmt_str(unit->paths.store)).value);
+  wasm_runtime_set_wasi_args(script->module, SP_NULLPTR, 0, preopens, 3, SP_NULLPTR, 0, SP_NULLPTR, 0);
+
   // WAMR runs _initialize during instantiation for WASI reactor modules;
   // calling it again trips wasi-libc's double-init trap
   script->instance = wasm_runtime_instantiate(script->module, SPN_WASM_STACK_SIZE, SPN_WASM_HEAP_SIZE, error, sizeof(error));
