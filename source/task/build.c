@@ -9,6 +9,7 @@
 
 #include "app/app.h"
 #include "error/types.h"
+#include "external/wasm/wasm.h"
 #include "graph/graph.h"
 #include "event/event.h"
 #include "session/session.h"
@@ -423,6 +424,20 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   spn_try(spn_bg_cmd_add_output(graph, nodes->exit, nodes->stamp.exit));
   spn_try(spn_bg_cmd_add_input(graph, nodes->package, nodes->stamp.exit));
   spn_try(spn_bg_cmd_add_output(graph, nodes->package, nodes->stamp.package));
+
+  if (spn_wasm_enabled() && sp_fs_is_file(unit->paths.build)) {
+    nodes->build_script.run = spn_bg_add_fn(graph, compile_build_script, unit);
+    nodes->build_script.module = spn_bg_add_file(graph, unit->paths.wasm.build);
+
+    spn_try(spn_bg_cmd_add_output(graph, nodes->build_script.run, nodes->build_script.module));
+    spn_try(spn_bg_cmd_add_input(graph, nodes->build_script.run, nodes->stamp.exit));
+    sp_da_for(unit->info->build.source, it) {
+      spn_bg_id_t source = get_or_put_user_file(unit, graph, unit->info->build.source[it]);
+      spn_try(spn_bg_cmd_add_input(graph, nodes->build_script.run, source));
+    }
+
+    spn_try(spn_bg_cmd_add_input(graph, nodes->package, nodes->build_script.module));
+  }
 
 
   // user nodes

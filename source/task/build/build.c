@@ -1,46 +1,91 @@
 #include "sp.h"
 #include "sp/macro.h"
 #include "cc.h"
+#include "ctx/types.h"
 #include "error/types.h"
+#include "event/types.h"
 #include "forward/types.h"
 #include "unit/types.h"
 
 #include "gen.h"
 #include "enum/enum.h"
+#include "event/event.h"
 #include "filter/filter.h"
 #include "pkg/types.h"
 #include "session/session.h"
 #include "target/closure.h"
 #include "task/build/build.h"
 
-// Manifest includes are source-relative; the build script API hands us absolute paths
-static sp_str_t resolve_pkg_include(sp_mem_t mem, spn_pkg_unit_t* pkg, sp_str_t include) {
-  if (sp_str_starts_with(include, sp_str_lit("/"))) return include;
-  return sp_fs_join_path(mem, pkg->paths.source, include);
+// Build deps are usable from configure and build scripts, so compile against them
+void spn_cc_target_add_build_deps(spn_cc_target_t* target, spn_pkg_unit_t* unit) {
+  spn_session_t* session = unit->session;
+
+  sp_ht_for_kv(unit->info->deps, it) {
+    spn_requested_pkg_t* dep = it.val;
+    if (dep->kind != SPN_DEP_KIND_BUILD) continue;
+
+    spn_pkg_unit_t* dep_unit = spn_session_find_pkg_by_qualified(session, dep->qualified);
+    if (!dep_unit) continue;
+
+    spn_cc_target_add_absolute_include(target, dep_unit->paths.include);
+    spn_cc_target_add_absolute_include(target, dep_unit->paths.source);
+  }
 }
 
-void add_pkg_to_cc(spn_cc_t* cc, spn_pkg_unit_t* pkg) {
-  sp_da_for(pkg->info->include, it) {
-    spn_cc_add_include(cc, resolve_pkg_include(cc->mem, pkg, pkg->info->include[it]));
+spn_err_t spn_compile_script_module(spn_pkg_unit_t* unit, spn_target_info_t* script, sp_str_t output) {
+  spn_session_t* session = unit->session;
+
+  spn_cc_t* cc = sp_alloc_type(spn.mem, spn_cc_t);
+  spn_cc_init(cc, spn.mem);
+  spn_cc_set_profile(cc, (spn_profile_info_t) {
+    .arch = SPN_ARCH_WASM32,
+    .os = SPN_OS_WASI,
+    .abi = SPN_ABI_NONE,
+    .mode = SPN_BUILD_MODE_DEBUG,
+    .linkage = SPN_LIB_KIND_SHARED,
+    .standard = SPN_C99
+  });
+  spn_cc_set_output_dir(cc, sp_fs_parent_path(output));
+  spn_cc_set_toolchain(cc, session->units.script);
+  spn_cc_add_include(cc, spn.paths.include);
+
+  spn_cc_target_t* target = spn_cc_add_target(cc, SPN_CC_OUTPUT_WASM, sp_fs_get_name(output));
+  sp_da_for(script->source, it) {
+    spn_cc_target_add_absolute_source(target, script->source[it]);
+  }
+  spn_cc_target_add_info(target, unit, script);
+  spn_cc_target_add_build_deps(target, unit);
+
+  spn_cc_run_t run = spn_cc_target_run(target, unit->paths.work);
+
+  sp_str_t source = sp_da_empty(script->source) ? sp_str_lit("") : script->source[0];
+  if (run.result.status.exit_code) {
+    spn_event_buffer_push_ex(session->events, unit->info, &unit->logs.io, (spn_build_event_t) {
+      .kind = SPN_EVENT_TARGET_BUILD_FAILED,
+      .target.failed = {
+        .source_file = source,
+        .object_file = output,
+        .rc = run.result.status.exit_code,
+        .out = run.result.out,
+        .args = run.args,
+        .time = run.elapsed,
+      }
+    });
+    return SPN_ERROR;
   }
 
-  sp_da_for(pkg->info->define, it) {
-    spn_cc_add_define(cc, pkg->info->define[it]);
-  }
-}
+  spn_event_buffer_push_ex(session->events, unit->info, &unit->logs.io, (spn_build_event_t) {
+    .kind = SPN_EVENT_TARGET_BUILD_PASSED,
+    .target.passed = {
+      .source_file = source,
+      .object_file = output,
+      .args = run.args,
+      .out = run.result.out,
+      .time = run.elapsed,
+    }
+  });
 
-void add_pkg_to_cc_target(spn_cc_target_t* target, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
-  sp_da_for(info->include, i) {
-    spn_cc_target_add_absolute_include(target, resolve_pkg_include(target->cc->mem, pkg, info->include[i]));
-  }
-
-  sp_da_for(info->define, i) {
-    spn_cc_target_add_define(target, info->define[i]);
-  }
-
-  sp_da_for(info->flags, i) {
-    spn_cc_target_add_flag(target, info->flags[i]);
-  }
+  return SPN_OK;
 }
 
 void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {

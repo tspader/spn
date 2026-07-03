@@ -9,6 +9,7 @@
 #include "graph/types.h"
 #include "intern/types.h"
 #include "external/tcc/types.h"
+#include "external/wasm/types.h"
 #include "log/lazy/types.h"
 
 typedef struct {
@@ -102,6 +103,10 @@ typedef struct {
     spn_bg_id_t main;
     spn_bg_id_t exit;
   } stamp;
+  struct {
+    spn_bg_id_t run;
+    spn_bg_id_t module;
+  } build_script;
   sp_da(spn_bg_id_t) user;
 } spn_pkg_nodes_t;
 
@@ -172,6 +177,11 @@ struct spn_pkg_unit_t {
 
     spn_build_log_paths_t logs;
 
+    struct {
+      sp_str_t configure;
+      sp_str_t build;
+    } wasm;
+
     sp_str_t manifest;
     sp_str_t script;
     sp_str_t configure;
@@ -206,6 +216,12 @@ struct spn_pkg_unit_t {
   spn_tcc_t* tcc;
   spn_configure_fn_t on_configure;
   spn_package_fn_t on_package;
+
+  struct {
+    spn_wasm_script_t* configure;
+    spn_wasm_script_t* build;
+  } wasm;
+
   sp_atomic_s32_t compile_announced;
 };
 

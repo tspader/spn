@@ -111,6 +111,8 @@ void             spn_cc_set_output_dir(spn_cc_t* cc, sp_str_t dir);
 void             spn_cc_add_include(spn_cc_t* cc, sp_str_t dir);
 void             spn_cc_add_relative_include(spn_cc_t* cc, sp_str_t dir);
 void             spn_cc_add_define(spn_cc_t* cc, sp_str_t var);
+void             spn_cc_add_pkg(spn_cc_t* cc, spn_pkg_unit_t* pkg);
+void             spn_cc_target_add_info(spn_cc_target_t* target, spn_pkg_unit_t* pkg, spn_target_info_t* info);
 spn_cc_target_t* spn_cc_add_target(spn_cc_t* cc, spn_cc_output_kind_t kind, sp_str_t name);
 void             spn_cc_target_add_relative_source(spn_cc_target_t* cc, sp_str_t path);
 void             spn_cc_target_add_absolute_source(spn_cc_target_t* cc, sp_str_t path);

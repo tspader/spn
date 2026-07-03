@@ -49,6 +49,36 @@ void spn_cc_add_include(spn_cc_t* cc, sp_str_t dir) {
   sp_da_push(cc->include, dir);
 }
 
+// Manifest paths are source-relative; the build script API hands us absolute paths
+static sp_str_t spn_cc_resolve_pkg_path(sp_mem_t mem, spn_pkg_unit_t* pkg, sp_str_t path) {
+  if (sp_str_starts_with(path, sp_str_lit("/"))) return path;
+  return sp_fs_join_path(mem, pkg->paths.source, path);
+}
+
+void spn_cc_add_pkg(spn_cc_t* cc, spn_pkg_unit_t* pkg) {
+  sp_da_for(pkg->info->include, it) {
+    spn_cc_add_include(cc, spn_cc_resolve_pkg_path(cc->mem, pkg, pkg->info->include[it]));
+  }
+
+  sp_da_for(pkg->info->define, it) {
+    spn_cc_add_define(cc, pkg->info->define[it]);
+  }
+}
+
+void spn_cc_target_add_info(spn_cc_target_t* target, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
+  sp_da_for(info->include, it) {
+    spn_cc_target_add_absolute_include(target, spn_cc_resolve_pkg_path(target->cc->mem, pkg, info->include[it]));
+  }
+
+  sp_da_for(info->define, it) {
+    spn_cc_target_add_define(target, info->define[it]);
+  }
+
+  sp_da_for(info->flags, it) {
+    spn_cc_target_add_flag(target, info->flags[it]);
+  }
+}
+
 void spn_cc_add_relative_include(spn_cc_t* cc, sp_str_t dir) {
   sp_broken();
 }

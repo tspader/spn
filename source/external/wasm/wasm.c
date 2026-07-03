@@ -3,7 +3,6 @@
 #include "error/types.h"
 #include "intern/intern.h"
 
-#include "sp/macro.h"
 #include "spn.h"
 #include "sp/sp_om.h"
 #include "ctx/types.h"
@@ -107,83 +106,158 @@ spn_err_t spn_wasm_init_stupid_global_runtime() {
   return SPN_OK;
 }
 
-spn_err_t spn_wasm_run_configure(spn_pkg_unit_t* unit) {
-  // wasm_runtime_thread_env_inited lies in interpreter-only builds (the signal
-  // env check is compiled out with AOT), so init unconditionally; it's a no-op
-  // on a thread that's already set up
-  if (!wasm_runtime_init_thread_env()) {
-    return SPN_ERR_WASM_CTX_FAILED;
+bool spn_wasm_enabled(void) {
+  return !sp_str_empty(sp_env_get(spn.env, sp_str_lit("SPN_USE_WASM")));
+}
+
+static spn_err_t spn_wasm_script_fail(spn_pkg_unit_t* unit, spn_err_t err, spn_err_wasm_t wasm) {
+  wasm.path = sp_str_copy(spn.mem, wasm.path);
+  wasm.error = sp_str_copy(spn.mem, wasm.error);
+  spn_event_buffer_push_ex(spn.events, unit->info, &unit->logs.io, (spn_build_event_t) {
+    .kind = SPN_EVENT_ERR,
+    .err = { .kind = err, .wasm = wasm },
+  });
+  return err;
+}
+
+// wasm_runtime_thread_env_inited lies in interpreter-only builds (the signal
+// env check is compiled out with AOT), so init unconditionally; it's a no-op
+// on a thread that's already set up. Scripts open on a configure worker and
+// their node fns run later on build workers, so every entry point re-inits.
+static wasm_exec_env_t spn_wasm_script_enter(spn_wasm_script_t* script) {
+  sp_mutex_lock(&script->mutex);
+
+  wasm_exec_env_t env = SP_NULLPTR;
+  if (wasm_runtime_init_thread_env()) {
+    env = wasm_runtime_create_exec_env(script->instance, SPN_WASM_STACK_SIZE);
   }
 
+  if (!env) {
+    sp_mutex_unlock(&script->mutex);
+    return SP_NULLPTR;
+  }
+
+  wasm_runtime_set_user_data(env, script->table);
+  return env;
+}
+
+static void spn_wasm_script_exit(spn_wasm_script_t* script, wasm_exec_env_t env) {
+  wasm_runtime_destroy_exec_env(env);
+  sp_mutex_unlock(&script->mutex);
+}
+
+spn_err_t spn_wasm_script_open(spn_wasm_script_t** out, spn_pkg_unit_t* unit, sp_str_t path) {
+  if (*out) return SPN_OK;
+
   spn_err_t err = SPN_OK;
+  c8 error [128] = sp_zero;
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
-  wasm_module_t module = SP_NULLPTR;
-  wasm_module_inst_t instance = SP_NULLPTR;
-  wasm_exec_env_t env = SP_NULLPTR;
-  sp_str_t detail = sp_zero;
+  spn_wasm_script_t* script = sp_alloc_type(spn.mem, spn_wasm_script_t);
+  *script = sp_zero_s(spn_wasm_script_t);
+  script->path = sp_str_copy(spn.mem, path);
+  sp_mutex_init(&script->mutex, SP_MUTEX_PLAIN);
+  script->table = sp_alloc_type(spn.mem, spn_abi_table_t);
+  spn_abi_table_init(script->table, spn.mem);
+  script->ctx = spn_abi_table_add(script->table, unit, SPN_ABI_KIND_CTX);
 
-  sp_str_t path = sp_fs_join_path(scratch.mem, unit->paths.generated, sp_str_lit("configure.wasm"));
+  if (!wasm_runtime_init_thread_env()) {
+    err = SPN_ERR_WASM_THREAD_ENV_FAILED; goto done;
+  }
 
   sp_str_t blob = sp_zero;
   if (sp_io_read_file(scratch.mem, path, &blob)) {
-    detail = sp_str_lit("failed to read module");
+    err = SPN_ERR_WASM_READ_FAILED; goto done;
+  }
+
+  script->module = wasm_runtime_load((u8*)blob.data, blob.len, error, sizeof(error));
+  if (!script->module) {
     err = SPN_ERR_WASM_MODULE_LOAD_FAILED; goto done;
   }
-
-  c8 error [128] = sp_zero;
-  module = wasm_runtime_load((u8*)blob.data, blob.len, error, sizeof(error));
-  if (!module) {
-    detail = sp_str_copy(spn.mem, sp_cstr_as_str(error));
-    err = SPN_ERR_WASM_MODULE_LOAD_FAILED; goto done;
-  }
-
-  instance = wasm_runtime_instantiate(module, SPN_WASM_STACK_SIZE, SPN_WASM_HEAP_SIZE, error, sizeof(error));
-  if (!instance) {
-    detail = sp_str_copy(spn.mem, sp_cstr_as_str(error));
-    err = SPN_ERR_WASM_MODULE_INSTANCE_FAILED; goto done;
-  }
-
-  env = wasm_runtime_create_exec_env(instance, SPN_WASM_STACK_SIZE);
-  if (!env) {
-    detail = sp_str_lit("failed to create exec env");
-    err = SPN_ERR_WASM_CTX_FAILED; goto done;
-  }
-  spn_abi_table_t table;
-  spn_abi_table_init(&table, scratch.mem);
-  wasm_runtime_set_user_data(env, &table);
 
   // WAMR runs _initialize during instantiation for WASI reactor modules;
   // calling it again trips wasi-libc's double-init trap
-  wasm_function_inst_t configure = wasm_runtime_lookup_function(instance, "configure");
-  if (!configure) {
-    goto done;
-  }
-
-  wasm_val_t args [1] = { { .kind = WASM_I32, .of.i32 = (s32)spn_abi_table_add(&table, unit, SPN_ABI_KIND_CTX) } };
-  wasm_val_t results [1] = sp_zero;
-  if (!wasm_runtime_call_wasm_a(env, configure, 1, results, 1, args)) {
-    detail = sp_fmt(spn.mem, "configure: {}", sp_fmt_cstr(wasm_runtime_get_exception(instance))).value;
-    err = SPN_ERR_WASM_MODULE_CALL_FAILED; goto done;
-  }
-
-  if (results[0].of.i32 != SPN_OK) {
-    detail = sp_fmt(spn.mem, "configure returned {}", sp_fmt_int(results[0].of.i32)).value;
-    err = SPN_ERR_WASM_MODULE_CALL_FAILED; goto done;
+  script->instance = wasm_runtime_instantiate(script->module, SPN_WASM_STACK_SIZE, SPN_WASM_HEAP_SIZE, error, sizeof(error));
+  if (!script->instance) {
+    err = SPN_ERR_WASM_MODULE_INSTANCE_FAILED; goto done;
   }
 
 done:
+  sp_mem_end_scratch(scratch);
   if (err) {
-    spn_event_buffer_push_ex(spn.events, unit->info, &unit->logs.io, (spn_build_event_t) {
-      .kind = SPN_EVENT_BUILD_SCRIPT_CRASHED,
-      .crashed = { .path = sp_str_copy(spn.mem, path), .error = detail },
+    if (script->module) wasm_runtime_unload(script->module);
+    return spn_wasm_script_fail(unit, err, (spn_err_wasm_t) {
+      .path = path,
+      .error = sp_cstr_as_str(error),
     });
   }
-  if (env) wasm_runtime_destroy_exec_env(env);
-  if (instance) wasm_runtime_deinstantiate(instance);
-  if (module) wasm_runtime_unload(module);
-  wasm_runtime_destroy_thread_env();
-  sp_mem_end_scratch(scratch);
+
+  *out = script;
+  return SPN_OK;
+}
+
+bool spn_wasm_script_has(spn_wasm_script_t* script, const c8* name) {
+  return wasm_runtime_lookup_function(script->instance, name) != SP_NULLPTR;
+}
+
+spn_err_t spn_wasm_script_call_hook(spn_wasm_script_t* script, spn_pkg_unit_t* unit, const c8* name) {
+  wasm_function_inst_t fn = wasm_runtime_lookup_function(script->instance, name);
+  if (!fn) return SPN_OK;
+
+  wasm_exec_env_t env = spn_wasm_script_enter(script);
+  if (!env) {
+    return spn_wasm_script_fail(unit, SPN_ERR_WASM_CTX_FAILED, (spn_err_wasm_t) { .path = script->path });
+  }
+
+  spn_err_t err = SPN_OK;
+
+  wasm_val_t args [1] = { { .kind = WASM_I32, .of.i32 = (s32)script->ctx } };
+  wasm_val_t results [1] = sp_zero;
+  if (!wasm_runtime_call_wasm_a(env, fn, 1, results, 1, args)) {
+    err = spn_wasm_script_fail(unit, SPN_ERR_WASM_MODULE_CALL_FAILED, (spn_err_wasm_t) {
+      .path = script->path,
+      .error = sp_cstr_as_str(wasm_runtime_get_exception(script->instance)),
+    });
+  }
+  else if (results[0].of.i32 != SPN_OK) {
+    err = spn_wasm_script_fail(unit, SPN_ERR_WASM_SCRIPT_ERROR, (spn_err_wasm_t) {
+      .path = script->path,
+      .rc = results[0].of.i32,
+    });
+  }
+
+  spn_wasm_script_exit(script, env);
+  return err;
+}
+
+spn_err_t spn_wasm_script_call_node(spn_wasm_script_t* script, spn_user_node_t* node) {
+  spn_pkg_unit_t* unit = node->pkg;
+  if (!script) {
+    return spn_wasm_script_fail(unit, SPN_ERR_WASM_NO_SCRIPT, (spn_err_wasm_t) sp_zero);
+  }
+
+  wasm_exec_env_t env = spn_wasm_script_enter(script);
+  if (!env) {
+    return spn_wasm_script_fail(unit, SPN_ERR_WASM_CTX_FAILED, (spn_err_wasm_t) { .path = script->path });
+  }
+
+  spn_err_t err = SPN_OK;
+
+  u32 argv [2] = { script->ctx, 0 };
+  if (!wasm_runtime_call_indirect(env, node->wasm_fn, sp_carr_len(argv), argv)) {
+    err = spn_wasm_script_fail(unit, SPN_ERR_WASM_MODULE_CALL_FAILED, (spn_err_wasm_t) {
+      .path = script->path,
+      .error = sp_cstr_as_str(wasm_runtime_get_exception(script->instance)),
+    });
+  }
+  else if ((s32)argv[0]) {
+    err = spn_wasm_script_fail(unit, SPN_ERR_WASM_SCRIPT_ERROR, (spn_err_wasm_t) {
+      .path = script->path,
+      .rc = (s32)argv[0],
+    });
+  }
+
+  spn_wasm_script_exit(script, env);
   return err;
 }
 

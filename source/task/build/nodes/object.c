@@ -25,10 +25,10 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   spn_cc_set_profile(cc, session->profile);
   spn_cc_set_output_dir(cc, dir);
   spn_cc_set_toolchain(cc, unit->session->units.toolchain);
-  add_pkg_to_cc(cc, unit->package);
+  spn_cc_add_pkg(cc, unit->package);
 
   spn_cc_target_t* target = spn_cc_add_target(cc, SPN_CC_OUTPUT_OBJECT, file);
-  add_pkg_to_cc_target(target, unit->package, unit->target->info);
+  spn_cc_target_add_info(target, unit->package, unit->target->info);
 
   // Dependencies publish their headers into their store; compile against them
   sp_da(spn_pkg_unit_t*) deps = spn_session_pkg_deps(session, unit->package);

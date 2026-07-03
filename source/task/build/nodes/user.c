@@ -2,6 +2,7 @@
 
 #include "ctx/ctx.h"
 #include "event/event.h"
+#include "external/wasm/wasm.h"
 #include "unit/package.h"
 
 s32 run_user_fn(spn_bg_cmd_t* cmd, void* user_data) {
@@ -22,6 +23,9 @@ s32 run_user_fn(spn_bg_cmd_t* cmd, void* user_data) {
     };
 
     spn_try(node->fn((spn_t*)node->pkg, &ctx));
+  }
+  else if (node->wasm_fn) {
+    spn_try(spn_wasm_script_call_node(node->pkg->wasm.configure, node));
   }
 
   sp_str_t stamp = sp_fs_join_path(spn.mem, node->pkg->paths.stamp.dir, node->tag);
