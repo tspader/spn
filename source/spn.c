@@ -255,7 +255,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   sp_fs_create_dir(spn.paths.tools.dir);
 
   // @spader
-  // spn_extract_runtime()
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
@@ -265,6 +264,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     version = sp_str_trim(version);
   }
 
+  // @spader Use SHA256 for this
   // The stamp must change whenever the embedded runtime does, not just on
   // release; otherwise dev builds compile scripts against a stale extraction
   sp_hash_t runtime_hash = 0;
@@ -395,36 +395,37 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   sp_unreachable_return(SP_APP_ERR);
 }
 
+SP_PRIVATE u32 get_short_thread_id(u64 thread_id) {
+  // Give each unique OS thread ID a small, monotonic ID so it's easier
+  // to track when reading logs
+  static sp_ht(u64, u32) thread_map = SP_NULLPTR;
+  static u32 id = 0;
+
+  if (!thread_map) sp_ht_init(spn.heap, thread_map);
+  if (!sp_ht_key_exists(thread_map, thread_id)) {
+    sp_ht_insert(thread_map, thread_id, id++);
+  }
+  return *sp_ht_getp(thread_map, thread_id);
+}
+
 sp_app_result_t spn_poll(sp_app_t* sp) {
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_da(spn_build_event_t) events = spn_event_buffer_drain(scratch.mem, spn.events);
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  sp_da(spn_build_event_t) events = spn_event_buffer_drain(s.mem, spn.events);
 
   sp_da_for(events, it) {
     spn_build_event_t* event = &events[it];
+    event->thread_id = get_short_thread_id(event->thread_id);
 
-    // map raw thread IDs to short sequential IDs
-    {
-      static sp_ht(u64, u32) thread_map = SP_NULLPTR;
-      static u32 next_thread_id = 0;
-      if (!thread_map) sp_ht_init(spn.heap, thread_map);
-      if (!sp_ht_key_exists(thread_map, event->thread_id)) {
-        sp_ht_insert(thread_map, event->thread_id, next_thread_id++);
-      }
-      event->thread_id = *sp_ht_getp(thread_map, event->thread_id);
-    }
-
-    // write jsonl (all events, unfiltered)
     spn_event_log_jsonl(&spn.logger.jsonl.base, event);
     if (event->io) {
       spn_event_log_jsonl(&event->io->jsonl.writer, event);
       spn_event_log_build(&event->io->build.writer, event);
     }
 
-    // write to tui (filtered by verbosity inside the renderer)
     spn_tui_log_event(event);
   }
 
-  sp_mem_end_scratch(scratch);
+  sp_mem_end_scratch(s);
 
   spn_prompt_pump();
 
