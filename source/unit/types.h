@@ -34,6 +34,7 @@ struct spn_user_node_t {
   spn_pkg_unit_t* pkg;
   sp_str_t tag;
   spn_node_fn_t fn;
+  u32 wasm_fn;
   void* user_data;
   sp_da(sp_str_t) inputs;
   sp_da(sp_str_t) outputs;

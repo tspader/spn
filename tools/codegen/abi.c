@@ -1,5 +1,151 @@
 #include "codegen.h"
 
+typedef enum {
+  ABI_VAL_VOID = 0,
+  ABI_VAL_S32,
+  ABI_VAL_STR,
+  ABI_VAL_FN,
+  ABI_VAL_CTX,
+  ABI_VAL_TARGET,
+  ABI_VAL_NODE,
+  ABI_VAL_PROFILE,
+} abi_val_t;
+
+#define ABI_MAX_ARGS 6
+
+typedef struct {
+  const c8* name;
+  const c8* host;
+  abi_val_t ret;
+  abi_val_t args [ABI_MAX_ARGS];
+} abi_fn_t;
+
+static const abi_fn_t abi_fns [] = {
+  { .name = "spn_get_target",           .ret = ABI_VAL_TARGET,  .args = { ABI_VAL_CTX, ABI_VAL_STR } },
+  { .name = "spn_get_dep",              .ret = ABI_VAL_CTX,     .args = { ABI_VAL_CTX, ABI_VAL_STR } },
+  { .name = "spn_get_dir",              .ret = ABI_VAL_STR,     .args = { ABI_VAL_CTX, ABI_VAL_S32 } },
+  { .name = "spn_get_subdir",           .ret = ABI_VAL_STR,     .args = { ABI_VAL_CTX, ABI_VAL_S32, ABI_VAL_STR } },
+  { .name = "spn_get_profile",          .ret = ABI_VAL_PROFILE, .args = { ABI_VAL_CTX } },
+  { .name = "spn_profile_get_libc",     .ret = ABI_VAL_S32,     .args = { ABI_VAL_PROFILE } },
+  { .name = "spn_target_add_include",   .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR } },
+  { .name = "spn_target_add_define",    .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR } },
+  { .name = "spn_target_embed_file",    .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR } },
+  { .name = "spn_target_embed_file_ex", .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR, ABI_VAL_STR, ABI_VAL_STR, ABI_VAL_STR } },
+  { .name = "spn_target_embed_dir",     .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR } },
+  { .name = "spn_target_embed_dir_ex",  .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR, ABI_VAL_STR, ABI_VAL_STR } },
+  { .name = "spn_add_node",             .ret = ABI_VAL_NODE,    .args = { ABI_VAL_CTX, ABI_VAL_STR } },
+  { .name = "spn_node_set_fn",          .ret = ABI_VAL_VOID,    .args = { ABI_VAL_NODE, ABI_VAL_FN }, .host = "spn_abi_node_set_fn" },
+  { .name = "spn_node_add_input",       .ret = ABI_VAL_VOID,    .args = { ABI_VAL_NODE, ABI_VAL_STR } },
+  { .name = "spn_node_add_output",      .ret = ABI_VAL_VOID,    .args = { ABI_VAL_NODE, ABI_VAL_STR } },
+  { .name = "spn_write_file",           .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CTX, ABI_VAL_STR, ABI_VAL_STR } },
+  { .name = "spn_copy",                 .ret = ABI_VAL_S32,     .args = { ABI_VAL_CTX, ABI_VAL_S32, ABI_VAL_STR, ABI_VAL_S32, ABI_VAL_STR } },
+};
+
+static bool abi_val_is_handle(abi_val_t val) {
+  return val >= ABI_VAL_CTX;
+}
+
+static const c8* abi_val_kind(abi_val_t val) {
+  switch (val) {
+    case ABI_VAL_CTX:     return "SPN_ABI_KIND_CTX";
+    case ABI_VAL_TARGET:  return "SPN_ABI_KIND_TARGET";
+    case ABI_VAL_NODE:    return "SPN_ABI_KIND_NODE";
+    case ABI_VAL_PROFILE: return "SPN_ABI_KIND_PROFILE";
+    default:              return "";
+  }
+}
+
+static u32 abi_fn_num_args(const abi_fn_t* fn) {
+  u32 count = 0;
+  while (count < ABI_MAX_ARGS && fn->args[count] != ABI_VAL_VOID) count++;
+  return count;
+}
+
+static sp_str_t abi_fn_sig(gen_t* g, const abi_fn_t* fn) {
+  sp_io_dyn_mem_writer_t w = sp_zero;
+  sp_io_dyn_mem_writer_init(g->mem, &w);
+
+  sp_fmt_io(&w.base, "(");
+  sp_for(it, abi_fn_num_args(fn)) {
+    sp_fmt_io(&w.base, "{}", sp_fmt_cstr(fn->args[it] == ABI_VAL_STR ? "$" : "i"));
+  }
+  sp_fmt_io(&w.base, ")");
+  if (fn->ret != ABI_VAL_VOID) {
+    sp_fmt_io(&w.base, "i");
+  }
+  return sp_io_dyn_mem_writer_take_str(&w);
+}
+
+static sp_str_t abi_fn_thunk(gen_t* g, const abi_fn_t* fn) {
+  sp_io_dyn_mem_writer_t w = sp_zero;
+  sp_io_dyn_mem_writer_init(g->mem, &w);
+  sp_io_writer_t* io = &w.base;
+
+  const c8* host = fn->host ? fn->host : fn->name;
+  u32 num_args = abi_fn_num_args(fn);
+
+  const c8* ret_type = "u32";
+  const c8* fail = "return 0;";
+  switch (fn->ret) {
+    case ABI_VAL_VOID: ret_type = "void"; fail = "return;"; break;
+    case ABI_VAL_S32:  ret_type = "s32"; fail = "return SPN_ERROR;"; break;
+    default: break;
+  }
+
+  sp_fmt_io(io, "static {} spn_abi_thunk_{}(wasm_exec_env_t env", sp_fmt_cstr(ret_type), sp_fmt_cstr(fn->name + 4));
+  sp_for(it, num_args) {
+    const c8* type = "u32";
+    switch (fn->args[it]) {
+      case ABI_VAL_STR: type = "const c8*"; break;
+      case ABI_VAL_S32: type = "s32"; break;
+      default: break;
+    }
+    sp_fmt_io(io, ", {} a{}", sp_fmt_cstr(type), sp_fmt_uint(it));
+  }
+  sp_fmt_io(io, ") {{\n");
+  sp_fmt_io(io, "  spn_abi_ctx_t abi = spn_abi_ctx(env);\n");
+
+  sp_for(it, num_args) {
+    if (!abi_val_is_handle(fn->args[it])) continue;
+    sp_fmt_io(io, "  void* h{} = spn_abi_table_get(abi.table, a{}, {});\n", sp_fmt_uint(it), sp_fmt_uint(it), sp_fmt_cstr(abi_val_kind(fn->args[it])));
+    sp_fmt_io(io, "  if (!h{}) {}\n", sp_fmt_uint(it), sp_fmt_cstr(fail));
+  }
+
+  sp_io_dyn_mem_writer_t args = sp_zero;
+  sp_io_dyn_mem_writer_init(g->mem, &args);
+  sp_for(it, num_args) {
+    sp_fmt_io(&args.base, "{}{}{}",
+      sp_fmt_cstr(it ? ", " : ""),
+      sp_fmt_cstr(abi_val_is_handle(fn->args[it]) ? "h" : "a"),
+      sp_fmt_uint(it));
+  }
+  sp_str_t call = sp_io_dyn_mem_writer_take_str(&args);
+
+  switch (fn->ret) {
+    case ABI_VAL_VOID: {
+      sp_fmt_io(io, "  {}({});\n", sp_fmt_cstr(host), sp_fmt_str(call));
+      break;
+    }
+    case ABI_VAL_S32: {
+      sp_fmt_io(io, "  return {}({});\n", sp_fmt_cstr(host), sp_fmt_str(call));
+      break;
+    }
+    case ABI_VAL_STR: {
+      sp_fmt_io(io, "  return spn_abi_str_to_guest(&abi, {}({}));\n", sp_fmt_cstr(host), sp_fmt_str(call));
+      break;
+    }
+    default: {
+      sp_fmt_io(io, "  void* result = (void*)({}({}));\n", sp_fmt_cstr(host), sp_fmt_str(call));
+      sp_fmt_io(io, "  if (!result) return 0;\n");
+      sp_fmt_io(io, "  return spn_abi_table_add(abi.table, result, {});\n", sp_fmt_cstr(abi_val_kind(fn->ret)));
+      break;
+    }
+  }
+
+  sp_fmt_io(io, "}}\n");
+  return sp_io_dyn_mem_writer_take_str(&w);
+}
+
 static sp_str_t abi_struct_type(gen_t* g, sp_str_t name) {
   return sp_fmt(g->mem, "spn_{}_t", sp_fmt_str(name)).value;
 }
@@ -140,6 +286,15 @@ static sp_template_scope_t* abi_scope(gen_t* g) {
     sp_template_scope_t* scope = sp_template_push(root, sp_str_lit("functions"));
     sp_template_set(scope, sp_str_lit("name"), g->roots[it]);
     sp_template_set(scope, sp_str_lit("type"), abi_struct_type(g, g->roots[it]));
+  }
+
+  sp_carr_for(abi_fns, it) {
+    const abi_fn_t* fn = &abi_fns[it];
+    sp_template_scope_t* scope = sp_template_push(root, sp_str_lit("fns"));
+    sp_template_set(scope, sp_str_lit("name"), sp_cstr_as_str(fn->name));
+    sp_template_set(scope, sp_str_lit("short"), sp_cstr_as_str(fn->name + 4));
+    sp_template_set(scope, sp_str_lit("sig"), abi_fn_sig(g, fn));
+    sp_template_set(scope, sp_str_lit("thunk"), abi_fn_thunk(g, fn));
   }
 
   return root;

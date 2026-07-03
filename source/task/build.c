@@ -13,6 +13,7 @@
 #include "event/event.h"
 #include "session/session.h"
 #include "sp/sp_glob.h"
+#include "target/closure.h"
 #include "task/build/build.h"
 #include "task/build/nodes/nodes.h"
 #include "task/task.h"
@@ -167,7 +168,8 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
     spn_try(add_package(graph, unit));
   }
 
-  // Link inter-package dependencies; we don't do anything more granular than entire packages.
+  // Order each package's build after its direct dependencies, and sequence any
+  // directory embeds after the dep step that populates the store they read.
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* pkg = sp_str_om_at(session->units.packages, it);
     sp_da(spn_pkg_unit_t*) deps = spn_session_pkg_deps(session, pkg);
@@ -177,29 +179,6 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
       if (!dep || dep == pkg) continue;
 
       spn_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.main, dep->nodes.build.stamp.package));
-
-      sp_da_for(pkg->targets, t) {
-        spn_target_unit_t* target = pkg->targets[t];
-        if (!target->nodes.link.occupied) continue;
-
-        sp_da_for(dep->libs, l) {
-          spn_target_unit_t* lib = dep->libs[l];
-          if (lib->info->no_link) continue;
-
-          switch (lib->lib_kind) {
-            case SPN_LIB_KIND_STATIC:
-            case SPN_LIB_KIND_SHARED: {
-              if (lib->nodes.output.occupied) {
-                spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, lib->nodes.output));
-              }
-              break;
-            }
-            case SPN_LIB_KIND_SOURCE:
-            case SPN_LIB_KIND_OBJECT:
-            case SPN_LIB_KIND_NONE: break;
-          }
-        }
-      }
 
       // A directory embed reads a dep's store directory wholesale. Unlike a file
       // embed it declares no per-file graph input, so order its embed node after
@@ -214,6 +193,37 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
           if (!sp_str_starts_with(embed->dir.path, dep->paths.store)) continue;
 
           spn_try(spn_bg_cmd_add_input(graph, target->nodes.embed.run, dep->nodes.build.stamp.package));
+        }
+      }
+    }
+  }
+
+  // Link each product against its transitive closure, rooted at the link unit
+  // and cut at shared-library boundaries, so a static dependency two hops away
+  // still lands on the link line.
+  sp_om_for(session->units.targets, it) {
+    spn_target_unit_t* target = sp_om_at(session->units.targets, it);
+    if (!target->nodes.link.occupied) continue;
+
+    sp_da(spn_pkg_unit_t*) closure = spn_target_link_closure(session->mem, target);
+    sp_da_for(closure, c) {
+      spn_pkg_unit_t* dep = closure[c];
+
+      sp_da_for(dep->libs, l) {
+        spn_target_unit_t* lib = dep->libs[l];
+        if (lib->info->no_link) continue;
+
+        switch (lib->lib_kind) {
+          case SPN_LIB_KIND_STATIC:
+          case SPN_LIB_KIND_SHARED: {
+            if (lib->nodes.output.occupied) {
+              spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, lib->nodes.output));
+            }
+            break;
+          }
+          case SPN_LIB_KIND_SOURCE:
+          case SPN_LIB_KIND_OBJECT:
+          case SPN_LIB_KIND_NONE: break;
         }
       }
     }

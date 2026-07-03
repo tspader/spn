@@ -1,5 +1,13 @@
 #include "sp.h"
 #include "external/wasm/abi.h"
+#include "unit/types.h"
+
+spn_abi_ctx_t spn_abi_ctx(wasm_exec_env_t env) {
+  return (spn_abi_ctx_t) {
+    .inst = wasm_runtime_get_module_inst(env),
+    .table = wasm_runtime_get_user_data(env),
+  };
+}
 
 void spn_abi_table_init(spn_abi_table_t* table, sp_mem_t mem) {
   table->entries = sp_da_new(mem, spn_abi_entry_t);
@@ -39,20 +47,20 @@ bool spn_abi_read_handle(spn_abi_ctx_t* abi, u32 token, spn_abi_kind_t kind, voi
   return *out != SP_NULLPTR;
 }
 
-u32 spn_abi_thunk_get_target(wasm_exec_env_t env, u32 ctx, u32 name_addr) {
-  spn_abi_ctx_t abi = {
-    .inst = wasm_runtime_get_module_inst(env),
-    .table = wasm_runtime_get_user_data(env),
-  };
+u32 spn_abi_str_to_guest(spn_abi_ctx_t* abi, const c8* str) {
+  if (!str) return 0;
 
-  spn_t* spn = spn_abi_table_get(abi.table, ctx, SPN_ABI_KIND_CTX);
-  if (!spn) return 0;
+  u64 size = 1;
+  for (const c8* c = str; *c; c++) size++;
 
-  const c8* name = SP_NULLPTR;
-  if (!spn_abi_read_str(&abi, name_addr, &name) || !name) return 0;
+  void* native = SP_NULLPTR;
+  u64 offset = wasm_runtime_module_malloc(abi->inst, size, &native);
+  if (!offset) return 0;
 
-  spn_target_t* target = spn_get_target(spn, name);
-  if (!target) return 0;
+  sp_mem_copy(native, str, size);
+  return (u32)offset;
+}
 
-  return spn_abi_table_add(abi.table, target, SPN_ABI_KIND_TARGET);
+void spn_abi_node_set_fn(spn_node_t* node, u32 fn) {
+  spn_find_user_node(node)->wasm_fn = fn;
 }

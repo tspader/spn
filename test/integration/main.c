@@ -397,6 +397,35 @@ UTEST_F(spn_build, consume_static_lib) {
   });
 }
 
+UTEST_F(spn_build, consume_transitive_static) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_transitive_static");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/consume_transitive_static",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "debug" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspam.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/bin/main") },
+    },
+  });
+}
+
+UTEST_F(spn_build, consume_system_dep_lib) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_system_dep_lib");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/spn_build/consume_system_dep_lib",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "static" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/static/store/lib/libspum.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/static/store/bin/main") },
+    },
+  });
+}
+
 UTEST_F(spn_build, consume_shared_lib) {
   tmpfs_init_named(&uf->fixture.fs, "consume_shared_lib");
 
@@ -826,9 +855,9 @@ UTEST_F(spn_build, api_configure_table) {
 
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/fixtures/api/configure_table",
-    .copy = { "scripts" },
+    .copy = { "tools", "include" },
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .env = { "SPN_USE_WASM=1" } } },
       { .kind = ACTION_RUN_BIN, .bin.name = "configure_table" },
     },
   });
@@ -840,7 +869,7 @@ UTEST_F(spn_build, api_configure_error) {
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/fixtures/api/configure_error",
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .env = { "SPN_USE_WASM=1" }, .rc = 1 } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "script_crashed" } },
     },
   });

@@ -112,6 +112,13 @@ add_dependencies(manifest_lower spn_codegen_gen)
 target_link_libraries(manifest_lower PRIVATE yyjson)
 add_test(NAME manifest_lower COMMAND "$<TARGET_FILE:manifest_lower>")
 
+add_executable(closure
+  closure.c
+  ${SRC}/target/closure.c
+)
+spn_test_binary(closure)
+add_test(NAME closure COMMAND "$<TARGET_FILE:closure>")
+
 add_subdirectory(resolver)
 add_subdirectory(index)
 add_subdirectory(publish)
