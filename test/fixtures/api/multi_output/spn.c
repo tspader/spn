@@ -1,5 +1,6 @@
 #include "spn.h"
 
+SPN_EXPORT
 s32 gen_all_headers(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "gen_all_headers: creating 3 headers from single node");
 
@@ -30,6 +31,7 @@ s32 gen_all_headers(spn_t* spn, spn_node_ctx_t* ctx) {
   return 0;
 }
 
+SPN_EXPORT
 s32 gen_combined(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "gen_combined: aggregating all headers");
   spn_write_file(spn, "all.h",
@@ -43,7 +45,10 @@ s32 gen_combined(spn_t* spn, spn_node_ctx_t* ctx) {
   return 0;
 }
 
-spn_err_t configure(spn_t* spn, spn_config_t* config) {
+SPN_EXPORT
+spn_err_t configure(spn_t* spn) {
+  spn_config_t* config = (spn_config_t*)spn;
+  (void)config;
   spn_add_include(config, spn_get_dir(spn, SPN_DIR_WORK));
 
   const c8* types_h = spn_get_subdir(spn, SPN_DIR_WORK, "types.h");
@@ -52,13 +57,13 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
   const c8* all_h = spn_get_subdir(spn, SPN_DIR_WORK, "all.h");
 
   spn_node_t* gen = spn_add_node(config, "gen_all_headers");
-  spn_node_set_fn(gen, gen_all_headers);
+  spn_node_set_fn(gen, "gen_all_headers");
   spn_node_add_output(gen, types_h);
   spn_node_add_output(gen, constants_h);
   spn_node_add_output(gen, macros_h);
 
   spn_node_t* combined = spn_add_node(config, "gen_combined");
-  spn_node_set_fn(combined, gen_combined);
+  spn_node_set_fn(combined, "gen_combined");
   spn_node_add_input(combined, types_h);
   spn_node_add_input(combined, constants_h);
   spn_node_add_input(combined, macros_h);

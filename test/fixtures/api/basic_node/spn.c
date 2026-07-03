@@ -1,5 +1,6 @@
 #include "spn.h"
 
+SPN_EXPORT
 s32 generate_header(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "generating version.h...");
   spn_write_file(spn, "version.h",
@@ -13,16 +14,20 @@ s32 generate_header(spn_t* spn, spn_node_ctx_t* ctx) {
   return 0;
 }
 
-spn_err_t configure(spn_t* spn, spn_config_t* config) {
+SPN_EXPORT
+spn_err_t configure(spn_t* spn) {
+  spn_config_t* config = (spn_config_t*)spn;
+  (void)config;
   spn_add_include(config, spn_get_dir(spn, SPN_DIR_WORK));
 
   spn_node_t* gen = spn_add_node(config, "gen_version");
-  spn_node_set_fn(gen, generate_header);
+  spn_node_set_fn(gen, "generate_header");
 
   spn_node_add_output(gen, spn_get_subdir(spn, SPN_DIR_WORK, "version.h"));
   return SPN_OK;
 }
 
+SPN_EXPORT
 spn_err_t package(spn_t* spn) {
   spn_copy(spn, SPN_DIR_WORK, "version.h", SPN_DIR_INCLUDE, "");
   return SPN_OK;

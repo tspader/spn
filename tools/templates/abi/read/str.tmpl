@@ -1,1 +1,1 @@
-  if (!spn_abi_read_str(abi, wire->{{ .key }}, &out->{{ .key }})) return false;
+  if (!spn_wasm_read_str(abi, wire->{{ .key }}, &out->{{ .key }})) return false;

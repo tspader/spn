@@ -123,21 +123,20 @@ spn_err_t configure_package(spn_pkg_unit_t* unit) {
 s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
-  // The legacy jammed script compiles either way; packages without split
-  // configure/build scripts fall back to its hooks even in wasm mode
-  spn_try(compile_package(unit->session, unit));
-
-  if (spn_wasm_enabled() && sp_fs_is_file(unit->paths.configure)) {
-    sp_tm_timer_t timer = sp_tm_start_timer();
-    spn_try(spn_compile_script_module(unit, &unit->info->configure, unit->paths.wasm.configure));
-    unit->time.compile = sp_tm_read_timer(&timer);
-
-    spn_try(spn_wasm_script_open(&unit->wasm.configure, unit, unit->paths.wasm.configure));
-    spn_try(spn_wasm_script_call_hook(unit->wasm.configure, unit, "configure"));
+  if (!spn_wasm_enabled()) {
+    spn_try(compile_package(unit->session, unit));
+    spn_try(configure_package(unit));
     return SPN_OK;
   }
 
-  spn_try(configure_package(unit));
+  if (!sp_fs_is_file(unit->paths.configure)) return SPN_OK;
+
+  sp_tm_timer_t timer = sp_tm_start_timer();
+  spn_try(spn_compile_script_module(unit, &unit->info->configure, unit->paths.wasm.configure));
+  unit->time.compile = sp_tm_read_timer(&timer);
+
+  spn_try(spn_wasm_script_open(&unit->wasm.configure, unit, unit->paths.wasm.configure));
+  spn_try(spn_wasm_script_call_hook(unit->wasm.configure, unit, "configure"));
   return SPN_OK;
 }
 

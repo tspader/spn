@@ -5,6 +5,7 @@ typedef struct {
   s32 multiplier;
 } codegen_config_t;
 
+SPN_EXPORT
 s32 generate_with_config(spn_t* spn, spn_node_ctx_t* ctx) {
   codegen_config_t* cfg = (codegen_config_t*)spn_node_ctx_get_user_data(ctx);
   if (!cfg) {
@@ -36,11 +37,14 @@ static codegen_config_t g_config = {
   .multiplier = 6,
 };
 
-spn_err_t configure(spn_t* spn, spn_config_t* config) {
+SPN_EXPORT
+spn_err_t configure(spn_t* spn) {
+  spn_config_t* config = (spn_config_t*)spn;
+  (void)config;
   spn_add_include(config, spn_get_dir(spn, SPN_DIR_WORK));
 
   spn_node_t* gen = spn_add_node(config, "gen_config");
-  spn_node_set_fn(gen, generate_with_config);
+  spn_node_set_fn(gen, "generate_with_config");
   spn_node_set_user_data(gen, &g_config);
   spn_node_add_output(gen, spn_get_subdir(spn, SPN_DIR_WORK, "config.h"));
   return SPN_OK;

@@ -204,6 +204,13 @@ static spn_err_t load_package(
   loaded->paths.configure = resolve_script(&info->configure, loaded->roots.recipe);
   loaded->paths.build = resolve_script(&info->build, loaded->roots.recipe);
 
+  // $ROOT/spn.c is the default script: when a package declares no split
+  // configure script, the jammed file provides configure/package/node fns
+  if (!sp_fs_is_file(loaded->paths.configure) && sp_fs_is_file(loaded->paths.script)) {
+    info->configure.source[0] = loaded->paths.script;
+    loaded->paths.configure = loaded->paths.script;
+  }
+
   if (derive_source) {
     source_tree = spn_pkg_manifest_source_tree(info);
   }

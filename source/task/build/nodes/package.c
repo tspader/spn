@@ -74,14 +74,13 @@ static spn_err_t publish_headers(spn_pkg_unit_t* unit) {
   return SPN_OK;
 }
 
-static spn_err_t run_wasm_package(spn_pkg_unit_t* unit) {
-  spn_try(spn_wasm_script_open(&unit->wasm.build, unit, unit->paths.wasm.build));
-  if (!spn_wasm_script_has(unit->wasm.build, "package")) return SPN_OK;
+static spn_err_t run_wasm_package(spn_pkg_unit_t* unit, spn_wasm_script_t* script) {
+  if (!spn_wasm_script_has(script, "package")) return SPN_OK;
 
   emit_run(unit);
 
   sp_tm_timer_t timer = sp_tm_start_timer();
-  spn_try(spn_wasm_script_call_hook(unit->wasm.build, unit, "package"));
+  spn_try(spn_wasm_script_call_hook(script, unit, "package"));
   unit->time.package = sp_tm_read_timer(&timer);
 
   emit_success(unit);
@@ -116,8 +115,17 @@ s32 run_package_hook(spn_bg_cmd_t* cmd, void* user_data) {
   spn_try(publish_headers(unit));
   spn_try(publish_copies(unit));
 
-  if (spn_wasm_enabled() && sp_fs_is_file(unit->paths.wasm.build)) {
-    spn_try(run_wasm_package(unit));
+  // @spader This is all too complicated:
+  // A split build script owns package() when present; otherwise the configure
+  // module (which is spn.c for packages without split scripts) may export it;
+  // otherwise the legacy TCC hook runs. Gate on the script source, like the
+  // graph does, so a stale module from a removed script never runs.
+  if (spn_wasm_enabled() && sp_fs_is_file(unit->paths.build)) {
+    spn_try(spn_wasm_script_open(&unit->wasm.build, unit, unit->paths.wasm.build));
+    spn_try(run_wasm_package(unit, unit->wasm.build));
+  }
+  else if (spn_wasm_enabled() && unit->wasm.configure && spn_wasm_script_has(unit->wasm.configure, "package")) {
+    spn_try(run_wasm_package(unit, unit->wasm.configure));
   }
   else if (unit->on_package) {
     spn_try(run_tcc_package(unit));

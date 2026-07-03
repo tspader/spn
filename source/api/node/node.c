@@ -53,10 +53,10 @@ void spn_node_link(spn_node_t* from, spn_node_t* to) {
   sp_da_push(info->deps, from);
 }
 
-void spn_node_set_fn(spn_node_t* node, spn_node_fn_t fn) {
+void spn_node_set_fn(spn_node_t* node, const c8* fn) {
   spn_user_node_t* info = spn_find_user_node(node);
-  SPN_API_LOG(node->ctx, "spn_node_set_fn", "{}", SP_FMT_STR(info->tag));
-  info->fn = fn;
+  SPN_API_LOG(node->ctx, "spn_node_set_fn", "{}, {}", SP_FMT_STR(info->tag), SP_FMT_CSTR(fn));
+  info->fn = spn_intern_cstr(fn);
 }
 
 void spn_node_set_user_data(spn_node_t* node, void* user_data) {

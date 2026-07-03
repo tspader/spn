@@ -145,6 +145,7 @@ typedef enum {
   SPN_ERR_WASM_THREAD_ENV_FAILED,
   SPN_ERR_WASM_SCRIPT_ERROR,
   SPN_ERR_WASM_NO_SCRIPT,
+  SPN_ERR_WASM_EXPORT_NOT_FOUND,
 } spn_err_t;
 
 typedef struct spn              spn_t;
@@ -161,9 +162,12 @@ typedef struct spn_node_t       spn_node_t;
 typedef struct spn_node_ctx_t   spn_node_ctx_t;
 
 #ifdef __wasm32__
-  #define SPN_API __attribute__((import_module("env")))
+#define SPN_API __attribute__((import_module("env")))
+#define SPN_EXPORT __attribute__((used, visibility("default")))
+
 #else
   #define SPN_API
+  #define SPN_EXPORT
 #endif
 
 typedef spn_err_t (*spn_configure_fn_t) (spn_t*, spn_config_t*);
@@ -202,17 +206,11 @@ void          spn_write_file(spn_t* spn, const c8* path, const c8* content);
 s32           spn_copy(spn_t* spn, spn_dir_t from, const c8* from_path, spn_dir_t to, const c8* to_path);
 void          spn_log(spn_t* spn, const c8* message);
 
-// args are a null terminated argv; spn_exec takes the program in args[0], while
-// spn_cc and spn_ar run the profile's toolchain. cwd is the package's work dir.
-s32           spn_exec(spn_t* spn, const c8** args);
-s32           spn_cc(spn_t* spn, const c8** args);
-s32           spn_ar(spn_t* spn, const c8** args);
-
 spn_node_t*   spn_add_node(spn_config_t* config, const c8* tag);
 void          spn_node_add_input(spn_node_t* node, const c8* input);
 void          spn_node_add_output(spn_node_t* node, const c8* output);
 void          spn_node_link(spn_node_t* from, spn_node_t* to);
-void          spn_node_set_fn(spn_node_t* node, spn_node_fn_t fn);
+void          spn_node_set_fn(spn_node_t* node, const c8* fn);
 void          spn_node_set_user_data(spn_node_t* node, void* user_data);
 void*         spn_node_ctx_get_user_data(spn_node_ctx_t* ctx);
 

@@ -8,6 +8,7 @@
 #include "sp/io.h"
 #include "sp/macro.h"
 #include "sp/str.h"
+#include "spn.h"
 #include "toolchain/select.h"
 #include "triple/triple.h"
 #include "tui/tui.h"
@@ -655,6 +656,15 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
         }
         case SPN_ERR_WASM_NO_SCRIPT: {
           sp_io_write_str(&w.base, sp_str_lit("node has a wasm fn but no build script is loaded"), SP_NULLPTR);
+          break;
+        }
+        case SPN_ERR_WASM_EXPORT_NOT_FOUND: {
+          sp_fmt_io(
+            &w.base,
+            "Referenced symbol {.yellow} was not found in {.cyan}",
+            sp_fmt_str(event->err.wasm.error),
+            sp_fmt_str(spn_tui_contextual_path(mem, event->err.wasm.path))
+          );
           break;
         }
         default: {

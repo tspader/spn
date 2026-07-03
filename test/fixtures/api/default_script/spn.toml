@@ -1,0 +1,7 @@
+[package]
+name = "default_script"
+version = "0.0.1"
+
+[[bin]]
+name = "default_script"
+source = ["main.c"]

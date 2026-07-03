@@ -4,11 +4,14 @@ typedef enum {
   ABI_VAL_VOID = 0,
   ABI_VAL_S32,
   ABI_VAL_STR,
-  ABI_VAL_FN,
   ABI_VAL_CTX,
   ABI_VAL_TARGET,
   ABI_VAL_NODE,
+  ABI_VAL_NODE_CTX,
   ABI_VAL_PROFILE,
+  ABI_VAL_MAKE,
+  ABI_VAL_AUTOCONF,
+  ABI_VAL_CMAKE,
 } abi_val_t;
 
 #define ABI_MAX_ARGS 6
@@ -27,18 +30,51 @@ static const abi_fn_t abi_fns [] = {
   { .name = "spn_get_subdir",           .ret = ABI_VAL_STR,     .args = { ABI_VAL_CTX, ABI_VAL_S32, ABI_VAL_STR } },
   { .name = "spn_get_profile",          .ret = ABI_VAL_PROFILE, .args = { ABI_VAL_CTX } },
   { .name = "spn_profile_get_libc",     .ret = ABI_VAL_S32,     .args = { ABI_VAL_PROFILE } },
+  { .name = "spn_profile_get_linkage",  .ret = ABI_VAL_S32,     .args = { ABI_VAL_PROFILE } },
+  { .name = "spn_profile_get_standard", .ret = ABI_VAL_S32,     .args = { ABI_VAL_PROFILE } },
+  { .name = "spn_profile_get_mode",     .ret = ABI_VAL_S32,     .args = { ABI_VAL_PROFILE } },
+  { .name = "spn_add_exe",              .ret = ABI_VAL_TARGET,  .args = { ABI_VAL_CTX, ABI_VAL_STR } },
+  { .name = "spn_add_lib",              .ret = ABI_VAL_TARGET,  .args = { ABI_VAL_CTX, ABI_VAL_STR, ABI_VAL_S32 } },
+  { .name = "spn_add_test",             .ret = ABI_VAL_TARGET,  .args = { ABI_VAL_CTX, ABI_VAL_STR } },
+  { .name = "spn_add_include",          .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CTX, ABI_VAL_STR } },
+  { .name = "spn_add_define",           .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CTX, ABI_VAL_STR } },
+  { .name = "spn_add_system_dep",       .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CTX, ABI_VAL_STR } },
+  { .name = "spn_log",                  .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CTX, ABI_VAL_STR } },
+  { .name = "spn_target_add_source",    .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR } },
   { .name = "spn_target_add_include",   .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR } },
   { .name = "spn_target_add_define",    .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR } },
+  { .name = "spn_target_add_flag",      .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR } },
+  { .name = "spn_target_set_linked",    .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_S32 } },
   { .name = "spn_target_embed_file",    .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR } },
   { .name = "spn_target_embed_file_ex", .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR, ABI_VAL_STR, ABI_VAL_STR, ABI_VAL_STR } },
   { .name = "spn_target_embed_dir",     .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR } },
   { .name = "spn_target_embed_dir_ex",  .ret = ABI_VAL_VOID,    .args = { ABI_VAL_TARGET, ABI_VAL_STR, ABI_VAL_STR, ABI_VAL_STR } },
-  { .name = "spn_add_node",             .ret = ABI_VAL_NODE,    .args = { ABI_VAL_CTX, ABI_VAL_STR } },
-  { .name = "spn_node_set_fn",          .ret = ABI_VAL_VOID,    .args = { ABI_VAL_NODE, ABI_VAL_FN }, .host = "spn_abi_node_set_fn" },
+  { .name = "spn_add_node",             .ret = ABI_VAL_NODE,    .args = { ABI_VAL_CTX, ABI_VAL_STR }, .host = "spn_abi_add_node" },
+  { .name = "spn_node_set_fn",          .ret = ABI_VAL_VOID,    .args = { ABI_VAL_NODE, ABI_VAL_STR } },
+  { .name = "spn_node_set_user_data",   .ret = ABI_VAL_VOID,    .args = { ABI_VAL_NODE, ABI_VAL_S32 }, .host = "spn_abi_node_set_user_data" },
   { .name = "spn_node_add_input",       .ret = ABI_VAL_VOID,    .args = { ABI_VAL_NODE, ABI_VAL_STR } },
   { .name = "spn_node_add_output",      .ret = ABI_VAL_VOID,    .args = { ABI_VAL_NODE, ABI_VAL_STR } },
+  { .name = "spn_node_link",            .ret = ABI_VAL_VOID,    .args = { ABI_VAL_NODE, ABI_VAL_NODE } },
+  { .name = "spn_node_ctx_get_user_data", .ret = ABI_VAL_S32,   .args = { ABI_VAL_NODE_CTX }, .host = "spn_abi_node_ctx_get_user_data" },
   { .name = "spn_write_file",           .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CTX, ABI_VAL_STR, ABI_VAL_STR } },
   { .name = "spn_copy",                 .ret = ABI_VAL_S32,     .args = { ABI_VAL_CTX, ABI_VAL_S32, ABI_VAL_STR, ABI_VAL_S32, ABI_VAL_STR } },
+  { .name = "spn_make",                 .ret = ABI_VAL_S32,     .args = { ABI_VAL_CTX } },
+  { .name = "spn_make_new",             .ret = ABI_VAL_MAKE,    .args = { ABI_VAL_CTX } },
+  { .name = "spn_make_add_target",      .ret = ABI_VAL_VOID,    .args = { ABI_VAL_MAKE, ABI_VAL_STR } },
+  { .name = "spn_make_run",             .ret = ABI_VAL_S32,     .args = { ABI_VAL_MAKE } },
+  { .name = "spn_autoconf",             .ret = ABI_VAL_S32,     .args = { ABI_VAL_CTX } },
+  { .name = "spn_autoconf_new",         .ret = ABI_VAL_AUTOCONF, .args = { ABI_VAL_CTX } },
+  { .name = "spn_autoconf_add_flag",    .ret = ABI_VAL_VOID,    .args = { ABI_VAL_AUTOCONF, ABI_VAL_STR } },
+  { .name = "spn_autoconf_run",         .ret = ABI_VAL_S32,     .args = { ABI_VAL_AUTOCONF } },
+  { .name = "spn_cmake",                .ret = ABI_VAL_S32,     .args = { ABI_VAL_CTX } },
+  { .name = "spn_cmake_new",            .ret = ABI_VAL_CMAKE,   .args = { ABI_VAL_CTX } },
+  { .name = "spn_cmake_set_generator",  .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CMAKE, ABI_VAL_S32 } },
+  { .name = "spn_cmake_add_define",     .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CMAKE, ABI_VAL_STR, ABI_VAL_STR } },
+  { .name = "spn_cmake_add_arg",        .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CMAKE, ABI_VAL_STR } },
+  { .name = "spn_cmake_configure",      .ret = ABI_VAL_S32,     .args = { ABI_VAL_CMAKE } },
+  { .name = "spn_cmake_build",          .ret = ABI_VAL_S32,     .args = { ABI_VAL_CMAKE } },
+  { .name = "spn_cmake_install",        .ret = ABI_VAL_S32,     .args = { ABI_VAL_CMAKE } },
+  { .name = "spn_cmake_run",            .ret = ABI_VAL_S32,     .args = { ABI_VAL_CMAKE } },
 };
 
 static bool abi_val_is_handle(abi_val_t val) {
@@ -47,11 +83,15 @@ static bool abi_val_is_handle(abi_val_t val) {
 
 static const c8* abi_val_kind(abi_val_t val) {
   switch (val) {
-    case ABI_VAL_CTX:     return "SPN_ABI_KIND_CTX";
-    case ABI_VAL_TARGET:  return "SPN_ABI_KIND_TARGET";
-    case ABI_VAL_NODE:    return "SPN_ABI_KIND_NODE";
-    case ABI_VAL_PROFILE: return "SPN_ABI_KIND_PROFILE";
-    default:              return "";
+    case ABI_VAL_CTX:      return "SPN_ABI_KIND_CTX";
+    case ABI_VAL_TARGET:   return "SPN_ABI_KIND_TARGET";
+    case ABI_VAL_NODE:     return "SPN_ABI_KIND_NODE";
+    case ABI_VAL_NODE_CTX: return "SPN_ABI_KIND_NODE_CTX";
+    case ABI_VAL_PROFILE:  return "SPN_ABI_KIND_PROFILE";
+    case ABI_VAL_MAKE:     return "SPN_ABI_KIND_MAKE";
+    case ABI_VAL_AUTOCONF: return "SPN_ABI_KIND_AUTOCONF";
+    case ABI_VAL_CMAKE:    return "SPN_ABI_KIND_CMAKE";
+    default:               return "";
   }
 }
 
@@ -103,11 +143,11 @@ static sp_str_t abi_fn_thunk(gen_t* g, const abi_fn_t* fn) {
     sp_fmt_io(io, ", {} a{}", sp_fmt_cstr(type), sp_fmt_uint(it));
   }
   sp_fmt_io(io, ") {{\n");
-  sp_fmt_io(io, "  spn_abi_ctx_t abi = spn_abi_ctx(env);\n");
+  sp_fmt_io(io, "  spn_wasm_ctx_t abi = spn_wasm_ctx(env);\n");
 
   sp_for(it, num_args) {
     if (!abi_val_is_handle(fn->args[it])) continue;
-    sp_fmt_io(io, "  void* h{} = spn_abi_table_get(abi.table, a{}, {});\n", sp_fmt_uint(it), sp_fmt_uint(it), sp_fmt_cstr(abi_val_kind(fn->args[it])));
+    sp_fmt_io(io, "  void* h{} = spn_wasm_resolve_handle(abi.handles, a{}, {});\n", sp_fmt_uint(it), sp_fmt_uint(it), sp_fmt_cstr(abi_val_kind(fn->args[it])));
     sp_fmt_io(io, "  if (!h{}) {}\n", sp_fmt_uint(it), sp_fmt_cstr(fail));
   }
 
@@ -131,13 +171,13 @@ static sp_str_t abi_fn_thunk(gen_t* g, const abi_fn_t* fn) {
       break;
     }
     case ABI_VAL_STR: {
-      sp_fmt_io(io, "  return spn_abi_str_to_guest(&abi, {}({}));\n", sp_fmt_cstr(host), sp_fmt_str(call));
+      sp_fmt_io(io, "  return spn_wasm_copy_str(&abi, {}({}));\n", sp_fmt_cstr(host), sp_fmt_str(call));
       break;
     }
     default: {
       sp_fmt_io(io, "  void* result = (void*)({}({}));\n", sp_fmt_cstr(host), sp_fmt_str(call));
       sp_fmt_io(io, "  if (!result) return 0;\n");
-      sp_fmt_io(io, "  return spn_abi_table_add(abi.table, result, {});\n", sp_fmt_cstr(abi_val_kind(fn->ret)));
+      sp_fmt_io(io, "  return spn_wasm_add_handle(abi.handles, result, {});\n", sp_fmt_cstr(abi_val_kind(fn->ret)));
       break;
     }
   }
