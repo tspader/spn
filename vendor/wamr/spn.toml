@@ -24,6 +24,8 @@ define = [
   "WASM_ENABLE_REF_TYPES=1",
   "WASM_ENABLE_MODULE_INST_CONTEXT=1",
   "WASM_ENABLE_BULK_MEMORY=1",
+  "WASM_ENABLE_BULK_MEMORY_OPT=1",
+  "WASM_ENABLE_CALL_INDIRECT_OVERLONG=1",
   "WASM_DISABLE_HW_BOUND_CHECK=1",
   "_GNU_SOURCE",
 ]
@@ -42,7 +44,7 @@ include = [
 ]
 source = [
   "core/iwasm/common/*.c",
-  "core/iwasm/common/arch/invokeNative_general.c",
+  "core/iwasm/common/arch/invokeNative_em64.s",
   "core/iwasm/interpreter/wasm_runtime.c",
   "core/iwasm/interpreter/wasm_loader.c",
   "core/iwasm/interpreter/wasm_interp_fast.c",

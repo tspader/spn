@@ -3,6 +3,7 @@
 #include "ctx/ctx.h"
 #include "error/types.h"
 #include "event/event.h"
+#include "external/wasm/wasm.h"
 #include "unit/package.h"
 
 #include <setjmp.h>
@@ -52,30 +53,52 @@ static spn_err_t publish_headers(spn_pkg_unit_t* unit) {
   return SPN_OK;
 }
 
+static spn_err_t run_wasm_package(spn_pkg_unit_t* unit) {
+  spn_try(spn_wasm_script_open(&unit->wasm.build, unit, unit->paths.wasm.build));
+  if (!spn_wasm_script_has(unit->wasm.build, "package")) return SPN_OK;
+
+  emit_run(unit);
+
+  sp_tm_timer_t timer = sp_tm_start_timer();
+  spn_try(spn_wasm_script_call_hook(unit->wasm.build, unit, "package"));
+  unit->time.package = sp_tm_read_timer(&timer);
+
+  emit_success(unit);
+  return SPN_OK;
+}
+
+static spn_err_t run_tcc_package(spn_pkg_unit_t* unit) {
+  emit_run(unit);
+
+  sp_tm_timer_t timer = sp_tm_start_timer();
+
+  jmp_buf jump;
+  s32 status = tcc_setjmp(unit->tcc->s, jump, unit->on_package);
+  if (!status) {
+    spn_t* spn = (spn_t*)unit;
+    unit->on_package(spn);
+  }
+  else {
+    emit_crash(unit);
+    return SPN_ERROR;
+  }
+
+  unit->time.package = sp_tm_read_timer(&timer);
+
+  emit_success(unit);
+  return SPN_OK;
+}
+
 s32 run_package_hook(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
   spn_try(publish_headers(unit));
 
-  if (unit->on_package) {
-    emit_run(unit);
-
-    sp_tm_timer_t timer = sp_tm_start_timer();
-
-    jmp_buf jump;
-    s32 status = tcc_setjmp(unit->tcc->s, jump, unit->on_package);
-    if (!status) {
-      spn_t* spn = (spn_t*)unit;
-      unit->on_package(spn);
-    }
-    else {
-      emit_crash(unit);
-      return SPN_ERROR;
-    }
-
-    unit->time.package = sp_tm_read_timer(&timer);
-
-    emit_success(unit);
+  if (spn_wasm_enabled() && sp_fs_is_file(unit->paths.wasm.build)) {
+    spn_try(run_wasm_package(unit));
+  }
+  else if (unit->on_package) {
+    spn_try(run_tcc_package(unit));
   }
 
   spn_pkg_unit_write_stamp(unit, unit->paths.stamp.package);

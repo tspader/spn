@@ -870,7 +870,21 @@ UTEST_F(spn_build, api_configure_error) {
     .project = "test/fixtures/api/configure_error",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .env = { "SPN_USE_WASM=1" }, .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "script_crashed" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err" } },
+    },
+  });
+}
+
+UTEST_F(spn_build, api_build_script) {
+  tmpfs_init_named(&uf->fixture.fs, "api_build_script");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/fixtures/api/build_script",
+    .copy = { "tools", "include", "vendor" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .env = { "SPN_USE_WASM=1" } } },
+      { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("version.h") },
+      { .kind = ACTION_RUN_BIN, .bin.name = "build_script" },
     },
   });
 }

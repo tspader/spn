@@ -1,0 +1,17 @@
+[package]
+name = "build_script"
+version = "0.0.1"
+
+[package.configure]
+source = ["tools/configure.c"]
+
+[package.build]
+source = ["tools/build.c"]
+include = ["include"]
+
+[deps.build]
+probe = "file://./vendor/probe/spn.toml"
+
+[[bin]]
+name = "build_script"
+source = ["main.c"]

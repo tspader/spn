@@ -20,6 +20,7 @@
 #include "graph/graph.h"
 #include "sp/sp_glob.h"
 #include "session/session.h"
+#include "task/build/build.h"
 #include "task/task.h"
 #include "unit/package.h"
 
@@ -38,18 +39,7 @@ spn_err_t compile_package(spn_session_t* session, spn_pkg_unit_t* unit) {
   spn_cc_set_profile(&cc, session->profile);
   spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_CC_OUTPUT_JIT, unit->info->name);
   spn_cc_target_add_absolute_source(target, unit->paths.script);
-
-  // Build deps are usable from the build script itself, so compile against them
-  sp_ht_for_kv(unit->info->deps, it) {
-    spn_requested_pkg_t* dep = it.val;
-    if (dep->kind != SPN_DEP_KIND_BUILD) continue;
-
-    spn_pkg_unit_t* dep_unit = spn_session_find_pkg_by_qualified(session, dep->qualified);
-    if (!dep_unit) continue;
-
-    spn_cc_target_add_absolute_include(target, dep_unit->paths.include);
-    spn_cc_target_add_absolute_include(target, dep_unit->paths.source);
-  }
+  spn_cc_target_add_build_deps(target, unit);
 
   unit->tcc = sp_alloc_type(spn.mem, spn_tcc_t);
   spn_tcc_init(spn.mem, unit->tcc);
@@ -87,79 +77,6 @@ fail:
     }
   });
   return SPN_ERROR;
-}
-
-static bool configure_use_wasm(void) {
-  return !sp_str_empty(sp_env_get(spn.env, sp_str_lit("SPN_USE_WASM")));
-}
-
-spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
-  spn_target_info_t* script = &unit->info->configure;
-  if (!sp_fs_is_file(unit->paths.configure)) return SPN_OK;
-
-  sp_tm_timer_t timer = sp_tm_start_timer();
-  spn_cc_t* cc = sp_alloc_type(spn.mem, spn_cc_t);
-  spn_cc_init(cc, spn.mem);
-
-  spn_profile_info_t profile = {
-    .arch = SPN_ARCH_WASM32,
-    .os = SPN_OS_WASI,
-    .abi = SPN_ABI_NONE,
-    .mode = SPN_BUILD_MODE_DEBUG,
-    .linkage = SPN_LIB_KIND_SHARED,
-    .standard = SPN_C99
-  };
-
-  spn_cc_set_profile(cc, profile);
-  spn_cc_set_output_dir(cc, unit->paths.generated);
-  spn_cc_set_toolchain(cc, session->units.script);
-  spn_cc_add_include(cc, spn.paths.include);
-
-  spn_cc_target_t* target = spn_cc_add_target(cc, SPN_CC_OUTPUT_WASM, sp_str_lit("configure.wasm"));
-  sp_da_for(script->source, it) {
-    spn_cc_target_add_absolute_source(target, script->source[it]);
-  }
-  sp_da_for(script->include, it) {
-    spn_cc_target_add_absolute_include(target, script->include[it]);
-  }
-  sp_da_for(script->define, it) {
-    spn_cc_target_add_define(target, script->define[it]);
-  }
-  sp_da_for(script->flags, it) {
-    spn_cc_target_add_flag(target, script->flags[it]);
-  }
-
-  spn_cc_run_t run = spn_cc_target_run(target, unit->paths.work);
-
-  unit->time.compile = sp_tm_read_timer(&timer);
-
-  if (run.result.status.exit_code) {
-    spn_event_buffer_push_ex(session->events, unit->info, &unit->logs.io, (spn_build_event_t) {
-      .kind = SPN_EVENT_TARGET_BUILD_FAILED,
-      .target.failed = {
-        .source_file = unit->paths.configure,
-        .object_file = unit->paths.object,
-        .rc = run.result.status.exit_code,
-        .out = run.result.out,
-        .args = run.args,
-        .time = run.elapsed,
-      }
-    });
-    return SPN_ERROR;
-  } else {
-    spn_event_buffer_push_ex(session->events, unit->info, &unit->logs.io, (spn_build_event_t) {
-      .kind = SPN_EVENT_TARGET_BUILD_PASSED,
-      .target.passed = {
-        .source_file = unit->paths.configure,
-        .object_file = unit->paths.object,
-        .args = run.args,
-        .out = run.result.out,
-        .time = run.elapsed,
-      }
-    });
-  }
-
-  return SPN_OK;
 }
 
 spn_err_t configure_package(spn_pkg_unit_t* unit) {
@@ -206,15 +123,17 @@ spn_err_t configure_package(spn_pkg_unit_t* unit) {
 s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
-  // package() still lives in the TCC script for now, so it compiles either way;
-  // the flag only decides who runs configuration
+  // The legacy jammed script compiles either way; packages without split
+  // configure/build scripts fall back to its hooks even in wasm mode
   spn_try(compile_package(unit->session, unit));
 
-  if (configure_use_wasm()) {
-    spn_try(compile_wasm(unit->session, unit));
-    if (sp_fs_is_file(unit->paths.configure)) {
-      spn_try(spn_wasm_run_configure(unit));
-    }
+  if (spn_wasm_enabled() && sp_fs_is_file(unit->paths.configure)) {
+    sp_tm_timer_t timer = sp_tm_start_timer();
+    spn_try(spn_compile_script_module(unit, &unit->info->configure, unit->paths.wasm.configure));
+    unit->time.compile = sp_tm_read_timer(&timer);
+
+    spn_try(spn_wasm_script_open(&unit->wasm.configure, unit, unit->paths.wasm.configure));
+    spn_try(spn_wasm_script_call_hook(unit->wasm.configure, unit, "configure"));
     return SPN_OK;
   }
 

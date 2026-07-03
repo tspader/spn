@@ -593,6 +593,70 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
           }
           break;
         }
+        case SPN_ERR_WASM_READ_FAILED: {
+          sp_fmt_io(
+            &w.base,
+            "failed to read build script {.cyan}",
+            SP_FMT_STR(spn_tui_contextual_path(mem, event->err.wasm.path))
+          );
+          break;
+        }
+        case SPN_ERR_WASM_MODULE_LOAD_FAILED: {
+          sp_fmt_io(
+            &w.base,
+            "failed to load build script {.cyan}: {.red}",
+            SP_FMT_STR(spn_tui_contextual_path(mem, event->err.wasm.path)),
+            SP_FMT_STR(event->err.wasm.error)
+          );
+          break;
+        }
+        case SPN_ERR_WASM_MODULE_INSTANCE_FAILED: {
+          sp_fmt_io(
+            &w.base,
+            "failed to instantiate build script {.cyan}: {.red}",
+            SP_FMT_STR(spn_tui_contextual_path(mem, event->err.wasm.path)),
+            SP_FMT_STR(event->err.wasm.error)
+          );
+          break;
+        }
+        case SPN_ERR_WASM_THREAD_ENV_FAILED: {
+          sp_fmt_io(
+            &w.base,
+            "failed to init wasm thread env for build script {.cyan}",
+            SP_FMT_STR(spn_tui_contextual_path(mem, event->err.wasm.path))
+          );
+          break;
+        }
+        case SPN_ERR_WASM_CTX_FAILED: {
+          sp_fmt_io(
+            &w.base,
+            "failed to create wasm context for build script {.cyan}",
+            SP_FMT_STR(spn_tui_contextual_path(mem, event->err.wasm.path))
+          );
+          break;
+        }
+        case SPN_ERR_WASM_MODULE_CALL_FAILED: {
+          sp_fmt_io(
+            &w.base,
+            "build script {.cyan} crashed: {.red}",
+            SP_FMT_STR(spn_tui_contextual_path(mem, event->err.wasm.path)),
+            SP_FMT_STR(event->err.wasm.error)
+          );
+          break;
+        }
+        case SPN_ERR_WASM_SCRIPT_ERROR: {
+          sp_fmt_io(
+            &w.base,
+            "build script {.cyan} returned {.red}",
+            SP_FMT_STR(spn_tui_contextual_path(mem, event->err.wasm.path)),
+            SP_FMT_S32(event->err.wasm.rc)
+          );
+          break;
+        }
+        case SPN_ERR_WASM_NO_SCRIPT: {
+          sp_io_write_str(&w.base, sp_str_lit("node has a wasm fn but no build script is loaded"), SP_NULLPTR);
+          break;
+        }
         default: {
           sp_io_write_str(&w.base, sp_str_lit("unknown error"), SP_NULLPTR);
           break;

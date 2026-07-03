@@ -6,6 +6,8 @@
 #include "spn.h"
 #include "wasm_export.h"
 
+#include "external/wasm/types.h"
+
 typedef enum {
   SPN_ABI_KIND_NONE = 0,
   SPN_ABI_KIND_CTX,
@@ -19,9 +21,9 @@ typedef struct {
   spn_abi_kind_t kind;
 } spn_abi_entry_t;
 
-typedef struct {
+struct spn_abi_table_t {
   sp_da(spn_abi_entry_t) entries;
-} spn_abi_table_t;
+};
 
 typedef struct {
   wasm_module_inst_t inst;

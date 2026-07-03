@@ -76,6 +76,12 @@ typedef struct {
   sp_str_t actual;
 } spn_err_artifact_t;
 
+typedef struct {
+  sp_str_t path;
+  sp_str_t error;
+  s32 rc;
+} spn_err_wasm_t;
+
 typedef struct spn_codegen_issue spn_codegen_issue_t;
 
 typedef struct {
@@ -102,6 +108,7 @@ typedef struct {
       sp_str_t name;
       sp_str_t version;
     } version_exists;
+    spn_err_wasm_t wasm;
     spn_err_build_graph_t build_graph;
     spn_err_toolchain_t toolchain;
     spn_err_artifact_t artifact;
