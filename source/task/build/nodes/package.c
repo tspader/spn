@@ -1,6 +1,7 @@
 #include "graph/types.h"
 
 #include "ctx/ctx.h"
+#include "enum/enum.h"
 #include "error/types.h"
 #include "event/event.h"
 #include "external/wasm/wasm.h"
@@ -34,6 +35,26 @@ static void emit_success(spn_pkg_unit_t* unit) {
       .time = unit->time.package
     }
   });
+}
+
+static spn_err_t publish_copies(spn_pkg_unit_t* unit) {
+  sp_da_for(unit->info->publish.copy, it) {
+    spn_publish_copy_t* copy = &unit->info->publish.copy[it];
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+
+    sp_str_pair_t from = sp_str_cleave_c8(copy->from, '/');
+    sp_str_pair_t to = sp_str_cleave_c8(copy->to, '/');
+    s32 err = spn_copy(
+      (spn_t*)unit,
+      spn_cache_dir_kind_from_str(from.first), sp_str_to_cstr(scratch.mem, from.second),
+      spn_cache_dir_kind_from_str(to.first), sp_str_to_cstr(scratch.mem, to.second)
+    );
+
+    sp_mem_end_scratch(scratch);
+    spn_try_as(err, SPN_ERROR);
+  }
+
+  return SPN_OK;
 }
 
 static spn_err_t publish_headers(spn_pkg_unit_t* unit) {
@@ -93,6 +114,7 @@ s32 run_package_hook(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
   spn_try(publish_headers(unit));
+  spn_try(publish_copies(unit));
 
   if (spn_wasm_enabled() && sp_fs_is_file(unit->paths.wasm.build)) {
     spn_try(run_wasm_package(unit));

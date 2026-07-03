@@ -156,6 +156,34 @@ static void lower_package(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, s
   out->configure = lower_script(ctx, &p->configure, sp_str_lit("configure"), sp_str_lit("configure.c"));
 }
 
+static bool publish_mount_ok(sp_str_t path) {
+  sp_str_t mount = sp_str_cleave_c8(path, '/').first;
+  const c8* mounts [] = { "store", "include", "lib", "vendor", "source", "work", "project" };
+  sp_carr_for(mounts, it) {
+    if (sp_str_equal_cstr(mount, mounts[it])) return true;
+  }
+  return false;
+}
+
+static void lower_publish(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
+  spn_codegen_push_key(ctx, "publish");
+  out->publish.copy = sp_da_new(ctx->mem, spn_publish_copy_t);
+  sp_da_for(cg->publish.copy, it) {
+    spn_publish_copy_t copy = {
+      .from = cg->publish.copy[it].from,
+      .to = cg->publish.copy[it].to,
+    };
+    if (!publish_mount_ok(copy.from) || !publish_mount_ok(copy.to)) {
+      spn_codegen_push_index(ctx, it);
+      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_INVALID, "copy");
+      spn_codegen_pop(ctx);
+      continue;
+    }
+    sp_da_push(out->publish.copy, copy);
+  }
+  spn_codegen_pop(ctx);
+}
+
 static void lower_versions(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   out->versions = sp_da_new(ctx->mem, spn_semver_t);
   sp_ht_init(ctx->mem, out->metadata);
@@ -350,6 +378,7 @@ spn_err_t spn_pkg_lower(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn
   out->arena = sp_mem_arena_new(ctx->mem);
 
   lower_package(ctx, cg, out);
+  lower_publish(ctx, cg, out);
   lower_versions(ctx, cg, out);
   lower_targets(ctx, cg, out);
   lower_toolchains(ctx, cg, out);

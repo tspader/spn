@@ -31,7 +31,21 @@
         "index": { "elements": { "ref": "index" }, "metadata": { "key": "name" } },
         "profile": { "values": { "ref": "profile" } },
         "deps": { "ref": "deps" },
-        "config": { "values": { "ref": "config_entry" } }
+        "config": { "values": { "ref": "config_entry" } },
+        "publish": { "ref": "publish" }
+      }
+    },
+
+    "publish": {
+      "optionalProperties": {
+        "copy": { "elements": { "ref": "publish_copy" } }
+      }
+    },
+
+    "publish_copy": {
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" }
       }
     },
 

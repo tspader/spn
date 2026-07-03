@@ -71,6 +71,11 @@ typedef struct {
   spn_pkg_config_t value;
 } spn_pkg_config_entry_t;
 
+typedef struct {
+  sp_str_t from;
+  sp_str_t to;
+} spn_publish_copy_t;
+
 typedef sp_str_om(spn_target_info_t)     spn_target_info_om_t;
 typedef sp_str_om(spn_profile_info_t)    spn_profile_info_om_t;
 typedef sp_str_om(spn_index_info_t)      spn_index_info_om_t;
@@ -101,6 +106,9 @@ struct spn_pkg_info {
   spn_toolchain_om_t toolchains;
   spn_target_info_t build;
   spn_target_info_t configure;
+  struct {
+    sp_da(spn_publish_copy_t) copy;
+  } publish;
 
   sp_mem_arena_t* arena;
 };
