@@ -96,7 +96,6 @@ set(SPN_SOURCES
   toolchain/sha256.c
   toolchain/toolchain.c
   triple/triple.c
-  tui/table.c
   tui/tui.c
   unit/package.c
 )
