@@ -1,12 +1,8 @@
 # overview
-`spn` is a package manager and build tool for C projects in the style of UV or cargo
-
-- projects are defined in TOML manifests (e.g. `./spn.toml`)
-- build scripts are written in plain C and jitted with embedded TCC (e.g. `./spn.c`)
+`spn` is a package manager and build tool for C projects in the style of UV or cargo. Key features:
+- Projects are defined in TOML manifests (e.g. `./spn.toml`)
+- Build scripts are written in plain C and compiled to WASM
 - `spn` is written in C using `sp.h` as its custom standard library
-  - we adhere strictly to its coding style, `./doc/skill/sp.md`
-  - reference the `sp` skill or `./doc/sp/SKILL.md` judiciously
-- we use a tiny game loop library from `sp.h`, so `sp_main` is the entry point
 
 # building
 The top-level Makefile wraps CMake (fetch pinned deps, configure, build with `zig cc`):
@@ -28,17 +24,14 @@ It is sometimes useful to run the binary thus produced:
 
 # references
 - `source/`
-  - `spn.c` is most of the code (large file; search, don't read)
-    - `spn_app_t` is all data for one invocation
-    - `spn_init` is the top level init function
-  - `graph.h` is the build DAG
-  - `cli.h` is a generic CLI library
+  - `spn.c` is the entry point
+  - `task/` is the entry points for each phase of work (e.g. resolve, sync, configure, build, etc)
+    - `build/` is all the code that sets up and runs inside the build graph
 - `include/`
   - `spn/spn.h` for public API used in downstream packages
-- `spn.toml` is the package for spn itself; (example of a downstream project that uses spn)
-- `examples/tcc/spn.toml` is the package for the `tcc` example (minimal example of a downstream project)
-- `packages/sp/spn.toml` is the package for `sp.h` (example of a source-only spn package)
-- `packages/tcc/spn.toml` is the package for `tcc` (example of a compiled spn package)
+- `spn.toml` is the package for spn itself; it's example of how a real downstream project would use spn
+- `test/fixtures/` contains small, hermetic spn projects used in integration tests.
+  - `api/build_script` is an excellent example
 
 # tests
 

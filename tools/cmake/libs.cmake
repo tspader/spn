@@ -1,25 +1,5 @@
 file(MAKE_DIRECTORY ${STORE}/bin ${STORE}/lib ${STORE}/include ${STORE}/test)
 
-#######
-# TCC #
-#######
-set(TCC_WORK  ${CMAKE_BINARY_DIR}/tinycc)
-set(TCC_STAMP ${TCC_WORK}/install.stamp)
-set(TCC_LIB   ${STORE}/lib/libtcc.a)
-
-add_custom_command(
-  OUTPUT ${TCC_STAMP}
-  COMMAND ${CMAKE_COMMAND} -E make_directory ${TCC_WORK}
-  COMMAND ${CMAKE_COMMAND} -E chdir ${TCC_WORK} ${SOURCE_ROOT}/tinycc/configure
-          --cc=${CMAKE_C_COMPILER} --enable-static --prefix=${STORE}
-          --extra-cflags=-fno-sanitize=undefined
-  COMMAND ${CMAKE_COMMAND} -E chdir ${TCC_WORK} make -j4
-  COMMAND ${CMAKE_COMMAND} -E chdir ${TCC_WORK} make install
-  COMMAND ${CMAKE_COMMAND} -E touch ${TCC_STAMP}
-  COMMENT "tcc (${TRIPLE})"
-  VERBATIM)
-add_custom_target(tcc DEPENDS ${TCC_STAMP})
-
 ###########
 # HEADERS #
 ###########

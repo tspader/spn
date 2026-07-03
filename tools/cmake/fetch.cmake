@@ -4,7 +4,6 @@ set(DEPS
   "sp|https://github.com/tspader/sp.git|ede42f835f63cdaf1d90c5eeeb9eaa1205ada954"
   "toml|https://github.com/tspader/toml.git|2e8ffdfa215cfe184fd06f8f48b47fbd04a4a678"
   "argparse|https://github.com/tspader/argparse.git|f71ed6c7b11cdbe75ffa0b42170530cc8610cbbf"
-  "tinycc|https://github.com/tspader/tinycc.git|64fbf9ff080fac639b09b9a65c70499bcf41b581"
   "yyjson|https://github.com/ibireme/yyjson.git|ad58f21bee1213a8fdd614c2a11b4453815a73e9"
   "wamr|https://github.com/bytecodealliance/wasm-micro-runtime.git|e571797fbdf498d9ac4edb495205ea0f01370091"
 )
