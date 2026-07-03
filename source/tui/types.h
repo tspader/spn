@@ -6,6 +6,7 @@
 #include "sp.h"
 #include "sp/sp_math.h"
 #include "sp/prompt.h"
+#include "forward/types.h"
 
 #if defined(SP_POSIX)
   #include <termios.h>
@@ -28,32 +29,6 @@ typedef enum {
   SPN_VERBOSITY_DEBUG,
 } spn_verbosity_t;
 
-typedef enum {
-  SP_TUI_TABLE_NONE,
-  SP_TUI_TABLE_SETUP,
-  SP_TUI_TABLE_BUILDING,
-} sp_tui_table_state_t;
-
-typedef struct {
-  u32 row;
-  u32 col;
-} sp_tui_cursor_t;
-
-typedef struct {
-  sp_str_t name;
-  u32 min_width;
-} sp_tui_column_t;
-
-typedef struct {
-  sp_mem_t mem;
-  sp_da(sp_tui_column_t) cols;
-  sp_da(sp_da(sp_str_t)) rows;
-  sp_tui_cursor_t cursor;
-  sp_tui_table_state_t state;
-  u32 columns;
-  u32 indent;
-} sp_tui_table_t;
-
 typedef struct {
   sp_io_writer_t base;
   sp_prompt_ctx_t* prompt;
@@ -64,6 +39,7 @@ typedef struct {
 
 typedef struct {
   spn_tui_mode_t mode;
+  spn_session_t* session;
   u32 num_deps;
   u32 width;
   sp_ht(sp_str_t, s32) state;
@@ -95,8 +71,6 @@ typedef struct {
 #endif
     bool modified;
   } terminal;
-
-  sp_tui_table_t table;
 } spn_tui_t;
 
 #endif

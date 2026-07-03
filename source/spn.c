@@ -120,7 +120,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
-  spn_tui_init(&spn.tui, SPN_OUTPUT_MODE_INTERACTIVE);
+  spn_tui_init(&spn.tui, &app.session, SPN_OUTPUT_MODE_INTERACTIVE);
 
   spn.events = spn_event_buffer_new(spn.mem);
 
@@ -393,89 +393,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   sp_unreachable_return(SP_APP_ERR);
-}
-
-static void spn_prompt_on_event(sp_prompt_ctx_t* ctx, sp_prompt_event_t event) {
-  switch (event.kind) {
-    case SP_PROMPT_EVENT_CTRL_C:
-    case SP_PROMPT_EVENT_ESCAPE: {
-      spn_abort();
-      break;
-    }
-    default: {
-      spn.tui.prompt.widget.on_event(ctx, event);
-      break;
-    }
-  }
-}
-
-static void spn_prompt_start(void) {
-  spn_tui_t* tui = &spn.tui;
-  if (tui->prompt.started) return;
-  tui->prompt.started = true;
-
-  if (tui->mode != SPN_OUTPUT_MODE_INTERACTIVE) return;
-  if (!sp_os_is_tty(sp_sys_stdout)) return;
-
-  tui->prompt.ctx = sp_prompt_begin(spn.mem);
-  if (!tui->prompt.ctx) return;
-
-  tui->prompt.widget = sp_prompt_progress_widget(tui->prompt.ctx, (sp_prompt_progress_t) {
-    .prompt = "building",
-    .color = { .rgb = { .r = 99, .g = 160, .b = 136 } },
-  });
-  sp_prompt_widget_t widget = tui->prompt.widget;
-  widget.on_event = spn_prompt_on_event;
-  sp_prompt_app(tui->prompt.ctx, widget);
-  tui->prompt.app = (sp_app_t) { .user_data = tui->prompt.ctx };
-  sp_prompt_app_on_init(&tui->prompt.app);
-  tui->prompt.on = true;
-  spn_tui_attach_prompt(tui, tui->prompt.ctx);
-}
-
-static void spn_prompt_stop(bool ok) {
-  spn_tui_t* tui = &spn.tui;
-  if (!tui->prompt.on) return;
-
-  sp_prompt_state_t state = ok ? SP_PROMPT_STATE_SUBMIT : SP_PROMPT_STATE_ERROR;
-  if (sp_atomic_s32_get(&spn.aborted)) {
-    state = SP_PROMPT_STATE_CANCEL;
-  }
-
-  sp_prompt_set_state(tui->prompt.ctx, state);
-  sp_prompt_app_on_poll(&tui->prompt.app);
-  sp_prompt_end(tui->prompt.ctx);
-  tui->prompt.on = false;
-  spn_tui_detach_prompt(tui);
-}
-
-static void spn_prompt_pump(void) {
-  spn_tui_t* tui = &spn.tui;
-
-  if (sp_atomic_s32_get(&spn.aborted)) {
-    spn_prompt_stop(false);
-    return;
-  }
-
-  spn_bg_ctx_t* build = &app.session.build;
-  if (!tui->prompt.on) {
-    if (!build->executor || !build->dirty) return;
-    if (!sp_ht_size(build->dirty->commands)) return;
-    spn_prompt_start();
-    if (!tui->prompt.on) return;
-  }
-
-  u32 total = sp_ht_size(build->dirty->commands);
-  u32 done = (u32)sp_atomic_s32_get(&build->executor->num_completed);
-  f32 value = total ? (f32)done / (f32)total : 0.f;
-
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  sp_prompt_send_status_str(tui->prompt.ctx, sp_fmt(s.mem,
-    "{}/{} units", sp_fmt_uint(done), sp_fmt_uint(total)).value);
-  sp_mem_end_scratch(s);
-
-  sp_prompt_send_progress_f32(tui->prompt.ctx, value);
-  sp_prompt_app_on_poll(&tui->prompt.app);
 }
 
 sp_app_result_t spn_poll(sp_app_t* sp) {

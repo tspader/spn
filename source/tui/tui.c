@@ -1,4 +1,5 @@
 #include "profile/types.h"
+#include "session/types.h"
 
 #include "codegen/codegen.h"
 #include "ctx/ctx.h"
@@ -7,6 +8,7 @@
 #include "sp/color.h"
 #include "sp/io.h"
 #include "sp/macro.h"
+#include "sp/prompt.h"
 #include "sp/str.h"
 #include "spn.h"
 #include "toolchain/select.h"
@@ -15,6 +17,11 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+
+sp_app_result_t sp_prompt_app_on_poll(sp_app_t* app);
+sp_app_result_t sp_prompt_app_on_init(sp_app_t* app);
+void sp_prompt_app_on_deinit(sp_app_t* app);
+sp_prompt_widget_t sp_prompt_progress_widget(sp_prompt_ctx_t* ctx, sp_prompt_progress_t config);
 
 #ifdef _WIN32
   #ifndef WIN32_LEAN_AND_MEAN
@@ -1062,8 +1069,9 @@ void spn_tui_detach_prompt(spn_tui_t* tui) {
   spn_tui_line_writer_flush(&tui->line_writer);
 }
 
-void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode) {
+void spn_tui_init(spn_tui_t* tui, spn_session_t* session, spn_tui_mode_t mode) {
   tui->mode = mode;
+  tui->session = session;
   tui->line_writer = (spn_tui_line_writer_t) {
     .base.write = spn_tui_line_writer_write,
     .downstream = &spn.logger.err.base,
@@ -1083,3 +1091,84 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode) {
   }
 }
 
+static void spn_prompt_on_event(sp_prompt_ctx_t* ctx, sp_prompt_event_t event) {
+  switch (event.kind) {
+    case SP_PROMPT_EVENT_CTRL_C:
+    case SP_PROMPT_EVENT_ESCAPE: {
+      break;
+    }
+    default: {
+      spn.tui.prompt.widget.on_event(ctx, event);
+      break;
+    }
+  }
+}
+
+static void spn_prompt_start(void) {
+  spn_tui_t* tui = &spn.tui;
+  if (tui->prompt.started) return;
+  tui->prompt.started = true;
+
+  if (tui->mode != SPN_OUTPUT_MODE_INTERACTIVE) return;
+  if (!sp_os_is_tty(sp_sys_stdout)) return;
+
+  tui->prompt.ctx = sp_prompt_begin(spn.mem);
+  if (!tui->prompt.ctx) return;
+
+  tui->prompt.widget = sp_prompt_progress_widget(tui->prompt.ctx, (sp_prompt_progress_t) {
+    .prompt = "building",
+    .color = { .rgb = { .r = 99, .g = 160, .b = 136 } },
+  });
+  sp_prompt_widget_t widget = tui->prompt.widget;
+  widget.on_event = spn_prompt_on_event;
+  sp_prompt_app(tui->prompt.ctx, widget);
+  tui->prompt.app = (sp_app_t) { .user_data = tui->prompt.ctx };
+  sp_prompt_app_on_init(&tui->prompt.app);
+  tui->prompt.on = true;
+  spn_tui_attach_prompt(tui, tui->prompt.ctx);
+}
+
+void spn_prompt_stop(bool ok) {
+  spn_tui_t* tui = &spn.tui;
+  if (!tui->prompt.on) return;
+
+  sp_prompt_state_t state = ok ? SP_PROMPT_STATE_SUBMIT : SP_PROMPT_STATE_ERROR;
+  if (sp_atomic_s32_get(&spn.aborted)) {
+    state = SP_PROMPT_STATE_CANCEL;
+  }
+
+  sp_prompt_set_state(tui->prompt.ctx, state);
+  sp_prompt_app_on_poll(&tui->prompt.app);
+  sp_prompt_end(tui->prompt.ctx);
+  tui->prompt.on = false;
+  spn_tui_detach_prompt(tui);
+}
+
+void spn_prompt_pump(void) {
+  spn_tui_t* tui = &spn.tui;
+
+  if (sp_atomic_s32_get(&spn.aborted)) {
+    spn_prompt_stop(false);
+    return;
+  }
+
+  spn_bg_ctx_t* build = &tui->session->build;
+  if (!tui->prompt.on) {
+    if (!build->executor || !build->dirty) return;
+    if (!sp_ht_size(build->dirty->commands)) return;
+    spn_prompt_start();
+    if (!tui->prompt.on) return;
+  }
+
+  u32 total = sp_ht_size(build->dirty->commands);
+  u32 done = (u32)sp_atomic_s32_get(&build->executor->num_completed);
+  f32 value = total ? (f32)done / (f32)total : 0.f;
+
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  sp_prompt_send_status_str(tui->prompt.ctx, sp_fmt(s.mem,
+    "{}/{} units", sp_fmt_uint(done), sp_fmt_uint(total)).value);
+  sp_mem_end_scratch(s);
+
+  sp_prompt_send_progress_f32(tui->prompt.ctx, value);
+  sp_prompt_app_on_poll(&tui->prompt.app);
+}
