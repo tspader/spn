@@ -49,9 +49,7 @@ s32 gen_combined(spn_t* spn, spn_node_ctx_t* ctx) {
 }
 
 SPN_EXPORT
-spn_err_t configure(spn_t* spn) {
-  spn_config_t* config = (spn_config_t*)spn;
-  (void)config;
+spn_err_t configure(spn_t* spn, spn_config_t* config) {
   spn_add_include(config, spn_get_dir(spn, SPN_DIR_WORK));
 
   const c8* alpha_h = spn_get_subdir(spn, SPN_DIR_WORK, "alpha.h");

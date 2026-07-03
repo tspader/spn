@@ -180,7 +180,6 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
       sp_unreachable_return(69);
     }
     case SPN_CC_OUTPUT_WASM:
-    case SPN_CC_OUTPUT_JIT:
     case SPN_CC_OUTPUT_OBJECT: {
       SP_UNREACHABLE_CASE();
     }

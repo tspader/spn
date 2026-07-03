@@ -17,10 +17,10 @@ s32 gen_version(spn_t* spn, spn_node_ctx_t* ctx) {
 }
 
 SPN_EXPORT
-spn_err_t package(spn_t* spn) {
+s32 package(spn_t* spn, spn_node_ctx_t* ctx) {
   if (spn_copy(spn, SPN_DIR_WORK, "version.h", SPN_DIR_INCLUDE, "version.h")) {
-    return SPN_ERROR;
+    return 1;
   }
 
-  return SPN_OK;
+  return 0;
 }

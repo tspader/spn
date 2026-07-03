@@ -31,9 +31,7 @@ s32 consumer_fn(spn_t* spn, spn_node_ctx_t* ctx) {
 }
 
 SPN_EXPORT
-spn_err_t configure(spn_t* spn) {
-  spn_config_t* config = (spn_config_t*)spn;
-  (void)config;
+spn_err_t configure(spn_t* spn, spn_config_t* config) {
   const c8* orphan_h = spn_get_subdir(spn, SPN_DIR_WORK, "orphan_header.h");
   const c8* consumed_h = spn_get_subdir(spn, SPN_DIR_WORK, "consumed_header.h");
 

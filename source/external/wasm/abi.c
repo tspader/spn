@@ -69,12 +69,6 @@ void spn_wasm_remove_handle(spn_wasm_handles_t* table, u32 token) {
   sp_ht_erase(table->map, token);
 }
 
-spn_node_t* spn_abi_add_node(spn_config_t* config, const c8* tag) {
-  spn_node_t* node = spn_add_node(config, tag);
-  spn_find_user_node(node)->wasm = true;
-  return node;
-}
-
 void spn_abi_node_set_user_data(spn_node_t* node, s32 data) {
   spn_find_user_node(node)->user_data = (void*)(u64)(u32)data;
 }
