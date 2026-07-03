@@ -89,10 +89,8 @@ fail:
   return SPN_ERROR;
 }
 
-spn_err_t compile_shim(spn_session_t* session, spn_pkg_unit_t* unit) {
-  spn_try(compile_wasm(session, unit));
-  spn_try(compile_package(session, unit));
-  return SPN_OK;
+static bool configure_use_wasm(void) {
+  return !sp_str_empty(sp_env_get(spn.env, sp_str_lit("SPN_USE_WASM")));
 }
 
 spn_err_t compile_wasm(spn_session_t* session, spn_pkg_unit_t* unit) {
@@ -208,10 +206,18 @@ spn_err_t configure_package(spn_pkg_unit_t* unit) {
 s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
-  spn_try(compile_shim(unit->session, unit));
-  if (sp_fs_is_file(unit->paths.configure)) {
-    spn_try(spn_wasm_run_configure(unit));
+  // package() still lives in the TCC script for now, so it compiles either way;
+  // the flag only decides who runs configuration
+  spn_try(compile_package(unit->session, unit));
+
+  if (configure_use_wasm()) {
+    spn_try(compile_wasm(unit->session, unit));
+    if (sp_fs_is_file(unit->paths.configure)) {
+      spn_try(spn_wasm_run_configure(unit));
+    }
+    return SPN_OK;
   }
+
   spn_try(configure_package(unit));
   return SPN_OK;
 }

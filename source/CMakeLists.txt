@@ -69,6 +69,7 @@ set(SPN_SOURCES
   sp/str.c
   sp/terminal.c
   spn.c
+  target/closure.c
   target/mutate.c
   target/select.c
   target/target.c

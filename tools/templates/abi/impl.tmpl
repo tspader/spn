@@ -43,9 +43,14 @@ static s32 spn_abi_thunk_{{ .name }}(wasm_exec_env_t env, u32 ctx, u32 addr) {
 }
 
 {{ end }}
+{{ for .fns }}
+{{ .thunk }}
+{{ end }}
 bool spn_abi_register(void) {
   static NativeSymbol natives [] = {
-    { "spn_get_target", spn_abi_thunk_get_target, "(ii)i", SP_NULLPTR },
+{{ for .fns }}
+    { "{{ .name }}", spn_abi_thunk_{{ .short }}, "{{ .sig }}", SP_NULLPTR },
+{{ end }}
 {{ for .functions }}
     { "spn_{{ .name }}_ex", spn_abi_thunk_{{ .name }}, "(ii)i", SP_NULLPTR },
 {{ end }}

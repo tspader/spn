@@ -540,6 +540,15 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
           },
         };
 
+        u32 env_slot = 0;
+        while (env_slot < sp_carr_len(config.env.extra) && !sp_str_empty(config.env.extra[env_slot].key)) env_slot++;
+        sp_carr_for(action.cli.env, env_it) {
+          const c8* var = action.cli.env[env_it];
+          if (!var || env_slot >= sp_carr_len(config.env.extra)) break;
+          sp_str_pair_t pair = sp_str_cleave_c8(sp_str_view(var), '=');
+          config.env.extra[env_slot++] = (sp_env_var_t) { .key = pair.first, .value = pair.second };
+        }
+
         if (action.cli.cmd) {
           sp_ps_config_add_arg(mem, &config, sp_str_view(action.cli.cmd));
         }

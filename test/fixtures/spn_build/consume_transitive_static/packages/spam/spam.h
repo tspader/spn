@@ -1,0 +1,1 @@
+int spam_value();

@@ -10,6 +10,7 @@
 #include "filter/filter.h"
 #include "pkg/types.h"
 #include "session/session.h"
+#include "target/closure.h"
 #include "task/build/build.h"
 
 // Manifest includes are source-relative; the build script API hands us absolute paths
@@ -46,18 +47,16 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
   spn_session_t* session = target->session;
   spn_pkg_unit_t* pkg = target->pkg;
 
-  sp_da_for(pkg->info->system_deps, it) {
-    spn_cc_target_add_system_lib(cc, pkg->info->system_deps[it]);
-  }
+  sp_da(spn_pkg_unit_t*) deps = spn_target_link_closure(session->mem, target);
 
-  sp_da(spn_pkg_unit_t*) deps = spn_session_pkg_deps(session, pkg);
+  // Package archives first. They reference symbols from system libraries, and
+  // the linker resolves left-to-right, so every -l<archive> must precede the
+  // -l<system> that satisfies it. Package archives and system libs share the
+  // same command-line bucket, so ordering them here is what keeps a math-using
+  // static lib linkable regardless of the order its package was discovered in.
   sp_da_for(deps, it) {
     spn_pkg_unit_t* dep = deps[it];
     if (!dep || dep == pkg) continue;
-
-    sp_da_for(dep->info->system_deps, s) {
-      spn_cc_target_add_system_lib(cc, dep->info->system_deps[s]);
-    }
 
     sp_da_for(dep->libs, l) {
       spn_target_unit_t* lib = dep->libs[l];
@@ -79,6 +78,19 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
         case SPN_LIB_KIND_OBJECT:
         case SPN_LIB_KIND_NONE: break;
       }
+    }
+  }
+
+  // System libraries last, so they resolve every archive above them.
+  sp_da_for(pkg->info->system_deps, it) {
+    spn_cc_target_add_system_lib(cc, pkg->info->system_deps[it]);
+  }
+  sp_da_for(deps, it) {
+    spn_pkg_unit_t* dep = deps[it];
+    if (!dep || dep == pkg) continue;
+
+    sp_da_for(dep->info->system_deps, s) {
+      spn_cc_target_add_system_lib(cc, dep->info->system_deps[s]);
     }
   }
 }
