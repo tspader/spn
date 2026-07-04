@@ -21,13 +21,24 @@ typedef struct {
   sp_om(sp_str_t, spn_wasm_fn_t*) functions;
 } spn_wasm_pkg_t;
 
+typedef union {
+  struct {
+    const c8* work;
+    const c8* source;
+    const c8* store;
+  };
+  const c8* array [3];
+} spn_wasm_preopens_t;
+
 typedef struct {
   spn_wasm_module_t* module;
   spn_wasm_module_instance_t* instance;
+  spn_wasm_exec_t* exec;
   spn_wasm_handles_t* table;
   u32 ctx;
   sp_str_t path;
   sp_mutex_t mutex;
+  spn_wasm_preopens_t preopens;
 } spn_wasm_script_t;
 
 typedef struct {
