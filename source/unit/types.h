@@ -175,15 +175,8 @@ struct spn_pkg_unit_t {
 
     spn_build_log_paths_t logs;
 
-    struct {
-      sp_str_t configure;
-      sp_str_t build;
-    } wasm;
-
     sp_str_t manifest;
     sp_str_t script;
-    sp_str_t configure;
-    sp_str_t build;
     sp_str_t source;
     sp_str_t work;
     sp_str_t generated;
@@ -212,9 +205,8 @@ struct spn_pkg_unit_t {
   } time;
 
   struct {
-    spn_wasm_script_t* configure;
-    spn_wasm_script_t* build;
-    sp_mutex_t mutex;
+    spn_wasm_script_t configure;
+    spn_wasm_script_t build;
   } wasm;
 
   sp_atomic_s32_t compile_announced;

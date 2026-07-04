@@ -8,6 +8,7 @@
 #include "unit/types.h"
 
 #include "enum/enum.h"
+#include "external/wasm/wasm.h"
 #include "filter/filter.h"
 #include "intern/intern.h"
 #include "log/lazy/lazy.h"
@@ -184,8 +185,6 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   sp_str_ht_init(session->mem, unit->nodes.files);
   unit->paths.manifest = loaded->paths.manifest;
   unit->paths.script = loaded->paths.script;
-  unit->paths.configure = loaded->paths.configure;
-  unit->paths.build = loaded->paths.build;
   unit->paths.source = loaded->roots.source;
 
   switch (loaded->source) {
@@ -210,9 +209,8 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* lo
   unit->paths.vendor = sp_fs_join_path(session->mem, unit->paths.store, SP_LIT("vendor"));
 
   unit->paths.generated = sp_fs_join_path(session->mem, unit->paths.work, SP_LIT("spn"));
-  unit->paths.wasm.configure = sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("configure.wasm"));
-  unit->paths.wasm.build = sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("build.wasm"));
-  sp_mutex_init(&unit->wasm.mutex, SP_MUTEX_PLAIN);
+  spn_wasm_script_init(&unit->wasm.configure, loaded->paths.configure, sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("configure.wasm")));
+  spn_wasm_script_init(&unit->wasm.build, loaded->paths.build, sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("build.wasm")));
 
   unit->logs.build = sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(unit->info->name)).value;
   unit->logs.test = sp_fmt(session->mem, "{}.test.log", SP_FMT_STR(unit->info->name)).value;

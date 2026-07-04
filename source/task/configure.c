@@ -25,14 +25,17 @@
 s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
-  if (!sp_fs_is_file(unit->paths.configure)) return SPN_OK;
+  spn_wasm_script_t* configure = &unit->wasm.configure;
+  if (configure->state == SPN_WASM_SCRIPT_NONE) return SPN_OK;
 
   sp_tm_timer_t timer = sp_tm_start_timer();
-  spn_try(spn_compile_script_module(unit, &unit->info->configure, unit->paths.wasm.configure));
+  spn_try(spn_compile_script_module(unit, &unit->info->configure, configure->path));
   unit->time.compile = sp_tm_read_timer(&timer);
 
-  spn_try(spn_wasm_script_open(&unit->wasm.configure, unit, unit->paths.wasm.configure));
-  spn_try(spn_wasm_script_call_hook(unit->wasm.configure, unit, "configure"));
+  spn_try(spn_wasm_script_open(configure, unit));
+  if (spn_wasm_script_exports(configure, sp_str_lit("configure"))) {
+    spn_try(spn_wasm_script_call(configure, unit, sp_str_lit("configure"), SPN_ABI_KIND_CONFIG, unit));
+  }
   return SPN_OK;
 }
 
@@ -42,7 +45,7 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   spn_bg_init(graph, spn.mem);
   spn_pkg_unit_t* root = spn_session_find_root(&app->session);
 
-  if (spn_wasm_init_stupid_global_runtime()) {
+  if (spn_wasm_init()) {
     return SPN_TASK_ERROR;
   }
 
