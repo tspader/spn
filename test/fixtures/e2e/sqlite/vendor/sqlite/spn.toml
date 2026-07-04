@@ -1,0 +1,26 @@
+[package]
+namespace = "spader"
+name      = "sqlite"
+version   = "3.53.0"
+url       = "https://github.com/sqlite/sqlite.git"
+commit    = "7ff8b558e8fe79047ccc73b1ee7e796b0401edee"
+system_deps = ["pthread", "m", "dl"]
+
+[package.configure]
+source = ["tools/configure.c"]
+
+[package.build]
+source  = ["tools/build.c", "tools/lemon.c", "tools/mkkeywordhash.c", "tools/jimsh0.c"]
+include = ["tools"]
+
+[[lib]]
+name   = "sqlite3"
+kinds  = ["static"]
+source = ["sqlite3.c"]
+define = ["SQLITE_ENABLE_FTS5", "SQLITE_ENABLE_RTREE"]
+
+[publish]
+copy = [
+  { from = "work/sqlite3.h", to = "include/sqlite3.h" },
+  { from = "work/sqlite3.c", to = "include/sqlite3.c" },
+]
