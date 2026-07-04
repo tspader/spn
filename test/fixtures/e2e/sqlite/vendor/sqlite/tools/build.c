@@ -78,6 +78,23 @@ static int run_jimsh(const char* in_path, const char* out_path, char* const* arg
   return rc;
 }
 
+typedef struct {
+  const c8* in;
+  const c8* out;
+  const c8* args [8];
+} jimsh_t;
+
+static int run_jimsh2(jimsh_t config) {
+  spn_jimsh_stdin_path = config.in;
+  spn_jimsh_stdout_path = config.out;
+  int n = 0;
+  for (int it = 0; it < 8; it++) {
+    if (!config.args[it]) break;
+    n++;
+  }
+  return jimsh_main(n, (c8* const*)config.args);
+}
+
 SPN_EXPORT
 s32 generate_code(spn_t* spn, spn_node_ctx_t* ctx) {
   (void)ctx;
@@ -102,8 +119,20 @@ s32 generate_code(spn_t* spn, spn_node_ctx_t* ctx) {
 
   LOG("mkopcodeh.tcl -> opcodes.h");   /* reads stdin (parse.h + vdbe.c), writes stdout */
   if (cat2("parse.h", "/source/src/vdbe.c", "/work/.opcodeh.in")) FAIL("cat opcodeh input");
-  if (run_jimsh("/work/.opcodeh.in", "/work/opcodes.h",
-                (char* const[]){ "jimsh", "/source/tool/mkopcodeh.tcl", 0 }, 2)) FAIL("mkopcodeh");
+
+  // @spader Do it like this
+  struct {
+    jimsh_t opcodes_h;
+  } jims = {
+    .opcodes_h = {
+      .in = "/work/.opcodeh.in",
+      .out = "/work/opcodes.h",
+      .args = {
+        "jimsh", "/source/tool/mkopcodeh.tcl"
+      }
+    }
+  };
+  if (run_jimsh2(jims.opcodes_h)) FAIL("mkopcodeh");
 
   LOG("mkopcodec.tcl -> opcodes.c");   /* reads opcodes.h (argv), writes stdout */
   if (run_jimsh(0, "/work/opcodes.c",
