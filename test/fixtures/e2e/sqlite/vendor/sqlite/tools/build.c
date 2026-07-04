@@ -104,9 +104,9 @@ s32 generate_code(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "Building mksqlite3h.tcl");
   spn_write_file(spn, "mksqlite3h.tcl", SPN_MKSQLITE3H_TCL);
 
-  if (copy_file("/source/src/parse.y", "parse.y")) FAIL("stage parse.y");
-  if (copy_file("/source/tool/lempar.c", "lempar.c")) FAIL("stage lempar.c");
-  if (copy_file("/source/ext/fts5/fts5parse.y", "fts5parse.y")) FAIL("stage fts5parse.y");
+  spn_fs_copy("/source/src/parse.y", "/work/parse.y");
+  spn_fs_copy("/source/tool/lempar.c", "/work/lempar.c");
+  spn_fs_copy("/source/ext/fts5/fts5parse.y", "/work/fts5parse.y");
 
   LOG("mkkeywordhash -> keywordhash.h");
   if (mkkeywordhash_main(2, (char*[]){ "mkkeywordhash", "keywordhash.h", 0 })) FAIL("mkkeywordhash");

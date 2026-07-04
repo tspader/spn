@@ -29,6 +29,7 @@ typedef struct {
 struct spn_wasm_handles_t {
   sp_ht(u32, spn_wasm_handle_t) map;
   u32 next;
+  spn_t* ctx;
 };
 
 typedef struct {
@@ -48,6 +49,7 @@ bool           spn_wasm_read_handle(spn_wasm_ctx_t* abi, u32 token, spn_abi_kind
 spn_wasm_ptr_t spn_wasm_copy_str(spn_wasm_ctx_t* abi, const c8* str);
 void        spn_abi_node_set_user_data(spn_node_t* node, s32 data);
 s32         spn_abi_node_ctx_get_user_data(spn_node_ctx_t* ctx);
+void        spn_abi_fs_copy(spn_wasm_ctx_t* abi, const c8* from, const c8* to);
 bool        spn_wasm_register_api(void);
 
 #endif

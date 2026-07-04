@@ -908,15 +908,15 @@ void spn_tui_log_event(spn_build_event_t* event) {
   }
 
   spn_build_event_display_t display = event_info[event->kind];
-  if (display.verbosity > spn.logger.verbosity) {
-    if (event->kind == SPN_EVENT_USER_LOG) {
-      sp_da_push(buffered_logs, ((spn_tui_buffered_log_t) {
-        .pkg = event->pkg ? sp_str_copy(spn.heap, event->pkg->name) : sp_str_lit(""),
-        .message = sp_str_copy(spn.heap, event->user_log.message),
-      }));
-    }
-    return;
-  }
+  // if (display.verbosity > spn.logger.verbosity) {
+  //   if (event->kind == SPN_EVENT_USER_LOG) {
+  //     sp_da_push(buffered_logs, ((spn_tui_buffered_log_t) {
+  //       .pkg = event->pkg ? sp_str_copy(spn.heap, event->pkg->name) : sp_str_lit(""),
+  //       .message = sp_str_copy(spn.heap, event->user_log.message),
+  //     }));
+  //   }
+  //   return;
+  // }
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_mem_t mem = scratch.mem;

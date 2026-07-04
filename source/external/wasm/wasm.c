@@ -105,6 +105,7 @@ static spn_err_t script_open(spn_wasm_script_t* script, spn_pkg_unit_t* unit) {
 
   script->handles = sp_alloc_type(spn.mem, spn_wasm_handles_t);
   sp_ht_init(spn.mem, script->handles->map);
+  script->handles->ctx = sp_ptr_cast(spn_t*, unit);
   script->ctx = spn_wasm_add_handle(script->handles, unit, SPN_ABI_KIND_CTX);
 
   return SPN_OK;

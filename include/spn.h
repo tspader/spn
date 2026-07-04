@@ -185,6 +185,8 @@ void          spn_write_file(spn_t* spn, const c8* path, const c8* content);
 s32           spn_copy(spn_t* spn, spn_dir_t from, const c8* from_path, spn_dir_t to, const c8* to_path);
 void          spn_log(spn_t* spn, const c8* message);
 
+void          spn_fs_copy(const c8* from, const c8* to);
+
 spn_target_t* spn_add_exe(spn_config_t* config, const c8* name);
 spn_target_t* spn_add_lib(spn_config_t* config, const c8* name, spn_linkage_t kind);
 spn_target_t* spn_add_test(spn_config_t* config, const c8* name);
