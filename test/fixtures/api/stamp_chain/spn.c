@@ -28,7 +28,7 @@ SPN_EXPORT
 s32 final_fn(spn_t* spn, spn_node_ctx_t* ctx) {
   order[order_idx++] = 4;
   spn_log(spn, "final: writing result.h");
-  spn_write_file(spn, "result.h",
+  spn_io_write("/work/result.h",
     "#ifndef RESULT_H\n"
     "#define RESULT_H\n"
     "#define CHAIN_COMPLETE 1\n"

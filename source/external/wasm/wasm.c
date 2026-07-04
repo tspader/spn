@@ -28,8 +28,10 @@ spn_err_t spn_wasm_init() {
     return SPN_ERR_WASM_INIT_FAILED;
   }
 
-  if (!wasm_runtime_set_default_running_mode(Mode_Fast_JIT)) {
-    return SPN_ERR_WASM_INIT_FAILED;
+  if (wasm_runtime_is_running_mode_supported(Mode_Fast_JIT)) {
+    if (!wasm_runtime_set_default_running_mode(Mode_Fast_JIT)) {
+      return SPN_ERR_WASM_INIT_FAILED;
+    }
   }
 
   if (!spn_wasm_register_api()) {
@@ -143,14 +145,25 @@ static void export_name(sp_str_t name, c8* buffer) {
 }
 
 bool spn_wasm_script_exports(spn_wasm_script_t* script, sp_str_t name) {
-  if (script->state != SPN_WASM_SCRIPT_OPEN) return false;
+  bool exported = false;
 
-  c8 buffer [SPN_WASM_EXPORT_MAX] = sp_zero;
-  export_name(name, buffer);
-  return wasm_runtime_lookup_function(script->instance, buffer) != SP_NULLPTR;
+  sp_mutex_lock(&script->mutex);
+  if (script->state == SPN_WASM_SCRIPT_OPEN) {
+    c8 buffer [SPN_WASM_EXPORT_MAX] = sp_zero;
+    export_name(name, buffer);
+    exported = wasm_runtime_lookup_function(script->instance, buffer) != SP_NULLPTR;
+  }
+  sp_mutex_unlock(&script->mutex);
+
+  return exported;
 }
 
 spn_err_t spn_wasm_script_call(spn_wasm_script_t* script, spn_pkg_unit_t* unit, sp_str_t name, spn_abi_kind_t kind, void* arg) {
+  if (!wasm_runtime_init_thread_env()) {
+    return script_fail(unit, SPN_ERR_WASM_THREAD_ENV_FAILED, (spn_err_wasm_t) { .path = script->path });
+  }
+
+  sp_mutex_lock(&script->mutex);
   SP_ASSERT(script->state == SPN_WASM_SCRIPT_OPEN);
 
   c8 buffer [SPN_WASM_EXPORT_MAX] = sp_zero;
@@ -158,17 +171,12 @@ spn_err_t spn_wasm_script_call(spn_wasm_script_t* script, spn_pkg_unit_t* unit, 
 
   wasm_function_inst_t fn = wasm_runtime_lookup_function(script->instance, buffer);
   if (!fn) {
+    sp_mutex_unlock(&script->mutex);
     return script_fail(unit, SPN_ERR_WASM_EXPORT_NOT_FOUND, (spn_err_wasm_t) {
       .path = script->path,
       .error = name,
     });
   }
-
-  if (!wasm_runtime_init_thread_env()) {
-    return script_fail(unit, SPN_ERR_WASM_THREAD_ENV_FAILED, (spn_err_wasm_t) { .path = script->path });
-  }
-
-  sp_mutex_lock(&script->mutex);
 
   spn_err_t err = SPN_OK;
 

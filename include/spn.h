@@ -186,6 +186,16 @@ s32           spn_copy(spn_t* spn, spn_dir_t from, const c8* from_path, spn_dir_
 void          spn_log(spn_t* spn, const c8* message);
 
 void          spn_fs_copy(const c8* from, const c8* to);
+void          spn_fs_copy_glob(const c8* glob, const c8* dir);
+void          spn_fs_create_dir(const c8* path);
+void          spn_fs_cat_ex(const c8* path, const c8* a0, const c8* a1, const c8* a2, const c8* a3);
+void          spn_io_write(const c8* path, const c8* contents);
+const c8*     spn_fmt_ex(const c8* fmt, const c8* a0, const c8* a1, const c8* a2, const c8* a3);
+
+#define spn_fmt_select(fmt, a0, a1, a2, a3, ...) spn_fmt_ex(fmt, a0, a1, a2, a3)
+#define spn_fmt(fmt, ...) spn_fmt_select(fmt, ##__VA_ARGS__, 0, 0, 0, 0, 0)
+#define spn_fs_cat_select(path, a0, a1, a2, a3, ...) spn_fs_cat_ex(path, a0, a1, a2, a3)
+#define spn_fs_cat(path, ...) spn_fs_cat_select(path, ##__VA_ARGS__, 0, 0, 0, 0, 0)
 
 spn_target_t* spn_add_exe(spn_config_t* config, const c8* name);
 spn_target_t* spn_add_lib(spn_config_t* config, const c8* name, spn_linkage_t kind);

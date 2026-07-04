@@ -3,7 +3,7 @@
 SPN_EXPORT
 s32 gen_data(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "gen_data: creating data.txt");
-  spn_write_file(spn, "data.txt", "hello world");
+  spn_io_write("/work/data.txt", "hello world");
   return 0;
 }
 
@@ -16,7 +16,7 @@ s32 validate(spn_t* spn, spn_node_ctx_t* ctx) {
 SPN_EXPORT
 s32 finalize(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "finalize: creating header after validation stamp");
-  spn_write_file(spn, "validated.h",
+  spn_io_write("/work/validated.h",
     "#ifndef VALIDATED_H\n"
     "#define VALIDATED_H\n"
     "#define VALIDATION_PASSED 1\n"

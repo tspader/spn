@@ -20,7 +20,7 @@ s32 generate_with_config(spn_t* spn, spn_node_ctx_t* ctx) {
     return 1;
   }
 
-  spn_write_file(spn, "config.h",
+  spn_io_write("/work/config.h",
     "#ifndef CONFIG_H\n"
     "#define CONFIG_H\n"
     "#define MY_BASE 7\n"

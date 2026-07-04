@@ -4,7 +4,7 @@ SPN_EXPORT
 s32 gen_all_headers(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "gen_all_headers: creating 3 headers from single node");
 
-  spn_write_file(spn, "types.h",
+  spn_io_write("/work/types.h",
     "#ifndef TYPES_H\n"
     "#define TYPES_H\n"
     "typedef int my_int_t;\n"
@@ -12,7 +12,7 @@ s32 gen_all_headers(spn_t* spn, spn_node_ctx_t* ctx) {
     "#endif\n"
   );
 
-  spn_write_file(spn, "constants.h",
+  spn_io_write("/work/constants.h",
     "#ifndef CONSTANTS_H\n"
     "#define CONSTANTS_H\n"
     "#define MAX_SIZE 1024\n"
@@ -20,7 +20,7 @@ s32 gen_all_headers(spn_t* spn, spn_node_ctx_t* ctx) {
     "#endif\n"
   );
 
-  spn_write_file(spn, "macros.h",
+  spn_io_write("/work/macros.h",
     "#ifndef MACROS_H\n"
     "#define MACROS_H\n"
     "#define SQUARE(x) ((x) * (x))\n"
@@ -34,7 +34,7 @@ s32 gen_all_headers(spn_t* spn, spn_node_ctx_t* ctx) {
 SPN_EXPORT
 s32 gen_combined(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "gen_combined: aggregating all headers");
-  spn_write_file(spn, "all.h",
+  spn_io_write("/work/all.h",
     "#ifndef ALL_H\n"
     "#define ALL_H\n"
     "#include \"types.h\"\n"

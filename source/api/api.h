@@ -9,6 +9,7 @@
 // Build scripts get opaque pointers; spn_t and spn_config_t are both the package unit
 spn_pkg_unit_t* spn_api_unit(const void* opaque);
 sp_str_t        spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir);
+s32             spn_api_copy(sp_str_t from, sp_str_t to);
 sp_ps_output_t  spn_api_subprocess(sp_mem_t mem, spn_pkg_unit_t* unit, sp_ps_config_t config);
 
 #define SPN_API_LOG(unit, fn_name, args_fmt, ...) \
