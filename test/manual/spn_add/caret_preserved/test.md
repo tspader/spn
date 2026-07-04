@@ -1,2 +1,0 @@
-- `spn add argparse` to trigger a manifest update
-- Verify `sp` still has a ^ in the project file when the manifest is written back to disk

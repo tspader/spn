@@ -1,7 +1,0 @@
-[package]
-name = "test_visibility"
-version = "0.0.0"
-
-[[bin]]
-name = "binary"
-source = ["main.c"]

@@ -6,7 +6,6 @@ function(spn_test_binary target)
     ${SRC}
     ${CMAKE_SOURCE_DIR}/include
     ${TEST_TOOLS}
-    ${CMAKE_SOURCE_DIR}/test/sp_test
     ${SOURCE_ROOT}/sp/tools
     ${STORE}/include
   )
@@ -16,3 +15,4 @@ endfunction()
 
 add_subdirectory(core)
 add_subdirectory(integration)
+add_subdirectory(e2e)

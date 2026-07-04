@@ -30,7 +30,7 @@ add_executable(publish
   ${SRC}/toolchain/toolchain.c
   main.c
   publish.c
-  ${TEST_TOOLS}/harness.c
+  ${TEST_TOOLS}/ctx.c
   ${TEST_TOOLS}/tmp.c
   ${TEST_TOOLS}/git.c
   ${TEST_TOOLS}/toml.c

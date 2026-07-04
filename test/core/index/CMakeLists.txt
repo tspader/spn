@@ -14,7 +14,7 @@ add_executable(index
   query.c
   publish.c
   sync.c
-  ${TEST_TOOLS}/harness.c
+  ${TEST_TOOLS}/ctx.c
   ${TEST_TOOLS}/tmp.c
   ${TEST_TOOLS}/git.c
   ${TEST_TOOLS}/toml.c

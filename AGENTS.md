@@ -30,8 +30,8 @@ It is sometimes useful to run the binary thus produced:
 - `include/`
   - `spn/spn.h` for public API used in downstream packages
 - `spn.toml` is the package for spn itself; it's example of how a real downstream project would use spn
-- `test/fixtures/` contains small, hermetic spn projects used in integration tests.
-  - `api/build_script` is an excellent example
+- `test/integration/fixtures/` contains small, hermetic spn projects used in integration tests.
+  - `script/build_script` is an excellent example
 
 # tests
 

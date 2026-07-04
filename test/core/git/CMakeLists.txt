@@ -7,7 +7,7 @@ add_executable(git
   fixture.c
   cache.c
   key.c
-  ${TEST_TOOLS}/harness.c
+  ${TEST_TOOLS}/ctx.c
   ${TEST_TOOLS}/tmp.c
   ${TEST_TOOLS}/git.c
   ${TEST_TOOLS}/toml.c

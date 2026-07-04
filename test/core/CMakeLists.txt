@@ -6,7 +6,7 @@ add_executable(lock
   ${SRC}/semver/parser.c
   ${SRC}/sp/str.c
   lock.c
-  ${TEST_TOOLS}/harness.c
+  ${TEST_TOOLS}/ctx.c
   ${TEST_TOOLS}/tmp.c
   ${TEST_TOOLS}/git.c
   ${TEST_TOOLS}/toml.c
@@ -15,10 +15,9 @@ spn_test_binary(lock)
 add_test(NAME lock COMMAND "$<TARGET_FILE:lock>")
 
 add_executable(graph
-  graph.c
+  graph/main.c
 )
 spn_test_binary(graph)
-target_include_directories(graph BEFORE PRIVATE ${CMAKE_SOURCE_DIR}/test/sp_test ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(graph PRIVATE SP_IMPLEMENTATION SP_TEST_IMPLEMENTATION SP_GRAPH_IMPLEMENTATION)
 add_test(NAME graph COMMAND "$<TARGET_FILE:graph>")
 
@@ -36,11 +35,7 @@ add_executable(stable_map
   stable_map.c
 )
 spn_test_binary(stable_map)
-
-add_executable(ordered_map
-  ordered_map.c
-)
-spn_test_binary(ordered_map)
+add_test(NAME stable_map COMMAND "$<TARGET_FILE:stable_map>")
 
 add_executable(triple
   ${SRC}/enum/enum.c
@@ -61,7 +56,7 @@ target_link_libraries(jtd PRIVATE yyjson)
 add_test(NAME jtd COMMAND "$<TARGET_FILE:jtd>")
 
 add_executable(manifest_gen
-  manifest_gen/main.c
+  manifest/gen/main.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/codegen.c
   ${SRC}/enum/enum.c
@@ -77,15 +72,15 @@ add_executable(manifest_gen
 spn_test_binary(manifest_gen)
 target_include_directories(manifest_gen PRIVATE
   ${SRC}/codegen/gen
-  ${CMAKE_CURRENT_SOURCE_DIR}/manifest_gen)
+  ${CMAKE_CURRENT_SOURCE_DIR}/manifest/gen)
 target_compile_definitions(manifest_gen PRIVATE
-  MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest_gen/manifests"
-  GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest_gen/golden")
+  MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest/gen/manifests"
+  GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest/gen/golden")
 add_dependencies(manifest_gen spn_codegen_gen)
 add_test(NAME manifest_gen COMMAND "$<TARGET_FILE:manifest_gen>")
 
 add_executable(manifest_lower
-  manifest_lower/main.c
+  manifest/lower/main.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/lower.c
@@ -105,9 +100,9 @@ add_executable(manifest_lower
 spn_test_binary(manifest_lower)
 target_include_directories(manifest_lower PRIVATE
   ${SRC}/codegen/gen
-  ${CMAKE_CURRENT_SOURCE_DIR}/manifest_lower)
+  ${CMAKE_CURRENT_SOURCE_DIR}/manifest/lower)
 target_compile_definitions(manifest_lower PRIVATE
-  MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest_lower/manifests")
+  MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest/lower/manifests")
 add_dependencies(manifest_lower spn_codegen_gen)
 target_link_libraries(manifest_lower PRIVATE yyjson)
 add_test(NAME manifest_lower COMMAND "$<TARGET_FILE:manifest_lower>")
