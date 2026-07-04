@@ -3,7 +3,7 @@
 
 #include "sp/sp_graph.h"
 
-#include "test.h"
+#include "sp_test.h"
 #include "utest.h"
 
 #define GRAPH_MAX_NODES 16

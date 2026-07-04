@@ -48,8 +48,8 @@ include = ["include", "source", "source/external", "source/codegen/gen"]
 flags = []
 
 [[test]]
-name = "om"
-source = ["test/core/ordered_map.c"]
+name = "stable_map"
+source = ["test/core/stable_map.c"]
 include = ["include", "source"]
 flags = []
 
@@ -66,8 +66,8 @@ flags = []
 
 [[test]]
 name = "graph"
-source = ["test/core/graph.c"]
-include = ["test/sp_test", "include", "source", "test/core"]
+source = ["test/core/graph/main.c"]
+include = ["include", "source", "test/tools"]
 flags = ["-DSP_IMPLEMENTATION", "-DSP_TEST_IMPLEMENTATION", "-DSP_GRAPH_IMPLEMENTATION"]
 
 [[test]]
@@ -88,7 +88,7 @@ source = [
   "test/core/index/query.c",
   "test/core/index/publish.c",
   "test/core/index/sync.c",
-  "test/tools/harness.c",
+  "test/tools/ctx.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
   "test/tools/toml.c",
@@ -128,7 +128,7 @@ source = [
   "source/semver/parser.c",
   "source/target/mutate.c",
   "test/core/resolver/main.c",
-  "test/tools/harness.c",
+  "test/tools/ctx.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
   "test/tools/toml.c",
@@ -170,7 +170,7 @@ source = [
   "source/target/mutate.c",
   "test/core/publish/main.c",
   "test/core/publish/publish.c",
-  "test/tools/harness.c",
+  "test/tools/ctx.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
   "test/tools/toml.c",
@@ -188,7 +188,7 @@ source = [
   "source/semver/parser.c",
   "source/sp/str.c",
   "test/core/lock.c",
-  "test/tools/harness.c",
+  "test/tools/ctx.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
   "test/tools/toml.c",
@@ -207,7 +207,7 @@ source = [
   "test/core/git/fixture.c",
   "test/core/git/cache.c",
   "test/core/git/key.c",
-  "test/tools/harness.c",
+  "test/tools/ctx.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
   "test/tools/toml.c",
@@ -232,7 +232,7 @@ source = [
   "source/external/tom.c",
   "source/sp/str.c",
   "test/integration/main.c",
-  "test/integration/harness.c",
+  "test/tools/harness.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
   "test/tools/toml.c",
