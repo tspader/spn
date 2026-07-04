@@ -14,8 +14,12 @@
 
 #include "external/wasm/abi.h"
 
-#define SPN_WASM_STACK_SIZE (64 * 1024)
-#define SPN_WASM_HEAP_SIZE  (64 * 1024)
+#define SPN_WASM_STACK_SIZE (8 * 1024 * 1024)
+#define SPN_WASM_HEAP_SIZE  (16 * 1024 * 1024)
+
+#define SPN_WASM_NO_ENV SP_NULL
+#define SPN_WASM_NO_DIRS SP_NULL
+#define SPN_WASM_NO_ARGS SP_NULL
 
 void spn_wasm_init(spn_wasm_t* wasm, sp_mem_t mem, sp_intern_t* interner) {
   wasm->mem = mem;
@@ -95,6 +99,10 @@ spn_err_t spn_wasm_init_stupid_global_runtime() {
     return SPN_ERR_WASM_INIT_FAILED;
   }
 
+  if (!wasm_runtime_set_default_running_mode(Mode_Fast_JIT)) {
+    return SPN_ERR_WASM_INIT_FAILED;
+  }
+
   if (!spn_wasm_register_api()) {
     return SPN_ERR_WASM_REGISTER_FAILED;
   }
@@ -112,25 +120,27 @@ static spn_err_t spn_wasm_script_fail(spn_pkg_unit_t* unit, spn_err_t err, spn_e
   return err;
 }
 
-// wasm_runtime_thread_env_inited lies in interpreter-only builds (the signal
-// env check is compiled out with AOT), so init unconditionally; it's a no-op
-// on a thread that's already set up. Scripts open on a configure worker and
-// their node fns run later on build workers, so every entry point re-inits.
-static wasm_exec_env_t spn_wasm_script_enter(spn_wasm_script_t* script) {
+static spn_err_t spn_wasm_script_enter(spn_wasm_script_t* script) {
   sp_mutex_lock(&script->mutex);
 
-  wasm_exec_env_t env = SP_NULLPTR;
   if (wasm_runtime_init_thread_env()) {
-    env = wasm_runtime_create_exec_env(script->instance, SPN_WASM_STACK_SIZE);
+    script->exec = wasm_runtime_create_exec_env(script->instance, SPN_WASM_STACK_SIZE);
   }
 
-  if (!env) {
+  if (!script->exec) {
     sp_mutex_unlock(&script->mutex);
-    return SP_NULLPTR;
+    return SPN_ERR_WASM_INIT_FAILED;
   }
 
-  wasm_runtime_set_user_data(env, script->table);
-  return env;
+  switch (wasm_runtime_get_running_mode(script->instance)) {
+    case Mode_Interp: sp_log("Mode_Interp"); break;
+    case Mode_Fast_JIT: sp_log("Mode_Fast_JIT"); break;
+    case Mode_LLVM_JIT: sp_log("Mode_LLVM_JIT"); break;
+    case Mode_Multi_Tier_JIT: sp_log("Mode_Multi_Tier_JIT"); break;
+  }
+
+  wasm_runtime_set_user_data(script->exec, script->table);
+  return SPN_OK;
 }
 
 static void spn_wasm_script_exit(spn_wasm_script_t* script, wasm_exec_env_t env) {
@@ -142,13 +152,11 @@ spn_err_t spn_wasm_script_open(spn_wasm_script_t** out, spn_pkg_unit_t* unit, sp
   if (*out) return SPN_OK;
 
   spn_err_t err = SPN_OK;
-  c8 error [128] = sp_zero;
 
   spn_wasm_script_t* script = sp_alloc_type(spn.mem, spn_wasm_script_t);
-  script->path = sp_str_copy(spn.mem, path);
   sp_mutex_init(&script->mutex, SP_MUTEX_PLAIN);
+  script->path = sp_str_copy(spn.mem, path);
   script->table = sp_alloc_type(spn.mem, spn_wasm_handles_t);
-  script->table->next = 0;
   sp_ht_init(spn.mem, script->table->map);
 
   script->ctx = spn_wasm_add_handle(script->table, unit, SPN_ABI_KIND_CTX);
@@ -157,32 +165,46 @@ spn_err_t spn_wasm_script_open(spn_wasm_script_t** out, spn_pkg_unit_t* unit, sp
     err = SPN_ERR_WASM_THREAD_ENV_FAILED; goto done;
   }
 
-  // WAMR keeps referencing the module blob after load in interpreter mode, so
-  // it has to live as long as the module does
   sp_str_t blob = sp_zero;
   if (sp_io_read_file(spn.mem, path, &blob)) {
-    err = SPN_ERR_WASM_READ_FAILED; goto done;
+    err = SPN_ERR_WASM_READ_FAILED;
+    goto done;
   }
 
+  c8 error [128] = sp_zero;
   script->module = wasm_runtime_load((u8*)blob.data, blob.len, error, sizeof(error));
   if (!script->module) {
-    err = SPN_ERR_WASM_MODULE_LOAD_FAILED; goto done;
+    err = SPN_ERR_WASM_MODULE_LOAD_FAILED;
+    goto done;
   }
 
+  // @spader We shouldn't be doing this here. These directories should get created in one place, up front
   sp_fs_create_dir(unit->paths.work);
   sp_fs_create_dir(unit->paths.store);
 
-  const c8** preopens = (const c8**)sp_alloc(spn.mem, 3 * sizeof(c8*));
-  preopens[0] = sp_str_to_cstr(spn.mem, sp_fmt(spn.mem, "/work::{}", sp_fmt_str(unit->paths.work)).value);
-  preopens[1] = sp_str_to_cstr(spn.mem, sp_fmt(spn.mem, "/source::{}", sp_fmt_str(unit->paths.source)).value);
-  preopens[2] = sp_str_to_cstr(spn.mem, sp_fmt(spn.mem, "/store::{}", sp_fmt_str(unit->paths.store)).value);
-  wasm_runtime_set_wasi_args(script->module, SP_NULLPTR, 0, preopens, 3, SP_NULLPTR, 0, SP_NULLPTR, 0);
+  // @spader We shouldn't have to branch here. We should keep both an absolute and relative version around if needed
+  sp_str_t cwd = sp_fs_get_cwd(spn.mem);
+  sp_str_t work = sp_fs_is_absolute(unit->paths.work) ? unit->paths.work : sp_fs_join_path(spn.mem, cwd, unit->paths.work);
+  sp_str_t source = sp_fs_is_absolute(unit->paths.source) ? unit->paths.source : sp_fs_join_path(spn.mem, cwd, unit->paths.source);
+  sp_str_t store = sp_fs_is_absolute(unit->paths.store)  ? unit->paths.store  : sp_fs_join_path(spn.mem, cwd, unit->paths.store);
 
-  // WAMR runs _initialize during instantiation for WASI reactor modules;
-  // calling it again trips wasi-libc's double-init trap
+  script->preopens = (spn_wasm_preopens_t) {
+    .work = sp_str_to_cstr(spn.mem, sp_fmt(spn.mem, "/work::{}", sp_fmt_str(work)).value),
+    .source = sp_str_to_cstr(spn.mem, sp_fmt(spn.mem, "/source::{}", sp_fmt_str(source)).value),
+    .store = sp_str_to_cstr(spn.mem, sp_fmt(spn.mem, "/store::{}", sp_fmt_str(store)).value),
+  };
+  wasm_runtime_set_wasi_args(
+    script->module,
+    SPN_WASM_NO_DIRS, SPN_WASM_NO_DIRS,
+    script->preopens.array, 3,
+    SPN_WASM_NO_ENV, SPN_WASM_NO_ENV,
+    SPN_WASM_NO_ARGS, SPN_WASM_NO_ARGS
+  );
+
   script->instance = wasm_runtime_instantiate(script->module, SPN_WASM_STACK_SIZE, SPN_WASM_HEAP_SIZE, error, sizeof(error));
   if (!script->instance) {
-    err = SPN_ERR_WASM_MODULE_INSTANCE_FAILED; goto done;
+    err = SPN_ERR_WASM_MODULE_INSTANCE_FAILED;
+    goto done;
   }
 
 done:
@@ -206,15 +228,9 @@ spn_err_t spn_wasm_script_call_hook(spn_wasm_script_t* script, spn_pkg_unit_t* u
   wasm_function_inst_t fn = wasm_runtime_lookup_function(script->instance, name);
   if (!fn) return SPN_OK;
 
-  wasm_exec_env_t env = spn_wasm_script_enter(script);
-  if (!env) {
-    return spn_wasm_script_fail(unit, SPN_ERR_WASM_CTX_FAILED, (spn_err_wasm_t) { .path = script->path });
-  }
-
   spn_err_t err = SPN_OK;
 
-  // The phase capability only resolves while its hook is on the stack; a
-  // stashed token fails handle resolution once the hook returns
+  spn_try(spn_wasm_script_enter(script));
   u32 token = spn_wasm_add_handle(script->table, unit, SPN_ABI_KIND_CONFIG);
 
   wasm_val_t args [2] = {
@@ -222,7 +238,7 @@ spn_err_t spn_wasm_script_call_hook(spn_wasm_script_t* script, spn_pkg_unit_t* u
     { .kind = WASM_I32, .of.i32 = (s32)token },
   };
   wasm_val_t results [1] = sp_zero;
-  if (!wasm_runtime_call_wasm_a(env, fn, 1, results, sp_carr_len(args), args)) {
+  if (!wasm_runtime_call_wasm_a(script->exec, fn, 1, results, sp_carr_len(args), args)) {
     err = spn_wasm_script_fail(unit, SPN_ERR_WASM_MODULE_CALL_FAILED, (spn_err_wasm_t) {
       .path = script->path,
       .error = sp_cstr_as_str(wasm_runtime_get_exception(script->instance)),
@@ -236,12 +252,13 @@ spn_err_t spn_wasm_script_call_hook(spn_wasm_script_t* script, spn_pkg_unit_t* u
   }
 
   spn_wasm_remove_handle(script->table, token);
-  spn_wasm_script_exit(script, env);
+  spn_wasm_script_exit(script, script->exec);
   return err;
 }
 
 bool spn_wasm_script_has_node_fn(spn_wasm_script_t* script, spn_user_node_t* node) {
-  if (!script || sp_str_empty(node->fn)) return false;
+  if (!script) return false;
+  if (sp_str_empty(node->fn)) return false;
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   bool has = spn_wasm_script_has(script, sp_str_to_cstr(scratch.mem, node->fn));

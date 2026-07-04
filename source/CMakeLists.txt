@@ -112,6 +112,10 @@ target_include_directories(spn PRIVATE
   ${STORE}/include
 )
 target_link_libraries(spn PRIVATE m vmlib yyjson)
+# vmlib carries C++ objects (WAMR Fast JIT: asmjit + x86_64 codegen). spn's own
+# sources are all C, so CMake would link with the C driver and miss the C++
+# runtime; force the C++ driver (zig c++) to pull it in.
+set_target_properties(spn PROPERTIES LINKER_LANGUAGE CXX)
 add_dependencies(spn headers spn_embed spn_codegen_gen)
 
 set_source_files_properties(${EMBED_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)

@@ -5,8 +5,11 @@ if(NOT DEFINED TRIPLE)
 endif()
 
 set(CMAKE_C_COMPILER ${CMAKE_CURRENT_SOURCE_DIR}/tools/cmake/zig-cc.sh)
-
-project(spn LANGUAGES C)
+# CXX is only pulled in by WAMR's Fast JIT (asmjit + codegen). Pin it to zig too
+# so it never falls back to system g++/libstdc++, which the zig-linked binary
+# can't satisfy. Must be set before WAMR calls enable_language(CXX).
+set(CMAKE_CXX_COMPILER ${CMAKE_CURRENT_SOURCE_DIR}/tools/cmake/zig-cxx.sh)
+project(spn LANGUAGES C CXX)
 
 # @spader Zig crashes when given --dependency-file
 set(CMAKE_LINK_DEPENDS_USE_LINKER OFF)
