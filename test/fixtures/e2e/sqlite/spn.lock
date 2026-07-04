@@ -1,0 +1,10 @@
+[spn]
+version = "1.0.0"
+commit = "00c0fa98"
+
+[[dep]]
+name = "spader/sqlite"
+version = "3.53.0"
+commit = ""
+kind = "file"
+
