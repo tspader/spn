@@ -2,24 +2,11 @@
 #define SPN_WASM_TYPES_H
 
 #include "forward/types.h"
-#include "sp/sp_om.h"
+#include "spn.h"
 
-typedef struct wasm_store_t wasm_store_t;
-typedef struct wasm_instance_t wasm_instance_t;
-typedef struct wasm_trap_t wasm_trap_t;
-typedef struct wasm_extern_vec_t wasm_extern_vec_t;
 typedef struct WASMModuleCommon spn_wasm_module_t;
-typedef struct WASMModuleInstanceCommon spn_wasm_module_instance_t;
-typedef struct WASMExecEnv spn_wasm_exec_t;
-typedef struct WASMFunctionInstanceCommon spn_wasm_fn_t;
-
+typedef struct WASMModuleInstanceCommon spn_wasm_instance_t;
 typedef struct spn_wasm_handles_t spn_wasm_handles_t;
-
-typedef struct {
-  spn_wasm_exec_t* exec;
-  spn_wasm_module_instance_t* instance;
-  sp_om(sp_str_t, spn_wasm_fn_t*) functions;
-} spn_wasm_pkg_t;
 
 typedef union {
   struct {
@@ -30,26 +17,23 @@ typedef union {
   const c8* array [3];
 } spn_wasm_preopens_t;
 
+typedef enum {
+  SPN_WASM_SCRIPT_NONE = 0,
+  SPN_WASM_SCRIPT_CLOSED,
+  SPN_WASM_SCRIPT_OPEN,
+  SPN_WASM_SCRIPT_FAILED,
+} spn_wasm_script_state_t;
+
 typedef struct {
-  spn_wasm_module_t* module;
-  spn_wasm_module_instance_t* instance;
-  spn_wasm_exec_t* exec;
-  spn_wasm_handles_t* table;
-  u32 ctx;
+  spn_wasm_script_state_t state;
+  spn_err_t err;
   sp_str_t path;
   sp_mutex_t mutex;
+  spn_wasm_module_t* module;
+  spn_wasm_instance_t* instance;
+  spn_wasm_handles_t* handles;
+  u32 ctx;
   spn_wasm_preopens_t preopens;
 } spn_wasm_script_t;
-
-typedef struct {
-  sp_mem_t mem;
-  sp_intern_t* interner;
-  wasm_instance_t* instance;
-  wasm_trap_t* trap;
-  wasm_extern_vec_t* exports;
-  wasm_store_t* store;
-  sp_om(sp_str_t, spn_wasm_module_t*) modules;
-} spn_wasm_t;
-
 
 #endif

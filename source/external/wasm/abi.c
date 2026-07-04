@@ -9,11 +9,6 @@ spn_wasm_ctx_t spn_wasm_ctx(wasm_exec_env_t env) {
   };
 }
 
-void spn_abi_table_init(spn_wasm_handles_t* table, sp_mem_t mem) {
-  table->next = 0;
-  sp_ht_init(mem, table->map);
-}
-
 u32 spn_wasm_add_handle(spn_wasm_handles_t* table, void* ptr, spn_abi_kind_t kind) {
   spn_wasm_handle_t handle = { ptr, kind };
   u32 token = ++table->next;
