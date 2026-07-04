@@ -20,6 +20,7 @@ typedef enum {
 typedef struct {
   const c8* name;
   const c8* host;
+  bool abi;
   abi_val_t ret;
   abi_val_t args [ABI_MAX_ARGS];
 } abi_fn_t;
@@ -59,6 +60,7 @@ static const abi_fn_t abi_fns [] = {
   { .name = "spn_node_ctx_get_user_data", .ret = ABI_VAL_S32,   .args = { ABI_VAL_NODE_CTX }, .host = "spn_abi_node_ctx_get_user_data" },
   { .name = "spn_write_file",           .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CTX, ABI_VAL_STR, ABI_VAL_STR } },
   { .name = "spn_copy",                 .ret = ABI_VAL_S32,     .args = { ABI_VAL_CTX, ABI_VAL_S32, ABI_VAL_STR, ABI_VAL_S32, ABI_VAL_STR } },
+  { .name = "spn_fs_copy",              .ret = ABI_VAL_VOID,    .args = { ABI_VAL_STR, ABI_VAL_STR }, .host = "spn_abi_fs_copy", .abi = true },
   { .name = "spn_make",                 .ret = ABI_VAL_S32,     .args = { ABI_VAL_CTX } },
   { .name = "spn_make_new",             .ret = ABI_VAL_MAKE,    .args = { ABI_VAL_CTX } },
   { .name = "spn_make_add_target",      .ret = ABI_VAL_VOID,    .args = { ABI_VAL_MAKE, ABI_VAL_STR } },
@@ -155,9 +157,12 @@ static sp_str_t abi_fn_thunk(gen_t* g, const abi_fn_t* fn) {
 
   sp_io_dyn_mem_writer_t args = sp_zero;
   sp_io_dyn_mem_writer_init(g->mem, &args);
+  if (fn->abi) {
+    sp_fmt_io(&args.base, "&abi");
+  }
   sp_for(it, num_args) {
     sp_fmt_io(&args.base, "{}{}{}",
-      sp_fmt_cstr(it ? ", " : ""),
+      sp_fmt_cstr((it || fn->abi) ? ", " : ""),
       sp_fmt_cstr(abi_val_is_handle(fn->args[it]) ? "h" : "a"),
       sp_fmt_uint(it));
   }
