@@ -1,5 +1,7 @@
 #include "spn.h"
 #include "mksqlite3h_tcl.h"
+#include "mksqlite3c_tcl.h"
+#include "mkfts5c_tcl.h"
 
 #include <unistd.h>
 
@@ -68,15 +70,17 @@ s32 generate_code(spn_t* spn, spn_node_ctx_t* ctx) {
       .args = { "jimsh", "/work/mksqlite3h.tcl", "/source", "-o", "sqlite3.h" },
     },
     .fts5_c = {
-      .args = { "jimsh", "/source/ext/fts5/tool/mkfts5c.tcl" },
+      .args = { "jimsh", "/work/mkfts5c.tcl", "/source/ext/fts5" },
     },
     .sqlite3_c = {
-      .args = { "jimsh", "/source/tool/mksqlite3c.tcl", "--linemacros=0" },
+      .args = { "jimsh", "/work/mksqlite3c.tcl", "--linemacros=0" },
     },
   };
 
   spn_fs_create_dir("/work/tsrc");
   spn_io_write("/work/mksqlite3h.tcl", SPN_MKSQLITE3H_TCL);
+  spn_io_write("/work/mksqlite3c.tcl", SPN_MKSQLITE3C_TCL);
+  spn_io_write("/work/mkfts5c.tcl", SPN_MKFTS5C_TCL);
 
   spn_fs_copy("/source/src/parse.y", "/work");
   spn_fs_copy("/source/tool/lempar.c", "/work");

@@ -8,5 +8,6 @@
 
 spn_toolchain_launcher_t spn_toolchain_launcher_with_root(sp_mem_t mem, spn_toolchain_launcher_t launcher, sp_str_t root);
 sp_str_t                 spn_toolchain_launcher_to_str(sp_mem_t mem, spn_toolchain_launcher_t launcher);
+bool                     spn_toolchain_has_cxx(spn_toolchain_t* toolchain);
 
 #endif

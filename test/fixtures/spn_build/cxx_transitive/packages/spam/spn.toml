@@ -1,0 +1,9 @@
+[package]
+name = "spam"
+version = "1.0.0"
+
+[[lib]]
+name = "spam"
+kinds = ["static"]
+source = ["spam.cpp"]
+headers = ["spam.h"]

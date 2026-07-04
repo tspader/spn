@@ -6,6 +6,7 @@
 #include "enum/enum.h"
 #include "external/cc.h"
 #include "event/event.h"
+#include "target/closure.h"
 #include "task/build/build.h"
 #include "unit/package.h"
 
@@ -57,6 +58,42 @@ ar_result_t archive_objects(spn_target_unit_t* unit, sp_str_t output) {
     .elapsed = elapsed,
     .args = args,
   };
+}
+
+static bool objects_have_cxx(sp_da(spn_compile_unit_t*) objects) {
+  sp_da_for(objects, it) {
+    if (objects[it]->lang == SPN_LANG_CXX) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static spn_lang_t get_link_language(spn_target_unit_t* target) {
+  if (objects_have_cxx(target->objects)) {
+    return SPN_LANG_CXX;
+  }
+
+  sp_da(spn_pkg_unit_t*) closure = spn_target_link_closure(target->session->mem, target);
+  sp_da_for(closure, it) {
+    spn_pkg_unit_t* dep = closure[it];
+    if (!dep || dep == target->pkg) continue;
+
+    sp_da_for(dep->libs, l) {
+      spn_target_unit_t* lib = dep->libs[l];
+      if (lib->info->no_link) {
+        continue;
+      }
+      if (lib->lib_kind != SPN_LIB_KIND_STATIC) {
+        continue;
+      }
+      if (objects_have_cxx(lib->objects)) {
+        return SPN_LANG_CXX;
+      }
+    }
+  }
+
+  return SPN_LANG_C;
 }
 
 spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, sp_str_t args, sp_str_t out, u64 elapsed) {
@@ -143,6 +180,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
       // (includes, defines, flags) stays off the command line; that's
       // add_pkg_to_cc_target's job in the compile node
       spn_cc_target_t* cc_target = spn_cc_add_target(cc, target->kind, output_name);
+      spn_cc_target_set_lang(cc_target, get_link_language(target));
       add_deps_to_cc_target(cc_target, target);
 
       sp_da_for(target->objects, it) {

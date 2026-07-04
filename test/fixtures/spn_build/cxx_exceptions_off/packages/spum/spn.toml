@@ -1,0 +1,10 @@
+[package]
+name = "spum"
+version = "1.0.0"
+
+[[lib]]
+name = "spum"
+kinds = ["static"]
+source = ["spum.cpp"]
+headers = ["spum.h"]
+cxx = { exceptions = false }

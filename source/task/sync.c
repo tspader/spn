@@ -79,10 +79,12 @@ setup_toolchain_unit(spn_session_t* session, spn_toolchain_store_t* store, spn_t
 
   if (sp_str_empty(unit->root)) {
     unit->compiler = toolchain->compiler;
+    unit->cxx = toolchain->cxx;
     unit->linker = toolchain->linker;
     unit->archiver = toolchain->archiver;
   } else {
     unit->compiler = spn_toolchain_launcher_with_root(spn.mem, toolchain->compiler, unit->root);
+    unit->cxx = spn_toolchain_launcher_with_root(spn.mem, toolchain->cxx, unit->root);
     unit->linker = spn_toolchain_launcher_with_root(spn.mem, toolchain->linker, unit->root);
     unit->archiver = spn_toolchain_launcher_with_root(spn.mem, toolchain->archiver, unit->root);
   }
@@ -458,6 +460,9 @@ spn_task_result_t spn_task_sync_update(spn_app_t *app) {
   sp_env_insert(env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(session->mem, session->units.toolchain->compiler));
   sp_env_insert(env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(session->mem, session->units.toolchain->archiver));
   sp_env_insert(env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(session->mem, session->units.toolchain->linker));
+  if (spn_toolchain_has_cxx(session->units.toolchain->toolchain)) {
+    sp_env_insert(env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(session->mem, session->units.toolchain->cxx));
+  }
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_SYNC_END,

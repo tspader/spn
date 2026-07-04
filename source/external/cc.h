@@ -68,6 +68,8 @@ typedef struct {
   sp_da(sp_str_t) rpath;
 
   spn_cc_output_kind_t kind;
+  spn_lang_t lang;
+  spn_cxx_options_t cxx;
   union {
     spn_cc_executable_t exe;
     spn_cc_shared_lib_t shared_lib;
@@ -79,6 +81,7 @@ typedef struct {
 struct spn_cc {
   sp_mem_t mem;
   spn_toolchain_launcher_t compiler;
+  spn_toolchain_launcher_t cxx;
   spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
   spn_cc_driver_t driver;
@@ -112,6 +115,7 @@ void             spn_cc_add_define(spn_cc_t* cc, sp_str_t var);
 void             spn_cc_add_pkg(spn_cc_t* cc, spn_pkg_unit_t* pkg);
 void             spn_cc_target_add_info(spn_cc_target_t* target, spn_pkg_unit_t* pkg, spn_target_info_t* info);
 spn_cc_target_t* spn_cc_add_target(spn_cc_t* cc, spn_cc_output_kind_t kind, sp_str_t name);
+void             spn_cc_target_set_lang(spn_cc_target_t* cc, spn_lang_t lang);
 void             spn_cc_target_add_relative_source(spn_cc_target_t* cc, sp_str_t path);
 void             spn_cc_target_add_absolute_source(spn_cc_target_t* cc, sp_str_t path);
 void             spn_cc_target_add_define(spn_cc_target_t* cc, sp_str_t var);
@@ -124,7 +128,7 @@ void             spn_cc_target_add_lib_dir(spn_cc_target_t* cc, sp_str_t dir);
 void             spn_cc_target_add_rpath(spn_cc_target_t* cc, sp_str_t dir);
 void             spn_cc_target_add_dep(spn_cc_target_t* target, spn_pkg_unit_t* dep);
 spn_cc_run_t     spn_cc_target_run(spn_cc_target_t* target, sp_str_t cwd);
-void             spn_cc_to_ps(sp_mem_t mem, spn_cc_t* cc, sp_ps_config_t* ps);
+void             spn_cc_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps);
 void             spn_cc_target_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps);
 sp_str_t         spn_cc_symbol_from_embedded_file(sp_mem_t mem, sp_str_t file_path);
 void             spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx, sp_mem_t mem, spn_os_t target_os);

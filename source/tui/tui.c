@@ -674,6 +674,14 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
           );
           break;
         }
+        case SPN_ERR_TOOLCHAIN_NO_CXX: {
+          sp_fmt_io(
+            &w.base,
+            "toolchain {} has no C++ compiler, but the build contains C++ sources",
+            SP_FMT_STR(spn_tui_colored_name(mem, event->err.toolchain.name))
+          );
+          break;
+        }
         default: {
           sp_io_write_str(&w.base, sp_str_lit("unknown error"), SP_NULLPTR);
           break;

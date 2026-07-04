@@ -32,6 +32,9 @@ spn_dir_t spn_cache_dir_kind_from_str(sp_str_t str);
 spn_cc_kind_t spn_cc_kind_from_str(sp_str_t str);
 spn_c_standard_t spn_c_standard_from_str(sp_str_t str);
 sp_str_t spn_c_standard_to_str(spn_c_standard_t standard);
+spn_cxx_standard_t spn_cxx_standard_from_str(sp_str_t str);
+sp_str_t spn_cxx_standard_to_str(spn_cxx_standard_t standard);
+spn_lang_t spn_lang_from_path(sp_str_t path);
 
 sp_str_t spn_pkg_source_to_str(spn_pkg_source_t kind);
 spn_pkg_source_t spn_pkg_source_from_str(sp_str_t str);

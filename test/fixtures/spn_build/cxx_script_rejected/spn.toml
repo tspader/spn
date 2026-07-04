@@ -1,0 +1,10 @@
+[package]
+name = "test"
+version = "0.1.0"
+
+[package.build]
+source = ["tools/build.cpp"]
+
+[[bin]]
+name = "main"
+source = ["main.c"]

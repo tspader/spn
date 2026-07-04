@@ -1,0 +1,9 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[lib]]
+name = "t"
+kinds = ["static"]
+source = ["spum.cpp"]
+cxx = { standard = "c++14", exceptions = false, rtti = false }

@@ -73,6 +73,14 @@ static bool is_path_absolute(sp_str_t path) {
   return path.len && (path.data[0] == '/' || (path.len >= 2 && path.data[1] == ':'));
 }
 
+static spn_cxx_options_t lower_cxx_options(const spn_cg_cxx_options_t* cg) {
+  return (spn_cxx_options_t) {
+    .standard = sp_opt_is_null(cg->standard) ? SPN_CXX_STANDARD_NONE : sp_opt_get(cg->standard),
+    .no_exceptions = sp_opt_is_null(cg->exceptions) ? false : !sp_opt_get(cg->exceptions),
+    .no_rtti = sp_opt_is_null(cg->rtti) ? false : !sp_opt_get(cg->rtti),
+  };
+}
+
 static spn_target_info_t lower_target(spn_codegen_ctx_t* ctx, const spn_cg_target_t* cg, spn_target_kind_t kind) {
   spn_target_info_t target = {
     .name = cg->name,
@@ -85,6 +93,7 @@ static spn_target_info_t lower_target(spn_codegen_ctx_t* ctx, const spn_cg_targe
     .define = cg->define,
     .flags = cg->flags,
     .deps = cg->deps,
+    .cxx = lower_cxx_options(&cg->cxx),
   };
   spn_target_info_init(ctx->mem, &target);
   return target;
@@ -209,6 +218,7 @@ static void lower_toolchains(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg
     toolchain.name = t->name;
     toolchain.driver = sp_opt_is_null(t->driver) ? SPN_CC_DRIVER_NONE : sp_opt_get(t->driver);
     toolchain.compiler = lower_launcher(ctx, t->compiler);
+    toolchain.cxx = lower_launcher(ctx, t->cxx);
     toolchain.linker = lower_launcher(ctx, t->linker);
     toolchain.archiver = lower_launcher(ctx, t->archiver);
 
@@ -321,6 +331,49 @@ static void validate_links(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg) 
   validate_collection_links(ctx, cg->test, "test");
 }
 
+static void validate_c_only_sources(spn_codegen_ctx_t* ctx, sp_da(sp_str_t) source) {
+  sp_da_for(source, it) {
+    if (spn_lang_from_path(source[it]) == SPN_LANG_CXX) {
+      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_INVALID, "source");
+    }
+  }
+}
+
+static void validate_collection_cxx(spn_codegen_ctx_t* ctx, spn_cg_target_om_t cg, const c8* key) {
+  spn_codegen_push_key(ctx, key);
+  sp_om_for(cg, it) {
+    const spn_cg_target_t* target = sp_str_om_at(cg, it);
+    if (!sp_opt_is_null(target->cxx.standard) && sp_opt_get(target->cxx.standard) == SPN_CXX_STANDARD_NONE) {
+      spn_codegen_push_index(ctx, it);
+      spn_codegen_push_key(ctx, "cxx");
+      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_INVALID, "standard");
+      spn_codegen_pop(ctx);
+      spn_codegen_pop(ctx);
+    }
+  }
+  spn_codegen_pop(ctx);
+}
+
+static void validate_cxx(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg) {
+  validate_collection_cxx(ctx, cg->lib, "lib");
+  validate_collection_cxx(ctx, cg->bin, "bin");
+  validate_collection_cxx(ctx, cg->script, "script");
+  validate_collection_cxx(ctx, cg->test, "test");
+}
+
+// Build and configure scripts compile to wasm, where C++ would drag libc++
+// into every module; they stay C
+static void validate_c_only_scripts(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg) {
+  spn_codegen_push_key(ctx, "package");
+  spn_codegen_push_key(ctx, "build");
+  validate_c_only_sources(ctx, cg->package.build.source);
+  spn_codegen_pop(ctx);
+  spn_codegen_push_key(ctx, "configure");
+  validate_c_only_sources(ctx, cg->package.configure.source);
+  spn_codegen_pop(ctx);
+  spn_codegen_pop(ctx);
+}
+
 static void validate_unique_targets(spn_codegen_ctx_t* ctx, spn_pkg_info_t* out) {
   sp_ht(sp_str_t, u8) seen;
   sp_str_ht_init(ctx->mem, seen);
@@ -388,7 +441,9 @@ spn_err_t spn_pkg_lower(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn
   lower_config(ctx, cg, out);
 
   validate_lib_linkages(ctx, out);
+  validate_cxx(ctx, cg);
   validate_links(ctx, cg);
+  validate_c_only_scripts(ctx, cg);
   validate_unique_targets(ctx, out);
   validate_inline_toolchains(ctx, cg);
 

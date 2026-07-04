@@ -42,6 +42,7 @@ typedef struct {
   struct {
     sp_hash_t name;
     sp_hash_t cc;
+    sp_hash_t cxx;
     sp_hash_t ld;
     sp_hash_t ar;
     sp_hash_t url;
@@ -77,6 +78,7 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_info_t* pkg) {
     fingerprint.toolchain.cc = sp_hash_str(toolchain->compiler.program);
     fingerprint.toolchain.ld = sp_hash_str(toolchain->linker.program);
     fingerprint.toolchain.ar = sp_hash_str(toolchain->archiver.program);
+    fingerprint.toolchain.cxx = sp_hash_str(toolchain->cxx.program);
     if (!sp_opt_is_null(toolchain->artifact)) {
       fingerprint.toolchain.url = sp_hash_str(sp_opt_get(toolchain->artifact).sha256);
     }

@@ -6,6 +6,7 @@
     "cc_driver": { "enum": ["gcc", "clang", "msvc"] },
     "linkage": { "enum": ["shared", "static", "source", "object"] },
     "c_standard": { "enum": ["c89", "c99", "c11"] },
+    "cxx_standard": { "enum": ["c++11", "c++14", "c++17", "c++20", "c++23"] },
     "build_mode": { "enum": ["release", "debug"] },
     "index_protocol": { "enum": ["git", "http", "filesystem"] },
 
@@ -90,7 +91,16 @@
         "define": { "elements": { "type": "string" } },
         "flags": { "elements": { "type": "string" } },
         "deps": { "elements": { "type": "string" } },
-        "link": { "type": "boolean" }
+        "link": { "type": "boolean" },
+        "cxx": { "ref": "cxx_options" }
+      }
+    },
+
+    "cxx_options": {
+      "optionalProperties": {
+        "standard": { "ref": "cxx_standard" },
+        "exceptions": { "type": "boolean" },
+        "rtti": { "type": "boolean" }
       }
     },
 
@@ -101,6 +111,7 @@
         "linker": { "type": "string" },
         "archiver": { "type": "string" },
         "driver": { "ref": "cc_driver" },
+        "cxx": { "type": "string" },
         "host": { "values": { "ref": "artifact" } },
         "mirrors": { "type": "string" },
         "target": { "elements": { "ref": "triple" } }
@@ -187,6 +198,7 @@
       },
       "optionalProperties": {
         "version":  { "type": "string" },
+        "cxx":      { "ref": "launcher" },
         "host":     { "values": { "ref": "artifact" } },
         "target":   { "elements": { "ref": "triple" } },
         "mirrors":  { "type": "string" }

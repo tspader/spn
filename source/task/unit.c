@@ -9,14 +9,18 @@
 #include "target/types.h"
 #include "task/types.h"
 
+#include "ctx/types.h"
 #include "enum/enum.h"
 #include "error/types.h"
+#include "event/event.h"
+#include "event/types.h"
 #include "filter/filter.h"
 #include "pkg/id.h"
 #include "session/session.h"
 #include "sp/sp_glob.h"
 #include "target/mutate.h"
 #include "target/select.h"
+#include "toolchain/toolchain.h"
 #include "unit/types.h"
 
 static bool has_source_file(sp_da(sp_str_t) source, sp_str_t path) {
@@ -225,28 +229,27 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
 
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
     sp_da(sp_str_t) source = collect_target_source(scratch.mem, pkg, target);
+
     sp_da_for(source, j) {
       sp_str_t relative = source[j];
       sp_str_t file = sp_fs_join_path(app->session.mem, pkg->paths.source, relative);
-      sp_str_t extension = sp_fs_get_ext(relative);
-      sp_str_t stem = relative;
-      if (!sp_str_empty(extension)) {
-        stem = sp_str_prefix(relative, relative.len - extension.len - 1);
-      }
+
+      spn_lang_t lang = spn_lang_from_path(relative);
 
       // Object libs publish their objects as artifacts; everyone else keeps
-      // them as intermediates. Source-relative paths are preserved either way
-      // so colliding stems (a/foo.c, b/foo.c) stay distinct.
+      // them as intermediates. The object name keeps the full source-relative
+      // path, extension included, so colliding sources stay distinct.
       sp_str_t object_dir = target->lib_kind == SPN_LIB_KIND_OBJECT ?
         target->paths.lib :
         target->paths.object;
-      sp_str_t object_path = sp_fs_join_path(app->session.mem, object_dir, sp_fmt(scratch.mem, "{}.o", SP_FMT_STR(stem)).value);
+      sp_str_t object_path = sp_fs_join_path(app->session.mem, object_dir, sp_fmt(scratch.mem, "{}.o", SP_FMT_STR(relative)).value);
 
       if (!sp_str_om_has(session->units.objects, file)) {
         sp_str_om_insert(session->units.objects, file, ((spn_compile_unit_t) {
           .package = pkg,
           .target = target,
           .session = target->session,
+          .lang = lang,
           .paths = {
             .object = object_path,
             .file = file,
@@ -259,6 +262,25 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
       sp_da_push(target->objects, object);
     }
     sp_mem_end_scratch(scratch);
+  }
+
+  spn_toolchain_t* toolchain = session->units.toolchain->toolchain;
+  if (!spn_toolchain_has_cxx(toolchain)) {
+    sp_om_for(session->units.objects, it) {
+      spn_compile_unit_t* object = sp_om_at(session->units.objects, it);
+      if (object->lang != SPN_LANG_CXX) {
+        continue;
+      }
+
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR,
+        .err = {
+          .kind = SPN_ERR_TOOLCHAIN_NO_CXX,
+          .toolchain = { .name = toolchain->name },
+        },
+      });
+      return SPN_TASK_ERROR;
+    }
   }
 
   return SPN_TASK_DONE;

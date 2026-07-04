@@ -770,9 +770,9 @@ UTEST_F(spn_build, api_object_lib) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       // object libs publish their objects to lib/, preserving source-relative paths
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/rt/extra.o") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/rt/extra.c.o") },
       // ditto for an object lib declared from the build script instead of the manifest
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/rt/extra2.o") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/rt/extra2.c.o") },
       // an unlinked archive still builds and installs
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libblob.a") },
       { .kind = ACTION_RUN_BIN, .bin.name = "object_lib" },
@@ -946,6 +946,8 @@ UTEST_F(spn_build, embed) {
     },
   });
 }
+
+#include "cxx.c"
 
 struct build_log {
   fixture_t fixture;
