@@ -50,6 +50,18 @@ sp_str_t spn_cc_c_standard_to_switch(spn_c_standard_t standard) {
   sp_unreachable(); return sp_str_lit("");
 }
 
+sp_str_t spn_cc_cxx_standard_to_switch(spn_cxx_standard_t standard) {
+  switch (standard) {
+    case SPN_CXX11: return sp_str_lit("-std=c++11");
+    case SPN_CXX14: return sp_str_lit("-std=c++14");
+    case SPN_CXX17: return sp_str_lit("-std=c++17");
+    case SPN_CXX20: return sp_str_lit("-std=c++20");
+    case SPN_CXX23: return sp_str_lit("-std=c++23");
+    case SPN_CXX_STANDARD_NONE: return sp_str_lit("-std=c++17");
+  }
+  sp_unreachable(); return sp_str_lit("");
+}
+
 sp_str_t spn_cc_build_mode_to_switch(spn_build_mode_t mode) {
   switch (mode) {
     case SPN_BUILD_MODE_DEBUG: return sp_str_lit("-g");

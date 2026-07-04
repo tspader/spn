@@ -28,6 +28,7 @@ void spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_unit_t* toolchain) {
   cc->compiler = toolchain->compiler;
   cc->archiver = toolchain->archiver;
   cc->linker = toolchain->linker;
+  cc->cxx = toolchain->cxx;
 }
 
 void spn_cc_set_profile(spn_cc_t* cc, spn_profile_info_t profile) {
@@ -63,7 +64,13 @@ void spn_cc_add_pkg(spn_cc_t* cc, spn_pkg_unit_t* pkg) {
   }
 }
 
+void spn_cc_target_set_lang(spn_cc_target_t* target, spn_lang_t lang) {
+  target->lang = lang;
+}
+
 void spn_cc_target_add_info(spn_cc_target_t* target, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
+  target->cxx = info->cxx;
+
   sp_da_for(info->include, it) {
     spn_cc_target_add_absolute_include(target, spn_cc_resolve_pkg_path(target->cc->mem, pkg, info->include[it]));
   }
@@ -256,17 +263,26 @@ spn_err_t spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_st
   return SPN_OK;
 }
 
-void spn_cc_to_ps(sp_mem_t mem, spn_cc_t* cc, sp_ps_config_t* ps) {
-  ps->command = cc->compiler.program;
-  sp_da_for(cc->compiler.args, ai) {
-    sp_ps_config_add_arg(mem, ps, cc->compiler.args[ai]);
+static spn_toolchain_launcher_t spn_cc_launcher(spn_cc_t* cc, spn_cc_target_t* target) {
+  if (target->lang == SPN_LANG_CXX) {
+    SP_ASSERT(!sp_str_empty(cc->cxx.program));
+    return cc->cxx;
+  }
+  return cc->compiler;
+}
+
+void spn_cc_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps) {
+  spn_toolchain_launcher_t launcher = spn_cc_launcher(cc, target);
+  ps->command = launcher.program;
+  sp_da_for(launcher.args, it) {
+    sp_ps_config_add_arg(mem, ps, launcher.args[it]);
   }
 
   // Clang and Zig require an explicit --target flag for cross-compilation.
   // GCC cross-compilers bake the target into the binary name (e.g. x86_64-w64-mingw32-gcc).
   if (cc->driver == SPN_CC_DRIVER_CLANG) {
-    spn_triple_t target = { cc->arch, cc->os, cc->abi };
-    sp_str_t target_str = spn_triple_to_cc_target(mem, target);
+    spn_triple_t triple = { cc->arch, cc->os, cc->abi };
+    sp_str_t target_str = spn_triple_to_cc_target(mem, triple);
     if (!sp_str_empty(target_str)) {
       sp_ps_config_add_arg(mem, ps, sp_fmt(mem, "--target={}", SP_FMT_STR(target_str)).value);
     }
@@ -279,7 +295,28 @@ void spn_cc_to_ps(sp_mem_t mem, spn_cc_t* cc, sp_ps_config_t* ps) {
     sp_ps_config_add_arg(mem, ps, spn_gen_format_entry(mem, cc->define[it], SPN_GEN_DEFINE, cc->driver));
   }
 
-  sp_ps_config_add_arg(mem, ps, spn_cc_c_standard_to_switch(cc->standard));
+  switch (target->kind) {
+    case SPN_CC_OUTPUT_OBJECT:
+    case SPN_CC_OUTPUT_WASM: {
+      switch (target->lang) {
+        case SPN_LANG_C: {
+          sp_ps_config_add_arg(mem, ps, spn_cc_c_standard_to_switch(cc->standard));
+          break;
+        }
+        case SPN_LANG_CXX: {
+          sp_ps_config_add_arg(mem, ps, spn_cc_cxx_standard_to_switch(target->cxx.standard));
+          break;
+        }
+      }
+      break;
+    }
+    case SPN_CC_OUTPUT_SHARED_LIB:
+    case SPN_CC_OUTPUT_STATIC_LIB:
+    case SPN_CC_OUTPUT_EXE: {
+      break;
+    }
+  }
+
   sp_ps_config_add_arg(mem, ps, spn_cc_build_mode_to_switch(cc->mode));
 }
 
@@ -319,6 +356,15 @@ void spn_cc_target_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp
     sp_ps_config_add_arg(mem, ps, spn_gen_format_entry(mem, target->define[it], SPN_GEN_DEFINE, driver));
   }
 
+  if (target->lang == SPN_LANG_CXX) {
+    if (target->cxx.no_exceptions) {
+      sp_ps_config_add_arg(mem, ps, sp_str_lit("-fno-exceptions"));
+    }
+    if (target->cxx.no_rtti) {
+      sp_ps_config_add_arg(mem, ps, sp_str_lit("-fno-rtti"));
+    }
+  }
+
   sp_da_for(target->flags, it) {
     sp_ps_config_add_arg(mem, ps, target->flags[it]);
   }
@@ -351,7 +397,7 @@ spn_cc_run_t spn_cc_target_run(spn_cc_target_t* target, sp_str_t cwd) {
       .err.mode = SP_PS_IO_MODE_REDIRECT,
     }
   };
-  spn_cc_to_ps(scratch.mem, cc, &ps);
+  spn_cc_to_ps(scratch.mem, cc, target, &ps);
   spn_cc_target_to_ps(scratch.mem, cc, target, &ps);
 
   sp_tm_timer_t timer = sp_tm_start_timer();
@@ -360,7 +406,7 @@ spn_cc_run_t spn_cc_target_run(spn_cc_target_t* target, sp_str_t cwd) {
 
   sp_io_dyn_mem_writer_t log;
   sp_io_dyn_mem_writer_init(cc->mem, &log);
-  sp_io_write_str(&log.base, cc->compiler.program, SP_NULLPTR);
+  sp_io_write_str(&log.base, ps.command, SP_NULLPTR);
   sp_io_write_c8(&log.base, ' ');
   sp_da_for(ps.dyn_args, it) {
     sp_io_write_str(&log.base, ps.dyn_args[it], SP_NULLPTR);

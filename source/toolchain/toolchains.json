@@ -22,6 +22,12 @@
           "ar"
         ]
       },
+      "cxx": {
+        "program": "zig",
+        "args": [
+          "c++"
+        ]
+      },
       "mirrors": "https://ziglang.org/download/community-mirrors.txt",
       "host": {
         "x86_64-linux": {
@@ -105,6 +111,9 @@
       },
       "archiver": {
         "program": "ar"
+      },
+      "cxx": {
+        "program": "c++"
       }
     }
   ]

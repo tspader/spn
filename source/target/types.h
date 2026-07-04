@@ -49,6 +49,12 @@ typedef struct {
 
 typedef sp_opt(spn_linkage_t) sp_opt_spn_linkage_t;
 
+typedef struct {
+  spn_cxx_standard_t standard;
+  bool no_exceptions;
+  bool no_rtti;
+} spn_cxx_options_t;
+
 struct spn_target_info {
   sp_str_t name;
   spn_target_kind_t kind;
@@ -63,6 +69,7 @@ struct spn_target_info {
   sp_da(sp_str_t) flags;
   sp_da(sp_str_t) deps;
   sp_da(spn_embed_t) embed;
+  spn_cxx_options_t cxx;
 };
 
 #endif

@@ -1,0 +1,21 @@
+[package]
+name = "test"
+version = "0.1.0"
+
+[deps.package]
+spum = "file://./packages/spum/spn.toml"
+
+[[toolchain]]
+name = "conly"
+compiler = "cc"
+linker = "cc"
+archiver = "ar"
+driver = "gcc"
+
+[profile.default]
+toolchain = "conly"
+linkage = "static"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

@@ -36,6 +36,7 @@ typedef struct spn_toolchain {
   sp_str_t version;
   spn_cc_driver_t driver;
   spn_toolchain_launcher_t compiler;
+  spn_toolchain_launcher_t cxx;
   spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
   sp_da(spn_triple_t) targets;

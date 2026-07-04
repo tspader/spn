@@ -31,6 +31,7 @@ typedef struct {
   const c8* define [4];
   const c8* flags [4];
   const c8* deps [4];
+  spn_cxx_options_t cxx;
 } target_t;
 
 typedef struct {
@@ -51,6 +52,8 @@ typedef struct {
   const c8* args [8];
   const c8* linker;
   const c8* archiver;
+  const c8* cxx;
+  const c8* cxx_args [8];
   spn_cc_driver_t driver;
   spn_triple_t targets [4];
 } toolchain_t;
@@ -124,6 +127,17 @@ static void check_strings(s32* utest_result, sp_da(sp_str_t) actual, const c8* c
   sp_for(i, n) EXPECT_STR(actual[i], expected[i]);
 }
 
+static void check_launcher_args(s32* utest_result, spn_toolchain_launcher_t launcher, const c8* const* expected, u32 cap) {
+  u32 n = 0;
+  for (u32 it = 0; it < cap; it++) {
+    if (!expected[it]) break;
+    n++;
+  }
+  if (!n) return;
+  ASSERT_EQ(n, (u32)sp_da_size(launcher.args));
+  sp_for(it, n) EXPECT_STR(launcher.args[it], expected[it]);
+}
+
 static void check_targets(s32* utest_result, spn_target_info_om_t om, const target_t* arr, u32 n, spn_target_kind_t kind) {
   for (u32 i = 0; i < n; i++) {
     if (!arr[i].name) break;
@@ -141,6 +155,9 @@ static void check_targets(s32* utest_result, spn_target_info_om_t om, const targ
     check_strings(utest_result, t->define,  arr[i].define,  SP_CARR_LEN(arr[i].define));
     check_strings(utest_result, t->flags,   arr[i].flags,   SP_CARR_LEN(arr[i].flags));
     check_strings(utest_result, t->deps,    arr[i].deps,    SP_CARR_LEN(arr[i].deps));
+    EXPECT_EQ((u32)arr[i].cxx.standard, (u32)t->cxx.standard);
+    EXPECT_EQ(arr[i].cxx.no_exceptions, t->cxx.no_exceptions);
+    EXPECT_EQ(arr[i].cxx.no_rtti, t->cxx.no_rtti);
   }
 }
 
@@ -245,17 +262,11 @@ static void run_case(s32* utest_result, test_t test) {
     if (expected.compiler) EXPECT_STR(tc->compiler.program, expected.compiler);
     if (expected.linker)   EXPECT_STR(tc->linker.program, expected.linker);
     if (expected.archiver) EXPECT_STR(tc->archiver.program, expected.archiver);
+    if (expected.cxx)      EXPECT_STR(tc->cxx.program, expected.cxx);
     if (expected.driver)   EXPECT_EQ((u32)expected.driver, (u32)tc->driver);
 
-    u32 num_args = 0;
-    sp_carr_for(expected.args, a) {
-      if (!expected.args[a]) break;
-      num_args++;
-    }
-    if (num_args) {
-      ASSERT_EQ(num_args, (u32)sp_da_size(tc->compiler.args));
-      sp_for(a, num_args) EXPECT_STR(tc->compiler.args[a], expected.args[a]);
-    }
+    check_launcher_args(utest_result, tc->compiler, expected.args, SP_CARR_LEN(expected.args));
+    check_launcher_args(utest_result, tc->cxx, expected.cxx_args, SP_CARR_LEN(expected.cxx_args));
 
     sp_carr_for(expected.targets, t) {
       spn_triple_t triple = expected.targets[t];
@@ -460,6 +471,68 @@ UTEST(lower, dep_namespaced) {
     .deps = {
       { .name = "ns/q", .source = SPN_PKG_SOURCE_INDEX }
     }
+  });
+}
+
+UTEST(lower, cxx_lib) {
+  run_case(utest_result, (test_t) {
+    .manifest = "cxx_lib",
+    .libs = {
+      {
+        .name = "t",
+        .linkages = { .static_lib = true },
+        .source = { "spum.cpp" },
+        .cxx = { .standard = SPN_CXX14, .no_exceptions = true, .no_rtti = true },
+      }
+    }
+  });
+}
+
+UTEST(lower, cxx_lib_defaults) {
+  run_case(utest_result, (test_t) {
+    .manifest = "cxx_lib_defaults",
+    .libs = {
+      {
+        .name = "t",
+        .linkages = { .static_lib = true },
+        .source = { "spum.cpp" },
+      }
+    }
+  });
+}
+
+UTEST(lower, validate_cxx_bad_standard) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_cxx_bad_standard",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "lib[0].cxx.standard" }
+    }
+  });
+}
+
+UTEST(lower, validate_cxx_source_on_build_script) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_cxx_source_on_build_script",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "package.build.source" }
+    }
+  });
+}
+
+UTEST(lower, toolchain_cxx) {
+  run_case(utest_result, (test_t) {
+    .manifest = "toolchain_cxx",
+    .toolchains = {
+      {
+        .name = "custom",
+        .compiler = "cc",
+        .linker = "cc",
+        .archiver = "ar",
+        .cxx = "g++",
+        .cxx_args = { "-pthread" },
+        .driver = SPN_CC_DRIVER_GCC,
+      },
+    },
   });
 }
 

@@ -1,0 +1,32 @@
+{
+  "package": {
+    "name": "app",
+    "version": "1.0.0"
+  },
+  "lib": {
+    "app": {
+      "name": "app",
+      "kinds": [
+        "static"
+      ],
+      "source": [
+        "app.cpp"
+      ],
+      "cxx": {
+        "standard": "c++17",
+        "exceptions": false,
+        "rtti": false
+      }
+    }
+  },
+  "toolchain": [
+    {
+      "name": "custom",
+      "compiler": "cc",
+      "linker": "cc",
+      "archiver": "ar",
+      "driver": "gcc",
+      "cxx": "c++"
+    }
+  ]
+}

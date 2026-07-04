@@ -25,6 +25,7 @@ spn_err_t spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, sp_str_t 
     toolchain.version = t->version;
     toolchain.driver = t->driver;
     toolchain.compiler = spn_toolchain_catalog_load_launcher(&t->compiler);
+    toolchain.cxx = spn_toolchain_catalog_load_launcher(&t->cxx);
     toolchain.linker = spn_toolchain_catalog_load_launcher(&t->linker);
     toolchain.archiver = spn_toolchain_catalog_load_launcher(&t->archiver);
 

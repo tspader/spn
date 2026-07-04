@@ -28,7 +28,11 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   spn_cc_add_pkg(cc, unit->package);
 
   spn_cc_target_t* target = spn_cc_add_target(cc, SPN_CC_OUTPUT_OBJECT, file);
+  spn_cc_target_set_lang(target, unit->lang);
   spn_cc_target_add_info(target, unit->package, unit->target->info);
+  if (unit->target->info->kind == SPN_TARGET_LIB) {
+    spn_cc_target_add_flag(target, sp_str_lit("-fPIC"));
+  }
 
   // Dependencies publish their headers into their store; compile against them
   sp_da(spn_pkg_unit_t*) deps = spn_session_pkg_deps(session, unit->package);

@@ -1,0 +1,12 @@
+[package]
+name = "spum"
+version = "1.0.0"
+
+[deps.package]
+spam = "file://../spam/spn.toml"
+
+[[lib]]
+name = "spum"
+kinds = ["shared"]
+source = ["spum.c"]
+headers = ["spum.h"]

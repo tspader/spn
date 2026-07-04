@@ -3546,6 +3546,191 @@ static int JimAioOpenPtyCommand(Jim_Interp *interp, int argc, Jim_Obj *const *ar
 
 
 
+enum {
+    SPN_PUMP_AMALG_C,
+    SPN_PUMP_AMALG_H,
+    SPN_PUMP_SQLITE3H,
+    SPN_PUMP_FTS5
+};
+
+static int spn_pump_prefix(const char *s, const char *prefix)
+{
+    return strncmp(s, prefix, strlen(prefix)) == 0;
+}
+
+static int spn_pump_alpha(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+static int spn_pump_interesting(const char *s, int mode)
+{
+    const char *p;
+
+    switch (mode) {
+        case SPN_PUMP_AMALG_C:
+        case SPN_PUMP_AMALG_H:
+            /* superset of: ^\s*#\s*include, ^#ifdef __cplusplus, ^#line */
+            p = s;
+            while (*p == ' ' || *p == '\t' || *p == '\v' || *p == '\f') p++;
+            if (*p == '#') return 1;
+            /* ^(static|typedef|SQLITE_PRIVATE) lines fall through to the
+            ** plain puts branch regardless of $addstatic */
+            if (spn_pump_prefix(s, "static") || spn_pump_prefix(s, "typedef")
+                || spn_pump_prefix(s, "SQLITE_PRIVATE")) return 0;
+            /* declpattern/varpattern/IoTrace/Os all require the literal
+            ** "sqlite3" and an alpha anchor: column 0 for .c, after
+            ** spaces only (" *" prefix) for .h */
+            p = s;
+            if (mode == SPN_PUMP_AMALG_H) {
+                while (*p == ' ') p++;
+            }
+            if (!spn_pump_alpha(*p)) return 0;
+            return strstr(p, "sqlite3") != NULL;
+
+        case SPN_PUMP_SQLITE3H:
+            /* every regsub marker (--VERS-- etc) contains "--" */
+            if (strstr(s, "--")) return 1;
+            /* varpattern/declpattern1-5 and the #include-sqlite3.h skip all
+            ** require the literal "sqlite3" */
+            if (!strstr(s, "sqlite3")) return 0;
+            p = s;
+            while (*p == ' ') p++;
+            if (spn_pump_alpha(*p)) return 1;
+            return strstr(s, "#include") != NULL;
+
+        case SPN_PUMP_FTS5:
+            /* ^#include.*fts5, sqlite3Fts5 decls, --FTS5-SOURCE-ID-- */
+            return strstr(s, "fts5") != NULL || strstr(s, "Fts5") != NULL
+                || strstr(s, "FTS5") != NULL;
+    }
+    return 1;
+}
+
+static AioFile *spn_pump_channel(Jim_Interp *interp, Jim_Obj *command)
+{
+    Jim_Cmd *cmdPtr = Jim_GetCommand(interp, command, JIM_ERRMSG);
+
+    if (cmdPtr && !cmdPtr->isproc && cmdPtr->u.native.cmdProc == JimAioSubCmdProc) {
+        return (AioFile *)cmdPtr->u.native.privData;
+    }
+    Jim_SetResultFormatted(interp, "Not a filehandle: \"%#s\"", command);
+    return NULL;
+}
+
+static Jim_Obj *spn_pump_getline(Jim_Interp *interp, AioFile *af)
+{
+    const char *nl = NULL;
+    int offset = 0;
+    Jim_Obj *objPtr;
+
+    errno = 0;
+    while (!aio_eof(af)) {
+        if (af->readbuf) {
+            int len;
+            const char *pt = Jim_GetString(af->readbuf, &len);
+
+            nl = memchr(pt + offset, '\n', len - offset);
+            if (nl) {
+                objPtr = Jim_NewStringObj(interp, pt, nl - pt);
+                aio_consume(af->readbuf, nl - pt + 1);
+                return objPtr;
+            }
+            offset = len;
+        }
+        if (aio_read_len(interp, af, AIO_ONEREAD, -1) != JIM_OK) {
+            break;
+        }
+    }
+    if (af->readbuf) {
+        objPtr = af->readbuf;
+        af->readbuf = NULL;
+        return objPtr;
+    }
+    return Jim_NewStringObj(interp, NULL, 0);
+}
+
+static int spn_pump_puts(Jim_Interp *interp, AioFile *af, const char *s, int len)
+{
+    Jim_AppendString(interp, af->writebuf, s, len);
+    Jim_AppendString(interp, af->writebuf, "\n", 1);
+
+    switch (af->wbuft) {
+        case WBUF_OPT_NONE:
+        case WBUF_OPT_LINE:
+            return aio_flush(interp, af);
+
+        case WBUF_OPT_FULL:
+            if ((size_t)Jim_Length(af->writebuf) >= af->wbuf_limit) {
+                return aio_flush(interp, af);
+            }
+            break;
+    }
+    return JIM_OK;
+}
+
+static int SpnPumpCmd(Jim_Interp *interp, int argc, Jim_Obj *const *argv)
+{
+    static const char * const modes[] = { "amalg-c", "amalg-h", "sqlite3h", "fts5", NULL };
+    AioFile *in, *out;
+    int mode;
+    jim_wide count = 0;
+
+    if (argc != 4) {
+        Jim_WrongNumArgs(interp, 1, argv, "in out mode");
+        return JIM_ERR;
+    }
+    in = spn_pump_channel(interp, argv[1]);
+    if (!in) return JIM_ERR;
+    out = spn_pump_channel(interp, argv[2]);
+    if (!out) return JIM_ERR;
+    if (Jim_GetEnum(interp, argv[3], modes, &mode, "mode", JIM_ERRMSG) != JIM_OK) {
+        return JIM_ERR;
+    }
+
+    for (;;) {
+        Jim_Obj *lineObj;
+        const char *s;
+        int len;
+
+        if (aio_eof(in)) {
+            Jim_SetResult(interp, Jim_NewListObj(interp, NULL, 0));
+            return JIM_OK;
+        }
+        lineObj = spn_pump_getline(interp, in);
+        count++;
+
+        s = Jim_GetString(lineObj, &len);
+        if (mode != SPN_PUMP_FTS5) {
+            /* string trimright: default trim set is " \t\n\r" plus NUL */
+            while (len > 0 && (s[len - 1] == ' ' || s[len - 1] == '\t'
+                || s[len - 1] == '\n' || s[len - 1] == '\r' || s[len - 1] == '\0')) {
+                len--;
+            }
+        }
+
+        if (spn_pump_interesting(s, mode)) {
+            Jim_Obj *result[2];
+
+            if (len != Jim_Length(lineObj)) {
+                Jim_Obj *trimmed = Jim_NewStringObj(interp, s, len);
+                Jim_FreeNewObj(interp, lineObj);
+                lineObj = trimmed;
+            }
+            result[0] = Jim_NewIntObj(interp, count);
+            result[1] = lineObj;
+            Jim_SetResult(interp, Jim_NewListObj(interp, result, 2));
+            return JIM_OK;
+        }
+
+        if (spn_pump_puts(interp, out, s, len) != JIM_OK) {
+            Jim_FreeNewObj(interp, lineObj);
+            return JIM_ERR;
+        }
+        Jim_FreeNewObj(interp, lineObj);
+    }
+}
+
 int Jim_aioInit(Jim_Interp *interp)
 {
     if (Jim_PackageProvide(interp, "aio", "1.0", JIM_ERRMSG))
@@ -3556,6 +3741,7 @@ int Jim_aioInit(Jim_Interp *interp)
 #endif
 
     Jim_CreateCommand(interp, "open", JimAioOpenCommand, NULL, NULL);
+    Jim_CreateCommand(interp, "spn_pump", SpnPumpCmd, NULL, NULL);
 #ifdef HAVE_SOCKETS
     Jim_CreateCommand(interp, "socket", JimAioSockCommand, NULL, NULL);
 #endif

@@ -328,6 +328,62 @@ sp_str_t spn_c_standard_to_str(spn_c_standard_t standard) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+sp_str_t spn_cxx_standard_to_str(spn_cxx_standard_t standard) {
+  switch (standard) {
+    case SPN_CXX11: {
+      return sp_str_lit("c++11");
+    }
+    case SPN_CXX14: {
+      return sp_str_lit("c++14");
+    }
+    case SPN_CXX17: {
+      return sp_str_lit("c++17");
+    }
+    case SPN_CXX20: {
+      return sp_str_lit("c++20");
+    }
+    case SPN_CXX23: {
+      return sp_str_lit("c++23");
+    }
+    case SPN_CXX_STANDARD_NONE: {
+      return sp_str_lit("");
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+spn_cxx_standard_t spn_cxx_standard_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "c++11")) {
+    return SPN_CXX11;
+  }
+  if (sp_str_equal_cstr(str, "c++14")) {
+    return SPN_CXX14;
+  }
+  if (sp_str_equal_cstr(str, "c++17")) {
+    return SPN_CXX17;
+  }
+  if (sp_str_equal_cstr(str, "c++20")) {
+    return SPN_CXX20;
+  }
+  if (sp_str_equal_cstr(str, "c++23")) {
+    return SPN_CXX23;
+  }
+
+  return SPN_CXX_STANDARD_NONE;
+}
+
+spn_lang_t spn_lang_from_path(sp_str_t path) {
+  sp_str_t ext = sp_fs_get_ext(path);
+  const c8* cxx [] = { "cpp", "cc", "cxx", "c++", "C" };
+  sp_carr_for(cxx, it) {
+    if (sp_str_equal_cstr(ext, cxx[it])) {
+      return SPN_LANG_CXX;
+    }
+  }
+  return SPN_LANG_C;
+}
+
 spn_c_standard_t spn_c_standard_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "c89")) {
     return SPN_C89;

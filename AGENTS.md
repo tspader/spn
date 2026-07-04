@@ -39,6 +39,12 @@ Tests must be written declaratively, by expressing test cases as pure data which
 - You can (and should, for larger suites) have multiple executors. Testing a feature does not mean jamming every test into one executor.
 - You can drop into imperative logic only when there is a single test which does not conform to the pattern
 
+Tests should be:
+- Minimal. Every test should test exactly one feature, and should only have what's needed for that. No fluff.
+- Orthogonal. Every feature should be tested in exactly one place.
+- High value. We shouldn't burden ourself with brittle tests, or tests that wouldn't catch real bugs.
+- Complete. Every feature should be tested.
+
 ## running
 Running the tests via CTest is easiest, and outputs to an ISO timestamped directory in `.tmp`:
 ```sh

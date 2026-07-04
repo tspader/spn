@@ -71,6 +71,7 @@ typedef struct {
   spn_session_t* session;
   spn_pkg_unit_t* package;
   spn_target_unit_t* target;
+  spn_lang_t lang;
 
   struct {
     spn_bg_id_t source;
@@ -217,6 +218,7 @@ struct spn_toolchain_unit_t {
   spn_session_t* session;
   sp_str_t root;
   spn_toolchain_launcher_t compiler;
+  spn_toolchain_launcher_t cxx;
   spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
   spn_build_io_t logs;

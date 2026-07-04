@@ -89,6 +89,20 @@ typedef enum {
 } spn_c_standard_t;
 
 typedef enum {
+  SPN_CXX_STANDARD_NONE,
+  SPN_CXX11,
+  SPN_CXX14,
+  SPN_CXX17,
+  SPN_CXX20,
+  SPN_CXX23,
+} spn_cxx_standard_t;
+
+typedef enum {
+  SPN_LANG_C,
+  SPN_LANG_CXX,
+} spn_lang_t;
+
+typedef enum {
   SPN_CC_NONE,
   SPN_CC_GCC,
   SPN_CC_CLANG,
@@ -125,6 +139,7 @@ typedef enum {
   SPN_ERR_TOOLCHAIN_NO_SHA,
   SPN_ERR_TOOLCHAIN_SHA,
   SPN_ERR_TOOLCHAIN_EXTRACT,
+  SPN_ERR_TOOLCHAIN_NO_CXX,
   SPN_ERR_TOML_MISSING,
   SPN_ERR_TOML_TYPE,
   SPN_CODEGEN_ERR_EXPECTED_BOOL,
