@@ -9,7 +9,7 @@ s32 gen_info(spn_t* spn, spn_node_ctx_t* ctx) {
     spn_log(spn, "found spum include dir");
     (void)dep_include;
 
-    spn_write_file(spn, "dep_info.h",
+    spn_io_write("/work/dep_info.h",
       "#ifndef DEP_INFO_H\n"
       "#define DEP_INFO_H\n"
       "#define HAS_LOG_DEP 1\n"
@@ -18,7 +18,7 @@ s32 gen_info(spn_t* spn, spn_node_ctx_t* ctx) {
   }
   else {
     spn_log(spn, "WARNING: spum dependency not found");
-    spn_write_file(spn, "dep_info.h",
+    spn_io_write("/work/dep_info.h",
       "#ifndef DEP_INFO_H\n"
       "#define DEP_INFO_H\n"
       "#define HAS_LOG_DEP 0\n"

@@ -200,32 +200,39 @@ void spn_write_file(spn_t* s, const c8* path, const c8* content) {
   sp_mem_end_scratch(scratch);
 }
 
-s32 spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir, const c8* to_path) {
-  spn_pkg_unit_t* unit = spn_api_unit(s);
+s32 spn_api_copy(sp_str_t from, sp_str_t to) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_str_t from = sp_fs_join_path(scratch.mem, spn_api_dir(unit, from_dir), sp_str_view(from_path));
-  sp_str_t to = sp_fs_join_path(scratch.mem, spn_api_dir(unit, to_dir), sp_str_view(to_path));
-  SPN_API_LOG(unit, "spn_copy", "{} -> {}", SP_FMT_STR(from), SP_FMT_STR(to));
 
   s32 err = SPN_OK;
 
   // sp_fs_copy only understands a bare "*" or an exact name; expand real glob
   // patterns (e.g. "lib/*.o") ourselves against the source directory.
   sp_str_t pattern = sp_fs_get_name(from);
-  if (sp_fs_is_glob(from) && !sp_str_equal(pattern, sp_str_lit("*"))) {
+  if (sp_fs_is_glob(from)) {
     sp_str_t dir = sp_fs_parent_path(from);
-    sp_fs_create_dir(to);
+    if (!sp_fs_is_dir(dir)) {
+      err = SPN_ERROR;
+    }
+    else if (sp_str_equal(pattern, sp_str_lit("*"))) {
+      err = sp_fs_copy(from, to);
+    }
+    else {
+      sp_fs_create_dir(to);
 
-    sp_glob_set_t* glob = sp_glob_set_new(scratch.mem);
-    sp_glob_set_add(glob, sp_str_to_cstr(scratch.mem, pattern));
-    sp_glob_set_build(glob);
+      sp_glob_set_t* glob = sp_glob_set_new(scratch.mem);
+      sp_glob_set_add(glob, sp_str_to_cstr(scratch.mem, pattern));
+      sp_glob_set_build(glob);
 
-    sp_da(sp_fs_entry_t) entries = sp_fs_collect(scratch.mem, dir);
-    sp_da_for(entries, i) {
-      if (sp_glob_set_match(glob, entries[i].name)) {
-        sp_fs_copy(sp_fs_join_path(scratch.mem, dir, entries[i].name), to);
+      sp_da(sp_fs_entry_t) entries = sp_fs_collect(scratch.mem, dir);
+      sp_da_for(entries, it) {
+        if (sp_glob_set_match(glob, entries[it].name)) {
+          sp_fs_copy(sp_fs_join_path(scratch.mem, dir, entries[it].name), to);
+        }
       }
     }
+  }
+  else if (!sp_fs_exists(from)) {
+    err = SPN_ERROR;
   }
   else {
     // @spader This bit me so I just patched it over like this, but
@@ -238,6 +245,18 @@ s32 spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir
     err = sp_fs_copy(from, to);
   }
 
+  sp_mem_end_scratch(scratch);
+  return err;
+}
+
+s32 spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir, const c8* to_path) {
+  spn_pkg_unit_t* unit = spn_api_unit(s);
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t from = sp_fs_join_path(scratch.mem, spn_api_dir(unit, from_dir), sp_str_view(from_path));
+  sp_str_t to = sp_fs_join_path(scratch.mem, spn_api_dir(unit, to_dir), sp_str_view(to_path));
+  SPN_API_LOG(unit, "spn_copy", "{} -> {}", SP_FMT_STR(from), SP_FMT_STR(to));
+
+  s32 err = spn_api_copy(from, to);
   sp_mem_end_scratch(scratch);
   return err;
 }

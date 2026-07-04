@@ -458,7 +458,10 @@ sp_app_result_t spn_update(sp_app_t* sp) {
       break;
     }
     case SPN_TASK_RUN_CONFIGURE_GRAPH: {
-      if (!task->initted) spn_task_init_configure_graph(&app);
+      if (!task->initted) {
+        result = spn_task_init_configure_graph(&app);
+        if (result == SPN_TASK_ERROR) break;
+      }
       result = spn_task_update_configure_graph(&app);
       break;
     }

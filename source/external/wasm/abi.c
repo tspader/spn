@@ -1,10 +1,6 @@
 #include "sp.h"
 #include "external/wasm/abi.h"
 #include "unit/types.h"
-#include "api/api.h"
-#include "ctx/types.h"
-#include "event/types.h"
-#include "event/event.h"
 
 spn_wasm_ctx_t spn_wasm_ctx(wasm_exec_env_t env) {
   return (spn_wasm_ctx_t) {
@@ -74,35 +70,4 @@ void spn_abi_node_set_user_data(spn_node_t* node, s32 data) {
 
 s32 spn_abi_node_ctx_get_user_data(spn_node_ctx_t* ctx) {
   return (s32)(u32)(u64)ctx->user_data;
-}
-
-static sp_str_t spn_abi_fs_path(sp_mem_t mem, spn_pkg_unit_t* unit, const c8* path) {
-  struct { sp_str_t guest; sp_str_t host; } dirs [] = {
-    { sp_str_lit("/work"),   unit->paths.work },
-    { sp_str_lit("/source"), unit->paths.source },
-    { sp_str_lit("/store"),  unit->paths.store },
-  };
-
-  sp_str_t str = sp_str_view(path);
-  sp_carr_for(dirs, it) {
-    sp_str_t guest = dirs[it].guest;
-    if (!sp_str_starts_with(str, guest)) continue;
-    if (str.len == guest.len) return dirs[it].host;
-    if (str.data[guest.len] != '/') continue;
-    return sp_fmt(mem, "{}{}", sp_fmt_str(dirs[it].host), sp_fmt_str(sp_str_sub(str, guest.len, str.len - guest.len))).value;
-  }
-  return str;
-}
-
-void spn_abi_fs_copy(spn_wasm_ctx_t* abi, const c8* from, const c8* to) {
-  spn_pkg_unit_t* unit = spn_api_unit(abi->handles->ctx);
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_str_t from_path = spn_abi_fs_path(scratch.mem, unit, from);
-  sp_str_t to_path = spn_abi_fs_path(scratch.mem, unit, to);
-  SPN_API_LOG(unit, "spn_fs_copy", "{} -> {}", sp_fmt_str(from_path), sp_fmt_str(to_path));
-
-  if (sp_fs_copy(from_path, to_path)) {
-    wasm_runtime_set_exception(abi->instance, sp_fmt_mem_cstr(scratch.mem, "spn_fs_copy: {} -> {}", sp_fmt_str(from_path), sp_fmt_str(to_path)));
-  }
-  sp_mem_end_scratch(scratch);
 }

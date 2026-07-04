@@ -57,6 +57,7 @@ spn_err_t spn_compile_script_module(spn_pkg_unit_t* unit, spn_target_info_t* scr
   spn_cc_target_add_build_deps(target, unit);
   spn_cc_target_add_flag(target, sp_str_lit("-fvisibility=hidden"));
   spn_cc_target_add_flag(target, sp_str_lit("-Wl,--export-dynamic"));
+  spn_cc_target_add_flag(target, sp_str_lit("-O2"));
   // spn_cc_target_add_flag(target, sp_str_lit("-Wl,--export="));
 
   spn_cc_run_t run = spn_cc_target_run(target, unit->paths.work);

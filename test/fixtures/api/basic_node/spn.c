@@ -3,7 +3,7 @@
 SPN_EXPORT
 s32 generate_header(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "generating version.h...");
-  spn_write_file(spn, "version.h",
+  spn_io_write("/work/version.h",
     "#ifndef VERSION_H\n"
     "#define VERSION_H\n"
     "#define VERSION_MAJOR 69\n"
@@ -27,6 +27,6 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
 
 SPN_EXPORT
 s32 package(spn_t* spn, spn_node_ctx_t* ctx) {
-  spn_copy(spn, SPN_DIR_WORK, "version.h", SPN_DIR_INCLUDE, "");
+  spn_fs_copy("/work/version.h", "/store/include");
   return 0;
 }

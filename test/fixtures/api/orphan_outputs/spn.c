@@ -3,7 +3,7 @@
 SPN_EXPORT
 s32 gen_orphan(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "generating orphan_header.h (no consumers)...");
-  spn_write_file(spn, "orphan_header.h",
+  spn_io_write("/work/orphan_header.h",
     "#ifndef ORPHAN_H\n"
     "#define ORPHAN_H\n"
     "#define ORPHAN_VALUE 42\n"
@@ -15,7 +15,7 @@ s32 gen_orphan(spn_t* spn, spn_node_ctx_t* ctx) {
 SPN_EXPORT
 s32 gen_consumed(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "generating consumed_header.h...");
-  spn_write_file(spn, "consumed_header.h",
+  spn_io_write("/work/consumed_header.h",
     "#ifndef CONSUMED_H\n"
     "#define CONSUMED_H\n"
     "#define CONSUMED_VALUE 100\n"

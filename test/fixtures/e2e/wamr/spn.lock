@@ -1,0 +1,10 @@
+[spn]
+version = "1.0.0"
+commit = "00c0fa98"
+
+[[dep]]
+name = "spader/wamr"
+version = "2.4.1"
+commit = ""
+kind = "file"
+

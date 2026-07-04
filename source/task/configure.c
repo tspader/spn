@@ -96,6 +96,10 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
 spn_task_result_t spn_task_update_configure_graph(spn_app_t* app) {
   spn_bg_ctx_t* build = &app->session.configure;
 
+  if (!build->executor) {
+    return SPN_TASK_ERROR;
+  }
+
   if (sp_atomic_s32_get(&build->executor->shutdown)) {
     return sp_da_empty(build->executor->errors) ?
       SPN_TASK_DONE :

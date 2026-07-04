@@ -12,7 +12,7 @@ s32 setup_fn(spn_t* spn, spn_node_ctx_t* ctx) {
 SPN_EXPORT
 s32 codegen_fn(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "codegen: generating header...");
-  spn_write_file(spn, "generated.h",
+  spn_io_write("/work/generated.h",
     "#ifndef GENERATED_H\n"
     "#define GENERATED_H\n"
     "#define SETUP_COMPLETE 1\n"

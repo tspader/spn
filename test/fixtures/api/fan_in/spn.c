@@ -3,7 +3,7 @@
 SPN_EXPORT
 s32 gen_alpha(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "gen_alpha");
-  spn_write_file(spn, "alpha.h",
+  spn_io_write("/work/alpha.h",
     "#ifndef ALPHA_H\n#define ALPHA_H\n#define ALPHA 1\n#endif\n");
   return 0;
 }
@@ -11,7 +11,7 @@ s32 gen_alpha(spn_t* spn, spn_node_ctx_t* ctx) {
 SPN_EXPORT
 s32 gen_beta(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "gen_beta");
-  spn_write_file(spn, "beta.h",
+  spn_io_write("/work/beta.h",
     "#ifndef BETA_H\n#define BETA_H\n#define BETA 2\n#endif\n");
   return 0;
 }
@@ -19,7 +19,7 @@ s32 gen_beta(spn_t* spn, spn_node_ctx_t* ctx) {
 SPN_EXPORT
 s32 gen_gamma(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "gen_gamma");
-  spn_write_file(spn, "gamma.h",
+  spn_io_write("/work/gamma.h",
     "#ifndef GAMMA_H\n#define GAMMA_H\n#define GAMMA 3\n#endif\n");
   return 0;
 }
@@ -27,7 +27,7 @@ s32 gen_gamma(spn_t* spn, spn_node_ctx_t* ctx) {
 SPN_EXPORT
 s32 gen_delta(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "gen_delta");
-  spn_write_file(spn, "delta.h",
+  spn_io_write("/work/delta.h",
     "#ifndef DELTA_H\n#define DELTA_H\n#define DELTA 4\n#endif\n");
   return 0;
 }
@@ -35,7 +35,7 @@ s32 gen_delta(spn_t* spn, spn_node_ctx_t* ctx) {
 SPN_EXPORT
 s32 gen_combined(spn_t* spn, spn_node_ctx_t* ctx) {
   spn_log(spn, "gen_combined: merging all inputs");
-  spn_write_file(spn, "combined.h",
+  spn_io_write("/work/combined.h",
     "#ifndef COMBINED_H\n"
     "#define COMBINED_H\n"
     "#include \"alpha.h\"\n"

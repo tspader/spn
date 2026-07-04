@@ -10,7 +10,7 @@ s32 generate_build_dep_value(spn_t* spn, spn_node_ctx_t* ctx) {
     return 1;
   }
 
-  spn_write_file(spn, "build_dep_value.h",
+  spn_io_write("/work/build_dep_value.h",
     "#ifndef BUILD_DEP_VALUE_H\n"
     "#define BUILD_DEP_VALUE_H\n"
     "#define BUILD_DEP_VALUE 78\n"

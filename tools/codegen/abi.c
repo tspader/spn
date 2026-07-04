@@ -4,6 +4,7 @@ typedef enum {
   ABI_VAL_VOID = 0,
   ABI_VAL_S32,
   ABI_VAL_STR,
+  ABI_VAL_STR_OPT,
   ABI_VAL_CTX,
   ABI_VAL_CONFIG,
   ABI_VAL_TARGET,
@@ -61,6 +62,11 @@ static const abi_fn_t abi_fns [] = {
   { .name = "spn_write_file",           .ret = ABI_VAL_VOID,    .args = { ABI_VAL_CTX, ABI_VAL_STR, ABI_VAL_STR } },
   { .name = "spn_copy",                 .ret = ABI_VAL_S32,     .args = { ABI_VAL_CTX, ABI_VAL_S32, ABI_VAL_STR, ABI_VAL_S32, ABI_VAL_STR } },
   { .name = "spn_fs_copy",              .ret = ABI_VAL_VOID,    .args = { ABI_VAL_STR, ABI_VAL_STR }, .host = "spn_abi_fs_copy", .abi = true },
+  { .name = "spn_fs_copy_glob",         .ret = ABI_VAL_VOID,    .args = { ABI_VAL_STR, ABI_VAL_STR }, .host = "spn_abi_fs_copy_glob", .abi = true },
+  { .name = "spn_fs_cat_ex",            .ret = ABI_VAL_VOID,    .args = { ABI_VAL_STR, ABI_VAL_STR_OPT, ABI_VAL_STR_OPT, ABI_VAL_STR_OPT, ABI_VAL_STR_OPT }, .host = "spn_abi_fs_cat", .abi = true },
+  { .name = "spn_fs_create_dir",        .ret = ABI_VAL_VOID,    .args = { ABI_VAL_STR }, .host = "spn_abi_fs_create_dir", .abi = true },
+  { .name = "spn_io_write",             .ret = ABI_VAL_VOID,    .args = { ABI_VAL_STR, ABI_VAL_STR }, .host = "spn_abi_io_write", .abi = true },
+  { .name = "spn_fmt_ex",               .ret = ABI_VAL_STR,     .args = { ABI_VAL_STR, ABI_VAL_STR_OPT, ABI_VAL_STR_OPT, ABI_VAL_STR_OPT, ABI_VAL_STR_OPT }, .host = "spn_abi_fmt", .abi = true },
   { .name = "spn_make",                 .ret = ABI_VAL_S32,     .args = { ABI_VAL_CTX } },
   { .name = "spn_make_new",             .ret = ABI_VAL_MAKE,    .args = { ABI_VAL_CTX } },
   { .name = "spn_make_add_target",      .ret = ABI_VAL_VOID,    .args = { ABI_VAL_MAKE, ABI_VAL_STR } },
@@ -150,6 +156,11 @@ static sp_str_t abi_fn_thunk(gen_t* g, const abi_fn_t* fn) {
   sp_fmt_io(io, "  spn_wasm_ctx_t abi = spn_wasm_ctx(env);\n");
 
   sp_for(it, num_args) {
+    if (fn->args[it] == ABI_VAL_STR_OPT) {
+      sp_fmt_io(io, "  const c8* s{} = SP_NULLPTR;\n", sp_fmt_uint(it));
+      sp_fmt_io(io, "  if (!spn_wasm_read_str(&abi, a{}, &s{})) {}\n", sp_fmt_uint(it), sp_fmt_uint(it), sp_fmt_cstr(fail));
+      continue;
+    }
     if (!abi_val_is_handle(fn->args[it])) continue;
     sp_fmt_io(io, "  void* h{} = spn_wasm_resolve_handle(abi.handles, a{}, {});\n", sp_fmt_uint(it), sp_fmt_uint(it), sp_fmt_cstr(abi_val_kind(fn->args[it])));
     sp_fmt_io(io, "  if (!h{}) {}\n", sp_fmt_uint(it), sp_fmt_cstr(fail));
@@ -161,9 +172,12 @@ static sp_str_t abi_fn_thunk(gen_t* g, const abi_fn_t* fn) {
     sp_fmt_io(&args.base, "&abi");
   }
   sp_for(it, num_args) {
+    const c8* prefix = "a";
+    if (abi_val_is_handle(fn->args[it])) prefix = "h";
+    if (fn->args[it] == ABI_VAL_STR_OPT) prefix = "s";
     sp_fmt_io(&args.base, "{}{}{}",
       sp_fmt_cstr((it || fn->abi) ? ", " : ""),
-      sp_fmt_cstr(abi_val_is_handle(fn->args[it]) ? "h" : "a"),
+      sp_fmt_cstr(prefix),
       sp_fmt_uint(it));
   }
   sp_str_t call = sp_io_dyn_mem_writer_take_str(&args);

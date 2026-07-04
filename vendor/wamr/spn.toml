@@ -26,7 +26,7 @@ define = [
   "WASM_ENABLE_BULK_MEMORY=1",
   "WASM_ENABLE_BULK_MEMORY_OPT=1",
   "WASM_ENABLE_CALL_INDIRECT_OVERLONG=1",
-  "WASM_DISABLE_HW_BOUND_CHECK=1",
+  "WASM_DISABLE_HW_BOUND_CHECK=0",
   "_GNU_SOURCE",
 ]
 include = [
@@ -60,6 +60,7 @@ source = [
   "core/iwasm/libraries/libc-wasi/sandboxed-system-primitives/src/*.c",
 ]
 flags = [
+  "-O2",
   "-std=gnu11",
   "-Wno-unused-function",
   "-Wno-unused-variable",

@@ -36,6 +36,7 @@ set(SPN_SOURCES
   external/obj.c
   external/tom.c
   external/wasm/abi.c
+  external/wasm/guest.c
   external/wasm/wasm.c
   filter/filter.c
   gen.c
