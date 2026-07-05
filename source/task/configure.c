@@ -7,6 +7,7 @@
 #include "event/types.h"
 #include "forward/types.h"
 #include "graph/types.h"
+#include "pkg/id.h"
 #include "pkg/types.h"
 #include "session/registry/types.h"
 #include "spn.h"
@@ -62,7 +63,7 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   // have their nodes, so this can't be folded into the loop above
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    spn_loaded_pkg_t* pkg = sp_str_ht_get(session->packages, unit->info->qualified);
+    spn_loaded_pkg_t* pkg = sp_ht_getp(session->packages, spn_pkg_id(session->intern, unit->info->qualified));
 
     if (pkg->source != SPN_PKG_SOURCE_ROOT) {
       spn_try(spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp));
@@ -71,7 +72,7 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
 
   // Add links between packages
   sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
 
     sp_da(spn_pkg_unit_t*) deps = *sp_om_get(session->units.graph, unit->id);
     sp_da_for(deps, j) {

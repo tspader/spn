@@ -38,6 +38,10 @@ typedef struct {
 typedef struct {
   sp_str_t namespace;
   sp_str_t name;
+} spn_pkg_name_t;
+
+typedef struct {
+  sp_intern_id_t qualified;
 } spn_pkg_id_t;
 
 typedef enum {

@@ -538,8 +538,8 @@ void spn_deinit(sp_app_t* sp) {
   spn_pkg_unit_t* root = spn_session_find_root(&app.session);
   if (!root) return;
 
-  sp_str_om_for(app.session.units.packages, it) {
-    spn_pkg_unit_t* unit = sp_str_om_at(app.session.units.packages, it);
+  sp_om_for(app.session.units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(app.session.units.packages, it);
 
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
     sp_fs_create_sym_link(

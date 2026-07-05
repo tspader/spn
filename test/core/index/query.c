@@ -92,7 +92,7 @@ static void run_index_query_case(s32* utest_result, struct index_query* fixture,
   };
   spn_index_init(&index, mem);
 
-  spn_index_pkg_t* pkg = spn_index_get_package(&index, (spn_pkg_id_t) {
+  spn_index_pkg_t* pkg = spn_index_get_package(&index, (spn_pkg_name_t) {
     .namespace = sp_str_lit("core"),
     .name = sp_str_lit("spum"),
   });

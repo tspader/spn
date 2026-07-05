@@ -6,9 +6,11 @@
 
 #include "codegen/codegen.h"
 #include "codegen/lower.h"
+#include "pkg/id.h"
 
 spn_registry_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_mem_t mem, sp_intern_t* intern, sp_str_t qualified, sp_str_t path, spn_registry_err_t* err) {
-  spn_registry_pkg_t* existing = sp_str_ht_get(*registry, qualified);
+  spn_pkg_id_t id = spn_pkg_id(intern, qualified);
+  spn_registry_pkg_t* existing = sp_ht_getp(*registry, id);
   if (existing) return existing;
 
   sp_str_t manifest = path;
@@ -35,11 +37,11 @@ spn_registry_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_
     return SP_NULLPTR;
   }
 
-  sp_str_ht_insert(*registry, qualified, ((spn_registry_pkg_t) {
+  sp_ht_insert(*registry, id, ((spn_registry_pkg_t) {
     .source = SPN_PKG_SOURCE_FILE,
     .info = info,
     .manifest = manifest,
   }));
 
-  return sp_str_ht_get(*registry, qualified);
+  return sp_ht_getp(*registry, id);
 }

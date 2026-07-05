@@ -159,10 +159,10 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
 
 spn_task_result_t spn_task_create_units(spn_app_t* app) {
   spn_session_t* session = &app->session;
-  sp_str_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* pkg = sp_str_om_at(session->units.packages, it);
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
     spn_pkg_info_t* info = pkg->info;
-    spn_loaded_pkg_t* loaded = sp_str_ht_get(session->packages, info->qualified);
+    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, spn_pkg_id(session->intern, info->qualified));
 
     // The target filter only applies to the root package; dependencies contribute
     // exactly their lib targets no matter what we were asked to build.

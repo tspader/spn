@@ -114,12 +114,12 @@ void spn_index_cache_init(spn_index_cache_t* cache, sp_mem_t mem, sp_intern_t* i
 
 }
 
-spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_id_t id) {
-  sp_str_t qualified = spn_pkg_id_to_qualified_name(id);
+spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_name_t id) {
+  sp_str_t qualified = spn_pkg_name_to_qualified(id);
   return sp_str_ht_get(state.cache, qualified);
 }
 
-spn_index_rel_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_id_t id, spn_semver_t version) {
+spn_index_rel_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_name_t id, spn_semver_t version) {
   return SP_NULLPTR;
 }
 
@@ -132,7 +132,7 @@ static void build_cache(sp_mem_t mem, fixture_t* fixture) {
     index_pkg_t* desc = &fixture->index[i];
     if (!desc->name) break;
 
-    spn_pkg_id_t id = {
+    spn_pkg_name_t id = {
       .namespace = sp_str_view(desc->namespace),
       .name = sp_str_view(desc->name),
     };
@@ -169,7 +169,7 @@ static void build_cache(sp_mem_t mem, fixture_t* fixture) {
       sp_da_push(pkg.releases, rel);
     }
 
-    sp_str_t qualified = spn_pkg_id_to_qualified_name(id);
+    sp_str_t qualified = spn_pkg_name_to_qualified(id);
     sp_str_ht_insert(state.cache, qualified, pkg);
   }
 }
@@ -182,8 +182,8 @@ static void build_manifest(sp_mem_t mem, fixture_t* fixture, spn_pkg_info_t* man
     manifest_dep_t* dep = &fixture->manifest.deps.package[i];
     if (!dep->name) break;
 
-    spn_pkg_id_t id = spn_qualified_name_to_pkg_id(sp_str_view(dep->name));
-    sp_str_t qualified = spn_pkg_id_to_qualified_name(id);
+    spn_pkg_name_t id = spn_pkg_name_from_qualified(sp_str_view(dep->name));
+    sp_str_t qualified = spn_pkg_name_to_qualified(id);
 
     spn_requested_pkg_t req = {
       .qualified = spn_pkg_canonicalize_name(sp_str_view(dep->name)),
@@ -230,13 +230,13 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
     expected_t expected = fixture.expected[it];
     if (!expected.name) break;
 
-    spn_pkg_id_t id = {
+    spn_pkg_name_t id = {
       .namespace = sp_str_view(expected.namespace),
       .name = sp_str_view(expected.name),
     };
-    sp_str_t qualified = spn_pkg_id_to_qualified_name(id);
+    sp_str_t qualified = spn_pkg_name_to_qualified(id);
 
-    spn_resolved_pkg_t* resolved = sp_str_ht_get(query.result, qualified);
+    spn_resolved_pkg_t* resolved = sp_ht_getp(query.result, spn_pkg_id(spn.intern, qualified));
     ASSERT_NE(resolved, SP_NULLPTR);
     ASSERT_TRUE(spn_semver_eq(resolved->version, expected.version));
   }

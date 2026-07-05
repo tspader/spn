@@ -8,15 +8,12 @@
 
 #include "graph/types.h"
 #include "intern/types.h"
+#include "pkg/types.h"
 #include "external/wasm/types.h"
 #include "log/lazy/types.h"
 
 typedef struct {
-  sp_intern_id_t pkg;
-} spn_pkg_unit_id_t;
-
-typedef struct {
-  spn_pkg_unit_id_t pkg;
+  spn_pkg_id_t pkg;
   sp_intern_id_t target;
 } spn_target_unit_id_t;
 
@@ -143,7 +140,7 @@ struct spn_target_unit {
 // PACKAGE //
 /////////////
 struct spn_pkg_unit_t {
-  spn_pkg_unit_id_t id;
+  spn_pkg_id_t id;
   spn_session_t* session;
   spn_pkg_info_t* info;
 

@@ -36,7 +36,7 @@ typedef enum {
 
 typedef struct {
   spn_index_dep_kind_t kind;
-  spn_pkg_id_t id;
+  spn_pkg_name_t id;
   sp_str_t version;
 } spn_index_dep_t;
 
@@ -52,7 +52,7 @@ typedef struct {
 } spn_index_rel_paths_t;
 
 typedef struct {
-  spn_pkg_id_t id;
+  spn_pkg_name_t id;
   spn_semver_t version;
 
   sp_str_t checksum;
@@ -66,7 +66,7 @@ typedef struct {
 } spn_index_rel_t;
 
 typedef struct {
-  spn_pkg_id_t id;
+  spn_pkg_name_t id;
   sp_da(spn_index_rel_t) releases;
 } spn_index_pkg_t;
 

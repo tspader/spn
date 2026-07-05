@@ -12,6 +12,7 @@
 #include "filter/filter.h"
 #include "intern/intern.h"
 #include "log/lazy/lazy.h"
+#include "pkg/id.h"
 #include "pkg/pkg.h"
 #include "session/session.h"
 #include "sp/str.h"
@@ -90,13 +91,16 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_info_t* pkg) {
   return id;
 }
 
-spn_pkg_unit_t* spn_session_find_pkg_by_qualified(spn_session_t* session, sp_str_t qualified) {
-  spn_pkg_unit_id_t id = { sp_intern_get_or_insert(session->intern, qualified) };
+spn_pkg_unit_t* spn_session_find_pkg_by_id(spn_session_t* session, spn_pkg_id_t id) {
   sp_mutex_lock(&session->mutex);
   spn_pkg_unit_t* pkg = sp_om_get(session->units.packages, id);
   sp_mutex_unlock(&session->mutex);
 
   return pkg;
+}
+
+spn_pkg_unit_t* spn_session_find_pkg_by_qualified(spn_session_t* session, sp_str_t qualified) {
+  return spn_session_find_pkg_by_id(session, spn_pkg_id(session->intern, qualified));
 }
 
 spn_target_unit_t* spn_session_find_target_in_pkg(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t name) {
@@ -169,7 +173,7 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
 }
 
 spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* loaded) {
-  spn_pkg_unit_id_t id = { sp_intern_get_or_insert(session->intern, loaded->info->qualified) };
+  spn_pkg_id_t id = spn_pkg_id(session->intern, loaded->info->qualified);
 
   sp_om_insert(session->units.packages, id, sp_zero_struct(spn_pkg_unit_t));
   spn_pkg_unit_t* unit = sp_om_back(session->units.packages);

@@ -23,7 +23,7 @@ spn_lock_file_t spn_build_lock_file(sp_mem_t mem, spn_resolve_t resolve, spn_pkg
   spn_lock_file_t lock = sp_zero;
   spn_lock_file_init(mem, &lock);
 
-  sp_str_ht_for_kv(resolve, it) {
+  sp_ht_for_kv(resolve, it) {
     spn_resolved_pkg_t* pkg = it.val;
     if (pkg->source == SPN_PKG_SOURCE_ROOT) continue;
 

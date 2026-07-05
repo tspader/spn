@@ -88,7 +88,7 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
     }
 
     sp_da_push(release.deps, ((spn_index_dep_t) {
-      .id = spn_qualified_name_to_pkg_id(req->qualified),
+      .id = spn_pkg_name_from_qualified(req->qualified),
       .version = spn_semver_range_to_str(opts->mem, req->index.range),
     }));
   }

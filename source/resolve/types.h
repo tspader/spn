@@ -14,6 +14,7 @@ typedef enum {
 } spn_resolve_strategy_t;
 
 typedef struct {
+  spn_pkg_id_t id;
   sp_intern_str_t qualified;
   spn_pkg_source_t source;
   spn_semver_t version;
@@ -25,7 +26,7 @@ typedef struct {
   };
 } spn_resolved_pkg_t;
 
-typedef sp_str_ht(spn_resolved_pkg_t) spn_resolve_t;
+typedef sp_ht(spn_pkg_id_t, spn_resolved_pkg_t) spn_resolve_t;
 
 typedef struct {
   sp_da(spn_requested_pkg_t) reqs;
@@ -35,7 +36,7 @@ typedef struct {
 
 typedef struct {
   spn_resolve_query_t* query;
-  sp_str_ht(u8) visited;
+  sp_ht(spn_pkg_id_t, u8) visited;
 } spn_resolve_run_t;
 
 typedef struct spn_resolver_t {
