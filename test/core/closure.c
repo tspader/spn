@@ -57,7 +57,7 @@ static spn_pkg_unit_t* build_pkg(sp_mem_t mem, spn_session_t* session, u32 id, c
   info->name = sp_str_view(spec.name);
 
   spn_pkg_unit_t* pkg = sp_alloc_type(mem, spn_pkg_unit_t);
-  pkg->id.pkg = id;
+  pkg->id.qualified = id;
   pkg->info = info;
   pkg->session = session;
   sp_da_init(mem, pkg->libs);

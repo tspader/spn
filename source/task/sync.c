@@ -8,6 +8,7 @@
 #include "git/cache.h"
 #include "index/types.h"
 #include "log/lazy/lazy.h"
+#include "pkg/id.h"
 #include "pkg/load.h"
 #include "pkg/types.h"
 #include "resolve/types.h"
@@ -299,7 +300,7 @@ static spn_err_t load_index_package(spn_session_t *session,
 }
 
 static spn_err_t load_file_package(spn_session_t *session, spn_resolved_pkg_t *pkg, spn_loaded_pkg_t *loaded) {
-  spn_registry_pkg_t *entry = sp_str_ht_get(session->registry, pkg->qualified);
+  spn_registry_pkg_t *entry = sp_ht_getp(session->registry, spn_pkg_id(session->intern, pkg->qualified));
   sp_assert(entry);
 
   sp_str_t dir = sp_fs_parent_path(entry->manifest);
@@ -336,13 +337,13 @@ static s32 sync_toolchain_node(spn_bg_cmd_t *cmd, void *user_data) {
 }
 
 void add_compilation_units(spn_session_t *session, spn_resolver_t *resolver) {
-  sp_str_ht_for_kv(session->packages, it) {
+  sp_ht_for_kv(session->packages, it) {
     spn_session_add_pkg(session, it.val);
   }
 
-  sp_str_ht_for_kv(session->resolve, it) {
+  sp_ht_for_kv(session->resolve, it) {
     spn_resolved_pkg_t* pkg = it.val;
-    spn_pkg_unit_t* unit = spn_session_find_pkg_by_qualified(session, pkg->qualified);
+    spn_pkg_unit_t* unit = spn_session_find_pkg_by_id(session, pkg->id);
 
     sp_da(spn_pkg_unit_t *) deps = sp_da_new(session->mem, spn_pkg_unit_t *);
     sp_da_for(pkg->deps, j) {
@@ -375,7 +376,7 @@ spn_task_result_t spn_task_sync_init(spn_app_t *app) {
 
   u32 num_index = 0;
   u32 num_file = 0;
-  sp_str_ht_for_kv(session->resolve, it) {
+  sp_ht_for_kv(session->resolve, it) {
     spn_resolved_pkg_t *pkg = it.val;
     switch (pkg->source) {
     case SPN_PKG_SOURCE_ROOT:
@@ -438,7 +439,7 @@ spn_task_result_t spn_task_sync_update(spn_app_t *app) {
 
   sp_da_for(app->sync.packages, it) {
     spn_sync_pkg_job_t *job = app->sync.packages[it];
-    sp_str_ht_insert(session->packages, job->pkg->qualified, job->loaded);
+    sp_ht_insert(session->packages, job->pkg->id, job->loaded);
   }
 
   session->units.toolchains = sp_da_new(session->mem, spn_toolchain_unit_t *);

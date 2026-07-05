@@ -96,7 +96,7 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
   EXPECT_EQ(c.expect.kind, result.kind);
 
   if (c.expect.namespace && result.kind == SPN_OK) {
-    spn_index_pkg_t* pkg = spn_index_get_package(&index, (spn_pkg_id_t) {
+    spn_index_pkg_t* pkg = spn_index_get_package(&index, (spn_pkg_name_t) {
       .namespace = sp_str_view(c.expect.namespace),
       .name = sp_str_view(c.expect.name),
     });

@@ -10,10 +10,10 @@ void spn_index_cache_init(spn_index_cache_t* cache, sp_mem_t mem, sp_intern_t* i
   sp_str_om_new(cache->packages);
 }
 
-spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_id_t id) {
+spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_name_t id) {
   sp_assert(cache);
 
-  sp_str_t qualified = spn_pkg_id_to_qualified_name(id);
+  sp_str_t qualified = spn_pkg_name_to_qualified(id);
 
   if (sp_str_om_has(cache->packages, qualified)) {
     return sp_str_om_get(cache->packages, qualified);
@@ -33,7 +33,7 @@ spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_i
   return SP_NULLPTR;
 }
 
-spn_index_rel_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_id_t id, spn_semver_t version) {
+spn_index_rel_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_name_t id, spn_semver_t version) {
   spn_index_pkg_t* pkg = spn_index_cache_get_package(cache, id);
   if (!pkg) return SP_NULLPTR;
 

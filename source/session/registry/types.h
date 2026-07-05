@@ -12,7 +12,7 @@ typedef struct {
   sp_str_t manifest;
 } spn_registry_pkg_t;
 
-typedef sp_str_ht(spn_registry_pkg_t) spn_pkg_registry_t;
+typedef sp_ht(spn_pkg_id_t, spn_registry_pkg_t) spn_pkg_registry_t;
 
 typedef struct spn_codegen_issue spn_codegen_issue_t;
 

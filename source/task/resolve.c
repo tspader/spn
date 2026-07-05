@@ -38,8 +38,8 @@ spn_err_t init_session(spn_session_t* session, spn_pkg_info_t* root) {
   session->paths.build = sp_fs_join_path(session->mem, spn.paths.project, sp_str_lit("build"));
   session->events = spn.events;
   session->intern = spn.intern;
-  sp_str_ht_init(session->mem, session->registry);
-  sp_str_ht_init(session->mem, session->packages);
+  sp_ht_init(session->mem, session->registry);
+  sp_ht_init(session->mem, session->packages);
   sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
 
   return SPN_OK;
@@ -82,11 +82,11 @@ void add_root(spn_session_t* session, spn_resolve_query_t* query) {
 }
 
 void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
-  sp_str_ht_for_kv(query->result, it) {
+  sp_ht_for_kv(query->result, it) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_RESOLVE_PACKAGE,
       .resolve_pkg = {
-        .name = *it.key,
+        .name = it.val->qualified,
         .version = spn_semver_to_str(mem, it.val->version),
       }
     });
@@ -95,7 +95,7 @@ void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_RESOLVE_END,
     .resolve_end = {
-      .num_resolved = sp_str_ht_size(query->result),
+      .num_resolved = sp_ht_size(query->result),
       .time = query->time,
     }
   });
@@ -116,7 +116,7 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
 
   // The solver reads local packages' deps from the registry, so the root must
   // be registered before we resolve.
-  sp_str_ht_insert(session->registry, session->pkg->qualified, ((spn_registry_pkg_t) {
+  sp_ht_insert(session->registry, spn_pkg_id(session->intern, session->pkg->qualified), ((spn_registry_pkg_t) {
     .source = SPN_PKG_SOURCE_ROOT,
     .info = session->pkg,
     .manifest = spn.paths.manifest,

@@ -165,14 +165,14 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
 
   // Add all nodes to the build graph
   sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_str_om_at(session->units.packages, it);
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
     spn_try(add_package(graph, unit));
   }
 
   // Order each package's build after its direct dependencies, and sequence any
   // directory embeds after the dep step that populates the store they read.
   sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* pkg = sp_str_om_at(session->units.packages, it);
+    spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
     sp_da(spn_pkg_unit_t*) deps = spn_session_pkg_deps(session, pkg);
 
     sp_da_for(deps, d) {

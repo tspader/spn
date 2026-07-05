@@ -68,7 +68,7 @@ static mz_err_t on_alloc_dep(mz_ctx_t* ctx, void* parent, mz_key_t key, u32 size
   return MZ_OK;
 }
 
-static spn_err_t spn_index_parse_rel(mz_ctx_t* ctx, mz_schema_t* schema, spn_pkg_id_t id, sp_str_t json, spn_index_rel_t* release) {
+static spn_err_t spn_index_parse_rel(mz_ctx_t* ctx, mz_schema_t* schema, spn_pkg_name_t id, sp_str_t json, spn_index_rel_t* release) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(ctx->allocator);
   c8* source = sp_str_to_cstr(scratch.mem, json);
 
@@ -207,7 +207,7 @@ sp_str_t spn_index_rel_to_json(sp_mem_t mem, spn_index_rel_t* rel) {
   return sp_io_dyn_mem_writer_take_str(&w);
 }
 
-spn_err_t spn_index_parse_pkg(mz_ctx_t* ctx, mz_schema_t* schema, spn_pkg_id_t id, sp_str_t blob, spn_index_pkg_t* pkg) {
+spn_err_t spn_index_parse_pkg(mz_ctx_t* ctx, mz_schema_t* schema, spn_pkg_name_t id, sp_str_t blob, spn_index_pkg_t* pkg) {
   pkg->id = id;
   sp_da_init(ctx->allocator, pkg->releases);
   sp_str_for_line(blob, it) {

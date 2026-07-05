@@ -151,7 +151,7 @@ const spn_t* spn_get_dep(const spn_t* s, const c8* name) {
 
   sp_ht_for_kv(unit->info->deps, it) {
     spn_requested_pkg_t* dep = it.val;
-    if (!sp_str_equal(spn_qualified_name_to_pkg_id(dep->qualified).name, key)) continue;
+    if (!sp_str_equal(spn_pkg_name_from_qualified(dep->qualified).name, key)) continue;
 
     spn_pkg_unit_t* dep_unit = spn_session_find_pkg_by_qualified(unit->session, dep->qualified);
     if (dep_unit) return (const spn_t*)dep_unit;

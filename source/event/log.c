@@ -302,8 +302,8 @@ static void build_schemas(sp_mem_t mem) {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
       SP_BIND_OBJECT(&b, spn_evt_circular_t, id, "id") {
-        SP_BIND(&b, spn_pkg_id_t, namespace, "namespace", SP_BIND_STR);
-        SP_BIND(&b, spn_pkg_id_t, name, "name", SP_BIND_STR);
+        SP_BIND(&b, spn_pkg_name_t, namespace, "namespace", SP_BIND_STR);
+        SP_BIND(&b, spn_pkg_name_t, name, "name", SP_BIND_STR);
       }
     }
     schemas[SPN_EVENT_ERR_CIRCULAR_DEP] = sp_bind_builder_end(&b);

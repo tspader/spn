@@ -27,7 +27,7 @@ void spn_index_deinit(spn_index_info_t* index) {
   }
 }
 
-sp_str_t spn_index_get_package_path(sp_mem_t mem, spn_index_info_t* index, spn_pkg_id_t id) {
+sp_str_t spn_index_get_package_path(sp_mem_t mem, spn_index_info_t* index, spn_pkg_name_t id) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
   sp_str_t file = sp_fmt(scratch.mem, "{}.jsonl", sp_fmt_str(id.name)).value;
   sp_str_t relative = sp_fs_join_path(scratch.mem, id.namespace, file);
@@ -75,7 +75,7 @@ spn_err_t spn_index_sync(spn_index_info_t* index) {
   return SPN_ERROR;
 }
 
-spn_index_pkg_t* spn_index_get_package(spn_index_info_t* index, spn_pkg_id_t id) {
+spn_index_pkg_t* spn_index_get_package(spn_index_info_t* index, spn_pkg_name_t id) {
   spn_index_pkg_t* package = SP_NULLPTR;
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
@@ -134,7 +134,7 @@ spn_err_t spn_index_publish(spn_index_info_t* index, spn_index_rel_t* rel) {
   return SPN_OK;
 }
 
-spn_index_rel_t* spn_index_get_release(spn_index_info_t* index, spn_pkg_id_t id, spn_semver_t version) {
+spn_index_rel_t* spn_index_get_release(spn_index_info_t* index, spn_pkg_name_t id, spn_semver_t version) {
   spn_index_pkg_t* package = spn_index_get_package(index, id);
   if (!package) return SP_NULLPTR;
 
