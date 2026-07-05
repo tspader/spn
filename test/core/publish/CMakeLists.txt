@@ -4,13 +4,13 @@ add_executable(publish
   ${SRC}/event/event.c
   ${SRC}/external/cJSON.c
   ${SRC}/external/git.c
-  ${SRC}/external/mz.c
   ${SRC}/external/tom.c
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/lower.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
+  ${SRC}/codegen/gen/release.gen.c
   ${SRC}/index/index.c
   ${SRC}/index/json.c
   ${SRC}/index/publish.c

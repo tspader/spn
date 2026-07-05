@@ -32,7 +32,6 @@ set(SPN_SOURCES
   external/cc.c
   external/cJSON.c
   external/git.c
-  external/mz.c
   external/obj.c
   external/tom.c
   external/wasm/abi.c
@@ -103,6 +102,7 @@ set(SPN_SOURCES
 
 add_executable(spn ${SPN_SOURCES}
   ${SRC}/codegen/gen/manifest.gen.c
+  ${SRC}/codegen/gen/release.gen.c
   ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/gen/abi.gen.c)
 target_include_directories(spn PRIVATE

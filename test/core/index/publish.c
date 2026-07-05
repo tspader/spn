@@ -75,7 +75,7 @@ static void run_roundtrip_case(s32* utest_result, struct index_roundtrip* fixtur
   spn_index_init(&index, mem);
 
   spn_index_pkg_t pkg = SP_ZERO_INITIALIZE();
-  spn_err_t err = spn_index_parse_pkg(&index.json.ctx, index.json.schema, rel.id, json, &pkg);
+  spn_err_t err = spn_index_parse_pkg(mem, rel.id, json, &pkg);
   EXPECT_EQ(SPN_OK, err);
 
   if (err == SPN_OK && sp_da_size(pkg.releases) == 1) {

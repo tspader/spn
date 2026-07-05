@@ -26,6 +26,7 @@ static u32 schema_c_standard_from(sp_str_t str) { return spn_c_standard_from_str
 static u32 schema_cxx_standard_from(sp_str_t str) { return spn_cxx_standard_from_str(str); }
 static u32 schema_build_mode_from(sp_str_t str) { return spn_build_mode_from_str(str); }
 static u32 schema_index_protocol_from(sp_str_t str) { return spn_index_protocol_from_str(str); }
+static u32 schema_index_dep_kind_from(sp_str_t str) { return spn_index_dep_kind_from_str(str); }
 
 static sp_str_t schema_arch_to(u32 value) { return spn_arch_to_str((spn_arch_t)value); }
 static sp_str_t schema_os_to(u32 value) { return spn_os_to_str((spn_os_t)value); }
@@ -36,6 +37,7 @@ static sp_str_t schema_c_standard_to(u32 value) { return spn_c_standard_to_str((
 static sp_str_t schema_cxx_standard_to(u32 value) { return spn_cxx_standard_to_str((spn_cxx_standard_t)value); }
 static sp_str_t schema_build_mode_to(u32 value) { return spn_build_mode_to_str((spn_build_mode_t)value); }
 static sp_str_t schema_index_protocol_to(u32 value) { return spn_index_protocol_to_str((spn_index_protocol_t)value); }
+static sp_str_t schema_index_dep_kind_to(u32 value) { return spn_index_dep_kind_to_str((spn_index_dep_kind_t)value); }
 
 void run_schema_enum_test(s32* utest_result, schema_enum_t t) {
   sp_mem_t mem = sp_mem_os_new();
@@ -142,6 +144,15 @@ UTEST(schema, index_protocol) {
     .def = "index_protocol",
     .from = schema_index_protocol_from,
     .to = schema_index_protocol_to,
+  });
+}
+
+UTEST(schema, index_dep_kind) {
+  run_schema_enum_test(utest_result, (schema_enum_t) {
+    .file = "release.jtd.json",
+    .def = "index_dep_kind",
+    .from = schema_index_dep_kind_from,
+    .to = schema_index_dep_kind_to,
   });
 }
 
