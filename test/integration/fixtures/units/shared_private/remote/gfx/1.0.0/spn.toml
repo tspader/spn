@@ -1,0 +1,12 @@
+[package]
+name = "gfx"
+version = "1.0.0"
+
+[deps.package]
+foo = { version = "1.0.0", private = true }
+
+[[lib]]
+name = "gfx"
+kinds = ["shared"]
+source = ["gfx.c"]
+headers = ["gfx.h"]

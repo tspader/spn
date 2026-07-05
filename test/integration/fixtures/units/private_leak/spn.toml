@@ -1,0 +1,11 @@
+[package]
+name = "units_private_leak"
+version = "0.1.0"
+
+[deps.package]
+gfx = "1.0.0"
+foo = "2.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

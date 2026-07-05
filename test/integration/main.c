@@ -46,6 +46,7 @@ UTEST_F(harness, tmpfs) {
 #include "target.c"
 #include "consume.c"
 #include "deps.c"
+#include "units.c"
 #include "script.c"
 #include "cxx.c"
 #include "run.c"

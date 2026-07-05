@@ -3,6 +3,7 @@
 #include "test.h"
 #include "action.h"
 #include "harness.h"
+#include "toml.h"
 #include "yyjson.h"
 
 static void fixture_write_file(sp_str_t path, sp_str_t content) {
@@ -48,7 +49,89 @@ s32 sort_dirs_by_name(const void* a, const void* b) {
   return sp_str_sort_kernel_alphabetical(&lhs->name, &rhs->name);
 }
 
-static sp_str_t build_release_json(sp_mem_t mem, sp_str_t name, sp_str_t version, sp_str_t repo_url, sp_str_t commit, sp_str_t manifest_url, sp_str_t manifest_rev) {
+static void release_json_deps(sp_io_writer_t* io, toml_table_t* deps, const c8* table, const c8* kind, u32* count) {
+  if (!deps) return;
+
+  toml_table_t* kinded = toml_table_table(deps, table);
+  if (!kinded) return;
+
+  for (s32 it = 0; it < toml_table_len(kinded); it++) {
+    s32 len = 0;
+    const c8* key = toml_table_key(kinded, it, &len);
+
+    // A dep is either a bare version string or an inline table carrying
+    // extras, e.g. foo = { version = "1.0.0", private = true }
+    bool private = false;
+    toml_value_t version = toml_table_string(kinded, key);
+    if (!version.ok) {
+      toml_table_t* dep = toml_table_table(kinded, key);
+      if (!dep) continue;
+
+      version = toml_table_string(dep, "version");
+      if (!version.ok) continue;
+
+      toml_value_t flag = toml_table_bool(dep, "private");
+      private = flag.ok && flag.u.b;
+    }
+
+    sp_str_t name = sp_str_view(key);
+    sp_str_t namespace = sp_str_lit("core");
+    sp_str_pair_t pair = sp_str_cleave_c8(name, '/');
+    if (!sp_str_empty(pair.second)) {
+      namespace = pair.first;
+      name = pair.second;
+    }
+
+    if ((*count)++) sp_fmt_io(io, ",");
+    sp_fmt_io(io, "{{\"namespace\":\"{}\",\"name\":\"{}\",\"version\":\"{}\",\"kind\":\"{}\"",
+      sp_fmt_str(namespace), sp_fmt_str(name), sp_fmt_cstr(version.u.s), sp_fmt_cstr(kind));
+    if (private) sp_fmt_io(io, ",\"private\":true");
+    sp_fmt_io(io, "}}");
+    free(version.u.s);
+  }
+}
+
+static void release_json_targets(sp_io_writer_t* io, toml_table_t* manifest) {
+  toml_array_t* libs = toml_table_array(manifest, "lib");
+  if (!libs) return;
+
+  u32 count = 0;
+  for (s32 it = 0; it < toml_array_len(libs); it++) {
+    toml_table_t* lib = toml_array_table(libs, it);
+    if (!lib) continue;
+
+    toml_value_t name = toml_table_string(lib, "name");
+    if (!name.ok) continue;
+
+    if (count++) sp_fmt_io(io, ",");
+    sp_fmt_io(io, "{{\"name\":\"{}\",\"linkages\":[", sp_fmt_cstr(name.u.s));
+    free(name.u.s);
+
+    toml_array_t* kinds = toml_table_array(lib, "kinds");
+    u32 kind_count = 0;
+    for (s32 k = 0; k < toml_array_len(kinds); k++) {
+      toml_value_t kind = toml_array_string(kinds, k);
+      if (!kind.ok) continue;
+      if (kind_count++) sp_fmt_io(io, ",");
+      sp_fmt_io(io, "\"{}\"", sp_fmt_cstr(kind.u.s));
+      free(kind.u.s);
+    }
+    sp_fmt_io(io, "]}}");
+  }
+}
+
+// The fixture index publishes what the remote manifest declares: deps with
+// their kinds and lib targets with their supported linkages, same as a real
+// spn publish would
+static sp_str_t build_release_json(sp_mem_t mem, sp_str_t name, sp_str_t version, sp_str_t manifest_dir, sp_str_t repo_url, sp_str_t commit, sp_str_t manifest_url, sp_str_t manifest_rev) {
+  sp_str_t manifest_path = sp_fs_join_path(mem, manifest_dir, sp_str_lit("spn.toml"));
+  sp_str_t content = test_read_file(mem, manifest_path);
+
+  c8 err [256] = { 0 };
+  c8* toml = (c8*)sp_alloc(mem, content.len + 1);
+  memcpy(toml, content.data, content.len);
+  toml_table_t* manifest = toml_parse(toml, err, sizeof(err));
+
   sp_io_dyn_mem_writer_t b = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &b);
 
@@ -57,7 +140,25 @@ static sp_str_t build_release_json(sp_mem_t mem, sp_str_t name, sp_str_t version
   if (!sp_str_empty(manifest_url)) {
     sp_fmt_io(&b.base, ",\"manifest\":{{\"url\":\"{}\",\"rev\":\"{}\",\"dir\":\"\"}}", sp_fmt_str(sp_str_replace_c8(mem, manifest_url, '\\', '/')), sp_fmt_str(manifest_rev));
   }
-  sp_fmt_io(&b.base, ",\"paths\":{{\"manifest\":\"spn.toml\",\"script\":\"spn.c\"}},\"deps\":[]}}");
+  sp_fmt_io(&b.base, ",\"paths\":{{\"manifest\":\"spn.toml\",\"script\":\"spn.c\"}}");
+
+  sp_fmt_io(&b.base, ",\"deps\":[");
+  if (manifest) {
+    toml_table_t* deps = toml_table_table(manifest, "deps");
+    u32 count = 0;
+    release_json_deps(&b.base, deps, "package", "normal", &count);
+    release_json_deps(&b.base, deps, "build", "build", &count);
+    release_json_deps(&b.base, deps, "test", "test", &count);
+  }
+  sp_fmt_io(&b.base, "]");
+
+  sp_fmt_io(&b.base, ",\"targets\":[");
+  if (manifest) {
+    release_json_targets(&b.base, manifest);
+  }
+  sp_fmt_io(&b.base, "]}}");
+
+  if (manifest) toml_free(manifest);
 
   return sp_io_dyn_mem_writer_take_str(&b);
 }
@@ -114,6 +215,7 @@ void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, s
 
       sp_str_t manifest_url = sp_str_lit("");
       sp_str_t manifest_rev = sp_str_lit("");
+      sp_str_t manifest_dir = dir->path;
       if (split) {
         sp_str_t recipe_dir = sp_fs_join_path(mem, recipe_versions, dir->name);
         ASSERT_TRUE(sp_fs_exists(sp_fs_join_path(mem, recipe_dir, sp_str_lit("spn.toml"))));
@@ -121,6 +223,7 @@ void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, s
         git_repo_commit_from_dir(recipe_dir, recipe_repo, dir->name);
         manifest_url = recipe_repo;
         manifest_rev = git_repo_head(recipe_repo);
+        manifest_dir = recipe_dir;
       }
       else {
         sp_str_t source_manifest = sp_fs_join_path(mem, dir->path, sp_str_lit("spn.toml"));
@@ -130,7 +233,7 @@ void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, s
       git_repo_commit_from_dir(dir->path, repo, dir->name);
       sp_str_t commit = git_repo_head(repo);
 
-      sp_fmt_io(&jsonl.base, "{}\n", sp_fmt_str(build_release_json(mem, entry->name, dir->name, repo, commit, manifest_url, manifest_rev)));
+      sp_fmt_io(&jsonl.base, "{}\n", sp_fmt_str(build_release_json(mem, entry->name, dir->name, manifest_dir, repo, commit, manifest_url, manifest_rev)));
     }
 
     fixture_write_file(jsonl_path, sp_io_dyn_mem_writer_as_str(&jsonl));

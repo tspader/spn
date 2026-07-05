@@ -1,0 +1,10 @@
+[package]
+name = "units_build_dep_cycle"
+version = "0.1.0"
+
+[deps.package]
+applib = "1.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

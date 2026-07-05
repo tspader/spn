@@ -36,6 +36,15 @@ void spn_resolve_query_add(spn_resolve_query_t* query, spn_requested_pkg_t req) 
   sp_da_push(query->reqs, req);
 }
 
+static spn_dep_kind_t dep_kind_from_index(spn_index_dep_kind_t kind) {
+  switch (kind) {
+    case SPN_INDEX_DEP_NORMAL: return SPN_DEP_KIND_PACKAGE;
+    case SPN_INDEX_DEP_BUILD:  return SPN_DEP_KIND_BUILD;
+    case SPN_INDEX_DEP_TEST:   return SPN_DEP_KIND_TEST;
+  }
+  sp_unreachable_return(SPN_DEP_KIND_PACKAGE);
+}
+
 static bool version_in_range(spn_semver_t version, spn_semver_range_t range) {
   return
     spn_semver_satisfies(version, range.low.version, range.low.op) &&
@@ -167,6 +176,7 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
       spn_requested_pkg_t dep = {
         .qualified = spn_pkg_name_to_qualified(release->deps[d].id),
         .source = SPN_PKG_SOURCE_INDEX,
+        .kind = dep_kind_from_index(release->deps[d].kind),
         .index = {
           .range = spn_semver_parse_range(release->deps[d].version)
         }

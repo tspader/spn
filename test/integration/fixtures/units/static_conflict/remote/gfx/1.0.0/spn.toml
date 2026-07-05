@@ -1,0 +1,12 @@
+[package]
+name = "gfx"
+version = "1.0.0"
+
+[deps.package]
+foo = "1.0.0"
+
+[[lib]]
+name = "gfx"
+kinds = ["static"]
+source = ["gfx.c"]
+headers = ["gfx.h"]

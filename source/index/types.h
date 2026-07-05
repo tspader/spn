@@ -34,6 +34,7 @@ typedef enum {
 
 typedef struct {
   spn_index_dep_kind_t kind;
+  bool private;
   spn_pkg_name_t id;
   sp_str_t version;
 } spn_index_dep_t;
