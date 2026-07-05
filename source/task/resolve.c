@@ -125,32 +125,15 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_index_cache_t index = SP_ZERO_INITIALIZE();
   spn_index_cache_init(&index, session->mem, session->intern, &spn.indexes);
 
-  spn_resolver_t* resolver = sp_alloc_type(app->session.mem, spn_resolver_t);
-  spn_resolver_init(resolver, spn.mem, session->intern, &index, &session->registry, spn.events);
-  app->resolver = resolver;
+  spn_resolver_t resolver = sp_zero;
+  spn_resolver_init(&resolver, spn.mem, session->intern, &index, &session->registry, spn.events);
 
   spn_resolve_query_t query = sp_zero_initialize();
   spn_resolve_query_init(session->mem, &query);
   add_root(session, &query);
 
-  // Resolve
-  spn_resolve_strategy_t strategy = app->lock.some == SP_OPT_SOME ?
-    SPN_RESOLVE_STRATEGY_LOCK_FILE :
-    SPN_RESOLVE_STRATEGY_SOLVER;
-
-  spn_try_as(spn_resolve_from_solver(resolver, &query), SPN_TASK_ERROR);
+  spn_try_as(spn_resolve_from_solver(&resolver, &query), SPN_TASK_ERROR);
   session->resolve = query.result;
-
-  // switch (strategy) {
-  //   case SPN_RESOLVE_STRATEGY_LOCK_FILE: {
-  //     spn_try_as(spn_resolve_from_lock_file(resolver, &app->lock.value), SPN_TASK_ERROR);
-  //     break;
-  //   }
-  //   case SPN_RESOLVE_STRATEGY_SOLVER: {
-  //     spn_try_as(spn_resolve_from_solver(resolver), SPN_TASK_ERROR);
-  //     break;
-  //   }
-  // }
 
   emit_resolved(session->mem, &query);
 

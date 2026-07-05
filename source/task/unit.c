@@ -157,12 +157,23 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
   SP_UNREACHABLE_RETURN(SPN_ERROR);
 }
 
+static spn_pkg_unit_t* find_dep_unit(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t qualified) {
+  const spn_dep_kind_t kinds [] = { SPN_DEP_KIND_PACKAGE, SPN_DEP_KIND_TEST, SPN_DEP_KIND_BUILD };
+  sp_carr_for(kinds, it) {
+    spn_pkg_unit_t* unit = spn_session_find_dep(session, pkg, qualified, kinds[it]);
+    if (unit) {
+      return unit;
+    }
+  }
+  return SP_NULLPTR;
+}
+
 spn_task_result_t spn_task_create_units(spn_app_t* app) {
   spn_session_t* session = &app->session;
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
     spn_pkg_info_t* info = pkg->info;
-    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, spn_pkg_id(session->intern, info->qualified));
+    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, pkg->id);
 
     // The target filter only applies to the root package; dependencies contribute
     // exactly their lib targets no matter what we were asked to build.
@@ -200,7 +211,7 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
         spn_pkg_unit_t* pkg;
         spn_target_unit_t* target;
       } candidates = {
-        .pkg = spn_session_find_pkg_by_qualified(session, qualified),
+        .pkg = find_dep_unit(session, unit->pkg, qualified),
         .target = spn_session_find_target_in_pkg(session, unit->pkg, unit->info->deps[j])
       };
 

@@ -74,9 +74,9 @@ static spn_lang_t get_link_language(spn_target_unit_t* target) {
     return SPN_LANG_CXX;
   }
 
-  sp_da(spn_pkg_unit_t*) closure = spn_target_link_closure(target->session->mem, target);
+  sp_da(spn_closure_entry_t) closure = spn_target_link_closure(target->session->mem, target);
   sp_da_for(closure, it) {
-    spn_pkg_unit_t* dep = closure[it];
+    spn_pkg_unit_t* dep = closure[it].pkg;
     if (!dep || dep == target->pkg) continue;
 
     sp_da_for(dep->libs, l) {

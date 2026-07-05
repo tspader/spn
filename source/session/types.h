@@ -41,7 +41,13 @@ typedef struct {
   spn_bg_executor_t *executor;
 } spn_bg_ctx_t;
 
-typedef sp_om(spn_pkg_id_t, sp_da(spn_pkg_unit_t*)) spn_unit_graph_t;
+typedef struct {
+  spn_pkg_unit_t* unit;
+  spn_dep_kind_t kind;
+  bool private;
+} spn_pkg_dep_t;
+
+typedef sp_om(spn_pkg_id_t, sp_da(spn_pkg_dep_t)) spn_unit_graph_t;
 
 struct spn_session_t {
   sp_mem_t mem;

@@ -1,0 +1,9 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[deps.package]
+foo = "2.0.0"
+
+[deps.build]
+foo = "1.0.0"

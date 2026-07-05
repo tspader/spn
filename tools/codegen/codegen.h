@@ -41,6 +41,7 @@ typedef struct {
   sp_str_t name;
   field_kind_t kind;
   sp_str_t object;
+  sp_str_t shorthand;
 } entry_t;
 
 typedef struct {

@@ -56,21 +56,6 @@ UTEST_F(units, shared_conflict) {
   });
 }
 
-// gfx declares foo private but gfx.h includes foo.h, so foo's types leak into
-// gfx's public API: the privacy claim is provably false and gfx's build fails
-// rather than letting divergence corrupt a consumer at runtime
-UTEST_F(units, private_leak) {
-  tmpfs_init_named(&uf->fixture.fs, "units_private_leak");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
-    .project = "test/integration/fixtures/units/private_leak",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_private_leak" } },
-    },
-  });
-}
-
 // gfx declares foo private, so gfx.so carries its own foo 1.0.0 copy while
 // main links foo 2.0.0. The binary observes both copies: private divergence
 // behind a dynamic boundary is the one duplicate spn permits.

@@ -320,6 +320,45 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_ERR_UNKNOWN_PKG] = sp_bind_builder_end(&b);
   }
 
+  // SPN_EVENT_ERR_UNIT_CYCLE
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND_OBJECT(&b, spn_evt_unit_cycle_t, id, "id") {
+        SP_BIND(&b, spn_pkg_name_t, namespace, "namespace", SP_BIND_STR);
+        SP_BIND(&b, spn_pkg_name_t, name, "name", SP_BIND_STR);
+      }
+      SP_BIND_OBJECT(&b, spn_evt_unit_cycle_t, version, "version") {
+        SP_BIND(&b, spn_semver_t, major, "major", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, minor, "minor", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, patch, "patch", SP_BIND_U32);
+      }
+    }
+    schemas[SPN_EVENT_ERR_UNIT_CYCLE] = sp_bind_builder_end(&b);
+  }
+
+  // SPN_EVENT_ERR_DYNAMIC_DUPLICATE
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND_OBJECT(&b, spn_evt_dynamic_dup_t, id, "id") {
+        SP_BIND(&b, spn_pkg_name_t, namespace, "namespace", SP_BIND_STR);
+        SP_BIND(&b, spn_pkg_name_t, name, "name", SP_BIND_STR);
+      }
+      SP_BIND_OBJECT(&b, spn_evt_dynamic_dup_t, low, "low") {
+        SP_BIND(&b, spn_semver_t, major, "major", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, minor, "minor", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, patch, "patch", SP_BIND_U32);
+      }
+      SP_BIND_OBJECT(&b, spn_evt_dynamic_dup_t, high, "high") {
+        SP_BIND(&b, spn_semver_t, major, "major", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, minor, "minor", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, patch, "patch", SP_BIND_U32);
+      }
+    }
+    schemas[SPN_EVENT_ERR_DYNAMIC_DUPLICATE] = sp_bind_builder_end(&b);
+  }
+
   // SPN_EVENT_EMBED_START
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
@@ -508,6 +547,8 @@ static void* event_variant_ptr(spn_build_event_t* event) {
     case SPN_EVENT_API_CALL:                    return &event->api_call;
     case SPN_EVENT_ERR_CIRCULAR_DEP:            return &event->circular;
     case SPN_EVENT_ERR_UNKNOWN_PKG:             return &event->unknown;
+    case SPN_EVENT_ERR_UNIT_CYCLE:              return &event->unit_cycle;
+    case SPN_EVENT_ERR_DYNAMIC_DUPLICATE:       return &event->dynamic_dup;
     case SPN_EVENT_EMBED_START:                 return &event->embed_start;
     case SPN_EVENT_EMBED_PASSED:                return &event->embed_passed;
     case SPN_EVENT_EMBED_FAILED:                return &event->embed_failed;
@@ -531,7 +572,6 @@ static const c8* event_names[SPN_EVENT_COUNT] = {
   [SPN_EVENT_ERR_MANIFEST]                  = "err_manifest",
   [SPN_EVENT_ERR_UNIT_CYCLE]                = "err_unit_cycle",
   [SPN_EVENT_ERR_DYNAMIC_DUPLICATE]         = "err_dynamic_duplicate",
-  [SPN_EVENT_ERR_PRIVATE_LEAK]              = "err_private_leak",
   [SPN_EVENT_RESOLVE_START]                 = "resolve_start",
   [SPN_EVENT_RESOLVE_PACKAGE]               = "resolve_package",
   [SPN_EVENT_RESOLVE_END]                   = "resolve_end",

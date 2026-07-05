@@ -50,6 +50,7 @@ static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t j
   sp_da_for(rel.deps, it) {
     sp_da_push(release->deps, ((spn_index_dep_t) {
       .kind = rel.deps[it].kind,
+      .private = !sp_opt_is_null(rel.deps[it].private) && sp_opt_get(rel.deps[it].private),
       .id = {
         .namespace = rel.deps[it].namespace,
         .name = rel.deps[it].name,
@@ -94,12 +95,16 @@ sp_str_t spn_index_rel_to_json(sp_mem_t mem, spn_index_rel_t* rel) {
   };
 
   sp_da_for(rel->deps, it) {
-    sp_da_push(release.deps, ((spn_cg_release_dep_t) {
+    spn_cg_release_dep_t dep = {
       .namespace = rel->deps[it].id.namespace,
       .name = rel->deps[it].id.name,
       .version = rel->deps[it].version,
       .kind = rel->deps[it].kind,
-    }));
+    };
+    if (rel->deps[it].private) {
+      sp_opt_set(dep.private, true);
+    }
+    sp_da_push(release.deps, dep);
   }
 
   sp_da_for(rel->targets, it) {

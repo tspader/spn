@@ -124,9 +124,18 @@
 
     "deps": {
       "optionalProperties": {
-        "package": { "values": { "type": "string" } },
-        "test": { "values": { "type": "string" } },
-        "build": { "values": { "type": "string" } }
+        "package": { "values": { "ref": "dep" }, "metadata": { "shorthand": "version" } },
+        "test": { "values": { "ref": "dep" }, "metadata": { "shorthand": "version" } },
+        "build": { "values": { "ref": "dep" }, "metadata": { "shorthand": "version" } }
+      }
+    },
+
+    "dep": {
+      "properties": {
+        "version": { "type": "string" }
+      },
+      "optionalProperties": {
+        "private": { "type": "boolean" }
       }
     },
 

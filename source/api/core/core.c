@@ -149,11 +149,11 @@ const spn_t* spn_get_dep(const spn_t* s, const c8* name) {
   spn_pkg_unit_t* unit = spn_api_unit(s);
   sp_str_t key = sp_str_view(name);
 
-  sp_ht_for_kv(unit->info->deps, it) {
-    spn_requested_pkg_t* dep = it.val;
+  sp_da_for(unit->info->deps, it) {
+    spn_requested_pkg_t* dep = &unit->info->deps[it];
     if (!sp_str_equal(spn_pkg_name_from_qualified(dep->qualified).name, key)) continue;
 
-    spn_pkg_unit_t* dep_unit = spn_session_find_pkg_by_qualified(unit->session, dep->qualified);
+    spn_pkg_unit_t* dep_unit = spn_session_find_dep(unit->session, unit, dep->qualified, dep->kind);
     if (dep_unit) return (const spn_t*)dep_unit;
   }
 

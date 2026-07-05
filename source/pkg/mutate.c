@@ -27,7 +27,7 @@ void spn_pkg_init(sp_mem_t mem, spn_pkg_info_t* pkg, sp_str_t name) {
   sp_str_om_init(pkg->profiles);
   sp_str_om_init(pkg->indexes);
   sp_str_om_init(pkg->toolchains);
-  sp_str_ht_init(a, pkg->deps);
+  sp_da_init(a, pkg->deps);
   sp_ht_init(a, pkg->metadata);
   sp_da_init(a, pkg->config);
   sp_da_init(a, pkg->versions);

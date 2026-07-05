@@ -38,6 +38,9 @@
         "name": { "type": "string" },
         "version": { "type": "string" },
         "kind": { "ref": "index_dep_kind" }
+      },
+      "optionalProperties": {
+        "private": { "type": "boolean" }
       }
     },
 

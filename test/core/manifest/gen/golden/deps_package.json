@@ -5,8 +5,12 @@
   },
   "deps": {
     "package": {
-      "libfoo": "^1.2.0",
-      "libbar": "2.0.0"
+      "libfoo": {
+        "version": "^1.2.0"
+      },
+      "libbar": {
+        "version": "2.0.0"
+      }
     }
   }
 }

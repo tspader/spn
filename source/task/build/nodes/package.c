@@ -46,23 +46,6 @@ static spn_err_t publish_copies(spn_pkg_unit_t* unit) {
   return SPN_OK;
 }
 
-static spn_err_t publish_headers(spn_pkg_unit_t* unit) {
-  sp_da_for(unit->targets, t) {
-    spn_target_unit_t* target = unit->targets[t];
-
-    sp_da_for(target->info->headers, h) {
-      sp_str_t header = target->info->headers[h];
-      sp_str_t from = sp_fs_join_path(spn.mem, unit->paths.source, header);
-      sp_str_t to = sp_fs_join_path(spn.mem, unit->paths.include, header);
-
-      sp_fs_create_dir(sp_fs_parent_path(to));
-      spn_try_as(sp_fs_copy(from, to), SPN_ERROR);
-    }
-  }
-
-  return SPN_OK;
-}
-
 static spn_err_t run_wasm_package(spn_pkg_unit_t* unit, spn_wasm_script_t* script) {
   emit_run(unit);
 
@@ -79,7 +62,7 @@ s32 run_package_hook(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
   // @spader These should be merged somehow?
-  spn_try(publish_headers(unit));
+  spn_try(spn_pkg_unit_publish_headers(unit, true));
   spn_try(publish_copies(unit));
 
   spn_wasm_script_t* script = SP_NULLPTR;

@@ -102,7 +102,7 @@ struct spn_pkg_info {
   spn_target_info_om_t tests;
   spn_profile_info_om_t profiles;
   spn_index_info_om_t indexes;
-  sp_ht(sp_str_t, spn_requested_pkg_t) deps;
+  sp_da(spn_requested_pkg_t) deps;
   sp_da(spn_pkg_config_entry_t) config;
   sp_ht(spn_semver_t, spn_pkg_metadata_t) metadata;
   sp_da(spn_semver_t) versions;
