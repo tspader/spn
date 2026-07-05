@@ -146,6 +146,7 @@ static bool extract_field(gen_t* g, type_t* type, jtd_property_t property) {
       .name = field.entry,
       .kind = field.kind,
       .object = field.type_name,
+      .shorthand = jtd_metadata(property.schema, "shorthand"),
     };
     add_entry(g, entry);
   }

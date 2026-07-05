@@ -336,19 +336,22 @@ static s32 sync_toolchain_node(spn_bg_cmd_t *cmd, void *user_data) {
   return job->unit ? SPN_OK : SPN_ERROR;
 }
 
-void add_compilation_units(spn_session_t *session, spn_resolver_t *resolver) {
+void add_compilation_units(spn_session_t *session) {
   sp_ht_for_kv(session->packages, it) {
-    spn_session_add_pkg(session, it.val);
+    spn_session_add_pkg(session, *it.key, it.val);
   }
 
   sp_ht_for_kv(session->resolve, it) {
     spn_resolved_pkg_t* pkg = it.val;
     spn_pkg_unit_t* unit = spn_session_find_pkg_by_id(session, pkg->id);
 
-    sp_da(spn_pkg_unit_t *) deps = sp_da_new(session->mem, spn_pkg_unit_t *);
-    sp_da_for(pkg->deps, j) {
-      spn_pkg_unit_t* dep = spn_session_find_pkg_by_qualified(session, pkg->deps[j].qualified);
-      sp_da_push(deps, dep);
+    sp_da(spn_pkg_dep_t) deps = sp_da_new(session->mem, spn_pkg_dep_t);
+    sp_da_for(pkg->edges, j) {
+      sp_da_push(deps, ((spn_pkg_dep_t) {
+        .unit = spn_session_find_pkg_by_id(session, pkg->edges[j].id),
+        .kind = pkg->edges[j].kind,
+        .private = pkg->edges[j].private,
+      }));
     }
 
     sp_om_insert(session->units.graph, unit->id, deps);
@@ -454,7 +457,7 @@ spn_task_result_t spn_task_sync_update(spn_app_t *app) {
     }
   }
 
-  add_compilation_units(session, app->resolver);
+  add_compilation_units(session);
 
   sp_env_t *env = &session->env;
   sp_env_init(session->mem, env);

@@ -40,6 +40,7 @@ typedef struct {
   const c8* file;
   u8 build;
   u8 test;
+  u8 private;
 } dep_t;
 
 typedef struct {
@@ -237,12 +238,18 @@ static void run_case(s32* utest_result, test_t test) {
     dep_t expected = test.deps[it];
     if (!expected.name) break;
 
-    spn_requested_pkg_t* req = sp_ht_getp(pkg.deps, sp_str_view(expected.name));
+    spn_dep_kind_t kind = expected.build ? SPN_DEP_KIND_BUILD : expected.test ? SPN_DEP_KIND_TEST : SPN_DEP_KIND_PACKAGE;
+
+    spn_requested_pkg_t* req = SP_NULLPTR;
+    sp_da_for(pkg.deps, jt) {
+      if (sp_str_equal(pkg.deps[jt].qualified, sp_str_view(expected.name)) && pkg.deps[jt].kind == kind) {
+        req = &pkg.deps[jt];
+        break;
+      }
+    }
     ASSERT_TRUE(req);
     EXPECT_EQ((u32)expected.source, (u32)req->source);
-
-    spn_dep_kind_t kind = expected.build ? SPN_DEP_KIND_BUILD : expected.test ? SPN_DEP_KIND_TEST : SPN_DEP_KIND_PACKAGE;
-    EXPECT_EQ((u32)kind, (u32)req->kind);
+    EXPECT_EQ(expected.private != 0, req->private);
 
     if (expected.file) EXPECT_TRUE(sp_str_ends_with(req->file.path, sp_str_view(expected.file)));
   }
@@ -470,6 +477,26 @@ UTEST(lower, dep_namespaced) {
     .manifest = "dep_namespaced",
     .deps = {
       { .name = "ns/q", .source = SPN_PKG_SOURCE_INDEX }
+    }
+  });
+}
+
+UTEST(lower, dep_private) {
+  run_case(utest_result, (test_t) {
+    .manifest = "dep_private",
+    .deps = {
+      { .name = "core/foo", .source = SPN_PKG_SOURCE_INDEX, .private = 1 }
+    }
+  });
+}
+
+// The same name under two kinds must survive as two requests, not collapse
+UTEST(lower, dep_dual_kind) {
+  run_case(utest_result, (test_t) {
+    .manifest = "dep_dual_kind",
+    .deps = {
+      { .name = "core/foo", .source = SPN_PKG_SOURCE_INDEX },
+      { .name = "core/foo", .source = SPN_PKG_SOURCE_INDEX, .build = 1 }
     }
   });
 }

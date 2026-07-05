@@ -11,6 +11,15 @@
 #include "semver/convert.h"
 #include "target/mutate.h"
 
+static spn_index_dep_kind_t dep_kind_to_index(spn_dep_kind_t kind) {
+  switch (kind) {
+    case SPN_DEP_KIND_PACKAGE: return SPN_INDEX_DEP_NORMAL;
+    case SPN_DEP_KIND_BUILD:   return SPN_INDEX_DEP_BUILD;
+    case SPN_DEP_KIND_TEST:    return SPN_INDEX_DEP_TEST;
+  }
+  sp_unreachable_return(SPN_INDEX_DEP_NORMAL);
+}
+
 spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
   sp_str_t manifest_path = sp_fs_join_path(opts->mem, opts->cwd, sp_str_lit("spn.toml"));
 
@@ -83,13 +92,15 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
     release.manifest = (spn_index_rel_source_t) { .url = url, .rev = revision, .dir = subdir };
   }
 
-  sp_ht_for_kv(info.deps, it) {
-    spn_requested_pkg_t* req = it.val;
+  sp_da_for(info.deps, it) {
+    spn_requested_pkg_t* req = &info.deps[it];
     if (req->source != SPN_PKG_SOURCE_INDEX) {
       continue;
     }
 
     sp_da_push(release.deps, ((spn_index_dep_t) {
+      .kind = dep_kind_to_index(req->kind),
+      .private = req->private,
       .id = spn_pkg_name_from_qualified(req->qualified),
       .version = spn_semver_range_to_str(opts->mem, req->index.range),
     }));

@@ -5,7 +5,9 @@
   },
   "deps": {
     "package": {
-      "libfoo": ""
+      "libfoo": {
+        "version": ""
+      }
     }
   }
 }

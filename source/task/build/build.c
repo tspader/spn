@@ -20,15 +20,16 @@
 void spn_cc_target_add_build_deps(spn_cc_target_t* target, spn_pkg_unit_t* unit) {
   spn_session_t* session = unit->session;
 
-  sp_ht_for_kv(unit->info->deps, it) {
-    spn_requested_pkg_t* dep = it.val;
-    if (dep->kind != SPN_DEP_KIND_BUILD) continue;
+  sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit);
+  sp_da_for(deps, it) {
+    if (deps[it].kind != SPN_DEP_KIND_BUILD) {
+      continue;
+    }
+    if (!deps[it].unit) {
+      continue;
+    }
 
-    spn_pkg_unit_t* dep_unit = spn_session_find_pkg_by_qualified(session, dep->qualified);
-    if (!dep_unit) continue;
-
-    spn_cc_target_add_absolute_include(target, dep_unit->paths.include);
-    spn_cc_target_add_absolute_include(target, dep_unit->paths.source);
+    spn_cc_target_add_absolute_include(target, deps[it].unit->paths.include);
   }
 }
 
@@ -96,7 +97,7 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
   spn_session_t* session = target->session;
   spn_pkg_unit_t* pkg = target->pkg;
 
-  sp_da(spn_pkg_unit_t*) deps = spn_target_link_closure(session->mem, target);
+  sp_da(spn_closure_entry_t) deps = spn_target_link_closure(session->mem, target);
 
   // Package archives first. They reference symbols from system libraries, and
   // the linker resolves left-to-right, so every -l<archive> must precede the
@@ -104,7 +105,7 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
   // same command-line bucket, so ordering them here is what keeps a math-using
   // static lib linkable regardless of the order its package was discovered in.
   sp_da_for(deps, it) {
-    spn_pkg_unit_t* dep = deps[it];
+    spn_pkg_unit_t* dep = deps[it].pkg;
     if (!dep || dep == pkg) continue;
 
     sp_da_for(dep->libs, l) {
@@ -115,6 +116,15 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
         case SPN_LIB_KIND_STATIC: {
           spn_cc_target_add_lib_dir(cc, dep->paths.lib);
           spn_cc_target_add_system_lib(cc, lib->info->name);
+
+          // A shared lib embedding a private static dep hides its symbols, so
+          // the embedded copy can't collide with a consumer's own instance
+          if (deps[it].private && target->kind == SPN_CC_OUTPUT_SHARED_LIB) {
+            sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+            sp_str_t archive = sp_os_lib_to_file_name(scratch.mem, lib->info->name, SP_OS_LIB_STATIC);
+            spn_cc_target_add_flag(cc, sp_fmt(session->mem, "-Wl,--exclude-libs,{}", SP_FMT_STR(archive)).value);
+            sp_mem_end_scratch(scratch);
+          }
           break;
         }
         case SPN_LIB_KIND_SHARED: {
@@ -135,7 +145,7 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
     spn_cc_target_add_system_lib(cc, pkg->info->system_deps[it]);
   }
   sp_da_for(deps, it) {
-    spn_pkg_unit_t* dep = deps[it];
+    spn_pkg_unit_t* dep = deps[it].pkg;
     if (!dep || dep == pkg) continue;
 
     sp_da_for(dep->info->system_deps, s) {

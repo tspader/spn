@@ -34,11 +34,31 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
     spn_cc_target_add_flag(target, sp_str_lit("-fPIC"));
   }
 
-  // Dependencies publish their headers into their store; compile against them
-  sp_da(spn_pkg_unit_t*) deps = spn_session_pkg_deps(session, unit->package);
+  // Dependencies publish their headers into their store; compile against them.
+  // Build deps live in other units and may hold conflicting versions, so only
+  // link edges (and test edges, for test targets) contribute includes.
+  sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit->package);
   sp_da_for(deps, it) {
-    if (!deps[it]) continue;
-    spn_cc_target_add_absolute_include(target, deps[it]->paths.include);
+    if (!deps[it].unit) {
+      continue;
+    }
+
+    switch (deps[it].kind) {
+      case SPN_DEP_KIND_PACKAGE: {
+        break;
+      }
+      case SPN_DEP_KIND_TEST: {
+        if (unit->target->info->kind != SPN_TARGET_TEST) {
+          continue;
+        }
+        break;
+      }
+      case SPN_DEP_KIND_BUILD: {
+        continue;
+      }
+    }
+
+    spn_cc_target_add_absolute_include(target, deps[it].unit->paths.include);
   }
 
   if (!sp_da_empty(unit->target->info->embed)) {

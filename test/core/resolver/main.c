@@ -1776,6 +1776,168 @@ UTEST_F(resolver, build_dep_bootstrap) {
   });
 }
 
+// A failure recorded inside a candidate that backtracking recovers from must
+// not shadow the resolve's real failure
+UTEST_F(resolver, backtrack_failure_not_sticky) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "audio",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          {
+            .version = spn_semver_lit(1, 1, 0),
+            .deps = {
+              { .namespace = "spn", .name = "physics", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "math",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/audio", .version = "^1.0.0" },
+        { .name = "spn/math", .version = "^2.0.0" },
+      }
+    },
+    .err = SPN_ERROR,
+    .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+  });
+}
+
+// Each build dep roots its own process: two consumers with disjoint ranges on
+// one tool hold two instances instead of conflicting
+UTEST_F(resolver, build_dep_disjoint_tools_diverge) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "renderer",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^1.0.0", .kind = SPN_INDEX_DEP_BUILD },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "audio",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^2.0.0", .kind = SPN_INDEX_DEP_BUILD },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/renderer", .version = "^1.0.0" },
+        { .name = "spn/audio", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/foo" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/foo" },
+    },
+    .instances = {
+      { .name = "spn/foo", .count = 2 },
+    },
+  });
+}
+
+// A shared lib's private scope is per-instance: gfx 1.0.0 in the tool's unit
+// and gfx 2.0.0 in the root's each carry their own private foo
+UTEST_F(resolver, private_scopes_per_instance) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "gfx",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "gfx", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+          {
+            .version = spn_semver_lit(2, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^2.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "gfx", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "tool",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "gfx", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/gfx", .version = "^2.0.0", .kind = SPN_DEP_KIND_PACKAGE },
+        { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
+      { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/gfx" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gfx" },
+    },
+    .instances = {
+      { .name = "spn/gfx", .count = 2 },
+      { .name = "spn/foo", .count = 2 },
+    },
+  });
+}
+
 // Splitting units doesn't make missing packages resolvable; a boundary
 // still resolves for real
 UTEST_F(resolver, build_dep_missing_still_fails) {

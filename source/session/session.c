@@ -99,8 +99,19 @@ spn_pkg_unit_t* spn_session_find_pkg_by_id(spn_session_t* session, spn_pkg_id_t 
   return pkg;
 }
 
-spn_pkg_unit_t* spn_session_find_pkg_by_qualified(spn_session_t* session, sp_str_t qualified) {
-  return spn_session_find_pkg_by_id(session, spn_pkg_id(session->intern, qualified));
+spn_pkg_unit_t* spn_session_find_dep(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t qualified, spn_dep_kind_t kind) {
+  sp_intern_id_t name = sp_intern_get_or_insert(session->intern, qualified);
+
+  sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, pkg);
+  sp_da_for(deps, it) {
+    if (deps[it].kind != kind) {
+      continue;
+    }
+    if (deps[it].unit && deps[it].unit->id.qualified == name) {
+      return deps[it].unit;
+    }
+  }
+  return SP_NULLPTR;
 }
 
 spn_target_unit_t* spn_session_find_target_in_pkg(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t name) {
@@ -113,10 +124,12 @@ spn_target_unit_t* spn_session_find_target_in_pkg(spn_session_t* session, spn_pk
 }
 
 spn_pkg_unit_t* spn_session_find_root(spn_session_t* s) {
-  return spn_session_find_pkg_by_qualified(s, s->pkg->qualified);
+  spn_pkg_id_t id = spn_pkg_id(s->intern, s->pkg->qualified);
+  id.version = s->pkg->version;
+  return spn_session_find_pkg_by_id(s, id);
 }
 
-sp_da(spn_pkg_unit_t*) spn_session_pkg_deps(spn_session_t* session, spn_pkg_unit_t* pkg) {
+sp_da(spn_pkg_dep_t) spn_session_pkg_deps(spn_session_t* session, spn_pkg_unit_t* pkg) {
   if (!sp_om_has(session->units.graph, pkg->id)) return SP_NULLPTR;
   return *sp_om_get(session->units.graph, pkg->id);
 }
@@ -172,9 +185,7 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
   return target;
 }
 
-spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_loaded_pkg_t* loaded) {
-  spn_pkg_id_t id = spn_pkg_id(session->intern, loaded->info->qualified);
-
+spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_pkg_id_t id, spn_loaded_pkg_t* loaded) {
   sp_om_insert(session->units.packages, id, sp_zero_struct(spn_pkg_unit_t));
   spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
   unit->id = id;

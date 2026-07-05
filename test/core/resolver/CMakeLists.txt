@@ -28,6 +28,7 @@ add_executable(resolver
   ${SRC}/semver/convert.c
   ${SRC}/semver/parser.c
   ${SRC}/target/mutate.c
+  ${SRC}/target/select.c
   ${SRC}/toolchain/toolchain.c
   main.c
   ${TEST_TOOLS}/ctx.c

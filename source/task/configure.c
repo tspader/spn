@@ -27,16 +27,18 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
   spn_wasm_script_t* configure = &unit->wasm.configure;
-  if (configure->state == SPN_WASM_SCRIPT_NONE) return SPN_OK;
+  if (configure->state != SPN_WASM_SCRIPT_NONE) {
+    sp_tm_timer_t timer = sp_tm_start_timer();
+    spn_try(spn_compile_script_module(unit, &unit->info->configure, configure->path));
+    unit->time.compile = sp_tm_read_timer(&timer);
 
-  sp_tm_timer_t timer = sp_tm_start_timer();
-  spn_try(spn_compile_script_module(unit, &unit->info->configure, configure->path));
-  unit->time.compile = sp_tm_read_timer(&timer);
-
-  spn_try(spn_wasm_script_open(configure, unit));
-  if (spn_wasm_script_exports(configure, sp_str_lit("configure"))) {
-    spn_try(spn_wasm_script_call(configure, unit, sp_str_lit("configure"), SPN_ABI_KIND_CONFIG, unit));
+    spn_try(spn_wasm_script_open(configure, unit));
+    if (spn_wasm_script_exports(configure, sp_str_lit("configure"))) {
+      spn_try(spn_wasm_script_call(configure, unit, sp_str_lit("configure"), SPN_ABI_KIND_CONFIG, unit));
+    }
   }
+
+  spn_try(spn_pkg_unit_publish_headers(unit, false));
   return SPN_OK;
 }
 
@@ -63,7 +65,7 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   // have their nodes, so this can't be folded into the loop above
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    spn_loaded_pkg_t* pkg = sp_ht_getp(session->packages, spn_pkg_id(session->intern, unit->info->qualified));
+    spn_loaded_pkg_t* pkg = sp_ht_getp(session->packages, unit->id);
 
     if (pkg->source != SPN_PKG_SOURCE_ROOT) {
       spn_try(spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp));
@@ -74,9 +76,9 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
 
-    sp_da(spn_pkg_unit_t*) deps = *sp_om_get(session->units.graph, unit->id);
+    sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit);
     sp_da_for(deps, j) {
-      spn_pkg_unit_t* parent = deps[j];
+      spn_pkg_unit_t* parent = deps[j].unit;
       spn_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, parent->nodes.configure.stamp));
     }
   }

@@ -123,15 +123,16 @@ static spn_target_info_t lower_script(spn_codegen_ctx_t* ctx, const spn_cg_build
   return script;
 }
 
-static void lower_dep(spn_codegen_ctx_t* ctx, sp_str_t name, sp_str_t version, spn_dep_kind_t kind, spn_pkg_info_t* out) {
+static void lower_dep(spn_codegen_ctx_t* ctx, sp_str_t name, const spn_cg_dep_t* cg, spn_dep_kind_t kind, spn_pkg_info_t* out) {
   spn_requested_pkg_t req = {
     .qualified = lower_canonicalize(ctx, name),
     .kind = kind,
+    .private = sp_opt_is_null(cg->private) ? false : sp_opt_get(cg->private),
   };
 
   sp_str_t prefix = sp_str_lit("file://");
-  if (sp_str_starts_with(version, prefix)) {
-    sp_str_t path = sp_str_strip_left(version, prefix);
+  if (sp_str_starts_with(cg->version, prefix)) {
+    sp_str_t path = sp_str_strip_left(cg->version, prefix);
     if (!is_path_absolute(path)) {
       path = sp_fs_join_path(ctx->mem, ctx->dir, path);
     }
@@ -139,10 +140,10 @@ static void lower_dep(spn_codegen_ctx_t* ctx, sp_str_t name, sp_str_t version, s
     req.file.path = sp_fs_normalize_path(ctx->mem, path);
   } else {
     req.source = SPN_PKG_SOURCE_INDEX;
-    req.index.range = spn_semver_parse_range(version);
+    req.index.range = spn_semver_parse_range(cg->version);
   }
 
-  sp_ht_insert(out->deps, req.qualified, req);
+  sp_da_push(out->deps, req);
 }
 
 static void lower_package(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
@@ -277,15 +278,15 @@ static void lower_indexes(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
 }
 
 static void lower_deps(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
-  sp_str_ht_init(ctx->mem, out->deps);
+  out->deps = sp_da_new(ctx->mem, spn_requested_pkg_t);
   sp_da_for(cg->deps.package, i) {
-    lower_dep(ctx, cg->deps.package[i].key, cg->deps.package[i].value, SPN_DEP_KIND_PACKAGE, out);
+    lower_dep(ctx, cg->deps.package[i].key, &cg->deps.package[i].value, SPN_DEP_KIND_PACKAGE, out);
   }
   sp_da_for(cg->deps.test, i) {
-    lower_dep(ctx, cg->deps.test[i].key, cg->deps.test[i].value, SPN_DEP_KIND_TEST, out);
+    lower_dep(ctx, cg->deps.test[i].key, &cg->deps.test[i].value, SPN_DEP_KIND_TEST, out);
   }
   sp_da_for(cg->deps.build, i) {
-    lower_dep(ctx, cg->deps.build[i].key, cg->deps.build[i].value, SPN_DEP_KIND_BUILD, out);
+    lower_dep(ctx, cg->deps.build[i].key, &cg->deps.build[i].value, SPN_DEP_KIND_BUILD, out);
   }
 }
 

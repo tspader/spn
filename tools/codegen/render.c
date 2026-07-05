@@ -357,10 +357,17 @@ bool render_impl(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg) {
     sp_template_scope_t* scope = sp_template_scope_create(g->mem);
     sp_template_set(scope, sp_str_lit("entry"), entry->name);
     sp_template_set(scope, sp_str_lit("entry_type"), struct_type(g, entry->name));
+
+    const c8* tmpl = "read/map_str";
     if (entry->kind == FIELD_STRUCT) {
       sp_template_set(scope, sp_str_lit("object"), entry->object);
+      tmpl = "read/map_object";
+      if (!sp_str_empty(entry->shorthand)) {
+        sp_template_set(scope, sp_str_lit("shorthand"), entry->shorthand);
+        tmpl = "read/map_object_shorthand";
+      }
     }
-    if (!gen_render(g, io, reg, entry->kind == FIELD_STRUCT ? "read/map_object" : "read/map_str", scope)) {
+    if (!gen_render(g, io, reg, tmpl, scope)) {
       return false;
     }
   }

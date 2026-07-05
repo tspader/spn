@@ -173,10 +173,10 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
   // directory embeds after the dep step that populates the store they read.
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
-    sp_da(spn_pkg_unit_t*) deps = spn_session_pkg_deps(session, pkg);
+    sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, pkg);
 
     sp_da_for(deps, d) {
-      spn_pkg_unit_t* dep = deps[d];
+      spn_pkg_unit_t* dep = deps[d].unit;
       if (!dep || dep == pkg) continue;
 
       spn_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.main, dep->nodes.build.stamp.package));
@@ -206,9 +206,9 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
     spn_target_unit_t* target = sp_om_at(session->units.targets, it);
     if (!target->nodes.link.occupied) continue;
 
-    sp_da(spn_pkg_unit_t*) closure = spn_target_link_closure(session->mem, target);
+    sp_da(spn_closure_entry_t) closure = spn_target_link_closure(session->mem, target);
     sp_da_for(closure, c) {
-      spn_pkg_unit_t* dep = closure[c];
+      spn_pkg_unit_t* dep = closure[c].pkg;
 
       sp_da_for(dep->libs, l) {
         spn_target_unit_t* lib = dep->libs[l];
