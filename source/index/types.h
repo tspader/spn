@@ -83,6 +83,7 @@ struct spn_index_info {
   spn_index_kind_t kind;
   spn_index_protocol_t protocol;
   spn_index_auth_t auth;
+  u32 refresh;
 
   sp_mem_arena_t* arena;
 };

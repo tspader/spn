@@ -47,7 +47,7 @@ spn_err_t spn_index_sync(spn_index_info_t* index) {
         sp_mem_end_scratch(scratch);
 
         sp_tm_epoch_t now = sp_tm_now_epoch();
-        if (mod_time.s + 600 <= now.s) {
+        if (mod_time.s + index->refresh <= now.s) {
           spn_try(spn_git_pull(index->location));
         }
         return SPN_OK;
