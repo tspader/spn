@@ -221,7 +221,7 @@ spn_linkage_t spn_lib_kind_from_str(sp_str_t str) {
     return SPN_LIB_KIND_OBJECT;
   }
 
-  SP_UNREACHABLE_RETURN(SPN_LIB_KIND_SHARED);
+  return SPN_LIB_KIND_NONE;
 }
 
 spn_linkage_t spn_linkage_from_str(sp_str_t str) {

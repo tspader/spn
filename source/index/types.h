@@ -50,6 +50,11 @@ typedef struct {
 } spn_index_rel_paths_t;
 
 typedef struct {
+  sp_str_t name;
+  sp_da(spn_linkage_t) linkages;
+} spn_index_rel_target_t;
+
+typedef struct {
   spn_pkg_name_t id;
   spn_semver_t version;
 
@@ -61,6 +66,7 @@ typedef struct {
   spn_index_rel_paths_t paths;
 
   sp_da(spn_index_dep_t) deps;
+  sp_da(spn_index_rel_target_t) targets;
 } spn_index_rel_t;
 
 typedef struct {

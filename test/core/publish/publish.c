@@ -27,6 +27,10 @@ typedef struct {
     const c8* manifest_url;
     const c8* manifest_rev;
     const c8* manifest_dir;
+    struct {
+      const c8* name;
+      spn_linkage_t linkages[4];
+    } targets[2];
   } expect;
 } case_t;
 
@@ -139,6 +143,30 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
       } else {
         SP_EXPECT_STR_EQ(rel->manifest.url, sp_str_lit(""));
       }
+
+      u32 expected_targets = 0;
+      sp_carr_for(c.expect.targets, ti) {
+        if (!c.expect.targets[ti].name) break;
+        expected_targets++;
+      }
+      EXPECT_EQ(expected_targets, sp_da_size(rel->targets));
+
+      sp_for(ti, expected_targets) {
+        if (ti >= sp_da_size(rel->targets)) break;
+        SP_EXPECT_STR_EQ_CSTR(rel->targets[ti].name, c.expect.targets[ti].name);
+
+        u32 expected_linkages = 0;
+        sp_carr_for(c.expect.targets[ti].linkages, li) {
+          if (c.expect.targets[ti].linkages[li] == SPN_LIB_KIND_NONE) break;
+          expected_linkages++;
+        }
+        EXPECT_EQ(expected_linkages, sp_da_size(rel->targets[ti].linkages));
+
+        sp_for(li, expected_linkages) {
+          if (li >= sp_da_size(rel->targets[ti].linkages)) break;
+          EXPECT_EQ(c.expect.targets[ti].linkages[li], rel->targets[ti].linkages[li]);
+        }
+      }
     }
   }
 
@@ -178,6 +206,46 @@ UTEST_F(cmd_publish, native_package) {
       .version = spn_semver_lit(1, 0, 0),
       .source_rev = "0",
       .source_dir = "",
+    },
+  });
+}
+
+UTEST_F(cmd_publish, lib_targets) {
+  run_case(utest_result, uf, (case_t) {
+    .name = "lib_targets",
+    .repo = {
+      .name = "spum_libs",
+      .commits = {
+        {
+          .message = "v1",
+          .files = {
+            { "spn.toml",
+              ts(package) "\n"
+              tkv(namespace, "core") "\n"
+              tkv(name, "spum") "\n"
+              tkv(version, "1.0.0") "\n"
+              "\n"
+              "[[lib]]\n"
+              tkv(name, "spum") "\n"
+              "kinds = [\"static\", \"shared\"]\n"
+              "source = [\"spum.c\"]\n"
+            },
+            { "spum.c", "int spum() { return 0; }" },
+            { "spn.c", "void build() {}" },
+          },
+        },
+      },
+    },
+    .expect = {
+      .kind = SPN_OK,
+      .namespace = "core",
+      .name = "spum",
+      .version = spn_semver_lit(1, 0, 0),
+      .source_rev = "0",
+      .source_dir = "",
+      .targets = {
+        { .name = "spum", .linkages = { SPN_LIB_KIND_STATIC, SPN_LIB_KIND_SHARED } },
+      },
     },
   });
 }

@@ -11,7 +11,8 @@
     "source": { "ref": "release_source" },
     "manifest": { "ref": "release_source" },
     "paths": { "ref": "release_paths" },
-    "deps": { "elements": { "ref": "release_dep" } }
+    "deps": { "elements": { "ref": "release_dep" } },
+    "targets": { "elements": { "ref": "release_target" } }
   },
   "definitions": {
     "index_dep_kind": { "enum": ["normal", "build", "test"], "metadata": { "include": "index/types.h" } },
@@ -37,6 +38,13 @@
         "name": { "type": "string" },
         "version": { "type": "string" },
         "kind": { "ref": "index_dep_kind" }
+      }
+    },
+
+    "release_target": {
+      "properties": {
+        "name": { "type": "string" },
+        "linkages": { "elements": { "ref": "linkage" } }
       }
     }
   }

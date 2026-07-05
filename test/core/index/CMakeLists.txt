@@ -17,6 +17,7 @@ add_executable(index
   main.c
   query.c
   publish.c
+  release.c
   sync.c
   ${TEST_TOOLS}/ctx.c
   ${TEST_TOOLS}/tmp.c
@@ -25,6 +26,8 @@ add_executable(index
 )
 spn_test_binary(index)
 target_include_directories(index PRIVATE ${SRC}/codegen/gen)
+target_compile_definitions(index PRIVATE
+  RELEASE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/releases")
 target_link_libraries(index PRIVATE yyjson)
 add_dependencies(index spn_codegen_gen)
 add_test(NAME index COMMAND "$<TARGET_FILE:index>")

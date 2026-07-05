@@ -58,6 +58,18 @@ static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t j
     }));
   }
 
+  sp_da_init(mem, release->targets);
+  sp_da_for(rel.targets, it) {
+    spn_index_rel_target_t target = { .name = rel.targets[it].name };
+    sp_da_init(mem, target.linkages);
+    sp_da_for(rel.targets[it].linkages, n) {
+      if (rel.targets[it].linkages[n] != SPN_LIB_KIND_NONE) {
+        sp_da_push(target.linkages, rel.targets[it].linkages[n]);
+      }
+    }
+    sp_da_push(release->targets, target);
+  }
+
   return SPN_OK;
 }
 
@@ -78,6 +90,7 @@ sp_str_t spn_index_rel_to_json(sp_mem_t mem, spn_index_rel_t* rel) {
     .manifest = { .url = rel->manifest.url, .rev = rel->manifest.rev, .dir = rel->manifest.dir },
     .paths = { .manifest = rel->paths.manifest, .script = rel->paths.script },
     .deps = sp_da_new(mem, spn_cg_release_dep_t),
+    .targets = sp_da_new(mem, spn_cg_release_target_t),
   };
 
   sp_da_for(rel->deps, it) {
@@ -86,6 +99,13 @@ sp_str_t spn_index_rel_to_json(sp_mem_t mem, spn_index_rel_t* rel) {
       .name = rel->deps[it].id.name,
       .version = rel->deps[it].version,
       .kind = rel->deps[it].kind,
+    }));
+  }
+
+  sp_da_for(rel->targets, it) {
+    sp_da_push(release.targets, ((spn_cg_release_target_t) {
+      .name = rel->targets[it].name,
+      .linkages = rel->targets[it].linkages,
     }));
   }
 

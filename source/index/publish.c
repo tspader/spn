@@ -9,6 +9,7 @@
 #include "pkg/id.h"
 #include "pkg/load.h"
 #include "semver/convert.h"
+#include "target/mutate.h"
 
 spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
   sp_str_t manifest_path = sp_fs_join_path(opts->mem, opts->cwd, sp_str_lit("spn.toml"));
@@ -74,6 +75,7 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
   };
 
   sp_da_init(opts->mem, release.deps);
+  sp_da_init(opts->mem, release.targets);
 
   spn_pkg_tree_t source = spn_pkg_manifest_source_tree(&info);
   if (source.kind == SPN_PKG_TREE_GIT) {
@@ -91,6 +93,21 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
       .id = spn_pkg_name_from_qualified(req->qualified),
       .version = spn_semver_range_to_str(opts->mem, req->index.range),
     }));
+  }
+
+  sp_str_om_for(info.libs, it) {
+    spn_target_info_t* lib = sp_str_om_at(info.libs, it);
+    spn_index_rel_target_t target = { .name = lib->name };
+    sp_da_init(opts->mem, target.linkages);
+
+    const spn_linkage_t kinds [] = { SPN_LIB_KIND_SOURCE, SPN_LIB_KIND_STATIC, SPN_LIB_KIND_SHARED, SPN_LIB_KIND_OBJECT };
+    sp_for(kind, sp_carr_len(kinds)) {
+      if (spn_linkage_set_has(lib->linkages, kinds[kind])) {
+        sp_da_push(target.linkages, kinds[kind]);
+      }
+    }
+
+    sp_da_push(release.targets, target);
   }
 
   spn_err_t publish_err = spn_index_publish(opts->index, &release);
