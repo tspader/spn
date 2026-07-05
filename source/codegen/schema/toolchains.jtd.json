@@ -1,0 +1,29 @@
+{
+  "metadata": { "format": "json" },
+  "optionalProperties": {
+    "toolchain": { "elements": { "ref": "toolchain" }, "metadata": { "key": "name" } }
+  },
+  "definitions": {
+    "launcher": {
+      "properties":         { "program": { "type": "string" } },
+      "optionalProperties": { "args": { "elements": { "type": "string" } } }
+    },
+
+    "toolchain": {
+      "properties": {
+        "name":     { "type": "string" },
+        "driver":   { "ref": "cc_driver" },
+        "compiler": { "ref": "launcher" },
+        "linker":   { "ref": "launcher" },
+        "archiver": { "ref": "launcher" }
+      },
+      "optionalProperties": {
+        "version":  { "type": "string" },
+        "cxx":      { "ref": "launcher" },
+        "host":     { "values": { "ref": "artifact" } },
+        "target":   { "elements": { "ref": "triple" } },
+        "mirrors":  { "type": "string" }
+      }
+    }
+  }
+}

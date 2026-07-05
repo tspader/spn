@@ -2,14 +2,13 @@
 
 gen_t* gen_new(sp_mem_t mem) {
   gen_t* gen = sp_alloc_type(mem, gen_t);
-  *gen = sp_zero_s(gen_t);
   gen->mem = mem;
   sp_str_om_init(gen->types);
   gen->entries = sp_da_new(mem, entry_t);
   gen->containers.array = sp_da_new(mem, sp_str_t);
   gen->containers.map = sp_da_new(mem, om_type_t);
   gen->containers.object = sp_da_new(mem, sp_str_t);
-  gen->roots = sp_da_new(mem, sp_str_t);
+  gen->includes = sp_da_new(mem, sp_str_t);
   sp_str_ht_init(mem, gen->visited);
   return gen;
 }
@@ -41,13 +40,13 @@ static bool fail_form(gen_t* g, sp_str_t type, sp_str_t key, jtd_form_t form) {
   return fail(g, type, key, sp_fmt(g->mem, "unsupported schema form {.red}", sp_fmt_cstr(jtd_form_name(form))).value);
 }
 
-static void add_array_type(gen_t* g, sp_str_t object) {
-  sp_da_for(g->containers.array, it) {
-    if (sp_str_equal(g->containers.array[it], object)) {
+static void add_unique(sp_da(sp_str_t) * strs, sp_str_t value) {
+  sp_da_for(*strs, it) {
+    if (sp_str_equal((*strs)[it], value)) {
       return;
     }
   }
-  sp_da_push(g->containers.array, object);
+  sp_da_push(*strs, value);
 }
 
 static void add_om_type(gen_t* g, sp_str_t object, sp_str_t key_field) {
@@ -58,15 +57,6 @@ static void add_om_type(gen_t* g, sp_str_t object, sp_str_t key_field) {
   }
   om_type_t om = { .object = object, .key_field = key_field };
   sp_da_push(g->containers.map, om);
-}
-
-static void add_object_type(gen_t* g, sp_str_t object) {
-  sp_da_for(g->containers.object, it) {
-    if (sp_str_equal(g->containers.object[it], object)) {
-      return;
-    }
-  }
-  sp_da_push(g->containers.object, object);
 }
 
 static void add_entry(gen_t* g, entry_t entry) {
@@ -89,10 +79,6 @@ static bool extract_field(gen_t* g, type_t* type, jtd_property_t property) {
   if (property.schema->form == JTD_FORM_ELEMENTS) {
     field.card = CARD_ARRAY;
     value = property.schema->as.elements.schema;
-    sp_str_t cap = jtd_metadata(property.schema, "cap");
-    if (!sp_str_empty(cap) && !sp_parse_u32_ex(cap, &field.cap)) {
-      return fail(g, type->name, property.key, sp_str_lit("cap must be a decimal string"));
-    }
   }
   else if (property.schema->form == JTD_FORM_VALUES) {
     field.card = CARD_MAP;
@@ -105,16 +91,16 @@ static bool extract_field(gen_t* g, type_t* type, jtd_property_t property) {
   if (target->form == JTD_FORM_ENUM) {
     field.kind = FIELD_ENUM;
     field.type_name = name;
+    sp_str_t include = jtd_metadata(target, "include");
+    if (!sp_str_empty(include)) {
+      add_unique(&g->includes, include);
+    }
   }
   else if (target->form == JTD_FORM_TYPE && target->as.type == JTD_TYPE_STRING) {
     field.kind = FIELD_STR;
   }
   else if (target->form == JTD_FORM_TYPE && target->as.type == JTD_TYPE_BOOLEAN) {
     field.kind = FIELD_BOOL;
-  }
-  else if (target->form == JTD_FORM_TYPE && target->as.type == JTD_TYPE_UINT32 && jtd_metadata_has(target, "handle")) {
-    field.kind = FIELD_HANDLE;
-    field.type_name = jtd_metadata(target, "handle");
   }
   else if (target->form == JTD_FORM_TYPE) {
     return fail_scalar(g, type->name, property.key, target->as.type);
@@ -137,7 +123,7 @@ static bool extract_field(gen_t* g, type_t* type, jtd_property_t property) {
   if (field.card == CARD_ARRAY && field.kind == FIELD_STRUCT) {
     field.key_field = jtd_metadata(property.schema, "key");
     if (sp_str_empty(field.key_field)) {
-      add_array_type(g, field.type_name);
+      add_unique(&g->containers.array, field.type_name);
     }
     else {
       add_om_type(g, field.type_name, field.key_field);
@@ -148,7 +134,7 @@ static bool extract_field(gen_t* g, type_t* type, jtd_property_t property) {
     if (!gen_type(g, field.type_name)) {
       return fail(g, type->name, property.key, sp_str_lit("recursive type must be an array or map"));
     }
-    add_object_type(g, field.type_name);
+    add_unique(&g->containers.object, field.type_name);
   }
 
   if (field.card == CARD_MAP) {
@@ -172,14 +158,20 @@ bool gen_extract(gen_t* g, sp_str_t name, jtd_schema_t* schema) {
     return false;
   }
 
-  if (sp_ht_getp(g->visited, name)) {
+  jtd_schema_t** visited = sp_ht_getp(g->visited, name);
+  if (visited) {
+    if (*visited != schema) {
+      g->err = sp_fmt(g->mem, "{.cyan}: two distinct schemas produce the same type name", sp_fmt_str(name)).value;
+      return false;
+    }
     return true;
   }
-  sp_ht_insert(g->visited, name, true);
+  sp_ht_insert(g->visited, name, schema);
 
   type_t type = {
     .name = name,
     .fields = sp_da_new(g->mem, field_t),
+    .schema = schema,
   };
 
   sp_da_for(schema->as.properties.all, it) {

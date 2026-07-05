@@ -26,7 +26,6 @@ static sp_str_t value_type(gen_t* g, field_t* field) {
     case FIELD_BOOL:   return sp_str_lit("bool");
     case FIELD_ENUM:   return sp_fmt(g->mem, "spn_{}_t", sp_fmt_str(field->type_name)).value;
     case FIELD_STRUCT: return struct_type(g, field->type_name);
-    case FIELD_HANDLE: break;
   }
   return sp_str_lit("");
 }
@@ -76,7 +75,6 @@ static sp_str_t present_expr(gen_t* g, field_t* field, sp_str_t recv) {
       }
       return sp_fmt(g->mem, "({})", sp_fmt_str(sp_io_dyn_mem_writer_as_str(&terms))).value;
     }
-    case FIELD_HANDLE: break;
   }
   return sp_str_lit("true");
 }
@@ -119,7 +117,6 @@ static void field_templates(field_t* field, sp_str_t* read, sp_str_t* write) {
       *write = sp_str_lit("write/object");
       return;
     }
-    case FIELD_HANDLE: break;
   }
 }
 
@@ -156,20 +153,24 @@ static void bind_field(gen_t* g, sp_template_scope_t* scope, field_t* field) {
   }
 }
 
-bool gen_render(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg, const c8* name, sp_template_scope_t* scope) {
+bool cg_render(sp_mem_t mem, sp_str_t* err, sp_io_writer_t* io, sp_template_registry_t* reg, const c8* name, sp_template_scope_t* scope) {
   sp_str_t source = sp_zero;
   if (!sp_template_get(reg, sp_cstr_as_str(name), &source)) {
-    g->err = sp_fmt(g->mem, "failed to find template {.cyan}", sp_fmt_cstr(name)).value;
+    *err = sp_fmt(mem, "failed to find template {.cyan}", sp_fmt_cstr(name)).value;
     return false;
   }
 
-  sp_template_err_t err = sp_template_render(out, source, scope, reg);
-  if (err) {
-    g->err = sp_fmt(g->mem, "failed to render template {.cyan} with code {.red}", sp_fmt_cstr(name), sp_fmt_int(err)).value;
+  sp_template_err_t result = sp_template_render(io, source, scope, reg);
+  if (result) {
+    *err = sp_fmt(mem, "failed to render template {.cyan} with code {.red}", sp_fmt_cstr(name), sp_fmt_int(result)).value;
     return false;
   }
 
   return true;
+}
+
+static bool gen_render(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg, const c8* name, sp_template_scope_t* scope) {
+  return cg_render(g->mem, &g->err, io, reg, name, scope);
 }
 
 static void bind_struct_field(sp_template_scope_t* scope, sp_str_t type, sp_str_t name) {
@@ -178,94 +179,124 @@ static void bind_struct_field(sp_template_scope_t* scope, sp_str_t type, sp_str_
   sp_template_set(child, sp_str_lit("name"), name);
 }
 
-static bool render_struct(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg, type_t* type) {
+static bool render_struct(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg, type_t* type) {
   sp_template_scope_t* scope = sp_template_scope_create(g->mem);
   sp_template_set(scope, sp_str_lit("name"), type->name);
   sp_da_for(type->fields, it) {
     field_t* field = &type->fields[it];
     bind_struct_field(scope, field_type(g, field), field->key);
   }
-  return gen_render(g, out, reg, "struct", scope);
+  return gen_render(g, io, reg, "struct", scope);
 }
 
-static bool render_entry_struct(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg, entry_t* entry) {
+static bool render_entry_struct(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg, entry_t* entry) {
   sp_template_scope_t* scope = sp_template_scope_create(g->mem);
   sp_template_set(scope, sp_str_lit("name"), entry->name);
   bind_struct_field(scope, sp_str_lit("sp_str_t"), sp_str_lit("key"));
   bind_struct_field(scope, entry->kind == FIELD_STRUCT ? struct_type(g, entry->object) : sp_str_lit("sp_str_t"), sp_str_lit("value"));
-  return gen_render(g, out, reg, "struct", scope);
+  return gen_render(g, io, reg, "struct", scope);
 }
 
-static bool render_object(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg, type_t* type, const c8* tmpl) {
+static bool render_object(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg, type_t* type, const c8* tmpl) {
   sp_template_scope_t* scope = sp_template_scope_create(g->mem);
   sp_template_set(scope, sp_str_lit("name"), type->name);
   sp_template_set(scope, sp_str_lit("type"), struct_type(g, type->name));
   sp_da_for(type->fields, it) {
     bind_field(g, sp_template_push(scope, sp_str_lit("fields")), &type->fields[it]);
   }
-  return gen_render(g, out, reg, tmpl, scope);
+  return gen_render(g, io, reg, tmpl, scope);
 }
 
-bool render_types(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
-  if (!gen_render(g, out, reg, "header", sp_template_scope_create(g->mem))) {
-    return false;
-  }
-
+static bool render_types(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg) {
   sp_template_scope_t* tags = sp_template_scope_create(g->mem);
   sp_om_for(g->types, it) {
-    sp_template_set(sp_template_push(tags, sp_str_lit("tags")), sp_str_lit("name"), undecorated(g, sp_str_om_at(g->types, it)->name));
+    type_t* type = sp_str_om_at(g->types, it);
+    if (type->shared) {
+      continue;
+    }
+    sp_template_set(sp_template_push(tags, sp_str_lit("tags")), sp_str_lit("name"), undecorated(g, type->name));
   }
   sp_da_for(g->entries, it) {
     sp_template_set(sp_template_push(tags, sp_str_lit("tags")), sp_str_lit("name"), undecorated(g, g->entries[it].name));
   }
-  if (!gen_render(g, out, reg, "tags", tags)) {
+  if (!gen_render(g, io, reg, "tags", tags)) {
     return false;
   }
-  sp_fmt_io(out, "\n");
+  sp_fmt_io(io, "\n");
 
   sp_da_for(g->containers.map, it) {
     sp_template_scope_t* scope = sp_template_scope_create(g->mem);
     sp_template_set(scope, sp_str_lit("object"), g->containers.map[it].object);
     sp_template_set(scope, sp_str_lit("type"), struct_type(g, g->containers.map[it].object));
-    if (!gen_render(g, out, reg, "named_type", scope)) {
+    if (!gen_render(g, io, reg, "named_type", scope)) {
       return false;
     }
   }
-  sp_fmt_io(out, "\n");
+  sp_fmt_io(io, "\n");
 
   sp_om_for(g->types, it) {
-    if (!render_struct(g, out, reg, sp_str_om_at(g->types, it))) {
+    type_t* type = sp_str_om_at(g->types, it);
+    if (type->shared) {
+      continue;
+    }
+    if (!render_struct(g, io, reg, type)) {
       return false;
     }
   }
   sp_da_for(g->entries, it) {
-    if (!render_entry_struct(g, out, reg, &g->entries[it])) {
+    if (!render_entry_struct(g, io, reg, &g->entries[it])) {
       return false;
     }
   }
-
-  sp_fmt_io(out, "\n#endif\n");
   return true;
 }
 
-bool render_decls(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
-  sp_template_scope_t* root = sp_template_scope_create(g->mem);
-  sp_template_set(root, sp_str_lit("root_name"), g->root->name);
-  if (!gen_render(g, out, reg, "header_fns", root)) {
-    return false;
+static sp_template_scope_t* includes_scope(gen_t* g, sp_template_scope_t* scope) {
+  sp_template_list(scope, sp_str_lit("includes"));
+  sp_da_for(g->includes, it) {
+    sp_template_set(sp_template_push(scope, sp_str_lit("includes")), sp_str_lit("name"), g->includes[it]);
   }
-  if (!gen_render(g, out, reg, "root_decl", root)) {
-    return false;
-  }
+  return scope;
+}
 
-  sp_fmt_io(out, "\n#endif\n");
+bool render_common(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg) {
+  if (!gen_render(g, io, reg, "common", includes_scope(g, sp_template_scope_create(g->mem)))) {
+    return false;
+  }
+  if (!render_types(g, io, reg)) {
+    return false;
+  }
+  sp_fmt_io(io, "\n#endif\n");
   return true;
 }
 
-bool render_impl(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
+static sp_template_scope_t* root_scope(gen_t* g) {
   sp_template_scope_t* root = sp_template_scope_create(g->mem);
   sp_template_set(root, sp_str_lit("root_name"), g->root->name);
-  if (!gen_render(g, out, reg, "header_impl", root)) {
+  sp_template_set(root, sp_str_lit("guard"), sp_str_to_upper(g->mem, g->root->name));
+  return includes_scope(g, root);
+}
+
+bool render_decls(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg) {
+  sp_template_scope_t* root = root_scope(g);
+  if (!gen_render(g, io, reg, "header", root)) {
+    return false;
+  }
+  if (!render_types(g, io, reg)) {
+    return false;
+  }
+  sp_fmt_io(io, "\n");
+  if (!gen_render(g, io, reg, "root_decl", root)) {
+    return false;
+  }
+
+  sp_fmt_io(io, "\n#endif\n");
+  return true;
+}
+
+bool render_impl(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg) {
+  sp_template_scope_t* root = root_scope(g);
+  if (!gen_render(g, io, reg, "header_impl", root)) {
     return false;
   }
 
@@ -276,16 +307,16 @@ bool render_impl(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
     sp_template_set(child, sp_str_lit("name"), type->name);
     sp_template_set(child, sp_str_lit("type"), struct_type(g, type->name));
   }
-  if (!gen_render(g, out, reg, "forward", objects)) {
+  if (!gen_render(g, io, reg, "forward", objects)) {
     return false;
   }
-  sp_fmt_io(out, "\n");
+  sp_fmt_io(io, "\n");
 
   sp_da_for(g->containers.array, it) {
     sp_template_scope_t* scope = sp_template_scope_create(g->mem);
     sp_template_set(scope, sp_str_lit("object"), g->containers.array[it]);
     sp_template_set(scope, sp_str_lit("type"), struct_type(g, g->containers.array[it]));
-    if (!gen_render(g, out, reg, "read/array", scope)) {
+    if (!gen_render(g, io, reg, "read/array", scope)) {
       return false;
     }
   }
@@ -295,7 +326,7 @@ bool render_impl(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
     sp_template_set(scope, sp_str_lit("object"), om->object);
     sp_template_set(scope, sp_str_lit("type"), struct_type(g, om->object));
     sp_template_set(scope, sp_str_lit("key_field"), om->key_field);
-    if (!gen_render(g, out, reg, "read/named", scope)) {
+    if (!gen_render(g, io, reg, "read/named", scope)) {
       return false;
     }
   }
@@ -303,7 +334,7 @@ bool render_impl(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
     sp_template_scope_t* scope = sp_template_scope_create(g->mem);
     sp_template_set(scope, sp_str_lit("object"), g->containers.object[it]);
     sp_template_set(scope, sp_str_lit("type"), struct_type(g, g->containers.object[it]));
-    if (!gen_render(g, out, reg, "read/object", scope)) {
+    if (!gen_render(g, io, reg, "read/object", scope)) {
       return false;
     }
   }
@@ -315,25 +346,25 @@ bool render_impl(gen_t* g, sp_io_writer_t* out, sp_template_registry_t* reg) {
     if (entry->kind == FIELD_STRUCT) {
       sp_template_set(scope, sp_str_lit("object"), entry->object);
     }
-    if (!gen_render(g, out, reg, entry->kind == FIELD_STRUCT ? "read/map_object" : "read/map_str", scope)) {
+    if (!gen_render(g, io, reg, entry->kind == FIELD_STRUCT ? "read/map_object" : "read/map_str", scope)) {
       return false;
     }
   }
-  sp_fmt_io(out, "\n");
+  sp_fmt_io(io, "\n");
 
   sp_om_for(g->types, it) {
     type_t* type = sp_str_om_at(g->types, it);
-    if (!render_object(g, out, reg, type, "read")) {
+    if (!render_object(g, io, reg, type, "read")) {
       return false;
     }
-    if (!render_object(g, out, reg, type, "write")) {
+    if (!render_object(g, io, reg, type, "write")) {
       return false;
     }
   }
 
-  if (!gen_render(g, out, reg, "root_read", root)) {
+  if (!gen_render(g, io, reg, "root_read", root)) {
     return false;
   }
-  sp_fmt_io(out, "\n");
-  return gen_render(g, out, reg, "root_write", root);
+  sp_fmt_io(io, "\n");
+  return gen_render(g, io, reg, "root_write", root);
 }

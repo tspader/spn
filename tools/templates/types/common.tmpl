@@ -1,0 +1,10 @@
+#ifndef SPN_CG_COMMON_H
+#define SPN_CG_COMMON_H
+
+#include "sp.h"
+#include "sp/sp_om.h"
+#include "spn.h"
+{{ for .includes }}
+#include "{{ .name }}"
+{{ end }}
+

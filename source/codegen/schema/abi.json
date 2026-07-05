@@ -1,0 +1,79 @@
+{
+  "handles": ["ctx", "config", "target", "node", "node_ctx", "profile", "make", "autoconf", "cmake"],
+  "types": [
+    {
+      "name": "run_std",
+      "fields": [
+        { "name": "out", "type": "str" }
+      ]
+    },
+    {
+      "name": "run",
+      "fn": true,
+      "fields": [
+        { "name": "target", "type": "target" },
+        { "name": "args", "type": "str", "cap": 16 },
+        { "name": "std", "type": "run_std" }
+      ]
+    }
+  ],
+  "exports": [
+    { "name": "spn_get_target", "ret": "target", "args": ["ctx", "str"] },
+    { "name": "spn_get_dep", "ret": "ctx", "args": ["ctx", "str"] },
+    { "name": "spn_get_dir", "ret": "str", "args": ["ctx", "s32"] },
+    { "name": "spn_get_subdir", "ret": "str", "args": ["ctx", "s32", "str"] },
+    { "name": "spn_get_profile", "ret": "profile", "args": ["ctx"] },
+    { "name": "spn_profile_get_libc", "ret": "s32", "args": ["profile"] },
+    { "name": "spn_profile_get_linkage", "ret": "s32", "args": ["profile"] },
+    { "name": "spn_profile_get_standard", "ret": "s32", "args": ["profile"] },
+    { "name": "spn_profile_get_mode", "ret": "s32", "args": ["profile"] },
+    { "name": "spn_add_exe", "ret": "target", "args": ["config", "str"] },
+    { "name": "spn_add_lib", "ret": "target", "args": ["config", "str", "s32"] },
+    { "name": "spn_add_test", "ret": "target", "args": ["config", "str"] },
+    { "name": "spn_add_include", "args": ["config", "str"] },
+    { "name": "spn_add_define", "args": ["config", "str"] },
+    { "name": "spn_add_system_dep", "args": ["config", "str"] },
+    { "name": "spn_log", "args": ["ctx", "str"] },
+    { "name": "spn_target_add_source", "args": ["target", "str"] },
+    { "name": "spn_target_add_include", "args": ["target", "str"] },
+    { "name": "spn_target_add_define", "args": ["target", "str"] },
+    { "name": "spn_target_add_flag", "args": ["target", "str"] },
+    { "name": "spn_target_set_linked", "args": ["target", "s32"] },
+    { "name": "spn_target_embed_file", "args": ["target", "str"] },
+    { "name": "spn_target_embed_file_ex", "args": ["target", "str", "str", "str", "str"] },
+    { "name": "spn_target_embed_dir", "args": ["target", "str"] },
+    { "name": "spn_target_embed_dir_ex", "args": ["target", "str", "str", "str"] },
+    { "name": "spn_add_node", "ret": "node", "args": ["config", "str"] },
+    { "name": "spn_node_set_fn", "args": ["node", "str"] },
+    { "name": "spn_node_set_user_data", "args": ["node", "s32"], "host": "spn_abi_node_set_user_data" },
+    { "name": "spn_node_add_input", "args": ["node", "str"] },
+    { "name": "spn_node_add_output", "args": ["node", "str"] },
+    { "name": "spn_node_link", "args": ["node", "node"] },
+    { "name": "spn_node_ctx_get_user_data", "ret": "s32", "args": ["node_ctx"], "host": "spn_abi_node_ctx_get_user_data" },
+    { "name": "spn_write_file", "args": ["ctx", "str", "str"] },
+    { "name": "spn_copy", "ret": "s32", "args": ["ctx", "s32", "str", "s32", "str"] },
+    { "name": "spn_fs_copy", "args": ["str", "str"], "host": "spn_abi_fs_copy", "wasm_ctx": true },
+    { "name": "spn_fs_copy_glob", "args": ["str", "str"], "host": "spn_abi_fs_copy_glob", "wasm_ctx": true },
+    { "name": "spn_fs_cat_ex", "args": ["str", "str_opt", "str_opt", "str_opt", "str_opt"], "host": "spn_abi_fs_cat", "wasm_ctx": true },
+    { "name": "spn_fs_create_dir", "args": ["str"], "host": "spn_abi_fs_create_dir", "wasm_ctx": true },
+    { "name": "spn_io_write", "args": ["str", "str"], "host": "spn_abi_io_write", "wasm_ctx": true },
+    { "name": "spn_fmt_ex", "ret": "str", "args": ["str", "str_opt", "str_opt", "str_opt", "str_opt"], "host": "spn_abi_fmt", "wasm_ctx": true },
+    { "name": "spn_make", "ret": "s32", "args": ["ctx"] },
+    { "name": "spn_make_new", "ret": "make", "args": ["ctx"] },
+    { "name": "spn_make_add_target", "args": ["make", "str"] },
+    { "name": "spn_make_run", "ret": "s32", "args": ["make"] },
+    { "name": "spn_autoconf", "ret": "s32", "args": ["ctx"] },
+    { "name": "spn_autoconf_new", "ret": "autoconf", "args": ["ctx"] },
+    { "name": "spn_autoconf_add_flag", "args": ["autoconf", "str"] },
+    { "name": "spn_autoconf_run", "ret": "s32", "args": ["autoconf"] },
+    { "name": "spn_cmake", "ret": "s32", "args": ["ctx"] },
+    { "name": "spn_cmake_new", "ret": "cmake", "args": ["ctx"] },
+    { "name": "spn_cmake_set_generator", "args": ["cmake", "s32"] },
+    { "name": "spn_cmake_add_define", "args": ["cmake", "str", "str"] },
+    { "name": "spn_cmake_add_arg", "args": ["cmake", "str"] },
+    { "name": "spn_cmake_configure", "ret": "s32", "args": ["cmake"] },
+    { "name": "spn_cmake_build", "ret": "s32", "args": ["cmake"] },
+    { "name": "spn_cmake_install", "ret": "s32", "args": ["cmake"] },
+    { "name": "spn_cmake_run", "ret": "s32", "args": ["cmake"] }
+  ]
+}
