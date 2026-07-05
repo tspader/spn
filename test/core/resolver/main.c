@@ -1813,6 +1813,99 @@ UTEST_F(resolver, backtrack_failure_not_sticky) {
   });
 }
 
+// A failed candidate must release the picks its subtree made: audio 1.1.0
+// resolves math 2.0.0 before failing on missing physics, and the fallback to
+// audio 1.0.0 needs math ^1.0.0, which resolves fine on a clean slate
+UTEST_F(resolver, backtrack_releases_subtree_picks) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "audio",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = "^1.0.0" },
+            }
+          },
+          {
+            .version = spn_semver_lit(1, 1, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = "^2.0.0" },
+              { .namespace = "spn", .name = "physics", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "math",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/audio", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "audio", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+    },
+    .instances = {
+      { .name = "spn/math", .count = 1 },
+    },
+  });
+}
+
+// A pick stranded by a failed candidate must not be committed: audio 1.1.0
+// resolves math before failing on missing physics, audio 1.0.0 has no deps,
+// so the resolve holds no math at all
+UTEST_F(resolver, backtrack_orphan_not_committed) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "audio",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          {
+            .version = spn_semver_lit(1, 1, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = "^1.0.0" },
+              { .namespace = "spn", .name = "physics", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "math",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/audio", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "audio", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+    },
+    .instances = {
+      { .name = "spn/math", .count = 0 },
+    },
+  });
+}
+
 // Each build dep roots its own process: two consumers with disjoint ranges on
 // one tool hold two instances instead of conflicting
 UTEST_F(resolver, build_dep_disjoint_tools_diverge) {
