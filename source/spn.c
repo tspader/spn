@@ -29,7 +29,7 @@
 #include "app/app.h"
 #include "codegen/codegen.h"
 #include "codegen/lower.h"
-#include "codegen/gen/types.gen.h"
+#include "codegen/gen/manifest.gen.h"
 #include "cli/cli.h"
 #include "event/event.h"
 #include "event/log.h"

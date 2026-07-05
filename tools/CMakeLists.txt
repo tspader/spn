@@ -35,24 +35,27 @@ add_dependencies(jtd_gen headers)
 set(GEN_DIR ${CMAKE_SOURCE_DIR}/source/codegen/gen)
 file(MAKE_DIRECTORY ${GEN_DIR})
 
-set(SCHEMA ${CMAKE_SOURCE_DIR}/source/codegen/schemas.jtd.json)
+set(SCHEMA_DIR ${CMAKE_SOURCE_DIR}/source/codegen/schema)
 set(GEN_FILES
-  ${GEN_DIR}/types.gen.h
+  ${GEN_DIR}/common.gen.h
   ${GEN_DIR}/manifest.gen.h
   ${GEN_DIR}/manifest.gen.c
+  ${GEN_DIR}/manifest.jtd.json
   ${GEN_DIR}/toolchains.gen.h
   ${GEN_DIR}/toolchains.gen.c
+  ${GEN_DIR}/toolchains.jtd.json
   ${GEN_DIR}/abi.gen.h
   ${GEN_DIR}/abi.gen.c)
+file(GLOB JTD_GEN_SCHEMAS CONFIGURE_DEPENDS ${SCHEMA_DIR}/*.json)
 file(GLOB_RECURSE JTD_GEN_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/templates/*.tmpl)
 add_custom_command(
   OUTPUT ${GEN_FILES}
   COMMAND ${CMAKE_COMMAND} -E make_directory ${GEN_DIR}
   COMMAND $<TARGET_FILE:jtd_gen>
-    ${SCHEMA}
+    ${SCHEMA_DIR}
     ${GEN_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/templates
-  DEPENDS jtd_gen ${SCHEMA} ${JTD_GEN_TEMPLATES}
-  COMMENT "codegen: types.gen.h, {manifest,toolchains,abi}.gen.{h,c}"
+  DEPENDS jtd_gen ${JTD_GEN_SCHEMAS} ${JTD_GEN_TEMPLATES}
+  COMMENT "codegen: common.gen.h, {manifest,toolchains,abi}.gen.{h,c}"
   VERBATIM)
 add_custom_target(spn_codegen_gen ALL DEPENDS ${GEN_FILES})

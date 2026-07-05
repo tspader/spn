@@ -1,0 +1,8 @@
+#ifndef SPN_CG_{{ .guard }}_H
+#define SPN_CG_{{ .guard }}_H
+
+#include "common.gen.h"
+{{ for .includes }}
+#include "{{ .name }}"
+{{ end }}
+

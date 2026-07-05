@@ -45,6 +45,20 @@ add_executable(triple
 spn_test_binary(triple)
 add_test(NAME triple COMMAND "$<TARGET_FILE:triple>")
 
+add_executable(schema
+  ${CMAKE_SOURCE_DIR}/tools/jtd.c
+  ${SRC}/enum/enum.c
+  schema.c
+)
+spn_test_binary(schema)
+target_include_directories(schema PRIVATE ${CMAKE_SOURCE_DIR}/tools)
+target_compile_definitions(schema PRIVATE
+  SCHEMA_GEN_DIR="${CMAKE_SOURCE_DIR}/source/codegen/gen"
+  SCHEMA_DIR="${CMAKE_SOURCE_DIR}/source/codegen/schema")
+target_link_libraries(schema PRIVATE yyjson)
+add_dependencies(schema spn_codegen_gen)
+add_test(NAME schema COMMAND "$<TARGET_FILE:schema>")
+
 add_executable(jtd
   ${CMAKE_SOURCE_DIR}/tools/jtd.c
   jtd/main.c

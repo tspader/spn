@@ -1,0 +1,25 @@
+{
+  "definitions": {
+    "arch": { "enum": ["x86_64", "aarch64", "wasm32"] },
+    "os": { "enum": ["windows", "linux", "macos", "wasi"] },
+    "abi": { "enum": ["gnu", "musl", "msvc", "mingw"] },
+    "cc_driver": { "enum": ["gcc", "clang", "msvc"], "metadata": { "include": "toolchain/types.h" } },
+
+    "triple": {
+      "optionalProperties": {
+        "arch": { "ref": "arch" },
+        "os": { "ref": "os" },
+        "abi": { "ref": "abi" }
+      }
+    },
+
+    "artifact": {
+      "properties": {
+        "url": { "type": "string" }
+      },
+      "optionalProperties": {
+        "sha256": { "type": "string" }
+      }
+    }
+  }
+}

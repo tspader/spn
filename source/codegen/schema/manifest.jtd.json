@@ -1,41 +1,26 @@
 {
+  "metadata": { "format": "toml" },
+  "properties": {
+    "package": { "ref": "package" }
+  },
+  "optionalProperties": {
+    "lib": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
+    "bin": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
+    "script": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
+    "test": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
+    "toolchain": { "elements": { "ref": "manifest_toolchain" } },
+    "index": { "elements": { "ref": "index" }, "metadata": { "key": "name" } },
+    "profile": { "values": { "ref": "profile" } },
+    "deps": { "ref": "deps" },
+    "config": { "values": { "ref": "config_entry" } },
+    "publish": { "ref": "publish" }
+  },
   "definitions": {
-    "arch": { "enum": ["x86_64", "aarch64", "wasm32"] },
-    "os": { "enum": ["windows", "linux", "macos", "wasi"] },
-    "abi": { "enum": ["gnu", "musl", "msvc", "mingw"] },
-    "cc_driver": { "enum": ["gcc", "clang", "msvc"] },
     "linkage": { "enum": ["shared", "static", "source", "object"] },
     "c_standard": { "enum": ["c89", "c99", "c11"] },
     "cxx_standard": { "enum": ["c++11", "c++14", "c++17", "c++20", "c++23"] },
     "build_mode": { "enum": ["release", "debug"] },
-    "index_protocol": { "enum": ["git", "http", "filesystem"] },
-
-    "triple": {
-      "optionalProperties": {
-        "arch": { "ref": "arch" },
-        "os": { "ref": "os" },
-        "abi": { "ref": "abi" }
-      }
-    },
-
-    "manifest": {
-      "metadata": { "renderer": "toml" },
-      "properties": {
-        "package": { "ref": "package" }
-      },
-      "optionalProperties": {
-        "lib": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
-        "bin": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
-        "script": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
-        "test": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
-        "toolchain": { "elements": { "ref": "manifest_toolchain" } },
-        "index": { "elements": { "ref": "index" }, "metadata": { "key": "name" } },
-        "profile": { "values": { "ref": "profile" } },
-        "deps": { "ref": "deps" },
-        "config": { "values": { "ref": "config_entry" } },
-        "publish": { "ref": "publish" }
-      }
-    },
+    "index_protocol": { "enum": ["git", "http", "filesystem"], "metadata": { "include": "index/types.h" } },
 
     "publish": {
       "optionalProperties": {
@@ -149,59 +134,6 @@
     "config_entry": {
       "optionalProperties": {
         "kind": { "ref": "linkage" }
-      }
-    },
-
-    "run_std": {
-      "optionalProperties": {
-        "out": { "type": "string" }
-      }
-    },
-
-    "run": {
-      "metadata": { "renderer": "abi" },
-      "optionalProperties": {
-        "target": { "type": "uint32", "metadata": { "handle": "target" } },
-        "args": { "elements": { "type": "string" }, "metadata": { "cap": "16" } },
-        "std": { "ref": "run_std" }
-      }
-    },
-
-    "toolchains": {
-      "metadata": { "renderer": "json" },
-      "optionalProperties": {
-        "toolchain": { "elements": { "ref": "toolchain" }, "metadata": { "key": "name" } }
-      }
-    },
-
-    "launcher": {
-      "properties":         { "program": { "type": "string" } },
-      "optionalProperties": { "args": { "elements": { "type": "string" } } }
-    },
-
-    "artifact": {
-      "properties": {
-        "url": { "type": "string" }
-      },
-      "optionalProperties": {
-        "sha256": { "type": "string" }
-      }
-    },
-
-    "toolchain": {
-      "properties": {
-        "name":     { "type": "string" },
-        "driver":   { "ref": "cc_driver" },
-        "compiler": { "ref": "launcher" },
-        "linker":   { "ref": "launcher" },
-        "archiver": { "ref": "launcher" }
-      },
-      "optionalProperties": {
-        "version":  { "type": "string" },
-        "cxx":      { "ref": "launcher" },
-        "host":     { "values": { "ref": "artifact" } },
-        "target":   { "elements": { "ref": "triple" } },
-        "mirrors":  { "type": "string" }
       }
     }
   }
