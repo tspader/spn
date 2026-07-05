@@ -1,0 +1,43 @@
+{
+  "metadata": { "format": "json" },
+  "properties": {
+    "namespace": { "type": "string" },
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "yanked": { "type": "boolean" }
+  },
+  "optionalProperties": {
+    "checksum": { "type": "string" },
+    "source": { "ref": "release_source" },
+    "manifest": { "ref": "release_source" },
+    "paths": { "ref": "release_paths" },
+    "deps": { "elements": { "ref": "release_dep" } }
+  },
+  "definitions": {
+    "index_dep_kind": { "enum": ["normal", "build", "test"], "metadata": { "include": "index/types.h" } },
+
+    "release_source": {
+      "optionalProperties": {
+        "url": { "type": "string" },
+        "rev": { "type": "string" },
+        "dir": { "type": "string" }
+      }
+    },
+
+    "release_paths": {
+      "optionalProperties": {
+        "manifest": { "type": "string" },
+        "script": { "type": "string" }
+      }
+    },
+
+    "release_dep": {
+      "properties": {
+        "namespace": { "type": "string" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "kind": { "ref": "index_dep_kind" }
+      }
+    }
+  }
+}

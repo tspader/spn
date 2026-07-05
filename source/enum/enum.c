@@ -461,6 +461,36 @@ spn_index_kind_t spn_index_kind_from_str(sp_str_t str) {
   SP_UNREACHABLE_RETURN(SPN_INDEX_WORKSPACE);
 }
 
+sp_str_t spn_index_dep_kind_to_str(spn_index_dep_kind_t kind) {
+  switch (kind) {
+    case SPN_INDEX_DEP_NORMAL: {
+      return sp_str_lit("normal");
+    }
+    case SPN_INDEX_DEP_BUILD: {
+      return sp_str_lit("build");
+    }
+    case SPN_INDEX_DEP_TEST: {
+      return sp_str_lit("test");
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+spn_index_dep_kind_t spn_index_dep_kind_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "normal")) {
+    return SPN_INDEX_DEP_NORMAL;
+  }
+  if (sp_str_equal_cstr(str, "build")) {
+    return SPN_INDEX_DEP_BUILD;
+  }
+  if (sp_str_equal_cstr(str, "test")) {
+    return SPN_INDEX_DEP_TEST;
+  }
+
+  return SPN_INDEX_DEP_NORMAL;
+}
+
 sp_str_t spn_index_protocol_to_str(spn_index_protocol_t protocol) {
   switch (protocol) {
     case SPN_INDEX_PROTOCOL_GIT: {

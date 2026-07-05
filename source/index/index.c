@@ -5,7 +5,6 @@
 #include "index/types.h"
 
 #include "external/git.h"
-#include "external/mz.h"
 #include "index/index.h"
 #include "index/json.h"
 #include "semver/compare.h"
@@ -13,14 +12,9 @@
 
 void spn_index_init(spn_index_info_t* index, sp_mem_t mem) {
   index->arena = sp_mem_arena_new(mem);
-  mz_ctx_init(&index->json.ctx, sp_mem_arena_as_allocator(index->arena));
-  index->json.schema = spn_index_build_schema(&index->json.ctx);
 }
 
 void spn_index_deinit(spn_index_info_t* index) {
-  index->json.schema = SP_NULLPTR;
-  index->json.ctx = SP_ZERO_STRUCT(mz_ctx_t);
-
   if (index->arena) {
     sp_mem_arena_destroy(index->arena);
     index->arena = SP_NULLPTR;
@@ -93,7 +87,7 @@ spn_index_pkg_t* spn_index_get_package(spn_index_info_t* index, spn_pkg_name_t i
 
   package = sp_alloc_type(sp_mem_arena_as_allocator(index->arena), spn_index_pkg_t);
   *package = SP_ZERO_STRUCT(spn_index_pkg_t);
-  if (spn_index_parse_pkg(&index->json.ctx, index->json.schema, id, blob, package) != SPN_OK) {
+  if (spn_index_parse_pkg(sp_mem_arena_as_allocator(index->arena), id, blob, package) != SPN_OK) {
     package = SP_NULLPTR;
     goto cleanup;
   }

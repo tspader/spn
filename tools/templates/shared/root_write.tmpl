@@ -6,3 +6,10 @@ sp_str_t spn_{{ .root_name }}_write(sp_mem_t mem, const spn_cg_{{ .root_name }}_
   spn_cg_{{ .root_name }}_write(in, &pretty.base);
   return sp_io_dyn_mem_writer_as_str(&sink);
 }
+
+sp_str_t spn_{{ .root_name }}_write_compact(sp_mem_t mem, const spn_cg_{{ .root_name }}_t* in) {
+  sp_io_dyn_mem_writer_t sink;
+  sp_io_dyn_mem_writer_init(mem, &sink);
+  spn_cg_{{ .root_name }}_write(in, &sink.base);
+  return sp_io_dyn_mem_writer_as_str(&sink);
+}

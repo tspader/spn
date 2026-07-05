@@ -5,7 +5,6 @@ add_executable(resolver
   ${SRC}/enum/enum.c
   ${SRC}/event/event.c
   ${SRC}/external/cJSON.c
-  ${SRC}/external/mz.c
   ${SRC}/external/git.c
   ${SRC}/external/tom.c
   ${SRC}/codegen/codegen.c
@@ -13,6 +12,7 @@ add_executable(resolver
   ${SRC}/toolchain/catalog.c
   ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
+  ${SRC}/codegen/gen/release.gen.c
   ${SRC}/index/index.c
   ${SRC}/index/json.c
   ${SRC}/sp/io.c

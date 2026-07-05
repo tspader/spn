@@ -8,8 +8,6 @@
 #include "pkg/types.h"
 #include "semver/types.h"
 
-#include "external/mz.h"
-
 typedef enum {
   SPN_INDEX_WORKSPACE,
   SPN_INDEX_BUILTIN,
@@ -81,11 +79,6 @@ struct spn_index_info {
   spn_index_auth_t auth;
 
   sp_mem_arena_t* arena;
-
-  struct {
-    mz_schema_t* schema;
-    mz_ctx_t ctx;
-  } json;
 };
 
 typedef sp_da(spn_index_info_t) spn_index_arr_t;
