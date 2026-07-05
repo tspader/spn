@@ -42,6 +42,7 @@ typedef struct {
 
 typedef struct {
   sp_intern_id_t qualified;
+  spn_semver_t version;
 } spn_pkg_id_t;
 
 typedef enum {
@@ -54,6 +55,7 @@ typedef struct spn_pkg_req {
   sp_intern_str_t qualified;
   spn_pkg_source_t source;
   spn_dep_kind_t kind;
+  bool private;
   union {
     struct { spn_semver_range_t range; } index;
     struct { sp_str_t path; } file;

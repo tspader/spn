@@ -1,0 +1,10 @@
+[package]
+name = "units_build_dep_bootstrap"
+version = "0.1.0"
+
+[deps.package]
+applib = "2.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

@@ -1,0 +1,9 @@
+[package]
+name = "applib"
+version = "1.0.0"
+
+[[lib]]
+name = "applib"
+kinds = ["static"]
+source = ["applib.c"]
+headers = ["applib.h"]
