@@ -1238,6 +1238,114 @@ UTEST_F(resolver, preference_prefers_unified) {
   });
 }
 
+// The tool's pin admits a version the root's range also admits, so pooling
+// constraints would downgrade the root to 1.0.0 to share one instance. The
+// root's pick is sovereign; the tool pays with its own copy instead
+UTEST_F(resolver, build_dep_never_constrains_root) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 9, 0) },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "tool",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "=1.0.0" },
+            }
+          },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/foo", .version = "^1.0.0", .kind = SPN_DEP_KIND_PACKAGE },
+        { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+    },
+    .instances = {
+      { .name = "spn/foo", .count = 2 },
+    },
+  });
+}
+
+// Convergence is a constraint, not a preference: the newest bar needs a foo
+// the root's pick excludes, so the tool's unit must fall back to the older
+// bar that shares the root's foo rather than split a second foo
+UTEST_F(resolver, convergence_forces_older_sibling) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "tool",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "bar", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "bar",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^1.0.0" },
+            }
+          },
+          {
+            .version = spn_semver_lit(1, 1, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^2.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 9, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/foo", .version = "^1.0.0", .kind = SPN_DEP_KIND_PACKAGE },
+        { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/tool" },
+      { .name = "bar", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+    },
+    .instances = {
+      { .name = "spn/foo", .count = 1 },
+      { .name = "spn/bar", .count = 1 },
+    },
+  });
+}
+
 // Deps are public by default: their types may appear in the package's API, so
 // they resolve in the consumer's scope and a conflict stays an error even
 // across a shared (dynamic) boundary
@@ -1375,6 +1483,56 @@ UTEST_F(resolver, shared_lib_private_diverges) {
     },
     .instances = {
       { .name = "spn/foo", .count = 2 },
+      { .name = "spn/gfx", .count = 1 },
+    },
+  });
+}
+
+// Privacy alone never costs a duplicate: gfx's private range admits foo
+// 2.0.0, which an isolated solve would take, but the root already decided
+// 1.9.0 and the private unit must converge onto that instance
+UTEST_F(resolver, private_compatible_unifies) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "gfx",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = ">=1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "gfx", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 9, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/gfx", .version = "^1.0.0" },
+        { .name = "spn/foo", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/gfx" },
+    },
+    .instances = {
+      { .name = "spn/foo", .count = 1 },
       { .name = "spn/gfx", .count = 1 },
     },
   });
@@ -1906,11 +2064,12 @@ UTEST_F(resolver, backtrack_orphan_not_committed) {
   });
 }
 
-// An instance shared by two units must hold one pick per dep: lib 1.0.0
-// resolves math 1.9.0 in the root's scope and math 1.0.0 in the tool's, but
-// there is only one lib instance, and a single build can't link both
-UTEST_F(resolver, instance_holds_one_pick_per_dep) {
-  fixture_t fixture = {
+// The tool's unit diverges on math, so lib's resolved subtree differs
+// between the units even though both hold lib 1.0.0. One lib build can't
+// link both maths: the instance must split rather than merge two dep sets
+// under one identity.
+UTEST_F(resolver, divergent_dep_splits_instance) {
+  run_fixture(utest_result, (fixture_t) {
     .index = {
       {
         .namespace = "spn",
@@ -1953,33 +2112,18 @@ UTEST_F(resolver, instance_holds_one_pick_per_dep) {
         { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-  };
-
-  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-  build_cache(mem, &fixture);
-
-  spn_event_buffer_t* events = spn_event_buffer_new(sp_mem_os_new());
-  spn_index_cache_t cache = sp_zero;
-  spn_pkg_registry_t registry = sp_zero;
-  spn_resolver_t resolver = sp_zero;
-  spn_resolver_init(&resolver, mem, spn.intern, &cache, &registry, events);
-
-  spn_resolve_query_t query = sp_zero;
-  spn_resolve_query_init(mem, &query);
-  build_query(&fixture, &query);
-
-  ASSERT_EQ(spn_resolve_from_solver(&resolver, &query), SPN_OK);
-
-  sp_ht_for_kv(query.result, it) {
-    spn_resolved_pkg_t* node = it.val;
-    sp_da_for(node->edges, a) {
-      sp_for(b, a) {
-        if (node->edges[a].id.qualified != node->edges[b].id.qualified) continue;
-        if (node->edges[a].kind != node->edges[b].kind) continue;
-        EXPECT_TRUE(spn_semver_eq(node->edges[a].id.version, node->edges[b].id.version));
-      }
-    }
-  }
+    .err = SPN_OK,
+    .expected = {
+      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
+      { .name = "lib", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
+      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "lib", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+    },
+    .instances = {
+      { .name = "spn/math", .count = 2 },
+      { .name = "spn/lib", .count = 2 },
+    },
+  });
 }
 
 // Each build dep roots its own process: two consumers with disjoint ranges on
@@ -2103,6 +2247,65 @@ UTEST_F(resolver, private_scopes_per_instance) {
     .instances = {
       { .name = "spn/gfx", .count = 2 },
       { .name = "spn/foo", .count = 2 },
+    },
+  });
+}
+
+// Sibling groups converge on each other in manifest order: gen decides foo
+// first, and opt's wider range admits 2.0.0 but must take gen's 1.9.0. An
+// isolated solve of opt would split a pointless second foo.
+UTEST_F(resolver, sibling_tools_unify) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "gen",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "opt",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = ">=1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 9, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/gen", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+        { .name = "spn/opt", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/gen" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/opt" },
+    },
+    .instances = {
+      { .name = "spn/foo", .count = 1 },
+      { .name = "spn/gen", .count = 1 },
+      { .name = "spn/opt", .count = 1 },
     },
   });
 }

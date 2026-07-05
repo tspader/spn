@@ -103,6 +103,24 @@ UTEST_F(units, no_double_build) {
   });
 }
 
+// The tool pins foo =1.0.0, which is compatible with the root's ^1.0.0: a
+// solver that pooled constraints would unify everyone on 1.0.0. The root's
+// pick is sovereign; main links 1.9.0 and the tool compiles against its own
+// 1.0.0 (enforced by a #error in tool.c).
+UTEST_F(units, no_downgrade) {
+  tmpfs_init_named(&uf->fixture.fs, "units_no_downgrade");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/units/no_downgrade",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unsatisfiable_version" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "resolve_package", .key = "version", .value = "1.9.0" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+    },
+  });
+}
+
 // applib build-depends on tool and tool links the same applib instance.
 // applib's script can't compile until tool builds, and tool can't link until
 // applib builds; unbuildable no matter how resolution splits. The flat
