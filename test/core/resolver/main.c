@@ -95,13 +95,23 @@ typedef struct {
   u32 count;
 } instance_count_t;
 
+// the root manifest's [config.<pkg>] kind override, keyed by bare package
+// name like the session's lookup
+typedef struct {
+  const c8* name;
+  spn_linkage_t kind;
+} config_kind_t;
+
 // event asserts that a failed resolve pushed the right error kind; zero
-// (SPN_EVENT_ERR) means don't check
+// (SPN_EVENT_ERR) means don't check. linkage is the profile's; zero
+// (SPN_LIB_KIND_NONE) is the default preference order.
 typedef struct {
   index_pkg_t index[8];
   struct {
     manifest_deps_t deps;
   } manifest;
+  spn_linkage_t linkage;
+  config_kind_t config[4];
   spn_err_t err;
   spn_build_event_kind_t event;
   expected_t expected[8];
@@ -252,11 +262,20 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
   build_cache(mem, &fixture);
 
+  sp_da(spn_pkg_config_entry_t) config = sp_da_new(mem, spn_pkg_config_entry_t);
+  sp_carr_for(fixture.config, it) {
+    if (!fixture.config[it].name) break;
+
+    spn_pkg_config_entry_t entry = { .key = sp_str_view(fixture.config[it].name) };
+    sp_opt_set(entry.value.kind, fixture.config[it].kind);
+    sp_da_push(config, entry);
+  }
+
   spn_event_buffer_t* events = spn_event_buffer_new(sp_mem_os_new());
   spn_index_cache_t cache = sp_zero;
   spn_pkg_registry_t registry = sp_zero;
   spn_resolver_t resolver = sp_zero;
-  spn_resolver_init(&resolver, mem, spn.intern, &cache, &registry, events);
+  spn_resolver_init(&resolver, mem, spn.intern, &cache, &registry, events, fixture.linkage, config);
 
   spn_resolve_query_t query = sp_zero;
   spn_resolve_query_init(mem, &query);
@@ -1346,6 +1365,143 @@ UTEST_F(resolver, convergence_forces_older_sibling) {
   });
 }
 
+// A group inheriting two decided versions of one name takes the earliest
+// admissible priority, not the newest version: opt's range admits both the
+// root's foo 1.9.0 and gen's split foo 2.0.0, and the root decided first.
+// Today's preference draws candidates in hash iteration order, so this pin
+// flickers with intern state — the order dependence is the defect it pins.
+UTEST_F(resolver, tiebreak_takes_earliest_admissible) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "gen",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "=2.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "opt",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = ">=1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 9, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/foo", .version = "^1.0.0" },
+        { .name = "spn/gen", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+        { .name = "spn/opt", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/gen" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/opt" },
+    },
+    .instances = {
+      { .name = "spn/foo", .count = 2 },
+    },
+  });
+}
+
+// Mutually exclusive inherited picks: use can hold the root's c 1.0.0 or mk's
+// b 2.0.0 (which needs c 2.0.0), never both. The root's pick has higher
+// priority, so c pins and b is the loser that splits — regardless of the
+// order use's own requests discover the names
+UTEST_F(resolver, tiebreak_higher_priority_pins_loser_splits) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "mk",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "b", .version = "^2.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "use",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "b", .version = ">=1.0.0" },
+              { .namespace = "spn", .name = "c", .version = ">=1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "b",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          {
+            .version = spn_semver_lit(2, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "c", .version = "=2.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "c",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/c", .version = "=1.0.0" },
+        { .name = "spn/mk", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+        { .name = "spn/use", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
+      { .name = "b", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/mk" },
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/mk" },
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/use" },
+      { .name = "b", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/use" },
+    },
+    .instances = {
+      { .name = "spn/b", .count = 2 },
+      { .name = "spn/c", .count = 2 },
+    },
+  });
+}
+
 // Deps are public by default: their types may appear in the package's API, so
 // they resolve in the consumer's scope and a conflict stays an error even
 // across a shared (dynamic) boundary
@@ -1680,6 +1836,99 @@ UTEST_F(resolver, static_lib_private_conflict_fails) {
   });
 }
 
+// Boundaries are classified by the linkage selected for this build, not by
+// capability: gfx offers static and shared, default selection picks static,
+// so gfx links into its consumer and its private foo conflicts exactly as a
+// static-only gfx's would
+UTEST_F(resolver, private_static_default_conflicts) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "gfx",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "gfx", .linkages = { SPN_LIB_KIND_STATIC, SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/gfx", .version = "^1.0.0" },
+        { .name = "spn/foo", .version = "^2.0.0" },
+      }
+    },
+    .err = SPN_ERROR,
+    .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+  });
+}
+
+// The same package under a [config.gfx] shared override is a dynamic
+// boundary: the identical topology now diverges instead of conflicting
+UTEST_F(resolver, config_shared_private_diverges) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "gfx",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "gfx", .linkages = { SPN_LIB_KIND_STATIC, SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/gfx", .version = "^1.0.0" },
+        { .name = "spn/foo", .version = "^2.0.0" },
+      }
+    },
+    .config = {
+      { .name = "gfx", .kind = SPN_LIB_KIND_SHARED },
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gfx" },
+    },
+    .instances = {
+      { .name = "spn/foo", .count = 2 },
+      { .name = "spn/gfx", .count = 1 },
+    },
+  });
+}
+
 // Two consumers of one shared lib share one instance of it, picked from the
 // intersection of their ranges
 UTEST_F(resolver, shared_lib_consumers_unify) {
@@ -1836,6 +2085,66 @@ UTEST_F(resolver, shared_lib_private_dynamic_dup_fails) {
         { .name = "spn/audio", .version = "^1.0.0" },
         { .name = "spn/video", .version = "^1.0.0" },
       }
+    },
+    .err = SPN_ERROR,
+    .event = SPN_EVENT_ERR_DYNAMIC_DUPLICATE,
+  });
+}
+
+// The dynamic-dup twin of the classification rule: gfx offers static and
+// shared, so by default the disjoint private copies embed statically and
+// coexist — but a [config.gfx] shared override loads both into the root's
+// process and the dup check must see the selected linkage, not the default
+UTEST_F(resolver, config_shared_dynamic_dup_fails) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "audio",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "gfx", .version = "^1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "audio", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "video",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "gfx", .version = "^2.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "video", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "gfx",
+        .releases = {
+          { .version = spn_semver_lit(1, 9, 0), .targets = { { .name = "gfx", .linkages = { SPN_LIB_KIND_STATIC, SPN_LIB_KIND_SHARED } } } },
+          { .version = spn_semver_lit(2, 0, 0), .targets = { { .name = "gfx", .linkages = { SPN_LIB_KIND_STATIC, SPN_LIB_KIND_SHARED } } } },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/audio", .version = "^1.0.0" },
+        { .name = "spn/video", .version = "^1.0.0" },
+      }
+    },
+    .config = {
+      { .name = "gfx", .kind = SPN_LIB_KIND_SHARED },
     },
     .err = SPN_ERROR,
     .event = SPN_EVENT_ERR_DYNAMIC_DUPLICATE,

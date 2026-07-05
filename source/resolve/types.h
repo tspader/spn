@@ -57,6 +57,8 @@ typedef struct spn_resolver_t {
   spn_index_cache_t* index;
   spn_pkg_registry_t* registry;
   spn_event_buffer_t* events;
+  spn_linkage_t linkage;
+  sp_da(spn_pkg_config_entry_t) config;
 } spn_resolver_t;
 
 #endif

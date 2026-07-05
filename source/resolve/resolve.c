@@ -66,13 +66,15 @@ typedef sp_ht(spn_pkg_id_t, u8) spn_instance_states_t;
 static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node, spn_requested_pkg_t* dep);
 static spn_err_t resolve_deps(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node);
 
-void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn_index_cache_t* index, spn_pkg_registry_t* registry, spn_event_buffer_t* events) {
+void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn_index_cache_t* index, spn_pkg_registry_t* registry, spn_event_buffer_t* events, spn_linkage_t linkage, sp_da(spn_pkg_config_entry_t) config) {
   *r = (spn_resolver_t){
     .mem = mem,
     .intern = intern,
     .index = index,
     .events = events,
     .registry = registry,
+    .linkage = linkage,
+    .config = config,
   };
 }
 
@@ -109,15 +111,28 @@ static void record_failure(spn_resolve_run_t* run, spn_build_event_t event) {
   run->failure = event;
 }
 
-static bool target_selects_shared(spn_target_info_t* info) {
+static spn_kind_query_t kind_query(spn_resolver_t* resolver, sp_str_t pkg_name) {
+  spn_kind_query_t query = { .linkage = resolver->linkage };
+  sp_da_for(resolver->config, it) {
+    spn_pkg_config_entry_t* entry = &resolver->config[it];
+    if (sp_str_equal(entry->key, pkg_name) && !sp_opt_is_null(entry->value.kind)) {
+      sp_opt_set(query.config, entry->value.kind.value);
+    }
+  }
+  return query;
+}
+
+static bool target_selects_shared(spn_target_info_t* info, spn_kind_query_t query) {
   spn_linkage_t kind = SPN_LIB_KIND_NONE;
-  if (spn_target_select_lib_kind(info, sp_zero_s(spn_kind_query_t), &kind)) {
+  if (spn_target_select_lib_kind(info, query, &kind)) {
     return false;
   }
   return kind == SPN_LIB_KIND_SHARED;
 }
 
 static bool node_is_shared(spn_resolver_t* resolver, spn_resolved_pkg_t* node) {
+  spn_kind_query_t query = kind_query(resolver, spn_pkg_name_from_qualified(node->qualified).name);
+
   switch (node->source) {
     case SPN_PKG_SOURCE_INDEX: {
       if (!node->index.release) {
@@ -134,7 +149,7 @@ static bool node_is_shared(spn_resolver_t* resolver, spn_resolved_pkg_t* node) {
         sp_da_for(target->linkages, jt) {
           spn_linkage_set_add(&info.linkages, target->linkages[jt]);
         }
-        if (target_selects_shared(&info)) {
+        if (target_selects_shared(&info, query)) {
           return true;
         }
       }
@@ -148,7 +163,7 @@ static bool node_is_shared(spn_resolver_t* resolver, spn_resolved_pkg_t* node) {
       }
 
       sp_str_om_for(pkg->info->libs, it) {
-        if (target_selects_shared(sp_str_om_at(pkg->info->libs, it))) {
+        if (target_selects_shared(sp_str_om_at(pkg->info->libs, it), query)) {
           return true;
         }
       }
