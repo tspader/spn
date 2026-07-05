@@ -1906,6 +1906,82 @@ UTEST_F(resolver, backtrack_orphan_not_committed) {
   });
 }
 
+// An instance shared by two units must hold one pick per dep: lib 1.0.0
+// resolves math 1.9.0 in the root's scope and math 1.0.0 in the tool's, but
+// there is only one lib instance, and a single build can't link both
+UTEST_F(resolver, instance_holds_one_pick_per_dep) {
+  fixture_t fixture = {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "lib",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "tool",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = "=1.0.0" },
+              { .namespace = "spn", .name = "lib", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "math",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 9, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/math", .version = "^1.9.0" },
+        { .name = "spn/lib", .version = "^1.0.0" },
+        { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+  };
+
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  build_cache(mem, &fixture);
+
+  spn_event_buffer_t* events = spn_event_buffer_new(sp_mem_os_new());
+  spn_index_cache_t cache = sp_zero;
+  spn_pkg_registry_t registry = sp_zero;
+  spn_resolver_t resolver = sp_zero;
+  spn_resolver_init(&resolver, mem, spn.intern, &cache, &registry, events);
+
+  spn_resolve_query_t query = sp_zero;
+  spn_resolve_query_init(mem, &query);
+  build_query(&fixture, &query);
+
+  ASSERT_EQ(spn_resolve_from_solver(&resolver, &query), SPN_OK);
+
+  sp_ht_for_kv(query.result, it) {
+    spn_resolved_pkg_t* node = it.val;
+    sp_da_for(node->edges, a) {
+      sp_for(b, a) {
+        if (node->edges[a].id.qualified != node->edges[b].id.qualified) continue;
+        if (node->edges[a].kind != node->edges[b].kind) continue;
+        EXPECT_TRUE(spn_semver_eq(node->edges[a].id.version, node->edges[b].id.version));
+      }
+    }
+  }
+}
+
 // Each build dep roots its own process: two consumers with disjoint ranges on
 // one tool hold two instances instead of conflicting
 UTEST_F(resolver, build_dep_disjoint_tools_diverge) {
