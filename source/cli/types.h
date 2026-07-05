@@ -153,6 +153,7 @@ struct spn_cli {
   sp_str_t output;
   bool verbose;
   bool quiet;
+  u32 refresh;
 
   spn_cli_add_t add;
   spn_cli_update_t update;

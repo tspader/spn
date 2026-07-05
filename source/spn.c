@@ -112,13 +112,35 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.env = sp_alloc_type(spn.heap, sp_env_t);
   *spn.env = sp_env_capture(spn.heap);
 
+  sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
+
+  spn_cli_t* cli = &spn.cli;
+
+  sp_cli_t parsed = sp_cli_parse((sp_cli_desc_t) {
+    .root = spn_cli(),
+    .args = spn.args,
+    .num_args = spn.num_args,
+    .user_data = &spn.cli,
+  });
+
+  if (parsed.status == SP_CLI_HELP) {
+    sp_cli_write_help(&spn.logger.out.base, &parsed);
+    return SP_APP_QUIT;
+  }
+  if (parsed.status == SP_CLI_ERR) {
+    sp_fmt_io(&spn.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
+    sp_cli_err_print(&spn.logger.err.base, parsed.err);
+    sp_fmt_io(&spn.logger.err.base, "\n");
+    return SP_APP_ERR;
+  }
+
+
   spn.logger.level = SPN_LOG_LEVEL_INFO;
   sp_str_t log_level = sp_env_get(spn.env, sp_str_lit("SPN_LOG_LEVEL"));
   if (!sp_str_empty(log_level)) {
     spn.logger.level = spn_log_level_from_str(log_level);
   }
 
-  sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
   spn_tui_init(&spn.tui, &app.session, SPN_OUTPUT_MODE_INTERACTIVE);
 
@@ -204,6 +226,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       .url = sp_str_lit("https://github.com/tspader/spandex.git"),
       .protocol = SPN_INDEX_PROTOCOL_GIT,
       .kind = SPN_INDEX_BUILTIN,
+      .refresh = spn.cli.refresh ? spn.cli.refresh : 600
     }));
   }
 
@@ -309,26 +332,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   sp_mem_end_scratch(scratch);
-
-  spn_cli_t* cli = &spn.cli;
-
-  sp_cli_t parsed = sp_cli_parse((sp_cli_desc_t) {
-    .root = spn_cli(),
-    .args = spn.args,
-    .num_args = spn.num_args,
-    .user_data = &spn.cli,
-  });
-
-  if (parsed.status == SP_CLI_HELP) {
-    sp_cli_write_help(&spn.logger.out.base, &parsed);
-    return SP_APP_QUIT;
-  }
-  if (parsed.status == SP_CLI_ERR) {
-    sp_fmt_io(&spn.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
-    sp_cli_err_print(&spn.logger.err.base, parsed.err);
-    sp_fmt_io(&spn.logger.err.base, "\n");
-    return SP_APP_ERR;
-  }
 
   spn_cli_commit();
 

@@ -1,5 +1,6 @@
 #include "cli/cli.h"
 
+#include "cli/types.h"
 #include "ctx/types.h"
 
 static spn_cli_raw_t spn_cli_raw;
@@ -322,6 +323,14 @@ static sp_cli_cmd_t cmd_root = {
       .summary = "Only show errors",
       .ptr = &spn.cli.quiet,
     },
+  },
+  .env = {
+    {
+      .name = "SPN_INDEX_REFRESH_SECONDS",
+      .kind = SP_CLI_OPT_INTEGER,
+      .summary = "Number of seconds which must elapse before the index gets refreshed",
+      .ptr = &spn.cli.refresh
+    }
   },
   .commands = {
     &cmd_build,
