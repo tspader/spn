@@ -86,10 +86,23 @@ static void field_templates(field_t* field, sp_str_t* read, sp_str_t* write) {
     return;
   }
   if (field->card == CARD_ARRAY) {
-    bool object = field->kind == FIELD_STRUCT;
-    *read = object ? sp_str_lit("read/object_array") : sp_str_lit("read/str_array");
-    *write = object ? sp_str_lit("write/object_array") : sp_str_lit("write/str_array");
-    return;
+    switch (field->kind) {
+      case FIELD_STRUCT: {
+        *read = sp_str_lit("read/object_array");
+        *write = sp_str_lit("write/object_array");
+        return;
+      }
+      case FIELD_ENUM: {
+        *read = sp_str_lit("read/conv_array");
+        *write = sp_str_lit("write/conv_array");
+        return;
+      }
+      default: {
+        *read = sp_str_lit("read/str_array");
+        *write = sp_str_lit("write/str_array");
+        return;
+      }
+    }
   }
   if (field->card == CARD_MAP) {
     *read = sp_str_lit("read/map_field");
@@ -126,6 +139,7 @@ static void bind_field(gen_t* g, sp_template_scope_t* scope, field_t* field) {
   if (field->kind == FIELD_ENUM) {
     sp_template_set(scope, sp_str_lit("from"), sp_fmt(g->mem, "spn_{}_from_str", sp_fmt_str(field->type_name)).value);
     sp_template_set(scope, sp_str_lit("to"), sp_fmt(g->mem, "spn_{}_to_str", sp_fmt_str(field->type_name)).value);
+    sp_template_set(scope, sp_str_lit("type"), value_type(g, field));
   }
   if (field->kind == FIELD_STRUCT) {
     sp_template_set(scope, sp_str_lit("object"), field->type_name);

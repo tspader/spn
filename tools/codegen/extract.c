@@ -116,7 +116,10 @@ static bool extract_field(gen_t* g, type_t* type, jtd_property_t property) {
     return fail_form(g, type->name, property.key, target->form);
   }
 
-  if (field.card != CARD_SCALAR && field.kind != FIELD_STR && field.kind != FIELD_STRUCT) {
+  if (field.card == CARD_MAP && field.kind != FIELD_STR && field.kind != FIELD_STRUCT) {
+    return fail_form(g, type->name, property.key, target->form);
+  }
+  if (field.card == CARD_ARRAY && field.kind == FIELD_BOOL) {
     return fail_form(g, type->name, property.key, target->form);
   }
 

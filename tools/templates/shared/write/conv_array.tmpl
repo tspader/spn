@@ -1,0 +1,8 @@
+    sp_io_write_c8(out, '[');
+    sp_da_for(in->{{ .key }}, it) {
+      if (it) {
+        sp_io_write_c8(out, ',');
+      }
+      spn_codegen_json_str(out, {{ .to }}(in->{{ .key }}[it]));
+    }
+    sp_io_write_c8(out, ']');

@@ -293,7 +293,7 @@ static void lower_config(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, sp
   out->config = sp_da_new(ctx->mem, spn_pkg_config_entry_t);
   sp_da_for(cg->config, i) {
     spn_pkg_config_entry_t entry = { .key = cg->config[i].key };
-    if (!sp_opt_is_null(cg->config[i].value.kind)) {
+    if (!sp_opt_is_null(cg->config[i].value.kind) && sp_opt_get(cg->config[i].value.kind) != SPN_LIB_KIND_NONE) {
       sp_opt_set(entry.value.kind, sp_opt_get(cg->config[i].value.kind));
     }
     sp_da_push(out->config, entry);
