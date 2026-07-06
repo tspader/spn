@@ -107,6 +107,16 @@ typedef struct {
   spn_linkage_t kind;
 } config_kind_t;
 
+// Payload of the expected unsatisfiable event: selected set expects a
+// conflict against that version; selected unset expects a plain
+// no-version-in-range failure
+typedef struct {
+  const c8* namespace;
+  const c8* name;
+  const c8* requester;
+  const c8* selected;
+} expect_unsat_t;
+
 typedef struct {
   index_pkg_t index[8];
   struct {
@@ -117,6 +127,7 @@ typedef struct {
   u64 budget;
   spn_err_t err;
   spn_build_event_kind_t event;
+  expect_unsat_t unsat;
   expected_t expected[8];
   instance_count_t instances[8];
 } fixture_t;
@@ -401,6 +412,35 @@ static bool pushed_event(resolve_result_t* result, spn_build_event_kind_t kind) 
   return false;
 }
 
+static spn_build_event_t* find_event(resolve_result_t* result, spn_build_event_kind_t kind) {
+  sp_da_for(result->events, it) {
+    if (result->events[it].kind == kind) {
+      return &result->events[it];
+    }
+  }
+  return SP_NULLPTR;
+}
+
+static void assert_unsat_event(s32* utest_result, sp_mem_t mem, resolve_result_t* result, expect_unsat_t unsat) {
+  spn_build_event_t* event = find_event(result, SPN_EVENT_ERR_UNSATISFIABLE_VERSION);
+  ASSERT_TRUE(event != SP_NULLPTR);
+
+  sp_str_t qualified = spn_pkg_canonicalize_pair(sp_str_view(unsat.namespace), sp_str_view(unsat.name));
+  ASSERT_TRUE(sp_str_equal(event->unsatisfiable.request.qualified, qualified));
+
+  if (unsat.requester) {
+    ASSERT_TRUE(sp_str_equal(event->unsatisfiable.requester, sp_str_view(unsat.requester)));
+  }
+
+  if (unsat.selected) {
+    ASSERT_TRUE(event->unsatisfiable.conflict);
+    ASSERT_TRUE(sp_str_equal(spn_semver_to_str(mem, event->unsatisfiable.selected), sp_str_view(unsat.selected)));
+  }
+  else {
+    ASSERT_FALSE(event->unsatisfiable.conflict);
+  }
+}
+
 static sp_str_t instance_name(spn_resolve_query_t* query, sp_intern_id_t qualified) {
   if (!qualified) return sp_str_lit("");
 
@@ -501,6 +541,11 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
     ASSERT_TRUE(pushed_event(&canonical, fixture.event));
   }
 
+  if (fixture.unsat.name) {
+    assert_unsat_event(utest_result, mem, &canonical, fixture.unsat);
+    if (*utest_result) return;
+  }
+
   // Picks may never depend on intern state: resolve against perturbed interns
   // and require structurally identical results every round
   for (u32 round = 0; round < 8; round++) {
@@ -508,6 +553,10 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
     ASSERT_EQ(shaken.err, canonical.err);
     if (fixture.event) {
       ASSERT_TRUE(pushed_event(&shaken, fixture.event));
+    }
+    if (fixture.unsat.name) {
+      assert_unsat_event(utest_result, mem, &shaken, fixture.unsat);
+      if (*utest_result) return;
     }
     if (canonical.err == SPN_OK) {
       assert_resolves_equal(utest_result, &canonical.query, &shaken.query);
@@ -1233,6 +1282,51 @@ UTEST_F(resolver, version_no_match) {
     },
     .err = SPN_ERROR,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+    .unsat = { .namespace = "spn", .name = "math", .requester = "test/root" },
+  });
+}
+
+// A conflict is reported as a conflict: the failure names the version the
+// scope already selected and who issued the losing request, never "no
+// version satisfies" when satisfying versions exist
+UTEST_F(resolver, conflict_reports_selected) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "audio",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = "^2.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "math",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/math", .version = "^1.0.0" },
+        { .name = "spn/audio", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_ERROR,
+    .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+    .unsat = {
+      .namespace = "spn",
+      .name = "math",
+      .requester = "spn/audio",
+      .selected = "1.0.0",
+    },
   });
 }
 
