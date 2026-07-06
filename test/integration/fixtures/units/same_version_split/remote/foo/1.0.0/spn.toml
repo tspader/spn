@@ -1,0 +1,12 @@
+[package]
+name = "foo"
+version = "1.0.0"
+
+[deps.package]
+num = ">=1.0.0"
+
+[[lib]]
+name = "foo"
+kinds = ["static"]
+source = ["foo.c"]
+headers = ["foo.h"]

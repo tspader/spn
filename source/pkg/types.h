@@ -40,8 +40,9 @@ typedef struct {
   sp_str_t name;
 } spn_pkg_name_t;
 
-typedef struct {
+typedef struct SP_ALIGNED {
   sp_intern_id_t qualified;
+  sp_hash_t hash;
   spn_semver_t version;
 } spn_pkg_id_t;
 

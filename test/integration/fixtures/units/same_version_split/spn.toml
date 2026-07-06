@@ -1,0 +1,14 @@
+[package]
+name = "units_same_version_split"
+version = "0.1.0"
+
+[deps.package]
+foo = "1.0.0"
+num = "2.0.0"
+
+[deps.build]
+tool = "1.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

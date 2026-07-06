@@ -1,0 +1,13 @@
+[package]
+name = "tool"
+version = "1.0.0"
+
+[deps.package]
+num = "1.0.0"
+foo = "1.0.0"
+
+[[lib]]
+name = "tool"
+kinds = ["static"]
+source = ["tool.c"]
+headers = ["tool.h"]

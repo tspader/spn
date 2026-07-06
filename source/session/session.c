@@ -33,6 +33,7 @@ sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pk
 
 typedef struct {
   sp_hash_t commit;
+  sp_hash_t subtree;
   spn_semver_t version;
   spn_build_mode_t mode;
   spn_linkage_t linkage;
@@ -57,12 +58,13 @@ typedef struct {
 } fingerprint_t;
 
 
-fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_info_t* pkg) {
+fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_id_t id, spn_pkg_info_t* pkg) {
   spn_pkg_metadata_t* metadata = sp_ht_getp(pkg->metadata, pkg->version);
   sp_assert(metadata);
 
   fingerprint_input_t fingerprint = SP_ZERO_INITIALIZE();
   fingerprint.commit = sp_hash_str(metadata->commit);
+  fingerprint.subtree = id.hash;
   fingerprint.version = metadata->version;
 
   bool compiled = sp_str_om_size(pkg->libs) > 0 || sp_str_om_size(pkg->exes) > 0;
@@ -85,10 +87,10 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_info_t* pkg) {
     }
   }
 
-  fingerprint_t id = SP_ZERO_INITIALIZE();
-  id.hash = sp_hash_bytes(&fingerprint, sizeof(fingerprint), 0);
-  id.str = sp_fmt(session->mem, "{:0>16x}", sp_fmt_uint(id.hash)).value;
-  return id;
+  fingerprint_t result = SP_ZERO_INITIALIZE();
+  result.hash = sp_hash_bytes(&fingerprint, sizeof(fingerprint), 0);
+  result.str = sp_fmt(session->mem, "{:0>16x}", sp_fmt_uint(result.hash)).value;
+  return result;
 }
 
 spn_pkg_unit_t* spn_session_find_pkg_by_id(spn_session_t* session, spn_pkg_id_t id) {
@@ -124,9 +126,12 @@ spn_target_unit_t* spn_session_find_target_in_pkg(spn_session_t* session, spn_pk
 }
 
 spn_pkg_unit_t* spn_session_find_root(spn_session_t* s) {
-  spn_pkg_id_t id = spn_pkg_id(s->intern, s->pkg->qualified);
-  id.version = s->pkg->version;
-  return spn_session_find_pkg_by_id(s, id);
+  sp_ht_for_kv(s->resolve, it) {
+    if (it.val->source == SPN_PKG_SOURCE_ROOT && sp_str_equal(it.val->qualified, s->pkg->qualified)) {
+      return spn_session_find_pkg_by_id(s, it.val->id);
+    }
+  }
+  return SP_NULLPTR;
 }
 
 sp_da(spn_pkg_dep_t) spn_session_pkg_deps(spn_session_t* session, spn_pkg_unit_t* pkg) {
@@ -213,9 +218,9 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_pkg_id_t id, spn
       break;
     }
     case SPN_PKG_SOURCE_INDEX: {
-      fingerprint_t id = fingerprint_package(session, loaded->info);
-      unit->paths.work = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, spn.paths.build, loaded->info->qualified), id.str);
-      unit->paths.store = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, spn.paths.store, loaded->info->qualified), id.str);
+      fingerprint_t fingerprint = fingerprint_package(session, id, loaded->info);
+      unit->paths.work = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, spn.paths.build, loaded->info->qualified), fingerprint.str);
+      unit->paths.store = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, spn.paths.store, loaded->info->qualified), fingerprint.str);
       break;
     }
   }
