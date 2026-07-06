@@ -14,5 +14,6 @@ function(spn_test_binary target)
 endfunction()
 
 add_subdirectory(core)
+add_subdirectory(fuzz)
 add_subdirectory(integration)
 add_subdirectory(e2e)

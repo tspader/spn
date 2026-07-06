@@ -1,4 +1,4 @@
-add_executable(resolver
+add_executable(fuzz_resolver
   ${SRC}/ctx/ctx.c
   ${SRC}/intern/context.c
   ${SRC}/intern/intern.c
@@ -31,14 +31,15 @@ add_executable(resolver
   ${SRC}/target/select.c
   ${SRC}/toolchain/toolchain.c
   main.c
-  ${TEST_TOOLS}/ctx.c
+  generator.c
+  oracles/exhaustive.c
+  checkers/solve.c
+  dump.c
   ${TEST_TOOLS}/sp_fuzz.c
-  ${TEST_TOOLS}/tmp.c
-  ${TEST_TOOLS}/git.c
   ${TEST_TOOLS}/toml.c
 )
-spn_test_binary(resolver)
-target_include_directories(resolver PRIVATE ${SRC}/codegen/gen)
-target_link_libraries(resolver PRIVATE yyjson)
-add_dependencies(resolver spn_codegen_gen)
-add_test(NAME resolver COMMAND "$<TARGET_FILE:resolver>")
+spn_test_binary(fuzz_resolver)
+target_include_directories(fuzz_resolver PRIVATE ${SRC}/codegen/gen ${CMAKE_SOURCE_DIR}/tools ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(fuzz_resolver PRIVATE yyjson)
+add_dependencies(fuzz_resolver spn_codegen_gen)
+add_test(NAME fuzz_resolver COMMAND "$<TARGET_FILE:fuzz_resolver>")

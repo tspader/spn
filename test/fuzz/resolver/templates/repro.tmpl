@@ -1,0 +1,33 @@
+fuzz repro: mode={{.mode}} iter={{.iter}} (replay: SPN_FUZZ_ITER={{.iter}}, seed printed above)
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+{{for .pkgs}}
+      {
+        .namespace = "spn",
+        .name = "{{.name}}",
+        .releases = {
+{{for .releases}}
+          {
+            .version = spn_semver_lit({{.version}}),
+{{for .with_deps}}
+            .deps = {
+{{for .deps}}
+              { .namespace = "spn", .name = "{{.name}}", .version = "{{.range}}" },
+{{end}}
+            }
+{{end}}
+          },
+{{end}}
+        }
+      },
+{{end}}
+    },
+    .manifest = {
+      .deps.package = {
+{{for .roots}}
+        { .name = "spn/{{.name}}", .version = "{{.range}}" },
+{{end}}
+      }
+    },
+    .err = {{.err}},
+  });
