@@ -174,3 +174,18 @@ UTEST_F(units, same_version_split) {
     },
   });
 }
+
+// The root declares c >=1.0.0 before a ^1.0.0, and a needs c ^1.0.0. The
+// greedy c 2.0.0 pick leaves a unsatisfiable even though c 1.9.0 satisfies
+// both; declaring a before c resolves, so the build hinges on manifest order.
+UTEST_F(units, sibling_order) {
+  tmpfs_init_named(&uf->fixture.fs, "units_sibling_order");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/units/sibling_order",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+    },
+  });
+}
