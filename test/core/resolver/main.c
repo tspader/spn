@@ -12,7 +12,7 @@
 
 #include "error/types.h"
 #include "event/event.h"
-#include "fuzz.h"
+#include "sp_fuzz.h"
 #include "index/cache.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
@@ -32,7 +32,7 @@ s32 main(s32 argc, const c8** argv) {
   ctx_init(ctx_get());
 
   spn.intern = sp_intern_new(sp_mem_os_new());
-  fuzz_seed_init();
+  sp_fuzz_seed_init();
 
   s32 result = utest_main(argc, argv);
 
@@ -531,7 +531,7 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
   build_cache(mem, &fixture);
 
   sp_da(sp_str_t) names = fixture_names(mem, &fixture);
-  prng_t prng = fuzz_stream(names);
+  sp_fuzz_prng_t prng = sp_fuzz_stream(names);
 
   sp_intern_t* intern = sp_intern_new(sp_mem_os_new());
   resolve_result_t canonical = execute_fixture(&fixture, intern);
@@ -549,7 +549,7 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
   // Picks may never depend on intern state: resolve against perturbed interns
   // and require structurally identical results every round
   for (u32 round = 0; round < 8; round++) {
-    resolve_result_t shaken = execute_fixture(&fixture, fuzz_perturbed_intern(&prng, names));
+    resolve_result_t shaken = execute_fixture(&fixture, sp_fuzz_perturbed_intern(&prng, names));
     ASSERT_EQ(shaken.err, canonical.err);
     if (fixture.event) {
       ASSERT_TRUE(pushed_event(&shaken, fixture.event));
