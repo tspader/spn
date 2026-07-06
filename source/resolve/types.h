@@ -11,20 +11,17 @@
 #include "semver/types.h"
 #include "session/registry/types.h"
 
-// A link unit is one final linked artifact and everything resolved into it: an
-// executable, a shared library, or a build-time tool. The zero value is the
-// root unit. Packages resolve per-unit; two units may hold the same package at
-// different versions.
-typedef struct {
-  sp_intern_id_t root;
-  spn_triple_t triple;
-} spn_link_unit_id_t;
+typedef enum {
+  SPN_DEP_EDGE_SCOPE,
+  SPN_DEP_EDGE_PROCESS,
+  SPN_DEP_EDGE_PRIVATE,
+  SPN_DEP_EDGE_PRUNED,
+} spn_dep_edge_t;
 
-// A resolved dep edge, materialized to the exact instance the dependency
-// resolved to in the consumer's scope
 typedef struct {
   spn_pkg_id_t id;
   spn_dep_kind_t kind;
+  spn_dep_edge_t edge;
   bool private;
 } spn_resolved_dep_t;
 
@@ -36,7 +33,6 @@ typedef struct {
   u64 priority;
   sp_da(spn_requested_pkg_t) deps;
   sp_da(spn_resolved_dep_t) edges;
-  sp_da(spn_link_unit_id_t) units;
   union {
     struct { spn_index_rel_t* release; } index;
     struct { sp_str_t path; } file;

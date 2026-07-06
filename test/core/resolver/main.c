@@ -82,12 +82,16 @@ typedef struct {
 } manifest_deps_t;
 
 // unit names which unit the package must be a member of: NULL is any unit, ""
-// is the root unit, and a qualified name is the unit rooted at that request
+// is the root unit, and a qualified name is the unit rooted at that request.
+// unit_version narrows the unit to the one rooted at that exact instance;
+// excluded flips the assertion to require the package NOT be a member
 typedef struct {
   const c8* name;
   const c8* namespace;
   spn_semver_t version;
   const c8* unit;
+  spn_semver_t unit_version;
+  bool excluded;
 } expected_t;
 
 // asserts how many instances (distinct versions) of a package the resolve
@@ -223,38 +227,125 @@ static void build_cache(sp_mem_t mem, fixture_t* fixture) {
   }
 }
 
-static void build_query(fixture_t* fixture, spn_resolve_query_t* query) {
+static const c8* root_qualified = "test/root";
+
+// The fixture manifest becomes a real root package, like production's
+// add_root: the root unit is the closure from the root package's node
+static spn_pkg_info_t* build_root(sp_mem_t mem, fixture_t* fixture) {
+  spn_pkg_info_t* info = (spn_pkg_info_t*)sp_alloc(mem, sizeof(spn_pkg_info_t));
+  *info = sp_zero_s(spn_pkg_info_t);
+  info->namespace = sp_str_lit("test");
+  info->name = sp_str_lit("root");
+  info->qualified = sp_str_view(root_qualified);
+  info->version = spn_semver_lit(0, 0, 1);
+  sp_da_init(mem, info->deps);
+
   sp_carr_for(fixture->manifest.deps.package, i) {
     manifest_dep_t* dep = &fixture->manifest.deps.package[i];
     if (!dep->name) break;
 
-    spn_resolve_query_add(query, (spn_requested_pkg_t) {
+    sp_da_push(info->deps, ((spn_requested_pkg_t) {
       .qualified = spn_pkg_canonicalize_name(sp_str_view(dep->name)),
       .source = SPN_PKG_SOURCE_INDEX,
       .kind = dep->kind,
       .private = dep->private,
       .index.range = spn_semver_parse_range(sp_str_view(dep->version)),
-    });
+    }));
   }
+
+  return info;
 }
 
-static bool resolved_in_unit(sp_intern_t* intern, spn_resolved_pkg_t* pkg, const c8* unit) {
+static bool id_eq(spn_pkg_id_t a, spn_pkg_id_t b) {
+  return a.qualified == b.qualified && spn_semver_eq(a.version, b.version);
+}
+
+static bool semver_zero(spn_semver_t version) {
+  return !version.major && !version.minor && !version.patch;
+}
+
+static bool closure_holds(sp_mem_t mem, spn_resolve_query_t* query, sp_da(spn_pkg_id_t) roots, spn_resolved_pkg_t* pkg) {
+  sp_da(spn_pkg_id_t) work = sp_da_new(mem, spn_pkg_id_t);
+  sp_da(spn_pkg_id_t) seen = sp_da_new(mem, spn_pkg_id_t);
+  sp_da_for(roots, it) {
+    sp_da_push(work, roots[it]);
+  }
+
+  while (!sp_da_empty(work)) {
+    spn_pkg_id_t id = *sp_da_back(work);
+    sp_da_pop(work);
+
+    bool visited = false;
+    sp_da_for(seen, it) {
+      if (id_eq(seen[it], id)) {
+        visited = true;
+        break;
+      }
+    }
+    if (visited) continue;
+    sp_da_push(seen, id);
+
+    if (id_eq(id, pkg->id)) return true;
+
+    spn_resolved_pkg_t* node = sp_ht_getp(query->result, id);
+    if (!node) continue;
+    sp_da_for(node->edges, it) {
+      if (node->edges[it].edge == SPN_DEP_EDGE_SCOPE) {
+        sp_da_push(work, node->edges[it].id);
+      }
+    }
+  }
+
+  return false;
+}
+
+// Membership is derived, never stored: an instance is in a unit iff it is
+// reachable from that unit's boundary through scope edges. The root unit is
+// rooted at the root package; a process unit at the target of a build/test
+// edge; a private unit at the private edge targets of its owning instance.
+static bool resolved_in_unit(spn_resolve_query_t* query, spn_resolved_pkg_t* pkg, const c8* unit, spn_semver_t unit_version) {
   if (!unit) return true;
 
-  sp_intern_id_t root = 0;
-  if (*unit) {
-    root = sp_intern_get_or_insert(intern, spn_pkg_canonicalize_name(sp_str_view(unit)));
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  sp_da(spn_pkg_id_t) roots = sp_da_new(mem, spn_pkg_id_t);
+
+  if (!*unit) {
+    sp_ht_for_kv(query->result, it) {
+      if (sp_str_equal(it.val->qualified, sp_str_view(root_qualified))) {
+        sp_da_push(roots, it.val->id);
+      }
+    }
+  }
+  else {
+    sp_str_t name = spn_pkg_canonicalize_name(sp_str_view(unit));
+    sp_ht_for_kv(query->result, it) {
+      spn_resolved_pkg_t* owner = it.val;
+      sp_da_for(owner->edges, et) {
+        spn_resolved_dep_t* edge = &owner->edges[et];
+        switch (edge->edge) {
+          case SPN_DEP_EDGE_PROCESS: {
+            spn_resolved_pkg_t* target = sp_ht_getp(query->result, edge->id);
+            if (!target || !sp_str_equal(target->qualified, name)) break;
+            if (!semver_zero(unit_version) && !spn_semver_eq(target->version, unit_version)) break;
+            sp_da_push(roots, edge->id);
+            break;
+          }
+          case SPN_DEP_EDGE_PRIVATE: {
+            if (!sp_str_equal(owner->qualified, name)) break;
+            if (!semver_zero(unit_version) && !spn_semver_eq(owner->version, unit_version)) break;
+            sp_da_push(roots, edge->id);
+            break;
+          }
+          case SPN_DEP_EDGE_SCOPE:
+          case SPN_DEP_EDGE_PRUNED: {
+            break;
+          }
+        }
+      }
+    }
   }
 
-  // A package with no explicit memberships belongs to the root unit
-  if (sp_da_empty(pkg->units)) {
-    return root == 0;
-  }
-
-  sp_da_for(pkg->units, it) {
-    if (pkg->units[it].root == root) return true;
-  }
-  return false;
+  return closure_holds(mem, query, roots, pkg);
 }
 
 typedef struct {
@@ -278,12 +369,23 @@ static resolve_result_t execute_fixture(fixture_t* fixture, sp_intern_t* intern)
   spn_event_buffer_t* events = spn_event_buffer_new(sp_mem_os_new());
   spn_index_cache_t cache = sp_zero;
   spn_pkg_registry_t registry = sp_zero;
+  sp_ht_init(mem, registry);
+
+  spn_pkg_info_t* root = build_root(mem, fixture);
+  sp_ht_insert(registry, spn_pkg_id(intern, root->qualified), ((spn_registry_pkg_t) {
+    .source = SPN_PKG_SOURCE_ROOT,
+    .info = root,
+  }));
+
   spn_resolver_t resolver = sp_zero;
   spn_resolver_init(&resolver, mem, intern, &cache, &registry, events, fixture->linkage, config, fixture->budget);
 
   resolve_result_t result = sp_zero_s(resolve_result_t);
   spn_resolve_query_init(mem, &result.query);
-  build_query(fixture, &result.query);
+  spn_resolve_query_add(&result.query, (spn_requested_pkg_t) {
+    .qualified = sp_str_view(root_qualified),
+    .source = SPN_PKG_SOURCE_ROOT,
+  });
 
   result.err = spn_resolve_from_solver(&resolver, &result.query);
   result.events = spn_event_buffer_drain(mem, events);
@@ -338,26 +440,6 @@ static void assert_resolves_equal(s32* utest_result, spn_resolve_query_t* a, spn
     ASSERT_TRUE(pb != SP_NULLPTR);
     sp_da_push(claimed, pb);
 
-    ASSERT_EQ(sp_da_size(pa->units), sp_da_size(pb->units));
-    sp_da(u8) unit_used = sp_da_new(mem, u8);
-    sp_da_for(pb->units, vt) {
-      sp_da_push(unit_used, 0);
-    }
-    sp_da_for(pa->units, kt) {
-      sp_str_t unit = instance_name(a, pa->units[kt].root);
-
-      bool matched = false;
-      sp_da_for(pb->units, vt) {
-        if (unit_used[vt]) continue;
-        if (sp_str_equal(instance_name(b, pb->units[vt].root), unit)) {
-          unit_used[vt] = 1;
-          matched = true;
-          break;
-        }
-      }
-      ASSERT_TRUE(matched);
-    }
-
     ASSERT_EQ(sp_da_size(pa->edges), sp_da_size(pb->edges));
     sp_da(u8) edge_used = sp_da_new(mem, u8);
     sp_da_for(pb->edges, ft) {
@@ -374,6 +456,7 @@ static void assert_resolves_equal(s32* utest_result, spn_resolve_query_t* a, spn
         if (!sp_str_equal(instance_name(b, eb->id.qualified), target)) continue;
         if (!spn_semver_eq(eb->id.version, ea->id.version)) continue;
         if (eb->kind != ea->kind) continue;
+        if (eb->edge != ea->edge) continue;
         if (eb->private != ea->private) continue;
         edge_used[ft] = 1;
         matched = true;
@@ -387,6 +470,7 @@ static void assert_resolves_equal(s32* utest_result, spn_resolve_query_t* a, spn
 static sp_da(sp_str_t) fixture_names(sp_mem_t mem, fixture_t* fixture) {
   sp_da(sp_str_t) names = sp_da_new(mem, sp_str_t);
   sp_da_push(names, sp_str_lit(""));
+  sp_da_push(names, sp_str_view(root_qualified));
 
   sp_carr_for(fixture->index, it) {
     if (!fixture->index[it].name) break;
@@ -447,11 +531,15 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
       spn_resolved_pkg_t* pkg = jt.val;
       if (!sp_str_equal(pkg->qualified, qualified)) continue;
       if (!spn_semver_eq(pkg->version, expected.version)) continue;
-      if (!resolved_in_unit(intern, pkg, expected.unit)) continue;
+      if (!resolved_in_unit(&query, pkg, expected.unit, expected.unit_version)) continue;
       found = true;
       break;
     }
-    ASSERT_TRUE(found);
+    if (expected.excluded) {
+      ASSERT_FALSE(found);
+    } else {
+      ASSERT_TRUE(found);
+    }
   }
 
   sp_carr_for(fixture.instances, it) {
@@ -2727,8 +2815,10 @@ UTEST_F(resolver, private_scopes_per_instance) {
     .expected = {
       { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
       { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
-      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/gfx" },
-      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gfx" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/gfx", .unit_version = spn_semver_lit(2, 0, 0) },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gfx", .unit_version = spn_semver_lit(1, 0, 0) },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/gfx", .unit_version = spn_semver_lit(1, 0, 0), .excluded = true },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gfx", .unit_version = spn_semver_lit(2, 0, 0), .excluded = true },
     },
     .instances = {
       { .name = "spn/gfx", .count = 2 },

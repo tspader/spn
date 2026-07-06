@@ -17,13 +17,6 @@
 #include "target/select.h"
 #include "spn.h"
 
-typedef enum {
-  SPN_DEP_EDGE_SCOPE,
-  SPN_DEP_EDGE_PROCESS,
-  SPN_DEP_EDGE_PRIVATE,
-  SPN_DEP_EDGE_PRUNED,
-} spn_dep_edge_t;
-
 typedef struct {
   spn_pkg_id_t from;
   spn_dep_edge_t edge;
@@ -36,7 +29,7 @@ typedef struct {
 } spn_pin_t;
 
 typedef struct {
-  spn_link_unit_id_t id;
+  sp_intern_id_t root;
   spn_pkg_id_t from;
   sp_da(spn_requested_pkg_t) reqs;
   u64 cursor;
@@ -253,7 +246,7 @@ static bool find_pin(spn_scope_t* scope, sp_intern_id_t name, spn_semver_t* vers
 
 static spn_scope_t* find_scope(spn_resolve_run_t* run, sp_intern_id_t root, spn_pkg_id_t from) {
   sp_da_for(run->scopes, it) {
-    if (run->scopes[it].id.root == root && pkg_id_eq(run->scopes[it].from, from)) {
+    if (run->scopes[it].root == root && pkg_id_eq(run->scopes[it].from, from)) {
       return &run->scopes[it];
     }
   }
@@ -262,13 +255,13 @@ static spn_scope_t* find_scope(spn_resolve_run_t* run, sp_intern_id_t root, spn_
 
 static u32 find_or_create_scope(spn_resolver_t* resolver, spn_resolve_run_t* run, sp_intern_id_t root, spn_pkg_id_t from) {
   sp_da_for(run->scopes, it) {
-    if (run->scopes[it].id.root == root && pkg_id_eq(run->scopes[it].from, from)) {
+    if (run->scopes[it].root == root && pkg_id_eq(run->scopes[it].from, from)) {
       return (u32)it;
     }
   }
 
   spn_scope_t scope = {
-    .id = { .root = root },
+    .root = root,
     .from = from,
   };
   sp_da_init(resolver->mem, scope.reqs);
@@ -797,23 +790,8 @@ static void commit_scope(spn_resolver_t* resolver, spn_resolve_run_t* run) {
   spn_scope_t* scope = &run->scopes[run->scope];
 
   sp_ht_for_kv(scope->named, it) {
-    spn_resolved_pkg_t* instance = sp_ht_getp(run->query->result, it.val->id);
-    if (!instance) {
-      spn_resolved_pkg_t copy = *it.val;
-      sp_da_init(resolver->mem, copy.units);
-      sp_ht_insert(run->query->result, copy.id, copy);
-      instance = sp_ht_getp(run->query->result, copy.id);
-    }
-
-    bool member = false;
-    sp_da_for(instance->units, jt) {
-      if (instance->units[jt].root == scope->id.root) {
-        member = true;
-        break;
-      }
-    }
-    if (!member) {
-      sp_da_push(instance->units, scope->id);
+    if (!sp_ht_getp(run->query->result, it.val->id)) {
+      sp_ht_insert(run->query->result, it.val->id, *it.val);
     }
   }
 }
@@ -944,6 +922,7 @@ static void materialize_edges(spn_resolver_t* resolver, spn_resolve_run_t* run) 
           sp_da_push(instance->edges, ((spn_resolved_dep_t) {
             .id = target->id,
             .kind = dep->kind,
+            .edge = edge,
             .private = dep->private,
           }));
         }
