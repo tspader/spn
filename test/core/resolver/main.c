@@ -257,7 +257,7 @@ static spn_pkg_info_t* build_root(sp_mem_t mem, fixture_t* fixture) {
 }
 
 static bool id_eq(spn_pkg_id_t a, spn_pkg_id_t b) {
-  return a.qualified == b.qualified && spn_semver_eq(a.version, b.version);
+  return a.qualified == b.qualified && spn_semver_eq(a.version, b.version) && a.hash == b.hash;
 }
 
 static bool semver_zero(spn_semver_t version) {
@@ -432,15 +432,13 @@ static void assert_resolves_equal(s32* utest_result, spn_resolve_query_t* a, spn
       }
       if (taken) continue;
 
-      if (sp_str_equal(jt.val->qualified, pa->qualified) && spn_semver_eq(jt.val->version, pa->version)) {
+      if (sp_str_equal(jt.val->qualified, pa->qualified) && spn_semver_eq(jt.val->version, pa->version) && jt.val->id.hash == pa->id.hash) {
         pb = jt.val;
         break;
       }
     }
     ASSERT_TRUE(pb != SP_NULLPTR);
     sp_da_push(claimed, pb);
-
-    ASSERT_EQ(pa->id.hash, pb->id.hash);
 
     ASSERT_EQ(sp_da_size(pa->edges), sp_da_size(pb->edges));
     sp_da(u8) edge_used = sp_da_new(mem, u8);
@@ -3102,4 +3100,1239 @@ UTEST_F(resolver, hash_tracks_build_subtree) {
   ASSERT_TRUE(a != 0);
   ASSERT_TRUE(b != 0);
   ASSERT_NE(a, b);
+}
+
+/////////////////
+// CONVERGENCE //
+/////////////////
+
+// Two sibling tools both pin math to the same older version, so each ends up
+// holding lib 1.0.0 over math 1.0.0. Identical resolved subtrees must collapse
+// to ONE split instance shared by both tool units, never one per group: two
+// lib instances total (the root's over math 1.9.0 plus one shared split),
+// never three
+UTEST_F(resolver, split_instances_reconverge) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "lib",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "t1",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = "=1.0.0" },
+              { .namespace = "spn", .name = "lib", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "t2",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = "=1.0.0" },
+              { .namespace = "spn", .name = "lib", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "math",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 9, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/math", .version = "^1.0.0" },
+        { .name = "spn/lib", .version = "^1.0.0" },
+        { .name = "spn/t1", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+        { .name = "spn/t2", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
+      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/t1" },
+      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/t2" },
+      { .name = "lib", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
+      { .name = "lib", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/t1" },
+      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/t1", .excluded = true },
+    },
+    .instances = {
+      { .name = "spn/lib", .count = 2 },
+      { .name = "spn/math", .count = 2 },
+      { .name = "spn/t1", .count = 1 },
+      { .name = "spn/t2", .count = 1 },
+    },
+  });
+}
+
+// The tool pins c older, so the divergence propagates up the chain: a and b
+// hold their root versions but over a different c subtree, splitting BOTH at
+// the same version purely transitively
+UTEST_F(resolver, split_propagates_through_middle) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "b", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "b",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "c", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "c",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 9, 0) },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "tool",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "c", .version = "=1.0.0" },
+              { .namespace = "spn", .name = "a", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/a", .version = "^1.0.0" },
+        { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "b", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/tool", .excluded = true },
+    },
+    .instances = {
+      { .name = "spn/a", .count = 2 },
+      { .name = "spn/b", .count = 2 },
+      { .name = "spn/c", .count = 2 },
+      { .name = "spn/tool", .count = 1 },
+    },
+  });
+}
+
+// The kept pin set is the lexicographically-first feasible subset of the
+// inherited table [a@1, b@1, c@1]. Keeping a@1 forces x 1.0.0, which excludes
+// b@1 (drops, splits to b 2.0.0) and never requests c (c@1 holds vacuously).
+// A newest-first solve would take x 1.2.0 and split a instead
+UTEST_F(resolver, pin_walk_lexicographic_subset) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "b",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "c",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "x",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "a", .version = "=1.0.0" },
+              { .namespace = "spn", .name = "b", .version = "=2.0.0" },
+            }
+          },
+          {
+            .version = spn_semver_lit(1, 1, 0),
+            .deps = {
+              { .namespace = "spn", .name = "a", .version = "=2.0.0" },
+              { .namespace = "spn", .name = "b", .version = "=1.0.0" },
+              { .namespace = "spn", .name = "c", .version = "=2.0.0" },
+            }
+          },
+          {
+            .version = spn_semver_lit(1, 2, 0),
+            .deps = {
+              { .namespace = "spn", .name = "a", .version = "=2.0.0" },
+              { .namespace = "spn", .name = "b", .version = "=2.0.0" },
+              { .namespace = "spn", .name = "c", .version = "=1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "tool",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "x", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/a", .version = "=1.0.0" },
+        { .name = "spn/b", .version = "=1.0.0" },
+        { .name = "spn/c", .version = "=1.0.0" },
+        { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "x", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "b", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/tool" },
+      { .name = "b", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool", .excluded = true },
+      { .name = "b", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool", .excluded = true },
+    },
+    .instances = {
+      { .name = "spn/a", .count = 1 },
+      { .name = "spn/b", .count = 2 },
+      { .name = "spn/c", .count = 1 },
+      { .name = "spn/x", .count = 1 },
+    },
+  });
+}
+
+// convergence_forces_older_sibling, two levels down: keeping the root's foo
+// pick is only satisfiable via older choices at BOTH transitive levels below
+// the tool's request (mid 1.0.0 instead of 1.1.0, bar 1.0.0 instead of 2.0.0)
+UTEST_F(resolver, convergence_forces_older_transitive) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 9, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "bar",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^1.0.0" },
+            }
+          },
+          {
+            .version = spn_semver_lit(2, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^2.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "mid",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "bar", .version = "^1.0.0" },
+            }
+          },
+          {
+            .version = spn_semver_lit(1, 1, 0),
+            .deps = {
+              { .namespace = "spn", .name = "bar", .version = "^2.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "tool",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "mid", .version = ">=1.0.0" },
+            }
+          },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/foo", .version = "^1.0.0" },
+        { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/tool" },
+      { .name = "mid", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "bar", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "mid", .namespace = "spn", .version = spn_semver_lit(1, 1, 0), .excluded = true },
+      { .name = "bar", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .excluded = true },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .excluded = true },
+    },
+    .instances = {
+      { .name = "spn/foo", .count = 1 },
+      { .name = "spn/bar", .count = 1 },
+      { .name = "spn/mid", .count = 1 },
+    },
+  });
+}
+
+// A tool's tool: tb is a build dep two process boundaries deep. Only tb's
+// unit may split foo; the middle tool converges with the root's pick
+UTEST_F(resolver, nested_tool_splits_only_inner) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "app",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "ta", .version = "^1.0.0", .kind = SPN_INDEX_DEP_BUILD },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "ta",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^1.0.0" },
+              { .namespace = "spn", .name = "tb", .version = "^1.0.0", .kind = SPN_INDEX_DEP_BUILD },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "tb",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "=1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 9, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/app", .version = "^1.0.0" },
+        { .name = "spn/foo", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/ta" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tb" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "", .excluded = true },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/ta", .excluded = true },
+    },
+    .instances = {
+      { .name = "spn/foo", .count = 2 },
+      { .name = "spn/ta", .count = 1 },
+      { .name = "spn/tb", .count = 1 },
+    },
+  });
+}
+
+// Privacy nests: inner is private to gfx, leaf is private to inner. Two
+// shared boundaries deep, leaf may still diverge from the root's pick, and
+// neither inner nor its leaf leaks into the root unit
+UTEST_F(resolver, private_inside_private_diverges) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "gfx",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "inner", .version = "^1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "gfx", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "inner",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "leaf", .version = "^1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "inner", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "leaf",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/gfx", .version = "^1.0.0" },
+        { .name = "spn/leaf", .version = "^2.0.0" },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "leaf", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
+      { .name = "inner", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gfx" },
+      { .name = "leaf", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/inner" },
+      { .name = "inner", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "", .excluded = true },
+      { .name = "leaf", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "", .excluded = true },
+    },
+    .instances = {
+      { .name = "spn/leaf", .count = 2 },
+      { .name = "spn/inner", .count = 1 },
+      { .name = "spn/gfx", .count = 1 },
+    },
+  });
+}
+
+// Nested privacy can't dodge the loader: leaf only builds shared, so the
+// root's leaf 2.0.0 and inner's private leaf 1.0.0 both load into the root
+// process regardless of being two private boundaries deep
+UTEST_F(resolver, private_inside_private_dynamic_dup_fails) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "gfx",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "inner", .version = "^1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "gfx", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "inner",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "leaf", .version = "^1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "inner", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "leaf",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0), .targets = { { .name = "leaf", .linkages = { SPN_LIB_KIND_SHARED } } } },
+          { .version = spn_semver_lit(2, 0, 0), .targets = { { .name = "leaf", .linkages = { SPN_LIB_KIND_SHARED } } } },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/gfx", .version = "^1.0.0" },
+        { .name = "spn/leaf", .version = "^2.0.0" },
+      }
+    },
+    .err = SPN_ERROR,
+    .event = SPN_EVENT_ERR_DYNAMIC_DUPLICATE,
+  });
+}
+
+// A build dep discovered inside a shared lib's private subtree still roots
+// its own process: the tool may take a foo the root's pick excludes, and that
+// foo never enters gfx's private unit
+UTEST_F(resolver, build_dep_inside_private_diverges) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "gfx",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "bar", .version = "^1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "gfx", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "bar",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "tool", .version = "^1.0.0", .kind = SPN_INDEX_DEP_BUILD },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "tool",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "=1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/gfx", .version = "^1.0.0" },
+        { .name = "spn/foo", .version = "^2.0.0" },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
+      { .name = "bar", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gfx" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gfx", .excluded = true },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "", .excluded = true },
+    },
+    .instances = {
+      { .name = "spn/foo", .count = 2 },
+      { .name = "spn/bar", .count = 1 },
+      { .name = "spn/tool", .count = 1 },
+    },
+  });
+}
+
+// One package reached through all three edge kinds at once: the root links
+// foo publicly, gfx carries a private copy behind its shared boundary, and
+// the tool holds a third in its own process. Three instances, each fenced
+// into exactly its own unit
+UTEST_F(resolver, boundary_diamond_three_instances) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 5, 0) },
+          { .version = spn_semver_lit(1, 9, 0) },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "gfx",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "=1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "gfx", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "tool",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "=1.5.0" },
+            }
+          },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/foo", .version = "^1.0.0" },
+        { .name = "spn/gfx", .version = "^1.0.0" },
+        { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gfx" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 5, 0), .unit = "spn/tool" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 5, 0), .unit = "", .excluded = true },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "", .excluded = true },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/gfx", .excluded = true },
+    },
+    .instances = {
+      { .name = "spn/foo", .count = 3 },
+      { .name = "spn/gfx", .count = 1 },
+      { .name = "spn/tool", .count = 1 },
+    },
+  });
+}
+
+// Bootstrap plus divergence: the tool must link the older audio (the root's
+// 2.0.0 is excluded), and its OTHER dep zed also falls outside the root's
+// pick, so the tool's unit diverges on both while the build order stays
+// acyclic: audio 1.0.0 -> tool -> audio 2.0.0
+UTEST_F(resolver, bootstrap_with_divergent_sibling) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "audio",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "zed", .version = "^1.0.0" },
+            }
+          },
+          {
+            .version = spn_semver_lit(2, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "zed", .version = "^2.0.0" },
+              { .namespace = "spn", .name = "tool", .version = "^1.0.0", .kind = SPN_INDEX_DEP_BUILD },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "tool",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "audio", .version = "^1.0.0" },
+              { .namespace = "spn", .name = "zed", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "zed",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 5, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/audio", .version = "^2.0.0" },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "audio", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
+      { .name = "zed", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
+      { .name = "audio", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "zed", .namespace = "spn", .version = spn_semver_lit(1, 5, 0), .unit = "spn/tool" },
+      { .name = "zed", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/tool", .excluded = true },
+      { .name = "audio", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/tool", .excluded = true },
+    },
+    .instances = {
+      { .name = "spn/audio", .count = 2 },
+      { .name = "spn/zed", .count = 2 },
+      { .name = "spn/tool", .count = 1 },
+    },
+  });
+}
+
+// Rule 5's same-version case: audio's and video's private scopes both hold
+// zed 1.0.0, but over different math subtrees. zed only builds shared, the
+// loader dedups by name, and one consumer would run against the wrong
+// embedded math: an error even though the versions are equal
+UTEST_F(resolver, same_version_dynamic_dup_fails) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "audio",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = "=1.0.0", .private = true },
+              { .namespace = "spn", .name = "zed", .version = "^1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "audio", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "video",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = "=1.5.0", .private = true },
+              { .namespace = "spn", .name = "zed", .version = "^1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "video", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "zed",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = "^1.0.0" },
+            },
+            .targets = {
+              { .name = "zed", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "math",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 5, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/audio", .version = "^1.0.0" },
+        { .name = "spn/video", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_ERROR,
+    .event = SPN_EVENT_ERR_DYNAMIC_DUPLICATE,
+  });
+}
+
+// Two private groups, one split: gfxa's range excludes the root's foo 2.0.0
+// and splits to 1.9.0. gfxb's range admits both decided versions, and must
+// take the EARLIEST admissible pick (the root's 2.0.0), not gfxa's newer
+// split priority-wise or the numerically-newest
+UTEST_F(resolver, private_groups_converge_on_earliest) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "gfxa",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "gfxa", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "gfxb",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = ">=1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "gfxb", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 9, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/foo", .version = "=2.0.0" },
+        { .name = "spn/gfxa", .version = "^1.0.0" },
+        { .name = "spn/gfxb", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/gfxa" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/gfxb" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/gfxb", .excluded = true },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .excluded = true },
+    },
+    .instances = {
+      { .name = "spn/foo", .count = 2 },
+      { .name = "spn/gfxa", .count = 1 },
+      { .name = "spn/gfxb", .count = 1 },
+    },
+  });
+}
+
+// A root test dep's transitive subtree diverges from the product's picks in
+// its own process instead of conflicting
+UTEST_F(resolver, test_dep_transitive_diverges) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "harness",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^2.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/foo", .version = "=1.0.0" },
+        { .name = "spn/harness", .version = "^1.0.0", .kind = SPN_DEP_KIND_TEST },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/harness" },
+      { .name = "harness", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/harness" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "", .excluded = true },
+    },
+    .instances = {
+      { .name = "spn/foo", .count = 2 },
+      { .name = "spn/harness", .count = 1 },
+    },
+  });
+}
+
+// The tool's range admits the root's audio 2.0.0, so convergence takes it —
+// and manufactures a genuine instance cycle (audio 2.0.0 -> tool -> audio
+// 2.0.0). Rule 6: instance cycles are errors, never split triggers; the
+// resolver must not quietly fall back to audio 1.0.0
+UTEST_F(resolver, admissible_pick_cycle_fails) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "audio",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          {
+            .version = spn_semver_lit(2, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "tool", .version = "^1.0.0", .kind = SPN_INDEX_DEP_BUILD },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "tool",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "audio", .version = ">=1.0.0" },
+            }
+          },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/audio", .version = "^2.0.0" },
+      }
+    },
+    .err = SPN_ERROR,
+    .event = SPN_EVENT_ERR_UNIT_CYCLE,
+  });
+}
+
+// Rule 1: a process boundary is a legal placement for a second dynamic
+// instance. The tool's process loads gfx.so 1.0.0, the root's loads 2.0.0,
+// and they never meet
+UTEST_F(resolver, shared_lib_diverges_across_process) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "gfx",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0), .targets = { { .name = "gfx", .linkages = { SPN_LIB_KIND_SHARED } } } },
+          { .version = spn_semver_lit(2, 0, 0), .targets = { { .name = "gfx", .linkages = { SPN_LIB_KIND_SHARED } } } },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "tool",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "gfx", .version = "=1.0.0" },
+            }
+          },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/gfx", .version = "^2.0.0" },
+        { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
+      { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "", .excluded = true },
+    },
+    .instances = {
+      { .name = "spn/gfx", .count = 2 },
+    },
+  });
+}
+
+// Two groups discover the same lib instance, and the lib carries a build
+// dep: the re-pushed boundary lands on the SAME tool group, so lib, gen, and
+// gen's dep all stay single instances
+UTEST_F(resolver, converged_lib_single_tool_group) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "lib",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "gen", .version = "^1.0.0", .kind = SPN_INDEX_DEP_BUILD },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "gen",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 9, 0) },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "wrap",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "lib", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/lib", .version = "^1.0.0" },
+        { .name = "spn/wrap", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "lib", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
+      { .name = "lib", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/wrap" },
+      { .name = "gen", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gen" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/gen" },
+      { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "", .excluded = true },
+      { .name = "gen", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "", .excluded = true },
+    },
+    .instances = {
+      { .name = "spn/lib", .count = 1 },
+      { .name = "spn/gen", .count = 1 },
+      { .name = "spn/foo", .count = 1 },
+      { .name = "spn/wrap", .count = 1 },
+    },
+  });
+}
+
+// The root package is an executable, so its own private dep still lives on
+// the root link line: a conflict with a public dep's requirement stays a hard
+// error, exactly as if the dep weren't private
+UTEST_F(resolver, root_private_dep_conflict_fails) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "gfx",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "foo", .version = "^2.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "foo",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/foo", .version = "=1.0.0", .private = true },
+        { .name = "spn/gfx", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_ERROR,
+    .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+  });
+}
+
+// Lots of equal-priority free choices across three groups; the perturbed
+// intern rounds in the harness assert the picks never depend on hash order
+UTEST_F(resolver, determinism_many_ties) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 1, 0) },
+          { .version = spn_semver_lit(1, 2, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "b",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 1, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "c",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 1, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "t1",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "a", .version = ">=1.0.0" },
+              { .namespace = "spn", .name = "b", .version = ">=1.0.0" },
+              { .namespace = "spn", .name = "c", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "t2",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "a", .version = ">=1.0.0" },
+              { .namespace = "spn", .name = "c", .version = ">=1.0.0" },
+            }
+          },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/a", .version = "^1.0.0" },
+        { .name = "spn/b", .version = "^1.0.0" },
+        { .name = "spn/t1", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+        { .name = "spn/t2", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 2, 0), .unit = "" },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 2, 0), .unit = "spn/t1" },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 2, 0), .unit = "spn/t2" },
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 1, 0), .unit = "spn/t1" },
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 1, 0), .unit = "spn/t2" },
+    },
+    .instances = {
+      { .name = "spn/a", .count = 1 },
+      { .name = "spn/b", .count = 1 },
+      { .name = "spn/c", .count = 1 },
+    },
+  });
 }
