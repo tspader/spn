@@ -168,6 +168,7 @@ if (err != SPN_OK) {
 ```
 
 ## Rules
+- Never, ever comment your code. Code with newly added comments will be rejected. If you're reviewing code, flag comments.
 - always use the `sp.h` skill when writing against sp.h APIs (either with your `Skill` tool or with `./doc/skill/sp.md`)
 - always use SP_ZERO_INITIALIZE() instead of leaving variables uninitialized
 - always use braces for one liner scopes (e.g. `for`, `if`)

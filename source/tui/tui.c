@@ -65,6 +65,7 @@ static spn_build_event_display_t event_info[] = {
   EVENT(SPN_EVENT_ERR_MANIFEST,                  "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
   EVENT(SPN_EVENT_ERR_UNIT_CYCLE,                "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
   EVENT(SPN_EVENT_ERR_DYNAMIC_DUPLICATE,         "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
+  EVENT(SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX,    "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
   EVENT(SPN_EVENT_RESOLVE_START,                 "Resolving",   SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
   EVENT(SPN_EVENT_RESOLVE_PACKAGE,               "Resolving",   SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
   EVENT(SPN_EVENT_RESOLVE_END,                   "Resolved",    SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
@@ -503,6 +504,14 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
       );
       break;
     }
+    case SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX: {
+      sp_fmt_io(
+        &w.base,
+        "resolving {} is too complex; pin a version to reduce the search",
+        SP_FMT_STR(spn_tui_colored_name(mem, event->too_complex.id.name))
+      );
+      break;
+    }
     case SPN_EVENT_ERR_MANIFEST: {
       sp_fmt_io(
         &w.base,
@@ -847,6 +856,7 @@ static sp_str_t spn_tui_event_subject(spn_build_event_t* event) {
     case SPN_EVENT_ERR_UNSATISFIABLE_VERSION: return event->unsatisfiable.low.qualified;
     case SPN_EVENT_ERR_UNIT_CYCLE:            return event->unit_cycle.id.name;
     case SPN_EVENT_ERR_DYNAMIC_DUPLICATE:     return event->dynamic_dup.id.name;
+    case SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX: return event->too_complex.id.name;
     default:                                  return event->pkg ? event->pkg->name : sp_str_lit("");
   }
 }
