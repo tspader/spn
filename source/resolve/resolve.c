@@ -30,17 +30,18 @@ typedef struct {
   spn_requested_pkg_t req;
 } spn_scope_boundary_t;
 
-// Scopes are identified by (unit root, requesting instance): the unit a build
-// dep roots is per-requester, so two consumers may hold diverging tools, and a
-// shared lib's private scope is per-instance of that lib. Compatible requests
-// still unify onto one instance through candidate preference, not through
-// scope identity.
+typedef struct {
+  sp_intern_id_t name;
+  spn_semver_t version;
+} spn_pin_t;
+
 typedef struct {
   spn_link_unit_id_t id;
   spn_pkg_id_t from;
   sp_da(spn_requested_pkg_t) reqs;
   u64 cursor;
   sp_ht(sp_intern_id_t, spn_resolved_pkg_t) named;
+  sp_da(spn_pin_t) pins;
   sp_da(u32) processes;
 } spn_scope_t;
 
@@ -58,6 +59,8 @@ typedef struct {
   sp_ht(sp_intern_id_t, u8) visited;
   u32 scope;
   u64 picks;
+  u64 budget;
+  bool fatal;
   bool failed;
   spn_build_event_t failure;
 } spn_resolve_run_t;
@@ -67,7 +70,7 @@ typedef sp_ht(spn_pkg_id_t, u8) spn_instance_states_t;
 static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node, spn_requested_pkg_t* dep);
 static spn_err_t resolve_deps(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node);
 
-void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn_index_cache_t* index, spn_pkg_registry_t* registry, spn_event_buffer_t* events, spn_linkage_t linkage, sp_da(spn_pkg_config_entry_t) config) {
+void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn_index_cache_t* index, spn_pkg_registry_t* registry, spn_event_buffer_t* events, spn_linkage_t linkage, sp_da(spn_pkg_config_entry_t) config, u64 budget) {
   *r = (spn_resolver_t){
     .mem = mem,
     .intern = intern,
@@ -76,6 +79,7 @@ void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn
     .registry = registry,
     .linkage = linkage,
     .config = config,
+    .budget = budget ? budget : SPN_RESOLVE_DEFAULT_BUDGET,
   };
 }
 
@@ -225,6 +229,28 @@ static void restore_named(sp_mem_t mem, spn_scope_t* scope, sp_da(sp_intern_id_t
   }
 }
 
+static s32 sort_pick_by_priority(const void* a, const void* b) {
+  const spn_resolved_pkg_t* lhs = *(const spn_resolved_pkg_t* const*)a;
+  const spn_resolved_pkg_t* rhs = *(const spn_resolved_pkg_t* const*)b;
+  return lhs->priority < rhs->priority ? -1 : 1;
+}
+
+static bool find_pin(spn_scope_t* scope, sp_intern_id_t name, spn_semver_t* version, bool* contradiction) {
+  bool found = false;
+  sp_da_for(scope->pins, it) {
+    if (scope->pins[it].name != name) {
+      continue;
+    }
+    if (found && !spn_semver_eq(*version, scope->pins[it].version)) {
+      *contradiction = true;
+      return true;
+    }
+    *version = scope->pins[it].version;
+    found = true;
+  }
+  return found;
+}
+
 static spn_scope_t* find_scope(spn_resolve_run_t* run, sp_intern_id_t root, spn_pkg_id_t from) {
   sp_da_for(run->scopes, it) {
     if (run->scopes[it].id.root == root && pkg_id_eq(run->scopes[it].from, from)) {
@@ -246,6 +272,7 @@ static u32 find_or_create_scope(spn_resolver_t* resolver, spn_resolve_run_t* run
     .from = from,
   };
   sp_da_init(resolver->mem, scope.reqs);
+  sp_da_init(resolver->mem, scope.pins);
   sp_da_init(resolver->mem, scope.processes);
   sp_ht_init(resolver->mem, scope.named);
   sp_da_push(run->scopes, scope);
@@ -294,6 +321,21 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
       .unknown.request = *request
     });
     return SPN_ERROR;
+  }
+
+  spn_semver_t pinned = sp_zero;
+  bool contradiction = false;
+  if (find_pin(scope, name, &pinned, &contradiction)) {
+    if (contradiction || !spn_semver_eq(pkg->info->version, pinned)) {
+      record_failure(run, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+        .unsatisfiable = {
+          .low = *request,
+          .high = *request
+        }
+      });
+      return SPN_ERROR;
+    }
   }
 
   spn_resolved_pkg_t node = {
@@ -345,6 +387,20 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
 }
 
 static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_index_rel_t* release) {
+  if (run->fatal) {
+    return SPN_ERROR;
+  }
+  if (!run->budget) {
+    run->fatal = true;
+    run->failed = true;
+    run->failure = (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX,
+      .too_complex.id = release->id,
+    };
+    return SPN_ERROR;
+  }
+  run->budget--;
+
   spn_scope_t* scope = &run->scopes[run->scope];
   sp_str_t qualified = spn_pkg_name_to_qualified(release->id);
   sp_intern_id_t name = sp_intern_get_or_insert(resolver->intern, qualified);
@@ -433,69 +489,57 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
     return SPN_ERROR;
   }
 
-  // Prefer versions earlier scopes already committed, in pick priority order, so compatible
-  // ranges unify onto the earliest-decided instance. After that, newest-first; no other
-  // heuristics. Priority order is the pick sequence, so candidate order never depends on
-  // hash iteration.
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_da(spn_index_rel_t*) candidates = sp_da_new(scratch.mem, spn_index_rel_t*);
-  sp_da(spn_resolved_pkg_t*) committed = sp_da_new(scratch.mem, spn_resolved_pkg_t*);
+  // By definition, if a name is pinned and a candidatae version doesn't satisfy
+  // the pin, this branch of resolution fails.
+  spn_semver_t pinned = sp_zero;
+  bool contradiction = false;
+  if (find_pin(scope, name, &pinned, &contradiction)) {
+    if (contradiction || !version_in_range(pinned, request->index.range)) {
+      record_failure(run, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+        .unsatisfiable = {
+          .low = *request,
+          .high = *request
+        }
+      });
+      return SPN_ERROR;
+    }
 
-  sp_ht_for_kv(run->query->result, it) {
-    if (it.key->qualified != name) {
-      continue;
-    }
-    if (!version_in_range(it.val->version, request->index.range)) {
-      continue;
-    }
-
-    u64 at = sp_da_size(committed);
-    while (at > 0 && committed[at - 1]->priority > it.val->priority) {
-      at--;
-    }
-    sp_da_push(committed, it.val);
-    for (u64 jt = sp_da_size(committed) - 1; jt > at; jt--) {
-      committed[jt] = committed[jt - 1];
-    }
-    committed[at] = it.val;
-  }
-
-  sp_da_for(committed, it) {
-    sp_da_for(pkg->releases, jt) {
-      if (spn_semver_eq(pkg->releases[jt].version, committed[it]->version)) {
-        sp_da_push(candidates, &pkg->releases[jt]);
+    sp_da_for(pkg->releases, it) {
+      if (spn_semver_eq(pkg->releases[it].version, pinned)) {
+        if (!try_candidate(resolver, run, &pkg->releases[it])) {
+          return SPN_OK;
+        }
         break;
       }
     }
+
+    record_failure(run, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+      .unsatisfiable = {
+        .low = *request,
+        .high = *request
+      }
+    });
+    return SPN_ERROR;
   }
 
-  u64 preferred = sp_da_size(candidates);
+  // If the name is totally free, just pick the newest legal version. This
+  // is just a simple, greedy heuristic, not for correctness.
+  spn_err_t result = SPN_ERROR;
   sp_da_rfor(pkg->releases, it) {
     spn_index_rel_t* release = &pkg->releases[it];
     if (!version_in_range(release->version, request->index.range)) {
       continue;
     }
-
-    bool tried = false;
-    sp_for(jt, preferred) {
-      if (spn_semver_eq(candidates[jt]->version, release->version)) {
-        tried = true;
-        break;
-      }
-    }
-    if (!tried) {
-      sp_da_push(candidates, release);
-    }
-  }
-
-  spn_err_t result = SPN_ERROR;
-  sp_da_for(candidates, it) {
-    if (!try_candidate(resolver, run, candidates[it])) {
+    if (!try_candidate(resolver, run, release)) {
       result = SPN_OK;
       break;
     }
+    if (run->fatal) {
+      break;
+    }
   }
-  sp_mem_end_scratch(scratch);
 
   if (!result) {
     return SPN_OK;
@@ -553,21 +597,200 @@ static spn_err_t resolve_deps(spn_resolver_t* resolver, spn_resolve_run_t* run, 
   return result;
 }
 
-static spn_err_t resolve_scope(spn_resolver_t* resolver, spn_resolve_run_t* run) {
-  spn_scope_t* scope = &run->scopes[run->scope];
-
+static spn_err_t solve_reqs(spn_resolver_t* resolver, spn_resolve_run_t* run, u64 from, u64 to) {
   spn_resolved_pkg_t root = {
     .id = spn_pkg_id(resolver->intern, sp_str_lit("")),
     .qualified = sp_str_lit(""),
     .source = SPN_PKG_SOURCE_ROOT,
   };
 
-  while (scope->cursor < sp_da_size(scope->reqs)) {
-    spn_requested_pkg_t req = scope->reqs[scope->cursor++];
+  for (u64 it = from; it < to; it++) {
+    spn_requested_pkg_t req = run->scopes[run->scope].reqs[it];
     spn_try(resolve_dep(resolver, run, &root, &req));
   }
 
   return SPN_OK;
+}
+
+// The full assignment for some feasibility check.
+typedef struct {
+  sp_da(sp_intern_id_t) keys;
+  sp_da(spn_resolved_pkg_t) vals;
+  sp_da(spn_scope_boundary_t) boundaries;
+  bool held;
+} spn_witness_t;
+
+static void capture_witness(sp_mem_t mem, spn_resolve_run_t* run, spn_scope_t* scope, sp_da(sp_intern_id_t) snapshot, u64 boundaries, spn_witness_t* witness) {
+  witness->keys = sp_da_new(mem, sp_intern_id_t);
+  witness->vals = sp_da_new(mem, spn_resolved_pkg_t);
+  witness->boundaries = sp_da_new(mem, spn_scope_boundary_t);
+
+  sp_ht_for_kv(scope->named, it) {
+    bool held = false;
+    sp_da_for(snapshot, jt) {
+      if (snapshot[jt] == *it.key) {
+        held = true;
+        break;
+      }
+    }
+    if (!held) {
+      sp_da_push(witness->keys, *it.key);
+      sp_da_push(witness->vals, *it.val);
+    }
+  }
+
+  for (u64 it = boundaries; it < sp_da_size(run->boundaries); it++) {
+    sp_da_push(witness->boundaries, run->boundaries[it]);
+  }
+
+  witness->held = true;
+}
+
+static spn_err_t attempt_reqs(spn_resolver_t* resolver, spn_resolve_run_t* run, u64 from, u64 to, bool keep, spn_witness_t* witness) {
+  spn_scope_t* scope = &run->scopes[run->scope];
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_da(sp_intern_id_t) snapshot = snapshot_named(scratch.mem, scope);
+  u64 boundaries = sp_da_size(run->boundaries);
+
+  spn_err_t result = solve_reqs(resolver, run, from, to);
+  if (!result && witness) {
+    capture_witness(resolver->mem, run, scope, snapshot, boundaries, witness);
+  }
+  if (result || !keep) {
+    restore_named(scratch.mem, scope, snapshot);
+    sp_da_head(run->boundaries)->size = boundaries;
+  }
+
+  sp_mem_end_scratch(scratch);
+  return result;
+}
+
+static spn_err_t resolve_scope(spn_resolver_t* resolver, spn_resolve_run_t* run) {
+  spn_scope_t* scope = &run->scopes[run->scope];
+  u64 from = scope->cursor;
+  u64 to = sp_da_size(scope->reqs);
+  scope->cursor = to;
+  run->budget = resolver->budget;
+
+  // Re-entered scopes solve under their kept pins; re-pushed requests are a
+  // function of manifests the scope already resolved, so they only duplicate
+  // what it holds
+  if (from || !sp_ht_size(run->query->result)) {
+    return solve_reqs(resolver, run, from, to);
+  }
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+
+  // # PICKS
+  //
+  // Picks are outputs. A pick says that some scope resolved name X to
+  // version Y in a way that cannot be changed by anything that happens by
+  // another scope.
+  sp_da(spn_resolved_pkg_t*) picks = sp_da_new(scratch.mem, spn_resolved_pkg_t*);
+  sp_ht_for_kv(run->query->result, it) {
+    sp_da_push(picks, it.val);
+  }
+  sp_da_sort(picks, sort_pick_by_priority);
+
+  // # PINS
+  //
+  // Pins are constraints. A pin says that if you're resolving name X, try
+  // version Y. But if version Y doesn't work (either by itself or its
+  // subtrees, exhaustively), it can be unpinned.
+  //
+  // But, and this is important, "try a different version" does not mean
+  // "override the pick in the parent scope". Picks are final decisions. They
+  // can't be changed by a child scope. What happens instead is that two
+  // versions of X now exist
+  //
+  // How that gets processed just depends on what X actually is. If X is, say,
+  // linked dynamically such that both copies would be visible, that's an
+  // error.
+  //
+  // # EXAMPLE
+  //
+  // If A is pinned to 1.9.0 and we have a simple dependency on B@1.0.0
+  //
+  // PIN: A@1.9.0
+  // NEED: B@1.0.0
+  //   TRY C@1.1.0 (The solver's free choice)
+  //     NEED: A =2.0.0
+  //       FAIL (Only candidate is A@1.9.0, from the pin)
+  //   KILL C@1.1.0 (The pin for A is not dropped yet)
+  //   TRY C@1.0.0 (This is just the solver trying the next version of C)
+  //     NEED A ^1.0.0
+  //       OK (The pinned A@1.9.0 works)
+  //   SUCCESS
+  sp_da(spn_pin_t) pins = sp_da_new(scratch.mem, spn_pin_t);
+  sp_da_for(picks, it) {
+    sp_da_push(pins, ((spn_pin_t) {
+      .name = picks[it]->id.qualified,
+      .version = picks[it]->version,
+    }));
+  }
+
+  // Try to solve, given what we have pinned. If it succeeds, we're done.
+  sp_da_for(pins, it) {
+    sp_da_push(scope->pins, pins[it]);
+  }
+  if (!attempt_reqs(resolver, run, from, to, true, SP_NULLPTR)) {
+    sp_mem_end_scratch(scratch);
+    return SPN_OK;
+  }
+  sp_da_clear(scope->pins);
+
+  if (run->fatal) {
+    sp_mem_end_scratch(scratch);
+    return SPN_ERROR;
+  }
+
+  // At this point, we know that this set of pins can't work, but we don't
+  // know which pin is guilty.
+  //
+  // Walk the pins, which are transitively sorted by priority, and keep
+  // a pin iff a complete assignment exists satisfying the set. If we drop
+  // a pin, we'll have to split.
+  //
+  // Keeping a pin, on the other hand, means that X@Y is proven and that
+  // we have an assignment that satisfies the entire set of pins at the
+  // point the pin in question was run.
+  //
+  // Say that we have [A, B, C]
+  // - A's check succeeds. A is kept; the assignment for {A} is saved as the witness.
+  // - B's check fails. B is dropped; the witness is still valid for {A}.
+  // - C's check succeeds. C is kept, and the witness is now an assignment for {A, C}
+  spn_witness_t witness = sp_zero;
+  sp_da_for(pins, it) {
+    run->failed = false;
+    sp_da_push(scope->pins, pins[it]);
+    if (attempt_reqs(resolver, run, from, to, false, &witness)) {
+      if (run->fatal) {
+        sp_mem_end_scratch(scratch);
+        return SPN_ERROR;
+      }
+      sp_da_head(scope->pins)->size -= 1;
+    }
+  }
+
+  // At this point, the pins that were kept form a set that is proven to be
+  // satisfiable. In our example, we know that we can satisfy {A, C}. Mark
+  // it down and keep going.
+  if (witness.held) {
+    sp_da_for(witness.keys, it) {
+      sp_ht_insert(scope->named, witness.keys[it], witness.vals[it]);
+    }
+    sp_da_for(witness.boundaries, it) {
+      sp_da_push(run->boundaries, witness.boundaries[it]);
+    }
+    sp_mem_end_scratch(scratch);
+    run->failed = false;
+    return SPN_OK;
+  }
+
+  sp_mem_end_scratch(scratch);
+  run->failed = false;
+  return solve_reqs(resolver, run, from, to);
 }
 
 static void commit_scope(spn_resolver_t* resolver, spn_resolve_run_t* run) {

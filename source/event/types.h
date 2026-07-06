@@ -14,11 +14,9 @@ typedef enum {
   SPN_EVENT_ERR_UNKNOWN_PKG,
   SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
   SPN_EVENT_ERR_MANIFEST,
-  // A dependency cycle through a single package instance across link units:
-  // the tool links the same instance whose build waits on the tool
   SPN_EVENT_ERR_UNIT_CYCLE,
-  // Two dynamic instances of one package would load into one process
   SPN_EVENT_ERR_DYNAMIC_DUPLICATE,
+  SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX,
   SPN_EVENT_RESOLVE_START,
   SPN_EVENT_RESOLVE_PACKAGE,
   SPN_EVENT_RESOLVE_END,
@@ -86,6 +84,7 @@ typedef struct { spn_requested_pkg_t low; spn_requested_pkg_t high; } spn_evt_un
 typedef struct { spn_pkg_name_t id; } spn_evt_circular_t;
 typedef struct { spn_pkg_name_t id; spn_semver_t version; } spn_evt_unit_cycle_t;
 typedef struct { spn_pkg_name_t id; spn_semver_t low; spn_semver_t high; } spn_evt_dynamic_dup_t;
+typedef struct { spn_pkg_name_t id; } spn_evt_too_complex_t;
 typedef struct { spn_requested_pkg_t request; } spn_evt_unknown_t;
 typedef struct { sp_str_t script_path; u64 time; bool has_configure; bool has_package; } spn_evt_script_compile_t;
 typedef struct { u64 time; } spn_evt_script_package_t;
@@ -160,6 +159,7 @@ struct spn_build_event_t {
     spn_evt_circular_t circular;
     spn_evt_unit_cycle_t unit_cycle;
     spn_evt_dynamic_dup_t dynamic_dup;
+    spn_evt_too_complex_t too_complex;
     spn_evt_unsatisfiable_t unsatisfiable;
     spn_evt_unknown_t unknown;
     spn_evt_script_compile_t script_compile;

@@ -60,6 +60,7 @@ typedef struct spn_resolver_t {
   spn_event_buffer_t* events;
   spn_linkage_t linkage;
   sp_da(spn_pkg_config_entry_t) config;
+  u64 budget;
 } spn_resolver_t;
 
 #endif

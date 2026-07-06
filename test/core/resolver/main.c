@@ -110,6 +110,7 @@ typedef struct {
   } manifest;
   spn_linkage_t linkage;
   config_kind_t config[4];
+  u64 budget;
   spn_err_t err;
   spn_build_event_kind_t event;
   expected_t expected[8];
@@ -278,7 +279,7 @@ static resolve_result_t execute_fixture(fixture_t* fixture, sp_intern_t* intern)
   spn_index_cache_t cache = sp_zero;
   spn_pkg_registry_t registry = sp_zero;
   spn_resolver_t resolver = sp_zero;
-  spn_resolver_init(&resolver, mem, intern, &cache, &registry, events, fixture->linkage, config);
+  spn_resolver_init(&resolver, mem, intern, &cache, &registry, events, fixture->linkage, config, fixture->budget);
 
   resolve_result_t result = sp_zero_s(resolve_result_t);
   spn_resolve_query_init(mem, &result.query);
@@ -958,6 +959,39 @@ UTEST_F(resolver, backtrack_simple) {
     .expected = {
       { .name = "audio", .namespace = "spn", .version = spn_semver_lit(1, 1, 0) },
     },
+  });
+}
+
+// The budget bounds search, never semantics: exhausting it is a hard error,
+// never a fallback split, so identical inputs always produce the same answer
+// or the same error. Same graph as backtrack_simple; a budget of one pop dies
+// before the resolvable audio 1.1.0 is ever tried.
+UTEST_F(resolver, budget_exhausted_fails) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "audio",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 1, 0) },
+          {
+            .version = spn_semver_lit(1, 2, 0),
+            .deps = {
+              { .namespace = "spn", .name = "physics", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/audio", .version = "^1.0.0" },
+      }
+    },
+    .budget = 1,
+    .err = SPN_ERROR,
+    .event = SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX,
   });
 }
 
