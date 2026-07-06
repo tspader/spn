@@ -154,3 +154,23 @@ UTEST_F(units, build_dep_bootstrap) {
     },
   });
 }
+
+// The same foo 1.0.0 resolves over num 2.0.0 in the root's unit and num
+// 1.0.0 in the tool's: one (name, version), two subtrees. main proves the
+// root's copy links num 2.0.0 at runtime; the script and tool prove the
+// tool unit resolved num 1.0.0 at compile time; the resolve must hold six
+// instances, not five. Until identity hashes key the store, commit merges
+// the two foos into one instance whose unit sees both nums.
+UTEST_F(units, same_version_split) {
+  tmpfs_init_named(&uf->fixture.fs, "units_same_version_split");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/units/same_version_split",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("Resolved 6 packages") },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unsatisfiable_version" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+    },
+  });
+}

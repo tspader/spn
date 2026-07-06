@@ -440,6 +440,8 @@ static void assert_resolves_equal(s32* utest_result, spn_resolve_query_t* a, spn
     ASSERT_TRUE(pb != SP_NULLPTR);
     sp_da_push(claimed, pb);
 
+    ASSERT_EQ(pa->id.hash, pb->id.hash);
+
     ASSERT_EQ(sp_da_size(pa->edges), sp_da_size(pb->edges));
     sp_da(u8) edge_used = sp_da_new(mem, u8);
     sp_da_for(pb->edges, ft) {
@@ -455,6 +457,7 @@ static void assert_resolves_equal(s32* utest_result, spn_resolve_query_t* a, spn
         if (edge_used[ft]) continue;
         if (!sp_str_equal(instance_name(b, eb->id.qualified), target)) continue;
         if (!spn_semver_eq(eb->id.version, ea->id.version)) continue;
+        if (eb->id.hash != ea->id.hash) continue;
         if (eb->kind != ea->kind) continue;
         if (eb->edge != ea->edge) continue;
         if (eb->private != ea->private) continue;
@@ -2912,4 +2915,191 @@ UTEST_F(resolver, build_dep_missing_still_fails) {
     .err = SPN_ERROR,
     .event = SPN_EVENT_ERR_UNKNOWN_PKG,
   });
+}
+
+//////////////
+// IDENTITY //
+//////////////
+static resolve_result_t run_isolated(fixture_t* fixture) {
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  state = sp_zero_s(state_t);
+  sp_str_ht_init(mem, state.cache);
+  build_cache(mem, fixture);
+  return execute_fixture(fixture, sp_intern_new(sp_mem_os_new()));
+}
+
+static sp_hash_t instance_hash(resolve_result_t* result, const c8* namespace, const c8* name, spn_semver_t version) {
+  sp_str_t qualified = spn_pkg_canonicalize_pair(sp_str_view(namespace), sp_str_view(name));
+  sp_ht_for_kv(result->query.result, it) {
+    if (sp_str_equal(it.val->qualified, qualified) && spn_semver_eq(it.val->version, version)) {
+      return it.val->id.hash;
+    }
+  }
+  return 0;
+}
+
+// A leaf hashes to bare (name, version): identical builds get identical
+// identity in every project regardless of how they were reached
+UTEST_F(resolver, hash_leaf_identity_across_projects) {
+  fixture_t direct = {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "math",
+        .releases = {
+          { .version = spn_semver_lit(1, 1, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/math", .version = "^1.0.0" },
+      }
+    },
+  };
+
+  fixture_t transitive = {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "renderer",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = "^1.1.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "math",
+        .releases = {
+          { .version = spn_semver_lit(1, 1, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/renderer", .version = "^1.0.0" },
+      }
+    },
+  };
+
+  resolve_result_t first = run_isolated(&direct);
+  resolve_result_t second = run_isolated(&transitive);
+  ASSERT_EQ(first.err, SPN_OK);
+  ASSERT_EQ(second.err, SPN_OK);
+
+  sp_hash_t a = instance_hash(&first, "spn", "math", spn_semver_lit(1, 1, 0));
+  sp_hash_t b = instance_hash(&second, "spn", "math", spn_semver_lit(1, 1, 0));
+  ASSERT_TRUE(a != 0);
+  ASSERT_EQ(a, b);
+}
+
+// A depender's identity covers its resolved subtree: the same renderer over
+// a different math is a different build
+UTEST_F(resolver, hash_tracks_child_subtree) {
+  fixture_t old = {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "renderer",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "math", .version = ">=1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "math",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/renderer", .version = "^1.0.0" },
+      }
+    },
+  };
+
+  fixture_t new = old;
+  new.index[1].releases[0].version = spn_semver_lit(1, 5, 0);
+
+  resolve_result_t first = run_isolated(&old);
+  resolve_result_t second = run_isolated(&new);
+  ASSERT_EQ(first.err, SPN_OK);
+  ASSERT_EQ(second.err, SPN_OK);
+
+  sp_hash_t a = instance_hash(&first, "spn", "renderer", spn_semver_lit(1, 0, 0));
+  sp_hash_t b = instance_hash(&second, "spn", "renderer", spn_semver_lit(1, 0, 0));
+  ASSERT_TRUE(a != 0);
+  ASSERT_TRUE(b != 0);
+  ASSERT_NE(a, b);
+}
+
+// A tool shapes what it generates: a build-dep subtree change re-identifies
+// every consumer
+UTEST_F(resolver, hash_tracks_build_subtree) {
+  fixture_t old = {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "app",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "tool", .version = "^1.0.0", .kind = SPN_INDEX_DEP_BUILD },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "tool",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "leaf", .version = ">=1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "leaf",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/app", .version = "^1.0.0" },
+      }
+    },
+  };
+
+  fixture_t new = old;
+  new.index[2].releases[0].version = spn_semver_lit(1, 5, 0);
+
+  resolve_result_t first = run_isolated(&old);
+  resolve_result_t second = run_isolated(&new);
+  ASSERT_EQ(first.err, SPN_OK);
+  ASSERT_EQ(second.err, SPN_OK);
+
+  sp_hash_t a = instance_hash(&first, "spn", "app", spn_semver_lit(1, 0, 0));
+  sp_hash_t b = instance_hash(&second, "spn", "app", spn_semver_lit(1, 0, 0));
+  ASSERT_TRUE(a != 0);
+  ASSERT_TRUE(b != 0);
+  ASSERT_NE(a, b);
 }

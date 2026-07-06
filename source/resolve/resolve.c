@@ -10,6 +10,7 @@
 #include "resolve/types.h"
 #include "semver/compare.h"
 #include "semver/parser.h"
+#include "sp/str.h"
 #include "semver/types.h"
 #include "session/registry/registry.h"
 #include "session/registry/types.h"
@@ -58,7 +59,25 @@ typedef struct {
   spn_build_event_t failure;
 } spn_resolve_run_t;
 
-typedef sp_ht(spn_pkg_id_t, u8) spn_instance_states_t;
+typedef struct {
+  u32 scope;
+  sp_intern_id_t name;
+} spn_group_node_t;
+
+typedef sp_ht(spn_group_node_t, u8) spn_group_states_t;
+
+typedef struct {
+  u8 state;
+  sp_hash_t hash;
+} spn_hash_state_t;
+
+typedef sp_ht(spn_pkg_id_t, spn_hash_state_t) spn_hash_memo_t;
+
+typedef struct {
+  sp_hash_t hash;
+  u32 kind;
+  u32 private;
+} spn_edge_record_t;
 
 static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node, spn_requested_pkg_t* dep);
 static spn_err_t resolve_deps(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node);
@@ -931,13 +950,19 @@ static void materialize_edges(spn_resolver_t* resolver, spn_resolve_run_t* run) 
   }
 }
 
-static spn_err_t check_instance_cycle(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_instance_states_t states, spn_pkg_id_t id) {
-  u8* state = sp_ht_getp(states, id);
+static spn_err_t check_group_cycle(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_group_states_t states, u32 scope_index, sp_intern_id_t name) {
+  spn_group_node_t key = { .scope = scope_index, .name = name };
+  u8* state = sp_ht_getp(states, key);
   if (state && *state == 2) {
     return SPN_OK;
   }
 
-  spn_resolved_pkg_t* node = sp_ht_getp(run->query->result, id);
+  spn_scope_t* scope = &run->scopes[scope_index];
+  spn_resolved_pkg_t* node = sp_ht_getp(scope->named, name);
+  if (!node) {
+    return SPN_OK;
+  }
+
   if (state && *state == 1) {
     spn_event_buffer_push(resolver->events, (spn_build_event_t) {
       .kind = SPN_EVENT_ERR_UNIT_CYCLE,
@@ -949,25 +974,45 @@ static spn_err_t check_instance_cycle(spn_resolver_t* resolver, spn_resolve_run_
     return SPN_ERROR;
   }
 
-  sp_ht_insert(states, id, (u8)1);
+  sp_ht_insert(states, key, (u8)1);
 
-  sp_da_for(node->edges, it) {
-    spn_try(check_instance_cycle(resolver, run, states, node->edges[it].id));
+  sp_da_for(node->deps, it) {
+    spn_requested_pkg_t* dep = &node->deps[it];
+    spn_dep_edge_t edge = classify_dep(resolver, node, dep);
+    if (edge == SPN_DEP_EDGE_PRUNED) {
+      continue;
+    }
+
+    sp_intern_id_t dep_name = sp_intern_get_or_insert(resolver->intern, dep->qualified);
+    u32 target = scope_index;
+    if (edge != SPN_DEP_EDGE_SCOPE) {
+      spn_scope_t* found = find_scope(run, edge == SPN_DEP_EDGE_PRIVATE ? node->id.qualified : dep_name, node->id);
+      if (!found) {
+        continue;
+      }
+      target = (u32)(found - run->scopes);
+    }
+
+    spn_try(check_group_cycle(resolver, run, states, target, dep_name));
   }
 
-  *sp_ht_getp(states, id) = 2;
+  *sp_ht_getp(states, key) = 2;
   return SPN_OK;
 }
 
-static spn_err_t check_instance_cycles(spn_resolver_t* resolver, spn_resolve_run_t* run) {
+static spn_err_t check_group_cycles(spn_resolver_t* resolver, spn_resolve_run_t* run) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
-  spn_instance_states_t states = SP_NULLPTR;
+  spn_group_states_t states = SP_NULLPTR;
   sp_ht_init(scratch.mem, states);
 
   spn_err_t result = SPN_OK;
-  sp_ht_for_kv(run->query->result, it) {
-    result = check_instance_cycle(resolver, run, states, *it.key);
+  sp_da_for(run->scopes, it) {
+    spn_scope_t* scope = &run->scopes[it];
+    sp_ht_for_kv(scope->named, jt) {
+      result = check_group_cycle(resolver, run, states, (u32)it, *jt.key);
+      if (result) break;
+    }
     if (result) break;
   }
 
@@ -975,9 +1020,91 @@ static spn_err_t check_instance_cycles(spn_resolver_t* resolver, spn_resolve_run
   return result;
 }
 
+static sp_hash_t leaf_hash(spn_resolved_pkg_t* instance) {
+  sp_hash_t hash = sp_hash_str(instance->qualified);
+  return sp_hash_bytes(&instance->version, sizeof(spn_semver_t), hash);
+}
+
+static s32 sort_edge_record(const void* a, const void* b) {
+  const spn_edge_record_t* lhs = (const spn_edge_record_t*)a;
+  const spn_edge_record_t* rhs = (const spn_edge_record_t*)b;
+  if (lhs->hash != rhs->hash) return lhs->hash < rhs->hash ? -1 : 1;
+  if (lhs->kind != rhs->kind) return lhs->kind < rhs->kind ? -1 : 1;
+  if (lhs->private != rhs->private) return lhs->private < rhs->private ? -1 : 1;
+  return 0;
+}
+
+static sp_hash_t hash_instance(spn_resolve_run_t* run, spn_hash_memo_t memo, spn_resolved_pkg_t* instance) {
+  spn_hash_state_t* state = sp_ht_getp(memo, instance->id);
+  if (state && state->state == 2) {
+    return state->hash;
+  }
+  if (state && state->state == 1) {
+    return leaf_hash(instance);
+  }
+
+  sp_ht_insert(memo, instance->id, ((spn_hash_state_t) { .state = 1 }));
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_da(spn_edge_record_t) records = sp_da_new(scratch.mem, spn_edge_record_t);
+  sp_da_for(instance->edges, it) {
+    spn_resolved_pkg_t* child = sp_ht_getp(run->query->result, instance->edges[it].id);
+    sp_assert(child);
+    sp_da_push(records, ((spn_edge_record_t) {
+      .hash = hash_instance(run, memo, child),
+      .kind = (u32)instance->edges[it].kind,
+      .private = (u32)instance->edges[it].private,
+    }));
+  }
+  sp_da_sort(records, sort_edge_record);
+
+  sp_hash_t hash = leaf_hash(instance);
+  if (!sp_da_empty(records)) {
+    hash = sp_hash_bytes(records, sp_da_size(records) * sizeof(spn_edge_record_t), hash);
+  }
+  sp_mem_end_scratch(scratch);
+
+  spn_hash_state_t* slot = sp_ht_getp(memo, instance->id);
+  slot->state = 2;
+  slot->hash = hash;
+  return hash;
+}
+
+static void assign_identity(spn_resolver_t* resolver, spn_resolve_run_t* run) {
+  spn_hash_memo_t memo = SP_NULLPTR;
+  sp_ht_init(resolver->mem, memo);
+
+  sp_ht_for_kv(run->query->result, it) {
+    hash_instance(run, memo, it.val);
+  }
+
+  spn_resolve_t rekeyed = SP_NULLPTR;
+  sp_ht_init(resolver->mem, rekeyed);
+  sp_ht_for_kv(run->query->result, it) {
+    spn_resolved_pkg_t instance = *it.val;
+    instance.id.hash = sp_ht_getp(memo, instance.id)->hash;
+    sp_da_for(instance.edges, jt) {
+      spn_hash_state_t* child = sp_ht_getp(memo, instance.edges[jt].id);
+      sp_assert(child);
+      instance.edges[jt].id.hash = child->hash;
+    }
+    sp_ht_insert(rekeyed, instance.id, instance);
+  }
+
+  run->query->result = rekeyed;
+}
+
 static spn_err_t check_dynamic_duplicates(spn_resolver_t* resolver, spn_resolve_run_t* run) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   spn_err_t result = SPN_OK;
+
+  sp_ht(spn_pkg_id_t, sp_hash_t) identities = SP_NULLPTR;
+  sp_ht_init(scratch.mem, identities);
+  sp_ht_for_kv(run->query->result, it) {
+    spn_pkg_id_t key = it.val->id;
+    key.hash = 0;
+    sp_ht_insert(identities, key, it.val->id.hash);
+  }
 
   sp_da_for(run->scopes, process) {
     sp_ht(sp_intern_id_t, spn_resolved_pkg_t*) shared = SP_NULLPTR;
@@ -1000,7 +1127,11 @@ static spn_err_t check_dynamic_duplicates(spn_resolver_t* resolver, spn_resolve_
           sp_ht_insert(shared, node->id.qualified, node);
           continue;
         }
-        if (spn_semver_eq((*prior)->version, node->version)) {
+
+        sp_hash_t* prior_identity = sp_ht_getp(identities, (*prior)->id);
+        sp_hash_t* node_identity = sp_ht_getp(identities, node->id);
+        sp_assert(prior_identity && node_identity);
+        if (*prior_identity == *node_identity) {
           continue;
         }
 
@@ -1073,8 +1204,9 @@ spn_err_t spn_resolve_from_solver(spn_resolver_t* resolver, spn_resolve_query_t*
 
   compute_processes(&run);
   materialize_edges(resolver, &run);
-  spn_err_t err = check_instance_cycles(resolver, &run);
+  spn_err_t err = check_group_cycles(resolver, &run);
   if (!err) {
+    assign_identity(resolver, &run);
     err = check_dynamic_duplicates(resolver, &run);
   }
 

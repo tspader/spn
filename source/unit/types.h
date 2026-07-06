@@ -12,7 +12,7 @@
 #include "external/wasm/types.h"
 #include "log/lazy/types.h"
 
-typedef struct {
+typedef struct SP_ALIGNED {
   spn_pkg_id_t pkg;
   sp_intern_id_t target;
 } spn_target_unit_id_t;
