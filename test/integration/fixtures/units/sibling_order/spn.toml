@@ -1,0 +1,11 @@
+[package]
+name = "units_sibling_order"
+version = "0.1.0"
+
+[deps.package]
+c = ">=1.0.0"
+a = "^1.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

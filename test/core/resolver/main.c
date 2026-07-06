@@ -4336,3 +4336,185 @@ UTEST_F(resolver, determinism_many_ties) {
     },
   });
 }
+
+// Root requests c before a, and a's range would admit an older c. Greedy
+// takes c 2.0.0 first, leaving a's ^1.0.0 with no candidate; c 1.9.0
+// satisfies both, so this should resolve.
+UTEST_F(resolver, sibling_order_greedy) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "c", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "c",
+        .releases = {
+          { .version = spn_semver_lit(1, 9, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/c", .version = ">=1.0.0" },
+        { .name = "spn/a", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 9, 0) },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+    },
+  });
+}
+
+// Identical graph, opposite manifest order: a resolves first and pulls
+// c 1.9.0, which the root's >=1.0.0 then accepts. Passing while
+// sibling_order_greedy fails pins the order dependence.
+UTEST_F(resolver, sibling_order_reversed) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "c", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "c",
+        .releases = {
+          { .version = spn_semver_lit(1, 9, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/a", .version = "^1.0.0" },
+        { .name = "spn/c", .version = ">=1.0.0" },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 9, 0) },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+    },
+  });
+}
+
+// Transitive form: neither range is declared at the root, so no manifest
+// order avoids it. a's loose >=1.0.0 resolves first and takes c 2.0.0;
+// b's ^1.0.0 then has no candidate, though c 1.9.0 satisfies everyone.
+UTEST_F(resolver, transitive_sibling_order) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "c", .version = ">=1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "b",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "c", .version = "^1.0.0" },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "c",
+        .releases = {
+          { .version = spn_semver_lit(1, 9, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/a", .version = "^1.0.0" },
+        { .name = "spn/b", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 9, 0) },
+    },
+  });
+}
+
+// Avoidable dynamic duplicate: a's private dep pins c =1.0.0 and the root's
+// >=1.0.0 admits 1.0.0 too, so c could unify. The root greedily picks 2.0.0
+// before the private constraint is visible, the private scope splits, and
+// both shared c copies land in process 0 as a hard error.
+UTEST_F(resolver, avoidable_dynamic_dup) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "c", .version = "=1.0.0", .private = true },
+            },
+            .targets = {
+              { .name = "a", .linkages = { SPN_LIB_KIND_SHARED } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "c",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0), .targets = { { .name = "c", .linkages = { SPN_LIB_KIND_SHARED } } } },
+          { .version = spn_semver_lit(2, 0, 0), .targets = { { .name = "c", .linkages = { SPN_LIB_KIND_SHARED } } } },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/c", .version = ">=1.0.0" },
+        { .name = "spn/a", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_OK,
+    .expected = {
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+    },
+    .instances = {
+      { .name = "spn/c", .count = 1 },
+    },
+  });
+}
