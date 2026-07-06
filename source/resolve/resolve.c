@@ -57,6 +57,7 @@ typedef struct {
   sp_da(spn_scope_edge_t) edges;
   sp_ht(sp_intern_id_t, u8) visited;
   u32 scope;
+  u64 picks;
   bool failed;
   spn_build_event_t failure;
 } spn_resolve_run_t;
@@ -196,6 +197,34 @@ static bool pkg_id_eq(spn_pkg_id_t a, spn_pkg_id_t b) {
   return a.qualified == b.qualified && spn_semver_eq(a.version, b.version);
 }
 
+static sp_da(sp_intern_id_t) snapshot_named(sp_mem_t mem, spn_scope_t* scope) {
+  sp_da(sp_intern_id_t) snapshot = sp_da_new(mem, sp_intern_id_t);
+  sp_ht_for_kv(scope->named, it) {
+    sp_da_push(snapshot, *it.key);
+  }
+  return snapshot;
+}
+
+static void restore_named(sp_mem_t mem, spn_scope_t* scope, sp_da(sp_intern_id_t) snapshot) {
+  sp_da(sp_intern_id_t) added = sp_da_new(mem, sp_intern_id_t);
+  sp_ht_for_kv(scope->named, it) {
+    bool held = false;
+    sp_da_for(snapshot, jt) {
+      if (snapshot[jt] == *it.key) {
+        held = true;
+        break;
+      }
+    }
+    if (!held) {
+      sp_da_push(added, *it.key);
+    }
+  }
+
+  sp_da_for(added, it) {
+    sp_ht_erase(scope->named, added[it]);
+  }
+}
+
 static spn_scope_t* find_scope(spn_resolve_run_t* run, sp_intern_id_t root, spn_pkg_id_t from) {
   sp_da_for(run->scopes, it) {
     if (run->scopes[it].id.root == root && pkg_id_eq(run->scopes[it].from, from)) {
@@ -297,15 +326,21 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
     sp_da_push(node.deps, pkg->info->deps[it]);
   }
 
-  sp_ht_insert(scope->named, name, node);
+  node.priority = run->picks++;
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_da(sp_intern_id_t) snapshot = snapshot_named(scratch.mem, scope);
   u64 boundaries = sp_da_size(run->boundaries);
+  sp_ht_insert(scope->named, name, node);
 
   if (!resolve_deps(resolver, run, &node)) {
+    sp_mem_end_scratch(scratch);
     return SPN_OK;
   }
 
-  sp_ht_erase(scope->named, name);
+  restore_named(scratch.mem, scope, snapshot);
   sp_da_head(run->boundaries)->size = boundaries;
+  sp_mem_end_scratch(scratch);
   return SPN_ERROR;
 }
 
@@ -340,16 +375,22 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
     }));
   }
 
-  sp_ht_insert(scope->named, name, node);
+  node.priority = run->picks++;
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_da(sp_intern_id_t) snapshot = snapshot_named(scratch.mem, scope);
   u64 boundaries = sp_da_size(run->boundaries);
+  sp_ht_insert(scope->named, name, node);
 
   if (!resolve_deps(resolver, run, &node)) {
     run->failed = false;
+    sp_mem_end_scratch(scratch);
     return SPN_OK;
   }
 
-  sp_ht_erase(scope->named, name);
+  restore_named(scratch.mem, scope, snapshot);
   sp_da_head(run->boundaries)->size = boundaries;
+  sp_mem_end_scratch(scratch);
   return SPN_ERROR;
 }
 
@@ -392,10 +433,13 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
     return SPN_ERROR;
   }
 
-  // Prefer versions other units already picked, so compatible ranges unify onto one instance
-  // instead of building a package twice. After that, newest-first; no other heuristics.
+  // Prefer versions earlier scopes already committed, in pick priority order, so compatible
+  // ranges unify onto the earliest-decided instance. After that, newest-first; no other
+  // heuristics. Priority order is the pick sequence, so candidate order never depends on
+  // hash iteration.
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_da(spn_index_rel_t*) candidates = sp_da_new(scratch.mem, spn_index_rel_t*);
+  sp_da(spn_resolved_pkg_t*) committed = sp_da_new(scratch.mem, spn_resolved_pkg_t*);
 
   sp_ht_for_kv(run->query->result, it) {
     if (it.key->qualified != name) {
@@ -405,8 +449,20 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
       continue;
     }
 
+    u64 at = sp_da_size(committed);
+    while (at > 0 && committed[at - 1]->priority > it.val->priority) {
+      at--;
+    }
+    sp_da_push(committed, it.val);
+    for (u64 jt = sp_da_size(committed) - 1; jt > at; jt--) {
+      committed[jt] = committed[jt - 1];
+    }
+    committed[at] = it.val;
+  }
+
+  sp_da_for(committed, it) {
     sp_da_for(pkg->releases, jt) {
-      if (spn_semver_eq(pkg->releases[jt].version, it.val->version)) {
+      if (spn_semver_eq(pkg->releases[jt].version, committed[it]->version)) {
         sp_da_push(candidates, &pkg->releases[jt]);
         break;
       }

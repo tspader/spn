@@ -32,6 +32,7 @@ add_executable(resolver
   ${SRC}/toolchain/toolchain.c
   main.c
   ${TEST_TOOLS}/ctx.c
+  ${TEST_TOOLS}/fuzz.c
   ${TEST_TOOLS}/tmp.c
   ${TEST_TOOLS}/git.c
   ${TEST_TOOLS}/toml.c
