@@ -372,6 +372,24 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX] = sp_bind_builder_end(&b);
   }
 
+  // SPN_EVENT_ERR_UNSATISFIABLE_VERSION
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND_OBJECT(&b, spn_evt_unsatisfiable_t, request, "request") {
+        SP_BIND(&b, spn_requested_pkg_t, qualified, "qualified", SP_BIND_STR);
+      }
+      SP_BIND(&b, spn_evt_unsatisfiable_t, requester, "requester", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_unsatisfiable_t, conflict, "conflict", SP_BIND_BOOL);
+      SP_BIND_OBJECT(&b, spn_evt_unsatisfiable_t, selected, "selected") {
+        SP_BIND(&b, spn_semver_t, major, "major", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, minor, "minor", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, patch, "patch", SP_BIND_U32);
+      }
+    }
+    schemas[SPN_EVENT_ERR_UNSATISFIABLE_VERSION] = sp_bind_builder_end(&b);
+  }
+
   // SPN_EVENT_EMBED_START
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
@@ -561,6 +579,7 @@ static void* event_variant_ptr(spn_build_event_t* event) {
     case SPN_EVENT_ERR_CIRCULAR_DEP:            return &event->circular;
     case SPN_EVENT_ERR_UNKNOWN_PKG:             return &event->unknown;
     case SPN_EVENT_ERR_UNIT_CYCLE:              return &event->unit_cycle;
+    case SPN_EVENT_ERR_UNSATISFIABLE_VERSION:   return &event->unsatisfiable;
     case SPN_EVENT_ERR_DYNAMIC_DUPLICATE:       return &event->dynamic_dup;
     case SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX:  return &event->too_complex;
     case SPN_EVENT_EMBED_START:                 return &event->embed_start;

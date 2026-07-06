@@ -469,12 +469,39 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
       break;
     }
     case SPN_EVENT_ERR_UNSATISFIABLE_VERSION: {
-      sp_fmt_io(
-        &w.base,
-        "no version of {} satisfies {.yellow}",
-        SP_FMT_STR(spn_tui_colored_name(mem, event->unsatisfiable.low.qualified)),
-        SP_FMT_STR(spn_semver_range_to_str(mem, event->unsatisfiable.low.index.range))
-      );
+      spn_evt_unsatisfiable_t* evt = &event->unsatisfiable;
+      sp_str_t requester = sp_str_empty(evt->requester) ?
+        sp_str_lit("the project") :
+        sp_fmt(mem, "{} {}", SP_FMT_STR(spn_tui_colored_name(mem, evt->requester)), SP_FMT_STR(spn_semver_to_str(mem, evt->requester_version))).value;
+
+      if (evt->conflict && evt->request.source == SPN_PKG_SOURCE_INDEX) {
+        sp_fmt_io(
+          &w.base,
+          "{} is already selected at {.yellow}, but {} requires {.yellow}",
+          SP_FMT_STR(spn_tui_colored_name(mem, evt->request.qualified)),
+          SP_FMT_STR(spn_semver_to_str(mem, evt->selected)),
+          SP_FMT_STR(requester),
+          SP_FMT_STR(spn_semver_range_to_str(mem, evt->request.index.range))
+        );
+      }
+      else if (evt->conflict) {
+        sp_fmt_io(
+          &w.base,
+          "{} is already selected at {.yellow}, which conflicts with the version required by {}",
+          SP_FMT_STR(spn_tui_colored_name(mem, evt->request.qualified)),
+          SP_FMT_STR(spn_semver_to_str(mem, evt->selected)),
+          SP_FMT_STR(requester)
+        );
+      }
+      else {
+        sp_fmt_io(
+          &w.base,
+          "no version of {} satisfies {.yellow}, required by {}",
+          SP_FMT_STR(spn_tui_colored_name(mem, evt->request.qualified)),
+          SP_FMT_STR(spn_semver_range_to_str(mem, evt->request.index.range)),
+          SP_FMT_STR(requester)
+        );
+      }
       break;
     }
     case SPN_EVENT_ERR_CIRCULAR_DEP: {
@@ -853,7 +880,7 @@ static sp_str_t spn_tui_event_subject(spn_build_event_t* event) {
     case SPN_EVENT_SYNC_FAILED:               return event->sync_failed.name;
     case SPN_EVENT_ERR_UNKNOWN_PKG:           return event->unknown.request.qualified;
     case SPN_EVENT_ERR_CIRCULAR_DEP:          return event->circular.id.name;
-    case SPN_EVENT_ERR_UNSATISFIABLE_VERSION: return event->unsatisfiable.low.qualified;
+    case SPN_EVENT_ERR_UNSATISFIABLE_VERSION: return event->unsatisfiable.request.qualified;
     case SPN_EVENT_ERR_UNIT_CYCLE:            return event->unit_cycle.id.name;
     case SPN_EVENT_ERR_DYNAMIC_DUPLICATE:     return event->dynamic_dup.id.name;
     case SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX: return event->too_complex.id.name;

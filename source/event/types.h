@@ -80,7 +80,13 @@ typedef struct {
 typedef struct { spn_profile_info_t* profile; u64 time; } spn_evt_build_passed_t;
 
 typedef struct { sp_str_t name; sp_str_t command; } spn_evt_run_t;
-typedef struct { spn_requested_pkg_t low; spn_requested_pkg_t high; } spn_evt_unsatisfiable_t;
+typedef struct {
+  spn_requested_pkg_t request;
+  sp_str_t requester;
+  spn_semver_t requester_version;
+  bool conflict;
+  spn_semver_t selected;
+} spn_evt_unsatisfiable_t;
 typedef struct { spn_pkg_name_t id; } spn_evt_circular_t;
 typedef struct { spn_pkg_name_t id; spn_semver_t version; } spn_evt_unit_cycle_t;
 typedef struct { spn_pkg_name_t id; spn_semver_t low; spn_semver_t high; } spn_evt_dynamic_dup_t;

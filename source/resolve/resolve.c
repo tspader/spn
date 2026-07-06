@@ -57,6 +57,10 @@ typedef struct {
   bool fatal;
   bool failed;
   spn_build_event_t failure;
+  spn_pin_t forced;
+  bool has_forced;
+  spn_pin_t retry[2];
+  u32 retries;
 } spn_resolve_run_t;
 
 typedef struct {
@@ -135,6 +139,27 @@ static void record_failure(spn_resolve_run_t* run, spn_build_event_t event) {
   }
   run->failed = true;
   run->failure = event;
+}
+
+static spn_build_event_t unsatisfiable_event(spn_resolved_pkg_t* from, spn_requested_pkg_t* request, bool conflict, spn_semver_t selected) {
+  return (spn_build_event_t) {
+    .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+    .unsatisfiable = {
+      .request = *request,
+      .requester = from ? from->qualified : sp_str_lit(""),
+      .requester_version = from ? from->version : sp_zero_s(spn_semver_t),
+      .conflict = conflict,
+      .selected = selected,
+    }
+  };
+}
+
+static bool find_forced(spn_resolve_run_t* run, sp_intern_id_t name, spn_semver_t* version) {
+  if (run->has_forced && run->forced.name == name) {
+    *version = run->forced.version;
+    return true;
+  }
+  return false;
 }
 
 static spn_kind_query_t kind_query(spn_resolver_t* resolver, sp_str_t pkg_name) {
@@ -300,7 +325,7 @@ static u32 find_or_create_scope(spn_resolver_t* resolver, spn_resolve_run_t* run
   return (u32)(sp_da_size(run->scopes) - 1);
 }
 
-static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_requested_pkg_t* request) {
+static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* from, spn_requested_pkg_t* request) {
   spn_scope_t* scope = &run->scopes[run->scope];
   sp_intern_id_t name = sp_intern_get_or_insert(resolver->intern, request->qualified);
 
@@ -346,15 +371,10 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
 
   spn_semver_t pinned = sp_zero;
   bool contradiction = false;
-  if (find_pin(scope, name, &pinned, &contradiction)) {
+  bool held = find_forced(run, name, &pinned) || find_pin(scope, name, &pinned, &contradiction);
+  if (held) {
     if (contradiction || !spn_semver_eq(pkg->info->version, pinned)) {
-      record_failure(run, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
-        .unsatisfiable = {
-          .low = *request,
-          .high = *request
-        }
-      });
+      record_failure(run, unsatisfiable_event(from, request, true, pinned));
       return SPN_ERROR;
     }
   }
@@ -471,7 +491,7 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
   return SPN_ERROR;
 }
 
-static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_requested_pkg_t* request) {
+static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* from, spn_requested_pkg_t* request) {
   spn_scope_t* scope = &run->scopes[run->scope];
   sp_intern_id_t name = sp_intern_get_or_insert(resolver->intern, request->qualified);
 
@@ -491,13 +511,7 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
       return SPN_OK;
     }
 
-    record_failure(run, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
-      .unsatisfiable = {
-        .low = *request,
-        .high = *request
-      }
-    });
+    record_failure(run, unsatisfiable_event(from, request, true, existing->version));
     return SPN_ERROR;
   }
 
@@ -514,15 +528,10 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
   // the pin, this branch of resolution fails.
   spn_semver_t pinned = sp_zero;
   bool contradiction = false;
-  if (find_pin(scope, name, &pinned, &contradiction)) {
+  bool held = find_forced(run, name, &pinned) || find_pin(scope, name, &pinned, &contradiction);
+  if (held) {
     if (contradiction || !version_in_range(pinned, request->index.range)) {
-      record_failure(run, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
-        .unsatisfiable = {
-          .low = *request,
-          .high = *request
-        }
-      });
+      record_failure(run, unsatisfiable_event(from, request, true, pinned));
       return SPN_ERROR;
     }
 
@@ -535,13 +544,7 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
       }
     }
 
-    record_failure(run, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
-      .unsatisfiable = {
-        .low = *request,
-        .high = *request
-      }
-    });
+    record_failure(run, unsatisfiable_event(from, request, true, pinned));
     return SPN_ERROR;
   }
 
@@ -566,13 +569,7 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
     return SPN_OK;
   }
 
-  record_failure(run, (spn_build_event_t) {
-    .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
-    .unsatisfiable = {
-      .low = *request,
-      .high = *request
-    }
-  });
+  record_failure(run, unsatisfiable_event(from, request, false, sp_zero_s(spn_semver_t)));
   return SPN_ERROR;
 }
 
@@ -597,9 +594,9 @@ static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, s
   }
 
   switch (dep->source) {
-    case SPN_PKG_SOURCE_INDEX: return resolve_index_package(resolver, run, dep);
+    case SPN_PKG_SOURCE_INDEX: return resolve_index_package(resolver, run, node, dep);
     case SPN_PKG_SOURCE_ROOT:
-    case SPN_PKG_SOURCE_FILE:  return resolve_local_package(resolver, run, dep);
+    case SPN_PKG_SOURCE_FILE:  return resolve_local_package(resolver, run, node, dep);
   }
 
   sp_unreachable_return(SPN_ERROR);
@@ -957,7 +954,7 @@ static spn_err_t check_group_cycle(spn_resolver_t* resolver, spn_resolve_run_t* 
   }
 
   if (state && *state == 1) {
-    spn_event_buffer_push(resolver->events, (spn_build_event_t) {
+    record_failure(run, (spn_build_event_t) {
       .kind = SPN_EVENT_ERR_UNIT_CYCLE,
       .unit_cycle = {
         .id = spn_pkg_name_from_qualified(node->qualified),
@@ -1132,14 +1129,26 @@ static spn_err_t check_dynamic_duplicates(spn_resolver_t* resolver, spn_resolve_
         }
 
         bool ordered = spn_semver_le(prior->node->version, node->version);
-        spn_event_buffer_push(resolver->events, (spn_build_event_t) {
+        spn_semver_t low = ordered ? prior->node->version : node->version;
+        spn_semver_t high = ordered ? node->version : prior->node->version;
+        record_failure(run, (spn_build_event_t) {
           .kind = SPN_EVENT_ERR_DYNAMIC_DUPLICATE,
           .dynamic_dup = {
             .id = spn_pkg_name_from_qualified(node->qualified),
-            .low = ordered ? prior->node->version : node->version,
-            .high = ordered ? node->version : prior->node->version,
+            .low = low,
+            .high = high,
           }
         });
+
+        // A duplicate between two different versions may be an artifact of a
+        // greedy pick: some assignment holding the name to one of the duped
+        // versions everywhere might satisfy every scope. The caller re-solves
+        // under each candidate and keeps the first full success.
+        if (!run->has_forced && !spn_semver_eq(low, high)) {
+          run->retry[0] = (spn_pin_t) { .name = node->id.qualified, .version = low };
+          run->retry[1] = (spn_pin_t) { .name = node->id.qualified, .version = high };
+          run->retries = 2;
+        }
         result = SPN_ERROR;
         goto done;
       }
@@ -1155,63 +1164,79 @@ spn_err_t spn_resolve_from_lock_file(spn_resolver_t* resolver, spn_lock_file_t* 
   return SPN_OK;
 }
 
-spn_err_t spn_resolve_from_solver(spn_resolver_t* resolver, spn_resolve_query_t* query) {
-  sp_tm_timer_t timer = sp_tm_start_timer();
-
-  spn_resolve_run_t run = {
+static spn_err_t solve_once(spn_resolver_t* resolver, spn_resolve_query_t* query, spn_pin_t* forced, spn_resolve_run_t* run) {
+  *run = (spn_resolve_run_t) {
     .query = query,
   };
-  sp_da_init(resolver->mem, run.scopes);
-  sp_da_init(resolver->mem, run.boundaries);
-  sp_da_init(resolver->mem, run.edges);
-  sp_ht_init(resolver->mem, run.visited);
+  if (forced) {
+    run->forced = *forced;
+    run->has_forced = true;
+  }
+  sp_da_init(resolver->mem, run->scopes);
+  sp_da_init(resolver->mem, run->boundaries);
+  sp_da_init(resolver->mem, run->edges);
+  sp_ht_init(resolver->mem, run->visited);
 
-  u32 root = find_or_create_scope(resolver, &run, 0, sp_zero_s(spn_pkg_id_t));
+  u32 root = find_or_create_scope(resolver, run, 0, sp_zero_s(spn_pkg_id_t));
   sp_da_for(query->reqs, it) {
-    sp_da_push(run.scopes[root].reqs, query->reqs[it]);
+    sp_da_push(run->scopes[root].reqs, query->reqs[it]);
   }
 
   bool progress = true;
   while (progress) {
     progress = false;
 
-    sp_da_for(run.scopes, it) {
-      spn_scope_t* scope = &run.scopes[it];
+    sp_da_for(run->scopes, it) {
+      spn_scope_t* scope = &run->scopes[it];
       if (scope->cursor == sp_da_size(scope->reqs)) {
         continue;
       }
 
       progress = true;
-      run.scope = (u32)it;
+      run->scope = (u32)it;
 
-      if (resolve_scope(resolver, &run)) {
-        if (run.failed) {
-          spn_event_buffer_push(resolver->events, run.failure);
-        }
-        query->time = sp_tm_read_timer(&timer);
-        return SPN_ERROR;
-      }
+      spn_try(resolve_scope(resolver, run));
 
-      commit_scope(resolver, &run);
-      process_boundaries(resolver, &run);
-      run.failed = false;
+      commit_scope(resolver, run);
+      process_boundaries(resolver, run);
+      run->failed = false;
     }
   }
 
-  compute_processes(&run);
-  spn_err_t err = check_group_cycles(resolver, &run);
-  if (!err) {
-    spn_group_hash_t memo = SP_NULLPTR;
-    sp_ht_init(resolver->mem, memo);
-    sp_da_for(run.scopes, it) {
-      spn_scope_t* scope = &run.scopes[it];
-      sp_ht_for_kv(scope->named, jt) {
-        hash_group_node(resolver, &run, memo, (u32)it, *jt.key);
-      }
-    }
+  compute_processes(run);
+  spn_try(check_group_cycles(resolver, run));
 
-    commit_instances(resolver, &run, memo);
-    err = check_dynamic_duplicates(resolver, &run, memo);
+  spn_group_hash_t memo = SP_NULLPTR;
+  sp_ht_init(resolver->mem, memo);
+  sp_da_for(run->scopes, it) {
+    spn_scope_t* scope = &run->scopes[it];
+    sp_ht_for_kv(scope->named, jt) {
+      hash_group_node(resolver, run, memo, (u32)it, *jt.key);
+    }
+  }
+
+  commit_instances(resolver, run, memo);
+  return check_dynamic_duplicates(resolver, run, memo);
+}
+
+spn_err_t spn_resolve_from_solver(spn_resolver_t* resolver, spn_resolve_query_t* query) {
+  sp_tm_timer_t timer = sp_tm_start_timer();
+
+  spn_resolve_run_t run = sp_zero;
+  spn_err_t err = solve_once(resolver, query, SP_NULLPTR, &run);
+
+  for (u32 it = 0; err && it < run.retries; it++) {
+    query->result = SP_NULLPTR;
+    sp_ht_init(resolver->mem, query->result);
+
+    spn_resolve_run_t retry = sp_zero;
+    if (!solve_once(resolver, query, &run.retry[it], &retry)) {
+      err = SPN_OK;
+    }
+  }
+
+  if (err && run.failed) {
+    spn_event_buffer_push(resolver->events, run.failure);
   }
 
   query->time = sp_tm_read_timer(&timer);
