@@ -281,6 +281,37 @@ static s32 sort_pick_by_priority(const void* a, const void* b) {
   return lhs->priority < rhs->priority ? -1 : 1;
 }
 
+static s32 sort_req_canonical(const void* a, const void* b) {
+  const spn_requested_pkg_t* lhs = (const spn_requested_pkg_t*)a;
+  const spn_requested_pkg_t* rhs = (const spn_requested_pkg_t*)b;
+
+  s32 order = sp_str_compare_alphabetical(lhs->qualified, rhs->qualified);
+  if (order) return order;
+  if (lhs->kind != rhs->kind) return lhs->kind < rhs->kind ? -1 : 1;
+  if (lhs->private != rhs->private) return lhs->private < rhs->private ? -1 : 1;
+  if (lhs->source != rhs->source) return lhs->source < rhs->source ? -1 : 1;
+
+  switch (lhs->source) {
+    case SPN_PKG_SOURCE_INDEX: {
+      order = spn_semver_cmp(lhs->index.range.low.version, rhs->index.range.low.version);
+      if (order) return order;
+      if (lhs->index.range.low.op != rhs->index.range.low.op) return lhs->index.range.low.op < rhs->index.range.low.op ? -1 : 1;
+      order = spn_semver_cmp(lhs->index.range.high.version, rhs->index.range.high.version);
+      if (order) return order;
+      if (lhs->index.range.high.op != rhs->index.range.high.op) return lhs->index.range.high.op < rhs->index.range.high.op ? -1 : 1;
+      if (lhs->index.range.mod != rhs->index.range.mod) return lhs->index.range.mod < rhs->index.range.mod ? -1 : 1;
+      return 0;
+    }
+    case SPN_PKG_SOURCE_FILE: {
+      return sp_str_compare_alphabetical(lhs->file.path, rhs->file.path);
+    }
+    case SPN_PKG_SOURCE_ROOT: {
+      return 0;
+    }
+  }
+  sp_unreachable_return(0);
+}
+
 static bool find_pin(spn_scope_t* scope, sp_intern_id_t name, spn_semver_t* version, bool* contradiction) {
   bool found = false;
   sp_da_for(scope->pins, it) {
@@ -408,6 +439,7 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
   sp_da_for(pkg->info->deps, it) {
     sp_da_push(node.deps, pkg->info->deps[it]);
   }
+  sp_da_sort(node.deps, sort_req_canonical);
 
   node.priority = run->picks++;
 
@@ -471,6 +503,7 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
       }
     }));
   }
+  sp_da_sort(node.deps, sort_req_canonical);
 
   node.priority = run->picks++;
 
@@ -690,6 +723,7 @@ static spn_err_t resolve_scope(spn_resolver_t* resolver, spn_resolve_run_t* run)
   u64 to = sp_da_size(scope->reqs);
   scope->cursor = to;
   run->budget = resolver->budget;
+  sp_os_qsort(scope->reqs + from, to - from, sizeof(spn_requested_pkg_t), sort_req_canonical);
 
   // Re-entered scopes solve under their kept pins; re-pushed requests are a
   // function of manifests the scope already resolved, so they only duplicate
