@@ -1,0 +1,13 @@
+[package]
+name = "reexport_shared_boundary"
+version = "0.1.0"
+
+[deps.package]
+sdl_mixer = "1.0.0"
+
+[profile.default]
+linkage = "shared"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

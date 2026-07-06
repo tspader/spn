@@ -1,0 +1,12 @@
+[package]
+name = "sdl_mixer"
+version = "1.0.0"
+
+[deps.package]
+sdl = { version = "1.0.0", private = true }
+
+[[lib]]
+name = "sdl_mixer"
+kinds = ["static"]
+source = ["sdl_mixer.c"]
+headers = ["sdl_mixer.h"]

@@ -1,0 +1,15 @@
+[package]
+name = "sdl"
+version = "1.0.0"
+
+[options.opengl]
+type = "bool"
+default = true
+define = "SDL_OPENGL"
+public = true
+
+[[lib]]
+name = "sdl"
+kinds = ["static"]
+source = ["sdl.c"]
+headers = ["sdl.h"]

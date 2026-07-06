@@ -1,0 +1,10 @@
+[package]
+name = "reexport_private_subtree"
+version = "0.1.0"
+
+[deps.package]
+engine = "1.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
