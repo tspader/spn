@@ -1294,19 +1294,19 @@ UTEST_F(resolver, conflict_reports_selected) {
     .index = {
       {
         .namespace = "spn",
-        .name = "audio",
+        .name = "b",
         .releases = {
           {
             .version = spn_semver_lit(1, 0, 0),
             .deps = {
-              { .namespace = "spn", .name = "math", .version = "^2.0.0" },
+              { .namespace = "spn", .name = "a", .version = "^2.0.0" },
             }
           },
         }
       },
       {
         .namespace = "spn",
-        .name = "math",
+        .name = "a",
         .releases = {
           { .version = spn_semver_lit(1, 0, 0) },
           { .version = spn_semver_lit(2, 0, 0) },
@@ -1315,16 +1315,16 @@ UTEST_F(resolver, conflict_reports_selected) {
     },
     .manifest = {
       .deps.package = {
-        { .name = "spn/math", .version = "^1.0.0" },
-        { .name = "spn/audio", .version = "^1.0.0" },
+        { .name = "spn/a", .version = "^1.0.0" },
+        { .name = "spn/b", .version = "^1.0.0" },
       }
     },
     .err = SPN_ERROR,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
     .unsat = {
       .namespace = "spn",
-      .name = "math",
-      .requester = "spn/audio",
+      .name = "a",
+      .requester = "spn/b",
       .selected = "1.0.0",
     },
   });
@@ -2733,41 +2733,40 @@ UTEST_F(resolver, backtrack_orphan_not_committed) {
   });
 }
 
-// The tool's unit diverges on math, so lib's resolved subtree differs
-// between the units even though both hold lib 1.0.0. One lib build can't
-// link both maths: the instance must split rather than merge two dep sets
-// under one identity.
+// The tool's unit diverges on a, so b's resolved subtree differs between the
+// units even though both hold b 1.0.0. One b build can't link both a's: the
+// instance must split rather than merge two dep sets under one identity.
 UTEST_F(resolver, divergent_dep_splits_instance) {
   run_fixture(utest_result, (fixture_t) {
     .index = {
       {
         .namespace = "spn",
-        .name = "lib",
+        .name = "b",
         .releases = {
           {
             .version = spn_semver_lit(1, 0, 0),
             .deps = {
-              { .namespace = "spn", .name = "math", .version = "^1.0.0" },
+              { .namespace = "spn", .name = "a", .version = "^1.0.0" },
             }
           },
         }
       },
       {
         .namespace = "spn",
-        .name = "tool",
+        .name = "c",
         .releases = {
           {
             .version = spn_semver_lit(1, 0, 0),
             .deps = {
-              { .namespace = "spn", .name = "math", .version = "=1.0.0" },
-              { .namespace = "spn", .name = "lib", .version = "^1.0.0" },
+              { .namespace = "spn", .name = "a", .version = "=1.0.0" },
+              { .namespace = "spn", .name = "b", .version = "^1.0.0" },
             }
           },
         }
       },
       {
         .namespace = "spn",
-        .name = "math",
+        .name = "a",
         .releases = {
           { .version = spn_semver_lit(1, 0, 0) },
           { .version = spn_semver_lit(1, 9, 0) },
@@ -2776,21 +2775,21 @@ UTEST_F(resolver, divergent_dep_splits_instance) {
     },
     .manifest = {
       .deps.package = {
-        { .name = "spn/math", .version = "^1.9.0" },
-        { .name = "spn/lib", .version = "^1.0.0" },
-        { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+        { .name = "spn/a", .version = "^1.9.0" },
+        { .name = "spn/b", .version = "^1.0.0" },
+        { .name = "spn/c", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
     .err = SPN_OK,
     .expected = {
-      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
-      { .name = "lib", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
-      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
-      { .name = "lib", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
+      { .name = "b", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/c" },
+      { .name = "b", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/c" },
     },
     .instances = {
-      { .name = "spn/math", .count = 2 },
-      { .name = "spn/lib", .count = 2 },
+      { .name = "spn/a", .count = 2 },
+      { .name = "spn/b", .count = 2 },
     },
   });
 }
@@ -3200,55 +3199,55 @@ UTEST_F(resolver, hash_tracks_build_subtree) {
 // CONVERGENCE //
 /////////////////
 
-// Two sibling tools both pin math to the same older version, so each ends up
-// holding lib 1.0.0 over math 1.0.0. Identical resolved subtrees must collapse
+// Two sibling tools both pin a to the same older version, so each ends up
+// holding b 1.0.0 over a 1.0.0. Identical resolved subtrees must collapse
 // to ONE split instance shared by both tool units, never one per group: two
-// lib instances total (the root's over math 1.9.0 plus one shared split),
+// b instances total (the root's over a 1.9.0 plus one shared split),
 // never three
 UTEST_F(resolver, split_instances_reconverge) {
   run_fixture(utest_result, (fixture_t) {
     .index = {
       {
         .namespace = "spn",
-        .name = "lib",
+        .name = "b",
         .releases = {
           {
             .version = spn_semver_lit(1, 0, 0),
             .deps = {
-              { .namespace = "spn", .name = "math", .version = "^1.0.0" },
+              { .namespace = "spn", .name = "a", .version = "^1.0.0" },
             }
           },
         }
       },
       {
         .namespace = "spn",
-        .name = "t1",
+        .name = "c1",
         .releases = {
           {
             .version = spn_semver_lit(1, 0, 0),
             .deps = {
-              { .namespace = "spn", .name = "math", .version = "=1.0.0" },
-              { .namespace = "spn", .name = "lib", .version = "^1.0.0" },
+              { .namespace = "spn", .name = "a", .version = "=1.0.0" },
+              { .namespace = "spn", .name = "b", .version = "^1.0.0" },
             }
           },
         }
       },
       {
         .namespace = "spn",
-        .name = "t2",
+        .name = "c2",
         .releases = {
           {
             .version = spn_semver_lit(1, 0, 0),
             .deps = {
-              { .namespace = "spn", .name = "math", .version = "=1.0.0" },
-              { .namespace = "spn", .name = "lib", .version = "^1.0.0" },
+              { .namespace = "spn", .name = "a", .version = "=1.0.0" },
+              { .namespace = "spn", .name = "b", .version = "^1.0.0" },
             }
           },
         }
       },
       {
         .namespace = "spn",
-        .name = "math",
+        .name = "a",
         .releases = {
           { .version = spn_semver_lit(1, 0, 0) },
           { .version = spn_semver_lit(1, 9, 0) },
@@ -3257,39 +3256,39 @@ UTEST_F(resolver, split_instances_reconverge) {
     },
     .manifest = {
       .deps.package = {
-        { .name = "spn/math", .version = "^1.0.0" },
-        { .name = "spn/lib", .version = "^1.0.0" },
-        { .name = "spn/t1", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
-        { .name = "spn/t2", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+        { .name = "spn/a", .version = "^1.0.0" },
+        { .name = "spn/b", .version = "^1.0.0" },
+        { .name = "spn/c1", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
+        { .name = "spn/c2", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
     .err = SPN_OK,
     .expected = {
-      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
-      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/t1" },
-      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/t2" },
-      { .name = "lib", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
-      { .name = "lib", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/t1" },
-      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/t1", .excluded = true },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/c1" },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/c2" },
+      { .name = "b", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
+      { .name = "b", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/c1" },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/c1", .excluded = true },
     },
     .instances = {
-      { .name = "spn/lib", .count = 2 },
-      { .name = "spn/math", .count = 2 },
-      { .name = "spn/t1", .count = 1 },
-      { .name = "spn/t2", .count = 1 },
+      { .name = "spn/b", .count = 2 },
+      { .name = "spn/a", .count = 2 },
+      { .name = "spn/c1", .count = 1 },
+      { .name = "spn/c2", .count = 1 },
     },
   });
 }
 
-// The tool pins c older, so the divergence propagates up the chain: a and b
-// hold their root versions but over a different c subtree, splitting BOTH at
+// The tool pins a older, so the divergence propagates up the chain: c and b
+// hold their root versions but over a different a subtree, splitting BOTH at
 // the same version purely transitively
 UTEST_F(resolver, split_propagates_through_middle) {
   run_fixture(utest_result, (fixture_t) {
     .index = {
       {
         .namespace = "spn",
-        .name = "a",
+        .name = "c",
         .releases = {
           {
             .version = spn_semver_lit(1, 0, 0),
@@ -3306,14 +3305,14 @@ UTEST_F(resolver, split_propagates_through_middle) {
           {
             .version = spn_semver_lit(1, 0, 0),
             .deps = {
-              { .namespace = "spn", .name = "c", .version = "^1.0.0" },
+              { .namespace = "spn", .name = "a", .version = "^1.0.0" },
             }
           },
         }
       },
       {
         .namespace = "spn",
-        .name = "c",
+        .name = "a",
         .releases = {
           { .version = spn_semver_lit(1, 0, 0) },
           { .version = spn_semver_lit(1, 9, 0) },
@@ -3326,8 +3325,8 @@ UTEST_F(resolver, split_propagates_through_middle) {
           {
             .version = spn_semver_lit(1, 0, 0),
             .deps = {
-              { .namespace = "spn", .name = "c", .version = "=1.0.0" },
-              { .namespace = "spn", .name = "a", .version = "^1.0.0" },
+              { .namespace = "spn", .name = "a", .version = "=1.0.0" },
+              { .namespace = "spn", .name = "c", .version = "^1.0.0" },
             }
           },
         }
@@ -3335,23 +3334,23 @@ UTEST_F(resolver, split_propagates_through_middle) {
     },
     .manifest = {
       .deps.package = {
-        { .name = "spn/a", .version = "^1.0.0" },
+        { .name = "spn/c", .version = "^1.0.0" },
         { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
     .err = SPN_OK,
     .expected = {
-      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
-      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
-      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
       { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
       { .name = "b", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
-      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/tool", .excluded = true },
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/tool", .excluded = true },
     },
     .instances = {
-      { .name = "spn/a", .count = 2 },
-      { .name = "spn/b", .count = 2 },
       { .name = "spn/c", .count = 2 },
+      { .name = "spn/b", .count = 2 },
+      { .name = "spn/a", .count = 2 },
       { .name = "spn/tool", .count = 1 },
     },
   });
