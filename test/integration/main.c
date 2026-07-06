@@ -47,6 +47,7 @@ UTEST_F(harness, tmpfs) {
 #include "consume.c"
 #include "deps.c"
 #include "units.c"
+#include "reexport.c"
 #include "script.c"
 #include "cxx.c"
 #include "run.c"

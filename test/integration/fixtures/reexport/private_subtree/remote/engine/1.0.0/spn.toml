@@ -1,0 +1,12 @@
+[package]
+name = "engine"
+version = "1.0.0"
+
+[deps.package]
+sdl_mixer = { version = "1.0.0", private = true }
+
+[[lib]]
+name = "engine"
+kinds = ["static"]
+source = ["engine.c"]
+headers = ["engine.h"]

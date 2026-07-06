@@ -1,0 +1,10 @@
+[package]
+name = "reexport_public_define"
+version = "0.1.0"
+
+[deps.package]
+sdl_mixer = "1.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
