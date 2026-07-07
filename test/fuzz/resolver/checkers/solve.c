@@ -3,7 +3,7 @@
 #include "pkg/id.h"
 #include "semver/compare.h"
 
-static s32 fz_instance_pkg(fz_universe_t* u, sp_str_t qualified) {
+s32 fz_pkg_from_qualified(fz_universe_t* u, sp_str_t qualified) {
   sp_da_for(u->pkgs, it) {
     sp_str_t expected = spn_pkg_canonicalize_pair(sp_str_lit("spn"), sp_str_view(fz_names[it]));
     if (sp_str_equal(qualified, expected)) {
@@ -25,7 +25,7 @@ fz_err_t fz_check_solve(fz_universe_t* u, spn_resolve_query_t* query) {
       continue;
     }
 
-    s32 pkg = fz_instance_pkg(u, node->qualified);
+    s32 pkg = fz_pkg_from_qualified(u, node->qualified);
     if (pkg < 0) {
       return FZ_ERR_SOLVE_FOREIGN_PKG;
     }
@@ -69,4 +69,43 @@ fz_err_t fz_check_solve(fz_universe_t* u, spn_resolve_query_t* query) {
   }
 
   return FZ_OK;
+}
+
+static s32 fz_sort_pick(const void* a, const void* b) {
+  const fz_pick_t* lhs = (const fz_pick_t*)a;
+  const fz_pick_t* rhs = (const fz_pick_t*)b;
+  if (lhs->pkg != rhs->pkg) return lhs->pkg < rhs->pkg ? -1 : 1;
+  s32 order = spn_semver_cmp(lhs->version, rhs->version);
+  if (order) return order;
+  if (lhs->hash != rhs->hash) return lhs->hash < rhs->hash ? -1 : 1;
+  return 0;
+}
+
+fz_solution_t fz_solution(sp_mem_t mem, fz_universe_t* u, spn_resolve_query_t* query) {
+  fz_solution_t solution = sp_da_new(mem, fz_pick_t);
+  sp_ht_for_kv(query->result, it) {
+    spn_resolved_pkg_t* node = it.val;
+    if (sp_str_equal(node->qualified, sp_str_view(fz_root_qualified))) {
+      continue;
+    }
+    sp_da_push(solution, ((fz_pick_t) {
+      .pkg = fz_pkg_from_qualified(u, node->qualified),
+      .version = node->version,
+      .hash = node->id.hash,
+    }));
+  }
+  sp_da_sort(solution, fz_sort_pick);
+  return solution;
+}
+
+bool fz_solution_equal(fz_solution_t a, fz_solution_t b) {
+  if (sp_da_size(a) != sp_da_size(b)) {
+    return false;
+  }
+  sp_da_for(a, it) {
+    if (a[it].pkg != b[it].pkg) return false;
+    if (!spn_semver_eq(a[it].version, b[it].version)) return false;
+    if (a[it].hash != b[it].hash) return false;
+  }
+  return true;
 }

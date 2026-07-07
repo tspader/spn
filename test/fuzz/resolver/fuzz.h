@@ -3,6 +3,7 @@
 
 #include "sp.h"
 
+#include "index/types.h"
 #include "resolve/types.h"
 #include "semver/types.h"
 #include "sp_fuzz.h"
@@ -23,6 +24,24 @@ typedef enum {
   FZ_ERR_EVENT_MISSING,
   FZ_ERR_PLANTED_REJECTED,
   FZ_ERR_INCOMPLETE,
+  FZ_ERR_ROOT_MISSING,
+  FZ_ERR_EDGE_MISSING,
+  FZ_ERR_EDGE_EXTRA,
+  FZ_ERR_EDGE_MISCLASSIFIED,
+  FZ_ERR_EDGE_OUT_OF_RANGE,
+  FZ_ERR_UNIT_DUPLICATE,
+  FZ_ERR_GRAPH_CYCLE,
+  FZ_ERR_SHARED_DUP_MISSED,
+  FZ_ERR_IDENTITY_SPLIT,
+  FZ_ERR_SHUFFLE_VERDICT,
+  FZ_ERR_SHUFFLE_SOLUTION,
+  FZ_ERR_RENAME_VERDICT,
+  FZ_ERR_INTERN_VERDICT,
+  FZ_ERR_INTERN_SOLUTION,
+  FZ_ERR_PIN_VERDICT,
+  FZ_ERR_PIN_SOLUTION,
+  FZ_ERR_EXTEND_VERDICT,
+  FZ_ERR_COUNT,
 } fz_err_t;
 
 typedef enum {
@@ -40,6 +59,8 @@ typedef struct {
   u32 pkg;
   fz_range_shape_t shape;
   spn_semver_t version;
+  spn_index_dep_kind_t kind;
+  bool private;
 } fz_dep_t;
 
 typedef struct {
@@ -48,27 +69,65 @@ typedef struct {
 } fz_release_t;
 
 typedef struct {
+  bool shared;
   sp_da(fz_release_t) releases;
 } fz_pkg_t;
 
 typedef struct {
+  u64 shapes[FZ_RANGE_COUNT];
+  u64 pkg_count;
+  u64 release_count;
+  u64 density;
+  u64 back_density;
+  u64 build_pct;
+  u64 test_pct;
+  u64 private_pct;
+  u64 shared_pct;
+  bool planted;
+  bool features;
+  u64 budget;
+} fz_profile_t;
+
+typedef struct {
+  fz_profile_t profile;
   sp_da(fz_pkg_t) pkgs;
   sp_da(fz_dep_t) roots;
   bool planted;
 } fz_universe_t;
 
+typedef struct {
+  s32 pkg;
+  spn_semver_t version;
+  sp_hash_t hash;
+} fz_pick_t;
+
+typedef sp_da(fz_pick_t) fz_solution_t;
+
 extern const c8* fz_names[FZ_MAX_PKGS];
 extern const c8* fz_root_qualified;
 
+#define try(expr) do { fz_err_t __err = (expr); if (__err) return __err; } while (0)
+#define must(expr, err) do { if (!(expr)) return err; } while (0)
+
 sp_str_t fz_err_to_str(fz_err_t err);
 
+bool          fz_ranges_agree(void);
 bool          fz_range_sat(fz_dep_t dep, spn_semver_t version);
 sp_str_t      fz_range_render(sp_mem_t mem, fz_dep_t dep);
-fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng);
+s32           fz_pkg_from_qualified(fz_universe_t* u, sp_str_t qualified);
+fz_profile_t  fz_gen_profile(sp_fuzz_prng_t* prng);
+fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t profile);
+fz_universe_t fz_shuffle_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u);
+fz_universe_t fz_rename_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u);
+fz_universe_t fz_pin_universe(sp_mem_t mem, fz_universe_t* u, fz_solution_t solution);
+fz_universe_t fz_extend_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u);
 
 bool fz_oracle_sat(fz_universe_t* u);
 
-fz_err_t fz_check_solve(fz_universe_t* u, spn_resolve_query_t* query);
+fz_err_t      fz_check_solve(fz_universe_t* u, spn_resolve_query_t* query);
+fz_err_t      fz_check_units(sp_mem_t mem, fz_universe_t* u, spn_resolve_query_t* query);
+fz_solution_t fz_solution(sp_mem_t mem, fz_universe_t* u, spn_resolve_query_t* query);
+bool          fz_solution_equal(fz_solution_t a, fz_solution_t b);
 
 void fz_dump(fz_universe_t* u, u64 iter);
 

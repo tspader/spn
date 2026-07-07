@@ -9,6 +9,7 @@ add_executable(fuzz_resolver
   ${SRC}/external/tom.c
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/lower.c
+  ${SRC}/when/when.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
@@ -34,6 +35,7 @@ add_executable(fuzz_resolver
   generator.c
   oracles/exhaustive.c
   checkers/solve.c
+  checkers/units.c
   dump.c
   ${TEST_TOOLS}/sp_fuzz.c
   ${TEST_TOOLS}/toml.c
