@@ -1,0 +1,9 @@
+[package]
+name = "plat"
+version = "1.0.0"
+
+[[lib]]
+name = "plat"
+kinds = ["static"]
+source = ["plat.c"]
+headers = ["plat.h"]

@@ -1,0 +1,15 @@
+[package]
+name = "ui"
+version = "1.0.0"
+
+[options.freetype]
+type = "bool"
+default = true
+define = "UI_FREETYPE"
+public = true
+
+[[lib]]
+name = "ui"
+kinds = ["static"]
+source = ["ui.c"]
+headers = ["ui.h"]

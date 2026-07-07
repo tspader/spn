@@ -1,0 +1,21 @@
+[package]
+name = "codec"
+version = "1.0.0"
+
+[options.audio]
+type = "bool"
+default = false
+additive = true
+define = "CODEC_AUDIO"
+
+[options.video]
+type = "bool"
+default = false
+additive = true
+define = "CODEC_VIDEO"
+
+[[lib]]
+name = "codec"
+kinds = ["static"]
+source = ["codec.c"]
+headers = ["codec.h"]

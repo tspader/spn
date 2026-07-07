@@ -1,0 +1,13 @@
+[package]
+name = "options_undeclared"
+version = "0.1.0"
+
+[deps.package]
+codec = "1.0.0"
+
+[config.codec]
+options = { nosuch = true }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

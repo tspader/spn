@@ -1,0 +1,14 @@
+[package]
+name = "codec"
+version = "1.0.0"
+
+[options.mp3]
+type = "bool"
+default = false
+define = "CODEC_MP3"
+
+[[lib]]
+name = "codec"
+kinds = ["static"]
+source = ["codec.c"]
+headers = ["codec.h"]

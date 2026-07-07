@@ -1,0 +1,11 @@
+[package]
+name = "when_flags"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+flags = [
+  { value = "-DFLAG_LINUX", when = { os = "linux" } },
+  { value = "/DFLAG_WINDOWS", when = { abi = "msvc" } },
+]

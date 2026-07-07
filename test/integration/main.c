@@ -50,6 +50,7 @@ UTEST_F(harness, tmpfs) {
 #include "reexport.c"
 #include "script.c"
 #include "cxx.c"
+#include "options.c"
 #include "run.c"
 #include "log.c"
 #include "cli.c"
