@@ -127,12 +127,6 @@ static spn_dep_kind_t dep_kind_from_index(spn_index_dep_kind_t kind) {
   sp_unreachable_return(SPN_DEP_KIND_PACKAGE);
 }
 
-static bool version_in_range(spn_semver_t version, spn_semver_range_t range) {
-  return
-    spn_semver_satisfies(version, range.low.version, range.low.op) &&
-    spn_semver_satisfies(version, range.high.version, range.high.op);
-}
-
 static void record_failure(spn_resolve_run_t* run, spn_build_event_t event) {
   if (run->failed) {
     return;
@@ -493,13 +487,17 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
 
   sp_da_init(resolver->mem, node.deps);
   sp_da_for(release->deps, it) {
+    spn_semver_range_t range = sp_zero;
+    if (spn_semver_parse_range(release->deps[it].version, &range)) {
+      return SPN_ERROR;
+    }
     sp_da_push(node.deps, ((spn_requested_pkg_t) {
       .qualified = spn_pkg_name_to_qualified(release->deps[it].id),
       .source = SPN_PKG_SOURCE_INDEX,
       .kind = dep_kind_from_index(release->deps[it].kind),
       .private = release->deps[it].private,
       .index = {
-        .range = spn_semver_parse_range(release->deps[it].version)
+        .range = range
       }
     }));
   }
@@ -540,7 +538,7 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
   // this request, too. If not, the scope is unsatisfiable; a caller with alternatives backtracks.
   spn_resolved_pkg_t* existing = sp_ht_getp(scope->named, name);
   if (existing) {
-    if (version_in_range(existing->version, request->index.range)) {
+    if (spn_semver_in_range(existing->version, request->index.range)) {
       return SPN_OK;
     }
 
@@ -563,7 +561,7 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
   bool contradiction = false;
   bool held = find_forced(run, name, &pinned) || find_pin(scope, name, &pinned, &contradiction);
   if (held) {
-    if (contradiction || !version_in_range(pinned, request->index.range)) {
+    if (contradiction || !spn_semver_in_range(pinned, request->index.range)) {
       record_failure(run, unsatisfiable_event(from, request, true, pinned));
       return SPN_ERROR;
     }
@@ -586,7 +584,7 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
   spn_err_t result = SPN_ERROR;
   sp_da_rfor(pkg->releases, it) {
     spn_index_rel_t* release = &pkg->releases[it];
-    if (!version_in_range(release->version, request->index.range)) {
+    if (!spn_semver_in_range(release->version, request->index.range)) {
       continue;
     }
     if (!try_candidate(resolver, run, release)) {

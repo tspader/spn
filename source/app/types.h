@@ -15,25 +15,6 @@ typedef struct {
   sp_str_t lock;
 } spn_app_paths_t;
 
-typedef enum {
-  SPN_RUN_KIND_NONE,
-  SPN_RUN_KIND_TESTS,
-  SPN_RUN_KIND_SCRIPT,
-  SPN_RUN_KIND_SOURCE,
-} spn_run_kind_t;
-
-typedef struct {
-  spn_run_kind_t kind;
-  sp_str_t target;
-} spn_run_config_t;
-
-typedef struct {
-  spn_target_filter_t filter;
-  bool force;
-  spn_run_config_t run;
-  spn_profile_info_t overrides;
-} spn_app_config_t;
-
 typedef struct {
   spn_session_t* session;
   spn_resolved_pkg_t* pkg;

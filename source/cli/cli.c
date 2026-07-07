@@ -5,6 +5,74 @@
 
 static spn_cli_raw_t spn_cli_raw;
 
+static sp_cli_cmd_t cmd_init = {
+  .name = "init",
+  .summary = "Scaffold a new project",
+  .opts = {
+    {
+      .name = "bare",
+      .summary = "Only write a manifest",
+      .ptr = &spn.cli.init.bare,
+    },
+  },
+  .args = {
+    {
+      .name = "path",
+      .kind = SP_CLI_ARG_OPTIONAL,
+      .summary = "Directory to scaffold into",
+      .ptr = &spn_cli_raw.init.path,
+    },
+  },
+  .handler = spn_cli_init,
+};
+
+static sp_cli_cmd_t cmd_add = {
+  .name = "add",
+  .summary = "Add a dependency to the manifest",
+  .opts = {
+    {
+      .name = "test",
+      .summary = "Add to test dependencies",
+      .ptr = &spn.cli.add.test,
+    },
+    {
+      .name = "build",
+      .summary = "Add to build dependencies",
+      .ptr = &spn.cli.add.build,
+    },
+  },
+  .args = {
+    {
+      .name = "package",
+      .summary = "Package to add (name or name@version)",
+      .ptr = &spn_cli_raw.add.package,
+    },
+  },
+  .handler = spn_cli_add,
+};
+
+static sp_cli_cmd_t cmd_update = {
+  .name = "update",
+  .summary = "Update dependencies to the latest compatible versions",
+  .handler = spn_cli_update,
+};
+
+static sp_cli_cmd_t cmd_clean = {
+  .name = "clean",
+  .summary = "Remove the project build directory",
+  .opts = {
+    {
+      .brief = "p",
+      .name = "profile",
+      .kind = SP_CLI_OPT_STRING,
+      .summary = "Only remove this profile's outputs",
+      .placeholder = "PROFILE",
+      .ptr = &spn_cli_raw.clean.profile,
+    },
+  },
+  .handler = spn_cli_clean,
+};
+
 static sp_cli_cmd_t cmd_build = {
   .name = "build",
   .summary = "Build the project, including dependencies, from source",
@@ -333,6 +401,10 @@ static sp_cli_cmd_t cmd_root = {
     }
   },
   .commands = {
+    &cmd_init,
+    &cmd_add,
+    &cmd_update,
+    &cmd_clean,
     &cmd_build,
     &cmd_run,
     &cmd_test,
@@ -348,6 +420,10 @@ void spn_cli_commit(void) {
   spn.cli.project_dir = sp_cstr_as_str(spn_cli_raw.project_dir);
   spn.cli.project_file = sp_cstr_as_str(spn_cli_raw.project_file);
   spn.cli.output = sp_cstr_as_str(spn_cli_raw.output);
+
+  spn.cli.init.path = sp_cstr_as_str(spn_cli_raw.init.path);
+  spn.cli.add.package = sp_cstr_as_str(spn_cli_raw.add.package);
+  spn.cli.clean.profile = sp_cstr_as_str(spn_cli_raw.clean.profile);
 
   spn.cli.build.name = sp_cstr_as_str(spn_cli_raw.build.name);
   spn.cli.build.profile = sp_cstr_as_str(spn_cli_raw.build.profile);

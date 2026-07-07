@@ -72,6 +72,7 @@ typedef struct {
 
 typedef struct {
   bool bare;
+  sp_str_t path;
 } spn_cli_init_t;
 
 typedef struct {
@@ -176,6 +177,9 @@ typedef struct {
   const c8* project_dir;
   const c8* project_file;
   const c8* output;
+  struct {
+    const c8* path;
+  } init;
   struct {
     const c8* package;
   } add;

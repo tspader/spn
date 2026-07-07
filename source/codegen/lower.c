@@ -159,7 +159,12 @@ static void lower_dep(spn_codegen_ctx_t* ctx, sp_str_t name, const spn_cg_dep_t*
     req.file.path = sp_fs_normalize_path(ctx->mem, path);
   } else {
     req.source = SPN_PKG_SOURCE_INDEX;
-    req.index.range = spn_semver_parse_range(cg->version);
+    if (spn_semver_parse_range(cg->version, &req.index.range)) {
+      spn_codegen_push_key(ctx, sp_str_to_cstr(ctx->mem, name));
+      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_INVALID, "version");
+      spn_codegen_pop(ctx);
+      return;
+    }
   }
 
   sp_da_push(out->deps, req);

@@ -5,6 +5,7 @@
 #include "resolve/types.h"
 #include "semver/types.h"
 #include "session/types.h"
+#include "spn.h"
 #include "unit/types.h"
 
 #include "enum/enum.h"
@@ -21,7 +22,7 @@
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
-spn_err_t spn_session_init(spn_session_t* session, spn_pkg_info_t* root) {
+spn_err_t spn_session_init(spn_session_t* session, spn_pkg_info_t* root, spn_app_config_t config) {
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
   spn_try(spn_toolchain_catalog_init(&session->catalog, builtins, spn_triple_host(), session->mem));
 
@@ -42,7 +43,38 @@ spn_err_t spn_session_init(spn_session_t* session, spn_pkg_info_t* root) {
   sp_ht_init(session->mem, session->packages);
   sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
 
+  if (spn_profile_resolve(session->profiles, &config.overrides, &session->profile)) {
+    sp_str_t name = spn_profile_select_name(&config.overrides);
+    spn_log_error("profile {.cyan} isn't defined", SP_FMT_STR(name));
+    return SPN_ERROR;
+  }
+
+  spn_toolchain_query_t query = {
+    .build = session->profile.toolchain,
+    .script = spn_toolchain_script_default(),
+    .target = { session->profile.arch, session->profile.os, session->profile.abi },
+    .host = spn_triple_host(),
+  };
+  spn_err_union_t select_err = spn_toolchain_select(&session->catalog, query, session->mem, &session->selection);
+  if (select_err.kind) {
+    spn_event_buffer_push(session->events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR,
+      .err = select_err,
+    });
+    return SPN_ERROR;
+  }
+
+  session->paths.profile = sp_fs_join_path(session->mem, session->paths.build, session->profile.name);
+  session->filter = config.filter;
+
   return SPN_OK;
+
+
+  return SPN_OK;
+}
+
+spn_err_t spn_session_apply_config(spn_session_t* session, spn_config_t config) {
+
 }
 
 // The root manifest can pin the lib kind of any package in the build with [config.<pkg>] kind

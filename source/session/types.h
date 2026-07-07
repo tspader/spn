@@ -49,6 +49,26 @@ typedef struct {
 
 typedef sp_om(spn_pkg_id_t, sp_da(spn_pkg_dep_t)) spn_unit_graph_t;
 
+typedef enum {
+  SPN_RUN_KIND_NONE,
+  SPN_RUN_KIND_TESTS,
+  SPN_RUN_KIND_SCRIPT,
+  SPN_RUN_KIND_SOURCE,
+} spn_run_kind_t;
+
+typedef struct {
+  spn_run_kind_t kind;
+  sp_str_t target;
+} spn_run_config_t;
+
+typedef struct {
+  spn_target_filter_t filter;
+  bool force;
+  spn_run_config_t run;
+  spn_profile_info_t overrides;
+} spn_app_config_t;
+
+
 struct spn_session_t {
   sp_mem_t mem;
   sp_intern_t* intern;

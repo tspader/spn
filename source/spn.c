@@ -58,8 +58,10 @@
 // SINGLE HEADER
 #define SP_IMPLEMENTATION
 #include "sp.h"
+#include "sp/atomic_file.h"
 #include "sp/prompt.h"
 #include "sp/sp_cli.h"
+#include "sp/sp_template.h"
 #include "sp/coff.h"
 #include "sp/sp_elf.h"
 
@@ -353,7 +355,8 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   if (!sp_fs_exists(spn.paths.manifest)) {
     // spn run can execute a lone source file without a project
-    if (!sp_str_equal_cstr(sp_cstr_as_str(parsed.cmd->name), "run")) {
+    sp_str_t cmd = sp_cstr_as_str(parsed.cmd->name);
+    if (!sp_str_equal_cstr(cmd, "run") && !sp_str_equal_cstr(cmd, "init")) {
       spn_log_error("no manifest found at {.cyan}", SP_FMT_STR(spn.paths.manifest));
       return SP_APP_ERR;
     }
@@ -386,7 +389,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       sp_opt_set(app.lock, spn_lock_file_load(spn.heap, app.paths.lock, spn.events));
     }
 
-    if (spn_session_init(&app.session, &app.package)) {
+    if (spn_session_init(&app.session, &app.package, app.config)) {
       spn_log_error("failed to initialize session");
       return SP_APP_ERR;
     }
@@ -496,6 +499,10 @@ sp_app_result_t spn_update(sp_app_t* sp) {
     }
     case SPN_TASK_KIND_WHICH: {
       result = spn_task_which(&app, &spn.cli.which);
+      break;
+    }
+    case SPN_TASK_KIND_UPDATE: {
+      result = spn_task_update(&app);
       break;
     }
     case SPN_TASK_KIND_COUNT: {

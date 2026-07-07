@@ -602,6 +602,49 @@ spn_toml_edit_entry_t* spn_toml_edit_find(spn_toml_edit_t* edit, const sp_str_t*
   return found;
 }
 
+static void spn_toml_edit_push_key(sp_da(sp_str_t)* keys, sp_str_t key) {
+  sp_da_for(*keys, it) {
+    if (sp_str_equal((*keys)[it], key)) {
+      return;
+    }
+  }
+  sp_da_push(*keys, key);
+}
+
+static void spn_toml_edit_keys_in(sp_da(spn_toml_edit_entry_t) entries, const sp_str_t* path, u32 num_segments, sp_da(sp_str_t)* keys) {
+  sp_da_for(entries, it) {
+    spn_toml_edit_entry_t* entry = &entries[it];
+    u32 len = sp_da_size(entry->path);
+    if (len > num_segments) {
+      if (spn_toml_edit_path_starts_with(entry->path, path, num_segments)) {
+        spn_toml_edit_push_key(keys, entry->path[num_segments]);
+      }
+    }
+    else if (spn_toml_edit_path_prefix(entry->path, path, num_segments) && entry->kind == SPN_TOML_EDIT_VALUE_TABLE) {
+      spn_toml_edit_keys_in(entry->entries, path + len, num_segments - len, keys);
+    }
+  }
+}
+
+sp_da(sp_str_t) spn_toml_edit_keys(spn_toml_edit_t* edit, sp_mem_t mem, const sp_str_t* path, u32 num_segments) {
+  sp_da(sp_str_t) keys = sp_da_new(mem, sp_str_t);
+
+  sp_da_for(edit->sections, it) {
+    spn_toml_edit_section_t* section = &edit->sections[it];
+    u32 len = sp_da_size(section->path);
+    if (len > num_segments) {
+      if (spn_toml_edit_path_starts_with(section->path, path, num_segments)) {
+        spn_toml_edit_push_key(&keys, section->path[num_segments]);
+      }
+    }
+    else if (spn_toml_edit_path_prefix(section->path, path, num_segments)) {
+      spn_toml_edit_keys_in(section->entries, path + len, num_segments - len, &keys);
+    }
+  }
+
+  return keys;
+}
+
 sp_str_t spn_toml_edit_entry_str(spn_toml_edit_t* edit, spn_toml_edit_entry_t* entry) {
   switch (entry->kind) {
     case SPN_TOML_EDIT_VALUE_SCALAR: {
