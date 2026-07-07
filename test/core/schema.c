@@ -26,6 +26,7 @@ static u32 schema_c_standard_from(sp_str_t str) { return spn_c_standard_from_str
 static u32 schema_cxx_standard_from(sp_str_t str) { return spn_cxx_standard_from_str(str); }
 static u32 schema_build_mode_from(sp_str_t str) { return spn_build_mode_from_str(str); }
 static u32 schema_index_protocol_from(sp_str_t str) { return spn_index_protocol_from_str(str); }
+static u32 schema_option_type_from(sp_str_t str) { return spn_option_type_from_str(str); }
 static u32 schema_index_dep_kind_from(sp_str_t str) { return spn_index_dep_kind_from_str(str); }
 
 static sp_str_t schema_arch_to(u32 value) { return spn_arch_to_str((spn_arch_t)value); }
@@ -37,6 +38,7 @@ static sp_str_t schema_c_standard_to(u32 value) { return spn_c_standard_to_str((
 static sp_str_t schema_cxx_standard_to(u32 value) { return spn_cxx_standard_to_str((spn_cxx_standard_t)value); }
 static sp_str_t schema_build_mode_to(u32 value) { return spn_build_mode_to_str((spn_build_mode_t)value); }
 static sp_str_t schema_index_protocol_to(u32 value) { return spn_index_protocol_to_str((spn_index_protocol_t)value); }
+static sp_str_t schema_option_type_to(u32 value) { return spn_option_type_to_str((spn_option_type_t)value); }
 static sp_str_t schema_index_dep_kind_to(u32 value) { return spn_index_dep_kind_to_str((spn_index_dep_kind_t)value); }
 
 void run_schema_enum_test(s32* utest_result, schema_enum_t t) {
@@ -135,6 +137,15 @@ UTEST(schema, build_mode) {
     .def = "build_mode",
     .from = schema_build_mode_from,
     .to = schema_build_mode_to,
+  });
+}
+
+UTEST(schema, option_type) {
+  run_schema_enum_test(utest_result, (schema_enum_t) {
+    .file = "manifest.jtd.json",
+    .def = "option_type",
+    .from = schema_option_type_from,
+    .to = schema_option_type_to,
   });
 }
 

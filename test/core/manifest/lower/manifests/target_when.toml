@@ -1,0 +1,11 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[lib]]
+name = "t"
+kinds = ["static"]
+source = ["a.c", { path = "b.c", when = { os = "linux" } }]
+define = ["X", { value = "Y", when = { os = "windows" } }]
+flags = [{ value = "-g", when = { mode = "debug" } }]
+system_deps = [{ value = "ws2_32", when = { os = "windows" } }]

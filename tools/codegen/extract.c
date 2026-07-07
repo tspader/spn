@@ -6,6 +6,7 @@ gen_t* gen_new(sp_mem_t mem) {
   sp_str_om_init(gen->types);
   gen->entries = sp_da_new(mem, entry_t);
   gen->containers.array = sp_da_new(mem, sp_str_t);
+  gen->containers.shorthand = sp_da_new(mem, shorthand_type_t);
   gen->containers.map = sp_da_new(mem, om_type_t);
   gen->containers.object = sp_da_new(mem, sp_str_t);
   gen->includes = sp_da_new(mem, sp_str_t);
@@ -49,6 +50,17 @@ static void add_unique(sp_da(sp_str_t) * strs, sp_str_t value) {
   sp_da_push(*strs, value);
 }
 
+static bool add_shorthand_type(gen_t* g, sp_str_t object, sp_str_t field) {
+  sp_da_for(g->containers.shorthand, it) {
+    if (sp_str_equal(g->containers.shorthand[it].object, object)) {
+      return sp_str_equal(g->containers.shorthand[it].field, field);
+    }
+  }
+  shorthand_type_t shorthand = { .object = object, .field = field };
+  sp_da_push(g->containers.shorthand, shorthand);
+  return true;
+}
+
 static void add_om_type(gen_t* g, sp_str_t object, sp_str_t key_field) {
   sp_da_for(g->containers.map, it) {
     if (sp_str_equal(g->containers.map[it].object, object)) {
@@ -71,9 +83,30 @@ static void add_entry(gen_t* g, entry_t entry) {
 static bool extract_field(gen_t* g, type_t* type, jtd_property_t property) {
   field_t field = {
     .key = property.key,
+    .name = property.key,
     .required = property.required,
     .card = CARD_SCALAR,
   };
+
+  sp_str_t rename = jtd_metadata(property.schema, "field");
+  if (!sp_str_empty(rename)) {
+    field.name = rename;
+  }
+
+  sp_str_t extern_name = jtd_metadata(property.schema, "extern");
+  if (!sp_str_empty(extern_name)) {
+    if (property.schema->form != JTD_FORM_EMPTY) {
+      return fail(g, type->name, property.key, sp_str_lit("extern fields must use the empty form"));
+    }
+    field.kind = FIELD_EXTERN;
+    field.type_name = extern_name;
+    sp_str_t include = jtd_metadata(property.schema, "include");
+    if (!sp_str_empty(include)) {
+      add_unique(&g->includes, include);
+    }
+    sp_da_push(type->fields, field);
+    return true;
+  }
 
   jtd_schema_t* value = property.schema;
   if (property.schema->form == JTD_FORM_ELEMENTS) {
@@ -125,11 +158,17 @@ static bool extract_field(gen_t* g, type_t* type, jtd_property_t property) {
 
   if (field.card == CARD_ARRAY && field.kind == FIELD_STRUCT) {
     field.key_field = jtd_metadata(property.schema, "key");
-    if (sp_str_empty(field.key_field)) {
-      add_unique(&g->containers.array, field.type_name);
+    field.shorthand = jtd_metadata(property.schema, "shorthand");
+    if (!sp_str_empty(field.key_field)) {
+      add_om_type(g, field.type_name, field.key_field);
+    }
+    else if (!sp_str_empty(field.shorthand)) {
+      if (!add_shorthand_type(g, field.type_name, field.shorthand)) {
+        return fail(g, type->name, property.key, sp_str_lit("object is used with two different shorthand fields"));
+      }
     }
     else {
-      add_om_type(g, field.type_name, field.key_field);
+      add_unique(&g->containers.array, field.type_name);
     }
   }
 

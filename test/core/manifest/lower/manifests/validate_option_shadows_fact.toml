@@ -1,0 +1,8 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[options.os]
+type = "enum"
+values = ["a"]
+default = "a"

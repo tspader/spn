@@ -1,0 +1,6 @@
+[package]
+name = "whennot"
+version = "1.0.0"
+
+[deps.package]
+openssl = { version = "3.3.0", when = { os = { not = "wasi" }, zstd = { not = true } } }

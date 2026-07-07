@@ -1,0 +1,24 @@
+{
+  "issues": [
+    {
+      "code": "invalid",
+      "path": "deps.package.a.when.os",
+      "detail": "os"
+    },
+    {
+      "code": "invalid",
+      "path": "deps.package.b.when.os",
+      "detail": "os"
+    },
+    {
+      "code": "expected_object",
+      "path": "deps.package.c.when",
+      "detail": "when"
+    },
+    {
+      "code": "invalid",
+      "path": "deps.package.d.when.os",
+      "detail": "os"
+    }
+  ]
+}

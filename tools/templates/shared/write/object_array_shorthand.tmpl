@@ -1,0 +1,12 @@
+    sp_io_write_c8(out, '[');
+    sp_da_for(in->{{ .name }}, it) {
+      if (it) {
+        sp_io_write_c8(out, ',');
+      }
+      if ({{ .table_present }}) {
+        spn_cg_{{ .object }}_write(&in->{{ .name }}[it], out);
+      } else {
+        spn_codegen_json_str(out, in->{{ .name }}[it].{{ .shorthand }});
+      }
+    }
+    sp_io_write_c8(out, ']');

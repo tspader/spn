@@ -1,0 +1,8 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[options.zstd]
+type = "bool"
+values = ["on", "off"]
+default = false

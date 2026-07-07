@@ -11,6 +11,7 @@
 #include "triple/triple.h"
 #include "profile/types.h"
 #include "index/types.h"
+#include "when/when.h"
 
 static sp_str_t lower_qualify(spn_codegen_ctx_t* ctx, sp_str_t namespace, sp_str_t name) {
   if (sp_str_empty(name)) return name;
@@ -81,17 +82,34 @@ static spn_cxx_options_t lower_cxx_options(const spn_cg_cxx_options_t* cg) {
   };
 }
 
+static sp_da(sp_str_t) lower_source_entries(spn_codegen_ctx_t* ctx, sp_da(spn_cg_source_entry_t) entries) {
+  sp_da(sp_str_t) values = sp_da_new(ctx->mem, sp_str_t);
+  sp_da_for(entries, it) {
+    sp_da_push(values, entries[it].path);
+  }
+  return values;
+}
+
+static sp_da(sp_str_t) lower_value_entries(spn_codegen_ctx_t* ctx, sp_da(spn_cg_value_entry_t) entries) {
+  sp_da(sp_str_t) values = sp_da_new(ctx->mem, sp_str_t);
+  sp_da_for(entries, it) {
+    sp_da_push(values, entries[it].value);
+  }
+  return values;
+}
+
 static spn_target_info_t lower_target(spn_codegen_ctx_t* ctx, const spn_cg_target_t* cg, spn_target_kind_t kind) {
   spn_target_info_t target = {
     .name = cg->name,
     .kind = kind,
     .linkages = lower_linkages(cg->kinds),
     .no_link = sp_opt_is_null(cg->link) ? false : !sp_opt_get(cg->link),
-    .source = cg->source,
+    .source = lower_source_entries(ctx, cg->source),
     .headers = cg->headers,
     .include = cg->include,
-    .define = cg->define,
-    .flags = cg->flags,
+    .define = lower_value_entries(ctx, cg->define),
+    .flags = lower_value_entries(ctx, cg->flags),
+    .system_deps = lower_value_entries(ctx, cg->system_deps),
     .deps = cg->deps,
     .cxx = lower_cxx_options(&cg->cxx),
   };
@@ -128,6 +146,7 @@ static void lower_dep(spn_codegen_ctx_t* ctx, sp_str_t name, const spn_cg_dep_t*
     .qualified = lower_canonicalize(ctx, name),
     .kind = kind,
     .private = sp_opt_is_null(cg->private) ? false : sp_opt_get(cg->private),
+    .when = cg->when,
   };
 
   sp_str_t prefix = sp_str_lit("file://");
@@ -290,6 +309,20 @@ static void lower_deps(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_
   }
 }
 
+static void lower_options(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
+  sp_str_om_init(out->options);
+  sp_da_for(cg->options, it) {
+    const spn_cg_manifest_options_entry_t* entry = &cg->options[it];
+    spn_option_info_t option = {
+      .name = entry->key,
+      .type = entry->value.type,
+      .values = entry->value.values ? entry->value.values : sp_da_new(ctx->mem, sp_str_t),
+      .defaults = entry->value.defaults ? entry->value.defaults : sp_da_new(ctx->mem, spn_option_default_t),
+    };
+    sp_str_om_insert(out->options, option.name, option);
+  }
+}
+
 static void lower_config(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   out->config = sp_da_new(ctx->mem, spn_pkg_config_entry_t);
   sp_da_for(cg->config, i) {
@@ -299,6 +332,153 @@ static void lower_config(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, sp
     }
     sp_da_push(out->config, entry);
   }
+}
+
+static bool when_key_is_fact(sp_str_t key) {
+  return sp_str_equal_cstr(key, "os")
+    || sp_str_equal_cstr(key, "arch")
+    || sp_str_equal_cstr(key, "abi")
+    || sp_str_equal_cstr(key, "mode");
+}
+
+static bool when_fact_value_valid(sp_str_t key, spn_option_value_t value) {
+  if (value.kind != SPN_OPTION_VALUE_STR) return false;
+  if (sp_str_equal_cstr(key, "os"))   return spn_os_from_str(value.str) != SPN_OS_NONE;
+  if (sp_str_equal_cstr(key, "arch")) return spn_arch_from_str(value.str) != SPN_ARCH_NONE;
+  if (sp_str_equal_cstr(key, "abi"))  return spn_abi_from_str(value.str) != SPN_ABI_NONE;
+  return sp_str_equal(value.str, spn_build_mode_to_str(SPN_BUILD_MODE_RELEASE))
+      || sp_str_equal(value.str, spn_build_mode_to_str(SPN_BUILD_MODE_DEBUG));
+}
+
+static bool when_option_value_valid(const spn_option_info_t* option, spn_option_value_t value) {
+  if (option->type == SPN_OPTION_TYPE_NONE) {
+    return true;
+  }
+  if (option->type == SPN_OPTION_TYPE_ENUM && sp_da_empty(option->values)) {
+    return value.kind == SPN_OPTION_VALUE_STR;
+  }
+  return spn_option_value_ok(option, value);
+}
+
+static void validate_when(spn_codegen_ctx_t* ctx, const spn_when_t* when, spn_pkg_info_t* out) {
+  spn_codegen_push_key(ctx, "when");
+  sp_da_for(when->clauses, it) {
+    const spn_when_clause_t* clause = &when->clauses[it];
+    bool ok = false;
+    if (when_key_is_fact(clause->key)) {
+      ok = when_fact_value_valid(clause->key, clause->value);
+    }
+    else {
+      spn_option_info_t** option = sp_str_om_getp(out->options, clause->key);
+      ok = option && when_option_value_valid(*option, clause->value);
+    }
+    if (!ok) {
+      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_INVALID, clause->key.data);
+    }
+  }
+  spn_codegen_pop(ctx);
+}
+
+static const c8* dep_kind_key(spn_dep_kind_t kind) {
+  switch (kind) {
+    case SPN_DEP_KIND_PACKAGE: return "package";
+    case SPN_DEP_KIND_TEST:    return "test";
+    case SPN_DEP_KIND_BUILD:   return "build";
+  }
+  SP_UNREACHABLE_RETURN("package");
+}
+
+static void validate_dep_whens(spn_codegen_ctx_t* ctx, spn_pkg_info_t* out) {
+  u32 counters [3] = sp_zero;
+  spn_codegen_push_key(ctx, "deps");
+  sp_da_for(out->deps, it) {
+    spn_requested_pkg_t* req = &out->deps[it];
+    spn_codegen_push_key(ctx, dep_kind_key(req->kind));
+    spn_codegen_push_index(ctx, counters[req->kind]++);
+    validate_when(ctx, &req->when, out);
+    spn_codegen_pop(ctx);
+    spn_codegen_pop(ctx);
+  }
+  spn_codegen_pop(ctx);
+}
+
+static void validate_source_whens(spn_codegen_ctx_t* ctx, sp_da(spn_cg_source_entry_t) entries, const c8* key, spn_pkg_info_t* out) {
+  spn_codegen_push_key(ctx, key);
+  sp_da_for(entries, it) {
+    spn_codegen_push_index(ctx, it);
+    validate_when(ctx, &entries[it].when, out);
+    spn_codegen_pop(ctx);
+  }
+  spn_codegen_pop(ctx);
+}
+
+static void validate_value_whens(spn_codegen_ctx_t* ctx, sp_da(spn_cg_value_entry_t) entries, const c8* key, spn_pkg_info_t* out) {
+  spn_codegen_push_key(ctx, key);
+  sp_da_for(entries, it) {
+    spn_codegen_push_index(ctx, it);
+    validate_when(ctx, &entries[it].when, out);
+    spn_codegen_pop(ctx);
+  }
+  spn_codegen_pop(ctx);
+}
+
+static void validate_target_whens(spn_codegen_ctx_t* ctx, spn_cg_target_om_t targets, const c8* key, spn_pkg_info_t* out) {
+  spn_codegen_push_key(ctx, key);
+  sp_om_for(targets, it) {
+    const spn_cg_target_t* target = sp_str_om_at(targets, it);
+    spn_codegen_push_index(ctx, it);
+    validate_source_whens(ctx, target->source, "source", out);
+    validate_value_whens(ctx, target->define, "define", out);
+    validate_value_whens(ctx, target->flags, "flags", out);
+    validate_value_whens(ctx, target->system_deps, "system_deps", out);
+    spn_codegen_pop(ctx);
+  }
+  spn_codegen_pop(ctx);
+}
+
+static void validate_options(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
+  spn_codegen_push_key(ctx, "options");
+  sp_da_for(cg->options, it) {
+    const spn_cg_option_t* option = &cg->options[it].value;
+    spn_codegen_push_index(ctx, it);
+
+    if (when_key_is_fact(cg->options[it].key)) {
+      spn_codegen_issue_at(ctx, SPN_CODEGEN_ERR_DUPLICATE_KEY, cg->options[it].key);
+    }
+    if (option->type == SPN_OPTION_TYPE_NONE) {
+      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_INVALID, "type");
+    }
+    if (option->type == SPN_OPTION_TYPE_ENUM && sp_da_empty(option->values)) {
+      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "values");
+    }
+    if (option->type == SPN_OPTION_TYPE_BOOL && !sp_da_empty(option->values)) {
+      spn_codegen_issue(ctx, SPN_CODEGEN_ERR_INVALID, "values");
+    }
+
+    spn_option_info_t** lowered = sp_str_om_getp(out->options, cg->options[it].key);
+    spn_codegen_push_key(ctx, "default");
+    sp_da_for(option->defaults, jt) {
+      const spn_option_default_t* entry = &option->defaults[jt];
+      spn_codegen_push_index(ctx, jt);
+      if (lowered && !when_option_value_valid(*lowered, entry->value)) {
+        spn_codegen_issue(ctx, SPN_CODEGEN_ERR_INVALID, "value");
+      }
+      validate_when(ctx, &entry->when, out);
+      spn_codegen_pop(ctx);
+    }
+    spn_codegen_pop(ctx);
+
+    spn_codegen_pop(ctx);
+  }
+  spn_codegen_pop(ctx);
+}
+
+static void validate_whens(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
+  validate_dep_whens(ctx, out);
+  validate_target_whens(ctx, cg->lib, "lib", out);
+  validate_target_whens(ctx, cg->bin, "bin", out);
+  validate_target_whens(ctx, cg->script, "script", out);
+  validate_target_whens(ctx, cg->test, "test", out);
 }
 
 static void validate_lib_linkages(spn_codegen_ctx_t* ctx, spn_pkg_info_t* out) {
@@ -439,6 +619,7 @@ spn_err_t spn_pkg_lower(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn
   lower_profiles(cg, out);
   lower_indexes(cg, out);
   lower_deps(ctx, cg, out);
+  lower_options(ctx, cg, out);
   lower_config(ctx, cg, out);
 
   validate_lib_linkages(ctx, out);
@@ -447,6 +628,8 @@ spn_err_t spn_pkg_lower(spn_codegen_ctx_t* ctx, const spn_cg_manifest_t* cg, spn
   validate_c_only_scripts(ctx, cg);
   validate_unique_targets(ctx, out);
   validate_inline_toolchains(ctx, cg);
+  validate_options(ctx, cg, out);
+  validate_whens(ctx, cg, out);
 
   return sp_da_empty(ctx->issues) ? SPN_OK : SPN_ERROR;
 }

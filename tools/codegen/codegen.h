@@ -12,6 +12,7 @@ typedef enum {
   FIELD_BOOL,
   FIELD_ENUM,
   FIELD_STRUCT,
+  FIELD_EXTERN,
 } field_kind_t;
 
 typedef enum {
@@ -22,11 +23,13 @@ typedef enum {
 
 typedef struct {
   sp_str_t key;
+  sp_str_t name;
   bool required;
   field_kind_t kind;
   cardinality_t card;
   sp_str_t type_name;
   sp_str_t key_field;
+  sp_str_t shorthand;
   sp_str_t entry;
 } field_t;
 
@@ -50,11 +53,17 @@ typedef struct {
 } om_type_t;
 
 typedef struct {
+  sp_str_t object;
+  sp_str_t field;
+} shorthand_type_t;
+
+typedef struct {
   sp_mem_t mem;
   sp_str_om(type_t) types;
   sp_da(entry_t) entries;
   struct {
     sp_da(sp_str_t) array;
+    sp_da(shorthand_type_t) shorthand;
     sp_da(om_type_t) map;
     sp_da(sp_str_t) object;
   } containers;

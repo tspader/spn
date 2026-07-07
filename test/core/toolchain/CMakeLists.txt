@@ -1,5 +1,8 @@
 add_executable(toolchain_test
   ${SRC}/codegen/codegen.c
+  ${SRC}/codegen/json.c
+  ${SRC}/codegen/options.c
+  ${SRC}/codegen/when.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/enum/enum.c

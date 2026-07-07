@@ -38,6 +38,9 @@ UTEST(triple, from_str) {
     { "x86_64",                SPN_ARCH_X64,   SPN_OS_NONE,    SPN_ABI_NONE },
     { "aarch64",               SPN_ARCH_ARM64, SPN_OS_NONE,    SPN_ABI_NONE },
 
+    // unknown abi
+    { "x86_64-linux-banana",   SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_NONE },
+
     // empty
     { "",                      SPN_ARCH_NONE,  SPN_OS_NONE,    SPN_ABI_NONE },
   };

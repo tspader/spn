@@ -1,0 +1,16 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[options.tls]
+type = "enum"
+values = ["schannel", "openssl", "off"]
+default = "off"
+
+[options.zstd]
+type = "bool"
+default = false
+
+[deps.package]
+openssl = { version = "^3.0.0", when = { tls = "openssl" } }
+zstd = { version = "^1.5.0", when = { zstd = true, os = { not = "wasi" } } }
