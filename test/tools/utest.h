@@ -53,6 +53,10 @@
 #define UTEST_WEAK __forceinline
 #define UTEST_UNUSED
 #define UTEST_INLINE __forceinline
+#elif defined(SP_WIN32)
+#define UTEST_WEAK static UTEST_ATTRIBUTE(unused)
+#define UTEST_UNUSED UTEST_ATTRIBUTE(unused)
+#define UTEST_INLINE inline
 #elif defined(__clang__) || defined(__GNUC__) || defined(__TINYC__)
 #define UTEST_WEAK UTEST_ATTRIBUTE(weak)
 #define UTEST_UNUSED UTEST_ATTRIBUTE(unused)

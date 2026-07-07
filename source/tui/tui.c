@@ -23,7 +23,7 @@ sp_app_result_t sp_prompt_app_on_init(sp_app_t* app);
 void sp_prompt_app_on_deinit(sp_app_t* app);
 sp_prompt_widget_t sp_prompt_progress_widget(sp_prompt_ctx_t* ctx, sp_prompt_progress_t config);
 
-#ifdef _WIN32
+#ifdef SP_WIN32
   #ifndef WIN32_LEAN_AND_MEAN
     #define WIN32_LEAN_AND_MEAN
   #endif

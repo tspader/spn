@@ -2,10 +2,16 @@ ROOT        := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 HOST_TRIPLE := $(shell uname -m)-linux-gnu
 TRIPLE      ?= $(HOST_TRIPLE)
 
-BUILD := $(ROOT)/.build
-WORK  := $(BUILD)/work/$(TRIPLE)
-STORE := $(BUILD)/store/$(TRIPLE)
-BIN   := $(STORE)/bin/spn
+BUILD     := $(ROOT)/.build
+WORK      := $(BUILD)/work/$(TRIPLE)
+WORK_HOST := $(BUILD)/work/$(HOST_TRIPLE)
+STORE     := $(BUILD)/store/$(TRIPLE)
+
+EXE :=
+ifneq (,$(findstring windows,$(TRIPLE)))
+EXE := .exe
+endif
+BIN := $(STORE)/bin/spn$(EXE)
 
 .PHONY: all build configure fetch test smoke install uninstall clean nuke
 all: build
@@ -20,8 +26,17 @@ endif
 build: configure
 	@cmake --build $(WORK) --parallel $(shell nproc)
 
+ifeq ($(TRIPLE),$(HOST_TRIPLE))
 configure: fetch
-	@cmake -S $(ROOT) -B $(WORK) -DTRIPLE=$(TRIPLE)
+	@cmake -S $(ROOT) -B $(WORK) -DTRIPLE=$(TRIPLE) -DHOST_TRIPLE=$(HOST_TRIPLE)
+else
+.PHONY: host-tools
+host-tools: fetch
+	@cmake -S $(ROOT) -B $(WORK_HOST) -DTRIPLE=$(HOST_TRIPLE) -DHOST_TRIPLE=$(HOST_TRIPLE)
+	@cmake --build $(WORK_HOST) --parallel $(shell nproc) --target embed jtd_gen
+configure: host-tools
+	@cmake -S $(ROOT) -B $(WORK) -DTRIPLE=$(TRIPLE) -DHOST_TRIPLE=$(HOST_TRIPLE) -DSPN_HOST_TOOLS=$(WORK_HOST)/tools
+endif
 
 fetch:
 	@cmake -P $(ROOT)/tools/cmake/fetch.cmake

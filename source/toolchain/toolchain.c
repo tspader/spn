@@ -7,6 +7,9 @@ spn_toolchain_launcher_t spn_toolchain_launcher_with_root(sp_mem_t mem, spn_tool
 
   spn_toolchain_launcher_t result = launcher;
   result.program = sp_fs_join_path(mem, root, launcher.program);
+#if defined(SP_WIN32)
+  result.program = sp_fmt(mem, "{}.exe", sp_fmt_str(result.program)).value;
+#endif
   return result;
 }
 
