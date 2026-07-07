@@ -1,0 +1,18 @@
+# spn manifest
+[package]
+name = "test" # inline comment
+version = "0.1.0"
+
+[deps.package]
+"spader/sp" = "3.0.0"
+toml = { version = "1.4.0", private = true }
+
+[[bin]]
+name = "main"
+source = [
+  "main.c", # entry
+  "lib.c",
+]
+
+[profile.default]
+mode = "debug"

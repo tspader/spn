@@ -1,0 +1,5 @@
+[deps.package]
+foo = "1.0.0"
+
+[deps.package]
+baz = "3.0.0"

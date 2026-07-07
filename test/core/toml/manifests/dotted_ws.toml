@@ -1,0 +1,6 @@
+[ deps . package ]
+foo   =   "1.0.0"
+nested.key = "x"
+
+   # indented comment
+bar = "2.0.0"   

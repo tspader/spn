@@ -1,0 +1,5 @@
+[deps.package]
+foo = "1.0.0"
+
+[profile.default]
+mode = "debug"

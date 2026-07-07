@@ -1,0 +1,7 @@
+[deps.package]
+foo = "1.0.0"
+bar = "2.0.0"
+# trailing
+
+[other]
+x = "y"
