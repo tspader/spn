@@ -59,7 +59,7 @@ static spn_dep_edge_t fz_classify(fz_universe_t* u, fz_instance_t* owner, fz_dep
       break;
     }
   }
-  if (dep.private && owner->pkg >= 0 && u->pkgs[owner->pkg].shared) {
+  if (dep.private && fz_pkg_shared(u, owner->pkg)) {
     return SPN_DEP_EDGE_PRIVATE;
   }
   return SPN_DEP_EDGE_SCOPE;
@@ -178,7 +178,7 @@ static fz_err_t fz_check_process(sp_mem_t mem, fz_universe_t* u, fz_instance_arr
     visited[index] = 1;
 
     fz_instance_t* inst = &instances[index];
-    if (inst->pkg >= 0 && u->pkgs[inst->pkg].shared) {
+    if (fz_pkg_shared(u, inst->pkg)) {
       if (named[inst->pkg] >= 0 && named[inst->pkg] != index) {
         return FZ_ERR_SHARED_DUP_MISSED;
       }

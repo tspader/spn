@@ -5,7 +5,7 @@
 
 s32 fz_pkg_from_qualified(fz_universe_t* u, sp_str_t qualified) {
   sp_da_for(u->pkgs, it) {
-    sp_str_t expected = spn_pkg_canonicalize_pair(sp_str_lit("spn"), sp_str_view(fz_names[it]));
+    sp_str_t expected = spn_pkg_canonicalize_pair(sp_str_lit("spn"), fz_pkg_name((u32)it));
     if (sp_str_equal(qualified, expected)) {
       return (s32)it;
     }
