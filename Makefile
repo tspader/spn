@@ -13,7 +13,7 @@ EXE := .exe
 endif
 BIN := $(STORE)/bin/spn$(EXE)
 
-.PHONY: all build configure fetch test smoke install uninstall clean nuke
+.PHONY: all build configure fetch test fuzz smoke install uninstall clean nuke
 all: build
 ifeq ($(TRIPLE),$(HOST_TRIPLE))
 	@ln -sfn .build/store/$(TRIPLE) $(ROOT)/bootstrap
@@ -42,10 +42,13 @@ fetch:
 	@cmake -P $(ROOT)/tools/cmake/fetch.cmake
 
 test: build
-	@ctest --test-dir $(WORK) --output-on-failure
+	@ctest --test-dir $(WORK) --output-on-failure -E '^fuzz'
+
+fuzz: build
+	@ctest --test-dir $(WORK) --output-on-failure -R '^fuzz'
 
 smoke: build
-	@ctest --test-dir $(WORK) --output-on-failure -E 'graph|integration'
+	@ctest --test-dir $(WORK) --output-on-failure -E 'graph|integration|^fuzz'
 
 install: build
 	@mkdir -p $(HOME)/.local/bin
