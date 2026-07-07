@@ -4,6 +4,7 @@
 #define UTEST_IMPLEMENTATION
 #include "utest.h"
 
+#include "test.h"
 #include "jtd_test.h"
 
 UTEST_MAIN();
@@ -16,7 +17,7 @@ void run_jtd_case(s32* utest_result, jtd_case_t c) {
   sp_mem_t mem = sp_mem_os_new();
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
-  sp_str_t path = sp_fmt(sp_mem_get_scratch(), "{}/{}", sp_fmt_cstr(JTD_TEST_JSON_DIR), sp_fmt_cstr(c.json)).value;
+  sp_str_t path = sp_fs_join_path(sp_mem_get_scratch(), test_repo_path(sp_mem_get_scratch(), sp_str_lit(JTD_TEST_JSON_DIR)), sp_cstr_as_str(c.json));
   sp_str_t json = sp_zero; sp_io_read_file(sp_mem_get_scratch(), path, &json);
 
   if (sp_str_empty(json)) {

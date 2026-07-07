@@ -233,6 +233,19 @@ include = ["include", "source", "test/tools"]
 flags = []
 
 [[test]]
+name = "toml"
+source = [
+  "source/toml/edit.c",
+  "test/core/toml.c",
+  "test/tools/ctx.c",
+  "test/tools/tmp.c",
+  "test/tools/git.c",
+  "test/tools/toml.c",
+]
+include = ["include", "source", "test/tools"]
+flags = []
+
+[[test]]
 name = "triple"
 source = [
   "source/enum/enum.c",

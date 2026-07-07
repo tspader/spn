@@ -14,15 +14,7 @@ ctx_paths_t ctx_get_paths(ctx_t* ctx) {
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx->arena);
   ctx_paths_t paths = sp_zero;
 
-  paths.repo = sp_fs_get_exe_path(mem);
-  while (true) {
-    sp_assert(!sp_str_empty(paths.repo));
-    sp_str_t stem = sp_fs_get_stem(paths.repo);
-    if (sp_str_equal(stem, strl("spn"))) {
-      break;
-    }
-    paths.repo = sp_fs_parent_path(paths.repo);
-  }
+  paths.repo = test_repo_root(mem);
 
   paths.test.dir = sp_fs_join_path(mem, paths.repo, strl("test"));
   paths.test.fixtures = sp_fs_join_path(mem, paths.test.dir, strl("fixtures"));

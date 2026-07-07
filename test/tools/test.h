@@ -36,6 +36,11 @@ sp_str_t tmpfs_touch(tmpfs_t* fs, sp_str_t path);
 void     tmpfs_deinit(tmpfs_t* fs);
 
 
+// REPO
+sp_str_t test_repo_root(sp_mem_t mem);
+sp_str_t test_repo_path(sp_mem_t mem, sp_str_t rel);
+
+
 // CONTEXT
 typedef struct {
   tmpfs_t fs;

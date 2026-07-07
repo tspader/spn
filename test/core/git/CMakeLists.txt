@@ -1,4 +1,4 @@
-add_executable(git
+add_executable(git_index
   ${SRC}/git/cache.c
   ${SRC}/git/key.c
   ${SRC}/external/git.c
@@ -12,5 +12,5 @@ add_executable(git
   ${TEST_TOOLS}/git.c
   ${TEST_TOOLS}/toml.c
 )
-spn_test_binary(git)
-add_test(NAME git COMMAND "$<TARGET_FILE:git>")
+spn_test_binary(git_index)
+add_test(NAME git_index COMMAND "$<TARGET_FILE:git_index>")

@@ -715,15 +715,14 @@ static sp_str_t pick_shared_toolchain_dir(sp_mem_t mem, sp_str_t root) {
 }
 
 void fixture_setup_paths(fixture_t* fixture) {
-  // CMake passes these as compile definitions; under spn, derive them from the
-  // repo root, which is where you'd run the suite from anyway
-#if defined(SPN_TEST_ROOT) && defined(SPN_TEST_BIN)
-  fixture->paths.root = sp_str_lit(SPN_TEST_ROOT);
-  fixture->paths.spn = sp_str_lit(SPN_TEST_BIN);
-#else
+  // CMake passes the binary as a repo-relative compile definition; under spn,
+  // fall back to its store. The root always comes from walking up the exe path
   sp_mem_t mem = sp_mem_os_new();
-  fixture->paths.root = sp_fs_get_cwd(mem);
-  fixture->paths.spn = sp_fs_join_path(mem, fixture->paths.root, sp_str_lit("build/debug/store/bin/spn"));
+  fixture->paths.root = test_repo_root(mem);
+#if defined(SPN_TEST_BIN)
+  fixture->paths.spn = test_repo_path(mem, sp_str_lit(SPN_TEST_BIN));
+#else
+  fixture->paths.spn = test_repo_path(mem, sp_str_lit("build/debug/store/bin/spn"));
 #endif
 }
 
