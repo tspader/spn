@@ -5,11 +5,11 @@
 #endif
 
 static u64 spn_current_thread_id(void) {
-#if defined(_WIN32)
+#if defined(SP_WIN32)
   return (u64)GetCurrentThreadId();
-#elif defined(__linux__)
+#elif defined(SP_LINUX)
   return (u64)pthread_self();
-#elif defined(__APPLE__)
+#elif defined(SP_MACOS)
   u64 tid;
   pthread_threadid_np(NULL, &tid);
   return tid;

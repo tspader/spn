@@ -1,7 +1,7 @@
 #include "sp.h"
 
 // STANDARD
-#ifdef _WIN32
+#ifdef SP_WIN32
   #ifndef WIN32_LEAN_AND_MEAN
     #define WIN32_LEAN_AND_MEAN
   #endif

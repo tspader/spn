@@ -134,7 +134,8 @@ spn_err_union_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolch
     };
   }
 
-  if (sp_sys_rename_s(SP_AT_FDCWD, work, SP_AT_FDCWD, dest)) {
+  sp_sys_fd_t cwd = sp_sys_get_root(0);
+  if (sp_sys_rename_s(cwd, work, cwd, dest)) {
     sp_fs_remove_dir(work);
     if (!sp_fs_is_dir(dest)) {
       return (spn_err_union_t) {

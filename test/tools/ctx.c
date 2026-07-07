@@ -1,5 +1,5 @@
 #include "test.h"
-#if !defined(_WIN32)
+#if !defined(SP_WIN32)
   #include <unistd.h>
 #endif
 #include "sp/macro.h"
@@ -49,7 +49,7 @@ static sp_str_t get_run_tmpdir(sp_mem_t mem) {
 
   sp_tm_epoch_t now = sp_tm_now_epoch();
   sp_str_t timestamp = sp_tm_epoch_to_iso8601(mem, now);
-#ifdef _WIN32
+#ifdef SP_WIN32
   u32 pid = (u32)GetCurrentProcessId();
 #else
   u32 pid = (u32)getpid();

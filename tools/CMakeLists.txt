@@ -1,13 +1,33 @@
-add_executable(embed embed.c)
-set_target_properties(embed PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(embed PRIVATE ${STORE}/include)
-target_link_libraries(embed PRIVATE m)
-add_dependencies(embed headers)
+if(SPN_HOST_TOOLS)
+  add_executable(embed IMPORTED GLOBAL)
+  set_target_properties(embed PROPERTIES IMPORTED_LOCATION ${SPN_HOST_TOOLS}/embed)
+  add_executable(jtd_gen IMPORTED GLOBAL)
+  set_target_properties(jtd_gen PROPERTIES IMPORTED_LOCATION ${SPN_HOST_TOOLS}/jtd_gen)
+else()
+  add_executable(embed embed.c)
+  set_target_properties(embed PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  target_include_directories(embed PRIVATE ${STORE}/include)
+  target_link_libraries(embed PRIVATE m)
+  add_dependencies(embed headers)
+
+  add_executable(jtd_gen codegen/main.c codegen/extract.c codegen/render.c codegen/abi.c jtd.c)
+  set_target_properties(jtd_gen PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  target_include_directories(jtd_gen PRIVATE ${STORE}/include ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/source/sp)
+  target_link_libraries(jtd_gen PRIVATE yyjson m)
+  add_dependencies(jtd_gen headers)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(EMBED_FORMAT coff)
+else()
+  set(EMBED_FORMAT elf)
+endif()
 
 add_custom_command(
   OUTPUT ${EMBED_OBJ} ${EMBED_HDR}
   COMMAND $<TARGET_FILE:embed>
     --header ${EMBED_HDR}
+    --format ${EMBED_FORMAT}
     ${EMBED_OBJ}
     ${CMAKE_SOURCE_DIR}/include/spn.h=include/spn.h
     ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.json=toolchains.json
@@ -25,12 +45,6 @@ add_dependencies(toolchain headers)
 add_executable(yyjson_stub yyjson_stub.c)
 set_target_properties(yyjson_stub PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(yyjson_stub PRIVATE yyjson)
-
-add_executable(jtd_gen codegen/main.c codegen/extract.c codegen/render.c codegen/abi.c jtd.c)
-set_target_properties(jtd_gen PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(jtd_gen PRIVATE ${STORE}/include ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/source/sp)
-target_link_libraries(jtd_gen PRIVATE yyjson m)
-add_dependencies(jtd_gen headers)
 
 set(GEN_DIR ${CMAKE_SOURCE_DIR}/source/codegen/gen)
 file(MAKE_DIRECTORY ${GEN_DIR})

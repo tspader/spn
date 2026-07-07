@@ -49,15 +49,15 @@ sp_str_t spn_triple_to_str(sp_mem_t mem, spn_triple_t triple) {
 spn_triple_t spn_triple_host(void) {
   spn_triple_t host = {0};
 
-#if defined(__x86_64__) || defined(_M_X64)
+#if defined(SP_AMD64)
   host.arch = SPN_ARCH_X64;
-#elif defined(__aarch64__) || defined(_M_ARM64)
+#elif defined(SP_ARM64)
   host.arch = SPN_ARCH_ARM64;
 #endif
 
   host.os = spn_os_from_sp_os(sp_os_get_kind());
 
-#if defined(__linux__)
+#if defined(SP_LINUX)
   #if defined(__GLIBC__)
     host.abi = SPN_ABI_GNU;
   #elif defined(__MUSL__)
@@ -65,7 +65,7 @@ spn_triple_t spn_triple_host(void) {
   #else
     host.abi = SPN_ABI_GNU;
   #endif
-#elif defined(_WIN32)
+#elif defined(SP_WIN32)
   #if defined(__MINGW32__) || defined(__MINGW64__)
     host.abi = SPN_ABI_MINGW;
   #else

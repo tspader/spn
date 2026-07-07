@@ -20,12 +20,21 @@ endif()
 
 set(CMAKE_C_EXTENSIONS ON)
 
-set(WAMR_BUILD_PLATFORM "linux")
+# Fast JIT is unsupported on Windows (runtime_lib.cmake force-disables it);
+# execution falls back to the fast interpreter there. HW bound check uses
+# MSVC-only SEH (__try) on Windows, which mingw/zig can't compile.
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(WAMR_BUILD_PLATFORM "windows")
+  set(WAMR_BUILD_FAST_JIT 0)
+  set(WAMR_DISABLE_HW_BOUND_CHECK 1)
+else()
+  set(WAMR_BUILD_PLATFORM "linux")
+  set(WAMR_BUILD_FAST_JIT 1)
+endif()
 set(WAMR_BUILD_INTERP 1)
 set(WAMR_BUILD_FAST_INTERP 1)
 set(WAMR_BUILD_AOT 0)
 set(WAMR_BUILD_JIT 0)
-set(WAMR_BUILD_FAST_JIT 1)
 set(WAMR_BUILD_LIBC_BUILTIN 0)
 set(WAMR_BUILD_LIBC_WASI 1)
 set(WAMR_BUILD_SIMD 0)
@@ -46,3 +55,9 @@ endforeach()
 add_library(vmlib STATIC ${WAMR_RUNTIME_LIB_SOURCE})
 target_include_directories(vmlib INTERFACE ${WAMR_ROOT_DIR}/core/iwasm/include)
 set_target_properties(vmlib PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${STORE}/lib)
+
+# WAMR's windows layer auto-links via #pragma comment(lib), which the GNU
+# driver ignores; PathCch* lives in the api-ms path apiset under mingw.
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  target_link_libraries(vmlib INTERFACE ws2_32 ntdll bcrypt api-ms-win-core-path-l1-1-0)
+endif()
