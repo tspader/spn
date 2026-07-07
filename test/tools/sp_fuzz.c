@@ -87,10 +87,13 @@ static sp_err_t sp_fuzz_fmt_hex(sp_io_writer_t* io, sp_fmt_arg_t* arg) {
   return sp_fmt_write_u64_ex(io, arg->value.u, SP_FMT_RADIX_HEX);
 }
 
-u64 sp_fuzz_seed_init(void) {
-  sp_str_t env = sp_os_env_get(sp_str_lit("SPN_TEST_SEED"));
-  if (!sp_str_empty(env)) {
-    sp_fuzz_seed = sp_fuzz_parse_u64(env);
+u64 sp_fuzz_seed_init_str(sp_str_t seed) {
+  if (sp_str_empty(seed)) {
+    seed = sp_os_env_get(sp_str_lit("SPN_TEST_SEED"));
+  }
+
+  if (!sp_str_empty(seed)) {
+    sp_fuzz_seed = sp_fuzz_parse_u64(seed);
   }
   else {
     sp_tm_epoch_t now = sp_tm_now_epoch();
@@ -101,6 +104,10 @@ u64 sp_fuzz_seed_init(void) {
   sp_io_stream_writer_t out = sp_io_get_std_out();
   sp_fmt_io(&out.base, "SPN_TEST_SEED=0x{}\n", sp_fmt_u64_custom(sp_fuzz_seed, sp_fuzz_fmt_hex));
   return sp_fuzz_seed;
+}
+
+u64 sp_fuzz_seed_init(void) {
+  return sp_fuzz_seed_init_str(sp_str_lit(""));
 }
 
 // Derive the stream from the seed and the name set, not from a shared stream

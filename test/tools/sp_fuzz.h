@@ -23,6 +23,7 @@ void sp_fuzz_shuffle(sp_fuzz_prng_t* prng, void* base, u64 count, u64 stride);
 void sp_fuzz_swarm(sp_fuzz_prng_t* prng, u64* weights, u32 count);
 
 u64            sp_fuzz_seed_init(void);
+u64            sp_fuzz_seed_init_str(sp_str_t seed);
 sp_fuzz_prng_t sp_fuzz_stream(sp_da(sp_str_t) names);
 sp_fuzz_prng_t sp_fuzz_iter(sp_fuzz_prng_t base, u64 iter);
 sp_fuzz_opts_t sp_fuzz_opts(u64 default_iters);
