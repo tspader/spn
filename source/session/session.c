@@ -14,8 +14,36 @@
 #include "log/lazy/lazy.h"
 #include "pkg/id.h"
 #include "pkg/pkg.h"
+#include "profile/profile.h"
 #include "session/session.h"
 #include "sp/str.h"
+#include "spn.embed.h"
+#include "toolchain/toolchain.h"
+#include "triple/triple.h"
+
+spn_err_t spn_session_init(spn_session_t* session, spn_pkg_info_t* root) {
+  sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
+  spn_try(spn_toolchain_catalog_init(&session->catalog, builtins, spn_triple_host(), session->mem));
+
+  sp_str_om_for(root->toolchains, it) {
+    spn_toolchain_catalog_add(&session->catalog, *sp_str_om_at(root->toolchains, it));
+  }
+
+  // Build the list of available profiles
+  sp_str_ht_init(session->mem, session->profiles);
+  spn_profile_populate(&session->profiles, root);
+
+  session->pkg = root;
+  session->paths.root = spn.paths.project;
+  session->paths.build = sp_fs_join_path(session->mem, spn.paths.project, sp_str_lit("build"));
+  session->events = spn.events;
+  session->intern = spn.intern;
+  sp_ht_init(session->mem, session->registry);
+  sp_ht_init(session->mem, session->packages);
+  sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
+
+  return SPN_OK;
+}
 
 // The root manifest can pin the lib kind of any package in the build with [config.<pkg>] kind
 sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pkg_name) {

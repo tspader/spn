@@ -385,6 +385,11 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     if (sp_fs_exists(app.paths.lock)) {
       sp_opt_set(app.lock, spn_lock_file_load(spn.heap, app.paths.lock, spn.events));
     }
+
+    if (spn_session_init(&app.session, &app.package)) {
+      spn_log_error("failed to initialize session");
+      return SP_APP_ERR;
+    }
   }
 
 
