@@ -13,8 +13,7 @@ target_include_directories(e2e PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
 target_compile_definitions(e2e PRIVATE
-  SPN_TEST_ROOT="${CMAKE_SOURCE_DIR}"
-  SPN_TEST_BIN="${STORE}/bin/spn"
+  SPN_TEST_BIN=".build/store/${TRIPLE}/bin/spn${CMAKE_EXECUTABLE_SUFFIX}"
 )
 target_link_libraries(e2e PRIVATE yyjson)
 add_dependencies(e2e spn)

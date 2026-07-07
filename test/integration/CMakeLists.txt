@@ -13,8 +13,7 @@ target_include_directories(integration PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
 target_compile_definitions(integration PRIVATE
-  SPN_TEST_ROOT="${CMAKE_SOURCE_DIR}"
-  SPN_TEST_BIN="${STORE}/bin/spn"
+  SPN_TEST_BIN=".build/store/${TRIPLE}/bin/spn${CMAKE_EXECUTABLE_SUFFIX}"
 )
 target_link_libraries(integration PRIVATE yyjson)
 add_dependencies(integration spn)

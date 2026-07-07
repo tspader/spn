@@ -4,6 +4,7 @@
 #define UTEST_IMPLEMENTATION
 #include "utest.h"
 
+#include "test.h"
 #include "jtd.h"
 #include "enum/enum.h"
 #include "yyjson.h"
@@ -44,7 +45,7 @@ static sp_str_t schema_index_dep_kind_to(u32 value) { return spn_index_dep_kind_
 void run_schema_enum_test(s32* utest_result, schema_enum_t t) {
   sp_mem_t mem = sp_mem_os_new();
 
-  sp_str_t path = sp_fs_join_path(mem, sp_str_lit(SCHEMA_GEN_DIR), sp_cstr_as_str(t.file));
+  sp_str_t path = sp_fs_join_path(mem, test_repo_path(mem, sp_str_lit(SCHEMA_GEN_DIR)), sp_cstr_as_str(t.file));
   jtd_result_t jtd = sp_zero;
   EXPECT_EQ(JTD_OK, jtd_parse_file(mem, path, &jtd));
   if (!jtd.ok) {
@@ -171,7 +172,7 @@ UTEST(schema, abi_handles) {
   const c8* kinds [] = { "ctx", "config", "target", "node", "node_ctx", "profile", "make", "autoconf", "cmake" };
 
   sp_mem_t mem = sp_mem_os_new();
-  sp_str_t path = sp_fs_join_path(mem, sp_str_lit(SCHEMA_DIR), sp_str_lit("abi.json"));
+  sp_str_t path = sp_fs_join_path(mem, test_repo_path(mem, sp_str_lit(SCHEMA_DIR)), sp_str_lit("abi.json"));
   sp_str_t json = sp_zero;
   ASSERT_EQ(SP_OK, sp_io_read_file(mem, path, &json));
 

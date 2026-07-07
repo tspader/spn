@@ -4,6 +4,7 @@
 #define UTEST_IMPLEMENTATION
 #include "utest.h"
 
+#include "test.h"
 #include "codegen/codegen.h"
 #include "manifest.gen.h"
 
@@ -56,8 +57,8 @@ UTEST(manifest_gen, corpus) {
     sp_str_t toml;
     sp_str_t json;
   } paths = {
-    .toml = sp_cstr_as_str(MANIFEST_DIR),
-    .json = sp_cstr_as_str(GOLDEN_DIR)
+    .toml = test_repo_path(mem, sp_str_lit(MANIFEST_DIR)),
+    .json = test_repo_path(mem, sp_str_lit(GOLDEN_DIR))
   };
 
   sp_env_t env = sp_env_capture(mem);

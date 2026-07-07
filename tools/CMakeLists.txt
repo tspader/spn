@@ -23,6 +23,7 @@ else()
   set(EMBED_FORMAT elf)
 endif()
 
+file(GLOB SPN_INIT_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/assets/init/*)
 add_custom_command(
   OUTPUT ${EMBED_OBJ} ${EMBED_HDR}
   COMMAND $<TARGET_FILE:embed>
@@ -31,7 +32,8 @@ add_custom_command(
     ${EMBED_OBJ}
     ${CMAKE_SOURCE_DIR}/include/spn.h=include/spn.h
     ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.json=toolchains.json
-  DEPENDS embed ${CMAKE_SOURCE_DIR}/include/spn.h ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.json
+    ${CMAKE_SOURCE_DIR}/assets/init=init
+  DEPENDS embed ${CMAKE_SOURCE_DIR}/include/spn.h ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.json ${SPN_INIT_TEMPLATES}
   COMMENT "spn.embed.o"
   VERBATIM)
 add_custom_target(spn_embed ALL DEPENDS ${EMBED_OBJ} ${EMBED_HDR})

@@ -1,6 +1,7 @@
 set(TEST_TOOLS ${CMAKE_CURRENT_SOURCE_DIR}/tools)
 
 function(spn_test_binary target)
+  target_sources(${target} PRIVATE ${TEST_TOOLS}/repo.c)
   set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${STORE}/test)
   target_include_directories(${target} PRIVATE
     ${SRC}

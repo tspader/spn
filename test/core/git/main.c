@@ -8,9 +8,9 @@
 
 UTEST_STATE();
 
-int main(int argc, const char *const argv[]) {
+s32 main(s32 num_args, const c8** args) {
   ctx_init(ctx_get());
-  s32 result = utest_main(argc, argv);
+  s32 result = utest_main(num_args, args);
   ctx_deinit(ctx_get());
   return result;
 }

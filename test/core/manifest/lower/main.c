@@ -4,6 +4,7 @@
 #define UTEST_IMPLEMENTATION
 #include "utest.h"
 
+#include "test.h"
 #include "intern/intern.h"
 #include "codegen/codegen.h"
 #include "codegen/lower.h"
@@ -188,9 +189,9 @@ static void run_case(s32* utest_result, test_t test) {
   spn_codegen_ctx_init(&ctx, mem, interner);
 
   sp_str_t file = sp_fmt(mem, "{}.toml", sp_fmt_cstr(test.manifest)).value;
-  sp_str_t path = sp_fs_join_path(mem, sp_cstr_as_str(MANIFEST_DIR), file);
+  sp_str_t path = sp_fs_join_path(mem, test_repo_path(mem, sp_str_lit(MANIFEST_DIR)), file);
 
-  ctx.dir = sp_cstr_as_str(MANIFEST_DIR);
+  ctx.dir = test_repo_path(mem, sp_str_lit(MANIFEST_DIR));
 
   spn_cg_manifest_t cg = sp_zero;
   spn_codegen_load(&ctx, path, &cg);
