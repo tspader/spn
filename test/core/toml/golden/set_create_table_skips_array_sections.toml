@@ -1,0 +1,5 @@
+[[test]]
+name = "main"
+
+[deps.package]
+foo = "1.0.0"

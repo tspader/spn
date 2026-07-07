@@ -18,7 +18,7 @@ add_executable(graph
   graph/main.c
 )
 spn_test_binary(graph)
-target_compile_definitions(graph PRIVATE SP_IMPLEMENTATION SP_TEST_IMPLEMENTATION SP_GRAPH_IMPLEMENTATION)
+set_source_files_properties(graph/main.c PROPERTIES COMPILE_DEFINITIONS "SP_IMPLEMENTATION;SP_TEST_IMPLEMENTATION;SP_GRAPH_IMPLEMENTATION")
 add_test(NAME graph COMMAND "$<TARGET_FILE:graph>")
 
 add_executable(lazy
@@ -36,6 +36,18 @@ add_executable(stable_map
 )
 spn_test_binary(stable_map)
 add_test(NAME stable_map COMMAND "$<TARGET_FILE:stable_map>")
+
+add_executable(toml
+  ${SRC}/toml/edit.c
+  toml/main.c
+  ${TEST_TOOLS}/ctx.c
+  ${TEST_TOOLS}/tmp.c
+)
+spn_test_binary(toml)
+target_compile_definitions(toml PRIVATE
+  TOML_MANIFEST_DIR="test/core/toml/manifests"
+  TOML_GOLDEN_DIR="test/core/toml/golden")
+add_test(NAME toml COMMAND "$<TARGET_FILE:toml>")
 
 add_executable(triple
   ${SRC}/enum/enum.c
@@ -61,8 +73,8 @@ add_executable(schema
 spn_test_binary(schema)
 target_include_directories(schema PRIVATE ${CMAKE_SOURCE_DIR}/tools)
 target_compile_definitions(schema PRIVATE
-  SCHEMA_GEN_DIR="${CMAKE_SOURCE_DIR}/source/codegen/gen"
-  SCHEMA_DIR="${CMAKE_SOURCE_DIR}/source/codegen/schema")
+  SCHEMA_GEN_DIR="source/codegen/gen"
+  SCHEMA_DIR="source/codegen/schema")
 target_link_libraries(schema PRIVATE yyjson)
 add_dependencies(schema spn_codegen_gen)
 add_test(NAME schema COMMAND "$<TARGET_FILE:schema>")
@@ -73,7 +85,7 @@ add_executable(jtd
 )
 spn_test_binary(jtd)
 target_include_directories(jtd PRIVATE ${CMAKE_SOURCE_DIR}/tools ${CMAKE_CURRENT_SOURCE_DIR}/jtd)
-target_compile_definitions(jtd PRIVATE JTD_TEST_JSON_DIR="${CMAKE_CURRENT_SOURCE_DIR}/jtd/json")
+target_compile_definitions(jtd PRIVATE JTD_TEST_JSON_DIR="test/core/jtd/json")
 target_link_libraries(jtd PRIVATE yyjson)
 add_test(NAME jtd COMMAND "$<TARGET_FILE:jtd>")
 
@@ -99,8 +111,8 @@ target_include_directories(manifest_gen PRIVATE
   ${SRC}/codegen/gen
   ${CMAKE_CURRENT_SOURCE_DIR}/manifest/gen)
 target_compile_definitions(manifest_gen PRIVATE
-  MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest/gen/manifests"
-  GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest/gen/golden")
+  MANIFEST_DIR="test/core/manifest/gen/manifests"
+  GOLDEN_DIR="test/core/manifest/gen/golden")
 add_dependencies(manifest_gen spn_codegen_gen)
 add_test(NAME manifest_gen COMMAND "$<TARGET_FILE:manifest_gen>")
 
@@ -131,7 +143,7 @@ target_include_directories(manifest_lower PRIVATE
   ${SRC}/codegen/gen
   ${CMAKE_CURRENT_SOURCE_DIR}/manifest/lower)
 target_compile_definitions(manifest_lower PRIVATE
-  MANIFEST_DIR="${CMAKE_CURRENT_SOURCE_DIR}/manifest/lower/manifests")
+  MANIFEST_DIR="test/core/manifest/lower/manifests")
 add_dependencies(manifest_lower spn_codegen_gen)
 target_link_libraries(manifest_lower PRIVATE yyjson)
 add_test(NAME manifest_lower COMMAND "$<TARGET_FILE:manifest_lower>")

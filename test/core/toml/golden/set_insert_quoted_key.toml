@@ -1,0 +1,3 @@
+[deps.package]
+foo = "1.0.0"
+"spader/sp" = "3.0.0"

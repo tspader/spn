@@ -1,0 +1,2 @@
+[deps.package]
+foo = "2.0.0" # pinned
