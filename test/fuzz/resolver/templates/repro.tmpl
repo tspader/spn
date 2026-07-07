@@ -18,7 +18,7 @@ fuzz repro: mode={{.mode}} iter={{.iter}} (replay: SPN_FUZZ_ITER={{.iter}}, seed
 {{end}}
 {{for .with_targets}}
             .targets = {
-              { .name = "{{.target}}", .linkages = { SPN_LIB_KIND_SHARED } },
+              { .name = "{{.target}}", .linkages = { {{.linkages}} } },
             },
 {{end}}
           },
@@ -33,6 +33,12 @@ fuzz repro: mode={{.mode}} iter={{.iter}} (replay: SPN_FUZZ_ITER={{.iter}}, seed
         { .name = "spn/{{.name}}", .version = "{{.range}}"{{.attrs}} },
 {{end}}
       }
+    },
+    .linkage = {{.linkage}},
+    .config = {
+{{for .config}}
+      { .name = "{{.name}}", .kind = {{.kind}} },
+{{end}}
     },
     .err = {{.err}},
   });

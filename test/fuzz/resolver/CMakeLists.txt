@@ -8,6 +8,9 @@ add_executable(fuzz_resolver
   ${SRC}/external/git.c
   ${SRC}/external/tom.c
   ${SRC}/codegen/codegen.c
+  ${SRC}/codegen/json.c
+  ${SRC}/codegen/options.c
+  ${SRC}/codegen/when.c
   ${SRC}/codegen/lower.c
   ${SRC}/when/when.c
   ${SRC}/toolchain/catalog.c
