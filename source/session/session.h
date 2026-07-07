@@ -7,6 +7,7 @@
 #include "session/types.h"
 #include "target/types.h"
 
+spn_err_t spn_session_init(spn_session_t* session, spn_pkg_info_t* root);
 sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pkg_name);
 sp_da(spn_pkg_dep_t) spn_session_pkg_deps(spn_session_t* session, spn_pkg_unit_t* pkg);
 spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* s, spn_pkg_id_t id, spn_loaded_pkg_t* loaded);
