@@ -64,6 +64,12 @@ bool spn_semver_satisfies(spn_semver_t version, spn_semver_t bound_version, spn_
   }
 }
 
+bool spn_semver_in_range(spn_semver_t version, spn_semver_range_t range) {
+  return
+    spn_semver_satisfies(version, range.low.version, range.low.op) &&
+    spn_semver_satisfies(version, range.high.version, range.high.op);
+}
+
 bool spn_semver_is_empty(spn_semver_t version) {
   return !version.major && !version.minor && !version.patch;
 }
