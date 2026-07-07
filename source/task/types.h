@@ -14,6 +14,7 @@ typedef enum {
   SPN_TASK_KIND_RUN,
   SPN_TASK_KIND_GENERATE,
   SPN_TASK_KIND_WHICH,
+  SPN_TASK_KIND_UPDATE,
   SPN_TASK_KIND_COUNT,
 } spn_task_kind_t;
 

@@ -20,3 +20,16 @@ sp_str_t sp_fs_get_bin_path(sp_mem_t mem) {
   sp_str_t home = sp_fs_get_home_path(mem);
   return sp_fs_join_path(mem, home, sp_str_lit(".local/bin"));
 }
+
+sp_err_t sp_fs_remove(sp_str_t path) {
+  if (sp_fs_is_symlink(path)) {
+    return sp_fs_remove_file(path);
+  }
+  if (sp_fs_is_dir(path)) {
+    return sp_fs_remove_dir(path);
+  }
+  if (sp_fs_exists(path)) {
+    return sp_fs_remove_file(path);
+  }
+  return SP_OK;
+}

@@ -1,0 +1,8 @@
+[package]
+name = "spum"
+version = "2.0.0"
+
+[[lib]]
+name = "spum"
+kinds = ["source"]
+headers = ["spum.h"]

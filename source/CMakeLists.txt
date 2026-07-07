@@ -92,7 +92,9 @@ set(SPN_SOURCES
   task/task.c
   task/test.c
   task/unit.c
+  task/update.c
   task/which.c
+  toml/edit.c
   toolchain/catalog.c
   toolchain/provision.c
   toolchain/select.c

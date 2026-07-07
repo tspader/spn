@@ -745,6 +745,7 @@ void             sp_prompt_log_str(sp_prompt_ctx_t* ctx, sp_str_t text);
 // @values
 const c8*        sp_prompt_get_str(sp_prompt_ctx_t* ctx);
 bool             sp_prompt_get_bool(sp_prompt_ctx_t* ctx);
+void*            sp_prompt_user_data(sp_prompt_ctx_t* ctx);
 void             sp_prompt_set_str(sp_prompt_ctx_t* ctx, sp_str_t value);
 void             sp_prompt_set_bool(sp_prompt_ctx_t* ctx, bool value);
 const c8*        sp_prompt_join_selection(sp_prompt_ctx_t* ctx, sp_prompt_select_option_t* options, u32 num_options);
@@ -1076,6 +1077,10 @@ bool sp_prompt_get_bool(sp_prompt_ctx_t* ctx) {
     return false;
   }
   return ctx->value.as.bool_value;
+}
+
+void* sp_prompt_user_data(sp_prompt_ctx_t* ctx) {
+  return ctx->user_data;
 }
 
 const c8* sp_prompt_join_selection(sp_prompt_ctx_t* ctx, sp_prompt_select_option_t* options, u32 num_options) {
