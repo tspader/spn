@@ -67,6 +67,7 @@ struct spn_target_info {
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) flags;
+  sp_da(sp_str_t) system_deps;
   sp_da(sp_str_t) deps;
   sp_da(spn_embed_t) embed;
   spn_cxx_options_t cxx;

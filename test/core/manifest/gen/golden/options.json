@@ -1,0 +1,55 @@
+{
+  "package": {
+    "name": "options",
+    "version": "1.0.0"
+  },
+  "options": {
+    "tls": {
+      "type": "enum",
+      "values": [
+        "schannel",
+        "openssl",
+        "off"
+      ],
+      "default": [
+        {
+          "value": "schannel",
+          "when": {
+            "os": "windows"
+          }
+        },
+        {
+          "value": "openssl",
+          "when": {
+            "os": {
+              "not": "wasi"
+            }
+          }
+        },
+        {
+          "value": "off"
+        }
+      ]
+    },
+    "zstd": {
+      "type": "bool",
+      "default": [
+        {
+          "value": false
+        }
+      ]
+    },
+    "compression": {
+      "type": "enum",
+      "values": [
+        "zlib",
+        "zstd"
+      ],
+      "default": [
+        {
+          "value": "zlib"
+        }
+      ]
+    }
+  }
+}

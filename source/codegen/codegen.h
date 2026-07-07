@@ -7,6 +7,7 @@
 #include "toml.h"
 #include "error/types.h"
 #include "intern/intern.h"
+#include "when/types.h"
 
 typedef struct spn_codegen_issue {
   spn_err_t code;
@@ -46,12 +47,26 @@ bool spn_codegen_issue_at(spn_codegen_ctx_t* ctx, spn_err_t code, sp_str_t detai
 
 sp_str_t spn_codegen_intern(spn_codegen_ctx_t* ctx, sp_str_t value);
 
+bool spn_codegen_field_present(toml_table_t* table, const c8* key);
+
 sp_str_t spn_codegen_str_required(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key);
 bool     spn_codegen_str_optional(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, sp_str_t* value);
 sp_str_t spn_codegen_raw_required(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key);
 bool     spn_codegen_raw_optional(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, sp_str_t* value);
 bool     spn_codegen_read_bool(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, bool* value);
 sp_da(sp_str_t) spn_codegen_read_str_array(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key);
+
+spn_option_value_t spn_codegen_value_str(spn_codegen_ctx_t* ctx, toml_value_t value);
+spn_option_value_t spn_codegen_value_bool(toml_value_t value);
+void spn_codegen_write_option_value(sp_io_writer_t* out, spn_option_value_t value);
+
+void spn_codegen_read_when(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, spn_when_t* out);
+void spn_codegen_write_when(sp_io_writer_t* out, const spn_when_t* in);
+bool spn_codegen_when_present(const spn_when_t* in);
+
+void spn_codegen_read_option_defaults(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, spn_option_defaults_t* out);
+void spn_codegen_write_option_defaults(sp_io_writer_t* out, const spn_option_defaults_t* in);
+bool spn_codegen_option_defaults_present(const spn_option_defaults_t* in);
 
 const c8* spn_codegen_err_name(spn_err_t code);
 

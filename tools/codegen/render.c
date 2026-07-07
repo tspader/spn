@@ -26,6 +26,7 @@ static sp_str_t value_type(gen_t* g, field_t* field) {
     case FIELD_BOOL:   return sp_str_lit("bool");
     case FIELD_ENUM:   return sp_fmt(g->mem, "spn_{}_t", sp_fmt_str(field->type_name)).value;
     case FIELD_STRUCT: return struct_type(g, field->type_name);
+    case FIELD_EXTERN: return sp_fmt(g->mem, "spn_{}_t", sp_fmt_str(field->type_name)).value;
   }
   return sp_str_lit("");
 }
@@ -49,25 +50,28 @@ static sp_str_t field_type(gen_t* g, field_t* field) {
 
 static sp_str_t present_expr(gen_t* g, field_t* field, sp_str_t recv) {
   if (field_named(field)) {
-    return sp_fmt(g->mem, "sp_om_size({}{}) > 0", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
+    return sp_fmt(g->mem, "sp_om_size({}{}) > 0", sp_fmt_str(recv), sp_fmt_str(field->name)).value;
   }
   if (field->required) {
     return sp_str_lit("true");
   }
   if (field->card == CARD_ARRAY || field->card == CARD_MAP) {
-    return sp_fmt(g->mem, "sp_da_size({}{}) > 0", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
+    return sp_fmt(g->mem, "sp_da_size({}{}) > 0", sp_fmt_str(recv), sp_fmt_str(field->name)).value;
   }
   switch (field->kind) {
     case FIELD_STR: {
-      return sp_fmt(g->mem, "!sp_str_empty({}{})", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
+      return sp_fmt(g->mem, "!sp_str_empty({}{})", sp_fmt_str(recv), sp_fmt_str(field->name)).value;
     }
     case FIELD_BOOL:
     case FIELD_ENUM: {
-      return sp_fmt(g->mem, "!sp_opt_is_null({}{})", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
+      return sp_fmt(g->mem, "!sp_opt_is_null({}{})", sp_fmt_str(recv), sp_fmt_str(field->name)).value;
+    }
+    case FIELD_EXTERN: {
+      return sp_fmt(g->mem, "spn_codegen_{}_present(&{}{})", sp_fmt_str(field->type_name), sp_fmt_str(recv), sp_fmt_str(field->name)).value;
     }
     case FIELD_STRUCT: {
       type_t* object = gen_type(g, field->type_name);
-      sp_str_t inner = sp_fmt(g->mem, "{}{}.", sp_fmt_str(recv), sp_fmt_str(field->key)).value;
+      sp_str_t inner = sp_fmt(g->mem, "{}{}.", sp_fmt_str(recv), sp_fmt_str(field->name)).value;
       sp_io_dyn_mem_writer_t terms;
       sp_io_dyn_mem_writer_init(g->mem, &terms);
       sp_da_for(object->fields, it) {
@@ -85,11 +89,16 @@ static void field_templates(field_t* field, sp_str_t* read, sp_str_t* write) {
     *write = sp_str_lit("write/named");
     return;
   }
+  if (field->kind == FIELD_EXTERN) {
+    *read = sp_str_lit("read/extern");
+    *write = sp_str_lit("write/extern");
+    return;
+  }
   if (field->card == CARD_ARRAY) {
     switch (field->kind) {
       case FIELD_STRUCT: {
         *read = sp_str_lit("read/object_array");
-        *write = sp_str_lit("write/object_array");
+        *write = sp_str_empty(field->shorthand) ? sp_str_lit("write/object_array") : sp_str_lit("write/object_array_shorthand");
         return;
       }
       case FIELD_ENUM: {
@@ -130,12 +139,19 @@ static void field_templates(field_t* field, sp_str_t* read, sp_str_t* write) {
       *write = sp_str_lit("write/object");
       return;
     }
+    case FIELD_EXTERN: {
+      return;
+    }
   }
 }
 
 static void bind_field(gen_t* g, sp_template_scope_t* scope, field_t* field) {
   sp_template_set(scope, sp_str_lit("key"), field->key);
+  sp_template_set(scope, sp_str_lit("name"), field->name);
 
+  if (field->kind == FIELD_EXTERN) {
+    sp_template_set(scope, sp_str_lit("extern"), field->type_name);
+  }
   if (field->kind == FIELD_ENUM) {
     sp_template_set(scope, sp_str_lit("from"), sp_fmt(g->mem, "spn_{}_from_str", sp_fmt_str(field->type_name)).value);
     sp_template_set(scope, sp_str_lit("to"), sp_fmt(g->mem, "spn_{}_to_str", sp_fmt_str(field->type_name)).value);
@@ -149,6 +165,24 @@ static void bind_field(gen_t* g, sp_template_scope_t* scope, field_t* field) {
   if (field->card == CARD_MAP) {
     sp_template_set(scope, sp_str_lit("entry"), field->entry);
     sp_template_set(scope, sp_str_lit("entry_type"), struct_type(g, field->entry));
+  }
+  if (field->card == CARD_ARRAY && field->kind == FIELD_STRUCT && !sp_str_empty(field->shorthand)) {
+    sp_template_set(scope, sp_str_lit("shorthand"), field->shorthand);
+
+    type_t* object = gen_type(g, field->type_name);
+    sp_str_t recv = sp_fmt(g->mem, "in->{}[it].", sp_fmt_str(field->name)).value;
+    sp_io_dyn_mem_writer_t terms;
+    sp_io_dyn_mem_writer_init(g->mem, &terms);
+    bool any = false;
+    sp_da_for(object->fields, it) {
+      field_t* inner = &object->fields[it];
+      if (sp_str_equal(inner->key, field->shorthand)) {
+        continue;
+      }
+      sp_fmt_io(&terms.base, any ? " || {}" : "{}", sp_fmt_str(present_expr(g, inner, recv)));
+      any = true;
+    }
+    sp_template_set(scope, sp_str_lit("table_present"), any ? sp_io_dyn_mem_writer_as_str(&terms) : sp_str_lit("false"));
   }
   if (field_named(field)) {
     sp_template_set(scope, sp_str_lit("key_field"), field->key_field);
@@ -198,7 +232,7 @@ static bool render_struct(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* 
   sp_template_set(scope, sp_str_lit("name"), type->name);
   sp_da_for(type->fields, it) {
     field_t* field = &type->fields[it];
-    bind_struct_field(scope, field_type(g, field), field->key);
+    bind_struct_field(scope, field_type(g, field), field->name);
   }
   return gen_render(g, io, reg, "struct", scope);
 }
@@ -331,6 +365,16 @@ bool render_impl(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg) {
     sp_template_set(scope, sp_str_lit("object"), g->containers.array[it]);
     sp_template_set(scope, sp_str_lit("type"), struct_type(g, g->containers.array[it]));
     if (!gen_render(g, io, reg, "read/array", scope)) {
+      return false;
+    }
+  }
+  sp_da_for(g->containers.shorthand, it) {
+    shorthand_type_t* shorthand = &g->containers.shorthand[it];
+    sp_template_scope_t* scope = sp_template_scope_create(g->mem);
+    sp_template_set(scope, sp_str_lit("object"), shorthand->object);
+    sp_template_set(scope, sp_str_lit("type"), struct_type(g, shorthand->object));
+    sp_template_set(scope, sp_str_lit("shorthand"), shorthand->field);
+    if (!gen_render(g, io, reg, "read/array_shorthand", scope)) {
       return false;
     }
   }

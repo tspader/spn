@@ -24,7 +24,10 @@ set(SPN_SOURCES
   cli/update.c
   cli/which.c
   codegen/codegen.c
+  codegen/json.c
   codegen/lower.c
+  codegen/options.c
+  codegen/when.c
   ctx/ctx.c
   enum/enum.c
   event/event.c
@@ -98,6 +101,7 @@ set(SPN_SOURCES
   triple/triple.c
   tui/tui.c
   unit/package.c
+  when/when.c
 )
 
 add_executable(spn ${SPN_SOURCES}

@@ -7,6 +7,7 @@
 #include "pkg/types.h"
 #include "target/types.h"
 #include "toolchain/types.h"
+#include "when/types.h"
 
 spn_arch_t      spn_arch_from_str(sp_str_t str);
 sp_str_t        spn_arch_to_str(spn_arch_t arch);
@@ -26,6 +27,9 @@ sp_str_t spn_build_mode_to_str(spn_build_mode_t mode);
 spn_linkage_t spn_lib_kind_from_str(sp_str_t str);
 spn_linkage_t spn_linkage_from_str(sp_str_t str);
 sp_str_t spn_linkage_to_str(spn_linkage_t kind);
+
+spn_option_type_t spn_option_type_from_str(sp_str_t str);
+sp_str_t spn_option_type_to_str(spn_option_type_t type);
 
 spn_dir_t spn_cache_dir_kind_from_str(sp_str_t str);
 

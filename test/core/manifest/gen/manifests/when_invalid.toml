@@ -1,0 +1,9 @@
+[package]
+name = "wheninvalid"
+version = "1.0.0"
+
+[deps.package]
+a = { version = "1.0.0", when = { os = 3 } }
+b = { version = "1.0.0", when = { os = { nope = "x" } } }
+c = { version = "1.0.0", when = "linux" }
+d = { version = "1.0.0", when = { os = { not = 3 } } }

@@ -11,6 +11,7 @@
     "toolchain": { "elements": { "ref": "manifest_toolchain" } },
     "index": { "elements": { "ref": "index" }, "metadata": { "key": "name" } },
     "profile": { "values": { "ref": "profile" } },
+    "options": { "values": { "ref": "option" } },
     "deps": { "ref": "deps" },
     "config": { "values": { "ref": "config_entry" } },
     "publish": { "ref": "publish" }
@@ -20,6 +21,35 @@
     "cxx_standard": { "enum": ["c++11", "c++14", "c++17", "c++20", "c++23"] },
     "build_mode": { "enum": ["release", "debug"] },
     "index_protocol": { "enum": ["git", "http", "filesystem"], "metadata": { "include": "index/types.h" } },
+    "option_type": { "enum": ["bool", "enum"], "metadata": { "include": "when/types.h" } },
+
+    "option": {
+      "properties": {
+        "type": { "ref": "option_type" }
+      },
+      "optionalProperties": {
+        "values": { "elements": { "type": "string" } },
+        "default": { "metadata": { "extern": "option_defaults", "field": "defaults", "include": "when/types.h" } }
+      }
+    },
+
+    "source_entry": {
+      "properties": {
+        "path": { "type": "string" }
+      },
+      "optionalProperties": {
+        "when": { "metadata": { "extern": "when", "include": "when/types.h" } }
+      }
+    },
+
+    "value_entry": {
+      "properties": {
+        "value": { "type": "string" }
+      },
+      "optionalProperties": {
+        "when": { "metadata": { "extern": "when", "include": "when/types.h" } }
+      }
+    },
 
     "publish": {
       "optionalProperties": {
@@ -69,11 +99,12 @@
       },
       "optionalProperties": {
         "kinds": { "elements": { "type": "string" } },
-        "source": { "elements": { "type": "string" } },
+        "source": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
         "headers": { "elements": { "type": "string" } },
         "include": { "elements": { "type": "string" } },
-        "define": { "elements": { "type": "string" } },
-        "flags": { "elements": { "type": "string" } },
+        "define": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
+        "flags": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
+        "system_deps": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "deps": { "elements": { "type": "string" } },
         "link": { "type": "boolean" },
         "cxx": { "ref": "cxx_options" }
@@ -135,7 +166,8 @@
         "version": { "type": "string" }
       },
       "optionalProperties": {
-        "private": { "type": "boolean" }
+        "private": { "type": "boolean" },
+        "when": { "metadata": { "extern": "when", "include": "when/types.h" } }
       }
     },
 

@@ -1,0 +1,28 @@
+{
+  "package": {
+    "name": "whensource",
+    "version": "1.0.0"
+  },
+  "lib": {
+    "netlib": {
+      "name": "netlib",
+      "source": [
+        "src/*.c",
+        {
+          "path": "src/tls_openssl.c",
+          "when": {
+            "tls": "openssl"
+          }
+        },
+        {
+          "path": "src/poll_epoll.c",
+          "when": {
+            "os": "linux"
+          }
+        },
+        "src/plain.c",
+        "src/empty_when.c"
+      ]
+    }
+  }
+}

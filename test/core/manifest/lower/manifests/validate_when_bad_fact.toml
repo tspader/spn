@@ -1,0 +1,11 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[lib]]
+name = "t"
+source = [
+  { path = "a.c", when = { os = "banana" } },
+  { path = "b.c", when = { mode = "banana" } },
+  { path = "c.c", when = { abi = "banana" } },
+]

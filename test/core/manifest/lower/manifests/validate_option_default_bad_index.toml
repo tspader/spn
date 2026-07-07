@@ -1,0 +1,11 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[options.tls]
+type = "enum"
+values = ["schannel", "openssl", "off"]
+default = [
+  { value = "openssl" },
+  { value = "gnutls" },
+]

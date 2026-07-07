@@ -13,6 +13,7 @@
 #include "index/types.h"
 #include "toolchain/types.h"
 #include "semver/compare.h"
+#include "when/when.h"
 
 UTEST_MAIN();
 
@@ -30,6 +31,7 @@ typedef struct {
   const c8* include [4];
   const c8* define [4];
   const c8* flags [4];
+  const c8* system_deps [4];
   const c8* deps [4];
   spn_cxx_options_t cxx;
 } target_t;
@@ -41,7 +43,20 @@ typedef struct {
   u8 build;
   u8 test;
   u8 private;
+  const c8* when;
 } dep_t;
+
+typedef struct {
+  const c8* when;
+  const c8* value;
+} option_default_t;
+
+typedef struct {
+  const c8* name;
+  spn_option_type_t type;
+  const c8* values [4];
+  option_default_t defaults [4];
+} option_t;
 
 typedef struct {
   const c8* name;
@@ -112,6 +127,7 @@ typedef struct {
   profile_t profiles [4];
   index_t indexes [4];
   config_t config [8];
+  option_t options [4];
 } test_t;
 
 //////////////
@@ -155,6 +171,7 @@ static void check_targets(s32* utest_result, spn_target_info_om_t om, const targ
     check_strings(utest_result, t->include, arr[i].include, SP_CARR_LEN(arr[i].include));
     check_strings(utest_result, t->define,  arr[i].define,  SP_CARR_LEN(arr[i].define));
     check_strings(utest_result, t->flags,   arr[i].flags,   SP_CARR_LEN(arr[i].flags));
+    check_strings(utest_result, t->system_deps, arr[i].system_deps, SP_CARR_LEN(arr[i].system_deps));
     check_strings(utest_result, t->deps,    arr[i].deps,    SP_CARR_LEN(arr[i].deps));
     EXPECT_EQ((u32)arr[i].cxx.standard, (u32)t->cxx.standard);
     EXPECT_EQ(arr[i].cxx.no_exceptions, t->cxx.no_exceptions);
@@ -252,6 +269,31 @@ static void run_case(s32* utest_result, test_t test) {
     EXPECT_EQ(expected.private != 0, req->private);
 
     if (expected.file) EXPECT_TRUE(sp_str_ends_with(req->file.path, sp_str_view(expected.file)));
+    if (expected.when) EXPECT_STR(spn_when_to_str(mem, &req->when), expected.when);
+  }
+
+  // Options
+  sp_carr_for(test.options, it) {
+    option_t expected = test.options[it];
+    if (!expected.name) break;
+
+    spn_option_info_t** slot = sp_str_om_getp(pkg.options, sp_str_view(expected.name));
+    ASSERT_TRUE(slot);
+    spn_option_info_t* option = *slot;
+    EXPECT_STR(option->name, expected.name);
+    EXPECT_EQ((u32)expected.type, (u32)option->type);
+    check_strings(utest_result, option->values, expected.values, SP_CARR_LEN(expected.values));
+
+    u32 num_defaults = 0;
+    sp_carr_for(expected.defaults, jt) {
+      if (!expected.defaults[jt].value) break;
+      num_defaults++;
+    }
+    ASSERT_EQ(num_defaults, (u32)sp_da_size(option->defaults));
+    sp_for(jt, num_defaults) {
+      EXPECT_STR(spn_when_to_str(mem, &option->defaults[jt].when), expected.defaults[jt].when ? expected.defaults[jt].when : "always");
+      EXPECT_STR(spn_option_value_to_str(mem, option->defaults[jt].value), expected.defaults[jt].value);
+    }
   }
 
   // Toolchains
@@ -715,6 +757,176 @@ UTEST(lower, config) {
     .manifest = "config",
     .config = {
       { .key = "core/foo", .kind = SPN_LIB_KIND_STATIC }
+    },
+  });
+}
+
+UTEST(lower, when_dep) {
+  run_case(utest_result, (test_t) {
+    .manifest = "when_dep",
+    .deps = {
+      { .name = "core/openssl", .source = SPN_PKG_SOURCE_INDEX, .when = "tls = \"openssl\"" },
+      { .name = "core/zstd", .source = SPN_PKG_SOURCE_INDEX, .when = "zstd = true, os != \"wasi\"" },
+    },
+  });
+}
+
+UTEST(lower, options) {
+  run_case(utest_result, (test_t) {
+    .manifest = "options",
+    .options = {
+      {
+        .name = "tls",
+        .type = SPN_OPTION_TYPE_ENUM,
+        .values = { "schannel", "openssl", "off" },
+        .defaults = {
+          { .when = "os = \"windows\"", .value = "\"schannel\"" },
+          { .when = "os != \"wasi\"", .value = "\"openssl\"" },
+          { .value = "\"off\"" },
+        },
+      },
+      {
+        .name = "zstd",
+        .type = SPN_OPTION_TYPE_BOOL,
+        .defaults = {
+          { .value = "false" },
+        },
+      },
+    },
+  });
+}
+
+UTEST(lower, target_when_flatten) {
+  run_case(utest_result, (test_t) {
+    .manifest = "target_when",
+    .libs = {
+      {
+        .name = "t",
+        .linkages = { .static_lib = true },
+        .source = { "a.c", "b.c" },
+        .define = { "X", "Y" },
+        .flags = { "-g" },
+        .system_deps = { "ws2_32" },
+      },
+    },
+  });
+}
+
+UTEST(lower, validate_when_unknown_key) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_when_unknown_key",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "deps.package[0].when.simd" }
+    },
+  });
+}
+
+UTEST(lower, validate_when_bad_fact) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_when_bad_fact",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "lib[0].source[0].when.os" },
+      { SPN_CODEGEN_ERR_INVALID, "lib[0].source[1].when.mode" },
+      { SPN_CODEGEN_ERR_INVALID, "lib[0].source[2].when.abi" }
+    },
+  });
+}
+
+UTEST(lower, validate_when_kind_mismatch) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_when_kind_mismatch",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "deps.package[0].when.zstd" }
+    },
+  });
+}
+
+UTEST(lower, validate_when_bad_option_value) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_when_bad_option_value",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "deps.package[0].when.tls" }
+    },
+  });
+}
+
+UTEST(lower, validate_when_in_default) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_when_in_default",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "options[0].default[0].when.simd" }
+    },
+  });
+}
+
+UTEST(lower, validate_option_bad_type) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_option_bad_type",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "options[0].type" }
+    },
+  });
+}
+
+UTEST(lower, validate_option_enum_no_values) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_option_enum_no_values",
+    .issues = {
+      { SPN_CODEGEN_ERR_MISSING_KEY, "options[0].values" }
+    },
+  });
+}
+
+UTEST(lower, validate_option_default_kind) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_option_default_kind",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "options[0].default[0].value" }
+    },
+  });
+}
+
+UTEST(lower, validate_option_default_not_in_values) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_option_default_not_in_values",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "options[0].default[0].value" }
+    },
+  });
+}
+
+UTEST(lower, validate_option_default_bad_index) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_option_default_bad_index",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "options[0].default[1].value" }
+    },
+  });
+}
+
+UTEST(lower, validate_option_shadows_fact) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_option_shadows_fact",
+    .issues = {
+      { SPN_CODEGEN_ERR_DUPLICATE_KEY, "options[0]" }
+    },
+  });
+}
+
+UTEST(lower, validate_option_bool_values) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_option_bool_values",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "options[0].values" }
+    },
+  });
+}
+
+UTEST(lower, validate_option_default_unknown_key) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_option_default_unknown_key",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "options.tls.default[0].whne" }
     },
   });
 }

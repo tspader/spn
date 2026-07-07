@@ -1,12 +1,12 @@
   {
     yyjson_val* arr = yyjson_obj_get(obj, "{{ .key }}");
-    out->{{ .key }} = sp_da_new(mem, {{ .type }});
+    out->{{ .name }} = sp_da_new(mem, {{ .type }});
     size_t i, n;
     yyjson_val* v;
     yyjson_arr_foreach(arr, i, n, v) {
       const c8* s = yyjson_get_str(v);
       if (s) {
-        sp_da_push(out->{{ .key }}, {{ .from }}(sp_str_from_cstr_n(mem, s, (u32)yyjson_get_len(v))));
+        sp_da_push(out->{{ .name }}, {{ .from }}(sp_str_from_cstr_n(mem, s, (u32)yyjson_get_len(v))));
       }
     }
   }

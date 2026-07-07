@@ -1,0 +1,13 @@
+[package]
+name = "whensource"
+version = "1.0.0"
+
+[[lib]]
+name = "netlib"
+source = [
+  "src/*.c",
+  { path = "src/tls_openssl.c", when = { tls = "openssl" } },
+  { path = "src/poll_epoll.c", when = { os = "linux" } },
+  { path = "src/plain.c" },
+  { path = "src/empty_when.c", when = { } },
+]

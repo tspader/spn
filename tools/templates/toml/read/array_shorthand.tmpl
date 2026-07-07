@@ -1,0 +1,25 @@
+static void spn_cg_{{ .object }}_read_array(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, sp_da({{ .type }})* out) {
+  toml_array_t* array = toml_table_array(table, key);
+  if (!array) {
+    return;
+  }
+  *out = sp_da_new(ctx->mem, {{ .type }});
+  spn_codegen_push_key(ctx, key);
+  sp_for(it, (u32)toml_array_len(array)) {
+    spn_codegen_push_index(ctx, it);
+    {{ .type }} entry = sp_zero;
+    toml_table_t* element = toml_array_table(array, (s32)it);
+    toml_value_t value = toml_array_string(array, (s32)it);
+    if (element) {
+      spn_cg_{{ .object }}_read(ctx, element, &entry);
+      sp_da_push(*out, entry);
+    } else if (value.ok) {
+      entry.{{ .shorthand }} = spn_codegen_intern(ctx, sp_str(value.u.s, (u32)value.u.sl));
+      sp_da_push(*out, entry);
+    } else {
+      spn_codegen_issue_at(ctx, SPN_CODEGEN_ERR_EXPECTED_STR, sp_str_lit(""));
+    }
+    spn_codegen_pop(ctx);
+  }
+  spn_codegen_pop(ctx);
+}

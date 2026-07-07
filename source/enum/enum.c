@@ -110,11 +110,8 @@ spn_abi_t spn_abi_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "mingw")) {
     return SPN_ABI_MINGW;
   }
-  if (sp_str_empty(str)) {
-    return SPN_ABI_NONE;
-  }
 
-  return SPN_ABI_GNU;
+  return SPN_ABI_NONE;
 }
 
 sp_str_t spn_abi_to_str(spn_abi_t abi) {
@@ -226,6 +223,33 @@ spn_linkage_t spn_lib_kind_from_str(sp_str_t str) {
 
 spn_linkage_t spn_linkage_from_str(sp_str_t str) {
   return spn_lib_kind_from_str(str);
+}
+
+spn_option_type_t spn_option_type_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "bool")) {
+    return SPN_OPTION_TYPE_BOOL;
+  }
+  if (sp_str_equal_cstr(str, "enum")) {
+    return SPN_OPTION_TYPE_ENUM;
+  }
+
+  return SPN_OPTION_TYPE_NONE;
+}
+
+sp_str_t spn_option_type_to_str(spn_option_type_t type) {
+  switch (type) {
+    case SPN_OPTION_TYPE_BOOL: {
+      return sp_str_lit("bool");
+    }
+    case SPN_OPTION_TYPE_ENUM: {
+      return sp_str_lit("enum");
+    }
+    case SPN_OPTION_TYPE_NONE: {
+      return sp_str_lit("");
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
 sp_str_t spn_linkage_to_str(spn_linkage_t kind) {

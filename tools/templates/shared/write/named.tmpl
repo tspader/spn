@@ -1,6 +1,6 @@
     sp_io_write_c8(out, '{');
-    sp_om_for(in->{{ .key }}, it) {
-      const {{ .type }}* entry = sp_om_at(in->{{ .key }}, it);
+    sp_om_for(in->{{ .name }}, it) {
+      const {{ .type }}* entry = sp_om_at(in->{{ .name }}, it);
       if (it) {
         sp_io_write_c8(out, ',');
       }

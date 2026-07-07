@@ -45,6 +45,14 @@ add_executable(triple
 spn_test_binary(triple)
 add_test(NAME triple COMMAND "$<TARGET_FILE:triple>")
 
+add_executable(when
+  ${SRC}/enum/enum.c
+  ${SRC}/when/when.c
+  when.c
+)
+spn_test_binary(when)
+add_test(NAME when COMMAND "$<TARGET_FILE:when>")
+
 add_executable(schema
   ${CMAKE_SOURCE_DIR}/tools/jtd.c
   ${SRC}/enum/enum.c
@@ -73,6 +81,9 @@ add_executable(manifest_gen
   manifest/gen/main.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/codegen.c
+  ${SRC}/codegen/json.c
+  ${SRC}/codegen/options.c
+  ${SRC}/codegen/when.c
   ${SRC}/enum/enum.c
   ${SRC}/external/tom.c
   ${SRC}/intern/intern.c
@@ -97,8 +108,12 @@ add_executable(manifest_lower
   manifest/lower/main.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/codegen.c
+  ${SRC}/codegen/json.c
+  ${SRC}/codegen/options.c
+  ${SRC}/codegen/when.c
   ${SRC}/codegen/lower.c
   ${SRC}/enum/enum.c
+  ${SRC}/when/when.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/triple/triple.c

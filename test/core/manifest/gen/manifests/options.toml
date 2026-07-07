@@ -1,0 +1,21 @@
+[package]
+name = "options"
+version = "1.0.0"
+
+[options.tls]
+type = "enum"
+values = ["schannel", "openssl", "off"]
+default = [
+  { when = { os = "windows" }, value = "schannel" },
+  { when = { os = { not = "wasi" } }, value = "openssl" },
+  { value = "off" },
+]
+
+[options.zstd]
+type = "bool"
+default = false
+
+[options.compression]
+type = "enum"
+values = ["zlib", "zstd"]
+default = "zlib"

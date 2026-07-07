@@ -1,0 +1,10 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[options.tls]
+type = "enum"
+values = ["openssl", "off"]
+default = [
+  { value = "off", when = { simd = "avx2" } },
+]

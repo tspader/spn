@@ -1,0 +1,10 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[options.zstd]
+type = "bool"
+default = false
+
+[deps.package]
+foo = { version = "^1.0.0", when = { zstd = "true" } }

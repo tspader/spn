@@ -10,6 +10,7 @@ static inline void spn_target_info_init(sp_mem_t mem, spn_target_info_t* target)
   if (!target->include) sp_da_init(mem, target->include);
   if (!target->define)  sp_da_init(mem, target->define);
   if (!target->flags)   sp_da_init(mem, target->flags);
+  if (!target->system_deps) sp_da_init(mem, target->system_deps);
   if (!target->deps)    sp_da_init(mem, target->deps);
   if (!target->embed)   sp_da_init(mem, target->embed);
 }

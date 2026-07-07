@@ -1,0 +1,16 @@
+[package]
+name = "whenvalues"
+version = "1.0.0"
+
+[[lib]]
+name = "netlib"
+define = [
+  "NETLIB_BUILD",
+  { value = "NETLIB_HAS_TLS", when = { tls = { not = "off" } } },
+]
+flags = [
+  { value = "-fno-omit-frame-pointer", when = { mode = "debug", abi = { not = "msvc" } } },
+]
+system_deps = [
+  { value = "ws2_32", when = { os = "windows" } },
+]

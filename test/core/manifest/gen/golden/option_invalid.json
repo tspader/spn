@@ -1,0 +1,24 @@
+{
+  "issues": [
+    {
+      "code": "missing_key",
+      "path": "options.tls.default[0].value",
+      "detail": "value"
+    },
+    {
+      "code": "invalid",
+      "path": "options.zstd.default",
+      "detail": "default"
+    },
+    {
+      "code": "expected_object",
+      "path": "options.raw.default[0]",
+      "detail": ""
+    },
+    {
+      "code": "invalid",
+      "path": "options.pin.default[0].when.os",
+      "detail": "os"
+    }
+  ]
+}
