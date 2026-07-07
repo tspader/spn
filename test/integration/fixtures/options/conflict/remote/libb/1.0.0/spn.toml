@@ -1,0 +1,12 @@
+[package]
+name = "libb"
+version = "1.0.0"
+
+[deps.package]
+render = { version = "1.0.0", options = { backend = "vk" } }
+
+[[lib]]
+name = "libb"
+kinds = ["static"]
+source = ["b.c"]
+headers = ["b.h"]

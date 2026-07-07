@@ -1,0 +1,18 @@
+[package]
+name = "options_gates_dep"
+version = "0.1.0"
+
+[options.trace]
+type = "bool"
+default = false
+define = "WITH_TRACE"
+
+[deps.package]
+tracer = { version = "1.0.0", when = { trace = true } }
+
+[profile.tracing]
+options = { trace = true }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

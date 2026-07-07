@@ -1,0 +1,9 @@
+[package]
+name = "tracer"
+version = "1.0.0"
+
+[[lib]]
+name = "tracer"
+kinds = ["static"]
+source = ["tracer.c"]
+headers = ["tracer.h"]

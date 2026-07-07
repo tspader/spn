@@ -1,0 +1,14 @@
+[package]
+name = "render"
+version = "1.0.0"
+
+[options.backend]
+type = "enum"
+values = ["gl", "vk"]
+default = "gl"
+
+[[lib]]
+name = "render"
+kinds = ["static"]
+source = ["render.c"]
+headers = ["render.h"]

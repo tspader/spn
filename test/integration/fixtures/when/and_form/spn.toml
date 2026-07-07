@@ -1,0 +1,10 @@
+[package]
+name = "when_and_form"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+define = [
+  { value = "RELEASE_LINUX", when = { os = "linux", mode = "release" } },
+]

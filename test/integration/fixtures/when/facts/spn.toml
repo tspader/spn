@@ -1,0 +1,13 @@
+[package]
+name = "when_facts"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+define = [
+  { value = "FACT_OS", when = { os = "linux" } },
+  { value = "FACT_ARCH", when = { arch = "x86_64" } },
+  { value = "FACT_MODE", when = { mode = "debug" } },
+  { value = "FACT_OTHER_OS", when = { os = "windows" } },
+]

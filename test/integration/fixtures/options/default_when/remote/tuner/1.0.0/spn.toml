@@ -1,0 +1,25 @@
+[package]
+name = "tuner"
+version = "1.0.0"
+
+[options.match_arm]
+type = "bool"
+default = [
+  { when = { os = "linux" }, value = true },
+  { value = false },
+]
+define = "TUNER_MATCH"
+
+[options.else_arm]
+type = "bool"
+default = [
+  { when = { os = "windows" }, value = true },
+  { value = false },
+]
+define = "TUNER_ELSE"
+
+[[lib]]
+name = "tuner"
+kinds = ["static"]
+source = ["tuner.c"]
+headers = ["tuner.h"]

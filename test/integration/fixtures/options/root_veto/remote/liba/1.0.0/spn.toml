@@ -1,0 +1,12 @@
+[package]
+name = "liba"
+version = "1.0.0"
+
+[deps.package]
+net = { version = "1.0.0", options = { ssl = { not = "off" } } }
+
+[[lib]]
+name = "liba"
+kinds = ["static"]
+source = ["a.c"]
+headers = ["a.h"]

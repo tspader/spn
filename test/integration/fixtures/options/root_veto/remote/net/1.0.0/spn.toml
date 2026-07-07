@@ -1,0 +1,14 @@
+[package]
+name = "net"
+version = "1.0.0"
+
+[options.ssl]
+type = "enum"
+values = ["openssl", "off"]
+default = "openssl"
+
+[[lib]]
+name = "net"
+kinds = ["static"]
+source = ["net.c"]
+headers = ["net.h"]

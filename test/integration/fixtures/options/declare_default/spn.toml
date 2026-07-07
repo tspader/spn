@@ -1,0 +1,10 @@
+[package]
+name = "options_declare_default"
+version = "0.1.0"
+
+[deps.package]
+codec = "1.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
