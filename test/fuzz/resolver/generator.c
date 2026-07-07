@@ -101,15 +101,11 @@ bool fz_range_sat(fz_dep_t dep, spn_semver_t version) {
     case FZ_RANGE_LT: {
       return spn_semver_cmp(version, low) < 0;
     }
-    // The parser never reaches its wildcard branch for these forms; they
-    // degrade to a caret on the written components. The mirror matches what
-    // the parser does, not what the syntax means, so ranges_agree pins the
-    // current behavior and flags the mirror the day the parser changes
     case FZ_RANGE_STAR_MINOR: {
-      return fz_caret_sat((spn_semver_t) { .major = low.major }, version);
+      return version.major == low.major;
     }
     case FZ_RANGE_STAR_PATCH: {
-      return fz_caret_sat((spn_semver_t) { .major = low.major, .minor = low.minor }, version);
+      return version.major == low.major && version.minor == low.minor;
     }
     case FZ_RANGE_ANY: {
       return true;
@@ -175,7 +171,8 @@ bool fz_ranges_agree(void) {
   for (u32 shape = 0; agree && shape < FZ_RANGE_COUNT; shape++) {
     for (u64 at = 0; agree && at < count; at++) {
       fz_dep_t dep = { .shape = (fz_range_shape_t)shape, .version = lattice[at] };
-      spn_semver_range_t range = spn_semver_parse_range(fz_range_render(mem, dep));
+      spn_semver_range_t range = sp_zero;
+      SP_ASSERT(!spn_semver_parse_range(fz_range_render(mem, dep), &range));
       for (u64 ct = 0; ct < count; ct++) {
         bool in_range =
           spn_semver_satisfies(lattice[ct], range.low.version, range.low.op) &&

@@ -104,7 +104,7 @@ static spn_requested_pkg_t fz_req(sp_mem_t mem, fz_universe_t* u, fz_dep_t dep) 
   }
   else {
     req.source = SPN_PKG_SOURCE_INDEX;
-    req.index.range = spn_semver_parse_range(fz_range_render(mem, dep));
+    SP_ASSERT(!spn_semver_parse_range(fz_range_render(mem, dep), &req.index.range));
   }
   return req;
 }
