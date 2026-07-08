@@ -1,0 +1,62 @@
+[spn]
+version = "1.0.0"
+commit = "00c0fa98"
+
+[[dep]]
+name = "core/toml"
+version = "1.5.0"
+commit = "2e8ffdfa215c"
+kind = "index"
+source_url = "https://github.com/tspader/toml.git"
+source_rev = "2e8ffdfa215c"
+manifest_url = "git@github.com:tspader/spam.git"
+manifest_rev = "07ec098418"
+manifest_dir = "toml"
+manifest_file = "spn.toml"
+script_file = "spn.c"
+
+[[dep]]
+name = "core/utest"
+version = "1.2.0"
+commit = "fb622dc480a5"
+kind = "index"
+source_url = "https://github.com/sheredom/utest.h.git"
+source_rev = "fb622dc480a5"
+manifest_url = "git@github.com:tspader/spam.git"
+manifest_rev = "07ec098418"
+manifest_dir = "utest"
+manifest_file = "spn.toml"
+script_file = "spn.c"
+
+[[dep]]
+name = "core/yyjson"
+version = "0.13.0"
+commit = "92ae1e2216548eb1dee78c09145a9a9bd067e9e9"
+kind = "index"
+source_url = "https://github.com/ibireme/yyjson.git"
+source_rev = "92ae1e2216548eb1dee78c09145a9a9bd067e9e9"
+manifest_url = "git@github.com:tspader/spam.git"
+manifest_rev = "98a7ad9aa0"
+manifest_dir = "yyjson"
+manifest_file = "spn.toml"
+script_file = "spn.c"
+
+[[dep]]
+name = "spader/sp"
+version = "3.1.0"
+commit = "ede42f835f63cdaf1d90c5eeeb9eaa1205ada954"
+kind = "index"
+source_url = "https://github.com/tspader/sp.git"
+source_rev = "ede42f835f63cdaf1d90c5eeeb9eaa1205ada954"
+manifest_url = "git@github.com:tspader/spam.git"
+manifest_rev = "24ad2ebd4e"
+manifest_dir = "sp"
+manifest_file = "spn.toml"
+script_file = "spn.c"
+
+[[dep]]
+name = "spader/wamr"
+version = "2.4.1"
+commit = ""
+kind = "file"
+

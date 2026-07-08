@@ -99,12 +99,7 @@ typedef struct { sp_str_t path; sp_str_t error; } spn_evt_script_crashed_t;
 typedef struct { sp_str_t name; sp_str_t url; } spn_evt_sync_t;
 typedef struct { sp_str_t profile; bool force; u32 packages; } spn_evt_graph_init_t;
 typedef struct {
-  s32 kind;
-  u32 num_objects;
-  sp_str_t output_path;
-  sp_str_t linker;
-  sp_str_t args;
-  bool has_embeds;
+  spn_target_unit_t* target;
 } spn_evt_link_start_t;
 typedef struct {
   sp_str_t output_path;

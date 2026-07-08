@@ -109,13 +109,11 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
   spn_session_t* session = target->session;
   spn_pkg_unit_t* pkg = target->pkg;
 
-  sp_da(spn_closure_entry_t) deps = spn_target_link_closure(session->mem, target);
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
-  // Package archives first. They reference symbols from system libraries, and
-  // the linker resolves left-to-right, so every -l<archive> must precede the
-  // -l<system> that satisfies it. Package archives and system libs share the
-  // same command-line bucket, so ordering them here is what keeps a math-using
-  // static lib linkable regardless of the order its package was discovered in.
+  sp_da(spn_closure_entry_t) deps = spn_target_link_closure(s.mem, target);
+
+  // Packages must precede the system libraries they need
   sp_da_for(deps, it) {
     spn_pkg_unit_t* dep = deps[it].pkg;
     if (!dep || dep == pkg) continue;
@@ -132,10 +130,8 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
           // A shared lib embedding a private static dep hides its symbols, so
           // the embedded copy can't collide with a consumer's own instance
           if (deps[it].private && target->kind == SPN_CC_OUTPUT_SHARED_LIB) {
-            sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-            sp_str_t archive = sp_os_lib_to_file_name(scratch.mem, lib->info->name, SP_OS_LIB_STATIC);
-            spn_cc_target_add_flag(cc, sp_fmt(session->mem, "-Wl,--exclude-libs,{}", SP_FMT_STR(archive)).value);
-            sp_mem_end_scratch(scratch);
+            sp_str_t archive = sp_os_lib_to_file_name(s.mem, lib->info->name, SP_OS_LIB_STATIC);
+            spn_cc_target_add_flag(cc, sp_fmt(cc->cc->mem, "-Wl,--exclude-libs,{}", SP_FMT_STR(archive)).value);
           }
           break;
         }
@@ -147,7 +143,9 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
         }
         case SPN_LIB_KIND_SOURCE:
         case SPN_LIB_KIND_OBJECT:
-        case SPN_LIB_KIND_NONE: break;
+        case SPN_LIB_KIND_NONE: {
+          break;
+        }
       }
     }
   }
@@ -164,50 +162,55 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
       spn_cc_target_add_system_lib(cc, dep->info->system_deps[s]);
     }
   }
+
+  sp_mem_end_scratch(s);
 }
 
 sp_str_t get_embed_object_path(sp_mem_t mem, spn_target_unit_t* unit) {
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_str_t name = sp_fmt(scratch.mem, "{}.embed.o", SP_FMT_STR(unit->info->name)).value;
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+  sp_str_t name = sp_fmt(s.mem, "{}.embed.o", SP_FMT_STR(unit->info->name)).value;
   sp_str_t path = sp_fs_join_path(mem, unit->paths.generated, name);
-  sp_mem_end_scratch(scratch);
+  sp_mem_end_scratch(s);
   return path;
 }
 
 sp_str_t get_embed_header_path(sp_mem_t mem, spn_target_unit_t* unit) {
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_str_t name = sp_fmt(scratch.mem, "{}.embed.h", SP_FMT_STR(unit->info->name)).value;
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+  sp_str_t name = sp_fmt(s.mem, "{}.embed.h", SP_FMT_STR(unit->info->name)).value;
   sp_str_t path = sp_fs_join_path(mem, unit->paths.generated, name);
-  sp_mem_end_scratch(scratch);
+  sp_mem_end_scratch(s);
   return path;
 }
 
 sp_str_t get_target_output_path(sp_mem_t mem, spn_target_unit_t* target) {
   spn_target_info_t* info = target->info;
-
   spn_toolchain_unit_t* toolchain = target->session->units.toolchain;
   spn_profile_info_t profile = target->session->profile;
+
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+
+  sp_str_t path = sp_zero;
+
   switch (target->kind) {
     case SPN_CC_OUTPUT_EXE: {
       return sp_fs_join_path(mem, target->paths.bin, info->name);
     }
     case SPN_CC_OUTPUT_STATIC_LIB: {
-      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-      sp_str_t file_name = sp_os_lib_to_file_name(scratch.mem, info->name, SP_OS_LIB_STATIC);
-      sp_str_t path = sp_fs_join_path(mem, target->paths.lib, file_name);
-      sp_mem_end_scratch(scratch);
-      return path;
+      sp_str_t file_name = sp_os_lib_to_file_name(s.mem, info->name, SP_OS_LIB_STATIC);
+      path = sp_fs_join_path(mem, target->paths.lib, file_name);
+      break;
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
-      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-      sp_str_t file_name = sp_os_lib_to_file_name(scratch.mem, info->name, SP_OS_LIB_SHARED);
-      sp_str_t path = sp_fs_join_path(mem, target->paths.lib, file_name);
-      sp_mem_end_scratch(scratch);
-      return path;
+      sp_str_t file_name = sp_os_lib_to_file_name(s.mem, info->name, SP_OS_LIB_SHARED);
+      path = sp_fs_join_path(mem, target->paths.lib, file_name);
+      break;
     }
     case SPN_CC_OUTPUT_WASM:
-    case SPN_CC_OUTPUT_OBJECT: break;
+    case SPN_CC_OUTPUT_OBJECT: {
+      sp_unreachable_case();
+    }
   }
 
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+  sp_mem_end_scratch(s);
+  return path;
 }
