@@ -21,6 +21,7 @@
 #include "sp/sp_glob.h"
 #include "target/mutate.h"
 #include "target/select.h"
+#include "task/build/build.h"
 #include "toolchain/toolchain.h"
 #include "unit/types.h"
 
@@ -296,6 +297,7 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
   }
 
   spn_session_build_invocations(session);
+  spn_build_link_invocations(session);
   spn_session_write_compile_commands(session, spn_session_compile_commands_path(session));
 
   return spn_task_done();

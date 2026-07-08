@@ -120,6 +120,7 @@ struct spn_target_unit {
   spn_target_info_t* info;
   spn_cc_output_kind_t kind;
   spn_linkage_t lib_kind;
+  spn_invocation_t invocation;
 
   sp_da(spn_compile_unit_t*) objects;
 

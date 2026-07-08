@@ -51,12 +51,6 @@ typedef struct {
 } spn_cc_embed_ctx_t;
 
 typedef struct {
-  sp_ps_output_t result;
-  u64 elapsed;
-  sp_str_t args;
-} spn_cc_run_t;
-
-typedef struct {
   sp_str_t output;
   sp_da(sp_str_t) source;
   sp_da(sp_str_t) include;
@@ -127,7 +121,6 @@ void             spn_cc_target_add_system_lib(spn_cc_target_t* cc, sp_str_t name
 void             spn_cc_target_add_lib_dir(spn_cc_target_t* cc, sp_str_t dir);
 void             spn_cc_target_add_rpath(spn_cc_target_t* cc, sp_str_t dir);
 void             spn_cc_target_add_dep(spn_cc_target_t* target, spn_pkg_unit_t* dep);
-spn_cc_run_t     spn_cc_target_run(spn_cc_target_t* target, sp_str_t cwd);
 void             spn_cc_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps);
 void             spn_cc_target_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps);
 sp_str_t         spn_cc_symbol_from_embedded_file(sp_mem_t mem, sp_str_t file_path);

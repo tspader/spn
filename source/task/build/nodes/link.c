@@ -3,67 +3,13 @@
 #include "spn.h"
 #include "unit/types.h"
 #include "session/types.h"
-#include "target/types.h"
 
-#include "enum/enum.h"
 #include "external/cc.h"
 #include "event/event.h"
+#include "session/invocation.h"
 #include "target/closure.h"
 #include "task/build/build.h"
 #include "unit/package.h"
-
-typedef struct {
-  sp_ps_output_t result;
-  u64 elapsed;
-  sp_str_t args;
-} ar_result_t;
-
-ar_result_t archive_objects(spn_target_unit_t* unit, sp_str_t output) {
-  spn_toolchain_unit_t* toolchain = unit->session->units.toolchain;
-
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  sp_mem_t mem = s.mem;
-
-  sp_ps_config_t ps = {
-    .command = toolchain->archiver.program,
-    .cwd = unit->paths.work,
-    .io = {
-      .in.mode = SP_PS_IO_MODE_NULL,
-      .err.mode = SP_PS_IO_MODE_REDIRECT,
-    },
-  };
-  sp_da_for(toolchain->archiver.args, ai) {
-    sp_ps_config_add_arg(s.mem, &ps, toolchain->archiver.args[ai]);
-  }
-  sp_ps_config_add_arg(s.mem, &ps, sp_str_lit("rcs"));
-  sp_ps_config_add_arg(s.mem, &ps, output);
-
-  sp_da_for(unit->objects, it) {
-    sp_ps_config_add_arg(s.mem, &ps, unit->objects[it]->paths.object);
-  }
-
-  sp_io_dyn_mem_writer_t log;
-  sp_io_dyn_mem_writer_init(spn.mem, &log);
-  sp_io_write_str(&log.base, ps.command, SP_NULLPTR);
-  sp_io_write_c8(&log.base, ' ');
-  sp_da_for(ps.dyn_args, it) {
-    sp_io_write_str(&log.base, ps.dyn_args[it], SP_NULLPTR);
-    sp_io_write_c8(&log.base, ' ');
-  }
-  sp_str_t args = sp_io_dyn_mem_writer_take_str(&log);
-
-  sp_tm_timer_t timer = sp_tm_start_timer();
-  sp_ps_output_t result = sp_ps_run(spn.mem, ps);
-  u64 elapsed = sp_tm_read_timer(&timer);
-
-  sp_mem_end_scratch(s);
-
-  return (ar_result_t) {
-    .result = result,
-    .elapsed = elapsed,
-    .args = args,
-  };
-}
 
 static bool objects_have_cxx(sp_da(spn_compile_unit_t*) objects) {
   sp_da_for(objects, it) {
@@ -107,7 +53,88 @@ done:
   return language;
 }
 
-spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, sp_str_t args, sp_str_t out, u64 elapsed) {
+static void build_archive_invocation(spn_target_unit_t* target, sp_str_t output) {
+  sp_mem_t mem = target->session->mem;
+  spn_toolchain_unit_t* toolchain = target->session->units.toolchain;
+
+  sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
+  sp_da_for(toolchain->archiver.args, it) {
+    sp_ps_config_add_arg(mem, &ps, toolchain->archiver.args[it]);
+  }
+  sp_ps_config_add_arg(mem, &ps, sp_str_lit("rcs"));
+  sp_ps_config_add_arg(mem, &ps, output);
+  sp_da_for(target->objects, it) {
+    sp_ps_config_add_arg(mem, &ps, target->objects[it]->paths.object);
+  }
+
+  target->invocation = (spn_invocation_t) {
+    .program = toolchain->archiver.program,
+    .args = ps.dyn_args,
+    .cwd = target->paths.work,
+  };
+}
+
+static void build_link_invocation(spn_target_unit_t* target, sp_str_t output) {
+  sp_mem_t mem = target->session->mem;
+
+  spn_cc_t cc;
+  spn_cc_init(&cc, mem);
+  spn_cc_set_profile(&cc, target->session->profile);
+  spn_cc_set_output_dir(&cc, sp_fs_parent_path(output));
+  spn_cc_set_toolchain(&cc, target->session->units.toolchain);
+
+  // The link consumes only objects, so the package's compile-stage data
+  // (includes, defines, flags) stays off the command line; that's
+  // add_pkg_to_cc_target's job in the compile node
+  spn_cc_target_t* cc_target = spn_cc_add_target(&cc, target->kind, sp_fs_get_name(output));
+  spn_cc_target_set_lang(cc_target, get_link_language(target));
+  add_deps_to_cc_target(cc_target, target);
+
+  sp_da_for(target->objects, it) {
+    spn_cc_target_add_absolute_source(cc_target, target->objects[it]->paths.object);
+  }
+
+  if (!sp_da_empty(target->info->embed)) {
+    spn_cc_target_add_absolute_source(cc_target, get_embed_object_path(mem, target));
+  }
+
+  sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
+  spn_cc_to_ps(mem, &cc, cc_target, &ps);
+  spn_cc_target_to_ps(mem, &cc, cc_target, &ps);
+
+  target->invocation = (spn_invocation_t) {
+    .program = ps.command,
+    .args = ps.dyn_args,
+    .cwd = target->paths.work,
+  };
+}
+
+void spn_build_link_invocations(spn_session_t* session) {
+  sp_om_for(session->units.targets, it) {
+    spn_target_unit_t* target = sp_om_at(session->units.targets, it);
+    if (sp_da_empty(target->objects)) {
+      continue;
+    }
+
+    switch (target->kind) {
+      case SPN_CC_OUTPUT_STATIC_LIB: {
+        build_archive_invocation(target, get_target_output_path(session->mem, target));
+        break;
+      }
+      case SPN_CC_OUTPUT_EXE:
+      case SPN_CC_OUTPUT_SHARED_LIB: {
+        build_link_invocation(target, get_target_output_path(session->mem, target));
+        break;
+      }
+      case SPN_CC_OUTPUT_WASM:
+      case SPN_CC_OUTPUT_OBJECT: {
+        break;
+      }
+    }
+  }
+}
+
+spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, sp_str_t out, u64 elapsed) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_PASSED,
     .pkg = unit->pkg->info,
@@ -115,7 +142,7 @@ spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, sp_str_t args, 
     .target.name = unit->info->name,
     .target.link_passed = {
       .output_path = output,
-      .args = args,
+      .invocation = &unit->invocation,
       .out = out,
       .time = elapsed,
     }
@@ -123,7 +150,7 @@ spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, sp_str_t args, 
   return SPN_OK;
 }
 
-spn_err_t emit_failure(spn_target_unit_t* unit, sp_str_t args, s32 rc, sp_str_t out, sp_str_t err) {
+spn_err_t emit_failure(spn_target_unit_t* unit, s32 rc, sp_str_t out, sp_str_t err) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_FAILED,
     .pkg = unit->pkg->info,
@@ -133,7 +160,7 @@ spn_err_t emit_failure(spn_target_unit_t* unit, sp_str_t args, s32 rc, sp_str_t 
       .exit_code = rc,
       .out = out,
       .err = err,
-      .args = args,
+      .invocation = &unit->invocation,
     }
   });
   return SPN_ERROR;
@@ -149,7 +176,6 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_announce_compile(target->pkg);
 
   sp_str_t output = get_target_output_path(spn.mem, target);
-  bool has_embeds = !sp_da_empty(info->embed);
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_START,
@@ -161,58 +187,11 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
     }
   });
 
-  switch (target->kind) {
-    case SPN_CC_OUTPUT_STATIC_LIB: {
-      ar_result_t run = archive_objects(target, output);
+  spn_invocation_result_t run = spn_invocation_run(&target->invocation);
 
-      if (run.result.status.exit_code) {
-        emit_failure(target, run.args, run.result.status.exit_code, run.result.out, run.result.err);
-        return SPN_ERROR;
-      }
-
-      emit_success(target, output, run.args, run.result.out, run.elapsed);
-      return SPN_OK;
-    }
-    case SPN_CC_OUTPUT_EXE:
-    case SPN_CC_OUTPUT_SHARED_LIB: {
-      spn_cc_t* cc = sp_alloc_type(spn.mem, spn_cc_t);
-      spn_cc_init(cc, spn.mem);
-      spn_cc_set_profile(cc, target->session->profile);
-      spn_cc_set_output_dir(cc, sp_fs_parent_path(output));
-      spn_cc_set_toolchain(cc, target->session->units.toolchain);
-
-      // The link consumes only objects, so the package's compile-stage data
-      // (includes, defines, flags) stays off the command line; that's
-      // add_pkg_to_cc_target's job in the compile node
-      spn_cc_target_t* cc_target = spn_cc_add_target(cc, target->kind, sp_fs_get_name(output));
-      spn_cc_target_set_lang(cc_target, get_link_language(target));
-      add_deps_to_cc_target(cc_target, target);
-
-      sp_da_for(target->objects, it) {
-        spn_cc_target_add_absolute_source(cc_target, target->objects[it]->paths.object);
-      }
-
-      if (has_embeds) {
-        spn_cc_target_add_absolute_source(cc_target, get_embed_object_path(spn.mem, target));
-      }
-
-      spn_cc_run_t run = spn_cc_target_run(cc_target, target->paths.work);
-      s32 rc = run.result.status.exit_code;
-
-      if (rc) {
-        return emit_failure(target, run.args, rc, run.result.out, run.result.err);
-      }
-      else {
-        return emit_success(target, output, run.args, run.result.out, run.elapsed);
-      }
-
-      sp_unreachable_return(69);
-    }
-    case SPN_CC_OUTPUT_WASM:
-    case SPN_CC_OUTPUT_OBJECT: {
-      SP_UNREACHABLE_CASE();
-    }
+  if (run.result.status.exit_code) {
+    return emit_failure(target, run.result.status.exit_code, run.result.out, run.result.err);
   }
 
-  SP_UNREACHABLE_RETURN(SPN_ERROR);
+  return emit_success(target, output, run.result.out, run.elapsed);
 }
