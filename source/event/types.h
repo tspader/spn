@@ -105,7 +105,7 @@ typedef struct {
 } spn_evt_link_start_t;
 typedef struct {
   sp_str_t output_path;
-  sp_str_t args;
+  spn_invocation_t* invocation;
   sp_str_t out;
   u64 time;
 } spn_evt_link_passed_t;
@@ -113,8 +113,7 @@ typedef struct {
   s32 exit_code;
   sp_str_t out;
   sp_str_t err;
-  sp_str_t linker;
-  sp_str_t args;
+  spn_invocation_t* invocation;
 } spn_evt_link_failed_t;
 typedef struct { u64 time; } spn_evt_configure_t;
 typedef struct { sp_str_t name; sp_str_t version; s32 kind; } spn_evt_resolve_pkg_t;
