@@ -1,0 +1,15 @@
+[package]
+name = "base"
+version = "1.0.0"
+
+[options.fast]
+type = "bool"
+default = false
+define = "BASE_FAST"
+public = true
+
+[[lib]]
+name = "base"
+kinds = ["static"]
+source = ["base.c"]
+headers = ["base.h"]

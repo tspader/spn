@@ -1,0 +1,17 @@
+[package]
+name = "tool"
+version = "1.0.0"
+
+[options.codegen]
+type = "bool"
+default = false
+define = "TOOL_CODEGEN"
+
+[deps.build]
+helper = { version = "1.0.0", when = { codegen = true } }
+
+[[lib]]
+name = "tool"
+kinds = ["static"]
+source = ["tool.c"]
+headers = ["tool.h"]

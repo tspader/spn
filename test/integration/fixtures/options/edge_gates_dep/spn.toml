@@ -1,0 +1,10 @@
+[package]
+name = "options_edge_gates_dep"
+version = "0.1.0"
+
+[deps.package]
+mixer = { version = "file://./vendor/mixer/spn.toml", options = { flac = true } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

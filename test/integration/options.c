@@ -350,16 +350,20 @@ UTEST_F(options, edge_request) {
   });
 }
 
-// additive = true: liba requests audio = true and libb requests audio =
-// false, which a strict agree-or-error merge rejects; the union resolves
-// true. libb's video rides along, so caps == 3 through both consumers.
+// additive = true: with the root silent, requests union — liba's audio =
+// true wins over libb's false and libb's video rides along, so caps == 3
+// through both consumers. When the root explicitly sets audio = false the
+// root is authoritative like any other setter: no request unions over it,
+// so caps drops to video alone.
 UTEST_F(options, additive) {
   tmpfs_init_named(&uf->fixture.fs, "options_additive");
 
   run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
     .project = "test/integration/fixtures/options/additive",
+    .copy = { "spn.off.toml" },
     .builds = {
-      { .expect = { .bin = { .name = "main" } } },
+      { .expect = { .bin = { .name = "main", .rc = 3 } } },
+      { .manifest = "spn.off.toml", .expect = { .bin = { .name = "main", .rc = 2 } } },
     },
   });
 }
@@ -413,6 +417,127 @@ UTEST_F(options, defaults_false) {
     .project = "test/integration/fixtures/options/defaults_false",
     .builds = {
       { .expect = { .bin = { .name = "main" } } },
+    },
+  });
+}
+
+// The composition of edge_request and gates_dep: the root's edge request
+// flips flac on, which must pull mixer's flac-gated dep into the build even
+// though the request isn't known when mixer's edges are first gated
+UTEST_F(options, edge_gates_dep) {
+  tmpfs_init_named(&uf->fixture.fs, "options_edge_gates_dep");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/options/edge_gates_dep",
+    .copy = { "vendor/*" },
+    .builds = {
+      {
+        .expect = {
+          .bin = { .name = "main", .rc = 7 },
+          .events = {
+            { .event = "resolve_package", .key = "name", .value = "flaclib" },
+          },
+        },
+      },
+    },
+  });
+}
+
+// A when-gated dep inside an index package whose gate is off: the index
+// metadata lists the dep unconditionally, but a false gate in the fetched
+// manifest must cut the edge, not fail the build
+UTEST_F(options, index_gated_dep) {
+  tmpfs_init_named(&uf->fixture.fs, "options_index_gated_dep");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/options/index_gated_dep",
+    .builds = {
+      { .expect = { .bin = { .name = "main", .rc = 5 } } },
+    },
+  });
+}
+
+// edge_gates_dep for a build-kind dep: the request flips codegen on, so
+// tool's define is applied and its gated build dep must resolve with it —
+// the define without the dep is a misbuild
+UTEST_F(options, edge_gates_build_dep) {
+  tmpfs_init_named(&uf->fixture.fs, "options_edge_gates_build_dep");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/options/edge_gates_build_dep",
+    .copy = { "vendor/*" },
+    .builds = {
+      {
+        .expect = {
+          .bin = { .name = "main", .rc = 9 },
+          .events = {
+            { .event = "resolve_package", .key = "name", .value = "helper" },
+          },
+        },
+      },
+    },
+  });
+}
+
+// Options are part of a package's transitive build identity: wrap's
+// compilation observes base's public define, so each value of base's option
+// is a distinct wrap. The flip-forward works by accident of mtimes (base's
+// new store stamp dirties wrap); the flip-back must not hand back the
+// fast-flavored wrap that the default store path now holds
+UTEST_F(options, dep_rebuild) {
+  tmpfs_init_named(&uf->fixture.fs, "options_dep_rebuild");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/options/dep_rebuild",
+    .copy = { "spn.fast.toml", "spn.default.toml" },
+    .builds = {
+      { .expect = { .bin = { .name = "main", .rc = 10 } } },
+      { .manifest = "spn.fast.toml", .expect = { .bin = { .name = "main", .rc = 20 } } },
+      { .manifest = "spn.default.toml", .expect = { .bin = { .name = "main", .rc = 10 } } },
+    },
+  });
+}
+
+// Mutually-referencing defaults make an explicitly-set build look default
+// under the final env: b = true and c = true each match the other's when-arm
+// default, but the all-defaults build resolved both false, so the two builds
+// are different configurations and must not share a store path
+UTEST_F(options, default_identity) {
+  tmpfs_init_named(&uf->fixture.fs, "options_default_identity");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/options/default_identity",
+    .copy = { "spn.on.toml" },
+    .builds = {
+      { .expect = { .bin = { .name = "main", .rc = 0 } } },
+      { .manifest = "spn.on.toml", .expect = { .bin = { .name = "main", .rc = 3 } } },
+    },
+  });
+}
+
+// Private scoping resolves codec at 1.0.0 (small, inside snd) and 2.0.0
+// (fast, at the root): two distinct packages, so the disagreeing requests
+// are not a conflict and each instance builds with its own value
+UTEST_F(options, private_versions) {
+  tmpfs_init_named(&uf->fixture.fs, "options_private_versions");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/options/private_versions",
+    .builds = {
+      { .expect = { .bin = { .name = "main", .rc = 0 } } },
+    },
+  });
+}
+
+// A [config.<pkg>] key naming no package in the build is a misconfiguration,
+// not a no-op: the typo'd key must fail the build by name
+UTEST_F(options, config_unknown) {
+  tmpfs_init_named(&uf->fixture.fs, "options_config_unknown");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/options/config_unknown",
+    .builds = {
+      { .expect = { .rc = 1, .contains = { "codex" } } },
     },
   });
 }

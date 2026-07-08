@@ -1,0 +1,12 @@
+[package]
+name = "wrap"
+version = "1.0.0"
+
+[deps.package]
+base = "1.0.0"
+
+[[lib]]
+name = "wrap"
+kinds = ["static"]
+source = ["wrap.c"]
+headers = ["wrap.h"]

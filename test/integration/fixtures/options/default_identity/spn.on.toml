@@ -1,0 +1,13 @@
+[package]
+name = "options_default_identity"
+version = "0.1.0"
+
+[deps.package]
+pipeline = "1.0.0"
+
+[config.pipeline]
+options = { b = true, c = true }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

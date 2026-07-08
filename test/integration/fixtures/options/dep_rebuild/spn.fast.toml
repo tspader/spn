@@ -1,0 +1,13 @@
+[package]
+name = "options_dep_rebuild"
+version = "0.1.0"
+
+[deps.package]
+wrap = "1.0.0"
+
+[config.base]
+options = { fast = true }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

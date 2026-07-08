@@ -1,0 +1,14 @@
+[package]
+name = "options_additive"
+version = "0.1.0"
+
+[deps.package]
+liba = "1.0.0"
+libb = "1.0.0"
+
+[config.codec]
+options = { audio = false }
+
+[[bin]]
+name = "main"
+source = ["main.c"]
