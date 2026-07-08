@@ -17,6 +17,8 @@
 #include "spn.h"
 #include "task/task.h"
 #include "task/types.h"
+#include "toml/loader.h"
+#include "toml/issue.h"
 #include "toolchain/toolchain.h"
 #include "toolchain/types.h"
 #include "unit/types.h"
@@ -188,8 +190,8 @@ static spn_err_t load_package(
 
   if (!info) {
     info = sp_alloc_type(spn.mem, spn_pkg_info_t);
-    spn_codegen_ctx_t ctx = sp_zero;
-    spn_codegen_ctx_init(&ctx, spn.mem, session->intern);
+    spn_toml_loader_t ctx = sp_zero;
+    spn_toml_loader_init(&ctx, spn.mem, session->intern);
     if (spn_codegen_load_pkg(&ctx, loaded->paths.manifest, info)) {
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_ERR_MANIFEST,

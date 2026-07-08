@@ -1,3 +1,3 @@
-  if (!spn_codegen_read_bool(ctx, table, "{{ .key }}", &out->{{ .name }})) {
-    spn_codegen_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "{{ .key }}");
+  if (!spn_toml_loader_read_bool(ctx, table, "{{ .key }}", &out->{{ .name }})) {
+    spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "{{ .key }}");
   }

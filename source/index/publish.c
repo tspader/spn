@@ -10,6 +10,7 @@
 #include "pkg/load.h"
 #include "semver/convert.h"
 #include "target/mutate.h"
+#include "toml/loader.h"
 
 static spn_index_dep_kind_t dep_kind_to_index(spn_dep_kind_t kind) {
   switch (kind) {
@@ -31,8 +32,8 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
   }
 
   spn_pkg_info_t info = SP_ZERO_INITIALIZE();
-  spn_codegen_ctx_t ctx = sp_zero;
-  spn_codegen_ctx_init(&ctx, opts->mem, opts->intern);
+  spn_toml_loader_t ctx = sp_zero;
+  spn_toml_loader_init(&ctx, opts->mem, opts->intern);
   if (spn_codegen_load_pkg(&ctx, manifest_path, &info)) {
     return spn_codegen_err(&ctx);
   }

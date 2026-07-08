@@ -1,22 +1,22 @@
-static void spn_cg_{{ .object }}_read_named(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, spn_cg_{{ .object }}_om_t* out) {
+static void spn_cg_{{ .object }}_read_named(spn_toml_loader_t* ctx, toml_table_t* table, const c8* key, spn_cg_{{ .object }}_om_t* out) {
   toml_array_t* array = toml_table_array(table, key);
   if (!array) {
     return;
   }
-  spn_codegen_push_key(ctx, key);
+  spn_toml_loader_push_key(ctx, key);
   sp_for(it, (u32)toml_array_len(array)) {
-    spn_codegen_push_index(ctx, it);
+    spn_toml_loader_push_index(ctx, it);
     toml_table_t* element = toml_array_table(array, (s32)it);
     if (element) {
       {{ .type }} entry = sp_zero;
       spn_cg_{{ .object }}_read(ctx, element, &entry);
       if (sp_str_om_has(*out, entry.{{ .key_field }})) {
-        spn_codegen_issue_at(ctx, SPN_CODEGEN_ERR_DUPLICATE_KEY, entry.{{ .key_field }});
+        spn_toml_loader_issue_at(ctx, SPN_CODEGEN_ERR_DUPLICATE_KEY, entry.{{ .key_field }});
       } else {
         sp_str_om_insert(*out, entry.{{ .key_field }}, entry);
       }
     }
-    spn_codegen_pop(ctx);
+    spn_toml_loader_pop(ctx);
   }
-  spn_codegen_pop(ctx);
+  spn_toml_loader_pop(ctx);
 }

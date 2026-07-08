@@ -91,6 +91,7 @@ add_test(NAME jtd COMMAND "$<TARGET_FILE:jtd>")
 
 add_executable(manifest_gen
   manifest/gen/main.c
+  ${SRC}/codegen/gen/config.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/json.c
@@ -118,6 +119,7 @@ add_test(NAME manifest_gen COMMAND "$<TARGET_FILE:manifest_gen>")
 
 add_executable(manifest_lower
   manifest/lower/main.c
+  ${SRC}/codegen/gen/config.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/json.c

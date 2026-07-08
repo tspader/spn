@@ -13,6 +13,7 @@
 #include "profile/types.h"
 #include "index/types.h"
 #include "toolchain/types.h"
+#include "toml/loader.h"
 #include "semver/compare.h"
 #include "when/when.h"
 
@@ -185,8 +186,8 @@ static void run_case(s32* utest_result, test_t test) {
   sp_mem_t mem = sp_mem_heap_as_allocator(heap);
   sp_intern_t* interner = sp_intern_new(mem);
 
-  spn_codegen_ctx_t ctx = sp_zero;
-  spn_codegen_ctx_init(&ctx, mem, interner);
+  spn_toml_loader_t ctx = sp_zero;
+  spn_toml_loader_init(&ctx, mem, interner);
 
   sp_str_t file = sp_fmt(mem, "{}.toml", sp_fmt_cstr(test.manifest)).value;
   sp_str_t path = sp_fs_join_path(mem, test_repo_path(mem, sp_str_lit(MANIFEST_DIR)), file);

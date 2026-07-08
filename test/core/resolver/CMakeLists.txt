@@ -15,6 +15,7 @@ add_executable(resolver
   ${SRC}/when/when.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/codegen/gen/toolchains.gen.c
+  ${SRC}/codegen/gen/config.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
   ${SRC}/index/index.c

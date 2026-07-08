@@ -5,6 +5,7 @@
     "abi": { "enum": ["gnu", "musl", "msvc", "mingw"] },
     "linkage": { "enum": ["shared", "static", "source", "object"] },
     "cc_driver": { "enum": ["gcc", "clang", "msvc"], "metadata": { "include": "toolchain/types.h" } },
+    "index_protocol": { "enum": ["git", "http", "filesystem"], "metadata": { "include": "index/types.h" } },
 
     "triple": {
       "optionalProperties": {

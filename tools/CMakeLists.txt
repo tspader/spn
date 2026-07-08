@@ -54,6 +54,9 @@ file(MAKE_DIRECTORY ${GEN_DIR})
 set(SCHEMA_DIR ${CMAKE_SOURCE_DIR}/source/codegen/schema)
 set(GEN_FILES
   ${GEN_DIR}/common.gen.h
+  ${GEN_DIR}/config.gen.h
+  ${GEN_DIR}/config.gen.c
+  ${GEN_DIR}/config.jtd.json
   ${GEN_DIR}/manifest.gen.h
   ${GEN_DIR}/manifest.gen.c
   ${GEN_DIR}/manifest.jtd.json
@@ -75,6 +78,6 @@ add_custom_command(
     ${GEN_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/templates
   DEPENDS jtd_gen ${JTD_GEN_SCHEMAS} ${JTD_GEN_TEMPLATES}
-  COMMENT "codegen: common.gen.h, {manifest,release,toolchains,abi}.gen.{h,c}"
+  COMMENT "codegen: common.gen.h, {config,manifest,release,toolchains,abi}.gen.{h,c}"
   VERBATIM)
 add_custom_target(spn_codegen_gen ALL DEPENDS ${GEN_FILES})

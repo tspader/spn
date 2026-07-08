@@ -104,7 +104,7 @@ static spn_lang_t get_link_language(spn_target_unit_t* target) {
 
 done:
   sp_mem_end_scratch(s);
-  return SPN_LANG_C;
+  return language;
 }
 
 spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, sp_str_t args, sp_str_t out, u64 elapsed) {

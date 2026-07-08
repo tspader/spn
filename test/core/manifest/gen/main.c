@@ -6,6 +6,8 @@
 
 #include "test.h"
 #include "codegen/codegen.h"
+#include "intern/intern.h"
+#include "toml/loader.h"
 #include "manifest.gen.h"
 
 UTEST_MAIN();
@@ -20,14 +22,14 @@ static sp_mem_t manifest_gen_mem(void) {
   return sp_mem_heap_as_allocator(sp_mem_heap_new());
 }
 
-static spn_codegen_ctx_t manifest_gen_ctx(sp_mem_t mem) {
-  spn_codegen_ctx_t ctx = sp_zero;
-  spn_codegen_ctx_init(&ctx, mem, sp_intern_new(mem));
+static spn_toml_loader_t manifest_gen_ctx(sp_mem_t mem) {
+  spn_toml_loader_t ctx = sp_zero;
+  spn_toml_loader_init(&ctx, mem, sp_intern_new(mem));
   return ctx;
 }
 
 static sp_str_t manifest_gen_render(sp_mem_t mem, sp_fs_entry_t* entry) {
-  spn_codegen_ctx_t ctx = manifest_gen_ctx(mem);
+  spn_toml_loader_t ctx = manifest_gen_ctx(mem);
 
   spn_cg_manifest_t manifest = sp_zero;
   if (spn_codegen_load(&ctx, entry->path, &manifest)) {
@@ -39,7 +41,7 @@ static sp_str_t manifest_gen_render(sp_mem_t mem, sp_fs_entry_t* entry) {
 
 UTEST(manifest_gen, missing_file) {
   sp_mem_t mem = manifest_gen_mem();
-  spn_codegen_ctx_t ctx = manifest_gen_ctx(mem);
+  spn_toml_loader_t ctx = manifest_gen_ctx(mem);
 
   spn_cg_manifest_t manifest = sp_zero;
   bool failed = spn_codegen_load(&ctx, sp_str_lit("/nonexistent/missing.toml"), &manifest);
