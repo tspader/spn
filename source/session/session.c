@@ -396,8 +396,8 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_pkg_id_t id, spn
     }
     case SPN_PKG_SOURCE_INDEX: {
       fingerprint_t fingerprint = fingerprint_package(session, id, loaded->info);
-      unit->paths.work = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, session->paths.cache.build, loaded->info->qualified), fingerprint.str);
-      unit->paths.store = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, session->paths.cache.store, loaded->info->qualified), fingerprint.str);
+      unit->paths.work = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, session->paths.system.caches.build.dir, loaded->info->qualified), fingerprint.str);
+      unit->paths.store = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, session->paths.system.caches.store.dir, loaded->info->qualified), fingerprint.str);
       break;
     }
   }

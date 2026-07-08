@@ -19,6 +19,8 @@ endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(EMBED_FORMAT coff)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(EMBED_FORMAT macho)
 else()
   set(EMBED_FORMAT elf)
 endif()

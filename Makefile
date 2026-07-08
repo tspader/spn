@@ -1,6 +1,15 @@
 ROOT        := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
-HOST_TRIPLE := $(shell uname -m)-linux-gnu
+UNAME_M     := $(shell uname -m)
+ifeq ($(UNAME_M),arm64)
+UNAME_M     := aarch64
+endif
+ifeq ($(shell uname -s),Darwin)
+HOST_TRIPLE := $(UNAME_M)-macos-none
+else
+HOST_TRIPLE := $(UNAME_M)-linux-gnu
+endif
 TRIPLE      ?= $(HOST_TRIPLE)
+NPROC       := $(shell getconf _NPROCESSORS_ONLN)
 
 BUILD     := $(ROOT)/.build
 WORK      := $(BUILD)/work/$(TRIPLE)
@@ -24,7 +33,7 @@ else
 endif
 
 build: configure
-	@cmake --build $(WORK) --parallel $(shell nproc)
+	@cmake --build $(WORK) --parallel $(NPROC)
 
 ifeq ($(TRIPLE),$(HOST_TRIPLE))
 configure: fetch
@@ -33,7 +42,7 @@ else
 .PHONY: host-tools
 host-tools: fetch
 	@cmake -S $(ROOT) -B $(WORK_HOST) -DTRIPLE=$(HOST_TRIPLE) -DHOST_TRIPLE=$(HOST_TRIPLE)
-	@cmake --build $(WORK_HOST) --parallel $(shell nproc) --target embed jtd_gen
+	@cmake --build $(WORK_HOST) --parallel $(NPROC) --target embed jtd_gen
 configure: host-tools
 	@cmake -S $(ROOT) -B $(WORK) -DTRIPLE=$(TRIPLE) -DHOST_TRIPLE=$(HOST_TRIPLE) -DSPN_HOST_TOOLS=$(WORK_HOST)/tools
 endif

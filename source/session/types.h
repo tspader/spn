@@ -7,6 +7,7 @@
 #include "filter/types.h"
 #include "graph/types.h"
 #include "intern/types.h"
+#include "paths/types.h"
 #include "pkg/options.h"
 #include "profile/types.h"
 #include "resolve/types.h"
@@ -103,10 +104,7 @@ struct spn_session_t {
     sp_str_t root;
     sp_str_t build;
     sp_str_t profile;
-    struct {
-      sp_str_t build;
-      sp_str_t store;
-    } cache;
+    spn_system_paths_t system;
   } paths;
 
   spn_bg_ctx_t sync;

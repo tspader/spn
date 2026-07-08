@@ -101,6 +101,68 @@ void on_signal(sp_os_signal_t signal, void* userdata) {
   }
 }
 
+sp_str_t build_path(sp_str_t base, const c8* dir) {
+  return sp_fs_join_path(spn.heap, base, sp_cstr_as_str(dir));
+}
+
+spn_err_t extract_runtime() {
+  spn_err_t err = SPN_OK;
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+
+  sp_str_t version = sp_zero;
+  if (sp_fs_exists(spn.paths.version)) {
+    sp_io_read_file(scratch.mem, spn.paths.version, &version);
+    version = sp_str_trim(version);
+  }
+
+  // @spader Use SHA256 for this
+  // The stamp must change whenever the embedded runtime does, not just on
+  // release; otherwise dev builds compile scripts against a stale extraction
+  sp_hash_t runtime_hash = 0;
+  sp_carr_for(spn_embed_manifest, it) {
+    spn_embed_entry_t entry = spn_embed_manifest[it];
+    sp_hash_t hashes [] = {
+      runtime_hash,
+      sp_hash_cstr(entry.path),
+      sp_hash_bytes(entry.data, entry.size, 0),
+    };
+    runtime_hash = sp_hash_combine(hashes, sp_carr_len(hashes));
+  }
+  sp_str_t stamp = sp_fmt(scratch.mem, "{}:{}", sp_fmt_cstr(SPN_VERSION), sp_fmt_uint(runtime_hash)).value;
+
+  if (!sp_str_equal(version, stamp)) {
+    sp_fs_remove_dir(spn.paths.runtime);
+    sp_fs_create_dir(spn.paths.runtime);
+    sp_fs_create_dir(spn.paths.include);
+
+    sp_glob_set_t* glob = sp_glob_set_new(scratch.mem);
+    sp_glob_set_add(glob, "include/*");
+    sp_glob_set_build(glob);
+
+    sp_carr_for(spn_embed_manifest, it) {
+      spn_embed_entry_t entry = spn_embed_manifest[it];
+      sp_str_t path = sp_str_view(entry.path);
+      if (sp_glob_set_match(glob, path)) {
+        path = sp_fs_join_path(scratch.mem, spn.paths.runtime, path);
+        sp_io_file_writer_t io = sp_zero;
+        sp_io_file_writer_from_path(&io, path);
+        sp_io_write(&io.base, entry.data, entry.size, SP_NULLPTR);
+        sp_io_file_writer_close(&io);
+      }
+    }
+
+    {
+      sp_io_file_writer_t io = sp_zero;
+      sp_io_file_writer_from_path(&io, spn.paths.version);
+      sp_io_write_str(&io.base, stamp, SP_NULLPTR);
+      sp_io_file_writer_close(&io);
+    }
+  }
+
+  sp_mem_end_scratch(scratch);
+  return err;
+}
+
 sp_app_result_t spn_init(sp_app_t* sp) {
   spn.sp = sp;
   spn.mem = sp_mem_os_new();
@@ -199,42 +261,41 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   // Find the cache directory after the config has been fully loaded
-  spn.paths.runtime = sp_fs_join_path(spn.heap, spn.paths.storage, SP_LIT("runtime"));
-  spn.paths.include = sp_fs_join_path(spn.heap, spn.paths.runtime, sp_str_lit("include"));
-  spn.paths.version = sp_fs_join_path(spn.heap, spn.paths.runtime, SP_LIT("version.stamp"));
-  spn.paths.log = sp_fs_join_path(spn.heap, spn.paths.storage, SP_LIT("log"));
-  spn.paths.cache = sp_fs_join_path(spn.heap, spn.paths.storage, SP_LIT("cache"));
-  spn.paths.source = sp_fs_join_path(spn.heap, spn.paths.cache, SP_LIT("source"));
-  spn.paths.build = sp_fs_join_path(spn.heap, spn.paths.cache, SP_LIT("build"));
-  spn.paths.store = sp_fs_join_path(spn.heap, spn.paths.cache, SP_LIT("store"));
-  spn.paths.index = sp_fs_join_path(spn.heap, spn.paths.storage, sp_str_lit("index"));
+  spn.paths.runtime = build_path(spn.paths.storage, "runtime");
+    spn.paths.include = build_path(spn.paths.runtime, "include");
+    spn.paths.version = build_path(spn.paths.runtime, "version.stamp");
+  spn.paths.log = build_path(spn.paths.storage, "log");
+  spn.paths.cache = build_path(spn.paths.storage, "cache");
+  spn.paths.caches.dir = build_path(spn.paths.storage, "cache");
+    spn.paths.caches.git.dir = build_path(spn.paths.caches.dir, "source");
+      spn.paths.caches.git.dbs = build_path(spn.paths.caches.git.dir, "dbs");
+      spn.paths.caches.git.checkouts = build_path(spn.paths.caches.git.dir, "checkouts");
+    spn.paths.caches.store.dir = build_path(spn.paths.caches.dir, "store");
+    spn.paths.caches.build.dir = build_path(spn.paths.caches.dir, "build");
+  spn.paths.index = build_path(spn.paths.storage, "index");
+
 
   spn.paths.toolchain = sp_env_get(spn.env, sp_str_lit("SPN_TOOLCHAIN_DIR"));
   if (sp_str_empty(spn.paths.toolchain)) {
-    spn.paths.toolchain = sp_fs_join_path(spn.heap, spn.paths.cache, SP_LIT("toolchain"));
+    spn.paths.toolchain = sp_fs_join_path(spn.heap, spn.paths.caches.dir, SP_LIT("toolchain"));
   }
 
   sp_fs_create_dir(spn.paths.log);
 
   spn_event_log_init(spn.heap);
-  {
-    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-    sp_str_t jsonl_path = sp_fs_join_path(scratch.mem, spn.paths.log, sp_str_lit("build.jsonl"));
-    sp_fs_create_file(jsonl_path);
-    sp_io_file_writer_from_path(&spn.logger.jsonl, jsonl_path);
-    sp_mem_end_scratch(scratch);
-  }
 
-  sp_fs_create_dir(spn.paths.cache);
-  sp_fs_create_dir(spn.paths.source);
-  sp_fs_create_dir(spn.paths.build);
+  sp_fs_create_dir(spn.paths.caches.dir);
+  sp_fs_create_dir(spn.paths.caches.git.dir);
+  sp_fs_create_dir(spn.paths.caches.build.dir);
   sp_fs_create_dir(spn.paths.index);
-  sp_fs_create_dir(spn.paths.store);
+  sp_fs_create_dir(spn.paths.caches.store.dir);
   sp_fs_create_dir(spn.paths.toolchain);
   sp_fs_create_dir(spn.paths.bin);
   sp_fs_create_dir(spn.paths.tools.dir);
 
+  extract_runtime();
 
+  // INDEXES
   bool has_core_index = false;
   sp_da_for(spn.indexes, i) {
     if (sp_str_equal(spn.indexes[i].name, sp_str_lit("core"))) {
@@ -266,61 +327,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
 
-  // @spader
-
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-
-  sp_str_t version = sp_zero;
-  if (sp_fs_exists(spn.paths.version)) {
-    sp_io_read_file(scratch.mem, spn.paths.version, &version);
-    version = sp_str_trim(version);
-  }
-
-  // @spader Use SHA256 for this
-  // The stamp must change whenever the embedded runtime does, not just on
-  // release; otherwise dev builds compile scripts against a stale extraction
-  sp_hash_t runtime_hash = 0;
-  sp_carr_for(spn_embed_manifest, it) {
-    spn_embed_entry_t entry = spn_embed_manifest[it];
-    sp_hash_t hashes [] = {
-      runtime_hash,
-      sp_hash_cstr(entry.path),
-      sp_hash_bytes(entry.data, entry.size, 0),
-    };
-    runtime_hash = sp_hash_combine(hashes, sp_carr_len(hashes));
-  }
-  sp_str_t stamp = sp_fmt(scratch.mem, "{}:{}", sp_fmt_cstr(SPN_VERSION), sp_fmt_uint(runtime_hash)).value;
-
-  if (!sp_str_equal(version, stamp)) {
-    sp_fs_remove_dir(spn.paths.runtime);
-    sp_fs_create_dir(spn.paths.runtime);
-    sp_fs_create_dir(spn.paths.include);
-
-    sp_glob_set_t* glob = sp_glob_set_new(scratch.mem);
-    sp_glob_set_add(glob, "include/*");
-    sp_glob_set_build(glob);
-
-    sp_carr_for(spn_embed_manifest, it) {
-      spn_embed_entry_t entry = spn_embed_manifest[it];
-      sp_str_t path = sp_str_view(entry.path);
-      if (sp_glob_set_match(glob, path)) {
-        path = sp_fs_join_path(scratch.mem, spn.paths.runtime, path);
-        sp_io_file_writer_t io = sp_zero;
-        sp_io_file_writer_from_path(&io, path);
-        sp_io_write(&io.base, entry.data, entry.size, SP_NULLPTR);
-        sp_io_file_writer_close(&io);
-      }
-    }
-
-    {
-      sp_io_file_writer_t io = sp_zero;
-      sp_io_file_writer_from_path(&io, spn.paths.version);
-      sp_io_write_str(&io.base, stamp, SP_NULLPTR);
-      sp_io_file_writer_close(&io);
-    }
-  }
-
-  sp_mem_end_scratch(scratch);
 
   spn_cli_commit();
 
@@ -399,8 +405,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     app.session.intern = spn.intern;
     app.session.events = spn.events;
     app.session.paths.root = spn.paths.project;
-    app.session.paths.cache.build = spn.paths.build;
-    app.session.paths.cache.store = spn.paths.store;
 
     spn_err_union_t session_err = spn_session_init(&app.session, &app.package, app.config);
     if (session_err.kind) {
@@ -438,9 +442,6 @@ static void spn_drain_events(void) {
     spn_build_event_t* event = &events[it];
     event->thread_id = get_short_thread_id(event->thread_id);
 
-    if (spn.logger.jsonl.fd) {
-      spn_event_log_jsonl(&spn.logger.jsonl.base, event);
-    }
     if (event->io) {
       spn_event_log_jsonl(&event->io->jsonl.writer, event);
       spn_event_log_build(&event->io->build.writer, event);
@@ -557,7 +558,6 @@ void spn_deinit(sp_app_t* sp) {
   spn_lazy_log_close(&root->logs.io.build);
   spn_lazy_log_close(&root->logs.io.test);
   spn_lazy_log_close(&root->logs.io.jsonl);
-  sp_io_file_writer_close(&spn.logger.jsonl);
 }
 
 sp_app_config_t spn_main(s32 num_args, const c8** args) {
