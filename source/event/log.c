@@ -156,20 +156,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_LINK_START
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_link_start_t, kind, "kind", SP_BIND_S32);
-      SP_BIND(&b, spn_evt_link_start_t, num_objects, "num_objects", SP_BIND_U32);
-      SP_BIND(&b, spn_evt_link_start_t, output_path, "output_path", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_link_start_t, linker, "linker", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_link_start_t, args, "args", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_link_start_t, has_embeds, "has_embeds", SP_BIND_BOOL);
-    }
-    schemas[SPN_EVENT_LINK_START] = sp_bind_builder_end(&b);
-  }
-
   // SPN_EVENT_LINK_PASSED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);

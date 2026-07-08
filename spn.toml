@@ -108,6 +108,7 @@ flags = []
 name = "resolver"
 source = [
   "source/ctx/ctx.c",
+  "source/intern/context.c",
   "source/intern/intern.c",
   "source/codegen/codegen.c",
   "source/codegen/json.c",
@@ -130,6 +131,7 @@ source = [
   "source/pkg/mutate.c",
   "source/profile/profile.c",
   "source/toolchain/catalog.c",
+  "source/toolchain/toolchain.c",
   "source/triple/triple.c",
   "source/resolve/resolve.c",
   "source/session/registry/registry.c",
@@ -142,6 +144,7 @@ source = [
   "source/when/when.c",
   "test/core/resolver/main.c",
   "test/tools/ctx.c",
+  "test/tools/repo.c",
   "test/tools/sp_fuzz.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
@@ -153,7 +156,6 @@ flags = []
 [[test]]
 name = "publish"
 source = [
-  "source/cli/publish.c",
   "source/ctx/ctx.c",
   "source/codegen/codegen.c",
   "source/codegen/json.c",
@@ -171,13 +173,14 @@ source = [
   "source/index/index.c",
   "source/index/json.c",
   "source/index/publish.c",
+  "source/intern/context.c",
   "source/intern/intern.c",
-  "source/log/log.c",
   "source/pkg/id.c",
   "source/pkg/load.c",
   "source/pkg/mutate.c",
   "source/profile/profile.c",
   "source/toolchain/catalog.c",
+  "source/toolchain/toolchain.c",
   "source/triple/triple.c",
   "source/semver/compare.c",
   "source/semver/convert.c",
@@ -189,6 +192,7 @@ source = [
   "test/core/publish/main.c",
   "test/core/publish/publish.c",
   "test/tools/ctx.c",
+  "test/tools/repo.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
   "test/tools/toml.c",
@@ -207,6 +211,7 @@ source = [
   "source/sp/str.c",
   "test/core/lock.c",
   "test/tools/ctx.c",
+  "test/tools/repo.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
   "test/tools/toml.c",
@@ -226,6 +231,7 @@ source = [
   "test/core/git/cache.c",
   "test/core/git/key.c",
   "test/tools/ctx.c",
+  "test/tools/repo.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
   "test/tools/toml.c",
@@ -245,7 +251,7 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "test/tools"]
-flags = []
+flags = ['-DTOML_MANIFEST_DIR="test/core/toml/manifests"', '-DTOML_GOLDEN_DIR="test/core/toml/golden"']
 
 [[test]]
 name = "triple"
@@ -265,6 +271,7 @@ source = [
   "source/sp/str.c",
   "test/integration/main.c",
   "test/tools/harness.c",
+  "test/tools/repo.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
   "test/tools/toml.c",

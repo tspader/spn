@@ -1,4 +1,6 @@
 #include "ctx/types.h"
+#include "sp/sp_graph.h"
+#include "spn.h"
 #include "unit/types.h"
 #include "session/types.h"
 #include "target/types.h"
@@ -18,7 +20,10 @@ typedef struct {
 
 ar_result_t archive_objects(spn_target_unit_t* unit, sp_str_t output) {
   spn_toolchain_unit_t* toolchain = unit->session->units.toolchain;
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  sp_mem_t mem = s.mem;
+
   sp_ps_config_t ps = {
     .command = toolchain->archiver.program,
     .cwd = unit->paths.work,
@@ -28,13 +33,13 @@ ar_result_t archive_objects(spn_target_unit_t* unit, sp_str_t output) {
     },
   };
   sp_da_for(toolchain->archiver.args, ai) {
-    sp_ps_config_add_arg(scratch.mem, &ps, toolchain->archiver.args[ai]);
+    sp_ps_config_add_arg(s.mem, &ps, toolchain->archiver.args[ai]);
   }
-  sp_ps_config_add_arg(scratch.mem, &ps, sp_str_lit("rcs"));
-  sp_ps_config_add_arg(scratch.mem, &ps, output);
+  sp_ps_config_add_arg(s.mem, &ps, sp_str_lit("rcs"));
+  sp_ps_config_add_arg(s.mem, &ps, output);
 
   sp_da_for(unit->objects, it) {
-    sp_ps_config_add_arg(scratch.mem, &ps, unit->objects[it]->paths.object);
+    sp_ps_config_add_arg(s.mem, &ps, unit->objects[it]->paths.object);
   }
 
   sp_io_dyn_mem_writer_t log;
@@ -51,7 +56,7 @@ ar_result_t archive_objects(spn_target_unit_t* unit, sp_str_t output) {
   sp_ps_output_t result = sp_ps_run(spn.mem, ps);
   u64 elapsed = sp_tm_read_timer(&timer);
 
-  sp_mem_end_scratch(scratch);
+  sp_mem_end_scratch(s);
 
   return (ar_result_t) {
     .result = result,
@@ -74,7 +79,10 @@ static spn_lang_t get_link_language(spn_target_unit_t* target) {
     return SPN_LANG_CXX;
   }
 
-  sp_da(spn_closure_entry_t) closure = spn_target_link_closure(target->session->mem, target);
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  spn_lang_t language = SPN_LANG_C;
+
+  sp_da(spn_closure_entry_t) closure = spn_target_link_closure(s.mem, target);
   sp_da_for(closure, it) {
     spn_pkg_unit_t* dep = closure[it].pkg;
     if (!dep || dep == target->pkg) continue;
@@ -88,11 +96,14 @@ static spn_lang_t get_link_language(spn_target_unit_t* target) {
         continue;
       }
       if (objects_have_cxx(lib->objects)) {
-        return SPN_LANG_CXX;
+        language = SPN_LANG_CXX;
+        goto done;
       }
     }
   }
 
+done:
+  sp_mem_end_scratch(s);
   return SPN_LANG_C;
 }
 
@@ -138,27 +149,21 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_announce_compile(target->pkg);
 
   sp_str_t output = get_target_output_path(spn.mem, target);
-  sp_str_t output_name = sp_fs_get_name(output);
   bool has_embeds = !sp_da_empty(info->embed);
+
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    .kind = SPN_EVENT_LINK_START,
+    .pkg = target->pkg->info,
+    .io = &target->logs,
+    .target.name = info->name,
+    .target.link_start = {
+      .target = target
+    }
+  });
 
   switch (target->kind) {
     case SPN_CC_OUTPUT_STATIC_LIB: {
       ar_result_t run = archive_objects(target, output);
-
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_LINK_START,
-        .pkg = target->pkg->info,
-        .io = &target->logs,
-        .target.name = info->name,
-        .target.link_start = {
-          .kind = info->kind,
-          .num_objects = sp_da_size(target->objects),
-          .output_path = output,
-          .linker = target->session->units.toolchain->archiver.program,
-          .args = run.args,
-          .has_embeds = has_embeds,
-        }
-      });
 
       if (run.result.status.exit_code) {
         emit_failure(target, run.args, run.result.status.exit_code, run.result.out, run.result.err);
@@ -179,7 +184,7 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
       // The link consumes only objects, so the package's compile-stage data
       // (includes, defines, flags) stays off the command line; that's
       // add_pkg_to_cc_target's job in the compile node
-      spn_cc_target_t* cc_target = spn_cc_add_target(cc, target->kind, output_name);
+      spn_cc_target_t* cc_target = spn_cc_add_target(cc, target->kind, sp_fs_get_name(output));
       spn_cc_target_set_lang(cc_target, get_link_language(target));
       add_deps_to_cc_target(cc_target, target);
 
@@ -193,20 +198,6 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
 
       spn_cc_run_t run = spn_cc_target_run(cc_target, target->paths.work);
       s32 rc = run.result.status.exit_code;
-
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_LINK_START,
-        .pkg = target->pkg->info,
-        .io = &target->logs,
-        .target.name = info->name,
-        .target.link_start = {
-          .kind = info->kind,
-          .num_objects = sp_da_size(target->objects),
-          .output_path = output,
-          .args = run.args,
-          .has_embeds = has_embeds,
-        }
-      });
 
       if (rc) {
         return emit_failure(target, run.args, rc, run.result.out, run.result.err);
