@@ -67,7 +67,7 @@ static sp_cli_cmd_t cmd_clean = {
       .kind = SP_CLI_OPT_STRING,
       .summary = "Only remove this profile's outputs",
       .placeholder = "PROFILE",
-      .ptr = &spn_cli_raw.clean.profile,
+      .ptr = &spn_cli_raw.profile.name,
     },
   },
   .handler = spn_cli_clean,
@@ -89,7 +89,7 @@ static sp_cli_cmd_t cmd_build = {
       .kind = SP_CLI_OPT_STRING,
       .summary = "Profile to use for building",
       .placeholder = "PROFILE",
-      .ptr = &spn_cli_raw.build.profile,
+      .ptr = &spn_cli_raw.profile.name,
     },
     {
       .name = "bin",
@@ -116,7 +116,7 @@ static sp_cli_cmd_t cmd_build = {
       .kind = SP_CLI_OPT_STRING,
       .summary = "Override toolchain",
       .placeholder = "NAME",
-      .ptr = &spn_cli_raw.build.toolchain,
+      .ptr = &spn_cli_raw.profile.toolchain,
     },
     {
       .brief = "m",
@@ -124,35 +124,35 @@ static sp_cli_cmd_t cmd_build = {
       .kind = SP_CLI_OPT_STRING,
       .summary = "Override build mode (debug, release)",
       .placeholder = "MODE",
-      .ptr = &spn_cli_raw.build.mode,
+      .ptr = &spn_cli_raw.profile.mode,
     },
     {
       .name = "target",
       .kind = SP_CLI_OPT_STRING,
       .summary = "Target triple (e.g. aarch64-linux-gnu)",
       .placeholder = "TRIPLE",
-      .ptr = &spn_cli_raw.build.target,
+      .ptr = &spn_cli_raw.profile.target,
     },
     {
       .name = "os",
       .kind = SP_CLI_OPT_STRING,
       .summary = "Override target OS (linux, macos, windows)",
       .placeholder = "OS",
-      .ptr = &spn_cli_raw.build.os,
+      .ptr = &spn_cli_raw.profile.os,
     },
     {
       .name = "arch",
       .kind = SP_CLI_OPT_STRING,
       .summary = "Override target architecture (x86_64, aarch64)",
       .placeholder = "ARCH",
-      .ptr = &spn_cli_raw.build.arch,
+      .ptr = &spn_cli_raw.profile.arch,
     },
     {
       .name = "abi",
       .kind = SP_CLI_OPT_STRING,
       .summary = "Override target ABI (gnu, musl, mingw)",
       .placeholder = "ABI",
-      .ptr = &spn_cli_raw.build.abi,
+      .ptr = &spn_cli_raw.profile.abi,
     },
   },
   .args = {
@@ -176,14 +176,14 @@ static sp_cli_cmd_t cmd_run = {
       .kind = SP_CLI_OPT_STRING,
       .summary = "Profile to use when resolving build dependencies",
       .placeholder = "PROFILE",
-      .ptr = &spn_cli_raw.run.profile,
+      .ptr = &spn_cli_raw.profile.name,
     },
     {
       .name = "toolchain",
       .kind = SP_CLI_OPT_STRING,
       .summary = "Override toolchain",
       .placeholder = "NAME",
-      .ptr = &spn_cli_raw.run.toolchain,
+      .ptr = &spn_cli_raw.profile.toolchain,
     },
     {
       .brief = "m",
@@ -191,7 +191,7 @@ static sp_cli_cmd_t cmd_run = {
       .kind = SP_CLI_OPT_STRING,
       .summary = "Override build mode (debug, release)",
       .placeholder = "MODE",
-      .ptr = &spn_cli_raw.run.mode,
+      .ptr = &spn_cli_raw.profile.mode,
     },
   },
   .args = {
@@ -214,14 +214,14 @@ static sp_cli_cmd_t cmd_test = {
       .kind = SP_CLI_OPT_STRING,
       .summary = "Profile to use for building",
       .placeholder = "PROFILE",
-      .ptr = &spn_cli_raw.test.profile,
+      .ptr = &spn_cli_raw.profile.name,
     },
     {
       .name = "toolchain",
       .kind = SP_CLI_OPT_STRING,
       .summary = "Override toolchain",
       .placeholder = "NAME",
-      .ptr = &spn_cli_raw.test.toolchain,
+      .ptr = &spn_cli_raw.profile.toolchain,
     },
     {
       .brief = "m",
@@ -229,7 +229,7 @@ static sp_cli_cmd_t cmd_test = {
       .kind = SP_CLI_OPT_STRING,
       .summary = "Override build mode (debug, release)",
       .placeholder = "MODE",
-      .ptr = &spn_cli_raw.test.mode,
+      .ptr = &spn_cli_raw.profile.mode,
     },
   },
   .args = {
@@ -416,33 +416,29 @@ sp_cli_cmd_t* spn_cli(void) {
   return &cmd_root;
 }
 
+bool spn_cli_requires_manifest(sp_cli_cmd_t* cmd) {
+  return cmd != &cmd_init && cmd != &cmd_run;
+}
+
 void spn_cli_commit(void) {
   spn.cli.project_dir = sp_cstr_as_str(spn_cli_raw.project_dir);
   spn.cli.project_file = sp_cstr_as_str(spn_cli_raw.project_file);
   spn.cli.output = sp_cstr_as_str(spn_cli_raw.output);
 
+  spn.cli.profile.name = sp_cstr_as_str(spn_cli_raw.profile.name);
+  spn.cli.profile.toolchain = sp_cstr_as_str(spn_cli_raw.profile.toolchain);
+  spn.cli.profile.mode = sp_cstr_as_str(spn_cli_raw.profile.mode);
+  spn.cli.profile.target = sp_cstr_as_str(spn_cli_raw.profile.target);
+  spn.cli.profile.os = sp_cstr_as_str(spn_cli_raw.profile.os);
+  spn.cli.profile.arch = sp_cstr_as_str(spn_cli_raw.profile.arch);
+  spn.cli.profile.abi = sp_cstr_as_str(spn_cli_raw.profile.abi);
+
   spn.cli.init.path = sp_cstr_as_str(spn_cli_raw.init.path);
   spn.cli.add.package = sp_cstr_as_str(spn_cli_raw.add.package);
-  spn.cli.clean.profile = sp_cstr_as_str(spn_cli_raw.clean.profile);
 
   spn.cli.build.name = sp_cstr_as_str(spn_cli_raw.build.name);
-  spn.cli.build.profile = sp_cstr_as_str(spn_cli_raw.build.profile);
-  spn.cli.build.toolchain = sp_cstr_as_str(spn_cli_raw.build.toolchain);
-  spn.cli.build.mode = sp_cstr_as_str(spn_cli_raw.build.mode);
-  spn.cli.build.target = sp_cstr_as_str(spn_cli_raw.build.target);
-  spn.cli.build.os = sp_cstr_as_str(spn_cli_raw.build.os);
-  spn.cli.build.arch = sp_cstr_as_str(spn_cli_raw.build.arch);
-  spn.cli.build.abi = sp_cstr_as_str(spn_cli_raw.build.abi);
-
   spn.cli.run.entry = sp_cstr_as_str(spn_cli_raw.run.entry);
-  spn.cli.run.profile = sp_cstr_as_str(spn_cli_raw.run.profile);
-  spn.cli.run.toolchain = sp_cstr_as_str(spn_cli_raw.run.toolchain);
-  spn.cli.run.mode = sp_cstr_as_str(spn_cli_raw.run.mode);
-
   spn.cli.test.name = sp_cstr_as_str(spn_cli_raw.test.name);
-  spn.cli.test.profile = sp_cstr_as_str(spn_cli_raw.test.profile);
-  spn.cli.test.toolchain = sp_cstr_as_str(spn_cli_raw.test.toolchain);
-  spn.cli.test.mode = sp_cstr_as_str(spn_cli_raw.test.mode);
 
   spn.cli.generate.generator = sp_cstr_as_str(spn_cli_raw.generate.generator);
   spn.cli.generate.compiler = sp_cstr_as_str(spn_cli_raw.generate.compiler);

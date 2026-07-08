@@ -164,6 +164,9 @@ typedef enum {
   SPN_ERR_WASM_EXPORT_NOT_FOUND,
   SPN_ERR_PROFILE_INVALID,
   SPN_ERR_PROFILE_UNDEFINED,
+  SPN_ERR_FLAG_INVALID,
+  SPN_ERR_FS_REMOVE,
+  SPN_ERR_INDEX_UNKNOWN,
 } spn_err_t;
 
 typedef struct spn              spn_t;

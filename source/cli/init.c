@@ -146,7 +146,7 @@ static void spn_init_files_render(sp_prompt_ctx_t* ctx) {
   }
 }
 
-sp_cli_result_t spn_cli_init(sp_cli_t* cli) {
+spn_task_result_t spn_task_init(spn_app_t* app) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_cli_init_t* command = &spn.cli.init;
 
@@ -191,5 +191,10 @@ sp_cli_result_t spn_cli_init(sp_cli_t* cli) {
   }
 
   sp_mem_end_scratch(s);
-  return sp_str_empty(error) ? SP_CLI_OK : SP_CLI_ERR;
+  return sp_str_empty(error) ? SPN_TASK_DONE : SPN_TASK_ERROR;
+}
+
+sp_cli_result_t spn_cli_init(sp_cli_t* cli) {
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_INIT);
+  return SP_CLI_CONTINUE;
 }

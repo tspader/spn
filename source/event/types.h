@@ -63,7 +63,7 @@ typedef struct { spn_user_node_t* info; } spn_evt_node_t;
 typedef struct {
   sp_str_t source_file;
   sp_str_t object_file;
-  sp_str_t args;
+  spn_invocation_t* invocation;
   sp_str_t out;
   u64 time;
 } spn_evt_target_passed_t;
@@ -73,7 +73,7 @@ typedef struct {
   s32 rc;
   sp_str_t out;
   sp_str_t err;
-  sp_str_t args;
+  spn_invocation_t* invocation;
   u64 time;
 } spn_evt_target_failed_t;
 

@@ -22,7 +22,11 @@ spn_task_result_t spn_task_graph(spn_app_t* app);
 spn_task_result_t spn_task_run(spn_app_t* app);
 spn_task_result_t spn_task_run_tests(spn_app_t* app);
 spn_task_result_t spn_task_generate(spn_app_t* app);
-spn_task_result_t spn_task_which(spn_app_t* app, spn_cli_which_t* which);
+spn_task_result_t spn_task_which(spn_app_t* app);
 spn_task_result_t spn_task_update(spn_app_t* app);
+spn_task_result_t spn_task_init(spn_app_t* app);
+spn_task_result_t spn_task_add(spn_app_t* app);
+spn_task_result_t spn_task_clean(spn_app_t* app);
+spn_task_result_t spn_task_publish(spn_app_t* app);
 
 #endif

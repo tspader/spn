@@ -1,8 +1,6 @@
 #include "cli/cli.h"
 
 #include "ctx/types.h"
-#include "app/app.h"
-#include "enum/enum.h"
 
 sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
   spn_cli_test_t* command = &spn.cli.test;
@@ -16,11 +14,6 @@ sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
   };
   app.config.run = (spn_run_config_t) {
     .kind = SPN_RUN_KIND_TESTS,
-  };
-  app.config.overrides = (spn_profile_info_t) {
-    .name = command->profile,
-    .toolchain = command->toolchain,
-    .mode = sp_str_empty(command->mode) ? 0 : spn_build_mode_from_str(command->mode),
   };
 
   spn_task_enqueue(&app.tasks, SPN_TASK_RESOLVE);

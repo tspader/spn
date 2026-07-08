@@ -135,12 +135,17 @@ static sp_str_t spn_add_run(spn_cli_add_t* command, sp_mem_arena_marker_t s) {
   return sp_zero_s(sp_str_t);
 }
 
-sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
+spn_task_result_t spn_task_add(spn_app_t* app) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   sp_str_t error = spn_add_run(&spn.cli.add, s);
   if (!sp_str_empty(error)) {
     spn_log_error("{}", sp_fmt_str(error));
   }
   sp_mem_end_scratch(s);
-  return sp_str_empty(error) ? SP_CLI_OK : SP_CLI_ERR;
+  return sp_str_empty(error) ? SPN_TASK_DONE : SPN_TASK_ERROR;
+}
+
+sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_ADD);
+  return SP_CLI_CONTINUE;
 }

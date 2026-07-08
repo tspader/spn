@@ -2,9 +2,7 @@
 #include "sp/macro.h"
 #include "cli/cli.h"
 
-#include "app/app.h"
-#include "ctx/ctx.h"
-#include "enum/enum.h"
+#include "ctx/types.h"
 #include "intern/intern.h"
 #include "log/log.h"
 
@@ -57,12 +55,6 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
   app.config.run = (spn_run_config_t) {
     .kind = source ? SPN_RUN_KIND_SOURCE : SPN_RUN_KIND_SCRIPT,
     .target = command->entry,
-  };
-
-  app.config.overrides = (spn_profile_info_t) {
-    .name = command->profile,
-    .toolchain = command->toolchain,
-    .mode = sp_str_empty(command->mode) ? 0 : spn_build_mode_from_str(command->mode),
   };
 
   if (source) {

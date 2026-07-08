@@ -4,6 +4,8 @@
 #include "sp.h"
 #include "sp/sp_cli.h"
 
+#include "profile/types.h"
+
 typedef struct spn_cli spn_cli_t;
 
 #define SPN_CLI_COMMAND(X) \
@@ -84,27 +86,14 @@ typedef struct {
     bool script;
   } only;
   sp_str_t name;
-  sp_str_t profile;
-  sp_str_t toolchain;
-  sp_str_t mode;
-  sp_str_t target;
-  sp_str_t os;
-  sp_str_t arch;
-  sp_str_t abi;
 } spn_cli_build_t;
 
 typedef struct {
   sp_str_t entry;
-  sp_str_t profile;
-  sp_str_t toolchain;
-  sp_str_t mode;
 } spn_cli_run_t;
 
 typedef struct {
   sp_str_t name;
-  sp_str_t profile;
-  sp_str_t toolchain;
-  sp_str_t mode;
 } spn_cli_test_t;
 
 typedef struct {
@@ -142,10 +131,6 @@ typedef struct {
   sp_str_t source_rev;
 } spn_cli_publish_t;
 
-typedef struct {
-  sp_str_t profile;
-} spn_cli_clean_t;
-
 struct spn_cli {
   u32 num_args;
   const c8** args;
@@ -155,6 +140,8 @@ struct spn_cli {
   bool verbose;
   bool quiet;
   u32 refresh;
+
+  spn_profile_args_t profile;
 
   spn_cli_add_t add;
   spn_cli_update_t update;
@@ -169,7 +156,6 @@ struct spn_cli {
   spn_cli_manifest_t manifest;
   spn_cli_copy_t copy;
   spn_cli_graph_t graph;
-  spn_cli_clean_t clean;
   spn_cli_publish_t publish;
 };
 
@@ -177,6 +163,15 @@ typedef struct {
   const c8* project_dir;
   const c8* project_file;
   const c8* output;
+  struct {
+    const c8* name;
+    const c8* toolchain;
+    const c8* mode;
+    const c8* target;
+    const c8* os;
+    const c8* arch;
+    const c8* abi;
+  } profile;
   struct {
     const c8* path;
   } init;
@@ -196,25 +191,12 @@ typedef struct {
   } tool_run;
   struct {
     const c8* name;
-    const c8* profile;
-    const c8* toolchain;
-    const c8* mode;
-    const c8* target;
-    const c8* os;
-    const c8* arch;
-    const c8* abi;
   } build;
   struct {
     const c8* entry;
-    const c8* profile;
-    const c8* toolchain;
-    const c8* mode;
   } run;
   struct {
     const c8* name;
-    const c8* profile;
-    const c8* toolchain;
-    const c8* mode;
   } test;
   struct {
     const c8* generator;
@@ -243,9 +225,6 @@ typedef struct {
     const c8* source_url;
     const c8* source_rev;
   } publish;
-  struct {
-    const c8* profile;
-  } clean;
 } spn_cli_raw_t;
 
 #endif

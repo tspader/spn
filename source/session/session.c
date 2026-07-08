@@ -39,15 +39,7 @@ spn_err_union_t spn_session_init(spn_session_t* session, spn_pkg_info_t* root, s
   sp_ht_init(session->mem, session->packages);
   sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
 
-  spn_err_t err = spn_profile_resolve(session->profiles, &config.overrides, &session->profile);
-  if (err) {
-    return (spn_err_union_t) {
-      .kind = err,
-      .profile = {
-        .name = spn_profile_select_name(&config.overrides),
-      },
-    };
-  }
+  spn_try_union(spn_profile_resolve(session->profiles, &config.overrides, &session->profile));
 
   spn_toolchain_query_t query = {
     .build = session->profile.toolchain,
