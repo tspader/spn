@@ -20,24 +20,6 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
 
   spn_invocation_result_t run = spn_invocation_run(&unit->invocation);
 
-
-  // @spader
-  // This is vestigial; we used to just assemble the invocation here, in the
-  // build graph. This meant that when we had to communicate the command back
-  // to the reporting thread, there was nothing to point to, so we just heap
-  // allocated a big string of all the arguments.
-  //
-  // But now, we already *have* the invocation. There's no point in assembling
-  // this string on the heap just so we can log it
-  sp_io_dyn_mem_writer_t io;
-  sp_io_dyn_mem_writer_init(spn.mem, &io);
-  sp_io_write_str(&io.base, unit->invocation.program, SP_NULLPTR);
-  sp_io_write_c8(&io.base, ' ');
-  sp_da_for(unit->invocation.args, it) {
-    sp_io_write_str(&io.base, unit->invocation.args[it], SP_NULLPTR);
-    sp_io_write_c8(&io.base, ' ');
-  }
-
   if (run.result.status.exit_code) {
     spn_event_buffer_push_ex(session->events, unit->package->info, &unit->target->logs, (spn_build_event_t) {
       .kind = SPN_EVENT_TARGET_BUILD_FAILED,
@@ -46,7 +28,7 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
         .object_file = unit->paths.object,
         .rc = run.result.status.exit_code,
         .out = run.result.out,
-        .args = sp_io_dyn_mem_writer_take_str(&io),
+        .invocation = &unit->invocation,
         .time = run.elapsed,
       }
     });
@@ -56,7 +38,7 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
       .target.passed = {
         .source_file = unit->paths.file,
         .object_file = unit->paths.object,
-        .args = args,
+        .invocation = &unit->invocation,
         .out = run.result.out,
         .time = run.elapsed,
       }

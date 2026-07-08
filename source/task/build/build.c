@@ -12,6 +12,7 @@
 #include "event/event.h"
 #include "filter/filter.h"
 #include "pkg/types.h"
+#include "session/invocation.h"
 #include "session/session.h"
 #include "target/closure.h"
 #include "task/build/build.h"
@@ -61,7 +62,18 @@ spn_err_t spn_compile_script_module(spn_pkg_unit_t* unit, spn_target_info_t* scr
   spn_cc_target_add_flag(target, sp_str_lit("-O2"));
   // spn_cc_target_add_flag(target, sp_str_lit("-Wl,--export="));
 
-  spn_cc_run_t run = spn_cc_target_run(target, unit->paths.work);
+  sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
+  spn_cc_to_ps(spn.mem, cc, target, &ps);
+  spn_cc_target_to_ps(spn.mem, cc, target, &ps);
+
+  spn_invocation_t* invocation = sp_alloc_type(spn.mem, spn_invocation_t);
+  *invocation = (spn_invocation_t) {
+    .program = ps.command,
+    .args = ps.dyn_args,
+    .cwd = unit->paths.work,
+  };
+
+  spn_invocation_result_t run = spn_invocation_run(invocation);
 
   sp_str_t source = sp_da_empty(script->source) ? sp_str_lit("") : script->source[0];
   if (run.result.status.exit_code) {
@@ -72,7 +84,7 @@ spn_err_t spn_compile_script_module(spn_pkg_unit_t* unit, spn_target_info_t* scr
         .object_file = output,
         .rc = run.result.status.exit_code,
         .out = run.result.out,
-        .args = run.args,
+        .invocation = invocation,
         .time = run.elapsed,
       }
     });
@@ -84,7 +96,7 @@ spn_err_t spn_compile_script_module(spn_pkg_unit_t* unit, spn_target_info_t* scr
     .target.passed = {
       .source_file = source,
       .object_file = output,
-      .args = run.args,
+      .invocation = invocation,
       .out = run.result.out,
       .time = run.elapsed,
     }

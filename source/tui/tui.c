@@ -588,6 +588,81 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
           sp_io_write_str(&w.base, sp_str_lit("invalid manifest"), SP_NULLPTR);
           break;
         }
+        case SPN_ERR_PROFILE_INVALID: {
+          sp_fmt_io(
+            &w.base,
+            "invalid profile {.cyan}",
+            SP_FMT_STR(event->err.profile.name)
+          );
+          break;
+        }
+        case SPN_ERR_PROFILE_UNDEFINED: {
+          sp_fmt_io(
+            &w.base,
+            "profile {.cyan} isn't defined",
+            SP_FMT_STR(event->err.profile.name)
+          );
+          break;
+        }
+        case SPN_ERR_FLAG_INVALID: {
+          sp_fmt_io(
+            &w.base,
+            "invalid value {.red} for {.yellow}; expected {}",
+            SP_FMT_STR(event->err.flag.value),
+            SP_FMT_STR(event->err.flag.name),
+            SP_FMT_STR(event->err.flag.expected)
+          );
+          break;
+        }
+        case SPN_ERR_FS_REMOVE: {
+          sp_fmt_io(
+            &w.base,
+            "failed to remove {.cyan}",
+            SP_FMT_STR(spn_tui_contextual_path(mem, event->err.fs.path))
+          );
+          break;
+        }
+        case SPN_ERR_INDEX_UNKNOWN: {
+          sp_fmt_io(
+            &w.base,
+            "index {.cyan} not found",
+            SP_FMT_STR(event->err.index.name)
+          );
+          break;
+        }
+        case SPN_ERR_NO_MANIFEST: {
+          sp_fmt_io(
+            &w.base,
+            "no manifest found at {.cyan}",
+            SP_FMT_STR(spn_tui_contextual_path(mem, event->err.no_manifest.path))
+          );
+          break;
+        }
+        case SPN_ERR_NOT_GIT_REPO: {
+          sp_fmt_io(
+            &w.base,
+            "{.cyan} is not inside a git repository",
+            SP_FMT_STR(spn_tui_contextual_path(mem, event->err.not_git_repo.path))
+          );
+          break;
+        }
+        case SPN_ERR_GIT: {
+          sp_fmt_io(
+            &w.base,
+            "git command failed: {.yellow}",
+            SP_FMT_STR(event->err.git.command)
+          );
+          break;
+        }
+        case SPN_ERR_VERSION_EXISTS: {
+          sp_fmt_io(
+            &w.base,
+            "version {.yellow} of {.cyan} already exists in the index",
+            SP_FMT_STR(event->err.version_exists.version),
+            SP_FMT_STR(event->err.version_exists.name)
+          );
+          break;
+        }
         case SPN_ERR_TOOLCHAIN_FETCH: {
           sp_fmt_io(
             &w.base,

@@ -172,7 +172,6 @@ sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-// @spader @error
 spn_build_mode_t spn_build_mode_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "release")) {
     return SPN_BUILD_MODE_RELEASE;
@@ -180,12 +179,8 @@ spn_build_mode_t spn_build_mode_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "debug")) {
     return SPN_BUILD_MODE_DEBUG;
   }
-  if (sp_str_empty(str)) {
-    return SPN_BUILD_MODE_NONE;
-  }
 
-  SP_FATAL("Unknown mode {.yellow}; options are [release, debug]", SP_FMT_STR(str));
-  SP_UNREACHABLE_RETURN(SPN_BUILD_MODE_RELEASE);
+  return SPN_BUILD_MODE_NONE;
 }
 
 sp_str_t spn_build_mode_to_str(spn_build_mode_t mode) {

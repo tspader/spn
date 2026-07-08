@@ -712,20 +712,30 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
 }
 
 void spn_event_log_build(sp_io_writer_t* out, spn_build_event_t* event) {
+  spn_invocation_t* invocation = SP_NULLPTR;
   sp_str_t args = SP_ZERO_INITIALIZE();
   sp_str_t transcript = SP_ZERO_INITIALIZE();
 
   switch (event->kind) {
-    case SPN_EVENT_TARGET_BUILD_PASSED: args = event->target.passed.args;      transcript = event->target.passed.out;      break;
-    case SPN_EVENT_TARGET_BUILD_FAILED: args = event->target.failed.args;      transcript = event->target.failed.out;      break;
-    case SPN_EVENT_LINK_PASSED:         args = event->target.link_passed.args; transcript = event->target.link_passed.out; break;
-    case SPN_EVENT_LINK_FAILED:         args = event->target.link_failed.args; transcript = event->target.link_failed.out; break;
+    case SPN_EVENT_TARGET_BUILD_PASSED: invocation = event->target.passed.invocation; transcript = event->target.passed.out;      break;
+    case SPN_EVENT_TARGET_BUILD_FAILED: invocation = event->target.failed.invocation; transcript = event->target.failed.out;      break;
+    case SPN_EVENT_LINK_PASSED:         args = event->target.link_passed.args;        transcript = event->target.link_passed.out; break;
+    case SPN_EVENT_LINK_FAILED:         args = event->target.link_failed.args;        transcript = event->target.link_failed.out; break;
     default: return;
   }
 
   if (sp_str_empty(transcript)) return;
 
-  sp_io_write_str(out, args, SP_NULLPTR);
+  if (invocation) {
+    sp_io_write_str(out, invocation->program, SP_NULLPTR);
+    sp_da_for(invocation->args, it) {
+      sp_io_write_c8(out, ' ');
+      sp_io_write_str(out, invocation->args[it], SP_NULLPTR);
+    }
+  }
+  else {
+    sp_io_write_str(out, args, SP_NULLPTR);
+  }
   sp_io_write_c8(out, '\n');
   sp_io_write_str(out, transcript, SP_NULLPTR);
   sp_io_write_c8(out, '\n');

@@ -42,6 +42,7 @@
 #include "log/log.h"
 #include "sp/sp_om.h"
 #include "pkg/load.h"
+#include "profile/profile.h"
 #include "session/session.h"
 #include "spn.embed.h"
 #include "toolchain/toolchain.h"
@@ -353,10 +354,9 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
   spn.paths.manifest = sp_fs_join_path(spn.heap, spn.paths.project, sp_str_lit("spn.toml"));
 
-  if (!sp_fs_exists(spn.paths.manifest)) {
-    // spn run can execute a lone source file without a project
-    sp_str_t cmd = sp_cstr_as_str(parsed.cmd->name);
-    if (!sp_str_equal_cstr(cmd, "run") && !sp_str_equal_cstr(cmd, "init")) {
+  bool has_manifest = sp_fs_exists(spn.paths.manifest);
+  if (!has_manifest) {
+    if (spn_cli_requires_manifest(parsed.cmd)) {
       spn_log_error("no manifest found at {.cyan}", SP_FMT_STR(spn.paths.manifest));
       return SP_APP_ERR;
     }
@@ -371,15 +371,13 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
 
     if (load_err) {
-      spn_log_error("{.red}: failed to parse manifest because of the following:", sp_fmt_cstr("error"));
-      if (spn_ctx_get_log_level() >= SPN_LOG_LEVEL_ERROR) {
-        sp_io_writer_t* err = spn_ctx_get_log_err();
-        sp_da_for(ctx.issues, it) {
-          sp_io_write_str(err, sp_str_lit("- "), SP_NULLPTR);
-          spn_codegen_issue_write(err, &ctx.issues[it]);
-          sp_io_write_new_line(err);
-        }
-      }
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR,
+        .err = {
+          .kind = SPN_ERR_MANIFEST_ISSUES,
+          .issues = ctx.issues,
+        },
+      });
       return SP_APP_ERR;
     }
 
@@ -388,7 +386,25 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     if (sp_fs_exists(app.paths.lock)) {
       sp_opt_set(app.lock, spn_lock_file_load(spn.heap, app.paths.lock, spn.events));
     }
+  }
 
+  spn_err_union_t overrides_err = spn_profile_overrides_parse(&spn.cli.profile, &app.config.overrides);
+  if (overrides_err.kind) {
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR,
+      .err = overrides_err,
+    });
+    return SP_APP_ERR;
+  }
+
+  switch (sp_cli_dispatch(&parsed)) {
+    case SP_CLI_CONTINUE: break;
+    case SP_CLI_OK: return SP_APP_QUIT;
+    case SP_CLI_HELP: sp_cli_write_help(&spn.logger.out.base, &parsed); return SP_APP_QUIT;
+    case SP_CLI_ERR: return SP_APP_ERR;
+  }
+
+  if (has_manifest) {
     app.session.intern = spn.intern;
     app.session.events = spn.events;
     app.session.paths.root = spn.paths.project;
@@ -396,42 +412,16 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     app.session.paths.cache.store = spn.paths.store;
 
     spn_err_union_t session_err = spn_session_init(&app.session, &app.package, app.config);
-    switch (session_err.kind) {
-      case SPN_OK: {
-        break;
-      }
-      case SPN_ERR_PROFILE_INVALID: {
-        spn_log_error("invalid profile {.cyan}", SP_FMT_STR(session_err.profile.name));
-        return SP_APP_ERR;
-      }
-      case SPN_ERR_PROFILE_UNDEFINED: {
-        spn_log_error("profile {.cyan} isn't defined", SP_FMT_STR(session_err.profile.name));
-        return SP_APP_ERR;
-      }
-      case SPN_ERR_TOOLCHAIN_UNKNOWN:
-      case SPN_ERR_TOOLCHAIN_TARGET: {
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
-          .kind = SPN_EVENT_ERR,
-          .err = session_err,
-        });
-        return SP_APP_ERR;
-      }
-      default: {
-        spn_log_error("failed to initialize session");
-        return SP_APP_ERR;
-      }
+    if (session_err.kind) {
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR,
+        .err = session_err,
+      });
+      return SP_APP_ERR;
     }
   }
 
-
-  switch (sp_cli_dispatch(&parsed)) {
-    case SP_CLI_CONTINUE: return SP_APP_CONTINUE;
-    case SP_CLI_OK: return SP_APP_QUIT;
-    case SP_CLI_HELP: sp_cli_write_help(&spn.logger.out.base, &parsed); return SP_APP_QUIT;
-    case SP_CLI_ERR: return SP_APP_ERR;
-  }
-
-  sp_unreachable_return(SP_APP_ERR);
+  return SP_APP_CONTINUE;
 }
 
 SP_PRIVATE u32 get_short_thread_id(u64 thread_id) {
@@ -447,7 +437,9 @@ SP_PRIVATE u32 get_short_thread_id(u64 thread_id) {
   return *sp_ht_getp(thread_map, thread_id);
 }
 
-sp_app_result_t spn_poll(sp_app_t* sp) {
+static void spn_drain_events(void) {
+  if (!spn.events) return;
+
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   sp_da(spn_build_event_t) events = spn_event_buffer_drain(s.mem, spn.events);
 
@@ -455,7 +447,9 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
     spn_build_event_t* event = &events[it];
     event->thread_id = get_short_thread_id(event->thread_id);
 
-    spn_event_log_jsonl(&spn.logger.jsonl.base, event);
+    if (spn.logger.jsonl.fd) {
+      spn_event_log_jsonl(&spn.logger.jsonl.base, event);
+    }
     if (event->io) {
       spn_event_log_jsonl(&event->io->jsonl.writer, event);
       spn_event_log_build(&event->io->build.writer, event);
@@ -465,7 +459,10 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
   }
 
   sp_mem_end_scratch(s);
+}
 
+sp_app_result_t spn_poll(sp_app_t* sp) {
+  spn_drain_events();
   spn_prompt_pump();
 
   return SP_APP_CONTINUE;
@@ -526,11 +523,27 @@ sp_app_result_t spn_update(sp_app_t* sp) {
       break;
     }
     case SPN_TASK_KIND_WHICH: {
-      result = spn_task_which(&app, &spn.cli.which);
+      result = spn_task_which(&app);
       break;
     }
     case SPN_TASK_KIND_UPDATE: {
       result = spn_task_update(&app);
+      break;
+    }
+    case SPN_TASK_KIND_INIT: {
+      result = spn_task_init(&app);
+      break;
+    }
+    case SPN_TASK_KIND_ADD: {
+      result = spn_task_add(&app);
+      break;
+    }
+    case SPN_TASK_KIND_CLEAN: {
+      result = spn_task_clean(&app);
+      break;
+    }
+    case SPN_TASK_KIND_PUBLISH: {
+      result = spn_task_publish(&app);
       break;
     }
     case SPN_TASK_KIND_COUNT: {
@@ -575,6 +588,8 @@ void spn_deinit(sp_app_t* sp) {
       break;
     }
   }
+
+  spn_drain_events();
 
   if (!app.session.pkg) return;
 

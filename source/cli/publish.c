@@ -1,15 +1,12 @@
 #include "sp.h"
 #include "sp/macro.h"
-#include "ctx/ctx.h"
 #include "ctx/types.h"
 
 #include "cli/cli.h"
-#include "codegen/codegen.h"
+#include "event/event.h"
 #include "index/publish.h"
-#include "log/log.h"
-#include "sp/io.h"
 
-sp_cli_result_t spn_cli_publish(sp_cli_t* cli) {
+spn_task_result_t spn_task_publish(spn_app_t* app) {
   spn_cli_publish_t* cmd = &spn.cli.publish;
 
   sp_str_t index_name = sp_str_empty(cmd->index) ? sp_str_lit("core") : cmd->index;
@@ -23,8 +20,14 @@ sp_cli_result_t spn_cli_publish(sp_cli_t* cli) {
   }
 
   if (!index) {
-    spn_log_error("index {.cyan} not found", SP_FMT_STR(index_name));
-    return SP_CLI_OK;
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR,
+      .err = {
+        .kind = SPN_ERR_INDEX_UNKNOWN,
+        .index = { .name = index_name },
+      },
+    });
+    return SPN_TASK_ERROR;
   }
 
   spn_publish_opts_t opts = {
@@ -37,62 +40,19 @@ sp_cli_result_t spn_cli_publish(sp_cli_t* cli) {
   };
 
   spn_err_union_t result = spn_publish(&opts);
-
   if (result.kind) {
-    // SPN_ERR_* kinds are not members of spn_err_t, so switching on the enum
-    // type trips -Wswitch on every case
-    switch ((s32) result.kind) {
-      case SPN_ERR_NO_MANIFEST: {
-        spn_log_error("no manifest found at {.cyan}", SP_FMT_STR(result.no_manifest.path));
-        break;
-      }
-      case SPN_ERR_MANIFEST_PARSE: {
-        spn_log_error("failed to parse {.cyan}", SP_FMT_STR(result.manifest_parse.path));
-        break;
-      }
-      case SPN_ERR_MANIFEST_FIELD: {
-        spn_log_error("invalid field {.yellow} in manifest: expected {.green}, got {.red}",
-          SP_FMT_STR(result.manifest_field.path),
-          SP_FMT_STR(result.manifest_field.expected),
-          SP_FMT_STR(result.manifest_field.actual)
-        );
-        break;
-      }
-      case SPN_ERR_MANIFEST_ISSUES: {
-        spn_log_error("invalid manifest:");
-        if (spn_ctx_get_log_level() >= SPN_LOG_LEVEL_ERROR) {
-          sp_io_writer_t* err = spn_ctx_get_log_err();
-          sp_da_for(result.issues, it) {
-            sp_io_write_str(err, sp_str_lit("- "), SP_NULLPTR);
-            spn_codegen_issue_write(err, &result.issues[it]);
-            sp_io_write_new_line(err);
-          }
-        }
-        break;
-      }
-      case SPN_ERR_NOT_GIT_REPO: {
-        spn_log_error("{.cyan} is not inside a git repository", SP_FMT_STR(result.not_git_repo.path));
-        break;
-      }
-      case SPN_ERR_GIT: {
-        spn_log_error("git command failed: {.yellow}", SP_FMT_STR(result.git.command));
-        break;
-      }
-      case SPN_ERR_VERSION_EXISTS: {
-        spn_log_error("version {.yellow} of {.cyan} already exists in the index",
-          SP_FMT_STR(result.version_exists.version),
-          SP_FMT_STR(result.version_exists.name)
-        );
-        break;
-      }
-      default: {
-        spn_log_error("publish failed");
-        break;
-      }
-    }
-  } else {
-    SP_LOG("published successfully");
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR,
+      .err = result,
+    });
+    return SPN_TASK_ERROR;
   }
 
-  return SP_CLI_OK;
+  SP_LOG("published successfully");
+  return SPN_TASK_DONE;
+}
+
+sp_cli_result_t spn_cli_publish(sp_cli_t* cli) {
+  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_PUBLISH);
+  return SP_CLI_CONTINUE;
 }

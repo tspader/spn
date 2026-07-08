@@ -111,6 +111,17 @@ typedef struct {
     struct {
       sp_str_t name;
     } profile;
+    struct {
+      sp_str_t name;
+      sp_str_t value;
+      sp_str_t expected;
+    } flag;
+    struct {
+      sp_str_t path;
+    } fs;
+    struct {
+      sp_str_t name;
+    } index;
     spn_err_wasm_t wasm;
     spn_err_build_graph_t build_graph;
     spn_err_toolchain_t toolchain;
