@@ -162,6 +162,8 @@ typedef enum {
   SPN_ERR_WASM_SCRIPT_ERROR,
   SPN_ERR_WASM_NO_SCRIPT,
   SPN_ERR_WASM_EXPORT_NOT_FOUND,
+  SPN_ERR_PROFILE_INVALID,
+  SPN_ERR_PROFILE_UNDEFINED,
 } spn_err_t;
 
 typedef struct spn              spn_t;

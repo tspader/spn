@@ -62,6 +62,7 @@ set(SPN_SOURCES
   semver/compare.c
   semver/convert.c
   semver/parser.c
+  session/invocation.c
   session/registry/registry.c
   session/session.c
   sp/color.c

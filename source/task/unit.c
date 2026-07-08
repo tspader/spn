@@ -16,6 +16,7 @@
 #include "event/types.h"
 #include "filter/filter.h"
 #include "pkg/id.h"
+#include "session/invocation.h"
 #include "session/session.h"
 #include "sp/sp_glob.h"
 #include "target/mutate.h"
@@ -293,6 +294,9 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
       return SPN_TASK_ERROR;
     }
   }
+
+  spn_session_build_invocations(session);
+  spn_session_write_compile_commands(session, spn_session_compile_commands_path(session));
 
   return SPN_TASK_DONE;
 }

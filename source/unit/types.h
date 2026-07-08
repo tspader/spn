@@ -65,10 +65,17 @@ typedef struct spn_build_io_t {
 } spn_build_io_t;
 
 typedef struct {
+  sp_str_t program;
+  sp_da(sp_str_t) args;
+  sp_str_t cwd;
+} spn_invocation_t;
+
+typedef struct {
   spn_session_t* session;
   spn_pkg_unit_t* package;
   spn_target_unit_t* target;
   spn_lang_t lang;
+  spn_invocation_t invocation;
 
   struct {
     spn_bg_id_t source;

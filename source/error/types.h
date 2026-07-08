@@ -108,6 +108,9 @@ typedef struct {
       sp_str_t name;
       sp_str_t version;
     } version_exists;
+    struct {
+      sp_str_t name;
+    } profile;
     spn_err_wasm_t wasm;
     spn_err_build_graph_t build_graph;
     spn_err_toolchain_t toolchain;

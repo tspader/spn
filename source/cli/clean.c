@@ -3,16 +3,21 @@
 
 #include "cli/cli.h"
 #include "log/log.h"
+#include "profile/profile.h"
 #include "sp/os.h"
 
 static sp_str_t spn_clean_run(spn_cli_clean_t* command, sp_mem_arena_marker_t s) {
-  if (sp_str_find_c8(command->profile, '/') >= 0 || sp_str_find_c8(command->profile, '\\') >= 0) {
-    return sp_fmt(s.mem, "invalid profile {.cyan}", sp_fmt_str(command->profile)).value;
-  }
-
   sp_str_t path = app.session.paths.build;
+
   if (!sp_str_empty(command->profile)) {
-    path = sp_fs_join_path(s.mem, path, command->profile);
+    spn_profile_info_t overrides = { .name = command->profile };
+    spn_profile_info_t profile = sp_zero;
+    switch (spn_profile_resolve(app.session.profiles, &overrides, &profile)) {
+      case SPN_OK: break;
+      case SPN_ERR_PROFILE_INVALID: return sp_fmt(s.mem, "invalid profile {.cyan}", sp_fmt_str(command->profile)).value;
+      default: return sp_fmt(s.mem, "profile {.cyan} isn't defined", sp_fmt_str(command->profile)).value;
+    }
+    path = sp_fs_join_path(s.mem, path, profile.name);
   }
 
   if (sp_fs_remove(path) != SP_OK) {

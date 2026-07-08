@@ -21,9 +21,19 @@
 #include "unit/types.h"
 
 spn_err_t apply_config(spn_session_t* session, spn_app_config_t config) {
-  if (spn_profile_resolve(session->profiles, &config.overrides, &session->profile)) {
+  spn_err_t profile_err = spn_profile_resolve(session->profiles, &config.overrides, &session->profile);
+  if (profile_err) {
     sp_str_t name = spn_profile_select_name(&config.overrides);
-    spn_log_error("profile {.cyan} isn't defined", SP_FMT_STR(name));
+    switch (profile_err) {
+      case SPN_ERR_PROFILE_INVALID: {
+        spn_log_error("invalid profile {.cyan}", SP_FMT_STR(name));
+        break;
+      }
+      default: {
+        spn_log_error("profile {.cyan} isn't defined", SP_FMT_STR(name));
+        break;
+      }
+    }
     return SPN_ERROR;
   }
 

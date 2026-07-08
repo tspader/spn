@@ -74,9 +74,13 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
 spn_err_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* overrides, spn_profile_info_t* result) {
   sp_str_t name = spn_profile_select_name(overrides);
 
+  if (sp_str_find_c8(name, '/') >= 0 || sp_str_find_c8(name, '\\') >= 0) {
+    return SPN_ERR_PROFILE_INVALID;
+  }
+
   spn_profile_info_t* info = sp_str_ht_get(profiles, name);
   if (!info) {
-    return SPN_ERROR;
+    return SPN_ERR_PROFILE_UNDEFINED;
   }
 
   spn_profile_info_t merged = *info;

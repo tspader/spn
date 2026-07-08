@@ -17,6 +17,7 @@ typedef enum {
   ACTION_VERIFY_CONTENT,
   ACTION_VERIFY_FILE_NONEMPTY,
   ACTION_VERIFY_FILE_CONTAINS,
+  ACTION_VERIFY_JSON,
   ACTION_VERIFY_FILE_NOT_CONTAINS,
   ACTION_SNAPSHOT_MTIME,
   ACTION_VERIFY_MTIME_UNCHANGED,
@@ -45,6 +46,7 @@ typedef struct {
     struct { sp_str_t file; sp_str_t content; } verify_content;
     struct { sp_str_t file; } verify_file_nonempty;
     struct { sp_str_t file; sp_str_t needle; } verify_file_contains;
+    struct { sp_str_t file; } verify_json;
     struct { sp_str_t file; sp_str_t needle; } verify_file_not_contains;
     struct { sp_str_t file; } snapshot_mtime;
     struct { sp_str_t file; } verify_mtime;

@@ -383,7 +383,10 @@ void spn_cc_target_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp
 
   sp_ps_config_add_arg(mem, ps, sp_str_lit("-Werror=return-type"));
   sp_ps_config_add_arg(mem, ps, sp_str_lit("-o"));
-  sp_ps_config_add_arg(mem, ps, sp_fs_join_path(mem, cc->dir, target->output));
+  sp_str_t output = sp_fs_is_absolute(target->output) ?
+    target->output :
+    sp_fs_join_path(mem, cc->dir, target->output);
+  sp_ps_config_add_arg(mem, ps, output);
 }
 
 spn_cc_run_t spn_cc_target_run(spn_cc_target_t* target, sp_str_t cwd) {
