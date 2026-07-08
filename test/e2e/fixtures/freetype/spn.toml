@@ -1,0 +1,13 @@
+[package]
+name = "smoke"
+version = "0.0.1"
+
+[profile.default]
+toolchain = "zig"
+
+[deps.package]
+"freetype/freetype" = "file://./vendor/freetype/spn.toml"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

@@ -65,7 +65,7 @@ spn_task_step_t spn_task_resolve(spn_app_t* app) {
   spn_index_cache_init(&index, session->mem, session->intern, &spn.indexes);
 
   spn_resolver_t resolver = sp_zero;
-  spn_resolver_init(&resolver, spn.mem, session->intern, &index, &session->registry, spn.events, session->profile.linkage, session->pkg->config, 0);
+  spn_resolver_init(&resolver, spn.mem, session->intern, &index, &session->registry, spn.events, session->profile, session->pkg->config, 0);
 
   spn_resolve_query_t query = sp_zero_initialize();
   spn_resolve_query_init(session->mem, &query);

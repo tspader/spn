@@ -1,0 +1,14 @@
+[package]
+name = "smoke"
+version = "0.0.1"
+
+[profile.default]
+toolchain = "zig"
+
+[deps.package]
+"jeremy-rifkin/cpptrace" = "file://./vendor/cpptrace/spn.toml"
+
+[[bin]]
+name = "main"
+source = ["main.cpp"]
+cxx = { standard = "c++17" }

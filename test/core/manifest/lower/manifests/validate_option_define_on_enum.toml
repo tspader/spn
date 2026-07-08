@@ -1,0 +1,9 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[options.backend]
+type = "enum"
+values = ["gl", "vk"]
+default = "gl"
+define = "BACKEND"

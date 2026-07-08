@@ -1,0 +1,51 @@
+[package]
+namespace = "lua"
+name = "lua"
+version = "5.4.6"
+url = "https://github.com/lua/lua.git"
+commit = "6443185167c77adcc8552a3fee7edab7895db1a9"
+system_deps = [
+  { lib = "m", when = { os = "linux" } },
+]
+
+[[lib]]
+name = "lua"
+kinds = ["static"]
+source = [
+  "lapi.c",
+  "lauxlib.c",
+  "lbaselib.c",
+  "lcode.c",
+  "lcorolib.c",
+  "lctype.c",
+  "ldblib.c",
+  "ldebug.c",
+  "ldo.c",
+  "ldump.c",
+  "lfunc.c",
+  "lgc.c",
+  "linit.c",
+  "liolib.c",
+  "llex.c",
+  "lmathlib.c",
+  "lmem.c",
+  "loadlib.c",
+  "lobject.c",
+  "lopcodes.c",
+  "loslib.c",
+  "lparser.c",
+  "lstate.c",
+  "lstring.c",
+  "lstrlib.c",
+  "ltable.c",
+  "ltablib.c",
+  "ltm.c",
+  "lundump.c",
+  "lutf8lib.c",
+  "lvm.c",
+  "lzio.c",
+]
+headers = ["lua.h", "luaconf.h", "lualib.h", "lauxlib.h"]
+define = [
+  { value = "LUA_USE_POSIX", when = { os = { not = "windows" } } },
+]

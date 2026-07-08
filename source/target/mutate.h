@@ -13,6 +13,11 @@ static inline void spn_target_info_init(sp_mem_t mem, spn_target_info_t* target)
   if (!target->system_deps) sp_da_init(mem, target->system_deps);
   if (!target->deps)    sp_da_init(mem, target->deps);
   if (!target->embed)   sp_da_init(mem, target->embed);
+  if (!target->gated.source)      sp_da_init(mem, target->gated.source);
+  if (!target->gated.define)      sp_da_init(mem, target->gated.define);
+  if (!target->gated.flags)       sp_da_init(mem, target->gated.flags);
+  if (!target->gated.system_deps) sp_da_init(mem, target->gated.system_deps);
+  if (!target->gated.deps)        sp_da_init(mem, target->gated.deps);
 }
 void spn_target_add_source_ex(spn_target_info_t* target, sp_str_t source);
 void spn_target_add_header_ex(spn_target_info_t* target, sp_str_t header);

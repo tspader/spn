@@ -70,7 +70,7 @@ void spn_toml_loader_read_option_defaults(spn_toml_loader_t* ctx, toml_table_t* 
   }
 }
 
-void spn_toml_loader_write_option_defaults(sp_io_writer_t* out, const spn_option_defaults_t* in) {
+void spn_codegen_write_option_defaults(sp_io_writer_t* out, const spn_option_defaults_t* in) {
   sp_io_write_c8(out, '[');
   sp_da_for(*in, it) {
     const spn_option_default_t* entry = &(*in)[it];

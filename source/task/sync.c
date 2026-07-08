@@ -447,6 +447,10 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
     sp_ht_insert(session->packages, job->pkg->id, job->loaded);
   }
 
+  if (spn_session_apply_options(session)) {
+    return spn_task_fail(SPN_ERROR);
+  }
+
   session->units.toolchains = sp_da_new(session->mem, spn_toolchain_unit_t *);
   sp_da_for(app->sync.toolchains, it) {
     spn_sync_toolchain_job_t *job = app->sync.toolchains[it];

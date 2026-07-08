@@ -66,6 +66,7 @@ static spn_build_event_display_t event_info[] = {
   EVENT(SPN_EVENT_ERR_UNIT_CYCLE,                "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
   EVENT(SPN_EVENT_ERR_DYNAMIC_DUPLICATE,         "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
   EVENT(SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX,    "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
+  EVENT(SPN_EVENT_ERR_OPTION,                    "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
   EVENT(SPN_EVENT_RESOLVE_START,                 "Resolving",   SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
   EVENT(SPN_EVENT_RESOLVE_PACKAGE,               "Resolving",   SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
   EVENT(SPN_EVENT_RESOLVE_END,                   "Resolved",    SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
@@ -538,6 +539,73 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
         sp_fmt_str(spn_semver_to_str(mem, event->dynamic_dup.low)),
         sp_fmt_str(spn_semver_to_str(mem, event->dynamic_dup.high))
       );
+      break;
+    }
+    case SPN_EVENT_ERR_OPTION: {
+      switch (event->option.err) {
+        case SPN_OPTION_ERR_UNDECLARED: {
+          sp_fmt_io(
+            &w.base,
+            "{} does not declare an option named {.yellow} (set by {.cyan})",
+            sp_fmt_str(spn_tui_colored_name(mem, event->option.pkg)),
+            sp_fmt_str(event->option.option),
+            sp_fmt_str(event->option.a)
+          );
+          break;
+        }
+        case SPN_OPTION_ERR_BAD_VALUE: {
+          sp_fmt_io(
+            &w.base,
+            "{.yellow} is not a valid value for {}.{.cyan} (set by {.cyan})",
+            sp_fmt_str(event->option.value),
+            sp_fmt_str(spn_tui_colored_name(mem, event->option.pkg)),
+            sp_fmt_str(event->option.option),
+            sp_fmt_str(event->option.a)
+          );
+          break;
+        }
+        case SPN_OPTION_ERR_CONFLICT: {
+          sp_fmt_io(
+            &w.base,
+            "option conflict on {}.{.cyan}: {.cyan} and {.cyan} request different values",
+            sp_fmt_str(spn_tui_colored_name(mem, event->option.pkg)),
+            sp_fmt_str(event->option.option),
+            sp_fmt_str(event->option.a),
+            sp_fmt_str(event->option.b)
+          );
+          break;
+        }
+        case SPN_OPTION_ERR_VETO: {
+          sp_fmt_io(
+            &w.base,
+            "{.cyan} requires {}.{.cyan} != {.yellow}, but {} set it",
+            sp_fmt_str(event->option.a),
+            sp_fmt_str(spn_tui_colored_name(mem, event->option.pkg)),
+            sp_fmt_str(event->option.option),
+            sp_fmt_str(event->option.value),
+            sp_fmt_str(event->option.b)
+          );
+          break;
+        }
+        case SPN_OPTION_ERR_NO_VALUE: {
+          sp_fmt_io(
+            &w.base,
+            "no value for {}.{.cyan}: no default matched and nothing set it",
+            sp_fmt_str(spn_tui_colored_name(mem, event->option.pkg)),
+            sp_fmt_str(event->option.option)
+          );
+          break;
+        }
+        case SPN_OPTION_ERR_LATE_GATE: {
+          sp_fmt_io(
+            &w.base,
+            "the dependency gate on {}'s edge to {.cyan} changed after resolution",
+            sp_fmt_str(spn_tui_colored_name(mem, event->option.pkg)),
+            sp_fmt_str(event->option.a)
+          );
+          break;
+        }
+      }
       break;
     }
     case SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX: {

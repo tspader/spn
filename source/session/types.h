@@ -7,6 +7,7 @@
 #include "filter/types.h"
 #include "graph/types.h"
 #include "intern/types.h"
+#include "pkg/options.h"
 #include "profile/types.h"
 #include "resolve/types.h"
 #include "session/registry/types.h"
@@ -85,6 +86,7 @@ struct spn_session_t {
   spn_resolve_t resolve;
   spn_pkg_registry_t registry;
   sp_ht(spn_pkg_id_t, spn_loaded_pkg_t) packages;
+  sp_str_ht(spn_resolved_options_t) options;
 
   spn_profile_info_t profile;
   struct {

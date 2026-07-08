@@ -1,0 +1,13 @@
+[package]
+name = "smoke"
+version = "0.0.1"
+
+[profile.default]
+toolchain = "zig"
+
+[deps.package]
+"libsdl/sdl2" = "file://./vendor/sdl2/spn.toml"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

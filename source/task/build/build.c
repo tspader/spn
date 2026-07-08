@@ -111,6 +111,32 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
+  // Sibling targets named in this target's deps come first: they may lean on
+  // the package closure below, never the reverse
+  sp_da_for(target->deps.target, it) {
+    spn_target_unit_t* lib = target->deps.target[it];
+    if (lib->info->no_link) continue;
+
+    switch (lib->lib_kind) {
+      case SPN_LIB_KIND_STATIC: {
+        spn_cc_target_add_lib_dir(cc, lib->paths.lib);
+        spn_cc_target_add_system_lib(cc, lib->info->name);
+        break;
+      }
+      case SPN_LIB_KIND_SHARED: {
+        spn_cc_target_add_lib_dir(cc, lib->paths.lib);
+        spn_cc_target_add_system_lib(cc, lib->info->name);
+        spn_cc_target_add_rpath(cc, lib->paths.lib);
+        break;
+      }
+      case SPN_LIB_KIND_SOURCE:
+      case SPN_LIB_KIND_OBJECT:
+      case SPN_LIB_KIND_NONE: {
+        break;
+      }
+    }
+  }
+
   sp_da(spn_closure_entry_t) deps = spn_target_link_closure(s.mem, target);
 
   // Packages must precede the system libraries they need

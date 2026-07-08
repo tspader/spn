@@ -59,6 +59,7 @@ typedef struct spn_pkg_req {
   spn_dep_kind_t kind;
   bool private;
   spn_when_t when;
+  spn_when_t options;
   union {
     struct { spn_semver_range_t range; } index;
     struct { sp_str_t path; } file;
@@ -73,6 +74,8 @@ typedef struct {
 
 typedef struct {
   sp_opt(spn_linkage_t) kind;
+  spn_when_t options;
+  bool defaults_declined;
 } spn_pkg_config_t;
 
 typedef struct {
@@ -113,7 +116,11 @@ struct spn_pkg_info {
   sp_da(spn_semver_t) versions;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
+  sp_da(sp_str_t) public_define;
   sp_da(sp_str_t) system_deps;
+  struct {
+    spn_gated_list_t system_deps;
+  } gated;
   spn_toolchain_om_t toolchains;
   spn_target_info_t build;
   spn_target_info_t configure;
@@ -121,6 +128,7 @@ struct spn_pkg_info {
     sp_da(spn_publish_copy_t) copy;
   } publish;
 
+  bool applied;
   sp_mem_arena_t* arena;
 };
 

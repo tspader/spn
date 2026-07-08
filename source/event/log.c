@@ -207,6 +207,19 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_RESOLVE_PACKAGE] = sp_bind_builder_end(&b);
   }
 
+  // SPN_EVENT_ERR_OPTION
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_option_t, pkg, "pkg", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_option_t, option, "option", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_option_t, value, "value", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_option_t, a, "a", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_option_t, b, "b", SP_BIND_STR);
+    }
+    schemas[SPN_EVENT_ERR_OPTION] = sp_bind_builder_end(&b);
+  }
+
   // SPN_EVENT_RESOLVE_END
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
@@ -597,6 +610,7 @@ static void* event_variant_ptr(spn_build_event_t* event) {
     case SPN_EVENT_ERR_UNSATISFIABLE_VERSION:   return &event->unsatisfiable;
     case SPN_EVENT_ERR_DYNAMIC_DUPLICATE:       return &event->dynamic_dup;
     case SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX:  return &event->too_complex;
+    case SPN_EVENT_ERR_OPTION:                  return &event->option;
     case SPN_EVENT_EMBED_START:                 return &event->embed_start;
     case SPN_EVENT_EMBED_PASSED:                return &event->embed_passed;
     case SPN_EVENT_EMBED_FAILED:                return &event->embed_failed;
@@ -621,6 +635,7 @@ static const c8* event_names[SPN_EVENT_COUNT] = {
   [SPN_EVENT_ERR_UNIT_CYCLE]                = "err_unit_cycle",
   [SPN_EVENT_ERR_DYNAMIC_DUPLICATE]         = "err_dynamic_duplicate",
   [SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX]    = "err_resolution_too_complex",
+  [SPN_EVENT_ERR_OPTION]                    = "err_option",
   [SPN_EVENT_RESOLVE_START]                 = "resolve_start",
   [SPN_EVENT_RESOLVE_PACKAGE]               = "resolve_package",
   [SPN_EVENT_RESOLVE_END]                   = "resolve_end",

@@ -1,0 +1,17 @@
+[package]
+name = "smoke"
+version = "0.0.1"
+
+[profile.default]
+toolchain = "zig"
+
+[deps.package]
+"wolfpld/tracy" = "file://./vendor/tracy/spn.toml"
+
+[config.tracy]
+options = { enable = true }
+
+[[bin]]
+name = "main"
+source = ["main.cpp"]
+cxx = { standard = "c++11" }

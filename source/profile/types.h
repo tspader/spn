@@ -4,6 +4,7 @@
 #include "sp.h"
 #include "spn.h"
 #include "forward/types.h"
+#include "when/types.h"
 
 struct spn_profile_info {
   sp_str_t name;
@@ -14,6 +15,7 @@ struct spn_profile_info {
   spn_linkage_t linkage;
   spn_c_standard_t standard;
   spn_build_mode_t mode;
+  spn_when_t options;
 };
 
 typedef struct {

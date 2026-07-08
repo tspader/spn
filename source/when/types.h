@@ -45,8 +45,20 @@ typedef sp_da(spn_option_default_t) spn_option_defaults_t;
 typedef struct {
   sp_str_t name;
   spn_option_type_t type;
+  bool additive;
+  bool public;
+  sp_str_t define;
   sp_da(sp_str_t) values;
   spn_option_defaults_t defaults;
 } spn_option_info_t;
+
+// A manifest list entry that may carry a predicate; after option application
+// every surviving entry has been folded into the plain list beside it
+typedef struct {
+  sp_str_t value;
+  spn_when_t when;
+} spn_gated_str_t;
+
+typedef sp_da(spn_gated_str_t) spn_gated_list_t;
 
 #endif

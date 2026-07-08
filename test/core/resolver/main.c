@@ -391,7 +391,7 @@ static resolve_result_t execute_fixture(fixture_t* fixture, sp_intern_t* intern)
   }));
 
   spn_resolver_t resolver = sp_zero;
-  spn_resolver_init(&resolver, mem, intern, &cache, &registry, events, fixture->linkage, config, fixture->budget);
+  spn_resolver_init(&resolver, mem, intern, &cache, &registry, events, (spn_profile_info_t) { .linkage = fixture->linkage }, config, fixture->budget);
 
   resolve_result_t result = sp_zero_s(resolve_result_t);
   spn_resolve_query_init(mem, &result.query);

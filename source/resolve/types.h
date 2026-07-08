@@ -8,6 +8,7 @@
 #include "index/types.h"
 #include "intern/types.h"
 #include "pkg/types.h"
+#include "profile/types.h"
 #include "semver/types.h"
 #include "session/registry/types.h"
 
@@ -54,7 +55,7 @@ typedef struct spn_resolver_t {
   spn_index_cache_t* index;
   spn_pkg_registry_t* registry;
   spn_event_buffer_t* events;
-  spn_linkage_t linkage;
+  spn_profile_info_t profile;
   sp_da(spn_pkg_config_entry_t) config;
   u64 budget;
 } spn_resolver_t;
