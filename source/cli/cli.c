@@ -398,7 +398,7 @@ static sp_cli_cmd_t cmd_root = {
       .kind = SP_CLI_OPT_INTEGER,
       .summary = "Number of seconds which must elapse before the index gets refreshed",
       .ptr = &spn.cli.refresh
-    }
+    },
   },
   .commands = {
     &cmd_init,

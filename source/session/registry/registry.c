@@ -4,7 +4,8 @@
 
 #include "ctx/types.h"
 
-#include "codegen/codegen.h"
+#include "toml/loader.h"
+#include "toml/issue.h"
 #include "codegen/lower.h"
 #include "pkg/id.h"
 
@@ -29,8 +30,8 @@ spn_registry_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_
   }
 
   spn_pkg_info_t* info = sp_alloc_type(mem, spn_pkg_info_t);
-  spn_codegen_ctx_t ctx = sp_zero;
-  spn_codegen_ctx_init(&ctx, mem, intern);
+  spn_toml_loader_t ctx = sp_zero;
+  spn_toml_loader_init(&ctx, mem, intern);
   if (spn_codegen_load_pkg(&ctx, manifest, info)) {
     err->error = spn_codegen_issues_message(mem, ctx.issues);
     err->issues = ctx.issues;

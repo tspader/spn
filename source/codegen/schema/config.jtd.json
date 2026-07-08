@@ -1,0 +1,18 @@
+{
+  "metadata": { "format": "toml" },
+  "optionalProperties": {
+    "index": { "elements": { "ref": "config_index" } }
+  },
+  "definitions": {
+    "config_index": {
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "protocol": { "ref": "index_protocol" }
+      },
+      "optionalProperties": {
+        "rev": { "type": "string" }
+      }
+    }
+  }
+}

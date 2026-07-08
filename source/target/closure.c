@@ -76,7 +76,7 @@ sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit
     .visited = sp_da_new(s.mem, spn_pkg_unit_t*),
     .closure = sp_da_new(s.mem, spn_closure_entry_t),
   };
-  collect(&search, root->pkg, CLOSURE_SEARCH_PRIVATE, root->info->kind == SPN_TARGET_TEST);
+  collect(&search, root->pkg, CLOSURE_SEARCH_PUBLIC, root->info->kind == SPN_TARGET_TEST);
 
   // The result is in post-order. Reversing us gives us a topological sort.
   sp_da(spn_closure_entry_t) closure = sp_da_new(mem, spn_closure_entry_t);

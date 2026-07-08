@@ -3,6 +3,7 @@
 
 #include "sp.h"
 
+#include "codegen/types.h"
 #include "cli/types.h"
 #include "event/types.h"
 #include "index/types.h"
@@ -11,6 +12,8 @@
 #include "tui/types.h"
 
 #include "log/types.h"
+
+typedef spn_cg_config_t spn_config_file_t;
 
 typedef struct {
   sp_str_t dir;
@@ -36,6 +39,7 @@ typedef struct {
     sp_str_t config;
     sp_str_t bin;
     sp_str_t storage;
+    sp_str_t index;
     sp_str_t runtime;
     sp_str_t version;
     sp_str_t log;

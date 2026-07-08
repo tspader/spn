@@ -3,6 +3,7 @@ add_executable(index
   ${SRC}/codegen/json.c
   ${SRC}/codegen/options.c
   ${SRC}/codegen/when.c
+  ${SRC}/codegen/gen/config.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
   ${SRC}/enum/enum.c

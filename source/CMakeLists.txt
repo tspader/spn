@@ -108,6 +108,7 @@ set(SPN_SOURCES
 )
 
 add_executable(spn ${SPN_SOURCES}
+  ${SRC}/codegen/gen/config.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
   ${SRC}/codegen/gen/toolchains.gen.c

@@ -1,10 +1,10 @@
-static void spn_cg_{{ .entry }}_read_map(spn_codegen_ctx_t* ctx, toml_table_t* table, const c8* key, sp_da({{ .entry_type }})* out) {
+static void spn_cg_{{ .entry }}_read_map(spn_toml_loader_t* ctx, toml_table_t* table, const c8* key, sp_da({{ .entry_type }})* out) {
   toml_table_t* child = toml_table_table(table, key);
   if (!child) {
     return;
   }
   *out = sp_da_new(ctx->mem, {{ .entry_type }});
-  spn_codegen_push_key(ctx, key);
+  spn_toml_loader_push_key(ctx, key);
   sp_for(it, (u32)toml_table_len(child)) {
     s32 len = 0;
     const c8* name = toml_table_key(child, (s32)it, &len);
@@ -12,9 +12,9 @@ static void spn_cg_{{ .entry }}_read_map(spn_codegen_ctx_t* ctx, toml_table_t* t
       break;
     }
     {{ .entry_type }} entry = sp_zero;
-    entry.key = spn_codegen_intern(ctx, sp_str(name, (u32)len));
-    spn_codegen_str_optional(ctx, child, name, &entry.value);
+    entry.key = spn_toml_loader_intern(ctx, sp_str(name, (u32)len));
+    spn_toml_loader_str_optional(ctx, child, name, &entry.value);
     sp_da_push(*out, entry);
   }
-  spn_codegen_pop(ctx);
+  spn_toml_loader_pop(ctx);
 }

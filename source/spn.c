@@ -1,3 +1,4 @@
+#include "error/types.h"
 #include "sp.h"
 
 // STANDARD
@@ -29,6 +30,7 @@
 #include "app/app.h"
 #include "codegen/codegen.h"
 #include "codegen/lower.h"
+#include "codegen/gen/config.gen.h"
 #include "codegen/gen/manifest.gen.h"
 #include "cli/cli.h"
 #include "event/event.h"
@@ -41,7 +43,6 @@
 #include "log/lazy/lazy.h"
 #include "log/log.h"
 #include "sp/sp_om.h"
-#include "pkg/load.h"
 #include "profile/profile.h"
 #include "session/session.h"
 #include "spn.embed.h"
@@ -51,8 +52,8 @@
 #include "sp/macro.h"
 #include "sp/os.h"
 #include "sp/sp_glob.h"
-#include "external/wasm/wasm.h"
 #include "task/task.h"
+#include "toml/loader.h"
 #include "tui/tui.h"
 #include "version.h"
 
@@ -167,53 +168,72 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   // CONFIG
   sp_str_t config_dir = sp_env_get(spn.env, sp_str_lit("SPN_CONFIG_DIR"));
-  if (sp_str_empty(config_dir)) {
-    config_dir = sp_fs_get_config_path(spn.heap);
-  }
+  config_dir = sp_str_empty(config_dir) ? sp_fs_get_config_path(spn.heap) : config_dir;
   spn.paths.config_dir = sp_fs_join_path(spn.heap, config_dir, SP_LIT("spn"));
   spn.paths.config = sp_fs_join_path(spn.heap, spn.paths.config_dir, SP_LIT("spn.toml"));
 
   if (sp_fs_exists(spn.paths.config)) {
-    bool parse_error = false;
-    toml_table_t* toml = spn_toml_parse_ex(spn.paths.config, &parse_error);
-    if (parse_error) {
-      spn_event_buffer_push_ex(spn.events, SP_NULLPTR, SP_NULLPTR, (spn_build_event_t) {
+    spn_toml_loader_t loader = sp_zero;
+    spn_toml_loader_init(&loader, spn.mem, spn.intern);
+    spn_config_file_t config = sp_zero;
+    if (spn_codegen_load_config(&loader, spn.paths.config, &config)) {
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_ERR,
         .err = {
-          .kind = SPN_ERR_MANIFEST_PARSE,
-          .manifest_parse = {
-            .path = spn.paths.config,
-          },
+          .kind = SPN_ERR_MANIFEST_ISSUES,
+          .issues = loader.issues,
         },
       });
+      return SP_APP_ERR;
     }
 
-    if (toml) {
-      toml_array_t* indexes = toml_table_array(toml, "index");
-      if (indexes) {
-        spn_toml_arr_for(indexes, n) {
-          toml_table_t* it = toml_array_table(indexes, n);
-          spn_index_info_t index = SP_ZERO_INITIALIZE();
-          spn_err_union_t idx_err = spn_index_load(spn.heap, it, sp_str_lit("index"), n, &index);
-          if (idx_err.kind == SPN_ERR_MANIFEST_FIELD) {
-            spn_log_error("invalid index in config: {.cyan} expected {.yellow}, got {.red}",
-              SP_FMT_STR(idx_err.manifest_field.path),
-              SP_FMT_STR(idx_err.manifest_field.expected),
-              SP_FMT_STR(idx_err.manifest_field.actual)
-            );
-            return SP_APP_ERR;
-          } else if (idx_err.kind) {
-            spn_log_error("failed to load index from config");
-            return SP_APP_ERR;
-          }
-          sp_da_push(spn.indexes, index);
-        }
-      }
+    sp_da_for(config.index, it) {
+      sp_da_push(spn.indexes, ((spn_index_info_t) {
+        .name = config.index[it].name,
+        .url = config.index[it].url,
+        .rev = config.index[it].rev,
+        .protocol = config.index[it].protocol,
+        .kind = SPN_INDEX_USER,
+      }));
     }
   }
 
-  sp_str_t index_dir = sp_fs_join_path(spn.heap, spn.paths.storage, sp_str_lit("index"));
-  sp_fs_create_dir(index_dir);
+  // Find the cache directory after the config has been fully loaded
+  spn.paths.runtime = sp_fs_join_path(spn.heap, spn.paths.storage, SP_LIT("runtime"));
+  spn.paths.include = sp_fs_join_path(spn.heap, spn.paths.runtime, sp_str_lit("include"));
+  spn.paths.version = sp_fs_join_path(spn.heap, spn.paths.runtime, SP_LIT("version.stamp"));
+  spn.paths.log = sp_fs_join_path(spn.heap, spn.paths.storage, SP_LIT("log"));
+  spn.paths.cache = sp_fs_join_path(spn.heap, spn.paths.storage, SP_LIT("cache"));
+  spn.paths.source = sp_fs_join_path(spn.heap, spn.paths.cache, SP_LIT("source"));
+  spn.paths.build = sp_fs_join_path(spn.heap, spn.paths.cache, SP_LIT("build"));
+  spn.paths.store = sp_fs_join_path(spn.heap, spn.paths.cache, SP_LIT("store"));
+  spn.paths.index = sp_fs_join_path(spn.heap, spn.paths.storage, sp_str_lit("index"));
+
+  spn.paths.toolchain = sp_env_get(spn.env, sp_str_lit("SPN_TOOLCHAIN_DIR"));
+  if (sp_str_empty(spn.paths.toolchain)) {
+    spn.paths.toolchain = sp_fs_join_path(spn.heap, spn.paths.cache, SP_LIT("toolchain"));
+  }
+
+  sp_fs_create_dir(spn.paths.log);
+
+  spn_event_log_init(spn.heap);
+  {
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    sp_str_t jsonl_path = sp_fs_join_path(scratch.mem, spn.paths.log, sp_str_lit("build.jsonl"));
+    sp_fs_create_file(jsonl_path);
+    sp_io_file_writer_from_path(&spn.logger.jsonl, jsonl_path);
+    sp_mem_end_scratch(scratch);
+  }
+
+  sp_fs_create_dir(spn.paths.cache);
+  sp_fs_create_dir(spn.paths.source);
+  sp_fs_create_dir(spn.paths.build);
+  sp_fs_create_dir(spn.paths.index);
+  sp_fs_create_dir(spn.paths.store);
+  sp_fs_create_dir(spn.paths.toolchain);
+  sp_fs_create_dir(spn.paths.bin);
+  sp_fs_create_dir(spn.paths.tools.dir);
+
 
   bool has_core_index = false;
   sp_da_for(spn.indexes, i) {
@@ -237,7 +257,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     if (spn.indexes[i].protocol == SPN_INDEX_PROTOCOL_FILESYSTEM) {
       spn.indexes[i].location = spn.indexes[i].url;
     } else {
-      spn.indexes[i].location = sp_fs_join_path(spn.heap, index_dir, spn_git_db_key(spn.heap, spn.indexes[i].url));
+      spn.indexes[i].location = sp_fs_join_path(spn.heap, spn.paths.index, spn_git_db_key(spn.heap, spn.indexes[i].url));
     }
   }
 
@@ -246,39 +266,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     spn_index_sync(&spn.indexes[idx]);
   }
 
-  // Find the cache directory after the config has been fully loaded
-  spn.paths.runtime = sp_fs_join_path(spn.heap, spn.paths.storage, SP_LIT("runtime"));
-  spn.paths.include = sp_fs_join_path(spn.heap, spn.paths.runtime, sp_str_lit("include"));
-  spn.paths.version = sp_fs_join_path(spn.heap, spn.paths.runtime, SP_LIT("version.stamp"));
-  spn.paths.log = sp_fs_join_path(spn.heap, spn.paths.storage, SP_LIT("log"));
-  spn.paths.cache = sp_fs_join_path(spn.heap, spn.paths.storage, SP_LIT("cache"));
-  spn.paths.source = sp_fs_join_path(spn.heap, spn.paths.cache, SP_LIT("source"));
-  spn.paths.build = sp_fs_join_path(spn.heap, spn.paths.cache, SP_LIT("build"));
-  spn.paths.store = sp_fs_join_path(spn.heap, spn.paths.cache, SP_LIT("store"));
-
-  spn.paths.toolchain = sp_env_get(spn.env, sp_str_lit("SPN_TOOLCHAIN_DIR"));
-  if (sp_str_empty(spn.paths.toolchain)) {
-    spn.paths.toolchain = sp_fs_join_path(spn.heap, spn.paths.cache, SP_LIT("toolchain"));
-  }
-
-  sp_fs_create_dir(spn.paths.log);
-
-  spn_event_log_init(spn.heap);
-  {
-    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-    sp_str_t jsonl_path = sp_fs_join_path(scratch.mem, spn.paths.log, sp_str_lit("build.jsonl"));
-    sp_fs_create_file(jsonl_path);
-    sp_io_file_writer_from_path(&spn.logger.jsonl, jsonl_path);
-    sp_mem_end_scratch(scratch);
-  }
-
-  sp_fs_create_dir(spn.paths.cache);
-  sp_fs_create_dir(spn.paths.source);
-  sp_fs_create_dir(spn.paths.build);
-  sp_fs_create_dir(spn.paths.store);
-  sp_fs_create_dir(spn.paths.toolchain);
-  sp_fs_create_dir(spn.paths.bin);
-  sp_fs_create_dir(spn.paths.tools.dir);
 
   // @spader
 
@@ -362,8 +349,8 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
   }
   else {
-    spn_codegen_ctx_t ctx = sp_zero;
-    spn_codegen_ctx_init(&ctx, spn.mem, spn.intern);
+    spn_toml_loader_t ctx = sp_zero;
+    spn_toml_loader_init(&ctx, spn.mem, spn.intern);
     spn_cg_manifest_t manifest = sp_zero;
     spn_err_t load_err = spn_codegen_load(&ctx, spn.paths.manifest, &manifest);
     if (!load_err) {
