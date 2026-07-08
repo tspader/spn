@@ -17,18 +17,6 @@ sp_io_writer_t* spn_ctx_get_log_err(void) {
   return &spn.logger.err.base;
 }
 
-sp_str_t spn_ctx_source_cache_root(void) {
-  return spn.paths.source;
-}
-
-sp_str_t spn_ctx_build_cache_root(void) {
-  return spn.paths.build;
-}
-
-sp_str_t spn_ctx_store_cache_root(void) {
-  return spn.paths.store;
-}
-
 sp_str_t spn_ctx_project_root(void) {
   return spn.paths.project;
 }

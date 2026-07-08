@@ -364,7 +364,7 @@ spn_task_step_t spn_task_sync_packages_init(spn_app_t *app) {
   spn_session_t *session = &app->session;
 
   session->git = sp_alloc_type(spn.mem, spn_git_cache_t);
-  spn_git_cache_init(session->git, spn.mem, session->intern, spn.paths.source);
+  spn_git_cache_init(session->git, spn.mem, session->intern, spn.paths.caches.git.dir);
 
   app->sync.store = (spn_toolchain_store_t){
     .mem = spn.mem,

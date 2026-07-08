@@ -148,6 +148,9 @@ spn_err_t spn_index_publish(spn_index_info_t* index, spn_index_rel_t* rel) {
   sp_sys_fd_t fd = sp_sys_open_s(sp_sys_get_root(0), path, SP_O_WRONLY | SP_O_CREAT | SP_O_APPEND | SP_O_BINARY, 0644);
   sp_io_file_writer_t io;
   sp_io_file_writer_from_fd(&io, fd, SP_IO_CLOSE_MODE_AUTO);
+  // The writer pwrites at pos, which O_APPEND only overrides on Linux; start
+  // at EOF explicitly so the append works everywhere
+  io.pos = io.size;
   sp_io_write_line(&io.base, json);
   sp_io_file_writer_close(&io);
 

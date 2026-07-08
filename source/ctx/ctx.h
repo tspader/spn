@@ -11,9 +11,6 @@ sp_intern_t* spn_ctx_get_intern(void);
 spn_log_level_t spn_ctx_get_log_level(void);
 sp_io_writer_t* spn_ctx_get_log_out(void);
 sp_io_writer_t* spn_ctx_get_log_err(void);
-sp_str_t spn_ctx_source_cache_root(void);
-sp_str_t spn_ctx_build_cache_root(void);
-sp_str_t spn_ctx_store_cache_root(void);
 sp_str_t spn_ctx_project_root(void);
 
 #endif

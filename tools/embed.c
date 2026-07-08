@@ -3,10 +3,12 @@
 #include "sp/sp_cli.h"
 #include "sp/sp_elf.h"
 #include "sp/coff.h"
+#include "sp/macho.h"
 
 typedef enum {
   EMBED_FORMAT_ELF,
   EMBED_FORMAT_COFF,
+  EMBED_FORMAT_MACHO,
 } embed_format_t;
 
 typedef struct {
@@ -25,6 +27,10 @@ typedef struct {
     sp_coff_t* coff;
     sp_coff_section_t* rdata;
   } coff;
+  struct {
+    sp_macho_t* macho;
+    sp_macho_section_t* konst;
+  } macho;
 } embed_obj_t;
 
 static embed_obj_t embed_obj_new(sp_mem_t mem, embed_format_t format) {
@@ -46,6 +52,16 @@ static embed_obj_t embed_obj_new(sp_mem_t mem, embed_format_t format) {
         obj.coff.coff,
         sp_str_lit(".rdata"),
         SP_COFF_SCN_CNT_INITIALIZED_DATA | SP_COFF_SCN_MEM_READ | SP_COFF_SCN_ALIGN_8BYTES);
+      break;
+    }
+    case EMBED_FORMAT_MACHO: {
+      // Only produced for the host; cross targets are elf/coff
+#if defined(__x86_64__)
+      obj.macho.macho = sp_macho_new(mem, SP_MACHO_CPU_X86_64, SP_MACHO_SUBTYPE_X86_64);
+#else
+      obj.macho.macho = sp_macho_new(mem, SP_MACHO_CPU_ARM64, SP_MACHO_SUBTYPE_ARM64);
+#endif
+      obj.macho.konst = sp_macho_add_section(obj.macho.macho, sp_str_lit("__TEXT"), sp_str_lit("__const"), 3);
       break;
     }
   }
@@ -75,21 +91,36 @@ static void embed_obj_add(embed_obj_t* obj, sp_str_t symbol, const void* data, u
       sp_coff_add_symbol(obj->coff.coff, symbol, (u32)offset, 1, SP_COFF_SYM_CLASS_EXTERNAL);
       break;
     }
+    case EMBED_FORMAT_MACHO: {
+      sp_io_writer_t* w = &obj->macho.konst->writer.base;
+      u64 head = obj->macho.konst->writer.storage.len;
+      u64 offset = sp_align_offset(head, 8);
+      if (offset > head) sp_io_pad(w, offset - head, SP_NULLPTR);
+      sp_io_write(w, data, size, SP_NULLPTR);
+      // Darwin mangles C identifiers with a leading underscore
+      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+      sp_str_t mangled = sp_fmt(scratch.mem, "_{}", sp_fmt_str(symbol)).value;
+      sp_macho_add_symbol(obj->macho.macho, mangled, 1, offset);
+      sp_mem_end_scratch(scratch);
+      break;
+    }
   }
 }
 
 static sp_err_t embed_obj_write(embed_obj_t* obj, sp_io_writer_t* out) {
   switch (obj->format) {
-    case EMBED_FORMAT_ELF:  return sp_elf_write(obj->elf.elf, out);
-    case EMBED_FORMAT_COFF: return sp_coff_write(obj->coff.coff, out);
+    case EMBED_FORMAT_ELF:   return sp_elf_write(obj->elf.elf, out);
+    case EMBED_FORMAT_COFF:  return sp_coff_write(obj->coff.coff, out);
+    case EMBED_FORMAT_MACHO: return sp_macho_write(obj->macho.macho, out);
   }
   return SP_ERR;
 }
 
 static void embed_obj_free(embed_obj_t* obj) {
   switch (obj->format) {
-    case EMBED_FORMAT_ELF:  sp_elf_free(obj->elf.elf); break;
-    case EMBED_FORMAT_COFF: sp_coff_free(obj->coff.coff); break;
+    case EMBED_FORMAT_ELF:   sp_elf_free(obj->elf.elf); break;
+    case EMBED_FORMAT_COFF:  sp_coff_free(obj->coff.coff); break;
+    case EMBED_FORMAT_MACHO: sp_macho_free(obj->macho.macho); break;
   }
 }
 
@@ -162,6 +193,9 @@ sp_cli_result_t embed_run(sp_cli_t* cli) {
     }
     else if (sp_str_equal(name, sp_str_lit("coff"))) {
       format = EMBED_FORMAT_COFF;
+    }
+    else if (sp_str_equal(name, sp_str_lit("macho"))) {
+      format = EMBED_FORMAT_MACHO;
     }
     else {
       return sp_cli_set_error(cli, sp_fmt(mem, "unknown format {.red}", sp_fmt_str(name)).value);
@@ -268,7 +302,7 @@ s32 embed_main(s32 num_args, const c8** args) {
       {
         .name = "format",
         .kind = SP_CLI_OPT_STRING,
-        .summary = "Object format to write: elf or coff (defaults to elf)",
+        .summary = "Object format to write: elf, coff, or macho (defaults to elf)",
         .placeholder = "format",
         .ptr = &embed.format,
       },

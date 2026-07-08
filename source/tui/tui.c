@@ -290,8 +290,8 @@ static sp_str_t spn_tui_colored_name(sp_mem_t mem, sp_str_t name) {
 }
 
 static sp_str_t spn_tui_contextual_path(sp_mem_t mem, sp_str_t path) {
-  if (!sp_str_empty(spn.paths.cache) && sp_str_starts_with(path, spn.paths.cache)) {
-    sp_str_t rel = sp_str_strip_left(path, spn.paths.cache);
+  if (!sp_str_empty(spn.paths.caches.dir) && sp_str_starts_with(path, spn.paths.caches.dir)) {
+    sp_str_t rel = sp_str_strip_left(path, spn.paths.caches.dir);
     rel = sp_str_strip_left(rel, sp_str_lit("/"));
     return sp_fmt(mem, "$SPN_CACHE/{}", sp_fmt_str(rel)).value;
   }
