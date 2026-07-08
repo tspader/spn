@@ -24,6 +24,7 @@ typedef enum {
   SPN_EVENT_SYNC_START,
   SPN_EVENT_SYNC_PACKAGE,
   SPN_EVENT_SYNC_FAILED,
+  SPN_EVENT_SYNC_STALE,
   SPN_EVENT_SYNC_END,
   SPN_EVENT_BUILD_SCRIPT_COMPILE,
   SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,
@@ -51,6 +52,7 @@ typedef enum {
   SPN_EVENT_BUILD_SUMMARY,
   SPN_EVENT_API_CALL,
   SPN_EVENT_USER_LOG,
+  SPN_EVENT_ADDED,
   SPN_EVENT_COUNT,
 } spn_build_event_kind_t;
 
@@ -124,6 +126,7 @@ typedef struct { sp_str_t name; sp_str_t path; sp_str_t error; sp_da(spn_codegen
 typedef struct { u32 num_synced; u64 time; } spn_evt_sync_end_t;
 typedef struct { sp_str_t fn; sp_str_t args; } spn_evt_api_call_t;
 typedef struct { sp_str_t message; } spn_evt_user_log_t;
+typedef struct { sp_str_t name; sp_str_t version; } spn_evt_added_t;
 typedef struct { u32 num_files; } spn_evt_embed_start_t;
 typedef struct { sp_str_t object_path; sp_str_t header_path; u64 time; } spn_evt_embed_passed_t;
 typedef struct { sp_str_t path; sp_str_t error; } spn_evt_embed_failed_t;
@@ -179,6 +182,7 @@ struct spn_build_event_t {
     spn_evt_sync_end_t sync_end;
     spn_evt_api_call_t api_call;
     spn_evt_user_log_t user_log;
+    spn_evt_added_t added;
     spn_evt_embed_start_t embed_start;
     spn_evt_embed_passed_t embed_passed;
     spn_evt_embed_failed_t embed_failed;

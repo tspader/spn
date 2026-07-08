@@ -44,7 +44,7 @@ void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
 
 }
 
-spn_task_result_t spn_task_resolve(spn_app_t* app) {
+spn_task_step_t spn_task_resolve(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_pkg_info_t* pkg = &app->package;
 
@@ -71,10 +71,10 @@ spn_task_result_t spn_task_resolve(spn_app_t* app) {
   spn_resolve_query_init(session->mem, &query);
   add_root(session, &query);
 
-  spn_try_as(spn_resolve_from_solver(&resolver, &query), SPN_TASK_ERROR);
+  if (spn_resolve_from_solver(&resolver, &query)) return spn_task_fail(SPN_ERROR);
   session->resolve = query.result;
 
   emit_resolved(session->mem, &query);
 
-  return SPN_TASK_DONE;
+  return spn_task_done();
 }

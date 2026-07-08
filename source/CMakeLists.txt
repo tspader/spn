@@ -84,10 +84,15 @@ set(SPN_SOURCES
   task/build/nodes/script.c
   task/build/nodes/stamp.c
   task/build/nodes/user.c
+  task/add.c
   task/build.c
+  task/clean.c
   task/configure.c
   task/generate.c
   task/graph.c
+  task/index.c
+  task/init.c
+  task/publish.c
   task/resolve.c
   task/sync.c
   task/task.c

@@ -17,25 +17,27 @@
 // don't know if it's exactly right; I just wanted to get it basically working
 // and move on.
 
-static spn_task_result_t run_script(spn_app_t* app) {
+static spn_task_step_t spn_task_run_tests(spn_app_t* app);
+
+static spn_task_step_t run_script(spn_app_t* app) {
   spn_session_t* session = &app->session;
 
   spn_pkg_unit_t* root = spn_session_find_root(session);
   if (!root) {
     spn_log_error("script {.yellow} was not built", SP_FMT_STR(app->config.run.target));
-    return SPN_TASK_ERROR;
+    return spn_task_fail(SPN_ERROR);
   }
 
   spn_target_unit_t* unit = spn_session_find_target_in_pkg(session, root, app->config.run.target);
   if (!unit) {
     spn_log_error("script {.yellow} was not built", SP_FMT_STR(app->config.run.target));
-    return SPN_TASK_ERROR;
+    return spn_task_fail(SPN_ERROR);
   }
 
   sp_str_t command = get_target_output_path(session->mem, unit);
   if (!sp_fs_exists(command)) {
     spn_log_error("script binary {.yellow} does not exist", SP_FMT_STR(command));
-    return SPN_TASK_ERROR;
+    return spn_task_fail(SPN_ERROR);
   }
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
@@ -64,21 +66,21 @@ static spn_task_result_t run_script(spn_app_t* app) {
       SP_FMT_STR(unit->info->name),
       SP_FMT_S32(status.exit_code)
     );
-    return SPN_TASK_ERROR;
+    return spn_task_fail(SPN_ERROR);
   }
 
-  return SPN_TASK_DONE;
+  return spn_task_done();
 }
 
-static spn_task_result_t run_source(spn_app_t* app) {
+static spn_task_step_t run_source(spn_app_t* app) {
   spn_log_error("{.yellow} cannot run native sources; build scripts are wasm", SP_FMT_STR(app->config.run.target));
-  return SPN_TASK_ERROR;
+  return spn_task_fail(SPN_ERROR);
 }
 
-spn_task_result_t spn_task_run(spn_app_t* app) {
+spn_task_step_t spn_task_run(spn_app_t* app) {
   switch (app->config.run.kind) {
     case SPN_RUN_KIND_NONE: {
-      return SPN_TASK_DONE;
+      return spn_task_done();
     }
     case SPN_RUN_KIND_TESTS: {
       return spn_task_run_tests(app);
@@ -91,9 +93,9 @@ spn_task_result_t spn_task_run(spn_app_t* app) {
     }
   }
 
-  SP_UNREACHABLE_RETURN(SPN_TASK_ERROR);
+  SP_UNREACHABLE_RETURN(spn_task_fail(SPN_ERROR));
 }
 
-spn_task_result_t spn_task_run_tests(spn_app_t* app) {
-  return SPN_TASK_DONE;
+static spn_task_step_t spn_task_run_tests(spn_app_t* app) {
+  return spn_task_done();
 }

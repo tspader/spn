@@ -30,6 +30,16 @@ sp_str_t spn_index_get_package_path(sp_mem_t mem, spn_index_info_t* index, spn_p
   return path;
 }
 
+static bool git_index_stale(spn_index_info_t* index) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t head = sp_fs_join_path(scratch.mem, index->location, sp_str_lit(".git/FETCH_HEAD"));
+  sp_tm_epoch_t mod_time = sp_fs_get_mod_time(head);
+  sp_mem_end_scratch(scratch);
+
+  sp_tm_epoch_t now = sp_tm_now_epoch();
+  return mod_time.s + index->refresh <= now.s;
+}
+
 spn_err_t spn_index_sync(spn_index_info_t* index) {
   switch (index->protocol) {
     case SPN_INDEX_PROTOCOL_GIT: {
@@ -41,13 +51,7 @@ spn_err_t spn_index_sync(spn_index_info_t* index) {
           return SPN_OK;
         }
 
-        sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-        sp_str_t head = sp_fs_join_path(scratch.mem, index->location, sp_str_lit(".git/FETCH_HEAD"));
-        sp_tm_epoch_t mod_time = sp_fs_get_mod_time(head);
-        sp_mem_end_scratch(scratch);
-
-        sp_tm_epoch_t now = sp_tm_now_epoch();
-        if (mod_time.s + index->refresh <= now.s) {
+        if (git_index_stale(index)) {
           spn_try(spn_git_pull(index->location));
         }
         return SPN_OK;
@@ -67,6 +71,30 @@ spn_err_t spn_index_sync(spn_index_info_t* index) {
     }
   }
   return SPN_ERROR;
+}
+
+bool spn_index_needs_fetch(spn_index_info_t* index) {
+  switch (index->protocol) {
+    case SPN_INDEX_PROTOCOL_GIT: {
+      if (!sp_fs_exists(index->location)) {
+        return true;
+      }
+
+      bool pinned = !sp_str_empty(index->rev);
+      if (pinned) {
+        return false;
+      }
+
+      return git_index_stale(index);
+    }
+    case SPN_INDEX_PROTOCOL_HTTP: {
+      return false;
+    }
+    case SPN_INDEX_PROTOCOL_FILESYSTEM: {
+      return false;
+    }
+  }
+  return false;
 }
 
 spn_index_pkg_t* spn_index_get_package(spn_index_info_t* index, spn_pkg_name_t id) {

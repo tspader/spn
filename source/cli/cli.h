@@ -7,6 +7,8 @@
 
 #define SPN_CLI_UNIMPLEMENTED() return sp_cli_set_error_c(cli, "unimplemented")
 
+sp_cli_result_t spn_cli_errf(sp_cli_t* cli, const c8* fmt, ...);
+
 sp_cli_result_t spn_cli_init(sp_cli_t* cli);
 sp_cli_result_t spn_cli_add(sp_cli_t* cli);
 sp_cli_result_t spn_cli_build(sp_cli_t* cli);

@@ -360,7 +360,7 @@ void add_compilation_units(spn_session_t *session) {
   }
 }
 
-spn_task_result_t spn_task_sync_init(spn_app_t *app) {
+spn_task_step_t spn_task_sync_packages_init(spn_app_t *app) {
   spn_session_t *session = &app->session;
 
   session->git = sp_alloc_type(spn.mem, spn_git_cache_t);
@@ -427,19 +427,19 @@ spn_task_result_t spn_task_sync_init(spn_app_t *app) {
   });
   spn_bg_executor_run(session->sync.executor);
 
-  return SPN_TASK_CONTINUE;
+  return spn_task_continue();
 }
 
-spn_task_result_t spn_task_sync_update(spn_app_t *app) {
+spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
   spn_session_t *session = &app->session;
 
   if (!sp_atomic_s32_get(&session->sync.executor->shutdown)) {
-    return SPN_TASK_CONTINUE;
+    return spn_task_continue();
   }
 
   spn_bg_executor_join(session->sync.executor);
   if (!sp_da_empty(session->sync.executor->errors)) {
-    return SPN_TASK_ERROR;
+    return spn_task_fail(SPN_ERROR);
   }
 
   sp_da_for(app->sync.packages, it) {
@@ -477,5 +477,5 @@ spn_task_result_t spn_task_sync_update(spn_app_t *app) {
       .time = session->sync.executor->elapsed,
     }});
 
-  return SPN_TASK_DONE;
+  return spn_task_done();
 }

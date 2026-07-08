@@ -28,6 +28,25 @@ typedef struct {
   spn_toolchain_unit_t* unit;
 } spn_sync_toolchain_job_t;
 
+typedef struct {
+  spn_index_info_t* index;
+  spn_err_t err;
+} spn_sync_index_job_t;
+
+typedef enum {
+  SPN_ADD_DEP_PACKAGE,
+  SPN_ADD_DEP_TEST,
+  SPN_ADD_DEP_BUILD,
+} spn_add_dep_t;
+
+typedef struct {
+  spn_pkg_name_t name;
+  sp_str_t key;
+  sp_str_t requested;
+  spn_semver_range_t range;
+  spn_add_dep_t dep;
+} spn_add_request_t;
+
 struct spn_app_t {
   spn_app_paths_t paths;
   spn_pkg_info_t package;
@@ -37,11 +56,20 @@ struct spn_app_t {
 
   spn_app_config_t config;
 
+  union {
+    spn_add_request_t add;
+  } request;
+
   struct {
     spn_toolchain_store_t store;
     sp_da(spn_sync_pkg_job_t*) packages;
     sp_da(spn_sync_toolchain_job_t*) toolchains;
   } sync;
+
+  struct {
+    spn_bg_ctx_t bg;
+    sp_da(spn_sync_index_job_t*) jobs;
+  } index_sync;
 
   sp_da(sp_str_t) search;
 };

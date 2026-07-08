@@ -169,7 +169,7 @@ static spn_pkg_unit_t* find_dep_unit(spn_session_t* session, spn_pkg_unit_t* pkg
   return SP_NULLPTR;
 }
 
-spn_task_result_t spn_task_create_units(spn_app_t* app) {
+spn_task_step_t spn_task_create_units(spn_app_t* app) {
   spn_session_t* session = &app->session;
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
@@ -200,7 +200,7 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
       }
 
       spn_target_unit_t* target = spn_session_add_target(session, pkg, targets[it]);
-      spn_try_as(set_target_kind(session, target), SPN_TASK_ERROR);
+      if (set_target_kind(session, target)) return spn_task_fail(SPN_ERROR);
     }
   }
 
@@ -291,13 +291,13 @@ spn_task_result_t spn_task_create_units(spn_app_t* app) {
           .toolchain = { .name = toolchain->name },
         },
       });
-      return SPN_TASK_ERROR;
+      return spn_task_fail(SPN_ERROR);
     }
   }
 
   spn_session_build_invocations(session);
   spn_session_write_compile_commands(session, spn_session_compile_commands_path(session));
 
-  return SPN_TASK_DONE;
+  return spn_task_done();
 }
 

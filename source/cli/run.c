@@ -4,7 +4,7 @@
 
 #include "ctx/types.h"
 #include "intern/intern.h"
-#include "log/log.h"
+#include "task/task.h"
 
 static bool spn_cli_run_path_is_absolute(sp_str_t path) {
   return sp_str_starts_with(path, sp_str_lit("/")) ||
@@ -59,36 +59,38 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
 
   if (source) {
     if (has_manifest) {
-      spn_task_enqueue(&app.tasks, SPN_TASK_RESOLVE);
-      spn_task_enqueue(&app.tasks, SPN_TASK_SYNC_PACKAGES);
-      spn_task_enqueue(&app.tasks, SPN_TASK_RUN_CONFIGURE_GRAPH);
+      return spn_plan(
+        SPN_TASK_SYNC_INDEXES,
+        SPN_TASK_RESOLVE,
+        SPN_TASK_SYNC_PACKAGES,
+        SPN_TASK_CONFIGURE_GRAPH,
+        SPN_TASK_RUN
+      );
     }
 
-    spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN);
-    return SP_CLI_CONTINUE;
+    return spn_plan(SPN_TASK_RUN);
   }
 
   if (!has_manifest) {
-    spn_log_error("no manifest found in {.cyan}; pass a relative {.yellow} file instead",
-      SP_FMT_STR(spn.paths.project),
-      SP_FMT_CSTR(".c")
+    return spn_cli_errf(cli, "no manifest found in {.cyan}; pass a relative {.yellow} file instead",
+      sp_fmt_str(spn.paths.project),
+      sp_fmt_cstr(".c")
     );
-    return SP_CLI_ERR;
   }
 
   if (!sp_str_om_has(app.package.scripts, spn_intern(command->entry))) {
-    spn_log_error("script target {.yellow} is not defined",
-      SP_FMT_STR(command->entry)
+    return spn_cli_errf(cli, "script target {.yellow} is not defined",
+      sp_fmt_str(command->entry)
     );
-    return SP_CLI_ERR;
   }
 
-  spn_task_enqueue(&app.tasks, SPN_TASK_RESOLVE);
-  spn_task_enqueue(&app.tasks, SPN_TASK_SYNC_PACKAGES);
-  spn_task_enqueue(&app.tasks, SPN_TASK_RUN_CONFIGURE_GRAPH);
-  spn_task_enqueue(&app.tasks, SPN_TASK_CREATE_UNITS);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN_BUILD_GRAPH);
-  spn_task_enqueue(&app.tasks, SPN_TASK_KIND_RUN);
-
-  return SP_CLI_CONTINUE;
+  return spn_plan(
+    SPN_TASK_SYNC_INDEXES,
+    SPN_TASK_RESOLVE,
+    SPN_TASK_SYNC_PACKAGES,
+    SPN_TASK_CONFIGURE_GRAPH,
+    SPN_TASK_CREATE_UNITS,
+    SPN_TASK_BUILD_GRAPH,
+    SPN_TASK_RUN
+  );
 }
