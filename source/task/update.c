@@ -101,7 +101,7 @@ static void spn_update_report_incompatible(spn_app_t* app, sp_mem_t mem) {
   }
 }
 
-spn_task_result_t spn_task_update(spn_app_t* app) {
+spn_task_step_t spn_task_update(spn_app_t* app) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
   u32 num_changed = spn_update_report_changes(app, scratch.mem);
@@ -114,5 +114,5 @@ spn_task_result_t spn_task_update(spn_app_t* app) {
   spn_app_update_lock_file(app);
 
   sp_mem_end_scratch(scratch);
-  return SPN_TASK_DONE;
+  return spn_task_done();
 }

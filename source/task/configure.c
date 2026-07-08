@@ -42,14 +42,14 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   return SPN_OK;
 }
 
-spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
+spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->configure.graph;
   spn_bg_init(graph, spn.mem);
   spn_pkg_unit_t* root = spn_session_find_root(&app->session);
 
   if (spn_wasm_init()) {
-    return SPN_TASK_ERROR;
+    return spn_task_fail(SPN_ERR_WASM_INIT_FAILED);
   }
 
   // Add a graph node for each package
@@ -58,7 +58,9 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
 
     unit->nodes.configure.run = spn_bg_add_fn(graph, on_configure_package, unit);
     unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
-    spn_try(spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp));
+    if (spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp)) {
+      return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
+    }
   }
 
   // The root configures last, after every other package; only now do all units
@@ -68,7 +70,9 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
     spn_loaded_pkg_t* pkg = sp_ht_getp(session->packages, unit->id);
 
     if (pkg->source != SPN_PKG_SOURCE_ROOT) {
-      spn_try(spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp));
+      if (spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp)) {
+        return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
+      }
     }
   }
 
@@ -79,7 +83,9 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
     sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit);
     sp_da_for(deps, j) {
       spn_pkg_unit_t* parent = deps[j].unit;
-      spn_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, parent->nodes.configure.stamp));
+      if (spn_bg_cmd_add_input(graph, unit->nodes.configure.run, parent->nodes.configure.stamp)) {
+        return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = parent->paths.stamp.configure });
+      }
     }
   }
 
@@ -93,22 +99,19 @@ spn_task_result_t spn_task_init_configure_graph(spn_app_t* app) {
   );
   spn_bg_executor_run(session->configure.executor);
 
-  return SPN_TASK_DONE;
+  return spn_task_continue();
 }
 
-spn_task_result_t spn_task_update_configure_graph(spn_app_t* app) {
+spn_task_step_t spn_task_configure_graph_update(spn_app_t* app) {
   spn_bg_ctx_t* build = &app->session.configure;
 
-  if (!build->executor) {
-    return SPN_TASK_ERROR;
-  }
-
   if (sp_atomic_s32_get(&build->executor->shutdown)) {
-    return sp_da_empty(build->executor->errors) ?
-      SPN_TASK_DONE :
-      SPN_TASK_ERROR;
+    if (sp_da_empty(build->executor->errors)) {
+      return spn_task_done();
+    }
+    return spn_task_fail(SPN_ERROR);
   }
 
-  return SPN_TASK_CONTINUE;
+  return spn_task_continue();
 }
 

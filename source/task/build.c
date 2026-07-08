@@ -25,7 +25,7 @@ static spn_bg_id_t get_or_put_user_file(spn_pkg_unit_t* ctx, spn_build_graph_t* 
 static spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit);
 static spn_err_t prepare_build_graph(spn_app_t* app);
 
-void spn_task_init_build_graph(spn_app_t* app) {
+spn_task_step_t spn_task_build_graph_init(spn_app_t* app) {
   spn_session_t* session = &app->session;
 
   spn_bg_init(&session->build.graph, spn.mem);
@@ -64,9 +64,11 @@ void spn_task_init_build_graph(spn_app_t* app) {
   );
 
   spn_bg_executor_run(app->session.build.executor);
+
+  return spn_task_continue();
 }
 
-spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
+spn_task_step_t spn_task_build_graph_update(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_bg_ctx_t* build = &session->build;
 
@@ -118,7 +120,7 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
           }
         });
 
-        return SPN_TASK_ERROR;
+        return spn_task_fail(SPN_ERROR);
       }
       case SP_OPT_NONE: {
         if (!app->lock.some) {
@@ -148,14 +150,14 @@ spn_task_result_t spn_task_run_build_graph(spn_app_t* app) {
           }
         });
 
-        return SPN_TASK_DONE;
+        return spn_task_done();
       }
     }
 
-    return SPN_TASK_DONE;
+    return spn_task_done();
   }
 
-  return SPN_TASK_CONTINUE;
+  return spn_task_continue();
 }
 
 

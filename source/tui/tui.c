@@ -73,6 +73,7 @@ static spn_build_event_display_t event_info[] = {
   EVENT(SPN_EVENT_SYNC_START,                    "Syncing",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
   EVENT(SPN_EVENT_SYNC_PACKAGE,                  "Synced",      SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
   EVENT(SPN_EVENT_SYNC_FAILED,                   "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
+  EVENT(SPN_EVENT_SYNC_STALE,                    "Stale",       SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
   EVENT(SPN_EVENT_SYNC_END,                      "Downloaded",  SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
   EVENT(SPN_EVENT_BUILD_SCRIPT_COMPILE,          "Compiling",   SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB, NOT_TERMINAL_VERB),
   EVENT(SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,   "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
@@ -100,6 +101,7 @@ static spn_build_event_display_t event_info[] = {
   EVENT(SPN_EVENT_BUILD_SUMMARY,                 "Summary",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
   EVENT(SPN_EVENT_API_CALL,                      "Calling",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
   EVENT(SPN_EVENT_USER_LOG,                      "",            SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB, NOT_TERMINAL_VERB),
+  EVENT(SPN_EVENT_ADDED,                         "Added",       SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
 };
 
 static sp_str_t spn_tui_name_to_color(sp_mem_t mem, sp_str_t str);
@@ -429,6 +431,13 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
       );
       break;
     }
+    case SPN_EVENT_ADDED: {
+      sp_fmt_io(&w.base, "{.cyan}=={.green}",
+        sp_fmt_str(event->added.name),
+        sp_fmt_str(event->added.version)
+      );
+      break;
+    }
     case SPN_EVENT_TARGET_RUN: {
       sp_fmt_io(&w.base, "{.gray}", sp_fmt_str(event->run.command));
       break;
@@ -561,6 +570,15 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
       );
       break;
     }
+    case SPN_EVENT_SYNC_STALE: {
+      sp_fmt_io(
+        &w.base,
+        "{} could not be fetched from {.gray}; using the cached copy",
+        sp_fmt_str(spn_tui_colored_name(mem, event->sync.name)),
+        sp_fmt_str(event->sync.url)
+      );
+      break;
+    }
     case SPN_EVENT_ERR: {
       switch (event->err.kind) {
         // case SPN_ERR_OK: {
@@ -622,11 +640,73 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
           );
           break;
         }
+        case SPN_ERR_WASM_INIT_FAILED: {
+          sp_io_write_str(&w.base, sp_str_lit("failed to initialize the wasm runtime"), SP_NULLPTR);
+          break;
+        }
+        case SPN_ERR_BUILD_GRAPH: {
+          sp_fmt_io(
+            &w.base,
+            "failed to construct the build graph at {.cyan}",
+            sp_fmt_str(spn_tui_contextual_path(mem, event->err.build_graph.file))
+          );
+          break;
+        }
+        case SPN_ERR_FS_READ: {
+          sp_fmt_io(
+            &w.base,
+            "failed to read {.cyan}",
+            sp_fmt_str(spn_tui_contextual_path(mem, event->err.fs.path))
+          );
+          break;
+        }
+        case SPN_ERR_FS_WRITE: {
+          sp_fmt_io(
+            &w.base,
+            "failed to write {.cyan}",
+            sp_fmt_str(spn_tui_contextual_path(mem, event->err.fs.path))
+          );
+          break;
+        }
         case SPN_ERR_INDEX_UNKNOWN: {
           sp_fmt_io(
             &w.base,
             "index {.cyan} not found",
             sp_fmt_str(event->err.index.name)
+          );
+          break;
+        }
+        case SPN_ERR_INDEX_SYNC: {
+          sp_fmt_io(
+            &w.base,
+            "failed to sync index {.cyan} from {.gray}",
+            sp_fmt_str(event->err.index.name),
+            sp_fmt_str(event->err.index.url)
+          );
+          break;
+        }
+        case SPN_ERR_PKG_UNKNOWN: {
+          sp_fmt_io(
+            &w.base,
+            "package {.cyan} not found in any index",
+            sp_fmt_str(event->err.pkg.name)
+          );
+          break;
+        }
+        case SPN_ERR_PKG_NO_MATCH: {
+          sp_fmt_io(
+            &w.base,
+            "no version of {.cyan} matches {.red}",
+            sp_fmt_str(event->err.pkg.name),
+            sp_fmt_str(sp_str_empty(event->err.pkg.requested) ? sp_str_lit("*") : event->err.pkg.requested)
+          );
+          break;
+        }
+        case SPN_ERR_MANIFEST_EDIT: {
+          sp_fmt_io(
+            &w.base,
+            "failed to edit {.cyan}",
+            sp_fmt_str(spn_tui_contextual_path(mem, event->err.manifest_parse.path))
           );
           break;
         }

@@ -263,7 +263,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   sp_da_for(spn.indexes, idx) {
     spn_index_init(&spn.indexes[idx], spn.mem);
-    spn_index_sync(&spn.indexes[idx]);
   }
 
 
@@ -388,7 +387,12 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     case SP_CLI_CONTINUE: break;
     case SP_CLI_OK: return SP_APP_QUIT;
     case SP_CLI_HELP: sp_cli_write_help(&spn.logger.out.base, &parsed); return SP_APP_QUIT;
-    case SP_CLI_ERR: return SP_APP_ERR;
+    case SP_CLI_ERR: {
+      sp_fmt_io(&spn.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
+      sp_cli_err_print(&spn.logger.err.base, parsed.err);
+      sp_fmt_io(&spn.logger.err.base, "\n");
+      return SP_APP_ERR;
+    }
   }
 
   if (has_manifest) {
@@ -460,97 +464,38 @@ sp_app_result_t spn_update(sp_app_t* sp) {
     return SP_APP_QUIT;
   }
 
-  spn_task_executor_t* task = &app.tasks;
-  s32 kind = task->data[task->index];
-  spn_task_result_t result = SPN_TASK_DONE;
-
-  switch (kind) {
-    case SPN_TASK_KIND_NONE: {
-      return SP_APP_QUIT;
-    }
-    case SPN_TASK_RESOLVE: {
-      result = spn_task_resolve(&app);
-      break;
-    }
-    case SPN_TASK_SYNC_PACKAGES: {
-      if (!task->initted) {
-        result = spn_task_sync_init(&app);
-        break;
-      }
-      result = spn_task_sync_update(&app);
-      break;
-    }
-    case SPN_TASK_RUN_CONFIGURE_GRAPH: {
-      if (!task->initted) {
-        result = spn_task_init_configure_graph(&app);
-        if (result == SPN_TASK_ERROR) break;
-      }
-      result = spn_task_update_configure_graph(&app);
-      break;
-    }
-    case SPN_TASK_CREATE_UNITS: {
-      result = spn_task_create_units(&app);
-      break;
-    }
-    case SPN_TASK_KIND_RUN_BUILD_GRAPH: {
-      if (!task->initted) spn_task_init_build_graph(&app);
-      result = spn_task_run_build_graph(&app);
-      break;
-    }
-    case SPN_TASK_KIND_RENDER_BUILD_GRAPH: {
-      result = spn_task_graph(&app);
-      break;
-    }
-    case SPN_TASK_KIND_RUN: {
-      result = spn_task_run(&app);
-      break;
-    }
-    case SPN_TASK_KIND_GENERATE: {
-      result = spn_task_generate(&app);
-      break;
-    }
-    case SPN_TASK_KIND_WHICH: {
-      result = spn_task_which(&app);
-      break;
-    }
-    case SPN_TASK_KIND_UPDATE: {
-      result = spn_task_update(&app);
-      break;
-    }
-    case SPN_TASK_KIND_INIT: {
-      result = spn_task_init(&app);
-      break;
-    }
-    case SPN_TASK_KIND_ADD: {
-      result = spn_task_add(&app);
-      break;
-    }
-    case SPN_TASK_KIND_CLEAN: {
-      result = spn_task_clean(&app);
-      break;
-    }
-    case SPN_TASK_KIND_PUBLISH: {
-      result = spn_task_publish(&app);
-      break;
-    }
-    case SPN_TASK_KIND_COUNT: {
-      SP_UNREACHABLE();
-      break;
-    }
+  spn_task_executor_t* ex = &app.tasks;
+  if (ex->index >= ex->len) {
+    return SP_APP_QUIT;
   }
 
-  task->initted = true;
+  spn_task_desc_t* task = spn_task_get(ex->data[ex->index]);
+  spn_task_step_t step = sp_zero;
+  if (!ex->initted) {
+    ex->initted = true;
+    step = task->init ? task->init(&app) : task->update(&app);
+  }
+  else {
+    step = task->update(&app);
+  }
 
-  switch (result) {
-    case SPN_TASK_ERROR: {
-      spn_prompt_stop(false);
-      spn_poll(sp);
-      return SP_APP_ERR;
+  if (step.err.kind) {
+    if (step.err.kind != SPN_ERROR) {
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR,
+        .err = step.err,
+      });
     }
+    spn_prompt_stop(false);
+    spn_poll(sp);
+    return SP_APP_ERR;
+  }
+
+  switch (step.status) {
     case SPN_TASK_CONTINUE: return SP_APP_CONTINUE;
     case SPN_TASK_DONE: {
-      task->index++;
-      task->initted = false;
+      ex->index++;
+      ex->initted = false;
       return SP_APP_CONTINUE;
     }
   }

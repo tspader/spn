@@ -416,6 +416,14 @@ sp_cli_cmd_t* spn_cli(void) {
   return &cmd_root;
 }
 
+sp_cli_result_t spn_cli_errf(sp_cli_t* cli, const c8* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  sp_str_t message = sp_fmt_mem_v(spn.heap, sp_str_view(fmt), args).value;
+  va_end(args);
+  return sp_cli_set_error(cli, message);
+}
+
 bool spn_cli_requires_manifest(sp_cli_cmd_t* cmd) {
   return cmd != &cmd_init && cmd != &cmd_run;
 }

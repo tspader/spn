@@ -8,6 +8,6 @@
 #include "sp/macro.h"
 #include "sp/str.h"
 
-spn_task_result_t spn_task_graph(spn_app_t* app) {
-  return SPN_TASK_DONE;
+spn_task_step_t spn_task_render_graph(spn_app_t* app) {
+  return spn_task_done();
 }

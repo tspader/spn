@@ -66,6 +66,16 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_SCRIPT_PACKAGE] = sp_bind_builder_end(&b);
   }
 
+  // SPN_EVENT_ADDED
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_added_t, name, "name", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_added_t, version, "version", SP_BIND_STR);
+    }
+    schemas[SPN_EVENT_ADDED] = sp_bind_builder_end(&b);
+  }
+
   // SPN_EVENT_BUILD_SCRIPT_CRASHED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
@@ -261,6 +271,16 @@ static void build_schemas(sp_mem_t mem) {
       SP_BIND(&b, spn_evt_sync_failed_t, error, "error", SP_BIND_STR);
     }
     schemas[SPN_EVENT_SYNC_FAILED] = sp_bind_builder_end(&b);
+  }
+
+  // SPN_EVENT_SYNC_STALE
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_sync_t, name, "name", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_sync_t, url, "url", SP_BIND_STR);
+    }
+    schemas[SPN_EVENT_SYNC_STALE] = sp_bind_builder_end(&b);
   }
 
   // SPN_EVENT_ERR_MANIFEST
@@ -569,6 +589,7 @@ static void* event_variant_ptr(spn_build_event_t* event) {
     case SPN_EVENT_SYNC_START:                  return &event->sync_start;
     case SPN_EVENT_SYNC_PACKAGE:                return &event->sync_pkg;
     case SPN_EVENT_SYNC_FAILED:                 return &event->sync_failed;
+    case SPN_EVENT_SYNC_STALE:                  return &event->sync;
     case SPN_EVENT_ERR_MANIFEST:                return &event->manifest_err;
     case SPN_EVENT_SYNC_END:                    return &event->sync_end;
     case SPN_EVENT_API_CALL:                    return &event->api_call;
@@ -609,6 +630,7 @@ static const c8* event_names[SPN_EVENT_COUNT] = {
   [SPN_EVENT_SYNC_START]                    = "sync_start",
   [SPN_EVENT_SYNC_PACKAGE]                  = "sync_package",
   [SPN_EVENT_SYNC_FAILED]                   = "sync_failed",
+  [SPN_EVENT_SYNC_STALE]                    = "sync_stale",
   [SPN_EVENT_SYNC_END]                      = "sync_end",
   [SPN_EVENT_BUILD_SCRIPT_COMPILE]          = "script_compile",
   [SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED]   = "script_compile_failed",
@@ -636,6 +658,7 @@ static const c8* event_names[SPN_EVENT_COUNT] = {
   [SPN_EVENT_BUILD_SUMMARY]                 = "build_summary",
   [SPN_EVENT_API_CALL]                      = "api_call",
   [SPN_EVENT_USER_LOG]                      = "user_log",
+  [SPN_EVENT_ADDED]                         = "added",
 };
 
 // ============================================================================
