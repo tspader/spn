@@ -101,6 +101,10 @@ struct spn_session_t {
     sp_str_t root;
     sp_str_t build;
     sp_str_t profile;
+    struct {
+      sp_str_t build;
+      sp_str_t store;
+    } cache;
   } paths;
 
   spn_bg_ctx_t sync;

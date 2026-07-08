@@ -472,7 +472,7 @@ static void build_schemas(sp_mem_t mem) {
 // JSON serializer — walks a bind schema + data pointer
 // ============================================================================
 
-static void json_write_str(sp_io_writer_t* out, sp_str_t str) {
+void spn_json_write_str(sp_io_writer_t* out, sp_str_t str) {
   sp_io_write_c8(out, '"');
   for (u32 i = 0; i < str.len; i++) {
     c8 c = str.data[i];
@@ -482,7 +482,17 @@ static void json_write_str(sp_io_writer_t* out, sp_str_t str) {
       case '\n': sp_io_write_cstr(out, "\\n", SP_NULLPTR);  break;
       case '\r': sp_io_write_cstr(out, "\\r", SP_NULLPTR);  break;
       case '\t': sp_io_write_cstr(out, "\\t", SP_NULLPTR);  break;
-      default:   sp_io_write_c8(out, c);                    break;
+      default: {
+        if ((u8)c < 0x20) {
+          const c8* hex = "0123456789abcdef";
+          sp_io_write_cstr(out, "\\u00", SP_NULLPTR);
+          sp_io_write_c8(out, hex[((u8)c >> 4) & 0xf]);
+          sp_io_write_c8(out, hex[(u8)c & 0xf]);
+        } else {
+          sp_io_write_c8(out, c);
+        }
+        break;
+      }
     }
   }
   sp_io_write_c8(out, '"');
@@ -495,7 +505,7 @@ static void json_write_object(sp_io_writer_t* out, sp_bind_t* schema, void* data
   sp_da_for(schema->as.object.fields, i) {
     sp_bind_field_t* f = &schema->as.object.fields[i];
     if (i > 0) sp_io_write_cstr(out, ", ", SP_NULLPTR);
-    json_write_str(out, sp_str_view(f->key));
+    spn_json_write_str(out, sp_str_view(f->key));
     sp_io_write_cstr(out, ": ", SP_NULLPTR);
     json_write_value(out, f, data);
   }
@@ -507,7 +517,7 @@ static void json_write_value(sp_io_writer_t* out, sp_bind_field_t* field, void* 
 
   switch (field->kind) {
     case SP_BIND_STR: {
-      json_write_str(out, *(sp_str_t*)ptr);
+      spn_json_write_str(out, *(sp_str_t*)ptr);
       break;
     }
     case SP_BIND_BOOL: {
@@ -672,7 +682,7 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
 
   if (event->pkg) {
     sp_io_write_cstr(out, ", \"pkg\": ", SP_NULLPTR);
-    json_write_str(out, event->pkg->name);
+    spn_json_write_str(out, event->pkg->name);
   }
 
   switch (event->kind) {
@@ -683,7 +693,7 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
     case SPN_EVENT_LINK_FAILED: {
       if (sp_str_valid(event->target.name)) {
         sp_io_write_cstr(out, ", \"target\": ", SP_NULLPTR);
-        json_write_str(out, event->target.name);
+        spn_json_write_str(out, event->target.name);
       }
       break;
     }

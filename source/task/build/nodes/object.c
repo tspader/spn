@@ -4,7 +4,7 @@
 #include "sp/macro.h"
 #include "unit/types.h"
 
-#include "external/cc.h"
+#include "session/invocation.h"
 #include "session/session.h"
 #include "task/build/build.h"
 #include "task/build/nodes/nodes.h"
@@ -16,58 +16,27 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
 
   spn_pkg_unit_announce_compile(unit->package);
 
-  sp_str_t file = sp_fs_get_name(unit->paths.object);
-  sp_str_t dir = sp_fs_parent_path(unit->paths.object);
-  sp_fs_create_dir(dir);
+  sp_fs_create_dir(sp_fs_parent_path(unit->paths.object));
 
-  spn_cc_t* cc = sp_alloc_type(spn.mem, spn_cc_t);
-  spn_cc_init(cc, spn.mem);
-  spn_cc_set_profile(cc, session->profile);
-  spn_cc_set_output_dir(cc, dir);
-  spn_cc_set_toolchain(cc, unit->session->units.toolchain);
-  spn_cc_add_pkg(cc, unit->package);
+  spn_invocation_result_t run = spn_invocation_run(&unit->invocation);
 
-  spn_cc_target_t* target = spn_cc_add_target(cc, SPN_CC_OUTPUT_OBJECT, file);
-  spn_cc_target_set_lang(target, unit->lang);
-  spn_cc_target_add_info(target, unit->package, unit->target->info);
-  if (unit->target->info->kind == SPN_TARGET_LIB) {
-    spn_cc_target_add_flag(target, sp_str_lit("-fPIC"));
+
+  // @spader
+  // This is vestigial; we used to just assemble the invocation here, in the
+  // build graph. This meant that when we had to communicate the command back
+  // to the reporting thread, there was nothing to point to, so we just heap
+  // allocated a big string of all the arguments.
+  //
+  // But now, we already *have* the invocation. There's no point in assembling
+  // this string on the heap just so we can log it
+  sp_io_dyn_mem_writer_t io;
+  sp_io_dyn_mem_writer_init(spn.mem, &io);
+  sp_io_write_str(&io.base, unit->invocation.program, SP_NULLPTR);
+  sp_io_write_c8(&io.base, ' ');
+  sp_da_for(unit->invocation.args, it) {
+    sp_io_write_str(&io.base, unit->invocation.args[it], SP_NULLPTR);
+    sp_io_write_c8(&io.base, ' ');
   }
-
-  // Dependencies publish their headers into their store; compile against them.
-  // Build deps live in other units and may hold conflicting versions, so only
-  // link edges (and test edges, for test targets) contribute includes.
-  sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit->package);
-  sp_da_for(deps, it) {
-    if (!deps[it].unit) {
-      continue;
-    }
-
-    switch (deps[it].kind) {
-      case SPN_DEP_KIND_PACKAGE: {
-        break;
-      }
-      case SPN_DEP_KIND_TEST: {
-        if (unit->target->info->kind != SPN_TARGET_TEST) {
-          continue;
-        }
-        break;
-      }
-      case SPN_DEP_KIND_BUILD: {
-        continue;
-      }
-    }
-
-    spn_cc_target_add_absolute_include(target, deps[it].unit->paths.include);
-  }
-
-  if (!sp_da_empty(unit->target->info->embed)) {
-    spn_cc_target_add_absolute_include(target, unit->target->paths.generated);
-  }
-
-  spn_cc_target_add_absolute_source(target, unit->paths.file);
-
-  spn_cc_run_t run = spn_cc_target_run(target, unit->target->paths.work);
 
   if (run.result.status.exit_code) {
     spn_event_buffer_push_ex(session->events, unit->package->info, &unit->target->logs, (spn_build_event_t) {
@@ -77,7 +46,7 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
         .object_file = unit->paths.object,
         .rc = run.result.status.exit_code,
         .out = run.result.out,
-        .args = run.args,
+        .args = sp_io_dyn_mem_writer_take_str(&io),
         .time = run.elapsed,
       }
     });
@@ -87,7 +56,7 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
       .target.passed = {
         .source_file = unit->paths.file,
         .object_file = unit->paths.object,
-        .args = run.args,
+        .args = args,
         .out = run.result.out,
         .time = run.elapsed,
       }
@@ -96,4 +65,3 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
 
   return run.result.status.exit_code;
 }
-

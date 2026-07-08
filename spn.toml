@@ -95,6 +95,7 @@ source = [
   "test/core/index/query.c",
   "test/core/index/publish.c",
   "test/core/index/sync.c",
+  "test/tools/repo.c",
   "test/tools/ctx.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
@@ -236,8 +237,9 @@ flags = []
 name = "toml"
 source = [
   "source/toml/edit.c",
-  "test/core/toml.c",
+  "test/core/toml/main.c",
   "test/tools/ctx.c",
+  "test/tools/repo.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
   "test/tools/toml.c",

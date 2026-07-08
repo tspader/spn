@@ -1,6 +1,5 @@
 #include "sp.h"
 #include "sp/macro.h"
-#include "ctx/types.h"
 #include "forward/types.h"
 #include "resolve/types.h"
 #include "semver/types.h"
@@ -22,9 +21,9 @@
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
-spn_err_t spn_session_init(spn_session_t* session, spn_pkg_info_t* root, spn_app_config_t config) {
+spn_err_union_t spn_session_init(spn_session_t* session, spn_pkg_info_t* root, spn_app_config_t config) {
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
-  spn_try(spn_toolchain_catalog_init(&session->catalog, builtins, spn_triple_host(), session->mem));
+  spn_try_as_union(spn_toolchain_catalog_init(&session->catalog, builtins, spn_triple_host(), session->mem));
 
   sp_str_om_for(root->toolchains, it) {
     spn_toolchain_catalog_add(&session->catalog, *sp_str_om_at(root->toolchains, it));
@@ -35,18 +34,19 @@ spn_err_t spn_session_init(spn_session_t* session, spn_pkg_info_t* root, spn_app
   spn_profile_populate(&session->profiles, root);
 
   session->pkg = root;
-  session->paths.root = spn.paths.project;
-  session->paths.build = sp_fs_join_path(session->mem, spn.paths.project, sp_str_lit("build"));
-  session->events = spn.events;
-  session->intern = spn.intern;
+  session->paths.build = sp_fs_join_path(session->mem, session->paths.root, sp_str_lit("build"));
   sp_ht_init(session->mem, session->registry);
   sp_ht_init(session->mem, session->packages);
   sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
 
-  if (spn_profile_resolve(session->profiles, &config.overrides, &session->profile)) {
-    sp_str_t name = spn_profile_select_name(&config.overrides);
-    spn_log_error("profile {.cyan} isn't defined", SP_FMT_STR(name));
-    return SPN_ERROR;
+  spn_err_t err = spn_profile_resolve(session->profiles, &config.overrides, &session->profile);
+  if (err) {
+    return (spn_err_union_t) {
+      .kind = err,
+      .profile = {
+        .name = spn_profile_select_name(&config.overrides),
+      },
+    };
   }
 
   spn_toolchain_query_t query = {
@@ -55,26 +55,12 @@ spn_err_t spn_session_init(spn_session_t* session, spn_pkg_info_t* root, spn_app
     .target = { session->profile.arch, session->profile.os, session->profile.abi },
     .host = spn_triple_host(),
   };
-  spn_err_union_t select_err = spn_toolchain_select(&session->catalog, query, session->mem, &session->selection);
-  if (select_err.kind) {
-    spn_event_buffer_push(session->events, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR,
-      .err = select_err,
-    });
-    return SPN_ERROR;
-  }
+  spn_try_union(spn_toolchain_select(&session->catalog, query, session->mem, &session->selection));
 
   session->paths.profile = sp_fs_join_path(session->mem, session->paths.build, session->profile.name);
   session->filter = config.filter;
 
-  return SPN_OK;
-
-
-  return SPN_OK;
-}
-
-spn_err_t spn_session_apply_config(spn_session_t* session, spn_config_t config) {
-
+  return spn_result(SPN_OK);
 }
 
 // The root manifest can pin the lib kind of any package in the build with [config.<pkg>] kind
@@ -262,7 +248,7 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_pkg_id_t id, spn
   sp_da_init(session->mem, unit->scripts);
   sp_da_init(session->mem, unit->tests);
   sp_da_init(session->mem, unit->targets);
-  sp_da_init(spn.mem, unit->nodes.user);
+  sp_da_init(session->mem, unit->nodes.user);
   sp_da_init(session->mem, unit->nodes.build.user);
   sp_str_ht_init(session->mem, unit->nodes.files);
   unit->paths.manifest = loaded->paths.manifest;
@@ -279,8 +265,8 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_pkg_id_t id, spn
     }
     case SPN_PKG_SOURCE_INDEX: {
       fingerprint_t fingerprint = fingerprint_package(session, id, loaded->info);
-      unit->paths.work = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, spn.paths.build, loaded->info->qualified), fingerprint.str);
-      unit->paths.store = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, spn.paths.store, loaded->info->qualified), fingerprint.str);
+      unit->paths.work = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, session->paths.cache.build, loaded->info->qualified), fingerprint.str);
+      unit->paths.store = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, session->paths.cache.store, loaded->info->qualified), fingerprint.str);
       break;
     }
   }

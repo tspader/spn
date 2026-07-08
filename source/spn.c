@@ -389,9 +389,37 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       sp_opt_set(app.lock, spn_lock_file_load(spn.heap, app.paths.lock, spn.events));
     }
 
-    if (spn_session_init(&app.session, &app.package, app.config)) {
-      spn_log_error("failed to initialize session");
-      return SP_APP_ERR;
+    app.session.intern = spn.intern;
+    app.session.events = spn.events;
+    app.session.paths.root = spn.paths.project;
+    app.session.paths.cache.build = spn.paths.build;
+    app.session.paths.cache.store = spn.paths.store;
+
+    spn_err_union_t session_err = spn_session_init(&app.session, &app.package, app.config);
+    switch (session_err.kind) {
+      case SPN_OK: {
+        break;
+      }
+      case SPN_ERR_PROFILE_INVALID: {
+        spn_log_error("invalid profile {.cyan}", SP_FMT_STR(session_err.profile.name));
+        return SP_APP_ERR;
+      }
+      case SPN_ERR_PROFILE_UNDEFINED: {
+        spn_log_error("profile {.cyan} isn't defined", SP_FMT_STR(session_err.profile.name));
+        return SP_APP_ERR;
+      }
+      case SPN_ERR_TOOLCHAIN_UNKNOWN:
+      case SPN_ERR_TOOLCHAIN_TARGET: {
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
+          .kind = SPN_EVENT_ERR,
+          .err = session_err,
+        });
+        return SP_APP_ERR;
+      }
+      default: {
+        spn_log_error("failed to initialize session");
+        return SP_APP_ERR;
+      }
     }
   }
 
