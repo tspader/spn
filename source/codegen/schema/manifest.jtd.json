@@ -28,7 +28,10 @@
       },
       "optionalProperties": {
         "values": { "elements": { "type": "string" } },
-        "default": { "metadata": { "extern": "option_defaults", "field": "defaults", "include": "when/types.h" } }
+        "default": { "metadata": { "extern": "option_defaults", "field": "defaults", "include": "when/types.h" } },
+        "additive": { "type": "boolean" },
+        "define": { "type": "string" },
+        "public": { "type": "boolean" }
       }
     },
 
@@ -44,6 +47,24 @@
     "value_entry": {
       "properties": {
         "value": { "type": "string" }
+      },
+      "optionalProperties": {
+        "when": { "metadata": { "extern": "when", "include": "when/types.h" } }
+      }
+    },
+
+    "system_dep_entry": {
+      "properties": {
+        "lib": { "type": "string" }
+      },
+      "optionalProperties": {
+        "when": { "metadata": { "extern": "when", "include": "when/types.h" } }
+      }
+    },
+
+    "target_dep_entry": {
+      "properties": {
+        "pkg": { "type": "string" }
       },
       "optionalProperties": {
         "when": { "metadata": { "extern": "when", "include": "when/types.h" } }
@@ -77,7 +98,7 @@
         "commit": { "type": "string" },
         "include": { "elements": { "type": "string" } },
         "define": { "elements": { "type": "string" } },
-        "system_deps": { "elements": { "type": "string" } },
+        "system_deps": { "elements": { "ref": "system_dep_entry" }, "metadata": { "shorthand": "lib" } },
         "build": { "ref": "build_script" },
         "configure": { "ref": "build_script" }
       }
@@ -104,7 +125,7 @@
         "define": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "flags": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "system_deps": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
-        "deps": { "elements": { "type": "string" } },
+        "deps": { "elements": { "ref": "target_dep_entry" }, "metadata": { "shorthand": "pkg" } },
         "link": { "type": "boolean" },
         "cxx": { "ref": "cxx_options" }
       }
@@ -140,7 +161,8 @@
         "mode": { "ref": "build_mode" },
         "os": { "ref": "os" },
         "arch": { "ref": "arch" },
-        "abi": { "ref": "abi" }
+        "abi": { "ref": "abi" },
+        "options": { "metadata": { "extern": "when", "include": "when/types.h" } }
       }
     },
 
@@ -166,13 +188,16 @@
       },
       "optionalProperties": {
         "private": { "type": "boolean" },
-        "when": { "metadata": { "extern": "when", "include": "when/types.h" } }
+        "when": { "metadata": { "extern": "when", "include": "when/types.h" } },
+        "options": { "metadata": { "extern": "when", "include": "when/types.h" } }
       }
     },
 
     "config_entry": {
       "optionalProperties": {
-        "kind": { "ref": "linkage" }
+        "kind": { "ref": "linkage" },
+        "options": { "metadata": { "extern": "when", "include": "when/types.h" } },
+        "defaults": { "type": "boolean" }
       }
     }
   }

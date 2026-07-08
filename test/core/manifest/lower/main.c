@@ -25,16 +25,21 @@ UTEST_MAIN();
 // DESCRIPTOR //
 ////////////////
 typedef struct {
+  const c8* value;
+  const c8* when;
+} gated_t;
+
+typedef struct {
   const c8* name;
   spn_linkage_set_t linkages;
   bool no_link;
-  const c8* source [4];
+  gated_t source [4];
   const c8* headers [4];
   const c8* include [4];
-  const c8* define [4];
-  const c8* flags [4];
-  const c8* system_deps [4];
-  const c8* deps [4];
+  gated_t define [4];
+  gated_t flags [4];
+  gated_t system_deps [4];
+  gated_t deps [4];
   spn_cxx_options_t cxx;
 } target_t;
 
@@ -46,6 +51,7 @@ typedef struct {
   u8 test;
   u8 private;
   const c8* when;
+  const c8* options;
 } dep_t;
 
 typedef struct {
@@ -56,6 +62,9 @@ typedef struct {
 typedef struct {
   const c8* name;
   spn_option_type_t type;
+  bool additive;
+  bool public;
+  const c8* define;
   const c8* values [4];
   option_default_t defaults [4];
 } option_t;
@@ -85,6 +94,7 @@ typedef struct {
   spn_os_t os;
   spn_arch_t arch;
   spn_abi_t abi;
+  const c8* options;
 } profile_t;
 
 typedef struct {
@@ -97,6 +107,8 @@ typedef struct {
 typedef struct {
   const c8* key;
   spn_linkage_t kind;
+  const c8* options;
+  bool defaults_declined;
 } config_t;
 
 typedef struct {
@@ -118,7 +130,7 @@ typedef struct {
   const c8* include [8];
   const c8* include_resolved;
   const c8* define [8];
-  const c8* system_deps [8];
+  gated_t system_deps [8];
   issue_t issues [4];
   target_t libs [8];
   target_t exes [8];
@@ -157,7 +169,21 @@ static void check_launcher_args(s32* utest_result, spn_toolchain_launcher_t laun
   sp_for(it, n) EXPECT_STR(launcher.args[it], expected[it]);
 }
 
-static void check_targets(s32* utest_result, spn_target_info_om_t om, const target_t* arr, u32 n, spn_target_kind_t kind) {
+static void check_gated(s32* utest_result, sp_mem_t mem, spn_gated_list_t actual, const gated_t* expected, u32 cap) {
+  u32 n = 0;
+  for (u32 i = 0; i < cap; i++) {
+    if (!expected[i].value) break;
+    n++;
+  }
+  if (!n) return;
+  ASSERT_EQ(n, (u32)sp_da_size(actual));
+  sp_for(i, n) {
+    EXPECT_STR(actual[i].value, expected[i].value);
+    EXPECT_STR(spn_when_to_str(mem, &actual[i].when), expected[i].when ? expected[i].when : "always");
+  }
+}
+
+static void check_targets(s32* utest_result, sp_mem_t mem, spn_target_info_om_t om, const target_t* arr, u32 n, spn_target_kind_t kind) {
   for (u32 i = 0; i < n; i++) {
     if (!arr[i].name) break;
     spn_target_info_t* t = sp_str_om_get(om, sp_str_view(arr[i].name));
@@ -168,13 +194,18 @@ static void check_targets(s32* utest_result, spn_target_info_om_t om, const targ
     EXPECT_EQ(arr[i].linkages.static_lib, t->linkages.static_lib);
     EXPECT_EQ(arr[i].linkages.object, t->linkages.object);
     EXPECT_EQ(arr[i].no_link, t->no_link);
-    check_strings(utest_result, t->source,  arr[i].source,  SP_CARR_LEN(arr[i].source));
+    EXPECT_EQ((u32)0, (u32)sp_da_size(t->source));
+    EXPECT_EQ((u32)0, (u32)sp_da_size(t->define));
+    EXPECT_EQ((u32)0, (u32)sp_da_size(t->flags));
+    EXPECT_EQ((u32)0, (u32)sp_da_size(t->system_deps));
+    EXPECT_EQ((u32)0, (u32)sp_da_size(t->deps));
+    check_gated(utest_result, mem, t->gated.source, arr[i].source, SP_CARR_LEN(arr[i].source));
     check_strings(utest_result, t->headers, arr[i].headers, SP_CARR_LEN(arr[i].headers));
     check_strings(utest_result, t->include, arr[i].include, SP_CARR_LEN(arr[i].include));
-    check_strings(utest_result, t->define,  arr[i].define,  SP_CARR_LEN(arr[i].define));
-    check_strings(utest_result, t->flags,   arr[i].flags,   SP_CARR_LEN(arr[i].flags));
-    check_strings(utest_result, t->system_deps, arr[i].system_deps, SP_CARR_LEN(arr[i].system_deps));
-    check_strings(utest_result, t->deps,    arr[i].deps,    SP_CARR_LEN(arr[i].deps));
+    check_gated(utest_result, mem, t->gated.define, arr[i].define, SP_CARR_LEN(arr[i].define));
+    check_gated(utest_result, mem, t->gated.flags, arr[i].flags, SP_CARR_LEN(arr[i].flags));
+    check_gated(utest_result, mem, t->gated.system_deps, arr[i].system_deps, SP_CARR_LEN(arr[i].system_deps));
+    check_gated(utest_result, mem, t->gated.deps, arr[i].deps, SP_CARR_LEN(arr[i].deps));
     EXPECT_EQ((u32)arr[i].cxx.standard, (u32)t->cxx.standard);
     EXPECT_EQ(arr[i].cxx.no_exceptions, t->cxx.no_exceptions);
     EXPECT_EQ(arr[i].cxx.no_rtti, t->cxx.no_rtti);
@@ -237,9 +268,9 @@ static void run_case(s32* utest_result, test_t test) {
   }
 
   // Package arrays
-  check_strings(utest_result, pkg.include,     test.include,     SP_CARR_LEN(test.include));
-  check_strings(utest_result, pkg.define,      test.define,      SP_CARR_LEN(test.define));
-  check_strings(utest_result, pkg.system_deps, test.system_deps, SP_CARR_LEN(test.system_deps));
+  check_strings(utest_result, pkg.include, test.include, SP_CARR_LEN(test.include));
+  check_strings(utest_result, pkg.define,  test.define,  SP_CARR_LEN(test.define));
+  check_gated(utest_result, mem, pkg.gated.system_deps, test.system_deps, SP_CARR_LEN(test.system_deps));
 
   if (test.include_resolved) {
     ASSERT_EQ((u32)1, (u32)sp_da_size(pkg.include));
@@ -247,10 +278,10 @@ static void run_case(s32* utest_result, test_t test) {
   }
 
   // Targets
-  check_targets(utest_result, pkg.libs,    test.libs,    SP_CARR_LEN(test.libs),    SPN_TARGET_LIB);
-  check_targets(utest_result, pkg.exes,    test.exes,    SP_CARR_LEN(test.exes),    SPN_TARGET_EXE);
-  check_targets(utest_result, pkg.scripts, test.scripts, SP_CARR_LEN(test.scripts), SPN_TARGET_SCRIPT);
-  check_targets(utest_result, pkg.tests,   test.tests,   SP_CARR_LEN(test.tests),   SPN_TARGET_TEST);
+  check_targets(utest_result, mem, pkg.libs,    test.libs,    SP_CARR_LEN(test.libs),    SPN_TARGET_LIB);
+  check_targets(utest_result, mem, pkg.exes,    test.exes,    SP_CARR_LEN(test.exes),    SPN_TARGET_EXE);
+  check_targets(utest_result, mem, pkg.scripts, test.scripts, SP_CARR_LEN(test.scripts), SPN_TARGET_SCRIPT);
+  check_targets(utest_result, mem, pkg.tests,   test.tests,   SP_CARR_LEN(test.tests),   SPN_TARGET_TEST);
 
   // Deps
   sp_carr_for(test.deps, it) {
@@ -272,6 +303,7 @@ static void run_case(s32* utest_result, test_t test) {
 
     if (expected.file) EXPECT_TRUE(sp_str_ends_with(req->file.path, sp_str_view(expected.file)));
     if (expected.when) EXPECT_STR(spn_when_to_str(mem, &req->when), expected.when);
+    if (expected.options) EXPECT_STR(spn_when_to_str(mem, &req->options), expected.options);
   }
 
   // Options
@@ -284,6 +316,9 @@ static void run_case(s32* utest_result, test_t test) {
     spn_option_info_t* option = *slot;
     EXPECT_STR(option->name, expected.name);
     EXPECT_EQ((u32)expected.type, (u32)option->type);
+    EXPECT_EQ(expected.additive, option->additive);
+    EXPECT_EQ(expected.public, option->public);
+    if (expected.define) EXPECT_STR(option->define, expected.define);
     check_strings(utest_result, option->values, expected.values, SP_CARR_LEN(expected.values));
 
     u32 num_defaults = 0;
@@ -344,6 +379,7 @@ static void run_case(s32* utest_result, test_t test) {
     EXPECT_EQ((u32)expected.os, (u32)p->os);
     EXPECT_EQ((u32)expected.arch, (u32)p->arch);
     if (expected.abi) EXPECT_EQ((u32)expected.abi, (u32)p->abi);
+    if (expected.options) EXPECT_STR(spn_when_to_str(mem, &p->options), expected.options);
   }
 
   // Indexes
@@ -375,6 +411,8 @@ static void run_case(s32* utest_result, test_t test) {
       ASSERT_FALSE(sp_opt_is_null(entry->value.kind));
       EXPECT_EQ((u32)expected.kind, (u32)sp_opt_get(entry->value.kind));
     }
+    if (expected.options) EXPECT_STR(spn_when_to_str(mem, &entry->value.options), expected.options);
+    EXPECT_EQ(expected.defaults_declined, entry->value.defaults_declined);
   }
 }
 
@@ -433,12 +471,12 @@ UTEST(lower, lib_all_fields) {
       {
         .name = "t",
         .linkages = { .static_lib = true },
-        .source = { "main.c" },
+        .source = { { "main.c" } },
         .headers = { "header.h" },
         .include = { "include/dir" },
-        .define = { "SPUM" },
-        .flags = { "-flag" },
-        .deps = { "spum" },
+        .define = { { "SPUM" } },
+        .flags = { { "-flag" } },
+        .deps = { { "spum" } },
       }
     }
   });
@@ -552,7 +590,7 @@ UTEST(lower, cxx_lib) {
       {
         .name = "t",
         .linkages = { .static_lib = true },
-        .source = { "spum.cpp" },
+        .source = { { "spum.cpp" } },
         .cxx = { .standard = SPN_CXX14, .no_exceptions = true, .no_rtti = true },
       }
     }
@@ -566,7 +604,7 @@ UTEST(lower, cxx_lib_defaults) {
       {
         .name = "t",
         .linkages = { .static_lib = true },
-        .source = { "spum.cpp" },
+        .source = { { "spum.cpp" } },
       }
     }
   });
@@ -683,7 +721,7 @@ UTEST(lower, package) {
     .version = spn_semver_lit(1, 2, 3),
     .commit = "abc",
     .define = { "SPUM" },
-    .system_deps = { "z" },
+    .system_deps = { { "z" } },
   });
 }
 
@@ -798,18 +836,77 @@ UTEST(lower, options) {
   });
 }
 
-UTEST(lower, target_when_flatten) {
+UTEST(lower, target_when_gated) {
   run_case(utest_result, (test_t) {
     .manifest = "target_when",
     .libs = {
       {
         .name = "t",
         .linkages = { .static_lib = true },
-        .source = { "a.c", "b.c" },
-        .define = { "X", "Y" },
-        .flags = { "-g" },
-        .system_deps = { "ws2_32" },
+        .source = { { "a.c" }, { "b.c", "os = \"linux\"" } },
+        .define = { { "X" }, { "Y", "os = \"windows\"" } },
+        .flags = { { "-g", "mode = \"debug\"" } },
+        .system_deps = { { "ws2_32", "os = \"windows\"" } },
       },
+    },
+  });
+}
+
+UTEST(lower, option_extras) {
+  run_case(utest_result, (test_t) {
+    .manifest = "option_extras",
+    .options = {
+      {
+        .name = "audio",
+        .type = SPN_OPTION_TYPE_BOOL,
+        .additive = true,
+        .public = true,
+        .define = "HAS_AUDIO",
+        .defaults = { { .value = "false" } },
+      },
+    },
+    .deps = {
+      { .name = "core/codec", .source = SPN_PKG_SOURCE_INDEX, .options = "audio = true, backend != \"vk\"" },
+    },
+    .profiles = {
+      { .name = "full", .options = "audio = true" },
+    },
+    .config = {
+      { .key = "codec", .options = "audio = true", .defaults_declined = true },
+    },
+  });
+}
+
+UTEST(lower, package_system_deps_gated) {
+  run_case(utest_result, (test_t) {
+    .manifest = "package_system_deps_gated",
+    .system_deps = { { "m" }, { "ws2_32", "os = \"windows\"" } },
+  });
+}
+
+UTEST(lower, validate_option_define_on_enum) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_option_define_on_enum",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "options[0].define" }
+    },
+  });
+}
+
+UTEST(lower, validate_config_negated_option) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_config_negated_option",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "config[0].options.ssl" }
+    },
+  });
+}
+
+UTEST(lower, validate_profile_unknown_option) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_profile_unknown_option",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "profile[0].options.nosuch" }
     },
   });
 }

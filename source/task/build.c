@@ -208,6 +208,14 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
     spn_target_unit_t* target = sp_om_at(session->units.targets, it);
     if (!target->nodes.link.occupied) continue;
 
+    sp_da_for(target->deps.target, l) {
+      spn_target_unit_t* lib = target->deps.target[l];
+      if (lib->info->no_link) continue;
+      if (lib->nodes.output.occupied) {
+        spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, lib->nodes.output));
+      }
+    }
+
     sp_da(spn_closure_entry_t) closure = spn_target_link_closure(session->mem, target);
     sp_da_for(closure, c) {
       spn_pkg_unit_t* dep = closure[c].pkg;

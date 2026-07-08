@@ -1,0 +1,7 @@
+[package]
+name = "p"
+version = "1.0.0"
+system_deps = [
+  "m",
+  { lib = "ws2_32", when = { os = "windows" } },
+]

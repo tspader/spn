@@ -47,6 +47,9 @@ void spn_session_build_invocations(spn_session_t* session) {
       }
 
       spn_cc_target_add_absolute_include(target, deps[it].unit->paths.include);
+      sp_da_for(deps[it].unit->info->public_define, dt) {
+        spn_cc_target_add_define(target, deps[it].unit->info->public_define[dt]);
+      }
     }
 
     if (!sp_da_empty(unit->target->info->embed)) {

@@ -56,6 +56,7 @@ set(SPN_SOURCES
   pkg/id.c
   pkg/load.c
   pkg/mutate.c
+  pkg/options.c
   pkg/pkg.c
   profile/profile.c
   resolve/resolve.c

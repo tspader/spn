@@ -76,6 +76,30 @@ void spn_cmake_add_arg(spn_cmake_t* cmake, const c8* arg) {
   sp_da_push(cmake->args, sp_str_from_cstr(cmake->mem, arg));
 }
 
+// CMake's compiler probes choke on multi-word launchers ("zig cc"), so any
+// launcher with baked-in args becomes a wrapper script and CMake sees one
+// program
+static sp_str_t spn_cmake_launcher_program(sp_mem_t mem, sp_str_t tools_dir, const c8* name, spn_toolchain_launcher_t launcher) {
+  if (sp_da_empty(launcher.args)) {
+    return launcher.program;
+  }
+
+  sp_str_t path = sp_fs_join_path(mem, tools_dir, sp_fmt(mem, "{}.sh", sp_fmt_cstr(name)).value);
+
+  sp_io_file_writer_t writer;
+  sp_io_file_writer_from_path(&writer, path);
+  sp_fmt_io(&writer.base, "#!/bin/sh\nexec \"{}\"", SP_FMT_STR(launcher.program));
+  sp_da_for(launcher.args, it) {
+    sp_fmt_io(&writer.base, " \"{}\"", SP_FMT_STR(launcher.args[it]));
+  }
+  sp_fmt_io(&writer.base, " \"$@\"\n");
+  sp_io_file_writer_close(&writer);
+
+  sp_sys_file_meta_t meta = { .raw_attrs = 0755 };
+  sp_sys_chmod_s(sp_sys_get_root(0), path, &meta);
+  return path;
+}
+
 static sp_str_t spn_cmake_generate_toolchain_file(sp_mem_t mem, spn_pkg_unit_t* unit) {
   spn_session_t* session = unit->session;
   spn_toolchain_unit_t* tc = session->units.toolchain;
@@ -93,10 +117,14 @@ static sp_str_t spn_cmake_generate_toolchain_file(sp_mem_t mem, spn_pkg_unit_t* 
 
   sp_fmt_io(io, "set(CMAKE_SYSTEM_NAME {})\n", SP_FMT_STR(spn_os_to_cmake_system_name(session->profile.os)));
   sp_fmt_io(io, "set(CMAKE_SYSTEM_PROCESSOR {})\n", SP_FMT_STR(spn_arch_to_str(session->profile.arch)));
-  sp_fmt_io(io, "set(CMAKE_C_COMPILER {})\n", SP_FMT_STR(spn_toolchain_launcher_to_str(mem, tc->compiler)));
+  sp_fmt_io(io, "set(CMAKE_C_COMPILER {})\n", SP_FMT_STR(spn_cmake_launcher_program(mem, tools_dir, "cc", tc->compiler)));
   sp_fmt_io(io, "set(CMAKE_C_COMPILER_TARGET {})\n", SP_FMT_STR(spn_triple_to_cc_target(mem, target)));
-  sp_fmt_io(io, "set(CMAKE_LINKER {})\n", SP_FMT_STR(spn_toolchain_launcher_to_str(mem, tc->linker)));
-  sp_fmt_io(io, "set(CMAKE_AR {})\n", SP_FMT_STR(tc->archiver.program));
+  if (spn_toolchain_has_cxx(tc->toolchain)) {
+    sp_fmt_io(io, "set(CMAKE_CXX_COMPILER {})\n", SP_FMT_STR(spn_cmake_launcher_program(mem, tools_dir, "cxx", tc->cxx)));
+    sp_fmt_io(io, "set(CMAKE_CXX_COMPILER_TARGET {})\n", SP_FMT_STR(spn_triple_to_cc_target(mem, target)));
+  }
+  sp_fmt_io(io, "set(CMAKE_LINKER {})\n", SP_FMT_STR(spn_cmake_launcher_program(mem, tools_dir, "ld", tc->linker)));
+  sp_fmt_io(io, "set(CMAKE_AR {})\n", SP_FMT_STR(spn_cmake_launcher_program(mem, tools_dir, "ar", tc->archiver)));
 
   sp_io_file_writer_close(&writer);
   return path;

@@ -5,6 +5,7 @@
 #include "spn.h"
 
 #include "forward/types.h"
+#include "when/types.h"
 
 #define SP_EMBED_DEFAULT_SYMBOL_S sp_str_lit("")
 #define SP_EMBED_DEFAULT_DATA_T_S sp_str_lit("")
@@ -71,6 +72,16 @@ struct spn_target_info {
   sp_da(sp_str_t) deps;
   sp_da(spn_embed_t) embed;
   spn_cxx_options_t cxx;
+  // Manifest entries land here at load; spn_pkg_apply_options folds the ones
+  // whose predicates pass into the plain lists above, which stay empty until
+  // then. Script-created targets skip this and write the plain lists directly.
+  struct {
+    spn_gated_list_t source;
+    spn_gated_list_t define;
+    spn_gated_list_t flags;
+    spn_gated_list_t system_deps;
+    spn_gated_list_t deps;
+  } gated;
 };
 
 #endif

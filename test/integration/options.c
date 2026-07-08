@@ -22,10 +22,88 @@ typedef struct {
   opt_build_t builds [3];
 } opt_test_t;
 
+static bool opt_build_present(const opt_build_t* build) {
+  return build->profile || build->manifest || build->expect.rc || build->expect.bin.name;
+}
+
 static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test) {
-  (void)utest_result;
-  (void)fixture;
-  (void)test;
+  sp_mem_t mem = fixture->fs.mem;
+
+  test_t t = { .project = test.project };
+  sp_carr_for(test.copy, it) {
+    t.copy[it] = test.copy[it];
+  }
+
+  u32 n = 0;
+  sp_carr_for(test.builds, it) {
+    const opt_build_t* build = &test.builds[it];
+    if (!opt_build_present(build)) {
+      break;
+    }
+
+    if (build->manifest) {
+      t.actions[n++] = (action_t) {
+        .kind = ACTION_MOVE_FILE,
+        .mv = { .from = sp_str_view(build->manifest), .to = sp_str_lit("spn.toml") },
+      };
+    }
+
+    action_t cli = {
+      .kind = ACTION_RUN_CLI,
+      .cli = { "build", .rc = build->expect.rc },
+    };
+    if (build->profile) {
+      cli.cli.args[0] = "-p";
+      cli.cli.args[1] = build->profile;
+    }
+    t.actions[n++] = cli;
+
+    sp_carr_for(build->expect.contains, ct) {
+      if (!build->expect.contains[ct]) {
+        break;
+      }
+      t.actions[n++] = (action_t) {
+        .kind = ACTION_VERIFY_CLI_CONTAINS,
+        .verify_cli = { .needle = sp_str_view(build->expect.contains[ct]) },
+      };
+    }
+
+    if (build->expect.bin.name) {
+      if (build->profile) {
+        sp_str_t bin = tmpfs_get(&fixture->fs, sp_fmt(
+          mem,
+          "build/{}/store/bin/{}",
+          sp_fmt_cstr(build->profile),
+          sp_fmt_cstr(build->expect.bin.name)
+        ).value);
+        t.actions[n++] = (action_t) {
+          .kind = ACTION_SUBPROCESS,
+          .process = { .config = { .command = bin }, .rc = build->expect.bin.rc },
+        };
+      }
+      else {
+        t.actions[n++] = (action_t) {
+          .kind = ACTION_RUN_BIN,
+          .bin = { .name = build->expect.bin.name, .rc = build->expect.bin.rc },
+        };
+      }
+    }
+
+    sp_carr_for(build->expect.events, et) {
+      const opt_event_t* event = &build->expect.events[et];
+      if (!event->event) {
+        break;
+      }
+      t.actions[n++] = (action_t) {
+        .kind = event->absent ? ACTION_VERIFY_NO_EVENT : ACTION_VERIFY_EVENT,
+        .verify_event = { .event = event->event, .key = event->key, .value = event->value },
+      };
+    }
+
+    SP_ASSERT(n < SPN_TEST_MAX_ACTIONS);
+  }
+
+  run_test(utest_result, fixture, t);
 }
 
 SPN_TEST_SUITE(when)

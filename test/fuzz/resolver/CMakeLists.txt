@@ -24,6 +24,7 @@ add_executable(fuzz_resolver
   ${SRC}/pkg/id.c
   ${SRC}/pkg/load.c
   ${SRC}/pkg/mutate.c
+  ${SRC}/pkg/options.c
   ${SRC}/profile/profile.c
   ${SRC}/session/registry/registry.c
   ${SRC}/triple/triple.c

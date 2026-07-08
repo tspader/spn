@@ -8,6 +8,8 @@
 #include "unit/types.h"
 
 #include "enum/enum.h"
+#include "event/event.h"
+#include "event/types.h"
 #include "external/wasm/wasm.h"
 #include "filter/filter.h"
 #include "intern/intern.h"
@@ -16,6 +18,7 @@
 #include "pkg/pkg.h"
 #include "profile/profile.h"
 #include "session/session.h"
+#include "when/when.h"
 #include "sp/str.h"
 #include "spn.embed.h"
 #include "toolchain/toolchain.h"
@@ -55,6 +58,115 @@ spn_err_union_t spn_session_init(spn_session_t* session, spn_pkg_info_t* root, s
   return spn_result(SPN_OK);
 }
 
+// Options resolve once every manifest is loaded and every edge is known:
+// requests are read off consumers' dep entries, merged per package with the
+// root's config, and the result drives one apply per loaded info. The gated
+// dep recheck compares each predicate against what resolution actually did,
+// since resolve gated local packages' edges before requests existed and
+// index packages' edges not at all.
+static sp_str_t node_short_name(spn_resolved_pkg_t* node) {
+  return spn_pkg_name_from_qualified(node->qualified).name;
+}
+
+static bool node_has_edge(spn_resolved_pkg_t* node, sp_intern_id_t qualified, spn_dep_kind_t kind) {
+  sp_da_for(node->edges, it) {
+    if (node->edges[it].id.qualified == qualified && node->edges[it].kind == kind) {
+      return true;
+    }
+  }
+  return false;
+}
+
+spn_err_t spn_session_apply_options(spn_session_t* session) {
+  sp_mem_t mem = session->mem;
+  sp_str_ht_init(mem, session->options);
+
+  sp_str_ht(sp_da(spn_option_request_t)) requests = SP_NULLPTR;
+  sp_str_ht_init(mem, requests);
+
+  sp_ht_for_kv(session->resolve, it) {
+    spn_resolved_pkg_t* node = it.val;
+    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, node->id);
+    sp_assert(loaded);
+
+    sp_da_for(loaded->info->deps, dt) {
+      spn_requested_pkg_t* dep = &loaded->info->deps[dt];
+      if (sp_da_empty(dep->options.clauses)) {
+        continue;
+      }
+      if (!node_has_edge(node, sp_intern_get_or_insert(session->intern, dep->qualified), dep->kind)) {
+        continue;
+      }
+
+      if (!sp_str_ht_get(requests, dep->qualified)) {
+        sp_str_ht_insert(requests, dep->qualified, sp_da_new(mem, spn_option_request_t));
+      }
+      sp_da_push(*sp_str_ht_get(requests, dep->qualified), ((spn_option_request_t) {
+        .consumer = node_short_name(node),
+        .options = &dep->options,
+      }));
+    }
+  }
+
+  sp_ht_for_kv(session->resolve, it) {
+    spn_resolved_pkg_t* node = it.val;
+    if (sp_str_ht_get(session->options, node->qualified)) {
+      continue;
+    }
+
+    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, node->id);
+    sp_da(spn_option_request_t)* asked = sp_str_ht_get(requests, node->qualified);
+
+    spn_resolved_options_t resolved = sp_zero;
+    spn_try(spn_pkg_options_merge(
+      mem,
+      loaded->info,
+      &session->profile,
+      session->pkg->config,
+      node->source == SPN_PKG_SOURCE_ROOT,
+      asked ? *asked : SP_NULLPTR,
+      session->events,
+      &resolved));
+
+    sp_str_ht_insert(session->options, node->qualified, resolved);
+  }
+
+  sp_ht_for_kv(session->resolve, it) {
+    spn_resolved_pkg_t* node = it.val;
+    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, node->id);
+    spn_resolved_options_t* resolved = sp_str_ht_get(session->options, loaded->info->qualified);
+    sp_assert(resolved);
+
+    spn_when_env_t env;
+    spn_when_env_from_profile(mem, &session->profile, &env);
+    spn_when_env_add_options(&env, resolved);
+
+    sp_da_for(loaded->info->deps, dt) {
+      spn_requested_pkg_t* dep = &loaded->info->deps[dt];
+      if (dep->kind != SPN_DEP_KIND_PACKAGE || sp_da_empty(dep->when.clauses)) {
+        continue;
+      }
+      bool expected = spn_when_eval(&dep->when, &env);
+      bool actual = node_has_edge(node, sp_intern_get_or_insert(session->intern, dep->qualified), dep->kind);
+      if (expected != actual) {
+        spn_event_buffer_push(session->events, (spn_build_event_t) {
+          .kind = SPN_EVENT_ERR_OPTION,
+          .option = {
+            .err = SPN_OPTION_ERR_LATE_GATE,
+            .pkg = loaded->info->name,
+            .a = spn_pkg_name_from_qualified(dep->qualified).name,
+          },
+        });
+        return SPN_ERROR;
+      }
+    }
+
+    spn_pkg_apply_options(loaded->info, &env);
+  }
+
+  return SPN_OK;
+}
+
 // The root manifest can pin the lib kind of any package in the build with [config.<pkg>] kind
 sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pkg_name) {
   sp_opt_spn_linkage_t requested = SP_ZERO_INITIALIZE();
@@ -72,6 +184,7 @@ sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pk
 typedef struct {
   sp_hash_t commit;
   sp_hash_t subtree;
+  sp_hash_t options;
   spn_semver_t version;
   spn_build_mode_t mode;
   spn_linkage_t linkage;
@@ -90,6 +203,31 @@ typedef struct {
   } toolchain;
 } fingerprint_input_t;
 
+// The resolved non-default option set: distinct option sets get distinct
+// store paths, while default flips ride the manifest commit hash instead
+static sp_hash_t hash_options(spn_session_t* session, spn_pkg_info_t* pkg) {
+  spn_resolved_options_t* options = sp_str_ht_get(session->options, pkg->qualified);
+  if (!options) {
+    return 0;
+  }
+
+  sp_hash_t hash = 0;
+  sp_da_for(*options, it) {
+    spn_resolved_option_t* option = &(*options)[it];
+    if (option->is_default) {
+      continue;
+    }
+    sp_hash_t parts [] = {
+      hash,
+      sp_hash_str(option->name),
+      (sp_hash_t)option->value.kind,
+      option->value.kind == SPN_OPTION_VALUE_STR ? sp_hash_str(option->value.str) : (sp_hash_t)option->value.b,
+    };
+    hash = sp_hash_combine(parts, sp_carr_len(parts));
+  }
+  return hash;
+}
+
 typedef struct {
   sp_hash_t hash;
   sp_str_t str;
@@ -103,6 +241,7 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_id_t id, spn_p
   fingerprint_input_t fingerprint = SP_ZERO_INITIALIZE();
   fingerprint.commit = sp_hash_str(metadata->commit);
   fingerprint.subtree = id.hash;
+  fingerprint.options = hash_options(session, pkg);
   fingerprint.version = metadata->version;
 
   bool compiled = sp_str_om_size(pkg->libs) > 0 || sp_str_om_size(pkg->exes) > 0;

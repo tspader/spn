@@ -1,0 +1,15 @@
+[package]
+namespace = "freetype"
+name = "freetype"
+version = "2.13.2"
+url = "https://github.com/freetype/freetype.git"
+commit = "920c5502cc3ddda88f6c7d85ee834ac611bb11cc"
+
+[[lib]]
+name = "freetype"
+kinds = ["static"]
+
+[publish]
+copy = [
+  { from = "store/include/freetype2/*", to = "include" },
+]

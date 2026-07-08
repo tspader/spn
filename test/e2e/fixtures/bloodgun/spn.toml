@@ -1,0 +1,163 @@
+[package]
+namespace = "bloodgun"
+name = "bloodgun"
+version = "0.1.0"
+
+[options.tracy]
+type = "bool"
+default = false
+define = "USE_TRACY"
+
+[deps.package]
+"libsdl/sdl2" = "file://./vendor/sdl2/spn.toml"
+"libsdl/sdl2_mixer" = "file://./vendor/sdl2_mixer/spn.toml"
+"freetype/freetype" = "file://./vendor/freetype/spn.toml"
+"fmtlib/fmt" = "file://./vendor/fmt/spn.toml"
+"jeremy-rifkin/cpptrace" = "file://./vendor/cpptrace/spn.toml"
+"lua/lua" = "file://./vendor/lua/spn.toml"
+"wolfpld/tracy" = { version = "file://./vendor/tracy/spn.toml", when = { tracy = true }, options = { enable = true } }
+
+[profile.default]
+toolchain = "zig"
+mode = "debug"
+
+[profile.profiling]
+mode = "release"
+options = { tracy = true }
+
+[[lib]]
+name = "flecs"
+kinds = ["shared"]
+source = [
+  "vendor/flecs/flecs.c",
+  "vendor/imgui/*.cpp",
+  "vendor/imgui/backends/imgui_impl_sdl2.cpp",
+  "vendor/imgui/backends/imgui_impl_opengl3.cpp",
+  "vendor/glad/src/glad.c",
+]
+include = [
+  "vendor",
+  "vendor/flecs",
+  "vendor/imgui",
+  "vendor/imgui/backends",
+  "vendor/glad/include",
+]
+define = [
+  "IMGUI_DEFINE_MATH_OPERATORS",
+  { value = "_GNU_SOURCE", when = { os = "linux" } },
+]
+flags = [
+  { value = "-idirafter", when = { os = "linux" } },
+  { value = "/usr/include", when = { os = "linux" } },
+]
+system_deps = [
+  { value = "ws2_32", when = { os = "windows" } },
+]
+cxx = { standard = "c++20" }
+
+[[bin]]
+name = "bitgun-survivors"
+source = ["host/src/*.cpp"]
+include = [
+  "host/include",
+  "game/include",
+  "shared/include",
+  "pch",
+  "vendor",
+  "vendor/flecs",
+  "vendor/imgui",
+  "vendor/imgui/backends",
+  "vendor/glad/include",
+]
+deps = [
+  "flecs",
+  "libsdl/sdl2",
+  "libsdl/sdl2_mixer",
+  "freetype/freetype",
+  "fmtlib/fmt",
+  "jeremy-rifkin/cpptrace",
+  "lua/lua",
+  { pkg = "wolfpld/tracy", when = { tracy = true } },
+]
+define = [
+  "IMGUI_DEFINE_MATH_OPERATORS",
+  { value = "OS_WINDOWS", when = { os = "windows" } },
+  { value = "OS_UNIX", when = { os = "linux" } },
+  { value = "OS_MAC", when = { os = "macos" } },
+]
+flags = [
+  "-include",
+  "stdafx.hpp",
+  { value = "/FS", when = { abi = "msvc" } },
+  { value = "-Wall", when = { abi = { not = "msvc" } } },
+  { value = "-Wno-deprecated-declarations", when = { abi = { not = "msvc" } } },
+  { value = "-Werror=return-type", when = { abi = { not = "msvc" } } },
+  { value = "-O1", when = { mode = "debug", abi = { not = "msvc" } } },
+  { value = "-ggdb3", when = { mode = "debug", abi = { not = "msvc" } } },
+]
+system_deps = [
+  { value = "m", when = { os = "linux" } },
+  { value = "dl", when = { os = "linux" } },
+  { value = "pthread", when = { os = "linux" } },
+]
+cxx = { standard = "c++20" }
+
+[[lib]]
+name = "bitgun"
+kinds = ["shared"]
+source = [
+  "game/src/autotile.cpp",
+  "game/src/background.cpp",
+  "game/src/blood_canvas.cpp",
+  "game/src/camera.cpp",
+  "game/src/collisions.cpp",
+  "game/src/combat_text.cpp",
+  "game/src/crafting.cpp",
+  "game/src/credits.cpp",
+  "game/src/error_validation.cpp",
+  "game/src/grass.cpp",
+  "game/src/input.cpp",
+  "game/src/inspector.cpp",
+  "game/src/intersections.cpp",
+  "game/src/level_editor.cpp",
+  "game/src/library.cpp",
+  "game/src/movement.cpp",
+  "game/src/npcs.cpp",
+  "game/src/particles.cpp",
+  "game/src/pathfinding.cpp",
+  "game/src/pickups.cpp",
+  "game/src/player.cpp",
+  "game/src/projectiles.cpp",
+  "game/src/registry.cpp",
+  "game/src/serialization.cpp",
+  "game/src/spatial_hash.cpp",
+  "game/src/spawner.cpp",
+  "game/src/sprite.cpp",
+  "game/src/timers.cpp",
+  "game/src/ui.cpp",
+  "game/src/zombies.cpp",
+]
+include = [
+  "game/include",
+  "host/include",
+  "shared/include",
+  "pch",
+  "vendor",
+  "vendor/flecs",
+  "vendor/imgui",
+  "vendor/imgui/backends",
+  "vendor/glad/include",
+]
+deps = ["flecs", "fmtlib/fmt"]
+define = [
+  "IMGUI_DEFINE_MATH_OPERATORS",
+  { value = "OS_WINDOWS", when = { os = "windows" } },
+  { value = "OS_UNIX", when = { os = "linux" } },
+  { value = "OS_MAC", when = { os = "macos" } },
+]
+flags = [
+  "-include",
+  "game.hpp",
+  { value = "-Wno-deprecated-declarations", when = { abi = { not = "msvc" } } },
+]
+cxx = { standard = "c++20" }

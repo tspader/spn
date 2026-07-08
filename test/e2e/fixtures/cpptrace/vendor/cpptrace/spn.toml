@@ -1,0 +1,13 @@
+[package]
+namespace = "jeremy-rifkin"
+name = "cpptrace"
+version = "0.7.3"
+url = "https://github.com/jeremy-rifkin/cpptrace.git"
+commit = "4354eb21ea3565a73afdf32ec0ba768fd648c425"
+system_deps = [
+  { lib = "dl", when = { os = "linux" } },
+]
+
+[[lib]]
+name = "cpptrace"
+kinds = ["static"]

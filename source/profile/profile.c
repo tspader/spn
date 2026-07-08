@@ -15,6 +15,7 @@ void spn_profile_overlay(spn_profile_info_t* dst, spn_profile_info_t* src) {
   if (src->os)                       dst->os = src->os;
   if (src->arch)                     dst->arch = src->arch;
   if (src->abi)                      dst->abi = src->abi;
+  if (!sp_da_empty(src->options.clauses)) dst->options = src->options;
 }
 
 static sp_str_t spn_profile_select_name(spn_profile_info_t* overrides) {
@@ -60,7 +61,8 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   release_profile.mode = SPN_BUILD_MODE_RELEASE;
   sp_str_ht_insert(*profiles, release_profile.name, release_profile);
 
-  // 4. Overlay remaining user profiles
+  // 4. Overlay remaining user profiles; new names derive from default like
+  // debug and release do, so a profile setting one field inherits the rest
   sp_str_om_for(pkg->profiles, it) {
     spn_profile_info_t* user = sp_str_om_at(pkg->profiles, it);
     if (sp_str_equal(user->name, sp_str_lit("default"))) continue;
@@ -68,7 +70,10 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
     if (entry) {
       spn_profile_overlay(entry, user);
     } else {
-      sp_str_ht_insert(*profiles, user->name, *user);
+      spn_profile_info_t derived = base;
+      derived.name = user->name;
+      spn_profile_overlay(&derived, user);
+      sp_str_ht_insert(*profiles, derived.name, derived);
     }
   }
 }
@@ -108,6 +113,7 @@ spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_in
     .linkage   = merged.linkage,
     .standard  = merged.standard,
     .mode      = merged.mode,
+    .options   = merged.options,
   };
   return spn_result(SPN_OK);
 }

@@ -12,10 +12,12 @@
 #include "semver/parser.h"
 #include "sp/str.h"
 #include "semver/types.h"
+#include "pkg/options.h"
 #include "session/registry/registry.h"
 #include "session/registry/types.h"
 #include "target/mutate.h"
 #include "target/select.h"
+#include "when/when.h"
 #include "spn.h"
 
 typedef struct {
@@ -95,14 +97,14 @@ typedef struct {
 static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node, spn_requested_pkg_t* dep);
 static spn_err_t resolve_deps(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node);
 
-void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn_index_cache_t* index, spn_pkg_registry_t* registry, spn_event_buffer_t* events, spn_linkage_t linkage, sp_da(spn_pkg_config_entry_t) config, u64 budget) {
+void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn_index_cache_t* index, spn_pkg_registry_t* registry, spn_event_buffer_t* events, spn_profile_info_t profile, sp_da(spn_pkg_config_entry_t) config, u64 budget) {
   *r = (spn_resolver_t){
     .mem = mem,
     .intern = intern,
     .index = index,
     .events = events,
     .registry = registry,
-    .linkage = linkage,
+    .profile = profile,
     .config = config,
     .budget = budget ? budget : SPN_RESOLVE_DEFAULT_BUDGET,
   };
@@ -157,7 +159,7 @@ static bool find_forced(spn_resolve_run_t* run, sp_intern_id_t name, spn_semver_
 }
 
 static spn_kind_query_t kind_query(spn_resolver_t* resolver, sp_str_t pkg_name) {
-  spn_kind_query_t query = { .linkage = resolver->linkage };
+  spn_kind_query_t query = { .linkage = resolver->profile.linkage };
   sp_da_for(resolver->config, it) {
     spn_pkg_config_entry_t* entry = &resolver->config[it];
     if (sp_str_equal(entry->key, pkg_name) && !sp_opt_is_null(entry->value.kind)) {
@@ -420,17 +422,20 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
 
   sp_da_init(resolver->mem, node.deps);
 
-  // Looks frivolous, but the point here is that the list of dependencies defined in the manifest is
-  // not the same as the list of dependencies we're actually using for this build.
-  //
-  // Pretty much any conditional compilation feature will run into this, and this is the place to
-  // filter dependencies (e.g. if pkg is only a dependency on aarch64, it would get cut here). The
-  // reason it's done here is that:
-  //   - It's the earliest place we *can* do it, because resolve is the first place where we have
-  //     package dependencies rather than just a list of requested package names
-  //   - We don't want to do it later, because then we'd fetch index data for packages that aren't
-  //     even going to be included in the build
+  // The list of dependencies defined in the manifest is not the same as the
+  // list of dependencies this build uses: when-gated edges whose predicates
+  // fail are cut here, before resolution ever fetches index data for them.
+  // The env is the package's pre-request view (facts, defaults, root config,
+  // and for the root itself the profile's options); consumer requests don't
+  // exist yet, and spn_session_apply_options rechecks every gate against the
+  // final merge so a request that would have flipped one is an error rather
+  // than a silent misbuild.
+  spn_when_env_t env;
+  spn_pkg_options_env(resolver->mem, pkg->info, &resolver->profile, resolver->config, pkg->source == SPN_PKG_SOURCE_ROOT, &env);
   sp_da_for(pkg->info->deps, it) {
+    if (!spn_when_eval(&pkg->info->deps[it].when, &env)) {
+      continue;
+    }
     sp_da_push(node.deps, pkg->info->deps[it]);
   }
   sp_da_sort(node.deps, sort_req_canonical);

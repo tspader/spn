@@ -1,0 +1,20 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[options.audio]
+type = "bool"
+default = false
+additive = true
+define = "HAS_AUDIO"
+public = true
+
+[deps.package]
+codec = { version = "1.0.0", options = { audio = true, backend = { not = "vk" } } }
+
+[profile.full]
+options = { audio = true }
+
+[config.codec]
+options = { audio = true }
+defaults = false
