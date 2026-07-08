@@ -1,0 +1,9 @@
+[package]
+name = "jacklib"
+version = "1.0.0"
+
+[[lib]]
+name = "jacklib"
+kinds = ["static"]
+source = ["jacklib.c"]
+headers = ["jacklib.h"]

@@ -1,0 +1,10 @@
+[package]
+name = "options_index_gated_dep"
+version = "0.1.0"
+
+[deps.package]
+porta = "1.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

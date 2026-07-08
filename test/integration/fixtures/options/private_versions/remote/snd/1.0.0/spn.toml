@@ -1,0 +1,12 @@
+[package]
+name = "snd"
+version = "1.0.0"
+
+[deps.package]
+codec = { version = "1.0.0", private = true, options = { mode = "small" } }
+
+[[lib]]
+name = "snd"
+kinds = ["shared"]
+source = ["snd.c"]
+headers = ["snd.h"]

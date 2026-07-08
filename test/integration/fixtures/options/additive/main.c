@@ -2,5 +2,5 @@
 #include "b.h"
 
 int main() {
-  return a_caps() == 3 && b_caps() == 3 ? 0 : 1;
+  return a_caps() == b_caps() ? a_caps() : 100;
 }
