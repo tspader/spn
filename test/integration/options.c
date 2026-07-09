@@ -559,3 +559,18 @@ UTEST_F(options, config_unknown) {
     },
   });
 }
+
+// config_unknown against the packages actually in the build, not every
+// package a resolve pass ever loaded: the root's edge request flips a's y
+// off, pruning b and zed after they loaded, so [config.zed] names a package
+// that isn't in the build and must fail rather than sit silently dead
+UTEST_F(options, config_stale) {
+  tmpfs_init_named(&uf->fixture.fs, "options_config_stale");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/options/config_stale",
+    .builds = {
+      { .expect = { .rc = 1, .contains = { "zed" } } },
+    },
+  });
+}

@@ -1,0 +1,13 @@
+[package]
+name = "zed"
+version = "1.0.0"
+
+[options.z]
+type = "bool"
+default = false
+
+[[lib]]
+name = "zed"
+kinds = ["static"]
+source = ["zed.c"]
+headers = ["zed.h"]
