@@ -1,0 +1,13 @@
+[package]
+name = "k6"
+version = "1.0.0"
+
+[options.x6]
+type = "bool"
+default = false
+
+[[lib]]
+name = "k6"
+kinds = ["static"]
+source = ["k6.c"]
+headers = ["k6.h"]

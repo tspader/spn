@@ -1,0 +1,13 @@
+[package]
+name = "options_config_negated"
+version = "0.1.0"
+
+[deps.package]
+net = "1.0.0"
+
+[config.net]
+options = { verbose = { not = true } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

@@ -1,0 +1,16 @@
+[package]
+name = "k4"
+version = "1.0.0"
+
+[options.x4]
+type = "bool"
+default = false
+
+[deps.package]
+k5 = { version = "file://../k5/spn.toml", when = { x4 = true }, options = { x5 = true } }
+
+[[lib]]
+name = "k4"
+kinds = ["static"]
+source = ["k4.c"]
+headers = ["k4.h"]

@@ -60,7 +60,6 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   return spn_result(SPN_OK);
 }
 
-#define SPN_GATE_MAX_PASSES   8
 #define SPN_GATE_MAX_RESOLVES 4
 
 static sp_str_t node_short_name(spn_resolved_pkg_t* node) {
@@ -168,11 +167,12 @@ static spn_err_t validate_config_keys(spn_session_t* session) {
 spn_err_t spn_session_apply_options(spn_session_t* session) {
   sp_mem_t mem = session->mem;
 
-  bool settled = false;
   sp_str_t missing_pkg = sp_zero;
   sp_str_t missing_dep = sp_zero;
 
-  sp_for(pass, SPN_GATE_MAX_PASSES) {
+  // Pruning is monotone (every pass removes at least one edge), so it runs
+  // to fixpoint; only the resolve direction is capped
+  for (;;) {
     sp_ht_init(mem, session->options);
     sp_str_ht_init(mem, session->gates.seeds);
 
@@ -277,22 +277,17 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
         session->gates.reresolve = true;
         return SPN_OK;
       }
-      break;
+      spn_event_buffer_push(session->events, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR_OPTION,
+        .option = {
+          .err = SPN_OPTION_ERR_LATE_GATE,
+          .pkg = missing_pkg,
+          .a = missing_dep,
+        },
+      });
+      return SPN_ERROR;
     }
-    settled = true;
     break;
-  }
-
-  if (!settled) {
-    spn_event_buffer_push(session->events, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR_OPTION,
-      .option = {
-        .err = SPN_OPTION_ERR_LATE_GATE,
-        .pkg = missing_pkg,
-        .a = missing_dep,
-      },
-    });
-    return SPN_ERROR;
   }
 
   spn_try(validate_config_keys(session));

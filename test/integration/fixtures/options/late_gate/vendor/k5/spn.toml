@@ -1,0 +1,16 @@
+[package]
+name = "k5"
+version = "1.0.0"
+
+[options.x5]
+type = "bool"
+default = false
+
+[deps.package]
+k6 = { version = "file://../k6/spn.toml", when = { x5 = true }, options = { x6 = true } }
+
+[[lib]]
+name = "k5"
+kinds = ["static"]
+source = ["k5.c"]
+headers = ["k5.h"]
