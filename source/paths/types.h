@@ -42,8 +42,6 @@ typedef struct {
   sp_str_t project;
   sp_str_t manifest;
   sp_str_t executable;
-  sp_str_t config_dir;
-  sp_str_t config;
   sp_str_t bin;
   sp_str_t storage;
   sp_str_t index;
@@ -53,6 +51,10 @@ typedef struct {
   sp_str_t include;
   sp_str_t cache;
   sp_str_t toolchain;
+  struct {
+    sp_str_t dir;
+    sp_str_t toml;
+  } config;
   spn_cache_paths_t caches;
 } spn_system_paths_t;
 

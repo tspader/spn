@@ -154,7 +154,7 @@ case SPN_ERR_TOOLCHAIN_UNKNOWN: {
 
 ## `try()` macros
 
-We use `try()` macros to keep code concise. There is a family of them (`spn_try()`, `spn_try_as()`, `spn_try_union()`, `spn_try_union_as()`). Prefer them, unless a conditional reads more simply.
+We use `try()` macros to keep code concise. There is a family of them (`spn_try()`, `spn_try_as()`, `try_union()`, `try_union_as()`). Prefer them, unless a conditional reads more simply.
 
 ```c
 spn_try(expr());

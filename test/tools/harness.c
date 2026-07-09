@@ -389,15 +389,15 @@ void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, bool expected,
   sp_fmt_io(&b.base, "{}:{}", sp_fmt_cstr(file), sp_fmt_uint(line));
 
   if (fs) {
-    sp_fmt_io(&b.base, "\n{}{.black} is the root", sp_fmt_str(bar), sp_fmt_str(fs->root));
+    sp_fmt_io(&b.base, "\n{}{.cyan} is the root", sp_fmt_str(bar), sp_fmt_str(fs->root));
 
     path = sp_str_strip_left(path, fs->root);
     path = sp_str_concat(mem, sp_str_lit("$test"), path);
   }
   if (expected) {
-    sp_fmt_io(&b.base, "\n{}{.black} does not exist", sp_fmt_str(bar), sp_fmt_str(path));
+    sp_fmt_io(&b.base, "\n{}{.cyan} does not exist", sp_fmt_str(bar), sp_fmt_str(path));
   } else {
-    sp_fmt_io(&b.base, "\n{}{.black} exists (expected not to)", sp_fmt_str(bar), sp_fmt_str(path));
+    sp_fmt_io(&b.base, "\n{}{.cyan} exists (expected not to)", sp_fmt_str(bar), sp_fmt_str(path));
   }
 
   SP_TEST_REPORT_STR(sp_io_dyn_mem_writer_as_str(&b));
@@ -448,9 +448,9 @@ static void expect_event(s32* utest_result, fixture_t* fixture, action_t action,
     sp_fmt_io(&b.base, " with {.cyan} = {.cyan}", sp_fmt_cstr(action.verify_event.key), sp_fmt_cstr(action.verify_event.value));
   }
   if (expected) {
-    sp_fmt_io(&b.base, " not found in {.black}", sp_fmt_str(path));
+    sp_fmt_io(&b.base, " not found in {.cyan}", sp_fmt_str(path));
   } else {
-    sp_fmt_io(&b.base, " found in {.black} (expected not to be)", sp_fmt_str(path));
+    sp_fmt_io(&b.base, " found in {.cyan} (expected not to be)", sp_fmt_str(path));
   }
 
   UTEST_PRINTF("{}\n", sp_fmt_str(sp_io_dyn_mem_writer_as_str(&b)));

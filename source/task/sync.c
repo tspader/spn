@@ -12,6 +12,7 @@
 #include "pkg/load.h"
 #include "pkg/types.h"
 #include "resolve/types.h"
+#include "session/registry/types.h"
 #include "session/session.h"
 #include "session/types.h"
 #include "spn.h"
@@ -95,6 +96,24 @@ setup_toolchain_unit(spn_session_t* session, spn_toolchain_store_t* store, spn_t
   return unit;
 }
 
+typedef enum {
+  LOAD_SOURCE_RECIPE,
+  LOAD_SOURCE_MANIFEST,
+  LOAD_SOURCE_PINNED,
+} load_source_kind_t;
+
+typedef struct {
+  sp_str_t name;
+  spn_pkg_source_t origin;
+  spn_pkg_info_t* info;
+  spn_index_rel_paths_t rel;
+  spn_pkg_tree_t recipe;
+  struct {
+    load_source_kind_t kind;
+    spn_pkg_tree_t tree;
+  } source;
+} load_t;
+
 static spn_pkg_tree_t tree_local(sp_str_t path) {
   return (spn_pkg_tree_t){
     .kind = SPN_PKG_TREE_LOCAL,
@@ -104,54 +123,53 @@ static spn_pkg_tree_t tree_local(sp_str_t path) {
 
 static spn_pkg_tree_t tree_git(spn_index_rel_source_t source) {
   return (spn_pkg_tree_t){
-      .kind = SPN_PKG_TREE_GIT,
-      .git = { .url = source.url, .rev = source.rev, .dir = source.dir },
+    .kind = SPN_PKG_TREE_GIT,
+    .git = { .url = source.url, .rev = source.rev, .dir = source.dir },
   };
 }
 
-static spn_err_t materialize_tree(spn_session_t *session, sp_str_t name,
-                                  spn_pkg_tree_t tree, sp_str_t *root,
-                                  bool *fetched) {
+static spn_err_t materialize_tree(spn_session_t* session, sp_str_t name, spn_pkg_tree_t tree, sp_str_t* root, bool* fetched) {
   switch (tree.kind) {
-  case SPN_PKG_TREE_LOCAL: {
-    *root = tree.local;
-    return SPN_OK;
-  }
-  case SPN_PKG_TREE_GIT: {
-    if (!spn_git_cache_is_checkout_cached(session->git, tree.git)) {
-      spn_event_buffer_push(spn.events, (spn_build_event_t){
-        .kind = SPN_EVENT_SYNC,
-          .sync = {
-            .name = name,
-            .url = tree.git.url,
-          }
-      });
+    case SPN_PKG_TREE_LOCAL: {
+      *root = tree.local;
+      return SPN_OK;
     }
-
-    spn_git_checkout_t *checkout = SP_NULLPTR;
-    if (spn_git_cache_ensure_checkout(session->git, tree.git, &checkout)) {
-      sp_str_t error = sp_str_lit("failed to fetch repository");
-      if (checkout && !sp_str_empty(checkout->error)) {
-        error = checkout->error;
+    case SPN_PKG_TREE_GIT: {
+      if (!spn_git_cache_is_checkout_cached(session->git, tree.git)) {
+        spn_event_buffer_push(spn.events, (spn_build_event_t){
+          .kind = SPN_EVENT_SYNC,
+            .sync = {
+              .name = name,
+              .url = tree.git.url,
+            }
+        });
       }
-      spn_event_buffer_push(spn.events,
-        (spn_build_event_t){.kind = SPN_EVENT_SYNC_FAILED,
+
+      spn_git_checkout_t* checkout = SP_NULLPTR;
+      if (spn_git_cache_ensure_checkout(session->git, tree.git, &checkout)) {
+        sp_str_t error = sp_str_lit("failed to fetch repository");
+        if (checkout && !sp_str_empty(checkout->error)) {
+          error = checkout->error;
+        }
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
+          .kind = SPN_EVENT_SYNC_FAILED,
           .sync_failed = {
               .name = name,
               .url = tree.git.url,
               .error = error,
-          }});
-      return SPN_ERROR;
-    }
+          }
+        });
+        return SPN_ERROR;
+      }
 
-    *root = checkout->path;
-    *fetched |= checkout->fetched;
-    return SPN_OK;
-  }
-  case SPN_PKG_TREE_NONE: {
-    *root = sp_str_lit("");
-    return SPN_OK;
-  }
+      *root = checkout->path;
+      *fetched |= checkout->fetched;
+      return SPN_OK;
+    }
+    case SPN_PKG_TREE_NONE: {
+      *root = sp_str_lit("");
+      return SPN_OK;
+    }
   }
 
   sp_unreachable_return(SPN_ERROR);
@@ -171,76 +189,86 @@ static sp_str_t resolve_script(spn_target_info_t* script, sp_str_t root) {
   return sp_da_empty(script->source) ? sp_str_lit("") : script->source[0];
 }
 
-// @spader this is junk
-static spn_err_t load_package(
-  spn_session_t *session, spn_loaded_pkg_t *loaded,
-  sp_str_t name,
-  spn_pkg_info_t *info,
-  spn_pkg_tree_t recipe_tree,
-  spn_index_rel_paths_t rel, bool derive_source,
-  spn_pkg_tree_t source_tree
-) {
+static spn_err_t load_manifest(spn_session_t* session, sp_str_t name, sp_str_t path, spn_pkg_info_t** info) {
+  spn_pkg_info_t* parsed = sp_alloc_type(spn.mem, spn_pkg_info_t);
+  spn_toml_loader_t ctx = sp_zero;
+  spn_toml_loader_init(&ctx, spn.mem, session->intern);
+  if (spn_codegen_load_pkg(&ctx, path, parsed)) {
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR_MANIFEST,
+      .manifest_err = {
+        .name = name,
+        .path = path,
+        .error = spn_codegen_issues_message(spn.mem, ctx.issues),
+        .issues = ctx.issues,
+      }});
+    return SPN_ERROR;
+  }
+
+  *info = parsed;
+  return SPN_OK;
+}
+
+static spn_pkg_tree_t source_tree(load_t load, spn_pkg_info_t* info) {
+  switch (load.source.kind) {
+    case LOAD_SOURCE_RECIPE: return (spn_pkg_tree_t) { .kind = SPN_PKG_TREE_NONE };
+    case LOAD_SOURCE_MANIFEST: return spn_pkg_manifest_source_tree(info);
+    case LOAD_SOURCE_PINNED: return load.source.tree;
+  }
+
+  sp_unreachable_return(sp_zero_s(spn_pkg_tree_t));
+}
+
+static sp_str_t sync_url(spn_pkg_tree_t recipe, spn_pkg_tree_t source) {
+  if (source.kind == SPN_PKG_TREE_GIT) {
+    return source.git.url;
+  }
+  if (recipe.kind == SPN_PKG_TREE_GIT) {
+    return recipe.git.url;
+  }
+  return sp_str_lit("");
+}
+
+static spn_err_t load_package(spn_session_t* session, load_t load, spn_loaded_pkg_t* loaded) {
   sp_tm_timer_t timer = sp_tm_start_timer();
   bool fetched = false;
 
-  spn_try(materialize_tree(session, name, recipe_tree, &loaded->roots.recipe, &fetched));
+  loaded->source = load.origin;
 
-  loaded->paths.manifest = sp_fs_join_path(spn.mem, loaded->roots.recipe, rel.manifest);
-  loaded->paths.script = sp_fs_join_path(spn.mem, loaded->roots.recipe, rel.script);
+  spn_try(materialize_tree(session, load.name, load.recipe, &loaded->roots.recipe, &fetched));
 
-  if (!info) {
-    info = sp_alloc_type(spn.mem, spn_pkg_info_t);
-    spn_toml_loader_t ctx = sp_zero;
-    spn_toml_loader_init(&ctx, spn.mem, session->intern);
-    if (spn_codegen_load_pkg(&ctx, loaded->paths.manifest, info)) {
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR_MANIFEST,
-        .manifest_err = {
-          .name = name,
-          .path = loaded->paths.manifest,
-          .error = spn_codegen_issues_message(spn.mem, ctx.issues),
-          .issues = ctx.issues,
-        }});
-      return SPN_ERROR;
-    }
+  loaded->paths.manifest = sp_fs_join_path(spn.mem, loaded->roots.recipe, load.rel.manifest);
+  loaded->paths.script = sp_fs_join_path(spn.mem, loaded->roots.recipe, load.rel.script);
+
+  loaded->info = load.info;
+  if (!loaded->info) {
+    spn_try(load_manifest(session, load.name, loaded->paths.manifest, &loaded->info));
   }
 
-  loaded->info = info;
-  loaded->paths.configure = resolve_script(&info->configure, loaded->roots.recipe);
-  loaded->paths.build = resolve_script(&info->build, loaded->roots.recipe);
+  loaded->paths.configure = resolve_script(&loaded->info->configure, loaded->roots.recipe);
+  loaded->paths.build = resolve_script(&loaded->info->build, loaded->roots.recipe);
 
   // $ROOT/spn.c is the default script: when a package declares no split
   // configure script, the jammed file provides configure/package/node fns
   if (!sp_fs_is_file(loaded->paths.configure) && sp_fs_is_file(loaded->paths.script)) {
-    info->configure.source[0] = loaded->paths.script;
+    loaded->info->configure.source[0] = loaded->paths.script;
     loaded->paths.configure = loaded->paths.script;
   }
 
-  if (derive_source) {
-    source_tree = spn_pkg_manifest_source_tree(info);
-  }
-
-  if (source_tree.kind == SPN_PKG_TREE_NONE) {
+  spn_pkg_tree_t source = source_tree(load, loaded->info);
+  if (source.kind == SPN_PKG_TREE_NONE) {
     loaded->roots.source = loaded->roots.recipe;
   } else {
-    spn_try(materialize_tree(session, name, source_tree, &loaded->roots.source,
-                             &fetched));
+    spn_try(materialize_tree(session, load.name, source, &loaded->roots.source, &fetched));
   }
 
   loaded->elapsed = sp_tm_read_timer(&timer);
 
-  sp_str_t url = sp_str_lit("");
-  if (source_tree.kind == SPN_PKG_TREE_GIT) {
-    url = source_tree.git.url;
-  } else if (recipe_tree.kind == SPN_PKG_TREE_GIT) {
-    url = recipe_tree.git.url;
-  }
-
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
-    .kind = SPN_EVENT_SYNC_PACKAGE, .pkg = info,
+    .kind = SPN_EVENT_SYNC_PACKAGE, .pkg = loaded->info,
     .sync_pkg = {
-      .name = name,
-      .url = url,
+      .name = load.name,
+      .url = sync_url(load.recipe, source),
       .source_path = loaded->roots.source,
       .time = loaded->elapsed,
       .fetched = fetched,
@@ -274,48 +302,57 @@ static spn_index_rel_paths_t local_rel_paths(sp_str_t manifest) {
   };
 }
 
-static spn_err_t load_index_package(spn_session_t *session,
-                                    spn_resolved_pkg_t *resolved,
-                                    spn_loaded_pkg_t *loaded) {
-  spn_index_rel_t *release = resolved->index.release;
+static load_t plan_index_package(spn_session_t* session, spn_resolved_pkg_t* pkg) {
+  spn_index_rel_t* release = pkg->index.release;
+
+  load_t load = {
+    .name = pkg->qualified,
+    .origin = SPN_PKG_SOURCE_INDEX,
+    .rel = release->paths,
+  };
 
   sp_str_t patch = patch_dir(session, release);
   if (!sp_str_empty(patch)) {
-    return load_package(session, loaded, resolved->qualified, SP_NULLPTR,
-                        tree_local(patch), release->paths, true,
-                        sp_zero_s(spn_pkg_tree_t));
+    load.recipe = tree_local(patch);
+    load.source.kind = LOAD_SOURCE_MANIFEST;
+    return load;
   }
 
-  // @spader this is junk
-  // The recipe lives in the manifest repo if there is one, otherwise the
-  // source repo carries it. The source is whatever the release pinned.
-  spn_pkg_tree_t recipe_tree = !sp_str_empty(release->manifest.url)
-                                   ? tree_git(release->manifest)
-                                   : tree_git(release->source);
-  spn_pkg_tree_t source_tree =
-      !sp_str_empty(release->source.url)
-          ? tree_git(release->source)
-          : (spn_pkg_tree_t){.kind = SPN_PKG_TREE_NONE};
+  load.recipe = tree_git(release->manifest);
+  if (sp_str_empty(release->manifest.url)) {
+    load.recipe = tree_git(release->source);
+  }
+  if (!sp_str_empty(release->source.url)) {
+    load.source.kind = LOAD_SOURCE_PINNED;
+    load.source.tree = tree_git(release->source);
+  }
 
-  return load_package(session, loaded, resolved->qualified, SP_NULLPTR,
-                      recipe_tree, release->paths, false, source_tree);
+  return load;
 }
 
-static spn_err_t load_file_package(spn_session_t *session, spn_resolved_pkg_t *pkg, spn_loaded_pkg_t *loaded) {
-  spn_registry_pkg_t *entry = sp_ht_getp(session->registry, spn_pkg_id(session->intern, pkg->qualified));
+static load_t plan_file_package(spn_session_t* session, spn_resolved_pkg_t* pkg) {
+  spn_pkg_id_t id = spn_pkg_id(session->intern, pkg->qualified);
+  spn_registry_pkg_t* entry = sp_ht_getp(session->registry, id);
   sp_assert(entry);
 
-  sp_str_t dir = sp_fs_parent_path(entry->manifest);
-  return load_package(session, loaded, pkg->qualified, entry->info,
-                      tree_local(dir), local_rel_paths(entry->manifest), true,
-                      sp_zero_s(spn_pkg_tree_t));
+  return (load_t) {
+    .name = pkg->qualified,
+    .origin = SPN_PKG_SOURCE_FILE,
+    .info = entry->info,
+    .recipe = tree_local(sp_fs_parent_path(entry->manifest)),
+    .rel = local_rel_paths(entry->manifest),
+    .source = { .kind = LOAD_SOURCE_MANIFEST },
+  };
 }
 
-static spn_err_t load_root_package(spn_session_t *session, spn_loaded_pkg_t *loaded) {
-  return load_package(session, loaded, session->pkg->qualified, session->pkg,
-                      tree_local(spn.paths.project),
-                      local_rel_paths(spn.paths.manifest), false,
-                      sp_zero_s(spn_pkg_tree_t));
+static load_t plan_root_package(spn_session_t* session) {
+  return (load_t) {
+    .name = session->pkg->qualified,
+    .origin = SPN_PKG_SOURCE_ROOT,
+    .info = session->pkg,
+    .recipe = tree_local(spn.paths.project),
+    .rel = local_rel_paths(spn.paths.manifest),
+  };
 }
 
 static s32 sync_package_node(spn_bg_cmd_t *cmd, void *user_data) {
@@ -323,13 +360,14 @@ static s32 sync_package_node(spn_bg_cmd_t *cmd, void *user_data) {
   spn_session_t* session = job->session;
   spn_resolved_pkg_t* pkg = job->pkg;
 
+  load_t load = SP_ZERO_INITIALIZE();
   switch (pkg->source) {
-    case SPN_PKG_SOURCE_ROOT: return load_root_package(session, &job->loaded);
-    case SPN_PKG_SOURCE_INDEX: return load_index_package(session, pkg, &job->loaded);
-    case SPN_PKG_SOURCE_FILE: return load_file_package(session, pkg, &job->loaded);
+    case SPN_PKG_SOURCE_ROOT: load = plan_root_package(session); break;
+    case SPN_PKG_SOURCE_INDEX: load = plan_index_package(session, pkg); break;
+    case SPN_PKG_SOURCE_FILE: load = plan_file_package(session, pkg); break;
   }
 
-  sp_unreachable_return(SPN_ERROR);
+  return load_package(session, load, &job->loaded);
 }
 
 static s32 sync_toolchain_node(spn_bg_cmd_t *cmd, void *user_data) {
@@ -384,20 +422,14 @@ spn_task_step_t spn_task_sync_packages_init(spn_app_t *app) {
   sp_ht_for_kv(session->resolve, it) {
     spn_resolved_pkg_t *pkg = it.val;
     switch (pkg->source) {
-    case SPN_PKG_SOURCE_ROOT:
-      break;
-    case SPN_PKG_SOURCE_INDEX:
-      num_index++;
-      break;
-    case SPN_PKG_SOURCE_FILE:
-      num_file++;
-      break;
+      case SPN_PKG_SOURCE_ROOT: break;
+      case SPN_PKG_SOURCE_INDEX: num_index++; break;
+      case SPN_PKG_SOURCE_FILE: num_file++; break;
     }
 
     spn_sync_pkg_job_t *job = sp_alloc_type(spn.mem, spn_sync_pkg_job_t);
     job->session = session;
     job->pkg = pkg;
-    job->loaded.source = pkg->source;
     sp_da_push(app->sync.packages, job);
 
     spn_bg_add_fn(graph, sync_package_node, job);

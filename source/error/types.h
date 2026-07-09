@@ -6,10 +6,11 @@
 
 #include "forward/types.h"
 
-#define spn_try(expr) do { \
-  s32 _sp_result = (expr); \
-  if (_sp_result) return _sp_result; \
-} while (0)
+#define spn_try(expr) \
+  do { \
+    s32 __err = (expr); \
+    if (__err) return __err; \
+  } while (0)
 
 #define spn_try_goto(expr, err, label) \
   do { \
@@ -17,29 +18,26 @@
     if (err) goto label; \
   } while (0)
 
-#define spn_try_as(expr, err) do { \
-  if (expr) return err; \
-} while (0)
+#define spn_try_as(expr, err) \
+  do { \
+    if (expr) return err; \
+  } while (0)
 
-#define spn_try_map(_expr, _err, _error_expr) do { \
-  spn_err_t _err = (_expr); \
-  if (_err) return _error_expr; \
-} while (0)
+#define try_union(expr) \
+  do { \
+    spn_err_union_t _err = (expr); \
+    if (_err.kind) return _err; \
+  } while (0)
 
-#define spn_try_union(expr) do { \
-  spn_err_union_t _spn_result = (expr); \
-  if (_spn_result.kind) return _spn_result; \
-} while (0)
+#define try_as_union(expr) \
+  do { \
+    spn_err_t _err = (expr); \
+    if (_err) return (spn_err_union_t) { \
+      .kind = _err \
+    }; \
+  } while (0)
 
-#define spn_try_as_union(expr) do { \
-  spn_err_t _spn_result = (expr); \
-  if (_spn_result) return (spn_err_union_t) { .kind = _spn_result }; \
-} while (0)
 
-#define spn_try_map_union(_expr, _err, _error_expr) do { \
-  spn_err_union_t _err = (_expr); \
-  if (_err.kind) return _error_expr; \
-} while (0)
 
 #define spn_result(status) (spn_err_union_t) { .kind = (status) }
 

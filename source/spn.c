@@ -82,16 +82,12 @@
 spn_app_t app;
 spn_ctx_t spn;
 
-static void spn_abort(void) {
-  sp_atomic_s32_set(&spn.aborted, 1);
-  sp_atomic_s32_set(&spn.sp->shutdown, 1);
-}
-
 void on_signal(sp_os_signal_t signal, void* userdata) {
   (void)userdata;
   switch (signal) {
     case SP_OS_SIGNAL_INTERRUPT: {
-      spn_abort();
+      sp_atomic_s32_set(&spn.aborted, 1);
+      sp_atomic_s32_set(&spn.sp->shutdown, 1);
       break;
     }
     case SP_OS_SIGNAL_ABORT:
@@ -101,8 +97,13 @@ void on_signal(sp_os_signal_t signal, void* userdata) {
   }
 }
 
-sp_str_t build_path(sp_str_t base, const c8* dir) {
+static sp_str_t join_path(sp_str_t base, const c8* dir) {
   return sp_fs_join_path(spn.heap, base, sp_cstr_as_str(dir));
+}
+
+static sp_str_t env_or(const c8* env, sp_str_t fallback) {
+  sp_str_t path = sp_env_get(spn.env, sp_cstr_as_str(env));
+  return sp_str_empty(path) ? fallback : path;
 }
 
 spn_err_t extract_runtime() {
@@ -163,25 +164,37 @@ spn_err_t extract_runtime() {
   return err;
 }
 
+#define try(expr) \
+  do { \
+    spn_err_union_t __err = (expr); \
+    if (__err.kind) { \
+      spn_event_buffer_push(spn.events, (spn_build_event_t) { \
+        .kind = SPN_EVENT_ERR, \
+        .err = __err }); \
+      return SP_APP_ERR; \
+    } \
+  } while (0)
+
 sp_app_result_t spn_init(sp_app_t* sp) {
+  sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
+
   spn.sp = sp;
   spn.mem = sp_mem_os_new();
   spn.arena = sp_mem_arena_new(spn.mem);
   spn.heap = sp_mem_arena_as_allocator(spn.arena);
-
-  app.session.mem = spn.heap;
-
   spn.intern = sp_intern_new(spn.mem);
-  sp_da_init(spn.heap, spn.indexes);
-  sp_io_stream_writer_from_fd(&spn.logger.out, sp_sys_stdout, SP_IO_CLOSE_MODE_NONE);
-  sp_io_stream_writer_from_fd(&spn.logger.err, sp_sys_stderr, SP_IO_CLOSE_MODE_NONE);
   spn.env = sp_alloc_type(spn.heap, sp_env_t);
   *spn.env = sp_env_capture(spn.heap);
 
-  sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
+  sp_io_stream_writer_from_fd(&spn.logger.out, sp_sys_stdout, SP_IO_CLOSE_MODE_NONE);
+  sp_io_stream_writer_from_fd(&spn.logger.err, sp_sys_stderr, SP_IO_CLOSE_MODE_NONE);
+  spn.logger.level = SPN_LOG_LEVEL_INFO;
+  sp_str_t log_level = sp_env_get(spn.env, sp_str_lit("SPN_LOG_LEVEL"));
+  if (!sp_str_empty(log_level)) {
+    spn.logger.level = spn_log_level_from_str(log_level);
+  }
 
   spn_cli_t* cli = &spn.cli;
-
   sp_cli_t parsed = sp_cli_parse((sp_cli_desc_t) {
     .root = spn_cli(),
     .args = spn.args,
@@ -189,56 +202,71 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     .user_data = &spn.cli,
   });
 
-  if (parsed.status == SP_CLI_HELP) {
-    sp_cli_write_help(&spn.logger.out.base, &parsed);
-    return SP_APP_QUIT;
+  switch (parsed.status) {
+    case SP_CLI_HELP: {
+      sp_cli_write_help(&spn.logger.out.base, &parsed);
+      return SP_APP_QUIT;
+    }
+    case SP_CLI_ERR: {
+      sp_fmt_io(&spn.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
+      sp_cli_err_print(&spn.logger.err.base, parsed.err);
+      sp_fmt_io(&spn.logger.err.base, "\n");
+      return SP_APP_ERR;
+    }
+    case SP_CLI_OK:
+    case SP_CLI_CONTINUE: {
+      break;
+    }
   }
-  if (parsed.status == SP_CLI_ERR) {
-    sp_fmt_io(&spn.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
-    sp_cli_err_print(&spn.logger.err.base, parsed.err);
-    sp_fmt_io(&spn.logger.err.base, "\n");
-    return SP_APP_ERR;
-  }
-
-
-  spn.logger.level = SPN_LOG_LEVEL_INFO;
-  sp_str_t log_level = sp_env_get(spn.env, sp_str_lit("SPN_LOG_LEVEL"));
-  if (!sp_str_empty(log_level)) {
-    spn.logger.level = spn_log_level_from_str(log_level);
-  }
-
 
   spn_tui_init(&spn.tui, &app.session, SPN_OUTPUT_MODE_INTERACTIVE);
 
   spn.events = spn_event_buffer_new(spn.mem);
+  spn_event_log_init(spn.heap);
 
   sp_atomic_s32_set(&spn.control, 0);
 
-
   spn.paths.cwd = sp_fs_get_cwd(spn.heap);
   spn.paths.bin = sp_fs_get_bin_path(spn.heap);
+  spn.paths.config.dir = join_path(env_or("SPN_CONFIG_DIR", sp_fs_get_config_path(spn.heap)), "spn");
+    spn.paths.config.toml = sp_fs_join_path(spn.heap, spn.paths.config.dir, SP_LIT("spn.toml"));
+  spn.paths.storage = env_or("SPN_STORAGE_DIR", join_path(sp_fs_get_storage_path(spn.heap), "spn"));
+    spn.paths.caches.dir = join_path(spn.paths.storage, "cache");
+      spn.paths.caches.git.dir = join_path(spn.paths.caches.dir, "source");
+        spn.paths.caches.git.dbs = join_path(spn.paths.caches.git.dir, "dbs");
+        spn.paths.caches.git.checkouts = join_path(spn.paths.caches.git.dir, "checkouts");
+      spn.paths.caches.store.dir = join_path(spn.paths.caches.dir, "store");
+      spn.paths.caches.build.dir = join_path(spn.paths.caches.dir, "build");
+      spn.paths.toolchain = env_or("SPN_TOOLCHAIN_DIR", join_path(spn.paths.caches.dir, "toolchain"));
+    spn.paths.index = join_path(spn.paths.storage, "index");
+    spn.paths.log = join_path(spn.paths.storage, "log");
+    spn.paths.cache = join_path(spn.paths.storage, "cache");
+    spn.paths.runtime = join_path(spn.paths.storage, "runtime");
+      spn.paths.include = join_path(spn.paths.runtime, "include");
+      spn.paths.version = join_path(spn.paths.runtime, "version.stamp");
+    spn.paths.tools.dir = sp_fs_join_path(spn.heap, spn.paths.storage, sp_str_lit("tools"));
+      spn.paths.tools.manifest = sp_fs_join_path(spn.heap, spn.paths.tools.dir, sp_str_lit("spn.toml"));
+      spn.paths.tools.lock = sp_fs_join_path(spn.heap, spn.paths.storage, sp_str_lit("spn.lock"));
 
-  sp_str_t storage = sp_env_get(spn.env, sp_str_lit("SPN_STORAGE_DIR"));
-  if (sp_str_empty(storage)) {
-    storage = sp_fs_join_path(spn.heap, sp_fs_get_storage_path(spn.heap), sp_str_lit("spn"));
-  }
+  sp_fs_create_dir(spn.paths.log);
+  sp_fs_create_dir(spn.paths.caches.dir);
+  sp_fs_create_dir(spn.paths.caches.git.dir);
+  sp_fs_create_dir(spn.paths.caches.git.dbs);
+  sp_fs_create_dir(spn.paths.caches.git.checkouts);
+  sp_fs_create_dir(spn.paths.caches.build.dir);
+  sp_fs_create_dir(spn.paths.caches.store.dir);
+  sp_fs_create_dir(spn.paths.index);
+  sp_fs_create_dir(spn.paths.toolchain);
+  sp_fs_create_dir(spn.paths.bin);
+  sp_fs_create_dir(spn.paths.tools.dir);
 
-  spn.paths.storage = storage;
-  spn.paths.tools.dir = sp_fs_join_path(spn.heap, spn.paths.storage, sp_str_lit("tools"));
-  spn.paths.tools.manifest = sp_fs_join_path(spn.heap, spn.paths.tools.dir, sp_str_lit("spn.toml"));
-  spn.paths.tools.lock = sp_fs_join_path(spn.heap, spn.paths.storage, sp_str_lit("spn.lock"));
+  extract_runtime();
 
   // CONFIG
-  sp_str_t config_dir = sp_env_get(spn.env, sp_str_lit("SPN_CONFIG_DIR"));
-  config_dir = sp_str_empty(config_dir) ? sp_fs_get_config_path(spn.heap) : config_dir;
-  spn.paths.config_dir = sp_fs_join_path(spn.heap, config_dir, SP_LIT("spn"));
-  spn.paths.config = sp_fs_join_path(spn.heap, spn.paths.config_dir, SP_LIT("spn.toml"));
-
-  if (sp_fs_exists(spn.paths.config)) {
+  if (sp_fs_exists(spn.paths.config.toml)) {
     spn_toml_loader_t loader = sp_zero;
     spn_toml_loader_init(&loader, spn.mem, spn.intern);
-    spn_config_file_t config = sp_zero;
-    if (spn_codegen_load_config(&loader, spn.paths.config, &config)) {
+    if (spn_codegen_load_config(&loader, spn.paths.config.toml, &spn.config)) {
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_ERR,
         .err = {
@@ -248,54 +276,22 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       });
       return SP_APP_ERR;
     }
-
-    sp_da_for(config.index, it) {
-      sp_da_push(spn.indexes, ((spn_index_info_t) {
-        .name = config.index[it].name,
-        .url = config.index[it].url,
-        .rev = config.index[it].rev,
-        .protocol = config.index[it].protocol,
-        .kind = SPN_INDEX_USER,
-      }));
-    }
   }
 
-  // Find the cache directory after the config has been fully loaded
-  spn.paths.runtime = build_path(spn.paths.storage, "runtime");
-    spn.paths.include = build_path(spn.paths.runtime, "include");
-    spn.paths.version = build_path(spn.paths.runtime, "version.stamp");
-  spn.paths.log = build_path(spn.paths.storage, "log");
-  spn.paths.cache = build_path(spn.paths.storage, "cache");
-  spn.paths.caches.dir = build_path(spn.paths.storage, "cache");
-    spn.paths.caches.git.dir = build_path(spn.paths.caches.dir, "source");
-      spn.paths.caches.git.dbs = build_path(spn.paths.caches.git.dir, "dbs");
-      spn.paths.caches.git.checkouts = build_path(spn.paths.caches.git.dir, "checkouts");
-    spn.paths.caches.store.dir = build_path(spn.paths.caches.dir, "store");
-    spn.paths.caches.build.dir = build_path(spn.paths.caches.dir, "build");
-  spn.paths.index = build_path(spn.paths.storage, "index");
-
-
-  spn.paths.toolchain = sp_env_get(spn.env, sp_str_lit("SPN_TOOLCHAIN_DIR"));
-  if (sp_str_empty(spn.paths.toolchain)) {
-    spn.paths.toolchain = sp_fs_join_path(spn.heap, spn.paths.caches.dir, SP_LIT("toolchain"));
-  }
-
-  sp_fs_create_dir(spn.paths.log);
-
-  spn_event_log_init(spn.heap);
-
-  sp_fs_create_dir(spn.paths.caches.dir);
-  sp_fs_create_dir(spn.paths.caches.git.dir);
-  sp_fs_create_dir(spn.paths.caches.build.dir);
-  sp_fs_create_dir(spn.paths.index);
-  sp_fs_create_dir(spn.paths.caches.store.dir);
-  sp_fs_create_dir(spn.paths.toolchain);
-  sp_fs_create_dir(spn.paths.bin);
-  sp_fs_create_dir(spn.paths.tools.dir);
-
-  extract_runtime();
 
   // INDEXES
+  sp_da_init(spn.heap, spn.indexes);
+
+  sp_da_for(spn.config.index, it) {
+    sp_da_push(spn.indexes, ((spn_index_info_t) {
+      .name = spn.config.index[it].name,
+      .url =  spn.config.index[it].url,
+      .rev =  spn.config.index[it].rev,
+      .protocol = spn.config.index[it].protocol,
+      .kind = SPN_INDEX_USER,
+    }));
+  }
+
   bool has_core_index = false;
   sp_da_for(spn.indexes, i) {
     if (sp_str_equal(spn.indexes[i].name, sp_str_lit("core"))) {
@@ -345,6 +341,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     spn.paths.project = sp_str_copy(spn.heap, spn.paths.cwd);
   }
   spn.paths.manifest = sp_fs_join_path(spn.heap, spn.paths.project, sp_str_lit("spn.toml"));
+  app.paths.lock = sp_fs_join_path(spn.heap, spn.paths.project, SP_LIT("spn.lock"));
 
   bool has_manifest = sp_fs_exists(spn.paths.manifest);
   if (!has_manifest) {
@@ -354,40 +351,15 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
   }
   else {
-    spn_toml_loader_t ctx = sp_zero;
-    spn_toml_loader_init(&ctx, spn.mem, spn.intern);
-    spn_cg_manifest_t manifest = sp_zero;
-    spn_err_t load_err = spn_codegen_load(&ctx, spn.paths.manifest, &manifest);
-    if (!load_err) {
-      load_err = spn_pkg_lower(&ctx, &manifest, &app.package);
-    }
+    try(spn_toml_load_manifest(spn.mem, spn.intern, spn.paths.manifest, &app.package));
 
-    if (load_err) {
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR,
-        .err = {
-          .kind = SPN_ERR_MANIFEST_ISSUES,
-          .issues = ctx.issues,
-        },
-      });
-      return SP_APP_ERR;
-    }
-
-    app.paths.lock = sp_fs_join_path(spn.heap, spn.paths.project, SP_LIT("spn.lock"));
 
     if (sp_fs_exists(app.paths.lock)) {
       sp_opt_set(app.lock, spn_lock_file_load(spn.heap, app.paths.lock, spn.events));
     }
   }
 
-  spn_err_union_t overrides_err = spn_profile_overrides_parse(&spn.cli.profile, &app.config.overrides);
-  if (overrides_err.kind) {
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR,
-      .err = overrides_err,
-    });
-    return SP_APP_ERR;
-  }
+  try(spn_profile_overrides_parse(&spn.cli.profile, &app.config.overrides));
 
   switch (sp_cli_dispatch(&parsed)) {
     case SP_CLI_CONTINUE: break;
@@ -406,14 +378,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     app.session.events = spn.events;
     app.session.paths.root = spn.paths.project;
 
-    spn_err_union_t session_err = spn_session_init(&app.session, &app.package, app.config);
-    if (session_err.kind) {
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR,
-        .err = session_err,
-      });
-      return SP_APP_ERR;
-    }
+    try(spn_session_init(&app.session, spn.heap, &app.package, app.config));
   }
 
   return SP_APP_CONTINUE;
