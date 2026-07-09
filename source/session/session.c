@@ -124,18 +124,24 @@ static void sweep_unreachable(spn_session_t* session) {
   session->resolve = kept;
 }
 
+// Keys check against the resolve set, not the loaded-package table: a gate
+// prune or re-resolve leaves the table holding packages no longer in the
+// build, and a key those legitimize is silently dead. Declared-but-gated-off
+// deps of in-build packages stay configurable.
 static spn_err_t validate_config_keys(spn_session_t* session) {
   sp_da_for(session->pkg->config, ct) {
     spn_pkg_config_entry_t* entry = &session->pkg->config[ct];
 
     bool known = false;
-    sp_ht_for_kv(session->packages, it) {
-      if (sp_str_equal(it.val->info->name, entry->key)) {
+    sp_ht_for_kv(session->resolve, it) {
+      spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, it.val->id);
+      sp_assert(loaded);
+      if (sp_str_equal(loaded->info->name, entry->key)) {
         known = true;
         break;
       }
-      sp_da_for(it.val->info->deps, dt) {
-        if (sp_str_equal(spn_pkg_name_from_qualified(it.val->info->deps[dt].qualified).name, entry->key)) {
+      sp_da_for(loaded->info->deps, dt) {
+        if (sp_str_equal(spn_pkg_name_from_qualified(loaded->info->deps[dt].qualified).name, entry->key)) {
           known = true;
           break;
         }
