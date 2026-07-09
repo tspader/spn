@@ -8,54 +8,63 @@
 #include "pkg/types.h"
 #include "unit/types.h"
 
+// One row per event kind: enum, jsonl name, TUI verb, TUI verbosity, jsonl
+// log level, whether it renders as an error, whether that error is terminal,
+// and the union arm carrying its payload (SPN_EVT_NONE when it has none).
+// Every consumer table derives from this list, so a new event is one row.
+#define SPN_EVENT_LIST(X) \
+  X(SPN_EVENT_ERR,                          "err",                        "error",       QUIET,   ERROR, true,  true,  SPN_EVT_NONE) \
+  X(SPN_EVENT_ERR_CIRCULAR_DEP,             "err_circular_dep",           "error",       QUIET,   ERROR, true,  true,  SPN_EVT(circular)) \
+  X(SPN_EVENT_ERR_UNKNOWN_PKG,              "err_unknown_pkg",            "error",       QUIET,   ERROR, true,  true,  SPN_EVT(unknown)) \
+  X(SPN_EVENT_ERR_UNSATISFIABLE_VERSION,    "err_unsatisfiable_version",  "error",       QUIET,   ERROR, true,  true,  SPN_EVT(unsatisfiable)) \
+  X(SPN_EVENT_ERR_MANIFEST,                 "err_manifest",               "error",       QUIET,   ERROR, true,  true,  SPN_EVT(manifest_err)) \
+  X(SPN_EVENT_ERR_UNIT_CYCLE,               "err_unit_cycle",             "error",       QUIET,   ERROR, true,  true,  SPN_EVT(unit_cycle)) \
+  X(SPN_EVENT_ERR_DYNAMIC_DUPLICATE,        "err_dynamic_duplicate",      "error",       QUIET,   ERROR, true,  true,  SPN_EVT(dynamic_dup)) \
+  X(SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX,   "err_resolution_too_complex", "error",       QUIET,   ERROR, true,  true,  SPN_EVT(too_complex)) \
+  X(SPN_EVENT_ERR_OPTION,                   "err_option",                 "error",       QUIET,   ERROR, true,  true,  SPN_EVT(option)) \
+  X(SPN_EVENT_RESOLVE_START,                "resolve_start",              "Resolving",   NORMAL,  INFO,  false, false, SPN_EVT_NONE) \
+  X(SPN_EVENT_RESOLVE_PACKAGE,              "resolve_package",            "Resolving",   DEBUG,   INFO,  false, false, SPN_EVT(resolve_pkg)) \
+  X(SPN_EVENT_RESOLVE_END,                  "resolve_end",                "Resolved",    NORMAL,  INFO,  false, false, SPN_EVT(resolve_end)) \
+  X(SPN_EVENT_SYNC,                         "sync",                       "Downloading", NORMAL,  INFO,  false, false, SPN_EVT(sync)) \
+  X(SPN_EVENT_SYNC_START,                   "sync_start",                 "Syncing",     DEBUG,   INFO,  false, false, SPN_EVT(sync_start)) \
+  X(SPN_EVENT_SYNC_PACKAGE,                 "sync_package",               "Synced",      DEBUG,   INFO,  false, false, SPN_EVT(sync_pkg)) \
+  X(SPN_EVENT_SYNC_FAILED,                  "sync_failed",                "error",       QUIET,   ERROR, true,  true,  SPN_EVT(sync_failed)) \
+  X(SPN_EVENT_SYNC_STALE,                   "sync_stale",                 "Stale",       NORMAL,  INFO,  false, false, SPN_EVT(sync)) \
+  X(SPN_EVENT_SYNC_END,                     "sync_end",                   "Downloaded",  NORMAL,  INFO,  false, false, SPN_EVT(sync_end)) \
+  X(SPN_EVENT_BUILD_SCRIPT_COMPILE,         "script_compile",             "Compiling",   VERBOSE, INFO,  false, false, SPN_EVT(script_compile)) \
+  X(SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,  "script_compile_failed",      "error",       QUIET,   ERROR, true,  true,  SPN_EVT(compile_failed)) \
+  X(SPN_EVENT_BUILD_SCRIPT_CONFIGURE,       "configure",                  "Configuring", DEBUG,   INFO,  false, false, SPN_EVT_NONE) \
+  X(SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK,    "configure_ok",               "Configured",  DEBUG,   DEBUG, false, false, SPN_EVT(configure)) \
+  X(SPN_EVENT_BUILD_SCRIPT_PACKAGE,         "script_package",             "Packaging",   DEBUG,   INFO,  false, false, SPN_EVT(script_package)) \
+  X(SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK,      "package_ok",                 "Packaged",    DEBUG,   INFO,  false, false, SPN_EVT(package_ok)) \
+  X(SPN_EVENT_BUILD_SCRIPT_CRASHED,         "script_crashed",             "error",       QUIET,   ERROR, true,  true,  SPN_EVT(crashed)) \
+  X(SPN_EVENT_BUILD_SCRIPT_USER_FN,         "script_user_fn",             "Running",     DEBUG,   DEBUG, false, false, SPN_EVT_NONE) \
+  X(SPN_EVENT_COMPILE_START,                "compile_start",              "Compiling",   NORMAL,  INFO,  false, false, SPN_EVT_NONE) \
+  X(SPN_EVENT_TARGET_BUILD_PASSED,          "target_build_passed",        "Compiled",    DEBUG,   INFO,  false, false, SPN_EVT(target.passed)) \
+  X(SPN_EVENT_TARGET_BUILD_FAILED,          "target_build_failed",        "error",       QUIET,   ERROR, true,  false, SPN_EVT(target.failed)) \
+  X(SPN_EVENT_TARGET_RUN,                   "target_run",                 "Running",     NORMAL,  INFO,  false, false, SPN_EVT(run)) \
+  X(SPN_EVENT_LINK_START,                   "link_start",                 "Linking",     VERBOSE, INFO,  false, false, SPN_EVT(target.link_start)) \
+  X(SPN_EVENT_LINK_PASSED,                  "link_passed",                "Linked",      DEBUG,   INFO,  false, false, SPN_EVT(target.link_passed)) \
+  X(SPN_EVENT_LINK_FAILED,                  "link_failed",                "error",       QUIET,   ERROR, true,  false, SPN_EVT(target.link_failed)) \
+  X(SPN_EVENT_EMBED_START,                  "embed_start",                "Embedding",   VERBOSE, INFO,  false, false, SPN_EVT(embed_start)) \
+  X(SPN_EVENT_EMBED_PASSED,                 "embed_passed",               "Embedded",    DEBUG,   INFO,  false, false, SPN_EVT(embed_passed)) \
+  X(SPN_EVENT_EMBED_FAILED,                 "embed_failed",               "error",       QUIET,   ERROR, true,  false, SPN_EVT(embed_failed)) \
+  X(SPN_EVENT_INIT_BUILD_GRAPH,             "init_build_graph",           "Planning",    DEBUG,   INFO,  false, false, SPN_EVT(graph_init)) \
+  X(SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED,   "prepare_build_graph_failed", "error",       QUIET,   ERROR, true,  true,  SPN_EVT(err.build_graph)) \
+  X(SPN_EVENT_DIRTY_SUMMARY,                "dirty_summary",              "Planned",     DEBUG,   INFO,  false, false, SPN_EVT(dirty_summary)) \
+  X(SPN_EVENT_BUILD_PASSED,                 "build_passed",               "Finished",    NORMAL,  INFO,  false, false, SPN_EVT(build.passed)) \
+  X(SPN_EVENT_BUILD_FAILED,                 "build_failed",               "error",       QUIET,   ERROR, true,  true,  SPN_EVT(build_failed)) \
+  X(SPN_EVENT_BUILD_SUMMARY,                "build_summary",              "Summary",     DEBUG,   INFO,  false, false, SPN_EVT(build_summary)) \
+  X(SPN_EVENT_API_CALL,                     "api_call",                   "Calling",     DEBUG,   DEBUG, false, false, SPN_EVT(api_call)) \
+  X(SPN_EVENT_USER_LOG,                     "user_log",                   "",            VERBOSE, INFO,  false, false, SPN_EVT(user_log)) \
+  X(SPN_EVENT_ADDED,                        "added",                      "Added",       NORMAL,  INFO,  false, false, SPN_EVT(added))
+
+#define SPN_EVENT_ENUM(kind, ...) kind,
 typedef enum {
-  SPN_EVENT_ERR,
-  SPN_EVENT_ERR_CIRCULAR_DEP,
-  SPN_EVENT_ERR_UNKNOWN_PKG,
-  SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
-  SPN_EVENT_ERR_MANIFEST,
-  SPN_EVENT_ERR_UNIT_CYCLE,
-  SPN_EVENT_ERR_DYNAMIC_DUPLICATE,
-  SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX,
-  SPN_EVENT_ERR_OPTION,
-  SPN_EVENT_RESOLVE_START,
-  SPN_EVENT_RESOLVE_PACKAGE,
-  SPN_EVENT_RESOLVE_END,
-  SPN_EVENT_SYNC,
-  SPN_EVENT_SYNC_START,
-  SPN_EVENT_SYNC_PACKAGE,
-  SPN_EVENT_SYNC_FAILED,
-  SPN_EVENT_SYNC_STALE,
-  SPN_EVENT_SYNC_END,
-  SPN_EVENT_BUILD_SCRIPT_COMPILE,
-  SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,
-  SPN_EVENT_BUILD_SCRIPT_CONFIGURE,
-  SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK,
-  SPN_EVENT_BUILD_SCRIPT_PACKAGE,
-  SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK,
-  SPN_EVENT_BUILD_SCRIPT_CRASHED,
-  SPN_EVENT_BUILD_SCRIPT_USER_FN,
-  SPN_EVENT_COMPILE_START,
-  SPN_EVENT_TARGET_BUILD_PASSED,
-  SPN_EVENT_TARGET_BUILD_FAILED,
-  SPN_EVENT_TARGET_RUN,
-  SPN_EVENT_LINK_START,
-  SPN_EVENT_LINK_PASSED,
-  SPN_EVENT_LINK_FAILED,
-  SPN_EVENT_EMBED_START,
-  SPN_EVENT_EMBED_PASSED,
-  SPN_EVENT_EMBED_FAILED,
-  SPN_EVENT_INIT_BUILD_GRAPH,
-  SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED,
-  SPN_EVENT_DIRTY_SUMMARY,
-  SPN_EVENT_BUILD_PASSED,
-  SPN_EVENT_BUILD_FAILED,
-  SPN_EVENT_BUILD_SUMMARY,
-  SPN_EVENT_API_CALL,
-  SPN_EVENT_USER_LOG,
-  SPN_EVENT_ADDED,
+  SPN_EVENT_LIST(SPN_EVENT_ENUM)
   SPN_EVENT_COUNT,
 } spn_build_event_kind_t;
+#undef SPN_EVENT_ENUM
 
 // ============================================================================
 // Named event variant types (used in the union and for bind schemas)
