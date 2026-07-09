@@ -498,6 +498,24 @@ UTEST_F(options, dep_rebuild) {
   });
 }
 
+// Facts are build identity for every package, targets or not: a script-only
+// package whose configure output depends on the mode is a distinct package
+// per mode. The flip to release works by accident of mtimes (the shared
+// store is rewritten in place); coming back to debug must not hand main the
+// release-flavored store that a fact-blind fingerprint now holds
+UTEST_F(options, fact_identity) {
+  tmpfs_init_named(&uf->fixture.fs, "options_fact_identity");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/options/fact_identity",
+    .builds = {
+      { .expect = { .bin = { .name = "main", .rc = 1 } } },
+      { .profile = "release", .expect = { .bin = { .name = "main", .rc = 2 } } },
+      { .expect = { .bin = { .name = "main", .rc = 1 } } },
+    },
+  });
+}
+
 // Mutually-referencing defaults make an explicitly-set build look default
 // under the final env: x = true and y = true each match the other's when-arm
 // default, but the all-defaults build resolved both false, so the two builds

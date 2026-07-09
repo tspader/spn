@@ -1,3 +1,5 @@
+#include "sp.h"
+#include "sp/str.h"
 #include "app/types.h"
 #include "codegen/codegen.h"
 #include "codegen/lower.h"
@@ -19,6 +21,33 @@
 #include "toolchain/toolchain.h"
 #include "toolchain/types.h"
 #include "unit/types.h"
+
+// A toolchain invoked by bare program name (no pinned artifact) drifts under
+// the fingerprint when the system compiler upgrades in place; the --version
+// output is the identity the program string can't carry. Pinned artifacts
+// skip the probe: their sha256 already is their identity.
+SP_PRIVATE sp_hash_t probe_toolchain_identity(spn_toolchain_launcher_t compiler, spn_toolchain_t* toolchain) {
+  sp_da(sp_str_t) args = sp_da_new(spn.mem, sp_str_t);
+  sp_da_for(compiler.args, it) {
+    sp_da_push(args, compiler.args[it]);
+  }
+  sp_da_push(args, sp_str_lit("--version"));
+
+  sp_ps_output_t output = sp_ps_run(spn.mem, (sp_ps_config_t) {
+    .command = compiler.program,
+    .dyn_args = args,
+    .io = {
+      .in.mode = SP_PS_IO_MODE_NULL,
+      .out.mode = SP_PS_IO_MODE_REDIRECT,
+      .err.mode = SP_PS_IO_MODE_NULL,
+    },
+  });
+
+  if (output.status.exit_code || sp_str_empty(output.out)) {
+    return sp_hash_str(toolchain->version);
+  }
+  return sp_hash_str(output.out);
+}
 
 SP_PRIVATE spn_toolchain_unit_t*
 setup_toolchain_unit(spn_session_t* session, spn_toolchain_store_t* store, spn_toolchain_t* toolchain) {
@@ -87,6 +116,10 @@ setup_toolchain_unit(spn_session_t* session, spn_toolchain_store_t* store, spn_t
     unit->cxx = spn_toolchain_launcher_with_root(spn.mem, toolchain->cxx, unit->root);
     unit->linker = spn_toolchain_launcher_with_root(spn.mem, toolchain->linker, unit->root);
     unit->archiver = spn_toolchain_launcher_with_root(spn.mem, toolchain->archiver, unit->root);
+  }
+
+  if (sp_opt_is_null(toolchain->artifact)) {
+    unit->identity = probe_toolchain_identity(unit->compiler, toolchain);
   }
 
   return unit;

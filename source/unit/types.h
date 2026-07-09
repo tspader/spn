@@ -228,6 +228,7 @@ struct spn_toolchain_unit_t {
   spn_toolchain_launcher_t cxx;
   spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
+  sp_hash_t identity;
   spn_build_io_t logs;
 };
 
