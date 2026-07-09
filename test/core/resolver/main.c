@@ -277,6 +277,10 @@ static bool semver_zero(spn_semver_t version) {
   return !version.major && !version.minor && !version.patch;
 }
 
+static sp_str_t node_qualified(sp_intern_t* intern, spn_resolved_pkg_t* node) {
+  return sp_intern_str_from_id(intern, node->id.qualified);
+}
+
 static bool closure_holds(sp_mem_t mem, spn_resolve_query_t* query, sp_da(spn_pkg_id_t) roots, spn_resolved_pkg_t* pkg) {
   sp_da(spn_pkg_id_t) work = sp_da_new(mem, spn_pkg_id_t);
   sp_da(spn_pkg_id_t) seen = sp_da_new(mem, spn_pkg_id_t);
@@ -316,7 +320,7 @@ static bool closure_holds(sp_mem_t mem, spn_resolve_query_t* query, sp_da(spn_pk
 // reachable from that unit's boundary through scope edges. The root unit is
 // rooted at the root package; a process unit at the target of a build/test
 // edge; a private unit at the private edge targets of its owning instance.
-static bool resolved_in_unit(spn_resolve_query_t* query, spn_resolved_pkg_t* pkg, const c8* unit, spn_semver_t unit_version) {
+static bool resolved_in_unit(spn_resolve_query_t* query, sp_intern_t* intern, spn_resolved_pkg_t* pkg, const c8* unit, spn_semver_t unit_version) {
   if (!unit) return true;
 
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
@@ -324,7 +328,7 @@ static bool resolved_in_unit(spn_resolve_query_t* query, spn_resolved_pkg_t* pkg
 
   if (!*unit) {
     sp_ht_for_kv(query->result, it) {
-      if (sp_str_equal(it.val->qualified, sp_str_view(root_qualified))) {
+      if (sp_str_equal(node_qualified(intern, it.val), sp_str_view(root_qualified))) {
         sp_da_push(roots, it.val->id);
       }
     }
@@ -338,14 +342,14 @@ static bool resolved_in_unit(spn_resolve_query_t* query, spn_resolved_pkg_t* pkg
         switch (edge->edge) {
           case SPN_DEP_EDGE_PROCESS: {
             spn_resolved_pkg_t* target = sp_ht_getp(query->result, edge->id);
-            if (!target || !sp_str_equal(target->qualified, name)) break;
-            if (!semver_zero(unit_version) && !spn_semver_eq(target->version, unit_version)) break;
+            if (!target || !sp_str_equal(node_qualified(intern, target), name)) break;
+            if (!semver_zero(unit_version) && !spn_semver_eq(target->id.version, unit_version)) break;
             sp_da_push(roots, edge->id);
             break;
           }
           case SPN_DEP_EDGE_PRIVATE: {
-            if (!sp_str_equal(owner->qualified, name)) break;
-            if (!semver_zero(unit_version) && !spn_semver_eq(owner->version, unit_version)) break;
+            if (!sp_str_equal(node_qualified(intern, owner), name)) break;
+            if (!semver_zero(unit_version) && !spn_semver_eq(owner->id.version, unit_version)) break;
             sp_da_push(roots, edge->id);
             break;
           }
@@ -363,6 +367,7 @@ static bool resolved_in_unit(spn_resolve_query_t* query, spn_resolved_pkg_t* pkg
 
 typedef struct {
   spn_resolve_query_t query;
+  sp_intern_t* intern;
   sp_da(spn_build_event_t) events;
   spn_err_t err;
 } resolve_result_t;
@@ -394,6 +399,7 @@ static resolve_result_t execute_fixture(fixture_t* fixture, sp_intern_t* intern)
   spn_resolver_init(&resolver, mem, intern, &cache, &registry, events, (spn_profile_info_t) { .linkage = fixture->linkage }, config, fixture->budget);
 
   resolve_result_t result = sp_zero_s(resolve_result_t);
+  result.intern = intern;
   spn_resolve_query_init(mem, &result.query);
   spn_resolve_query_add(&result.query, (spn_requested_pkg_t) {
     .qualified = sp_str_view(root_qualified),
@@ -443,28 +449,28 @@ static void assert_unsat_event(s32* utest_result, sp_mem_t mem, resolve_result_t
   }
 }
 
-static sp_str_t instance_name(spn_resolve_query_t* query, sp_intern_id_t qualified) {
+static sp_str_t instance_name(resolve_result_t* result, sp_intern_id_t qualified) {
   if (!qualified) return sp_str_lit("");
 
-  sp_ht_for_kv(query->result, it) {
+  sp_ht_for_kv(result->query.result, it) {
     if (it.key->qualified == qualified) {
-      return it.val->qualified;
+      return sp_intern_str_from_id(result->intern, qualified);
     }
   }
   return sp_str_lit("<unresolved>");
 }
 
-static void assert_resolves_equal(s32* utest_result, spn_resolve_query_t* a, spn_resolve_query_t* b) {
+static void assert_resolves_equal(s32* utest_result, resolve_result_t* a, resolve_result_t* b) {
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
 
-  ASSERT_EQ(sp_ht_size(a->result), sp_ht_size(b->result));
+  ASSERT_EQ(sp_ht_size(a->query.result), sp_ht_size(b->query.result));
   sp_da(spn_resolved_pkg_t*) claimed = sp_da_new(mem, spn_resolved_pkg_t*);
 
-  sp_ht_for_kv(a->result, it) {
+  sp_ht_for_kv(a->query.result, it) {
     spn_resolved_pkg_t* pa = it.val;
 
     spn_resolved_pkg_t* pb = SP_NULLPTR;
-    sp_ht_for_kv(b->result, jt) {
+    sp_ht_for_kv(b->query.result, jt) {
       bool taken = false;
       sp_da_for(claimed, ct) {
         if (claimed[ct] == jt.val) {
@@ -474,7 +480,7 @@ static void assert_resolves_equal(s32* utest_result, spn_resolve_query_t* a, spn
       }
       if (taken) continue;
 
-      if (sp_str_equal(jt.val->qualified, pa->qualified) && spn_semver_eq(jt.val->version, pa->version) && jt.val->id.hash == pa->id.hash) {
+      if (sp_str_equal(node_qualified(b->intern, jt.val), node_qualified(a->intern, pa)) && spn_semver_eq(jt.val->id.version, pa->id.version) && jt.val->id.hash == pa->id.hash) {
         pb = jt.val;
         break;
       }
@@ -561,7 +567,7 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
       if (*utest_result) return;
     }
     if (canonical.err == SPN_OK) {
-      assert_resolves_equal(utest_result, &canonical.query, &shaken.query);
+      assert_resolves_equal(utest_result, &canonical, &shaken);
       if (*utest_result) return;
     }
   }
@@ -581,9 +587,9 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
     bool found = false;
     sp_ht_for_kv(query.result, jt) {
       spn_resolved_pkg_t* pkg = jt.val;
-      if (!sp_str_equal(pkg->qualified, qualified)) continue;
-      if (!spn_semver_eq(pkg->version, expected.version)) continue;
-      if (!resolved_in_unit(&query, pkg, expected.unit, expected.unit_version)) continue;
+      if (!sp_str_equal(node_qualified(intern, pkg), qualified)) continue;
+      if (!spn_semver_eq(pkg->id.version, expected.version)) continue;
+      if (!resolved_in_unit(&query, intern, pkg, expected.unit, expected.unit_version)) continue;
       found = true;
       break;
     }
@@ -602,7 +608,7 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
 
     u32 count = 0;
     sp_ht_for_kv(query.result, jt) {
-      if (sp_str_equal(jt.val->qualified, qualified)) count++;
+      if (sp_str_equal(node_qualified(intern, jt.val), qualified)) count++;
     }
     ASSERT_EQ(count, instance.count);
   }
@@ -3024,7 +3030,7 @@ static resolve_result_t run_isolated(fixture_t* fixture) {
 static sp_hash_t instance_hash(resolve_result_t* result, const c8* namespace, const c8* name, spn_semver_t version) {
   sp_str_t qualified = spn_pkg_canonicalize_pair(sp_str_view(namespace), sp_str_view(name));
   sp_ht_for_kv(result->query.result, it) {
-    if (sp_str_equal(it.val->qualified, qualified) && spn_semver_eq(it.val->version, version)) {
+    if (sp_str_equal(node_qualified(result->intern, it.val), qualified) && spn_semver_eq(it.val->id.version, version)) {
       return it.val->id.hash;
     }
   }

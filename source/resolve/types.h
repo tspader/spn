@@ -29,9 +29,7 @@ typedef struct {
 
 typedef struct {
   spn_pkg_id_t id;
-  sp_intern_str_t qualified;
   spn_pkg_source_t source;
-  spn_semver_t version;
   u64 priority;
   sp_da(spn_requested_pkg_t) deps;
   sp_da(spn_resolved_dep_t) edges;

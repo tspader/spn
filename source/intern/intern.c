@@ -100,6 +100,9 @@ void sp_intern_init_ex(sp_intern_t* intern, sp_mem_t mem, sp_intern_hash_fn_t ha
     .id = SP_INTERN_INVALID_ID,
     .data = empty,
   });
+
+  intern->by_id = sp_da_new(mem, sp_str_t);
+  sp_da_push(intern->by_id, sp_str(empty, 0));
 }
 
 sp_intern_id_t sp_intern_get_or_insert(sp_intern_t* intern, sp_str_t str) {
@@ -118,6 +121,7 @@ sp_intern_id_t sp_intern_get_or_insert(sp_intern_t* intern, sp_str_t str) {
     const c8* cstr = sp_str_to_cstr(sp_mem_arena_as_allocator(intern->data), str);
     id = intern->next_id++;
     sp_intern_index_put(index, (sp_intern_slot_t) { .hash = hash, .len = str.len, .id = id, .data = cstr }, slot);
+    sp_da_push(intern->by_id, sp_str(cstr, str.len));
   }
   sp_mutex_unlock(&intern->mutex);
   return id;
@@ -164,10 +168,19 @@ sp_str_t sp_intern_get_or_insert_str(sp_intern_t* intern, sp_str_t str) {
   if (!cstr) {
     cstr = sp_str_to_cstr(sp_mem_arena_as_allocator(intern->data), str);
     sp_intern_index_put(index, (sp_intern_slot_t) { .hash = hash, .len = str.len, .id = intern->next_id++, .data = cstr }, slot);
+    sp_da_push(intern->by_id, sp_str(cstr, str.len));
   }
   sp_mutex_unlock(&intern->mutex);
 
   return sp_str(cstr, str.len);
+}
+
+sp_str_t sp_intern_str_from_id(sp_intern_t* intern, sp_intern_id_t id) {
+  if (!intern) return SP_INTERN_INVALID_STR;
+  sp_mutex_lock(&intern->mutex);
+  sp_str_t str = id < sp_da_size(intern->by_id) ? intern->by_id[id] : SP_INTERN_INVALID_STR;
+  sp_mutex_unlock(&intern->mutex);
+  return str;
 }
 
 bool sp_intern_is_interned(sp_intern_t* intern, sp_str_t str) {

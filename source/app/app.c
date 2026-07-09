@@ -8,7 +8,7 @@
 
 void spn_app_update_lock_file(spn_app_t* app) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  spn_lock_file_t lock = spn_build_lock_file(scratch.mem, app->session.resolve, &app->package);
+  spn_lock_file_t lock = spn_build_lock_file(scratch.mem, app->session.intern, app->session.resolve, &app->package);
 
   sp_da_for(app->package.system_deps, i) {
     sp_ht_insert(lock.system_deps, app->package.system_deps[i], true);

@@ -30,6 +30,7 @@ struct sp_intern_t {
   sp_mem_t mem;
   sp_mem_arena_t* data;
   sp_intern_index_t index;
+  sp_da(sp_str_t) by_id;
   sp_intern_hash_fn_t hash;
   u32 next_id;
   sp_mutex_t mutex;

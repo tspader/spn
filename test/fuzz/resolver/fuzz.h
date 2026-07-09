@@ -144,9 +144,9 @@ fz_universe_t fz_extend_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe
 bool fz_oracle_sat(fz_universe_t* u);
 bool fz_plan_sat(fz_universe_t* u);
 
-fz_err_t      fz_check_solve(fz_universe_t* u, spn_resolve_query_t* query);
-fz_err_t      fz_check_units(sp_mem_t mem, fz_universe_t* u, spn_resolve_query_t* query);
-fz_solution_t fz_solution(sp_mem_t mem, fz_universe_t* u, spn_resolve_query_t* query);
+fz_err_t      fz_check_solve(fz_universe_t* u, sp_intern_t* intern, spn_resolve_query_t* query);
+fz_err_t      fz_check_units(sp_mem_t mem, fz_universe_t* u, sp_intern_t* intern, spn_resolve_query_t* query);
+fz_solution_t fz_solution(sp_mem_t mem, fz_universe_t* u, sp_intern_t* intern, spn_resolve_query_t* query);
 bool          fz_solution_equal(fz_solution_t a, fz_solution_t b);
 
 void fz_dump(fz_universe_t* u, u64 iter);
