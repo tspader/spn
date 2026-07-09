@@ -28,27 +28,17 @@ static spn_lang_t get_link_language(spn_target_unit_t* target) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_lang_t language = SPN_LANG_C;
 
-  sp_da(spn_closure_entry_t) closure = spn_target_link_closure(s.mem, target);
-  sp_da_for(closure, it) {
-    spn_pkg_unit_t* dep = closure[it].pkg;
-    if (!dep || dep == target->pkg) continue;
-
-    sp_da_for(dep->libs, l) {
-      spn_target_unit_t* lib = dep->libs[l];
-      if (lib->info->no_link) {
-        continue;
-      }
-      if (lib->lib_kind != SPN_LIB_KIND_STATIC) {
-        continue;
-      }
-      if (objects_have_cxx(lib->objects)) {
-        language = SPN_LANG_CXX;
-        goto done;
-      }
+  sp_da(spn_link_lib_t) libs = spn_closure_link_libs(s.mem, spn_target_link_closure(s.mem, target), target->pkg);
+  sp_da_for(libs, it) {
+    if (libs[it].lib->lib_kind != SPN_LIB_KIND_STATIC) {
+      continue;
+    }
+    if (objects_have_cxx(libs[it].lib->objects)) {
+      language = SPN_LANG_CXX;
+      break;
     }
   }
 
-done:
   sp_mem_end_scratch(s);
   return language;
 }

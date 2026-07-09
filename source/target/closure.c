@@ -85,3 +85,40 @@ sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit
   }
   return closure;
 }
+
+sp_da(spn_link_lib_t) spn_closure_link_libs(sp_mem_t mem, sp_da(spn_closure_entry_t) closure, spn_pkg_unit_t* self) {
+  sp_da(spn_link_lib_t) libs = sp_da_new(mem, spn_link_lib_t);
+
+  sp_da_for(closure, it) {
+    spn_pkg_unit_t* pkg = closure[it].pkg;
+    if (!pkg || pkg == self) {
+      continue;
+    }
+
+    sp_da_for(pkg->libs, lt) {
+      spn_target_unit_t* lib = pkg->libs[lt];
+      if (lib->info->no_link) {
+        continue;
+      }
+
+      switch (lib->lib_kind) {
+        case SPN_LIB_KIND_STATIC:
+        case SPN_LIB_KIND_SHARED: {
+          sp_da_push(libs, ((spn_link_lib_t) {
+            .pkg = pkg,
+            .lib = lib,
+            .private = closure[it].private,
+          }));
+          break;
+        }
+        case SPN_LIB_KIND_SOURCE:
+        case SPN_LIB_KIND_OBJECT:
+        case SPN_LIB_KIND_NONE: {
+          break;
+        }
+      }
+    }
+  }
+
+  return libs;
+}
