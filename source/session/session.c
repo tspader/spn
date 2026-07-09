@@ -59,109 +59,255 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   return spn_result(SPN_OK);
 }
 
-// Options resolve once every manifest is loaded and every edge is known:
-// requests are read off consumers' dep entries, merged per package with the
-// root's config, and the result drives one apply per loaded info. The gated
-// dep recheck compares each predicate against what resolution actually did,
-// since resolve gated local packages' edges before requests existed and
-// index packages' edges not at all.
+// Options resolve once every manifest is loaded: requests are read off
+// consumers' live edges, merged per resolved package with the root's config,
+// and the result drives one apply per loaded info. Gates and requests are
+// circular — a request can flip a gate, which changes the edge set, which
+// changes the requests — so the recheck iterates: an edge whose gate went
+// false is pruned in place (index metadata carries no whens, so index
+// packages always over-resolve), and a gate that needs an edge resolution
+// never made stashes the requests as seeds and asks for another resolve
+// pass. Both directions are bounded; exhaustion is a LATE_GATE error.
+#define SPN_GATE_MAX_PASSES   8
+#define SPN_GATE_MAX_RESOLVES 4
+
 static sp_str_t node_short_name(spn_resolved_pkg_t* node) {
   return spn_pkg_name_from_qualified(node->qualified).name;
 }
 
-static bool node_has_edge(spn_resolved_pkg_t* node, sp_intern_id_t qualified, spn_dep_kind_t kind) {
+static spn_resolved_dep_t* node_find_edge(spn_resolved_pkg_t* node, sp_intern_id_t qualified, spn_dep_kind_t kind) {
   sp_da_for(node->edges, it) {
     if (node->edges[it].id.qualified == qualified && node->edges[it].kind == kind) {
-      return true;
+      return &node->edges[it];
     }
   }
-  return false;
+  return SP_NULLPTR;
+}
+
+static void node_prune_edge(spn_resolved_pkg_t* node, spn_resolved_dep_t* edge) {
+  u64 index = (u64)(edge - node->edges);
+  for (u64 it = index + 1; it < sp_da_size(node->edges); it++) {
+    node->edges[it - 1] = node->edges[it];
+  }
+  sp_da_pop(node->edges);
+}
+
+static void sweep_unreachable(spn_session_t* session) {
+  sp_mem_t mem = session->mem;
+
+  sp_ht(spn_pkg_id_t, u8) visited = SP_NULLPTR;
+  sp_ht_init(mem, visited);
+  sp_da(spn_pkg_id_t) frontier = sp_da_new(mem, spn_pkg_id_t);
+
+  sp_ht_for_kv(session->resolve, it) {
+    if (it.val->source == SPN_PKG_SOURCE_ROOT) {
+      sp_ht_insert(visited, it.val->id, (u8)true);
+      sp_da_push(frontier, it.val->id);
+    }
+  }
+
+  while (!sp_da_empty(frontier)) {
+    spn_pkg_id_t id = *sp_da_back(frontier);
+    sp_da_pop(frontier);
+
+    spn_resolved_pkg_t* node = sp_ht_getp(session->resolve, id);
+    if (!node) {
+      continue;
+    }
+    sp_da_for(node->edges, et) {
+      if (!sp_ht_getp(visited, node->edges[et].id)) {
+        sp_ht_insert(visited, node->edges[et].id, (u8)true);
+        sp_da_push(frontier, node->edges[et].id);
+      }
+    }
+  }
+
+  spn_resolve_t kept = SP_NULLPTR;
+  sp_ht_init(mem, kept);
+  sp_ht_for_kv(session->resolve, it) {
+    if (sp_ht_getp(visited, it.val->id)) {
+      sp_ht_insert(kept, *it.key, *it.val);
+    }
+  }
+  session->resolve = kept;
+}
+
+static spn_err_t validate_config_keys(spn_session_t* session) {
+  sp_da_for(session->pkg->config, ct) {
+    spn_pkg_config_entry_t* entry = &session->pkg->config[ct];
+
+    bool known = false;
+    sp_ht_for_kv(session->packages, it) {
+      if (sp_str_equal(it.val->info->name, entry->key)) {
+        known = true;
+        break;
+      }
+      sp_da_for(it.val->info->deps, dt) {
+        if (sp_str_equal(spn_pkg_name_from_qualified(it.val->info->deps[dt].qualified).name, entry->key)) {
+          known = true;
+          break;
+        }
+      }
+      if (known) {
+        break;
+      }
+    }
+
+    if (!known) {
+      spn_event_buffer_push(session->events, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR_OPTION,
+        .option = {
+          .err = SPN_OPTION_ERR_UNKNOWN_PKG,
+          .pkg = entry->key,
+        },
+      });
+      return SPN_ERROR;
+    }
+  }
+  return SPN_OK;
 }
 
 spn_err_t spn_session_apply_options(spn_session_t* session) {
   sp_mem_t mem = session->mem;
-  sp_str_ht_init(mem, session->options);
 
-  sp_str_ht(sp_da(spn_option_request_t)) requests = SP_NULLPTR;
-  sp_str_ht_init(mem, requests);
+  bool settled = false;
+  sp_str_t missing_pkg = sp_zero;
+  sp_str_t missing_dep = sp_zero;
 
-  sp_ht_for_kv(session->resolve, it) {
-    spn_resolved_pkg_t* node = it.val;
-    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, node->id);
-    sp_assert(loaded);
+  sp_for(pass, SPN_GATE_MAX_PASSES) {
+    sp_ht_init(mem, session->options);
+    sp_str_ht_init(mem, session->gates.seeds);
 
-    sp_da_for(loaded->info->deps, dt) {
-      spn_requested_pkg_t* dep = &loaded->info->deps[dt];
-      if (sp_da_empty(dep->options.clauses)) {
-        continue;
+    sp_ht(spn_pkg_id_t, sp_da(spn_option_request_t)) requests = SP_NULLPTR;
+    sp_ht_init(mem, requests);
+
+    sp_ht_for_kv(session->resolve, it) {
+      spn_resolved_pkg_t* node = it.val;
+      spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, node->id);
+      sp_assert(loaded);
+
+      sp_da_for(loaded->info->deps, dt) {
+        spn_requested_pkg_t* dep = &loaded->info->deps[dt];
+        if (sp_da_empty(dep->options.clauses)) {
+          continue;
+        }
+        spn_resolved_dep_t* edge = node_find_edge(node, sp_intern_get_or_insert(session->intern, dep->qualified), dep->kind);
+        if (!edge) {
+          continue;
+        }
+
+        spn_option_request_t request = {
+          .consumer = node_short_name(node),
+          .options = &dep->options,
+        };
+
+        if (!sp_ht_getp(requests, edge->id)) {
+          sp_ht_insert(requests, edge->id, sp_da_new(mem, spn_option_request_t));
+        }
+        sp_da_push(*sp_ht_getp(requests, edge->id), request);
+
+        // Seeds feed a possible next resolve pass, which looks packages up
+        // by the qualified name their manifest declares
+        spn_resolved_pkg_t* target = sp_ht_getp(session->resolve, edge->id);
+        sp_str_t seed_key = target ? target->qualified : dep->qualified;
+        if (!sp_str_ht_get(session->gates.seeds, seed_key)) {
+          sp_str_ht_insert(session->gates.seeds, seed_key, sp_da_new(mem, spn_option_request_t));
+        }
+        sp_da_push(*sp_str_ht_get(session->gates.seeds, seed_key), request);
       }
-      if (!node_has_edge(node, sp_intern_get_or_insert(session->intern, dep->qualified), dep->kind)) {
-        continue;
-      }
-
-      if (!sp_str_ht_get(requests, dep->qualified)) {
-        sp_str_ht_insert(requests, dep->qualified, sp_da_new(mem, spn_option_request_t));
-      }
-      sp_da_push(*sp_str_ht_get(requests, dep->qualified), ((spn_option_request_t) {
-        .consumer = node_short_name(node),
-        .options = &dep->options,
-      }));
     }
-  }
 
-  sp_ht_for_kv(session->resolve, it) {
-    spn_resolved_pkg_t* node = it.val;
-    if (sp_str_ht_get(session->options, node->qualified)) {
+    sp_ht_for_kv(session->resolve, it) {
+      spn_resolved_pkg_t* node = it.val;
+      spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, node->id);
+      sp_da(spn_option_request_t)* asked = sp_ht_getp(requests, node->id);
+
+      spn_resolved_options_t resolved = sp_zero;
+      spn_try(spn_pkg_options_merge(
+        mem,
+        loaded->info,
+        &session->profile,
+        session->pkg->config,
+        node->source == SPN_PKG_SOURCE_ROOT,
+        asked ? *asked : SP_NULLPTR,
+        session->events,
+        &resolved));
+
+      sp_ht_insert(session->options, node->id, resolved);
+    }
+
+    bool pruned = false;
+    bool missing = false;
+    sp_ht_for_kv(session->resolve, it) {
+      spn_resolved_pkg_t* node = it.val;
+      spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, node->id);
+      spn_resolved_options_t* resolved = sp_ht_getp(session->options, node->id);
+      sp_assert(resolved);
+
+      spn_when_env_t env;
+      spn_when_env_from_profile(mem, &session->profile, &env);
+      spn_when_env_add_options(&env, resolved);
+
+      sp_da_for(loaded->info->deps, dt) {
+        spn_requested_pkg_t* dep = &loaded->info->deps[dt];
+        if (sp_da_empty(dep->when.clauses)) {
+          continue;
+        }
+        spn_resolved_dep_t* edge = node_find_edge(node, sp_intern_get_or_insert(session->intern, dep->qualified), dep->kind);
+        bool expected = spn_when_eval(&dep->when, &env);
+        if (expected && !edge) {
+          missing = true;
+          if (sp_str_empty(missing_pkg)) {
+            missing_pkg = loaded->info->name;
+            missing_dep = spn_pkg_name_from_qualified(dep->qualified).name;
+          }
+        }
+        if (!expected && edge) {
+          node_prune_edge(node, edge);
+          pruned = true;
+        }
+      }
+    }
+
+    if (pruned) {
+      sweep_unreachable(session);
       continue;
     }
-
-    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, node->id);
-    sp_da(spn_option_request_t)* asked = sp_str_ht_get(requests, node->qualified);
-
-    spn_resolved_options_t resolved = sp_zero;
-    spn_try(spn_pkg_options_merge(
-      mem,
-      loaded->info,
-      &session->profile,
-      session->pkg->config,
-      node->source == SPN_PKG_SOURCE_ROOT,
-      asked ? *asked : SP_NULLPTR,
-      session->events,
-      &resolved));
-
-    sp_str_ht_insert(session->options, node->qualified, resolved);
+    if (missing) {
+      if (session->gates.resolves < SPN_GATE_MAX_RESOLVES) {
+        session->gates.resolves++;
+        session->gates.reresolve = true;
+        return SPN_OK;
+      }
+      break;
+    }
+    settled = true;
+    break;
   }
+
+  if (!settled) {
+    spn_event_buffer_push(session->events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR_OPTION,
+      .option = {
+        .err = SPN_OPTION_ERR_LATE_GATE,
+        .pkg = missing_pkg,
+        .a = missing_dep,
+      },
+    });
+    return SPN_ERROR;
+  }
+
+  spn_try(validate_config_keys(session));
 
   sp_ht_for_kv(session->resolve, it) {
     spn_resolved_pkg_t* node = it.val;
     spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, node->id);
-    spn_resolved_options_t* resolved = sp_str_ht_get(session->options, loaded->info->qualified);
+    spn_resolved_options_t* resolved = sp_ht_getp(session->options, node->id);
     sp_assert(resolved);
 
     spn_when_env_t env;
     spn_when_env_from_profile(mem, &session->profile, &env);
     spn_when_env_add_options(&env, resolved);
-
-    sp_da_for(loaded->info->deps, dt) {
-      spn_requested_pkg_t* dep = &loaded->info->deps[dt];
-      if (dep->kind != SPN_DEP_KIND_PACKAGE || sp_da_empty(dep->when.clauses)) {
-        continue;
-      }
-      bool expected = spn_when_eval(&dep->when, &env);
-      bool actual = node_has_edge(node, sp_intern_get_or_insert(session->intern, dep->qualified), dep->kind);
-      if (expected != actual) {
-        spn_event_buffer_push(session->events, (spn_build_event_t) {
-          .kind = SPN_EVENT_ERR_OPTION,
-          .option = {
-            .err = SPN_OPTION_ERR_LATE_GATE,
-            .pkg = loaded->info->name,
-            .a = spn_pkg_name_from_qualified(dep->qualified).name,
-          },
-        });
-        return SPN_ERROR;
-      }
-    }
-
     spn_pkg_apply_options(loaded->info, &env);
   }
 
@@ -186,6 +332,7 @@ typedef struct {
   sp_hash_t commit;
   sp_hash_t subtree;
   sp_hash_t options;
+  sp_hash_t dep_options;
   spn_semver_t version;
   spn_build_mode_t mode;
   spn_linkage_t linkage;
@@ -206,8 +353,8 @@ typedef struct {
 
 // The resolved non-default option set: distinct option sets get distinct
 // store paths, while default flips ride the manifest commit hash instead
-static sp_hash_t hash_options(spn_session_t* session, spn_pkg_info_t* pkg) {
-  spn_resolved_options_t* options = sp_str_ht_get(session->options, pkg->qualified);
+static sp_hash_t hash_options(spn_session_t* session, spn_pkg_id_t id) {
+  spn_resolved_options_t* options = sp_ht_getp(session->options, id);
   if (!options) {
     return 0;
   }
@@ -229,6 +376,59 @@ static sp_hash_t hash_options(spn_session_t* session, spn_pkg_info_t* pkg) {
   return hash;
 }
 
+static s32 sort_hashes(const void* a, const void* b) {
+  sp_hash_t lhs = *(const sp_hash_t*)a;
+  sp_hash_t rhs = *(const sp_hash_t*)b;
+  return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
+}
+
+// Options are transitive build identity: a package compiled against a dep's
+// public define (or a dep whose own store path moved) is a different
+// artifact, so every reachable dep's option set folds into the fingerprint
+static sp_hash_t hash_dep_options(spn_session_t* session, spn_pkg_id_t id) {
+  sp_mem_t mem = session->mem;
+
+  sp_ht(spn_pkg_id_t, u8) visited = SP_NULLPTR;
+  sp_ht_init(mem, visited);
+  sp_da(spn_pkg_id_t) frontier = sp_da_new(mem, spn_pkg_id_t);
+  sp_da(sp_hash_t) hashes = sp_da_new(mem, sp_hash_t);
+
+  sp_da_push(frontier, id);
+  while (!sp_da_empty(frontier)) {
+    spn_pkg_id_t at = *sp_da_back(frontier);
+    sp_da_pop(frontier);
+
+    spn_resolved_pkg_t* node = sp_ht_getp(session->resolve, at);
+    if (!node) {
+      continue;
+    }
+    sp_da_for(node->edges, et) {
+      spn_pkg_id_t dep = node->edges[et].id;
+      if (sp_ht_getp(visited, dep)) {
+        continue;
+      }
+      sp_ht_insert(visited, dep, (u8)true);
+      sp_da_push(frontier, dep);
+
+      spn_resolved_pkg_t* target = sp_ht_getp(session->resolve, dep);
+      sp_hash_t parts [] = {
+        target ? sp_hash_str(target->qualified) : (sp_hash_t)dep.qualified,
+        (sp_hash_t)dep.version.major,
+        (sp_hash_t)dep.version.minor,
+        (sp_hash_t)dep.version.patch,
+        hash_options(session, dep),
+      };
+      sp_da_push(hashes, sp_hash_combine(parts, sp_carr_len(parts)));
+    }
+  }
+
+  if (sp_da_empty(hashes)) {
+    return 0;
+  }
+  sp_da_sort(hashes, sort_hashes);
+  return sp_hash_combine(hashes, sp_da_size(hashes));
+}
+
 typedef struct {
   sp_hash_t hash;
   sp_str_t str;
@@ -239,7 +439,8 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_id_t id, spn_p
   fingerprint_input_t fingerprint = SP_ZERO_INITIALIZE();
   fingerprint.commit = sp_hash_str(pkg->upstream.commit);
   fingerprint.subtree = id.hash;
-  fingerprint.options = hash_options(session, pkg);
+  fingerprint.options = hash_options(session, id);
+  fingerprint.dep_options = hash_dep_options(session, id);
   fingerprint.version = pkg->version;
 
   bool compiled = sp_str_om_size(pkg->libs) > 0 || sp_str_om_size(pkg->exes) > 0;

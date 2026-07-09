@@ -1,0 +1,14 @@
+[package]
+name = "b"
+version = "1.0.0"
+
+[options.x]
+type = "bool"
+default = false
+define = "B_X"
+
+[[lib]]
+name = "b"
+kinds = ["static"]
+source = ["b.c"]
+headers = ["b.h"]

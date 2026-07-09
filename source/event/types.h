@@ -102,6 +102,7 @@ typedef enum {
   SPN_OPTION_ERR_VETO,
   SPN_OPTION_ERR_NO_VALUE,
   SPN_OPTION_ERR_LATE_GATE,
+  SPN_OPTION_ERR_UNKNOWN_PKG,
 } spn_option_err_t;
 
 typedef struct {

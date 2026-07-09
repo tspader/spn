@@ -31,6 +31,17 @@ void spn_task_enqueue(spn_task_executor_t* ex, spn_task_kind_t kind) {
   ex->data[ex->len++] = kind;
 }
 
+bool spn_task_rewind(spn_task_executor_t* ex, spn_task_kind_t kind) {
+  for (s32 it = (s32)ex->index; it >= 0; it--) {
+    if (ex->data[it] == kind) {
+      ex->index = (u32)it;
+      ex->initted = false;
+      return true;
+    }
+  }
+  return false;
+}
+
 sp_cli_result_t spn_task_plan_kinds(const spn_task_kind_t* kinds, u32 len) {
   sp_for(it, len) {
     spn_task_enqueue(&app.tasks, kinds[it]);

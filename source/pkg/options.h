@@ -11,6 +11,9 @@ typedef struct {
   const spn_when_t* options;
 } spn_option_request_t;
 
+typedef sp_da(spn_option_request_t) spn_option_requests_t;
+typedef sp_str_ht(spn_option_requests_t) spn_option_seeds_t;
+
 typedef struct {
   sp_str_t name;
   spn_option_value_t value;
@@ -25,12 +28,13 @@ void spn_when_env_from_profile(sp_mem_t mem, const spn_profile_info_t* profile, 
 void spn_when_env_add_options(spn_when_env_t* env, const spn_resolved_options_t* options);
 
 // One resolved value per declared option, in declaration order. Root config
-// sets authoritatively (the root's own options come from the profile instead),
-// additive bools union across requests, everything else must agree across
-// requests with the root as tiebreaker, { not = v } requests veto the winner,
-// and unset options fall through to their first-match defaults unless the
-// root declined them. With events NULL nothing is validated or reported; the
-// resolver uses that silent form to gate dep edges before requests exist.
+// sets authoritatively for every option kind (the root's own options come
+// from the profile instead); with the root silent, additive bools union
+// across requests and everything else must agree across them. { not = v }
+// requests veto the winner, and unset options fall through to their
+// first-match defaults unless the root declined them. With events NULL
+// nothing is validated or reported; the resolver uses that silent form to
+// gate dep edges during resolution.
 spn_err_t spn_pkg_options_merge(
   sp_mem_t mem,
   spn_pkg_info_t* info,
@@ -47,6 +51,7 @@ void spn_pkg_options_env(
   const spn_profile_info_t* profile,
   sp_da(spn_pkg_config_entry_t) root_config,
   bool is_root,
+  sp_da(spn_option_request_t) requests,
   spn_when_env_t* env);
 
 // The transform from manifest-shaped data to build-shaped data: every gated

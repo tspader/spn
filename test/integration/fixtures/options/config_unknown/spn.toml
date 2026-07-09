@@ -3,10 +3,10 @@ name = "options_config_unknown"
 version = "0.1.0"
 
 [deps.package]
-codec = "1.0.0"
+a = "1.0.0"
 
-[config.codex]
-options = { mp3 = true }
+[config.nosuch]
+options = { x = true }
 
 [[bin]]
 name = "main"

@@ -7,6 +7,7 @@
 
 spn_task_desc_t* spn_task_get(spn_task_kind_t kind);
 void             spn_task_enqueue(spn_task_executor_t* ex, spn_task_kind_t kind);
+bool             spn_task_rewind(spn_task_executor_t* ex, spn_task_kind_t kind);
 sp_cli_result_t  spn_task_plan_kinds(const spn_task_kind_t* kinds, u32 len);
 
 #define spn_plan(...) \

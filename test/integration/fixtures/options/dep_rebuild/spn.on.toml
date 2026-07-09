@@ -1,0 +1,13 @@
+[package]
+name = "options_dep_rebuild"
+version = "0.1.0"
+
+[deps.package]
+b = "1.0.0"
+
+[config.a]
+options = { x = true }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

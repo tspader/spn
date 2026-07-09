@@ -1,5 +1,5 @@
-#include "pipeline.h"
+#include "a.h"
 
 int main() {
-  return pipeline_value();
+  return a_value();
 }

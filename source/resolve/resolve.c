@@ -459,13 +459,16 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
   // The list of dependencies defined in the manifest is not the same as the
   // list of dependencies this build uses: when-gated edges whose predicates
   // fail are cut here, before resolution ever fetches index data for them.
-  // The env is the package's pre-request view (facts, defaults, root config,
-  // and for the root itself the profile's options); consumer requests don't
-  // exist yet, and spn_session_apply_options rechecks every gate against the
-  // final merge so a request that would have flipped one is an error rather
-  // than a silent misbuild.
+  // The env is facts, defaults, root config, the profile's options for the
+  // root itself, and any consumer requests seeded from a prior pass —
+  // spn_session_apply_options rechecks every gate against the final merge
+  // and re-enters resolution with the requests it found when a gate flips.
+  sp_da(spn_option_request_t)* seeds = SP_NULLPTR;
+  if (resolver->seeds) {
+    seeds = sp_str_ht_get(resolver->seeds, pkg->info->qualified);
+  }
   spn_when_env_t env;
-  spn_pkg_options_env(resolver->mem, pkg->info, &resolver->profile, resolver->config, pkg->source == SPN_PKG_SOURCE_ROOT, &env);
+  spn_pkg_options_env(resolver->mem, pkg->info, &resolver->profile, resolver->config, pkg->source == SPN_PKG_SOURCE_ROOT, seeds ? *seeds : SP_NULLPTR, &env);
   sp_da_for(pkg->info->deps, it) {
     if (!spn_when_eval(&pkg->info->deps[it].when, &env)) {
       continue;

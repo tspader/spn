@@ -88,7 +88,17 @@ struct spn_session_t {
   spn_resolve_t resolve;
   spn_pkg_registry_t registry;
   sp_ht(spn_pkg_id_t, spn_loaded_pkg_t) packages;
-  sp_str_ht(spn_resolved_options_t) options;
+  sp_ht(spn_pkg_id_t, spn_resolved_options_t) options;
+
+  // Dependency gates and consumer requests reach a fixed point across
+  // resolve passes: apply stashes the requests it collected as seeds, and a
+  // gate that needs an edge resolution never made rewinds the task queue to
+  // resolve, which gates with the seeds. resolves bounds the loop.
+  struct {
+    spn_option_seeds_t seeds;
+    u32 resolves;
+    bool reresolve;
+  } gates;
 
   spn_profile_info_t profile;
   struct {

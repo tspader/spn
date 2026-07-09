@@ -422,8 +422,8 @@ UTEST_F(options, defaults_false) {
 }
 
 // The composition of edge_request and gates_dep: the root's edge request
-// flips flac on, which must pull mixer's flac-gated dep into the build even
-// though the request isn't known when mixer's edges are first gated
+// flips x on, which must pull a's x-gated dep b into the build even though
+// the request isn't known when a's edges are first gated
 UTEST_F(options, edge_gates_dep) {
   tmpfs_init_named(&uf->fixture.fs, "options_edge_gates_dep");
 
@@ -433,9 +433,9 @@ UTEST_F(options, edge_gates_dep) {
     .builds = {
       {
         .expect = {
-          .bin = { .name = "main", .rc = 7 },
+          .bin = { .name = "main", .rc = 1 },
           .events = {
-            { .event = "resolve_package", .key = "name", .value = "flaclib" },
+            { .event = "resolve_package", .key = "name", .value = "core/b" },
           },
         },
       },
@@ -452,14 +452,14 @@ UTEST_F(options, index_gated_dep) {
   run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
     .project = "test/integration/fixtures/options/index_gated_dep",
     .builds = {
-      { .expect = { .bin = { .name = "main", .rc = 5 } } },
+      { .expect = { .bin = { .name = "main", .rc = 1 } } },
     },
   });
 }
 
-// edge_gates_dep for a build-kind dep: the request flips codegen on, so
-// tool's define is applied and its gated build dep must resolve with it —
-// the define without the dep is a misbuild
+// edge_gates_dep for a build-kind dep: the request flips x on, so a's define
+// is applied and its gated build dep b must resolve with it — the define
+// without the dep is a misbuild
 UTEST_F(options, edge_gates_build_dep) {
   tmpfs_init_named(&uf->fixture.fs, "options_edge_gates_build_dep");
 
@@ -469,9 +469,9 @@ UTEST_F(options, edge_gates_build_dep) {
     .builds = {
       {
         .expect = {
-          .bin = { .name = "main", .rc = 9 },
+          .bin = { .name = "main", .rc = 1 },
           .events = {
-            { .event = "resolve_package", .key = "name", .value = "helper" },
+            { .event = "resolve_package", .key = "name", .value = "core/b" },
           },
         },
       },
@@ -479,27 +479,27 @@ UTEST_F(options, edge_gates_build_dep) {
   });
 }
 
-// Options are part of a package's transitive build identity: wrap's
-// compilation observes base's public define, so each value of base's option
-// is a distinct wrap. The flip-forward works by accident of mtimes (base's
-// new store stamp dirties wrap); the flip-back must not hand back the
-// fast-flavored wrap that the default store path now holds
+// Options are part of a package's transitive build identity: b's compilation
+// observes a's public define, so each value of a's option is a distinct b.
+// The flip-forward works by accident of mtimes (a's new store stamp dirties
+// b); the flip-back must not hand back the on-flavored b that the default
+// store path now holds
 UTEST_F(options, dep_rebuild) {
   tmpfs_init_named(&uf->fixture.fs, "options_dep_rebuild");
 
   run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
     .project = "test/integration/fixtures/options/dep_rebuild",
-    .copy = { "spn.fast.toml", "spn.default.toml" },
+    .copy = { "spn.on.toml", "spn.off.toml" },
     .builds = {
-      { .expect = { .bin = { .name = "main", .rc = 10 } } },
-      { .manifest = "spn.fast.toml", .expect = { .bin = { .name = "main", .rc = 20 } } },
-      { .manifest = "spn.default.toml", .expect = { .bin = { .name = "main", .rc = 10 } } },
+      { .expect = { .bin = { .name = "main", .rc = 1 } } },
+      { .manifest = "spn.on.toml", .expect = { .bin = { .name = "main", .rc = 2 } } },
+      { .manifest = "spn.off.toml", .expect = { .bin = { .name = "main", .rc = 1 } } },
     },
   });
 }
 
 // Mutually-referencing defaults make an explicitly-set build look default
-// under the final env: b = true and c = true each match the other's when-arm
+// under the final env: x = true and y = true each match the other's when-arm
 // default, but the all-defaults build resolved both false, so the two builds
 // are different configurations and must not share a store path
 UTEST_F(options, default_identity) {
@@ -515,9 +515,9 @@ UTEST_F(options, default_identity) {
   });
 }
 
-// Private scoping resolves codec at 1.0.0 (small, inside snd) and 2.0.0
-// (fast, at the root): two distinct packages, so the disagreeing requests
-// are not a conflict and each instance builds with its own value
+// Private scoping resolves b at 1.0.0 (x on, inside a) and 2.0.0 (x off, at
+// the root): two distinct packages, so the disagreeing requests are not a
+// conflict and each instance builds with its own value
 UTEST_F(options, private_versions) {
   tmpfs_init_named(&uf->fixture.fs, "options_private_versions");
 
@@ -537,7 +537,7 @@ UTEST_F(options, config_unknown) {
   run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
     .project = "test/integration/fixtures/options/config_unknown",
     .builds = {
-      { .expect = { .rc = 1, .contains = { "codex" } } },
+      { .expect = { .rc = 1, .contains = { "nosuch" } } },
     },
   });
 }

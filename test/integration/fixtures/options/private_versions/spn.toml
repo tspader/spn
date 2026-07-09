@@ -3,8 +3,8 @@ name = "options_private_versions"
 version = "0.1.0"
 
 [deps.package]
-snd = "1.0.0"
-codec = { version = "2.0.0", options = { mode = "fast" } }
+a = "1.0.0"
+b = { version = "2.0.0", options = { x = false } }
 
 [[bin]]
 name = "main"

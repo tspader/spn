@@ -1,5 +1,5 @@
-#include "tool.h"
+#include "a.h"
 
 int main() {
-  return tool_value();
+  return a_value();
 }

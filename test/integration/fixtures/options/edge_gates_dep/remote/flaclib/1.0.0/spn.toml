@@ -1,9 +1,0 @@
-[package]
-name = "flaclib"
-version = "1.0.0"
-
-[[lib]]
-name = "flaclib"
-kinds = ["static"]
-source = ["flaclib.c"]
-headers = ["flaclib.h"]
