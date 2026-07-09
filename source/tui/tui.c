@@ -3,6 +3,7 @@
 
 #include "toml/issue.h"
 #include "ctx/ctx.h"
+#include "event/event.h"
 #include "log/log.h"
 #include "semver/convert.h"
 #include "sp/color.h"
@@ -42,69 +43,6 @@ sp_prompt_widget_t sp_prompt_progress_widget(sp_prompt_ctx_t* ctx, sp_prompt_pro
 
 #define SP_TUI_PRINT(command) sp_tui_print(sp_str_view(command))
 
-#define ERROR_VERB        true
-#define NOT_ERROR_VERB    false
-#define TERMINAL_VERB     true
-#define NOT_TERMINAL_VERB false
-
-typedef struct {
-  const c8* name;
-  const c8* id;
-  spn_verbosity_t verbosity;
-  bool error;
-  bool terminal;
-} spn_build_event_display_t;
-
-#define EVENT(ID, NAME, VERBOSITY, ERROR, TERMINAL) [ID] = { NAME, sp_mstr(ID), VERBOSITY, ERROR, TERMINAL }
-
-static spn_build_event_display_t event_info[] = {
-  EVENT(SPN_EVENT_ERR,                           "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_ERR_CIRCULAR_DEP,              "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_ERR_UNKNOWN_PKG,               "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_ERR_UNSATISFIABLE_VERSION,     "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_ERR_MANIFEST,                  "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_ERR_UNIT_CYCLE,                "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_ERR_DYNAMIC_DUPLICATE,         "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX,    "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_ERR_OPTION,                    "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_RESOLVE_START,                 "Resolving",   SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_RESOLVE_PACKAGE,               "Resolving",   SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_RESOLVE_END,                   "Resolved",    SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_SYNC,                          "Downloading", SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_SYNC_START,                    "Syncing",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_SYNC_PACKAGE,                  "Synced",      SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_SYNC_FAILED,                   "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_SYNC_STALE,                    "Stale",       SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_SYNC_END,                      "Downloaded",  SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_COMPILE,          "Compiling",   SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,   "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_CONFIGURE,        "Configuring", SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK,     "Configured",  SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_PACKAGE,          "Packaging",   SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK,       "Packaged",    SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_CRASHED,          "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_BUILD_SCRIPT_USER_FN,          "Running",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_COMPILE_START,                 "Compiling",   SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_TARGET_BUILD_PASSED,           "Compiled",    SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_TARGET_BUILD_FAILED,           "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_TARGET_RUN,                    "Running",     SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_LINK_START,                    "Linking",     SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_LINK_PASSED,                   "Linked",      SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_LINK_FAILED,                   "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_EMBED_START,                   "Embedding",   SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_EMBED_PASSED,                  "Embedded",    SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_EMBED_FAILED,                  "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_INIT_BUILD_GRAPH,              "Planning",    SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED,    "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_DIRTY_SUMMARY,                 "Planned",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_BUILD_PASSED,                  "Finished",    SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_BUILD_FAILED,                  "error",       SPN_VERBOSITY_QUIET,   ERROR_VERB,     TERMINAL_VERB    ),
-  EVENT(SPN_EVENT_BUILD_SUMMARY,                 "Summary",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_API_CALL,                      "Calling",     SPN_VERBOSITY_DEBUG,   NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_USER_LOG,                      "",            SPN_VERBOSITY_VERBOSE, NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-  EVENT(SPN_EVENT_ADDED,                         "Added",       SPN_VERBOSITY_NORMAL,  NOT_ERROR_VERB, NOT_TERMINAL_VERB),
-};
-
 static sp_str_t spn_tui_name_to_color(sp_mem_t mem, sp_str_t str);
 static sp_str_t spn_tui_decorate_name(sp_mem_t mem, sp_str_t name, u32 padded_len, c8 pad);
 static void     spn_tui_line_writer_flush(spn_tui_line_writer_t* writer);
@@ -129,14 +67,6 @@ sp_str_t spn_output_mode_to_str(spn_tui_mode_t mode) {
     SPN_OUTPUT_MODE(SP_X_ENUM_CASE_TO_STRING_LOWER)
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-sp_str_t spn_build_event_kind_to_str(spn_build_event_kind_t kind) {
-  return sp_str_view(event_info[kind].name);
-}
-
-spn_verbosity_t spn_build_event_get_verbosity(spn_build_event_kind_t kind) {
-  return event_info[kind].verbosity;
 }
 
 void sp_tui_print(sp_str_t str) {
@@ -1200,8 +1130,8 @@ void spn_tui_log_event(spn_build_event_t* event) {
     sp_da_init(spn.heap, buffered_logs);
   }
 
-  spn_build_event_display_t display = event_info[event->kind];
-  if (display.verbosity > spn.logger.verbosity) {
+  const spn_event_info_t* display = &spn_event_info[event->kind];
+  if (display->verbosity > spn.logger.verbosity) {
     if (event->kind == SPN_EVENT_USER_LOG) {
       sp_da_push(buffered_logs, ((spn_tui_buffered_log_t) {
         .pkg = event->pkg ? sp_str_copy(spn.heap, event->pkg->name) : sp_str_lit(""),
@@ -1214,9 +1144,9 @@ void spn_tui_log_event(spn_build_event_t* event) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_mem_t mem = scratch.mem;
   sp_io_writer_t* w = spn.tui.out;
-  sp_str_t verb = sp_str_view(display.name);
+  sp_str_t verb = sp_str_view(display->display);
 
-  if (display.error) {
+  if (display->error) {
     sp_da_for(buffered_logs, it) {
       spn_tui_buffered_log_t* log = &buffered_logs[it];
       spn_tui_write_event_line(w, mem, sp_str_lit(""), false, log->pkg, log->message);
@@ -1224,7 +1154,7 @@ void spn_tui_log_event(spn_build_event_t* event) {
     sp_da_clear(buffered_logs);
 
     sp_str_t detail = spn_tui_render_event_detail(mem, event);
-    if (display.terminal) {
+    if (display->terminal) {
       spn_tui_write_event_line(w, mem, sp_str_lit("Failed"), true, spn_tui_event_subject(event), sp_str_lit(""));
       sp_io_write_c8(w, '\n');
       spn_tui_write_terminal_error_line(w, mem, verb, detail);

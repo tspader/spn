@@ -1,8 +1,36 @@
 #include "event/event.h"
 
+#include <stddef.h>
+
 #if defined(SP_POSIX)
   #include <pthread.h>
 #endif
+
+#define SPN_EVT(member) (u16)offsetof(spn_build_event_t, member)
+#define SPN_EVT_NONE 0
+#define SPN_EVENT_INFO(kind, name_, display_, verbosity_, level_, error_, terminal_, payload_) \
+  [kind] = { \
+    .name = name_, \
+    .display = display_, \
+    .verbosity = SPN_VERBOSITY_##verbosity_, \
+    .level = SPN_LOG_LEVEL_##level_, \
+    .error = error_, \
+    .terminal = terminal_, \
+    .payload = payload_, \
+  },
+
+const spn_event_info_t spn_event_info[SPN_EVENT_COUNT] = {
+  SPN_EVENT_LIST(SPN_EVENT_INFO)
+};
+
+#undef SPN_EVENT_INFO
+#undef SPN_EVT
+#undef SPN_EVT_NONE
+
+void* spn_event_payload(spn_build_event_t* event) {
+  u16 offset = spn_event_info[event->kind].payload;
+  return offset ? (u8*)event + offset : SP_NULLPTR;
+}
 
 static u64 spn_current_thread_id(void) {
 #if defined(SP_WIN32)

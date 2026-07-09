@@ -2,37 +2,10 @@
 #include "sp/macro.h"
 #include "event/log.h"
 
+#include "event/event.h"
+
 #include "log/types.h"
 #include "sp/bind.h"
-
-static s32 event_level(spn_build_event_kind_t kind) {
-  switch (kind) {
-    case SPN_EVENT_ERR:
-    case SPN_EVENT_ERR_CIRCULAR_DEP:
-    case SPN_EVENT_ERR_UNKNOWN_PKG:
-    case SPN_EVENT_ERR_UNSATISFIABLE_VERSION:
-    case SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX:
-    case SPN_EVENT_ERR_MANIFEST:
-    case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED:
-    case SPN_EVENT_BUILD_SCRIPT_CRASHED:
-    case SPN_EVENT_TARGET_BUILD_FAILED:
-    case SPN_EVENT_SYNC_FAILED:
-    case SPN_EVENT_LINK_FAILED:
-    case SPN_EVENT_EMBED_FAILED:
-    case SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED:
-    case SPN_EVENT_BUILD_FAILED: {
-      return SPN_LOG_LEVEL_ERROR;
-    }
-    case SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK:
-    case SPN_EVENT_BUILD_SCRIPT_USER_FN:
-    case SPN_EVENT_API_CALL: {
-      return SPN_LOG_LEVEL_DEBUG;
-    }
-    default: {
-      return SPN_LOG_LEVEL_INFO;
-    }
-  }
-}
 
 static const c8* level_name(s32 level) {
   switch (level) {
@@ -575,106 +548,6 @@ static void json_write_value(sp_io_writer_t* out, sp_bind_field_t* field, void* 
 }
 
 // ============================================================================
-// Variant pointer — switch on tag, return pointer into the union
-// ============================================================================
-
-static void* event_variant_ptr(spn_build_event_t* event) {
-  switch (event->kind) {
-    case SPN_EVENT_SYNC:                        return &event->sync;
-    case SPN_EVENT_BUILD_SCRIPT_COMPILE:        return &event->script_compile;
-    case SPN_EVENT_BUILD_SCRIPT_CRASHED:        return &event->crashed;
-    case SPN_EVENT_BUILD_SCRIPT_PACKAGE:        return &event->script_package;
-    case SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK:   return &event->configure;
-    case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED: return &event->compile_failed;
-    case SPN_EVENT_TARGET_BUILD_PASSED:         return &event->target.passed;
-    case SPN_EVENT_TARGET_BUILD_FAILED:         return &event->target.failed;
-    case SPN_EVENT_TARGET_RUN:                  return &event->run;
-    case SPN_EVENT_INIT_BUILD_GRAPH:            return &event->graph_init;
-    case SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED:  return &event->err.build_graph;
-    case SPN_EVENT_LINK_START:                  return &event->target.link_start;
-    case SPN_EVENT_LINK_PASSED:                 return &event->target.link_passed;
-    case SPN_EVENT_LINK_FAILED:                 return &event->target.link_failed;
-    case SPN_EVENT_RESOLVE_PACKAGE:             return &event->resolve_pkg;
-    case SPN_EVENT_RESOLVE_END:                 return &event->resolve_end;
-    case SPN_EVENT_USER_LOG:                    return &event->user_log;
-    case SPN_EVENT_SYNC_START:                  return &event->sync_start;
-    case SPN_EVENT_SYNC_PACKAGE:                return &event->sync_pkg;
-    case SPN_EVENT_SYNC_FAILED:                 return &event->sync_failed;
-    case SPN_EVENT_SYNC_STALE:                  return &event->sync;
-    case SPN_EVENT_ERR_MANIFEST:                return &event->manifest_err;
-    case SPN_EVENT_SYNC_END:                    return &event->sync_end;
-    case SPN_EVENT_API_CALL:                    return &event->api_call;
-    case SPN_EVENT_ERR_CIRCULAR_DEP:            return &event->circular;
-    case SPN_EVENT_ERR_UNKNOWN_PKG:             return &event->unknown;
-    case SPN_EVENT_ERR_UNIT_CYCLE:              return &event->unit_cycle;
-    case SPN_EVENT_ERR_UNSATISFIABLE_VERSION:   return &event->unsatisfiable;
-    case SPN_EVENT_ERR_DYNAMIC_DUPLICATE:       return &event->dynamic_dup;
-    case SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX:  return &event->too_complex;
-    case SPN_EVENT_ERR_OPTION:                  return &event->option;
-    case SPN_EVENT_EMBED_START:                 return &event->embed_start;
-    case SPN_EVENT_EMBED_PASSED:                return &event->embed_passed;
-    case SPN_EVENT_EMBED_FAILED:                return &event->embed_failed;
-    case SPN_EVENT_DIRTY_SUMMARY:               return &event->dirty_summary;
-    case SPN_EVENT_BUILD_FAILED:                return &event->build_failed;
-    case SPN_EVENT_BUILD_SUMMARY:               return &event->build_summary;
-    case SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK:     return &event->package_ok;
-    default:                                    return SP_NULLPTR;
-  }
-}
-
-// ============================================================================
-// Machine-readable event names (unique per kind, unlike TUI display names)
-// ============================================================================
-
-static const c8* event_names[SPN_EVENT_COUNT] = {
-  [SPN_EVENT_ERR]                           = "err",
-  [SPN_EVENT_ERR_CIRCULAR_DEP]              = "err_circular_dep",
-  [SPN_EVENT_ERR_UNKNOWN_PKG]               = "err_unknown_pkg",
-  [SPN_EVENT_ERR_UNSATISFIABLE_VERSION]     = "err_unsatisfiable_version",
-  [SPN_EVENT_ERR_MANIFEST]                  = "err_manifest",
-  [SPN_EVENT_ERR_UNIT_CYCLE]                = "err_unit_cycle",
-  [SPN_EVENT_ERR_DYNAMIC_DUPLICATE]         = "err_dynamic_duplicate",
-  [SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX]    = "err_resolution_too_complex",
-  [SPN_EVENT_ERR_OPTION]                    = "err_option",
-  [SPN_EVENT_RESOLVE_START]                 = "resolve_start",
-  [SPN_EVENT_RESOLVE_PACKAGE]               = "resolve_package",
-  [SPN_EVENT_RESOLVE_END]                   = "resolve_end",
-  [SPN_EVENT_SYNC]                          = "sync",
-  [SPN_EVENT_SYNC_START]                    = "sync_start",
-  [SPN_EVENT_SYNC_PACKAGE]                  = "sync_package",
-  [SPN_EVENT_SYNC_FAILED]                   = "sync_failed",
-  [SPN_EVENT_SYNC_STALE]                    = "sync_stale",
-  [SPN_EVENT_SYNC_END]                      = "sync_end",
-  [SPN_EVENT_BUILD_SCRIPT_COMPILE]          = "script_compile",
-  [SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED]   = "script_compile_failed",
-  [SPN_EVENT_BUILD_SCRIPT_CONFIGURE]        = "configure",
-  [SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK]     = "configure_ok",
-  [SPN_EVENT_BUILD_SCRIPT_PACKAGE]          = "script_package",
-  [SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK]       = "package_ok",
-  [SPN_EVENT_BUILD_SCRIPT_CRASHED]          = "script_crashed",
-  [SPN_EVENT_BUILD_SCRIPT_USER_FN]          = "script_user_fn",
-  [SPN_EVENT_COMPILE_START]                 = "compile_start",
-  [SPN_EVENT_TARGET_BUILD_PASSED]           = "target_build_passed",
-  [SPN_EVENT_TARGET_BUILD_FAILED]           = "target_build_failed",
-  [SPN_EVENT_TARGET_RUN]                    = "target_run",
-  [SPN_EVENT_LINK_START]                    = "link_start",
-  [SPN_EVENT_LINK_PASSED]                   = "link_passed",
-  [SPN_EVENT_LINK_FAILED]                   = "link_failed",
-  [SPN_EVENT_EMBED_START]                   = "embed_start",
-  [SPN_EVENT_EMBED_PASSED]                  = "embed_passed",
-  [SPN_EVENT_EMBED_FAILED]                  = "embed_failed",
-  [SPN_EVENT_INIT_BUILD_GRAPH]              = "init_build_graph",
-  [SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED]    = "prepare_build_graph_failed",
-  [SPN_EVENT_DIRTY_SUMMARY]                 = "dirty_summary",
-  [SPN_EVENT_BUILD_PASSED]                  = "build_passed",
-  [SPN_EVENT_BUILD_FAILED]                  = "build_failed",
-  [SPN_EVENT_BUILD_SUMMARY]                 = "build_summary",
-  [SPN_EVENT_API_CALL]                      = "api_call",
-  [SPN_EVENT_USER_LOG]                      = "user_log",
-  [SPN_EVENT_ADDED]                         = "added",
-};
-
-// ============================================================================
 // Public API
 // ============================================================================
 
@@ -687,12 +560,12 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
 
   sp_tm_epoch_t now = sp_tm_now_epoch();
 
-  const c8* name = event_names[event->kind];
+  const spn_event_info_t* info = &spn_event_info[event->kind];
   sp_io_write_cstr(out, "{\"event\": \"", SP_NULLPTR);
-  sp_io_write_cstr(out, name ? name : "unknown", SP_NULLPTR);
+  sp_io_write_cstr(out, info->name ? info->name : "unknown", SP_NULLPTR);
   sp_io_write_cstr(out, "\"", SP_NULLPTR);
 
-  s32 level = event_level(event->kind);
+  s32 level = info->level;
   sp_fmt_io(out, ", \"level\": {}", sp_fmt_int(level));
   sp_io_write_cstr(out, ", \"level_name\": \"", SP_NULLPTR);
   sp_io_write_cstr(out, level_name(level), SP_NULLPTR);
@@ -723,7 +596,7 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
   }
 
   if (schema) {
-    void* data = event_variant_ptr(event);
+    void* data = spn_event_payload(event);
     if (data) {
       sp_io_write_cstr(out, ", \"data\": ", SP_NULLPTR);
       json_write_object(out, schema, data);
