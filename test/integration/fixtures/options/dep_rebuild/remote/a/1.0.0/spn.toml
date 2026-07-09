@@ -1,0 +1,15 @@
+[package]
+name = "a"
+version = "1.0.0"
+
+[options.x]
+type = "bool"
+default = false
+define = "A_X"
+public = true
+
+[[lib]]
+name = "a"
+kinds = ["static"]
+source = ["a.c"]
+headers = ["a.h"]

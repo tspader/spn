@@ -1,0 +1,17 @@
+[package]
+name = "a"
+version = "1.0.0"
+
+[options.x]
+type = "bool"
+default = false
+define = "A_X"
+
+[deps.package]
+b = { version = "1.0.0", when = { x = true } }
+
+[[lib]]
+name = "a"
+kinds = ["static"]
+source = ["a.c"]
+headers = ["a.h"]

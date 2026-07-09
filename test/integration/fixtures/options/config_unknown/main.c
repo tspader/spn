@@ -1,5 +1,5 @@
-#include "codec.h"
+#include "a.h"
 
 int main() {
-  return codec_mp3();
+  return a_value();
 }

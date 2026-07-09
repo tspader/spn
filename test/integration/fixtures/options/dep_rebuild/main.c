@@ -1,5 +1,5 @@
-#include "wrap.h"
+#include "b.h"
 
 int main() {
-  return wrap_value();
+  return b_value();
 }

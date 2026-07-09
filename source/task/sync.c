@@ -260,8 +260,13 @@ static s32 sync_toolchain_node(spn_bg_cmd_t *cmd, void *user_data) {
 }
 
 void add_compilation_units(spn_session_t *session) {
-  sp_ht_for_kv(session->packages, it) {
-    spn_session_add_pkg(session, *it.key, it.val);
+  // Units come from the resolve set, not the loaded-package table: gate
+  // pruning can drop resolved packages after they were loaded, and a
+  // re-resolve pass leaves the table holding packages no longer in the build
+  sp_ht_for_kv(session->resolve, it) {
+    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, it.val->id);
+    sp_assert(loaded);
+    spn_session_add_pkg(session, it.val->id, loaded);
   }
 
   sp_ht_for_kv(session->resolve, it) {
@@ -364,6 +369,14 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
 
   if (spn_session_apply_options(session)) {
     return spn_task_fail(SPN_ERROR);
+  }
+
+  if (session->gates.reresolve) {
+    session->gates.reresolve = false;
+    if (!spn_task_rewind(&app->tasks, SPN_TASK_RESOLVE)) {
+      return spn_task_fail(SPN_ERROR);
+    }
+    return spn_task_continue();
   }
 
   session->units.toolchains = sp_da_new(session->mem, spn_toolchain_unit_t *);

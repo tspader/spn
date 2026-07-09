@@ -7,6 +7,7 @@
 #include "forward/types.h"
 #include "index/types.h"
 #include "intern/types.h"
+#include "pkg/options.h"
 #include "pkg/types.h"
 #include "profile/types.h"
 #include "semver/types.h"
@@ -59,6 +60,7 @@ typedef struct spn_resolver_t {
   spn_event_buffer_t* events;
   spn_profile_info_t profile;
   sp_da(spn_pkg_config_entry_t) config;
+  spn_option_seeds_t seeds;
   u64 budget;
 } spn_resolver_t;
 

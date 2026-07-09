@@ -1,5 +1,5 @@
-#include "mixer.h"
+#include "a.h"
 
 int main() {
-  return mixer_caps();
+  return a_value();
 }

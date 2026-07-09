@@ -1,0 +1,25 @@
+[package]
+name = "a"
+version = "1.0.0"
+
+[options.x]
+type = "bool"
+default = [
+  { when = { y = true }, value = true },
+  { value = false },
+]
+define = "A_X"
+
+[options.y]
+type = "bool"
+default = [
+  { when = { x = true }, value = true },
+  { value = false },
+]
+define = "A_Y"
+
+[[lib]]
+name = "a"
+kinds = ["static"]
+source = ["a.c"]
+headers = ["a.h"]

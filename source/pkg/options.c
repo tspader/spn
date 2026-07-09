@@ -109,13 +109,28 @@ spn_err_t spn_pkg_options_merge(
       setter_clause = SP_NULLPTR;
     }
 
+    // The value this option lands on when nobody sets it, resolved against
+    // the env as it stands before this option joins it; is_default compares
+    // against this same value so the fingerprint and the merge can't disagree
+    spn_option_value_t fallback = sp_zero;
+    if (!defaults_declined) {
+      fallback = spn_option_resolve(option, &env);
+    }
+    if (fallback.kind == SPN_OPTION_VALUE_NONE && option->type == SPN_OPTION_TYPE_BOOL) {
+      fallback = spn_option_value_bool(false);
+    }
+
     spn_resolved_option_t resolved = { .name = option->name };
     bool settled = false;
     sp_str_t winner = sp_str_lit("the default");
 
-    if (option->additive) {
-      bool value = setter_clause && setter_clause->value.kind == SPN_OPTION_VALUE_BOOL && setter_clause->value.b;
-      settled = setter_clause != SP_NULLPTR;
+    if (setter_clause) {
+      resolved.value = setter_clause->value;
+      settled = true;
+      winner = setter;
+    }
+    else if (option->additive) {
+      bool value = false;
       sp_da_for(requests, rt) {
         const spn_when_clause_t* clause = find_clause(requests[rt].options, option->name);
         if (!clause || clause->negated) {
@@ -126,13 +141,8 @@ spn_err_t spn_pkg_options_merge(
       }
       if (settled) {
         resolved.value = spn_option_value_bool(value);
-        winner = setter_clause ? setter : sp_str_lit("the union of requests");
+        winner = sp_str_lit("the union of requests");
       }
-    }
-    else if (setter_clause) {
-      resolved.value = setter_clause->value;
-      settled = true;
-      winner = setter;
     }
     else {
       sp_da_for(requests, rt) {
@@ -157,12 +167,7 @@ spn_err_t spn_pkg_options_merge(
     }
 
     if (!settled) {
-      if (!defaults_declined) {
-        resolved.value = spn_option_resolve(option, &env);
-      }
-      if (resolved.value.kind == SPN_OPTION_VALUE_NONE && option->type == SPN_OPTION_TYPE_BOOL) {
-        resolved.value = spn_option_value_bool(false);
-      }
+      resolved.value = fallback;
       if (resolved.value.kind == SPN_OPTION_VALUE_NONE && events) {
         return option_fail(events, (spn_evt_option_t) {
           .err = SPN_OPTION_ERR_NO_VALUE,
@@ -189,15 +194,11 @@ spn_err_t spn_pkg_options_merge(
       }
     }
 
+    resolved.is_default = spn_option_value_equal(resolved.value, fallback);
     if (resolved.value.kind != SPN_OPTION_VALUE_NONE) {
       spn_when_env_set(&env, resolved.name, resolved.value);
     }
     sp_da_push(*out, resolved);
-  }
-
-  sp_da_for(*out, it) {
-    spn_option_info_t* option = *sp_str_om_getp(info->options, (*out)[it].name);
-    (*out)[it].is_default = spn_option_value_equal((*out)[it].value, spn_option_resolve(option, &env));
   }
 
   return SPN_OK;
@@ -209,10 +210,11 @@ void spn_pkg_options_env(
   const spn_profile_info_t* profile,
   sp_da(spn_pkg_config_entry_t) root_config,
   bool is_root,
+  sp_da(spn_option_request_t) requests,
   spn_when_env_t* env
 ) {
   spn_resolved_options_t options = sp_zero;
-  spn_pkg_options_merge(mem, info, profile, root_config, is_root, SP_NULLPTR, SP_NULLPTR, &options);
+  spn_pkg_options_merge(mem, info, profile, root_config, is_root, requests, SP_NULLPTR, &options);
   spn_when_env_from_profile(mem, profile, env);
   spn_when_env_add_options(env, &options);
 }

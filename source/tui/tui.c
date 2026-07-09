@@ -599,9 +599,17 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
         case SPN_OPTION_ERR_LATE_GATE: {
           sp_fmt_io(
             &w.base,
-            "the dependency gate on {}'s edge to {.cyan} changed after resolution",
+            "the dependency gate on {}'s edge to {.cyan} never settled",
             sp_fmt_str(spn_tui_colored_name(mem, event->option.pkg)),
             sp_fmt_str(event->option.a)
+          );
+          break;
+        }
+        case SPN_OPTION_ERR_UNKNOWN_PKG: {
+          sp_fmt_io(
+            &w.base,
+            "the root manifest configures {.yellow}, which is not a package in this build",
+            sp_fmt_str(event->option.pkg)
           );
           break;
         }

@@ -1,5 +1,5 @@
-#include "porta.h"
+#include "a.h"
 
 int main() {
-  return porta_value();
+  return a_value();
 }
