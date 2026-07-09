@@ -22,7 +22,6 @@ add_executable(publish
   ${SRC}/intern/context.c
   ${SRC}/intern/intern.c
   ${SRC}/pkg/id.c
-  ${SRC}/pkg/load.c
   ${SRC}/pkg/mutate.c
   ${SRC}/profile/profile.c
   ${SRC}/triple/triple.c

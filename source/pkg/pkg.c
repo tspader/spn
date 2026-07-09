@@ -3,7 +3,6 @@
 #include "pkg/pkg.h"
 
 #include "intern/intern.h"
-#include "pkg/load.h"
 #include "pkg/mutate.h"
 #include "target/mutate.h"
 
@@ -22,10 +21,6 @@ bool spn_pkg_has_lib_kind(spn_pkg_info_t* pkg, spn_linkage_t kind) {
   }
 
   return false;
-}
-
-sp_str_t spn_pkg_get_url(spn_pkg_info_t* pkg) {
-  return pkg->url;
 }
 
 spn_target_info_t* spn_pkg_get_target(spn_pkg_info_t* pkg, const c8* name) {

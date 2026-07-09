@@ -179,7 +179,8 @@ static void lower_package(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
   out->name = p->name;
   out->namespace = p->namespace;
   out->repo = p->repo;
-  out->url = p->url;
+  out->upstream.url = p->url;
+  out->upstream.commit = p->commit;
   out->author = p->author;
   out->maintainer = p->maintainer;
   out->qualified = lower_qualify(ctx, p->namespace, p->name);
@@ -225,15 +226,6 @@ static void lower_publish(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
     sp_da_push(out->publish.copy, copy);
   }
   spn_toml_loader_pop(ctx);
-}
-
-static void lower_versions(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
-  out->versions = sp_da_new(ctx->mem, spn_semver_t);
-  sp_ht_init(ctx->mem, out->metadata);
-
-  spn_semver_t version = spn_semver_from_str(cg->package.version);
-  sp_da_push(out->versions, version);
-  sp_ht_insert(out->metadata, version, ((spn_pkg_metadata_t) { version, cg->package.commit }));
 }
 
 static void lower_targets(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
@@ -629,6 +621,15 @@ static void validate_collection_cxx(spn_toml_loader_t* ctx, spn_cg_target_om_t c
   spn_toml_loader_pop(ctx);
 }
 
+static void validate_upstream(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg) {
+  const spn_cg_package_t* p = &cg->package;
+  if (sp_str_empty(p->url) != sp_str_empty(p->commit)) {
+    spn_toml_loader_push_key(ctx, "package");
+    spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, sp_str_empty(p->commit) ? "commit" : "url");
+    spn_toml_loader_pop(ctx);
+  }
+}
+
 static void validate_cxx(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg) {
   validate_collection_cxx(ctx, cg->lib, "lib");
   validate_collection_cxx(ctx, cg->bin, "bin");
@@ -707,7 +708,6 @@ spn_err_t spn_pkg_lower(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn
 
   lower_package(ctx, cg, out);
   lower_publish(ctx, cg, out);
-  lower_versions(ctx, cg, out);
   lower_targets(ctx, cg, out);
   lower_toolchains(ctx, cg, out);
   lower_profiles(cg, out);
@@ -717,6 +717,7 @@ spn_err_t spn_pkg_lower(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn
   lower_config(ctx, cg, out);
 
   validate_lib_linkages(ctx, out);
+  validate_upstream(ctx, cg);
   validate_cxx(ctx, cg);
   validate_links(ctx, cg);
   validate_c_only_scripts(ctx, cg);

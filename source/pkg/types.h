@@ -68,11 +68,6 @@ typedef struct spn_pkg_req {
 
 
 typedef struct {
-  spn_semver_t version;
-  sp_str_t commit;
-} spn_pkg_metadata_t;
-
-typedef struct {
   sp_opt(spn_linkage_t) kind;
   spn_when_t options;
   bool defaults_declined;
@@ -99,10 +94,13 @@ struct spn_pkg_info {
   sp_str_t name;
   sp_str_t qualified;
   sp_str_t repo;
-  sp_str_t url;
   sp_str_t author;
   sp_str_t maintainer;
   spn_semver_t version;
+  struct {
+    sp_str_t url;
+    sp_str_t commit;
+  } upstream;
   spn_target_info_om_t libs;
   spn_target_info_om_t exes;
   spn_target_info_om_t scripts;
@@ -112,8 +110,6 @@ struct spn_pkg_info {
   sp_da(spn_requested_pkg_t) deps;
   sp_da(spn_pkg_config_entry_t) config;
   spn_option_info_om_t options;
-  sp_ht(spn_semver_t, spn_pkg_metadata_t) metadata;
-  sp_da(spn_semver_t) versions;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) public_define;
