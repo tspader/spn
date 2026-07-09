@@ -443,6 +443,45 @@ UTEST_F(options, edge_gates_dep) {
   });
 }
 
+// Each re-resolve discovers one more chain level, because a package's edge
+// request only lands once its own edge exists: a six-deep chain of gated
+// deps blows the resolve cap, and the LATE_GATE error must name the exact
+// gate that never settled rather than failing anonymously
+UTEST_F(options, late_gate) {
+  tmpfs_init_named(&uf->fixture.fs, "options_late_gate");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/options/late_gate",
+    .copy = { "vendor/*" },
+    .builds = {
+      {
+        .expect = {
+          .rc = 1,
+          .contains = { "k5", "k6" },
+          .events = {
+            { .event = "err_option", .key = "pkg", .value = "k5" },
+            { .event = "err_option", .key = "a", .value = "k6" },
+          },
+        },
+      },
+    },
+  });
+}
+
+// { not = ... } is a request-only form: an authoritative setter negating a
+// value is meaningless, so the root config declaring one is a load error
+// naming the option rather than a silently dropped clause
+UTEST_F(options, config_negated) {
+  tmpfs_init_named(&uf->fixture.fs, "options_config_negated");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/options/config_negated",
+    .builds = {
+      { .expect = { .rc = 1, .contains = { "verbose" } } },
+    },
+  });
+}
+
 // A when-gated dep inside an index package whose gate is off: the index
 // metadata lists the dep unconditionally, but a false gate in the fetched
 // manifest must cut the edge, not fail the build
