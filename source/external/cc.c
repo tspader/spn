@@ -165,18 +165,20 @@ spn_cc_target_t* spn_cc_add_target(spn_cc_t* cc, spn_cc_output_kind_t kind, sp_s
   return sp_da_back(cc->targets);
 }
 
-void spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx, sp_mem_t mem, spn_os_t target_os) {
-  ctx->arena = sp_mem_arena_new(mem);
-  ctx->mem = sp_mem_arena_as_allocator(ctx->arena);
-  sp_da_init(ctx->mem, ctx->entries);
+void spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* c, sp_mem_t mem, spn_os_t os, spn_arch_t arch) {
+  c->arena = sp_mem_arena_new(mem);
+  c->mem = sp_mem_arena_as_allocator(c->arena);
+  sp_da_init(c->mem, c->entries);
 
   spn_obj_kind_t format;
-  switch (target_os) {
+  switch (os) {
     case SPN_OS_WINDOWS: format = SPN_OBJ_COFF; break;
-    case SPN_OS_MACOS:   format = SPN_OBJ_MACHO; break;
-    default:             format = SPN_OBJ_ELF; break;
+    case SPN_OS_MACOS: format = SPN_OBJ_MACHO; break;
+    case SPN_OS_LINUX:
+    case SPN_OS_WASI: format = SPN_OBJ_ELF; break;
+    case SPN_OS_NONE: sp_unreachable_case();
   }
-  spn_obj_init(&ctx->obj, ctx->mem, format);
+  spn_obj_init(&c->obj, c->mem, format, arch);
 }
 
 void spn_cc_embed_ctx_free(spn_cc_embed_ctx_t* ctx) {
@@ -331,7 +333,7 @@ void spn_cc_target_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp
       break;
     }
     case SPN_CC_OUTPUT_EXE: {
-      sp_ps_config_add_arg(mem, ps, spn_cc_lib_kind_to_switch(cc->linkage));
+      sp_ps_config_add_arg(mem, ps, spn_cc_lib_kind_to_switch(cc->linkage, cc->os));
       break;
     }
     case SPN_CC_OUTPUT_WASM: {

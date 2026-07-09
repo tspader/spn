@@ -12,6 +12,7 @@
 #include "profile/types.h"
 #include "resolve/types.h"
 #include "session/registry/types.h"
+#include "target/types.h"
 #include "toolchain/types.h"
 #include "toolchain/select.h"
 #include "unit/types.h"
@@ -31,9 +32,9 @@ typedef struct {
   struct {
     sp_str_t manifest;
     sp_str_t script;
-    sp_str_t configure;
-    sp_str_t build;
   } paths;
+  spn_target_info_t configure;
+  spn_target_info_t build;
   u64 elapsed;
 } spn_loaded_pkg_t;
 

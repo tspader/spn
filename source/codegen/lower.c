@@ -131,7 +131,7 @@ static void lower_collection(spn_toml_loader_t* ctx, spn_cg_target_om_t cg, spn_
   }
 }
 
-static spn_target_info_t lower_script(spn_toml_loader_t* ctx, const spn_cg_build_script_t* cg, sp_str_t name, sp_str_t default_source) {
+static spn_target_info_t lower_script(spn_toml_loader_t* ctx, const spn_cg_build_script_t* cg, sp_str_t name) {
   spn_target_info_t script = {
     .name = name,
     .kind = SPN_TARGET_SCRIPT,
@@ -141,9 +141,6 @@ static spn_target_info_t lower_script(spn_toml_loader_t* ctx, const spn_cg_build
     .flags = cg->flags,
   };
   spn_target_info_init(ctx->mem, &script);
-  if (sp_da_empty(script.source)) {
-    sp_da_push(script.source, default_source);
-  }
   return script;
 }
 
@@ -198,8 +195,8 @@ static void lower_package(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
   sp_da_for(p->system_deps, it) {
     sp_da_push(out->gated.system_deps, ((spn_gated_str_t) { .value = p->system_deps[it].lib, .when = p->system_deps[it].when }));
   }
-  out->build = lower_script(ctx, &p->build, sp_str_lit("build"), sp_str_lit("build.c"));
-  out->configure = lower_script(ctx, &p->configure, sp_str_lit("configure"), sp_str_lit("configure.c"));
+  out->build = lower_script(ctx, &p->build, sp_str_lit("build"));
+  out->configure = lower_script(ctx, &p->configure, sp_str_lit("configure"));
 }
 
 static bool publish_mount_ok(sp_str_t path) {

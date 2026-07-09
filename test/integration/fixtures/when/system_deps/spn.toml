@@ -3,6 +3,7 @@ name = "when_system_deps"
 version = "0.1.0"
 system_deps = [
   { lib = "c++", when = { os = "linux" } },
+  { lib = "c++", when = { os = "macos" } },
   { lib = "ws2_32", when = { os = "windows" } },
 ]
 

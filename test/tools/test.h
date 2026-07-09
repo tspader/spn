@@ -18,6 +18,12 @@
 #define tkv(key, val) tk(key) #val
 #define tt(key, val) tk(key) #val
 
+#if defined(SP_MACOS)
+  #define SPN_TEST_SHARED_EXT ".dylib"
+#else
+  #define SPN_TEST_SHARED_EXT ".so"
+#endif
+
 
 
 

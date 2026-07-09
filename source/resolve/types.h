@@ -34,11 +34,13 @@ typedef struct {
   u64 priority;
   sp_da(spn_requested_pkg_t) deps;
   sp_da(spn_resolved_dep_t) edges;
-  union {
-    struct { spn_index_rel_t* release; } index;
-    struct { sp_str_t path; } file;
-    struct { spn_pkg_info_t* info; } root;
-  };
+  struct {
+    spn_pkg_tree_t recipe;
+    spn_pkg_tree_t source;
+    spn_index_rel_paths_t paths;
+    spn_pkg_info_t* info;
+    spn_index_rel_t* release;
+  } origin;
 } spn_resolved_pkg_t;
 
 typedef sp_ht(spn_pkg_id_t, spn_resolved_pkg_t) spn_resolve_t;

@@ -66,6 +66,7 @@
 #include "sp/sp_template.h"
 #include "sp/coff.h"
 #include "sp/sp_elf.h"
+#include "sp/macho.h"
 
 #define SP_GRAPH_IMPLEMENTATION
 #include "sp/sp_graph.h"
@@ -228,6 +229,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   spn.paths.cwd = sp_fs_get_cwd(spn.heap);
   spn.paths.bin = sp_fs_get_bin_path(spn.heap);
+  spn.paths.patches = sp_env_get(spn.env, sp_str_lit("SPN_PATCH_DIR"));
   spn.paths.config.dir = join_path(env_or("SPN_CONFIG_DIR", sp_fs_get_config_path(spn.heap)), "spn");
     spn.paths.config.toml = sp_fs_join_path(spn.heap, spn.paths.config.dir, SP_LIT("spn.toml"));
   spn.paths.storage = env_or("SPN_STORAGE_DIR", join_path(sp_fs_get_storage_path(spn.heap), "spn"));
@@ -249,6 +251,13 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       spn.paths.tools.lock = sp_fs_join_path(spn.heap, spn.paths.storage, sp_str_lit("spn.lock"));
 
   sp_fs_create_dir(spn.paths.log);
+  {
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    sp_str_t jsonl_path = sp_fs_join_path(scratch.mem, spn.paths.log, sp_str_lit("build.jsonl"));
+    sp_fs_create_file(jsonl_path);
+    sp_io_file_writer_from_path(&spn.logger.jsonl, jsonl_path);
+    sp_mem_end_scratch(scratch);
+  }
   sp_fs_create_dir(spn.paths.caches.dir);
   sp_fs_create_dir(spn.paths.caches.git.dir);
   sp_fs_create_dir(spn.paths.caches.git.dbs);
@@ -377,6 +386,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     app.session.intern = spn.intern;
     app.session.events = spn.events;
     app.session.paths.root = spn.paths.project;
+    app.session.paths.system = spn.paths;
 
     try(spn_session_init(&app.session, spn.heap, &app.package, app.config));
   }
@@ -407,6 +417,9 @@ static void spn_drain_events(void) {
     spn_build_event_t* event = &events[it];
     event->thread_id = get_short_thread_id(event->thread_id);
 
+    if (spn.logger.jsonl.fd) {
+      spn_event_log_jsonl(&spn.logger.jsonl.base, event);
+    }
     if (event->io) {
       spn_event_log_jsonl(&event->io->jsonl.writer, event);
       spn_event_log_build(&event->io->build.writer, event);

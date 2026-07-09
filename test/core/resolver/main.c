@@ -221,7 +221,7 @@ static void build_cache(sp_mem_t mem, fixture_t* fixture) {
         index_target_t* target_desc = &rel_desc->targets[t];
         if (!target_desc->name) break;
 
-        spn_index_rel_target_t target = { .name = sp_str_view(target_desc->name) };
+        spn_index_target_t target = { .name = sp_str_view(target_desc->name) };
         sp_da_init(mem, target.linkages);
         sp_carr_for(target_desc->linkages, l) {
           if (target_desc->linkages[l] == SPN_LIB_KIND_NONE) break;

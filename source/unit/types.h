@@ -151,6 +151,8 @@ struct spn_pkg_unit_t {
   spn_pkg_id_t id;
   spn_session_t* session;
   spn_pkg_info_t* info;
+  spn_target_info_t configure;
+  spn_target_info_t build;
 
   sp_da(spn_compile_unit_t*) objects;
   sp_da(spn_target_unit_t*) libs;

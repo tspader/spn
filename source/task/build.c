@@ -442,8 +442,8 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
 
     spn_try(spn_bg_cmd_add_output(graph, nodes->build_script.run, nodes->build_script.module));
     spn_try(spn_bg_cmd_add_input(graph, nodes->build_script.run, nodes->stamp.main));
-    sp_da_for(unit->info->build.source, it) {
-      spn_bg_id_t source = get_or_put_user_file(unit, graph, unit->info->build.source[it]);
+    sp_da_for(unit->build.source, it) {
+      spn_bg_id_t source = get_or_put_user_file(unit, graph, unit->build.source[it]);
       spn_try(spn_bg_cmd_add_input(graph, nodes->build_script.run, source));
     }
 

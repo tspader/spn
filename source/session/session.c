@@ -373,6 +373,8 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_pkg_id_t id, spn
   spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
   unit->id = id;
   unit->info = loaded->info;
+  unit->configure = loaded->configure;
+  unit->build = loaded->build;
   unit->session = session;
   sp_da_init(session->mem, unit->objects);
   sp_da_init(session->mem, unit->libs);
@@ -409,8 +411,8 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_pkg_id_t id, spn
   unit->paths.vendor = sp_fs_join_path(session->mem, unit->paths.store, SP_LIT("vendor"));
 
   unit->paths.generated = sp_fs_join_path(session->mem, unit->paths.work, SP_LIT("spn"));
-  spn_wasm_script_init(&unit->wasm.configure, loaded->paths.configure, sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("configure.wasm")));
-  spn_wasm_script_init(&unit->wasm.build, loaded->paths.build, sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("build.wasm")));
+  spn_wasm_script_init(&unit->wasm.configure, !sp_da_empty(unit->configure.source), sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("configure.wasm")));
+  spn_wasm_script_init(&unit->wasm.build, !sp_da_empty(unit->build.source), sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("build.wasm")));
 
   unit->logs.build = sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(unit->info->name)).value;
   unit->logs.test = sp_fmt(session->mem, "{}.test.log", SP_FMT_STR(unit->info->name)).value;

@@ -7,7 +7,9 @@ name = "main"
 source = ["main.c"]
 define = [
   { value = "FACT_OS", when = { os = "linux" } },
+  { value = "FACT_OS", when = { os = "macos" } },
   { value = "FACT_ARCH", when = { arch = "x86_64" } },
+  { value = "FACT_ARCH", when = { arch = "aarch64" } },
   { value = "FACT_MODE", when = { mode = "debug" } },
   { value = "FACT_OTHER_OS", when = { os = "windows" } },
 ]

@@ -7,4 +7,5 @@ name = "main"
 source = ["main.c"]
 define = [
   { value = "RELEASE_LINUX", when = { os = "linux", mode = "release" } },
+  { value = "RELEASE_LINUX", when = { os = "macos", mode = "release" } },
 ]

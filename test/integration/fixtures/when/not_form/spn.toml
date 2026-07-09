@@ -7,5 +7,5 @@ name = "main"
 source = ["main.c"]
 define = [
   { value = "NOT_MSVC", when = { abi = { not = "msvc" } } },
-  { value = "NOT_LINUX", when = { os = { not = "linux" } } },
+  { value = "NOT_DEBUG", when = { mode = { not = "debug" } } },
 ]

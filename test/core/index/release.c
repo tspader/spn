@@ -47,22 +47,22 @@ UTEST_EMPTY_FIXTURE(index_release)
 static spn_index_rel_t release_test_build(sp_mem_t mem, release_test_rel_t* rel) {
   spn_index_rel_t built = {
     .id = {
-      .namespace = sp_str_view(rel->namespace),
-      .name = sp_str_view(rel->name),
+      .namespace = sp_cstr_as_str(rel->namespace),
+      .name = sp_cstr_as_str(rel->name),
     },
-    .version = spn_semver_from_str(sp_str_view(rel->version)),
+    .version = spn_semver_from_str(sp_cstr_as_str(rel->version)),
     .yanked = rel->yanked,
   };
 
-  if (rel->checksum) { built.checksum = sp_str_view(rel->checksum); }
-  if (rel->source.url) { built.source.url = sp_str_view(rel->source.url); }
-  if (rel->source.rev) { built.source.rev = sp_str_view(rel->source.rev); }
-  if (rel->source.dir) { built.source.dir = sp_str_view(rel->source.dir); }
-  if (rel->manifest.url) { built.manifest.url = sp_str_view(rel->manifest.url); }
-  if (rel->manifest.rev) { built.manifest.rev = sp_str_view(rel->manifest.rev); }
-  if (rel->manifest.dir) { built.manifest.dir = sp_str_view(rel->manifest.dir); }
-  if (rel->paths.manifest) { built.paths.manifest = sp_str_view(rel->paths.manifest); }
-  if (rel->paths.script) { built.paths.script = sp_str_view(rel->paths.script); }
+  if (rel->checksum) { built.checksum = sp_cstr_as_str(rel->checksum); }
+  if (rel->source.url) { built.source.url = sp_cstr_as_str(rel->source.url); }
+  if (rel->source.rev) { built.source.rev = sp_cstr_as_str(rel->source.rev); }
+  if (rel->source.dir) { built.source.dir = sp_cstr_as_str(rel->source.dir); }
+  if (rel->manifest.url) { built.manifest.url = sp_cstr_as_str(rel->manifest.url); }
+  if (rel->manifest.rev) { built.manifest.rev = sp_cstr_as_str(rel->manifest.rev); }
+  if (rel->manifest.dir) { built.manifest.dir = sp_cstr_as_str(rel->manifest.dir); }
+  if (rel->paths.manifest) { built.paths.manifest = sp_cstr_as_str(rel->paths.manifest); }
+  if (rel->paths.script) { built.paths.script = sp_cstr_as_str(rel->paths.script); }
 
   sp_da_init(mem, built.deps);
   sp_carr_for(rel->deps, it) {
@@ -70,17 +70,19 @@ static spn_index_rel_t release_test_build(sp_mem_t mem, release_test_rel_t* rel)
     sp_da_push(built.deps, ((spn_index_dep_t) {
       .kind = rel->deps[it].kind,
       .id = {
-        .namespace = sp_str_view(rel->deps[it].namespace),
-        .name = sp_str_view(rel->deps[it].name),
+        .namespace = sp_cstr_as_str(rel->deps[it].namespace),
+        .name = sp_cstr_as_str(rel->deps[it].name),
       },
-      .version = sp_str_view(rel->deps[it].version),
+      .version = sp_cstr_as_str(rel->deps[it].version),
     }));
   }
 
   sp_da_init(mem, built.targets);
   sp_carr_for(rel->targets, it) {
-    if (!rel->targets[it].name) { break; }
-    spn_index_rel_target_t target = { .name = sp_str_view(rel->targets[it].name) };
+    if (!rel->targets[it].name) break;
+
+    spn_index_target_t target = sp_zero;
+    target.name = sp_cstr_as_str(rel->targets[it].name);
     sp_da_init(mem, target.linkages);
     sp_carr_for(rel->targets[it].linkages, kind) {
       if (rel->targets[it].linkages[kind] == SPN_LIB_KIND_NONE) { break; }
@@ -150,7 +152,7 @@ static void release_test_check(s32* utest_result, sp_mem_t mem, release_test_rel
 
 static void run_release_test(s32* utest_result, release_test_t t) {
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-  sp_str_t path = sp_fs_join_path(mem, sp_cstr_as_str(RELEASE_DIR), sp_str_view(t.file));
+  sp_str_t path = sp_fs_join_path(mem, sp_cstr_as_str(RELEASE_DIR), sp_cstr_as_str(t.file));
 
   u32 num_releases = 0;
   sp_carr_for(t.expect.releases, it) {

@@ -1,10 +1,15 @@
+#include "git/types.h"
+#include "index/types.h"
 #include "sp.h"
 #include "sp/macro.h"
 #include "error/types.h"
 #include "event/event.h"
 #include "index/cache.h"
 #include "intern/intern.h"
+#include "codegen/lower.h"
+#include "ctx/types.h"
 #include "pkg/id.h"
+#include "pkg/load.h"
 #include "pkg/types.h"
 #include "resolve/resolve.h"
 #include "resolve/types.h"
@@ -17,6 +22,8 @@
 #include "session/registry/types.h"
 #include "target/mutate.h"
 #include "target/select.h"
+#include "toml/issue.h"
+#include "toml/loader.h"
 #include "when/when.h"
 #include "spn.h"
 
@@ -96,6 +103,13 @@ typedef struct {
 
 static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node, spn_requested_pkg_t* dep);
 static spn_err_t resolve_deps(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node);
+
+static spn_pkg_tree_t tree_git(spn_index_rel_source_t source) {
+  return (spn_pkg_tree_t){
+    .kind = SPN_PKG_TREE_GIT,
+    .git = { .url = source.url, .rev = source.rev, .dir = source.dir },
+  };
+}
 
 void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn_index_cache_t* index, spn_pkg_registry_t* registry, spn_event_buffer_t* events, spn_profile_info_t profile, sp_da(spn_pkg_config_entry_t) config, u64 budget) {
   *r = (spn_resolver_t){
@@ -182,12 +196,12 @@ static bool node_is_shared(spn_resolver_t* resolver, spn_resolved_pkg_t* node) {
 
   switch (node->source) {
     case SPN_PKG_SOURCE_INDEX: {
-      if (!node->index.release) {
+      if (!node->origin.release) {
         return false;
       }
 
-      sp_da_for(node->index.release->targets, it) {
-        spn_index_rel_target_t* target = &node->index.release->targets[it];
+      sp_da_for(node->origin.release->targets, it) {
+        spn_index_target_t* target = &node->origin.release->targets[it];
         if (sp_da_empty(target->linkages)) {
           continue;
         }
@@ -414,10 +428,21 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
     .qualified = pkg->info->qualified,
     .source = pkg->source,
     .version = pkg->info->version,
+    .origin = {
+      .recipe = {
+        .kind = SPN_PKG_TREE_LOCAL,
+        .local = sp_fs_parent_path(pkg->manifest)
+      },
+      .paths = {
+        .manifest = sp_fs_get_name(pkg->manifest),
+        .script = sp_str_lit("spn.c")
+      },
+      .info = pkg->info,
+    },
   };
 
   if (pkg->source == SPN_PKG_SOURCE_FILE) {
-    node.file.path = request->file.path;
+    node.origin.source = spn_pkg_manifest_source_tree(pkg->info);
   }
 
   sp_da_init(resolver->mem, node.deps);
@@ -476,6 +501,7 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
   spn_scope_t* scope = &run->scopes[run->scope];
   sp_str_t qualified = spn_pkg_name_to_qualified(release->id);
   sp_intern_id_t name = sp_intern_get_or_insert(resolver->intern, qualified);
+  spn_index_rel_source_t manifest = sp_str_empty(release->manifest.url) ? release->source : release->manifest;
 
   spn_resolved_pkg_t node = {
     .id = {
@@ -485,10 +511,22 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
     .qualified = qualified,
     .source = SPN_PKG_SOURCE_INDEX,
     .version = release->version,
-    .index = {
+    .origin = {
       .release = release,
+      .paths = release->paths,
+      .recipe = {
+        .kind = SPN_PKG_TREE_GIT,
+        .git = { .url = manifest.url, .rev = manifest.rev, .dir = manifest.dir },
+      },
     }
   };
+
+  if (!sp_str_empty(release->source.url)) {
+    node.origin.source.kind = SPN_PKG_TREE_GIT;
+    node.origin.source.git = (spn_git_checkout_id_t) {
+      release->source.url, release->source.rev, release->source.dir
+    };
+  }
 
   sp_da_init(resolver->mem, node.deps);
   sp_da_for(release->deps, it) {
@@ -1197,6 +1235,60 @@ done:
   return result;
 }
 
+static sp_str_t patch_dir(spn_resolver_t* resolver, spn_index_rel_t* release) {
+  if (sp_str_empty(spn.paths.patches))
+    return sp_str_lit("");
+
+  sp_str_t dir = sp_fs_join_path(resolver->mem, spn.paths.patches, release->id.name);
+  sp_str_t manifest = sp_fs_join_path(resolver->mem, dir, release->paths.manifest);
+  if (!sp_fs_exists(manifest))
+    return sp_str_lit("");
+
+  return dir;
+}
+
+static spn_err_t apply_patch_overrides(spn_resolver_t* resolver, spn_resolve_query_t* query) {
+  spn_err_t result = SPN_OK;
+
+  sp_ht_for_kv(query->result, it) {
+    spn_resolved_pkg_t* pkg = it.val;
+    if (pkg->source != SPN_PKG_SOURCE_INDEX) {
+      continue;
+    }
+
+    sp_str_t patch = patch_dir(resolver, pkg->origin.release);
+    if (sp_str_empty(patch)) {
+      continue;
+    }
+
+    sp_str_t manifest = sp_fs_join_path(resolver->mem, patch, pkg->origin.paths.manifest);
+    spn_pkg_info_t* info = sp_alloc_type(resolver->mem, spn_pkg_info_t);
+    spn_toml_loader_t ctx = sp_zero;
+    spn_toml_loader_init(&ctx, resolver->mem, resolver->intern);
+    if (spn_codegen_load_pkg(&ctx, manifest, info)) {
+      spn_event_buffer_push(resolver->events, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR_MANIFEST,
+        .manifest_err = {
+          .name = pkg->qualified,
+          .path = manifest,
+          .error = spn_codegen_issues_message(resolver->mem, ctx.issues),
+          .issues = ctx.issues,
+        }});
+      result = SPN_ERROR;
+      continue;
+    }
+
+    pkg->origin.recipe = (spn_pkg_tree_t) {
+      .kind = SPN_PKG_TREE_LOCAL,
+      .local = patch
+    },
+    pkg->origin.source = spn_pkg_manifest_source_tree(info);
+    pkg->origin.info = info;
+  }
+
+  return result;
+}
+
 spn_err_t spn_resolve_from_lock_file(spn_resolver_t* resolver, spn_lock_file_t* lock) {
   return SPN_OK;
 }
@@ -1274,6 +1366,10 @@ spn_err_t spn_resolve_from_solver(spn_resolver_t* resolver, spn_resolve_query_t*
 
   if (err && run.failed) {
     spn_event_buffer_push(resolver->events, run.failure);
+  }
+
+  if (!err) {
+    err = apply_patch_overrides(resolver, query);
   }
 
   query->time = sp_tm_read_timer(&timer);

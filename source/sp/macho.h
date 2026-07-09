@@ -52,6 +52,7 @@ void                 sp_macho_free(sp_macho_t* macho);
 sp_macho_section_t*  sp_macho_add_section(sp_macho_t* macho, sp_str_t segname, sp_str_t sectname, u32 align);
 void                 sp_macho_add_symbol(sp_macho_t* macho, sp_str_t name, u8 section, u64 value);
 sp_err_t             sp_macho_write(sp_macho_t* macho, sp_io_writer_t* out);
+sp_err_t             sp_macho_write_to_file(sp_macho_t* macho, sp_str_t path);
 
 #endif // SP_MACHO_H
 
@@ -226,6 +227,14 @@ sp_err_t sp_macho_write(sp_macho_t* macho, sp_io_writer_t* out) {
 
   sp_mem_end_scratch(scratch);
   return SP_OK;
+}
+
+sp_err_t sp_macho_write_to_file(sp_macho_t* macho, sp_str_t path) {
+  sp_io_file_writer_t f = sp_zero;
+  sp_try(sp_io_file_writer_from_path(&f, path));
+  sp_err_t err = sp_macho_write(macho, &f.base);
+  sp_io_file_writer_close(&f);
+  return err;
 }
 
 #endif // SP_IMPLEMENTATION
