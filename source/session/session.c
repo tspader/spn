@@ -123,10 +123,6 @@ static void sweep_unreachable(spn_session_t* session) {
   session->resolve = kept;
 }
 
-// Keys check against the resolve set, not the loaded-package table: a gate
-// prune or re-resolve leaves the table holding packages no longer in the
-// build, and a key those legitimize is silently dead. Declared-but-gated-off
-// deps of in-build packages stay configurable.
 static spn_err_t validate_config_keys(spn_session_t* session) {
   sp_da_for(session->pkg->config, ct) {
     spn_pkg_config_entry_t* entry = &session->pkg->config[ct];

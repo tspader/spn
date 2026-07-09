@@ -4,16 +4,17 @@ typedef struct {
   const c8* value;
   bool absent;
 } opt_event_t;
+typedef struct {
+  s32 rc;
+  struct { const c8* name; s32 rc; } bin;
+  const c8* contains [4];
+  opt_event_t events [2];
+} opt_expect_t;
 
 typedef struct {
   const c8* profile;
   const c8* manifest;
-  struct {
-    s32 rc;
-    struct { const c8* name; s32 rc; } bin;
-    const c8* contains [4];
-    opt_event_t events [2];
-  } expect;
+  opt_expect_t expect;
 } opt_build_t;
 
 typedef struct {
@@ -537,20 +538,22 @@ UTEST_F(options, dep_rebuild) {
   });
 }
 
-// Facts are build identity for every package, targets or not: a script-only
-// package whose configure output depends on the mode is a distinct package
-// per mode. The flip to release works by accident of mtimes (the shared
-// store is rewritten in place); coming back to debug must not hand main the
-// release-flavored store that a fact-blind fingerprint now holds
+// Test that swapping the build profile on a dependency with no binary artifacts
+// still flips its fingerprint.
+//
+// The dependency has a build script which writes a header defining a value
+// differently depending on the profile's mode.
 UTEST_F(options, fact_identity) {
   tmpfs_init_named(&uf->fixture.fs, "options_fact_identity");
 
+  opt_expect_t debug = { .bin = { .name = "main", .rc = 1 } };
+  opt_expect_t release = { .bin = { .name = "main", .rc = 2 } };
   run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
     .project = "test/integration/fixtures/options/fact_identity",
     .builds = {
-      { .expect = { .bin = { .name = "main", .rc = 1 } } },
-      { .profile = "release", .expect = { .bin = { .name = "main", .rc = 2 } } },
-      { .expect = { .bin = { .name = "main", .rc = 1 } } },
+      { .expect = debug },
+      { .profile = "release", .expect = release },
+      { .expect = debug },
     },
   });
 }
