@@ -339,7 +339,7 @@ typedef struct {
     sp_hash_t ld;
     sp_hash_t ar;
     sp_hash_t url;
-    spn_semver_t version;
+    sp_hash_t identity;
   } toolchain;
 } fingerprint_input_t;
 
@@ -413,24 +413,23 @@ static sp_hash_t fingerprint_hash(spn_session_t* session, spn_pkg_id_t id) {
     fingerprint.deps = sp_hash_bytes(edges, sp_da_size(edges) * sizeof(fingerprint_edge_t), 0);
   }
 
-  bool compiled = sp_str_om_size(pkg->libs) > 0 || sp_str_om_size(pkg->exes) > 0;
-  if (compiled) {
-    fingerprint.mode = session->profile.mode;
-    sp_opt_spn_linkage_t config = spn_session_config_kind(session, pkg->name);
-    fingerprint.linkage = config.some ? config.value : session->profile.linkage;
-    fingerprint.standard = session->profile.standard;
-    fingerprint.arch = session->profile.arch;
-    fingerprint.os = session->profile.os;
-    fingerprint.abi = session->profile.abi;
+  fingerprint.mode = session->profile.mode;
+  sp_opt_spn_linkage_t config = spn_session_config_kind(session, pkg->name);
+  fingerprint.linkage = config.some ? config.value : session->profile.linkage;
+  fingerprint.standard = session->profile.standard;
+  fingerprint.arch = session->profile.arch;
+  fingerprint.os = session->profile.os;
+  fingerprint.abi = session->profile.abi;
 
-    spn_toolchain_t* toolchain = session->units.toolchain->toolchain;
-    fingerprint.toolchain.cc = sp_hash_str(toolchain->compiler.program);
-    fingerprint.toolchain.ld = sp_hash_str(toolchain->linker.program);
-    fingerprint.toolchain.ar = sp_hash_str(toolchain->archiver.program);
-    fingerprint.toolchain.cxx = sp_hash_str(toolchain->cxx.program);
-    if (!sp_opt_is_null(toolchain->artifact)) {
-      fingerprint.toolchain.url = sp_hash_str(sp_opt_get(toolchain->artifact).sha256);
-    }
+  spn_toolchain_t* toolchain = session->units.toolchain->toolchain;
+  fingerprint.toolchain.name = sp_hash_str(toolchain->name);
+  fingerprint.toolchain.cc = sp_hash_str(toolchain->compiler.program);
+  fingerprint.toolchain.ld = sp_hash_str(toolchain->linker.program);
+  fingerprint.toolchain.ar = sp_hash_str(toolchain->archiver.program);
+  fingerprint.toolchain.cxx = sp_hash_str(toolchain->cxx.program);
+  fingerprint.toolchain.identity = session->units.toolchain->identity;
+  if (!sp_opt_is_null(toolchain->artifact)) {
+    fingerprint.toolchain.url = sp_hash_str(sp_opt_get(toolchain->artifact).sha256);
   }
 
   sp_hash_t hash = sp_hash_bytes(&fingerprint, sizeof(fingerprint), 0);
