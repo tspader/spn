@@ -7,7 +7,6 @@
 #include "index/index.h"
 #include "index/publish.h"
 #include "pkg/id.h"
-#include "pkg/load.h"
 #include "semver/convert.h"
 #include "target/mutate.h"
 #include "toml/loader.h"
@@ -87,9 +86,8 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
   sp_da_init(opts->mem, release.deps);
   sp_da_init(opts->mem, release.targets);
 
-  spn_pkg_tree_t source = spn_pkg_manifest_source_tree(&info);
-  if (source.kind == SPN_PKG_TREE_GIT) {
-    release.source = (spn_index_rel_source_t) { .url = source.git.url, .rev = source.git.rev };
+  if (!sp_str_empty(info.upstream.url)) {
+    release.source = (spn_index_rel_source_t) { .url = info.upstream.url, .rev = info.upstream.commit };
     release.manifest = (spn_index_rel_source_t) { .url = url, .rev = revision, .dir = subdir };
   }
 

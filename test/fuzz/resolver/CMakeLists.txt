@@ -22,7 +22,6 @@ add_executable(fuzz_resolver
   ${SRC}/index/json.c
   ${SRC}/sp/io.c
   ${SRC}/pkg/id.c
-  ${SRC}/pkg/load.c
   ${SRC}/pkg/mutate.c
   ${SRC}/pkg/options.c
   ${SRC}/profile/profile.c

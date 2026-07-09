@@ -54,7 +54,6 @@ set(SPN_SOURCES
   log/lazy/lazy.c
   log/log.c
   pkg/id.c
-  pkg/load.c
   pkg/mutate.c
   pkg/options.c
   pkg/pkg.c

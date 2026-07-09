@@ -236,14 +236,11 @@ typedef struct {
 
 
 fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_id_t id, spn_pkg_info_t* pkg) {
-  spn_pkg_metadata_t* metadata = sp_ht_getp(pkg->metadata, pkg->version);
-  sp_assert(metadata);
-
   fingerprint_input_t fingerprint = SP_ZERO_INITIALIZE();
-  fingerprint.commit = sp_hash_str(metadata->commit);
+  fingerprint.commit = sp_hash_str(pkg->upstream.commit);
   fingerprint.subtree = id.hash;
   fingerprint.options = hash_options(session, pkg);
-  fingerprint.version = metadata->version;
+  fingerprint.version = pkg->version;
 
   bool compiled = sp_str_om_size(pkg->libs) > 0 || sp_str_om_size(pkg->exes) > 0;
   if (compiled) {

@@ -7,8 +7,6 @@
 #include "enum/enum.h"
 #include "intern/intern.h"
 #include "pkg/mutate.h"
-#include "semver/compare.h"
-#include "semver/convert.h"
 #include "target/mutate.h"
 
 static sp_mem_t spn_pkg_mem(spn_pkg_info_t* pkg) {
@@ -28,9 +26,7 @@ void spn_pkg_init(sp_mem_t mem, spn_pkg_info_t* pkg, sp_str_t name) {
   sp_str_om_init(pkg->indexes);
   sp_str_om_init(pkg->toolchains);
   sp_da_init(a, pkg->deps);
-  sp_ht_init(a, pkg->metadata);
   sp_da_init(a, pkg->config);
-  sp_da_init(a, pkg->versions);
   sp_da_init(a, pkg->include);
   sp_da_init(a, pkg->define);
   sp_da_init(a, pkg->public_define);
@@ -55,14 +51,6 @@ void spn_pkg_set_repo_ex(spn_pkg_info_t* pkg, sp_str_t repo) {
   pkg->repo = sp_str_copy(spn_pkg_mem(pkg), repo);
 }
 
-void spn_pkg_set_url(spn_pkg_info_t* pkg, const c8* url) {
-  spn_pkg_set_url_ex(pkg, sp_str_view(url));
-}
-
-void spn_pkg_set_url_ex(spn_pkg_info_t* pkg, sp_str_t url) {
-  pkg->url = sp_str_copy(spn_pkg_mem(pkg), url);
-}
-
 void spn_pkg_set_author(spn_pkg_info_t* pkg, const c8* author) {
   spn_pkg_set_author_ex(pkg, sp_str_view(author));
 }
@@ -77,20 +65,6 @@ void spn_pkg_set_maintainer(spn_pkg_info_t* pkg, const c8* maintainer) {
 
 void spn_pkg_set_maintainer_ex(spn_pkg_info_t* pkg, sp_str_t maintainer) {
   pkg->maintainer = sp_str_copy(spn_pkg_mem(pkg), maintainer);
-}
-
-void spn_pkg_add_version(spn_pkg_info_t* pkg, const c8* version, const c8* commit) {
-  spn_pkg_add_version_ex(pkg, spn_semver_from_str(sp_str_view(version)), sp_str_view(commit));
-}
-
-void spn_pkg_add_version_ex(spn_pkg_info_t* pkg, spn_semver_t version, sp_str_t commit) {
-  if (spn_semver_is_empty(pkg->version)) {
-    pkg->version = version;
-  }
-
-  spn_pkg_metadata_t metadata = { version, sp_str_copy(spn_pkg_mem(pkg), commit) };
-  sp_ht_insert(pkg->metadata, version, metadata);
-  sp_da_push(pkg->versions, version);
 }
 
 void spn_pkg_add_include(spn_pkg_info_t* pkg, const c8* include) {

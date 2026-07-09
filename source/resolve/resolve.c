@@ -9,7 +9,6 @@
 #include "codegen/lower.h"
 #include "ctx/types.h"
 #include "pkg/id.h"
-#include "pkg/load.h"
 #include "pkg/types.h"
 #include "resolve/resolve.h"
 #include "resolve/types.h"
@@ -149,6 +148,16 @@ static void record_failure(spn_resolve_run_t* run, spn_build_event_t event) {
   }
   run->failed = true;
   run->failure = event;
+}
+
+static spn_pkg_tree_t upstream_tree(spn_pkg_info_t* info) {
+  if (sp_str_empty(info->upstream.url)) {
+    return (spn_pkg_tree_t) { .kind = SPN_PKG_TREE_NONE };
+  }
+  return (spn_pkg_tree_t) {
+    .kind = SPN_PKG_TREE_GIT,
+    .git = { .url = info->upstream.url, .rev = info->upstream.commit },
+  };
 }
 
 static spn_build_event_t unsatisfiable_event(spn_resolved_pkg_t* from, spn_requested_pkg_t* request, bool conflict, spn_semver_t selected) {
@@ -442,7 +451,7 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
   };
 
   if (pkg->source == SPN_PKG_SOURCE_FILE) {
-    node.origin.source = spn_pkg_manifest_source_tree(pkg->info);
+    node.origin.source = upstream_tree(pkg->info);
   }
 
   sp_da_init(resolver->mem, node.deps);
@@ -1282,7 +1291,7 @@ static spn_err_t apply_patch_overrides(spn_resolver_t* resolver, spn_resolve_que
       .kind = SPN_PKG_TREE_LOCAL,
       .local = patch
     },
-    pkg->origin.source = spn_pkg_manifest_source_tree(info);
+    pkg->origin.source = upstream_tree(info);
     pkg->origin.info = info;
   }
 

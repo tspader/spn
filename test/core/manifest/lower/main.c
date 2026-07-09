@@ -247,7 +247,7 @@ static void run_case(s32* utest_result, test_t test) {
   if (test.name)       EXPECT_STR(pkg.name, test.name);
   if (test.namespace)  EXPECT_STR(pkg.namespace, test.namespace);
   if (test.qualified)  EXPECT_STR(pkg.qualified, test.qualified);
-  if (test.url)        EXPECT_STR(pkg.url, test.url);
+  if (test.url)        EXPECT_STR(pkg.upstream.url, test.url);
   if (test.repo)       EXPECT_STR(pkg.repo, test.repo);
   if (test.author)     EXPECT_STR(pkg.author, test.author);
   if (test.maintainer) EXPECT_STR(pkg.maintainer, test.maintainer);
@@ -256,15 +256,10 @@ static void run_case(s32* utest_result, test_t test) {
     EXPECT_EQ(test.version.major, pkg.version.major);
     EXPECT_EQ(test.version.minor, pkg.version.minor);
     EXPECT_EQ(test.version.patch, pkg.version.patch);
-
-    ASSERT_EQ((u32)1, (u32)sp_da_size(pkg.versions));
-    EXPECT_EQ(test.version.major, pkg.versions[0].major);
   }
 
   if (test.commit) {
-    spn_pkg_metadata_t* meta = sp_ht_getp(pkg.metadata, pkg.version);
-    ASSERT_TRUE(meta);
-    EXPECT_STR(meta->commit, test.commit);
+    EXPECT_STR(pkg.upstream.commit, test.commit);
   }
 
   // Package arrays
@@ -704,6 +699,24 @@ UTEST(lower, validate_duplicate_name) {
     .manifest = "validate_duplicate_name",
     .issues = {
       { SPN_CODEGEN_ERR_DUPLICATE_KEY, "bin[0]" }
+    }
+  });
+}
+
+UTEST(lower, validate_upstream_url_only) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_upstream_url_only",
+    .issues = {
+      { SPN_CODEGEN_ERR_MISSING_KEY, "package.commit" }
+    }
+  });
+}
+
+UTEST(lower, validate_upstream_commit_only) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_upstream_commit_only",
+    .issues = {
+      { SPN_CODEGEN_ERR_MISSING_KEY, "package.url" }
     }
   });
 }
