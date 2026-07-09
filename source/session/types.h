@@ -89,6 +89,7 @@ struct spn_session_t {
   spn_pkg_registry_t registry;
   sp_ht(spn_pkg_id_t, spn_loaded_pkg_t) packages;
   sp_ht(spn_pkg_id_t, spn_resolved_options_t) options;
+  sp_ht(spn_pkg_id_t, sp_hash_t) fingerprints;
 
   // Dependency gates and consumer requests reach a fixed point across
   // resolve passes: apply stashes the requests it collected as seeds, and a

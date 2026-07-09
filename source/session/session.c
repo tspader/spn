@@ -41,6 +41,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   s->paths.build = sp_fs_join_path(s->mem, s->paths.root, sp_str_lit("build"));
   sp_ht_init(s->mem, s->registry);
   sp_ht_init(s->mem, s->packages);
+  sp_ht_init(s->mem, s->fingerprints);
   sp_mutex_init(&s->mutex, SP_MUTEX_PLAIN);
 
   try_union(spn_profile_resolve(s->profiles, &config.overrides, &s->profile));
@@ -59,15 +60,6 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   return spn_result(SPN_OK);
 }
 
-// Options resolve once every manifest is loaded: requests are read off
-// consumers' live edges, merged per resolved package with the root's config,
-// and the result drives one apply per loaded info. Gates and requests are
-// circular — a request can flip a gate, which changes the edge set, which
-// changes the requests — so the recheck iterates: an edge whose gate went
-// false is pruned in place (index metadata carries no whens, so index
-// packages always over-resolve), and a gate that needs an edge resolution
-// never made stashes the requests as seeds and asks for another resolve
-// pass. Both directions are bounded; exhaustion is a LATE_GATE error.
 #define SPN_GATE_MAX_PASSES   8
 #define SPN_GATE_MAX_RESOLVES 4
 
@@ -329,10 +321,10 @@ sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pk
 }
 
 typedef struct {
+  sp_hash_t qualified;
   sp_hash_t commit;
-  sp_hash_t subtree;
   sp_hash_t options;
-  sp_hash_t dep_options;
+  sp_hash_t deps;
   spn_semver_t version;
   spn_build_mode_t mode;
   spn_linkage_t linkage;
@@ -376,72 +368,50 @@ static sp_hash_t hash_options(spn_session_t* session, spn_pkg_id_t id) {
   return hash;
 }
 
-static s32 sort_hashes(const void* a, const void* b) {
-  sp_hash_t lhs = *(const sp_hash_t*)a;
-  sp_hash_t rhs = *(const sp_hash_t*)b;
-  return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
-}
-
-// Options are transitive build identity: a package compiled against a dep's
-// public define (or a dep whose own store path moved) is a different
-// artifact, so every reachable dep's option set folds into the fingerprint
-static sp_hash_t hash_dep_options(spn_session_t* session, spn_pkg_id_t id) {
-  sp_mem_t mem = session->mem;
-
-  sp_ht(spn_pkg_id_t, u8) visited = SP_NULLPTR;
-  sp_ht_init(mem, visited);
-  sp_da(spn_pkg_id_t) frontier = sp_da_new(mem, spn_pkg_id_t);
-  sp_da(sp_hash_t) hashes = sp_da_new(mem, sp_hash_t);
-
-  sp_da_push(frontier, id);
-  while (!sp_da_empty(frontier)) {
-    spn_pkg_id_t at = *sp_da_back(frontier);
-    sp_da_pop(frontier);
-
-    spn_resolved_pkg_t* node = sp_ht_getp(session->resolve, at);
-    if (!node) {
-      continue;
-    }
-    sp_da_for(node->edges, et) {
-      spn_pkg_id_t dep = node->edges[et].id;
-      if (sp_ht_getp(visited, dep)) {
-        continue;
-      }
-      sp_ht_insert(visited, dep, (u8)true);
-      sp_da_push(frontier, dep);
-
-      spn_resolved_pkg_t* target = sp_ht_getp(session->resolve, dep);
-      sp_hash_t parts [] = {
-        target ? sp_hash_str(target->qualified) : (sp_hash_t)dep.qualified,
-        (sp_hash_t)dep.version.major,
-        (sp_hash_t)dep.version.minor,
-        (sp_hash_t)dep.version.patch,
-        hash_options(session, dep),
-      };
-      sp_da_push(hashes, sp_hash_combine(parts, sp_carr_len(parts)));
-    }
-  }
-
-  if (sp_da_empty(hashes)) {
-    return 0;
-  }
-  sp_da_sort(hashes, sort_hashes);
-  return sp_hash_combine(hashes, sp_da_size(hashes));
-}
-
 typedef struct {
   sp_hash_t hash;
-  sp_str_t str;
-} fingerprint_t;
+  u32 kind;
+  u32 private;
+} fingerprint_edge_t;
 
+static s32 sort_fingerprint_edges(const void* a, const void* b) {
+  const fingerprint_edge_t* lhs = (const fingerprint_edge_t*)a;
+  const fingerprint_edge_t* rhs = (const fingerprint_edge_t*)b;
+  if (lhs->hash != rhs->hash) return lhs->hash < rhs->hash ? -1 : 1;
+  if (lhs->kind != rhs->kind) return lhs->kind < rhs->kind ? -1 : 1;
+  if (lhs->private != rhs->private) return lhs->private < rhs->private ? -1 : 1;
+  return 0;
+}
 
-fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_id_t id, spn_pkg_info_t* pkg) {
+static sp_hash_t fingerprint_hash(spn_session_t* session, spn_pkg_id_t id) {
+  sp_hash_t* memo = sp_ht_getp(session->fingerprints, id);
+  if (memo) {
+    return *memo;
+  }
+
+  spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, id);
+  sp_assert(loaded);
+  spn_pkg_info_t* pkg = loaded->info;
+
   fingerprint_input_t fingerprint = SP_ZERO_INITIALIZE();
-  fingerprint.commit = sp_hash_str(pkg->upstream.commit);
-  fingerprint.subtree = id.hash;
+  fingerprint.qualified = sp_hash_str(pkg->qualified);
   fingerprint.options = hash_options(session, id);
-  fingerprint.dep_options = hash_dep_options(session, id);
   fingerprint.version = pkg->version;
+  fingerprint.commit = sp_hash_str(pkg->upstream.commit);
+
+  spn_resolved_pkg_t* node = sp_ht_getp(session->resolve, id);
+  if (node && !sp_da_empty(node->edges)) {
+    sp_da(fingerprint_edge_t) edges = sp_da_new(session->mem, fingerprint_edge_t);
+    sp_da_for(node->edges, it) {
+      sp_da_push(edges, ((fingerprint_edge_t) {
+        .hash = fingerprint_hash(session, node->edges[it].id),
+        .kind = (u32)node->edges[it].kind,
+        .private = (u32)node->edges[it].private,
+      }));
+    }
+    sp_da_sort(edges, sort_fingerprint_edges);
+    fingerprint.deps = sp_hash_bytes(edges, sp_da_size(edges) * sizeof(fingerprint_edge_t), 0);
+  }
 
   bool compiled = sp_str_om_size(pkg->libs) > 0 || sp_str_om_size(pkg->exes) > 0;
   if (compiled) {
@@ -463,8 +433,19 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_id_t id, spn_p
     }
   }
 
+  sp_hash_t hash = sp_hash_bytes(&fingerprint, sizeof(fingerprint), 0);
+  sp_ht_insert(session->fingerprints, id, hash);
+  return hash;
+}
+
+typedef struct {
+  sp_hash_t hash;
+  sp_str_t str;
+} fingerprint_t;
+
+fingerprint_t fingerprint_package(spn_session_t* session, spn_pkg_id_t id) {
   fingerprint_t result = SP_ZERO_INITIALIZE();
-  result.hash = sp_hash_bytes(&fingerprint, sizeof(fingerprint), 0);
+  result.hash = fingerprint_hash(session, id);
   result.str = sp_fmt(session->mem, "{:0>16x}", sp_fmt_uint(result.hash)).value;
   return result;
 }
@@ -596,7 +577,7 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_pkg_id_t id, spn
       break;
     }
     case SPN_PKG_SOURCE_INDEX: {
-      fingerprint_t fingerprint = fingerprint_package(session, id, loaded->info);
+      fingerprint_t fingerprint = fingerprint_package(session, id);
       unit->paths.work = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, session->paths.system.caches.build.dir, loaded->info->qualified), fingerprint.str);
       unit->paths.store = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, session->paths.system.caches.store.dir, loaded->info->qualified), fingerprint.str);
       break;
