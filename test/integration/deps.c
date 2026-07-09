@@ -41,6 +41,23 @@ UTEST_F(deps_file, invalid_manifest) {
   });
 }
 
+// A file dep whose manifest declares a different name than the edge
+// requested must fail at load: everything downstream routes by the
+// requested name, so a silent mismatch strands option requests and config
+UTEST_F(deps_file, name_mismatch) {
+  tmpfs_init_named(&uf->fixture.fs, "deps_file_name_mismatch");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/deps/file/name_mismatch",
+    .copy = { "vendor/spum/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_manifest", .key = "name", .value = "core/spum" } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("core/spork") } },
+    },
+  });
+}
+
 UTEST_F(deps_file, missing_manifest) {
   tmpfs_init_named(&uf->fixture.fs, "deps_file_missing_manifest");
 
@@ -125,6 +142,22 @@ UTEST_F(deps_index, basic) {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
+    },
+  });
+}
+
+// name_mismatch for the index path: the release publishes as spum but the
+// fetched manifest declares spork. Short names compare because published
+// manifests routinely omit the namespace the index assigns.
+UTEST_F(deps_index, name_mismatch) {
+  tmpfs_init_named(&uf->fixture.fs, "deps_index_name_mismatch");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/deps/index/name_mismatch",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_manifest", .key = "name", .value = "core/spum" } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("spork") } },
     },
   });
 }

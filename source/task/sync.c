@@ -9,6 +9,7 @@
 #include "forward/types.h"
 #include "git/cache.h"
 #include "log/lazy/lazy.h"
+#include "pkg/id.h"
 #include "pkg/types.h"
 #include "resolve/types.h"
 #include "session/session.h"
@@ -201,6 +202,20 @@ static spn_err_t load_manifest(spn_session_t* session, sp_str_t name, sp_str_t p
         .path = path,
         .error = spn_codegen_issues_message(spn.mem, ctx.issues),
         .issues = ctx.issues,
+      }});
+    return SPN_ERROR;
+  }
+
+  // Short names only: published manifests routinely omit the namespace the
+  // index assigns, but config keys and consumer routing use the name
+  sp_str_t requested = spn_pkg_name_from_qualified(name).name;
+  if (!sp_str_equal(parsed->name, requested)) {
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR_MANIFEST,
+      .manifest_err = {
+        .name = name,
+        .path = path,
+        .error = sp_fmt(spn.mem, "the manifest declares {} but the release is {}", sp_fmt_str(parsed->name), sp_fmt_str(requested)).value,
       }});
     return SPN_ERROR;
   }

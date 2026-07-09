@@ -41,6 +41,13 @@ spn_registry_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_
     return SP_NULLPTR;
   }
 
+  // Option requests, config keys, and edge lookups all route by the name the
+  // edge requested; a manifest declaring some other name would strand them
+  if (!sp_str_equal(info->qualified, qualified)) {
+    err->error = sp_fmt(mem, "the manifest declares {} but the dependency was requested as {}", sp_fmt_str(info->qualified), sp_fmt_str(qualified)).value;
+    return SP_NULLPTR;
+  }
+
   sp_ht_insert(*registry, id, ((spn_registry_pkg_t) {
     .source = SPN_PKG_SOURCE_FILE,
     .info = info,
