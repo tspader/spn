@@ -1,0 +1,10 @@
+[package]
+name = "file_dep_name_mismatch"
+version = "0.1.0"
+
+[deps.package]
+spum = "file://./vendor/spum/spn.toml"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
