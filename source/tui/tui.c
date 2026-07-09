@@ -1401,7 +1401,7 @@ static void spn_prompt_start(void) {
   if (!tui->prompt.ctx) return;
 
   tui->prompt.widget = sp_prompt_progress_widget(tui->prompt.ctx, (sp_prompt_progress_t) {
-    .prompt = "building",
+    .prompt = "Building",
     .color = { .rgb = { .r = 99, .g = 160, .b = 136 } },
   });
   sp_prompt_widget_t widget = tui->prompt.widget;
@@ -1413,6 +1413,14 @@ static void spn_prompt_start(void) {
   spn_tui_attach_prompt(tui, tui->prompt.ctx);
 }
 
+// @spader
+// What does this even mean? What does it mean to "submit" the main
+// TUI? Also, this can get called from:
+// - poll(), when we see the shutdown signal
+// - update(), if a step returns an error
+// - deinit(), unconditionally in interactive mode?
+//
+//
 void spn_prompt_stop(bool ok) {
   spn_tui_t* tui = &spn.tui;
   if (!tui->prompt.on) return;
@@ -1429,7 +1437,9 @@ void spn_prompt_stop(bool ok) {
   spn_tui_detach_prompt(tui);
 }
 
-void spn_prompt_pump(void) {
+// @spader
+//
+void spn_prompt_pump() {
   spn_tui_t* tui = &spn.tui;
 
   if (sp_atomic_s32_get(&spn.aborted)) {

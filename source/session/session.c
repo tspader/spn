@@ -24,36 +24,37 @@
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
-spn_err_union_t spn_session_init(spn_session_t* session, spn_pkg_info_t* root, spn_app_config_t config) {
+spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t* root, spn_app_config_t config) {
+  s->mem = mem;
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
-  spn_try_as_union(spn_toolchain_catalog_init(&session->catalog, builtins, spn_triple_host(), session->mem));
+  try_as_union(spn_toolchain_catalog_init(&s->catalog, builtins, spn_triple_host(), s->mem));
 
   sp_str_om_for(root->toolchains, it) {
-    spn_toolchain_catalog_add(&session->catalog, *sp_str_om_at(root->toolchains, it));
+    spn_toolchain_catalog_add(&s->catalog, *sp_str_om_at(root->toolchains, it));
   }
 
   // Build the list of available profiles
-  sp_str_ht_init(session->mem, session->profiles);
-  spn_profile_populate(&session->profiles, root);
+  sp_str_ht_init(s->mem, s->profiles);
+  spn_profile_populate(&s->profiles, root);
 
-  session->pkg = root;
-  session->paths.build = sp_fs_join_path(session->mem, session->paths.root, sp_str_lit("build"));
-  sp_ht_init(session->mem, session->registry);
-  sp_ht_init(session->mem, session->packages);
-  sp_mutex_init(&session->mutex, SP_MUTEX_PLAIN);
+  s->pkg = root;
+  s->paths.build = sp_fs_join_path(s->mem, s->paths.root, sp_str_lit("build"));
+  sp_ht_init(s->mem, s->registry);
+  sp_ht_init(s->mem, s->packages);
+  sp_mutex_init(&s->mutex, SP_MUTEX_PLAIN);
 
-  spn_try_union(spn_profile_resolve(session->profiles, &config.overrides, &session->profile));
+  try_union(spn_profile_resolve(s->profiles, &config.overrides, &s->profile));
 
   spn_toolchain_query_t query = {
-    .build = session->profile.toolchain,
+    .build = s->profile.toolchain,
     .script = spn_toolchain_script_default(),
-    .target = { session->profile.arch, session->profile.os, session->profile.abi },
+    .target = { s->profile.arch, s->profile.os, s->profile.abi },
     .host = spn_triple_host(),
   };
-  spn_try_union(spn_toolchain_select(&session->catalog, query, session->mem, &session->selection));
+  try_union(spn_toolchain_select(&s->catalog, query, s->mem, &s->selection));
 
-  session->paths.profile = sp_fs_join_path(session->mem, session->paths.build, session->profile.name);
-  session->filter = config.filter;
+  s->paths.profile = sp_fs_join_path(s->mem, s->paths.build, s->profile.name);
+  s->filter = config.filter;
 
   return spn_result(SPN_OK);
 }

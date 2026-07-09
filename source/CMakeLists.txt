@@ -102,6 +102,7 @@ set(SPN_SOURCES
   task/update.c
   task/which.c
   toml/edit.c
+  toml/loader.c
   toolchain/catalog.c
   toolchain/provision.c
   toolchain/select.c

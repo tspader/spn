@@ -4,6 +4,7 @@
 #include "sp.h"
 
 #include "codegen/types.h"
+#include "codegen/gen/config.gen.h"
 #include "cli/types.h"
 #include "event/types.h"
 #include "index/types.h"
@@ -32,16 +33,7 @@ typedef struct {
   sp_mem_t heap;
   sp_env_t* env;
   spn_system_paths_t paths;
-
-  struct {
-    struct {
-      u64 level;
-    } log;
-    struct {
-      const c8* config;
-      const c8* storage;
-    } dir;
-  } config;
+  spn_config_file_t config;
 
   struct {
     sp_io_stream_writer_t out;

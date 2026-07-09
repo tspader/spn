@@ -13,6 +13,7 @@
 // @spader @nuke
 typedef struct {
   sp_str_t lock;
+  sp_str_t manifest;
 } spn_app_paths_t;
 
 typedef struct {
