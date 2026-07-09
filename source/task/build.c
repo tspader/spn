@@ -87,74 +87,55 @@ spn_task_step_t spn_task_build_graph_update(spn_app_t* app) {
     u32 num_errors = sp_da_size(build->executor->errors);
     u32 dirty_cmds = sp_ht_size(session->build.dirty->commands);
 
-    switch (error.some) {
-      case SP_OPT_SOME: {
-        sp_str_t first_error = sp_str_lit("");
-        spn_bg_cmd_t* err_cmd = spn_bg_find_command(&session->build.graph, error.value.cmd_id);
-        if (err_cmd) {
-          first_error = err_cmd->tag;
-        }
-
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
-          .kind = SPN_EVENT_BUILD_FAILED,
-          .pkg = root->info,
-          .io = &root->logs.io,
-          .build_failed = {
-            .profile = session->profile.name,
-            .time = session->build.executor->elapsed,
-            .num_errors = num_errors,
-            .first_error = first_error,
-          }
-        });
-
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
-          .kind = SPN_EVENT_BUILD_SUMMARY,
-          .pkg = root->info,
-          .io = &root->logs.io,
-          .build_summary = {
-            .success = false,
-            .num_dirty = dirty_cmds,
-            .total_commands = sp_da_size(session->build.graph.commands),
-            .time = session->build.executor->elapsed,
-            .profile = session->profile.name,
-          }
-        });
-
-        return spn_task_fail(SPN_ERROR);
+    if (error.some) {
+      sp_str_t first_error = sp_str_lit("");
+      spn_bg_cmd_t* err_cmd = spn_bg_find_command(&session->build.graph, error.value.cmd_id);
+      if (err_cmd) {
+        first_error = err_cmd->tag;
       }
-      case SP_OPT_NONE: {
-        if (!app->lock.some) {
-          spn_app_update_lock_file(app);
+
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        .kind = SPN_EVENT_BUILD_FAILED,
+        .pkg = root->info,
+        .io = &root->logs.io,
+        .build_failed = {
+          .profile = session->profile.name,
+          .time = session->build.executor->elapsed,
+          .num_errors = num_errors,
+          .first_error = first_error,
         }
-
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
-          .kind = SPN_EVENT_BUILD_PASSED,
-          .pkg = root->info,
-          .io = &root->logs.io,
-          .build.passed = {
-            .profile = &session->profile,
-            .time = session->build.executor->elapsed
-          }
-        });
-
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
-          .kind = SPN_EVENT_BUILD_SUMMARY,
-          .pkg = root->info,
-          .io = &root->logs.io,
-          .build_summary = {
-            .success = true,
-            .num_dirty = dirty_cmds,
-            .total_commands = sp_da_size(session->build.graph.commands),
-            .time = session->build.executor->elapsed,
-            .profile = session->profile.name,
-          }
-        });
-
-        return spn_task_done();
+      });
+    }
+    else {
+      if (!app->lock.some) {
+        spn_app_update_lock_file(app);
       }
+
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        .kind = SPN_EVENT_BUILD_PASSED,
+        .pkg = root->info,
+        .io = &root->logs.io,
+        .build.passed = {
+          .profile = &session->profile,
+          .time = session->build.executor->elapsed
+        }
+      });
     }
 
-    return spn_task_done();
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_BUILD_SUMMARY,
+      .pkg = root->info,
+      .io = &root->logs.io,
+      .build_summary = {
+        .success = !error.some,
+        .num_dirty = dirty_cmds,
+        .total_commands = sp_da_size(session->build.graph.commands),
+        .time = session->build.executor->elapsed,
+        .profile = session->profile.name,
+      }
+    });
+
+    return error.some ? spn_task_fail(SPN_ERROR) : spn_task_done();
   }
 
   return spn_task_continue();
@@ -217,25 +198,10 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
     }
 
     sp_da(spn_closure_entry_t) closure = spn_target_link_closure(session->mem, target);
-    sp_da_for(closure, c) {
-      spn_pkg_unit_t* dep = closure[c].pkg;
-
-      sp_da_for(dep->libs, l) {
-        spn_target_unit_t* lib = dep->libs[l];
-        if (lib->info->no_link) continue;
-
-        switch (lib->lib_kind) {
-          case SPN_LIB_KIND_STATIC:
-          case SPN_LIB_KIND_SHARED: {
-            if (lib->nodes.output.occupied) {
-              spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, lib->nodes.output));
-            }
-            break;
-          }
-          case SPN_LIB_KIND_SOURCE:
-          case SPN_LIB_KIND_OBJECT:
-          case SPN_LIB_KIND_NONE: break;
-        }
+    sp_da(spn_link_lib_t) libs = spn_closure_link_libs(session->mem, closure, target->pkg);
+    sp_da_for(libs, l) {
+      if (libs[l].lib->nodes.output.occupied) {
+        spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, libs[l].lib->nodes.output));
       }
     }
   }

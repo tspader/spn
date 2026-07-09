@@ -140,47 +140,33 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
   sp_da(spn_closure_entry_t) deps = spn_target_link_closure(s.mem, target);
 
   // Packages must precede the system libraries they need
-  sp_da_for(deps, it) {
-    spn_pkg_unit_t* dep = deps[it].pkg;
-    if (!dep || dep == pkg) continue;
+  sp_da(spn_link_lib_t) libs = spn_closure_link_libs(s.mem, deps, pkg);
+  sp_da_for(libs, it) {
+    spn_pkg_unit_t* dep = libs[it].pkg;
+    spn_target_unit_t* lib = libs[it].lib;
 
-    sp_da_for(dep->libs, l) {
-      spn_target_unit_t* lib = dep->libs[l];
-      if (lib->info->no_link) continue;
+    spn_cc_target_add_lib_dir(cc, dep->paths.lib);
 
-      switch (lib->lib_kind) {
-        case SPN_LIB_KIND_STATIC: {
-          spn_cc_target_add_lib_dir(cc, dep->paths.lib);
+    if (lib->lib_kind == SPN_LIB_KIND_SHARED) {
+      spn_cc_target_add_system_lib(cc, lib->info->name);
+      spn_cc_target_add_rpath(cc, dep->paths.lib);
+      continue;
+    }
 
-          // A shared lib embedding a private static dep hides its symbols, so
-          // the embedded copy can't collide with a consumer's own instance
-          if (deps[it].private && target->kind == SPN_CC_OUTPUT_SHARED_LIB) {
-            if (cc->cc->os == SPN_OS_MACOS) {
-              spn_cc_target_add_flag(cc, sp_fmt(cc->cc->mem, "-Wl,-hidden-l{}", SP_FMT_STR(lib->info->name)).value);
-            }
-            else {
-              spn_cc_target_add_system_lib(cc, lib->info->name);
-              sp_str_t archive = sp_os_lib_to_file_name(s.mem, lib->info->name, SP_OS_LIB_STATIC);
-              spn_cc_target_add_flag(cc, sp_fmt(cc->cc->mem, "-Wl,--exclude-libs,{}", SP_FMT_STR(archive)).value);
-            }
-          }
-          else {
-            spn_cc_target_add_system_lib(cc, lib->info->name);
-          }
-          break;
-        }
-        case SPN_LIB_KIND_SHARED: {
-          spn_cc_target_add_lib_dir(cc, dep->paths.lib);
-          spn_cc_target_add_system_lib(cc, lib->info->name);
-          spn_cc_target_add_rpath(cc, dep->paths.lib);
-          break;
-        }
-        case SPN_LIB_KIND_SOURCE:
-        case SPN_LIB_KIND_OBJECT:
-        case SPN_LIB_KIND_NONE: {
-          break;
-        }
+    // A shared lib embedding a private static dep hides its symbols, so
+    // the embedded copy can't collide with a consumer's own instance
+    if (libs[it].private && target->kind == SPN_CC_OUTPUT_SHARED_LIB) {
+      if (cc->cc->os == SPN_OS_MACOS) {
+        spn_cc_target_add_flag(cc, sp_fmt(cc->cc->mem, "-Wl,-hidden-l{}", SP_FMT_STR(lib->info->name)).value);
       }
+      else {
+        spn_cc_target_add_system_lib(cc, lib->info->name);
+        sp_str_t archive = sp_os_lib_to_file_name(s.mem, lib->info->name, SP_OS_LIB_STATIC);
+        spn_cc_target_add_flag(cc, sp_fmt(cc->cc->mem, "-Wl,--exclude-libs,{}", SP_FMT_STR(archive)).value);
+      }
+    }
+    else {
+      spn_cc_target_add_system_lib(cc, lib->info->name);
     }
   }
 

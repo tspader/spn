@@ -31,4 +31,16 @@ typedef struct {
 // did the direct dependency list.
 sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit_t* root);
 
+typedef struct {
+  spn_pkg_unit_t* pkg;
+  spn_target_unit_t* lib;
+  bool private;
+} spn_link_lib_t;
+
+// Flattens a closure to the libs that participate in linking: every STATIC or
+// SHARED lib of every closure package, in closure order, with no_link libs and
+// the link unit's own package excluded. What counts as linkable lives here;
+// consumers branch only on static vs shared.
+sp_da(spn_link_lib_t) spn_closure_link_libs(sp_mem_t mem, sp_da(spn_closure_entry_t) closure, spn_pkg_unit_t* self);
+
 #endif
