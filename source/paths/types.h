@@ -51,6 +51,7 @@ typedef struct {
   sp_str_t include;
   sp_str_t cache;
   sp_str_t toolchain;
+  sp_str_t patches;
   struct {
     sp_str_t dir;
     sp_str_t toml;

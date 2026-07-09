@@ -122,7 +122,7 @@ UTEST_F(when, facts) {
   });
 }
 
-// { not = v }: abi != msvc holds on the host, os != linux does not
+// { not = v }: abi != msvc holds on the host, mode != debug does not
 UTEST_F(when, not_form) {
   tmpfs_init_named(&uf->fixture.fs, "when_not_form");
 

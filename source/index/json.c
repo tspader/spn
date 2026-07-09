@@ -61,7 +61,7 @@ static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t j
 
   sp_da_init(mem, release->targets);
   sp_da_for(rel.targets, it) {
-    spn_index_rel_target_t target = { .name = rel.targets[it].name };
+    spn_index_target_t target = { .name = rel.targets[it].name };
     sp_da_init(mem, target.linkages);
     sp_da_for(rel.targets[it].linkages, n) {
       if (rel.targets[it].linkages[n] != SPN_LIB_KIND_NONE) {

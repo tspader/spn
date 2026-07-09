@@ -6,6 +6,7 @@ version = "1.0.0"
 type = "bool"
 default = [
   { when = { os = "linux" }, value = true },
+  { when = { os = "macos" }, value = true },
   { value = false },
 ]
 define = "TUNER_MATCH"

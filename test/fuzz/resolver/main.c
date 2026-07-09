@@ -152,7 +152,7 @@ static fz_result_t fz_execute(sp_mem_t mem, fz_universe_t* u, sp_intern_t* inter
       }
 
       if (fz_pkg_linked(&u->pkgs[it])) {
-        spn_index_rel_target_t target = { .name = fz_pkg_name((u32)it) };
+        spn_index_target_t target = { .name = fz_pkg_name((u32)it) };
         sp_da_init(mem, target.linkages);
         if (u->pkgs[it].linkages.source) sp_da_push(target.linkages, SPN_LIB_KIND_SOURCE);
         if (u->pkgs[it].linkages.static_lib) sp_da_push(target.linkages, SPN_LIB_KIND_STATIC);

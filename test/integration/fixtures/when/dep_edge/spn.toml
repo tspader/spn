@@ -3,7 +3,7 @@ name = "when_dep_edge"
 version = "0.1.0"
 
 [deps.package]
-plat = { version = "1.0.0", when = { os = "linux" } }
+plat = { version = "1.0.0", when = { os = { not = "windows" } } }
 wsock = { version = "1.0.0", when = { os = "windows" } }
 
 [[bin]]

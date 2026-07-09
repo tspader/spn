@@ -109,7 +109,7 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
 
   sp_str_om_for(info.libs, it) {
     spn_target_info_t* lib = sp_str_om_at(info.libs, it);
-    spn_index_rel_target_t target = { .name = lib->name };
+    spn_index_target_t target = { .name = lib->name };
     sp_da_init(opts->mem, target.linkages);
 
     const spn_linkage_t kinds [] = { SPN_LIB_KIND_SOURCE, SPN_LIB_KIND_STATIC, SPN_LIB_KIND_SHARED, SPN_LIB_KIND_OBJECT };

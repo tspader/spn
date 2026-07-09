@@ -27,7 +27,10 @@ spn_gen_kind_t spn_gen_kind_from_str(sp_str_t str) {
   SP_UNREACHABLE_RETURN(SPN_GEN_KIND_RAW);
 }
 
-sp_str_t spn_cc_lib_kind_to_switch(spn_linkage_t kind) {
+sp_str_t spn_cc_lib_kind_to_switch(spn_linkage_t kind, spn_os_t os) {
+  if (os == SPN_OS_MACOS) {
+    return sp_str_lit("");
+  }
   switch (kind) {
     case SPN_LIB_KIND_STATIC: return sp_str_lit("-static");
     case SPN_LIB_KIND_NONE:

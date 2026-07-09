@@ -27,7 +27,7 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
   sp_tm_timer_t timer = sp_tm_start_timer();
 
   spn_cc_embed_ctx_t embedder = SP_ZERO_INITIALIZE();
-  spn_cc_embed_ctx_init(&embedder, spn.mem, unit->session->profile.os);
+  spn_cc_embed_ctx_init(&embedder, spn.mem, unit->session->profile.os, unit->session->profile.arch);
 
   sp_da_for(info->embed, it) {
     spn_embed_t embed = info->embed[it];

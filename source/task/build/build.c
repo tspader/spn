@@ -75,7 +75,7 @@ spn_err_t spn_compile_script_module(spn_pkg_unit_t* unit, spn_target_info_t* scr
 
   spn_invocation_result_t run = spn_invocation_run(invocation);
 
-  sp_str_t source = sp_da_empty(script->source) ? sp_str_lit("") : script->source[0];
+  sp_str_t source = sp_str_join_n(spn.mem, script->source, sp_da_size(script->source), sp_str_lit(" "));
   if (run.result.status.exit_code) {
     spn_event_buffer_push_ex(session->events, unit->info, &unit->logs.io, (spn_build_event_t) {
       .kind = SPN_EVENT_TARGET_BUILD_FAILED,
@@ -151,13 +151,21 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
       switch (lib->lib_kind) {
         case SPN_LIB_KIND_STATIC: {
           spn_cc_target_add_lib_dir(cc, dep->paths.lib);
-          spn_cc_target_add_system_lib(cc, lib->info->name);
 
           // A shared lib embedding a private static dep hides its symbols, so
           // the embedded copy can't collide with a consumer's own instance
           if (deps[it].private && target->kind == SPN_CC_OUTPUT_SHARED_LIB) {
-            sp_str_t archive = sp_os_lib_to_file_name(s.mem, lib->info->name, SP_OS_LIB_STATIC);
-            spn_cc_target_add_flag(cc, sp_fmt(cc->cc->mem, "-Wl,--exclude-libs,{}", SP_FMT_STR(archive)).value);
+            if (cc->cc->os == SPN_OS_MACOS) {
+              spn_cc_target_add_flag(cc, sp_fmt(cc->cc->mem, "-Wl,-hidden-l{}", SP_FMT_STR(lib->info->name)).value);
+            }
+            else {
+              spn_cc_target_add_system_lib(cc, lib->info->name);
+              sp_str_t archive = sp_os_lib_to_file_name(s.mem, lib->info->name, SP_OS_LIB_STATIC);
+              spn_cc_target_add_flag(cc, sp_fmt(cc->cc->mem, "-Wl,--exclude-libs,{}", SP_FMT_STR(archive)).value);
+            }
+          }
+          else {
+            spn_cc_target_add_system_lib(cc, lib->info->name);
           }
           break;
         }

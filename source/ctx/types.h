@@ -38,6 +38,7 @@ typedef struct {
   struct {
     sp_io_stream_writer_t out;
     sp_io_stream_writer_t err;
+    sp_io_file_writer_t jsonl;
     spn_log_level_t level;
     spn_verbosity_t verbosity;
   } logger;

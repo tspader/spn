@@ -124,7 +124,7 @@ void             spn_cc_target_add_dep(spn_cc_target_t* target, spn_pkg_unit_t* 
 void             spn_cc_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps);
 void             spn_cc_target_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps);
 sp_str_t         spn_cc_symbol_from_embedded_file(sp_mem_t mem, sp_str_t file_path);
-void             spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx, sp_mem_t mem, spn_os_t target_os);
+void             spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* ctx, sp_mem_t mem, spn_os_t target_os, spn_arch_t target_arch);
 void             spn_cc_embed_ctx_free(spn_cc_embed_ctx_t* ctx);
 spn_err_t        spn_cc_embed_ctx_add(spn_cc_embed_ctx_t* ctx, sp_mem_buffer_t data, sp_str_t symbol, sp_str_t path, sp_str_t data_type, sp_str_t size_type);
 spn_err_t        spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_str_t header);

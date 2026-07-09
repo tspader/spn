@@ -23,7 +23,7 @@ UTEST_F(cxx, shared_lib) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum.so") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum" SPN_TEST_SHARED_EXT) },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
     },
   });
@@ -96,7 +96,7 @@ UTEST_F(cxx, static_into_shared) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum.so") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum" SPN_TEST_SHARED_EXT) },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
     },
   });

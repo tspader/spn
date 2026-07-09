@@ -29,7 +29,7 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_wasm_script_t* configure = &unit->wasm.configure;
   if (configure->state != SPN_WASM_SCRIPT_NONE) {
     sp_tm_timer_t timer = sp_tm_start_timer();
-    spn_try(spn_compile_script_module(unit, &unit->info->configure, configure->path));
+    spn_try(spn_compile_script_module(unit, &unit->configure, configure->path));
     unit->time.compile = sp_tm_read_timer(&timer);
 
     spn_try(spn_wasm_script_open(configure, unit));

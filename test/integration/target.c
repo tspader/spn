@@ -21,7 +21,7 @@ UTEST_F(target, shared_lib) {
     .copy = { "spum.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "spum" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum.so") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum" SPN_TEST_SHARED_EXT) },
     },
   });
 }
