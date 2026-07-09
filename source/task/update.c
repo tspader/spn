@@ -3,6 +3,7 @@
 
 #include "app/app.h"
 #include "index/cache.h"
+#include "intern/intern.h"
 #include "lock/lock.h"
 #include "log/log.h"
 #include "pkg/id.h"
@@ -13,10 +14,10 @@
 static spn_resolved_pkg_t* spn_update_find_resolved(spn_resolve_t resolve, sp_str_t qualified) {
   spn_resolved_pkg_t* found = SP_NULLPTR;
   sp_ht_for_kv(resolve, it) {
-    if (!sp_str_equal(it.val->qualified, qualified)) {
+    if (!sp_str_equal(spn_intern_str(it.val->id.qualified), qualified)) {
       continue;
     }
-    if (!found || spn_semver_ge(it.val->version, found->version)) {
+    if (!found || spn_semver_ge(it.val->id.version, found->id.version)) {
       found = it.val;
     }
   }
@@ -24,7 +25,7 @@ static spn_resolved_pkg_t* spn_update_find_resolved(spn_resolve_t resolve, sp_st
 }
 
 static u32 spn_update_report_changes(spn_app_t* app, sp_mem_t mem) {
-  spn_lock_file_t fresh = spn_build_lock_file(mem, app->session.resolve, &app->package);
+  spn_lock_file_t fresh = spn_build_lock_file(mem, app->session.intern, app->session.resolve, &app->package);
   spn_lock_file_t* old = app->lock.some ? &app->lock.value : SP_NULLPTR;
 
   u32 num_changed = 0;
@@ -88,11 +89,11 @@ static void spn_update_report_incompatible(spn_app_t* app, sp_mem_t mem) {
       if (release->yanked) {
         continue;
       }
-      if (spn_semver_ge(release->version, resolved->version) && !spn_semver_in_range(release->version, dep->index.range)) {
+      if (spn_semver_ge(release->version, resolved->id.version) && !spn_semver_in_range(release->version, dep->index.range)) {
         spn_log_info(
           "{.cyan} {.green} (latest {.yellow} is semver incompatible)",
           SP_FMT_STR(dep->qualified),
-          SP_FMT_STR(spn_semver_to_str(mem, resolved->version)),
+          SP_FMT_STR(spn_semver_to_str(mem, resolved->id.version)),
           SP_FMT_STR(spn_semver_to_str(mem, release->version))
         );
       }

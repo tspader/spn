@@ -2,6 +2,7 @@ add_executable(lock
   ${SRC}/lock/lock.c
   ${SRC}/external/tom.c
   ${SRC}/enum/enum.c
+  ${SRC}/intern/intern.c
   ${SRC}/semver/convert.c
   ${SRC}/semver/parser.c
   ${SRC}/sp/str.c

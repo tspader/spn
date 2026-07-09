@@ -79,6 +79,7 @@ spn_index_rel_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_n
 
 typedef struct {
   spn_resolve_query_t query;
+  sp_intern_t* intern;
   sp_da(spn_build_event_t) events;
   spn_err_t err;
 } fz_result_t;
@@ -240,6 +241,7 @@ static fz_result_t fz_execute(sp_mem_t mem, fz_universe_t* u, sp_intern_t* inter
   spn_resolver_init(&resolver, mem, intern, &cache, &registry, events, (spn_profile_info_t) { .linkage = u->profile.linkage }, config, u->profile.budget);
 
   fz_result_t result = sp_zero_s(fz_result_t);
+  result.intern = intern;
   spn_resolve_query_init(mem, &result.query);
   spn_resolve_query_add(&result.query, (spn_requested_pkg_t) {
     .qualified = sp_str_view(fz_root_qualified),
@@ -278,9 +280,9 @@ static bool fz_pushed_event(fz_result_t* result, spn_build_event_kind_t kind) {
 //   may still exist). Big universes skip it and lean on planted mode.
 static fz_err_t fz_check_result(sp_mem_t mem, fz_universe_t* u, fz_result_t* result) {
   if (!result->err) {
-    fz_err_t err = u->profile.features ? FZ_OK : fz_check_solve(u, &result->query);
+    fz_err_t err = u->profile.features ? FZ_OK : fz_check_solve(u, result->intern, &result->query);
     if (err) return err;
-    return fz_check_units(mem, u, &result->query);
+    return fz_check_units(mem, u, result->intern, &result->query);
   }
 
   if (sp_da_empty(result->events)) {
@@ -339,7 +341,7 @@ static fz_err_t fz_run_iteration(sp_fuzz_prng_t base, u64 iter) {
   if (stable) {
     fz_solution_t solution = sp_zero;
     if (!result.err) {
-      solution = fz_solution(mem, &universe, &result.query);
+      solution = fz_solution(mem, &universe, result.intern, &result.query);
     }
 
     fz_universe_t shuffled = fz_shuffle_universe(mem, &prng, &universe);
@@ -348,7 +350,7 @@ static fz_err_t fz_run_iteration(sp_fuzz_prng_t base, u64 iter) {
       err = FZ_ERR_SHUFFLE_VERDICT;
       dumped = shuffled;
     }
-    else if (!result.err && !fz_solution_equal(solution, fz_solution(mem, &shuffled, &shuffled_result.query))) {
+    else if (!result.err && !fz_solution_equal(solution, fz_solution(mem, &shuffled, shuffled_result.intern, &shuffled_result.query))) {
       err = FZ_ERR_SHUFFLE_SOLUTION;
       dumped = shuffled;
     }
@@ -368,7 +370,7 @@ static fz_err_t fz_run_iteration(sp_fuzz_prng_t base, u64 iter) {
       if (!perturbed.err != !result.err) {
         err = FZ_ERR_INTERN_VERDICT;
       }
-      else if (!result.err && !fz_solution_equal(solution, fz_solution(mem, &universe, &perturbed.query))) {
+      else if (!result.err && !fz_solution_equal(solution, fz_solution(mem, &universe, perturbed.intern, &perturbed.query))) {
         err = FZ_ERR_INTERN_SOLUTION;
       }
     }
@@ -380,7 +382,7 @@ static fz_err_t fz_run_iteration(sp_fuzz_prng_t base, u64 iter) {
         err = FZ_ERR_PIN_VERDICT;
         dumped = pinned;
       }
-      else if (!profile.features && !fz_solution_equal(solution, fz_solution(mem, &pinned, &pinned_result.query))) {
+      else if (!profile.features && !fz_solution_equal(solution, fz_solution(mem, &pinned, pinned_result.intern, &pinned_result.query))) {
         err = FZ_ERR_PIN_SOLUTION;
         dumped = pinned;
       }

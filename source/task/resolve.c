@@ -7,6 +7,7 @@
 
 #include "event/event.h"
 #include "index/cache.h"
+#include "intern/intern.h"
 #include "pkg/id.h"
 #include "pkg/pkg.h"
 #include "resolve/resolve.h"
@@ -28,8 +29,8 @@ void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_RESOLVE_PACKAGE,
       .resolve_pkg = {
-        .name = it.val->qualified,
-        .version = spn_semver_to_str(mem, it.val->version),
+        .name = spn_intern_str(it.val->id.qualified),
+        .version = spn_semver_to_str(mem, it.val->id.version),
       }
     });
   }

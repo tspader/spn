@@ -62,8 +62,8 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
 
 #define SPN_GATE_MAX_RESOLVES 4
 
-static sp_str_t node_short_name(spn_resolved_pkg_t* node) {
-  return spn_pkg_name_from_qualified(node->qualified).name;
+static sp_str_t node_short_name(spn_session_t* session, spn_resolved_pkg_t* node) {
+  return spn_pkg_name_from_qualified(sp_intern_str_from_id(session->intern, node->id.qualified)).name;
 }
 
 static spn_resolved_dep_t* node_find_edge(spn_resolved_pkg_t* node, sp_intern_id_t qualified, spn_dep_kind_t kind) {
@@ -191,7 +191,7 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
         }
 
         spn_option_request_t request = {
-          .consumer = node_short_name(node),
+          .consumer = node_short_name(session, node),
           .options = &dep->options,
         };
 
@@ -203,7 +203,7 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
         // Seeds feed a possible next resolve pass, which looks packages up
         // by the qualified name their manifest declares
         spn_resolved_pkg_t* target = sp_ht_getp(session->resolve, edge->id);
-        sp_str_t seed_key = target ? target->qualified : dep->qualified;
+        sp_str_t seed_key = target ? sp_intern_str_from_id(session->intern, target->id.qualified) : dep->qualified;
         if (!sp_str_ht_get(session->gates.seeds, seed_key)) {
           sp_str_ht_insert(session->gates.seeds, seed_key, sp_da_new(mem, spn_option_request_t));
         }
@@ -307,11 +307,9 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
 sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pkg_name) {
   sp_opt_spn_linkage_t requested = SP_ZERO_INITIALIZE();
 
-  sp_da_for(session->pkg->config, it) {
-    spn_pkg_config_entry_t* entry = &session->pkg->config[it];
-    if (sp_str_equal(entry->key, pkg_name) && !sp_opt_is_null(entry->value.kind)) {
-      sp_opt_set(requested, entry->value.kind.value);
-    }
+  spn_pkg_config_t* config = spn_pkg_config_find(session->pkg->config, pkg_name);
+  if (config && !sp_opt_is_null(config->kind)) {
+    sp_opt_set(requested, config->kind.value);
   }
 
   return requested;
@@ -480,7 +478,7 @@ spn_target_unit_t* spn_session_find_target_in_pkg(spn_session_t* session, spn_pk
 
 spn_pkg_unit_t* spn_session_find_root(spn_session_t* s) {
   sp_ht_for_kv(s->resolve, it) {
-    if (it.val->source == SPN_PKG_SOURCE_ROOT && sp_str_equal(it.val->qualified, s->pkg->qualified)) {
+    if (it.val->source == SPN_PKG_SOURCE_ROOT && it.val->id.qualified == sp_intern_get(s->intern, s->pkg->qualified)) {
       return spn_session_find_pkg_by_id(s, it.val->id);
     }
   }

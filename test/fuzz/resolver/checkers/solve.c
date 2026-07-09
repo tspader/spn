@@ -1,5 +1,6 @@
 #include "fuzz.h"
 
+#include "intern/intern.h"
 #include "pkg/id.h"
 #include "semver/compare.h"
 
@@ -13,7 +14,7 @@ s32 fz_pkg_from_qualified(fz_universe_t* u, sp_str_t qualified) {
   return -1;
 }
 
-fz_err_t fz_check_solve(fz_universe_t* u, spn_resolve_query_t* query) {
+fz_err_t fz_check_solve(fz_universe_t* u, sp_intern_t* intern, spn_resolve_query_t* query) {
   s64 picks[FZ_MAX_PKGS];
   sp_carr_for(picks, it) {
     picks[it] = -1;
@@ -21,11 +22,11 @@ fz_err_t fz_check_solve(fz_universe_t* u, spn_resolve_query_t* query) {
 
   sp_ht_for_kv(query->result, it) {
     spn_resolved_pkg_t* node = it.val;
-    if (sp_str_equal(node->qualified, sp_str_view(fz_root_qualified))) {
+    if (sp_str_equal(sp_intern_str_from_id(intern, node->id.qualified), sp_str_view(fz_root_qualified))) {
       continue;
     }
 
-    s32 pkg = fz_pkg_from_qualified(u, node->qualified);
+    s32 pkg = fz_pkg_from_qualified(u, sp_intern_str_from_id(intern, node->id.qualified));
     if (pkg < 0) {
       return FZ_ERR_SOLVE_FOREIGN_PKG;
     }
@@ -34,7 +35,7 @@ fz_err_t fz_check_solve(fz_universe_t* u, spn_resolve_query_t* query) {
     }
 
     sp_da_for(u->pkgs[pkg].releases, rt) {
-      if (spn_semver_eq(u->pkgs[pkg].releases[rt].version, node->version)) {
+      if (spn_semver_eq(u->pkgs[pkg].releases[rt].version, node->id.version)) {
         picks[pkg] = (s64)rt;
         break;
       }
@@ -81,16 +82,16 @@ static s32 fz_sort_pick(const void* a, const void* b) {
   return 0;
 }
 
-fz_solution_t fz_solution(sp_mem_t mem, fz_universe_t* u, spn_resolve_query_t* query) {
+fz_solution_t fz_solution(sp_mem_t mem, fz_universe_t* u, sp_intern_t* intern, spn_resolve_query_t* query) {
   fz_solution_t solution = sp_da_new(mem, fz_pick_t);
   sp_ht_for_kv(query->result, it) {
     spn_resolved_pkg_t* node = it.val;
-    if (sp_str_equal(node->qualified, sp_str_view(fz_root_qualified))) {
+    if (sp_str_equal(sp_intern_str_from_id(intern, node->id.qualified), sp_str_view(fz_root_qualified))) {
       continue;
     }
     sp_da_push(solution, ((fz_pick_t) {
-      .pkg = fz_pkg_from_qualified(u, node->qualified),
-      .version = node->version,
+      .pkg = fz_pkg_from_qualified(u, sp_intern_str_from_id(intern, node->id.qualified)),
+      .version = node->id.version,
       .hash = node->id.hash,
     }));
   }

@@ -29,6 +29,10 @@ sp_str_t spn_intern_cstr(const c8* cstr) {
   return sp_intern_get_or_insert_str(spn_ctx_get_intern(), sp_str_view(cstr));
 }
 
+sp_str_t spn_intern_str(sp_intern_id_t id) {
+  return sp_intern_str_from_id(spn_ctx_get_intern(), id);
+}
+
 bool spn_intern_is_equal(sp_str_t a, sp_str_t b) {
   return sp_intern_is_equal_str(spn_ctx_get_intern(), a, b);
 }

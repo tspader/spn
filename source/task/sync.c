@@ -8,6 +8,7 @@
 #include "event/event.h"
 #include "forward/types.h"
 #include "git/cache.h"
+#include "intern/intern.h"
 #include "log/lazy/lazy.h"
 #include "pkg/id.h"
 #include "pkg/types.h"
@@ -237,17 +238,18 @@ static sp_str_t sync_url(spn_pkg_tree_t recipe, spn_pkg_tree_t source) {
 static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, spn_loaded_pkg_t* loaded) {
   sp_tm_timer_t timer = sp_tm_start_timer();
   bool fetched = false;
+  sp_str_t qualified = spn_intern_str(pkg->id.qualified);
 
   loaded->source = pkg->source;
 
-  spn_try(materialize_tree(session, pkg->qualified, pkg->origin.recipe, &loaded->roots.recipe, &fetched));
+  spn_try(materialize_tree(session, qualified, pkg->origin.recipe, &loaded->roots.recipe, &fetched));
 
   loaded->paths.manifest = sp_fs_join_path(spn.mem, loaded->roots.recipe, pkg->origin.paths.manifest);
   loaded->paths.script = sp_fs_join_path(spn.mem, loaded->roots.recipe, pkg->origin.paths.script);
 
   loaded->info = pkg->origin.info;
   if (!loaded->info) {
-    spn_try(load_manifest(session, pkg->qualified, loaded->paths.manifest, &loaded->info));
+    spn_try(load_manifest(session, qualified, loaded->paths.manifest, &loaded->info));
   }
 
   loaded->configure = resolve_script(loaded->info->configure, loaded->roots.recipe);
@@ -278,7 +280,7 @@ static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, s
   if (pkg->origin.source.kind == SPN_PKG_TREE_NONE) {
     loaded->roots.source = loaded->roots.recipe;
   } else {
-    spn_try(materialize_tree(session, pkg->qualified, pkg->origin.source, &loaded->roots.source, &fetched));
+    spn_try(materialize_tree(session, qualified, pkg->origin.source, &loaded->roots.source, &fetched));
   }
 
   loaded->elapsed = sp_tm_read_timer(&timer);
@@ -286,7 +288,7 @@ static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, s
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_SYNC_PACKAGE, .pkg = loaded->info,
     .sync_pkg = {
-      .name = pkg->qualified,
+      .name = qualified,
       .url = sync_url(pkg->origin.recipe, pkg->origin.source),
       .source_path = loaded->roots.source,
       .time = loaded->elapsed,
