@@ -83,7 +83,84 @@ sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit
   sp_da_rfor(search.closure, it) {
     sp_da_push(closure, search.closure[it]);
   }
+  sp_mem_end_scratch(s);
   return closure;
+}
+
+static void collect_runtime(search_t* s, spn_pkg_unit_t* pkg, bool tests) {
+  sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(s->session, pkg);
+  sp_da_for(deps, it) {
+    spn_pkg_dep_t* dep = &deps[it];
+    if (!edge_links(dep, tests)) {
+      continue;
+    }
+    if (!dep->unit || dep->unit == pkg) {
+      continue;
+    }
+    if (closure_has_pkg(s->visited, dep->unit)) {
+      continue;
+    }
+    sp_da_push(s->visited, dep->unit);
+
+    collect_runtime(s, dep->unit, CLOSURE_DO_NOT_SEARCH_TESTS);
+
+    sp_da_push(s->closure, ((spn_closure_entry_t) {
+      .pkg = dep->unit,
+    }));
+  }
+}
+
+static void push_unique_runtime_lib(sp_da(spn_target_unit_t*)* libs, spn_target_unit_t* lib) {
+  if (lib->info->no_link) return;
+  if (lib->lib_kind != SPN_LIB_KIND_SHARED) return;
+  sp_da_for(*libs, it) {
+    if ((*libs)[it] == lib) return;
+  }
+  sp_da_push(*libs, lib);
+}
+
+static bool runtime_target_seen(sp_da(spn_target_unit_t*) seen, spn_target_unit_t* target) {
+  sp_da_for(seen, it) {
+    if (seen[it] == target) return true;
+  }
+  return false;
+}
+
+static void collect_runtime_siblings(sp_da(spn_target_unit_t*)* seen, sp_da(spn_target_unit_t*)* libs, spn_target_unit_t* target) {
+  sp_da_for(target->deps.target, it) {
+    spn_target_unit_t* dep = target->deps.target[it];
+    if (runtime_target_seen(*seen, dep)) continue;
+    sp_da_push(*seen, dep);
+
+    push_unique_runtime_lib(libs, dep);
+    collect_runtime_siblings(seen, libs, dep);
+  }
+}
+
+sp_da(spn_target_unit_t*) spn_target_runtime_libs(sp_mem_t mem, spn_target_unit_t* root) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+
+  search_t search = {
+    .session = root->session,
+    .visited = sp_da_new(s.mem, spn_pkg_unit_t*),
+    .closure = sp_da_new(s.mem, spn_closure_entry_t),
+  };
+  collect_runtime(&search, root->pkg, root->info->kind == SPN_TARGET_TEST);
+
+  sp_da(spn_target_unit_t*) libs = sp_da_new(mem, spn_target_unit_t*);
+  sp_da(spn_target_unit_t*) seen = sp_da_new(s.mem, spn_target_unit_t*);
+  collect_runtime_siblings(&seen, &libs, root);
+  sp_da_for(search.closure, it) {
+    spn_pkg_unit_t* pkg = search.closure[it].pkg;
+    if (!pkg || pkg == root->pkg) {
+      continue;
+    }
+    sp_da_for(pkg->libs, lt) {
+      push_unique_runtime_lib(&libs, pkg->libs[lt]);
+    }
+  }
+  sp_mem_end_scratch(s);
+  return libs;
 }
 
 sp_da(spn_link_lib_t) spn_closure_link_libs(sp_mem_t mem, sp_da(spn_closure_entry_t) closure, spn_pkg_unit_t* self) {

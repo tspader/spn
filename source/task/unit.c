@@ -105,6 +105,10 @@ static sp_da(sp_str_t) collect_target_source(sp_mem_t mem, spn_pkg_unit_t* pkg, 
 }
 
 
+static bool exe_name_reserved(sp_str_t name) {
+  return sp_str_equal_cstr(name, "store") || sp_str_equal_cstr(name, "work") || sp_str_equal_cstr(name, "test");
+}
+
 static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* target) {
   spn_target_info_t* info = target->info;
 
@@ -198,6 +202,16 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
     sp_da_for(targets, it) {
       if (loaded->source == SPN_PKG_SOURCE_ROOT && !spn_target_filter_pass(&session->filter, targets[it])) {
         continue;
+      }
+
+      bool staged_at_root = targets[it]->kind == SPN_TARGET_EXE || targets[it]->kind == SPN_TARGET_SCRIPT;
+      if (loaded->source == SPN_PKG_SOURCE_ROOT && staged_at_root && exe_name_reserved(targets[it]->name)) {
+        spn_log_error(
+          "{.cyan} names an executable {.yellow}, which collides with a build output directory (store, work, test)",
+          SP_FMT_STR(info->name),
+          SP_FMT_STR(targets[it]->name)
+        );
+        return spn_task_fail(SPN_ERROR);
       }
 
       spn_target_unit_t* target = spn_session_add_target(session, pkg, targets[it]);

@@ -14,5 +14,6 @@ spn_err_t spn_compile_script_module(spn_pkg_unit_t* unit, spn_target_info_t* scr
 sp_str_t get_embed_object_path(sp_mem_t mem, spn_target_unit_t* unit);
 sp_str_t get_embed_header_path(sp_mem_t mem, spn_target_unit_t* unit);
 sp_str_t get_target_output_path(sp_mem_t mem, spn_target_unit_t* unit);
+sp_str_t get_target_staged_path(sp_mem_t mem, spn_target_unit_t* unit);
 
 #endif

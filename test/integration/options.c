@@ -71,12 +71,7 @@ static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test)
 
     if (build->expect.bin.name) {
       if (build->profile) {
-        sp_str_t bin = tmpfs_get(&fixture->fs, sp_fmt(
-          mem,
-          "build/{}/store/bin/{}",
-          sp_fmt_cstr(build->profile),
-          sp_fmt_cstr(build->expect.bin.name)
-        ).value);
+        sp_str_t bin = tmpfs_get(&fixture->fs, profile_exe(build->profile, build->expect.bin.name));
         t.actions[n++] = (action_t) {
           .kind = ACTION_SUBPROCESS,
           .process = { .config = { .command = bin }, .rc = build->expect.bin.rc },

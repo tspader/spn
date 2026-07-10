@@ -54,7 +54,13 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   };
   try_union(spn_toolchain_select(&s->catalog, query, s->mem, &s->selection));
 
-  s->paths.profile = sp_fs_join_path(s->mem, s->paths.build, s->profile.name);
+  sp_str_t profile = s->paths.build;
+  if (s->profile.targeted) {
+    spn_triple_t target = { s->profile.arch, s->profile.os, s->profile.abi };
+    profile = sp_fs_join_path(s->mem, profile, spn_triple_to_str(s->mem, target));
+  }
+  s->paths.profile = sp_fs_join_path(s->mem, profile, s->profile.name);
+
   s->filter = config.filter;
 
   return spn_result(SPN_OK);
@@ -541,6 +547,7 @@ spn_pkg_unit_t* spn_session_add_pkg(spn_session_t* session, spn_pkg_id_t id, spn
   spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
   unit->id = id;
   unit->info = loaded->info;
+  unit->source = loaded->source;
   unit->configure = loaded->configure;
   unit->build = loaded->build;
   unit->session = session;

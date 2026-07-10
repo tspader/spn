@@ -27,7 +27,7 @@ Bootstrap it with `make` (a thin wrapper over CMake + `zig cc`), and then it sel
 ```bash
 make
 ./bootstrap/bin/spn build
-./build/debug/store/bin/spn build
+./build/debug/spn build
 ```
 
 Dependencies are pinned by SHA in `tools/cmake/fetch.cmake` and fetched into `.build/source`. Build artifacts land in `.build/store/$TRIPLE`; `bootstrap` is a symlink to the host triple's store.

@@ -21,6 +21,18 @@ typedef struct {
 
 void fixture_setup_paths(fixture_t* fixture);
 
+sp_str_t shared_lib(const c8* name);
+sp_str_t staged_lib(const c8* name);
+sp_str_t test_lib(const c8* name);
+sp_str_t exe(const c8* name);
+sp_str_t test_exe(const c8* name);
+sp_str_t target_exe(const c8* name, const c8* triple);
+sp_str_t store_file(const c8* rest);
+sp_str_t work_file(const c8* rest);
+sp_str_t profile_exe(const c8* profile, const c8* name);
+sp_str_t profile_store_file(const c8* profile, const c8* rest);
+sp_str_t target_store_file(const c8* rest, const c8* triple);
+
 #define SPN_TEST_SUITE(suite) \
   struct suite { \
     fixture_t fixture; \

@@ -1,0 +1,17 @@
+[package]
+name = "layout"
+version = "0.1.0"
+
+[deps.package]
+spum = { path = "packages/spum" }
+
+[profile.default]
+linkage = "shared"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+
+[[test]]
+name = "check"
+source = ["check.c"]

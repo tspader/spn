@@ -135,8 +135,8 @@ UTEST_F(cli, clean) {
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/integration/fixtures/cli/add",
     .actions = {
-      { .kind = ACTION_CREATE_FILE, .create = { .file = sp_str_lit("build/debug/store/bin/main"), .content = sp_str_lit("x") } },
-      { .kind = ACTION_CREATE_FILE, .create = { .file = sp_str_lit("build/release/store/bin/main"), .content = sp_str_lit("x") } },
+      { .kind = ACTION_CREATE_FILE, .create = { .file = store_file("bin/main"), .content = sp_str_lit("x") } },
+      { .kind = ACTION_CREATE_FILE, .create = { .file = profile_store_file("release", "bin/main"), .content = sp_str_lit("x") } },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "clean", .args = { "-p", "debug" } } },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug") },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/release") },

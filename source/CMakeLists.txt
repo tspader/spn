@@ -83,6 +83,7 @@ set(SPN_SOURCES
   task/build/nodes/object.c
   task/build/nodes/package.c
   task/build/nodes/script.c
+  task/build/nodes/stage.c
   task/build/nodes/stamp.c
   task/build/nodes/user.c
   task/add.c

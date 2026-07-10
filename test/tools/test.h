@@ -18,10 +18,18 @@
 #define tkv(key, val) tk(key) #val
 #define tt(key, val) tk(key) #val
 
-#if defined(SP_MACOS)
-  #define SPN_TEST_SHARED_EXT ".dylib"
+#if defined(SP_ARM64)
+  #define SPN_TEST_ARCH "aarch64"
 #else
-  #define SPN_TEST_SHARED_EXT ".so"
+  #define SPN_TEST_ARCH "x86_64"
+#endif
+
+#if defined(SP_MACOS)
+  #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-macos"
+#elif defined(SP_WIN32)
+  #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-windows-gnu"
+#else
+  #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-linux-gnu"
 #endif
 
 

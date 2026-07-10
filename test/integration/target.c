@@ -8,7 +8,7 @@ UTEST_F(target, static_lib) {
     .copy = { "mylib.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "mylib" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libmylib.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libmylib.a") },
     },
   });
 }
@@ -21,7 +21,7 @@ UTEST_F(target, shared_lib) {
     .copy = { "spum.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "spum" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libspum" SPN_TEST_SHARED_EXT) },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = shared_lib("spum") },
     },
   });
 }

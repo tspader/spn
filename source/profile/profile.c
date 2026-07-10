@@ -88,6 +88,13 @@ spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_in
     };
   }
 
+  if (spn_triple_from_str(name).arch) {
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_PROFILE_INVALID,
+      .profile = { .name = name },
+    };
+  }
+
   spn_profile_info_t* info = sp_str_ht_get(profiles, name);
   if (!info) {
     return (spn_err_union_t) {
@@ -102,6 +109,7 @@ spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_in
   // Resolve the target triple: fill empty fields with host values.
   spn_triple_t host = spn_triple_host();
   spn_triple_t target = { merged.arch, merged.os, merged.abi };
+  bool targeted = target.arch || target.os || target.abi;
   target = spn_triple_merge(host, target);
 
   *result = (spn_profile_info_t) {
@@ -114,6 +122,7 @@ spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_in
     .standard  = merged.standard,
     .mode      = merged.mode,
     .options   = merged.options,
+    .targeted  = targeted,
   };
   return spn_result(SPN_OK);
 }

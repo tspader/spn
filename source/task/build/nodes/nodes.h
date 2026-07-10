@@ -11,5 +11,6 @@ s32 stamp_enter(spn_bg_cmd_t* cmd, void* user_data);
 s32 stamp_exit(spn_bg_cmd_t* cmd, void* user_data);
 s32 run_user_fn(spn_bg_cmd_t* cmd, void* user_data);
 s32 run_package_hook(spn_bg_cmd_t* cmd, void* user_data);
+s32 stage_targets(spn_bg_cmd_t* cmd, void* user_data);
 
 #endif
