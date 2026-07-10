@@ -1,30 +1,16 @@
 #include "sp.h"
-#include "sp/macro.h"
 #include "session/registry/registry.h"
-
-#include "ctx/types.h"
 
 #include "toml/loader.h"
 #include "toml/issue.h"
 #include "codegen/lower.h"
 #include "pkg/id.h"
 
-sp_str_t parse(sp_mem_t mem, sp_str_t path) {
-  if (sp_str_starts_with(path, SP_LIT("file://"))) {
-    path = sp_str_strip_left(path, SP_LIT("file://"));
-  }
-  if (!sp_str_starts_with(path, SP_LIT("/"))) {
-    path = sp_fs_join_path(mem, spn.paths.project, path);
-  }
-  return sp_fs_normalize_path(mem, path);
-}
-
-spn_registry_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_mem_t mem, sp_intern_t* intern, sp_str_t qualified, sp_str_t path, spn_registry_err_t* err) {
+spn_registry_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_mem_t mem, sp_intern_t* intern, sp_str_t qualified, sp_str_t manifest, spn_registry_err_t* err) {
   spn_pkg_id_t id = spn_pkg_id(intern, qualified);
   spn_registry_pkg_t* existing = sp_ht_getp(*registry, id);
   if (existing) return existing;
 
-  sp_str_t manifest = parse(mem, path);
   err->manifest = manifest;
 
   if (!sp_fs_exists(manifest)) {

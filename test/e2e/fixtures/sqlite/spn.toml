@@ -3,7 +3,7 @@ name = "smoke"
 version = "0.0.1"
 
 [deps.package]
-"spader/sqlite" = "file://./vendor/sqlite/spn.toml"
+"spader/sqlite" = { path = "vendor/sqlite" }
 
 [[bin]]
 name = "main"

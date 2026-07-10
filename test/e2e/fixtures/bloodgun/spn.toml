@@ -9,13 +9,13 @@ default = false
 define = "USE_TRACY"
 
 [deps.package]
-"libsdl/sdl2" = "file://./vendor/sdl2/spn.toml"
-"libsdl/sdl2_mixer" = "file://./vendor/sdl2_mixer/spn.toml"
-"freetype/freetype" = "file://./vendor/freetype/spn.toml"
-"fmtlib/fmt" = "file://./vendor/fmt/spn.toml"
-"jeremy-rifkin/cpptrace" = "file://./vendor/cpptrace/spn.toml"
-"lua/lua" = "file://./vendor/lua/spn.toml"
-"wolfpld/tracy" = { version = "file://./vendor/tracy/spn.toml", when = { tracy = true }, options = { enable = true } }
+"libsdl/sdl2" = { path = "vendor/sdl2" }
+"libsdl/sdl2_mixer" = { path = "vendor/sdl2_mixer" }
+"freetype/freetype" = { path = "vendor/freetype" }
+"fmtlib/fmt" = { path = "vendor/fmt" }
+"jeremy-rifkin/cpptrace" = { path = "vendor/cpptrace" }
+"lua/lua" = { path = "vendor/lua" }
+"wolfpld/tracy" = { path = "vendor/tracy", when = { tracy = true }, options = { enable = true } }
 
 [profile.default]
 toolchain = "zig"

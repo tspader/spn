@@ -3,7 +3,7 @@ name = "smoke"
 version = "0.0.1"
 
 [deps.package]
-"spader/wamr" = "file://./vendor/wamr/spn.toml"
+"spader/wamr" = { path = "vendor/wamr" }
 
 [[bin]]
 name = "main"

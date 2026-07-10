@@ -10,7 +10,7 @@ source = ["tools/build.c"]
 include = ["include"]
 
 [deps.build]
-probe = "file://./vendor/probe/spn.toml"
+probe = { path = "vendor/probe" }
 
 [[bin]]
 name = "build_script"

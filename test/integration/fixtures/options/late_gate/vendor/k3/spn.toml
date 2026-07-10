@@ -7,7 +7,7 @@ type = "bool"
 default = false
 
 [deps.package]
-k4 = { version = "file://../k4/spn.toml", when = { x3 = true }, options = { x4 = true } }
+k4 = { path = "../k4", when = { x3 = true }, options = { x4 = true } }
 
 [[lib]]
 name = "k3"

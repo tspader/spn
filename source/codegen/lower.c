@@ -153,17 +153,22 @@ static void lower_dep(spn_toml_loader_t* ctx, sp_str_t name, const spn_cg_dep_t*
     .options = cg->options,
   };
 
-  sp_str_t prefix = sp_str_lit("file://");
-  if (sp_str_starts_with(cg->version, prefix)) {
-    sp_str_t path = sp_str_strip_left(cg->version, prefix);
+  if (!sp_str_empty(cg->path)) {
+    if (!sp_str_empty(cg->version)) {
+      spn_toml_loader_push_key(ctx, sp_str_to_cstr(ctx->mem, name));
+      spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, "path");
+      spn_toml_loader_pop(ctx);
+      return;
+    }
+    sp_str_t path = cg->path;
     if (!is_path_absolute(path)) {
       path = sp_fs_join_path(ctx->mem, ctx->dir, path);
     }
     req.source = SPN_PKG_SOURCE_FILE;
-    req.file.path = sp_fs_normalize_path(ctx->mem, path);
+    req.file.path = sp_fs_normalize_path(ctx->mem, sp_fs_join_path(ctx->mem, path, sp_str_lit("spn.toml")));
   } else {
     req.source = SPN_PKG_SOURCE_INDEX;
-    if (spn_semver_parse_range(cg->version, &req.index.range)) {
+    if (sp_str_empty(cg->version) || spn_semver_parse_range(cg->version, &req.index.range)) {
       spn_toml_loader_push_key(ctx, sp_str_to_cstr(ctx->mem, name));
       spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, "version");
       spn_toml_loader_pop(ctx);

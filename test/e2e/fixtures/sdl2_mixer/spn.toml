@@ -6,7 +6,7 @@ version = "0.0.1"
 toolchain = "zig"
 
 [deps.package]
-"libsdl/sdl2_mixer" = "file://./vendor/sdl2_mixer/spn.toml"
+"libsdl/sdl2_mixer" = { path = "vendor/sdl2_mixer" }
 
 [[bin]]
 name = "main"

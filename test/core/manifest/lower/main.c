@@ -517,7 +517,7 @@ UTEST(lower, dep_file) {
   run_case(utest_result, (test_t) {
     .manifest = "dep_file",
     .deps = {
-      { .name = "core/foo", .source = SPN_PKG_SOURCE_FILE, .file = "/abs/foo" }
+      { .name = "core/foo", .source = SPN_PKG_SOURCE_FILE, .file = "/abs/foo/spn.toml" }
     }
   });
 }
@@ -526,7 +526,7 @@ UTEST(lower, dep_file_relative) {
   run_case(utest_result, (test_t) {
     .manifest = "dep_file_relative",
     .deps = {
-      { .name = "core/foo", .source = SPN_PKG_SOURCE_FILE, .file = "vendor/foo" }
+      { .name = "core/foo", .source = SPN_PKG_SOURCE_FILE, .file = "vendor/foo/spn.toml" }
     }
   });
 }

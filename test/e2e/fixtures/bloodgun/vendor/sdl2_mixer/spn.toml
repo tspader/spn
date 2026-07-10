@@ -6,7 +6,7 @@ url = "https://github.com/libsdl-org/SDL_mixer.git"
 commit = "a37e09f85d321a13dfcf0d4432827ee09beeb623"
 
 [deps.package]
-"libsdl/sdl2" = "file://../sdl2/spn.toml"
+"libsdl/sdl2" = { path = "../sdl2" }
 
 [[lib]]
 name = "SDL2_mixer"
