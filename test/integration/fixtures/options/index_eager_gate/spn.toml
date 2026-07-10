@@ -1,0 +1,10 @@
+[package]
+name = "options_index_eager_gate"
+version = "0.1.0"
+
+[deps.package]
+a = "1.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

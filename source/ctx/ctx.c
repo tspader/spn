@@ -21,6 +21,15 @@ sp_str_t spn_ctx_project_root(void) {
   return spn.paths.project;
 }
 
+spn_index_info_t* spn_find_index(sp_str_t name) {
+  sp_da_for(spn.indexes, it) {
+    if (sp_str_equal(spn.indexes[it].name, name)) {
+      return &spn.indexes[it];
+    }
+  }
+  return SP_NULLPTR;
+}
+
 sp_str_t spn_intern(sp_str_t str) {
   return sp_intern_get_or_insert_str(spn_ctx_get_intern(), str);
 }

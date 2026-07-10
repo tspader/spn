@@ -483,9 +483,10 @@ UTEST_F(options, config_negated) {
   });
 }
 
-// A when-gated dep inside an index package whose gate is off: the index
-// metadata lists the dep unconditionally, but a false gate in the fetched
-// manifest must cut the edge, not fail the build
+// A when-gated dep inside an index package whose entry predates published
+// gates (the fixture pins a raw old-format index): the index metadata lists
+// the dep unconditionally, but a false gate in the fetched manifest must cut
+// the edge, not fail the build
 UTEST_F(options, index_gated_dep) {
   tmpfs_init_named(&uf->fixture.fs, "options_index_gated_dep");
 
@@ -493,6 +494,24 @@ UTEST_F(options, index_gated_dep) {
     .project = "test/integration/fixtures/options/index_gated_dep",
     .builds = {
       { .expect = { .bin = { .name = "main", .rc = 1 } } },
+    },
+  });
+}
+
+// The published entry carries a's option declarations and the dep's gate, so
+// the resolver cuts the edge before ever looking the name up: the gated dep
+// doesn't exist in the index at all, and the build must not care
+UTEST_F(options, index_eager_gate) {
+  tmpfs_init_named(&uf->fixture.fs, "options_index_eager_gate");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/options/index_eager_gate",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit(".home/storage/spn/packages/core/a.jsonl"), .needle = sp_str_lit("\"when\":{\"x\":true}") } },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit(".home/storage/spn/packages/core/a.jsonl"), .needle = sp_str_lit("\"type\":\"bool\"") } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unknown_pkg" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 1 } },
     },
   });
 }

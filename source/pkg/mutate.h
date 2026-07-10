@@ -23,8 +23,6 @@ void                spn_pkg_add_system_dep_ex(spn_pkg_info_t* pkg, sp_str_t dep)
 void                spn_pkg_add_linkage(spn_pkg_info_t* pkg, spn_linkage_t linkage);
 spn_profile_info_t* spn_pkg_add_profile(spn_pkg_info_t* pkg, const c8* name);
 spn_profile_info_t* spn_pkg_add_profile_ex(spn_pkg_info_t* pkg, spn_profile_info_t profile);
-spn_index_info_t*   spn_pkg_add_index(spn_pkg_info_t* pkg, const c8* name, const c8* location);
-spn_index_info_t*   spn_pkg_add_index_ex(spn_pkg_info_t* pkg, sp_str_t name, sp_str_t location);
 spn_target_info_t*  spn_pkg_add_exe(spn_pkg_info_t* pkg, const c8* name);
 spn_target_info_t*  spn_pkg_add_exe_ex(spn_pkg_info_t* pkg, sp_str_t name);
 spn_target_info_t*  spn_pkg_add_script(spn_pkg_info_t* pkg, const c8* name);

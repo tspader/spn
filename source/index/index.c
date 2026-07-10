@@ -8,6 +8,7 @@
 #include "index/index.h"
 #include "index/json.h"
 #include "semver/compare.h"
+#include "semver/convert.h"
 #include "sp/io.h"
 
 void spn_index_init(spn_index_info_t* index, sp_mem_t mem) {
@@ -40,19 +41,69 @@ static bool git_index_stale(spn_index_info_t* index) {
   return mod_time.s + index->refresh <= now.s;
 }
 
-spn_err_t spn_index_sync(spn_index_info_t* index) {
+// Restore the managed clone to a bit-exact copy of the remote's default
+// branch. checkout --force -B discards tracked-file damage and re-attaches a
+// HEAD detached by an old pin, clean sweeps untracked files (both are shapes
+// a pre-transactional spn left behind by appending without committing). A
+// clone of an empty remote has no branches to restore; sweeping it clean is
+// the whole job — unless a failed bootstrap push left a commit on the unborn
+// branch, which no origin ref can reset away. That and any other anomaly
+// nukes the clone and re-clones once: the clone is a cache, so deletion is
+// always a safe repair.
+static spn_err_t git_index_freshen(spn_index_info_t* index) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  spn_err_t err = SPN_ERROR;
+
+  sp_for(attempt, 2) {
+    if (attempt || !sp_fs_is_dir(index->location)) {
+      sp_fs_remove_dir(index->location);
+      if (spn_git_clone(index->url, index->location)) {
+        break;
+      }
+    }
+    else if (spn_git_fetch(index->location)) {
+      continue;
+    }
+
+    sp_str_t branch = sp_zero;
+    if (spn_git_default_branch(scratch.mem, index->location, &branch)) {
+      sp_str_t head = sp_zero;
+      if (spn_git_has_remote_branches(index->location) ||
+          !spn_git_get_commit_full(scratch.mem, index->location, sp_str_lit("HEAD"), &head)) {
+        continue;
+      }
+    }
+    else if (spn_git_checkout_branch(index->location, branch)) {
+      continue;
+    }
+    if (spn_git_clean(index->location)) {
+      continue;
+    }
+
+    err = SPN_OK;
+    break;
+  }
+
+  sp_mem_end_scratch(scratch);
+  return err;
+}
+
+spn_err_t spn_index_sync(spn_index_info_t* index, bool force) {
   switch (index->protocol) {
     case SPN_INDEX_PROTOCOL_GIT: {
       bool pinned = !sp_str_empty(index->rev);
 
       if (sp_fs_exists(index->location)) {
         if (pinned) {
+          if (force) {
+            spn_try(spn_git_fetch(index->location));
+          }
           spn_try(spn_git_checkout(index->location, index->rev));
           return SPN_OK;
         }
 
-        if (git_index_stale(index)) {
-          spn_try(spn_git_pull(index->location));
+        if (force || git_index_stale(index)) {
+          spn_try(git_index_freshen(index));
         }
         return SPN_OK;
       }
@@ -67,7 +118,7 @@ spn_err_t spn_index_sync(spn_index_info_t* index) {
       return SPN_ERROR;
     }
     case SPN_INDEX_PROTOCOL_FILESYSTEM: {
-      return SPN_OK;
+      return sp_fs_is_dir(index->location) ? SPN_OK : SPN_ERROR;
     }
   }
   return SPN_ERROR;
@@ -125,16 +176,20 @@ cleanup:
   return package;
 }
 
-spn_err_t spn_index_publish(spn_index_info_t* index, spn_index_rel_t* rel) {
+static bool index_release_exists(spn_index_info_t* index, spn_index_rel_t* rel) {
   spn_index_pkg_t* existing = spn_index_get_package(index, rel->id);
-  if (existing) {
-    sp_da_for(existing->releases, it) {
-      if (spn_semver_eq(existing->releases[it].version, rel->version)) {
-        return SPN_ERR_VERSION_EXISTS;
-      }
+  if (!existing) {
+    return false;
+  }
+  sp_da_for(existing->releases, it) {
+    if (spn_semver_eq(existing->releases[it].version, rel->version)) {
+      return true;
     }
   }
+  return false;
+}
 
+static void index_append_release(spn_index_info_t* index, spn_index_rel_t* rel) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
   sp_str_t path = spn_index_get_package_path(scratch.mem, index, rel->id);
@@ -155,8 +210,133 @@ spn_err_t spn_index_publish(spn_index_info_t* index, spn_index_rel_t* rel) {
   sp_io_file_writer_close(&io);
 
   sp_mem_end_scratch(scratch);
+}
 
-  return SPN_OK;
+static spn_err_union_t version_exists(spn_index_info_t* index, spn_index_rel_t* rel) {
+  return (spn_err_union_t) {
+    .kind = SPN_ERR_VERSION_EXISTS,
+    .version_exists = {
+      .name = rel->id.name,
+      .version = spn_semver_to_str(sp_mem_arena_as_allocator(index->arena), rel->version),
+    },
+  };
+}
+
+#define SPN_INDEX_PUBLISH_ATTEMPTS 3
+
+spn_err_union_t spn_index_publish(spn_index_info_t* index, spn_index_rel_t* rel) {
+  switch (index->protocol) {
+    case SPN_INDEX_PROTOCOL_FILESYSTEM: {
+      if (!sp_fs_is_dir(index->location)) {
+        return (spn_err_union_t) {
+          .kind = SPN_ERR_INDEX_SYNC,
+          .index = { .name = index->name, .url = index->url },
+        };
+      }
+      if (index_release_exists(index, rel)) {
+        return version_exists(index, rel);
+      }
+      index_append_release(index, rel);
+      return spn_result(SPN_OK);
+    }
+
+    case SPN_INDEX_PROTOCOL_GIT: {
+      if (!sp_str_empty(index->rev)) {
+        return (spn_err_union_t) {
+          .kind = SPN_ERR_INDEX_PINNED,
+          .index = { .name = index->name, .url = index->url },
+        };
+      }
+
+      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+      sp_str_t message = sp_fmt(scratch.mem, "{}/{} {}",
+        sp_fmt_str(rel->id.namespace),
+        sp_fmt_str(rel->id.name),
+        sp_fmt_str(spn_semver_to_str(scratch.mem, rel->version))).value;
+      sp_str_t url = sp_str_empty(index->publish_url) ? index->url : index->publish_url;
+
+      spn_err_union_t result = spn_result(SPN_OK);
+      sp_str_t output = sp_zero;
+      bool dirtied = false;
+
+      sp_for(attempt, SPN_INDEX_PUBLISH_ATTEMPTS) {
+        if (git_index_freshen(index)) {
+          result = (spn_err_union_t) {
+            .kind = SPN_ERR_INDEX_SYNC,
+            .index = { .name = index->name, .url = index->url },
+          };
+          break;
+        }
+        dirtied = false;
+
+        if (index_release_exists(index, rel)) {
+          result = version_exists(index, rel);
+          break;
+        }
+
+        index_append_release(index, rel);
+        dirtied = true;
+
+        // A clone of an empty remote has no origin/HEAD yet; the first push
+        // creates the branch the clone was born on
+        sp_str_t branch = sp_zero;
+        if (spn_git_default_branch(scratch.mem, index->location, &branch) &&
+            spn_git_current_branch(scratch.mem, index->location, &branch)) {
+          result = (spn_err_union_t) {
+            .kind = SPN_ERR_GIT,
+            .git.command = sp_str_lit("git symbolic-ref HEAD"),
+          };
+          break;
+        }
+
+        sp_str_t path = spn_index_get_package_path(scratch.mem, index, rel->id);
+        if (spn_git_add(index->location, path)) {
+          result = (spn_err_union_t) {
+            .kind = SPN_ERR_GIT,
+            .git.command = sp_str_lit("git add"),
+          };
+          break;
+        }
+        if (spn_git_commit(index->location, message)) {
+          result = (spn_err_union_t) {
+            .kind = SPN_ERR_GIT,
+            .git.command = sp_str_lit("git commit"),
+          };
+          break;
+        }
+
+        sp_str_t refspec = sp_fmt(scratch.mem, "HEAD:refs/heads/{}", sp_fmt_str(branch)).value;
+        if (!spn_git_push(scratch.mem, index->location, url, refspec, &output)) {
+          sp_mem_end_scratch(scratch);
+          return spn_result(SPN_OK);
+        }
+
+        result = (spn_err_union_t) {
+          .kind = SPN_ERR_PUBLISH_PUSH,
+          .publish = {
+            .url = sp_str_copy(sp_mem_arena_as_allocator(index->arena), url),
+            .output = sp_str_copy(sp_mem_arena_as_allocator(index->arena), output),
+          },
+        };
+      }
+
+      // Leave the replica clean when the transaction died after mutating it
+      if (dirtied) {
+        git_index_freshen(index);
+      }
+      sp_mem_end_scratch(scratch);
+      return result;
+    }
+
+    case SPN_INDEX_PROTOCOL_HTTP: {
+      return (spn_err_union_t) {
+        .kind = SPN_ERR_INDEX_PUBLISH_PROTOCOL,
+        .index = { .name = index->name, .url = index->url },
+      };
+    }
+  }
+
+  return spn_result(SPN_ERROR);
 }
 
 spn_index_rel_t* spn_index_get_release(spn_index_info_t* index, spn_pkg_name_t id, spn_semver_t version) {

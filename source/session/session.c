@@ -219,7 +219,8 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
       spn_resolved_options_t resolved = sp_zero;
       spn_try(spn_pkg_options_merge(
         mem,
-        loaded->info,
+        loaded->info->name,
+        loaded->info->options,
         &session->profile,
         session->pkg->config,
         node->source == SPN_PKG_SOURCE_ROOT,

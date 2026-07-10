@@ -149,7 +149,7 @@ spn_semver_range_t spn_semver_comparison_to_range(spn_semver_op_t op, spn_semver
 
 static sp_str_t spn_semver_op_to_str(spn_semver_op_t op) {
   switch (op) {
-    case SPN_SEMVER_OP_EQ: return sp_str_lit("==");
+    case SPN_SEMVER_OP_EQ: return sp_str_lit("=");
     case SPN_SEMVER_OP_GEQ: return sp_str_lit(">=");
     case SPN_SEMVER_OP_GT: return sp_str_lit(">");
     case SPN_SEMVER_OP_LEQ: return sp_str_lit("<=");
@@ -187,7 +187,59 @@ sp_str_t spn_semver_to_str(sp_mem_t mem, spn_semver_t version) {
   ).value;
 }
 
+static bool semver_version_eq(spn_semver_t a, spn_semver_t b) {
+  return a.major == b.major && a.minor == b.minor && a.patch == b.patch;
+}
+
+// The parser normalizes every expression into low/high bounds, so rendering
+// must reconstruct the surface form from the bounds; printing the low bound
+// alone turns =1.0.0 into >=1.0.0 and <2.0.0 into >=0.0.0
 sp_str_t spn_semver_range_to_str(sp_mem_t mem, spn_semver_range_t range) {
+  spn_semver_t max = { SP_LIMIT_U32_MAX, SP_LIMIT_U32_MAX, SP_LIMIT_U32_MAX };
+  spn_semver_t zero = SP_ZERO_STRUCT(spn_semver_t);
+
+  switch (range.mod) {
+    case SPN_SEMVER_MOD_CMP: {
+      if (semver_version_eq(range.low.version, range.high.version)) {
+        return sp_fmt(mem, "={}", SP_FMT_STR(spn_semver_to_str(mem, range.low.version))).value;
+      }
+      if (semver_version_eq(range.low.version, zero) && range.low.op == SPN_SEMVER_OP_GEQ) {
+        return sp_fmt(
+          mem,
+          "{}{}",
+          SP_FMT_STR(spn_semver_op_to_str(range.high.op)),
+          SP_FMT_STR(spn_semver_to_str(mem, range.high.version))
+        ).value;
+      }
+      return sp_fmt(
+        mem,
+        "{}{}",
+        SP_FMT_STR(spn_semver_op_to_str(range.low.op)),
+        SP_FMT_STR(spn_semver_to_str(mem, range.low.version))
+      ).value;
+    }
+    case SPN_SEMVER_MOD_WILDCARD: {
+      if (semver_version_eq(range.low.version, zero) && semver_version_eq(range.high.version, max)) {
+        return sp_str_lit("*");
+      }
+      if (range.low.version.minor == 0 && range.low.version.patch == 0 && range.high.version.major == range.low.version.major + 1) {
+        return sp_fmt(mem, "{}.*", SP_FMT_U32(range.low.version.major)).value;
+      }
+      return sp_fmt(mem, "{}.{}.*", SP_FMT_U32(range.low.version.major), SP_FMT_U32(range.low.version.minor)).value;
+    }
+    case SPN_SEMVER_MOD_TILDE: {
+      // ~N spans a whole major (>=N.0.0 <N+1.0.0), which ~N.0.0 does not
+      if (range.low.version.minor == 0 && range.low.version.patch == 0 && range.high.version.major == range.low.version.major + 1) {
+        return sp_fmt(mem, "~{}", SP_FMT_U32(range.low.version.major)).value;
+      }
+      break;
+    }
+    case SPN_SEMVER_MOD_CARET:
+    case SPN_SEMVER_MOD_NONE: {
+      break;
+    }
+  }
+
   return sp_fmt(
     mem,
     "{}{}",

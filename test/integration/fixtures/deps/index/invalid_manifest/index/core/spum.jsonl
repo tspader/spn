@@ -1,0 +1,1 @@
+{"namespace":"core","name":"spum","version":"1.0.0","yanked":false,"source":{"url":"@spum.url@","rev":"@spum.1.0.0.commit@"},"paths":{"manifest":"spn.toml","script":"spn.c"}}

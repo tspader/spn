@@ -296,6 +296,7 @@ static void lower_indexes(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
     spn_index_info_t info = {
       .name = idx->name,
       .url = idx->url,
+      .rev = idx->rev,
       .protocol = idx->protocol,
       .kind = SPN_INDEX_WORKSPACE,
     };

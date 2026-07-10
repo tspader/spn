@@ -270,6 +270,22 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
       );
       break;
     }
+    case SPN_EVENT_PUBLISH: {
+      sp_fmt_io(&w.base, "{} v{}",
+        sp_fmt_str(event->publish.name),
+        sp_fmt_str(event->publish.version)
+      );
+      break;
+    }
+    case SPN_EVENT_PUBLISH_END: {
+      sp_fmt_io(&w.base, "{} v{} to {} {.gray}",
+        sp_fmt_str(event->publish.name),
+        sp_fmt_str(event->publish.version),
+        sp_fmt_str(event->publish.index),
+        sp_fmt_str(event->publish.url)
+      );
+      break;
+    }
     case SPN_EVENT_COMPILE_START: {
       if (event->pkg) {
         sp_fmt_io(&w.base, "v{}", sp_fmt_str(spn_semver_to_str(mem, event->pkg->version)));
@@ -746,6 +762,49 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
             "version {.yellow} of {.cyan} already exists in the index",
             sp_fmt_str(event->err.version_exists.version),
             sp_fmt_str(event->err.version_exists.name)
+          );
+          break;
+        }
+        case SPN_ERR_INDEX_PINNED: {
+          sp_fmt_io(
+            &w.base,
+            "index {.cyan} is pinned to a revision and cannot be published to",
+            sp_fmt_str(event->err.index.name)
+          );
+          break;
+        }
+        case SPN_ERR_INDEX_PUBLISH_PROTOCOL: {
+          sp_fmt_io(
+            &w.base,
+            "index {.cyan} does not support publishing",
+            sp_fmt_str(event->err.index.name)
+          );
+          break;
+        }
+        case SPN_ERR_PUBLISH_PUSH: {
+          sp_fmt_io(
+            &w.base,
+            "failed to push to {.gray}\n{}",
+            sp_fmt_str(event->err.publish.url),
+            sp_fmt_str(event->err.publish.output)
+          );
+          break;
+        }
+        case SPN_ERR_PUBLISH_DIRTY: {
+          sp_fmt_io(
+            &w.base,
+            "{.cyan} has uncommitted changes; commit them or pass {.yellow}",
+            sp_fmt_str(spn_tui_contextual_path(mem, event->err.publish.path)),
+            sp_fmt_cstr("--allow-dirty")
+          );
+          break;
+        }
+        case SPN_ERR_PUBLISH_UNPUSHED: {
+          sp_fmt_io(
+            &w.base,
+            "commit {.yellow} is not on any branch of {.gray}; push it first",
+            sp_fmt_str(event->err.publish.rev),
+            sp_fmt_str(event->err.publish.url)
           );
           break;
         }

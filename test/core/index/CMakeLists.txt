@@ -23,6 +23,7 @@ add_executable(index
   publish.c
   release.c
   sync.c
+  transaction.c
   ${TEST_TOOLS}/ctx.c
   ${TEST_TOOLS}/tmp.c
   ${TEST_TOOLS}/git.c

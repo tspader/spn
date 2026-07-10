@@ -1,5 +1,6 @@
 #include "codegen/codegen.h"
 #include "sp.h"
+#include "yyjson.h"
 
 spn_option_value_t spn_toml_loader_value_str(spn_toml_loader_t* ctx, toml_value_t value) {
   return (spn_option_value_t) {
@@ -79,6 +80,47 @@ void spn_toml_loader_read_when(spn_toml_loader_t* ctx, toml_table_t* table, cons
     sp_da_push(out->clauses, clause);
   }
   spn_toml_loader_pop(ctx);
+}
+
+spn_option_value_t spn_json_option_value(yyjson_val* value, sp_mem_t mem) {
+  if (yyjson_is_bool(value)) {
+    return (spn_option_value_t) { .kind = SPN_OPTION_VALUE_BOOL, .b = yyjson_get_bool(value) };
+  }
+  if (yyjson_is_str(value)) {
+    return (spn_option_value_t) {
+      .kind = SPN_OPTION_VALUE_STR,
+      .str = sp_str_from_cstr_n(mem, yyjson_get_str(value), (u32)yyjson_get_len(value)),
+    };
+  }
+  return (spn_option_value_t) { .kind = SPN_OPTION_VALUE_NONE };
+}
+
+void spn_json_read_when(yyjson_val* obj, const c8* key, spn_when_t* out, sp_mem_t mem) {
+  yyjson_val* child = yyjson_obj_get(obj, key);
+  if (!yyjson_is_obj(child)) {
+    return;
+  }
+
+  out->clauses = sp_da_new(mem, spn_when_clause_t);
+  size_t idx, max;
+  yyjson_val *name, *value;
+  yyjson_obj_foreach(child, idx, max, name, value) {
+    spn_when_clause_t clause = {
+      .key = sp_str_from_cstr_n(mem, yyjson_get_str(name), (u32)yyjson_get_len(name)),
+    };
+
+    yyjson_val* negation = yyjson_is_obj(value) ? yyjson_obj_get(value, "not") : SP_NULLPTR;
+    if (negation) {
+      clause.negated = true;
+      value = negation;
+    }
+
+    clause.value = spn_json_option_value(value, mem);
+    if (clause.value.kind == SPN_OPTION_VALUE_NONE) {
+      continue;
+    }
+    sp_da_push(out->clauses, clause);
+  }
 }
 
 void spn_codegen_write_when(sp_io_writer_t* out, const spn_when_t* in) {

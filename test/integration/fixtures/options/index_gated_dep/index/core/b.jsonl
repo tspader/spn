@@ -1,0 +1,1 @@
+{"namespace":"core","name":"b","version":"1.0.0","yanked":false,"source":{"url":"@b.url@","rev":"@b.1.0.0.commit@"},"paths":{"manifest":"spn.toml","script":"spn.c"},"targets":[{"name":"b","linkages":["static"]}]}

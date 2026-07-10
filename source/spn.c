@@ -288,51 +288,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
 
-  // INDEXES
-  sp_da_init(spn.heap, spn.indexes);
-
-  sp_da_for(spn.config.index, it) {
-    sp_da_push(spn.indexes, ((spn_index_info_t) {
-      .name = spn.config.index[it].name,
-      .url =  spn.config.index[it].url,
-      .rev =  spn.config.index[it].rev,
-      .protocol = spn.config.index[it].protocol,
-      .kind = SPN_INDEX_USER,
-    }));
-  }
-
-  bool has_core_index = false;
-  sp_da_for(spn.indexes, i) {
-    if (sp_str_equal(spn.indexes[i].name, sp_str_lit("core"))) {
-      has_core_index = true;
-      break;
-    }
-  }
-
-  if (!has_core_index) {
-    sp_da_push(spn.indexes, ((spn_index_info_t) {
-      .name = sp_str_lit("core"),
-      .url = sp_str_lit("https://github.com/tspader/spandex.git"),
-      .protocol = SPN_INDEX_PROTOCOL_GIT,
-      .kind = SPN_INDEX_BUILTIN,
-      .refresh = spn.cli.refresh ? spn.cli.refresh : 600
-    }));
-  }
-
-  sp_da_for(spn.indexes, i) {
-    if (spn.indexes[i].protocol == SPN_INDEX_PROTOCOL_FILESYSTEM) {
-      spn.indexes[i].location = spn.indexes[i].url;
-    } else {
-      spn.indexes[i].location = sp_fs_join_path(spn.heap, spn.paths.index, spn_git_db_key(spn.heap, spn.indexes[i].url));
-    }
-  }
-
-  sp_da_for(spn.indexes, idx) {
-    spn_index_init(&spn.indexes[idx], spn.mem);
-  }
-
-
-
   spn_cli_commit();
 
   if (cli->quiet) {
@@ -366,6 +321,62 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     if (sp_fs_exists(app.paths.lock)) {
       sp_opt_set(app.lock, spn_lock_file_load(spn.heap, app.paths.lock, spn.events));
     }
+  }
+
+  // INDEXES
+  //
+  // Search order is array order: the root manifest's indexes shadow the
+  // user config's, which shadow the builtin core. Relative filesystem urls
+  // resolve against whoever declared them.
+  sp_da_init(spn.heap, spn.indexes);
+
+  if (has_manifest) {
+    sp_str_om_for(app.package.indexes, it) {
+      spn_index_info_t* index = sp_str_om_at(app.package.indexes, it);
+      sp_da_push(spn.indexes, *index);
+    }
+  }
+
+  sp_da_for(spn.config.index, it) {
+    if (spn_find_index(spn.config.index[it].name)) {
+      continue;
+    }
+    sp_da_push(spn.indexes, ((spn_index_info_t) {
+      .name = spn.config.index[it].name,
+      .url =  spn.config.index[it].url,
+      .rev =  spn.config.index[it].rev,
+      .publish_url = spn.config.index[it].publish_url,
+      .protocol = spn.config.index[it].protocol,
+      .kind = SPN_INDEX_USER,
+    }));
+  }
+
+  if (!spn_find_index(sp_str_lit("core"))) {
+    sp_da_push(spn.indexes, ((spn_index_info_t) {
+      .name = sp_str_lit("core"),
+      .url = sp_str_lit("https://github.com/tspader/spandex.git"),
+      .protocol = SPN_INDEX_PROTOCOL_GIT,
+      .kind = SPN_INDEX_BUILTIN,
+    }));
+  }
+
+  sp_da_for(spn.indexes, i) {
+    spn_index_info_t* index = &spn.indexes[i];
+    if (index->protocol == SPN_INDEX_PROTOCOL_FILESYSTEM) {
+      sp_str_t base = index->kind == SPN_INDEX_WORKSPACE ? spn.paths.project : spn.paths.config.dir;
+      index->location = index->url;
+      if (!sp_fs_is_absolute(index->url)) {
+        sp_str_t joined = sp_fs_join_path(spn.heap, base, index->url);
+        sp_str_t canonical = sp_fs_canonicalize_path(spn.heap, joined);
+        index->location = sp_str_empty(canonical) ? joined : canonical;
+      }
+    } else {
+      index->location = sp_fs_join_path(spn.heap, spn.paths.index, spn_git_db_key(spn.heap, index->url));
+    }
+    if (!index->refresh) {
+      index->refresh = spn.cli.refresh ? spn.cli.refresh : 600;
+    }
+    spn_index_init(index, spn.mem);
   }
 
   try(spn_profile_overrides_parse(&spn.cli.profile, &app.config.overrides));
