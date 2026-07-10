@@ -26,6 +26,12 @@ spn_option_value_t spn_toml_loader_value_bool(toml_value_t value);
 void               spn_toml_loader_write_option_value(sp_io_writer_t* out, spn_option_value_t value);
 void               spn_toml_loader_read_when(spn_toml_loader_t* t, toml_table_t* table, const c8* key, spn_when_t* out);
 void               spn_toml_loader_read_option_defaults(spn_toml_loader_t* t, toml_table_t* table, const c8* k, spn_option_defaults_t* out);
+
+typedef struct yyjson_val yyjson_val;
+spn_option_value_t spn_json_option_value(yyjson_val* value, sp_mem_t mem);
+void spn_json_read_when(yyjson_val* obj, const c8* key, spn_when_t* out, sp_mem_t mem);
+void spn_json_read_option_defaults(yyjson_val* obj, const c8* key, spn_option_defaults_t* out, sp_mem_t mem);
+
 void spn_codegen_write_option_defaults(sp_io_writer_t* out, const spn_option_defaults_t* in);
 
 bool spn_codegen_option_defaults_present(const spn_option_defaults_t* in);

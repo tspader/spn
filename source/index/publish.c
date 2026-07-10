@@ -1,10 +1,8 @@
 #include "sp.h"
 #include "sp/macro.h"
 #include "error/types.h"
-#include "codegen/codegen.h"
 #include "codegen/lower.h"
 #include "external/git.h"
-#include "index/index.h"
 #include "index/publish.h"
 #include "pkg/id.h"
 #include "semver/convert.h"
@@ -20,7 +18,7 @@ static spn_index_dep_kind_t dep_kind_to_index(spn_dep_kind_t kind) {
   sp_unreachable_return(SPN_INDEX_DEP_NORMAL);
 }
 
-spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
+spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_rel_t* out) {
   sp_str_t manifest_path = sp_fs_join_path(opts->mem, opts->cwd, sp_str_lit("spn.toml"));
 
   if (!sp_fs_exists(manifest_path)) {
@@ -57,10 +55,22 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
 
   sp_str_t revision = opts->revision;
   if (sp_str_empty(revision)) {
-    if (spn_git_get_commit(opts->mem, repo, sp_str_lit("HEAD"), &revision)) {
+    if (!opts->allow_dirty && spn_git_is_dirty(repo, opts->cwd)) {
+      return (spn_err_union_t) {
+        .kind = SPN_ERR_PUBLISH_DIRTY,
+        .publish.path = repo,
+      };
+    }
+    if (spn_git_get_commit_full(opts->mem, repo, sp_str_lit("HEAD"), &revision)) {
       return (spn_err_union_t) {
         .kind = SPN_ERR_GIT,
         .git.command = sp_str_lit("git rev-parse HEAD"),
+      };
+    }
+    if (sp_str_empty(opts->url) && !spn_git_rev_on_remote(repo, revision)) {
+      return (spn_err_union_t) {
+        .kind = SPN_ERR_PUBLISH_UNPUSHED,
+        .publish = { .url = url, .rev = revision },
       };
     }
   }
@@ -85,6 +95,7 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
 
   sp_da_init(opts->mem, release.deps);
   sp_da_init(opts->mem, release.targets);
+  release.options = info.options;
 
   if (!sp_str_empty(info.upstream.url)) {
     release.source = (spn_index_rel_source_t) { .url = info.upstream.url, .rev = info.upstream.commit };
@@ -102,6 +113,8 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
       .private = req->private,
       .id = spn_pkg_name_from_qualified(req->qualified),
       .version = spn_semver_range_to_str(opts->mem, req->index.range),
+      .when = req->when,
+      .options = req->options,
     }));
   }
 
@@ -120,19 +133,6 @@ spn_err_union_t spn_publish(spn_publish_opts_t* opts) {
     sp_da_push(release.targets, target);
   }
 
-  spn_err_t publish_err = spn_index_publish(opts->index, &release);
-  if (publish_err == SPN_ERR_VERSION_EXISTS) {
-    return (spn_err_union_t) {
-      .kind = SPN_ERR_VERSION_EXISTS,
-      .version_exists = {
-        .name = release.id.name,
-        .version = spn_semver_to_str(opts->mem, release.version),
-      },
-    };
-  }
-  if (publish_err) {
-    return (spn_err_union_t) { .kind = publish_err };
-  }
-
+  *out = release;
   return spn_result(SPN_OK);
 }

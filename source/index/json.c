@@ -40,7 +40,6 @@ static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t j
 
   release->id.namespace = rel.namespace;
   release->id.name = rel.name;
-  release->checksum = rel.checksum;
   release->yanked = rel.yanked;
   release->source = (spn_index_rel_source_t) { .url = rel.source.url, .rev = rel.source.rev, .dir = rel.source.dir };
   release->manifest = (spn_index_rel_source_t) { .url = rel.manifest.url, .rev = rel.manifest.rev, .dir = rel.manifest.dir };
@@ -56,6 +55,8 @@ static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t j
         .name = rel.deps[it].name,
       },
       .version = rel.deps[it].version,
+      .when = rel.deps[it].when,
+      .options = rel.deps[it].options,
     }));
   }
 
@@ -69,6 +70,18 @@ static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t j
       }
     }
     sp_da_push(release->targets, target);
+  }
+
+  sp_da_for(rel.options, it) {
+    spn_cg_release_options_entry_t* entry = &rel.options[it];
+    spn_option_info_t option = {
+      .name = entry->key,
+      .type = entry->value.type,
+      .additive = !sp_opt_is_null(entry->value.additive) && sp_opt_get(entry->value.additive),
+      .values = entry->value.values ? entry->value.values : sp_da_new(mem, sp_str_t),
+      .defaults = entry->value.defaults ? entry->value.defaults : sp_da_new(mem, spn_option_default_t),
+    };
+    sp_str_om_insert(release->options, option.name, option);
   }
 
   return SPN_OK;
@@ -86,12 +99,12 @@ sp_str_t spn_index_rel_to_json(sp_mem_t mem, spn_index_rel_t* rel) {
     .name = rel->id.name,
     .version = spn_semver_to_str(mem, rel->version),
     .yanked = rel->yanked,
-    .checksum = rel->checksum,
     .source = { .url = rel->source.url, .rev = rel->source.rev, .dir = rel->source.dir },
     .manifest = { .url = rel->manifest.url, .rev = rel->manifest.rev, .dir = rel->manifest.dir },
     .paths = { .manifest = rel->paths.manifest, .script = rel->paths.script },
     .deps = sp_da_new(mem, spn_cg_release_dep_t),
     .targets = sp_da_new(mem, spn_cg_release_target_t),
+    .options = sp_da_new(mem, spn_cg_release_options_entry_t),
   };
 
   sp_da_for(rel->deps, it) {
@@ -100,6 +113,8 @@ sp_str_t spn_index_rel_to_json(sp_mem_t mem, spn_index_rel_t* rel) {
       .name = rel->deps[it].id.name,
       .version = rel->deps[it].version,
       .kind = rel->deps[it].kind,
+      .when = rel->deps[it].when,
+      .options = rel->deps[it].options,
     };
     if (rel->deps[it].private) {
       sp_opt_set(dep.private, true);
@@ -112,6 +127,22 @@ sp_str_t spn_index_rel_to_json(sp_mem_t mem, spn_index_rel_t* rel) {
       .name = rel->targets[it].name,
       .linkages = rel->targets[it].linkages,
     }));
+  }
+
+  sp_str_om_for(rel->options, it) {
+    spn_option_info_t* option = sp_str_om_at(rel->options, it);
+    spn_cg_release_options_entry_t entry = {
+      .key = option->name,
+      .value = {
+        .type = option->type,
+        .values = option->values,
+        .defaults = option->defaults,
+      },
+    };
+    if (option->additive) {
+      sp_opt_set(entry.value.additive, true);
+    }
+    sp_da_push(release.options, entry);
   }
 
   return spn_release_write_compact(mem, &release);

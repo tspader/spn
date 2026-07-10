@@ -5,6 +5,8 @@
 #include "index/index.h"
 #include "sp/str.h"
 
+UTEST_EMPTY_FIXTURE(index_publish)
+
 typedef struct {
   const c8* path;
   const c8* lines[8];
@@ -30,10 +32,6 @@ typedef struct {
   } expect;
 } publish_case_t;
 
-struct index_publish {
-  s32 unused;
-};
-
 static void write_publish_fixtures(ctx_t* harness, const c8* name, const publish_file_t files[4]) {
   sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
   sp_str_t prefix = sp_str_view(name);
@@ -58,7 +56,7 @@ static void write_publish_fixtures(ctx_t* harness, const c8* name, const publish
   }
 }
 
-static void run_publish_case(s32* utest_result, struct index_publish* fixture, publish_case_t c) {
+static void run_publish_case(s32* utest_result, publish_case_t c) {
   ctx_t* harness = ctx_get();
   sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
   sp_str_t case_root = tmpfs_get(&harness->fs, sp_str_view(c.name));
@@ -70,6 +68,7 @@ static void run_publish_case(s32* utest_result, struct index_publish* fixture, p
 
   spn_index_info_t index = {
     .location = index_root,
+    .protocol = SPN_INDEX_PROTOCOL_FILESYSTEM,
   };
   spn_index_init(&index, mem);
 
@@ -83,7 +82,7 @@ static void run_publish_case(s32* utest_result, struct index_publish* fixture, p
   if (c.release.source.url) { rel.source.url = sp_str_view(c.release.source.url); }
   if (c.release.source.rev) { rel.source.rev = sp_str_view(c.release.source.rev); }
 
-  spn_err_t result = spn_index_publish(&index, &rel);
+  spn_err_t result = spn_index_publish(&index, &rel).kind;
   EXPECT_EQ(c.expect.result, result);
 
   if (c.expect.lines > 0) {
@@ -109,14 +108,8 @@ static void run_publish_case(s32* utest_result, struct index_publish* fixture, p
   spn_index_deinit(&index);
 }
 
-UTEST_F_SETUP(index_publish) {
-}
-
-UTEST_F_TEARDOWN(index_publish) {
-}
-
 UTEST_F(index_publish, publish_to_empty_index) {
-  run_publish_case(utest_result, uf, (publish_case_t) {
+  run_publish_case(utest_result, (publish_case_t) {
     .name = "publish_to_empty_index",
     .release = {
       .namespace = "core",
@@ -125,14 +118,13 @@ UTEST_F(index_publish, publish_to_empty_index) {
       .source = { .url = "https://github.com/example/spum", .rev = "abc123" },
     },
     .expect = {
-      .result = SPN_OK,
       .lines = 1,
     },
   });
 }
 
 UTEST_F(index_publish, publish_second_version) {
-  run_publish_case(utest_result, uf, (publish_case_t) {
+  run_publish_case(utest_result, (publish_case_t) {
     .name = "publish_second_version",
     .fixture = {
       .files = {
@@ -156,14 +148,13 @@ UTEST_F(index_publish, publish_second_version) {
       .source = { .url = "https://github.com/example/spum", .rev = "def456" },
     },
     .expect = {
-      .result = SPN_OK,
       .lines = 2,
     },
   });
 }
 
 UTEST_F(index_publish, publish_duplicate_version_rejected) {
-  run_publish_case(utest_result, uf, (publish_case_t) {
+  run_publish_case(utest_result, (publish_case_t) {
     .name = "publish_duplicate_version_rejected",
     .fixture = {
       .files = {
@@ -188,12 +179,13 @@ UTEST_F(index_publish, publish_duplicate_version_rejected) {
     },
     .expect = {
       .result = SPN_ERR_VERSION_EXISTS,
+      .lines = 1,
     },
   });
 }
 
 UTEST_F(index_publish, publish_creates_new_file_for_different_package) {
-  run_publish_case(utest_result, uf, (publish_case_t) {
+  run_publish_case(utest_result, (publish_case_t) {
     .name = "publish_creates_new_file_for_different_package",
     .fixture = {
       .files = {
@@ -217,7 +209,6 @@ UTEST_F(index_publish, publish_creates_new_file_for_different_package) {
       .source = { .url = "https://github.com/example/spum", .rev = "abc123" },
     },
     .expect = {
-      .result = SPN_OK,
       .lines = 1,
     },
   });

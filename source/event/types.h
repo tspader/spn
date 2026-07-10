@@ -57,7 +57,9 @@
   X(SPN_EVENT_BUILD_SUMMARY,                "build_summary",              "Summary",     DEBUG,   INFO,  false, false, SPN_EVT(build_summary)) \
   X(SPN_EVENT_API_CALL,                     "api_call",                   "Calling",     DEBUG,   DEBUG, false, false, SPN_EVT(api_call)) \
   X(SPN_EVENT_USER_LOG,                     "user_log",                   "",            VERBOSE, INFO,  false, false, SPN_EVT(user_log)) \
-  X(SPN_EVENT_ADDED,                        "added",                      "Added",       NORMAL,  INFO,  false, false, SPN_EVT(added))
+  X(SPN_EVENT_ADDED,                        "added",                      "Added",       NORMAL,  INFO,  false, false, SPN_EVT(added)) \
+  X(SPN_EVENT_PUBLISH,                      "publish",                    "Publishing",  NORMAL,  INFO,  false, false, SPN_EVT(publish)) \
+  X(SPN_EVENT_PUBLISH_END,                  "publish_end",                "Published",   NORMAL,  INFO,  false, false, SPN_EVT(publish))
 
 #define SPN_EVENT_ENUM(kind, ...) kind,
 typedef enum {
@@ -155,6 +157,7 @@ typedef struct { u32 num_synced; u64 time; } spn_evt_sync_end_t;
 typedef struct { sp_str_t fn; sp_str_t args; } spn_evt_api_call_t;
 typedef struct { sp_str_t message; } spn_evt_user_log_t;
 typedef struct { sp_str_t name; sp_str_t version; } spn_evt_added_t;
+typedef struct { sp_str_t name; sp_str_t version; sp_str_t index; sp_str_t url; } spn_evt_publish_t;
 typedef struct { u32 num_files; } spn_evt_embed_start_t;
 typedef struct { sp_str_t object_path; sp_str_t header_path; u64 time; } spn_evt_embed_passed_t;
 typedef struct { sp_str_t path; sp_str_t error; } spn_evt_embed_failed_t;
@@ -212,6 +215,7 @@ struct spn_build_event_t {
     spn_evt_api_call_t api_call;
     spn_evt_user_log_t user_log;
     spn_evt_added_t added;
+    spn_evt_publish_t publish;
     spn_evt_embed_start_t embed_start;
     spn_evt_embed_passed_t embed_passed;
     spn_evt_embed_failed_t embed_failed;

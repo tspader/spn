@@ -16,7 +16,7 @@
 
 static s32 sync_index_node(spn_bg_cmd_t* cmd, void* user_data) {
   spn_sync_index_job_t* job = (spn_sync_index_job_t*)user_data;
-  job->err = spn_index_sync(job->index);
+  job->err = spn_index_sync(job->index, job->force);
   return job->err;
 }
 
@@ -25,10 +25,17 @@ spn_task_step_t spn_task_sync_indexes_init(spn_app_t* app) {
   spn_bg_init(graph, spn.mem);
   sp_da_init(spn.mem, app->index_sync.jobs);
 
+  bool force = spn.cli.index.force;
+  sp_str_t only = spn.cli.index.name;
+
   sp_da_for(spn.indexes, it) {
     spn_index_info_t* index = &spn.indexes[it];
 
-    if (spn_index_needs_fetch(index)) {
+    if (!sp_str_empty(only) && !sp_str_equal(index->name, only)) {
+      continue;
+    }
+
+    if (force || spn_index_needs_fetch(index)) {
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_SYNC,
         .sync = {
@@ -39,6 +46,7 @@ spn_task_step_t spn_task_sync_indexes_init(spn_app_t* app) {
 
     spn_sync_index_job_t* job = sp_alloc_type(spn.mem, spn_sync_index_job_t);
     job->index = index;
+    job->force = force;
     sp_da_push(app->index_sync.jobs, job);
 
     spn_bg_add_fn(graph, sync_index_node, job);
@@ -68,7 +76,7 @@ spn_task_step_t spn_task_sync_indexes_update(spn_app_t* app) {
       continue;
     }
 
-    if (sp_fs_exists(job->index->location)) {
+    if (!job->force && sp_fs_exists(job->index->location)) {
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_SYNC_STALE,
         .sync = {

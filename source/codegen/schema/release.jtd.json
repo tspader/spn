@@ -7,12 +7,12 @@
     "yanked": { "type": "boolean" }
   },
   "optionalProperties": {
-    "checksum": { "type": "string" },
     "source": { "ref": "release_source" },
     "manifest": { "ref": "release_source" },
     "paths": { "ref": "release_paths" },
     "deps": { "elements": { "ref": "release_dep" } },
-    "targets": { "elements": { "ref": "release_target" } }
+    "targets": { "elements": { "ref": "release_target" } },
+    "options": { "values": { "ref": "release_option" } }
   },
   "definitions": {
     "index_dep_kind": { "enum": ["normal", "build", "test"], "metadata": { "include": "index/types.h" } },
@@ -40,7 +40,20 @@
         "kind": { "ref": "index_dep_kind" }
       },
       "optionalProperties": {
-        "private": { "type": "boolean" }
+        "private": { "type": "boolean" },
+        "when": { "metadata": { "extern": "when", "include": "when/types.h" } },
+        "options": { "metadata": { "extern": "when", "include": "when/types.h" } }
+      }
+    },
+
+    "release_option": {
+      "properties": {
+        "type": { "ref": "option_type" }
+      },
+      "optionalProperties": {
+        "values": { "elements": { "type": "string" } },
+        "default": { "metadata": { "extern": "option_defaults", "field": "defaults", "include": "when/types.h" } },
+        "additive": { "type": "boolean" }
       }
     },
 

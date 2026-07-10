@@ -23,7 +23,8 @@ typedef struct spn_cli spn_cli_t;
   X(SPN_CLI_LS, "ls") \
   X(SPN_CLI_MANIFEST, "manifest") \
   X(SPN_CLI_TOOL, "tool") \
-  X(SPN_CLI_PUBLISH, "publish")
+  X(SPN_CLI_PUBLISH, "publish") \
+  X(SPN_CLI_INDEX, "index")
 
 typedef enum {
   SPN_CLI_COMMAND(SP_X_NAMED_ENUM_DEFINE)
@@ -129,7 +130,14 @@ typedef struct {
   sp_str_t index;
   sp_str_t source_url;
   sp_str_t source_rev;
+  bool dry;
+  bool allow_dirty;
 } spn_cli_publish_t;
+
+typedef struct {
+  sp_str_t name;
+  bool force;
+} spn_cli_index_t;
 
 struct spn_cli {
   u32 num_args;
@@ -157,6 +165,7 @@ struct spn_cli {
   spn_cli_copy_t copy;
   spn_cli_graph_t graph;
   spn_cli_publish_t publish;
+  spn_cli_index_t index;
 };
 
 typedef struct {
@@ -225,6 +234,9 @@ typedef struct {
     const c8* source_url;
     const c8* source_rev;
   } publish;
+  struct {
+    const c8* name;
+  } index;
 } spn_cli_raw_t;
 
 #endif

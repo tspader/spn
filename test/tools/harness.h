@@ -40,7 +40,7 @@ void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, bool expected,
 #define SP_EXPECT_NOT_EXISTS_TMPFS(fs, path) expect_exists(utest_result, fs, path, false, __FILE__, __LINE__)
 
 void copy_project_path(s32* utest_result, tmpfs_t* fs, sp_str_t project, sp_str_t relative);
-void setup_fixture_index_from_remote(s32* utest_result, tmpfs_t* fs, sp_str_t index, sp_str_t project);
+void setup_fixture_index_from_remote(s32* utest_result, fixture_t* fixture, sp_str_t project);
 void setup_fixture_source_repos(s32* utest_result, fixture_t* fixture, sp_str_t project);
 void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t toolchain, sp_str_t config);
 void setup_fixture_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir);

@@ -147,3 +147,71 @@ UTEST_F(cli, clean) {
     },
   });
 }
+
+UTEST_F(cli, index_list) {
+  tmpfs_init_named(&uf->fixture.fs, "cli_index_list");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/deps/index/basic",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "index", .args = { "list" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("core") } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("filesystem") } },
+    },
+  });
+}
+
+UTEST_F(cli, index_path) {
+  tmpfs_init_named(&uf->fixture.fs, "cli_index_path");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/deps/index/basic",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "index", .args = { "path" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("spn/packages") } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "index", .args = { "path", "nope" }, .rc = 1 } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("unknown index") } },
+    },
+  });
+}
+
+UTEST_F(cli, index_sync) {
+  tmpfs_init_named(&uf->fixture.fs, "cli_index_sync");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/deps/index/basic",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "index", .args = { "sync" } } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "index", .args = { "sync", "nope" }, .rc = 1 } },
+    },
+  });
+}
+
+UTEST_F(cli, publish_dry_run) {
+  tmpfs_init_named(&uf->fixture.fs, "cli_publish_dry_run");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/deps/index/basic",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "publish", .args = { "--dry", "--source-url", "https://example.com/x.git", "--source-rev", "abc123" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("\"name\":\"index_package\"") } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("dry run") } },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit(".home/storage/spn/packages/core/index_package.jsonl") },
+    },
+  });
+}
+
+UTEST_F(cli, workspace_index) {
+  tmpfs_init_named(&uf->fixture.fs, "cli_workspace_index");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/cli/workspace_index",
+    .copy = { "index/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "index", .args = { "list" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("local") } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
+      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 3 } },
+    },
+  });
+}

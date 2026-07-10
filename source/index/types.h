@@ -21,12 +21,6 @@ typedef enum {
 } spn_index_protocol_t;
 
 typedef enum {
-  SPN_INDEX_AUTH_AUTO,
-  SPN_INDEX_AUTH_ALWAYS,
-  SPN_INDEX_AUTH_NEVER,
-} spn_index_auth_t;
-
-typedef enum {
   SPN_INDEX_DEP_NORMAL,
   SPN_INDEX_DEP_BUILD,
   SPN_INDEX_DEP_TEST,
@@ -37,6 +31,8 @@ typedef struct {
   bool private;
   spn_pkg_name_t id;
   sp_str_t version;
+  spn_when_t when;
+  spn_when_t options;
 } spn_index_dep_t;
 
 typedef struct {
@@ -59,7 +55,6 @@ typedef struct {
   spn_pkg_name_t id;
   spn_semver_t version;
 
-  sp_str_t checksum;
   bool yanked;
 
   spn_index_rel_source_t source;
@@ -68,6 +63,7 @@ typedef struct {
 
   sp_da(spn_index_dep_t) deps;
   sp_da(spn_index_target_t) targets;
+  spn_option_info_om_t options;
 } spn_index_rel_t;
 
 typedef struct {
@@ -83,7 +79,6 @@ struct spn_index_info {
   sp_str_t publish_url;
   spn_index_kind_t kind;
   spn_index_protocol_t protocol;
-  spn_index_auth_t auth;
   u32 refresh;
 
   sp_mem_arena_t* arena;

@@ -5,53 +5,33 @@
 
 #include "index/index.h"
 
-#define uf utest_fixture
-
-typedef enum {
-  INDEX_SYNC_SETUP_REMOTE_ONLY,
-  INDEX_SYNC_SETUP_CLONED_REPO,
-} index_sync_setup_t;
-
-struct index_sync_fixture {
-  s32 unused;
-};
+UTEST_EMPTY_FIXTURE(index_sync)
 
 typedef struct {
   const c8* name;
 
   spn_index_protocol_t protocol;
-  index_sync_setup_t setup;
+  bool cloned;
   bool mutate_remote;
 
   struct {
     spn_err_t result;
     bool cached;
   } expect;
-} case_t;
+} sync_case_t;
 
-void modify_index(sp_str_t dir) {
-  static u32 it = 0;
+static void commit_seed(sp_str_t repo) {
+  static u32 counter = 0;
 
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-  sp_str_t file = sp_fs_join_path(mem, dir, sp_str_lit("seed.txt"));
-  sp_str_t content = sp_fmt(mem, "{}", sp_fmt_uint(it++)).value;
+  sp_str_t file = sp_fs_join_path(mem, repo, sp_str_lit("seed.txt"));
+  sp_fs_create_file_str(file, sp_fmt(mem, "{}", sp_fmt_uint(counter++)).value);
 
-  sp_io_file_writer_t io = sp_zero;
-  sp_io_file_writer_from_path(&io, file);
-  sp_io_write_str(&io.base, content, SP_NULLPTR);
-  sp_io_file_writer_close(&io);
-
-  git_repo_stage_all(dir);
-  git_repo_commit(dir, sp_str_lit("seed"));
+  git_repo_stage_all(repo);
+  git_repo_commit(repo, sp_str_lit("seed"));
 }
 
-static void index_sync_prepare(s32* utest_result, case_t c, sp_str_t remote, sp_str_t cache) {
-
-}
-
-static void run_index_sync_case(s32* utest_result, struct index_sync_fixture* fixture, case_t c) {
-  SP_UNUSED(fixture);
-
+static void run_sync_case(s32* utest_result, sync_case_t c) {
   ctx_t* harness = ctx_get();
   sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
   sp_str_t tmp = tmpfs_get(&harness->fs, sp_str_view(c.name));
@@ -61,24 +41,7 @@ static void run_index_sync_case(s32* utest_result, struct index_sync_fixture* fi
 
   sp_fs_create_dir(remote);
   git_repo_init(remote);
-
-  // Always add an initial commit
-  modify_index(remote);
-
-  // Optionally sync
-  if (c.setup != INDEX_SYNC_SETUP_REMOTE_ONLY) {
-    spn_index_info_t setup_index = {
-      .url = remote,
-      .location = cache,
-      .protocol = SPN_INDEX_PROTOCOL_GIT,
-    };
-    EXPECT_EQ(spn_index_sync(&setup_index), SPN_OK);
-  }
-
-  // Optionally add another commit
-  if (c.mutate_remote) {
-    modify_index(remote);
-  }
+  commit_seed(remote);
 
   spn_index_info_t index = {
     .name = sp_str_lit("test"),
@@ -87,50 +50,43 @@ static void run_index_sync_case(s32* utest_result, struct index_sync_fixture* fi
     .protocol = c.protocol,
   };
 
-  EXPECT_EQ(spn_index_sync(&index), c.expect.result);
-  EXPECT_EQ(sp_fs_exists(cache), c.expect.cached);
+  if (c.cloned) {
+    EXPECT_EQ(SPN_OK, spn_index_sync(&index, false));
+  }
+  if (c.mutate_remote) {
+    commit_seed(remote);
+  }
+
+  EXPECT_EQ(c.expect.result, spn_index_sync(&index, false));
+  EXPECT_EQ(c.expect.cached, sp_fs_exists(cache));
 }
 
-UTEST_F_SETUP(index_sync_fixture) {
-  uf->unused = 0;
-}
-
-UTEST_F_TEARDOWN(index_sync_fixture) {
-}
-
-UTEST_F(index_sync_fixture, sync_clone_when_missing) {
-  run_index_sync_case(utest_result, uf, (case_t) {
+UTEST_F(index_sync, sync_clone_when_missing) {
+  run_sync_case(utest_result, (sync_case_t) {
     .name = "sync_clone_when_missing",
-    .protocol = SPN_INDEX_PROTOCOL_GIT,
-    .setup = INDEX_SYNC_SETUP_REMOTE_ONLY,
     .expect = {
-      .result = SPN_OK,
       .cached = true,
     },
   });
 }
 
-UTEST_F(index_sync_fixture, sync_fetch_when_present) {
-  run_index_sync_case(utest_result, uf, (case_t) {
+UTEST_F(index_sync, sync_fetch_when_present) {
+  run_sync_case(utest_result, (sync_case_t) {
     .name = "sync_fetch_when_present",
-    .protocol = SPN_INDEX_PROTOCOL_GIT,
-    .setup = INDEX_SYNC_SETUP_CLONED_REPO,
+    .cloned = true,
     .mutate_remote = true,
     .expect = {
-      .result = SPN_OK,
       .cached = true,
     },
   });
 }
 
-UTEST_F(index_sync_fixture, sync_http_unimplemented) {
-  run_index_sync_case(utest_result, uf, (case_t) {
+UTEST_F(index_sync, sync_http_unimplemented) {
+  run_sync_case(utest_result, (sync_case_t) {
     .name = "sync_http_unimplemented",
     .protocol = SPN_INDEX_PROTOCOL_HTTP,
-    .setup = INDEX_SYNC_SETUP_REMOTE_ONLY,
     .expect = {
       .result = SPN_ERROR,
-      .cached = false,
     },
   });
 }

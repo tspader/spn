@@ -1,5 +1,6 @@
 #include "codegen/codegen.h"
 #include "sp.h"
+#include "yyjson.h"
 
 void spn_toml_loader_read_option_defaults(spn_toml_loader_t* ctx, toml_table_t* table, const c8* key, spn_option_defaults_t* out) {
   toml_array_t* array = toml_table_array(table, key);
@@ -67,6 +68,30 @@ void spn_toml_loader_read_option_defaults(spn_toml_loader_t* ctx, toml_table_t* 
 
   if (spn_toml_loader_field_present(table, key)) {
     spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, key);
+  }
+}
+
+void spn_json_read_option_defaults(yyjson_val* obj, const c8* key, spn_option_defaults_t* out, sp_mem_t mem) {
+  yyjson_val* array = yyjson_obj_get(obj, key);
+  if (!yyjson_is_arr(array)) {
+    return;
+  }
+
+  *out = sp_da_new(mem, spn_option_default_t);
+  size_t idx, max;
+  yyjson_val* element;
+  yyjson_arr_foreach(array, idx, max, element) {
+    if (!yyjson_is_obj(element)) {
+      continue;
+    }
+
+    spn_option_default_t entry = sp_zero;
+    entry.value = spn_json_option_value(yyjson_obj_get(element, "value"), mem);
+    if (entry.value.kind == SPN_OPTION_VALUE_NONE) {
+      continue;
+    }
+    spn_json_read_when(element, "when", &entry.when, mem);
+    sp_da_push(*out, entry);
   }
 }
 

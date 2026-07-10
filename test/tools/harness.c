@@ -3,7 +3,6 @@
 #include "test.h"
 #include "action.h"
 #include "harness.h"
-#include "toml.h"
 #include "yyjson.h"
 
 static void fixture_write_file(sp_str_t path, sp_str_t content) {
@@ -49,122 +48,51 @@ s32 sort_dirs_by_name(const void* a, const void* b) {
   return sp_str_sort_kernel_alphabetical(&lhs->name, &rhs->name);
 }
 
-static void release_json_deps(sp_io_writer_t* io, toml_table_t* deps, const c8* table, const c8* kind, u32* count) {
-  if (!deps) return;
+typedef struct {
+  sp_str_t token;
+  sp_str_t value;
+} fixture_sub_t;
 
-  toml_table_t* kinded = toml_table_table(deps, table);
-  if (!kinded) return;
+static sp_str_t str_replace_all(sp_mem_t mem, sp_str_t str, sp_str_t needle, sp_str_t repl);
 
-  for (s32 it = 0; it < toml_table_len(kinded); it++) {
-    s32 len = 0;
-    const c8* key = toml_table_key(kinded, it, &len);
-
-    // A dep is either a bare version string or an inline table carrying
-    // extras, e.g. foo = { version = "1.0.0", private = true }
-    bool private = false;
-    toml_value_t version = toml_table_string(kinded, key);
-    if (!version.ok) {
-      toml_table_t* dep = toml_table_table(kinded, key);
-      if (!dep) continue;
-
-      version = toml_table_string(dep, "version");
-      if (!version.ok) continue;
-
-      toml_value_t flag = toml_table_bool(dep, "private");
-      private = flag.ok && flag.u.b;
-    }
-
-    sp_str_t name = sp_str_view(key);
-    sp_str_t namespace = sp_str_lit("core");
-    sp_str_pair_t pair = sp_str_cleave_c8(name, '/');
-    if (!sp_str_empty(pair.second)) {
-      namespace = pair.first;
-      name = pair.second;
-    }
-
-    if ((*count)++) sp_fmt_io(io, ",");
-    sp_fmt_io(io, "{{\"namespace\":\"{}\",\"name\":\"{}\",\"version\":\"{}\",\"kind\":\"{}\"",
-      sp_fmt_str(namespace), sp_fmt_str(name), sp_fmt_cstr(version.u.s), sp_fmt_cstr(kind));
-    if (private) sp_fmt_io(io, ",\"private\":true");
-    sp_fmt_io(io, "}}");
-    free(version.u.s);
-  }
-}
-
-static void release_json_targets(sp_io_writer_t* io, toml_table_t* manifest) {
-  toml_array_t* libs = toml_table_array(manifest, "lib");
-  if (!libs) return;
-
-  u32 count = 0;
-  for (s32 it = 0; it < toml_array_len(libs); it++) {
-    toml_table_t* lib = toml_array_table(libs, it);
-    if (!lib) continue;
-
-    toml_value_t name = toml_table_string(lib, "name");
-    if (!name.ok) continue;
-
-    if (count++) sp_fmt_io(io, ",");
-    sp_fmt_io(io, "{{\"name\":\"{}\",\"linkages\":[", sp_fmt_cstr(name.u.s));
-    free(name.u.s);
-
-    toml_array_t* kinds = toml_table_array(lib, "kinds");
-    u32 kind_count = 0;
-    for (s32 k = 0; k < toml_array_len(kinds); k++) {
-      toml_value_t kind = toml_array_string(kinds, k);
-      if (!kind.ok) continue;
-      if (kind_count++) sp_fmt_io(io, ",");
-      sp_fmt_io(io, "\"{}\"", sp_fmt_cstr(kind.u.s));
-      free(kind.u.s);
-    }
-    sp_fmt_io(io, "]}}");
-  }
-}
-
-// The fixture index publishes what the remote manifest declares: deps with
-// their kinds and lib targets with their supported linkages, same as a real
-// spn publish would
-static sp_str_t build_release_json(sp_mem_t mem, sp_str_t name, sp_str_t version, sp_str_t manifest_dir, sp_str_t repo_url, sp_str_t commit, sp_str_t manifest_url, sp_str_t manifest_rev) {
-  sp_str_t manifest_path = sp_fs_join_path(mem, manifest_dir, sp_str_lit("spn.toml"));
-  sp_str_t content = test_read_file(mem, manifest_path);
-
-  c8 err [256] = { 0 };
-  c8* toml = (c8*)sp_alloc(mem, content.len + 1);
-  memcpy(toml, content.data, content.len);
-  toml_table_t* manifest = toml_parse(toml, err, sizeof(err));
-
-  sp_io_dyn_mem_writer_t b = sp_zero;
-  sp_io_dyn_mem_writer_init(mem, &b);
-
-  sp_fmt_io(&b.base, "{{\"namespace\":\"core\",\"name\":\"{}\",\"version\":\"{}\",\"yanked\":false", sp_fmt_str(name), sp_fmt_str(version));
-  sp_fmt_io(&b.base, ",\"source\":{{\"url\":\"{}\",\"rev\":\"{}\",\"dir\":\"\"}}", sp_fmt_str(sp_str_replace_c8(mem, repo_url, '\\', '/')), sp_fmt_str(commit));
-  if (!sp_str_empty(manifest_url)) {
-    sp_fmt_io(&b.base, ",\"manifest\":{{\"url\":\"{}\",\"rev\":\"{}\",\"dir\":\"\"}}", sp_fmt_str(sp_str_replace_c8(mem, manifest_url, '\\', '/')), sp_fmt_str(manifest_rev));
-  }
-  sp_fmt_io(&b.base, ",\"paths\":{{\"manifest\":\"spn.toml\",\"script\":\"spn.c\"}}");
-
-  sp_fmt_io(&b.base, ",\"deps\":[");
-  if (manifest) {
-    toml_table_t* deps = toml_table_table(manifest, "deps");
-    u32 count = 0;
-    release_json_deps(&b.base, deps, "package", "normal", &count);
-    release_json_deps(&b.base, deps, "build", "build", &count);
-    release_json_deps(&b.base, deps, "test", "test", &count);
-  }
-  sp_fmt_io(&b.base, "]");
-
-  sp_fmt_io(&b.base, ",\"targets\":[");
-  if (manifest) {
-    release_json_targets(&b.base, manifest);
-  }
-  sp_fmt_io(&b.base, "]}}");
-
-  if (manifest) toml_free(manifest);
-
-  return sp_io_dyn_mem_writer_take_str(&b);
-}
-
-void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, sp_str_t project) {
+// Publish one committed manifest checkout into the fixture's filesystem
+// index with the real spn binary, so fixture index entries are whatever
+// publish actually produces
+static void fixture_publish(s32* result, fixture_t* fixture, sp_str_t repo, sp_str_t url, sp_str_t rev) {
   UTEST_RESULT(result);
+  sp_mem_t mem = fixture->fs.mem;
+
+  sp_ps_config_t config = {
+    .command = fixture->paths.spn,
+    .cwd = repo,
+    .io = {
+      .in.mode = SP_PS_IO_MODE_NULL,
+      .err.mode = SP_PS_IO_MODE_REDIRECT,
+    },
+    .env = {
+      .extra = {
+        { sp_str_lit("SPN_STORAGE_DIR"), fixture->paths.storage },
+        { sp_str_lit("SPN_TOOLCHAIN_DIR"), fixture->paths.toolchain },
+        { sp_str_lit("SPN_CONFIG_DIR"), fixture->paths.config },
+      },
+    },
+  };
+  sp_ps_config_add_arg(mem, &config, sp_str_lit("publish"));
+  sp_ps_config_add_arg(mem, &config, sp_str_lit("--source-url"));
+  sp_ps_config_add_arg(mem, &config, sp_str_replace_c8(mem, url, '\\', '/'));
+  sp_ps_config_add_arg(mem, &config, sp_str_lit("--source-rev"));
+  sp_ps_config_add_arg(mem, &config, rev);
+
+  sp_ps_output_t output = sp_ps_run(mem, config);
+  if (output.status.exit_code) {
+    sp_log("publish failed in {}:\n{}", sp_fmt_str(repo), sp_fmt_str(output.out));
+  }
+  ASSERT_EQ(0, output.status.exit_code);
+}
+
+void setup_fixture_index_from_remote(s32* result, fixture_t* fixture, sp_str_t project) {
+  UTEST_RESULT(result);
+  tmpfs_t* fs = &fixture->fs;
   sp_mem_t mem = fs->mem;
 
   sp_str_t remote = sp_fs_join_path(mem, project, sp_str_lit("remote"));
@@ -174,11 +102,10 @@ void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, s
 
   ASSERT_TRUE(sp_fs_is_dir(remote));
 
-  // create core/ namespace directory under index
-  sp_str_t core_dir = sp_fs_join_path(mem, index, sp_str_lit("core"));
-  sp_fs_create_dir(core_dir);
+  sp_str_t raw = sp_fs_join_path(mem, project, sp_str_lit("index"));
 
   sp_str_t recipes = sp_fs_join_path(mem, project, sp_str_lit("recipes"));
+  sp_da(fixture_sub_t) subs = sp_da_new(mem, fixture_sub_t);
 
   sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, remote);
   sp_da_for(entries, it) {
@@ -192,9 +119,11 @@ void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, s
     sp_da_sort(versions, sort_dirs_by_name);
 
     sp_str_t repo = tmpfs_get(fs, sp_fs_join_path(mem, sp_str_lit("remote"), entry->name));
-    sp_str_t jsonl_path = sp_fs_join_path(mem, core_dir, sp_fmt(mem, "{}.jsonl", sp_fmt_str(entry->name)).value);
-
     git_repo_init(repo);
+    sp_da_push(subs, ((fixture_sub_t) {
+      .token = sp_fmt(mem, "@{}.url@", sp_fmt_str(entry->name)).value,
+      .value = sp_str_replace_c8(mem, repo, '\\', '/'),
+    }));
 
     // recipes/<pkg>/<version>/ holds a separate manifest repo for packages
     // whose recipe is published apart from their source
@@ -206,37 +135,73 @@ void setup_fixture_index_from_remote(s32* result, tmpfs_t* fs, sp_str_t index, s
       git_repo_init(recipe_repo);
     }
 
-    sp_io_dyn_mem_writer_t jsonl = sp_zero;
-    sp_io_dyn_mem_writer_init(mem, &jsonl);
-
     sp_da_for(versions, v) {
       sp_fs_entry_t* dir = &versions[v];
       ASSERT_TRUE(sp_fs_is_dir(dir->path));
 
-      sp_str_t manifest_url = sp_str_lit("");
-      sp_str_t manifest_rev = sp_str_lit("");
-      sp_str_t manifest_dir = dir->path;
+      git_repo_commit_from_dir(dir->path, repo, dir->name);
+      sp_str_t commit = git_repo_head(repo);
+      sp_da_push(subs, ((fixture_sub_t) {
+        .token = sp_fmt(mem, "@{}.{}.commit@", sp_fmt_str(entry->name), sp_fmt_str(dir->name)).value,
+        .value = commit,
+      }));
+
+      if (sp_fs_is_dir(raw)) {
+        continue;
+      }
+
       if (split) {
         sp_str_t recipe_dir = sp_fs_join_path(mem, recipe_versions, dir->name);
-        ASSERT_TRUE(sp_fs_exists(sp_fs_join_path(mem, recipe_dir, sp_str_lit("spn.toml"))));
+        sp_str_t recipe_manifest = sp_fs_join_path(mem, recipe_dir, sp_str_lit("spn.toml"));
+        ASSERT_TRUE(sp_fs_exists(recipe_manifest));
 
         git_repo_commit_from_dir(recipe_dir, recipe_repo, dir->name);
-        manifest_url = recipe_repo;
-        manifest_rev = git_repo_head(recipe_repo);
-        manifest_dir = recipe_dir;
+
+        // The recipe manifest names its upstream with @<pkg>.url@ and
+        // @<pkg>.commit@ tokens, which resolve to this version's source
+        sp_str_t content = test_read_file(mem, recipe_manifest);
+        content = str_replace_all(mem, content,
+          sp_fmt(mem, "@{}.url@", sp_fmt_str(entry->name)).value,
+          sp_str_replace_c8(mem, repo, '\\', '/'));
+        content = str_replace_all(mem, content,
+          sp_fmt(mem, "@{}.commit@", sp_fmt_str(entry->name)).value,
+          commit);
+        fixture_write_file(sp_fs_join_path(mem, recipe_repo, sp_str_lit("spn.toml")), content);
+        git_repo_stage_all(recipe_repo);
+        git_repo_commit(recipe_repo, dir->name);
+
+        fixture_publish(result, fixture, recipe_repo, recipe_repo, git_repo_head(recipe_repo));
       }
       else {
         sp_str_t source_manifest = sp_fs_join_path(mem, dir->path, sp_str_lit("spn.toml"));
         ASSERT_TRUE(sp_fs_exists(source_manifest));
+
+        fixture_publish(result, fixture, repo, repo, commit);
       }
-
-      git_repo_commit_from_dir(dir->path, repo, dir->name);
-      sp_str_t commit = git_repo_head(repo);
-
-      sp_fmt_io(&jsonl.base, "{}\n", sp_fmt_str(build_release_json(mem, entry->name, dir->name, manifest_dir, repo, commit, manifest_url, manifest_rev)));
     }
+  }
 
-    fixture_write_file(jsonl_path, sp_io_dyn_mem_writer_as_str(&jsonl));
+  // A fixture with an index/ dir writes its entries verbatim (with repo
+  // tokens substituted) instead of publishing: coverage for entries that
+  // predate whatever publish currently emits
+  if (sp_fs_is_dir(raw)) {
+    sp_da(sp_fs_entry_t) namespaces = sp_fs_collect(mem, raw);
+    sp_da_for(namespaces, nt) {
+      sp_fs_entry_t* ns = &namespaces[nt];
+      if (!sp_fs_is_dir(ns->path)) {
+        continue;
+      }
+      sp_da(sp_fs_entry_t) files = sp_fs_collect(mem, ns->path);
+      sp_da_for(files, ft) {
+        sp_str_t content = test_read_file(mem, files[ft].path);
+        sp_da_for(subs, st) {
+          content = str_replace_all(mem, content, subs[st].token, subs[st].value);
+        }
+        fixture_write_file(
+          sp_fs_join_path(mem, sp_fs_join_path(mem, fixture->paths.index, ns->name), files[ft].name),
+          content);
+      }
+    }
   }
 }
 
@@ -757,7 +722,7 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
   if (test.project) {
     sp_str_t project = sp_fs_join_path(mem, fixture->paths.root, sp_str_view(test.project));
     fixture_copy_project(utest_result, fixture, project, test.copy);
-    setup_fixture_index_from_remote(utest_result, &fixture->fs, fixture->paths.index, project);
+    setup_fixture_index_from_remote(utest_result, fixture, project);
     setup_fixture_source_repos(utest_result, fixture, project);
   }
 

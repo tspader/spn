@@ -13,6 +13,7 @@
 #include "resolve/resolve.h"
 #include "resolve/types.h"
 #include "semver/compare.h"
+#include "semver/convert.h"
 #include "semver/parser.h"
 #include "sp/str.h"
 #include "semver/types.h"
@@ -452,19 +453,12 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
 
   sp_da_init(resolver->mem, node.deps);
 
-  // The list of dependencies defined in the manifest is not the same as the
-  // list of dependencies this build uses: when-gated edges whose predicates
-  // fail are cut here, before resolution ever fetches index data for them.
-  // The env is facts, defaults, root config, the profile's options for the
-  // root itself, and any consumer requests seeded from a prior pass —
-  // spn_session_apply_options rechecks every gate against the final merge
-  // and re-enters resolution with the requests it found when a gate flips.
   sp_da(spn_option_request_t)* seeds = SP_NULLPTR;
   if (resolver->seeds) {
     seeds = sp_str_ht_get(resolver->seeds, pkg->info->qualified);
   }
   spn_when_env_t env;
-  spn_pkg_options_env(resolver->mem, pkg->info, &resolver->profile, resolver->config, pkg->source == SPN_PKG_SOURCE_ROOT, seeds ? *seeds : SP_NULLPTR, &env);
+  spn_pkg_options_env(resolver->mem, pkg->info->name, pkg->info->options, &resolver->profile, resolver->config, pkg->source == SPN_PKG_SOURCE_ROOT, seeds ? *seeds : SP_NULLPTR, &env);
   sp_da_for(pkg->info->deps, it) {
     if (!spn_when_eval(&pkg->info->deps[it].when, &env)) {
       continue;
@@ -534,17 +528,42 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
     };
   }
 
+  sp_da(spn_option_request_t)* seeds = SP_NULLPTR;
+  if (resolver->seeds) {
+    seeds = sp_str_ht_get(resolver->seeds, qualified);
+  }
+  spn_when_env_t env;
+  spn_pkg_options_env(resolver->mem, release->id.name, release->options, &resolver->profile, resolver->config, false, seeds ? *seeds : SP_NULLPTR, &env);
+
   sp_da_init(resolver->mem, node.deps);
   sp_da_for(release->deps, it) {
+    if (!spn_when_eval(&release->deps[it].when, &env)) {
+      continue;
+    }
+
     spn_semver_range_t range = sp_zero;
     if (spn_semver_parse_range(release->deps[it].version, &range)) {
+      record_failure(run, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR_MANIFEST,
+        .manifest_err = {
+          .name = qualified,
+          .error = sp_fmt(resolver->mem, "index entry for {} {} has invalid version range {} for dep {}",
+            sp_fmt_str(qualified),
+            sp_fmt_str(spn_semver_to_str(resolver->mem, release->version)),
+            sp_fmt_str(release->deps[it].version),
+            sp_fmt_str(release->deps[it].id.name)).value,
+        },
+      });
       return SPN_ERROR;
     }
+
     sp_da_push(node.deps, ((spn_requested_pkg_t) {
       .qualified = spn_pkg_name_to_qualified(release->deps[it].id),
       .source = SPN_PKG_SOURCE_INDEX,
       .kind = dep_kind_from_index(release->deps[it].kind),
       .private = release->deps[it].private,
+      .when = release->deps[it].when,
+      .options = release->deps[it].options,
       .index = {
         .range = range
       }
@@ -633,6 +652,9 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
   spn_err_t result = SPN_ERROR;
   sp_da_rfor(pkg->releases, it) {
     spn_index_rel_t* release = &pkg->releases[it];
+    if (release->yanked) {
+      continue;
+    }
     if (!spn_semver_in_range(release->version, request->index.range)) {
       continue;
     }

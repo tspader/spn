@@ -23,7 +23,6 @@ typedef struct {
   const c8* name;
   const c8* version;
   bool yanked;
-  const c8* checksum;
   struct { const c8* url; const c8* rev; const c8* dir; } source;
   struct { const c8* url; const c8* rev; const c8* dir; } manifest;
   struct { const c8* manifest; const c8* script; } paths;
@@ -54,7 +53,6 @@ static spn_index_rel_t release_test_build(sp_mem_t mem, release_test_rel_t* rel)
     .yanked = rel->yanked,
   };
 
-  if (rel->checksum) { built.checksum = sp_cstr_as_str(rel->checksum); }
   if (rel->source.url) { built.source.url = sp_cstr_as_str(rel->source.url); }
   if (rel->source.rev) { built.source.rev = sp_cstr_as_str(rel->source.rev); }
   if (rel->source.dir) { built.source.dir = sp_cstr_as_str(rel->source.dir); }
@@ -100,7 +98,6 @@ static void release_test_check(s32* utest_result, sp_mem_t mem, release_test_rel
   SP_EXPECT_STR_EQ_CSTR(spn_semver_to_str(mem, rel->version), expected->version);
   EXPECT_EQ(expected->yanked, rel->yanked);
 
-  if (expected->checksum) { SP_EXPECT_STR_EQ_CSTR(rel->checksum, expected->checksum); }
   if (expected->source.url) { SP_EXPECT_STR_EQ_CSTR(rel->source.url, expected->source.url); }
   if (expected->source.rev) { SP_EXPECT_STR_EQ_CSTR(rel->source.rev, expected->source.rev); }
   if (expected->source.dir) { SP_EXPECT_STR_EQ_CSTR(rel->source.dir, expected->source.dir); }
@@ -226,7 +223,6 @@ UTEST_F(index_release, full) {
           .name = "spum",
           .version = "2.1.0",
           .yanked = true,
-          .checksum = "deadbeef",
           .source = { .url = "https://github.com/example/spum", .rev = "abc123", .dir = "packages/spum" },
           .manifest = { .url = "https://github.com/example/packages", .rev = "def456", .dir = "spum" },
           .paths = { .manifest = "spn.toml", .script = "spn.c" },

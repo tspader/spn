@@ -167,18 +167,4 @@ spn_target_info_t* spn_pkg_add_lib_ex(spn_pkg_info_t* pkg, sp_str_t name, spn_li
   return target;
 }
 
-spn_index_info_t* spn_pkg_add_index(spn_pkg_info_t* pkg, const c8* name, const c8* location) {
-  return spn_pkg_add_index_ex(pkg, spn_intern_cstr(name), spn_intern_cstr(location));
-}
-
-spn_index_info_t* spn_pkg_add_index_ex(spn_pkg_info_t* pkg, sp_str_t name, sp_str_t location) {
-  spn_index_info_t index = {
-    .name = spn_intern(name),
-    .location = spn_intern(location),
-    .kind = SPN_INDEX_WORKSPACE,
-  };
-  sp_str_om_insert(pkg->indexes, index.name, index);
-  return sp_str_om_get(pkg->indexes, index.name);
-}
-
 

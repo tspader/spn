@@ -77,7 +77,10 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
     sp_fmt(mem, "{}_index", sp_fmt_cstr(c.name)).value);
   sp_fs_create_dir(index_root);
 
-  spn_index_info_t index = { .location = index_root };
+  spn_index_info_t index = {
+    .location = index_root,
+    .protocol = SPN_INDEX_PROTOCOL_FILESYSTEM,
+  };
   spn_index_init(&index, mem);
 
   sp_str_t cwd = repo.path;
@@ -91,12 +94,15 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
     .mem = mem,
     .intern = spn.intern,
     .cwd = cwd,
-    .index = &index,
     .url = repo.path,
     .revision = repo.commits[rev_idx],
   };
 
-  spn_err_union_t result = spn_publish(&opts);
+  spn_index_rel_t release = SP_ZERO_INITIALIZE();
+  spn_err_union_t result = spn_publish_build(&opts, &release);
+  if (!result.kind) {
+    result = spn_index_publish(&index, &release);
+  }
   EXPECT_EQ(c.expect.kind, result.kind);
 
   if (c.expect.namespace && result.kind == SPN_OK) {

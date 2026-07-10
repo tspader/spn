@@ -27,17 +27,10 @@ spn_pkg_config_t* spn_pkg_config_find(sp_da(spn_pkg_config_entry_t) config, sp_s
 void spn_when_env_from_profile(sp_mem_t mem, const spn_profile_info_t* profile, spn_when_env_t* env);
 void spn_when_env_add_options(spn_when_env_t* env, const spn_resolved_options_t* options);
 
-// One resolved value per declared option, in declaration order. Root config
-// sets authoritatively for every option kind (the root's own options come
-// from the profile instead); with the root silent, additive bools union
-// across requests and everything else must agree across them. { not = v }
-// requests veto the winner, and unset options fall through to their
-// first-match defaults unless the root declined them. With events NULL
-// nothing is validated or reported; the resolver uses that silent form to
-// gate dep edges during resolution.
 spn_err_t spn_pkg_options_merge(
   sp_mem_t mem,
-  spn_pkg_info_t* info,
+  sp_str_t pkg,
+  spn_option_info_om_t options,
   const spn_profile_info_t* profile,
   sp_da(spn_pkg_config_entry_t) root_config,
   bool is_root,
@@ -47,18 +40,14 @@ spn_err_t spn_pkg_options_merge(
 
 void spn_pkg_options_env(
   sp_mem_t mem,
-  spn_pkg_info_t* info,
+  sp_str_t pkg,
+  spn_option_info_om_t options,
   const spn_profile_info_t* profile,
   sp_da(spn_pkg_config_entry_t) root_config,
   bool is_root,
   sp_da(spn_option_request_t) requests,
   spn_when_env_t* env);
 
-// The transform from manifest-shaped data to build-shaped data: every gated
-// list folds into the plain list beside it under env, and each true bool
-// option with a define lands in the package's define list (public ones also
-// in public_define, which direct consumers compile with). Idempotent because
-// file-backed packages share one info across resolved instances.
 void spn_pkg_apply_options(spn_pkg_info_t* info, spn_when_env_t* env);
 
 #endif

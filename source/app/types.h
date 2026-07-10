@@ -31,6 +31,7 @@ typedef struct {
 
 typedef struct {
   spn_index_info_t* index;
+  bool force;
   spn_err_t err;
 } spn_sync_index_job_t;
 

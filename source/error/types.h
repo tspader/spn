@@ -122,6 +122,12 @@ typedef struct {
       sp_str_t url;
     } index;
     struct {
+      sp_str_t url;
+      sp_str_t rev;
+      sp_str_t path;
+      sp_str_t output;
+    } publish;
+    struct {
       sp_str_t name;
       sp_str_t requested;
     } pkg;

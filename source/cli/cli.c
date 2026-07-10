@@ -347,8 +347,63 @@ static sp_cli_cmd_t cmd_publish = {
       .placeholder = "REV",
       .ptr = &spn_cli_raw.publish.source_rev,
     },
+    {
+      .name = "dry",
+      .summary = "Print the release entry without publishing it",
+      .ptr = &spn.cli.publish.dry,
+    },
+    {
+      .name = "allow-dirty",
+      .summary = "Publish even if the working tree has uncommitted changes",
+      .ptr = &spn.cli.publish.allow_dirty,
+    },
   },
   .handler = spn_cli_publish,
+};
+
+static sp_cli_cmd_t cmd_index_list = {
+  .name = "list",
+  .summary = "List configured indexes",
+  .handler = spn_cli_index_list,
+};
+
+static sp_cli_cmd_t cmd_index_path = {
+  .name = "path",
+  .summary = "Print the local checkout path of an index",
+  .args = {
+    {
+      .name = "name",
+      .kind = SP_CLI_ARG_OPTIONAL,
+      .summary = "Index name (default: core)",
+      .ptr = &spn_cli_raw.index.name,
+    },
+  },
+  .handler = spn_cli_index_path,
+};
+
+static sp_cli_cmd_t cmd_index_sync = {
+  .name = "sync",
+  .summary = "Refresh indexes, ignoring the staleness window",
+  .args = {
+    {
+      .name = "name",
+      .kind = SP_CLI_ARG_OPTIONAL,
+      .summary = "Only sync this index",
+      .ptr = &spn_cli_raw.index.name,
+    },
+  },
+  .handler = spn_cli_index_sync,
+};
+
+static sp_cli_cmd_t cmd_index = {
+  .name = "index",
+  .summary = "Inspect and manage package indexes",
+  .commands = {
+    &cmd_index_list,
+    &cmd_index_path,
+    &cmd_index_sync,
+  },
+  .handler = spn_cli_index,
 };
 
 static sp_cli_cmd_t cmd_root = {
@@ -409,6 +464,7 @@ static sp_cli_cmd_t cmd_root = {
     &cmd_run,
     &cmd_test,
     &cmd_publish,
+    &cmd_index,
   },
 };
 
@@ -425,7 +481,15 @@ sp_cli_result_t spn_cli_errf(sp_cli_t* cli, const c8* fmt, ...) {
 }
 
 bool spn_cli_requires_manifest(sp_cli_cmd_t* cmd) {
-  return cmd != &cmd_init && cmd != &cmd_run;
+  if (cmd == &cmd_init || cmd == &cmd_run) {
+    return false;
+  }
+  sp_carr_for(cmd_index.commands, it) {
+    if (cmd == cmd_index.commands[it]) {
+      return false;
+    }
+  }
+  return cmd != &cmd_index;
 }
 
 void spn_cli_commit(void) {
@@ -460,4 +524,6 @@ void spn_cli_commit(void) {
   spn.cli.publish.index = sp_cstr_as_str(spn_cli_raw.publish.index);
   spn.cli.publish.source_url = sp_cstr_as_str(spn_cli_raw.publish.source_url);
   spn.cli.publish.source_rev = sp_cstr_as_str(spn_cli_raw.publish.source_rev);
+
+  spn.cli.index.name = sp_cstr_as_str(spn_cli_raw.index.name);
 }

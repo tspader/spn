@@ -11,7 +11,8 @@
         "protocol": { "ref": "index_protocol" }
       },
       "optionalProperties": {
-        "rev": { "type": "string" }
+        "rev": { "type": "string" },
+        "publish_url": { "type": "string" }
       }
     }
   }
