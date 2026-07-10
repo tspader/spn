@@ -85,7 +85,7 @@ static void spn_update_report_incompatible(spn_app_t* app, sp_mem_t mem) {
     }
 
     sp_da_rfor(pkg->releases, release_it) {
-      spn_index_rel_t* release = &pkg->releases[release_it];
+      spn_index_release_t* release = &pkg->releases[release_it];
       if (release->yanked) {
         continue;
       }

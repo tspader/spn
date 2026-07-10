@@ -41,7 +41,7 @@ spn_lock_file_t spn_build_lock_file(sp_mem_t mem, sp_intern_t* intern, spn_resol
     }
 
     if (pkg->source == SPN_PKG_SOURCE_INDEX) {
-      spn_index_rel_t* release = pkg->origin.release;
+      spn_index_release_t* release = pkg->origin.release;
       entry.commit = release->source.rev;
       entry.source.url = release->source.url;
       entry.source.rev = release->source.rev;

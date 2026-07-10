@@ -176,7 +176,7 @@ cleanup:
   return package;
 }
 
-static bool index_release_exists(spn_index_info_t* index, spn_index_rel_t* rel) {
+static bool index_release_exists(spn_index_info_t* index, spn_index_release_t* rel) {
   spn_index_pkg_t* existing = spn_index_get_package(index, rel->id);
   if (!existing) {
     return false;
@@ -189,7 +189,7 @@ static bool index_release_exists(spn_index_info_t* index, spn_index_rel_t* rel) 
   return false;
 }
 
-static void index_append_release(spn_index_info_t* index, spn_index_rel_t* rel) {
+static void index_append_release(spn_index_info_t* index, spn_index_release_t* rel) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
   sp_str_t path = spn_index_get_package_path(scratch.mem, index, rel->id);
@@ -198,7 +198,7 @@ static void index_append_release(spn_index_info_t* index, spn_index_rel_t* rel) 
     sp_fs_create_dir(parent);
   }
 
-  sp_str_t json = spn_index_rel_to_json(scratch.mem, rel);
+  sp_str_t json = spn_index_release_to_json(scratch.mem, rel);
 
   sp_sys_fd_t fd = sp_sys_open_s(sp_sys_get_root(0), path, SP_O_WRONLY | SP_O_CREAT | SP_O_APPEND | SP_O_BINARY, 0644);
   sp_io_file_writer_t io;
@@ -212,7 +212,7 @@ static void index_append_release(spn_index_info_t* index, spn_index_rel_t* rel) 
   sp_mem_end_scratch(scratch);
 }
 
-static spn_err_union_t version_exists(spn_index_info_t* index, spn_index_rel_t* rel) {
+static spn_err_union_t version_exists(spn_index_info_t* index, spn_index_release_t* rel) {
   return (spn_err_union_t) {
     .kind = SPN_ERR_VERSION_EXISTS,
     .version_exists = {
@@ -224,7 +224,7 @@ static spn_err_union_t version_exists(spn_index_info_t* index, spn_index_rel_t* 
 
 #define SPN_INDEX_PUBLISH_ATTEMPTS 3
 
-spn_err_union_t spn_index_publish(spn_index_info_t* index, spn_index_rel_t* rel) {
+spn_err_union_t spn_index_publish(spn_index_info_t* index, spn_index_release_t* rel) {
   switch (index->protocol) {
     case SPN_INDEX_PROTOCOL_FILESYSTEM: {
       if (!sp_fs_is_dir(index->location)) {
@@ -339,12 +339,12 @@ spn_err_union_t spn_index_publish(spn_index_info_t* index, spn_index_rel_t* rel)
   return spn_result(SPN_ERROR);
 }
 
-spn_index_rel_t* spn_index_get_release(spn_index_info_t* index, spn_pkg_name_t id, spn_semver_t version) {
+spn_index_release_t* spn_index_get_release(spn_index_info_t* index, spn_pkg_name_t id, spn_semver_t version) {
   spn_index_pkg_t* package = spn_index_get_package(index, id);
   if (!package) return SP_NULLPTR;
 
   sp_da_for(package->releases, it) {
-    spn_index_rel_t* release = &package->releases[it];
+    spn_index_release_t* release = &package->releases[it];
     if (spn_semver_eq(release->version, version)) {
       return release;
     }

@@ -33,7 +33,7 @@ spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_n
   return SP_NULLPTR;
 }
 
-spn_index_rel_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_name_t id, spn_semver_t version) {
+spn_index_release_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_name_t id, spn_semver_t version) {
   spn_index_pkg_t* pkg = spn_index_cache_get_package(cache, id);
   if (!pkg) return SP_NULLPTR;
 

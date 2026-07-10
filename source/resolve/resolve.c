@@ -485,7 +485,7 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
   return SPN_ERROR;
 }
 
-static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_index_rel_t* release) {
+static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_index_release_t* release) {
   if (run->fatal) {
     return SPN_ERROR;
   }
@@ -651,7 +651,7 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
   // is just a simple, greedy heuristic, not for correctness.
   spn_err_t result = SPN_ERROR;
   sp_da_rfor(pkg->releases, it) {
-    spn_index_rel_t* release = &pkg->releases[it];
+    spn_index_release_t* release = &pkg->releases[it];
     if (release->yanked) {
       continue;
     }
@@ -1262,7 +1262,7 @@ done:
   return result;
 }
 
-static sp_str_t patch_dir(spn_resolver_t* resolver, spn_index_rel_t* release) {
+static sp_str_t patch_dir(spn_resolver_t* resolver, spn_index_release_t* release) {
   if (sp_str_empty(spn.paths.patches))
     return sp_str_lit("");
 

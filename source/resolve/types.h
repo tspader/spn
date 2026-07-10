@@ -38,7 +38,7 @@ typedef struct {
     spn_pkg_tree_t source;
     spn_index_rel_paths_t paths;
     spn_pkg_info_t* info;
-    spn_index_rel_t* release;
+    spn_index_release_t* release;
   } origin;
 } spn_resolved_pkg_t;
 
