@@ -27,8 +27,10 @@ typedef struct {
   bool private;
 } spn_resolved_dep_t;
 
-typedef struct {
+struct spn_resolved_pkg {
   spn_pkg_id_t id;
+  sp_str_t name;
+  spn_option_info_om_t options;
   spn_pkg_source_t source;
   u64 priority;
   sp_da(spn_requested_pkg_t) deps;
@@ -40,7 +42,7 @@ typedef struct {
     spn_pkg_info_t* info;
     spn_index_release_t* release;
   } origin;
-} spn_resolved_pkg_t;
+};
 
 typedef sp_ht(spn_pkg_id_t, spn_resolved_pkg_t) spn_resolve_t;
 

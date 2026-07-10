@@ -24,33 +24,6 @@
 #include "toolchain/types.h"
 #include "unit/types.h"
 
-// A toolchain invoked by bare program name (no pinned artifact) drifts under
-// the fingerprint when the system compiler upgrades in place; the --version
-// output is the identity the program string can't carry. Pinned artifacts
-// skip the probe: their sha256 already is their identity.
-SP_PRIVATE sp_hash_t probe_toolchain_identity(spn_toolchain_launcher_t compiler, spn_toolchain_t* toolchain) {
-  sp_da(sp_str_t) args = sp_da_new(spn.mem, sp_str_t);
-  sp_da_for(compiler.args, it) {
-    sp_da_push(args, compiler.args[it]);
-  }
-  sp_da_push(args, sp_str_lit("--version"));
-
-  sp_ps_output_t output = sp_ps_run(spn.mem, (sp_ps_config_t) {
-    .command = compiler.program,
-    .dyn_args = args,
-    .io = {
-      .in.mode = SP_PS_IO_MODE_NULL,
-      .out.mode = SP_PS_IO_MODE_REDIRECT,
-      .err.mode = SP_PS_IO_MODE_NULL,
-    },
-  });
-
-  if (output.status.exit_code || sp_str_empty(output.out)) {
-    return sp_hash_str(toolchain->version);
-  }
-  return sp_hash_str(output.out);
-}
-
 SP_PRIVATE spn_toolchain_unit_t*
 setup_toolchain_unit(spn_session_t* session, spn_toolchain_store_t* store, spn_toolchain_t* toolchain) {
   spn_toolchain_unit_t *unit = sp_alloc_type(spn.mem, spn_toolchain_unit_t);
@@ -121,7 +94,9 @@ setup_toolchain_unit(spn_session_t* session, spn_toolchain_store_t* store, spn_t
   }
 
   if (sp_opt_is_null(toolchain->artifact)) {
-    unit->identity = probe_toolchain_identity(unit->compiler, toolchain);
+    // @spader If you bring your own toolchain, I don't care about
+    // tracking it for now.
+    unit->identity = sp_hash_str(unit->compiler.program);
   }
 
   return unit;
@@ -414,6 +389,8 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
 
   sp_da_for(app->sync.packages, it) {
     spn_sync_pkg_job_t *job = app->sync.packages[it];
+    job->pkg->name = job->loaded.info->name;
+    job->pkg->options = job->loaded.info->options;
     sp_ht_insert(session->packages, job->pkg->id, job->loaded);
   }
 

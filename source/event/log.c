@@ -201,8 +201,10 @@ static void build_schemas(sp_mem_t mem) {
       SP_BIND(&b, spn_evt_option_t, pkg, "pkg", SP_BIND_STR);
       SP_BIND(&b, spn_evt_option_t, option, "option", SP_BIND_STR);
       SP_BIND(&b, spn_evt_option_t, value, "value", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_option_t, a, "a", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_option_t, b, "b", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_option_t, a.kind, "a_kind", SP_BIND_S32);
+      SP_BIND(&b, spn_evt_option_t, a.name, "a", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_option_t, b.kind, "b_kind", SP_BIND_S32);
+      SP_BIND(&b, spn_evt_option_t, b.name, "b", SP_BIND_STR);
     }
     schemas[SPN_EVENT_ERR_OPTION] = sp_bind_builder_end(&b);
   }
