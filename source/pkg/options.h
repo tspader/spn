@@ -12,7 +12,7 @@ typedef struct {
 } spn_option_request_t;
 
 typedef sp_da(spn_option_request_t) spn_option_requests_t;
-typedef sp_str_ht(spn_option_requests_t) spn_option_seeds_t;
+typedef sp_ht(sp_intern_id_t, spn_option_requests_t) spn_option_seeds_t;
 
 typedef struct {
   sp_str_t name;
@@ -29,23 +29,19 @@ void spn_when_env_add_options(spn_when_env_t* env, const spn_resolved_options_t*
 
 spn_err_t spn_pkg_options_merge(
   sp_mem_t mem,
-  sp_str_t pkg,
-  spn_option_info_om_t options,
+  const spn_resolved_pkg_t* pkg,
   const spn_profile_info_t* profile,
   sp_da(spn_pkg_config_entry_t) root_config,
-  bool is_root,
-  sp_da(spn_option_request_t) requests,
+  spn_option_requests_t requests,
   spn_event_buffer_t* events,
-  spn_resolved_options_t* out);
+  spn_resolved_options_t* resolved);
 
 void spn_pkg_options_env(
   sp_mem_t mem,
-  sp_str_t pkg,
-  spn_option_info_om_t options,
+  const spn_resolved_pkg_t* pkg,
   const spn_profile_info_t* profile,
   sp_da(spn_pkg_config_entry_t) root_config,
-  bool is_root,
-  sp_da(spn_option_request_t) requests,
+  spn_option_requests_t requests,
   spn_when_env_t* env);
 
 void spn_pkg_apply_options(spn_pkg_info_t* info, spn_when_env_t* env);

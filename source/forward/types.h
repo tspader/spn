@@ -8,6 +8,7 @@ typedef struct spn_app_t spn_app_t;
 typedef struct spn_event_buffer_t spn_event_buffer_t;
 typedef struct spn_index_info spn_index_info_t;
 typedef struct spn_pkg_info spn_pkg_info_t;
+typedef struct spn_resolved_pkg spn_resolved_pkg_t;
 typedef struct spn_profile_info spn_profile_info_t;
 typedef struct spn_target_info spn_target_info_t;
 typedef struct spn_autoconf spn_autoconf_t;

@@ -24,7 +24,7 @@ typedef struct {
   sp_str_t mirror_list;
 } spn_artifact_t;
 
-typedef sp_opt(spn_artifact_t) sp_opt_spn_artifact_t;
+typedef sp_opt(spn_artifact_t) spn_opt_artifact_t;
 
 typedef struct {
   spn_triple_t triple;
@@ -40,7 +40,7 @@ typedef struct spn_toolchain {
   spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
   sp_da(spn_triple_t) targets;
-  sp_opt_spn_artifact_t artifact;
+  spn_opt_artifact_t artifact;
 } spn_toolchain_t;
 
 struct spn_toolchain_catalog_t {

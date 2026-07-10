@@ -247,6 +247,30 @@ sp_str_t spn_option_type_to_str(spn_option_type_t type) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+sp_str_t spn_option_setter_to_str(spn_option_setter_t setter) {
+  switch (setter.kind) {
+    case SPN_OPTION_SETTER_NONE: {
+      return sp_str_lit("");
+    }
+    case SPN_OPTION_SETTER_DEFAULT: {
+      return sp_str_lit("the default");
+    }
+    case SPN_OPTION_SETTER_PROFILE: {
+      return sp_str_lit("the profile");
+    }
+    case SPN_OPTION_SETTER_ROOT_MANIFEST: {
+      return sp_str_lit("the root manifest");
+    }
+    case SPN_OPTION_SETTER_UNION: {
+      return sp_str_lit("the union of requests");
+    }
+    case SPN_OPTION_SETTER_CONSUMER: {
+      return setter.name;
+    }
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 sp_str_t spn_linkage_to_str(spn_linkage_t kind) {
   switch (kind) {
     case SPN_LIB_KIND_SHARED: {

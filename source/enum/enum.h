@@ -3,6 +3,7 @@
 
 #include "sp.h"
 #include "spn.h"
+#include "event/types.h"
 #include "index/types.h"
 #include "pkg/types.h"
 #include "target/types.h"
@@ -30,6 +31,7 @@ sp_str_t spn_linkage_to_str(spn_linkage_t kind);
 
 spn_option_type_t spn_option_type_from_str(sp_str_t str);
 sp_str_t spn_option_type_to_str(spn_option_type_t type);
+sp_str_t spn_option_setter_to_str(spn_option_setter_t setter);
 
 spn_dir_t spn_cache_dir_kind_from_str(sp_str_t str);
 

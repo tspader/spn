@@ -41,15 +41,6 @@ static bool git_index_stale(spn_index_info_t* index) {
   return mod_time.s + index->refresh <= now.s;
 }
 
-// Restore the managed clone to a bit-exact copy of the remote's default
-// branch. checkout --force -B discards tracked-file damage and re-attaches a
-// HEAD detached by an old pin, clean sweeps untracked files (both are shapes
-// a pre-transactional spn left behind by appending without committing). A
-// clone of an empty remote has no branches to restore; sweeping it clean is
-// the whole job — unless a failed bootstrap push left a commit on the unborn
-// branch, which no origin ref can reset away. That and any other anomaly
-// nukes the clone and re-clones once: the clone is a cache, so deletion is
-// always a safe repair.
 static spn_err_t git_index_freshen(spn_index_info_t* index) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   spn_err_t err = SPN_ERROR;

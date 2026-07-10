@@ -199,8 +199,16 @@ static bool target_selects_shared(spn_target_info_t* info, spn_kind_query_t quer
   return kind == SPN_LIB_KIND_SHARED;
 }
 
+static void node_options_env(spn_resolver_t* resolver, spn_resolved_pkg_t* node, spn_when_env_t* env) {
+  spn_option_requests_t* seeds = SP_NULLPTR;
+  if (resolver->seeds) {
+    seeds = sp_ht_getp(resolver->seeds, node->id.qualified);
+  }
+  spn_pkg_options_env(resolver->mem, node, &resolver->profile, resolver->config, seeds ? *seeds : SP_NULLPTR, env);
+}
+
 static bool node_is_shared(spn_resolver_t* resolver, spn_resolved_pkg_t* node) {
-  spn_kind_query_t query = kind_query(resolver, spn_pkg_name_from_qualified(sp_intern_str_from_id(resolver->intern, node->id.qualified)).name);
+  spn_kind_query_t query = kind_query(resolver, node->name);
 
   switch (node->source) {
     case SPN_PKG_SOURCE_INDEX: {
@@ -433,6 +441,8 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
       .qualified = sp_intern_get_or_insert(resolver->intern, pkg->info->qualified),
       .version = pkg->info->version,
     },
+    .name = pkg->info->name,
+    .options = pkg->info->options,
     .source = pkg->source,
     .origin = {
       .recipe = {
@@ -453,12 +463,8 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
 
   sp_da_init(resolver->mem, node.deps);
 
-  sp_da(spn_option_request_t)* seeds = SP_NULLPTR;
-  if (resolver->seeds) {
-    seeds = sp_str_ht_get(resolver->seeds, pkg->info->qualified);
-  }
   spn_when_env_t env;
-  spn_pkg_options_env(resolver->mem, pkg->info->name, pkg->info->options, &resolver->profile, resolver->config, pkg->source == SPN_PKG_SOURCE_ROOT, seeds ? *seeds : SP_NULLPTR, &env);
+  node_options_env(resolver, &node, &env);
   sp_da_for(pkg->info->deps, it) {
     if (!spn_when_eval(&pkg->info->deps[it].when, &env)) {
       continue;
@@ -510,6 +516,8 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
       .qualified = name,
       .version = release->version,
     },
+    .name = release->id.name,
+    .options = release->options,
     .source = SPN_PKG_SOURCE_INDEX,
     .origin = {
       .release = release,
@@ -528,12 +536,8 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
     };
   }
 
-  sp_da(spn_option_request_t)* seeds = SP_NULLPTR;
-  if (resolver->seeds) {
-    seeds = sp_str_ht_get(resolver->seeds, qualified);
-  }
   spn_when_env_t env;
-  spn_pkg_options_env(resolver->mem, release->id.name, release->options, &resolver->profile, resolver->config, false, seeds ? *seeds : SP_NULLPTR, &env);
+  node_options_env(resolver, &node, &env);
 
   sp_da_init(resolver->mem, node.deps);
   sp_da_for(release->deps, it) {
@@ -1311,6 +1315,8 @@ static spn_err_t apply_patch_overrides(spn_resolver_t* resolver, spn_resolve_que
     },
     pkg->origin.source = upstream_tree(info);
     pkg->origin.info = info;
+    pkg->name = info->name;
+    pkg->options = info->options;
   }
 
   return result;

@@ -62,10 +62,6 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
 
 #define SPN_GATE_MAX_RESOLVES 4
 
-static sp_str_t node_short_name(spn_session_t* session, spn_resolved_pkg_t* node) {
-  return spn_pkg_name_from_qualified(sp_intern_str_from_id(session->intern, node->id.qualified)).name;
-}
-
 static spn_resolved_dep_t* node_find_edge(spn_resolved_pkg_t* node, sp_intern_id_t qualified, spn_dep_kind_t kind) {
   sp_da_for(node->edges, it) {
     if (node->edges[it].id.qualified == qualified && node->edges[it].kind == kind) {
@@ -129,9 +125,10 @@ static spn_err_t validate_config_keys(spn_session_t* session) {
 
     bool known = false;
     sp_ht_for_kv(session->resolve, it) {
-      spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, it.val->id);
+      spn_resolved_pkg_t* node = it.val;
+      spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, node->id);
       sp_assert(loaded);
-      if (sp_str_equal(loaded->info->name, entry->key)) {
+      if (sp_str_equal(node->name, entry->key)) {
         known = true;
         break;
       }
@@ -170,9 +167,9 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
   // to fixpoint; only the resolve direction is capped
   for (;;) {
     sp_ht_init(mem, session->options);
-    sp_str_ht_init(mem, session->gates.seeds);
+    sp_ht_init(mem, session->gates.seeds);
 
-    sp_ht(spn_pkg_id_t, sp_da(spn_option_request_t)) requests = SP_NULLPTR;
+    sp_ht(spn_pkg_id_t, spn_option_requests_t) requests = SP_NULLPTR;
     sp_ht_init(mem, requests);
 
     sp_ht_for_kv(session->resolve, it) {
@@ -191,7 +188,7 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
         }
 
         spn_option_request_t request = {
-          .consumer = node_short_name(session, node),
+          .consumer = node->name,
           .options = &dep->options,
         };
 
@@ -203,27 +200,24 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
         // Seeds feed a possible next resolve pass, which looks packages up
         // by the qualified name their manifest declares
         spn_resolved_pkg_t* target = sp_ht_getp(session->resolve, edge->id);
-        sp_str_t seed_key = target ? sp_intern_str_from_id(session->intern, target->id.qualified) : dep->qualified;
-        if (!sp_str_ht_get(session->gates.seeds, seed_key)) {
-          sp_str_ht_insert(session->gates.seeds, seed_key, sp_da_new(mem, spn_option_request_t));
+        sp_intern_id_t seed_key = target ? target->id.qualified : sp_intern_get_or_insert(session->intern, dep->qualified);
+        if (!sp_ht_getp(session->gates.seeds, seed_key)) {
+          sp_ht_insert(session->gates.seeds, seed_key, sp_da_new(mem, spn_option_request_t));
         }
-        sp_da_push(*sp_str_ht_get(session->gates.seeds, seed_key), request);
+        sp_da_push(*sp_ht_getp(session->gates.seeds, seed_key), request);
       }
     }
 
     sp_ht_for_kv(session->resolve, it) {
       spn_resolved_pkg_t* node = it.val;
-      spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, node->id);
-      sp_da(spn_option_request_t)* asked = sp_ht_getp(requests, node->id);
+      spn_option_requests_t* asked = sp_ht_getp(requests, node->id);
 
       spn_resolved_options_t resolved = sp_zero;
       spn_try(spn_pkg_options_merge(
         mem,
-        loaded->info->name,
-        loaded->info->options,
+        node,
         &session->profile,
         session->pkg->config,
-        node->source == SPN_PKG_SOURCE_ROOT,
         asked ? *asked : SP_NULLPTR,
         session->events,
         &resolved));
@@ -253,7 +247,7 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
         if (expected && !edge) {
           missing = true;
           if (sp_str_empty(missing_pkg)) {
-            missing_pkg = loaded->info->name;
+            missing_pkg = node->name;
             missing_dep = spn_pkg_name_from_qualified(dep->qualified).name;
           }
         }
@@ -279,7 +273,7 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
         .option = {
           .err = SPN_OPTION_ERR_LATE_GATE,
           .pkg = missing_pkg,
-          .a = missing_dep,
+          .a = { .kind = SPN_OPTION_SETTER_CONSUMER, .name = missing_dep },
         },
       });
       return SPN_ERROR;

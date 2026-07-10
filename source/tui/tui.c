@@ -3,6 +3,7 @@
 
 #include "toml/issue.h"
 #include "ctx/ctx.h"
+#include "enum/enum.h"
 #include "event/event.h"
 #include "log/log.h"
 #include "semver/convert.h"
@@ -495,7 +496,7 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
             "{} does not declare an option named {.yellow} (set by {.cyan})",
             sp_fmt_str(spn_tui_colored_name(mem, event->option.pkg)),
             sp_fmt_str(event->option.option),
-            sp_fmt_str(event->option.a)
+            sp_fmt_str(spn_option_setter_to_str(event->option.a))
           );
           break;
         }
@@ -506,7 +507,7 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
             sp_fmt_str(event->option.value),
             sp_fmt_str(spn_tui_colored_name(mem, event->option.pkg)),
             sp_fmt_str(event->option.option),
-            sp_fmt_str(event->option.a)
+            sp_fmt_str(spn_option_setter_to_str(event->option.a))
           );
           break;
         }
@@ -516,8 +517,8 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
             "option conflict on {}.{.cyan}: {.cyan} and {.cyan} request different values",
             sp_fmt_str(spn_tui_colored_name(mem, event->option.pkg)),
             sp_fmt_str(event->option.option),
-            sp_fmt_str(event->option.a),
-            sp_fmt_str(event->option.b)
+            sp_fmt_str(spn_option_setter_to_str(event->option.a)),
+            sp_fmt_str(spn_option_setter_to_str(event->option.b))
           );
           break;
         }
@@ -525,11 +526,11 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
           sp_fmt_io(
             &w.base,
             "{.cyan} requires {}.{.cyan} != {.yellow}, but {} set it",
-            sp_fmt_str(event->option.a),
+            sp_fmt_str(spn_option_setter_to_str(event->option.a)),
             sp_fmt_str(spn_tui_colored_name(mem, event->option.pkg)),
             sp_fmt_str(event->option.option),
             sp_fmt_str(event->option.value),
-            sp_fmt_str(event->option.b)
+            sp_fmt_str(spn_option_setter_to_str(event->option.b))
           );
           break;
         }
@@ -547,7 +548,7 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
             &w.base,
             "the dependency gate on {}'s edge to {.cyan} never settled",
             sp_fmt_str(spn_tui_colored_name(mem, event->option.pkg)),
-            sp_fmt_str(event->option.a)
+            sp_fmt_str(spn_option_setter_to_str(event->option.a))
           );
           break;
         }
