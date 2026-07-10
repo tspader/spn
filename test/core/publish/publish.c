@@ -98,7 +98,7 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
     .revision = repo.commits[rev_idx],
   };
 
-  spn_index_rel_t release = SP_ZERO_INITIALIZE();
+  spn_index_release_t release = SP_ZERO_INITIALIZE();
   spn_err_union_t result = spn_publish_build(&opts, &release);
   if (!result.kind) {
     result = spn_index_publish(&index, &release);
@@ -113,7 +113,7 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
 
     EXPECT_TRUE(pkg != SP_NULLPTR);
     if (pkg && sp_da_size(pkg->releases) > 0) {
-      spn_index_rel_t* rel = &pkg->releases[0];
+      spn_index_release_t* rel = &pkg->releases[0];
 
       EXPECT_EQ(c.expect.version.major, rel->version.major);
       EXPECT_EQ(c.expect.version.minor, rel->version.minor);

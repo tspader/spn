@@ -41,7 +41,7 @@ typedef struct {
 } resolved_pkg_t;
 
 // A single JSONL entry from the index
-typedef spn_index_rel_t index_release_t;
+typedef spn_index_release_t index_release_t;
 
 typedef struct {
   sp_om(pkg_id_t, resolved_pkg_t) packages;

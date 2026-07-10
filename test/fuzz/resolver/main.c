@@ -73,7 +73,7 @@ spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_n
   return sp_str_ht_get(fz_state.cache, qualified);
 }
 
-spn_index_rel_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_name_t id, spn_semver_t version) {
+spn_index_release_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_name_t id, spn_semver_t version) {
   return SP_NULLPTR;
 }
 
@@ -133,7 +133,7 @@ static fz_result_t fz_execute(sp_mem_t mem, fz_universe_t* u, sp_intern_t* inter
 
     sp_da_for(u->pkgs[it].releases, rt) {
       fz_release_t* source = &u->pkgs[it].releases[rt];
-      spn_index_rel_t release = {
+      spn_index_release_t release = {
         .id = pkg.id,
         .version = source->version,
       };

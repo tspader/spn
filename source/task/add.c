@@ -55,9 +55,9 @@ spn_task_step_t spn_task_add(spn_app_t* app) {
     return spn_task_fail(SPN_ERR_PKG_UNKNOWN, .pkg = { .name = spn_pkg_name_to_qualified(req->name) });
   }
 
-  spn_index_rel_t* release = SP_NULLPTR;
+  spn_index_release_t* release = SP_NULLPTR;
   sp_da_rfor(pkg->releases, it) {
-    spn_index_rel_t* candidate = &pkg->releases[it];
+    spn_index_release_t* candidate = &pkg->releases[it];
     if (candidate->yanked) {
       continue;
     }

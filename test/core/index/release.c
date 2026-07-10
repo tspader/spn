@@ -43,8 +43,8 @@ typedef struct {
 
 UTEST_EMPTY_FIXTURE(index_release)
 
-static spn_index_rel_t release_test_build(sp_mem_t mem, release_test_rel_t* rel) {
-  spn_index_rel_t built = {
+static spn_index_release_t release_test_build(sp_mem_t mem, release_test_rel_t* rel) {
+  spn_index_release_t built = {
     .id = {
       .namespace = sp_cstr_as_str(rel->namespace),
       .name = sp_cstr_as_str(rel->name),
@@ -92,7 +92,7 @@ static spn_index_rel_t release_test_build(sp_mem_t mem, release_test_rel_t* rel)
   return built;
 }
 
-static void release_test_check(s32* utest_result, sp_mem_t mem, release_test_rel_t* expected, spn_index_rel_t* rel) {
+static void release_test_check(s32* utest_result, sp_mem_t mem, release_test_rel_t* expected, spn_index_release_t* rel) {
   SP_EXPECT_STR_EQ_CSTR(rel->id.namespace, expected->namespace);
   SP_EXPECT_STR_EQ_CSTR(rel->id.name, expected->name);
   SP_EXPECT_STR_EQ_CSTR(spn_semver_to_str(mem, rel->version), expected->version);
@@ -161,8 +161,8 @@ static void run_release_test(s32* utest_result, release_test_t t) {
     sp_io_dyn_mem_writer_t rendered = sp_zero;
     sp_io_dyn_mem_writer_init(mem, &rendered);
     sp_for(it, num_releases) {
-      spn_index_rel_t rel = release_test_build(mem, &t.expect.releases[it]);
-      sp_io_write_line(&rendered.base, spn_index_rel_to_json(mem, &rel));
+      spn_index_release_t rel = release_test_build(mem, &t.expect.releases[it]);
+      sp_io_write_line(&rendered.base, spn_index_release_to_json(mem, &rel));
     }
 
     sp_env_t env = sp_env_capture(mem);

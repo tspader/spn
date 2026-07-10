@@ -143,7 +143,7 @@ static void run_txn_case(s32* utest_result, txn_case_t c) {
 
     switch (action.kind) {
       case TXN_ACTION_PUBLISH: {
-        spn_index_rel_t rel = {
+        spn_index_release_t rel = {
           .id = {
             .namespace = sp_str_lit("core"),
             .name = sp_str_view(action.publish.name),

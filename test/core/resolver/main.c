@@ -167,7 +167,7 @@ spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_n
   return sp_str_ht_get(state.cache, qualified);
 }
 
-spn_index_rel_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_name_t id, spn_semver_t version) {
+spn_index_release_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_name_t id, spn_semver_t version) {
   return SP_NULLPTR;
 }
 
@@ -195,7 +195,7 @@ static void build_cache(sp_mem_t mem, fixture_t* fixture) {
         break;
       }
 
-      spn_index_rel_t rel = {
+      spn_index_release_t rel = {
         .id = id,
         .version = rel_desc->version,
       };

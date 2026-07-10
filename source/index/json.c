@@ -24,7 +24,7 @@ static spn_err_t spn_index_parse_semver(sp_str_t version, spn_semver_t* out) {
   return SPN_OK;
 }
 
-static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t json, spn_index_rel_t* release) {
+static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t json, spn_index_release_t* release) {
   spn_cg_release_t rel = SP_ZERO_INITIALIZE();
   if (!spn_release_read(json, &rel, mem)) {
     return SPN_ERROR;
@@ -88,12 +88,12 @@ static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t j
 }
 
 static s32 sort_release_by_version(const void* a, const void* b) {
-  const spn_index_rel_t* lhs = (const spn_index_rel_t*)a;
-  const spn_index_rel_t* rhs = (const spn_index_rel_t*)b;
+  const spn_index_release_t* lhs = (const spn_index_release_t*)a;
+  const spn_index_release_t* rhs = (const spn_index_release_t*)b;
   return spn_semver_cmp(lhs->version, rhs->version);
 }
 
-sp_str_t spn_index_rel_to_json(sp_mem_t mem, spn_index_rel_t* rel) {
+sp_str_t spn_index_release_to_json(sp_mem_t mem, spn_index_release_t* rel) {
   spn_cg_release_t release = {
     .namespace = rel->id.namespace,
     .name = rel->id.name,
@@ -157,7 +157,7 @@ spn_err_t spn_index_parse_pkg(sp_mem_t mem, spn_pkg_name_t id, sp_str_t blob, sp
       continue;
     }
 
-    spn_index_rel_t release = SP_ZERO_INITIALIZE();
+    spn_index_release_t release = SP_ZERO_INITIALIZE();
     spn_try(spn_index_parse_rel(mem, id, line, &release));
 
     sp_da_for(pkg->releases, n) {

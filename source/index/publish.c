@@ -18,7 +18,7 @@ static spn_index_dep_kind_t dep_kind_to_index(spn_dep_kind_t kind) {
   sp_unreachable_return(SPN_INDEX_DEP_NORMAL);
 }
 
-spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_rel_t* out) {
+spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t* out) {
   sp_str_t manifest_path = sp_fs_join_path(opts->mem, opts->cwd, sp_str_lit("spn.toml"));
 
   if (!sp_fs_exists(manifest_path)) {
@@ -80,7 +80,7 @@ spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_rel_t* out
     subdir = sp_str_suffix(opts->cwd, opts->cwd.len - repo.len - 1);
   }
 
-  spn_index_rel_t release = {
+  spn_index_release_t release = {
     .id = {
       .namespace = sp_str_empty(info.namespace) ? sp_str_lit("core") : info.namespace,
       .name = info.name,

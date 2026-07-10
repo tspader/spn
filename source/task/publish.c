@@ -31,11 +31,11 @@ spn_task_step_t spn_task_publish(spn_app_t* app) {
     .allow_dirty = cmd->allow_dirty,
   };
 
-  spn_index_rel_t release = SP_ZERO_INITIALIZE();
+  spn_index_release_t release = SP_ZERO_INITIALIZE();
   spn_try_step(spn_publish_build(&opts, &release));
 
   if (cmd->dry) {
-    sp_str_t json = spn_index_rel_to_json(spn.mem, &release);
+    sp_str_t json = spn_index_release_to_json(spn.mem, &release);
     sp_fmt_io(&spn.logger.out.base, "{}\n", sp_fmt_str(json));
     sp_fmt_io(&spn.logger.err.base, "{.cyan}: dry run, nothing published\n", sp_fmt_cstr("note"));
     return spn_task_done();

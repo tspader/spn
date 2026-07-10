@@ -64,11 +64,11 @@ typedef struct {
   sp_da(spn_index_dep_t) deps;
   sp_da(spn_index_target_t) targets;
   spn_option_info_om_t options;
-} spn_index_rel_t;
+} spn_index_release_t;
 
 typedef struct {
   spn_pkg_name_t id;
-  sp_da(spn_index_rel_t) releases;
+  sp_da(spn_index_release_t) releases;
 } spn_index_pkg_t;
 
 struct spn_index_info {

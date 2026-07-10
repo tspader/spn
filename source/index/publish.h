@@ -17,6 +17,6 @@ typedef struct {
   bool allow_dirty;
 } spn_publish_opts_t;
 
-spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_rel_t* out);
+spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t* out);
 
 #endif

@@ -72,7 +72,7 @@ static void run_publish_case(s32* utest_result, publish_case_t c) {
   };
   spn_index_init(&index, mem);
 
-  spn_index_rel_t rel = {
+  spn_index_release_t rel = {
     .id = {
       .namespace = sp_str_view(c.release.namespace),
       .name = sp_str_view(c.release.name),
