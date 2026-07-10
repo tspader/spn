@@ -15,7 +15,7 @@ include = ["include", "source/codegen/gen"]
 
 [deps.package]
 "spader/sp" = "3.0.0"
-"spader/wamr" = "file://./vendor/wamr/spn.toml"
+"spader/wamr" = { path = "vendor/wamr" }
 toml = "1.4.0"
 yyjson = "0.13.0"
 

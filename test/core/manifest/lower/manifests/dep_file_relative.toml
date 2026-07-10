@@ -3,4 +3,4 @@ name = "p"
 version = "1.0.0"
 
 [deps.package]
-foo = "file://vendor/foo"
+foo = { path = "vendor/foo" }

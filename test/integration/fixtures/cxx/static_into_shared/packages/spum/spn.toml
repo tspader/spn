@@ -3,7 +3,7 @@ name = "spum"
 version = "1.0.0"
 
 [deps.package]
-spam = "file://../spam/spn.toml"
+spam = { path = "../spam" }
 
 [[lib]]
 name = "spum"

@@ -3,7 +3,7 @@ name = "file_dep_missing_manifest"
 version = "0.1.0"
 
 [deps.package]
-spum = "file://./vendor/spum/spn.toml"
+spum = { path = "vendor/spum" }
 
 [[bin]]
 name = "main"

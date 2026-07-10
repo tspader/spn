@@ -14,19 +14,6 @@ UTEST_F(deps_file, basic) {
   });
 }
 
-UTEST_F(deps_file, custom_manifest_name) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_file_custom_manifest_name");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
-    .project = "test/integration/fixtures/deps/file/custom_manifest_name",
-    .copy = { "vendor/spum/*" },
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
-    },
-  });
-}
-
 UTEST_F(deps_file, invalid_manifest) {
   tmpfs_init_named(&uf->fixture.fs, "deps_file_invalid_manifest");
 

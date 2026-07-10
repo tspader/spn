@@ -6,7 +6,7 @@ version = "0.0.1"
 toolchain = "zig"
 
 [deps.package]
-"lua/lua" = "file://./vendor/lua/spn.toml"
+"lua/lua" = { path = "vendor/lua" }
 
 [[bin]]
 name = "main"

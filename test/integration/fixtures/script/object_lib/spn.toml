@@ -3,7 +3,7 @@ name = "object_lib"
 version = "0.0.1"
 
 [deps.package]
-spum = "file://./packages/spum/spn.toml"
+spum = { path = "packages/spum" }
 
 [[bin]]
 name = "object_lib"

@@ -6,7 +6,7 @@ version = "0.0.1"
 toolchain = "zig"
 
 [deps.package]
-"fmtlib/fmt" = "file://./vendor/fmt/spn.toml"
+"fmtlib/fmt" = { path = "vendor/fmt" }
 
 [[bin]]
 name = "main"

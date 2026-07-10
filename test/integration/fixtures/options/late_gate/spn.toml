@@ -3,7 +3,7 @@ name = "options_late_gate"
 version = "0.1.0"
 
 [deps.package]
-k1 = { version = "file://./vendor/k1/spn.toml", options = { x1 = true } }
+k1 = { path = "vendor/k1", options = { x1 = true } }
 
 [[bin]]
 name = "main"

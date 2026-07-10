@@ -6,7 +6,7 @@ version = "0.0.1"
 toolchain = "zig"
 
 [deps.package]
-"jeremy-rifkin/cpptrace" = "file://./vendor/cpptrace/spn.toml"
+"jeremy-rifkin/cpptrace" = { path = "vendor/cpptrace" }
 
 [[bin]]
 name = "main"
