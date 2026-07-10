@@ -43,4 +43,6 @@ typedef struct {
 // consumers branch only on static vs shared.
 sp_da(spn_link_lib_t) spn_closure_link_libs(sp_mem_t mem, sp_da(spn_closure_entry_t) closure, spn_pkg_unit_t* self);
 
+sp_da(spn_target_unit_t*) spn_target_runtime_libs(sp_mem_t mem, spn_target_unit_t* root);
+
 #endif

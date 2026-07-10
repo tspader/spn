@@ -23,6 +23,7 @@
 static spn_err_union_t spn_bg_error_to_union(spn_build_graph_t* graph);
 static spn_bg_id_t get_or_put_user_file(spn_pkg_unit_t* ctx, spn_build_graph_t* graph, sp_str_t path);
 static spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit);
+static spn_err_t add_stage(spn_build_graph_t* graph, spn_session_t* session, sp_da(spn_target_unit_t*) targets, sp_str_t dir);
 static spn_err_t prepare_build_graph(spn_app_t* app);
 
 spn_task_step_t spn_task_build_graph_init(spn_app_t* app) {
@@ -204,6 +205,60 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
         spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, libs[l].lib->nodes.output));
       }
     }
+  }
+
+  spn_pkg_unit_t* root = spn_session_find_root(session);
+  sp_da(spn_target_unit_t*) staged = sp_da_new(session->mem, spn_target_unit_t*);
+  sp_da_for(root->exes, it) sp_da_push(staged, root->exes[it]);
+  sp_da_for(root->scripts, it) sp_da_push(staged, root->scripts[it]);
+
+  spn_try(add_stage(graph, session, staged, session->paths.profile));
+  spn_try(add_stage(graph, session, root->tests, sp_fs_join_path(session->mem, session->paths.profile, SP_LIT("test"))));
+
+  return SPN_OK;
+}
+
+static void stage_push_file(spn_stage_unit_t* stage, sp_str_t from, sp_str_t to, spn_bg_id_t input) {
+  sp_da_for(stage->files, it) {
+    if (sp_str_equal(stage->files[it].to, to)) return;
+  }
+  sp_da_push(stage->files, ((spn_stage_file_t) {
+    .from = from,
+    .to = to,
+    .input = input,
+  }));
+}
+
+spn_err_t add_stage(spn_build_graph_t* graph, spn_session_t* session, sp_da(spn_target_unit_t*) targets, sp_str_t dir) {
+  sp_mem_t mem = session->mem;
+
+  spn_stage_unit_t* stage = sp_alloc_type(mem, spn_stage_unit_t);
+  stage->dir = dir;
+  sp_da_init(mem, stage->files);
+
+  sp_da_for(targets, it) {
+    spn_target_unit_t* target = targets[it];
+    if (!target->nodes.output.occupied) continue;
+
+    stage_push_file(stage, get_target_output_path(mem, target), get_target_staged_path(mem, target), target->nodes.output);
+
+    sp_da(spn_target_unit_t*) libs = spn_target_runtime_libs(mem, target);
+    sp_da_for(libs, lt) {
+      spn_target_unit_t* lib = libs[lt];
+      if (!lib->nodes.output.occupied) continue;
+
+      sp_str_t from = get_target_output_path(mem, lib);
+      stage_push_file(stage, from, sp_fs_join_path(mem, dir, sp_fs_get_name(from)), lib->nodes.output);
+    }
+  }
+
+  if (sp_da_empty(stage->files)) return SPN_OK;
+
+  spn_bg_id_t node = spn_bg_add_fn(graph, stage_targets, stage);
+  sp_da_for(stage->files, it) {
+    spn_stage_file_t* file = &stage->files[it];
+    spn_try(spn_bg_cmd_add_input(graph, node, file->input));
+    spn_try(spn_bg_cmd_add_output(graph, node, spn_bg_add_file(graph, file->to)));
   }
 
   return SPN_OK;

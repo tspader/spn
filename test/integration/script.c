@@ -83,11 +83,11 @@ UTEST_F(script, object_lib) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       // object libs publish their objects to lib/, preserving source-relative paths
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/rt/extra.c.o") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/rt/extra.c.o") },
       // ditto for an object lib declared from the build script instead of the manifest
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/rt/extra2.c.o") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/rt/extra2.c.o") },
       // an unlinked archive still builds and installs
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/lib/libblob.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libblob.a") },
       { .kind = ACTION_RUN_BIN, .bin.name = "object_lib" },
     },
   });
@@ -216,7 +216,7 @@ UTEST_F(script, build_script) {
       // stale, the module compile is skipped and the fn must still resolve
       { .kind = ACTION_REMOVE_FILE, .rm.file = "build/debug/work/build_script/version.h" },
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/work/build_script/version.h") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = work_file("build_script/version.h") },
     },
   });
 }
@@ -291,7 +291,7 @@ UTEST_F(script, add_test) {
     .project = "test/integration/fixtures/script/add_test",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_RUN_BIN, .bin.name = "test" },
+      { .kind = ACTION_RUN_TEST, .bin.name = "test" },
     },
   });
 }

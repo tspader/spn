@@ -7,12 +7,12 @@ UTEST_F(run, manifest) {
     .project = "test/integration/fixtures/run/manifest",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug/store/bin/main") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/main") },
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "main" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/bin/main") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
       { .kind = ACTION_REMOVE_DIR, .rm = { .dir = "build" } },
       { .kind = ACTION_RUN_CLI, .cli = { "run", .args = { "main" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/store/bin/main") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
       { .kind = ACTION_VERIFY_CONTENT, .verify_content = { .file = sp_str_lit("ran.txt"), .content = sp_str_lit("script\n") } },
     },
   });

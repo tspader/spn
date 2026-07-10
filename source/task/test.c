@@ -33,8 +33,12 @@ static spn_task_step_t run_script(spn_app_t* app) {
     spn_log_error("script {.yellow} was not built", SP_FMT_STR(app->config.run.target));
     return spn_task_fail(SPN_ERROR);
   }
+  if (unit->info->kind != SPN_TARGET_SCRIPT) {
+    spn_log_error("{.yellow} is not a script", SP_FMT_STR(app->config.run.target));
+    return spn_task_fail(SPN_ERROR);
+  }
 
-  sp_str_t command = get_target_output_path(session->mem, unit);
+  sp_str_t command = get_target_staged_path(session->mem, unit);
   if (!sp_fs_exists(command)) {
     spn_log_error("script binary {.yellow} does not exist", SP_FMT_STR(command));
     return spn_task_fail(SPN_ERROR);

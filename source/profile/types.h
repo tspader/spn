@@ -16,6 +16,7 @@ struct spn_profile_info {
   spn_c_standard_t standard;
   spn_build_mode_t mode;
   spn_when_t options;
+  bool targeted;
 };
 
 typedef struct {

@@ -126,7 +126,6 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
       case SPN_LIB_KIND_SHARED: {
         spn_cc_target_add_lib_dir(cc, lib->paths.lib);
         spn_cc_target_add_system_lib(cc, lib->info->name);
-        spn_cc_target_add_rpath(cc, lib->paths.lib);
         break;
       }
       case SPN_LIB_KIND_SOURCE:
@@ -149,7 +148,6 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
 
     if (lib->lib_kind == SPN_LIB_KIND_SHARED) {
       spn_cc_target_add_system_lib(cc, lib->info->name);
-      spn_cc_target_add_rpath(cc, dep->paths.lib);
       continue;
     }
 
@@ -200,6 +198,28 @@ sp_str_t get_embed_header_path(sp_mem_t mem, spn_target_unit_t* unit) {
   sp_str_t path = sp_fs_join_path(mem, unit->paths.generated, name);
   sp_mem_end_scratch(s);
   return path;
+}
+
+sp_str_t get_target_staged_path(sp_mem_t mem, spn_target_unit_t* target) {
+  spn_session_t* session = target->session;
+
+  if (target->pkg->source != SPN_PKG_SOURCE_ROOT) return sp_zero_s(sp_str_t);
+  if (target->kind != SPN_CC_OUTPUT_EXE) return sp_zero_s(sp_str_t);
+
+  switch (target->info->kind) {
+    case SPN_TARGET_EXE:
+    case SPN_TARGET_SCRIPT: {
+      return sp_fs_join_path(mem, session->paths.profile, target->info->name);
+    }
+    case SPN_TARGET_TEST: {
+      sp_str_t dir = sp_fs_join_path(mem, session->paths.profile, SP_LIT("test"));
+      return sp_fs_join_path(mem, dir, target->info->name);
+    }
+    case SPN_TARGET_LIB: {
+      return sp_zero_s(sp_str_t);
+    }
+  }
+  sp_unreachable_return(sp_zero_s(sp_str_t));
 }
 
 sp_str_t get_target_output_path(sp_mem_t mem, spn_target_unit_t* target) {

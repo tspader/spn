@@ -96,6 +96,17 @@ typedef struct {
 } spn_target_nodes_t;
 
 typedef struct {
+  sp_str_t from;
+  sp_str_t to;
+  spn_bg_id_t input;
+} spn_stage_file_t;
+
+typedef struct {
+  sp_str_t dir;
+  sp_da(spn_stage_file_t) files;
+} spn_stage_unit_t;
+
+typedef struct {
   spn_bg_id_t manifest;
   spn_bg_id_t script;
   spn_bg_id_t package;
@@ -151,6 +162,7 @@ struct spn_pkg_unit_t {
   spn_pkg_id_t id;
   spn_session_t* session;
   spn_pkg_info_t* info;
+  spn_pkg_source_t source;
   spn_target_info_t configure;
   spn_target_info_t build;
 

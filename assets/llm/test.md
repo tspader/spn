@@ -8,15 +8,16 @@ Tests should be:
 - High value. We shouldn't burden ourself with brittle tests, or tests that wouldn't catch real bugs.
 - Complete. Every feature should be tested.
 
-## running
+# running
 Running the tests via CTest is easiest, and outputs to an ISO timestamped directory in `.tmp`:
 ```sh
 make test
 ```
 or, equivalently, `ctest --test-dir .build/work/$TRIPLE --output-on-failure`.
 
-## notes
+# notes
 
+- The fuzz tests currently fail. Don't run them.
 - Use literal friendly types, like `const c8*` and `T [N]` (i.e. fixed size C arrays)
 - Use `sp_carr_for()` + zero-as-sentinel (when possible) to avoid typing sentinels or lengths at the test site
 - Use a separate struct for `.expect`
@@ -24,7 +25,7 @@ or, equivalently, `ctest --test-dir .build/work/$TRIPLE --output-on-failure`.
 - When test cases need multistep, ordered setup, used a tagged union of actions (see: `fs_setup_t`)
 - One class of tests per C file. If a suite has multiple, write the individual C files in `test/$module/`, and then have `test/module.c` `#include` all the C files (see: `test/fs.c`)
 
-## example
+# example
 
 Follow this structure when adding new tests.
 

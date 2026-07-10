@@ -5,6 +5,80 @@
 #include "harness.h"
 #include "yyjson.h"
 
+static sp_mem_t layout_mem(void) {
+  static sp_mem_t mem;
+  static bool init = false;
+  if (!init) {
+    mem = sp_mem_os_new();
+    init = true;
+  }
+  return mem;
+}
+
+static sp_str_t layout_path(const c8* triple, const c8* profile, sp_str_t rest) {
+  sp_mem_t mem = layout_mem();
+  sp_str_t path = sp_str_lit("build");
+  if (triple) {
+    path = sp_fs_join_path(mem, path, sp_str_view(triple));
+  }
+  path = sp_fs_join_path(mem, path, sp_str_view(profile));
+  return sp_fs_join_path(mem, path, rest);
+}
+
+static sp_str_t layout_sub(const c8* dir, const c8* rest) {
+  return sp_fs_join_path(layout_mem(), sp_str_view(dir), sp_str_view(rest));
+}
+
+static const c8* shared_lib_file(const c8* name) {
+  sp_mem_t mem = layout_mem();
+  return sp_str_to_cstr(mem, sp_os_lib_to_file_name(mem, sp_str_view(name), SP_OS_LIB_SHARED));
+}
+
+sp_str_t shared_lib(const c8* name) {
+  sp_mem_t mem = layout_mem();
+  return store_file(sp_str_to_cstr(mem, sp_fs_join_path(mem, sp_str_lit("lib"), sp_str_view(shared_lib_file(name)))));
+}
+
+sp_str_t staged_lib(const c8* name) {
+  return exe(shared_lib_file(name));
+}
+
+sp_str_t test_lib(const c8* name) {
+  return test_exe(shared_lib_file(name));
+}
+
+sp_str_t profile_exe(const c8* profile, const c8* name) {
+  return layout_path(SP_NULLPTR, profile, sp_str_view(name));
+}
+
+sp_str_t profile_store_file(const c8* profile, const c8* rest) {
+  return layout_path(SP_NULLPTR, profile, layout_sub("store", rest));
+}
+
+sp_str_t exe(const c8* name) {
+  return profile_exe("debug", name);
+}
+
+sp_str_t test_exe(const c8* name) {
+  return layout_path(SP_NULLPTR, "debug", layout_sub("test", name));
+}
+
+sp_str_t target_exe(const c8* name, const c8* triple) {
+  return layout_path(triple, "debug", sp_str_view(name));
+}
+
+sp_str_t store_file(const c8* rest) {
+  return profile_store_file("debug", rest);
+}
+
+sp_str_t work_file(const c8* rest) {
+  return layout_path(SP_NULLPTR, "debug", layout_sub("work", rest));
+}
+
+sp_str_t target_store_file(const c8* rest, const c8* triple) {
+  return layout_path(triple, "debug", layout_sub("store", rest));
+}
+
 static void fixture_write_file(sp_str_t path, sp_str_t content) {
   sp_str_t parent = sp_fs_parent_path(path);
   if (!sp_str_empty(parent)) {
@@ -496,12 +570,10 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         EXPECT_EQ(action.process.rc, output.status.exit_code);
         break;
       }
-      case ACTION_RUN_BIN: {
-        sp_str_t bin = tmpfs_get(&fixture->fs, sp_fmt(
-          mem,
-          "build/debug/store/bin/{}",
-          sp_fmt_cstr(action.bin.name)
-        ).value);
+      case ACTION_RUN_BIN:
+      case ACTION_RUN_TEST: {
+        sp_str_t staged = action.kind == ACTION_RUN_TEST ? test_exe(action.bin.name) : exe(action.bin.name);
+        sp_str_t bin = tmpfs_get(&fixture->fs, staged);
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, bin);
 
         sp_ps_output_t output = sp_ps_run(mem, (sp_ps_config_t) {
@@ -525,7 +597,7 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
       case ACTION_VERIFY_INCLUDE: {
         sp_str_t path = tmpfs_get(
           &fixture->fs,
-          sp_fs_join_path(mem, sp_str_lit("build/debug/store/include"), action.verify_include.file)
+          sp_fs_join_path(mem, store_file("include"), action.verify_include.file)
         );
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
         break;
@@ -696,7 +768,7 @@ void fixture_setup_paths(fixture_t* fixture) {
 #if defined(SPN_TEST_BIN)
   fixture->paths.spn = test_repo_path(mem, sp_str_lit(SPN_TEST_BIN));
 #else
-  fixture->paths.spn = test_repo_path(mem, sp_str_lit("build/debug/store/bin/spn"));
+  fixture->paths.spn = test_repo_path(mem, exe("spn"));
 #endif
 }
 

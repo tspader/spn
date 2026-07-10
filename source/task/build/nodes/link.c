@@ -73,12 +73,25 @@ static void build_link_invocation(spn_target_unit_t* target, sp_str_t output) {
   spn_cc_set_output_dir(&cc, sp_fs_parent_path(output));
   spn_cc_set_toolchain(&cc, target->session->units.toolchain);
 
-  // The link consumes only objects, so the package's compile-stage data
-  // (includes, defines, flags) stays off the command line; that's
-  // add_pkg_to_cc_target's job in the compile node
   spn_cc_target_t* cc_target = spn_cc_add_target(&cc, target->kind, sp_fs_get_name(output));
   spn_cc_target_set_lang(cc_target, get_link_language(target));
   add_deps_to_cc_target(cc_target, target);
+
+  switch (target->session->profile.os) {
+    case SPN_OS_LINUX: {
+      spn_cc_target_add_rpath(cc_target, sp_str_lit("$ORIGIN"));
+      break;
+    }
+    case SPN_OS_MACOS: {
+      spn_cc_target_add_rpath(cc_target, sp_str_lit("@loader_path"));
+      break;
+    }
+    case SPN_OS_WINDOWS:
+    case SPN_OS_WASI:
+    case SPN_OS_NONE: {
+      break;
+    }
+  }
 
   sp_da_for(target->objects, it) {
     spn_cc_target_add_absolute_source(cc_target, target->objects[it]->paths.object);
