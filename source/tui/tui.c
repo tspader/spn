@@ -400,6 +400,14 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
       );
       break;
     }
+    case SPN_EVENT_BUILD_CANCELLED: {
+      sp_fmt_io(&w.base, "profile {.cyan} with {} pending {}",
+        sp_fmt_str(event->build_cancelled.profile),
+        SP_FMT_U32(event->build_cancelled.num_pending),
+        sp_fmt_cstr(event->build_cancelled.num_pending == 1 ? "command" : "commands")
+      );
+      break;
+    }
     case SPN_EVENT_BUILD_SCRIPT_CRASHED: {
       if (sp_str_empty(event->crashed.error)) {
         sp_io_write_str(&w.base, sp_str_lit("build script crashed"), SP_NULLPTR);

@@ -1,0 +1,22 @@
+[package]
+name = "test"
+version = "0.1.0"
+
+[[lib]]
+name = "spum"
+kinds = ["static"]
+source = ["spum.c"]
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+deps = ["spum"]
+
+[[test]]
+name = "test"
+source = ["main.c"]
+deps = ["spum"]
+
+[[script]]
+name = "script"
+source = ["script.c"]

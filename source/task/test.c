@@ -24,7 +24,7 @@ static spn_task_step_t run_script(spn_app_t* app, spn_target_unit_t* unit) {
   spn_pkg_unit_t* root = unit->pkg;
 
   if (unit->info->kind != SPN_TARGET_SCRIPT) {
-    spn_log_error("{.yellow} is not a script", SP_FMT_STR(app->config.run.target));
+    spn_log_error("{.yellow} is not a script", SP_FMT_STR(unit->info->name));
     return spn_task_fail(SPN_ERROR);
   }
 
@@ -67,34 +67,37 @@ static spn_task_step_t run_script(spn_app_t* app, spn_target_unit_t* unit) {
 }
 
 static spn_task_step_t run_source(spn_app_t* app) {
-  spn_log_error("{.yellow} cannot run native sources; build scripts are wasm", SP_FMT_STR(app->config.run.target));
+  spn_log_error("{.yellow} cannot run native sources; build scripts are wasm", SP_FMT_STR(app->config.action.source.path));
   return spn_task_fail(SPN_ERROR);
 }
 
 static spn_task_step_t run_roots(spn_app_t* app) {
   spn_session_t* session = &app->session;
   bool tests = false;
-  sp_da_for(session->units.roots, it) {
-    spn_target_unit_t* root = session->units.roots[it];
-    if (root->info->kind == SPN_TARGET_SCRIPT) {
-      return run_script(app, root);
-    }
-    if (root->info->kind == SPN_TARGET_TEST) {
-      tests = true;
+  sp_da_for(session->plan.builds, it) {
+    spn_build_plan_t* plan = &session->plan.builds[it];
+    sp_da_for(plan->roots, it) {
+      spn_target_unit_t* root = spn_session_get_target_unit(session, plan->roots[it]);
+      if (root->info->kind == SPN_TARGET_SCRIPT) {
+        return run_script(app, root);
+      }
+      if (root->info->kind == SPN_TARGET_TEST) {
+        tests = true;
+      }
     }
   }
   return tests ? spn_task_run_tests(app) : spn_task_done();
 }
 
 spn_task_step_t spn_task_run(spn_app_t* app) {
-  switch (app->config.run.kind) {
-    case SPN_RUN_KIND_NONE: {
+  switch (app->config.action.kind) {
+    case SPN_ACTION_NONE: {
       return spn_task_done();
     }
-    case SPN_RUN_KIND_ROOTS: {
+    case SPN_ACTION_RUN_ROOTS: {
       return run_roots(app);
     }
-    case SPN_RUN_KIND_SOURCE: {
+    case SPN_ACTION_RUN_SOURCE: {
       return run_source(app);
     }
   }

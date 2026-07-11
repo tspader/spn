@@ -316,7 +316,12 @@ void add_compilation_units(spn_session_t *s) {
       .toolchain = s->units.toolchain,
       .paths = { .profile = s->paths.profile },
     };
-    sp_da_push(s->plan.builds, build);
+    spn_build_plan_t plan = {
+      .build = build,
+      .selection = s->plan.request.targets,
+    };
+    sp_da_init(s->mem, plan.roots);
+    sp_da_push(s->plan.builds, plan);
   }
 
   spn_pkg_id_t root = SP_ZERO_INITIALIZE();
@@ -328,11 +333,13 @@ void add_compilation_units(spn_session_t *s) {
   }
 
   sp_assert(root.qualified);
-  sp_da_for(s->plan.requests, it) {
-    spn_build_request_t* request = &s->plan.requests[it];
-    request->pkg = root;
-    request->build = s->plan.builds[0];
-    add_package_units(s, request->build, request->pkg);
+  sp_da_for(s->plan.builds, it) {
+    spn_build_plan_t* plan = &s->plan.builds[it];
+    plan->root = (spn_pkg_unit_id_t) {
+      .pkg = root,
+      .ctx = plan->build->id,
+    };
+    add_package_units(s, plan->build, root);
   }
 }
 

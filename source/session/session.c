@@ -61,13 +61,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   }
   s->paths.profile = sp_fs_join_path(s->mem, profile, s->profile.name);
 
-  s->plan.requests = config.requests;
-  if (sp_da_empty(s->plan.requests)) {
-    sp_da_init(s->mem, s->plan.requests);
-    sp_da_push(s->plan.requests, ((spn_build_request_t) {
-      .filter = SP_ZERO_INITIALIZE(),
-    }));
-  }
+  s->plan.request = config.compile;
 
   return spn_result(SPN_OK);
 }
@@ -443,13 +437,19 @@ fingerprint_t fingerprint_package(spn_session_t* session, spn_build_unit_t* buil
   return result;
 }
 
-spn_pkg_unit_t* spn_session_find_pkg_unit(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t pkg_id) {
-  spn_pkg_unit_id_t id = { .pkg = pkg_id, .ctx = build->id };
+spn_pkg_unit_t* spn_session_find_pkg_unit_by_id(spn_session_t* session, spn_pkg_unit_id_t id) {
   sp_mutex_lock(&session->mutex);
   spn_pkg_unit_t* pkg = sp_om_has(session->units.packages, id) ? sp_om_get(session->units.packages, id) : SP_NULLPTR;
   sp_mutex_unlock(&session->mutex);
 
   return pkg;
+}
+
+spn_pkg_unit_t* spn_session_find_pkg_unit(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t pkg_id) {
+  return spn_session_find_pkg_unit_by_id(session, (spn_pkg_unit_id_t) {
+    .pkg = pkg_id,
+    .ctx = build->id,
+  });
 }
 
 spn_pkg_unit_t* spn_session_find_dep(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t qualified, spn_dep_kind_t kind) {
@@ -476,12 +476,17 @@ spn_target_unit_t* spn_session_find_target_in_pkg(spn_session_t* session, spn_pk
   return sp_om_get(session->units.targets, id);
 }
 
-spn_pkg_unit_t* spn_session_find_requested_pkg(spn_session_t* session, spn_build_unit_t* build) {
+spn_target_unit_t* spn_session_get_target_unit(spn_session_t* session, spn_target_unit_id_t id) {
+  sp_assert(sp_om_has(session->units.targets, id));
+  return sp_om_get(session->units.targets, id);
+}
+
+spn_pkg_unit_t* spn_session_find_root_pkg(spn_session_t* session, spn_build_unit_t* build) {
   sp_assert(build);
-  sp_da_for(session->plan.requests, it) {
-    spn_build_request_t* request = &session->plan.requests[it];
-    if (request->build == build && request->pkg.qualified) {
-      return spn_session_find_pkg_unit(session, request->build, request->pkg);
+  sp_da_for(session->plan.builds, it) {
+    spn_build_plan_t* plan = &session->plan.builds[it];
+    if (plan->build == build && plan->root.pkg.qualified) {
+      return spn_session_find_pkg_unit_by_id(session, plan->root);
     }
   }
   return SP_NULLPTR;

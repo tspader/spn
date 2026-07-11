@@ -45,20 +45,22 @@ typedef struct {
 } spn_bg_ctx_t;
 
 typedef enum {
-  SPN_RUN_KIND_NONE,
-  SPN_RUN_KIND_ROOTS,
-  SPN_RUN_KIND_SOURCE,
-} spn_run_kind_t;
+  SPN_ACTION_NONE,
+  SPN_ACTION_RUN_ROOTS,
+  SPN_ACTION_RUN_SOURCE,
+} spn_action_kind_t;
 
 typedef struct {
-  spn_run_kind_t kind;
-  sp_str_t target;
-} spn_run_config_t;
+  spn_action_kind_t kind;
+  struct {
+    sp_str_t path;
+  } source;
+} spn_action_t;
 
 typedef struct {
-  sp_da(spn_build_request_t) requests;
+  spn_compile_request_t compile;
   bool force;
-  spn_run_config_t run;
+  spn_action_t action;
   spn_profile_info_t overrides;
 } spn_app_config_t;
 
@@ -89,11 +91,10 @@ struct spn_session_t {
 
   spn_profile_info_t profile;
   struct {
-    sp_da(spn_build_unit_t*) builds;
-    sp_da(spn_build_request_t) requests;
+    spn_compile_request_t request;
+    sp_da(spn_build_plan_t) builds;
   } plan;
   struct {
-    sp_da(spn_target_unit_t*) roots;
     sp_om(spn_compile_unit_id_t, spn_compile_unit_t) objects;
     sp_om(spn_target_unit_id_t, spn_target_unit_t) targets;
     sp_om(spn_pkg_unit_id_t, spn_pkg_unit_t) packages;
@@ -112,6 +113,7 @@ struct spn_session_t {
   spn_bg_ctx_t sync;
   spn_bg_ctx_t configure;
   spn_bg_ctx_t build;
+  sp_ht(spn_bg_id_t, spn_build_unit_id_t) owners;
   sp_mutex_t mutex;
 };
 
