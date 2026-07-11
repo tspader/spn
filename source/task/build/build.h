@@ -9,8 +9,6 @@
 
 void add_deps_to_cc_target(spn_cc_link_t* link, spn_target_unit_t* target);
 spn_err_union_t spn_build_link_invocations(spn_session_t* session);
-void spn_cc_compile_add_build_deps(spn_cc_compile_t* compile, spn_pkg_unit_t* unit);
-spn_err_t spn_compile_script_module(spn_pkg_unit_t* unit, spn_target_info_t* script, sp_str_t output);
 sp_str_t get_embed_object_path(sp_mem_t mem, spn_target_unit_t* unit);
 sp_str_t get_embed_header_path(sp_mem_t mem, spn_target_unit_t* unit);
 sp_str_t get_target_output_path(sp_mem_t mem, spn_target_unit_t* unit);

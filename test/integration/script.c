@@ -212,8 +212,8 @@ UTEST_F(script, build_script) {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("compile_commands.json"), .needle = sp_str_lit("tools/configure.c") } },
       { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("compile_commands.json"), .needle = sp_str_lit("tools/build.c") } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = work_file("build_script/spn/object/build/tools/a/main.c.o") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = work_file("build_script/spn/object/build/tools/b/main.c.o") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/script/work/build_script/spn/object/build/tools/a/main.c.o") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/script/work/build_script/spn/object/build/tools/b/main.c.o") },
       { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("version.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "build_script" },
       // The node fn lives in the build module; when only the node's output is

@@ -102,6 +102,7 @@ struct spn_session_t {
     sp_om(spn_pkg_unit_id_t, spn_pkg_unit_t) packages;
     spn_toolchain_unit_t* toolchain;
     spn_toolchain_unit_t* script;
+    spn_build_unit_t* host;
     sp_da(spn_toolchain_unit_t*) toolchains;
   } units;
 
