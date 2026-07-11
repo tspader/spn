@@ -14,8 +14,8 @@ void spn_session_build_invocations(spn_session_t* session) {
 
     spn_cc_t cc;
     spn_cc_init(&cc, mem);
-    spn_cc_set_profile(&cc, unit->package->ctx->profile);
-    spn_cc_set_toolchain(&cc, unit->package->ctx->toolchain);
+    spn_cc_set_profile(&cc, unit->package->build->profile);
+    spn_cc_set_toolchain(&cc, unit->package->build->toolchain);
     spn_cc_add_pkg(&cc, unit->package);
 
     spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_CC_OUTPUT_OBJECT, unit->paths.object);

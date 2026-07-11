@@ -29,7 +29,7 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_wasm_script_t* configure = &unit->wasm.configure;
   if (configure->state != SPN_WASM_SCRIPT_NONE) {
     sp_tm_timer_t timer = sp_tm_start_timer();
-    spn_try(spn_compile_script_module(unit, &unit->configure, configure->path));
+    spn_try(spn_compile_script_module(unit, &unit->script.configure, configure->path));
     unit->time.compile = sp_tm_read_timer(&timer);
 
     spn_try(spn_wasm_script_open(configure, unit));
@@ -45,7 +45,7 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
 static spn_err_t order_root_configure(spn_session_t* session, spn_build_graph_t* graph, spn_pkg_unit_t* root) {
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (unit->ctx == root->ctx && unit->source != SPN_PKG_SOURCE_ROOT) {
+    if (unit->build == root->build && unit->source != SPN_PKG_SOURCE_ROOT) {
       if (spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp)) {
         return SPN_ERROR;
       }

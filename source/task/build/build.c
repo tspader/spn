@@ -207,10 +207,10 @@ sp_str_t get_target_staged_path(sp_mem_t mem, spn_target_unit_t* target) {
   switch (target->info->kind) {
     case SPN_TARGET_EXE:
     case SPN_TARGET_SCRIPT: {
-      return sp_fs_join_path(mem, target->pkg->ctx->paths.profile, target->info->name);
+      return sp_fs_join_path(mem, target->pkg->build->paths.profile, target->info->name);
     }
     case SPN_TARGET_TEST: {
-      sp_str_t dir = sp_fs_join_path(mem, target->pkg->ctx->paths.profile, SP_LIT("test"));
+      sp_str_t dir = sp_fs_join_path(mem, target->pkg->build->paths.profile, SP_LIT("test"));
       return sp_fs_join_path(mem, dir, target->info->name);
     }
     case SPN_TARGET_LIB: {

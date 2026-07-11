@@ -34,8 +34,8 @@ static spn_err_t add_root_stages(spn_build_graph_t* graph, spn_session_t* sessio
   sp_da_for(root->scripts, it) {
     sp_da_push(staged, root->scripts[it]);
   }
-  spn_try(add_stage(graph, session, staged, root->ctx->paths.profile));
-  return add_stage(graph, session, root->tests, sp_fs_join_path(session->mem, root->ctx->paths.profile, SP_LIT("test")));
+  spn_try(add_stage(graph, session, staged, root->build->paths.profile));
+  return add_stage(graph, session, root->tests, sp_fs_join_path(session->mem, root->build->paths.profile, SP_LIT("test")));
 }
 
 spn_task_step_t spn_task_build_graph_init(spn_app_t* app) {
@@ -471,8 +471,8 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
 
     spn_try(spn_bg_cmd_add_output(graph, nodes->build_script.run, nodes->build_script.module));
     spn_try(spn_bg_cmd_add_input(graph, nodes->build_script.run, nodes->stamp.main));
-    sp_da_for(unit->build.source, it) {
-      spn_bg_id_t source = get_or_put_user_file(unit, graph, unit->build.source[it]);
+    sp_da_for(unit->script.build.source, it) {
+      spn_bg_id_t source = get_or_put_user_file(unit, graph, unit->script.build.source[it]);
       spn_try(spn_bg_cmd_add_input(graph, nodes->build_script.run, source));
     }
 
