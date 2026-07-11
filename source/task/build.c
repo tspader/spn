@@ -26,16 +26,30 @@ static spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit);
 static spn_err_t add_stage(spn_build_graph_t* graph, spn_session_t* session, sp_da(spn_target_unit_t*) targets, sp_str_t dir);
 static spn_err_t prepare_build_graph(spn_app_t* app);
 
-static spn_err_t add_root_stages(spn_build_graph_t* graph, spn_session_t* session, spn_pkg_unit_t* root) {
-  sp_da(spn_target_unit_t*) staged = sp_da_new(session->mem, spn_target_unit_t*);
-  sp_da_for(root->exes, it) {
-    sp_da_push(staged, root->exes[it]);
+static spn_err_t add_build_stages(spn_build_graph_t* graph, spn_session_t* session, spn_build_unit_t* build) {
+  sp_da(spn_target_unit_t*) targets = sp_da_new(session->mem, spn_target_unit_t*);
+  sp_da(spn_target_unit_t*) tests = sp_da_new(session->mem, spn_target_unit_t*);
+  sp_da_for(session->units.roots, it) {
+    spn_target_unit_t* root = session->units.roots[it];
+    if (root->pkg->build != build || root->kind != SPN_CC_OUTPUT_EXE) {
+      continue;
+    }
+    if (root->info->kind == SPN_TARGET_TEST) {
+      sp_da_push(tests, root);
+    }
+    else {
+      sp_da_push(targets, root);
+    }
   }
-  sp_da_for(root->scripts, it) {
-    sp_da_push(staged, root->scripts[it]);
+  spn_try(add_stage(graph, session, targets, build->paths.profile));
+  return add_stage(graph, session, tests, sp_fs_join_path(session->mem, build->paths.profile, SP_LIT("test")));
+}
+
+static spn_err_t add_root_stages(spn_build_graph_t* graph, spn_session_t* session) {
+  sp_da_for(session->plan.builds, it) {
+    spn_try(add_build_stages(graph, session, session->plan.builds[it]));
   }
-  spn_try(add_stage(graph, session, staged, root->build->paths.profile));
-  return add_stage(graph, session, root->tests, sp_fs_join_path(session->mem, root->build->paths.profile, SP_LIT("test")));
+  return SPN_OK;
 }
 
 spn_task_step_t spn_task_build_graph_init(spn_app_t* app) {
@@ -96,7 +110,8 @@ spn_task_step_t spn_task_build_graph_update(spn_app_t* app) {
       sp_opt_set(error, build->executor->errors[0]);
     }
 
-    spn_pkg_unit_t* root = spn_session_find_root(session);
+    spn_pkg_unit_t* root = spn_session_find_requested_pkg(session, session->plan.builds[0]);
+    sp_assert(root);
     u32 num_errors = sp_da_size(build->executor->errors);
     u32 dirty_cmds = sp_ht_size(session->build.dirty->commands);
 
@@ -219,9 +234,7 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
     }
   }
 
-  sp_da_for(session->units.roots, it) {
-    spn_try(add_root_stages(graph, session, session->units.roots[it]));
-  }
+  spn_try(add_root_stages(graph, session));
 
   return SPN_OK;
 }

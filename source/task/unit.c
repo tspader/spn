@@ -16,6 +16,7 @@
 #include "event/types.h"
 #include "filter/filter.h"
 #include "pkg/id.h"
+#include "pkg/pkg.h"
 #include "session/invocation.h"
 #include "session/session.h"
 #include "sp/sp_glob.h"
@@ -174,49 +175,107 @@ static spn_pkg_unit_t* find_dep_unit(spn_session_t* session, spn_pkg_unit_t* pkg
   return SP_NULLPTR;
 }
 
-spn_task_step_t spn_task_create_units(spn_app_t* app) {
-  spn_session_t* session = &app->session;
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
-    spn_pkg_info_t* info = pkg->info;
-    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, pkg->id.pkg);
+static spn_err_t ensure_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_info_t* info, spn_target_unit_t** result) {
+  spn_target_unit_t* target = spn_session_find_target_in_pkg(session, pkg, info->name);
+  if (!target) {
+    target = spn_session_add_target(session, pkg, info);
+    spn_try(set_target_kind(session, target));
+  }
+  *result = target;
+  return SPN_OK;
+}
 
-    // The target filter only applies to the root package; dependencies contribute
-    // exactly their lib targets no matter what we were asked to build.
-    sp_da(spn_target_info_t*) targets = sp_da_new(session->mem, spn_target_info_t*);
-    sp_str_om_for(info->libs, it) {
-      sp_da_push(targets, sp_str_om_at(info->libs, it));
+static bool is_root_target(spn_session_t* session, spn_target_unit_t* target) {
+  sp_da_for(session->units.roots, it) {
+    if (session->units.roots[it] == target) {
+      return true;
     }
-    if (loaded->source == SPN_PKG_SOURCE_ROOT) {
-      sp_str_om_for(info->exes, it) {
-        sp_da_push(targets, sp_str_om_at(info->exes, it));
-      }
-      sp_str_om_for(info->scripts, it) {
-        sp_da_push(targets, sp_str_om_at(info->scripts, it));
-      }
-      sp_str_om_for(info->tests, it) {
-        sp_da_push(targets, sp_str_om_at(info->tests, it));
-      }
+  }
+  return false;
+}
+
+static spn_err_t add_request_targets(spn_session_t* session, spn_build_request_t* request, spn_pkg_unit_t* pkg, spn_target_info_om_t targets) {
+  sp_str_om_for(targets, it) {
+    spn_target_info_t* info = sp_str_om_at(targets, it);
+    if (!spn_target_filter_pass(&request->filter, info)) {
+      continue;
     }
 
-    sp_da_for(targets, it) {
-      if (loaded->source == SPN_PKG_SOURCE_ROOT && !spn_target_filter_pass(&session->filter, targets[it])) {
+    bool staged_at_root = info->kind == SPN_TARGET_EXE || info->kind == SPN_TARGET_SCRIPT;
+    if (staged_at_root && exe_name_reserved(info->name)) {
+      spn_log_error(
+        "{.cyan} names an executable {.yellow}, which collides with a build output directory (store, work, test)",
+        SP_FMT_STR(pkg->info->name),
+        SP_FMT_STR(info->name)
+      );
+      return SPN_ERROR;
+    }
+
+    spn_target_unit_t* target = SP_NULLPTR;
+    spn_try(ensure_target(session, pkg, info, &target));
+    if (!is_root_target(session, target)) {
+      sp_da_push(session->units.roots, target);
+    }
+  }
+  return SPN_OK;
+}
+
+static spn_err_t ensure_sibling_targets(spn_session_t* session, sp_da(spn_target_unit_t*) pending) {
+  while (!sp_da_empty(pending)) {
+    spn_target_unit_t* unit = *sp_da_back(pending);
+    sp_da_pop(pending);
+    sp_da_for(unit->info->deps, it) {
+      sp_str_t qualified = spn_pkg_canonicalize_name(unit->info->deps[it]);
+      if (find_dep_unit(session, unit->pkg, qualified)) {
         continue;
       }
+      if (spn_session_find_target_in_pkg(session, unit->pkg, unit->info->deps[it])) {
+        continue;
+      }
+      spn_target_info_t* info = spn_pkg_get_target_ex(unit->pkg->info, unit->info->deps[it]);
+      if (!info) {
+        continue;
+      }
+      spn_target_unit_t* target = SP_NULLPTR;
+      spn_try(ensure_target(session, unit->pkg, info, &target));
+      sp_da_push(pending, target);
+    }
+  }
+  return SPN_OK;
+}
 
-      bool staged_at_root = targets[it]->kind == SPN_TARGET_EXE || targets[it]->kind == SPN_TARGET_SCRIPT;
-      if (loaded->source == SPN_PKG_SOURCE_ROOT && staged_at_root && exe_name_reserved(targets[it]->name)) {
-        spn_log_error(
-          "{.cyan} names an executable {.yellow}, which collides with a build output directory (store, work, test)",
-          SP_FMT_STR(info->name),
-          SP_FMT_STR(targets[it]->name)
-        );
+spn_task_step_t spn_task_create_units(spn_app_t* app) {
+  spn_session_t* session = &app->session;
+  sp_da_init(session->mem, session->units.roots);
+
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
+    sp_str_om_for(pkg->info->libs, it) {
+      spn_target_unit_t* target = SP_NULLPTR;
+      if (ensure_target(session, pkg, sp_str_om_at(pkg->info->libs, it), &target)) {
         return spn_task_fail(SPN_ERROR);
       }
-
-      spn_target_unit_t* target = spn_session_add_target(session, pkg, targets[it]);
-      if (set_target_kind(session, target)) return spn_task_fail(SPN_ERROR);
     }
+  }
+
+  sp_da_for(session->plan.requests, it) {
+    spn_build_request_t* request = &session->plan.requests[it];
+    spn_pkg_unit_t* pkg = spn_session_find_pkg_unit(session, request->build, request->pkg);
+    sp_assert(pkg);
+    if (add_request_targets(session, request, pkg, pkg->info->libs) ||
+        add_request_targets(session, request, pkg, pkg->info->exes) ||
+        add_request_targets(session, request, pkg, pkg->info->scripts) ||
+        add_request_targets(session, request, pkg, pkg->info->tests)) {
+      return spn_task_fail(SPN_ERROR);
+    }
+  }
+
+  sp_da(spn_target_unit_t*) pending = sp_da_new(session->mem, spn_target_unit_t*);
+  sp_om_for(session->units.targets, it) {
+    sp_da_push(pending, sp_om_at(session->units.targets, it));
+  }
+  if (ensure_sibling_targets(session, pending)) {
+    return spn_task_fail(SPN_ERROR);
   }
 
   sp_om_for(session->units.targets, it) {

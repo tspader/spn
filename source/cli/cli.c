@@ -158,9 +158,8 @@ static sp_cli_cmd_t cmd_build = {
   .args = {
     {
       .name = "name",
-      .kind = SP_CLI_ARG_OPTIONAL,
+      .kind = SP_CLI_ARG_REST,
       .summary = "Name of entry to build",
-      .ptr = &spn_cli_raw.build.name,
     },
   },
   .handler = spn_cli_build,
@@ -508,7 +507,6 @@ void spn_cli_commit(void) {
   spn.cli.init.path = sp_cstr_as_str(spn_cli_raw.init.path);
   spn.cli.add.package = sp_cstr_as_str(spn_cli_raw.add.package);
 
-  spn.cli.build.name = sp_cstr_as_str(spn_cli_raw.build.name);
   spn.cli.run.entry = sp_cstr_as_str(spn_cli_raw.run.entry);
   spn.cli.test.name = sp_cstr_as_str(spn_cli_raw.test.name);
 

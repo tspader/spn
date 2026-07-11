@@ -201,7 +201,6 @@ sp_str_t get_embed_header_path(sp_mem_t mem, spn_target_unit_t* unit) {
 }
 
 sp_str_t get_target_staged_path(sp_mem_t mem, spn_target_unit_t* target) {
-  if (target->pkg->source != SPN_PKG_SOURCE_ROOT) return sp_zero_s(sp_str_t);
   if (target->kind != SPN_CC_OUTPUT_EXE) return sp_zero_s(sp_str_t);
 
   switch (target->info->kind) {

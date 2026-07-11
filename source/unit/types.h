@@ -7,6 +7,7 @@
 #include "spn.h"
 
 #include "graph/types.h"
+#include "filter/types.h"
 #include "intern/types.h"
 #include "pkg/types.h"
 #include "profile/types.h"
@@ -15,14 +16,26 @@
 
 typedef u32 spn_build_unit_id_t;
 
+typedef enum {
+  SPN_BUILD_KIND_TARGET,
+  SPN_BUILD_KIND_HOST,
+} spn_build_kind_t;
+
 struct spn_build_unit_t {
   spn_build_unit_id_t id;
+  spn_build_kind_t kind;
   spn_profile_info_t profile;
   spn_toolchain_unit_t* toolchain;
   struct {
     sp_str_t profile;
   } paths;
 };
+
+typedef struct {
+  spn_pkg_id_t pkg;
+  spn_build_unit_t* build;
+  spn_target_filter_t filter;
+} spn_build_request_t;
 
 typedef struct SP_ALIGNED {
   spn_pkg_id_t pkg;
