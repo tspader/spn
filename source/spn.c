@@ -520,7 +520,7 @@ void spn_deinit(sp_app_t* sp) {
 
   sp_om_for(app.session.units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(app.session.units.packages, it);
-    spn_pkg_unit_t* ctx_root = spn_session_find_root_in_ctx(&app.session, unit->ctx);
+    spn_pkg_unit_t* ctx_root = spn_session_find_root_in_ctx(&app.session, unit->build);
     if (!ctx_root) {
       continue;
     }

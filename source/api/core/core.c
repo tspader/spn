@@ -263,7 +263,7 @@ s32 spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir
 
 spn_profile_t* spn_get_profile(spn_t* s) {
   spn_pkg_unit_t* unit = sp_ptr_cast(spn_pkg_unit_t*, s);
-  return sp_ptr_cast(spn_profile_t*, &unit->ctx->profile);
+  return sp_ptr_cast(spn_profile_t*, &unit->build->profile);
 }
 
 spn_libc_kind_t spn_profile_get_libc(spn_profile_t* profile) {

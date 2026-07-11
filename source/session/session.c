@@ -367,8 +367,8 @@ static s32 sort_fingerprint_edges(const void* a, const void* b) {
   return 0;
 }
 
-static sp_hash_t hash_package(spn_session_t* session, spn_build_unit_t* ctx, spn_pkg_id_t id) {
-  spn_pkg_unit_id_t uid = { .pkg = id, .ctx = ctx->id };
+static sp_hash_t hash_package(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t id) {
+  spn_pkg_unit_id_t uid = { .pkg = id, .ctx = build->id };
   sp_hash_t* memo = sp_ht_getp(session->fingerprints, uid);
   if (memo) {
     return *memo;
@@ -389,7 +389,7 @@ static sp_hash_t hash_package(spn_session_t* session, spn_build_unit_t* ctx, spn
       sp_da(fingerprint_edge_t) edges = sp_da_new(session->mem, fingerprint_edge_t);
       sp_da_for(resolved->edges, it) {
         sp_da_push(edges, ((fingerprint_edge_t) {
-          .hash = hash_package(session, ctx, resolved->edges[it].id),
+          .hash = hash_package(session, build, resolved->edges[it].id),
           .kind = (u32)resolved->edges[it].kind,
           .private = (u32)resolved->edges[it].private,
         }));
@@ -399,21 +399,21 @@ static sp_hash_t hash_package(spn_session_t* session, spn_build_unit_t* ctx, spn
     }
   }
 
-  spn_toolchain_t* toolchain = ctx->toolchain->toolchain;
+  spn_toolchain_t* toolchain = build->toolchain->toolchain;
   sp_opt_spn_linkage_t config = spn_session_config_kind(session, pkg->name);
 
-  fingerprint.mode = ctx->profile.mode;
-  fingerprint.linkage = config.some ? config.value : ctx->profile.linkage;
-  fingerprint.standard = ctx->profile.standard;
-  fingerprint.arch = ctx->profile.arch;
-  fingerprint.os = ctx->profile.os;
-  fingerprint.abi = ctx->profile.abi;
+  fingerprint.mode = build->profile.mode;
+  fingerprint.linkage = config.some ? config.value : build->profile.linkage;
+  fingerprint.standard = build->profile.standard;
+  fingerprint.arch = build->profile.arch;
+  fingerprint.os = build->profile.os;
+  fingerprint.abi = build->profile.abi;
   fingerprint.toolchain.name = sp_hash_str(toolchain->name);
   fingerprint.toolchain.cc = sp_hash_str(toolchain->compiler.program);
   fingerprint.toolchain.ld = sp_hash_str(toolchain->linker.program);
   fingerprint.toolchain.ar = sp_hash_str(toolchain->archiver.program);
   fingerprint.toolchain.cxx = sp_hash_str(toolchain->cxx.program);
-  fingerprint.toolchain.identity = ctx->toolchain->identity;
+  fingerprint.toolchain.identity = build->toolchain->identity;
   if (!sp_opt_is_null(toolchain->artifact)) {
     fingerprint.toolchain.url = sp_hash_str(sp_opt_get(toolchain->artifact).sha256);
   }
@@ -428,15 +428,15 @@ typedef struct {
   sp_str_t str;
 } fingerprint_t;
 
-fingerprint_t fingerprint_package(spn_session_t* session, spn_build_unit_t* ctx, spn_pkg_id_t id) {
+fingerprint_t fingerprint_package(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t id) {
   fingerprint_t result = SP_ZERO_INITIALIZE();
-  result.hash = hash_package(session, ctx, id);
+  result.hash = hash_package(session, build, id);
   result.str = sp_fmt(session->mem, "{:0>16x}", sp_fmt_uint(result.hash)).value;
   return result;
 }
 
-spn_pkg_unit_t* spn_session_find_pkg_unit(spn_session_t* session, spn_build_unit_t* ctx, spn_pkg_id_t pkg_id) {
-  spn_pkg_unit_id_t id = { .pkg = pkg_id, .ctx = ctx->id };
+spn_pkg_unit_t* spn_session_find_pkg_unit(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t pkg_id) {
+  spn_pkg_unit_id_t id = { .pkg = pkg_id, .ctx = build->id };
   sp_mutex_lock(&session->mutex);
   spn_pkg_unit_t* pkg = sp_om_get(session->units.packages, id);
   sp_mutex_unlock(&session->mutex);
@@ -472,9 +472,9 @@ spn_pkg_unit_t* spn_session_find_root(spn_session_t* s) {
   return sp_da_empty(s->units.roots) ? SP_NULLPTR : s->units.roots[0];
 }
 
-spn_pkg_unit_t* spn_session_find_root_in_ctx(spn_session_t* session, spn_build_unit_t* ctx) {
+spn_pkg_unit_t* spn_session_find_root_in_ctx(spn_session_t* session, spn_build_unit_t* build) {
   sp_da_for(session->units.roots, it) {
-    if (session->units.roots[it]->ctx == ctx) {
+    if (session->units.roots[it]->build == build) {
       return session->units.roots[it];
     }
   }
@@ -483,9 +483,6 @@ spn_pkg_unit_t* spn_session_find_root_in_ctx(spn_session_t* session, spn_build_u
 
 sp_da(spn_pkg_dep_t) spn_session_pkg_deps(spn_session_t* session, spn_pkg_unit_t* pkg) {
   return pkg->deps;
-}
-
-spn_build_unit_t* spn_session_add_build_ctx(spn_session_t* session, spn_profile_info_t profile, spn_toolchain_unit_t* toolchain, sp_str_t path) {
 }
 
 spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
@@ -576,7 +573,7 @@ static void clone_target_map(spn_target_info_om_t* result, spn_target_info_om_t 
   }
 }
 
-static spn_pkg_info_t* clone_pkg_info(spn_session_t* session, spn_pkg_id_t id, spn_build_unit_t* ctx, spn_pkg_info_t* source) {
+static spn_pkg_info_t* clone_pkg_info(spn_session_t* session, spn_pkg_id_t id, spn_build_unit_t* build, spn_pkg_info_t* source) {
   spn_pkg_info_t* info = sp_alloc_type(session->mem, spn_pkg_info_t);
   *info = *source;
   info->arena = sp_mem_arena_new(session->mem);
@@ -593,7 +590,7 @@ static spn_pkg_info_t* clone_pkg_info(spn_session_t* session, spn_pkg_id_t id, s
   info->system_deps = clone_str_list(mem, source->system_deps);
 
   spn_when_env_t env;
-  spn_when_env_from_profile(mem, &ctx->profile, &env);
+  spn_when_env_from_profile(mem, &build->profile, &env);
   spn_resolved_options_t* resolved = sp_ht_getp(session->options, id);
   if (resolved) {
     spn_when_env_add_options(&env, resolved);
@@ -602,16 +599,16 @@ static spn_pkg_info_t* clone_pkg_info(spn_session_t* session, spn_pkg_id_t id, s
   return info;
 }
 
-spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_t* ctx, spn_pkg_id_t pkg_id, spn_loaded_pkg_t* loaded) {
-  spn_pkg_unit_id_t id = { .pkg = pkg_id, .ctx = ctx->id };
+spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t pkg_id, spn_loaded_pkg_t* loaded) {
+  spn_pkg_unit_id_t id = { .pkg = pkg_id, .ctx = build->id };
   sp_om_insert(session->units.packages, id, sp_zero_struct(spn_pkg_unit_t));
   spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
   unit->id = id;
-  unit->ctx = ctx;
-  unit->info = clone_pkg_info(session, pkg_id, ctx, loaded->info);
+  unit->build = build;
+  unit->info = clone_pkg_info(session, pkg_id, build, loaded->info);
   unit->source = loaded->source;
-  unit->configure = loaded->configure;
-  unit->build = loaded->build;
+  unit->script.configure = loaded->configure;
+  unit->script.build = loaded->build;
   unit->session = session;
   sp_da_init(session->mem, unit->objects);
   sp_da_init(session->mem, unit->deps);
@@ -630,13 +627,13 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   switch (loaded->source) {
     case SPN_PKG_SOURCE_ROOT:
     case SPN_PKG_SOURCE_FILE: {
-      sp_str_t work = sp_fs_join_path(session->mem, ctx->paths.profile, sp_str_lit("work"));
+      sp_str_t work = sp_fs_join_path(session->mem, build->paths.profile, sp_str_lit("work"));
       unit->paths.work = sp_fs_join_path(session->mem, work, loaded->info->name);
-      unit->paths.store = sp_fs_join_path(session->mem, ctx->paths.profile, sp_str_lit("store"));
+      unit->paths.store = sp_fs_join_path(session->mem, build->paths.profile, sp_str_lit("store"));
       break;
     }
     case SPN_PKG_SOURCE_INDEX: {
-      fingerprint_t fingerprint = fingerprint_package(session, ctx, pkg_id);
+      fingerprint_t fingerprint = fingerprint_package(session, build, pkg_id);
       unit->paths.work = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, session->paths.system.caches.build.dir, loaded->info->qualified), fingerprint.str);
       unit->paths.store = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, session->paths.system.caches.store.dir, loaded->info->qualified), fingerprint.str);
       break;
@@ -649,8 +646,8 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   unit->paths.vendor = sp_fs_join_path(session->mem, unit->paths.store, SP_LIT("vendor"));
 
   unit->paths.generated = sp_fs_join_path(session->mem, unit->paths.work, SP_LIT("spn"));
-  spn_wasm_script_init(&unit->wasm.configure, !sp_da_empty(unit->configure.source), sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("configure.wasm")));
-  spn_wasm_script_init(&unit->wasm.build, !sp_da_empty(unit->build.source), sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("build.wasm")));
+  spn_wasm_script_init(&unit->wasm.configure, !sp_da_empty(unit->script.configure.source), sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("configure.wasm")));
+  spn_wasm_script_init(&unit->wasm.build, !sp_da_empty(unit->script.build.source), sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("build.wasm")));
 
   unit->logs.build = sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(unit->info->name)).value;
   unit->logs.test = sp_fmt(session->mem, "{}.test.log", SP_FMT_STR(unit->info->name)).value;

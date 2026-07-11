@@ -131,7 +131,7 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
       else {
         spn_kind_query_t query = {
           .config = spn_session_config_kind(session, target->pkg->info->name),
-          .linkage = target->pkg->ctx->profile.linkage,
+          .linkage = target->pkg->build->profile.linkage,
         };
 
         if (spn_target_select_lib_kind(info, query, &target->lib_kind)) {
@@ -298,7 +298,7 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
 
   sp_om_for(session->units.objects, it) {
     spn_compile_unit_t* object = sp_om_at(session->units.objects, it);
-    spn_toolchain_t* toolchain = object->package->ctx->toolchain->toolchain;
+    spn_toolchain_t* toolchain = object->package->build->toolchain->toolchain;
     if (object->lang != SPN_LANG_CXX || spn_toolchain_has_cxx(toolchain)) {
       continue;
     }

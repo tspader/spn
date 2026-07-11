@@ -189,12 +189,15 @@ struct spn_target_unit {
 /////////////
 struct spn_pkg_unit_t {
   spn_pkg_unit_id_t id;
-  spn_build_unit_t* ctx;
+  spn_build_unit_t* build;
   spn_session_t* session;
   spn_pkg_info_t* info;
   spn_pkg_source_t source;
-  spn_target_info_t configure;
-  spn_target_info_t build;
+
+  struct {
+    spn_target_info_t configure;
+    spn_target_info_t build;
+  } script;
 
   sp_da(spn_compile_unit_t*) objects;
   sp_da(spn_pkg_dep_t) deps;

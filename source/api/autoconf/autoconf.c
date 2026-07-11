@@ -26,7 +26,7 @@ spn_autoconf_t* spn_autoconf_new(spn_t* build) {
 
 s32 spn_autoconf_run(spn_autoconf_t* autoconf) {
   spn_pkg_unit_t* unit = spn_api_unit(autoconf->build);
-  spn_profile_info_t* profile = &unit->ctx->profile;
+  spn_profile_info_t* profile = &unit->build->profile;
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 

@@ -106,8 +106,8 @@ static void set(sp_io_writer_t* io, const c8* name, sp_str_t value) {
 }
 
 static sp_str_t spn_cmake_generate_toolchain_file(sp_mem_t mem, spn_pkg_unit_t* unit) {
-  spn_profile_info_t* profile = &unit->ctx->profile;
-  spn_toolchain_unit_t* toolchain = unit->ctx->toolchain;
+  spn_profile_info_t* profile = &unit->build->profile;
+  spn_toolchain_unit_t* toolchain = unit->build->toolchain;
   if (!toolchain) return sp_str_lit("");
 
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
@@ -138,7 +138,7 @@ static sp_str_t spn_cmake_generate_toolchain_file(sp_mem_t mem, spn_pkg_unit_t* 
 
 s32 spn_cmake_configure(spn_cmake_t* cmake) {
   spn_pkg_unit_t* unit = spn_api_unit(cmake->build);
-  spn_profile_info_t* profile = &unit->ctx->profile;
+  spn_profile_info_t* profile = &unit->build->profile;
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 

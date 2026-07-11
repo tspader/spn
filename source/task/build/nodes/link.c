@@ -45,7 +45,7 @@ static spn_lang_t get_link_language(spn_target_unit_t* target) {
 
 static void build_archive_invocation(spn_target_unit_t* target, sp_str_t output) {
   sp_mem_t mem = target->session->mem;
-  spn_toolchain_unit_t* toolchain = target->pkg->ctx->toolchain;
+  spn_toolchain_unit_t* toolchain = target->pkg->build->toolchain;
 
   sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
   sp_da_for(toolchain->archiver.args, it) {
@@ -69,15 +69,15 @@ static void build_link_invocation(spn_target_unit_t* target, sp_str_t output) {
 
   spn_cc_t cc;
   spn_cc_init(&cc, mem);
-  spn_cc_set_profile(&cc, target->pkg->ctx->profile);
+  spn_cc_set_profile(&cc, target->pkg->build->profile);
   spn_cc_set_output_dir(&cc, sp_fs_parent_path(output));
-  spn_cc_set_toolchain(&cc, target->pkg->ctx->toolchain);
+  spn_cc_set_toolchain(&cc, target->pkg->build->toolchain);
 
   spn_cc_target_t* cc_target = spn_cc_add_target(&cc, target->kind, sp_fs_get_name(output));
   spn_cc_target_set_lang(cc_target, get_link_language(target));
   add_deps_to_cc_target(cc_target, target);
 
-  switch (target->pkg->ctx->profile.os) {
+  switch (target->pkg->build->profile.os) {
     case SPN_OS_LINUX: {
       spn_cc_target_add_rpath(cc_target, sp_str_lit("$ORIGIN"));
       break;
