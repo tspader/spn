@@ -276,14 +276,59 @@ spn_task_step_t spn_task_build_graph_update(spn_app_t* app) {
 }
 
 
+// Build-script modules compile in the host ctx with none of the package
+// machinery: no stamps, no hooks, no user nodes. Their commands are owned by
+// the main build so reports stay per-plan, and the link lands on the native
+// package's module node so the package step and user nodes order after it.
+// Configure modules already built in the configure graph.
+static spn_err_t add_host_package(spn_build_graph_t* graph, spn_session_t* session, spn_pkg_unit_t* unit) {
+  spn_target_unit_t* target = spn_session_find_target_in_pkg(session, unit, sp_str_lit("build"));
+  if (!target || sp_da_empty(target->objects)) {
+    return SPN_OK;
+  }
+
+  spn_pkg_unit_t* native = spn_session_find_pkg_unit(session, session->plan.builds[0].build, unit->id.pkg);
+  sp_assert(native);
+  sp_assert(native->wasm.build.state != SPN_WASM_SCRIPT_NONE);
+
+  spn_build_unit_t* owner = session->plan.builds[0].build;
+  target->nodes.link = add_build_command(session, owner, link_target, target);
+  target->nodes.output = native->nodes.build.build_script.module;
+  spn_try(spn_bg_cmd_add_output(graph, target->nodes.link, target->nodes.output));
+
+  sp_da_for(target->objects, it) {
+    spn_compile_unit_t* object = target->objects[it];
+    object->nodes.source = spn_bg_add_file(graph, object->paths.file);
+    object->nodes.compile = add_build_command(session, owner, compile_object, object);
+    object->nodes.object = spn_bg_add_file(graph, object->paths.object);
+    spn_try(spn_bg_cmd_add_output(graph, object->nodes.compile, object->nodes.object));
+    spn_try(spn_bg_cmd_add_input(graph, object->nodes.compile, object->nodes.source));
+    spn_try(spn_bg_cmd_add_input(graph, object->nodes.compile, native->nodes.build.stamp.main));
+    spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, object->nodes.object));
+  }
+
+  return SPN_OK;
+}
+
 spn_err_t prepare_build_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->build.graph;
 
-  // Add all nodes to the build graph
+  // Add all nodes to the build graph. Native packages first: host script
+  // links attach to the module node each native package creates.
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    if (unit->build->kind == SPN_BUILD_KIND_HOST) {
+      continue;
+    }
     spn_try(add_package(graph, unit));
+  }
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    if (unit->build->kind != SPN_BUILD_KIND_HOST) {
+      continue;
+    }
+    spn_try(add_host_package(graph, session, unit));
   }
 
   // Order each package's build after its direct dependencies, and sequence any
@@ -587,16 +632,7 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
 
   bool has_build_script = unit->wasm.build.state != SPN_WASM_SCRIPT_NONE;
   if (has_build_script) {
-    nodes->build_script.run = add_build_command(unit->session, unit->build, compile_build_script, unit);
     nodes->build_script.module = spn_bg_add_file(graph, unit->wasm.build.path);
-
-    spn_try(spn_bg_cmd_add_output(graph, nodes->build_script.run, nodes->build_script.module));
-    spn_try(spn_bg_cmd_add_input(graph, nodes->build_script.run, nodes->stamp.main));
-    sp_da_for(unit->script.build.source, it) {
-      spn_bg_id_t source = get_or_put_user_file(unit, graph, unit->script.build.source[it]);
-      spn_try(spn_bg_cmd_add_input(graph, nodes->build_script.run, source));
-    }
-
     spn_try(spn_bg_cmd_add_input(graph, nodes->package, nodes->build_script.module));
   }
 

@@ -2,6 +2,7 @@
 #define SPN_TASK_H
 
 #include "cli/types.h"
+#include "error/types.h"
 #include "forward/types.h"
 #include "task/types.h"
 
@@ -27,6 +28,7 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t* app);
 spn_task_step_t spn_task_configure_graph_init(spn_app_t* app);
 spn_task_step_t spn_task_configure_graph_update(spn_app_t* app);
 spn_task_step_t spn_task_create_units(spn_app_t* app);
+spn_err_union_t spn_task_create_script_units(spn_session_t* session);
 spn_task_step_t spn_task_build_graph_init(spn_app_t* app);
 spn_task_step_t spn_task_build_graph_update(spn_app_t* app);
 spn_task_step_t spn_task_render_graph(spn_app_t* app);

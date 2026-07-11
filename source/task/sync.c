@@ -462,6 +462,9 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
   }
 
   spn_err_union_t flags_err = add_compilation_units(session);
+  if (!flags_err.kind) {
+    flags_err = spn_task_create_script_units(session);
+  }
   if (flags_err.kind) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_ERR,

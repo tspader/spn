@@ -20,6 +20,10 @@ spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
   sp_mem_t mem = session->mem;
   sp_om_for(session->units.objects, it) {
     spn_compile_unit_t* unit = sp_om_at(session->units.objects, it);
+    if (!sp_str_empty(unit->invocation.program)) {
+      continue;
+    }
+    bool host = unit->package->build->kind == SPN_BUILD_KIND_HOST;
 
     spn_cc_compile_t compile = {
       .lang = unit->lang,
@@ -27,15 +31,21 @@ spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
       .output = unit->paths.object,
       .cxx = unit->target->info->cxx,
       .pic = unit->target->info->kind == SPN_TARGET_LIB,
+      .visibility = host ? SPN_SYMBOL_VISIBILITY_HIDDEN : SPN_SYMBOL_VISIBILITY_DEFAULT,
     };
     sp_da_init(mem, compile.include);
     sp_da_init(mem, compile.define);
     sp_da_init(mem, compile.args);
-    sp_da_for(unit->package->info->include, it) {
-      sp_da_push(compile.include, resolve_pkg_path(mem, unit->package, unit->package->info->include[it]));
+    if (host) {
+      sp_da_push(compile.include, spn.paths.include);
     }
-    sp_da_for(unit->package->info->define, it) {
-      sp_da_push(compile.define, unit->package->info->define[it]);
+    else {
+      sp_da_for(unit->package->info->include, it) {
+        sp_da_push(compile.include, resolve_pkg_path(mem, unit->package, unit->package->info->include[it]));
+      }
+      sp_da_for(unit->package->info->define, it) {
+        sp_da_push(compile.define, unit->package->info->define[it]);
+      }
     }
     sp_da_for(unit->target->info->include, it) {
       sp_da_push(compile.include, resolve_pkg_path(mem, unit->package, unit->target->info->include[it]));
@@ -47,35 +57,51 @@ spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
       sp_da_push(compile.args, unit->target->info->flags[it]);
     }
 
-    sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit->package);
-    sp_da_for(deps, it) {
-      if (!deps[it].unit) {
-        continue;
-      }
-
-      switch (deps[it].kind) {
-        case SPN_DEP_KIND_PACKAGE: {
-          break;
-        }
-        case SPN_DEP_KIND_TEST: {
-          if (unit->target->info->kind != SPN_TARGET_TEST) {
+    if (host) {
+      spn_pkg_unit_t* native = sp_da_empty(session->plan.builds) ?
+        SP_NULLPTR :
+        spn_session_find_pkg_unit(session, session->plan.builds[0].build, unit->package->id.pkg);
+      if (native) {
+        sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, native);
+        sp_da_for(deps, it) {
+          if (deps[it].kind != SPN_DEP_KIND_BUILD || !deps[it].unit) {
             continue;
           }
-          break;
+          sp_da_push(compile.include, deps[it].unit->paths.include);
         }
-        case SPN_DEP_KIND_BUILD: {
-          continue;
-        }
-      }
-
-      sp_da_push(compile.include, deps[it].unit->paths.include);
-      sp_da_for(deps[it].unit->info->public_define, dt) {
-        sp_da_push(compile.define, deps[it].unit->info->public_define[dt]);
       }
     }
+    else {
+      sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit->package);
+      sp_da_for(deps, it) {
+        if (!deps[it].unit) {
+          continue;
+        }
 
-    if (!sp_da_empty(unit->target->info->embed)) {
-      sp_da_push(compile.include, unit->target->paths.generated);
+        switch (deps[it].kind) {
+          case SPN_DEP_KIND_PACKAGE: {
+            break;
+          }
+          case SPN_DEP_KIND_TEST: {
+            if (unit->target->info->kind != SPN_TARGET_TEST) {
+              continue;
+            }
+            break;
+          }
+          case SPN_DEP_KIND_BUILD: {
+            continue;
+          }
+        }
+
+        sp_da_push(compile.include, deps[it].unit->paths.include);
+        sp_da_for(deps[it].unit->info->public_define, dt) {
+          sp_da_push(compile.define, deps[it].unit->info->public_define[dt]);
+        }
+      }
+
+      if (!sp_da_empty(unit->target->info->embed)) {
+        sp_da_push(compile.include, unit->target->paths.generated);
+      }
     }
 
     sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);

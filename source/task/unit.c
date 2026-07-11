@@ -14,6 +14,7 @@
 #include "error/types.h"
 #include "event/event.h"
 #include "event/types.h"
+#include "external/wasm/wasm.h"
 #include "filter/filter.h"
 #include "pkg/id.h"
 #include "pkg/pkg.h"
@@ -117,7 +118,9 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
     case SPN_TARGET_EXE:
     case SPN_TARGET_SCRIPT:
     case SPN_TARGET_TEST: {
-      target->kind = SPN_CC_OUTPUT_EXE;
+      target->kind = target->pkg->build->kind == SPN_BUILD_KIND_HOST ?
+        SPN_CC_OUTPUT_REACTOR :
+        SPN_CC_OUTPUT_EXE;
       return SPN_OK;
     }
     case SPN_TARGET_LIB: {
@@ -185,6 +188,129 @@ static spn_err_t ensure_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_
   return SPN_OK;
 }
 
+static void create_target_objects(spn_session_t* session, spn_target_unit_t* target) {
+  spn_pkg_unit_t* pkg = target->pkg;
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_da(sp_str_t) source = collect_target_source(scratch.mem, pkg, target);
+
+  sp_da_for(source, j) {
+    sp_str_t relative = source[j];
+    sp_str_t file = relative;
+    if (sp_fs_is_absolute(relative)) {
+      relative = sp_str_strip_left(relative, pkg->paths.recipe);
+      relative = sp_str_strip_left(relative, sp_str_lit("/"));
+    }
+    else {
+      file = sp_fs_join_path(session->mem, pkg->paths.source, relative);
+    }
+
+    spn_lang_t lang = spn_lang_from_path(relative);
+
+    // Object libs publish their objects as artifacts; everyone else keeps
+    // them as intermediates. The object name keeps the full source-relative
+    // path, extension included, so colliding sources stay distinct.
+    sp_str_t object_dir = target->lib_kind == SPN_LIB_KIND_OBJECT ?
+      target->paths.lib :
+      sp_fs_join_path(session->mem, target->paths.object, target->info->name);
+    sp_str_t object_path = sp_fs_join_path(session->mem, object_dir, sp_fmt(scratch.mem, "{}.o", SP_FMT_STR(relative)).value);
+    spn_compile_unit_id_t id = {
+      .target = target->id,
+      .source = sp_intern_get_or_insert(session->intern, file),
+    };
+
+    if (!sp_om_has(session->units.objects, id)) {
+      sp_om_insert(session->units.objects, id, ((spn_compile_unit_t) {
+        .id = id,
+        .package = pkg,
+        .target = target,
+        .session = target->session,
+        .lang = lang,
+        .paths = {
+          .object = object_path,
+          .file = file,
+        },
+      }));
+    }
+
+    spn_compile_unit_t* object = sp_om_get(session->units.objects, id);
+    sp_da_push(pkg->objects, object);
+    sp_da_push(target->objects, object);
+  }
+  sp_mem_end_scratch(scratch);
+}
+
+static spn_err_union_t add_script_target(spn_session_t* session, spn_pkg_unit_t* unit, spn_target_info_t* info, spn_wasm_script_t* wasm) {
+  spn_target_unit_t* target = SP_NULLPTR;
+  if (ensure_target(session, unit, info, &target)) {
+    return spn_result(SPN_ERROR);
+  }
+  create_target_objects(session, target);
+  spn_wasm_script_init(wasm, true, get_target_output_path(session->mem, target));
+  return spn_result(SPN_OK);
+}
+
+// Scripts compile like any other target, just in the host build: one pkg unit
+// per scripted package, a reactor target per module, invocations rendered
+// here so the configure graph can consume them. Only script units exist this
+// early, so the session-wide invocation passes touch nothing else.
+spn_err_union_t spn_task_create_script_units(spn_session_t* session) {
+  if (!session->units.script) {
+    return spn_result(SPN_OK);
+  }
+
+  sp_da(spn_pkg_unit_t*) scripted = sp_da_new(session->mem, spn_pkg_unit_t*);
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
+    if (pkg->build->kind != SPN_BUILD_KIND_TARGET) {
+      continue;
+    }
+    if (sp_da_empty(pkg->script.configure.source) && sp_da_empty(pkg->script.build.source)) {
+      continue;
+    }
+    sp_da_push(scripted, pkg);
+  }
+  if (sp_da_empty(scripted)) {
+    return spn_result(SPN_OK);
+  }
+
+  spn_build_unit_t* build = sp_alloc_type(session->mem, spn_build_unit_t);
+  *build = (spn_build_unit_t) {
+    .id = (spn_build_unit_id_t)sp_da_size(session->plan.builds),
+    .kind = SPN_BUILD_KIND_HOST,
+    .profile = {
+      .name = sp_str_lit("script"),
+      .arch = SPN_ARCH_WASM32,
+      .os = SPN_OS_WASI,
+      .abi = SPN_ABI_NONE,
+      .mode = SPN_BUILD_MODE_DEBUG,
+      .opt = SPN_OPT_LEVEL_2,
+      .standard = SPN_C99,
+      .linkage = SPN_LIB_KIND_STATIC,
+    },
+    .toolchain = session->units.script,
+    .paths = { .profile = sp_fs_join_path(session->mem, session->paths.build, sp_str_lit("script")) },
+  };
+  session->units.host = build;
+
+  sp_da_for(scripted, it) {
+    spn_pkg_unit_t* native = scripted[it];
+    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, native->id.pkg);
+    sp_assert(loaded);
+    spn_pkg_unit_t* unit = spn_session_add_pkg_unit(session, build, native->id.pkg, loaded);
+
+    if (!sp_da_empty(unit->script.configure.source)) {
+      try_union(add_script_target(session, unit, &unit->script.configure, &native->wasm.configure));
+    }
+    if (!sp_da_empty(unit->script.build.source)) {
+      try_union(add_script_target(session, unit, &unit->script.build, &native->wasm.build));
+    }
+  }
+
+  try_union(spn_session_build_invocations(session));
+  return spn_build_link_invocations(session);
+}
+
 static bool is_root_target(spn_session_t* session, spn_build_plan_t* plan, spn_target_unit_t* target) {
   sp_da_for(plan->roots, it) {
     if (spn_session_get_target_unit(session, plan->roots[it]) == target) {
@@ -249,6 +375,9 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
 
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
+    if (pkg->build->kind != SPN_BUILD_KIND_TARGET) {
+      continue;
+    }
     sp_str_om_for(pkg->info->libs, it) {
       spn_target_unit_t* target = SP_NULLPTR;
       if (ensure_target(session, pkg, sp_str_om_at(pkg->info->libs, it), &target)) {
@@ -304,54 +433,16 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
 
   // Now that the configure phase is done, everything about the build is static. We
   // can go through every target and resolve file globs into object files which need
-  // to be compiled.
+  // to be compiled. Script targets already did this at sync.
   sp_om_for(session->units.targets, it) {
     spn_target_unit_t* target = sp_om_at(session->units.targets, it);
-    spn_pkg_unit_t* pkg = target->pkg;
+
+    if (target->pkg->build->kind == SPN_BUILD_KIND_HOST) continue;
 
     // Source libs are consumed as source; we never compile them ourselves
     if (target->lib_kind == SPN_LIB_KIND_SOURCE) continue;
 
-    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-    sp_da(sp_str_t) source = collect_target_source(scratch.mem, pkg, target);
-
-    sp_da_for(source, j) {
-      sp_str_t relative = source[j];
-      sp_str_t file = sp_fs_join_path(app->session.mem, pkg->paths.source, relative);
-
-      spn_lang_t lang = spn_lang_from_path(relative);
-
-      // Object libs publish their objects as artifacts; everyone else keeps
-      // them as intermediates. The object name keeps the full source-relative
-      // path, extension included, so colliding sources stay distinct.
-      sp_str_t object_dir = target->lib_kind == SPN_LIB_KIND_OBJECT ?
-        target->paths.lib :
-        sp_fs_join_path(app->session.mem, target->paths.object, target->info->name);
-      sp_str_t object_path = sp_fs_join_path(app->session.mem, object_dir, sp_fmt(scratch.mem, "{}.o", SP_FMT_STR(relative)).value);
-      spn_compile_unit_id_t id = {
-        .target = target->id,
-        .source = sp_intern_get_or_insert(session->intern, file),
-      };
-
-      if (!sp_om_has(session->units.objects, id)) {
-        sp_om_insert(session->units.objects, id, ((spn_compile_unit_t) {
-          .id = id,
-          .package = pkg,
-          .target = target,
-          .session = target->session,
-          .lang = lang,
-          .paths = {
-            .object = object_path,
-            .file = file,
-          },
-        }));
-      }
-
-      spn_compile_unit_t* object = sp_om_get(session->units.objects, id);
-      sp_da_push(pkg->objects, object);
-      sp_da_push(target->objects, object);
-    }
-    sp_mem_end_scratch(scratch);
+    create_target_objects(session, target);
   }
 
   sp_om_for(session->units.objects, it) {

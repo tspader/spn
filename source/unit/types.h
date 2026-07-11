@@ -173,7 +173,6 @@ typedef struct {
     spn_bg_id_t profile;
   } stamp;
   struct {
-    spn_bg_id_t run;
     spn_bg_id_t module;
   } build_script;
   sp_da(spn_bg_id_t) user;
