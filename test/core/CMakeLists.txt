@@ -134,6 +134,7 @@ target_compile_definitions(manifest_gen PRIVATE
   MANIFEST_DIR="test/core/manifest/gen/manifests"
   GOLDEN_DIR="test/core/manifest/gen/golden")
 add_dependencies(manifest_gen spn_codegen_gen)
+target_link_libraries(manifest_gen PRIVATE yyjson)
 add_test(NAME manifest_gen COMMAND "$<TARGET_FILE:manifest_gen>")
 
 add_executable(manifest_lower
