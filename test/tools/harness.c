@@ -579,6 +579,10 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         sp_ps_output_t output = sp_ps_run(mem, (sp_ps_config_t) {
           .command = bin,
           .cwd = fixture->fs.root,
+          .io = {
+            .in.mode = SP_PS_IO_MODE_NULL,
+            .err.mode = SP_PS_IO_MODE_REDIRECT,
+          },
         });
 
         EXPECT_EQ(action.bin.rc, output.status.exit_code);
