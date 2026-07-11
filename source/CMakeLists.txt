@@ -29,7 +29,9 @@ set(SPN_SOURCES
   codegen/lower.c
   codegen/options.c
   codegen/when.c
-  compiler/flags.c
+  compiler/driver.c
+  compiler/gnu.c
+  compiler/msvc.c
   ctx/ctx.c
   enum/enum.c
   event/event.c
@@ -43,7 +45,6 @@ set(SPN_SOURCES
   external/wasm/guest.c
   external/wasm/wasm.c
   filter/filter.c
-  gen.c
   git/cache.c
   git/key.c
   index/cache.c
@@ -112,6 +113,7 @@ set(SPN_SOURCES
   toolchain/toolchain.c
   triple/triple.c
   tui/tui.c
+  unit/compiler.c
   unit/package.c
   when/when.c
 )

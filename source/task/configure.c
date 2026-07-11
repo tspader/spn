@@ -60,6 +60,18 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
     if (spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp)) {
       return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
     }
+    if (unit->wasm.configure.state != SPN_WASM_SCRIPT_NONE) {
+      spn_bg_id_t module = spn_bg_add_file(graph, unit->wasm.configure.path);
+      if (spn_bg_cmd_add_output(graph, unit->nodes.configure.run, module)) {
+        return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->wasm.configure.path });
+      }
+      sp_da_for(unit->script.configure.source, it) {
+        spn_bg_id_t source = spn_bg_add_file(graph, unit->script.configure.source[it]);
+        if (spn_bg_cmd_add_input(graph, unit->nodes.configure.run, source)) {
+          return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->script.configure.source[it] });
+        }
+      }
+    }
   }
 
   // Add links between packages

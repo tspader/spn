@@ -5,10 +5,12 @@
 #include "session/types.h"
 
 #include "external/cc.h"
+#include "compiler/driver.h"
 #include "event/event.h"
 #include "session/invocation.h"
 #include "target/closure.h"
 #include "task/build/build.h"
+#include "unit/compiler.h"
 #include "unit/package.h"
 
 static bool objects_have_cxx(sp_da(spn_compile_unit_t*) objects) {
@@ -43,48 +45,58 @@ static spn_lang_t get_link_language(spn_target_unit_t* target) {
   return language;
 }
 
-static void build_archive_invocation(spn_target_unit_t* target, sp_str_t output) {
+static spn_err_union_t build_archive_invocation(spn_target_unit_t* target, sp_str_t output) {
   sp_mem_t mem = target->session->mem;
   spn_toolchain_unit_t* toolchain = target->pkg->build->toolchain;
 
   sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
-  sp_da_for(toolchain->archiver.args, it) {
-    sp_ps_config_add_arg(mem, &ps, toolchain->archiver.args[it]);
-  }
-  sp_ps_config_add_arg(mem, &ps, sp_str_lit("rcs"));
-  sp_ps_config_add_arg(mem, &ps, output);
+  spn_cc_archive_t archive = {
+    .output = output,
+  };
+  sp_da_init(mem, archive.objects);
+  sp_da_init(mem, archive.args);
   sp_da_for(target->objects, it) {
-    sp_ps_config_add_arg(mem, &ps, target->objects[it]->paths.object);
+    sp_da_push(archive.objects, target->objects[it]->paths.object);
+  }
+  spn_profile_info_t* profile = &target->pkg->build->profile;
+  spn_cc_toolchain_t compiler = spn_toolchain_unit_compiler(toolchain);
+  spn_err_union_t err = spn_cc_render_archive(mem, &compiler, profile, &archive, &ps);
+  if (err.kind) {
+    return err;
   }
 
   target->invocation = (spn_invocation_t) {
-    .program = toolchain->archiver.program,
+    .program = ps.command,
     .args = ps.dyn_args,
     .cwd = target->paths.work,
   };
+  return spn_result(SPN_OK);
 }
 
-static void build_link_invocation(spn_target_unit_t* target, sp_str_t output) {
+static spn_err_union_t build_link_invocation(spn_target_unit_t* target, sp_str_t output) {
   sp_mem_t mem = target->session->mem;
 
-  spn_cc_t cc;
-  spn_cc_init(&cc, mem);
-  spn_cc_set_profile(&cc, target->pkg->build->profile);
-  spn_cc_set_flags(&cc, target->pkg->build->flags);
-  spn_cc_set_output_dir(&cc, sp_fs_parent_path(output));
-  spn_cc_set_toolchain(&cc, target->pkg->build->toolchain);
-
-  spn_cc_target_t* cc_target = spn_cc_add_target(&cc, target->kind, sp_fs_get_name(output));
-  spn_cc_target_set_lang(cc_target, get_link_language(target));
-  add_deps_to_cc_target(cc_target, target);
+  spn_cc_link_t link = {
+    .lang = get_link_language(target),
+    .kind = target->kind,
+    .output = output,
+  };
+  sp_da_init(mem, link.objects);
+  sp_da_init(mem, link.args);
+  sp_da_init(mem, link.libs);
+  sp_da_init(mem, link.system_libs);
+  sp_da_init(mem, link.hidden_libs);
+  sp_da_init(mem, link.lib_dirs);
+  sp_da_init(mem, link.rpath);
+  add_deps_to_cc_target(&link, target);
 
   switch (target->pkg->build->profile.os) {
     case SPN_OS_LINUX: {
-      spn_cc_target_add_rpath(cc_target, sp_str_lit("$ORIGIN"));
+      sp_da_push(link.rpath, sp_str_lit("$ORIGIN"));
       break;
     }
     case SPN_OS_MACOS: {
-      spn_cc_target_add_rpath(cc_target, sp_str_lit("@loader_path"));
+      sp_da_push(link.rpath, sp_str_lit("@loader_path"));
       break;
     }
     case SPN_OS_WINDOWS:
@@ -95,25 +107,29 @@ static void build_link_invocation(spn_target_unit_t* target, sp_str_t output) {
   }
 
   sp_da_for(target->objects, it) {
-    spn_cc_target_add_absolute_source(cc_target, target->objects[it]->paths.object);
+    sp_da_push(link.objects, target->objects[it]->paths.object);
   }
 
   if (!sp_da_empty(target->info->embed)) {
-    spn_cc_target_add_absolute_source(cc_target, get_embed_object_path(mem, target));
+    sp_da_push(link.objects, get_embed_object_path(mem, target));
   }
 
   sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
-  spn_cc_to_ps(mem, &cc, cc_target, &ps);
-  spn_cc_target_to_ps(mem, &cc, cc_target, &ps);
+  spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(target->pkg->build->toolchain);
+  spn_err_union_t err = spn_cc_render_link(mem, &toolchain, &target->pkg->build->profile, &link, &ps);
+  if (err.kind) {
+    return err;
+  }
 
   target->invocation = (spn_invocation_t) {
     .program = ps.command,
     .args = ps.dyn_args,
     .cwd = target->paths.work,
   };
+  return spn_result(SPN_OK);
 }
 
-void spn_build_link_invocations(spn_session_t* session) {
+spn_err_union_t spn_build_link_invocations(spn_session_t* session) {
   sp_om_for(session->units.targets, it) {
     spn_target_unit_t* target = sp_om_at(session->units.targets, it);
     if (sp_da_empty(target->objects)) {
@@ -122,20 +138,21 @@ void spn_build_link_invocations(spn_session_t* session) {
 
     switch (target->kind) {
       case SPN_CC_OUTPUT_STATIC_LIB: {
-        build_archive_invocation(target, get_target_output_path(session->mem, target));
+        try_union(build_archive_invocation(target, get_target_output_path(session->mem, target)));
         break;
       }
       case SPN_CC_OUTPUT_EXE:
-      case SPN_CC_OUTPUT_SHARED_LIB: {
-        build_link_invocation(target, get_target_output_path(session->mem, target));
+      case SPN_CC_OUTPUT_SHARED_LIB:
+      case SPN_CC_OUTPUT_REACTOR: {
+        try_union(build_link_invocation(target, get_target_output_path(session->mem, target)));
         break;
       }
-      case SPN_CC_OUTPUT_WASM:
       case SPN_CC_OUTPUT_OBJECT: {
         break;
       }
     }
   }
+  return spn_result(SPN_OK);
 }
 
 spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, sp_str_t out, u64 elapsed) {

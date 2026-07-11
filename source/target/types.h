@@ -5,6 +5,7 @@
 #include "spn.h"
 
 #include "forward/types.h"
+#include "compiler/types.h"
 #include "when/types.h"
 
 #define SP_EMBED_DEFAULT_SYMBOL_S sp_str_lit("")
@@ -49,12 +50,6 @@ typedef struct {
 } spn_linkage_set_t;
 
 typedef sp_opt(spn_linkage_t) sp_opt_spn_linkage_t;
-
-typedef struct {
-  spn_cxx_standard_t standard;
-  bool no_exceptions;
-  bool no_rtti;
-} spn_cxx_options_t;
 
 struct spn_target_info {
   sp_str_t name;

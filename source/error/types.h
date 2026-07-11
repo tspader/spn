@@ -4,6 +4,7 @@
 #include "sp.h"
 #include "spn.h"
 
+#include "compiler/types.h"
 #include "forward/types.h"
 
 #define spn_try(expr) \
@@ -119,6 +120,11 @@ typedef struct {
       spn_triple_t target;
       spn_sanitizer_set_t unsupported;
     } sanitizer;
+    struct {
+      sp_str_t toolchain;
+      spn_triple_t target;
+      spn_cc_feature_t feature;
+    } compiler;
     struct {
       sp_str_t path;
     } fs;

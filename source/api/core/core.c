@@ -14,6 +14,7 @@
 #include "unit/types.h"
 
 #include "event/event.h"
+#include "compiler/driver.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
 #include "pkg/mutate.h"
@@ -44,24 +45,17 @@ sp_str_t spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-void spn_api_add_profile_flags_env(sp_mem_t mem, spn_pkg_unit_t* unit, sp_ps_config_t* config) {
-  spn_cc_flags_t* flags = &unit->build->flags;
-  sp_str_t compile = sp_str_join_n(mem, flags->compile, sp_da_size(flags->compile), sp_str_lit(" "));
-  sp_str_t link = sp_str_join_n(mem, flags->link, sp_da_size(flags->link), sp_str_lit(" "));
+void spn_api_add_profile_flags_env(sp_mem_t mem, spn_cc_driver_t driver, const spn_profile_info_t* profile, sp_env_t* env) {
+  spn_cc_flags_t flags = SP_ZERO_INITIALIZE();
+  spn_err_union_t err = spn_cc_render_flags(mem, driver, profile, &flags);
+  sp_assert(!err.kind);
+  sp_str_t compile = sp_str_join_n(mem, flags.compile, sp_da_size(flags.compile), sp_str_lit(" "));
+  sp_str_t link = sp_str_join_n(mem, flags.link, sp_da_size(flags.link), sp_str_lit(" "));
 
-  u32 slot = sp_carr_len(config->env.extra);
-  sp_carr_for(config->env.extra, it) {
-    if (sp_str_empty(config->env.extra[it].key)) {
-      slot = it;
-      break;
-    }
-  }
-  u32 count = sp_str_empty(link) ? 2 : 3;
-  SP_ASSERT(slot + count <= sp_carr_len(config->env.extra));
-  config->env.extra[slot++] = (sp_env_var_t) { .key = sp_str_lit("CFLAGS"), .value = compile };
-  config->env.extra[slot++] = (sp_env_var_t) { .key = sp_str_lit("CXXFLAGS"), .value = compile };
+  sp_env_insert(env, sp_str_lit("CFLAGS"), compile);
+  sp_env_insert(env, sp_str_lit("CXXFLAGS"), compile);
   if (!sp_str_empty(link)) {
-    config->env.extra[slot] = (sp_env_var_t) { .key = sp_str_lit("LDFLAGS"), .value = link };
+    sp_env_insert(env, sp_str_lit("LDFLAGS"), link);
   }
 }
 
@@ -78,20 +72,21 @@ sp_ps_output_t spn_api_subprocess(sp_mem_t mem, spn_pkg_unit_t* unit, sp_ps_conf
     .err = { .mode = SP_PS_IO_MODE_REDIRECT },
   };
 
-  // The session env holds only our overrides (e.g. the toolchain's CC/AR/LD);
-  // layer them on top of the default SP_PS_ENV_INHERIT. Empty keys are the
-  // terminator for extra[], so scan with the same sentinel.
+  // Inherit the process env, then layer the caller's vars and the session's
+  // overrides (e.g. the toolchain's CC/AR/LD) on top
   spn_session_t* session = unit->session;
-  u32 slot = 0;
-  for (; slot < sp_carr_len(config.env.extra); slot++) {
-    if (sp_str_empty(config.env.extra[slot].key)) break;
+  sp_env_t env = sp_env_capture(mem);
+  if (config.env.env.vars) {
+    sp_ht_for_kv(config.env.env.vars, it) {
+      sp_env_insert(&env, *it.key, *it.val);
+    }
   }
-
   sp_ht_for_kv(session->env.vars, it) {
-    if (slot >= sp_carr_len(config.env.extra)) break;
     if (sp_str_empty(*it.val)) continue;
-    config.env.extra[slot++] = (sp_env_var_t) { .key = *it.key, .value = *it.val };
+    sp_env_insert(&env, *it.key, *it.val);
   }
+  config.env.env = env;
+  config.env.mode = SP_PS_ENV_EXISTING;
 
   sp_ps_output_t result = sp_ps_run(mem, config);
   if (!sp_str_empty(result.out)) {

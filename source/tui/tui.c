@@ -2,6 +2,7 @@
 #include "session/types.h"
 
 #include "toml/issue.h"
+#include "compiler/driver.h"
 #include "ctx/ctx.h"
 #include "enum/enum.h"
 #include "event/event.h"
@@ -670,6 +671,16 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
             sp_fmt_str(event->err.sanitizer.toolchain),
             sp_fmt_str(spn_triple_to_str(mem, event->err.sanitizer.target)),
             sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.unsupported))
+          );
+          break;
+        }
+        case SPN_ERR_COMPILER_FEATURE_UNSUPPORTED: {
+          sp_fmt_io(
+            &w.base,
+            "toolchain {.cyan} targeting {.yellow} doesn't support {.red}",
+            sp_fmt_str(event->err.compiler.toolchain),
+            sp_fmt_str(spn_triple_to_str(mem, event->err.compiler.target)),
+            sp_fmt_str(spn_cc_feature_to_str(event->err.compiler.feature))
           );
           break;
         }

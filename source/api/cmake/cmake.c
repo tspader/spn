@@ -1,6 +1,7 @@
 #include "sp.h"
 #include "sp/macro.h"
 #include "api/cmake/cmake.h"
+#include "compiler/driver.h"
 
 #include "api/api.h"
 #include "api/core/types.h"
@@ -42,8 +43,8 @@ static sp_str_t spn_cmake_profile_configuration(const spn_profile_info_t* profil
   return profile->mode == SPN_BUILD_MODE_RELEASE ? sp_str_lit("Release") : sp_str_lit("Debug");
 }
 
-static sp_str_t spn_cmake_format_define(sp_mem_t mem, sp_str_t name, sp_str_t value) {
-  return sp_fmt(mem, "-D{}={}", sp_fmt_str(name), sp_fmt_str(value)).value;
+static void add_define(sp_mem_t mem, sp_ps_config_t* ps, sp_str_t name, sp_str_t value) {
+  sp_ps_config_add_arg(mem, ps, sp_fmt(mem, "-D{}={}", sp_fmt_str(name), sp_fmt_str(value)).value);
 }
 
 s32 spn_cmake(spn_t* build) {
@@ -159,52 +160,41 @@ s32 spn_cmake_configure(spn_cmake_t* cmake) {
     sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_gen_to_str(cmake->generator));
   }
 
-  // Generate and pass a CMake toolchain file for cross-compilation support.
-  // Even for native builds this is useful: it tells CMake exactly which
-  // compiler, linker, and archiver to use.
   sp_str_t toolchain_file = spn_cmake_generate_toolchain_file(scratch.mem, unit);
   if (!sp_str_empty(toolchain_file)) {
-    sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_format_define(scratch.mem,
-      sp_str_lit("CMAKE_TOOLCHAIN_FILE"), toolchain_file));
+    add_define(scratch.mem, &config, sp_str_lit("CMAKE_TOOLCHAIN_FILE"), toolchain_file);
   }
 
-  sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_format_define(scratch.mem,
-    sp_str_lit("CMAKE_INSTALL_PREFIX"),
-    unit->paths.store)
-  );
+  add_define(scratch.mem, &config, sp_str_lit("CMAKE_INSTALL_PREFIX"), unit->paths.store);
+  add_define(scratch.mem, &config, sp_str_lit("BUILD_SHARED_LIBS"), profile->linkage == SPN_LIB_KIND_SHARED ? sp_str_lit("ON") : sp_str_lit("OFF"));
+  add_define(scratch.mem, &config, sp_str_lit("CMAKE_BUILD_TYPE"), spn_cmake_profile_configuration(profile));
 
-  sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_format_define(scratch.mem,
-    sp_str_lit("BUILD_SHARED_LIBS"),
-    profile->linkage == SPN_LIB_KIND_SHARED ? sp_str_lit("ON") : sp_str_lit("OFF"))
-  );
-
-  bool release = profile->mode == SPN_BUILD_MODE_RELEASE;
-  sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_format_define(scratch.mem,
-    sp_str_lit("CMAKE_BUILD_TYPE"),
-    spn_cmake_profile_configuration(profile))
-  );
-
-  const c8* configuration = release ? "RELEASE" : "DEBUG";
-  spn_cc_flags_t* flags = &unit->build->flags;
-  sp_str_t compile = sp_str_join_n(scratch.mem, flags->compile, sp_da_size(flags->compile), sp_str_lit(" "));
+  const c8* configuration = profile->mode == SPN_BUILD_MODE_RELEASE ? "RELEASE" : "DEBUG";
+  spn_cc_flags_t flags = SP_ZERO_INITIALIZE();
+  spn_err_union_t flags_err = spn_cc_render_flags(scratch.mem, unit->build->toolchain->toolchain->driver, profile, &flags);
+  if (flags_err.kind) {
+    sp_mem_end_scratch(scratch);
+    return SPN_ERROR;
+  }
+  sp_str_t compile = sp_str_join_n(scratch.mem, flags.compile, sp_da_size(flags.compile), sp_str_lit(" "));
   const c8* compile_vars [] = { "CMAKE_C_FLAGS_", "CMAKE_CXX_FLAGS_" };
   sp_carr_for(compile_vars, it) {
     sp_str_t var = sp_fmt(scratch.mem, "{}{}", sp_fmt_cstr(compile_vars[it]), sp_fmt_cstr(configuration)).value;
-    sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_format_define(scratch.mem, var, compile));
+    add_define(scratch.mem, &config, var, compile);
   }
 
-  sp_str_t link = sp_str_join_n(scratch.mem, flags->link, sp_da_size(flags->link), sp_str_lit(" "));
+  sp_str_t link = sp_str_join_n(scratch.mem, flags.link, sp_da_size(flags.link), sp_str_lit(" "));
   if (!sp_str_empty(link)) {
     const c8* link_vars [] = { "CMAKE_EXE_LINKER_FLAGS_", "CMAKE_SHARED_LINKER_FLAGS_" };
     sp_carr_for(link_vars, it) {
       sp_str_t var = sp_fmt(scratch.mem, "{}{}", sp_fmt_cstr(link_vars[it]), sp_fmt_cstr(configuration)).value;
-      sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_format_define(scratch.mem, var, link));
+      add_define(scratch.mem, &config, var, link);
     }
   }
 
   sp_da_for(cmake->defines, it) {
     spn_cmake_define_t define = cmake->defines[it];
-    sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_format_define(scratch.mem, define.name, define.value));
+    add_define(scratch.mem, &config, define.name, define.value);
   }
 
   sp_da_for(cmake->args, it) {

@@ -1,7 +1,6 @@
 #ifndef SPN_UNIT_TYPES_H
 #define SPN_UNIT_TYPES_H
 
-#include "external/cc.h"
 #include "forward/types.h"
 #include "sp.h"
 #include "spn.h"
@@ -26,7 +25,6 @@ struct spn_build_unit_t {
   spn_build_unit_id_t id;
   spn_build_kind_t kind;
   spn_profile_info_t profile;
-  spn_cc_flags_t flags;
   spn_toolchain_unit_t* toolchain;
   struct {
     sp_str_t profile;
@@ -94,6 +92,7 @@ typedef struct {
 } spn_build_log_paths_t;
 
 typedef struct {
+  sp_str_t recipe;
   sp_str_t source;
   sp_str_t work;
   sp_str_t generated;
@@ -117,6 +116,12 @@ typedef struct {
   sp_da(sp_str_t) args;
   sp_str_t cwd;
 } spn_invocation_t;
+
+typedef struct {
+  sp_str_t source;
+  sp_str_t output;
+  spn_invocation_t invocation;
+} spn_compile_command_t;
 
 typedef struct {
   spn_compile_unit_id_t id;
@@ -253,6 +258,7 @@ struct spn_pkg_unit_t {
 
     sp_str_t manifest;
     sp_str_t script;
+    sp_str_t recipe;
     sp_str_t source;
     sp_str_t work;
     sp_str_t generated;

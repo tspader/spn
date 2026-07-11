@@ -371,8 +371,17 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
     return spn_task_fail(SPN_ERROR);
   }
 
-  spn_session_build_invocations(session);
-  spn_build_link_invocations(session);
+  spn_err_union_t err = spn_session_build_invocations(session);
+  if (!err.kind) {
+    err = spn_build_link_invocations(session);
+  }
+  if (err.kind) {
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR,
+      .err = err,
+    });
+    return spn_task_fail(SPN_ERROR);
+  }
   spn_session_write_compile_commands(session, spn_session_compile_commands_path(session));
 
   return spn_task_done();
