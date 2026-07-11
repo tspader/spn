@@ -7,8 +7,7 @@
 #include "forward/types.h"
 #include "unit/types.h"
 
-#include "gen.h"
-#include "compiler/flags.h"
+#include "compiler/driver.h"
 #include "enum/enum.h"
 #include "event/event.h"
 #include "filter/filter.h"
@@ -17,9 +16,10 @@
 #include "session/session.h"
 #include "target/closure.h"
 #include "task/build/build.h"
+#include "unit/compiler.h"
 
 // Build deps are usable from configure and build scripts, so compile against them
-void spn_cc_target_add_build_deps(spn_cc_target_t* target, spn_pkg_unit_t* unit) {
+void spn_cc_compile_add_build_deps(spn_cc_compile_t* compile, spn_pkg_unit_t* unit) {
   spn_session_t* session = unit->session;
 
   sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit);
@@ -31,8 +31,17 @@ void spn_cc_target_add_build_deps(spn_cc_target_t* target, spn_pkg_unit_t* unit)
       continue;
     }
 
-    spn_cc_target_add_absolute_include(target, deps[it].unit->paths.include);
+    sp_da_push(compile->include, deps[it].unit->paths.include);
   }
+}
+
+static sp_str_t script_object_path(sp_mem_t mem, spn_pkg_unit_t* unit, sp_str_t module, sp_str_t source) {
+  sp_str_t relative = sp_str_strip_left(source, unit->paths.recipe);
+  relative = sp_str_strip_left(relative, sp_str_lit("/"));
+  sp_str_t object = sp_fmt(mem, "{}.o", SP_FMT_STR(relative)).value;
+  sp_str_t dir = sp_fs_join_path(mem, unit->paths.generated, sp_str_lit("object"));
+  dir = sp_fs_join_path(mem, dir, sp_fs_get_stem(module));
+  return sp_fs_join_path(mem, dir, object);
 }
 
 spn_err_t spn_compile_script_module(spn_pkg_unit_t* unit, spn_target_info_t* script, sp_str_t output) {
@@ -42,37 +51,96 @@ spn_err_t spn_compile_script_module(spn_pkg_unit_t* unit, spn_target_info_t* scr
     .os = SPN_OS_WASI,
     .abi = SPN_ABI_NONE,
     .mode = SPN_BUILD_MODE_DEBUG,
-    .linkage = SPN_LIB_KIND_SHARED,
+    .opt = SPN_OPT_LEVEL_2,
     .standard = SPN_C99
   };
 
-  spn_cc_t* cc = sp_alloc_type(spn.mem, spn_cc_t);
-  spn_cc_init(cc, spn.mem);
-  spn_cc_set_profile(cc, profile);
-  spn_cc_set_output_dir(cc, sp_fs_parent_path(output));
-  spn_cc_set_toolchain(cc, session->units.script);
-  spn_cc_flags_t flags = SP_ZERO_INITIALIZE();
-  spn_err_union_t err = spn_cc_flags_resolve(spn.mem, &profile, session->units.script->toolchain, &flags);
+  spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(session->units.script);
+  spn_cc_link_t link = {
+    .lang = SPN_LANG_C,
+    .kind = SPN_CC_OUTPUT_REACTOR,
+    .output = output,
+  };
+  sp_da_init(spn.mem, link.objects);
+  sp_da_init(spn.mem, link.args);
+  sp_da_init(spn.mem, link.libs);
+  sp_da_init(spn.mem, link.system_libs);
+  sp_da_init(spn.mem, link.hidden_libs);
+  sp_da_init(spn.mem, link.lib_dirs);
+  sp_da_init(spn.mem, link.rpath);
+
+  sp_da_for(script->source, it) {
+    sp_str_t source = script->source[it];
+    sp_str_t object = script_object_path(spn.mem, unit, output, source);
+    spn_lang_t lang = spn_lang_from_path(source);
+    if (lang == SPN_LANG_CXX) {
+      link.lang = SPN_LANG_CXX;
+    }
+    spn_cc_compile_t compile = {
+      .lang = lang,
+      .source = source,
+      .output = object,
+      .cxx = script->cxx,
+      .visibility = SPN_SYMBOL_VISIBILITY_HIDDEN,
+    };
+    sp_da_init(spn.mem, compile.include);
+    sp_da_init(spn.mem, compile.define);
+    sp_da_init(spn.mem, compile.args);
+    sp_da_push(compile.include, spn.paths.include);
+    sp_da_for(script->include, include) {
+      sp_str_t path = script->include[include];
+      sp_da_push(compile.include, sp_fs_is_absolute(path) ? path : sp_fs_join_path(spn.mem, unit->paths.source, path));
+    }
+    sp_da_for(script->define, define) {
+      sp_da_push(compile.define, script->define[define]);
+    }
+    sp_da_for(script->flags, flag) {
+      sp_da_push(compile.args, script->flags[flag]);
+    }
+    spn_cc_compile_add_build_deps(&compile, unit);
+
+    sp_ps_config_t compile_ps = SP_ZERO_INITIALIZE();
+    spn_err_union_t err = spn_cc_render_compile(spn.mem, &toolchain, &profile, &compile, &compile_ps);
+    if (err.kind) {
+      spn_event_buffer_push(session->events, (spn_build_event_t) { .kind = SPN_EVENT_ERR, .err = err });
+      return err.kind;
+    }
+    spn_invocation_t* invocation = sp_alloc_type(spn.mem, spn_invocation_t);
+    *invocation = (spn_invocation_t) {
+      .program = compile_ps.command,
+      .args = compile_ps.dyn_args,
+      .cwd = unit->paths.work,
+    };
+    sp_da_push(session->units.compile_commands, ((spn_compile_command_t) {
+      .source = source,
+      .output = object,
+      .invocation = *invocation,
+    }));
+    spn_session_write_compile_commands(session, spn_session_compile_commands_path(session));
+    sp_fs_create_dir(sp_fs_parent_path(object));
+    spn_invocation_result_t compiled = spn_invocation_run(invocation);
+    if (compiled.result.status.exit_code) {
+      spn_event_buffer_push_ex(session->events, unit->info, &unit->logs.io, (spn_build_event_t) {
+        .kind = SPN_EVENT_TARGET_BUILD_FAILED,
+        .target.failed = {
+          .source_file = source,
+          .object_file = object,
+          .rc = compiled.result.status.exit_code,
+          .out = compiled.result.out,
+          .invocation = invocation,
+          .time = compiled.elapsed,
+        }
+      });
+      return SPN_ERROR;
+    }
+    sp_da_push(link.objects, object);
+  }
+  sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
+  spn_err_union_t err = spn_cc_render_link(spn.mem, &toolchain, &profile, &link, &ps);
   if (err.kind) {
+    spn_event_buffer_push(session->events, (spn_build_event_t) { .kind = SPN_EVENT_ERR, .err = err });
     return err.kind;
   }
-  spn_cc_set_flags(cc, flags);
-  spn_cc_add_include(cc, spn.paths.include);
-
-  spn_cc_target_t* target = spn_cc_add_target(cc, SPN_CC_OUTPUT_WASM, sp_fs_get_name(output));
-  sp_da_for(script->source, it) {
-    spn_cc_target_add_absolute_source(target, script->source[it]);
-  }
-  spn_cc_target_add_info(target, unit, script);
-  spn_cc_target_add_build_deps(target, unit);
-  spn_cc_target_add_flag(target, sp_str_lit("-fvisibility=hidden"));
-  spn_cc_target_add_flag(target, sp_str_lit("-Wl,--export-dynamic"));
-  spn_cc_target_add_flag(target, sp_str_lit("-O2"));
-  // spn_cc_target_add_flag(target, sp_str_lit("-Wl,--export="));
-
-  sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
-  spn_cc_to_ps(spn.mem, cc, target, &ps);
-  spn_cc_target_to_ps(spn.mem, cc, target, &ps);
 
   spn_invocation_t* invocation = sp_alloc_type(spn.mem, spn_invocation_t);
   *invocation = (spn_invocation_t) {
@@ -113,7 +181,7 @@ spn_err_t spn_compile_script_module(spn_pkg_unit_t* unit, spn_target_info_t* scr
   return SPN_OK;
 }
 
-void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
+void add_deps_to_cc_target(spn_cc_link_t* link, spn_target_unit_t* target) {
   spn_session_t* session = target->session;
   spn_pkg_unit_t* pkg = target->pkg;
 
@@ -127,13 +195,13 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
 
     switch (lib->lib_kind) {
       case SPN_LIB_KIND_STATIC: {
-        spn_cc_target_add_lib_dir(cc, lib->paths.lib);
-        spn_cc_target_add_system_lib(cc, lib->info->name);
+        sp_da_push(link->lib_dirs, lib->paths.lib);
+        sp_da_push(link->system_libs, lib->info->name);
         break;
       }
       case SPN_LIB_KIND_SHARED: {
-        spn_cc_target_add_lib_dir(cc, lib->paths.lib);
-        spn_cc_target_add_system_lib(cc, lib->info->name);
+        sp_da_push(link->lib_dirs, lib->paths.lib);
+        sp_da_push(link->system_libs, lib->info->name);
         break;
       }
       case SPN_LIB_KIND_SOURCE:
@@ -152,40 +220,33 @@ void add_deps_to_cc_target(spn_cc_target_t* cc, spn_target_unit_t* target) {
     spn_pkg_unit_t* dep = libs[it].pkg;
     spn_target_unit_t* lib = libs[it].lib;
 
-    spn_cc_target_add_lib_dir(cc, dep->paths.lib);
+    sp_da_push(link->lib_dirs, dep->paths.lib);
 
     if (lib->lib_kind == SPN_LIB_KIND_SHARED) {
-      spn_cc_target_add_system_lib(cc, lib->info->name);
+      sp_da_push(link->system_libs, lib->info->name);
       continue;
     }
 
     // A shared lib embedding a private static dep hides its symbols, so
     // the embedded copy can't collide with a consumer's own instance
     if (libs[it].private && target->kind == SPN_CC_OUTPUT_SHARED_LIB) {
-      if (cc->cc->os == SPN_OS_MACOS) {
-        spn_cc_target_add_flag(cc, sp_fmt(cc->cc->mem, "-Wl,-hidden-l{}", SP_FMT_STR(lib->info->name)).value);
-      }
-      else {
-        spn_cc_target_add_system_lib(cc, lib->info->name);
-        sp_str_t archive = sp_os_lib_to_file_name(s.mem, lib->info->name, SP_OS_LIB_STATIC);
-        spn_cc_target_add_flag(cc, sp_fmt(cc->cc->mem, "-Wl,--exclude-libs,{}", SP_FMT_STR(archive)).value);
-      }
+      sp_da_push(link->hidden_libs, lib->info->name);
     }
     else {
-      spn_cc_target_add_system_lib(cc, lib->info->name);
+      sp_da_push(link->system_libs, lib->info->name);
     }
   }
 
   // System libraries last, so they resolve every archive above them.
   sp_da_for(pkg->info->system_deps, it) {
-    spn_cc_target_add_system_lib(cc, pkg->info->system_deps[it]);
+    sp_da_push(link->system_libs, pkg->info->system_deps[it]);
   }
   sp_da_for(deps, it) {
     spn_pkg_unit_t* dep = deps[it].pkg;
     if (!dep || dep == pkg) continue;
 
     sp_da_for(dep->info->system_deps, s) {
-      spn_cc_target_add_system_lib(cc, dep->info->system_deps[s]);
+      sp_da_push(link->system_libs, dep->info->system_deps[s]);
     }
   }
 
@@ -248,8 +309,8 @@ sp_str_t get_target_output_path(sp_mem_t mem, spn_target_unit_t* target) {
       path = sp_fs_join_path(mem, target->paths.lib, file_name);
       break;
     }
-    case SPN_CC_OUTPUT_WASM:
-    case SPN_CC_OUTPUT_OBJECT: {
+    case SPN_CC_OUTPUT_OBJECT:
+    case SPN_CC_OUTPUT_REACTOR: {
       sp_unreachable_case();
     }
   }

@@ -8,7 +8,6 @@
 #include "unit/types.h"
 
 #include "enum/enum.h"
-#include "compiler/flags.h"
 #include "event/event.h"
 #include "event/types.h"
 #include "external/wasm/wasm.h"
@@ -54,7 +53,6 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
     .host = spn_triple_host(),
   };
   try_union(spn_toolchain_select(&s->catalog, query, s->mem, &s->selection));
-  try_union(spn_cc_flags_resolve(s->mem, &s->profile, s->selection.build, &s->flags));
 
   sp_str_t profile = s->paths.build;
   if (s->profile.targeted) {
@@ -527,6 +525,7 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
     case SPN_TARGET_TEST: sp_da_push(pkg->tests, target); break;
   }
 
+  target->paths.recipe = pkg->paths.recipe;
   target->paths.source = pkg->paths.source;
   target->paths.work = pkg->paths.work;
   target->paths.store = pkg->paths.store;
@@ -639,6 +638,7 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   sp_str_ht_init(session->mem, unit->nodes.files);
   unit->paths.manifest = loaded->paths.manifest;
   unit->paths.script = loaded->paths.script;
+  unit->paths.recipe = loaded->roots.recipe;
   unit->paths.source = loaded->roots.source;
 
   switch (loaded->source) {

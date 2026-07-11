@@ -91,13 +91,13 @@ struct spn_session_t {
   } gates;
 
   spn_profile_info_t profile;
-  spn_cc_flags_t flags;
   struct {
     spn_compile_request_t request;
     sp_da(spn_build_plan_t) builds;
   } plan;
   struct {
     sp_om(spn_compile_unit_id_t, spn_compile_unit_t) objects;
+    sp_da(spn_compile_command_t) compile_commands;
     sp_om(spn_target_unit_id_t, spn_target_unit_t) targets;
     sp_om(spn_pkg_unit_id_t, spn_pkg_unit_t) packages;
     spn_toolchain_unit_t* toolchain;

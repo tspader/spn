@@ -6,7 +6,7 @@ version = "0.0.1"
 source = ["tools/configure.c"]
 
 [package.build]
-source = ["tools/build.c"]
+source = ["tools/build.c", "tools/a/main.c", "tools/b/main.c"]
 include = ["include"]
 
 [deps.build]

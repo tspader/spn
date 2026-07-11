@@ -73,9 +73,13 @@ spn_test_binary(when)
 add_test(NAME when COMMAND "$<TARGET_FILE:when>")
 
 add_executable(compiler_flags
-  ${SRC}/compiler/flags.c
+  ${SRC}/compiler/driver.c
+  ${SRC}/compiler/gnu.c
+  ${SRC}/compiler/msvc.c
   ${SRC}/enum/enum.c
+  ${SRC}/triple/triple.c
   compiler.c
+  compiler/render.c
 )
 spn_test_binary(compiler_flags)
 add_test(NAME compiler_flags COMMAND "$<TARGET_FILE:compiler_flags>")

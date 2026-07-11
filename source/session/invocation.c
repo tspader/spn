@@ -3,27 +3,48 @@
 #include "unit/types.h"
 
 #include "event/log.h"
+#include "compiler/driver.h"
 #include "external/cc.h"
 #include "session/invocation.h"
 #include "session/session.h"
+#include "unit/compiler.h"
 
-void spn_session_build_invocations(spn_session_t* session) {
+static sp_str_t resolve_pkg_path(sp_mem_t mem, spn_pkg_unit_t* pkg, sp_str_t path) {
+  if (sp_fs_is_absolute(path)) {
+    return path;
+  }
+  return sp_fs_join_path(mem, pkg->paths.source, path);
+}
+
+spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
   sp_mem_t mem = session->mem;
   sp_om_for(session->units.objects, it) {
     spn_compile_unit_t* unit = sp_om_at(session->units.objects, it);
 
-    spn_cc_t cc;
-    spn_cc_init(&cc, mem);
-    spn_cc_set_profile(&cc, unit->package->build->profile);
-    spn_cc_set_flags(&cc, unit->package->build->flags);
-    spn_cc_set_toolchain(&cc, unit->package->build->toolchain);
-    spn_cc_add_pkg(&cc, unit->package);
-
-    spn_cc_target_t* target = spn_cc_add_target(&cc, SPN_CC_OUTPUT_OBJECT, unit->paths.object);
-    spn_cc_target_set_lang(target, unit->lang);
-    spn_cc_target_add_info(target, unit->package, unit->target->info);
-    if (unit->target->info->kind == SPN_TARGET_LIB) {
-      spn_cc_target_add_flag(target, sp_str_lit("-fPIC"));
+    spn_cc_compile_t compile = {
+      .lang = unit->lang,
+      .source = unit->paths.file,
+      .output = unit->paths.object,
+      .cxx = unit->target->info->cxx,
+      .pic = unit->target->info->kind == SPN_TARGET_LIB,
+    };
+    sp_da_init(mem, compile.include);
+    sp_da_init(mem, compile.define);
+    sp_da_init(mem, compile.args);
+    sp_da_for(unit->package->info->include, it) {
+      sp_da_push(compile.include, resolve_pkg_path(mem, unit->package, unit->package->info->include[it]));
+    }
+    sp_da_for(unit->package->info->define, it) {
+      sp_da_push(compile.define, unit->package->info->define[it]);
+    }
+    sp_da_for(unit->target->info->include, it) {
+      sp_da_push(compile.include, resolve_pkg_path(mem, unit->package, unit->target->info->include[it]));
+    }
+    sp_da_for(unit->target->info->define, it) {
+      sp_da_push(compile.define, unit->target->info->define[it]);
+    }
+    sp_da_for(unit->target->info->flags, it) {
+      sp_da_push(compile.args, unit->target->info->flags[it]);
     }
 
     sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit->package);
@@ -47,28 +68,35 @@ void spn_session_build_invocations(spn_session_t* session) {
         }
       }
 
-      spn_cc_target_add_absolute_include(target, deps[it].unit->paths.include);
+      sp_da_push(compile.include, deps[it].unit->paths.include);
       sp_da_for(deps[it].unit->info->public_define, dt) {
-        spn_cc_target_add_define(target, deps[it].unit->info->public_define[dt]);
+        sp_da_push(compile.define, deps[it].unit->info->public_define[dt]);
       }
     }
 
     if (!sp_da_empty(unit->target->info->embed)) {
-      spn_cc_target_add_absolute_include(target, unit->target->paths.generated);
+      sp_da_push(compile.include, unit->target->paths.generated);
     }
 
-    spn_cc_target_add_absolute_source(target, unit->paths.file);
-
     sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
-    spn_cc_to_ps(mem, &cc, target, &ps);
-    spn_cc_target_to_ps(mem, &cc, target, &ps);
+    spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(unit->package->build->toolchain);
+    spn_err_union_t err = spn_cc_render_compile(mem, &toolchain, &unit->package->build->profile, &compile, &ps);
+    if (err.kind) {
+      return err;
+    }
 
     unit->invocation = (spn_invocation_t) {
       .program = ps.command,
       .args = ps.dyn_args,
       .cwd = unit->target->paths.work,
     };
+    sp_da_push(session->units.compile_commands, ((spn_compile_command_t) {
+      .source = unit->paths.file,
+      .output = unit->paths.object,
+      .invocation = unit->invocation,
+    }));
   }
+  return spn_result(SPN_OK);
 }
 
 spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t path) {
@@ -80,9 +108,9 @@ spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t pa
 
   sp_io_write_cstr(io, "[", SP_NULLPTR);
   u32 count = 0;
-  sp_om_for(session->units.objects, it) {
-    spn_compile_unit_t* unit = sp_om_at(session->units.objects, it);
-    spn_invocation_t* invocation = &unit->invocation;
+  sp_da_for(session->units.compile_commands, it) {
+    spn_compile_command_t* command = &session->units.compile_commands[it];
+    spn_invocation_t* invocation = &command->invocation;
 
     if (count++) {
       sp_io_write_c8(io, ',');
@@ -90,9 +118,9 @@ spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t pa
     sp_io_write_cstr(io, "\n  { \"directory\": ", SP_NULLPTR);
     spn_json_write_str(io, invocation->cwd);
     sp_io_write_cstr(io, ", \"file\": ", SP_NULLPTR);
-    spn_json_write_str(io, unit->paths.file);
+    spn_json_write_str(io, command->source);
     sp_io_write_cstr(io, ", \"output\": ", SP_NULLPTR);
-    spn_json_write_str(io, unit->paths.object);
+    spn_json_write_str(io, command->output);
     sp_io_write_cstr(io, ", \"arguments\": [", SP_NULLPTR);
     spn_json_write_str(io, invocation->program);
     sp_da_for(invocation->args, arg) {

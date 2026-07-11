@@ -4,7 +4,7 @@
 #define UTEST_IMPLEMENTATION
 #include "utest.h"
 
-#include "compiler/flags.h"
+#include "compiler/driver.h"
 #include "test.h"
 
 UTEST_MAIN();
@@ -25,12 +25,8 @@ typedef struct {
 
 static void run_flags_test(s32* utest_result, flags_test_t test) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  spn_toolchain_t toolchain = {
-    .name = sp_str_lit("test"),
-    .driver = test.driver,
-  };
   spn_cc_flags_t flags = SP_ZERO_INITIALIZE();
-  spn_err_union_t err = spn_cc_flags_resolve(scratch.mem, &test.profile, &toolchain, &flags);
+  spn_err_union_t err = spn_cc_render_flags(scratch.mem, test.driver, &test.profile, &flags);
 
   if (test.expect.unsupported) {
     EXPECT_EQ(err.kind, SPN_ERR_SANITIZER_UNSUPPORTED);

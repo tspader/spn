@@ -54,7 +54,8 @@ s32 spn_autoconf_run(spn_autoconf_t* autoconf) {
   sp_da_for(autoconf->flags, it) {
     sp_ps_config_add_arg(scratch.mem, &config, autoconf->flags[it]);
   }
-  spn_api_add_profile_flags_env(scratch.mem, unit, &config);
+  sp_env_init(scratch.mem, &config.env.env);
+  spn_api_add_profile_flags_env(scratch.mem, unit->build->toolchain->toolchain->driver, &unit->build->profile, &config.env.env);
 
   sp_ps_output_t result = spn_api_subprocess(scratch.mem, unit, config);
   s32 exit_code = result.status.exit_code;

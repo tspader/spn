@@ -3,6 +3,7 @@
 #include "app/types.h"
 #include "codegen/codegen.h"
 #include "codegen/lower.h"
+#include "compiler/driver.h"
 #include "ctx/types.h"
 #include "error/types.h"
 #include "event/event.h"
@@ -306,14 +307,13 @@ static spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* bui
   return unit;
 }
 
-void add_compilation_units(spn_session_t *s) {
+spn_err_union_t add_compilation_units(spn_session_t *s) {
   if (sp_da_empty(s->plan.builds)) {
     spn_build_unit_t* build = sp_alloc_type(s->mem, spn_build_unit_t);
     *build = (spn_build_unit_t) {
       .id = (spn_build_unit_id_t)sp_da_size(s->plan.builds),
       .kind = SPN_BUILD_KIND_TARGET,
       .profile = s->profile,
-      .flags = s->flags,
       .toolchain = s->units.toolchain,
       .paths = { .profile = s->paths.profile },
     };
@@ -336,12 +336,20 @@ void add_compilation_units(spn_session_t *s) {
   sp_assert(root.qualified);
   sp_da_for(s->plan.builds, it) {
     spn_build_plan_t* plan = &s->plan.builds[it];
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    spn_cc_flags_t flags = SP_ZERO_INITIALIZE();
+    spn_err_union_t err = spn_cc_render_flags(scratch.mem, plan->build->toolchain->toolchain->driver, &plan->build->profile, &flags);
+    sp_mem_end_scratch(scratch);
+    if (err.kind) {
+      return err;
+    }
     plan->root = (spn_pkg_unit_id_t) {
       .pkg = root,
       .ctx = plan->build->id,
     };
     add_package_units(s, plan->build, root);
   }
+  return spn_result(SPN_OK);
 }
 
 spn_task_step_t spn_task_sync_packages_init(spn_app_t *app) {
@@ -440,6 +448,7 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
   }
 
   session->units.toolchains = sp_da_new(session->mem, spn_toolchain_unit_t *);
+  sp_da_init(session->mem, session->units.compile_commands);
   sp_da_init(session->mem, session->plan.builds);
   sp_da_for(app->sync.toolchains, it) {
     spn_sync_toolchain_job_t* job = app->sync.toolchains[it];
@@ -452,7 +461,14 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
     }
   }
 
-  add_compilation_units(session);
+  spn_err_union_t flags_err = add_compilation_units(session);
+  if (flags_err.kind) {
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR,
+      .err = flags_err,
+    });
+    return spn_task_fail(SPN_ERROR);
+  }
 
   sp_env_t *env = &session->env;
   sp_env_init(session->mem, env);

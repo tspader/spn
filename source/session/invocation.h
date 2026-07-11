@@ -11,7 +11,7 @@ typedef struct {
   u64 elapsed;
 } spn_invocation_result_t;
 
-void                    spn_session_build_invocations(spn_session_t* session);
+spn_err_union_t         spn_session_build_invocations(spn_session_t* session);
 spn_err_t               spn_session_write_compile_commands(spn_session_t* session, sp_str_t path);
 sp_str_t                spn_session_compile_commands_path(spn_session_t* session);
 spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation);
