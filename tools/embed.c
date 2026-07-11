@@ -294,14 +294,14 @@ s32 embed_main(s32 num_args, const c8** args) {
     .opts = {
       {
         .name = "header",
-        .kind = SP_CLI_OPT_STRING,
+        .kind = SP_CLI_OPT_CSTR,
         .summary = "Path of the C header to write (defaults to <output> with a .h extension)",
         .placeholder = "path",
         .ptr = &embed.header,
       },
       {
         .name = "format",
-        .kind = SP_CLI_OPT_STRING,
+        .kind = SP_CLI_OPT_CSTR,
         .summary = "Object format to write: elf, coff, or macho (defaults to elf)",
         .placeholder = "format",
         .ptr = &embed.format,
@@ -315,7 +315,7 @@ s32 embed_main(s32 num_args, const c8** args) {
       },
       {
         .name = "files",
-        .kind = SP_CLI_ARG_REST,
+        .arity = SP_CLI_ARG_REST,
         .summary = "Files or directories to embed (use src=dest to override the embedded path)",
       },
     },

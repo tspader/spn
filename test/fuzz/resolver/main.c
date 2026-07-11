@@ -486,7 +486,7 @@ s32 main(s32 num_args, c8** args) {
       {
         .brief = "n",
         .name = "iters",
-        .kind = SP_CLI_OPT_INTEGER,
+        .kind = SP_CLI_OPT_S64,
         .summary = "Number of universes to run",
         .placeholder = "N",
         .ptr = &config.iters,
@@ -494,7 +494,7 @@ s32 main(s32 num_args, c8** args) {
       {
         .brief = "i",
         .name = "iter",
-        .kind = SP_CLI_OPT_INTEGER,
+        .kind = SP_CLI_OPT_S64,
         .summary = "Run a single iteration, e.g. to replay a dumped failure",
         .placeholder = "ITER",
         .ptr = &config.iter,
@@ -502,7 +502,7 @@ s32 main(s32 num_args, c8** args) {
       {
         .brief = "s",
         .name = "seed",
-        .kind = SP_CLI_OPT_STRING,
+        .kind = SP_CLI_OPT_CSTR,
         .summary = "PRNG seed, decimal or 0x-hex; random when unset",
         .placeholder = "SEED",
         .ptr = &config.seed,
@@ -515,10 +515,10 @@ s32 main(s32 num_args, c8** args) {
       },
     },
     .env = {
-      { .name = "SPN_TEST_SEED",       .kind = SP_CLI_OPT_STRING, .summary = "Same as --seed, which wins when both are set" },
-      { .name = "SPN_FUZZ_ITERS",      .kind = SP_CLI_OPT_STRING, .summary = "Same as --iters, which wins when both are set" },
-      { .name = "SPN_FUZZ_ITER",       .kind = SP_CLI_OPT_STRING, .summary = "Same as --iter, which wins when both are set" },
-      { .name = "SPN_FUZZ_KEEP_GOING", .kind = SP_CLI_OPT_STRING, .summary = "Same as --keep-going" },
+      { .name = "SPN_TEST_SEED",       .kind = SP_CLI_OPT_CSTR, .summary = "Same as --seed, which wins when both are set" },
+      { .name = "SPN_FUZZ_ITERS",      .kind = SP_CLI_OPT_CSTR, .summary = "Same as --iters, which wins when both are set" },
+      { .name = "SPN_FUZZ_ITER",       .kind = SP_CLI_OPT_CSTR, .summary = "Same as --iter, which wins when both are set" },
+      { .name = "SPN_FUZZ_KEEP_GOING", .kind = SP_CLI_OPT_CSTR, .summary = "Same as --keep-going" },
     },
     .handler = fz_cli_run,
   };
