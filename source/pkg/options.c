@@ -16,7 +16,14 @@ spn_pkg_config_t* spn_pkg_config_find(sp_da(spn_pkg_config_entry_t) config, sp_s
 
 void spn_when_env_from_profile(sp_mem_t mem, const spn_profile_info_t* profile, spn_when_env_t* env) {
   spn_when_env_init(mem, env);
-  spn_when_env_set_facts(env, profile->os, profile->arch, profile->abi, profile->mode);
+  spn_when_env_set_facts(env, (spn_when_facts_t) {
+    .os = profile->os,
+    .arch = profile->arch,
+    .abi = profile->abi,
+    .mode = profile->mode,
+    .opt = profile->opt,
+    .sanitizers = profile->sanitizers,
+  });
 }
 
 void spn_when_env_add_options(spn_when_env_t* env, const spn_resolved_options_t* options) {

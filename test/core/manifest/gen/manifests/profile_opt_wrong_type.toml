@@ -1,0 +1,7 @@
+[package]
+name = "prof"
+version = "1.0.0"
+
+[profile.dev]
+opt = 2
+sanitize = "address"

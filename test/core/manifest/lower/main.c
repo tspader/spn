@@ -91,6 +91,9 @@ typedef struct {
   spn_linkage_t linkage;
   spn_c_standard_t standard;
   spn_build_mode_t mode;
+  spn_opt_level_t opt;
+  spn_sanitizer_set_t sanitizers;
+  bool sanitizers_set;
   spn_os_t os;
   spn_arch_t arch;
   spn_abi_t abi;
@@ -371,6 +374,9 @@ static void run_case(s32* utest_result, test_t test) {
     EXPECT_EQ((u32)expected.linkage, (u32)p->linkage);
     if (expected.standard) EXPECT_EQ((u32)expected.standard, (u32)p->standard);
     if (expected.mode) EXPECT_EQ((u32)expected.mode, (u32)p->mode);
+    if (expected.opt) EXPECT_EQ((u32)expected.opt, (u32)p->opt);
+    EXPECT_EQ(expected.sanitizers, p->sanitizers);
+    EXPECT_EQ(expected.sanitizers_set, p->sanitizers_set);
     EXPECT_EQ((u32)expected.os, (u32)p->os);
     EXPECT_EQ((u32)expected.arch, (u32)p->arch);
     if (expected.abi) EXPECT_EQ((u32)expected.abi, (u32)p->abi);
@@ -783,9 +789,16 @@ UTEST(lower, profile) {
         .linkage = SPN_LIB_KIND_SHARED,
         .standard = SPN_C99,
         .mode = SPN_BUILD_MODE_RELEASE,
+        .opt = SPN_OPT_LEVEL_3,
+        .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
+        .sanitizers_set = true,
         .os = SPN_OS_LINUX,
         .arch = SPN_ARCH_X64,
         .abi = SPN_ABI_GNU,
+      },
+      {
+        .name = "clean",
+        .sanitizers_set = true,
       },
     },
   });
@@ -820,6 +833,53 @@ UTEST(lower, when_dep) {
     .deps = {
       { .name = "core/openssl", .source = SPN_PKG_SOURCE_INDEX, .when = "tls = \"openssl\"" },
       { .name = "core/zstd", .source = SPN_PKG_SOURCE_INDEX, .when = "zstd = true, os != \"wasi\"" },
+    },
+  });
+}
+
+UTEST(lower, when_new_facts) {
+  run_case(utest_result, (test_t) {
+    .manifest = "when_new_facts",
+    .deps = {
+      { .name = "core/fast", .source = SPN_PKG_SOURCE_INDEX, .when = "opt = \"3\"" },
+      { .name = "core/asan", .source = SPN_PKG_SOURCE_INDEX, .when = "sanitize_address = true" },
+    },
+  });
+}
+
+UTEST(lower, validate_when_bad_new_facts) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_when_bad_new_facts",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "deps.package[0].when.opt" },
+      { SPN_CODEGEN_ERR_INVALID, "deps.package[1].when.sanitize_address" },
+    },
+  });
+}
+
+UTEST(lower, validate_profile_bad_opt) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_profile_bad_opt",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "profile[0].opt" },
+    },
+  });
+}
+
+UTEST(lower, validate_profile_sanitize_conflict) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_profile_sanitize_conflict",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "profile[0].sanitize" },
+    },
+  });
+}
+
+UTEST(lower, validate_profile_bad_sanitizer) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_profile_bad_sanitizer",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "profile.dev.sanitize[0]" },
     },
   });
 }

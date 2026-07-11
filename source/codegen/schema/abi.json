@@ -27,6 +27,8 @@
     { "name": "spn_profile_get_linkage", "ret": "s32", "args": ["profile"] },
     { "name": "spn_profile_get_standard", "ret": "s32", "args": ["profile"] },
     { "name": "spn_profile_get_mode", "ret": "s32", "args": ["profile"] },
+    { "name": "spn_profile_get_opt", "ret": "s32", "args": ["profile"] },
+    { "name": "spn_profile_get_sanitizers", "ret": "s32", "args": ["profile"] },
     { "name": "spn_add_exe", "ret": "target", "args": ["config", "str"] },
     { "name": "spn_add_lib", "ret": "target", "args": ["config", "str", "s32"] },
     { "name": "spn_add_test", "ret": "target", "args": ["config", "str"] },

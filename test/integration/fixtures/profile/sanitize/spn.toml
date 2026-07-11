@@ -1,0 +1,10 @@
+[package]
+name = "profile_sanitize"
+version = "0.1.0"
+
+[profile.asan]
+sanitize = ["address"]
+
+[[bin]]
+name = "main"
+source = ["main.c"]

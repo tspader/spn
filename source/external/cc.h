@@ -85,6 +85,8 @@ struct spn_cc {
   spn_linkage_t linkage;
   spn_c_standard_t standard;
   spn_build_mode_t mode;
+  spn_opt_level_t opt;
+  spn_sanitizer_set_t sanitizers;
 
   struct {
     sp_str_t runtime;

@@ -1,0 +1,14 @@
+{
+  "issues": [
+    {
+      "code": "expected_str",
+      "path": "profile.dev.opt",
+      "detail": "opt"
+    },
+    {
+      "code": "invalid",
+      "path": "profile.dev.sanitize",
+      "detail": "sanitize"
+    }
+  ]
+}

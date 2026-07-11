@@ -38,6 +38,7 @@ s32 spn_make_run(spn_make_t* make) {
   if (!sp_str_empty(make->target)) {
     sp_ps_config_add_arg(scratch.mem, &ps, make->target);
   }
+  spn_api_add_profile_flags_env(scratch.mem, unit, &ps);
 
   sp_ps_output_t result = spn_api_subprocess(scratch.mem, unit, ps);
   s32 exit_code = result.status.exit_code;

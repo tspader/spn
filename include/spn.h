@@ -55,6 +55,27 @@ typedef enum {
 } spn_build_mode_t;
 
 typedef enum {
+  SPN_OPT_LEVEL_NONE,
+  SPN_OPT_LEVEL_0,
+  SPN_OPT_LEVEL_1,
+  SPN_OPT_LEVEL_2,
+  SPN_OPT_LEVEL_3,
+  SPN_OPT_LEVEL_S,
+  SPN_OPT_LEVEL_Z,
+} spn_opt_level_t;
+
+typedef enum {
+  SPN_SANITIZER_NONE      = 0,
+  SPN_SANITIZER_ADDRESS   = 1 << 0,
+  SPN_SANITIZER_THREAD    = 1 << 1,
+  SPN_SANITIZER_UNDEFINED = 1 << 2,
+  SPN_SANITIZER_MEMORY    = 1 << 3,
+  SPN_SANITIZER_LEAK      = 1 << 4,
+} spn_sanitizer_t;
+
+typedef u32 spn_sanitizer_set_t;
+
+typedef enum {
   SPN_LIB_KIND_NONE,
   SPN_LIB_KIND_SHARED,
   SPN_LIB_KIND_STATIC,
@@ -165,6 +186,7 @@ typedef enum {
   SPN_ERR_PROFILE_INVALID,
   SPN_ERR_PROFILE_UNDEFINED,
   SPN_ERR_FLAG_INVALID,
+  SPN_ERR_SANITIZER_UNSUPPORTED,
   SPN_ERR_FS_REMOVE,
   SPN_ERR_FS_READ,
   SPN_ERR_FS_WRITE,
@@ -260,6 +282,8 @@ spn_libc_kind_t  spn_profile_get_libc(spn_profile_t* profile);
 spn_linkage_t    spn_profile_get_linkage(spn_profile_t* profile);
 spn_c_standard_t spn_profile_get_standard(spn_profile_t* profile);
 spn_build_mode_t spn_profile_get_mode(spn_profile_t* profile);
+spn_opt_level_t  spn_profile_get_opt(spn_profile_t* profile);
+spn_sanitizer_set_t spn_profile_get_sanitizers(spn_profile_t* profile);
 
 s32             spn_make(spn_t* spn);
 spn_make_t*     spn_make_new(spn_t* spn);

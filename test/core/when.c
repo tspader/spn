@@ -50,7 +50,14 @@ static spn_when_t make_when(sp_mem_t mem, const clause_lit_t* clauses) {
 static spn_when_env_t make_env(sp_mem_t mem) {
   spn_when_env_t env;
   spn_when_env_init(mem, &env);
-  spn_when_env_set_facts(&env, SPN_OS_LINUX, SPN_ARCH_X64, SPN_ABI_GNU, SPN_BUILD_MODE_DEBUG);
+  spn_when_env_set_facts(&env, (spn_when_facts_t) {
+    .os = SPN_OS_LINUX,
+    .arch = SPN_ARCH_X64,
+    .abi = SPN_ABI_GNU,
+    .mode = SPN_BUILD_MODE_DEBUG,
+    .opt = SPN_OPT_LEVEL_2,
+    .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
+  });
   spn_when_env_set(&env, sp_str_lit("tls"), spn_option_value_str(sp_str_lit("openssl")));
   spn_when_env_set(&env, sp_str_lit("zstd"), spn_option_value_bool(true));
   return env;
@@ -164,6 +171,38 @@ UTEST(when, eval) {
         { "mode", "release" },
         { .key = "abi", .str = "msvc", .negated = true }
       },
+      false
+    },
+    {
+      { { "opt", "2" } },
+      true
+    },
+    {
+      { { "opt", "0" } },
+      false
+    },
+    {
+      { { .key = "opt", .str = "z", .negated = true } },
+      true
+    },
+    {
+      { { .key = "sanitize_address", .is_bool = true, .b = true } },
+      true
+    },
+    {
+      { { .key = "sanitize_undefined", .is_bool = true, .b = true } },
+      true
+    },
+    {
+      { { .key = "sanitize_thread", .is_bool = true, .b = true } },
+      false
+    },
+    {
+      { { .key = "sanitize_thread", .is_bool = true } },
+      true
+    },
+    {
+      { { .key = "sanitize_address", .is_bool = true, .b = true, .negated = true } },
       false
     },
     {
@@ -294,7 +333,11 @@ UTEST(option, resolve_first_match) {
   sp_carr_for(tests, it) {
     spn_when_env_t env;
     spn_when_env_init(mem, &env);
-    spn_when_env_set_facts(&env, tests[it].os, SPN_ARCH_X64, SPN_ABI_NONE, SPN_BUILD_MODE_DEBUG);
+    spn_when_env_set_facts(&env, (spn_when_facts_t) {
+      .os = tests[it].os,
+      .arch = SPN_ARCH_X64,
+      .mode = SPN_BUILD_MODE_DEBUG,
+    });
 
     spn_option_value_t value = spn_option_resolve(&tls, &env);
     EXPECT_EQ(value.kind, SPN_OPTION_VALUE_STR);

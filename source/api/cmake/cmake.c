@@ -10,6 +10,7 @@
 #include "profile/types.h"
 #include "unit/types.h"
 
+#include "gen.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 #include "sp/io.h"
@@ -36,6 +37,10 @@ sp_str_t spn_cmake_gen_to_str(spn_cmake_gen_t gen) {
     }
   }
   return SP_ZERO_STRUCT(sp_str_t);
+}
+
+static sp_str_t spn_cmake_profile_configuration(const spn_profile_info_t* profile) {
+  return profile->mode == SPN_BUILD_MODE_RELEASE ? sp_str_lit("Release") : sp_str_lit("Debug");
 }
 
 static sp_str_t spn_cmake_format_define(sp_mem_t mem, sp_str_t name, sp_str_t value) {
@@ -174,10 +179,32 @@ s32 spn_cmake_configure(spn_cmake_t* cmake) {
     profile->linkage == SPN_LIB_KIND_SHARED ? sp_str_lit("ON") : sp_str_lit("OFF"))
   );
 
+  bool release = profile->mode == SPN_BUILD_MODE_RELEASE;
   sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_format_define(scratch.mem,
     sp_str_lit("CMAKE_BUILD_TYPE"),
-    profile->mode == SPN_BUILD_MODE_RELEASE ? sp_str_lit("Release") : sp_str_lit("Debug"))
+    spn_cmake_profile_configuration(profile))
   );
+
+  spn_cc_driver_t driver = unit->build->toolchain->toolchain->driver;
+  const c8* configuration = release ? "RELEASE" : "DEBUG";
+  sp_str_t compile = spn_cc_profile_to_flags(scratch.mem, profile, driver);
+  if (release) {
+    compile = sp_fmt(scratch.mem, "{} -DNDEBUG", sp_fmt_str(compile)).value;
+  }
+  const c8* compile_vars [] = { "CMAKE_C_FLAGS_", "CMAKE_CXX_FLAGS_" };
+  sp_carr_for(compile_vars, it) {
+    sp_str_t var = sp_fmt(scratch.mem, "{}{}", sp_fmt_cstr(compile_vars[it]), sp_fmt_cstr(configuration)).value;
+    sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_format_define(scratch.mem, var, compile));
+  }
+
+  sp_str_t sanitize = spn_cc_sanitizers_to_switch(scratch.mem, profile->sanitizers, driver);
+  if (!sp_str_empty(sanitize)) {
+    const c8* link_vars [] = { "CMAKE_EXE_LINKER_FLAGS_", "CMAKE_SHARED_LINKER_FLAGS_" };
+    sp_carr_for(link_vars, it) {
+      sp_str_t var = sp_fmt(scratch.mem, "{}{}", sp_fmt_cstr(link_vars[it]), sp_fmt_cstr(configuration)).value;
+      sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_format_define(scratch.mem, var, sanitize));
+    }
+  }
 
   sp_da_for(cmake->defines, it) {
     spn_cmake_define_t define = cmake->defines[it];
@@ -196,6 +223,7 @@ s32 spn_cmake_configure(spn_cmake_t* cmake) {
 
 s32 spn_cmake_build(spn_cmake_t* cmake) {
   spn_pkg_unit_t* unit = spn_api_unit(cmake->build);
+  spn_profile_info_t* profile = &unit->build->profile;
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_ps_output_t result = spn_api_subprocess(scratch.mem, unit, (sp_ps_config_t) {
@@ -203,6 +231,8 @@ s32 spn_cmake_build(spn_cmake_t* cmake) {
     .args = {
       sp_str_lit("--build"),
       unit->paths.work,
+      sp_str_lit("--config"),
+      spn_cmake_profile_configuration(profile),
     }
   });
   s32 exit_code = result.status.exit_code;
@@ -212,6 +242,7 @@ s32 spn_cmake_build(spn_cmake_t* cmake) {
 
 s32 spn_cmake_install(spn_cmake_t* cmake) {
   spn_pkg_unit_t* unit = spn_api_unit(cmake->build);
+  spn_profile_info_t* profile = &unit->build->profile;
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_ps_output_t result = spn_api_subprocess(scratch.mem, unit, (sp_ps_config_t) {
@@ -219,6 +250,8 @@ s32 spn_cmake_install(spn_cmake_t* cmake) {
     .args = {
       sp_str_lit("--install"),
       unit->paths.work,
+      sp_str_lit("--config"),
+      spn_cmake_profile_configuration(profile),
     }
   });
   s32 exit_code = result.status.exit_code;

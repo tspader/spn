@@ -2,6 +2,7 @@
 #define SPN_WHEN_TYPES_H
 
 #include "sp.h"
+#include "spn.h"
 
 typedef enum {
   SPN_OPTION_VALUE_NONE,
@@ -28,6 +29,15 @@ typedef struct {
 } spn_when_t;
 
 typedef sp_str_ht(spn_option_value_t) spn_when_env_t;
+
+typedef struct {
+  spn_os_t os;
+  spn_arch_t arch;
+  spn_abi_t abi;
+  spn_build_mode_t mode;
+  spn_opt_level_t opt;
+  spn_sanitizer_set_t sanitizers;
+} spn_when_facts_t;
 
 typedef enum {
   SPN_OPTION_TYPE_NONE,

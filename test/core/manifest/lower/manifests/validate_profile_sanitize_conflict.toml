@@ -1,0 +1,6 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[profile.dev]
+sanitize = ["thread", "address"]

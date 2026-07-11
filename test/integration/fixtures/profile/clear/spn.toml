@@ -1,0 +1,13 @@
+[package]
+name = "profile_clear"
+version = "0.1.0"
+
+[profile.default]
+sanitize = ["address"]
+
+[profile.clean]
+sanitize = []
+
+[[bin]]
+name = "main"
+source = ["main.c"]

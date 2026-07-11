@@ -1,0 +1,7 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[deps.package]
+a = { version = "^1.0.0", when = { opt = "9" } }
+b = { version = "^1.0.0", when = { sanitize_address = "yes" } }

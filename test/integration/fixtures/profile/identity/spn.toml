@@ -1,0 +1,16 @@
+[package]
+name = "profile_identity"
+version = "0.1.0"
+
+[deps.package]
+gen = "1.0.0"
+
+[profile.fast]
+opt = "2"
+
+[profile.asan]
+sanitize = ["address"]
+
+[[bin]]
+name = "main"
+source = ["main.c"]

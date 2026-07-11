@@ -36,6 +36,8 @@ void spn_cc_set_profile(spn_cc_t* cc, spn_profile_info_t profile) {
   cc->os = profile.os;
   cc->abi = profile.abi;
   cc->mode = profile.mode;
+  cc->opt = profile.opt;
+  cc->sanitizers = profile.sanitizers;
   cc->linkage = profile.linkage;
   cc->standard = profile.standard;
 }
@@ -319,7 +321,9 @@ void spn_cc_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp_ps_con
     }
   }
 
-  sp_ps_config_add_arg(mem, ps, spn_cc_build_mode_to_switch(cc->mode));
+  sp_ps_config_add_arg(mem, ps, spn_cc_build_mode_to_switch(cc->mode, cc->driver));
+  sp_ps_config_add_arg(mem, ps, spn_cc_opt_level_to_switch(cc->opt, cc->driver));
+  sp_ps_config_add_arg(mem, ps, spn_cc_sanitizers_to_switch(mem, cc->sanitizers, cc->driver));
 }
 
 void spn_cc_target_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps) {

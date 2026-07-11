@@ -10,6 +10,7 @@
 #include "enum/enum.h"
 #include "event/event.h"
 #include "event/types.h"
+#include "gen.h"
 #include "external/wasm/wasm.h"
 #include "filter/filter.h"
 #include "intern/intern.h"
@@ -53,6 +54,19 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
     .host = spn_triple_host(),
   };
   try_union(spn_toolchain_select(&s->catalog, query, s->mem, &s->selection));
+
+  spn_sanitizer_set_t supported = spn_cc_driver_supported_sanitizers(s->selection.build->driver)
+    & spn_cc_target_supported_sanitizers(s->profile.os, s->profile.abi);
+  spn_sanitizer_set_t unsupported = s->profile.sanitizers & ~supported;
+  if (unsupported) {
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_SANITIZER_UNSUPPORTED,
+      .sanitizer = {
+        .toolchain = s->selection.build->name,
+        .unsupported = unsupported,
+      },
+    };
+  }
 
   sp_str_t profile = s->paths.build;
   if (s->profile.targeted) {
@@ -312,6 +326,8 @@ typedef struct {
   spn_semver_t version;
   spn_build_kind_t kind;
   spn_build_mode_t mode;
+  spn_opt_level_t opt;
+  spn_sanitizer_set_t sanitizers;
   spn_linkage_t linkage;
   spn_c_standard_t standard;
   spn_arch_t arch;
@@ -405,6 +421,8 @@ static sp_hash_t hash_package(spn_session_t* session, spn_build_unit_t* build, s
   sp_opt_spn_linkage_t config = spn_session_config_kind(session, pkg->name);
 
   fingerprint.mode = build->profile.mode;
+  fingerprint.opt = build->profile.opt;
+  fingerprint.sanitizers = build->profile.sanitizers;
   fingerprint.linkage = config.some ? config.value : build->profile.linkage;
   fingerprint.standard = build->profile.standard;
   fingerprint.arch = build->profile.arch;
@@ -684,8 +702,18 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   unit->paths.stamp.configure = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("configure.stamp"));
   unit->paths.stamp.build = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("build.stamp"));
   unit->paths.stamp.package = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("package.stamp"));
+  unit->paths.stamp.profile = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("profile.stamp"));
 
   sp_fs_create_dir(unit->paths.stamp.dir);
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t identity = spn_profile_identity_to_str(scratch.mem, &build->profile);
+  sp_str_t existing = sp_zero;
+  sp_io_read_file(scratch.mem, unit->paths.stamp.profile, &existing);
+  if (!sp_str_equal(existing, identity)) {
+    sp_fs_create_file_str(unit->paths.stamp.profile, identity);
+  }
+  sp_mem_end_scratch(scratch);
 
   return unit;
 }

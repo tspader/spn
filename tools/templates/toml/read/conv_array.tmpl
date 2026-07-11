@@ -1,0 +1,23 @@
+  {
+    toml_array_t* array = toml_table_array(table, "{{ .key }}");
+    if (array) {
+      out->{{ .name }} = sp_da_new(ctx->mem, {{ .type }});
+      spn_toml_loader_push_key(ctx, "{{ .key }}");
+      sp_for(it, (u32)toml_array_len(array)) {
+        spn_toml_loader_push_index(ctx, it);
+        toml_value_t element = toml_array_string(array, (s32)it);
+        {{ .type }} value = element.ok ? {{ .from }}(sp_str(element.u.s, (u32)element.u.sl)) : ({{ .type }})0;
+        if (value) {
+          sp_da_push(out->{{ .name }}, value);
+        }
+        else {
+          spn_toml_loader_issue_at(ctx, element.ok ? SPN_CODEGEN_ERR_INVALID : SPN_CODEGEN_ERR_EXPECTED_STR, sp_str_lit("{{ .key }}"));
+        }
+        spn_toml_loader_pop(ctx);
+      }
+      spn_toml_loader_pop(ctx);
+    }
+    else if (toml_table_string(table, "{{ .key }}").ok || spn_toml_loader_field_present(table, "{{ .key }}")) {
+      spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, "{{ .key }}");
+    }
+  }

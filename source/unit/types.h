@@ -163,6 +163,7 @@ typedef struct {
     spn_bg_id_t package;
     spn_bg_id_t main;
     spn_bg_id_t exit;
+    spn_bg_id_t profile;
   } stamp;
   struct {
     spn_bg_id_t run;
@@ -243,6 +244,7 @@ struct spn_pkg_unit_t {
       sp_str_t package;
       sp_str_t main;
       sp_str_t exit;
+      sp_str_t profile;
     } stamp;
 
     spn_build_log_paths_t logs;

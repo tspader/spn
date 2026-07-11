@@ -3,6 +3,8 @@
 #include "gen.h"
 
 #include "spn.h"
+#include "enum/enum.h"
+#include "profile/types.h"
 #include "toolchain/types.h"
 
 spn_gen_entry_t spn_gen_entry_from_str(sp_str_t str) {
@@ -65,13 +67,118 @@ sp_str_t spn_cc_cxx_standard_to_switch(spn_cxx_standard_t standard) {
   sp_unreachable(); return sp_str_lit("");
 }
 
-sp_str_t spn_cc_build_mode_to_switch(spn_build_mode_t mode) {
+sp_str_t spn_cc_build_mode_to_switch(spn_build_mode_t mode, spn_cc_driver_t driver) {
   switch (mode) {
-    case SPN_BUILD_MODE_DEBUG: return sp_str_lit("-g");
+    case SPN_BUILD_MODE_DEBUG: {
+      return driver == SPN_CC_DRIVER_MSVC ? sp_str_lit("/Zi") : sp_str_lit("-g");
+    }
     case SPN_BUILD_MODE_RELEASE:
     case SPN_BUILD_MODE_NONE: return sp_str_lit("");
   }
   sp_unreachable(); return sp_str_lit("");
+}
+
+sp_str_t spn_cc_opt_level_to_switch(spn_opt_level_t level, spn_cc_driver_t driver) {
+  switch (driver) {
+    case SPN_CC_DRIVER_NONE:
+    case SPN_CC_DRIVER_GCC:
+    case SPN_CC_DRIVER_CLANG: {
+      switch (level) {
+        case SPN_OPT_LEVEL_0: return sp_str_lit("-O0");
+        case SPN_OPT_LEVEL_1: return sp_str_lit("-O1");
+        case SPN_OPT_LEVEL_2: return sp_str_lit("-O2");
+        case SPN_OPT_LEVEL_3: return sp_str_lit("-O3");
+        case SPN_OPT_LEVEL_S: return sp_str_lit("-Os");
+        case SPN_OPT_LEVEL_Z: return sp_str_lit("-Oz");
+        case SPN_OPT_LEVEL_NONE: return sp_str_lit("");
+      }
+      sp_unreachable(); return sp_str_lit("");
+    }
+    case SPN_CC_DRIVER_MSVC: {
+      switch (level) {
+        case SPN_OPT_LEVEL_0: return sp_str_lit("/Od");
+        case SPN_OPT_LEVEL_1: return sp_str_lit("/O1");
+        case SPN_OPT_LEVEL_2:
+        case SPN_OPT_LEVEL_3: return sp_str_lit("/O2");
+        case SPN_OPT_LEVEL_S:
+        case SPN_OPT_LEVEL_Z: return sp_str_lit("/O1");
+        case SPN_OPT_LEVEL_NONE: return sp_str_lit("");
+      }
+      sp_unreachable(); return sp_str_lit("");
+    }
+  }
+  sp_unreachable(); return sp_str_lit("");
+}
+
+spn_sanitizer_set_t spn_cc_driver_supported_sanitizers(spn_cc_driver_t driver) {
+  switch (driver) {
+    case SPN_CC_DRIVER_NONE:
+    case SPN_CC_DRIVER_GCC: {
+      return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_LEAK;
+    }
+    case SPN_CC_DRIVER_CLANG: {
+      return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_MEMORY | SPN_SANITIZER_LEAK;
+    }
+    case SPN_CC_DRIVER_MSVC: {
+      return SPN_SANITIZER_ADDRESS;
+    }
+  }
+  sp_unreachable(); return 0;
+}
+
+sp_str_t spn_cc_sanitizers_to_switch(sp_mem_t mem, spn_sanitizer_set_t sanitizers, spn_cc_driver_t driver) {
+  if (!sanitizers) {
+    return sp_str_lit("");
+  }
+  switch (driver) {
+    case SPN_CC_DRIVER_NONE:
+    case SPN_CC_DRIVER_GCC:
+    case SPN_CC_DRIVER_CLANG: {
+      return sp_fmt(mem, "-fsanitize={}", sp_fmt_str(spn_sanitizer_set_to_str(mem, sanitizers))).value;
+    }
+    case SPN_CC_DRIVER_MSVC: {
+      return sp_fmt(mem, "/fsanitize={}", sp_fmt_str(spn_sanitizer_set_to_str(mem, sanitizers))).value;
+    }
+  }
+  sp_unreachable(); return sp_str_lit("");
+}
+
+spn_sanitizer_set_t spn_cc_target_supported_sanitizers(spn_os_t os, spn_abi_t abi) {
+  spn_sanitizer_set_t all = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_MEMORY | SPN_SANITIZER_LEAK;
+  switch (os) {
+    case SPN_OS_WASI: {
+      return 0;
+    }
+    case SPN_OS_WINDOWS: {
+      return abi == SPN_ABI_MSVC ? SPN_SANITIZER_ADDRESS : 0;
+    }
+    case SPN_OS_LINUX:
+    case SPN_OS_MACOS:
+    case SPN_OS_NONE: {
+      return all;
+    }
+  }
+  sp_unreachable(); return 0;
+}
+
+sp_str_t spn_cc_profile_to_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_cc_driver_t driver) {
+  sp_str_t flags [] = {
+    spn_cc_build_mode_to_switch(profile->mode, driver),
+    spn_cc_opt_level_to_switch(profile->opt, driver),
+    spn_cc_sanitizers_to_switch(mem, profile->sanitizers, driver),
+  };
+
+  sp_io_dyn_mem_writer_t out;
+  sp_io_dyn_mem_writer_init(mem, &out);
+  bool first = true;
+  sp_carr_for(flags, it) {
+    if (sp_str_empty(flags[it])) {
+      continue;
+    }
+    sp_fmt_io(&out.base, first ? "{}" : " {}", sp_fmt_str(flags[it]));
+    first = false;
+  }
+  return sp_io_dyn_mem_writer_as_str(&out);
 }
 
 sp_str_t spn_cc_kind_to_executable(spn_cc_kind_t compiler) {

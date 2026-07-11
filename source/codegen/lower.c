@@ -275,6 +275,14 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
   }
 }
 
+static spn_sanitizer_set_t lower_sanitizers(sp_da(spn_sanitizer_t) sanitizers) {
+  spn_sanitizer_set_t set = 0;
+  sp_da_for(sanitizers, it) {
+    set |= sanitizers[it];
+  }
+  return set;
+}
+
 static void lower_profiles(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   sp_str_om_init(out->profiles);
   sp_da_for(cg->profile, i) {
@@ -288,6 +296,9 @@ static void lower_profiles(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
       .linkage = sp_opt_is_null(p->linkage) ? SPN_LIB_KIND_NONE : sp_opt_get(p->linkage),
       .standard = sp_opt_is_null(p->standard) ? SPN_C_STANDARD_NONE : sp_opt_get(p->standard),
       .mode = sp_opt_is_null(p->mode) ? SPN_BUILD_MODE_NONE : sp_opt_get(p->mode),
+      .opt = sp_opt_is_null(p->opt) ? SPN_OPT_LEVEL_NONE : sp_opt_get(p->opt),
+      .sanitizers = lower_sanitizers(p->sanitize),
+      .sanitizers_set = p->sanitize != SP_NULLPTR,
       .options = p->options,
     };
     sp_str_om_insert(out->profiles, info.name, info);
@@ -356,18 +367,31 @@ static void lower_config(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, sp
   }
 }
 
+static bool when_key_is_sanitizer_fact(sp_str_t key) {
+  sp_str_t prefix = sp_str_lit("sanitize_");
+  if (!sp_str_starts_with(key, prefix)) return false;
+  sp_str_t name = sp_str_suffix(key, key.len - prefix.len);
+  return spn_sanitizer_from_str(name) != SPN_SANITIZER_NONE;
+}
+
 static bool when_key_is_fact(sp_str_t key) {
   return sp_str_equal_cstr(key, "os")
     || sp_str_equal_cstr(key, "arch")
     || sp_str_equal_cstr(key, "abi")
-    || sp_str_equal_cstr(key, "mode");
+    || sp_str_equal_cstr(key, "mode")
+    || sp_str_equal_cstr(key, "opt")
+    || when_key_is_sanitizer_fact(key);
 }
 
 static bool when_fact_value_valid(sp_str_t key, spn_option_value_t value) {
+  if (when_key_is_sanitizer_fact(key)) {
+    return value.kind == SPN_OPTION_VALUE_BOOL;
+  }
   if (value.kind != SPN_OPTION_VALUE_STR) return false;
   if (sp_str_equal_cstr(key, "os"))   return spn_os_from_str(value.str) != SPN_OS_NONE;
   if (sp_str_equal_cstr(key, "arch")) return spn_arch_from_str(value.str) != SPN_ARCH_NONE;
   if (sp_str_equal_cstr(key, "abi"))  return spn_abi_from_str(value.str) != SPN_ABI_NONE;
+  if (sp_str_equal_cstr(key, "opt"))  return spn_opt_level_from_str(value.str) != SPN_OPT_LEVEL_NONE;
   return sp_str_equal(value.str, spn_build_mode_to_str(SPN_BUILD_MODE_RELEASE))
       || sp_str_equal(value.str, spn_build_mode_to_str(SPN_BUILD_MODE_DEBUG));
 }
@@ -573,6 +597,22 @@ static void validate_whens(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, 
   validate_option_sets(ctx, cg, out);
 }
 
+static void validate_profiles(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg) {
+  spn_toml_loader_push_key(ctx, "profile");
+  sp_da_for(cg->profile, it) {
+    const spn_cg_profile_t* p = &cg->profile[it].value;
+    spn_toml_loader_push_index(ctx, it);
+    if (!sp_opt_is_null(p->opt) && sp_opt_get(p->opt) == SPN_OPT_LEVEL_NONE) {
+      spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, "opt");
+    }
+    if (spn_sanitizer_set_conflicting(lower_sanitizers(p->sanitize))) {
+      spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, "sanitize");
+    }
+    spn_toml_loader_pop(ctx);
+  }
+  spn_toml_loader_pop(ctx);
+}
+
 static void validate_lib_linkages(spn_toml_loader_t* ctx, spn_pkg_info_t* out) {
   spn_toml_loader_push_key(ctx, "lib");
   sp_om_for(out->libs, it) {
@@ -722,6 +762,7 @@ spn_err_t spn_pkg_lower(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn
   lower_options(ctx, cg, out);
   lower_config(ctx, cg, out);
 
+  validate_profiles(ctx, cg);
   validate_lib_linkages(ctx, out);
   validate_upstream(ctx, cg);
   validate_cxx(ctx, cg);

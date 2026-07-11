@@ -11,6 +11,7 @@ spn_pkg_unit_t* spn_api_unit(const void* opaque);
 sp_str_t        spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir);
 s32             spn_api_copy(sp_str_t from, sp_str_t to);
 sp_ps_output_t  spn_api_subprocess(sp_mem_t mem, spn_pkg_unit_t* unit, sp_ps_config_t config);
+void            spn_api_add_profile_flags_env(sp_mem_t mem, spn_pkg_unit_t* unit, sp_ps_config_t* config);
 
 #define SPN_API_LOG(unit, fn_name, args_fmt, ...) \
   spn_event_buffer_push_ex(spn.events, (unit)->info, &(unit)->logs.io, (spn_build_event_t) { \
