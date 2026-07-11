@@ -1,0 +1,15 @@
+[package]
+name = "test"
+version = "0.1.0"
+
+[[lib]]
+name = "spum"
+kinds = ["static"]
+source = ["main.c"]
+flags = ["-DSPUM=69"]
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+flags = ["-DSPUM=70"]
+deps = ["spum"]

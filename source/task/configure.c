@@ -42,11 +42,22 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   return SPN_OK;
 }
 
+static spn_err_t order_root_configure(spn_session_t* session, spn_build_graph_t* graph, spn_pkg_unit_t* root) {
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    if (unit->ctx == root->ctx && unit->source != SPN_PKG_SOURCE_ROOT) {
+      if (spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp)) {
+        return SPN_ERROR;
+      }
+    }
+  }
+  return SPN_OK;
+}
+
 spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->configure.graph;
   spn_bg_init(graph, spn.mem);
-  spn_pkg_unit_t* root = spn_session_find_root(&app->session);
 
   if (spn_wasm_init()) {
     return spn_task_fail(SPN_ERR_WASM_INIT_FAILED);
@@ -63,16 +74,10 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
     }
   }
 
-  // The root configures last, after every other package; only now do all units
-  // have their nodes, so this can't be folded into the loop above
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    spn_loaded_pkg_t* pkg = sp_ht_getp(session->packages, unit->id);
-
-    if (pkg->source != SPN_PKG_SOURCE_ROOT) {
-      if (spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp)) {
-        return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
-      }
+  sp_da_for(session->units.roots, it) {
+    spn_pkg_unit_t* root = session->units.roots[it];
+    if (order_root_configure(session, graph, root)) {
+      return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = root->paths.stamp.configure });
     }
   }
 
@@ -114,4 +119,3 @@ spn_task_step_t spn_task_configure_graph_update(spn_app_t* app) {
 
   return spn_task_continue();
 }
-

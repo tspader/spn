@@ -16,6 +16,7 @@ typedef struct spn_make spn_make_t;
 typedef struct spn_cmake spn_cmake_t;
 typedef struct spn_cc spn_cc_t;
 typedef struct spn_node_t spn_node_t;
+typedef struct spn_build_unit_t spn_build_unit_t;
 typedef struct spn_pkg_unit_t spn_pkg_unit_t;
 typedef struct spn_node_ctx_t spn_node_ctx_t;
 typedef struct spn_toolchain_unit_t spn_toolchain_unit_t;

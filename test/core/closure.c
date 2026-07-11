@@ -42,10 +42,7 @@ typedef struct {
 } closure_test_t;
 
 sp_da(spn_pkg_dep_t) spn_session_pkg_deps(spn_session_t* session, spn_pkg_unit_t* pkg) {
-  if (!sp_om_has(session->units.graph, pkg->id)) {
-    return SP_NULLPTR;
-  }
-  return *sp_om_get(session->units.graph, pkg->id);
+  return pkg->deps;
 }
 
 UTEST_EMPTY_FIXTURE(closure)
@@ -65,7 +62,7 @@ static spn_pkg_unit_t* build_pkg(sp_mem_t mem, spn_session_t* session, u32 id, c
   info->name = sp_str_view(spec.name);
 
   spn_pkg_unit_t* pkg = sp_alloc_type(mem, spn_pkg_unit_t);
-  pkg->id.qualified = id;
+  pkg->id.pkg.qualified = id;
   pkg->info = info;
   pkg->session = session;
   sp_da_init(mem, pkg->libs);
@@ -112,7 +109,7 @@ void run_closure_test(s32* utest_result, closure_test_t t) {
         .private = t.pkgs[it].deps[d].private,
       }));
     }
-    sp_om_insert(session->units.graph, pkgs[it]->id, deps);
+    pkgs[it]->deps = deps;
   }
 
   spn_pkg_unit_t* root = find_pkg(pkgs, count, t.root);

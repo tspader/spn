@@ -49,7 +49,7 @@ static spn_err_t publish_target_headers(spn_pkg_unit_t* unit, spn_target_info_om
 // publish for them; the root publishes everything it builds.
 spn_err_t spn_pkg_unit_publish_headers(spn_pkg_unit_t* unit, bool strict) {
   spn_try(publish_target_headers(unit, unit->info->libs, strict));
-  if (unit->info == unit->session->pkg) {
+  if (unit->source == SPN_PKG_SOURCE_ROOT) {
     spn_try(publish_target_headers(unit, unit->info->exes, strict));
     spn_try(publish_target_headers(unit, unit->info->scripts, strict));
     spn_try(publish_target_headers(unit, unit->info->tests, strict));
@@ -73,4 +73,3 @@ void spn_pkg_unit_announce_compile(spn_pkg_unit_t* unit) {
     .io = &unit->logs.io,
   });
 }
-
