@@ -44,21 +44,26 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
   bool has_manifest = sp_fs_exists(spn.paths.manifest);
   bool source = spn_cli_run_is_source_entry(command->entry, has_manifest);
 
-  app.config.requests = sp_da_new(spn.heap, spn_build_request_t);
-  sp_da_push(app.config.requests, ((spn_build_request_t) {
-    .filter = {
-      .name = source ? sp_str_lit("") : command->entry,
-      .disabled = {
-        .public = source,
-        .test = source,
-        .script = source,
-      },
-    },
-  }));
-  app.config.run = (spn_run_config_t) {
-    .kind = source ? SPN_RUN_KIND_SOURCE : SPN_RUN_KIND_ROOTS,
-    .target = command->entry,
-  };
+  app.config.compile.targets.kind = SPN_TARGET_SELECTION_EXPLICIT;
+  if (!source) {
+    spn_target_names_t names = sp_da_new(spn.heap, sp_str_t);
+    sp_da_push(names, command->entry);
+    app.config.compile.targets.targets.script = (spn_target_rule_t) {
+      .kind = SPN_TARGET_RULE_NAMED,
+      .names = names,
+    };
+  }
+  if (source) {
+    app.config.action = (spn_action_t) {
+      .kind = SPN_ACTION_RUN_SOURCE,
+      .source = { .path = command->entry },
+    };
+  }
+  else {
+    app.config.action = (spn_action_t) {
+      .kind = SPN_ACTION_RUN_ROOTS,
+    };
+  }
 
   if (source) {
     if (has_manifest) {

@@ -32,10 +32,8 @@ struct spn_build_unit_t {
 };
 
 typedef struct {
-  spn_pkg_id_t pkg;
-  spn_build_unit_t* build;
-  spn_target_filter_t filter;
-} spn_build_request_t;
+  spn_target_selection_t targets;
+} spn_compile_request_t;
 
 typedef struct SP_ALIGNED {
   spn_pkg_id_t pkg;
@@ -51,6 +49,13 @@ typedef struct SP_ALIGNED {
   spn_target_unit_id_t target;
   sp_intern_id_t source;
 } spn_compile_unit_id_t;
+
+typedef struct {
+  spn_build_unit_t* build;
+  spn_pkg_unit_id_t root;
+  spn_target_selection_t selection;
+  sp_da(spn_target_unit_id_t) roots;
+} spn_build_plan_t;
 
 typedef struct {
   spn_pkg_unit_t* unit;

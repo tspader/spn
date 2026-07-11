@@ -185,19 +185,19 @@ static spn_err_t ensure_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_
   return SPN_OK;
 }
 
-static bool is_root_target(spn_session_t* session, spn_target_unit_t* target) {
-  sp_da_for(session->units.roots, it) {
-    if (session->units.roots[it] == target) {
+static bool is_root_target(spn_session_t* session, spn_build_plan_t* plan, spn_target_unit_t* target) {
+  sp_da_for(plan->roots, it) {
+    if (spn_session_get_target_unit(session, plan->roots[it]) == target) {
       return true;
     }
   }
   return false;
 }
 
-static spn_err_t add_request_targets(spn_session_t* session, spn_build_request_t* request, spn_pkg_unit_t* pkg, spn_target_info_om_t targets) {
+static spn_err_t add_plan_targets(spn_session_t* session, spn_build_plan_t* plan, spn_pkg_unit_t* pkg, spn_target_info_om_t targets) {
   sp_str_om_for(targets, it) {
     spn_target_info_t* info = sp_str_om_at(targets, it);
-    if (!spn_target_filter_pass(&request->filter, info)) {
+    if (!spn_target_selection_pass(&plan->selection, info)) {
       continue;
     }
 
@@ -213,8 +213,8 @@ static spn_err_t add_request_targets(spn_session_t* session, spn_build_request_t
 
     spn_target_unit_t* target = SP_NULLPTR;
     spn_try(ensure_target(session, pkg, info, &target));
-    if (!is_root_target(session, target)) {
-      sp_da_push(session->units.roots, target);
+    if (!is_root_target(session, plan, target)) {
+      sp_da_push(plan->roots, target->id);
     }
   }
   return SPN_OK;
@@ -246,7 +246,6 @@ static spn_err_t ensure_sibling_targets(spn_session_t* session, sp_da(spn_target
 
 spn_task_step_t spn_task_create_units(spn_app_t* app) {
   spn_session_t* session = &app->session;
-  sp_da_init(session->mem, session->units.roots);
 
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
@@ -258,14 +257,14 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
     }
   }
 
-  sp_da_for(session->plan.requests, it) {
-    spn_build_request_t* request = &session->plan.requests[it];
-    spn_pkg_unit_t* pkg = spn_session_find_pkg_unit(session, request->build, request->pkg);
+  sp_da_for(session->plan.builds, it) {
+    spn_build_plan_t* plan = &session->plan.builds[it];
+    spn_pkg_unit_t* pkg = spn_session_find_pkg_unit_by_id(session, plan->root);
     sp_assert(pkg);
-    if (add_request_targets(session, request, pkg, pkg->info->libs) ||
-        add_request_targets(session, request, pkg, pkg->info->exes) ||
-        add_request_targets(session, request, pkg, pkg->info->scripts) ||
-        add_request_targets(session, request, pkg, pkg->info->tests)) {
+    if (add_plan_targets(session, plan, pkg, pkg->info->libs) ||
+        add_plan_targets(session, plan, pkg, pkg->info->exes) ||
+        add_plan_targets(session, plan, pkg, pkg->info->scripts) ||
+        add_plan_targets(session, plan, pkg, pkg->info->tests)) {
       return spn_task_fail(SPN_ERROR);
     }
   }

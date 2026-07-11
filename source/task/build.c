@@ -23,15 +23,164 @@
 static spn_err_union_t spn_bg_error_to_union(spn_build_graph_t* graph);
 static spn_bg_id_t get_or_put_user_file(spn_pkg_unit_t* ctx, spn_build_graph_t* graph, sp_str_t path);
 static spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit);
-static spn_err_t add_stage(spn_build_graph_t* graph, spn_session_t* session, sp_da(spn_target_unit_t*) targets, sp_str_t dir);
+static spn_err_t add_stage(spn_build_graph_t* graph, spn_session_t* session, spn_build_unit_t* build, sp_da(spn_target_unit_t*) targets, sp_str_t dir);
 static spn_err_t prepare_build_graph(spn_app_t* app);
 
-static spn_err_t add_build_stages(spn_build_graph_t* graph, spn_session_t* session, spn_build_unit_t* build) {
+static spn_bg_id_t add_build_command(spn_session_t* session, spn_build_unit_t* build, spn_bg_fn_t fn, void* user_data) {
+  spn_bg_id_t id = spn_bg_add_fn(&session->build.graph, fn, user_data);
+  sp_ht_insert(session->owners, id, build->id);
+  return id;
+}
+
+typedef enum {
+  SPN_BUILD_REPORT_PASSED,
+  SPN_BUILD_REPORT_FAILED,
+  SPN_BUILD_REPORT_CANCELLED,
+} spn_build_report_kind_t;
+
+typedef struct {
+  spn_build_plan_t* plan;
+  spn_build_report_kind_t kind;
+  u32 total;
+  u32 dirty;
+  u32 completed;
+  u32 errors;
+  sp_str_t first_error;
+} spn_build_report_t;
+
+typedef sp_da(spn_build_report_t) spn_build_reports_t;
+
+static spn_build_report_t* find_build_report(spn_build_reports_t reports, spn_build_unit_id_t id) {
+  sp_da_for(reports, it) {
+    if (reports[it].plan->build->id == id) {
+      return &reports[it];
+    }
+  }
+  return SP_NULLPTR;
+}
+
+static spn_build_reports_t collect_build_reports(sp_mem_t mem, spn_session_t* session) {
+  spn_build_reports_t reports = sp_da_new(mem, spn_build_report_t);
+  sp_da_for(session->plan.builds, it) {
+    sp_da_push(reports, ((spn_build_report_t) {
+      .plan = &session->plan.builds[it],
+    }));
+  }
+
+  sp_da_for(session->build.graph.commands, it) {
+    spn_bg_cmd_t* command = &session->build.graph.commands[it];
+    spn_build_unit_id_t* owner = sp_ht_getp(session->owners, command->id);
+    sp_assert(owner);
+    spn_build_report_t* report = find_build_report(reports, *owner);
+    sp_assert(report);
+    report->total++;
+    if (spn_bg_is_cmd_dirty(session->build.dirty, command->id)) {
+      report->dirty++;
+      if (sp_ht_getp(session->build.executor->completed, command->id)) {
+        report->completed++;
+      }
+    }
+  }
+
+  sp_da_for(session->build.executor->errors, it) {
+    spn_bg_exec_error_t* error = &session->build.executor->errors[it];
+    spn_build_unit_id_t* owner = sp_ht_getp(session->owners, error->cmd_id);
+    sp_assert(owner);
+    spn_build_report_t* report = find_build_report(reports, *owner);
+    sp_assert(report);
+    report->errors++;
+    if (sp_str_empty(report->first_error)) {
+      spn_bg_cmd_t* command = spn_bg_find_command(&session->build.graph, error->cmd_id);
+      if (command) {
+        report->first_error = command->tag;
+      }
+    }
+  }
+
+  sp_da_for(reports, it) {
+    spn_build_report_t* report = &reports[it];
+    if (report->errors) {
+      report->kind = SPN_BUILD_REPORT_FAILED;
+    }
+    else if (report->completed < report->dirty) {
+      report->kind = SPN_BUILD_REPORT_CANCELLED;
+    }
+    else {
+      report->kind = SPN_BUILD_REPORT_PASSED;
+    }
+  }
+
+  return reports;
+}
+
+static void emit_build_report(spn_session_t* session, spn_build_report_t* report) {
+  spn_pkg_unit_t* root = spn_session_find_pkg_unit_by_id(session, report->plan->root);
+  sp_assert(root);
+  spn_profile_info_t* profile = &report->plan->build->profile;
+  u64 elapsed = session->build.executor->elapsed;
+
+  switch (report->kind) {
+    case SPN_BUILD_REPORT_PASSED: {
+      spn_event_buffer_push(session->events, (spn_build_event_t) {
+        .kind = SPN_EVENT_BUILD_PASSED,
+        .pkg = root->info,
+        .io = &root->logs.io,
+        .build.passed = {
+          .profile = profile,
+          .time = elapsed,
+        },
+      });
+      break;
+    }
+    case SPN_BUILD_REPORT_FAILED: {
+      spn_event_buffer_push(session->events, (spn_build_event_t) {
+        .kind = SPN_EVENT_BUILD_FAILED,
+        .pkg = root->info,
+        .io = &root->logs.io,
+        .build_failed = {
+          .profile = profile->name,
+          .time = elapsed,
+          .num_errors = report->errors,
+          .first_error = report->first_error,
+        },
+      });
+      break;
+    }
+    case SPN_BUILD_REPORT_CANCELLED: {
+      spn_event_buffer_push(session->events, (spn_build_event_t) {
+        .kind = SPN_EVENT_BUILD_CANCELLED,
+        .pkg = root->info,
+        .io = &root->logs.io,
+        .build_cancelled = {
+          .profile = profile->name,
+          .time = elapsed,
+          .num_pending = report->dirty - report->completed,
+        },
+      });
+      break;
+    }
+  }
+
+  spn_event_buffer_push(session->events, (spn_build_event_t) {
+    .kind = SPN_EVENT_BUILD_SUMMARY,
+    .pkg = root->info,
+    .io = &root->logs.io,
+    .build_summary = {
+      .success = report->kind == SPN_BUILD_REPORT_PASSED,
+      .num_dirty = report->dirty,
+      .total_commands = report->total,
+      .time = elapsed,
+      .profile = profile->name,
+    },
+  });
+}
+
+static spn_err_t add_build_stages(spn_build_graph_t* graph, spn_session_t* session, spn_build_plan_t* plan) {
   sp_da(spn_target_unit_t*) targets = sp_da_new(session->mem, spn_target_unit_t*);
   sp_da(spn_target_unit_t*) tests = sp_da_new(session->mem, spn_target_unit_t*);
-  sp_da_for(session->units.roots, it) {
-    spn_target_unit_t* root = session->units.roots[it];
-    if (root->pkg->build != build || root->kind != SPN_CC_OUTPUT_EXE) {
+  sp_da_for(plan->roots, it) {
+    spn_target_unit_t* root = spn_session_get_target_unit(session, plan->roots[it]);
+    if (root->kind != SPN_CC_OUTPUT_EXE) {
       continue;
     }
     if (root->info->kind == SPN_TARGET_TEST) {
@@ -41,13 +190,13 @@ static spn_err_t add_build_stages(spn_build_graph_t* graph, spn_session_t* sessi
       sp_da_push(targets, root);
     }
   }
-  spn_try(add_stage(graph, session, targets, build->paths.profile));
-  return add_stage(graph, session, tests, sp_fs_join_path(session->mem, build->paths.profile, SP_LIT("test")));
+  spn_try(add_stage(graph, session, plan->build, targets, plan->build->paths.profile));
+  return add_stage(graph, session, plan->build, tests, sp_fs_join_path(session->mem, plan->build->paths.profile, SP_LIT("test")));
 }
 
 static spn_err_t add_root_stages(spn_build_graph_t* graph, spn_session_t* session) {
   sp_da_for(session->plan.builds, it) {
-    spn_try(add_build_stages(graph, session, session->plan.builds[it]));
+    spn_try(add_build_stages(graph, session, &session->plan.builds[it]));
   }
   return SPN_OK;
 }
@@ -56,6 +205,7 @@ spn_task_step_t spn_task_build_graph_init(spn_app_t* app) {
   spn_session_t* session = &app->session;
 
   spn_bg_init(&session->build.graph, spn.mem);
+  sp_ht_init(session->mem, session->owners);
   prepare_build_graph(app);
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
@@ -105,65 +255,21 @@ spn_task_step_t spn_task_build_graph_update(spn_app_t* app) {
     // sp_tui_home();
     // sp_tui_clear_line();
 
-    sp_opt(spn_bg_exec_error_t) error = SP_ZERO_INITIALIZE();
-    if (sp_da_size(build->executor->errors)) {
-      sp_opt_set(error, build->executor->errors[0]);
-    }
-
-    spn_pkg_unit_t* root = spn_session_find_requested_pkg(session, session->plan.builds[0]);
-    sp_assert(root);
-    u32 num_errors = sp_da_size(build->executor->errors);
-    u32 dirty_cmds = sp_ht_size(session->build.dirty->commands);
-
-    if (error.some) {
-      sp_str_t first_error = sp_str_lit("");
-      spn_bg_cmd_t* err_cmd = spn_bg_find_command(&session->build.graph, error.value.cmd_id);
-      if (err_cmd) {
-        first_error = err_cmd->tag;
-      }
-
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_BUILD_FAILED,
-        .pkg = root->info,
-        .io = &root->logs.io,
-        .build_failed = {
-          .profile = session->profile.name,
-          .time = session->build.executor->elapsed,
-          .num_errors = num_errors,
-          .first_error = first_error,
-        }
-      });
-    }
-    else {
+    bool failed = !sp_da_empty(build->executor->errors);
+    if (!failed) {
       if (!app->lock.some) {
         spn_app_update_lock_file(app);
       }
-
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_BUILD_PASSED,
-        .pkg = root->info,
-        .io = &root->logs.io,
-        .build.passed = {
-          .profile = &session->profile,
-          .time = session->build.executor->elapsed
-        }
-      });
     }
 
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_BUILD_SUMMARY,
-      .pkg = root->info,
-      .io = &root->logs.io,
-      .build_summary = {
-        .success = !error.some,
-        .num_dirty = dirty_cmds,
-        .total_commands = sp_da_size(session->build.graph.commands),
-        .time = session->build.executor->elapsed,
-        .profile = session->profile.name,
-      }
-    });
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    spn_build_reports_t reports = collect_build_reports(scratch.mem, session);
+    sp_da_for(reports, it) {
+      emit_build_report(session, &reports[it]);
+    }
+    sp_mem_end_scratch(scratch);
 
-    return error.some ? spn_task_fail(SPN_ERROR) : spn_task_done();
+    return failed ? spn_task_fail(SPN_ERROR) : spn_task_done();
   }
 
   return spn_task_continue();
@@ -250,7 +356,7 @@ static void stage_push_file(spn_stage_unit_t* stage, sp_str_t from, sp_str_t to,
   }));
 }
 
-spn_err_t add_stage(spn_build_graph_t* graph, spn_session_t* session, sp_da(spn_target_unit_t*) targets, sp_str_t dir) {
+spn_err_t add_stage(spn_build_graph_t* graph, spn_session_t* session, spn_build_unit_t* build, sp_da(spn_target_unit_t*) targets, sp_str_t dir) {
   sp_mem_t mem = session->mem;
 
   spn_stage_unit_t* stage = sp_alloc_type(mem, spn_stage_unit_t);
@@ -275,7 +381,7 @@ spn_err_t add_stage(spn_build_graph_t* graph, spn_session_t* session, sp_da(spn_
 
   if (sp_da_empty(stage->files)) return SPN_OK;
 
-  spn_bg_id_t node = spn_bg_add_fn(graph, stage_targets, stage);
+  spn_bg_id_t node = add_build_command(session, build, stage_targets, stage);
   sp_da_for(stage->files, it) {
     spn_stage_file_t* file = &stage->files[it];
     spn_try(spn_bg_cmd_add_input(graph, node, file->input));
@@ -401,7 +507,7 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
     }
   }
 
-  target->nodes.link = spn_bg_add_fn(graph, link_target, target);
+  target->nodes.link = add_build_command(target->session, target->pkg->build, link_target, target);
   target->nodes.output = spn_bg_add_file(graph, get_target_output_path(spn.mem, target));
 
   spn_bg_cmd_add_output(graph, target->nodes.link,  target->nodes.output);
@@ -413,7 +519,7 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
   }
 
   if (!sp_da_empty(info->embed)) {
-    target->nodes.embed.run = spn_bg_add_fn(graph, compile_embed, target);
+    target->nodes.embed.run = add_build_command(target->session, target->pkg->build, compile_embed, target);
     target->nodes.embed.object = spn_bg_add_file(graph, get_embed_object_path(spn.mem, target));
     target->nodes.embed.header = spn_bg_add_file(graph, get_embed_header_path(spn.mem, target));
 
@@ -462,12 +568,12 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
 
   nodes->manifest = spn_bg_add_file(graph, unit->paths.manifest);
   nodes->script = spn_bg_add_file(graph, unit->paths.script);
-  nodes->package = spn_bg_add_fn(graph, run_package_hook, unit);
+  nodes->package = add_build_command(unit->session, unit->build, run_package_hook, unit);
   nodes->stamp.package = spn_bg_add_file(graph, unit->paths.stamp.package);
   nodes->stamp.main = spn_bg_add_file(graph, unit->paths.stamp.main);
   nodes->stamp.exit = spn_bg_add_file(graph, unit->paths.stamp.exit);
-  nodes->main = spn_bg_add_fn(graph, stamp_enter, unit);
-  nodes->exit = spn_bg_add_fn(graph, stamp_exit, unit);
+  nodes->main = add_build_command(unit->session, unit->build, stamp_enter, unit);
+  nodes->exit = add_build_command(unit->session, unit->build, stamp_exit, unit);
 
   spn_try(spn_bg_cmd_add_input(graph, nodes->main, nodes->manifest));
   spn_try(spn_bg_cmd_add_input(graph, nodes->main, nodes->script));
@@ -479,7 +585,7 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
 
   bool has_build_script = unit->wasm.build.state != SPN_WASM_SCRIPT_NONE;
   if (has_build_script) {
-    nodes->build_script.run = spn_bg_add_fn(graph, compile_build_script, unit);
+    nodes->build_script.run = add_build_command(unit->session, unit->build, compile_build_script, unit);
     nodes->build_script.module = spn_bg_add_file(graph, unit->wasm.build.path);
 
     spn_try(spn_bg_cmd_add_output(graph, nodes->build_script.run, nodes->build_script.module));
@@ -497,7 +603,7 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   // pass 1: create all command nodes
   sp_da_for(unit->nodes.user, it) {
     spn_user_node_t* node = &unit->nodes.user[it];
-    node->id = spn_bg_add_fn(graph, run_user_fn, node);
+    node->id = add_build_command(unit->session, unit->build, run_user_fn, node);
     sp_da_push(unit->nodes.build.user, node->id);
 
     if (has_build_script) {
@@ -549,7 +655,7 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   sp_da_for(unit->objects, it) {
     spn_compile_unit_t* object = unit->objects[it];
     object->nodes.source = spn_bg_add_file(graph, object->paths.file);
-    object->nodes.compile = spn_bg_add_fn(graph, compile_object, object);
+    object->nodes.compile = add_build_command(object->session, object->package->build, compile_object, object);
     object->nodes.object = spn_bg_add_file(graph, object->paths.object);
     spn_bg_cmd_add_output(graph, object->nodes.compile, object->nodes.object);
     spn_bg_cmd_add_input(graph, object->nodes.compile, object->nodes.source);

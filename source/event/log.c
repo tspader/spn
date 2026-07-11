@@ -451,6 +451,16 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_FAILED] = sp_bind_builder_end(&b);
   }
 
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_build_cancelled_t, profile, "profile", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_build_cancelled_t, time, "time_ns", SP_BIND_U64);
+      SP_BIND(&b, spn_evt_build_cancelled_t, num_pending, "num_pending", SP_BIND_U32);
+    }
+    schemas[SPN_EVENT_BUILD_CANCELLED] = sp_bind_builder_end(&b);
+  }
+
   // SPN_EVENT_BUILD_SUMMARY
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
