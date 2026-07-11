@@ -139,7 +139,7 @@ s32 main(s32 num_args, const c8** args) {
     .opts = {
       {
         .name = "mirror",
-        .kind = SP_CLI_OPT_STRING,
+        .kind = SP_CLI_OPT_CSTR,
         .summary = "fetch tarballs from this mirror base instead of the canonical url",
         .placeholder = "URL",
         .ptr = &parsed.mirror
@@ -148,7 +148,7 @@ s32 main(s32 num_args, const c8** args) {
     .args = {
       {
         .name = "manifest",
-        .kind = SP_CLI_ARG_REQUIRED,
+        .arity = SP_CLI_ARG_REQUIRED,
         .summary = "path to toolchains.json",
         .ptr = &parsed.manifest
       },

@@ -10,8 +10,10 @@ system_deps = ["m"]
 name = "vmlib"
 kinds = ["static"]
 define = [
-  "BH_PLATFORM_LINUX",
-  "BUILD_TARGET_X86_64",
+  { value = "BH_PLATFORM_LINUX", when = { os = "linux" } },
+  { value = "BH_PLATFORM_DARWIN", when = { os = "macos" } },
+  { value = "BUILD_TARGET_X86_64", when = { arch = "x86_64" } },
+  { value = "BUILD_TARGET_AARCH64", when = { arch = "aarch64" } },
   "BH_MALLOC=wasm_runtime_malloc",
   "BH_FREE=wasm_runtime_free",
   "WASM_ENABLE_INTERP=1",
@@ -33,7 +35,7 @@ include = [
   "core/iwasm/include",
   "core/iwasm/common",
   "core/iwasm/interpreter",
-  "core/shared/platform/linux",
+  "core/shared/platform/darwin",
   "core/shared/platform/include",
   "core/shared/platform/common/libc-util",
   "core/shared/mem-alloc",
@@ -44,11 +46,13 @@ include = [
 ]
 source = [
   "core/iwasm/common/*.c",
-  "core/iwasm/common/arch/invokeNative_em64.s",
+  { path = "core/iwasm/common/arch/invokeNative_em64.s", when = { arch = "x86_64" } },
+  { path = "core/iwasm/common/arch/invokeNative_aarch64.s", when = { arch = "aarch64" } },
   "core/iwasm/interpreter/wasm_runtime.c",
   "core/iwasm/interpreter/wasm_loader.c",
   "core/iwasm/interpreter/wasm_interp_fast.c",
-  "core/shared/platform/linux/*.c",
+  { path = "core/shared/platform/linux/*.c", when = { os = "linux" } },
+  { path = "core/shared/platform/darwin/*.c", when = { os = "macos" } },
   "core/shared/platform/common/posix/*.c",
   "core/shared/platform/common/libc-util/*.c",
   "core/shared/platform/common/memory/*.c",
