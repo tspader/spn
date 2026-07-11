@@ -5,6 +5,7 @@
 #include "spn.h"
 
 #include "forward/types.h"
+#include "compiler/types.h"
 #include "target/types.h"
 #include "toolchain/types.h"
 
@@ -84,9 +85,7 @@ struct spn_cc {
   spn_abi_t abi;
   spn_linkage_t linkage;
   spn_c_standard_t standard;
-  spn_build_mode_t mode;
-  spn_opt_level_t opt;
-  spn_sanitizer_set_t sanitizers;
+  spn_cc_flags_t flags;
 
   struct {
     sp_str_t runtime;
@@ -104,6 +103,7 @@ void             spn_cc_init(spn_cc_t* cc, sp_mem_t mem);
 void             spn_cc_add_runtime(spn_cc_t* cc, sp_str_t runtime, sp_str_t include);
 void             spn_cc_set_toolchain(spn_cc_t* cc, spn_toolchain_unit_t* toolchain);
 void             spn_cc_set_profile(spn_cc_t* cc, spn_profile_info_t profile);
+void             spn_cc_set_flags(spn_cc_t* cc, spn_cc_flags_t flags);
 void             spn_cc_set_output_dir(spn_cc_t* cc, sp_str_t dir);
 void             spn_cc_add_include(spn_cc_t* cc, sp_str_t dir);
 void             spn_cc_add_relative_include(spn_cc_t* cc, sp_str_t dir);

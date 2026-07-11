@@ -10,7 +10,6 @@
 #include "profile/types.h"
 #include "unit/types.h"
 
-#include "gen.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 #include "sp/io.h"
@@ -185,24 +184,21 @@ s32 spn_cmake_configure(spn_cmake_t* cmake) {
     spn_cmake_profile_configuration(profile))
   );
 
-  spn_cc_driver_t driver = unit->build->toolchain->toolchain->driver;
   const c8* configuration = release ? "RELEASE" : "DEBUG";
-  sp_str_t compile = spn_cc_profile_to_flags(scratch.mem, profile, driver);
-  if (release) {
-    compile = sp_fmt(scratch.mem, "{} -DNDEBUG", sp_fmt_str(compile)).value;
-  }
+  spn_cc_flags_t* flags = &unit->build->flags;
+  sp_str_t compile = sp_str_join_n(scratch.mem, flags->compile, sp_da_size(flags->compile), sp_str_lit(" "));
   const c8* compile_vars [] = { "CMAKE_C_FLAGS_", "CMAKE_CXX_FLAGS_" };
   sp_carr_for(compile_vars, it) {
     sp_str_t var = sp_fmt(scratch.mem, "{}{}", sp_fmt_cstr(compile_vars[it]), sp_fmt_cstr(configuration)).value;
     sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_format_define(scratch.mem, var, compile));
   }
 
-  sp_str_t sanitize = spn_cc_sanitizers_to_switch(scratch.mem, profile->sanitizers, driver);
-  if (!sp_str_empty(sanitize)) {
+  sp_str_t link = sp_str_join_n(scratch.mem, flags->link, sp_da_size(flags->link), sp_str_lit(" "));
+  if (!sp_str_empty(link)) {
     const c8* link_vars [] = { "CMAKE_EXE_LINKER_FLAGS_", "CMAKE_SHARED_LINKER_FLAGS_" };
     sp_carr_for(link_vars, it) {
       sp_str_t var = sp_fmt(scratch.mem, "{}{}", sp_fmt_cstr(link_vars[it]), sp_fmt_cstr(configuration)).value;
-      sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_format_define(scratch.mem, var, sanitize));
+      sp_ps_config_add_arg(scratch.mem, &config, spn_cmake_format_define(scratch.mem, var, link));
     }
   }
 

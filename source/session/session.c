@@ -8,9 +8,9 @@
 #include "unit/types.h"
 
 #include "enum/enum.h"
+#include "compiler/flags.h"
 #include "event/event.h"
 #include "event/types.h"
-#include "gen.h"
 #include "external/wasm/wasm.h"
 #include "filter/filter.h"
 #include "intern/intern.h"
@@ -54,19 +54,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
     .host = spn_triple_host(),
   };
   try_union(spn_toolchain_select(&s->catalog, query, s->mem, &s->selection));
-
-  spn_sanitizer_set_t supported = spn_cc_driver_supported_sanitizers(s->selection.build->driver)
-    & spn_cc_target_supported_sanitizers(s->profile.os, s->profile.abi);
-  spn_sanitizer_set_t unsupported = s->profile.sanitizers & ~supported;
-  if (unsupported) {
-    return (spn_err_union_t) {
-      .kind = SPN_ERR_SANITIZER_UNSUPPORTED,
-      .sanitizer = {
-        .toolchain = s->selection.build->name,
-        .unsupported = unsupported,
-      },
-    };
-  }
+  try_union(spn_cc_flags_resolve(s->mem, &s->profile, s->selection.build, &s->flags));
 
   sp_str_t profile = s->paths.build;
   if (s->profile.targeted) {

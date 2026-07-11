@@ -14,7 +14,6 @@
 #include "unit/types.h"
 
 #include "event/event.h"
-#include "gen.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
 #include "pkg/mutate.h"
@@ -46,10 +45,9 @@ sp_str_t spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir) {
 }
 
 void spn_api_add_profile_flags_env(sp_mem_t mem, spn_pkg_unit_t* unit, sp_ps_config_t* config) {
-  spn_profile_info_t* profile = &unit->build->profile;
-  spn_cc_driver_t driver = unit->build->toolchain->toolchain->driver;
-  sp_str_t flags = spn_cc_profile_to_flags(mem, profile, driver);
-  sp_str_t link = spn_cc_sanitizers_to_switch(mem, profile->sanitizers, driver);
+  spn_cc_flags_t* flags = &unit->build->flags;
+  sp_str_t compile = sp_str_join_n(mem, flags->compile, sp_da_size(flags->compile), sp_str_lit(" "));
+  sp_str_t link = sp_str_join_n(mem, flags->link, sp_da_size(flags->link), sp_str_lit(" "));
 
   u32 slot = sp_carr_len(config->env.extra);
   sp_carr_for(config->env.extra, it) {
@@ -60,8 +58,8 @@ void spn_api_add_profile_flags_env(sp_mem_t mem, spn_pkg_unit_t* unit, sp_ps_con
   }
   u32 count = sp_str_empty(link) ? 2 : 3;
   SP_ASSERT(slot + count <= sp_carr_len(config->env.extra));
-  config->env.extra[slot++] = (sp_env_var_t) { .key = sp_str_lit("CFLAGS"), .value = flags };
-  config->env.extra[slot++] = (sp_env_var_t) { .key = sp_str_lit("CXXFLAGS"), .value = flags };
+  config->env.extra[slot++] = (sp_env_var_t) { .key = sp_str_lit("CFLAGS"), .value = compile };
+  config->env.extra[slot++] = (sp_env_var_t) { .key = sp_str_lit("CXXFLAGS"), .value = compile };
   if (!sp_str_empty(link)) {
     config->env.extra[slot] = (sp_env_var_t) { .key = sp_str_lit("LDFLAGS"), .value = link };
   }

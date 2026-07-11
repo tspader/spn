@@ -35,11 +35,12 @@ void spn_cc_set_profile(spn_cc_t* cc, spn_profile_info_t profile) {
   cc->arch = profile.arch;
   cc->os = profile.os;
   cc->abi = profile.abi;
-  cc->mode = profile.mode;
-  cc->opt = profile.opt;
-  cc->sanitizers = profile.sanitizers;
   cc->linkage = profile.linkage;
   cc->standard = profile.standard;
+}
+
+void spn_cc_set_flags(spn_cc_t* cc, spn_cc_flags_t flags) {
+  cc->flags = flags;
 }
 
 void spn_cc_set_output_dir(spn_cc_t* cc, sp_str_t dir) {
@@ -321,9 +322,11 @@ void spn_cc_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp_ps_con
     }
   }
 
-  sp_ps_config_add_arg(mem, ps, spn_cc_build_mode_to_switch(cc->mode, cc->driver));
-  sp_ps_config_add_arg(mem, ps, spn_cc_opt_level_to_switch(cc->opt, cc->driver));
-  sp_ps_config_add_arg(mem, ps, spn_cc_sanitizers_to_switch(mem, cc->sanitizers, cc->driver));
+  sp_da(sp_str_t) flags = target->kind == SPN_CC_OUTPUT_OBJECT || target->kind == SPN_CC_OUTPUT_WASM ?
+    cc->flags.compile : cc->flags.link;
+  sp_da_for(flags, it) {
+    sp_ps_config_add_arg(mem, ps, flags[it]);
+  }
 }
 
 void spn_cc_target_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp_ps_config_t* ps) {
@@ -394,4 +397,3 @@ void spn_cc_target_to_ps(sp_mem_t mem, spn_cc_t* cc, spn_cc_target_t* target, sp
     sp_fs_join_path(mem, cc->dir, target->output);
   sp_ps_config_add_arg(mem, ps, output);
 }
-

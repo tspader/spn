@@ -49,12 +49,6 @@ sp_str_t spn_cc_kind_to_executable(spn_cc_kind_t compiler);
 sp_str_t spn_cc_c_standard_to_switch(spn_c_standard_t standard);
 sp_str_t spn_cc_cxx_standard_to_switch(spn_cxx_standard_t standard);
 sp_str_t spn_cc_lib_kind_to_switch(spn_linkage_t kind, spn_os_t os);
-sp_str_t spn_cc_build_mode_to_switch(spn_build_mode_t mode, spn_cc_driver_t driver);
-sp_str_t spn_cc_opt_level_to_switch(spn_opt_level_t level, spn_cc_driver_t driver);
-sp_str_t spn_cc_sanitizers_to_switch(sp_mem_t mem, spn_sanitizer_set_t sanitizers, spn_cc_driver_t driver);
-sp_str_t spn_cc_profile_to_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_cc_driver_t driver);
-spn_sanitizer_set_t spn_cc_driver_supported_sanitizers(spn_cc_driver_t driver);
-spn_sanitizer_set_t spn_cc_target_supported_sanitizers(spn_os_t os, spn_abi_t abi);
 sp_str_t spn_gen_format_entry(sp_mem_t mem, sp_str_t entry, spn_gen_entry_t kind, spn_cc_driver_t driver);
 sp_str_t spn_gen_format_entry_kernel(sp_str_map_context_t* context);
 

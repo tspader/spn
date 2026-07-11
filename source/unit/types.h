@@ -7,6 +7,7 @@
 #include "spn.h"
 
 #include "graph/types.h"
+#include "compiler/types.h"
 #include "filter/types.h"
 #include "intern/types.h"
 #include "pkg/types.h"
@@ -25,6 +26,7 @@ struct spn_build_unit_t {
   spn_build_unit_id_t id;
   spn_build_kind_t kind;
   spn_profile_info_t profile;
+  spn_cc_flags_t flags;
   spn_toolchain_unit_t* toolchain;
   struct {
     sp_str_t profile;

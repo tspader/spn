@@ -70,6 +70,7 @@ static void build_link_invocation(spn_target_unit_t* target, sp_str_t output) {
   spn_cc_t cc;
   spn_cc_init(&cc, mem);
   spn_cc_set_profile(&cc, target->pkg->build->profile);
+  spn_cc_set_flags(&cc, target->pkg->build->flags);
   spn_cc_set_output_dir(&cc, sp_fs_parent_path(output));
   spn_cc_set_toolchain(&cc, target->pkg->build->toolchain);
 
