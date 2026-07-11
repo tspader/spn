@@ -100,31 +100,37 @@ static sp_str_t spn_cmake_launcher_program(sp_mem_t mem, sp_str_t tools_dir, con
   return path;
 }
 
-static sp_str_t spn_cmake_generate_toolchain_file(sp_mem_t mem, spn_pkg_unit_t* unit) {
-  spn_session_t* session = unit->session;
-  spn_toolchain_unit_t* tc = session->units.toolchain;
-  if (!tc) return sp_str_lit("");
+static void set(sp_io_writer_t* io, const c8* name, sp_str_t value) {
+  sp_fmt_io(io, "set({} {})", sp_fmt_cstr(name), sp_fmt_str(value));
+  sp_fmt_io(io, "\n");
+}
 
-  sp_str_t tools_dir = sp_fs_join_path(mem, unit->paths.generated, sp_str_lit("tools"));
-  sp_fs_create_dir(tools_dir);
-  sp_str_t path = sp_fs_join_path(mem, tools_dir, sp_str_lit("spn.cmake"));
+static sp_str_t spn_cmake_generate_toolchain_file(sp_mem_t mem, spn_pkg_unit_t* unit) {
+  spn_profile_info_t* profile = &unit->ctx->profile;
+  spn_toolchain_unit_t* toolchain = unit->ctx->toolchain;
+  if (!toolchain) return sp_str_lit("");
+
+  spn_triple_t target = { profile->arch, profile->os, profile->abi };
+
+  sp_str_t tools = sp_fs_join_path(mem, unit->paths.generated, sp_str_lit("tools"));
+  sp_str_t path = sp_fs_join_path(mem, tools, sp_str_lit("spn.cmake"));
+
+  sp_fs_create_dir(tools);
 
   sp_io_file_writer_t writer;
   sp_io_file_writer_from_path(&writer, path);
   sp_io_writer_t* io = &writer.base;
 
-  spn_triple_t target = { session->profile.arch, session->profile.os, session->profile.abi };
-
-  sp_fmt_io(io, "set(CMAKE_SYSTEM_NAME {})\n", SP_FMT_STR(spn_os_to_cmake_system_name(session->profile.os)));
-  sp_fmt_io(io, "set(CMAKE_SYSTEM_PROCESSOR {})\n", SP_FMT_STR(spn_arch_to_str(session->profile.arch)));
-  sp_fmt_io(io, "set(CMAKE_C_COMPILER {})\n", SP_FMT_STR(spn_cmake_launcher_program(mem, tools_dir, "cc", tc->compiler)));
-  sp_fmt_io(io, "set(CMAKE_C_COMPILER_TARGET {})\n", SP_FMT_STR(spn_triple_to_cc_target(mem, target)));
-  if (spn_toolchain_has_cxx(tc->toolchain)) {
-    sp_fmt_io(io, "set(CMAKE_CXX_COMPILER {})\n", SP_FMT_STR(spn_cmake_launcher_program(mem, tools_dir, "cxx", tc->cxx)));
-    sp_fmt_io(io, "set(CMAKE_CXX_COMPILER_TARGET {})\n", SP_FMT_STR(spn_triple_to_cc_target(mem, target)));
+  set(io, "CMAKE_SYSTEM_NAME", spn_os_to_cmake_system_name(profile->os));
+  set(io, "CMAKE_SYSTEM_PROCESSOR", spn_arch_to_str(profile->arch));
+  set(io, "CMAKE_C_COMPILER", spn_cmake_launcher_program(mem, tools, "cc", toolchain->compiler));
+  set(io, "CMAKE_C_COMPILER_TARGET", spn_triple_to_cc_target(mem, target));
+  if (spn_toolchain_has_cxx(toolchain->toolchain)) {
+    set(io, "CMAKE_CXX_COMPILER", spn_cmake_launcher_program(mem, tools, "cxx", toolchain->cxx));
+    set(io, "CMAKE_CXX_COMPILER_TARGET", spn_triple_to_cc_target(mem, target));
   }
-  sp_fmt_io(io, "set(CMAKE_LINKER {})\n", SP_FMT_STR(spn_cmake_launcher_program(mem, tools_dir, "ld", tc->linker)));
-  sp_fmt_io(io, "set(CMAKE_AR {})\n", SP_FMT_STR(spn_cmake_launcher_program(mem, tools_dir, "ar", tc->archiver)));
+  set(io, "CMAKE_LINKER", spn_cmake_launcher_program(mem, tools, "ld", toolchain->linker));
+  set(io, "CMAKE_AR", spn_cmake_launcher_program(mem, tools, "ar", toolchain->archiver));
 
   sp_io_file_writer_close(&writer);
   return path;
@@ -132,7 +138,7 @@ static sp_str_t spn_cmake_generate_toolchain_file(sp_mem_t mem, spn_pkg_unit_t* 
 
 s32 spn_cmake_configure(spn_cmake_t* cmake) {
   spn_pkg_unit_t* unit = spn_api_unit(cmake->build);
-  spn_profile_info_t* profile = &unit->session->profile;
+  spn_profile_info_t* profile = &unit->ctx->profile;
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 

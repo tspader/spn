@@ -131,7 +131,7 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
       else {
         spn_kind_query_t query = {
           .config = spn_session_config_kind(session, target->pkg->info->name),
-          .linkage = session->profile.linkage,
+          .linkage = target->pkg->ctx->profile.linkage,
         };
 
         if (spn_target_select_lib_kind(info, query, &target->lib_kind)) {
@@ -179,7 +179,7 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
     spn_pkg_info_t* info = pkg->info;
-    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, pkg->id);
+    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, pkg->id.pkg);
 
     // The target filter only applies to the root package; dependencies contribute
     // exactly their lib targets no matter what we were asked to build.
@@ -268,11 +268,16 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
       // path, extension included, so colliding sources stay distinct.
       sp_str_t object_dir = target->lib_kind == SPN_LIB_KIND_OBJECT ?
         target->paths.lib :
-        target->paths.object;
+        sp_fs_join_path(app->session.mem, target->paths.object, target->info->name);
       sp_str_t object_path = sp_fs_join_path(app->session.mem, object_dir, sp_fmt(scratch.mem, "{}.o", SP_FMT_STR(relative)).value);
+      spn_compile_unit_id_t id = {
+        .target = target->id,
+        .source = sp_intern_get_or_insert(session->intern, file),
+      };
 
-      if (!sp_str_om_has(session->units.objects, file)) {
-        sp_str_om_insert(session->units.objects, file, ((spn_compile_unit_t) {
+      if (!sp_om_has(session->units.objects, id)) {
+        sp_om_insert(session->units.objects, id, ((spn_compile_unit_t) {
+          .id = id,
           .package = pkg,
           .target = target,
           .session = target->session,
@@ -284,30 +289,28 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
         }));
       }
 
-      spn_compile_unit_t* object = sp_str_om_get(session->units.objects, file);
+      spn_compile_unit_t* object = sp_om_get(session->units.objects, id);
       sp_da_push(pkg->objects, object);
       sp_da_push(target->objects, object);
     }
     sp_mem_end_scratch(scratch);
   }
 
-  spn_toolchain_t* toolchain = session->units.toolchain->toolchain;
-  if (!spn_toolchain_has_cxx(toolchain)) {
-    sp_om_for(session->units.objects, it) {
-      spn_compile_unit_t* object = sp_om_at(session->units.objects, it);
-      if (object->lang != SPN_LANG_CXX) {
-        continue;
-      }
-
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR,
-        .err = {
-          .kind = SPN_ERR_TOOLCHAIN_NO_CXX,
-          .toolchain = { .name = toolchain->name },
-        },
-      });
-      return spn_task_fail(SPN_ERROR);
+  sp_om_for(session->units.objects, it) {
+    spn_compile_unit_t* object = sp_om_at(session->units.objects, it);
+    spn_toolchain_t* toolchain = object->package->ctx->toolchain->toolchain;
+    if (object->lang != SPN_LANG_CXX || spn_toolchain_has_cxx(toolchain)) {
+      continue;
     }
+
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR,
+      .err = {
+        .kind = SPN_ERR_TOOLCHAIN_NO_CXX,
+        .toolchain = { .name = toolchain->name },
+      },
+    });
+    return spn_task_fail(SPN_ERROR);
   }
 
   spn_session_build_invocations(session);
@@ -316,4 +319,3 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
 
   return spn_task_done();
 }
-

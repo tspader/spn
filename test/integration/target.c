@@ -39,6 +39,18 @@ UTEST_F(target, source_glob) {
   });
 }
 
+UTEST_F(target, shared_source) {
+  tmpfs_init_named(&uf->fixture.fs, "target_shared_source");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/target/shared_source",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+    },
+  });
+}
+
 UTEST_F(target, publish) {
   tmpfs_init_named(&uf->fixture.fs, "target_publish");
 

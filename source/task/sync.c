@@ -278,36 +278,54 @@ static s32 sync_package_node(spn_bg_cmd_t *cmd, void *user_data) {
   return load_package(job->session, job->pkg, &job->loaded);
 }
 
-static s32 sync_toolchain_node(spn_bg_cmd_t *cmd, void *user_data) {
-  spn_sync_toolchain_job_t *job = (spn_sync_toolchain_job_t *)user_data;
+static s32 sync_toolchain_node(spn_bg_cmd_t* cmd, void* user_data) {
+  spn_sync_toolchain_job_t* job = (spn_sync_toolchain_job_t *)user_data;
   job->unit = setup_toolchain_unit(job->session, job->store, job->toolchain);
   return job->unit ? SPN_OK : SPN_ERROR;
 }
 
-void add_compilation_units(spn_session_t *session) {
-  // Units come from the resolve set, not the loaded-package table: gate
-  // pruning can drop resolved packages after they were loaded, and a
-  // re-resolve pass leaves the table holding packages no longer in the build
-  sp_ht_for_kv(session->resolve, it) {
-    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, it.val->id);
-    sp_assert(loaded);
-    spn_session_add_pkg(session, it.val->id, loaded);
+void add_compilation_units(spn_session_t *s) {
+  sp_da_init(s->mem, s->units.roots);
+
+  if (sp_da_empty(s->units.builds)) {
+    spn_build_unit_t* build = sp_alloc_type(s->mem, spn_build_unit_t);
+    *build = (spn_build_unit_t) {
+      .id = (spn_build_unit_id_t)sp_da_size(s->units.builds),
+      .profile = s->profile,
+      .toolchain = s->units.toolchain,
+      .paths = { .profile = s->paths.profile },
+    };
+    sp_da_push(s->units.builds, build);
   }
 
-  sp_ht_for_kv(session->resolve, it) {
-    spn_resolved_pkg_t* pkg = it.val;
-    spn_pkg_unit_t* unit = spn_session_find_pkg_by_id(session, pkg->id);
+  sp_da_for(s->units.builds, it) {
+    spn_build_unit_t* build = s->units.builds[it];
 
-    sp_da(spn_pkg_dep_t) deps = sp_da_new(session->mem, spn_pkg_dep_t);
-    sp_da_for(pkg->edges, j) {
-      sp_da_push(deps, ((spn_pkg_dep_t) {
-        .unit = spn_session_find_pkg_by_id(session, pkg->edges[j].id),
-        .kind = pkg->edges[j].kind,
-        .private = pkg->edges[j].private,
-      }));
+    sp_ht_for_kv(s->resolve, it) {
+      spn_loaded_pkg_t* loaded = sp_ht_getp(s->packages, it.val->id);
+      sp_assert(loaded);
+
+      spn_pkg_unit_t* unit = spn_session_add_pkg_unit(s, build, it.val->id, loaded);
+      if (it.val->source == SPN_PKG_SOURCE_ROOT) {
+        sp_da_push(s->units.roots, unit);
+      }
     }
 
-    sp_om_insert(session->units.graph, unit->id, deps);
+    sp_ht_for_kv(s->resolve, it) {
+      spn_resolved_pkg_t* pkg = it.val;
+      spn_pkg_unit_t* unit = spn_session_find_pkg_unit(s, build, pkg->id);
+
+      sp_da(spn_pkg_dep_t) deps = sp_da_new(s->mem, spn_pkg_dep_t);
+      sp_da_for(pkg->edges, j) {
+        sp_da_push(deps, ((spn_pkg_dep_t) {
+          .unit = spn_session_find_pkg_unit(s, build, pkg->edges[j].id),
+          .kind = pkg->edges[j].kind,
+          .private = pkg->edges[j].private,
+        }));
+      }
+
+      unit->deps = deps;
+    }
   }
 }
 
@@ -407,6 +425,7 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
   }
 
   session->units.toolchains = sp_da_new(session->mem, spn_toolchain_unit_t *);
+  sp_da_init(session->mem, session->units.builds);
   sp_da_for(app->sync.toolchains, it) {
     spn_sync_toolchain_job_t* job = app->sync.toolchains[it];
     sp_da_push(session->units.toolchains, job->unit);

@@ -26,6 +26,18 @@ static spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit);
 static spn_err_t add_stage(spn_build_graph_t* graph, spn_session_t* session, sp_da(spn_target_unit_t*) targets, sp_str_t dir);
 static spn_err_t prepare_build_graph(spn_app_t* app);
 
+static spn_err_t add_root_stages(spn_build_graph_t* graph, spn_session_t* session, spn_pkg_unit_t* root) {
+  sp_da(spn_target_unit_t*) staged = sp_da_new(session->mem, spn_target_unit_t*);
+  sp_da_for(root->exes, it) {
+    sp_da_push(staged, root->exes[it]);
+  }
+  sp_da_for(root->scripts, it) {
+    sp_da_push(staged, root->scripts[it]);
+  }
+  spn_try(add_stage(graph, session, staged, root->ctx->paths.profile));
+  return add_stage(graph, session, root->tests, sp_fs_join_path(session->mem, root->ctx->paths.profile, SP_LIT("test")));
+}
+
 spn_task_step_t spn_task_build_graph_init(spn_app_t* app) {
   spn_session_t* session = &app->session;
 
@@ -207,13 +219,9 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
     }
   }
 
-  spn_pkg_unit_t* root = spn_session_find_root(session);
-  sp_da(spn_target_unit_t*) staged = sp_da_new(session->mem, spn_target_unit_t*);
-  sp_da_for(root->exes, it) sp_da_push(staged, root->exes[it]);
-  sp_da_for(root->scripts, it) sp_da_push(staged, root->scripts[it]);
-
-  spn_try(add_stage(graph, session, staged, session->paths.profile));
-  spn_try(add_stage(graph, session, root->tests, sp_fs_join_path(session->mem, session->paths.profile, SP_LIT("test"))));
+  sp_da_for(session->units.roots, it) {
+    spn_try(add_root_stages(graph, session, session->units.roots[it]));
+  }
 
   return SPN_OK;
 }
@@ -544,4 +552,3 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
 
   return SPN_OK;
 }
-

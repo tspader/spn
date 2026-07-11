@@ -201,18 +201,16 @@ sp_str_t get_embed_header_path(sp_mem_t mem, spn_target_unit_t* unit) {
 }
 
 sp_str_t get_target_staged_path(sp_mem_t mem, spn_target_unit_t* target) {
-  spn_session_t* session = target->session;
-
   if (target->pkg->source != SPN_PKG_SOURCE_ROOT) return sp_zero_s(sp_str_t);
   if (target->kind != SPN_CC_OUTPUT_EXE) return sp_zero_s(sp_str_t);
 
   switch (target->info->kind) {
     case SPN_TARGET_EXE:
     case SPN_TARGET_SCRIPT: {
-      return sp_fs_join_path(mem, session->paths.profile, target->info->name);
+      return sp_fs_join_path(mem, target->pkg->ctx->paths.profile, target->info->name);
     }
     case SPN_TARGET_TEST: {
-      sp_str_t dir = sp_fs_join_path(mem, session->paths.profile, SP_LIT("test"));
+      sp_str_t dir = sp_fs_join_path(mem, target->pkg->ctx->paths.profile, SP_LIT("test"));
       return sp_fs_join_path(mem, dir, target->info->name);
     }
     case SPN_TARGET_LIB: {
@@ -224,8 +222,6 @@ sp_str_t get_target_staged_path(sp_mem_t mem, spn_target_unit_t* target) {
 
 sp_str_t get_target_output_path(sp_mem_t mem, spn_target_unit_t* target) {
   spn_target_info_t* info = target->info;
-  spn_toolchain_unit_t* toolchain = target->session->units.toolchain;
-  spn_profile_info_t profile = target->session->profile;
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
 

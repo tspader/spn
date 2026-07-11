@@ -9,13 +9,41 @@
 #include "graph/types.h"
 #include "intern/types.h"
 #include "pkg/types.h"
+#include "profile/types.h"
 #include "external/wasm/types.h"
 #include "log/lazy/types.h"
 
+typedef u32 spn_build_unit_id_t;
+
+struct spn_build_unit_t {
+  spn_build_unit_id_t id;
+  spn_profile_info_t profile;
+  spn_toolchain_unit_t* toolchain;
+  struct {
+    sp_str_t profile;
+  } paths;
+};
+
 typedef struct SP_ALIGNED {
   spn_pkg_id_t pkg;
+  spn_build_unit_id_t ctx;
+} spn_pkg_unit_id_t;
+
+typedef struct SP_ALIGNED {
+  spn_pkg_unit_id_t pkg;
   sp_intern_id_t target;
 } spn_target_unit_id_t;
+
+typedef struct SP_ALIGNED {
+  spn_target_unit_id_t target;
+  sp_intern_id_t source;
+} spn_compile_unit_id_t;
+
+typedef struct {
+  spn_pkg_unit_t* unit;
+  spn_dep_kind_t kind;
+  bool private;
+} spn_pkg_dep_t;
 
 
 struct spn_node_t {
@@ -71,6 +99,7 @@ typedef struct {
 } spn_invocation_t;
 
 typedef struct {
+  spn_compile_unit_id_t id;
   spn_session_t* session;
   spn_pkg_unit_t* package;
   spn_target_unit_t* target;
@@ -159,7 +188,8 @@ struct spn_target_unit {
 // PACKAGE //
 /////////////
 struct spn_pkg_unit_t {
-  spn_pkg_id_t id;
+  spn_pkg_unit_id_t id;
+  spn_build_unit_t* ctx;
   spn_session_t* session;
   spn_pkg_info_t* info;
   spn_pkg_source_t source;
@@ -167,6 +197,7 @@ struct spn_pkg_unit_t {
   spn_target_info_t build;
 
   sp_da(spn_compile_unit_t*) objects;
+  sp_da(spn_pkg_dep_t) deps;
   sp_da(spn_target_unit_t*) libs;
   sp_da(spn_target_unit_t*) exes;
   sp_da(spn_target_unit_t*) scripts;

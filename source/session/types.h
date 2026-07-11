@@ -44,14 +44,6 @@ typedef struct {
   spn_bg_executor_t *executor;
 } spn_bg_ctx_t;
 
-typedef struct {
-  spn_pkg_unit_t* unit;
-  spn_dep_kind_t kind;
-  bool private;
-} spn_pkg_dep_t;
-
-typedef sp_om(spn_pkg_id_t, sp_da(spn_pkg_dep_t)) spn_unit_graph_t;
-
 typedef enum {
   SPN_RUN_KIND_NONE,
   SPN_RUN_KIND_TESTS,
@@ -89,12 +81,8 @@ struct spn_session_t {
   spn_pkg_registry_t registry;
   sp_ht(spn_pkg_id_t, spn_loaded_pkg_t) packages;
   sp_ht(spn_pkg_id_t, spn_resolved_options_t) options;
-  sp_ht(spn_pkg_id_t, sp_hash_t) fingerprints;
+  sp_ht(spn_pkg_unit_id_t, sp_hash_t) fingerprints;
 
-  // Dependency gates and consumer requests reach a fixed point across
-  // resolve passes: apply stashes the requests it collected as seeds, and a
-  // gate that needs an edge resolution never made rewinds the task queue to
-  // resolve, which gates with the seeds. resolves bounds the loop.
   struct {
     spn_option_seeds_t seeds;
     u32 resolves;
@@ -103,10 +91,11 @@ struct spn_session_t {
 
   spn_profile_info_t profile;
   struct {
-    spn_unit_graph_t graph;
-    sp_str_om(spn_compile_unit_t) objects;
+    sp_da(spn_build_unit_t*) builds;
+    sp_da(spn_pkg_unit_t*) roots;
+    sp_om(spn_compile_unit_id_t, spn_compile_unit_t) objects;
     sp_om(spn_target_unit_id_t, spn_target_unit_t) targets;
-    sp_om(spn_pkg_id_t, spn_pkg_unit_t) packages;
+    sp_om(spn_pkg_unit_id_t, spn_pkg_unit_t) packages;
     spn_toolchain_unit_t* toolchain;
     spn_toolchain_unit_t* script;
     sp_da(spn_toolchain_unit_t*) toolchains;

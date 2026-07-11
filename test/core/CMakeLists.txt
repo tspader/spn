@@ -38,6 +38,12 @@ add_executable(stable_map
 spn_test_binary(stable_map)
 add_test(NAME stable_map COMMAND "$<TARGET_FILE:stable_map>")
 
+add_executable(unit
+  unit.c
+)
+spn_test_binary(unit)
+add_test(NAME unit COMMAND "$<TARGET_FILE:unit>")
+
 add_executable(toml
   ${SRC}/toml/edit.c
   toml/main.c
