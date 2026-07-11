@@ -74,7 +74,16 @@ static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test)
         sp_str_t bin = tmpfs_get(&fixture->fs, profile_exe(build->profile, build->expect.bin.name));
         t.actions[n++] = (action_t) {
           .kind = ACTION_SUBPROCESS,
-          .process = { .config = { .command = bin }, .rc = build->expect.bin.rc },
+          .process = {
+            .config = {
+              .command = bin,
+              .io = {
+                .in.mode = SP_PS_IO_MODE_NULL,
+                .err.mode = SP_PS_IO_MODE_REDIRECT
+              }
+            },
+            .rc = build->expect.bin.rc
+          },
         };
       }
       else {
