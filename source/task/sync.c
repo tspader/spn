@@ -284,48 +284,55 @@ static s32 sync_toolchain_node(spn_bg_cmd_t* cmd, void* user_data) {
   return job->unit ? SPN_OK : SPN_ERROR;
 }
 
-void add_compilation_units(spn_session_t *s) {
-  sp_da_init(s->mem, s->units.roots);
+static spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* build, spn_pkg_id_t id) {
+  spn_pkg_unit_t* existing = spn_session_find_pkg_unit(s, build, id);
+  if (existing) {
+    return existing;
+  }
 
-  if (sp_da_empty(s->units.builds)) {
+  spn_resolved_pkg_t* pkg = sp_ht_getp(s->resolve, id);
+  spn_loaded_pkg_t* loaded = sp_ht_getp(s->packages, id);
+  sp_assert(pkg);
+  sp_assert(loaded);
+
+  spn_pkg_unit_t* unit = spn_session_add_pkg_unit(s, build, id, loaded);
+  sp_da_for(pkg->edges, it) {
+    sp_da_push(unit->deps, ((spn_pkg_dep_t) {
+      .unit = add_package_units(s, build, pkg->edges[it].id),
+      .kind = pkg->edges[it].kind,
+      .private = pkg->edges[it].private,
+    }));
+  }
+  return unit;
+}
+
+void add_compilation_units(spn_session_t *s) {
+  if (sp_da_empty(s->plan.builds)) {
     spn_build_unit_t* build = sp_alloc_type(s->mem, spn_build_unit_t);
     *build = (spn_build_unit_t) {
-      .id = (spn_build_unit_id_t)sp_da_size(s->units.builds),
+      .id = (spn_build_unit_id_t)sp_da_size(s->plan.builds),
+      .kind = SPN_BUILD_KIND_TARGET,
       .profile = s->profile,
       .toolchain = s->units.toolchain,
       .paths = { .profile = s->paths.profile },
     };
-    sp_da_push(s->units.builds, build);
+    sp_da_push(s->plan.builds, build);
   }
 
-  sp_da_for(s->units.builds, it) {
-    spn_build_unit_t* build = s->units.builds[it];
-
-    sp_ht_for_kv(s->resolve, it) {
-      spn_loaded_pkg_t* loaded = sp_ht_getp(s->packages, it.val->id);
-      sp_assert(loaded);
-
-      spn_pkg_unit_t* unit = spn_session_add_pkg_unit(s, build, it.val->id, loaded);
-      if (it.val->source == SPN_PKG_SOURCE_ROOT) {
-        sp_da_push(s->units.roots, unit);
-      }
+  spn_pkg_id_t root = SP_ZERO_INITIALIZE();
+  sp_ht_for_kv(s->resolve, it) {
+    if (it.val->source == SPN_PKG_SOURCE_ROOT) {
+      root = it.val->id;
+      break;
     }
+  }
 
-    sp_ht_for_kv(s->resolve, it) {
-      spn_resolved_pkg_t* pkg = it.val;
-      spn_pkg_unit_t* unit = spn_session_find_pkg_unit(s, build, pkg->id);
-
-      sp_da(spn_pkg_dep_t) deps = sp_da_new(s->mem, spn_pkg_dep_t);
-      sp_da_for(pkg->edges, j) {
-        sp_da_push(deps, ((spn_pkg_dep_t) {
-          .unit = spn_session_find_pkg_unit(s, build, pkg->edges[j].id),
-          .kind = pkg->edges[j].kind,
-          .private = pkg->edges[j].private,
-        }));
-      }
-
-      unit->deps = deps;
-    }
+  sp_assert(root.qualified);
+  sp_da_for(s->plan.requests, it) {
+    spn_build_request_t* request = &s->plan.requests[it];
+    request->pkg = root;
+    request->build = s->plan.builds[0];
+    add_package_units(s, request->build, request->pkg);
   }
 }
 
@@ -425,7 +432,7 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
   }
 
   session->units.toolchains = sp_da_new(session->mem, spn_toolchain_unit_t *);
-  sp_da_init(session->mem, session->units.builds);
+  sp_da_init(session->mem, session->plan.builds);
   sp_da_for(app->sync.toolchains, it) {
     spn_sync_toolchain_job_t* job = app->sync.toolchains[it];
     sp_da_push(session->units.toolchains, job->unit);

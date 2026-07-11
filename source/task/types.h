@@ -37,6 +37,12 @@ typedef struct {
 #define spn_task_done()     ((spn_task_step_t) { .status = SPN_TASK_DONE })
 #define spn_task_continue() ((spn_task_step_t) { .status = SPN_TASK_CONTINUE })
 #define spn_task_fail(kind_, ...) ((spn_task_step_t) { .err = { .kind = (kind_), ##__VA_ARGS__ } })
+#define spn_cli_assert(expr, fmt, ...) \
+  do { \
+    if (expr) { \
+      spn_log_error(fmt, __VA_ARGS__); \
+    } \
+  } while (0)
 #define spn_task_fail_with(union_) ((spn_task_step_t) { .err = (union_) })
 
 #define spn_try_step(expr) do { \

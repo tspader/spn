@@ -51,6 +51,20 @@ UTEST_F(target, shared_source) {
   });
 }
 
+UTEST_F(target, multiple_roots) {
+  tmpfs_init_named(&uf->fixture.fs, "target_multiple_roots");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/target/shared_source",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "main", "test" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libspum.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/test/test") },
+    },
+  });
+}
+
 UTEST_F(target, publish) {
   tmpfs_init_named(&uf->fixture.fs, "target_publish");
 

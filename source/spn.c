@@ -515,24 +515,26 @@ void spn_deinit(sp_app_t* sp) {
 
   if (!app.session.pkg) return;
 
-  spn_pkg_unit_t* root = spn_session_find_root(&app.session);
+  if (sp_da_empty(app.session.plan.requests) || !app.session.plan.requests[0].build) return;
+
+  spn_pkg_unit_t* root = spn_session_find_requested_pkg(&app.session, app.session.plan.requests[0].build);
   if (!root) return;
 
   sp_om_for(app.session.units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(app.session.units.packages, it);
-    spn_pkg_unit_t* ctx_root = spn_session_find_root_in_ctx(&app.session, unit->build);
-    if (!ctx_root) {
+    spn_pkg_unit_t* requested = spn_session_find_requested_pkg(&app.session, unit->build);
+    if (!requested) {
       continue;
     }
 
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
     sp_fs_create_sym_link(
       unit->paths.logs.build,
-      sp_fs_join_path(scratch.mem, ctx_root->paths.work, unit->logs.build)
+      sp_fs_join_path(scratch.mem, requested->paths.work, unit->logs.build)
     );
     sp_fs_create_sym_link(
       unit->paths.logs.jsonl,
-      sp_fs_join_path(scratch.mem, ctx_root->paths.work, unit->logs.jsonl)
+      sp_fs_join_path(scratch.mem, requested->paths.work, unit->logs.jsonl)
     );
     sp_mem_end_scratch(scratch);
 

@@ -19,20 +19,10 @@
 
 static spn_task_step_t spn_task_run_tests(spn_app_t* app);
 
-static spn_task_step_t run_script(spn_app_t* app) {
+static spn_task_step_t run_script(spn_app_t* app, spn_target_unit_t* unit) {
   spn_session_t* session = &app->session;
+  spn_pkg_unit_t* root = unit->pkg;
 
-  spn_pkg_unit_t* root = spn_session_find_root(session);
-  if (!root) {
-    spn_log_error("script {.yellow} was not built", SP_FMT_STR(app->config.run.target));
-    return spn_task_fail(SPN_ERROR);
-  }
-
-  spn_target_unit_t* unit = spn_session_find_target_in_pkg(session, root, app->config.run.target);
-  if (!unit) {
-    spn_log_error("script {.yellow} was not built", SP_FMT_STR(app->config.run.target));
-    return spn_task_fail(SPN_ERROR);
-  }
   if (unit->info->kind != SPN_TARGET_SCRIPT) {
     spn_log_error("{.yellow} is not a script", SP_FMT_STR(app->config.run.target));
     return spn_task_fail(SPN_ERROR);
@@ -81,16 +71,28 @@ static spn_task_step_t run_source(spn_app_t* app) {
   return spn_task_fail(SPN_ERROR);
 }
 
+static spn_task_step_t run_roots(spn_app_t* app) {
+  spn_session_t* session = &app->session;
+  bool tests = false;
+  sp_da_for(session->units.roots, it) {
+    spn_target_unit_t* root = session->units.roots[it];
+    if (root->info->kind == SPN_TARGET_SCRIPT) {
+      return run_script(app, root);
+    }
+    if (root->info->kind == SPN_TARGET_TEST) {
+      tests = true;
+    }
+  }
+  return tests ? spn_task_run_tests(app) : spn_task_done();
+}
+
 spn_task_step_t spn_task_run(spn_app_t* app) {
   switch (app->config.run.kind) {
     case SPN_RUN_KIND_NONE: {
       return spn_task_done();
     }
-    case SPN_RUN_KIND_TESTS: {
-      return spn_task_run_tests(app);
-    }
-    case SPN_RUN_KIND_SCRIPT: {
-      return run_script(app);
+    case SPN_RUN_KIND_ROOTS: {
+      return run_roots(app);
     }
     case SPN_RUN_KIND_SOURCE: {
       return run_source(app);

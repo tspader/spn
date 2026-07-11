@@ -13,3 +13,9 @@ name = "main"
 source = ["main.c"]
 flags = ["-DSPUM=70"]
 deps = ["spum"]
+
+[[test]]
+name = "test"
+source = ["main.c"]
+flags = ["-DSPUM=70"]
+deps = ["spum"]

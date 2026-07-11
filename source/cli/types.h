@@ -86,7 +86,6 @@ typedef struct {
     bool lib;
     bool script;
   } only;
-  sp_str_t name;
 } spn_cli_build_t;
 
 typedef struct {
@@ -198,9 +197,6 @@ typedef struct {
     const c8* package;
     const c8* command;
   } tool_run;
-  struct {
-    const c8* name;
-  } build;
   struct {
     const c8* entry;
   } run;

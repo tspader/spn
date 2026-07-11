@@ -7,8 +7,8 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
   spn_cli_build_t* command = &spn.cli.build;
 
   app.config.force = command->force;
-  app.config.filter = (spn_target_filter_t) {
-    .name = command->name,
+  app.config.requests = sp_da_new(spn.heap, spn_build_request_t);
+  spn_target_filter_t filter = {
     .only = {
       .bin = command->only.bin,
       .lib = command->only.lib,
@@ -16,9 +16,23 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
       .script = command->only.script,
     },
     .disabled = {
-      .script = sp_str_empty(command->name) && !command->only.script,
+      .script = !command->only.script,
     }
   };
+  if (cli->num_rest) {
+    sp_for(it, cli->num_rest) {
+      filter.name = sp_cstr_as_str(cli->rest[it]);
+      filter.disabled.script = false;
+      sp_da_push(app.config.requests, ((spn_build_request_t) {
+        .filter = filter,
+      }));
+    }
+  }
+  else {
+    sp_da_push(app.config.requests, ((spn_build_request_t) {
+      .filter = filter,
+    }));
+  }
 
   return spn_plan(
     SPN_TASK_SYNC_INDEXES,

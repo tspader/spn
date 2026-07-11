@@ -6,15 +6,18 @@
 sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
   spn_cli_test_t* command = &spn.cli.test;
 
-  app.config.filter = (spn_target_filter_t) {
-    .name = command->name,
-    .disabled = {
-      .public = true,
-      .script = true,
-    }
-  };
+  app.config.requests = sp_da_new(spn.heap, spn_build_request_t);
+  sp_da_push(app.config.requests, ((spn_build_request_t) {
+    .filter = {
+      .name = command->name,
+      .disabled = {
+        .public = true,
+        .script = true,
+      },
+    },
+  }));
   app.config.run = (spn_run_config_t) {
-    .kind = SPN_RUN_KIND_TESTS,
+    .kind = SPN_RUN_KIND_ROOTS,
   };
 
   return spn_plan(

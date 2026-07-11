@@ -42,18 +42,6 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   return SPN_OK;
 }
 
-static spn_err_t order_root_configure(spn_session_t* session, spn_build_graph_t* graph, spn_pkg_unit_t* root) {
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (unit->build == root->build && unit->source != SPN_PKG_SOURCE_ROOT) {
-      if (spn_bg_cmd_add_input(graph, root->nodes.configure.run, unit->nodes.configure.stamp)) {
-        return SPN_ERROR;
-      }
-    }
-  }
-  return SPN_OK;
-}
-
 spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->configure.graph;
@@ -71,13 +59,6 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
     unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
     if (spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp)) {
       return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
-    }
-  }
-
-  sp_da_for(session->units.roots, it) {
-    spn_pkg_unit_t* root = session->units.roots[it];
-    if (order_root_configure(session, graph, root)) {
-      return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = root->paths.stamp.configure });
     }
   }
 

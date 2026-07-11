@@ -46,8 +46,7 @@ typedef struct {
 
 typedef enum {
   SPN_RUN_KIND_NONE,
-  SPN_RUN_KIND_TESTS,
-  SPN_RUN_KIND_SCRIPT,
+  SPN_RUN_KIND_ROOTS,
   SPN_RUN_KIND_SOURCE,
 } spn_run_kind_t;
 
@@ -57,7 +56,7 @@ typedef struct {
 } spn_run_config_t;
 
 typedef struct {
-  spn_target_filter_t filter;
+  sp_da(spn_build_request_t) requests;
   bool force;
   spn_run_config_t run;
   spn_profile_info_t overrides;
@@ -70,7 +69,6 @@ struct spn_session_t {
   spn_pkg_info_t* pkg;
   spn_event_buffer_t* events;
   spn_git_cache_t* git;
-  spn_target_filter_t filter;
   sp_env_t env;
 
   spn_profile_table_t profiles;
@@ -92,7 +90,10 @@ struct spn_session_t {
   spn_profile_info_t profile;
   struct {
     sp_da(spn_build_unit_t*) builds;
-    sp_da(spn_pkg_unit_t*) roots;
+    sp_da(spn_build_request_t) requests;
+  } plan;
+  struct {
+    sp_da(spn_target_unit_t*) roots;
     sp_om(spn_compile_unit_id_t, spn_compile_unit_t) objects;
     sp_om(spn_target_unit_id_t, spn_target_unit_t) targets;
     sp_om(spn_pkg_unit_id_t, spn_pkg_unit_t) packages;
