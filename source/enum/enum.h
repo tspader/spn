@@ -24,6 +24,12 @@ spn_libc_kind_t spn_libc_kind_from_str(sp_str_t str);
 sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc);
 spn_build_mode_t spn_build_mode_from_str(sp_str_t str);
 sp_str_t spn_build_mode_to_str(spn_build_mode_t mode);
+spn_opt_level_t spn_opt_level_from_str(sp_str_t str);
+sp_str_t spn_opt_level_to_str(spn_opt_level_t level);
+spn_sanitizer_t spn_sanitizer_from_str(sp_str_t str);
+sp_str_t spn_sanitizer_to_str(spn_sanitizer_t sanitizer);
+sp_str_t spn_sanitizer_set_to_str(sp_mem_t mem, spn_sanitizer_set_t set);
+bool spn_sanitizer_set_conflicting(spn_sanitizer_set_t set);
 
 spn_linkage_t spn_lib_kind_from_str(sp_str_t str);
 spn_linkage_t spn_linkage_from_str(sp_str_t str);

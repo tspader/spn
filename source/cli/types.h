@@ -175,6 +175,8 @@ typedef struct {
     const c8* name;
     const c8* toolchain;
     const c8* mode;
+    const c8* opt;
+    const c8* sanitize;
     const c8* target;
     const c8* os;
     const c8* arch;

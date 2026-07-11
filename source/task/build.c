@@ -572,11 +572,13 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   nodes->stamp.package = spn_bg_add_file(graph, unit->paths.stamp.package);
   nodes->stamp.main = spn_bg_add_file(graph, unit->paths.stamp.main);
   nodes->stamp.exit = spn_bg_add_file(graph, unit->paths.stamp.exit);
+  nodes->stamp.profile = spn_bg_add_file(graph, unit->paths.stamp.profile);
   nodes->main = add_build_command(unit->session, unit->build, stamp_enter, unit);
   nodes->exit = add_build_command(unit->session, unit->build, stamp_exit, unit);
 
   spn_try(spn_bg_cmd_add_input(graph, nodes->main, nodes->manifest));
   spn_try(spn_bg_cmd_add_input(graph, nodes->main, nodes->script));
+  spn_try(spn_bg_cmd_add_input(graph, nodes->main, nodes->stamp.profile));
   spn_try(spn_bg_cmd_add_output(graph, nodes->main, nodes->stamp.main));
   spn_try(spn_bg_cmd_add_input(graph, nodes->exit, nodes->stamp.main));
   spn_try(spn_bg_cmd_add_output(graph, nodes->exit, nodes->stamp.exit));

@@ -43,11 +43,17 @@ void spn_when_env_set(spn_when_env_t* env, sp_str_t key, spn_option_value_t valu
   sp_str_ht_insert(*env, key, value);
 }
 
-void spn_when_env_set_facts(spn_when_env_t* env, spn_os_t os, spn_arch_t arch, spn_abi_t abi, spn_build_mode_t mode) {
-  spn_when_env_set(env, sp_str_lit("os"), spn_option_value_str(spn_os_to_str(os)));
-  spn_when_env_set(env, sp_str_lit("arch"), spn_option_value_str(spn_arch_to_str(arch)));
-  spn_when_env_set(env, sp_str_lit("abi"), spn_option_value_str(spn_abi_to_str(abi)));
-  spn_when_env_set(env, sp_str_lit("mode"), spn_option_value_str(spn_build_mode_to_str(mode)));
+void spn_when_env_set_facts(spn_when_env_t* env, spn_when_facts_t facts) {
+  spn_when_env_set(env, sp_str_lit("os"), spn_option_value_str(spn_os_to_str(facts.os)));
+  spn_when_env_set(env, sp_str_lit("arch"), spn_option_value_str(spn_arch_to_str(facts.arch)));
+  spn_when_env_set(env, sp_str_lit("abi"), spn_option_value_str(spn_abi_to_str(facts.abi)));
+  spn_when_env_set(env, sp_str_lit("mode"), spn_option_value_str(spn_build_mode_to_str(facts.mode)));
+  spn_when_env_set(env, sp_str_lit("opt"), spn_option_value_str(spn_opt_level_to_str(facts.opt)));
+  spn_when_env_set(env, sp_str_lit("sanitize_address"), spn_option_value_bool(facts.sanitizers & SPN_SANITIZER_ADDRESS));
+  spn_when_env_set(env, sp_str_lit("sanitize_thread"), spn_option_value_bool(facts.sanitizers & SPN_SANITIZER_THREAD));
+  spn_when_env_set(env, sp_str_lit("sanitize_undefined"), spn_option_value_bool(facts.sanitizers & SPN_SANITIZER_UNDEFINED));
+  spn_when_env_set(env, sp_str_lit("sanitize_memory"), spn_option_value_bool(facts.sanitizers & SPN_SANITIZER_MEMORY));
+  spn_when_env_set(env, sp_str_lit("sanitize_leak"), spn_option_value_bool(facts.sanitizers & SPN_SANITIZER_LEAK));
 }
 
 bool spn_when_eval(const spn_when_t* when, spn_when_env_t* env) {

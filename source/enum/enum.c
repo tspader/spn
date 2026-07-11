@@ -199,6 +199,127 @@ sp_str_t spn_build_mode_to_str(spn_build_mode_t mode) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+spn_opt_level_t spn_opt_level_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "0")) {
+    return SPN_OPT_LEVEL_0;
+  }
+  if (sp_str_equal_cstr(str, "1")) {
+    return SPN_OPT_LEVEL_1;
+  }
+  if (sp_str_equal_cstr(str, "2")) {
+    return SPN_OPT_LEVEL_2;
+  }
+  if (sp_str_equal_cstr(str, "3")) {
+    return SPN_OPT_LEVEL_3;
+  }
+  if (sp_str_equal_cstr(str, "s")) {
+    return SPN_OPT_LEVEL_S;
+  }
+  if (sp_str_equal_cstr(str, "z")) {
+    return SPN_OPT_LEVEL_Z;
+  }
+
+  return SPN_OPT_LEVEL_NONE;
+}
+
+sp_str_t spn_opt_level_to_str(spn_opt_level_t level) {
+  switch (level) {
+    case SPN_OPT_LEVEL_0: {
+      return sp_str_lit("0");
+    }
+    case SPN_OPT_LEVEL_1: {
+      return sp_str_lit("1");
+    }
+    case SPN_OPT_LEVEL_2: {
+      return sp_str_lit("2");
+    }
+    case SPN_OPT_LEVEL_3: {
+      return sp_str_lit("3");
+    }
+    case SPN_OPT_LEVEL_S: {
+      return sp_str_lit("s");
+    }
+    case SPN_OPT_LEVEL_Z: {
+      return sp_str_lit("z");
+    }
+    case SPN_OPT_LEVEL_NONE: {
+      return sp_str_lit("");
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+spn_sanitizer_t spn_sanitizer_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "address")) {
+    return SPN_SANITIZER_ADDRESS;
+  }
+  if (sp_str_equal_cstr(str, "thread")) {
+    return SPN_SANITIZER_THREAD;
+  }
+  if (sp_str_equal_cstr(str, "undefined")) {
+    return SPN_SANITIZER_UNDEFINED;
+  }
+  if (sp_str_equal_cstr(str, "memory")) {
+    return SPN_SANITIZER_MEMORY;
+  }
+  if (sp_str_equal_cstr(str, "leak")) {
+    return SPN_SANITIZER_LEAK;
+  }
+
+  return SPN_SANITIZER_NONE;
+}
+
+sp_str_t spn_sanitizer_to_str(spn_sanitizer_t sanitizer) {
+  switch (sanitizer) {
+    case SPN_SANITIZER_ADDRESS: {
+      return sp_str_lit("address");
+    }
+    case SPN_SANITIZER_THREAD: {
+      return sp_str_lit("thread");
+    }
+    case SPN_SANITIZER_UNDEFINED: {
+      return sp_str_lit("undefined");
+    }
+    case SPN_SANITIZER_MEMORY: {
+      return sp_str_lit("memory");
+    }
+    case SPN_SANITIZER_LEAK: {
+      return sp_str_lit("leak");
+    }
+    case SPN_SANITIZER_NONE: {
+      return sp_str_lit("");
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+sp_str_t spn_sanitizer_set_to_str(sp_mem_t mem, spn_sanitizer_set_t set) {
+  sp_io_dyn_mem_writer_t out;
+  sp_io_dyn_mem_writer_init(mem, &out);
+  bool first = true;
+  sp_for(it, 5) {
+    spn_sanitizer_set_t bit = (spn_sanitizer_set_t)1 << it;
+    if (!(set & bit)) {
+      continue;
+    }
+    sp_fmt_io(&out.base, first ? "{}" : ",{}", sp_fmt_str(spn_sanitizer_to_str((spn_sanitizer_t)bit)));
+    first = false;
+  }
+  return sp_io_dyn_mem_writer_as_str(&out);
+}
+
+bool spn_sanitizer_set_conflicting(spn_sanitizer_set_t set) {
+  if ((set & SPN_SANITIZER_THREAD) && (set & (SPN_SANITIZER_ADDRESS | SPN_SANITIZER_MEMORY | SPN_SANITIZER_LEAK))) {
+    return true;
+  }
+  if ((set & SPN_SANITIZER_MEMORY) && (set & (SPN_SANITIZER_ADDRESS | SPN_SANITIZER_LEAK))) {
+    return true;
+  }
+  return false;
+}
+
 spn_linkage_t spn_lib_kind_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "shared")) {
     return SPN_LIB_KIND_SHARED;

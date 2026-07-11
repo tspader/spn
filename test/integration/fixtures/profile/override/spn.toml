@@ -1,0 +1,10 @@
+[package]
+name = "profile_override"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+define = [
+  { value = "FAST", when = { opt = "3" } },
+]

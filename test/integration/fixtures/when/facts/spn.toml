@@ -11,5 +11,8 @@ define = [
   { value = "FACT_ARCH", when = { arch = "x86_64" } },
   { value = "FACT_ARCH", when = { arch = "aarch64" } },
   { value = "FACT_MODE", when = { mode = "debug" } },
+  { value = "FACT_OPT", when = { opt = "0" } },
+  { value = "FACT_NO_TSAN", when = { sanitize_thread = false } },
   { value = "FACT_OTHER_OS", when = { os = "windows" } },
+  { value = "FACT_SANITIZED", when = { sanitize_address = true } },
 ]

@@ -1,0 +1,8 @@
+[package]
+name = "prof"
+version = "1.0.0"
+
+[profile.fast]
+mode = "release"
+opt = "3"
+sanitize = ["address", "undefined"]

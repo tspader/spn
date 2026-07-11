@@ -14,6 +14,7 @@
 #include "unit/types.h"
 
 #include "event/event.h"
+#include "gen.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
 #include "pkg/mutate.h"
@@ -42,6 +43,28 @@ sp_str_t spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir) {
   }
 
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+void spn_api_add_profile_flags_env(sp_mem_t mem, spn_pkg_unit_t* unit, sp_ps_config_t* config) {
+  spn_profile_info_t* profile = &unit->build->profile;
+  spn_cc_driver_t driver = unit->build->toolchain->toolchain->driver;
+  sp_str_t flags = spn_cc_profile_to_flags(mem, profile, driver);
+  sp_str_t link = spn_cc_sanitizers_to_switch(mem, profile->sanitizers, driver);
+
+  u32 slot = sp_carr_len(config->env.extra);
+  sp_carr_for(config->env.extra, it) {
+    if (sp_str_empty(config->env.extra[it].key)) {
+      slot = it;
+      break;
+    }
+  }
+  u32 count = sp_str_empty(link) ? 2 : 3;
+  SP_ASSERT(slot + count <= sp_carr_len(config->env.extra));
+  config->env.extra[slot++] = (sp_env_var_t) { .key = sp_str_lit("CFLAGS"), .value = flags };
+  config->env.extra[slot++] = (sp_env_var_t) { .key = sp_str_lit("CXXFLAGS"), .value = flags };
+  if (!sp_str_empty(link)) {
+    config->env.extra[slot] = (sp_env_var_t) { .key = sp_str_lit("LDFLAGS"), .value = link };
+  }
 }
 
 sp_ps_output_t spn_api_subprocess(sp_mem_t mem, spn_pkg_unit_t* unit, sp_ps_config_t config) {
@@ -284,6 +307,14 @@ spn_c_standard_t spn_profile_get_standard(spn_profile_t* profile) {
 
 spn_build_mode_t spn_profile_get_mode(spn_profile_t* profile) {
   return ((spn_profile_info_t*)profile)->mode;
+}
+
+spn_opt_level_t spn_profile_get_opt(spn_profile_t* profile) {
+  return ((spn_profile_info_t*)profile)->opt;
+}
+
+spn_sanitizer_set_t spn_profile_get_sanitizers(spn_profile_t* profile) {
+  return ((spn_profile_info_t*)profile)->sanitizers;
 }
 
 void spn_target_add_source(spn_target_t* target, const c8* source) {

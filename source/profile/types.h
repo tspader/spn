@@ -15,6 +15,9 @@ struct spn_profile_info {
   spn_linkage_t linkage;
   spn_c_standard_t standard;
   spn_build_mode_t mode;
+  spn_opt_level_t opt;
+  spn_sanitizer_set_t sanitizers;
+  bool sanitizers_set;
   spn_when_t options;
   bool targeted;
 };
@@ -23,6 +26,8 @@ typedef struct {
   sp_str_t name;
   sp_str_t toolchain;
   sp_str_t mode;
+  sp_str_t opt;
+  sp_str_t sanitize;
   sp_str_t target;
   sp_str_t os;
   sp_str_t arch;

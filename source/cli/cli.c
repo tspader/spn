@@ -127,6 +127,20 @@ static sp_cli_cmd_t cmd_build = {
       .ptr = &spn_cli_raw.profile.mode,
     },
     {
+      .name = "opt",
+      .kind = SP_CLI_OPT_STRING,
+      .summary = "Override optimization level (0, 1, 2, 3, s, z)",
+      .placeholder = "LEVEL",
+      .ptr = &spn_cli_raw.profile.opt,
+    },
+    {
+      .name = "sanitize",
+      .kind = SP_CLI_OPT_STRING,
+      .summary = "Enable sanitizers (address, thread, undefined, memory, leak)",
+      .placeholder = "LIST",
+      .ptr = &spn_cli_raw.profile.sanitize,
+    },
+    {
       .name = "target",
       .kind = SP_CLI_OPT_STRING,
       .summary = "Target triple (e.g. aarch64-linux-gnu)",
@@ -192,6 +206,20 @@ static sp_cli_cmd_t cmd_run = {
       .placeholder = "MODE",
       .ptr = &spn_cli_raw.profile.mode,
     },
+    {
+      .name = "opt",
+      .kind = SP_CLI_OPT_STRING,
+      .summary = "Override optimization level (0, 1, 2, 3, s, z)",
+      .placeholder = "LEVEL",
+      .ptr = &spn_cli_raw.profile.opt,
+    },
+    {
+      .name = "sanitize",
+      .kind = SP_CLI_OPT_STRING,
+      .summary = "Enable sanitizers (address, thread, undefined, memory, leak)",
+      .placeholder = "LIST",
+      .ptr = &spn_cli_raw.profile.sanitize,
+    },
   },
   .args = {
     {
@@ -229,6 +257,20 @@ static sp_cli_cmd_t cmd_test = {
       .summary = "Override build mode (debug, release)",
       .placeholder = "MODE",
       .ptr = &spn_cli_raw.profile.mode,
+    },
+    {
+      .name = "opt",
+      .kind = SP_CLI_OPT_STRING,
+      .summary = "Override optimization level (0, 1, 2, 3, s, z)",
+      .placeholder = "LEVEL",
+      .ptr = &spn_cli_raw.profile.opt,
+    },
+    {
+      .name = "sanitize",
+      .kind = SP_CLI_OPT_STRING,
+      .summary = "Enable sanitizers (address, thread, undefined, memory, leak)",
+      .placeholder = "LIST",
+      .ptr = &spn_cli_raw.profile.sanitize,
     },
   },
   .args = {
@@ -499,6 +541,8 @@ void spn_cli_commit(void) {
   spn.cli.profile.name = sp_cstr_as_str(spn_cli_raw.profile.name);
   spn.cli.profile.toolchain = sp_cstr_as_str(spn_cli_raw.profile.toolchain);
   spn.cli.profile.mode = sp_cstr_as_str(spn_cli_raw.profile.mode);
+  spn.cli.profile.opt = sp_cstr_as_str(spn_cli_raw.profile.opt);
+  spn.cli.profile.sanitize = sp_cstr_as_str(spn_cli_raw.profile.sanitize);
   spn.cli.profile.target = sp_cstr_as_str(spn_cli_raw.profile.target);
   spn.cli.profile.os = sp_cstr_as_str(spn_cli_raw.profile.os);
   spn.cli.profile.arch = sp_cstr_as_str(spn_cli_raw.profile.arch);

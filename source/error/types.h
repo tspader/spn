@@ -115,6 +115,10 @@ typedef struct {
       sp_str_t expected;
     } flag;
     struct {
+      sp_str_t toolchain;
+      spn_sanitizer_set_t unsupported;
+    } sanitizer;
+    struct {
       sp_str_t path;
     } fs;
     struct {

@@ -20,6 +20,8 @@
     "c_standard": { "enum": ["c89", "c99", "c11"] },
     "cxx_standard": { "enum": ["c++11", "c++14", "c++17", "c++20", "c++23"] },
     "build_mode": { "enum": ["release", "debug"] },
+    "opt_level": { "enum": ["0", "1", "2", "3", "s", "z"] },
+    "sanitizer": { "enum": ["address", "thread", "undefined", "memory", "leak"] },
 
     "option": {
       "properties": {
@@ -158,6 +160,8 @@
         "standard": { "ref": "c_standard" },
         "toolchain": { "type": "string" },
         "mode": { "ref": "build_mode" },
+        "opt": { "ref": "opt_level" },
+        "sanitize": { "elements": { "ref": "sanitizer" } },
         "os": { "ref": "os" },
         "arch": { "ref": "arch" },
         "abi": { "ref": "abi" },
