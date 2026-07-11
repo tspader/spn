@@ -3,6 +3,7 @@
 
 #include "sp.h"
 
+#include "compiler/types.h"
 #include "git/types.h"
 #include "filter/types.h"
 #include "graph/types.h"
@@ -90,6 +91,7 @@ struct spn_session_t {
   } gates;
 
   spn_profile_info_t profile;
+  spn_cc_flags_t flags;
   struct {
     spn_compile_request_t request;
     sp_da(spn_build_plan_t) builds;

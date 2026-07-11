@@ -313,6 +313,7 @@ void add_compilation_units(spn_session_t *s) {
       .id = (spn_build_unit_id_t)sp_da_size(s->plan.builds),
       .kind = SPN_BUILD_KIND_TARGET,
       .profile = s->profile,
+      .flags = s->flags,
       .toolchain = s->units.toolchain,
       .paths = { .profile = s->paths.profile },
     };

@@ -666,8 +666,9 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
         case SPN_ERR_SANITIZER_UNSUPPORTED: {
           sp_fmt_io(
             &w.base,
-            "toolchain {.cyan} doesn't support {.red}",
+            "toolchain {.cyan} targeting {.yellow} doesn't support {.red}",
             sp_fmt_str(event->err.sanitizer.toolchain),
+            sp_fmt_str(spn_triple_to_str(mem, event->err.sanitizer.target)),
             sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.unsupported))
           );
           break;

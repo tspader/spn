@@ -15,6 +15,7 @@ void spn_session_build_invocations(spn_session_t* session) {
     spn_cc_t cc;
     spn_cc_init(&cc, mem);
     spn_cc_set_profile(&cc, unit->package->build->profile);
+    spn_cc_set_flags(&cc, unit->package->build->flags);
     spn_cc_set_toolchain(&cc, unit->package->build->toolchain);
     spn_cc_add_pkg(&cc, unit->package);
 

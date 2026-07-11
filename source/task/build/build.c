@@ -8,6 +8,7 @@
 #include "unit/types.h"
 
 #include "gen.h"
+#include "compiler/flags.h"
 #include "enum/enum.h"
 #include "event/event.h"
 #include "filter/filter.h"
@@ -36,19 +37,26 @@ void spn_cc_target_add_build_deps(spn_cc_target_t* target, spn_pkg_unit_t* unit)
 
 spn_err_t spn_compile_script_module(spn_pkg_unit_t* unit, spn_target_info_t* script, sp_str_t output) {
   spn_session_t* session = unit->session;
-
-  spn_cc_t* cc = sp_alloc_type(spn.mem, spn_cc_t);
-  spn_cc_init(cc, spn.mem);
-  spn_cc_set_profile(cc, (spn_profile_info_t) {
+  spn_profile_info_t profile = {
     .arch = SPN_ARCH_WASM32,
     .os = SPN_OS_WASI,
     .abi = SPN_ABI_NONE,
     .mode = SPN_BUILD_MODE_DEBUG,
     .linkage = SPN_LIB_KIND_SHARED,
     .standard = SPN_C99
-  });
+  };
+
+  spn_cc_t* cc = sp_alloc_type(spn.mem, spn_cc_t);
+  spn_cc_init(cc, spn.mem);
+  spn_cc_set_profile(cc, profile);
   spn_cc_set_output_dir(cc, sp_fs_parent_path(output));
   spn_cc_set_toolchain(cc, session->units.script);
+  spn_cc_flags_t flags = SP_ZERO_INITIALIZE();
+  spn_err_union_t err = spn_cc_flags_resolve(spn.mem, &profile, session->units.script->toolchain, &flags);
+  if (err.kind) {
+    return err.kind;
+  }
+  spn_cc_set_flags(cc, flags);
   spn_cc_add_include(cc, spn.paths.include);
 
   spn_cc_target_t* target = spn_cc_add_target(cc, SPN_CC_OUTPUT_WASM, sp_fs_get_name(output));

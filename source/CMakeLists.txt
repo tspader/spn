@@ -29,6 +29,7 @@ set(SPN_SOURCES
   codegen/lower.c
   codegen/options.c
   codegen/when.c
+  compiler/flags.c
   ctx/ctx.c
   enum/enum.c
   event/event.c

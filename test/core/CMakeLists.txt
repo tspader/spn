@@ -72,6 +72,14 @@ add_executable(when
 spn_test_binary(when)
 add_test(NAME when COMMAND "$<TARGET_FILE:when>")
 
+add_executable(compiler_flags
+  ${SRC}/compiler/flags.c
+  ${SRC}/enum/enum.c
+  compiler.c
+)
+spn_test_binary(compiler_flags)
+add_test(NAME compiler_flags COMMAND "$<TARGET_FILE:compiler_flags>")
+
 add_executable(schema
   ${CMAKE_SOURCE_DIR}/tools/jtd.c
   ${SRC}/enum/enum.c

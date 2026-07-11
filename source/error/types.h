@@ -116,6 +116,7 @@ typedef struct {
     } flag;
     struct {
       sp_str_t toolchain;
+      spn_triple_t target;
       spn_sanitizer_set_t unsupported;
     } sanitizer;
     struct {
