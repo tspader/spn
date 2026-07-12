@@ -130,7 +130,7 @@ static sp_str_t spn_cmake_generate_toolchain_file(sp_mem_t mem, spn_pkg_unit_t* 
   set(io, "CMAKE_SYSTEM_PROCESSOR", spn_arch_to_str(profile->arch));
   set(io, "CMAKE_C_COMPILER", spn_cmake_launcher_program(mem, tools, "cc", toolchain->compiler));
   set(io, "CMAKE_C_COMPILER_TARGET", spn_triple_to_cc_target(mem, target));
-  if (spn_toolchain_has_cxx(toolchain->toolchain)) {
+  if (spn_toolchain_has_cxx(toolchain->info)) {
     set(io, "CMAKE_CXX_COMPILER", spn_cmake_launcher_program(mem, tools, "cxx", toolchain->cxx));
     set(io, "CMAKE_CXX_COMPILER_TARGET", spn_triple_to_cc_target(mem, target));
   }
@@ -171,7 +171,7 @@ s32 spn_cmake_configure(spn_cmake_t* cmake) {
 
   const c8* configuration = profile->mode == SPN_BUILD_MODE_RELEASE ? "RELEASE" : "DEBUG";
   spn_cc_flags_t flags = SP_ZERO_INITIALIZE();
-  spn_err_union_t flags_err = spn_cc_render_flags(scratch.mem, unit->build->toolchain->toolchain->driver, profile, &flags);
+  spn_err_union_t flags_err = spn_cc_render_flags(scratch.mem, unit->build->toolchain->info->driver, profile, &flags);
   if (flags_err.kind) {
     sp_mem_end_scratch(scratch);
     return SPN_ERROR;

@@ -24,7 +24,7 @@ spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
       continue;
     }
 
-    spn_build_unit_t* build = unit->package->build;
+    spn_build_unit_t* build = unit->target->build;
 
     spn_cc_compile_t compile = {
       .lang = unit->lang,
@@ -42,7 +42,9 @@ spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
       sp_da_push(compile.include, build->include[it]);
     }
 
-    if (unit->target->info->kind != SPN_TARGET_MODULE) {
+    bool program = unit->target->info->kind == SPN_TARGET_CONFIGURE_METAPROGRAM ||
+      unit->target->info->kind == SPN_TARGET_BUILD_METAPROGRAM;
+    if (!program) {
       sp_da_for(unit->package->info->include, it) {
         sp_da_push(compile.include, resolve_pkg_path(mem, unit->package, unit->package->info->include[it]));
       }
@@ -61,21 +63,31 @@ spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
       sp_da_push(compile.args, unit->target->info->flags[it]);
     }
 
-    sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit->package);
-    sp_da_for(deps, it) {
-      if (!deps[it].unit) {
-        continue;
-      }
-      if (!(build->dep_kinds & spn_dep_kind_bit(deps[it].kind))) {
-        continue;
-      }
-      if (deps[it].kind == SPN_DEP_KIND_TEST && unit->target->info->kind != SPN_TARGET_TEST) {
-        continue;
-      }
+    if (!program) {
+      sp_da(spn_pkg_dep_t) deps = unit->package->deps;
+      sp_da_for(deps, it) {
+        if (!deps[it].unit) {
+          continue;
+        }
+        if (deps[it].kind == SPN_DEP_KIND_TEST && unit->target->info->kind != SPN_TARGET_TEST) {
+          continue;
+        }
 
-      sp_da_push(compile.include, deps[it].unit->paths.include);
-      sp_da_for(deps[it].unit->info->public_define, dt) {
-        sp_da_push(compile.define, deps[it].unit->info->public_define[dt]);
+        spn_pkg_unit_t* dependency = deps[it].unit;
+        sp_da_push(compile.include, dependency->paths.include);
+        sp_da_for(dependency->info->public_define, it) {
+          sp_da_push(compile.define, dependency->info->public_define[it]);
+        }
+      }
+    }
+
+    if (program) {
+      sp_da_for(unit->target->deps.package, it) {
+        spn_pkg_unit_t* dependency = unit->target->deps.package[it];
+        sp_da_push(compile.include, dependency->paths.include);
+        sp_da_for(dependency->info->public_define, it) {
+          sp_da_push(compile.define, dependency->info->public_define[it]);
+        }
       }
     }
 
@@ -84,8 +96,8 @@ spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
     }
 
     sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
-    spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(unit->package->build->toolchain);
-    spn_err_union_t err = spn_cc_render_compile(mem, &toolchain, &unit->package->build->profile, &compile, &ps);
+    spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(unit->target->build->toolchain);
+    spn_err_union_t err = spn_cc_render_compile(mem, &toolchain, &unit->target->build->profile, &compile, &ps);
     if (err.kind) {
       return err;
     }

@@ -1,11 +1,9 @@
 #include "target/closure.h"
 
 #include "forward/types.h"
-#include "session/session.h"
 #include "target/types.h"
 
 typedef struct {
-  spn_session_t* session;
   sp_da(spn_pkg_unit_t*) visited;
   sp_da(spn_closure_entry_t) closure;
 } search_t;
@@ -40,7 +38,7 @@ static bool edge_links(spn_pkg_dep_t* dep, bool tests) {
 #define CLOSURE_DO_NOT_SEARCH_TESTS false
 
 static void collect(search_t* s, spn_pkg_unit_t* pkg, bool private, bool tests) {
-  sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(s->session, pkg);
+  sp_da(spn_pkg_dep_t) deps = pkg->deps;
   sp_da_for(deps, it) {
     spn_pkg_dep_t* dep = &deps[it];
     if (!edge_links(dep, tests)) {
@@ -72,7 +70,6 @@ sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
 
   search_t search = {
-    .session = root->session,
     .visited = sp_da_new(s.mem, spn_pkg_unit_t*),
     .closure = sp_da_new(s.mem, spn_closure_entry_t),
   };
@@ -88,7 +85,7 @@ sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit
 }
 
 static void collect_runtime(search_t* s, spn_pkg_unit_t* pkg, bool tests) {
-  sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(s->session, pkg);
+  sp_da(spn_pkg_dep_t) deps = pkg->deps;
   sp_da_for(deps, it) {
     spn_pkg_dep_t* dep = &deps[it];
     if (!edge_links(dep, tests)) {
@@ -141,7 +138,6 @@ sp_da(spn_target_unit_t*) spn_target_runtime_libs(sp_mem_t mem, spn_target_unit_
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
 
   search_t search = {
-    .session = root->session,
     .visited = sp_da_new(s.mem, spn_pkg_unit_t*),
     .closure = sp_da_new(s.mem, spn_closure_entry_t),
   };

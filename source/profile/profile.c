@@ -6,6 +6,14 @@
 #include "spn.h"
 #include "triple/triple.h"
 
+sp_str_t spn_profile_build_path(sp_mem_t mem, sp_str_t build, const spn_profile_info_t* profile) {
+  if (profile->targeted) {
+    spn_triple_t target = { profile->arch, profile->os, profile->abi };
+    build = sp_fs_join_path(mem, build, spn_triple_to_str(mem, target));
+  }
+  return sp_fs_join_path(mem, build, profile->name);
+}
+
 void spn_profile_overlay(spn_profile_info_t* dst, spn_profile_info_t* src) {
   if (!sp_str_empty(src->name))      dst->name = src->name;
   if (!sp_str_empty(src->toolchain)) dst->toolchain = src->toolchain;

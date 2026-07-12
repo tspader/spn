@@ -81,6 +81,7 @@ set(SPN_SOURCES
   target/select.c
   target/target.c
   task/build/build.c
+  task/build/target.c
   task/build/nodes/embed.c
   task/build/nodes/link.c
   task/build/nodes/object.c

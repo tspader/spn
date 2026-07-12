@@ -131,17 +131,17 @@ static void lower_collection(spn_toml_loader_t* ctx, spn_cg_target_om_t cg, spn_
   }
 }
 
-static spn_target_info_t lower_script(spn_toml_loader_t* ctx, const spn_cg_build_script_t* cg, sp_str_t name) {
-  spn_target_info_t script = {
+static spn_target_info_t lower_metaprogram(spn_toml_loader_t* ctx, const spn_cg_build_script_t* cg, sp_str_t name, spn_target_kind_t kind) {
+  spn_target_info_t program = {
     .name = name,
-    .kind = SPN_TARGET_MODULE,
+    .kind = kind,
     .source = cg->source,
     .include = cg->include,
     .define = cg->define,
     .flags = cg->flags,
   };
-  spn_target_info_init(ctx->mem, &script);
-  return script;
+  spn_target_info_init(ctx->mem, &program);
+  return program;
 }
 
 static void lower_dep(spn_toml_loader_t* ctx, sp_str_t name, const spn_cg_dep_t* cg, spn_dep_kind_t kind, spn_pkg_info_t* out) {
@@ -179,30 +179,30 @@ static void lower_dep(spn_toml_loader_t* ctx, sp_str_t name, const spn_cg_dep_t*
   sp_da_push(out->deps, req);
 }
 
-static void lower_package(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
+static void lower_package(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* info) {
   const spn_cg_package_t* p = &cg->package;
-  out->name = p->name;
-  out->namespace = p->namespace;
-  out->repo = p->repo;
-  out->upstream.url = p->url;
-  out->upstream.commit = p->commit;
-  out->author = p->author;
-  out->maintainer = p->maintainer;
-  out->qualified = lower_qualify(ctx, p->namespace, p->name);
-  out->version = spn_semver_from_str(p->version);
-  out->include = sp_da_new(ctx->mem, sp_str_t);
+  info->name = p->name;
+  info->namespace = p->namespace;
+  info->repo = p->repo;
+  info->upstream.url = p->url;
+  info->upstream.commit = p->commit;
+  info->author = p->author;
+  info->maintainer = p->maintainer;
+  info->qualified = lower_qualify(ctx, p->namespace, p->name);
+  info->version = spn_semver_from_str(p->version);
+  info->include = sp_da_new(ctx->mem, sp_str_t);
   sp_da_for(p->include, it) {
-    sp_da_push(out->include, sp_fs_join_path(ctx->mem, ctx->dir, p->include[it]));
+    sp_da_push(info->include, sp_fs_join_path(ctx->mem, ctx->dir, p->include[it]));
   }
-  out->define = p->define ? p->define : sp_da_new(ctx->mem, sp_str_t);
-  out->public_define = sp_da_new(ctx->mem, sp_str_t);
-  out->system_deps = sp_da_new(ctx->mem, sp_str_t);
-  out->gated.system_deps = sp_da_new(ctx->mem, spn_gated_str_t);
+  info->define = p->define ? p->define : sp_da_new(ctx->mem, sp_str_t);
+  info->public_define = sp_da_new(ctx->mem, sp_str_t);
+  info->system_deps = sp_da_new(ctx->mem, sp_str_t);
+  info->gated.system_deps = sp_da_new(ctx->mem, spn_gated_str_t);
   sp_da_for(p->system_deps, it) {
-    sp_da_push(out->gated.system_deps, ((spn_gated_str_t) { .value = p->system_deps[it].lib, .when = p->system_deps[it].when }));
+    sp_da_push(info->gated.system_deps, ((spn_gated_str_t) { .value = p->system_deps[it].lib, .when = p->system_deps[it].when }));
   }
-  out->build = lower_script(ctx, &p->build, sp_str_lit("build"));
-  out->configure = lower_script(ctx, &p->configure, sp_str_lit("configure"));
+  info->build = lower_metaprogram(ctx, &p->build, sp_str_lit("build"), SPN_TARGET_BUILD_METAPROGRAM);
+  info->configure = lower_metaprogram(ctx, &p->configure, sp_str_lit("configure"), SPN_TARGET_CONFIGURE_METAPROGRAM);
 }
 
 static bool publish_mount_ok(sp_str_t path) {
@@ -245,7 +245,7 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
   sp_da_for(cg->toolchain, n) {
     const spn_cg_manifest_toolchain_t* t = &cg->toolchain[n];
 
-    spn_toolchain_t toolchain = sp_zero;
+    spn_toolchain_info_t toolchain = sp_zero;
     toolchain.name = t->name;
     toolchain.driver = sp_opt_is_null(t->driver) ? SPN_CC_DRIVER_NONE : sp_opt_get(t->driver);
     toolchain.compiler = lower_launcher(ctx, t->compiler);
@@ -253,22 +253,22 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
     toolchain.linker = lower_launcher(ctx, t->linker);
     toolchain.archiver = lower_launcher(ctx, t->archiver);
 
-    sp_da(spn_toolchain_host_t) hosts = sp_da_new(ctx->mem, spn_toolchain_host_t);
-    sp_da_for(t->host, i) {
-      sp_da_push(hosts, ((spn_toolchain_host_t) {
-        .triple = spn_triple_from_str(t->host[i].key),
+    toolchain.hosts = sp_da_new(ctx->mem, spn_toolchain_host_t);
+    sp_da_for(t->host, it) {
+      sp_da_push(toolchain.hosts, ((spn_toolchain_host_t) {
+        .triple = spn_triple_from_str(t->host[it].key),
         .artifact = {
-          .url = t->host[i].value.url,
-          .sha256 = t->host[i].value.sha256,
+          .url = t->host[it].value.url,
+          .sha256 = t->host[it].value.sha256,
           .mirror_list = t->mirrors,
         },
       }));
     }
-    toolchain.artifact = spn_toolchain_select_artifact(hosts, spn_triple_host());
+    toolchain.source = sp_da_empty(toolchain.hosts) ? SPN_TOOLCHAIN_SOURCE_LOCAL : SPN_TOOLCHAIN_SOURCE_DISTRIBUTION;
 
     toolchain.targets = sp_da_new(ctx->mem, spn_triple_t);
-    sp_da_for(t->target, i) {
-      sp_da_push(toolchain.targets, lower_triple(&t->target[i]));
+    sp_da_for(t->target, it) {
+      sp_da_push(toolchain.targets, lower_triple(&t->target[it]));
     }
 
     sp_str_om_insert(out->toolchains, toolchain.name, toolchain);

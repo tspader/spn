@@ -468,6 +468,29 @@ static bool event_matches(yyjson_val* line, const c8* event, const c8* key, cons
   return str && sp_cstr_equal(str, value);
 }
 
+static u32 count_events(fixture_t* fixture, const c8* event, const c8* key, const c8* value) {
+  sp_mem_t mem = fixture->fs.mem;
+  sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
+
+  sp_str_t content = sp_zero;
+  sp_io_read_file(mem, path, &content);
+
+  u32 count = 0;
+  sp_da(sp_str_t) lines = sp_str_split_c8(mem, content, '\n');
+  sp_da_for(lines, it) {
+    if (sp_str_empty(lines[it])) continue;
+
+    yyjson_doc* doc = yyjson_read(lines[it].data, lines[it].len, 0);
+    if (!doc) continue;
+
+    if (event_matches(yyjson_doc_get_root(doc), event, key, value)) {
+      count++;
+    }
+    yyjson_doc_free(doc);
+  }
+  return count;
+}
+
 static void expect_event(s32* utest_result, fixture_t* fixture, const c8* event, const c8* key, const c8* value, bool expected, const c8* file, u32 line) {
   sp_mem_t mem = fixture->fs.mem;
   sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
@@ -860,6 +883,19 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
         break;
       }
+      case ACTION_VERIFY_DIR_COUNT: {
+        sp_str_t path = tmpfs_get(&fixture->fs, sp_str_view(action.verify_dir_count.dir));
+        sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, path);
+        u32 dirs = 0;
+        sp_da_for(entries, et) {
+          if (entries[et].kind == SP_FS_KIND_DIR) {
+            dirs++;
+          }
+        }
+        utest_kv("path", path);
+        EXPECT_EQ(action.verify_dir_count.count, dirs);
+        break;
+      }
       case ACTION_VERIFY_INCLUDE: {
         sp_str_t path = tmpfs_get(
           &fixture->fs,
@@ -947,6 +983,12 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
       case ACTION_VERIFY_EVENT:
       case ACTION_VERIFY_NO_EVENT: {
         expect_event(utest_result, fixture, action.verify_event.event, action.verify_event.key, action.verify_event.value, action.kind == ACTION_VERIFY_EVENT, __FILE__, __LINE__);
+        break;
+      }
+      case ACTION_VERIFY_EVENT_COUNT: {
+        u32 count = count_events(fixture, action.verify_event_count.event, action.verify_event_count.key, action.verify_event_count.value);
+        utest_kv("event", sp_str_view(action.verify_event_count.event));
+        EXPECT_EQ(action.verify_event_count.count, count);
         break;
       }
       case ACTION_VERIFY_LOCKED: {

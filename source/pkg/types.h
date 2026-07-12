@@ -86,7 +86,7 @@ typedef struct {
 typedef sp_str_om(spn_target_info_t)     spn_target_map_t;
 typedef sp_str_om(spn_profile_info_t)    spn_profile_map_t;
 typedef sp_str_om(spn_index_info_t)      spn_index_map_t;
-typedef sp_str_om(spn_toolchain_t) spn_toolchain_map_t;
+typedef sp_str_om(spn_toolchain_info_t) spn_toolchain_map_t;
 typedef sp_str_om(spn_option_info_t)     spn_option_map_t;
 
 struct spn_pkg_info {

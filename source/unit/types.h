@@ -15,17 +15,18 @@
 #include "log/lazy/types.h"
 
 typedef u32 spn_build_unit_id_t;
+typedef u32 spn_toolchain_unit_id_t;
 
 struct spn_build_unit_t {
   spn_build_unit_id_t id;
-  bool script;
   spn_profile_info_t profile;
   spn_toolchain_unit_t* toolchain;
   spn_symbol_visibility_t visibility;
   u32 dep_kinds;
   sp_da(sp_str_t) include;
+  sp_da(spn_pkg_unit_t*) packages;
   struct {
-    sp_str_t profile;
+    sp_str_t root;
   } paths;
 };
 
@@ -173,8 +174,8 @@ typedef struct {
     spn_bg_id_t profile;
   } stamp;
   struct {
-    spn_bg_id_t module;
-  } build_script;
+    spn_bg_id_t output;
+  } program;
   sp_da(spn_bg_id_t) user;
 } spn_pkg_nodes_t;
 
@@ -182,6 +183,7 @@ struct spn_target_unit {
   spn_target_unit_id_t id;
   spn_session_t* session;
   spn_pkg_unit_t* pkg;
+  spn_build_unit_t* build;
   spn_target_info_t* info;
   spn_cc_output_kind_t kind;
   spn_linkage_t lib_kind;
@@ -218,13 +220,19 @@ struct spn_pkg_unit_t {
   spn_session_t* session;
   spn_pkg_info_t* info;
   spn_pkg_source_t source;
+  u32 materialized_dep_kinds;
 
   struct {
-    spn_target_info_t configure;
-    spn_target_info_t build;
-  } script;
+    struct {
+      spn_target_info_t* info;
+      spn_target_unit_t* target;
+    } configure;
+    struct {
+      spn_target_info_t* info;
+      spn_target_unit_t* target;
+    } build;
+  } meta;
 
-  sp_da(spn_compile_unit_t*) objects;
   sp_da(spn_pkg_dep_t) deps;
   sp_da(spn_target_unit_t*) libs;
   sp_da(spn_target_unit_t*) exes;
@@ -294,8 +302,10 @@ struct spn_pkg_unit_t {
 };
 
 struct spn_toolchain_unit_t {
-  spn_toolchain_t* toolchain;
-  spn_session_t* session;
+  spn_toolchain_unit_id_t id;
+  spn_toolchain_info_t* info;
+  spn_triple_t host;
+  spn_opt_artifact_t artifact;
   sp_str_t root;
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t cxx;

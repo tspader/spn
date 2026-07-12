@@ -15,7 +15,6 @@
 #include "session/registry/types.h"
 #include "target/types.h"
 #include "toolchain/types.h"
-#include "toolchain/select.h"
 #include "unit/types.h"
 
 typedef enum {
@@ -76,7 +75,6 @@ struct spn_session_t {
 
   spn_profile_table_t profiles;
   spn_toolchain_catalog_t catalog;
-  spn_toolchain_selection_t selection;
 
   spn_resolve_t resolve;
   spn_pkg_registry_t registry;
@@ -95,22 +93,21 @@ struct spn_session_t {
     spn_compile_request_t request;
     sp_da(spn_pkg_id_t) requested;
     sp_da(spn_build_plan_t) builds;
-    spn_build_unit_t* script;
   } plan;
   struct {
+    sp_da(spn_build_unit_t*) builds;
+    spn_build_unit_t* target;
+    spn_build_unit_t* metaprogram;
     sp_om(spn_compile_unit_id_t, spn_compile_unit_t) objects;
     sp_da(spn_compile_command_t) compile_commands;
     sp_om(spn_target_unit_id_t, spn_target_unit_t) targets;
     sp_om(spn_pkg_unit_id_t, spn_pkg_unit_t) packages;
-    spn_toolchain_unit_t* toolchain;
-    spn_toolchain_unit_t* script;
     sp_da(spn_toolchain_unit_t*) toolchains;
   } units;
 
   struct {
     sp_str_t root;
     sp_str_t build;
-    sp_str_t profile;
     spn_system_paths_t system;
   } paths;
 

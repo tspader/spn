@@ -13,7 +13,7 @@ spn_toolchain_launcher_t spn_toolchain_launcher_with_root(sp_mem_t mem, spn_tool
   return result;
 }
 
-bool spn_toolchain_has_cxx(spn_toolchain_t* toolchain) {
+bool spn_toolchain_has_cxx(spn_toolchain_info_t* toolchain) {
   return !sp_str_empty(toolchain->cxx.program);
 }
 

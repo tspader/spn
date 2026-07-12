@@ -22,6 +22,8 @@ typedef enum {
   ACTION_VERIFY_PKG_LOCKED,
   ACTION_VERIFY_EVENT,
   ACTION_VERIFY_NO_EVENT,
+  ACTION_VERIFY_DIR_COUNT,
+  ACTION_VERIFY_EVENT_COUNT,
   ACTION_RUN_CLI,
   ACTION_VERIFY_CLI_CONTAINS,
   ACTION_VERIFY_CLI_NOT_CONTAINS,
@@ -45,6 +47,8 @@ typedef struct {
     struct { sp_str_t file; sp_str_t needle; } verify_file_not_contains;
     struct { const c8* name; } verify_locked;
     struct { const c8* event; const c8* key; const c8* value; } verify_event;
+    struct { const c8* dir; u32 count; } verify_dir_count;
+    struct { const c8* event; const c8* key; const c8* value; u32 count; } verify_event_count;
     struct { const c8* cmd; const c8* args [8]; const c8* env [4]; s32 rc; } cli;
     struct { sp_str_t needle; } verify_cli;
   };

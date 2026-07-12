@@ -41,9 +41,9 @@ spn_err_t spn_wasm_init() {
   return SPN_OK;
 }
 
-void spn_wasm_script_init(spn_wasm_script_t* script, bool exists, sp_str_t module) {
+void spn_wasm_script_init(spn_wasm_script_t* script, sp_str_t module) {
   *script = (spn_wasm_script_t) {
-    .state = exists ? SPN_WASM_SCRIPT_CLOSED : SPN_WASM_SCRIPT_NONE,
+    .state = SPN_WASM_SCRIPT_CLOSED,
     .path = module,
   };
   sp_mutex_init(&script->mutex, SP_MUTEX_PLAIN);

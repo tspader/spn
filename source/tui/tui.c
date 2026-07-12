@@ -908,6 +908,16 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
           }
           break;
         }
+        case SPN_ERR_TOOLCHAIN_HOST: {
+          sp_str_t host = spn_triple_to_str(mem, event->err.toolchain.host);
+          sp_fmt_io(
+            &w.base,
+            "toolchain {} isn't distributed for host {.yellow}",
+            sp_fmt_str(spn_tui_colored_name(mem, event->err.toolchain.name)),
+            sp_fmt_str(host)
+          );
+          break;
+        }
         case SPN_ERR_WASM_READ_FAILED: {
           sp_fmt_io(
             &w.base,
@@ -1182,7 +1192,7 @@ static void spn_tui_render_event_extra(sp_io_writer_t* w, spn_build_event_t* eve
         case SPN_ERR_TOOLCHAIN_TARGET: {
           bool first = true;
           sp_str_ht_for_kv(event->err.toolchain.catalog->entries, it) {
-            spn_toolchain_t* toolchain = *it.val;
+            spn_toolchain_info_t* toolchain = *it.val;
             if (!spn_toolchain_supports(toolchain, event->err.toolchain.target, event->err.toolchain.host)) continue;
             sp_io_write_str(w, first ? sp_str_lit("toolchains that can: ") : sp_str_lit(", "), SP_NULLPTR);
             sp_fmt_io(w, "{.green}", sp_fmt_str(toolchain->name));

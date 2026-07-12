@@ -10,5 +10,6 @@ void            spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info
 spn_err_union_t spn_profile_overrides_parse(spn_profile_args_t* args, spn_profile_info_t* result);
 spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* overrides, spn_profile_info_t* result);
 sp_str_t        spn_profile_identity_to_str(sp_mem_t mem, const spn_profile_info_t* profile);
+sp_str_t        spn_profile_build_path(sp_mem_t mem, sp_str_t build, const spn_profile_info_t* profile);
 
 #endif

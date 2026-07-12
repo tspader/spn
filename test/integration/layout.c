@@ -38,6 +38,18 @@ UTEST_F(layout, staged_script) {
   });
 }
 
+UTEST_F(layout, script_ctx_footprint) {
+  tmpfs_init_named(&uf->fixture.fs, "layout_script_ctx");
+
+  run_command_test(utest_result, &uf->fixture, (command_test_t) {
+    .project = "test/integration/fixtures/script/default_script",
+    .args = { "build" },
+    .expect = {
+      .exists = { sp_str_lit("build/wasm32-wasi/work/default_script/spn/configure.wasm") },
+    },
+  });
+}
+
 UTEST_F(layout, reserved_bin_name) {
   tmpfs_init_named(&uf->fixture.fs, "layout_reserved_bin_name");
 

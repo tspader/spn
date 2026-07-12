@@ -1,0 +1,7 @@
+[package]
+name = "module_name_collision"
+version = "0.0.1"
+
+[[bin]]
+name = "configure"
+source = ["main.c"]
