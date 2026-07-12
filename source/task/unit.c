@@ -270,10 +270,6 @@ spn_err_union_t add_script_units(spn_session_t* session) {
     return spn_result(SPN_OK);
   }
 
-  spn_build_plan_t* target = spn_session_find_plan(session, SPN_BUILD_KIND_TARGET);
-  sp_assert(target);
-  spn_pkg_id_t root = target->root.pkg;
-
   spn_build_unit_t* build = sp_alloc_type(session->mem, spn_build_unit_t);
   *build = (spn_build_unit_t) {
     .id = (spn_build_unit_id_t)sp_da_size(session->plan.builds),
@@ -298,7 +294,6 @@ spn_err_union_t add_script_units(spn_session_t* session) {
 
   spn_build_plan_t plan = {
     .build = build,
-    .root = { .pkg = root, .ctx = build->id },
   };
   sp_da_init(session->mem, plan.roots);
   sp_da_push(session->plan.builds, plan);
@@ -407,7 +402,7 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
     if (plan->build->kind != SPN_BUILD_KIND_TARGET) {
       continue;
     }
-    spn_pkg_unit_t* pkg = spn_session_find_pkg_unit_by_id(session, plan->root);
+    spn_pkg_unit_t* pkg = spn_session_find_pkg_unit(session, plan->build, spn_session_root_pkg(session));
     sp_assert(pkg);
     if (add_plan_targets(session, plan, pkg, pkg->info->libs) ||
         add_plan_targets(session, plan, pkg, pkg->info->exes) ||

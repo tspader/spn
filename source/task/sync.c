@@ -308,13 +308,7 @@ static spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* bui
 }
 
 spn_err_union_t add_compilation_units(spn_session_t *s) {
-  spn_pkg_id_t root = SP_ZERO_INITIALIZE();
-  sp_ht_for_kv(s->resolve, it) {
-    if (it.val->source == SPN_PKG_SOURCE_ROOT) {
-      root = it.val->id;
-      break;
-    }
-  }
+  spn_pkg_id_t root = spn_session_root_pkg(s);
   sp_assert(root.qualified);
 
   spn_build_unit_t* build = sp_alloc_type(s->mem, spn_build_unit_t);
@@ -331,7 +325,6 @@ spn_err_union_t add_compilation_units(spn_session_t *s) {
 
   spn_build_plan_t target = {
     .build = build,
-    .root = { .pkg = root, .ctx = build->id },
     .selection = s->plan.request.targets,
   };
   sp_da_init(s->mem, target.roots);
@@ -346,7 +339,7 @@ spn_err_union_t add_compilation_units(spn_session_t *s) {
     if (err.kind) {
       return err;
     }
-    add_package_units(s, plan->build, plan->root.pkg);
+    add_package_units(s, plan->build, root);
   }
   return spn_result(SPN_OK);
 }

@@ -114,7 +114,7 @@ static spn_build_reports_t collect_build_reports(sp_mem_t mem, spn_session_t* se
 }
 
 static void emit_build_report(spn_session_t* session, spn_build_report_t* report) {
-  spn_pkg_unit_t* root = spn_session_find_pkg_unit_by_id(session, report->plan->root);
+  spn_pkg_unit_t* root = spn_session_find_pkg_unit(session, report->plan->build, spn_session_root_pkg(session));
   sp_assert(root);
   spn_profile_info_t* profile = &report->plan->build->profile;
   u64 elapsed = session->build.executor->elapsed;
