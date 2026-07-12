@@ -119,8 +119,8 @@ sp_str_t get_target_staged_path(sp_mem_t mem, spn_target_unit_t* target) {
       return sp_fs_join_path(mem, dir, target->info->name);
     }
     case SPN_TARGET_LIB:
-    case SPN_TARGET_CONFIGURE_PROGRAM:
-    case SPN_TARGET_BUILD_PROGRAM: {
+    case SPN_TARGET_CONFIGURE_METAPROGRAM:
+    case SPN_TARGET_BUILD_METAPROGRAM: {
       return sp_zero_s(sp_str_t);
     }
   }

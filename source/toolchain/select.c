@@ -3,14 +3,6 @@
 #include "toolchain/catalog.h"
 #include "triple/triple.h"
 
-sp_str_t spn_toolchain_script_default(void) {
-  return sp_str_lit("zig");
-}
-
-spn_triple_t spn_toolchain_script_target(void) {
-  return (spn_triple_t) { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI, .abi = SPN_ABI_NONE };
-}
-
 bool spn_toolchain_supports(spn_toolchain_t* toolchain, spn_triple_t target, spn_triple_t host) {
   if (sp_da_empty(toolchain->targets)) {
     return spn_triple_match(target, host) && spn_triple_match(host, target);
@@ -34,7 +26,12 @@ spn_err_union_t spn_toolchain_select(spn_toolchain_catalog_t* catalog, spn_toolc
     spn_toolchain_t** slot;
   } roles [] = {
     { query.build, query.target, SPN_TOOLCHAIN_ROLE_BUILD, &out->build },
-    { query.script, spn_toolchain_script_target(), SPN_TOOLCHAIN_ROLE_SCRIPT, &out->script },
+    {
+      query.script,
+      .target = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI, .abi = SPN_ABI_NONE },
+      SPN_TOOLCHAIN_ROLE_SCRIPT,
+      &out->script
+    },
   };
 
   sp_carr_for(roles, it) {

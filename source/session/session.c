@@ -48,7 +48,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
 
   spn_toolchain_query_t query = {
     .build = s->profile.toolchain,
-    .script = spn_toolchain_script_default(),
+    .script = sp_str_lit("zig"),
     .target = { s->profile.arch, s->profile.os, s->profile.abi },
     .host = spn_triple_host(),
   };
@@ -450,7 +450,7 @@ spn_pkg_unit_t* spn_session_find_pkg_unit(spn_session_t* session, spn_build_unit
 spn_pkg_unit_t* spn_session_find_dep(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t qualified, spn_dep_kind_t kind) {
   sp_intern_id_t name = sp_intern_get_or_insert(session->intern, qualified);
 
-  sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, pkg);
+  sp_da(spn_pkg_dep_t) deps = pkg->deps;
   sp_da_for(deps, it) {
     if (deps[it].kind != kind) {
       continue;
@@ -494,10 +494,6 @@ spn_build_plan_t* spn_session_plan_for_build(spn_session_t* session, spn_build_u
   return SP_NULLPTR;
 }
 
-sp_da(spn_pkg_dep_t) spn_session_pkg_deps(spn_session_t* session, spn_pkg_unit_t* pkg) {
-  return pkg->deps;
-}
-
 spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
   spn_target_unit_id_t id = {
     .pkg = pkg->id,
@@ -537,12 +533,12 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
       sp_da_push(pkg->tests, target);
       break;
     }
-    case SPN_TARGET_CONFIGURE_PROGRAM: {
-      pkg->program.configure.target = target;
+    case SPN_TARGET_CONFIGURE_METAPROGRAM: {
+      pkg->meta.configure.target = target;
       break;
     }
-    case SPN_TARGET_BUILD_PROGRAM: {
-      pkg->program.build.target = target;
+    case SPN_TARGET_BUILD_METAPROGRAM: {
+      pkg->meta.build.target = target;
       break;
     }
   }
@@ -645,11 +641,10 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   unit->build = build;
   unit->info = clone_pkg_info(session, pkg_id, build, loaded->info);
   unit->source = loaded->source;
-  unit->program.configure.info = &loaded->configure;
-  unit->program.build.info = &loaded->build;
+  unit->meta.configure.info = &loaded->configure;
+  unit->meta.build.info = &loaded->build;
   unit->session = session;
   sp_da_push(build->packages, unit);
-  sp_da_init(session->mem, unit->objects);
   sp_da_init(session->mem, unit->deps);
   sp_da_init(session->mem, unit->libs);
   sp_da_init(session->mem, unit->exes);

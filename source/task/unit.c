@@ -121,8 +121,8 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
       target->kind = SPN_CC_OUTPUT_EXE;
       return SPN_OK;
     }
-    case SPN_TARGET_CONFIGURE_PROGRAM:
-    case SPN_TARGET_BUILD_PROGRAM: {
+    case SPN_TARGET_CONFIGURE_METAPROGRAM:
+    case SPN_TARGET_BUILD_METAPROGRAM: {
       target->kind = SPN_CC_OUTPUT_REACTOR;
       return SPN_OK;
     }
@@ -246,13 +246,12 @@ static void create_target_objects(spn_session_t* session, spn_target_unit_t* tar
     }
 
     spn_compile_unit_t* object = sp_om_get(session->units.objects, id);
-    sp_da_push(pkg->objects, object);
     sp_da_push(target->objects, object);
   }
   sp_mem_end_scratch(scratch);
 }
 
-static void add_program_dep(spn_target_unit_t* program, spn_pkg_unit_t* dep) {
+static void add_metaprogram_dep(spn_target_unit_t* program, spn_pkg_unit_t* dep) {
   sp_da_for(program->deps.package, it) {
     if (spn_pkg_id_eq(program->deps.package[it]->id.pkg, dep->id.pkg)) {
       return;
@@ -264,16 +263,31 @@ static void add_program_dep(spn_target_unit_t* program, spn_pkg_unit_t* dep) {
     if (dep->deps[it].kind != SPN_DEP_KIND_PACKAGE) {
       continue;
     }
-    add_program_dep(program, dep->deps[it].unit);
+    add_metaprogram_dep(program, dep->deps[it].unit);
   }
 }
 
-static spn_err_t add_program_target(spn_session_t* session, spn_pkg_unit_t* unit, spn_target_info_t* info, spn_target_unit_t** result) {
+static spn_err_t add_metaprogram_target(spn_session_t* session, spn_pkg_unit_t* unit, spn_target_info_t* info, spn_target_unit_t** result) {
   spn_target_unit_t* target = SP_NULLPTR;
   spn_try(ensure_target(session, unit, info, &target));
   create_target_objects(session, target);
   *result = target;
   return SPN_OK;
+}
+
+static void init_program_runtime(spn_session_t* session, spn_pkg_unit_t* unit, spn_pkg_unit_t* program) {
+  if (program->meta.configure.target) {
+    spn_wasm_script_init(
+      &unit->wasm.configure,
+      get_target_output_path(session->mem, program->meta.configure.target)
+    );
+  }
+  if (program->meta.build.target) {
+    spn_wasm_script_init(
+      &unit->wasm.build,
+      get_target_output_path(session->mem, program->meta.build.target)
+    );
+  }
 }
 
 spn_err_union_t add_program_units(spn_session_t* session) {
@@ -294,7 +308,7 @@ spn_err_union_t add_program_units(spn_session_t* session) {
   sp_for(it, sp_da_size(pending)) {
     spn_pkg_unit_t* unit = add_package_units(
       session,
-      session->units.program,
+      session->units.metaprogram,
       pending[it],
       spn_dep_kind_bit(SPN_DEP_KIND_BUILD)
     );
@@ -308,13 +322,13 @@ spn_err_union_t add_program_units(spn_session_t* session) {
     }
   }
 
-  sp_da_for(session->units.program->packages, it) {
-    spn_pkg_unit_t* unit = session->units.program->packages[it];
-    if (!sp_da_empty(unit->program.configure.info->source)) {
-      try_as_union(add_program_target(session, unit, unit->program.configure.info, &unit->program.configure.target));
+  sp_da_for(session->units.metaprogram->packages, it) {
+    spn_pkg_unit_t* unit = session->units.metaprogram->packages[it];
+    if (!sp_da_empty(unit->meta.configure.info->source)) {
+      try_as_union(add_metaprogram_target(session, unit, unit->meta.configure.info, &unit->meta.configure.target));
     }
-    if (!sp_da_empty(unit->program.build.info->source)) {
-      try_as_union(add_program_target(session, unit, unit->program.build.info, &unit->program.build.target));
+    if (!sp_da_empty(unit->meta.build.info->source)) {
+      try_as_union(add_metaprogram_target(session, unit, unit->meta.build.info, &unit->meta.build.target));
     }
 
     sp_da_for(unit->deps, it) {
@@ -322,49 +336,27 @@ spn_err_union_t add_program_units(spn_session_t* session) {
       if (dep->kind != SPN_DEP_KIND_BUILD) {
         continue;
       }
-      if (unit->program.configure.target) {
-        add_program_dep(unit->program.configure.target, dep->unit);
+      if (unit->meta.configure.target) {
+        add_metaprogram_dep(unit->meta.configure.target, dep->unit);
       }
-      if (unit->program.build.target) {
-        add_program_dep(unit->program.build.target, dep->unit);
+      if (unit->meta.build.target) {
+        add_metaprogram_dep(unit->meta.build.target, dep->unit);
       }
     }
   }
 
-  sp_da_for(session->units.program->packages, it) {
-    spn_pkg_unit_t* unit = session->units.program->packages[it];
-    if (unit->program.configure.target) {
-      spn_wasm_script_init(
-        &unit->wasm.configure,
-        get_target_output_path(session->mem, unit->program.configure.target)
-      );
-    }
-    if (unit->program.build.target) {
-      spn_wasm_script_init(
-        &unit->wasm.build,
-        get_target_output_path(session->mem, unit->program.build.target)
-      );
-    }
+  sp_da_for(session->units.metaprogram->packages, it) {
+    spn_pkg_unit_t* unit = session->units.metaprogram->packages[it];
+    init_program_runtime(session, unit, unit);
   }
 
   sp_da_for(session->plan.builds, it) {
     spn_build_unit_t* build = session->plan.builds[it].build;
     sp_da_for(build->packages, it) {
       spn_pkg_unit_t* unit = build->packages[it];
-      spn_pkg_unit_t* program = spn_session_find_pkg_unit(session, session->units.program, unit->id.pkg);
+      spn_pkg_unit_t* program = spn_session_find_pkg_unit(session, session->units.metaprogram, unit->id.pkg);
       sp_assert(program);
-      if (program->program.configure.target) {
-        spn_wasm_script_init(
-          &unit->wasm.configure,
-          get_target_output_path(session->mem, program->program.configure.target)
-        );
-      }
-      if (program->program.build.target) {
-        spn_wasm_script_init(
-          &unit->wasm.build,
-          get_target_output_path(session->mem, program->program.build.target)
-        );
-      }
+      init_program_runtime(session, unit, program);
     }
   }
 
@@ -496,12 +488,11 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
   sp_om_for(session->units.targets, it) {
     spn_target_unit_t* target = sp_om_at(session->units.targets, it);
 
-    if (target->info->kind == SPN_TARGET_CONFIGURE_PROGRAM ||
-        target->info->kind == SPN_TARGET_BUILD_PROGRAM) {
-      continue;
-    }
-
-    if (target->lib_kind == SPN_LIB_KIND_SOURCE) {
+    if (
+      target->info->kind == SPN_TARGET_BUILD_METAPROGRAM ||
+      target->info->kind == SPN_TARGET_CONFIGURE_METAPROGRAM ||
+      target->lib_kind == SPN_LIB_KIND_SOURCE
+    ) {
       continue;
     }
 

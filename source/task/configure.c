@@ -41,9 +41,9 @@ static spn_err_t add_configure_package(spn_build_graph_t* graph, spn_session_t* 
   unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
   spn_try(spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp));
 
-  spn_pkg_unit_t* program = spn_session_find_pkg_unit(session, session->units.program, unit->id.pkg);
+  spn_pkg_unit_t* program = spn_session_find_pkg_unit(session, session->units.metaprogram, unit->id.pkg);
   sp_assert(program);
-  spn_target_unit_t* target = program->program.configure.target;
+  spn_target_unit_t* target = program->meta.configure.target;
   if (target) {
     spn_try(spn_build_add_target_nodes(graph, target));
     spn_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, target->nodes.output));
@@ -63,7 +63,7 @@ static spn_err_t add_configure_package_edges(spn_build_graph_t* graph, spn_pkg_u
 }
 
 static spn_err_t add_configure_target_edges(spn_build_graph_t* graph, spn_target_unit_t* target) {
-  if (!target || !target->nodes.link.occupied) {
+  if (!target->nodes.link.occupied) {
     return SPN_OK;
   }
   sp_da_for(target->deps.package, it) {
@@ -105,10 +105,10 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
   }
 
   sp_da(spn_pkg_unit_t*) dependencies = sp_da_new(session->mem, spn_pkg_unit_t*);
-  sp_da_for(session->units.program->packages, it) {
-    spn_pkg_unit_t* unit = session->units.program->packages[it];
-    collect_program_dependencies(&dependencies, unit->program.configure.target);
-    collect_program_dependencies(&dependencies, unit->program.build.target);
+  sp_da_for(session->units.metaprogram->packages, it) {
+    spn_pkg_unit_t* unit = session->units.metaprogram->packages[it];
+    collect_program_dependencies(&dependencies, unit->meta.configure.target);
+    collect_program_dependencies(&dependencies, unit->meta.build.target);
   }
 
   sp_da_for(dependencies, it) {
@@ -145,10 +145,12 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
     }
   }
 
-  sp_da_for(session->units.program->packages, it) {
-    spn_target_unit_t* target = session->units.program->packages[it]->program.configure.target;
+  sp_da_for(session->units.metaprogram->packages, it) {
+    spn_target_unit_t* target = session->units.metaprogram->packages[it]->meta.configure.target;
+    if (!target) {
+      continue;
+    }
     if (add_configure_target_edges(graph, target)) {
-      sp_assert(target);
       return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = get_target_output_path(session->mem, target) });
     }
   }

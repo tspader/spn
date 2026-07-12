@@ -75,9 +75,9 @@ static spn_build_reports_t collect_build_reports(sp_mem_t mem, spn_session_t* se
       .build = session->plan.builds[it].build,
     }));
   }
-  if (session->units.program) {
+  if (session->units.metaprogram) {
     sp_da_push(reports, ((spn_build_report_t) {
-      .build = session->units.program,
+      .build = session->units.metaprogram,
     }));
   }
 
@@ -352,9 +352,9 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
     }
   }
 
-  sp_da_for(session->units.program->packages, it) {
-    spn_pkg_unit_t* pkg = session->units.program->packages[it];
-    spn_try(add_target_link_deps(graph, session, pkg->program.build.target));
+  sp_da_for(session->units.metaprogram->packages, it) {
+    spn_pkg_unit_t* pkg = session->units.metaprogram->packages[it];
+    spn_try(add_target_link_deps(graph, session, pkg->meta.build.target));
   }
 
   spn_try(add_root_stages(graph, session));
@@ -573,9 +573,9 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   spn_try(spn_bg_cmd_add_input(graph, nodes->package, nodes->stamp.exit));
   spn_try(spn_bg_cmd_add_output(graph, nodes->package, nodes->stamp.package));
 
-  spn_pkg_unit_t* program = spn_session_find_pkg_unit(unit->session, unit->session->units.program, unit->id.pkg);
+  spn_pkg_unit_t* program = spn_session_find_pkg_unit(unit->session, unit->session->units.metaprogram, unit->id.pkg);
   sp_assert(program);
-  spn_target_unit_t* build = program->program.build.target;
+  spn_target_unit_t* build = program->meta.build.target;
   if (build) {
     spn_try(spn_build_add_target_nodes(graph, build));
     own_target_commands(unit->session, build);

@@ -7,6 +7,7 @@
 #include "log/log.h"
 #include "pkg/id.h"
 #include "pkg/types.h"
+#include "profile/profile.h"
 #include "resolve/types.h"
 #include "session/session.h"
 #include "session/types.h"
@@ -29,8 +30,8 @@ spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* build, spn
     unit = spn_session_add_pkg_unit(s, build, id, loaded);
   }
 
-  u32 missing = kinds & ~unit->dep_kinds;
-  unit->dep_kinds |= missing;
+  u32 missing = kinds & ~unit->materialized_dep_kinds;
+  unit->materialized_dep_kinds |= missing;
   sp_da_for(pkg->edges, it) {
     if (!(missing & spn_dep_kind_bit(pkg->edges[it].kind))) {
       continue;
@@ -52,12 +53,6 @@ static spn_build_unit_t* add_build_unit(spn_session_t* s) {
 }
 
 static spn_build_unit_t* add_target_build(spn_session_t* s, spn_profile_info_t profile) {
-  sp_str_t path = s->paths.build;
-  if (profile.targeted) {
-    spn_triple_t target = { profile.arch, profile.os, profile.abi };
-    path = sp_fs_join_path(s->mem, path, spn_triple_to_str(s->mem, target));
-  }
-
   spn_build_unit_t* unit = add_build_unit(s);
   spn_build_unit_id_t id = unit->id;
   *unit = (spn_build_unit_t) {
@@ -67,7 +62,7 @@ static spn_build_unit_t* add_target_build(spn_session_t* s, spn_profile_info_t p
     .visibility = SPN_SYMBOL_VISIBILITY_DEFAULT,
     .dep_kinds = spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE) | spn_dep_kind_bit(SPN_DEP_KIND_TEST),
     .paths = {
-      .root = sp_fs_join_path(s->mem, path, profile.name)
+      .root = spn_profile_build_path(s->mem, s->paths.build, &profile)
     },
   };
   sp_da_init(s->mem, unit->include);
@@ -89,6 +84,7 @@ static spn_build_unit_t* add_program_build(spn_session_t* s) {
   *unit = (spn_build_unit_t) {
     .id = id,
     .profile = {
+      .name = sp_str_lit("program"),
       .arch = target.arch,
       .os = target.os,
       .abi = target.abi,
@@ -183,7 +179,7 @@ spn_task_step_t spn_task_plan(spn_app_t* app) {
   }
 
   s->units.target = add_target_build(s, s->profile);
-  s->units.program = add_program_build(s);
+  s->units.metaprogram = add_program_build(s);
   try_task(add_compilation_units(s));
   try_task(add_program_units(s));
 

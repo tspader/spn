@@ -260,9 +260,3 @@ UTEST(select, supports_wildcard_target_fields) {
     },
   });
 }
-
-UTEST(select, script_target_is_wasm_wasi) {
-  spn_triple_t target = spn_toolchain_script_target();
-  EXPECT_EQ((u32)SPN_ARCH_WASM32, (u32)target.arch);
-  EXPECT_EQ((u32)SPN_OS_WASI, (u32)target.os);
-}

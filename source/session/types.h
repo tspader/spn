@@ -99,7 +99,7 @@ struct spn_session_t {
   struct {
     sp_da(spn_build_unit_t*) builds;
     spn_build_unit_t* target;
-    spn_build_unit_t* program;
+    spn_build_unit_t* metaprogram;
     sp_om(spn_compile_unit_id_t, spn_compile_unit_t) objects;
     sp_da(spn_compile_command_t) compile_commands;
     sp_om(spn_target_unit_id_t, spn_target_unit_t) targets;

@@ -219,7 +219,7 @@ struct spn_pkg_unit_t {
   spn_session_t* session;
   spn_pkg_info_t* info;
   spn_pkg_source_t source;
-  u32 dep_kinds;
+  u32 materialized_dep_kinds;
 
   struct {
     struct {
@@ -230,9 +230,8 @@ struct spn_pkg_unit_t {
       spn_target_info_t* info;
       spn_target_unit_t* target;
     } build;
-  } program;
+  } meta;
 
-  sp_da(spn_compile_unit_t*) objects;
   sp_da(spn_pkg_dep_t) deps;
   sp_da(spn_target_unit_t*) libs;
   sp_da(spn_target_unit_t*) exes;

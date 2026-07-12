@@ -25,9 +25,18 @@ static bool spn_target_rule_pass(const spn_target_rule_t* rule, const spn_target
 
 bool spn_target_selection_pass(const spn_target_selection_t* selection, const spn_target_info_t* target) {
   if (selection->kind == SPN_TARGET_SELECTION_DEFAULT) {
-    return target->kind != SPN_TARGET_SCRIPT &&
-      target->kind != SPN_TARGET_CONFIGURE_PROGRAM &&
-      target->kind != SPN_TARGET_BUILD_PROGRAM;
+    switch (target->kind) {
+      case SPN_TARGET_BUILD_METAPROGRAM:
+      case SPN_TARGET_CONFIGURE_METAPROGRAM:
+      case SPN_TARGET_SCRIPT: {
+        return false;
+      }
+      case SPN_TARGET_LIB:
+      case SPN_TARGET_TEST:
+      case SPN_TARGET_EXE: {
+        break;
+      }
+    }
   }
 
   switch (target->kind) {
@@ -43,8 +52,8 @@ bool spn_target_selection_pass(const spn_target_selection_t* selection, const sp
     case SPN_TARGET_SCRIPT: {
       return spn_target_rule_pass(&selection->targets.script, target);
     }
-    case SPN_TARGET_CONFIGURE_PROGRAM:
-    case SPN_TARGET_BUILD_PROGRAM: {
+    case SPN_TARGET_CONFIGURE_METAPROGRAM:
+    case SPN_TARGET_BUILD_METAPROGRAM: {
       return false;
     }
   }
