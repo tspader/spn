@@ -39,6 +39,14 @@ sp_str_t shared_lib(const c8* name) {
   return store_file(sp_str_to_cstr(mem, sp_fs_join_path(mem, sp_str_lit("lib"), sp_str_view(shared_lib_file(name)))));
 }
 
+sp_str_t static_lib(const c8* name) {
+  sp_mem_t mem = layout_mem();
+  return sp_fmt(mem,
+    "build/debug/store/lib/{}",
+    sp_fmt_str(sp_os_lib_to_file_name(mem, sp_cstr_as_str(name), SP_OS_LIB_STATIC))
+  ).value;
+}
+
 sp_str_t staged_lib(const c8* name) {
   return exe(shared_lib_file(name));
 }
@@ -420,26 +428,29 @@ void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, bool expected,
   bool exists = sp_fs_exists(path);
   if (exists == expected) return;
 
-  sp_mem_t mem = sp_mem_get_scratch();
-  sp_str_t bar = sp_fmt(mem, "{.red}", sp_fmt_cstr("▐ ")).value;
+  UTEST_KVP("root", fs->root);
+  UTEST_KVP("path", path);
 
-  sp_io_dyn_mem_writer_t b = sp_zero;
-  sp_io_dyn_mem_writer_init(mem, &b);
-  sp_fmt_io(&b.base, "{}:{}", sp_fmt_cstr(file), sp_fmt_uint(line));
+  // sp_mem_t mem = sp_mem_get_scratch();
+  // sp_str_t bar = sp_fmt(mem, "{.red}", sp_fmt_cstr("▐ ")).value;
+  //
+  // sp_io_dyn_mem_writer_t b = sp_zero;
+  // sp_io_dyn_mem_writer_init(mem, &b);
+  // sp_fmt_io(&b.base, "{}:{}", sp_fmt_cstr(file), sp_fmt_uint(line));
+  //
+  // if (fs) {
+  //   sp_fmt_io(&b.base, "\n{}{.cyan} is the root", sp_fmt_str(bar), sp_fmt_str(fs->root));
+  //
+  //   path = sp_str_strip_left(path, fs->root);
+  //   path = sp_str_concat(mem, sp_str_lit("$test"), path);
+  // }
+  // if (expected) {
+  //   sp_fmt_io(&b.base, "\n{}{.cyan} does not exist", sp_fmt_str(bar), sp_fmt_str(path));
+  // } else {
+  //   sp_fmt_io(&b.base, "\n{}{.cyan} exists (expected not to)", sp_fmt_str(bar), sp_fmt_str(path));
+  // }
 
-  if (fs) {
-    sp_fmt_io(&b.base, "\n{}{.cyan} is the root", sp_fmt_str(bar), sp_fmt_str(fs->root));
-
-    path = sp_str_strip_left(path, fs->root);
-    path = sp_str_concat(mem, sp_str_lit("$test"), path);
-  }
-  if (expected) {
-    sp_fmt_io(&b.base, "\n{}{.cyan} does not exist", sp_fmt_str(bar), sp_fmt_str(path));
-  } else {
-    sp_fmt_io(&b.base, "\n{}{.cyan} exists (expected not to)", sp_fmt_str(bar), sp_fmt_str(path));
-  }
-
-  SP_TEST_REPORT_STR(sp_io_dyn_mem_writer_as_str(&b));
+  // SP_TEST_REPORT_STR(sp_io_dyn_mem_writer_as_str(&b));
   *utest_result = UTEST_TEST_FAILURE;
 }
 
@@ -717,6 +728,11 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
 
         sp_ps_output_t output = sp_ps_run(mem, config);
         EXPECT_EQ(action.cli.rc, output.status.exit_code);
+
+        if (action.cli.rc != output.status.exit_code) {
+          sp_str_t command = sp_str_join_n(mem, config.dyn_args, sp_da_size(config.dyn_args), sp_str_lit(" "));
+          UTEST_KVP("command", command);
+        }
         cli_output = output.out;
         break;
       }

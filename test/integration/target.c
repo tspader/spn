@@ -73,8 +73,8 @@ UTEST_F(target, selection_multiple_kinds) {
     .copy = { "spum.c", "script.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--bin", "--test" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libspum.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = exe("main") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/test/test") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/script") },
     },

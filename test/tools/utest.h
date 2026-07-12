@@ -145,12 +145,28 @@ struct utest_test_state_s {
   c8* test;
 };
 
+typedef struct {
+  sp_str_t key;
+  sp_str_t value;
+} utest_report_kvp_t;
+
+typedef struct {
+  struct { sp_str_t x; sp_str_t y; } expected;
+  struct { sp_str_t x; sp_str_t y; } actual;
+  sp_str_t file;
+  u32 line;
+  sp_str_t condition;
+  sp_str_t custom;
+  utest_report_kvp_t map [8];
+} utest_error_message_t;
+
 struct utest_state_s {
   struct utest_test_state_s *tests;
   u64 tests_length;
   sp_io_file_writer_t output;
   int has_output;
   sp_mem_t mem;
+  utest_error_message_t error;
 };
 
 /* extern to the global state utest needs to execute */
@@ -160,6 +176,9 @@ UTEST_EXTERN struct utest_state_s utest_state;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wvariadic-macros"
 #endif
+#define utest_fmt_s(...)                                                      \
+    sp_fmt(utest_state.mem, __VA_ARGS__).value
+
 #define UTEST_PRINTF(...)                                                      \
   do {                                                                         \
     sp_str_t _utest_fmtd = sp_fmt(utest_state.mem, __VA_ARGS__).value;                               \
@@ -176,7 +195,64 @@ UTEST_EXTERN struct utest_state_s utest_state;
 #define UTEST_OVERLOADABLE UTEST_ATTRIBUTE(overloadable)
 #endif
 
+#define UTEST_FORMATTER UTEST_WEAK UTEST_OVERLOADABLE
+
 #if defined(UTEST_OVERLOADABLE)
+
+UTEST_FORMATTER sp_str_t utest_fmt(signed char c);
+UTEST_FORMATTER sp_str_t utest_fmt(signed char c) {
+  return utest_fmt_s("{}", sp_fmt_int(c));
+}
+
+UTEST_FORMATTER sp_str_t utest_fmt(unsigned char c);
+UTEST_FORMATTER sp_str_t utest_fmt(unsigned char c) {
+  return utest_fmt_s("{}", sp_fmt_uint(c));
+}
+
+UTEST_FORMATTER sp_str_t utest_fmt(f32 v);
+UTEST_FORMATTER sp_str_t utest_fmt(f32 v) {
+  return utest_fmt_s("{:.3}", sp_fmt_float(v));
+}
+
+UTEST_FORMATTER sp_str_t utest_fmt(f64 v);
+UTEST_FORMATTER sp_str_t utest_fmt(f64 v) {
+  return utest_fmt_s("{:.3}", sp_fmt_float(v));
+}
+
+UTEST_FORMATTER sp_str_t utest_fmt(s32 v);
+UTEST_FORMATTER sp_str_t utest_fmt(s32 v) {
+  return utest_fmt_s("{}", sp_fmt_int(v));
+}
+
+UTEST_FORMATTER sp_str_t utest_fmt(u32 v);
+UTEST_FORMATTER sp_str_t utest_fmt(u32 v) {
+  return utest_fmt_s("{:.3}", sp_fmt_uint(v));
+}
+
+UTEST_FORMATTER sp_str_t utest_fmt(s64 v);
+UTEST_FORMATTER sp_str_t utest_fmt(s64 v) {
+  return utest_fmt_s("{}", sp_fmt_int(v));
+}
+
+UTEST_FORMATTER sp_str_t utest_fmt(u64 v);
+UTEST_FORMATTER sp_str_t utest_fmt(u64 v) {
+  return utest_fmt_s("{}", sp_fmt_uint(v));
+}
+
+UTEST_FORMATTER sp_str_t utest_fmt(void* v);
+UTEST_FORMATTER sp_str_t utest_fmt(void* v) {
+  return utest_fmt_s("{}", sp_fmt_ptr(v));
+}
+
+UTEST_FORMATTER sp_str_t utest_fmt(const c8* v);
+UTEST_FORMATTER sp_str_t utest_fmt(const c8* v) {
+  return utest_fmt_s("{}", sp_fmt_cstr(v));
+}
+
+UTEST_FORMATTER sp_str_t utest_fmt(sp_str_t v);
+UTEST_FORMATTER sp_str_t utest_fmt(sp_str_t v) {
+  return utest_fmt_s("{}", sp_fmt_str(v));
+}
 
 UTEST_WEAK UTEST_OVERLOADABLE void utest_type_printer(signed char c);
 UTEST_WEAK UTEST_OVERLOADABLE void utest_type_printer(signed char c) {
@@ -271,7 +347,36 @@ static UTEST_INLINE int utest_strncmp(const c8 *a, const c8 *b, u32 n) {
     return;                                                                    \
   } while (0)
 
+#define UTEST_KVP_S(__key, __value) \
+  do { \
+    sp_carr_for(utest_state.error.map, it) { \
+      if (!utest_state.error.map[it].key.len) { \
+        utest_state.error.map[it] = (utest_report_kvp_t) { __key, __value }; \
+        break; \
+      } \
+    } \
+  } \
+  while (0)
+
+#define UTEST_KVP(__key, __value) \
+  UTEST_KVP_S(sp_cstr_as_str(__key), __value)
+
+#define UTEST_ERROR(_xe, _ye, _xa, _ya, _file, _line, _condition) \
+  utest_state.error = (utest_error_message_t) { \
+    .expected = { \
+      .x = _xe, \
+      .y = _ye \
+    }, \
+    .actual = { \
+      .x = _xa, \
+      .y = _ya }, \
+    .file = _file, \
+    .line = _line, \
+    .condition = _condition \
+  }
+
 #if defined(__clang__)
+
 #define UTEST_COND(x, y, cond, msg, is_assert)                                 \
   UTEST_SURPRESS_WARNING_BEGIN do {                                            \
     _Pragma("clang diagnostic push")                                           \
@@ -280,22 +385,8 @@ static UTEST_INLINE int utest_strncmp(const c8 *a, const c8 *b, u32 n) {
                 UTEST_AUTO(x) xEval = (x);                                     \
     UTEST_AUTO(y) yEval = (y);                                                 \
     if (!((xEval)cond(yEval))) {                                               \
-      const c8 *const xAsString = #x;                                         \
-      const c8 *const yAsString = #y;                                         \
+      UTEST_ERROR(sp_str_lit(#x), sp_str_lit(#y), utest_fmt(xEval), utest_fmt(yEval), sp_str_lit(__FILE__), __LINE__, sp_str_lit(#cond)); \
       _Pragma("clang diagnostic pop")                                          \
-          UTEST_PRINTF("{}:{}: Failure\n",                                     \
-                       sp_fmt_cstr(__FILE__), sp_fmt_int(__LINE__));           \
-      UTEST_PRINTF("  expected -> {.gray} {} {.gray}\n",                              \
-                   sp_fmt_cstr(xAsString), sp_fmt_cstr(#cond),                \
-                   sp_fmt_cstr(yAsString));                                    \
-      UTEST_PRINTF("    actual -> ");                                           \
-      utest_type_printer(xEval);                                               \
-      UTEST_PRINTF(" vs ");                                                    \
-      utest_type_printer(yEval);                                               \
-      UTEST_PRINTF("\n");                                                      \
-      if ((msg)[0] != '\0') {                                                  \
-        UTEST_PRINTF("   Message : {}\n", sp_fmt_cstr(msg));                  \
-      }                                                                        \
       *utest_result = UTEST_TEST_FAILURE;                                      \
       if (is_assert) {                                                         \
         return;                                                                \
@@ -910,6 +1001,7 @@ s32 utest_main(s32 argc, const c8 **argv) {
   int random_order = 0;
   u32 seed = 0;
 
+  struct utest_state_s* s = &utest_state;
   utest_state.mem = sp_mem_os_new();
 
   /* loop through all arguments looking for our options */
@@ -1046,6 +1138,8 @@ s32 utest_main(s32 argc, const c8 **argv) {
 
     sp_print("{}.{}...", sp_fmt_cstr(utest_state.tests[index].set), sp_fmt_cstr(utest_state.tests[index].test));
 
+    s->error = sp_zero_s(utest_error_message_t);
+
     ns = utest_ns();
     utest_state.tests[index].func(&result, utest_state.tests[index].index);
     ns = utest_ns() - ns;
@@ -1060,8 +1154,7 @@ s32 utest_main(s32 argc, const c8 **argv) {
       failed++;
     } else if (UTEST_TEST_SKIPPED == result) {
       const u64 skipped_testcase_index = skipped_testcases_length++;
-      skipped_testcases = UTEST_PTR_CAST(
-          u64 *, utest_realloc(UTEST_PTR_CAST(void *, skipped_testcases),
+      skipped_testcases = sp_ptr_cast(u64*, utest_realloc(sp_ptr_cast(void*, skipped_testcases),
                                   sizeof(u64) * skipped_testcases_length));
       if (UTEST_NULL != skipped_testcases) {
         skipped_testcases[skipped_testcase_index] = index;
@@ -1091,7 +1184,28 @@ s32 utest_main(s32 argc, const c8 **argv) {
       } else {
         sp_print("{.green} ", sp_fmt_cstr("ok"));
       }
-      sp_log("{.black}{.black}", sp_fmt_int(time), sp_fmt_cstr(units[unit_index]));
+      sp_log("{.gray}{.gray}", sp_fmt_int(time), sp_fmt_cstr(units[unit_index]));
+
+      if (result == UTEST_TEST_FAILURE) {
+        sp_str_t expected = sp_fmt(s->mem, "{} {} {}",
+          sp_fmt_str(s->error.expected.x),
+          sp_fmt_str(s->error.condition),
+          sp_fmt_str(s->error.expected.y)
+        ).value;
+        sp_str_t actual = sp_fmt(s->mem, "{} vs. {}",
+          sp_fmt_str(s->error.actual.x),
+          sp_fmt_str(s->error.actual.y)
+        ).value;
+        sp_log("  {.gray}: {}", sp_fmt_cstr("file"), sp_fmt_str(s->error.file));
+        sp_log("  {.gray}: {}", sp_fmt_cstr("line"), sp_fmt_uint(s->error.line));
+        sp_log("  {.gray}: {}", sp_fmt_cstr("expected"), sp_fmt_str(expected));
+        sp_log("  {.gray}: {}", sp_fmt_cstr("actual"), sp_fmt_str(actual));
+        sp_carr_for(s->error.map, it) {
+          if (!s->error.map[it].key.len) break;
+            sp_log("  {.gray}: {}", sp_fmt_str(s->error.map[it].key), sp_fmt_str(s->error.map[it].value));
+          }
+      }
+
     }
   }
 

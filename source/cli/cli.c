@@ -81,6 +81,7 @@ static sp_cli_cmd_t cmd_build = {
       .brief = "f",
       .name = "force",
       .summary = "Force build, even if it exists in store",
+      .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &spn.cli.build.force,
     },
     {
@@ -94,21 +95,25 @@ static sp_cli_cmd_t cmd_build = {
     {
       .name = "bin",
       .summary = "Build only binary targets",
+      .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &spn.cli.build.only.bin,
     },
     {
       .name = "lib",
       .summary = "Build only library targets",
+      .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &spn.cli.build.only.lib,
     },
     {
       .name = "test",
       .summary = "Build only test targets",
+      .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &spn.cli.build.only.test,
     },
     {
       .name = "script",
       .summary = "Build only script targets",
+      .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &spn.cli.build.only.script,
     },
     {
@@ -356,6 +361,7 @@ static sp_cli_cmd_t cmd_graph = {
       .brief = "d",
       .name = "dirty",
       .summary = "Color nodes by dirtiness instead of type",
+      .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &spn.cli.graph.dirty,
     },
   },
@@ -391,6 +397,7 @@ static sp_cli_cmd_t cmd_publish = {
     {
       .name = "dry",
       .summary = "Print the release entry without publishing it",
+      .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &spn.cli.publish.dry,
     },
     {
@@ -479,12 +486,14 @@ static sp_cli_cmd_t cmd_root = {
       .brief = "v",
       .name = "verbose",
       .summary = "Show verbose output",
+      .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &spn.cli.verbose,
     },
     {
       .brief = "q",
       .name = "quiet",
       .summary = "Only show errors",
+      .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &spn.cli.quiet,
     },
   },
