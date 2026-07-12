@@ -38,6 +38,30 @@
     }; \
   } while (0)
 
+// @spader i know this is fucking stupid
+#define try_emit(__event_buffer, __expr) \
+  do { \
+    spn_err_union_t __err = (__expr); \
+    if (__err.kind) { \
+      spn_event_buffer_push(__event_buffer, (spn_build_event_t) { \
+        .kind = SPN_EVENT_ERR, \
+        .err = __err \
+      }); \
+      return __err; \
+    } \
+  } while (0)
+
+#define try_task(__expr) \
+  do { \
+    spn_err_union_t __err = (__expr); \
+    if (__err.kind) { \
+      spn_event_buffer_push(spn.events, (spn_build_event_t) { \
+        .kind = SPN_EVENT_ERR, \
+        .err = __err \
+      }); \
+      return spn_task_fail(SPN_ERROR); \
+    } \
+  } while (0)
 
 
 #define spn_result(status) (spn_err_union_t) { .kind = (status) }

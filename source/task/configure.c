@@ -28,7 +28,7 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
   spn_wasm_script_t* configure = &unit->wasm.configure;
-  if (configure->state != SPN_WASM_SCRIPT_NONE) {
+  if (!unit->build->script && configure->state != SPN_WASM_SCRIPT_NONE) {
     spn_try(spn_wasm_script_open(configure, unit));
     if (spn_wasm_script_exports(configure, sp_str_lit("configure"))) {
       spn_try(spn_wasm_script_call(configure, unit, sp_str_lit("configure"), SPN_ABI_KIND_CONFIG, unit));
@@ -80,17 +80,19 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
   }
 
   // Add a graph node for each package; configure modules compile and link in
-  // this graph so the run node consumes a pipeline-built artifact
+  // this graph so the run node consumes a pipeline-built artifact. Script-ctx
+  // units publish headers only: their packages' configure scripts run in the
+  // native ctx, and module targets are compiled below against the native unit
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (unit->build->script) {
-      continue;
-    }
 
     unit->nodes.configure.run = spn_bg_add_fn(graph, on_configure_package, unit);
     unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
     if (spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp)) {
       return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
+    }
+    if (unit->build->script) {
+      continue;
     }
     if (unit->wasm.configure.state != SPN_WASM_SCRIPT_NONE) {
       spn_bg_id_t module = spn_bg_add_file(graph, unit->wasm.configure.path);
@@ -106,12 +108,9 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
   // Add links between packages
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (unit->build->script) {
-      continue;
-    }
 
-    spn_target_unit_t* configure = unit->wasm.configure.state != SPN_WASM_SCRIPT_NONE ?
-      find_configure_target(session, unit) :
+    spn_target_unit_t* configure = unit->build->script ?
+      spn_session_find_target_in_pkg(session, unit, sp_str_lit("configure")) :
       SP_NULLPTR;
 
     sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit);

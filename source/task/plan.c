@@ -17,7 +17,7 @@
 #include "toolchain/types.h"
 #include "unit/types.h"
 
-static spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* build, spn_pkg_id_t id) {
+spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* build, spn_pkg_id_t id, u32 kinds) {
   spn_pkg_unit_t* existing = spn_session_find_pkg_unit(s, build, id);
   if (existing) {
     return existing;
@@ -29,13 +29,12 @@ static spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* bui
   sp_assert(loaded);
 
   spn_pkg_unit_t* unit = spn_session_add_pkg_unit(s, build, id, loaded);
-  u32 kinds = build->dep_kinds | spn_dep_kind_bit(SPN_DEP_KIND_BUILD);
   sp_da_for(pkg->edges, it) {
     if (!(kinds & spn_dep_kind_bit(pkg->edges[it].kind))) {
       continue;
     }
     sp_da_push(unit->deps, ((spn_pkg_dep_t) {
-      .unit = add_package_units(s, build, pkg->edges[it].id),
+      .unit = add_package_units(s, build, pkg->edges[it].id, spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE)),
       .kind = pkg->edges[it].kind,
       .private = pkg->edges[it].private,
     }));
@@ -109,7 +108,7 @@ static spn_err_union_t add_compilation_units(spn_session_t *s) {
       return err;
     }
     sp_da_for(s->plan.requested, rt) {
-      add_package_units(s, plan->build, s->plan.requested[rt]);
+      add_package_units(s, plan->build, s->plan.requested[rt], plan->build->dep_kinds);
     }
   }
   return spn_result(SPN_OK);
@@ -137,17 +136,8 @@ spn_task_step_t spn_task_plan(spn_app_t* app) {
     }
   }
 
-  spn_err_union_t err = add_compilation_units(session);
-  if (!err.kind) {
-    err = add_script_units(session);
-  }
-  if (err.kind) {
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR,
-      .err = err,
-    });
-    return spn_task_fail(SPN_ERROR);
-  }
+  try_task(add_compilation_units(session));
+  try_task(add_script_units(session));
 
   sp_env_t* env = &session->env;
   sp_env_init(session->mem, env);
