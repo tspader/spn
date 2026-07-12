@@ -43,7 +43,7 @@ static bool triple_empty(spn_triple_t triple) {
   return !triple.arch && !triple.os && !triple.abi;
 }
 
-static void fixture_targets(sp_mem_t mem, spn_toolchain_t* toolchain, const spn_triple_t* targets, u32 len) {
+static void fixture_targets(sp_mem_t mem, spn_toolchain_info_t* toolchain, const spn_triple_t* targets, u32 len) {
   sp_for(it, len) {
     if (triple_empty(targets[it])) {
       break;
@@ -66,7 +66,7 @@ static void run_select_test(s32* utest_result, select_test_t t) {
     if (!desc.name) {
       break;
     }
-    spn_toolchain_t toolchain = fixture_local_toolchain(desc.name, desc.compiler);
+    spn_toolchain_info_t toolchain = fixture_local_toolchain(desc.name, desc.compiler);
     fixture_targets(mem, &toolchain, desc.targets, SP_CARR_LEN(desc.targets));
     spn_toolchain_catalog_add(&catalog, toolchain);
   }
@@ -113,7 +113,7 @@ static void run_select_test(s32* utest_result, select_test_t t) {
 static void run_supports_test(s32* utest_result, supports_test_t t) {
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
 
-  spn_toolchain_t toolchain = fixture_local_toolchain("system", "cc");
+  spn_toolchain_info_t toolchain = fixture_local_toolchain("system", "cc");
   fixture_targets(mem, &toolchain, t.targets, SP_CARR_LEN(t.targets));
 
   sp_carr_for(t.checks, it) {

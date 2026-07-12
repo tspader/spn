@@ -144,7 +144,7 @@ static spn_err_union_t add_compilation_units(spn_session_t *s) {
     spn_build_plan_t* plan = &s->plan.builds[it];
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
     spn_cc_flags_t flags = SP_ZERO_INITIALIZE();
-    spn_err_union_t err = spn_cc_render_flags(scratch.mem, plan->build->toolchain->toolchain->driver, &plan->build->profile, &flags);
+    spn_err_union_t err = spn_cc_render_flags(scratch.mem, plan->build->toolchain->info->driver, &plan->build->profile, &flags);
     sp_mem_end_scratch(scratch);
     if (err.kind) {
       return err;
@@ -188,7 +188,7 @@ spn_task_step_t spn_task_plan(spn_app_t* app) {
   sp_env_insert(env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(s->mem, s->units.toolchain->compiler));
   sp_env_insert(env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(s->mem, s->units.toolchain->archiver));
   sp_env_insert(env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(s->mem, s->units.toolchain->linker));
-  if (spn_toolchain_has_cxx(s->units.toolchain->toolchain)) {
+  if (spn_toolchain_has_cxx(s->units.toolchain->info)) {
     sp_env_insert(env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(s->mem, s->units.toolchain->cxx));
   }
 

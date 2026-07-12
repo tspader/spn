@@ -245,7 +245,7 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
   sp_da_for(cg->toolchain, n) {
     const spn_cg_manifest_toolchain_t* t = &cg->toolchain[n];
 
-    spn_toolchain_t toolchain = sp_zero;
+    spn_toolchain_info_t toolchain = sp_zero;
     toolchain.name = t->name;
     toolchain.driver = sp_opt_is_null(t->driver) ? SPN_CC_DRIVER_NONE : sp_opt_get(t->driver);
     toolchain.compiler = lower_launcher(ctx, t->compiler);

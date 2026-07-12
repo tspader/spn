@@ -20,7 +20,7 @@ spn_err_t spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, sp_str_t 
   sp_om_for(root.toolchain, it) {
     const spn_cg_toolchain_t* t = sp_om_at(root.toolchain, it);
 
-    spn_toolchain_t toolchain = sp_zero;
+    spn_toolchain_info_t toolchain = sp_zero;
     toolchain.name = t->name;
     toolchain.version = t->version;
     toolchain.driver = t->driver;
@@ -57,14 +57,14 @@ spn_err_t spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, sp_str_t 
   return SPN_OK;
 }
 
-void spn_toolchain_catalog_add(spn_toolchain_catalog_t* catalog, spn_toolchain_t toolchain) {
-  spn_toolchain_t* entry = sp_alloc_type(catalog->mem, spn_toolchain_t);
+void spn_toolchain_catalog_add(spn_toolchain_catalog_t* catalog, spn_toolchain_info_t toolchain) {
+  spn_toolchain_info_t* entry = sp_alloc_type(catalog->mem, spn_toolchain_info_t);
   *entry = toolchain;
   sp_str_ht_insert(catalog->entries, entry->name, entry);
 }
 
-spn_toolchain_t* spn_toolchain_catalog_get(spn_toolchain_catalog_t* catalog, sp_str_t name) {
-  spn_toolchain_t** entry = sp_str_ht_get(catalog->entries, name);
+spn_toolchain_info_t* spn_toolchain_catalog_get(spn_toolchain_catalog_t* catalog, sp_str_t name) {
+  spn_toolchain_info_t** entry = sp_str_ht_get(catalog->entries, name);
   return entry ? *entry : SP_NULLPTR;
 }
 

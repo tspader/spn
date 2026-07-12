@@ -55,7 +55,7 @@ SP_PRIVATE u64 spn_toolchain_provision_stamp(void) {
   return stamp ^ ((u64)(u32)sp_atomic_s32_add(&sequence, 1) << 48);
 }
 
-spn_err_union_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolchain_t* toolchain, sp_str_t* root) {
+spn_err_union_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, sp_str_t* root) {
   *root = sp_str_lit("");
   if (sp_opt_is_null(toolchain->artifact)) return spn_result(SPN_OK);
 

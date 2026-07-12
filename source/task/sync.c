@@ -25,10 +25,9 @@
 #include "unit/types.h"
 
 SP_PRIVATE spn_toolchain_unit_t*
-setup_toolchain_unit(spn_session_t* session, spn_toolchain_store_t* store, spn_toolchain_t* toolchain) {
+setup_toolchain_unit(spn_session_t* session, spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain) {
   spn_toolchain_unit_t *unit = sp_alloc_type(spn.mem, spn_toolchain_unit_t);
-  unit->session = session;
-  unit->toolchain = toolchain;
+  unit->info = toolchain;
 
   sp_str_t name = toolchain->name;
 

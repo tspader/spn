@@ -336,7 +336,7 @@ static void run_case(s32* utest_result, test_t test) {
     toolchain_t expected = test.toolchains[it];
     if (!expected.name) break;
 
-    spn_toolchain_t* tc = sp_str_om_get(pkg.toolchains, sp_str_view(expected.name));
+    spn_toolchain_info_t* tc = sp_str_om_get(pkg.toolchains, sp_str_view(expected.name));
     ASSERT_TRUE(tc);
     EXPECT_EQ(expected.remote, !sp_opt_is_null(tc->artifact));
 

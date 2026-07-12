@@ -1182,7 +1182,7 @@ static void spn_tui_render_event_extra(sp_io_writer_t* w, spn_build_event_t* eve
         case SPN_ERR_TOOLCHAIN_TARGET: {
           bool first = true;
           sp_str_ht_for_kv(event->err.toolchain.catalog->entries, it) {
-            spn_toolchain_t* toolchain = *it.val;
+            spn_toolchain_info_t* toolchain = *it.val;
             if (!spn_toolchain_supports(toolchain, event->err.toolchain.target, event->err.toolchain.host)) continue;
             sp_io_write_str(w, first ? sp_str_lit("toolchains that can: ") : sp_str_lit(", "), SP_NULLPTR);
             sp_fmt_io(w, "{.green}", sp_fmt_str(toolchain->name));

@@ -197,7 +197,7 @@ static void run_provision_test(s32* utest_result, provision_test_t t) {
       break;
     }
 
-    spn_toolchain_t toolchain = fixture_local_toolchain(name, name);
+    spn_toolchain_info_t toolchain = fixture_local_toolchain(name, name);
     if (!t.local) {
       sp_opt_set(toolchain.artifact, ((spn_artifact_t) {
         .url = url,

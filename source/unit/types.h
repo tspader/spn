@@ -301,8 +301,7 @@ struct spn_pkg_unit_t {
 };
 
 struct spn_toolchain_unit_t {
-  spn_toolchain_t* toolchain;
-  spn_session_t* session;
+  spn_toolchain_info_t* info;
   sp_str_t root;
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t cxx;

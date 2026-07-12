@@ -501,7 +501,7 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
 
   sp_om_for(session->units.objects, it) {
     spn_compile_unit_t* object = sp_om_at(session->units.objects, it);
-    spn_toolchain_t* toolchain = object->target->build->toolchain->toolchain;
+    spn_toolchain_info_t* toolchain = object->target->build->toolchain->info;
     if (object->lang != SPN_LANG_CXX || spn_toolchain_has_cxx(toolchain)) {
       continue;
     }

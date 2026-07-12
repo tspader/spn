@@ -7,7 +7,7 @@ UTEST(catalog, builtin_with_host_match) {
   spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
-  spn_toolchain_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
+  spn_toolchain_info_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
   ASSERT_TRUE(zig);
 
   EXPECT_STR(zig->name, "zig");
@@ -35,7 +35,7 @@ UTEST(catalog, host_selects_matching_artifact) {
   spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_ARM_MACOS);
 
-  spn_toolchain_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
+  spn_toolchain_info_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
   ASSERT_TRUE(zig);
   ASSERT_FALSE(sp_opt_is_null(zig->artifact));
   EXPECT_STR(sp_opt_get(zig->artifact).url, "https://tc.example.com/zig-aarch64-macos.tar.xz");
@@ -46,7 +46,7 @@ UTEST(catalog, unmatched_host_has_no_artifact) {
   spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_ARM_LINUX);
 
-  spn_toolchain_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
+  spn_toolchain_info_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
   ASSERT_TRUE(zig);
   EXPECT_TRUE(sp_opt_is_null(zig->artifact));
 }
@@ -55,7 +55,7 @@ UTEST(catalog, system_entry_is_local) {
   spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
 
-  spn_toolchain_t* system = spn_toolchain_catalog_get(&catalog, sp_str_lit("system"));
+  spn_toolchain_info_t* system = spn_toolchain_catalog_get(&catalog, sp_str_lit("system"));
   ASSERT_TRUE(system);
   EXPECT_TRUE(sp_opt_is_null(system->artifact));
   EXPECT_EQ((u32)SPN_CC_DRIVER_GCC, (u32)system->driver);
@@ -69,7 +69,7 @@ UTEST(catalog, add_overrides_builtin) {
 
   spn_toolchain_catalog_add(&catalog, fixture_local_toolchain("zig", "/opt/zig/zig"));
 
-  spn_toolchain_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
+  spn_toolchain_info_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
   ASSERT_TRUE(zig);
   EXPECT_STR(zig->compiler.program, "/opt/zig/zig");
   EXPECT_TRUE(sp_opt_is_null(zig->artifact));
@@ -81,7 +81,7 @@ UTEST(catalog, add_new_entry) {
 
   spn_toolchain_catalog_add(&catalog, fixture_local_toolchain("mingw", "x86_64-w64-mingw32-gcc"));
 
-  spn_toolchain_t* mingw = spn_toolchain_catalog_get(&catalog, sp_str_lit("mingw"));
+  spn_toolchain_info_t* mingw = spn_toolchain_catalog_get(&catalog, sp_str_lit("mingw"));
   ASSERT_TRUE(mingw);
   EXPECT_STR(mingw->compiler.program, "x86_64-w64-mingw32-gcc");
 
@@ -107,7 +107,7 @@ UTEST(catalog, embedded_builtins_parse) {
   spn_toolchain_catalog_t catalog = sp_zero;
   ASSERT_EQ(SPN_OK, spn_toolchain_catalog_init(&catalog, json, HOST_X64_LINUX, mem));
 
-  spn_toolchain_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
+  spn_toolchain_info_t* zig = spn_toolchain_catalog_get(&catalog, sp_str_lit("zig"));
   ASSERT_TRUE(zig);
   ASSERT_FALSE(sp_opt_is_null(zig->artifact));
   EXPECT_TRUE(sp_str_contains(sp_opt_get(zig->artifact).url, sp_str_lit("ziglang.org")));
@@ -119,7 +119,7 @@ UTEST(catalog, embedded_builtins_parse) {
   }
   EXPECT_TRUE(targets_wasm);
 
-  spn_toolchain_t* system = spn_toolchain_catalog_get(&catalog, sp_str_lit("system"));
+  spn_toolchain_info_t* system = spn_toolchain_catalog_get(&catalog, sp_str_lit("system"));
   ASSERT_TRUE(system);
   EXPECT_TRUE(sp_opt_is_null(system->artifact));
 }

@@ -54,8 +54,8 @@ static u32 fixture_catalog_size(spn_toolchain_catalog_t* catalog) {
   return (u32)sp_str_ht_size(catalog->entries);
 }
 
-static spn_toolchain_t fixture_local_toolchain(const c8* name, const c8* compiler) {
-  return (spn_toolchain_t) {
+static spn_toolchain_info_t fixture_local_toolchain(const c8* name, const c8* compiler) {
+  return (spn_toolchain_info_t) {
     .name = sp_str_view(name),
     .driver = SPN_CC_DRIVER_GCC,
     .compiler = { .program = sp_str_view(compiler) },

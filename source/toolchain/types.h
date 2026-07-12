@@ -31,7 +31,7 @@ typedef struct {
   spn_artifact_t artifact;
 } spn_toolchain_host_t;
 
-typedef struct spn_toolchain {
+typedef struct {
   sp_str_t name;
   sp_str_t version;
   spn_cc_driver_t driver;
@@ -41,10 +41,10 @@ typedef struct spn_toolchain {
   spn_toolchain_launcher_t archiver;
   sp_da(spn_triple_t) targets;
   spn_opt_artifact_t artifact;
-} spn_toolchain_t;
+} spn_toolchain_info_t;
 
 struct spn_toolchain_catalog_t {
-  sp_str_ht(spn_toolchain_t*) entries;
+  sp_str_ht(spn_toolchain_info_t*) entries;
   sp_mem_t mem;
 };
 

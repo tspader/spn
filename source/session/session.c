@@ -394,7 +394,7 @@ static sp_hash_t hash_package(spn_session_t* session, spn_build_unit_t* build, s
     }
   }
 
-  spn_toolchain_t* toolchain = build->toolchain->toolchain;
+  spn_toolchain_info_t* toolchain = build->toolchain->info;
   sp_opt_spn_linkage_t config = spn_session_config_kind(session, pkg->name);
 
   fingerprint.mode = build->profile.mode;
