@@ -523,7 +523,7 @@ void spn_deinit(sp_app_t* sp) {
     if (!plan) {
       continue;
     }
-    spn_pkg_unit_t* requested = spn_session_find_pkg_unit_by_id(&app.session, plan->root);
+    spn_pkg_unit_t* requested = spn_session_find_pkg_unit(&app.session, plan->build, spn_session_root_pkg(&app.session));
     if (!requested) {
       continue;
     }

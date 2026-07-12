@@ -485,6 +485,15 @@ spn_target_unit_t* spn_session_get_target_unit(spn_session_t* session, spn_targe
   return sp_om_get(session->units.targets, id);
 }
 
+spn_pkg_id_t spn_session_root_pkg(spn_session_t* session) {
+  sp_ht_for_kv(session->resolve, it) {
+    if (it.val->source == SPN_PKG_SOURCE_ROOT) {
+      return it.val->id;
+    }
+  }
+  return SP_ZERO_STRUCT(spn_pkg_id_t);
+}
+
 spn_build_plan_t* spn_session_find_plan(spn_session_t* session, spn_build_kind_t kind) {
   sp_da_for(session->plan.builds, it) {
     if (session->plan.builds[it].build->kind == kind) {
