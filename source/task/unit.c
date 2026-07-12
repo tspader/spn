@@ -309,15 +309,7 @@ spn_err_union_t add_script_units(spn_session_t* session) {
 
   sp_da_for(scripted, it) {
     spn_pkg_unit_t* native = scripted[it];
-    spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, native->id.pkg);
-    sp_assert(loaded);
-    spn_pkg_unit_t* unit = spn_session_add_pkg_unit(session, build, native->id.pkg, loaded);
-    sp_da_for(native->deps, dt) {
-      if (native->deps[dt].kind != SPN_DEP_KIND_BUILD) {
-        continue;
-      }
-      sp_da_push(unit->deps, native->deps[dt]);
-    }
+    spn_pkg_unit_t* unit = add_package_units(session, build, native->id.pkg, spn_dep_kind_bit(SPN_DEP_KIND_BUILD));
 
     struct {
       spn_target_unit_t* build;
