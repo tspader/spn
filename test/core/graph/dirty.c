@@ -17,14 +17,10 @@ void expect_node_dirty(s32* utest_result, built_graph_t* b, spn_bg_dirty_t* dirt
       : spn_bg_is_cmd_dirty(dirty, ref->handle);
 
   if (is_dirty != want_dirty) {
-    sp_str_t message = sp_fmt(
-      b->graph->allocator,
-      "{} expected {} but was {}",
-      sp_fmt_cstr(id),
-      sp_fmt_cstr(want_dirty ? "dirty" : "clean"),
-      sp_fmt_cstr(is_dirty ? "dirty" : "clean")
-    ).value;
-    EXPECT_TRUE_MSG(is_dirty == want_dirty, sp_str_to_cstr(b->graph->allocator, message));
+    utest_kv("node", sp_cstr_as_str(id));
+    utest_fail(utest_result, __FILE__, __LINE__,
+      sp_str_view(want_dirty ? "dirty" : "clean"),
+      sp_str_view(is_dirty ? "dirty" : "clean"));
   }
 }
 

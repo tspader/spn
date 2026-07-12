@@ -9,7 +9,7 @@
 
 void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn_index_cache_t* index, spn_pkg_registry_t* registry, spn_event_buffer_t* events, spn_profile_info_t profile, sp_da(spn_pkg_config_entry_t) config, u64 budget);
 void spn_resolve_query_init(sp_mem_t mem, spn_resolve_query_t* query);
-void spn_resolve_query_add(spn_resolve_query_t* query, spn_requested_pkg_t req);
+void spn_resolve_query_add(spn_resolve_query_t* query, spn_requested_dep_t req);
 spn_err_t spn_resolve_from_solver(spn_resolver_t* resolver, spn_resolve_query_t* query);
 spn_err_t spn_resolve_from_lock_file(spn_resolver_t* resolver, spn_lock_file_t* lock);
 

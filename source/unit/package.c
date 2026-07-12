@@ -17,7 +17,7 @@ sp_str_t spn_pkg_unit_get_node_stamp_file(spn_pkg_unit_t* ctx, spn_user_node_t* 
   return sp_fs_join_path(spn.mem, ctx->paths.stamp.dir, node->tag);
 }
 
-static spn_err_t publish_target_headers(spn_pkg_unit_t* unit, spn_target_info_om_t targets, bool strict) {
+static spn_err_t publish_target_headers(spn_pkg_unit_t* unit, spn_target_map_t targets, bool strict) {
   sp_om_for(targets, it) {
     spn_target_info_t* target = sp_str_om_at(targets, it);
 

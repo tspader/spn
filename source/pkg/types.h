@@ -53,7 +53,7 @@ typedef enum {
   SPN_DEP_KIND_TEST,
 } spn_dep_kind_t;
 
-typedef struct spn_pkg_req {
+typedef struct {
   sp_intern_str_t qualified;
   spn_pkg_source_t source;
   spn_dep_kind_t kind;
@@ -64,7 +64,7 @@ typedef struct spn_pkg_req {
     struct { spn_semver_range_t range; } index;
     struct { sp_str_t path; } file;
   };
-} spn_requested_pkg_t;
+} spn_requested_dep_t;
 
 
 typedef struct {
@@ -83,11 +83,11 @@ typedef struct {
   sp_str_t to;
 } spn_publish_copy_t;
 
-typedef sp_str_om(spn_target_info_t)     spn_target_info_om_t;
-typedef sp_str_om(spn_profile_info_t)    spn_profile_info_om_t;
-typedef sp_str_om(spn_index_info_t)      spn_index_info_om_t;
-typedef sp_str_om(spn_toolchain_t) spn_toolchain_om_t;
-typedef sp_str_om(spn_option_info_t)     spn_option_info_om_t;
+typedef sp_str_om(spn_target_info_t)     spn_target_map_t;
+typedef sp_str_om(spn_profile_info_t)    spn_profile_map_t;
+typedef sp_str_om(spn_index_info_t)      spn_index_map_t;
+typedef sp_str_om(spn_toolchain_t) spn_toolchain_map_t;
+typedef sp_str_om(spn_option_info_t)     spn_option_map_t;
 
 struct spn_pkg_info {
   sp_str_t namespace;
@@ -101,15 +101,15 @@ struct spn_pkg_info {
     sp_str_t url;
     sp_str_t commit;
   } upstream;
-  spn_target_info_om_t libs;
-  spn_target_info_om_t exes;
-  spn_target_info_om_t scripts;
-  spn_target_info_om_t tests;
-  spn_profile_info_om_t profiles;
-  spn_index_info_om_t indexes;
-  sp_da(spn_requested_pkg_t) deps;
+  spn_target_map_t libs;
+  spn_target_map_t exes;
+  spn_target_map_t scripts;
+  spn_target_map_t tests;
+  spn_profile_map_t profiles;
+  spn_index_map_t indexes;
+  sp_da(spn_requested_dep_t) deps;
   sp_da(spn_pkg_config_entry_t) config;
-  spn_option_info_om_t options;
+  spn_option_map_t options;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) public_define;
@@ -117,7 +117,7 @@ struct spn_pkg_info {
   struct {
     spn_gated_list_t system_deps;
   } gated;
-  spn_toolchain_om_t toolchains;
+  spn_toolchain_map_t toolchains;
   spn_target_info_t build;
   spn_target_info_t configure;
   struct {

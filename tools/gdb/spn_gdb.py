@@ -273,7 +273,6 @@ PRINTERS = {
     "spn_semver_range_t": SemverRangePrinter,
     "spn_pkg_id_t": PkgIdPrinter,
     "spn_requested_pkg_t": RequestedPkgPrinter,
-    "spn_pkg_req": RequestedPkgPrinter,
     "spn_resolved_dep_t": ResolvedDepPrinter,
     "spn_link_unit_id_t": LinkUnitIdPrinter,
     "spn_resolved_pkg_t": ResolvedPkgPrinter,

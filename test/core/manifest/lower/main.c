@@ -186,7 +186,7 @@ static void check_gated(s32* utest_result, sp_mem_t mem, spn_gated_list_t actual
   }
 }
 
-static void check_targets(s32* utest_result, sp_mem_t mem, spn_target_info_om_t om, const target_t* arr, u32 n, spn_target_kind_t kind) {
+static void check_targets(s32* utest_result, sp_mem_t mem, spn_target_map_t om, const target_t* arr, u32 n, spn_target_kind_t kind) {
   for (u32 i = 0; i < n; i++) {
     if (!arr[i].name) break;
     spn_target_info_t* t = sp_str_om_get(om, sp_str_view(arr[i].name));
@@ -288,7 +288,7 @@ static void run_case(s32* utest_result, test_t test) {
 
     spn_dep_kind_t kind = expected.build ? SPN_DEP_KIND_BUILD : expected.test ? SPN_DEP_KIND_TEST : SPN_DEP_KIND_PACKAGE;
 
-    spn_requested_pkg_t* req = SP_NULLPTR;
+    spn_requested_dep_t* req = SP_NULLPTR;
     sp_da_for(pkg.deps, jt) {
       if (sp_str_equal(pkg.deps[jt].qualified, sp_str_view(expected.name)) && pkg.deps[jt].kind == kind) {
         req = &pkg.deps[jt];

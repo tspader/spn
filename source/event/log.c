@@ -321,7 +321,7 @@ static void build_schemas(sp_mem_t mem) {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
       SP_BIND_OBJECT(&b, spn_evt_unknown_t, request, "request") {
-        SP_BIND(&b, spn_requested_pkg_t, qualified, "qualified", SP_BIND_STR);
+        SP_BIND(&b, spn_requested_dep_t, qualified, "qualified", SP_BIND_STR);
       }
     }
     schemas[SPN_EVENT_ERR_UNKNOWN_PKG] = sp_bind_builder_end(&b);
@@ -383,7 +383,7 @@ static void build_schemas(sp_mem_t mem) {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
       SP_BIND_OBJECT(&b, spn_evt_unsatisfiable_t, request, "request") {
-        SP_BIND(&b, spn_requested_pkg_t, qualified, "qualified", SP_BIND_STR);
+        SP_BIND(&b, spn_requested_dep_t, qualified, "qualified", SP_BIND_STR);
       }
       SP_BIND(&b, spn_evt_unsatisfiable_t, requester, "requester", SP_BIND_STR);
       SP_BIND(&b, spn_evt_unsatisfiable_t, conflict, "conflict", SP_BIND_BOOL);

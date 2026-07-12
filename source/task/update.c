@@ -69,7 +69,7 @@ static void spn_update_report_incompatible(spn_app_t* app, sp_mem_t mem) {
   spn_index_cache_init(&cache, spn.heap, spn.intern, &spn.indexes);
 
   sp_da_for(app->package.deps, it) {
-    spn_requested_pkg_t* dep = &app->package.deps[it];
+    spn_requested_dep_t* dep = &app->package.deps[it];
     if (dep->source != SPN_PKG_SOURCE_INDEX) {
       continue;
     }

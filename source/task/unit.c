@@ -336,7 +336,7 @@ static bool is_root_target(spn_session_t* session, spn_build_plan_t* plan, spn_t
   return false;
 }
 
-static spn_err_t add_plan_targets(spn_session_t* session, spn_build_plan_t* plan, spn_pkg_unit_t* pkg, spn_target_info_om_t targets) {
+static spn_err_t add_plan_targets(spn_session_t* session, spn_build_plan_t* plan, spn_pkg_unit_t* pkg, spn_target_map_t targets) {
   sp_str_om_for(targets, it) {
     spn_target_info_t* info = sp_str_om_at(targets, it);
     if (!spn_target_selection_pass(&plan->selection, info)) {

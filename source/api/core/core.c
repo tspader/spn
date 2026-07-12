@@ -166,7 +166,7 @@ const spn_t* spn_get_dep(const spn_t* s, const c8* name) {
   sp_str_t key = sp_str_view(name);
 
   sp_da_for(unit->info->deps, it) {
-    spn_requested_pkg_t* dep = &unit->info->deps[it];
+    spn_requested_dep_t* dep = &unit->info->deps[it];
     if (!sp_str_equal(spn_pkg_name_from_qualified(dep->qualified).name, key)) continue;
 
     spn_pkg_unit_t* dep_unit = spn_session_find_dep(unit->session, unit, dep->qualified, dep->kind);
