@@ -15,6 +15,7 @@
 #include "task/types.h"
 #include "toolchain/toolchain.h"
 #include "toolchain/types.h"
+#include "triple/triple.h"
 #include "unit/types.h"
 
 spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* build, spn_pkg_id_t id, u32 kinds) {
@@ -43,6 +44,13 @@ spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* build, spn
 }
 
 static void add_target_build(spn_session_t* s, spn_profile_info_t profile) {
+
+  sp_str_t path = s->paths.build;
+  if (s->profile.targeted) {
+    spn_triple_t target = { s->profile.arch, s->profile.os, s->profile.abi };
+    path = sp_fs_join_path(s->mem, path, spn_triple_to_str(s->mem, target));
+  }
+
   spn_build_unit_t* unit = sp_alloc_type(s->mem, spn_build_unit_t);
   *unit = (spn_build_unit_t) {
     .id = (spn_build_unit_id_t)sp_da_size(s->plan.builds),
@@ -50,7 +58,9 @@ static void add_target_build(spn_session_t* s, spn_profile_info_t profile) {
     .toolchain = s->units.toolchain,
     .visibility = SPN_SYMBOL_VISIBILITY_DEFAULT,
     .dep_kinds = spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE) | spn_dep_kind_bit(SPN_DEP_KIND_TEST),
-    .paths = { .profile = s->paths.profile },
+    .paths = {
+      .profile = sp_fs_join_path(s->mem, path, profile.name)
+    },
   };
   sp_da_init(s->mem, unit->include);
 
@@ -135,7 +145,6 @@ spn_task_step_t spn_task_plan(spn_app_t* app) {
   }
 
   add_target_build(s, s->profile);
-
   try_task(add_compilation_units(s));
   try_task(add_script_units(s));
 
