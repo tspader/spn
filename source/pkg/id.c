@@ -2,12 +2,17 @@
 
 #include "intern/intern.h"
 #include "pkg/id.h"
+#include "semver/compare.h"
 #include "sp/macro.h"
 
 spn_pkg_id_t spn_pkg_id(sp_intern_t* intern, sp_str_t qualified) {
   return (spn_pkg_id_t) {
     .qualified = sp_intern_get_or_insert(intern, qualified),
   };
+}
+
+bool spn_pkg_id_eq(spn_pkg_id_t a, spn_pkg_id_t b) {
+  return a.qualified == b.qualified && spn_semver_eq(a.version, b.version);
 }
 
 sp_intern_str_t spn_pkg_canonicalize_name(sp_str_t name) {

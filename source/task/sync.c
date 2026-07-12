@@ -443,6 +443,7 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
   session->units.toolchains = sp_da_new(session->mem, spn_toolchain_unit_t *);
   sp_da_init(session->mem, session->units.compile_commands);
   sp_da_init(session->mem, session->plan.builds);
+  session->plan.script = SP_NULLPTR;
   sp_da_for(app->sync.toolchains, it) {
     spn_sync_toolchain_job_t* job = app->sync.toolchains[it];
     sp_da_push(session->units.toolchains, job->unit);

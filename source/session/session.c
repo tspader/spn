@@ -494,15 +494,6 @@ spn_pkg_id_t spn_session_root_pkg(spn_session_t* session) {
   return SP_ZERO_STRUCT(spn_pkg_id_t);
 }
 
-spn_build_plan_t* spn_session_find_plan(spn_session_t* session, spn_build_kind_t kind) {
-  sp_da_for(session->plan.builds, it) {
-    if (session->plan.builds[it].build->kind == kind) {
-      return &session->plan.builds[it];
-    }
-  }
-  return SP_NULLPTR;
-}
-
 spn_build_plan_t* spn_session_plan_for_build(spn_session_t* session, spn_build_unit_t* build) {
   sp_da_for(session->plan.builds, it) {
     if (session->plan.builds[it].build == build) {

@@ -240,14 +240,12 @@ static void create_target_objects(spn_session_t* session, spn_target_unit_t* tar
   sp_mem_end_scratch(scratch);
 }
 
-static spn_err_union_t add_script_target(spn_session_t* session, spn_pkg_unit_t* unit, spn_target_info_t* info, spn_wasm_script_t* wasm) {
+static spn_err_t add_script_target(spn_session_t* session, spn_pkg_unit_t* unit, spn_target_info_t* info, spn_target_unit_t** result) {
   spn_target_unit_t* target = SP_NULLPTR;
-  if (ensure_target(session, unit, info, &target)) {
-    return spn_result(SPN_ERROR);
-  }
+  spn_try(ensure_target(session, unit, info, &target));
   create_target_objects(session, target);
-  spn_wasm_script_init(wasm, true, get_target_output_path(session->mem, target));
-  return spn_result(SPN_OK);
+  *result = target;
+  return SPN_OK;
 }
 
 spn_err_union_t add_script_units(spn_session_t* session) {
@@ -262,6 +260,16 @@ spn_err_union_t add_script_units(spn_session_t* session) {
       continue;
     }
     if (sp_da_empty(pkg->script.configure.source) && sp_da_empty(pkg->script.build.source)) {
+      continue;
+    }
+    bool seen = false;
+    sp_da_for(scripted, st) {
+      if (spn_pkg_id_eq(scripted[st]->id.pkg, pkg->id.pkg)) {
+        seen = true;
+        break;
+      }
+    }
+    if (seen) {
       continue;
     }
     sp_da_push(scripted, pkg);
@@ -297,6 +305,7 @@ spn_err_union_t add_script_units(spn_session_t* session) {
   };
   sp_da_init(session->mem, plan.roots);
   sp_da_push(session->plan.builds, plan);
+  session->plan.script = build;
 
   sp_da_for(scripted, it) {
     spn_pkg_unit_t* native = scripted[it];
@@ -310,11 +319,28 @@ spn_err_union_t add_script_units(spn_session_t* session) {
       sp_da_push(unit->deps, native->deps[dt]);
     }
 
+    struct {
+      spn_target_unit_t* build;
+      spn_target_unit_t* configure;
+    } scripts = sp_zero;
     if (!sp_da_empty(unit->script.configure.source)) {
-      try_union(add_script_target(session, unit, &unit->script.configure, &native->wasm.configure));
+      try_as_union(add_script_target(session, unit, &unit->script.configure, &scripts.configure));
     }
     if (!sp_da_empty(unit->script.build.source)) {
-      try_union(add_script_target(session, unit, &unit->script.build, &native->wasm.build));
+      try_as_union(add_script_target(session, unit, &unit->script.build, &scripts.build));
+    }
+
+    sp_om_for(session->units.packages, j) {
+      spn_pkg_unit_t* candidate = sp_om_at(session->units.packages, j);
+      if (!spn_pkg_id_eq(candidate->id.pkg, unit->id.pkg)) {
+        continue;
+      }
+      if (scripts.configure) {
+        spn_wasm_script_init(&candidate->wasm.configure, true, get_target_output_path(session->mem, scripts.configure));
+      }
+      if (scripts.build) {
+        spn_wasm_script_init(&candidate->wasm.build, true, get_target_output_path(session->mem, scripts.build));
+      }
     }
   }
 
