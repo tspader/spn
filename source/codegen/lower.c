@@ -134,7 +134,7 @@ static void lower_collection(spn_toml_loader_t* ctx, spn_cg_target_om_t cg, spn_
 static spn_target_info_t lower_script(spn_toml_loader_t* ctx, const spn_cg_build_script_t* cg, sp_str_t name) {
   spn_target_info_t script = {
     .name = name,
-    .kind = SPN_TARGET_SCRIPT,
+    .kind = SPN_TARGET_MODULE,
     .source = cg->source,
     .include = cg->include,
     .define = cg->define,

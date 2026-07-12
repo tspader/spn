@@ -328,14 +328,14 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
   // links attach to the module node each native package creates.
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (unit->build->kind == SPN_BUILD_KIND_HOST) {
+    if (unit->build->script) {
       continue;
     }
     spn_try(add_package(graph, unit));
   }
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (unit->build->kind != SPN_BUILD_KIND_HOST) {
+    if (!unit->build->script) {
       continue;
     }
     spn_try(add_host_package(graph, session, unit));

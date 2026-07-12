@@ -83,7 +83,7 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
   // this graph so the run node consumes a pipeline-built artifact
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (unit->build->kind == SPN_BUILD_KIND_HOST) {
+    if (unit->build->script) {
       continue;
     }
 
@@ -106,7 +106,7 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
   // Add links between packages
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (unit->build->kind == SPN_BUILD_KIND_HOST) {
+    if (unit->build->script) {
       continue;
     }
 

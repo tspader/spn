@@ -16,14 +16,9 @@
 
 typedef u32 spn_build_unit_id_t;
 
-typedef enum {
-  SPN_BUILD_KIND_TARGET,
-  SPN_BUILD_KIND_HOST,
-} spn_build_kind_t;
-
 struct spn_build_unit_t {
   spn_build_unit_id_t id;
-  spn_build_kind_t kind;
+  bool script;
   spn_profile_info_t profile;
   spn_toolchain_unit_t* toolchain;
   spn_symbol_visibility_t visibility;
