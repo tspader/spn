@@ -428,13 +428,15 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
     if (plan->build->script) {
       continue;
     }
-    spn_pkg_unit_t* pkg = spn_session_find_pkg_unit(session, plan->build, spn_session_root_pkg(session));
-    sp_assert(pkg);
-    if (add_plan_targets(session, plan, pkg, pkg->info->libs) ||
-        add_plan_targets(session, plan, pkg, pkg->info->exes) ||
-        add_plan_targets(session, plan, pkg, pkg->info->scripts) ||
-        add_plan_targets(session, plan, pkg, pkg->info->tests)) {
-      return spn_task_fail(SPN_ERROR);
+    sp_da_for(session->plan.requested, rt) {
+      spn_pkg_unit_t* pkg = spn_session_find_pkg_unit(session, plan->build, session->plan.requested[rt]);
+      sp_assert(pkg);
+      if (add_plan_targets(session, plan, pkg, pkg->info->libs) ||
+          add_plan_targets(session, plan, pkg, pkg->info->exes) ||
+          add_plan_targets(session, plan, pkg, pkg->info->scripts) ||
+          add_plan_targets(session, plan, pkg, pkg->info->tests)) {
+        return spn_task_fail(SPN_ERROR);
+      }
     }
   }
 
