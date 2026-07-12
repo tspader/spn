@@ -4,6 +4,7 @@
 #include "sp.h"
 #include "test.h"
 #include "action.h"
+#include "command.h"
 
 typedef struct {
   tmpfs_t fs;
@@ -60,6 +61,8 @@ void setup_fixture_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t index_dir, 
 void setup_e2e_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t spn_dir, sp_str_t index_url, sp_str_t index_rev);
 
 void fixture_copy_project(s32* utest_result, fixture_t* fixture, sp_str_t project, const c8* const* copy);
+void prepare_test(s32* utest_result, fixture_t* fixture, const c8* project, const c8* const* copy);
+void run_command_test(s32* utest_result, fixture_t* fixture, command_test_t test);
 void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions);
 void run_test(s32* utest_result, fixture_t* fixture, test_t test);
 

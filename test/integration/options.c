@@ -1,20 +1,7 @@
 typedef struct {
-  const c8* event;
-  const c8* key;
-  const c8* value;
-  bool absent;
-} opt_event_t;
-typedef struct {
-  s32 rc;
-  struct { const c8* name; s32 rc; } bin;
-  const c8* contains [4];
-  opt_event_t events [2];
-} opt_expect_t;
-
-typedef struct {
   const c8* profile;
   const c8* manifest;
-  opt_expect_t expect;
+  command_expect_t expect;
 } opt_build_t;
 
 typedef struct {
@@ -27,15 +14,19 @@ static bool opt_build_present(const opt_build_t* build) {
   return build->profile || build->manifest || build->expect.rc || build->expect.bin.name;
 }
 
+static void opt_set_manifest(s32* utest_result, fixture_t* fixture, const c8* manifest) {
+  sp_str_t from = tmpfs_get(&fixture->fs, sp_str_view(manifest));
+  sp_str_t to = tmpfs_get(&fixture->fs, sp_str_lit("spn.toml"));
+  sp_str_t content = test_read_file(fixture->fs.mem, from);
+  tmpfs_create(&fixture->fs, sp_str_lit("spn.toml"), content);
+  sp_fs_remove_file(from);
+  SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, from);
+  SP_EXPECT_EXISTS_TMPFS(&fixture->fs, to);
+}
+
 static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test) {
-  sp_mem_t mem = fixture->fs.mem;
+  prepare_test(utest_result, fixture, test.project, test.copy);
 
-  test_t t = { .project = test.project };
-  sp_carr_for(test.copy, it) {
-    t.copy[it] = test.copy[it];
-  }
-
-  u32 n = 0;
   sp_carr_for(test.builds, it) {
     const opt_build_t* build = &test.builds[it];
     if (!opt_build_present(build)) {
@@ -43,72 +34,20 @@ static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test)
     }
 
     if (build->manifest) {
-      t.actions[n++] = (action_t) {
-        .kind = ACTION_MOVE_FILE,
-        .mv = { .from = sp_str_view(build->manifest), .to = sp_str_lit("spn.toml") },
-      };
+      opt_set_manifest(utest_result, fixture, build->manifest);
     }
 
-    action_t cli = {
-      .kind = ACTION_RUN_CLI,
-      .cli = { "build", .rc = build->expect.rc },
+    command_test_t command = {
+      .args = { "build" },
+      .expect = build->expect,
     };
     if (build->profile) {
-      cli.cli.args[0] = "-p";
-      cli.cli.args[1] = build->profile;
+      command.args[1] = "-p";
+      command.args[2] = build->profile;
+      command.expect.bin.profile = build->profile;
     }
-    t.actions[n++] = cli;
-
-    sp_carr_for(build->expect.contains, ct) {
-      if (!build->expect.contains[ct]) {
-        break;
-      }
-      t.actions[n++] = (action_t) {
-        .kind = ACTION_VERIFY_CLI_CONTAINS,
-        .verify_cli = { .needle = sp_str_view(build->expect.contains[ct]) },
-      };
-    }
-
-    if (build->expect.bin.name) {
-      if (build->profile) {
-        sp_str_t bin = tmpfs_get(&fixture->fs, profile_exe(build->profile, build->expect.bin.name));
-        t.actions[n++] = (action_t) {
-          .kind = ACTION_SUBPROCESS,
-          .process = {
-            .config = {
-              .command = bin,
-              .io = {
-                .in.mode = SP_PS_IO_MODE_NULL,
-                .err.mode = SP_PS_IO_MODE_REDIRECT
-              }
-            },
-            .rc = build->expect.bin.rc
-          },
-        };
-      }
-      else {
-        t.actions[n++] = (action_t) {
-          .kind = ACTION_RUN_BIN,
-          .bin = { .name = build->expect.bin.name, .rc = build->expect.bin.rc },
-        };
-      }
-    }
-
-    sp_carr_for(build->expect.events, et) {
-      const opt_event_t* event = &build->expect.events[et];
-      if (!event->event) {
-        break;
-      }
-      t.actions[n++] = (action_t) {
-        .kind = event->absent ? ACTION_VERIFY_NO_EVENT : ACTION_VERIFY_EVENT,
-        .verify_event = { .event = event->event, .key = event->key, .value = event->value },
-      };
-    }
-
-    SP_ASSERT(n < SPN_TEST_MAX_ACTIONS);
+    run_command_test(utest_result, fixture, command);
   }
-
-  run_test(utest_result, fixture, t);
 }
 
 SPN_TEST_SUITE(when)
@@ -508,14 +447,23 @@ UTEST_F(options, index_gated_dep) {
 UTEST_F(options, index_eager_gate) {
   tmpfs_init_named(&uf->fixture.fs, "options_index_eager_gate");
 
-  run_test(utest_result, &uf->fixture, (test_t) {
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
     .project = "test/integration/fixtures/options/index_eager_gate",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
-      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit(".home/storage/spn/packages/core/a.jsonl"), .needle = sp_str_lit("\"when\":{\"x\":true}") } },
-      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit(".home/storage/spn/packages/core/a.jsonl"), .needle = sp_str_lit("\"type\":\"bool\"") } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unknown_pkg" } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 1 } },
+    .builds = {
+      {
+        .expect = {
+          .bin = { .name = "main", .rc = 1 },
+          .events = {
+            { .event = "err_unknown_pkg", .absent = true },
+          },
+          .files = {
+            {
+              .file = sp_str_lit(".home/storage/spn/packages/core/a.jsonl"),
+              .contains = { "\"when\":{\"x\":true}", "\"type\":\"bool\"" },
+            },
+          },
+        },
+      },
     },
   });
 }
@@ -569,8 +517,8 @@ UTEST_F(options, dep_rebuild) {
 UTEST_F(options, fact_identity) {
   tmpfs_init_named(&uf->fixture.fs, "options_fact_identity");
 
-  opt_expect_t debug = { .bin = { .name = "main", .rc = 1 } };
-  opt_expect_t release = { .bin = { .name = "main", .rc = 2 } };
+  command_expect_t debug = { .bin = { .name = "main", .rc = 1 } };
+  command_expect_t release = { .bin = { .name = "main", .rc = 2 } };
   run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
     .project = "test/integration/fixtures/options/fact_identity",
     .builds = {
