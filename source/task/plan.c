@@ -96,8 +96,6 @@ static spn_err_t collect_requested_pkgs(spn_session_t* session) {
 }
 
 static spn_err_union_t add_compilation_units(spn_session_t *s) {
-  add_target_build(s, s->profile);
-
   sp_da_for(s->plan.builds, it) {
     spn_build_plan_t* plan = &s->plan.builds[it];
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
@@ -115,37 +113,39 @@ static spn_err_union_t add_compilation_units(spn_session_t *s) {
 }
 
 spn_task_step_t spn_task_plan(spn_app_t* app) {
-  spn_session_t* session = &app->session;
+  spn_session_t* s = &app->session;
 
-  session->units.toolchains = sp_da_new(session->mem, spn_toolchain_unit_t*);
-  sp_da_init(session->mem, session->units.compile_commands);
-  sp_da_init(session->mem, session->plan.builds);
-  session->plan.script = SP_NULLPTR;
+  s->units.toolchains = sp_da_new(s->mem, spn_toolchain_unit_t*);
+  sp_da_init(s->mem, s->units.compile_commands);
+  sp_da_init(s->mem, s->plan.builds);
+  s->plan.script = SP_NULLPTR;
 
-  if (collect_requested_pkgs(session)) {
+  if (collect_requested_pkgs(s)) {
     return spn_task_fail(SPN_ERROR);
   }
   sp_da_for(app->sync.toolchains, it) {
     spn_sync_toolchain_job_t* job = app->sync.toolchains[it];
-    sp_da_push(session->units.toolchains, job->unit);
-    if (job->toolchain == session->selection.build) {
-      session->units.toolchain = job->unit;
+    sp_da_push(s->units.toolchains, job->unit);
+    if (job->toolchain == s->selection.build) {
+      s->units.toolchain = job->unit;
     }
-    if (job->toolchain == session->selection.script) {
-      session->units.script = job->unit;
+    if (job->toolchain == s->selection.script) {
+      s->units.script = job->unit;
     }
   }
 
-  try_task(add_compilation_units(session));
-  try_task(add_script_units(session));
+  add_target_build(s, s->profile);
 
-  sp_env_t* env = &session->env;
-  sp_env_init(session->mem, env);
-  sp_env_insert(env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(session->mem, session->units.toolchain->compiler));
-  sp_env_insert(env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(session->mem, session->units.toolchain->archiver));
-  sp_env_insert(env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(session->mem, session->units.toolchain->linker));
-  if (spn_toolchain_has_cxx(session->units.toolchain->toolchain)) {
-    sp_env_insert(env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(session->mem, session->units.toolchain->cxx));
+  try_task(add_compilation_units(s));
+  try_task(add_script_units(s));
+
+  sp_env_t* env = &s->env;
+  sp_env_init(s->mem, env);
+  sp_env_insert(env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(s->mem, s->units.toolchain->compiler));
+  sp_env_insert(env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(s->mem, s->units.toolchain->archiver));
+  sp_env_insert(env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(s->mem, s->units.toolchain->linker));
+  if (spn_toolchain_has_cxx(s->units.toolchain->toolchain)) {
+    sp_env_insert(env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(s->mem, s->units.toolchain->cxx));
   }
 
   return spn_task_done();

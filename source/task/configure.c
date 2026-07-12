@@ -73,18 +73,18 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
     return spn_task_fail(SPN_ERR_WASM_INIT_FAILED);
   }
 
-  // Add a graph node for each package; configure modules compile and link in
-  // this graph so the run node consumes a pipeline-built artifact. Every unit
-  // with a configure module runs it with its own mounts; the module itself
-  // compiles once, wired where the target lives
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
 
     unit->nodes.configure.run = spn_bg_add_fn(graph, on_configure_package, unit);
     unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
-    if (spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp)) {
-      return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
-    }
+    spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp);
+
+    spn_bg_id_t module = spn_bg_add_file(graph, unit->wasm.configure.path);
+    spn_bg_cmd_add_input(graph, unit->nodes.configure.run, module);
+    spn_target_unit_t* target = find_configure_target(session, unit);
+    add_configure_module(graph, session, target, module);
+
     if (unit->wasm.configure.state != SPN_WASM_SCRIPT_NONE) {
       spn_bg_id_t module = spn_bg_add_file(graph, unit->wasm.configure.path);
       if (spn_bg_cmd_add_input(graph, unit->nodes.configure.run, module)) {

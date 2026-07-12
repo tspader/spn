@@ -670,8 +670,6 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   unit->paths.vendor = sp_fs_join_path(session->mem, unit->paths.store, SP_LIT("vendor"));
 
   unit->paths.generated = sp_fs_join_path(session->mem, unit->paths.work, SP_LIT("spn"));
-  spn_wasm_script_init(&unit->wasm.configure, !sp_da_empty(unit->script.configure.source), sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("configure.wasm")));
-  spn_wasm_script_init(&unit->wasm.build, !sp_da_empty(unit->script.build.source), sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("build.wasm")));
 
   unit->logs.build = sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(unit->info->name)).value;
   unit->logs.test = sp_fmt(session->mem, "{}.test.log", SP_FMT_STR(unit->info->name)).value;

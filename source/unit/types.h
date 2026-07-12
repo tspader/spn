@@ -18,7 +18,6 @@ typedef u32 spn_build_unit_id_t;
 
 struct spn_build_unit_t {
   spn_build_unit_id_t id;
-  bool script;
   spn_profile_info_t profile;
   spn_toolchain_unit_t* toolchain;
   spn_symbol_visibility_t visibility;

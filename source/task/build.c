@@ -329,15 +329,8 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->build.graph;
 
-  // Add all nodes to the build graph. Native packages first: host script
-  // links attach to the module node each native package creates. Module
-  // targets are excluded from add_package and wired by add_host_package,
-  // whichever unit parents them.
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (unit->build->script) {
-      continue;
-    }
     spn_try(add_package(graph, unit));
   }
   sp_om_for(session->units.packages, it) {

@@ -310,23 +310,11 @@ static bool scripted_push(sp_da(spn_pkg_unit_t*)* scripted, spn_pkg_unit_t* unit
 }
 
 spn_err_union_t add_script_units(spn_session_t* session) {
-  if (!session->units.script) {
-    return spn_result(SPN_OK);
-  }
-
-  sp_da(spn_pkg_unit_t*) scripted = sp_da_new(session->mem, spn_pkg_unit_t*);
-  sp_assert(!session->plan.script);
-  sp_om_for(session->units.packages, it) {
-    scripted_push(&scripted, sp_om_at(session->units.packages, it));
-  }
-  if (sp_da_empty(scripted)) {
-    return spn_result(SPN_OK);
-  }
+  sp_assert(session->units.script);
 
   spn_build_unit_t* build = sp_alloc_type(session->mem, spn_build_unit_t);
   *build = (spn_build_unit_t) {
     .id = (spn_build_unit_id_t)sp_da_size(session->plan.builds),
-    .script = true,
     .profile = {
       .name = sp_str_lit("script"),
       .arch = SPN_ARCH_WASM32,
@@ -340,12 +328,28 @@ spn_err_union_t add_script_units(spn_session_t* session) {
     .toolchain = session->units.script,
     .visibility = SPN_SYMBOL_VISIBILITY_HIDDEN,
     .dep_kinds = spn_dep_kind_bit(SPN_DEP_KIND_BUILD),
-    .paths = { .profile = sp_fs_join_path(session->mem, session->paths.build, sp_str_lit("script")) },
+    .paths = {
+      .profile = sp_fs_join_path(session->mem, session->paths.build, sp_str_lit("script"))
+    },
   };
   sp_da_init(session->mem, build->include);
   sp_da_push(build->include, spn.paths.include);
 
   session->plan.script = build;
+
+
+  sp_da(spn_pkg_unit_t*) scripted = sp_da_new(session->mem, spn_pkg_unit_t*);
+  sp_assert(!session->plan.script);
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    if (!sp_da_empty(unit->info->configure.source)) {
+      spn_wasm_script_init(&unit->wasm.configure, sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("configure.wasm")));
+    }
+    spn_wasm_script_init(&unit->wasm.build, sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("build.wasm")));
+
+  }
+
+
 
   // The script ctx holds only the BUILD dep closures of scripted packages;
   // scripted packages themselves stay in their own ctx and parent the module
@@ -512,9 +516,6 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
 
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
-    if (pkg->build->script) {
-      continue;
-    }
     sp_str_om_for(pkg->info->libs, it) {
       spn_target_unit_t* target = SP_NULLPTR;
       if (ensure_target(session, pkg, sp_str_om_at(pkg->info->libs, it), &target)) {
