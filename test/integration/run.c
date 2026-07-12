@@ -21,12 +21,12 @@ UTEST_F(run, manifest) {
 UTEST_F(run, script_name_c) {
   tmpfs_init_named(&uf->fixture.fs, "run_script_name_c");
 
-  run_test(utest_result, &uf->fixture, (test_t) {
+  run_command_test(utest_result, &uf->fixture, (command_test_t) {
     .project = "test/integration/fixtures/run/script_name_c",
     .copy = { "script.c" },
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "run", .args = { "main.c" } } },
-      { .kind = ACTION_VERIFY_CONTENT, .verify_content = { .file = sp_str_lit("ran.txt"), .content = sp_str_lit("script-name-c\n") } },
+    .args = { "run", "main.c" },
+    .expect.files = {
+      { .file = sp_str_lit("ran.txt"), .content = "script-name-c\n" },
     },
   });
 }

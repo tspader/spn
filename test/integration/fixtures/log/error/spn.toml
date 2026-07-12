@@ -1,7 +1,0 @@
-[package]
-name = "log_error"
-version = "0.0.1"
-
-[[bin]]
-name = "log_error"
-source = ["main.c"]
