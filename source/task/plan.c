@@ -4,6 +4,8 @@
 #include "ctx/types.h"
 #include "error/types.h"
 #include "event/event.h"
+#include "log/log.h"
+#include "pkg/id.h"
 #include "pkg/types.h"
 #include "resolve/types.h"
 #include "session/session.h"
@@ -27,7 +29,11 @@ static spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* bui
   sp_assert(loaded);
 
   spn_pkg_unit_t* unit = spn_session_add_pkg_unit(s, build, id, loaded);
+  u32 kinds = build->dep_kinds | spn_dep_kind_bit(SPN_DEP_KIND_BUILD);
   sp_da_for(pkg->edges, it) {
+    if (!(kinds & spn_dep_kind_bit(pkg->edges[it].kind))) {
+      continue;
+    }
     sp_da_push(unit->deps, ((spn_pkg_dep_t) {
       .unit = add_package_units(s, build, pkg->edges[it].id),
       .kind = pkg->edges[it].kind,
@@ -57,6 +63,39 @@ static void add_target_build(spn_session_t* s, spn_profile_info_t profile) {
   sp_da_push(s->plan.builds, build);
 }
 
+static bool find_resolved_pkg(spn_session_t* s, sp_str_t qualified, spn_pkg_id_t* id) {
+  spn_pkg_id_t probe = spn_pkg_id(s->intern, qualified);
+  sp_ht_for_kv(s->resolve, it) {
+    if (it.val->id.qualified == probe.qualified) {
+      *id = it.val->id;
+      return true;
+    }
+  }
+  return false;
+}
+
+static spn_err_t collect_requested_pkgs(spn_session_t* session) {
+  sp_da_init(session->mem, session->plan.requested);
+
+  if (sp_da_empty(session->plan.request.packages)) {
+    spn_pkg_id_t id = sp_zero;
+    sp_assert(find_resolved_pkg(session, session->pkg->qualified, &id));
+    sp_da_push(session->plan.requested, id);
+    return SPN_OK;
+  }
+
+  sp_da_for(session->plan.request.packages, it) {
+    sp_str_t requested = session->plan.request.packages[it];
+    spn_pkg_id_t id = sp_zero;
+    if (!find_resolved_pkg(session, spn_pkg_canonicalize_name(requested), &id)) {
+      spn_log_error("requested package {.cyan} is not in the dependency graph", SP_FMT_STR(requested));
+      return SPN_ERROR;
+    }
+    sp_da_push(session->plan.requested, id);
+  }
+  return SPN_OK;
+}
+
 static spn_err_union_t add_compilation_units(spn_session_t *s) {
   add_target_build(s, s->profile);
 
@@ -84,13 +123,9 @@ spn_task_step_t spn_task_plan(spn_app_t* app) {
   sp_da_init(session->mem, session->plan.builds);
   session->plan.script = SP_NULLPTR;
 
-  sp_da_init(session->mem, session->plan.requested);
-  sp_ht_for_kv(session->resolve, it) {
-    if (it.val->source == SPN_PKG_SOURCE_ROOT) {
-      sp_da_push(session->plan.requested, it.val->id);
-    }
+  if (collect_requested_pkgs(session)) {
+    return spn_task_fail(SPN_ERROR);
   }
-  sp_assert(!sp_da_empty(session->plan.requested));
   sp_da_for(app->sync.toolchains, it) {
     spn_sync_toolchain_job_t* job = app->sync.toolchains[it];
     sp_da_push(session->units.toolchains, job->unit);
