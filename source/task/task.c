@@ -5,6 +5,7 @@ static spn_task_desc_t spn_tasks[SPN_TASK_COUNT] = {
   [SPN_TASK_SYNC_INDEXES]    = { "sync-indexes",  spn_task_sync_indexes_init,    spn_task_sync_indexes_update    },
   [SPN_TASK_RESOLVE]         = { "resolve",       SP_NULLPTR,                    spn_task_resolve                },
   [SPN_TASK_SYNC_PACKAGES]   = { "sync-packages", spn_task_sync_packages_init,   spn_task_sync_packages_update   },
+  [SPN_TASK_PLAN]            = { "plan",          SP_NULLPTR,                    spn_task_plan                   },
   [SPN_TASK_CONFIGURE_GRAPH] = { "configure",     spn_task_configure_graph_init, spn_task_configure_graph_update },
   [SPN_TASK_CREATE_UNITS]    = { "create-units",  SP_NULLPTR,                    spn_task_create_units           },
   [SPN_TASK_BUILD_GRAPH]     = { "build",         spn_task_build_graph_init,     spn_task_build_graph_update     },
