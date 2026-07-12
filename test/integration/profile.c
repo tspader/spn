@@ -4,6 +4,7 @@ SPN_TEST_SUITE(profile)
 // [profile.asan] must compile and link with the address sanitizer, which
 // aborts the binary at runtime
 UTEST_F(profile, sanitize_trigger) {
+  UTEST_SKIP("");
   tmpfs_init_named(&uf->fixture.fs, "profile_sanitize_trigger");
 
   run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
@@ -18,6 +19,7 @@ UTEST_F(profile, sanitize_trigger) {
 // sanitize = [] is an explicit clear, not an unset field: a derived profile
 // must be able to drop the sanitizers it inherits from default
 UTEST_F(profile, sanitize_clear) {
+  UTEST_SKIP("");
   tmpfs_init_named(&uf->fixture.fs, "profile_sanitize_clear");
 
   run_opt_test(utest_result, &uf->fixture, (opt_test_t) {

@@ -308,23 +308,6 @@ static spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* bui
 }
 
 spn_err_union_t add_compilation_units(spn_session_t *s) {
-  if (sp_da_empty(s->plan.builds)) {
-    spn_build_unit_t* build = sp_alloc_type(s->mem, spn_build_unit_t);
-    *build = (spn_build_unit_t) {
-      .id = (spn_build_unit_id_t)sp_da_size(s->plan.builds),
-      .kind = SPN_BUILD_KIND_TARGET,
-      .profile = s->profile,
-      .toolchain = s->units.toolchain,
-      .paths = { .profile = s->paths.profile },
-    };
-    spn_build_plan_t plan = {
-      .build = build,
-      .selection = s->plan.request.targets,
-    };
-    sp_da_init(s->mem, plan.roots);
-    sp_da_push(s->plan.builds, plan);
-  }
-
   spn_pkg_id_t root = SP_ZERO_INITIALIZE();
   sp_ht_for_kv(s->resolve, it) {
     if (it.val->source == SPN_PKG_SOURCE_ROOT) {
@@ -332,8 +315,28 @@ spn_err_union_t add_compilation_units(spn_session_t *s) {
       break;
     }
   }
-
   sp_assert(root.qualified);
+
+  spn_build_unit_t* build = sp_alloc_type(s->mem, spn_build_unit_t);
+  *build = (spn_build_unit_t) {
+    .id = (spn_build_unit_id_t)sp_da_size(s->plan.builds),
+    .kind = SPN_BUILD_KIND_TARGET,
+    .profile = s->profile,
+    .toolchain = s->units.toolchain,
+    .visibility = SPN_SYMBOL_VISIBILITY_DEFAULT,
+    .dep_kinds = spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE) | spn_dep_kind_bit(SPN_DEP_KIND_TEST),
+    .paths = { .profile = s->paths.profile },
+  };
+  sp_da_init(s->mem, build->include);
+
+  spn_build_plan_t target = {
+    .build = build,
+    .root = { .pkg = root, .ctx = build->id },
+    .selection = s->plan.request.targets,
+  };
+  sp_da_init(s->mem, target.roots);
+  sp_da_push(s->plan.builds, target);
+
   sp_da_for(s->plan.builds, it) {
     spn_build_plan_t* plan = &s->plan.builds[it];
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
@@ -343,11 +346,7 @@ spn_err_union_t add_compilation_units(spn_session_t *s) {
     if (err.kind) {
       return err;
     }
-    plan->root = (spn_pkg_unit_id_t) {
-      .pkg = root,
-      .ctx = plan->build->id,
-    };
-    add_package_units(s, plan->build, root);
+    add_package_units(s, plan->build, plan->root.pkg);
   }
   return spn_result(SPN_OK);
 }
@@ -435,6 +434,7 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
     sp_ht_insert(session->packages, job->pkg->id, job->loaded);
   }
 
+  // @spader why is everything from here down in the sync task
   if (spn_session_apply_options(session)) {
     return spn_task_fail(SPN_ERROR);
   }
@@ -461,14 +461,14 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
     }
   }
 
-  spn_err_union_t flags_err = add_compilation_units(session);
-  if (!flags_err.kind) {
-    flags_err = spn_task_create_script_units(session);
+  spn_err_union_t err = add_compilation_units(session);
+  if (!err.kind) {
+    err = add_script_units(session);
   }
-  if (flags_err.kind) {
+  if (err.kind) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_ERR,
-      .err = flags_err,
+      .err = err,
     });
     return spn_task_fail(SPN_ERROR);
   }

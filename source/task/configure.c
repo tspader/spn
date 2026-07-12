@@ -40,7 +40,11 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
 }
 
 static spn_target_unit_t* find_configure_target(spn_session_t* session, spn_pkg_unit_t* unit) {
-  spn_pkg_unit_t* host = spn_session_find_pkg_unit(session, session->units.host, unit->id.pkg);
+  spn_build_plan_t* plan = spn_session_find_plan(session, SPN_BUILD_KIND_HOST);
+  if (!plan) {
+    return SP_NULLPTR;
+  }
+  spn_pkg_unit_t* host = spn_session_find_pkg_unit(session, plan->build, unit->id.pkg);
   if (!host) {
     return SP_NULLPTR;
   }

@@ -515,14 +515,15 @@ void spn_deinit(sp_app_t* sp) {
 
   if (!app.session.pkg) return;
 
-  if (sp_da_empty(app.session.plan.builds) || !app.session.plan.builds[0].build) return;
-
-  spn_pkg_unit_t* root = spn_session_find_root_pkg(&app.session, app.session.plan.builds[0].build);
-  if (!root) return;
+  if (sp_da_empty(app.session.plan.builds)) return;
 
   sp_om_for(app.session.units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(app.session.units.packages, it);
-    spn_pkg_unit_t* requested = spn_session_find_root_pkg(&app.session, unit->build);
+    spn_build_plan_t* plan = spn_session_plan_for_build(&app.session, unit->build);
+    if (!plan) {
+      continue;
+    }
+    spn_pkg_unit_t* requested = spn_session_find_pkg_unit_by_id(&app.session, plan->root);
     if (!requested) {
       continue;
     }
@@ -549,10 +550,6 @@ void spn_deinit(sp_app_t* sp) {
     spn_lazy_log_close(&target->logs.test);
     spn_lazy_log_close(&target->logs.jsonl);
   }
-
-  spn_lazy_log_close(&root->logs.io.build);
-  spn_lazy_log_close(&root->logs.io.test);
-  spn_lazy_log_close(&root->logs.io.jsonl);
 }
 
 sp_app_config_t spn_main(s32 num_args, const c8** args) {
