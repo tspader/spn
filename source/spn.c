@@ -33,6 +33,7 @@
 #include "codegen/gen/config.gen.h"
 #include "codegen/gen/manifest.gen.h"
 #include "cli/cli.h"
+#include "event/build.h"
 #include "event/event.h"
 #include "event/log.h"
 #include "external/tom.h"

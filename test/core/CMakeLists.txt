@@ -32,6 +32,15 @@ add_executable(lazy
 spn_test_binary(lazy)
 add_test(NAME lazy COMMAND "$<TARGET_FILE:lazy>")
 
+add_executable(transcript
+  ${SRC}/event/build.c
+  ${SRC}/sp/io.c
+  ${SRC}/sp/str.c
+  transcript.c
+)
+spn_test_binary(transcript)
+add_test(NAME transcript COMMAND "$<TARGET_FILE:transcript>")
+
 add_executable(stable_map
   stable_map.c
 )

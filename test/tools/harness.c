@@ -552,7 +552,10 @@ static sp_ps_output_t run_spn_command(fixture_t* fixture, const c8* const* args,
 }
 
 static void run_command_bin(s32* utest_result, fixture_t* fixture, command_bin_t bin) {
-  sp_str_t staged = bin.profile ? profile_exe(bin.profile, bin.name) : exe(bin.name);
+  sp_str_t staged = bin.path;
+  if (sp_str_empty(staged)) {
+    staged = bin.profile ? profile_exe(bin.profile, bin.name) : exe(bin.name);
+  }
   sp_str_t path = tmpfs_get(&fixture->fs, staged);
   SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
 
@@ -573,6 +576,12 @@ static void run_command_bin(s32* utest_result, fixture_t* fixture, command_bin_t
 static void expect_command_file(s32* utest_result, fixture_t* fixture, command_file_t expected) {
   sp_str_t path = tmpfs_get(&fixture->fs, expected.file);
   sp_str_t content = test_read_file(fixture->fs.mem, path);
+  if (expected.content) {
+    utest_kv("path", path);
+    utest_kv("expected", sp_str_view(expected.content));
+    utest_kv("content", content);
+    EXPECT_TRUE(sp_str_equal(content, sp_str_view(expected.content)));
+  }
   sp_carr_for(expected.contains, it) {
     if (!expected.contains[it]) {
       break;
@@ -590,6 +599,13 @@ static void expect_command_file(s32* utest_result, fixture_t* fixture, command_f
     utest_kv("needle", sp_str_view(expected.excludes[it]));
     utest_kv("content", content);
     EXPECT_FALSE(sp_str_contains(content, sp_str_view(expected.excludes[it])));
+  }
+  if (expected.json) {
+    yyjson_doc* doc = yyjson_read(content.data, content.len, 0);
+    utest_kv("path", path);
+    utest_kv("content", content);
+    EXPECT_TRUE(doc != NULL);
+    yyjson_doc_free(doc);
   }
 }
 
@@ -613,6 +629,9 @@ static void expect_command_lock(s32* utest_result, fixture_t* fixture, command_e
 }
 
 void run_command_test(s32* utest_result, fixture_t* fixture, command_test_t test) {
+  if (test.project) {
+    prepare_test(utest_result, fixture, test.project, test.copy);
+  }
   sp_ps_output_t output = run_spn_command(fixture, test.args, test.env);
   EXPECT_EQ(test.expect.rc, output.status.exit_code);
 
@@ -623,6 +642,15 @@ void run_command_test(s32* utest_result, fixture_t* fixture, command_test_t test
     utest_kv("needle", sp_str_view(test.expect.contains[it]));
     utest_kv("output", output.out);
     EXPECT_TRUE(sp_str_contains(output.out, sp_str_view(test.expect.contains[it])));
+  }
+
+  sp_carr_for(test.expect.excludes, it) {
+    if (!test.expect.excludes[it]) {
+      break;
+    }
+    utest_kv("needle", sp_str_view(test.expect.excludes[it]));
+    utest_kv("output", output.out);
+    EXPECT_FALSE(sp_str_contains(output.out, sp_str_view(test.expect.excludes[it])));
   }
 
   sp_carr_for(test.expect.files, it) {
@@ -661,7 +689,7 @@ void run_command_test(s32* utest_result, fixture_t* fixture, command_test_t test
     expect_command_lock(utest_result, fixture, test.expect);
   }
 
-  if (test.expect.bin.name) {
+  if (test.expect.bin.name || !sp_str_empty(test.expect.bin.path)) {
     run_command_bin(utest_result, fixture, test.expect.bin);
   }
 }

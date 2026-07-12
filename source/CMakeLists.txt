@@ -35,6 +35,7 @@ set(SPN_SOURCES
   ctx/ctx.c
   enum/enum.c
   event/event.c
+  event/build.c
   event/log.c
   external/cc.c
   external/cJSON.c

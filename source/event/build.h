@@ -1,0 +1,8 @@
+#ifndef SPN_EVENT_BUILD_H
+#define SPN_EVENT_BUILD_H
+
+#include "event/types.h"
+
+void spn_event_log_build(sp_io_writer_t* out, spn_build_event_t* event);
+
+#endif
