@@ -1,0 +1,13 @@
+[package]
+name = "dual_ctx"
+version = "0.0.1"
+
+[deps.package]
+gamma = "1.0.0"
+
+[deps.build]
+gamma = "1.0.0"
+
+[[bin]]
+name = "dual_ctx"
+source = ["main.c"]

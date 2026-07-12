@@ -1,0 +1,11 @@
+[package]
+name = "alpha"
+version = "1.0.0"
+
+[deps.package]
+beta = { version = "1.0.0", private = true }
+
+[[lib]]
+name = "alpha"
+kinds = ["source"]
+headers = ["alpha.h"]

@@ -255,7 +255,53 @@ UTEST_F(script, build_deps) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "core/spum" },
+      { .kind = ACTION_VERIFY_DIR_COUNT, .verify_dir_count = { .dir = ".home/storage/cache/store/core/spum", .count = 1 } },
+      { .kind = ACTION_VERIFY_EVENT_COUNT, .verify_event_count = { .event = "user_log", .key = "message", .value = "spum configure", .count = 1 } },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/script/store") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug/store/include/spum.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "build_deps" },
+    },
+  });
+}
+
+UTEST_F(script, dual_ctx) {
+  tmpfs_init_named(&uf->fixture.fs, "script_dual_ctx");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/script/dual_ctx",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EVENT_COUNT, .verify_event_count = { .event = "user_log", .key = "message", .value = "gamma configure", .count = 2 } },
+      { .kind = ACTION_VERIFY_DIR_COUNT, .verify_dir_count = { .dir = ".home/storage/cache/store/core/gamma", .count = 2 } },
+      { .kind = ACTION_RUN_BIN, .bin.name = "dual_ctx" },
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EVENT_COUNT, .verify_event_count = { .event = "user_log", .key = "message", .value = "gamma configure", .count = 2 } },
+    },
+  });
+}
+
+UTEST_F(script, module_name_collision) {
+  tmpfs_init_named(&uf->fixture.fs, "script_module_name_collision");
+
+  run_command_test(utest_result, &uf->fixture, (command_test_t) {
+    .project = "test/integration/fixtures/script/module_name_collision",
+    .args = { "build" },
+    .expect.rc = 1,
+  });
+}
+
+UTEST_F(script, build_dep_closure) {
+  tmpfs_init_named(&uf->fixture.fs, "script_build_dep_closure");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/script/build_dep_closure",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "core/alpha" },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "core/beta" },
+      { .kind = ACTION_VERIFY_DIR_COUNT, .verify_dir_count = { .dir = ".home/storage/cache/store/core/alpha", .count = 1 } },
+      { .kind = ACTION_VERIFY_DIR_COUNT, .verify_dir_count = { .dir = ".home/storage/cache/store/core/beta", .count = 1 } },
+      { .kind = ACTION_RUN_BIN, .bin.name = "build_dep_closure" },
     },
   });
 }

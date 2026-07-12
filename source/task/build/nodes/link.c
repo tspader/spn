@@ -47,7 +47,7 @@ static spn_lang_t get_link_language(spn_target_unit_t* target) {
 
 static spn_err_union_t build_archive_invocation(spn_target_unit_t* target, sp_str_t output) {
   sp_mem_t mem = target->session->mem;
-  spn_toolchain_unit_t* toolchain = target->pkg->build->toolchain;
+  spn_toolchain_unit_t* toolchain = target->build->toolchain;
 
   sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
   spn_cc_archive_t archive = {
@@ -58,7 +58,7 @@ static spn_err_union_t build_archive_invocation(spn_target_unit_t* target, sp_st
   sp_da_for(target->objects, it) {
     sp_da_push(archive.objects, target->objects[it]->paths.object);
   }
-  spn_profile_info_t* profile = &target->pkg->build->profile;
+  spn_profile_info_t* profile = &target->build->profile;
   spn_cc_toolchain_t compiler = spn_toolchain_unit_compiler(toolchain);
   spn_err_union_t err = spn_cc_render_archive(mem, &compiler, profile, &archive, &ps);
   if (err.kind) {
@@ -90,7 +90,7 @@ static spn_err_union_t build_link_invocation(spn_target_unit_t* target, sp_str_t
   sp_da_init(mem, link.rpath);
   add_deps_to_cc_target(&link, target);
 
-  switch (target->pkg->build->profile.os) {
+  switch (target->build->profile.os) {
     case SPN_OS_LINUX: {
       sp_da_push(link.rpath, sp_str_lit("$ORIGIN"));
       break;
@@ -115,8 +115,8 @@ static spn_err_union_t build_link_invocation(spn_target_unit_t* target, sp_str_t
   }
 
   sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
-  spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(target->pkg->build->toolchain);
-  spn_err_union_t err = spn_cc_render_link(mem, &toolchain, &target->pkg->build->profile, &link, &ps);
+  spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(target->build->toolchain);
+  spn_err_union_t err = spn_cc_render_link(mem, &toolchain, &target->build->profile, &link, &ps);
   if (err.kind) {
     return err;
   }

@@ -516,6 +516,7 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
   target->id = id;
   target->session = session;
   target->pkg = pkg;
+  target->build = pkg->build;
   target->info = info;
   sp_da_init(session->mem, target->objects);
   sp_da_init(session->mem, target->deps.target);

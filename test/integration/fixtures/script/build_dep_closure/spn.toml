@@ -1,0 +1,10 @@
+[package]
+name = "build_dep_closure"
+version = "0.0.1"
+
+[deps.build]
+alpha = "1.0.0"
+
+[[bin]]
+name = "build_dep_closure"
+source = ["main.c"]

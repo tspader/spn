@@ -24,7 +24,7 @@ spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
       continue;
     }
 
-    spn_build_unit_t* build = unit->package->build;
+    spn_build_unit_t* build = unit->target->build;
 
     spn_cc_compile_t compile = {
       .lang = unit->lang,
@@ -79,13 +79,24 @@ spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
       }
     }
 
+    // Module deps are target-level: the script's BUILD deps, materialized in
+    // the script ctx, not the owning package's deps
+    if (unit->target->info->kind == SPN_TARGET_MODULE) {
+      sp_da_for(unit->target->deps.package, it) {
+        sp_da_push(compile.include, unit->target->deps.package[it]->paths.include);
+        sp_da_for(unit->target->deps.package[it]->info->public_define, dt) {
+          sp_da_push(compile.define, unit->target->deps.package[it]->info->public_define[dt]);
+        }
+      }
+    }
+
     if (!sp_da_empty(unit->target->info->embed)) {
       sp_da_push(compile.include, unit->target->paths.generated);
     }
 
     sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
-    spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(unit->package->build->toolchain);
-    spn_err_union_t err = spn_cc_render_compile(mem, &toolchain, &unit->package->build->profile, &compile, &ps);
+    spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(unit->target->build->toolchain);
+    spn_err_union_t err = spn_cc_render_compile(mem, &toolchain, &unit->target->build->profile, &compile, &ps);
     if (err.kind) {
       return err;
     }

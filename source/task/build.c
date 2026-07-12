@@ -40,7 +40,7 @@ typedef enum {
 } spn_build_report_kind_t;
 
 typedef struct {
-  spn_build_plan_t* plan;
+  spn_build_unit_t* build;
   spn_build_report_kind_t kind;
   u32 total;
   u32 dirty;
@@ -53,7 +53,7 @@ typedef sp_da(spn_build_report_t) spn_build_reports_t;
 
 static spn_build_report_t* find_build_report(spn_build_reports_t reports, spn_build_unit_id_t id) {
   sp_da_for(reports, it) {
-    if (reports[it].plan->build->id == id) {
+    if (reports[it].build->id == id) {
       return &reports[it];
     }
   }
@@ -64,7 +64,12 @@ static spn_build_reports_t collect_build_reports(sp_mem_t mem, spn_session_t* se
   spn_build_reports_t reports = sp_da_new(mem, spn_build_report_t);
   sp_da_for(session->plan.builds, it) {
     sp_da_push(reports, ((spn_build_report_t) {
-      .plan = &session->plan.builds[it],
+      .build = session->plan.builds[it].build,
+    }));
+  }
+  if (session->plan.script) {
+    sp_da_push(reports, ((spn_build_report_t) {
+      .build = session->plan.script,
     }));
   }
 
@@ -115,10 +120,10 @@ static spn_build_reports_t collect_build_reports(sp_mem_t mem, spn_session_t* se
 }
 
 static void emit_build_report(spn_session_t* session, spn_build_report_t* report) {
-  spn_pkg_unit_t* root = spn_session_find_pkg_unit(session, report->plan->build, spn_session_root_pkg(session));
+  spn_pkg_unit_t* root = spn_session_find_pkg_unit(session, report->build, spn_session_root_pkg(session));
   spn_pkg_info_t* pkg = root ? root->info : session->pkg;
   spn_build_io_t* io = root ? &root->logs.io : SP_NULLPTR;
-  spn_profile_info_t* profile = &report->plan->build->profile;
+  spn_profile_info_t* profile = &report->build->profile;
   u64 elapsed = session->build.executor->elapsed;
 
   switch (report->kind) {
@@ -287,20 +292,20 @@ spn_task_step_t spn_task_build_graph_update(spn_app_t* app) {
 // Configure modules already built in the configure graph.
 static spn_err_t add_host_package(spn_build_graph_t* graph, spn_session_t* session, spn_pkg_unit_t* unit) {
   spn_target_unit_t* target = spn_session_find_target_in_pkg(session, unit, sp_str_lit("build"));
-  if (!target || sp_da_empty(target->objects)) {
+  if (!target || target->info->kind != SPN_TARGET_MODULE || sp_da_empty(target->objects)) {
     return SPN_OK;
   }
 
   sp_assert(unit->wasm.build.state != SPN_WASM_SCRIPT_NONE);
 
-  target->nodes.link = add_build_command(session, unit->build, link_target, target);
+  target->nodes.link = add_build_command(session, target->build, link_target, target);
   target->nodes.output = spn_bg_add_file(graph, unit->wasm.build.path);
   spn_try(spn_bg_cmd_add_output(graph, target->nodes.link, target->nodes.output));
 
   sp_da_for(target->objects, it) {
     spn_compile_unit_t* object = target->objects[it];
     object->nodes.source = spn_bg_add_file(graph, object->paths.file);
-    object->nodes.compile = add_build_command(session, unit->build, compile_object, object);
+    object->nodes.compile = add_build_command(session, target->build, compile_object, object);
     object->nodes.object = spn_bg_add_file(graph, object->paths.object);
     spn_try(spn_bg_cmd_add_output(graph, object->nodes.compile, object->nodes.object));
     spn_try(spn_bg_cmd_add_input(graph, object->nodes.compile, object->nodes.source));
@@ -325,7 +330,9 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
   spn_build_graph_t* graph = &session->build.graph;
 
   // Add all nodes to the build graph. Native packages first: host script
-  // links attach to the module node each native package creates.
+  // links attach to the module node each native package creates. Module
+  // targets are excluded from add_package and wired by add_host_package,
+  // whichever unit parents them.
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
     if (unit->build->script) {
@@ -335,9 +342,6 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
   }
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (!unit->build->script) {
-      continue;
-    }
     spn_try(add_host_package(graph, session, unit));
   }
 
@@ -563,7 +567,7 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
     }
   }
 
-  target->nodes.link = add_build_command(target->session, target->pkg->build, link_target, target);
+  target->nodes.link = add_build_command(target->session, target->build, link_target, target);
   target->nodes.output = spn_bg_add_file(graph, get_target_output_path(spn.mem, target));
 
   spn_bg_cmd_add_output(graph, target->nodes.link,  target->nodes.output);
@@ -575,7 +579,7 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
   }
 
   if (!sp_da_empty(info->embed)) {
-    target->nodes.embed.run = add_build_command(target->session, target->pkg->build, compile_embed, target);
+    target->nodes.embed.run = add_build_command(target->session, target->build, compile_embed, target);
     target->nodes.embed.object = spn_bg_add_file(graph, get_embed_object_path(spn.mem, target));
     target->nodes.embed.header = spn_bg_add_file(graph, get_embed_header_path(spn.mem, target));
 
@@ -649,7 +653,7 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
 
 
   // user nodes
-  // pass 1: create all command nodes
+  // pass 1: create all user-added nodes
   sp_da_for(unit->nodes.user, it) {
     spn_user_node_t* node = &unit->nodes.user[it];
     node->id = add_build_command(unit->session, unit->build, run_user_fn, node);
@@ -700,11 +704,13 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
     }
   }
 
-  // object files
   sp_da_for(unit->objects, it) {
     spn_compile_unit_t* object = unit->objects[it];
+    if (object->target->info->kind == SPN_TARGET_MODULE) {
+      continue;
+    }
     object->nodes.source = spn_bg_add_file(graph, object->paths.file);
-    object->nodes.compile = add_build_command(object->session, object->package->build, compile_object, object);
+    object->nodes.compile = add_build_command(object->session, object->target->build, compile_object, object);
     object->nodes.object = spn_bg_add_file(graph, object->paths.object);
     spn_bg_cmd_add_output(graph, object->nodes.compile, object->nodes.object);
     spn_bg_cmd_add_input(graph, object->nodes.compile, object->nodes.source);
@@ -713,6 +719,9 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
 
   sp_da_for(unit->targets, it) {
     spn_target_unit_t* target = unit->targets[it];
+    if (target->info->kind == SPN_TARGET_MODULE) {
+      continue;
+    }
     if (!sp_da_empty(target->info->source)) {
       spn_try(add_target(graph, unit, target));
     }

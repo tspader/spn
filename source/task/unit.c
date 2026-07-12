@@ -3,6 +3,7 @@
 #include "app/types.h"
 #include "forward/types.h"
 #include "intern/intern.h"
+#include "log/lazy/lazy.h"
 #include "log/log.h"
 #include "sp/sp_om.h"
 #include "session/types.h"
@@ -137,7 +138,7 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
       else {
         spn_kind_query_t query = {
           .config = spn_session_config_kind(session, target->pkg->info->name),
-          .linkage = target->pkg->build->profile.linkage,
+          .linkage = target->build->profile.linkage,
         };
 
         if (spn_target_select_lib_kind(info, query, &target->lib_kind)) {
@@ -182,8 +183,17 @@ static spn_pkg_unit_t* find_dep_unit(spn_session_t* session, spn_pkg_unit_t* pkg
 
 static spn_err_t ensure_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_info_t* info, spn_target_unit_t** result) {
   spn_target_unit_t* target = spn_session_find_target_in_pkg(session, pkg, info->name);
+  if (target && target->info != info) {
+    spn_log_error(
+      "{.cyan} declares a target {.yellow}, which collides with another target of the same name",
+      SP_FMT_STR(pkg->info->name),
+      SP_FMT_STR(info->name)
+    );
+    return SPN_ERROR;
+  }
   if (!target) {
     target = spn_session_add_target(session, pkg, info);
+    sp_assert(target->build);
     spn_try(set_target_kind(session, target));
   }
   *result = target;
@@ -242,12 +252,61 @@ static void create_target_objects(spn_session_t* session, spn_target_unit_t* tar
   sp_mem_end_scratch(scratch);
 }
 
+static void add_module_dep(spn_target_unit_t* module, spn_pkg_unit_t* dep) {
+  sp_da_for(module->deps.package, it) {
+    if (spn_pkg_id_eq(module->deps.package[it]->id.pkg, dep->id.pkg)) {
+      return;
+    }
+  }
+  sp_da_push(module->deps.package, dep);
+
+  // Mirror resolve's scope flattening: a dep's package deps re-export to its
+  // consumers unless the provider is shared, and wasm providers never are.
+  // Script-ctx deps hold PACKAGE edges only, so no kind filter
+  sp_da_for(dep->deps, it) {
+    add_module_dep(module, dep->deps[it].unit);
+  }
+}
+
 static spn_err_t add_script_target(spn_session_t* session, spn_pkg_unit_t* unit, spn_target_info_t* info, spn_target_unit_t** result) {
   spn_target_unit_t* target = SP_NULLPTR;
   spn_try(ensure_target(session, unit, info, &target));
+
+  // Modules compile in the script ctx regardless of which unit parents them.
+  // When the parent lives in another ctx, the module's outputs move under the
+  // script profile so ctx artifacts never mix.
+  if (target->build != session->plan.script) {
+    target->build = session->plan.script;
+    sp_str_t work = sp_fs_join_path(session->mem, session->plan.script->paths.profile, sp_str_lit("work"));
+    target->paths.work = sp_fs_join_path(session->mem, work, unit->info->name);
+    target->paths.generated = sp_fs_join_path(session->mem, target->paths.work, SP_LIT("spn"));
+    target->paths.object = sp_fs_join_path(session->mem, target->paths.generated, sp_str_lit("object"));
+    target->paths.logs.build = sp_fs_join_path(session->mem, target->paths.work, sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(info->name)).value);
+    target->paths.logs.test = sp_fs_join_path(session->mem, target->paths.work, sp_fmt(session->mem, "{}.test.log", SP_FMT_STR(info->name)).value);
+    target->paths.logs.jsonl = sp_fs_join_path(session->mem, target->paths.work, sp_fmt(session->mem, "{}.build.jsonl", SP_FMT_STR(info->name)).value);
+    sp_fs_create_dir(target->paths.work);
+    sp_fs_create_dir(target->paths.generated);
+    sp_fs_create_dir(target->paths.object);
+    spn_lazy_log_init(&target->logs.build, target->paths.logs.build);
+    spn_lazy_log_init(&target->logs.jsonl, target->paths.logs.jsonl);
+  }
+
   create_target_objects(session, target);
   *result = target;
   return SPN_OK;
+}
+
+static bool scripted_push(sp_da(spn_pkg_unit_t*)* scripted, spn_pkg_unit_t* unit) {
+  if (sp_da_empty(unit->script.configure.source) && sp_da_empty(unit->script.build.source)) {
+    return false;
+  }
+  sp_da_for(*scripted, st) {
+    if (spn_pkg_id_eq((*scripted)[st]->id.pkg, unit->id.pkg)) {
+      return false;
+    }
+  }
+  sp_da_push(*scripted, unit);
+  return true;
 }
 
 spn_err_union_t add_script_units(spn_session_t* session) {
@@ -258,21 +317,7 @@ spn_err_union_t add_script_units(spn_session_t* session) {
   sp_da(spn_pkg_unit_t*) scripted = sp_da_new(session->mem, spn_pkg_unit_t*);
   sp_assert(!session->plan.script);
   sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
-    if (sp_da_empty(pkg->script.configure.source) && sp_da_empty(pkg->script.build.source)) {
-      continue;
-    }
-    bool seen = false;
-    sp_da_for(scripted, st) {
-      if (spn_pkg_id_eq(scripted[st]->id.pkg, pkg->id.pkg)) {
-        seen = true;
-        break;
-      }
-    }
-    if (seen) {
-      continue;
-    }
-    sp_da_push(scripted, pkg);
+    scripted_push(&scripted, sp_om_at(session->units.packages, it));
   }
   if (sp_da_empty(scripted)) {
     return spn_result(SPN_OK);
@@ -300,16 +345,25 @@ spn_err_union_t add_script_units(spn_session_t* session) {
   sp_da_init(session->mem, build->include);
   sp_da_push(build->include, spn.paths.include);
 
-  spn_build_plan_t plan = {
-    .build = build,
-  };
-  sp_da_init(session->mem, plan.roots);
-  sp_da_push(session->plan.builds, plan);
   session->plan.script = build;
 
+  // The script ctx holds only the BUILD dep closures of scripted packages;
+  // scripted packages themselves stay in their own ctx and parent the module
+  // targets. A BUILD dep can itself be scripted, so the worklist grows.
+  for (u32 it = 0; it < sp_da_size(scripted); it++) {
+    spn_resolved_pkg_t* pkg = sp_ht_getp(session->resolve, scripted[it]->id.pkg);
+    sp_assert(pkg);
+    sp_da_for(pkg->edges, et) {
+      if (pkg->edges[et].kind != SPN_DEP_KIND_BUILD) {
+        continue;
+      }
+      spn_pkg_unit_t* dep = add_package_units(session, build, pkg->edges[et].id, spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE));
+      scripted_push(&scripted, dep);
+    }
+  }
+
   sp_da_for(scripted, it) {
-    spn_pkg_unit_t* native = scripted[it];
-    spn_pkg_unit_t* unit = add_package_units(session, build, native->id.pkg, spn_dep_kind_bit(SPN_DEP_KIND_BUILD));
+    spn_pkg_unit_t* unit = scripted[it];
 
     struct {
       spn_target_unit_t* build;
@@ -320,6 +374,22 @@ spn_err_union_t add_script_units(spn_session_t* session) {
     }
     if (!sp_da_empty(unit->script.build.source)) {
       try_as_union(add_script_target(session, unit, &unit->script.build, &scripts.build));
+    }
+
+    spn_resolved_pkg_t* resolved = sp_ht_getp(session->resolve, unit->id.pkg);
+    sp_assert(resolved);
+    sp_da_for(resolved->edges, et) {
+      if (resolved->edges[et].kind != SPN_DEP_KIND_BUILD) {
+        continue;
+      }
+      spn_pkg_unit_t* dep = spn_session_find_pkg_unit(session, build, resolved->edges[et].id);
+      sp_assert(dep);
+      if (scripts.configure) {
+        add_module_dep(scripts.configure, dep);
+      }
+      if (scripts.build) {
+        add_module_dep(scripts.build, dep);
+      }
     }
 
     sp_om_for(session->units.packages, j) {
@@ -335,6 +405,44 @@ spn_err_union_t add_script_units(spn_session_t* session) {
       }
     }
   }
+
+  // Script-ctx units exist only to serve modules: each must be reachable from
+  // some module target's deps. One that isn't is a container regression.
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_ht(spn_pkg_id_t, u8) reachable = SP_NULLPTR;
+  sp_ht_init(scratch.mem, reachable);
+  sp_da(spn_pkg_unit_t*) frontier = sp_da_new(scratch.mem, spn_pkg_unit_t*);
+  sp_da_for(scripted, it) {
+    const c8* names [] = { "configure", "build" };
+    sp_carr_for(names, nt) {
+      spn_target_unit_t* module = spn_session_find_target_in_pkg(session, scripted[it], sp_str_view(names[nt]));
+      if (!module || module->info->kind != SPN_TARGET_MODULE) {
+        continue;
+      }
+      sp_da_for(module->deps.package, dt) {
+        sp_da_push(frontier, module->deps.package[dt]);
+      }
+    }
+  }
+  while (!sp_da_empty(frontier)) {
+    spn_pkg_unit_t* unit = *sp_da_back(frontier);
+    sp_da_pop(frontier);
+    if (sp_ht_getp(reachable, unit->id.pkg)) {
+      continue;
+    }
+    sp_ht_insert(reachable, unit->id.pkg, (u8)true);
+    sp_da_for(unit->deps, dt) {
+      sp_da_push(frontier, unit->deps[dt].unit);
+    }
+  }
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    if (unit->build != build) {
+      continue;
+    }
+    sp_assert(sp_ht_getp(reachable, unit->id.pkg));
+  }
+  sp_mem_end_scratch(scratch);
 
   try_union(spn_session_build_invocations(session));
   return spn_build_link_invocations(session);
@@ -417,9 +525,6 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
 
   sp_da_for(session->plan.builds, it) {
     spn_build_plan_t* plan = &session->plan.builds[it];
-    if (plan->build->script) {
-      continue;
-    }
     sp_da_for(session->plan.requested, rt) {
       spn_pkg_unit_t* pkg = spn_session_find_pkg_unit(session, plan->build, session->plan.requested[rt]);
       sp_assert(pkg);
@@ -481,7 +586,7 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
 
   sp_om_for(session->units.objects, it) {
     spn_compile_unit_t* object = sp_om_at(session->units.objects, it);
-    spn_toolchain_t* toolchain = object->package->build->toolchain->toolchain;
+    spn_toolchain_t* toolchain = object->target->build->toolchain->toolchain;
     if (object->lang != SPN_LANG_CXX || spn_toolchain_has_cxx(toolchain)) {
       continue;
     }

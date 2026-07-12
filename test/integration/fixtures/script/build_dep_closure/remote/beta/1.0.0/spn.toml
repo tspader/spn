@@ -1,0 +1,8 @@
+[package]
+name = "beta"
+version = "1.0.0"
+
+[[lib]]
+name = "beta"
+kinds = ["source"]
+headers = ["beta.h"]

@@ -1,0 +1,7 @@
+[package]
+name = "gamma"
+version = "1.0.0"
+
+[[lib]]
+name = "gamma"
+kinds = ["source"]

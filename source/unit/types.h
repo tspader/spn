@@ -182,6 +182,7 @@ struct spn_target_unit {
   spn_target_unit_id_t id;
   spn_session_t* session;
   spn_pkg_unit_t* pkg;
+  spn_build_unit_t* build;
   spn_target_info_t* info;
   spn_cc_output_kind_t kind;
   spn_linkage_t lib_kind;
