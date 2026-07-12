@@ -12,6 +12,7 @@
 #include "external/wasm/wasm.h"
 #include "graph/graph.h"
 #include "event/event.h"
+#include "pkg/id.h"
 #include "session/session.h"
 #include "sp/sp_glob.h"
 #include "target/closure.h"
@@ -115,7 +116,8 @@ static spn_build_reports_t collect_build_reports(sp_mem_t mem, spn_session_t* se
 
 static void emit_build_report(spn_session_t* session, spn_build_report_t* report) {
   spn_pkg_unit_t* root = spn_session_find_pkg_unit(session, report->plan->build, spn_session_root_pkg(session));
-  sp_assert(root);
+  spn_pkg_info_t* pkg = root ? root->info : session->pkg;
+  spn_build_io_t* io = root ? &root->logs.io : SP_NULLPTR;
   spn_profile_info_t* profile = &report->plan->build->profile;
   u64 elapsed = session->build.executor->elapsed;
 
@@ -123,8 +125,8 @@ static void emit_build_report(spn_session_t* session, spn_build_report_t* report
     case SPN_BUILD_REPORT_PASSED: {
       spn_event_buffer_push(session->events, (spn_build_event_t) {
         .kind = SPN_EVENT_BUILD_PASSED,
-        .pkg = root->info,
-        .io = &root->logs.io,
+        .pkg = pkg,
+        .io = io,
         .build.passed = {
           .profile = profile,
           .time = elapsed,
@@ -135,8 +137,8 @@ static void emit_build_report(spn_session_t* session, spn_build_report_t* report
     case SPN_BUILD_REPORT_FAILED: {
       spn_event_buffer_push(session->events, (spn_build_event_t) {
         .kind = SPN_EVENT_BUILD_FAILED,
-        .pkg = root->info,
-        .io = &root->logs.io,
+        .pkg = pkg,
+        .io = io,
         .build_failed = {
           .profile = profile->name,
           .time = elapsed,
@@ -149,8 +151,8 @@ static void emit_build_report(spn_session_t* session, spn_build_report_t* report
     case SPN_BUILD_REPORT_CANCELLED: {
       spn_event_buffer_push(session->events, (spn_build_event_t) {
         .kind = SPN_EVENT_BUILD_CANCELLED,
-        .pkg = root->info,
-        .io = &root->logs.io,
+        .pkg = pkg,
+        .io = io,
         .build_cancelled = {
           .profile = profile->name,
           .time = elapsed,
@@ -163,8 +165,8 @@ static void emit_build_report(spn_session_t* session, spn_build_report_t* report
 
   spn_event_buffer_push(session->events, (spn_build_event_t) {
     .kind = SPN_EVENT_BUILD_SUMMARY,
-    .pkg = root->info,
-    .io = &root->logs.io,
+    .pkg = pkg,
+    .io = io,
     .build_summary = {
       .success = report->kind == SPN_BUILD_REPORT_PASSED,
       .num_dirty = report->dirty,
@@ -279,10 +281,9 @@ spn_task_step_t spn_task_build_graph_update(spn_app_t* app) {
 }
 
 
-// Build-script modules compile in the host ctx with none of the package
-// machinery: no stamps, no hooks, no user nodes. Their commands are owned by
-// the main build so reports stay per-plan, and the link lands on the native
-// package's module node so the package step and user nodes order after it.
+// Build-script modules compile in the script ctx with none of the package
+// machinery: no stamps, no hooks, no user nodes. The link produces the shared
+// module file that every native unit's package step and user nodes consume.
 // Configure modules already built in the configure graph.
 static spn_err_t add_host_package(spn_build_graph_t* graph, spn_session_t* session, spn_pkg_unit_t* unit) {
   spn_target_unit_t* target = spn_session_find_target_in_pkg(session, unit, sp_str_lit("build"));
@@ -290,24 +291,29 @@ static spn_err_t add_host_package(spn_build_graph_t* graph, spn_session_t* sessi
     return SPN_OK;
   }
 
-  spn_build_plan_t* plan = spn_session_find_plan(session, SPN_BUILD_KIND_TARGET);
-  spn_pkg_unit_t* native = spn_session_find_pkg_unit(session, plan->build, unit->id.pkg);
-  sp_assert(native);
-  sp_assert(native->wasm.build.state != SPN_WASM_SCRIPT_NONE);
+  sp_assert(unit->wasm.build.state != SPN_WASM_SCRIPT_NONE);
 
-  spn_build_unit_t* owner = plan->build;
-  target->nodes.link = add_build_command(session, owner, link_target, target);
-  target->nodes.output = native->nodes.build.build_script.module;
+  target->nodes.link = add_build_command(session, unit->build, link_target, target);
+  target->nodes.output = spn_bg_add_file(graph, unit->wasm.build.path);
   spn_try(spn_bg_cmd_add_output(graph, target->nodes.link, target->nodes.output));
 
   sp_da_for(target->objects, it) {
     spn_compile_unit_t* object = target->objects[it];
     object->nodes.source = spn_bg_add_file(graph, object->paths.file);
-    object->nodes.compile = add_build_command(session, owner, compile_object, object);
+    object->nodes.compile = add_build_command(session, unit->build, compile_object, object);
     object->nodes.object = spn_bg_add_file(graph, object->paths.object);
     spn_try(spn_bg_cmd_add_output(graph, object->nodes.compile, object->nodes.object));
     spn_try(spn_bg_cmd_add_input(graph, object->nodes.compile, object->nodes.source));
-    spn_try(spn_bg_cmd_add_input(graph, object->nodes.compile, native->nodes.build.stamp.main));
+    sp_om_for(session->units.packages, nt) {
+      spn_pkg_unit_t* native = sp_om_at(session->units.packages, nt);
+      if (!spn_pkg_id_eq(native->id.pkg, unit->id.pkg)) {
+        continue;
+      }
+      if (!native->nodes.build.stamp.main.occupied) {
+        continue;
+      }
+      spn_try(spn_bg_cmd_add_input(graph, object->nodes.compile, native->nodes.build.stamp.main));
+    }
     spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, object->nodes.object));
   }
 

@@ -7,6 +7,7 @@
 #include "pkg/types.h"
 
 spn_pkg_id_t    spn_pkg_id(sp_intern_t* intern, sp_str_t qualified);
+bool            spn_pkg_id_eq(spn_pkg_id_t a, spn_pkg_id_t b);
 
 sp_intern_str_t spn_pkg_name_to_qualified(spn_pkg_name_t name);
 spn_pkg_name_t  spn_pkg_name_from_qualified(sp_str_t qualified);

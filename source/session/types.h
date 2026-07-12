@@ -94,6 +94,7 @@ struct spn_session_t {
   struct {
     spn_compile_request_t request;
     sp_da(spn_build_plan_t) builds;
+    spn_build_unit_t* script;
   } plan;
   struct {
     sp_om(spn_compile_unit_id_t, spn_compile_unit_t) objects;

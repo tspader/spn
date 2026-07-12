@@ -269,10 +269,6 @@ static spn_dep_edge_t classify_dep(spn_resolver_t* resolver, spn_resolved_pkg_t*
   return SPN_DEP_EDGE_SCOPE;
 }
 
-static bool pkg_id_eq(spn_pkg_id_t a, spn_pkg_id_t b) {
-  return a.qualified == b.qualified && spn_semver_eq(a.version, b.version);
-}
-
 static sp_da(sp_intern_id_t) snapshot_named(sp_mem_t mem, spn_scope_t* scope) {
   sp_da(sp_intern_id_t) snapshot = sp_da_new(mem, sp_intern_id_t);
   sp_ht_for_kv(scope->named, it) {
@@ -356,7 +352,7 @@ static bool find_pin(spn_scope_t* scope, sp_intern_id_t name, spn_semver_t* vers
 
 static spn_scope_t* find_scope(spn_resolve_run_t* run, sp_intern_id_t root, spn_pkg_id_t from) {
   sp_da_for(run->scopes, it) {
-    if (run->scopes[it].root == root && pkg_id_eq(run->scopes[it].from, from)) {
+    if (run->scopes[it].root == root && spn_pkg_id_eq(run->scopes[it].from, from)) {
       return &run->scopes[it];
     }
   }
@@ -365,7 +361,7 @@ static spn_scope_t* find_scope(spn_resolve_run_t* run, sp_intern_id_t root, spn_
 
 static u32 find_or_create_scope(spn_resolver_t* resolver, spn_resolve_run_t* run, sp_intern_id_t root, spn_pkg_id_t from) {
   sp_da_for(run->scopes, it) {
-    if (run->scopes[it].root == root && pkg_id_eq(run->scopes[it].from, from)) {
+    if (run->scopes[it].root == root && spn_pkg_id_eq(run->scopes[it].from, from)) {
       return (u32)it;
     }
   }
