@@ -7,6 +7,8 @@
 #define SPN_TEST_COMMAND_MAX_EVENTS 4
 #define SPN_TEST_COMMAND_MAX_FILES 4
 #define SPN_TEST_COMMAND_MAX_FILE_CONTAINS 4
+#define SPN_TEST_COMMAND_MAX_PATHS 8
+#define SPN_TEST_COMMAND_MAX_PACKAGES 4
 
 typedef struct {
   const c8* event;
@@ -18,6 +20,7 @@ typedef struct {
 typedef struct {
   sp_str_t file;
   const c8* contains[SPN_TEST_COMMAND_MAX_FILE_CONTAINS];
+  const c8* excludes[SPN_TEST_COMMAND_MAX_FILE_CONTAINS];
 } command_file_t;
 
 typedef struct {
@@ -32,6 +35,10 @@ typedef struct {
   const c8* contains[SPN_TEST_COMMAND_MAX_CONTAINS];
   command_event_t events[SPN_TEST_COMMAND_MAX_EVENTS];
   command_file_t files[SPN_TEST_COMMAND_MAX_FILES];
+  sp_str_t exists[SPN_TEST_COMMAND_MAX_PATHS];
+  sp_str_t missing[SPN_TEST_COMMAND_MAX_PATHS];
+  bool lock;
+  const c8* packages[SPN_TEST_COMMAND_MAX_PACKAGES];
 } command_expect_t;
 
 typedef struct {

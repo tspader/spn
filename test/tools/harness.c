@@ -582,6 +582,34 @@ static void expect_command_file(s32* utest_result, fixture_t* fixture, command_f
     utest_kv("content", content);
     EXPECT_TRUE(sp_str_contains(content, sp_str_view(expected.contains[it])));
   }
+  sp_carr_for(expected.excludes, it) {
+    if (!expected.excludes[it]) {
+      break;
+    }
+    utest_kv("path", path);
+    utest_kv("needle", sp_str_view(expected.excludes[it]));
+    utest_kv("content", content);
+    EXPECT_FALSE(sp_str_contains(content, sp_str_view(expected.excludes[it])));
+  }
+}
+
+static void expect_command_lock(s32* utest_result, fixture_t* fixture, command_expect_t expected) {
+  sp_str_t path = tmpfs_get(&fixture->fs, sp_str_lit("spn.lock"));
+  SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+  sp_str_t lock = test_read_file(fixture->fs.mem, path);
+  if (expected.lock) {
+    utest_kv("lock", lock);
+    EXPECT_TRUE(sp_str_contains(lock, sp_str_lit("[[dep]]")));
+  }
+  sp_carr_for(expected.packages, it) {
+    if (!expected.packages[it]) {
+      break;
+    }
+    sp_str_t needle = sp_fmt(fixture->fs.mem, "name = \"{}\"", sp_fmt_cstr(expected.packages[it])).value;
+    utest_kv("needle", needle);
+    utest_kv("lock", lock);
+    EXPECT_TRUE(sp_str_contains(lock, needle));
+  }
 }
 
 void run_command_test(s32* utest_result, fixture_t* fixture, command_test_t test) {
@@ -613,8 +641,107 @@ void run_command_test(s32* utest_result, fixture_t* fixture, command_test_t test
     expect_event(utest_result, fixture, expected.event, expected.key, expected.value, !expected.absent, __FILE__, __LINE__);
   }
 
+  sp_carr_for(test.expect.exists, it) {
+    if (sp_str_empty(test.expect.exists[it])) {
+      break;
+    }
+    sp_str_t path = tmpfs_get(&fixture->fs, test.expect.exists[it]);
+    SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+  }
+
+  sp_carr_for(test.expect.missing, it) {
+    if (sp_str_empty(test.expect.missing[it])) {
+      break;
+    }
+    sp_str_t path = tmpfs_get(&fixture->fs, test.expect.missing[it]);
+    SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
+  }
+
+  if (test.expect.lock || test.expect.packages[0]) {
+    expect_command_lock(utest_result, fixture, test.expect);
+  }
+
   if (test.expect.bin.name) {
     run_command_bin(utest_result, fixture, test.expect.bin);
+  }
+}
+
+static void apply_rebuild_change(s32* utest_result, fixture_t* fixture, rebuild_change_t change) {
+  sp_carr_for(change.remove_files, it) {
+    if (sp_str_empty(change.remove_files[it])) {
+      break;
+    }
+    sp_str_t path = tmpfs_get(&fixture->fs, change.remove_files[it]);
+    sp_fs_remove_file(path);
+    SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
+  }
+
+  sp_carr_for(change.moves, it) {
+    if (sp_str_empty(change.moves[it].from)) {
+      break;
+    }
+    sp_str_t from = tmpfs_get(&fixture->fs, change.moves[it].from);
+    sp_str_t to = tmpfs_get(&fixture->fs, change.moves[it].to);
+    sp_str_t content = test_read_file(fixture->fs.mem, from);
+    tmpfs_create(&fixture->fs, change.moves[it].to, content);
+    sp_fs_remove_file(from);
+    SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, from);
+    SP_EXPECT_EXISTS_TMPFS(&fixture->fs, to);
+  }
+
+  sp_carr_for(change.writes, it) {
+    if (sp_str_empty(change.writes[it].file)) {
+      break;
+    }
+    tmpfs_create(&fixture->fs, change.writes[it].file, change.writes[it].content);
+  }
+
+  sp_carr_for(change.remove_dirs, it) {
+    if (sp_str_empty(change.remove_dirs[it])) {
+      break;
+    }
+    sp_str_t path = tmpfs_get(&fixture->fs, change.remove_dirs[it]);
+    sp_fs_remove_dir(path);
+    SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
+  }
+}
+
+void run_rebuild_test(s32* utest_result, fixture_t* fixture, rebuild_test_t test) {
+  prepare_test(utest_result, fixture, test.project, test.copy);
+  run_command_test(utest_result, fixture, test.first);
+
+  sp_tm_epoch_t mtimes[SPN_TEST_REBUILD_MAX_WATCHES] = sp_zero;
+  sp_carr_for(test.watches, it) {
+    if (sp_str_empty(test.watches[it].file)) {
+      break;
+    }
+    sp_str_t path = tmpfs_get(&fixture->fs, test.watches[it].file);
+    SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+    mtimes[it] = sp_fs_get_mod_time(path);
+  }
+
+  sp_carr_for(test.rebuilds, it) {
+    if (!test.rebuilds[it].command.args[0]) {
+      break;
+    }
+    apply_rebuild_change(utest_result, fixture, test.rebuilds[it].change);
+    run_command_test(utest_result, fixture, test.rebuilds[it].command);
+  }
+
+  sp_carr_for(test.watches, it) {
+    rebuild_watch_t watch = test.watches[it];
+    if (sp_str_empty(watch.file)) {
+      break;
+    }
+    sp_str_t path = tmpfs_get(&fixture->fs, watch.file);
+    sp_tm_epoch_t now = sp_fs_get_mod_time(path);
+    bool unchanged = mtimes[it].s == now.s && mtimes[it].ns == now.ns;
+    if (watch.mtime == REBUILD_MTIME_UNCHANGED) {
+      EXPECT_TRUE(unchanged);
+    }
+    if (watch.mtime == REBUILD_MTIME_CHANGED) {
+      EXPECT_FALSE(unchanged);
+    }
   }
 }
 
@@ -646,8 +773,6 @@ void fixture_copy_project(s32* utest_result, fixture_t* fixture, sp_str_t projec
 void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions) {
   sp_mem_t mem = fixture->fs.mem;
 
-  struct { sp_str_t path; sp_tm_epoch_t mtime; } mtime_snaps[8];
-  s32 num_mtime_snaps = 0;
   sp_str_t cli_output = sp_zero;
 
   sp_for(it, SPN_TEST_MAX_ACTIONS) {
@@ -662,24 +787,6 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
       }
       case ACTION_CREATE_FILE: {
         tmpfs_create(&fixture->fs, action.create.file, action.create.content);
-        break;
-      }
-      case ACTION_REMOVE_FILE: {
-        sp_str_t path = tmpfs_get(&fixture->fs, sp_str_view(action.rm.file));
-        sp_fs_remove_file(path);
-        SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
-        break;
-      }
-      case ACTION_MOVE_FILE: {
-        sp_str_t from = tmpfs_get(&fixture->fs, action.mv.from);
-        sp_str_t to = tmpfs_get(&fixture->fs, action.mv.to);
-        sp_str_t content = test_read_file(mem, from);
-
-        tmpfs_create(&fixture->fs, action.mv.to, content);
-        sp_fs_remove_file(from);
-
-        SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, from);
-        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, to);
         break;
       }
       case ACTION_SUBPROCESS: {
@@ -775,36 +882,6 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         utest_kv("needle", action.verify_file_not_contains.needle);
         utest_kv("content", content);
         EXPECT_FALSE(sp_str_contains(content, action.verify_file_not_contains.needle));
-        break;
-      }
-      case ACTION_SNAPSHOT_MTIME: {
-        sp_str_t path = tmpfs_get(&fixture->fs, action.snapshot_mtime.file);
-        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
-        ASSERT_TRUE(num_mtime_snaps < (s32)sp_carr_len(mtime_snaps));
-        mtime_snaps[num_mtime_snaps].path = path;
-        mtime_snaps[num_mtime_snaps].mtime = sp_fs_get_mod_time(path);
-        num_mtime_snaps++;
-        break;
-      }
-      case ACTION_VERIFY_MTIME_UNCHANGED:
-      case ACTION_VERIFY_MTIME_CHANGED: {
-        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_mtime.file);
-        sp_tm_epoch_t before = sp_zero;
-        bool found = false;
-        sp_for(s, (u32)num_mtime_snaps) {
-          if (sp_str_equal(mtime_snaps[s].path, path)) {
-            before = mtime_snaps[s].mtime;
-            found = true;
-          }
-        }
-        ASSERT_TRUE(found);
-        sp_tm_epoch_t now = sp_fs_get_mod_time(path);
-        bool unchanged = before.s == now.s && before.ns == now.ns;
-        if (action.kind == ACTION_VERIFY_MTIME_UNCHANGED) {
-          EXPECT_TRUE(unchanged);
-        } else {
-          EXPECT_FALSE(unchanged);
-        }
         break;
       }
       case ACTION_REMOVE_DIR: {

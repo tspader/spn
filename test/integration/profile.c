@@ -53,15 +53,25 @@ UTEST_F(profile, identity) {
 UTEST_F(profile, override_rebuild) {
   tmpfs_init_named(&uf->fixture.fs, "profile_override_rebuild");
 
-  run_test(utest_result, &uf->fixture, (test_t) {
+  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
     .project = "test/integration/fixtures/profile/override",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 1 } },
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--opt", "3" } } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 2 } },
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 1 } },
+    .first = {
+      .args = { "build" },
+      .expect.bin = { .name = "main", .rc = 1 },
+    },
+    .rebuilds = {
+      {
+        .command = {
+          .args = { "build", "--opt", "3" },
+          .expect.bin = { .name = "main", .rc = 2 },
+        },
+      },
+      {
+        .command = {
+          .args = { "build" },
+          .expect.bin = { .name = "main", .rc = 1 },
+        },
+      },
     },
   });
 }
