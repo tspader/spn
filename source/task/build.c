@@ -265,6 +265,9 @@ spn_task_step_t spn_task_build_graph_update(spn_app_t* app) {
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
     spn_build_reports_t reports = collect_build_reports(scratch.mem, session);
     sp_da_for(reports, it) {
+      if (!reports[it].total) {
+        continue;
+      }
       emit_build_report(session, &reports[it]);
     }
     sp_mem_end_scratch(scratch);
@@ -287,11 +290,12 @@ static spn_err_t add_host_package(spn_build_graph_t* graph, spn_session_t* sessi
     return SPN_OK;
   }
 
-  spn_pkg_unit_t* native = spn_session_find_pkg_unit(session, session->plan.builds[0].build, unit->id.pkg);
+  spn_build_plan_t* plan = spn_session_find_plan(session, SPN_BUILD_KIND_TARGET);
+  spn_pkg_unit_t* native = spn_session_find_pkg_unit(session, plan->build, unit->id.pkg);
   sp_assert(native);
   sp_assert(native->wasm.build.state != SPN_WASM_SCRIPT_NONE);
 
-  spn_build_unit_t* owner = session->plan.builds[0].build;
+  spn_build_unit_t* owner = plan->build;
   target->nodes.link = add_build_command(session, owner, link_target, target);
   target->nodes.output = native->nodes.build.build_script.module;
   spn_try(spn_bg_cmd_add_output(graph, target->nodes.link, target->nodes.output));
@@ -335,6 +339,7 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
   // directory embeds after the dep step that populates the store they read.
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
+    if (!pkg->nodes.build.main.occupied) continue;
     sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, pkg);
 
     sp_da_for(deps, d) {

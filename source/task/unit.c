@@ -250,11 +250,7 @@ static spn_err_union_t add_script_target(spn_session_t* session, spn_pkg_unit_t*
   return spn_result(SPN_OK);
 }
 
-// Scripts compile like any other target, just in the host build: one pkg unit
-// per scripted package, a reactor target per module, invocations rendered
-// here so the configure graph can consume them. Only script units exist this
-// early, so the session-wide invocation passes touch nothing else.
-spn_err_union_t spn_task_create_script_units(spn_session_t* session) {
+spn_err_union_t add_script_units(spn_session_t* session) {
   if (!session->units.script) {
     return spn_result(SPN_OK);
   }
@@ -274,6 +270,10 @@ spn_err_union_t spn_task_create_script_units(spn_session_t* session) {
     return spn_result(SPN_OK);
   }
 
+  spn_build_plan_t* target = spn_session_find_plan(session, SPN_BUILD_KIND_TARGET);
+  sp_assert(target);
+  spn_pkg_id_t root = target->root.pkg;
+
   spn_build_unit_t* build = sp_alloc_type(session->mem, spn_build_unit_t);
   *build = (spn_build_unit_t) {
     .id = (spn_build_unit_id_t)sp_da_size(session->plan.builds),
@@ -289,15 +289,31 @@ spn_err_union_t spn_task_create_script_units(spn_session_t* session) {
       .linkage = SPN_LIB_KIND_STATIC,
     },
     .toolchain = session->units.script,
+    .visibility = SPN_SYMBOL_VISIBILITY_HIDDEN,
+    .dep_kinds = spn_dep_kind_bit(SPN_DEP_KIND_BUILD),
     .paths = { .profile = sp_fs_join_path(session->mem, session->paths.build, sp_str_lit("script")) },
   };
-  session->units.host = build;
+  sp_da_init(session->mem, build->include);
+  sp_da_push(build->include, spn.paths.include);
+
+  spn_build_plan_t plan = {
+    .build = build,
+    .root = { .pkg = root, .ctx = build->id },
+  };
+  sp_da_init(session->mem, plan.roots);
+  sp_da_push(session->plan.builds, plan);
 
   sp_da_for(scripted, it) {
     spn_pkg_unit_t* native = scripted[it];
     spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, native->id.pkg);
     sp_assert(loaded);
     spn_pkg_unit_t* unit = spn_session_add_pkg_unit(session, build, native->id.pkg, loaded);
+    sp_da_for(native->deps, dt) {
+      if (native->deps[dt].kind != SPN_DEP_KIND_BUILD) {
+        continue;
+      }
+      sp_da_push(unit->deps, native->deps[dt]);
+    }
 
     if (!sp_da_empty(unit->script.configure.source)) {
       try_union(add_script_target(session, unit, &unit->script.configure, &native->wasm.configure));
@@ -388,6 +404,9 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
 
   sp_da_for(session->plan.builds, it) {
     spn_build_plan_t* plan = &session->plan.builds[it];
+    if (plan->build->kind != SPN_BUILD_KIND_TARGET) {
+      continue;
+    }
     spn_pkg_unit_t* pkg = spn_session_find_pkg_unit_by_id(session, plan->root);
     sp_assert(pkg);
     if (add_plan_targets(session, plan, pkg, pkg->info->libs) ||

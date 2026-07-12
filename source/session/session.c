@@ -485,12 +485,19 @@ spn_target_unit_t* spn_session_get_target_unit(spn_session_t* session, spn_targe
   return sp_om_get(session->units.targets, id);
 }
 
-spn_pkg_unit_t* spn_session_find_root_pkg(spn_session_t* session, spn_build_unit_t* build) {
-  sp_assert(build);
+spn_build_plan_t* spn_session_find_plan(spn_session_t* session, spn_build_kind_t kind) {
   sp_da_for(session->plan.builds, it) {
-    spn_build_plan_t* plan = &session->plan.builds[it];
-    if (plan->build == build && plan->root.pkg.qualified) {
-      return spn_session_find_pkg_unit_by_id(session, plan->root);
+    if (session->plan.builds[it].build->kind == kind) {
+      return &session->plan.builds[it];
+    }
+  }
+  return SP_NULLPTR;
+}
+
+spn_build_plan_t* spn_session_plan_for_build(spn_session_t* session, spn_build_unit_t* build) {
+  sp_da_for(session->plan.builds, it) {
+    if (session->plan.builds[it].build == build) {
+      return &session->plan.builds[it];
     }
   }
   return SP_NULLPTR;

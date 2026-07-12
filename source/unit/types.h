@@ -26,10 +26,15 @@ struct spn_build_unit_t {
   spn_build_kind_t kind;
   spn_profile_info_t profile;
   spn_toolchain_unit_t* toolchain;
+  spn_symbol_visibility_t visibility;
+  u32 dep_kinds;
+  sp_da(sp_str_t) include;
   struct {
     sp_str_t profile;
   } paths;
 };
+
+#define spn_dep_kind_bit(kind) (1u << (kind))
 
 typedef struct {
   spn_target_selection_t targets;

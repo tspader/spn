@@ -88,9 +88,7 @@ static spn_err_union_t build_link_invocation(spn_target_unit_t* target, sp_str_t
   sp_da_init(mem, link.hidden_libs);
   sp_da_init(mem, link.lib_dirs);
   sp_da_init(mem, link.rpath);
-  if (target->pkg->build->kind != SPN_BUILD_KIND_HOST) {
-    add_deps_to_cc_target(&link, target);
-  }
+  add_deps_to_cc_target(&link, target);
 
   switch (target->pkg->build->profile.os) {
     case SPN_OS_LINUX: {
