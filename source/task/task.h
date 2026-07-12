@@ -25,6 +25,7 @@ spn_task_step_t spn_task_sync_indexes_update(spn_app_t* app);
 spn_task_step_t spn_task_resolve(spn_app_t* app);
 spn_task_step_t spn_task_sync_packages_init(spn_app_t* app);
 spn_task_step_t spn_task_sync_packages_update(spn_app_t* app);
+spn_task_step_t spn_task_plan(spn_app_t* app);
 spn_task_step_t spn_task_configure_graph_init(spn_app_t* app);
 spn_task_step_t spn_task_configure_graph_update(spn_app_t* app);
 spn_task_step_t spn_task_create_units(spn_app_t* app);

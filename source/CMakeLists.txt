@@ -95,6 +95,7 @@ set(SPN_SOURCES
   task/graph.c
   task/index.c
   task/init.c
+  task/plan.c
   task/publish.c
   task/resolve.c
   task/sync.c
