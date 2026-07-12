@@ -137,6 +137,19 @@ typedef struct {
 
 static sp_str_t str_replace_all(sp_mem_t mem, sp_str_t str, sp_str_t needle, sp_str_t repl);
 
+static sp_str_t ps_command_line(sp_mem_t mem, const sp_ps_config_t* config) {
+  sp_da(sp_str_t) parts = sp_da_new(mem, sp_str_t);
+  sp_da_push(parts, config->command);
+  sp_carr_for(config->args, it) {
+    if (sp_str_empty(config->args[it])) break;
+    sp_da_push(parts, config->args[it]);
+  }
+  sp_da_for(config->dyn_args, it) {
+    sp_da_push(parts, config->dyn_args[it]);
+  }
+  return sp_str_join_n(mem, parts, sp_da_size(parts), sp_str_lit(" "));
+}
+
 // Publish one committed manifest checkout into the fixture's filesystem
 // index with the real spn binary, so fixture index entries are whatever
 // publish actually produces
@@ -166,9 +179,9 @@ static void fixture_publish(s32* result, fixture_t* fixture, sp_str_t repo, sp_s
   sp_ps_config_add_arg(mem, &config, rev);
 
   sp_ps_output_t output = sp_ps_run(mem, config);
-  if (output.status.exit_code) {
-    sp_log("publish failed in {}:\n{}", sp_fmt_str(repo), sp_fmt_str(output.out));
-  }
+  utest_kv("command", ps_command_line(mem, &config));
+  utest_kv("cwd", repo);
+  utest_kv("output", output.out);
   ASSERT_EQ(0, output.status.exit_code);
 }
 
@@ -428,30 +441,17 @@ void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, bool expected,
   bool exists = sp_fs_exists(path);
   if (exists == expected) return;
 
-  UTEST_KVP("root", fs->root);
-  UTEST_KVP("path", path);
-
-  // sp_mem_t mem = sp_mem_get_scratch();
-  // sp_str_t bar = sp_fmt(mem, "{.red}", sp_fmt_cstr("▐ ")).value;
-  //
-  // sp_io_dyn_mem_writer_t b = sp_zero;
-  // sp_io_dyn_mem_writer_init(mem, &b);
-  // sp_fmt_io(&b.base, "{}:{}", sp_fmt_cstr(file), sp_fmt_uint(line));
-  //
-  // if (fs) {
-  //   sp_fmt_io(&b.base, "\n{}{.cyan} is the root", sp_fmt_str(bar), sp_fmt_str(fs->root));
-  //
-  //   path = sp_str_strip_left(path, fs->root);
-  //   path = sp_str_concat(mem, sp_str_lit("$test"), path);
-  // }
-  // if (expected) {
-  //   sp_fmt_io(&b.base, "\n{}{.cyan} does not exist", sp_fmt_str(bar), sp_fmt_str(path));
-  // } else {
-  //   sp_fmt_io(&b.base, "\n{}{.cyan} exists (expected not to)", sp_fmt_str(bar), sp_fmt_str(path));
-  // }
-
-  // SP_TEST_REPORT_STR(sp_io_dyn_mem_writer_as_str(&b));
-  *utest_result = UTEST_TEST_FAILURE;
+  if (fs) {
+    utest_kv("root", fs->root);
+    sp_str_t relative = sp_str_strip_left(path, fs->root);
+    if (relative.len != path.len) {
+      path = sp_str_concat(sp_mem_get_scratch(), sp_str_lit("$test"), relative);
+    }
+  }
+  utest_kv("path", path);
+  utest_fail(utest_result, file, line,
+    sp_str_view(expected ? "path exists" : "path does not exist"),
+    sp_str_view(exists ? "it exists" : "it does not"));
 }
 
 static bool event_matches(yyjson_val* line, const c8* event, const c8* key, const c8* value) {
@@ -490,21 +490,16 @@ static void expect_event(s32* utest_result, fixture_t* fixture, action_t action,
 
   if (found == expected) return;
 
-  sp_io_dyn_mem_writer_t b = sp_zero;
-  sp_io_dyn_mem_writer_init(mem, &b);
-  sp_fmt_io(&b.base, "{}:{}\n", sp_fmt_cstr(file), sp_fmt_uint(line));
-  sp_fmt_io(&b.base, "{.red}event {.cyan}", sp_fmt_cstr("▐ "), sp_fmt_cstr(action.verify_event.event));
+  utest_kv("event", sp_str_view(action.verify_event.event));
   if (action.verify_event.key) {
-    sp_fmt_io(&b.base, " with {.cyan} = {.cyan}", sp_fmt_cstr(action.verify_event.key), sp_fmt_cstr(action.verify_event.value));
+    utest_kv("field", sp_fmt(mem, "{} = {}",
+      sp_fmt_cstr(action.verify_event.key),
+      sp_fmt_cstr(action.verify_event.value)).value);
   }
-  if (expected) {
-    sp_fmt_io(&b.base, " not found in {.cyan}", sp_fmt_str(path));
-  } else {
-    sp_fmt_io(&b.base, " found in {.cyan} (expected not to be)", sp_fmt_str(path));
-  }
-
-  UTEST_PRINTF("{}\n", sp_fmt_str(sp_io_dyn_mem_writer_as_str(&b)));
-  *utest_result = UTEST_TEST_FAILURE;
+  utest_kv("log", path);
+  utest_fail(utest_result, file, line,
+    sp_str_view(expected ? "event logged" : "event not logged"),
+    sp_str_view(found ? "it was logged" : "it was not"));
 }
 
 void fixture_copy_project(s32* utest_result, fixture_t* fixture, sp_str_t project, const c8* const* copy) {
@@ -578,13 +573,16 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         }
 
         sp_ps_output_t output = sp_ps_run(mem, config);
+        utest_kv("command", ps_command_line(mem, &config));
+        utest_kv("cwd", config.cwd);
+        utest_kv("output", output.out);
         EXPECT_EQ(action.process.rc, output.status.exit_code);
         break;
       }
       case ACTION_RUN_BIN:
       case ACTION_RUN_TEST: {
-        sp_str_t staged = action.kind == ACTION_RUN_TEST ? test_exe(action.bin.name) : exe(action.bin.name);
-        sp_str_t bin = tmpfs_get(&fixture->fs, staged);
+        sp_str_t staged_bin = action.kind == ACTION_RUN_TEST ? test_exe(action.bin.name) : exe(action.bin.name);
+        sp_str_t bin = tmpfs_get(&fixture->fs, staged_bin);
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, bin);
 
         sp_ps_output_t output = sp_ps_run(mem, (sp_ps_config_t) {
@@ -596,6 +594,8 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
           },
         });
 
+        utest_kv("command", bin);
+        utest_kv("output", output.out);
         EXPECT_EQ(action.bin.rc, output.status.exit_code);
         break;
       }
@@ -620,6 +620,9 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
       case ACTION_VERIFY_CONTENT: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_content.file);
         sp_str_t content = test_read_file(mem, path);
+        utest_kv("path", path);
+        utest_kv("expected", action.verify_content.content);
+        utest_kv("content", content);
         EXPECT_TRUE(sp_str_equal(content, action.verify_content.content));
         break;
       }
@@ -634,6 +637,8 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
         sp_str_t content = test_read_file(mem, path);
         yyjson_doc* doc = yyjson_read(content.data, content.len, 0);
+        utest_kv("path", path);
+        utest_kv("content", content);
         EXPECT_TRUE(doc != NULL);
         yyjson_doc_free(doc);
         break;
@@ -641,12 +646,18 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
       case ACTION_VERIFY_FILE_CONTAINS: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_contains.file);
         sp_str_t content = test_read_file(mem, path);
+        utest_kv("path", path);
+        utest_kv("needle", action.verify_file_contains.needle);
+        utest_kv("content", content);
         EXPECT_TRUE(sp_str_contains(content, action.verify_file_contains.needle));
         break;
       }
       case ACTION_VERIFY_FILE_NOT_CONTAINS: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_not_contains.file);
         sp_str_t content = test_read_file(mem, path);
+        utest_kv("path", path);
+        utest_kv("needle", action.verify_file_not_contains.needle);
+        utest_kv("content", content);
         EXPECT_FALSE(sp_str_contains(content, action.verify_file_not_contains.needle));
         break;
       }
@@ -727,20 +738,22 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         }
 
         sp_ps_output_t output = sp_ps_run(mem, config);
+        utest_kv("command", ps_command_line(mem, &config));
+        utest_kv("output", output.out);
         EXPECT_EQ(action.cli.rc, output.status.exit_code);
 
-        if (action.cli.rc != output.status.exit_code) {
-          sp_str_t command = sp_str_join_n(mem, config.dyn_args, sp_da_size(config.dyn_args), sp_str_lit(" "));
-          UTEST_KVP("command", command);
-        }
         cli_output = output.out;
         break;
       }
       case ACTION_VERIFY_CLI_CONTAINS: {
+        utest_kv("needle", action.verify_cli.needle);
+        utest_kv("output", cli_output);
         EXPECT_TRUE(sp_str_contains(cli_output, action.verify_cli.needle));
         break;
       }
       case ACTION_VERIFY_CLI_NOT_CONTAINS: {
+        utest_kv("needle", action.verify_cli.needle);
+        utest_kv("output", cli_output);
         EXPECT_FALSE(sp_str_contains(cli_output, action.verify_cli.needle));
         break;
       }
@@ -754,6 +767,7 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
 
         sp_str_t lock = test_read_file(mem, path);
+        utest_kv("lock", lock);
         EXPECT_TRUE(sp_str_contains(lock, sp_str_lit("[[dep]]")));
         break;
       }
@@ -763,6 +777,8 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
 
         sp_str_t lock = test_read_file(mem, path);
         sp_str_t needle = sp_fmt(mem, "name = \"{}\"", sp_fmt_cstr(action.verify_locked.name)).value;
+        utest_kv("needle", needle);
+        utest_kv("lock", lock);
         EXPECT_TRUE(sp_str_contains(lock, needle));
         break;
       }

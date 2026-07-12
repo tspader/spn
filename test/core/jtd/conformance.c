@@ -9,7 +9,8 @@ static void run_conformance_reject(s32* utest_result, const c8* file) {
   sp_str_t conformance = sp_fs_join_path(s.mem, repo, sp_str_lit("conformance"));
   sp_str_t path = sp_fs_join_path(s.mem, conformance, sp_cstr_as_str(file));
   sp_str_t json = sp_zero; sp_io_read_file(s.mem, path, &json);
-  ASSERT_FALSE_MSG(sp_str_empty(json), "Fixture is empty");
+  utest_kv("fixture", path);
+  ASSERT_FALSE(sp_str_empty(json));
 
   jtd_result_t result = jtd_parse(mem, json);
   EXPECT_FALSE(result.ok);

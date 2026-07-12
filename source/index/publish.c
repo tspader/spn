@@ -103,7 +103,7 @@ spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t*
   }
 
   sp_da_for(info.deps, it) {
-    spn_requested_pkg_t* req = &info.deps[it];
+    spn_requested_dep_t* req = &info.deps[it];
     if (req->source != SPN_PKG_SOURCE_INDEX) {
       continue;
     }

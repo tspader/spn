@@ -30,10 +30,10 @@ typedef struct {
 struct spn_resolved_pkg {
   spn_pkg_id_t id;
   sp_str_t name;
-  spn_option_info_om_t options;
+  spn_option_map_t options;
   spn_pkg_source_t source;
   u64 priority;
-  sp_da(spn_requested_pkg_t) deps;
+  sp_da(spn_requested_dep_t) deps;
   sp_da(spn_resolved_dep_t) edges;
   struct {
     spn_pkg_tree_t recipe;
@@ -47,7 +47,7 @@ struct spn_resolved_pkg {
 typedef sp_ht(spn_pkg_id_t, spn_resolved_pkg_t) spn_resolve_t;
 
 typedef struct {
-  sp_da(spn_requested_pkg_t) reqs;
+  sp_da(spn_requested_dep_t) reqs;
   spn_resolve_t result;
   u64 time;
 } spn_resolve_query_t;

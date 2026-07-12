@@ -63,7 +63,7 @@ typedef struct {
 
   sp_da(spn_index_dep_t) deps;
   sp_da(spn_index_target_t) targets;
-  spn_option_info_om_t options;
+  spn_option_map_t options;
 } spn_index_release_t;
 
 typedef struct {

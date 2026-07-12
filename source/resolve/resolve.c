@@ -30,7 +30,7 @@
 typedef struct {
   spn_pkg_id_t from;
   spn_dep_edge_t edge;
-  spn_requested_pkg_t req;
+  spn_requested_dep_t req;
 } spn_scope_boundary_t;
 
 typedef struct {
@@ -41,7 +41,7 @@ typedef struct {
 typedef struct {
   sp_intern_id_t root;
   spn_pkg_id_t from;
-  sp_da(spn_requested_pkg_t) reqs;
+  sp_da(spn_requested_dep_t) reqs;
   u64 cursor;
   sp_ht(sp_intern_id_t, spn_resolved_pkg_t) named;
   sp_da(spn_pin_t) pins;
@@ -101,7 +101,7 @@ typedef struct {
   bool private;
 } spn_node_edge_t;
 
-static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node, spn_requested_pkg_t* dep);
+static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node, spn_requested_dep_t* dep);
 static spn_err_t resolve_deps(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node);
 
 static spn_pkg_tree_t tree_git(spn_index_rel_source_t source) {
@@ -130,7 +130,7 @@ void spn_resolve_query_init(sp_mem_t mem, spn_resolve_query_t* query) {
   sp_ht_init(mem, query->result);
 }
 
-void spn_resolve_query_add(spn_resolve_query_t* query, spn_requested_pkg_t req) {
+void spn_resolve_query_add(spn_resolve_query_t* query, spn_requested_dep_t req) {
   sp_da_push(query->reqs, req);
 }
 
@@ -161,7 +161,7 @@ static spn_pkg_tree_t upstream_tree(spn_pkg_info_t* info) {
   };
 }
 
-static spn_build_event_t unsatisfiable_event(spn_resolver_t* resolver, spn_resolved_pkg_t* from, spn_requested_pkg_t* request, bool conflict, spn_semver_t selected) {
+static spn_build_event_t unsatisfiable_event(spn_resolver_t* resolver, spn_resolved_pkg_t* from, spn_requested_dep_t* request, bool conflict, spn_semver_t selected) {
   return (spn_build_event_t) {
     .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
     .unsatisfiable = {
@@ -250,7 +250,7 @@ static bool node_is_shared(spn_resolver_t* resolver, spn_resolved_pkg_t* node) {
   sp_unreachable_return(false);
 }
 
-static spn_dep_edge_t classify_dep(spn_resolver_t* resolver, spn_resolved_pkg_t* node, spn_requested_pkg_t* dep) {
+static spn_dep_edge_t classify_dep(spn_resolver_t* resolver, spn_resolved_pkg_t* node, spn_requested_dep_t* dep) {
   switch (dep->kind) {
     case SPN_DEP_KIND_BUILD: {
       return SPN_DEP_EDGE_PROCESS;
@@ -308,8 +308,8 @@ static s32 sort_pick_by_priority(const void* a, const void* b) {
 }
 
 static s32 sort_req_canonical(const void* a, const void* b) {
-  const spn_requested_pkg_t* lhs = (const spn_requested_pkg_t*)a;
-  const spn_requested_pkg_t* rhs = (const spn_requested_pkg_t*)b;
+  const spn_requested_dep_t* lhs = (const spn_requested_dep_t*)a;
+  const spn_requested_dep_t* rhs = (const spn_requested_dep_t*)b;
 
   s32 order = sp_str_compare_alphabetical(lhs->qualified, rhs->qualified);
   if (order) return order;
@@ -382,7 +382,7 @@ static u32 find_or_create_scope(spn_resolver_t* resolver, spn_resolve_run_t* run
   return (u32)(sp_da_size(run->scopes) - 1);
 }
 
-static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* from, spn_requested_pkg_t* request) {
+static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* from, spn_requested_dep_t* request) {
   spn_scope_t* scope = &run->scopes[run->scope];
   sp_intern_id_t name = sp_intern_get_or_insert(resolver->intern, request->qualified);
 
@@ -561,7 +561,7 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
       return SPN_ERROR;
     }
 
-    sp_da_push(node.deps, ((spn_requested_pkg_t) {
+    sp_da_push(node.deps, ((spn_requested_dep_t) {
       .qualified = spn_pkg_name_to_qualified(release->deps[it].id),
       .source = SPN_PKG_SOURCE_INDEX,
       .kind = dep_kind_from_index(release->deps[it].kind),
@@ -594,7 +594,7 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
   return SPN_ERROR;
 }
 
-static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* from, spn_requested_pkg_t* request) {
+static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* from, spn_requested_dep_t* request) {
   spn_scope_t* scope = &run->scopes[run->scope];
   sp_intern_id_t name = sp_intern_get_or_insert(resolver->intern, request->qualified);
 
@@ -679,7 +679,7 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
   return SPN_ERROR;
 }
 
-static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node, spn_requested_pkg_t* dep) {
+static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node, spn_requested_dep_t* dep) {
   spn_dep_edge_t edge = classify_dep(resolver, node, dep);
   switch (edge) {
     case SPN_DEP_EDGE_PRUNED: {
@@ -728,7 +728,7 @@ static spn_err_t solve_reqs(spn_resolver_t* resolver, spn_resolve_run_t* run, u6
   };
 
   for (u64 it = from; it < to; it++) {
-    spn_requested_pkg_t req = run->scopes[run->scope].reqs[it];
+    spn_requested_dep_t req = run->scopes[run->scope].reqs[it];
     spn_try(resolve_dep(resolver, run, &root, &req));
   }
 
@@ -795,7 +795,7 @@ static spn_err_t resolve_scope(spn_resolver_t* resolver, spn_resolve_run_t* run)
   u64 to = sp_da_size(scope->reqs);
   scope->cursor = to;
   run->budget = resolver->budget;
-  sp_os_qsort(scope->reqs + from, to - from, sizeof(spn_requested_pkg_t), sort_req_canonical);
+  sp_os_qsort(scope->reqs + from, to - from, sizeof(spn_requested_dep_t), sort_req_canonical);
 
   // Re-entered scopes solve under their kept pins; re-pushed requests are a
   // function of manifests the scope already resolved, so they only duplicate
@@ -944,7 +944,7 @@ static void process_boundaries(spn_resolver_t* resolver, spn_resolve_run_t* run)
       .private = boundary.edge == SPN_DEP_EDGE_PRIVATE,
     }));
 
-    spn_requested_pkg_t req = boundary.req;
+    spn_requested_dep_t req = boundary.req;
     req.kind = SPN_DEP_KIND_PACKAGE;
     req.private = false;
     sp_da_push(run->scopes[target].reqs, req);
@@ -1003,7 +1003,7 @@ static sp_da(spn_node_edge_t) collect_node_edges(spn_resolver_t* resolver, spn_r
   sp_da(spn_node_edge_t) edges = sp_da_new(mem, spn_node_edge_t);
 
   sp_da_for(node->deps, it) {
-    spn_requested_pkg_t* dep = &node->deps[it];
+    spn_requested_dep_t* dep = &node->deps[it];
     spn_dep_edge_t edge = classify_dep(resolver, node, dep);
     if (edge == SPN_DEP_EDGE_PRUNED) {
       continue;

@@ -184,7 +184,7 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
       sp_assert(loaded);
 
       sp_da_for(loaded->info->deps, dt) {
-        spn_requested_pkg_t* dep = &loaded->info->deps[dt];
+        spn_requested_dep_t* dep = &loaded->info->deps[dt];
         if (sp_da_empty(dep->options.clauses)) {
           continue;
         }
@@ -244,7 +244,7 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
       spn_when_env_add_options(&env, resolved);
 
       sp_da_for(loaded->info->deps, dt) {
-        spn_requested_pkg_t* dep = &loaded->info->deps[dt];
+        spn_requested_dep_t* dep = &loaded->info->deps[dt];
         if (sp_da_empty(dep->when.clauses)) {
           continue;
         }
@@ -588,7 +588,7 @@ static spn_target_info_t clone_target_info(sp_mem_t mem, spn_target_info_t* sour
   return target;
 }
 
-static void clone_target_map(spn_target_info_om_t* result, spn_target_info_om_t source, sp_mem_t mem) {
+static void clone_target_map(spn_target_map_t* result, spn_target_map_t source, sp_mem_t mem) {
   sp_str_om_init(*result);
   sp_str_om_for(source, it) {
     spn_target_info_t target = clone_target_info(mem, sp_str_om_at(source, it));

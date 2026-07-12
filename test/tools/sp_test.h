@@ -41,41 +41,24 @@
 
 #define SP_FAIL() *utest_result = UTEST_TEST_FAILURE
 
-#define SP_TEST_REPORT(fmt, ...) \
+#define SP_TEST_STREQ(a, b, sa, sb, is_assert) \
   do { \
-    sp_str_t formatted = sp_fmt(utest_state.mem, fmt, ##__VA_ARGS__).value; \
-    UTEST_PRINTF("{}", sp_fmt_str(formatted)); \
-  } while (0)
-
-#define SP_TEST_REPORT_STR(str) \
-  do { \
-    UTEST_PRINTF("{}", sp_fmt_str(str)); \
-  } while (0)
-
-#define SP_TEST_STREQ(a, b, is_assert) \
-  UTEST_SURPRESS_WARNING_BEGIN do { \
-    if (!sp_str_equal((a), (b))) { \
-      const c8* __file = __FILE__; \
-      const u32 __line = __LINE__; \
-      sp_str_t __msg = sp_fmt( \
-        utest_state.mem, \
-        "{}:{} Failure:\n  {.quote} != {.quote}",     \
-        sp_fmt_cstr(__file), sp_fmt_uint(__line), \
-        sp_fmt_str((a)),                          \
-        sp_fmt_str((b))                           \
-      ).value;                                    \
-      SP_TEST_REPORT_STR(__msg);                  \
-      *utest_result = UTEST_TEST_FAILURE;         \
-                                                  \
+    sp_str_t utest_a = (a); \
+    sp_str_t utest_b = (b); \
+    if (sp_str_equal(utest_a, utest_b)) { \
+      utest_context_reset(); \
+    } else { \
+      utest_fail(utest_result, __FILE__, __LINE__, \
+        utest_fmt_s("{} == {}", sp_fmt_cstr(sa), sp_fmt_cstr(sb)), \
+        utest_fmt_s("{.quote} vs {.quote}", sp_fmt_str(utest_a), sp_fmt_str(utest_b))); \
       if (is_assert) { \
         return; \
       } \
     } \
-  } while (0) \
-  UTEST_SURPRESS_WARNING_END
+  } while (0)
 
-#define SP_EXPECT_STR_EQ_CSTR(a, b) SP_TEST_STREQ((a), sp_str_view(b), false)
-#define SP_EXPECT_STR_EQ(a, b) SP_TEST_STREQ((a), (b), false)
+#define SP_EXPECT_STR_EQ_CSTR(a, b) SP_TEST_STREQ((a), sp_str_view(b), #a, #b, false)
+#define SP_EXPECT_STR_EQ(a, b) SP_TEST_STREQ((a), (b), #a, #b, false)
 
 typedef struct {
   u32 len;

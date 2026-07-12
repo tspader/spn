@@ -17,7 +17,7 @@
 #include "unit/types.h"
 
 void add_root(spn_session_t* session, spn_resolve_query_t* query) {
-  spn_resolve_query_add(query, (spn_requested_pkg_t) {
+  spn_resolve_query_add(query, (spn_requested_dep_t) {
     .qualified = session->pkg->qualified,
     .source = SPN_PKG_SOURCE_ROOT,
   });

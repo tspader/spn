@@ -257,7 +257,7 @@ static spn_pkg_info_t* build_root(sp_mem_t mem, fixture_t* fixture) {
 
     spn_semver_range_t range = sp_zero;
     SP_ASSERT(!spn_semver_parse_range(sp_str_view(dep->version), &range));
-    sp_da_push(info->deps, ((spn_requested_pkg_t) {
+    sp_da_push(info->deps, ((spn_requested_dep_t) {
       .qualified = spn_pkg_canonicalize_name(sp_str_view(dep->name)),
       .source = SPN_PKG_SOURCE_INDEX,
       .kind = dep->kind,
@@ -401,7 +401,7 @@ static resolve_result_t execute_fixture(fixture_t* fixture, sp_intern_t* intern)
   resolve_result_t result = sp_zero_s(resolve_result_t);
   result.intern = intern;
   spn_resolve_query_init(mem, &result.query);
-  spn_resolve_query_add(&result.query, (spn_requested_pkg_t) {
+  spn_resolve_query_add(&result.query, (spn_requested_dep_t) {
     .qualified = sp_str_view(root_qualified),
     .source = SPN_PKG_SOURCE_ROOT,
   });

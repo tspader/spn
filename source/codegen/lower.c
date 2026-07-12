@@ -123,7 +123,7 @@ static spn_target_info_t lower_target(spn_toml_loader_t* ctx, const spn_cg_targe
   return target;
 }
 
-static void lower_collection(spn_toml_loader_t* ctx, spn_cg_target_om_t cg, spn_target_info_om_t* out, spn_target_kind_t kind) {
+static void lower_collection(spn_toml_loader_t* ctx, spn_cg_target_om_t cg, spn_target_map_t* out, spn_target_kind_t kind) {
   sp_str_om_init(*out);
   sp_om_for(cg, it) {
     spn_target_info_t target = lower_target(ctx, sp_str_om_at(cg, it), kind);
@@ -145,7 +145,7 @@ static spn_target_info_t lower_script(spn_toml_loader_t* ctx, const spn_cg_build
 }
 
 static void lower_dep(spn_toml_loader_t* ctx, sp_str_t name, const spn_cg_dep_t* cg, spn_dep_kind_t kind, spn_pkg_info_t* out) {
-  spn_requested_pkg_t req = {
+  spn_requested_dep_t req = {
     .qualified = lower_canonicalize(ctx, name),
     .kind = kind,
     .private = sp_opt_is_null(cg->private) ? false : sp_opt_get(cg->private),
@@ -321,7 +321,7 @@ static void lower_indexes(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
 }
 
 static void lower_deps(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
-  out->deps = sp_da_new(ctx->mem, spn_requested_pkg_t);
+  out->deps = sp_da_new(ctx->mem, spn_requested_dep_t);
   sp_da_for(cg->deps.package, i) {
     lower_dep(ctx, cg->deps.package[i].key, &cg->deps.package[i].value, SPN_DEP_KIND_PACKAGE, out);
   }
@@ -438,7 +438,7 @@ static void validate_dep_whens(spn_toml_loader_t* ctx, spn_pkg_info_t* out) {
   u32 counters [3] = sp_zero;
   spn_toml_loader_push_key(ctx, "deps");
   sp_da_for(out->deps, it) {
-    spn_requested_pkg_t* req = &out->deps[it];
+    spn_requested_dep_t* req = &out->deps[it];
     spn_toml_loader_push_key(ctx, dep_kind_key(req->kind));
     spn_toml_loader_push_index(ctx, counters[req->kind]++);
     validate_when(ctx, &req->when, out);
@@ -702,7 +702,7 @@ static void validate_unique_targets(spn_toml_loader_t* ctx, spn_pkg_info_t* out)
 
   struct {
     const c8* key;
-    spn_target_info_om_t om;
+    spn_target_map_t om;
   } groups[] = {
     { "lib", out->libs },
     { "bin", out->exes },

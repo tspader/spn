@@ -96,7 +96,7 @@ typedef struct { spn_profile_info_t* profile; u64 time; } spn_evt_build_passed_t
 
 typedef struct { sp_str_t name; sp_str_t command; } spn_evt_run_t;
 typedef struct {
-  spn_requested_pkg_t request;
+  spn_requested_dep_t request;
   sp_str_t requester;
   spn_semver_t requester_version;
   bool conflict;
@@ -139,7 +139,7 @@ typedef struct {
   spn_option_setter_t a;
   spn_option_setter_t b;
 } spn_evt_option_t;
-typedef struct { spn_requested_pkg_t request; } spn_evt_unknown_t;
+typedef struct { spn_requested_dep_t request; } spn_evt_unknown_t;
 typedef struct { sp_str_t script_path; u64 time; bool has_configure; bool has_package; } spn_evt_script_compile_t;
 typedef struct { u64 time; } spn_evt_script_package_t;
 typedef struct { sp_str_t script_path; sp_str_t error; } spn_evt_compile_failed_t;
