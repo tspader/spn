@@ -37,27 +37,28 @@ static spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* bui
   return unit;
 }
 
-static spn_err_union_t add_compilation_units(spn_session_t *s) {
-  spn_pkg_id_t root = spn_session_root_pkg(s);
-  sp_assert(root.qualified);
-
-  spn_build_unit_t* build = sp_alloc_type(s->mem, spn_build_unit_t);
-  *build = (spn_build_unit_t) {
+static void add_target_build(spn_session_t* s, spn_profile_info_t profile) {
+  spn_build_unit_t* unit = sp_alloc_type(s->mem, spn_build_unit_t);
+  *unit = (spn_build_unit_t) {
     .id = (spn_build_unit_id_t)sp_da_size(s->plan.builds),
-    .profile = s->profile,
+    .profile = profile,
     .toolchain = s->units.toolchain,
     .visibility = SPN_SYMBOL_VISIBILITY_DEFAULT,
     .dep_kinds = spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE) | spn_dep_kind_bit(SPN_DEP_KIND_TEST),
     .paths = { .profile = s->paths.profile },
   };
-  sp_da_init(s->mem, build->include);
+  sp_da_init(s->mem, unit->include);
 
-  spn_build_plan_t target = {
-    .build = build,
+  spn_build_plan_t build = {
+    .build = unit,
     .selection = s->plan.request.targets,
   };
-  sp_da_init(s->mem, target.roots);
-  sp_da_push(s->plan.builds, target);
+  sp_da_init(s->mem, build.roots);
+  sp_da_push(s->plan.builds, build);
+}
+
+static spn_err_union_t add_compilation_units(spn_session_t *s) {
+  add_target_build(s, s->profile);
 
   sp_da_for(s->plan.builds, it) {
     spn_build_plan_t* plan = &s->plan.builds[it];
@@ -68,7 +69,9 @@ static spn_err_union_t add_compilation_units(spn_session_t *s) {
     if (err.kind) {
       return err;
     }
-    add_package_units(s, plan->build, root);
+    sp_da_for(s->plan.requested, rt) {
+      add_package_units(s, plan->build, s->plan.requested[rt]);
+    }
   }
   return spn_result(SPN_OK);
 }
@@ -80,6 +83,14 @@ spn_task_step_t spn_task_plan(spn_app_t* app) {
   sp_da_init(session->mem, session->units.compile_commands);
   sp_da_init(session->mem, session->plan.builds);
   session->plan.script = SP_NULLPTR;
+
+  sp_da_init(session->mem, session->plan.requested);
+  sp_ht_for_kv(session->resolve, it) {
+    if (it.val->source == SPN_PKG_SOURCE_ROOT) {
+      sp_da_push(session->plan.requested, it.val->id);
+    }
+  }
+  sp_assert(!sp_da_empty(session->plan.requested));
   sp_da_for(app->sync.toolchains, it) {
     spn_sync_toolchain_job_t* job = app->sync.toolchains[it];
     sp_da_push(session->units.toolchains, job->unit);
