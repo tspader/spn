@@ -7,26 +7,21 @@
 #include "event/types.h"
 #include "forward/types.h"
 #include "graph/types.h"
-#include "pkg/id.h"
 #include "pkg/types.h"
-#include "session/registry/types.h"
+#include "session/types.h"
 #include "spn.h"
-#include "target/types.h"
 #include "unit/types.h"
 
-#include "event/event.h"
 #include "external/wasm/wasm.h"
 #include "graph/graph.h"
-#include "sp/sp_glob.h"
 #include "session/session.h"
 #include "task/build/build.h"
-#include "task/build/nodes/nodes.h"
+#include "task/build/target.h"
 #include "task/task.h"
 #include "unit/package.h"
 
 s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
-
   spn_wasm_script_t* configure = &unit->wasm.configure;
   if (configure->state != SPN_WASM_SCRIPT_NONE) {
     spn_try(spn_wasm_script_open(configure, unit));
@@ -34,34 +29,70 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
       spn_try(spn_wasm_script_call(configure, unit, sp_str_lit("configure"), SPN_ABI_KIND_CONFIG, unit));
     }
   }
-
   spn_try(spn_pkg_unit_publish_headers(unit, false));
   return SPN_OK;
 }
 
-static spn_target_unit_t* find_configure_target(spn_session_t* session, spn_pkg_unit_t* unit) {
-  spn_target_unit_t* target = spn_session_find_target_in_pkg(session, unit, sp_str_lit("configure"));
-  if (!target || target->info->kind != SPN_TARGET_MODULE) {
-    return SP_NULLPTR;
+static spn_err_t add_configure_package(spn_build_graph_t* graph, spn_session_t* session, spn_pkg_unit_t* unit) {
+  if (unit->nodes.configure.run.occupied) {
+    return SPN_OK;
   }
-  return target;
+  unit->nodes.configure.run = spn_bg_add_fn(graph, on_configure_package, unit);
+  unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
+  spn_try(spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp));
+
+  spn_pkg_unit_t* program = spn_session_find_pkg_unit(session, session->units.program, unit->id.pkg);
+  sp_assert(program);
+  spn_target_unit_t* target = program->program.configure.target;
+  if (target) {
+    spn_try(spn_build_add_target_nodes(graph, target));
+    spn_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, target->nodes.output));
+  }
+  return SPN_OK;
 }
 
-static spn_err_t add_configure_module(spn_build_graph_t* graph, spn_session_t* session, spn_target_unit_t* target, spn_bg_id_t module) {
-  spn_bg_id_t link = spn_bg_add_fn(graph, link_target, target);
-  spn_try(spn_bg_cmd_add_output(graph, link, module));
-
-  sp_da_for(target->objects, it) {
-    spn_compile_unit_t* object = target->objects[it];
-    object->nodes.source = spn_bg_add_file(graph, object->paths.file);
-    object->nodes.compile = spn_bg_add_fn(graph, compile_object, object);
-    object->nodes.object = spn_bg_add_file(graph, object->paths.object);
-    spn_try(spn_bg_cmd_add_input(graph, object->nodes.compile, object->nodes.source));
-    spn_try(spn_bg_cmd_add_output(graph, object->nodes.compile, object->nodes.object));
-    spn_try(spn_bg_cmd_add_input(graph, link, object->nodes.object));
+static spn_err_t add_configure_package_edges(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
+  sp_da_for(unit->deps, it) {
+    if (unit->deps[it].kind == SPN_DEP_KIND_BUILD) {
+      continue;
+    }
+    spn_pkg_unit_t* dep = unit->deps[it].unit;
+    spn_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, dep->nodes.configure.stamp));
   }
-
   return SPN_OK;
+}
+
+static spn_err_t add_configure_target_edges(spn_build_graph_t* graph, spn_target_unit_t* target) {
+  if (!target || !target->nodes.link.occupied) {
+    return SPN_OK;
+  }
+  sp_da_for(target->deps.package, it) {
+    spn_pkg_unit_t* dep = target->deps.package[it];
+    sp_assert(dep->nodes.configure.stamp.occupied);
+    sp_da_for(target->objects, it) {
+      spn_try(spn_bg_cmd_add_input(graph, target->objects[it]->nodes.compile, dep->nodes.configure.stamp));
+    }
+  }
+  return SPN_OK;
+}
+
+static void collect_program_dependencies(sp_da(spn_pkg_unit_t*)* dependencies, spn_target_unit_t* target) {
+  if (!target) {
+    return;
+  }
+  sp_da_for(target->deps.package, it) {
+    spn_pkg_unit_t* dependency = target->deps.package[it];
+    bool present = false;
+    sp_da_for(*dependencies, it) {
+      if ((*dependencies)[it] == dependency) {
+        present = true;
+        break;
+      }
+    }
+    if (!present) {
+      sp_da_push(*dependencies, dependency);
+    }
+  }
 }
 
 spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
@@ -73,58 +104,52 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
     return spn_task_fail(SPN_ERR_WASM_INIT_FAILED);
   }
 
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+  sp_da(spn_pkg_unit_t*) dependencies = sp_da_new(session->mem, spn_pkg_unit_t*);
+  sp_da_for(session->units.program->packages, it) {
+    spn_pkg_unit_t* unit = session->units.program->packages[it];
+    collect_program_dependencies(&dependencies, unit->program.configure.target);
+    collect_program_dependencies(&dependencies, unit->program.build.target);
+  }
 
-    unit->nodes.configure.run = spn_bg_add_fn(graph, on_configure_package, unit);
-    unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
-    spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp);
+  sp_da_for(dependencies, it) {
+    spn_pkg_unit_t* unit = dependencies[it];
+    if (add_configure_package(graph, session, unit)) {
+      return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
+    }
+  }
 
-    spn_bg_id_t module = spn_bg_add_file(graph, unit->wasm.configure.path);
-    spn_bg_cmd_add_input(graph, unit->nodes.configure.run, module);
-    spn_target_unit_t* target = find_configure_target(session, unit);
-    add_configure_module(graph, session, target, module);
-
-    if (unit->wasm.configure.state != SPN_WASM_SCRIPT_NONE) {
-      spn_bg_id_t module = spn_bg_add_file(graph, unit->wasm.configure.path);
-      if (spn_bg_cmd_add_input(graph, unit->nodes.configure.run, module)) {
-        return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->wasm.configure.path });
-      }
-      spn_target_unit_t* target = find_configure_target(session, unit);
-      if (target && add_configure_module(graph, session, target, module)) {
-        return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->wasm.configure.path });
+  sp_da_for(session->plan.builds, it) {
+    spn_build_unit_t* build = session->plan.builds[it].build;
+    sp_da_for(build->packages, it) {
+      spn_pkg_unit_t* unit = build->packages[it];
+      if (add_configure_package(graph, session, unit)) {
+        return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
       }
     }
   }
 
-  // Add links between packages
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+  sp_da_for(dependencies, it) {
+    spn_pkg_unit_t* unit = dependencies[it];
+    if (add_configure_package_edges(graph, unit)) {
+      return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
+    }
+  }
 
-    sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit);
-    sp_da_for(deps, j) {
-      spn_pkg_unit_t* parent = deps[j].unit;
-      if (spn_bg_cmd_add_input(graph, unit->nodes.configure.run, parent->nodes.configure.stamp)) {
-        return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = parent->paths.stamp.configure });
+  sp_da_for(session->plan.builds, it) {
+    spn_build_unit_t* build = session->plan.builds[it].build;
+    sp_da_for(build->packages, it) {
+      spn_pkg_unit_t* unit = build->packages[it];
+      if (add_configure_package_edges(graph, unit)) {
+        return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
       }
     }
+  }
 
-    // The configure module compiles against its target-level deps' published
-    // headers, so its objects wait on those packages' configure
-    spn_target_unit_t* configure = find_configure_target(session, unit);
-    if (!configure) {
-      continue;
-    }
-    sp_da_for(configure->deps.package, j) {
-      spn_pkg_unit_t* parent = configure->deps.package[j];
-      sp_da_for(configure->objects, ot) {
-        if (!configure->objects[ot]->nodes.compile.occupied) {
-          continue;
-        }
-        if (spn_bg_cmd_add_input(graph, configure->objects[ot]->nodes.compile, parent->nodes.configure.stamp)) {
-          return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = parent->paths.stamp.configure });
-        }
-      }
+  sp_da_for(session->units.program->packages, it) {
+    spn_target_unit_t* target = session->units.program->packages[it]->program.configure.target;
+    if (add_configure_target_edges(graph, target)) {
+      sp_assert(target);
+      return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = get_target_output_path(session->mem, target) });
     }
   }
 
@@ -137,19 +162,16 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
     }
   );
   spn_bg_executor_run(session->configure.executor);
-
   return spn_task_continue();
 }
 
 spn_task_step_t spn_task_configure_graph_update(spn_app_t* app) {
   spn_bg_ctx_t* build = &app->session.configure;
-
   if (sp_atomic_s32_get(&build->executor->shutdown)) {
     if (sp_da_empty(build->executor->errors)) {
       return spn_task_done();
     }
     return spn_task_fail(SPN_ERROR);
   }
-
   return spn_task_continue();
 }

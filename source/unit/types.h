@@ -23,8 +23,9 @@ struct spn_build_unit_t {
   spn_symbol_visibility_t visibility;
   u32 dep_kinds;
   sp_da(sp_str_t) include;
+  sp_da(spn_pkg_unit_t*) packages;
   struct {
-    sp_str_t profile;
+    sp_str_t root;
   } paths;
 };
 
@@ -172,8 +173,8 @@ typedef struct {
     spn_bg_id_t profile;
   } stamp;
   struct {
-    spn_bg_id_t module;
-  } build_script;
+    spn_bg_id_t output;
+  } program;
   sp_da(spn_bg_id_t) user;
 } spn_pkg_nodes_t;
 
@@ -218,11 +219,18 @@ struct spn_pkg_unit_t {
   spn_session_t* session;
   spn_pkg_info_t* info;
   spn_pkg_source_t source;
+  u32 dep_kinds;
 
   struct {
-    spn_target_info_t configure;
-    spn_target_info_t build;
-  } script;
+    struct {
+      spn_target_info_t* info;
+      spn_target_unit_t* target;
+    } configure;
+    struct {
+      spn_target_info_t* info;
+      spn_target_unit_t* target;
+    } build;
+  } program;
 
   sp_da(spn_compile_unit_t*) objects;
   sp_da(spn_pkg_dep_t) deps;

@@ -54,13 +54,6 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   };
   try_union(spn_toolchain_select(&s->catalog, query, s->mem, &s->selection));
 
-  sp_str_t profile = s->paths.build;
-  if (s->profile.targeted) {
-    spn_triple_t target = { s->profile.arch, s->profile.os, s->profile.abi };
-    profile = sp_fs_join_path(s->mem, profile, spn_triple_to_str(s->mem, target));
-  }
-  s->paths.profile = sp_fs_join_path(s->mem, profile, s->profile.name);
-
   s->plan.request = config.compile;
 
   return spn_result(SPN_OK);
@@ -523,13 +516,35 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
   sp_da_init(session->mem, target->deps.package);
   sp_da_init(session->mem, target->nodes.source);
 
-  sp_da_push(pkg->targets, target);
   switch (info->kind) {
-    case SPN_TARGET_LIB: sp_da_push(pkg->libs, target); break;
-    case SPN_TARGET_EXE: sp_da_push(pkg->exes, target); break;
-    case SPN_TARGET_SCRIPT: sp_da_push(pkg->scripts, target); break;
-    case SPN_TARGET_TEST: sp_da_push(pkg->tests, target); break;
-    case SPN_TARGET_MODULE: break;
+    case SPN_TARGET_LIB: {
+      sp_da_push(pkg->targets, target);
+      sp_da_push(pkg->libs, target);
+      break;
+    }
+    case SPN_TARGET_EXE: {
+      sp_da_push(pkg->targets, target);
+      sp_da_push(pkg->exes, target);
+      break;
+    }
+    case SPN_TARGET_SCRIPT: {
+      sp_da_push(pkg->targets, target);
+      sp_da_push(pkg->scripts, target);
+      break;
+    }
+    case SPN_TARGET_TEST: {
+      sp_da_push(pkg->targets, target);
+      sp_da_push(pkg->tests, target);
+      break;
+    }
+    case SPN_TARGET_CONFIGURE_PROGRAM: {
+      pkg->program.configure.target = target;
+      break;
+    }
+    case SPN_TARGET_BUILD_PROGRAM: {
+      pkg->program.build.target = target;
+      break;
+    }
   }
 
   target->paths.recipe = pkg->paths.recipe;
@@ -630,9 +645,10 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   unit->build = build;
   unit->info = clone_pkg_info(session, pkg_id, build, loaded->info);
   unit->source = loaded->source;
-  unit->script.configure = loaded->configure;
-  unit->script.build = loaded->build;
+  unit->program.configure.info = &loaded->configure;
+  unit->program.build.info = &loaded->build;
   unit->session = session;
+  sp_da_push(build->packages, unit);
   sp_da_init(session->mem, unit->objects);
   sp_da_init(session->mem, unit->deps);
   sp_da_init(session->mem, unit->libs);
@@ -651,9 +667,9 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   switch (loaded->source) {
     case SPN_PKG_SOURCE_ROOT:
     case SPN_PKG_SOURCE_FILE: {
-      sp_str_t work = sp_fs_join_path(session->mem, build->paths.profile, sp_str_lit("work"));
+      sp_str_t work = sp_fs_join_path(session->mem, build->paths.root, sp_str_lit("work"));
       unit->paths.work = sp_fs_join_path(session->mem, work, loaded->info->name);
-      unit->paths.store = sp_fs_join_path(session->mem, build->paths.profile, sp_str_lit("store"));
+      unit->paths.store = sp_fs_join_path(session->mem, build->paths.root, sp_str_lit("store"));
       break;
     }
     case SPN_PKG_SOURCE_INDEX: {

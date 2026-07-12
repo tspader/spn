@@ -95,9 +95,11 @@ struct spn_session_t {
     spn_compile_request_t request;
     sp_da(spn_pkg_id_t) requested;
     sp_da(spn_build_plan_t) builds;
-    spn_build_unit_t* script;
   } plan;
   struct {
+    sp_da(spn_build_unit_t*) builds;
+    spn_build_unit_t* target;
+    spn_build_unit_t* program;
     sp_om(spn_compile_unit_id_t, spn_compile_unit_t) objects;
     sp_da(spn_compile_command_t) compile_commands;
     sp_om(spn_target_unit_id_t, spn_target_unit_t) targets;
@@ -110,7 +112,6 @@ struct spn_session_t {
   struct {
     sp_str_t root;
     sp_str_t build;
-    sp_str_t profile;
     spn_system_paths_t system;
   } paths;
 

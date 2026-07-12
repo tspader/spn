@@ -216,8 +216,8 @@ UTEST_F(script, build_script) {
           { .file = sp_str_lit("compile_commands.json"), .contains = { "tools/configure.c", "tools/build.c" } },
         },
         .exists = {
-          sp_str_lit("build/script/work/build_script/spn/object/build/tools/a/main.c.o"),
-          sp_str_lit("build/script/work/build_script/spn/object/build/tools/b/main.c.o"),
+          sp_str_lit("build/wasm32-wasi/work/build_script/spn/object/build/tools/a/main.c.o"),
+          sp_str_lit("build/wasm32-wasi/work/build_script/spn/object/build/tools/b/main.c.o"),
           store_file("include/version.h"),
         },
       },
@@ -257,7 +257,6 @@ UTEST_F(script, build_deps) {
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "core/spum" },
       { .kind = ACTION_VERIFY_DIR_COUNT, .verify_dir_count = { .dir = ".home/storage/cache/store/core/spum", .count = 1 } },
       { .kind = ACTION_VERIFY_EVENT_COUNT, .verify_event_count = { .event = "user_log", .key = "message", .value = "spum configure", .count = 1 } },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/script/store") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug/store/include/spum.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "build_deps" },
     },
@@ -280,13 +279,13 @@ UTEST_F(script, dual_ctx) {
   });
 }
 
-UTEST_F(script, module_name_collision) {
-  tmpfs_init_named(&uf->fixture.fs, "script_module_name_collision");
+UTEST_F(script, program_name_context) {
+  tmpfs_init_named(&uf->fixture.fs, "script_program_name_context");
 
   run_command_test(utest_result, &uf->fixture, (command_test_t) {
     .project = "test/integration/fixtures/script/module_name_collision",
     .args = { "build" },
-    .expect.rc = 1,
+    .expect.bin.name = "configure",
   });
 }
 

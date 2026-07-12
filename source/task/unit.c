@@ -3,7 +3,6 @@
 #include "app/types.h"
 #include "forward/types.h"
 #include "intern/intern.h"
-#include "log/lazy/lazy.h"
 #include "log/log.h"
 #include "sp/sp_om.h"
 #include "session/types.h"
@@ -122,7 +121,8 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
       target->kind = SPN_CC_OUTPUT_EXE;
       return SPN_OK;
     }
-    case SPN_TARGET_MODULE: {
+    case SPN_TARGET_CONFIGURE_PROGRAM:
+    case SPN_TARGET_BUILD_PROGRAM: {
       target->kind = SPN_CC_OUTPUT_REACTOR;
       return SPN_OK;
     }
@@ -252,201 +252,121 @@ static void create_target_objects(spn_session_t* session, spn_target_unit_t* tar
   sp_mem_end_scratch(scratch);
 }
 
-static void add_module_dep(spn_target_unit_t* module, spn_pkg_unit_t* dep) {
-  sp_da_for(module->deps.package, it) {
-    if (spn_pkg_id_eq(module->deps.package[it]->id.pkg, dep->id.pkg)) {
+static void add_program_dep(spn_target_unit_t* program, spn_pkg_unit_t* dep) {
+  sp_da_for(program->deps.package, it) {
+    if (spn_pkg_id_eq(program->deps.package[it]->id.pkg, dep->id.pkg)) {
       return;
     }
   }
-  sp_da_push(module->deps.package, dep);
+  sp_da_push(program->deps.package, dep);
 
-  // Mirror resolve's scope flattening: a dep's package deps re-export to its
-  // consumers unless the provider is shared, and wasm providers never are.
-  // Script-ctx deps hold PACKAGE edges only, so no kind filter
   sp_da_for(dep->deps, it) {
-    add_module_dep(module, dep->deps[it].unit);
+    if (dep->deps[it].kind != SPN_DEP_KIND_PACKAGE) {
+      continue;
+    }
+    add_program_dep(program, dep->deps[it].unit);
   }
 }
 
-static spn_err_t add_script_target(spn_session_t* session, spn_pkg_unit_t* unit, spn_target_info_t* info, spn_target_unit_t** result) {
+static spn_err_t add_program_target(spn_session_t* session, spn_pkg_unit_t* unit, spn_target_info_t* info, spn_target_unit_t** result) {
   spn_target_unit_t* target = SP_NULLPTR;
   spn_try(ensure_target(session, unit, info, &target));
-
-  // Modules compile in the script ctx regardless of which unit parents them.
-  // When the parent lives in another ctx, the module's outputs move under the
-  // script profile so ctx artifacts never mix.
-  if (target->build != session->plan.script) {
-    target->build = session->plan.script;
-    sp_str_t work = sp_fs_join_path(session->mem, session->plan.script->paths.profile, sp_str_lit("work"));
-    target->paths.work = sp_fs_join_path(session->mem, work, unit->info->name);
-    target->paths.generated = sp_fs_join_path(session->mem, target->paths.work, SP_LIT("spn"));
-    target->paths.object = sp_fs_join_path(session->mem, target->paths.generated, sp_str_lit("object"));
-    target->paths.logs.build = sp_fs_join_path(session->mem, target->paths.work, sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(info->name)).value);
-    target->paths.logs.test = sp_fs_join_path(session->mem, target->paths.work, sp_fmt(session->mem, "{}.test.log", SP_FMT_STR(info->name)).value);
-    target->paths.logs.jsonl = sp_fs_join_path(session->mem, target->paths.work, sp_fmt(session->mem, "{}.build.jsonl", SP_FMT_STR(info->name)).value);
-    sp_fs_create_dir(target->paths.work);
-    sp_fs_create_dir(target->paths.generated);
-    sp_fs_create_dir(target->paths.object);
-    spn_lazy_log_init(&target->logs.build, target->paths.logs.build);
-    spn_lazy_log_init(&target->logs.jsonl, target->paths.logs.jsonl);
-  }
-
   create_target_objects(session, target);
   *result = target;
   return SPN_OK;
 }
 
-static bool scripted_push(sp_da(spn_pkg_unit_t*)* scripted, spn_pkg_unit_t* unit) {
-  if (sp_da_empty(unit->script.configure.source) && sp_da_empty(unit->script.build.source)) {
-    return false;
-  }
-  sp_da_for(*scripted, st) {
-    if (spn_pkg_id_eq((*scripted)[st]->id.pkg, unit->id.pkg)) {
-      return false;
+spn_err_union_t add_program_units(spn_session_t* session) {
+  sp_da(spn_pkg_id_t) pending = sp_da_new(session->mem, spn_pkg_id_t);
+  sp_ht(spn_pkg_id_t, u8) added = SP_NULLPTR;
+  sp_ht_init(session->mem, added);
+  sp_da_for(session->plan.builds, it) {
+    spn_build_unit_t* build = session->plan.builds[it].build;
+    sp_da_for(build->packages, it) {
+      spn_pkg_unit_t* unit = build->packages[it];
+      if (!sp_ht_getp(added, unit->id.pkg)) {
+        sp_ht_insert(added, unit->id.pkg, (u8)true);
+        sp_da_push(pending, unit->id.pkg);
+      }
     }
   }
-  sp_da_push(*scripted, unit);
-  return true;
-}
 
-spn_err_union_t add_script_units(spn_session_t* session) {
-  sp_assert(session->units.script);
-
-  spn_build_unit_t* build = sp_alloc_type(session->mem, spn_build_unit_t);
-  *build = (spn_build_unit_t) {
-    .id = (spn_build_unit_id_t)sp_da_size(session->plan.builds),
-    .profile = {
-      .name = sp_str_lit("script"),
-      .arch = SPN_ARCH_WASM32,
-      .os = SPN_OS_WASI,
-      .abi = SPN_ABI_NONE,
-      .mode = SPN_BUILD_MODE_DEBUG,
-      .opt = SPN_OPT_LEVEL_2,
-      .standard = SPN_C99,
-      .linkage = SPN_LIB_KIND_STATIC,
-    },
-    .toolchain = session->units.script,
-    .visibility = SPN_SYMBOL_VISIBILITY_HIDDEN,
-    .dep_kinds = spn_dep_kind_bit(SPN_DEP_KIND_BUILD),
-    .paths = {
-      .profile = sp_fs_join_path(session->mem, session->paths.build, sp_str_lit("script"))
-    },
-  };
-  sp_da_init(session->mem, build->include);
-  sp_da_push(build->include, spn.paths.include);
-
-  session->plan.script = build;
-
-
-  sp_da(spn_pkg_unit_t*) scripted = sp_da_new(session->mem, spn_pkg_unit_t*);
-  sp_assert(!session->plan.script);
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (!sp_da_empty(unit->info->configure.source)) {
-      spn_wasm_script_init(&unit->wasm.configure, sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("configure.wasm")));
-    }
-    spn_wasm_script_init(&unit->wasm.build, sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("build.wasm")));
-
-  }
-
-
-
-  // The script ctx holds only the BUILD dep closures of scripted packages;
-  // scripted packages themselves stay in their own ctx and parent the module
-  // targets. A BUILD dep can itself be scripted, so the worklist grows.
-  for (u32 it = 0; it < sp_da_size(scripted); it++) {
-    spn_resolved_pkg_t* pkg = sp_ht_getp(session->resolve, scripted[it]->id.pkg);
-    sp_assert(pkg);
-    sp_da_for(pkg->edges, et) {
-      if (pkg->edges[et].kind != SPN_DEP_KIND_BUILD) {
+  sp_for(it, sp_da_size(pending)) {
+    spn_pkg_unit_t* unit = add_package_units(
+      session,
+      session->units.program,
+      pending[it],
+      spn_dep_kind_bit(SPN_DEP_KIND_BUILD)
+    );
+    sp_da_for(unit->deps, it) {
+      spn_pkg_id_t id = unit->deps[it].unit->id.pkg;
+      if (sp_ht_getp(added, id)) {
         continue;
       }
-      spn_pkg_unit_t* dep = add_package_units(session, build, pkg->edges[et].id, spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE));
-      scripted_push(&scripted, dep);
+      sp_ht_insert(added, id, (u8)true);
+      sp_da_push(pending, id);
     }
   }
 
-  sp_da_for(scripted, it) {
-    spn_pkg_unit_t* unit = scripted[it];
-
-    struct {
-      spn_target_unit_t* build;
-      spn_target_unit_t* configure;
-    } scripts = sp_zero;
-    if (!sp_da_empty(unit->script.configure.source)) {
-      try_as_union(add_script_target(session, unit, &unit->script.configure, &scripts.configure));
+  sp_da_for(session->units.program->packages, it) {
+    spn_pkg_unit_t* unit = session->units.program->packages[it];
+    if (!sp_da_empty(unit->program.configure.info->source)) {
+      try_as_union(add_program_target(session, unit, unit->program.configure.info, &unit->program.configure.target));
     }
-    if (!sp_da_empty(unit->script.build.source)) {
-      try_as_union(add_script_target(session, unit, &unit->script.build, &scripts.build));
+    if (!sp_da_empty(unit->program.build.info->source)) {
+      try_as_union(add_program_target(session, unit, unit->program.build.info, &unit->program.build.target));
     }
 
-    spn_resolved_pkg_t* resolved = sp_ht_getp(session->resolve, unit->id.pkg);
-    sp_assert(resolved);
-    sp_da_for(resolved->edges, et) {
-      if (resolved->edges[et].kind != SPN_DEP_KIND_BUILD) {
+    sp_da_for(unit->deps, it) {
+      spn_pkg_dep_t* dep = &unit->deps[it];
+      if (dep->kind != SPN_DEP_KIND_BUILD) {
         continue;
       }
-      spn_pkg_unit_t* dep = spn_session_find_pkg_unit(session, build, resolved->edges[et].id);
-      sp_assert(dep);
-      if (scripts.configure) {
-        add_module_dep(scripts.configure, dep);
+      if (unit->program.configure.target) {
+        add_program_dep(unit->program.configure.target, dep->unit);
       }
-      if (scripts.build) {
-        add_module_dep(scripts.build, dep);
-      }
-    }
-
-    sp_om_for(session->units.packages, j) {
-      spn_pkg_unit_t* candidate = sp_om_at(session->units.packages, j);
-      if (!spn_pkg_id_eq(candidate->id.pkg, unit->id.pkg)) {
-        continue;
-      }
-      if (scripts.configure) {
-        spn_wasm_script_init(&candidate->wasm.configure, true, get_target_output_path(session->mem, scripts.configure));
-      }
-      if (scripts.build) {
-        spn_wasm_script_init(&candidate->wasm.build, true, get_target_output_path(session->mem, scripts.build));
+      if (unit->program.build.target) {
+        add_program_dep(unit->program.build.target, dep->unit);
       }
     }
   }
 
-  // Script-ctx units exist only to serve modules: each must be reachable from
-  // some module target's deps. One that isn't is a container regression.
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_ht(spn_pkg_id_t, u8) reachable = SP_NULLPTR;
-  sp_ht_init(scratch.mem, reachable);
-  sp_da(spn_pkg_unit_t*) frontier = sp_da_new(scratch.mem, spn_pkg_unit_t*);
-  sp_da_for(scripted, it) {
-    const c8* names [] = { "configure", "build" };
-    sp_carr_for(names, nt) {
-      spn_target_unit_t* module = spn_session_find_target_in_pkg(session, scripted[it], sp_str_view(names[nt]));
-      if (!module || module->info->kind != SPN_TARGET_MODULE) {
-        continue;
+  sp_da_for(session->units.program->packages, it) {
+    spn_pkg_unit_t* unit = session->units.program->packages[it];
+    if (unit->program.configure.target) {
+      spn_wasm_script_init(
+        &unit->wasm.configure,
+        get_target_output_path(session->mem, unit->program.configure.target)
+      );
+    }
+    if (unit->program.build.target) {
+      spn_wasm_script_init(
+        &unit->wasm.build,
+        get_target_output_path(session->mem, unit->program.build.target)
+      );
+    }
+  }
+
+  sp_da_for(session->plan.builds, it) {
+    spn_build_unit_t* build = session->plan.builds[it].build;
+    sp_da_for(build->packages, it) {
+      spn_pkg_unit_t* unit = build->packages[it];
+      spn_pkg_unit_t* program = spn_session_find_pkg_unit(session, session->units.program, unit->id.pkg);
+      sp_assert(program);
+      if (program->program.configure.target) {
+        spn_wasm_script_init(
+          &unit->wasm.configure,
+          get_target_output_path(session->mem, program->program.configure.target)
+        );
       }
-      sp_da_for(module->deps.package, dt) {
-        sp_da_push(frontier, module->deps.package[dt]);
+      if (program->program.build.target) {
+        spn_wasm_script_init(
+          &unit->wasm.build,
+          get_target_output_path(session->mem, program->program.build.target)
+        );
       }
     }
   }
-  while (!sp_da_empty(frontier)) {
-    spn_pkg_unit_t* unit = *sp_da_back(frontier);
-    sp_da_pop(frontier);
-    if (sp_ht_getp(reachable, unit->id.pkg)) {
-      continue;
-    }
-    sp_ht_insert(reachable, unit->id.pkg, (u8)true);
-    sp_da_for(unit->deps, dt) {
-      sp_da_push(frontier, unit->deps[dt].unit);
-    }
-  }
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (unit->build != build) {
-      continue;
-    }
-    sp_assert(sp_ht_getp(reachable, unit->id.pkg));
-  }
-  sp_mem_end_scratch(scratch);
 
   try_union(spn_session_build_invocations(session));
   return spn_build_link_invocations(session);
@@ -514,12 +434,15 @@ static spn_err_t ensure_sibling_targets(spn_session_t* session, sp_da(spn_target
 spn_task_step_t spn_task_create_units(spn_app_t* app) {
   spn_session_t* session = &app->session;
 
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
-    sp_str_om_for(pkg->info->libs, it) {
-      spn_target_unit_t* target = SP_NULLPTR;
-      if (ensure_target(session, pkg, sp_str_om_at(pkg->info->libs, it), &target)) {
-        return spn_task_fail(SPN_ERROR);
+  sp_da_for(session->plan.builds, it) {
+    spn_build_unit_t* build = session->plan.builds[it].build;
+    sp_da_for(build->packages, it) {
+      spn_pkg_unit_t* pkg = build->packages[it];
+      sp_str_om_for(pkg->info->libs, it) {
+        spn_target_unit_t* target = SP_NULLPTR;
+        if (ensure_target(session, pkg, sp_str_om_at(pkg->info->libs, it), &target)) {
+          return spn_task_fail(SPN_ERROR);
+        }
       }
     }
   }
@@ -570,17 +493,17 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
     }
   }
 
-
-  // Now that the configure phase is done, everything about the build is static. We
-  // can go through every target and resolve file globs into object files which need
-  // to be compiled. Module targets already did this at sync.
   sp_om_for(session->units.targets, it) {
     spn_target_unit_t* target = sp_om_at(session->units.targets, it);
 
-    if (target->info->kind == SPN_TARGET_MODULE) continue;
+    if (target->info->kind == SPN_TARGET_CONFIGURE_PROGRAM ||
+        target->info->kind == SPN_TARGET_BUILD_PROGRAM) {
+      continue;
+    }
 
-    // Source libs are consumed as source; we never compile them ourselves
-    if (target->lib_kind == SPN_LIB_KIND_SOURCE) continue;
+    if (target->lib_kind == SPN_LIB_KIND_SOURCE) {
+      continue;
+    }
 
     create_target_objects(session, target);
   }

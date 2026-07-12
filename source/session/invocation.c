@@ -42,7 +42,9 @@ spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
       sp_da_push(compile.include, build->include[it]);
     }
 
-    if (unit->target->info->kind != SPN_TARGET_MODULE) {
+    bool program = unit->target->info->kind == SPN_TARGET_CONFIGURE_PROGRAM ||
+      unit->target->info->kind == SPN_TARGET_BUILD_PROGRAM;
+    if (!program) {
       sp_da_for(unit->package->info->include, it) {
         sp_da_push(compile.include, resolve_pkg_path(mem, unit->package, unit->package->info->include[it]));
       }
@@ -61,31 +63,33 @@ spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
       sp_da_push(compile.args, unit->target->info->flags[it]);
     }
 
-    sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit->package);
-    sp_da_for(deps, it) {
-      if (!deps[it].unit) {
-        continue;
-      }
-      if (!(build->dep_kinds & spn_dep_kind_bit(deps[it].kind))) {
-        continue;
-      }
-      if (deps[it].kind == SPN_DEP_KIND_TEST && unit->target->info->kind != SPN_TARGET_TEST) {
-        continue;
-      }
+    if (!program) {
+      sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, unit->package);
+      sp_da_for(deps, it) {
+        if (!deps[it].unit) {
+          continue;
+        }
+        if (!(build->dep_kinds & spn_dep_kind_bit(deps[it].kind))) {
+          continue;
+        }
+        if (deps[it].kind == SPN_DEP_KIND_TEST && unit->target->info->kind != SPN_TARGET_TEST) {
+          continue;
+        }
 
-      sp_da_push(compile.include, deps[it].unit->paths.include);
-      sp_da_for(deps[it].unit->info->public_define, dt) {
-        sp_da_push(compile.define, deps[it].unit->info->public_define[dt]);
+        spn_pkg_unit_t* dependency = deps[it].unit;
+        sp_da_push(compile.include, dependency->paths.include);
+        sp_da_for(dependency->info->public_define, it) {
+          sp_da_push(compile.define, dependency->info->public_define[it]);
+        }
       }
     }
 
-    // Module deps are target-level: the script's BUILD deps, materialized in
-    // the script ctx, not the owning package's deps
-    if (unit->target->info->kind == SPN_TARGET_MODULE) {
+    if (program) {
       sp_da_for(unit->target->deps.package, it) {
-        sp_da_push(compile.include, unit->target->deps.package[it]->paths.include);
-        sp_da_for(unit->target->deps.package[it]->info->public_define, dt) {
-          sp_da_push(compile.define, unit->target->deps.package[it]->info->public_define[dt]);
+        spn_pkg_unit_t* dependency = unit->target->deps.package[it];
+        sp_da_push(compile.include, dependency->paths.include);
+        sp_da_for(dependency->info->public_define, it) {
+          sp_da_push(compile.define, dependency->info->public_define[it]);
         }
       }
     }

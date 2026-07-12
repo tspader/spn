@@ -9,15 +9,14 @@
 
 #include "app/app.h"
 #include "error/types.h"
-#include "external/wasm/wasm.h"
 #include "graph/graph.h"
 #include "event/event.h"
-#include "pkg/id.h"
 #include "session/session.h"
 #include "sp/sp_glob.h"
 #include "target/closure.h"
 #include "task/build/build.h"
 #include "task/build/nodes/nodes.h"
+#include "task/build/target.h"
 #include "task/task.h"
 #include "unit/package.h"
 
@@ -31,6 +30,15 @@ static spn_bg_id_t add_build_command(spn_session_t* session, spn_build_unit_t* b
   spn_bg_id_t id = spn_bg_add_fn(&session->build.graph, fn, user_data);
   sp_ht_insert(session->owners, id, build->id);
   return id;
+}
+
+static void own_target_commands(spn_session_t* session, spn_target_unit_t* target) {
+  if (target->nodes.link.occupied) {
+    sp_ht_insert(session->owners, target->nodes.link, target->build->id);
+  }
+  sp_da_for(target->objects, it) {
+    sp_ht_insert(session->owners, target->objects[it]->nodes.compile, target->build->id);
+  }
 }
 
 typedef enum {
@@ -67,9 +75,9 @@ static spn_build_reports_t collect_build_reports(sp_mem_t mem, spn_session_t* se
       .build = session->plan.builds[it].build,
     }));
   }
-  if (session->plan.script) {
+  if (session->units.program) {
     sp_da_push(reports, ((spn_build_report_t) {
-      .build = session->plan.script,
+      .build = session->units.program,
     }));
   }
 
@@ -197,8 +205,8 @@ static spn_err_t add_build_stages(spn_build_graph_t* graph, spn_session_t* sessi
       sp_da_push(targets, root);
     }
   }
-  spn_try(add_stage(graph, session, plan->build, targets, plan->build->paths.profile));
-  return add_stage(graph, session, plan->build, tests, sp_fs_join_path(session->mem, plan->build->paths.profile, SP_LIT("test")));
+  spn_try(add_stage(graph, session, plan->build, targets, plan->build->paths.root));
+  return add_stage(graph, session, plan->build, tests, sp_fs_join_path(session->mem, plan->build->paths.root, SP_LIT("test")));
 }
 
 static spn_err_t add_root_stages(spn_build_graph_t* graph, spn_session_t* session) {
@@ -286,42 +294,23 @@ spn_task_step_t spn_task_build_graph_update(spn_app_t* app) {
 }
 
 
-// Build-script modules compile in the script ctx with none of the package
-// machinery: no stamps, no hooks, no user nodes. The link produces the shared
-// module file that every native unit's package step and user nodes consume.
-// Configure modules already built in the configure graph.
-static spn_err_t add_host_package(spn_build_graph_t* graph, spn_session_t* session, spn_pkg_unit_t* unit) {
-  spn_target_unit_t* target = spn_session_find_target_in_pkg(session, unit, sp_str_lit("build"));
-  if (!target || target->info->kind != SPN_TARGET_MODULE || sp_da_empty(target->objects)) {
+static spn_err_t add_target_link_deps(spn_build_graph_t* graph, spn_session_t* session, spn_target_unit_t* target) {
+  if (!target || !target->nodes.link.occupied) {
     return SPN_OK;
   }
-
-  sp_assert(unit->wasm.build.state != SPN_WASM_SCRIPT_NONE);
-
-  target->nodes.link = add_build_command(session, target->build, link_target, target);
-  target->nodes.output = spn_bg_add_file(graph, unit->wasm.build.path);
-  spn_try(spn_bg_cmd_add_output(graph, target->nodes.link, target->nodes.output));
-
-  sp_da_for(target->objects, it) {
-    spn_compile_unit_t* object = target->objects[it];
-    object->nodes.source = spn_bg_add_file(graph, object->paths.file);
-    object->nodes.compile = add_build_command(session, target->build, compile_object, object);
-    object->nodes.object = spn_bg_add_file(graph, object->paths.object);
-    spn_try(spn_bg_cmd_add_output(graph, object->nodes.compile, object->nodes.object));
-    spn_try(spn_bg_cmd_add_input(graph, object->nodes.compile, object->nodes.source));
-    sp_om_for(session->units.packages, nt) {
-      spn_pkg_unit_t* native = sp_om_at(session->units.packages, nt);
-      if (!spn_pkg_id_eq(native->id.pkg, unit->id.pkg)) {
-        continue;
-      }
-      if (!native->nodes.build.stamp.main.occupied) {
-        continue;
-      }
-      spn_try(spn_bg_cmd_add_input(graph, object->nodes.compile, native->nodes.build.stamp.main));
+  sp_da_for(target->deps.target, it) {
+    spn_target_unit_t* lib = target->deps.target[it];
+    if (!lib->info->no_link && lib->nodes.output.occupied) {
+      spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, lib->nodes.output));
     }
-    spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, object->nodes.object));
   }
-
+  sp_da(spn_closure_entry_t) closure = spn_target_link_closure(session->mem, target);
+  sp_da(spn_link_lib_t) libs = spn_closure_link_libs(session->mem, closure, target->pkg);
+  sp_da_for(libs, it) {
+    if (libs[it].lib->nodes.output.occupied) {
+      spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, libs[it].lib->nodes.output));
+    }
+  }
   return SPN_OK;
 }
 
@@ -329,68 +318,43 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_build_graph_t* graph = &session->build.graph;
 
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    spn_try(add_package(graph, unit));
+  sp_da_for(session->plan.builds, it) {
+    spn_build_unit_t* build = session->plan.builds[it].build;
+    sp_da_for(build->packages, it) {
+      spn_pkg_unit_t* unit = build->packages[it];
+      spn_try(add_package(graph, unit));
+    }
   }
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    spn_try(add_host_package(graph, session, unit));
-  }
 
-  // Order each package's build after its direct dependencies, and sequence any
-  // directory embeds after the dep step that populates the store they read.
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
-    if (!pkg->nodes.build.main.occupied) continue;
-    sp_da(spn_pkg_dep_t) deps = spn_session_pkg_deps(session, pkg);
-
-    sp_da_for(deps, d) {
-      spn_pkg_unit_t* dep = deps[d].unit;
-      if (!dep || dep == pkg) continue;
-
-      spn_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.main, dep->nodes.build.stamp.package));
-
-      // A directory embed reads a dep's store directory wholesale. Unlike a file
-      // embed it declares no per-file graph input, so order its embed node after
-      // the dep's package step that populates the directory.
-      sp_da_for(pkg->targets, t) {
-        spn_target_unit_t* target = pkg->targets[t];
-        if (!target->nodes.embed.run.occupied) continue;
-
-        sp_da_for(target->info->embed, e) {
-          spn_embed_t* embed = &target->info->embed[e];
-          if (embed->kind != SPN_EMBED_DIR) continue;
-          if (!sp_str_starts_with(embed->dir.path, dep->paths.store)) continue;
-
-          spn_try(spn_bg_cmd_add_input(graph, target->nodes.embed.run, dep->nodes.build.stamp.package));
+  sp_da_for(session->plan.builds, it) {
+    spn_build_unit_t* build = session->plan.builds[it].build;
+    sp_da_for(build->packages, it) {
+      spn_pkg_unit_t* pkg = build->packages[it];
+      sp_da_for(pkg->deps, it) {
+        spn_pkg_unit_t* dep = pkg->deps[it].unit;
+        spn_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.main, dep->nodes.build.stamp.package));
+        sp_da_for(pkg->targets, it) {
+          spn_target_unit_t* target = pkg->targets[it];
+          if (!target->nodes.embed.run.occupied) {
+            continue;
+          }
+          sp_da_for(target->info->embed, it) {
+            spn_embed_t* embed = &target->info->embed[it];
+            if (embed->kind == SPN_EMBED_DIR && sp_str_starts_with(embed->dir.path, dep->paths.store)) {
+              spn_try(spn_bg_cmd_add_input(graph, target->nodes.embed.run, dep->nodes.build.stamp.package));
+            }
+          }
         }
       }
+      sp_da_for(pkg->targets, it) {
+        spn_try(add_target_link_deps(graph, session, pkg->targets[it]));
+      }
     }
   }
 
-  // Link each product against its transitive closure, rooted at the link unit
-  // and cut at shared-library boundaries, so a static dependency two hops away
-  // still lands on the link line.
-  sp_om_for(session->units.targets, it) {
-    spn_target_unit_t* target = sp_om_at(session->units.targets, it);
-    if (!target->nodes.link.occupied) continue;
-
-    sp_da_for(target->deps.target, l) {
-      spn_target_unit_t* lib = target->deps.target[l];
-      if (lib->info->no_link) continue;
-      if (lib->nodes.output.occupied) {
-        spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, lib->nodes.output));
-      }
-    }
-
-    sp_da(spn_closure_entry_t) closure = spn_target_link_closure(session->mem, target);
-    sp_da(spn_link_lib_t) libs = spn_closure_link_libs(session->mem, closure, target->pkg);
-    sp_da_for(libs, l) {
-      if (libs[l].lib->nodes.output.occupied) {
-        spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, libs[l].lib->nodes.output));
-      }
-    }
+  sp_da_for(session->units.program->packages, it) {
+    spn_pkg_unit_t* pkg = session->units.program->packages[it];
+    spn_try(add_target_link_deps(graph, session, pkg->program.build.target));
   }
 
   spn_try(add_root_stages(graph, session));
@@ -525,18 +489,6 @@ spn_bg_id_t get_or_put_user_file(spn_pkg_unit_t* ctx, spn_build_graph_t* graph, 
 }
 
 
-//                    ┌───────┐   ┌────────────────┐   ┌────────┐
-//                    │ foo.c │──▶│ compile::foo.c │──▶│ foo.o  │──┐
-//                    └───────┘   └────────────────┘   └────────┘  │
-//                                                                 │  ┌──────┐   ┌───────────────────┐   ┌─────────────────┐
-//                                                                 ├─▶│ link │──▶│ $STORE/bin/foobar │──▶│ script::package │
-//                    ┌───────┐   ┌────────────────┐   ┌────────┐  │  └──────┘   └───────────────────┘   └─────────────────┘
-//                    │ bar.c │──▶│ compile::bar.c │──▶│ bar.o  │──┘     ▲
-//                    └───────┘   └────────────────┘   └────────┘        │
-//                                                                       │
-// ┌ ─ ─ ─ ─ ─ ─ ┐    ┌─────────────┐                                    │
-//   user graph   ───▶│ user::exit  │────────────────────────────────────┘
-// └ ─ ─ ─ ─ ─ ─ ┘    └─────────────┘
 spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_unit_t* target) {
   spn_target_info_t* info = target->info;
 
@@ -560,16 +512,7 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
     }
   }
 
-  target->nodes.link = add_build_command(target->session, target->build, link_target, target);
-  target->nodes.output = spn_bg_add_file(graph, get_target_output_path(spn.mem, target));
-
-  spn_bg_cmd_add_output(graph, target->nodes.link,  target->nodes.output);
   spn_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.package, target->nodes.output));
-
-  sp_da_for(target->objects, it) {
-    spn_compile_unit_t* object = target->objects[it];
-    spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, object->nodes.object));
-  }
 
   if (!sp_da_empty(info->embed)) {
     target->nodes.embed.run = add_build_command(target->session, target->build, compile_embed, target);
@@ -607,14 +550,6 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
   return SPN_OK;
 }
 
-// ┌──────────┐
-// │ spn.toml │──┐
-// └──────────┘  │  ┌─────────────┐    ┌─────────┐  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ┐   ┌─────────────┐   ┌──────────────────┐
-//               ├─▶│ user::main  │───▶│ build.c │─▶    user graph     ──▶│ user::exit  │──▶│ script::package  │
-// ┌──────────┐  │  └─────────────┘    └─────────┘  └ ─ ─ ─ ─ ─ ─ ─ ─ ┘   └─────────────┘   └──────────────────┘
-// │  spn.c   │──┘         │                                                    ▲
-// └──────────┘            └────────────────────────────────────────────────────┘
-//
 spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   spn_pkg_nodes_t* nodes = &unit->nodes.build;
   spn_pkg_info_t* pkg = unit->info;
@@ -638,86 +573,88 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   spn_try(spn_bg_cmd_add_input(graph, nodes->package, nodes->stamp.exit));
   spn_try(spn_bg_cmd_add_output(graph, nodes->package, nodes->stamp.package));
 
-  bool has_build_script = unit->wasm.build.state != SPN_WASM_SCRIPT_NONE;
-  if (has_build_script) {
-    nodes->build_script.module = spn_bg_add_file(graph, unit->wasm.build.path);
-    spn_try(spn_bg_cmd_add_input(graph, nodes->package, nodes->build_script.module));
+  spn_pkg_unit_t* program = spn_session_find_pkg_unit(unit->session, unit->session->units.program, unit->id.pkg);
+  sp_assert(program);
+  spn_target_unit_t* build = program->program.build.target;
+  if (build) {
+    spn_try(spn_build_add_target_nodes(graph, build));
+    own_target_commands(unit->session, build);
+    nodes->program.output = build->nodes.output;
+    sp_da_for(build->objects, it) {
+      spn_compile_unit_t* object = build->objects[it];
+      spn_try(spn_bg_cmd_add_input(graph, object->nodes.compile, nodes->stamp.main));
+      sp_da_for(build->deps.package, it) {
+        spn_bg_id_t configured = spn_bg_add_file(graph, build->deps.package[it]->paths.stamp.configure);
+        spn_try(spn_bg_cmd_add_input(graph, object->nodes.compile, configured));
+      }
+    }
+    spn_try(spn_bg_cmd_add_input(graph, nodes->package, nodes->program.output));
   }
 
-
-  // user nodes
-  // pass 1: create all user-added nodes
   sp_da_for(unit->nodes.user, it) {
     spn_user_node_t* node = &unit->nodes.user[it];
     node->id = add_build_command(unit->session, unit->build, run_user_fn, node);
     sp_da_push(unit->nodes.build.user, node->id);
 
-    if (has_build_script) {
-      spn_try(spn_bg_cmd_add_input(graph, node->id, nodes->build_script.module));
+    if (build) {
+      spn_try(spn_bg_cmd_add_input(graph, node->id, nodes->program.output));
     }
   }
 
-  // pass 2: create all file in/outputs + create a stamp file for phonies
   sp_da_for(unit->nodes.user, it) {
     spn_user_node_t* node = &unit->nodes.user[it];
 
-    // if no outputs, depend on the exit node's stamp
     if (sp_da_empty(node->outputs)) {
       sp_da_push(node->outputs, spn_pkg_unit_get_node_stamp_file(unit, node));
     }
 
-    sp_da_for(node->outputs, o) {
-      spn_bg_id_t file = get_or_put_user_file(unit, graph, node->outputs[o]);
+    sp_da_for(node->outputs, it) {
+      spn_bg_id_t file = get_or_put_user_file(unit, graph, node->outputs[it]);
       spn_try(spn_bg_cmd_add_output(graph, node->id, file));
       spn_try(spn_bg_cmd_add_input(graph, nodes->exit, file));
     }
 
-    // if no inputs, depend on the main node's stamp
     if (sp_da_empty(node->inputs) && sp_da_empty(node->deps)) {
       spn_try(spn_bg_cmd_add_input(graph, node->id, nodes->stamp.main));
     }
 
-    sp_da_for(node->inputs, i) {
-      spn_bg_id_t file = get_or_put_user_file(unit, graph, node->inputs[i]);
+    sp_da_for(node->inputs, it) {
+      spn_bg_id_t file = get_or_put_user_file(unit, graph, node->inputs[it]);
       spn_try(spn_bg_cmd_add_input(graph, node->id, file));
     }
   }
 
-  // pass 3: now that all file nodes exist, set up links for command inputs
   sp_da_for(unit->nodes.user, it) {
     spn_user_node_t* node = &unit->nodes.user[it];
 
-    // depend on the outputs of your command inputs
-    sp_da_for(node->deps, j) {
-      spn_user_node_t* dep = spn_find_user_node(node->deps[j]);
-      sp_da_for(dep->outputs, k) {
-        spn_bg_id_t output = get_or_put_user_file(unit, graph, dep->outputs[k]);
+    sp_da_for(node->deps, it) {
+      spn_user_node_t* dep = spn_find_user_node(node->deps[it]);
+      sp_da_for(dep->outputs, it) {
+        spn_bg_id_t output = get_or_put_user_file(unit, graph, dep->outputs[it]);
         spn_try(spn_bg_cmd_add_input(graph, node->id, output));
       }
     }
   }
 
-  sp_da_for(unit->objects, it) {
-    spn_compile_unit_t* object = unit->objects[it];
-    if (object->target->info->kind == SPN_TARGET_MODULE) {
-      continue;
-    }
-    object->nodes.source = spn_bg_add_file(graph, object->paths.file);
-    object->nodes.compile = add_build_command(object->session, object->target->build, compile_object, object);
-    object->nodes.object = spn_bg_add_file(graph, object->paths.object);
-    spn_bg_cmd_add_output(graph, object->nodes.compile, object->nodes.object);
-    spn_bg_cmd_add_input(graph, object->nodes.compile, object->nodes.source);
-    spn_bg_cmd_add_input(graph, object->nodes.compile, unit->nodes.build.stamp.exit);
-  }
-
   sp_da_for(unit->targets, it) {
     spn_target_unit_t* target = unit->targets[it];
-    if (target->info->kind == SPN_TARGET_MODULE) {
+    if (sp_da_empty(target->info->source)) {
       continue;
     }
-    if (!sp_da_empty(target->info->source)) {
-      spn_try(add_target(graph, unit, target));
+    if (target->lib_kind == SPN_LIB_KIND_SOURCE) {
+      continue;
     }
+    if (target->lib_kind == SPN_LIB_KIND_OBJECT) {
+      spn_try(spn_build_add_object_nodes(graph, target));
+    }
+    else {
+      spn_try(spn_build_add_target_nodes(graph, target));
+    }
+    own_target_commands(unit->session, target);
+    sp_da_for(target->objects, it) {
+      spn_try(spn_bg_cmd_add_input(graph, target->objects[it]->nodes.compile, unit->nodes.build.stamp.exit));
+    }
+    spn_try(add_target(graph, unit, target));
   }
 
   return SPN_OK;

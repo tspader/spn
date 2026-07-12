@@ -40,7 +40,8 @@ typedef enum {
   SPN_TARGET_EXE,
   SPN_TARGET_SCRIPT,
   SPN_TARGET_TEST,
-  SPN_TARGET_MODULE,
+  SPN_TARGET_CONFIGURE_PROGRAM,
+  SPN_TARGET_BUILD_PROGRAM,
 } spn_target_kind_t;
 
 typedef struct {
