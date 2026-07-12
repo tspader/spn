@@ -12,6 +12,7 @@ static sp_cli_cmd_t cmd_init = {
     {
       .name = "bare",
       .summary = "Only write a manifest",
+      .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &spn.cli.init.bare,
     },
   },
@@ -33,11 +34,13 @@ static sp_cli_cmd_t cmd_add = {
     {
       .name = "test",
       .summary = "Add to test dependencies",
+      .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &spn.cli.add.test,
     },
     {
       .name = "build",
       .summary = "Add to build dependencies",
+      .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &spn.cli.add.build,
     },
   },
