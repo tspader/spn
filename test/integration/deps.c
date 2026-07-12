@@ -76,40 +76,31 @@ UTEST_F(deps_file, remote_source) {
 UTEST_F(deps_file, editable) {
   tmpfs_init_named(&uf->fixture.fs, "deps_file_editable");
 
-  run_test(utest_result, &uf->fixture, (test_t) {
+  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
     .project = "test/integration/fixtures/deps/file/editable",
     .copy = { "packages/*" },
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+    .first = {
+      .args = { "build" },
+      .expect.bin = { .name = "editable_package", .rc = 69 },
+    },
+    .rebuilds = {
       {
-        .kind = ACTION_RUN_BIN,
-        .bin = {
-          .name = "editable_package",
-          .rc = 69,
+        .change = {
+          .remove_files = { sp_str_lit("packages/spum/spum.h") },
+          .moves = {
+            { .from = sp_str_lit("packages/spum/kram.h"), .to = sp_str_lit("packages/spum/spum.h") },
+          },
+          .remove_dirs = { sp_str_lit("build") },
+        },
+        .command = {
+          .args = { "build" },
+          .expect = {
+            .bin = { .name = "editable_package", .rc = 42 },
+            .lock = true,
+            .packages = { "core/spum" },
+          },
         },
       },
-      {
-        .kind = ACTION_REMOVE_FILE,
-        .rm.file = "packages/spum/spum.h",
-      },
-      {
-        .kind = ACTION_MOVE_FILE,
-        .mv = {
-          .from = sp_str_lit("packages/spum/kram.h"),
-          .to = sp_str_lit("packages/spum/spum.h"),
-        },
-      },
-      { .kind = ACTION_REMOVE_DIR, .rm.dir = "build" },
-      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      {
-        .kind = ACTION_RUN_BIN,
-        .bin = {
-          .name = "editable_package",
-          .rc = 42,
-        },
-      },
-      { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "core/spum" },
     },
   });
 }
@@ -119,16 +110,26 @@ SPN_TEST_SUITE(deps_index)
 UTEST_F(deps_index, basic) {
   tmpfs_init_named(&uf->fixture.fs, "deps_index_basic");
 
-  run_test(utest_result, &uf->fixture, (test_t) {
+  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
     .project = "test/integration/fixtures/deps/index/basic",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
-      { .kind = ACTION_REMOVE_DIR, .rm = { .dir = "build" } },
-      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_LOCKED },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
+    .first = {
+      .args = { "build" },
+      .expect = {
+        .lock = true,
+        .packages = { "core/spum" },
+      },
+    },
+    .rebuilds = {
+      {
+        .change.remove_dirs = { sp_str_lit("build") },
+        .command = {
+          .args = { "build" },
+          .expect = {
+            .lock = true,
+            .packages = { "core/spum" },
+          },
+        },
+      },
     },
   });
 }

@@ -205,22 +205,31 @@ UTEST_F(script, stale_config) {
 UTEST_F(script, build_script) {
   tmpfs_init_named(&uf->fixture.fs, "script_build_script");
 
-  run_test(utest_result, &uf->fixture, (test_t) {
+  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
     .project = "test/integration/fixtures/script/build_script",
     .copy = { "tools", "include", "vendor" },
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("compile_commands.json"), .needle = sp_str_lit("tools/configure.c") } },
-      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("compile_commands.json"), .needle = sp_str_lit("tools/build.c") } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/script/work/build_script/spn/object/build/tools/a/main.c.o") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/script/work/build_script/spn/object/build/tools/b/main.c.o") },
-      { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("version.h") },
-      { .kind = ACTION_RUN_BIN, .bin.name = "build_script" },
-      // The node fn lives in the build module; when only the node's output is
-      // stale, the module compile is skipped and the fn must still resolve
-      { .kind = ACTION_REMOVE_FILE, .rm.file = "build/debug/work/build_script/version.h" },
-      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = work_file("build_script/version.h") },
+    .first = {
+      .args = { "build" },
+      .expect = {
+        .bin.name = "build_script",
+        .files = {
+          { .file = sp_str_lit("compile_commands.json"), .contains = { "tools/configure.c", "tools/build.c" } },
+        },
+        .exists = {
+          sp_str_lit("build/script/work/build_script/spn/object/build/tools/a/main.c.o"),
+          sp_str_lit("build/script/work/build_script/spn/object/build/tools/b/main.c.o"),
+          store_file("include/version.h"),
+        },
+      },
+    },
+    .rebuilds = {
+      {
+        .change.remove_files = { work_file("build_script/version.h") },
+        .command = {
+          .args = { "build" },
+          .expect.exists = { work_file("build_script/version.h") },
+        },
+      },
     },
   });
 }

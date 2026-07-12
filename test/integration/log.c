@@ -69,14 +69,19 @@ UTEST_F(log, warn_multi) {
 UTEST_F(log, preserved_on_cache_hit) {
   tmpfs_init_named(&uf->fixture.fs, "log_preserved");
 
-  run_test(utest_result, &uf->fixture, (test_t) {
+  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
     .project = "test/integration/fixtures/log/warn",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = work_file("log_warn/log_warn.build.log"), .needle = sp_str_lit("spn-log-probe-warn") } },
-      { .kind = ACTION_SNAPSHOT_MTIME, .snapshot_mtime.file = work_file("log_warn/log_warn.build.log") },
-      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_MTIME_UNCHANGED, .verify_mtime.file = work_file("log_warn/log_warn.build.log") },
+    .first = {
+      .args = { "build" },
+      .expect.files = {
+        { .file = work_file("log_warn/log_warn.build.log"), .contains = { "spn-log-probe-warn" } },
+      },
+    },
+    .rebuilds = {
+      { .command.args = { "build" } },
+    },
+    .watches = {
+      { .file = work_file("log_warn/log_warn.build.log"), .mtime = REBUILD_MTIME_UNCHANGED },
     },
   });
 }
@@ -120,16 +125,28 @@ UTEST_F(log, script_log_shown_on_failure) {
 UTEST_F(log, rewritten_on_rebuild) {
   tmpfs_init_named(&uf->fixture.fs, "log_rewritten");
 
-  run_test(utest_result, &uf->fixture, (test_t) {
+  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
     .project = "test/integration/fixtures/log/warn",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_SNAPSHOT_MTIME, .snapshot_mtime.file = work_file("log_warn/log_warn.build.log") },
-      { .kind = ACTION_CREATE_FILE, .create = { .file = sp_str_lit("main.c"), .content = sp_str_lit("#warning \"spn-log-probe-rebuilt\"\nint main(void) { return 0; }\n") } },
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--force" } } },
-      { .kind = ACTION_VERIFY_MTIME_CHANGED, .verify_mtime.file = work_file("log_warn/log_warn.build.log") },
-      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = work_file("log_warn/log_warn.build.log"), .needle = sp_str_lit("spn-log-probe-rebuilt") } },
-      { .kind = ACTION_VERIFY_FILE_NOT_CONTAINS, .verify_file_not_contains = { .file = work_file("log_warn/log_warn.build.log"), .needle = sp_str_lit("spn-log-probe-warn") } },
+    .first.args = { "build" },
+    .rebuilds = {
+      {
+        .change.writes = {
+          { .file = sp_str_lit("main.c"), .content = sp_str_lit("#warning \"spn-log-probe-rebuilt\"\nint main(void) { return 0; }\n") },
+        },
+        .command = {
+          .args = { "build", "--force" },
+          .expect.files = {
+            {
+              .file = work_file("log_warn/log_warn.build.log"),
+              .contains = { "spn-log-probe-rebuilt" },
+              .excludes = { "spn-log-probe-warn" },
+            },
+          },
+        },
+      },
+    },
+    .watches = {
+      { .file = work_file("log_warn/log_warn.build.log"), .mtime = REBUILD_MTIME_CHANGED },
     },
   });
 }
