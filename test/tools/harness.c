@@ -468,7 +468,7 @@ static bool event_matches(yyjson_val* line, const c8* event, const c8* key, cons
   return str && sp_cstr_equal(str, value);
 }
 
-static void expect_event(s32* utest_result, fixture_t* fixture, action_t action, bool expected, const c8* file, u32 line) {
+static void expect_event(s32* utest_result, fixture_t* fixture, const c8* event, const c8* key, const c8* value, bool expected, const c8* file, u32 line) {
   sp_mem_t mem = fixture->fs.mem;
   sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
 
@@ -483,23 +483,139 @@ static void expect_event(s32* utest_result, fixture_t* fixture, action_t action,
     yyjson_doc* doc = yyjson_read(lines[it].data, lines[it].len, 0);
     if (!doc) continue;
 
-    found = event_matches(yyjson_doc_get_root(doc), action.verify_event.event, action.verify_event.key, action.verify_event.value);
+    found = event_matches(yyjson_doc_get_root(doc), event, key, value);
     yyjson_doc_free(doc);
     if (found) break;
   }
 
   if (found == expected) return;
 
-  utest_kv("event", sp_str_view(action.verify_event.event));
-  if (action.verify_event.key) {
+  utest_kv("event", sp_str_view(event));
+  if (key) {
     utest_kv("field", sp_fmt(mem, "{} = {}",
-      sp_fmt_cstr(action.verify_event.key),
-      sp_fmt_cstr(action.verify_event.value)).value);
+      sp_fmt_cstr(key),
+      sp_fmt_cstr(value)).value);
   }
   utest_kv("log", path);
   utest_fail(utest_result, file, line,
     sp_str_view(expected ? "event logged" : "event not logged"),
     sp_str_view(found ? "it was logged" : "it was not"));
+}
+
+static sp_ps_output_t run_spn_command(fixture_t* fixture, const c8* const* args, const c8* const* env) {
+  sp_mem_t mem = fixture->fs.mem;
+  sp_ps_config_t config = {
+    .command = fixture->paths.spn,
+    .cwd = fixture->fs.root,
+    .io = {
+      .in.mode = SP_PS_IO_MODE_NULL,
+      .err.mode = SP_PS_IO_MODE_REDIRECT,
+    },
+    .env = {
+      .extra = {
+        { sp_str_lit("SPN_STORAGE_DIR"), fixture->paths.storage },
+        { sp_str_lit("SPN_TOOLCHAIN_DIR"), fixture->paths.toolchain },
+        { sp_str_lit("SPN_CONFIG_DIR"), fixture->paths.config },
+        { sp_str_lit("SPN_PATCH_DIR"), fixture->paths.patches },
+      },
+    },
+  };
+
+  u32 env_slot = 0;
+  while (env_slot < sp_carr_len(config.env.extra) && !sp_str_empty(config.env.extra[env_slot].key)) {
+    env_slot++;
+  }
+  if (env) {
+    sp_for(it, SPN_TEST_COMMAND_MAX_ENV) {
+      const c8* var = env[it];
+      if (!var || env_slot >= sp_carr_len(config.env.extra)) {
+        break;
+      }
+      sp_str_pair_t pair = sp_str_cleave_c8(sp_str_view(var), '=');
+      config.env.extra[env_slot++] = (sp_env_var_t) { .key = pair.first, .value = pair.second };
+    }
+  }
+
+  if (args) {
+    sp_for(it, SPN_TEST_COMMAND_MAX_ARGS) {
+      if (!args[it]) {
+        break;
+      }
+      sp_ps_config_add_arg(mem, &config, sp_str_view(args[it]));
+    }
+  }
+
+  sp_ps_output_t output = sp_ps_run(mem, config);
+  utest_kv("command", ps_command_line(mem, &config));
+  utest_kv("output", output.out);
+  return output;
+}
+
+static void run_command_bin(s32* utest_result, fixture_t* fixture, command_bin_t bin) {
+  sp_str_t staged = bin.profile ? profile_exe(bin.profile, bin.name) : exe(bin.name);
+  sp_str_t path = tmpfs_get(&fixture->fs, staged);
+  SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+
+  sp_ps_output_t output = sp_ps_run(fixture->fs.mem, (sp_ps_config_t) {
+    .command = path,
+    .cwd = fixture->fs.root,
+    .io = {
+      .in.mode = SP_PS_IO_MODE_NULL,
+      .err.mode = SP_PS_IO_MODE_REDIRECT,
+    },
+  });
+
+  utest_kv("command", path);
+  utest_kv("output", output.out);
+  EXPECT_EQ(bin.rc, output.status.exit_code);
+}
+
+static void expect_command_file(s32* utest_result, fixture_t* fixture, command_file_t expected) {
+  sp_str_t path = tmpfs_get(&fixture->fs, expected.file);
+  sp_str_t content = test_read_file(fixture->fs.mem, path);
+  sp_carr_for(expected.contains, it) {
+    if (!expected.contains[it]) {
+      break;
+    }
+    utest_kv("path", path);
+    utest_kv("needle", sp_str_view(expected.contains[it]));
+    utest_kv("content", content);
+    EXPECT_TRUE(sp_str_contains(content, sp_str_view(expected.contains[it])));
+  }
+}
+
+void run_command_test(s32* utest_result, fixture_t* fixture, command_test_t test) {
+  sp_ps_output_t output = run_spn_command(fixture, test.args, test.env);
+  EXPECT_EQ(test.expect.rc, output.status.exit_code);
+
+  sp_carr_for(test.expect.contains, it) {
+    if (!test.expect.contains[it]) {
+      break;
+    }
+    utest_kv("needle", sp_str_view(test.expect.contains[it]));
+    utest_kv("output", output.out);
+    EXPECT_TRUE(sp_str_contains(output.out, sp_str_view(test.expect.contains[it])));
+  }
+
+  sp_carr_for(test.expect.files, it) {
+    command_file_t expected = test.expect.files[it];
+    if (sp_str_empty(expected.file)) {
+      break;
+    }
+    expect_command_file(utest_result, fixture, expected);
+  }
+
+  sp_carr_for(test.expect.events, it) {
+    command_event_t expected = test.expect.events[it];
+    if (!expected.event) {
+      break;
+    }
+    expect_event(utest_result, fixture, expected.event, expected.key, expected.value, !expected.absent, __FILE__, __LINE__);
+  }
+
+  if (test.expect.bin.name) {
+    run_command_bin(utest_result, fixture, test.expect.bin);
+  }
 }
 
 void fixture_copy_project(s32* utest_result, fixture_t* fixture, sp_str_t project, const c8* const* copy) {
@@ -698,48 +814,14 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         break;
       }
       case ACTION_RUN_CLI: {
-        sp_ps_config_t config = {
-          .command = fixture->paths.spn,
-          .cwd = fixture->fs.root,
-          .io = {
-            .in.mode = SP_PS_IO_MODE_NULL,
-            .err.mode = SP_PS_IO_MODE_REDIRECT,
-          },
-          .env = {
-            .extra = {
-              { sp_str_lit("SPN_STORAGE_DIR"), fixture->paths.storage },
-              { sp_str_lit("SPN_TOOLCHAIN_DIR"), fixture->paths.toolchain },
-              { sp_str_lit("SPN_CONFIG_DIR"), fixture->paths.config },
-              { sp_str_lit("SPN_PATCH_DIR"), fixture->paths.patches },
-            },
-          },
-        };
-
-        u32 env_slot = 0;
-        while (env_slot < sp_carr_len(config.env.extra) && !sp_str_empty(config.env.extra[env_slot].key)) env_slot++;
-        sp_carr_for(action.cli.env, env_it) {
-          const c8* var = action.cli.env[env_it];
-          if (!var || env_slot >= sp_carr_len(config.env.extra)) break;
-          sp_str_pair_t pair = sp_str_cleave_c8(sp_str_view(var), '=');
-          config.env.extra[env_slot++] = (sp_env_var_t) { .key = pair.first, .value = pair.second };
-        }
-
-        if (action.cli.cmd) {
-          sp_ps_config_add_arg(mem, &config, sp_str_view(action.cli.cmd));
-        }
-
-        sp_carr_for(action.cli.args, arg_it) {
-          const c8* arg = action.cli.args[arg_it];
-          if (!arg) {
+        const c8* args[SPN_TEST_COMMAND_MAX_ARGS] = { action.cli.cmd };
+        sp_carr_for(action.cli.args, it) {
+          if (!action.cli.args[it]) {
             break;
           }
-
-          sp_ps_config_add_arg(mem, &config, sp_str_view(arg));
+          args[it + 1] = action.cli.args[it];
         }
-
-        sp_ps_output_t output = sp_ps_run(mem, config);
-        utest_kv("command", ps_command_line(mem, &config));
-        utest_kv("output", output.out);
+        sp_ps_output_t output = run_spn_command(fixture, args, action.cli.env);
         EXPECT_EQ(action.cli.rc, output.status.exit_code);
 
         cli_output = output.out;
@@ -759,7 +841,7 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
       }
       case ACTION_VERIFY_EVENT:
       case ACTION_VERIFY_NO_EVENT: {
-        expect_event(utest_result, fixture, action, action.kind == ACTION_VERIFY_EVENT, __FILE__, __LINE__);
+        expect_event(utest_result, fixture, action.verify_event.event, action.verify_event.key, action.verify_event.value, action.kind == ACTION_VERIFY_EVENT, __FILE__, __LINE__);
         break;
       }
       case ACTION_VERIFY_LOCKED: {
@@ -808,7 +890,7 @@ void fixture_setup_paths(fixture_t* fixture) {
 #endif
 }
 
-void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
+void prepare_test(s32* utest_result, fixture_t* fixture, const c8* project, const c8* const* copy) {
   sp_mem_t mem = fixture->fs.mem;
 
   fixture->paths.config = tmpfs_get(&fixture->fs, sp_str_lit(".home/config"));
@@ -827,12 +909,15 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
 
   sp_fs_copy(sp_fs_join_path(mem, fixture->paths.root, sp_str_lit("include/spn.h")), fixture->paths.include);
 
-  if (test.project) {
-    sp_str_t project = sp_fs_join_path(mem, fixture->paths.root, sp_str_view(test.project));
-    fixture_copy_project(utest_result, fixture, project, test.copy);
-    setup_fixture_index_from_remote(utest_result, fixture, project);
-    setup_fixture_source_repos(utest_result, fixture, project);
+  if (project) {
+    sp_str_t path = sp_fs_join_path(mem, fixture->paths.root, sp_str_view(project));
+    fixture_copy_project(utest_result, fixture, path, copy);
+    setup_fixture_index_from_remote(utest_result, fixture, path);
+    setup_fixture_source_repos(utest_result, fixture, path);
   }
+}
 
+void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
+  prepare_test(utest_result, fixture, test.project, test.copy);
   run_actions(utest_result, fixture, test.actions);
 }

@@ -1,0 +1,43 @@
+#ifndef SPN_TEST_COMMAND_H
+#define SPN_TEST_COMMAND_H
+
+#define SPN_TEST_COMMAND_MAX_ARGS 9
+#define SPN_TEST_COMMAND_MAX_ENV 4
+#define SPN_TEST_COMMAND_MAX_CONTAINS 4
+#define SPN_TEST_COMMAND_MAX_EVENTS 4
+#define SPN_TEST_COMMAND_MAX_FILES 4
+#define SPN_TEST_COMMAND_MAX_FILE_CONTAINS 4
+
+typedef struct {
+  const c8* event;
+  const c8* key;
+  const c8* value;
+  bool absent;
+} command_event_t;
+
+typedef struct {
+  sp_str_t file;
+  const c8* contains[SPN_TEST_COMMAND_MAX_FILE_CONTAINS];
+} command_file_t;
+
+typedef struct {
+  const c8* name;
+  const c8* profile;
+  s32 rc;
+} command_bin_t;
+
+typedef struct {
+  s32 rc;
+  command_bin_t bin;
+  const c8* contains[SPN_TEST_COMMAND_MAX_CONTAINS];
+  command_event_t events[SPN_TEST_COMMAND_MAX_EVENTS];
+  command_file_t files[SPN_TEST_COMMAND_MAX_FILES];
+} command_expect_t;
+
+typedef struct {
+  const c8* args[SPN_TEST_COMMAND_MAX_ARGS];
+  const c8* env[SPN_TEST_COMMAND_MAX_ENV];
+  command_expect_t expect;
+} command_test_t;
+
+#endif
