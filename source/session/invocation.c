@@ -42,7 +42,7 @@ spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
       sp_da_push(compile.include, build->include[it]);
     }
 
-    if (build->kind == SPN_BUILD_KIND_TARGET) {
+    if (unit->target->info->kind != SPN_TARGET_MODULE) {
       sp_da_for(unit->package->info->include, it) {
         sp_da_push(compile.include, resolve_pkg_path(mem, unit->package, unit->package->info->include[it]));
       }

@@ -118,9 +118,11 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
     case SPN_TARGET_EXE:
     case SPN_TARGET_SCRIPT:
     case SPN_TARGET_TEST: {
-      target->kind = target->pkg->build->kind == SPN_BUILD_KIND_HOST ?
-        SPN_CC_OUTPUT_REACTOR :
-        SPN_CC_OUTPUT_EXE;
+      target->kind = SPN_CC_OUTPUT_EXE;
+      return SPN_OK;
+    }
+    case SPN_TARGET_MODULE: {
+      target->kind = SPN_CC_OUTPUT_REACTOR;
       return SPN_OK;
     }
     case SPN_TARGET_LIB: {
@@ -254,11 +256,9 @@ spn_err_union_t add_script_units(spn_session_t* session) {
   }
 
   sp_da(spn_pkg_unit_t*) scripted = sp_da_new(session->mem, spn_pkg_unit_t*);
+  sp_assert(!session->plan.script);
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
-    if (pkg->build->kind != SPN_BUILD_KIND_TARGET) {
-      continue;
-    }
     if (sp_da_empty(pkg->script.configure.source) && sp_da_empty(pkg->script.build.source)) {
       continue;
     }
@@ -281,7 +281,7 @@ spn_err_union_t add_script_units(spn_session_t* session) {
   spn_build_unit_t* build = sp_alloc_type(session->mem, spn_build_unit_t);
   *build = (spn_build_unit_t) {
     .id = (spn_build_unit_id_t)sp_da_size(session->plan.builds),
-    .kind = SPN_BUILD_KIND_HOST,
+    .script = true,
     .profile = {
       .name = sp_str_lit("script"),
       .arch = SPN_ARCH_WASM32,
@@ -412,7 +412,7 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
 
   sp_om_for(session->units.packages, it) {
     spn_pkg_unit_t* pkg = sp_om_at(session->units.packages, it);
-    if (pkg->build->kind != SPN_BUILD_KIND_TARGET) {
+    if (pkg->build->script) {
       continue;
     }
     sp_str_om_for(pkg->info->libs, it) {
@@ -425,7 +425,7 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
 
   sp_da_for(session->plan.builds, it) {
     spn_build_plan_t* plan = &session->plan.builds[it];
-    if (plan->build->kind != SPN_BUILD_KIND_TARGET) {
+    if (plan->build->script) {
       continue;
     }
     spn_pkg_unit_t* pkg = spn_session_find_pkg_unit(session, plan->build, spn_session_root_pkg(session));
@@ -473,11 +473,11 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
 
   // Now that the configure phase is done, everything about the build is static. We
   // can go through every target and resolve file globs into object files which need
-  // to be compiled. Script targets already did this at sync.
+  // to be compiled. Module targets already did this at sync.
   sp_om_for(session->units.targets, it) {
     spn_target_unit_t* target = sp_om_at(session->units.targets, it);
 
-    if (target->pkg->build->kind == SPN_BUILD_KIND_HOST) continue;
+    if (target->info->kind == SPN_TARGET_MODULE) continue;
 
     // Source libs are consumed as source; we never compile them ourselves
     if (target->lib_kind == SPN_LIB_KIND_SOURCE) continue;

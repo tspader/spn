@@ -310,7 +310,6 @@ typedef struct {
   sp_hash_t options;
   sp_hash_t deps;
   spn_semver_t version;
-  spn_build_kind_t kind;
   spn_build_mode_t mode;
   spn_opt_level_t opt;
   spn_sanitizer_set_t sanitizers;
@@ -385,7 +384,6 @@ static sp_hash_t hash_package(spn_session_t* session, spn_build_unit_t* build, s
   fingerprint.options = hash_options(session, id);
   fingerprint.version = pkg->version;
   fingerprint.commit = sp_hash_str(pkg->upstream.commit);
-  fingerprint.kind = build->kind;
 
   spn_resolved_pkg_t* resolved = sp_ht_getp(session->resolve, id);
   if (resolved) {
@@ -530,6 +528,7 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
     case SPN_TARGET_EXE: sp_da_push(pkg->exes, target); break;
     case SPN_TARGET_SCRIPT: sp_da_push(pkg->scripts, target); break;
     case SPN_TARGET_TEST: sp_da_push(pkg->tests, target); break;
+    case SPN_TARGET_MODULE: break;
   }
 
   target->paths.recipe = pkg->paths.recipe;

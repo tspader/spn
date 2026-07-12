@@ -314,7 +314,6 @@ spn_err_union_t add_compilation_units(spn_session_t *s) {
   spn_build_unit_t* build = sp_alloc_type(s->mem, spn_build_unit_t);
   *build = (spn_build_unit_t) {
     .id = (spn_build_unit_id_t)sp_da_size(s->plan.builds),
-    .kind = SPN_BUILD_KIND_TARGET,
     .profile = s->profile,
     .toolchain = s->units.toolchain,
     .visibility = SPN_SYMBOL_VISIBILITY_DEFAULT,

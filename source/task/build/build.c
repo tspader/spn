@@ -118,7 +118,8 @@ sp_str_t get_target_staged_path(sp_mem_t mem, spn_target_unit_t* target) {
       sp_str_t dir = sp_fs_join_path(mem, target->pkg->build->paths.profile, SP_LIT("test"));
       return sp_fs_join_path(mem, dir, target->info->name);
     }
-    case SPN_TARGET_LIB: {
+    case SPN_TARGET_LIB:
+    case SPN_TARGET_MODULE: {
       return sp_zero_s(sp_str_t);
     }
   }
