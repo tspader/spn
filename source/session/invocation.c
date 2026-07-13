@@ -40,9 +40,9 @@ spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
       sp_da_push(compile.include, build->include[it]);
     }
 
-    bool program = unit->target->info->kind == SPN_TARGET_CONFIGURE_METAPROGRAM ||
+    bool metaprogram = unit->target->info->kind == SPN_TARGET_CONFIGURE_METAPROGRAM ||
       unit->target->info->kind == SPN_TARGET_BUILD_METAPROGRAM;
-    if (!program) {
+    if (!metaprogram) {
       sp_da_for(pkg->info->include, it) {
         sp_da_push(compile.include, resolve_pkg_path(mem, pkg, pkg->info->include[it]));
       }
@@ -61,7 +61,7 @@ spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
       sp_da_push(compile.args, unit->target->info->flags[it]);
     }
 
-    if (!program) {
+    if (!metaprogram) {
       sp_da(spn_pkg_dep_t) deps = pkg->deps;
       sp_da_for(deps, it) {
         if (!deps[it].unit) {
@@ -79,7 +79,7 @@ spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
       }
     }
 
-    if (program) {
+    if (metaprogram) {
       sp_da_for(unit->target->deps.package, it) {
         spn_pkg_unit_t* dependency = unit->target->deps.package[it];
         sp_da_push(compile.include, dependency->paths.include);

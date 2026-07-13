@@ -63,7 +63,7 @@ spn_task_step_t spn_task_plan(spn_app_t* app) {
   sp_da_init(s->mem, s->units.compile_commands);
 
   try_task(add_compilation_units(s));
-  try_task(add_program_units(s));
+  try_task(add_metaprogram_units(s));
 
   sp_env_t* env = &s->env;
   spn_toolchain_unit_t* toolchain = s->units.target->toolchain;

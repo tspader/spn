@@ -356,7 +356,7 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
 
   sp_da_for(session->units.metaprogram->packages, it) {
     spn_pkg_unit_t* pkg = session->units.metaprogram->packages[it];
-    spn_try(add_target_link_deps(graph, session, pkg->meta.build.target));
+    spn_try(add_target_link_deps(graph, session, pkg->metaprogram.build.target));
   }
 
   spn_try(add_root_stages(graph, session));
@@ -575,8 +575,8 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   spn_try(spn_bg_cmd_add_input(graph, nodes->package, nodes->stamp.exit));
   spn_try(spn_bg_cmd_add_output(graph, nodes->package, nodes->stamp.package));
 
-  sp_assert(unit->program);
-  spn_target_unit_t* build = unit->program->meta.build.target;
+  sp_assert(unit->metaprogram.pkg);
+  spn_target_unit_t* build = unit->metaprogram.build.target;
   if (build) {
     spn_try(spn_build_add_target_nodes(graph, build));
     own_target_commands(unit->session, build);

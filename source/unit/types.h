@@ -182,28 +182,28 @@ struct spn_target_unit {
   spn_build_io_t logs;
 };
 
+typedef struct {
+  spn_target_info_t* info;
+  spn_target_unit_t* target;
+} spn_pkg_metaprogram_target_t;
+
+typedef struct {
+  spn_pkg_unit_t* pkg;
+  spn_pkg_metaprogram_target_t configure;
+  spn_pkg_metaprogram_target_t build;
+} spn_pkg_metaprogram_t;
+
 /////////////
 // PACKAGE //
 /////////////
 struct spn_pkg_unit_t {
   spn_pkg_unit_id_t id;
   spn_build_unit_t* build;
-  spn_pkg_unit_t* program;
+  spn_pkg_metaprogram_t metaprogram;
   spn_session_t* session;
   spn_pkg_info_t* info;
   spn_pkg_source_t source;
   u32 materialized_dep_kinds;
-
-  struct {
-    struct {
-      spn_target_info_t* info;
-      spn_target_unit_t* target;
-    } configure;
-    struct {
-      spn_target_info_t* info;
-      spn_target_unit_t* target;
-    } build;
-  } meta;
 
   sp_da(spn_pkg_dep_t) deps;
   sp_da(spn_target_unit_t*) libs;
