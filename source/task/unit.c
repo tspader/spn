@@ -292,6 +292,11 @@ static void init_program_runtime(spn_pkg_unit_t* unit) {
   }
 }
 
+static spn_err_union_t build_target_invocations(spn_target_unit_t* target) {
+  try_union(spn_build_compile_invocations(target));
+  return spn_build_link_invocation(target);
+}
+
 spn_err_union_t add_program_units(spn_session_t* session) {
   sp_da(spn_pkg_id_t) pending = sp_da_new(session->mem, spn_pkg_id_t);
   sp_ht(spn_pkg_id_t, u8) added = SP_NULLPTR;
@@ -350,6 +355,12 @@ spn_err_union_t add_program_units(spn_session_t* session) {
 
   sp_da_for(session->units.metaprogram->packages, it) {
     spn_pkg_unit_t* unit = session->units.metaprogram->packages[it];
+    if (unit->meta.configure.target) {
+      try_union(build_target_invocations(unit->meta.configure.target));
+    }
+    if (unit->meta.build.target) {
+      try_union(build_target_invocations(unit->meta.build.target));
+    }
     init_program_runtime(unit);
   }
 
@@ -363,8 +374,7 @@ spn_err_union_t add_program_units(spn_session_t* session) {
     }
   }
 
-  try_union(spn_session_build_invocations(session));
-  return spn_build_link_invocations(session);
+  return spn_result(SPN_OK);
 }
 
 static bool is_root_target(spn_session_t* session, spn_build_plan_t* plan, spn_target_unit_t* target) {
@@ -573,9 +583,12 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
     return spn_task_fail(SPN_ERROR);
   }
 
-  spn_err_union_t err = spn_session_build_invocations(session);
-  if (!err.kind) {
-    err = spn_build_link_invocations(session);
+  spn_err_union_t err = spn_result(SPN_OK);
+  sp_da_for(targets, it) {
+    err = build_target_invocations(targets[it]);
+    if (err.kind) {
+      break;
+    }
   }
   if (err.kind) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
