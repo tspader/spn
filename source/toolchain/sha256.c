@@ -1,11 +1,5 @@
 #include "toolchain/sha256.h"
 
-typedef struct {
-  u32 state [8];
-  u64 length;
-  u8 block [64];
-  u32 fill;
-} spn_sha256_ctx_t;
 
 static const u32 spn_sha256_k [64] = {
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -82,7 +76,7 @@ static void spn_sha256_compress(spn_sha256_ctx_t* ctx, const u8* block) {
   ctx->state[7] += h;
 }
 
-static void spn_sha256_update(spn_sha256_ctx_t* ctx, const u8* data, u64 len) {
+void spn_sha256_update(spn_sha256_ctx_t* ctx, const u8* data, u64 len) {
   ctx->length += len;
 
   while (len) {
@@ -99,7 +93,7 @@ static void spn_sha256_update(spn_sha256_ctx_t* ctx, const u8* data, u64 len) {
   }
 }
 
-static void spn_sha256_final(spn_sha256_ctx_t* ctx, u8 digest [32]) {
+void spn_sha256_final(spn_sha256_ctx_t* ctx, u8 digest [32]) {
   u64 bits = ctx->length * 8;
 
   u8 pad = 0x80;
