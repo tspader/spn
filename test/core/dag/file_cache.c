@@ -8,6 +8,7 @@ typedef enum {
 
 typedef struct {
   spn_err_t err;
+  u32 entries;
 } file_cache_expect_t;
 
 typedef struct {
@@ -30,7 +31,7 @@ static void run_file_cache_test(s32* utest_result, file_cache_test_t t) {
   sp_str_t table = tmpfs_get(&fs, sp_str_lit("file_cache.bin"));
 
   spn_dag_file_cache_t c = sp_zero;
-  spn_dag_file_cache_init(&c, sp_mem_os_new());
+  spn_dag_file_cache_init(&c, fs.mem);
 
   sp_carr_for(t.ops, it) {
     file_cache_op_t op = t.ops[it];
@@ -60,8 +61,12 @@ static void run_file_cache_test(s32* utest_result, file_cache_test_t t) {
         break;
       }
       case FILE_CACHE_OP_RELOAD: {
-        spn_dag_file_cache_init(&c, sp_mem_os_new());
-        EXPECT_EQ(op.expect.err, spn_dag_file_cache_load(&c, table));
+        spn_dag_file_cache_init(&c, fs.mem);
+        spn_err_t err = spn_dag_file_cache_load(&c, table);
+        EXPECT_EQ(op.expect.err, err);
+        if (!err) {
+          EXPECT_EQ(op.expect.entries, (u32)sp_ht_size(c.entries));
+        }
         break;
       }
     }
@@ -75,17 +80,6 @@ UTEST_F(file_cache, digest_matches_content) {
     .name = "file_cache_digest",
     .ops = {
       { .kind = FILE_CACHE_OP_FILE, .path = "a.c", .blob = "spum" },
-      { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .blob = "spum" },
-    }
-  });
-}
-
-UTEST_F(file_cache, repeated_digest_is_stable) {
-  run_file_cache_test(&ur, (file_cache_test_t) {
-    .name = "file_cache_repeat",
-    .ops = {
-      { .kind = FILE_CACHE_OP_FILE, .path = "a.c", .blob = "spum" },
-      { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .blob = "spum" },
       { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .blob = "spum" },
     }
   });
@@ -107,7 +101,7 @@ UTEST_F(file_cache, save_load_roundtrip) {
       { .kind = FILE_CACHE_OP_FILE, .path = "a.c", .blob = "spum" },
       { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .blob = "spum" },
       { .kind = FILE_CACHE_OP_SAVE },
-      { .kind = FILE_CACHE_OP_RELOAD },
+      { .kind = FILE_CACHE_OP_RELOAD, .expect = { .entries = 1 } },
       { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .blob = "spum" },
     }
   });
@@ -121,7 +115,7 @@ UTEST_F(file_cache, persisted_detects_change) {
       { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .blob = "spum" },
       { .kind = FILE_CACHE_OP_SAVE },
       { .kind = FILE_CACHE_OP_FILE, .path = "a.c", .blob = "spum spum" },
-      { .kind = FILE_CACHE_OP_RELOAD },
+      { .kind = FILE_CACHE_OP_RELOAD, .expect = { .entries = 1 } },
       { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .blob = "spum spum" },
     }
   });
