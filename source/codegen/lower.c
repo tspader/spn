@@ -253,22 +253,22 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
     toolchain.linker = lower_launcher(ctx, t->linker);
     toolchain.archiver = lower_launcher(ctx, t->archiver);
 
-    sp_da(spn_toolchain_host_t) hosts = sp_da_new(ctx->mem, spn_toolchain_host_t);
-    sp_da_for(t->host, i) {
-      sp_da_push(hosts, ((spn_toolchain_host_t) {
-        .triple = spn_triple_from_str(t->host[i].key),
+    toolchain.hosts = sp_da_new(ctx->mem, spn_toolchain_host_t);
+    sp_da_for(t->host, it) {
+      sp_da_push(toolchain.hosts, ((spn_toolchain_host_t) {
+        .triple = spn_triple_from_str(t->host[it].key),
         .artifact = {
-          .url = t->host[i].value.url,
-          .sha256 = t->host[i].value.sha256,
+          .url = t->host[it].value.url,
+          .sha256 = t->host[it].value.sha256,
           .mirror_list = t->mirrors,
         },
       }));
     }
-    toolchain.artifact = spn_toolchain_select_artifact(hosts, spn_triple_host());
+    toolchain.source = sp_da_empty(toolchain.hosts) ? SPN_TOOLCHAIN_SOURCE_LOCAL : SPN_TOOLCHAIN_SOURCE_DISTRIBUTION;
 
     toolchain.targets = sp_da_new(ctx->mem, spn_triple_t);
-    sp_da_for(t->target, i) {
-      sp_da_push(toolchain.targets, lower_triple(&t->target[i]));
+    sp_da_for(t->target, it) {
+      sp_da_push(toolchain.targets, lower_triple(&t->target[it]));
     }
 
     sp_str_om_insert(out->toolchains, toolchain.name, toolchain);

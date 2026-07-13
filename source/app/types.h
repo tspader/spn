@@ -23,9 +23,7 @@ typedef struct {
 } spn_sync_pkg_job_t;
 
 typedef struct {
-  spn_session_t* session;
   spn_toolchain_store_t* store;
-  spn_toolchain_info_t* toolchain;
   spn_toolchain_unit_t* unit;
 } spn_sync_toolchain_job_t;
 

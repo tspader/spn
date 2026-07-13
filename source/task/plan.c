@@ -7,7 +7,6 @@
 #include "log/log.h"
 #include "pkg/id.h"
 #include "pkg/types.h"
-#include "profile/profile.h"
 #include "resolve/types.h"
 #include "session/session.h"
 #include "session/types.h"
@@ -16,7 +15,6 @@
 #include "task/types.h"
 #include "toolchain/toolchain.h"
 #include "toolchain/types.h"
-#include "triple/triple.h"
 #include "unit/types.h"
 
 spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* build, spn_pkg_id_t id, u32 kinds) {
@@ -42,67 +40,6 @@ spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* build, spn
       .private = pkg->edges[it].private,
     }));
   }
-  return unit;
-}
-
-static spn_build_unit_t* add_build_unit(spn_session_t* s) {
-  spn_build_unit_t* unit = sp_alloc_type(s->mem, spn_build_unit_t);
-  unit->id = (spn_build_unit_id_t)sp_da_size(s->units.builds);
-  sp_da_push(s->units.builds, unit);
-  return unit;
-}
-
-static spn_build_unit_t* add_target_build(spn_session_t* s, spn_profile_info_t profile) {
-  spn_build_unit_t* unit = add_build_unit(s);
-  spn_build_unit_id_t id = unit->id;
-  *unit = (spn_build_unit_t) {
-    .id = id,
-    .profile = profile,
-    .toolchain = s->units.toolchain,
-    .visibility = SPN_SYMBOL_VISIBILITY_DEFAULT,
-    .dep_kinds = spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE) | spn_dep_kind_bit(SPN_DEP_KIND_TEST),
-    .paths = {
-      .root = spn_profile_build_path(s->mem, s->paths.build, &profile)
-    },
-  };
-  sp_da_init(s->mem, unit->include);
-  sp_da_init(s->mem, unit->packages);
-
-  spn_build_plan_t build = {
-    .build = unit,
-    .selection = s->plan.request.targets,
-  };
-  sp_da_init(s->mem, build.roots);
-  sp_da_push(s->plan.builds, build);
-  return unit;
-}
-
-static spn_build_unit_t* add_program_build(spn_session_t* s) {
-  spn_build_unit_t* unit = add_build_unit(s);
-  spn_build_unit_id_t id = unit->id;
-  spn_triple_t target = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_NONE };
-  *unit = (spn_build_unit_t) {
-    .id = id,
-    .profile = {
-      .name = sp_str_lit("program"),
-      .arch = target.arch,
-      .os = target.os,
-      .abi = target.abi,
-      .mode = SPN_BUILD_MODE_DEBUG,
-      .opt = SPN_OPT_LEVEL_2,
-      .standard = SPN_C99,
-      .linkage = SPN_LIB_KIND_STATIC,
-    },
-    .toolchain = s->units.script,
-    .visibility = SPN_SYMBOL_VISIBILITY_HIDDEN,
-    .dep_kinds = spn_dep_kind_bit(SPN_DEP_KIND_BUILD),
-    .paths = {
-      .root = sp_fs_join_path(s->mem, s->paths.build, spn_triple_to_str(s->mem, target)),
-    },
-  };
-  sp_da_init(s->mem, unit->include);
-  sp_da_init(s->mem, unit->packages);
-  sp_da_push(unit->include, spn.paths.include);
   return unit;
 }
 
@@ -159,37 +96,22 @@ static spn_err_union_t add_compilation_units(spn_session_t *s) {
 spn_task_step_t spn_task_plan(spn_app_t* app) {
   spn_session_t* s = &app->session;
 
-  s->units.toolchains = sp_da_new(s->mem, spn_toolchain_unit_t*);
-  s->units.builds = sp_da_new(s->mem, spn_build_unit_t*);
   sp_da_init(s->mem, s->units.compile_commands);
-  sp_da_init(s->mem, s->plan.builds);
 
   if (collect_requested_pkgs(s)) {
     return spn_task_fail(SPN_ERROR);
   }
-  sp_da_for(app->sync.toolchains, it) {
-    spn_sync_toolchain_job_t* job = app->sync.toolchains[it];
-    sp_da_push(s->units.toolchains, job->unit);
-    if (job->toolchain == s->selection.build) {
-      s->units.toolchain = job->unit;
-    }
-    if (job->toolchain == s->selection.script) {
-      s->units.script = job->unit;
-    }
-  }
-
-  s->units.target = add_target_build(s, s->profile);
-  s->units.metaprogram = add_program_build(s);
   try_task(add_compilation_units(s));
   try_task(add_program_units(s));
 
   sp_env_t* env = &s->env;
+  spn_toolchain_unit_t* toolchain = s->units.target->toolchain;
   sp_env_init(s->mem, env);
-  sp_env_insert(env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(s->mem, s->units.toolchain->compiler));
-  sp_env_insert(env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(s->mem, s->units.toolchain->archiver));
-  sp_env_insert(env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(s->mem, s->units.toolchain->linker));
-  if (spn_toolchain_has_cxx(s->units.toolchain->info)) {
-    sp_env_insert(env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(s->mem, s->units.toolchain->cxx));
+  sp_env_insert(env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(s->mem, toolchain->compiler));
+  sp_env_insert(env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(s->mem, toolchain->archiver));
+  sp_env_insert(env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(s->mem, toolchain->linker));
+  if (spn_toolchain_has_cxx(toolchain->info)) {
+    sp_env_insert(env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(s->mem, toolchain->cxx));
   }
 
   return spn_task_done();

@@ -338,11 +338,11 @@ static void run_case(s32* utest_result, test_t test) {
 
     spn_toolchain_info_t* tc = sp_str_om_get(pkg.toolchains, sp_str_view(expected.name));
     ASSERT_TRUE(tc);
-    EXPECT_EQ(expected.remote, !sp_opt_is_null(tc->artifact));
+    EXPECT_EQ(expected.remote, tc->source == SPN_TOOLCHAIN_SOURCE_DISTRIBUTION);
 
-    if (expected.url)     EXPECT_STR(sp_opt_get(tc->artifact).url, expected.url);
-    if (expected.sha256)  EXPECT_STR(sp_opt_get(tc->artifact).sha256, expected.sha256);
-    if (expected.mirrors) EXPECT_STR(sp_opt_get(tc->artifact).mirror_list, expected.mirrors);
+    if (expected.url)     EXPECT_STR(tc->hosts[0].artifact.url, expected.url);
+    if (expected.sha256)  EXPECT_STR(tc->hosts[0].artifact.sha256, expected.sha256);
+    if (expected.mirrors) EXPECT_STR(tc->hosts[0].artifact.mirror_list, expected.mirrors);
     if (expected.compiler) EXPECT_STR(tc->compiler.program, expected.compiler);
     if (expected.linker)   EXPECT_STR(tc->linker.program, expected.linker);
     if (expected.archiver) EXPECT_STR(tc->archiver.program, expected.archiver);

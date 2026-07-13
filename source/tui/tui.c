@@ -908,6 +908,16 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
           }
           break;
         }
+        case SPN_ERR_TOOLCHAIN_HOST: {
+          sp_str_t host = spn_triple_to_str(mem, event->err.toolchain.host);
+          sp_fmt_io(
+            &w.base,
+            "toolchain {} isn't distributed for host {.yellow}",
+            sp_fmt_str(spn_tui_colored_name(mem, event->err.toolchain.name)),
+            sp_fmt_str(host)
+          );
+          break;
+        }
         case SPN_ERR_WASM_READ_FAILED: {
           sp_fmt_io(
             &w.base,

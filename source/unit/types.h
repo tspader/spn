@@ -15,6 +15,7 @@
 #include "log/lazy/types.h"
 
 typedef u32 spn_build_unit_id_t;
+typedef u32 spn_toolchain_unit_id_t;
 
 struct spn_build_unit_t {
   spn_build_unit_id_t id;
@@ -301,7 +302,10 @@ struct spn_pkg_unit_t {
 };
 
 struct spn_toolchain_unit_t {
+  spn_toolchain_unit_id_t id;
   spn_toolchain_info_t* info;
+  spn_triple_t host;
+  spn_opt_artifact_t artifact;
   sp_str_t root;
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t cxx;

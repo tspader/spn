@@ -3,7 +3,7 @@
 
 #include "toolchain/types.h"
 
-spn_err_t         spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, sp_str_t builtins_json, spn_triple_t host, sp_mem_t mem);
+spn_err_t         spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, sp_str_t builtins_json, sp_mem_t mem);
 void              spn_toolchain_catalog_add(spn_toolchain_catalog_t* catalog, spn_toolchain_info_t toolchain);
 spn_toolchain_info_t*  spn_toolchain_catalog_get(spn_toolchain_catalog_t* catalog, sp_str_t name);
 

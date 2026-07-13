@@ -55,11 +55,15 @@ SP_PRIVATE u64 spn_toolchain_provision_stamp(void) {
   return stamp ^ ((u64)(u32)sp_atomic_s32_add(&sequence, 1) << 48);
 }
 
-spn_err_union_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, sp_str_t* root) {
+spn_err_union_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, spn_opt_artifact_t selected, sp_str_t* root) {
   *root = sp_str_lit("");
-  if (sp_opt_is_null(toolchain->artifact)) return spn_result(SPN_OK);
+  if (toolchain->source == SPN_TOOLCHAIN_SOURCE_LOCAL) {
+    sp_assert(sp_opt_is_null(selected));
+    return spn_result(SPN_OK);
+  }
 
-  spn_artifact_t artifact = sp_opt_get(toolchain->artifact);
+  sp_assert(!sp_opt_is_null(selected));
+  spn_artifact_t artifact = sp_opt_get(selected);
   if (sp_str_empty(artifact.sha256)) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_TOOLCHAIN_NO_SHA,
@@ -73,7 +77,9 @@ spn_err_union_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolch
   sp_str_t dest = spn_toolchain_store_path(store, artifact);
   *root = dest;
 
-  if (sp_fs_is_dir(dest)) return spn_result(SPN_OK);
+  if (sp_fs_is_dir(dest)) {
+    return spn_result(SPN_OK);
+  }
   sp_fs_create_dir(store->dir);
 
   u64 stamp = spn_toolchain_provision_stamp();

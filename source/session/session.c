@@ -24,10 +24,113 @@
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
+static bool same_triple(spn_triple_t lhs, spn_triple_t rhs) {
+  return lhs.arch == rhs.arch && lhs.os == rhs.os && lhs.abi == rhs.abi;
+}
+
+static spn_err_union_t bind_toolchain(spn_session_t* session, spn_toolchain_query_t query, spn_toolchain_unit_t** binding) {
+  spn_toolchain_resolution_t resolution = SP_ZERO_INITIALIZE();
+  try_union(spn_toolchain_select(&session->catalog, query, &resolution));
+
+  sp_da_for(session->units.toolchains, it) {
+    spn_toolchain_unit_t* unit = session->units.toolchains[it];
+    if (unit->info == resolution.info && same_triple(unit->host, query.host)) {
+      *binding = unit;
+      return spn_result(SPN_OK);
+    }
+  }
+
+  spn_toolchain_unit_t* unit = sp_alloc_type(session->mem, spn_toolchain_unit_t);
+  *unit = (spn_toolchain_unit_t) {
+    .id = (spn_toolchain_unit_id_t)sp_da_size(session->units.toolchains),
+    .info = resolution.info,
+    .host = query.host,
+    .artifact = resolution.artifact,
+  };
+  sp_da_push(session->units.toolchains, unit);
+  *binding = unit;
+  return spn_result(SPN_OK);
+}
+
+static spn_build_unit_t* add_build_unit(spn_session_t* session, spn_build_unit_t value) {
+  spn_build_unit_t* unit = sp_alloc_type(session->mem, spn_build_unit_t);
+  value.id = (spn_build_unit_id_t)sp_da_size(session->units.builds);
+  *unit = value;
+  sp_da_init(session->mem, unit->include);
+  sp_da_init(session->mem, unit->packages);
+  sp_da_push(session->units.builds, unit);
+  return unit;
+}
+
+static spn_err_union_t add_target_build(spn_session_t* session, spn_profile_info_t profile, spn_build_unit_t** build) {
+  spn_triple_t host = spn_triple_host();
+  spn_triple_t target = { profile.arch, profile.os, profile.abi };
+  spn_toolchain_unit_t* toolchain = SP_NULLPTR;
+  try_union(bind_toolchain(session, (spn_toolchain_query_t) {
+    .name = profile.toolchain,
+    .target = target,
+    .host = host,
+    .role = SPN_TOOLCHAIN_ROLE_BUILD,
+  }, &toolchain));
+
+  spn_build_unit_t* unit = add_build_unit(session, (spn_build_unit_t) {
+    .profile = profile,
+    .toolchain = toolchain,
+    .visibility = SPN_SYMBOL_VISIBILITY_DEFAULT,
+    .dep_kinds = spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE) | spn_dep_kind_bit(SPN_DEP_KIND_TEST),
+    .paths = {
+      .root = spn_profile_build_path(session->mem, session->paths.build, &profile),
+    },
+  });
+
+  spn_build_plan_t plan = {
+    .build = unit,
+    .selection = session->plan.request.targets,
+  };
+  sp_da_init(session->mem, plan.roots);
+  sp_da_push(session->plan.builds, plan);
+  *build = unit;
+  return spn_result(SPN_OK);
+}
+
+static spn_err_union_t add_metaprogram_build(spn_session_t* session, spn_build_unit_t** build) {
+  spn_triple_t host = spn_triple_host();
+  spn_triple_t target = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_NONE };
+  spn_toolchain_unit_t* toolchain = SP_NULLPTR;
+  try_union(bind_toolchain(session, (spn_toolchain_query_t) {
+    .name = sp_str_lit("zig"),
+    .target = target,
+    .host = host,
+    .role = SPN_TOOLCHAIN_ROLE_SCRIPT,
+  }, &toolchain));
+
+  spn_build_unit_t* unit = add_build_unit(session, (spn_build_unit_t) {
+    .profile = {
+      .name = sp_str_lit("program"),
+      .arch = target.arch,
+      .os = target.os,
+      .abi = target.abi,
+      .mode = SPN_BUILD_MODE_DEBUG,
+      .opt = SPN_OPT_LEVEL_2,
+      .standard = SPN_C99,
+      .linkage = SPN_LIB_KIND_STATIC,
+    },
+    .toolchain = toolchain,
+    .visibility = SPN_SYMBOL_VISIBILITY_HIDDEN,
+    .dep_kinds = spn_dep_kind_bit(SPN_DEP_KIND_BUILD),
+    .paths = {
+      .root = sp_fs_join_path(session->mem, session->paths.build, spn_triple_to_str(session->mem, target)),
+    },
+  });
+  sp_da_push(unit->include, spn.paths.include);
+  *build = unit;
+  return spn_result(SPN_OK);
+}
+
 spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t* root, spn_app_config_t config) {
   s->mem = mem;
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
-  try_as_union(spn_toolchain_catalog_init(&s->catalog, builtins, spn_triple_host(), s->mem));
+  try_as_union(spn_toolchain_catalog_init(&s->catalog, builtins, s->mem));
 
   sp_str_om_for(root->toolchains, it) {
     spn_toolchain_catalog_add(&s->catalog, *sp_str_om_at(root->toolchains, it));
@@ -46,15 +149,12 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
 
   try_union(spn_profile_resolve(s->profiles, &config.overrides, &s->profile));
 
-  spn_toolchain_query_t query = {
-    .build = s->profile.toolchain,
-    .script = sp_str_lit("zig"),
-    .target = { s->profile.arch, s->profile.os, s->profile.abi },
-    .host = spn_triple_host(),
-  };
-  try_union(spn_toolchain_select(&s->catalog, query, s->mem, &s->selection));
-
   s->plan.request = config.compile;
+  sp_da_init(s->mem, s->plan.builds);
+  sp_da_init(s->mem, s->units.builds);
+  sp_da_init(s->mem, s->units.toolchains);
+  try_union(add_target_build(s, s->profile, &s->units.target));
+  try_union(add_metaprogram_build(s, &s->units.metaprogram));
 
   return spn_result(SPN_OK);
 }
@@ -411,8 +511,8 @@ static sp_hash_t hash_package(spn_session_t* session, spn_build_unit_t* build, s
   fingerprint.toolchain.ar = sp_hash_str(toolchain->archiver.program);
   fingerprint.toolchain.cxx = sp_hash_str(toolchain->cxx.program);
   fingerprint.toolchain.identity = build->toolchain->identity;
-  if (!sp_opt_is_null(toolchain->artifact)) {
-    fingerprint.toolchain.url = sp_hash_str(sp_opt_get(toolchain->artifact).sha256);
+  if (!sp_opt_is_null(build->toolchain->artifact)) {
+    fingerprint.toolchain.url = sp_hash_str(sp_opt_get(build->toolchain->artifact).sha256);
   }
 
   sp_hash_t hash = sp_hash_bytes(&fingerprint, sizeof(fingerprint), 0);

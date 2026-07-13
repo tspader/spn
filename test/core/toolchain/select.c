@@ -13,8 +13,7 @@ typedef struct {
   spn_err_t kind;
   const c8* build;
   const c8* script;
-  u32 required;
-  bool dedup;
+  bool same_definition;
   struct {
     const c8* name;
     spn_toolchain_role_t role;
@@ -59,7 +58,7 @@ static void run_select_test(s32* utest_result, select_test_t t) {
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
 
   spn_toolchain_catalog_t catalog = sp_zero;
-  fixture_catalog(utest_result, &catalog, HOST_X64_LINUX);
+  fixture_catalog(utest_result, &catalog);
 
   sp_carr_for(t.toolchains, it) {
     select_toolchain_t desc = t.toolchains[it];
@@ -71,15 +70,24 @@ static void run_select_test(s32* utest_result, select_test_t t) {
     spn_toolchain_catalog_add(&catalog, toolchain);
   }
 
-  spn_toolchain_query_t query = {
-    .build = sp_str_view(t.build),
-    .script = sp_str_lit("zig"),
+  spn_toolchain_query_t build_query = {
+    .name = sp_str_view(t.build),
     .target = t.target,
     .host = HOST_X64_LINUX,
+    .role = SPN_TOOLCHAIN_ROLE_BUILD,
   };
-
-  spn_toolchain_selection_t selection = sp_zero;
-  spn_err_union_t err = spn_toolchain_select(&catalog, query, mem, &selection);
+  spn_toolchain_query_t script_query = {
+    .name = sp_str_lit("zig"),
+    .target = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI, .abi = SPN_ABI_NONE },
+    .host = HOST_X64_LINUX,
+    .role = SPN_TOOLCHAIN_ROLE_SCRIPT,
+  };
+  spn_toolchain_resolution_t build = SP_ZERO_INITIALIZE();
+  spn_toolchain_resolution_t script = SP_ZERO_INITIALIZE();
+  spn_err_union_t err = spn_toolchain_select(&catalog, build_query, &build);
+  if (!err.kind) {
+    err = spn_toolchain_select(&catalog, script_query, &script);
+  }
 
   ASSERT_EQ((u32)t.expect.kind, (u32)err.kind);
 
@@ -98,15 +106,14 @@ static void run_select_test(s32* utest_result, select_test_t t) {
     return;
   }
 
-  ASSERT_TRUE(selection.build);
-  ASSERT_TRUE(selection.script);
-  EXPECT_STR(selection.build->name, t.expect.build);
-  EXPECT_STR(selection.script->name, t.expect.script);
-  EXPECT_EQ(t.expect.required, (u32)sp_da_size(selection.required));
-
-  if (t.expect.dedup) {
-    EXPECT_TRUE(selection.build == selection.script);
-    EXPECT_TRUE(selection.build == selection.required[0]);
+  ASSERT_TRUE(build.info);
+  ASSERT_TRUE(script.info);
+  EXPECT_STR(build.info->name, t.expect.build);
+  EXPECT_STR(script.info->name, t.expect.script);
+  if (t.expect.same_definition) {
+    EXPECT_TRUE(build.info == script.info);
+  } else {
+    EXPECT_TRUE(build.info != script.info);
   }
 }
 
@@ -132,20 +139,18 @@ UTEST(select, system_for_host_pulls_zig_for_scripts) {
     .expect = {
       .build = "system",
       .script = "zig",
-      .required = 2,
     },
   });
 }
 
-UTEST(select, zig_as_build_toolchain_dedups) {
+UTEST(select, zig_resolves_for_both_contexts) {
   run_select_test(utest_result, (select_test_t) {
     .build = "zig",
     .target = HOST_X64_LINUX,
     .expect = {
       .build = "zig",
       .script = "zig",
-      .required = 1,
-      .dedup = true,
+      .same_definition = true,
     },
   });
 }
@@ -185,7 +190,6 @@ UTEST(select, declared_target_allows_cross) {
     .expect = {
       .build = "mingw",
       .script = "zig",
-      .required = 2,
     },
   });
 }
@@ -237,6 +241,23 @@ UTEST(select, build_target_failure_reports_build_role_for_zig) {
       },
     },
   });
+}
+
+UTEST(select, distribution_rejects_unsupported_host) {
+  spn_toolchain_catalog_t catalog = SP_ZERO_INITIALIZE();
+  fixture_catalog(utest_result, &catalog);
+  spn_toolchain_resolution_t resolution = SP_ZERO_INITIALIZE();
+  spn_err_union_t err = spn_toolchain_select(&catalog, (spn_toolchain_query_t) {
+    .name = sp_str_lit("zig"),
+    .target = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI, .abi = SPN_ABI_NONE },
+    .host = HOST_ARM_LINUX,
+    .role = SPN_TOOLCHAIN_ROLE_SCRIPT,
+  }, &resolution);
+
+  EXPECT_EQ((u32)SPN_ERR_TOOLCHAIN_HOST, (u32)err.kind);
+  EXPECT_STR(err.toolchain.name, "zig");
+  EXPECT_EQ((u32)HOST_ARM_LINUX.arch, (u32)err.toolchain.host.arch);
+  EXPECT_TRUE(sp_opt_is_null(resolution.artifact));
 }
 
 UTEST(select, supports_empty_targets_match_host_only) {

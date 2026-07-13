@@ -24,11 +24,8 @@
 #include "toolchain/types.h"
 #include "unit/types.h"
 
-SP_PRIVATE spn_toolchain_unit_t*
-setup_toolchain_unit(spn_session_t* session, spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain) {
-  spn_toolchain_unit_t *unit = sp_alloc_type(spn.mem, spn_toolchain_unit_t);
-  unit->info = toolchain;
-
+SP_PRIVATE spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchain_unit_t* unit) {
+  spn_toolchain_info_t* toolchain = unit->info;
   sp_str_t name = toolchain->name;
 
   struct { sp_str_t build; sp_str_t test; sp_str_t jsonl; } paths = {
@@ -45,8 +42,8 @@ setup_toolchain_unit(spn_session_t* session, spn_toolchain_store_t* store, spn_t
 
   bool cached = true;
   sp_str_t url = sp_zero;
-  if (!sp_opt_is_null(toolchain->artifact)) {
-    spn_artifact_t artifact = sp_opt_get(toolchain->artifact);
+  if (toolchain->source == SPN_TOOLCHAIN_SOURCE_DISTRIBUTION) {
+    spn_artifact_t artifact = sp_opt_get(unit->artifact);
     url = spn_artifact_resolve_url(spn.mem, artifact, store->mirror);
     cached = sp_fs_is_dir(spn_toolchain_store_path(store, artifact));
   }
@@ -60,13 +57,13 @@ setup_toolchain_unit(spn_session_t* session, spn_toolchain_store_t* store, spn_t
       }});
   }
 
-  spn_err_union_t err = spn_toolchain_provision(store, toolchain, &unit->root);
+  spn_err_union_t err = spn_toolchain_provision(store, toolchain, unit->artifact, &unit->root);
   if (err.kind) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_ERR,
       .err = err,
     });
-    return SP_NULLPTR;
+    return SPN_ERROR;
   }
 
   spn_event_buffer_push(spn.events, (spn_build_event_t){
@@ -92,13 +89,11 @@ setup_toolchain_unit(spn_session_t* session, spn_toolchain_store_t* store, spn_t
     unit->archiver = spn_toolchain_launcher_with_root(spn.mem, toolchain->archiver, unit->root);
   }
 
-  if (sp_opt_is_null(toolchain->artifact)) {
-    // @spader If you bring your own toolchain, I don't care about
-    // tracking it for now.
+  if (toolchain->source == SPN_TOOLCHAIN_SOURCE_LOCAL) {
     unit->identity = sp_hash_str(unit->compiler.program);
   }
 
-  return unit;
+  return SPN_OK;
 }
 
 static spn_err_t materialize_tree(spn_session_t* session, sp_str_t name, spn_pkg_tree_t tree, sp_str_t* root, bool* fetched) {
@@ -279,8 +274,7 @@ static s32 sync_package_node(spn_bg_cmd_t *cmd, void *user_data) {
 
 static s32 sync_toolchain_node(spn_bg_cmd_t* cmd, void* user_data) {
   spn_sync_toolchain_job_t* job = (spn_sync_toolchain_job_t *)user_data;
-  job->unit = setup_toolchain_unit(job->session, job->store, job->toolchain);
-  return job->unit ? SPN_OK : SPN_ERROR;
+  return setup_toolchain_unit(job->store, job->unit);
 }
 
 spn_task_step_t spn_task_sync_packages_init(spn_app_t *app) {
@@ -320,11 +314,10 @@ spn_task_step_t spn_task_sync_packages_init(spn_app_t *app) {
     spn_bg_add_fn(graph, sync_package_node, job);
   }
 
-  sp_da_for(session->selection.required, it) {
+  sp_da_for(session->units.toolchains, it) {
     spn_sync_toolchain_job_t *job = sp_alloc_type(spn.mem, spn_sync_toolchain_job_t);
-    job->session = session;
     job->store = &app->sync.store;
-    job->toolchain = session->selection.required[it];
+    job->unit = session->units.toolchains[it];
     sp_da_push(app->sync.toolchains, job);
 
     spn_bg_add_fn(graph, sync_toolchain_node, job);

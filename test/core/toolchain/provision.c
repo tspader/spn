@@ -198,15 +198,17 @@ static void run_provision_test(s32* utest_result, provision_test_t t) {
     }
 
     spn_toolchain_info_t toolchain = fixture_local_toolchain(name, name);
+    spn_opt_artifact_t artifact = SP_ZERO_INITIALIZE();
     if (!t.local) {
-      sp_opt_set(toolchain.artifact, ((spn_artifact_t) {
+      toolchain.source = SPN_TOOLCHAIN_SOURCE_DISTRIBUTION;
+      sp_opt_set(artifact, ((spn_artifact_t) {
         .url = url,
         .sha256 = artifact_sha,
       }));
     }
 
     roots[it] = sp_str_lit("sentinel");
-    err = spn_toolchain_provision(&store, &toolchain, &roots[it]);
+    err = spn_toolchain_provision(&store, &toolchain, artifact, &roots[it]);
     ASSERT_EQ((u32)t.expect.kind, (u32)err.kind);
     if (err.kind) {
       EXPECT_STR(err.artifact.name, name);
