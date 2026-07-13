@@ -32,12 +32,12 @@ void add_deps_to_cc_target(spn_cc_link_t* link, spn_target_unit_t* target) {
 
     switch (lib->lib_kind) {
       case SPN_LIB_KIND_STATIC: {
-        sp_da_push(link->lib_dirs, lib->paths.lib);
+        sp_da_push(link->lib_dirs, lib->pkg->paths.lib);
         sp_da_push(link->system_libs, lib->info->name);
         break;
       }
       case SPN_LIB_KIND_SHARED: {
-        sp_da_push(link->lib_dirs, lib->paths.lib);
+        sp_da_push(link->lib_dirs, lib->pkg->paths.lib);
         sp_da_push(link->system_libs, lib->info->name);
         break;
       }
@@ -93,7 +93,7 @@ void add_deps_to_cc_target(spn_cc_link_t* link, spn_target_unit_t* target) {
 sp_str_t get_embed_object_path(sp_mem_t mem, spn_target_unit_t* unit) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
   sp_str_t name = sp_fmt(s.mem, "{}.embed.o", SP_FMT_STR(unit->info->name)).value;
-  sp_str_t path = sp_fs_join_path(mem, unit->paths.generated, name);
+  sp_str_t path = sp_fs_join_path(mem, unit->pkg->paths.generated, name);
   sp_mem_end_scratch(s);
   return path;
 }
@@ -101,7 +101,7 @@ sp_str_t get_embed_object_path(sp_mem_t mem, spn_target_unit_t* unit) {
 sp_str_t get_embed_header_path(sp_mem_t mem, spn_target_unit_t* unit) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
   sp_str_t name = sp_fmt(s.mem, "{}.embed.h", SP_FMT_STR(unit->info->name)).value;
-  sp_str_t path = sp_fs_join_path(mem, unit->paths.generated, name);
+  sp_str_t path = sp_fs_join_path(mem, unit->pkg->paths.generated, name);
   sp_mem_end_scratch(s);
   return path;
 }
@@ -136,21 +136,21 @@ sp_str_t get_target_output_path(sp_mem_t mem, spn_target_unit_t* target) {
 
   switch (target->kind) {
     case SPN_CC_OUTPUT_EXE: {
-      return sp_fs_join_path(mem, target->paths.bin, info->name);
+      return sp_fs_join_path(mem, target->pkg->paths.bin, info->name);
     }
     case SPN_CC_OUTPUT_STATIC_LIB: {
       sp_str_t file_name = sp_os_lib_to_file_name(s.mem, info->name, SP_OS_LIB_STATIC);
-      path = sp_fs_join_path(mem, target->paths.lib, file_name);
+      path = sp_fs_join_path(mem, target->pkg->paths.lib, file_name);
       break;
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
       sp_str_t file_name = sp_os_lib_to_file_name(s.mem, info->name, SP_OS_LIB_SHARED);
-      path = sp_fs_join_path(mem, target->paths.lib, file_name);
+      path = sp_fs_join_path(mem, target->pkg->paths.lib, file_name);
       break;
     }
     case SPN_CC_OUTPUT_REACTOR: {
       sp_str_t file_name = sp_fmt(s.mem, "{}.wasm", SP_FMT_STR(info->name)).value;
-      path = sp_fs_join_path(mem, target->paths.generated, file_name);
+      path = sp_fs_join_path(mem, target->pkg->paths.generated, file_name);
       break;
     }
     case SPN_CC_OUTPUT_OBJECT: {

@@ -68,7 +68,7 @@ static spn_err_union_t render_archive_invocation(spn_target_unit_t* target, sp_s
   target->invocation = (spn_invocation_t) {
     .program = ps.command,
     .args = ps.dyn_args,
-    .cwd = target->paths.work,
+    .cwd = target->pkg->paths.work,
   };
   return spn_result(SPN_OK);
 }
@@ -124,7 +124,7 @@ static spn_err_union_t render_link_invocation(spn_target_unit_t* target, sp_str_
   target->invocation = (spn_invocation_t) {
     .program = ps.command,
     .args = ps.dyn_args,
-    .cwd = target->paths.work,
+    .cwd = target->pkg->paths.work,
   };
   return spn_result(SPN_OK);
 }

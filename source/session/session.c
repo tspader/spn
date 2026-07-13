@@ -634,30 +634,10 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
     }
   }
 
-  target->paths.recipe = pkg->paths.recipe;
-  target->paths.source = pkg->paths.source;
-  target->paths.work = pkg->paths.work;
-  target->paths.store = pkg->paths.store;
-  target->paths.include = sp_fs_join_path(session->mem, target->paths.store, SP_LIT("include"));
-  target->paths.bin = sp_fs_join_path(session->mem, target->paths.store, SP_LIT("bin"));
-  target->paths.lib = sp_fs_join_path(session->mem, target->paths.store, SP_LIT("lib"));
-  target->paths.vendor = sp_fs_join_path(session->mem, target->paths.store, SP_LIT("vendor"));
-  target->paths.generated = sp_fs_join_path(session->mem, target->paths.work, SP_LIT("spn"));
-  target->paths.object = sp_fs_join_path(session->mem, target->paths.generated, sp_str_lit("object"));
-  target->paths.logs.build = sp_fs_join_path(session->mem, target->paths.work, sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(info->name)).value);
-  target->paths.logs.test = sp_fs_join_path(session->mem, target->paths.work, sp_fmt(session->mem, "{}.test.log", SP_FMT_STR(info->name)).value);
-  target->paths.logs.jsonl = sp_fs_join_path(session->mem, target->paths.work, sp_fmt(session->mem, "{}.build.jsonl", SP_FMT_STR(info->name)).value);
-
-  sp_fs_create_dir(target->paths.work);
-  sp_fs_create_dir(target->paths.generated);
-  sp_fs_create_dir(target->paths.object);
-  sp_fs_create_dir(target->paths.store);
-  sp_fs_create_dir(target->paths.bin);
-  sp_fs_create_dir(target->paths.include);
-  sp_fs_create_dir(target->paths.lib);
-  sp_fs_create_dir(target->paths.vendor);
-  spn_lazy_log_init(&target->logs.build, target->paths.logs.build);
-  spn_lazy_log_init(&target->logs.jsonl, target->paths.logs.jsonl);
+  sp_str_t build_log = sp_fs_join_path(session->mem, pkg->paths.work, sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(info->name)).value);
+  sp_str_t jsonl_log = sp_fs_join_path(session->mem, pkg->paths.work, sp_fmt(session->mem, "{}.build.jsonl", SP_FMT_STR(info->name)).value);
+  spn_lazy_log_init(&target->logs.build, build_log);
+  spn_lazy_log_init(&target->logs.jsonl, jsonl_log);
   return target;
 }
 
@@ -769,6 +749,7 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   unit->paths.vendor = sp_fs_join_path(session->mem, unit->paths.store, SP_LIT("vendor"));
 
   unit->paths.generated = sp_fs_join_path(session->mem, unit->paths.work, SP_LIT("spn"));
+  unit->paths.object = sp_fs_join_path(session->mem, unit->paths.generated, sp_str_lit("object"));
 
   unit->logs.build = sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(unit->info->name)).value;
   unit->logs.test = sp_fmt(session->mem, "{}.test.log", SP_FMT_STR(unit->info->name)).value;
@@ -780,6 +761,7 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
 
   sp_fs_create_dir(unit->paths.work);
   sp_fs_create_dir(unit->paths.generated);
+  sp_fs_create_dir(unit->paths.object);
   sp_fs_create_dir(unit->paths.store);
   sp_fs_create_dir(unit->paths.bin);
   sp_fs_create_dir(unit->paths.include);
