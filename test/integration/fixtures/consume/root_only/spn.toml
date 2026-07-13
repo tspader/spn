@@ -1,0 +1,10 @@
+[package]
+name = "root_only"
+version = "0.1.0"
+
+[deps.package]
+dependency = { path = "packages/dependency" }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

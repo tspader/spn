@@ -1,0 +1,21 @@
+[package]
+name = "dependency"
+version = "1.0.0"
+
+[[lib]]
+name = "dependency"
+kinds = ["static"]
+source = ["dependency.c"]
+headers = ["dependency.h"]
+
+[[bin]]
+name = "dependency-bin"
+source = ["program.c"]
+
+[[test]]
+name = "dependency-test"
+source = ["program.c"]
+
+[[script]]
+name = "dependency-script"
+source = ["program.c"]

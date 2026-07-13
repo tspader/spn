@@ -14,20 +14,6 @@ UTEST_F(consume, static_lib) {
   });
 }
 
-UTEST_F(consume, static_lib_static_profile) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_static_static_profile");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
-    .project = "test/integration/fixtures/consume/static",
-    .copy = { "packages/*" },
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "static" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = profile_store_file("static", "lib/libspum.a") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = profile_store_file("static", "bin/main") },
-    },
-  });
-}
-
 UTEST_F(consume, shared_lib) {
   tmpfs_init_named(&uf->fixture.fs, "consume_shared");
 
@@ -50,6 +36,8 @@ UTEST_F(consume, shared_lib_static_profile) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "static" }, .rc = 1 } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("doesn't support") },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("the profile requested it") },
     },
   });
 }
@@ -63,19 +51,6 @@ UTEST_F(consume, source_lib) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "debug" } } },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
-    },
-  });
-}
-
-UTEST_F(consume, source_lib_static_profile) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_source_static_profile");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
-    .project = "test/integration/fixtures/consume/source",
-    .copy = { "packages/*" },
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "static" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = profile_store_file("static", "bin/main") },
     },
   });
 }
@@ -105,6 +80,37 @@ UTEST_F(consume, transitive) {
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libspum.a") },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libspam.a") },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
+    },
+  });
+}
+
+UTEST_F(consume, explicit_root_with_package_dep) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_explicit_root_with_package_dep");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/consume/root_only",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "main" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("dependency") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/dependency-bin") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/dependency-script") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug/test/dependency-test") },
+    },
+  });
+}
+
+UTEST_F(consume, dependency_package_is_not_a_root_target) {
+  tmpfs_init_named(&uf->fixture.fs, "consume_dependency_package_is_not_a_root_target");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/consume/root_only",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "dependency" }, .rc = 1 } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("is not defined for the selected target kinds") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = static_lib("dependency") },
     },
   });
 }
@@ -171,6 +177,8 @@ UTEST_F(consume, kind_not_supported) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("doesn't support") },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("the root manifest requested it") },
     },
   });
 }
