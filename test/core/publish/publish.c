@@ -42,7 +42,7 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
   ctx_t* harness = ctx_get();
   sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
 
-  git_repo_result_t source_repo = SP_ZERO_INITIALIZE();
+  git_repo_result_t source_repo = sp_zero;
   if (c.source_repo.name) {
     source_repo = git_repo_build(&harness->fs, c.source_repo.name, &c.source_repo);
 
@@ -98,7 +98,7 @@ static void run_case(s32* utest_result, struct cmd_publish* fixture, case_t c) {
     .revision = repo.commits[rev_idx],
   };
 
-  spn_index_release_t release = SP_ZERO_INITIALIZE();
+  spn_index_release_t release = sp_zero;
   spn_err_union_t result = spn_publish_build(&opts, &release);
   if (!result.kind) {
     result = spn_index_publish(&index, &release);

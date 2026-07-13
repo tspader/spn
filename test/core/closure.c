@@ -87,7 +87,7 @@ void run_closure_test(s32* utest_result, closure_test_t t) {
   spn_session_t* session = sp_alloc_type(mem, spn_session_t);
   session->mem = mem;
 
-  spn_pkg_unit_t* pkgs [CLOSURE_TEST_MAX_PKGS] = SP_ZERO_INITIALIZE();
+  spn_pkg_unit_t* pkgs [CLOSURE_TEST_MAX_PKGS] = sp_zero;
   u32 count = 0;
   sp_carr_for(t.pkgs, it) {
     if (!t.pkgs[it].name) {
@@ -222,7 +222,7 @@ UTEST_F(closure, test_edge_excluded_from_exe) {
       { .name = "test", .deps = { { "spum", .kind = SPN_DEP_KIND_TEST } } },
       { .name = "spum", .kind = SPN_LIB_KIND_STATIC },
     },
-    .expect = SP_ZERO_INITIALIZE(),
+    .expect = sp_zero,
   });
 }
 

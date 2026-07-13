@@ -1,6 +1,7 @@
 #include "target/closure.h"
 
 #include "forward/types.h"
+#include "unit/types.h"
 #include "target/types.h"
 
 typedef struct {

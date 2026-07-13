@@ -62,7 +62,7 @@ spn_task_step_t spn_task_resolve(spn_app_t* app) {
     .manifest = spn.paths.manifest,
   }));
 
-  spn_index_cache_t index = SP_ZERO_INITIALIZE();
+  spn_index_cache_t index = sp_zero;
   spn_index_cache_init(&index, session->mem, session->intern, &spn.indexes);
 
   spn_resolver_t resolver = sp_zero;

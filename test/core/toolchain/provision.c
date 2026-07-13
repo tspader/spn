@@ -2,7 +2,7 @@
 #include "utest.h"
 
 #include "fixture.h"
-#include "toolchain/sha256.h"
+#include "sha256/sha256.h"
 
 typedef struct {
   const c8* data;
@@ -198,7 +198,7 @@ static void run_provision_test(s32* utest_result, provision_test_t t) {
     }
 
     spn_toolchain_info_t toolchain = fixture_local_toolchain(name, name);
-    spn_opt_artifact_t artifact = SP_ZERO_INITIALIZE();
+    spn_opt_artifact_t artifact = sp_zero;
     if (!t.local) {
       toolchain.source = SPN_TOOLCHAIN_SOURCE_DISTRIBUTION;
       sp_opt_set(artifact, ((spn_artifact_t) {

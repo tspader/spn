@@ -18,7 +18,7 @@ bool spn_toolchain_supports(spn_toolchain_info_t* toolchain, spn_triple_t target
 }
 
 spn_err_union_t spn_toolchain_select(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, spn_toolchain_resolution_t* resolution) {
-  *resolution = (spn_toolchain_resolution_t)SP_ZERO_INITIALIZE();
+  *resolution = (spn_toolchain_resolution_t)sp_zero;
   spn_toolchain_info_t* toolchain = spn_toolchain_catalog_get(catalog, query.name);
   if (!toolchain) {
     return (spn_err_union_t) {

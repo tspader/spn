@@ -19,7 +19,6 @@
 #define sp_fmt_qstr(STR)     sp_fmt_str(STR)
 #define SP_FMT_QCSTR(CSTR)   sp_fmt_cstr(CSTR)
 
-#define SP_ZERO_INITIALIZE() sp_zero
 #define SP_ZERO()            sp_zero
 #define sp_zero_initialize() sp_zero
 #define SP_ZERO_STRUCT(T)    sp_zero_s(T)

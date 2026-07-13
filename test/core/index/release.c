@@ -184,7 +184,7 @@ static void run_release_test(s32* utest_result, release_test_t t) {
     .name = sp_str_lit("spum"),
   };
 
-  spn_index_pkg_t pkg = SP_ZERO_INITIALIZE();
+  spn_index_pkg_t pkg = sp_zero;
   spn_err_t err = spn_index_parse_pkg(mem, id, blob, &pkg);
   EXPECT_EQ(t.expect.err, err);
   if (err != SPN_OK || t.expect.err != SPN_OK) { return; }

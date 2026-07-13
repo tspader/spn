@@ -54,7 +54,7 @@ static void run_transcript_test(s32* utest_result, transcript_test_t test) {
     }
   }
 
-  sp_io_dyn_mem_writer_t writer = SP_ZERO_INITIALIZE();
+  sp_io_dyn_mem_writer_t writer = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &writer);
   spn_event_log_build(&writer.base, &event);
   EXPECT_TRUE(sp_str_equal_cstr(sp_io_dyn_mem_writer_as_str(&writer), test.expect));

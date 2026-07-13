@@ -102,7 +102,7 @@ if (err != SPN_OK) {
 
 ## Rules
 - Never, ever comment your code. Code with newly added comments will be rejected. If you're reviewing code, flag comments.
-- always use SP_ZERO_INITIALIZE() instead of leaving variables uninitialized
+- always use sp_zero instead of leaving variables uninitialized
 - always use braces for one liner scopes (e.g. `for`, `if`)
 - always use `foo()` instead of `foo(void)` for no-argument functions
 - always use `sp_for(it, 5)` instead of `for (u32 it = 0; it < 5; it++)`

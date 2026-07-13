@@ -6,7 +6,7 @@
 
 void spn_event_log_build(sp_io_writer_t* out, spn_build_event_t* event) {
   spn_invocation_t* invocation = SP_NULLPTR;
-  sp_str_t transcript = SP_ZERO_INITIALIZE();
+  sp_str_t transcript = sp_zero;
 
   switch (event->kind) {
     case SPN_EVENT_TARGET_BUILD_PASSED: invocation = event->target.passed.invocation;      transcript = event->target.passed.out;      break;

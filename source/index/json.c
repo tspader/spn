@@ -25,7 +25,7 @@ static spn_err_t spn_index_parse_semver(sp_str_t version, spn_semver_t* out) {
 }
 
 static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t json, spn_index_release_t* release) {
-  spn_cg_release_t rel = SP_ZERO_INITIALIZE();
+  spn_cg_release_t rel = sp_zero;
   if (!spn_release_read(json, &rel, mem)) {
     return SPN_ERROR;
   }
@@ -157,7 +157,7 @@ spn_err_t spn_index_parse_pkg(sp_mem_t mem, spn_pkg_name_t id, sp_str_t blob, sp
       continue;
     }
 
-    spn_index_release_t release = SP_ZERO_INITIALIZE();
+    spn_index_release_t release = sp_zero;
     spn_try(spn_index_parse_rel(mem, id, line, &release));
 
     sp_da_for(pkg->releases, n) {

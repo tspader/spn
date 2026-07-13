@@ -33,7 +33,7 @@ UTEST_F(intern, hello) {
     u64 d;
     u64 e;
     u64 f;
-  } markers = SP_ZERO_INITIALIZE();
+  } markers = sp_zero;
 
   sp_mem_t mem = sp_mem_os_new();
   sp_intern_t* intern = sp_alloc_type(mem, sp_intern_t);

@@ -63,13 +63,13 @@ static void run_toml_test(s32* utest_result, toml_test_t t) {
     ? toml_test_fixture(mem, TOML_MANIFEST_DIR, t.manifest)
     : sp_str_view(t.toml);
 
-  spn_toml_edit_t edit = SP_ZERO_INITIALIZE();
+  spn_toml_edit_t edit = sp_zero;
   spn_err_t err = spn_toml_edit_init(&edit, mem, source);
   EXPECT_EQ(t.expect.err, err);
   if (err || t.expect.err) return;
 
   if (t.expect.get.path[0]) {
-    sp_str_t path [TOML_TEST_MAX_PATH] = SP_ZERO_INITIALIZE();
+    sp_str_t path [TOML_TEST_MAX_PATH] = sp_zero;
     u32 num_segments = collect_path(t.expect.get.path, path);
     spn_toml_edit_entry_t* entry = spn_toml_edit_find(&edit, path, num_segments);
     if (t.expect.get.missing) {
@@ -83,7 +83,7 @@ static void run_toml_test(s32* utest_result, toml_test_t t) {
 
   sp_carr_for(t.set, it) {
     if (!t.set[it].value) break;
-    sp_str_t path [TOML_TEST_MAX_PATH] = SP_ZERO_INITIALIZE();
+    sp_str_t path [TOML_TEST_MAX_PATH] = sp_zero;
     u32 num_segments = collect_path(t.set[it].path, path);
     EXPECT_EQ(t.set[it].err, spn_toml_edit_set_str(&edit, path, num_segments, sp_str_view(t.set[it].value)));
   }

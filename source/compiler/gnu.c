@@ -129,7 +129,7 @@ static void add_define(sp_mem_t mem, sp_ps_config_t* ps, sp_str_t value) {
 
 void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, sp_ps_config_t* ps) {
   add_launcher(mem, toolchain, profile, compile->lang, ps);
-  spn_cc_flags_t flags = SP_ZERO_INITIALIZE();
+  spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);
   spn_gnu_render_flags(mem, profile, &flags);
@@ -169,7 +169,7 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
 
 void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, sp_ps_config_t* ps) {
   add_launcher(mem, toolchain, profile, link->lang, ps);
-  spn_cc_flags_t flags = SP_ZERO_INITIALIZE();
+  spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);
   spn_gnu_render_flags(mem, profile, &flags);

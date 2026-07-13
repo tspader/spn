@@ -1,5 +1,6 @@
 #include "sp.h"
 #include "sp/macro.h"
+#include "ctx/types.h"
 #include "forward/types.h"
 #include "resolve/types.h"
 #include "semver/types.h"
@@ -29,7 +30,7 @@ static bool same_triple(spn_triple_t lhs, spn_triple_t rhs) {
 }
 
 static spn_err_union_t bind_toolchain(spn_session_t* session, spn_toolchain_query_t query, spn_toolchain_unit_t** binding) {
-  spn_toolchain_resolution_t resolution = SP_ZERO_INITIALIZE();
+  spn_toolchain_resolution_t resolution = sp_zero;
   try_union(spn_toolchain_select(&session->catalog, query, &resolution));
 
   sp_da_for(session->units.toolchains, it) {
@@ -387,7 +388,7 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
 
 // The root manifest can pin the lib kind of any package in the build with [config.<pkg>] kind
 sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pkg_name) {
-  sp_opt_spn_linkage_t requested = SP_ZERO_INITIALIZE();
+  sp_opt_spn_linkage_t requested = sp_zero;
 
   spn_pkg_config_t* config = spn_pkg_config_find(session->pkg->config, pkg_name);
   if (config && !sp_opt_is_null(config->kind)) {
@@ -472,7 +473,7 @@ static sp_hash_t hash_package(spn_session_t* session, spn_build_unit_t* build, s
   spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, id);
   spn_pkg_info_t* pkg = loaded->info;
 
-  fingerprint_input_t fingerprint = SP_ZERO_INITIALIZE();
+  fingerprint_input_t fingerprint = sp_zero;
   fingerprint.qualified = sp_hash_str(pkg->qualified);
   fingerprint.options = hash_options(session, id);
   fingerprint.version = pkg->version;
@@ -526,7 +527,7 @@ typedef struct {
 } fingerprint_t;
 
 fingerprint_t fingerprint_package(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t id) {
-  fingerprint_t result = SP_ZERO_INITIALIZE();
+  fingerprint_t result = sp_zero;
   result.hash = hash_package(session, build, id);
   result.str = sp_fmt(session->mem, "{:0>16x}", sp_fmt_uint(result.hash)).value;
   return result;

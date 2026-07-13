@@ -110,7 +110,7 @@ static void build_lock(fixture_t* fixture, spn_lock_file_t* lock) {
 }
 
 static void run_fixture(s32* utest_result, fixture_t fixture) {
-  spn_lock_file_t lock = SP_ZERO_INITIALIZE();
+  spn_lock_file_t lock = sp_zero;
   build_lock(&fixture, &lock);
 
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);

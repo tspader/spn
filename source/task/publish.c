@@ -31,7 +31,7 @@ spn_task_step_t spn_task_publish(spn_app_t* app) {
     .allow_dirty = cmd->allow_dirty,
   };
 
-  spn_index_release_t release = SP_ZERO_INITIALIZE();
+  spn_index_release_t release = sp_zero;
   spn_try_step(spn_publish_build(&opts, &release));
 
   if (cmd->dry) {
