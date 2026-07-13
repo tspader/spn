@@ -20,10 +20,10 @@ bool                spn_dag_digest_equal(spn_dag_digest_t a, spn_dag_digest_t b)
 sp_str_t            spn_dag_digest_hex(sp_mem_t mem, spn_dag_digest_t digest);
 
 void                spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config);
-spn_err_t           spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag_digest_t* digest);
+spn_err_t           spn_dag_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag_digest_t* digest);
 spn_err_t           spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_digest_t* digest);
 bool                spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest);
-spn_err_t           spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_str_t* data);
+spn_err_t           spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_mem_slice_t* data);
 spn_err_t           spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t path);
 
 #endif

@@ -68,7 +68,7 @@ typedef struct {
   sp_mem_arena_t* arena;
   sp_mem_t mem;
   sp_str_t dir;
-  sp_ht(spn_dag_digest_t, sp_str_t) blobs;
+  sp_ht(spn_dag_digest_t, sp_mem_slice_t) blobs;
 } spn_dag_store_t;
 
 #endif

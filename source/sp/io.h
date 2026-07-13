@@ -10,5 +10,6 @@ void sp_io_write_u16(sp_io_writer_t* io, u16 value);
 void sp_io_write_u32(sp_io_writer_t* io, u32 value);
 void sp_io_write_u64(sp_io_writer_t* io, u64 value);
 void sp_io_write_s16(sp_io_writer_t* io, s16 value);
+sp_err_t sp_io_read_file_slice(sp_mem_t mem, sp_str_t path, sp_mem_slice_t* content);
 
 #endif
