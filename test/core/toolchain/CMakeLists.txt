@@ -17,7 +17,7 @@ add_executable(toolchain_test
   ${SRC}/toolchain/catalog.c
   ${SRC}/toolchain/provision.c
   ${SRC}/toolchain/select.c
-  ${SRC}/toolchain/sha256.c
+  ${SRC}/sha256/sha256.c
   ${SRC}/toolchain/toolchain.c
   ${SRC}/triple/triple.c
   main.c

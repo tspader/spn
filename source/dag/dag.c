@@ -1,0 +1,262 @@
+#include "dag/dag.h"
+#include "sha256/sha256.h"
+
+spn_dag_t* spn_dag_new(sp_mem_t mem) {
+  sp_mem_arena_t* arena = sp_mem_arena_new(mem);
+  sp_mem_t a = sp_mem_arena_as_allocator(arena);
+  spn_dag_t* g = sp_mem_allocator_alloc_type(a, spn_dag_t);
+  g->arena = arena;
+  g->mem = a;
+  sp_da_init(a, g->artifacts);
+  sp_da_init(a, g->actions);
+  return g;
+}
+
+spn_dag_artifact_t* spn_dag_find_artifact(spn_dag_t* g, spn_dag_id_t id) {
+  sp_assert(id.occupied);
+  return g->artifacts + id.index;
+}
+
+spn_dag_action_t* spn_dag_find_action(spn_dag_t* g, spn_dag_id_t id) {
+  sp_assert(id.occupied);
+  return g->actions + id.index;
+}
+
+static spn_dag_id_t spn_dag_add_artifact(spn_dag_t* g, spn_dag_artifact_t artifact) {
+  artifact.id = (spn_dag_id_t) {
+    .index = (u32)sp_da_size(g->artifacts),
+    .occupied = true
+  };
+  sp_da_init(g->mem, artifact.consumers);
+  sp_da_push(g->artifacts, artifact);
+  return artifact.id;
+}
+
+spn_dag_id_t spn_dag_add_value(spn_dag_t* g, const void* data, u64 len) {
+  return spn_dag_add_artifact(g, (spn_dag_artifact_t) {
+    .kind = SPN_DAG_ARTIFACT_KIND_VALUE,
+    .digest = spn_dag_digest(data, len),
+  });
+}
+
+spn_dag_id_t spn_dag_add_file(spn_dag_t* g, sp_str_t path) {
+  return spn_dag_add_artifact(g, (spn_dag_artifact_t) {
+    .kind = SPN_DAG_ARTIFACT_KIND_FILE,
+    .path = sp_str_copy(g->mem, path),
+  });
+}
+
+spn_dag_id_t spn_dag_add_action(spn_dag_t* g, spn_dag_action_config_t config) {
+  spn_dag_action_t action = {
+    .id = {
+      .index = (u32)sp_da_size(g->actions),
+      .occupied = true
+    },
+    .salt = config.salt,
+    .execute = config.execute,
+    .user_data = config.user_data,
+  };
+  sp_da_init(g->mem, action.consumes);
+  sp_da_init(g->mem, action.produces);
+  sp_da_push(g->actions, action);
+  return action.id;
+}
+
+void spn_dag_action_add_input(spn_dag_t* g, spn_dag_id_t action_id, spn_dag_id_t artifact_id) {
+  spn_dag_action_t* action = spn_dag_find_action(g, action_id);
+  spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, artifact_id);
+  sp_da_push(action->consumes, artifact_id);
+  sp_da_push(artifact->consumers, action_id);
+}
+
+spn_err_t spn_dag_action_add_output(spn_dag_t* g, spn_dag_id_t action_id, spn_dag_id_t artifact_id) {
+  spn_dag_action_t* action = spn_dag_find_action(g, action_id);
+  spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, artifact_id);
+  if (artifact->producer.occupied) {
+    return SPN_ERROR;
+  }
+  artifact->producer = action_id;
+  sp_da_push(action->produces, artifact_id);
+  return SPN_OK;
+}
+
+spn_dag_digest_t spn_dag_action_key(spn_dag_t* g, spn_dag_id_t action_id) {
+  spn_dag_action_t* action = spn_dag_find_action(g, action_id);
+
+  spn_sha256_ctx_t ctx = sp_zero;
+  spn_sha256_init(&ctx);
+  spn_sha256_update(&ctx, action->salt.bytes, sizeof(action->salt.bytes));
+  sp_da_for(action->consumes, it) {
+    spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, action->consumes[it]);
+    spn_sha256_update(&ctx, artifact->digest.bytes, sizeof(artifact->digest.bytes));
+  }
+
+  spn_dag_digest_t key = sp_zero;
+  spn_sha256_final(&ctx, key.bytes);
+  return key;
+}
+
+spn_dag_digest_t spn_dag_digest(const void* data, u64 len) {
+  spn_dag_digest_t digest = sp_zero;
+  spn_sha256(data, len, digest.bytes);
+  return digest;
+}
+
+bool spn_dag_digest_equal(spn_dag_digest_t a, spn_dag_digest_t b) {
+  return sp_mem_is_equal(a.bytes, b.bytes, sizeof(a.bytes));
+}
+
+sp_str_t spn_dag_digest_hex(sp_mem_t mem, spn_dag_digest_t digest) {
+  return spn_sha256_digest_hex(mem, digest.bytes);
+}
+
+static sp_str_t spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
+  return sp_fs_join_path(mem, store->dir, spn_dag_digest_hex(mem, digest));
+}
+
+void spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config) {
+  store->kind = config.kind;
+  store->arena = sp_mem_arena_new(config.mem);
+  store->mem = sp_mem_arena_as_allocator(store->arena);
+
+  switch (store->kind) {
+    case SPN_DAG_STORE_MEM: {
+      sp_ht_init(store->mem, store->blobs);
+      break;
+    }
+    case SPN_DAG_STORE_FILESYSTEM: {
+      store->dir = sp_str_copy(store->mem, config.dir);
+      if (!sp_fs_exists(store->dir)) {
+        sp_fs_create_dir(store->dir);
+      }
+      break;
+    }
+  }
+}
+
+spn_err_t spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag_digest_t* digest) {
+  *digest = spn_dag_digest(data, len);
+
+  switch (store->kind) {
+    case SPN_DAG_STORE_MEM: {
+      if (sp_ht_getp(store->blobs, *digest)) {
+        return SPN_OK;
+      }
+      sp_str_t blob = sp_str_copy(store->mem, sp_str((const c8*)data, (u32)len));
+      sp_ht_insert(store->blobs, *digest, blob);
+      return SPN_OK;
+    }
+    case SPN_DAG_STORE_FILESYSTEM: {
+      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+      sp_str_t path = spn_dag_store_path(store, scratch.mem, *digest);
+      spn_err_t err = SPN_OK;
+      if (!sp_fs_exists(path)) {
+        if (sp_fs_create_file_str(path, sp_str((const c8*)data, (u32)len))) {
+          err = SPN_ERROR;
+        }
+      }
+      sp_mem_end_scratch(scratch);
+      return err;
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(SPN_ERROR);
+}
+
+spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_digest_t* digest) {
+  switch (store->kind) {
+    case SPN_DAG_STORE_MEM: {
+      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+      sp_str_t content = sp_zero;
+      if (sp_io_read_file(scratch.mem, path, &content)) {
+        sp_mem_end_scratch(scratch);
+        return SPN_ERROR;
+      }
+      spn_err_t err = spn_dag_store_put(store, content.data, content.len, digest);
+      sp_mem_end_scratch(scratch);
+      return err;
+    }
+    case SPN_DAG_STORE_FILESYSTEM: {
+      if (spn_sha256_file_digest(path, digest->bytes)) {
+        return SPN_ERROR;
+      }
+
+      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+      sp_str_t stored = spn_dag_store_path(store, scratch.mem, *digest);
+      spn_err_t err = SPN_OK;
+      if (!sp_fs_exists(stored)) {
+        if (sp_fs_copy(path, stored)) {
+          err = SPN_ERROR;
+        }
+      }
+      sp_mem_end_scratch(scratch);
+      return err;
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(SPN_ERROR);
+}
+
+bool spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest) {
+  switch (store->kind) {
+    case SPN_DAG_STORE_MEM: {
+      return sp_ht_getp(store->blobs, digest) != SP_NULLPTR;
+    }
+    case SPN_DAG_STORE_FILESYSTEM: {
+      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+      bool exists = sp_fs_exists(spn_dag_store_path(store, scratch.mem, digest));
+      sp_mem_end_scratch(scratch);
+      return exists;
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(false);
+}
+
+spn_err_t spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_str_t* data) {
+  switch (store->kind) {
+    case SPN_DAG_STORE_MEM: {
+      sp_str_t* blob = sp_ht_getp(store->blobs, digest);
+      if (!blob) {
+        return SPN_ERROR;
+      }
+      *data = sp_str_copy(mem, *blob);
+      return SPN_OK;
+    }
+    case SPN_DAG_STORE_FILESYSTEM: {
+      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+      sp_str_t path = spn_dag_store_path(store, scratch.mem, digest);
+      spn_err_t err = sp_io_read_file(mem, path, data) ? SPN_ERROR : SPN_OK;
+      sp_mem_end_scratch(scratch);
+      return err;
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(SPN_ERROR);
+}
+
+spn_err_t spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t path) {
+  switch (store->kind) {
+    case SPN_DAG_STORE_MEM: {
+      sp_str_t* blob = sp_ht_getp(store->blobs, digest);
+      if (!blob) {
+        return SPN_ERROR;
+      }
+      return sp_fs_create_file_str(path, *blob) ? SPN_ERROR : SPN_OK;
+    }
+    case SPN_DAG_STORE_FILESYSTEM: {
+      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+      sp_str_t stored = spn_dag_store_path(store, scratch.mem, digest);
+      spn_err_t err = SPN_OK;
+      if (!sp_fs_exists(stored)) {
+        err = SPN_ERROR;
+      } else if (sp_fs_copy(stored, path)) {
+        err = SPN_ERROR;
+      }
+      sp_mem_end_scratch(scratch);
+      return err;
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(SPN_ERROR);
+}
