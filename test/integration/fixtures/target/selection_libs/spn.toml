@@ -1,0 +1,13 @@
+[package]
+name = "selection_libs"
+version = "0.1.0"
+
+[[lib]]
+name = "one"
+kinds = ["static"]
+source = ["one.c"]
+
+[[lib]]
+name = "two"
+kinds = ["static"]
+source = ["two.c"]

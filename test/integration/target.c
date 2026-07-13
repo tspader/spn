@@ -7,7 +7,7 @@ UTEST_F(target, static_lib) {
     .project = "test/integration/fixtures/target/static_lib",
     .copy = { "mylib.c" },
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "mylib" } } },
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libmylib.a") },
     },
   });
@@ -20,7 +20,7 @@ UTEST_F(target, shared_lib) {
     .project = "test/integration/fixtures/target/shared_lib",
     .copy = { "spum.c" },
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "spum" } } },
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = shared_lib("spum") },
     },
   });
@@ -65,6 +65,36 @@ UTEST_F(target, multiple_roots) {
   });
 }
 
+UTEST_F(target, selection_default) {
+  tmpfs_init_named(&uf->fixture.fs, "target_selection_default");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/target/selection",
+    .copy = { "spum.c", "script.c" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libspum.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/test/test") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/script") },
+    },
+  });
+}
+
+UTEST_F(target, selection_named_library) {
+  tmpfs_init_named(&uf->fixture.fs, "target_selection_named_library");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/target/selection_libs",
+    .copy = { "one.c", "two.c" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "one" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("one") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = static_lib("two") },
+    },
+  });
+}
+
 UTEST_F(target, selection_multiple_kinds) {
   tmpfs_init_named(&uf->fixture.fs, "target_selection_multiple_kinds");
 
@@ -88,7 +118,8 @@ UTEST_F(target, selection_name_respects_kind) {
     .project = "test/integration/fixtures/target/selection",
     .copy = { "spum.c", "script.c" },
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--lib", "main" } } },
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--lib", "main" }, .rc = 1 } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("is not defined for the selected target kinds") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/main") },
     },
   });

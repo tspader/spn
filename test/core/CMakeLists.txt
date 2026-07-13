@@ -186,6 +186,13 @@ add_executable(closure
 spn_test_binary(closure)
 add_test(NAME closure COMMAND "$<TARGET_FILE:closure>")
 
+add_executable(target_filter
+  filter.c
+  ${SRC}/filter/filter.c
+)
+spn_test_binary(target_filter)
+add_test(NAME target_filter COMMAND "$<TARGET_FILE:target_filter>")
+
 add_subdirectory(dag)
 add_subdirectory(resolver)
 add_subdirectory(index)
