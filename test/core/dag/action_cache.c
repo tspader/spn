@@ -1,3 +1,5 @@
+#include "common.h"
+
 typedef struct {
   const c8* path;
   const c8* blob;

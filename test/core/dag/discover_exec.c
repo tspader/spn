@@ -1,3 +1,5 @@
+#include "common.h"
+
 typedef struct {
   const c8* path;
   const c8* content;
@@ -96,7 +98,7 @@ static void run_disco_exec_test(s32* utest_result, disco_exec_test_t t) {
   });
   spn_dag_file_cache_init(&env.files, env.fs.mem);
   spn_dag_action_cache_init(&env.cache, env.fs.mem);
-  spn_dag_discovery_init(&env.discovery, env.fs.mem);
+  spn_dag_discovery_init(&env.discovery, env.fs.mem, tmpfs_get(&env.fs, sp_str_lit("manifests")));
 
   sp_carr_for(t.runs, r) {
     disco_run_t* run = &t.runs[r];
@@ -217,4 +219,65 @@ UTEST_F(discover_exec, probe_still_absent_hits) {
       { .headers = { { "inc2/sp.h", "SP" } }, .probes = { "inc1/sp.h" }, .expect_runs = 1 },
     }
   });
+}
+
+static sp_str_t disco_manifest_read(disco_exec_env_t* env) {
+  sp_str_t dir = tmpfs_get(&env->fs, sp_str_lit("manifests"));
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect(env->fs.mem, dir);
+  if (sp_da_size(entries) != 1) {
+    return sp_str_lit("");
+  }
+  sp_str_t content = sp_zero;
+  sp_io_read_file(env->fs.mem, entries[0].path, &content);
+  return content;
+}
+
+UTEST_F(discover_exec, manifest_rewritten_on_hit) {
+  disco_exec_env_t env = sp_zero;
+  tmpfs_init_named(&env.fs, "discover_manifest_rewrite");
+  spn_dag_store_init(&env.store, (spn_dag_store_config_t) {
+    .kind = SPN_DAG_STORE_MEM,
+    .mem = env.fs.mem
+  });
+  spn_dag_file_cache_init(&env.files, env.fs.mem);
+  spn_dag_action_cache_init(&env.cache, env.fs.mem);
+  spn_dag_discovery_init(&env.discovery, env.fs.mem, tmpfs_get(&env.fs, sp_str_lit("manifests")));
+
+  const c8* input = "int main() {}";
+  disco_run_t run = { .headers = { { "sp.h", "SP" } }, .expect_runs = 1 };
+  env.run = &run;
+
+  sp_for(build, 3) {
+    if (build == 2) {
+      tmpfs_create(&env.fs, sp_str_lit("sp.h"), sp_str_lit("SP"));
+    }
+
+    spn_dag_file_cache_init(&env.files, env.fs.mem);
+    spn_dag_discovery_init(&env.discovery, env.fs.mem, tmpfs_get(&env.fs, sp_str_lit("manifests")));
+    disco_exec_prepare(&env, &run);
+
+    spn_dag_t* g = spn_dag_new(env.fs.mem);
+    env.g = g;
+    spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
+      .identity = spn_dag_digest(input, sp_cstr_len(input)),
+      .execute = disco_exec_fn,
+      .discover = disco_discover_fn,
+      .user_data = &env
+    });
+    spn_dag_action_add_input(g, action, spn_dag_add_value(g, input, sp_cstr_len(input)));
+    ASSERT_EQ(SPN_OK, spn_dag_action_add_output(g, action, spn_dag_add_file(g, tmpfs_get(&env.fs, sp_str_lit("main.o")))));
+
+    ASSERT_EQ(SPN_OK, spn_dag_execute_discovered(g, action, &env.files, &env.cache, &env.store, &env.discovery));
+    EXPECT_EQ(1u, env.runs);
+  }
+
+  sp_str_t manifest = disco_manifest_read(&env);
+  EXPECT_TRUE(!sp_str_empty(manifest));
+
+  sp_sys_file_meta_t sys = sp_zero;
+  ASSERT_EQ(SPN_OK, spn_dag_get_file_meta(&env.files, tmpfs_get(&env.fs, sp_str_lit("sp.h")), &sys));
+  sp_str_t mtime = sp_fmt(env.fs.mem, "\"mtime_ns\":\"{}\"", sp_fmt_int(sys.mtime.tv_nsec)).value;
+  EXPECT_TRUE(sp_str_contains(manifest, mtime));
+
+  tmpfs_deinit(&env.fs);
 }

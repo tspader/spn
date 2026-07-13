@@ -1,6 +1,7 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 #include "sp/sp_cli.h"
+#include "sp/atomic_file.h"
 #include "dag/dag.h"
 
 typedef struct {
@@ -176,14 +177,10 @@ static sp_cli_result_t cc_build(sp_cli_t* cli) {
   });
   spn_dag_file_cache_init(&app->files, app->mem);
   spn_dag_action_cache_init(&app->cache, app->mem);
-  spn_dag_discovery_init(&app->discovery, app->mem);
+  spn_dag_discovery_init(&app->discovery, app->mem, sp_fs_join_path(app->mem, app->root, sp_str_lit("manifests")));
 
-  sp_str_t files_table = sp_fs_join_path(app->mem, app->root, sp_str_lit("files.jsonl"));
   sp_str_t cache_table = sp_fs_join_path(app->mem, app->root, sp_str_lit("actions.jsonl"));
-  sp_str_t disc_table = sp_fs_join_path(app->mem, app->root, sp_str_lit("discovery.jsonl"));
-  spn_dag_file_cache_load(&app->files, files_table);
   spn_dag_action_cache_load(&app->cache, cache_table);
-  spn_dag_discovery_load(&app->discovery, disc_table);
 
   app->g = spn_dag_new(app->mem);
   spn_dag_id_t link = spn_dag_add_action(app->g, (spn_dag_action_config_t) {
@@ -229,9 +226,7 @@ static sp_cli_result_t cc_build(sp_cli_t* cli) {
 
   spn_err_t err = spn_dag_run(app->g, &app->files, &app->cache, &app->store, &app->discovery);
 
-  spn_dag_file_cache_save(&app->files, files_table);
   spn_dag_action_cache_save(&app->cache, cache_table);
-  spn_dag_discovery_save(&app->discovery, disc_table);
 
   if (err) {
     return sp_cli_set_error(cli, sp_str_lit("build failed"));

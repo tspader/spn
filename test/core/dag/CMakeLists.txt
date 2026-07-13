@@ -2,9 +2,8 @@ add_executable(dag
   ${SRC}/dag/dag.c
   ${SRC}/dag/lower.c
   ${SRC}/codegen/json.c
-  ${SRC}/codegen/gen/dag_file.gen.c
   ${SRC}/codegen/gen/dag_action.gen.c
-  ${SRC}/codegen/gen/dag_pathset.gen.c
+  ${SRC}/codegen/gen/dag_obs.gen.c
   ${SRC}/sha256/sha256.c
   ${SRC}/sp/io.c
   main.c

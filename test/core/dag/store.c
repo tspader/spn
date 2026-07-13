@@ -1,3 +1,5 @@
+#include "common.h"
+
 typedef enum {
   STORE_OP_DONE,
   STORE_OP_FILE,

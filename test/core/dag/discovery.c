@@ -1,3 +1,5 @@
+#include "common.h"
+
 typedef struct {
   spn_dag_obs_kind_t kind;
   const c8* path;
@@ -26,7 +28,6 @@ typedef struct {
 
 typedef struct {
   const c8* name;
-  spn_err_t expect_err;
 } discovery_load_test_t;
 
 UTEST_EMPTY_FIXTURE(discovery)
@@ -79,7 +80,7 @@ static void discovery_expect(s32* utest_result, spn_dag_discovery_t* discovery, 
 static void run_discovery_test(s32* utest_result, discovery_test_t t) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   spn_dag_discovery_t discovery = sp_zero;
-  spn_dag_discovery_init(&discovery, scratch.mem);
+  spn_dag_discovery_init(&discovery, scratch.mem, sp_str_lit(""));
 
   sp_carr_for(t.entries, it) {
     if (!t.entries[it].key) {
@@ -95,21 +96,19 @@ static void run_discovery_test(s32* utest_result, discovery_test_t t) {
 static void run_discovery_persistence_test(s32* utest_result, discovery_persistence_test_t t) {
   tmpfs_t fs = sp_zero;
   tmpfs_init_named(&fs, t.name);
-  sp_str_t path = tmpfs_get(&fs, sp_str_lit("discovery.jsonl"));
+  sp_str_t dir = tmpfs_get(&fs, sp_str_lit("manifests"));
 
   spn_dag_discovery_t saved = sp_zero;
-  spn_dag_discovery_init(&saved, fs.mem);
+  spn_dag_discovery_init(&saved, fs.mem, dir);
   sp_carr_for(t.entries, it) {
     if (!t.entries[it].key) {
       break;
     }
     discovery_put(&saved, t.entries[it]);
   }
-  ASSERT_EQ(SPN_OK, spn_dag_discovery_save(&saved, path));
 
   spn_dag_discovery_t loaded = sp_zero;
-  spn_dag_discovery_init(&loaded, fs.mem);
-  ASSERT_EQ(SPN_OK, spn_dag_discovery_load(&loaded, path));
+  spn_dag_discovery_init(&loaded, fs.mem, dir);
   sp_carr_for(t.entries, it) {
     if (!t.entries[it].key) {
       break;
@@ -127,15 +126,15 @@ static void run_discovery_load_test(s32* utest_result, discovery_load_test_t t) 
   tmpfs_init_named(&fs, t.name);
 
   spn_dag_discovery_t discovery = sp_zero;
-  spn_dag_discovery_init(&discovery, fs.mem);
-  EXPECT_EQ(t.expect_err, spn_dag_discovery_load(&discovery, tmpfs_get(&fs, sp_str_lit("missing.jsonl"))));
+  spn_dag_discovery_init(&discovery, fs.mem, tmpfs_get(&fs, sp_str_lit("manifests")));
+  EXPECT_EQ(SP_NULLPTR, spn_dag_discovery_get(&discovery, discovery_key("K")));
 
   tmpfs_deinit(&fs);
 }
 
 UTEST_F(discovery, missing_key_misses) {
   run_discovery_test(&ur, (discovery_test_t) {
-    .key = "test"
+    .key = "K"
   });
 }
 
@@ -143,19 +142,19 @@ UTEST_F(discovery, stored_pathset_hits) {
   run_discovery_test(&ur, (discovery_test_t) {
     .entries = {
       {
-        .key = "test",
+        .key = "K",
         .obs = {
-          { .path = "first" },
-          { .kind = SPN_DAG_OBS_ABSENT, .path = "second" }
+          { .path = "A" },
+          { .kind = SPN_DAG_OBS_ABSENT, .path = "B" }
         }
       }
     },
-    .key = "test",
+    .key = "K",
     .expect = {
       .hit = true,
       .obs = {
-        { .path = "first" },
-        { .kind = SPN_DAG_OBS_ABSENT, .path = "second" }
+        { .path = "A" },
+        { .kind = SPN_DAG_OBS_ABSENT, .path = "B" }
       }
     }
   });
@@ -164,9 +163,9 @@ UTEST_F(discovery, stored_pathset_hits) {
 UTEST_F(discovery, empty_pathset_hits) {
   run_discovery_test(&ur, (discovery_test_t) {
     .entries = {
-      { .key = "test" }
+      { .key = "K" }
     },
-    .key = "test",
+    .key = "K",
     .expect = { .hit = true }
   });
 }
@@ -174,13 +173,13 @@ UTEST_F(discovery, empty_pathset_hits) {
 UTEST_F(discovery, keys_are_independent) {
   run_discovery_test(&ur, (discovery_test_t) {
     .entries = {
-      { .key = "test", .obs = { { .path = "first" } } },
-      { .key = "spum", .obs = { { .path = "second" } } }
+      { .key = "K", .obs = { { .path = "A" } } },
+      { .key = "K2", .obs = { { .path = "B" } } }
     },
-    .key = "test",
+    .key = "K",
     .expect = {
       .hit = true,
-      .obs = { { .path = "first" } }
+      .obs = { { .path = "A" } }
     }
   });
 }
@@ -188,13 +187,13 @@ UTEST_F(discovery, keys_are_independent) {
 UTEST_F(discovery, new_pathset_replaces_existing) {
   run_discovery_test(&ur, (discovery_test_t) {
     .entries = {
-      { .key = "test", .obs = { { .path = "first" } } },
-      { .key = "test", .obs = { { .path = "second" } } }
+      { .key = "K", .obs = { { .path = "A" } } },
+      { .key = "K", .obs = { { .path = "B" } } }
     },
-    .key = "test",
+    .key = "K",
     .expect = {
       .hit = true,
-      .obs = { { .path = "second" } }
+      .obs = { { .path = "B" } }
     }
   });
 }
@@ -204,20 +203,19 @@ UTEST_F(discovery, save_load_roundtrip) {
     .name = "discovery_roundtrip",
     .entries = {
       {
-        .key = "test",
+        .key = "K",
         .obs = {
-          { .path = "first" },
-          { .kind = SPN_DAG_OBS_ABSENT, .path = "second" }
+          { .path = "A" },
+          { .kind = SPN_DAG_OBS_ABSENT, .path = "B" }
         }
       },
-      { .key = "spum" }
+      { .key = "K2" }
     }
   });
 }
 
-UTEST_F(discovery, load_missing_file_fails) {
+UTEST_F(discovery, missing_manifest_misses) {
   run_discovery_load_test(&ur, (discovery_load_test_t) {
-    .name = "discovery_missing",
-    .expect_err = SPN_ERROR
+    .name = "discovery_missing"
   });
 }

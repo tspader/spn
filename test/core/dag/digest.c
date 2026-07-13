@@ -1,3 +1,5 @@
+#include "common.h"
+
 typedef struct {
   const c8* data;
   const c8* hex;

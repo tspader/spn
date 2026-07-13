@@ -54,9 +54,8 @@ add_executable(sp_cc
   ${CMAKE_SOURCE_DIR}/source/dag/dag.c
   ${CMAKE_SOURCE_DIR}/source/dag/lower.c
   ${CMAKE_SOURCE_DIR}/source/codegen/json.c
-  ${GEN_DIR}/dag_file.gen.c
   ${GEN_DIR}/dag_action.gen.c
-  ${GEN_DIR}/dag_pathset.gen.c
+  ${GEN_DIR}/dag_obs.gen.c
   ${CMAKE_SOURCE_DIR}/source/sha256/sha256.c
   ${CMAKE_SOURCE_DIR}/source/sp/io.c)
 set_target_properties(sp_cc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${STORE}/bin)
@@ -85,15 +84,12 @@ set(GEN_FILES
   ${GEN_DIR}/toolchains.jtd.json
   ${GEN_DIR}/abi.gen.h
   ${GEN_DIR}/abi.gen.c
-  ${GEN_DIR}/dag_file.gen.h
-  ${GEN_DIR}/dag_file.gen.c
-  ${GEN_DIR}/dag_file.jtd.json
   ${GEN_DIR}/dag_action.gen.h
   ${GEN_DIR}/dag_action.gen.c
   ${GEN_DIR}/dag_action.jtd.json
-  ${GEN_DIR}/dag_pathset.gen.h
-  ${GEN_DIR}/dag_pathset.gen.c
-  ${GEN_DIR}/dag_pathset.jtd.json)
+  ${GEN_DIR}/dag_obs.gen.h
+  ${GEN_DIR}/dag_obs.gen.c
+  ${GEN_DIR}/dag_obs.jtd.json)
 file(GLOB JTD_GEN_SCHEMAS CONFIGURE_DEPENDS ${SCHEMA_DIR}/*.json)
 file(GLOB_RECURSE JTD_GEN_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/templates/*.tmpl)
 add_custom_command(
