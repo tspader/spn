@@ -33,7 +33,7 @@ s32 on_configure_package(spn_bg_cmd_t* cmd, void* user_data) {
   return SPN_OK;
 }
 
-static spn_err_t add_configure_package(spn_build_graph_t* graph, spn_session_t* session, spn_pkg_unit_t* unit) {
+static spn_err_t add_configure_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   if (unit->nodes.configure.run.occupied) {
     return SPN_OK;
   }
@@ -41,9 +41,8 @@ static spn_err_t add_configure_package(spn_build_graph_t* graph, spn_session_t* 
   unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
   spn_try(spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp));
 
-  spn_pkg_unit_t* program = spn_session_find_pkg_unit(session, session->units.metaprogram, unit->id.pkg);
-  sp_assert(program);
-  spn_target_unit_t* target = program->meta.configure.target;
+  sp_assert(unit->program);
+  spn_target_unit_t* target = unit->program->meta.configure.target;
   if (target) {
     spn_try(spn_build_add_target_nodes(graph, target));
     spn_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, target->nodes.output));
@@ -113,7 +112,7 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
 
   sp_da_for(dependencies, it) {
     spn_pkg_unit_t* unit = dependencies[it];
-    if (add_configure_package(graph, session, unit)) {
+    if (add_configure_package(graph, unit)) {
       return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
     }
   }
@@ -122,7 +121,7 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
     spn_build_unit_t* build = session->plan.builds[it].build;
     sp_da_for(build->packages, it) {
       spn_pkg_unit_t* unit = build->packages[it];
-      if (add_configure_package(graph, session, unit)) {
+      if (add_configure_package(graph, unit)) {
         return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
       }
     }

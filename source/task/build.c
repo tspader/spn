@@ -573,9 +573,8 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   spn_try(spn_bg_cmd_add_input(graph, nodes->package, nodes->stamp.exit));
   spn_try(spn_bg_cmd_add_output(graph, nodes->package, nodes->stamp.package));
 
-  spn_pkg_unit_t* program = spn_session_find_pkg_unit(unit->session, unit->session->units.metaprogram, unit->id.pkg);
-  sp_assert(program);
-  spn_target_unit_t* build = program->meta.build.target;
+  sp_assert(unit->program);
+  spn_target_unit_t* build = unit->program->meta.build.target;
   if (build) {
     spn_try(spn_build_add_target_nodes(graph, build));
     own_target_commands(unit->session, build);
