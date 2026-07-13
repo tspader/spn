@@ -91,7 +91,6 @@ struct spn_session_t {
   spn_profile_info_t profile;
   struct {
     spn_compile_request_t request;
-    sp_da(spn_pkg_id_t) requested;
     sp_da(spn_build_plan_t) builds;
   } plan;
   struct {
