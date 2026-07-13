@@ -12,16 +12,17 @@
 
 s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   spn_compile_unit_t* unit = (spn_compile_unit_t*)user_data;
-  spn_session_t* session = unit->session;
+  spn_pkg_unit_t* pkg = unit->target->pkg;
+  spn_session_t* session = pkg->session;
 
-  spn_pkg_unit_announce_compile(unit->package);
+  spn_pkg_unit_announce_compile(pkg);
 
   sp_fs_create_dir(sp_fs_parent_path(unit->paths.object));
 
   spn_invocation_result_t run = spn_invocation_run(&unit->invocation);
 
   if (run.result.status.exit_code) {
-    spn_event_buffer_push_ex(session->events, unit->package->info, &unit->target->logs, (spn_build_event_t) {
+    spn_event_buffer_push_ex(session->events, pkg->info, &unit->target->logs, (spn_build_event_t) {
       .kind = SPN_EVENT_TARGET_BUILD_FAILED,
       .target.failed = {
         .source_file = unit->paths.file,
@@ -33,7 +34,7 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
       }
     });
   } else {
-    spn_event_buffer_push_ex(session->events, unit->package->info, &unit->target->logs, (spn_build_event_t) {
+    spn_event_buffer_push_ex(session->events, pkg->info, &unit->target->logs, (spn_build_event_t) {
       .kind = SPN_EVENT_TARGET_BUILD_PASSED,
       .target.passed = {
         .source_file = unit->paths.file,

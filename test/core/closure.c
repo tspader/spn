@@ -74,7 +74,6 @@ static spn_pkg_unit_t* build_pkg(sp_mem_t mem, spn_session_t* session, u32 id, c
     spn_target_unit_t* lib = sp_alloc_type(mem, spn_target_unit_t);
     lib->info = lib_info;
     lib->pkg = pkg;
-    lib->session = session;
     lib->lib_kind = spec.kind;
     sp_da_push(pkg->libs, lib);
   }
@@ -120,7 +119,6 @@ void run_closure_test(s32* utest_result, closure_test_t t) {
   spn_target_unit_t* exe = sp_alloc_type(mem, spn_target_unit_t);
   exe->pkg = root;
   exe->info = exe_info;
-  exe->session = session;
   exe->lib_kind = SPN_LIB_KIND_NONE;
 
   sp_da(spn_closure_entry_t) closure = spn_target_link_closure(mem, exe);

@@ -19,7 +19,7 @@
 #include "unit/compiler.h"
 
 void add_deps_to_cc_target(spn_cc_link_t* link, spn_target_unit_t* target) {
-  spn_session_t* session = target->session;
+  spn_session_t* session = target->pkg->session;
   spn_pkg_unit_t* pkg = target->pkg;
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
@@ -112,10 +112,10 @@ sp_str_t get_target_staged_path(sp_mem_t mem, spn_target_unit_t* target) {
   switch (target->info->kind) {
     case SPN_TARGET_EXE:
     case SPN_TARGET_SCRIPT: {
-      return sp_fs_join_path(mem, target->build->paths.root, target->info->name);
+      return sp_fs_join_path(mem, target->pkg->build->paths.root, target->info->name);
     }
     case SPN_TARGET_TEST: {
-      sp_str_t dir = sp_fs_join_path(mem, target->build->paths.root, SP_LIT("test"));
+      sp_str_t dir = sp_fs_join_path(mem, target->pkg->build->paths.root, SP_LIT("test"));
       return sp_fs_join_path(mem, dir, target->info->name);
     }
     case SPN_TARGET_LIB:
