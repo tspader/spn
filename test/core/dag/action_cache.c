@@ -7,6 +7,7 @@ typedef enum {
   CACHE_OP_DONE,
   CACHE_OP_PUT,
   CACHE_OP_GET,
+  CACHE_OP_REMOVE,
   CACHE_OP_SAVE,
   CACHE_OP_RELOAD,
 } cache_op_kind_t;
@@ -30,15 +31,14 @@ typedef struct {
 
 UTEST_EMPTY_FIXTURE(action_cache)
 
-static u32 cache_output_count(cache_op_t* op) {
-  u32 count = 0;
+static void cache_output_count(cache_op_t* op, u32* count) {
+  *count = 0;
   sp_carr_for(op->outputs, it) {
     if (!op->outputs[it].path) {
       break;
     }
-    count++;
+    (*count)++;
   }
-  return count;
 }
 
 static spn_dag_digest_t cache_blob_digest(const c8* blob) {
@@ -67,7 +67,8 @@ static void run_cache_test(s32* utest_result, cache_test_t t) {
       case CACHE_OP_PUT: {
         spn_dag_action_output_t outputs [DAG_TEST_MAX_OUTPUTS] = sp_zero;
         c8 paths [DAG_TEST_MAX_OUTPUTS][SP_PATH_MAX] = sp_zero;
-        u32 count = cache_output_count(&op);
+        u32 count = 0;
+        cache_output_count(&op, &count);
         sp_for(it, count) {
           u32 len = sp_cstr_len(op.outputs[it].path);
           sp_cstr_copy_to_n(op.outputs[it].path, len, paths[it], sizeof(paths[it]));
@@ -77,20 +78,26 @@ static void run_cache_test(s32* utest_result, cache_test_t t) {
           };
         }
         spn_dag_action_cache_put(&c, cache_blob_digest(op.key), outputs, count);
+        sp_mem_fill_u8(outputs, sizeof(outputs), 69);
         sp_mem_fill_u8(paths, sizeof(paths), 69);
         break;
       }
       case CACHE_OP_GET: {
-        spn_dag_action_entry_t* entry = spn_dag_action_cache_get(&c, cache_blob_digest(op.key));
+        const spn_dag_action_entry_t* entry = spn_dag_action_cache_get(&c, cache_blob_digest(op.key));
         EXPECT_EQ(op.expect.hit, entry != SP_NULLPTR);
         if (op.expect.hit && entry) {
-          u32 count = cache_output_count(&op);
+          u32 count = 0;
+          cache_output_count(&op, &count);
           ASSERT_EQ(count, (u32)sp_da_size(entry->outputs));
           sp_for(it, count) {
             EXPECT_STR(entry->outputs[it].path, op.outputs[it].path);
             EXPECT_TRUE(spn_dag_digest_equal(entry->outputs[it].digest, cache_blob_digest(op.outputs[it].blob)));
           }
         }
+        break;
+      }
+      case CACHE_OP_REMOVE: {
+        EXPECT_EQ(op.expect.hit, spn_dag_action_cache_remove(&c, cache_blob_digest(op.key)));
         break;
       }
       case CACHE_OP_SAVE: {
@@ -127,13 +134,13 @@ UTEST_F(action_cache, put_then_get) {
   });
 }
 
-UTEST_F(action_cache, put_overwrites) {
+UTEST_F(action_cache, remove_existing) {
   run_cache_test(&ur, (cache_test_t) {
-    .name = "action_cache_overwrite",
+    .name = "action_cache_remove",
     .ops = {
       { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" } } },
-      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj2" } } },
-      { .kind = CACHE_OP_GET, .key = "cc main.c", .outputs = { { "main.o", "obj2" } }, .expect = { .hit = true } },
+      { .kind = CACHE_OP_REMOVE, .key = "cc main.c", .expect = { .hit = true } },
+      { .kind = CACHE_OP_GET, .key = "cc main.c" },
     }
   });
 }

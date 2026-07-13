@@ -17,6 +17,7 @@ spn_dag_digest_t    spn_dag_action_key(spn_dag_t* g, spn_dag_id_t action);
 
 spn_dag_digest_t    spn_dag_digest(const void* data, u64 len);
 bool                spn_dag_digest_equal(spn_dag_digest_t a, spn_dag_digest_t b);
+bool                spn_dag_digest_valid(spn_dag_digest_t digest);
 sp_str_t            spn_dag_digest_hex(sp_mem_t mem, spn_dag_digest_t digest);
 
 void                spn_dag_file_cache_init(spn_dag_file_cache_t* c, sp_mem_t mem);
@@ -26,11 +27,12 @@ spn_err_t           spn_dag_file_cache_save(spn_dag_file_cache_t* c, sp_str_t pa
 spn_err_t           spn_dag_file_cache_load(spn_dag_file_cache_t* c, sp_str_t path);
 
 void                     spn_dag_action_cache_init(spn_dag_action_cache_t* c, sp_mem_t mem);
-spn_dag_action_entry_t*  spn_dag_action_cache_get(spn_dag_action_cache_t* c, spn_dag_digest_t key);
-void                     spn_dag_action_cache_put(spn_dag_action_cache_t* c, spn_dag_digest_t key, spn_dag_action_output_t* outputs, u32 count);
+const spn_dag_action_entry_t* spn_dag_action_cache_get(spn_dag_action_cache_t* c, spn_dag_digest_t key);
+void                     spn_dag_action_cache_put(spn_dag_action_cache_t* c, spn_dag_digest_t key, const spn_dag_action_output_t* outputs, u32 count);
+bool                     spn_dag_action_cache_remove(spn_dag_action_cache_t* c, spn_dag_digest_t key);
 spn_err_t                spn_dag_action_cache_save(spn_dag_action_cache_t* c, sp_str_t path);
 spn_err_t                spn_dag_action_cache_load(spn_dag_action_cache_t* c, sp_str_t path);
-spn_err_t                spn_dag_execute(spn_dag_t* g, spn_dag_id_t action, spn_dag_action_cache_t* cache, spn_dag_store_t* store);
+spn_err_t                spn_dag_execute(spn_dag_t* g, spn_dag_id_t action, spn_dag_file_cache_t* files, spn_dag_action_cache_t* cache, spn_dag_store_t* store);
 
 void                spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config);
 spn_err_t           spn_dag_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag_digest_t* digest);

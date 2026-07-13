@@ -32,7 +32,7 @@ typedef struct {
 
 struct spn_dag_action_t {
   spn_dag_id_t id;
-  spn_dag_digest_t salt;
+  spn_dag_digest_t identity;
   spn_dag_exec_fn_t execute;
   void* user_data;
   sp_da(spn_dag_id_t) consumes;
@@ -40,7 +40,7 @@ struct spn_dag_action_t {
 };
 
 typedef struct {
-  spn_dag_digest_t salt;
+  spn_dag_digest_t identity;
   spn_dag_exec_fn_t execute;
   void* user_data;
 } spn_dag_action_config_t;

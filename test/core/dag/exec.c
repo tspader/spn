@@ -5,16 +5,17 @@ typedef enum {
 } exec_action_behavior_t;
 
 typedef struct {
-  const c8* salt;
+  const c8* identity;
   const c8* inputs [DAG_TEST_MAX_INPUTS];
   const c8* outputs [DAG_TEST_MAX_OUTPUTS];
-  const c8* write;
+  const c8* write [DAG_TEST_MAX_OUTPUTS];
   exec_action_behavior_t behavior;
 } exec_action_t;
 
 typedef struct {
-  const c8* salt;
+  const c8* identity;
   const c8* inputs [DAG_TEST_MAX_INPUTS];
+  const c8* outputs [DAG_TEST_MAX_OUTPUTS];
 } exec_action_change_t;
 
 typedef struct {
@@ -25,6 +26,7 @@ typedef struct {
 typedef struct {
   const c8* name;
   exec_action_t action;
+  const c8* unavailable [DAG_TEST_MAX_OUTPUTS];
   exec_expect_t expect;
 } exec_test_t;
 
@@ -33,7 +35,7 @@ typedef struct {
   exec_action_t action;
   exec_action_change_t change;
   exec_expect_t expect;
-} exec_invalidate_test_t;
+} exec_change_test_t;
 
 typedef struct {
   const c8* name;
@@ -46,6 +48,7 @@ typedef struct {
   tmpfs_t fs;
   sp_mem_t mem;
   spn_dag_store_t store;
+  spn_dag_file_cache_t files;
   spn_dag_action_cache_t cache;
   spn_err_t err;
   u32 runs;
@@ -85,7 +88,7 @@ static s32 exec_test_fn(spn_dag_action_t* action, void* user_data) {
       continue;
     }
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(ctx->g, action->produces[it]);
-    sp_str_t content = sp_fmt(ctx->env->mem, "{}-{}", sp_fmt_cstr(ctx->spec->write), sp_fmt_uint(ctx->env->runs)).value;
+    sp_str_t content = sp_fmt(ctx->env->mem, "{}-{}", sp_fmt_cstr(ctx->spec->write[it]), sp_fmt_uint(ctx->env->runs)).value;
     if (sp_fs_create_file_str(artifact->path, content)) {
       return 1;
     }
@@ -101,6 +104,7 @@ static void exec_env_init(exec_env_t* env, const c8* name, spn_dag_store_kind_t 
     .mem = env->mem,
     .dir = tmpfs_get(&env->fs, sp_str_lit("store"))
   });
+  spn_dag_file_cache_init(&env->files, env->mem);
   spn_dag_action_cache_init(&env->cache, env->mem);
 }
 
@@ -118,17 +122,22 @@ static void exec_store_context(exec_env_t* env) {
 }
 
 static void exec_action_change(exec_action_t* action, exec_action_change_t change) {
-  if (change.salt) {
-    action->salt = change.salt;
+  if (change.identity) {
+    action->identity = change.identity;
   }
   if (change.inputs[0]) {
     sp_carr_for(action->inputs, it) {
       action->inputs[it] = change.inputs[it];
     }
   }
+  if (change.outputs[0]) {
+    sp_carr_for(action->outputs, it) {
+      action->outputs[it] = change.outputs[it];
+    }
+  }
 }
 
-static void exec_action_run(s32* utest_result, exec_env_t* env, exec_action_t spec, spn_err_t expected, const c8** contents) {
+static void exec_action_run(s32* utest_result, exec_env_t* env, exec_action_t spec, const c8** unavailable, spn_err_t expected, const c8** contents) {
   spn_dag_t* g = spn_dag_new(env->mem);
   exec_fn_ctx_t ctx = {
     .g = g,
@@ -136,14 +145,14 @@ static void exec_action_run(s32* utest_result, exec_env_t* env, exec_action_t sp
     .env = env
   };
 
-  spn_dag_digest_t salt = sp_zero;
-  if (spec.salt) {
-    sp_str_t str = sp_str_view(spec.salt);
-    salt = spn_dag_digest(str.data, str.len);
+  spn_dag_digest_t identity = sp_zero;
+  if (spec.identity) {
+    sp_str_t str = sp_str_view(spec.identity);
+    identity = spn_dag_digest(str.data, str.len);
   }
 
   spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
-    .salt = salt,
+    .identity = identity,
     .execute = exec_test_fn,
     .user_data = &ctx
   });
@@ -165,7 +174,26 @@ static void exec_action_run(s32* utest_result, exec_env_t* env, exec_action_t sp
     ASSERT_EQ(SPN_OK, spn_dag_action_add_output(g, action, file));
   }
 
-  env->err = spn_dag_execute(g, action, &env->cache, &env->store);
+  if (unavailable && unavailable[0]) {
+    spn_dag_action_output_t outputs [DAG_TEST_MAX_OUTPUTS] = sp_zero;
+    spn_dag_action_t* a = spn_dag_find_action(g, action);
+    u32 count = 0;
+    sp_for(it, DAG_TEST_MAX_OUTPUTS) {
+      if (!unavailable[it]) {
+        break;
+      }
+      sp_str_t content = sp_str_view(unavailable[it]);
+      spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, a->produces[it]);
+      outputs[it] = (spn_dag_action_output_t) {
+        .path = artifact->path,
+        .digest = spn_dag_digest(content.data, content.len)
+      };
+      count++;
+    }
+    spn_dag_action_cache_put(&env->cache, spn_dag_action_key(g, action), outputs, count);
+  }
+
+  env->err = spn_dag_execute(g, action, &env->files, &env->cache, &env->store);
   exec_store_context(env);
   EXPECT_EQ(expected, env->err);
   if (env->err != expected || env->err || !contents) {
@@ -186,6 +214,7 @@ static void exec_action_run(s32* utest_result, exec_env_t* env, exec_action_t sp
     spn_dag_action_t* a = spn_dag_find_action(g, action);
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, a->produces[it]);
     exec_store_context(env);
+    ASSERT_TRUE(spn_dag_digest_valid(artifact->digest));
     EXPECT_TRUE(spn_dag_digest_equal(artifact->digest, spn_dag_digest(content.data, content.len)));
   }
 }
@@ -211,7 +240,7 @@ static void run_exec_once_test(s32* utest_result, exec_test_t t) {
   sp_carr_for(exec_store_kinds, it) {
     exec_env_t env = sp_zero;
     exec_env_init(&env, t.name, exec_store_kinds[it]);
-    exec_action_run(utest_result, &env, t.action, SPN_OK, t.expect.contents);
+    exec_action_run(utest_result, &env, t.action, t.unavailable, SPN_OK, t.expect.contents);
     if (!env.err) {
       exec_store_context(&env);
       EXPECT_EQ(t.expect.runs, env.runs);
@@ -224,12 +253,12 @@ static void run_exec_restore_test(s32* utest_result, exec_test_t t) {
   sp_carr_for(exec_store_kinds, it) {
     exec_env_t env = sp_zero;
     exec_env_init(&env, t.name, exec_store_kinds[it]);
-    exec_action_run(utest_result, &env, t.action, SPN_OK, SP_NULLPTR);
+    exec_action_run(utest_result, &env, t.action, SP_NULLPTR, SPN_OK, SP_NULLPTR);
     if (!env.err) {
       exec_remove_outputs(utest_result, &env, t.action);
     }
     if (!env.err) {
-      exec_action_run(utest_result, &env, t.action, SPN_OK, t.expect.contents);
+      exec_action_run(utest_result, &env, t.action, SP_NULLPTR, SPN_OK, t.expect.contents);
     }
     if (!env.err) {
       exec_store_context(&env);
@@ -239,15 +268,15 @@ static void run_exec_restore_test(s32* utest_result, exec_test_t t) {
   }
 }
 
-static void run_exec_invalidate_test(s32* utest_result, exec_invalidate_test_t t) {
+static void run_exec_change_test(s32* utest_result, exec_change_test_t t) {
   sp_carr_for(exec_store_kinds, it) {
     exec_env_t env = sp_zero;
     exec_env_init(&env, t.name, exec_store_kinds[it]);
-    exec_action_run(utest_result, &env, t.action, SPN_OK, SP_NULLPTR);
+    exec_action_run(utest_result, &env, t.action, SP_NULLPTR, SPN_OK, SP_NULLPTR);
     if (!env.err) {
       exec_action_t changed = t.action;
       exec_action_change(&changed, t.change);
-      exec_action_run(utest_result, &env, changed, SPN_OK, t.expect.contents);
+      exec_action_run(utest_result, &env, changed, SP_NULLPTR, SPN_OK, t.expect.contents);
     }
     if (!env.err) {
       exec_store_context(&env);
@@ -263,9 +292,9 @@ static void run_exec_retry_test(s32* utest_result, exec_retry_test_t t) {
     exec_env_init(&env, t.name, exec_store_kinds[it]);
     exec_action_t first = t.action;
     first.behavior = t.first;
-    exec_action_run(utest_result, &env, first, SPN_ERROR, SP_NULLPTR);
+    exec_action_run(utest_result, &env, first, SP_NULLPTR, SPN_ERROR, SP_NULLPTR);
     if (env.err == SPN_ERROR) {
-      exec_action_run(utest_result, &env, t.action, SPN_OK, t.expect.contents);
+      exec_action_run(utest_result, &env, t.action, SP_NULLPTR, SPN_OK, t.expect.contents);
     }
     if (!env.err) {
       exec_store_context(&env);
@@ -278,7 +307,7 @@ static void run_exec_retry_test(s32* utest_result, exec_retry_test_t t) {
 UTEST_F(exec, miss_executes_action) {
   run_exec_once_test(&ur, (exec_test_t) {
     .name = "exec_miss",
-    .action = { .salt = "cc", .inputs = { "main.c" }, .outputs = { "main.o" }, .write = "obj" },
+    .action = { .identity = "cc", .inputs = { "main.c" }, .outputs = { "main.o" }, .write = { "obj" } },
     .expect = { .runs = 1, .contents = { "obj-1" } }
   });
 }
@@ -286,25 +315,34 @@ UTEST_F(exec, miss_executes_action) {
 UTEST_F(exec, hit_restores_deleted_output) {
   run_exec_restore_test(&ur, (exec_test_t) {
     .name = "exec_hit",
-    .action = { .salt = "cc", .inputs = { "main.c" }, .outputs = { "main.o" }, .write = "obj" },
+    .action = { .identity = "cc", .inputs = { "main.c" }, .outputs = { "main.o" }, .write = { "obj" } },
     .expect = { .runs = 1, .contents = { "obj-1" } }
   });
 }
 
 UTEST_F(exec, input_change_reruns) {
-  run_exec_invalidate_test(&ur, (exec_invalidate_test_t) {
+  run_exec_change_test(&ur, (exec_change_test_t) {
     .name = "exec_input_change",
-    .action = { .salt = "cc", .inputs = { "int main() {}" }, .outputs = { "main.o" }, .write = "obj" },
+    .action = { .identity = "cc", .inputs = { "int main() {}" }, .outputs = { "main.o" }, .write = { "obj" } },
     .change = { .inputs = { "int main() { return 1; }" } },
     .expect = { .runs = 2, .contents = { "obj-2" } }
   });
 }
 
-UTEST_F(exec, salt_change_reruns) {
-  run_exec_invalidate_test(&ur, (exec_invalidate_test_t) {
-    .name = "exec_salt_change",
-    .action = { .salt = "cc -O0", .inputs = { "main.c" }, .outputs = { "main.o" }, .write = "obj" },
-    .change = { .salt = "cc -O2" },
+UTEST_F(exec, identity_change_reruns) {
+  run_exec_change_test(&ur, (exec_change_test_t) {
+    .name = "exec_identity_change",
+    .action = { .identity = "cc -O0", .inputs = { "main.c" }, .outputs = { "main.o" }, .write = { "obj" } },
+    .change = { .identity = "cc -O2" },
+    .expect = { .runs = 2, .contents = { "obj-2" } }
+  });
+}
+
+UTEST_F(exec, output_path_change_reruns) {
+  run_exec_change_test(&ur, (exec_change_test_t) {
+    .name = "exec_output_change",
+    .action = { .identity = "cc", .inputs = { "main.c" }, .outputs = { "main.o" }, .write = { "obj" } },
+    .change = { .outputs = { "spum.o" } },
     .expect = { .runs = 2, .contents = { "obj-2" } }
   });
 }
@@ -312,15 +350,15 @@ UTEST_F(exec, salt_change_reruns) {
 UTEST_F(exec, multiple_outputs_restored) {
   run_exec_restore_test(&ur, (exec_test_t) {
     .name = "exec_multi_output",
-    .action = { .salt = "cc", .inputs = { "main.c" }, .outputs = { "main.o", "main.d" }, .write = "obj" },
-    .expect = { .runs = 1, .contents = { "obj-1", "obj-1" } }
+    .action = { .identity = "cc", .inputs = { "main.c" }, .outputs = { "main.o", "main.d" }, .write = { "obj", "deps" } },
+    .expect = { .runs = 1, .contents = { "obj-1", "deps-1" } }
   });
 }
 
 UTEST_F(exec, failed_action_not_cached) {
   run_exec_retry_test(&ur, (exec_retry_test_t) {
     .name = "exec_fail",
-    .action = { .salt = "cc", .inputs = { "main.c" }, .outputs = { "main.o" }, .write = "obj" },
+    .action = { .identity = "cc", .inputs = { "main.c" }, .outputs = { "main.o" }, .write = { "obj" } },
     .first = EXEC_ACTION_FAIL,
     .expect = { .runs = 1, .contents = { "obj-1" } }
   });
@@ -329,8 +367,22 @@ UTEST_F(exec, failed_action_not_cached) {
 UTEST_F(exec, missing_output_not_cached) {
   run_exec_retry_test(&ur, (exec_retry_test_t) {
     .name = "exec_missing_output",
-    .action = { .salt = "cc", .inputs = { "main.c" }, .outputs = { "main.o", "main.d" }, .write = "obj" },
+    .action = { .identity = "cc", .inputs = { "main.c" }, .outputs = { "main.o", "main.d" }, .write = { "obj", "deps" } },
     .first = EXEC_ACTION_SKIP_LAST_OUTPUT,
-    .expect = { .runs = 2, .contents = { "obj-2", "obj-2" } }
+    .expect = { .runs = 2, .contents = { "obj-2", "deps-2" } }
+  });
+}
+
+UTEST_F(exec, unavailable_cached_output_reruns) {
+  run_exec_once_test(&ur, (exec_test_t) {
+    .name = "exec_unavailable_output",
+    .action = {
+      .identity = "cc",
+      .inputs = { "main.c" },
+      .outputs = { "main.o" },
+      .write = { "obj" }
+    },
+    .unavailable = { "missing" },
+    .expect = { .runs = 1, .contents = { "obj-1" } }
   });
 }
