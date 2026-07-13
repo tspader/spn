@@ -470,6 +470,20 @@ static spn_err_t ensure_sibling_targets(spn_session_t* session, sp_da(spn_target
   return SPN_OK;
 }
 
+static sp_da(spn_target_unit_t*) collect_plan_targets(spn_session_t* session) {
+  sp_da(spn_target_unit_t*) targets = sp_da_new(session->mem, spn_target_unit_t*);
+  sp_da_for(session->plan.builds, it) {
+    spn_build_unit_t* build = session->plan.builds[it].build;
+    sp_da_for(build->packages, it) {
+      spn_pkg_unit_t* pkg = build->packages[it];
+      sp_da_for(pkg->targets, it) {
+        sp_da_push(targets, pkg->targets[it]);
+      }
+    }
+  }
+  return targets;
+}
+
 spn_task_step_t spn_task_create_units(spn_app_t* app) {
   spn_session_t* session = &app->session;
   spn_pkg_id_t root = spn_session_root_pkg(session);
@@ -503,16 +517,14 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
     }
   }
 
-  sp_da(spn_target_unit_t*) pending = sp_da_new(session->mem, spn_target_unit_t*);
-  sp_om_for(session->units.targets, it) {
-    sp_da_push(pending, sp_om_at(session->units.targets, it));
-  }
+  sp_da(spn_target_unit_t*) pending = collect_plan_targets(session);
   if (ensure_sibling_targets(session, pending)) {
     return spn_task_fail(SPN_ERROR);
   }
 
-  sp_om_for(session->units.targets, it) {
-    spn_target_unit_t* unit = sp_om_at(session->units.targets, it);
+  sp_da(spn_target_unit_t*) targets = collect_plan_targets(session);
+  sp_da_for(targets, it) {
+    spn_target_unit_t* unit = targets[it];
     sp_da_for(unit->info->deps, j) {
       sp_str_t qualified = spn_pkg_canonicalize_name(unit->info->deps[j]);
       struct {
@@ -535,14 +547,9 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
     }
   }
 
-  sp_om_for(session->units.targets, it) {
-    spn_target_unit_t* target = sp_om_at(session->units.targets, it);
-
-    if (
-      target->info->kind == SPN_TARGET_BUILD_METAPROGRAM ||
-      target->info->kind == SPN_TARGET_CONFIGURE_METAPROGRAM ||
-      target->lib_kind == SPN_LIB_KIND_SOURCE
-    ) {
+  sp_da_for(targets, it) {
+    spn_target_unit_t* target = targets[it];
+    if (target->lib_kind == SPN_LIB_KIND_SOURCE) {
       continue;
     }
 
