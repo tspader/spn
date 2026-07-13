@@ -70,10 +70,6 @@ typedef struct {
   sp_mem_t mem;
   sp_ht(spn_dag_file_id_t, spn_dag_file_meta_t) entries;
   sp_ht(sp_str_t, sp_sys_file_meta_t) metadata;
-  struct {
-    u64 stats;
-    u64 hashes;
-  } counts;
 } spn_dag_file_cache_t;
 
 typedef enum {
