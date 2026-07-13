@@ -1,6 +1,7 @@
 add_executable(dag
   ${SRC}/dag/dag.c
   ${SRC}/sha256/sha256.c
+  ${SRC}/sp/io.c
   main.c
   ${TEST_TOOLS}/tmp.c
 )

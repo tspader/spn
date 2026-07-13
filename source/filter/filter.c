@@ -34,7 +34,7 @@ bool spn_target_selection_pass(const spn_target_selection_t* selection, const sp
       case SPN_TARGET_LIB:
       case SPN_TARGET_TEST:
       case SPN_TARGET_EXE: {
-        break;
+        return true;
       }
     }
   }

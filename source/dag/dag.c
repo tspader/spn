@@ -1,5 +1,6 @@
 #include "dag/dag.h"
 #include "sha256/sha256.h"
+#include "sp/io.h"
 
 spn_dag_t* spn_dag_new(sp_mem_t mem) {
   sp_mem_arena_t* arena = sp_mem_arena_new(mem);
@@ -134,7 +135,7 @@ void spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config) {
   }
 }
 
-spn_err_t spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag_digest_t* digest) {
+spn_err_t spn_dag_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag_digest_t* digest) {
   *digest = spn_dag_digest(data, len);
 
   switch (store->kind) {
@@ -142,20 +143,24 @@ spn_err_t spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, s
       if (sp_ht_getp(store->blobs, *digest)) {
         return SPN_OK;
       }
-      sp_str_t blob = sp_str_copy(store->mem, sp_str((const c8*)data, (u32)len));
+      sp_mem_slice_t blob = {
+        .data = sp_alloc_n(store->mem, u8, len),
+        .len = len
+      };
+      sp_mem_copy(blob.data, data, len);
       sp_ht_insert(store->blobs, *digest, blob);
       return SPN_OK;
     }
     case SPN_DAG_STORE_FILESYSTEM: {
-      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-      sp_str_t path = spn_dag_store_path(store, scratch.mem, *digest);
+      sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+      sp_str_t path = spn_dag_store_path(store, s.mem, *digest);
       spn_err_t err = SPN_OK;
       if (!sp_fs_exists(path)) {
-        if (sp_fs_create_file_str(path, sp_str((const c8*)data, (u32)len))) {
+        if (sp_fs_create_file_slice(path, sp_mem_slice((u8*)data, len))) {
           err = SPN_ERROR;
         }
       }
-      sp_mem_end_scratch(scratch);
+      sp_mem_end_scratch(s);
       return err;
     }
   }
@@ -166,14 +171,14 @@ spn_err_t spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, s
 spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_digest_t* digest) {
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
-      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-      sp_str_t content = sp_zero;
-      if (sp_io_read_file(scratch.mem, path, &content)) {
-        sp_mem_end_scratch(scratch);
+      sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+      sp_mem_slice_t content = sp_zero;
+      if (sp_io_read_file_slice(s.mem, path, &content)) {
+        sp_mem_end_scratch(s);
         return SPN_ERROR;
       }
-      spn_err_t err = spn_dag_store_put(store, content.data, content.len, digest);
-      sp_mem_end_scratch(scratch);
+      spn_err_t err = spn_dag_put(store, content.data, content.len, digest);
+      sp_mem_end_scratch(s);
       return err;
     }
     case SPN_DAG_STORE_FILESYSTEM: {
@@ -181,15 +186,15 @@ spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_
         return SPN_ERROR;
       }
 
-      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-      sp_str_t stored = spn_dag_store_path(store, scratch.mem, *digest);
+      sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+      sp_str_t stored = spn_dag_store_path(store, s.mem, *digest);
       spn_err_t err = SPN_OK;
       if (!sp_fs_exists(stored)) {
         if (sp_fs_copy(path, stored)) {
           err = SPN_ERROR;
         }
       }
-      sp_mem_end_scratch(scratch);
+      sp_mem_end_scratch(s);
       return err;
     }
   }
@@ -203,9 +208,9 @@ bool spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest) {
       return sp_ht_getp(store->blobs, digest) != SP_NULLPTR;
     }
     case SPN_DAG_STORE_FILESYSTEM: {
-      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-      bool exists = sp_fs_exists(spn_dag_store_path(store, scratch.mem, digest));
-      sp_mem_end_scratch(scratch);
+      sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+      bool exists = sp_fs_exists(spn_dag_store_path(store, s.mem, digest));
+      sp_mem_end_scratch(s);
       return exists;
     }
   }
@@ -213,21 +218,23 @@ bool spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest) {
   SP_UNREACHABLE_RETURN(false);
 }
 
-spn_err_t spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_str_t* data) {
+spn_err_t spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_mem_slice_t* data) {
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
-      sp_str_t* blob = sp_ht_getp(store->blobs, digest);
+      sp_mem_slice_t* blob = sp_ht_getp(store->blobs, digest);
       if (!blob) {
         return SPN_ERROR;
       }
-      *data = sp_str_copy(mem, *blob);
+      data->data = sp_alloc_n(mem, u8, blob->len);
+      data->len = blob->len;
+      sp_mem_copy(data->data, blob->data, blob->len);
       return SPN_OK;
     }
     case SPN_DAG_STORE_FILESYSTEM: {
-      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-      sp_str_t path = spn_dag_store_path(store, scratch.mem, digest);
-      spn_err_t err = sp_io_read_file(mem, path, data) ? SPN_ERROR : SPN_OK;
-      sp_mem_end_scratch(scratch);
+      sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+      sp_str_t path = spn_dag_store_path(store, s.mem, digest);
+      spn_err_t err = sp_io_read_file_slice(mem, path, data) ? SPN_ERROR : SPN_OK;
+      sp_mem_end_scratch(s);
       return err;
     }
   }
@@ -238,22 +245,22 @@ spn_err_t spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_
 spn_err_t spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t path) {
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
-      sp_str_t* blob = sp_ht_getp(store->blobs, digest);
+      sp_mem_slice_t* blob = sp_ht_getp(store->blobs, digest);
       if (!blob) {
         return SPN_ERROR;
       }
-      return sp_fs_create_file_str(path, *blob) ? SPN_ERROR : SPN_OK;
+      return sp_fs_create_file_slice(path, *blob) ? SPN_ERROR : SPN_OK;
     }
     case SPN_DAG_STORE_FILESYSTEM: {
-      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-      sp_str_t stored = spn_dag_store_path(store, scratch.mem, digest);
+      sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+      sp_str_t stored = spn_dag_store_path(store, s.mem, digest);
       spn_err_t err = SPN_OK;
       if (!sp_fs_exists(stored)) {
         err = SPN_ERROR;
       } else if (sp_fs_copy(stored, path)) {
         err = SPN_ERROR;
       }
-      sp_mem_end_scratch(scratch);
+      sp_mem_end_scratch(s);
       return err;
     }
   }
