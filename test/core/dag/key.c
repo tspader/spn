@@ -1,6 +1,7 @@
 typedef struct {
-  const c8* salt;
+  const c8* identity;
   const c8* inputs [DAG_TEST_MAX_INPUTS];
+  const c8* outputs [DAG_TEST_MAX_OUTPUTS];
 } key_action_t;
 
 typedef struct {
@@ -15,15 +16,15 @@ typedef struct {
 
 UTEST_EMPTY_FIXTURE(key)
 
-static spn_dag_digest_t build_action_key(spn_dag_t* g, key_action_t spec) {
-  spn_dag_digest_t salt = sp_zero;
-  if (spec.salt) {
-    sp_str_t str = sp_str_view(spec.salt);
-    salt = spn_dag_digest(str.data, str.len);
+static void build_action_key(s32* utest_result, spn_dag_t* g, key_action_t spec, spn_dag_digest_t* key) {
+  spn_dag_digest_t identity = sp_zero;
+  if (spec.identity) {
+    sp_str_t str = sp_str_view(spec.identity);
+    identity = spn_dag_digest(str.data, str.len);
   }
 
   spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
-    .salt = salt
+    .identity = identity
   });
 
   sp_carr_for(spec.inputs, it) {
@@ -35,20 +36,30 @@ static spn_dag_digest_t build_action_key(spn_dag_t* g, key_action_t spec) {
     spn_dag_action_add_input(g, action, value);
   }
 
-  return spn_dag_action_key(g, action);
+  sp_carr_for(spec.outputs, it) {
+    if (!spec.outputs[it]) {
+      break;
+    }
+    spn_dag_id_t file = spn_dag_add_file(g, sp_str_view(spec.outputs[it]));
+    ASSERT_EQ(SPN_OK, spn_dag_action_add_output(g, action, file));
+  }
+
+  *key = spn_dag_action_key(g, action);
 }
 
 static void run_key_test(s32* utest_result, key_test_t t) {
   spn_dag_t* g = spn_dag_new(sp_mem_os_new());
-  spn_dag_digest_t a = build_action_key(g, t.a);
-  spn_dag_digest_t b = build_action_key(g, t.b);
+  spn_dag_digest_t a = sp_zero;
+  spn_dag_digest_t b = sp_zero;
+  build_action_key(utest_result, g, t.a, &a);
+  build_action_key(utest_result, g, t.b, &b);
   EXPECT_EQ(t.expect.equal, spn_dag_digest_equal(a, b));
 }
 
 UTEST_F(key, identical_actions_match) {
   run_key_test(&ur, (key_test_t) {
-    .a = { .salt = "cc -c", .inputs = { "main.c", "sp.h" } },
-    .b = { .salt = "cc -c", .inputs = { "main.c", "sp.h" } },
+    .a = { .identity = "cc -c", .inputs = { "main.c", "sp.h" }, .outputs = { "main.o" } },
+    .b = { .identity = "cc -c", .inputs = { "main.c", "sp.h" }, .outputs = { "main.o" } },
     .expect = { .equal = true }
   });
 }
@@ -74,9 +85,23 @@ UTEST_F(key, extra_input_changes_key) {
   });
 }
 
-UTEST_F(key, salt_changes_key) {
+UTEST_F(key, identity_changes_key) {
   run_key_test(&ur, (key_test_t) {
-    .a = { .salt = "cc -c -O0", .inputs = { "main.c" } },
-    .b = { .salt = "cc -c -O2", .inputs = { "main.c" } },
+    .a = { .identity = "cc -c -O0", .inputs = { "main.c" } },
+    .b = { .identity = "cc -c -O2", .inputs = { "main.c" } },
+  });
+}
+
+UTEST_F(key, output_path_changes_key) {
+  run_key_test(&ur, (key_test_t) {
+    .a = { .outputs = { "main.o" } },
+    .b = { .outputs = { "spum.o" } },
+  });
+}
+
+UTEST_F(key, extra_output_changes_key) {
+  run_key_test(&ur, (key_test_t) {
+    .a = { .outputs = { "main.o" } },
+    .b = { .outputs = { "main.o", "main.d" } },
   });
 }

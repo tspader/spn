@@ -55,7 +55,7 @@ spn_dag_id_t spn_dag_add_action(spn_dag_t* g, spn_dag_action_config_t config) {
       .index = (u32)sp_da_size(g->actions),
       .occupied = true
     },
-    .salt = config.salt,
+    .identity = config.identity,
     .execute = config.execute,
     .user_data = config.user_data,
   };
@@ -88,9 +88,10 @@ spn_dag_digest_t spn_dag_action_key(spn_dag_t* g, spn_dag_id_t action_id) {
 
   spn_sha256_ctx_t ctx = sp_zero;
   spn_sha256_init(&ctx);
-  spn_sha256_update(&ctx, action->salt.bytes, sizeof(action->salt.bytes));
+  spn_sha256_update(&ctx, action->identity.bytes, sizeof(action->identity.bytes));
   sp_da_for(action->consumes, it) {
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, action->consumes[it]);
+    sp_assert(spn_dag_digest_valid(artifact->digest));
     spn_sha256_update(&ctx, artifact->digest.bytes, sizeof(artifact->digest.bytes));
   }
 
@@ -107,6 +108,15 @@ spn_dag_digest_t spn_dag_digest(const void* data, u64 len) {
 
 bool spn_dag_digest_equal(spn_dag_digest_t a, spn_dag_digest_t b) {
   return sp_mem_is_equal(a.bytes, b.bytes, sizeof(a.bytes));
+}
+
+bool spn_dag_digest_valid(spn_dag_digest_t digest) {
+  sp_for(it, sizeof(digest.bytes)) {
+    if (digest.bytes[it]) {
+      return true;
+    }
+  }
+  return false;
 }
 
 sp_str_t spn_dag_digest_hex(sp_mem_t mem, spn_dag_digest_t digest) {
@@ -236,11 +246,16 @@ void spn_dag_action_cache_init(spn_dag_action_cache_t* c, sp_mem_t mem) {
   sp_ht_init(c->mem, c->entries);
 }
 
-spn_dag_action_entry_t* spn_dag_action_cache_get(spn_dag_action_cache_t* c, spn_dag_digest_t key) {
+const spn_dag_action_entry_t* spn_dag_action_cache_get(spn_dag_action_cache_t* c, spn_dag_digest_t key) {
   return SP_NULLPTR;
 }
 
-void spn_dag_action_cache_put(spn_dag_action_cache_t* c, spn_dag_digest_t key, spn_dag_action_output_t* outputs, u32 count) {
+void spn_dag_action_cache_put(spn_dag_action_cache_t* c, spn_dag_digest_t key, const spn_dag_action_output_t* outputs, u32 count) {
+  sp_assert(!sp_ht_getp(c->entries, key));
+}
+
+bool spn_dag_action_cache_remove(spn_dag_action_cache_t* c, spn_dag_digest_t key) {
+  return false;
 }
 
 spn_err_t spn_dag_action_cache_save(spn_dag_action_cache_t* c, sp_str_t path) {
@@ -251,7 +266,7 @@ spn_err_t spn_dag_action_cache_load(spn_dag_action_cache_t* c, sp_str_t path) {
   return SPN_ERROR;
 }
 
-spn_err_t spn_dag_execute(spn_dag_t* g, spn_dag_id_t action, spn_dag_action_cache_t* cache, spn_dag_store_t* store) {
+spn_err_t spn_dag_execute(spn_dag_t* g, spn_dag_id_t action, spn_dag_file_cache_t* files, spn_dag_action_cache_t* cache, spn_dag_store_t* store) {
   return SPN_ERROR;
 }
 
