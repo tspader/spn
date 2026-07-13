@@ -52,6 +52,30 @@ typedef struct {
   sp_da(spn_dag_action_t) actions;
 } spn_dag_t;
 
+typedef struct {
+  u64 device;
+  u64 id;
+} spn_dag_file_id_t;
+
+typedef struct {
+  spn_dag_file_id_t id;
+  sp_sys_timespec_t mtime;
+  s64 size;
+  spn_dag_digest_t digest;
+} spn_dag_file_meta_t;
+
+
+typedef struct {
+  sp_mem_arena_t* arena;
+  sp_mem_t mem;
+  sp_ht(spn_dag_file_id_t, spn_dag_file_meta_t) entries;
+  sp_ht(sp_str_t, sp_sys_file_meta_t) metadata;
+  struct {
+    u64 stats;
+    u64 hashes;
+  } counts;
+} spn_dag_file_cache_t;
+
 typedef enum {
   SPN_DAG_STORE_MEM,
   SPN_DAG_STORE_FILESYSTEM,
