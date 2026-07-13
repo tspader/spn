@@ -8,6 +8,7 @@
 #include "dag/dag.h"
 
 #define DAG_TEST_MAX_INPUTS 4
+#define DAG_TEST_MAX_OUTPUTS 4
 #define DAG_TEST_MAX_OPS 8
 
 #define EXPECT_STR(actual, cstr) EXPECT_TRUE(sp_str_equal((actual), sp_str_view(cstr)))
@@ -16,5 +17,7 @@
 #include "key.c"
 #include "store.c"
 #include "file_cache.c"
+#include "action_cache.c"
+#include "exec.c"
 
 UTEST_MAIN();
