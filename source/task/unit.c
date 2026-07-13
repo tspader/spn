@@ -275,17 +275,19 @@ static spn_err_t add_metaprogram_target(spn_session_t* session, spn_pkg_unit_t* 
   return SPN_OK;
 }
 
-static void init_program_runtime(spn_session_t* session, spn_pkg_unit_t* unit, spn_pkg_unit_t* program) {
+static void init_program_runtime(spn_pkg_unit_t* unit) {
+  spn_pkg_unit_t* program = unit->program;
+  sp_assert(program);
   if (program->meta.configure.target) {
     spn_wasm_script_init(
       &unit->wasm.configure,
-      get_target_output_path(session->mem, program->meta.configure.target)
+      get_target_output_path(unit->session->mem, program->meta.configure.target)
     );
   }
   if (program->meta.build.target) {
     spn_wasm_script_init(
       &unit->wasm.build,
-      get_target_output_path(session->mem, program->meta.build.target)
+      get_target_output_path(unit->session->mem, program->meta.build.target)
     );
   }
 }
@@ -324,6 +326,7 @@ spn_err_union_t add_program_units(spn_session_t* session) {
 
   sp_da_for(session->units.metaprogram->packages, it) {
     spn_pkg_unit_t* unit = session->units.metaprogram->packages[it];
+    unit->program = unit;
     if (!sp_da_empty(unit->meta.configure.info->source)) {
       try_as_union(add_metaprogram_target(session, unit, unit->meta.configure.info, &unit->meta.configure.target));
     }
@@ -347,16 +350,16 @@ spn_err_union_t add_program_units(spn_session_t* session) {
 
   sp_da_for(session->units.metaprogram->packages, it) {
     spn_pkg_unit_t* unit = session->units.metaprogram->packages[it];
-    init_program_runtime(session, unit, unit);
+    init_program_runtime(unit);
   }
 
   sp_da_for(session->plan.builds, it) {
     spn_build_unit_t* build = session->plan.builds[it].build;
     sp_da_for(build->packages, it) {
       spn_pkg_unit_t* unit = build->packages[it];
-      spn_pkg_unit_t* program = spn_session_find_pkg_unit(session, session->units.metaprogram, unit->id.pkg);
-      sp_assert(program);
-      init_program_runtime(session, unit, program);
+      unit->program = spn_session_find_pkg_unit(session, session->units.metaprogram, unit->id.pkg);
+      sp_assert(unit->program);
+      init_program_runtime(unit);
     }
   }
 

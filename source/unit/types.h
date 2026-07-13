@@ -216,6 +216,7 @@ struct spn_target_unit {
 struct spn_pkg_unit_t {
   spn_pkg_unit_id_t id;
   spn_build_unit_t* build;
+  spn_pkg_unit_t* program;
   spn_session_t* session;
   spn_pkg_info_t* info;
   spn_pkg_source_t source;
