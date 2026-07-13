@@ -111,6 +111,127 @@ sp_str_t spn_dag_digest_hex(sp_mem_t mem, spn_dag_digest_t digest) {
   return spn_sha256_digest_hex(mem, digest.bytes);
 }
 
+#define SPN_DAG_FCT_VERSION 1
+
+void spn_dag_file_cache_init(spn_dag_file_cache_t* c, sp_mem_t mem) {
+  c->arena = sp_mem_arena_new(mem);
+  c->mem = sp_mem_arena_as_allocator(c->arena);
+  sp_ht_init(c->mem, c->entries);
+  sp_str_ht_init(c->mem, c->metadata);
+}
+
+spn_err_t spn_dag_get_file_meta(spn_dag_file_cache_t* c, sp_str_t path, sp_sys_file_meta_t* meta) {
+  sp_sys_file_meta_t* cached = sp_ht_getp(c->metadata, path);
+  if (cached) {
+    *meta = *cached;
+    return SPN_OK;
+  }
+
+  c->counts.stats++;
+  sp_sys_file_meta_t st = sp_zero;
+  if (sp_sys_get_path_metadata_s(sp_sys_get_root(0), path, &st) != 0) {
+    return SPN_ERROR;
+  }
+
+  sp_ht_insert(c->metadata, sp_str_copy(c->mem, path), st);
+  *meta = st;
+  return SPN_OK;
+}
+
+static bool spn_dag_timespec_equal(sp_sys_timespec_t a, sp_sys_timespec_t b) {
+  return a.tv_sec == b.tv_sec && a.tv_nsec == b.tv_nsec;
+}
+
+spn_err_t spn_dag_get_file_digest(spn_dag_file_cache_t* c, sp_str_t path, spn_dag_digest_t* digest) {
+  sp_sys_file_meta_t meta = sp_zero;
+  if (spn_dag_get_file_meta(c, path, &meta)) {
+    return SPN_ERROR;
+  }
+
+  spn_dag_file_id_t id = {
+    .device = meta.device,
+    .id = meta.id
+  };
+
+  spn_dag_file_meta_t* entry = sp_ht_getp(c->entries, id);
+  if (entry && spn_dag_timespec_equal(entry->mtime, meta.mtime) && entry->size == meta.size) {
+    *digest = entry->digest;
+    return SPN_OK;
+  }
+
+  c->counts.hashes++;
+  if (spn_sha256_file_digest(path, digest->bytes)) {
+    return SPN_ERROR;
+  }
+
+  spn_dag_file_meta_t fresh = {
+    .id = id,
+    .mtime = meta.mtime,
+    .size = meta.size,
+    .digest = *digest
+  };
+
+  if (entry) {
+    *entry = fresh;
+  } else {
+    sp_ht_insert(c->entries, id, fresh);
+  }
+
+  return SPN_OK;
+}
+
+spn_err_t spn_dag_file_cache_save(spn_dag_file_cache_t* c, sp_str_t path) {
+  sp_fs_remove_file(path);
+
+  sp_io_file_writer_t writer = sp_zero;
+  if (sp_io_file_writer_from_path(&writer, path)) {
+    return SPN_ERROR;
+  }
+
+  sp_err_t err = SP_OK;
+  u64 version = SPN_DAG_FCT_VERSION;
+  u64 count = sp_ht_size(c->entries);
+  err |= sp_io_write(&writer.base, &version, sizeof(version), SP_NULLPTR);
+  err |= sp_io_write(&writer.base, &count, sizeof(count), SP_NULLPTR);
+
+  sp_ht_for(c->entries, it) {
+    spn_dag_file_meta_t* entry = sp_ht_it_getp(c->entries, it);
+    err |= sp_io_write(&writer.base, entry, sizeof(*entry), SP_NULLPTR);
+  }
+
+  sp_io_file_writer_close(&writer);
+  return err ? SPN_ERROR : SPN_OK;
+}
+
+spn_err_t spn_dag_file_cache_load(spn_dag_file_cache_t* c, sp_str_t path) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+
+  sp_mem_slice_t data = sp_zero;
+  if (sp_io_read_file_slice(s.mem, path, &data)) {
+    sp_mem_end_scratch(s);
+    return SPN_ERROR;
+  }
+
+  spn_err_t err = SPN_ERROR;
+  struct { u64 version; u64 count; } header = sp_zero;
+  if (data.len >= sizeof(header)) {
+    sp_mem_copy(&header, data.data, sizeof(header));
+    bool valid = header.version == SPN_DAG_FCT_VERSION;
+    valid &= data.len == sizeof(header) + header.count * sizeof(spn_dag_file_meta_t);
+    if (valid) {
+      sp_for(it, header.count) {
+        spn_dag_file_meta_t entry = sp_zero;
+        sp_mem_copy(&entry, data.data + sizeof(header) + it * sizeof(entry), sizeof(entry));
+        sp_ht_insert(c->entries, entry.id, entry);
+      }
+      err = SPN_OK;
+    }
+  }
+
+  sp_mem_end_scratch(s);
+  return err;
+}
+
 static sp_str_t spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
   return sp_fs_join_path(mem, store->dir, spn_dag_digest_hex(mem, digest));
 }

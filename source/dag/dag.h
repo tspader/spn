@@ -19,6 +19,12 @@ spn_dag_digest_t    spn_dag_digest(const void* data, u64 len);
 bool                spn_dag_digest_equal(spn_dag_digest_t a, spn_dag_digest_t b);
 sp_str_t            spn_dag_digest_hex(sp_mem_t mem, spn_dag_digest_t digest);
 
+void                spn_dag_file_cache_init(spn_dag_file_cache_t* c, sp_mem_t mem);
+spn_err_t           spn_dag_get_file_meta(spn_dag_file_cache_t* c, sp_str_t path, sp_sys_file_meta_t* meta);
+spn_err_t           spn_dag_get_file_digest(spn_dag_file_cache_t* c, sp_str_t path, spn_dag_digest_t* digest);
+spn_err_t           spn_dag_file_cache_save(spn_dag_file_cache_t* c, sp_str_t path);
+spn_err_t           spn_dag_file_cache_load(spn_dag_file_cache_t* c, sp_str_t path);
+
 void                spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config);
 spn_err_t           spn_dag_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag_digest_t* digest);
 spn_err_t           spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_digest_t* digest);
