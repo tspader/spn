@@ -145,11 +145,6 @@ typedef struct {
 } spn_compile_unit_t;
 
 typedef struct {
-  spn_bg_id_t build;
-  spn_bg_id_t bin;
-} spn_target_nodes_t;
-
-typedef struct {
   sp_str_t from;
   sp_str_t to;
   spn_bg_id_t input;
@@ -172,9 +167,6 @@ typedef struct {
     spn_bg_id_t exit;
     spn_bg_id_t profile;
   } stamp;
-  struct {
-    spn_bg_id_t output;
-  } program;
   sp_da(spn_bg_id_t) user;
 } spn_pkg_nodes_t;
 
@@ -203,7 +195,6 @@ struct spn_target_unit {
       spn_bg_id_t object;
       spn_bg_id_t header;
     } embed;
-    sp_da(spn_bg_id_t) source;
   } nodes;
 
   spn_build_paths_t paths;
@@ -235,9 +226,6 @@ struct spn_pkg_unit_t {
 
   sp_da(spn_pkg_dep_t) deps;
   sp_da(spn_target_unit_t*) libs;
-  sp_da(spn_target_unit_t*) exes;
-  sp_da(spn_target_unit_t*) scripts;
-  sp_da(spn_target_unit_t*) tests;
   sp_da(spn_target_unit_t*) targets;
 
   struct {
@@ -253,7 +241,6 @@ struct spn_pkg_unit_t {
   struct {
     struct {
       sp_str_t dir;
-      sp_str_t build;
       sp_str_t configure;
       sp_str_t package;
       sp_str_t main;
