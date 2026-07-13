@@ -52,7 +52,7 @@ static void run_cache_test(s32* utest_result, cache_test_t t) {
   sp_str_t table = tmpfs_get(&fs, sp_str_lit("actions.bin"));
 
   spn_dag_action_cache_t c = sp_zero;
-  spn_dag_action_cache_init(&c, sp_mem_os_new());
+  spn_dag_action_cache_init(&c, fs.mem);
 
   sp_carr_for(t.ops, it) {
     cache_op_t op = t.ops[it];
@@ -66,14 +66,18 @@ static void run_cache_test(s32* utest_result, cache_test_t t) {
       }
       case CACHE_OP_PUT: {
         spn_dag_action_output_t outputs [DAG_TEST_MAX_OUTPUTS] = sp_zero;
+        c8 paths [DAG_TEST_MAX_OUTPUTS][SP_PATH_MAX] = sp_zero;
         u32 count = cache_output_count(&op);
-        sp_for(o, count) {
-          outputs[o] = (spn_dag_action_output_t) {
-            .path = sp_str_view(op.outputs[o].path),
-            .digest = cache_blob_digest(op.outputs[o].blob)
+        sp_for(it, count) {
+          u32 len = sp_cstr_len(op.outputs[it].path);
+          sp_cstr_copy_to_n(op.outputs[it].path, len, paths[it], sizeof(paths[it]));
+          outputs[it] = (spn_dag_action_output_t) {
+            .path = sp_str(paths[it], len),
+            .digest = cache_blob_digest(op.outputs[it].blob)
           };
         }
         spn_dag_action_cache_put(&c, cache_blob_digest(op.key), outputs, count);
+        sp_mem_fill_u8(paths, sizeof(paths), 69);
         break;
       }
       case CACHE_OP_GET: {
@@ -82,9 +86,9 @@ static void run_cache_test(s32* utest_result, cache_test_t t) {
         if (op.expect.hit && entry) {
           u32 count = cache_output_count(&op);
           ASSERT_EQ(count, (u32)sp_da_size(entry->outputs));
-          sp_for(o, count) {
-            EXPECT_STR(entry->outputs[o].path, op.outputs[o].path);
-            EXPECT_TRUE(spn_dag_digest_equal(entry->outputs[o].digest, cache_blob_digest(op.outputs[o].blob)));
+          sp_for(it, count) {
+            EXPECT_STR(entry->outputs[it].path, op.outputs[it].path);
+            EXPECT_TRUE(spn_dag_digest_equal(entry->outputs[it].digest, cache_blob_digest(op.outputs[it].blob)));
           }
         }
         break;
@@ -94,7 +98,7 @@ static void run_cache_test(s32* utest_result, cache_test_t t) {
         break;
       }
       case CACHE_OP_RELOAD: {
-        spn_dag_action_cache_init(&c, sp_mem_os_new());
+        spn_dag_action_cache_init(&c, fs.mem);
         EXPECT_EQ(op.expect.err, spn_dag_action_cache_load(&c, table));
         break;
       }
