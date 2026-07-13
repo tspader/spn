@@ -89,7 +89,7 @@ spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
     }
 
     if (!sp_da_empty(unit->target->info->embed)) {
-      sp_da_push(compile.include, unit->target->paths.generated);
+      sp_da_push(compile.include, unit->package->paths.generated);
     }
 
     sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
@@ -102,7 +102,7 @@ spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
     unit->invocation = (spn_invocation_t) {
       .program = ps.command,
       .args = ps.dyn_args,
-      .cwd = unit->target->paths.work,
+      .cwd = unit->package->paths.work,
     };
     sp_da_push(session->units.compile_commands, ((spn_compile_command_t) {
       .source = unit->paths.file,

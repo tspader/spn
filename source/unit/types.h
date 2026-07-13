@@ -91,20 +91,6 @@ typedef struct {
   sp_str_t jsonl;
 } spn_build_log_paths_t;
 
-typedef struct {
-  sp_str_t recipe;
-  sp_str_t source;
-  sp_str_t work;
-  sp_str_t generated;
-  sp_str_t object;
-  sp_str_t store;
-  sp_str_t include;
-  sp_str_t lib;
-  sp_str_t bin;
-  sp_str_t vendor;
-  spn_build_log_paths_t logs;
-} spn_build_paths_t;
-
 typedef struct spn_build_io_t {
   spn_lazy_log_t build;
   spn_lazy_log_t test;
@@ -197,7 +183,6 @@ struct spn_target_unit {
     } embed;
   } nodes;
 
-  spn_build_paths_t paths;
   spn_build_io_t logs;
 };
 

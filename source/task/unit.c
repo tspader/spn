@@ -223,8 +223,8 @@ static void create_target_objects(spn_session_t* session, spn_target_unit_t* tar
     // them as intermediates. The object name keeps the full source-relative
     // path, extension included, so colliding sources stay distinct.
     sp_str_t object_dir = target->lib_kind == SPN_LIB_KIND_OBJECT ?
-      target->paths.lib :
-      sp_fs_join_path(session->mem, target->paths.object, target->info->name);
+      pkg->paths.lib :
+      sp_fs_join_path(session->mem, pkg->paths.object, target->info->name);
     sp_str_t object_path = sp_fs_join_path(session->mem, object_dir, sp_fmt(scratch.mem, "{}.o", SP_FMT_STR(relative)).value);
     spn_compile_unit_id_t id = {
       .target = target->id,
