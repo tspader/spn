@@ -33,6 +33,7 @@ set(SPN_SOURCES
   compiler/gnu.c
   compiler/msvc.c
   ctx/ctx.c
+  dag/dag.c
   enum/enum.c
   event/event.c
   event/build.c
@@ -69,6 +70,7 @@ set(SPN_SOURCES
   session/invocation.c
   session/registry/registry.c
   session/session.c
+  sha256/sha256.c
   sp/color.c
   sp/io.c
   sp/it.c
@@ -111,7 +113,6 @@ set(SPN_SOURCES
   toolchain/catalog.c
   toolchain/provision.c
   toolchain/select.c
-  toolchain/sha256.c
   toolchain/toolchain.c
   triple/triple.c
   tui/tui.c

@@ -186,6 +186,7 @@ add_executable(closure
 spn_test_binary(closure)
 add_test(NAME closure COMMAND "$<TARGET_FILE:closure>")
 
+add_subdirectory(dag)
 add_subdirectory(resolver)
 add_subdirectory(index)
 add_subdirectory(publish)

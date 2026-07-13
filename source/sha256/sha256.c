@@ -1,4 +1,4 @@
-#include "toolchain/sha256.h"
+#include "sha256/sha256.h"
 
 
 static const u32 spn_sha256_k [64] = {
@@ -30,13 +30,13 @@ void spn_sha256_init(spn_sha256_ctx_t* ctx) {
 static void spn_sha256_compress(spn_sha256_ctx_t* ctx, const u8* block) {
   u32 w [64];
 
-  for (u32 i = 0; i < 16; i++) {
-    w[i] = ((u32)block[i * 4] << 24) | ((u32)block[i * 4 + 1] << 16) | ((u32)block[i * 4 + 2] << 8) | (u32)block[i * 4 + 3];
+  sp_for(it, 16) {
+    w[it] = ((u32)block[it * 4] << 24) | ((u32)block[it * 4 + 1] << 16) | ((u32)block[it * 4 + 2] << 8) | (u32)block[it * 4 + 3];
   }
-  for (u32 i = 16; i < 64; i++) {
-    u32 s0 = SPN_SHA256_ROR(w[i - 15], 7) ^ SPN_SHA256_ROR(w[i - 15], 18) ^ (w[i - 15] >> 3);
-    u32 s1 = SPN_SHA256_ROR(w[i - 2], 17) ^ SPN_SHA256_ROR(w[i - 2], 19) ^ (w[i - 2] >> 10);
-    w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+  for (u32 it = 16; it < 64; it++) {
+    u32 s0 = SPN_SHA256_ROR(w[it - 15], 7) ^ SPN_SHA256_ROR(w[it - 15], 18) ^ (w[it - 15] >> 3);
+    u32 s1 = SPN_SHA256_ROR(w[it - 2], 17) ^ SPN_SHA256_ROR(w[it - 2], 19) ^ (w[it - 2] >> 10);
+    w[it] = w[it - 16] + s0 + w[it - 7] + s1;
   }
 
   u32 a = ctx->state[0];
@@ -48,10 +48,10 @@ static void spn_sha256_compress(spn_sha256_ctx_t* ctx, const u8* block) {
   u32 g = ctx->state[6];
   u32 h = ctx->state[7];
 
-  for (u32 i = 0; i < 64; i++) {
+  sp_for(it, 64) {
     u32 s1 = SPN_SHA256_ROR(e, 6) ^ SPN_SHA256_ROR(e, 11) ^ SPN_SHA256_ROR(e, 25);
     u32 ch = (e & f) ^ (~e & g);
-    u32 t1 = h + s1 + ch + spn_sha256_k[i] + w[i];
+    u32 t1 = h + s1 + ch + spn_sha256_k[it] + w[it];
     u32 s0 = SPN_SHA256_ROR(a, 2) ^ SPN_SHA256_ROR(a, 13) ^ SPN_SHA256_ROR(a, 22);
     u32 maj = (a & b) ^ (a & c) ^ (b & c);
     u32 t2 = s0 + maj;
@@ -107,31 +107,31 @@ void spn_sha256_final(spn_sha256_ctx_t* ctx, u8 digest [32]) {
   }
 
   u8 tail [8];
-  for (u32 i = 0; i < 8; i++) {
-    tail[i] = (u8)(bits >> (56 - i * 8));
+  sp_for(it, 8) {
+    tail[it] = (u8)(bits >> (56 - it * 8));
   }
   spn_sha256_update(ctx, tail, 8);
 
-  for (u32 i = 0; i < 8; i++) {
-    digest[i * 4] = (u8)(ctx->state[i] >> 24);
-    digest[i * 4 + 1] = (u8)(ctx->state[i] >> 16);
-    digest[i * 4 + 2] = (u8)(ctx->state[i] >> 8);
-    digest[i * 4 + 3] = (u8)(ctx->state[i]);
+  sp_for(it, 8) {
+    digest[it * 4] = (u8)(ctx->state[it] >> 24);
+    digest[it * 4 + 1] = (u8)(ctx->state[it] >> 16);
+    digest[it * 4 + 2] = (u8)(ctx->state[it] >> 8);
+    digest[it * 4 + 3] = (u8)(ctx->state[it]);
   }
 }
 
-static sp_str_t spn_sha256_digest_to_hex(sp_mem_t mem, const u8 digest [32]) {
+sp_str_t spn_sha256_digest_hex(sp_mem_t mem, const u8 digest [32]) {
   static const c8 hex [] = "0123456789abcdef";
-  c8* out = (c8*)sp_alloc(mem, 64);
-  for (u32 i = 0; i < 32; i++) {
-    out[i * 2] = hex[digest[i] >> 4];
-    out[i * 2 + 1] = hex[digest[i] & 0xf];
+  c8* buffer = (c8*)sp_alloc(mem, 64);
+  sp_for(it, 32) {
+    buffer[it * 2] = hex[digest[it] >> 4];
+    buffer[it * 2 + 1] = hex[digest[it] & 0xf];
   }
-  return sp_str(out, 64);
+  return sp_str(buffer, 64);
 }
 
 void spn_sha256(const void* data, u64 len, u8 digest [32]) {
-  spn_sha256_ctx_t ctx;
+  spn_sha256_ctx_t ctx = sp_zero;
   spn_sha256_init(&ctx);
   spn_sha256_update(&ctx, (const u8*)data, len);
   spn_sha256_final(&ctx, digest);
@@ -140,33 +140,47 @@ void spn_sha256(const void* data, u64 len, u8 digest [32]) {
 sp_str_t spn_sha256_hex(sp_mem_t mem, const void* data, u64 len) {
   u8 digest [32];
   spn_sha256(data, len, digest);
-  return spn_sha256_digest_to_hex(mem, digest);
+  return spn_sha256_digest_hex(mem, digest);
 }
 
-spn_err_t spn_sha256_file(sp_mem_t mem, sp_str_t path, sp_str_t* hex) {
-  sp_io_file_reader_t reader;
-  if (sp_io_file_reader_from_path(&reader, path)) return SPN_ERROR;
+spn_err_t spn_sha256_file_digest(sp_str_t path, u8 digest [32]) {
+  sp_io_file_reader_t reader = sp_zero;
+  if (sp_io_file_reader_from_path(&reader, path)) {
+    return SPN_ERROR;
+  }
 
-  spn_sha256_ctx_t ctx;
+  spn_sha256_ctx_t ctx = sp_zero;
   spn_sha256_init(&ctx);
 
   u8 chunk [65536];
   while (true) {
     u64 bytes_read = 0;
     sp_err_t err = sp_io_read(&reader.base, chunk, sizeof(chunk), &bytes_read);
-    if (bytes_read) spn_sha256_update(&ctx, chunk, bytes_read);
-    if (err == SP_ERR_IO_EOF) break;
+    if (bytes_read) {
+      spn_sha256_update(&ctx, chunk, bytes_read);
+    }
+    if (err == SP_ERR_IO_EOF) {
+      break;
+    }
     if (err) {
       sp_io_file_reader_close(&reader);
       return SPN_ERROR;
     }
-    if (!bytes_read) break;
+    if (!bytes_read) {
+      break;
+    }
   }
 
   sp_io_file_reader_close(&reader);
-
-  u8 digest [32];
   spn_sha256_final(&ctx, digest);
-  *hex = spn_sha256_digest_to_hex(mem, digest);
+  return SPN_OK;
+}
+
+spn_err_t spn_sha256_file(sp_mem_t mem, sp_str_t path, sp_str_t* hex) {
+  u8 digest [32];
+  if (spn_sha256_file_digest(path, digest)) {
+    return SPN_ERROR;
+  }
+  *hex = spn_sha256_digest_hex(mem, digest);
   return SPN_OK;
 }
