@@ -107,7 +107,7 @@ static spn_err_union_t add_metaprogram_build(spn_session_t* session, spn_build_u
 
   spn_build_unit_t* unit = add_build_unit(session, (spn_build_unit_t) {
     .profile = {
-      .name = sp_str_lit("program"),
+      .name = sp_str_lit("metaprogram"),
       .arch = target.arch,
       .os = target.os,
       .abi = target.abi,
@@ -623,11 +623,13 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
       break;
     }
     case SPN_TARGET_CONFIGURE_METAPROGRAM: {
-      pkg->meta.configure.target = target;
+      sp_assert(pkg->metaprogram.pkg == pkg);
+      pkg->metaprogram.configure.target = target;
       break;
     }
     case SPN_TARGET_BUILD_METAPROGRAM: {
-      pkg->meta.build.target = target;
+      sp_assert(pkg->metaprogram.pkg == pkg);
+      pkg->metaprogram.build.target = target;
       break;
     }
   }
@@ -710,9 +712,14 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   unit->build = build;
   unit->info = clone_pkg_info(session, pkg_id, build, loaded->info);
   unit->source = loaded->source;
-  unit->meta.configure.info = &loaded->configure;
-  unit->meta.build.info = &loaded->build;
   unit->session = session;
+  if (build == session->units.metaprogram) {
+    unit->metaprogram = (spn_pkg_metaprogram_t) {
+      .pkg = unit,
+      .configure = { .info = &loaded->configure },
+      .build = { .info = &loaded->build },
+    };
+  }
   sp_da_push(build->packages, unit);
   sp_da_init(session->mem, unit->deps);
   sp_da_init(session->mem, unit->libs);

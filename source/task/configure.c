@@ -41,8 +41,8 @@ static spn_err_t add_configure_package(spn_build_graph_t* graph, spn_pkg_unit_t*
   unit->nodes.configure.stamp = spn_bg_add_file(graph, unit->paths.stamp.configure);
   spn_try(spn_bg_cmd_add_output(graph, unit->nodes.configure.run, unit->nodes.configure.stamp));
 
-  sp_assert(unit->program);
-  spn_target_unit_t* target = unit->program->meta.configure.target;
+  sp_assert(unit->metaprogram.pkg);
+  spn_target_unit_t* target = unit->metaprogram.configure.target;
   if (target) {
     spn_try(spn_build_add_target_nodes(graph, target));
     spn_try(spn_bg_cmd_add_input(graph, unit->nodes.configure.run, target->nodes.output));
@@ -75,7 +75,7 @@ static spn_err_t add_configure_target_edges(spn_build_graph_t* graph, spn_target
   return SPN_OK;
 }
 
-static void collect_program_dependencies(sp_da(spn_pkg_unit_t*)* dependencies, spn_target_unit_t* target) {
+static void collect_metaprogram_dependencies(sp_da(spn_pkg_unit_t*)* dependencies, spn_target_unit_t* target) {
   if (!target) {
     return;
   }
@@ -106,8 +106,8 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
   sp_da(spn_pkg_unit_t*) dependencies = sp_da_new(session->mem, spn_pkg_unit_t*);
   sp_da_for(session->units.metaprogram->packages, it) {
     spn_pkg_unit_t* unit = session->units.metaprogram->packages[it];
-    collect_program_dependencies(&dependencies, unit->meta.configure.target);
-    collect_program_dependencies(&dependencies, unit->meta.build.target);
+    collect_metaprogram_dependencies(&dependencies, unit->metaprogram.configure.target);
+    collect_metaprogram_dependencies(&dependencies, unit->metaprogram.build.target);
   }
 
   sp_da_for(dependencies, it) {
@@ -145,7 +145,7 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
   }
 
   sp_da_for(session->units.metaprogram->packages, it) {
-    spn_target_unit_t* target = session->units.metaprogram->packages[it]->meta.configure.target;
+    spn_target_unit_t* target = session->units.metaprogram->packages[it]->metaprogram.configure.target;
     if (!target) {
       continue;
     }
