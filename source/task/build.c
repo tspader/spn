@@ -578,7 +578,6 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
   if (build) {
     spn_try(spn_build_add_target_nodes(graph, build));
     own_target_commands(unit->session, build);
-    nodes->program.output = build->nodes.output;
     sp_da_for(build->objects, it) {
       spn_compile_unit_t* object = build->objects[it];
       spn_try(spn_bg_cmd_add_input(graph, object->nodes.compile, nodes->stamp.main));
@@ -587,7 +586,7 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
         spn_try(spn_bg_cmd_add_input(graph, object->nodes.compile, configured));
       }
     }
-    spn_try(spn_bg_cmd_add_input(graph, nodes->package, nodes->program.output));
+    spn_try(spn_bg_cmd_add_input(graph, nodes->package, build->nodes.output));
   }
 
   sp_da_for(unit->nodes.user, it) {
@@ -596,7 +595,7 @@ spn_err_t add_package(spn_build_graph_t* graph, spn_pkg_unit_t* unit) {
     sp_da_push(unit->nodes.build.user, node->id);
 
     if (build) {
-      spn_try(spn_bg_cmd_add_input(graph, node->id, nodes->program.output));
+      spn_try(spn_bg_cmd_add_input(graph, node->id, build->nodes.output));
     }
   }
 

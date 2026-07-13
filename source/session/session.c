@@ -611,7 +611,6 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
   sp_da_init(session->mem, target->objects);
   sp_da_init(session->mem, target->deps.target);
   sp_da_init(session->mem, target->deps.package);
-  sp_da_init(session->mem, target->nodes.source);
 
   switch (info->kind) {
     case SPN_TARGET_LIB: {
@@ -619,19 +618,10 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
       sp_da_push(pkg->libs, target);
       break;
     }
-    case SPN_TARGET_EXE: {
-      sp_da_push(pkg->targets, target);
-      sp_da_push(pkg->exes, target);
-      break;
-    }
-    case SPN_TARGET_SCRIPT: {
-      sp_da_push(pkg->targets, target);
-      sp_da_push(pkg->scripts, target);
-      break;
-    }
+    case SPN_TARGET_EXE:
+    case SPN_TARGET_SCRIPT:
     case SPN_TARGET_TEST: {
       sp_da_push(pkg->targets, target);
-      sp_da_push(pkg->tests, target);
       break;
     }
     case SPN_TARGET_CONFIGURE_METAPROGRAM: {
@@ -748,9 +738,6 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   sp_da_push(build->packages, unit);
   sp_da_init(session->mem, unit->deps);
   sp_da_init(session->mem, unit->libs);
-  sp_da_init(session->mem, unit->exes);
-  sp_da_init(session->mem, unit->scripts);
-  sp_da_init(session->mem, unit->tests);
   sp_da_init(session->mem, unit->targets);
   sp_da_init(session->mem, unit->nodes.user);
   sp_da_init(session->mem, unit->nodes.build.user);
@@ -805,7 +792,6 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   unit->paths.stamp.main = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("main.stamp"));
   unit->paths.stamp.exit = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("user.stamp"));
   unit->paths.stamp.configure = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("configure.stamp"));
-  unit->paths.stamp.build = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("build.stamp"));
   unit->paths.stamp.package = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("package.stamp"));
   unit->paths.stamp.profile = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("profile.stamp"));
 
