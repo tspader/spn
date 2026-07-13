@@ -553,6 +553,7 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
       }
       else {
         spn_log_error("failed to find {.cyan} as a package or target", SP_FMT_STR(unit->info->deps[j]));
+        return spn_task_fail(SPN_ERROR);
       }
     }
   }
