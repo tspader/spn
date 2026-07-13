@@ -230,6 +230,31 @@ done:
   return err ? SPN_ERROR : SPN_OK;
 }
 
+void spn_dag_action_cache_init(spn_dag_action_cache_t* c, sp_mem_t mem) {
+  c->arena = sp_mem_arena_new(mem);
+  c->mem = sp_mem_arena_as_allocator(c->arena);
+  sp_ht_init(c->mem, c->entries);
+}
+
+spn_dag_action_entry_t* spn_dag_action_cache_get(spn_dag_action_cache_t* c, spn_dag_digest_t key) {
+  return SP_NULLPTR;
+}
+
+void spn_dag_action_cache_put(spn_dag_action_cache_t* c, spn_dag_digest_t key, spn_dag_action_output_t* outputs, u32 count) {
+}
+
+spn_err_t spn_dag_action_cache_save(spn_dag_action_cache_t* c, sp_str_t path) {
+  return SPN_ERROR;
+}
+
+spn_err_t spn_dag_action_cache_load(spn_dag_action_cache_t* c, sp_str_t path) {
+  return SPN_ERROR;
+}
+
+spn_err_t spn_dag_execute(spn_dag_t* g, spn_dag_id_t action, spn_dag_action_cache_t* cache, spn_dag_store_t* store) {
+  return SPN_ERROR;
+}
+
 static sp_str_t spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
   return sp_fs_join_path(mem, store->dir, spn_dag_digest_hex(mem, digest));
 }
