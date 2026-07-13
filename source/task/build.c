@@ -221,7 +221,9 @@ spn_task_step_t spn_task_build_graph_init(spn_app_t* app) {
 
   spn_bg_init(&session->build.graph, spn.mem);
   sp_ht_init(session->mem, session->owners);
-  prepare_build_graph(app);
+  if (prepare_build_graph(app)) {
+    return spn_task_fail_with(spn_bg_error_to_union(&session->build.graph));
+  }
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_INIT_BUILD_GRAPH,
