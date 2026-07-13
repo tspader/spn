@@ -1,6 +1,8 @@
 {
   "metadata": { "format": "json" },
   "properties": {
+    "kind": { "type": "string" },
+    "path": { "type": "string" },
     "device": { "type": "string" },
     "inode": { "type": "string" },
     "mtime_s": { "type": "string" },

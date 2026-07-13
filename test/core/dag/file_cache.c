@@ -1,14 +1,14 @@
+#include "common.h"
+
 typedef enum {
   FILE_CACHE_OP_DONE,
   FILE_CACHE_OP_FILE,
   FILE_CACHE_OP_DIGEST,
-  FILE_CACHE_OP_SAVE,
-  FILE_CACHE_OP_RELOAD,
+  FILE_CACHE_OP_SEED,
 } file_cache_op_kind_t;
 
 typedef struct {
   spn_err_t err;
-  u32 entries;
 } file_cache_expect_t;
 
 typedef struct {
@@ -28,7 +28,6 @@ UTEST_EMPTY_FIXTURE(file_cache)
 static void run_file_cache_test(s32* utest_result, file_cache_test_t t) {
   tmpfs_t fs = sp_zero;
   tmpfs_init_named(&fs, t.name);
-  sp_str_t table = tmpfs_get(&fs, sp_str_lit("file_cache.jsonl"));
 
   spn_dag_file_cache_t c = sp_zero;
   spn_dag_file_cache_init(&c, fs.mem);
@@ -45,6 +44,7 @@ static void run_file_cache_test(s32* utest_result, file_cache_test_t t) {
       }
       case FILE_CACHE_OP_FILE: {
         tmpfs_create(&fs, sp_str_view(op.path), sp_str_view(op.blob));
+        spn_dag_file_cache_refresh(&c);
         break;
       }
       case FILE_CACHE_OP_DIGEST: {
@@ -56,17 +56,16 @@ static void run_file_cache_test(s32* utest_result, file_cache_test_t t) {
         }
         break;
       }
-      case FILE_CACHE_OP_SAVE: {
-        EXPECT_EQ(SPN_OK, spn_dag_file_cache_save(&c, table));
-        break;
-      }
-      case FILE_CACHE_OP_RELOAD: {
-        spn_dag_file_cache_init(&c, fs.mem);
-        spn_err_t err = spn_dag_file_cache_load(&c, table);
-        EXPECT_EQ(op.expect.err, err);
-        if (!err) {
-          EXPECT_EQ(op.expect.entries, (u32)sp_ht_size(c.entries));
-        }
+      case FILE_CACHE_OP_SEED: {
+        sp_sys_file_meta_t sys = sp_zero;
+        ASSERT_EQ(SPN_OK, spn_dag_get_file_meta(&c, tmpfs_get(&fs, sp_str_view(op.path)), &sys));
+        sp_str_t blob = sp_str_view(op.blob);
+        spn_dag_file_cache_seed(&c, (spn_dag_file_meta_t) {
+          .id = { .device = sys.device, .id = sys.id },
+          .mtime = sys.mtime,
+          .size = sys.size,
+          .digest = spn_dag_digest(blob.data, blob.len)
+        });
         break;
       }
     }
@@ -94,38 +93,25 @@ UTEST_F(file_cache, missing_file) {
   });
 }
 
-UTEST_F(file_cache, save_load_roundtrip) {
+UTEST_F(file_cache, seeded_digest_trusted_without_hash) {
   run_file_cache_test(&ur, (file_cache_test_t) {
-    .name = "file_cache_roundtrip",
+    .name = "file_cache_seed",
     .ops = {
       { .kind = FILE_CACHE_OP_FILE, .path = "a.c", .blob = "spum" },
-      { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .blob = "spum" },
-      { .kind = FILE_CACHE_OP_SAVE },
-      { .kind = FILE_CACHE_OP_RELOAD, .expect = { .entries = 1 } },
-      { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .blob = "spum" },
+      { .kind = FILE_CACHE_OP_SEED, .path = "a.c", .blob = "not the real content" },
+      { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .blob = "not the real content" },
     }
   });
 }
 
-UTEST_F(file_cache, persisted_detects_change) {
+UTEST_F(file_cache, seed_invalidated_by_change) {
   run_file_cache_test(&ur, (file_cache_test_t) {
-    .name = "file_cache_detects_change",
+    .name = "file_cache_seed_stale",
     .ops = {
       { .kind = FILE_CACHE_OP_FILE, .path = "a.c", .blob = "spum" },
-      { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .blob = "spum" },
-      { .kind = FILE_CACHE_OP_SAVE },
+      { .kind = FILE_CACHE_OP_SEED, .path = "a.c", .blob = "not the real content" },
       { .kind = FILE_CACHE_OP_FILE, .path = "a.c", .blob = "spum spum" },
-      { .kind = FILE_CACHE_OP_RELOAD, .expect = { .entries = 1 } },
       { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .blob = "spum spum" },
-    }
-  });
-}
-
-UTEST_F(file_cache, load_missing_table) {
-  run_file_cache_test(&ur, (file_cache_test_t) {
-    .name = "file_cache_load_missing",
-    .ops = {
-      { .kind = FILE_CACHE_OP_RELOAD, .expect = { .err = SPN_ERROR } },
     }
   });
 }

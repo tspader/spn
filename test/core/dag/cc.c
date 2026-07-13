@@ -1,3 +1,5 @@
+#include "common.h"
+
 typedef struct {
   spn_err_t err;
   const c8* prereqs [DAG_TEST_MAX_INPUTS];

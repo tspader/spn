@@ -34,6 +34,7 @@ set(SPN_SOURCES
   compiler/msvc.c
   ctx/ctx.c
   dag/dag.c
+  dag/lower.c
   enum/enum.c
   event/event.c
   event/build.c
@@ -126,7 +127,9 @@ add_executable(spn ${SPN_SOURCES}
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
   ${SRC}/codegen/gen/toolchains.gen.c
-  ${SRC}/codegen/gen/abi.gen.c)
+  ${SRC}/codegen/gen/abi.gen.c
+  ${SRC}/codegen/gen/dag_action.gen.c
+  ${SRC}/codegen/gen/dag_obs.gen.c)
 target_include_directories(spn PRIVATE
   ${SRC}
   ${SRC}/external

@@ -1,3 +1,5 @@
+#include "common.h"
+
 typedef struct {
   const c8* identity;
   const c8* inputs [DAG_TEST_MAX_INPUTS];

@@ -1,3 +1,5 @@
+#include "common.h"
+
 typedef struct {
   const c8* path;
   const c8* content;
@@ -29,7 +31,6 @@ static spn_dag_digest_t build_strong_key(strong_key_action_t spec) {
   }
 
   spn_dag_obs_t obs [DAG_TEST_MAX_INPUTS] = sp_zero;
-  spn_dag_digest_t digests [DAG_TEST_MAX_INPUTS] = sp_zero;
   u32 count = 0;
   sp_carr_for(spec.obs, it) {
     if (!spec.obs[it].path) {
@@ -41,12 +42,12 @@ static spn_dag_digest_t build_strong_key(strong_key_action_t spec) {
     };
     if (spec.obs[it].content) {
       sp_str_t content = sp_str_view(spec.obs[it].content);
-      digests[count] = spn_dag_digest(content.data, content.len);
+      obs[count].meta.digest = spn_dag_digest(content.data, content.len);
     }
     count++;
   }
 
-  return spn_dag_strong_key(prelim, obs, digests, count);
+  return spn_dag_strong_key(prelim, obs, count);
 }
 
 static void run_strong_key_test(s32* utest_result, strong_key_test_t t) {

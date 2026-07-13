@@ -1,3 +1,5 @@
+#include "common.h"
+
 typedef enum {
   EXEC_ACTION_WRITE,
   EXEC_ACTION_FAIL,

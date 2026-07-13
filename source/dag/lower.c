@@ -2,9 +2,9 @@
 #include "error/types.h"
 #include "sp.h"
 #include "sp/io.h"
-#include "dag_file.gen.h"
+#include "sp/atomic_file.h"
 #include "dag_action.gen.h"
-#include "dag_pathset.gen.h"
+#include "dag_obs.gen.h"
 
 static sp_str_t emit_u64(sp_mem_t mem, u64 value) {
   return sp_fmt(mem, "{}", sp_fmt_uint(value)).value;
@@ -103,68 +103,6 @@ static spn_err_t read_lines(sp_mem_t mem, sp_str_t path, sp_da(sp_str_t)* out) {
   return SPN_OK;
 }
 
-spn_err_t spn_dag_file_cache_save(spn_dag_file_cache_t* c, sp_str_t path) {
-  sp_fs_remove_file(path);
-
-  sp_io_file_writer_t writer = sp_zero;
-  sp_try_as(sp_io_file_writer_from_path(&writer, path), SPN_ERROR);
-
-  spn_err_t err = SPN_OK;
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-
-  sp_ht_for(c->entries, it) {
-    spn_dag_file_meta_t* entry = sp_ht_it_getp(c->entries, it);
-    spn_cg_dag_file_t cg = {
-      .device = emit_u64(s.mem, entry->id.device),
-      .inode = emit_u64(s.mem, entry->id.id),
-      .mtime_s = emit_s64(s.mem, (s64)entry->mtime.tv_sec),
-      .mtime_ns = emit_s64(s.mem, (s64)entry->mtime.tv_nsec),
-      .size = emit_s64(s.mem, entry->size),
-      .digest = spn_dag_digest_hex(s.mem, entry->digest),
-    };
-    if ((err = emit_line(&writer.base, spn_dag_file_write_compact(s.mem, &cg)))) {
-      break;
-    }
-  }
-
-  sp_mem_end_scratch(s);
-  sp_io_file_writer_close(&writer);
-  return err;
-}
-
-spn_err_t spn_dag_file_cache_load(spn_dag_file_cache_t* c, sp_str_t path) {
-  spn_err_t err = SPN_OK;
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-
-  sp_da(sp_str_t) lines = sp_zero;
-  spn_try_goto(read_lines(s.mem, path, &lines), err, done);
-
-  sp_da_for(lines, it) {
-    spn_cg_dag_file_t cg = sp_zero;
-    spn_dag_file_meta_t entry = sp_zero;
-    s64 mtime_s = 0;
-    s64 mtime_ns = 0;
-    if (!spn_dag_file_read(lines[it], &cg, s.mem)
-      || !lower_u64(cg.device, &entry.id.device)
-      || !lower_u64(cg.inode, &entry.id.id)
-      || !lower_s64(cg.mtime_s, &mtime_s)
-      || !lower_s64(cg.mtime_ns, &mtime_ns)
-      || !lower_s64(cg.size, &entry.size)
-      || !lower_digest(cg.digest, &entry.digest)) {
-      sp_ht_clear(c->entries);
-      err = SPN_ERROR;
-      goto done;
-    }
-    entry.mtime.tv_sec = mtime_s;
-    entry.mtime.tv_nsec = mtime_ns;
-    sp_ht_insert(c->entries, entry.id, entry);
-  }
-
-done:
-  sp_mem_end_scratch(s);
-  return err;
-}
-
 spn_err_t spn_dag_action_cache_save(spn_dag_action_cache_t* c, sp_str_t path) {
   sp_fs_remove_file(path);
 
@@ -232,69 +170,129 @@ done:
   return err;
 }
 
-spn_err_t spn_dag_discovery_save(spn_dag_discovery_t* d, sp_str_t path) {
-  sp_fs_remove_file(path);
+void spn_dag_discovery_init(spn_dag_discovery_t* d, sp_mem_t mem, sp_str_t dir) {
+  d->arena = sp_mem_arena_new(mem);
+  d->mem = sp_mem_arena_as_allocator(d->arena);
+  d->dir = sp_str_copy(d->mem, dir);
+  sp_ht_init(d->mem, d->entries);
 
-  sp_io_file_writer_t writer = sp_zero;
-  sp_try_as(sp_io_file_writer_from_path(&writer, path), SPN_ERROR);
-
-  spn_err_t err = SPN_OK;
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-
-  sp_ht_for(d->entries, it) {
-    spn_dag_digest_t* prelim = sp_ht_it_getkp(d->entries, it);
-    spn_dag_pathset_t* set = sp_ht_it_getp(d->entries, it);
-    spn_cg_dag_pathset_t cg = {
-      .prelim = spn_dag_digest_hex(s.mem, *prelim),
-      .obs = sp_da_new(s.mem, spn_cg_dag_obs_t),
-    };
-    sp_da_for(set->obs, o) {
-      sp_da_push(cg.obs, ((spn_cg_dag_obs_t) {
-        .kind = emit_obs_kind(set->obs[o].kind),
-        .path = set->obs[o].path,
-      }));
-    }
-    if ((err = emit_line(&writer.base, spn_dag_pathset_write_compact(s.mem, &cg)))) {
-      break;
-    }
+  if (!sp_str_empty(d->dir) && !sp_fs_exists(d->dir)) {
+    sp_fs_create_dir(d->dir);
   }
-
-  sp_mem_end_scratch(s);
-  sp_io_file_writer_close(&writer);
-  return err;
 }
 
-spn_err_t spn_dag_discovery_load(spn_dag_discovery_t* d, sp_str_t path) {
-  spn_err_t err = SPN_OK;
+static sp_str_t spn_dag_manifest_path(spn_dag_discovery_t* d, sp_mem_t mem, spn_dag_digest_t prelim) {
+  sp_str_t name = sp_fmt(mem, "{}.jsonl", sp_fmt_str(spn_dag_digest_hex(mem, prelim))).value;
+  return sp_fs_join_path(mem, d->dir, name);
+}
+
+static bool spn_dag_manifest_load(spn_dag_discovery_t* d, spn_dag_digest_t prelim, spn_dag_pathset_t* out) {
+  bool ok = false;
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
   sp_da(sp_str_t) lines = sp_zero;
-  spn_try_goto(read_lines(s.mem, path, &lines), err, done);
+  if (read_lines(s.mem, spn_dag_manifest_path(d, s.mem, prelim), &lines)) {
+    goto done;
+  }
 
+  spn_dag_pathset_t set = sp_zero;
+  sp_da_init(d->mem, set.obs);
   sp_da_for(lines, it) {
-    spn_cg_dag_pathset_t cg = sp_zero;
-    spn_dag_digest_t prelim = sp_zero;
-    if (!spn_dag_pathset_read(lines[it], &cg, s.mem) || !lower_digest(cg.prelim, &prelim)) {
-      sp_ht_clear(d->entries);
-      err = SPN_ERROR;
+    spn_cg_dag_obs_t cg = sp_zero;
+    spn_dag_obs_t obs = sp_zero;
+    s64 mtime_s = 0;
+    s64 mtime_ns = 0;
+    if (!spn_dag_obs_read(lines[it], &cg, s.mem)
+      || !lower_obs_kind(cg.kind, &obs.kind)
+      || !lower_u64(cg.device, &obs.meta.id.device)
+      || !lower_u64(cg.inode, &obs.meta.id.id)
+      || !lower_s64(cg.mtime_s, &mtime_s)
+      || !lower_s64(cg.mtime_ns, &mtime_ns)
+      || !lower_s64(cg.size, &obs.meta.size)
+      || !lower_digest(cg.digest, &obs.meta.digest)) {
       goto done;
     }
-
-    spn_dag_pathset_t set = sp_zero;
-    sp_da_init(d->mem, set.obs);
-    sp_da_for(cg.obs, o) {
-      spn_dag_obs_t obs = { .path = sp_str_copy(d->mem, cg.obs[o].path) };
-      if (!lower_obs_kind(cg.obs[o].kind, &obs.kind)) {
-        sp_ht_clear(d->entries);
-        err = SPN_ERROR;
-        goto done;
-      }
-      sp_da_push(set.obs, obs);
-    }
-    sp_ht_insert(d->entries, prelim, set);
+    obs.path = sp_str_copy(d->mem, cg.path);
+    obs.meta.mtime.tv_sec = mtime_s;
+    obs.meta.mtime.tv_nsec = mtime_ns;
+    sp_da_push(set.obs, obs);
   }
+
+  *out = set;
+  ok = true;
 
 done:
   sp_mem_end_scratch(s);
-  return err;
+  return ok;
+}
+
+static void spn_dag_manifest_write(spn_dag_discovery_t* d, spn_dag_digest_t prelim, const spn_dag_pathset_t* set) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+
+  sp_io_dyn_mem_writer_t sink = sp_zero;
+  sp_io_dyn_mem_writer_init(s.mem, &sink);
+
+  sp_da_for(set->obs, it) {
+    const spn_dag_obs_t* obs = &set->obs[it];
+    spn_cg_dag_obs_t cg = {
+      .kind = emit_obs_kind(obs->kind),
+      .path = obs->path,
+      .device = emit_u64(s.mem, obs->meta.id.device),
+      .inode = emit_u64(s.mem, obs->meta.id.id),
+      .mtime_s = emit_s64(s.mem, (s64)obs->meta.mtime.tv_sec),
+      .mtime_ns = emit_s64(s.mem, (s64)obs->meta.mtime.tv_nsec),
+      .size = emit_s64(s.mem, obs->meta.size),
+      .digest = spn_dag_digest_hex(s.mem, obs->meta.digest),
+    };
+    if (emit_line(&sink.base, spn_dag_obs_write_compact(s.mem, &cg))) {
+      goto done;
+    }
+  }
+
+  sp_fs_write_atomic(spn_dag_manifest_path(d, s.mem, prelim), sp_io_dyn_mem_writer_as_str(&sink));
+
+done:
+  sp_mem_end_scratch(s);
+}
+
+spn_dag_pathset_t* spn_dag_discovery_get(spn_dag_discovery_t* d, spn_dag_digest_t prelim) {
+  spn_dag_pathset_t* cached = sp_ht_getp(d->entries, prelim);
+  if (cached) {
+    return cached;
+  }
+
+  if (sp_str_empty(d->dir)) {
+    return SP_NULLPTR;
+  }
+
+  spn_dag_pathset_t set = sp_zero;
+  if (!spn_dag_manifest_load(d, prelim, &set)) {
+    return SP_NULLPTR;
+  }
+
+  sp_ht_insert(d->entries, prelim, set);
+  return sp_ht_getp(d->entries, prelim);
+}
+
+void spn_dag_discovery_put(spn_dag_discovery_t* d, spn_dag_digest_t prelim, const spn_dag_obs_t* obs, u32 count) {
+  spn_dag_pathset_t set = sp_zero;
+  sp_da_init(d->mem, set.obs);
+  sp_for(it, count) {
+    spn_dag_obs_t copy = obs[it];
+    copy.path = sp_str_copy(d->mem, obs[it].path);
+    sp_da_push(set.obs, copy);
+  }
+  sp_ht_insert(d->entries, prelim, set);
+  spn_dag_discovery_flush(d, prelim);
+}
+
+void spn_dag_discovery_flush(spn_dag_discovery_t* d, spn_dag_digest_t prelim) {
+  if (sp_str_empty(d->dir)) {
+    return;
+  }
+
+  spn_dag_pathset_t* set = sp_ht_getp(d->entries, prelim);
+  if (set) {
+    spn_dag_manifest_write(d, prelim, set);
+  }
 }
