@@ -247,3 +247,36 @@ spn_err_union_t spn_codegen_err(spn_toml_loader_t* ctx) {
     .issues = ctx->issues,
   };
 }
+
+void spn_codegen_json_issues(sp_io_writer_t* out, sp_da(spn_codegen_issue_t) issues) {
+  sp_io_write_c8(out, '{');
+  bool first = true;
+  spn_codegen_json_key(out, &first, sp_str_lit("issues"));
+  sp_io_write_c8(out, '[');
+  sp_da_for(issues, it) {
+    if (it) {
+      sp_io_write_c8(out, ',');
+    }
+    spn_codegen_issue_t* issue = &issues[it];
+    sp_io_write_c8(out, '{');
+    bool ifirst = true;
+    spn_codegen_json_key(out, &ifirst, sp_str_lit("code"));
+    spn_codegen_json_str(out, sp_cstr_as_str(spn_codegen_err_name(issue->code)));
+    spn_codegen_json_key(out, &ifirst, sp_str_lit("path"));
+    spn_codegen_json_str(out, issue->path);
+    spn_codegen_json_key(out, &ifirst, sp_str_lit("detail"));
+    spn_codegen_json_str(out, issue->detail);
+    sp_io_write_c8(out, '}');
+  }
+  sp_io_write_c8(out, ']');
+  sp_io_write_c8(out, '}');
+}
+
+sp_str_t spn_codegen_issues_to_str(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues) {
+  sp_io_dyn_mem_writer_t sink;
+  sp_io_dyn_mem_writer_init(mem, &sink);
+  spn_codegen_json_writer_t pretty;
+  spn_codegen_json_writer_init(&pretty, &sink.base);
+  spn_codegen_json_issues(&pretty.base, issues);
+  return sp_io_dyn_mem_writer_as_str(&sink);
+}

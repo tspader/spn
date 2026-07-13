@@ -1,0 +1,233 @@
+typedef struct {
+  const c8* path;
+  const c8* content;
+} run_source_t;
+
+typedef struct {
+  const c8* identity;
+  const c8* inputs [DAG_TEST_MAX_INPUTS];
+  const c8* discovers [DAG_TEST_MAX_INPUTS];
+  const c8* output;
+} run_action_t;
+
+typedef struct {
+  run_source_t sources [DAG_TEST_MAX_INPUTS];
+  spn_err_t expect_err;
+  u32 expect_runs;
+} run_build_t;
+
+typedef struct {
+  const c8* name;
+  bool discovery;
+  run_action_t actions [DAG_TEST_MAX_OPS];
+  run_build_t builds [DAG_TEST_MAX_OPS];
+} run_test_t;
+
+typedef struct {
+  tmpfs_t fs;
+  spn_dag_store_t store;
+  spn_dag_file_cache_t files;
+  spn_dag_action_cache_t cache;
+  spn_dag_discovery_t discovery;
+  u32 runs;
+} run_env_t;
+
+typedef struct {
+  run_env_t* env;
+  spn_dag_t* g;
+  run_action_t* spec;
+} run_ctx_t;
+
+UTEST_EMPTY_FIXTURE(run)
+
+static s32 run_exec_fn(spn_dag_action_t* action, void* user_data) {
+  run_ctx_t* ctx = (run_ctx_t*)user_data;
+  sp_da_for(action->consumes, it) {
+    spn_dag_artifact_t* in = spn_dag_find_artifact(ctx->g, action->consumes[it]);
+    if (in->kind == SPN_DAG_ARTIFACT_KIND_FILE && !sp_fs_exists(in->path)) {
+      return 1;
+    }
+  }
+  ctx->env->runs++;
+  spn_dag_artifact_t* out = spn_dag_find_artifact(ctx->g, action->produces[0]);
+  sp_str_t content = sp_fmt(ctx->env->fs.mem, "{}", sp_fmt_uint(ctx->env->runs)).value;
+  return sp_fs_create_file_str(out->path, content) ? 1 : 0;
+}
+
+static spn_err_t run_discover_fn(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+  run_ctx_t* ctx = (run_ctx_t*)user_data;
+  sp_carr_for(ctx->spec->discovers, it) {
+    if (!ctx->spec->discovers[it]) {
+      break;
+    }
+    sp_da_push(*out, ((spn_dag_obs_t) {
+      .kind = SPN_DAG_OBS_FILE,
+      .path = tmpfs_get(&ctx->env->fs, sp_str_view(ctx->spec->discovers[it]))
+    }));
+  }
+  return SPN_OK;
+}
+
+static void run_build_graph(s32* utest_result, run_env_t* env, spn_dag_t* g, run_test_t* t) {
+  sp_carr_for(t->actions, ai) {
+    run_action_t* spec = &t->actions[ai];
+    if (!spec->identity) {
+      break;
+    }
+
+    run_ctx_t* ctx = sp_alloc_type(env->fs.mem, run_ctx_t);
+    ctx->env = env;
+    ctx->g = g;
+    ctx->spec = spec;
+
+    spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
+      .identity = spn_dag_digest(spec->identity, sp_cstr_len(spec->identity)),
+      .execute = run_exec_fn,
+      .discover = spec->discovers[0] ? run_discover_fn : SP_NULLPTR,
+      .user_data = ctx
+    });
+    sp_carr_for(spec->inputs, ii) {
+      if (!spec->inputs[ii]) {
+        break;
+      }
+      spn_dag_action_add_input(g, action, spn_dag_add_file(g, tmpfs_get(&env->fs, sp_str_view(spec->inputs[ii]))));
+    }
+    ASSERT_EQ(SPN_OK, spn_dag_action_add_output(g, action, spn_dag_add_file(g, tmpfs_get(&env->fs, sp_str_view(spec->output)))));
+  }
+}
+
+static void run_run_test(s32* utest_result, run_test_t t) {
+  run_env_t env = sp_zero;
+  tmpfs_init_named(&env.fs, t.name);
+  spn_dag_store_init(&env.store, (spn_dag_store_config_t) {
+    .kind = SPN_DAG_STORE_MEM,
+    .mem = env.fs.mem
+  });
+  spn_dag_file_cache_init(&env.files, env.fs.mem);
+  spn_dag_action_cache_init(&env.cache, env.fs.mem);
+  spn_dag_discovery_init(&env.discovery, env.fs.mem);
+
+  sp_carr_for(t.builds, b) {
+    run_build_t* build = &t.builds[b];
+    if (!build->expect_runs) {
+      break;
+    }
+
+    spn_dag_file_cache_refresh(&env.files);
+    sp_carr_for(build->sources, si) {
+      if (!build->sources[si].path) {
+        break;
+      }
+      sp_fs_create_file_str(tmpfs_get(&env.fs, sp_str_view(build->sources[si].path)), sp_str_view(build->sources[si].content));
+    }
+
+    spn_dag_t* g = spn_dag_new(env.fs.mem);
+    run_build_graph(utest_result, &env, g, &t);
+
+    spn_err_t err = spn_dag_run(g, &env.files, &env.cache, &env.store, t.discovery ? &env.discovery : SP_NULLPTR);
+    EXPECT_EQ(build->expect_err, err);
+    EXPECT_EQ(build->expect_runs, env.runs);
+  }
+
+  tmpfs_deinit(&env.fs);
+}
+
+UTEST_F(run, chain_runs_in_dependency_order) {
+  run_run_test(&ur, (run_test_t) {
+    .name = "run_chain",
+    .actions = {
+      { .identity = "cc main.c", .inputs = { "main.c" }, .output = "main.o" },
+      { .identity = "link app", .inputs = { "main.o" }, .output = "app" },
+    },
+    .builds = {
+      { .sources = { { "main.c", "int main() {}" } }, .expect_runs = 2 },
+    }
+  });
+}
+
+UTEST_F(run, second_build_all_hits) {
+  run_run_test(&ur, (run_test_t) {
+    .name = "run_hits",
+    .actions = {
+      { .identity = "cc main.c", .inputs = { "main.c" }, .output = "main.o" },
+      { .identity = "link app", .inputs = { "main.o" }, .output = "app" },
+    },
+    .builds = {
+      { .sources = { { "main.c", "int main() {}" } }, .expect_runs = 2 },
+      { .sources = { { "main.c", "int main() {}" } }, .expect_runs = 2 },
+    }
+  });
+}
+
+UTEST_F(run, source_change_reruns_chain) {
+  run_run_test(&ur, (run_test_t) {
+    .name = "run_source_change",
+    .actions = {
+      { .identity = "cc main.c", .inputs = { "main.c" }, .output = "main.o" },
+      { .identity = "link app", .inputs = { "main.o" }, .output = "app" },
+    },
+    .builds = {
+      { .sources = { { "main.c", "int main() {}" } }, .expect_runs = 2 },
+      { .sources = { { "main.c", "int main() { return 1; }" } }, .expect_runs = 4 },
+    }
+  });
+}
+
+UTEST_F(run, independent_actions_both_run) {
+  run_run_test(&ur, (run_test_t) {
+    .name = "run_independent",
+    .actions = {
+      { .identity = "cc a.c", .inputs = { "a.c" }, .output = "a.o" },
+      { .identity = "cc b.c", .inputs = { "b.c" }, .output = "b.o" },
+    },
+    .builds = {
+      { .sources = { { "a.c", "A" }, { "b.c", "B" } }, .expect_runs = 2 },
+    }
+  });
+}
+
+UTEST_F(run, diamond_selective_rebuild) {
+  run_run_test(&ur, (run_test_t) {
+    .name = "run_diamond",
+    .actions = {
+      { .identity = "cc main.c", .inputs = { "main.c" }, .output = "main.o" },
+      { .identity = "cc util.c", .inputs = { "util.c" }, .output = "util.o" },
+      { .identity = "link app", .inputs = { "main.o", "util.o" }, .output = "app" },
+    },
+    .builds = {
+      { .sources = { { "main.c", "M" }, { "util.c", "U" } }, .expect_runs = 3 },
+      { .sources = { { "main.c", "M2" }, { "util.c", "U" } }, .expect_runs = 5 },
+    }
+  });
+}
+
+UTEST_F(run, discovered_generated_header_waits_for_producer) {
+  run_run_test(&ur, (run_test_t) {
+    .name = "run_generated_header",
+    .discovery = true,
+    .actions = {
+      { .identity = "gen gen.h", .inputs = { "seed" }, .output = "gen.h" },
+      { .identity = "cc main.c", .inputs = { "main.c" }, .discovers = { "gen.h" }, .output = "main.o" },
+    },
+    .builds = {
+      { .sources = { { "seed", "S" }, { "main.c", "M" } }, .expect_runs = 3 },
+      { .sources = { { "seed", "S" }, { "main.c", "M" } }, .expect_runs = 3 },
+      { .sources = { { "seed", "S2" }, { "main.c", "M" } }, .expect_runs = 5 },
+    }
+  });
+}
+
+UTEST_F(run, discovered_source_header_no_deferral) {
+  run_run_test(&ur, (run_test_t) {
+    .name = "run_discovered_source",
+    .discovery = true,
+    .actions = {
+      { .identity = "cc main.c", .inputs = { "main.c" }, .discovers = { "sp.h" }, .output = "main.o" },
+    },
+    .builds = {
+      { .sources = { { "main.c", "M" }, { "sp.h", "SP" } }, .expect_runs = 1 },
+      { .sources = { { "main.c", "M" }, { "sp.h", "SP" } }, .expect_runs = 1 },
+      { .sources = { { "main.c", "M" }, { "sp.h", "SP2" } }, .expect_runs = 2 },
+    }
+  });
+}

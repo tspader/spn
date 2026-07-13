@@ -46,12 +46,27 @@ target_include_directories(toolchain PRIVATE ${STORE}/include)
 target_link_libraries(toolchain PRIVATE yyjson m)
 add_dependencies(toolchain headers)
 
+set(GEN_DIR ${CMAKE_SOURCE_DIR}/source/codegen/gen)
+file(MAKE_DIRECTORY ${GEN_DIR})
+
+add_executable(sp_cc
+  cc.c
+  ${CMAKE_SOURCE_DIR}/source/dag/dag.c
+  ${CMAKE_SOURCE_DIR}/source/dag/lower.c
+  ${CMAKE_SOURCE_DIR}/source/codegen/json.c
+  ${GEN_DIR}/dag_file.gen.c
+  ${GEN_DIR}/dag_action.gen.c
+  ${GEN_DIR}/dag_pathset.gen.c
+  ${CMAKE_SOURCE_DIR}/source/sha256/sha256.c
+  ${CMAKE_SOURCE_DIR}/source/sp/io.c)
+set_target_properties(sp_cc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${STORE}/bin)
+target_include_directories(sp_cc PRIVATE ${CMAKE_SOURCE_DIR}/source ${CMAKE_SOURCE_DIR}/include ${GEN_DIR} ${STORE}/include)
+target_link_libraries(sp_cc PRIVATE m yyjson)
+add_dependencies(sp_cc headers spn_codegen_gen)
+
 add_executable(yyjson_stub yyjson_stub.c)
 set_target_properties(yyjson_stub PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(yyjson_stub PRIVATE yyjson)
-
-set(GEN_DIR ${CMAKE_SOURCE_DIR}/source/codegen/gen)
-file(MAKE_DIRECTORY ${GEN_DIR})
 
 set(SCHEMA_DIR ${CMAKE_SOURCE_DIR}/source/codegen/schema)
 set(GEN_FILES
@@ -69,7 +84,16 @@ set(GEN_FILES
   ${GEN_DIR}/toolchains.gen.c
   ${GEN_DIR}/toolchains.jtd.json
   ${GEN_DIR}/abi.gen.h
-  ${GEN_DIR}/abi.gen.c)
+  ${GEN_DIR}/abi.gen.c
+  ${GEN_DIR}/dag_file.gen.h
+  ${GEN_DIR}/dag_file.gen.c
+  ${GEN_DIR}/dag_file.jtd.json
+  ${GEN_DIR}/dag_action.gen.h
+  ${GEN_DIR}/dag_action.gen.c
+  ${GEN_DIR}/dag_action.jtd.json
+  ${GEN_DIR}/dag_pathset.gen.h
+  ${GEN_DIR}/dag_pathset.gen.c
+  ${GEN_DIR}/dag_pathset.jtd.json)
 file(GLOB JTD_GEN_SCHEMAS CONFIGURE_DEPENDS ${SCHEMA_DIR}/*.json)
 file(GLOB_RECURSE JTD_GEN_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/templates/*.tmpl)
 add_custom_command(

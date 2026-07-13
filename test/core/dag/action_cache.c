@@ -49,7 +49,7 @@ static spn_dag_digest_t cache_blob_digest(const c8* blob) {
 static void run_cache_test(s32* utest_result, cache_test_t t) {
   tmpfs_t fs = sp_zero;
   tmpfs_init_named(&fs, t.name);
-  sp_str_t table = tmpfs_get(&fs, sp_str_lit("actions.bin"));
+  sp_str_t table = tmpfs_get(&fs, sp_str_lit("actions.jsonl"));
 
   spn_dag_action_cache_t c = sp_zero;
   spn_dag_action_cache_init(&c, fs.mem);

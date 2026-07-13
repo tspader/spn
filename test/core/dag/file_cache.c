@@ -28,7 +28,7 @@ UTEST_EMPTY_FIXTURE(file_cache)
 static void run_file_cache_test(s32* utest_result, file_cache_test_t t) {
   tmpfs_t fs = sp_zero;
   tmpfs_init_named(&fs, t.name);
-  sp_str_t table = tmpfs_get(&fs, sp_str_lit("file_cache.bin"));
+  sp_str_t table = tmpfs_get(&fs, sp_str_lit("file_cache.jsonl"));
 
   spn_dag_file_cache_t c = sp_zero;
   spn_dag_file_cache_init(&c, fs.mem);

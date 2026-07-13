@@ -48,11 +48,11 @@ static void build_action_key(s32* utest_result, spn_dag_t* g, key_action_t spec,
 }
 
 static void run_key_test(s32* utest_result, key_test_t t) {
-  spn_dag_t* g = spn_dag_new(sp_mem_os_new());
+  sp_mem_t mem = sp_mem_os_new();
   spn_dag_digest_t a = sp_zero;
   spn_dag_digest_t b = sp_zero;
-  build_action_key(utest_result, g, t.a, &a);
-  build_action_key(utest_result, g, t.b, &b);
+  build_action_key(utest_result, spn_dag_new(mem), t.a, &a);
+  build_action_key(utest_result, spn_dag_new(mem), t.b, &b);
   EXPECT_EQ(t.expect.equal, spn_dag_digest_equal(a, b));
 }
 
