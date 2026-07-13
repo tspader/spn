@@ -373,6 +373,24 @@ UTEST_F(exec, missing_output_not_cached) {
   });
 }
 
+UTEST_F(exec, republish_after_unavailable_restore_then_hits) {
+  sp_carr_for(exec_store_kinds, it) {
+    exec_env_t env = sp_zero;
+    exec_env_init(&env, "exec_republish", exec_store_kinds[it]);
+    exec_action_t action = { .identity = "cc", .inputs = { "main.c" }, .outputs = { "main.o" }, .write = { "obj" } };
+    const c8* unavailable [DAG_TEST_MAX_OUTPUTS] = { "missing" };
+    exec_action_run(&ur, &env, action, unavailable, SPN_OK, SP_NULLPTR);
+    if (!env.err) {
+      exec_action_run(&ur, &env, action, SP_NULLPTR, SPN_OK, (const c8* [DAG_TEST_MAX_OUTPUTS]) { "obj-1" });
+    }
+    if (!env.err) {
+      exec_store_context(&env);
+      EXPECT_EQ(1u, env.runs);
+    }
+    tmpfs_deinit(&env.fs);
+  }
+}
+
 UTEST_F(exec, unavailable_cached_output_reruns) {
   run_exec_once_test(&ur, (exec_test_t) {
     .name = "exec_unavailable_output",

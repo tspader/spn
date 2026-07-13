@@ -1,0 +1,11 @@
+{
+  "metadata": { "format": "json" },
+  "properties": {
+    "device": { "type": "string" },
+    "inode": { "type": "string" },
+    "mtime_s": { "type": "string" },
+    "mtime_ns": { "type": "string" },
+    "size": { "type": "string" },
+    "digest": { "type": "string" }
+  }
+}

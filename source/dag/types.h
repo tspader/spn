@@ -2,6 +2,7 @@
 #define SPN_DAG_TYPES_H
 
 #include "sp.h"
+#include "spn.h"
 
 typedef struct spn_dag_action_t spn_dag_action_t;
 
@@ -9,7 +10,18 @@ typedef struct {
   u8 bytes [32];
 } spn_dag_digest_t;
 
+typedef enum {
+  SPN_DAG_OBS_FILE,
+  SPN_DAG_OBS_ABSENT,
+} spn_dag_obs_kind_t;
+
+typedef struct {
+  spn_dag_obs_kind_t kind;
+  sp_str_t path;
+} spn_dag_obs_t;
+
 SP_TYPEDEF_FN(s32, spn_dag_exec_fn_t, spn_dag_action_t*, void*);
+SP_TYPEDEF_FN(spn_err_t, spn_dag_discover_fn_t, spn_dag_action_t*, void*, sp_mem_t, sp_da(spn_dag_obs_t)*);
 
 typedef struct {
   u32 index;
@@ -34,6 +46,7 @@ struct spn_dag_action_t {
   spn_dag_id_t id;
   spn_dag_digest_t identity;
   spn_dag_exec_fn_t execute;
+  spn_dag_discover_fn_t discover;
   void* user_data;
   sp_da(spn_dag_id_t) consumes;
   sp_da(spn_dag_id_t) produces;
@@ -42,6 +55,7 @@ struct spn_dag_action_t {
 typedef struct {
   spn_dag_digest_t identity;
   spn_dag_exec_fn_t execute;
+  spn_dag_discover_fn_t discover;
   void* user_data;
 } spn_dag_action_config_t;
 
@@ -50,6 +64,7 @@ typedef struct {
   sp_mem_t mem;
   sp_da(spn_dag_artifact_t) artifacts;
   sp_da(spn_dag_action_t) actions;
+  sp_ht(sp_str_t, spn_dag_id_t) files;
 } spn_dag_t;
 
 typedef struct {
@@ -63,7 +78,6 @@ typedef struct {
   s64 size;
   spn_dag_digest_t digest;
 } spn_dag_file_meta_t;
-
 
 typedef struct {
   sp_mem_arena_t* arena;
@@ -86,6 +100,21 @@ typedef struct {
   sp_mem_t mem;
   sp_ht(spn_dag_digest_t, spn_dag_action_entry_t) entries;
 } spn_dag_action_cache_t;
+
+typedef struct {
+  sp_da(spn_dag_obs_t) obs;
+} spn_dag_pathset_t;
+
+typedef struct {
+  spn_dag_t* g;
+  sp_da(sp_str_t) search_dirs;
+} spn_cc_ctx_t;
+
+typedef struct {
+  sp_mem_arena_t* arena;
+  sp_mem_t mem;
+  sp_ht(spn_dag_digest_t, spn_dag_pathset_t) entries;
+} spn_dag_discovery_t;
 
 typedef enum {
   SPN_DAG_STORE_MEM,
