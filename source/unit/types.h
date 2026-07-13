@@ -33,7 +33,6 @@ struct spn_build_unit_t {
 #define spn_dep_kind_bit(kind) (1u << (kind))
 
 typedef struct {
-  sp_da(sp_str_t) packages;
   spn_target_selection_t targets;
 } spn_compile_request_t;
 
