@@ -45,7 +45,7 @@ static spn_lang_t get_link_language(spn_target_unit_t* target) {
   return language;
 }
 
-static spn_err_union_t build_archive_invocation(spn_target_unit_t* target, sp_str_t output) {
+static spn_err_union_t render_archive_invocation(spn_target_unit_t* target, sp_str_t output) {
   sp_mem_t mem = target->session->mem;
   spn_toolchain_unit_t* toolchain = target->build->toolchain;
 
@@ -73,7 +73,7 @@ static spn_err_union_t build_archive_invocation(spn_target_unit_t* target, sp_st
   return spn_result(SPN_OK);
 }
 
-static spn_err_union_t build_link_invocation(spn_target_unit_t* target, sp_str_t output) {
+static spn_err_union_t render_link_invocation(spn_target_unit_t* target, sp_str_t output) {
   sp_mem_t mem = target->session->mem;
 
   spn_cc_link_t link = {
@@ -129,33 +129,24 @@ static spn_err_union_t build_link_invocation(spn_target_unit_t* target, sp_str_t
   return spn_result(SPN_OK);
 }
 
-spn_err_union_t spn_build_link_invocations(spn_session_t* session) {
-  sp_om_for(session->units.targets, it) {
-    spn_target_unit_t* target = sp_om_at(session->units.targets, it);
-    if (sp_da_empty(target->objects)) {
-      continue;
+spn_err_union_t spn_build_link_invocation(spn_target_unit_t* target) {
+  if (sp_da_empty(target->objects)) {
+    return spn_result(SPN_OK);
+  }
+  switch (target->kind) {
+    case SPN_CC_OUTPUT_STATIC_LIB: {
+      return render_archive_invocation(target, get_target_output_path(target->session->mem, target));
     }
-    if (!sp_str_empty(target->invocation.program)) {
-      continue;
+    case SPN_CC_OUTPUT_EXE:
+    case SPN_CC_OUTPUT_SHARED_LIB:
+    case SPN_CC_OUTPUT_REACTOR: {
+      return render_link_invocation(target, get_target_output_path(target->session->mem, target));
     }
-
-    switch (target->kind) {
-      case SPN_CC_OUTPUT_STATIC_LIB: {
-        try_union(build_archive_invocation(target, get_target_output_path(session->mem, target)));
-        break;
-      }
-      case SPN_CC_OUTPUT_EXE:
-      case SPN_CC_OUTPUT_SHARED_LIB:
-      case SPN_CC_OUTPUT_REACTOR: {
-        try_union(build_link_invocation(target, get_target_output_path(session->mem, target)));
-        break;
-      }
-      case SPN_CC_OUTPUT_OBJECT: {
-        break;
-      }
+    case SPN_CC_OUTPUT_OBJECT: {
+      return spn_result(SPN_OK);
     }
   }
-  return spn_result(SPN_OK);
+  sp_unreachable_return(spn_result(SPN_ERROR));
 }
 
 spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, sp_str_t out, u64 elapsed) {

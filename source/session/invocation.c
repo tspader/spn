@@ -16,14 +16,11 @@ static sp_str_t resolve_pkg_path(sp_mem_t mem, spn_pkg_unit_t* pkg, sp_str_t pat
   return sp_fs_join_path(mem, pkg->paths.source, path);
 }
 
-spn_err_union_t spn_session_build_invocations(spn_session_t* session) {
+spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
+  spn_session_t* session = target->session;
   sp_mem_t mem = session->mem;
-  sp_om_for(session->units.objects, it) {
-    spn_compile_unit_t* unit = sp_om_at(session->units.objects, it);
-    if (!sp_str_empty(unit->invocation.program)) {
-      continue;
-    }
-
+  sp_da_for(target->objects, it) {
+    spn_compile_unit_t* unit = target->objects[it];
     spn_build_unit_t* build = unit->target->build;
 
     spn_cc_compile_t compile = {
