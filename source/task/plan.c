@@ -80,7 +80,7 @@ static spn_err_union_t add_compilation_units(spn_session_t *s) {
   sp_da_for(s->plan.builds, it) {
     spn_build_plan_t* plan = &s->plan.builds[it];
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-    spn_cc_flags_t flags = SP_ZERO_INITIALIZE();
+    spn_cc_flags_t flags = sp_zero;
     spn_err_union_t err = spn_cc_render_flags(scratch.mem, plan->build->toolchain->info->driver, &plan->build->profile, &flags);
     sp_mem_end_scratch(scratch);
     if (err.kind) {
