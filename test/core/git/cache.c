@@ -71,7 +71,7 @@ static void run_fixture(s32* utest_result, fixture_t fixture) {
     sp_fmt(mem, "{}_cache", sp_fmt_cstr(fixture.repo.name)).value);
   sp_fs_create_dir(cache_root);
 
-  spn_git_cache_t cache = SP_ZERO_INITIALIZE();
+  spn_git_cache_t cache = sp_zero;
   spn_git_cache_init(&cache, mem, SP_NULLPTR, cache_root);
 
   // for each checkout request: ensure db, ensure rev, ensure checkout

@@ -61,7 +61,7 @@ static void run_compile_test(s32* utest_result, compile_test_t test) {
   if (test.arg) {
     sp_da_push(compile.args, sp_str_from_cstr(scratch.mem, test.arg));
   }
-  sp_ps_config_t ps = SP_ZERO_INITIALIZE();
+  sp_ps_config_t ps = sp_zero;
   spn_err_union_t err = spn_cc_render_compile(scratch.mem, &toolchain, &test.profile, &compile, &ps);
   EXPECT_EQ(err.kind, test.expect.err);
   if (test.expect.err) {
@@ -153,7 +153,7 @@ static void run_link_test(s32* utest_result, link_test_t test) {
   if (test.system_lib) {
     sp_da_push(link.system_libs, sp_str_from_cstr(scratch.mem, test.system_lib));
   }
-  sp_ps_config_t ps = SP_ZERO_INITIALIZE();
+  sp_ps_config_t ps = sp_zero;
   spn_err_union_t err = spn_cc_render_link(scratch.mem, &toolchain, &test.profile, &link, &ps);
   EXPECT_EQ(err.kind, test.expect.err);
   if (test.expect.err) {
@@ -256,7 +256,7 @@ static void run_archive_test(s32* utest_result, archive_test_t test) {
   sp_da_init(scratch.mem, archive.objects);
   sp_da_init(scratch.mem, archive.args);
   sp_da_push(archive.objects, sp_str_lit("main.o"));
-  sp_ps_config_t ps = SP_ZERO_INITIALIZE();
+  sp_ps_config_t ps = sp_zero;
   spn_err_union_t err = spn_cc_render_archive(scratch.mem, &toolchain, &profile, &archive, &ps);
   EXPECT_EQ(err.kind, test.expect.err);
   if (test.expect.err) {

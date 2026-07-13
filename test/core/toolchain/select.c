@@ -82,8 +82,8 @@ static void run_select_test(s32* utest_result, select_test_t t) {
     .host = HOST_X64_LINUX,
     .role = SPN_TOOLCHAIN_ROLE_SCRIPT,
   };
-  spn_toolchain_resolution_t build = SP_ZERO_INITIALIZE();
-  spn_toolchain_resolution_t script = SP_ZERO_INITIALIZE();
+  spn_toolchain_resolution_t build = sp_zero;
+  spn_toolchain_resolution_t script = sp_zero;
   spn_err_union_t err = spn_toolchain_select(&catalog, build_query, &build);
   if (!err.kind) {
     err = spn_toolchain_select(&catalog, script_query, &script);
@@ -244,9 +244,9 @@ UTEST(select, build_target_failure_reports_build_role_for_zig) {
 }
 
 UTEST(select, distribution_rejects_unsupported_host) {
-  spn_toolchain_catalog_t catalog = SP_ZERO_INITIALIZE();
+  spn_toolchain_catalog_t catalog = sp_zero;
   fixture_catalog(utest_result, &catalog);
-  spn_toolchain_resolution_t resolution = SP_ZERO_INITIALIZE();
+  spn_toolchain_resolution_t resolution = sp_zero;
   spn_err_union_t err = spn_toolchain_select(&catalog, (spn_toolchain_query_t) {
     .name = sp_str_lit("zig"),
     .target = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI, .abi = SPN_ABI_NONE },

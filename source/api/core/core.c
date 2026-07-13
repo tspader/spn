@@ -46,7 +46,7 @@ sp_str_t spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir) {
 }
 
 void spn_api_add_profile_flags_env(sp_mem_t mem, spn_cc_driver_t driver, const spn_profile_info_t* profile, sp_env_t* env) {
-  spn_cc_flags_t flags = SP_ZERO_INITIALIZE();
+  spn_cc_flags_t flags = sp_zero;
   spn_err_union_t err = spn_cc_render_flags(mem, driver, profile, &flags);
   sp_assert(!err.kind);
   sp_str_t compile = sp_str_join_n(mem, flags.compile, sp_da_size(flags.compile), sp_str_lit(" "));
@@ -97,7 +97,7 @@ sp_ps_output_t spn_api_subprocess(sp_mem_t mem, spn_pkg_unit_t* unit, sp_ps_conf
 
 static s32 run_argv(spn_pkg_unit_t* unit, spn_toolchain_launcher_t* launcher, const c8** args) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_ps_config_t config = SP_ZERO_INITIALIZE();
+  sp_ps_config_t config = sp_zero;
 
   if (launcher) {
     config.command = launcher->program;
@@ -140,7 +140,7 @@ spn_target_t* spn_add_exe(spn_config_t* config, const c8* name) {
 }
 
 spn_target_t* spn_add_lib(spn_config_t* config, const c8* name, spn_linkage_t kind) {
-  spn_linkage_set_t linkages = SP_ZERO_INITIALIZE();
+  spn_linkage_set_t linkages = sp_zero;
   spn_linkage_set_add(&linkages, kind);
   return wrap_target(config, spn_pkg_add_lib_ex(spn_api_unit(config)->info, spn_intern_cstr(name), linkages));
 }

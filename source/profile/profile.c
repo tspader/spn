@@ -170,11 +170,11 @@ static spn_err_union_t spn_flag_invalid(const c8* flag, sp_str_t value, const c8
 }
 
 spn_err_union_t spn_profile_overrides_parse(spn_profile_args_t* args, spn_profile_info_t* result) {
-  spn_triple_t target = SP_ZERO_INITIALIZE();
+  spn_triple_t target = sp_zero;
   if (!sp_str_empty(args->target)) {
     const c8* expected = "an <arch>-<os>-<abi> triple like x86_64-linux-gnu";
 
-    sp_str_t segments [3] = SP_ZERO_INITIALIZE();
+    sp_str_t segments [3] = sp_zero;
     u32 num_segments = 0;
     sp_str_t remaining = args->target;
     while (true) {

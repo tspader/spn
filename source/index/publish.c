@@ -28,14 +28,14 @@ spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t*
     };
   }
 
-  spn_pkg_info_t info = SP_ZERO_INITIALIZE();
+  spn_pkg_info_t info = sp_zero;
   spn_toml_loader_t ctx = sp_zero;
   spn_toml_loader_init(&ctx, opts->mem, opts->intern);
   if (spn_codegen_load_pkg(&ctx, manifest_path, &info)) {
     return spn_codegen_err(&ctx);
   }
 
-  sp_str_t repo = SP_ZERO_INITIALIZE();
+  sp_str_t repo = sp_zero;
   if (spn_git_get_root(opts->mem, opts->cwd, &repo)) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_NOT_GIT_REPO,

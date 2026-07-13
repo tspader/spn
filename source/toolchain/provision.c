@@ -1,6 +1,6 @@
 #include "toolchain/provision.h"
 
-#include "toolchain/sha256.h"
+#include "sha256/sha256.h"
 
 spn_err_t spn_fetch_curl(sp_str_t url, sp_str_t dest, void* user_data) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();

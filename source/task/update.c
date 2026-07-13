@@ -65,7 +65,7 @@ static u32 spn_update_report_changes(spn_app_t* app, sp_mem_t mem) {
 }
 
 static void spn_update_report_incompatible(spn_app_t* app, sp_mem_t mem) {
-  spn_index_cache_t cache = SP_ZERO_INITIALIZE();
+  spn_index_cache_t cache = sp_zero;
   spn_index_cache_init(&cache, spn.heap, spn.intern, &spn.indexes);
 
   sp_da_for(app->package.deps, it) {

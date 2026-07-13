@@ -48,7 +48,7 @@ u32 spn_semver_parser_parse_number(spn_semver_parser_t* parser) {
 }
 
 spn_semver_parsed_t spn_semver_parser_parse(spn_semver_parser_t* parser) {
-  spn_semver_parsed_t parsed = SP_ZERO_INITIALIZE();
+  spn_semver_parsed_t parsed = sp_zero;
 
   parsed.version.major = spn_semver_parser_parse_number(parser);
   parsed.components.major = true;

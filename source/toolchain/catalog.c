@@ -14,7 +14,7 @@ spn_err_t spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, sp_str_t 
   catalog->mem = mem;
   sp_str_ht_init(mem, catalog->entries);
 
-  spn_cg_toolchains_t root = SP_ZERO_INITIALIZE();
+  spn_cg_toolchains_t root = sp_zero;
   if (!spn_toolchains_read(builtins_json, &root, mem)) {
     return SPN_ERROR;
   }
@@ -22,7 +22,7 @@ spn_err_t spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, sp_str_t 
   sp_om_for(root.toolchain, it) {
     const spn_cg_toolchain_t* t = sp_om_at(root.toolchain, it);
 
-    spn_toolchain_info_t toolchain = SP_ZERO_INITIALIZE();
+    spn_toolchain_info_t toolchain = sp_zero;
     toolchain.name = t->name;
     toolchain.version = t->version;
     toolchain.driver = t->driver;
@@ -71,7 +71,7 @@ spn_toolchain_info_t* spn_toolchain_catalog_get(spn_toolchain_catalog_t* catalog
 }
 
 spn_opt_artifact_t spn_toolchain_select_artifact(sp_da(spn_toolchain_host_t) hosts, spn_triple_t host) {
-  spn_opt_artifact_t result = SP_ZERO_INITIALIZE();
+  spn_opt_artifact_t result = sp_zero;
 
   sp_da_for(hosts, it) {
     if (spn_triple_match(hosts[it].triple, host)) {

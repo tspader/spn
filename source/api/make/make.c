@@ -30,7 +30,7 @@ s32 spn_make_run(spn_make_t* make) {
   spn_pkg_unit_t* unit = spn_api_unit(make->build);
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_ps_config_t ps = SP_ZERO_INITIALIZE();
+  sp_ps_config_t ps = sp_zero;
   ps.command = sp_str_lit("make");
   sp_ps_config_add_arg(scratch.mem, &ps, sp_str_lit("--quiet"));
   sp_ps_config_add_arg(scratch.mem, &ps, sp_str_lit("--directory"));
