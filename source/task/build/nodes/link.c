@@ -46,8 +46,8 @@ static spn_lang_t get_link_language(spn_target_unit_t* target) {
 }
 
 static spn_err_union_t render_archive_invocation(spn_target_unit_t* target, sp_str_t output) {
-  sp_mem_t mem = target->session->mem;
-  spn_toolchain_unit_t* toolchain = target->build->toolchain;
+  sp_mem_t mem = target->pkg->session->mem;
+  spn_toolchain_unit_t* toolchain = target->pkg->build->toolchain;
 
   sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
   spn_cc_archive_t archive = {
@@ -58,7 +58,7 @@ static spn_err_union_t render_archive_invocation(spn_target_unit_t* target, sp_s
   sp_da_for(target->objects, it) {
     sp_da_push(archive.objects, target->objects[it]->paths.object);
   }
-  spn_profile_info_t* profile = &target->build->profile;
+  spn_profile_info_t* profile = &target->pkg->build->profile;
   spn_cc_toolchain_t compiler = spn_toolchain_unit_compiler(toolchain);
   spn_err_union_t err = spn_cc_render_archive(mem, &compiler, profile, &archive, &ps);
   if (err.kind) {
@@ -74,7 +74,7 @@ static spn_err_union_t render_archive_invocation(spn_target_unit_t* target, sp_s
 }
 
 static spn_err_union_t render_link_invocation(spn_target_unit_t* target, sp_str_t output) {
-  sp_mem_t mem = target->session->mem;
+  sp_mem_t mem = target->pkg->session->mem;
 
   spn_cc_link_t link = {
     .lang = get_link_language(target),
@@ -90,7 +90,7 @@ static spn_err_union_t render_link_invocation(spn_target_unit_t* target, sp_str_
   sp_da_init(mem, link.rpath);
   add_deps_to_cc_target(&link, target);
 
-  switch (target->build->profile.os) {
+  switch (target->pkg->build->profile.os) {
     case SPN_OS_LINUX: {
       sp_da_push(link.rpath, sp_str_lit("$ORIGIN"));
       break;
@@ -115,8 +115,8 @@ static spn_err_union_t render_link_invocation(spn_target_unit_t* target, sp_str_
   }
 
   sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
-  spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(target->build->toolchain);
-  spn_err_union_t err = spn_cc_render_link(mem, &toolchain, &target->build->profile, &link, &ps);
+  spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(target->pkg->build->toolchain);
+  spn_err_union_t err = spn_cc_render_link(mem, &toolchain, &target->pkg->build->profile, &link, &ps);
   if (err.kind) {
     return err;
   }
@@ -135,12 +135,12 @@ spn_err_union_t spn_build_link_invocation(spn_target_unit_t* target) {
   }
   switch (target->kind) {
     case SPN_CC_OUTPUT_STATIC_LIB: {
-      return render_archive_invocation(target, get_target_output_path(target->session->mem, target));
+      return render_archive_invocation(target, get_target_output_path(target->pkg->session->mem, target));
     }
     case SPN_CC_OUTPUT_EXE:
     case SPN_CC_OUTPUT_SHARED_LIB:
     case SPN_CC_OUTPUT_REACTOR: {
-      return render_link_invocation(target, get_target_output_path(target->session->mem, target));
+      return render_link_invocation(target, get_target_output_path(target->pkg->session->mem, target));
     }
     case SPN_CC_OUTPUT_OBJECT: {
       return spn_result(SPN_OK);

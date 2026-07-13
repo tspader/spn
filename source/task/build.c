@@ -34,10 +34,10 @@ static spn_bg_id_t add_build_command(spn_session_t* session, spn_build_unit_t* b
 
 static void own_target_commands(spn_session_t* session, spn_target_unit_t* target) {
   if (target->nodes.link.occupied) {
-    sp_ht_insert(session->owners, target->nodes.link, target->build->id);
+    sp_ht_insert(session->owners, target->nodes.link, target->pkg->build->id);
   }
   sp_da_for(target->objects, it) {
-    sp_ht_insert(session->owners, target->objects[it]->nodes.compile, target->build->id);
+    sp_ht_insert(session->owners, target->objects[it]->nodes.compile, target->pkg->build->id);
   }
 }
 
@@ -517,7 +517,7 @@ spn_err_t add_target(spn_build_graph_t* graph, spn_pkg_unit_t* pkg, spn_target_u
   spn_try(spn_bg_cmd_add_input(graph, pkg->nodes.build.package, target->nodes.output));
 
   if (!sp_da_empty(info->embed)) {
-    target->nodes.embed.run = add_build_command(target->session, target->build, compile_embed, target);
+    target->nodes.embed.run = add_build_command(target->pkg->session, target->pkg->build, compile_embed, target);
     target->nodes.embed.object = spn_bg_add_file(graph, get_embed_object_path(spn.mem, target));
     target->nodes.embed.header = spn_bg_add_file(graph, get_embed_header_path(spn.mem, target));
 

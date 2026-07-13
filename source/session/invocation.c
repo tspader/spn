@@ -17,11 +17,12 @@ static sp_str_t resolve_pkg_path(sp_mem_t mem, spn_pkg_unit_t* pkg, sp_str_t pat
 }
 
 spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
-  spn_session_t* session = target->session;
+  spn_pkg_unit_t* pkg = target->pkg;
+  spn_session_t* session = pkg->session;
   sp_mem_t mem = session->mem;
   sp_da_for(target->objects, it) {
     spn_compile_unit_t* unit = target->objects[it];
-    spn_build_unit_t* build = unit->target->build;
+    spn_build_unit_t* build = pkg->build;
 
     spn_cc_compile_t compile = {
       .lang = unit->lang,
@@ -42,16 +43,16 @@ spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
     bool program = unit->target->info->kind == SPN_TARGET_CONFIGURE_METAPROGRAM ||
       unit->target->info->kind == SPN_TARGET_BUILD_METAPROGRAM;
     if (!program) {
-      sp_da_for(unit->package->info->include, it) {
-        sp_da_push(compile.include, resolve_pkg_path(mem, unit->package, unit->package->info->include[it]));
+      sp_da_for(pkg->info->include, it) {
+        sp_da_push(compile.include, resolve_pkg_path(mem, pkg, pkg->info->include[it]));
       }
-      sp_da_for(unit->package->info->define, it) {
-        sp_da_push(compile.define, unit->package->info->define[it]);
+      sp_da_for(pkg->info->define, it) {
+        sp_da_push(compile.define, pkg->info->define[it]);
       }
     }
 
     sp_da_for(unit->target->info->include, it) {
-      sp_da_push(compile.include, resolve_pkg_path(mem, unit->package, unit->target->info->include[it]));
+      sp_da_push(compile.include, resolve_pkg_path(mem, pkg, unit->target->info->include[it]));
     }
     sp_da_for(unit->target->info->define, it) {
       sp_da_push(compile.define, unit->target->info->define[it]);
@@ -61,7 +62,7 @@ spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
     }
 
     if (!program) {
-      sp_da(spn_pkg_dep_t) deps = unit->package->deps;
+      sp_da(spn_pkg_dep_t) deps = pkg->deps;
       sp_da_for(deps, it) {
         if (!deps[it].unit) {
           continue;
@@ -89,12 +90,12 @@ spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
     }
 
     if (!sp_da_empty(unit->target->info->embed)) {
-      sp_da_push(compile.include, unit->package->paths.generated);
+      sp_da_push(compile.include, pkg->paths.generated);
     }
 
     sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
-    spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(unit->target->build->toolchain);
-    spn_err_union_t err = spn_cc_render_compile(mem, &toolchain, &unit->target->build->profile, &compile, &ps);
+    spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(build->toolchain);
+    spn_err_union_t err = spn_cc_render_compile(mem, &toolchain, &build->profile, &compile, &ps);
     if (err.kind) {
       return err;
     }
@@ -102,7 +103,7 @@ spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
     unit->invocation = (spn_invocation_t) {
       .program = ps.command,
       .args = ps.dyn_args,
-      .cwd = unit->package->paths.work,
+      .cwd = pkg->paths.work,
     };
     sp_da_push(session->units.compile_commands, ((spn_compile_command_t) {
       .source = unit->paths.file,

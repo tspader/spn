@@ -27,7 +27,7 @@ spn_err_t spn_build_add_target_nodes(spn_build_graph_t* graph, spn_target_unit_t
   }
 
   target->nodes.link = spn_bg_add_fn(graph, link_target, target);
-  target->nodes.output = spn_bg_add_file(graph, get_target_output_path(target->session->mem, target));
+  target->nodes.output = spn_bg_add_file(graph, get_target_output_path(target->pkg->session->mem, target));
   spn_try(spn_bg_cmd_add_output(graph, target->nodes.link, target->nodes.output));
   sp_da_for(target->objects, it) {
     spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, target->objects[it]->nodes.object));

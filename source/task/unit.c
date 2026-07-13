@@ -138,7 +138,7 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
       else {
         spn_kind_query_t query = {
           .config = spn_session_config_kind(session, target->pkg->info->name),
-          .linkage = target->build->profile.linkage,
+          .linkage = target->pkg->build->profile.linkage,
         };
 
         if (spn_target_select_lib_kind(info, query, &target->lib_kind)) {
@@ -193,7 +193,7 @@ static spn_err_t ensure_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_
   }
   if (!target) {
     target = spn_session_add_target(session, pkg, info);
-    sp_assert(target->build);
+    sp_assert(target->pkg->build);
     spn_try(set_target_kind(session, target));
   }
   *result = target;
@@ -234,9 +234,7 @@ static void create_target_objects(spn_session_t* session, spn_target_unit_t* tar
     if (!sp_om_has(session->units.objects, id)) {
       sp_om_insert(session->units.objects, id, ((spn_compile_unit_t) {
         .id = id,
-        .package = pkg,
         .target = target,
-        .session = target->session,
         .lang = lang,
         .paths = {
           .object = object_path,
@@ -569,7 +567,7 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
 
   sp_om_for(session->units.objects, it) {
     spn_compile_unit_t* object = sp_om_at(session->units.objects, it);
-    spn_toolchain_info_t* toolchain = object->target->build->toolchain->info;
+    spn_toolchain_info_t* toolchain = object->target->pkg->build->toolchain->info;
     if (object->lang != SPN_LANG_CXX || spn_toolchain_has_cxx(toolchain)) {
       continue;
     }
