@@ -45,7 +45,7 @@ void fz_render_mermaid(sp_io_writer_t* io, fz_universe_t* u) {
   sp_da_for(u->actions, at) {
     sp_da_for(u->actions[at].obs, ot) {
       fz_obs_t obs = u->actions[at].obs[ot];
-      if (obs.absent) {
+      if (obs.probe) {
         phantoms[obs.phantom] = true;
       }
     }
@@ -68,8 +68,8 @@ void fz_render_mermaid(sp_io_writer_t* io, fz_universe_t* u) {
     }
     sp_da_for(action->obs, ot) {
       fz_obs_t obs = action->obs[ot];
-      if (obs.absent) {
-        sp_fmt_io(io, "  a{} -. absent .-> g{}", sp_fmt_uint(at), sp_fmt_uint(obs.phantom));
+      if (obs.probe) {
+        sp_fmt_io(io, "  a{} -. probe .-> g{}", sp_fmt_uint(at), sp_fmt_uint(obs.phantom));
         sp_io_write_cstr(io, "\n", SP_NULLPTR);
       }
       else {
@@ -96,12 +96,13 @@ void fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_trace
 
   sp_io_file_writer_t graph = sp_zero;
   if (!sp_io_file_writer_from_path(&graph, sp_fs_join_path(mem, dir, sp_str_lit("graph.mmd")))) {
-    fz_line(&graph.base, sp_fmt(mem, "%% iter {}: {} actions, {} artifacts{}{}",
+    fz_line(&graph.base, sp_fmt(mem, "%% iter {}: {} actions, {} artifacts{}{}{}",
       sp_fmt_uint(iter),
       sp_fmt_uint(sp_da_size(u->actions)),
       sp_fmt_uint(sp_da_size(u->artifacts)),
       sp_fmt_str(u->profile.big ? sp_str_lit(", big") : sp_str_lit("")),
-      sp_fmt_str(u->cyclic ? sp_str_lit(", cyclic") : sp_str_lit(""))).value);
+      sp_fmt_str(u->cyclic ? sp_str_lit(", cyclic") : sp_str_lit("")),
+      sp_fmt_str(!u->cyclic && u->obs_cyclic ? sp_str_lit(", obs-cyclic") : sp_str_lit(""))).value);
     fz_render_mermaid(&graph.base, u);
     sp_io_file_writer_close(&graph);
   }
@@ -133,6 +134,14 @@ void fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_trace
         }
         case FZ_STEP_DELETE: {
           fz_line(&steps.base, sp_fmt(mem, "delete f{}", sp_fmt_uint(step->artifact)).value);
+          break;
+        }
+        case FZ_STEP_PHANTOM: {
+          fz_line(&steps.base, sp_fmt(mem, "phantom g{} c{}", sp_fmt_uint(step->artifact), sp_fmt_uint(step->content)).value);
+          break;
+        }
+        case FZ_STEP_DISCOVERY: {
+          fz_line(&steps.base, sp_str_lit("discovery"));
           break;
         }
         case FZ_STEP_COUNT: {

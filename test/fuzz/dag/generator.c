@@ -17,6 +17,10 @@ sp_str_t fz_phantom_path(sp_mem_t mem, u64 phantom) {
   return sp_fmt(mem, "gone/g{}", sp_fmt_uint(phantom)).value;
 }
 
+sp_str_t fz_phantom_sim_path(sp_mem_t mem, u64 phantom) {
+  return sp_fmt(mem, "/{}", sp_fmt_str(fz_phantom_path(mem, phantom))).value;
+}
+
 fz_profile_t fz_gen_profile(sp_fuzz_prng_t* prng) {
   fz_profile_t profile = sp_zero;
   profile.big = sp_fuzz_chance(prng, 1, 8);
@@ -44,6 +48,7 @@ fz_profile_t fz_gen_profile(sp_fuzz_prng_t* prng) {
   profile.steps = sp_fuzz_range(prng, 1, profile.big ? 4 : 12);
   sp_fuzz_swarm(prng, profile.step_weights, FZ_STEP_COUNT);
   profile.store_fs = sp_fuzz_chance(prng, 1, 2);
+  profile.disco_fs = sp_fuzz_chance(prng, 1, 2);
   profile.run_ex = sp_fuzz_chance(prng, 1, 2);
   return profile;
 }
@@ -130,15 +135,19 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
       continue;
     }
 
-    u64 count = 1 + sp_fuzz_below(prng, profile.obs_count);
+    u64 count = sp_fuzz_below(prng, profile.obs_count + 1);
     sp_for(ot, count) {
       fz_obs_t obs = sp_zero;
       if (sp_fuzz_chance(prng, profile.absent_pct, 16)) {
-        obs.absent = true;
+        obs.probe = true;
         obs.phantom = sp_fuzz_below(prng, FZ_MAX_PHANTOMS);
       }
-      else if (sp_fuzz_chance(prng, profile.obs_output_pct, 16)) {
-        fz_action_t* owner = &u.actions[sp_fuzz_below(prng, sp_da_size(u.actions))];
+      else if (sp_fuzz_chance(prng, profile.obs_output_pct, 16) && sp_da_size(u.actions) > 1) {
+        u64 pick = sp_fuzz_below(prng, sp_da_size(u.actions) - 1);
+        if (pick >= it) {
+          pick++;
+        }
+        fz_action_t* owner = &u.actions[pick];
         obs.artifact = owner->produces[sp_fuzz_below(prng, sp_da_size(owner->produces))];
       }
       else {
@@ -146,13 +155,14 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
       }
       sp_da_push(action->obs, obs);
     }
-    if (sp_fuzz_chance(prng, 1, 8)) {
+    if (!sp_da_empty(action->obs) && sp_fuzz_chance(prng, 1, 8)) {
       fz_obs_t dup = action->obs[sp_fuzz_below(prng, sp_da_size(action->obs))];
       sp_da_push(action->obs, dup);
     }
   }
 
   u.cyclic = fz_universe_cyclic(&u);
+  u.obs_cyclic = fz_universe_obs_cyclic(&u);
   return u;
 }
 
@@ -213,7 +223,13 @@ fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
         step.artifact = outputs[sp_fuzz_below(prng, sp_da_size(outputs))];
         break;
       }
+      case FZ_STEP_PHANTOM: {
+        step.artifact = sp_fuzz_below(prng, FZ_MAX_PHANTOMS);
+        step.content = fz_pick_content(prng, profile);
+        break;
+      }
       case FZ_STEP_RUN:
+      case FZ_STEP_DISCOVERY:
       case FZ_STEP_COUNT: {
         break;
       }
@@ -225,15 +241,27 @@ fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
   return trace;
 }
 
-static bool fz_cyclic_at(fz_universe_t* u, u8* states, u64 action) {
+static bool fz_cyclic_at(fz_universe_t* u, u8* states, bool obs, u64 action) {
   if (states[action] == 2) return false;
   if (states[action] == 1) return true;
   states[action] = 1;
 
   sp_da_for(u->actions[action].consumes, ct) {
     s64 producer = u->artifacts[u->actions[action].consumes[ct]].producer;
-    if (producer >= 0 && fz_cyclic_at(u, states, (u64)producer)) {
+    if (producer >= 0 && fz_cyclic_at(u, states, obs, (u64)producer)) {
       return true;
+    }
+  }
+  if (obs) {
+    sp_da_for(u->actions[action].obs, ot) {
+      fz_obs_t o = u->actions[action].obs[ot];
+      if (o.probe) {
+        continue;
+      }
+      s64 producer = u->artifacts[o.artifact].producer;
+      if (producer >= 0 && (u64)producer != action && fz_cyclic_at(u, states, obs, (u64)producer)) {
+        return true;
+      }
     }
   }
 
@@ -241,14 +269,22 @@ static bool fz_cyclic_at(fz_universe_t* u, u8* states, u64 action) {
   return false;
 }
 
-bool fz_universe_cyclic(fz_universe_t* u) {
+static bool fz_cyclic(fz_universe_t* u, bool obs) {
   u8 states[FZ_MAX_ACTIONS] = sp_zero;
   sp_da_for(u->actions, at) {
-    if (fz_cyclic_at(u, states, at)) {
+    if (fz_cyclic_at(u, states, obs, at)) {
       return true;
     }
   }
   return false;
+}
+
+bool fz_universe_cyclic(fz_universe_t* u) {
+  return fz_cyclic(u, false);
+}
+
+bool fz_universe_obs_cyclic(fz_universe_t* u) {
+  return fz_cyclic(u, true);
 }
 
 fz_err_t fz_check_universe(fz_universe_t* u) {
@@ -287,15 +323,17 @@ fz_err_t fz_check_universe(fz_universe_t* u) {
       must(artifact->kind == FZ_ARTIFACT_OUTPUT, FZ_ERR_GEN_PRODUCER);
       must(artifact->producer == (s64)at, FZ_ERR_GEN_PRODUCER);
     }
-    must(action->discover == !sp_da_empty(action->obs), FZ_ERR_GEN_OBS);
+    must(action->discover || sp_da_empty(action->obs), FZ_ERR_GEN_OBS);
+    must(sp_da_size(action->obs) <= FZ_MAX_OBS, FZ_ERR_GEN_OBS);
     sp_da_for(action->obs, ot) {
       fz_obs_t obs = action->obs[ot];
-      if (obs.absent) {
+      if (obs.probe) {
         must(obs.phantom < FZ_MAX_PHANTOMS, FZ_ERR_GEN_OBS);
       }
       else {
         must(obs.artifact < sp_da_size(u->artifacts), FZ_ERR_GEN_OBS);
         must(u->artifacts[obs.artifact].kind != FZ_ARTIFACT_VALUE, FZ_ERR_GEN_OBS);
+        must(u->artifacts[obs.artifact].producer != (s64)at, FZ_ERR_GEN_OBS);
       }
     }
   }
