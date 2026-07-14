@@ -4,6 +4,7 @@
 #include "error/types.h"
 #include "sp.h"
 #include "sp/io.h"
+#include "sp/atomic_file.h"
 
 spn_dag_t* spn_dag_new(sp_mem_t mem) {
   sp_mem_arena_t* arena = sp_mem_arena_new(mem);
@@ -264,38 +265,6 @@ spn_err_t spn_dag_get_file_digest(spn_dag_file_cache_t* c, sp_str_t path, spn_da
   return SPN_OK;
 }
 
-void spn_dag_action_cache_init(spn_dag_action_cache_t* c, sp_mem_t mem) {
-  c->arena = sp_mem_arena_new(mem);
-  c->mem = sp_mem_arena_as_allocator(c->arena);
-  sp_ht_init(c->mem, c->entries);
-}
-
-const spn_dag_action_entry_t* spn_dag_action_cache_get(spn_dag_action_cache_t* c, spn_dag_digest_t key) {
-  return sp_ht_getp(c->entries, key);
-}
-
-void spn_dag_action_cache_put(spn_dag_action_cache_t* c, spn_dag_digest_t key, const spn_dag_action_output_t* outputs, u32 count) {
-  sp_assert(!sp_ht_getp(c->entries, key));
-
-  spn_dag_action_entry_t entry = sp_zero;
-  sp_da_init(c->mem, entry.outputs);
-  sp_for(it, count) {
-    sp_da_push(entry.outputs, ((spn_dag_action_output_t) {
-      .path = sp_str_copy(c->mem, outputs[it].path),
-      .digest = outputs[it].digest
-    }));
-  }
-  sp_ht_insert(c->entries, key, entry);
-}
-
-bool spn_dag_action_cache_remove(spn_dag_action_cache_t* c, spn_dag_digest_t key) {
-  if (!sp_ht_getp(c->entries, key)) {
-    return false;
-  }
-  sp_ht_erase(c->entries, key);
-  return true;
-}
-
 static bool spn_dag_restore(spn_dag_t* g, spn_dag_action_t* action, const spn_dag_action_entry_t* entry, spn_dag_file_cache_t* files, spn_dag_store_t* store) {
   if (sp_da_size(entry->outputs) != sp_da_size(action->produces)) {
     return false;
@@ -403,12 +372,19 @@ static spn_err_t spn_dag_publish(spn_dag_t* g, spn_dag_action_t* action, spn_dag
     }));
   }
 
-  spn_dag_action_cache_remove(cache, key);
   spn_dag_action_cache_put(cache, key, outputs, (u32)sp_da_size(outputs));
 
 done:
   sp_mem_end_scratch(s);
   return err;
+}
+
+static void spn_dag_clear_outputs(spn_dag_t* g, spn_dag_action_t* action, spn_dag_file_cache_t* files) {
+  sp_da_for(action->produces, it) {
+    spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, action->produces[it]);
+    sp_fs_remove_file(artifact->path);
+    spn_dag_file_cache_invalidate(files, artifact->path);
+  }
 }
 
 static spn_err_t spn_dag_exec_plain(spn_dag_t* g, spn_dag_action_t* action, spn_dag_file_cache_t* files, spn_dag_action_cache_t* cache, spn_dag_store_t* store) {
@@ -422,8 +398,11 @@ static spn_err_t spn_dag_exec_plain(spn_dag_t* g, spn_dag_action_t* action, spn_
     spn_dag_action_cache_remove(cache, key);
   }
 
-  if (action->execute && action->execute(action, action->user_data)) {
-    return SPN_ERROR;
+  if (action->execute) {
+    spn_dag_clear_outputs(g, action, files);
+    if (action->execute(action, action->user_data)) {
+      return SPN_ERROR;
+    }
   }
 
   return spn_dag_publish(g, action, key, files, cache, store);
@@ -451,9 +430,12 @@ static spn_err_t spn_dag_exec_discovery(spn_dag_t* g, spn_dag_action_t* action, 
     }
   }
 
-  if (action->execute && action->execute(action, action->user_data)) {
-    err = SPN_ERROR;
-    goto done;
+  if (action->execute) {
+    spn_dag_clear_outputs(g, action, files);
+    if (action->execute(action, action->user_data)) {
+      err = SPN_ERROR;
+      goto done;
+    }
   }
 
   sp_da(spn_dag_obs_t) obs = sp_da_new(s.mem, spn_dag_obs_t);
@@ -686,8 +668,26 @@ spn_err_t spn_cc_discover(spn_dag_action_t* action, void* user_data, sp_mem_t me
   return SPN_OK;
 }
 
-static sp_str_t spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
+static sp_str_t spn_dag_store_blob_dir(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
   return sp_fs_join_path(mem, store->dir, spn_dag_digest_hex(mem, digest));
+}
+
+static sp_str_t spn_dag_store_find(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, spn_dag_store_blob_dir(store, mem, digest));
+  sp_da_for(entries, it) {
+    if (entries[it].kind == SP_FS_KIND_FILE) {
+      return entries[it].path;
+    }
+  }
+  return sp_str_lit("");
+}
+
+static spn_err_t spn_dag_store_link(sp_str_t from, sp_str_t to) {
+  sp_fs_remove_file(to);
+  if (!sp_fs_link(from, to, SP_FS_LINK_HARD)) {
+    return SPN_OK;
+  }
+  return sp_fs_copy(from, to) ? SPN_ERROR : SPN_OK;
 }
 
 void spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config) {
@@ -728,10 +728,11 @@ spn_err_t spn_dag_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag
     }
     case SPN_DAG_STORE_FILESYSTEM: {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      sp_str_t path = spn_dag_store_path(store, s.mem, *digest);
       spn_err_t err = SPN_OK;
-      if (!sp_fs_exists(path)) {
-        if (sp_fs_create_file_slice(path, sp_mem_slice((u8*)data, len))) {
+      if (sp_str_empty(spn_dag_store_find(store, s.mem, *digest))) {
+        sp_str_t dir = spn_dag_store_blob_dir(store, s.mem, *digest);
+        sp_fs_create_dir(dir);
+        if (sp_fs_write_atomic_slice(sp_fs_join_path(s.mem, dir, sp_str_lit("blob")), sp_mem_slice((u8*)data, len))) {
           err = SPN_ERROR;
         }
       }
@@ -762,12 +763,12 @@ spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_
       }
 
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      sp_str_t stored = spn_dag_store_path(store, s.mem, *digest);
       spn_err_t err = SPN_OK;
-      if (!sp_fs_exists(stored)) {
-        if (sp_fs_copy(path, stored)) {
-          err = SPN_ERROR;
-        }
+      if (sp_str_empty(spn_dag_store_find(store, s.mem, *digest))) {
+        sp_str_t dir = spn_dag_store_blob_dir(store, s.mem, *digest);
+        sp_fs_create_dir(dir);
+        sp_str_t stored = sp_fs_join_path(s.mem, dir, sp_fs_get_name(path));
+        err = spn_dag_store_link(path, stored);
       }
       sp_mem_end_scratch(s);
       return err;
@@ -784,7 +785,7 @@ bool spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest) {
     }
     case SPN_DAG_STORE_FILESYSTEM: {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      bool exists = sp_fs_exists(spn_dag_store_path(store, s.mem, digest));
+      bool exists = !sp_str_empty(spn_dag_store_find(store, s.mem, digest));
       sp_mem_end_scratch(s);
       return exists;
     }
@@ -807,8 +808,11 @@ spn_err_t spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_
     }
     case SPN_DAG_STORE_FILESYSTEM: {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      sp_str_t path = spn_dag_store_path(store, s.mem, digest);
-      spn_err_t err = sp_io_read_file_slice(mem, path, data) ? SPN_ERROR : SPN_OK;
+      sp_str_t stored = spn_dag_store_find(store, s.mem, digest);
+      spn_err_t err = SPN_ERROR;
+      if (!sp_str_empty(stored)) {
+        err = sp_io_read_file_slice(mem, stored, data) ? SPN_ERROR : SPN_OK;
+      }
       sp_mem_end_scratch(s);
       return err;
     }
@@ -828,12 +832,10 @@ spn_err_t spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t dig
     }
     case SPN_DAG_STORE_FILESYSTEM: {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      sp_str_t stored = spn_dag_store_path(store, s.mem, digest);
-      spn_err_t err = SPN_OK;
-      if (!sp_fs_exists(stored)) {
-        err = SPN_ERROR;
-      } else if (sp_fs_copy(stored, path)) {
-        err = SPN_ERROR;
+      sp_str_t stored = spn_dag_store_find(store, s.mem, digest);
+      spn_err_t err = SPN_ERROR;
+      if (!sp_str_empty(stored)) {
+        err = spn_dag_store_link(stored, path);
       }
       sp_mem_end_scratch(s);
       return err;

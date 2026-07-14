@@ -107,7 +107,7 @@ static void exec_env_init(exec_env_t* env, const c8* name, spn_dag_store_kind_t 
     .dir = tmpfs_get(&env->fs, sp_str_lit("store"))
   });
   spn_dag_file_cache_init(&env->files, env->mem);
-  spn_dag_action_cache_init(&env->cache, env->mem);
+  spn_dag_action_cache_init(&env->cache, env->mem, sp_str_lit(""));
 }
 
 static void exec_store_context(exec_env_t* env) {

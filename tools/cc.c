@@ -150,7 +150,7 @@ static void cc_report(cc_app_t* app) {
   u32 hits = app->actions - app->executed;
   sp_os_print(sp_fmt(app->mem, "\n{} action(s): {} executed, {} restored from cache\n",
     sp_fmt_uint(app->actions), sp_fmt_uint(app->executed), sp_fmt_uint(hits)).value);
-  sp_os_print(sp_fmt(app->mem, "store: {}/store\n", sp_fmt_str(app->root)).value);
+  sp_os_print(sp_fmt(app->mem, "cache: {}\n", sp_fmt_str(app->root)).value);
 }
 
 static sp_cli_result_t cc_build(sp_cli_t* cli) {
@@ -166,21 +166,17 @@ static sp_cli_result_t cc_build(sp_cli_t* cli) {
   app->clang = sp_str_lit("clang");
   app->root = sp_str_lit(".sp-cc");
   sp_str_t obj_dir = sp_fs_join_path(app->mem, app->root, sp_str_lit("obj"));
-  sp_str_t store_dir = sp_fs_join_path(app->mem, app->root, sp_str_lit("store"));
   sp_fs_create_dir(obj_dir);
   cc_flags_init(app);
 
   spn_dag_store_init(&app->store, (spn_dag_store_config_t) {
     .kind = SPN_DAG_STORE_FILESYSTEM,
     .mem = app->mem,
-    .dir = store_dir
+    .dir = sp_fs_join_path(app->mem, app->root, sp_str_lit("blobs"))
   });
   spn_dag_file_cache_init(&app->files, app->mem);
-  spn_dag_action_cache_init(&app->cache, app->mem);
-  spn_dag_discovery_init(&app->discovery, app->mem, sp_fs_join_path(app->mem, app->root, sp_str_lit("manifests")));
-
-  sp_str_t cache_table = sp_fs_join_path(app->mem, app->root, sp_str_lit("actions.jsonl"));
-  spn_dag_action_cache_load(&app->cache, cache_table);
+  spn_dag_action_cache_init(&app->cache, app->mem, sp_fs_join_path(app->mem, app->root, sp_str_lit("strong")));
+  spn_dag_discovery_init(&app->discovery, app->mem, sp_fs_join_path(app->mem, app->root, sp_str_lit("weak")));
 
   app->g = spn_dag_new(app->mem);
   spn_dag_id_t link = spn_dag_add_action(app->g, (spn_dag_action_config_t) {
@@ -225,8 +221,6 @@ static sp_cli_result_t cc_build(sp_cli_t* cli) {
   }
 
   spn_err_t err = spn_dag_run(app->g, &app->files, &app->cache, &app->store, &app->discovery);
-
-  spn_dag_action_cache_save(&app->cache, cache_table);
 
   if (err) {
     return sp_cli_set_error(cli, sp_str_lit("build failed"));

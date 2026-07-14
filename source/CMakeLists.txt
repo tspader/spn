@@ -128,7 +128,7 @@ add_executable(spn ${SPN_SOURCES}
   ${SRC}/codegen/gen/release.gen.c
   ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/gen/abi.gen.c
-  ${SRC}/codegen/gen/dag_action.gen.c
+  ${SRC}/codegen/gen/dag_output.gen.c
   ${SRC}/codegen/gen/dag_obs.gen.c)
 target_include_directories(spn PRIVATE
   ${SRC}

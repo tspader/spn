@@ -99,6 +99,7 @@ typedef struct {
 typedef struct {
   sp_mem_arena_t* arena;
   sp_mem_t mem;
+  sp_str_t dir;
   sp_ht(spn_dag_digest_t, spn_dag_action_entry_t) entries;
 } spn_dag_action_cache_t;
 
