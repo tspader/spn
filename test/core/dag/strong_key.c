@@ -50,14 +50,14 @@ static spn_dag_digest_t build_strong_key(strong_key_action_t spec) {
   return spn_dag_strong_key(prelim, obs, count);
 }
 
-static void run_strong_key_test(s32* utest_result, strong_key_test_t t) {
+static void run_test(s32* utest_result, strong_key_test_t t) {
   spn_dag_digest_t a = build_strong_key(t.a);
   spn_dag_digest_t b = build_strong_key(t.b);
   EXPECT_EQ(t.expect.equal, spn_dag_digest_equal(a, b));
 }
 
 UTEST_F(strong_key, identical_folds_match) {
-  run_strong_key_test(&ur, (strong_key_test_t) {
+  run_test(&ur, (strong_key_test_t) {
     .a = { .prelim = "cc main.c", .obs = { { "sp.h", "SP" }, { "io.h", "IO" } } },
     .b = { .prelim = "cc main.c", .obs = { { "sp.h", "SP" }, { "io.h", "IO" } } },
     .expect = { .equal = true }
@@ -65,56 +65,56 @@ UTEST_F(strong_key, identical_folds_match) {
 }
 
 UTEST_F(strong_key, discovered_content_changes_key) {
-  run_strong_key_test(&ur, (strong_key_test_t) {
+  run_test(&ur, (strong_key_test_t) {
     .a = { .prelim = "cc main.c", .obs = { { "sp.h", "v1" } } },
     .b = { .prelim = "cc main.c", .obs = { { "sp.h", "v2" } } },
   });
 }
 
 UTEST_F(strong_key, discovered_path_changes_key) {
-  run_strong_key_test(&ur, (strong_key_test_t) {
+  run_test(&ur, (strong_key_test_t) {
     .a = { .prelim = "cc main.c", .obs = { { "inc1/sp.h", "SP" } } },
     .b = { .prelim = "cc main.c", .obs = { { "inc2/sp.h", "SP" } } },
   });
 }
 
 UTEST_F(strong_key, prelim_changes_key) {
-  run_strong_key_test(&ur, (strong_key_test_t) {
+  run_test(&ur, (strong_key_test_t) {
     .a = { .prelim = "cc -O0 main.c", .obs = { { "sp.h", "SP" } } },
     .b = { .prelim = "cc -O2 main.c", .obs = { { "sp.h", "SP" } } },
   });
 }
 
 UTEST_F(strong_key, discovered_order_changes_key) {
-  run_strong_key_test(&ur, (strong_key_test_t) {
+  run_test(&ur, (strong_key_test_t) {
     .a = { .prelim = "cc main.c", .obs = { { "sp.h", "SP" }, { "io.h", "IO" } } },
     .b = { .prelim = "cc main.c", .obs = { { "io.h", "IO" }, { "sp.h", "SP" } } },
   });
 }
 
 UTEST_F(strong_key, extra_discovered_changes_key) {
-  run_strong_key_test(&ur, (strong_key_test_t) {
+  run_test(&ur, (strong_key_test_t) {
     .a = { .prelim = "cc main.c", .obs = { { "sp.h", "SP" } } },
     .b = { .prelim = "cc main.c", .obs = { { "sp.h", "SP" }, { "io.h", "IO" } } },
   });
 }
 
 UTEST_F(strong_key, empty_differs_from_folded) {
-  run_strong_key_test(&ur, (strong_key_test_t) {
+  run_test(&ur, (strong_key_test_t) {
     .a = { .prelim = "cc main.c" },
     .b = { .prelim = "cc main.c", .obs = { { "sp.h", "SP" } } },
   });
 }
 
 UTEST_F(strong_key, obs_kind_changes_key) {
-  run_strong_key_test(&ur, (strong_key_test_t) {
+  run_test(&ur, (strong_key_test_t) {
     .a = { .prelim = "cc main.c", .obs = { { "inc1/sp.h", SP_NULLPTR, SPN_DAG_OBS_ABSENT } } },
     .b = { .prelim = "cc main.c", .obs = { { "inc1/sp.h", SP_NULLPTR, SPN_DAG_OBS_FILE } } },
   });
 }
 
 UTEST_F(strong_key, probe_now_present_changes_key) {
-  run_strong_key_test(&ur, (strong_key_test_t) {
+  run_test(&ur, (strong_key_test_t) {
     .a = { .prelim = "cc main.c", .obs = { { "inc1/sp.h", SP_NULLPTR, SPN_DAG_OBS_ABSENT }, { "inc2/sp.h", "SP" } } },
     .b = { .prelim = "cc main.c", .obs = { { "inc1/sp.h", "SP", SPN_DAG_OBS_ABSENT }, { "inc2/sp.h", "SP" } } },
   });

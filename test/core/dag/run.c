@@ -42,7 +42,7 @@ typedef struct {
 
 UTEST_EMPTY_FIXTURE(run)
 
-static s32 run_exec_fn(spn_dag_action_t* action, void* user_data) {
+static s32 on_exec(spn_dag_action_t* action, void* user_data) {
   run_ctx_t* ctx = (run_ctx_t*)user_data;
   sp_da_for(action->consumes, it) {
     spn_dag_artifact_t* in = spn_dag_find_artifact(ctx->g, action->consumes[it]);
@@ -56,7 +56,7 @@ static s32 run_exec_fn(spn_dag_action_t* action, void* user_data) {
   return sp_fs_create_file_str(out->path, content) ? 1 : 0;
 }
 
-static spn_err_t run_discover_fn(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t on_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   run_ctx_t* ctx = (run_ctx_t*)user_data;
   sp_carr_for(ctx->spec->discovers, it) {
     if (!ctx->spec->discovers[it]) {
@@ -70,7 +70,7 @@ static spn_err_t run_discover_fn(spn_dag_action_t* action, void* user_data, sp_m
   return SPN_OK;
 }
 
-static void run_build_graph(s32* utest_result, run_env_t* env, spn_dag_t* g, run_test_t* t) {
+static void run_dag(s32* utest_result, run_env_t* env, spn_dag_t* g, run_test_t* t) {
   sp_carr_for(t->actions, ai) {
     run_action_t* spec = &t->actions[ai];
     if (!spec->identity) {
@@ -84,8 +84,8 @@ static void run_build_graph(s32* utest_result, run_env_t* env, spn_dag_t* g, run
 
     spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
       .identity = spn_dag_digest(spec->identity, sp_cstr_len(spec->identity)),
-      .execute = run_exec_fn,
-      .discover = spec->discovers[0] ? run_discover_fn : SP_NULLPTR,
+      .execute = on_exec,
+      .discover = spec->discovers[0] ? on_discover : SP_NULLPTR,
       .user_data = ctx
     });
     sp_carr_for(spec->inputs, ii) {
@@ -98,7 +98,7 @@ static void run_build_graph(s32* utest_result, run_env_t* env, spn_dag_t* g, run
   }
 }
 
-static void run_run_test(s32* utest_result, run_test_t t) {
+static void run_test(s32* utest_result, run_test_t t) {
   run_env_t env = sp_zero;
   tmpfs_init_named(&env.fs, t.name);
   spn_dag_store_init(&env.store, (spn_dag_store_config_t) {
@@ -124,7 +124,7 @@ static void run_run_test(s32* utest_result, run_test_t t) {
     }
 
     spn_dag_t* g = spn_dag_new(env.fs.mem);
-    run_build_graph(utest_result, &env, g, &t);
+    run_dag(utest_result, &env, g, &t);
 
     spn_err_t err = spn_dag_run(g, &env.files, &env.cache, &env.store, t.discovery ? &env.discovery : SP_NULLPTR);
     EXPECT_EQ(build->expect_err, err);
@@ -135,7 +135,7 @@ static void run_run_test(s32* utest_result, run_test_t t) {
 }
 
 UTEST_F(run, chain_runs_in_dependency_order) {
-  run_run_test(&ur, (run_test_t) {
+  run_test(&ur, (run_test_t) {
     .name = "run_chain",
     .actions = {
       { .identity = "cc main.c", .inputs = { "main.c" }, .output = "main.o" },
@@ -148,7 +148,7 @@ UTEST_F(run, chain_runs_in_dependency_order) {
 }
 
 UTEST_F(run, second_build_all_hits) {
-  run_run_test(&ur, (run_test_t) {
+  run_test(&ur, (run_test_t) {
     .name = "run_hits",
     .actions = {
       { .identity = "cc main.c", .inputs = { "main.c" }, .output = "main.o" },
@@ -162,7 +162,7 @@ UTEST_F(run, second_build_all_hits) {
 }
 
 UTEST_F(run, source_change_reruns_chain) {
-  run_run_test(&ur, (run_test_t) {
+  run_test(&ur, (run_test_t) {
     .name = "run_source_change",
     .actions = {
       { .identity = "cc main.c", .inputs = { "main.c" }, .output = "main.o" },
@@ -176,7 +176,7 @@ UTEST_F(run, source_change_reruns_chain) {
 }
 
 UTEST_F(run, independent_actions_both_run) {
-  run_run_test(&ur, (run_test_t) {
+  run_test(&ur, (run_test_t) {
     .name = "run_independent",
     .actions = {
       { .identity = "cc a.c", .inputs = { "a.c" }, .output = "a.o" },
@@ -189,7 +189,7 @@ UTEST_F(run, independent_actions_both_run) {
 }
 
 UTEST_F(run, diamond_selective_rebuild) {
-  run_run_test(&ur, (run_test_t) {
+  run_test(&ur, (run_test_t) {
     .name = "run_diamond",
     .actions = {
       { .identity = "cc main.c", .inputs = { "main.c" }, .output = "main.o" },
@@ -204,7 +204,7 @@ UTEST_F(run, diamond_selective_rebuild) {
 }
 
 UTEST_F(run, discovered_generated_header_waits_for_producer) {
-  run_run_test(&ur, (run_test_t) {
+  run_test(&ur, (run_test_t) {
     .name = "run_generated_header",
     .discovery = true,
     .actions = {
@@ -220,7 +220,7 @@ UTEST_F(run, discovered_generated_header_waits_for_producer) {
 }
 
 UTEST_F(run, discovered_source_header_no_deferral) {
-  run_run_test(&ur, (run_test_t) {
+  run_test(&ur, (run_test_t) {
     .name = "run_discovered_source",
     .discovery = true,
     .actions = {

@@ -29,7 +29,7 @@ typedef struct {
 
 UTEST_EMPTY_FIXTURE(store)
 
-static void run_store_ops(s32* utest_result, spn_dag_store_kind_t kind, store_test_t t) {
+static void run_ops(s32* utest_result, spn_dag_store_kind_t kind, store_test_t t) {
   tmpfs_t fs = sp_zero;
   tmpfs_init_named(&fs, sp_str_to_cstr(sp_mem_os_new(), sp_fmt(sp_mem_os_new(), "{}_{}", sp_fmt_cstr(t.name), sp_fmt_uint((u32)kind)).value));
   sp_mem_t mem = fs.mem;
@@ -102,15 +102,15 @@ static void run_store_ops(s32* utest_result, spn_dag_store_kind_t kind, store_te
   tmpfs_deinit(&fs);
 }
 
-static void run_store_test(s32* utest_result, store_test_t t) {
+static void run_test(s32* utest_result, store_test_t t) {
   spn_dag_store_kind_t kinds [] = { SPN_DAG_STORE_MEM, SPN_DAG_STORE_FILESYSTEM };
   sp_carr_for(kinds, it) {
-    run_store_ops(utest_result, kinds[it], t);
+    run_ops(utest_result, kinds[it], t);
   }
 }
 
 UTEST_F(store, put_then_get) {
-  run_store_test(&ur, (store_test_t) {
+  run_test(&ur, (store_test_t) {
     .name = "put_then_get",
     .ops = {
       { .kind = STORE_OP_PUT, .blob = "int main() {}" },
@@ -121,7 +121,7 @@ UTEST_F(store, put_then_get) {
 }
 
 UTEST_F(store, empty_blob) {
-  run_store_test(&ur, (store_test_t) {
+  run_test(&ur, (store_test_t) {
     .name = "empty_blob",
     .ops = {
       { .kind = STORE_OP_PUT, .blob = "" },
@@ -131,7 +131,7 @@ UTEST_F(store, empty_blob) {
 }
 
 UTEST_F(store, put_is_idempotent) {
-  run_store_test(&ur, (store_test_t) {
+  run_test(&ur, (store_test_t) {
     .name = "put_is_idempotent",
     .ops = {
       { .kind = STORE_OP_PUT, .blob = "spum" },
@@ -142,7 +142,7 @@ UTEST_F(store, put_is_idempotent) {
 }
 
 UTEST_F(store, missing_digest) {
-  run_store_test(&ur, (store_test_t) {
+  run_test(&ur, (store_test_t) {
     .name = "missing_digest",
     .ops = {
       { .kind = STORE_OP_HAS, .blob = "spum" },
@@ -153,7 +153,7 @@ UTEST_F(store, missing_digest) {
 }
 
 UTEST_F(store, put_file_matches_put) {
-  run_store_test(&ur, (store_test_t) {
+  run_test(&ur, (store_test_t) {
     .name = "put_file_matches_put",
     .ops = {
       { .kind = STORE_OP_FILE, .blob = "spum", .path = "src.c" },
@@ -164,7 +164,7 @@ UTEST_F(store, put_file_matches_put) {
 }
 
 UTEST_F(store, put_file_missing) {
-  run_store_test(&ur, (store_test_t) {
+  run_test(&ur, (store_test_t) {
     .name = "put_file_missing",
     .ops = {
       { .kind = STORE_OP_PUT_FILE, .blob = "spum", .path = "absent.bin", .expect = { .err = SPN_ERROR } },
@@ -173,7 +173,7 @@ UTEST_F(store, put_file_missing) {
 }
 
 UTEST_F(store, materialize) {
-  run_store_test(&ur, (store_test_t) {
+  run_test(&ur, (store_test_t) {
     .name = "materialize",
     .ops = {
       { .kind = STORE_OP_PUT, .blob = "spum" },
