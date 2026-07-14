@@ -8,11 +8,13 @@ add_executable(dag
   ${SRC}/sp/io.c
   main.c
   action_cache.c
+  cc.c
   digest.c
   discovery.c
   discover_exec.c
   exec.c
   file_cache.c
+  graph.c
   key.c
   run.c
   store.c

@@ -3,6 +3,9 @@
 typedef enum {
   FILE_CACHE_OP_DONE,
   FILE_CACHE_OP_FILE,
+  FILE_CACHE_OP_WRITE,
+  FILE_CACHE_OP_REFRESH,
+  FILE_CACHE_OP_INVALIDATE,
   FILE_CACHE_OP_DIGEST,
   FILE_CACHE_OP_SEED,
 } file_cache_op_kind_t;
@@ -47,6 +50,18 @@ static void run_test(s32* utest_result, file_cache_test_t t) {
         spn_dag_file_cache_refresh(&c);
         break;
       }
+      case FILE_CACHE_OP_WRITE: {
+        tmpfs_create(&fs, sp_cstr_as_str(op.path), sp_cstr_as_str(op.blob));
+        break;
+      }
+      case FILE_CACHE_OP_REFRESH: {
+        spn_dag_file_cache_refresh(&c);
+        break;
+      }
+      case FILE_CACHE_OP_INVALIDATE: {
+        spn_dag_file_cache_invalidate(&c, tmpfs_get(&fs, sp_cstr_as_str(op.path)));
+        break;
+      }
       case FILE_CACHE_OP_DIGEST: {
         spn_dag_digest_t digest = sp_zero;
         EXPECT_EQ(op.expect.err, spn_dag_get_file_digest(&c, tmpfs_get(&fs, sp_cstr_as_str(op.path)), &digest));
@@ -89,6 +104,33 @@ UTEST_F(file_cache, missing_file) {
     .name = "file_cache_missing",
     .ops = {
       { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .expect = { .err = SPN_ERROR } },
+    }
+  });
+}
+
+UTEST_F(file_cache, metadata_pinned_until_refresh) {
+  run_test(&ur, (file_cache_test_t) {
+    .name = "file_cache_refresh",
+    .ops = {
+      { .kind = FILE_CACHE_OP_FILE, .path = "F", .blob = "A" },
+      { .kind = FILE_CACHE_OP_DIGEST, .path = "F", .blob = "A" },
+      { .kind = FILE_CACHE_OP_WRITE, .path = "F", .blob = "BB" },
+      { .kind = FILE_CACHE_OP_DIGEST, .path = "F", .blob = "A" },
+      { .kind = FILE_CACHE_OP_REFRESH },
+      { .kind = FILE_CACHE_OP_DIGEST, .path = "F", .blob = "BB" },
+    }
+  });
+}
+
+UTEST_F(file_cache, invalidate_unpins_path) {
+  run_test(&ur, (file_cache_test_t) {
+    .name = "file_cache_invalidate",
+    .ops = {
+      { .kind = FILE_CACHE_OP_FILE, .path = "F", .blob = "A" },
+      { .kind = FILE_CACHE_OP_DIGEST, .path = "F", .blob = "A" },
+      { .kind = FILE_CACHE_OP_WRITE, .path = "F", .blob = "BB" },
+      { .kind = FILE_CACHE_OP_INVALIDATE, .path = "F" },
+      { .kind = FILE_CACHE_OP_DIGEST, .path = "F", .blob = "BB" },
     }
   });
 }
