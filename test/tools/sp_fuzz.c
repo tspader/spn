@@ -30,7 +30,7 @@ u64 sp_fuzz_range(sp_fuzz_prng_t* prng, u64 min, u64 max) {
   return min + sp_fuzz_below(prng, max - min + 1);
 }
 
-bool sp_fuzz_chance(sp_fuzz_prng_t* prng, u32 numerator, u32 denominator) {
+bool sp_fuzz_chance(sp_fuzz_prng_t* prng, u64 numerator, u64 denominator) {
   return sp_fuzz_below(prng, denominator) < numerator;
 }
 

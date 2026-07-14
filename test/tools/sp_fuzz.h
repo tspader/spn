@@ -31,7 +31,7 @@ typedef struct {
 u64  sp_fuzz_next(sp_fuzz_prng_t* prng);
 u64  sp_fuzz_below(sp_fuzz_prng_t* prng, u64 bound);
 u64  sp_fuzz_range(sp_fuzz_prng_t* prng, u64 min, u64 max);
-bool sp_fuzz_chance(sp_fuzz_prng_t* prng, u32 numerator, u32 denominator);
+bool sp_fuzz_chance(sp_fuzz_prng_t* prng, u64 numerator, u64 denominator);
 u32  sp_fuzz_weighted(sp_fuzz_prng_t* prng, const u64* weights, u32 count);
 void sp_fuzz_shuffle(sp_fuzz_prng_t* prng, void* base, u64 count, u64 stride);
 void sp_fuzz_swarm(sp_fuzz_prng_t* prng, u64* weights, u32 count);
