@@ -19,6 +19,7 @@ sp_str_t fz_err_to_str(fz_err_t err) {
     case FZ_ERR_STALE_OUTPUT: return sp_str_lit("an output's bytes diverge from the model");
     case FZ_ERR_EXEC_MISSING: return sp_str_lit("an action hit the cache where the model expected execution");
     case FZ_ERR_EXEC_SPURIOUS: return sp_str_lit("an action executed where the model expected a cache hit");
+    case FZ_ERR_MODEL:        return sp_str_lit("cache mirror bytes diverge from the clean model in an honest world");
     case FZ_ERR_COUNT:        break;
   }
   sp_unreachable_return(sp_str_lit("unknown"));

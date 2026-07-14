@@ -119,6 +119,22 @@ void fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_trace
           fz_line(&steps.base, sp_fmt(mem, "mutate f{} c{}", sp_fmt_uint(step->artifact), sp_fmt_uint(step->content)).value);
           break;
         }
+        case FZ_STEP_TOUCH: {
+          fz_line(&steps.base, sp_fmt(mem, "touch f{}", sp_fmt_uint(step->artifact)).value);
+          break;
+        }
+        case FZ_STEP_REVERT: {
+          fz_line(&steps.base, sp_fmt(mem, "revert f{} c{}", sp_fmt_uint(step->artifact), sp_fmt_uint(step->content)).value);
+          break;
+        }
+        case FZ_STEP_STEALTH: {
+          fz_line(&steps.base, sp_fmt(mem, "stealth f{} c{}", sp_fmt_uint(step->artifact), sp_fmt_uint(step->content)).value);
+          break;
+        }
+        case FZ_STEP_DELETE: {
+          fz_line(&steps.base, sp_fmt(mem, "delete f{}", sp_fmt_uint(step->artifact)).value);
+          break;
+        }
         case FZ_STEP_COUNT: {
           break;
         }

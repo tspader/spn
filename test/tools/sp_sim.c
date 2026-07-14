@@ -33,7 +33,7 @@ static sp_sim_t* sp_sim_syscall_at(sp_sys_fd_t fd) {
   return sp_sim_syscall();
 }
 
-static void sp_sim_touch(sp_sim_inode_t* node) {
+static void sp_sim_stamp(sp_sim_inode_t* node) {
   sp_sim_t* sim = sp_sim_active;
   sim->clock.tv_nsec += 1000000;
   if (sim->clock.tv_nsec >= 1000000000) {
@@ -101,7 +101,7 @@ static sp_sim_inode_t* sp_sim_inode(sp_fs_kind_t kind) {
     .nlink = 1,
     .bytes = sp_da_new(sim->mem, u8),
   };
-  sp_sim_touch(node);
+  sp_sim_stamp(node);
   return node;
 }
 
@@ -153,7 +153,7 @@ static s64 sp_sim_write_at(sp_sim_inode_t* node, const void* buf, u64 count, u64
   if (node->kind != SP_FS_KIND_FILE) return -1;
   sp_sim_file_reserve(node, offset + count);
   sp_sys_memcpy(node->bytes + offset, buf, count);
-  sp_sim_touch(node);
+  sp_sim_stamp(node);
   return (s64)count;
 }
 
@@ -253,7 +253,7 @@ static sp_sys_fd_t sp_sim_sys_open(sp_sys_fd_t fd, const c8* path, u32 len, s32 
 
   if ((flags & SP_O_TRUNC) && node->kind == SP_FS_KIND_FILE && sp_da_size(node->bytes)) {
     sp_da_clear(node->bytes);
-    sp_sim_touch(node);
+    sp_sim_stamp(node);
   }
 
   sp_da_push(sim->fds, ((sp_sim_fd_t) {
@@ -710,6 +710,30 @@ void sp_sim_init(sp_sim_t* sim, sp_mem_t mem) {
     .bytes = sp_da_new(mem, u8),
   };
   sp_ht_insert(sim->nodes, sp_str_lit("/"), root);
+}
+
+bool sp_sim_touch(sp_sim_t* sim, sp_str_t path) {
+  SP_ASSERT(sp_sim_active == sim);
+
+  c8 buf [SP_PATH_MAX];
+  sp_sim_inode_t* node = sp_sim_find(sp_sim_norm(path.data, (u32)path.len, buf));
+  if (!node || node->kind != SP_FS_KIND_FILE) {
+    return false;
+  }
+  sp_sim_stamp(node);
+  return true;
+}
+
+bool sp_sim_stealth_write(sp_sim_t* sim, sp_str_t path, sp_str_t bytes) {
+  SP_ASSERT(sp_sim_active == sim);
+
+  c8 buf [SP_PATH_MAX];
+  sp_sim_inode_t* node = sp_sim_find(sp_sim_norm(path.data, (u32)path.len, buf));
+  if (!node || node->kind != SP_FS_KIND_FILE || sp_da_size(node->bytes) != bytes.len) {
+    return false;
+  }
+  sp_sys_memcpy(node->bytes, bytes.data, bytes.len);
+  return true;
 }
 
 void sp_sim_install(sp_sim_t* sim) {

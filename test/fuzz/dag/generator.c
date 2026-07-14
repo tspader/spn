@@ -160,13 +160,56 @@ fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
   fz_trace_t trace = sp_zero;
   sp_da_init(mem, trace.steps);
 
+  sp_da(u64) outputs = sp_da_new(mem, u64);
+  sp_da_for(u->artifacts, it) {
+    if (u->artifacts[it].kind == FZ_ARTIFACT_OUTPUT) {
+      sp_da_push(outputs, it);
+    }
+  }
+
+  sp_da(u64)* history = sp_alloc_n(mem, sp_da(u64), profile->source_count);
+  sp_for(st, profile->source_count) {
+    sp_da_init(mem, history[st]);
+    sp_da_push(history[st], u->artifacts[profile->value_count + st].content);
+  }
+
   sp_for(it, profile->steps) {
     fz_step_t step = sp_zero;
     step.kind = (fz_step_kind_t)sp_fuzz_weighted(prng, profile->step_weights, FZ_STEP_COUNT);
     switch (step.kind) {
       case FZ_STEP_MUTATE: {
-        step.artifact = profile->value_count + sp_fuzz_below(prng, profile->source_count);
+        u64 source = sp_fuzz_below(prng, profile->source_count);
+        step.artifact = profile->value_count + source;
         step.content = fz_pick_content(prng, profile);
+        sp_da_push(history[source], step.content);
+        break;
+      }
+      case FZ_STEP_REVERT: {
+        u64 source = sp_fuzz_below(prng, profile->source_count);
+        step.artifact = profile->value_count + source;
+        step.content = history[source][sp_fuzz_below(prng, sp_da_size(history[source]))];
+        sp_da_push(history[source], step.content);
+        break;
+      }
+      case FZ_STEP_STEALTH: {
+        u64 source = sp_fuzz_below(prng, profile->source_count);
+        u64 current = *sp_da_back(history[source]);
+        step.artifact = profile->value_count + source;
+        step.content = profile->content_count > 1
+          ? (current + 1 + sp_fuzz_below(prng, profile->content_count - 1)) % profile->content_count
+          : current;
+        sp_da_push(history[source], step.content);
+        break;
+      }
+      case FZ_STEP_TOUCH: {
+        u64 pick = sp_fuzz_below(prng, profile->source_count + sp_da_size(outputs));
+        step.artifact = pick < profile->source_count
+          ? profile->value_count + pick
+          : outputs[pick - profile->source_count];
+        break;
+      }
+      case FZ_STEP_DELETE: {
+        step.artifact = outputs[sp_fuzz_below(prng, sp_da_size(outputs))];
         break;
       }
       case FZ_STEP_RUN:
