@@ -825,6 +825,7 @@ typedef struct {
   u32 pending;
   u32 deferred;
   bool done;
+  u64 done_epoch;
   sp_da(u32) waiters;
 } spn_dag_run_state_t;
 
@@ -841,24 +842,22 @@ static bool is_artifact_covered(const spn_dag_obs_t* obs, spn_dag_artifact_t* ar
   return obs->kind == SPN_DAG_OBS_ENUMERATION && is_path_within(artifact->target, obs->path);
 }
 
-static bool spn_dag_run_defer(spn_dag_t* g, spn_dag_action_t* action, spn_dag_discovery_t* discovery, spn_dag_run_state_t* states) {
-  const spn_dag_pathset_t* set = spn_dag_discovery_get(discovery, spn_dag_action_key(g, action->id));
-  if (!set) {
-    return false;
-  }
-
+static bool run_defer_obs(spn_dag_t* g, spn_dag_action_t* action, const spn_dag_obs_t* obs, u64 count, spn_dag_run_state_t* states, u64 epoch, bool* requeue) {
   spn_dag_run_state_t* state = &states[action->id.index];
-  sp_da_for(set->obs, it) {
+  sp_for(it, count) {
     sp_da_for(g->artifacts, ai) {
       spn_dag_artifact_t* artifact = &g->artifacts[ai];
       if (!artifact->producer.occupied || artifact->producer.index == action->id.index) {
         continue;
       }
-      if (!is_artifact_covered(&set->obs[it], artifact)) {
+      if (!is_artifact_covered(&obs[it], artifact)) {
         continue;
       }
       spn_dag_run_state_t* producer = &states[artifact->producer.index];
       if (producer->done) {
+        if (producer->done_epoch > epoch) {
+          *requeue = true;
+        }
         continue;
       }
       sp_da_push(producer->waiters, action->id.index);
@@ -869,10 +868,15 @@ static bool spn_dag_run_defer(spn_dag_t* g, spn_dag_action_t* action, spn_dag_di
   return state->deferred > 0;
 }
 
-spn_err_t spn_dag_run(spn_dag_t* g, spn_dag_env_t* env) {
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  spn_err_t err = SPN_OK;
+static bool spn_dag_run_defer(spn_dag_t* g, spn_dag_action_t* action, spn_dag_digest_t key, spn_dag_discovery_t* discovery, spn_dag_run_state_t* states, u64 epoch, bool* requeue) {
+  const spn_dag_pathset_t* set = spn_dag_discovery_get(discovery, key);
+  if (!set) {
+    return false;
+  }
+  return run_defer_obs(g, action, set->obs, sp_da_size(set->obs), states, epoch, requeue);
+}
 
+static spn_err_t seed_sources(spn_dag_t* g, spn_dag_env_t* env) {
   sp_da_for(g->artifacts, it) {
     spn_dag_artifact_t* artifact = &g->artifacts[it];
     if (artifact->kind == SPN_DAG_ARTIFACT_KIND_TREE) {
@@ -880,30 +884,62 @@ spn_err_t spn_dag_run(spn_dag_t* g, spn_dag_env_t* env) {
       continue;
     }
     if (artifact->kind == SPN_DAG_ARTIFACT_KIND_FILE && !artifact->producer.occupied) {
-      if (spn_dag_get_file_digest(env->files, artifact->path, &artifact->digest)) {
-        err = SPN_ERROR;
-        goto done;
-      }
+      spn_try(spn_dag_get_file_digest(env->files, artifact->path, &artifact->digest));
     }
   }
+  return SPN_OK;
+}
 
-  u64 n = sp_da_size(g->actions);
-  spn_dag_run_state_t* states = sp_alloc_n(s.mem, spn_dag_run_state_t, n ? n : 1);
-  sp_mem_zero(states, n * sizeof(spn_dag_run_state_t));
-  sp_da(spn_dag_id_t) ready = sp_da_new(s.mem, spn_dag_id_t);
-
+static void seed_ready(spn_dag_t* g, sp_mem_t mem, spn_dag_run_state_t* states, sp_da(spn_dag_id_t)* ready) {
   sp_da_for(g->actions, ai) {
     spn_dag_action_t* action = &g->actions[ai];
-    sp_da_init(s.mem, states[ai].waiters);
+    sp_da_init(mem, states[ai].waiters);
     sp_da_for(action->consumes, ci) {
       if (!spn_dag_digest_valid(spn_dag_find_artifact(g, action->consumes[ci])->digest)) {
         states[ai].pending++;
       }
     }
     if (!states[ai].pending) {
-      sp_da_push(ready, action->id);
+      sp_da_push(*ready, action->id);
     }
   }
+}
+
+static void finish_action(spn_dag_t* g, spn_dag_action_t* action, spn_dag_run_state_t* states, sp_da(spn_dag_id_t)* ready, u64* completed) {
+  spn_dag_run_state_t* state = &states[action->id.index];
+  state->done = true;
+  state->done_epoch = ++(*completed);
+
+  sp_da_for(action->produces, pi) {
+    spn_dag_artifact_t* produced = spn_dag_find_artifact(g, action->produces[pi]);
+    sp_da_for(produced->consumers, cj) {
+      u32 index = produced->consumers[cj].index;
+      if (states[index].pending && !--states[index].pending) {
+        sp_da_push(*ready, produced->consumers[cj]);
+      }
+    }
+  }
+
+  sp_da_for(state->waiters, wi) {
+    u32 index = state->waiters[wi];
+    if (states[index].deferred && !--states[index].deferred) {
+      sp_da_push(*ready, g->actions[index].id);
+    }
+  }
+}
+
+spn_err_t spn_dag_run(spn_dag_t* g, spn_dag_env_t* env) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  spn_err_t err = seed_sources(g, env);
+  if (err) {
+    goto done;
+  }
+
+  u64 n = sp_da_size(g->actions);
+  spn_dag_run_state_t* states = sp_alloc_n(s.mem, spn_dag_run_state_t, n ? n : 1);
+  sp_mem_zero(states, n * sizeof(spn_dag_run_state_t));
+  sp_da(spn_dag_id_t) ready = sp_da_new(s.mem, spn_dag_id_t);
+  seed_ready(g, s.mem, states, &ready);
 
   u64 completed = 0;
   while (!sp_da_empty(ready)) {
@@ -911,18 +947,21 @@ spn_err_t spn_dag_run(spn_dag_t* g, spn_dag_env_t* env) {
     sp_da_pop(ready);
 
     spn_dag_action_t* action = spn_dag_find_action(g, id);
+    bool requeue = false;
     if (action->discover) {
       sp_assert(env->discovery);
-      if (spn_dag_run_defer(g, action, env->discovery, states)) {
+      spn_dag_digest_t key = spn_dag_action_key(g, action->id);
+      if (spn_dag_run_defer(g, action, key, env->discovery, states, completed, &requeue)) {
         continue;
       }
       if (exec_action(g, action, env)) {
         err = SPN_ERROR;
         goto done;
       }
-      if (spn_dag_run_defer(g, action, env->discovery, states)) {
+      if (spn_dag_run_defer(g, action, key, env->discovery, states, completed, &requeue)) {
         continue;
       }
+      sp_assert(!requeue);
     } else {
       if (exec_action(g, action, env)) {
         err = SPN_ERROR;
@@ -930,26 +969,7 @@ spn_err_t spn_dag_run(spn_dag_t* g, spn_dag_env_t* env) {
       }
     }
 
-    spn_dag_run_state_t* state = &states[id.index];
-    state->done = true;
-    completed++;
-
-    sp_da_for(action->produces, pi) {
-      spn_dag_artifact_t* produced = spn_dag_find_artifact(g, action->produces[pi]);
-      sp_da_for(produced->consumers, cj) {
-        u32 index = produced->consumers[cj].index;
-        if (states[index].pending && !--states[index].pending) {
-          sp_da_push(ready, produced->consumers[cj]);
-        }
-      }
-    }
-
-    sp_da_for(state->waiters, wi) {
-      u32 index = state->waiters[wi];
-      if (states[index].deferred && !--states[index].deferred) {
-        sp_da_push(ready, g->actions[index].id);
-      }
-    }
+    finish_action(g, action, states, &ready, &completed);
   }
 
   if (completed != n) {
@@ -959,6 +979,213 @@ spn_err_t spn_dag_run(spn_dag_t* g, spn_dag_env_t* env) {
 done:
   sp_mem_end_scratch(s);
   return err;
+}
+
+typedef struct {
+  spn_dag_t* g;
+  spn_dag_env_t* env;
+  sp_mem_arena_t* arena;
+  u64 epoch;
+  spn_err_t err;
+  spn_dag_work_t work;
+} spn_dag_flight_t;
+
+static void flight_run(void* data) {
+  spn_dag_flight_t* flight = (spn_dag_flight_t*)data;
+  flight->err = execute(flight->g, &flight->work, flight->env);
+}
+
+static void flight_free(spn_dag_flight_t* flight) {
+  end_scratch(flight->work.scratch);
+  sp_mem_arena_destroy(flight->arena);
+}
+
+spn_err_t spn_dag_run_ex(spn_dag_t* g, spn_dag_env_t* env, spn_dag_executor_t* ex) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  spn_err_t err = seed_sources(g, env);
+  if (err) {
+    goto done;
+  }
+
+  u64 n = sp_da_size(g->actions);
+  spn_dag_run_state_t* states = sp_alloc_n(s.mem, spn_dag_run_state_t, n ? n : 1);
+  sp_mem_zero(states, n * sizeof(spn_dag_run_state_t));
+  sp_da(spn_dag_id_t) ready = sp_da_new(s.mem, spn_dag_id_t);
+  seed_ready(g, s.mem, states, &ready);
+
+  u64 completed = 0;
+  u32 in_flight = 0;
+
+  while (true) {
+    while (!err && !sp_da_empty(ready)) {
+      spn_dag_id_t id = *sp_da_back(ready);
+      sp_da_pop(ready);
+
+      spn_dag_action_t* action = spn_dag_find_action(g, id);
+      if (action->discover) {
+        sp_assert(env->discovery);
+        bool requeue = false;
+        if (spn_dag_run_defer(g, action, spn_dag_action_key(g, action->id), env->discovery, states, completed, &requeue)) {
+          continue;
+        }
+        sp_assert(!requeue);
+      }
+
+      sp_mem_arena_t* arena = sp_mem_arena_new(sp_mem_os_new());
+      sp_mem_t mem = sp_mem_arena_as_allocator(arena);
+      spn_dag_flight_t* flight = sp_mem_allocator_alloc_type(mem, spn_dag_flight_t);
+      *flight = (spn_dag_flight_t) {
+        .g = g,
+        .env = env,
+        .arena = arena,
+        .epoch = completed,
+      };
+
+      err = lookup(g, action, env, mem, &flight->work);
+      if (err) {
+        flight_free(flight);
+        break;
+      }
+      if (flight->work.hit) {
+        flight_free(flight);
+        finish_action(g, action, states, &ready, &completed);
+        continue;
+      }
+
+      ex->submit(ex, (spn_dag_job_t) { .fn = flight_run, .data = flight });
+      in_flight++;
+    }
+
+    if (!in_flight) {
+      break;
+    }
+
+    spn_dag_job_t job = ex->poll(ex);
+    in_flight--;
+    spn_dag_flight_t* flight = (spn_dag_flight_t*)job.data;
+    spn_dag_action_t* action = flight->work.action;
+
+    if (err || flight->err) {
+      err = err ? err : SPN_ERROR;
+      flight_free(flight);
+      continue;
+    }
+
+    if (action->discover) {
+      bool requeue = false;
+      if (run_defer_obs(g, action, flight->work.obs, sp_da_size(flight->work.obs), states, flight->epoch, &requeue)) {
+        flight_free(flight);
+        continue;
+      }
+      if (requeue) {
+        flight_free(flight);
+        sp_da_push(ready, action->id);
+        continue;
+      }
+    }
+
+    err = commit(g, &flight->work, env);
+    flight_free(flight);
+    if (err) {
+      continue;
+    }
+    finish_action(g, action, states, &ready, &completed);
+  }
+
+  if (!err && completed != n) {
+    err = SPN_ERROR;
+  }
+
+done:
+  sp_mem_end_scratch(s);
+  return err;
+}
+
+static s32 pool_worker(void* data) {
+  spn_dag_pool_t* pool = (spn_dag_pool_t*)data;
+
+  while (true) {
+    sp_mutex_lock(&pool->mutex);
+    while (!pool->shutdown && sp_da_empty(pool->queue)) {
+      sp_cv_wait(&pool->submitted, &pool->mutex);
+    }
+    if (pool->shutdown) {
+      sp_mutex_unlock(&pool->mutex);
+      return 0;
+    }
+    spn_dag_job_t job = *sp_da_back(pool->queue);
+    sp_da_pop(pool->queue);
+    sp_mutex_unlock(&pool->mutex);
+
+    job.fn(job.data);
+
+    sp_mutex_lock(&pool->mutex);
+    sp_da_push(pool->done, job);
+    sp_mutex_unlock(&pool->mutex);
+    sp_cv_notify_all(&pool->completed);
+  }
+}
+
+static void pool_submit(spn_dag_executor_t* ex, spn_dag_job_t job) {
+  spn_dag_pool_t* pool = (spn_dag_pool_t*)ex;
+  sp_mutex_lock(&pool->mutex);
+  sp_da_push(pool->queue, job);
+  sp_mutex_unlock(&pool->mutex);
+  sp_cv_notify_one(&pool->submitted);
+}
+
+static spn_dag_job_t pool_poll(spn_dag_executor_t* ex) {
+  spn_dag_pool_t* pool = (spn_dag_pool_t*)ex;
+  sp_mutex_lock(&pool->mutex);
+  while (sp_da_empty(pool->done)) {
+    sp_cv_wait(&pool->completed, &pool->mutex);
+  }
+  spn_dag_job_t job = *sp_da_back(pool->done);
+  sp_da_pop(pool->done);
+  sp_mutex_unlock(&pool->mutex);
+  return job;
+}
+
+void spn_dag_pool_init(spn_dag_pool_t* pool, sp_mem_t mem, u32 workers) {
+  sp_assert(workers);
+
+  pool->executor = (spn_dag_executor_t) {
+    .submit = pool_submit,
+    .poll = pool_poll,
+  };
+  pool->arena = sp_mem_arena_new(mem);
+  pool->mem = sp_mem_arena_as_allocator(pool->arena);
+  sp_mutex_init(&pool->mutex, SP_MUTEX_PLAIN);
+  sp_cv_init(&pool->submitted);
+  sp_cv_init(&pool->completed);
+  sp_da_init(pool->mem, pool->queue);
+  sp_da_init(pool->mem, pool->done);
+  sp_da_init(pool->mem, pool->workers);
+  pool->shutdown = false;
+
+  sp_for(it, workers) {
+    sp_thread_t thread = sp_zero;
+    sp_thread_init(&thread, pool_worker, pool);
+    sp_da_push(pool->workers, thread);
+  }
+}
+
+void spn_dag_pool_deinit(spn_dag_pool_t* pool) {
+  sp_mutex_lock(&pool->mutex);
+  sp_assert(sp_da_empty(pool->queue));
+  sp_assert(sp_da_empty(pool->done));
+  pool->shutdown = true;
+  sp_mutex_unlock(&pool->mutex);
+  sp_cv_notify_all(&pool->submitted);
+
+  sp_da_for(pool->workers, it) {
+    sp_thread_join(&pool->workers[it]);
+  }
+
+  sp_cv_destroy(&pool->submitted);
+  sp_cv_destroy(&pool->completed);
+  sp_mutex_destroy(&pool->mutex);
+  sp_mem_arena_destroy(pool->arena);
 }
 
 static sp_str_t get_blob_dir(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
@@ -985,10 +1212,21 @@ static spn_err_t link_from_store(sp_str_t from, sp_str_t to) {
   return sp_fs_is_file(to) ? SPN_OK : SPN_ERROR;
 }
 
+static bool find_blob(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_slice_t* blob) {
+  sp_mutex_lock(&store->mutex);
+  sp_mem_slice_t* found = sp_ht_getp(store->blobs, digest);
+  if (found) {
+    *blob = *found;
+  }
+  sp_mutex_unlock(&store->mutex);
+  return found != SP_NULLPTR;
+}
+
 void spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config) {
   store->kind = config.kind;
   store->arena = sp_mem_arena_new(config.mem);
   store->mem = sp_mem_arena_as_allocator(store->arena);
+  sp_mutex_init(&store->mutex, SP_MUTEX_PLAIN);
 
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
@@ -1010,15 +1248,16 @@ spn_err_t spn_dag_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag
 
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
-      if (sp_ht_getp(store->blobs, *digest)) {
-        return SPN_OK;
+      sp_mutex_lock(&store->mutex);
+      if (!sp_ht_getp(store->blobs, *digest)) {
+        sp_mem_slice_t blob = {
+          .data = sp_alloc_n(store->mem, u8, len),
+          .len = len
+        };
+        sp_mem_copy(blob.data, data, len);
+        sp_ht_insert(store->blobs, *digest, blob);
       }
-      sp_mem_slice_t blob = {
-        .data = sp_alloc_n(store->mem, u8, len),
-        .len = len
-      };
-      sp_mem_copy(blob.data, data, len);
-      sp_ht_insert(store->blobs, *digest, blob);
+      sp_mutex_unlock(&store->mutex);
       return SPN_OK;
     }
     case SPN_DAG_STORE_FILESYSTEM: {
@@ -1089,7 +1328,8 @@ sp_str_t spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest
 bool spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest) {
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
-      return sp_ht_getp(store->blobs, digest) != SP_NULLPTR;
+      sp_mem_slice_t blob = sp_zero;
+      return find_blob(store, digest, &blob);
     }
     case SPN_DAG_STORE_FILESYSTEM: {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
@@ -1105,13 +1345,13 @@ bool spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest) {
 spn_err_t spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_mem_slice_t* data) {
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
-      sp_mem_slice_t* blob = sp_ht_getp(store->blobs, digest);
-      if (!blob) {
+      sp_mem_slice_t blob = sp_zero;
+      if (!find_blob(store, digest, &blob)) {
         return SPN_ERROR;
       }
-      data->data = sp_alloc_n(mem, u8, blob->len);
-      data->len = blob->len;
-      sp_mem_copy(data->data, blob->data, blob->len);
+      data->data = sp_alloc_n(mem, u8, blob.len);
+      data->len = blob.len;
+      sp_mem_copy(data->data, blob.data, blob.len);
       return SPN_OK;
     }
     case SPN_DAG_STORE_FILESYSTEM: {
@@ -1132,12 +1372,12 @@ spn_err_t spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_
 spn_err_t spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t path) {
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
-      sp_mem_slice_t* blob = sp_ht_getp(store->blobs, digest);
-      if (!blob) {
+      sp_mem_slice_t blob = sp_zero;
+      if (!find_blob(store, digest, &blob)) {
         return SPN_ERROR;
       }
       sp_fs_create_dir(sp_fs_parent_path(path));
-      return sp_fs_create_file_slice(path, *blob) ? SPN_ERROR : SPN_OK;
+      return sp_fs_create_file_slice(path, blob) ? SPN_ERROR : SPN_OK;
     }
     case SPN_DAG_STORE_FILESYSTEM: {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
