@@ -1,0 +1,16 @@
+[package]
+name = "worlds_when_list_dep"
+version = "0.1.0"
+
+[options.kram]
+type = "enum"
+values = ["p", "q", "r", "s", "t"]
+default = "p"
+
+[deps.package]
+spum = { version = "1.0.0", when = { kram = ["p", "q", "r"] } }
+grum = { version = "1.0.0", when = { kram = { not = ["p", "q", "r"] } } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

@@ -1,0 +1,15 @@
+[package]
+name = "spum"
+version = "1.0.0"
+
+[options.grum]
+type = "bool"
+default = false
+additive = true
+define = "SPUM_GRUM"
+
+[[lib]]
+name = "spum"
+kinds = ["static"]
+source = ["spum.c"]
+headers = ["spum.h"]

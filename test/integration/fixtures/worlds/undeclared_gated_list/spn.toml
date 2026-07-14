@@ -1,0 +1,10 @@
+[package]
+name = "worlds_undeclared_gated_list"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+define = [
+  { value = "KRAM", when = { grum = true } },
+]

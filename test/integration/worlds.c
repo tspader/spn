@@ -159,7 +159,9 @@ UTEST_F(worlds, cut0_peer_demanded_in_range) {
 }
 
 // I0.11: demanded with the provider out of range is an error naming the
-// edge, range, and provider version
+// edge, range, and provider version. The index also holds an in-range 1.5.0:
+// a peer range that leaked into candidate selection would downgrade to it
+// and build, so the error is proof the range reached no selection.
 UTEST_F(worlds, cut0_peer_demanded_out_of_range) {
   UTEST_SKIP("worlds cut 0");
   tmpfs_init_named(&uf->fixture.fs, "worlds_peer_out_of_range");
@@ -167,7 +169,7 @@ UTEST_F(worlds, cut0_peer_demanded_out_of_range) {
   run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
     .project = "test/integration/fixtures/worlds/peer_out_of_range",
     .builds = {
-      { .expect = { .rc = 1, .contains = { "spum" } } },
+      { .expect = { .rc = 1, .contains = { "spum", "2.0.0" } } },
     },
   });
 }
@@ -181,6 +183,88 @@ UTEST_F(worlds, cut0_peer_demanded_absent) {
     .project = "test/integration/fixtures/worlds/peer_absent",
     .builds = {
       { .expect = { .rc = 1, .contains = { "spum" } } },
+    },
+  });
+}
+
+// I0.11: peer + private is a load error — the provider is by definition not
+// the consumer's own
+UTEST_F(worlds, cut0_peer_private_rejected) {
+  UTEST_SKIP("worlds cut 0");
+  tmpfs_init_named(&uf->fixture.fs, "worlds_peer_private");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/worlds/peer_private",
+    .builds = {
+      { .expect = { .rc = 1, .contains = { "spum" } } },
+    },
+  });
+}
+
+// I0.5: enum-list clauses gate dep edges in both polarities — the membership
+// edge resolves, the complement edge to a package that exists nowhere prunes
+UTEST_F(worlds, cut0_when_list_gates_dep) {
+  UTEST_SKIP("worlds cut 0");
+  tmpfs_init_named(&uf->fixture.fs, "worlds_when_list_dep");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/worlds/when_list_dep",
+    .builds = {
+      { .expect = { .bin = { .name = "main" } } },
+    },
+  });
+}
+
+// I0.5: an undeclared key at a non-dep site (target gated list) is the same
+// manifest error as on a dep gate
+UTEST_F(worlds, cut0_undeclared_key_gated_list) {
+  UTEST_SKIP("worlds cut 0");
+  tmpfs_init_named(&uf->fixture.fs, "worlds_undeclared_gated_list");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/worlds/undeclared_gated_list",
+    .builds = {
+      { .expect = { .rc = 1, .contains = { "grum" } } },
+    },
+  });
+}
+
+// I0.1: non-additive bool forms are rejected at load like strings
+UTEST_F(worlds, cut0_nonadditive_bool_rejected) {
+  UTEST_SKIP("worlds cut 0");
+  tmpfs_init_named(&uf->fixture.fs, "worlds_bool_nonadditive");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/worlds/bool_nonadditive",
+    .builds = {
+      { .expect = { .rc = 1, .contains = { "kram" } } },
+    },
+  });
+}
+
+// I0.5: a dep gate testing an additive bool negatively is a manifest error —
+// the negation of a feature is spelled as an enum
+UTEST_F(worlds, cut0_negated_bool_gate_rejected) {
+  UTEST_SKIP("worlds cut 0");
+  tmpfs_init_named(&uf->fixture.fs, "worlds_bool_negated_gate");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/worlds/bool_negated_gate",
+    .builds = {
+      { .expect = { .rc = 1, .contains = { "kram", "spum" } } },
+    },
+  });
+}
+
+// I0.8's legal half, live today and after every cut: a bool demand riding a
+// bool-gated edge — chained gating settles in the prune
+UTEST_F(worlds, bool_demand_on_gated_edge) {
+  tmpfs_init_named(&uf->fixture.fs, "worlds_bool_demand_on_gated");
+
+  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+    .project = "test/integration/fixtures/worlds/bool_demand_on_gated",
+    .builds = {
+      { .expect = { .bin = { .name = "main" } } },
     },
   });
 }

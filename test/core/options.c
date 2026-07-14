@@ -53,9 +53,16 @@ typedef struct {
 } expect_option_t;
 
 typedef struct {
+  spn_option_setter_kind_t kind;
+  const c8* name;
+} expect_setter_t;
+
+typedef struct {
   spn_err_t err;
   spn_option_err_t option_err;
   const c8* option;
+  expect_setter_t a;
+  expect_setter_t b;
   expect_option_t options [4];
 } merge_expect_t;
 
@@ -165,10 +172,21 @@ void run_merge_test(s32* utest_result, merge_test_t t) {
 
   if (t.expect.err) {
     sp_da(spn_build_event_t) drained = spn_event_buffer_drain(mem, events);
-    ASSERT_EQ(sp_da_size(drained), (u64)1);
-    ASSERT_EQ(drained[0].kind, SPN_EVENT_ERR_OPTION);
-    EXPECT_EQ(drained[0].option.err, t.expect.option_err);
-    EXPECT_TRUE(sp_str_equal_cstr(drained[0].option.option, t.expect.option));
+
+    bool matched = false;
+    sp_da_for(drained, it) {
+      spn_evt_option_t* option = &drained[it].option;
+      if (drained[it].kind != SPN_EVENT_ERR_OPTION) continue;
+      if (option->err != t.expect.option_err) continue;
+      if (!sp_str_equal_cstr(option->option, t.expect.option)) continue;
+      if (t.expect.a.kind && option->a.kind != t.expect.a.kind) continue;
+      if (t.expect.a.name && !sp_str_equal_cstr(option->a.name, t.expect.a.name)) continue;
+      if (t.expect.b.kind && option->b.kind != t.expect.b.kind) continue;
+      if (t.expect.b.name && !sp_str_equal_cstr(option->b.name, t.expect.b.name)) continue;
+      matched = true;
+      break;
+    }
+    EXPECT_TRUE(matched);
     return;
   }
 
@@ -212,12 +230,31 @@ UTEST(options_merge, additive_unions) {
       { .name = "x", .type = SPN_OPTION_TYPE_BOOL, .additive = true },
     },
     .requests = {
-      { .consumer = "a", .options = { { .key = "x", .is_bool = true } } },
-      { .consumer = "b", .options = { { .key = "x", .is_bool = true, .b = true } } },
+      { .consumer = "a", .options = { { .key = "x", .is_bool = true, .b = true } } },
+      { .consumer = "b", .options = { { .key = "x", .is_bool = true } } },
     },
     .expect = {
       .options = {
         { .name = "x", .value = { .is_bool = true, .b = true } },
+      },
+    },
+  });
+}
+
+// Two consumers agreeing on a non-additive option settle without a
+// tiebreaker
+UTEST(options_merge, agreeing_requests) {
+  run_merge_test(utest_result, (merge_test_t) {
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "vk" } } } },
+    },
+    .requests = {
+      { .consumer = "a", .options = { { "e", "gl" } } },
+      { .consumer = "b", .options = { { "e", "gl" } } },
+    },
+    .expect = {
+      .options = {
+        { .name = "e", .value = { .str = "gl" } },
       },
     },
   });
@@ -272,6 +309,8 @@ UTEST(options_merge, request_conflict) {
       .err = SPN_ERROR,
       .option_err = SPN_OPTION_ERR_CONFLICT,
       .option = "e",
+      .a = { SPN_OPTION_SETTER_CONSUMER, "a" },
+      .b = { SPN_OPTION_SETTER_CONSUMER, "b" },
     },
   });
 }
@@ -289,6 +328,8 @@ UTEST(options_merge, veto_contradicted) {
       .err = SPN_ERROR,
       .option_err = SPN_OPTION_ERR_VETO,
       .option = "e",
+      .a = { SPN_OPTION_SETTER_CONSUMER, "a" },
+      .b = { .kind = SPN_OPTION_SETTER_DEFAULT },
     },
   });
 }
@@ -420,13 +461,13 @@ UTEST(options_merge, default_arm_facts) {
 UTEST(options_merge, default_arm_chains) {
   run_merge_test(utest_result, (merge_test_t) {
     .decls = {
-      { .name = "x", .type = SPN_OPTION_TYPE_BOOL, .defaults = { { .value = { .is_bool = true, .b = true } } } },
+      { .name = "r", .type = SPN_OPTION_TYPE_ENUM, .values = { "on", "off" }, .defaults = { { .value = { .str = "on" } } } },
       {
         .name = "e",
         .type = SPN_OPTION_TYPE_ENUM,
         .values = { "gl", "off" },
         .defaults = {
-          { .when = { { .key = "x", .is_bool = true, .b = true } }, .value = { .str = "gl" } },
+          { .when = { { "r", "on" } }, .value = { .str = "gl" } },
           { .value = { .str = "off" } },
         },
       },
@@ -475,6 +516,8 @@ UTEST(options_merge, cut0_config_contradicts_constraint) {
       .err = SPN_ERROR,
       .option_err = SPN_OPTION_ERR_CONFLICT,
       .option = "e",
+      .a = { .kind = SPN_OPTION_SETTER_ROOT_MANIFEST },
+      .b = { SPN_OPTION_SETTER_CONSUMER, "a" },
     },
   });
 }
@@ -495,6 +538,8 @@ UTEST(options_merge, cut0_prohibition_vs_demand) {
       .err = SPN_ERROR,
       .option_err = SPN_OPTION_ERR_CONFLICT,
       .option = "x",
+      .a = { .kind = SPN_OPTION_SETTER_ROOT_MANIFEST },
+      .b = { SPN_OPTION_SETTER_CONSUMER, "a" },
     },
   });
 }
@@ -568,6 +613,53 @@ UTEST(options_merge, cut0_negative_constraint_outside_domain) {
       .err = SPN_ERROR,
       .option_err = SPN_OPTION_ERR_BAD_VALUE,
       .option = "e",
+    },
+  });
+}
+
+// I0.3: a negative constraint contradicting a real selection (config, not a
+// default) is still the veto event
+UTEST(options_merge, cut0_veto_against_config) {
+  UTEST_SKIP("worlds cut 0");
+  run_merge_test(utest_result, (merge_test_t) {
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
+    },
+    .config = { { "e", "vk" } },
+    .requests = {
+      { .consumer = "a", .options = { { .key = "e", .str = "vk", .negated = true } } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_VETO,
+      .option = "e",
+      .a = { SPN_OPTION_SETTER_CONSUMER, "a" },
+      .b = { .kind = SPN_OPTION_SETTER_ROOT_MANIFEST },
+    },
+  });
+}
+
+// I0.6: default evaluation is a deferred worklist, not declaration order —
+// an arm referencing a later-declared sibling defers and retries
+UTEST(options_merge, cut0_default_arm_defers) {
+  UTEST_SKIP("worlds cut 0");
+  run_merge_test(utest_result, (merge_test_t) {
+    .decls = {
+      {
+        .name = "e",
+        .type = SPN_OPTION_TYPE_ENUM,
+        .values = { "gl", "off" },
+        .defaults = {
+          { .when = { { "r", "on" } }, .value = { .str = "gl" } },
+          { .value = { .str = "off" } },
+        },
+      },
+      { .name = "r", .type = SPN_OPTION_TYPE_ENUM, .values = { "on", "off" }, .defaults = { { .value = { .str = "on" } } } },
+    },
+    .expect = {
+      .options = {
+        { .name = "e", .value = { .str = "gl" }, .is_default = true },
+      },
     },
   });
 }

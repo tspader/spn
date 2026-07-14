@@ -1,0 +1,15 @@
+[package]
+name = "worlds_bool_demand_on_gated"
+version = "0.1.0"
+
+[options.kram]
+type = "bool"
+default = true
+additive = true
+
+[deps.package]
+spum = { version = "1.0.0", when = { kram = true }, options = { grum = true } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

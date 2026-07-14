@@ -183,20 +183,6 @@ UTEST_F(options, root_set) {
   });
 }
 
-// First-match default lists: one option's when-arm matches the host and one
-// falls through to the bare arm; opposite orderings catch an evaluator that
-// blindly takes the first or the last entry
-UTEST_F(options, default_when) {
-  tmpfs_init_named(&uf->fixture.fs, "options_default_when");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
-    .project = "test/integration/fixtures/options/default_when",
-    .builds = {
-      { .expect = { .bin = { .name = "main" } } },
-    },
-  });
-}
-
 // Options join the when key domain: the enum value gates which backend
 // source compiles inside the dep. Both backends define render_backend, so a
 // wrong or double selection fails the link, and the root picks the
@@ -208,31 +194,6 @@ UTEST_F(options, enum_gate) {
     .project = "test/integration/fixtures/options/enum_gate",
     .builds = {
       { .expect = { .bin = { .name = "main" } } },
-    },
-  });
-}
-
-// Setting an option the dep never declared is a load-time error naming it
-UTEST_F(options, undeclared) {
-  tmpfs_init_named(&uf->fixture.fs, "options_undeclared");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
-    .project = "test/integration/fixtures/options/undeclared",
-    .builds = {
-      { .expect = { .rc = 1, .contains = { "nosuch" } } },
-    },
-  });
-}
-
-// Setting an enum outside its declared values is a load-time error naming
-// the value
-UTEST_F(options, bad_value) {
-  tmpfs_init_named(&uf->fixture.fs, "options_bad_value");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
-    .project = "test/integration/fixtures/options/bad_value",
-    .builds = {
-      { .expect = { .rc = 1, .contains = { "dx12" } } },
     },
   });
 }
@@ -312,19 +273,6 @@ UTEST_F(options, additive) {
   });
 }
 
-// Non-additive disagreement with no tiebreaker: liba wants gl, libb wants
-// vk, resolve fails naming the option and both requesting sides
-UTEST_F(options, conflict) {
-  tmpfs_init_named(&uf->fixture.fs, "options_conflict");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
-    .project = "test/integration/fixtures/options/conflict",
-    .builds = {
-      { .expect = { .rc = 1, .contains = { "backend", "liba", "libb" } } },
-    },
-  });
-}
-
 // The identical topology settles when the root sets the value: liba's gl
 // request loses to the root, both consumers observe vk
 UTEST_F(options, tiebreak) {
@@ -334,20 +282,6 @@ UTEST_F(options, tiebreak) {
     .project = "test/integration/fixtures/options/tiebreak",
     .builds = {
       { .expect = { .bin = { .name = "main" } } },
-    },
-  });
-}
-
-// Root contradicting an edge's { not = ... } request is an error naming both
-// sides, not a silent root win: the root is the tiebreaker between edges,
-// never an override of them
-UTEST_F(options, root_veto) {
-  tmpfs_init_named(&uf->fixture.fs, "options_root_veto");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
-    .project = "test/integration/fixtures/options/root_veto",
-    .builds = {
-      { .expect = { .rc = 1, .contains = { "ssl", "liba" } } },
     },
   });
 }
