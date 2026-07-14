@@ -20,4 +20,7 @@ void sp_sim_init(sp_sim_t* sim, sp_mem_t mem);
 void sp_sim_install(sp_sim_t* sim);
 void sp_sim_remove(sp_sim_t* sim);
 
+bool sp_sim_touch(sp_sim_t* sim, sp_str_t path);
+bool sp_sim_stealth_write(sp_sim_t* sim, sp_str_t path, sp_str_t bytes);
+
 #endif

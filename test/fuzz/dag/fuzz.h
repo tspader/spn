@@ -23,12 +23,17 @@ typedef enum {
   FZ_ERR_STALE_OUTPUT,
   FZ_ERR_EXEC_MISSING,
   FZ_ERR_EXEC_SPURIOUS,
+  FZ_ERR_MODEL,
   FZ_ERR_COUNT,
 } fz_err_t;
 
 typedef enum {
   FZ_STEP_RUN,
   FZ_STEP_MUTATE,
+  FZ_STEP_TOUCH,
+  FZ_STEP_REVERT,
+  FZ_STEP_STEALTH,
+  FZ_STEP_DELETE,
   FZ_STEP_COUNT,
 } fz_step_kind_t;
 
