@@ -3,6 +3,7 @@ add_executable(fuzz_dag
   main.c
   generator.c
   render.c
+  sim.c
   ${TEST_TOOLS}/sp_fuzz.c
 )
 spn_test_binary(fuzz_dag)
