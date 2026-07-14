@@ -20,6 +20,7 @@ sp_str_t fz_err_to_str(fz_err_t err) {
     case FZ_ERR_EXEC_MISSING: return sp_str_lit("an action hit the cache where the model expected execution");
     case FZ_ERR_EXEC_SPURIOUS: return sp_str_lit("an action executed where the model expected a cache hit");
     case FZ_ERR_MODEL:        return sp_str_lit("cache mirror bytes diverge from the clean model in an honest world");
+    case FZ_ERR_SCHEDULE:     return sp_str_lit("a schedule reseed changed output bytes");
     case FZ_ERR_COUNT:        break;
   }
   sp_unreachable_return(sp_str_lit("unknown"));
@@ -43,7 +44,7 @@ static u32 fz_run_iteration(sp_mem_t mem, sp_fuzz_prng_t prng, u64 iter) {
   if (err) {
     return (u32)err;
   }
-  return (u32)fz_run_trace(mem, &universe, &trace);
+  return (u32)fz_run_trace(mem, &prng, &universe, &trace);
 }
 
 s32 main(s32 num_args, c8** args) {

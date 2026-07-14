@@ -44,6 +44,7 @@ fz_profile_t fz_gen_profile(sp_fuzz_prng_t* prng) {
   profile.steps = sp_fuzz_range(prng, 1, profile.big ? 4 : 12);
   sp_fuzz_swarm(prng, profile.step_weights, FZ_STEP_COUNT);
   profile.store_fs = sp_fuzz_chance(prng, 1, 2);
+  profile.run_ex = sp_fuzz_chance(prng, 1, 2);
   return profile;
 }
 
