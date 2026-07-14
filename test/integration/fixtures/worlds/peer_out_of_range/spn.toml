@@ -1,0 +1,11 @@
+[package]
+name = "worlds_peer_out_of_range"
+version = "0.1.0"
+
+[deps.package]
+kram = { version = "1.0.0", options = { uv = true } }
+spum = "2.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

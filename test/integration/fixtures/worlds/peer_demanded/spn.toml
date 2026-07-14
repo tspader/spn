@@ -1,0 +1,11 @@
+[package]
+name = "worlds_peer_demanded"
+version = "0.1.0"
+
+[deps.package]
+kram = { version = "1.0.0", options = { uv = true } }
+spum = "1.5.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

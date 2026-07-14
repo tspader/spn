@@ -52,6 +52,7 @@ UTEST_F(harness, tmpfs) {
 #include "script.c"
 #include "cxx.c"
 #include "options.c"
+#include "worlds.c"
 #include "run.c"
 #include "layout.c"
 #include "log.c"

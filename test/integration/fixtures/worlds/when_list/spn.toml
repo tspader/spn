@@ -1,0 +1,11 @@
+[package]
+name = "worlds_when_list"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = [
+  "main.c",
+  { path = "impl_member.c", when = { os = ["linux", "macos"] } },
+  { path = "impl_complement.c", when = { os = { not = ["linux", "macos"] } } },
+]

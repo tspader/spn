@@ -1,0 +1,10 @@
+[package]
+name = "worlds_undeclared_key"
+version = "0.1.0"
+
+[deps.package]
+spum = { version = "1.0.0", when = { kram = true } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

@@ -1,0 +1,15 @@
+[package]
+name = "worlds_when_list_domain"
+version = "0.1.0"
+
+[options.kram]
+type = "enum"
+values = ["spum", "grum"]
+default = "spum"
+
+[[bin]]
+name = "main"
+source = [
+  "main.c",
+  { path = "impl.c", when = { kram = ["spum", "qux"] } },
+]

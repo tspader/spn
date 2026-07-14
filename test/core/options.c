@@ -453,3 +453,121 @@ UTEST(options_merge, explicit_default_is_default) {
     },
   });
 }
+
+// Everything below is the merge-level review contract for worlds.md cut 0
+// (.llm/doc/resolve/worlds.md): skipped until the cut lands, then un-skipped
+// verbatim. The tests above whose semantics the cut deliberately changes
+// (config_overrides_request, veto_contradicted) are deleted when these land.
+
+// I0.2: a constraint contradicting the config selection errors naming both
+// sides — silent override was the lie
+UTEST(options_merge, cut0_config_contradicts_constraint) {
+  UTEST_SKIP("worlds cut 0");
+  run_merge_test(utest_result, (merge_test_t) {
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "gl" } } } },
+    },
+    .config = { { "e", "vk" } },
+    .requests = {
+      { .consumer = "a", .options = { { "e", "gl" } } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_CONFLICT,
+      .option = "e",
+    },
+  });
+}
+
+// I0.7: config x = false is a prohibition — an error naming both sides once
+// any demand arrives
+UTEST(options_merge, cut0_prohibition_vs_demand) {
+  UTEST_SKIP("worlds cut 0");
+  run_merge_test(utest_result, (merge_test_t) {
+    .decls = {
+      { .name = "x", .type = SPN_OPTION_TYPE_BOOL, .additive = true },
+    },
+    .config = { { .key = "x", .is_bool = true } },
+    .requests = {
+      { .consumer = "a", .options = { { .key = "x", .is_bool = true, .b = true } } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_CONFLICT,
+      .option = "x",
+    },
+  });
+}
+
+// I0.7: without a demand the prohibition yields the default-false value
+UTEST(options_merge, cut0_prohibition_without_demand) {
+  UTEST_SKIP("worlds cut 0");
+  run_merge_test(utest_result, (merge_test_t) {
+    .decls = {
+      { .name = "x", .type = SPN_OPTION_TYPE_BOOL, .additive = true, .defaults = { { .value = { .is_bool = true, .b = true } } } },
+    },
+    .config = { { .key = "x", .is_bool = true } },
+    .expect = {
+      .options = {
+        { .name = "x", .value = { .is_bool = true } },
+      },
+    },
+  });
+}
+
+// I0.3: a negative constraint against a contradicting default on a two-value
+// domain selects the survivor instead of erroring
+UTEST(options_merge, cut0_negative_constraint_selects_survivor) {
+  UTEST_SKIP("worlds cut 0");
+  run_merge_test(utest_result, (merge_test_t) {
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "vk" } } } },
+    },
+    .requests = {
+      { .consumer = "a", .options = { { .key = "e", .str = "vk", .negated = true } } },
+    },
+    .expect = {
+      .options = {
+        { .name = "e", .value = { .str = "gl" } },
+      },
+    },
+  });
+}
+
+// I0.2: constraints leaving more than one value with no config or default to
+// decide is the undetermined error
+UTEST(options_merge, cut0_undetermined) {
+  UTEST_SKIP("worlds cut 0");
+  run_merge_test(utest_result, (merge_test_t) {
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk", "dx" } },
+    },
+    .requests = {
+      { .consumer = "a", .options = { { .key = "e", .str = "dx", .negated = true } } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_NO_VALUE,
+      .option = "e",
+    },
+  });
+}
+
+// I0.4: a { not } value outside the declared domain is BAD_VALUE like any
+// other
+UTEST(options_merge, cut0_negative_constraint_outside_domain) {
+  UTEST_SKIP("worlds cut 0");
+  run_merge_test(utest_result, (merge_test_t) {
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
+    },
+    .requests = {
+      { .consumer = "a", .options = { { .key = "e", .str = "dx12", .negated = true } } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_BAD_VALUE,
+      .option = "e",
+    },
+  });
+}
