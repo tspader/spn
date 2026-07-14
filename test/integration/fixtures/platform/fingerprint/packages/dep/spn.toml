@@ -1,0 +1,12 @@
+[package]
+name = "dep"
+version = "1.0.0"
+
+[package.macos]
+min_os = { major = 12 }
+
+[[lib]]
+name = "dep"
+kinds = ["static"]
+source = ["dep.c"]
+headers = ["dep.h"]

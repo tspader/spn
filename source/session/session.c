@@ -29,6 +29,31 @@ static bool same_triple(spn_triple_t lhs, spn_triple_t rhs) {
   return lhs.arch == rhs.arch && lhs.os == rhs.os && lhs.abi == rhs.abi;
 }
 
+static sp_str_t resolve_macos_sdk(sp_mem_t mem) {
+  sp_str_t sdk = sp_env_get(spn.env, sp_str_lit("SPN_MACOS_SDK"));
+  if (!sp_str_empty(sdk)) {
+    return sdk;
+  }
+  if (spn_triple_host().os != SPN_OS_MACOS) {
+    return sp_str_lit("");
+  }
+
+  sp_ps_output_t result = sp_ps_run(mem, (sp_ps_config_t) {
+    .command = sp_str_lit("xcrun"),
+    .args = {
+      sp_str_lit("--show-sdk-path"),
+    },
+    .io = {
+      .in = { .mode = SP_PS_IO_MODE_NULL },
+      .err = { .mode = SP_PS_IO_MODE_NULL },
+    },
+  });
+  if (result.status.exit_code) {
+    return sp_str_lit("");
+  }
+  return sp_str_trim(result.out);
+}
+
 static spn_err_union_t bind_toolchain(spn_session_t* session, spn_toolchain_query_t query, spn_toolchain_unit_t** binding) {
   spn_toolchain_resolution_t resolution = sp_zero;
   try_union(spn_toolchain_select(&session->catalog, query, &resolution));
@@ -149,6 +174,9 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   sp_mutex_init(&s->mutex, SP_MUTEX_PLAIN);
 
   try_union(spn_profile_resolve(s->profiles, &config.overrides, &s->profile));
+  if (s->profile.os == SPN_OS_MACOS) {
+    s->profile.sysroot = resolve_macos_sdk(s->mem);
+  }
 
   s->plan.request = config.compile;
   sp_da_init(s->mem, s->plan.builds);
@@ -412,6 +440,7 @@ typedef struct {
   spn_arch_t arch;
   spn_os_t os;
   spn_abi_t abi;
+  sp_hash_t platform;
   struct {
     sp_hash_t name;
     sp_hash_t cc;
@@ -422,6 +451,7 @@ typedef struct {
     sp_hash_t identity;
   } toolchain;
 } fingerprint_input_t;
+
 
 // The resolved non-default option set: distinct option sets get distinct
 // store paths, while default flips ride the manifest commit hash instead
@@ -506,6 +536,7 @@ static sp_hash_t hash_package(spn_session_t* session, spn_build_unit_t* build, s
   fingerprint.arch = build->profile.arch;
   fingerprint.os = build->profile.os;
   fingerprint.abi = build->profile.abi;
+  fingerprint.platform = spn_pkg_hash_platform(pkg, &build->profile);
   fingerprint.toolchain.name = sp_hash_str(toolchain->name);
   fingerprint.toolchain.cc = sp_hash_str(toolchain->compiler.program);
   fingerprint.toolchain.ld = sp_hash_str(toolchain->linker.program);

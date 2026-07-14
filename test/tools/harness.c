@@ -918,32 +918,6 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
         break;
       }
-      case ACTION_VERIFY_CONTENT: {
-        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_content.file);
-        sp_str_t content = test_read_file(mem, path);
-        utest_kv("path", path);
-        utest_kv("expected", action.verify_content.content);
-        utest_kv("content", content);
-        EXPECT_TRUE(sp_str_equal(content, action.verify_content.content));
-        break;
-      }
-      case ACTION_VERIFY_FILE_NONEMPTY: {
-        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_nonempty.file);
-        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
-        EXPECT_FALSE(test_read_empty(mem, path));
-        break;
-      }
-      case ACTION_VERIFY_JSON: {
-        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_json.file);
-        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
-        sp_str_t content = test_read_file(mem, path);
-        yyjson_doc* doc = yyjson_read(content.data, content.len, 0);
-        utest_kv("path", path);
-        utest_kv("content", content);
-        EXPECT_TRUE(doc != NULL);
-        yyjson_doc_free(doc);
-        break;
-      }
       case ACTION_VERIFY_FILE_CONTAINS: {
         sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_contains.file);
         sp_str_t content = test_read_file(mem, path);

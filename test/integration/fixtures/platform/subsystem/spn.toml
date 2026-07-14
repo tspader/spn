@@ -1,0 +1,10 @@
+[package]
+name = "platform_subsystem"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+
+[bin.windows]
+subsystem = "windows"

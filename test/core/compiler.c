@@ -5,9 +5,35 @@
 #include "utest.h"
 
 #include "compiler/driver.h"
+#include "compiler/common.h"
 #include "test.h"
 
 UTEST_MAIN();
+
+void expect_args(s32* utest_result, sp_ps_config_t* ps, render_expect_t expect) {
+  EXPECT_TRUE(sp_str_equal_cstr(ps->command, expect.command));
+  u32 count = 0;
+  sp_carr_for(expect.args, it) {
+    if (!expect.args[it]) {
+      break;
+    }
+    count++;
+  }
+  EXPECT_EQ(sp_da_size(ps->dyn_args), count);
+  sp_for(it, count) {
+    EXPECT_TRUE(sp_str_equal_cstr(ps->dyn_args[it], expect.args[it]));
+  }
+}
+
+spn_cc_toolchain_t test_toolchain(spn_cc_driver_t driver) {
+  return (spn_cc_toolchain_t) {
+    .name = sp_str_lit("test"),
+    .driver = driver,
+    .compiler = { .program = sp_str_lit("cc") },
+    .cxx = { .program = sp_str_lit("c++") },
+    .archiver = { .program = sp_str_lit("ar") },
+  };
+}
 
 #define flags_max 5
 

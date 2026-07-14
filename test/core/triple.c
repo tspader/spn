@@ -20,7 +20,6 @@ typedef struct {
 
 UTEST(triple, from_str) {
   from_str_t tests [] = {
-    // full triples
     { "x86_64-linux-gnu",      SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_GNU },
     { "x86_64-linux-musl",     SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_MUSL },
     { "aarch64-linux-gnu",     SPN_ARCH_ARM64, SPN_OS_LINUX,   SPN_ABI_GNU },
@@ -29,19 +28,11 @@ UTEST(triple, from_str) {
     { "aarch64-windows-mingw", SPN_ARCH_ARM64, SPN_OS_WINDOWS, SPN_ABI_MINGW },
     { "x86_64-macos",          SPN_ARCH_X64,   SPN_OS_MACOS,   SPN_ABI_NONE },
     { "aarch64-macos",         SPN_ARCH_ARM64, SPN_OS_MACOS,   SPN_ABI_NONE },
-
-    // partial: arch-os (no abi)
     { "x86_64-linux",          SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_NONE },
     { "aarch64-linux",         SPN_ARCH_ARM64, SPN_OS_LINUX,   SPN_ABI_NONE },
-
-    // partial: arch only
     { "x86_64",                SPN_ARCH_X64,   SPN_OS_NONE,    SPN_ABI_NONE },
     { "aarch64",               SPN_ARCH_ARM64, SPN_OS_NONE,    SPN_ABI_NONE },
-
-    // unknown abi
     { "x86_64-linux-banana",   SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_NONE },
-
-    // empty
     { "",                      SPN_ARCH_NONE,  SPN_OS_NONE,    SPN_ABI_NONE },
   };
 
@@ -61,19 +52,12 @@ typedef struct {
 
 UTEST(triple, to_str) {
   to_str_t tests [] = {
-    // full triples
     { { SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_GNU },   "x86_64-linux-gnu" },
     { { SPN_ARCH_ARM64, SPN_OS_LINUX,   SPN_ABI_MUSL },  "aarch64-linux-musl" },
     { { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_MINGW }, "x86_64-windows-mingw" },
     { { SPN_ARCH_ARM64, SPN_OS_MACOS,   SPN_ABI_NONE },  "aarch64-macos" },
-
-    // partial: arch-os
     { { SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_NONE },  "x86_64-linux" },
-
-    // partial: arch only
     { { SPN_ARCH_ARM64, SPN_OS_NONE,    SPN_ABI_NONE },  "aarch64" },
-
-    // empty
     { { SPN_ARCH_NONE,  SPN_OS_NONE,    SPN_ABI_NONE },  "" },
   };
 
@@ -167,6 +151,48 @@ UTEST(triple, exe_file_name) {
   sp_carr_for(tests, it) {
     sp_str_t result = spn_triple_exe_file_name(sp_mem_os_new(), tests[it].triple, sp_str_lit("foo"));
     EXPECT_TRUE(sp_str_equal_cstr(result, tests[it].expected));
+  }
+}
+
+
+typedef struct {
+  spn_os_version_t a;
+  spn_os_version_t b;
+  struct {
+    bool less;
+  } expect;
+} os_version_less_t;
+
+UTEST(triple, os_version_less) {
+  os_version_less_t tests [] = {
+    { .a = { 12, 4 }, .b = { 13 },    .expect = { .less = true } },
+    { .a = { 13 },    .b = { 13, 1 }, .expect = { .less = true } },
+    { .a = { 13, 1 }, .b = { 13, 1 } },
+    { .a = { 13, 1 }, .b = { 12, 4 } },
+    { .b = { 1 },     .expect = { .less = true } },
+  };
+
+  sp_carr_for(tests, it) {
+    EXPECT_EQ(spn_os_version_less(tests[it].a, tests[it].b), tests[it].expect.less);
+  }
+}
+
+typedef struct {
+  spn_os_version_t version;
+  struct {
+    bool present;
+  } expect;
+} os_version_present_t;
+
+UTEST(triple, os_version_present) {
+  os_version_present_t tests [] = {
+    { .version = { 13 },   .expect = { .present = true } },
+    { .version = { 0, 4 }, .expect = { .present = true } },
+    { .version = { 0 } },
+  };
+
+  sp_carr_for(tests, it) {
+    EXPECT_EQ(spn_os_version_present(tests[it].version), tests[it].expect.present);
   }
 }
 

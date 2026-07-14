@@ -7,6 +7,7 @@
 #include "external/cc.h"
 #include "session/invocation.h"
 #include "session/session.h"
+#include "task/build/build.h"
 #include "unit/compiler.h"
 
 static sp_str_t resolve_pkg_path(sp_mem_t mem, spn_pkg_unit_t* pkg, sp_str_t path) {
@@ -32,6 +33,9 @@ spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
       .pic = unit->target->info->kind == SPN_TARGET_LIB,
       .visibility = build->visibility,
     };
+    if (build->profile.os == SPN_OS_MACOS) {
+      compile.min_os = spn_target_macos_min_os(unit->target);
+    }
     sp_da_init(mem, compile.include);
     sp_da_init(mem, compile.define);
     sp_da_init(mem, compile.args);

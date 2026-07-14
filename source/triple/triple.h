@@ -40,4 +40,7 @@ sp_str_t spn_triple_lib_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t na
 // {}.wasm on wasi, bare otherwise.
 sp_str_t spn_triple_exe_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name);
 
+bool spn_os_version_present(spn_os_version_t version);
+bool spn_os_version_less(spn_os_version_t a, spn_os_version_t b);
+
 #endif

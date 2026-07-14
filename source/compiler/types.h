@@ -18,6 +18,7 @@ typedef enum {
   SPN_CC_FEATURE_LINK_SHARED,
   SPN_CC_FEATURE_LINK_REACTOR,
   SPN_CC_FEATURE_ARCHIVE,
+  SPN_CC_FEATURE_FRAMEWORKS,
 } spn_cc_feature_t;
 
 typedef enum {
@@ -64,6 +65,7 @@ typedef struct {
   spn_cxx_options_t cxx;
   spn_symbol_visibility_t visibility;
   bool pic;
+  spn_os_version_t min_os;
 } spn_cc_compile_t;
 
 typedef struct {
@@ -77,6 +79,9 @@ typedef struct {
   sp_da(sp_str_t) hidden_libs;
   sp_da(sp_str_t) lib_dirs;
   sp_da(sp_str_t) rpath;
+  sp_da(sp_str_t) frameworks;
+  spn_os_version_t min_os;
+  spn_win_subsystem_t subsystem;
 } spn_cc_link_t;
 
 typedef struct {

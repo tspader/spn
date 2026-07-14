@@ -48,6 +48,11 @@ typedef struct {
   spn_abi_t abi;
 } spn_triple_t;
 
+typedef struct {
+  u16 major;
+  u16 minor;
+} spn_os_version_t;
+
 typedef enum {
   SPN_BUILD_MODE_NONE,
   SPN_BUILD_MODE_DEBUG,
@@ -82,6 +87,12 @@ typedef enum {
   SPN_LIB_KIND_SOURCE,
   SPN_LIB_KIND_OBJECT,
 } spn_linkage_t;
+
+typedef enum {
+  SPN_WIN_SUBSYSTEM_NONE,
+  SPN_WIN_SUBSYSTEM_CONSOLE,
+  SPN_WIN_SUBSYSTEM_WINDOWS,
+} spn_win_subsystem_t;
 
 typedef enum {
   SPN_LIBC_GNU = 0,

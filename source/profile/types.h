@@ -20,6 +20,7 @@ struct spn_profile_info {
   bool sanitizers_set;
   spn_when_t options;
   bool targeted;
+  sp_str_t sysroot;
 };
 
 typedef struct {

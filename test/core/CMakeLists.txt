@@ -81,6 +81,19 @@ add_executable(when
 spn_test_binary(when)
 add_test(NAME when COMMAND "$<TARGET_FILE:when>")
 
+add_executable(pkg
+  ${SRC}/ctx/ctx.c
+  ${SRC}/enum/enum.c
+  ${SRC}/intern/intern.c
+  ${SRC}/pkg/pkg.c
+  ${SRC}/pkg/mutate.c
+  ${SRC}/target/mutate.c
+  ${SRC}/sp/str.c
+  pkg.c
+)
+spn_test_binary(pkg)
+add_test(NAME pkg COMMAND "$<TARGET_FILE:pkg>")
+
 add_executable(compiler_flags
   ${SRC}/compiler/driver.c
   ${SRC}/compiler/gnu.c
@@ -88,7 +101,9 @@ add_executable(compiler_flags
   ${SRC}/enum/enum.c
   ${SRC}/triple/triple.c
   compiler.c
-  compiler/render.c
+  compiler/archive.c
+  compiler/compile.c
+  compiler/link.c
 )
 spn_test_binary(compiler_flags)
 add_test(NAME compiler_flags COMMAND "$<TARGET_FILE:compiler_flags>")

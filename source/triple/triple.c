@@ -145,6 +145,15 @@ sp_str_t spn_triple_to_autoconf(sp_mem_t mem, spn_triple_t triple) {
   return arch;
 }
 
+bool spn_os_version_present(spn_os_version_t version) {
+  return version.major || version.minor;
+}
+
+bool spn_os_version_less(spn_os_version_t a, spn_os_version_t b) {
+  if (a.major != b.major) return a.major < b.major;
+  return a.minor < b.minor;
+}
+
 sp_str_t spn_triple_lib_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name, sp_os_lib_kind_t kind) {
   switch (kind) {
     case SP_OS_LIB_STATIC: {

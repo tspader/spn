@@ -31,6 +31,7 @@ void spn_pkg_init(sp_mem_t mem, spn_pkg_info_t* pkg, sp_str_t name) {
   sp_da_init(a, pkg->define);
   sp_da_init(a, pkg->public_define);
   sp_da_init(a, pkg->system_deps);
+  sp_da_init(a, pkg->macos.frameworks);
   sp_da_init(a, pkg->gated.system_deps);
   sp_str_om_init(pkg->options);
 }

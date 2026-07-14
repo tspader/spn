@@ -22,6 +22,20 @@
     "build_mode": { "enum": ["release", "debug"] },
     "opt_level": { "enum": ["0", "1", "2", "3", "s", "z"] },
     "sanitizer": { "enum": ["address", "thread", "undefined", "memory", "leak"] },
+    "win_subsystem": { "enum": ["console", "windows"] },
+
+    "platform_macos": {
+      "optionalProperties": {
+        "frameworks": { "elements": { "type": "string" } },
+        "min_os": { "metadata": { "extern": "os_version" } }
+      }
+    },
+
+    "platform_windows": {
+      "optionalProperties": {
+        "subsystem": { "ref": "win_subsystem" }
+      }
+    },
 
     "option": {
       "properties": {
@@ -100,6 +114,7 @@
         "include": { "elements": { "type": "string" } },
         "define": { "elements": { "type": "string" } },
         "system_deps": { "elements": { "ref": "system_dep_entry" }, "metadata": { "shorthand": "lib" } },
+        "macos": { "ref": "platform_macos" },
         "build": { "ref": "build_script" },
         "configure": { "ref": "build_script" }
       }
@@ -128,7 +143,9 @@
         "system_deps": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "deps": { "elements": { "ref": "target_dep_entry" }, "metadata": { "shorthand": "pkg" } },
         "link": { "type": "boolean" },
-        "cxx": { "ref": "cxx_options" }
+        "cxx": { "ref": "cxx_options" },
+        "macos": { "ref": "platform_macos" },
+        "windows": { "ref": "platform_windows" }
       }
     },
 
