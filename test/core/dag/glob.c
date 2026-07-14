@@ -179,7 +179,7 @@ UTEST_F(glob, invalid_pattern_fails) {
     .name = "glob_invalid",
     .pattern = "A/[",
     .expect = {
-      .err = SPN_ERROR,
+      .err = SPN_ERR_DAG_GLOB,
     }
   });
 }

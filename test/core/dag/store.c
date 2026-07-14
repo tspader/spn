@@ -136,8 +136,8 @@ UTEST_F(store, missing_digest) {
     .name = "missing_digest",
     .ops = {
       { .kind = STORE_OP_HAS, .blob = "A" },
-      { .kind = STORE_OP_GET, .blob = "A", .expect = { .err = SPN_ERROR } },
-      { .kind = STORE_OP_MATERIALIZE, .blob = "A", .path = "a.bin", .expect = { .err = SPN_ERROR } },
+      { .kind = STORE_OP_GET, .blob = "A", .expect = { .err = SPN_ERR_DAG_STORE_MISSING } },
+      { .kind = STORE_OP_MATERIALIZE, .blob = "A", .path = "a.bin", .expect = { .err = SPN_ERR_DAG_STORE_MISSING } },
     }
   });
 }
@@ -157,7 +157,7 @@ UTEST_F(store, put_file_missing) {
   run_test(&ur, (store_test_t) {
     .name = "put_file_missing",
     .ops = {
-      { .kind = STORE_OP_PUT_FILE, .blob = "A", .path = "a.bin", .expect = { .err = SPN_ERROR } },
+      { .kind = STORE_OP_PUT_FILE, .blob = "A", .path = "a.bin", .expect = { .err = SPN_ERR_DAG_STORE_READ } },
     }
   });
 }
