@@ -106,7 +106,7 @@ UTEST_F(file_cache, missing_file) {
   run_test(&ur, (file_cache_test_t) {
     .name = "file_cache_missing",
     .ops = {
-      { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .expect = { .err = SPN_ERROR } },
+      { .kind = FILE_CACHE_OP_DIGEST, .path = "a.c", .expect = { .err = SPN_ERR_DAG_STAT } },
     }
   });
 }

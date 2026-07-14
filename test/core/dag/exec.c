@@ -324,7 +324,7 @@ UTEST_F(exec, failed_action_not_cached) {
     .name = "exec_fail",
     .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
     .ops = {
-      { .kind = EXEC_OP_RUN, .behavior = EXEC_BEHAVIOR_FAIL, .expect = { .err = SPN_ERROR } },
+      { .kind = EXEC_OP_RUN, .behavior = EXEC_BEHAVIOR_FAIL, .expect = { .err = SPN_ERR_DAG_ACTION } },
       { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1" } } },
     }
   });
@@ -335,7 +335,7 @@ UTEST_F(exec, missing_output_not_cached) {
     .name = "exec_missing_output",
     .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O", "P" }, .write = { "V", "W" } },
     .ops = {
-      { .kind = EXEC_OP_RUN, .behavior = EXEC_BEHAVIOR_SKIP_LAST_OUTPUT, .expect = { .err = SPN_ERROR, .runs = 1 } },
+      { .kind = EXEC_OP_RUN, .behavior = EXEC_BEHAVIOR_SKIP_LAST_OUTPUT, .expect = { .err = SPN_ERR_DAG_MISSING_OUTPUT, .runs = 1 } },
       { .kind = EXEC_OP_RUN, .expect = { .runs = 2, .contents = { "V2", "W2" } } },
     }
   });

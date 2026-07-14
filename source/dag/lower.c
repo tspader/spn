@@ -89,14 +89,14 @@ static bool lower_obs_kind(sp_str_t str, spn_dag_obs_kind_t* out) {
 }
 
 static spn_err_t emit_line(sp_io_writer_t* io, sp_str_t line) {
-  spn_try_as(sp_io_write(io, line.data, line.len, SP_NULLPTR), SPN_ERROR);
-  spn_try_as(sp_io_write(io, "\n", 1, SP_NULLPTR), SPN_ERROR);
+  spn_try_as(sp_io_write(io, line.data, line.len, SP_NULLPTR), SPN_ERR_DAG_STORE_WRITE);
+  spn_try_as(sp_io_write(io, "\n", 1, SP_NULLPTR), SPN_ERR_DAG_STORE_WRITE);
   return SPN_OK;
 }
 
 static spn_err_t read_lines(sp_mem_t mem, sp_str_t path, sp_da(sp_str_t)* out) {
   sp_str_t content = sp_zero;
-  spn_try_as(sp_io_read_file(mem, path, &content), SPN_ERROR);
+  spn_try_as(sp_io_read_file(mem, path, &content), SPN_ERR_DAG_STORE_READ);
 
   *out = sp_da_new(mem, sp_str_t);
   sp_da(sp_str_t) lines = sp_str_split_c8(mem, content, '\n');
@@ -257,7 +257,7 @@ static bool spn_dag_tree_name_ok(sp_str_t name) {
 
 spn_err_t spn_dag_store_put_tree(spn_dag_store_t* store, sp_str_t dir, spn_dag_digest_t* digest) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  spn_err_t err = SPN_ERROR;
+  spn_err_t err = SPN_OK;
 
   sp_da(spn_dag_action_output_t) entries = sp_da_new(s.mem, spn_dag_action_output_t);
   sp_da(sp_fs_entry_t) files = sp_fs_collect_recursive(s.mem, dir);
@@ -268,9 +268,7 @@ spn_err_t spn_dag_store_put_tree(spn_dag_store_t* store, sp_str_t dir, spn_dag_d
     spn_dag_action_output_t entry = {
       .name = sp_str_strip_left(sp_str_strip_left(files[it].path, dir), sp_str_lit("/"))
     };
-    if (spn_dag_store_put_file(store, files[it].path, &entry.digest)) {
-      goto done;
-    }
+    spn_try_goto(spn_dag_store_put_file(store, files[it].path, &entry.digest), err, done);
     sp_da_push(entries, entry);
   }
   sp_da_sort(entries, spn_dag_tree_entry_order);
@@ -282,9 +280,7 @@ spn_err_t spn_dag_store_put_tree(spn_dag_store_t* store, sp_str_t dir, spn_dag_d
       .name = entries[it].name,
       .digest = spn_dag_digest_hex(s.mem, entries[it].digest),
     };
-    if (emit_line(&sink.base, spn_dag_output_write_compact(s.mem, &cg))) {
-      goto done;
-    }
+    spn_try_goto(emit_line(&sink.base, spn_dag_output_write_compact(s.mem, &cg)), err, done);
   }
 
   sp_str_t manifest = sp_io_dyn_mem_writer_as_str(&sink);
@@ -309,10 +305,10 @@ spn_err_t spn_dag_tree_entries(spn_dag_store_t* store, spn_dag_digest_t digest, 
     spn_cg_dag_output_t cg = sp_zero;
     spn_dag_action_output_t entry = sp_zero;
     if (!spn_dag_output_read(lines[it], &cg, mem) || !lower_digest(cg.digest, &entry.digest)) {
-      return SPN_ERROR;
+      return SPN_ERR_DAG_TREE;
     }
     if (!spn_dag_tree_name_ok(cg.name)) {
-      return SPN_ERROR;
+      return SPN_ERR_DAG_TREE;
     }
     entry.name = sp_str_copy(mem, cg.name);
     sp_da_push(*out, entry);
@@ -342,23 +338,18 @@ done:
 
 spn_err_t spn_dag_store_materialize_tree(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t dir) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  spn_err_t err = SPN_ERROR;
+  spn_err_t err = SPN_OK;
 
   sp_da(spn_dag_action_output_t) entries = sp_zero;
-  if (spn_dag_tree_entries(store, digest, s.mem, &entries)) {
-    goto done;
-  }
+  spn_try_goto(spn_dag_tree_entries(store, digest, s.mem, &entries), err, done);
 
   sp_fs_remove_dir(dir);
   sp_fs_create_dir(dir);
   sp_da_for(entries, it) {
     sp_str_t path = sp_fs_join_path(s.mem, dir, entries[it].name);
     sp_fs_create_dir(sp_fs_parent_path(path));
-    if (spn_dag_store_materialize(store, entries[it].digest, path)) {
-      goto done;
-    }
+    spn_try_goto(spn_dag_store_materialize(store, entries[it].digest, path), err, done);
   }
-  err = SPN_OK;
 
 done:
   sp_mem_end_scratch(s);

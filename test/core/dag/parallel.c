@@ -249,7 +249,7 @@ UTEST_F(parallel, failing_action_stops_build) {
       { .identity = "B", .inputs = { "X" }, .output = "Y" },
     },
     .builds = {
-      { .sources = { { "S", "1" } }, .expect_err = SPN_ERROR },
+      { .sources = { { "S", "1" } }, .expect_err = SPN_ERR_DAG_ACTION },
     }
   });
 }
@@ -262,7 +262,7 @@ UTEST_F(parallel, cycle_fails) {
       { .identity = "B", .inputs = { "X" }, .output = "Y" },
     },
     .builds = {
-      { .expect_err = SPN_ERROR },
+      { .expect_err = SPN_ERR_DAG_STALLED },
     }
   });
 }
