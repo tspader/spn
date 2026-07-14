@@ -135,6 +135,8 @@ struct utest_state_s {
 typedef struct {
   sp_da(utest_failure_t) failures;
   sp_da(utest_attr_t) staged;
+  sp_io_stream_writer_t out;
+  u8 out_buffer[4096];
 } utest_tls_t;
 
 UTEST_EXTERN struct utest_state_s utest_state;
@@ -157,6 +159,60 @@ UTEST_WEAK utest_tls_t* utest_tls_get(void) {
     utest_tls.staged = sp_da_new(mem, utest_attr_t);
   }
   return &utest_tls;
+}
+
+UTEST_WEAK sp_io_writer_t* utest_io(void);
+UTEST_WEAK sp_io_writer_t* utest_io(void) {
+  utest_tls_t* tls = utest_tls_get();
+  if (!tls->out.base.write) {
+    sp_io_stream_writer_from_fd(&tls->out, sp_sys_stdout, SP_IO_CLOSE_MODE_NONE);
+    sp_io_writer_set_buffer(&tls->out.base, tls->out_buffer, sizeof(tls->out_buffer));
+  }
+  return &tls->out.base;
+}
+
+UTEST_WEAK void utest_flush(void);
+UTEST_WEAK void utest_flush(void) {
+  sp_io_flush(utest_io());
+}
+
+UTEST_WEAK void utest_print(const c8* fmt, ...);
+UTEST_WEAK void utest_print(const c8* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  sp_fmt_io_v(utest_io(), sp_str_view(fmt), args);
+  va_end(args);
+}
+
+UTEST_WEAK void utest_print_f(const c8* fmt, ...);
+UTEST_WEAK void utest_print_f(const c8* fmt, ...) {
+  sp_io_writer_t* io = utest_io();
+  va_list args;
+  va_start(args, fmt);
+  sp_fmt_io_v(io, sp_str_view(fmt), args);
+  va_end(args);
+  sp_io_flush(io);
+}
+
+UTEST_WEAK void utest_log(const c8* fmt, ...);
+UTEST_WEAK void utest_log(const c8* fmt, ...) {
+  sp_io_writer_t* io = utest_io();
+  va_list args;
+  va_start(args, fmt);
+  sp_fmt_io_v(io, sp_str_view(fmt), args);
+  va_end(args);
+  sp_io_write_cstr(io, "\n", SP_NULLPTR);
+}
+
+UTEST_WEAK void utest_log_f(const c8* fmt, ...);
+UTEST_WEAK void utest_log_f(const c8* fmt, ...) {
+  sp_io_writer_t* io = utest_io();
+  va_list args;
+  va_start(args, fmt);
+  sp_fmt_io_v(io, sp_str_view(fmt), args);
+  va_end(args);
+  sp_io_write_cstr(io, "\n", SP_NULLPTR);
+  sp_io_flush(io);
 }
 
 UTEST_WEAK void utest_register(utest_test_fn_t func, const c8* name, const c8* set, const c8* test);
@@ -496,22 +552,22 @@ UTEST_WEAK void utest_report_attr(sp_str_t bar, sp_str_t key, sp_str_t value, u3
 
   if (sp_str_empty(key)) {
     sp_da_for(lines, it) {
-      sp_log("  {}{}", sp_fmt_str(bar), sp_fmt_str(lines[it]));
+      utest_log("  {}{}", sp_fmt_str(bar), sp_fmt_str(lines[it]));
     }
     return;
   }
 
   if (sp_da_size(lines) <= 1) {
-    sp_log("  {}{.gray} {}",
+    utest_log("  {}{.gray} {}",
       sp_fmt_str(bar),
       sp_fmt_str(sp_str_pad(mem, key, width)),
       sp_fmt_str(value));
     return;
   }
 
-  sp_log("  {}{.gray}", sp_fmt_str(bar), sp_fmt_str(key));
+  utest_log("  {}{.gray}", sp_fmt_str(bar), sp_fmt_str(key));
   sp_da_for(lines, it) {
-    sp_log("  {}  {}", sp_fmt_str(bar), sp_fmt_str(lines[it]));
+    utest_log("  {}  {}", sp_fmt_str(bar), sp_fmt_str(lines[it]));
   }
 }
 
@@ -525,7 +581,7 @@ UTEST_WEAK void utest_report_failure(utest_failure_t* failure) {
     width = sp_max(width, failure->attrs[it].key.len);
   }
 
-  sp_log("  {}{.gray}:{.gray}",
+  utest_log("  {}{.gray}:{.gray}",
     sp_fmt_str(bar),
     sp_fmt_str(failure->file),
     sp_fmt_uint(failure->line));
@@ -574,25 +630,26 @@ UTEST_WEAK void utest_finish(utest_test_t* test, s32 result, s64 ns, sp_da(const
   switch (result) {
     case UTEST_TEST_FAILURE: {
       sp_da_push(*failed, test->name);
-      sp_print("{.red} ", sp_fmt_cstr("failed"));
+      utest_print("{.red} ", sp_fmt_cstr("failed"));
       break;
     }
     case UTEST_TEST_SKIPPED: {
       sp_da_push(*skipped, test->name);
-      sp_print("{.yellow} ", sp_fmt_cstr("skipped"));
+      utest_print("{.yellow} ", sp_fmt_cstr("skipped"));
       break;
     }
     default: {
-      sp_print("{.green} ", sp_fmt_cstr("ok"));
+      utest_print("{.green} ", sp_fmt_cstr("ok"));
       break;
     }
   }
-  sp_log("{.gray}{.gray}", sp_fmt_int(time), sp_fmt_cstr(units[unit]));
+  utest_log("{.gray}{.gray}", sp_fmt_int(time), sp_fmt_cstr(units[unit]));
 
   utest_tls_t* tls = utest_tls_get();
   sp_da_for(tls->failures, ft) {
     utest_report_failure(&tls->failures[ft]);
   }
+  utest_flush();
 }
 
 UTEST_WEAK s32 utest_worker(void* userdata);
@@ -615,7 +672,7 @@ UTEST_WEAK s32 utest_worker(void* userdata) {
     ns = (s64)sp_tm_now_point() - ns;
 
     sp_mutex_lock(&pool->mutex);
-    sp_print("{}.{}...", sp_fmt_cstr(test->set), sp_fmt_cstr(test->test));
+    utest_print("{}.{}...", sp_fmt_cstr(test->set), sp_fmt_cstr(test->test));
     utest_finish(test, result, ns, pool->failed, pool->skipped);
     sp_mutex_unlock(&pool->mutex);
   }
@@ -669,8 +726,9 @@ s32 utest_main(s32 argc, const c8** argv) {
       }
     } else if (sp_str_equal_cstr(arg, "--list-tests")) {
       sp_da_for(utest_state.tests, it) {
-        sp_log("{}", sp_fmt_cstr(utest_state.tests[it].name));
+        utest_log("{}", sp_fmt_cstr(utest_state.tests[it].name));
       }
+      utest_flush();
       return 0;
     }
   }
@@ -706,7 +764,7 @@ s32 utest_main(s32 argc, const c8** argv) {
   abi = sp_str_lit("musl");
 #endif
 
-  sp_log(
+  utest_log_f(
     "> running {.black} test cases on {}-{}-{}",
     sp_fmt_uint(ran),
     sp_fmt_str(arch), sp_fmt_str(sp_os_get_name()), sp_fmt_str(abi)
@@ -728,7 +786,7 @@ s32 utest_main(s32 argc, const c8** argv) {
   if (jobs <= 1) {
     sp_da_for(queue, it) {
       utest_test_t* test = queue[it];
-      sp_print("{}.{}...", sp_fmt_cstr(test->set), sp_fmt_cstr(test->test));
+      utest_print_f("{}.{}...", sp_fmt_cstr(test->set), sp_fmt_cstr(test->test));
 
       utest_tls_t* tls = utest_tls_get();
       sp_da_clear(tls->failures);
@@ -760,14 +818,15 @@ s32 utest_main(s32 argc, const c8** argv) {
     sp_mutex_destroy(&pool.mutex);
   }
 
-  sp_log("> {.green} passed, {.red} failed, {.yellow} skipped",
+  utest_log("> {.green} passed, {.red} failed, {.yellow} skipped",
     sp_fmt_uint(ran - sp_da_size(failed) - sp_da_size(skipped)),
     sp_fmt_uint(sp_da_size(failed)),
     sp_fmt_uint(sp_da_size(skipped)));
 
   sp_da_for(failed, it) {
-    sp_log("  {.red} {}", sp_fmt_cstr("failed"), sp_fmt_cstr(failed[it]));
+    utest_log("  {.red} {}", sp_fmt_cstr("failed"), sp_fmt_cstr(failed[it]));
   }
+  utest_flush();
 
   return (s32)sp_da_size(failed);
 }
