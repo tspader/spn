@@ -1,0 +1,10 @@
+[package]
+name = "worlds_edge_prohibition"
+version = "0.1.0"
+
+[deps.package]
+spum = { version = "1.0.0", options = { kram = false } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

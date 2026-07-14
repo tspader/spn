@@ -1,0 +1,20 @@
+[package]
+name = "worlds_default_bool_arm"
+version = "0.1.0"
+
+[options.kram]
+type = "bool"
+default = false
+additive = true
+
+[options.spum]
+type = "enum"
+values = ["on", "off"]
+default = [
+  { when = { kram = true }, value = "on" },
+  { value = "off" },
+]
+
+[[bin]]
+name = "main"
+source = ["main.c"]

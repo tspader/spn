@@ -1,0 +1,20 @@
+[package]
+name = "kram"
+version = "1.0.0"
+
+[options.r]
+type = "enum"
+values = ["gl", "vk"]
+default = "gl"
+
+[deps.package]
+spum = { version = "1.0.0", options = { grum = [
+  { value = "gl", when = { r = "gl" } },
+  { value = "vk", when = { r = "vk" } },
+] } }
+
+[[lib]]
+name = "kram"
+kinds = ["static"]
+source = ["kram.c"]
+headers = ["kram.h"]

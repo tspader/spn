@@ -1,0 +1,13 @@
+[package]
+name = "worlds_constraint_arms"
+version = "0.1.0"
+
+[deps.package]
+kram = "1.0.0"
+
+[config.kram]
+options = { r = "vk" }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

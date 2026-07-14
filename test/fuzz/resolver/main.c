@@ -355,6 +355,9 @@ static fz_err_t fz_run_iteration(sp_fuzz_prng_t base, u64 iter) {
       dumped = shuffled;
     }
 
+    // Renaming checks the verdict only: canonical request order derives from
+    // names, so a rename may legitimately steer the greedy search to a
+    // different (equally valid) solution — solvability must not change
     if (!err) {
       fz_universe_t renamed = fz_rename_universe(mem, &prng, &universe);
       fz_result_t renamed_result = fz_execute(mem, &renamed, SP_NULLPTR);
@@ -474,6 +477,11 @@ static sp_cli_result_t fz_cli_run(sp_cli_t* cli) {
 }
 
 s32 main(s32 num_args, c8** args) {
+  if (sp_str_empty(sp_os_env_get(sp_str_lit("SPN_FUZZ_ENABLE")))) {
+    sp_log("fuzz_resolver is disabled pending known resolver bugs; set SPN_FUZZ_ENABLE=1 to run");
+    return 0;
+  }
+
   fz_cli_t config = {
     .iters = -1,
     .iter = -1,
@@ -515,6 +523,7 @@ s32 main(s32 num_args, c8** args) {
       },
     },
     .env = {
+      { .name = "SPN_FUZZ_ENABLE",     .kind = SP_CLI_OPT_CSTR, .summary = "Must be set for the fuzzer to run at all" },
       { .name = "SPN_TEST_SEED",       .kind = SP_CLI_OPT_CSTR, .summary = "Same as --seed, which wins when both are set" },
       { .name = "SPN_FUZZ_ITERS",      .kind = SP_CLI_OPT_CSTR, .summary = "Same as --iters, which wins when both are set" },
       { .name = "SPN_FUZZ_ITER",       .kind = SP_CLI_OPT_CSTR, .summary = "Same as --iter, which wins when both are set" },
@@ -522,9 +531,6 @@ s32 main(s32 num_args, c8** args) {
     },
     .handler = fz_cli_run,
   };
-
-  sp_log("These tests currently fail because of resolver bugs; ignore");
-  return 0;
 
   switch (sp_cli_run((sp_cli_desc_t) {
     .root = &root,

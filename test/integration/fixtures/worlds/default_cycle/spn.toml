@@ -1,0 +1,23 @@
+[package]
+name = "worlds_default_cycle"
+version = "0.1.0"
+
+[options.spum]
+type = "enum"
+values = ["p", "q"]
+default = [
+  { when = { kram = "p" }, value = "p" },
+  { value = "q" },
+]
+
+[options.kram]
+type = "enum"
+values = ["p", "q"]
+default = [
+  { when = { spum = "p" }, value = "p" },
+  { value = "q" },
+]
+
+[[bin]]
+name = "main"
+source = ["main.c"]
