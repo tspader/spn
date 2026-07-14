@@ -45,9 +45,6 @@ static spn_dep_kind_t fz_dep_kind(spn_index_dep_kind_t kind) {
   sp_unreachable_return(SPN_DEP_KIND_PACKAGE);
 }
 
-// Mirrors classify_dep against the universe instead of the resolver's own
-// bookkeeping: build deps cross a process boundary, test deps survive only on
-// the root, and a private dep leaves the scope iff its owner is shared
 static spn_dep_edge_t fz_classify(fz_universe_t* u, fz_instance_t* owner, fz_dep_t dep) {
   switch (dep.kind) {
     case SPN_INDEX_DEP_BUILD: {
