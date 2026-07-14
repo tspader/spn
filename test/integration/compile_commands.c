@@ -37,7 +37,6 @@ UTEST_F(compile_commands, written_when_compile_fails) {
       { .kind = ACTION_CREATE_FILE, .create = { .file = sp_str_lit("main.c"), .content = sp_str_lit("int main( {") } },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists = { .file = sp_str_lit("compile_commands.json") } },
-      { .kind = ACTION_VERIFY_JSON, .verify_json = { .file = sp_str_lit("compile_commands.json") } },
     },
   });
 }

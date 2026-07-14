@@ -3,9 +3,13 @@
 typedef struct {
   spn_cc_driver_t driver;
   spn_profile_info_t profile;
+  spn_lang_t lang;
+  spn_cxx_options_t cxx;
   spn_symbol_visibility_t visibility;
   bool pic;
   const c8* arg;
+  const c8* include;
+  const c8* define;
   spn_os_version_t min_os;
   render_expect_t expect;
 } compile_test_t;
@@ -14,7 +18,8 @@ static void run_compile_test(s32* utest_result, compile_test_t test) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   spn_cc_toolchain_t toolchain = test_toolchain(test.driver);
   spn_cc_compile_t compile = {
-    .lang = SPN_LANG_C,
+    .lang = test.lang,
+    .cxx = test.cxx,
     .source = sp_str_lit("main.c"),
     .output = sp_str_lit("main.o"),
     .visibility = test.visibility,
@@ -26,6 +31,12 @@ static void run_compile_test(s32* utest_result, compile_test_t test) {
   sp_da_init(scratch.mem, compile.args);
   if (test.arg) {
     sp_da_push(compile.args, sp_str_from_cstr(scratch.mem, test.arg));
+  }
+  if (test.include) {
+    sp_da_push(compile.include, sp_str_from_cstr(scratch.mem, test.include));
+  }
+  if (test.define) {
+    sp_da_push(compile.define, sp_str_from_cstr(scratch.mem, test.define));
   }
   sp_ps_config_t ps = sp_zero;
   spn_err_union_t err = spn_cc_render_compile(scratch.mem, &toolchain, &test.profile, &compile, &ps);
@@ -102,6 +113,91 @@ UTEST(render_compile, clang_macos_sdk) {
     .expect = {
       .command = "cc",
       .args = { "--target=aarch64-macos", "-std=c99", "-c", "main.c", "-isysroot", "/sdk", "-mmacosx-version-min=13.0", "-Werror=return-type", "-o", "main.o" },
+    },
+  });
+}
+
+UTEST(render_compile, cxx_defaults) {
+  run_compile_test(utest_result, (compile_test_t) {
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+    },
+    .lang = SPN_LANG_CXX,
+    .cxx = { .no_exceptions = true, .no_rtti = true },
+    .expect = {
+      .command = "c++",
+      .args = { "-std=c++17", "-c", "main.c", "-fno-exceptions", "-fno-rtti", "-Werror=return-type", "-o", "main.o" },
+    },
+  });
+}
+
+UTEST(render_compile, cxx_standard) {
+  run_compile_test(utest_result, (compile_test_t) {
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+    },
+    .lang = SPN_LANG_CXX,
+    .cxx = { .standard = SPN_CXX20 },
+    .expect = {
+      .command = "c++",
+      .args = { "-std=c++20", "-c", "main.c", "-Werror=return-type", "-o", "main.o" },
+    },
+  });
+}
+
+UTEST(render_compile, includes_and_defines) {
+  run_compile_test(utest_result, (compile_test_t) {
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+      .standard = SPN_C99,
+    },
+    .include = "inc",
+    .define = "SPUM=1",
+    .expect = {
+      .command = "cc",
+      .args = { "-std=c99", "-c", "main.c", "-Iinc", "-DSPUM=1", "-Werror=return-type", "-o", "main.o" },
+    },
+  });
+}
+
+UTEST(render_compile, sanitizers_on_compile_line) {
+  run_compile_test(utest_result, (compile_test_t) {
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+      .standard = SPN_C99,
+      .sanitizers = SPN_SANITIZER_ADDRESS,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "-std=c99", "-fsanitize=address", "-c", "main.c", "-Werror=return-type", "-o", "main.o" },
+    },
+  });
+}
+
+UTEST(render_compile, macos_min_os_minor) {
+  run_compile_test(utest_result, (compile_test_t) {
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_MACOS,
+      .standard = SPN_C99,
+    },
+    .min_os = { 13, 1 },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=aarch64-macos", "-std=c99", "-c", "main.c", "-mmacosx-version-min=13.1", "-Werror=return-type", "-o", "main.o" },
     },
   });
 }
