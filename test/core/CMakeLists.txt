@@ -15,6 +15,13 @@ add_executable(lock
 spn_test_binary(lock)
 add_test(NAME lock COMMAND "$<TARGET_FILE:lock>")
 
+add_executable(fs
+  ${SRC}/sp/fs.c
+  fs.c
+)
+spn_test_binary(fs)
+add_test(NAME fs COMMAND "$<TARGET_FILE:fs>")
+
 add_executable(graph
   graph/main.c
 )

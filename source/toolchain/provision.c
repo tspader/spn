@@ -1,6 +1,7 @@
 #include "toolchain/provision.h"
 
 #include "sha256/sha256.h"
+#include "sp/fs.h"
 
 spn_err_t spn_fetch_curl(sp_str_t url, sp_str_t dest, void* user_data) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
@@ -55,33 +56,7 @@ SP_PRIVATE u64 spn_toolchain_provision_stamp(void) {
   return stamp ^ ((u64)(u32)sp_atomic_s32_add(&sequence, 1) << 48);
 }
 
-spn_err_union_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, spn_opt_artifact_t selected, sp_str_t* root) {
-  *root = sp_str_lit("");
-  if (toolchain->source == SPN_TOOLCHAIN_SOURCE_LOCAL) {
-    sp_assert(sp_opt_is_null(selected));
-    return spn_result(SPN_OK);
-  }
-
-  sp_assert(!sp_opt_is_null(selected));
-  spn_artifact_t artifact = sp_opt_get(selected);
-  if (sp_str_empty(artifact.sha256)) {
-    return (spn_err_union_t) {
-      .kind = SPN_ERR_TOOLCHAIN_NO_SHA,
-      .artifact = {
-        .name = toolchain->name,
-        .url = artifact.url,
-      },
-    };
-  }
-
-  sp_str_t dest = spn_toolchain_store_path(store, artifact);
-  *root = dest;
-
-  if (sp_fs_is_dir(dest)) {
-    return spn_result(SPN_OK);
-  }
-  sp_fs_create_dir(store->dir);
-
+SP_PRIVATE spn_err_union_t spn_toolchain_provision_fill(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, spn_artifact_t artifact, sp_str_t dest) {
   u64 stamp = spn_toolchain_provision_stamp();
   sp_str_t tarball = sp_fmt(store->mem, "{}.{}.download", sp_fmt_str(dest), sp_fmt_uint(stamp)).value;
   sp_str_t work = sp_fmt(store->mem, "{}.{}.tmp", sp_fmt_str(dest), sp_fmt_uint(stamp)).value;
@@ -155,4 +130,45 @@ spn_err_union_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolch
   }
 
   return spn_result(SPN_OK);
+}
+
+spn_err_union_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, spn_opt_artifact_t selected, sp_str_t* root) {
+  *root = sp_str_lit("");
+  if (toolchain->source == SPN_TOOLCHAIN_SOURCE_LOCAL) {
+    sp_assert(sp_opt_is_null(selected));
+    return spn_result(SPN_OK);
+  }
+
+  sp_assert(!sp_opt_is_null(selected));
+  spn_artifact_t artifact = sp_opt_get(selected);
+  if (sp_str_empty(artifact.sha256)) {
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_TOOLCHAIN_NO_SHA,
+      .artifact = {
+        .name = toolchain->name,
+        .url = artifact.url,
+      },
+    };
+  }
+
+  sp_str_t dest = spn_toolchain_store_path(store, artifact);
+  *root = dest;
+
+  if (sp_fs_is_dir(dest)) {
+    return spn_result(SPN_OK);
+  }
+  sp_fs_create_dir(store->dir);
+
+  sp_fs_lock_t lock = sp_zero;
+  sp_str_t lock_path = sp_fmt(store->mem, "{}.lock", sp_fmt_str(dest)).value;
+  bool locked = sp_fs_lock_acquire(&lock, lock_path) == SP_OK;
+
+  if (locked && sp_fs_is_dir(dest)) {
+    sp_fs_lock_release(&lock);
+    return spn_result(SPN_OK);
+  }
+
+  spn_err_union_t result = spn_toolchain_provision_fill(store, toolchain, artifact, dest);
+  sp_fs_lock_release(&lock);
+  return result;
 }

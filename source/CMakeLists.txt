@@ -73,6 +73,7 @@ set(SPN_SOURCES
   session/session.c
   sha256/sha256.c
   sp/color.c
+  sp/fs.c
   sp/io.c
   sp/it.c
   sp/os.c
