@@ -12,6 +12,7 @@ add_executable(toolchain_test
   ${SRC}/semver/compare.c
   ${SRC}/semver/convert.c
   ${SRC}/semver/parser.c
+  ${SRC}/sp/fs.c
   ${SRC}/sp/io.c
   ${SRC}/sp/str.c
   ${SRC}/toolchain/catalog.c
