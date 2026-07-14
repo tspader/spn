@@ -130,21 +130,33 @@ typedef struct {
 struct utest_state_s {
   sp_mem_t mem;
   sp_da(utest_test_t) tests;
-  sp_da(utest_failure_t) failures;
-  sp_da(utest_attr_t) staged;
 };
 
+typedef struct {
+  sp_da(utest_failure_t) failures;
+  sp_da(utest_attr_t) staged;
+} utest_tls_t;
+
 UTEST_EXTERN struct utest_state_s utest_state;
+UTEST_EXTERN SP_THREAD_LOCAL utest_tls_t utest_tls;
 
 UTEST_WEAK sp_mem_t utest_mem(void);
 UTEST_WEAK sp_mem_t utest_mem(void) {
   if (!utest_state.mem.on_alloc) {
     utest_state.mem = sp_mem_os_new();
     utest_state.tests = sp_da_new(utest_state.mem, utest_test_t);
-    utest_state.failures = sp_da_new(utest_state.mem, utest_failure_t);
-    utest_state.staged = sp_da_new(utest_state.mem, utest_attr_t);
   }
   return utest_state.mem;
+}
+
+UTEST_WEAK utest_tls_t* utest_tls_get(void);
+UTEST_WEAK utest_tls_t* utest_tls_get(void) {
+  if (!utest_tls.failures) {
+    sp_mem_t mem = utest_mem();
+    utest_tls.failures = sp_da_new(mem, utest_failure_t);
+    utest_tls.staged = sp_da_new(mem, utest_attr_t);
+  }
+  return &utest_tls;
 }
 
 UTEST_WEAK void utest_register(utest_test_fn_t func, const c8* name, const c8* set, const c8* test);
@@ -167,7 +179,8 @@ UTEST_WEAK void utest_register(utest_test_fn_t func, const c8* name, const c8* s
 UTEST_WEAK void utest_kv(const c8* key, sp_str_t value);
 UTEST_WEAK void utest_kv(const c8* key, sp_str_t value) {
   sp_mem_t mem = utest_mem();
-  sp_da_push(utest_state.staged, ((utest_attr_t) {
+  utest_tls_t* tls = utest_tls_get();
+  sp_da_push(tls->staged, ((utest_attr_t) {
     .key = sp_str_copy(mem, sp_cstr_as_str(key)),
     .value = sp_str_copy(mem, value),
   }));
@@ -176,29 +189,31 @@ UTEST_WEAK void utest_kv(const c8* key, sp_str_t value) {
 UTEST_WEAK void utest_note(sp_str_t value);
 UTEST_WEAK void utest_note(sp_str_t value) {
   sp_mem_t mem = utest_mem();
-  sp_da_push(utest_state.staged, ((utest_attr_t) {
+  utest_tls_t* tls = utest_tls_get();
+  sp_da_push(tls->staged, ((utest_attr_t) {
     .value = sp_str_copy(mem, value),
   }));
 }
 
 UTEST_WEAK void utest_context_reset(void);
 UTEST_WEAK void utest_context_reset(void) {
-  if (utest_state.staged) {
-    sp_da_clear(utest_state.staged);
+  if (utest_tls.staged) {
+    sp_da_clear(utest_tls.staged);
   }
 }
 
 UTEST_WEAK void utest_fail(s32* utest_result, const c8* file, u32 line, sp_str_t expected, sp_str_t actual);
 UTEST_WEAK void utest_fail(s32* utest_result, const c8* file, u32 line, sp_str_t expected, sp_str_t actual) {
   sp_mem_t mem = utest_mem();
-  sp_da_push(utest_state.failures, ((utest_failure_t) {
+  utest_tls_t* tls = utest_tls_get();
+  sp_da_push(tls->failures, ((utest_failure_t) {
     .file = sp_cstr_as_str(file),
     .line = line,
     .expected = sp_str_copy(mem, expected),
     .actual = sp_str_copy(mem, actual),
-    .attrs = utest_state.staged,
+    .attrs = tls->staged,
   }));
-  utest_state.staged = sp_da_new(mem, utest_attr_t);
+  tls->staged = sp_da_new(mem, utest_attr_t);
   *utest_result = UTEST_TEST_FAILURE;
 }
 
@@ -526,6 +541,91 @@ UTEST_WEAK void utest_report_failure(utest_failure_t* failure) {
   }
 }
 
+UTEST_WEAK u32 utest_num_cpus(void);
+UTEST_WEAK u32 utest_num_cpus(void) {
+#if defined(SP_WIN32)
+  SYSTEM_INFO info;
+  GetSystemInfo(&info);
+  return info.dwNumberOfProcessors ? (u32)info.dwNumberOfProcessors : 1;
+#else
+  long n = sysconf(_SC_NPROCESSORS_ONLN);
+  return n < 1 ? 1 : (u32)n;
+#endif
+}
+
+typedef struct {
+  sp_da(utest_test_t*) queue;
+  sp_atomic_s32_t next;
+  sp_mutex_t mutex;
+  sp_da(const c8*)* failed;
+  sp_da(const c8*)* skipped;
+} utest_pool_t;
+
+UTEST_WEAK void utest_finish(utest_test_t* test, s32 result, s64 ns, sp_da(const c8*)* failed, sp_da(const c8*)* skipped);
+UTEST_WEAK void utest_finish(utest_test_t* test, s32 result, s64 ns, sp_da(const c8*)* failed, sp_da(const c8*)* skipped) {
+  const c8* const units[] = { "ns", "us", "ms", "s" };
+  u32 unit = 0;
+  s64 time = ns;
+  while (unit < sp_carr_len(units) - 1 && time >= 10000) {
+    time /= 1000;
+    unit++;
+  }
+
+  switch (result) {
+    case UTEST_TEST_FAILURE: {
+      sp_da_push(*failed, test->name);
+      sp_print("{.red} ", sp_fmt_cstr("failed"));
+      break;
+    }
+    case UTEST_TEST_SKIPPED: {
+      sp_da_push(*skipped, test->name);
+      sp_print("{.yellow} ", sp_fmt_cstr("skipped"));
+      break;
+    }
+    default: {
+      sp_print("{.green} ", sp_fmt_cstr("ok"));
+      break;
+    }
+  }
+  sp_log("{.gray}{.gray}", sp_fmt_int(time), sp_fmt_cstr(units[unit]));
+
+  utest_tls_t* tls = utest_tls_get();
+  sp_da_for(tls->failures, ft) {
+    utest_report_failure(&tls->failures[ft]);
+  }
+}
+
+UTEST_WEAK s32 utest_worker(void* userdata);
+UTEST_WEAK s32 utest_worker(void* userdata) {
+  utest_pool_t* pool = (utest_pool_t*)userdata;
+  while (true) {
+    s32 slot = sp_atomic_s32_add(&pool->next, 1);
+    if ((u32)slot >= sp_da_size(pool->queue)) {
+      break;
+    }
+    utest_test_t* test = pool->queue[slot];
+
+    utest_tls_t* tls = utest_tls_get();
+    sp_da_clear(tls->failures);
+    sp_da_clear(tls->staged);
+
+    s32 result = UTEST_TEST_PASSED;
+    s64 ns = (s64)sp_tm_now_point();
+    test->func(&result);
+    ns = (s64)sp_tm_now_point() - ns;
+
+    sp_mutex_lock(&pool->mutex);
+    sp_print("{}.{}...", sp_fmt_cstr(test->set), sp_fmt_cstr(test->test));
+    utest_finish(test, result, ns, pool->failed, pool->skipped);
+    sp_mutex_unlock(&pool->mutex);
+  }
+  return 0;
+}
+
+#if !defined(UTEST_DEFAULT_JOBS)
+  #define UTEST_DEFAULT_JOBS 1
+#endif
+
 static UTEST_INLINE s32 utest_main(s32 argc, const c8** argv);
 s32 utest_main(s32 argc, const c8** argv) {
 #if defined(SP_FREESTANDING)
@@ -541,10 +641,12 @@ s32 utest_main(s32 argc, const c8** argv) {
 
   sp_mem_t mem = utest_mem();
   const c8* filter = SP_NULLPTR;
+  u32 jobs = (u32)(UTEST_DEFAULT_JOBS);
 
   for (s32 index = 1; index < argc; index++) {
     sp_str_t arg = sp_cstr_as_str(argv[index]);
     sp_str_t filter_flag = sp_str_lit("--filter=");
+    sp_str_t jobs_flag = sp_str_lit("--jobs=");
 
     if (sp_str_equal_cstr(arg, "--help")) {
       sp_os_print(sp_str_lit(
@@ -554,16 +656,27 @@ s32 utest_main(s32 argc, const c8** argv) {
         "  --filter=<filter>   Filter the test cases to run (EG. "
         "MyTest*.a would run MyTestCase.a but not MyTestCase.b).\n"
         "  --list-tests        List testnames, one per line. Output "
-        "names can be passed to --filter.\n"));
+        "names can be passed to --filter.\n"
+        "  --jobs=<n>          Run tests on n threads; 0 uses one "
+        "per processor.\n"));
       return 0;
     } else if (sp_str_starts_with(arg, filter_flag)) {
       filter = argv[index] + filter_flag.len;
+    } else if (sp_str_starts_with(arg, jobs_flag)) {
+      jobs = 0;
+      for (const c8* c = argv[index] + jobs_flag.len; *c >= '0' && *c <= '9'; c++) {
+        jobs = jobs * 10 + (u32)(*c - '0');
+      }
     } else if (sp_str_equal_cstr(arg, "--list-tests")) {
       sp_da_for(utest_state.tests, it) {
         sp_log("{}", sp_fmt_cstr(utest_state.tests[it].name));
       }
       return 0;
     }
+  }
+
+  if (jobs == 0) {
+    jobs = utest_num_cpus();
   }
 
   u64 ran = 0;
@@ -602,51 +715,49 @@ s32 utest_main(s32 argc, const c8** argv) {
   sp_da(const c8*) failed = sp_da_new(mem, const c8*);
   sp_da(const c8*) skipped = sp_da_new(mem, const c8*);
 
+  sp_da(utest_test_t*) queue = sp_da_new(mem, utest_test_t*);
   sp_da_for(utest_state.tests, it) {
     utest_test_t* test = &utest_state.tests[it];
     if (utest_filtered(filter, test->name)) {
       continue;
     }
+    sp_da_push(queue, test);
+  }
 
-    sp_print("{}.{}...", sp_fmt_cstr(test->set), sp_fmt_cstr(test->test));
+  jobs = (u32)sp_min((u64)jobs, sp_da_size(queue));
+  if (jobs <= 1) {
+    sp_da_for(queue, it) {
+      utest_test_t* test = queue[it];
+      sp_print("{}.{}...", sp_fmt_cstr(test->set), sp_fmt_cstr(test->test));
 
-    sp_da_clear(utest_state.failures);
-    sp_da_clear(utest_state.staged);
+      utest_tls_t* tls = utest_tls_get();
+      sp_da_clear(tls->failures);
+      sp_da_clear(tls->staged);
 
-    s32 result = UTEST_TEST_PASSED;
-    s64 ns = (s64)sp_tm_now_point();
-    test->func(&result);
-    ns = (s64)sp_tm_now_point() - ns;
+      s32 result = UTEST_TEST_PASSED;
+      s64 ns = (s64)sp_tm_now_point();
+      test->func(&result);
+      ns = (s64)sp_tm_now_point() - ns;
 
-    const c8* const units[] = { "ns", "us", "ms", "s" };
-    u32 unit = 0;
-    s64 time = ns;
-    while (unit < sp_carr_len(units) - 1 && time >= 10000) {
-      time /= 1000;
-      unit++;
+      utest_finish(test, result, ns, &failed, &skipped);
     }
+  }
+  else {
+    utest_pool_t pool = {
+      .queue = queue,
+      .failed = &failed,
+      .skipped = &skipped,
+    };
+    sp_mutex_init(&pool.mutex, SP_MUTEX_PLAIN);
 
-    switch (result) {
-      case UTEST_TEST_FAILURE: {
-        sp_da_push(failed, test->name);
-        sp_print("{.red} ", sp_fmt_cstr("failed"));
-        break;
-      }
-      case UTEST_TEST_SKIPPED: {
-        sp_da_push(skipped, test->name);
-        sp_print("{.yellow} ", sp_fmt_cstr("skipped"));
-        break;
-      }
-      default: {
-        sp_print("{.green} ", sp_fmt_cstr("ok"));
-        break;
-      }
+    sp_thread_t* threads = (sp_thread_t*)sp_alloc(mem, jobs * sizeof(sp_thread_t));
+    sp_for(it, jobs) {
+      sp_thread_init(&threads[it], utest_worker, &pool);
     }
-    sp_log("{.gray}{.gray}", sp_fmt_int(time), sp_fmt_cstr(units[unit]));
-
-    sp_da_for(utest_state.failures, ft) {
-      utest_report_failure(&utest_state.failures[ft]);
+    sp_for(it, jobs) {
+      sp_thread_join(&threads[it]);
     }
+    sp_mutex_destroy(&pool.mutex);
   }
 
   sp_log("> {.green} passed, {.red} failed, {.yellow} skipped",
@@ -667,7 +778,9 @@ s32 utest_main(s32 argc, const c8** argv) {
    data without having to use the UTEST_MAIN macro, thus allowing them to write
    their own main() function.
 */
-#define UTEST_STATE() struct utest_state_s utest_state = {0}
+#define UTEST_STATE()                                                          \
+  struct utest_state_s utest_state = {0};                                      \
+  SP_THREAD_LOCAL utest_tls_t utest_tls = {0}
 
 /*
    define a main() function to call into utest.h and start executing tests! A

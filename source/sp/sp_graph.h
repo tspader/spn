@@ -156,6 +156,7 @@ typedef struct {
 typedef struct {
   u32 num_threads;
   bool enable_logging;
+  void (*on_worker_exit)(void);
 } spn_bg_executor_config_t;
 
 typedef struct {
@@ -173,6 +174,7 @@ typedef struct {
   spn_bg_dirty_t* dirty;
   u32 num_threads;
   bool enable_logging;
+  void (*on_worker_exit)(void);
   sp_thread_t driver;
   sp_tm_timer_t timer;
   u64 elapsed;
@@ -846,9 +848,7 @@ bool spn_bg_cmd_is_ready(spn_bg_executor_t* ex, spn_bg_id_t cmd_id) {
   return true;
 }
 
-s32 spn_bg_worker_fn(void* user_data) {
-  spn_bg_executor_t* ex = (spn_bg_executor_t*)user_data;
-
+SP_PRIVATE s32 spn_bg_worker_run(spn_bg_executor_t* ex) {
   while (true) {
     sp_semaphore_wait(&ex->work_available);
 
@@ -948,6 +948,15 @@ s32 spn_bg_worker_fn(void* user_data) {
   }
 }
 
+s32 spn_bg_worker_fn(void* user_data) {
+  spn_bg_executor_t* ex = (spn_bg_executor_t*)user_data;
+  s32 result = spn_bg_worker_run(ex);
+  if (ex->on_worker_exit) {
+    ex->on_worker_exit();
+  }
+  return result;
+}
+
 s32 spn_bg_driver_fn(void* user_data) {
   spn_bg_executor_t* ex = (spn_bg_executor_t*)user_data;
 
@@ -989,6 +998,7 @@ spn_bg_executor_t* spn_bg_executor_new(spn_build_graph_t* graph, spn_bg_dirty_t*
   ex->dirty = dirty;
   ex->num_threads = config.num_threads ? config.num_threads : 4;
   ex->enable_logging = config.enable_logging;
+  ex->on_worker_exit = config.on_worker_exit;
 
   sp_mutex_init(&ex->mutex, SP_MUTEX_PLAIN);
   sp_semaphore_init(&ex->work_available);

@@ -13,6 +13,7 @@
 #include "event/event.h"
 #include "index/index.h"
 #include "task/task.h"
+#include "external/wasm/wasm.h"
 
 static s32 sync_index_node(spn_bg_cmd_t* cmd, void* user_data) {
   spn_sync_index_job_t* job = (spn_sync_index_job_t*)user_data;
@@ -55,6 +56,7 @@ spn_task_step_t spn_task_sync_indexes_init(spn_app_t* app) {
   app->index_sync.bg.dirty = spn_bg_compute_forced_dirty(graph);
   app->index_sync.bg.executor = spn_bg_executor_new(graph, app->index_sync.bg.dirty, (spn_bg_executor_config_t) {
     .num_threads = 4,
+    .on_worker_exit = spn_wasm_thread_exit,
   });
   spn_bg_executor_run(app->index_sync.bg.executor);
 

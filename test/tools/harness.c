@@ -6,13 +6,7 @@
 #include "yyjson.h"
 
 static sp_mem_t layout_mem(void) {
-  static sp_mem_t mem;
-  static bool init = false;
-  if (!init) {
-    mem = sp_mem_os_new();
-    init = true;
-  }
-  return mem;
+  return sp_mem_os_new();
 }
 
 static sp_str_t layout_path(const c8* triple, const c8* profile, sp_str_t rest) {
@@ -172,6 +166,7 @@ static void fixture_publish(s32* result, fixture_t* fixture, sp_str_t repo, sp_s
       },
     },
   };
+  sp_ps_config_add_arg(mem, &config, sp_str_lit("--ci"));
   sp_ps_config_add_arg(mem, &config, sp_str_lit("publish"));
   sp_ps_config_add_arg(mem, &config, sp_str_lit("--source-url"));
   sp_ps_config_add_arg(mem, &config, sp_str_replace_c8(mem, url, '\\', '/'));
@@ -543,6 +538,7 @@ static sp_ps_output_t run_spn_command(fixture_t* fixture, const c8* const* args,
       },
     },
   };
+  sp_ps_config_add_arg(mem, &config, sp_str_lit("--ci"));
 
   u32 env_slot = 0;
   while (env_slot < sp_carr_len(config.env.extra) && !sp_str_empty(config.env.extra[env_slot].key)) {

@@ -23,6 +23,7 @@
 #include "toolchain/toolchain.h"
 #include "toolchain/types.h"
 #include "unit/types.h"
+#include "external/wasm/wasm.h"
 
 SP_PRIVATE spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchain_unit_t* unit) {
   spn_toolchain_info_t* toolchain = unit->info;
@@ -334,6 +335,7 @@ spn_task_step_t spn_task_sync_packages_init(spn_app_t *app) {
   session->sync.dirty = spn_bg_compute_forced_dirty(graph);
   session->sync.executor = spn_bg_executor_new(graph, session->sync.dirty, (spn_bg_executor_config_t){
     .num_threads = 16,
+    .on_worker_exit = spn_wasm_thread_exit,
   });
   spn_bg_executor_run(session->sync.executor);
 

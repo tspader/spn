@@ -41,12 +41,6 @@ static spn_err_t publish_target_headers(spn_pkg_unit_t* unit, spn_target_map_t t
   return SPN_OK;
 }
 
-// Consumers compile against a dependency's store, never its checkout. Static
-// headers publish as soon as the package configures, so downstream configure
-// and build scripts can include them before anything builds; the package step
-// re-publishes strictly to pick up anything generated during the build.
-// Dependencies contribute exactly their lib targets, so only lib headers
-// publish for them; the root publishes everything it builds.
 spn_err_t spn_pkg_unit_publish_headers(spn_pkg_unit_t* unit, bool strict) {
   spn_try(publish_target_headers(unit, unit->info->libs, strict));
   if (unit->source == SPN_PKG_SOURCE_ROOT) {

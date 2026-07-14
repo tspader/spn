@@ -499,6 +499,12 @@ static sp_cli_cmd_t cmd_root = {
       .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &spn.cli.quiet,
     },
+    {
+      .name = "ci",
+      .summary = "Run the main loop unthrottled; use when no human is watching",
+      .kind = SP_CLI_OPT_BOOLEAN,
+      .ptr = &spn.cli.ci,
+    },
   },
   .env = {
     {
