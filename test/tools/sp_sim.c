@@ -13,6 +13,7 @@ struct sp_sim_inode {
 
 struct sp_sim_fd {
   sp_sim_inode_t* node;
+  sp_str_t path;
   u64 offset;
   s32 flags;
   bool open;
@@ -110,6 +111,14 @@ static void sp_sim_insert(sp_str_t path, sp_sim_inode_t* node) {
   sp_ht_insert(sim->nodes, sp_str_copy(sim->mem, path), node);
 }
 
+static void sp_sim_log(sp_str_t path) {
+  sp_sim_t* sim = sp_sim_active;
+  sp_da_push(sim->events, ((sp_sim_event_t) {
+    .path = sp_str_copy(sim->mem, path),
+    .sys = sim->syscalls,
+  }));
+}
+
 static sp_sim_fd_t* sp_sim_fd(sp_sys_fd_t fd) {
   sp_sim_t* sim = sp_sim_active;
   u64 idx = (u64)(fd - SP_SIM_FD_BASE);
@@ -183,6 +192,7 @@ static s64 sp_sim_sys_write(sp_sys_fd_t fd, const void* buf, u64 count) {
   s64 n = sp_sim_write_at(entry->node, buf, count, entry->offset);
   if (n > 0) {
     entry->offset += (u64)n;
+    sp_sim_log(entry->path);
   }
   return n;
 }
@@ -194,7 +204,12 @@ static s64 sp_sim_sys_pread(sp_sys_fd_t fd, void* buf, u64 count, u64 offset) {
 
 static s64 sp_sim_sys_pwrite(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset) {
   sp_sim_syscall();
-  return sp_sim_write_at(sp_sim_fd(fd)->node, buf, count, offset);
+  sp_sim_fd_t* entry = sp_sim_fd(fd);
+  s64 n = sp_sim_write_at(entry->node, buf, count, offset);
+  if (n > 0) {
+    sp_sim_log(entry->path);
+  }
+  return n;
 }
 
 static sp_sys_fd_t sp_sim_sys_get_root(s32 it) {
@@ -245,6 +260,7 @@ static sp_sys_fd_t sp_sim_sys_open(sp_sys_fd_t fd, const c8* path, u32 len, s32 
     }
     node = sp_sim_inode(SP_FS_KIND_FILE);
     sp_sim_insert(norm, node);
+    sp_sim_log(norm);
   }
 
   if (node->kind == SP_FS_KIND_DIR && (flags & (SP_O_WRONLY | SP_O_RDWR))) {
@@ -254,10 +270,12 @@ static sp_sys_fd_t sp_sim_sys_open(sp_sys_fd_t fd, const c8* path, u32 len, s32 
   if ((flags & SP_O_TRUNC) && node->kind == SP_FS_KIND_FILE && sp_da_size(node->bytes)) {
     sp_da_clear(node->bytes);
     sp_sim_stamp(node);
+    sp_sim_log(norm);
   }
 
   sp_da_push(sim->fds, ((sp_sim_fd_t) {
     .node = node,
+    .path = sp_str_copy(sim->mem, norm),
     .offset = 0,
     .flags = flags,
     .open = true,
@@ -393,6 +411,7 @@ static s32 sp_sim_sys_rename(sp_sys_fd_t from_fd, const c8* from, u32 from_len, 
 
   sp_ht_erase(sim->nodes, from_norm);
   sp_sim_insert(to_norm, src);
+  sp_sim_log(to_norm);
   return 0;
 }
 
@@ -420,6 +439,7 @@ static s32 sp_sim_sys_link(sp_sys_fd_t from_fd, const c8* existing, u32 existing
 
   sp_sim_insert(alias_norm, src);
   src->nlink++;
+  sp_sim_log(alias_norm);
   return 0;
 }
 
@@ -696,6 +716,7 @@ void sp_sim_init(sp_sim_t* sim, sp_mem_t mem) {
   *sim = (sp_sim_t) {
     .mem = mem,
     .fds = sp_da_new(mem, sp_sim_fd_t),
+    .events = sp_da_new(mem, sp_sim_event_t),
     .clock = { .tv_sec = 1 },
     .ids = 1,
   };

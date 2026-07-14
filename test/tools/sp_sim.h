@@ -7,9 +7,15 @@ typedef struct sp_sim_inode sp_sim_inode_t;
 typedef struct sp_sim_fd sp_sim_fd_t;
 
 typedef struct {
+  sp_str_t path;
+  u64 sys;
+} sp_sim_event_t;
+
+typedef struct {
   sp_mem_t mem;
   sp_ht(sp_str_t, sp_sim_inode_t*) nodes;
   sp_da(sp_sim_fd_t) fds;
+  sp_da(sp_sim_event_t) events;
   sp_sys_timespec_t clock;
   u64 ids;
   u64 syscalls;
