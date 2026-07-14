@@ -24,6 +24,11 @@ static u32 fz_run_iteration(sp_mem_t mem, sp_fuzz_prng_t prng, u64 iter) {
   fz_profile_t profile = fz_gen_profile(&prng);
   fz_universe_t universe = fz_gen_universe(mem, &prng, profile);
 
+  fz_sim_t sim = sp_zero;
+  fz_sim_init(&sim, mem);
+  fz_sim_install(&sim);
+  fz_sim_remove(&sim);
+
   sp_str_t render = sp_fuzz_render_path();
   if (!sp_str_empty(render)) {
     fz_render_iteration(mem, render, &universe, iter);
