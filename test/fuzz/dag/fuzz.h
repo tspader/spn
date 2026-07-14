@@ -4,6 +4,7 @@
 #include "sp.h"
 
 #include "sp_fuzz.h"
+#include "sp_sim.h"
 
 #define FZ_MAX_ACTIONS 128
 #define FZ_SMALL_ACTIONS 8
@@ -68,37 +69,6 @@ typedef struct {
   sp_da(fz_action_t) actions;
   bool cyclic;
 } fz_universe_t;
-
-#define FZ_SIM_ROOT ((sp_sys_fd_t)-4097)
-#define FZ_SIM_FD_BASE ((sp_sys_fd_t)4096)
-
-typedef struct {
-  u64 inode;
-  bool dir;
-  sp_sys_timespec_t mtime;
-  sp_da(u8) bytes;
-} fz_sim_node_t;
-
-typedef struct {
-  sp_str_t path;
-  u64 offset;
-  s32 flags;
-  bool open;
-} fz_sim_fd_t;
-
-typedef struct {
-  sp_mem_t mem;
-  sp_ht(sp_str_t, fz_sim_node_t) nodes;
-  sp_da(fz_sim_fd_t) fds;
-  sp_sys_timespec_t clock;
-  u64 inodes;
-  u64 syscalls;
-  const sp_sys_vtable_t* prev;
-} fz_sim_t;
-
-void fz_sim_init(fz_sim_t* sim, sp_mem_t mem);
-void fz_sim_install(fz_sim_t* sim);
-void fz_sim_remove(fz_sim_t* sim);
 
 #define try(expr) do { fz_err_t __err = (expr); if (__err) return __err; } while (0)
 #define must(expr, err) do { if (!(expr)) return err; } while (0)
