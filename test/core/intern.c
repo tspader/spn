@@ -14,7 +14,7 @@ UTEST_MAIN()
 #define uf utest_fixture
 #define ur (*utest_result)
 
-struct intern {};
+struct intern { u8 unused; };
 UTEST_F_SETUP(intern) {}
 UTEST_F_TEARDOWN(intern) {}
 

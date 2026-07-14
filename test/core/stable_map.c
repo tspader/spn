@@ -16,7 +16,7 @@ UTEST_MAIN()
 
 // ---- s32 key tests (flat scalar key, default hash/compare) ----
 
-struct sm_s32 {};
+struct sm_s32 { u8 unused; };
 
 UTEST_F_SETUP(sm_s32) {}
 UTEST_F_TEARDOWN(sm_s32) {}
@@ -230,7 +230,7 @@ typedef struct {
   s32 b;
 } pair_key_t;
 
-struct sm_pair {};
+struct sm_pair { u8 unused; };
 
 UTEST_F_SETUP(sm_pair) {}
 UTEST_F_TEARDOWN(sm_pair) {}
@@ -454,7 +454,7 @@ UTEST(sm_pkg, iteration_order_preserved) {
 
 // ---- u64 key, different value type ----
 
-struct sm_u64 {};
+struct sm_u64 { u8 unused; };
 
 UTEST_F_SETUP(sm_u64) {}
 UTEST_F_TEARDOWN(sm_u64) {}
