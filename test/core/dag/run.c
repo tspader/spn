@@ -215,7 +215,7 @@ UTEST_F(run, missing_source_fails) {
       { .identity = "I", .inputs = { "S" }, .output = "X" },
     },
     .builds = {
-      { .expect_err = SPN_ERROR },
+      { .expect_err = SPN_ERR_DAG_MISSING_INPUT },
     }
   });
 }
@@ -228,7 +228,7 @@ UTEST_F(run, cycle_fails) {
       { .identity = "J", .inputs = { "X" }, .output = "Y" },
     },
     .builds = {
-      { .expect_err = SPN_ERROR },
+      { .expect_err = SPN_ERR_DAG_STALLED },
     }
   });
 }
@@ -241,7 +241,7 @@ UTEST_F(run, failing_action_stops_build) {
       { .identity = "J", .inputs = { "X" }, .output = "Y" },
     },
     .builds = {
-      { .sources = { { "S", "A" } }, .expect_err = SPN_ERROR },
+      { .sources = { { "S", "A" } }, .expect_err = SPN_ERR_DAG_ACTION },
     }
   });
 }

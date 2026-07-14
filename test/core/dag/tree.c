@@ -122,7 +122,7 @@ UTEST_F(tree, materialize_missing_fails) {
   run_store_test(&ur, (tree_store_test_t) {
     .name = "tree_materialize_missing",
     .ops = {
-      { .kind = TREE_OP_MATERIALIZE, .expect = { .err = SPN_ERROR } },
+      { .kind = TREE_OP_MATERIALIZE, .expect = { .err = SPN_ERR_DAG_STORE_MISSING } },
     }
   });
 }
