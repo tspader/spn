@@ -13,6 +13,7 @@ typedef struct {
   const c8* created [DAG_TEST_MAX_INPUTS];
   bool discover_fails;
   bool cold;
+  bool manifest_stable;
   const c8* output;
   const c8* manifest_fresh;
   spn_err_t expect_err;
@@ -88,6 +89,16 @@ static void prepare(env_t* env, run_t* run) {
   }
 }
 
+static sp_sys_file_meta_t manifest_meta(env_t* env) {
+  sp_sys_file_meta_t meta = sp_zero;
+  sp_str_t dir = tmpfs_get(&env->dag.fs, sp_str_lit("manifests"));
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect(env->dag.fs.mem, dir);
+  if (sp_da_size(entries) == 1) {
+    sp_sys_get_path_metadata_s(sp_sys_get_root(0), entries[0].path, &meta);
+  }
+  return meta;
+}
+
 static sp_str_t manifest_read(env_t* env) {
   sp_str_t dir = tmpfs_get(&env->dag.fs, sp_str_lit("manifests"));
   sp_da(sp_fs_entry_t) entries = sp_fs_collect(env->dag.fs.mem, dir);
@@ -131,7 +142,20 @@ static void run_test(s32* utest_result, test_t t) {
     spn_dag_id_t obj = spn_dag_add_file(g, tmpfs_get(&env.dag.fs, sp_str_lit("O")));
     ASSERT_EQ(SPN_OK, spn_dag_action_add_output(g, action, obj));
 
+    sp_sys_file_meta_t before = sp_zero;
+    if (run->manifest_stable) {
+      before = manifest_meta(&env);
+    }
+
     spn_err_t err = spn_dag_execute_discovered(g, action, &env.dag.env);
+
+    if (run->manifest_stable) {
+      sp_sys_file_meta_t after = manifest_meta(&env);
+      EXPECT_EQ(before.device, after.device);
+      EXPECT_EQ(before.id, after.id);
+      EXPECT_EQ(before.mtime.tv_sec, after.mtime.tv_sec);
+      EXPECT_EQ(before.mtime.tv_nsec, after.mtime.tv_nsec);
+    }
 
     EXPECT_EQ(run->expect_err, err);
     EXPECT_EQ(run->expect_runs, env.dag.runs);
@@ -310,6 +334,18 @@ UTEST_F(discover_exec, manifest_rewritten_on_hit) {
       { .headers = { { "H", "A" } }, .expect_runs = 1 },
       { .headers = { { "H", "A" } }, .cold = true, .expect_runs = 1 },
       { .headers = { { "H", "A" } }, .cold = true, .expect_runs = 1, .manifest_fresh = "H" },
+    }
+  });
+}
+
+UTEST_F(discover_exec, manifest_flush_skipped_when_unchanged) {
+  run_test(&ur, (test_t) {
+    .name = "discover_manifest_skip",
+    .input = "A",
+    .runs = {
+      { .headers = { { "H", "A" } }, .expect_runs = 1 },
+      { .expect_runs = 1, .manifest_stable = true },
+      { .cold = true, .expect_runs = 1, .manifest_stable = true },
     }
   });
 }
