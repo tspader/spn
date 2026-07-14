@@ -1,6 +1,11 @@
 #include "sp_fuzz.h"
+#include "sp/prompt.h"
 
 #include "intern/intern.h"
+
+sp_app_result_t    sp_prompt_app_on_init(sp_app_t* app);
+sp_app_result_t    sp_prompt_app_on_poll(sp_app_t* app);
+sp_prompt_widget_t sp_prompt_progress_widget(sp_prompt_ctx_t* ctx, sp_prompt_progress_t config);
 
 static u64 sp_fuzz_seed;
 static sp_str_t sp_fuzz_render;
@@ -96,7 +101,7 @@ static sp_err_t sp_fuzz_fmt_hex(sp_io_writer_t* io, sp_fmt_arg_t* arg) {
   return sp_fmt_write_u64_ex(io, arg->value.u, SP_FMT_RADIX_HEX);
 }
 
-u64 sp_fuzz_seed_init_str(sp_str_t seed) {
+static u64 sp_fuzz_seed_compute(sp_str_t seed) {
   if (sp_str_empty(seed)) {
     seed = sp_os_env_get(sp_str_lit("SPN_TEST_SEED"));
   }
@@ -110,6 +115,11 @@ u64 sp_fuzz_seed_init_str(sp_str_t seed) {
     sp_fuzz_seed = sp_fuzz_next(&entropy);
   }
 
+  return sp_fuzz_seed;
+}
+
+u64 sp_fuzz_seed_init_str(sp_str_t seed) {
+  sp_fuzz_seed_compute(seed);
   sp_io_stream_writer_t out = sp_io_get_std_out();
   sp_fmt_io(&out.base, "SPN_TEST_SEED=0x{}\n", sp_fmt_u64_custom(sp_fuzz_seed, sp_fuzz_fmt_hex));
   return sp_fuzz_seed;
@@ -160,11 +170,86 @@ typedef struct {
   s32 status;
 } sp_fuzz_cli_t;
 
+typedef struct {
+  sp_prompt_ctx_t* ctx;
+  sp_app_t app;
+  bool on;
+} sp_fuzz_prompt_t;
+
+static sp_str_t sp_fuzz_params(sp_mem_t mem, sp_fuzz_opts_t opts, bool keep_going) {
+  sp_str_t params = sp_fmt(mem, "SPN_TEST_SEED=0x{:x}\nSPN_FUZZ_ITERS={}", sp_fmt_uint(sp_fuzz_seed), sp_fmt_uint(opts.iters)).value;
+  if (opts.only >= 0) {
+    params = sp_fmt(mem, "{}\nSPN_FUZZ_ITER={}", sp_fmt_str(params), sp_fmt_uint((u64)opts.only)).value;
+  }
+  if (keep_going) {
+    params = sp_fmt(mem, "{}\nSPN_FUZZ_KEEP_GOING=1", sp_fmt_str(params)).value;
+  }
+  if (!sp_str_empty(sp_fuzz_render)) {
+    params = sp_fmt(mem, "{}\nSPN_FUZZ_RENDER={}", sp_fmt_str(params), sp_fmt_str(sp_fuzz_render)).value;
+  }
+  return params;
+}
+
+static void sp_fuzz_prompt_start(sp_fuzz_prompt_t* prompt, sp_mem_t mem, const sp_fuzz_desc_t* desc, sp_fuzz_opts_t opts, bool keep_going) {
+  if (!sp_os_is_tty(sp_sys_stdout)) {
+    return;
+  }
+  prompt->ctx = sp_prompt_begin(mem);
+  if (!prompt->ctx) {
+    return;
+  }
+
+  sp_prompt_note(prompt->ctx, sp_str_to_cstr(mem, sp_fuzz_params(mem, opts, keep_going)), desc->name);
+
+  sp_prompt_app(prompt->ctx, sp_prompt_progress_widget(prompt->ctx, (sp_prompt_progress_t) {
+    .prompt = "fuzzing",
+    .color = { .rgb = { .r = 99, .g = 160, .b = 136 } },
+  }));
+  prompt->app = (sp_app_t) { .user_data = prompt->ctx };
+  sp_prompt_app_on_init(&prompt->app);
+  prompt->on = true;
+}
+
+static void sp_fuzz_prompt_pump(sp_fuzz_prompt_t* prompt, u64 done, u64 total, u64 failed) {
+  if (!prompt->on) {
+    return;
+  }
+
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  sp_str_t status = failed
+    ? sp_fmt(s.mem, "{}/{} iterations, {} failed", sp_fmt_uint(done), sp_fmt_uint(total), sp_fmt_uint(failed)).value
+    : sp_fmt(s.mem, "{}/{} iterations", sp_fmt_uint(done), sp_fmt_uint(total)).value;
+  sp_prompt_send_status_str(prompt->ctx, status);
+  sp_mem_end_scratch(s);
+
+  sp_prompt_send_progress_f32(prompt->ctx, total ? (f32)done / (f32)total : 0.f);
+  sp_prompt_app_on_poll(&prompt->app);
+}
+
+static void sp_fuzz_prompt_stop(sp_fuzz_prompt_t* prompt, bool ok) {
+  if (!prompt->on) {
+    return;
+  }
+  sp_prompt_set_state(prompt->ctx, ok ? SP_PROMPT_STATE_SUBMIT : SP_PROMPT_STATE_ERROR);
+  sp_prompt_app_on_poll(&prompt->app);
+  sp_prompt_end(prompt->ctx);
+  prompt->on = false;
+}
+
+static void sp_fuzz_report(sp_fuzz_prompt_t* prompt, sp_io_writer_t* out, sp_str_t line) {
+  if (prompt->on) {
+    sp_prompt_log_str(prompt->ctx, line);
+  }
+  else {
+    sp_fmt_io(out, "{}\n", sp_fmt_str(line));
+  }
+}
+
 static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
   sp_fuzz_cli_t* config = (sp_fuzz_cli_t*)cli->user_data;
   const sp_fuzz_desc_t* desc = config->desc;
 
-  sp_fuzz_seed_init_str(config->seed ? sp_cstr_as_str(config->seed) : sp_str_lit(""));
+  sp_fuzz_seed_compute(config->seed ? sp_cstr_as_str(config->seed) : sp_str_lit(""));
 
   sp_fuzz_opts_t opts = sp_fuzz_opts(desc->iters);
   if (config->iters >= 0) {
@@ -188,26 +273,45 @@ static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
   sp_mem_zero(failures, desc->errs * sizeof(u64));
   u64 failed = 0;
 
+  sp_fuzz_prompt_t prompt = sp_zero;
+  sp_fuzz_prompt_start(&prompt, mem, desc, opts, keep_going);
+  if (!prompt.on) {
+    sp_fmt_io(&out.base, "SPN_TEST_SEED=0x{}\n", sp_fmt_u64_custom(sp_fuzz_seed, sp_fuzz_fmt_hex));
+  }
+
   for (u64 iter = 0; iter < opts.iters; iter++) {
     if (opts.only >= 0 && iter != (u64)opts.only) continue;
 
     sp_mem_arena_t* arena = sp_mem_arena_new(sp_mem_os_new());
     u32 err = desc->run(sp_mem_arena_as_allocator(arena), sp_fuzz_iter(base, iter), iter);
     sp_mem_arena_destroy(arena);
-    if (!err) continue;
 
-    failed++;
-    if (err < desc->errs) {
-      failures[err]++;
+    if (err) {
+      failed++;
+      if (err < desc->errs) {
+        failures[err]++;
+      }
+
+      sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+      sp_fuzz_report(&prompt, &out.base, sp_fmt(s.mem, "fuzz: {} (iter {})", sp_fmt_str(desc->err_str(err)), sp_fmt_uint(iter)).value);
+      sp_mem_end_scratch(s);
+
+      if (!keep_going) {
+        config->status = (s32)err;
+        break;
+      }
     }
-    sp_fmt_io(&out.base, "fuzz: {} (iter {})\n", sp_fmt_str(desc->err_str(err)), sp_fmt_uint(iter));
-    if (!keep_going) {
-      config->status = (s32)err;
-      return SP_CLI_OK;
+
+    sp_fuzz_prompt_pump(&prompt, iter + 1, opts.iters, failed);
+    if (prompt.on && sp_prompt_cancelled(prompt.ctx)) {
+      config->status = 1;
+      break;
     }
   }
 
-  if (failed) {
+  sp_fuzz_prompt_stop(&prompt, !failed && !config->status);
+
+  if (failed && keep_going) {
     sp_fmt_io(&out.base, "fuzz: {} of {} iterations failed\n", sp_fmt_uint(failed), sp_fmt_uint(opts.iters));
     for (u32 it = 0; it < desc->errs; it++) {
       if (!failures[it]) continue;

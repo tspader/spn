@@ -3,6 +3,7 @@
 #include "sp/sp_cli.h"
 #include "sp/atomic_file.h"
 #include "sp/sp_glob.h"
+#include "sp/prompt.h"
 
 #include "fuzz.h"
 
