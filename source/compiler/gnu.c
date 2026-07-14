@@ -72,7 +72,7 @@ spn_sanitizer_set_t spn_gcc_supported_sanitizers(spn_triple_t target) {
   switch (target.os) {
     case SPN_OS_WASI:
     case SPN_OS_WINDOWS: return 0;
-    case SPN_OS_MACOS: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_LEAK;
+    case SPN_OS_MACOS: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED;
     case SPN_OS_LINUX:
     case SPN_OS_NONE: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_LEAK;
   }

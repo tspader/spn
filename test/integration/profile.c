@@ -2,16 +2,18 @@ SPN_TEST_SUITE(profile)
 
 // The planted heap overflow in the fixture is benign in a plain build;
 // [profile.asan] must compile and link with the address sanitizer, which
-// aborts the binary at runtime
+// reports the overflow and fails the binary at runtime
 UTEST_F(profile, sanitize_trigger) {
-  UTEST_SKIP("");
+#if defined(SP_WIN32)
+  UTEST_SKIP("the system toolchain has no sanitizer support on windows");
+#endif
   tmpfs_init_named(&uf->fixture.fs, "profile_sanitize_trigger");
 
   run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
     .project = "test/integration/fixtures/profile/sanitize",
     .builds = {
       { .expect = { .bin = { .name = "main" } } },
-      { .profile = "asan", .expect = { .bin = { .name = "main", .rc = 1 } } },
+      { .profile = "asan", .expect = { .bin = { .name = "main", .rc = 1, .contains = { "AddressSanitizer" } } } },
     },
   });
 }
@@ -19,13 +21,15 @@ UTEST_F(profile, sanitize_trigger) {
 // sanitize = [] is an explicit clear, not an unset field: a derived profile
 // must be able to drop the sanitizers it inherits from default
 UTEST_F(profile, sanitize_clear) {
-  UTEST_SKIP("");
+#if defined(SP_WIN32)
+  UTEST_SKIP("the system toolchain has no sanitizer support on windows");
+#endif
   tmpfs_init_named(&uf->fixture.fs, "profile_sanitize_clear");
 
   run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
     .project = "test/integration/fixtures/profile/clear",
     .builds = {
-      { .expect = { .bin = { .name = "main", .rc = 1 } } },
+      { .expect = { .bin = { .name = "main", .rc = 1, .contains = { "AddressSanitizer" } } } },
       { .profile = "clean", .expect = { .bin = { .name = "main" } } },
     },
   });
