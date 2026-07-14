@@ -49,6 +49,8 @@ typedef enum {
 typedef struct {
   spn_dag_id_t id;
   spn_dag_artifact_kind_t kind;
+  sp_str_t name;
+  sp_str_t target;
   sp_str_t path;
   spn_dag_digest_t digest;
   spn_dag_id_t producer;
@@ -88,7 +90,7 @@ typedef struct {
 } spn_dag_file_cache_t;
 
 typedef struct {
-  sp_str_t path;
+  sp_str_t name;
   spn_dag_digest_t digest;
 } spn_dag_action_output_t;
 
@@ -132,5 +134,13 @@ typedef struct {
   sp_str_t dir;
   sp_ht(spn_dag_digest_t, sp_mem_slice_t) blobs;
 } spn_dag_store_t;
+
+typedef struct {
+  spn_dag_file_cache_t* files;
+  spn_dag_action_cache_t* cache;
+  spn_dag_store_t* store;
+  spn_dag_discovery_t* discovery;
+  sp_str_t scratch;
+} spn_dag_env_t;
 
 #endif

@@ -10,6 +10,7 @@ spn_dag_artifact_t* spn_dag_find_artifact(spn_dag_t* g, spn_dag_id_t id);
 spn_dag_action_t*   spn_dag_find_action(spn_dag_t* g, spn_dag_id_t id);
 spn_dag_id_t        spn_dag_add_value(spn_dag_t* g, const void* data, u64 len);
 spn_dag_id_t        spn_dag_add_file(spn_dag_t* g, sp_str_t path);
+spn_dag_id_t        spn_dag_add_output(spn_dag_t* g, sp_str_t name);
 spn_dag_id_t        spn_dag_find_file(spn_dag_t* g, sp_str_t path);
 spn_dag_id_t        spn_dag_add_action(spn_dag_t* g, spn_dag_action_config_t config);
 void                spn_dag_action_add_input(spn_dag_t* g, spn_dag_id_t action, spn_dag_id_t artifact);
@@ -33,20 +34,21 @@ void                     spn_dag_action_cache_init(spn_dag_action_cache_t* c, sp
 const spn_dag_action_entry_t* spn_dag_action_cache_get(spn_dag_action_cache_t* c, spn_dag_digest_t key);
 void                     spn_dag_action_cache_put(spn_dag_action_cache_t* c, spn_dag_digest_t key, const spn_dag_action_output_t* outputs, u32 count);
 bool                     spn_dag_action_cache_remove(spn_dag_action_cache_t* c, spn_dag_digest_t key);
-spn_err_t                spn_dag_execute(spn_dag_t* g, spn_dag_id_t action, spn_dag_file_cache_t* files, spn_dag_action_cache_t* cache, spn_dag_store_t* store);
+spn_err_t                spn_dag_execute(spn_dag_t* g, spn_dag_id_t action, spn_dag_env_t* env);
 
 void                        spn_dag_discovery_init(spn_dag_discovery_t* d, sp_mem_t mem, sp_str_t dir);
 spn_dag_pathset_t*          spn_dag_discovery_get(spn_dag_discovery_t* d, spn_dag_digest_t prelim);
 void                        spn_dag_discovery_put(spn_dag_discovery_t* d, spn_dag_digest_t prelim, const spn_dag_obs_t* obs, u32 count);
 void                        spn_dag_discovery_flush(spn_dag_discovery_t* d, spn_dag_digest_t prelim);
-spn_err_t                   spn_dag_execute_discovered(spn_dag_t* g, spn_dag_id_t action, spn_dag_file_cache_t* files, spn_dag_action_cache_t* cache, spn_dag_store_t* store, spn_dag_discovery_t* discovery);
+spn_err_t                   spn_dag_execute_discovered(spn_dag_t* g, spn_dag_id_t action, spn_dag_env_t* env);
 
-spn_err_t                   spn_dag_run(spn_dag_t* g, spn_dag_file_cache_t* files, spn_dag_action_cache_t* cache, spn_dag_store_t* store, spn_dag_discovery_t* discovery);
+spn_err_t                   spn_dag_run(spn_dag_t* g, spn_dag_env_t* env);
 
 void                spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config);
 spn_err_t           spn_dag_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag_digest_t* digest);
 spn_err_t           spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_digest_t* digest);
 bool                spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest);
+sp_str_t            spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest);
 spn_err_t           spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_mem_slice_t* data);
 spn_err_t           spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t path);
 

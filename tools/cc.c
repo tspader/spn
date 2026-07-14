@@ -30,13 +30,11 @@ typedef struct {
 typedef struct {
   cc_app_t* app;
   sp_str_t input;
-  sp_str_t obj;
-  sp_str_t dep;
+  spn_dag_id_t obj;
 } cc_compile_t;
 
 typedef struct {
   cc_app_t* app;
-  sp_str_t output;
 } cc_link_t;
 
 static void cc_log_run(cc_app_t* app, sp_ps_config_t ps) {
@@ -45,6 +43,14 @@ static void cc_log_run(cc_app_t* app, sp_ps_config_t ps) {
     line = sp_fmt(app->mem, "{} {}", sp_fmt_str(line), sp_fmt_str(ps.dyn_args[it])).value;
   }
   sp_os_print(sp_fmt(app->mem, "  run   {}\n", sp_fmt_str(line)).value);
+}
+
+static sp_str_t cc_obj_path(cc_compile_t* c) {
+  return spn_dag_find_artifact(c->app->g, c->obj)->path;
+}
+
+static sp_str_t cc_dep_path(cc_compile_t* c, sp_mem_t mem) {
+  return sp_fmt(mem, "{}.d", sp_fmt_str(cc_obj_path(c))).value;
 }
 
 static s32 cc_compile_exec(spn_dag_action_t* action, void* user_data) {
@@ -57,9 +63,9 @@ static s32 cc_compile_exec(spn_dag_action_t* action, void* user_data) {
   sp_da_push(ps.dyn_args, sp_str_lit("-c"));
   sp_da_push(ps.dyn_args, sp_str_lit("-MD"));
   sp_da_push(ps.dyn_args, sp_str_lit("-MF"));
-  sp_da_push(ps.dyn_args, c->dep);
+  sp_da_push(ps.dyn_args, cc_dep_path(c, app->mem));
   sp_da_push(ps.dyn_args, sp_str_lit("-o"));
-  sp_da_push(ps.dyn_args, c->obj);
+  sp_da_push(ps.dyn_args, cc_obj_path(c));
   sp_da_for(app->flags, it) {
     sp_da_push(ps.dyn_args, app->flags[it]);
   }
@@ -107,7 +113,7 @@ static void cc_probe_shadows(cc_app_t* app, sp_str_t prereq, sp_mem_t mem, sp_da
 static spn_err_t cc_compile_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   cc_compile_t* c = (cc_compile_t*)user_data;
   sp_str_t content = sp_zero;
-  spn_try_as(sp_io_read_file(mem, c->dep, &content), SPN_ERROR);
+  spn_try_as(sp_io_read_file(mem, cc_dep_path(c, mem), &content), SPN_ERROR);
 
   sp_da(sp_str_t) prereqs = sp_da_new(mem, sp_str_t);
   spn_try(cc_deps_parse(mem, content, &prereqs));
@@ -131,7 +137,7 @@ static s32 cc_link_exec(spn_dag_action_t* action, void* user_data) {
   sp_ps_config_t ps = { .command = app->clang };
   sp_da_init(app->mem, ps.dyn_args);
   sp_da_push(ps.dyn_args, sp_str_lit("-o"));
-  sp_da_push(ps.dyn_args, l->output);
+  sp_da_push(ps.dyn_args, spn_dag_find_artifact(app->g, action->produces[0])->path);
   sp_da_for(action->consumes, it) {
     sp_da_push(ps.dyn_args, spn_dag_find_artifact(app->g, action->consumes[it])->path);
   }
@@ -186,13 +192,6 @@ static void cc_flags_init(cc_app_t* app) {
   cc_push_search_dirs(app, sp_os_env_get(sp_str_lit("CPATH")));
 }
 
-static sp_str_t cc_obj_name(cc_app_t* app, sp_str_t input, sp_str_t ext) {
-  sp_str_t stem = sp_fs_get_stem(input);
-  spn_dag_digest_t digest = spn_dag_digest(input.data, input.len);
-  sp_str_t tag = sp_str_sub(spn_dag_digest_hex(app->mem, digest), 0, 8);
-  return sp_fmt(app->mem, "{}-{}.{}", sp_fmt_str(stem), sp_fmt_str(tag), sp_fmt_str(ext)).value;
-}
-
 static void cc_report(cc_app_t* app) {
   u32 hits = app->actions - app->executed;
   sp_os_print(sp_fmt(app->mem, "\n{} action(s): {} executed, {} restored from cache\n",
@@ -211,15 +210,13 @@ static sp_cli_result_t cc_build(sp_cli_t* cli) {
   }
 
   app->clang = sp_str_lit("clang");
-  app->root = sp_str_lit(".sp-cc");
-  sp_str_t obj_dir = sp_fs_join_path(app->mem, app->root, sp_str_lit("obj"));
-  sp_fs_create_dir(obj_dir);
+  app->root = sp_str_lit(".cache/spn");
   cc_flags_init(app);
 
   spn_dag_store_init(&app->store, (spn_dag_store_config_t) {
     .kind = SPN_DAG_STORE_FILESYSTEM,
     .mem = app->mem,
-    .dir = sp_fs_join_path(app->mem, app->root, sp_str_lit("blobs"))
+    .dir = sp_fs_join_path(app->mem, app->root, sp_str_lit("store"))
   });
   spn_dag_file_cache_init(&app->files, app->mem);
   spn_dag_action_cache_init(&app->cache, app->mem, sp_fs_join_path(app->mem, app->root, sp_str_lit("strong")));
@@ -232,7 +229,6 @@ static sp_cli_result_t cc_build(sp_cli_t* cli) {
   });
   cc_link_t* link_ctx = sp_alloc_type(app->mem, cc_link_t);
   link_ctx->app = app;
-  link_ctx->output = sp_str_view(app->output);
   spn_dag_find_action(app->g, link)->user_data = link_ctx;
 
   spn_dag_id_t out_id = spn_dag_add_file(app->g, sp_str_view(app->output));
@@ -241,14 +237,10 @@ static sp_cli_result_t cc_build(sp_cli_t* cli) {
 
   sp_for(it, cli->num_rest) {
     sp_str_t input = sp_str_view(cli->rest[it]);
-    sp_str_t obj = sp_fs_join_path(app->mem, obj_dir, cc_obj_name(app, input, sp_str_lit("o")));
-    sp_str_t dep = sp_fs_join_path(app->mem, obj_dir, cc_obj_name(app, input, sp_str_lit("d")));
 
     cc_compile_t* ctx = sp_alloc_type(app->mem, cc_compile_t);
     ctx->app = app;
     ctx->input = input;
-    ctx->obj = obj;
-    ctx->dep = dep;
 
     spn_dag_id_t compile = spn_dag_add_action(app->g, (spn_dag_action_config_t) {
       .identity = cc_identity(app, sp_fmt(app->mem, "compile {}", sp_fmt_str(input)).value),
@@ -258,16 +250,23 @@ static sp_cli_result_t cc_build(sp_cli_t* cli) {
     });
     spn_dag_action_add_input(app->g, compile, spn_dag_add_file(app->g, input));
 
-    spn_dag_id_t obj_id = spn_dag_add_file(app->g, obj);
-    spn_dag_id_t dep_id = spn_dag_add_file(app->g, dep);
+    sp_str_t name = sp_fmt(app->mem, "{}.o", sp_fmt_str(sp_fs_get_stem(input))).value;
+    spn_dag_id_t obj_id = spn_dag_add_output(app->g, name);
     spn_dag_action_add_output(app->g, compile, obj_id);
-    spn_dag_action_add_output(app->g, compile, dep_id);
+    ctx->obj = obj_id;
 
     spn_dag_action_add_input(app->g, link, obj_id);
     app->actions++;
   }
 
-  spn_err_t err = spn_dag_run(app->g, &app->files, &app->cache, &app->store, &app->discovery);
+  spn_dag_env_t env = {
+    .files = &app->files,
+    .cache = &app->cache,
+    .store = &app->store,
+    .discovery = &app->discovery,
+    .scratch = sp_fs_join_path(app->mem, app->root, sp_str_lit("tmp"))
+  };
+  spn_err_t err = spn_dag_run(app->g, &env);
 
   if (err) {
     return sp_cli_set_error(cli, sp_str_lit("build failed"));
@@ -282,7 +281,7 @@ s32 main(s32 num_args, const c8** args) {
   app.mem = sp_mem_os_new();
 
   sp_cli_cmd_t root = {
-    .name = "sp-cc",
+    .name = "spcc",
     .summary = "Content-addressed C compiler frontend (clang + DAG cache)",
     .opts = {
       { .brief = "o", .name = "output", .kind = SP_CLI_OPT_CSTR, .summary = "output binary", .placeholder = "FILE", .ptr = &app.output },
