@@ -28,6 +28,7 @@ sp_str_t            spn_dag_digest_hex(sp_mem_t mem, spn_dag_digest_t digest);
 void                spn_dag_file_cache_init(spn_dag_file_cache_t* c, sp_mem_t mem);
 void                spn_dag_file_cache_refresh(spn_dag_file_cache_t* c);
 void                spn_dag_file_cache_invalidate(spn_dag_file_cache_t* c, sp_str_t path);
+void                spn_dag_file_cache_invalidate_dir(spn_dag_file_cache_t* c, sp_str_t dir);
 void                spn_dag_file_cache_seed(spn_dag_file_cache_t* c, spn_dag_file_meta_t meta);
 spn_err_t           spn_dag_get_file_meta(spn_dag_file_cache_t* c, sp_str_t path, sp_sys_file_meta_t* meta);
 spn_err_t           spn_dag_get_file_digest(spn_dag_file_cache_t* c, sp_str_t path, spn_dag_digest_t* digest);

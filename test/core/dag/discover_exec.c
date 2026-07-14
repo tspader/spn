@@ -272,10 +272,10 @@ UTEST_F(discover_exec, missing_discovered_input_reruns_until_present) {
     .name = "discover_missing",
     .input = "A",
     .runs = {
-      { .missing = { "H" }, .expect_runs = 1 },
-      { .missing = { "H" }, .expect_runs = 2 },
-      { .headers = { { "H", "A" } }, .expect_runs = 3 },
-      { .headers = { { "H", "A" } }, .expect_runs = 3 },
+      { .missing = { "H" }, .expect_runs = 1, .output = "1" },
+      { .missing = { "H" }, .expect_runs = 2, .output = "2" },
+      { .headers = { { "H", "A" } }, .expect_runs = 3, .output = "3" },
+      { .headers = { { "H", "A" } }, .expect_runs = 3, .output = "3" },
     }
   });
 }

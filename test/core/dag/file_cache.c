@@ -6,6 +6,7 @@ typedef enum {
   FILE_CACHE_OP_WRITE,
   FILE_CACHE_OP_REFRESH,
   FILE_CACHE_OP_INVALIDATE,
+  FILE_CACHE_OP_INVALIDATE_DIR,
   FILE_CACHE_OP_DIGEST,
   FILE_CACHE_OP_SEED,
 } file_cache_op_kind_t;
@@ -60,6 +61,10 @@ static void run_test(s32* utest_result, file_cache_test_t t) {
       }
       case FILE_CACHE_OP_INVALIDATE: {
         spn_dag_file_cache_invalidate(&c, tmpfs_get(&fs, sp_cstr_as_str(op.path)));
+        break;
+      }
+      case FILE_CACHE_OP_INVALIDATE_DIR: {
+        spn_dag_file_cache_invalidate_dir(&c, tmpfs_get(&fs, sp_cstr_as_str(op.path)));
         break;
       }
       case FILE_CACHE_OP_DIGEST: {
@@ -129,6 +134,32 @@ UTEST_F(file_cache, invalidate_unpins_path) {
       { .kind = FILE_CACHE_OP_WRITE, .path = "F", .blob = "BB" },
       { .kind = FILE_CACHE_OP_INVALIDATE, .path = "F" },
       { .kind = FILE_CACHE_OP_DIGEST, .path = "F", .blob = "BB" },
+    }
+  });
+}
+
+UTEST_F(file_cache, invalidate_dir_unpins_subtree) {
+  run_test(&ur, (file_cache_test_t) {
+    .name = "file_cache_invalidate_dir",
+    .ops = {
+      { .kind = FILE_CACHE_OP_FILE, .path = "D/F", .blob = "A" },
+      { .kind = FILE_CACHE_OP_DIGEST, .path = "D/F", .blob = "A" },
+      { .kind = FILE_CACHE_OP_WRITE, .path = "D/F", .blob = "BB" },
+      { .kind = FILE_CACHE_OP_INVALIDATE_DIR, .path = "D" },
+      { .kind = FILE_CACHE_OP_DIGEST, .path = "D/F", .blob = "BB" },
+    }
+  });
+}
+
+UTEST_F(file_cache, invalidate_dir_spares_siblings) {
+  run_test(&ur, (file_cache_test_t) {
+    .name = "file_cache_invalidate_dir_siblings",
+    .ops = {
+      { .kind = FILE_CACHE_OP_FILE, .path = "E/G", .blob = "C" },
+      { .kind = FILE_CACHE_OP_DIGEST, .path = "E/G", .blob = "C" },
+      { .kind = FILE_CACHE_OP_WRITE, .path = "E/G", .blob = "DD" },
+      { .kind = FILE_CACHE_OP_INVALIDATE_DIR, .path = "D" },
+      { .kind = FILE_CACHE_OP_DIGEST, .path = "E/G", .blob = "C" },
     }
   });
 }
