@@ -11,6 +11,9 @@ static s32 fz_exec(spn_dag_action_t* action, void* user_data) {
   fz_lowered_t* low = ctx->low;
   sp_mem_t mem = low->mem;
   low->execs[ctx->action]++;
+  if (low->ex) {
+    low->ex->ran = (s64)ctx->action;
+  }
 
   u64 count = sp_da_size(action->consumes);
   sp_str_t* inputs = sp_alloc_n(mem, sp_str_t, count);
