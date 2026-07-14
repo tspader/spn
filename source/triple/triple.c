@@ -145,6 +145,39 @@ sp_str_t spn_triple_to_autoconf(sp_mem_t mem, spn_triple_t triple) {
   return arch;
 }
 
+sp_str_t spn_triple_lib_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name, sp_os_lib_kind_t kind) {
+  switch (kind) {
+    case SP_OS_LIB_STATIC: {
+      if (triple.os == SPN_OS_WINDOWS && triple.abi == SPN_ABI_MSVC) {
+        return sp_fmt(mem, "{}.lib", sp_fmt_str(name)).value;
+      }
+      return sp_fmt(mem, "lib{}.a", sp_fmt_str(name)).value;
+    }
+    case SP_OS_LIB_SHARED: {
+      switch (triple.os) {
+        case SPN_OS_WINDOWS: return sp_fmt(mem, "{}.dll", sp_fmt_str(name)).value;
+        case SPN_OS_MACOS:   return sp_fmt(mem, "lib{}.dylib", sp_fmt_str(name)).value;
+        case SPN_OS_LINUX:
+        case SPN_OS_WASI:
+        case SPN_OS_NONE:    return sp_fmt(mem, "lib{}.so", sp_fmt_str(name)).value;
+      }
+      break;
+    }
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+sp_str_t spn_triple_exe_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name) {
+  switch (triple.os) {
+    case SPN_OS_WINDOWS: return sp_fmt(mem, "{}.exe", sp_fmt_str(name)).value;
+    case SPN_OS_WASI:    return sp_fmt(mem, "{}.wasm", sp_fmt_str(name)).value;
+    case SPN_OS_LINUX:
+    case SPN_OS_MACOS:
+    case SPN_OS_NONE:    return sp_str_copy(mem, name);
+  }
+  SP_UNREACHABLE_RETURN(name);
+}
+
 sp_str_t spn_os_to_cmake_system_name(spn_os_t os) {
   switch (os) {
     case SPN_OS_LINUX:   return sp_str_lit("Linux");
