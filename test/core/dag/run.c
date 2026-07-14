@@ -106,7 +106,7 @@ static void run_run_test(s32* utest_result, run_test_t t) {
     .mem = env.fs.mem
   });
   spn_dag_file_cache_init(&env.files, env.fs.mem);
-  spn_dag_action_cache_init(&env.cache, env.fs.mem);
+  spn_dag_action_cache_init(&env.cache, env.fs.mem, sp_str_lit(""));
   spn_dag_discovery_init(&env.discovery, env.fs.mem, tmpfs_get(&env.fs, sp_str_lit("manifests")));
 
   sp_carr_for(t.builds, b) {

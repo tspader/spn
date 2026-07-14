@@ -10,13 +10,12 @@ typedef enum {
   CACHE_OP_PUT,
   CACHE_OP_GET,
   CACHE_OP_REMOVE,
-  CACHE_OP_SAVE,
   CACHE_OP_RELOAD,
+  CACHE_OP_CORRUPT,
 } cache_op_kind_t;
 
 typedef struct {
   bool hit;
-  spn_err_t err;
 } cache_expect_t;
 
 typedef struct {
@@ -48,13 +47,18 @@ static spn_dag_digest_t cache_blob_digest(const c8* blob) {
   return spn_dag_digest(str.data, str.len);
 }
 
+static sp_str_t cache_entry_path(tmpfs_t* fs, sp_str_t dir, const c8* key) {
+  sp_str_t hex = spn_dag_digest_hex(fs->mem, cache_blob_digest(key));
+  return sp_fs_join_path(fs->mem, dir, sp_fmt(fs->mem, "{}.jsonl", sp_fmt_str(hex)).value);
+}
+
 static void run_cache_test(s32* utest_result, cache_test_t t) {
   tmpfs_t fs = sp_zero;
   tmpfs_init_named(&fs, t.name);
-  sp_str_t table = tmpfs_get(&fs, sp_str_lit("actions.jsonl"));
+  sp_str_t dir = tmpfs_get(&fs, sp_str_lit("strong"));
 
   spn_dag_action_cache_t c = sp_zero;
-  spn_dag_action_cache_init(&c, fs.mem);
+  spn_dag_action_cache_init(&c, fs.mem, dir);
 
   sp_carr_for(t.ops, it) {
     cache_op_t op = t.ops[it];
@@ -102,13 +106,12 @@ static void run_cache_test(s32* utest_result, cache_test_t t) {
         EXPECT_EQ(op.expect.hit, spn_dag_action_cache_remove(&c, cache_blob_digest(op.key)));
         break;
       }
-      case CACHE_OP_SAVE: {
-        EXPECT_EQ(op.expect.err, spn_dag_action_cache_save(&c, table));
+      case CACHE_OP_RELOAD: {
+        spn_dag_action_cache_init(&c, fs.mem, dir);
         break;
       }
-      case CACHE_OP_RELOAD: {
-        spn_dag_action_cache_init(&c, fs.mem);
-        EXPECT_EQ(op.expect.err, spn_dag_action_cache_load(&c, table));
+      case CACHE_OP_CORRUPT: {
+        ASSERT_EQ(SP_OK, sp_fs_create_file_cstr(cache_entry_path(&fs, dir, op.key), "not json\n"));
         break;
       }
     }
@@ -169,13 +172,12 @@ UTEST_F(action_cache, empty_outputs) {
   });
 }
 
-UTEST_F(action_cache, save_load_roundtrip) {
+UTEST_F(action_cache, reload_roundtrip) {
   run_cache_test(&ur, (cache_test_t) {
     .name = "action_cache_roundtrip",
     .ops = {
       { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" }, { "main.d", "deps" } } },
       { .kind = CACHE_OP_PUT, .key = "cc spum.c", .outputs = { { "spum.o", "spum" } } },
-      { .kind = CACHE_OP_SAVE },
       { .kind = CACHE_OP_RELOAD },
       { .kind = CACHE_OP_GET, .key = "cc main.c", .outputs = { { "main.o", "obj" }, { "main.d", "deps" } }, .expect = { .hit = true } },
       { .kind = CACHE_OP_GET, .key = "cc spum.c", .outputs = { { "spum.o", "spum" } }, .expect = { .hit = true } },
@@ -183,11 +185,37 @@ UTEST_F(action_cache, save_load_roundtrip) {
   });
 }
 
-UTEST_F(action_cache, load_missing_table) {
+UTEST_F(action_cache, reload_empty_dir) {
   run_cache_test(&ur, (cache_test_t) {
-    .name = "action_cache_load_missing",
+    .name = "action_cache_reload_empty",
     .ops = {
-      { .kind = CACHE_OP_RELOAD, .expect = { .err = SPN_ERROR } },
+      { .kind = CACHE_OP_RELOAD },
+      { .kind = CACHE_OP_GET, .key = "cc main.c" },
+    }
+  });
+}
+
+UTEST_F(action_cache, remove_unlinks_entry) {
+  run_cache_test(&ur, (cache_test_t) {
+    .name = "action_cache_remove_unlinks",
+    .ops = {
+      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" } } },
+      { .kind = CACHE_OP_REMOVE, .key = "cc main.c", .expect = { .hit = true } },
+      { .kind = CACHE_OP_RELOAD },
+      { .kind = CACHE_OP_GET, .key = "cc main.c" },
+    }
+  });
+}
+
+UTEST_F(action_cache, corrupt_entry_misses) {
+  run_cache_test(&ur, (cache_test_t) {
+    .name = "action_cache_corrupt",
+    .ops = {
+      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" } } },
+      { .kind = CACHE_OP_CORRUPT, .key = "cc main.c" },
+      { .kind = CACHE_OP_RELOAD },
+      { .kind = CACHE_OP_GET, .key = "cc main.c" },
+      { .kind = CACHE_OP_GET, .key = "cc main.c" },
     }
   });
 }

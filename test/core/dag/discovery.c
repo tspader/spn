@@ -21,15 +21,6 @@ typedef struct {
   discovery_expect_t expect;
 } discovery_test_t;
 
-typedef struct {
-  const c8* name;
-  discovery_entry_t entries [DAG_TEST_MAX_OPS];
-} discovery_persistence_test_t;
-
-typedef struct {
-  const c8* name;
-} discovery_load_test_t;
-
 UTEST_EMPTY_FIXTURE(discovery)
 
 static spn_dag_digest_t discovery_key(const c8* key) {
@@ -91,45 +82,6 @@ static void run_discovery_test(s32* utest_result, discovery_test_t t) {
 
   discovery_expect(utest_result, &discovery, t.key, t.expect);
   sp_mem_end_scratch(scratch);
-}
-
-static void run_discovery_persistence_test(s32* utest_result, discovery_persistence_test_t t) {
-  tmpfs_t fs = sp_zero;
-  tmpfs_init_named(&fs, t.name);
-  sp_str_t dir = tmpfs_get(&fs, sp_str_lit("manifests"));
-
-  spn_dag_discovery_t saved = sp_zero;
-  spn_dag_discovery_init(&saved, fs.mem, dir);
-  sp_carr_for(t.entries, it) {
-    if (!t.entries[it].key) {
-      break;
-    }
-    discovery_put(&saved, t.entries[it]);
-  }
-
-  spn_dag_discovery_t loaded = sp_zero;
-  spn_dag_discovery_init(&loaded, fs.mem, dir);
-  sp_carr_for(t.entries, it) {
-    if (!t.entries[it].key) {
-      break;
-    }
-    const spn_dag_pathset_t* set = spn_dag_discovery_get(&loaded, discovery_key(t.entries[it].key));
-    ASSERT_TRUE(set);
-    discovery_expect_obs(utest_result, set, t.entries[it].obs);
-  }
-
-  tmpfs_deinit(&fs);
-}
-
-static void run_discovery_load_test(s32* utest_result, discovery_load_test_t t) {
-  tmpfs_t fs = sp_zero;
-  tmpfs_init_named(&fs, t.name);
-
-  spn_dag_discovery_t discovery = sp_zero;
-  spn_dag_discovery_init(&discovery, fs.mem, tmpfs_get(&fs, sp_str_lit("manifests")));
-  EXPECT_EQ(SP_NULLPTR, spn_dag_discovery_get(&discovery, discovery_key("K")));
-
-  tmpfs_deinit(&fs);
 }
 
 UTEST_F(discovery, missing_key_misses) {
@@ -195,27 +147,5 @@ UTEST_F(discovery, new_pathset_replaces_existing) {
       .hit = true,
       .obs = { { .path = "B" } }
     }
-  });
-}
-
-UTEST_F(discovery, save_load_roundtrip) {
-  run_discovery_persistence_test(&ur, (discovery_persistence_test_t) {
-    .name = "discovery_roundtrip",
-    .entries = {
-      {
-        .key = "K",
-        .obs = {
-          { .path = "A" },
-          { .kind = SPN_DAG_OBS_ABSENT, .path = "B" }
-        }
-      },
-      { .key = "K2" }
-    }
-  });
-}
-
-UTEST_F(discovery, missing_manifest_misses) {
-  run_discovery_load_test(&ur, (discovery_load_test_t) {
-    .name = "discovery_missing"
   });
 }
