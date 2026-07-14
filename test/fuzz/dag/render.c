@@ -1,0 +1,108 @@
+#include "fuzz.h"
+#include "sp/io.h"
+
+static void fz_line(sp_io_writer_t* io, sp_str_t line) {
+  sp_io_write_str(io, line, SP_NULLPTR);
+  sp_io_write_c8(io, '\n');
+}
+
+void fz_render_mermaid(sp_io_writer_t* io, fz_universe_t* u) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  sp_mem_t mem = s.mem;
+
+  sp_fmt_io(io, "flowchart TD\n");
+  sp_fmt_io(io, "  classDef phantom stroke-dasharray: 4 4\n");
+
+  sp_da_for(u->artifacts, it) {
+    fz_artifact_t* artifact = &u->artifacts[it];
+    switch (artifact->kind) {
+      case FZ_ARTIFACT_VALUE: {
+        sp_fmt_io(io, "  f{}([\"value f{} c{}\"])", sp_fmt_uint(it), sp_fmt_uint(it), sp_fmt_uint(artifact->content));
+        sp_io_write_cstr(io, "\n", SP_NULLPTR);
+        break;
+      }
+      case FZ_ARTIFACT_SOURCE: {
+        sp_fmt_io(io, "  f{}[/\"{} c{}\"/]", sp_fmt_uint(it), sp_fmt_str(fz_artifact_path(mem, u, (u32)it)), sp_fmt_uint(artifact->content));
+        sp_io_write_cstr(io, "\n", SP_NULLPTR);
+        break;
+      }
+      case FZ_ARTIFACT_OUTPUT: {
+        sp_fmt_io(io, "  f{}[\"{}\"]", sp_fmt_uint(it), sp_fmt_str(fz_artifact_path(mem, u, (u32)it)));
+        sp_io_write_cstr(io, "\n", SP_NULLPTR);
+        break;
+      }
+    }
+  }
+
+  sp_da_for(u->actions, at) {
+    fz_action_t* action = &u->actions[at];
+    sp_fmt_io(io, "  a{}[[\"a{} id{}{}\"]]\n",
+      sp_fmt_uint(at), sp_fmt_uint(at), sp_fmt_uint(action->identity),
+      sp_fmt_str(action->discover ? sp_str_lit(" discover") : sp_str_lit("")));
+  }
+
+  bool phantoms[FZ_MAX_PHANTOMS] = sp_zero;
+  sp_da_for(u->actions, at) {
+    sp_da_for(u->actions[at].obs, ot) {
+      fz_obs_t obs = u->actions[at].obs[ot];
+      if (obs.absent) {
+        phantoms[obs.phantom] = true;
+      }
+    }
+  }
+  sp_carr_for(phantoms, it) {
+    if (!phantoms[it]) continue;
+    sp_fmt_io(io, "  g{}((\"{}\")):::phantom", sp_fmt_uint(it), sp_fmt_str(fz_phantom_path(mem, (u32)it)));
+    sp_io_write_cstr(io, "\n", SP_NULLPTR);
+  }
+
+  sp_da_for(u->actions, at) {
+    fz_action_t* action = &u->actions[at];
+    sp_da_for(action->consumes, ct) {
+      sp_fmt_io(io, "  f{} --> a{}", sp_fmt_uint(action->consumes[ct]), sp_fmt_uint(at));
+      sp_io_write_cstr(io, "\n", SP_NULLPTR);
+    }
+    sp_da_for(action->produces, pt) {
+      sp_fmt_io(io, "  a{} --> f{}", sp_fmt_uint(at), sp_fmt_uint(action->produces[pt]));
+      sp_io_write_cstr(io, "\n", SP_NULLPTR);
+    }
+    sp_da_for(action->obs, ot) {
+      fz_obs_t obs = action->obs[ot];
+      if (obs.absent) {
+        sp_fmt_io(io, "  a{} -. absent .-> g{}", sp_fmt_uint(at), sp_fmt_uint(obs.phantom));
+        sp_io_write_cstr(io, "\n", SP_NULLPTR);
+      }
+      else {
+        sp_fmt_io(io, "  a{} -. obs .-> f{}", sp_fmt_uint(at), sp_fmt_uint(obs.artifact));
+        sp_io_write_cstr(io, "\n", SP_NULLPTR);
+      }
+    }
+  }
+
+  sp_mem_end_scratch(s);
+}
+
+void fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, u64 iter) {
+  sp_fs_create_dir(root);
+  sp_str_t dir = sp_fs_join_path(mem, root, sp_fmt(mem, "{:0>3}", sp_fmt_uint(iter)).value);
+  sp_fs_create_dir(dir);
+
+  sp_io_file_writer_t envrc = sp_zero;
+  if (!sp_io_file_writer_from_path(&envrc, sp_fs_join_path(mem, dir, sp_str_lit(".envrc")))) {
+    fz_line(&envrc.base, sp_fmt(mem, "export SPN_TEST_SEED=0x{:x}", sp_fmt_uint(sp_fuzz_seed_get())).value);
+    fz_line(&envrc.base, sp_fmt(mem, "export SPN_FUZZ_ITER={}", sp_fmt_uint(iter)).value);
+    sp_io_file_writer_close(&envrc);
+  }
+
+  sp_io_file_writer_t graph = sp_zero;
+  if (!sp_io_file_writer_from_path(&graph, sp_fs_join_path(mem, dir, sp_str_lit("graph.mmd")))) {
+    fz_line(&graph.base, sp_fmt(mem, "%% iter {}: {} actions, {} artifacts{}{}",
+      sp_fmt_uint(iter),
+      sp_fmt_uint(sp_da_size(u->actions)),
+      sp_fmt_uint(sp_da_size(u->artifacts)),
+      sp_fmt_str(u->profile.big ? sp_str_lit(", big") : sp_str_lit("")),
+      sp_fmt_str(u->cyclic ? sp_str_lit(", cyclic") : sp_str_lit(""))).value);
+    fz_render_mermaid(&graph.base, u);
+    sp_io_file_writer_close(&graph);
+  }
+}

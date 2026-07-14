@@ -2,12 +2,26 @@
 #define SP_FUZZ_H
 
 #include "sp.h"
+#include "sp/sp_cli.h"
 
 #include "intern/types.h"
 
 typedef struct {
   u64 state;
 } sp_fuzz_prng_t;
+
+typedef struct {
+  const c8* name;
+  const c8* summary;
+  u64 iters;
+  u32 errs;
+  sp_str_t (*err_str)(u32 err);
+  u32 (*run)(sp_mem_t mem, sp_fuzz_prng_t prng, u64 iter);
+} sp_fuzz_desc_t;
+
+s32      sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc);
+u64      sp_fuzz_seed_get(void);
+sp_str_t sp_fuzz_render_path(void);
 
 typedef struct {
   u64 iters;
