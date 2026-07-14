@@ -19,14 +19,8 @@ typedef struct {
 UTEST_EMPTY_FIXTURE(key)
 
 static void build_action_key(s32* utest_result, spn_dag_t* g, key_action_t spec, spn_dag_digest_t* key) {
-  spn_dag_digest_t identity = sp_zero;
-  if (spec.identity) {
-    sp_str_t str = sp_cstr_as_str(spec.identity);
-    identity = spn_dag_digest(str.data, str.len);
-  }
-
   spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
-    .identity = identity
+    .identity = dag_test_digest(spec.identity)
   });
 
   sp_carr_for(spec.inputs, it) {

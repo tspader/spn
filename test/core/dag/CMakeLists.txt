@@ -11,17 +11,23 @@ add_executable(dag
   digest.c
   discovery.c
   discover_exec.c
+  enumeration.c
   exec.c
   file_cache.c
+  glob.c
   graph.c
   key.c
   run.c
   store.c
   strong_key.c
+  tree.c
   ${TEST_TOOLS}/tmp.c
+  ${TEST_TOOLS}/sp_sim.c
 )
 spn_test_binary(dag)
 target_include_directories(dag PRIVATE ${SRC}/codegen/gen)
 target_link_libraries(dag PRIVATE yyjson)
 add_dependencies(dag spn_codegen_gen)
 add_test(NAME dag COMMAND "$<TARGET_FILE:dag>")
+add_test(NAME dag_sim COMMAND "$<TARGET_FILE:dag>")
+set_tests_properties(dag_sim PROPERTIES ENVIRONMENT "SPN_TEST_SIM=1")

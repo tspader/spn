@@ -11,6 +11,8 @@ spn_dag_action_t*   spn_dag_find_action(spn_dag_t* g, spn_dag_id_t id);
 spn_dag_id_t        spn_dag_add_value(spn_dag_t* g, const void* data, u64 len);
 spn_dag_id_t        spn_dag_add_file(spn_dag_t* g, sp_str_t path);
 spn_dag_id_t        spn_dag_add_output(spn_dag_t* g, sp_str_t name);
+spn_dag_id_t        spn_dag_add_tree(spn_dag_t* g, sp_str_t path);
+spn_err_t           spn_dag_glob(sp_mem_t mem, sp_str_t root, sp_str_t pattern, sp_da(spn_dag_obs_t)* obs, sp_da(spn_dag_match_t)* matches);
 spn_dag_id_t        spn_dag_find_file(spn_dag_t* g, sp_str_t path);
 spn_dag_id_t        spn_dag_add_action(spn_dag_t* g, spn_dag_action_config_t config);
 void                spn_dag_action_add_input(spn_dag_t* g, spn_dag_id_t action, spn_dag_id_t artifact);
@@ -51,5 +53,9 @@ bool                spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t d
 sp_str_t            spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest);
 spn_err_t           spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_mem_slice_t* data);
 spn_err_t           spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t path);
+spn_err_t           spn_dag_store_put_tree(spn_dag_store_t* store, sp_str_t dir, spn_dag_digest_t* digest);
+spn_err_t           spn_dag_tree_entries(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_da(spn_dag_action_output_t)* out);
+bool                spn_dag_store_has_tree(spn_dag_store_t* store, spn_dag_digest_t digest);
+spn_err_t           spn_dag_store_materialize_tree(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t dir);
 
 #endif

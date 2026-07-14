@@ -1,14 +1,8 @@
 #include "common.h"
 
 typedef struct {
-  const c8* path;
-  const c8* content;
-  spn_dag_obs_kind_t kind;
-} strong_key_obs_t;
-
-typedef struct {
   const c8* prelim;
-  strong_key_obs_t obs [DAG_TEST_MAX_INPUTS];
+  dag_test_obs_t obs [DAG_TEST_MAX_INPUTS];
 } strong_key_action_t;
 
 typedef struct {
@@ -24,30 +18,9 @@ typedef struct {
 UTEST_EMPTY_FIXTURE(strong_key)
 
 static spn_dag_digest_t build_strong_key(strong_key_action_t spec) {
-  spn_dag_digest_t prelim = sp_zero;
-  if (spec.prelim) {
-    sp_str_t str = sp_str_view(spec.prelim);
-    prelim = spn_dag_digest(str.data, str.len);
-  }
-
   spn_dag_obs_t obs [DAG_TEST_MAX_INPUTS] = sp_zero;
-  u32 count = 0;
-  sp_carr_for(spec.obs, it) {
-    if (!spec.obs[it].path) {
-      break;
-    }
-    obs[count] = (spn_dag_obs_t) {
-      .kind = spec.obs[it].kind,
-      .path = sp_str_view(spec.obs[it].path)
-    };
-    if (spec.obs[it].content) {
-      sp_str_t content = sp_str_view(spec.obs[it].content);
-      obs[count].meta.digest = spn_dag_digest(content.data, content.len);
-    }
-    count++;
-  }
-
-  return spn_dag_strong_key(prelim, obs, count);
+  u32 count = dag_test_obs_build(spec.obs, DAG_TEST_MAX_INPUTS, obs);
+  return spn_dag_strong_key(dag_test_digest(spec.prelim), obs, count);
 }
 
 static void run_test(s32* utest_result, strong_key_test_t t) {
@@ -117,5 +90,19 @@ UTEST_F(strong_key, probe_now_present_changes_key) {
   run_test(&ur, (strong_key_test_t) {
     .a = { .prelim = "cc main.c", .obs = { { "inc1/sp.h", SP_NULLPTR, SPN_DAG_OBS_ABSENT }, { "inc2/sp.h", "SP" } } },
     .b = { .prelim = "cc main.c", .obs = { { "inc1/sp.h", "SP", SPN_DAG_OBS_ABSENT }, { "inc2/sp.h", "SP" } } },
+  });
+}
+
+UTEST_F(strong_key, enumeration_filter_changes_key) {
+  run_test(&ur, (strong_key_test_t) {
+    .a = { .prelim = "publish", .obs = { { "inc", "M", SPN_DAG_OBS_ENUMERATION, "*.h" } } },
+    .b = { .prelim = "publish", .obs = { { "inc", "M", SPN_DAG_OBS_ENUMERATION, "*.c" } } },
+  });
+}
+
+UTEST_F(strong_key, enumeration_membership_changes_key) {
+  run_test(&ur, (strong_key_test_t) {
+    .a = { .prelim = "publish", .obs = { { "inc", "M1", SPN_DAG_OBS_ENUMERATION, "*.h" } } },
+    .b = { .prelim = "publish", .obs = { { "inc", "M2", SPN_DAG_OBS_ENUMERATION, "*.h" } } },
   });
 }
