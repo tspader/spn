@@ -7,6 +7,8 @@ typedef struct {
   const c8* hidden_lib;
   const c8* system_lib;
   const c8* framework;
+  const c8* lib_dir;
+  const c8* rpath;
   spn_os_version_t min_os;
   spn_win_subsystem_t subsystem;
   render_expect_t expect;
@@ -38,6 +40,12 @@ static void run_link_test(s32* utest_result, link_test_t test) {
   }
   if (test.framework) {
     sp_da_push(link.frameworks, sp_str_from_cstr(scratch.mem, test.framework));
+  }
+  if (test.lib_dir) {
+    sp_da_push(link.lib_dirs, sp_str_from_cstr(scratch.mem, test.lib_dir));
+  }
+  if (test.rpath) {
+    sp_da_push(link.rpath, sp_str_from_cstr(scratch.mem, test.rpath));
   }
   link.subsystem = test.subsystem;
   sp_ps_config_t ps = sp_zero;
@@ -194,6 +202,106 @@ UTEST(render_link, mingw_subsystem) {
     .expect = {
       .command = "cc",
       .args = { "-Wl,--subsystem,windows", "main.o", "-o", "main" },
+    },
+  });
+}
+
+UTEST(render_link, linux_shared_lib) {
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+    },
+    .kind = SPN_CC_OUTPUT_SHARED_LIB,
+    .expect = {
+      .command = "cc",
+      .args = { "-shared", "main.o", "-o", "main" },
+    },
+  });
+}
+
+UTEST(render_link, static_linkage) {
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+      .linkage = SPN_LIB_KIND_STATIC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "-static", "main.o", "-o", "main" },
+    },
+  });
+}
+
+UTEST(render_link, macos_static_linkage_suppressed) {
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_MACOS,
+      .linkage = SPN_LIB_KIND_STATIC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "--target=aarch64-macos", "main.o", "-o", "main" },
+    },
+  });
+}
+
+UTEST(render_link, macos_hidden_lib) {
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_MACOS,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .hidden_lib = "spum",
+    .expect = {
+      .command = "cc",
+      .args = { "--target=aarch64-macos", "main.o", "-Wl,-hidden-lspum", "-o", "main" },
+    },
+  });
+}
+
+UTEST(render_link, lib_dirs_and_rpath) {
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .lib_dir = "deps/lib",
+    .rpath = "$ORIGIN",
+    .expect = {
+      .command = "cc",
+      .args = { "main.o", "-Ldeps/lib", "-Wl,-rpath,$ORIGIN", "-o", "main" },
+    },
+  });
+}
+
+UTEST(render_link, sanitizers_on_link_line) {
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+      .sanitizers = SPN_SANITIZER_ADDRESS,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "-fsanitize=address", "main.o", "-o", "main" },
     },
   });
 }

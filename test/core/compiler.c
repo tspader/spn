@@ -19,7 +19,7 @@ void expect_args(s32* utest_result, sp_ps_config_t* ps, render_expect_t expect) 
     }
     count++;
   }
-  EXPECT_EQ(sp_da_size(ps->dyn_args), count);
+  ASSERT_EQ(sp_da_size(ps->dyn_args), count);
   sp_for(it, count) {
     EXPECT_TRUE(sp_str_equal_cstr(ps->dyn_args[it], expect.args[it]));
   }
