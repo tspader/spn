@@ -24,6 +24,7 @@ or, equivalently, `ctest --test-dir .build/work/$TRIPLE --output-on-failure`.
 - Never explicitly initialize fields which are zero initialized (e.g. do not set `.err = SP_OK`)
 - When test cases need multistep, ordered setup, used a tagged union of actions (see: `fs_setup_t`)
 - One class of tests per C file. If a suite has multiple, write the individual C files in `test/$module/`, and then have `test/module.c` `#include` all the C files (see: `test/fs.c`)
+- Always use single capital letters as IDs and content when needed. For example, don't name a test package "mathlib"; name it "A".
 
 # example
 

@@ -21,7 +21,7 @@ UTEST_EMPTY_FIXTURE(key)
 static void build_action_key(s32* utest_result, spn_dag_t* g, key_action_t spec, spn_dag_digest_t* key) {
   spn_dag_digest_t identity = sp_zero;
   if (spec.identity) {
-    sp_str_t str = sp_str_view(spec.identity);
+    sp_str_t str = sp_cstr_as_str(spec.identity);
     identity = spn_dag_digest(str.data, str.len);
   }
 
@@ -33,7 +33,7 @@ static void build_action_key(s32* utest_result, spn_dag_t* g, key_action_t spec,
     if (!spec.inputs[it]) {
       break;
     }
-    sp_str_t str = sp_str_view(spec.inputs[it]);
+    sp_str_t str = sp_cstr_as_str(spec.inputs[it]);
     spn_dag_id_t value = spn_dag_add_value(g, str.data, str.len);
     spn_dag_action_add_input(g, action, value);
   }
@@ -42,14 +42,14 @@ static void build_action_key(s32* utest_result, spn_dag_t* g, key_action_t spec,
     if (!spec.outputs[it]) {
       break;
     }
-    spn_dag_id_t file = spn_dag_add_file(g, sp_str_view(spec.outputs[it]));
+    spn_dag_id_t file = spn_dag_add_file(g, sp_cstr_as_str(spec.outputs[it]));
     ASSERT_EQ(SPN_OK, spn_dag_action_add_output(g, action, file));
   }
 
   *key = spn_dag_action_key(g, action);
 }
 
-static void run_key_test(s32* utest_result, key_test_t t) {
+static void run_test(s32* utest_result, key_test_t t) {
   sp_mem_t mem = sp_mem_os_new();
   spn_dag_digest_t a = sp_zero;
   spn_dag_digest_t b = sp_zero;
@@ -59,51 +59,51 @@ static void run_key_test(s32* utest_result, key_test_t t) {
 }
 
 UTEST_F(key, identical_actions_match) {
-  run_key_test(&ur, (key_test_t) {
-    .a = { .identity = "cc -c", .inputs = { "main.c", "sp.h" }, .outputs = { "main.o" } },
-    .b = { .identity = "cc -c", .inputs = { "main.c", "sp.h" }, .outputs = { "main.o" } },
+  run_test(&ur, (key_test_t) {
+    .a = { .identity = "I", .inputs = { "A", "B" }, .outputs = { "O" } },
+    .b = { .identity = "I", .inputs = { "A", "B" }, .outputs = { "O" } },
     .expect = { .equal = true }
   });
 }
 
 UTEST_F(key, input_order_changes_key) {
-  run_key_test(&ur, (key_test_t) {
-    .a = { .inputs = { "main.c", "sp.h" } },
-    .b = { .inputs = { "sp.h", "main.c" } },
+  run_test(&ur, (key_test_t) {
+    .a = { .inputs = { "A", "B" } },
+    .b = { .inputs = { "B", "A" } },
   });
 }
 
 UTEST_F(key, input_content_changes_key) {
-  run_key_test(&ur, (key_test_t) {
-    .a = { .inputs = { "main.c" } },
-    .b = { .inputs = { "main.d" } },
+  run_test(&ur, (key_test_t) {
+    .a = { .inputs = { "A" } },
+    .b = { .inputs = { "B" } },
   });
 }
 
 UTEST_F(key, extra_input_changes_key) {
-  run_key_test(&ur, (key_test_t) {
-    .a = { .inputs = { "main.c" } },
-    .b = { .inputs = { "main.c", "sp.h" } },
+  run_test(&ur, (key_test_t) {
+    .a = { .inputs = { "A" } },
+    .b = { .inputs = { "A", "B" } },
   });
 }
 
 UTEST_F(key, identity_changes_key) {
-  run_key_test(&ur, (key_test_t) {
-    .a = { .identity = "cc -c -O0", .inputs = { "main.c" } },
-    .b = { .identity = "cc -c -O2", .inputs = { "main.c" } },
+  run_test(&ur, (key_test_t) {
+    .a = { .identity = "A", .inputs = { "A" } },
+    .b = { .identity = "B", .inputs = { "A" } },
   });
 }
 
 UTEST_F(key, output_path_changes_key) {
-  run_key_test(&ur, (key_test_t) {
-    .a = { .outputs = { "main.o" } },
-    .b = { .outputs = { "spum.o" } },
+  run_test(&ur, (key_test_t) {
+    .a = { .outputs = { "A" } },
+    .b = { .outputs = { "B" } },
   });
 }
 
 UTEST_F(key, extra_output_changes_key) {
-  run_key_test(&ur, (key_test_t) {
-    .a = { .outputs = { "main.o" } },
-    .b = { .outputs = { "main.o", "main.d" } },
+  run_test(&ur, (key_test_t) {
+    .a = { .outputs = { "A" } },
+    .b = { .outputs = { "A", "B" } },
   });
 }
