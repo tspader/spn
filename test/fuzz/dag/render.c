@@ -22,12 +22,12 @@ void fz_render_mermaid(sp_io_writer_t* io, fz_universe_t* u) {
         break;
       }
       case FZ_ARTIFACT_SOURCE: {
-        sp_fmt_io(io, "  f{}[/\"{} c{}\"/]", sp_fmt_uint(it), sp_fmt_str(fz_artifact_path(mem, u, (u32)it)), sp_fmt_uint(artifact->content));
+        sp_fmt_io(io, "  f{}[/\"{} c{}\"/]", sp_fmt_uint(it), sp_fmt_str(fz_artifact_path(mem, u, it)), sp_fmt_uint(artifact->content));
         sp_io_write_cstr(io, "\n", SP_NULLPTR);
         break;
       }
       case FZ_ARTIFACT_OUTPUT: {
-        sp_fmt_io(io, "  f{}[\"{}\"]", sp_fmt_uint(it), sp_fmt_str(fz_artifact_path(mem, u, (u32)it)));
+        sp_fmt_io(io, "  f{}[\"{}\"]", sp_fmt_uint(it), sp_fmt_str(fz_artifact_path(mem, u, it)));
         sp_io_write_cstr(io, "\n", SP_NULLPTR);
         break;
       }
@@ -52,7 +52,7 @@ void fz_render_mermaid(sp_io_writer_t* io, fz_universe_t* u) {
   }
   sp_carr_for(phantoms, it) {
     if (!phantoms[it]) continue;
-    sp_fmt_io(io, "  g{}((\"{}\")):::phantom", sp_fmt_uint(it), sp_fmt_str(fz_phantom_path(mem, (u32)it)));
+    sp_fmt_io(io, "  g{}((\"{}\")):::phantom", sp_fmt_uint(it), sp_fmt_str(fz_phantom_path(mem, it)));
     sp_io_write_cstr(io, "\n", SP_NULLPTR);
   }
 
@@ -82,7 +82,7 @@ void fz_render_mermaid(sp_io_writer_t* io, fz_universe_t* u) {
   sp_mem_end_scratch(s);
 }
 
-void fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, u64 iter) {
+void fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_trace_t* trace, u64 iter) {
   sp_fs_create_dir(root);
   sp_str_t dir = sp_fs_join_path(mem, root, sp_fmt(mem, "{:0>3}", sp_fmt_uint(iter)).value);
   sp_fs_create_dir(dir);
@@ -104,5 +104,26 @@ void fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, u64 iter
       sp_fmt_str(u->cyclic ? sp_str_lit(", cyclic") : sp_str_lit(""))).value);
     fz_render_mermaid(&graph.base, u);
     sp_io_file_writer_close(&graph);
+  }
+
+  sp_io_file_writer_t steps = sp_zero;
+  if (!sp_io_file_writer_from_path(&steps, sp_fs_join_path(mem, dir, sp_str_lit("trace.txt")))) {
+    sp_da_for(trace->steps, st) {
+      fz_step_t* step = &trace->steps[st];
+      switch (step->kind) {
+        case FZ_STEP_RUN: {
+          fz_line(&steps.base, sp_str_lit("run"));
+          break;
+        }
+        case FZ_STEP_MUTATE: {
+          fz_line(&steps.base, sp_fmt(mem, "mutate f{} c{}", sp_fmt_uint(step->artifact), sp_fmt_uint(step->content)).value);
+          break;
+        }
+        case FZ_STEP_COUNT: {
+          break;
+        }
+      }
+    }
+    sp_io_file_writer_close(&steps);
   }
 }

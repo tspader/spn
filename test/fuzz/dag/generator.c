@@ -1,6 +1,6 @@
 #include "fuzz.h"
 
-sp_str_t fz_artifact_path(sp_mem_t mem, fz_universe_t* u, u32 artifact) {
+sp_str_t fz_artifact_path(sp_mem_t mem, fz_universe_t* u, u64 artifact) {
   switch (u->artifacts[artifact].kind) {
     case FZ_ARTIFACT_SOURCE: return sp_fmt(mem, "src/f{}", sp_fmt_uint(artifact)).value;
     case FZ_ARTIFACT_OUTPUT: return sp_fmt(mem, "out/f{}", sp_fmt_uint(artifact)).value;
@@ -9,23 +9,14 @@ sp_str_t fz_artifact_path(sp_mem_t mem, fz_universe_t* u, u32 artifact) {
   sp_unreachable_return(sp_str_lit(""));
 }
 
-sp_str_t fz_phantom_path(sp_mem_t mem, u32 phantom) {
+sp_str_t fz_artifact_sim_path(sp_mem_t mem, fz_universe_t* u, u64 artifact) {
+  return sp_fmt(mem, "/{}", sp_fmt_str(fz_artifact_path(mem, u, artifact))).value;
+}
+
+sp_str_t fz_phantom_path(sp_mem_t mem, u64 phantom) {
   return sp_fmt(mem, "gone/g{}", sp_fmt_uint(phantom)).value;
 }
 
-// A universe is a self-contained build problem: a set of input artifacts
-// (value blobs and source files whose contents the harness owns), a set of
-// actions wired to them, and for discovery actions a scripted observation
-// set. Creation order is a topological order for the static edges, so the
-// graph is acyclic unless back-edges are injected; contents and identities
-// draw from small pools so digests and action keys collide densely.
-//
-// Swarm testing: each run samples a qualitatively different regime instead
-// of an average over all of them. Most knobs are zeroed entirely for a slice
-// of runs — no discovery, no back-edges, a single content class — so the
-// simple regimes stay in rotation at full strength. Big universes trade
-// density for scale: they stress the executor's bookkeeping and accidental
-// quadratics, not the cache semantics.
 fz_profile_t fz_gen_profile(sp_fuzz_prng_t* prng) {
   fz_profile_t profile = sp_zero;
   profile.big = sp_fuzz_chance(prng, 1, 8);
@@ -50,22 +41,16 @@ fz_profile_t fz_gen_profile(sp_fuzz_prng_t* prng) {
     profile.obs_output_pct = sp_fuzz_below(prng, 8);
   }
   profile.back_density = sp_fuzz_chance(prng, 1, 8) ? sp_fuzz_range(prng, 1, 2) : 0;
+  profile.steps = sp_fuzz_range(prng, 1, profile.big ? 4 : 12);
+  sp_fuzz_swarm(prng, profile.step_weights, FZ_STEP_COUNT);
+  profile.store_fs = sp_fuzz_chance(prng, 1, 2);
   return profile;
 }
 
-static u32 fz_pick_content(sp_fuzz_prng_t* prng, fz_profile_t* profile) {
-  return (u32)sp_fuzz_below(prng, profile->content_count);
+static u64 fz_pick_content(sp_fuzz_prng_t* prng, fz_profile_t* profile) {
+  return sp_fuzz_below(prng, profile->content_count);
 }
 
-// Static edges point backward through creation order, so the base graph is
-// acyclic by construction; back-edges are how cycles may enter, and whether
-// one actually closed a loop is derived afterward, not assumed. An action
-// occasionally repeats an input it already consumes: registration pushes
-// edges blindly, so the executor's pending bookkeeping must stay symmetric
-// under duplicates. Discovery observations are assigned last so they can
-// reference any file in the universe: an observation on another action's
-// output — even a later one — is what exercises the executor's defer path,
-// and one on the action's own output is the compiler depfile pattern.
 fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t profile) {
   fz_universe_t u = sp_zero;
   u.profile = profile;
@@ -87,10 +72,10 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
     }));
   }
 
-  sp_for(at, profile.action_count) {
+  sp_for(it, profile.action_count) {
     fz_action_t action = {
-      .discover = profile.discover_pct && sp_fuzz_chance(prng, (u32)profile.discover_pct, 16),
-      .identity = (u32)sp_fuzz_below(prng, profile.identity_count),
+      .discover = profile.discover_pct && sp_fuzz_chance(prng, profile.discover_pct, 16),
+      .identity = sp_fuzz_below(prng, profile.identity_count),
     };
     sp_da_init(mem, action.consumes);
     sp_da_init(mem, action.produces);
@@ -100,27 +85,27 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
     if (profile.big) {
       u64 degree = sp_fuzz_below(prng, profile.out_degree + 1);
       sp_for(dt, degree) {
-        sp_da_push(action.consumes, (u32)sp_fuzz_below(prng, have));
+        sp_da_push(action.consumes, sp_fuzz_below(prng, have));
       }
     }
     else {
-      sp_for(jt, have) {
-        if (sp_fuzz_chance(prng, (u32)profile.density, 8)) {
-          sp_da_push(action.consumes, (u32)jt);
+      sp_for(j, have) {
+        if (sp_fuzz_chance(prng, profile.density, 8)) {
+          sp_da_push(action.consumes, j);
         }
       }
     }
     if (!sp_da_empty(action.consumes) && sp_fuzz_chance(prng, 1, 8)) {
-      u32 dup = action.consumes[sp_fuzz_below(prng, sp_da_size(action.consumes))];
+      u64 dup = action.consumes[sp_fuzz_below(prng, sp_da_size(action.consumes))];
       sp_da_push(action.consumes, dup);
     }
 
     u64 produced = 1 + sp_fuzz_below(prng, profile.produce_count);
-    sp_for(pt, produced) {
-      u32 artifact = (u32)sp_da_size(u.artifacts);
+    sp_for(j, produced) {
+      u64 artifact = sp_da_size(u.artifacts);
       sp_da_push(u.artifacts, ((fz_artifact_t) {
         .kind = FZ_ARTIFACT_OUTPUT,
-        .producer = (s32)at,
+        .producer = (s64)it,
       }));
       sp_da_push(action.produces, artifact);
     }
@@ -128,17 +113,18 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
     sp_da_push(u.actions, action);
   }
 
-  sp_da_for(u.actions, at) {
-    if (!sp_fuzz_chance(prng, (u32)profile.back_density, 8)) {
+  sp_da_for(u.actions, it) {
+    if (!sp_fuzz_chance(prng, profile.back_density, 8)) {
       continue;
     }
-    u64 jt = sp_fuzz_range(prng, at, sp_da_size(u.actions) - 1);
-    fz_action_t* later = &u.actions[jt];
-    sp_da_push(u.actions[at].consumes, later->produces[sp_fuzz_below(prng, sp_da_size(later->produces))]);
+    u64 j = sp_fuzz_range(prng, it, sp_da_size(u.actions) - 1);
+    fz_action_t* later = &u.actions[j];
+    u64 n = sp_fuzz_below(prng, sp_da_size(later->produces));
+    sp_da_push(u.actions[it].consumes, later->produces[n]);
   }
 
-  sp_da_for(u.actions, at) {
-    fz_action_t* action = &u.actions[at];
+  sp_da_for(u.actions, it) {
+    fz_action_t* action = &u.actions[it];
     if (!action->discover) {
       continue;
     }
@@ -146,16 +132,16 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
     u64 count = 1 + sp_fuzz_below(prng, profile.obs_count);
     sp_for(ot, count) {
       fz_obs_t obs = sp_zero;
-      if (sp_fuzz_chance(prng, (u32)profile.absent_pct, 16)) {
+      if (sp_fuzz_chance(prng, profile.absent_pct, 16)) {
         obs.absent = true;
-        obs.phantom = (u32)sp_fuzz_below(prng, FZ_MAX_PHANTOMS);
+        obs.phantom = sp_fuzz_below(prng, FZ_MAX_PHANTOMS);
       }
-      else if (sp_fuzz_chance(prng, (u32)profile.obs_output_pct, 16)) {
+      else if (sp_fuzz_chance(prng, profile.obs_output_pct, 16)) {
         fz_action_t* owner = &u.actions[sp_fuzz_below(prng, sp_da_size(u.actions))];
         obs.artifact = owner->produces[sp_fuzz_below(prng, sp_da_size(owner->produces))];
       }
       else {
-        obs.artifact = (u32)(profile.value_count + sp_fuzz_below(prng, profile.source_count));
+        obs.artifact = profile.value_count + sp_fuzz_below(prng, profile.source_count);
       }
       sp_da_push(action->obs, obs);
     }
@@ -169,14 +155,40 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
   return u;
 }
 
-static bool fz_cyclic_at(fz_universe_t* u, u8* states, u32 action) {
+fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
+  fz_profile_t* profile = &u->profile;
+  fz_trace_t trace = sp_zero;
+  sp_da_init(mem, trace.steps);
+
+  sp_for(it, profile->steps) {
+    fz_step_t step = sp_zero;
+    step.kind = (fz_step_kind_t)sp_fuzz_weighted(prng, profile->step_weights, FZ_STEP_COUNT);
+    switch (step.kind) {
+      case FZ_STEP_MUTATE: {
+        step.artifact = profile->value_count + sp_fuzz_below(prng, profile->source_count);
+        step.content = fz_pick_content(prng, profile);
+        break;
+      }
+      case FZ_STEP_RUN:
+      case FZ_STEP_COUNT: {
+        break;
+      }
+    }
+    sp_da_push(trace.steps, step);
+  }
+
+  sp_da_push(trace.steps, ((fz_step_t) { .kind = FZ_STEP_RUN }));
+  return trace;
+}
+
+static bool fz_cyclic_at(fz_universe_t* u, u8* states, u64 action) {
   if (states[action] == 2) return false;
   if (states[action] == 1) return true;
   states[action] = 1;
 
   sp_da_for(u->actions[action].consumes, ct) {
-    s32 producer = u->artifacts[u->actions[action].consumes[ct]].producer;
-    if (producer >= 0 && fz_cyclic_at(u, states, (u32)producer)) {
+    s64 producer = u->artifacts[u->actions[action].consumes[ct]].producer;
+    if (producer >= 0 && fz_cyclic_at(u, states, (u64)producer)) {
       return true;
     }
   }
@@ -188,7 +200,7 @@ static bool fz_cyclic_at(fz_universe_t* u, u8* states, u32 action) {
 bool fz_universe_cyclic(fz_universe_t* u) {
   u8 states[FZ_MAX_ACTIONS] = sp_zero;
   sp_da_for(u->actions, at) {
-    if (fz_cyclic_at(u, states, (u32)at)) {
+    if (fz_cyclic_at(u, states, at)) {
       return true;
     }
   }
@@ -210,7 +222,7 @@ fz_err_t fz_check_universe(fz_universe_t* u) {
         bool held = false;
         fz_action_t* producer = &u->actions[artifact->producer];
         sp_da_for(producer->produces, pt) {
-          if (producer->produces[pt] == (u32)it) {
+          if (producer->produces[pt] == it) {
             held = true;
             break;
           }
@@ -229,7 +241,7 @@ fz_err_t fz_check_universe(fz_universe_t* u) {
     sp_da_for(action->produces, pt) {
       fz_artifact_t* artifact = &u->artifacts[action->produces[pt]];
       must(artifact->kind == FZ_ARTIFACT_OUTPUT, FZ_ERR_GEN_PRODUCER);
-      must(artifact->producer == (s32)at, FZ_ERR_GEN_PRODUCER);
+      must(artifact->producer == (s64)at, FZ_ERR_GEN_PRODUCER);
     }
     must(action->discover == !sp_da_empty(action->obs), FZ_ERR_GEN_OBS);
     sp_da_for(action->obs, ot) {
