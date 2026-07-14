@@ -47,8 +47,6 @@ static bool fz_picks_acyclic(fz_universe_t* u, s64* picks) {
   return true;
 }
 
-// Validates the planted assignment directly, so it stays O(n) where the
-// exhaustive oracle would be intractable on big universes
 bool fz_plan_sat(fz_universe_t* u) {
   s64 picks[FZ_MAX_PKGS];
   sp_da_for(u->pkgs, it) {

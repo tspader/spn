@@ -22,9 +22,6 @@ sp_str_t fz_pkg_name(u32 pkg) {
   return sp_str_view(chars);
 }
 
-// Shared-ness is not a package property; it is a function of the package's
-// lib linkages, the profile's linkage, and any config override, so the mirror
-// runs the resolver's own selection instead of restating its rules
 bool fz_pkg_shared(fz_universe_t* u, s32 pkg) {
   if (pkg < 0) {
     return false;
@@ -50,14 +47,6 @@ bool fz_pkg_shared(fz_universe_t* u, s32 pkg) {
   return kind == SPN_LIB_KIND_SHARED;
 }
 
-// A universe is a self-contained resolution problem over a tiny version
-// lattice: an index of packages whose deps reference other pkg indices, plus
-// the root manifest's requests. A pure universe holds only scope edges, so
-// the whole problem is one scope and the exhaustive oracle is exact; a
-// feature universe adds build/test/private deps and shared packages, where
-// the output invariants, the one-sided oracle, and the metamorphic checks
-// apply. A big universe trades the exhaustive oracle for scale: planted mode
-// is its completeness check and the default budget is its performance check.
 static bool fz_caret_sat(spn_semver_t low, spn_semver_t version) {
   spn_semver_t high = sp_zero_s(spn_semver_t);
   if (low.major) {
@@ -157,9 +146,6 @@ static spn_semver_t fz_sample_version(sp_fuzz_prng_t* prng) {
   return lattice[sp_fuzz_below(prng, count)];
 }
 
-// Every verdict check bottoms out in fz_range_sat standing in for the
-// resolver's parse-then-evaluate: sweep the full anchor x candidate lattice
-// once so any divergence fails loudly instead of poisoning verdicts
 bool fz_ranges_agree(void) {
   sp_mem_arena_t* arena = sp_mem_arena_new(sp_mem_os_new());
   sp_mem_t mem = sp_mem_arena_as_allocator(arena);
@@ -208,8 +194,6 @@ static spn_index_dep_kind_t fz_sample_kind(sp_fuzz_prng_t* prng, fz_profile_t* p
   return SPN_INDEX_DEP_NORMAL;
 }
 
-// A local package has exactly one version and a dep on it carries no range,
-// so its constraint is just "resolve it"
 static fz_dep_t fz_free_range(sp_fuzz_prng_t* prng, fz_universe_t* u, u32 target) {
   fz_pkg_t* pkg = &u->pkgs[target];
   if (pkg->local) {
@@ -249,21 +233,10 @@ static fz_dep_t fz_sat_range(sp_fuzz_prng_t* prng, fz_universe_t* u, u32 target,
   return (fz_dep_t) { .pkg = target, .shape = FZ_RANGE_EXACT, .version = assigned };
 }
 
-// The index format cannot express a dep on a file package, so index-sourced
-// owners only reference index targets; locals and the root reference anything
 static bool fz_can_dep(fz_universe_t* u, u64 owner, u64 target) {
   return u->pkgs[owner].local || !u->pkgs[target].local;
 }
 
-// Swarm testing: each run samples a qualitatively different regime instead of
-// an average over all of them. Range shapes get swarm weights; features
-// (build/test/private/shared) are off entirely for most runs so the oracle
-// stays exact, and dialed to independent intensities when on. Planted mode
-// only exists for pure universes: with the dyn-dup retry still best-effort,
-// a planted assignment does not yet bound the resolver on feature universes.
-// Big universes trade the exhaustive oracle for scale; a deliberately tiny
-// budget only means anything where a blown budget would otherwise be a bug,
-// so it stays small-only.
 fz_profile_t fz_gen_profile(sp_fuzz_prng_t* prng) {
   fz_profile_t profile = sp_zero;
   sp_fuzz_swarm(prng, profile.shapes, FZ_RANGE_COUNT);
@@ -297,16 +270,6 @@ fz_profile_t fz_gen_profile(sp_fuzz_prng_t* prng) {
   return profile;
 }
 
-// Half of all pure universes plant a known assignment: every range generated
-// on the assigned release of each package (and at the root) is built to admit
-// the assigned version of its target, so the universe is satisfiable by
-// construction and any resolver error is a completeness bug. Decoy releases
-// get unconstrained ranges; a decoy newer than the assigned version is
-// exactly the bait a greedy searcher takes. The planted plan only points
-// forward through the pkg order, so it is acyclic; decoy back-edges are how
-// cycles enter. A release (or the root) occasionally repeats a target it
-// already names: the resolver's edge dedup must conjoin the ranges, not
-// drop one.
 fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t profile) {
   fz_universe_t u = sp_zero;
   u.profile = profile;
@@ -464,8 +427,6 @@ static fz_universe_t fz_copy_universe(sp_mem_t mem, fz_universe_t* u) {
   return copy;
 }
 
-// Verdict and solution must be a function of the input as a set: reordering
-// the root requests or any release's dep list must not change the solve
 fz_universe_t fz_shuffle_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
   fz_universe_t copy = fz_copy_universe(mem, u);
   sp_fuzz_shuffle(prng, copy.roots, sp_da_size(copy.roots), sizeof(fz_dep_t));
@@ -478,9 +439,6 @@ fz_universe_t fz_shuffle_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_univers
   return copy;
 }
 
-// Satisfiability is name-independent: permuting which name each package
-// wears must not change the verdict. Unlike a shuffle this legitimately
-// changes which solution a solver prefers, so only the verdict is compared
 fz_universe_t fz_rename_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
   u32 perm[FZ_MAX_PKGS];
   u64 count = sp_da_size(u->pkgs);
@@ -516,8 +474,6 @@ fz_universe_t fz_rename_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe
   return copy;
 }
 
-// Restrict the index to exactly the releases the solve used: the solution
-// must still be reachable when every decoy that was not taken disappears
 fz_universe_t fz_pin_universe(sp_mem_t mem, fz_universe_t* u, fz_solution_t solution) {
   fz_universe_t copy = fz_copy_universe(mem, u);
   sp_da_for(copy.pkgs, it) {
@@ -539,9 +495,6 @@ fz_universe_t fz_pin_universe(sp_mem_t mem, fz_universe_t* u, fz_solution_t solu
   return copy;
 }
 
-// Adding a release only adds options: a satisfiable universe must stay
-// satisfiable. A new release above the solution's pick is fresh bait for a
-// greedy searcher, which makes this the sharpest completeness probe we have
 fz_universe_t fz_extend_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
   fz_universe_t copy = fz_copy_universe(mem, u);
 
