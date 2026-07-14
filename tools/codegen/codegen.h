@@ -2,9 +2,9 @@
 #define CODEGEN_H
 
 #include "sp.h"
-#include "sp_om.h"
+#include "sp/sp_om.h"
 #include "jtd.h"
-#include "sp_template.h"
+#include "sp/sp_template.h"
 #include "yyjson.h"
 
 typedef enum {
