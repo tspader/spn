@@ -1,7 +1,7 @@
 #include "common.h"
 
 typedef struct {
-  const c8* path;
+  const c8* name;
   const c8* blob;
 } cache_output_t;
 
@@ -35,7 +35,7 @@ UTEST_EMPTY_FIXTURE(action_cache)
 static void get_output_count(cache_op_t* op, u32* count) {
   *count = 0;
   sp_carr_for(op->outputs, it) {
-    if (!op->outputs[it].path) {
+    if (!op->outputs[it].name) {
       break;
     }
     (*count)++;
@@ -72,20 +72,20 @@ static void run_test(s32* utest_result, cache_test_t t) {
       }
       case CACHE_OP_PUT: {
         spn_dag_action_output_t outputs [DAG_TEST_MAX_OUTPUTS] = sp_zero;
-        c8 paths [DAG_TEST_MAX_OUTPUTS][SP_PATH_MAX] = sp_zero;
+        c8 names [DAG_TEST_MAX_OUTPUTS][SP_PATH_MAX] = sp_zero;
         u32 count = 0;
         get_output_count(&op, &count);
         sp_for(it, count) {
-          u32 len = sp_cstr_len(op.outputs[it].path);
-          sp_cstr_copy_to_n(op.outputs[it].path, len, paths[it], sizeof(paths[it]));
+          u32 len = sp_cstr_len(op.outputs[it].name);
+          sp_cstr_copy_to_n(op.outputs[it].name, len, names[it], sizeof(names[it]));
           outputs[it] = (spn_dag_action_output_t) {
-            .path = sp_str(paths[it], len),
+            .name = sp_str(names[it], len),
             .digest = get_blob_digest(op.outputs[it].blob)
           };
         }
         spn_dag_action_cache_put(&c, get_blob_digest(op.key), outputs, count);
         sp_mem_fill_u8(outputs, sizeof(outputs), 69);
-        sp_mem_fill_u8(paths, sizeof(paths), 69);
+        sp_mem_fill_u8(names, sizeof(names), 69);
         break;
       }
       case CACHE_OP_GET: {
@@ -96,7 +96,7 @@ static void run_test(s32* utest_result, cache_test_t t) {
           get_output_count(&op, &count);
           ASSERT_EQ(count, (u32)sp_da_size(entry->outputs));
           sp_for(it, count) {
-            EXPECT_STR(entry->outputs[it].path, op.outputs[it].path);
+            EXPECT_STR(entry->outputs[it].name, op.outputs[it].name);
             EXPECT_TRUE(spn_dag_digest_equal(entry->outputs[it].digest, get_blob_digest(op.outputs[it].blob)));
           }
         }

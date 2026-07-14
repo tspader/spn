@@ -32,6 +32,7 @@ typedef struct {
   spn_dag_file_cache_t files;
   spn_dag_action_cache_t cache;
   spn_dag_discovery_t discovery;
+  spn_dag_env_t env;
   u32 runs;
 } run_env_t;
 
@@ -112,6 +113,13 @@ static void run_test(s32* utest_result, run_test_t t) {
   spn_dag_file_cache_init(&env.files, env.fs.mem);
   spn_dag_action_cache_init(&env.cache, env.fs.mem, sp_str_lit(""));
   spn_dag_discovery_init(&env.discovery, env.fs.mem, tmpfs_get(&env.fs, sp_str_lit("manifests")));
+  env.env = (spn_dag_env_t) {
+    .files = &env.files,
+    .cache = &env.cache,
+    .store = &env.store,
+    .discovery = t.discovery ? &env.discovery : SP_NULLPTR,
+    .scratch = tmpfs_get(&env.fs, sp_str_lit("scratch"))
+  };
 
   sp_carr_for(t.builds, b) {
     run_build_t* build = &t.builds[b];
@@ -130,7 +138,7 @@ static void run_test(s32* utest_result, run_test_t t) {
     spn_dag_t* g = spn_dag_new(env.fs.mem);
     run_dag(utest_result, &env, g, &t);
 
-    spn_err_t err = spn_dag_run(g, &env.files, &env.cache, &env.store, t.discovery ? &env.discovery : SP_NULLPTR);
+    spn_err_t err = spn_dag_run(g, &env.env);
     EXPECT_EQ(build->expect_err, err);
     EXPECT_EQ(build->expect_runs, env.runs);
   }

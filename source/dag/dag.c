@@ -64,6 +64,13 @@ spn_dag_id_t spn_dag_add_file(spn_dag_t* g, sp_str_t path) {
   return id;
 }
 
+spn_dag_id_t spn_dag_add_output(spn_dag_t* g, sp_str_t name) {
+  return spn_dag_add_artifact(g, (spn_dag_artifact_t) {
+    .kind = SPN_DAG_ARTIFACT_KIND_FILE,
+    .name = sp_str_copy(g->mem, name),
+  });
+}
+
 spn_dag_id_t spn_dag_add_action(spn_dag_t* g, spn_dag_action_config_t config) {
   spn_dag_action_t action = {
     .id = {
@@ -93,6 +100,18 @@ spn_err_t spn_dag_action_add_output(spn_dag_t* g, spn_dag_id_t action_id, spn_da
   spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, artifact_id);
   if (artifact->producer.occupied) {
     return SPN_ERROR;
+  }
+  if (sp_str_empty(artifact->name)) {
+    artifact->name = sp_fs_get_name(artifact->path);
+    artifact->target = artifact->path;
+  }
+  if (sp_str_empty(artifact->name)) {
+    return SPN_ERROR;
+  }
+  sp_da_for(action->produces, it) {
+    if (sp_str_equal(spn_dag_find_artifact(g, action->produces[it])->name, artifact->name)) {
+      return SPN_ERROR;
+    }
   }
   artifact->producer = action_id;
   sp_da_push(action->produces, artifact_id);
@@ -140,7 +159,7 @@ spn_dag_digest_t spn_dag_action_key(spn_dag_t* g, spn_dag_id_t action_id) {
   sp_da_for(action->produces, it) {
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, action->produces[it]);
     spn_dag_hash_u8(&ctx, (u8)artifact->kind);
-    spn_dag_hash_str(&ctx, artifact->path);
+    spn_dag_hash_str(&ctx, artifact->name);
   }
 
   spn_dag_digest_t key = sp_zero;
@@ -264,31 +283,42 @@ spn_err_t spn_dag_get_file_digest(spn_dag_file_cache_t* c, sp_str_t path, spn_da
   return SPN_OK;
 }
 
-static bool spn_dag_restore(spn_dag_t* g, spn_dag_action_t* action, const spn_dag_action_entry_t* entry, spn_dag_file_cache_t* files, spn_dag_store_t* store) {
+static spn_err_t spn_dag_settle(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env_t* env) {
+  sp_da_for(action->produces, it) {
+    spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, action->produces[it]);
+    if (!sp_str_empty(artifact->target)) {
+      if (spn_dag_store_materialize(env->store, artifact->digest, artifact->target)) {
+        return SPN_ERROR;
+      }
+      spn_dag_file_cache_invalidate(env->files, artifact->target);
+      artifact->path = artifact->target;
+    } else {
+      artifact->path = spn_dag_store_path(env->store, g->mem, artifact->digest);
+    }
+  }
+  return SPN_OK;
+}
+
+static bool spn_dag_restore(spn_dag_t* g, spn_dag_action_t* action, const spn_dag_action_entry_t* entry, spn_dag_env_t* env) {
   if (sp_da_size(entry->outputs) != sp_da_size(action->produces)) {
     return false;
   }
 
   sp_da_for(entry->outputs, it) {
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, action->produces[it]);
-    if (!sp_str_equal(entry->outputs[it].path, artifact->path)) {
+    if (!sp_str_equal(entry->outputs[it].name, artifact->name)) {
       return false;
     }
-    if (!spn_dag_store_has(store, entry->outputs[it].digest)) {
+    if (!spn_dag_store_has(env->store, entry->outputs[it].digest)) {
       return false;
     }
   }
 
   sp_da_for(entry->outputs, it) {
-    spn_dag_action_output_t* out = &entry->outputs[it];
-    if (spn_dag_store_materialize(store, out->digest, out->path)) {
-      return false;
-    }
-    spn_dag_find_artifact(g, action->produces[it])->digest = out->digest;
-    spn_dag_file_cache_invalidate(files, out->path);
+    spn_dag_find_artifact(g, action->produces[it])->digest = entry->outputs[it].digest;
   }
 
-  return true;
+  return !spn_dag_settle(g, action, env);
 }
 
 static s32 spn_dag_obs_sort_kernel(const void* a, const void* b) {
@@ -349,92 +379,124 @@ static spn_err_t spn_dag_resolve_obs(spn_dag_file_cache_t* files, spn_dag_obs_t*
   return SPN_OK;
 }
 
-static spn_err_t spn_dag_publish(spn_dag_t* g, spn_dag_action_t* action, spn_dag_digest_t key, spn_dag_file_cache_t* files, spn_dag_action_cache_t* cache, spn_dag_store_t* store) {
+static spn_err_t spn_dag_publish(spn_dag_t* g, spn_dag_action_t* action, spn_dag_digest_t key, spn_dag_env_t* env) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_err_t err = SPN_OK;
 
   sp_da(spn_dag_action_output_t) outputs = sp_da_new(s.mem, spn_dag_action_output_t);
   sp_da_for(action->produces, it) {
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, action->produces[it]);
-    spn_dag_file_cache_invalidate(files, artifact->path);
     if (!sp_fs_exists(artifact->path)) {
       err = SPN_ERROR;
       goto done;
     }
-    if (spn_dag_store_put_file(store, artifact->path, &artifact->digest)) {
+    if (spn_dag_store_put_file(env->store, artifact->path, &artifact->digest)) {
       err = SPN_ERROR;
       goto done;
     }
     sp_da_push(outputs, ((spn_dag_action_output_t) {
-      .path = artifact->path,
+      .name = artifact->name,
       .digest = artifact->digest
     }));
   }
 
-  spn_dag_action_cache_put(cache, key, outputs, (u32)sp_da_size(outputs));
+  spn_dag_action_cache_put(env->cache, key, outputs, (u32)sp_da_size(outputs));
+  err = spn_dag_settle(g, action, env);
 
 done:
   sp_mem_end_scratch(s);
   return err;
 }
 
-static void spn_dag_clear_outputs(spn_dag_t* g, spn_dag_action_t* action, spn_dag_file_cache_t* files) {
+static sp_atomic_s32_t spn_dag_scratch_sequence;
+
+static sp_str_t spn_dag_scratch_begin(spn_dag_t* g, spn_dag_action_t* action, sp_str_t root) {
+  if (sp_str_empty(root)) {
+    return sp_str_lit("");
+  }
+
+  sp_tm_epoch_t now = sp_tm_now_epoch();
+  u64 stamp = ((u64)now.s << 20) ^ (u64)now.ns;
+  u64 sequence = (u64)(u32)sp_atomic_s32_add(&spn_dag_scratch_sequence, 1);
+  sp_str_t name = sp_fmt(g->mem, "{}.{}", sp_fmt_uint(stamp), sp_fmt_uint(sequence)).value;
+  sp_str_t dir = sp_fs_join_path(g->mem, root, name);
+  if (sp_fs_create_dir(dir)) {
+    return sp_str_lit("");
+  }
+
   sp_da_for(action->produces, it) {
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, action->produces[it]);
-    sp_fs_remove_file(artifact->path);
-    spn_dag_file_cache_invalidate(files, artifact->path);
+    artifact->path = sp_fs_join_path(g->mem, dir, artifact->name);
+  }
+  return dir;
+}
+
+static void spn_dag_scratch_end(sp_str_t dir) {
+  if (!sp_str_empty(dir)) {
+    sp_fs_remove_dir(dir);
   }
 }
 
-static spn_err_t spn_dag_exec_plain(spn_dag_t* g, spn_dag_action_t* action, spn_dag_file_cache_t* files, spn_dag_action_cache_t* cache, spn_dag_store_t* store) {
+static spn_err_t spn_dag_exec_plain(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env_t* env) {
   spn_dag_digest_t key = spn_dag_action_key(g, action->id);
 
-  const spn_dag_action_entry_t* entry = spn_dag_action_cache_get(cache, key);
+  const spn_dag_action_entry_t* entry = spn_dag_action_cache_get(env->cache, key);
   if (entry) {
-    if (spn_dag_restore(g, action, entry, files, store)) {
+    if (spn_dag_restore(g, action, entry, env)) {
       return SPN_OK;
     }
-    spn_dag_action_cache_remove(cache, key);
+    spn_dag_action_cache_remove(env->cache, key);
   }
 
-  if (action->execute) {
-    spn_dag_clear_outputs(g, action, files);
-    if (action->execute(action, action->user_data)) {
-      return SPN_ERROR;
-    }
+  sp_str_t scratch = spn_dag_scratch_begin(g, action, env->scratch);
+  if (sp_str_empty(scratch)) {
+    return SPN_ERROR;
   }
 
-  return spn_dag_publish(g, action, key, files, cache, store);
+  spn_err_t err = SPN_OK;
+  if (action->execute && action->execute(action, action->user_data)) {
+    err = SPN_ERROR;
+  }
+  if (!err) {
+    err = spn_dag_publish(g, action, key, env);
+  }
+
+  spn_dag_scratch_end(scratch);
+  return err;
 }
 
-static spn_err_t spn_dag_exec_discovery(spn_dag_t* g, spn_dag_action_t* action, spn_dag_file_cache_t* files, spn_dag_action_cache_t* cache, spn_dag_store_t* store, spn_dag_discovery_t* discovery) {
+static spn_err_t spn_dag_exec_discovery(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env_t* env) {
   spn_dag_digest_t prelim = spn_dag_action_key(g, action->id);
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_err_t err = SPN_OK;
+  sp_str_t scratch = sp_str_lit("");
 
-  spn_dag_pathset_t* set = spn_dag_discovery_get(discovery, prelim);
+  spn_dag_pathset_t* set = spn_dag_discovery_get(env->discovery, prelim);
   if (set) {
     u32 count = (u32)sp_da_size(set->obs);
-    if (!spn_dag_resolve_obs(files, set->obs, count)) {
+    if (!spn_dag_resolve_obs(env->files, set->obs, count)) {
       spn_dag_digest_t key = spn_dag_strong_key(prelim, set->obs, count);
-      const spn_dag_action_entry_t* entry = spn_dag_action_cache_get(cache, key);
+      const spn_dag_action_entry_t* entry = spn_dag_action_cache_get(env->cache, key);
       if (entry) {
-        if (spn_dag_restore(g, action, entry, files, store)) {
-          spn_dag_discovery_flush(discovery, prelim);
+        if (spn_dag_restore(g, action, entry, env)) {
+          spn_dag_discovery_flush(env->discovery, prelim);
           goto done;
         }
-        spn_dag_action_cache_remove(cache, key);
+        spn_dag_action_cache_remove(env->cache, key);
       }
     }
   }
 
-  if (action->execute) {
-    spn_dag_clear_outputs(g, action, files);
-    if (action->execute(action, action->user_data)) {
-      err = SPN_ERROR;
-      goto done;
-    }
+  scratch = spn_dag_scratch_begin(g, action, env->scratch);
+  if (sp_str_empty(scratch)) {
+    err = SPN_ERROR;
+    goto done;
+  }
+
+  if (action->execute && action->execute(action, action->user_data)) {
+    err = SPN_ERROR;
+    goto done;
   }
 
   sp_da(spn_dag_obs_t) obs = sp_da_new(s.mem, spn_dag_obs_t);
@@ -445,31 +507,32 @@ static spn_err_t spn_dag_exec_discovery(spn_dag_t* g, spn_dag_action_t* action, 
   spn_dag_canonicalize(obs);
 
   u32 count = (u32)sp_da_size(obs);
-  bool resolved = !spn_dag_resolve_obs(files, obs, count);
-  spn_dag_discovery_put(discovery, prelim, obs, count);
+  bool resolved = !spn_dag_resolve_obs(env->files, obs, count);
+  spn_dag_discovery_put(env->discovery, prelim, obs, count);
   if (!resolved) {
     goto done;
   }
 
   spn_dag_digest_t key = spn_dag_strong_key(prelim, obs, count);
-  err = spn_dag_publish(g, action, key, files, cache, store);
+  err = spn_dag_publish(g, action, key, env);
 
 done:
+  spn_dag_scratch_end(scratch);
   sp_mem_end_scratch(s);
   return err;
 }
 
-spn_err_t spn_dag_execute(spn_dag_t* g, spn_dag_id_t action_id, spn_dag_file_cache_t* files, spn_dag_action_cache_t* cache, spn_dag_store_t* store) {
+spn_err_t spn_dag_execute(spn_dag_t* g, spn_dag_id_t action_id, spn_dag_env_t* env) {
   spn_dag_action_t* action = spn_dag_find_action(g, action_id);
   sp_assert(!action->discover);
-  return spn_dag_exec_plain(g, action, files, cache, store);
+  return spn_dag_exec_plain(g, action, env);
 }
 
-spn_err_t spn_dag_execute_discovered(spn_dag_t* g, spn_dag_id_t action_id, spn_dag_file_cache_t* files, spn_dag_action_cache_t* cache, spn_dag_store_t* store, spn_dag_discovery_t* discovery) {
+spn_err_t spn_dag_execute_discovered(spn_dag_t* g, spn_dag_id_t action_id, spn_dag_env_t* env) {
   spn_dag_action_t* action = spn_dag_find_action(g, action_id);
   sp_assert(action->discover);
-  sp_assert(discovery);
-  return spn_dag_exec_discovery(g, action, files, cache, store, discovery);
+  sp_assert(env->discovery);
+  return spn_dag_exec_discovery(g, action, env);
 }
 
 typedef struct {
@@ -509,14 +572,14 @@ static bool spn_dag_run_defer(spn_dag_t* g, spn_dag_action_t* action, spn_dag_di
   return state->deferred > 0;
 }
 
-spn_err_t spn_dag_run(spn_dag_t* g, spn_dag_file_cache_t* files, spn_dag_action_cache_t* cache, spn_dag_store_t* store, spn_dag_discovery_t* discovery) {
+spn_err_t spn_dag_run(spn_dag_t* g, spn_dag_env_t* env) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_err_t err = SPN_OK;
 
   sp_da_for(g->artifacts, it) {
     spn_dag_artifact_t* artifact = &g->artifacts[it];
     if (artifact->kind == SPN_DAG_ARTIFACT_KIND_FILE && !artifact->producer.occupied) {
-      if (spn_dag_get_file_digest(files, artifact->path, &artifact->digest)) {
+      if (spn_dag_get_file_digest(env->files, artifact->path, &artifact->digest)) {
         err = SPN_ERROR;
         goto done;
       }
@@ -548,19 +611,19 @@ spn_err_t spn_dag_run(spn_dag_t* g, spn_dag_file_cache_t* files, spn_dag_action_
 
     spn_dag_action_t* action = spn_dag_find_action(g, id);
     if (action->discover) {
-      sp_assert(discovery);
-      if (spn_dag_run_defer(g, action, discovery, states)) {
+      sp_assert(env->discovery);
+      if (spn_dag_run_defer(g, action, env->discovery, states)) {
         continue;
       }
-      if (spn_dag_exec_discovery(g, action, files, cache, store, discovery)) {
+      if (spn_dag_exec_discovery(g, action, env)) {
         err = SPN_ERROR;
         goto done;
       }
-      if (spn_dag_run_defer(g, action, discovery, states)) {
+      if (spn_dag_run_defer(g, action, env->discovery, states)) {
         continue;
       }
     } else {
-      if (spn_dag_exec_plain(g, action, files, cache, store)) {
+      if (spn_dag_exec_plain(g, action, env)) {
         err = SPN_ERROR;
         goto done;
       }
@@ -705,6 +768,19 @@ spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_
   }
 
   SP_UNREACHABLE_RETURN(SPN_ERROR);
+}
+
+sp_str_t spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
+  switch (store->kind) {
+    case SPN_DAG_STORE_MEM: {
+      return sp_str_lit("");
+    }
+    case SPN_DAG_STORE_FILESYSTEM: {
+      return spn_dag_store_find(store, mem, digest);
+    }
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
 bool spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest) {

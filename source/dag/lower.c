@@ -138,7 +138,7 @@ static bool spn_dag_action_entry_load(spn_dag_action_cache_t* c, spn_dag_digest_
       sp_fs_remove_file(path);
       goto done;
     }
-    output.path = sp_str_copy(c->mem, cg.path);
+    output.name = sp_str_copy(c->mem, cg.name);
     sp_da_push(entry.outputs, output);
   }
 
@@ -158,7 +158,7 @@ static void spn_dag_action_entry_write(spn_dag_action_cache_t* c, spn_dag_digest
 
   sp_da_for(entry->outputs, it) {
     spn_cg_dag_output_t cg = {
-      .path = entry->outputs[it].path,
+      .name = entry->outputs[it].name,
       .digest = spn_dag_digest_hex(s.mem, entry->outputs[it].digest),
     };
     if (emit_line(&sink.base, spn_dag_output_write_compact(s.mem, &cg))) {
@@ -196,7 +196,7 @@ void spn_dag_action_cache_put(spn_dag_action_cache_t* c, spn_dag_digest_t key, c
   sp_da_init(c->mem, entry.outputs);
   sp_for(it, count) {
     sp_da_push(entry.outputs, ((spn_dag_action_output_t) {
-      .path = sp_str_copy(c->mem, outputs[it].path),
+      .name = sp_str_copy(c->mem, outputs[it].name),
       .digest = outputs[it].digest
     }));
   }

@@ -51,6 +51,7 @@ typedef struct {
   spn_dag_store_t store;
   spn_dag_file_cache_t files;
   spn_dag_action_cache_t cache;
+  spn_dag_env_t env;
   spn_err_t err;
   u32 runs;
 } exec_env_t;
@@ -100,6 +101,12 @@ static void exec_env_init(exec_env_t* env, const c8* name, spn_dag_store_kind_t 
   });
   spn_dag_file_cache_init(&env->files, env->mem);
   spn_dag_action_cache_init(&env->cache, env->mem, sp_str_lit(""));
+  env->env = (spn_dag_env_t) {
+    .files = &env->files,
+    .cache = &env->cache,
+    .store = &env->store,
+    .scratch = tmpfs_get(&env->fs, sp_str_lit("scratch"))
+  };
 }
 
 static void exec_store_context(exec_env_t* env) {
@@ -180,7 +187,7 @@ static void exec_action_run(s32* utest_result, exec_env_t* env, exec_action_t sp
       sp_str_t content = sp_str_view(op.unavailable[it]);
       spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, a->produces[it]);
       outputs[it] = (spn_dag_action_output_t) {
-        .path = artifact->path,
+        .name = artifact->name,
         .digest = spn_dag_digest(content.data, content.len)
       };
       count++;
@@ -188,7 +195,7 @@ static void exec_action_run(s32* utest_result, exec_env_t* env, exec_action_t sp
     spn_dag_action_cache_put(&env->cache, spn_dag_action_key(g, action), outputs, count);
   }
 
-  env->err = spn_dag_execute(g, action, &env->files, &env->cache, &env->store);
+  env->err = spn_dag_execute(g, action, &env->env);
   exec_store_context(env);
   EXPECT_EQ(op.expect.err, env->err);
   if (env->err != op.expect.err) {
