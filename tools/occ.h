@@ -1,5 +1,5 @@
-#ifndef OCC_H
-#define OCC_H
+#ifndef SPN_TOOLS_OCC_H
+#define SPN_TOOLS_OCC_H
 
 #include "sp.h"
 

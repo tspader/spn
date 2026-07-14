@@ -43,9 +43,6 @@ spn_err_t                   spn_dag_execute_discovered(spn_dag_t* g, spn_dag_id_
 
 spn_err_t                   spn_dag_run(spn_dag_t* g, spn_dag_file_cache_t* files, spn_dag_action_cache_t* cache, spn_dag_store_t* store, spn_dag_discovery_t* discovery);
 
-spn_err_t                   spn_cc_deps_parse(sp_mem_t mem, sp_str_t content, sp_da(sp_str_t)* out);
-spn_err_t                   spn_cc_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out);
-
 void                spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config);
 spn_err_t           spn_dag_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag_digest_t* digest);
 spn_err_t           spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_digest_t* digest);

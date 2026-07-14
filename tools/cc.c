@@ -3,6 +3,8 @@
 #include "sp/sp_cli.h"
 #include "sp/atomic_file.h"
 #include "dag/dag.h"
+#include "error/types.h"
+#include "occ.h"
 
 typedef struct {
   const c8* output;
@@ -67,13 +69,58 @@ static s32 cc_compile_exec(spn_dag_action_t* action, void* user_data) {
   return sp_ps_run(app->mem, ps).status.exit_code;
 }
 
+static spn_err_t cc_deps_parse(sp_mem_t mem, sp_str_t content, sp_da(sp_str_t)* prereqs) {
+  occ_parser_t p = sp_zero;
+  if (occ_init(&p, content)) {
+    return SPN_ERROR;
+  }
+
+  sp_str_t prereq = sp_zero;
+  while (occ_next(&p, &prereq)) {
+    sp_da_push(*prereqs, sp_str_copy(mem, prereq));
+  }
+
+  return p.err ? SPN_ERROR : SPN_OK;
+}
+
+static void cc_probe_shadows(cc_app_t* app, sp_str_t prereq, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
+  sp_da_for(app->search_dirs, it) {
+    sp_str_t dir = app->search_dirs[it];
+    if (prereq.len <= dir.len + 1) {
+      continue;
+    }
+    if (!sp_str_starts_with(prereq, dir) || prereq.data[dir.len] != '/') {
+      continue;
+    }
+
+    sp_str_t suffix = sp_str_sub(prereq, dir.len + 1, prereq.len - dir.len - 1);
+    sp_for(shadow, it) {
+      sp_da_push(*obs, ((spn_dag_obs_t) {
+        .kind = SPN_DAG_OBS_ABSENT,
+        .path = sp_fs_join_path(mem, app->search_dirs[shadow], suffix)
+      }));
+    }
+    return;
+  }
+}
+
 static spn_err_t cc_compile_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   cc_compile_t* c = (cc_compile_t*)user_data;
-  spn_cc_ctx_t ctx = {
-    .g = c->app->g,
-    .search_dirs = c->app->search_dirs
-  };
-  return spn_cc_discover(action, &ctx, mem, out);
+  sp_str_t content = sp_zero;
+  spn_try_as(sp_io_read_file(mem, c->dep, &content), SPN_ERROR);
+
+  sp_da(sp_str_t) prereqs = sp_da_new(mem, sp_str_t);
+  spn_try(cc_deps_parse(mem, content, &prereqs));
+
+  sp_da_for(prereqs, it) {
+    sp_da_push(*out, ((spn_dag_obs_t) {
+      .kind = SPN_DAG_OBS_FILE,
+      .path = prereqs[it]
+    }));
+    cc_probe_shadows(c->app, prereqs[it], mem, out);
+  }
+
+  return SPN_OK;
 }
 
 static s32 cc_link_exec(spn_dag_action_t* action, void* user_data) {
