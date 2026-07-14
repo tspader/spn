@@ -8,9 +8,13 @@ typedef struct {
 typedef struct {
   header_t headers [DAG_TEST_MAX_INPUTS];
   const c8* probes [DAG_TEST_MAX_INPUTS];
+  const c8* missing [DAG_TEST_MAX_INPUTS];
   const c8* removed [DAG_TEST_MAX_INPUTS];
   const c8* created [DAG_TEST_MAX_INPUTS];
   bool discover_fails;
+  bool cold;
+  const c8* output;
+  const c8* manifest_fresh;
   spn_err_t expect_err;
   u32 expect_runs;
 } run_t;
@@ -56,6 +60,15 @@ static spn_err_t on_discover(spn_dag_action_t* action, void* user_data, sp_mem_t
       .path = tmpfs_get(&env->fs, sp_str_view(env->run->headers[it].path))
     }));
   }
+  sp_carr_for(env->run->missing, it) {
+    if (!env->run->missing[it]) {
+      break;
+    }
+    sp_da_push(*out, ((spn_dag_obs_t) {
+      .kind = SPN_DAG_OBS_FILE,
+      .path = tmpfs_get(&env->fs, sp_str_view(env->run->missing[it]))
+    }));
+  }
   sp_carr_for(env->run->probes, it) {
     if (!env->run->probes[it]) {
       break;
@@ -85,8 +98,19 @@ static void prepare(env_t* env, run_t* run) {
     if (!run->created[it]) {
       break;
     }
-    tmpfs_create(&env->fs, sp_str_view(run->created[it]), sp_str_lit("SHADOW"));
+    tmpfs_create(&env->fs, sp_str_view(run->created[it]), sp_str_lit("S"));
   }
+}
+
+static sp_str_t manifest_read(env_t* env) {
+  sp_str_t dir = tmpfs_get(&env->fs, sp_str_lit("manifests"));
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect(env->fs.mem, dir);
+  if (sp_da_size(entries) != 1) {
+    return sp_str_lit("");
+  }
+  sp_str_t content = sp_zero;
+  sp_io_read_file(env->fs.mem, entries[0].path, &content);
+  return content;
 }
 
 static void run_test(s32* utest_result, test_t t) {
@@ -107,6 +131,10 @@ static void run_test(s32* utest_result, test_t t) {
     }
 
     env.run = run;
+    if (run->cold) {
+      spn_dag_file_cache_init(&env.files, env.fs.mem);
+      spn_dag_discovery_init(&env.discovery, env.fs.mem, tmpfs_get(&env.fs, sp_str_lit("manifests")));
+    }
     spn_dag_file_cache_refresh(&env.files);
     prepare(&env, run);
 
@@ -119,13 +147,28 @@ static void run_test(s32* utest_result, test_t t) {
       .user_data = &env
     });
     spn_dag_action_add_input(g, action, spn_dag_add_value(g, t.input, sp_cstr_len(t.input)));
-    spn_dag_id_t obj = spn_dag_add_file(g, tmpfs_get(&env.fs, sp_str_lit("main.o")));
+    spn_dag_id_t obj = spn_dag_add_file(g, tmpfs_get(&env.fs, sp_str_lit("O")));
     ASSERT_EQ(SPN_OK, spn_dag_action_add_output(g, action, obj));
 
     spn_err_t err = spn_dag_execute_discovered(g, action, &env.files, &env.cache, &env.store, &env.discovery);
 
     EXPECT_EQ(run->expect_err, err);
     EXPECT_EQ(run->expect_runs, env.runs);
+
+    if (run->output) {
+      sp_str_t from_disk = sp_zero;
+      ASSERT_EQ(SP_OK, sp_io_read_file(env.fs.mem, tmpfs_get(&env.fs, sp_str_lit("O")), &from_disk));
+      EXPECT_STR(from_disk, run->output);
+    }
+
+    if (run->manifest_fresh) {
+      sp_str_t manifest = manifest_read(&env);
+      EXPECT_TRUE(!sp_str_empty(manifest));
+      sp_sys_file_meta_t sys = sp_zero;
+      ASSERT_EQ(SPN_OK, spn_dag_get_file_meta(&env.files, tmpfs_get(&env.fs, sp_str_view(run->manifest_fresh)), &sys));
+      sp_str_t mtime = sp_fmt(env.fs.mem, "\"mtime_ns\":\"{}\"", sp_fmt_int(sys.mtime.tv_nsec)).value;
+      EXPECT_TRUE(sp_str_contains(manifest, mtime));
+    }
   }
 
   tmpfs_deinit(&env.fs);
@@ -136,8 +179,8 @@ UTEST_F(discover_exec, unchanged_header_hits) {
     .name = "discover_unchanged",
     .input = "A",
     .runs = {
-      { .headers = { { "a.h", "A" } }, .expect_runs = 1 },
-      { .headers = { { "a.h", "A" } }, .expect_runs = 1 },
+      { .headers = { { "H", "A" } }, .expect_runs = 1 },
+      { .headers = { { "H", "A" } }, .expect_runs = 1 },
     }
   });
 }
@@ -147,8 +190,8 @@ UTEST_F(discover_exec, changed_header_reruns) {
     .name = "discover_changed",
     .input = "A",
     .runs = {
-      { .headers = { { "a.h", "A" } }, .expect_runs = 1 },
-      { .headers = { { "a.h", "B" } }, .expect_runs = 2 },
+      { .headers = { { "H", "A" } }, .expect_runs = 1 },
+      { .headers = { { "H", "B" } }, .expect_runs = 2 },
     }
   });
 }
@@ -158,8 +201,8 @@ UTEST_F(discover_exec, removed_header_reruns) {
     .name = "discover_removed",
     .input = "A",
     .runs = {
-      { .headers = { { "a.h", "A" } }, .expect_runs = 1 },
-      { .removed = { "a.h" }, .expect_runs = 2 },
+      { .headers = { { "H", "A" } }, .expect_runs = 1 },
+      { .removed = { "H" }, .expect_runs = 2 },
     }
   });
 }
@@ -169,9 +212,9 @@ UTEST_F(discover_exec, changed_set_refreshes_pathset) {
     .name = "discover_refresh",
     .input = "A",
     .runs = {
-      { .headers = { { "a.h", "A" } }, .expect_runs = 1 },
-      { .headers = { { "a.h", "B" }, { "b.h", "B" } }, .expect_runs = 2 },
-      { .headers = { { "a.h", "B" }, { "b.h", "B" } }, .expect_runs = 2 },
+      { .headers = { { "H", "A" } }, .expect_runs = 1 },
+      { .headers = { { "H", "B" }, { "I", "B" } }, .expect_runs = 2 },
+      { .headers = { { "H", "B" }, { "I", "B" } }, .expect_runs = 2 },
     }
   });
 }
@@ -193,7 +236,7 @@ UTEST_F(discover_exec, discover_failure_not_cached) {
     .input = "A",
     .runs = {
       { .discover_fails = true, .expect_err = SPN_ERROR, .expect_runs = 1 },
-      { .headers = { { "a.h", "A" } }, .expect_runs = 2 },
+      { .headers = { { "H", "A" } }, .expect_runs = 2 },
     }
   });
 }
@@ -203,9 +246,9 @@ UTEST_F(discover_exec, shadowing_header_reruns) {
     .name = "discover_shadow",
     .input = "A",
     .runs = {
-      { .headers = { { "a/a.h", "A" } }, .probes = { "b/a.h" }, .expect_runs = 1 },
-      { .headers = { { "a/a.h", "A" } }, .probes = { "b/a.h" }, .expect_runs = 1 },
-      { .headers = { { "a/a.h", "A" } }, .probes = { "b/a.h" }, .created = { "b/a.h" }, .expect_runs = 2 },
+      { .headers = { { "X/H", "A" } }, .probes = { "Y/H" }, .expect_runs = 1 },
+      { .headers = { { "X/H", "A" } }, .probes = { "Y/H" }, .expect_runs = 1 },
+      { .headers = { { "X/H", "A" } }, .probes = { "Y/H" }, .created = { "Y/H" }, .expect_runs = 2 },
     }
   });
 }
@@ -215,69 +258,79 @@ UTEST_F(discover_exec, probe_still_absent_hits) {
     .name = "discover_probe_absent",
     .input = "A",
     .runs = {
-      { .headers = { { "a/a.h", "A" } }, .probes = { "b/a.h" }, .expect_runs = 1 },
-      { .headers = { { "a/a.h", "A" } }, .probes = { "b/a.h" }, .expect_runs = 1 },
+      { .headers = { { "X/H", "A" } }, .probes = { "Y/H" }, .expect_runs = 1 },
+      { .headers = { { "X/H", "A" } }, .probes = { "Y/H" }, .expect_runs = 1 },
     }
   });
 }
 
-static sp_str_t disco_manifest_read(env_t* env) {
-  sp_str_t dir = tmpfs_get(&env->fs, sp_str_lit("manifests"));
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(env->fs.mem, dir);
-  if (sp_da_size(entries) != 1) {
-    return sp_str_lit("");
-  }
-  sp_str_t content = sp_zero;
-  sp_io_read_file(env->fs.mem, entries[0].path, &content);
-  return content;
+UTEST_F(discover_exec, reverted_header_hits_prior_entry) {
+  run_test(&ur, (test_t) {
+    .name = "discover_revert",
+    .input = "A",
+    .runs = {
+      { .headers = { { "H", "A" } }, .expect_runs = 1 },
+      { .headers = { { "H", "B" } }, .expect_runs = 2 },
+      { .headers = { { "H", "A" } }, .expect_runs = 2 },
+    }
+  });
+}
+
+UTEST_F(discover_exec, discover_order_canonicalized) {
+  run_test(&ur, (test_t) {
+    .name = "discover_order",
+    .input = "A",
+    .runs = {
+      { .headers = { { "I", "B" }, { "H", "A" } }, .expect_runs = 1 },
+      { .headers = { { "H", "C" }, { "I", "B" } }, .expect_runs = 2 },
+      { .headers = { { "H", "A" }, { "I", "B" } }, .expect_runs = 2 },
+    }
+  });
+}
+
+UTEST_F(discover_exec, missing_discovered_input_reruns_until_present) {
+  run_test(&ur, (test_t) {
+    .name = "discover_missing",
+    .input = "A",
+    .runs = {
+      { .missing = { "H" }, .expect_runs = 1 },
+      { .missing = { "H" }, .expect_runs = 2 },
+      { .headers = { { "H", "A" } }, .expect_runs = 3 },
+      { .headers = { { "H", "A" } }, .expect_runs = 3 },
+    }
+  });
+}
+
+UTEST_F(discover_exec, hit_restores_deleted_output) {
+  run_test(&ur, (test_t) {
+    .name = "discover_restore",
+    .input = "A",
+    .runs = {
+      { .headers = { { "H", "A" } }, .expect_runs = 1 },
+      { .removed = { "O" }, .expect_runs = 1, .output = "obj-1" },
+    }
+  });
+}
+
+UTEST_F(discover_exec, manifest_reloaded_across_cold_start) {
+  run_test(&ur, (test_t) {
+    .name = "discover_manifest_reload",
+    .input = "A",
+    .runs = {
+      { .headers = { { "H", "A" } }, .expect_runs = 1 },
+      { .headers = { { "H", "A" } }, .cold = true, .expect_runs = 1 },
+    }
+  });
 }
 
 UTEST_F(discover_exec, manifest_rewritten_on_hit) {
-  env_t env = sp_zero;
-  tmpfs_init_named(&env.fs, "discover_manifest_rewrite");
-  spn_dag_store_init(&env.store, (spn_dag_store_config_t) {
-    .kind = SPN_DAG_STORE_MEM,
-    .mem = env.fs.mem
-  });
-  spn_dag_file_cache_init(&env.files, env.fs.mem);
-  spn_dag_action_cache_init(&env.cache, env.fs.mem, sp_str_lit(""));
-  spn_dag_discovery_init(&env.discovery, env.fs.mem, tmpfs_get(&env.fs, sp_str_lit("manifests")));
-
-  const c8* input = "A";
-  run_t run = { .headers = { { "a.h", "A" } }, .expect_runs = 1 };
-  env.run = &run;
-
-  sp_for(build, 3) {
-    if (build == 2) {
-      tmpfs_create(&env.fs, sp_str_lit("a.h"), sp_str_lit("A"));
+  run_test(&ur, (test_t) {
+    .name = "discover_manifest_rewrite",
+    .input = "A",
+    .runs = {
+      { .headers = { { "H", "A" } }, .expect_runs = 1 },
+      { .headers = { { "H", "A" } }, .cold = true, .expect_runs = 1 },
+      { .headers = { { "H", "A" } }, .cold = true, .expect_runs = 1, .manifest_fresh = "H" },
     }
-
-    spn_dag_file_cache_init(&env.files, env.fs.mem);
-    spn_dag_discovery_init(&env.discovery, env.fs.mem, tmpfs_get(&env.fs, sp_str_lit("manifests")));
-    prepare(&env, &run);
-
-    spn_dag_t* g = spn_dag_new(env.fs.mem);
-    env.g = g;
-    spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
-      .identity = spn_dag_digest(input, sp_cstr_len(input)),
-      .execute = on_exec,
-      .discover = on_discover,
-      .user_data = &env
-    });
-    spn_dag_action_add_input(g, action, spn_dag_add_value(g, input, sp_cstr_len(input)));
-    ASSERT_EQ(SPN_OK, spn_dag_action_add_output(g, action, spn_dag_add_file(g, tmpfs_get(&env.fs, sp_str_lit("main.o")))));
-
-    ASSERT_EQ(SPN_OK, spn_dag_execute_discovered(g, action, &env.files, &env.cache, &env.store, &env.discovery));
-    EXPECT_EQ(1u, env.runs);
-  }
-
-  sp_str_t manifest = disco_manifest_read(&env);
-  EXPECT_TRUE(!sp_str_empty(manifest));
-
-  sp_sys_file_meta_t sys = sp_zero;
-  ASSERT_EQ(SPN_OK, spn_dag_get_file_meta(&env.files, tmpfs_get(&env.fs, sp_str_lit("a.h")), &sys));
-  sp_str_t mtime = sp_fmt(env.fs.mem, "\"mtime_ns\":\"{}\"", sp_fmt_int(sys.mtime.tv_nsec)).value;
-  EXPECT_TRUE(sp_str_contains(manifest, mtime));
-
-  tmpfs_deinit(&env.fs);
+  });
 }

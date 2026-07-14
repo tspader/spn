@@ -10,6 +10,7 @@ typedef struct {
   const c8* inputs [DAG_TEST_MAX_INPUTS];
   const c8* discovers [DAG_TEST_MAX_INPUTS];
   const c8* output;
+  bool fails;
 } run_action_t;
 
 typedef struct {
@@ -44,6 +45,9 @@ UTEST_EMPTY_FIXTURE(run)
 
 static s32 on_exec(spn_dag_action_t* action, void* user_data) {
   run_ctx_t* ctx = (run_ctx_t*)user_data;
+  if (ctx->spec->fails) {
+    return 1;
+  }
   sp_da_for(action->consumes, it) {
     spn_dag_artifact_t* in = spn_dag_find_artifact(ctx->g, action->consumes[it]);
     if (in->kind == SPN_DAG_ARTIFACT_KIND_FILE && !sp_fs_exists(in->path)) {
@@ -111,7 +115,7 @@ static void run_test(s32* utest_result, run_test_t t) {
 
   sp_carr_for(t.builds, b) {
     run_build_t* build = &t.builds[b];
-    if (!build->expect_runs) {
+    if (!build->expect_runs && !build->expect_err) {
       break;
     }
 
@@ -138,11 +142,11 @@ UTEST_F(run, chain_runs_in_dependency_order) {
   run_test(&ur, (run_test_t) {
     .name = "run_chain",
     .actions = {
-      { .identity = "cc main.c", .inputs = { "main.c" }, .output = "main.o" },
-      { .identity = "link app", .inputs = { "main.o" }, .output = "app" },
+      { .identity = "I", .inputs = { "S" }, .output = "X" },
+      { .identity = "J", .inputs = { "X" }, .output = "Y" },
     },
     .builds = {
-      { .sources = { { "main.c", "int main() {}" } }, .expect_runs = 2 },
+      { .sources = { { "S", "A" } }, .expect_runs = 2 },
     }
   });
 }
@@ -151,12 +155,12 @@ UTEST_F(run, second_build_all_hits) {
   run_test(&ur, (run_test_t) {
     .name = "run_hits",
     .actions = {
-      { .identity = "cc main.c", .inputs = { "main.c" }, .output = "main.o" },
-      { .identity = "link app", .inputs = { "main.o" }, .output = "app" },
+      { .identity = "I", .inputs = { "S" }, .output = "X" },
+      { .identity = "J", .inputs = { "X" }, .output = "Y" },
     },
     .builds = {
-      { .sources = { { "main.c", "int main() {}" } }, .expect_runs = 2 },
-      { .sources = { { "main.c", "int main() {}" } }, .expect_runs = 2 },
+      { .sources = { { "S", "A" } }, .expect_runs = 2 },
+      { .sources = { { "S", "A" } }, .expect_runs = 2 },
     }
   });
 }
@@ -165,12 +169,12 @@ UTEST_F(run, source_change_reruns_chain) {
   run_test(&ur, (run_test_t) {
     .name = "run_source_change",
     .actions = {
-      { .identity = "cc main.c", .inputs = { "main.c" }, .output = "main.o" },
-      { .identity = "link app", .inputs = { "main.o" }, .output = "app" },
+      { .identity = "I", .inputs = { "S" }, .output = "X" },
+      { .identity = "J", .inputs = { "X" }, .output = "Y" },
     },
     .builds = {
-      { .sources = { { "main.c", "int main() {}" } }, .expect_runs = 2 },
-      { .sources = { { "main.c", "int main() { return 1; }" } }, .expect_runs = 4 },
+      { .sources = { { "S", "A" } }, .expect_runs = 2 },
+      { .sources = { { "S", "B" } }, .expect_runs = 4 },
     }
   });
 }
@@ -179,11 +183,11 @@ UTEST_F(run, independent_actions_both_run) {
   run_test(&ur, (run_test_t) {
     .name = "run_independent",
     .actions = {
-      { .identity = "cc a.c", .inputs = { "a.c" }, .output = "a.o" },
-      { .identity = "cc b.c", .inputs = { "b.c" }, .output = "b.o" },
+      { .identity = "I", .inputs = { "S" }, .output = "X" },
+      { .identity = "J", .inputs = { "T" }, .output = "Y" },
     },
     .builds = {
-      { .sources = { { "a.c", "A" }, { "b.c", "B" } }, .expect_runs = 2 },
+      { .sources = { { "S", "A" }, { "T", "B" } }, .expect_runs = 2 },
     }
   });
 }
@@ -192,13 +196,51 @@ UTEST_F(run, diamond_selective_rebuild) {
   run_test(&ur, (run_test_t) {
     .name = "run_diamond",
     .actions = {
-      { .identity = "cc main.c", .inputs = { "main.c" }, .output = "main.o" },
-      { .identity = "cc util.c", .inputs = { "util.c" }, .output = "util.o" },
-      { .identity = "link app", .inputs = { "main.o", "util.o" }, .output = "app" },
+      { .identity = "I", .inputs = { "S" }, .output = "X" },
+      { .identity = "J", .inputs = { "T" }, .output = "Y" },
+      { .identity = "K", .inputs = { "X", "Y" }, .output = "Z" },
     },
     .builds = {
-      { .sources = { { "main.c", "M" }, { "util.c", "U" } }, .expect_runs = 3 },
-      { .sources = { { "main.c", "M2" }, { "util.c", "U" } }, .expect_runs = 5 },
+      { .sources = { { "S", "A" }, { "T", "B" } }, .expect_runs = 3 },
+      { .sources = { { "S", "C" }, { "T", "B" } }, .expect_runs = 5 },
+    }
+  });
+}
+
+UTEST_F(run, missing_source_fails) {
+  run_test(&ur, (run_test_t) {
+    .name = "run_missing_source",
+    .actions = {
+      { .identity = "I", .inputs = { "S" }, .output = "X" },
+    },
+    .builds = {
+      { .expect_err = SPN_ERROR },
+    }
+  });
+}
+
+UTEST_F(run, cycle_fails) {
+  run_test(&ur, (run_test_t) {
+    .name = "run_cycle",
+    .actions = {
+      { .identity = "I", .inputs = { "Y" }, .output = "X" },
+      { .identity = "J", .inputs = { "X" }, .output = "Y" },
+    },
+    .builds = {
+      { .expect_err = SPN_ERROR },
+    }
+  });
+}
+
+UTEST_F(run, failing_action_stops_build) {
+  run_test(&ur, (run_test_t) {
+    .name = "run_failing_action",
+    .actions = {
+      { .identity = "I", .inputs = { "S" }, .output = "X", .fails = true },
+      { .identity = "J", .inputs = { "X" }, .output = "Y" },
+    },
+    .builds = {
+      { .sources = { { "S", "A" } }, .expect_err = SPN_ERROR },
     }
   });
 }
@@ -208,13 +250,13 @@ UTEST_F(run, discovered_generated_header_waits_for_producer) {
     .name = "run_generated_header",
     .discovery = true,
     .actions = {
-      { .identity = "gen gen.h", .inputs = { "seed" }, .output = "gen.h" },
-      { .identity = "cc main.c", .inputs = { "main.c" }, .discovers = { "gen.h" }, .output = "main.o" },
+      { .identity = "I", .inputs = { "S" }, .output = "H" },
+      { .identity = "J", .inputs = { "M" }, .discovers = { "H" }, .output = "O" },
     },
     .builds = {
-      { .sources = { { "seed", "S" }, { "main.c", "M" } }, .expect_runs = 3 },
-      { .sources = { { "seed", "S" }, { "main.c", "M" } }, .expect_runs = 3 },
-      { .sources = { { "seed", "S2" }, { "main.c", "M" } }, .expect_runs = 5 },
+      { .sources = { { "S", "A" }, { "M", "B" } }, .expect_runs = 3 },
+      { .sources = { { "S", "A" }, { "M", "B" } }, .expect_runs = 3 },
+      { .sources = { { "S", "C" }, { "M", "B" } }, .expect_runs = 5 },
     }
   });
 }
@@ -224,12 +266,12 @@ UTEST_F(run, discovered_source_header_no_deferral) {
     .name = "run_discovered_source",
     .discovery = true,
     .actions = {
-      { .identity = "cc main.c", .inputs = { "main.c" }, .discovers = { "sp.h" }, .output = "main.o" },
+      { .identity = "I", .inputs = { "M" }, .discovers = { "H" }, .output = "O" },
     },
     .builds = {
-      { .sources = { { "main.c", "M" }, { "sp.h", "SP" } }, .expect_runs = 1 },
-      { .sources = { { "main.c", "M" }, { "sp.h", "SP" } }, .expect_runs = 1 },
-      { .sources = { { "main.c", "M" }, { "sp.h", "SP2" } }, .expect_runs = 2 },
+      { .sources = { { "M", "A" }, { "H", "B" } }, .expect_runs = 1 },
+      { .sources = { { "M", "A" }, { "H", "B" } }, .expect_runs = 1 },
+      { .sources = { { "M", "A" }, { "H", "C" } }, .expect_runs = 2 },
     }
   });
 }
