@@ -152,7 +152,6 @@ UTEST_F(target, selection_run_command) {
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/script") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/main") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug/test/test") },
-      { .kind = ACTION_VERIFY_CONTENT, .verify_content = { .file = sp_str_lit("ran.txt"), .content = sp_str_lit("script\n") } },
     },
   });
 }

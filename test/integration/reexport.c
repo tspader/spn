@@ -1,14 +1,3 @@
-// The compile closure: consuming a package means seeing the headers (and
-// public defines) of everything reachable from it through public dep edges,
-// because C headers re-export their deps (sdl_mixer.h does #include "sdl.h").
-// A private edge is an implementation detail: its whole subtree is invisible
-// to consumers but fully visible to its declarer. Unlike the link closure,
-// the walk does not stop at shared-library boundaries; consumers still parse
-// a shared dep's headers. Today only direct deps contribute include paths:
-// private_hidden, private_owner, and private_subtree pin behavior that must
-// keep passing; transitive, shared_boundary, and public_define fail until
-// the compile closure lands. (Index packages only: file-backed deps share
-// one store include dir today, which would leak every header to every TU.)
 SPN_TEST_SUITE(reexport)
 
 // main deps only sdl_mixer; sdl_mixer.h includes sdl.h from its public sdl

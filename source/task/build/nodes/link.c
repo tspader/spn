@@ -88,6 +88,7 @@ static spn_err_union_t render_link_invocation(spn_target_unit_t* target, sp_str_
   sp_da_init(mem, link.hidden_libs);
   sp_da_init(mem, link.lib_dirs);
   sp_da_init(mem, link.rpath);
+  sp_da_init(mem, link.frameworks);
   add_deps_to_cc_target(&link, target);
 
   switch (target->pkg->build->profile.os) {
@@ -97,9 +98,13 @@ static spn_err_union_t render_link_invocation(spn_target_unit_t* target, sp_str_
     }
     case SPN_OS_MACOS: {
       sp_da_push(link.rpath, sp_str_lit("@loader_path"));
+      link.min_os = spn_target_macos_min_os(target);
       break;
     }
-    case SPN_OS_WINDOWS:
+    case SPN_OS_WINDOWS: {
+      link.subsystem = target->info->windows.subsystem;
+      break;
+    }
     case SPN_OS_WASI:
     case SPN_OS_NONE: {
       break;

@@ -250,6 +250,26 @@ sp_str_t spn_opt_level_to_str(spn_opt_level_t level) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+spn_win_subsystem_t spn_win_subsystem_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "console")) {
+    return SPN_WIN_SUBSYSTEM_CONSOLE;
+  }
+  if (sp_str_equal_cstr(str, "windows")) {
+    return SPN_WIN_SUBSYSTEM_WINDOWS;
+  }
+
+  return SPN_WIN_SUBSYSTEM_NONE;
+}
+
+sp_str_t spn_win_subsystem_to_str(spn_win_subsystem_t subsystem) {
+  switch (subsystem) {
+    case SPN_WIN_SUBSYSTEM_CONSOLE: return sp_str_lit("console");
+    case SPN_WIN_SUBSYSTEM_WINDOWS: return sp_str_lit("windows");
+    case SPN_WIN_SUBSYSTEM_NONE:    return sp_str_lit("");
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 spn_sanitizer_t spn_sanitizer_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "address")) {
     return SPN_SANITIZER_ADDRESS;

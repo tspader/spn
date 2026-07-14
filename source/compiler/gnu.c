@@ -10,8 +10,21 @@ static void push_flag(sp_da(sp_str_t)* flags, sp_str_t flag) {
   }
 }
 
+static void push_arg_fmt(sp_mem_t mem, sp_ps_config_t* ps, const c8* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  sp_str_r str = sp_fmt_mem_v(mem, sp_cstr_as_str(fmt), args);
+  va_end(args);
+
+  sp_ps_config_add_arg(mem, ps, str.value);
+}
+
 static void push_arg(sp_mem_t mem, sp_ps_config_t* ps, const c8* arg) {
   sp_ps_config_add_arg(mem, ps, sp_cstr_as_str(arg));
+}
+
+static void push_arg_str(sp_mem_t mem, sp_ps_config_t* ps, sp_str_t arg) {
+  sp_ps_config_add_arg(mem, ps, arg);
 }
 
 static void push_args(sp_mem_t mem, sp_ps_config_t* ps, sp_da(sp_str_t) args) {
@@ -114,7 +127,7 @@ static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
     spn_triple_t triple = { profile->arch, profile->os, profile->abi };
     sp_str_t target = spn_triple_to_cc_target(mem, triple);
     if (!sp_str_empty(target)) {
-      sp_ps_config_add_arg(mem, ps, sp_fmt(mem, "--target={}", SP_FMT_STR(target)).value);
+      push_arg_fmt(mem, ps, "--target={}", sp_fmt_str(target));
     }
   }
 }
@@ -156,10 +169,19 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
     }
   }
   if (compile->pic) {
-    sp_ps_config_add_arg(mem, ps, sp_str_lit("-fPIC"));
+    push_arg(mem, ps, "-fPIC");
   }
   if (compile->visibility == SPN_SYMBOL_VISIBILITY_HIDDEN) {
     push_arg(mem, ps, "-fvisibility=hidden");
+  }
+  if (profile->os == SPN_OS_MACOS) {
+    if (!sp_str_empty(profile->sysroot)) {
+      push_arg(mem, ps, "-isysroot");
+      push_arg_str(mem, ps, profile->sysroot);
+    }
+    if (spn_os_version_present(compile->min_os)) {
+      push_arg_fmt(mem, ps, "-mmacosx-version-min={}.{}", sp_fmt_uint(compile->min_os.major), sp_fmt_uint(compile->min_os.minor));
+    }
   }
   push_args(mem, ps, compile->args);
   push_arg(mem, ps, "-Werror=return-type");
@@ -183,12 +205,15 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       break;
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
-      sp_ps_config_add_arg(mem, ps, sp_str_lit("-shared"));
+      push_arg(mem, ps, "-shared");
       break;
     }
     case SPN_CC_OUTPUT_EXE: {
       if (profile->linkage == SPN_LIB_KIND_STATIC && profile->os != SPN_OS_MACOS) {
-        sp_ps_config_add_arg(mem, ps, sp_str_lit("-static"));
+        push_arg(mem, ps, "-static");
+      }
+      if (profile->os == SPN_OS_WINDOWS && link->subsystem == SPN_WIN_SUBSYSTEM_WINDOWS) {
+        push_arg(mem, ps, "-Wl,--subsystem,windows");
       }
       break;
     }
@@ -200,24 +225,37 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   push_args(mem, ps, link->objects);
   push_args(mem, ps, link->args);
   sp_da_for(link->lib_dirs, it) {
-    sp_ps_config_add_arg(mem, ps, sp_fmt(mem, "-L{}", SP_FMT_STR(link->lib_dirs[it])).value);
+    push_arg_fmt(mem, ps, "-L{}", sp_fmt_str(link->lib_dirs[it]));
   }
   push_args(mem, ps, link->libs);
   sp_da_for(link->hidden_libs, it) {
     if (profile->os == SPN_OS_MACOS) {
-      sp_ps_config_add_arg(mem, ps, sp_fmt(mem, "-Wl,-hidden-l{}", SP_FMT_STR(link->hidden_libs[it])).value);
+      push_arg_fmt(mem, ps, "-Wl,-hidden-l{}", sp_fmt_str(link->hidden_libs[it]));
     } else {
-      sp_ps_config_add_arg(mem, ps, sp_fmt(mem, "-l{}", SP_FMT_STR(link->hidden_libs[it])).value);
+      push_arg_fmt(mem, ps, "-l{}", sp_fmt_str(link->hidden_libs[it]));
       spn_triple_t triple = { profile->arch, profile->os, profile->abi };
       sp_str_t archive = spn_triple_lib_file_name(mem, triple, link->hidden_libs[it], SP_OS_LIB_STATIC);
-      sp_ps_config_add_arg(mem, ps, sp_fmt(mem, "-Wl,--exclude-libs,{}", SP_FMT_STR(archive)).value);
+      push_arg_fmt(mem, ps, "-Wl,--exclude-libs,{}", sp_fmt_str(archive));
     }
   }
   sp_da_for(link->system_libs, it) {
-    sp_ps_config_add_arg(mem, ps, sp_fmt(mem, "-l{}", SP_FMT_STR(link->system_libs[it])).value);
+    push_arg_fmt(mem, ps, "-l{}", sp_fmt_str(link->system_libs[it]));
+  }
+  if (profile->os == SPN_OS_MACOS) {
+    if (!sp_str_empty(profile->sysroot)) {
+      push_arg(mem, ps, "-isysroot");
+      sp_ps_config_add_arg(mem, ps, profile->sysroot);
+    }
+    if (spn_os_version_present(link->min_os)) {
+      push_arg_fmt(mem, ps, "-mmacosx-version-min={}.{}", sp_fmt_uint(link->min_os.major), sp_fmt_uint(link->min_os.minor));
+    }
+    sp_da_for(link->frameworks, it) {
+      push_arg(mem, ps, "-framework");
+      sp_ps_config_add_arg(mem, ps, link->frameworks[it]);
+    }
   }
   sp_da_for(link->rpath, it) {
-    sp_ps_config_add_arg(mem, ps, sp_fmt(mem, "-Wl,-rpath,{}", SP_FMT_STR(link->rpath[it])).value);
+    push_arg_fmt(mem, ps, "-Wl,-rpath,{}", sp_fmt_str(link->rpath[it]));
   }
   sp_ps_config_add_arg(mem, ps, sp_str_lit("-o"));
   sp_ps_config_add_arg(mem, ps, link->output);

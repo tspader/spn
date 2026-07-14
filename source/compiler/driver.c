@@ -18,6 +18,7 @@ sp_str_t spn_cc_feature_to_str(spn_cc_feature_t feature) {
     case SPN_CC_FEATURE_LINK_SHARED: return sp_str_lit("shared library linking");
     case SPN_CC_FEATURE_LINK_REACTOR: return sp_str_lit("reactor module linking");
     case SPN_CC_FEATURE_ARCHIVE: return sp_str_lit("static archiving");
+    case SPN_CC_FEATURE_FRAMEWORKS: return sp_str_lit("framework linking without a macOS SDK");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
@@ -118,6 +119,9 @@ spn_err_union_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolc
   }
   if (link->kind == SPN_CC_OUTPUT_SHARED_LIB && profile->os == SPN_OS_WASI) {
     return unsupported(toolchain, profile, feature);
+  }
+  if (profile->os == SPN_OS_MACOS && !sp_da_empty(link->frameworks) && sp_str_empty(profile->sysroot)) {
+    return unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
   }
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:

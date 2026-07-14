@@ -19,17 +19,65 @@
 #include "triple/triple.h"
 #include "unit/compiler.h"
 
+static void push_frameworks(sp_da(sp_str_t)* frameworks, sp_da(sp_str_t) values) {
+  sp_da_for(values, it) {
+    bool present = false;
+    sp_da_for(*frameworks, jt) {
+      if (sp_str_equal((*frameworks)[jt], values[it])) {
+        present = true;
+        break;
+      }
+    }
+    if (!present) {
+      sp_da_push(*frameworks, values[it]);
+    }
+  }
+}
+
+static spn_os_version_t max_os_version(spn_os_version_t current, spn_os_version_t candidate) {
+  return spn_os_version_less(current, candidate) ? candidate : current;
+}
+
+spn_os_version_t spn_target_macos_min_os(spn_target_unit_t* target) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+
+  spn_os_version_t best = target->info->macos.min_os;
+  best = max_os_version(best, target->pkg->info->macos.min_os);
+
+  sp_da_for(target->deps.target, it) {
+    best = max_os_version(best, target->deps.target[it]->info->macos.min_os);
+  }
+
+  sp_da(spn_closure_entry_t) closure = spn_target_link_closure(s.mem, target);
+  sp_da_for(closure, it) {
+    spn_pkg_unit_t* dep = closure[it].pkg;
+    if (!dep || dep == target->pkg) continue;
+    best = max_os_version(best, dep->info->macos.min_os);
+    sp_da_for(dep->libs, lt) {
+      best = max_os_version(best, dep->libs[lt]->info->macos.min_os);
+    }
+  }
+
+  sp_mem_end_scratch(s);
+  return best;
+}
+
 void add_deps_to_cc_target(spn_cc_link_t* link, spn_target_unit_t* target) {
   spn_session_t* session = target->pkg->session;
   spn_pkg_unit_t* pkg = target->pkg;
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
-  // Sibling targets named in this target's deps come first: they may lean on
-  // the package closure below, never the reverse
+  push_frameworks(&link->frameworks, target->info->macos.frameworks);
+  push_frameworks(&link->frameworks, pkg->info->macos.frameworks);
+
   sp_da_for(target->deps.target, it) {
     spn_target_unit_t* lib = target->deps.target[it];
     if (lib->info->no_link) continue;
+
+    if (lib->lib_kind != SPN_LIB_KIND_SHARED) {
+      push_frameworks(&link->frameworks, lib->info->macos.frameworks);
+    }
 
     switch (lib->lib_kind) {
       case SPN_LIB_KIND_STATIC: {
@@ -65,8 +113,6 @@ void add_deps_to_cc_target(spn_cc_link_t* link, spn_target_unit_t* target) {
       continue;
     }
 
-    // A shared lib embedding a private static dep hides its symbols, so
-    // the embedded copy can't collide with a consumer's own instance
     if (libs[it].private && target->kind == SPN_CC_OUTPUT_SHARED_LIB) {
       sp_da_push(link->hidden_libs, lib->info->name);
     }
@@ -75,7 +121,6 @@ void add_deps_to_cc_target(spn_cc_link_t* link, spn_target_unit_t* target) {
     }
   }
 
-  // System libraries last, so they resolve every archive above them.
   sp_da_for(pkg->info->system_deps, it) {
     sp_da_push(link->system_libs, pkg->info->system_deps[it]);
   }
@@ -85,6 +130,17 @@ void add_deps_to_cc_target(spn_cc_link_t* link, spn_target_unit_t* target) {
 
     sp_da_for(dep->info->system_deps, s) {
       sp_da_push(link->system_libs, dep->info->system_deps[s]);
+    }
+    bool static_link = false;
+    sp_da_for(dep->libs, lt) {
+      spn_target_unit_t* lib = dep->libs[lt];
+      if (lib->info->no_link) continue;
+      if (lib->lib_kind == SPN_LIB_KIND_SHARED) continue;
+      static_link = true;
+      push_frameworks(&link->frameworks, lib->info->macos.frameworks);
+    }
+    if (static_link || sp_da_empty(dep->libs)) {
+      push_frameworks(&link->frameworks, dep->info->macos.frameworks);
     }
   }
 

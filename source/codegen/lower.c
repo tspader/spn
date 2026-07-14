@@ -108,6 +108,13 @@ static spn_target_info_t lower_target(spn_toml_loader_t* ctx, const spn_cg_targe
     .headers = cg->headers,
     .include = cg->include,
     .cxx = lower_cxx_options(&cg->cxx),
+    .macos = {
+      .frameworks = cg->macos.frameworks,
+      .min_os = cg->macos.min_os,
+    },
+    .windows = {
+      .subsystem = sp_opt_is_null(cg->windows.subsystem) ? SPN_WIN_SUBSYSTEM_NONE : sp_opt_get(cg->windows.subsystem),
+    },
     .gated = {
       .source = lower_gated_sources(ctx, cg->source),
       .define = lower_gated_values(ctx, cg->define),
@@ -201,6 +208,8 @@ static void lower_package(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
   sp_da_for(p->system_deps, it) {
     sp_da_push(info->gated.system_deps, ((spn_gated_str_t) { .value = p->system_deps[it].lib, .when = p->system_deps[it].when }));
   }
+  info->macos.frameworks = p->macos.frameworks ? p->macos.frameworks : sp_da_new(ctx->mem, sp_str_t);
+  info->macos.min_os = p->macos.min_os;
   info->build = lower_metaprogram(ctx, &p->build, sp_str_lit("build"), SPN_TARGET_BUILD_METAPROGRAM);
   info->configure = lower_metaprogram(ctx, &p->configure, sp_str_lit("configure"), SPN_TARGET_CONFIGURE_METAPROGRAM);
 }
@@ -696,6 +705,31 @@ static void validate_c_only_scripts(spn_toml_loader_t* ctx, const spn_cg_manifes
   spn_toml_loader_pop(ctx);
 }
 
+static void validate_collection_platform(spn_toml_loader_t* ctx, spn_cg_target_om_t cg, const c8* key, bool linkable) {
+  spn_toml_loader_push_key(ctx, key);
+  sp_om_for(cg, it) {
+    const spn_cg_target_t* target = sp_str_om_at(cg, it);
+    if (!sp_opt_is_null(target->windows.subsystem)) {
+      bool invalid = sp_opt_get(target->windows.subsystem) == SPN_WIN_SUBSYSTEM_NONE;
+      if (invalid || linkable) {
+        spn_toml_loader_push_index(ctx, it);
+        spn_toml_loader_push_key(ctx, "windows");
+        spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, "subsystem");
+        spn_toml_loader_pop(ctx);
+        spn_toml_loader_pop(ctx);
+      }
+    }
+  }
+  spn_toml_loader_pop(ctx);
+}
+
+static void validate_platform(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg) {
+  validate_collection_platform(ctx, cg->lib, "lib", true);
+  validate_collection_platform(ctx, cg->bin, "bin", false);
+  validate_collection_platform(ctx, cg->script, "script", false);
+  validate_collection_platform(ctx, cg->test, "test", false);
+}
+
 static void validate_unique_targets(spn_toml_loader_t* ctx, spn_pkg_info_t* out) {
   sp_ht(sp_str_t, u8) seen;
   sp_str_ht_init(ctx->mem, seen);
@@ -768,6 +802,7 @@ spn_err_t spn_pkg_lower(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn
   validate_cxx(ctx, cg);
   validate_links(ctx, cg);
   validate_c_only_scripts(ctx, cg);
+  validate_platform(ctx, cg);
   validate_unique_targets(ctx, out);
   validate_inline_toolchains(ctx, cg);
   validate_options(ctx, cg, out);

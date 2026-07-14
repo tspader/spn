@@ -1,0 +1,10 @@
+[package]
+name = "platform_fingerprint"
+version = "0.1.0"
+
+[deps.package]
+dep = { path = "packages/dep" }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

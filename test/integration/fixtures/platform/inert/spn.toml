@@ -1,0 +1,13 @@
+[package]
+name = "platform_inert"
+version = "0.1.0"
+
+[package.macos]
+min_os = { major = 12 }
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+
+[bin.windows]
+subsystem = "console"

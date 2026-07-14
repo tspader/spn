@@ -57,9 +57,7 @@ struct spn_target_info {
   sp_str_t name;
   spn_target_kind_t kind;
   spn_linkage_set_t linkages;
-  // An unlinked lib still builds and installs, but consumers don't link it;
-  // think runtime data that happens to be an archive (e.g. tcc's libtcc1.a)
-  bool no_link;
+  bool no_link; // @spader A hack for libtcc1.a (building an unlinked library)
   sp_da(sp_str_t) source;
   sp_da(sp_str_t) headers;
   sp_da(sp_str_t) include;
@@ -69,9 +67,13 @@ struct spn_target_info {
   sp_da(sp_str_t) deps;
   sp_da(spn_embed_t) embed;
   spn_cxx_options_t cxx;
-  // Manifest entries land here at load; spn_pkg_apply_options folds the ones
-  // whose predicates pass into the plain lists above, which stay empty until
-  // then. Script-created targets skip this and write the plain lists directly.
+  struct {
+    sp_da(sp_str_t) frameworks;
+    spn_os_version_t min_os;
+  } macos;
+  struct {
+    spn_win_subsystem_t subsystem;
+  } windows;
   struct {
     spn_gated_list_t source;
     spn_gated_list_t define;
