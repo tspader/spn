@@ -46,6 +46,10 @@ void                        spn_dag_discovery_flush(spn_dag_discovery_t* d, spn_
 spn_err_t                   spn_dag_execute_discovered(spn_dag_t* g, spn_dag_id_t action, spn_dag_env_t* env);
 
 spn_err_t                   spn_dag_run(spn_dag_t* g, spn_dag_env_t* env);
+spn_err_t                   spn_dag_run_ex(spn_dag_t* g, spn_dag_env_t* env, spn_dag_executor_t* executor);
+
+void                spn_dag_pool_init(spn_dag_pool_t* pool, sp_mem_t mem, u32 workers);
+void                spn_dag_pool_deinit(spn_dag_pool_t* pool);
 
 void                spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config);
 spn_err_t           spn_dag_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag_digest_t* digest);

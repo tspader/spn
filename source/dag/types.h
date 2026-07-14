@@ -140,6 +140,7 @@ typedef struct {
   sp_mem_arena_t* arena;
   sp_mem_t mem;
   sp_str_t dir;
+  sp_mutex_t mutex;
   sp_ht(spn_dag_digest_t, sp_mem_slice_t) blobs;
 } spn_dag_store_t;
 
@@ -150,5 +151,29 @@ typedef struct {
   spn_dag_discovery_t* discovery;
   sp_str_t scratch;
 } spn_dag_env_t;
+
+typedef struct {
+  void (*fn)(void* data);
+  void* data;
+} spn_dag_job_t;
+
+typedef struct spn_dag_executor_t spn_dag_executor_t;
+struct spn_dag_executor_t {
+  void (*submit)(spn_dag_executor_t* ex, spn_dag_job_t job);
+  spn_dag_job_t (*poll)(spn_dag_executor_t* ex);
+};
+
+typedef struct {
+  spn_dag_executor_t executor;
+  sp_mem_arena_t* arena;
+  sp_mem_t mem;
+  sp_mutex_t mutex;
+  sp_cv_t submitted;
+  sp_cv_t completed;
+  sp_da(spn_dag_job_t) queue;
+  sp_da(spn_dag_job_t) done;
+  sp_da(sp_thread_t) workers;
+  bool shutdown;
+} spn_dag_pool_t;
 
 #endif
