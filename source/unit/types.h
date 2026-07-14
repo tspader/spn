@@ -11,6 +11,7 @@
 #include "intern/types.h"
 #include "pkg/types.h"
 #include "profile/types.h"
+#include "target/closure.h"
 #include "external/wasm/types.h"
 #include "log/lazy/types.h"
 
@@ -168,6 +169,16 @@ struct spn_target_unit {
     sp_da(spn_target_unit_t*) target;
     sp_da(spn_pkg_unit_t*) package;
   } deps;
+
+  struct {
+    spn_os_version_t min_os;
+    spn_lang_t lang;
+    sp_da(spn_link_lib_t) libs;
+    sp_da(sp_str_t) lib_dirs;
+    sp_da(sp_str_t) system_libs;
+    sp_da(sp_str_t) hidden_libs;
+    sp_da(sp_str_t) frameworks;
+  } link;
 
   struct {
     spn_bg_id_t output;

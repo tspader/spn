@@ -38,56 +38,46 @@ static spn_os_version_t max_os_version(spn_os_version_t current, spn_os_version_
   return spn_os_version_less(current, candidate) ? candidate : current;
 }
 
-spn_os_version_t spn_target_macos_min_os(spn_target_unit_t* target) {
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-
-  spn_os_version_t best = target->info->macos.min_os;
-  best = max_os_version(best, target->pkg->info->macos.min_os);
-
-  sp_da_for(target->deps.target, it) {
-    best = max_os_version(best, target->deps.target[it]->info->macos.min_os);
-  }
-
-  sp_da(spn_closure_entry_t) closure = spn_target_link_closure(s.mem, target);
-  sp_da_for(closure, it) {
-    spn_pkg_unit_t* dep = closure[it].pkg;
-    if (!dep || dep == target->pkg) continue;
-    best = max_os_version(best, dep->info->macos.min_os);
-    sp_da_for(dep->libs, lt) {
-      best = max_os_version(best, dep->libs[lt]->info->macos.min_os);
+static bool objects_have_cxx(sp_da(spn_compile_unit_t*) objects) {
+  sp_da_for(objects, it) {
+    if (objects[it]->lang == SPN_LANG_CXX) {
+      return true;
     }
   }
-
-  sp_mem_end_scratch(s);
-  return best;
+  return false;
 }
 
-void add_deps_to_cc_target(spn_cc_link_t* link, spn_target_unit_t* target) {
-  spn_session_t* session = target->pkg->session;
+void spn_target_resolve_link(spn_target_unit_t* target) {
   spn_pkg_unit_t* pkg = target->pkg;
+  sp_mem_t mem = pkg->session->mem;
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
-  push_frameworks(&link->frameworks, target->info->macos.frameworks);
-  push_frameworks(&link->frameworks, pkg->info->macos.frameworks);
+  sp_da_init(mem, target->link.lib_dirs);
+  sp_da_init(mem, target->link.system_libs);
+  sp_da_init(mem, target->link.hidden_libs);
+  sp_da_init(mem, target->link.frameworks);
+
+  spn_os_version_t min_os = max_os_version(target->info->macos.min_os, pkg->info->macos.min_os);
+  spn_lang_t lang = objects_have_cxx(target->objects) ? SPN_LANG_CXX : SPN_LANG_C;
+
+  push_frameworks(&target->link.frameworks, target->info->macos.frameworks);
+  push_frameworks(&target->link.frameworks, pkg->info->macos.frameworks);
 
   sp_da_for(target->deps.target, it) {
     spn_target_unit_t* lib = target->deps.target[it];
+    min_os = max_os_version(min_os, lib->info->macos.min_os);
     if (lib->info->no_link) continue;
 
     if (lib->lib_kind != SPN_LIB_KIND_SHARED) {
-      push_frameworks(&link->frameworks, lib->info->macos.frameworks);
+      push_frameworks(&target->link.frameworks, lib->info->macos.frameworks);
     }
 
     switch (lib->lib_kind) {
-      case SPN_LIB_KIND_STATIC: {
-        sp_da_push(link->lib_dirs, lib->pkg->paths.lib);
-        sp_da_push(link->system_libs, lib->info->name);
-        break;
-      }
+      case SPN_LIB_KIND_STATIC:
       case SPN_LIB_KIND_SHARED: {
-        sp_da_push(link->lib_dirs, lib->pkg->paths.lib);
-        sp_da_push(link->system_libs, lib->info->name);
+        sp_da_push(target->link.lib_dirs, lib->pkg->paths.lib);
+        sp_da_push(target->link.system_libs, lib->info->name);
         break;
       }
       case SPN_LIB_KIND_SOURCE:
@@ -98,51 +88,61 @@ void add_deps_to_cc_target(spn_cc_link_t* link, spn_target_unit_t* target) {
     }
   }
 
-  sp_da(spn_closure_entry_t) deps = spn_target_link_closure(s.mem, target);
+  sp_da(spn_closure_entry_t) closure = spn_target_link_closure(s.mem, target);
 
   // Packages must precede the system libraries they need
-  sp_da(spn_link_lib_t) libs = spn_closure_link_libs(s.mem, deps, pkg);
-  sp_da_for(libs, it) {
-    spn_pkg_unit_t* dep = libs[it].pkg;
-    spn_target_unit_t* lib = libs[it].lib;
+  target->link.libs = spn_closure_link_libs(mem, closure, pkg);
+  sp_da_for(target->link.libs, it) {
+    spn_pkg_unit_t* dep = target->link.libs[it].pkg;
+    spn_target_unit_t* lib = target->link.libs[it].lib;
 
-    sp_da_push(link->lib_dirs, dep->paths.lib);
+    if (lang != SPN_LANG_CXX && lib->lib_kind == SPN_LIB_KIND_STATIC && objects_have_cxx(lib->objects)) {
+      lang = SPN_LANG_CXX;
+    }
+
+    sp_da_push(target->link.lib_dirs, dep->paths.lib);
 
     if (lib->lib_kind == SPN_LIB_KIND_SHARED) {
-      sp_da_push(link->system_libs, lib->info->name);
+      sp_da_push(target->link.system_libs, lib->info->name);
       continue;
     }
 
-    if (libs[it].private && target->kind == SPN_CC_OUTPUT_SHARED_LIB) {
-      sp_da_push(link->hidden_libs, lib->info->name);
+    if (target->link.libs[it].private && target->kind == SPN_CC_OUTPUT_SHARED_LIB) {
+      sp_da_push(target->link.hidden_libs, lib->info->name);
     }
     else {
-      sp_da_push(link->system_libs, lib->info->name);
+      sp_da_push(target->link.system_libs, lib->info->name);
     }
   }
 
   sp_da_for(pkg->info->system_deps, it) {
-    sp_da_push(link->system_libs, pkg->info->system_deps[it]);
+    sp_da_push(target->link.system_libs, pkg->info->system_deps[it]);
   }
-  sp_da_for(deps, it) {
-    spn_pkg_unit_t* dep = deps[it].pkg;
+  sp_da_for(closure, it) {
+    spn_pkg_unit_t* dep = closure[it].pkg;
     if (!dep || dep == pkg) continue;
 
-    sp_da_for(dep->info->system_deps, s) {
-      sp_da_push(link->system_libs, dep->info->system_deps[s]);
+    min_os = max_os_version(min_os, dep->info->macos.min_os);
+
+    sp_da_for(dep->info->system_deps, st) {
+      sp_da_push(target->link.system_libs, dep->info->system_deps[st]);
     }
     bool static_link = false;
     sp_da_for(dep->libs, lt) {
       spn_target_unit_t* lib = dep->libs[lt];
+      min_os = max_os_version(min_os, lib->info->macos.min_os);
       if (lib->info->no_link) continue;
       if (lib->lib_kind == SPN_LIB_KIND_SHARED) continue;
       static_link = true;
-      push_frameworks(&link->frameworks, lib->info->macos.frameworks);
+      push_frameworks(&target->link.frameworks, lib->info->macos.frameworks);
     }
     if (static_link || sp_da_empty(dep->libs)) {
-      push_frameworks(&link->frameworks, dep->info->macos.frameworks);
+      push_frameworks(&target->link.frameworks, dep->info->macos.frameworks);
     }
   }
+
+  target->link.min_os = min_os;
+  target->link.lang = lang;
 
   sp_mem_end_scratch(s);
 }

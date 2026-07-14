@@ -7,12 +7,11 @@
 #include "target/types.h"
 #include "unit/types.h"
 
-void add_deps_to_cc_target(spn_cc_link_t* link, spn_target_unit_t* target);
+void spn_target_resolve_link(spn_target_unit_t* target);
 spn_err_union_t spn_build_link_invocation(spn_target_unit_t* target);
 sp_str_t get_embed_object_path(sp_mem_t mem, spn_target_unit_t* unit);
 sp_str_t get_embed_header_path(sp_mem_t mem, spn_target_unit_t* unit);
 sp_str_t get_target_output_path(sp_mem_t mem, spn_target_unit_t* unit);
-spn_os_version_t spn_target_macos_min_os(spn_target_unit_t* target);
 sp_str_t get_target_staged_path(sp_mem_t mem, spn_target_unit_t* unit);
 
 #endif

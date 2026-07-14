@@ -34,7 +34,7 @@ spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
       .visibility = build->visibility,
     };
     if (build->profile.os == SPN_OS_MACOS) {
-      compile.min_os = spn_target_macos_min_os(unit->target);
+      compile.min_os = target->link.min_os;
     }
     sp_da_init(mem, compile.include);
     sp_da_init(mem, compile.define);
