@@ -298,7 +298,7 @@ spn_task_step_t spn_task_build_graph_update(spn_app_t* app) {
 }
 
 
-static spn_err_t add_target_link_deps(spn_build_graph_t* graph, spn_session_t* session, spn_target_unit_t* target) {
+static spn_err_t add_target_link_deps(spn_build_graph_t* graph, spn_target_unit_t* target) {
   if (!target || !target->nodes.link.occupied) {
     return SPN_OK;
   }
@@ -308,11 +308,10 @@ static spn_err_t add_target_link_deps(spn_build_graph_t* graph, spn_session_t* s
       spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, lib->nodes.output));
     }
   }
-  sp_da(spn_closure_entry_t) closure = spn_target_link_closure(session->mem, target);
-  sp_da(spn_link_lib_t) libs = spn_closure_link_libs(session->mem, closure, target->pkg);
-  sp_da_for(libs, it) {
-    if (libs[it].lib->nodes.output.occupied) {
-      spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, libs[it].lib->nodes.output));
+  sp_da_for(target->link.libs, it) {
+    spn_target_unit_t* lib = target->link.libs[it].lib;
+    if (lib->nodes.output.occupied) {
+      spn_try(spn_bg_cmd_add_input(graph, target->nodes.link, lib->nodes.output));
     }
   }
   return SPN_OK;
@@ -351,14 +350,14 @@ spn_err_t prepare_build_graph(spn_app_t* app) {
         }
       }
       sp_da_for(pkg->targets, it) {
-        spn_try(add_target_link_deps(graph, session, pkg->targets[it]));
+        spn_try(add_target_link_deps(graph, pkg->targets[it]));
       }
     }
   }
 
   sp_da_for(session->units.metaprogram->packages, it) {
     spn_pkg_unit_t* pkg = session->units.metaprogram->packages[it];
-    spn_try(add_target_link_deps(graph, session, pkg->metaprogram.build.target));
+    spn_try(add_target_link_deps(graph, pkg->metaprogram.build.target));
   }
 
   spn_try(add_root_stages(graph, session));

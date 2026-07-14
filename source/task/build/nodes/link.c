@@ -8,42 +8,9 @@
 #include "compiler/driver.h"
 #include "event/event.h"
 #include "session/invocation.h"
-#include "target/closure.h"
 #include "task/build/build.h"
 #include "unit/compiler.h"
 #include "unit/package.h"
-
-static bool objects_have_cxx(sp_da(spn_compile_unit_t*) objects) {
-  sp_da_for(objects, it) {
-    if (objects[it]->lang == SPN_LANG_CXX) {
-      return true;
-    }
-  }
-  return false;
-}
-
-static spn_lang_t get_link_language(spn_target_unit_t* target) {
-  if (objects_have_cxx(target->objects)) {
-    return SPN_LANG_CXX;
-  }
-
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  spn_lang_t language = SPN_LANG_C;
-
-  sp_da(spn_link_lib_t) libs = spn_closure_link_libs(s.mem, spn_target_link_closure(s.mem, target), target->pkg);
-  sp_da_for(libs, it) {
-    if (libs[it].lib->lib_kind != SPN_LIB_KIND_STATIC) {
-      continue;
-    }
-    if (objects_have_cxx(libs[it].lib->objects)) {
-      language = SPN_LANG_CXX;
-      break;
-    }
-  }
-
-  sp_mem_end_scratch(s);
-  return language;
-}
 
 static spn_err_union_t render_archive_invocation(spn_target_unit_t* target, sp_str_t output) {
   sp_mem_t mem = target->pkg->session->mem;
@@ -77,19 +44,18 @@ static spn_err_union_t render_link_invocation(spn_target_unit_t* target, sp_str_
   sp_mem_t mem = target->pkg->session->mem;
 
   spn_cc_link_t link = {
-    .lang = get_link_language(target),
+    .lang = target->link.lang,
     .kind = target->kind,
     .output = output,
+    .system_libs = target->link.system_libs,
+    .hidden_libs = target->link.hidden_libs,
+    .lib_dirs = target->link.lib_dirs,
+    .frameworks = target->link.frameworks,
   };
   sp_da_init(mem, link.objects);
   sp_da_init(mem, link.args);
   sp_da_init(mem, link.libs);
-  sp_da_init(mem, link.system_libs);
-  sp_da_init(mem, link.hidden_libs);
-  sp_da_init(mem, link.lib_dirs);
   sp_da_init(mem, link.rpath);
-  sp_da_init(mem, link.frameworks);
-  add_deps_to_cc_target(&link, target);
 
   switch (target->pkg->build->profile.os) {
     case SPN_OS_LINUX: {
@@ -98,7 +64,7 @@ static spn_err_union_t render_link_invocation(spn_target_unit_t* target, sp_str_
     }
     case SPN_OS_MACOS: {
       sp_da_push(link.rpath, sp_str_lit("@loader_path"));
-      link.min_os = spn_target_macos_min_os(target);
+      link.min_os = target->link.min_os;
       break;
     }
     case SPN_OS_WINDOWS: {
