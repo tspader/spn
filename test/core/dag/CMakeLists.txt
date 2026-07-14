@@ -8,7 +8,6 @@ add_executable(dag
   ${SRC}/sp/io.c
   main.c
   action_cache.c
-  cc.c
   digest.c
   discovery.c
   discover_exec.c

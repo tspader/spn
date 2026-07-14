@@ -1,5 +1,4 @@
 #include "dag/dag.h"
-#include "dag/occ.h"
 #include "sha256/sha256.h"
 #include "error/types.h"
 #include "sp.h"
@@ -596,76 +595,6 @@ spn_err_t spn_dag_run(spn_dag_t* g, spn_dag_file_cache_t* files, spn_dag_action_
 done:
   sp_mem_end_scratch(s);
   return err;
-}
-
-spn_err_t spn_cc_deps_parse(sp_mem_t mem, sp_str_t content, sp_da(sp_str_t)* out) {
-  occ_parser_t p = sp_zero;
-  if (occ_init(&p, content)) {
-    return SPN_ERROR;
-  }
-
-  sp_str_t prereq = sp_zero;
-  while (occ_next(&p, &prereq)) {
-    sp_da_push(*out, sp_str_copy(mem, prereq));
-  }
-
-  return p.err ? SPN_ERROR : SPN_OK;
-}
-
-static void spn_cc_probe_shadows(spn_cc_ctx_t* ctx, sp_str_t prereq, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
-  sp_da_for(ctx->search_dirs, it) {
-    sp_str_t dir = ctx->search_dirs[it];
-    if (prereq.len <= dir.len + 1) {
-      continue;
-    }
-    if (!sp_str_starts_with(prereq, dir) || prereq.data[dir.len] != '/') {
-      continue;
-    }
-
-    sp_str_t suffix = sp_str_sub(prereq, dir.len + 1, prereq.len - dir.len - 1);
-    sp_for(shadow, it) {
-      sp_da_push(*out, ((spn_dag_obs_t) {
-        .kind = SPN_DAG_OBS_ABSENT,
-        .path = sp_fs_join_path(mem, ctx->search_dirs[shadow], suffix)
-      }));
-    }
-    return;
-  }
-}
-
-spn_err_t spn_cc_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
-  spn_cc_ctx_t* ctx = (spn_cc_ctx_t*)user_data;
-
-  sp_str_t dep_path = sp_zero;
-  sp_da_for(action->produces, it) {
-    spn_dag_artifact_t* artifact = spn_dag_find_artifact(ctx->g, action->produces[it]);
-    if (sp_str_ends_with(artifact->path, sp_str_lit(".d"))) {
-      dep_path = artifact->path;
-      break;
-    }
-  }
-
-  if (sp_str_empty(dep_path)) {
-    return SPN_ERROR;
-  }
-
-  sp_str_t content = sp_zero;
-  if (sp_io_read_file(mem, dep_path, &content)) {
-    return SPN_ERROR;
-  }
-
-  sp_da(sp_str_t) prereqs = sp_da_new(mem, sp_str_t);
-  spn_try(spn_cc_deps_parse(mem, content, &prereqs));
-
-  sp_da_for(prereqs, it) {
-    sp_da_push(*out, ((spn_dag_obs_t) {
-      .kind = SPN_DAG_OBS_FILE,
-      .path = prereqs[it]
-    }));
-    spn_cc_probe_shadows(ctx, prereqs[it], mem, out);
-  }
-
-  return SPN_OK;
 }
 
 static sp_str_t spn_dag_store_blob_dir(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {

@@ -108,11 +108,6 @@ typedef struct {
 } spn_dag_pathset_t;
 
 typedef struct {
-  spn_dag_t* g;
-  sp_da(sp_str_t) search_dirs;
-} spn_cc_ctx_t;
-
-typedef struct {
   sp_mem_arena_t* arena;
   sp_mem_t mem;
   sp_str_t dir;
