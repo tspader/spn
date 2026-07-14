@@ -1,0 +1,19 @@
+[package]
+namespace = "spader"
+name = "sp"
+url = "https://github.com/tspader/sp.git"
+version = "3.3.0"
+commit = "f58f6e6e3ef79ebc52b635d90ab09b18fde2249c"
+author = "tspader"
+maintainer = "tspader"
+system_deps = ["m"]
+
+[[lib]]
+name = "sp"
+kinds = ["source"]
+
+[publish]
+copy = [
+  { from = "source/sp.h", to = "include" },
+  { from = "source/sp/*", to = "include/sp" },
+]
