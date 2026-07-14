@@ -25,13 +25,20 @@ typedef struct {
 typedef enum {
   SPN_DAG_OBS_FILE,
   SPN_DAG_OBS_ABSENT,
+  SPN_DAG_OBS_ENUMERATION,
 } spn_dag_obs_kind_t;
 
 typedef struct {
   spn_dag_obs_kind_t kind;
   sp_str_t path;
+  sp_str_t filter;
   spn_dag_file_meta_t meta;
 } spn_dag_obs_t;
+
+typedef struct {
+  sp_str_t path;
+  sp_str_t relative;
+} spn_dag_match_t;
 
 SP_TYPEDEF_FN(s32, spn_dag_exec_fn_t, spn_dag_action_t*, void*);
 SP_TYPEDEF_FN(spn_err_t, spn_dag_discover_fn_t, spn_dag_action_t*, void*, sp_mem_t, sp_da(spn_dag_obs_t)*);
@@ -44,6 +51,7 @@ typedef struct {
 typedef enum {
   SPN_DAG_ARTIFACT_KIND_VALUE,
   SPN_DAG_ARTIFACT_KIND_FILE,
+  SPN_DAG_ARTIFACT_KIND_TREE,
 } spn_dag_artifact_kind_t;
 
 typedef struct {

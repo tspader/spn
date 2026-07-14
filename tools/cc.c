@@ -2,6 +2,7 @@
 #include "sp.h"
 #include "sp/sp_cli.h"
 #include "sp/atomic_file.h"
+#include "sp/sp_glob.h"
 #include "dag/dag.h"
 #include "error/types.h"
 #include "occ.h"

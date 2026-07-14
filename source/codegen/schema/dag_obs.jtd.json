@@ -3,6 +3,7 @@
   "properties": {
     "kind": { "type": "string" },
     "path": { "type": "string" },
+    "filter": { "type": "string" },
     "device": { "type": "string" },
     "inode": { "type": "string" },
     "mtime_s": { "type": "string" },

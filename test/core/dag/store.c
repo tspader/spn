@@ -30,16 +30,9 @@ typedef struct {
 UTEST_EMPTY_FIXTURE(store)
 
 static void run_ops(s32* utest_result, spn_dag_store_kind_t kind, store_test_t t) {
-  tmpfs_t fs = sp_zero;
-  tmpfs_init_named(&fs, sp_str_to_cstr(sp_mem_os_new(), sp_fmt(sp_mem_os_new(), "{}_{}", sp_fmt_cstr(t.name), sp_fmt_uint((u32)kind)).value));
-  sp_mem_t mem = fs.mem;
-
-  spn_dag_store_t store = sp_zero;
-  spn_dag_store_init(&store, (spn_dag_store_config_t) {
-    .kind = kind,
-    .mem = mem,
-    .dir = tmpfs_get(&fs, sp_str_lit("store"))
-  });
+  dag_test_env_t env = sp_zero;
+  dag_test_env_init(&env, (dag_test_env_config_t) { .name = t.name, .store = kind });
+  sp_mem_t mem = env.fs.mem;
 
   sp_carr_for(t.ops, it) {
     store_op_t op = t.ops[it];
@@ -48,19 +41,19 @@ static void run_ops(s32* utest_result, spn_dag_store_kind_t kind, store_test_t t
     }
 
     sp_str_t blob = sp_str_view(op.blob);
-    spn_dag_digest_t digest = spn_dag_digest(blob.data, blob.len);
+    spn_dag_digest_t digest = dag_test_digest(op.blob);
 
     switch (op.kind) {
       case STORE_OP_DONE: {
         break;
       }
       case STORE_OP_FILE: {
-        tmpfs_create(&fs, sp_str_view(op.path), blob);
+        tmpfs_create(&env.fs, sp_str_view(op.path), blob);
         break;
       }
       case STORE_OP_PUT: {
         spn_dag_digest_t returned = sp_zero;
-        EXPECT_EQ(op.expect.err, spn_dag_put(&store, blob.data, blob.len, &returned));
+        EXPECT_EQ(op.expect.err, spn_dag_put(&env.store, blob.data, blob.len, &returned));
         if (!op.expect.err) {
           EXPECT_TRUE(spn_dag_digest_equal(digest, returned));
         }
@@ -68,7 +61,7 @@ static void run_ops(s32* utest_result, spn_dag_store_kind_t kind, store_test_t t
       }
       case STORE_OP_PUT_FILE: {
         spn_dag_digest_t returned = sp_zero;
-        EXPECT_EQ(op.expect.err, spn_dag_store_put_file(&store, tmpfs_get(&fs, sp_str_view(op.path)), &returned));
+        EXPECT_EQ(op.expect.err, spn_dag_store_put_file(&env.store, tmpfs_get(&env.fs, sp_str_view(op.path)), &returned));
         if (!op.expect.err) {
           EXPECT_TRUE(spn_dag_digest_equal(digest, returned));
         }
@@ -76,36 +69,33 @@ static void run_ops(s32* utest_result, spn_dag_store_kind_t kind, store_test_t t
       }
       case STORE_OP_GET: {
         sp_mem_slice_t fetched = sp_zero;
-        EXPECT_EQ(op.expect.err, spn_dag_store_get(&store, digest, mem, &fetched));
+        EXPECT_EQ(op.expect.err, spn_dag_store_get(&env.store, digest, mem, &fetched));
         if (!op.expect.err) {
           EXPECT_STR(sp_str((const c8*)fetched.data, (u32)fetched.len), op.blob);
         }
         break;
       }
       case STORE_OP_HAS: {
-        EXPECT_EQ(op.expect.has, spn_dag_store_has(&store, digest));
+        EXPECT_EQ(op.expect.has, spn_dag_store_has(&env.store, digest));
         break;
       }
       case STORE_OP_MATERIALIZE: {
-        sp_str_t path = tmpfs_get(&fs, sp_str_view(op.path));
-        EXPECT_EQ(op.expect.err, spn_dag_store_materialize(&store, digest, path));
+        sp_str_t path = tmpfs_get(&env.fs, sp_str_view(op.path));
+        EXPECT_EQ(op.expect.err, spn_dag_store_materialize(&env.store, digest, path));
         if (!op.expect.err) {
-          sp_str_t from_disk = sp_zero;
-          ASSERT_EQ(SP_OK, sp_io_read_file(mem, path, &from_disk));
-          EXPECT_STR(from_disk, op.blob);
+          dag_test_expect_file(utest_result, mem, path, op.blob);
         }
         break;
       }
     }
   }
 
-  tmpfs_deinit(&fs);
+  dag_test_env_deinit(&env);
 }
 
 static void run_test(s32* utest_result, store_test_t t) {
-  spn_dag_store_kind_t kinds [] = { SPN_DAG_STORE_MEM, SPN_DAG_STORE_FILESYSTEM };
-  sp_carr_for(kinds, it) {
-    run_ops(utest_result, kinds[it], t);
+  sp_carr_for(dag_test_store_kinds, it) {
+    run_ops(utest_result, dag_test_store_kinds[it], t);
   }
 }
 
@@ -113,9 +103,9 @@ UTEST_F(store, put_then_get) {
   run_test(&ur, (store_test_t) {
     .name = "put_then_get",
     .ops = {
-      { .kind = STORE_OP_PUT, .blob = "int main() {}" },
-      { .kind = STORE_OP_HAS, .blob = "int main() {}", .expect = { .has = true } },
-      { .kind = STORE_OP_GET, .blob = "int main() {}" },
+      { .kind = STORE_OP_PUT, .blob = "A" },
+      { .kind = STORE_OP_HAS, .blob = "A", .expect = { .has = true } },
+      { .kind = STORE_OP_GET, .blob = "A" },
     }
   });
 }
@@ -134,9 +124,9 @@ UTEST_F(store, put_is_idempotent) {
   run_test(&ur, (store_test_t) {
     .name = "put_is_idempotent",
     .ops = {
-      { .kind = STORE_OP_PUT, .blob = "spum" },
-      { .kind = STORE_OP_PUT, .blob = "spum" },
-      { .kind = STORE_OP_GET, .blob = "spum" },
+      { .kind = STORE_OP_PUT, .blob = "A" },
+      { .kind = STORE_OP_PUT, .blob = "A" },
+      { .kind = STORE_OP_GET, .blob = "A" },
     }
   });
 }
@@ -145,9 +135,9 @@ UTEST_F(store, missing_digest) {
   run_test(&ur, (store_test_t) {
     .name = "missing_digest",
     .ops = {
-      { .kind = STORE_OP_HAS, .blob = "spum" },
-      { .kind = STORE_OP_GET, .blob = "spum", .expect = { .err = SPN_ERROR } },
-      { .kind = STORE_OP_MATERIALIZE, .blob = "spum", .path = "out.bin", .expect = { .err = SPN_ERROR } },
+      { .kind = STORE_OP_HAS, .blob = "A" },
+      { .kind = STORE_OP_GET, .blob = "A", .expect = { .err = SPN_ERROR } },
+      { .kind = STORE_OP_MATERIALIZE, .blob = "A", .path = "a.bin", .expect = { .err = SPN_ERROR } },
     }
   });
 }
@@ -156,9 +146,9 @@ UTEST_F(store, put_file_matches_put) {
   run_test(&ur, (store_test_t) {
     .name = "put_file_matches_put",
     .ops = {
-      { .kind = STORE_OP_FILE, .blob = "spum", .path = "src.c" },
-      { .kind = STORE_OP_PUT_FILE, .blob = "spum", .path = "src.c" },
-      { .kind = STORE_OP_GET, .blob = "spum" },
+      { .kind = STORE_OP_FILE, .blob = "A", .path = "a.c" },
+      { .kind = STORE_OP_PUT_FILE, .blob = "A", .path = "a.c" },
+      { .kind = STORE_OP_GET, .blob = "A" },
     }
   });
 }
@@ -167,7 +157,7 @@ UTEST_F(store, put_file_missing) {
   run_test(&ur, (store_test_t) {
     .name = "put_file_missing",
     .ops = {
-      { .kind = STORE_OP_PUT_FILE, .blob = "spum", .path = "absent.bin", .expect = { .err = SPN_ERROR } },
+      { .kind = STORE_OP_PUT_FILE, .blob = "A", .path = "a.bin", .expect = { .err = SPN_ERROR } },
     }
   });
 }
@@ -176,8 +166,8 @@ UTEST_F(store, materialize) {
   run_test(&ur, (store_test_t) {
     .name = "materialize",
     .ops = {
-      { .kind = STORE_OP_PUT, .blob = "spum" },
-      { .kind = STORE_OP_MATERIALIZE, .blob = "spum", .path = "out.bin" },
+      { .kind = STORE_OP_PUT, .blob = "A" },
+      { .kind = STORE_OP_MATERIALIZE, .blob = "A", .path = "a.bin" },
     }
   });
 }

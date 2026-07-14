@@ -65,8 +65,9 @@ static bool lower_digest(sp_str_t hex, spn_dag_digest_t* out) {
 
 static sp_str_t emit_obs_kind(spn_dag_obs_kind_t kind) {
   switch (kind) {
-    case SPN_DAG_OBS_FILE:   return sp_str_lit("file");
-    case SPN_DAG_OBS_ABSENT: return sp_str_lit("absent");
+    case SPN_DAG_OBS_FILE:        return sp_str_lit("file");
+    case SPN_DAG_OBS_ABSENT:      return sp_str_lit("absent");
+    case SPN_DAG_OBS_ENUMERATION: return sp_str_lit("enumeration");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
@@ -78,6 +79,10 @@ static bool lower_obs_kind(sp_str_t str, spn_dag_obs_kind_t* out) {
   }
   if (sp_str_equal(str, sp_str_lit("absent"))) {
     *out = SPN_DAG_OBS_ABSENT;
+    return true;
+  }
+  if (sp_str_equal(str, sp_str_lit("enumeration"))) {
+    *out = SPN_DAG_OBS_ENUMERATION;
     return true;
   }
   return false;
@@ -228,6 +233,138 @@ bool spn_dag_action_cache_remove(spn_dag_action_cache_t* c, spn_dag_digest_t key
   return removed;
 }
 
+static s32 spn_dag_tree_entry_order(const void* a, const void* b) {
+  return sp_str_compare_alphabetical(((const spn_dag_action_output_t*)a)->name, ((const spn_dag_action_output_t*)b)->name);
+}
+
+static bool spn_dag_tree_name_ok(sp_str_t name) {
+  if (sp_str_empty(name) || name.data[0] == '/') {
+    return false;
+  }
+  sp_da(sp_str_t) segments = sp_zero;
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  segments = sp_str_split_c8(s.mem, name, '/');
+  bool ok = true;
+  sp_da_for(segments, it) {
+    if (sp_str_equal(segments[it], sp_str_lit(".."))) {
+      ok = false;
+      break;
+    }
+  }
+  sp_mem_end_scratch(s);
+  return ok;
+}
+
+spn_err_t spn_dag_store_put_tree(spn_dag_store_t* store, sp_str_t dir, spn_dag_digest_t* digest) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  spn_err_t err = SPN_ERROR;
+
+  sp_da(spn_dag_action_output_t) entries = sp_da_new(s.mem, spn_dag_action_output_t);
+  sp_da(sp_fs_entry_t) files = sp_fs_collect_recursive(s.mem, dir);
+  sp_da_for(files, it) {
+    if (files[it].kind == SP_FS_KIND_DIR) {
+      continue;
+    }
+    spn_dag_action_output_t entry = {
+      .name = sp_str_strip_left(sp_str_strip_left(files[it].path, dir), sp_str_lit("/"))
+    };
+    if (spn_dag_store_put_file(store, files[it].path, &entry.digest)) {
+      goto done;
+    }
+    sp_da_push(entries, entry);
+  }
+  sp_da_sort(entries, spn_dag_tree_entry_order);
+
+  sp_io_dyn_mem_writer_t sink = sp_zero;
+  sp_io_dyn_mem_writer_init(s.mem, &sink);
+  sp_da_for(entries, it) {
+    spn_cg_dag_output_t cg = {
+      .name = entries[it].name,
+      .digest = spn_dag_digest_hex(s.mem, entries[it].digest),
+    };
+    if (emit_line(&sink.base, spn_dag_output_write_compact(s.mem, &cg))) {
+      goto done;
+    }
+  }
+
+  sp_str_t manifest = sp_io_dyn_mem_writer_as_str(&sink);
+  err = spn_dag_put(store, manifest.data, manifest.len, digest);
+
+done:
+  sp_mem_end_scratch(s);
+  return err;
+}
+
+spn_err_t spn_dag_tree_entries(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_da(spn_dag_action_output_t)* out) {
+  sp_mem_slice_t manifest = sp_zero;
+  spn_try(spn_dag_store_get(store, digest, mem, &manifest));
+
+  sp_str_t content = sp_str((c8*)manifest.data, (u32)manifest.len);
+  *out = sp_da_new(mem, spn_dag_action_output_t);
+  sp_da(sp_str_t) lines = sp_str_split_c8(mem, content, '\n');
+  sp_da_for(lines, it) {
+    if (sp_str_empty(sp_str_trim(lines[it]))) {
+      continue;
+    }
+    spn_cg_dag_output_t cg = sp_zero;
+    spn_dag_action_output_t entry = sp_zero;
+    if (!spn_dag_output_read(lines[it], &cg, mem) || !lower_digest(cg.digest, &entry.digest)) {
+      return SPN_ERROR;
+    }
+    if (!spn_dag_tree_name_ok(cg.name)) {
+      return SPN_ERROR;
+    }
+    entry.name = sp_str_copy(mem, cg.name);
+    sp_da_push(*out, entry);
+  }
+  return SPN_OK;
+}
+
+bool spn_dag_store_has_tree(spn_dag_store_t* store, spn_dag_digest_t digest) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  bool ok = false;
+
+  sp_da(spn_dag_action_output_t) entries = sp_zero;
+  if (spn_dag_tree_entries(store, digest, s.mem, &entries)) {
+    goto done;
+  }
+  sp_da_for(entries, it) {
+    if (!spn_dag_store_has(store, entries[it].digest)) {
+      goto done;
+    }
+  }
+  ok = true;
+
+done:
+  sp_mem_end_scratch(s);
+  return ok;
+}
+
+spn_err_t spn_dag_store_materialize_tree(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t dir) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  spn_err_t err = SPN_ERROR;
+
+  sp_da(spn_dag_action_output_t) entries = sp_zero;
+  if (spn_dag_tree_entries(store, digest, s.mem, &entries)) {
+    goto done;
+  }
+
+  sp_fs_remove_dir(dir);
+  sp_fs_create_dir(dir);
+  sp_da_for(entries, it) {
+    sp_str_t path = sp_fs_join_path(s.mem, dir, entries[it].name);
+    sp_fs_create_dir(sp_fs_parent_path(path));
+    if (spn_dag_store_materialize(store, entries[it].digest, path)) {
+      goto done;
+    }
+  }
+  err = SPN_OK;
+
+done:
+  sp_mem_end_scratch(s);
+  return err;
+}
+
 void spn_dag_discovery_init(spn_dag_discovery_t* d, sp_mem_t mem, sp_str_t dir) {
   d->arena = sp_mem_arena_new(mem);
   d->mem = sp_mem_arena_as_allocator(d->arena);
@@ -270,6 +407,7 @@ static bool spn_dag_manifest_load(spn_dag_discovery_t* d, spn_dag_digest_t preli
       goto done;
     }
     obs.path = sp_str_copy(d->mem, cg.path);
+    obs.filter = sp_str_copy(d->mem, cg.filter);
     obs.meta.mtime.tv_sec = mtime_s;
     obs.meta.mtime.tv_nsec = mtime_ns;
     sp_da_push(set.obs, obs);
@@ -294,6 +432,7 @@ static void spn_dag_manifest_write(spn_dag_discovery_t* d, spn_dag_digest_t prel
     spn_cg_dag_obs_t cg = {
       .kind = emit_obs_kind(obs->kind),
       .path = obs->path,
+      .filter = obs->filter,
       .device = emit_u64(s.mem, obs->meta.id.device),
       .inode = emit_u64(s.mem, obs->meta.id.id),
       .mtime_s = emit_s64(s.mem, (s64)obs->meta.mtime.tv_sec),
@@ -337,6 +476,7 @@ void spn_dag_discovery_put(spn_dag_discovery_t* d, spn_dag_digest_t prelim, cons
   sp_for(it, count) {
     spn_dag_obs_t copy = obs[it];
     copy.path = sp_str_copy(d->mem, obs[it].path);
+    copy.filter = sp_str_copy(d->mem, obs[it].filter);
     sp_da_push(set.obs, copy);
   }
   sp_ht_insert(d->entries, prelim, set);

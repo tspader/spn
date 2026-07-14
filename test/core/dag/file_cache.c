@@ -66,20 +66,18 @@ static void run_test(s32* utest_result, file_cache_test_t t) {
         spn_dag_digest_t digest = sp_zero;
         EXPECT_EQ(op.expect.err, spn_dag_get_file_digest(&c, tmpfs_get(&fs, sp_cstr_as_str(op.path)), &digest));
         if (!op.expect.err) {
-          sp_str_t blob = sp_cstr_as_str(op.blob);
-          EXPECT_TRUE(spn_dag_digest_equal(digest, spn_dag_digest(blob.data, blob.len)));
+          EXPECT_TRUE(spn_dag_digest_equal(digest, dag_test_digest(op.blob)));
         }
         break;
       }
       case FILE_CACHE_OP_SEED: {
         sp_sys_file_meta_t sys = sp_zero;
         ASSERT_EQ(SPN_OK, spn_dag_get_file_meta(&c, tmpfs_get(&fs, sp_cstr_as_str(op.path)), &sys));
-        sp_str_t blob = sp_cstr_as_str(op.blob);
         spn_dag_file_cache_seed(&c, (spn_dag_file_meta_t) {
           .id = { .device = sys.device, .id = sys.id },
           .mtime = sys.mtime,
           .size = sys.size,
-          .digest = spn_dag_digest(blob.data, blob.len)
+          .digest = dag_test_digest(op.blob)
         });
         break;
       }

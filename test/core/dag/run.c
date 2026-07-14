@@ -10,11 +10,13 @@ typedef struct {
   const c8* inputs [DAG_TEST_MAX_INPUTS];
   const c8* discovers [DAG_TEST_MAX_INPUTS];
   const c8* output;
+  bool tree;
   bool fails;
 } run_action_t;
 
 typedef struct {
   run_source_t sources [DAG_TEST_MAX_INPUTS];
+  const c8* remove_dirs [DAG_TEST_MAX_INPUTS];
   spn_err_t expect_err;
   u32 expect_runs;
 } run_build_t;
@@ -27,17 +29,7 @@ typedef struct {
 } run_test_t;
 
 typedef struct {
-  tmpfs_t fs;
-  spn_dag_store_t store;
-  spn_dag_file_cache_t files;
-  spn_dag_action_cache_t cache;
-  spn_dag_discovery_t discovery;
-  spn_dag_env_t env;
-  u32 runs;
-} run_env_t;
-
-typedef struct {
-  run_env_t* env;
+  dag_test_env_t* env;
   spn_dag_t* g;
   run_action_t* spec;
 } run_ctx_t;
@@ -58,6 +50,9 @@ static s32 on_exec(spn_dag_action_t* action, void* user_data) {
   ctx->env->runs++;
   spn_dag_artifact_t* out = spn_dag_find_artifact(ctx->g, action->produces[0]);
   sp_str_t content = sp_fmt(ctx->env->fs.mem, "{}", sp_fmt_uint(ctx->env->runs)).value;
+  if (out->kind == SPN_DAG_ARTIFACT_KIND_TREE) {
+    return sp_fs_create_file_str(sp_fs_join_path(ctx->env->fs.mem, out->path, sp_str_lit("H")), sp_str_lit("T")) ? 1 : 0;
+  }
   return sp_fs_create_file_str(out->path, content) ? 1 : 0;
 }
 
@@ -75,7 +70,7 @@ static spn_err_t on_discover(spn_dag_action_t* action, void* user_data, sp_mem_t
   return SPN_OK;
 }
 
-static void run_dag(s32* utest_result, run_env_t* env, spn_dag_t* g, run_test_t* t) {
+static void run_dag(s32* utest_result, dag_test_env_t* env, spn_dag_t* g, run_test_t* t) {
   sp_carr_for(t->actions, ai) {
     run_action_t* spec = &t->actions[ai];
     if (!spec->identity) {
@@ -88,7 +83,7 @@ static void run_dag(s32* utest_result, run_env_t* env, spn_dag_t* g, run_test_t*
     ctx->spec = spec;
 
     spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
-      .identity = spn_dag_digest(spec->identity, sp_cstr_len(spec->identity)),
+      .identity = dag_test_digest(spec->identity),
       .execute = on_exec,
       .discover = spec->discovers[0] ? on_discover : SP_NULLPTR,
       .user_data = ctx
@@ -99,27 +94,19 @@ static void run_dag(s32* utest_result, run_env_t* env, spn_dag_t* g, run_test_t*
       }
       spn_dag_action_add_input(g, action, spn_dag_add_file(g, tmpfs_get(&env->fs, sp_str_view(spec->inputs[ii]))));
     }
-    ASSERT_EQ(SPN_OK, spn_dag_action_add_output(g, action, spn_dag_add_file(g, tmpfs_get(&env->fs, sp_str_view(spec->output)))));
+    sp_str_t output = tmpfs_get(&env->fs, sp_str_view(spec->output));
+    spn_dag_id_t out_id = spec->tree ? spn_dag_add_tree(g, output) : spn_dag_add_file(g, output);
+    ASSERT_EQ(SPN_OK, spn_dag_action_add_output(g, action, out_id));
   }
 }
 
 static void run_test(s32* utest_result, run_test_t t) {
-  run_env_t env = sp_zero;
-  tmpfs_init_named(&env.fs, t.name);
-  spn_dag_store_init(&env.store, (spn_dag_store_config_t) {
-    .kind = SPN_DAG_STORE_MEM,
-    .mem = env.fs.mem
+  dag_test_env_t env = sp_zero;
+  dag_test_env_init(&env, (dag_test_env_config_t) {
+    .name = t.name,
+    .store = SPN_DAG_STORE_MEM,
+    .discovery = t.discovery
   });
-  spn_dag_file_cache_init(&env.files, env.fs.mem);
-  spn_dag_action_cache_init(&env.cache, env.fs.mem, sp_str_lit(""));
-  spn_dag_discovery_init(&env.discovery, env.fs.mem, tmpfs_get(&env.fs, sp_str_lit("manifests")));
-  env.env = (spn_dag_env_t) {
-    .files = &env.files,
-    .cache = &env.cache,
-    .store = &env.store,
-    .discovery = t.discovery ? &env.discovery : SP_NULLPTR,
-    .scratch = tmpfs_get(&env.fs, sp_str_lit("scratch"))
-  };
 
   sp_carr_for(t.builds, b) {
     run_build_t* build = &t.builds[b];
@@ -134,8 +121,14 @@ static void run_test(s32* utest_result, run_test_t t) {
       }
       sp_fs_create_file_str(tmpfs_get(&env.fs, sp_str_view(build->sources[si].path)), sp_str_view(build->sources[si].content));
     }
+    sp_carr_for(build->remove_dirs, si) {
+      if (!build->remove_dirs[si]) {
+        break;
+      }
+      sp_fs_remove_dir(tmpfs_get(&env.fs, sp_str_view(build->remove_dirs[si])));
+    }
 
-    spn_dag_t* g = spn_dag_new(env.fs.mem);
+    spn_dag_t* g = dag_test_env_graph(&env);
     run_dag(utest_result, &env, g, &t);
 
     spn_err_t err = spn_dag_run(g, &env.env);
@@ -143,7 +136,7 @@ static void run_test(s32* utest_result, run_test_t t) {
     EXPECT_EQ(build->expect_runs, env.runs);
   }
 
-  tmpfs_deinit(&env.fs);
+  dag_test_env_deinit(&env);
 }
 
 UTEST_F(run, chain_runs_in_dependency_order) {
@@ -265,6 +258,21 @@ UTEST_F(run, discovered_generated_header_waits_for_producer) {
       { .sources = { { "S", "A" }, { "M", "B" } }, .expect_runs = 3 },
       { .sources = { { "S", "A" }, { "M", "B" } }, .expect_runs = 3 },
       { .sources = { { "S", "C" }, { "M", "B" } }, .expect_runs = 5 },
+    }
+  });
+}
+
+UTEST_F(run, discovered_tree_member_waits_for_producer) {
+  run_test(&ur, (run_test_t) {
+    .name = "run_tree_member",
+    .discovery = true,
+    .actions = {
+      { .identity = "I", .inputs = { "S" }, .output = "D", .tree = true },
+      { .identity = "J", .inputs = { "M" }, .discovers = { "D/H" }, .output = "O" },
+    },
+    .builds = {
+      { .sources = { { "S", "A" }, { "M", "B" } }, .expect_runs = 3 },
+      { .sources = { { "S", "A" }, { "M", "B" } }, .remove_dirs = { "D" }, .expect_runs = 3 },
     }
   });
 }

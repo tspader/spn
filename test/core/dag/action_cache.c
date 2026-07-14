@@ -42,13 +42,8 @@ static void get_output_count(cache_op_t* op, u32* count) {
   }
 }
 
-static spn_dag_digest_t get_blob_digest(const c8* blob) {
-  sp_str_t str = sp_str_view(blob);
-  return spn_dag_digest(str.data, str.len);
-}
-
 static sp_str_t get_path(tmpfs_t* fs, sp_str_t dir, const c8* key) {
-  sp_str_t hex = spn_dag_digest_hex(fs->mem, get_blob_digest(key));
+  sp_str_t hex = spn_dag_digest_hex(fs->mem, dag_test_digest(key));
   return sp_fs_join_path(fs->mem, dir, sp_fmt(fs->mem, "{}.jsonl", sp_fmt_str(hex)).value);
 }
 
@@ -80,16 +75,16 @@ static void run_test(s32* utest_result, cache_test_t t) {
           sp_cstr_copy_to_n(op.outputs[it].name, len, names[it], sizeof(names[it]));
           outputs[it] = (spn_dag_action_output_t) {
             .name = sp_str(names[it], len),
-            .digest = get_blob_digest(op.outputs[it].blob)
+            .digest = dag_test_digest(op.outputs[it].blob)
           };
         }
-        spn_dag_action_cache_put(&c, get_blob_digest(op.key), outputs, count);
+        spn_dag_action_cache_put(&c, dag_test_digest(op.key), outputs, count);
         sp_mem_fill_u8(outputs, sizeof(outputs), 69);
         sp_mem_fill_u8(names, sizeof(names), 69);
         break;
       }
       case CACHE_OP_GET: {
-        const spn_dag_action_entry_t* entry = spn_dag_action_cache_get(&c, get_blob_digest(op.key));
+        const spn_dag_action_entry_t* entry = spn_dag_action_cache_get(&c, dag_test_digest(op.key));
         EXPECT_EQ(op.expect.hit, entry != SP_NULLPTR);
         if (op.expect.hit && entry) {
           u32 count = 0;
@@ -97,13 +92,13 @@ static void run_test(s32* utest_result, cache_test_t t) {
           ASSERT_EQ(count, (u32)sp_da_size(entry->outputs));
           sp_for(it, count) {
             EXPECT_STR(entry->outputs[it].name, op.outputs[it].name);
-            EXPECT_TRUE(spn_dag_digest_equal(entry->outputs[it].digest, get_blob_digest(op.outputs[it].blob)));
+            EXPECT_TRUE(spn_dag_digest_equal(entry->outputs[it].digest, dag_test_digest(op.outputs[it].blob)));
           }
         }
         break;
       }
       case CACHE_OP_REMOVE: {
-        EXPECT_EQ(op.expect.hit, spn_dag_action_cache_remove(&c, get_blob_digest(op.key)));
+        EXPECT_EQ(op.expect.hit, spn_dag_action_cache_remove(&c, dag_test_digest(op.key)));
         break;
       }
       case CACHE_OP_RELOAD: {
