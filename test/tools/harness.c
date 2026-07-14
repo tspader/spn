@@ -574,6 +574,26 @@ static sp_ps_output_t run_spn_command(fixture_t* fixture, const c8* const* args,
   return output;
 }
 
+// Sanitizer runtimes disagree on how an error exits the process: asan on
+// darwin aborts via SIGABRT where linux exits 1, and ubsan reports without
+// failing at all. Pin both so a fixture asserts one exit code everywhere.
+static sp_ps_output_t run_fixture_bin(fixture_t* fixture, sp_str_t path) {
+  return sp_ps_run(fixture->fs.mem, (sp_ps_config_t) {
+    .command = path,
+    .cwd = fixture->fs.root,
+    .env = {
+      .extra = {
+        { sp_str_lit("ASAN_OPTIONS"), sp_str_lit("abort_on_error=0:exitcode=1") },
+        { sp_str_lit("UBSAN_OPTIONS"), sp_str_lit("halt_on_error=1:abort_on_error=0:exitcode=1") },
+      },
+    },
+    .io = {
+      .in.mode = SP_PS_IO_MODE_NULL,
+      .err.mode = SP_PS_IO_MODE_REDIRECT,
+    },
+  });
+}
+
 static void run_command_bin(s32* utest_result, fixture_t* fixture, command_bin_t bin) {
   sp_str_t staged = bin.path;
   if (sp_str_empty(staged)) {
@@ -582,18 +602,19 @@ static void run_command_bin(s32* utest_result, fixture_t* fixture, command_bin_t
   sp_str_t path = tmpfs_get(&fixture->fs, staged);
   SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
 
-  sp_ps_output_t output = sp_ps_run(fixture->fs.mem, (sp_ps_config_t) {
-    .command = path,
-    .cwd = fixture->fs.root,
-    .io = {
-      .in.mode = SP_PS_IO_MODE_NULL,
-      .err.mode = SP_PS_IO_MODE_REDIRECT,
-    },
-  });
+  sp_ps_output_t output = run_fixture_bin(fixture, path);
 
   utest_kv("command", path);
   utest_kv("output", output.out);
   EXPECT_EQ(bin.rc, output.status.exit_code);
+
+  sp_carr_for(bin.contains, it) {
+    if (!bin.contains[it]) {
+      break;
+    }
+    utest_kv("needle", sp_str_view(bin.contains[it]));
+    EXPECT_TRUE(sp_str_contains(output.out, sp_str_view(bin.contains[it])));
+  }
 }
 
 static void expect_command_file(s32* utest_result, fixture_t* fixture, command_file_t expected) {
@@ -859,14 +880,7 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         sp_str_t bin = tmpfs_get(&fixture->fs, staged_bin);
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, bin);
 
-        sp_ps_output_t output = sp_ps_run(mem, (sp_ps_config_t) {
-          .command = bin,
-          .cwd = fixture->fs.root,
-          .io = {
-            .in.mode = SP_PS_IO_MODE_NULL,
-            .err.mode = SP_PS_IO_MODE_REDIRECT,
-          },
-        });
+        sp_ps_output_t output = run_fixture_bin(fixture, bin);
 
         utest_kv("command", bin);
         utest_kv("output", output.out);

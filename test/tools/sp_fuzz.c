@@ -3,6 +3,15 @@
 #include "intern/intern.h"
 
 static u64 sp_fuzz_seed;
+static sp_str_t sp_fuzz_render;
+
+u64 sp_fuzz_seed_get(void) {
+  return sp_fuzz_seed;
+}
+
+sp_str_t sp_fuzz_render_path(void) {
+  return sp_fuzz_render;
+}
 
 u64 sp_fuzz_next(sp_fuzz_prng_t* prng) {
   prng->state += 0x9e3779b97f4a7c15u;
@@ -139,6 +148,150 @@ sp_fuzz_opts_t sp_fuzz_opts(u64 default_iters) {
   }
 
   return opts;
+}
+
+typedef struct {
+  const sp_fuzz_desc_t* desc;
+  s64 iters;
+  s64 iter;
+  const c8* seed;
+  const c8* render;
+  bool keep_going;
+  s32 status;
+} sp_fuzz_cli_t;
+
+static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
+  sp_fuzz_cli_t* config = (sp_fuzz_cli_t*)cli->user_data;
+  const sp_fuzz_desc_t* desc = config->desc;
+
+  sp_fuzz_seed_init_str(config->seed ? sp_cstr_as_str(config->seed) : sp_str_lit(""));
+
+  sp_fuzz_opts_t opts = sp_fuzz_opts(desc->iters);
+  if (config->iters >= 0) {
+    opts.iters = (u64)config->iters;
+    opts.only = -1;
+  }
+  if (config->iter >= 0) {
+    opts.only = config->iter;
+    opts.iters = (u64)config->iter + 1;
+  }
+  bool keep_going = config->keep_going || !sp_str_empty(sp_os_env_get(sp_str_lit("SPN_FUZZ_KEEP_GOING")));
+  sp_fuzz_render = config->render ? sp_cstr_as_str(config->render) : sp_os_env_get(sp_str_lit("SPN_FUZZ_RENDER"));
+
+  sp_mem_t mem = sp_mem_os_new();
+  sp_da(sp_str_t) names = sp_da_new(mem, sp_str_t);
+  sp_da_push(names, sp_str_view(desc->name));
+  sp_fuzz_prng_t base = sp_fuzz_stream(names);
+
+  sp_io_stream_writer_t out = sp_io_get_std_out();
+  u64* failures = sp_alloc_n(mem, u64, desc->errs);
+  sp_mem_zero(failures, desc->errs * sizeof(u64));
+  u64 failed = 0;
+
+  for (u64 iter = 0; iter < opts.iters; iter++) {
+    if (opts.only >= 0 && iter != (u64)opts.only) continue;
+
+    sp_mem_arena_t* arena = sp_mem_arena_new(sp_mem_os_new());
+    u32 err = desc->run(sp_mem_arena_as_allocator(arena), sp_fuzz_iter(base, iter), iter);
+    sp_mem_arena_destroy(arena);
+    if (!err) continue;
+
+    failed++;
+    if (err < desc->errs) {
+      failures[err]++;
+    }
+    sp_fmt_io(&out.base, "fuzz: {} (iter {})\n", sp_fmt_str(desc->err_str(err)), sp_fmt_uint(iter));
+    if (!keep_going) {
+      config->status = (s32)err;
+      return SP_CLI_OK;
+    }
+  }
+
+  if (failed) {
+    sp_fmt_io(&out.base, "fuzz: {} of {} iterations failed\n", sp_fmt_uint(failed), sp_fmt_uint(opts.iters));
+    for (u32 it = 0; it < desc->errs; it++) {
+      if (!failures[it]) continue;
+      sp_fmt_io(&out.base, "  {}: {}\n", sp_fmt_uint(failures[it]), sp_fmt_str(desc->err_str(it)));
+    }
+    config->status = 1;
+  }
+
+  return SP_CLI_OK;
+}
+
+s32 sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc) {
+  sp_fuzz_cli_t config = {
+    .desc = desc,
+    .iters = -1,
+    .iter = -1,
+  };
+
+  sp_cli_cmd_t root = {
+    .name = desc->name,
+    .summary = desc->summary,
+    .opts = {
+      {
+        .brief = "n",
+        .name = "iters",
+        .kind = SP_CLI_OPT_S64,
+        .summary = "Number of iterations to run",
+        .placeholder = "N",
+        .ptr = &config.iters,
+      },
+      {
+        .brief = "i",
+        .name = "iter",
+        .kind = SP_CLI_OPT_S64,
+        .summary = "Run a single iteration, e.g. to replay a dumped failure",
+        .placeholder = "ITER",
+        .ptr = &config.iter,
+      },
+      {
+        .brief = "s",
+        .name = "seed",
+        .kind = SP_CLI_OPT_CSTR,
+        .summary = "PRNG seed, decimal or 0x-hex; random when unset",
+        .placeholder = "SEED",
+        .ptr = &config.seed,
+      },
+      {
+        .brief = "k",
+        .name = "keep-going",
+        .kind = SP_CLI_OPT_BOOLEAN,
+        .summary = "Run every iteration instead of stopping at the first failure",
+        .ptr = &config.keep_going,
+      },
+      {
+        .brief = "r",
+        .name = "render",
+        .kind = SP_CLI_OPT_CSTR,
+        .summary = "Render each iteration into DIR/NNN/ with everything needed to replay it",
+        .placeholder = "DIR",
+        .ptr = &config.render,
+      },
+    },
+    .env = {
+      { .name = "SPN_TEST_SEED",       .kind = SP_CLI_OPT_CSTR, .summary = "Same as --seed, which wins when both are set" },
+      { .name = "SPN_FUZZ_ITERS",      .kind = SP_CLI_OPT_CSTR, .summary = "Same as --iters, which wins when both are set" },
+      { .name = "SPN_FUZZ_ITER",       .kind = SP_CLI_OPT_CSTR, .summary = "Same as --iter, which wins when both are set" },
+      { .name = "SPN_FUZZ_KEEP_GOING", .kind = SP_CLI_OPT_CSTR, .summary = "Same as --keep-going" },
+      { .name = "SPN_FUZZ_RENDER",     .kind = SP_CLI_OPT_CSTR, .summary = "Same as --render, which wins when both are set" },
+    },
+    .handler = sp_fuzz_cli_run,
+  };
+
+  switch (sp_cli_run((sp_cli_desc_t) {
+    .root = &root,
+    .args = (const c8**)args,
+    .num_args = num_args,
+    .user_data = &config,
+  })) {
+    case SP_CLI_OK:       return config.status;
+    case SP_CLI_HELP:
+    case SP_CLI_CONTINUE: return 0;
+    case SP_CLI_ERR:      return 1;
+  }
+  sp_unreachable_return(1);
 }
 
 sp_intern_t* sp_fuzz_perturbed_intern(sp_fuzz_prng_t* prng, sp_da(sp_str_t) names) {

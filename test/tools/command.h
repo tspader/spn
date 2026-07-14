@@ -30,6 +30,7 @@ typedef struct {
   const c8* profile;
   sp_str_t path;
   s32 rc;
+  const c8* contains[SPN_TEST_COMMAND_MAX_CONTAINS];
 } command_bin_t;
 
 typedef struct {
