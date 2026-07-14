@@ -87,7 +87,7 @@ typedef struct {
   sp_mem_t mem;
   sp_da(spn_dag_artifact_t) artifacts;
   sp_da(spn_dag_action_t) actions;
-  sp_ht(sp_str_t, spn_dag_id_t) files;
+  sp_ht(sp_str_t, spn_dag_id_t) paths;
 } spn_dag_t;
 
 typedef struct {
