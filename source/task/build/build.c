@@ -16,6 +16,7 @@
 #include "session/session.h"
 #include "target/closure.h"
 #include "task/build/build.h"
+#include "triple/triple.h"
 #include "unit/compiler.h"
 
 void add_deps_to_cc_target(spn_cc_link_t* link, spn_target_unit_t* target) {
@@ -106,25 +107,38 @@ sp_str_t get_embed_header_path(sp_mem_t mem, spn_target_unit_t* unit) {
   return path;
 }
 
+static spn_triple_t get_target_triple(spn_target_unit_t* target) {
+  spn_profile_info_t* profile = &target->pkg->build->profile;
+  return (spn_triple_t) { profile->arch, profile->os, profile->abi };
+}
+
 sp_str_t get_target_staged_path(sp_mem_t mem, spn_target_unit_t* target) {
   if (target->kind != SPN_CC_OUTPUT_EXE) return sp_zero_s(sp_str_t);
 
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+  sp_str_t file_name = spn_triple_exe_file_name(s.mem, get_target_triple(target), target->info->name);
+
+  sp_str_t path = sp_zero;
   switch (target->info->kind) {
     case SPN_TARGET_EXE:
     case SPN_TARGET_SCRIPT: {
-      return sp_fs_join_path(mem, target->pkg->build->paths.root, target->info->name);
+      path = sp_fs_join_path(mem, target->pkg->build->paths.root, file_name);
+      break;
     }
     case SPN_TARGET_TEST: {
-      sp_str_t dir = sp_fs_join_path(mem, target->pkg->build->paths.root, SP_LIT("test"));
-      return sp_fs_join_path(mem, dir, target->info->name);
+      sp_str_t dir = sp_fs_join_path(s.mem, target->pkg->build->paths.root, SP_LIT("test"));
+      path = sp_fs_join_path(mem, dir, file_name);
+      break;
     }
     case SPN_TARGET_LIB:
     case SPN_TARGET_CONFIGURE_METAPROGRAM:
     case SPN_TARGET_BUILD_METAPROGRAM: {
-      return sp_zero_s(sp_str_t);
+      break;
     }
   }
-  sp_unreachable_return(sp_zero_s(sp_str_t));
+
+  sp_mem_end_scratch(s);
+  return path;
 }
 
 sp_str_t get_target_output_path(sp_mem_t mem, spn_target_unit_t* target) {
@@ -136,15 +150,17 @@ sp_str_t get_target_output_path(sp_mem_t mem, spn_target_unit_t* target) {
 
   switch (target->kind) {
     case SPN_CC_OUTPUT_EXE: {
-      return sp_fs_join_path(mem, target->pkg->paths.bin, info->name);
+      sp_str_t file_name = spn_triple_exe_file_name(s.mem, get_target_triple(target), info->name);
+      path = sp_fs_join_path(mem, target->pkg->paths.bin, file_name);
+      break;
     }
     case SPN_CC_OUTPUT_STATIC_LIB: {
-      sp_str_t file_name = sp_os_lib_to_file_name(s.mem, info->name, SP_OS_LIB_STATIC);
+      sp_str_t file_name = spn_triple_lib_file_name(s.mem, get_target_triple(target), info->name, SP_OS_LIB_STATIC);
       path = sp_fs_join_path(mem, target->pkg->paths.lib, file_name);
       break;
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
-      sp_str_t file_name = sp_os_lib_to_file_name(s.mem, info->name, SP_OS_LIB_SHARED);
+      sp_str_t file_name = spn_triple_lib_file_name(s.mem, get_target_triple(target), info->name, SP_OS_LIB_SHARED);
       path = sp_fs_join_path(mem, target->pkg->paths.lib, file_name);
       break;
     }

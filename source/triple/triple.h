@@ -32,4 +32,12 @@ sp_str_t spn_triple_to_autoconf(sp_mem_t mem, spn_triple_t triple);
 // Map target OS enum to CMake's CMAKE_SYSTEM_NAME string.
 sp_str_t spn_os_to_cmake_system_name(spn_os_t os);
 
+// Render an artifact file name using the target triple's conventions, not the
+// host's: lib{}.a / {}.lib, lib{}.so / lib{}.dylib / {}.dll.
+sp_str_t spn_triple_lib_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name, sp_os_lib_kind_t kind);
+
+// Render an executable file name for the target triple: {}.exe on windows,
+// {}.wasm on wasi, bare otherwise.
+sp_str_t spn_triple_exe_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name);
+
 #endif

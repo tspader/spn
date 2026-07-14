@@ -125,6 +125,52 @@ UTEST(triple, merge) {
 }
 
 
+typedef struct {
+  spn_triple_t triple;
+  sp_os_lib_kind_t kind;
+  const c8* expected;
+} lib_file_name_t;
+
+UTEST(triple, lib_file_name) {
+  lib_file_name_t tests [] = {
+    { { SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_GNU },   SP_OS_LIB_STATIC, "libfoo.a" },
+    { { SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_GNU },   SP_OS_LIB_SHARED, "libfoo.so" },
+    { { SPN_ARCH_ARM64, SPN_OS_MACOS,   SPN_ABI_NONE },  SP_OS_LIB_STATIC, "libfoo.a" },
+    { { SPN_ARCH_ARM64, SPN_OS_MACOS,   SPN_ABI_NONE },  SP_OS_LIB_SHARED, "libfoo.dylib" },
+    { { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_MSVC },  SP_OS_LIB_STATIC, "foo.lib" },
+    { { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_MSVC },  SP_OS_LIB_SHARED, "foo.dll" },
+    { { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_MINGW }, SP_OS_LIB_STATIC, "libfoo.a" },
+    { { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_MINGW }, SP_OS_LIB_SHARED, "foo.dll" },
+    { { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_GNU },   SP_OS_LIB_STATIC, "libfoo.a" },
+  };
+
+  sp_carr_for(tests, it) {
+    sp_str_t result = spn_triple_lib_file_name(sp_mem_os_new(), tests[it].triple, sp_str_lit("foo"), tests[it].kind);
+    EXPECT_TRUE(sp_str_equal_cstr(result, tests[it].expected));
+  }
+}
+
+typedef struct {
+  spn_triple_t triple;
+  const c8* expected;
+} exe_file_name_t;
+
+UTEST(triple, exe_file_name) {
+  exe_file_name_t tests [] = {
+    { { SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_GNU },   "foo" },
+    { { SPN_ARCH_ARM64, SPN_OS_MACOS,   SPN_ABI_NONE },  "foo" },
+    { { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_MSVC },  "foo.exe" },
+    { { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_MINGW }, "foo.exe" },
+    { { SPN_ARCH_WASM32, SPN_OS_WASI,   SPN_ABI_NONE },  "foo.wasm" },
+  };
+
+  sp_carr_for(tests, it) {
+    sp_str_t result = spn_triple_exe_file_name(sp_mem_os_new(), tests[it].triple, sp_str_lit("foo"));
+    EXPECT_TRUE(sp_str_equal_cstr(result, tests[it].expected));
+  }
+}
+
+
 UTEST(triple, host) {
   spn_triple_t host = spn_triple_host();
 

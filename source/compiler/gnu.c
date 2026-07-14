@@ -208,7 +208,8 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       sp_ps_config_add_arg(mem, ps, sp_fmt(mem, "-Wl,-hidden-l{}", SP_FMT_STR(link->hidden_libs[it])).value);
     } else {
       sp_ps_config_add_arg(mem, ps, sp_fmt(mem, "-l{}", SP_FMT_STR(link->hidden_libs[it])).value);
-      sp_str_t archive = sp_os_lib_to_file_name(mem, link->hidden_libs[it], SP_OS_LIB_STATIC);
+      spn_triple_t triple = { profile->arch, profile->os, profile->abi };
+      sp_str_t archive = spn_triple_lib_file_name(mem, triple, link->hidden_libs[it], SP_OS_LIB_STATIC);
       sp_ps_config_add_arg(mem, ps, sp_fmt(mem, "-Wl,--exclude-libs,{}", SP_FMT_STR(archive)).value);
     }
   }
