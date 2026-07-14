@@ -1,0 +1,14 @@
+[package]
+name = "spum"
+version = "1.0.0"
+
+[options.kram]
+type = "bool"
+default = false
+additive = true
+
+[[lib]]
+name = "spum"
+kinds = ["static"]
+source = ["spum.c"]
+headers = ["spum.h"]

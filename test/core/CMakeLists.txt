@@ -88,6 +88,16 @@ add_executable(when
 spn_test_binary(when)
 add_test(NAME when COMMAND "$<TARGET_FILE:when>")
 
+add_executable(options
+  ${SRC}/enum/enum.c
+  ${SRC}/event/event.c
+  ${SRC}/pkg/options.c
+  ${SRC}/when/when.c
+  options.c
+)
+spn_test_binary(options)
+add_test(NAME options COMMAND "$<TARGET_FILE:options>")
+
 add_executable(pkg
   ${SRC}/ctx/ctx.c
   ${SRC}/enum/enum.c

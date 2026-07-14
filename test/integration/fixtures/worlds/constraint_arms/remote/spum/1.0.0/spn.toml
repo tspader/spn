@@ -1,0 +1,17 @@
+[package]
+name = "spum"
+version = "1.0.0"
+
+[options.grum]
+type = "enum"
+values = ["gl", "vk"]
+default = "gl"
+
+[[lib]]
+name = "spum"
+kinds = ["static"]
+source = [
+  { path = "impl_gl.c", when = { grum = "gl" } },
+  { path = "impl_vk.c", when = { grum = "vk" } },
+]
+headers = ["spum.h"]

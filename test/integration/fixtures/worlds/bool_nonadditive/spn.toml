@@ -1,0 +1,12 @@
+[package]
+name = "worlds_bool_nonadditive"
+version = "0.1.0"
+
+[options.kram]
+type = "bool"
+default = false
+additive = false
+
+[[bin]]
+name = "main"
+source = ["main.c"]

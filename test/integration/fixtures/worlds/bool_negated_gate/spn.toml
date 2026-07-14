@@ -1,0 +1,15 @@
+[package]
+name = "worlds_bool_negated_gate"
+version = "0.1.0"
+
+[options.kram]
+type = "bool"
+default = false
+additive = true
+
+[deps.package]
+spum = { version = "1.0.0", when = { kram = false } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

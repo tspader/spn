@@ -1,0 +1,15 @@
+[package]
+name = "worlds_enum_under_bool"
+version = "0.1.0"
+
+[options.kram]
+type = "bool"
+default = false
+additive = true
+
+[deps.package]
+spum = { version = "1.0.0", when = { kram = true }, options = { grum = "p" } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

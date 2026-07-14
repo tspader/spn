@@ -1,0 +1,14 @@
+[package]
+name = "spum"
+version = "1.0.0"
+
+[options.grum]
+type = "enum"
+values = ["p", "q"]
+default = "q"
+
+[[lib]]
+name = "spum"
+kinds = ["static"]
+source = ["spum.c"]
+headers = ["spum.h"]

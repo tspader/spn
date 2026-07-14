@@ -254,14 +254,3 @@ UTEST_F(deps_index, invalid_manifest) {
     },
   });
 }
-
-// UTEST_F(deps_index, codeberg) {
-//   run_test(utest_result, &uf->fixture, (test_t) {
-//     .project = "test/manual/spn_build/codeberg",
-//     .actions = {
-//       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-//       { .kind = ACTION_VERIFY_LOCKED },
-//       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "sp" } },
-//     },
-//   });
-// }

@@ -1,0 +1,18 @@
+[package]
+name = "kram"
+version = "1.0.0"
+
+[options.uv]
+type = "bool"
+default = false
+additive = true
+define = "KRAM_UV"
+
+[deps.package]
+spum = { version = "^1.0.0", peer = true, when = { uv = true } }
+
+[[lib]]
+name = "kram"
+kinds = ["static"]
+source = ["kram.c"]
+headers = ["kram.h"]

@@ -17,7 +17,7 @@ or, equivalently, `ctest --test-dir .build/work/$TRIPLE --output-on-failure`.
 
 # notes
 
-- The fuzz tests currently fail. Don't run them.
+- The resolver fuzzer only runs with SPN_FUZZ_ENABLE set; it currently finds known resolver bugs (greedy incompleteness), so it is not wired into CI. Don't treat its failures as regressions unless you changed the resolver.
 - Use literal friendly types, like `const c8*` and `T [N]` (i.e. fixed size C arrays)
 - Use `sp_carr_for()` + zero-as-sentinel (when possible) to avoid typing sentinels or lengths at the test site
 - Use a separate struct for `.expect`

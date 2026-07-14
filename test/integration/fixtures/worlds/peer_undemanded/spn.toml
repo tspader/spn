@@ -1,0 +1,11 @@
+[package]
+name = "worlds_peer_undemanded"
+version = "0.1.0"
+
+[deps.package]
+kram = "1.0.0"
+spum = "2.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

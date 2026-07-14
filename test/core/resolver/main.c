@@ -21,6 +21,7 @@
 #include "semver/compare.h"
 #include "semver/convert.h"
 #include "semver/parser.h"
+#include "when/when.h"
 #include "spn.h"
 
 UTEST_STATE();
@@ -45,11 +46,26 @@ s32 main(s32 argc, const c8** argv) {
 // DESCRIPTOR //
 ////////////////
 typedef struct {
+  const c8* str;
+  bool b;
+  bool is_bool;
+} value_lit_t;
+
+typedef struct {
+  const c8* key;
+  const c8* str;
+  bool b;
+  bool is_bool;
+  bool negated;
+} clause_lit_t;
+
+typedef struct {
   const c8* namespace;
   const c8* name;
   const c8* version;
   spn_index_dep_kind_t kind;
   bool private;
+  clause_lit_t when[2];
 } index_dep_t;
 
 typedef struct {
@@ -58,9 +74,18 @@ typedef struct {
 } index_target_t;
 
 typedef struct {
+  const c8* name;
+  spn_option_type_t type;
+  const c8* values[4];
+  value_lit_t fallback;
+} index_option_t;
+
+typedef struct {
   spn_semver_t version;
+  bool yanked;
   index_dep_t deps[4];
   index_target_t targets[2];
+  index_option_t options[2];
 } index_rel_t;
 
 typedef struct {
@@ -74,11 +99,11 @@ typedef struct {
   const c8* version;
   spn_dep_kind_t kind;
   bool private;
+  clause_lit_t when[2];
 } manifest_dep_t;
 
 typedef struct {
   manifest_dep_t package[8];
-  const c8* system[8];
 } manifest_deps_t;
 
 // unit names which unit the package must be a member of: NULL is any unit, ""
@@ -123,6 +148,7 @@ typedef struct {
     manifest_deps_t deps;
   } manifest;
   spn_linkage_t linkage;
+  spn_when_facts_t facts;
   config_kind_t config[4];
   u64 budget;
   spn_err_t err;
@@ -175,6 +201,57 @@ spn_index_release_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_p
 ///////////////
 // EXECUTOR //
 //////////////
+static spn_option_value_t build_value(value_lit_t lit) {
+  if (lit.str) {
+    return spn_option_value_str(sp_str_view(lit.str));
+  }
+  if (lit.is_bool) {
+    return spn_option_value_bool(lit.b);
+  }
+  return spn_option_value_none();
+}
+
+static spn_when_t build_when(sp_mem_t mem, const clause_lit_t* clauses, u64 count) {
+  spn_when_t when = sp_zero;
+  for (u64 it = 0; it < count; it++) {
+    if (!clauses[it].key) break;
+    if (sp_da_empty(when.clauses)) {
+      when.clauses = sp_da_new(mem, spn_when_clause_t);
+    }
+    sp_da_push(when.clauses, ((spn_when_clause_t) {
+      .key = sp_str_view(clauses[it].key),
+      .negated = clauses[it].negated,
+      .value = build_value((value_lit_t) { .str = clauses[it].str, .b = clauses[it].b, .is_bool = clauses[it].is_bool }),
+    }));
+  }
+  return when;
+}
+
+static spn_option_map_t build_options(sp_mem_t mem, index_option_t* descs, u64 count) {
+  spn_option_map_t options = sp_zero;
+  for (u64 it = 0; it < count; it++) {
+    index_option_t* desc = &descs[it];
+    if (!desc->name) break;
+
+    spn_option_info_t option = {
+      .name = sp_str_view(desc->name),
+      .type = desc->type,
+      .values = sp_da_new(mem, sp_str_t),
+      .defaults = sp_da_new(mem, spn_option_default_t),
+    };
+    sp_carr_for(desc->values, vt) {
+      if (!desc->values[vt]) break;
+      sp_da_push(option.values, sp_str_view(desc->values[vt]));
+    }
+    spn_option_value_t fallback = build_value(desc->fallback);
+    if (fallback.kind != SPN_OPTION_VALUE_NONE) {
+      sp_da_push(option.defaults, ((spn_option_default_t) { .value = fallback }));
+    }
+    sp_str_om_insert(options, option.name, option);
+  }
+  return options;
+}
+
 static void build_cache(sp_mem_t mem, fixture_t* fixture) {
   sp_carr_for(fixture->index, i) {
     index_pkg_t* desc = &fixture->index[i];
@@ -198,6 +275,8 @@ static void build_cache(sp_mem_t mem, fixture_t* fixture) {
       spn_index_release_t rel = {
         .id = id,
         .version = rel_desc->version,
+        .yanked = rel_desc->yanked,
+        .options = build_options(mem, rel_desc->options, SP_CARR_LEN(rel_desc->options)),
       };
       sp_da_init(mem, rel.deps);
 
@@ -213,6 +292,7 @@ static void build_cache(sp_mem_t mem, fixture_t* fixture) {
             .name = sp_str_view(dep_desc->name),
           },
           .version = sp_str_view(dep_desc->version),
+          .when = build_when(mem, dep_desc->when, SP_CARR_LEN(dep_desc->when)),
         }));
       }
 
@@ -262,6 +342,7 @@ static spn_pkg_info_t* build_root(sp_mem_t mem, fixture_t* fixture) {
       .source = SPN_PKG_SOURCE_INDEX,
       .kind = dep->kind,
       .private = dep->private,
+      .when = build_when(mem, dep->when, SP_CARR_LEN(dep->when)),
       .index.range = range,
     }));
   }
@@ -396,7 +477,15 @@ static resolve_result_t execute_fixture(fixture_t* fixture, sp_intern_t* intern)
   }));
 
   spn_resolver_t resolver = sp_zero;
-  spn_resolver_init(&resolver, mem, intern, &cache, &registry, events, (spn_profile_info_t) { .linkage = fixture->linkage }, config, fixture->budget);
+  spn_resolver_init(&resolver, mem, intern, &cache, &registry, events, (spn_profile_info_t) {
+    .linkage = fixture->linkage,
+    .os = fixture->facts.os,
+    .arch = fixture->facts.arch,
+    .abi = fixture->facts.abi,
+    .mode = fixture->facts.mode,
+    .opt = fixture->facts.opt,
+    .sanitizers = fixture->facts.sanitizers,
+  }, config, fixture->budget);
 
   resolve_result_t result = sp_zero_s(resolve_result_t);
   result.intern = intern;
@@ -619,7 +708,6 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
 ///////////
 UTEST_F(resolver, none_resolves) {
   run_fixture(utest_result, (fixture_t) {
-    .err = SPN_OK,
   });
 }
 
@@ -641,7 +729,6 @@ UTEST_F(resolver, linear_resolves) {
         { .name = "spn/math", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 1, 0) },
     },
@@ -704,7 +791,6 @@ UTEST_F(resolver, diamond_compatible) {
         { .name = "spn/audio", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "renderer", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
       { .name = "audio", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
@@ -773,43 +859,6 @@ UTEST_F(resolver, diamond_missing_renderer) {
             .version = spn_semver_lit(1, 0, 0),
             .deps = {
               { .namespace = "spn", .name = "math", .version = "^1.5.0" },
-            }
-          },
-        }
-      },
-      {
-        .namespace = "spn",
-        .name = "math",
-        .releases = {
-          { .version = spn_semver_lit(1, 0, 0) },
-          { .version = spn_semver_lit(1, 5, 0) },
-          { .version = spn_semver_lit(1, 9, 0) },
-          { .version = spn_semver_lit(2, 0, 0) },
-        }
-      },
-    },
-    .manifest = {
-      .deps.package = {
-        { .name = "spn/renderer", .version = "^1.0.0" },
-        { .name = "spn/audio", .version = "^1.0.0" },
-      }
-    },
-    .err = SPN_ERROR,
-    .event = SPN_EVENT_ERR_UNKNOWN_PKG,
-  });
-}
-
-UTEST_F(resolver, diamond_missing_audio) {
-  run_fixture(utest_result, (fixture_t) {
-    .index = {
-      {
-        .namespace = "spn",
-        .name = "renderer",
-        .releases = {
-          {
-            .version = spn_semver_lit(1, 0, 0),
-            .deps = {
-              { .namespace = "spn", .name = "math", .version = "^1.0.0" },
             }
           },
         }
@@ -963,118 +1012,6 @@ UTEST_F(resolver, cycle_indirect) {
   });
 }
 
-UTEST_F(resolver, system_deps) {
-  run_fixture(utest_result, (fixture_t) {
-    .index = {
-      {
-        .namespace = "spn",
-        .name = "renderer",
-        .releases = {
-          {
-            .version = spn_semver_lit(1, 0, 0),
-            .deps = {
-              { .namespace = "spn", .name = "math", .version = "^1.0.0" },
-            }
-          },
-        }
-      },
-      {
-        .namespace = "spn",
-        .name = "audio",
-        .releases = {
-          {
-            .version = spn_semver_lit(1, 0, 0),
-            .deps = {
-              { .namespace = "spn", .name = "math", .version = "^1.5.0" },
-            }
-          },
-        }
-      },
-      {
-        .namespace = "spn",
-        .name = "math",
-        .releases = {
-          { .version = spn_semver_lit(1, 0, 0) },
-          { .version = spn_semver_lit(1, 5, 0) },
-          { .version = spn_semver_lit(1, 9, 0) },
-          { .version = spn_semver_lit(2, 0, 0) },
-        }
-      },
-    },
-    .manifest = {
-      .deps = {
-        .package = {
-          { .name = "spn/renderer", .version = "^1.0.0" },
-          { .name = "spn/audio", .version = "^1.0.0" },
-        },
-        .system = { "alsa", "x11" },
-      }
-    },
-    .err = SPN_OK,
-    .expected = {
-      { .name = "renderer", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
-      { .name = "audio", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
-      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 9, 0) },
-    },
-  });
-}
-
-UTEST_F(resolver, system_deps_dedup) {
-  run_fixture(utest_result, (fixture_t) {
-    .index = {
-      {
-        .namespace = "spn",
-        .name = "renderer",
-        .releases = {
-          {
-            .version = spn_semver_lit(1, 0, 0),
-            .deps = {
-              { .namespace = "spn", .name = "math", .version = "^1.0.0" },
-            }
-          },
-        }
-      },
-      {
-        .namespace = "spn",
-        .name = "audio",
-        .releases = {
-          {
-            .version = spn_semver_lit(1, 0, 0),
-            .deps = {
-              { .namespace = "spn", .name = "math", .version = "^1.5.0" },
-            }
-          },
-        }
-      },
-      {
-        .namespace = "spn",
-        .name = "math",
-        .releases = {
-          { .version = spn_semver_lit(1, 0, 0) },
-          { .version = spn_semver_lit(1, 5, 0) },
-          { .version = spn_semver_lit(1, 9, 0) },
-          { .version = spn_semver_lit(2, 0, 0) },
-        }
-      },
-    },
-    .manifest = {
-      .deps = {
-        .package = {
-          { .name = "spn/renderer", .version = "^1.0.0" },
-          { .name = "spn/audio", .version = "^1.0.0" },
-        },
-        .system = { "alsa" },
-      }
-    },
-    .err = SPN_OK,
-    .expected = {
-      { .name = "renderer", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
-      { .name = "audio", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
-      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 9, 0) },
-    },
-  });
-}
-
 UTEST_F(resolver, backtrack_simple) {
   // audio has 3 versions in ^1.0.0; 1.2.0 requires missing "physics", 1.1.0 and 1.0.0 are fine.
   // A correct resolver should pick audio 1.1.0 (newest valid).
@@ -1101,7 +1038,6 @@ UTEST_F(resolver, backtrack_simple) {
         { .name = "spn/audio", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "audio", .namespace = "spn", .version = spn_semver_lit(1, 1, 0) },
     },
@@ -1180,7 +1116,6 @@ UTEST_F(resolver, backtrack_transitive_missing) {
         { .name = "spn/audio", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "audio", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
       { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
@@ -1229,7 +1164,6 @@ UTEST_F(resolver, backtrack_divergent_deps) {
         { .name = "spn/renderer", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "renderer", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
       { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
@@ -1268,6 +1202,13 @@ UTEST_F(resolver, root_transitive_conflict) {
       }
     },
     .err = SPN_ERROR,
+    .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+    .unsat = {
+      .namespace = "spn",
+      .name = "math",
+      .requester = "test/root",
+      .selected = "2.0.0",
+    },
   });
 }
 
@@ -1338,36 +1279,82 @@ UTEST_F(resolver, conflict_reports_selected) {
   });
 }
 
-UTEST_F(resolver, smoke) {
+////////////////////
+// INDEX METADATA //
+////////////////////
+// A yanked release is invisible to free selection: the newest in-range
+// version is skipped for the newest un-yanked one
+UTEST_F(resolver, yanked_release_skipped) {
   run_fixture(utest_result, (fixture_t) {
     .index = {
       {
         .namespace = "spn",
-        .name = "renderer",
+        .name = "a",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(1, 1, 0), .yanked = true },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/a", .version = "^1.0.0" },
+      }
+    },
+    .expected = {
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+    },
+    .instances = {
+      { .name = "spn/a", .count = 1 },
+    },
+  });
+}
+
+// A range only a yanked release satisfies is unsatisfiable, reported as
+// no-version-in-range rather than a conflict
+UTEST_F(resolver, yanked_only_candidate_fails) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0), .yanked = true },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/a", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_ERROR,
+    .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+    .unsat = { .namespace = "spn", .name = "a", .requester = "test/root" },
+  });
+}
+
+// An index dep whose version range fails to parse is a manifest error naming
+// the release, never a silent skip
+UTEST_F(resolver, index_invalid_range) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
         .releases = {
           {
             .version = spn_semver_lit(1, 0, 0),
             .deps = {
-              { .namespace = "spn", .name = "math", .version = "^1.0.0" },
+              { .namespace = "spn", .name = "b", .version = "kram" },
             }
           },
         }
       },
       {
         .namespace = "spn",
-        .name = "audio",
-        .releases = {
-          {
-            .version = spn_semver_lit(1, 0, 0),
-            .deps = {
-              { .namespace = "spn", .name = "math", .version = "^1.0.0" },
-            }
-          },
-        }
-      },
-      {
-        .namespace = "spn",
-        .name = "math",
+        .name = "b",
         .releases = {
           { .version = spn_semver_lit(1, 0, 0) },
         }
@@ -1375,15 +1362,169 @@ UTEST_F(resolver, smoke) {
     },
     .manifest = {
       .deps.package = {
-        { .name = "spn/renderer", .version = "^1.0.0" },
-        { .name = "spn/audio", .version = "^1.0.0" },
+        { .name = "spn/a", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
+    .err = SPN_ERROR,
+    .event = SPN_EVENT_ERR_MANIFEST,
+  });
+}
+
+///////////
+// GATES //
+///////////
+// A fact gate on an index dep evaluates at resolve time: the false edge is
+// never resolved (its package exists nowhere), the true edge is
+UTEST_F(resolver, index_dep_fact_gate) {
+  run_fixture(utest_result, (fixture_t) {
+    .facts = { .os = SPN_OS_LINUX, .arch = SPN_ARCH_X64, .abi = SPN_ABI_GNU },
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "b", .version = "^1.0.0", .when = { { "os", "linux" } } },
+              { .namespace = "spn", .name = "w", .version = "^1.0.0", .when = { { "os", "windows" } } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "b",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/a", .version = "^1.0.0" },
+      }
+    },
     .expected = {
-      { .name = "renderer", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
-      { .name = "audio", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
-      { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+      { .name = "b", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+    },
+    .instances = {
+      { .name = "spn/w", .count = 0 },
+    },
+  });
+}
+
+// The { not = v } form gates with opposite polarity: os != windows holds on
+// this profile, os != linux does not
+UTEST_F(resolver, index_dep_negated_gate) {
+  run_fixture(utest_result, (fixture_t) {
+    .facts = { .os = SPN_OS_LINUX, .arch = SPN_ARCH_X64, .abi = SPN_ABI_GNU },
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .deps = {
+              { .namespace = "spn", .name = "b", .version = "^1.0.0", .when = { { .key = "os", .str = "windows", .negated = true } } },
+              { .namespace = "spn", .name = "w", .version = "^1.0.0", .when = { { .key = "os", .str = "linux", .negated = true } } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "b",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/a", .version = "^1.0.0" },
+      }
+    },
+    .expected = {
+      { .name = "b", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+    },
+    .instances = {
+      { .name = "spn/w", .count = 0 },
+    },
+  });
+}
+
+// The gate env includes the release's own declared options at their
+// resolved defaults: x defaults true and admits its edge, y is an
+// undefaulted bool (false) and cuts the edge to the missing package
+UTEST_F(resolver, index_dep_option_gate) {
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .options = {
+              { .name = "x", .type = SPN_OPTION_TYPE_BOOL, .fallback = { .is_bool = true, .b = true } },
+              { .name = "y", .type = SPN_OPTION_TYPE_BOOL },
+            },
+            .deps = {
+              { .namespace = "spn", .name = "b", .version = "^1.0.0", .when = { { .key = "x", .is_bool = true, .b = true } } },
+              { .namespace = "spn", .name = "w", .version = "^1.0.0", .when = { { .key = "y", .is_bool = true, .b = true } } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "b",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/a", .version = "^1.0.0" },
+      }
+    },
+    .expected = {
+      { .name = "b", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+    },
+    .instances = {
+      { .name = "spn/w", .count = 0 },
+    },
+  });
+}
+
+// Root manifest deps gate through the local-package path exactly like index
+// deps gate through candidates
+UTEST_F(resolver, root_dep_gate) {
+  run_fixture(utest_result, (fixture_t) {
+    .facts = { .os = SPN_OS_LINUX, .arch = SPN_ARCH_X64, .abi = SPN_ABI_GNU },
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/a", .version = "^1.0.0", .when = { { "os", "linux" } } },
+        { .name = "spn/w", .version = "^1.0.0", .when = { { "os", "windows" } } },
+      }
+    },
+    .expected = {
+      { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+    },
+    .instances = {
+      { .name = "spn/w", .count = 0 },
     },
   });
 }
@@ -1411,7 +1552,6 @@ UTEST_F(resolver, build_dep_root_conflict) {
         { .name = "spn/foo", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/foo" },
@@ -1454,7 +1594,6 @@ UTEST_F(resolver, build_dep_transitive_conflict) {
         { .name = "spn/foo", .version = "^2.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "renderer", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
@@ -1486,7 +1625,6 @@ UTEST_F(resolver, test_dep_root_conflict) {
         { .name = "spn/foo", .version = "^1.0.0", .kind = SPN_DEP_KIND_TEST },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/foo" },
@@ -1529,7 +1667,6 @@ UTEST_F(resolver, transitive_test_dep_pruned) {
         { .name = "spn/foo", .version = "^2.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "renderer", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
@@ -1573,7 +1710,6 @@ UTEST_F(resolver, build_dep_compatible_unifies) {
         { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
       { .name = "tool", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
@@ -1606,7 +1742,6 @@ UTEST_F(resolver, preference_prefers_unified) {
         { .name = "spn/foo", .version = ">=1.5.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/foo" },
@@ -1650,7 +1785,6 @@ UTEST_F(resolver, build_dep_never_constrains_root) {
         { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
@@ -1712,7 +1846,6 @@ UTEST_F(resolver, convergence_forces_older_sibling) {
         { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/tool" },
@@ -1774,7 +1907,6 @@ UTEST_F(resolver, tiebreak_takes_earliest_admissible) {
         { .name = "spn/opt", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/gen" },
@@ -1847,7 +1979,6 @@ UTEST_F(resolver, tiebreak_higher_priority_pins_loser_splits) {
         { .name = "spn/use", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
       { .name = "b", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/mk" },
@@ -1991,7 +2122,6 @@ UTEST_F(resolver, shared_lib_private_diverges) {
         { .name = "spn/foo", .version = "^2.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
@@ -2041,7 +2171,6 @@ UTEST_F(resolver, private_compatible_unifies) {
         { .name = "spn/foo", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
@@ -2102,7 +2231,6 @@ UTEST_F(resolver, shared_lib_private_transitive_diverges) {
         { .name = "spn/baz", .version = "^2.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "baz", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
       { .name = "bar", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gfx" },
@@ -2285,7 +2413,6 @@ UTEST_F(resolver, config_shared_private_diverges) {
     .config = {
       { .name = "gfx", .kind = SPN_LIB_KIND_SHARED },
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
@@ -2343,7 +2470,6 @@ UTEST_F(resolver, shared_lib_consumers_unify) {
         { .name = "spn/video", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(1, 9, 0) },
     },
@@ -2598,7 +2724,6 @@ UTEST_F(resolver, build_dep_bootstrap) {
         { .name = "spn/audio", .version = "^2.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "audio", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
       { .name = "tool", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
@@ -2687,7 +2812,6 @@ UTEST_F(resolver, backtrack_releases_subtree_picks) {
         { .name = "spn/audio", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "audio", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
       { .name = "math", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
@@ -2731,7 +2855,6 @@ UTEST_F(resolver, backtrack_orphan_not_committed) {
         { .name = "spn/audio", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "audio", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
     },
@@ -2788,7 +2911,6 @@ UTEST_F(resolver, divergent_dep_splits_instance) {
         { .name = "spn/c", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
       { .name = "b", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
@@ -2846,7 +2968,6 @@ UTEST_F(resolver, build_dep_disjoint_tools_diverge) {
         { .name = "spn/audio", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/foo" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/foo" },
@@ -2913,7 +3034,6 @@ UTEST_F(resolver, private_scopes_per_instance) {
         { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
       { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
@@ -2975,7 +3095,6 @@ UTEST_F(resolver, sibling_tools_unify) {
         { .name = "spn/opt", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/gen" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/opt" },
@@ -3270,7 +3389,6 @@ UTEST_F(resolver, split_instances_reconverge) {
         { .name = "spn/c2", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
       { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/c1" },
@@ -3346,7 +3464,6 @@ UTEST_F(resolver, split_propagates_through_middle) {
         { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
       { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
@@ -3445,7 +3562,6 @@ UTEST_F(resolver, pin_walk_lexicographic_subset) {
         { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "x", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
       { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
@@ -3533,7 +3649,6 @@ UTEST_F(resolver, convergence_forces_older_transitive) {
         { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/tool" },
@@ -3608,7 +3723,6 @@ UTEST_F(resolver, nested_tool_splits_only_inner) {
         { .name = "spn/foo", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/ta" },
@@ -3675,7 +3789,6 @@ UTEST_F(resolver, private_inside_private_diverges) {
         { .name = "spn/leaf", .version = "^2.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "leaf", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
       { .name = "inner", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gfx" },
@@ -3807,7 +3920,6 @@ UTEST_F(resolver, build_dep_inside_private_diverges) {
         { .name = "spn/foo", .version = "^2.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
       { .name = "bar", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gfx" },
@@ -3874,7 +3986,6 @@ UTEST_F(resolver, boundary_diamond_three_instances) {
         { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/gfx" },
@@ -3945,7 +4056,6 @@ UTEST_F(resolver, bootstrap_with_divergent_sibling) {
         { .name = "spn/audio", .version = "^2.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "audio", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
       { .name = "zed", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
@@ -4090,7 +4200,6 @@ UTEST_F(resolver, private_groups_converge_on_earliest) {
         { .name = "spn/gfxb", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 9, 0), .unit = "spn/gfxa" },
@@ -4138,7 +4247,6 @@ UTEST_F(resolver, test_dep_transitive_diverges) {
         { .name = "spn/harness", .version = "^1.0.0", .kind = SPN_DEP_KIND_TEST },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
       { .name = "foo", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "spn/harness" },
@@ -4228,7 +4336,6 @@ UTEST_F(resolver, shared_lib_diverges_across_process) {
         { .name = "spn/tool", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .unit = "" },
       { .name = "gfx", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/tool" },
@@ -4297,7 +4404,6 @@ UTEST_F(resolver, converged_lib_single_tool_group) {
         { .name = "spn/wrap", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "lib", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "" },
       { .name = "lib", .namespace = "spn", .version = spn_semver_lit(1, 0, 0), .unit = "spn/wrap" },
@@ -4422,7 +4528,6 @@ UTEST_F(resolver, determinism_many_ties) {
         { .name = "spn/t2", .version = "^1.0.0", .kind = SPN_DEP_KIND_BUILD },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 2, 0), .unit = "" },
       { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 2, 0), .unit = "spn/t1" },
@@ -4471,7 +4576,6 @@ UTEST_F(resolver, sibling_order_greedy) {
         { .name = "spn/a", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 9, 0) },
       { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
@@ -4512,7 +4616,6 @@ UTEST_F(resolver, sibling_order_reversed) {
         { .name = "spn/c", .version = ">=1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 9, 0) },
       { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
@@ -4566,7 +4669,6 @@ UTEST_F(resolver, transitive_sibling_order) {
         { .name = "spn/b", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 9, 0) },
     },
@@ -4610,10 +4712,107 @@ UTEST_F(resolver, avoidable_dynamic_dup) {
         { .name = "spn/a", .version = "^1.0.0" },
       }
     },
-    .err = SPN_OK,
     .expected = {
       { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
       { .name = "a", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+    },
+    .instances = {
+      { .name = "spn/c", .count = 1 },
+    },
+  });
+}
+
+////////////
+// WORLDS //
+////////////
+// The resolver-level review contract for worlds.md cut 3
+// (.llm/doc/resolve/worlds.md): skipped until the cut lands. Under today's
+// concrete resolver these gates evaluate false and both fixtures resolve
+// trivially; under ⊤-resolve the bool-gated edges participate in version
+// selection unconditionally.
+
+// I3.12b: two bool-gated edges with conflicting version requirements error
+// with no demand anywhere — mutually incompatible alternatives are the
+// enum's job
+UTEST_F(resolver, cut3_top_resolve_bool_edges_conflict) {
+  UTEST_SKIP("worlds cut 3");
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .options = {
+              { .name = "x", .type = SPN_OPTION_TYPE_BOOL },
+              { .name = "y", .type = SPN_OPTION_TYPE_BOOL },
+            },
+            .deps = {
+              { .namespace = "spn", .name = "c", .version = "=1.0.0", .when = { { .key = "x", .is_bool = true, .b = true } } },
+              { .namespace = "spn", .name = "c", .version = "=2.0.0", .when = { { .key = "y", .is_bool = true, .b = true } } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "c",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/a", .version = "^1.0.0" },
+      }
+    },
+    .err = SPN_ERROR,
+    .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+  });
+}
+
+// I3.12c: a phantom bool-gated edge holds a sibling to the older version;
+// the over-pin is the deliberate price of demand-independent selection
+UTEST_F(resolver, cut3_phantom_edge_over_pins) {
+  UTEST_SKIP("worlds cut 3");
+  run_fixture(utest_result, (fixture_t) {
+    .index = {
+      {
+        .namespace = "spn",
+        .name = "a",
+        .releases = {
+          {
+            .version = spn_semver_lit(1, 0, 0),
+            .options = {
+              { .name = "x", .type = SPN_OPTION_TYPE_BOOL },
+            },
+            .deps = {
+              { .namespace = "spn", .name = "c", .version = "=1.0.0", .when = { { .key = "x", .is_bool = true, .b = true } } },
+            }
+          },
+        }
+      },
+      {
+        .namespace = "spn",
+        .name = "c",
+        .releases = {
+          { .version = spn_semver_lit(1, 0, 0) },
+          { .version = spn_semver_lit(2, 0, 0) },
+        }
+      },
+    },
+    .manifest = {
+      .deps.package = {
+        { .name = "spn/a", .version = "^1.0.0" },
+        { .name = "spn/c", .version = "^1.0.0" },
+      }
+    },
+    .expected = {
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(1, 0, 0) },
+      { .name = "c", .namespace = "spn", .version = spn_semver_lit(2, 0, 0), .excluded = true },
     },
     .instances = {
       { .name = "spn/c", .count = 1 },

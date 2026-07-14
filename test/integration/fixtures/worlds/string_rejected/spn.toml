@@ -1,0 +1,11 @@
+[package]
+name = "worlds_string_rejected"
+version = "0.1.0"
+
+[options.kram]
+type = "string"
+default = "x"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
