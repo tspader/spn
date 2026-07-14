@@ -41,6 +41,15 @@ spn_err_t spn_wasm_init() {
   return SPN_OK;
 }
 
+// WAMR mprotects guard pages at the bottom of any thread that runs a script;
+// a thread that exits without destroying its env leaves those pages PROT_NONE
+// on a stack glibc will hand to the next pthread, which then faults on it
+void spn_wasm_thread_exit() {
+  if (wasm_runtime_thread_env_inited()) {
+    wasm_runtime_destroy_thread_env();
+  }
+}
+
 void spn_wasm_script_init(spn_wasm_script_t* script, sp_str_t module) {
   *script = (spn_wasm_script_t) {
     .state = SPN_WASM_SCRIPT_CLOSED,

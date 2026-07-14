@@ -146,6 +146,7 @@ struct spn_cli {
   sp_str_t output;
   bool verbose;
   bool quiet;
+  bool ci;
   u32 refresh;
 
   spn_profile_args_t profile;

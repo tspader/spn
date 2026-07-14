@@ -221,6 +221,10 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
   }
 
+  if (spn.cli.ci) {
+    sp->fps = 100000;
+  }
+
   spn_tui_init(&spn.tui, &app.session, SPN_OUTPUT_MODE_INTERACTIVE);
 
   spn.events = spn_event_buffer_new(spn.mem);

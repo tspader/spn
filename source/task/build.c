@@ -19,6 +19,7 @@
 #include "task/build/target.h"
 #include "task/task.h"
 #include "unit/package.h"
+#include "external/wasm/wasm.h"
 
 static spn_err_union_t spn_bg_error_to_union(spn_build_graph_t* graph);
 static spn_bg_id_t get_or_put_user_file(spn_pkg_unit_t* ctx, spn_build_graph_t* graph, sp_str_t path);
@@ -253,7 +254,8 @@ spn_task_step_t spn_task_build_graph_init(spn_app_t* app) {
     session->build.dirty,
     (spn_bg_executor_config_t) {
       .num_threads = 16,
-      .enable_logging = false
+      .enable_logging = false,
+      .on_worker_exit = spn_wasm_thread_exit,
     }
   );
 
