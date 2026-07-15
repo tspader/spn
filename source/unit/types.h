@@ -10,6 +10,7 @@
 #include "filter/types.h"
 #include "intern/types.h"
 #include "pkg/types.h"
+#include "sp/macro.h"
 #include "profile/types.h"
 #include "target/closure.h"
 #include "external/wasm/types.h"
@@ -37,20 +38,35 @@ typedef struct {
   spn_target_selection_t targets;
 } spn_compile_request_t;
 
-typedef struct SP_ALIGNED {
+SPN_PACK_PUSH
+typedef struct {
   spn_pkg_id_t pkg;
   spn_build_unit_id_t ctx;
 } spn_pkg_unit_id_t;
 
-typedef struct SP_ALIGNED {
+typedef struct {
   spn_pkg_unit_id_t pkg;
   sp_intern_id_t target;
 } spn_target_unit_id_t;
 
-typedef struct SP_ALIGNED {
+typedef struct {
   spn_target_unit_id_t target;
   sp_intern_id_t source;
 } spn_compile_unit_id_t;
+SPN_PACK_POP
+
+_Static_assert(
+  sizeof(spn_pkg_unit_id_t) == sizeof(spn_pkg_id_t) + sizeof(spn_build_unit_id_t),
+  "spn_pkg_unit_id_t is byte-hashed as a key; it must have no padding"
+);
+_Static_assert(
+  sizeof(spn_target_unit_id_t) == sizeof(spn_pkg_unit_id_t) + sizeof(sp_intern_id_t),
+  "spn_target_unit_id_t is byte-hashed as a key; it must have no padding"
+);
+_Static_assert(
+  sizeof(spn_compile_unit_id_t) == sizeof(spn_target_unit_id_t) + sizeof(sp_intern_id_t),
+  "spn_compile_unit_id_t is byte-hashed as a key; it must have no padding"
+);
 
 typedef struct {
   spn_build_unit_t* build;

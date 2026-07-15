@@ -48,4 +48,12 @@
 #define SP_X_NAMED_ENUM_CASE_TO_STRING_LOWER(ID, NAME) \
   case ID: { return sp_str_lit(NAME); }
 
+#if defined(_MSC_VER)
+  #define SPN_PACK_PUSH __pragma(pack(push, 1))
+  #define SPN_PACK_POP  __pragma(pack(pop))
+#else
+  #define SPN_PACK_PUSH _Pragma("pack(push, 1)")
+  #define SPN_PACK_POP  _Pragma("pack(pop)")
+#endif
+
 #endif

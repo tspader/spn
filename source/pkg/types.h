@@ -6,6 +6,7 @@
 #include "forward/types.h"
 #include "git/types.h"
 #include "intern/types.h"
+#include "sp/macro.h"
 #include "sp/sp_om.h"
 #include "semver/types.h"
 #include "target/types.h"
@@ -41,11 +42,18 @@ typedef struct {
   sp_str_t name;
 } spn_pkg_name_t;
 
-typedef struct SP_ALIGNED {
+SPN_PACK_PUSH
+typedef struct {
   sp_intern_id_t qualified;
   sp_hash_t hash;
   spn_semver_t version;
 } spn_pkg_id_t;
+SPN_PACK_POP
+
+_Static_assert(
+  sizeof(spn_pkg_id_t) == sizeof(sp_intern_id_t) + sizeof(sp_hash_t) + sizeof(spn_semver_t),
+  "spn_pkg_id_t is byte-hashed as a key; it must have no padding"
+);
 
 typedef enum {
   SPN_DEP_KIND_PACKAGE,
