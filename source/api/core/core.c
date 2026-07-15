@@ -351,10 +351,10 @@ void spn_target_embed_mem_ex(spn_target_t* t, const c8* s, const u8* b, u64 z, c
 }
 
 void spn_target_embed_dir(spn_target_t* t, const c8* d) {
-  spn_target_embed_dir_ex_s(t->info, view(d), DATA_T, SIZE_T);
+  spn_target_embed_dir_ex_s(t->info, view(d), sp_str_lit(""), DATA_T, SIZE_T);
 }
 
-void spn_target_embed_dir_ex(spn_target_t* t, const c8* d, const c8* d_t, const c8* s_t) {
-  spn_target_embed_dir_ex_s(t->info, view(d), view(d_t), view(s_t));
+void spn_target_embed_dir_ex(spn_target_t* t, const c8* d, const c8* dest, const c8* d_t, const c8* s_t) {
+  spn_target_embed_dir_ex_s(t->info, view(d), view(dest), view(d_t), view(s_t));
 
 }

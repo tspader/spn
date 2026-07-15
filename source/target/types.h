@@ -30,7 +30,7 @@ typedef struct {
   union {
     struct { sp_str_t path; } file;
     struct { const u8* buffer; u64 size; } memory;
-    struct { sp_str_t path; } dir;
+    struct { sp_str_t path; sp_str_t dest; } dir;
   };
 } spn_embed_t;
 
