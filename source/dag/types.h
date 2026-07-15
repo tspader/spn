@@ -63,7 +63,6 @@ typedef struct {
   spn_dag_digest_t digest;
   spn_dag_id_t producer;
   sp_da(spn_dag_id_t) consumers;
-  u64 write_epoch;
 } spn_dag_artifact_t;
 
 struct spn_dag_action_t {
@@ -149,7 +148,8 @@ typedef struct {
 typedef struct {
   sp_atomic_s32_t total;
   sp_atomic_s32_t completed;
-  sp_atomic_s32_t executed;
+  sp_atomic_s32_t hits;
+  sp_atomic_s32_t misses;
 } spn_dag_progress_t;
 
 typedef struct {

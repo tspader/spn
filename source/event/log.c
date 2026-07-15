@@ -426,19 +426,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_EMBED_FAILED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_DIRTY_SUMMARY
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_dirty_summary_t, total_commands, "total_commands", SP_BIND_U32);
-      SP_BIND(&b, spn_evt_dirty_summary_t, dirty_commands, "dirty_commands", SP_BIND_U32);
-      SP_BIND(&b, spn_evt_dirty_summary_t, total_files, "total_files", SP_BIND_U32);
-      SP_BIND(&b, spn_evt_dirty_summary_t, dirty_files, "dirty_files", SP_BIND_U32);
-      SP_BIND(&b, spn_evt_dirty_summary_t, forced, "forced", SP_BIND_BOOL);
-    }
-    schemas[SPN_EVENT_DIRTY_SUMMARY] = sp_bind_builder_end(&b);
-  }
-
   // SPN_EVENT_BUILD_FAILED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
@@ -451,23 +438,14 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_FAILED] = sp_bind_builder_end(&b);
   }
 
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_build_cancelled_t, profile, "profile", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_build_cancelled_t, time, "time_ns", SP_BIND_U64);
-      SP_BIND(&b, spn_evt_build_cancelled_t, num_pending, "num_pending", SP_BIND_U32);
-    }
-    schemas[SPN_EVENT_BUILD_CANCELLED] = sp_bind_builder_end(&b);
-  }
-
   // SPN_EVENT_BUILD_SUMMARY
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
       SP_BIND(&b, spn_evt_build_summary_t, success, "success", SP_BIND_BOOL);
-      SP_BIND(&b, spn_evt_build_summary_t, num_dirty, "num_dirty", SP_BIND_U32);
-      SP_BIND(&b, spn_evt_build_summary_t, total_commands, "total_commands", SP_BIND_U32);
+      SP_BIND(&b, spn_evt_build_summary_t, hits, "hits", SP_BIND_U32);
+      SP_BIND(&b, spn_evt_build_summary_t, misses, "misses", SP_BIND_U32);
+      SP_BIND(&b, spn_evt_build_summary_t, total, "total", SP_BIND_U32);
       SP_BIND(&b, spn_evt_build_summary_t, time, "time_ns", SP_BIND_U64);
       SP_BIND(&b, spn_evt_build_summary_t, profile, "profile", SP_BIND_STR);
     }

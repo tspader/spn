@@ -292,8 +292,7 @@ static void init_metaprogram_runtime(spn_pkg_unit_t* unit) {
 
 static spn_err_union_t build_target_invocations(spn_target_unit_t* target) {
   spn_target_resolve_link(target);
-  try_union(spn_build_compile_invocations(target));
-  return spn_build_link_invocation(target);
+  return spn_build_validate_target(target);
 }
 
 spn_err_union_t add_metaprogram_units(spn_session_t* session) {

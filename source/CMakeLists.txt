@@ -91,10 +91,6 @@ set(SPN_SOURCES
   task/build/nodes/embed.c
   task/build/nodes/link.c
   task/build/nodes/object.c
-  task/build/nodes/package.c
-  task/build/nodes/stage.c
-  task/build/nodes/stamp.c
-  task/build/nodes/user.c
   task/add.c
   task/build.c
   task/clean.c

@@ -138,7 +138,9 @@ static void run_test(s32* utest_result, par_test_t t) {
     });
 
     spn_dag_pool_t pool = sp_zero;
-    spn_dag_pool_init(&pool, env.dag.fs.mem, t.workers ? t.workers : 4);
+    spn_dag_pool_init(&pool, env.dag.fs.mem, (spn_dag_pool_config_t) {
+      .workers = t.workers ? t.workers : 4,
+    });
 
     sp_carr_for(t.builds, b) {
       par_build_t* build = &t.builds[b];
