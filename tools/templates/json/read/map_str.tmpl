@@ -1,6 +1,9 @@
 static void spn_cg_{{ .entry }}_read_map(yyjson_val* obj, const c8* key, sp_da({{ .entry_type }})* out, sp_mem_t mem) {
   yyjson_val* map = yyjson_obj_get(obj, key);
   *out = sp_da_new(mem, {{ .entry_type }});
+  if (!yyjson_is_obj(map)) {
+    return;
+  }
   size_t i, n;
   yyjson_val* k;
   yyjson_val* v;
