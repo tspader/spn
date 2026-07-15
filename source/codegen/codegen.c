@@ -51,7 +51,7 @@ static sp_str_t spn_codegen_path(spn_toml_loader_t* ctx) {
 }
 
 static void spn_toml_loader_record(spn_toml_loader_t* ctx, spn_err_t code, sp_str_t detail) {
-  spn_codegen_issue_t issue = { .code = code, .path = spn_codegen_path(ctx), .detail = detail };
+  spn_codegen_issue_t issue = { .code = code, .path = spn_codegen_path(ctx), .detail = sp_str_copy(ctx->mem, detail) };
   sp_da_push(ctx->issues, issue);
 }
 
@@ -71,12 +71,26 @@ sp_str_t spn_toml_loader_intern(spn_toml_loader_t* ctx, sp_str_t value) {
   return sp_intern_get_or_insert_str(ctx->intern, value);
 }
 
-static bool spn_toml_loader_read_raw_value(toml_table_t* table, const c8* key, sp_str_t* value) {
+sp_str_t spn_toml_loader_intern_value(spn_toml_loader_t* ctx, toml_value_t value) {
+  sp_str_t interned = sp_intern_get_or_insert_str(ctx->intern, sp_str(value.u.s, (u32)value.u.sl));
+  free(value.u.s);
+  return interned;
+}
+
+bool spn_toml_loader_str_present(toml_table_t* table, const c8* key) {
+  toml_value_t value = toml_table_string(table, key);
+  if (value.ok) {
+    free(value.u.s);
+  }
+  return value.ok;
+}
+
+static bool spn_toml_loader_read_raw_value(spn_toml_loader_t* ctx, toml_table_t* table, const c8* key, sp_str_t* value) {
   toml_value_t found = toml_table_string(table, key);
   if (!found.ok) {
     return false;
   }
-  *value = sp_str(found.u.s, (u32)found.u.sl);
+  *value = spn_toml_loader_intern_value(ctx, found);
   return true;
 }
 
@@ -90,32 +104,26 @@ static spn_err_t spn_toml_loader_required_str_err(toml_table_t* table, const c8*
 
 sp_str_t spn_toml_loader_str_required(spn_toml_loader_t* ctx, toml_table_t* table, const c8* key) {
   sp_str_t value = sp_zero;
-  if (!spn_toml_loader_read_raw_value(table, key, &value)) {
+  if (!spn_toml_loader_read_raw_value(ctx, table, key, &value)) {
     spn_toml_loader_issue(ctx, spn_toml_loader_required_str_err(table, key), key);
-    return value;
   }
-  return sp_intern_get_or_insert_str(ctx->intern, value);
+  return value;
 }
 
 bool spn_toml_loader_str_optional(spn_toml_loader_t* ctx, toml_table_t* table, const c8* key, sp_str_t* value) {
-  if (!spn_toml_loader_read_raw_value(table, key, value)) {
-    return false;
-  }
-  *value = sp_intern_get_or_insert_str(ctx->intern, *value);
-  return true;
+  return spn_toml_loader_read_raw_value(ctx, table, key, value);
 }
 
 sp_str_t spn_toml_loader_raw_required(spn_toml_loader_t* ctx, toml_table_t* table, const c8* key) {
   sp_str_t value = sp_zero;
-  if (!spn_toml_loader_read_raw_value(table, key, &value)) {
+  if (!spn_toml_loader_read_raw_value(ctx, table, key, &value)) {
     spn_toml_loader_issue(ctx, spn_toml_loader_required_str_err(table, key), key);
   }
   return value;
 }
 
 bool spn_toml_loader_raw_optional(spn_toml_loader_t* ctx, toml_table_t* table, const c8* key, sp_str_t* value) {
-  (void)ctx;
-  return spn_toml_loader_read_raw_value(table, key, value);
+  return spn_toml_loader_read_raw_value(ctx, table, key, value);
 }
 
 bool spn_toml_loader_read_bool(spn_toml_loader_t* ctx, toml_table_t* table, const c8* key, bool* value) {
@@ -139,7 +147,7 @@ sp_da(sp_str_t) spn_toml_loader_read_str_array(spn_toml_loader_t* ctx, toml_tabl
     spn_toml_loader_push_index(ctx, it);
     toml_value_t element = toml_array_string(array, (s32)it);
     if (element.ok) {
-      sp_da_push(values, sp_intern_get_or_insert_str(ctx->intern, sp_str(element.u.s, (u32)element.u.sl)));
+      sp_da_push(values, spn_toml_loader_intern_value(ctx, element));
     } else {
       spn_toml_loader_record(ctx, SPN_CODEGEN_ERR_EXPECTED_STR, sp_str_lit(""));
     }
@@ -265,6 +273,7 @@ spn_err_t spn_codegen_load(spn_toml_loader_t* ctx, sp_str_t path, spn_cg_manifes
   toml_table_t* table = spn_codegen_parse(ctx, path);
   if (table) {
     spn_manifest_read(ctx, table, out);
+    toml_free(table);
   }
   return (sp_da_empty(ctx->issues)) ? SPN_OK : SPN_ERROR;
 }
@@ -273,6 +282,7 @@ spn_err_t spn_codegen_load_config(spn_toml_loader_t* ctx, sp_str_t path, spn_cg_
   toml_table_t* table = spn_codegen_parse(ctx, path);
   if (table) {
     spn_config_read(ctx, table, out);
+    toml_free(table);
   }
   return (sp_da_empty(ctx->issues)) ? SPN_OK : SPN_ERROR;
 }
