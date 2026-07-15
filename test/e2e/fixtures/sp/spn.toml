@@ -3,7 +3,7 @@ name = "smoke"
 version = "0.0.1"
 
 [deps.package]
-"spader/sp" = "1.9.0"
+"spader/sp" = "3.2.0"
 
 [[bin]]
 name = "main"
