@@ -48,7 +48,19 @@ static s32 fz_exec(spn_dag_action_t* action, void* user_data) {
       ? fz_phantom_sim_path(mem, obs.phantom)
       : fz_artifact_sim_path(mem, low->u, obs.artifact);
     sp_str_t bytes = sp_zero;
-    inputs[consumed + ot] = sp_io_read_file(mem, path, &bytes) ? sp_str_lit("absent") : bytes;
+    if (!sp_io_read_file(mem, path, &bytes)) {
+      inputs[consumed + ot] = bytes;
+      continue;
+    }
+    if (obs.probe) {
+      if (low->u->phantoms[obs.phantom].present) {
+        return 1;
+      }
+    }
+    else if (spn_dag_digest_valid(spn_dag_find_artifact(low->g, low->ids[obs.artifact])->digest)) {
+      return 1;
+    }
+    inputs[consumed + ot] = sp_str_lit("absent");
   }
 
   sp_da_for(action->produces, it) {

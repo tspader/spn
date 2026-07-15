@@ -38,6 +38,10 @@ typedef enum {
   FZ_STEP_DELETE,
   FZ_STEP_PHANTOM,
   FZ_STEP_DISCOVERY,
+  FZ_STEP_EIO,
+  FZ_STEP_CRASH,
+  FZ_STEP_BLOB,
+  FZ_STEP_EVICT,
   FZ_STEP_COUNT,
 } fz_step_kind_t;
 
@@ -104,6 +108,7 @@ typedef struct {
   u64 step_weights [FZ_STEP_COUNT];
   bool store_fs;
   bool disco_fs;
+  bool cache_fs;
   bool run_ex;
   bool big;
 } fz_profile_t;
