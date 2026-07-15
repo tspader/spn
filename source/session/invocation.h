@@ -3,6 +3,8 @@
 
 #include "sp.h"
 
+#include "compiler/types.h"
+#include "error/types.h"
 #include "forward/types.h"
 #include "unit/types.h"
 
@@ -11,7 +13,7 @@ typedef struct {
   u64 elapsed;
 } spn_invocation_result_t;
 
-spn_err_union_t         spn_build_compile_invocations(spn_target_unit_t* target);
+spn_err_union_t         spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit, sp_str_t output, sp_str_t depfile, spn_invocation_t* invocation);
 spn_err_t               spn_session_write_compile_commands(spn_session_t* session, sp_str_t path);
 sp_str_t                spn_session_compile_commands_path(spn_session_t* session);
 spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation);

@@ -99,7 +99,6 @@ struct spn_user_node_t {
   sp_da(sp_str_t) inputs;
   sp_da(sp_str_t) outputs;
   sp_da(spn_node_t*) deps;
-  spn_bg_id_t id;
   spn_dag_id_t dag;
 };
 
@@ -121,12 +120,6 @@ typedef struct {
   sp_da(sp_str_t) args;
   sp_str_t cwd;
 } spn_invocation_t;
-
-typedef struct {
-  sp_str_t source;
-  sp_str_t output;
-  spn_invocation_t invocation;
-} spn_compile_command_t;
 
 typedef struct {
   spn_compile_unit_id_t id;
@@ -151,32 +144,6 @@ typedef struct {
     sp_str_t source;
   } paths;
 } spn_compile_unit_t;
-
-typedef struct {
-  sp_str_t from;
-  sp_str_t to;
-  spn_bg_id_t input;
-} spn_stage_file_t;
-
-typedef struct {
-  sp_str_t dir;
-  sp_da(spn_stage_file_t) files;
-} spn_stage_unit_t;
-
-typedef struct {
-  spn_bg_id_t manifest;
-  spn_bg_id_t script;
-  spn_bg_id_t package;
-  spn_bg_id_t main;
-  spn_bg_id_t exit;
-  struct {
-    spn_bg_id_t package;
-    spn_bg_id_t main;
-    spn_bg_id_t exit;
-    spn_bg_id_t profile;
-  } stamp;
-  sp_da(spn_bg_id_t) user;
-} spn_pkg_nodes_t;
 
 struct spn_target_unit {
   spn_target_unit_id_t id;
@@ -258,9 +225,7 @@ struct spn_pkg_unit_t {
       spn_bg_id_t run;
       spn_bg_id_t stamp;
     } configure;
-    spn_pkg_nodes_t build;
     sp_da(spn_user_node_t) user;
-    sp_str_ht(spn_bg_id_t) files;
   } nodes;
 
   struct {
@@ -275,8 +240,6 @@ struct spn_pkg_unit_t {
       sp_str_t dir;
       sp_str_t configure;
       sp_str_t package;
-      sp_str_t main;
-      sp_str_t exit;
       sp_str_t profile;
     } stamp;
 

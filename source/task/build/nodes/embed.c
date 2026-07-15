@@ -168,10 +168,3 @@ s32 spn_embed_write(spn_target_unit_t* unit, sp_str_t obj, sp_str_t hdr, sp_mem_
 
   return SPN_OK;
 }
-
-s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_target_unit_t* unit = (spn_target_unit_t*)user_data;
-  sp_str_t obj = get_embed_object_path(spn.mem, unit);
-  sp_str_t hdr = get_embed_header_path(spn.mem, unit);
-  return spn_embed_write(unit, obj, hdr, spn.mem, SP_NULLPTR);
-}

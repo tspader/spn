@@ -59,6 +59,7 @@ typedef struct {
   spn_lang_t lang;
   sp_str_t source;
   sp_str_t output;
+  sp_str_t depfile;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) args;

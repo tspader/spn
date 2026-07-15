@@ -17,104 +17,100 @@ static sp_str_t resolve_pkg_path(sp_mem_t mem, spn_pkg_unit_t* pkg, sp_str_t pat
   return sp_fs_join_path(mem, pkg->paths.source, path);
 }
 
-spn_err_union_t spn_build_compile_invocations(spn_target_unit_t* target) {
-  spn_pkg_unit_t* pkg = target->pkg;
-  spn_session_t* session = pkg->session;
-  sp_mem_t mem = session->mem;
-  sp_da_for(target->objects, it) {
-    spn_compile_unit_t* unit = target->objects[it];
-    spn_build_unit_t* build = pkg->build;
+static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t* unit) {
+  spn_pkg_unit_t* pkg = unit->target->pkg;
+  spn_build_unit_t* build = pkg->build;
 
-    spn_cc_compile_t compile = {
-      .lang = unit->lang,
-      .source = unit->paths.file,
-      .output = unit->paths.object,
-      .cxx = unit->target->info->cxx,
-      .pic = unit->target->info->kind == SPN_TARGET_LIB,
-      .visibility = build->visibility,
-    };
-    if (build->profile.os == SPN_OS_MACOS) {
-      compile.min_os = target->link.min_os;
-    }
-    sp_da_init(mem, compile.include);
-    sp_da_init(mem, compile.define);
-    sp_da_init(mem, compile.args);
-
-    sp_da_for(build->include, it) {
-      sp_da_push(compile.include, build->include[it]);
-    }
-
-    bool metaprogram = unit->target->info->kind == SPN_TARGET_CONFIGURE_METAPROGRAM ||
-      unit->target->info->kind == SPN_TARGET_BUILD_METAPROGRAM;
-    if (!metaprogram) {
-      sp_da_for(pkg->info->include, it) {
-        sp_da_push(compile.include, resolve_pkg_path(mem, pkg, pkg->info->include[it]));
-      }
-      sp_da_for(pkg->info->define, it) {
-        sp_da_push(compile.define, pkg->info->define[it]);
-      }
-    }
-
-    sp_da_for(unit->target->info->include, it) {
-      sp_da_push(compile.include, resolve_pkg_path(mem, pkg, unit->target->info->include[it]));
-    }
-    sp_da_for(unit->target->info->define, it) {
-      sp_da_push(compile.define, unit->target->info->define[it]);
-    }
-    sp_da_for(unit->target->info->flags, it) {
-      sp_da_push(compile.args, unit->target->info->flags[it]);
-    }
-
-    if (!metaprogram) {
-      sp_da(spn_pkg_dep_t) deps = pkg->deps;
-      sp_da_for(deps, it) {
-        if (!deps[it].unit) {
-          continue;
-        }
-        if (deps[it].kind == SPN_DEP_KIND_TEST && unit->target->info->kind != SPN_TARGET_TEST) {
-          continue;
-        }
-
-        spn_pkg_unit_t* dependency = deps[it].unit;
-        sp_da_push(compile.include, dependency->paths.include);
-        sp_da_for(dependency->info->public_define, it) {
-          sp_da_push(compile.define, dependency->info->public_define[it]);
-        }
-      }
-    }
-
-    if (metaprogram) {
-      sp_da_for(unit->target->deps.package, it) {
-        spn_pkg_unit_t* dependency = unit->target->deps.package[it];
-        sp_da_push(compile.include, dependency->paths.include);
-        sp_da_for(dependency->info->public_define, it) {
-          sp_da_push(compile.define, dependency->info->public_define[it]);
-        }
-      }
-    }
-
-    if (!sp_da_empty(unit->target->info->embed)) {
-      sp_da_push(compile.include, pkg->paths.generated);
-    }
-
-    sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
-    spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(build->toolchain);
-    spn_err_union_t err = spn_cc_render_compile(mem, &toolchain, &build->profile, &compile, &ps);
-    if (err.kind) {
-      return err;
-    }
-
-    unit->invocation = (spn_invocation_t) {
-      .program = ps.command,
-      .args = ps.dyn_args,
-      .cwd = pkg->paths.work,
-    };
-    sp_da_push(session->units.compile_commands, ((spn_compile_command_t) {
-      .source = unit->paths.file,
-      .output = unit->paths.object,
-      .invocation = unit->invocation,
-    }));
+  spn_cc_compile_t compile = {
+    .lang = unit->lang,
+    .source = unit->paths.file,
+    .cxx = unit->target->info->cxx,
+    .pic = unit->target->info->kind == SPN_TARGET_LIB,
+    .visibility = build->visibility,
+  };
+  if (build->profile.os == SPN_OS_MACOS) {
+    compile.min_os = unit->target->link.min_os;
   }
+  sp_da_init(mem, compile.include);
+  sp_da_init(mem, compile.define);
+  sp_da_init(mem, compile.args);
+
+  sp_da_for(build->include, it) {
+    sp_da_push(compile.include, build->include[it]);
+  }
+
+  bool metaprogram = unit->target->info->kind == SPN_TARGET_CONFIGURE_METAPROGRAM ||
+    unit->target->info->kind == SPN_TARGET_BUILD_METAPROGRAM;
+  if (!metaprogram) {
+    sp_da_for(pkg->info->include, it) {
+      sp_da_push(compile.include, resolve_pkg_path(mem, pkg, pkg->info->include[it]));
+    }
+    sp_da_for(pkg->info->define, it) {
+      sp_da_push(compile.define, pkg->info->define[it]);
+    }
+  }
+
+  sp_da_for(unit->target->info->include, it) {
+    sp_da_push(compile.include, resolve_pkg_path(mem, pkg, unit->target->info->include[it]));
+  }
+  sp_da_for(unit->target->info->define, it) {
+    sp_da_push(compile.define, unit->target->info->define[it]);
+  }
+  sp_da_for(unit->target->info->flags, it) {
+    sp_da_push(compile.args, unit->target->info->flags[it]);
+  }
+
+  if (!metaprogram) {
+    sp_da_for(pkg->deps, it) {
+      if (!pkg->deps[it].unit) {
+        continue;
+      }
+      if (pkg->deps[it].kind == SPN_DEP_KIND_TEST && unit->target->info->kind != SPN_TARGET_TEST) {
+        continue;
+      }
+
+      spn_pkg_unit_t* dependency = pkg->deps[it].unit;
+      sp_da_push(compile.include, dependency->paths.include);
+      sp_da_for(dependency->info->public_define, jt) {
+        sp_da_push(compile.define, dependency->info->public_define[jt]);
+      }
+    }
+  }
+
+  if (metaprogram) {
+    sp_da_for(unit->target->deps.package, it) {
+      spn_pkg_unit_t* dependency = unit->target->deps.package[it];
+      sp_da_push(compile.include, dependency->paths.include);
+      sp_da_for(dependency->info->public_define, jt) {
+        sp_da_push(compile.define, dependency->info->public_define[jt]);
+      }
+    }
+  }
+
+  if (!sp_da_empty(unit->target->info->embed)) {
+    sp_da_push(compile.include, pkg->paths.generated);
+  }
+
+  return compile;
+}
+
+spn_err_union_t spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit, sp_str_t output, sp_str_t depfile, spn_invocation_t* invocation) {
+  spn_pkg_unit_t* pkg = unit->target->pkg;
+  spn_build_unit_t* build = pkg->build;
+
+  spn_cc_compile_t compile = spn_build_compile_desc(mem, unit);
+  compile.output = output;
+  compile.depfile = depfile;
+
+  sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
+  spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(build->toolchain);
+  try_union(spn_cc_render_compile(mem, &toolchain, &build->profile, &compile, &ps));
+
+  *invocation = (spn_invocation_t) {
+    .program = ps.command,
+    .args = ps.dyn_args,
+    .cwd = pkg->paths.work,
+  };
   return spn_result(SPN_OK);
 }
 
@@ -127,24 +123,28 @@ spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t pa
 
   sp_io_write_cstr(io, "[", SP_NULLPTR);
   u32 count = 0;
-  sp_da_for(session->units.compile_commands, it) {
-    spn_compile_command_t* command = &session->units.compile_commands[it];
-    spn_invocation_t* invocation = &command->invocation;
+  sp_om_for(session->units.objects, it) {
+    spn_compile_unit_t* unit = sp_om_at(session->units.objects, it);
+
+    spn_invocation_t invocation = sp_zero;
+    if (spn_build_render_compile(scratch.mem, unit, unit->paths.object, sp_str_lit(""), &invocation).kind) {
+      continue;
+    }
 
     if (count++) {
       sp_io_write_c8(io, ',');
     }
     sp_io_write_cstr(io, "\n  { \"directory\": ", SP_NULLPTR);
-    spn_json_write_str(io, invocation->cwd);
+    spn_json_write_str(io, invocation.cwd);
     sp_io_write_cstr(io, ", \"file\": ", SP_NULLPTR);
-    spn_json_write_str(io, command->source);
+    spn_json_write_str(io, unit->paths.file);
     sp_io_write_cstr(io, ", \"output\": ", SP_NULLPTR);
-    spn_json_write_str(io, command->output);
+    spn_json_write_str(io, unit->paths.object);
     sp_io_write_cstr(io, ", \"arguments\": [", SP_NULLPTR);
-    spn_json_write_str(io, invocation->program);
-    sp_da_for(invocation->args, arg) {
+    spn_json_write_str(io, invocation.program);
+    sp_da_for(invocation.args, arg) {
       sp_io_write_cstr(io, ", ", SP_NULLPTR);
-      spn_json_write_str(io, invocation->args[arg]);
+      spn_json_write_str(io, invocation.args[arg]);
     }
     sp_io_write_cstr(io, "] }", SP_NULLPTR);
   }

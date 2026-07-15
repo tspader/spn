@@ -17,7 +17,6 @@ struct spn_dag_build_t {
   spn_dag_pool_t pool;
   spn_dag_env_t env;
   spn_dag_progress_t progress;
-  sp_str_t file_cache_path;
   sp_thread_t runner;
   sp_atomic_s32_t done;
   spn_err_t result;
