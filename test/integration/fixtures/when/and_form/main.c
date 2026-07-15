@@ -1,5 +1,5 @@
 int main() {
-#ifdef RELEASE_LINUX
+#ifdef RELEASE_OS
   return 20;
 #else
   return 10;
