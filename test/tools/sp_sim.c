@@ -728,12 +728,7 @@ static s32 sp_sim_sys_fs_it_open(sp_sys_fd_t fd, sp_sys_fs_it_t* it, const c8* p
     need += SP_SIM_DIRENT_HEADER + name.len;
   }
 
-  u8* data = (u8*)buf;
-  if (need > cap) {
-    data = sp_alloc_n(sim->mem, u8, need);
-    cap = need;
-  }
-
+  u8* data = need ? sp_alloc_n(sim->mem, u8, need) : SP_NULLPTR;
   u64 out = 0;
   sp_ht_for_kv(sim->nodes, kv) {
     sp_str_t name = sp_sim_child_name(*kv.key, norm);
@@ -742,7 +737,8 @@ static s32 sp_sim_sys_fs_it_open(sp_sys_fd_t fd, sp_sys_fs_it_t* it, const c8* p
   }
 
   *it = (sp_sys_fs_it_t) {
-    .buf = { .data = data, .len = out, .capacity = cap },
+    .handle = (s64)(uintptr_t)data,
+    .buf = { .len = out },
   };
   return 0;
 }
@@ -751,7 +747,8 @@ static s32 sp_sim_sys_fs_it_next(sp_sys_fs_it_t* it, sp_sys_fs_entry_t* out) {
   if (it->cursor >= it->buf.len) {
     return -1;
   }
-  it->cursor += sp_sim_dirent_read(it->buf.data + it->cursor, out);
+  const u8* data = (const u8*)(uintptr_t)it->handle;
+  it->cursor += sp_sim_dirent_read(data + it->cursor, out);
   return 0;
 }
 
