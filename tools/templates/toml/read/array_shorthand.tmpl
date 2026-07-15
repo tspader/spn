@@ -14,7 +14,7 @@ static void spn_cg_{{ .object }}_read_array(spn_toml_loader_t* ctx, toml_table_t
       spn_cg_{{ .object }}_read(ctx, element, &entry);
       sp_da_push(*out, entry);
     } else if (value.ok) {
-      entry.{{ .shorthand }} = spn_toml_loader_intern(ctx, sp_str(value.u.s, (u32)value.u.sl));
+      entry.{{ .shorthand }} = spn_toml_loader_intern_value(ctx, value);
       sp_da_push(*out, entry);
     } else {
       spn_toml_loader_issue_at(ctx, SPN_CODEGEN_ERR_EXPECTED_STR, sp_str_lit(""));
