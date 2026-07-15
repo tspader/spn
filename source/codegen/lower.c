@@ -106,7 +106,6 @@ static spn_target_info_t lower_target(spn_toml_loader_t* ctx, const spn_cg_targe
     .linkages = lower_linkages(cg->kinds),
     .no_link = sp_opt_is_null(cg->link) ? false : !sp_opt_get(cg->link),
     .headers = cg->headers,
-    .include = cg->include,
     .cxx = lower_cxx_options(&cg->cxx),
     .macos = {
       .frameworks = cg->macos.frameworks,
@@ -117,6 +116,7 @@ static spn_target_info_t lower_target(spn_toml_loader_t* ctx, const spn_cg_targe
     },
     .gated = {
       .source = lower_gated_sources(ctx, cg->source),
+      .include = lower_gated_sources(ctx, cg->include),
       .define = lower_gated_values(ctx, cg->define),
       .flags = lower_gated_values(ctx, cg->flags),
       .system_deps = lower_gated_values(ctx, cg->system_deps),

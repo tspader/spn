@@ -76,6 +76,7 @@ struct spn_target_info {
   } windows;
   struct {
     spn_gated_list_t source;
+    spn_gated_list_t include;
     spn_gated_list_t define;
     spn_gated_list_t flags;
     spn_gated_list_t system_deps;

@@ -31,6 +31,8 @@ project(spn LANGUAGES C CXX)
 if(MSVC)
   add_library(m INTERFACE)
   link_libraries(ws2_32)
+  # Serialize PDB access; parallel cl.exe instances race on vc143.pdb otherwise
+  add_compile_options(/FS)
 endif()
 
 # @spader Zig crashes when given --dependency-file

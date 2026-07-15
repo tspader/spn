@@ -88,14 +88,29 @@ spn_err_t spn_git_db_ensure_rev(spn_git_db_t* db, sp_str_t rev) {
   sp_ps_output_t result = sp_ps_run(scratch.mem, cat_file);
 
   if (result.status.exit_code) {
+    // Bare clones have no remote.origin.fetch refspec, so a plain fetch never
+    // brings in commits made after the clone. Ask for the rev itself, and if
+    // the remote won't serve it by hash, mirror all heads and tags.
     result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
       .command = SP_LIT("git"),
       .args = {
         SP_LIT("-C"), db->path,
-        SP_LIT("fetch"), SP_LIT("--quiet"), SP_LIT("origin")
+        SP_LIT("fetch"), SP_LIT("--quiet"), SP_LIT("origin"), rev
       },
       .io.err.mode = SP_PS_IO_MODE_NULL,
     });
+
+    if (result.status.exit_code) {
+      result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
+        .command = SP_LIT("git"),
+        .args = {
+          SP_LIT("-C"), db->path,
+          SP_LIT("fetch"), SP_LIT("--quiet"), SP_LIT("origin"),
+          SP_LIT("+refs/heads/*:refs/heads/*"), SP_LIT("+refs/tags/*:refs/tags/*")
+        },
+        .io.err.mode = SP_PS_IO_MODE_NULL,
+      });
+    }
 
     if (!result.status.exit_code) {
       result = sp_ps_run(scratch.mem, cat_file);
