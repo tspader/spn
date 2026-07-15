@@ -197,6 +197,11 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
   }
   push_args(mem, ps, compile->args);
   push_arg(mem, ps, "-Werror=return-type");
+  if (!sp_str_empty(compile->depfile)) {
+    push_arg(mem, ps, "-MD");
+    push_arg(mem, ps, "-MF");
+    push_arg_str(mem, ps, compile->depfile);
+  }
   push_arg(mem, ps, "-o");
   sp_ps_config_add_arg(mem, ps, compile->output);
 }

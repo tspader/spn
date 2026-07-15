@@ -10,14 +10,20 @@
 #include "task/build/nodes/nodes.h"
 #include "unit/package.h"
 
-s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_compile_unit_t* unit = (spn_compile_unit_t*)user_data;
+s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t depfile) {
   spn_pkg_unit_t* pkg = unit->target->pkg;
   spn_session_t* session = pkg->session;
 
   spn_pkg_unit_announce_compile(pkg);
 
-  sp_fs_create_dir(sp_fs_parent_path(unit->paths.object));
+  spn_err_union_t render = spn_build_render_compile(spn.mem, unit, object, depfile, &unit->invocation);
+  if (render.kind) {
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR,
+      .err = render,
+    });
+    return 1;
+  }
 
   spn_invocation_result_t run = spn_invocation_run(&unit->invocation);
 
@@ -26,7 +32,7 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
       .kind = SPN_EVENT_TARGET_BUILD_FAILED,
       .target.failed = {
         .source_file = unit->paths.file,
-        .object_file = unit->paths.object,
+        .object_file = object,
         .rc = run.result.status.exit_code,
         .out = run.result.out,
         .invocation = &unit->invocation,
@@ -38,7 +44,7 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
       .kind = SPN_EVENT_TARGET_BUILD_PASSED,
       .target.passed = {
         .source_file = unit->paths.file,
-        .object_file = unit->paths.object,
+        .object_file = object,
         .invocation = &unit->invocation,
         .out = run.result.out,
         .time = run.elapsed,
@@ -47,4 +53,10 @@ s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
   }
 
   return run.result.status.exit_code;
+}
+
+s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
+  spn_compile_unit_t* unit = (spn_compile_unit_t*)user_data;
+  sp_fs_create_dir(sp_fs_parent_path(unit->paths.object));
+  return spn_compile_object_run(unit, unit->paths.object, sp_str_lit(""));
 }

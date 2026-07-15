@@ -4,6 +4,7 @@
 #include "sp.h"
 #include "spn.h"
 #include "dag/types.h"
+#include "sha256/sha256.h"
 
 spn_dag_t*          spn_dag_new(sp_mem_t mem);
 spn_dag_artifact_t* spn_dag_find_artifact(spn_dag_t* g, spn_dag_id_t id);
@@ -19,6 +20,14 @@ void                spn_dag_action_add_input(spn_dag_t* g, spn_dag_id_t action, 
 spn_err_t           spn_dag_action_add_output(spn_dag_t* g, spn_dag_id_t action, spn_dag_id_t artifact);
 spn_dag_digest_t    spn_dag_action_key(spn_dag_t* g, spn_dag_id_t action);
 spn_dag_digest_t    spn_dag_strong_key(spn_dag_digest_t prelim, const spn_dag_obs_t* obs, u32 count);
+
+void                spn_dag_hash_bytes(spn_sha256_ctx_t* ctx, const void* data, u64 len);
+void                spn_dag_hash_u8(spn_sha256_ctx_t* ctx, u8 value);
+void                spn_dag_hash_u64(spn_sha256_ctx_t* ctx, u64 value);
+void                spn_dag_hash_str(spn_sha256_ctx_t* ctx, sp_str_t str);
+void                spn_dag_hash_strs(spn_sha256_ctx_t* ctx, sp_da(sp_str_t) strs);
+void                spn_dag_hash_digest(spn_sha256_ctx_t* ctx, spn_dag_digest_t digest);
+spn_dag_digest_t    spn_dag_hash_final(spn_sha256_ctx_t* ctx);
 
 spn_dag_digest_t    spn_dag_digest(const void* data, u64 len);
 bool                spn_dag_digest_equal(spn_dag_digest_t a, spn_dag_digest_t b);
@@ -48,7 +57,7 @@ spn_err_t                   spn_dag_execute_discovered(spn_dag_t* g, spn_dag_id_
 spn_err_t                   spn_dag_run(spn_dag_t* g, spn_dag_env_t* env);
 spn_err_t                   spn_dag_run_ex(spn_dag_t* g, spn_dag_env_t* env, spn_dag_executor_t* executor);
 
-void                spn_dag_pool_init(spn_dag_pool_t* pool, sp_mem_t mem, u32 workers);
+void                spn_dag_pool_init(spn_dag_pool_t* pool, sp_mem_t mem, spn_dag_pool_config_t config);
 void                spn_dag_pool_deinit(spn_dag_pool_t* pool);
 
 void                spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config);

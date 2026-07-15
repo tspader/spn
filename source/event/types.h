@@ -51,9 +51,7 @@
   X(SPN_EVENT_EMBED_FAILED,                 "embed_failed",               "error",       QUIET,   ERROR, true,  false, SPN_EVT(embed_failed)) \
   X(SPN_EVENT_INIT_BUILD_GRAPH,             "init_build_graph",           "Planning",    DEBUG,   INFO,  false, false, SPN_EVT(graph_init)) \
   X(SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED,   "prepare_build_graph_failed", "error",       QUIET,   ERROR, true,  true,  SPN_EVT(err.build_graph)) \
-  X(SPN_EVENT_DIRTY_SUMMARY,                "dirty_summary",              "Planned",     DEBUG,   INFO,  false, false, SPN_EVT(dirty_summary)) \
   X(SPN_EVENT_BUILD_PASSED,                 "build_passed",               "Finished",    NORMAL,  INFO,  false, false, SPN_EVT(build.passed)) \
-  X(SPN_EVENT_BUILD_CANCELLED,              "build_cancelled",            "Cancelled",   NORMAL,  WARN,  false, false, SPN_EVT(build_cancelled)) \
   X(SPN_EVENT_BUILD_FAILED,                 "build_failed",               "error",       QUIET,   ERROR, true,  true,  SPN_EVT(build_failed)) \
   X(SPN_EVENT_BUILD_SUMMARY,                "build_summary",              "Summary",     DEBUG,   INFO,  false, false, SPN_EVT(build_summary)) \
   X(SPN_EVENT_API_CALL,                     "api_call",                   "Calling",     DEBUG,   DEBUG, false, false, SPN_EVT(api_call)) \
@@ -92,7 +90,7 @@ typedef struct {
   u64 time;
 } spn_evt_target_failed_t;
 
-typedef struct { spn_profile_info_t* profile; u64 time; } spn_evt_build_passed_t;
+typedef struct { spn_profile_info_t* profile; u64 time; u32 hits; u32 misses; } spn_evt_build_passed_t;
 
 typedef struct { sp_str_t name; sp_str_t command; } spn_evt_run_t;
 typedef struct {
@@ -176,10 +174,8 @@ typedef struct { sp_str_t name; sp_str_t version; sp_str_t index; sp_str_t url; 
 typedef struct { u32 num_files; } spn_evt_embed_start_t;
 typedef struct { sp_str_t object_path; sp_str_t header_path; u64 time; } spn_evt_embed_passed_t;
 typedef struct { sp_str_t path; sp_str_t error; } spn_evt_embed_failed_t;
-typedef struct { u32 total_commands; u32 dirty_commands; u32 total_files; u32 dirty_files; bool forced; } spn_evt_dirty_summary_t;
 typedef struct { sp_str_t profile; u64 time; u32 num_errors; sp_str_t first_error; } spn_evt_build_failed_t;
-typedef struct { sp_str_t profile; u64 time; u32 num_pending; } spn_evt_build_cancelled_t;
-typedef struct { bool success; u32 num_dirty; u32 total_commands; u64 time; sp_str_t profile; } spn_evt_build_summary_t;
+typedef struct { bool success; u32 hits; u32 misses; u32 total; u64 time; sp_str_t profile; } spn_evt_build_summary_t;
 typedef struct { u64 time; } spn_evt_package_ok_t;
 
 typedef struct spn_build_event_t spn_build_event_t;
@@ -235,9 +231,7 @@ struct spn_build_event_t {
     spn_evt_embed_start_t embed_start;
     spn_evt_embed_passed_t embed_passed;
     spn_evt_embed_failed_t embed_failed;
-    spn_evt_dirty_summary_t dirty_summary;
     spn_evt_build_failed_t build_failed;
-    spn_evt_build_cancelled_t build_cancelled;
     spn_evt_build_summary_t build_summary;
     spn_evt_package_ok_t package_ok;
   };

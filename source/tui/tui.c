@@ -345,22 +345,12 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
       );
       break;
     }
-    case SPN_EVENT_DIRTY_SUMMARY: {
-      sp_fmt_io(&w.base, "commands={}/{} files={}/{} forced={}",
-        SP_FMT_U32(event->dirty_summary.dirty_commands),
-        SP_FMT_U32(event->dirty_summary.total_commands),
-        SP_FMT_U32(event->dirty_summary.dirty_files),
-        SP_FMT_U32(event->dirty_summary.total_files),
-        sp_fmt_cstr(event->dirty_summary.forced ? "true" : "false")
-      );
-      break;
-    }
     case SPN_EVENT_BUILD_SUMMARY: {
       c8 buffer [64] = sp_zero;
       sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->build_summary.time);
-      sp_fmt_io(&w.base, "{}/{} commands in {.gray}",
-        SP_FMT_U32(event->build_summary.num_dirty),
-        SP_FMT_U32(event->build_summary.total_commands),
+      sp_fmt_io(&w.base, "{} executed, {} cached in {.gray}",
+        SP_FMT_U32(event->build_summary.misses),
+        SP_FMT_U32(event->build_summary.hits),
         sp_fmt_cstr(buffer)
       );
       break;
@@ -396,17 +386,12 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
       c8 buffer [64] = sp_zero;
       sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->build.passed.time);
       sp_fmt_io(&w.base,
-        "Compiled for profile {.cyan} in {.gray}",
+        "Compiled for profile {.cyan} in {.gray} {.gray}",
         sp_fmt_str(event->build.passed.profile->name),
-        sp_fmt_cstr(buffer)
-      );
-      break;
-    }
-    case SPN_EVENT_BUILD_CANCELLED: {
-      sp_fmt_io(&w.base, "profile {.cyan} with {} pending {}",
-        sp_fmt_str(event->build_cancelled.profile),
-        SP_FMT_U32(event->build_cancelled.num_pending),
-        sp_fmt_cstr(event->build_cancelled.num_pending == 1 ? "command" : "commands")
+        sp_fmt_cstr(buffer),
+        sp_fmt_str(sp_fmt(mem, "({} executed, {} cached)",
+          SP_FMT_U32(event->build.passed.misses),
+          SP_FMT_U32(event->build.passed.hits)).value)
       );
       break;
     }
@@ -1498,7 +1483,7 @@ void spn_prompt_pump() {
   if (!dag) return;
 
   if (!tui->prompt.on) {
-    if (!sp_atomic_s32_get(&dag->progress.executed)) return;
+    if (!sp_atomic_s32_get(&dag->progress.misses)) return;
     spn_prompt_start();
     if (!tui->prompt.on) return;
   }

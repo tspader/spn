@@ -757,8 +757,6 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   sp_da_init(session->mem, unit->libs);
   sp_da_init(session->mem, unit->targets);
   sp_da_init(session->mem, unit->nodes.user);
-  sp_da_init(session->mem, unit->nodes.build.user);
-  sp_str_ht_init(session->mem, unit->nodes.files);
   unit->paths.manifest = loaded->paths.manifest;
   unit->paths.script = loaded->paths.script;
   unit->paths.recipe = loaded->roots.recipe;
@@ -808,8 +806,6 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   spn_lazy_log_init(&unit->logs.io.jsonl, unit->paths.logs.jsonl);
 
   unit->paths.stamp.dir = sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("stamp"));
-  unit->paths.stamp.main = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("main.stamp"));
-  unit->paths.stamp.exit = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("user.stamp"));
   unit->paths.stamp.configure = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("configure.stamp"));
   unit->paths.stamp.package = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("package.stamp"));
   unit->paths.stamp.profile = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("profile.stamp"));

@@ -97,8 +97,16 @@ spn_err_union_t spn_cc_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* tool
   return spn_result(SPN_OK);
 }
 
-spn_err_union_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, sp_ps_config_t* ps) {
+spn_err_union_t spn_cc_validate_compile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
   try_union(validate_profile(toolchain, profile));
+  if (toolchain->driver == SPN_CC_DRIVER_MSVC) {
+    return unsupported(toolchain, profile, SPN_CC_FEATURE_COMPILE);
+  }
+  return spn_result(SPN_OK);
+}
+
+spn_err_union_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, sp_ps_config_t* ps) {
+  try_union(spn_cc_validate_compile(toolchain, profile));
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
     case SPN_CC_DRIVER_CLANG: {
@@ -129,18 +137,26 @@ static spn_cc_feature_t link_feature(spn_cc_output_kind_t kind) {
   SP_UNREACHABLE_RETURN(SPN_CC_FEATURE_LINK_EXE);
 }
 
-spn_err_union_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, sp_ps_config_t* ps) {
+spn_err_union_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_output_kind_t kind, bool frameworks) {
   try_union(validate_profile(toolchain, profile));
-  spn_cc_feature_t feature = link_feature(link->kind);
-  if (link->kind == SPN_CC_OUTPUT_REACTOR && profile->os != SPN_OS_WASI) {
+  spn_cc_feature_t feature = link_feature(kind);
+  if (kind == SPN_CC_OUTPUT_REACTOR && profile->os != SPN_OS_WASI) {
     return unsupported(toolchain, profile, feature);
   }
-  if (link->kind == SPN_CC_OUTPUT_SHARED_LIB && profile->os == SPN_OS_WASI) {
+  if (kind == SPN_CC_OUTPUT_SHARED_LIB && profile->os == SPN_OS_WASI) {
     return unsupported(toolchain, profile, feature);
   }
-  if (profile->os == SPN_OS_MACOS && !sp_da_empty(link->frameworks) && sp_str_empty(profile->sysroot)) {
+  if (profile->os == SPN_OS_MACOS && frameworks && sp_str_empty(profile->sysroot)) {
     return unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
   }
+  if (toolchain->driver == SPN_CC_DRIVER_MSVC) {
+    return unsupported(toolchain, profile, feature);
+  }
+  return spn_result(SPN_OK);
+}
+
+spn_err_union_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, sp_ps_config_t* ps) {
+  try_union(spn_cc_validate_link(toolchain, profile, link->kind, !sp_da_empty(link->frameworks)));
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
     case SPN_CC_DRIVER_CLANG: {
@@ -161,7 +177,15 @@ spn_err_union_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolc
   SP_UNREACHABLE_RETURN(spn_result(SPN_ERROR));
 }
 
+spn_err_union_t spn_cc_validate_archive(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
+  if (toolchain->archiver_driver == SPN_AR_DRIVER_MSVC) {
+    return unsupported(toolchain, profile, SPN_CC_FEATURE_ARCHIVE);
+  }
+  return spn_result(SPN_OK);
+}
+
 spn_err_union_t spn_cc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_archive_t* archive, sp_ps_config_t* ps) {
+  try_union(spn_cc_validate_archive(toolchain, profile));
   switch (toolchain->archiver_driver) {
     case SPN_AR_DRIVER_GNU: {
       spn_gnu_render_archive(mem, toolchain, archive, ps);

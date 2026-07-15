@@ -286,25 +286,38 @@ spn_err_t spn_dag_action_add_output(spn_dag_t* g, spn_dag_id_t action_id, spn_da
   return SPN_OK;
 }
 
-static void hash_bytes(spn_sha256_ctx_t* ctx, const void* data, u64 len) {
+void spn_dag_hash_bytes(spn_sha256_ctx_t* ctx, const void* data, u64 len) {
   spn_sha256_update(ctx, (const u8*)data, len);
 }
 
-static void hash_u8(spn_sha256_ctx_t* ctx, u8 value) {
-  hash_bytes(ctx, &value, sizeof(value));
+void spn_dag_hash_u8(spn_sha256_ctx_t* ctx, u8 value) {
+  spn_dag_hash_bytes(ctx, &value, sizeof(value));
 }
 
-static void hash_u64(spn_sha256_ctx_t* ctx, u64 value) {
-  hash_bytes(ctx, &value, sizeof(value));
+void spn_dag_hash_u64(spn_sha256_ctx_t* ctx, u64 value) {
+  spn_dag_hash_bytes(ctx, &value, sizeof(value));
 }
 
-static void hash_str(spn_sha256_ctx_t* ctx, sp_str_t str) {
-  hash_u64(ctx, str.len);
-  hash_bytes(ctx, str.data, str.len);
+void spn_dag_hash_str(spn_sha256_ctx_t* ctx, sp_str_t str) {
+  spn_dag_hash_u64(ctx, str.len);
+  spn_dag_hash_bytes(ctx, str.data, str.len);
 }
 
-static void hash_digest(spn_sha256_ctx_t* ctx, spn_dag_digest_t digest) {
-  hash_bytes(ctx, digest.bytes, sizeof(digest.bytes));
+void spn_dag_hash_strs(spn_sha256_ctx_t* ctx, sp_da(sp_str_t) strs) {
+  spn_dag_hash_u64(ctx, sp_da_size(strs));
+  sp_da_for(strs, it) {
+    spn_dag_hash_str(ctx, strs[it]);
+  }
+}
+
+void spn_dag_hash_digest(spn_sha256_ctx_t* ctx, spn_dag_digest_t digest) {
+  spn_dag_hash_bytes(ctx, digest.bytes, sizeof(digest.bytes));
+}
+
+spn_dag_digest_t spn_dag_hash_final(spn_sha256_ctx_t* ctx) {
+  spn_dag_digest_t digest = sp_zero;
+  spn_sha256_final(ctx, digest.bytes);
+  return digest;
 }
 
 spn_dag_digest_t spn_dag_action_key(spn_dag_t* g, spn_dag_id_t action_id) {
@@ -312,22 +325,22 @@ spn_dag_digest_t spn_dag_action_key(spn_dag_t* g, spn_dag_id_t action_id) {
 
   spn_sha256_ctx_t ctx = sp_zero;
   spn_sha256_init(&ctx);
-  hash_str(&ctx, sp_str_lit("spn.dag.action.v2"));
-  hash_digest(&ctx, action->identity);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.action.v2"));
+  spn_dag_hash_digest(&ctx, action->identity);
 
-  hash_u64(&ctx, sp_da_size(action->consumes));
+  spn_dag_hash_u64(&ctx, sp_da_size(action->consumes));
   sp_da_for(action->consumes, it) {
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, action->consumes[it]);
     sp_assert(spn_dag_digest_valid(artifact->digest));
-    hash_u8(&ctx, (u8)artifact->kind);
-    hash_digest(&ctx, artifact->digest);
+    spn_dag_hash_u8(&ctx, (u8)artifact->kind);
+    spn_dag_hash_digest(&ctx, artifact->digest);
   }
 
-  hash_u64(&ctx, sp_da_size(action->produces));
+  spn_dag_hash_u64(&ctx, sp_da_size(action->produces));
   sp_da_for(action->produces, it) {
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, action->produces[it]);
-    hash_u8(&ctx, (u8)artifact->kind);
-    hash_str(&ctx, artifact->name);
+    spn_dag_hash_u8(&ctx, (u8)artifact->kind);
+    spn_dag_hash_str(&ctx, artifact->name);
   }
 
   spn_dag_digest_t key = sp_zero;
@@ -338,14 +351,14 @@ spn_dag_digest_t spn_dag_action_key(spn_dag_t* g, spn_dag_id_t action_id) {
 spn_dag_digest_t spn_dag_strong_key(spn_dag_digest_t prelim, const spn_dag_obs_t* obs, u32 count) {
   spn_sha256_ctx_t ctx = sp_zero;
   spn_sha256_init(&ctx);
-  hash_str(&ctx, sp_str_lit("spn.dag.strong.v3"));
-  hash_digest(&ctx, prelim);
-  hash_u64(&ctx, count);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.strong.v3"));
+  spn_dag_hash_digest(&ctx, prelim);
+  spn_dag_hash_u64(&ctx, count);
   sp_for(it, count) {
-    hash_u8(&ctx, (u8)obs[it].kind);
-    hash_str(&ctx, obs[it].path);
-    hash_str(&ctx, obs[it].filter);
-    hash_digest(&ctx, obs[it].meta.digest);
+    spn_dag_hash_u8(&ctx, (u8)obs[it].kind);
+    spn_dag_hash_str(&ctx, obs[it].path);
+    spn_dag_hash_str(&ctx, obs[it].filter);
+    spn_dag_hash_digest(&ctx, obs[it].meta.digest);
   }
 
   spn_dag_digest_t key = sp_zero;
@@ -591,11 +604,11 @@ static spn_err_t spn_dag_membership(sp_str_t dir, sp_str_t filter, spn_dag_diges
 
   spn_sha256_ctx_t ctx = sp_zero;
   spn_sha256_init(&ctx);
-  hash_str(&ctx, sp_str_lit("spn.dag.enum.v1"));
-  hash_u64(&ctx, sp_da_size(members));
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.enum.v1"));
+  spn_dag_hash_u64(&ctx, sp_da_size(members));
   sp_da_for(members, it) {
-    hash_str(&ctx, members[it].name);
-    hash_u8(&ctx, (u8)members[it].kind);
+    spn_dag_hash_str(&ctx, members[it].name);
+    spn_dag_hash_u8(&ctx, (u8)members[it].kind);
   }
   spn_sha256_final(&ctx, digest->bytes);
 
@@ -808,6 +821,20 @@ static spn_err_t commit(spn_dag_t* g, spn_dag_work_t* work, spn_dag_env_t* env) 
   return SPN_OK;
 }
 
+static void progress_total(spn_dag_env_t* env, u64 total) {
+  if (env->progress) {
+    sp_atomic_s32_set(&env->progress->total, (s32)total);
+  }
+}
+
+static void progress_count(spn_dag_env_t* env, bool hit) {
+  if (!env->progress) {
+    return;
+  }
+  sp_atomic_s32_add(hit ? &env->progress->hits : &env->progress->misses, 1);
+  sp_atomic_s32_add(&env->progress->completed, 1);
+}
+
 static spn_err_t exec_action(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env_t* env) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
@@ -819,6 +846,9 @@ static spn_err_t exec_action(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env
       err = commit(g, &work, env);
     }
     end_scratch(work.scratch);
+  }
+  if (!err) {
+    progress_count(env, work.hit);
   }
 
   sp_mem_end_scratch(s);
@@ -1002,6 +1032,7 @@ spn_err_t spn_dag_run(spn_dag_t* g, spn_dag_env_t* env) {
   }
 
   u64 n = sp_da_size(g->actions);
+  progress_total(env, n);
   spn_dag_run_state_t* states = sp_alloc_n(s.mem, spn_dag_run_state_t, n ? n : 1);
   sp_mem_zero(states, n * sizeof(spn_dag_run_state_t));
   sp_da(spn_dag_id_t) ready = sp_da_new(s.mem, spn_dag_id_t);
@@ -1076,6 +1107,7 @@ spn_err_t spn_dag_run_ex(spn_dag_t* g, spn_dag_env_t* env, spn_dag_executor_t* e
   }
 
   u64 n = sp_da_size(g->actions);
+  progress_total(env, n);
   spn_dag_run_state_t* states = sp_alloc_n(s.mem, spn_dag_run_state_t, n ? n : 1);
   sp_mem_zero(states, n * sizeof(spn_dag_run_state_t));
   sp_da(spn_dag_id_t) ready = sp_da_new(s.mem, spn_dag_id_t);
@@ -1118,6 +1150,7 @@ spn_err_t spn_dag_run_ex(spn_dag_t* g, spn_dag_env_t* env, spn_dag_executor_t* e
       }
       if (flight->work.hit) {
         flight_free(flight);
+        progress_count(env, true);
         finish_action(g, action, states, &ready, &completed);
         continue;
       }
@@ -1159,6 +1192,7 @@ spn_err_t spn_dag_run_ex(spn_dag_t* g, spn_dag_env_t* env, spn_dag_executor_t* e
     if (err) {
       continue;
     }
+    progress_count(env, false);
     finish_action(g, action, states, &ready, &completed);
   }
 
@@ -1181,6 +1215,9 @@ static s32 pool_worker(void* data) {
     }
     if (pool->shutdown) {
       sp_mutex_unlock(&pool->mutex);
+      if (pool->on_worker_exit) {
+        pool->on_worker_exit();
+      }
       return 0;
     }
     spn_dag_job_t job = *sp_da_back(pool->queue);
@@ -1216,8 +1253,8 @@ static spn_dag_job_t pool_poll(spn_dag_executor_t* ex) {
   return job;
 }
 
-void spn_dag_pool_init(spn_dag_pool_t* pool, sp_mem_t mem, u32 workers) {
-  sp_assert(workers);
+void spn_dag_pool_init(spn_dag_pool_t* pool, sp_mem_t mem, spn_dag_pool_config_t config) {
+  sp_assert(config.workers);
 
   pool->executor = (spn_dag_executor_t) {
     .submit = pool_submit,
@@ -1231,9 +1268,10 @@ void spn_dag_pool_init(spn_dag_pool_t* pool, sp_mem_t mem, u32 workers) {
   sp_da_init(pool->mem, pool->queue);
   sp_da_init(pool->mem, pool->done);
   sp_da_init(pool->mem, pool->workers);
+  pool->on_worker_exit = config.on_worker_exit;
   pool->shutdown = false;
 
-  sp_for(it, workers) {
+  sp_for(it, config.workers) {
     sp_thread_t thread = sp_zero;
     sp_thread_init(&thread, pool_worker, pool);
     sp_da_push(pool->workers, thread);

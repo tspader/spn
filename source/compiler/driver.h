@@ -5,6 +5,9 @@
 #include "error/types.h"
 
 sp_str_t        spn_cc_feature_to_str(spn_cc_feature_t feature);
+spn_err_union_t spn_cc_validate_compile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile);
+spn_err_union_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_output_kind_t kind, bool frameworks);
+spn_err_union_t spn_cc_validate_archive(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile);
 spn_err_union_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, sp_ps_config_t* ps);
 spn_err_union_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, sp_ps_config_t* ps);
 spn_err_union_t spn_cc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_archive_t* archive, sp_ps_config_t* ps);
