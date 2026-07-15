@@ -27,6 +27,7 @@ endif
 
 TRIPLE ?= $(HOST_TRIPLE)
 CONFIG ?= Debug
+SANITIZE ?=
 
 ifeq ($(OS),Windows_NT)
   ifneq ($(TRIPLE),$(HOST_TRIPLE))
@@ -34,10 +35,18 @@ ifeq ($(OS),Windows_NT)
   endif
 endif
 
+FLAVOR :=
+ifneq ($(SANITIZE),)
+  ifneq ($(TRIPLE),$(HOST_TRIPLE))
+    $(error sanitized builds are host-only; drop TRIPLE or SANITIZE)
+  endif
+  FLAVOR := -san
+endif
+
 BUILD := $(ROOT)/.build
-WORK := $(BUILD)/work/$(TRIPLE)
+WORK := $(BUILD)/work/$(TRIPLE)$(FLAVOR)
 WORK_HOST := $(BUILD)/work/$(HOST_TRIPLE)
-STORE := $(BUILD)/store/$(TRIPLE)
+STORE := $(BUILD)/store/$(TRIPLE)$(FLAVOR)
 
 EXE :=
 ifneq (,$(findstring windows,$(TRIPLE)))
@@ -49,6 +58,8 @@ BIN := $(STORE)/bin/spn$(EXE)
 all: build
 ifeq ($(OS),Windows_NT)
 	@echo host binary: $(BIN)
+else ifneq ($(SANITIZE),)
+	@echo "sanitized binary: $(BIN)"
 else ifeq ($(TRIPLE),$(HOST_TRIPLE))
 	@ln -sfn .build/store/$(TRIPLE) $(ROOT)/bootstrap
 	@ln -sf .build/work/$(TRIPLE)/compile_commands.json $(ROOT)/compile_commands.json
@@ -62,7 +73,7 @@ build: configure
 
 ifeq ($(TRIPLE),$(HOST_TRIPLE))
 configure: fetch
-	@cmake -S $(ROOT) -B $(WORK) $(GEN_FLAGS) -DTRIPLE=$(TRIPLE) -DHOST_TRIPLE=$(HOST_TRIPLE)
+	@cmake -S $(ROOT) -B $(WORK) $(GEN_FLAGS) -DTRIPLE=$(TRIPLE) -DHOST_TRIPLE=$(HOST_TRIPLE) -DSPN_SANITIZE=$(if $(SANITIZE),ON,OFF)
 else
 .PHONY: host-tools
 host-tools: fetch
