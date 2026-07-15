@@ -5,7 +5,7 @@
 #include "sp/sp_glob.h"
 #include "dag/dag.h"
 #include "error/types.h"
-#include "occ.h"
+#include "dag/occ.h"
 
 typedef struct {
   sp_mem_t mem;
