@@ -16,6 +16,7 @@ spn_err_t spn_git_get_root(sp_mem_t mem, sp_str_t cwd, sp_str_t* root);
 spn_err_t spn_git_default_branch(sp_mem_t mem, sp_str_t repo, sp_str_t* branch);
 spn_err_t spn_git_current_branch(sp_mem_t mem, sp_str_t repo, sp_str_t* branch);
 bool spn_git_has_remote_branches(sp_str_t repo);
+bool spn_git_is_repo_root(sp_str_t repo);
 spn_err_t spn_git_checkout_branch(sp_str_t repo, sp_str_t branch);
 spn_err_t spn_git_clean(sp_str_t repo);
 spn_err_t spn_git_add(sp_str_t repo, sp_str_t path);

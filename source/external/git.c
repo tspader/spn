@@ -145,7 +145,21 @@ spn_err_t spn_git_default_branch(sp_mem_t mem, sp_str_t repo, sp_str_t* branch) 
   return SPN_OK;
 }
 
+bool spn_git_is_repo_root(sp_str_t repo) {
+  if (sp_str_empty(repo) || !sp_fs_is_dir(repo)) return false;
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t root = sp_zero;
+  bool ok = !spn_git_get_root(scratch.mem, repo, &root) &&
+    sp_str_equal(sp_fs_canonicalize_path(scratch.mem, root), sp_fs_canonicalize_path(scratch.mem, repo));
+  sp_mem_end_scratch(scratch);
+  return ok;
+}
+
 spn_err_t spn_git_checkout_branch(sp_str_t repo, sp_str_t branch) {
+  if (!spn_git_is_repo_root(repo)) return SPN_ERROR;
+  if (sp_str_empty(branch)) return SPN_ERROR;
+
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
     .command = SP_LIT("git"),
@@ -191,6 +205,8 @@ bool spn_git_has_remote_branches(sp_str_t repo) {
 }
 
 spn_err_t spn_git_clean(sp_str_t repo) {
+  if (!spn_git_is_repo_root(repo)) return SPN_ERROR;
+
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
     .command = SP_LIT("git"),
@@ -292,7 +308,7 @@ bool spn_git_rev_on_remote(sp_str_t repo, sp_str_t rev) {
 
 spn_err_t spn_git_checkout(sp_str_t repo, sp_str_t id) {
   if (sp_str_empty(id)) return SPN_ERROR;
-  if (!sp_fs_exists(repo)) return SPN_ERROR;
+  if (!spn_git_is_repo_root(repo)) return SPN_ERROR;
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
