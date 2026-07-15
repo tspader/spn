@@ -238,6 +238,7 @@ static void apply_gated(sp_da(sp_str_t)* plain, spn_gated_list_t gated, spn_when
 
 static void apply_target(spn_target_info_t* target, spn_when_env_t* env) {
   apply_gated(&target->source, target->gated.source, env);
+  apply_gated(&target->include, target->gated.include, env);
   apply_gated(&target->define, target->gated.define, env);
   apply_gated(&target->flags, target->gated.flags, env);
   apply_gated(&target->system_deps, target->gated.system_deps, env);

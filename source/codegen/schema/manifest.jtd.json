@@ -137,7 +137,7 @@
         "kinds": { "elements": { "type": "string" } },
         "source": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
         "headers": { "elements": { "type": "string" } },
-        "include": { "elements": { "type": "string" } },
+        "include": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
         "define": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "flags": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "system_deps": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },

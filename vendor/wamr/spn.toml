@@ -4,7 +4,13 @@ name = "wamr"
 url = "https://github.com/bytecodealliance/wasm-micro-runtime.git"
 version = "2.4.1"
 commit = "e571797fbdf498d9ac4edb495205ea0f01370091"
-system_deps = ["m"]
+system_deps = [
+  "m",
+  { lib = "ws2_32", when = { os = "windows" } },
+  { lib = "ntdll", when = { os = "windows" } },
+  { lib = "bcrypt", when = { os = "windows" } },
+  { lib = "api-ms-win-core-path-l1-1-0", when = { os = "windows" } },
+]
 
 [[lib]]
 name = "vmlib"
@@ -12,6 +18,9 @@ kinds = ["static"]
 define = [
   { value = "BH_PLATFORM_LINUX", when = { os = "linux" } },
   { value = "BH_PLATFORM_DARWIN", when = { os = "macos" } },
+  { value = "BH_PLATFORM_WINDOWS", when = { os = "windows" } },
+  { value = "HAVE_STRUCT_TIMESPEC", when = { os = "windows" } },
+  { value = "_WINSOCK_DEPRECATED_NO_WARNINGS", when = { os = "windows" } },
   { value = "BUILD_TARGET_X86_64", when = { arch = "x86_64" } },
   { value = "BUILD_TARGET_AARCH64", when = { arch = "aarch64" } },
   "BH_MALLOC=wasm_runtime_malloc",
@@ -28,14 +37,19 @@ define = [
   "WASM_ENABLE_BULK_MEMORY=1",
   "WASM_ENABLE_BULK_MEMORY_OPT=1",
   "WASM_ENABLE_CALL_INDIRECT_OVERLONG=1",
-  "WASM_DISABLE_HW_BOUND_CHECK=0",
+  # SEH-based bounds checks only compile under MSVC
+  { value = "WASM_DISABLE_HW_BOUND_CHECK=0", when = { os = { not = "windows" } } },
+  { value = "WASM_DISABLE_HW_BOUND_CHECK=1", when = { os = "windows" } },
   "_GNU_SOURCE",
 ]
 include = [
   "core/iwasm/include",
   "core/iwasm/common",
   "core/iwasm/interpreter",
-  "core/shared/platform/darwin",
+  # Each platform dir has its own platform_internal.h; exactly one may be
+  # on the include path
+  { path = "core/shared/platform/darwin", when = { os = { not = "windows" } } },
+  { path = "core/shared/platform/windows", when = { os = "windows" } },
   "core/shared/platform/include",
   "core/shared/platform/common/libc-util",
   "core/shared/mem-alloc",
@@ -46,14 +60,18 @@ include = [
 ]
 source = [
   "core/iwasm/common/*.c",
-  { path = "core/iwasm/common/arch/invokeNative_em64.s", when = { arch = "x86_64" } },
+  { path = "core/iwasm/common/arch/invokeNative_em64.s", when = { arch = "x86_64", os = { not = "windows" } } },
+  { path = "core/iwasm/common/arch/invokeNative_mingw_x64.s", when = { arch = "x86_64", os = "windows" } },
   { path = "core/iwasm/common/arch/invokeNative_aarch64.s", when = { arch = "aarch64" } },
   "core/iwasm/interpreter/wasm_runtime.c",
   "core/iwasm/interpreter/wasm_loader.c",
   "core/iwasm/interpreter/wasm_interp_fast.c",
   { path = "core/shared/platform/linux/*.c", when = { os = "linux" } },
   { path = "core/shared/platform/darwin/*.c", when = { os = "macos" } },
-  "core/shared/platform/common/posix/*.c",
+  # win_atomic.cpp is only needed with WASM_ENABLE_SHARED_MEMORY, so the *.c
+  # glob skipping it is what we want
+  { path = "core/shared/platform/windows/*.c", when = { os = "windows" } },
+  { path = "core/shared/platform/common/posix/*.c", when = { os = { not = "windows" } } },
   "core/shared/platform/common/libc-util/*.c",
   "core/shared/platform/common/memory/*.c",
   "core/shared/mem-alloc/mem_alloc.c",
