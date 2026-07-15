@@ -124,6 +124,8 @@ void spn_gnu_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_c
     sp_str_t sanitizer = sp_fmt(mem, "-fsanitize={}", sp_fmt_str(spn_sanitizer_set_to_str(mem, profile->sanitizers))).value;
     sp_da_push(flags->compile, sanitizer);
     sp_da_push(flags->link, sanitizer);
+    sp_da_push(flags->compile, sp_str_lit("-fno-sanitize-recover=all"));
+    sp_da_push(flags->compile, sp_str_lit("-fno-omit-frame-pointer"));
   }
 }
 

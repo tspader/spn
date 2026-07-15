@@ -5,6 +5,7 @@
 #include "api/api.h"
 #include "ctx/types.h"
 #include "session/types.h"
+#include "unit/compiler.h"
 #include "unit/types.h"
 
 s32 spn_make(spn_t* build) {
@@ -39,7 +40,8 @@ s32 spn_make_run(spn_make_t* make) {
     sp_ps_config_add_arg(scratch.mem, &ps, make->target);
   }
   sp_env_init(scratch.mem, &ps.env.env);
-  spn_api_add_profile_flags_env(scratch.mem, unit->build->toolchain->info->driver, &unit->build->profile, &ps.env.env);
+  spn_cc_toolchain_t compiler = spn_toolchain_unit_compiler(unit->build->toolchain);
+  spn_api_add_profile_flags_env(scratch.mem, &compiler, &unit->build->profile, &ps.env.env);
 
   sp_ps_output_t result = spn_api_subprocess(scratch.mem, unit, ps);
   s32 exit_code = result.status.exit_code;

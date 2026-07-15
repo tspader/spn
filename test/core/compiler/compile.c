@@ -181,7 +181,7 @@ UTEST(render_compile, sanitizers_on_compile_line) {
     },
     .expect = {
       .command = "cc",
-      .args = { "-std=c99", "-fsanitize=address", "-c", "main.c", "-Werror=return-type", "-o", "main.o" },
+      .args = { "-std=c99", "-fsanitize=address", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-c", "main.c", "-Werror=return-type", "-o", "main.o" },
     },
   });
 }

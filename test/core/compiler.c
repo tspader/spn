@@ -41,21 +41,27 @@ typedef struct {
   const c8* compile [flags_max];
   const c8* link [flags_max];
   spn_sanitizer_set_t unsupported;
+  spn_err_t kind;
 } flags_expect_t;
 
 typedef struct {
   spn_profile_info_t profile;
   spn_cc_driver_t driver;
+  const c8* toolchain;
   flags_expect_t expect;
 } flags_test_t;
 
 static void run_flags_test(s32* utest_result, flags_test_t test) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  spn_cc_toolchain_t toolchain = test_toolchain(test.driver);
+  if (test.toolchain) {
+    toolchain.name = sp_str_view(test.toolchain);
+  }
   spn_cc_flags_t flags = sp_zero;
-  spn_err_union_t err = spn_cc_render_flags(scratch.mem, test.driver, &test.profile, &flags);
+  spn_err_union_t err = spn_cc_render_flags(scratch.mem, &toolchain, &test.profile, &flags);
 
   if (test.expect.unsupported) {
-    EXPECT_EQ(err.kind, SPN_ERR_SANITIZER_UNSUPPORTED);
+    EXPECT_EQ(err.kind, test.expect.kind ? test.expect.kind : SPN_ERR_SANITIZER_UNSUPPORTED);
     EXPECT_EQ(err.sanitizer.unsupported, test.expect.unsupported);
     EXPECT_EQ(err.sanitizer.target.arch, test.profile.arch);
     EXPECT_EQ(err.sanitizer.target.os, test.profile.os);
@@ -125,7 +131,7 @@ UTEST(compiler_flags, resolve) {
       },
       .driver = SPN_CC_DRIVER_CLANG,
       .expect = {
-        .compile = { "-g", "-O0", "-fsanitize=address,undefined" },
+        .compile = { "-g", "-O0", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer" },
         .link = { "-fsanitize=address,undefined" },
       },
     },
@@ -161,6 +167,47 @@ UTEST(compiler_flags, resolve) {
       },
       .driver = SPN_CC_DRIVER_CLANG,
       .expect = { .unsupported = SPN_SANITIZER_ADDRESS },
+    },
+    {
+      .profile = {
+        .arch = SPN_ARCH_X64,
+        .os = SPN_OS_LINUX,
+        .abi = SPN_ABI_MUSL,
+        .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
+      },
+      .driver = SPN_CC_DRIVER_CLANG,
+      .toolchain = "zig",
+      .expect = { .unsupported = SPN_SANITIZER_ADDRESS },
+    },
+    {
+      .profile = {
+        .arch = SPN_ARCH_X64,
+        .os = SPN_OS_LINUX,
+        .abi = SPN_ABI_MUSL,
+        .mode = SPN_BUILD_MODE_DEBUG,
+        .opt = SPN_OPT_LEVEL_0,
+        .sanitizers = SPN_SANITIZER_UNDEFINED,
+      },
+      .driver = SPN_CC_DRIVER_CLANG,
+      .toolchain = "zig",
+      .expect = {
+        .compile = { "-g", "-O0", "-fsanitize=undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer" },
+        .link = { "-fsanitize=undefined" },
+      },
+    },
+    {
+      .profile = {
+        .arch = SPN_ARCH_X64,
+        .os = SPN_OS_LINUX,
+        .abi = SPN_ABI_GNU,
+        .linkage = SPN_LIB_KIND_STATIC,
+        .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
+      },
+      .driver = SPN_CC_DRIVER_CLANG,
+      .expect = {
+        .kind = SPN_ERR_SANITIZER_STATIC,
+        .unsupported = SPN_SANITIZER_ADDRESS,
+      },
     },
   };
 

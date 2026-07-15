@@ -13,6 +13,7 @@
 #include "task/types.h"
 #include "toolchain/toolchain.h"
 #include "toolchain/types.h"
+#include "unit/compiler.h"
 #include "unit/types.h"
 
 spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* build, spn_pkg_id_t id, u32 kinds) {
@@ -46,8 +47,9 @@ static spn_err_union_t add_compilation_units(spn_session_t *s) {
   sp_da_for(s->plan.builds, it) {
     spn_build_plan_t* plan = &s->plan.builds[it];
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    spn_cc_toolchain_t compiler = spn_toolchain_unit_compiler(plan->build->toolchain);
     spn_cc_flags_t flags = sp_zero;
-    spn_err_union_t err = spn_cc_render_flags(scratch.mem, plan->build->toolchain->info->driver, &plan->build->profile, &flags);
+    spn_err_union_t err = spn_cc_render_flags(scratch.mem, &compiler, &plan->build->profile, &flags);
     sp_mem_end_scratch(scratch);
     if (err.kind) {
       return err;

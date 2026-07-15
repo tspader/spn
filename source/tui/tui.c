@@ -674,6 +674,15 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
           );
           break;
         }
+        case SPN_ERR_SANITIZER_STATIC: {
+          sp_fmt_io(
+            &w.base,
+            "{.red} requires a dynamically linked executable; set {.cyan} in the profile",
+            sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.unsupported)),
+            sp_fmt_str(sp_str_lit("linkage = \"shared\""))
+          );
+          break;
+        }
         case SPN_ERR_COMPILER_FEATURE_UNSUPPORTED: {
           sp_fmt_io(
             &w.base,

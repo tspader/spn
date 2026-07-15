@@ -9,6 +9,7 @@
 #include "enum/enum.h"
 #include "session/types.h"
 #include "profile/types.h"
+#include "unit/compiler.h"
 #include "unit/types.h"
 
 #include "toolchain/toolchain.h"
@@ -170,8 +171,9 @@ s32 spn_cmake_configure(spn_cmake_t* cmake) {
   add_define(scratch.mem, &config, sp_str_lit("CMAKE_BUILD_TYPE"), spn_cmake_profile_configuration(profile));
 
   const c8* configuration = profile->mode == SPN_BUILD_MODE_RELEASE ? "RELEASE" : "DEBUG";
+  spn_cc_toolchain_t compiler = spn_toolchain_unit_compiler(unit->build->toolchain);
   spn_cc_flags_t flags = sp_zero;
-  spn_err_union_t flags_err = spn_cc_render_flags(scratch.mem, unit->build->toolchain->info->driver, profile, &flags);
+  spn_err_union_t flags_err = spn_cc_render_flags(scratch.mem, &compiler, profile, &flags);
   if (flags_err.kind) {
     sp_mem_end_scratch(scratch);
     return SPN_ERROR;

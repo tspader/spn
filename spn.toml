@@ -31,6 +31,10 @@ mode = "debug"
 toolchain = "zig"
 abi = "musl"
 
+[profile.sanitizer]
+linkage = "shared"
+sanitize = ["address", "undefined"]
+
 [[toolchain]]
 name = "mingw"
 compiler = "x86_64-w64-mingw32-gcc"
