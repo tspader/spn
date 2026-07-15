@@ -11,8 +11,23 @@
 #include "task/build/build.h"
 #include "unit/package.h"
 
-s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_target_unit_t* unit = (spn_target_unit_t*)user_data;
+static void embed_obs_file(sp_mem_t mem, sp_da(spn_dag_obs_t)* obs, sp_str_t path) {
+  if (!obs) return;
+  sp_da_push(*obs, ((spn_dag_obs_t) {
+    .kind = SPN_DAG_OBS_FILE,
+    .path = sp_str_copy(mem, path),
+  }));
+}
+
+static void embed_obs_dir(sp_mem_t mem, sp_da(spn_dag_obs_t)* obs, sp_str_t path) {
+  if (!obs) return;
+  sp_da_push(*obs, ((spn_dag_obs_t) {
+    .kind = SPN_DAG_OBS_ENUMERATION,
+    .path = sp_str_copy(mem, path),
+  }));
+}
+
+s32 spn_embed_write(spn_target_unit_t* unit, sp_str_t obj, sp_str_t hdr, sp_mem_t obs_mem, sp_da(spn_dag_obs_t)* obs) {
   spn_target_info_t* info = unit->info;
 
   spn_pkg_unit_announce_compile(unit->pkg);
@@ -53,6 +68,7 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
         break;
       }
       case SPN_EMBED_FILE: {
+        embed_obs_file(obs_mem, obs, embed.file.path);
         sp_str_t content = sp_zero;
         if (sp_io_read_file(embedder.mem, embed.file.path, &content) != SP_OK) {
           spn_event_buffer_push(spn.events, (spn_build_event_t) {
@@ -77,9 +93,15 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
       }
       case SPN_EMBED_DIR: {
         sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+        embed_obs_dir(obs_mem, obs, embed.dir.path);
         sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(scratch.mem, embed.dir.path);
         sp_da_for(entries, e) {
+          if (entries[e].kind == SP_FS_KIND_DIR) {
+            embed_obs_dir(obs_mem, obs, entries[e].path);
+            continue;
+          }
           if (!sp_fs_is_file(entries[e].path)) continue;
+          embed_obs_file(obs_mem, obs, entries[e].path);
           sp_str_t rel = sp_str_suffix(entries[e].path, entries[e].path.len - embed.dir.path.len - 1);
           if (!sp_str_empty(embed.dir.dest)) {
             rel = sp_fs_join_path(embedder.mem, embed.dir.dest, rel);
@@ -124,9 +146,6 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
     }
   }
 
-  sp_str_t obj = get_embed_object_path(spn.mem, unit);
-  sp_str_t hdr = get_embed_header_path(spn.mem, unit);
-
   spn_err_t write_err = spn_cc_embed_ctx_write(&embedder, obj, hdr);
   spn_cc_embed_ctx_free(&embedder);
   if (write_err) {
@@ -148,4 +167,11 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
   });
 
   return SPN_OK;
+}
+
+s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
+  spn_target_unit_t* unit = (spn_target_unit_t*)user_data;
+  sp_str_t obj = get_embed_object_path(spn.mem, unit);
+  sp_str_t hdr = get_embed_header_path(spn.mem, unit);
+  return spn_embed_write(unit, obj, hdr, spn.mem, SP_NULLPTR);
 }

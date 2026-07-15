@@ -58,6 +58,7 @@ add_executable(sp_cc
   cc.c
   ${CMAKE_SOURCE_DIR}/source/dag/dag.c
   ${CMAKE_SOURCE_DIR}/source/dag/lower.c
+  ${CMAKE_SOURCE_DIR}/source/dag/occ.c
   ${CMAKE_SOURCE_DIR}/source/codegen/json.c
   ${GEN_DIR}/dag_output.gen.c
   ${GEN_DIR}/dag_obs.gen.c
@@ -72,6 +73,7 @@ add_executable(sp_lib
   lib.c
   ${CMAKE_SOURCE_DIR}/source/dag/dag.c
   ${CMAKE_SOURCE_DIR}/source/dag/lower.c
+  ${CMAKE_SOURCE_DIR}/source/dag/occ.c
   ${CMAKE_SOURCE_DIR}/source/codegen/json.c
   ${GEN_DIR}/dag_output.gen.c
   ${GEN_DIR}/dag_obs.gen.c

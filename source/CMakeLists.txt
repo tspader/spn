@@ -35,6 +35,7 @@ set(SPN_SOURCES
   ctx/ctx.c
   dag/dag.c
   dag/lower.c
+  dag/occ.c
   enum/enum.c
   event/event.c
   event/build.c
@@ -85,6 +86,7 @@ set(SPN_SOURCES
   target/select.c
   target/target.c
   task/build/build.c
+  task/build/dag.c
   task/build/target.c
   task/build/nodes/embed.c
   task/build/nodes/link.c

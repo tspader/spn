@@ -120,7 +120,7 @@ spn_err_union_t spn_build_link_invocation(spn_target_unit_t* target) {
   sp_unreachable_return(spn_result(SPN_ERROR));
 }
 
-spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, sp_str_t out, u64 elapsed) {
+spn_err_t emit_link_passed(spn_target_unit_t* unit, sp_str_t output, sp_str_t out, u64 elapsed) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_PASSED,
     .pkg = unit->pkg->info,
@@ -136,7 +136,7 @@ spn_err_t emit_success(spn_target_unit_t* unit, sp_str_t output, sp_str_t out, u
   return SPN_OK;
 }
 
-spn_err_t emit_failure(spn_target_unit_t* unit, s32 rc, sp_str_t out, sp_str_t err) {
+spn_err_t emit_link_failed(spn_target_unit_t* unit, s32 rc, sp_str_t out, sp_str_t err) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_FAILED,
     .pkg = unit->pkg->info,
@@ -176,8 +176,8 @@ s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
   spn_invocation_result_t run = spn_invocation_run(&target->invocation);
 
   if (run.result.status.exit_code) {
-    return emit_failure(target, run.result.status.exit_code, run.result.out, run.result.err);
+    return emit_link_failed(target, run.result.status.exit_code, run.result.out, run.result.err);
   }
 
-  return emit_success(target, output, run.result.out, run.elapsed);
+  return emit_link_passed(target, output, run.result.out, run.elapsed);
 }

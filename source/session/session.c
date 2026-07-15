@@ -19,6 +19,7 @@
 #include "pkg/pkg.h"
 #include "profile/profile.h"
 #include "session/session.h"
+#include "task/build/dag.h"
 #include "when/when.h"
 #include "sp/str.h"
 #include "spn.embed.h"
@@ -768,7 +769,7 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
     case SPN_PKG_SOURCE_FILE: {
       sp_str_t work = sp_fs_join_path(session->mem, build->paths.root, sp_str_lit("work"));
       unit->paths.work = sp_fs_join_path(session->mem, work, loaded->info->name);
-      unit->paths.store = sp_fs_join_path(session->mem, build->paths.root, sp_str_lit("store"));
+      unit->paths.store = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, build->paths.root, sp_str_lit("store")), loaded->info->name);
       break;
     }
     case SPN_PKG_SOURCE_INDEX: {

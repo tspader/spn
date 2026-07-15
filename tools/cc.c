@@ -5,7 +5,7 @@
 #include "sp/sp_glob.h"
 #include "dag/dag.h"
 #include "error/types.h"
-#include "occ.h"
+#include "dag/occ.h"
 
 typedef struct {
   const c8* output;
