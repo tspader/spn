@@ -144,6 +144,22 @@ void fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_trace
           fz_line(&steps.base, sp_str_lit("discovery"));
           break;
         }
+        case FZ_STEP_EIO: {
+          fz_line(&steps.base, sp_fmt(mem, "eio 1/{}", sp_fmt_uint(step->content)).value);
+          break;
+        }
+        case FZ_STEP_CRASH: {
+          fz_line(&steps.base, sp_str_lit("crash"));
+          break;
+        }
+        case FZ_STEP_BLOB: {
+          fz_line(&steps.base, sp_str_lit("blob"));
+          break;
+        }
+        case FZ_STEP_EVICT: {
+          fz_line(&steps.base, sp_str_lit("evict"));
+          break;
+        }
         case FZ_STEP_COUNT: {
           break;
         }

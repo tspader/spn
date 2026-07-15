@@ -49,6 +49,7 @@ fz_profile_t fz_gen_profile(sp_fuzz_prng_t* prng) {
   sp_fuzz_swarm(prng, profile.step_weights, FZ_STEP_COUNT);
   profile.store_fs = sp_fuzz_chance(prng, 1, 2);
   profile.disco_fs = sp_fuzz_chance(prng, 1, 2);
+  profile.cache_fs = sp_fuzz_chance(prng, 1, 2);
   profile.run_ex = sp_fuzz_chance(prng, 1, 2);
   return profile;
 }
@@ -226,6 +227,17 @@ fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
       case FZ_STEP_PHANTOM: {
         step.artifact = sp_fuzz_below(prng, FZ_MAX_PHANTOMS);
         step.content = fz_pick_content(prng, profile);
+        break;
+      }
+      case FZ_STEP_EIO: {
+        step.artifact = sp_fuzz_next(prng);
+        step.content = sp_fuzz_range(prng, 8, 512);
+        break;
+      }
+      case FZ_STEP_CRASH:
+      case FZ_STEP_BLOB:
+      case FZ_STEP_EVICT: {
+        step.artifact = sp_fuzz_next(prng);
         break;
       }
       case FZ_STEP_RUN:

@@ -1265,7 +1265,7 @@ static sp_str_t get_blob_dir(spn_dag_store_t* store, sp_mem_t mem, spn_dag_diges
 static sp_str_t get_blob_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
   sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, get_blob_dir(store, mem, digest));
   sp_da_for(entries, it) {
-    if (entries[it].kind == SP_FS_KIND_FILE) {
+    if (entries[it].kind == SP_FS_KIND_FILE && entries[it].name.data[0] != '.') {
       return entries[it].path;
     }
   }
@@ -1278,8 +1278,15 @@ static spn_err_t link_from_store(sp_str_t from, sp_str_t to) {
   if (!sp_fs_link(from, to, SP_FS_LINK_HARD)) {
     return SPN_OK;
   }
-  sp_fs_copy(from, to);
-  return sp_fs_is_file(to) ? SPN_OK : SPN_ERR_DAG_STORE_WRITE;
+
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  sp_mem_slice_t bytes = sp_zero;
+  spn_err_t err = SPN_ERR_DAG_STORE_READ;
+  if (!sp_io_read_file_slice(s.mem, from, &bytes)) {
+    err = sp_fs_write_atomic_slice(to, bytes) ? SPN_ERR_DAG_STORE_WRITE : SPN_OK;
+  }
+  sp_mem_end_scratch(s);
+  return err;
 }
 
 static bool find_blob(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_slice_t* blob) {
@@ -1447,7 +1454,7 @@ spn_err_t spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t dig
         return SPN_ERR_DAG_STORE_MISSING;
       }
       sp_fs_create_dir(sp_fs_parent_path(path));
-      return sp_fs_create_file_slice(path, blob) ? SPN_ERR_DAG_STORE_WRITE : SPN_OK;
+      return sp_fs_write_atomic_slice(path, blob) ? SPN_ERR_DAG_STORE_WRITE : SPN_OK;
     }
     case SPN_DAG_STORE_FILESYSTEM: {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
