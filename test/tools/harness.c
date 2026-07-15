@@ -33,12 +33,23 @@ sp_str_t shared_lib(const c8* name) {
   return store_file(sp_str_to_cstr(mem, sp_fs_join_path(mem, sp_str_lit("lib"), sp_str_view(shared_lib_file(name)))));
 }
 
-sp_str_t static_lib(const c8* name) {
+sp_str_t profile_static_lib(const c8* profile, const c8* name) {
   sp_mem_t mem = layout_mem();
+  // Mirrors spn_triple_lib_file_name: the native windows triple is msvc-abi,
+  // where static libs are {}.lib rather than lib{}.a
+#ifdef SP_WIN32
+  return sp_fmt(mem, "build/{}/store/lib/{}.lib", sp_fmt_cstr(profile), sp_fmt_cstr(name)).value;
+#else
   return sp_fmt(mem,
-    "build/debug/store/lib/{}",
+    "build/{}/store/lib/{}",
+    sp_fmt_cstr(profile),
     sp_fmt_str(sp_os_lib_to_file_name(mem, sp_cstr_as_str(name), SP_OS_LIB_STATIC))
   ).value;
+#endif
+}
+
+sp_str_t static_lib(const c8* name) {
+  return profile_static_lib("debug", name);
 }
 
 sp_str_t staged_lib(const c8* name) {
@@ -49,12 +60,35 @@ sp_str_t test_lib(const c8* name) {
   return test_exe(shared_lib_file(name));
 }
 
+static sp_str_t exe_file_name(const c8* name, const c8* triple) {
+#ifdef SP_WIN32
+  bool windows = !triple || sp_str_find(sp_str_view(triple), sp_str_lit("windows")) >= 0;
+#else
+  bool windows = triple && sp_str_find(sp_str_view(triple), sp_str_lit("windows")) >= 0;
+#endif
+  // Names that already carry an extension (spum.dll and friends coming
+  // through the staged-lib helpers) pass through untouched
+  if (!windows || sp_str_find_c8(sp_fs_get_name(sp_str_view(name)), '.') >= 0) {
+    return sp_str_view(name);
+  }
+  return sp_fmt(layout_mem(), "{}.exe", sp_fmt_cstr(name)).value;
+}
+
 sp_str_t profile_exe(const c8* profile, const c8* name) {
-  return layout_path(SP_NULLPTR, profile, sp_str_view(name));
+  return layout_path(SP_NULLPTR, profile, exe_file_name(name, SP_NULLPTR));
+}
+
+// Everything under store/bin is an executable; append the platform suffix so
+// tests can name binaries plainly
+static const c8* store_rest(const c8* rest, const c8* triple) {
+  if (sp_str_starts_with(sp_str_view(rest), sp_str_lit("bin/"))) {
+    return sp_str_to_cstr(layout_mem(), exe_file_name(rest, triple));
+  }
+  return rest;
 }
 
 sp_str_t profile_store_file(const c8* profile, const c8* rest) {
-  return layout_path(SP_NULLPTR, profile, layout_sub("store", rest));
+  return layout_path(SP_NULLPTR, profile, layout_sub("store", store_rest(rest, SP_NULLPTR)));
 }
 
 sp_str_t exe(const c8* name) {
@@ -62,11 +96,12 @@ sp_str_t exe(const c8* name) {
 }
 
 sp_str_t test_exe(const c8* name) {
-  return layout_path(SP_NULLPTR, "debug", layout_sub("test", name));
+  sp_str_t file = exe_file_name(name, SP_NULLPTR);
+  return layout_path(SP_NULLPTR, "debug", layout_sub("test", sp_str_to_cstr(layout_mem(), file)));
 }
 
 sp_str_t target_exe(const c8* name, const c8* triple) {
-  return layout_path(triple, "debug", sp_str_view(name));
+  return layout_path(triple, "debug", exe_file_name(name, triple));
 }
 
 sp_str_t store_file(const c8* rest) {
@@ -78,7 +113,7 @@ sp_str_t work_file(const c8* rest) {
 }
 
 sp_str_t target_store_file(const c8* rest, const c8* triple) {
-  return layout_path(triple, "debug", layout_sub("store", rest));
+  return layout_path(triple, "debug", layout_sub("store", store_rest(rest, triple)));
 }
 
 static void fixture_write_file(sp_str_t path, sp_str_t content) {

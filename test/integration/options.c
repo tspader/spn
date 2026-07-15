@@ -53,8 +53,7 @@ static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test)
 SPN_TEST_SUITE(when)
 
 // Every build fact resolves from the profile: os/arch/mode gate defines that
-// must be present, and a windows-gated define must be absent. abi is covered
-// in not_form, where the assertion holds under both gnu and musl.
+// must be present, and a wasi-gated define must be absent.
 UTEST_F(when, facts) {
   tmpfs_init_named(&uf->fixture.fs, "when_facts");
 
@@ -66,7 +65,7 @@ UTEST_F(when, facts) {
   });
 }
 
-// { not = v }: abi != msvc holds on the host, mode != debug does not
+// { not = v }: os != wasi holds on the host, mode != debug does not
 UTEST_F(when, not_form) {
   tmpfs_init_named(&uf->fixture.fs, "when_not_form");
 
@@ -94,8 +93,8 @@ UTEST_F(when, and_form) {
 }
 
 // Gated source entries: both impl files define impl_value, so failing to
-// exclude the windows one is a duplicate-symbol link error and failing to
-// include the linux one is an undefined reference
+// exclude the other platform's impl is a duplicate-symbol link error and
+// failing to include the host's is an undefined reference
 UTEST_F(when, source) {
   tmpfs_init_named(&uf->fixture.fs, "when_source");
 
@@ -108,8 +107,8 @@ UTEST_F(when, source) {
   });
 }
 
-// Gated flags entries: the msvc-gated /DFLAG_WINDOWS is not a valid gcc
-// argument, so failing to exclude it breaks the compile; the linux-gated
+// Gated flags entries: the wasi-gated /DFLAG_INVALID is not a valid gcc
+// argument, so failing to exclude it breaks the compile; the os-gated
 // define proves inclusion
 UTEST_F(when, flags) {
   tmpfs_init_named(&uf->fixture.fs, "when_flags");

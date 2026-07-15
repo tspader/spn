@@ -8,7 +8,7 @@ UTEST_F(target, static_lib) {
     .copy = { "mylib.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libmylib.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("mylib") },
     },
   });
 }
@@ -58,9 +58,9 @@ UTEST_F(target, multiple_roots) {
     .project = "test/integration/fixtures/target/shared_source",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "main", "test" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libspum.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/test/test") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = test_exe("test") },
     },
   });
 }
@@ -73,9 +73,9 @@ UTEST_F(target, selection_default) {
     .copy = { "spum.c", "script.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libspum.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/test/test") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = test_exe("test") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/script") },
     },
   });
@@ -105,7 +105,7 @@ UTEST_F(target, selection_multiple_kinds) {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--bin", "--test" } } },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = exe("main") },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/test/test") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = test_exe("test") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/script") },
     },
   });
@@ -133,8 +133,8 @@ UTEST_F(target, selection_test_command) {
     .copy = { "spum.c", "script.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "test", .args = { "test" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/debug/test/test") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libspum.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = test_exe("test") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/main") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/script") },
     },
@@ -151,7 +151,7 @@ UTEST_F(target, selection_run_command) {
       { .kind = ACTION_RUN_CLI, .cli = { "run", .args = { "script" } } },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/script") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/main") },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug/test/test") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = test_exe("test") },
     },
   });
 }

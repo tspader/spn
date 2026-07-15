@@ -6,6 +6,6 @@ version = "0.1.0"
 name = "main"
 source = ["main.c"]
 define = [
-  { value = "NOT_MSVC", when = { abi = { not = "msvc" } } },
+  { value = "NOT_WASI", when = { os = { not = "wasi" } } },
   { value = "NOT_DEBUG", when = { mode = { not = "debug" } } },
 ]

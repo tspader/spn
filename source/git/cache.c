@@ -54,6 +54,7 @@ spn_err_t spn_git_cache_ensure_db(spn_git_cache_t* cache, sp_str_t url, spn_git_
         .command = SP_LIT("git"),
         .args = {
           SP_LIT("clone"), SP_LIT("--bare"), SP_LIT("--quiet"),
+          SP_LIT("-c"), SP_LIT("core.autocrlf=false"),
           url,
           entry->path
         },
@@ -138,10 +139,14 @@ static spn_err_t spn_git_cache_materialize_checkout(spn_git_cache_t* cache, spn_
     entry->fetched = true;
 
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    // Checkouts must be byte-identical to the committed content no matter
+    // what the machine's autocrlf is; hashes and golden comparisons depend
+    // on it. -c on clone persists into the new repo's config.
     sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
       .command = SP_LIT("git"),
       .args = {
         SP_LIT("clone"), SP_LIT("--shared"), SP_LIT("--quiet"),
+        SP_LIT("-c"), SP_LIT("core.autocrlf=false"),
         db->path,
         entry->path
       },
