@@ -153,6 +153,30 @@ UTEST_F(store, put_file_matches_put) {
   });
 }
 
+UTEST_F(store, put_file_dot_name) {
+  run_test(&ur, (store_test_t) {
+    .name = "put_file_dot_name",
+    .ops = {
+      { .kind = STORE_OP_FILE, .blob = "A", .path = ".gitignore" },
+      { .kind = STORE_OP_PUT_FILE, .blob = "A", .path = ".gitignore" },
+      { .kind = STORE_OP_HAS, .blob = "A", .expect = { .has = true } },
+      { .kind = STORE_OP_GET, .blob = "A" },
+    }
+  });
+}
+
+UTEST_F(store, put_file_temp_pattern_name) {
+  run_test(&ur, (store_test_t) {
+    .name = "put_file_temp_pattern_name",
+    .ops = {
+      { .kind = STORE_OP_FILE, .blob = "B", .path = ".b.123.4.tmp" },
+      { .kind = STORE_OP_PUT_FILE, .blob = "B", .path = ".b.123.4.tmp" },
+      { .kind = STORE_OP_HAS, .blob = "B", .expect = { .has = true } },
+      { .kind = STORE_OP_GET, .blob = "B" },
+    }
+  });
+}
+
 UTEST_F(store, put_file_missing) {
   run_test(&ur, (store_test_t) {
     .name = "put_file_missing",

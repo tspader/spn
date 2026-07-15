@@ -1262,17 +1262,21 @@ static sp_str_t get_blob_dir(spn_dag_store_t* store, sp_mem_t mem, spn_dag_diges
   return sp_fs_join_path(mem, store->dir, spn_dag_digest_hex(mem, digest));
 }
 
+static sp_str_t get_staging_dir(spn_dag_store_t* store, sp_mem_t mem) {
+  return sp_fs_join_path(mem, store->dir, sp_str_lit(".staging"));
+}
+
 static sp_str_t get_blob_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
   sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, get_blob_dir(store, mem, digest));
   sp_da_for(entries, it) {
-    if (entries[it].kind == SP_FS_KIND_FILE && entries[it].name.data[0] != '.') {
+    if (entries[it].kind == SP_FS_KIND_FILE) {
       return entries[it].path;
     }
   }
   return sp_str_lit("");
 }
 
-static spn_err_t link_from_store(sp_str_t from, sp_str_t to) {
+static spn_err_t link_from_store(sp_str_t from, sp_str_t to, sp_str_t staging) {
   sp_fs_create_dir(sp_fs_parent_path(to));
   sp_fs_remove_file(to);
   if (!sp_fs_link(from, to, SP_FS_LINK_HARD)) {
@@ -1283,7 +1287,7 @@ static spn_err_t link_from_store(sp_str_t from, sp_str_t to) {
   sp_mem_slice_t bytes = sp_zero;
   spn_err_t err = SPN_ERR_DAG_STORE_READ;
   if (!sp_io_read_file_slice(s.mem, from, &bytes)) {
-    err = sp_fs_write_atomic_slice(to, bytes) ? SPN_ERR_DAG_STORE_WRITE : SPN_OK;
+    err = sp_fs_write_atomic_slice_staged(to, staging, bytes) ? SPN_ERR_DAG_STORE_WRITE : SPN_OK;
   }
   sp_mem_end_scratch(s);
   return err;
@@ -1343,7 +1347,7 @@ spn_err_t spn_dag_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag
       if (sp_str_empty(get_blob_path(store, s.mem, *digest))) {
         sp_str_t dir = get_blob_dir(store, s.mem, *digest);
         sp_fs_create_dir(dir);
-        if (sp_fs_write_atomic_slice(sp_fs_join_path(s.mem, dir, sp_str_lit("blob")), sp_mem_slice((u8*)data, len))) {
+        if (sp_fs_write_atomic_slice_staged(sp_fs_join_path(s.mem, dir, sp_str_lit("blob")), get_staging_dir(store, s.mem), sp_mem_slice((u8*)data, len))) {
           err = SPN_ERR_DAG_STORE_WRITE;
         }
       }
@@ -1379,7 +1383,7 @@ spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_
         sp_str_t dir = get_blob_dir(store, s.mem, *digest);
         sp_fs_create_dir(dir);
         sp_str_t stored = sp_fs_join_path(s.mem, dir, sp_fs_get_name(path));
-        err = link_from_store(path, stored);
+        err = link_from_store(path, stored, get_staging_dir(store, s.mem));
       }
       sp_mem_end_scratch(s);
       return err;
@@ -1461,7 +1465,7 @@ spn_err_t spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t dig
       sp_str_t stored = get_blob_path(store, s.mem, digest);
       spn_err_t err = SPN_ERR_DAG_STORE_MISSING;
       if (!sp_str_empty(stored)) {
-        err = link_from_store(stored, path);
+        err = link_from_store(stored, path, sp_str_lit(""));
       }
       sp_mem_end_scratch(s);
       return err;
