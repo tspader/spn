@@ -2,9 +2,6 @@
 name = "smoke"
 version = "0.0.1"
 
-[profile.default]
-toolchain = "zig"
-
 [deps.package]
 "lua/lua" = { path = "vendor/lua" }
 
