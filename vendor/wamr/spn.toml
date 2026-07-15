@@ -3,13 +3,13 @@ namespace = "spader"
 name = "wamr"
 url = "https://github.com/bytecodealliance/wasm-micro-runtime.git"
 version = "2.4.1"
-commit = "e571797fbdf498d9ac4edb495205ea0f01370091"
+commit = "0b9db98aea32f5d634de8268a57b442f41fffc45"
 system_deps = [
   "m",
   { lib = "ws2_32", when = { os = "windows" } },
   { lib = "ntdll", when = { os = "windows" } },
   { lib = "bcrypt", when = { os = "windows" } },
-  { lib = "api-ms-win-core-path-l1-1-0", when = { os = "windows" } },
+  { lib = "pathcch", when = { os = "windows" } },
 ]
 
 [[lib]]
