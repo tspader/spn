@@ -7,7 +7,7 @@ sp_str_t spn_cc_symbol_from_embedded_file(sp_mem_t mem, sp_str_t file_path) {
   c8* data = sp_alloc_n(mem, c8, file_path.len);
   for (u32 it = 0; it < file_path.len; it++) {
     c8 c = file_path.data[it];
-    data[it] = (c == '/' || c == '.' || c == '-') ? '_' : c;
+    data[it] = (c == '/' || c == '\\' || c == '.' || c == '-') ? '_' : c;
   }
   return sp_str(data, file_path.len);
 }

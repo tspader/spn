@@ -44,7 +44,7 @@
     { "name": "spn_target_embed_file", "args": ["target", "str"] },
     { "name": "spn_target_embed_file_ex", "args": ["target", "str", "str", "str", "str"] },
     { "name": "spn_target_embed_dir", "args": ["target", "str"] },
-    { "name": "spn_target_embed_dir_ex", "args": ["target", "str", "str", "str"] },
+    { "name": "spn_target_embed_dir_ex", "args": ["target", "str", "str", "str", "str"] },
     { "name": "spn_add_node", "ret": "node", "args": ["config", "str"] },
     { "name": "spn_node_set_fn", "args": ["node", "str"] },
     { "name": "spn_node_set_user_data", "args": ["node", "s32"], "host": "spn_abi_node_set_user_data" },

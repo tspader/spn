@@ -81,6 +81,9 @@ s32 compile_embed(spn_bg_cmd_t* cmd, void* user_data) {
         sp_da_for(entries, e) {
           if (!sp_fs_is_file(entries[e].path)) continue;
           sp_str_t rel = sp_str_suffix(entries[e].path, entries[e].path.len - embed.dir.path.len - 1);
+          if (!sp_str_empty(embed.dir.dest)) {
+            rel = sp_fs_join_path(embedder.mem, embed.dir.dest, rel);
+          }
           sp_str_t content = sp_zero;
           spn_err_t err = SPN_OK;
           if (sp_io_read_file(embedder.mem, entries[e].path, &content) != SP_OK) {
