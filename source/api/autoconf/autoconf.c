@@ -4,6 +4,7 @@
 #include "api/core/types.h"
 #include "ctx/types.h"
 #include "session/types.h"
+#include "unit/compiler.h"
 #include "unit/types.h"
 
 #include "triple/triple.h"
@@ -55,7 +56,8 @@ s32 spn_autoconf_run(spn_autoconf_t* autoconf) {
     sp_ps_config_add_arg(scratch.mem, &config, autoconf->flags[it]);
   }
   sp_env_init(scratch.mem, &config.env.env);
-  spn_api_add_profile_flags_env(scratch.mem, unit->build->toolchain->info->driver, &unit->build->profile, &config.env.env);
+  spn_cc_toolchain_t compiler = spn_toolchain_unit_compiler(unit->build->toolchain);
+  spn_api_add_profile_flags_env(scratch.mem, &compiler, &unit->build->profile, &config.env.env);
 
   sp_ps_output_t result = spn_api_subprocess(scratch.mem, unit, config);
   s32 exit_code = result.status.exit_code;

@@ -45,9 +45,9 @@ sp_str_t spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-void spn_api_add_profile_flags_env(sp_mem_t mem, spn_cc_driver_t driver, const spn_profile_info_t* profile, sp_env_t* env) {
+void spn_api_add_profile_flags_env(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, sp_env_t* env) {
   spn_cc_flags_t flags = sp_zero;
-  spn_err_union_t err = spn_cc_render_flags(mem, driver, profile, &flags);
+  spn_err_union_t err = spn_cc_render_flags(mem, toolchain, profile, &flags);
   sp_assert(!err.kind);
   sp_str_t compile = sp_str_join_n(mem, flags.compile, sp_da_size(flags.compile), sp_str_lit(" "));
   sp_str_t link = sp_str_join_n(mem, flags.link, sp_da_size(flags.link), sp_str_lit(" "));

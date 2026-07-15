@@ -35,21 +35,52 @@ spn_sanitizer_set_t spn_cc_supported_sanitizers(spn_cc_driver_t driver, spn_trip
   SP_UNREACHABLE_RETURN(0);
 }
 
-spn_err_union_t spn_cc_render_flags(sp_mem_t mem, spn_cc_driver_t driver, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
-  sp_da_init(mem, flags->compile);
-  sp_da_init(mem, flags->link);
+// Zig compiles every sanitizer clang does, but only bundles the UBSan
+// runtime; anything else dies at link with undefined __asan/__tsan symbols
+spn_sanitizer_set_t spn_toolchain_supported_sanitizers(const spn_cc_toolchain_t* toolchain, spn_triple_t target) {
+  spn_sanitizer_set_t set = spn_cc_supported_sanitizers(toolchain->driver, target);
+  if (sp_str_equal_cstr(toolchain->name, "zig")) {
+    set &= SPN_SANITIZER_UNDEFINED;
+  }
+  return set;
+}
+
+static spn_err_union_t validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
-  spn_sanitizer_set_t unsupported_set = profile->sanitizers & ~spn_cc_supported_sanitizers(driver, target);
+  spn_sanitizer_set_t unsupported_set = profile->sanitizers & ~spn_toolchain_supported_sanitizers(toolchain, target);
   if (unsupported_set) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_SANITIZER_UNSUPPORTED,
       .sanitizer = {
+        .toolchain = toolchain->name,
         .target = target,
         .unsupported = unsupported_set,
       },
     };
   }
-  switch (driver) {
+
+  // The runtime-backed sanitizers need a dynamic executable; -static links
+  // fail with undefined _DYNAMIC. UBSan's runtime is the exception.
+  spn_sanitizer_set_t static_set = profile->sanitizers & ~SPN_SANITIZER_UNDEFINED;
+  bool renders_static = profile->linkage == SPN_LIB_KIND_STATIC && profile->os != SPN_OS_MACOS && toolchain->driver != SPN_CC_DRIVER_MSVC;
+  if (static_set && renders_static) {
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_SANITIZER_STATIC,
+      .sanitizer = {
+        .toolchain = toolchain->name,
+        .target = target,
+        .unsupported = static_set,
+      },
+    };
+  }
+  return spn_result(SPN_OK);
+}
+
+spn_err_union_t spn_cc_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
+  sp_da_init(mem, flags->compile);
+  sp_da_init(mem, flags->link);
+  try_union(validate_profile(toolchain, profile));
+  switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
     case SPN_CC_DRIVER_CLANG: {
       spn_gnu_render_flags(mem, profile, flags);
@@ -62,22 +93,6 @@ spn_err_union_t spn_cc_render_flags(sp_mem_t mem, spn_cc_driver_t driver, const 
     case SPN_CC_DRIVER_NONE: {
       sp_unreachable_case();
     }
-  }
-  return spn_result(SPN_OK);
-}
-
-static spn_err_union_t validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
-  spn_triple_t target = { profile->arch, profile->os, profile->abi };
-  spn_sanitizer_set_t unsupported_set = profile->sanitizers & ~spn_cc_supported_sanitizers(toolchain->driver, target);
-  if (unsupported_set) {
-    return (spn_err_union_t) {
-      .kind = SPN_ERR_SANITIZER_UNSUPPORTED,
-      .sanitizer = {
-        .toolchain = toolchain->name,
-        .target = target,
-        .unsupported = unsupported_set,
-      },
-    };
   }
   return spn_result(SPN_OK);
 }
