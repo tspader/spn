@@ -63,6 +63,7 @@ typedef struct {
   spn_dag_digest_t digest;
   spn_dag_id_t producer;
   sp_da(spn_dag_id_t) consumers;
+  u64 write_epoch;
 } spn_dag_artifact_t;
 
 struct spn_dag_action_t {
@@ -142,14 +143,23 @@ typedef struct {
   sp_str_t dir;
   sp_mutex_t mutex;
   sp_ht(spn_dag_digest_t, sp_mem_slice_t) blobs;
+  sp_ht(spn_dag_digest_t, sp_str_t) paths;
 } spn_dag_store_t;
+
+typedef struct {
+  sp_atomic_s32_t total;
+  sp_atomic_s32_t completed;
+  sp_atomic_s32_t executed;
+} spn_dag_progress_t;
 
 typedef struct {
   spn_dag_file_cache_t* files;
   spn_dag_action_cache_t* cache;
   spn_dag_store_t* store;
   spn_dag_discovery_t* discovery;
+  spn_dag_progress_t* progress;
   sp_str_t scratch;
+  bool force;
 } spn_dag_env_t;
 
 typedef struct {
@@ -164,6 +174,11 @@ struct spn_dag_executor_t {
 };
 
 typedef struct {
+  u32 workers;
+  void (*on_worker_exit)(void);
+} spn_dag_pool_config_t;
+
+typedef struct {
   spn_dag_executor_t executor;
   sp_mem_arena_t* arena;
   sp_mem_t mem;
@@ -173,6 +188,7 @@ typedef struct {
   sp_da(spn_dag_job_t) queue;
   sp_da(spn_dag_job_t) done;
   sp_da(sp_thread_t) workers;
+  void (*on_worker_exit)(void);
   bool shutdown;
 } spn_dag_pool_t;
 

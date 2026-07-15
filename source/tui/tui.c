@@ -14,6 +14,7 @@
 #include "sp/prompt.h"
 #include "sp/str.h"
 #include "spn.h"
+#include "task/build/dag.h"
 #include "toolchain/select.h"
 #include "triple/triple.h"
 #include "tui/tui.h"
@@ -1493,16 +1494,17 @@ void spn_prompt_pump() {
     return;
   }
 
-  spn_bg_ctx_t* build = &tui->session->build;
+  spn_dag_build_t* dag = tui->session->dag;
+  if (!dag) return;
+
   if (!tui->prompt.on) {
-    if (!build->executor || !build->dirty) return;
-    if (!sp_ht_size(build->dirty->commands)) return;
+    if (!sp_atomic_s32_get(&dag->progress.executed)) return;
     spn_prompt_start();
     if (!tui->prompt.on) return;
   }
+  u32 total = (u32)sp_atomic_s32_get(&dag->progress.total);
+  u32 done = (u32)sp_atomic_s32_get(&dag->progress.completed);
 
-  u32 total = sp_ht_size(build->dirty->commands);
-  u32 done = (u32)sp_atomic_s32_get(&build->executor->num_completed);
   f32 value = total ? (f32)done / (f32)total : 0.f;
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();

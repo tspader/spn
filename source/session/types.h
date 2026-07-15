@@ -112,8 +112,7 @@ struct spn_session_t {
 
   spn_bg_ctx_t sync;
   spn_bg_ctx_t configure;
-  spn_bg_ctx_t build;
-  sp_ht(spn_bg_id_t, spn_build_unit_id_t) owners;
+  spn_dag_build_t* dag;
   sp_mutex_t mutex;
 };
 
