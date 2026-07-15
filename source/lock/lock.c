@@ -102,6 +102,7 @@ spn_lock_file_t spn_lock_file_parse(sp_mem_t mem, sp_str_t toml, spn_event_buffe
 
   toml_array_t* deps = toml_table_array(root, "dep");
   if (!deps) {
+    toml_free(root);
     return lock;
   }
 
@@ -110,30 +111,31 @@ spn_lock_file_t spn_lock_file_parse(sp_mem_t mem, sp_str_t toml, spn_event_buffe
     SP_ASSERT(pkg);
 
     spn_lock_entry_t entry = {
-      .name = spn_toml_str(pkg, "name"),
-      .version = spn_semver_from_str(spn_toml_str(pkg, "version")),
-      .commit = spn_toml_str(pkg, "commit"),
-      .kind = spn_pkg_source_from_str(spn_toml_str(pkg, "kind")),
+      .name = spn_toml_str(mem, pkg, "name"),
+      .version = spn_semver_from_str(spn_toml_str(mem, pkg, "version")),
+      .commit = spn_toml_str(mem, pkg, "commit"),
+      .kind = spn_pkg_source_from_str(spn_toml_str(mem, pkg, "kind")),
       .deps = spn_toml_arr_to_str_arr(mem, toml_table_array(pkg, "deps")),
       .dependents = sp_da_new(mem, sp_str_t),
       .source = {
-        .url = spn_toml_str_opt(pkg, "source_url", ""),
-        .rev = spn_toml_str_opt(pkg, "source_rev", ""),
-        .dir = spn_toml_str_opt(pkg, "source_dir", ""),
+        .url = spn_toml_str_opt(mem, pkg, "source_url", ""),
+        .rev = spn_toml_str_opt(mem, pkg, "source_rev", ""),
+        .dir = spn_toml_str_opt(mem, pkg, "source_dir", ""),
       },
       .manifest = {
-        .url = spn_toml_str_opt(pkg, "manifest_url", ""),
-        .rev = spn_toml_str_opt(pkg, "manifest_rev", ""),
-        .dir = spn_toml_str_opt(pkg, "manifest_dir", ""),
+        .url = spn_toml_str_opt(mem, pkg, "manifest_url", ""),
+        .rev = spn_toml_str_opt(mem, pkg, "manifest_rev", ""),
+        .dir = spn_toml_str_opt(mem, pkg, "manifest_dir", ""),
       },
       .paths = {
-        .manifest = spn_toml_str_opt(pkg, "manifest_file", "spn.toml"),
-        .script = spn_toml_str_opt(pkg, "script_file", "spn.c"),
+        .manifest = spn_toml_str_opt(mem, pkg, "manifest_file", "spn.toml"),
+        .script = spn_toml_str_opt(mem, pkg, "script_file", "spn.c"),
       },
     };
     sp_ht_insert(lock.entries, entry.name, entry);
   }
 
+  toml_free(root);
   spn_lock_build_dependents(&lock);
 
   return lock;

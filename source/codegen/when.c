@@ -5,7 +5,7 @@
 spn_option_value_t spn_toml_loader_value_str(spn_toml_loader_t* ctx, toml_value_t value) {
   return (spn_option_value_t) {
     .kind = SPN_OPTION_VALUE_STR,
-    .str = spn_toml_loader_intern(ctx, sp_str(value.u.s, (u32)value.u.sl)),
+    .str = spn_toml_loader_intern_value(ctx, value),
   };
 }
 
@@ -66,6 +66,9 @@ void spn_toml_loader_read_when(spn_toml_loader_t* ctx, toml_table_t* table, cons
       toml_value_t not_str = toml_table_string(negation, "not");
       toml_value_t not_bool = toml_table_bool(negation, "not");
       if (toml_table_len(negation) != 1 || (!not_str.ok && !not_bool.ok)) {
+        if (not_str.ok) {
+          free(not_str.u.s);
+        }
         spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, name);
         continue;
       }

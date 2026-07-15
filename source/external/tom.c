@@ -37,37 +37,30 @@ toml_table_t* spn_toml_parse_ex(sp_str_t path, bool* parse_error) {
   return toml;
 }
 
-const c8* spn_toml_cstr(toml_table_t* toml, const c8* key) {
-  toml_value_t value = toml_table_string(toml, key);
-  SP_ASSERT_FMT(value.ok, "missing string key: {.cyan}", SP_FMT_CSTR(key));
-  return value.u.s;
+static sp_str_t spn_toml_value_take(sp_mem_t mem, toml_value_t value) {
+  sp_str_t result = sp_str_copy(mem, sp_str(value.u.s, (u32)value.u.sl));
+  free(value.u.s);
+  return result;
 }
 
-const c8* spn_toml_cstr_opt(toml_table_t* toml, const c8* key, const c8* fallback) {
-  toml_value_t value = toml_table_string(toml, key);
-  if (!value.ok) {
-    return fallback;
-  }
-
-  return value.u.s;
-}
-
-const c8* spn_toml_arr_cstr(toml_array_t* toml, u32 it) {
+sp_str_t spn_toml_arr_str(sp_mem_t mem, toml_array_t* toml, u32 it) {
   toml_value_t value = toml_array_string(toml, it);
   SP_ASSERT(value.ok);
-  return value.u.s;
+  return spn_toml_value_take(mem, value);
 }
 
-sp_str_t spn_toml_arr_str(toml_array_t* toml, u32 it) {
-  return sp_str_view(spn_toml_arr_cstr(toml, it));
+sp_str_t spn_toml_str(sp_mem_t mem, toml_table_t* toml, const c8* key) {
+  toml_value_t value = toml_table_string(toml, key);
+  SP_ASSERT_FMT(value.ok, "missing string key: {.cyan}", SP_FMT_CSTR(key));
+  return spn_toml_value_take(mem, value);
 }
 
-sp_str_t spn_toml_str(toml_table_t* toml, const c8* key) {
-  return sp_str_view(spn_toml_cstr(toml, key));
-}
-
-sp_str_t spn_toml_str_opt(toml_table_t* toml, const c8* key, const c8* fallback) {
-  return sp_str_view(spn_toml_cstr_opt(toml, key, fallback));
+sp_str_t spn_toml_str_opt(sp_mem_t mem, toml_table_t* toml, const c8* key, const c8* fallback) {
+  toml_value_t value = toml_table_string(toml, key);
+  if (!value.ok) {
+    return sp_str_view(fallback);
+  }
+  return spn_toml_value_take(mem, value);
 }
 
 sp_da(sp_str_t) spn_toml_arr_to_str_arr(sp_mem_t mem, toml_array_t* toml) {
@@ -77,7 +70,7 @@ sp_da(sp_str_t) spn_toml_arr_to_str_arr(sp_mem_t mem, toml_array_t* toml) {
 
   sp_da(sp_str_t) strs = sp_da_new(mem, sp_str_t);
   spn_toml_arr_for(toml, it) {
-    sp_da_push(strs, spn_toml_arr_str(toml, it));
+    sp_da_push(strs, spn_toml_arr_str(mem, toml, it));
   }
 
   return strs;
