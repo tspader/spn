@@ -6,7 +6,10 @@ version = "0.1.0"
 name = "main"
 source = ["main.c"]
 flags = [
-  { value = "-DFLAG_LINUX", when = { os = "linux" } },
-  { value = "-DFLAG_LINUX", when = { os = "macos" } },
-  { value = "/DFLAG_WINDOWS", when = { abi = "msvc" } },
+  { value = "-DFLAG_OS", when = { os = "linux" } },
+  { value = "-DFLAG_OS", when = { os = "macos" } },
+  { value = "-DFLAG_OS", when = { os = "windows" } },
+  # Never true on any platform the suite runs on; /D is not a valid gcc
+  # argument, so a broken filter fails the compile everywhere
+  { value = "/DFLAG_INVALID", when = { os = "wasi" } },
 ]

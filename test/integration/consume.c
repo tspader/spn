@@ -8,7 +8,7 @@ UTEST_F(consume, static_lib) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "debug" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libspum.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
     },
   });
@@ -63,7 +63,7 @@ UTEST_F(consume, system_dep) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "static" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = profile_store_file("static", "lib/libspum.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = profile_static_lib("static", "spum") },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = profile_store_file("static", "bin/main") },
     },
   });
@@ -77,8 +77,8 @@ UTEST_F(consume, transitive) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "debug" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libspum.a") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libspam.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spam") },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
     },
   });
@@ -96,7 +96,7 @@ UTEST_F(consume, explicit_root_with_package_dep) {
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/dependency-bin") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/dependency-script") },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug/test/dependency-test") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = test_exe("dependency-test") },
     },
   });
 }
@@ -136,7 +136,7 @@ UTEST_F(consume, multi_kind_static) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libspum.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
     },
   });

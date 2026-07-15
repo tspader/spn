@@ -87,7 +87,7 @@ UTEST_F(script, object_lib) {
       // ditto for an object lib declared from the build script instead of the manifest
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/rt/extra2.c.o") },
       // an unlinked archive still builds and installs
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libblob.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("blob") },
       { .kind = ACTION_RUN_BIN, .bin.name = "object_lib" },
     },
   });

@@ -46,7 +46,10 @@ UTEST_F(profile, identity) {
     .builds = {
       { .expect = { .bin = { .name = "main", .rc = 1 } } },
       { .profile = "fast", .expect = { .bin = { .name = "main", .rc = 2 } } },
+#ifndef SP_WIN32
+      // The system toolchain has no sanitizer support on windows
       { .profile = "asan", .expect = { .bin = { .name = "main", .rc = 3 } } },
+#endif
     },
   });
 }
@@ -88,8 +91,14 @@ UTEST_F(profile, flags) {
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/integration/fixtures/profile/sanitize",
     .actions = {
+#ifndef SP_WIN32
+      // The system toolchain has no sanitizer support on windows; the opt
+      // level assertions below still run against a plain build there
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "-p", "asan" } } },
       { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("compile_commands.json"), .needle = sp_str_lit("-fsanitize=address") } },
+#else
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
+#endif
       { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("compile_commands.json"), .needle = sp_str_lit("-O0") } },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "-m", "release" } } },
       { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("compile_commands.json"), .needle = sp_str_lit("-O2") } },

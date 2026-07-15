@@ -6,6 +6,7 @@ version = "0.1.0"
 name = "main"
 source = ["main.c"]
 define = [
-  { value = "RELEASE_LINUX", when = { os = "linux", mode = "release" } },
-  { value = "RELEASE_LINUX", when = { os = "macos", mode = "release" } },
+  { value = "RELEASE_OS", when = { os = "linux", mode = "release" } },
+  { value = "RELEASE_OS", when = { os = "macos", mode = "release" } },
+  { value = "RELEASE_OS", when = { os = "windows", mode = "release" } },
 ]

@@ -9,7 +9,7 @@ UTEST_F(cxx, static_lib) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/libspum.a") },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
     },
   });

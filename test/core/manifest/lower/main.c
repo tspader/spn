@@ -35,7 +35,7 @@ typedef struct {
   bool no_link;
   gated_t source [4];
   const c8* headers [4];
-  const c8* include [4];
+  gated_t include [4];
   gated_t define [4];
   gated_t flags [4];
   gated_t system_deps [4];
@@ -198,13 +198,14 @@ static void check_targets(s32* utest_result, sp_mem_t mem, spn_target_map_t om, 
     EXPECT_EQ(arr[i].linkages.object, t->linkages.object);
     EXPECT_EQ(arr[i].no_link, t->no_link);
     EXPECT_EQ((u32)0, (u32)sp_da_size(t->source));
+    EXPECT_EQ((u32)0, (u32)sp_da_size(t->include));
     EXPECT_EQ((u32)0, (u32)sp_da_size(t->define));
     EXPECT_EQ((u32)0, (u32)sp_da_size(t->flags));
     EXPECT_EQ((u32)0, (u32)sp_da_size(t->system_deps));
     EXPECT_EQ((u32)0, (u32)sp_da_size(t->deps));
     check_gated(utest_result, mem, t->gated.source, arr[i].source, SP_CARR_LEN(arr[i].source));
     check_strings(utest_result, t->headers, arr[i].headers, SP_CARR_LEN(arr[i].headers));
-    check_strings(utest_result, t->include, arr[i].include, SP_CARR_LEN(arr[i].include));
+    check_gated(utest_result, mem, t->gated.include, arr[i].include, SP_CARR_LEN(arr[i].include));
     check_gated(utest_result, mem, t->gated.define, arr[i].define, SP_CARR_LEN(arr[i].define));
     check_gated(utest_result, mem, t->gated.flags, arr[i].flags, SP_CARR_LEN(arr[i].flags));
     check_gated(utest_result, mem, t->gated.system_deps, arr[i].system_deps, SP_CARR_LEN(arr[i].system_deps));
@@ -474,7 +475,7 @@ UTEST(lower, lib_all_fields) {
         .linkages = { .static_lib = true },
         .source = { { "main.c" } },
         .headers = { "header.h" },
-        .include = { "include/dir" },
+        .include = { { "include/dir" } },
         .define = { { "SPUM" } },
         .flags = { { "-flag" } },
         .deps = { { "spum" } },

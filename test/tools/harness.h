@@ -25,6 +25,7 @@ void fixture_setup_paths(fixture_t* fixture);
 
 sp_str_t shared_lib(const c8* name);
 sp_str_t static_lib(const c8* name);
+sp_str_t profile_static_lib(const c8* profile, const c8* name);
 sp_str_t staged_lib(const c8* name);
 sp_str_t test_lib(const c8* name);
 sp_str_t exe(const c8* name);

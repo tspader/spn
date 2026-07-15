@@ -8,6 +8,9 @@ spn_err_t spn_git_clone(sp_str_t url, sp_str_t path) {
     .command = SP_LIT("git"),
     .args = {
       SP_LIT("clone"), SP_LIT("--quiet"),
+      // Index content must be byte-identical to what was committed no matter
+      // what the machine's autocrlf is
+      SP_LIT("-c"), SP_LIT("core.autocrlf=false"),
       url,
       path
     },

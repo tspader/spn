@@ -4,6 +4,9 @@ version = "0.1.0"
 system_deps = [
   { lib = "c++", when = { os = "linux" } },
   { lib = "c++", when = { os = "macos" } },
+  # mingw spells the C++ runtime stdc++; ws2_32 proves the windows arm is
+  # excluded elsewhere (it does not exist on linux or macos)
+  { lib = "stdc++", when = { os = "windows" } },
   { lib = "ws2_32", when = { os = "windows" } },
 ]
 
