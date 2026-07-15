@@ -375,8 +375,9 @@ static bool spn_dag_manifest_load(spn_dag_discovery_t* d, spn_dag_digest_t preli
   bool ok = false;
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
+  sp_str_t path = spn_dag_manifest_path(d, s.mem, prelim);
   sp_da(sp_str_t) lines = sp_zero;
-  if (read_lines(s.mem, spn_dag_manifest_path(d, s.mem, prelim), &lines)) {
+  if (read_lines(s.mem, path, &lines)) {
     goto done;
   }
 
@@ -395,6 +396,7 @@ static bool spn_dag_manifest_load(spn_dag_discovery_t* d, spn_dag_digest_t preli
       || !lower_s64(cg.mtime_ns, &mtime_ns)
       || !lower_s64(cg.size, &obs.meta.size)
       || !lower_digest(cg.digest, &obs.meta.digest)) {
+      sp_fs_remove_file(path);
       goto done;
     }
     obs.path = sp_str_copy(d->mem, cg.path);

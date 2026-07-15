@@ -15,13 +15,17 @@ typedef struct {
   spn_dag_action_cache_t cache;
   spn_dag_discovery_t discovery;
   sp_str_t disco_dir;
+  sp_str_t cache_dir;
   spn_dag_env_t env;
   fz_executor_t ex;
   sp_ht(spn_dag_digest_t, fz_cached_t) mirror;
   sp_ht(spn_dag_digest_t, fz_shape_t) pathsets;
   u64* believed;
   bool* dirty;
+  u64 last_sys;
   bool honest;
+  bool murky;
+  bool tainted;
 } fz_world_t;
 
 static void fz_executor_submit(spn_dag_executor_t* base, spn_dag_job_t job) {
@@ -63,6 +67,10 @@ void fz_executor_init(fz_executor_t* ex, sp_mem_t mem, sp_sim_t* sim, sp_fuzz_pr
   sp_da_init(mem, ex->jobs);
   sp_da_init(mem, ex->submitted);
   sp_da_init(mem, ex->log);
+}
+
+static s32 fz_entry_order(const void* a, const void* b) {
+  return sp_str_compare_alphabetical(((const sp_fs_entry_t*)a)->name, ((const sp_fs_entry_t*)b)->name);
 }
 
 static bool fz_covered_write(fz_universe_t* u, fz_world_t* w, sp_mem_t mem, u64 at, u64 lo, u64 hi) {
@@ -119,7 +127,8 @@ static void fz_world_init(fz_world_t* w, sp_mem_t mem, sp_sim_t* sim, fz_univers
     .dir = sp_str_lit("/store"),
   });
   spn_dag_file_cache_init(&w->files, mem);
-  spn_dag_action_cache_init(&w->cache, mem, sp_str_lit(""));
+  w->cache_dir = u->profile.cache_fs ? sp_str_lit("/cache") : sp_str_lit("");
+  spn_dag_action_cache_init(&w->cache, mem, w->cache_dir);
   w->disco_dir = u->profile.disco_fs ? sp_str_lit("/manifests") : sp_str_lit("");
   spn_dag_discovery_init(&w->discovery, mem, w->disco_dir);
   w->env = (spn_dag_env_t) {
@@ -148,6 +157,33 @@ static spn_err_t fz_world_run(fz_world_t* w, fz_universe_t* u, spn_dag_t* g) {
     return spn_dag_run_ex(g, &w->env, &w->ex.base);
   }
   return spn_dag_run(g, &w->env);
+}
+
+static void fz_world_diverge(fz_world_t* w) {
+  w->murky = true;
+  if (!w->honest) {
+    w->tainted = true;
+  }
+}
+
+static void fz_world_reboot(fz_world_t* w, fz_universe_t* u) {
+  spn_dag_store_init(&w->store, (spn_dag_store_config_t) {
+    .kind = u->profile.store_fs ? SPN_DAG_STORE_FILESYSTEM : SPN_DAG_STORE_MEM,
+    .mem = w->mem,
+    .dir = sp_str_lit("/store"),
+  });
+  spn_dag_file_cache_init(&w->files, w->mem);
+  spn_dag_action_cache_init(&w->cache, w->mem, w->cache_dir);
+  spn_dag_discovery_init(&w->discovery, w->mem, w->disco_dir);
+  if (sp_str_empty(w->disco_dir)) {
+    sp_ht_clear(w->pathsets);
+  }
+
+  sp_da_for(u->artifacts, it) {
+    if (u->artifacts[it].kind == FZ_ARTIFACT_SOURCE) {
+      w->dirty[it] = true;
+    }
+  }
 }
 
 static void fz_write_source(sp_mem_t mem, fz_universe_t* u, u64 artifact) {
@@ -232,7 +268,7 @@ static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes,
   sp_ht_insert(w->mirror, key, entry);
 }
 
-static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w) {
+static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w, fz_step_t* step) {
   spn_dag_file_cache_refresh(&w->files);
 
   sp_da_for(u->artifacts, it) {
@@ -274,13 +310,51 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   }
 
   u64 log_start = sp_da_size(w->ex.log);
-  must(!fz_world_run(w, u, low.g), FZ_ERR_RUN_FAILED);
+  switch (step->kind) {
+    case FZ_STEP_EIO: {
+      sp_sim_fault_eio(w->sim, step->artifact, step->content);
+      break;
+    }
+    case FZ_STEP_CRASH: {
+      sp_sim_fault_crash(w->sim, 1 + step->artifact % sp_max(w->last_sys, 256));
+      break;
+    }
+    default: {
+      break;
+    }
+  }
 
-  sp_da_for(u->actions, at) {
-    u64 want = misses[at] ? 1 : 0;
-    want += fz_action_requeues(u, w, mem, log_start, at);
-    must(low.execs[at] >= want, FZ_ERR_EXEC_MISSING);
-    must(low.execs[at] <= want, FZ_ERR_EXEC_SPURIOUS);
+  u64 sys_start = w->sim->syscalls;
+  spn_err_t err = fz_world_run(w, u, low.g);
+  u64 fired = step->kind == FZ_STEP_EIO ? w->sim->faults : 0;
+  bool crashed = w->sim->crashed;
+  sp_sim_fault_clear(w->sim);
+  w->last_sys = w->sim->syscalls - sys_start;
+
+  if (fired || crashed) {
+    fz_world_diverge(w);
+  }
+  if (crashed) {
+    sp_sim_crash_restore(w->sim);
+    fz_world_reboot(w, u);
+    return FZ_OK;
+  }
+  if (fired && err) {
+    return FZ_OK;
+  }
+  must(!err, FZ_ERR_RUN_FAILED);
+
+  if (!w->murky) {
+    sp_da_for(u->actions, at) {
+      u64 want = misses[at] ? 1 : 0;
+      want += fz_action_requeues(u, w, mem, log_start, at);
+      must(low.execs[at] >= want, FZ_ERR_EXEC_MISSING);
+      must(low.execs[at] <= want, FZ_ERR_EXEC_SPURIOUS);
+    }
+  }
+
+  if (w->tainted) {
+    return FZ_OK;
   }
 
   if (w->honest) {
@@ -347,6 +421,9 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
           bool wrote = sp_sim_stealth_write(w.sim, fz_artifact_sim_path(mem, u, step->artifact), fz_content(mem, step->content));
           sp_assert(wrote);
           w.honest = false;
+          if (w.murky) {
+            w.tainted = true;
+          }
         }
         break;
       }
@@ -375,8 +452,54 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
         }
         break;
       }
-      case FZ_STEP_RUN: {
-        try(fz_trace_check_run(mem, u, &w));
+      case FZ_STEP_BLOB: {
+        if (!u->profile.store_fs) {
+          break;
+        }
+        sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, sp_str_lit("/store"));
+        sp_da(sp_fs_entry_t) blobs = sp_da_new(mem, sp_fs_entry_t);
+        sp_da_for(entries, et) {
+          if (entries[et].kind == SP_FS_KIND_DIR) {
+            sp_da_push(blobs, entries[et]);
+          }
+        }
+        if (sp_da_empty(blobs)) {
+          break;
+        }
+        sp_da_sort(blobs, fz_entry_order);
+        sp_fs_entry_t* blob = &blobs[step->artifact % sp_da_size(blobs)];
+        sp_da(sp_fs_entry_t) files = sp_fs_collect(mem, blob->path);
+        sp_da_for(files, ft) {
+          sp_fs_remove_file(files[ft].path);
+        }
+        sp_fs_remove_dir(blob->path);
+        fz_world_diverge(&w);
+        break;
+      }
+      case FZ_STEP_EVICT: {
+        if (!u->profile.cache_fs) {
+          break;
+        }
+        sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, w.cache_dir);
+        sp_da(sp_fs_entry_t) cached = sp_da_new(mem, sp_fs_entry_t);
+        sp_da_for(entries, et) {
+          if (entries[et].kind == SP_FS_KIND_FILE) {
+            sp_da_push(cached, entries[et]);
+          }
+        }
+        if (sp_da_empty(cached)) {
+          break;
+        }
+        sp_da_sort(cached, fz_entry_order);
+        sp_fs_remove_file(cached[step->artifact % sp_da_size(cached)].path);
+        spn_dag_action_cache_init(&w.cache, mem, w.cache_dir);
+        fz_world_diverge(&w);
+        break;
+      }
+      case FZ_STEP_RUN:
+      case FZ_STEP_EIO:
+      case FZ_STEP_CRASH: {
+        try(fz_trace_check_run(mem, u, &w, step));
         break;
       }
       case FZ_STEP_COUNT: {
@@ -423,7 +546,13 @@ fz_err_t fz_run_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_t
   sp_mem_zero(final, artifacts * sizeof(sp_str_t));
   try(fz_trace_pass(mem, u, trace, schedule, final));
 
-  if (u->cyclic || u->obs_cyclic || !u->profile.run_ex) {
+  bool faulted = false;
+  sp_da_for(trace->steps, st) {
+    if (trace->steps[st].kind == FZ_STEP_EIO || trace->steps[st].kind == FZ_STEP_CRASH) {
+      faulted = true;
+    }
+  }
+  if (u->cyclic || u->obs_cyclic || !u->profile.run_ex || faulted) {
     return FZ_OK;
   }
 
