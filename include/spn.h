@@ -303,7 +303,7 @@ void          spn_target_embed_file_ex(spn_target_t* target, const c8* file, con
 void          spn_target_embed_mem(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size);
 void          spn_target_embed_mem_ex(spn_target_t* target, const c8* symbol, const u8* buffer, u64 buffer_size, const c8* data_type, const c8* size_type);
 void          spn_target_embed_dir(spn_target_t* target, const c8* dir);
-void          spn_target_embed_dir_ex(spn_target_t* target, const c8* dir, const c8* data_type, const c8* size_type);
+void          spn_target_embed_dir_ex(spn_target_t* target, const c8* dir, const c8* dest, const c8* data_type, const c8* size_type);
 
 spn_profile_t*   spn_get_profile(spn_t* spn);
 spn_libc_kind_t  spn_profile_get_libc(spn_profile_t* profile);
