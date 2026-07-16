@@ -1,0 +1,83 @@
+diff --git a/core/iwasm/libraries/libc-wasi/libc_wasi_wrapper.c b/core/iwasm/libraries/libc-wasi/libc_wasi_wrapper.c
+index 7eebf12..1fb6249 100644
+--- a/core/iwasm/libraries/libc-wasi/libc_wasi_wrapper.c
++++ b/core/iwasm/libraries/libc-wasi/libc_wasi_wrapper.c
+@@ -16,6 +16,10 @@
+ void
+ wasm_runtime_set_exception(wasm_module_inst_t module, const char *exception);
+ 
++void (*spn_wasi_hook)(wasm_exec_env_t exec_env, int op, uint32 fd,
++                      const char *path, uint32 path_len, uint16 error,
++                      uint32 new_fd, uint32 oflags, uint64 rights) = NULL;
++
+ /* clang-format off */
+ #define get_module_inst(exec_env) \
+     wasm_runtime_get_module_inst(exec_env)
+@@ -336,7 +340,12 @@ wasi_fd_close(wasm_exec_env_t exec_env, wasi_fd_t fd)
+     if (!wasi_ctx)
+         return (wasi_errno_t)-1;
+ 
+-    return wasmtime_ssp_fd_close(exec_env, curfds, prestats, fd);
++    wasi_errno_t err = wasmtime_ssp_fd_close(exec_env, curfds, prestats, fd);
++
++    if (spn_wasi_hook)
++        spn_wasi_hook(exec_env, 3, fd, NULL, 0, err, 0, 0, 0);
++
++    return err;
+ }
+ 
+ static wasi_errno_t
+@@ -535,7 +544,13 @@ wasi_fd_renumber(wasm_exec_env_t exec_env, wasi_fd_t from, wasi_fd_t to)
+     if (!wasi_ctx)
+         return (wasi_errno_t)-1;
+ 
+-    return wasmtime_ssp_fd_renumber(exec_env, curfds, prestats, from, to);
++    wasi_errno_t err =
++        wasmtime_ssp_fd_renumber(exec_env, curfds, prestats, from, to);
++
++    if (spn_wasi_hook)
++        spn_wasi_hook(exec_env, 4, from, NULL, 0, err, to, 0, 0);
++
++    return err;
+ }
+ 
+ static wasi_errno_t
+@@ -782,6 +797,10 @@ wasi_path_open(wasm_exec_env_t exec_env, wasi_fd_t dirfd,
+                                  path_len, oflags, fs_rights_base,
+                                  fs_rights_inheriting, fs_flags, &fd);
+ 
++    if (spn_wasi_hook)
++        spn_wasi_hook(exec_env, 0, dirfd, path, path_len, err, fd, oflags,
++                      fs_rights_base);
++
+     *fd_app = fd;
+     return err;
+ }
+@@ -804,6 +823,10 @@ wasi_fd_readdir(wasm_exec_env_t exec_env, wasi_fd_t fd, void *buf,
+ 
+     err = wasmtime_ssp_fd_readdir(exec_env, curfds, fd, buf, buf_len, cookie,
+                                   &bufused);
++
++    if (spn_wasi_hook)
++        spn_wasi_hook(exec_env, 2, fd, NULL, 0, err, 0, 0, 0);
++
+     if (err)
+         return err;
+ 
+@@ -916,8 +939,14 @@ wasi_path_filestat_get(wasm_exec_env_t exec_env, wasi_fd_t fd,
+     if (!validate_native_addr(filestat, (uint64)sizeof(wasi_filestat_t)))
+         return (wasi_errno_t)-1;
+ 
+-    return wasmtime_ssp_path_filestat_get(exec_env, curfds, fd, flags, path,
+-                                          path_len, filestat);
++    wasi_errno_t err = wasmtime_ssp_path_filestat_get(exec_env, curfds, fd,
++                                                      flags, path, path_len,
++                                                      filestat);
++
++    if (spn_wasi_hook)
++        spn_wasi_hook(exec_env, 1, fd, path, path_len, err, 0, 0, 0);
++
++    return err;
+ }
+ 
+ static wasi_errno_t
