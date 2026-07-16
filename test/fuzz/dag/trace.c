@@ -23,6 +23,7 @@ typedef struct {
   u64* believed;
   bool* dirty;
   u64 last_sys;
+  fz_journal_t* j;
   bool honest;
   bool murky;
   bool tainted;
@@ -115,7 +116,7 @@ static u64 fz_action_requeues(fz_universe_t* u, fz_world_t* w, sp_mem_t mem, u64
   return requeues;
 }
 
-static void fz_world_init(fz_world_t* w, sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, sp_fuzz_prng_t schedule) {
+static void fz_world_init(fz_world_t* w, sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, sp_fuzz_prng_t schedule, fz_journal_t* j) {
   sp_fs_create_dir(sp_str_lit("/src"));
   sp_fs_create_dir(sp_str_lit("/out"));
   sp_fs_create_dir(sp_str_lit("/scratch"));
@@ -138,6 +139,12 @@ static void fz_world_init(fz_world_t* w, sp_mem_t mem, sp_sim_t* sim, fz_univers
     .discovery = &w->discovery,
     .scratch = sp_str_lit("/scratch"),
   };
+  w->j = j;
+  if (j) {
+    j->sim = sim;
+    w->env.trace = fz_journal_trace_hook;
+    w->env.trace_data = j;
+  }
   fz_executor_init(&w->ex, mem, sim, schedule);
   sp_ht_init(mem, w->mirror);
   sp_ht_init(mem, w->pathsets);
@@ -164,6 +171,7 @@ static void fz_world_diverge(fz_world_t* w) {
   if (!w->honest) {
     w->tainted = true;
   }
+  fz_journal_world(w->j, w->honest, w->murky, w->tainted);
 }
 
 static void fz_world_reboot(fz_world_t* w, fz_universe_t* u) {
@@ -236,6 +244,7 @@ static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes,
 
   fz_cached_t* cached = resolved ? sp_ht_getp(w->mirror, key) : SP_NULLPTR;
   if (cached) {
+    fz_journal_model(w->j, at, key, resolved, true);
     misses[at] = false;
     sp_da_for(action->produces, pt) {
       u64 out = action->produces[pt];
@@ -252,6 +261,7 @@ static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes,
     sp_ht_insert(w->pathsets, prelim, shape);
     key = fz_model_strong(u, key_bytes, prelim, at, &shape);
   }
+  fz_journal_model(w->j, at, key, resolved, false);
 
   sp_str_t* inputs = SP_NULLPTR;
   u64 count = fz_action_inputs(mem, u, at, disk_bytes, &inputs);
@@ -281,6 +291,7 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   fz_lowered_t low = sp_zero;
   fz_lower(&low, mem, u);
   low.ex = &w->ex;
+  low.journal = w->j;
 
   u64 artifacts = sp_da_size(u->artifacts);
   sp_str_t* key_bytes = sp_alloc_n(mem, sp_str_t, artifacts);
@@ -330,6 +341,7 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   bool crashed = w->sim->crashed;
   sp_sim_fault_clear(w->sim);
   w->last_sys = w->sim->syscalls - sys_start;
+  fz_journal_run_done(w->j, (u64)err, fired, crashed);
 
   if (fired || crashed) {
     fz_world_diverge(w);
@@ -346,8 +358,9 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
 
   if (!w->murky) {
     sp_da_for(u->actions, at) {
-      u64 want = misses[at] ? 1 : 0;
-      want += fz_action_requeues(u, w, mem, log_start, at);
+      u64 requeues = fz_action_requeues(u, w, mem, log_start, at);
+      u64 want = (misses[at] ? 1 : 0) + requeues;
+      fz_journal_check(w->j, at, low.execs[at], want, misses[at], requeues);
       must(low.execs[at] >= want, FZ_ERR_EXEC_MISSING);
       must(low.execs[at] <= want, FZ_ERR_EXEC_SPURIOUS);
     }
@@ -362,7 +375,9 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
     fz_expect(mem, u, clean);
     sp_da_for(u->artifacts, it) {
       if (u->artifacts[it].kind == FZ_ARTIFACT_OUTPUT) {
-        must(sp_str_equal(clean[it], disk_bytes[it]), FZ_ERR_MODEL);
+        bool ok = sp_str_equal(clean[it], disk_bytes[it]);
+        fz_journal_bytes(w->j, sp_str_lit("model"), it, clean[it], disk_bytes[it], ok);
+        must(ok, FZ_ERR_MODEL);
       }
     }
   }
@@ -372,16 +387,18 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
       continue;
     }
     sp_str_t disk = sp_zero;
-    must(!sp_io_read_file(mem, fz_artifact_sim_path(mem, u, it), &disk), FZ_ERR_STALE_OUTPUT);
-    must(sp_str_equal(disk, disk_bytes[it]), FZ_ERR_STALE_OUTPUT);
+    bool read = !sp_io_read_file(mem, fz_artifact_sim_path(mem, u, it), &disk);
+    bool ok = read && sp_str_equal(disk, disk_bytes[it]);
+    fz_journal_bytes(w->j, sp_str_lit("disk"), it, disk_bytes[it], read ? disk : sp_str_lit("missing"), ok);
+    must(ok, FZ_ERR_STALE_OUTPUT);
   }
 
   return FZ_OK;
 }
 
-static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_trace_t* trace, sp_fuzz_prng_t schedule, sp_str_t* final) {
+static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_trace_t* trace, sp_fuzz_prng_t schedule, sp_str_t* final, fz_journal_t* j) {
   fz_world_t w = sp_zero;
-  fz_world_init(&w, mem, sim, u, schedule);
+  fz_world_init(&w, mem, sim, u, schedule, j);
 
   sp_da_for(u->artifacts, it) {
     if (u->artifacts[it].kind == FZ_ARTIFACT_SOURCE) {
@@ -394,12 +411,14 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
     fz_lowered_t low = sp_zero;
     fz_lower(&low, mem, u);
     low.ex = &w.ex;
+    low.journal = w.j;
     must(fz_world_run(&w, u, low.g), FZ_ERR_RUN_CYCLIC);
     return FZ_OK;
   }
 
   sp_da_for(trace->steps, st) {
     fz_step_t* step = &trace->steps[st];
+    fz_journal_step(w.j, step, st);
     switch (step->kind) {
       case FZ_STEP_MUTATE:
       case FZ_STEP_REVERT: {
@@ -424,6 +443,7 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
           if (w.murky) {
             w.tainted = true;
           }
+          fz_journal_world(w.j, w.honest, w.murky, w.tainted);
         }
         break;
       }
@@ -523,16 +543,19 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
   return FZ_OK;
 }
 
-static fz_err_t fz_trace_pass(sp_mem_t mem, fz_universe_t* u, fz_trace_t* trace, sp_fuzz_prng_t schedule, sp_str_t* final) {
+static fz_err_t fz_trace_pass(sp_mem_t mem, fz_universe_t* u, fz_trace_t* trace, sp_fuzz_prng_t schedule, sp_str_t* final, fz_journal_t* j) {
   sp_sim_t sim = sp_zero;
   sp_sim_init(&sim, mem);
   sp_sim_install(&sim);
-  fz_err_t err = fz_trace_body(mem, &sim, u, trace, schedule, final);
+  fz_err_t err = fz_trace_body(mem, &sim, u, trace, schedule, final, j);
   sp_sim_remove(&sim);
+  if (j) {
+    j->sim = SP_NULLPTR;
+  }
   return err;
 }
 
-fz_err_t fz_run_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_trace_t* trace) {
+fz_err_t fz_run_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_trace_t* trace, fz_journal_t* j) {
   sp_fuzz_prng_t schedule = { .state = sp_fuzz_next(prng) };
   sp_fuzz_prng_t reseed = { .state = sp_fuzz_next(prng) };
 
@@ -544,7 +567,8 @@ fz_err_t fz_run_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_t
 
   sp_str_t* final = sp_alloc_n(mem, sp_str_t, artifacts);
   sp_mem_zero(final, artifacts * sizeof(sp_str_t));
-  try(fz_trace_pass(mem, u, trace, schedule, final));
+  fz_journal_pass(j, sp_str_lit("main"));
+  try(fz_trace_pass(mem, u, trace, schedule, final, j));
 
   bool faulted = false;
   sp_da_for(trace->steps, st) {
@@ -562,13 +586,16 @@ fz_err_t fz_run_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_t
   sp_mem_zero(u->phantoms, sizeof(u->phantoms));
   sp_str_t* reseeded = sp_alloc_n(mem, sp_str_t, artifacts);
   sp_mem_zero(reseeded, artifacts * sizeof(sp_str_t));
-  try(fz_trace_pass(mem, u, trace, reseed, reseeded));
+  fz_journal_pass(j, sp_str_lit("reseed"));
+  try(fz_trace_pass(mem, u, trace, reseed, reseeded, j));
 
   sp_da_for(u->artifacts, it) {
     if (u->artifacts[it].kind != FZ_ARTIFACT_OUTPUT) {
       continue;
     }
-    must(sp_str_equal(final[it], reseeded[it]), FZ_ERR_SCHEDULE);
+    bool ok = sp_str_equal(final[it], reseeded[it]);
+    fz_journal_bytes(j, sp_str_lit("schedule"), it, final[it], reseeded[it], ok);
+    must(ok, FZ_ERR_SCHEDULE);
   }
 
   return FZ_OK;

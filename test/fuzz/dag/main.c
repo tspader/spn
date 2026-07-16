@@ -30,21 +30,50 @@ static sp_str_t fz_err_str(u32 err) {
   return fz_err_to_str((fz_err_t)err);
 }
 
+static void fz_write_failure(sp_mem_t mem, sp_str_t dir, fz_err_t err, u64 iter) {
+  sp_io_file_writer_t out = sp_zero;
+  if (sp_io_file_writer_from_path(&out, sp_fs_join_path(mem, dir, sp_str_lit("failure.json")))) {
+    return;
+  }
+  sp_fmt_io(&out.base, "{{\"err\":{},\"str\":\"{}\",\"seed\":\"0x{:x}\",\"iter\":{}}}\n",
+    sp_fmt_uint((u64)err), sp_fmt_str(fz_err_to_str(err)), sp_fmt_uint(sp_fuzz_seed_get()), sp_fmt_uint(iter));
+  sp_io_file_writer_close(&out);
+}
+
 static u32 fz_run_iteration(sp_mem_t mem, sp_fuzz_prng_t prng, u64 iter) {
   fz_profile_t profile = fz_gen_profile(&prng);
   fz_universe_t universe = fz_gen_universe(mem, &prng, profile);
   fz_trace_t trace = fz_gen_trace(mem, &prng, &universe);
 
+  fz_journal_t journal = sp_zero;
+  fz_journal_t* j = SP_NULLPTR;
+  sp_str_t dir = sp_zero;
   sp_str_t render = sp_fuzz_render_path();
   if (!sp_str_empty(render)) {
-    fz_render_iteration(mem, render, &universe, &trace, iter);
+    dir = fz_render_iteration(mem, render, &universe, &trace, iter);
+    fz_journal_init(&journal, mem);
+    fz_journal_universe(&journal, &universe, &trace, iter);
+    j = &journal;
   }
 
   fz_err_t err = fz_check_universe(&universe);
-  if (err) {
-    return (u32)err;
+  if (!err) {
+    err = fz_run_trace(mem, &prng, &universe, &trace, j);
   }
-  return (u32)fz_run_trace(mem, &prng, &universe, &trace);
+
+  if (j) {
+    fz_journal_done(j, err);
+    sp_io_file_writer_t out = sp_zero;
+    if (!sp_io_file_writer_from_path(&out, sp_fs_join_path(mem, dir, sp_str_lit("journal.jsonl")))) {
+      fz_journal_write(j, &out.base);
+      sp_io_file_writer_close(&out);
+    }
+    if (err) {
+      fz_write_failure(mem, dir, err, iter);
+    }
+  }
+
+  return (u32)err;
 }
 
 s32 main(s32 num_args, c8** args) {

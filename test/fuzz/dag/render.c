@@ -82,7 +82,7 @@ void fz_render_mermaid(sp_io_writer_t* io, fz_universe_t* u) {
   sp_mem_end_scratch(s);
 }
 
-void fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_trace_t* trace, u64 iter) {
+sp_str_t fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_trace_t* trace, u64 iter) {
   sp_fs_create_dir(root);
   sp_str_t dir = sp_fs_join_path(mem, root, sp_fmt(mem, "{:0>3}", sp_fmt_uint(iter)).value);
   sp_fs_create_dir(dir);
@@ -167,4 +167,6 @@ void fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_trace
     }
     sp_io_file_writer_close(&steps);
   }
+
+  return dir;
 }
