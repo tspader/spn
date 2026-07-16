@@ -139,10 +139,17 @@ typedef struct {
 } fz_executor_t;
 
 typedef struct {
+  sp_mem_t mem;
+  sp_sim_t* sim;
+  sp_da(sp_str_t) lines;
+} fz_journal_t;
+
+typedef struct {
   fz_universe_t* u;
   spn_dag_t* g;
   sp_mem_t mem;
   fz_executor_t* ex;
+  fz_journal_t* journal;
   sp_da(spn_dag_id_t) ids;
   sp_da(u64) execs;
 } fz_lowered_t;
@@ -174,9 +181,23 @@ spn_dag_digest_t fz_model_key(fz_universe_t* u, const sp_str_t* bytes, u64 actio
 fz_shape_t       fz_shape_now(fz_universe_t* u, u64 action);
 spn_dag_digest_t fz_model_strong(fz_universe_t* u, const sp_str_t* bytes, spn_dag_digest_t prelim, u64 action, const fz_shape_t* shape);
 void             fz_executor_init(fz_executor_t* ex, sp_mem_t mem, sp_sim_t* sim, sp_fuzz_prng_t prng);
-fz_err_t         fz_run_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_trace_t* trace);
+fz_err_t         fz_run_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_trace_t* trace, fz_journal_t* j);
 
-void fz_render_mermaid(sp_io_writer_t* io, fz_universe_t* u);
-void fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_trace_t* trace, u64 iter);
+void fz_journal_init(fz_journal_t* j, sp_mem_t mem);
+void fz_journal_universe(fz_journal_t* j, fz_universe_t* u, fz_trace_t* trace, u64 iter);
+void fz_journal_step(fz_journal_t* j, fz_step_t* step, u64 index);
+void fz_journal_run_done(fz_journal_t* j, u64 err, u64 fired, bool crashed);
+void fz_journal_world(fz_journal_t* j, bool honest, bool murky, bool tainted);
+void fz_journal_model(fz_journal_t* j, u64 action, spn_dag_digest_t key, bool resolved, bool hit);
+void fz_journal_exec(fz_journal_t* j, u64 action);
+void fz_journal_check(fz_journal_t* j, u64 action, u64 execs, u64 want, bool miss, u64 requeues);
+void fz_journal_bytes(fz_journal_t* j, sp_str_t check, u64 artifact, sp_str_t want, sp_str_t got, bool ok);
+void fz_journal_pass(fz_journal_t* j, sp_str_t name);
+void fz_journal_done(fz_journal_t* j, fz_err_t err);
+void fz_journal_trace_hook(const spn_dag_trace_event_t* event, void* user_data);
+void fz_journal_write(fz_journal_t* j, sp_io_writer_t* io);
+
+void     fz_render_mermaid(sp_io_writer_t* io, fz_universe_t* u);
+sp_str_t fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_trace_t* trace, u64 iter);
 
 #endif

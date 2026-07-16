@@ -9,6 +9,7 @@ add_executable(fuzz_dag
   ${SRC}/intern/intern.c
   main.c
   generator.c
+  journal.c
   lower.c
   model.c
   render.c
