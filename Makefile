@@ -10,7 +10,10 @@ ifeq ($(OS),Windows_NT)
   NPROC := $(NUMBER_OF_PROCESSORS)
   HOME ?= $(USERPROFILE)
   GENERATOR ?= Visual Studio 17 2022
-  GEN_FLAGS := -G "$(GENERATOR)"
+	GEN_FLAGS :=
+	ifneq ($(GENERATOR),)
+		GEN_FLAGS := -G "$(GENERATOR)"
+	endif
 else
   UNAME_M := $(shell uname -m)
   ifeq ($(UNAME_M),arm64)
