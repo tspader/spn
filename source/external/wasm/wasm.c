@@ -10,6 +10,7 @@
 #include "wasm_export.h"
 
 #include "external/wasm/abi.h"
+#include "dag/wasi.h"
 
 #define SPN_WASM_STACK_SIZE (8 * 1024 * 1024)
 #define SPN_WASM_HEAP_SIZE  (16 * 1024 * 1024)
@@ -38,7 +39,7 @@ spn_err_t spn_wasm_init() {
     return SPN_ERR_WASM_REGISTER_FAILED;
   }
 
-  return SPN_OK;
+  return spn_dag_wasi_install();
 }
 
 // WAMR mprotects guard pages at the bottom of any thread that runs a script;
@@ -114,10 +115,28 @@ static spn_err_t script_open(spn_wasm_script_t* script, spn_pkg_unit_t* unit) {
     });
   }
 
+  script->env = wasm_runtime_create_exec_env(script->instance, SPN_WASM_STACK_SIZE);
+  if (!script->env) {
+    wasm_runtime_deinstantiate(script->instance);
+    script->instance = SP_NULLPTR;
+    wasm_runtime_unload(script->module);
+    script->module = SP_NULLPTR;
+    return script_fail(unit, SPN_ERR_WASM_CTX_FAILED, (spn_err_wasm_t) { .path = script->path });
+  }
+
   script->handles = sp_alloc_type(spn.mem, spn_wasm_handles_t);
   sp_ht_init(spn.mem, script->handles->map);
   script->handles->ctx = sp_ptr_cast(spn_t*, unit);
   script->ctx = spn_wasm_add_handle(script->handles, unit, SPN_ABI_KIND_CTX);
+  wasm_runtime_set_user_data(script->env, script->handles);
+
+  spn_dag_wasi_mount_t mounts [] = {
+    { .guest = "/work",   .host = unit->paths.work },
+    { .guest = "/source", .host = unit->paths.source },
+    { .guest = "/store",  .host = unit->paths.store },
+  };
+  script->wasi = spn_dag_wasi_new(spn.mem, mounts, sp_carr_len(mounts));
+  spn_dag_wasi_bind(script->wasi, script->instance);
 
   return SPN_OK;
 }
@@ -167,35 +186,7 @@ bool spn_wasm_script_exports(spn_wasm_script_t* script, sp_str_t name) {
   return exported;
 }
 
-spn_err_t spn_wasm_script_call(spn_wasm_script_t* script, spn_pkg_unit_t* unit, sp_str_t name, spn_abi_kind_t kind, void* arg) {
-  if (!wasm_runtime_init_thread_env()) {
-    return script_fail(unit, SPN_ERR_WASM_THREAD_ENV_FAILED, (spn_err_wasm_t) { .path = script->path });
-  }
-
-  sp_mutex_lock(&script->mutex);
-  SP_ASSERT(script->state == SPN_WASM_SCRIPT_OPEN);
-
-  c8 buffer [SPN_WASM_EXPORT_MAX] = sp_zero;
-  export_name(name, buffer);
-
-  wasm_function_inst_t fn = wasm_runtime_lookup_function(script->instance, buffer);
-  if (!fn) {
-    sp_mutex_unlock(&script->mutex);
-    return script_fail(unit, SPN_ERR_WASM_EXPORT_NOT_FOUND, (spn_err_wasm_t) {
-      .path = script->path,
-      .error = name,
-    });
-  }
-
-  spn_err_t err = SPN_OK;
-
-  wasm_exec_env_t env = wasm_runtime_create_exec_env(script->instance, SPN_WASM_STACK_SIZE);
-  if (!env) {
-    sp_mutex_unlock(&script->mutex);
-    return script_fail(unit, SPN_ERR_WASM_CTX_FAILED, (spn_err_wasm_t) { .path = script->path });
-  }
-
-  wasm_runtime_set_user_data(env, script->handles);
+static spn_err_t script_call_invoke(spn_wasm_script_t* script, spn_pkg_unit_t* unit, wasm_function_inst_t fn, spn_abi_kind_t kind, void* arg) {
   u32 token = spn_wasm_add_handle(script->handles, arg, kind);
 
   wasm_val_t args [2] = {
@@ -203,24 +194,60 @@ spn_err_t spn_wasm_script_call(spn_wasm_script_t* script, spn_pkg_unit_t* unit, 
     { .kind = WASM_I32, .of.i32 = (s32)token },
   };
   wasm_val_t results [1] = sp_zero;
-  if (!wasm_runtime_call_wasm_a(env, fn, 1, results, sp_carr_len(args), args)) {
-    err = script_fail(unit, SPN_ERR_WASM_MODULE_CALL_FAILED, (spn_err_wasm_t) {
+  bool called = wasm_runtime_call_wasm_a(script->env, fn, 1, results, sp_carr_len(args), args);
+  spn_wasm_remove_handle(script->handles, token);
+
+  if (!called) {
+    return script_fail(unit, SPN_ERR_WASM_MODULE_CALL_FAILED, (spn_err_wasm_t) {
       .path = script->path,
       .error = sp_cstr_as_str(wasm_runtime_get_exception(script->instance)),
     });
   }
-  else if (results[0].of.i32) {
-    err = script_fail(unit, SPN_ERR_WASM_SCRIPT_ERROR, (spn_err_wasm_t) {
+  if (results[0].of.i32) {
+    return script_fail(unit, SPN_ERR_WASM_SCRIPT_ERROR, (spn_err_wasm_t) {
       .path = script->path,
       .rc = results[0].of.i32,
     });
   }
+  return SPN_OK;
+}
 
-  spn_wasm_remove_handle(script->handles, token);
-  wasm_runtime_destroy_exec_env(env);
+spn_err_t spn_wasm_script_call_ex(spn_wasm_script_t* script, spn_pkg_unit_t* unit, sp_str_t name, spn_abi_kind_t kind, void* arg, spn_wasm_obs_t obs) {
+  if (!wasm_runtime_init_thread_env()) {
+    return script_fail(unit, SPN_ERR_WASM_THREAD_ENV_FAILED, (spn_err_wasm_t) { .path = script->path });
+  }
+
+  c8 buffer [SPN_WASM_EXPORT_MAX] = sp_zero;
+  export_name(name, buffer);
+
+  sp_mutex_lock(&script->mutex);
+  SP_ASSERT(script->state == SPN_WASM_SCRIPT_OPEN);
+
+  spn_err_t err = SPN_OK;
+  wasm_function_inst_t fn = wasm_runtime_lookup_function(script->instance, buffer);
+
+  if (!fn) {
+    err = script_fail(unit, SPN_ERR_WASM_EXPORT_NOT_FOUND, (spn_err_wasm_t) {
+      .path = script->path,
+      .error = name,
+    });
+  }
+  else {
+    if (obs.out) {
+      spn_dag_wasi_begin(script->wasi, obs.mem, obs.out);
+    }
+    err = script_call_invoke(script, unit, fn, kind, arg);
+    if (obs.out) {
+      spn_dag_wasi_end(script->wasi);
+    }
+  }
+
   sp_mutex_unlock(&script->mutex);
-
   return err;
+}
+
+spn_err_t spn_wasm_script_call(spn_wasm_script_t* script, spn_pkg_unit_t* unit, sp_str_t name, spn_abi_kind_t kind, void* arg) {
+  return spn_wasm_script_call_ex(script, unit, name, kind, arg, sp_zero_s(spn_wasm_obs_t));
 }
 
 spn_err_t spn_wasm_find_export(spn_pkg_unit_t* unit, sp_str_t name, spn_wasm_script_t** script) {
@@ -241,7 +268,7 @@ spn_err_t spn_wasm_find_export(spn_pkg_unit_t* unit, sp_str_t name, spn_wasm_scr
   return SPN_OK;
 }
 
-spn_err_t spn_wasm_call_export(spn_pkg_unit_t* unit, sp_str_t name, spn_abi_kind_t kind, void* arg) {
+spn_err_t spn_wasm_call_export_ex(spn_pkg_unit_t* unit, sp_str_t name, spn_abi_kind_t kind, void* arg, spn_wasm_obs_t obs) {
   spn_wasm_script_t* script = SP_NULLPTR;
   spn_try(spn_wasm_find_export(unit, name, &script));
 
@@ -261,5 +288,9 @@ spn_err_t spn_wasm_call_export(spn_pkg_unit_t* unit, sp_str_t name, spn_abi_kind
     return script_fail(unit, SPN_ERR_WASM_NO_SCRIPT, (spn_err_wasm_t) { .error = name });
   }
 
-  return spn_wasm_script_call(script, unit, name, kind, arg);
+  return spn_wasm_script_call_ex(script, unit, name, kind, arg, obs);
+}
+
+spn_err_t spn_wasm_call_export(spn_pkg_unit_t* unit, sp_str_t name, spn_abi_kind_t kind, void* arg) {
+  return spn_wasm_call_export_ex(unit, name, kind, arg, (spn_wasm_obs_t) sp_zero);
 }
