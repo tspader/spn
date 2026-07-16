@@ -32,6 +32,7 @@ set(SPN_SOURCES
   compiler/driver.c
   compiler/gnu.c
   compiler/msvc.c
+  complete/complete.c
   ctx/ctx.c
   dag/dag.c
   dag/lower.c
