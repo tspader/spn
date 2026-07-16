@@ -274,6 +274,17 @@ include = ["include", "source", "test/tools"]
 flags = []
 
 [[test]]
+name = "complete"
+source = [
+  "source/cli/cli.c",
+  "source/complete/complete.c",
+  "source/sp/str.c",
+  "test/core/complete.c",
+]
+include = ["include", "source", "test/tools"]
+flags = []
+
+[[test]]
 name = "integration"
 source = [
   "source/external/tom.c",

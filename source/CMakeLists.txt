@@ -10,6 +10,7 @@ set(SPN_SOURCES
   cli/build.c
   cli/clean.c
   cli/cli.c
+  cli/completions.c
   cli/copy.c
   cli/generate.c
   cli/graph.c
@@ -32,6 +33,7 @@ set(SPN_SOURCES
   compiler/driver.c
   compiler/gnu.c
   compiler/msvc.c
+  complete/complete.c
   ctx/ctx.c
   dag/dag.c
   dag/lower.c
