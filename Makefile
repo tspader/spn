@@ -9,7 +9,16 @@ ifeq ($(OS),Windows_NT)
   HOST_TRIPLE := $(HOST_ARCH)-windows-msvc
   NPROC := $(NUMBER_OF_PROCESSORS)
   HOME ?= $(USERPROFILE)
-  GENERATOR ?= Visual Studio 17 2022
+  ifeq ($(origin GENERATOR),undefined)
+    VSWHERE := $(shell command -v vswhere.exe 2>/dev/null || echo "C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe")
+    VS_MIN_VERSION := [17.0,)
+    VS_VERSION := $(shell "$(VSWHERE)" -latest -products "*" -requires Microsoft.Component.MSBuild -version "$(VS_MIN_VERSION)" -property installationVersion 2>/dev/null)
+    VS_YEAR := $(shell "$(VSWHERE)" -latest -products "*" -requires Microsoft.Component.MSBuild -version "$(VS_MIN_VERSION)" -property catalog_featureReleaseYear 2>/dev/null)
+    ifeq ($(strip $(VS_VERSION)),)
+      $(error no Visual Studio 17.0 or newer installation found; install VS 2022 or newer or override with GENERATOR=<generator>)
+    endif
+    GENERATOR := Visual Studio $(word 1,$(subst ., ,$(VS_VERSION))) $(VS_YEAR)
+  endif
   GEN_FLAGS := -G "$(GENERATOR)"
 else
   UNAME_M := $(shell uname -m)
