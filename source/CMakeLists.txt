@@ -30,12 +30,15 @@ set(SPN_SOURCES
   codegen/options.c
   codegen/when.c
   compiler/driver.c
+  compiler/exports.c
   compiler/gnu.c
   compiler/msvc.c
+  compiler/toc.c
   ctx/ctx.c
   dag/dag.c
   dag/lower.c
   dag/occ.c
+  dag/wasi.c
   enum/enum.c
   event/event.c
   event/build.c

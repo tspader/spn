@@ -4,6 +4,10 @@ typedef struct {
   spn_cc_driver_t driver;
   spn_profile_info_t profile;
   spn_cc_output_kind_t kind;
+  const c8* exports;
+  const c8* export_symbols [2];
+  const c8* whole_archive;
+  const c8* private_lib;
   const c8* hidden_lib;
   const c8* system_lib;
   const c8* framework;
@@ -26,12 +30,28 @@ static void run_link_test(s32* utest_result, link_test_t test) {
   sp_da_init(scratch.mem, link.objects);
   sp_da_init(scratch.mem, link.args);
   sp_da_init(scratch.mem, link.libs);
+  sp_da_init(scratch.mem, link.whole_archives);
+  sp_da_init(scratch.mem, link.private_libs);
   sp_da_init(scratch.mem, link.system_libs);
   sp_da_init(scratch.mem, link.hidden_libs);
   sp_da_init(scratch.mem, link.lib_dirs);
   sp_da_init(scratch.mem, link.rpath);
+  sp_da_init(scratch.mem, link.exports.symbols);
   sp_da_init(scratch.mem, link.frameworks);
   sp_da_push(link.objects, sp_str_lit("main.o"));
+  if (test.exports) {
+    link.exports.path = sp_str_from_cstr(scratch.mem, test.exports);
+  }
+  sp_carr_for(test.export_symbols, it) {
+    if (!test.export_symbols[it]) break;
+    sp_da_push(link.exports.symbols, sp_str_from_cstr(scratch.mem, test.export_symbols[it]));
+  }
+  if (test.whole_archive) {
+    sp_da_push(link.whole_archives, sp_str_from_cstr(scratch.mem, test.whole_archive));
+  }
+  if (test.private_lib) {
+    sp_da_push(link.private_libs, sp_str_from_cstr(scratch.mem, test.private_lib));
+  }
   if (test.hidden_lib) {
     sp_da_push(link.hidden_libs, sp_str_from_cstr(scratch.mem, test.hidden_lib));
   }
@@ -377,6 +397,107 @@ UTEST(render_link, sanitizers_on_link_line) {
     .expect = {
       .command = "cc",
       .args = { "-fsanitize=address", "main.o", "-o", "main" },
+    },
+  });
+}
+
+UTEST(render_link, linux_shared_exports) {
+  UTEST_SKIP("");
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+    },
+    .kind = SPN_CC_OUTPUT_SHARED_LIB,
+    .exports = "S.map",
+    .whole_archive = "libD.a",
+    .private_lib = "P",
+    .expect = {
+      .command = "cc",
+      .args = {
+        "-shared", "-Wl,--version-script,S.map",
+        "main.o",
+        "-Wl,--whole-archive", "libD.a", "-Wl,--no-whole-archive",
+        "-lP",
+        "-o", "main"
+      },
+    },
+  });
+}
+
+UTEST(render_link, macos_shared_exports) {
+  UTEST_SKIP("");
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_MACOS,
+    },
+    .kind = SPN_CC_OUTPUT_SHARED_LIB,
+    .exports = "S.exp",
+    .whole_archive = "libD.a",
+    .private_lib = "P",
+    .expect = {
+      .command = "cc",
+      .args = {
+        "--target=aarch64-macos",
+        "-shared", "-Wl,-exported_symbols_list,S.exp",
+        "main.o",
+        "-Wl,-force_load,libD.a",
+        "-lP",
+        "-o", "main"
+      },
+    },
+  });
+}
+
+UTEST(render_link, mingw_shared_def) {
+  UTEST_SKIP("");
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MINGW,
+    },
+    .kind = SPN_CC_OUTPUT_SHARED_LIB,
+    .exports = "S.def",
+    .whole_archive = "libD.a",
+    .private_lib = "P",
+    .expect = {
+      .command = "cc",
+      .args = {
+        "-shared", "S.def",
+        "main.o",
+        "-Wl,--whole-archive", "libD.a", "-Wl,--no-whole-archive",
+        "-lP", "-Wl,--exclude-libs,libP.a",
+        "-o", "main"
+      },
+    },
+  });
+}
+
+UTEST(render_link, wasi_reactor_exports) {
+  UTEST_SKIP("");
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_WASM32,
+      .os = SPN_OS_WASI,
+    },
+    .kind = SPN_CC_OUTPUT_REACTOR,
+    .export_symbols = { "A", "B" },
+    .expect = {
+      .command = "cc",
+      .args = {
+        "--target=wasm32-wasi",
+        "-mexec-model=reactor",
+        "-Wl,--no-entry", "-Wl,--import-symbols",
+        "-Wl,--export=A", "-Wl,--export=B",
+        "main.o", "-o", "main"
+      },
     },
   });
 }

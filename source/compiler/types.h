@@ -70,12 +70,20 @@ typedef struct {
 } spn_cc_compile_t;
 
 typedef struct {
+  sp_str_t path;
+  sp_da(sp_str_t) symbols;
+} spn_cc_exports_t;
+
+typedef struct {
   spn_lang_t lang;
   spn_cc_output_kind_t kind;
   sp_str_t output;
+  spn_cc_exports_t exports;
   sp_da(sp_str_t) objects;
   sp_da(sp_str_t) args;
   sp_da(sp_str_t) libs;
+  sp_da(sp_str_t) whole_archives;
+  sp_da(sp_str_t) private_libs;
   sp_da(sp_str_t) system_libs;
   sp_da(sp_str_t) hidden_libs;
   sp_da(sp_str_t) lib_dirs;
