@@ -111,6 +111,34 @@
       ]
     },
     {
+      "name": "msvc",
+      "driver": "msvc",
+      "compiler": {
+        "program": "cl"
+      },
+      "linker": {
+        "program": "cl"
+      },
+      "archiver": {
+        "program": "lib"
+      },
+      "cxx": {
+        "program": "cl"
+      },
+      "target": [
+        {
+          "arch": "x86_64",
+          "os": "windows",
+          "abi": "msvc"
+        },
+        {
+          "arch": "aarch64",
+          "os": "windows",
+          "abi": "msvc"
+        }
+      ]
+    },
+    {
       "name": "system",
       "driver": "gcc",
       "compiler": {

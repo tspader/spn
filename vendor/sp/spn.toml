@@ -6,7 +6,9 @@ version = "3.3.0"
 commit = "cb474f197d44a332e3a7e6fd84dff06e276f7d4a"
 author = "tspader"
 maintainer = "tspader"
-system_deps = ["m"]
+system_deps = [
+  { lib = "m", when = { os = "linux" } },
+]
 
 [[lib]]
 name = "sp"

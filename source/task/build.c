@@ -253,7 +253,7 @@ spn_task_step_t spn_task_build_graph_init(spn_app_t* app) {
     &session->build.graph,
     session->build.dirty,
     (spn_bg_executor_config_t) {
-      .num_threads = 16,
+      .num_threads = 8,
       .enable_logging = false,
       .on_worker_exit = spn_wasm_thread_exit,
     }

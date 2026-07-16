@@ -5,17 +5,32 @@ url = "https://github.com/bytecodealliance/wasm-micro-runtime.git"
 version = "2.4.1"
 commit = "0b9db98aea32f5d634de8268a57b442f41fffc45"
 system_deps = [
-  "m",
+  { lib = "m", when = { os = "linux" } },
   { lib = "ws2_32", when = { os = "windows" } },
   { lib = "ntdll", when = { os = "windows" } },
   { lib = "bcrypt", when = { os = "windows" } },
   { lib = "pathcch", when = { os = "windows" } },
 ]
 
+# wasm_export.h declares the runtime API __declspec(dllimport) under MSVC
+# unless this macro is empty; vmlib is static, so it must be
+[options.static_api]
+type = "bool"
+public = true
+define = "WASM_RUNTIME_API_EXTERN="
+default = [
+  { when = { abi = "msvc" }, value = true },
+  { value = false },
+]
+
 [[lib]]
 name = "vmlib"
 kinds = ["static"]
 define = [
+  # wasm_c_api.h has its own import/export macro separate from
+  # wasm_export.h's; nothing outside vmlib uses the C API, so it only
+  # needs neutralizing here
+  { value = "WASM_API_EXTERN=", when = { abi = "msvc" } },
   { value = "BH_PLATFORM_LINUX", when = { os = "linux" } },
   { value = "BH_PLATFORM_DARWIN", when = { os = "macos" } },
   { value = "BH_PLATFORM_WINDOWS", when = { os = "windows" } },
@@ -82,11 +97,9 @@ source = [
   "core/iwasm/libraries/libc-wasi/sandboxed-system-primitives/src/*.c",
 ]
 flags = [
-  "-O2",
-  "-std=gnu11",
-  "-Wno-unused-function",
-  "-Wno-unused-variable",
-  "-Wno-unused-parameter",
+  { value = "-Wno-unused-function", when = { abi = { not = "msvc" } } },
+  { value = "-Wno-unused-variable", when = { abi = { not = "msvc" } } },
+  { value = "-Wno-unused-parameter", when = { abi = { not = "msvc" } } },
 ]
 
 [publish]

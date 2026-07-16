@@ -105,7 +105,10 @@ spn_err_union_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* to
       spn_gnu_render_compile(mem, toolchain, profile, compile, ps);
       return spn_result(SPN_OK);
     }
-    case SPN_CC_DRIVER_MSVC: return unsupported(toolchain, profile, SPN_CC_FEATURE_COMPILE);
+    case SPN_CC_DRIVER_MSVC: {
+      spn_msvc_render_compile(mem, toolchain, profile, compile, ps);
+      return spn_result(SPN_OK);
+    }
     case SPN_CC_DRIVER_NONE: {
       sp_unreachable_case();
     }
@@ -144,7 +147,13 @@ spn_err_union_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolc
       spn_gnu_render_link(mem, toolchain, profile, link, ps);
       return spn_result(SPN_OK);
     }
-    case SPN_CC_DRIVER_MSVC: return unsupported(toolchain, profile, feature);
+    case SPN_CC_DRIVER_MSVC: {
+      if (link->kind == SPN_CC_OUTPUT_REACTOR) {
+        return unsupported(toolchain, profile, feature);
+      }
+      spn_msvc_render_link(mem, toolchain, profile, link, ps);
+      return spn_result(SPN_OK);
+    }
     case SPN_CC_DRIVER_NONE: {
       sp_unreachable_case();
     }
@@ -158,7 +167,10 @@ spn_err_union_t spn_cc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* to
       spn_gnu_render_archive(mem, toolchain, archive, ps);
       return spn_result(SPN_OK);
     }
-    case SPN_AR_DRIVER_MSVC: return unsupported(toolchain, profile, SPN_CC_FEATURE_ARCHIVE);
+    case SPN_AR_DRIVER_MSVC: {
+      spn_msvc_render_archive(mem, toolchain, archive, ps);
+      return spn_result(SPN_OK);
+    }
   }
   SP_UNREACHABLE_RETURN(spn_result(SPN_ERROR));
 }
