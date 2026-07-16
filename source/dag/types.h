@@ -73,6 +73,7 @@ struct spn_dag_action_t {
   void* user_data;
   sp_da(spn_dag_id_t) consumes;
   sp_da(spn_dag_id_t) produces;
+  bool wrote;
 };
 
 typedef struct {
@@ -152,12 +153,39 @@ typedef struct {
   sp_atomic_s32_t misses;
 } spn_dag_progress_t;
 
+typedef enum {
+  SPN_DAG_TRACE_KEY,
+  SPN_DAG_TRACE_DISCOVERY,
+  SPN_DAG_TRACE_RESOLVE,
+  SPN_DAG_TRACE_STRONG,
+  SPN_DAG_TRACE_CACHE,
+  SPN_DAG_TRACE_EXECUTE,
+  SPN_DAG_TRACE_COMMIT,
+  SPN_DAG_TRACE_DEFER,
+  SPN_DAG_TRACE_REQUEUE,
+  SPN_DAG_TRACE_SETTLE,
+} spn_dag_trace_kind_t;
+
+typedef struct {
+  spn_dag_trace_kind_t kind;
+  spn_dag_id_t action;
+  spn_dag_digest_t key;
+  spn_dag_id_t producer;
+  bool present;
+  bool hit;
+  bool changed;
+} spn_dag_trace_event_t;
+
+SP_TYPEDEF_FN(void, spn_dag_trace_fn_t, const spn_dag_trace_event_t*, void*);
+
 typedef struct {
   spn_dag_file_cache_t* files;
   spn_dag_action_cache_t* cache;
   spn_dag_store_t* store;
   spn_dag_discovery_t* discovery;
   spn_dag_progress_t* progress;
+  spn_dag_trace_fn_t trace;
+  void* trace_data;
   sp_str_t scratch;
   bool force;
 } spn_dag_env_t;
