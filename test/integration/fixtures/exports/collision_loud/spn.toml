@@ -1,0 +1,13 @@
+[package]
+name = "exports_collision_loud"
+version = "0.1.0"
+
+[deps.package]
+S = "1.0.0"
+
+[profile.default]
+linkage = "shared"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

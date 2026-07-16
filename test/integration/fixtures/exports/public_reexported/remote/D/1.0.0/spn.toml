@@ -1,0 +1,9 @@
+[package]
+name = "D"
+version = "1.0.0"
+
+[[lib]]
+name = "D"
+kinds = ["static"]
+source = ["D.c"]
+headers = ["D.h"]

@@ -1,0 +1,12 @@
+[package]
+name = "S"
+version = "1.0.0"
+
+[deps.package]
+P = { version = "1.0.0", private = true }
+
+[[lib]]
+name = "S"
+kinds = ["shared"]
+source = ["S.c"]
+headers = ["S.h"]
