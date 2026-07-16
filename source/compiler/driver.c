@@ -98,11 +98,7 @@ spn_err_union_t spn_cc_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* tool
 }
 
 spn_err_union_t spn_cc_validate_compile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
-  try_union(validate_profile(toolchain, profile));
-  if (toolchain->driver == SPN_CC_DRIVER_MSVC) {
-    return unsupported(toolchain, profile, SPN_CC_FEATURE_COMPILE);
-  }
-  return spn_result(SPN_OK);
+  return validate_profile(toolchain, profile);
 }
 
 spn_err_union_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, sp_ps_config_t* ps) {
@@ -177,9 +173,8 @@ spn_err_union_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolc
 }
 
 spn_err_union_t spn_cc_validate_archive(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
-  if (toolchain->archiver_driver == SPN_AR_DRIVER_MSVC) {
-    return unsupported(toolchain, profile, SPN_CC_FEATURE_ARCHIVE);
-  }
+  SP_UNUSED(toolchain);
+  SP_UNUSED(profile);
   return spn_result(SPN_OK);
 }
 
