@@ -23,6 +23,7 @@ yyjson = "0.13.0"
 utest = "1.0.0"
 
 [profile.default]
+toolchain = "zig"
 linkage = "static"
 standard = "c11"
 mode = "debug"
