@@ -33,6 +33,30 @@ UTEST_F(script, package_discovery) {
   });
 }
 
+UTEST_F(script, abi_discovery) {
+  tmpfs_init_named(&uf->fixture.fs, "script_abi_discovery");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/script/abi_discovery",
+    .copy = { "data" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = store_file("misc/data/D.txt"), .needle = sp_str_lit("A") } },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = store_file("misc/witness"), .needle = sp_str_lit("R") } },
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_FILE_NOT_CONTAINS, .verify_file_not_contains = { .file = store_file("misc/witness"), .needle = sp_str_lit("RR") } },
+      { .kind = ACTION_CREATE_FILE, .create = { .file = sp_str_lit("data/D.txt"), .content = sp_str_lit("B") } },
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = store_file("misc/data/D.txt"), .needle = sp_str_lit("B") } },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = store_file("misc/witness"), .needle = sp_str_lit("RR") } },
+      { .kind = ACTION_CREATE_FILE, .create = { .file = sp_str_lit("data/E.txt"), .content = sp_str_lit("C") } },
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = store_file("misc/data/E.txt"), .needle = sp_str_lit("C") } },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = store_file("misc/witness"), .needle = sp_str_lit("RRR") } },
+    },
+  });
+}
+
 UTEST_F(script, chained_nodes) {
   tmpfs_init_named(&uf->fixture.fs, "script_chained_nodes");
 
