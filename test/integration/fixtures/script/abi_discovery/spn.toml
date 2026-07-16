@@ -1,0 +1,7 @@
+[package]
+name = "abi_discovery"
+version = "0.0.1"
+
+[[bin]]
+name = "abi_discovery"
+source = ["main.c"]
