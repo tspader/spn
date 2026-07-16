@@ -113,14 +113,19 @@ add_test(NAME pkg COMMAND "$<TARGET_FILE:pkg>")
 
 add_executable(compiler_flags
   ${SRC}/compiler/driver.c
+  ${SRC}/compiler/exports.c
   ${SRC}/compiler/gnu.c
   ${SRC}/compiler/msvc.c
+  ${SRC}/compiler/toc.c
   ${SRC}/enum/enum.c
   ${SRC}/triple/triple.c
   compiler.c
   compiler/archive.c
   compiler/compile.c
+  compiler/exports/collect.c
+  compiler/exports/render.c
   compiler/link.c
+  compiler/toc.c
 )
 spn_test_binary(compiler_flags)
 add_test(NAME compiler_flags COMMAND "$<TARGET_FILE:compiler_flags>")
