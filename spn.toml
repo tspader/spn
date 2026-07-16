@@ -24,7 +24,7 @@ utest = "1.0.0"
 
 [profile.default]
 toolchain = "zig"
-linkage = "static"
+linkage = "shared"
 standard = "c11"
 mode = "debug"
 
