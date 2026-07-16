@@ -132,7 +132,32 @@ UTEST(render_link, gcc_reactor_unsupported) {
   });
 }
 
-UTEST(render_link, msvc_shared_lib_unsupported) {
+UTEST(render_link, msvc_exe_libs) {
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .hidden_lib = "spum",
+    .system_lib = "ws2_32",
+    .lib_dir = "deps/lib",
+    .expect = {
+      .command = "cc",
+      .args = {
+        "/nologo",
+        "main.o",
+        "spum.lib", "ws2_32.lib",
+        "/Femain",
+        "/link", "/LIBPATH:deps/lib"
+      },
+    },
+  });
+}
+
+UTEST(render_link, msvc_shared_lib) {
   run_link_test(utest_result, (link_test_t) {
     .driver = SPN_CC_DRIVER_MSVC,
     .profile = {
@@ -142,8 +167,58 @@ UTEST(render_link, msvc_shared_lib_unsupported) {
     },
     .kind = SPN_CC_OUTPUT_SHARED_LIB,
     .expect = {
+      .command = "cc",
+      .args = { "/nologo", "/LD", "main.o", "/Femain" },
+    },
+  });
+}
+
+UTEST(render_link, msvc_debug_pdb) {
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .mode = SPN_BUILD_MODE_DEBUG,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "/nologo", "main.o", "/Femain", "/link", "/DEBUG" },
+    },
+  });
+}
+
+UTEST(render_link, msvc_subsystem) {
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .subsystem = SPN_WIN_SUBSYSTEM_WINDOWS,
+    .expect = {
+      .command = "cc",
+      .args = { "/nologo", "main.o", "/Femain", "/link", "/SUBSYSTEM:WINDOWS" },
+    },
+  });
+}
+
+UTEST(render_link, msvc_reactor_unsupported) {
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+    },
+    .kind = SPN_CC_OUTPUT_REACTOR,
+    .expect = {
       .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
-      .feature = SPN_CC_FEATURE_LINK_SHARED,
+      .feature = SPN_CC_FEATURE_LINK_REACTOR,
     },
   });
 }

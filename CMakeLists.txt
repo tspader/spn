@@ -44,6 +44,9 @@ if(MSVC)
   link_libraries(ws2_32)
   # cl.exe needs this to serialize PDB access
   add_compile_options(/FS)
+  # cl.exe defaults the source and execution charsets to the system ANSI
+  # codepage; non-ASCII string literals are mangled without this
+  add_compile_options(/utf-8)
 endif()
 
 # @spader Zig crashes when given --dependency-file

@@ -41,10 +41,13 @@ UTEST(render_archive, gnu_archiver) {
   });
 }
 
-UTEST(render_archive, msvc_archiver_unsupported) {
+UTEST(render_archive, msvc_archiver) {
   run_archive_test(utest_result, (archive_test_t) {
     .compiler = SPN_CC_DRIVER_GCC,
     .archiver = SPN_AR_DRIVER_MSVC,
-    .expect = { .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED },
+    .expect = {
+      .command = "ar",
+      .args = { "/nologo", "/OUT:libmain.a", "main.o" },
+    },
   });
 }
