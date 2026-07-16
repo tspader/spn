@@ -1,0 +1,7 @@
+[package]
+name = "package_discovery"
+version = "0.0.1"
+
+[[bin]]
+name = "package_discovery"
+source = ["main.c"]
