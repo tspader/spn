@@ -334,7 +334,7 @@ spn_task_step_t spn_task_sync_packages_init(spn_app_t *app) {
 
   session->sync.dirty = spn_bg_compute_forced_dirty(graph);
   session->sync.executor = spn_bg_executor_new(graph, session->sync.dirty, (spn_bg_executor_config_t){
-    .num_threads = 16,
+    .num_threads = 8,
     .on_worker_exit = spn_wasm_thread_exit,
   });
   spn_bg_executor_run(session->sync.executor);

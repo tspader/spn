@@ -153,6 +153,17 @@ UTEST(compiler_flags, resolve) {
     {
       .profile = {
         .arch = SPN_ARCH_X64,
+        .os = SPN_OS_WINDOWS,
+        .abi = SPN_ABI_MSVC,
+        .mode = SPN_BUILD_MODE_DEBUG,
+        .opt = SPN_OPT_LEVEL_0,
+      },
+      .driver = SPN_CC_DRIVER_MSVC,
+      .expect = { .compile = { "/Z7", "/Od" } },
+    },
+    {
+      .profile = {
+        .arch = SPN_ARCH_X64,
         .os = SPN_OS_MACOS,
         .sanitizers = SPN_SANITIZER_MEMORY,
       },

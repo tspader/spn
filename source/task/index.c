@@ -55,7 +55,7 @@ spn_task_step_t spn_task_sync_indexes_init(spn_app_t* app) {
 
   app->index_sync.bg.dirty = spn_bg_compute_forced_dirty(graph);
   app->index_sync.bg.executor = spn_bg_executor_new(graph, app->index_sync.bg.dirty, (spn_bg_executor_config_t) {
-    .num_threads = 4,
+    .num_threads = 8,
     .on_worker_exit = spn_wasm_thread_exit,
   });
   spn_bg_executor_run(app->index_sync.bg.executor);

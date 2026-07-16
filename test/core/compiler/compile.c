@@ -85,7 +85,59 @@ UTEST(render_compile, clang_wasi) {
   });
 }
 
-UTEST(render_compile, msvc_unsupported) {
+UTEST(render_compile, msvc_windows) {
+  run_compile_test(utest_result, (compile_test_t) {
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .standard = SPN_C11,
+    },
+    .include = "inc",
+    .define = "SPUM=1",
+    .expect = {
+      .command = "cc",
+      .args = { "/nologo", "/utf-8", "/std:c11", "/c", "main.c", "/Iinc", "/DSPUM=1", "/we4715", "/Fomain.o" },
+    },
+  });
+}
+
+UTEST(render_compile, msvc_c99_has_no_switch) {
+  run_compile_test(utest_result, (compile_test_t) {
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .standard = SPN_C99,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "/nologo", "/utf-8", "/c", "main.c", "/we4715", "/Fomain.o" },
+    },
+  });
+}
+
+UTEST(render_compile, msvc_debug) {
+  run_compile_test(utest_result, (compile_test_t) {
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .standard = SPN_C11,
+      .mode = SPN_BUILD_MODE_DEBUG,
+      .opt = SPN_OPT_LEVEL_0,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "/nologo", "/utf-8", "/std:c11", "/Z7", "/Od", "/c", "main.c", "/we4715", "/Fomain.o" },
+    },
+  });
+}
+
+UTEST(render_compile, msvc_cxx_defaults) {
   run_compile_test(utest_result, (compile_test_t) {
     .driver = SPN_CC_DRIVER_MSVC,
     .profile = {
@@ -93,9 +145,27 @@ UTEST(render_compile, msvc_unsupported) {
       .os = SPN_OS_WINDOWS,
       .abi = SPN_ABI_MSVC,
     },
+    .lang = SPN_LANG_CXX,
     .expect = {
-      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
-      .feature = SPN_CC_FEATURE_COMPILE,
+      .command = "c++",
+      .args = { "/nologo", "/utf-8", "/std:c++17", "/c", "main.c", "/EHsc", "/we4715", "/Fomain.o" },
+    },
+  });
+}
+
+UTEST(render_compile, msvc_cxx_options) {
+  run_compile_test(utest_result, (compile_test_t) {
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+    },
+    .lang = SPN_LANG_CXX,
+    .cxx = { .standard = SPN_CXX20, .no_exceptions = true, .no_rtti = true },
+    .expect = {
+      .command = "c++",
+      .args = { "/nologo", "/utf-8", "/std:c++20", "/c", "main.c", "/GR-", "/we4715", "/Fomain.o" },
     },
   });
 }
