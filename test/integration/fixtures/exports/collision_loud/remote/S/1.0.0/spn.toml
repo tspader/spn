@@ -1,0 +1,13 @@
+[package]
+name = "S"
+version = "1.0.0"
+
+[deps.package]
+A = "1.0.0"
+B = "1.0.0"
+
+[[lib]]
+name = "S"
+kinds = ["shared"]
+source = ["S.c"]
+headers = ["S.h"]

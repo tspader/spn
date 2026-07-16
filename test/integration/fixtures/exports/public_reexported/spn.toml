@@ -1,0 +1,14 @@
+[package]
+name = "exports_public_reexported"
+version = "0.1.0"
+system_deps = ["dl"]
+
+[deps.package]
+S = "1.0.0"
+
+[profile.default]
+linkage = "shared"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

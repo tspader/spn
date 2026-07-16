@@ -1,0 +1,14 @@
+[package]
+name = "exports_no_interference"
+version = "0.1.0"
+
+[deps.package]
+S = "1.0.0"
+P = { version = "1.0.0", private = true }
+
+[profile.default]
+linkage = "shared"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
