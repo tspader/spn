@@ -63,6 +63,10 @@ static void expect_obs(s32* utest_result, tmpfs_t* fs, wasm_expect_t* expect, sp
 }
 
 static void run_wasm_test(s32* utest_result, wasm_test_t t) {
+  if (!sp_str_empty(sp_os_env_get(sp_str_lit("SPN_TEST_SIM")))) {
+    UTEST_SKIP("wamr syscalls bypass the sim filesystem");
+  }
+
   static bool runtime_ready = false;
   if (!runtime_ready) {
     ASSERT_TRUE(wasm_runtime_init());
