@@ -1,6 +1,7 @@
 add_executable(dag
   ${SRC}/dag/dag.c
   ${SRC}/dag/lower.c
+  ${SRC}/dag/wasi.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/gen/dag_output.gen.c
   ${SRC}/codegen/gen/dag_obs.gen.c
@@ -22,12 +23,14 @@ add_executable(dag
   store.c
   strong_key.c
   tree.c
+  wasm.c
   ${TEST_TOOLS}/tmp.c
   ${TEST_TOOLS}/sp_sim.c
+  ${TEST_TOOLS}/wasm_emit.c
 )
 spn_test_binary(dag)
 target_include_directories(dag PRIVATE ${SRC}/codegen/gen)
-target_link_libraries(dag PRIVATE yyjson)
+target_link_libraries(dag PRIVATE yyjson vmlib)
 add_dependencies(dag spn_codegen_gen)
 add_test(NAME dag COMMAND "$<TARGET_FILE:dag>")
 add_test(NAME dag_sim COMMAND "$<TARGET_FILE:dag>")
