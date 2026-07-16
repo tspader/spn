@@ -42,7 +42,13 @@ typedef struct {
 typedef struct {
   spn_user_node_t* node;
   bool stamp;
+  sp_da(spn_dag_obs_t) obs;
 } spn_dag_user_ctx_t;
+
+typedef struct {
+  spn_pkg_unit_t* pkg;
+  sp_da(spn_dag_obs_t) obs;
+} spn_dag_package_ctx_t;
 
 static spn_dag_build_t* dag_of(spn_pkg_unit_t* pkg) {
   return pkg->session->dag;
@@ -309,9 +315,10 @@ static s32 dag_user_exec(spn_dag_action_t* action, void* user_data) {
     .node = { .info = node }
   });
 
+  sp_da_init(b->mem, ctx->obs);
   if (!sp_str_empty(node->fn)) {
     spn_node_ctx_t node_ctx = { .user_data = node->user_data };
-    if (spn_wasm_call_export(pkg, node->fn, SPN_ABI_KIND_NODE_CTX, &node_ctx)) {
+    if (spn_wasm_call_export_ex(pkg, node->fn, SPN_ABI_KIND_NODE_CTX, &node_ctx, (spn_wasm_obs_t) { .mem = b->mem, .out = &ctx->obs })) {
       return 1;
     }
   }
@@ -463,9 +470,20 @@ static spn_err_t dag_tree_discover(spn_dag_action_t* action, void* user_data, sp
   return SPN_OK;
 }
 
+static spn_err_t dag_user_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+  spn_dag_user_ctx_t* ctx = (spn_dag_user_ctx_t*)user_data;
+  sp_da_for(ctx->obs, it) {
+    sp_da_push(*out, ctx->obs[it]);
+  }
+  return SPN_OK;
+}
+
 static s32 dag_package_exec(spn_dag_action_t* action, void* user_data) {
-  spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
+  spn_dag_package_ctx_t* ctx = (spn_dag_package_ctx_t*)user_data;
+  spn_pkg_unit_t* unit = ctx->pkg;
   spn_dag_build_t* b = dag_of(unit);
+
+  sp_da_init(b->mem, ctx->obs);
 
   sp_da_for(unit->info->publish.copy, it) {
     spn_publish_copy_t* copy = &unit->info->publish.copy[it];
@@ -499,7 +517,7 @@ static s32 dag_package_exec(spn_dag_action_t* action, void* user_data) {
 
     sp_tm_timer_t timer = sp_tm_start_timer();
     spn_node_ctx_t node_ctx = sp_zero;
-    if (spn_wasm_script_call(script, unit, sp_str_lit("package"), SPN_ABI_KIND_NODE_CTX, &node_ctx)) {
+    if (spn_wasm_script_call_ex(script, unit, sp_str_lit("package"), SPN_ABI_KIND_NODE_CTX, &node_ctx, (spn_wasm_obs_t) { .mem = b->mem, .out = &ctx->obs })) {
       return 1;
     }
     unit->time.package = sp_tm_read_timer(&timer);
@@ -518,6 +536,14 @@ static s32 dag_package_exec(spn_dag_action_t* action, void* user_data) {
   spn_pkg_unit_write_stamp(unit, stamp->path);
 
   return 0;
+}
+
+static spn_err_t dag_package_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+  spn_dag_package_ctx_t* ctx = (spn_dag_package_ctx_t*)user_data;
+  sp_da_for(ctx->obs, it) {
+    sp_da_push(*out, ctx->obs[it]);
+  }
+  return SPN_OK;
 }
 
 //////////////////
@@ -551,6 +577,7 @@ static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
     node->dag = spn_dag_add_action(g, (spn_dag_action_config_t) {
       .identity = dag_user_identity(node),
       .execute = dag_user_exec,
+      .discover = dag_user_discover,
       .user_data = ctx,
     });
 
@@ -771,10 +798,15 @@ static spn_err_t dag_add_tree(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
 static spn_err_t dag_add_package_action(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
   spn_dag_t* g = b->graph;
 
+  spn_dag_package_ctx_t* ctx = sp_alloc_type(b->mem, spn_dag_package_ctx_t);
+  ctx->pkg = unit;
+  sp_da_init(b->mem, ctx->obs);
+
   unit->dag.package = spn_dag_add_action(g, (spn_dag_action_config_t) {
     .identity = dag_package_identity(unit),
     .execute = dag_package_exec,
-    .user_data = unit,
+    .discover = dag_package_discover,
+    .user_data = ctx,
   });
   unit->dag.stamp = spn_dag_add_file(g, unit->paths.stamp.package);
   spn_try(spn_dag_action_add_output(g, unit->dag.package, unit->dag.stamp));
