@@ -201,6 +201,72 @@ UTEST_F(cli, publish_dry_run) {
   });
 }
 
+UTEST_F(cli, complete) {
+  tmpfs_init_named(&uf->fixture.fs, "cli_complete");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/cli/complete",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "__complete", .args = { "--", "spn", "bu" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("build") } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "__complete", .args = { "--", "spn", "build", "ma" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("main") } },
+      { .kind = ACTION_VERIFY_CLI_NOT_CONTAINS, .verify_cli = { .needle = sp_str_lit("A") } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "__complete", .args = { "--", "spn", "build", "-p", "de" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("default") } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("debug") } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "__complete", .args = { "--", "spn", "test", "A" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("A") } },
+      { .kind = ACTION_VERIFY_CLI_NOT_CONTAINS, .verify_cli = { .needle = sp_str_lit("main") } },
+    },
+  });
+}
+
+UTEST_F(cli, complete_no_manifest) {
+  tmpfs_init_named(&uf->fixture.fs, "cli_complete_no_manifest");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "__complete", .args = { "--", "spn", "build", "ma" } } },
+      { .kind = ACTION_VERIFY_CLI_NOT_CONTAINS, .verify_cli = { .needle = sp_str_lit("main") } },
+      { .kind = ACTION_VERIFY_CLI_NOT_CONTAINS, .verify_cli = { .needle = sp_str_lit("error") } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "__complete", .args = { "--", "spn", "bu" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("build") } },
+    },
+  });
+}
+
+UTEST_F(cli, complete_broken_manifest) {
+  tmpfs_init_named(&uf->fixture.fs, "cli_complete_broken_manifest");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/cli/complete_broken",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "__complete", .args = { "--", "spn", "build", "ma" } } },
+      { .kind = ACTION_VERIFY_CLI_NOT_CONTAINS, .verify_cli = { .needle = sp_str_lit("main") } },
+      { .kind = ACTION_VERIFY_CLI_NOT_CONTAINS, .verify_cli = { .needle = sp_str_lit("error") } },
+    },
+  });
+}
+
+UTEST_F(cli, completions) {
+  tmpfs_init_named(&uf->fixture.fs, "cli_completions");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "completions", .args = { "bash" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("complete -o default -F _spn spn") } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "completions", .args = { "zsh" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("compdef _spn spn") } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "completions", .args = { "fish" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("complete -c spn") } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "completions", .args = { "powershell" } } },
+      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("Register-ArgumentCompleter") } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "completions", .args = { "elvish" }, .rc = 1 } },
+    },
+  });
+}
+
 UTEST_F(cli, workspace_index) {
   tmpfs_init_named(&uf->fixture.fs, "cli_workspace_index");
 

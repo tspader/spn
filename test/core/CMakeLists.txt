@@ -211,6 +211,15 @@ add_dependencies(manifest_lower spn_codegen_gen)
 target_link_libraries(manifest_lower PRIVATE yyjson)
 add_test(NAME manifest_lower COMMAND "$<TARGET_FILE:manifest_lower>")
 
+add_executable(complete
+  ${SRC}/cli/cli.c
+  ${SRC}/complete/complete.c
+  ${SRC}/sp/str.c
+  complete.c
+)
+spn_test_binary(complete)
+add_test(NAME complete COMMAND "$<TARGET_FILE:complete>")
+
 add_executable(closure
   closure.c
   ${SRC}/target/closure.c
