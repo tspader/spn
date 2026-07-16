@@ -150,7 +150,9 @@ spn_err_union_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const 
     return unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
   }
   if (toolchain->driver == SPN_CC_DRIVER_MSVC) {
-    return unsupported(toolchain, profile, feature);
+    if (kind == SPN_CC_OUTPUT_REACTOR) {
+      return unsupported(toolchain, profile, feature);
+    }
   }
   return spn_result(SPN_OK);
 }
@@ -164,9 +166,6 @@ spn_err_union_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolc
       return spn_result(SPN_OK);
     }
     case SPN_CC_DRIVER_MSVC: {
-      if (link->kind == SPN_CC_OUTPUT_REACTOR) {
-        return unsupported(toolchain, profile, feature);
-      }
       spn_msvc_render_link(mem, toolchain, profile, link, ps);
       return spn_result(SPN_OK);
     }
