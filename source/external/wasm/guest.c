@@ -1,4 +1,5 @@
 #include "sp.h"
+#include "dag/wasi.h"
 #include "external/wasm/abi.h"
 #include "unit/types.h"
 #include "api/api.h"
@@ -47,8 +48,18 @@ static void guest_copy(spn_wasm_ctx_t* abi, const c8* name, const c8* from, cons
     .api_call = { .fn = sp_cstr_as_str(name), .args = sp_fmt(spn.mem, "{} -> {}", SP_FMT_STR(from_path), SP_FMT_STR(to_path)).value },
   });
 
+  if (sp_fs_is_glob(from_path)) {
+    spn_dag_wasi_observe_glob(abi->instance, sp_fs_parent_path(from_path), sp_fs_get_name(from_path));
+  }
+  else {
+    spn_dag_wasi_observe_read(abi->instance, from_path);
+  }
+
   if (spn_api_copy(from_path, to_path)) {
     wasm_runtime_set_exception(abi->instance, sp_fmt_mem_cstr(scratch.mem, "{}: {} -> {}", SP_FMT_CSTR(name), SP_FMT_STR(from_path), SP_FMT_STR(to_path)));
+  }
+  else {
+    spn_dag_wasi_observe_write(abi->instance, to_path);
   }
   sp_mem_end_scratch(scratch);
 }
@@ -74,6 +85,9 @@ void spn_abi_fs_create_dir(spn_wasm_ctx_t* abi, const c8* path) {
   if (sp_fs_create_dir(dir)) {
     wasm_runtime_set_exception(abi->instance, sp_fmt_mem_cstr(scratch.mem, "spn_fs_create_dir: {}", SP_FMT_STR(dir)));
   }
+  else {
+    spn_dag_wasi_observe_write(abi->instance, dir);
+  }
   sp_mem_end_scratch(scratch);
 }
 
@@ -98,6 +112,7 @@ void spn_abi_fs_cat(spn_wasm_ctx_t* abi, const c8* path, const c8* a0, const c8*
     sp_mem_end_scratch(scratch);
     return;
   }
+  spn_dag_wasi_observe_write(abi->instance, dst);
 
   const c8* srcs [] = { a0, a1, a2, a3 };
   sp_carr_for(srcs, it) {
@@ -109,6 +124,7 @@ void spn_abi_fs_cat(spn_wasm_ctx_t* abi, const c8* path, const c8* a0, const c8*
     if (sp_str_empty(src)) {
       break;
     }
+    spn_dag_wasi_observe_read(abi->instance, src);
 
     sp_str_t data = sp_zero;
     if (sp_io_read_file(scratch.mem, src, &data)) {
@@ -143,6 +159,7 @@ void spn_abi_io_write(spn_wasm_ctx_t* abi, const c8* path, const c8* contents) {
     sp_mem_end_scratch(scratch);
     return;
   }
+  spn_dag_wasi_observe_write(abi->instance, dst);
 
   sp_io_write_cstr(&writer.base, contents, SP_NULLPTR);
   sp_io_file_writer_close(&writer);
