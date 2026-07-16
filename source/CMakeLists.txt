@@ -10,6 +10,7 @@ set(SPN_SOURCES
   cli/build.c
   cli/clean.c
   cli/cli.c
+  cli/completions.c
   cli/copy.c
   cli/generate.c
   cli/graph.c

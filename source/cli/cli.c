@@ -457,6 +457,20 @@ static sp_cli_cmd_t cmd_index = {
   .handler = spn_cli_index,
 };
 
+static sp_cli_cmd_t cmd_completions = {
+  .name = "completions",
+  .summary = "Print a completion script for a shell",
+  .args = {
+    {
+      .name = "shell",
+      .arity = SP_CLI_ARG_REQUIRED,
+      .summary = "Shell to generate for (bash, zsh, fish, powershell)",
+      .ptr = &spn_cli_raw.completions.shell,
+    },
+  },
+  .handler = spn_cli_completions,
+};
+
 static sp_cli_cmd_t cmd_root = {
   .name = "spn",
   .summary = "A package manager and build tool for C",
@@ -524,6 +538,7 @@ static sp_cli_cmd_t cmd_root = {
     &cmd_test,
     &cmd_publish,
     &cmd_index,
+    &cmd_completions,
   },
 };
 
@@ -540,7 +555,7 @@ sp_cli_result_t spn_cli_errf(sp_cli_t* cli, const c8* fmt, ...) {
 }
 
 bool spn_cli_requires_manifest(sp_cli_cmd_t* cmd) {
-  if (cmd == &cmd_init || cmd == &cmd_run) {
+  if (cmd == &cmd_init || cmd == &cmd_run || cmd == &cmd_completions) {
     return false;
   }
   sp_carr_for(cmd_index.commands, it) {
@@ -586,4 +601,6 @@ void spn_cli_commit(void) {
   spn.cli.publish.source_rev = sp_cstr_as_str(spn_cli_raw.publish.source_rev);
 
   spn.cli.index.name = sp_cstr_as_str(spn_cli_raw.index.name);
+
+  spn.cli.completions.shell = sp_cstr_as_str(spn_cli_raw.completions.shell);
 }

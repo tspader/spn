@@ -196,6 +196,10 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     spn.logger.level = spn_log_level_from_str(log_level);
   }
 
+  if (spn_complete_intercept()) {
+    return SP_APP_QUIT;
+  }
+
   spn_cli_t* cli = &spn.cli;
   sp_cli_t parsed = sp_cli_parse((sp_cli_desc_t) {
     .root = spn_cli(),

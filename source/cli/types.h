@@ -24,7 +24,8 @@ typedef struct spn_cli spn_cli_t;
   X(SPN_CLI_MANIFEST, "manifest") \
   X(SPN_CLI_TOOL, "tool") \
   X(SPN_CLI_PUBLISH, "publish") \
-  X(SPN_CLI_INDEX, "index")
+  X(SPN_CLI_INDEX, "index") \
+  X(SPN_CLI_COMPLETIONS, "completions")
 
 typedef enum {
   SPN_CLI_COMMAND(SP_X_NAMED_ENUM_DEFINE)
@@ -138,6 +139,10 @@ typedef struct {
   bool force;
 } spn_cli_index_t;
 
+typedef struct {
+  sp_str_t shell;
+} spn_cli_completions_t;
+
 struct spn_cli {
   u32 num_args;
   const c8** args;
@@ -166,6 +171,7 @@ struct spn_cli {
   spn_cli_graph_t graph;
   spn_cli_publish_t publish;
   spn_cli_index_t index;
+  spn_cli_completions_t completions;
 };
 
 typedef struct {
@@ -236,6 +242,9 @@ typedef struct {
   struct {
     const c8* name;
   } index;
+  struct {
+    const c8* shell;
+  } completions;
 } spn_cli_raw_t;
 
 #endif
