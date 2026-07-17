@@ -306,8 +306,17 @@ void spn_dag_discovery_flush(spn_dag_discovery_t* d, spn_dag_digest_t weak) {
   }
 }
 
-static sp_str_t get_blob_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
+static sp_str_t get_blob_name(sp_str_t name) {
+  sp_str_t base = sp_fs_get_name(name);
+  return sp_str_empty(base) ? sp_str_lit("blob") : base;
+}
+
+static sp_str_t get_blob_dir(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
   return sp_fs_join_path(mem, store->dir, spn_dag_digest_hex(mem, digest));
+}
+
+static sp_str_t get_blob_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest, sp_str_t name) {
+  return sp_fs_join_path(mem, get_blob_dir(store, mem, digest), get_blob_name(name));
 }
 
 static sp_str_t get_staging_dir(spn_dag_store_t* store, sp_mem_t mem) {
@@ -375,7 +384,7 @@ void spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config) {
   }
 }
 
-spn_err_t spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag_digest_t* digest) {
+spn_err_t spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, sp_str_t name, spn_dag_digest_t* digest) {
   *digest = spn_dag_digest(data, len);
 
   switch (store->kind) {
@@ -395,8 +404,9 @@ spn_err_t spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, s
     case SPN_DAG_STORE_FILESYSTEM: {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
       spn_err_t err = SPN_OK;
-      sp_str_t blob = get_blob_path(store, s.mem, *digest);
+      sp_str_t blob = get_blob_path(store, s.mem, *digest, name);
       if (!sp_fs_is_file(blob)) {
+        sp_fs_create_dir(get_blob_dir(store, s.mem, *digest));
         if (sp_fs_write_atomic_slice_staged(blob, get_staging_dir(store, s.mem), sp_mem_slice((u8*)data, len))) {
           err = SPN_ERR_DAG_STORE_WRITE;
         }
@@ -409,7 +419,7 @@ spn_err_t spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, s
   SP_UNREACHABLE_RETURN(SPN_ERROR);
 }
 
-spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_digest_t* digest) {
+spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, sp_str_t name, spn_dag_digest_t* digest) {
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
@@ -418,7 +428,7 @@ spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_
         sp_mem_end_scratch(s);
         return SPN_ERR_DAG_STORE_READ;
       }
-      spn_err_t err = spn_dag_store_put(store, content.data, content.len, digest);
+      spn_err_t err = spn_dag_store_put(store, content.data, content.len, name, digest);
       sp_mem_end_scratch(s);
       return err;
     }
@@ -429,8 +439,9 @@ spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_
 
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
       spn_err_t err = SPN_OK;
-      sp_str_t blob = get_blob_path(store, s.mem, *digest);
+      sp_str_t blob = get_blob_path(store, s.mem, *digest, name);
       if (!sp_fs_is_file(blob)) {
+        sp_fs_create_dir(get_blob_dir(store, s.mem, *digest));
         err = link_into_store(path, blob, get_staging_dir(store, s.mem));
       }
       sp_mem_end_scratch(s);
@@ -441,13 +452,13 @@ spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_
   SP_UNREACHABLE_RETURN(SPN_ERROR);
 }
 
-sp_str_t spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
+sp_str_t spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest, sp_str_t name) {
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
       return sp_str_lit("");
     }
     case SPN_DAG_STORE_FILESYSTEM: {
-      sp_str_t blob = get_blob_path(store, mem, digest);
+      sp_str_t blob = get_blob_path(store, mem, digest, name);
       return sp_fs_is_file(blob) ? blob : sp_str_lit("");
     }
   }
@@ -455,7 +466,7 @@ sp_str_t spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-bool spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest) {
+bool spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t name) {
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
       sp_mem_slice_t blob = sp_zero;
@@ -463,7 +474,7 @@ bool spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest) {
     }
     case SPN_DAG_STORE_FILESYSTEM: {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      bool exists = sp_fs_is_file(get_blob_path(store, s.mem, digest));
+      bool exists = sp_fs_is_file(get_blob_path(store, s.mem, digest, name));
       sp_mem_end_scratch(s);
       return exists;
     }
@@ -472,7 +483,7 @@ bool spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest) {
   SP_UNREACHABLE_RETURN(false);
 }
 
-spn_err_t spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_mem_slice_t* data) {
+spn_err_t spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t name, sp_mem_t mem, sp_mem_slice_t* data) {
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
       sp_mem_slice_t blob = sp_zero;
@@ -485,7 +496,7 @@ spn_err_t spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_
       return SPN_OK;
     }
     case SPN_DAG_STORE_FILESYSTEM: {
-      sp_str_t stored = get_blob_path(store, mem, digest);
+      sp_str_t stored = get_blob_path(store, mem, digest, name);
       if (!sp_fs_is_file(stored)) {
         return SPN_ERR_DAG_STORE_MISSING;
       }
@@ -496,7 +507,7 @@ spn_err_t spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_
   SP_UNREACHABLE_RETURN(SPN_ERROR);
 }
 
-spn_err_t spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t path) {
+spn_err_t spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t name, sp_str_t path) {
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
       sp_mem_slice_t blob = sp_zero;
@@ -508,7 +519,7 @@ spn_err_t spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t dig
     }
     case SPN_DAG_STORE_FILESYSTEM: {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      sp_str_t stored = get_blob_path(store, s.mem, digest);
+      sp_str_t stored = get_blob_path(store, s.mem, digest, name);
       spn_err_t err = SPN_ERR_DAG_STORE_MISSING;
       if (sp_fs_is_file(stored)) {
         err = link_from_store(stored, path, sp_str_lit(""));
@@ -555,7 +566,7 @@ spn_err_t spn_dag_store_put_tree(spn_dag_store_t* store, sp_str_t dir, spn_dag_d
     spn_dag_action_output_t entry = {
       .name = sp_str_strip_left(sp_str_strip_left(files[it].path, dir), sp_str_lit("/"))
     };
-    spn_try_goto(spn_dag_store_put_file(store, files[it].path, &entry.digest), err, done);
+    spn_try_goto(spn_dag_store_put_file(store, files[it].path, entry.name, &entry.digest), err, done);
     sp_da_push(entries, entry);
   }
   sp_da_sort(entries, tree_entry_order);
@@ -565,7 +576,7 @@ spn_err_t spn_dag_store_put_tree(spn_dag_store_t* store, sp_str_t dir, spn_dag_d
   spn_try_goto(write_outputs(&sink.base, s.mem, entries, sp_da_size(entries)), err, done);
 
   sp_str_t manifest = sp_io_dyn_mem_writer_as_str(&sink);
-  err = spn_dag_store_put(store, manifest.data, manifest.len, digest);
+  err = spn_dag_store_put(store, manifest.data, manifest.len, sp_str_lit("tree"), digest);
 
 done:
   sp_mem_end_scratch(s);
@@ -574,7 +585,7 @@ done:
 
 spn_err_t spn_dag_tree_entries(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_da(spn_dag_action_output_t)* out) {
   sp_mem_slice_t manifest = sp_zero;
-  try(spn_dag_store_get(store, digest, mem, &manifest));
+  try(spn_dag_store_get(store, digest, sp_str_lit("tree"), mem, &manifest));
   sp_assert(manifest.len <= SP_LIMIT_U32_MAX);
 
   sp_str_t content = sp_str((c8*)manifest.data, (u32)manifest.len);
@@ -603,7 +614,7 @@ bool spn_dag_store_has_tree(spn_dag_store_t* store, spn_dag_digest_t digest) {
     goto done;
   }
   sp_da_for(entries, it) {
-    if (!spn_dag_store_has(store, entries[it].digest)) {
+    if (!spn_dag_store_has(store, entries[it].digest, entries[it].name)) {
       goto done;
     }
   }
@@ -625,7 +636,7 @@ spn_err_t spn_dag_store_materialize_tree(spn_dag_store_t* store, spn_dag_digest_
   sp_fs_create_dir(dir);
   sp_da_for(entries, it) {
     sp_str_t path = sp_fs_join_path(s.mem, dir, entries[it].name);
-    spn_try_goto(spn_dag_store_materialize(store, entries[it].digest, path), err, done);
+    spn_try_goto(spn_dag_store_materialize(store, entries[it].digest, entries[it].name, path), err, done);
   }
 
 done:
