@@ -203,7 +203,7 @@ static void wasi_hook(wasm_exec_env_t exec_env, s32 op, u32 fd, const c8* path, 
 }
 
 spn_err_t spn_dag_wasi_install(void) {
-  spn_wasi_hook = wasi_hook;
+  // spn_wasi_hook = wasi_hook;
   return SPN_OK;
 }
 

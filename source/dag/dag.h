@@ -36,14 +36,14 @@ bool                spn_dag_digest_parse(sp_str_t hex, spn_dag_digest_t* out);
 spn_err_t           spn_dag_glob(sp_mem_t mem, sp_str_t root, sp_str_t pattern, sp_da(spn_dag_obs_t)* obs, sp_da(spn_dag_match_t)* matches);
 
 void                spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config);
-spn_err_t           spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, spn_dag_digest_t* digest);
-spn_err_t           spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_digest_t* digest);
+spn_err_t           spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, sp_str_t name, spn_dag_digest_t* digest);
+spn_err_t           spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, sp_str_t name, spn_dag_digest_t* digest);
 spn_err_t           spn_dag_store_put_tree(spn_dag_store_t* store, sp_str_t dir, spn_dag_digest_t* digest);
-bool                spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest);
+bool                spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t name);
 bool                spn_dag_store_has_tree(spn_dag_store_t* store, spn_dag_digest_t digest);
-sp_str_t            spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest);
-spn_err_t           spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_mem_slice_t* data);
-spn_err_t           spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t path);
+sp_str_t            spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest, sp_str_t name);
+spn_err_t           spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t name, sp_mem_t mem, sp_mem_slice_t* data);
+spn_err_t           spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t name, sp_str_t path);
 spn_err_t           spn_dag_store_materialize_tree(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t dir);
 spn_err_t           spn_dag_tree_entries(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_da(spn_dag_action_output_t)* out);
 
