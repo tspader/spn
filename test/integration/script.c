@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(script)
 
 UTEST_F(script, basic_node) {

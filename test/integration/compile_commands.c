@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(compile_commands)
 
 UTEST_F(compile_commands, written_on_build) {

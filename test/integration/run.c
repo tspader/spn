@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(run)
 
 UTEST_F(run, manifest) {
