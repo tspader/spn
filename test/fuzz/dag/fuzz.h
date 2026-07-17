@@ -129,6 +129,7 @@ typedef struct {
   fz_profile_t profile;
   sp_da(fz_artifact_t) artifacts;
   sp_da(fz_action_t) actions;
+  sp_da(u64) order;
   bool cyclic;
   bool obs_cyclic;
 } fz_universe_t;
@@ -182,8 +183,6 @@ fz_limits_t   fz_gen_limits(const spn_cg_fuzz_graph_t* graph);
 fz_profile_t  fz_gen_profile(sp_fuzz_prng_t* prng, fz_limits_t limits);
 fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t profile);
 fz_trace_t    fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u);
-bool          fz_universe_cyclic(sp_mem_t mem, fz_universe_t* u);
-bool          fz_universe_obs_cyclic(sp_mem_t mem, fz_universe_t* u);
 
 void             fz_lower(fz_lowered_t* low, sp_mem_t mem, fz_universe_t* u);
 sp_str_t         fz_output_content(sp_mem_t mem, u64 identity, const sp_str_t* inputs, u64 count, sp_str_t name);

@@ -225,30 +225,8 @@ static void fz_write_source(sp_mem_t mem, fz_universe_t* u, fz_state_t* state, u
   sp_fs_create_file_str(fz_artifact_sim_path(mem, u, artifact), fz_content(mem, state->contents[artifact]));
 }
 
-static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes, sp_str_t* disk_bytes, bool* done, fz_predict_row_t* predict, u64 at) {
-  if (done[at]) {
-    return;
-  }
-  done[at] = true;
-
+static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes, sp_str_t* disk_bytes, fz_predict_row_t* predict, u64 at) {
   fz_action_t* action = &u->actions[at];
-  sp_da_for(action->consumes, ct) {
-    s64 producer = u->artifacts[action->consumes[ct]].producer;
-    if (producer >= 0) {
-      fz_eval_action(w, u, key_bytes, disk_bytes, done, predict, (u64)producer);
-    }
-  }
-  sp_da_for(action->obs, ot) {
-    fz_obs_t obs = action->obs[ot];
-    if (obs.probe) {
-      continue;
-    }
-    s64 producer = u->artifacts[obs.artifact].producer;
-    if (producer >= 0 && (u64)producer != at) {
-      fz_eval_action(w, u, key_bytes, disk_bytes, done, predict, (u64)producer);
-    }
-  }
-
   spn_dag_digest_t prelim = fz_model_key(u, key_bytes, at);
   spn_dag_digest_t key = prelim;
   bool resolved = true;
@@ -342,12 +320,10 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   }
 
   u64 actions = sp_da_size(u->actions);
-  bool* done = sp_alloc_n(mem, bool, actions ? actions : 1);
-  sp_mem_zero(done, actions * sizeof(bool));
   fz_predict_row_t* predict = sp_alloc_n(mem, fz_predict_row_t, actions ? actions : 1);
   sp_mem_zero(predict, actions * sizeof(fz_predict_row_t));
-  sp_da_for(u->actions, at) {
-    fz_eval_action(w, u, key_bytes, disk_bytes, done, predict, at);
+  sp_da_for(u->order, ot) {
+    fz_eval_action(w, u, key_bytes, disk_bytes, predict, u->order[ot]);
   }
   fz_journal_predict(w->j, predict, actions);
 

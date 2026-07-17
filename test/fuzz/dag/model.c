@@ -55,51 +55,24 @@ u64 fz_action_inputs(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, u6
   return count;
 }
 
-static void fz_expect_action(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, sp_str_t* bytes, bool* done, u64 at) {
-  if (done[at]) {
-    return;
-  }
-  done[at] = true;
-
-  fz_action_t* action = &u->actions[at];
-  sp_da_for(action->consumes, ct) {
-    s64 producer = u->artifacts[action->consumes[ct]].producer;
-    if (producer >= 0) {
-      fz_expect_action(mem, u, state, bytes, done, (u64)producer);
-    }
-  }
-  sp_da_for(action->obs, ot) {
-    fz_obs_t obs = action->obs[ot];
-    if (obs.probe) {
-      continue;
-    }
-    s64 producer = u->artifacts[obs.artifact].producer;
-    if (producer >= 0) {
-      fz_expect_action(mem, u, state, bytes, done, (u64)producer);
-    }
-  }
-
-  sp_str_t* inputs = SP_NULLPTR;
-  u64 count = fz_action_inputs(mem, u, state, at, bytes, &inputs);
-  sp_da_for(action->produces, pt) {
-    u64 out = action->produces[pt];
-    bytes[out] = fz_output_content(mem, action->identity, inputs, count, fz_output_name(mem, out));
-  }
-}
-
 void fz_expect(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, sp_str_t* bytes) {
   sp_assert(!u->cyclic && !u->obs_cyclic);
+  sp_assert(sp_da_size(u->order) == sp_da_size(u->actions));
   sp_da_for(u->artifacts, it) {
     if (u->artifacts[it].kind != FZ_ARTIFACT_OUTPUT) {
       bytes[it] = fz_content(mem, state->contents[it]);
     }
   }
 
-  u64 actions = sp_da_size(u->actions);
-  bool* done = sp_alloc_n(mem, bool, actions ? actions : 1);
-  sp_mem_zero(done, actions * sizeof(bool));
-  sp_da_for(u->actions, at) {
-    fz_expect_action(mem, u, state, bytes, done, at);
+  sp_da_for(u->order, ot) {
+    u64 at = u->order[ot];
+    fz_action_t* action = &u->actions[at];
+    sp_str_t* inputs = SP_NULLPTR;
+    u64 count = fz_action_inputs(mem, u, state, at, bytes, &inputs);
+    sp_da_for(action->produces, pt) {
+      u64 out = action->produces[pt];
+      bytes[out] = fz_output_content(mem, action->identity, inputs, count, fz_output_name(mem, out));
+    }
   }
 }
 
