@@ -18,10 +18,6 @@ typedef struct {
 
 typedef enum {
   FZ_OK = 0,
-  FZ_ERR_GEN_PRODUCER,
-  FZ_ERR_GEN_EDGE,
-  FZ_ERR_GEN_OBS,
-  FZ_ERR_GEN_CYCLE,
   FZ_ERR_RUN_FAILED,
   FZ_ERR_RUN_CYCLIC,
   FZ_ERR_STALE_OUTPUT,
@@ -85,6 +81,13 @@ typedef struct {
   u64* contents;
   fz_phantom_t* phantoms;
 } fz_state_t;
+
+typedef enum {
+  FZ_WORLD_CLEAN,
+  FZ_WORLD_STEALTHY,
+  FZ_WORLD_MURKY,
+  FZ_WORLD_TAINTED,
+} fz_world_state_t;
 
 typedef struct {
   bool* file;
@@ -181,7 +184,6 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
 fz_trace_t    fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u);
 bool          fz_universe_cyclic(sp_mem_t mem, fz_universe_t* u);
 bool          fz_universe_obs_cyclic(sp_mem_t mem, fz_universe_t* u);
-fz_err_t      fz_check_universe(fz_universe_t* u);
 
 void             fz_lower(fz_lowered_t* low, sp_mem_t mem, fz_universe_t* u);
 sp_str_t         fz_output_content(sp_mem_t mem, u64 identity, const sp_str_t* inputs, u64 count, sp_str_t name);
@@ -220,7 +222,7 @@ void fz_journal_init(fz_journal_t* j, sp_mem_t mem);
 void fz_journal_universe(fz_journal_t* j, fz_universe_t* u, fz_trace_t* trace, u64 iter);
 void fz_journal_step(fz_journal_t* j, fz_step_t* step, u64 index);
 void fz_journal_run_done(fz_journal_t* j, u64 err, u64 fired, bool crashed);
-void fz_journal_world(fz_journal_t* j, bool honest, bool murky, bool tainted);
+void fz_journal_world(fz_journal_t* j, fz_world_state_t world);
 void fz_journal_predict(fz_journal_t* j, const fz_predict_row_t* rows, u64 count);
 void fz_journal_exec(fz_journal_t* j, u64 action);
 void fz_journal_check_execs(fz_journal_t* j, const fz_exec_row_t* rows, u64 count);

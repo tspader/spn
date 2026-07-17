@@ -1,4 +1,4 @@
-fuzz repro: mode={{.mode}} iter={{.iter}} (replay: SPN_FUZZ_ITER={{.iter}}, seed printed above)
+fuzz repro: mode={{.mode}} iter={{.iter}} (replay: --iter {{.iter}}, seed printed above)
   run_fixture(utest_result, (fixture_t) {
     .index = {
 {{for .pkgs}}

@@ -181,6 +181,9 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
 
   u.cyclic = fz_universe_cyclic(mem, &u);
   u.obs_cyclic = fz_universe_obs_cyclic(mem, &u);
+  if (!profile.back_density) {
+    sp_assert(!u.cyclic);
+  }
   return u;
 }
 
@@ -316,62 +319,4 @@ bool fz_universe_cyclic(sp_mem_t mem, fz_universe_t* u) {
 
 bool fz_universe_obs_cyclic(sp_mem_t mem, fz_universe_t* u) {
   return fz_cyclic(mem, u, true);
-}
-
-fz_err_t fz_check_universe(fz_universe_t* u) {
-  sp_da_for(u->artifacts, it) {
-    fz_artifact_t* artifact = &u->artifacts[it];
-    switch (artifact->kind) {
-      case FZ_ARTIFACT_VALUE:
-      case FZ_ARTIFACT_SOURCE: {
-        must(artifact->producer < 0, FZ_ERR_GEN_PRODUCER);
-        must(artifact->content < u->profile.content_count, FZ_ERR_GEN_EDGE);
-        break;
-      }
-      case FZ_ARTIFACT_OUTPUT: {
-        must(artifact->producer >= 0 && (u64)artifact->producer < sp_da_size(u->actions), FZ_ERR_GEN_PRODUCER);
-        bool held = false;
-        fz_action_t* producer = &u->actions[artifact->producer];
-        sp_da_for(producer->produces, pt) {
-          if (producer->produces[pt] == it) {
-            held = true;
-            break;
-          }
-        }
-        must(held, FZ_ERR_GEN_PRODUCER);
-        break;
-      }
-    }
-  }
-
-  sp_da_for(u->actions, at) {
-    fz_action_t* action = &u->actions[at];
-    sp_da_for(action->consumes, ct) {
-      must(action->consumes[ct] < sp_da_size(u->artifacts), FZ_ERR_GEN_EDGE);
-    }
-    sp_da_for(action->produces, pt) {
-      fz_artifact_t* artifact = &u->artifacts[action->produces[pt]];
-      must(artifact->kind == FZ_ARTIFACT_OUTPUT, FZ_ERR_GEN_PRODUCER);
-      must(artifact->producer == (s64)at, FZ_ERR_GEN_PRODUCER);
-    }
-    must(action->discover || sp_da_empty(action->obs), FZ_ERR_GEN_OBS);
-    must(sp_da_size(action->obs) <= u->profile.limits.obs, FZ_ERR_GEN_OBS);
-    sp_da_for(action->obs, ot) {
-      fz_obs_t obs = action->obs[ot];
-      if (obs.probe) {
-        must(obs.phantom < u->profile.limits.phantoms, FZ_ERR_GEN_OBS);
-      }
-      else {
-        must(obs.artifact < sp_da_size(u->artifacts), FZ_ERR_GEN_OBS);
-        must(u->artifacts[obs.artifact].kind != FZ_ARTIFACT_VALUE, FZ_ERR_GEN_OBS);
-        must(u->artifacts[obs.artifact].producer != (s64)at, FZ_ERR_GEN_OBS);
-      }
-    }
-  }
-
-  if (!u->profile.back_density) {
-    must(!u->cyclic, FZ_ERR_GEN_CYCLE);
-  }
-
-  return FZ_OK;
 }

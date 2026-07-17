@@ -162,11 +162,20 @@ void fz_journal_sim_fault(fz_journal_t* j, u64 sys) {
   fz_journal_event(j, sp_fmt(j->mem, "\"ev\":\"sim.fault\",\"sys\":{}", sp_fmt_uint(sys)).value);
 }
 
-void fz_journal_world(fz_journal_t* j, bool honest, bool murky, bool tainted) {
+static sp_str_t fz_world_state_str(fz_world_state_t world) {
+  switch (world) {
+    case FZ_WORLD_CLEAN:    return sp_str_lit("clean");
+    case FZ_WORLD_STEALTHY: return sp_str_lit("stealthy");
+    case FZ_WORLD_MURKY:    return sp_str_lit("murky");
+    case FZ_WORLD_TAINTED:  return sp_str_lit("tainted");
+  }
+  sp_unreachable_return(sp_str_lit("unknown"));
+}
+
+void fz_journal_world(fz_journal_t* j, fz_world_state_t world) {
   if (!j) return;
-  fz_journal_event(j, sp_fmt(j->mem, "\"ev\":\"world\",\"honest\":{},\"murky\":{},\"tainted\":{},\"sys\":{}",
-    sp_fmt_str(fz_json_bool(honest)), sp_fmt_str(fz_json_bool(murky)), sp_fmt_str(fz_json_bool(tainted)),
-    sp_fmt_uint(fz_journal_sys(j))).value);
+  fz_journal_event(j, sp_fmt(j->mem, "\"ev\":\"world\",\"state\":\"{}\",\"sys\":{}",
+    sp_fmt_str(fz_world_state_str(world)), sp_fmt_uint(fz_journal_sys(j))).value);
 }
 
 void fz_journal_predict(fz_journal_t* j, const fz_predict_row_t* rows, u64 count) {

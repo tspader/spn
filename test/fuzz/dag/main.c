@@ -11,16 +11,12 @@
 sp_str_t fz_err_to_str(fz_err_t err) {
   switch (err) {
     case FZ_OK:               return sp_str_lit("ok");
-    case FZ_ERR_GEN_PRODUCER: return sp_str_lit("generator wired an output to the wrong producer");
-    case FZ_ERR_GEN_EDGE:     return sp_str_lit("generator emitted an edge to an artifact that does not exist");
-    case FZ_ERR_GEN_OBS:      return sp_str_lit("generator scripted an observation that cannot be resolved");
-    case FZ_ERR_GEN_CYCLE:    return sp_str_lit("generator built a cycle without injecting back-edges");
     case FZ_ERR_RUN_FAILED:   return sp_str_lit("run failed where the model expected success");
     case FZ_ERR_RUN_CYCLIC:   return sp_str_lit("run succeeded on a cyclic graph");
     case FZ_ERR_STALE_OUTPUT: return sp_str_lit("an output's bytes diverge from the model");
     case FZ_ERR_EXEC_MISSING: return sp_str_lit("an action hit the cache where the model expected execution");
     case FZ_ERR_EXEC_SPURIOUS: return sp_str_lit("an action executed where the model expected a cache hit");
-    case FZ_ERR_MODEL:        return sp_str_lit("cache mirror bytes diverge from the clean model in an honest world");
+    case FZ_ERR_MODEL:        return sp_str_lit("cache mirror bytes diverge from the clean model in a world without stealth writes");
     case FZ_ERR_SCHEDULE:     return sp_str_lit("a schedule reseed changed output bytes");
     case FZ_ERR_COUNT:        break;
   }
@@ -58,10 +54,7 @@ static u32 fz_run_iteration(sp_mem_t mem, sp_fuzz_prng_t prng, u64 iter) {
     j = &journal;
   }
 
-  fz_err_t err = fz_check_universe(&universe);
-  if (!err) {
-    err = fz_run_trace(mem, &prng, &universe, &trace, j);
-  }
+  fz_err_t err = fz_run_trace(mem, &prng, &universe, &trace, j);
 
   if (j) {
     fz_journal_done(j, err);
