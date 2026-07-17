@@ -439,7 +439,7 @@ static sp_cli_result_t fz_cli_run(sp_cli_t* cli) {
     opts.only = config->iter;
     opts.iters = (u64)config->iter + 1;
   }
-  bool keep_going = config->keep_going || !sp_str_empty(sp_os_env_get(sp_str_lit("SPN_FUZZ_KEEP_GOING")));
+  bool keep_going = config->keep_going;
 
   sp_da(sp_str_t) names = sp_da_new(sp_mem_os_new(), sp_str_t);
   sp_da_push(names, sp_str_lit("fuzz/resolver"));
@@ -524,10 +524,6 @@ s32 main(s32 num_args, c8** args) {
     },
     .env = {
       { .name = "SPN_FUZZ_ENABLE",     .kind = SP_CLI_OPT_CSTR, .summary = "Must be set for the fuzzer to run at all" },
-      { .name = "SPN_TEST_SEED",       .kind = SP_CLI_OPT_CSTR, .summary = "Same as --seed, which wins when both are set" },
-      { .name = "SPN_FUZZ_ITERS",      .kind = SP_CLI_OPT_CSTR, .summary = "Same as --iters, which wins when both are set" },
-      { .name = "SPN_FUZZ_ITER",       .kind = SP_CLI_OPT_CSTR, .summary = "Same as --iter, which wins when both are set" },
-      { .name = "SPN_FUZZ_KEEP_GOING", .kind = SP_CLI_OPT_CSTR, .summary = "Same as --keep-going" },
     },
     .handler = fz_cli_run,
   };

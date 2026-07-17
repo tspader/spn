@@ -89,7 +89,7 @@ void fz_dump(fz_universe_t* u, u64 iter) {
   }
 
   if (sp_da_size(u->pkgs) > 8) {
-    sp_fmt_io(&out.base, "fuzz repro: mode={} iter={}: {} pkgs exceeds the fixture's 8, replay with SPN_FUZZ_ITER={}\n",
+    sp_fmt_io(&out.base, "fuzz repro: mode={} iter={}: {} pkgs exceeds the fixture's 8, replay with --iter {}\n",
       sp_fmt_str(mode), sp_fmt_uint(iter), sp_fmt_uint(sp_da_size(u->pkgs)), sp_fmt_uint(iter));
     sp_mem_end_scratch(scratch);
     return;
@@ -164,7 +164,7 @@ void fz_dump(fz_universe_t* u, u64 iter) {
     sp_template_render(&out.base, tmpl, scope, SP_NULLPTR);
   }
   else {
-    sp_fmt_io(&out.base, "fuzz: repro template missing; replay with SPN_FUZZ_ITER={}\n", sp_fmt_uint(iter));
+    sp_fmt_io(&out.base, "fuzz: repro template missing; replay with --iter {}\n", sp_fmt_uint(iter));
   }
 
   u64 widest = 0;
@@ -176,10 +176,10 @@ void fz_dump(fz_universe_t* u, u64 iter) {
     }
   }
   if (widest > 4) {
-    sp_fmt_io(&out.base, "fuzz: a release holds {} deps; fixture_t caps deps at 4, replay with SPN_FUZZ_ITER={}\n", sp_fmt_uint(widest), sp_fmt_uint(iter));
+    sp_fmt_io(&out.base, "fuzz: a release holds {} deps; fixture_t caps deps at 4, replay with --iter {}\n", sp_fmt_uint(widest), sp_fmt_uint(iter));
   }
   if (locals) {
-    sp_fmt_io(&out.base, "fuzz: universe holds local packages; the fixture renders them as index entries, replay with SPN_FUZZ_ITER={}\n", sp_fmt_uint(iter));
+    sp_fmt_io(&out.base, "fuzz: universe holds local packages; the fixture renders them as index entries, replay with --iter {}\n", sp_fmt_uint(iter));
   }
 
   sp_mem_end_scratch(scratch);
