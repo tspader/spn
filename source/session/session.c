@@ -103,7 +103,6 @@ static spn_err_union_t add_target_build(spn_session_t* session, spn_profile_info
   spn_build_unit_t* unit = add_build_unit(session, (spn_build_unit_t) {
     .profile = profile,
     .toolchain = toolchain,
-    .visibility = SPN_SYMBOL_VISIBILITY_DEFAULT,
     .dep_kinds = spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE) | spn_dep_kind_bit(SPN_DEP_KIND_TEST),
     .paths = {
       .root = spn_profile_build_path(session->mem, session->paths.build, &profile),
@@ -143,7 +142,6 @@ static spn_err_union_t add_metaprogram_build(spn_session_t* session, spn_build_u
       .linkage = SPN_LIB_KIND_STATIC,
     },
     .toolchain = toolchain,
-    .visibility = SPN_SYMBOL_VISIBILITY_HIDDEN,
     .dep_kinds = spn_dep_kind_bit(SPN_DEP_KIND_BUILD),
     .paths = {
       .root = sp_fs_join_path(session->mem, session->paths.build, spn_triple_to_str(session->mem, target)),

@@ -8,7 +8,6 @@
 #include "session/invocation.h"
 #include "session/session.h"
 #include "task/build/build.h"
-#include "unit/compiler.h"
 
 static sp_str_t resolve_pkg_path(sp_mem_t mem, spn_pkg_unit_t* pkg, sp_str_t path) {
   if (sp_fs_is_absolute(path)) {
@@ -26,7 +25,6 @@ static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t*
     .source = unit->paths.file,
     .cxx = unit->target->info->cxx,
     .pic = unit->target->info->kind == SPN_TARGET_LIB,
-    .visibility = build->visibility,
   };
   if (build->profile.os == SPN_OS_MACOS) {
     compile.min_os = unit->target->link.min_os;
@@ -102,15 +100,9 @@ spn_err_union_t spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit,
   compile.output = output;
   compile.depfile = depfile;
 
-  sp_ps_config_t ps = sp_zero_s(sp_ps_config_t);
-  spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(build->toolchain);
-  try_union(spn_cc_render_compile(mem, &toolchain, &build->profile, &compile, &ps));
-
-  *invocation = (spn_invocation_t) {
-    .program = ps.command,
-    .args = ps.dyn_args,
-    .cwd = pkg->paths.work,
-  };
+  spn_cc_toolchain_t* toolchain = &build->toolchain->cc;
+  try_union(spn_cc_render_compile(mem, toolchain, &build->profile, &compile, invocation));
+  invocation->cwd = pkg->paths.work;
   return spn_result(SPN_OK);
 }
 

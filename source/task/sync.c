@@ -78,20 +78,25 @@ SP_PRIVATE spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_tool
     }
   });
 
+  unit->cc = (spn_cc_toolchain_t) {
+    .name = toolchain->name,
+    .driver = toolchain->driver,
+    .archiver_driver = toolchain->driver == SPN_CC_DRIVER_MSVC ? SPN_AR_DRIVER_MSVC : SPN_AR_DRIVER_GNU,
+  };
   if (sp_str_empty(unit->root)) {
-    unit->compiler = toolchain->compiler;
-    unit->cxx = toolchain->cxx;
-    unit->linker = toolchain->linker;
-    unit->archiver = toolchain->archiver;
+    unit->cc.compiler = toolchain->compiler;
+    unit->cc.cxx = toolchain->cxx;
+    unit->cc.linker = toolchain->linker;
+    unit->cc.archiver = toolchain->archiver;
   } else {
-    unit->compiler = spn_toolchain_launcher_with_root(spn.mem, toolchain->compiler, unit->root);
-    unit->cxx = spn_toolchain_launcher_with_root(spn.mem, toolchain->cxx, unit->root);
-    unit->linker = spn_toolchain_launcher_with_root(spn.mem, toolchain->linker, unit->root);
-    unit->archiver = spn_toolchain_launcher_with_root(spn.mem, toolchain->archiver, unit->root);
+    unit->cc.compiler = spn_toolchain_launcher_with_root(spn.mem, toolchain->compiler, unit->root);
+    unit->cc.cxx = spn_toolchain_launcher_with_root(spn.mem, toolchain->cxx, unit->root);
+    unit->cc.linker = spn_toolchain_launcher_with_root(spn.mem, toolchain->linker, unit->root);
+    unit->cc.archiver = spn_toolchain_launcher_with_root(spn.mem, toolchain->archiver, unit->root);
   }
 
   if (toolchain->source == SPN_TOOLCHAIN_SOURCE_LOCAL) {
-    unit->identity = sp_hash_str(unit->compiler.program);
+    unit->identity = sp_hash_str(unit->cc.compiler.program);
   }
 
   return SPN_OK;

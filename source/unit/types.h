@@ -24,7 +24,6 @@ struct spn_build_unit_t {
   spn_build_unit_id_t id;
   spn_profile_info_t profile;
   spn_toolchain_unit_t* toolchain;
-  spn_symbol_visibility_t visibility;
   u32 dep_kinds;
   sp_da(sp_str_t) include;
   sp_da(spn_pkg_unit_t*) packages;
@@ -116,12 +115,6 @@ typedef struct spn_build_io_t {
 } spn_build_io_t;
 
 typedef struct {
-  sp_str_t program;
-  sp_da(sp_str_t) args;
-  sp_str_t cwd;
-} spn_invocation_t;
-
-typedef struct {
   spn_compile_unit_id_t id;
   spn_target_unit_t* target;
   spn_lang_t lang;
@@ -163,10 +156,12 @@ struct spn_target_unit {
   struct {
     spn_os_version_t min_os;
     spn_lang_t lang;
+    spn_cc_exports_t exports;
     sp_da(spn_link_lib_t) libs;
     sp_da(sp_str_t) lib_dirs;
     sp_da(sp_str_t) system_libs;
-    sp_da(sp_str_t) hidden_libs;
+    sp_da(sp_str_t) whole_archives;
+    sp_da(sp_str_t) private_libs;
     sp_da(sp_str_t) frameworks;
   } link;
 
@@ -289,10 +284,7 @@ struct spn_toolchain_unit_t {
   spn_triple_t host;
   spn_opt_artifact_t artifact;
   sp_str_t root;
-  spn_toolchain_launcher_t compiler;
-  spn_toolchain_launcher_t cxx;
-  spn_toolchain_launcher_t linker;
-  spn_toolchain_launcher_t archiver;
+  spn_cc_toolchain_t cc;
   sp_hash_t identity;
   spn_build_io_t logs;
 };

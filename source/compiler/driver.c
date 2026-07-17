@@ -101,16 +101,17 @@ spn_err_union_t spn_cc_validate_compile(const spn_cc_toolchain_t* toolchain, con
   return validate_profile(toolchain, profile);
 }
 
-spn_err_union_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, sp_ps_config_t* ps) {
+spn_err_union_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, spn_invocation_t* invocation) {
   try_union(spn_cc_validate_compile(toolchain, profile));
+  *invocation = sp_zero_s(spn_invocation_t);
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
     case SPN_CC_DRIVER_CLANG: {
-      spn_gnu_render_compile(mem, toolchain, profile, compile, ps);
+      spn_gnu_render_compile(mem, toolchain, profile, compile, invocation);
       return spn_result(SPN_OK);
     }
     case SPN_CC_DRIVER_MSVC: {
-      spn_msvc_render_compile(mem, toolchain, profile, compile, ps);
+      spn_msvc_render_compile(mem, toolchain, profile, compile, invocation);
       return spn_result(SPN_OK);
     }
     case SPN_CC_DRIVER_NONE: {
@@ -153,16 +154,17 @@ spn_err_union_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const 
   return spn_result(SPN_OK);
 }
 
-spn_err_union_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, sp_ps_config_t* ps) {
+spn_err_union_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, spn_invocation_t* invocation) {
   try_union(spn_cc_validate_link(toolchain, profile, link->kind, !sp_da_empty(link->frameworks)));
+  *invocation = sp_zero_s(spn_invocation_t);
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
     case SPN_CC_DRIVER_CLANG: {
-      spn_gnu_render_link(mem, toolchain, profile, link, ps);
+      spn_gnu_render_link(mem, toolchain, profile, link, invocation);
       return spn_result(SPN_OK);
     }
     case SPN_CC_DRIVER_MSVC: {
-      spn_msvc_render_link(mem, toolchain, profile, link, ps);
+      spn_msvc_render_link(mem, toolchain, profile, link, invocation);
       return spn_result(SPN_OK);
     }
     case SPN_CC_DRIVER_NONE: {
@@ -178,15 +180,17 @@ spn_err_union_t spn_cc_validate_archive(const spn_cc_toolchain_t* toolchain, con
   return spn_result(SPN_OK);
 }
 
-spn_err_union_t spn_cc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_archive_t* archive, sp_ps_config_t* ps) {
+spn_err_union_t spn_cc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_archive_t* archive, spn_invocation_t* invocation) {
   try_union(spn_cc_validate_archive(toolchain, profile));
+  *invocation = sp_zero_s(spn_invocation_t);
+
   switch (toolchain->archiver_driver) {
     case SPN_AR_DRIVER_GNU: {
-      spn_gnu_render_archive(mem, toolchain, archive, ps);
+      spn_gnu_render_archive(mem, toolchain, archive, invocation);
       return spn_result(SPN_OK);
     }
     case SPN_AR_DRIVER_MSVC: {
-      spn_msvc_render_archive(mem, toolchain, archive, ps);
+      spn_msvc_render_archive(mem, toolchain, archive, invocation);
       return spn_result(SPN_OK);
     }
   }

@@ -9,27 +9,33 @@ static void push_flag(sp_da(sp_str_t)* flags, sp_str_t flag) {
     sp_da_push(*flags, flag);
   }
 }
+static void add_arg(sp_mem_t mem, spn_invocation_t* invocation, sp_str_t arg) {
+  if (!invocation->args) sp_da_init(mem, invocation->args);
+  if (!sp_str_empty(arg)) {
+    sp_da_push(invocation->args, arg);
+  }
+}
 
-static void push_arg_fmt(sp_mem_t mem, sp_ps_config_t* ps, const c8* fmt, ...) {
+static void push_arg_fmt(sp_mem_t mem, spn_invocation_t* invocation, const c8* fmt, ...) {
   va_list args;
   va_start(args, fmt);
   sp_str_r str = sp_fmt_mem_v(mem, sp_cstr_as_str(fmt), args);
   va_end(args);
 
-  sp_ps_config_add_arg(mem, ps, str.value);
+  add_arg(mem, invocation, str.value);
 }
 
-static void push_arg(sp_mem_t mem, sp_ps_config_t* ps, const c8* arg) {
-  sp_ps_config_add_arg(mem, ps, sp_cstr_as_str(arg));
+static void push_arg(sp_mem_t mem, spn_invocation_t* invocation, const c8* arg) {
+  add_arg(mem, invocation, sp_cstr_as_str(arg));
 }
 
-static void push_arg_str(sp_mem_t mem, sp_ps_config_t* ps, sp_str_t arg) {
-  sp_ps_config_add_arg(mem, ps, arg);
+static void push_arg_str(sp_mem_t mem, spn_invocation_t* invocation, sp_str_t arg) {
+  add_arg(mem, invocation, arg);
 }
 
-static void push_args(sp_mem_t mem, sp_ps_config_t* ps, sp_da(sp_str_t) args) {
+static void push_args(sp_mem_t mem, spn_invocation_t* invocation, sp_da(sp_str_t) args) {
   sp_da_for(args, it) {
-    sp_ps_config_add_arg(mem, ps, args[it]);
+    add_arg(mem, invocation, args[it]);
   }
 }
 
@@ -129,109 +135,126 @@ void spn_gnu_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_c
   }
 }
 
-static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_lang_t lang, sp_ps_config_t* ps) {
+static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_lang_t lang, spn_invocation_t* invocation) {
   spn_toolchain_launcher_t launcher = lang == SPN_LANG_CXX ? toolchain->cxx : toolchain->compiler;
   sp_assert(!sp_str_empty(launcher.program));
-  ps->command = launcher.program;
-  push_args(mem, ps, launcher.args);
+  invocation->program = launcher.program;
+  push_args(mem, invocation, launcher.args);
   if (toolchain->driver == SPN_CC_DRIVER_CLANG) {
     spn_triple_t triple = { profile->arch, profile->os, profile->abi };
     sp_str_t target = spn_triple_to_cc_target(mem, triple);
     if (!sp_str_empty(target)) {
-      push_arg_fmt(mem, ps, "--target={}", sp_fmt_str(target));
+      push_arg_fmt(mem, invocation, "--target={}", sp_fmt_str(target));
     }
   }
 }
 
-static void add_include(sp_mem_t mem, sp_ps_config_t* ps, sp_str_t value) {
-  sp_ps_config_add_arg(mem, ps, render_include(mem, value));
+static void add_include(sp_mem_t mem, spn_invocation_t* invocation, sp_str_t value) {
+  push_arg_str(mem, invocation, render_include(mem, value));
 }
 
-static void add_define(sp_mem_t mem, sp_ps_config_t* ps, sp_str_t value) {
-  sp_ps_config_add_arg(mem, ps, render_define(mem, value));
+static void add_define(sp_mem_t mem, spn_invocation_t* invocation, sp_str_t value) {
+  push_arg_str(mem, invocation, render_define(mem, value));
 }
 
-void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, sp_ps_config_t* ps) {
-  add_launcher(mem, toolchain, profile, compile->lang, ps);
+void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, spn_invocation_t* invocation) {
+  add_launcher(mem, toolchain, profile, compile->lang, invocation);
   spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);
   spn_gnu_render_flags(mem, profile, &flags);
   zig_default_sanitizer_off(toolchain, profile, &flags);
   if (compile->lang == SPN_LANG_C) {
-    sp_ps_config_add_arg(mem, ps, c_standard_switch(profile->standard));
+    push_arg_str(mem, invocation, c_standard_switch(profile->standard));
   } else if (compile->lang == SPN_LANG_CXX) {
-    sp_ps_config_add_arg(mem, ps, cxx_standard_switch(compile->cxx.standard));
+    push_arg_str(mem, invocation, cxx_standard_switch(compile->cxx.standard));
   }
-  push_args(mem, ps, flags.compile);
-  push_arg(mem, ps, "-c");
-  sp_ps_config_add_arg(mem, ps, compile->source);
+  push_args(mem, invocation, flags.compile);
+  push_arg(mem, invocation, "-c");
+  push_arg_str(mem, invocation, compile->source);
   sp_da_for(compile->include, it) {
-    add_include(mem, ps, compile->include[it]);
+    add_include(mem, invocation, compile->include[it]);
   }
   sp_da_for(compile->define, it) {
-    add_define(mem, ps, compile->define[it]);
+    add_define(mem, invocation, compile->define[it]);
   }
   if (compile->lang == SPN_LANG_CXX) {
     if (compile->cxx.no_exceptions) {
-      push_arg(mem, ps, "-fno-exceptions");
+      push_arg(mem, invocation, "-fno-exceptions");
     }
     if (compile->cxx.no_rtti) {
-      push_arg(mem, ps, "-fno-rtti");
+      push_arg(mem, invocation, "-fno-rtti");
     }
   }
   if (compile->pic) {
-    push_arg(mem, ps, "-fPIC");
-  }
-  if (compile->visibility == SPN_SYMBOL_VISIBILITY_HIDDEN) {
-    push_arg(mem, ps, "-fvisibility=hidden");
+    push_arg(mem, invocation, "-fPIC");
   }
   if (profile->os == SPN_OS_MACOS) {
     if (!sp_str_empty(profile->sysroot)) {
-      push_arg(mem, ps, "-isysroot");
-      push_arg_str(mem, ps, profile->sysroot);
+      push_arg(mem, invocation, "-isysroot");
+      push_arg_str(mem, invocation, profile->sysroot);
     }
     if (spn_os_version_present(compile->min_os)) {
-      push_arg_fmt(mem, ps, "-mmacosx-version-min={}.{}", sp_fmt_uint(compile->min_os.major), sp_fmt_uint(compile->min_os.minor));
+      push_arg_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(compile->min_os.major), sp_fmt_uint(compile->min_os.minor));
     }
   }
-  push_args(mem, ps, compile->args);
-  push_arg(mem, ps, "-Werror=return-type");
+  push_args(mem, invocation, compile->args);
+  push_arg(mem, invocation, "-Werror=return-type");
   if (!sp_str_empty(compile->depfile)) {
-    push_arg(mem, ps, "-MD");
-    push_arg(mem, ps, "-MF");
-    push_arg_str(mem, ps, compile->depfile);
+    push_arg(mem, invocation, "-MD");
+    push_arg(mem, invocation, "-MF");
+    push_arg_str(mem, invocation, compile->depfile);
   }
-  push_arg(mem, ps, "-o");
-  sp_ps_config_add_arg(mem, ps, compile->output);
+  push_arg(mem, invocation, "-o");
+  push_arg_str(mem, invocation, compile->output);
 }
 
-void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, sp_ps_config_t* ps) {
-  add_launcher(mem, toolchain, profile, link->lang, ps);
+void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, spn_invocation_t* invocation) {
+  add_launcher(mem, toolchain, profile, link->lang, invocation);
   spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);
   spn_gnu_render_flags(mem, profile, &flags);
   zig_default_sanitizer_off(toolchain, profile, &flags);
-  push_args(mem, ps, flags.link);
+  push_args(mem, invocation, flags.link);
   switch (link->kind) {
     case SPN_CC_OUTPUT_REACTOR: {
-      push_arg(mem, ps, "-mexec-model=reactor");
-      push_arg(mem, ps, "-Wl,--no-entry");
-      push_arg(mem, ps, "-Wl,--import-symbols");
-      push_arg(mem, ps, "-Wl,--export-dynamic");
+      push_arg(mem, invocation, "-mexec-model=reactor");
+      push_arg(mem, invocation, "-Wl,--no-entry");
+      push_arg(mem, invocation, "-Wl,--import-symbols");
+      sp_da_for(link->exports.symbols, it) {
+        push_arg_fmt(mem, invocation, "-Wl,--export={}", sp_fmt_str(link->exports.symbols[it]));
+      }
       break;
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
-      push_arg(mem, ps, "-shared");
+      push_arg(mem, invocation, "-shared");
+      if (!sp_str_empty(link->exports.path)) {
+        switch (profile->os) {
+          case SPN_OS_MACOS: {
+            push_arg_fmt(mem, invocation, "-Wl,-exported_symbols_list,{}", sp_fmt_str(link->exports.path));
+            break;
+          }
+          case SPN_OS_WINDOWS: {
+            push_arg_str(mem, invocation, link->exports.path);
+            break;
+          }
+          case SPN_OS_LINUX:
+          case SPN_OS_WASI:
+          case SPN_OS_NONE: {
+            push_arg_fmt(mem, invocation, "-Wl,--version-script,{}", sp_fmt_str(link->exports.path));
+            break;
+          }
+        }
+      }
       break;
     }
     case SPN_CC_OUTPUT_EXE: {
       if (profile->linkage == SPN_LIB_KIND_STATIC && profile->os != SPN_OS_MACOS) {
-        push_arg(mem, ps, "-static");
+        push_arg(mem, invocation, "-static");
       }
       if (profile->os == SPN_OS_WINDOWS && link->subsystem == SPN_WIN_SUBSYSTEM_WINDOWS) {
-        push_arg(mem, ps, "-Wl,--subsystem,windows");
+        push_arg(mem, invocation, "-Wl,--subsystem,windows");
       }
       break;
     }
@@ -240,50 +263,59 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       sp_unreachable_case();
     }
   }
-  push_args(mem, ps, link->objects);
-  push_args(mem, ps, link->args);
-  sp_da_for(link->lib_dirs, it) {
-    push_arg_fmt(mem, ps, "-L{}", sp_fmt_str(link->lib_dirs[it]));
-  }
-  push_args(mem, ps, link->libs);
-  sp_da_for(link->hidden_libs, it) {
+  push_args(mem, invocation, link->objects);
+  if (!sp_da_empty(link->whole_archives)) {
     if (profile->os == SPN_OS_MACOS) {
-      push_arg_fmt(mem, ps, "-Wl,-hidden-l{}", sp_fmt_str(link->hidden_libs[it]));
+      sp_da_for(link->whole_archives, it) {
+        push_arg_fmt(mem, invocation, "-Wl,-force_load,{}", sp_fmt_str(link->whole_archives[it]));
+      }
     } else {
-      push_arg_fmt(mem, ps, "-l{}", sp_fmt_str(link->hidden_libs[it]));
+      push_arg(mem, invocation, "-Wl,--whole-archive");
+      push_args(mem, invocation, link->whole_archives);
+      push_arg(mem, invocation, "-Wl,--no-whole-archive");
+    }
+  }
+  push_args(mem, invocation, link->args);
+  sp_da_for(link->lib_dirs, it) {
+    push_arg_fmt(mem, invocation, "-L{}", sp_fmt_str(link->lib_dirs[it]));
+  }
+  push_args(mem, invocation, link->libs);
+  sp_da_for(link->private_libs, it) {
+    push_arg_fmt(mem, invocation, "-l{}", sp_fmt_str(link->private_libs[it]));
+    if (profile->os == SPN_OS_WINDOWS) {
       spn_triple_t triple = { profile->arch, profile->os, profile->abi };
-      sp_str_t archive = spn_triple_lib_file_name(mem, triple, link->hidden_libs[it], SP_OS_LIB_STATIC);
-      push_arg_fmt(mem, ps, "-Wl,--exclude-libs,{}", sp_fmt_str(archive));
+      sp_str_t archive = spn_triple_lib_file_name(mem, triple, link->private_libs[it], SP_OS_LIB_STATIC);
+      push_arg_fmt(mem, invocation, "-Wl,--exclude-libs,{}", sp_fmt_str(archive));
     }
   }
   sp_da_for(link->system_libs, it) {
-    push_arg_fmt(mem, ps, "-l{}", sp_fmt_str(link->system_libs[it]));
+    push_arg_fmt(mem, invocation, "-l{}", sp_fmt_str(link->system_libs[it]));
   }
   if (profile->os == SPN_OS_MACOS) {
     if (!sp_str_empty(profile->sysroot)) {
-      push_arg(mem, ps, "-isysroot");
-      sp_ps_config_add_arg(mem, ps, profile->sysroot);
+      push_arg(mem, invocation, "-isysroot");
+      push_arg_str(mem, invocation, profile->sysroot);
     }
     if (spn_os_version_present(link->min_os)) {
-      push_arg_fmt(mem, ps, "-mmacosx-version-min={}.{}", sp_fmt_uint(link->min_os.major), sp_fmt_uint(link->min_os.minor));
+      push_arg_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(link->min_os.major), sp_fmt_uint(link->min_os.minor));
     }
     sp_da_for(link->frameworks, it) {
-      push_arg(mem, ps, "-framework");
-      sp_ps_config_add_arg(mem, ps, link->frameworks[it]);
+      push_arg(mem, invocation, "-framework");
+      push_arg_str(mem, invocation, link->frameworks[it]);
     }
   }
   sp_da_for(link->rpath, it) {
-    push_arg_fmt(mem, ps, "-Wl,-rpath,{}", sp_fmt_str(link->rpath[it]));
+    push_arg_fmt(mem, invocation, "-Wl,-rpath,{}", sp_fmt_str(link->rpath[it]));
   }
-  sp_ps_config_add_arg(mem, ps, sp_str_lit("-o"));
-  sp_ps_config_add_arg(mem, ps, link->output);
+  push_arg(mem, invocation, "-o");
+  push_arg_str(mem, invocation, link->output);
 }
 
-void spn_gnu_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_cc_archive_t* archive, sp_ps_config_t* ps) {
-  ps->command = toolchain->archiver.program;
-  push_args(mem, ps, toolchain->archiver.args);
-  sp_ps_config_add_arg(mem, ps, sp_str_lit("rcs"));
-  push_args(mem, ps, archive->args);
-  sp_ps_config_add_arg(mem, ps, archive->output);
-  push_args(mem, ps, archive->objects);
+void spn_gnu_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_cc_archive_t* archive, spn_invocation_t* invocation) {
+  invocation->program = toolchain->archiver.program;
+  push_args(mem, invocation, toolchain->archiver.args);
+  push_arg(mem, invocation, "rcs");
+  push_args(mem, invocation, archive->args);
+  push_arg_str(mem, invocation, archive->output);
+  push_args(mem, invocation, archive->objects);
 }

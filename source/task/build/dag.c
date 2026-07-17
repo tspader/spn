@@ -21,7 +21,6 @@
 #include "task/build/dag.h"
 #include "task/build/nodes/nodes.h"
 #include "task/task.h"
-#include "unit/compiler.h"
 #include "unit/package.h"
 
 typedef struct {
@@ -613,8 +612,8 @@ static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
 
 static spn_err_t dag_add_objects(spn_dag_build_t* b, spn_target_unit_t* target) {
   spn_dag_t* g = b->graph;
-  spn_cc_toolchain_t toolchain = spn_toolchain_unit_compiler(target->pkg->build->toolchain);
-  bool discovery = toolchain.driver != SPN_CC_DRIVER_MSVC;
+  spn_cc_toolchain_t* toolchain = &target->pkg->build->toolchain->cc;
+  bool discovery = toolchain->driver != SPN_CC_DRIVER_MSVC;
 
   sp_da_for(target->objects, it) {
     spn_compile_unit_t* unit = target->objects[it];

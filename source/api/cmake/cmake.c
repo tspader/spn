@@ -9,7 +9,6 @@
 #include "enum/enum.h"
 #include "session/types.h"
 #include "profile/types.h"
-#include "unit/compiler.h"
 #include "unit/types.h"
 
 #include "toolchain/toolchain.h"
@@ -129,14 +128,14 @@ static sp_str_t spn_cmake_generate_toolchain_file(sp_mem_t mem, spn_pkg_unit_t* 
 
   set(io, "CMAKE_SYSTEM_NAME", spn_os_to_cmake_system_name(profile->os));
   set(io, "CMAKE_SYSTEM_PROCESSOR", spn_arch_to_str(profile->arch));
-  set(io, "CMAKE_C_COMPILER", spn_cmake_launcher_program(mem, tools, "cc", toolchain->compiler));
+  set(io, "CMAKE_C_COMPILER", spn_cmake_launcher_program(mem, tools, "cc", toolchain->cc.compiler));
   set(io, "CMAKE_C_COMPILER_TARGET", spn_triple_to_cc_target(mem, target));
   if (spn_toolchain_has_cxx(toolchain->info)) {
-    set(io, "CMAKE_CXX_COMPILER", spn_cmake_launcher_program(mem, tools, "cxx", toolchain->cxx));
+    set(io, "CMAKE_CXX_COMPILER", spn_cmake_launcher_program(mem, tools, "cxx", toolchain->cc.cxx));
     set(io, "CMAKE_CXX_COMPILER_TARGET", spn_triple_to_cc_target(mem, target));
   }
-  set(io, "CMAKE_LINKER", spn_cmake_launcher_program(mem, tools, "ld", toolchain->linker));
-  set(io, "CMAKE_AR", spn_cmake_launcher_program(mem, tools, "ar", toolchain->archiver));
+  set(io, "CMAKE_LINKER", spn_cmake_launcher_program(mem, tools, "ld", toolchain->cc.linker));
+  set(io, "CMAKE_AR", spn_cmake_launcher_program(mem, tools, "ar", toolchain->cc.archiver));
 
   sp_io_file_writer_close(&writer);
   return path;
@@ -171,9 +170,9 @@ s32 spn_cmake_configure(spn_cmake_t* cmake) {
   add_define(scratch.mem, &config, sp_str_lit("CMAKE_BUILD_TYPE"), spn_cmake_profile_configuration(profile));
 
   const c8* configuration = profile->mode == SPN_BUILD_MODE_RELEASE ? "RELEASE" : "DEBUG";
-  spn_cc_toolchain_t compiler = spn_toolchain_unit_compiler(unit->build->toolchain);
+  spn_cc_toolchain_t* compiler = &unit->build->toolchain->cc;
   spn_cc_flags_t flags = sp_zero;
-  spn_err_union_t flags_err = spn_cc_render_flags(scratch.mem, &compiler, profile, &flags);
+  spn_err_union_t flags_err = spn_cc_render_flags(scratch.mem, compiler, profile, &flags);
   if (flags_err.kind) {
     sp_mem_end_scratch(scratch);
     return SPN_ERROR;

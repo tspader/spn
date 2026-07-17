@@ -8,7 +8,6 @@ typedef struct {
   const c8* export_symbols [2];
   const c8* whole_archive;
   const c8* private_lib;
-  const c8* hidden_lib;
   const c8* system_lib;
   const c8* framework;
   const c8* lib_dir;
@@ -33,7 +32,6 @@ static void run_link_test(s32* utest_result, link_test_t test) {
   sp_da_init(scratch.mem, link.whole_archives);
   sp_da_init(scratch.mem, link.private_libs);
   sp_da_init(scratch.mem, link.system_libs);
-  sp_da_init(scratch.mem, link.hidden_libs);
   sp_da_init(scratch.mem, link.lib_dirs);
   sp_da_init(scratch.mem, link.rpath);
   sp_da_init(scratch.mem, link.exports.symbols);
@@ -52,9 +50,6 @@ static void run_link_test(s32* utest_result, link_test_t test) {
   if (test.private_lib) {
     sp_da_push(link.private_libs, sp_str_from_cstr(scratch.mem, test.private_lib));
   }
-  if (test.hidden_lib) {
-    sp_da_push(link.hidden_libs, sp_str_from_cstr(scratch.mem, test.hidden_lib));
-  }
   if (test.system_lib) {
     sp_da_push(link.system_libs, sp_str_from_cstr(scratch.mem, test.system_lib));
   }
@@ -68,13 +63,13 @@ static void run_link_test(s32* utest_result, link_test_t test) {
     sp_da_push(link.rpath, sp_str_from_cstr(scratch.mem, test.rpath));
   }
   link.subsystem = test.subsystem;
-  sp_ps_config_t ps = sp_zero;
-  spn_err_union_t err = spn_cc_render_link(scratch.mem, &toolchain, &test.profile, &link, &ps);
+  spn_invocation_t invocation = sp_zero;
+  spn_err_union_t err = spn_cc_render_link(scratch.mem, &toolchain, &test.profile, &link, &invocation);
   EXPECT_EQ(err.kind, test.expect.err);
   if (test.expect.err) {
     EXPECT_EQ(err.compiler.feature, test.expect.feature);
   } else {
-    expect_args(utest_result, &ps, test.expect);
+    expect_args(utest_result, &invocation, test.expect);
   }
   sp_mem_end_scratch(scratch);
 }
@@ -88,13 +83,12 @@ UTEST(render_link, gcc_linux_libs) {
       .abi = SPN_ABI_GNU,
     },
     .kind = SPN_CC_OUTPUT_EXE,
-    .hidden_lib = "spum",
     .system_lib = "m",
     .expect = {
       .command = "cc",
       .args = {
         "main.o",
-        "-lspum", "-Wl,--exclude-libs,libspum.a", "-lm",
+        "-lm",
         "-o", "main"
       },
     },
@@ -114,7 +108,7 @@ UTEST(render_link, clang_wasi_reactor) {
       .args = {
         "--target=wasm32-wasi",
         "-mexec-model=reactor",
-        "-Wl,--no-entry", "-Wl,--import-symbols", "-Wl,--export-dynamic",
+        "-Wl,--no-entry", "-Wl,--import-symbols",
         "main.o", "-o", "main"
       },
     },
@@ -160,14 +154,15 @@ UTEST(render_link, msvc_exe_libs) {
       .os = SPN_OS_WINDOWS,
       .abi = SPN_ABI_MSVC,
     },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .hidden_lib = "spum",
+    .kind = SPN_CC_OUTPUT_SHARED_LIB,
+    .private_lib = "spum",
     .system_lib = "ws2_32",
     .lib_dir = "deps/lib",
     .expect = {
       .command = "cc",
       .args = {
         "/nologo",
+        "/LD",
         "main.o",
         "spum.lib", "ws2_32.lib",
         "/Femain",
@@ -350,22 +345,6 @@ UTEST(render_link, macos_static_linkage_suppressed) {
   });
 }
 
-UTEST(render_link, macos_hidden_lib) {
-  run_link_test(utest_result, (link_test_t) {
-    .driver = SPN_CC_DRIVER_CLANG,
-    .profile = {
-      .arch = SPN_ARCH_ARM64,
-      .os = SPN_OS_MACOS,
-    },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .hidden_lib = "spum",
-    .expect = {
-      .command = "cc",
-      .args = { "--target=aarch64-macos", "main.o", "-Wl,-hidden-lspum", "-o", "main" },
-    },
-  });
-}
-
 UTEST(render_link, lib_dirs_and_rpath) {
   run_link_test(utest_result, (link_test_t) {
     .driver = SPN_CC_DRIVER_GCC,
@@ -402,7 +381,6 @@ UTEST(render_link, sanitizers_on_link_line) {
 }
 
 UTEST(render_link, linux_shared_exports) {
-  UTEST_SKIP("");
   run_link_test(utest_result, (link_test_t) {
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
@@ -428,7 +406,6 @@ UTEST(render_link, linux_shared_exports) {
 }
 
 UTEST(render_link, macos_shared_exports) {
-  UTEST_SKIP("");
   run_link_test(utest_result, (link_test_t) {
     .driver = SPN_CC_DRIVER_CLANG,
     .profile = {
@@ -454,7 +431,6 @@ UTEST(render_link, macos_shared_exports) {
 }
 
 UTEST(render_link, mingw_shared_def) {
-  UTEST_SKIP("");
   run_link_test(utest_result, (link_test_t) {
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
@@ -480,7 +456,6 @@ UTEST(render_link, mingw_shared_def) {
 }
 
 UTEST(render_link, wasi_reactor_exports) {
-  UTEST_SKIP("");
   run_link_test(utest_result, (link_test_t) {
     .driver = SPN_CC_DRIVER_CLANG,
     .profile = {
