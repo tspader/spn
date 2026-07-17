@@ -1,9 +1,9 @@
 {
   "issues": [
     {
-      "code": "missing_key",
-      "path": "package",
-      "detail": "package"
+      "code": "file_missing",
+      "path": "",
+      "detail": "missing file"
     }
   ]
 }
