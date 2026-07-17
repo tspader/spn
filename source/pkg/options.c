@@ -251,10 +251,10 @@ void spn_pkg_apply_options(spn_pkg_info_t* info, spn_when_env_t* env) {
   }
   info->applied = true;
 
-  sp_str_om_for(info->libs, it)    apply_target(sp_str_om_at(info->libs, it), env);
-  sp_str_om_for(info->exes, it)    apply_target(sp_str_om_at(info->exes, it), env);
+  sp_str_om_for(info->libs, it) apply_target(sp_str_om_at(info->libs, it), env);
+  sp_str_om_for(info->exes, it) apply_target(sp_str_om_at(info->exes, it), env);
   sp_str_om_for(info->scripts, it) apply_target(sp_str_om_at(info->scripts, it), env);
-  sp_str_om_for(info->tests, it)   apply_target(sp_str_om_at(info->tests, it), env);
+  sp_str_om_for(info->tests, it) apply_target(sp_str_om_at(info->tests, it), env);
 
   apply_gated(&info->system_deps, info->gated.system_deps, env);
 
