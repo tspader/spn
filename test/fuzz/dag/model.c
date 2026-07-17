@@ -95,7 +95,9 @@ void fz_expect(sp_mem_t mem, fz_universe_t* u, sp_str_t* bytes) {
     }
   }
 
-  bool done[FZ_MAX_ACTIONS] = sp_zero;
+  u64 actions = sp_da_size(u->actions);
+  bool* done = sp_alloc_n(mem, bool, actions ? actions : 1);
+  sp_mem_zero(done, actions * sizeof(bool));
   sp_da_for(u->actions, at) {
     fz_expect_action(mem, u, bytes, done, at);
   }
@@ -119,8 +121,10 @@ spn_dag_digest_t fz_model_key(fz_universe_t* u, const sp_str_t* bytes, u64 at) {
   return key;
 }
 
-fz_shape_t fz_shape_now(fz_universe_t* u, u64 at) {
-  fz_shape_t shape = sp_zero;
+fz_shape_t fz_shape_now(sp_mem_t mem, fz_universe_t* u, u64 at) {
+  u64 count = sp_da_size(u->actions[at].obs);
+  fz_shape_t shape = { .file = sp_alloc_n(mem, bool, count ? count : 1) };
+  sp_mem_zero(shape.file, count * sizeof(bool));
   sp_da_for(u->actions[at].obs, ot) {
     fz_obs_t obs = u->actions[at].obs[ot];
     shape.file[ot] = !obs.probe || u->phantoms[obs.phantom].present;
@@ -141,7 +145,7 @@ spn_dag_digest_t fz_model_strong(fz_universe_t* u, const sp_str_t* bytes, spn_da
     fz_hash_u64(&ctx, shape->file[ot]);
     if (obs.probe) {
       fz_phantom_t* phantom = &u->phantoms[obs.phantom];
-      fz_hash_u64(&ctx, FZ_MAX_ACTIONS + obs.phantom);
+      fz_hash_u64(&ctx, sp_da_size(u->artifacts) + obs.phantom);
       fz_hash_u64(&ctx, phantom->present ? phantom->content : (u64)-1);
     }
     else {

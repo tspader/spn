@@ -57,7 +57,8 @@ file(MAKE_DIRECTORY ${GEN_DIR})
 add_executable(sp_cc
   cc.c
   ${CMAKE_SOURCE_DIR}/source/dag/dag.c
-  ${CMAKE_SOURCE_DIR}/source/dag/lower.c
+  ${CMAKE_SOURCE_DIR}/source/dag/store.c
+  ${CMAKE_SOURCE_DIR}/source/dag/run.c
   ${CMAKE_SOURCE_DIR}/source/dag/occ.c
   ${CMAKE_SOURCE_DIR}/source/codegen/json.c
   ${GEN_DIR}/dag_output.gen.c
@@ -72,7 +73,8 @@ add_dependencies(sp_cc headers spn_codegen_gen)
 add_executable(sp_lib
   lib.c
   ${CMAKE_SOURCE_DIR}/source/dag/dag.c
-  ${CMAKE_SOURCE_DIR}/source/dag/lower.c
+  ${CMAKE_SOURCE_DIR}/source/dag/store.c
+  ${CMAKE_SOURCE_DIR}/source/dag/run.c
   ${CMAKE_SOURCE_DIR}/source/dag/occ.c
   ${CMAKE_SOURCE_DIR}/source/codegen/json.c
   ${GEN_DIR}/dag_output.gen.c
@@ -110,7 +112,10 @@ set(GEN_FILES
   ${GEN_DIR}/dag_output.jtd.json
   ${GEN_DIR}/dag_obs.gen.h
   ${GEN_DIR}/dag_obs.gen.c
-  ${GEN_DIR}/dag_obs.jtd.json)
+  ${GEN_DIR}/dag_obs.jtd.json
+  ${GEN_DIR}/fuzz.gen.h
+  ${GEN_DIR}/fuzz.gen.c
+  ${GEN_DIR}/fuzz.jtd.json)
 file(GLOB JTD_GEN_SCHEMAS CONFIGURE_DEPENDS ${SCHEMA_DIR}/*.json)
 file(GLOB_RECURSE JTD_GEN_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/templates/*.tmpl)
 add_custom_command(
@@ -121,6 +126,6 @@ add_custom_command(
     ${GEN_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/templates
   DEPENDS jtd_gen ${JTD_GEN_SCHEMAS} ${JTD_GEN_TEMPLATES}
-  COMMENT "codegen: common.gen.h, {config,manifest,release,toolchains,abi}.gen.{h,c}"
+  COMMENT "codegen: common.gen.h, {config,fuzz,manifest,release,toolchains,abi}.gen.{h,c}"
   VERBATIM)
 add_custom_target(spn_codegen_gen ALL DEPENDS ${GEN_FILES})

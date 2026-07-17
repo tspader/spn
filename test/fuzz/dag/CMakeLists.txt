@@ -1,9 +1,13 @@
 add_executable(fuzz_dag
   ${SRC}/dag/dag.c
-  ${SRC}/dag/lower.c
+  ${SRC}/dag/store.c
+  ${SRC}/dag/run.c
   ${SRC}/codegen/json.c
+  ${SRC}/codegen/loader.c
   ${SRC}/codegen/gen/dag_output.gen.c
   ${SRC}/codegen/gen/dag_obs.gen.c
+  ${SRC}/codegen/gen/fuzz.gen.c
+  ${SRC}/external/tom.c
   ${SRC}/sha256/sha256.c
   ${SRC}/sp/io.c
   ${SRC}/intern/intern.c
@@ -16,6 +20,8 @@ add_executable(fuzz_dag
   trace.c
   ${TEST_TOOLS}/sp_sim.c
   ${TEST_TOOLS}/sp_fuzz.c
+  ${TEST_TOOLS}/sp_fuzz_cli.c
+  ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(fuzz_dag)
 target_include_directories(fuzz_dag PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${SRC}/codegen/gen)

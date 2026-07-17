@@ -6,6 +6,7 @@
 #include "sp/prompt.h"
 
 #include "fuzz.h"
+#include "fuzz.gen.h"
 
 sp_str_t fz_err_to_str(fz_err_t err) {
   switch (err) {
@@ -35,13 +36,14 @@ static void fz_write_failure(sp_mem_t mem, sp_str_t dir, fz_err_t err, u64 iter)
   if (sp_io_file_writer_from_path(&out, sp_fs_join_path(mem, dir, sp_str_lit("failure.json")))) {
     return;
   }
-  sp_fmt_io(&out.base, "{{\"err\":{},\"str\":\"{}\",\"seed\":\"0x{:x}\",\"iter\":{}}}\n",
-    sp_fmt_uint((u64)err), sp_fmt_str(fz_err_to_str(err)), sp_fmt_uint(sp_fuzz_seed_get()), sp_fmt_uint(iter));
+  sp_fmt_io(&out.base, "{{\"err\":{},\"str\":\"{}\",\"seed\":\"0x{:x}\",\"iter\":{},\"repro\":\"{}\"}}\n",
+    sp_fmt_uint((u64)err), sp_fmt_str(fz_err_to_str(err)), sp_fmt_uint(sp_fuzz_seed_get()), sp_fmt_uint(iter),
+    sp_fmt_str(sp_fuzz_repro_args(mem, iter)));
   sp_io_file_writer_close(&out);
 }
 
 static u32 fz_run_iteration(sp_mem_t mem, sp_fuzz_prng_t prng, u64 iter) {
-  fz_profile_t profile = fz_gen_profile(&prng);
+  fz_profile_t profile = fz_gen_profile(&prng, fz_gen_limits(sp_fuzz_graph()));
   fz_universe_t universe = fz_gen_universe(mem, &prng, profile);
   fz_trace_t trace = fz_gen_trace(mem, &prng, &universe);
 

@@ -25,6 +25,7 @@ set(SPN_SOURCES
   cli/update.c
   cli/which.c
   codegen/codegen.c
+  codegen/loader.c
   codegen/json.c
   codegen/lower.c
   codegen/options.c
@@ -36,7 +37,8 @@ set(SPN_SOURCES
   compiler/toc.c
   ctx/ctx.c
   dag/dag.c
-  dag/lower.c
+  dag/store.c
+  dag/run.c
   dag/occ.c
   dag/wasi.c
   enum/enum.c
