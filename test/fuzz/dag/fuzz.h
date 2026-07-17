@@ -130,6 +130,7 @@ typedef struct {
   sp_da(fz_artifact_t) artifacts;
   sp_da(fz_action_t) actions;
   sp_da(u64) order;
+  sp_da(u64) outputs;
   bool cyclic;
   bool obs_cyclic;
 } fz_universe_t;
