@@ -329,11 +329,11 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   u64 log_start = sp_da_size(w->ex.log);
   switch (step->kind) {
     case FZ_STEP_EIO: {
-      sp_sim_fault_eio(w->sim, step->artifact, step->content);
+      sp_sim_fault_eio(w->sim, step->entropy, step->rate);
       break;
     }
     case FZ_STEP_CRASH: {
-      sp_sim_fault_crash(w->sim, 1 + step->artifact % sp_max(w->last_sys, 256));
+      sp_sim_fault_crash(w->sim, 1 + step->entropy % sp_max(w->last_sys, 256));
       break;
     }
     default: {
@@ -534,7 +534,7 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
         sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, sp_str_lit("/store"));
         sp_da(sp_fs_entry_t) blobs = sp_da_new(mem, sp_fs_entry_t);
         sp_da_for(entries, et) {
-          if (entries[et].kind == SP_FS_KIND_DIR) {
+          if (entries[et].kind == SP_FS_KIND_FILE) {
             sp_da_push(blobs, entries[et]);
           }
         }
@@ -542,12 +542,8 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
           break;
         }
         sp_da_sort(blobs, fz_entry_order);
-        sp_fs_entry_t* blob = &blobs[step->artifact % sp_da_size(blobs)];
-        sp_da(sp_fs_entry_t) files = sp_fs_collect(mem, blob->path);
-        sp_da_for(files, ft) {
-          sp_fs_remove_file(files[ft].path);
-        }
-        sp_fs_remove_dir(blob->path);
+        sp_fs_entry_t* blob = &blobs[step->entropy % sp_da_size(blobs)];
+        sp_fs_remove_file(blob->path);
         fz_journal_drop(w.j, sp_str_lit("blob"), blob->path);
         mark_world(&w, FZ_WORLD_MURKY);
         break;
@@ -567,7 +563,7 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
           break;
         }
         sp_da_sort(cached, fz_entry_order);
-        sp_str_t evicted = cached[step->artifact % sp_da_size(cached)].path;
+        sp_str_t evicted = cached[step->entropy % sp_da_size(cached)].path;
         sp_fs_remove_file(evicted);
         spn_dag_action_cache_init(&w.cache, mem, w.cache_dir);
         fz_journal_drop(w.j, sp_str_lit("cache"), evicted);

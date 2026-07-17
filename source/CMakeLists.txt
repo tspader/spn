@@ -39,6 +39,8 @@ set(SPN_SOURCES
   dag/dag.c
   dag/store.c
   dag/run.c
+  dag/glob.c
+  dag/executor.c
   dag/occ.c
   dag/wasi.c
   enum/enum.c

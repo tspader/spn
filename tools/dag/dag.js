@@ -160,7 +160,7 @@ function describeStep(e) {
     case 'blob': return 'drop a store blob';
     case 'evict': return 'drop a cache entry';
     case 'discovery': return 'reset discovery';
-    case 'eio': return `run, io fault every ~${e.content} syscalls`;
+    case 'eio': return `run, io fault every ~${e.rate} syscalls`;
     case 'crash': return `run + crash`;
     default: return e.kind;
   }

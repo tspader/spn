@@ -48,6 +48,8 @@ typedef struct {
   fz_step_kind_t kind;
   u64 artifact;
   u64 content;
+  u64 entropy;
+  u64 rate;
 } fz_step_t;
 
 typedef struct {

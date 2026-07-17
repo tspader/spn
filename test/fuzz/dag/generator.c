@@ -300,14 +300,14 @@ fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
         break;
       }
       case FZ_STEP_EIO: {
-        step.artifact = sp_fuzz_next(prng);
-        step.content = sp_fuzz_range(prng, 8, 512);
+        step.entropy = sp_fuzz_next(prng);
+        step.rate = sp_fuzz_range(prng, 8, 512);
         break;
       }
       case FZ_STEP_CRASH:
       case FZ_STEP_BLOB:
       case FZ_STEP_EVICT: {
-        step.artifact = sp_fuzz_next(prng);
+        step.entropy = sp_fuzz_next(prng);
         break;
       }
       case FZ_STEP_RUN:

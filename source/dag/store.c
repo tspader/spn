@@ -17,62 +17,6 @@ static sp_str_t format_s64(sp_mem_t mem, s64 value) {
   return sp_fmt(mem, "{}", sp_fmt_int(value)).value;
 }
 
-static bool parse_u64(sp_str_t str, u64* out) {
-  if (sp_str_empty(str)) {
-    return false;
-  }
-  u64 value = 0;
-  sp_for(it, str.len) {
-    c8 c = str.data[it];
-    if (c < '0' || c > '9') {
-      return false;
-    }
-    u64 digit = (u64)(c - '0');
-    if (value > (SP_LIMIT_U64_MAX - digit) / 10) {
-      return false;
-    }
-    value = value * 10 + digit;
-  }
-  *out = value;
-  return true;
-}
-
-static bool parse_s64(sp_str_t str, s64* out) {
-  bool negative = !sp_str_empty(str) && str.data[0] == '-';
-  u64 magnitude = 0;
-  if (!parse_u64(negative ? sp_str_sub(str, 1, str.len - 1) : str, &magnitude)) {
-    return false;
-  }
-  if (magnitude > (u64)SP_LIMIT_S64_MAX + (negative ? 1 : 0)) {
-    return false;
-  }
-  *out = (s64)(negative ? (u64)0 - magnitude : magnitude);
-  return true;
-}
-
-static bool parse_digest(sp_str_t hex, spn_dag_digest_t* out) {
-  if (hex.len != 2 * sizeof(out->bytes)) {
-    return false;
-  }
-  sp_for(it, sizeof(out->bytes)) {
-    u8 byte = 0;
-    sp_for(n, 2) {
-      c8 c = hex.data[2 * it + n];
-      u8 nibble = 0;
-      if (c >= '0' && c <= '9') {
-        nibble = (u8)(c - '0');
-      } else if (c >= 'a' && c <= 'f') {
-        nibble = (u8)(c - 'a' + 10);
-      } else {
-        return false;
-      }
-      byte = (u8)(byte << 4) | nibble;
-    }
-    out->bytes[it] = byte;
-  }
-  return true;
-}
-
 static sp_str_t format_obs_kind(spn_dag_obs_kind_t kind) {
   switch (kind) {
     case SPN_DAG_OBS_FILE:        return sp_str_lit("file");
@@ -123,13 +67,118 @@ static sp_str_t entry_path(sp_str_t dir, sp_mem_t mem, spn_dag_digest_t key) {
   return sp_fs_join_path(mem, dir, name);
 }
 
+typedef bool (*spn_dag_parse_row_fn)(sp_str_t line, sp_mem_t scratch, sp_mem_t mem, void* into);
+typedef spn_err_t (*spn_dag_format_row_fn)(sp_io_writer_t* io, sp_mem_t mem, const void* rows, u64 index);
+
+static bool table_load(sp_str_t dir, spn_dag_digest_t key, sp_mem_t mem, spn_dag_parse_row_fn parse, void* into) {
+  bool ok = false;
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+
+  sp_str_t path = entry_path(dir, s.mem, key);
+  sp_da(sp_str_t) lines = sp_zero;
+  if (read_lines(s.mem, path, &lines)) {
+    goto done;
+  }
+
+  sp_da_for(lines, it) {
+    if (!parse(lines[it], s.mem, mem, into)) {
+      sp_fs_remove_file(path);
+      goto done;
+    }
+  }
+  ok = true;
+
+done:
+  sp_mem_end_scratch(s);
+  return ok;
+}
+
+static void table_write(sp_str_t dir, spn_dag_digest_t key, spn_dag_format_row_fn format, const void* rows, u64 count) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+
+  sp_fs_atomic_t af = sp_zero;
+  if (sp_fs_atomic_open(&af, entry_path(dir, s.mem, key))) {
+    goto done;
+  }
+
+  sp_for(it, count) {
+    if (format(sp_fs_atomic_writer(&af), s.mem, rows, it)) {
+      sp_fs_atomic_abort(&af);
+      goto done;
+    }
+  }
+  sp_fs_atomic_commit(&af, SP_FS_ATOMIC_REPLACE);
+
+done:
+  sp_mem_end_scratch(s);
+}
+
+static spn_err_t format_output_row(sp_io_writer_t* io, sp_mem_t mem, const void* rows, u64 index) {
+  const spn_dag_action_output_t* output = (const spn_dag_action_output_t*)rows + index;
+  spn_cg_dag_output_t cg = {
+    .name = output->name,
+    .digest = spn_dag_digest_hex(mem, output->digest),
+  };
+  return write_line(io, spn_dag_output_write_compact(mem, &cg));
+}
+
+static bool parse_output_row(sp_str_t line, sp_mem_t scratch, sp_mem_t mem, void* into) {
+  sp_da(spn_dag_action_output_t)* outputs = (sp_da(spn_dag_action_output_t)*)into;
+
+  spn_cg_dag_output_t cg = sp_zero;
+  spn_dag_action_output_t output = sp_zero;
+  if (!spn_dag_output_read(line, &cg, scratch) || !spn_dag_digest_parse(cg.digest, &output.digest)) {
+    return false;
+  }
+  output.name = sp_str_copy(mem, cg.name);
+  sp_da_push(*outputs, output);
+  return true;
+}
+
+static spn_err_t format_obs_row(sp_io_writer_t* io, sp_mem_t mem, const void* rows, u64 index) {
+  const spn_dag_obs_t* obs = (const spn_dag_obs_t*)rows + index;
+  spn_cg_dag_obs_t cg = {
+    .kind = format_obs_kind(obs->kind),
+    .path = obs->path,
+    .filter = obs->filter,
+    .device = format_u64(mem, obs->meta.id.device),
+    .inode = format_u64(mem, obs->meta.id.inode),
+    .mtime_s = format_s64(mem, (s64)obs->meta.mtime.tv_sec),
+    .mtime_ns = format_s64(mem, (s64)obs->meta.mtime.tv_nsec),
+    .size = format_s64(mem, obs->meta.size),
+    .digest = spn_dag_digest_hex(mem, obs->meta.digest),
+  };
+  return write_line(io, spn_dag_obs_write_compact(mem, &cg));
+}
+
+static bool parse_obs_row(sp_str_t line, sp_mem_t scratch, sp_mem_t mem, void* into) {
+  sp_da(spn_dag_obs_t)* set = (sp_da(spn_dag_obs_t)*)into;
+
+  spn_cg_dag_obs_t cg = sp_zero;
+  if (!spn_dag_obs_read(line, &cg, scratch)) return false;
+
+  spn_dag_obs_t obs = sp_zero;
+  s64 mtime_s = 0;
+  s64 mtime_ns = 0;
+  if (!parse_obs_kind(cg.kind, &obs.kind)) return false;
+  if (!sp_parse_u64_ex(cg.device, &obs.meta.id.device)) return false;
+  if (!sp_parse_u64_ex(cg.inode, &obs.meta.id.inode)) return false;
+  if (!sp_parse_s64_ex(cg.mtime_s, &mtime_s)) return false;
+  if (!sp_parse_s64_ex(cg.mtime_ns, &mtime_ns)) return false;
+  if (!sp_parse_s64_ex(cg.size, &obs.meta.size)) return false;
+  if (!spn_dag_digest_parse(cg.digest, &obs.meta.digest)) return false;
+
+  obs.path = sp_str_copy(mem, cg.path);
+  obs.filter = sp_str_copy(mem, cg.filter);
+  obs.meta.mtime.tv_sec = mtime_s;
+  obs.meta.mtime.tv_nsec = mtime_ns;
+  sp_da_push(*set, obs);
+  return true;
+}
+
 static spn_err_t write_outputs(sp_io_writer_t* io, sp_mem_t mem, const spn_dag_action_output_t* outputs, u64 count) {
   sp_for(it, count) {
-    spn_cg_dag_output_t cg = {
-      .name = outputs[it].name,
-      .digest = spn_dag_digest_hex(mem, outputs[it].digest),
-    };
-    try(write_line(io, spn_dag_output_write_compact(mem, &cg)));
+    try(format_output_row(io, mem, outputs, it));
   }
   return SPN_OK;
 }
@@ -140,52 +189,9 @@ void spn_dag_action_cache_init(spn_dag_action_cache_t* c, sp_mem_t mem, sp_str_t
   c->dir = sp_str_copy(c->mem, dir);
   sp_ht_init(c->mem, c->entries);
 
-  if (!sp_str_empty(c->dir) && !sp_fs_exists(c->dir)) {
+  if (!sp_str_empty(c->dir)) {
     sp_fs_create_dir(c->dir);
   }
-}
-
-static bool action_entry_load(spn_dag_action_cache_t* c, spn_dag_digest_t key, spn_dag_action_entry_t* out) {
-  bool ok = false;
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-
-  sp_str_t path = entry_path(c->dir, s.mem, key);
-  sp_da(sp_str_t) lines = sp_zero;
-  if (read_lines(s.mem, path, &lines)) {
-    goto done;
-  }
-
-  spn_dag_action_entry_t entry = sp_zero;
-  sp_da_init(c->mem, entry.outputs);
-  sp_da_for(lines, it) {
-    spn_cg_dag_output_t cg = sp_zero;
-    spn_dag_action_output_t output = sp_zero;
-    if (!spn_dag_output_read(lines[it], &cg, s.mem) || !parse_digest(cg.digest, &output.digest)) {
-      sp_fs_remove_file(path);
-      goto done;
-    }
-    output.name = sp_str_copy(c->mem, cg.name);
-    sp_da_push(entry.outputs, output);
-  }
-
-  *out = entry;
-  ok = true;
-
-done:
-  sp_mem_end_scratch(s);
-  return ok;
-}
-
-static void action_entry_write(spn_dag_action_cache_t* c, spn_dag_digest_t key, const spn_dag_action_entry_t* entry) {
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-
-  sp_io_dyn_mem_writer_t sink = sp_zero;
-  sp_io_dyn_mem_writer_init(s.mem, &sink);
-  if (!write_outputs(&sink.base, s.mem, entry->outputs, sp_da_size(entry->outputs))) {
-    sp_fs_write_atomic(entry_path(c->dir, s.mem, key), sp_io_dyn_mem_writer_as_str(&sink));
-  }
-
-  sp_mem_end_scratch(s);
 }
 
 const spn_dag_action_entry_t* spn_dag_action_cache_get(spn_dag_action_cache_t* c, spn_dag_digest_t key) {
@@ -199,7 +205,8 @@ const spn_dag_action_entry_t* spn_dag_action_cache_get(spn_dag_action_cache_t* c
   }
 
   spn_dag_action_entry_t entry = sp_zero;
-  if (!action_entry_load(c, key, &entry)) {
+  sp_da_init(c->mem, entry.outputs);
+  if (!table_load(c->dir, key, c->mem, parse_output_row, &entry.outputs)) {
     return SP_NULLPTR;
   }
 
@@ -219,7 +226,7 @@ void spn_dag_action_cache_put(spn_dag_action_cache_t* c, spn_dag_digest_t key, c
   sp_ht_insert(c->entries, key, entry);
 
   if (!sp_str_empty(c->dir)) {
-    action_entry_write(c, key, &entry);
+    table_write(c->dir, key, format_output_row, entry.outputs, sp_da_size(entry.outputs));
   }
 }
 
@@ -250,91 +257,9 @@ void spn_dag_discovery_init(spn_dag_discovery_t* d, sp_mem_t mem, sp_str_t dir) 
   d->dir = sp_str_copy(d->mem, dir);
   sp_ht_init(d->mem, d->entries);
 
-  if (!sp_str_empty(d->dir) && !sp_fs_exists(d->dir)) {
+  if (!sp_str_empty(d->dir)) {
     sp_fs_create_dir(d->dir);
   }
-}
-
-static bool parse_obs(sp_str_t line, sp_mem_t scratch, sp_mem_t mem, spn_dag_obs_t* out) {
-  spn_cg_dag_obs_t cg = sp_zero;
-  if (!spn_dag_obs_read(line, &cg, scratch)) return false;
-
-  spn_dag_obs_t obs = sp_zero;
-  s64 mtime_s = 0;
-  s64 mtime_ns = 0;
-  if (!parse_obs_kind(cg.kind, &obs.kind)) return false;
-  if (!parse_u64(cg.device, &obs.meta.id.device)) return false;
-  if (!parse_u64(cg.inode, &obs.meta.id.inode)) return false;
-  if (!parse_s64(cg.mtime_s, &mtime_s)) return false;
-  if (!parse_s64(cg.mtime_ns, &mtime_ns)) return false;
-  if (!parse_s64(cg.size, &obs.meta.size)) return false;
-  if (!parse_digest(cg.digest, &obs.meta.digest)) return false;
-
-  obs.path = sp_str_copy(mem, cg.path);
-  obs.filter = sp_str_copy(mem, cg.filter);
-  obs.meta.mtime.tv_sec = mtime_s;
-  obs.meta.mtime.tv_nsec = mtime_ns;
-  *out = obs;
-  return true;
-}
-
-static bool pathset_load(spn_dag_discovery_t* d, spn_dag_digest_t weak, spn_dag_pathset_t* out) {
-  bool ok = false;
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-
-  sp_str_t path = entry_path(d->dir, s.mem, weak);
-  sp_da(sp_str_t) lines = sp_zero;
-  if (read_lines(s.mem, path, &lines)) {
-    goto done;
-  }
-
-  spn_dag_pathset_t set = sp_zero;
-  sp_da_init(d->mem, set.obs);
-  sp_da_for(lines, it) {
-    spn_dag_obs_t obs = sp_zero;
-    if (!parse_obs(lines[it], s.mem, d->mem, &obs)) {
-      sp_fs_remove_file(path);
-      goto done;
-    }
-    sp_da_push(set.obs, obs);
-  }
-
-  *out = set;
-  ok = true;
-
-done:
-  sp_mem_end_scratch(s);
-  return ok;
-}
-
-static void pathset_write(spn_dag_discovery_t* d, spn_dag_digest_t weak, const spn_dag_pathset_t* set) {
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-
-  sp_io_dyn_mem_writer_t sink = sp_zero;
-  sp_io_dyn_mem_writer_init(s.mem, &sink);
-
-  sp_da_for(set->obs, it) {
-    const spn_dag_obs_t* obs = &set->obs[it];
-    spn_cg_dag_obs_t cg = {
-      .kind = format_obs_kind(obs->kind),
-      .path = obs->path,
-      .filter = obs->filter,
-      .device = format_u64(s.mem, obs->meta.id.device),
-      .inode = format_u64(s.mem, obs->meta.id.inode),
-      .mtime_s = format_s64(s.mem, (s64)obs->meta.mtime.tv_sec),
-      .mtime_ns = format_s64(s.mem, (s64)obs->meta.mtime.tv_nsec),
-      .size = format_s64(s.mem, obs->meta.size),
-      .digest = spn_dag_digest_hex(s.mem, obs->meta.digest),
-    };
-    if (write_line(&sink.base, spn_dag_obs_write_compact(s.mem, &cg))) {
-      goto done;
-    }
-  }
-
-  sp_fs_write_atomic(entry_path(d->dir, s.mem, weak), sp_io_dyn_mem_writer_as_str(&sink));
-
-done:
-  sp_mem_end_scratch(s);
 }
 
 spn_dag_pathset_t* spn_dag_discovery_get(spn_dag_discovery_t* d, spn_dag_digest_t weak) {
@@ -348,7 +273,8 @@ spn_dag_pathset_t* spn_dag_discovery_get(spn_dag_discovery_t* d, spn_dag_digest_
   }
 
   spn_dag_pathset_t set = sp_zero;
-  if (!pathset_load(d, weak, &set)) {
+  sp_da_init(d->mem, set.obs);
+  if (!table_load(d->dir, weak, d->mem, parse_obs_row, &set.obs)) {
     return SP_NULLPTR;
   }
 
@@ -376,11 +302,11 @@ void spn_dag_discovery_flush(spn_dag_discovery_t* d, spn_dag_digest_t weak) {
 
   spn_dag_pathset_t* set = sp_ht_getp(d->entries, weak);
   if (set) {
-    pathset_write(d, weak, set);
+    table_write(d->dir, weak, format_obs_row, set->obs, sp_da_size(set->obs));
   }
 }
 
-static sp_str_t get_blob_dir(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
+static sp_str_t get_blob_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
   return sp_fs_join_path(mem, store->dir, spn_dag_digest_hex(mem, digest));
 }
 
@@ -388,25 +314,7 @@ static sp_str_t get_staging_dir(spn_dag_store_t* store, sp_mem_t mem) {
   return sp_fs_join_path(mem, store->dir, sp_str_lit(".staging"));
 }
 
-static sp_str_t get_blob_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, get_blob_dir(store, mem, digest));
-  sp_da_for(entries, it) {
-    if (entries[it].kind == SP_FS_KIND_FILE) {
-      return entries[it].path;
-    }
-  }
-  return sp_str_lit("");
-}
-
-static spn_err_t link_from_store(sp_str_t source, sp_str_t target, sp_str_t staging) {
-  sp_fs_create_dir(sp_fs_parent_path(target));
-  sp_fs_remove_file(target);
-
-  bool linked = !sp_fs_link(source, target, SP_FS_LINK_HARD);
-  if (linked) {
-    return SPN_OK;
-  }
-
+static spn_err_t copy_blob(sp_str_t source, sp_str_t target, sp_str_t staging) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_err_t err = SPN_OK;
 
@@ -419,6 +327,23 @@ static spn_err_t link_from_store(sp_str_t source, sp_str_t target, sp_str_t stag
 
   sp_mem_end_scratch(s);
   return err;
+}
+
+static spn_err_t link_into_store(sp_str_t source, sp_str_t blob, sp_str_t staging) {
+  if (!sp_fs_link(source, blob, SP_FS_LINK_HARD)) {
+    return SPN_OK;
+  }
+  return copy_blob(source, blob, staging);
+}
+
+static spn_err_t link_from_store(sp_str_t source, sp_str_t target, sp_str_t staging) {
+  sp_fs_create_dir(sp_fs_parent_path(target));
+  sp_fs_remove_file(target);
+
+  if (!sp_fs_link(source, target, SP_FS_LINK_HARD)) {
+    return SPN_OK;
+  }
+  return copy_blob(source, target, staging);
 }
 
 static bool find_blob(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_slice_t* blob) {
@@ -444,9 +369,7 @@ void spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config) {
     }
     case SPN_DAG_STORE_FILESYSTEM: {
       store->dir = sp_str_copy(store->mem, config.dir);
-      if (!sp_fs_exists(store->dir)) {
-        sp_fs_create_dir(store->dir);
-      }
+      sp_fs_create_dir(store->dir);
       break;
     }
   }
@@ -472,10 +395,9 @@ spn_err_t spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, s
     case SPN_DAG_STORE_FILESYSTEM: {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
       spn_err_t err = SPN_OK;
-      if (sp_str_empty(get_blob_path(store, s.mem, *digest))) {
-        sp_str_t dir = get_blob_dir(store, s.mem, *digest);
-        sp_fs_create_dir(dir);
-        if (sp_fs_write_atomic_slice_staged(sp_fs_join_path(s.mem, dir, sp_str_lit("blob")), get_staging_dir(store, s.mem), sp_mem_slice((u8*)data, len))) {
+      sp_str_t blob = get_blob_path(store, s.mem, *digest);
+      if (!sp_fs_is_file(blob)) {
+        if (sp_fs_write_atomic_slice_staged(blob, get_staging_dir(store, s.mem), sp_mem_slice((u8*)data, len))) {
           err = SPN_ERR_DAG_STORE_WRITE;
         }
       }
@@ -507,11 +429,9 @@ spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, spn_dag_
 
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
       spn_err_t err = SPN_OK;
-      if (sp_str_empty(get_blob_path(store, s.mem, *digest))) {
-        sp_str_t dir = get_blob_dir(store, s.mem, *digest);
-        sp_fs_create_dir(dir);
-        sp_str_t stored = sp_fs_join_path(s.mem, dir, sp_fs_get_name(path));
-        err = link_from_store(path, stored, get_staging_dir(store, s.mem));
+      sp_str_t blob = get_blob_path(store, s.mem, *digest);
+      if (!sp_fs_is_file(blob)) {
+        err = link_into_store(path, blob, get_staging_dir(store, s.mem));
       }
       sp_mem_end_scratch(s);
       return err;
@@ -527,7 +447,8 @@ sp_str_t spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest
       return sp_str_lit("");
     }
     case SPN_DAG_STORE_FILESYSTEM: {
-      return get_blob_path(store, mem, digest);
+      sp_str_t blob = get_blob_path(store, mem, digest);
+      return sp_fs_is_file(blob) ? blob : sp_str_lit("");
     }
   }
 
@@ -542,7 +463,7 @@ bool spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest) {
     }
     case SPN_DAG_STORE_FILESYSTEM: {
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      bool exists = !sp_str_empty(get_blob_path(store, s.mem, digest));
+      bool exists = sp_fs_is_file(get_blob_path(store, s.mem, digest));
       sp_mem_end_scratch(s);
       return exists;
     }
@@ -564,14 +485,11 @@ spn_err_t spn_dag_store_get(spn_dag_store_t* store, spn_dag_digest_t digest, sp_
       return SPN_OK;
     }
     case SPN_DAG_STORE_FILESYSTEM: {
-      sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      sp_str_t stored = get_blob_path(store, s.mem, digest);
-      spn_err_t err = SPN_ERR_DAG_STORE_MISSING;
-      if (!sp_str_empty(stored)) {
-        err = sp_io_read_file_slice(mem, stored, data) ? SPN_ERR_DAG_STORE_READ : SPN_OK;
+      sp_str_t stored = get_blob_path(store, mem, digest);
+      if (!sp_fs_is_file(stored)) {
+        return SPN_ERR_DAG_STORE_MISSING;
       }
-      sp_mem_end_scratch(s);
-      return err;
+      return sp_io_read_file_slice(mem, stored, data) ? SPN_ERR_DAG_STORE_READ : SPN_OK;
     }
   }
 
@@ -592,7 +510,7 @@ spn_err_t spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t dig
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
       sp_str_t stored = get_blob_path(store, s.mem, digest);
       spn_err_t err = SPN_ERR_DAG_STORE_MISSING;
-      if (!sp_str_empty(stored)) {
+      if (sp_fs_is_file(stored)) {
         err = link_from_store(stored, path, sp_str_lit(""));
       }
       sp_mem_end_scratch(s);
@@ -666,16 +584,12 @@ spn_err_t spn_dag_tree_entries(spn_dag_store_t* store, spn_dag_digest_t digest, 
     if (sp_str_empty(sp_str_trim(lines[it]))) {
       continue;
     }
-    spn_cg_dag_output_t cg = sp_zero;
-    spn_dag_action_output_t entry = sp_zero;
-    if (!spn_dag_output_read(lines[it], &cg, mem) || !parse_digest(cg.digest, &entry.digest)) {
+    if (!parse_output_row(lines[it], mem, mem, out)) {
       return SPN_ERR_DAG_TREE;
     }
-    if (!tree_name_ok(cg.name)) {
+    if (!tree_name_ok(sp_da_back(*out)->name)) {
       return SPN_ERR_DAG_TREE;
     }
-    entry.name = sp_str_copy(mem, cg.name);
-    sp_da_push(*out, entry);
   }
   return SPN_OK;
 }
@@ -711,7 +625,6 @@ spn_err_t spn_dag_store_materialize_tree(spn_dag_store_t* store, spn_dag_digest_
   sp_fs_create_dir(dir);
   sp_da_for(entries, it) {
     sp_str_t path = sp_fs_join_path(s.mem, dir, entries[it].name);
-    sp_fs_create_dir(sp_fs_parent_path(path));
     spn_try_goto(spn_dag_store_materialize(store, entries[it].digest, path), err, done);
   }
 

@@ -2,6 +2,8 @@ add_executable(fuzz_dag
   ${SRC}/dag/dag.c
   ${SRC}/dag/store.c
   ${SRC}/dag/run.c
+  ${SRC}/dag/glob.c
+  ${SRC}/dag/executor.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/loader.c
   ${SRC}/codegen/gen/dag_output.gen.c
