@@ -1,6 +1,7 @@
 add_executable(dag
   ${SRC}/dag/dag.c
-  ${SRC}/dag/lower.c
+  ${SRC}/dag/store.c
+  ${SRC}/dag/run.c
   ${SRC}/dag/wasi.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/gen/dag_output.gen.c

@@ -209,7 +209,7 @@ static void run_exec_test(s32* utest_result, tree_exec_test_t t) {
     }
 
     env.run = run;
-    spn_dag_file_cache_refresh(&env.dag.files);
+    spn_dag_file_cache_invalidate_all(&env.dag.files);
     if (run->remove_target) {
       sp_fs_remove_dir(target);
     }

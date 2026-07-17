@@ -85,7 +85,7 @@ static void run_test(s32* utest_result, enum_test_t t) {
     if (run->cold) {
       dag_test_env_cold(&env.dag);
     }
-    spn_dag_file_cache_refresh(&env.dag.files);
+    spn_dag_file_cache_invalidate_all(&env.dag.files);
     enum_prepare(&env, run);
 
     spn_dag_t* g = dag_test_env_graph(&env.dag);

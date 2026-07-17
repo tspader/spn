@@ -114,7 +114,7 @@ static void run_test(s32* utest_result, run_test_t t) {
       break;
     }
 
-    spn_dag_file_cache_refresh(&env.files);
+    spn_dag_file_cache_invalidate_all(&env.files);
     sp_carr_for(build->sources, si) {
       if (!build->sources[si].path) {
         break;

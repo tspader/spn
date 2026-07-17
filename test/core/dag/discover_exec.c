@@ -128,7 +128,7 @@ static void run_test(s32* utest_result, test_t t) {
     if (run->cold) {
       dag_test_env_cold(&env.dag);
     }
-    spn_dag_file_cache_refresh(&env.dag.files);
+    spn_dag_file_cache_invalidate_all(&env.dag.files);
     prepare(&env, run);
 
     spn_dag_t* g = dag_test_env_graph(&env.dag);
@@ -168,7 +168,7 @@ static void run_test(s32* utest_result, test_t t) {
       sp_str_t manifest = manifest_read(&env);
       EXPECT_TRUE(!sp_str_empty(manifest));
       sp_sys_file_meta_t sys = sp_zero;
-      ASSERT_EQ(SPN_OK, spn_dag_get_file_meta(&env.dag.files, tmpfs_get(&env.dag.fs, sp_str_view(run->manifest_fresh)), &sys));
+      ASSERT_EQ(SPN_OK, spn_dag_file_cache_stat(&env.dag.files, tmpfs_get(&env.dag.fs, sp_str_view(run->manifest_fresh)), &sys));
       sp_str_t mtime = sp_fmt(env.dag.fs.mem, "\"mtime_ns\":\"{}\"", sp_fmt_int(sys.mtime.tv_nsec)).value;
       EXPECT_TRUE(sp_str_contains(manifest, mtime));
     }
