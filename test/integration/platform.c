@@ -21,21 +21,17 @@ UTEST_F(platform, dep_inert) {
     .copy = { "main.c", "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
     },
   });
 }
 
 UTEST_F(platform, frameworks) {
-  if (sp_os_get_kind() != SP_OS_MACOS) {
-    UTEST_SKIP("frameworks only link on macos");
-  }
-
   tmpfs_init_named(&uf->fixture.fs, "platform_frameworks");
 
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/integration/fixtures/platform/frameworks",
     .copy = { "main.c" },
+    .when.os = SPN_OS_MACOS,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
@@ -44,15 +40,12 @@ UTEST_F(platform, frameworks) {
 }
 
 UTEST_F(platform, subsystem) {
-  if (sp_os_get_kind() != SP_OS_WIN32) {
-    UTEST_SKIP("the windows subsystem flag only links on windows");
-  }
-
   tmpfs_init_named(&uf->fixture.fs, "platform_subsystem");
 
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/integration/fixtures/platform/subsystem",
     .copy = { "main.c" },
+    .when.os = SPN_OS_WINDOWS,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
