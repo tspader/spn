@@ -19,6 +19,7 @@ typedef struct {
   store_op_kind_t kind;
   const c8* blob;
   const c8* path;
+  const c8* name;
   store_expect_t expect;
 } store_op_t;
 
@@ -42,6 +43,7 @@ static void run_ops(s32* utest_result, spn_dag_store_kind_t kind, store_test_t t
 
     sp_str_t blob = sp_str_view(op.blob);
     spn_dag_digest_t digest = dag_test_digest(op.blob);
+    sp_str_t name = op.name ? sp_str_view(op.name) : sp_str_lit("blob");
 
     switch (op.kind) {
       case STORE_OP_DONE: {
@@ -53,7 +55,7 @@ static void run_ops(s32* utest_result, spn_dag_store_kind_t kind, store_test_t t
       }
       case STORE_OP_PUT: {
         spn_dag_digest_t returned = sp_zero;
-        EXPECT_EQ(op.expect.err, spn_dag_store_put(&env.store, blob.data, blob.len, &returned));
+        EXPECT_EQ(op.expect.err, spn_dag_store_put(&env.store, blob.data, blob.len, name, &returned));
         if (!op.expect.err) {
           EXPECT_TRUE(spn_dag_digest_equal(digest, returned));
         }
@@ -61,7 +63,8 @@ static void run_ops(s32* utest_result, spn_dag_store_kind_t kind, store_test_t t
       }
       case STORE_OP_PUT_FILE: {
         spn_dag_digest_t returned = sp_zero;
-        EXPECT_EQ(op.expect.err, spn_dag_store_put_file(&env.store, tmpfs_get(&env.fs, sp_str_view(op.path)), &returned));
+        sp_str_t file_name = op.name ? sp_str_view(op.name) : sp_str_view(op.path);
+        EXPECT_EQ(op.expect.err, spn_dag_store_put_file(&env.store, tmpfs_get(&env.fs, sp_str_view(op.path)), file_name, &returned));
         if (!op.expect.err) {
           EXPECT_TRUE(spn_dag_digest_equal(digest, returned));
         }
@@ -69,19 +72,19 @@ static void run_ops(s32* utest_result, spn_dag_store_kind_t kind, store_test_t t
       }
       case STORE_OP_GET: {
         sp_mem_slice_t fetched = sp_zero;
-        EXPECT_EQ(op.expect.err, spn_dag_store_get(&env.store, digest, mem, &fetched));
+        EXPECT_EQ(op.expect.err, spn_dag_store_get(&env.store, digest, name, mem, &fetched));
         if (!op.expect.err) {
           EXPECT_STR(sp_str((const c8*)fetched.data, (u32)fetched.len), op.blob);
         }
         break;
       }
       case STORE_OP_HAS: {
-        EXPECT_EQ(op.expect.has, spn_dag_store_has(&env.store, digest));
+        EXPECT_EQ(op.expect.has, spn_dag_store_has(&env.store, digest, name));
         break;
       }
       case STORE_OP_MATERIALIZE: {
         sp_str_t path = tmpfs_get(&env.fs, sp_str_view(op.path));
-        EXPECT_EQ(op.expect.err, spn_dag_store_materialize(&env.store, digest, path));
+        EXPECT_EQ(op.expect.err, spn_dag_store_materialize(&env.store, digest, name, path));
         if (!op.expect.err) {
           dag_test_expect_file(utest_result, mem, path, op.blob);
         }
@@ -148,7 +151,7 @@ UTEST_F(store, put_file_matches_put) {
     .ops = {
       { .kind = STORE_OP_FILE, .blob = "A", .path = "a.c" },
       { .kind = STORE_OP_PUT_FILE, .blob = "A", .path = "a.c" },
-      { .kind = STORE_OP_GET, .blob = "A" },
+      { .kind = STORE_OP_GET, .blob = "A", .name = "a.c" },
     }
   });
 }
@@ -159,8 +162,8 @@ UTEST_F(store, put_file_dot_name) {
     .ops = {
       { .kind = STORE_OP_FILE, .blob = "A", .path = ".gitignore" },
       { .kind = STORE_OP_PUT_FILE, .blob = "A", .path = ".gitignore" },
-      { .kind = STORE_OP_HAS, .blob = "A", .expect = { .has = true } },
-      { .kind = STORE_OP_GET, .blob = "A" },
+      { .kind = STORE_OP_HAS, .blob = "A", .name = ".gitignore", .expect = { .has = true } },
+      { .kind = STORE_OP_GET, .blob = "A", .name = ".gitignore" },
     }
   });
 }
@@ -171,8 +174,8 @@ UTEST_F(store, put_file_temp_pattern_name) {
     .ops = {
       { .kind = STORE_OP_FILE, .blob = "B", .path = ".b.123.4.tmp" },
       { .kind = STORE_OP_PUT_FILE, .blob = "B", .path = ".b.123.4.tmp" },
-      { .kind = STORE_OP_HAS, .blob = "B", .expect = { .has = true } },
-      { .kind = STORE_OP_GET, .blob = "B" },
+      { .kind = STORE_OP_HAS, .blob = "B", .name = ".b.123.4.tmp", .expect = { .has = true } },
+      { .kind = STORE_OP_GET, .blob = "B", .name = ".b.123.4.tmp" },
     }
   });
 }

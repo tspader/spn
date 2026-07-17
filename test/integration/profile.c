@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(profile)
 
 // The planted heap overflow in the fixture is benign in a plain build;

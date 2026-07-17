@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(platform)
 
 UTEST_F(platform, inert) {

@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(reexport)
 
 // main deps only sdl_mixer; sdl_mixer.h includes sdl.h from its public sdl

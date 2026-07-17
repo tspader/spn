@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(consume)
 
 UTEST_F(consume, static_lib) {

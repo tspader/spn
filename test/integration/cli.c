@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(cli)
 
 UTEST_F(cli, missing_required_package_version) {
