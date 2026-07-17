@@ -93,7 +93,9 @@ add_executable(options
   ${SRC}/event/event.c
   ${SRC}/pkg/options.c
   ${SRC}/when/when.c
-  options.c
+  options/main.c
+  options/merge.c
+  options/apply.c
 )
 spn_test_binary(options)
 add_test(NAME options COMMAND "$<TARGET_FILE:options>")

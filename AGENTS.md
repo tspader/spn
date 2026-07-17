@@ -103,6 +103,7 @@ if (err != SPN_OK) {
 ## Rules
 - Never, ever comment your code. Code with newly added comments will be rejected. If you're reviewing code, flag comments.
 - Always use unprefixed names for private, static functions (e.g. `is_file_clean()` instead of `spn_is_file_clean()`)
+- Always use `sp_cstr_as_str()` instead of `sp_str_view()`
 - always use sp_zero instead of leaving variables uninitialized
 - always use braces for one liner scopes (e.g. `for`, `if`)
 - always use `foo()` instead of `foo(void)` for no-argument functions
