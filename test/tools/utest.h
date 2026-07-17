@@ -135,6 +135,7 @@ struct utest_state_s {
 typedef struct {
   sp_da(utest_failure_t) failures;
   sp_da(utest_attr_t) staged;
+  sp_str_t skip_reason;
   sp_io_stream_writer_t out;
   u8 out_buffer[4096];
 } utest_tls_t;
@@ -232,6 +233,11 @@ UTEST_WEAK void utest_register(utest_test_fn_t func, const c8* name, const c8* s
   discards them if it passes. The runner prints everything once the test
   finishes.
 */
+UTEST_WEAK void utest_skip_reason(sp_str_t reason);
+UTEST_WEAK void utest_skip_reason(sp_str_t reason) {
+  utest_tls_get()->skip_reason = reason;
+}
+
 UTEST_WEAK void utest_kv(const c8* key, sp_str_t value);
 UTEST_WEAK void utest_kv(const c8* key, sp_str_t value) {
   sp_mem_t mem = utest_mem();
@@ -347,6 +353,9 @@ UTEST_FORMATTER sp_str_t utest_fmt(sp_str_t v) {
   do {                                                                         \
     if (UTEST_TEST_PASSED == *utest_result) {                                  \
       *utest_result = UTEST_TEST_SKIPPED;                                      \
+    }                                                                          \
+    if ((msg)[0]) {                                                            \
+      utest_tls_get()->skip_reason = sp_str_view(msg);                         \
     }                                                                          \
     return;                                                                    \
   } while (0)
@@ -636,6 +645,10 @@ UTEST_WEAK void utest_finish(utest_test_t* test, s32 result, s64 ns, sp_da(const
     case UTEST_TEST_SKIPPED: {
       sp_da_push(*skipped, test->name);
       utest_print("{.yellow} ", sp_fmt_cstr("skipped"));
+      sp_str_t reason = utest_tls_get()->skip_reason;
+      if (reason.len) {
+        utest_print("{.gray} ", sp_fmt_str(reason));
+      }
       break;
     }
     default: {
@@ -665,6 +678,7 @@ UTEST_WEAK s32 utest_worker(void* userdata) {
     utest_tls_t* tls = utest_tls_get();
     sp_da_clear(tls->failures);
     sp_da_clear(tls->staged);
+    tls->skip_reason = sp_zero_s(sp_str_t);
 
     s32 result = UTEST_TEST_PASSED;
     s64 ns = (s64)sp_tm_now_point();

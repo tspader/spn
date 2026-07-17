@@ -4,13 +4,11 @@ SPN_TEST_SUITE(profile)
 // [profile.asan] must compile and link with the address sanitizer, which
 // reports the overflow and fails the binary at runtime
 UTEST_F(profile, sanitize_trigger) {
-#if defined(SP_WIN32)
-  UTEST_SKIP("the system toolchain has no sanitizer support on windows");
-#endif
   tmpfs_init_named(&uf->fixture.fs, "profile_sanitize_trigger");
 
   run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
     .project = "test/integration/fixtures/profile/sanitize",
+    .when.sanitize = SPN_SANITIZER_ADDRESS,
     .builds = {
       { .expect = { .bin = { .name = "main" } } },
       { .profile = "asan", .expect = { .bin = { .name = "main", .rc = 1, .contains = { "AddressSanitizer" } } } },
@@ -21,13 +19,11 @@ UTEST_F(profile, sanitize_trigger) {
 // sanitize = [] is an explicit clear, not an unset field: a derived profile
 // must be able to drop the sanitizers it inherits from default
 UTEST_F(profile, sanitize_clear) {
-#if defined(SP_WIN32)
-  UTEST_SKIP("the system toolchain has no sanitizer support on windows");
-#endif
   tmpfs_init_named(&uf->fixture.fs, "profile_sanitize_clear");
 
   run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
     .project = "test/integration/fixtures/profile/clear",
+    .when.sanitize = SPN_SANITIZER_ADDRESS,
     .builds = {
       { .expect = { .bin = { .name = "main", .rc = 1, .contains = { "AddressSanitizer" } } } },
       { .profile = "clean", .expect = { .bin = { .name = "main" } } },
@@ -46,10 +42,7 @@ UTEST_F(profile, identity) {
     .builds = {
       { .expect = { .bin = { .name = "main", .rc = 1 } } },
       { .profile = "fast", .expect = { .bin = { .name = "main", .rc = 2 } } },
-#ifndef SP_WIN32
-      // The system toolchain has no sanitizer support on windows
-      { .profile = "asan", .expect = { .bin = { .name = "main", .rc = 3 } } },
-#endif
+      { .profile = "asan", .when.sanitize = SPN_SANITIZER_ADDRESS, .expect = { .bin = { .name = "main", .rc = 3 } } },
     },
   });
 }
@@ -83,26 +76,33 @@ UTEST_F(profile, override_rebuild) {
   });
 }
 
-// The resolved profile's opt level and sanitizers land on the compiler
-// command line for both defaulted and explicit levels
+// The resolved profile's opt level lands on the compiler command line for
+// both defaulted and explicit levels
 UTEST_F(profile, flags) {
   tmpfs_init_named(&uf->fixture.fs, "profile_flags");
 
   run_test(utest_result, &uf->fixture, (test_t) {
     .project = "test/integration/fixtures/profile/sanitize",
     .actions = {
-#ifndef SP_WIN32
-      // The system toolchain has no sanitizer support on windows; the opt
-      // level assertions below still run against a plain build there
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "-p", "asan" } } },
-      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("compile_commands.json"), .needle = sp_str_lit("-fsanitize=address") } },
-#else
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
-#endif
       { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("compile_commands.json"), .needle = sp_str_lit("-O0") } },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "-m", "release" } } },
       { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("compile_commands.json"), .needle = sp_str_lit("-O2") } },
       { .kind = ACTION_VERIFY_FILE_NOT_CONTAINS, .verify_file_not_contains = { .file = sp_str_lit("compile_commands.json"), .needle = sp_str_lit("-fsanitize") } },
+    },
+  });
+}
+
+// The resolved profile's sanitizers land on the compiler command line
+UTEST_F(profile, flags_sanitize) {
+  tmpfs_init_named(&uf->fixture.fs, "profile_flags_sanitize");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/profile/sanitize",
+    .when.sanitize = SPN_SANITIZER_ADDRESS,
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "-p", "asan" } } },
+      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("compile_commands.json"), .needle = sp_str_lit("-fsanitize=address") } },
     },
   });
 }

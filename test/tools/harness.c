@@ -1084,6 +1084,26 @@ void prepare_test(s32* utest_result, fixture_t* fixture, const c8* project, cons
 }
 
 void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
+  sp_str_t blocked = test_when_blocked(&test.when);
+  if (blocked.len) {
+    utest_skip_reason(blocked);
+    UTEST_SKIP("");
+  }
+
+  if (!test_when_runs(&test.when)) {
+    u32 kept = 0;
+    sp_carr_for(test.actions, it) {
+      action_t action = test.actions[it];
+      if (action.kind == ACTION_RUN_BIN || action.kind == ACTION_RUN_TEST) {
+        continue;
+      }
+      test.actions[kept++] = action;
+    }
+    while (kept < SPN_TEST_MAX_ACTIONS) {
+      test.actions[kept++] = (action_t) { .kind = ACTION_NONE };
+    }
+  }
+
   prepare_test(utest_result, fixture, test.project, test.copy);
   run_actions(utest_result, fixture, test.actions);
 }

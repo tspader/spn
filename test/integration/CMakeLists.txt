@@ -1,7 +1,13 @@
 add_executable(integration
+  ${SRC}/compiler/driver.c
+  ${SRC}/compiler/gnu.c
+  ${SRC}/compiler/msvc.c
+  ${SRC}/enum/enum.c
   ${SRC}/external/tom.c
   ${SRC}/sp/str.c
+  ${SRC}/triple/triple.c
   main.c
+  ${TEST_TOOLS}/caps.c
   ${TEST_TOOLS}/harness.c
   ${TEST_TOOLS}/tmp.c
   ${TEST_TOOLS}/git.c
