@@ -78,6 +78,7 @@ flags = ["-DSP_IMPLEMENTATION", "-DSP_TEST_IMPLEMENTATION", "-DSP_GRAPH_IMPLEMEN
 [[test]]
 name = "index"
 source = [
+  "source/codegen/loader.c",
   "source/codegen/codegen.c",
   "source/codegen/json.c",
   "source/codegen/options.c",
@@ -118,6 +119,7 @@ source = [
   "source/intern/intern.c",
   "source/codegen/codegen.c",
   "source/codegen/json.c",
+  "source/codegen/loader.c",
   "source/codegen/lower.c",
   "source/codegen/options.c",
   "source/codegen/when.c",
@@ -166,6 +168,7 @@ source = [
   "source/ctx/ctx.c",
   "source/codegen/codegen.c",
   "source/codegen/json.c",
+  "source/codegen/loader.c",
   "source/codegen/lower.c",
   "source/codegen/options.c",
   "source/codegen/when.c",
@@ -276,9 +279,15 @@ flags = []
 [[test]]
 name = "integration"
 source = [
+  "source/compiler/driver.c",
+  "source/compiler/gnu.c",
+  "source/compiler/msvc.c",
+  "source/enum/enum.c",
   "source/external/tom.c",
   "source/sp/str.c",
+  "source/triple/triple.c",
   "test/integration/main.c",
+  "test/tools/caps.c",
   "test/tools/harness.c",
   "test/tools/repo.c",
   "test/tools/tmp.c",
