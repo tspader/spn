@@ -25,9 +25,7 @@ typedef struct {
   bool* dirty;
   u64 last_sys;
   fz_journal_t* j;
-  bool honest;
-  bool murky;
-  bool tainted;
+  fz_world_state_t world;
 } fz_world_t;
 
 static void fz_executor_submit(spn_dag_executor_t* base, spn_dag_job_t job) {
@@ -129,7 +127,7 @@ static u64 fz_action_requeues(fz_universe_t* u, fz_world_t* w, sp_mem_t mem, u64
   return requeues;
 }
 
-static void fz_world_init(fz_world_t* w, sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, sp_fuzz_prng_t schedule, fz_journal_t* j) {
+static void init_world(fz_world_t* w, sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, sp_fuzz_prng_t schedule, fz_journal_t* j) {
   sp_fs_create_dir(sp_str_lit("/src"));
   sp_fs_create_dir(sp_str_lit("/out"));
   sp_fs_create_dir(sp_str_lit("/scratch"));
@@ -175,25 +173,35 @@ static void fz_world_init(fz_world_t* w, sp_mem_t mem, sp_sim_t* sim, fz_univers
   w->dirty = sp_alloc_n(mem, bool, artifacts);
   sp_mem_zero(w->believed, artifacts * sizeof(u64));
   sp_mem_zero(w->dirty, artifacts * sizeof(bool));
-  w->honest = true;
+  w->world = FZ_WORLD_CLEAN;
 }
 
-static spn_err_t fz_world_run(fz_world_t* w, fz_universe_t* u, spn_dag_t* g) {
+static spn_err_t run_world(fz_world_t* w, fz_universe_t* u, spn_dag_t* g) {
   if (u->profile.run_ex) {
     return spn_dag_run_executor(g, &w->env, &w->ex.base);
   }
   return spn_dag_run(g, &w->env);
 }
 
-static void fz_world_diverge(fz_world_t* w) {
-  w->murky = true;
-  if (!w->honest) {
-    w->tainted = true;
+static void mark_world(fz_world_t* w, fz_world_state_t mark) {
+  if (w->world == FZ_WORLD_CLEAN) {
+    w->world = mark;
   }
-  fz_journal_world(w->j, w->honest, w->murky, w->tainted);
+  else if (w->world != mark) {
+    w->world = FZ_WORLD_TAINTED;
+  }
+  fz_journal_world(w->j, w->world);
 }
 
-static void fz_world_reboot(fz_world_t* w, fz_universe_t* u) {
+static bool is_stealth(fz_world_t* w) {
+  return w->world == FZ_WORLD_STEALTHY || w->world == FZ_WORLD_TAINTED;
+}
+
+static bool is_diverged(fz_world_t* w) {
+  return w->world == FZ_WORLD_MURKY || w->world == FZ_WORLD_TAINTED;
+}
+
+static void reboot_world(fz_world_t* w, fz_universe_t* u) {
   spn_dag_store_init(&w->store, (spn_dag_store_config_t) {
     .kind = u->profile.store_fs ? SPN_DAG_STORE_FILESYSTEM : SPN_DAG_STORE_MEM,
     .mem = w->mem,
@@ -359,7 +367,7 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   }
 
   u64 sys_start = w->sim->syscalls;
-  spn_err_t err = fz_world_run(w, u, low.g);
+  spn_err_t err = run_world(w, u, low.g);
   u64 fired = step->kind == FZ_STEP_EIO ? w->sim->faults : 0;
   bool crashed = w->sim->crashed;
   sp_sim_fault_clear(w->sim);
@@ -372,11 +380,11 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   fz_journal_run_done(w->j, (u64)err, fired, crashed);
 
   if (fired || crashed) {
-    fz_world_diverge(w);
+    mark_world(w, FZ_WORLD_MURKY);
   }
   if (crashed) {
     sp_sim_crash_restore(w->sim);
-    fz_world_reboot(w, u);
+    reboot_world(w, u);
     return FZ_OK;
   }
   if (fired && err) {
@@ -385,7 +393,7 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   must(!err, FZ_ERR_RUN_FAILED);
 
   fz_exec_row_t* exec_rows = SP_NULLPTR;
-  if (!w->murky) {
+  if (!is_diverged(w)) {
     exec_rows = sp_alloc_n(mem, fz_exec_row_t, actions ? actions : 1);
     sp_da_for(u->actions, at) {
       u64 requeues = fz_action_requeues(u, w, mem, log_start, at);
@@ -402,7 +410,7 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
     fz_journal_check_execs(w->j, exec_rows, actions);
   }
 
-  if (w->tainted) {
+  if (w->world == FZ_WORLD_TAINTED) {
     return FZ_OK;
   }
 
@@ -414,7 +422,7 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   }
 
   fz_bytes_row_t* model_rows = SP_NULLPTR;
-  if (w->honest) {
+  if (!is_stealth(w)) {
     sp_str_t* clean = sp_alloc_n(mem, sp_str_t, artifacts);
     fz_expect(mem, u, &w->state, clean);
     model_rows = sp_alloc_n(mem, fz_bytes_row_t, outputs ? outputs : 1);
@@ -488,7 +496,7 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
 
 static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_trace_t* trace, sp_fuzz_prng_t schedule, sp_str_t* final, fz_journal_t* j) {
   fz_world_t w = sp_zero;
-  fz_world_init(&w, mem, sim, u, schedule, j);
+  init_world(&w, mem, sim, u, schedule, j);
 
   sp_da_for(u->artifacts, it) {
     if (u->artifacts[it].kind == FZ_ARTIFACT_SOURCE) {
@@ -503,7 +511,7 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
     low.state = &w.state;
     low.ex = &w.ex;
     low.journal = w.j;
-    must(fz_world_run(&w, u, low.g), FZ_ERR_RUN_CYCLIC);
+    must(run_world(&w, u, low.g), FZ_ERR_RUN_CYCLIC);
     return FZ_OK;
   }
 
@@ -529,11 +537,7 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
           w.state.contents[step->artifact] = step->content;
           bool wrote = sp_sim_stealth_write(w.sim, fz_artifact_sim_path(mem, u, step->artifact), fz_content(mem, step->content));
           sp_assert(wrote);
-          w.honest = false;
-          if (w.murky) {
-            w.tainted = true;
-          }
-          fz_journal_world(w.j, w.honest, w.murky, w.tainted);
+          mark_world(&w, FZ_WORLD_STEALTHY);
         }
         break;
       }
@@ -584,7 +588,7 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
         }
         sp_fs_remove_dir(blob->path);
         fz_journal_drop(w.j, sp_str_lit("blob"), blob->path);
-        fz_world_diverge(&w);
+        mark_world(&w, FZ_WORLD_MURKY);
         break;
       }
       case FZ_STEP_EVICT: {
@@ -606,7 +610,7 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
         sp_fs_remove_file(evicted);
         spn_dag_action_cache_init(&w.cache, mem, w.cache_dir);
         fz_journal_drop(w.j, sp_str_lit("cache"), evicted);
-        fz_world_diverge(&w);
+        mark_world(&w, FZ_WORLD_MURKY);
         break;
       }
       case FZ_STEP_RUN:
