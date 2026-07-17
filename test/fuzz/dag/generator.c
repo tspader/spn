@@ -134,6 +134,7 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
   u.profile = profile;
   sp_da_init(mem, u.artifacts);
   sp_da_init(mem, u.actions);
+  sp_da_init(mem, u.outputs);
 
   sp_for(it, profile.value_count) {
     sp_da_push(u.artifacts, ((fz_artifact_t) {
@@ -186,6 +187,7 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
         .producer = (s64)it,
       }));
       sp_da_push(action.produces, artifact);
+      sp_da_push(u.outputs, artifact);
     }
 
     sp_da_push(u.actions, action);
@@ -247,13 +249,6 @@ fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
   fz_trace_t trace = sp_zero;
   sp_da_init(mem, trace.steps);
 
-  sp_da(u64) outputs = sp_da_new(mem, u64);
-  sp_da_for(u->artifacts, it) {
-    if (u->artifacts[it].kind == FZ_ARTIFACT_OUTPUT) {
-      sp_da_push(outputs, it);
-    }
-  }
-
   sp_da(u64)* history = sp_alloc_n(mem, sp_da(u64), profile->source_count);
   sp_for(st, profile->source_count) {
     sp_da_init(mem, history[st]);
@@ -289,14 +284,14 @@ fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
         break;
       }
       case FZ_STEP_TOUCH: {
-        u64 pick = sp_fuzz_below(prng, profile->source_count + sp_da_size(outputs));
+        u64 pick = sp_fuzz_below(prng, profile->source_count + sp_da_size(u->outputs));
         step.artifact = pick < profile->source_count
           ? profile->value_count + pick
-          : outputs[pick - profile->source_count];
+          : u->outputs[pick - profile->source_count];
         break;
       }
       case FZ_STEP_DELETE: {
-        step.artifact = outputs[sp_fuzz_below(prng, sp_da_size(outputs))];
+        step.artifact = u->outputs[sp_fuzz_below(prng, sp_da_size(u->outputs))];
         break;
       }
       case FZ_STEP_PHANTOM: {
