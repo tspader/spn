@@ -22,6 +22,5 @@ typedef struct {
 
 occ_err_t occ_init(occ_parser_t* p, sp_str_t content);
 bool occ_next(occ_parser_t* p, sp_str_t* prereq);
-sp_str_t occ_deps_write(sp_mem_t mem, sp_str_t* prereqs, u32 num_prereqs);
 
 #endif

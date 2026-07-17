@@ -12,7 +12,7 @@ typedef struct {
 
 typedef struct {
   u64 device;
-  u64 id;
+  u64 inode;
 } spn_dag_file_id_t;
 
 typedef struct {
@@ -143,7 +143,6 @@ typedef struct {
   sp_str_t dir;
   sp_mutex_t mutex;
   sp_ht(spn_dag_digest_t, sp_mem_slice_t) blobs;
-  sp_ht(spn_dag_digest_t, sp_str_t) paths;
 } spn_dag_store_t;
 
 typedef struct {
@@ -187,7 +186,6 @@ typedef struct {
   spn_dag_trace_fn_t trace;
   void* trace_data;
   sp_str_t scratch;
-  bool force;
 } spn_dag_env_t;
 
 typedef struct {
@@ -199,6 +197,7 @@ typedef struct spn_dag_executor_t spn_dag_executor_t;
 struct spn_dag_executor_t {
   void (*submit)(spn_dag_executor_t* ex, spn_dag_job_t job);
   spn_dag_job_t (*poll)(spn_dag_executor_t* ex);
+  spn_dag_job_t (*try_poll)(spn_dag_executor_t* ex);
 };
 
 typedef struct {

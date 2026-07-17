@@ -156,7 +156,7 @@ static void exec_action_run(s32* utest_result, exec_env_t* env, exec_action_t sp
       };
       count++;
     }
-    spn_dag_action_cache_put(&env->dag.cache, spn_dag_action_key(g, action), outputs, count);
+    spn_dag_action_cache_put(&env->dag.cache, spn_dag_weak_key(g, action), outputs, count);
   }
 
   env->err = spn_dag_execute(g, action, &env->dag.env);
