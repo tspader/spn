@@ -62,7 +62,6 @@ static sp_str_t wasi_host_path(spn_dag_wasi_t* w, sp_mem_t mem, sp_str_t guest) 
 }
 
 static void wasi_track_dir(spn_dag_wasi_t* w, u32 fd, sp_str_t guest) {
-  sp_ht_erase(w->dirs, fd);
   sp_ht_insert(w->dirs, fd, sp_str_copy(w->mem, guest));
 }
 
@@ -252,10 +251,13 @@ static void wasi_observe_dir(spn_dag_wasi_t* w, sp_str_t dir) {
   });
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(s.mem, dir);
+  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(s.mem, dir);
   sp_da_for(entries, it) {
     if (entries[it].kind == SP_FS_KIND_DIR) {
-      wasi_observe_dir(w, entries[it].path);
+      wasi_push(w, (spn_dag_obs_t) {
+        .kind = SPN_DAG_OBS_ENUMERATION,
+        .path = entries[it].path
+      });
     }
     else if (!wasi_written(w, entries[it].path)) {
       wasi_push_obs(w, SPN_DAG_OBS_FILE, entries[it].path);

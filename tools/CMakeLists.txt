@@ -59,6 +59,8 @@ add_executable(sp_cc
   ${CMAKE_SOURCE_DIR}/source/dag/dag.c
   ${CMAKE_SOURCE_DIR}/source/dag/store.c
   ${CMAKE_SOURCE_DIR}/source/dag/run.c
+  ${CMAKE_SOURCE_DIR}/source/dag/glob.c
+  ${CMAKE_SOURCE_DIR}/source/dag/executor.c
   ${CMAKE_SOURCE_DIR}/source/dag/occ.c
   ${CMAKE_SOURCE_DIR}/source/codegen/json.c
   ${GEN_DIR}/dag_output.gen.c
@@ -75,6 +77,8 @@ add_executable(sp_lib
   ${CMAKE_SOURCE_DIR}/source/dag/dag.c
   ${CMAKE_SOURCE_DIR}/source/dag/store.c
   ${CMAKE_SOURCE_DIR}/source/dag/run.c
+  ${CMAKE_SOURCE_DIR}/source/dag/glob.c
+  ${CMAKE_SOURCE_DIR}/source/dag/executor.c
   ${CMAKE_SOURCE_DIR}/source/dag/occ.c
   ${CMAKE_SOURCE_DIR}/source/codegen/json.c
   ${GEN_DIR}/dag_output.gen.c
