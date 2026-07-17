@@ -54,7 +54,7 @@ static s32 fz_exec(spn_dag_action_t* action, void* user_data) {
       continue;
     }
     if (obs.probe) {
-      if (low->u->phantoms[obs.phantom].present) {
+      if (low->state->phantoms[obs.phantom].present) {
         return 1;
       }
     }

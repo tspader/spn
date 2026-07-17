@@ -20,6 +20,7 @@ typedef struct {
   fz_executor_t ex;
   sp_ht(spn_dag_digest_t, fz_cached_t) mirror;
   sp_ht(spn_dag_digest_t, fz_shape_t) pathsets;
+  fz_state_t state;
   u64* believed;
   bool* dirty;
   u64 last_sys;
@@ -164,6 +165,12 @@ static void fz_world_init(fz_world_t* w, sp_mem_t mem, sp_sim_t* sim, fz_univers
   w->mem = mem;
   w->sim = sim;
   u64 artifacts = sp_da_size(u->artifacts);
+  w->state.contents = sp_alloc_n(mem, u64, artifacts);
+  sp_da_for(u->artifacts, it) {
+    w->state.contents[it] = u->artifacts[it].content;
+  }
+  w->state.phantoms = sp_alloc_n(mem, fz_phantom_t, u->profile.limits.phantoms);
+  sp_mem_zero(w->state.phantoms, u->profile.limits.phantoms * sizeof(fz_phantom_t));
   w->believed = sp_alloc_n(mem, u64, artifacts);
   w->dirty = sp_alloc_n(mem, bool, artifacts);
   sp_mem_zero(w->believed, artifacts * sizeof(u64));
@@ -206,8 +213,8 @@ static void fz_world_reboot(fz_world_t* w, fz_universe_t* u) {
   }
 }
 
-static void fz_write_source(sp_mem_t mem, fz_universe_t* u, u64 artifact) {
-  sp_fs_create_file_str(fz_artifact_sim_path(mem, u, artifact), fz_content(mem, u->artifacts[artifact].content));
+static void fz_write_source(sp_mem_t mem, fz_universe_t* u, fz_state_t* state, u64 artifact) {
+  sp_fs_create_file_str(fz_artifact_sim_path(mem, u, artifact), fz_content(mem, state->contents[artifact]));
 }
 
 static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes, sp_str_t* disk_bytes, bool* done, fz_predict_row_t* predict, u64 at) {
@@ -243,14 +250,14 @@ static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes,
     if (stored) {
       sp_da_for(action->obs, ot) {
         fz_obs_t obs = action->obs[ot];
-        if (obs.probe && stored->file[ot] && !u->phantoms[obs.phantom].present) {
+        if (obs.probe && stored->file[ot] && !w->state.phantoms[obs.phantom].present) {
           resolved = false;
           break;
         }
       }
     }
     if (resolved) {
-      key = fz_model_strong(u, key_bytes, prelim, at, stored);
+      key = fz_model_strong(u, &w->state, key_bytes, prelim, at, stored);
     }
   }
 
@@ -267,14 +274,14 @@ static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes,
 
   sp_mem_t mem = w->mem;
   if (action->discover) {
-    fz_shape_t shape = fz_shape_now(mem, u, at);
+    fz_shape_t shape = fz_shape_now(mem, u, &w->state, at);
     sp_ht_insert(w->pathsets, prelim, shape);
-    key = fz_model_strong(u, key_bytes, prelim, at, &shape);
+    key = fz_model_strong(u, &w->state, key_bytes, prelim, at, &shape);
   }
   predict[at] = (fz_predict_row_t) { .action = at, .key = key, .resolved = resolved, .hit = false };
 
   sp_str_t* inputs = SP_NULLPTR;
-  u64 count = fz_action_inputs(mem, u, at, disk_bytes, &inputs);
+  u64 count = fz_action_inputs(mem, u, &w->state, at, disk_bytes, &inputs);
 
   fz_cached_t entry = sp_zero;
   entry.count = sp_da_size(action->produces);
@@ -294,13 +301,14 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
 
   sp_da_for(u->artifacts, it) {
     if (u->artifacts[it].kind == FZ_ARTIFACT_SOURCE && w->dirty[it]) {
-      w->believed[it] = u->artifacts[it].content;
+      w->believed[it] = w->state.contents[it];
       w->dirty[it] = false;
     }
   }
 
   fz_lowered_t low = sp_zero;
   fz_lower(&low, mem, u);
+  low.state = &w->state;
   low.ex = &w->ex;
   low.journal = w->j;
 
@@ -310,13 +318,13 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   sp_da_for(u->artifacts, it) {
     switch (u->artifacts[it].kind) {
       case FZ_ARTIFACT_VALUE: {
-        key_bytes[it] = fz_content(mem, u->artifacts[it].content);
+        key_bytes[it] = fz_content(mem, w->state.contents[it]);
         disk_bytes[it] = key_bytes[it];
         break;
       }
       case FZ_ARTIFACT_SOURCE: {
         key_bytes[it] = fz_content(mem, w->believed[it]);
-        disk_bytes[it] = fz_content(mem, u->artifacts[it].content);
+        disk_bytes[it] = fz_content(mem, w->state.contents[it]);
         break;
       }
       case FZ_ARTIFACT_OUTPUT: {
@@ -408,7 +416,7 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   fz_bytes_row_t* model_rows = SP_NULLPTR;
   if (w->honest) {
     sp_str_t* clean = sp_alloc_n(mem, sp_str_t, artifacts);
-    fz_expect(mem, u, clean);
+    fz_expect(mem, u, &w->state, clean);
     model_rows = sp_alloc_n(mem, fz_bytes_row_t, outputs ? outputs : 1);
     u64 row = 0;
     sp_da_for(u->artifacts, it) {
@@ -484,7 +492,7 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
 
   sp_da_for(u->artifacts, it) {
     if (u->artifacts[it].kind == FZ_ARTIFACT_SOURCE) {
-      fz_write_source(mem, u, it);
+      fz_write_source(mem, u, &w.state, it);
       w.dirty[it] = true;
     }
   }
@@ -492,6 +500,7 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
   if (u->cyclic || u->obs_cyclic) {
     fz_lowered_t low = sp_zero;
     fz_lower(&low, mem, u);
+    low.state = &w.state;
     low.ex = &w.ex;
     low.journal = w.j;
     must(fz_world_run(&w, u, low.g), FZ_ERR_RUN_CYCLIC);
@@ -504,8 +513,8 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
     switch (step->kind) {
       case FZ_STEP_MUTATE:
       case FZ_STEP_REVERT: {
-        u->artifacts[step->artifact].content = step->content;
-        fz_write_source(mem, u, step->artifact);
+        w.state.contents[step->artifact] = step->content;
+        fz_write_source(mem, u, &w.state, step->artifact);
         w.dirty[step->artifact] = true;
         break;
       }
@@ -516,9 +525,8 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
         break;
       }
       case FZ_STEP_STEALTH: {
-        fz_artifact_t* artifact = &u->artifacts[step->artifact];
-        if (artifact->content != step->content) {
-          artifact->content = step->content;
+        if (w.state.contents[step->artifact] != step->content) {
+          w.state.contents[step->artifact] = step->content;
           bool wrote = sp_sim_stealth_write(w.sim, fz_artifact_sim_path(mem, u, step->artifact), fz_content(mem, step->content));
           sp_assert(wrote);
           w.honest = false;
@@ -534,7 +542,7 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
         break;
       }
       case FZ_STEP_PHANTOM: {
-        fz_phantom_t* phantom = &u->phantoms[step->artifact];
+        fz_phantom_t* phantom = &w.state.phantoms[step->artifact];
         sp_str_t path = fz_phantom_sim_path(mem, step->artifact);
         if (phantom->present) {
           sp_fs_remove_file(path);
@@ -645,11 +653,6 @@ fz_err_t fz_run_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_t
   sp_fuzz_prng_t reseed = { .state = sp_fuzz_next(prng) };
 
   u64 artifacts = sp_da_size(u->artifacts);
-  u64* contents = sp_alloc_n(mem, u64, artifacts);
-  sp_da_for(u->artifacts, it) {
-    contents[it] = u->artifacts[it].content;
-  }
-
   sp_str_t* final = sp_alloc_n(mem, sp_str_t, artifacts);
   sp_mem_zero(final, artifacts * sizeof(sp_str_t));
   fz_journal_pass(j, sp_str_lit("main"));
@@ -665,10 +668,6 @@ fz_err_t fz_run_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_t
     return FZ_OK;
   }
 
-  sp_da_for(u->artifacts, it) {
-    u->artifacts[it].content = contents[it];
-  }
-  sp_mem_zero(u->phantoms, u->profile.limits.phantoms * sizeof(fz_phantom_t));
   sp_str_t* reseeded = sp_alloc_n(mem, sp_str_t, artifacts);
   sp_mem_zero(reseeded, artifacts * sizeof(sp_str_t));
   fz_journal_pass(j, sp_str_lit("reseed"));

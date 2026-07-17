@@ -80,8 +80,6 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
   u.profile = profile;
   sp_da_init(mem, u.artifacts);
   sp_da_init(mem, u.actions);
-  u.phantoms = sp_alloc_n(mem, fz_phantom_t, profile.limits.phantoms);
-  sp_mem_zero(u.phantoms, profile.limits.phantoms * sizeof(fz_phantom_t));
 
   sp_for(it, profile.value_count) {
     sp_da_push(u.artifacts, ((fz_artifact_t) {
