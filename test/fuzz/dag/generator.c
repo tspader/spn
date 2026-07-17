@@ -75,6 +75,60 @@ static u64 fz_pick_content(sp_fuzz_prng_t* prng, fz_profile_t* profile) {
   return sp_fuzz_below(prng, profile->content_count);
 }
 
+static s64 fz_obs_producer(fz_universe_t* u, u64 action, fz_obs_t obs) {
+  if (obs.probe) {
+    return -1;
+  }
+  s64 producer = u->artifacts[obs.artifact].producer;
+  return producer == (s64)action ? -1 : producer;
+}
+
+static sp_da(u64) fz_topo(sp_mem_t mem, fz_universe_t* u, bool obs) {
+  u64 actions = sp_da_size(u->actions);
+  u64* degree = sp_alloc_n(mem, u64, actions ? actions : 1);
+  sp_mem_zero(degree, actions * sizeof(u64));
+  sp_da(u64)* dependents = sp_alloc_n(mem, sp_da(u64), actions ? actions : 1);
+  sp_for(at, actions) {
+    sp_da_init(mem, dependents[at]);
+  }
+
+  sp_da_for(u->actions, at) {
+    fz_action_t* action = &u->actions[at];
+    sp_da_for(action->consumes, ct) {
+      s64 producer = u->artifacts[action->consumes[ct]].producer;
+      if (producer >= 0) {
+        sp_da_push(dependents[producer], at);
+        degree[at]++;
+      }
+    }
+    if (obs) {
+      sp_da_for(action->obs, ot) {
+        s64 producer = fz_obs_producer(u, at, action->obs[ot]);
+        if (producer >= 0) {
+          sp_da_push(dependents[producer], at);
+          degree[at]++;
+        }
+      }
+    }
+  }
+
+  sp_da(u64) order = sp_da_new(mem, u64);
+  sp_da_for(u->actions, at) {
+    if (!degree[at]) {
+      sp_da_push(order, at);
+    }
+  }
+  for (u64 it = 0; it < sp_da_size(order); it++) {
+    sp_da_for(dependents[order[it]], dt) {
+      u64 at = dependents[order[it]][dt];
+      if (!--degree[at]) {
+        sp_da_push(order, at);
+      }
+    }
+  }
+  return order;
+}
+
 fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t profile) {
   fz_universe_t u = sp_zero;
   u.profile = profile;
@@ -179,8 +233,9 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
     }
   }
 
-  u.cyclic = fz_universe_cyclic(mem, &u);
-  u.obs_cyclic = fz_universe_obs_cyclic(mem, &u);
+  u.cyclic = sp_da_size(fz_topo(mem, &u, false)) < sp_da_size(u.actions);
+  u.order = fz_topo(mem, &u, true);
+  u.obs_cyclic = sp_da_size(u.order) < sp_da_size(u.actions);
   if (!profile.back_density) {
     sp_assert(!u.cyclic);
   }
@@ -273,50 +328,3 @@ fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
   return trace;
 }
 
-static bool fz_cyclic_at(fz_universe_t* u, u8* states, bool obs, u64 action) {
-  if (states[action] == 2) return false;
-  if (states[action] == 1) return true;
-  states[action] = 1;
-
-  sp_da_for(u->actions[action].consumes, ct) {
-    s64 producer = u->artifacts[u->actions[action].consumes[ct]].producer;
-    if (producer >= 0 && fz_cyclic_at(u, states, obs, (u64)producer)) {
-      return true;
-    }
-  }
-  if (obs) {
-    sp_da_for(u->actions[action].obs, ot) {
-      fz_obs_t o = u->actions[action].obs[ot];
-      if (o.probe) {
-        continue;
-      }
-      s64 producer = u->artifacts[o.artifact].producer;
-      if (producer >= 0 && (u64)producer != action && fz_cyclic_at(u, states, obs, (u64)producer)) {
-        return true;
-      }
-    }
-  }
-
-  states[action] = 2;
-  return false;
-}
-
-static bool fz_cyclic(sp_mem_t mem, fz_universe_t* u, bool obs) {
-  u64 actions = sp_da_size(u->actions);
-  u8* states = sp_alloc_n(mem, u8, actions ? actions : 1);
-  sp_mem_zero(states, actions * sizeof(u8));
-  sp_da_for(u->actions, at) {
-    if (fz_cyclic_at(u, states, obs, at)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool fz_universe_cyclic(sp_mem_t mem, fz_universe_t* u) {
-  return fz_cyclic(mem, u, false);
-}
-
-bool fz_universe_obs_cyclic(sp_mem_t mem, fz_universe_t* u) {
-  return fz_cyclic(mem, u, true);
-}
