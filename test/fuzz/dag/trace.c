@@ -4,7 +4,7 @@
 
 typedef struct {
   u64 count;
-  sp_str_t bytes [FZ_MAX_PRODUCES];
+  sp_str_t* bytes;
 } fz_cached_t;
 
 typedef struct {
@@ -55,11 +55,23 @@ static spn_dag_job_t fz_executor_poll(spn_dag_executor_t* base) {
   return job;
 }
 
+static spn_dag_job_t fz_executor_try_poll(spn_dag_executor_t* base) {
+  fz_executor_t* ex = (fz_executor_t*)base;
+  if (sp_da_empty(ex->jobs)) {
+    return (spn_dag_job_t) sp_zero;
+  }
+  if (sp_fuzz_below(&ex->prng, 2)) {
+    return (spn_dag_job_t) sp_zero;
+  }
+  return fz_executor_poll(base);
+}
+
 void fz_executor_init(fz_executor_t* ex, sp_mem_t mem, sp_sim_t* sim, sp_fuzz_prng_t prng) {
   *ex = (fz_executor_t) {
     .base = {
       .submit = fz_executor_submit,
       .poll = fz_executor_poll,
+      .try_poll = fz_executor_try_poll,
     },
     .prng = prng,
     .sim = sim,
@@ -161,7 +173,7 @@ static void fz_world_init(fz_world_t* w, sp_mem_t mem, sp_sim_t* sim, fz_univers
 
 static spn_err_t fz_world_run(fz_world_t* w, fz_universe_t* u, spn_dag_t* g) {
   if (u->profile.run_ex) {
-    return spn_dag_run_ex(g, &w->env, &w->ex.base);
+    return spn_dag_run_executor(g, &w->env, &w->ex.base);
   }
   return spn_dag_run(g, &w->env);
 }
@@ -198,7 +210,7 @@ static void fz_write_source(sp_mem_t mem, fz_universe_t* u, u64 artifact) {
   sp_fs_create_file_str(fz_artifact_sim_path(mem, u, artifact), fz_content(mem, u->artifacts[artifact].content));
 }
 
-static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes, sp_str_t* disk_bytes, bool* done, bool* misses, u64 at) {
+static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes, sp_str_t* disk_bytes, bool* done, fz_predict_row_t* predict, u64 at) {
   if (done[at]) {
     return;
   }
@@ -208,7 +220,7 @@ static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes,
   sp_da_for(action->consumes, ct) {
     s64 producer = u->artifacts[action->consumes[ct]].producer;
     if (producer >= 0) {
-      fz_eval_action(w, u, key_bytes, disk_bytes, done, misses, (u64)producer);
+      fz_eval_action(w, u, key_bytes, disk_bytes, done, predict, (u64)producer);
     }
   }
   sp_da_for(action->obs, ot) {
@@ -218,7 +230,7 @@ static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes,
     }
     s64 producer = u->artifacts[obs.artifact].producer;
     if (producer >= 0 && (u64)producer != at) {
-      fz_eval_action(w, u, key_bytes, disk_bytes, done, misses, (u64)producer);
+      fz_eval_action(w, u, key_bytes, disk_bytes, done, predict, (u64)producer);
     }
   }
 
@@ -244,8 +256,7 @@ static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes,
 
   fz_cached_t* cached = resolved ? sp_ht_getp(w->mirror, key) : SP_NULLPTR;
   if (cached) {
-    fz_journal_model(w->j, at, key, resolved, true);
-    misses[at] = false;
+    predict[at] = (fz_predict_row_t) { .action = at, .key = key, .resolved = resolved, .hit = true };
     sp_da_for(action->produces, pt) {
       u64 out = action->produces[pt];
       key_bytes[out] = cached->bytes[pt];
@@ -254,20 +265,20 @@ static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes,
     return;
   }
 
-  misses[at] = true;
   sp_mem_t mem = w->mem;
   if (action->discover) {
-    fz_shape_t shape = fz_shape_now(u, at);
+    fz_shape_t shape = fz_shape_now(mem, u, at);
     sp_ht_insert(w->pathsets, prelim, shape);
     key = fz_model_strong(u, key_bytes, prelim, at, &shape);
   }
-  fz_journal_model(w->j, at, key, resolved, false);
+  predict[at] = (fz_predict_row_t) { .action = at, .key = key, .resolved = resolved, .hit = false };
 
   sp_str_t* inputs = SP_NULLPTR;
   u64 count = fz_action_inputs(mem, u, at, disk_bytes, &inputs);
 
   fz_cached_t entry = sp_zero;
   entry.count = sp_da_size(action->produces);
+  entry.bytes = sp_alloc_n(mem, sp_str_t, entry.count ? entry.count : 1);
   sp_da_for(action->produces, pt) {
     u64 out = action->produces[pt];
     sp_str_t content = fz_output_content(mem, action->identity, inputs, count, fz_output_name(mem, out));
@@ -279,7 +290,7 @@ static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes,
 }
 
 static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w, fz_step_t* step) {
-  spn_dag_file_cache_refresh(&w->files);
+  spn_dag_file_cache_invalidate_all(&w->files);
 
   sp_da_for(u->artifacts, it) {
     if (u->artifacts[it].kind == FZ_ARTIFACT_SOURCE && w->dirty[it]) {
@@ -314,11 +325,15 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
     }
   }
 
-  bool done[FZ_MAX_ACTIONS] = sp_zero;
-  bool misses[FZ_MAX_ACTIONS] = sp_zero;
+  u64 actions = sp_da_size(u->actions);
+  bool* done = sp_alloc_n(mem, bool, actions ? actions : 1);
+  sp_mem_zero(done, actions * sizeof(bool));
+  fz_predict_row_t* predict = sp_alloc_n(mem, fz_predict_row_t, actions ? actions : 1);
+  sp_mem_zero(predict, actions * sizeof(fz_predict_row_t));
   sp_da_for(u->actions, at) {
-    fz_eval_action(w, u, key_bytes, disk_bytes, done, misses, at);
+    fz_eval_action(w, u, key_bytes, disk_bytes, done, predict, at);
   }
+  fz_journal_predict(w->j, predict, actions);
 
   u64 log_start = sp_da_size(w->ex.log);
   switch (step->kind) {
@@ -341,6 +356,11 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   bool crashed = w->sim->crashed;
   sp_sim_fault_clear(w->sim);
   w->last_sys = w->sim->syscalls - sys_start;
+  if (step->kind == FZ_STEP_EIO) {
+    sp_da_for(w->sim->fault_log, ft) {
+      fz_journal_sim_fault(w->j, w->sim->fault_log[ft]);
+    }
+  }
   fz_journal_run_done(w->j, (u64)err, fired, crashed);
 
   if (fired || crashed) {
@@ -356,41 +376,103 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   }
   must(!err, FZ_ERR_RUN_FAILED);
 
+  fz_exec_row_t* exec_rows = SP_NULLPTR;
   if (!w->murky) {
+    exec_rows = sp_alloc_n(mem, fz_exec_row_t, actions ? actions : 1);
     sp_da_for(u->actions, at) {
       u64 requeues = fz_action_requeues(u, w, mem, log_start, at);
-      u64 want = (misses[at] ? 1 : 0) + requeues;
-      fz_journal_check(w->j, at, low.execs[at], want, misses[at], requeues);
-      must(low.execs[at] >= want, FZ_ERR_EXEC_MISSING);
-      must(low.execs[at] <= want, FZ_ERR_EXEC_SPURIOUS);
+      u64 want = (predict[at].hit ? 0 : 1) + requeues;
+      exec_rows[at] = (fz_exec_row_t) {
+        .action = at,
+        .execs = low.execs[at],
+        .want = want,
+        .requeues = requeues,
+        .miss = !predict[at].hit,
+        .ok = low.execs[at] == want,
+      };
     }
+    fz_journal_check_execs(w->j, exec_rows, actions);
   }
 
   if (w->tainted) {
     return FZ_OK;
   }
 
-  if (w->honest) {
-    sp_str_t* clean = sp_alloc_n(mem, sp_str_t, artifacts);
-    fz_expect(mem, u, clean);
-    sp_da_for(u->artifacts, it) {
-      if (u->artifacts[it].kind == FZ_ARTIFACT_OUTPUT) {
-        bool ok = sp_str_equal(clean[it], disk_bytes[it]);
-        fz_journal_bytes(w->j, sp_str_lit("model"), it, clean[it], disk_bytes[it], ok);
-        must(ok, FZ_ERR_MODEL);
-      }
+  u64 outputs = 0;
+  sp_da_for(u->artifacts, it) {
+    if (u->artifacts[it].kind == FZ_ARTIFACT_OUTPUT) {
+      outputs++;
     }
   }
 
+  fz_bytes_row_t* model_rows = SP_NULLPTR;
+  if (w->honest) {
+    sp_str_t* clean = sp_alloc_n(mem, sp_str_t, artifacts);
+    fz_expect(mem, u, clean);
+    model_rows = sp_alloc_n(mem, fz_bytes_row_t, outputs ? outputs : 1);
+    u64 row = 0;
+    sp_da_for(u->artifacts, it) {
+      if (u->artifacts[it].kind != FZ_ARTIFACT_OUTPUT) {
+        continue;
+      }
+      model_rows[row++] = (fz_bytes_row_t) {
+        .artifact = it,
+        .want = clean[it],
+        .got = disk_bytes[it],
+        .ok = sp_str_equal(clean[it], disk_bytes[it]),
+      };
+    }
+    fz_journal_check_bytes(w->j, sp_str_lit("model"), model_rows, outputs);
+  }
+
+  fz_bytes_row_t* disk_rows = sp_alloc_n(mem, fz_bytes_row_t, outputs ? outputs : 1);
+  u64 row = 0;
   sp_da_for(u->artifacts, it) {
     if (u->artifacts[it].kind != FZ_ARTIFACT_OUTPUT) {
       continue;
     }
     sp_str_t disk = sp_zero;
     bool read = !sp_io_read_file(mem, fz_artifact_sim_path(mem, u, it), &disk);
-    bool ok = read && sp_str_equal(disk, disk_bytes[it]);
-    fz_journal_bytes(w->j, sp_str_lit("disk"), it, disk_bytes[it], read ? disk : sp_str_lit("missing"), ok);
-    must(ok, FZ_ERR_STALE_OUTPUT);
+    disk_rows[row++] = (fz_bytes_row_t) {
+      .artifact = it,
+      .want = disk_bytes[it],
+      .got = read ? disk : sp_str_lit("missing"),
+      .ok = read && sp_str_equal(disk, disk_bytes[it]),
+    };
+  }
+  fz_journal_check_bytes(w->j, sp_str_lit("disk"), disk_rows, outputs);
+
+  sp_for(it, outputs) {
+    if (disk_rows[it].ok) {
+      continue;
+    }
+    u64 id = disk_rows[it].artifact;
+    sp_str_t path = fz_artifact_sim_path(mem, u, id);
+    sp_da_for(w->sim->events, et) {
+      if (sp_str_equal(w->sim->events[et].path, path)) {
+        fz_journal_sim_write(w->j, id, path, w->sim->events[et].sys);
+      }
+    }
+    spn_dag_digest_t want = spn_dag_digest(disk_bytes[id].data, disk_bytes[id].len);
+    sp_str_t blob = spn_dag_store_path(&w->store, mem, want);
+    sp_str_t blob_bytes = sp_zero;
+    bool blob_read = !sp_str_empty(blob) && !sp_io_read_file(mem, blob, &blob_bytes);
+    fz_journal_blob(w->j, id, disk_bytes[id], blob_read ? blob_bytes : sp_str_lit("missing"));
+  }
+
+  if (exec_rows) {
+    sp_for(at, actions) {
+      must(exec_rows[at].execs >= exec_rows[at].want, FZ_ERR_EXEC_MISSING);
+      must(exec_rows[at].execs <= exec_rows[at].want, FZ_ERR_EXEC_SPURIOUS);
+    }
+  }
+  if (model_rows) {
+    sp_for(it, outputs) {
+      must(model_rows[it].ok, FZ_ERR_MODEL);
+    }
+  }
+  sp_for(it, outputs) {
+    must(disk_rows[it].ok, FZ_ERR_STALE_OUTPUT);
   }
 
   return FZ_OK;
@@ -493,6 +575,7 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
           sp_fs_remove_file(files[ft].path);
         }
         sp_fs_remove_dir(blob->path);
+        fz_journal_drop(w.j, sp_str_lit("blob"), blob->path);
         fz_world_diverge(&w);
         break;
       }
@@ -511,8 +594,10 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
           break;
         }
         sp_da_sort(cached, fz_entry_order);
-        sp_fs_remove_file(cached[step->artifact % sp_da_size(cached)].path);
+        sp_str_t evicted = cached[step->artifact % sp_da_size(cached)].path;
+        sp_fs_remove_file(evicted);
         spn_dag_action_cache_init(&w.cache, mem, w.cache_dir);
+        fz_journal_drop(w.j, sp_str_lit("cache"), evicted);
         fz_world_diverge(&w);
         break;
       }
@@ -583,19 +668,34 @@ fz_err_t fz_run_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_t
   sp_da_for(u->artifacts, it) {
     u->artifacts[it].content = contents[it];
   }
-  sp_mem_zero(u->phantoms, sizeof(u->phantoms));
+  sp_mem_zero(u->phantoms, u->profile.limits.phantoms * sizeof(fz_phantom_t));
   sp_str_t* reseeded = sp_alloc_n(mem, sp_str_t, artifacts);
   sp_mem_zero(reseeded, artifacts * sizeof(sp_str_t));
   fz_journal_pass(j, sp_str_lit("reseed"));
   try(fz_trace_pass(mem, u, trace, reseed, reseeded, j));
 
+  u64 outputs = 0;
+  sp_da_for(u->artifacts, it) {
+    if (u->artifacts[it].kind == FZ_ARTIFACT_OUTPUT) {
+      outputs++;
+    }
+  }
+  fz_bytes_row_t* rows = sp_alloc_n(mem, fz_bytes_row_t, outputs ? outputs : 1);
+  u64 row = 0;
   sp_da_for(u->artifacts, it) {
     if (u->artifacts[it].kind != FZ_ARTIFACT_OUTPUT) {
       continue;
     }
-    bool ok = sp_str_equal(final[it], reseeded[it]);
-    fz_journal_bytes(j, sp_str_lit("schedule"), it, final[it], reseeded[it], ok);
-    must(ok, FZ_ERR_SCHEDULE);
+    rows[row++] = (fz_bytes_row_t) {
+      .artifact = it,
+      .want = final[it],
+      .got = reseeded[it],
+      .ok = sp_str_equal(final[it], reseeded[it]),
+    };
+  }
+  fz_journal_check_bytes(j, sp_str_lit("schedule"), rows, outputs);
+  sp_for(it, outputs) {
+    must(rows[it].ok, FZ_ERR_SCHEDULE);
   }
 
   return FZ_OK;

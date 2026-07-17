@@ -41,7 +41,9 @@ void fz_render_mermaid(sp_io_writer_t* io, fz_universe_t* u) {
       sp_fmt_str(action->discover ? sp_str_lit(" discover") : sp_str_lit("")));
   }
 
-  bool phantoms[FZ_MAX_PHANTOMS] = sp_zero;
+  u64 phantom_count = u->profile.limits.phantoms;
+  bool* phantoms = sp_alloc_n(mem, bool, phantom_count);
+  sp_mem_zero(phantoms, phantom_count * sizeof(bool));
   sp_da_for(u->actions, at) {
     sp_da_for(u->actions[at].obs, ot) {
       fz_obs_t obs = u->actions[at].obs[ot];
@@ -50,7 +52,7 @@ void fz_render_mermaid(sp_io_writer_t* io, fz_universe_t* u) {
       }
     }
   }
-  sp_carr_for(phantoms, it) {
+  sp_for(it, phantom_count) {
     if (!phantoms[it]) continue;
     sp_fmt_io(io, "  g{}((\"{}\")):::phantom", sp_fmt_uint(it), sp_fmt_str(fz_phantom_path(mem, it)));
     sp_io_write_cstr(io, "\n", SP_NULLPTR);
@@ -87,11 +89,10 @@ sp_str_t fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_t
   sp_str_t dir = sp_fs_join_path(mem, root, sp_fmt(mem, "{:0>3}", sp_fmt_uint(iter)).value);
   sp_fs_create_dir(dir);
 
-  sp_io_file_writer_t envrc = sp_zero;
-  if (!sp_io_file_writer_from_path(&envrc, sp_fs_join_path(mem, dir, sp_str_lit(".envrc")))) {
-    fz_line(&envrc.base, sp_fmt(mem, "export SPN_TEST_SEED=0x{:x}", sp_fmt_uint(sp_fuzz_seed_get())).value);
-    fz_line(&envrc.base, sp_fmt(mem, "export SPN_FUZZ_ITER={}", sp_fmt_uint(iter)).value);
-    sp_io_file_writer_close(&envrc);
+  sp_io_file_writer_t repro = sp_zero;
+  if (!sp_io_file_writer_from_path(&repro, sp_fs_join_path(mem, dir, sp_str_lit("repro")))) {
+    fz_line(&repro.base, sp_fuzz_repro_args(mem, iter));
+    sp_io_file_writer_close(&repro);
   }
 
   sp_io_file_writer_t graph = sp_zero;

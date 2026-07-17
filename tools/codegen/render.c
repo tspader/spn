@@ -17,13 +17,14 @@ static bool field_named(field_t* field) {
 }
 
 static bool field_uses_opt(field_t* field) {
-  return field->kind == FIELD_BOOL || field->kind == FIELD_ENUM;
+  return field->kind == FIELD_BOOL || field->kind == FIELD_U64 || field->kind == FIELD_ENUM;
 }
 
 static sp_str_t value_type(gen_t* g, field_t* field) {
   switch (field->kind) {
     case FIELD_STR:    return sp_str_lit("sp_str_t");
     case FIELD_BOOL:   return sp_str_lit("bool");
+    case FIELD_U64:    return sp_str_lit("u64");
     case FIELD_ENUM:   return sp_fmt(g->mem, "spn_{}_t", sp_fmt_str(field->type_name)).value;
     case FIELD_STRUCT: return struct_type(g, field->type_name);
     case FIELD_EXTERN: return sp_fmt(g->mem, "spn_{}_t", sp_fmt_str(field->type_name)).value;
@@ -63,6 +64,7 @@ static sp_str_t present_expr(gen_t* g, field_t* field, sp_str_t recv) {
       return sp_fmt(g->mem, "!sp_str_empty({}{})", sp_fmt_str(recv), sp_fmt_str(field->name)).value;
     }
     case FIELD_BOOL:
+    case FIELD_U64:
     case FIELD_ENUM: {
       return sp_fmt(g->mem, "!sp_opt_is_null({}{})", sp_fmt_str(recv), sp_fmt_str(field->name)).value;
     }
@@ -127,6 +129,11 @@ static void field_templates(field_t* field, sp_str_t* read, sp_str_t* write) {
     case FIELD_BOOL: {
       *read = field->required ? sp_str_lit("read/bool_required") : sp_str_lit("read/bool_optional");
       *write = field->required ? sp_str_lit("write/bool_required") : sp_str_lit("write/bool_optional");
+      return;
+    }
+    case FIELD_U64: {
+      *read = field->required ? sp_str_lit("read/u64_required") : sp_str_lit("read/u64_optional");
+      *write = field->required ? sp_str_lit("write/u64_required") : sp_str_lit("write/u64_optional");
       return;
     }
     case FIELD_ENUM: {
