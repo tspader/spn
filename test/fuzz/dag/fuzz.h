@@ -82,6 +82,11 @@ typedef struct {
 } fz_phantom_t;
 
 typedef struct {
+  u64* contents;
+  fz_phantom_t* phantoms;
+} fz_state_t;
+
+typedef struct {
   bool* file;
 } fz_shape_t;
 
@@ -121,7 +126,6 @@ typedef struct {
   fz_profile_t profile;
   sp_da(fz_artifact_t) artifacts;
   sp_da(fz_action_t) actions;
-  fz_phantom_t* phantoms;
   bool cyclic;
   bool obs_cyclic;
 } fz_universe_t;
@@ -150,6 +154,7 @@ typedef struct {
 
 typedef struct {
   fz_universe_t* u;
+  const fz_state_t* state;
   spn_dag_t* g;
   sp_mem_t mem;
   fz_executor_t* ex;
@@ -180,11 +185,11 @@ fz_err_t      fz_check_universe(fz_universe_t* u);
 
 void             fz_lower(fz_lowered_t* low, sp_mem_t mem, fz_universe_t* u);
 sp_str_t         fz_output_content(sp_mem_t mem, u64 identity, const sp_str_t* inputs, u64 count, sp_str_t name);
-void             fz_expect(sp_mem_t mem, fz_universe_t* u, sp_str_t* bytes);
-u64              fz_action_inputs(sp_mem_t mem, fz_universe_t* u, u64 action, const sp_str_t* bytes, sp_str_t** inputs);
+void             fz_expect(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, sp_str_t* bytes);
+u64              fz_action_inputs(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, u64 action, const sp_str_t* bytes, sp_str_t** inputs);
 spn_dag_digest_t fz_model_key(fz_universe_t* u, const sp_str_t* bytes, u64 action);
-fz_shape_t       fz_shape_now(sp_mem_t mem, fz_universe_t* u, u64 action);
-spn_dag_digest_t fz_model_strong(fz_universe_t* u, const sp_str_t* bytes, spn_dag_digest_t prelim, u64 action, const fz_shape_t* shape);
+fz_shape_t       fz_shape_now(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, u64 action);
+spn_dag_digest_t fz_model_strong(fz_universe_t* u, const fz_state_t* state, const sp_str_t* bytes, spn_dag_digest_t prelim, u64 action, const fz_shape_t* shape);
 void             fz_executor_init(fz_executor_t* ex, sp_mem_t mem, sp_sim_t* sim, sp_fuzz_prng_t prng);
 fz_err_t         fz_run_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_trace_t* trace, fz_journal_t* j);
 
