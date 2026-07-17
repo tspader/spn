@@ -1,3 +1,5 @@
+#include "common.h"
+
 // The review contract for worlds.md cut 0 (.llm/doc/resolve/worlds.md): every
 // test is skipped until its cut lands, then un-skipped verbatim. Invariant
 // numbers refer to that document.

@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(units)
 
 // Root links foo 2.0.0 but its build scripts want foo 1.0.0. Today lowering

@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(layout)
 
 UTEST_F(layout, staged_bin) {

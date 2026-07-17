@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(cxx)
 
 // spum.cpp exercises defaults too: exceptions and rtti are on unless disabled

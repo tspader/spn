@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(log)
 
 UTEST_F(log, warn_multi) {

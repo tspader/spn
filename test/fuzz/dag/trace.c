@@ -434,7 +434,7 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
       }
     }
     spn_dag_digest_t want = spn_dag_digest(disk_bytes[id].data, disk_bytes[id].len);
-    sp_str_t blob = spn_dag_store_path(&w->store, mem, want);
+    sp_str_t blob = spn_dag_store_path(&w->store, mem, want, path);
     sp_str_t blob_bytes = sp_zero;
     bool blob_read = !sp_str_empty(blob) && !sp_io_read_file(mem, blob, &blob_bytes);
     fz_journal_blob(w->j, id, disk_bytes[id], blob_read ? blob_bytes : sp_str_lit("missing"));
@@ -531,10 +531,10 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
         if (!u->profile.store_fs) {
           break;
         }
-        sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, sp_str_lit("/store"));
+        sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(mem, sp_str_lit("/store"));
         sp_da(sp_fs_entry_t) blobs = sp_da_new(mem, sp_fs_entry_t);
         sp_da_for(entries, et) {
-          if (entries[et].kind == SP_FS_KIND_FILE) {
+          if (entries[et].kind == SP_FS_KIND_FILE && !sp_str_contains(entries[et].path, sp_str_lit("/.staging/"))) {
             sp_da_push(blobs, entries[et]);
           }
         }

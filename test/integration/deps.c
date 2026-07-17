@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(deps_file)
 
 UTEST_F(deps_file, basic) {

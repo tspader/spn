@@ -1,10 +1,6 @@
 #define SP_IMPLEMENTATION
 #define UTEST_DEFAULT_JOBS 0
-#include "sp.h"
-#include "test.h"
-#include "utest.h"
-#include "action.h"
-#include "harness.h"
+#include "common.h"
 
 UTEST_MAIN()
 

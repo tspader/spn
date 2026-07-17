@@ -1,3 +1,5 @@
+#include "common.h"
+
 SPN_TEST_SUITE(exports)
 
 // Shared lib S defines spn_test_s; its own symbols are always exported, so a
