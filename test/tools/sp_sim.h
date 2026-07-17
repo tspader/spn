@@ -23,6 +23,7 @@ typedef struct {
   u64 fault_state;
   u64 fault_den;
   u64 faults;
+  sp_da(u64) fault_log;
   u64 crash_at;
   bool crashed;
   const sp_sys_vtable_t* prev;

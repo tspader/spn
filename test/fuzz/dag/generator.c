@@ -1,4 +1,5 @@
 #include "fuzz.h"
+#include "fuzz.gen.h"
 
 sp_str_t fz_artifact_path(sp_mem_t mem, fz_universe_t* u, u64 artifact) {
   switch (u->artifacts[artifact].kind) {
@@ -21,26 +22,42 @@ sp_str_t fz_phantom_sim_path(sp_mem_t mem, u64 phantom) {
   return sp_fmt(mem, "/{}", sp_fmt_str(fz_phantom_path(mem, phantom))).value;
 }
 
-fz_profile_t fz_gen_profile(sp_fuzz_prng_t* prng) {
+#define fz_limit(knob, fallback) (sp_opt_is_null(knob) ? (u64)(fallback) : sp_max(sp_opt_get(knob), (u64)1))
+
+fz_limits_t fz_gen_limits(const spn_cg_fuzz_graph_t* graph) {
+  return (fz_limits_t) {
+    .actions = fz_limit(graph->max_actions, 128),
+    .small_actions = fz_limit(graph->small_actions, 8),
+    .sources = fz_limit(graph->max_sources, 16),
+    .produces = fz_limit(graph->max_produces, 3),
+    .phantoms = fz_limit(graph->max_phantoms, 4),
+    .obs = fz_limit(graph->max_obs, 8),
+  };
+}
+
+fz_profile_t fz_gen_profile(sp_fuzz_prng_t* prng, fz_limits_t limits) {
   fz_profile_t profile = sp_zero;
-  profile.big = sp_fuzz_chance(prng, 1, 8);
+  profile.limits = limits;
+
+  u64 small = sp_min(limits.small_actions, limits.actions);
+  profile.big = limits.actions > small && sp_fuzz_chance(prng, 1, 8);
   if (profile.big) {
-    profile.action_count = sp_fuzz_range(prng, FZ_SMALL_ACTIONS + 1, FZ_MAX_ACTIONS);
+    profile.action_count = sp_fuzz_range(prng, small + 1, limits.actions);
     profile.out_degree = sp_fuzz_range(prng, 1, 4);
-    profile.source_count = sp_fuzz_range(prng, 1, 16);
+    profile.source_count = sp_fuzz_range(prng, 1, limits.sources);
   }
   else {
-    profile.action_count = sp_fuzz_range(prng, 1, FZ_SMALL_ACTIONS);
-    profile.source_count = sp_fuzz_range(prng, 1, 4);
+    profile.action_count = sp_fuzz_range(prng, 1, small);
+    profile.source_count = sp_fuzz_range(prng, 1, sp_min(4, limits.sources));
     profile.density = sp_fuzz_below(prng, 4);
   }
   profile.value_count = sp_fuzz_chance(prng, 1, 2) ? sp_fuzz_range(prng, 1, 3) : 0;
   profile.content_count = sp_fuzz_range(prng, 1, 6);
   profile.identity_count = sp_fuzz_chance(prng, 1, 8) ? sp_fuzz_range(prng, 1, 2) : sp_fuzz_range(prng, 4, 64);
-  profile.produce_count = sp_fuzz_range(prng, 1, FZ_MAX_PRODUCES);
+  profile.produce_count = sp_fuzz_range(prng, 1, limits.produces);
   profile.discover_pct = sp_fuzz_chance(prng, 1, 2) ? sp_fuzz_range(prng, 2, 12) : 0;
   if (profile.discover_pct) {
-    profile.obs_count = sp_fuzz_range(prng, 1, 4);
+    profile.obs_count = sp_fuzz_range(prng, 1, limits.obs);
     profile.absent_pct = sp_fuzz_below(prng, 6);
     profile.obs_output_pct = sp_fuzz_below(prng, 8);
   }
@@ -63,6 +80,8 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
   u.profile = profile;
   sp_da_init(mem, u.artifacts);
   sp_da_init(mem, u.actions);
+  u.phantoms = sp_alloc_n(mem, fz_phantom_t, profile.limits.phantoms);
+  sp_mem_zero(u.phantoms, profile.limits.phantoms * sizeof(fz_phantom_t));
 
   sp_for(it, profile.value_count) {
     sp_da_push(u.artifacts, ((fz_artifact_t) {
@@ -141,7 +160,7 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
       fz_obs_t obs = sp_zero;
       if (sp_fuzz_chance(prng, profile.absent_pct, 16)) {
         obs.probe = true;
-        obs.phantom = sp_fuzz_below(prng, FZ_MAX_PHANTOMS);
+        obs.phantom = sp_fuzz_below(prng, profile.limits.phantoms);
       }
       else if (sp_fuzz_chance(prng, profile.obs_output_pct, 16) && sp_da_size(u.actions) > 1) {
         u64 pick = sp_fuzz_below(prng, sp_da_size(u.actions) - 1);
@@ -156,14 +175,14 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
       }
       sp_da_push(action->obs, obs);
     }
-    if (!sp_da_empty(action->obs) && sp_fuzz_chance(prng, 1, 8)) {
+    if (!sp_da_empty(action->obs) && sp_da_size(action->obs) < profile.limits.obs && sp_fuzz_chance(prng, 1, 8)) {
       fz_obs_t dup = action->obs[sp_fuzz_below(prng, sp_da_size(action->obs))];
       sp_da_push(action->obs, dup);
     }
   }
 
-  u.cyclic = fz_universe_cyclic(&u);
-  u.obs_cyclic = fz_universe_obs_cyclic(&u);
+  u.cyclic = fz_universe_cyclic(mem, &u);
+  u.obs_cyclic = fz_universe_obs_cyclic(mem, &u);
   return u;
 }
 
@@ -225,7 +244,7 @@ fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
         break;
       }
       case FZ_STEP_PHANTOM: {
-        step.artifact = sp_fuzz_below(prng, FZ_MAX_PHANTOMS);
+        step.artifact = sp_fuzz_below(prng, profile->limits.phantoms);
         step.content = fz_pick_content(prng, profile);
         break;
       }
@@ -281,8 +300,10 @@ static bool fz_cyclic_at(fz_universe_t* u, u8* states, bool obs, u64 action) {
   return false;
 }
 
-static bool fz_cyclic(fz_universe_t* u, bool obs) {
-  u8 states[FZ_MAX_ACTIONS] = sp_zero;
+static bool fz_cyclic(sp_mem_t mem, fz_universe_t* u, bool obs) {
+  u64 actions = sp_da_size(u->actions);
+  u8* states = sp_alloc_n(mem, u8, actions ? actions : 1);
+  sp_mem_zero(states, actions * sizeof(u8));
   sp_da_for(u->actions, at) {
     if (fz_cyclic_at(u, states, obs, at)) {
       return true;
@@ -291,12 +312,12 @@ static bool fz_cyclic(fz_universe_t* u, bool obs) {
   return false;
 }
 
-bool fz_universe_cyclic(fz_universe_t* u) {
-  return fz_cyclic(u, false);
+bool fz_universe_cyclic(sp_mem_t mem, fz_universe_t* u) {
+  return fz_cyclic(mem, u, false);
 }
 
-bool fz_universe_obs_cyclic(fz_universe_t* u) {
-  return fz_cyclic(u, true);
+bool fz_universe_obs_cyclic(sp_mem_t mem, fz_universe_t* u) {
+  return fz_cyclic(mem, u, true);
 }
 
 fz_err_t fz_check_universe(fz_universe_t* u) {
@@ -336,11 +357,11 @@ fz_err_t fz_check_universe(fz_universe_t* u) {
       must(artifact->producer == (s64)at, FZ_ERR_GEN_PRODUCER);
     }
     must(action->discover || sp_da_empty(action->obs), FZ_ERR_GEN_OBS);
-    must(sp_da_size(action->obs) <= FZ_MAX_OBS, FZ_ERR_GEN_OBS);
+    must(sp_da_size(action->obs) <= u->profile.limits.obs, FZ_ERR_GEN_OBS);
     sp_da_for(action->obs, ot) {
       fz_obs_t obs = action->obs[ot];
       if (obs.probe) {
-        must(obs.phantom < FZ_MAX_PHANTOMS, FZ_ERR_GEN_OBS);
+        must(obs.phantom < u->profile.limits.phantoms, FZ_ERR_GEN_OBS);
       }
       else {
         must(obs.artifact < sp_da_size(u->artifacts), FZ_ERR_GEN_OBS);

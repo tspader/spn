@@ -1,4 +1,5 @@
 #include "fuzz.h"
+#include "error/types.h"
 #include "sp/io.h"
 
 void fz_journal_init(fz_journal_t* j, sp_mem_t mem) {
@@ -125,10 +126,40 @@ void fz_journal_step(fz_journal_t* j, fz_step_t* step, u64 index) {
     sp_fmt_uint(step->content), sp_fmt_uint(fz_journal_sys(j))).value);
 }
 
+static sp_str_t fz_run_err_str(u64 err) {
+  switch ((spn_err_t)err) {
+    case SPN_OK:                     return sp_str_lit("");
+    case SPN_ERR_DAG_GLOB:           return sp_str_lit("a glob failed");
+    case SPN_ERR_DAG_STAT:           return sp_str_lit("a stat failed");
+    case SPN_ERR_DAG_MISSING_INPUT:  return sp_str_lit("an input is missing");
+    case SPN_ERR_DAG_MISSING_OUTPUT: return sp_str_lit("an action did not produce an output");
+    case SPN_ERR_DAG_SCRATCH:        return sp_str_lit("scratch dir failed");
+    case SPN_ERR_DAG_ACTION:         return sp_str_lit("an action failed");
+    case SPN_ERR_DAG_STORE_READ:     return sp_str_lit("a store read failed");
+    case SPN_ERR_DAG_STORE_WRITE:    return sp_str_lit("a store write failed");
+    case SPN_ERR_DAG_STORE_MISSING:  return sp_str_lit("a store blob is missing");
+    case SPN_ERR_DAG_TREE:           return sp_str_lit("a tree failed to materialize");
+    case SPN_ERR_DAG_STALLED:        return sp_str_lit("the scheduler stalled");
+    default:                         return sp_str_lit("");
+  }
+}
+
 void fz_journal_run_done(fz_journal_t* j, u64 err, u64 fired, bool crashed) {
   if (!j) return;
-  fz_journal_event(j, sp_fmt(j->mem, "\"ev\":\"run_done\",\"err\":{},\"fired\":{},\"crashed\":{},\"sys\":{}",
-    sp_fmt_uint(err), sp_fmt_uint(fired), sp_fmt_str(fz_json_bool(crashed)), sp_fmt_uint(fz_journal_sys(j))).value);
+  fz_journal_event(j, sp_fmt(j->mem, "\"ev\":\"run_done\",\"err\":{},\"err_str\":\"{}\",\"fired\":{},\"crashed\":{},\"sys\":{}",
+    sp_fmt_uint(err), sp_fmt_str(fz_run_err_str(err)), sp_fmt_uint(fired), sp_fmt_str(fz_json_bool(crashed)),
+    sp_fmt_uint(fz_journal_sys(j))).value);
+}
+
+void fz_journal_drop(fz_journal_t* j, sp_str_t what, sp_str_t path) {
+  if (!j) return;
+  fz_journal_event(j, sp_fmt(j->mem, "\"ev\":\"drop\",\"what\":\"{}\",\"path\":\"{}\",\"sys\":{}",
+    sp_fmt_str(what), sp_fmt_str(path), sp_fmt_uint(fz_journal_sys(j))).value);
+}
+
+void fz_journal_sim_fault(fz_journal_t* j, u64 sys) {
+  if (!j) return;
+  fz_journal_event(j, sp_fmt(j->mem, "\"ev\":\"sim.fault\",\"sys\":{}", sp_fmt_uint(sys)).value);
 }
 
 void fz_journal_world(fz_journal_t* j, bool honest, bool murky, bool tainted) {
@@ -138,11 +169,17 @@ void fz_journal_world(fz_journal_t* j, bool honest, bool murky, bool tainted) {
     sp_fmt_uint(fz_journal_sys(j))).value);
 }
 
-void fz_journal_model(fz_journal_t* j, u64 action, spn_dag_digest_t key, bool resolved, bool hit) {
+void fz_journal_predict(fz_journal_t* j, const fz_predict_row_t* rows, u64 count) {
   if (!j) return;
-  fz_journal_event(j, sp_fmt(j->mem, "\"ev\":\"model\",\"action\":{},\"key\":\"{}\",\"resolved\":{},\"hit\":{},\"sys\":{}",
-    sp_fmt_uint(action), sp_fmt_str(fz_json_key(j->mem, key)), sp_fmt_str(fz_json_bool(resolved)),
-    sp_fmt_str(fz_json_bool(hit)), sp_fmt_uint(fz_journal_sys(j))).value);
+  sp_mem_t mem = j->mem;
+  sp_str_t* items = sp_alloc_n(mem, sp_str_t, count ? count : 1);
+  sp_for(it, count) {
+    items[it] = sp_fmt(mem, "{{\"action\":{},\"key\":\"{}\",\"resolved\":{},\"hit\":{}}}",
+      sp_fmt_uint(rows[it].action), sp_fmt_str(fz_json_key(mem, rows[it].key)),
+      sp_fmt_str(fz_json_bool(rows[it].resolved)), sp_fmt_str(fz_json_bool(rows[it].hit))).value;
+  }
+  fz_journal_event(j, sp_fmt(mem, "\"ev\":\"predict\",\"rows\":{},\"sys\":{}",
+    sp_fmt_str(fz_json_list(mem, items, (u32)count)), sp_fmt_uint(fz_journal_sys(j))).value);
 }
 
 void fz_journal_exec(fz_journal_t* j, u64 action) {
@@ -151,18 +188,43 @@ void fz_journal_exec(fz_journal_t* j, u64 action) {
     sp_fmt_uint(action), sp_fmt_uint(fz_journal_sys(j))).value);
 }
 
-void fz_journal_check(fz_journal_t* j, u64 action, u64 execs, u64 want, bool miss, u64 requeues) {
+void fz_journal_check_execs(fz_journal_t* j, const fz_exec_row_t* rows, u64 count) {
   if (!j) return;
-  fz_journal_event(j, sp_fmt(j->mem, "\"ev\":\"check\",\"action\":{},\"execs\":{},\"want\":{},\"miss\":{},\"requeues\":{},\"ok\":{},\"sys\":{}",
-    sp_fmt_uint(action), sp_fmt_uint(execs), sp_fmt_uint(want), sp_fmt_str(fz_json_bool(miss)),
-    sp_fmt_uint(requeues), sp_fmt_str(fz_json_bool(execs == want)), sp_fmt_uint(fz_journal_sys(j))).value);
+  sp_mem_t mem = j->mem;
+  sp_str_t* items = sp_alloc_n(mem, sp_str_t, count ? count : 1);
+  sp_for(it, count) {
+    items[it] = sp_fmt(mem, "{{\"action\":{},\"execs\":{},\"want\":{},\"requeues\":{},\"miss\":{},\"ok\":{}}}",
+      sp_fmt_uint(rows[it].action), sp_fmt_uint(rows[it].execs), sp_fmt_uint(rows[it].want),
+      sp_fmt_uint(rows[it].requeues), sp_fmt_str(fz_json_bool(rows[it].miss)), sp_fmt_str(fz_json_bool(rows[it].ok))).value;
+  }
+  fz_journal_event(j, sp_fmt(mem, "\"ev\":\"check\",\"kind\":\"execs\",\"rows\":{},\"sys\":{}",
+    sp_fmt_str(fz_json_list(mem, items, (u32)count)), sp_fmt_uint(fz_journal_sys(j))).value);
 }
 
-void fz_journal_bytes(fz_journal_t* j, sp_str_t check, u64 artifact, sp_str_t want, sp_str_t got, bool ok) {
+void fz_journal_check_bytes(fz_journal_t* j, sp_str_t kind, const fz_bytes_row_t* rows, u64 count) {
   if (!j) return;
-  fz_journal_event(j, sp_fmt(j->mem, "\"ev\":\"bytes\",\"check\":\"{}\",\"artifact\":{},\"want\":\"{}\",\"got\":\"{}\",\"ok\":{},\"sys\":{}",
-    sp_fmt_str(check), sp_fmt_uint(artifact), sp_fmt_str(fz_json_bytes(want)), sp_fmt_str(fz_json_bytes(got)),
-    sp_fmt_str(fz_json_bool(ok)), sp_fmt_uint(fz_journal_sys(j))).value);
+  sp_mem_t mem = j->mem;
+  sp_str_t* items = sp_alloc_n(mem, sp_str_t, count ? count : 1);
+  sp_for(it, count) {
+    items[it] = sp_fmt(mem, "{{\"artifact\":{},\"want\":\"{}\",\"got\":\"{}\",\"ok\":{}}}",
+      sp_fmt_uint(rows[it].artifact), sp_fmt_str(fz_json_bytes(rows[it].want)),
+      sp_fmt_str(fz_json_bytes(rows[it].got)), sp_fmt_str(fz_json_bool(rows[it].ok))).value;
+  }
+  fz_journal_event(j, sp_fmt(mem, "\"ev\":\"check\",\"kind\":\"{}\",\"rows\":{},\"sys\":{}",
+    sp_fmt_str(kind), sp_fmt_str(fz_json_list(mem, items, (u32)count)), sp_fmt_uint(fz_journal_sys(j))).value);
+}
+
+void fz_journal_blob(fz_journal_t* j, u64 artifact, sp_str_t want, sp_str_t got) {
+  if (!j) return;
+  fz_journal_event(j, sp_fmt(j->mem, "\"ev\":\"blob\",\"artifact\":{},\"want\":\"{}\",\"got\":\"{}\",\"sys\":{}",
+    sp_fmt_uint(artifact), sp_fmt_str(fz_json_bytes(want)), sp_fmt_str(fz_json_bytes(got)),
+    sp_fmt_uint(fz_journal_sys(j))).value);
+}
+
+void fz_journal_sim_write(fz_journal_t* j, u64 artifact, sp_str_t path, u64 sys) {
+  if (!j) return;
+  fz_journal_event(j, sp_fmt(j->mem, "\"ev\":\"sim.write\",\"artifact\":{},\"path\":\"{}\",\"sys\":{}",
+    sp_fmt_uint(artifact), sp_fmt_str(path), sp_fmt_uint(sys)).value);
 }
 
 void fz_journal_pass(fz_journal_t* j, sp_str_t name) {

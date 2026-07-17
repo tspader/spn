@@ -10,6 +10,7 @@
 typedef enum {
   FIELD_STR,
   FIELD_BOOL,
+  FIELD_U64,
   FIELD_ENUM,
   FIELD_STRUCT,
   FIELD_EXTERN,

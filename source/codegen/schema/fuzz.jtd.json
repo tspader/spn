@@ -1,0 +1,29 @@
+{
+  "metadata": { "format": "toml" },
+  "optionalProperties": {
+    "profile": { "values": { "ref": "fuzz_profile" } }
+  },
+  "definitions": {
+    "fuzz_profile": {
+      "optionalProperties": {
+        "from": { "type": "string" },
+        "iterations": { "type": "uint64" },
+        "iteration": { "type": "uint64" },
+        "seed": { "type": "uint64" },
+        "keep_going": { "type": "boolean" },
+        "render": { "type": "string" },
+        "graph": { "ref": "fuzz_graph" }
+      }
+    },
+    "fuzz_graph": {
+      "optionalProperties": {
+        "max_actions": { "type": "uint64" },
+        "small_actions": { "type": "uint64" },
+        "max_sources": { "type": "uint64" },
+        "max_produces": { "type": "uint64" },
+        "max_phantoms": { "type": "uint64" },
+        "max_obs": { "type": "uint64" }
+      }
+    }
+  }
+}

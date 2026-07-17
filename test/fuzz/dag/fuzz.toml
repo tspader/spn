@@ -1,0 +1,26 @@
+[profile.default]
+iterations = 10000
+iteration = 7702
+seed = 0x444a1411ef1fb56b
+render = "foo"
+
+[profile.smoke]
+iterations = 32
+
+[profile.big]
+graph = { max_actions = 1024, max_obs = 64 }
+iterations = 64
+
+[profile.huge]
+from = "big"
+graph = { max_actions = 100, max_sources = 256 }
+iterations = 1
+render = "foo"
+
+[profile.observe]
+from = "big"
+graph = { max_obs = 1000 }
+
+[profile.soak]
+iterations = 100000
+keep_going = true

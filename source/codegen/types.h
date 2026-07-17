@@ -30,6 +30,7 @@ typedef struct {
   sp_mem_t mem;
   sp_intern_t* intern;
   sp_str_t dir;
+  bool strict;
   spn_codegen_path_seg_t path [SPN_CODEGEN_PATH_MAX];
   u32 depth;
   sp_da(spn_codegen_issue_t) issues;

@@ -75,6 +75,7 @@ static bool sp_sim_fail(void) {
     return false;
   }
   sim->faults++;
+  sp_da_push(sim->fault_log, sim->syscalls);
   return true;
 }
 
@@ -819,6 +820,7 @@ void sp_sim_init(sp_sim_t* sim, sp_mem_t mem) {
     .mem = mem,
     .fds = sp_da_new(mem, sp_sim_fd_t),
     .events = sp_da_new(mem, sp_sim_event_t),
+    .fault_log = sp_da_new(mem, u64),
     .clock = { .tv_sec = 1 },
     .ids = 1,
   };
@@ -866,6 +868,7 @@ void sp_sim_fault_eio(sp_sim_t* sim, u64 seed, u64 denominator) {
   sim->fault_state = seed ? seed : 1;
   sim->fault_den = denominator;
   sim->faults = 0;
+  sp_da_clear(sim->fault_log);
 }
 
 void sp_sim_fault_crash(sp_sim_t* sim, u64 after) {

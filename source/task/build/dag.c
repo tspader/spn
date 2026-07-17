@@ -982,7 +982,7 @@ static spn_err_t dag_prepare(spn_dag_build_t* b) {
 /////////
 static s32 dag_run_thread(void* data) {
   spn_dag_build_t* b = (spn_dag_build_t*)data;
-  b->result = spn_dag_run_ex(b->graph, &b->env, &b->pool.executor);
+  b->result = spn_dag_run_executor(b->graph, &b->env, &b->pool.executor);
   sp_atomic_s32_set(&b->done, 1);
   return 0;
 }
@@ -1164,7 +1164,6 @@ spn_task_step_t spn_dag_build_init(spn_app_t* app) {
     .discovery = &b->discovery,
     .progress = &b->progress,
     .scratch = tmp,
-    .force = app->config.force,
   };
 
   if (dag_prepare(b)) {

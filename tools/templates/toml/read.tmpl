@@ -1,4 +1,11 @@
 static void spn_cg_{{ .name }}_read(spn_toml_loader_t* ctx, toml_table_t* table, {{ .type }}* out) {
+  static const c8* keys [] = {
+{{ for .fields }}
+    "{{ .key }}",
+{{ end }}
+    SP_NULLPTR,
+  };
+  spn_toml_loader_check_keys(ctx, table, keys, sp_carr_len(keys) - 1);
 {{ for .fields }}
 {{ $read }}
 {{ end }}}

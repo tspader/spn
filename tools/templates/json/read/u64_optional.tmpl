@@ -1,0 +1,7 @@
+  {
+    yyjson_val* v = yyjson_obj_get(obj, "{{ .key }}");
+    if (v) {
+      out->{{ .name }}.value = yyjson_get_uint(v);
+      out->{{ .name }}.some = SP_OPT_SOME;
+    }
+  }

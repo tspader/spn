@@ -59,6 +59,8 @@ const c8* jtd_type_name(jtd_type_t type) {
     case JTD_TYPE_UINT16: return "uint16";
     case JTD_TYPE_INT32: return "int32";
     case JTD_TYPE_UINT32: return "uint32";
+    case JTD_TYPE_INT64: return "int64";
+    case JTD_TYPE_UINT64: return "uint64";
     case JTD_TYPE_STRING: return "string";
     case JTD_TYPE_TIMESTAMP: return "timestamp";
   }
@@ -78,6 +80,8 @@ static const struct {
   { "uint16", JTD_TYPE_UINT16 },
   { "int32", JTD_TYPE_INT32 },
   { "uint32", JTD_TYPE_UINT32 },
+  { "int64", JTD_TYPE_INT64 },
+  { "uint64", JTD_TYPE_UINT64 },
   { "string", JTD_TYPE_STRING },
   { "timestamp", JTD_TYPE_TIMESTAMP },
 };

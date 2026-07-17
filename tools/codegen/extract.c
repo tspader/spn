@@ -135,6 +135,9 @@ static bool extract_field(gen_t* g, type_t* type, jtd_property_t property) {
   else if (target->form == JTD_FORM_TYPE && target->as.type == JTD_TYPE_BOOLEAN) {
     field.kind = FIELD_BOOL;
   }
+  else if (target->form == JTD_FORM_TYPE && target->as.type == JTD_TYPE_UINT64) {
+    field.kind = FIELD_U64;
+  }
   else if (target->form == JTD_FORM_TYPE) {
     return fail_scalar(g, type->name, property.key, target->as.type);
   }
@@ -152,7 +155,7 @@ static bool extract_field(gen_t* g, type_t* type, jtd_property_t property) {
   if (field.card == CARD_MAP && field.kind != FIELD_STR && field.kind != FIELD_STRUCT) {
     return fail_form(g, type->name, property.key, target->form);
   }
-  if (field.card == CARD_ARRAY && field.kind == FIELD_BOOL) {
+  if (field.card == CARD_ARRAY && (field.kind == FIELD_BOOL || field.kind == FIELD_U64)) {
     return fail_form(g, type->name, property.key, target->form);
   }
 

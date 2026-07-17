@@ -120,6 +120,10 @@ void spn_codegen_json_bool(sp_io_writer_t* out, bool value) {
   sp_io_write_str(out, value ? sp_str_lit("true") : sp_str_lit("false"), SP_NULLPTR);
 }
 
+void spn_codegen_json_u64(sp_io_writer_t* out, u64 value) {
+  sp_fmt_io(out, "{}", sp_fmt_uint(value));
+}
+
 void spn_codegen_json_str_array(sp_io_writer_t* out, sp_da(sp_str_t) values) {
   sp_io_write_c8(out, '[');
   sp_da_for(values, it) {
