@@ -66,8 +66,6 @@ static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test)
 
 SPN_TEST_SUITE(when)
 
-// Every build fact resolves from the profile: os/arch/mode gate defines that
-// must be present, and a wasi-gated define must be absent.
 UTEST_F(when, facts) {
   tmpfs_init_named(&uf->fixture.fs, "when_facts");
 
@@ -79,7 +77,6 @@ UTEST_F(when, facts) {
   });
 }
 
-// { not = v }: os != wasi holds on the host, mode != debug does not
 UTEST_F(when, not_form) {
   tmpfs_init_named(&uf->fixture.fs, "when_not_form");
 
@@ -91,9 +88,6 @@ UTEST_F(when, not_form) {
   });
 }
 
-// Multiple keys AND: { os = "linux", mode = "release" } is false in debug
-// even though os matches (an OR evaluator returns 20 on the first build),
-// true in release
 UTEST_F(when, and_form) {
   tmpfs_init_named(&uf->fixture.fs, "when_and_form");
 
@@ -106,9 +100,6 @@ UTEST_F(when, and_form) {
   });
 }
 
-// Gated source entries: both impl files define impl_value, so failing to
-// exclude the other platform's impl is a duplicate-symbol link error and
-// failing to include the host's is an undefined reference
 UTEST_F(when, source) {
   tmpfs_init_named(&uf->fixture.fs, "when_source");
 
@@ -121,9 +112,6 @@ UTEST_F(when, source) {
   });
 }
 
-// Gated flags entries: the wasi-gated /DFLAG_INVALID is not a valid gcc
-// argument, so failing to exclude it breaks the compile; the os-gated
-// define proves inclusion
 UTEST_F(when, flags) {
   tmpfs_init_named(&uf->fixture.fs, "when_flags");
 
@@ -135,11 +123,6 @@ UTEST_F(when, flags) {
   });
 }
 
-// Gated entries in the package system_deps list: ws2_32 does not exist on
-// linux, so failing to exclude the false arm breaks the link. The true arm
-// is c++ rather than m because musl folds libm into libc — main references
-// std::terminate by mangled name, which only resolves if the matching entry
-// survives filtering.
 UTEST_F(when, system_deps) {
   tmpfs_init_named(&uf->fixture.fs, "when_system_deps");
 
@@ -151,9 +134,6 @@ UTEST_F(when, system_deps) {
   });
 }
 
-// Gated dependency edges: wsock has no package in the index, so the build
-// succeeds only if the false edge is pruned before resolution ever looks at
-// it; plat proves the true edge resolves and links
 UTEST_F(when, dep_edge) {
   tmpfs_init_named(&uf->fixture.fs, "when_dep_edge");
 
@@ -167,8 +147,6 @@ UTEST_F(when, dep_edge) {
 
 SPN_TEST_SUITE(options)
 
-// A declared bool defaults on and its define reaches the dep's own TUs; no
-// consumer says anything
 UTEST_F(options, declare_default) {
   tmpfs_init_named(&uf->fixture.fs, "options_declare_default");
 
@@ -180,9 +158,6 @@ UTEST_F(options, declare_default) {
   });
 }
 
-// [config.codec] overrides the dep's default (rc 10 proves the root won, not
-// the default), and swapping the root manifest flips the built behavior —
-// option values participate in staleness, a stale store returns 10 twice
 UTEST_F(options, root_set) {
   tmpfs_init_named(&uf->fixture.fs, "options_root_set");
 
@@ -196,10 +171,6 @@ UTEST_F(options, root_set) {
   });
 }
 
-// Options join the when key domain: the enum value gates which backend
-// source compiles inside the dep. Both backends define render_backend, so a
-// wrong or double selection fails the link, and the root picks the
-// non-default so the default can't mask a no-op
 UTEST_F(options, enum_gate) {
   tmpfs_init_named(&uf->fixture.fs, "options_enum_gate");
 
@@ -211,9 +182,6 @@ UTEST_F(options, enum_gate) {
   });
 }
 
-// define + public = true: the option's define lands in the consumer's own
-// compile, not just the dep's. The general propagation machinery is pinned
-// in reexport; this pins the option -> public define wiring specifically.
 UTEST_F(options, public_define) {
   tmpfs_init_named(&uf->fixture.fs, "options_public_define");
 
@@ -225,9 +193,6 @@ UTEST_F(options, public_define) {
   });
 }
 
-// The root's own option gates its dep edge and a profile flips it: default
-// build never resolves tracer (rc 10, no resolve event), -p tracing resolves
-// and links it (rc 20). Version 1.0.0 identifies tracer; the root is 0.1.0.
 UTEST_F(options, gates_dep) {
   tmpfs_init_named(&uf->fixture.fs, "options_gates_dep");
 
@@ -255,8 +220,6 @@ UTEST_F(options, gates_dep) {
   });
 }
 
-// A consumer edge requests a value with no root config in play: the request
-// alone flips the dep off its default
 UTEST_F(options, edge_request) {
   tmpfs_init_named(&uf->fixture.fs, "options_edge_request");
 
@@ -268,11 +231,6 @@ UTEST_F(options, edge_request) {
   });
 }
 
-// additive = true: with the root silent, requests union — liba's audio =
-// true wins over libb's false and libb's video rides along, so caps == 3
-// through both consumers. When the root explicitly sets audio = false the
-// root is authoritative like any other setter: no request unions over it,
-// so caps drops to video alone.
 UTEST_F(options, additive) {
   tmpfs_init_named(&uf->fixture.fs, "options_additive");
 
@@ -286,8 +244,6 @@ UTEST_F(options, additive) {
   });
 }
 
-// The identical topology settles when the root sets the value: liba's gl
-// request loses to the root, both consumers observe vk
 UTEST_F(options, tiebreak) {
   tmpfs_init_named(&uf->fixture.fs, "options_tiebreak");
 
@@ -299,8 +255,6 @@ UTEST_F(options, tiebreak) {
   });
 }
 
-// defaults = false declines the dep's defaults wholesale; only the edge's
-// ogg request survives, so caps == 2 rather than 3
 UTEST_F(options, defaults_false) {
   tmpfs_init_named(&uf->fixture.fs, "options_defaults_false");
 
@@ -312,9 +266,6 @@ UTEST_F(options, defaults_false) {
   });
 }
 
-// The composition of edge_request and gates_dep: the root's edge request
-// flips x on, which must pull a's x-gated dep b into the build even though
-// the request isn't known when a's edges are first gated
 UTEST_F(options, edge_gates_dep) {
   tmpfs_init_named(&uf->fixture.fs, "options_edge_gates_dep");
 
@@ -334,10 +285,6 @@ UTEST_F(options, edge_gates_dep) {
   });
 }
 
-// Each re-resolve discovers one more chain level, because a package's edge
-// request only lands once its own edge exists: a six-deep chain of gated
-// deps blows the resolve cap, and the LATE_GATE error must name the exact
-// gate that never settled rather than failing anonymously
 UTEST_F(options, late_gate) {
   tmpfs_init_named(&uf->fixture.fs, "options_late_gate");
 
@@ -359,9 +306,6 @@ UTEST_F(options, late_gate) {
   });
 }
 
-// { not = ... } is a request-only form: an authoritative setter negating a
-// value is meaningless, so the root config declaring one is a load error
-// naming the option rather than a silently dropped clause
 UTEST_F(options, config_negated) {
   tmpfs_init_named(&uf->fixture.fs, "options_config_negated");
 
@@ -373,10 +317,6 @@ UTEST_F(options, config_negated) {
   });
 }
 
-// A when-gated dep inside an index package whose entry predates published
-// gates (the fixture pins a raw old-format index): the index metadata lists
-// the dep unconditionally, but a false gate in the fetched manifest must cut
-// the edge, not fail the build
 UTEST_F(options, index_gated_dep) {
   tmpfs_init_named(&uf->fixture.fs, "options_index_gated_dep");
 
@@ -388,9 +328,6 @@ UTEST_F(options, index_gated_dep) {
   });
 }
 
-// The published entry carries a's option declarations and the dep's gate, so
-// the resolver cuts the edge before ever looking the name up: the gated dep
-// doesn't exist in the index at all, and the build must not care
 UTEST_F(options, index_eager_gate) {
   tmpfs_init_named(&uf->fixture.fs, "options_index_eager_gate");
 
@@ -415,9 +352,6 @@ UTEST_F(options, index_eager_gate) {
   });
 }
 
-// edge_gates_dep for a build-kind dep: the request flips x on, so a's define
-// is applied and its gated build dep b must resolve with it — the define
-// without the dep is a misbuild
 UTEST_F(options, edge_gates_build_dep) {
   tmpfs_init_named(&uf->fixture.fs, "options_edge_gates_build_dep");
 
@@ -437,11 +371,6 @@ UTEST_F(options, edge_gates_build_dep) {
   });
 }
 
-// Options are part of a package's transitive build identity: b's compilation
-// observes a's public define, so each value of a's option is a distinct b.
-// The flip-forward works by accident of mtimes (a's new store stamp dirties
-// b); the flip-back must not hand back the on-flavored b that the default
-// store path now holds
 UTEST_F(options, dep_rebuild) {
   tmpfs_init_named(&uf->fixture.fs, "options_dep_rebuild");
 
@@ -456,11 +385,6 @@ UTEST_F(options, dep_rebuild) {
   });
 }
 
-// Test that swapping the build profile on a dependency with no binary artifacts
-// still flips its fingerprint.
-//
-// The dependency has a build script which writes a header defining a value
-// differently depending on the profile's mode.
 UTEST_F(options, fact_identity) {
   tmpfs_init_named(&uf->fixture.fs, "options_fact_identity");
 
@@ -476,10 +400,6 @@ UTEST_F(options, fact_identity) {
   });
 }
 
-// Mutually-referencing defaults make an explicitly-set build look default
-// under the final env: x = true and y = true each match the other's when-arm
-// default, but the all-defaults build resolved both false, so the two builds
-// are different configurations and must not share a store path
 UTEST_F(options, default_identity) {
   tmpfs_init_named(&uf->fixture.fs, "options_default_identity");
 
@@ -493,9 +413,6 @@ UTEST_F(options, default_identity) {
   });
 }
 
-// Private scoping resolves b at 1.0.0 (x on, inside a) and 2.0.0 (x off, at
-// the root): two distinct packages, so the disagreeing requests are not a
-// conflict and each instance builds with its own value
 UTEST_F(options, private_versions) {
   tmpfs_init_named(&uf->fixture.fs, "options_private_versions");
 
@@ -507,8 +424,6 @@ UTEST_F(options, private_versions) {
   });
 }
 
-// A [config.<pkg>] key naming no package in the build is a misconfiguration,
-// not a no-op: the typo'd key must fail the build by name
 UTEST_F(options, config_unknown) {
   tmpfs_init_named(&uf->fixture.fs, "options_config_unknown");
 
@@ -520,10 +435,6 @@ UTEST_F(options, config_unknown) {
   });
 }
 
-// config_unknown against the packages actually in the build, not every
-// package a resolve pass ever loaded: the root's edge request flips a's y
-// off, pruning b and zed after they loaded, so [config.zed] names a package
-// that isn't in the build and must fail rather than sit silently dead
 UTEST_F(options, config_stale) {
   tmpfs_init_named(&uf->fixture.fs, "options_config_stale");
 

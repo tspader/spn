@@ -222,8 +222,6 @@ UTEST(options_merge, bool_defaults_false) {
   });
 }
 
-// Additive requests union: any true request wins over any false one, and the
-// result is attributed to the union, not a single consumer
 UTEST(options_merge, additive_unions) {
   run_merge_test(utest_result, (merge_test_t) {
     .decls = {
@@ -241,8 +239,6 @@ UTEST(options_merge, additive_unions) {
   });
 }
 
-// Two consumers agreeing on a non-additive option settle without a
-// tiebreaker
 UTEST(options_merge, agreeing_requests) {
   run_merge_test(utest_result, (merge_test_t) {
     .decls = {
@@ -260,8 +256,6 @@ UTEST(options_merge, agreeing_requests) {
   });
 }
 
-// A root config entry beats a consumer request on a non-additive option
-// (today's tiebreak rule; worlds cut 0 turns this into a conflict)
 UTEST(options_merge, config_overrides_request) {
   run_merge_test(utest_result, (merge_test_t) {
     .decls = {
@@ -279,7 +273,6 @@ UTEST(options_merge, config_overrides_request) {
   });
 }
 
-// The profile options table is the root package's setter
 UTEST(options_merge, profile_sets_root) {
   run_merge_test(utest_result, (merge_test_t) {
     .is_root = true,
@@ -295,7 +288,6 @@ UTEST(options_merge, profile_sets_root) {
   });
 }
 
-// Two consumers disagree on a non-additive option with no tiebreaker
 UTEST(options_merge, request_conflict) {
   run_merge_test(utest_result, (merge_test_t) {
     .decls = {
@@ -315,7 +307,6 @@ UTEST(options_merge, request_conflict) {
   });
 }
 
-// A { not = v } request vetoes the settled value
 UTEST(options_merge, veto_contradicted) {
   run_merge_test(utest_result, (merge_test_t) {
     .decls = {
@@ -334,7 +325,6 @@ UTEST(options_merge, veto_contradicted) {
   });
 }
 
-// A veto that the settled value already avoids is inert
 UTEST(options_merge, veto_respected) {
   run_merge_test(utest_result, (merge_test_t) {
     .decls = {
@@ -351,7 +341,6 @@ UTEST(options_merge, veto_respected) {
   });
 }
 
-// Setting an undeclared option is an error naming it
 UTEST(options_merge, undeclared) {
   run_merge_test(utest_result, (merge_test_t) {
     .decls = {
@@ -366,8 +355,6 @@ UTEST(options_merge, undeclared) {
   });
 }
 
-// A value outside the enum's declared domain is an error, from config and
-// from a consumer request alike
 UTEST(options_merge, bad_value_config) {
   run_merge_test(utest_result, (merge_test_t) {
     .decls = {
@@ -398,7 +385,6 @@ UTEST(options_merge, bad_value_request) {
   });
 }
 
-// An enum with no applicable default and no setter has no value
 UTEST(options_merge, no_value) {
   run_merge_test(utest_result, (merge_test_t) {
     .decls = {
@@ -412,8 +398,6 @@ UTEST(options_merge, no_value) {
   });
 }
 
-// defaults = false declines the declared defaults wholesale; a request still
-// lands, a bool with no request falls to false
 UTEST(options_merge, defaults_declined) {
   run_merge_test(utest_result, (merge_test_t) {
     .decls = {
@@ -433,7 +417,6 @@ UTEST(options_merge, defaults_declined) {
   });
 }
 
-// A default arm gated on a fact applies only when the fact holds
 UTEST(options_merge, default_arm_facts) {
   run_merge_test(utest_result, (merge_test_t) {
     .facts = { .os = SPN_OS_LINUX },
@@ -457,7 +440,6 @@ UTEST(options_merge, default_arm_facts) {
   });
 }
 
-// A later option's default arm sees an earlier option's resolved value
 UTEST(options_merge, default_arm_chains) {
   run_merge_test(utest_result, (merge_test_t) {
     .decls = {
@@ -480,7 +462,6 @@ UTEST(options_merge, default_arm_chains) {
   });
 }
 
-// An explicit setter that lands on the default value still hashes as default
 UTEST(options_merge, explicit_default_is_default) {
   run_merge_test(utest_result, (merge_test_t) {
     .decls = {
@@ -495,13 +476,6 @@ UTEST(options_merge, explicit_default_is_default) {
   });
 }
 
-// Everything below is the merge-level review contract for worlds.md cut 0
-// (.llm/doc/resolve/worlds.md): skipped until the cut lands, then un-skipped
-// verbatim. The tests above whose semantics the cut deliberately changes
-// (config_overrides_request, veto_contradicted) are deleted when these land.
-
-// I0.2: a constraint contradicting the config selection errors naming both
-// sides — silent override was the lie
 UTEST(options_merge, cut0_config_contradicts_constraint) {
   UTEST_SKIP("worlds cut 0");
   run_merge_test(utest_result, (merge_test_t) {
@@ -522,8 +496,6 @@ UTEST(options_merge, cut0_config_contradicts_constraint) {
   });
 }
 
-// I0.7: config x = false is a prohibition — an error naming both sides once
-// any demand arrives
 UTEST(options_merge, cut0_prohibition_vs_demand) {
   UTEST_SKIP("worlds cut 0");
   run_merge_test(utest_result, (merge_test_t) {
@@ -544,7 +516,6 @@ UTEST(options_merge, cut0_prohibition_vs_demand) {
   });
 }
 
-// I0.7: without a demand the prohibition yields the default-false value
 UTEST(options_merge, cut0_prohibition_without_demand) {
   UTEST_SKIP("worlds cut 0");
   run_merge_test(utest_result, (merge_test_t) {
@@ -560,8 +531,6 @@ UTEST(options_merge, cut0_prohibition_without_demand) {
   });
 }
 
-// I0.3: a negative constraint against a contradicting default on a two-value
-// domain selects the survivor instead of erroring
 UTEST(options_merge, cut0_negative_constraint_selects_survivor) {
   UTEST_SKIP("worlds cut 0");
   run_merge_test(utest_result, (merge_test_t) {
@@ -579,8 +548,6 @@ UTEST(options_merge, cut0_negative_constraint_selects_survivor) {
   });
 }
 
-// I0.2: constraints leaving more than one value with no config or default to
-// decide is the undetermined error
 UTEST(options_merge, cut0_undetermined) {
   UTEST_SKIP("worlds cut 0");
   run_merge_test(utest_result, (merge_test_t) {
@@ -598,8 +565,6 @@ UTEST(options_merge, cut0_undetermined) {
   });
 }
 
-// I0.4: a { not } value outside the declared domain is BAD_VALUE like any
-// other
 UTEST(options_merge, cut0_negative_constraint_outside_domain) {
   UTEST_SKIP("worlds cut 0");
   run_merge_test(utest_result, (merge_test_t) {
@@ -617,8 +582,6 @@ UTEST(options_merge, cut0_negative_constraint_outside_domain) {
   });
 }
 
-// I0.3: a negative constraint contradicting a real selection (config, not a
-// default) is still the veto event
 UTEST(options_merge, cut0_veto_against_config) {
   UTEST_SKIP("worlds cut 0");
   run_merge_test(utest_result, (merge_test_t) {
@@ -639,8 +602,6 @@ UTEST(options_merge, cut0_veto_against_config) {
   });
 }
 
-// I0.6: default evaluation is a deferred worklist, not declaration order —
-// an arm referencing a later-declared sibling defers and retries
 UTEST(options_merge, cut0_default_arm_defers) {
   UTEST_SKIP("worlds cut 0");
   run_merge_test(utest_result, (merge_test_t) {
