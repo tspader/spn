@@ -1,18 +1,4 @@
-#define SP_IMPLEMENTATION
-#include "sp.h"
-
-#define UTEST_IMPLEMENTATION
-#include "utest.h"
-
-#include "test.h"
-#include "spn.h"
-#include "event/event.h"
-#include "event/types.h"
-#include "pkg/options.h"
-#include "resolve/types.h"
-#include "when/when.h"
-
-UTEST_MAIN();
+#include "common.h"
 
 typedef struct {
   const c8* str;
