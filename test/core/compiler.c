@@ -10,8 +10,8 @@
 
 UTEST_MAIN();
 
-void expect_args(s32* utest_result, sp_ps_config_t* ps, render_expect_t expect) {
-  EXPECT_TRUE(sp_str_equal_cstr(ps->command, expect.command));
+void expect_args(s32* utest_result, spn_invocation_t* invocation, render_expect_t expect) {
+  EXPECT_TRUE(sp_str_equal_cstr(invocation->program, expect.command));
   u32 count = 0;
   sp_carr_for(expect.args, it) {
     if (!expect.args[it]) {
@@ -19,9 +19,9 @@ void expect_args(s32* utest_result, sp_ps_config_t* ps, render_expect_t expect) 
     }
     count++;
   }
-  ASSERT_EQ(sp_da_size(ps->dyn_args), count);
+  ASSERT_EQ(sp_da_size(invocation->args), count);
   sp_for(it, count) {
-    EXPECT_TRUE(sp_str_equal_cstr(ps->dyn_args[it], expect.args[it]));
+    EXPECT_TRUE(sp_str_equal_cstr(invocation->args[it], expect.args[it]));
   }
 }
 

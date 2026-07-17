@@ -3,7 +3,7 @@
 static void compare_type_primitives(s32* utest_result, const jtd_result_t* root, const void* expect) {
   (void)expect;
   EXPECT_EQ((s32)JTD_FORM_PROPERTIES, (s32)root->root->form);
-  EXPECT_EQ((u64)11, (u64)sp_da_size(root->root->as.properties.required));
+  EXPECT_EQ((u64)13, (u64)sp_da_size(root->root->as.properties.required));
   sp_da_for(root->root->as.properties.required, i) {
     const jtd_property_t* p = &root->root->as.properties.required[i];
     EXPECT_EQ((s32)JTD_FORM_TYPE, (s32)p->schema->form);

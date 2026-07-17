@@ -3,7 +3,7 @@
     {
       "code": "parse",
       "path": "",
-      "detail": "invalid toml"
+      "detail": "at 2:15: unterminated quote (\")"
     }
   ]
 }

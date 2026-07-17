@@ -6,6 +6,7 @@ add_executable(publish
   ${SRC}/external/git.c
   ${SRC}/external/tom.c
   ${SRC}/codegen/codegen.c
+  ${SRC}/codegen/loader.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/options.c
   ${SRC}/codegen/when.c
