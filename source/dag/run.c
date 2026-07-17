@@ -212,14 +212,14 @@ static spn_err_t settle(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env_t* e
       continue;
     }
     if (sp_str_empty(artifact->target)) {
-      artifact->path = spn_dag_store_path(env->store, g->mem, artifact->digest);
+      artifact->path = spn_dag_store_path(env->store, g->mem, artifact->digest, artifact->name);
       continue;
     }
     bool settled = is_file_settled(env->files, artifact->target, artifact->digest);
     trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_SETTLE, .action = action->id, .producer = artifact->id, .key = artifact->digest, .hit = settled });
     if (!settled) {
       action->wrote = true;
-      try(spn_dag_store_materialize(env->store, artifact->digest, artifact->target));
+      try(spn_dag_store_materialize(env->store, artifact->digest, artifact->name, artifact->target));
       spn_dag_file_cache_invalidate(env->files, artifact->target);
     }
     artifact->path = artifact->target;
@@ -239,7 +239,7 @@ static bool restore_entry(spn_dag_t* g, spn_dag_action_t* action, const spn_dag_
     }
     bool present = artifact->kind == SPN_DAG_ARTIFACT_KIND_TREE
       ? spn_dag_store_has_tree(env->store, entry->outputs[it].digest)
-      : spn_dag_store_has(env->store, entry->outputs[it].digest);
+      : spn_dag_store_has(env->store, entry->outputs[it].digest, entry->outputs[it].name);
     if (!present) {
       return false;
     }
@@ -507,7 +507,7 @@ static spn_err_t execute(spn_dag_t* g, spn_dag_attempt_t* attempt, spn_dag_env_t
     spn_dag_digest_t digest = sp_zero;
     spn_err_t put = artifact->kind == SPN_DAG_ARTIFACT_KIND_TREE
       ? spn_dag_store_put_tree(env->store, artifact->path, &digest)
-      : spn_dag_store_put_file(env->store, artifact->path, &digest);
+      : spn_dag_store_put_file(env->store, artifact->path, artifact->name, &digest);
     try(put);
     sp_da_push(attempt->digests, digest);
   }
