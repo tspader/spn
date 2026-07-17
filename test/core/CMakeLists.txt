@@ -118,11 +118,11 @@ add_executable(compiler_flags
   ${SRC}/compiler/msvc.c
   ${SRC}/compiler/toc.c
   ${SRC}/enum/enum.c
+  ${SRC}/sp/io.c
   ${SRC}/triple/triple.c
   compiler.c
   compiler/archive.c
   compiler/compile.c
-  compiler/exports/collect.c
   compiler/exports/render.c
   compiler/link.c
   compiler/toc.c
@@ -159,6 +159,7 @@ add_executable(manifest_gen
   ${SRC}/codegen/gen/config.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/codegen.c
+  ${SRC}/codegen/loader.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/options.c
   ${SRC}/codegen/when.c
@@ -188,6 +189,7 @@ add_executable(manifest_lower
   ${SRC}/codegen/gen/config.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/codegen.c
+  ${SRC}/codegen/loader.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/options.c
   ${SRC}/codegen/when.c
