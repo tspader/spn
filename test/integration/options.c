@@ -1,12 +1,14 @@
 typedef struct {
   const c8* profile;
   const c8* manifest;
+  test_when_t when;
   command_expect_t expect;
 } opt_build_t;
 
 typedef struct {
   const c8* project;
   const c8* copy [4];
+  test_when_t when;
   opt_build_t builds [3];
 } opt_test_t;
 
@@ -25,12 +27,22 @@ static void opt_set_manifest(s32* utest_result, fixture_t* fixture, const c8* ma
 }
 
 static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test) {
+  sp_str_t blocked = test_when_blocked(&test.when);
+  if (blocked.len) {
+    utest_skip_reason(blocked);
+    UTEST_SKIP("");
+  }
+
   prepare_test(utest_result, fixture, test.project, test.copy);
 
   sp_carr_for(test.builds, it) {
     const opt_build_t* build = &test.builds[it];
     if (!opt_build_present(build)) {
       break;
+    }
+
+    if (test_when_blocked(&build->when).len) {
+      continue;
     }
 
     if (build->manifest) {

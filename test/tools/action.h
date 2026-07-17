@@ -1,6 +1,8 @@
 #ifndef SPN_TEST_ACTION_H
 #define SPN_TEST_ACTION_H
 
+#include "caps.h"
+
 #define SPN_TEST_MAX_ACTIONS 32
 
 typedef enum {
@@ -54,6 +56,7 @@ typedef struct {
 typedef struct {
   const c8* project;
   const c8* copy [16];
+  test_when_t when;
   action_t actions[SPN_TEST_MAX_ACTIONS];
 } test_t;
 
