@@ -146,7 +146,7 @@ sp_str_t fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_t
           break;
         }
         case FZ_STEP_EIO: {
-          fz_line(&steps.base, sp_fmt(mem, "eio 1/{}", sp_fmt_uint(step->content)).value);
+          fz_line(&steps.base, sp_fmt(mem, "eio 1/{}", sp_fmt_uint(step->rate)).value);
           break;
         }
         case FZ_STEP_CRASH: {
