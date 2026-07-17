@@ -53,7 +53,7 @@ static void run_ops(s32* utest_result, spn_dag_store_kind_t kind, store_test_t t
       }
       case STORE_OP_PUT: {
         spn_dag_digest_t returned = sp_zero;
-        EXPECT_EQ(op.expect.err, spn_dag_put(&env.store, blob.data, blob.len, &returned));
+        EXPECT_EQ(op.expect.err, spn_dag_store_put(&env.store, blob.data, blob.len, &returned));
         if (!op.expect.err) {
           EXPECT_TRUE(spn_dag_digest_equal(digest, returned));
         }

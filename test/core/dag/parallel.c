@@ -148,7 +148,7 @@ static void run_test(s32* utest_result, par_test_t t) {
         break;
       }
 
-      spn_dag_file_cache_refresh(&env.dag.files);
+      spn_dag_file_cache_invalidate_all(&env.dag.files);
       sp_carr_for(build->sources, si) {
         if (!build->sources[si].path) {
           break;
@@ -165,7 +165,7 @@ static void run_test(s32* utest_result, par_test_t t) {
       spn_dag_t* g = dag_test_env_graph(&env.dag);
       par_build_graph(utest_result, &env, g, &t);
 
-      spn_err_t err = spn_dag_run_ex(g, &env.dag.env, &pool.executor);
+      spn_err_t err = spn_dag_run_executor(g, &env.dag.env, &pool.executor);
       EXPECT_EQ(build->expect_err, err);
       EXPECT_EQ((s32)build->expect_runs, sp_atomic_s32_get(&env.runs));
 

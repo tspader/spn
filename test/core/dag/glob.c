@@ -264,7 +264,7 @@ static void run_exec_test(s32* utest_result, glob_exec_test_t t) {
       break;
     }
 
-    spn_dag_file_cache_refresh(&env.dag.files);
+    spn_dag_file_cache_invalidate_all(&env.dag.files);
     sp_carr_for(run->files, it) {
       if (!run->files[it].path) {
         break;

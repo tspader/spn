@@ -217,15 +217,3 @@ bool occ_next(occ_parser_t* p, sp_str_t* prereq) {
   p->err = occ_parse_one(p, prereq);
   return !p->err;
 }
-
-sp_str_t occ_deps_write(sp_mem_t mem, sp_str_t* prereqs, u32 num_prereqs) {
-  sp_io_dyn_mem_writer_t writer = sp_zero;
-  sp_io_dyn_mem_writer_init(mem, &writer);
-
-  sp_for(it, num_prereqs) {
-    sp_assert(sp_io_write_str(&writer.base, prereqs[it], SP_NULL) == SP_OK);
-    sp_assert(sp_io_write_c8(&writer.base, '\n') == SP_OK);
-  }
-
-  return sp_io_dyn_mem_writer_take_str(&writer);
-}

@@ -40,7 +40,7 @@ static void build_action_key(s32* utest_result, spn_dag_t* g, key_action_t spec,
     ASSERT_EQ(SPN_OK, spn_dag_action_add_output(g, action, file));
   }
 
-  *key = spn_dag_action_key(g, action);
+  *key = spn_dag_weak_key(g, action);
 }
 
 static void run_test(s32* utest_result, key_test_t t) {
