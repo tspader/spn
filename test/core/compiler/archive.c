@@ -19,13 +19,13 @@ static void run_archive_test(s32* utest_result, archive_test_t test) {
   sp_da_init(scratch.mem, archive.objects);
   sp_da_init(scratch.mem, archive.args);
   sp_da_push(archive.objects, sp_str_lit("main.o"));
-  sp_ps_config_t ps = sp_zero;
-  spn_err_union_t err = spn_cc_render_archive(scratch.mem, &toolchain, &profile, &archive, &ps);
+  spn_invocation_t invocation = sp_zero;
+  spn_err_union_t err = spn_cc_render_archive(scratch.mem, &toolchain, &profile, &archive, &invocation);
   EXPECT_EQ(err.kind, test.expect.err);
   if (test.expect.err) {
     EXPECT_EQ(err.compiler.feature, SPN_CC_FEATURE_ARCHIVE);
   } else {
-    expect_args(utest_result, &ps, test.expect);
+    expect_args(utest_result, &invocation, test.expect);
   }
   sp_mem_end_scratch(scratch);
 }

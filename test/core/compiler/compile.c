@@ -5,7 +5,6 @@ typedef struct {
   spn_profile_info_t profile;
   spn_lang_t lang;
   spn_cxx_options_t cxx;
-  spn_symbol_visibility_t visibility;
   bool pic;
   const c8* arg;
   const c8* include;
@@ -22,7 +21,6 @@ static void run_compile_test(s32* utest_result, compile_test_t test) {
     .cxx = test.cxx,
     .source = sp_str_lit("main.c"),
     .output = sp_str_lit("main.o"),
-    .visibility = test.visibility,
     .pic = test.pic,
     .min_os = test.min_os,
   };
@@ -38,13 +36,13 @@ static void run_compile_test(s32* utest_result, compile_test_t test) {
   if (test.define) {
     sp_da_push(compile.define, sp_str_from_cstr(scratch.mem, test.define));
   }
-  sp_ps_config_t ps = sp_zero;
-  spn_err_union_t err = spn_cc_render_compile(scratch.mem, &toolchain, &test.profile, &compile, &ps);
+  spn_invocation_t invocation = sp_zero;
+  spn_err_union_t err = spn_cc_render_compile(scratch.mem, &toolchain, &test.profile, &compile, &invocation);
   EXPECT_EQ(err.kind, test.expect.err);
   if (test.expect.err) {
     EXPECT_EQ(err.compiler.feature, test.expect.feature);
   } else {
-    expect_args(utest_result, &ps, test.expect);
+    expect_args(utest_result, &invocation, test.expect);
   }
   sp_mem_end_scratch(scratch);
 }
@@ -58,12 +56,11 @@ UTEST(render_compile, gcc_linux) {
       .abi = SPN_ABI_GNU,
       .standard = SPN_C99,
     },
-    .visibility = SPN_SYMBOL_VISIBILITY_HIDDEN,
     .pic = true,
     .arg = "-fno-common",
     .expect = {
       .command = "cc",
-      .args = { "-std=c99", "-c", "main.c", "-fPIC", "-fvisibility=hidden", "-fno-common", "-Werror=return-type", "-o", "main.o" },
+      .args = { "-std=c99", "-c", "main.c", "-fPIC", "-fno-common", "-Werror=return-type", "-o", "main.o" },
     },
   });
 }
@@ -77,10 +74,9 @@ UTEST(render_compile, clang_wasi) {
       .standard = SPN_C99,
       .opt = SPN_OPT_LEVEL_2,
     },
-    .visibility = SPN_SYMBOL_VISIBILITY_HIDDEN,
     .expect = {
       .command = "cc",
-      .args = { "--target=wasm32-wasi", "-std=c99", "-O2", "-c", "main.c", "-fvisibility=hidden", "-Werror=return-type", "-o", "main.o" },
+      .args = { "--target=wasm32-wasi", "-std=c99", "-O2", "-c", "main.c", "-Werror=return-type", "-o", "main.o" },
     },
   });
 }

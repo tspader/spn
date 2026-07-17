@@ -39,7 +39,7 @@
   } while (0)
 
 // @spader i know this is fucking stupid
-#define try_emit(__event_buffer, __expr) \
+#define try_emit(__expr, __event_buffer) \
   do { \
     spn_err_union_t __err = (__expr); \
     if (__err.kind) { \
@@ -47,7 +47,7 @@
         .kind = SPN_EVENT_ERR, \
         .err = __err \
       }); \
-      return __err; \
+      return __err.kind; \
     } \
   } while (0)
 
