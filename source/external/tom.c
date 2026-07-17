@@ -19,6 +19,15 @@ toml_table_t* spn_toml_parse_ex(sp_str_t path, bool* parse_error) {
     *parse_error = false;
   }
 
+  toml_table_t* toml = spn_toml_parse_diag(sp_mem_os_new(), path, SP_NULLPTR);
+  if (!toml && parse_error) {
+    *parse_error = true;
+  }
+
+  return toml;
+}
+
+toml_table_t* spn_toml_parse_diag(sp_mem_t mem, sp_str_t path, sp_str_t* diag) {
   if (!sp_fs_exists(path)) {
     return SP_NULLPTR;
   }
@@ -30,8 +39,8 @@ toml_table_t* spn_toml_parse_ex(sp_str_t path, bool* parse_error) {
   toml_table_t* toml = toml_parse(sp_str_to_cstr(scratch.mem, file), parse_err, SP_CARR_LEN(parse_err));
   sp_mem_end_scratch(scratch);
 
-  if (!toml && parse_error) {
-    *parse_error = true;
+  if (!toml && diag) {
+    *diag = sp_str_copy(mem, sp_cstr_as_str(parse_err));
   }
 
   return toml;

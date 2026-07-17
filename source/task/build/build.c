@@ -17,7 +17,6 @@
 #include "target/closure.h"
 #include "task/build/build.h"
 #include "triple/triple.h"
-#include "unit/compiler.h"
 
 static void push_frameworks(sp_da(sp_str_t)* frameworks, sp_da(sp_str_t) values) {
   sp_da_for(values, it) {
@@ -47,6 +46,20 @@ static bool objects_have_cxx(sp_da(spn_compile_unit_t*) objects) {
   return false;
 }
 
+static bool target_is_dynamic(spn_target_unit_t* target) {
+  return target->kind == SPN_CC_OUTPUT_SHARED_LIB || target->kind == SPN_CC_OUTPUT_REACTOR;
+}
+
+static sp_str_t static_archive_path(sp_mem_t mem, spn_target_unit_t* lib) {
+  spn_profile_info_t* profile = &lib->pkg->build->profile;
+  spn_triple_t triple = { profile->arch, profile->os, profile->abi };
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+  sp_str_t file_name = spn_triple_lib_file_name(s.mem, triple, lib->info->name, SP_OS_LIB_STATIC);
+  sp_str_t path = sp_fs_join_path(mem, lib->pkg->paths.lib, file_name);
+  sp_mem_end_scratch(s);
+  return path;
+}
+
 void spn_target_resolve_link(spn_target_unit_t* target) {
   spn_pkg_unit_t* pkg = target->pkg;
   sp_mem_t mem = pkg->session->mem;
@@ -55,7 +68,8 @@ void spn_target_resolve_link(spn_target_unit_t* target) {
 
   sp_da_init(mem, target->link.lib_dirs);
   sp_da_init(mem, target->link.system_libs);
-  sp_da_init(mem, target->link.hidden_libs);
+  sp_da_init(mem, target->link.whole_archives);
+  sp_da_init(mem, target->link.private_libs);
   sp_da_init(mem, target->link.frameworks);
 
   spn_os_version_t min_os = max_os_version(target->info->macos.min_os, pkg->info->macos.min_os);
@@ -74,7 +88,15 @@ void spn_target_resolve_link(spn_target_unit_t* target) {
     }
 
     switch (lib->lib_kind) {
-      case SPN_LIB_KIND_STATIC:
+      case SPN_LIB_KIND_STATIC: {
+        if (target_is_dynamic(target)) {
+          sp_da_push(target->link.whole_archives, static_archive_path(mem, lib));
+          break;
+        }
+        sp_da_push(target->link.lib_dirs, lib->pkg->paths.lib);
+        sp_da_push(target->link.system_libs, lib->info->name);
+        break;
+      }
       case SPN_LIB_KIND_SHARED: {
         sp_da_push(target->link.lib_dirs, lib->pkg->paths.lib);
         sp_da_push(target->link.system_libs, lib->info->name);
@@ -107,11 +129,14 @@ void spn_target_resolve_link(spn_target_unit_t* target) {
       continue;
     }
 
-    if (target->link.libs[it].private && target->kind == SPN_CC_OUTPUT_SHARED_LIB) {
-      sp_da_push(target->link.hidden_libs, lib->info->name);
+    if (!target_is_dynamic(target)) {
+      sp_da_push(target->link.system_libs, lib->info->name);
+    }
+    else if (target->link.libs[it].private) {
+      sp_da_push(target->link.private_libs, lib->info->name);
     }
     else {
-      sp_da_push(target->link.system_libs, lib->info->name);
+      sp_da_push(target->link.whole_archives, static_archive_path(mem, lib));
     }
   }
 

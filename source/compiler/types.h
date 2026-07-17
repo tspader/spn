@@ -29,11 +29,6 @@ typedef enum {
   SPN_CC_OUTPUT_REACTOR,
 } spn_cc_output_kind_t;
 
-typedef enum {
-  SPN_SYMBOL_VISIBILITY_DEFAULT,
-  SPN_SYMBOL_VISIBILITY_HIDDEN,
-} spn_symbol_visibility_t;
-
 typedef struct {
   spn_cxx_standard_t standard;
   bool no_exceptions;
@@ -64,7 +59,6 @@ typedef struct {
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) args;
   spn_cxx_options_t cxx;
-  spn_symbol_visibility_t visibility;
   bool pic;
   spn_os_version_t min_os;
 } spn_cc_compile_t;
@@ -85,7 +79,6 @@ typedef struct {
   sp_da(sp_str_t) whole_archives;
   sp_da(sp_str_t) private_libs;
   sp_da(sp_str_t) system_libs;
-  sp_da(sp_str_t) hidden_libs;
   sp_da(sp_str_t) lib_dirs;
   sp_da(sp_str_t) rpath;
   sp_da(sp_str_t) frameworks;
@@ -98,5 +91,11 @@ typedef struct {
   sp_da(sp_str_t) objects;
   sp_da(sp_str_t) args;
 } spn_cc_archive_t;
+
+typedef struct {
+  sp_str_t program;
+  sp_da(sp_str_t) args;
+  sp_str_t cwd;
+} spn_invocation_t;
 
 #endif

@@ -121,7 +121,6 @@ set(SPN_SOURCES
   toolchain/toolchain.c
   triple/triple.c
   tui/tui.c
-  unit/compiler.c
   unit/package.c
   when/when.c
 )

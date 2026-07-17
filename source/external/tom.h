@@ -31,6 +31,7 @@ typedef struct {
 u32               spn_toml_array_len(toml_array_t* array);
 toml_table_t*     spn_toml_parse(sp_str_t path);
 toml_table_t*     spn_toml_parse_ex(sp_str_t path, bool* parse_error);
+toml_table_t*     spn_toml_parse_diag(sp_mem_t mem, sp_str_t path, sp_str_t* diag);
 sp_str_t          spn_toml_arr_str(sp_mem_t mem, toml_array_t* toml, u32 it);
 sp_str_t          spn_toml_str(sp_mem_t mem, toml_table_t* toml, const c8* key);
 sp_str_t          spn_toml_str_opt(sp_mem_t mem, toml_table_t* toml, const c8* key, const c8* fallback);
