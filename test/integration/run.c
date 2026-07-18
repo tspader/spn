@@ -9,9 +9,9 @@ UTEST_F(run, manifest) {
     .project = "test/integration/fixtures/run/manifest",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/main") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("bin/main") },
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "main" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("bin/main") },
     },
   });
 }

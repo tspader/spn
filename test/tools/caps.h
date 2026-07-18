@@ -18,6 +18,7 @@ typedef struct {
 } test_toolchain_t;
 
 const test_toolchain_t* test_toolchain(void);
+spn_triple_t test_host(void);
 const c8* test_target_alternate(void);
 sp_str_t  test_when_blocked(const test_when_t* when);
 bool      test_when_runs(const test_when_t* when);

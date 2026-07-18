@@ -3,6 +3,7 @@
 #include "test.h"
 #include "action.h"
 #include "harness.h"
+#include "triple/triple.h"
 #include "yyjson.h"
 
 static sp_mem_t layout_mem(void) {
@@ -25,7 +26,7 @@ static sp_str_t layout_sub(const c8* dir, const c8* rest) {
 
 static const c8* shared_lib_file(const c8* name) {
   sp_mem_t mem = layout_mem();
-  return sp_str_to_cstr(mem, sp_os_lib_to_file_name(mem, sp_str_view(name), SP_OS_LIB_SHARED));
+  return sp_str_to_cstr(mem, spn_triple_lib_file_name(mem, test_host(), sp_str_view(name), SP_OS_LIB_SHARED));
 }
 
 sp_str_t shared_lib(const c8* name) {
@@ -35,17 +36,11 @@ sp_str_t shared_lib(const c8* name) {
 
 sp_str_t profile_static_lib(const c8* profile, const c8* name) {
   sp_mem_t mem = layout_mem();
-  // Mirrors spn_triple_lib_file_name: the native windows triple is msvc-abi,
-  // where static libs are {}.lib rather than lib{}.a
-#ifdef SP_WIN32
-  return sp_fmt(mem, "build/{}/store/lib/{}.lib", sp_fmt_cstr(profile), sp_fmt_cstr(name)).value;
-#else
   return sp_fmt(mem,
     "build/{}/store/lib/{}",
     sp_fmt_cstr(profile),
-    sp_fmt_str(sp_os_lib_to_file_name(mem, sp_cstr_as_str(name), SP_OS_LIB_STATIC))
+    sp_fmt_str(spn_triple_lib_file_name(mem, test_host(), sp_cstr_as_str(name), SP_OS_LIB_STATIC))
   ).value;
-#endif
 }
 
 sp_str_t static_lib(const c8* name) {
@@ -61,17 +56,16 @@ sp_str_t test_lib(const c8* name) {
 }
 
 static sp_str_t exe_file_name(const c8* name, const c8* triple) {
-#ifdef SP_WIN32
-  bool windows = !triple || sp_str_find(sp_str_view(triple), sp_str_lit("windows")) >= 0;
-#else
-  bool windows = triple && sp_str_find(sp_str_view(triple), sp_str_lit("windows")) >= 0;
-#endif
+  spn_triple_t target = test_host();
+  if (triple) {
+    target = spn_triple_merge(target, spn_triple_from_str(sp_str_view(triple)));
+  }
   // Names that already carry an extension (spum.dll and friends coming
   // through the staged-lib helpers) pass through untouched
-  if (!windows || sp_str_find_c8(sp_fs_get_name(sp_str_view(name)), '.') >= 0) {
+  if (sp_str_find_c8(sp_fs_get_name(sp_str_view(name)), '.') >= 0) {
     return sp_str_view(name);
   }
-  return sp_fmt(layout_mem(), "{}.exe", sp_fmt_cstr(name)).value;
+  return spn_triple_exe_file_name(layout_mem(), target, sp_str_view(name));
 }
 
 sp_str_t profile_exe(const c8* profile, const c8* name) {
@@ -555,23 +549,51 @@ static void expect_event(s32* utest_result, fixture_t* fixture, const c8* event,
     sp_str_view(found ? "it was logged" : "it was not"));
 }
 
+static void expect_result(s32* utest_result, fixture_t* fixture, const c8* err, const c8* file, u32 line) {
+  sp_mem_t mem = fixture->fs.mem;
+  sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
+
+  sp_str_t content = sp_zero;
+  sp_io_read_file(mem, path, &content);
+
+  const c8* actual = SP_NULLPTR;
+  sp_da(sp_str_t) lines = sp_str_split_c8(mem, content, '\n');
+  sp_da_for(lines, it) {
+    if (sp_str_empty(lines[it])) continue;
+
+    yyjson_doc* doc = yyjson_read(lines[it].data, lines[it].len, 0);
+    if (!doc) continue;
+
+    yyjson_val* root = yyjson_doc_get_root(doc);
+    const c8* name = yyjson_get_str(yyjson_obj_get(root, "event"));
+    if (name && sp_cstr_equal(name, "result")) {
+      const c8* code = yyjson_get_str(yyjson_obj_get(yyjson_obj_get(root, "data"), "err"));
+      actual = code ? sp_str_to_cstr(mem, sp_str_view(code)) : SP_NULLPTR;
+    }
+    yyjson_doc_free(doc);
+  }
+
+  if (actual && sp_cstr_equal(actual, err)) return;
+
+  utest_kv("log", path);
+  utest_fail(utest_result, file, line,
+    sp_str_view(err),
+    actual ? sp_str_view(actual) : sp_str_lit("no result event"));
+}
+
 static void expect_cc_arg(s32* utest_result, fixture_t* fixture, const action_t* action, const c8* file, u32 line) {
   sp_mem_t mem = fixture->fs.mem;
   bool expected = action->kind == ACTION_VERIFY_CC_ARG;
 
-  sp_str_t db = action->verify_cc_arg.file;
-  if (sp_str_empty(db)) {
-    db = sp_str_lit("compile_commands.json");
-  }
-  sp_str_t path = tmpfs_get(&fixture->fs, db);
+  sp_str_t path = tmpfs_get(&fixture->fs, sp_str_lit("compile_commands.json"));
   sp_str_t content = test_read_file(mem, path);
 
   sp_str_t list = sp_str_lit("");
-  sp_carr_for(action->verify_cc_arg.args, it) {
-    if (!action->verify_cc_arg.args[it]) {
+  sp_carr_for(action->verify_cc_arg, it) {
+    if (!action->verify_cc_arg[it]) {
       break;
     }
-    list = sp_fmt(mem, "{} {.quote}", sp_fmt_str(list), sp_fmt_str(sp_str_view(action->verify_cc_arg.args[it]))).value;
+    list = sp_fmt(mem, "{} {.quote}", sp_fmt_str(list), sp_fmt_str(sp_str_view(action->verify_cc_arg[it]))).value;
   }
 
   yyjson_doc* doc = yyjson_read(content.data, content.len, 0);
@@ -592,11 +614,11 @@ static void expect_cc_arg(s32* utest_result, fixture_t* fixture, const action_t*
       if (!arg) {
         continue;
       }
-      sp_carr_for(action->verify_cc_arg.args, alt) {
-        if (!action->verify_cc_arg.args[alt]) {
+      sp_carr_for(action->verify_cc_arg, alt) {
+        if (!action->verify_cc_arg[alt]) {
           break;
         }
-        if (sp_cstr_equal(arg, action->verify_cc_arg.args[alt])) {
+        if (sp_cstr_equal(arg, action->verify_cc_arg[alt])) {
           found = true;
         }
       }
@@ -994,12 +1016,12 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         break;
       }
       case ACTION_VERIFY_EXISTS: {
-        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_exists.file);
+        sp_str_t path = tmpfs_get(&fixture->fs, action.exists);
         SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
         break;
       }
       case ACTION_VERIFY_NOT_EXISTS: {
-        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_not_exists.file);
+        sp_str_t path = tmpfs_get(&fixture->fs, action.exists);
         SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
         break;
       }
@@ -1082,6 +1104,10 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
       case ACTION_VERIFY_EVENT:
       case ACTION_VERIFY_NO_EVENT: {
         expect_event(utest_result, fixture, action.verify_event.event, action.verify_event.key, action.verify_event.value, action.kind == ACTION_VERIFY_EVENT, __FILE__, __LINE__);
+        break;
+      }
+      case ACTION_VERIFY_RESULT: {
+        expect_result(utest_result, fixture, action.verify_result.err, __FILE__, __LINE__);
         break;
       }
       case ACTION_VERIFY_EVENT_COUNT: {
