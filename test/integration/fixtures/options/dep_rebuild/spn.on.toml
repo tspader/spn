@@ -10,4 +10,4 @@ options = { x = true }
 
 [[bin]]
 name = "main"
-source = ["main.c"]
+source = ["main.on.c"]

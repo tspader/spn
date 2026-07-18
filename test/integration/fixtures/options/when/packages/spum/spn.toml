@@ -1,0 +1,9 @@
+[package]
+name = "spum"
+version = "1.0.0"
+
+[[lib]]
+name = "spum"
+kinds = ["static"]
+source = ["src/spum.c"]
+headers = ["include/spum.h"]

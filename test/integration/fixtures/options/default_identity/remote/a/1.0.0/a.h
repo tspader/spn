@@ -1,3 +1,4 @@
 #pragma once
 
-int a_value(void);
+int a_on();
+int a_off();

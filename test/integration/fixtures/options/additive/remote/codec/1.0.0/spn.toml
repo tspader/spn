@@ -7,12 +7,14 @@ type = "bool"
 default = false
 additive = true
 define = "CODEC_AUDIO"
+public = true
 
 [options.video]
 type = "bool"
 default = false
 additive = true
 define = "CODEC_VIDEO"
+public = true
 
 [[lib]]
 name = "codec"
