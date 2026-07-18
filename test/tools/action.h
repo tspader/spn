@@ -32,6 +32,8 @@ typedef enum {
   ACTION_VERIFY_INCLUDE,
   ACTION_VERIFY_FILE_CONTAINS,
   ACTION_VERIFY_FILE_NOT_CONTAINS,
+  ACTION_VERIFY_CC_ARG,
+  ACTION_VERIFY_NO_CC_ARG,
   ACTION_VERIFY_LOCKED,
   ACTION_VERIFY_PKG_LOCKED,
   ACTION_VERIFY_EVENT,
@@ -59,6 +61,7 @@ typedef struct {
     struct { sp_str_t file; sp_str_t needle; } verify_file_contains;
     struct { sp_str_t file; } verify_json;
     struct { sp_str_t file; sp_str_t needle; } verify_file_not_contains;
+    struct { sp_str_t file; const c8* args [4]; } verify_cc_arg;
     struct { const c8* name; } verify_locked;
     struct { const c8* event; const c8* key; const c8* value; } verify_event;
     struct { const c8* dir; u32 count; } verify_dir_count;

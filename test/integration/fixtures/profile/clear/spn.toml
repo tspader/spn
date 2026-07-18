@@ -11,3 +11,6 @@ sanitize = []
 [[bin]]
 name = "main"
 source = ["main.c"]
+define = [
+  { value = "WANT_ASAN", when = { sanitize_address = true } },
+]
