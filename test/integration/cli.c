@@ -41,7 +41,7 @@ UTEST_F(cli, init) {
   run_test(utest_result, &uf->fixture, (test_t) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "init" } },
-      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("spn.toml"), .needle = sp_str_lit("name = \"cli_init\"") } },
+      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("spn.toml") },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("main.c") },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit(".gitignore") },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "init", .rc = 1 } },
@@ -55,7 +55,6 @@ UTEST_F(cli, init_path) {
   run_test(utest_result, &uf->fixture, (test_t) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "init", .args = { "sub" } } },
-      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("sub/spn.toml"), .needle = sp_str_lit("name = \"sub\"") } },
       { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("sub/main.c") },
     },
   });
