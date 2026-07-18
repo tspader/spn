@@ -1,0 +1,20 @@
+[package]
+name = "test"
+version = "0.1.0"
+
+[deps.package]
+spum = { path = "packages/spum", when = { os = { not = "wasi" } } }
+
+[[bin]]
+name = "main"
+source = [
+  "src/main.c",
+  { path = "src/native.c", when = { os = { not = "wasi" } } },
+  { path = "src/wasi.c", when = { os = "wasi" } },
+]
+define = [
+  { value = "SPUM=69", when = { os = { not = "wasi" } } },
+]
+flags = [
+  { value = "-DSPUM_FLAG=69", when = { os = { not = "wasi" } } },
+]

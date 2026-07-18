@@ -11,6 +11,7 @@ define = "WITH_TRACE"
 tracer = { version = "1.0.0", when = { trace = true } }
 
 [profile.tracing]
+mode = "release"
 options = { trace = true }
 
 [[bin]]
