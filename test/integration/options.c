@@ -89,6 +89,9 @@ static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test)
       command.args[arg++] = "--toolchain";
       command.args[arg++] = toolchain->name;
     }
+    if ((command.expect.bin.name || command.expect.bin.path.len) && !test_when_runs(&when)) {
+      command.expect.bin.build_only = true;
+    }
     run_command_test(utest_result, fixture, command);
     ran++;
   }
