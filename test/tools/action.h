@@ -5,6 +5,21 @@
 
 #define SPN_TEST_MAX_ACTIONS 32
 
+// @spader Anything that verifies a file's contents is banned; it's an old, hacky way of writing
+// integration tests that was fine at some point in the past when everything was simpler but
+// which now is unacceptable.
+//
+// Ditto for "actually run the binary and check the RC". There are a very few tests that will be
+// implemented by running the resulting binary, but the pattern we use where it's
+//
+// #if SOMETHING_CORRECT
+//   return 69;
+// #else
+//   return 420;
+// #endif
+//
+// And then verifying that we get 69 -- this pattern is wrong. It makes brittle tests that are incompatible
+// with cross compiling.
 typedef enum {
   ACTION_NONE,
   ACTION_CREATE_FILE,

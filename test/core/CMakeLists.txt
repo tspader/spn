@@ -91,11 +91,14 @@ add_test(NAME when COMMAND "$<TARGET_FILE:when>")
 add_executable(options
   ${SRC}/enum/enum.c
   ${SRC}/event/event.c
+  ${SRC}/intern/intern.c
   ${SRC}/pkg/options.c
+  ${SRC}/session/options.c
   ${SRC}/when/when.c
   options/main.c
   options/merge.c
   options/apply.c
+  options/session.c
 )
 spn_test_binary(options)
 add_test(NAME options COMMAND "$<TARGET_FILE:options>")

@@ -1,12 +1,21 @@
 #include "codec.h"
 
 int codec_caps(void) {
-  int caps = 0;
-#ifdef CODEC_AUDIO
-  caps |= 1;
+#if defined(CODEC_AUDIO) && defined(CODEC_VIDEO)
+  return 3;
+#elif !defined(CODEC_AUDIO) && defined(CODEC_VIDEO)
+  return 2;
+#else
+#error "unexpected codec options"
 #endif
-#ifdef CODEC_VIDEO
-  caps |= 2;
-#endif
-  return caps;
 }
+
+#if defined(CODEC_AUDIO) && defined(CODEC_VIDEO)
+int codec_audio_video() {
+  return 3;
+}
+#elif !defined(CODEC_AUDIO) && defined(CODEC_VIDEO)
+int codec_video() {
+  return 2;
+}
+#endif

@@ -1,9 +1,11 @@
 #include "b.h"
 
-int b_value(void) {
 #ifdef A_X
+int b_on() {
   return 2;
-#else
-  return 1;
-#endif
 }
+#else
+int b_off() {
+  return 1;
+}
+#endif

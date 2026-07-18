@@ -77,6 +77,7 @@ set(SPN_SOURCES
   semver/convert.c
   semver/parser.c
   session/invocation.c
+  session/options.c
   session/registry/registry.c
   session/session.c
   sha256/sha256.c

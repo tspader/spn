@@ -11,4 +11,4 @@ options = { audio = false }
 
 [[bin]]
 name = "main"
-source = ["main.c"]
+source = ["main.off.c"]

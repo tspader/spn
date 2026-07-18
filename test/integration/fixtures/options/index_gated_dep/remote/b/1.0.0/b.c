@@ -1,5 +1,3 @@
 #include "b.h"
 
-int b_value(void) {
-  return 1;
-}
+#error "gated dependency must not be built"

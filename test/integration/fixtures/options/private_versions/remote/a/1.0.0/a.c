@@ -2,5 +2,5 @@
 #include "b.h"
 
 int a_value(void) {
-  return b_value();
+  return b_one_on();
 }

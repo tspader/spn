@@ -1,12 +1,13 @@
 #include "a.h"
 
-int a_value(void) {
-  int v = 0;
-#ifdef A_X
-  v += 1;
-#endif
-#ifdef A_Y
-  v += 2;
-#endif
-  return v;
+#if defined(A_X) && defined(A_Y)
+int a_on() {
+  return 3;
 }
+#elif !defined(A_X) && !defined(A_Y)
+int a_off() {
+  return 0;
+}
+#else
+#error "unexpected default option state"
+#endif

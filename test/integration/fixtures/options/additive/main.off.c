@@ -4,5 +4,5 @@
 int main() {
   a_caps();
   b_caps();
-  return a_audio_video();
+  return a_video();
 }

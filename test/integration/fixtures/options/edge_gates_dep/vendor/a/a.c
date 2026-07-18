@@ -1,13 +1,10 @@
 #include "a.h"
-
-#ifdef A_X
 #include "b.h"
+
+#ifndef A_X
+#error "expected A_X"
 #endif
 
 int a_value(void) {
-#ifdef A_X
   return b_value();
-#else
-  return 0;
-#endif
 }

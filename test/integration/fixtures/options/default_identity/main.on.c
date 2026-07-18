@@ -1,5 +1,5 @@
 #include "a.h"
 
 int main() {
-  return a_off();
+  return a_on();
 }
