@@ -1,4 +1,4 @@
-#if defined(__wasi__)
+#if defined(__wasm32__)
 #error SPUM
 #endif
 
