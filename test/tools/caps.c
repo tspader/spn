@@ -61,7 +61,7 @@ const test_toolchain_t* test_toolchain(void) {
   return SP_NULLPTR;
 }
 
-static spn_triple_t test_host(void) {
+spn_triple_t test_host(void) {
   spn_triple_t host = spn_triple_host();
   const test_toolchain_t* toolchain = test_toolchain();
   if (toolchain->abi && host.os == SPN_OS_WINDOWS) {

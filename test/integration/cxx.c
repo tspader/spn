@@ -2,7 +2,6 @@
 
 SPN_TEST_SUITE(cxx)
 
-// spum.cpp exercises defaults too: exceptions and rtti are on unless disabled
 UTEST_F(cxx, static_lib) {
   tmpfs_init_named(&uf->fixture.fs, "cxx_static_lib");
 
@@ -11,7 +10,7 @@ UTEST_F(cxx, static_lib) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("spum") },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
     },
   });
@@ -25,14 +24,12 @@ UTEST_F(cxx, shared_lib) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = shared_lib("spum") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = shared_lib("spum") },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
     },
   });
 }
 
-// value.c uses `new` as an identifier, so routing the C TU through the C++
-// compiler fails loudly
 UTEST_F(cxx, mixed_lib) {
   tmpfs_init_named(&uf->fixture.fs, "cxx_mixed_lib");
 
@@ -46,8 +43,6 @@ UTEST_F(cxx, mixed_lib) {
   });
 }
 
-// c++14 is deliberately not the default; the static_assert on __cplusplus
-// fails unless cxx.standard actually reaches the command line
 UTEST_F(cxx, standard) {
   tmpfs_init_named(&uf->fixture.fs, "cxx_standard");
 
@@ -56,7 +51,7 @@ UTEST_F(cxx, standard) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
 }
@@ -69,7 +64,7 @@ UTEST_F(cxx, exceptions_off) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
 }
@@ -82,14 +77,11 @@ UTEST_F(cxx, rtti_off) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
 }
 
-// A C++ static lib linked into a C shared lib: the archive's objects need
-// -fPIC and the .so link needs the C++ driver, while the consuming exe stays
-// on the C driver across the shared boundary
 UTEST_F(cxx, static_into_shared) {
   tmpfs_init_named(&uf->fixture.fs, "cxx_static_into_shared");
 
@@ -98,7 +90,7 @@ UTEST_F(cxx, static_into_shared) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = shared_lib("spum") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = shared_lib("spum") },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
     },
   });
