@@ -4,6 +4,7 @@ typedef struct {
   const c8* profile;
   const c8* manifest;
   const c8* target;
+  bool alternate;
   bool present;
   test_when_t when;
   command_expect_t expect;
@@ -18,7 +19,7 @@ typedef struct {
 
 static bool opt_build_present(const opt_build_t* build) {
   return build->present || build->profile || build->manifest || build->target ||
-    build->expect.rc || build->expect.bin.name;
+    build->alternate || build->expect.rc || build->expect.bin.name;
 }
 
 static void opt_set_manifest(s32* utest_result, fixture_t* fixture, const c8* manifest) {
@@ -40,12 +41,29 @@ static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test)
 
   prepare_test(utest_result, fixture, test.project, test.copy);
 
+  const test_toolchain_t* toolchain = test_toolchain();
+  u32 ran = 0;
   sp_carr_for(test.builds, it) {
     const opt_build_t* build = &test.builds[it];
     if (!opt_build_present(build)) {
       break;
     }
-    if (test_when_blocked(&build->when).len) {
+
+    const c8* target = build->target;
+    if (build->alternate) {
+      target = test_target_alternate();
+      if (!target) {
+        blocked = sp_fmt(fixture->fs.mem, "{} has no cross target", sp_fmt_cstr(toolchain->name)).value;
+        continue;
+      }
+    }
+
+    test_when_t when = build->when;
+    if (!when.target) {
+      when.target = target;
+    }
+    blocked = test_when_blocked(&when);
+    if (blocked.len) {
       continue;
     }
 
@@ -57,16 +75,27 @@ static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test)
       .args = { "build" },
       .expect = build->expect,
     };
+    u32 arg = 1;
     if (build->profile) {
-      command.args[1] = "-p";
-      command.args[2] = build->profile;
+      command.args[arg++] = "-p";
+      command.args[arg++] = build->profile;
       command.expect.bin.profile = build->profile;
     }
-    if (build->target) {
-      command.args[1] = "--target";
-      command.args[2] = build->target;
+    if (target) {
+      command.args[arg++] = "--target";
+      command.args[arg++] = target;
+    }
+    if (!sp_str_equal_cstr(sp_str_lit("zig"), toolchain->name)) {
+      command.args[arg++] = "--toolchain";
+      command.args[arg++] = toolchain->name;
     }
     run_command_test(utest_result, fixture, command);
+    ran++;
+  }
+
+  if (!ran) {
+    utest_skip_reason(blocked);
+    UTEST_SKIP("");
   }
 }
 
@@ -80,7 +109,7 @@ UTEST_F(options, when) {
     .copy = { "src/*", "packages/*" },
     .builds = {
       { .present = true },
-      { .target = "wasm32-wasi-musl" },
+      { .alternate = true },
     },
   });
 }
