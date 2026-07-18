@@ -3,18 +3,21 @@ name = "test"
 version = "0.1.0"
 
 [deps.package]
-spum = { path = "packages/spum", when = { os = { not = "wasi" } } }
+spum = { path = "packages/spum", when = { arch = { not = "wasm32" } } }
 
 [[bin]]
 name = "main"
 source = [
   "src/main.c",
-  { path = "src/native.c", when = { os = { not = "wasi" } } },
-  { path = "src/wasi.c", when = { os = "wasi" } },
+  { path = "src/x86_64.c", when = { arch = "x86_64" } },
+  { path = "src/aarch64.c", when = { arch = "aarch64" } },
+  { path = "src/wasm32.c", when = { arch = "wasm32" } },
 ]
 define = [
-  { value = "SPUM=69", when = { os = { not = "wasi" } } },
+  { value = "GATE_X86_64=69", when = { arch = "x86_64" } },
+  { value = "GATE_AARCH64=69", when = { arch = "aarch64" } },
+  { value = "GATE_WASM32=69", when = { arch = "wasm32" } },
 ]
 flags = [
-  { value = "-DSPUM_FLAG=69", when = { os = { not = "wasi" } } },
+  { value = "-DSPUM_FLAG=69", when = { arch = { not = "wasm32" } } },
 ]

@@ -10,7 +10,16 @@ typedef struct {
   const c8* target;
 } test_when_t;
 
-sp_str_t test_when_blocked(const test_when_t* when);
-bool test_when_runs(const test_when_t* when);
+typedef struct {
+  const c8* name;
+  spn_cc_driver_t driver;
+  spn_abi_t abi;
+  const c8* targets [12];
+} test_toolchain_t;
+
+const test_toolchain_t* test_toolchain(void);
+const c8* test_target_alternate(void);
+sp_str_t  test_when_blocked(const test_when_t* when);
+bool      test_when_runs(const test_when_t* when);
 
 #endif
