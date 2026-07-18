@@ -555,6 +555,77 @@ static void expect_event(s32* utest_result, fixture_t* fixture, const c8* event,
     sp_str_view(found ? "it was logged" : "it was not"));
 }
 
+static void expect_cc_arg(s32* utest_result, fixture_t* fixture, const action_t* action, const c8* file, u32 line) {
+  sp_mem_t mem = fixture->fs.mem;
+  bool expected = action->kind == ACTION_VERIFY_CC_ARG;
+
+  sp_str_t db = action->verify_cc_arg.file;
+  if (sp_str_empty(db)) {
+    db = sp_str_lit("compile_commands.json");
+  }
+  sp_str_t path = tmpfs_get(&fixture->fs, db);
+  sp_str_t content = test_read_file(mem, path);
+
+  sp_str_t list = sp_str_lit("");
+  sp_carr_for(action->verify_cc_arg.args, it) {
+    if (!action->verify_cc_arg.args[it]) {
+      break;
+    }
+    list = sp_fmt(mem, "{} {.quote}", sp_fmt_str(list), sp_fmt_str(sp_str_view(action->verify_cc_arg.args[it]))).value;
+  }
+
+  yyjson_doc* doc = yyjson_read(content.data, content.len, 0);
+  yyjson_val* root = doc ? yyjson_doc_get_root(doc) : SP_NULLPTR;
+
+  u32 num = (u32)yyjson_arr_size(root);
+  bool ok = num || !expected;
+  sp_str_t offender = sp_zero;
+
+  sp_for(it, num) {
+    yyjson_val* entry = yyjson_arr_get(root, it);
+    yyjson_val* arguments = yyjson_obj_get(entry, "arguments");
+
+    bool found = false;
+    u32 num_args = (u32)yyjson_arr_size(arguments);
+    sp_for(ai, num_args) {
+      const c8* arg = yyjson_get_str(yyjson_arr_get(arguments, ai));
+      if (!arg) {
+        continue;
+      }
+      sp_carr_for(action->verify_cc_arg.args, alt) {
+        if (!action->verify_cc_arg.args[alt]) {
+          break;
+        }
+        if (sp_cstr_equal(arg, action->verify_cc_arg.args[alt])) {
+          found = true;
+        }
+      }
+    }
+
+    if (found != expected) {
+      ok = false;
+      const c8* source = yyjson_get_str(yyjson_obj_get(entry, "file"));
+      offender = source ? sp_str_view(source) : sp_str_lit("(unknown)");
+    }
+  }
+
+  if (doc) {
+    yyjson_doc_free(doc);
+  }
+  if (ok) {
+    return;
+  }
+
+  utest_kv("args", list);
+  utest_kv("path", path);
+  if (offender.len) {
+    utest_kv("entry", offender);
+  }
+  utest_fail(utest_result, file, line,
+    sp_str_view(expected ? "compile argument present in every entry" : "compile argument absent from every entry"),
+    sp_str_view(num ? (expected ? "an entry is missing it" : "an entry has it") : "no compile entries"));
+}
+
 static sp_ps_output_t run_spn_command(fixture_t* fixture, const c8* const* args, const c8* const* env) {
   sp_mem_t mem = fixture->fs.mem;
   sp_ps_config_t config = {
@@ -632,6 +703,10 @@ static void run_command_bin(s32* utest_result, fixture_t* fixture, command_bin_t
   }
   sp_str_t path = tmpfs_get(&fixture->fs, staged);
   SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+
+  if (bin.build_only) {
+    return;
+  }
 
   sp_ps_output_t output = run_fixture_bin(fixture, path);
 
@@ -997,6 +1072,11 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
         utest_kv("needle", action.verify_cli.needle);
         utest_kv("output", cli_output);
         EXPECT_FALSE(sp_str_contains(cli_output, action.verify_cli.needle));
+        break;
+      }
+      case ACTION_VERIFY_CC_ARG:
+      case ACTION_VERIFY_NO_CC_ARG: {
+        expect_cc_arg(utest_result, fixture, &action, __FILE__, __LINE__);
         break;
       }
       case ACTION_VERIFY_EVENT:

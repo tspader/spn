@@ -14,3 +14,7 @@ sanitize = ["address"]
 [[bin]]
 name = "main"
 source = ["main.c"]
+define = [
+  { value = "EXPECT_GEN=2", when = { opt = "2" } },
+  { value = "EXPECT_GEN=3", when = { sanitize_address = true } },
+]
