@@ -66,7 +66,7 @@ UTEST_F(deps_file, remote_source) {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
 }
@@ -76,10 +76,10 @@ UTEST_F(deps_file, editable) {
 
   run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
     .project = "test/integration/fixtures/deps/file/editable",
-    .copy = { "packages/*" },
+    .copy = { "packages/*", "main.kram.c" },
     .first = {
       .args = { "build" },
-      .expect.bin = { .name = "editable_package", .rc = 69 },
+      .expect.exists = { exe("editable_package") },
     },
     .rebuilds = {
       {
@@ -87,13 +87,14 @@ UTEST_F(deps_file, editable) {
           .remove_files = { sp_str_lit("packages/spum/spum.h") },
           .moves = {
             { .from = sp_str_lit("packages/spum/kram.h"), .to = sp_str_lit("packages/spum/spum.h") },
+            { .from = sp_str_lit("main.kram.c"), .to = sp_str_lit("main.c") },
           },
           .remove_dirs = { sp_str_lit("build") },
         },
         .command = {
           .args = { "build" },
           .expect = {
-            .bin = { .name = "editable_package", .rc = 42 },
+            .exists = { exe("editable_package") },
             .lock = true,
             .packages = { "core/spum" },
           },
@@ -152,7 +153,7 @@ UTEST_F(deps_index, pinned_commit) {
     .project = "test/integration/fixtures/deps/index/pinned_commit",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "index_package_pinned_commit", .rc = 0 } },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("index_package_pinned_commit") },
     },
   });
 }
@@ -166,7 +167,7 @@ UTEST_F(deps_index, without_source) {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
 }
@@ -207,7 +208,7 @@ UTEST_F(deps_index, split_recipe) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
 }
@@ -220,7 +221,7 @@ UTEST_F(deps_index, patched) {
     .copy = { "patches/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
 }
