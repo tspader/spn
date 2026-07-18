@@ -31,9 +31,9 @@ UTEST_F(profile, sanitize_clear) {
     .when.sanitize = SPN_SANITIZER_ADDRESS,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
-      { .kind = ACTION_VERIFY_CC_ARG, .verify_cc_arg = { .args = { "-fsanitize=address", "/fsanitize=address" } } },
+      { .kind = ACTION_VERIFY_CC_ARG, .verify_cc_arg = { "-fsanitize=address", "/fsanitize=address" } },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "-p", "clean" } } },
-      { .kind = ACTION_VERIFY_NO_CC_ARG, .verify_cc_arg = { .args = { "-fsanitize=address", "/fsanitize=address" } } },
+      { .kind = ACTION_VERIFY_NO_CC_ARG, .verify_cc_arg = { "-fsanitize=address", "/fsanitize=address" } },
     },
   });
 }
@@ -109,10 +109,10 @@ UTEST_F(profile, flags) {
     .project = "test/integration/fixtures/profile/sanitize",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
-      { .kind = ACTION_VERIFY_CC_ARG, .verify_cc_arg = { .args = { "-O0", "/Od" } } },
+      { .kind = ACTION_VERIFY_CC_ARG, .verify_cc_arg = { "-O0", "/Od" } },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "-m", "release" } } },
-      { .kind = ACTION_VERIFY_CC_ARG, .verify_cc_arg = { .args = { "-O2", "/O2" } } },
-      { .kind = ACTION_VERIFY_NO_CC_ARG, .verify_cc_arg = { .args = { "-fsanitize=address", "/fsanitize=address" } } },
+      { .kind = ACTION_VERIFY_CC_ARG, .verify_cc_arg = { "-O2", "/O2" } },
+      { .kind = ACTION_VERIFY_NO_CC_ARG, .verify_cc_arg = { "-fsanitize=address", "/fsanitize=address" } },
     },
   });
 }
@@ -126,7 +126,7 @@ UTEST_F(profile, flags_sanitize) {
     .when.sanitize = SPN_SANITIZER_ADDRESS,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "-p", "asan" } } },
-      { .kind = ACTION_VERIFY_CC_ARG, .verify_cc_arg = { .args = { "-fsanitize=address", "/fsanitize=address" } } },
+      { .kind = ACTION_VERIFY_CC_ARG, .verify_cc_arg = { "-fsanitize=address", "/fsanitize=address" } },
     },
   });
 }

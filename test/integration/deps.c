@@ -24,15 +24,11 @@ UTEST_F(deps_file, invalid_manifest) {
     .copy = { "vendor/spum/spn.toml" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_manifest", .key = "name", .value = "core/spum" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unknown_pkg" } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = "dep_manifest" } },
     },
   });
 }
 
-// A file dep whose manifest declares a different name than the edge
-// requested must fail at load: everything downstream routes by the
-// requested name, so a silent mismatch strands option requests and config
 UTEST_F(deps_file, name_mismatch) {
   tmpfs_init_named(&uf->fixture.fs, "deps_file_name_mismatch");
 
@@ -136,9 +132,6 @@ UTEST_F(deps_index, basic) {
   });
 }
 
-// name_mismatch for the index path: the release publishes as spum but the
-// fetched manifest declares spork. Short names compare because published
-// manifests routinely omit the namespace the index assigns.
 UTEST_F(deps_index, name_mismatch) {
   tmpfs_init_named(&uf->fixture.fs, "deps_index_name_mismatch");
 
@@ -187,7 +180,7 @@ UTEST_F(deps_index, binary_static) {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("bin/main") },
     },
   });
 }
@@ -201,7 +194,7 @@ UTEST_F(deps_index, binary_shared) {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("bin/main") },
     },
   });
 }

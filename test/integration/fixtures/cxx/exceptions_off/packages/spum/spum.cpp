@@ -1,6 +1,6 @@
 #include "spum.h"
 
-#ifdef __cpp_exceptions
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
 #error "cxx.exceptions = false was not applied"
 #endif
 

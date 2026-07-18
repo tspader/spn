@@ -293,10 +293,10 @@ UTEST_F(e2e, bloodgun) {
       },
     },
     { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-    { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/bitgun-survivors") },
+    { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("bin/bitgun-survivors") },
     { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "resolve_package", .key = "name", .value = "wolfpld/tracy" } },
     { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "profiling" } } },
-    { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = profile_store_file("profiling", "bin/bitgun-survivors") },
+    { .kind = ACTION_VERIFY_EXISTS, .exists = profile_store_file("profiling", "bin/bitgun-survivors") },
     { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "resolve_package", .key = "name", .value = "wolfpld/tracy" } },
   });
 }

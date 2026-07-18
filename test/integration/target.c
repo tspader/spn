@@ -10,7 +10,7 @@ UTEST_F(target, static_lib) {
     .copy = { "mylib.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("mylib") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("mylib") },
     },
   });
 }
@@ -23,7 +23,7 @@ UTEST_F(target, shared_lib) {
     .copy = { "spum.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = shared_lib("spum") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = shared_lib("spum") },
     },
   });
 }
@@ -60,9 +60,9 @@ UTEST_F(target, multiple_roots) {
     .project = "test/integration/fixtures/target/shared_source",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "main", "test" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = test_exe("test") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("spum") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("bin/main") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = test_exe("test") },
     },
   });
 }
@@ -75,10 +75,10 @@ UTEST_F(target, selection_default) {
     .copy = { "spum.c", "script.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/main") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = test_exe("test") },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/script") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("spum") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("bin/main") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = test_exe("test") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("bin/script") },
     },
   });
 }
@@ -91,8 +91,8 @@ UTEST_F(target, selection_named_library) {
     .copy = { "one.c", "two.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "one" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("one") },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = static_lib("two") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("one") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = static_lib("two") },
     },
   });
 }
@@ -105,10 +105,10 @@ UTEST_F(target, selection_multiple_kinds) {
     .copy = { "spum.c", "script.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--bin", "--test" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = exe("main") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = test_exe("test") },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/script") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("spum") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = test_exe("test") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("bin/script") },
     },
   });
 }
@@ -122,7 +122,7 @@ UTEST_F(target, selection_name_respects_kind) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--lib", "main" }, .rc = 1 } },
       { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("is not defined for the selected target kinds") },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/main") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("bin/main") },
     },
   });
 }
@@ -135,10 +135,10 @@ UTEST_F(target, selection_test_command) {
     .copy = { "spum.c", "script.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "test", .args = { "test" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = test_exe("test") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("spum") },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/main") },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/script") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = test_exe("test") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("spum") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("bin/main") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("bin/script") },
     },
   });
 }
@@ -151,9 +151,9 @@ UTEST_F(target, selection_run_command) {
     .copy = { "spum.c", "script.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "run", .args = { "script" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("bin/script") },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = store_file("bin/main") },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = test_exe("test") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("bin/script") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("bin/main") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = test_exe("test") },
     },
   });
 }
@@ -181,7 +181,7 @@ UTEST_F(target, system_deps) {
     .project = "test/integration/fixtures/target/system_deps",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("spn.lock") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("spn.lock") },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--force" } } },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },

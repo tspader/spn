@@ -130,11 +130,11 @@ UTEST_F(script, object_lib) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       // object libs publish their objects to lib/, preserving source-relative paths
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/rt/extra.c.o") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("lib/rt/extra.c.o") },
       // ditto for an object lib declared from the build script instead of the manifest
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = store_file("lib/rt/extra2.c.o") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("lib/rt/extra2.c.o") },
       // an unlinked archive still builds and installs
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = static_lib("blob") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("blob") },
       { .kind = ACTION_RUN_BIN, .bin.name = "object_lib" },
     },
   });
@@ -304,7 +304,7 @@ UTEST_F(script, build_deps) {
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "core/spum" },
       { .kind = ACTION_VERIFY_DIR_COUNT, .verify_dir_count = { .dir = ".home/storage/cache/store/core/spum", .count = 1 } },
       { .kind = ACTION_VERIFY_EVENT_COUNT, .verify_event_count = { .event = "user_log", .key = "message", .value = "spum configure", .count = 1 } },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug/store/include/spum.h") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = sp_str_lit("build/debug/store/include/spum.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "build_deps" },
     },
   });

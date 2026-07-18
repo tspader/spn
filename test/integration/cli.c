@@ -41,9 +41,9 @@ UTEST_F(cli, init) {
   run_test(utest_result, &uf->fixture, (test_t) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "init" } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("spn.toml") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("main.c") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit(".gitignore") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("spn.toml") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("main.c") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit(".gitignore") },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "init", .rc = 1 } },
     },
   });
@@ -55,7 +55,7 @@ UTEST_F(cli, init_path) {
   run_test(utest_result, &uf->fixture, (test_t) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "init", .args = { "sub" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("sub/main.c") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("sub/main.c") },
     },
   });
 }
@@ -66,9 +66,9 @@ UTEST_F(cli, init_bare) {
   run_test(utest_result, &uf->fixture, (test_t) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "init", .args = { "sub", "--bare" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("sub/spn.toml") },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("sub/main.c") },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("sub/.gitignore") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("sub/spn.toml") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = sp_str_lit("sub/main.c") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = sp_str_lit("sub/.gitignore") },
     },
   });
 }
@@ -139,10 +139,10 @@ UTEST_F(cli, clean) {
       { .kind = ACTION_CREATE_FILE, .create = { .file = store_file("bin/main"), .content = sp_str_lit("x") } },
       { .kind = ACTION_CREATE_FILE, .create = { .file = profile_store_file("release", "bin/main"), .content = sp_str_lit("x") } },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "clean", .args = { "-p", "debug" } } },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build/debug") },
-      { .kind = ACTION_VERIFY_EXISTS, .verify_exists.file = sp_str_lit("build/release") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = sp_str_lit("build/debug") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("build/release") },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "clean" } },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit("build") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = sp_str_lit("build") },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "clean" } },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "clean", .args = { "-p", "../escape" }, .rc = 1 } },
     },
@@ -197,7 +197,7 @@ UTEST_F(cli, publish_dry_run) {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "publish", .args = { "--dry", "--source-url", "https://example.com/x.git", "--source-rev", "abc123" } } },
       { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("\"name\":\"index_package\"") } },
       { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("dry run") } },
-      { .kind = ACTION_VERIFY_NOT_EXISTS, .verify_not_exists.file = sp_str_lit(".home/storage/spn/packages/core/index_package.jsonl") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = sp_str_lit(".home/storage/spn/packages/core/index_package.jsonl") },
     },
   });
 }

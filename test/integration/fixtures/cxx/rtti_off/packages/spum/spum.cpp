@@ -1,6 +1,6 @@
 #include "spum.h"
 
-#ifdef __cpp_rtti
+#if defined(__cpp_rtti) || defined(_CPPRTTI)
 #error "cxx.rtti = false was not applied"
 #endif
 
