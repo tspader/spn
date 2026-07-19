@@ -1,0 +1,31 @@
+#include "spn.h"
+
+#include "spum.h"
+
+SPN_EXPORT
+s32 generate_build_dep_static_value(spn_t* spn, spn_node_ctx_t* ctx) {
+  s32 value = spum_magic() + 1;
+  if (value != 78) {
+    spn_log(spn, "unexpected spum value");
+    return 1;
+  }
+
+  spn_io_write("/work/build_dep_static_value.h",
+    "#ifndef BUILD_DEP_STATIC_VALUE_H\n"
+    "#define BUILD_DEP_STATIC_VALUE_H\n"
+    "#define BUILD_DEP_STATIC_VALUE 78\n"
+    "#endif\n"
+  );
+
+  return 0;
+}
+
+SPN_EXPORT
+spn_err_t configure(spn_t* spn, spn_config_t* config) {
+  spn_add_include(config, spn_get_dir(spn, SPN_DIR_WORK));
+
+  spn_node_t* gen = spn_add_node(config, "generate_build_dep_static_value");
+  spn_node_set_fn(gen, "generate_build_dep_static_value");
+  spn_node_add_output(gen, spn_get_subdir(spn, SPN_DIR_WORK, "build_dep_static_value.h"));
+  return SPN_OK;
+}
