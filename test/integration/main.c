@@ -55,5 +55,6 @@ UTEST_F(harness, tmpfs) {
 #include "log.c"
 #include "cli.c"
 #include "compile_commands.c"
+#include "freshness.c"
 #include "platform.c"
 #include "profile.c"
