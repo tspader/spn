@@ -37,15 +37,11 @@ static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t*
     sp_da_push(compile.include, build->include[it]);
   }
 
-  bool metaprogram = unit->target->info->kind == SPN_TARGET_CONFIGURE_METAPROGRAM ||
-    unit->target->info->kind == SPN_TARGET_BUILD_METAPROGRAM;
-  if (!metaprogram) {
-    sp_da_for(pkg->info->include, it) {
-      sp_da_push(compile.include, resolve_pkg_path(mem, pkg, pkg->info->include[it]));
-    }
-    sp_da_for(pkg->info->define, it) {
-      sp_da_push(compile.define, pkg->info->define[it]);
-    }
+  sp_da_for(pkg->info->include, it) {
+    sp_da_push(compile.include, resolve_pkg_path(mem, pkg, pkg->info->include[it]));
+  }
+  sp_da_for(pkg->info->define, it) {
+    sp_da_push(compile.define, pkg->info->define[it]);
   }
 
   sp_da_for(unit->target->info->include, it) {
@@ -58,30 +54,18 @@ static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t*
     sp_da_push(compile.args, unit->target->info->flags[it]);
   }
 
-  if (!metaprogram) {
-    sp_da_for(pkg->deps, it) {
-      if (!pkg->deps[it].unit) {
-        continue;
-      }
-      if (pkg->deps[it].kind == SPN_DEP_KIND_TEST && unit->target->info->kind != SPN_TARGET_TEST) {
-        continue;
-      }
-
-      spn_pkg_unit_t* dependency = pkg->deps[it].unit;
-      sp_da_push(compile.include, dependency->paths.include);
-      sp_da_for(dependency->info->public_define, jt) {
-        sp_da_push(compile.define, dependency->info->public_define[jt]);
-      }
+  sp_da_for(pkg->deps, it) {
+    if (!pkg->deps[it].unit) {
+      continue;
     }
-  }
+    if (pkg->deps[it].kind == SPN_DEP_KIND_TEST && unit->target->info->kind != SPN_TARGET_TEST) {
+      continue;
+    }
 
-  if (metaprogram) {
-    sp_da_for(unit->target->deps.package, it) {
-      spn_pkg_unit_t* dependency = unit->target->deps.package[it];
-      sp_da_push(compile.include, dependency->paths.include);
-      sp_da_for(dependency->info->public_define, jt) {
-        sp_da_push(compile.define, dependency->info->public_define[jt]);
-      }
+    spn_pkg_unit_t* dependency = pkg->deps[it].unit;
+    sp_da_push(compile.include, dependency->paths.include);
+    sp_da_for(dependency->info->public_define, jt) {
+      sp_da_push(compile.define, dependency->info->public_define[jt]);
     }
   }
 

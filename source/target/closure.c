@@ -68,6 +68,10 @@ static void collect(search_t* s, spn_pkg_unit_t* pkg, bool private, bool tests) 
 }
 
 sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit_t* root) {
+  if (root->info->kind == SPN_TARGET_CONFIGURE_METAPROGRAM) {
+    return sp_da_new(mem, spn_closure_entry_t);
+  }
+
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
 
   search_t search = {
