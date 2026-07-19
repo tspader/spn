@@ -34,6 +34,7 @@ typedef struct {
   sp_env_t* env;
   spn_system_paths_t paths;
   spn_config_file_t config;
+  spn_err_union_t result;
 
   struct {
     sp_io_stream_writer_t out;

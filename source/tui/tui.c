@@ -6,6 +6,7 @@
 #include "ctx/ctx.h"
 #include "enum/enum.h"
 #include "event/event.h"
+#include "event/log.h"
 #include "log/log.h"
 #include "semver/convert.h"
 #include "sp/color.h"
@@ -59,9 +60,11 @@ spn_tui_mode_t spn_output_mode_from_str(sp_str_t str) {
     return SPN_OUTPUT_MODE_QUIET;
   } else if (sp_str_equal_cstr(str, "none")) {
     return SPN_OUTPUT_MODE_NONE;
+  } else if (sp_str_equal_cstr(str, "json")) {
+    return SPN_OUTPUT_MODE_JSON;
   }
 
-  SP_FATAL("Unknown output mode {.yellow}; options are [interactive, noninteractive, quiet, none]", sp_fmt_str(str));
+  SP_FATAL("Unknown output mode {.yellow}; options are [interactive, noninteractive, quiet, none, json]", sp_fmt_str(str));
   SP_UNREACHABLE_RETURN(SPN_OUTPUT_MODE_NONE);
 }
 
@@ -1216,6 +1219,11 @@ typedef struct {
 } spn_tui_buffered_log_t;
 
 void spn_tui_log_event(spn_build_event_t* event) {
+  if (spn.tui.mode == SPN_OUTPUT_MODE_JSON) {
+    spn_event_log_jsonl(&spn.logger.out.base, event);
+    return;
+  }
+
   static sp_str_ht(bool) seen_url = SP_NULLPTR;
   static sp_da(spn_tui_buffered_log_t) buffered_logs = SP_NULLPTR;
   static u32 num_downloads = 0;
@@ -1402,7 +1410,8 @@ void spn_tui_init(spn_tui_t* tui, spn_session_t* session, spn_tui_mode_t mode) {
     }
     case SPN_OUTPUT_MODE_QUIET:
     case SPN_OUTPUT_MODE_NONINTERACTIVE:
-    case SPN_OUTPUT_MODE_NONE: {
+    case SPN_OUTPUT_MODE_NONE:
+    case SPN_OUTPUT_MODE_JSON: {
       break;
     }
   }

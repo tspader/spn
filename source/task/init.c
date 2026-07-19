@@ -191,6 +191,6 @@ spn_task_step_t spn_task_init(spn_app_t* app) {
   }
 
   sp_mem_end_scratch(s);
-  if (!sp_str_empty(error)) return spn_task_fail(SPN_ERROR);
+  if (!sp_str_empty(error)) return spn_task_fail(SPN_ERROR, .reported = true);
   return spn_task_done();
 }

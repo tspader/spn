@@ -71,7 +71,7 @@ static void sweep_unreachable(spn_session_t* session) {
   session->resolve = kept;
 }
 
-static spn_err_t validate_config_keys(spn_session_t* session) {
+static spn_err_union_t validate_config_keys(spn_session_t* session) {
   sp_da_for(session->pkg->config, it) {
     spn_pkg_config_entry_t* entry = &session->pkg->config[it];
 
@@ -103,13 +103,13 @@ static spn_err_t validate_config_keys(spn_session_t* session) {
           .pkg = entry->key,
         },
       });
-      return SPN_ERROR;
+      return spn_err_reported(SPN_ERR_OPTION);
     }
   }
-  return SPN_OK;
+  return spn_result(SPN_OK);
 }
 
-spn_err_t spn_session_apply_options(spn_session_t* session) {
+spn_err_union_t spn_session_apply_options(spn_session_t* session) {
   sp_mem_t mem = session->mem;
   sp_str_t missing_pkg = sp_zero;
   sp_str_t missing_dep = sp_zero;
@@ -160,14 +160,14 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
       spn_option_requests_t* asked = sp_ht_getp(requests, node->id);
 
       spn_resolved_options_t resolved = sp_zero;
-      spn_try(spn_pkg_options_merge(
+      spn_try_as(spn_pkg_options_merge(
         mem,
         node,
         &session->profile,
         session->pkg->config,
         asked ? *asked : SP_NULLPTR,
         session->events,
-        &resolved));
+        &resolved), spn_err_reported(SPN_ERR_OPTION));
 
       sp_ht_insert(session->options, node->id, resolved);
     }
@@ -213,7 +213,7 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
       if (session->gates.resolves < SPN_GATE_MAX_RESOLVES) {
         session->gates.resolves++;
         session->gates.reresolve = true;
-        return SPN_OK;
+        return spn_result(SPN_OK);
       }
       spn_event_buffer_push(session->events, (spn_build_event_t) {
         .kind = SPN_EVENT_ERR_OPTION,
@@ -223,11 +223,11 @@ spn_err_t spn_session_apply_options(spn_session_t* session) {
           .a = { .kind = SPN_OPTION_SETTER_CONSUMER, .name = missing_dep },
         },
       });
-      return SPN_ERROR;
+      return spn_err_reported(SPN_ERR_OPTION);
     }
     break;
   }
 
-  spn_try(validate_config_keys(session));
-  return SPN_OK;
+  try_union(validate_config_keys(session));
+  return spn_result(SPN_OK);
 }

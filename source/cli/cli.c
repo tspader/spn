@@ -481,7 +481,7 @@ static sp_cli_cmd_t cmd_root = {
       .brief = "o",
       .name = "output",
       .kind = SP_CLI_OPT_CSTR,
-      .summary = "Output mode: interactive, noninteractive, quiet, none",
+      .summary = "Output mode: interactive, noninteractive, quiet, none, json",
       .placeholder = "MODE",
       .ptr = &spn_cli_raw.output,
     },
