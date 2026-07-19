@@ -352,6 +352,20 @@ UTEST_F(script, build_dep_closure) {
   });
 }
 
+UTEST_F(script, build_dep_static) {
+  tmpfs_init_named(&uf->fixture.fs, "script_build_dep_static");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/script/build_dep_static",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "core/spum" },
+      { .kind = ACTION_VERIFY_DIR_COUNT, .verify_dir_count = { .dir = ".home/storage/cache/store/core/spum", .count = 1 } },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = sp_str_lit("build/debug/store/include/spum.h") },
+    },
+  });
+}
+
 UTEST_F(script, add_define) {
   tmpfs_init_named(&uf->fixture.fs, "script_add_define");
 
