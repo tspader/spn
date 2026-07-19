@@ -210,6 +210,15 @@ static sp_str_t sync_url(spn_pkg_tree_t recipe, spn_pkg_tree_t source) {
   return sp_str_lit("");
 }
 
+static bool package_has_build_deps(spn_resolved_pkg_t* pkg) {
+  sp_da_for(pkg->edges, it) {
+    if (pkg->edges[it].kind == SPN_DEP_KIND_BUILD) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, spn_loaded_pkg_t* loaded) {
   sp_tm_timer_t timer = sp_tm_start_timer();
   bool fetched = false;
@@ -249,6 +258,9 @@ static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, s
     sp_str_t candidate = sp_fs_join_path(spn.mem, loaded->roots.recipe, sp_str_lit("build.c"));
     if (sp_fs_is_file(candidate)) {
       sp_da_push(loaded->build.source, candidate);
+    }
+    else if (package_has_build_deps(pkg) && sp_fs_is_file(loaded->paths.script)) {
+      sp_da_push(loaded->build.source, loaded->paths.script);
     }
   }
 

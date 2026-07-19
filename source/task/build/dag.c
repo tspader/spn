@@ -690,10 +690,6 @@ static spn_err_t dag_add_target(spn_dag_build_t* b, spn_target_unit_t* target) {
       }
     }
 
-    sp_da_for(pkg->dag.user_outputs, it) {
-      spn_dag_action_add_input(g, target->dag.embed.action, pkg->dag.user_outputs[it]);
-    }
-
     sp_da_for(target->objects, it) {
       spn_dag_action_add_input(g, target->objects[it]->dag.action, target->dag.embed.header);
     }
@@ -818,7 +814,7 @@ static spn_err_t dag_add_package_action(spn_dag_build_t* b, spn_pkg_unit_t* unit
   }
 
   spn_target_unit_t* metaprogram = unit->metaprogram.build.target;
-  if (metaprogram && metaprogram->dag.output.occupied) {
+  if (metaprogram && metaprogram->pkg != unit && metaprogram->dag.output.occupied) {
     spn_dag_action_add_input(g, unit->dag.package, metaprogram->dag.output);
   }
   spn_dag_id_t configure = dag_configure_reactor(b, unit);
@@ -845,13 +841,6 @@ static spn_err_t dag_add_package_action(spn_dag_build_t* b, spn_pkg_unit_t* unit
 }
 
 static spn_err_t dag_add_package(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
-  spn_target_unit_t* metaprogram = unit->metaprogram.build.target;
-  if (metaprogram) {
-    spn_try(dag_add_target(b, metaprogram));
-  }
-
-  spn_try(dag_add_user_nodes(b, unit));
-
   sp_da_for(unit->targets, it) {
     spn_target_unit_t* target = unit->targets[it];
     if (sp_da_empty(target->info->source)) {
@@ -860,6 +849,7 @@ static spn_err_t dag_add_package(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
     spn_try(dag_add_target(b, target));
   }
 
+  spn_try(dag_add_user_nodes(b, unit));
   spn_try(dag_add_tree(b, unit));
   spn_try(dag_add_package_action(b, unit));
 
@@ -885,55 +875,65 @@ static void dag_add_link_deps(spn_dag_build_t* b, spn_target_unit_t* target) {
   }
 }
 
+static void dag_add_target_edges(spn_dag_build_t* b, spn_target_unit_t* target) {
+  spn_dag_t* g = b->graph;
+  spn_pkg_unit_t* unit = target->pkg;
+
+  if (target->lib_kind == SPN_LIB_KIND_SOURCE) {
+    return;
+  }
+
+  sp_da_for(target->objects, ot) {
+    spn_compile_unit_t* object = target->objects[ot];
+    if (!object->dag.action.occupied) {
+      continue;
+    }
+
+    sp_da_for(unit->dag.user_outputs, ut) {
+      spn_dag_action_add_input(g, object->dag.action, unit->dag.user_outputs[ut]);
+    }
+
+    sp_da_for(unit->deps, dt) {
+      spn_pkg_dep_t* dep = &unit->deps[dt];
+      if (!dep->unit) {
+        continue;
+      }
+      if (dep->kind == SPN_DEP_KIND_TEST && target->info->kind != SPN_TARGET_TEST) {
+        continue;
+      }
+      if (dep->unit->dag.stamp.occupied) {
+        spn_dag_action_add_input(g, object->dag.action, dep->unit->dag.stamp);
+      }
+    }
+  }
+
+  dag_add_link_deps(b, target);
+
+  if (target->dag.embed.action.occupied) {
+    sp_da_for(unit->dag.user_outputs, ut) {
+      spn_dag_action_add_input(g, target->dag.embed.action, unit->dag.user_outputs[ut]);
+    }
+
+    sp_da_for(target->info->embed, et) {
+      spn_embed_t* embed = &target->info->embed[et];
+      if (embed->kind != SPN_EMBED_DIR) {
+        continue;
+      }
+      sp_da_for(unit->deps, dt) {
+        spn_pkg_dep_t* dep = &unit->deps[dt];
+        if (dep->unit && sp_str_starts_with(embed->dir.path, dep->unit->paths.store) && dep->unit->dag.stamp.occupied) {
+          spn_dag_action_add_input(g, target->dag.embed.action, dep->unit->dag.stamp);
+        }
+      }
+    }
+  }
+}
+
 static spn_err_t dag_add_edges(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
   spn_dag_t* g = b->graph;
 
   sp_da_for(unit->targets, it) {
-    spn_target_unit_t* target = unit->targets[it];
-    if (target->lib_kind == SPN_LIB_KIND_SOURCE) {
-      continue;
-    }
-
-    sp_da_for(target->objects, ot) {
-      spn_compile_unit_t* object = target->objects[ot];
-      if (!object->dag.action.occupied) {
-        continue;
-      }
-
-      sp_da_for(unit->dag.user_outputs, ut) {
-        spn_dag_action_add_input(g, object->dag.action, unit->dag.user_outputs[ut]);
-      }
-
-      sp_da_for(unit->deps, dt) {
-        spn_pkg_dep_t* dep = &unit->deps[dt];
-        if (!dep->unit) {
-          continue;
-        }
-        if (dep->kind == SPN_DEP_KIND_TEST && target->info->kind != SPN_TARGET_TEST) {
-          continue;
-        }
-        if (dep->unit->dag.stamp.occupied) {
-          spn_dag_action_add_input(g, object->dag.action, dep->unit->dag.stamp);
-        }
-      }
-    }
-
-    dag_add_link_deps(b, target);
-
-    if (target->dag.embed.action.occupied) {
-      sp_da_for(target->info->embed, et) {
-        spn_embed_t* embed = &target->info->embed[et];
-        if (embed->kind != SPN_EMBED_DIR) {
-          continue;
-        }
-        sp_da_for(unit->deps, dt) {
-          spn_pkg_dep_t* dep = &unit->deps[dt];
-          if (dep->unit && sp_str_starts_with(embed->dir.path, dep->unit->paths.store) && dep->unit->dag.stamp.occupied) {
-            spn_dag_action_add_input(g, target->dag.embed.action, dep->unit->dag.stamp);
-          }
-        }
-      }
-    }
+    dag_add_target_edges(b, unit->targets[it]);
   }
 
   sp_da_for(unit->deps, dt) {
@@ -953,23 +953,37 @@ static spn_err_t dag_add_edges(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
 static spn_err_t dag_prepare(spn_dag_build_t* b) {
   spn_session_t* session = b->session;
 
-  sp_da_for(session->plan.builds, it) {
-    spn_build_unit_t* build = session->plan.builds[it].build;
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    if (unit->member) {
+      continue;
+    }
+    sp_da_for(unit->targets, jt) {
+      spn_try(dag_add_target(b, unit->targets[jt]));
+    }
+  }
+
+  sp_da_for(session->units.builds, it) {
+    spn_build_unit_t* build = session->units.builds[it];
     sp_da_for(build->packages, jt) {
       spn_try(dag_add_package(b, build->packages[jt]));
     }
   }
 
-  sp_da_for(session->plan.builds, it) {
-    spn_build_unit_t* build = session->plan.builds[it].build;
+  sp_da_for(session->units.builds, it) {
+    spn_build_unit_t* build = session->units.builds[it];
     sp_da_for(build->packages, jt) {
       spn_try(dag_add_edges(b, build->packages[jt]));
     }
   }
 
-  if (session->units.metaprogram) {
-    sp_da_for(session->units.metaprogram->packages, it) {
-      dag_add_link_deps(b, session->units.metaprogram->packages[it]->metaprogram.build.target);
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    if (unit->member) {
+      continue;
+    }
+    sp_da_for(unit->targets, jt) {
+      dag_add_target_edges(b, unit->targets[jt]);
     }
   }
 

@@ -52,7 +52,7 @@ UTEST_F(profile, override_rebuild) {
       .args = { "build" },
       .expect = {
         .bin = { .name = "main", .rc = 1 },
-        .events = { { .event = "target_build_passed" } },
+        .events = { { .event = SPN_EVENT_TARGET_BUILD_PASSED } },
         .files = { { .file = sp_str_lit("compile_commands.json"), .excludes = { "DFAST" } } },
       },
     },
@@ -62,7 +62,7 @@ UTEST_F(profile, override_rebuild) {
           .args = { "build", "--opt", "3" },
           .expect = {
             .bin = { .name = "main", .rc = 2 },
-            .events = { { .event = "target_build_passed" } },
+            .events = { { .event = SPN_EVENT_TARGET_BUILD_PASSED } },
             .files = { { .file = sp_str_lit("compile_commands.json"), .contains = { "DFAST" } } },
           },
         },
@@ -72,7 +72,7 @@ UTEST_F(profile, override_rebuild) {
           .args = { "build" },
           .expect = {
             .bin = { .name = "main", .rc = 1 },
-            .events = { { .event = "target_build_passed", .absent = true } },
+            .events = { { .event = SPN_EVENT_TARGET_BUILD_PASSED, .absent = true } },
             .files = { { .file = sp_str_lit("compile_commands.json"), .excludes = { "DFAST" } } },
           },
         },

@@ -37,7 +37,7 @@ UTEST_F(deps_file, name_mismatch) {
     .copy = { "vendor/spum/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_manifest", .key = "name", .value = "core/spum" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_MANIFEST, .key = "name", .value = "core/spum" } },
       { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("core/spork") } },
     },
   });
@@ -50,8 +50,8 @@ UTEST_F(deps_file, missing_manifest) {
     .project = "test/integration/fixtures/deps/file/missing_manifest",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_manifest", .key = "name", .value = "core/spum" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unknown_pkg" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_MANIFEST, .key = "name", .value = "core/spum" } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNKNOWN_PKG } },
     },
   });
 }
@@ -140,7 +140,7 @@ UTEST_F(deps_index, name_mismatch) {
     .project = "test/integration/fixtures/deps/index/name_mismatch",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_manifest", .key = "name", .value = "core/spum" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_MANIFEST, .key = "name", .value = "core/spum" } },
       { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("spork") } },
     },
   });
@@ -234,7 +234,7 @@ UTEST_F(deps_index, fetch_fails) {
     .actions = {
       { .kind = ACTION_REMOVE_DIR, .rm = { .dir = "remote/spum" } },
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "sync_failed", .key = "name", .value = "core/spum" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_SYNC_FAILED, .key = "name", .value = "core/spum" } },
     },
   });
 }
@@ -246,7 +246,7 @@ UTEST_F(deps_index, invalid_manifest) {
     .project = "test/integration/fixtures/deps/index/invalid_manifest",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_manifest", .key = "name", .value = "core/spum" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_MANIFEST, .key = "name", .value = "core/spum" } },
     },
   });
 }

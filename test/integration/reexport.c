@@ -22,7 +22,7 @@ UTEST_F(reexport, private_hidden) {
     .project = "test/integration/fixtures/reexport/private_hidden",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "target_build_failed" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_TARGET_BUILD_FAILED } },
     },
   });
 }
@@ -46,7 +46,7 @@ UTEST_F(reexport, private_subtree) {
     .project = "test/integration/fixtures/reexport/private_subtree",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "target_build_failed" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_TARGET_BUILD_FAILED } },
     },
   });
 }

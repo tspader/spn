@@ -21,7 +21,7 @@ UTEST_F(units, build_dep_transitive_conflict) {
     .project = "test/integration/fixtures/units/build_dep_transitive_conflict",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unsatisfiable_version" } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
       { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
     },
   });
@@ -34,7 +34,7 @@ UTEST_F(units, shared_conflict) {
     .project = "test/integration/fixtures/units/shared_conflict",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_unsatisfiable_version" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
     },
   });
 }
@@ -46,8 +46,8 @@ UTEST_F(units, shared_private) {
     .project = "test/integration/fixtures/units/shared_private",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unsatisfiable_version" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_dynamic_duplicate" } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_DYNAMIC_DUPLICATE } },
       { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
     },
   });
@@ -60,7 +60,7 @@ UTEST_F(units, static_conflict) {
     .project = "test/integration/fixtures/units/static_conflict",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_unsatisfiable_version" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
     },
   });
 }
@@ -72,8 +72,8 @@ UTEST_F(units, no_double_build) {
     .project = "test/integration/fixtures/units/no_double_build",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "resolve_package", .key = "version", .value = "1.5.0" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "resolve_package", .key = "version", .value = "2.0.0" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_RESOLVE_PACKAGE, .key = "version", .value = "1.5.0" } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_RESOLVE_PACKAGE, .key = "version", .value = "2.0.0" } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
@@ -86,8 +86,8 @@ UTEST_F(units, no_downgrade) {
     .project = "test/integration/fixtures/units/no_downgrade",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unsatisfiable_version" } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "resolve_package", .key = "version", .value = "1.9.0" } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_RESOLVE_PACKAGE, .key = "version", .value = "1.9.0" } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
@@ -100,7 +100,7 @@ UTEST_F(units, build_dep_cycle) {
     .project = "test/integration/fixtures/units/build_dep_cycle",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err_unit_cycle" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNIT_CYCLE } },
     },
   });
 }
@@ -112,8 +112,8 @@ UTEST_F(units, build_dep_bootstrap) {
     .project = "test/integration/fixtures/units/build_dep_bootstrap",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unit_cycle" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unsatisfiable_version" } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNIT_CYCLE } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
@@ -128,7 +128,7 @@ UTEST_F(units, same_version_split) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("Resolved 6 packages") },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "err_unsatisfiable_version" } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
       { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
     },
   });

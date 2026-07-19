@@ -210,6 +210,7 @@ struct spn_pkg_unit_t {
   spn_pkg_info_t* info;
   spn_pkg_source_t source;
   u32 materialized_dep_kinds;
+  bool member;
 
   sp_da(spn_pkg_dep_t) deps;
   sp_da(spn_target_unit_t*) libs;

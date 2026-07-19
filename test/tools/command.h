@@ -11,7 +11,7 @@
 #define SPN_TEST_COMMAND_MAX_PACKAGES 4
 
 typedef struct {
-  const c8* event;
+  spn_build_event_kind_t event;
   const c8* key;
   const c8* value;
   bool absent;

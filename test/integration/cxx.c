@@ -144,7 +144,7 @@ UTEST_F(cxx, script_rejected) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
       { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("package.build.source") },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "script_compile_failed" } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED } },
     },
   });
 }
@@ -157,8 +157,8 @@ UTEST_F(cxx, toolchain_missing) {
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = "target_build_failed" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR } },
+      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_TARGET_BUILD_FAILED } },
     },
   });
 }

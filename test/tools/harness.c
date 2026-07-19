@@ -6,6 +6,12 @@
 #include "triple/triple.h"
 #include "yyjson.h"
 
+#define SPN_EVENT_NAME(kind, name, ...) [kind] = name,
+static const c8* event_names[SPN_EVENT_COUNT] = {
+  SPN_EVENT_LIST(SPN_EVENT_NAME)
+};
+#undef SPN_EVENT_NAME
+
 static sp_mem_t layout_mem(void) {
   return sp_mem_os_new();
 }
@@ -492,7 +498,8 @@ static bool event_matches(yyjson_val* line, const c8* event, const c8* key, cons
   return str && sp_cstr_equal(str, value);
 }
 
-static u32 count_events(fixture_t* fixture, const c8* event, const c8* key, const c8* value) {
+static u32 count_events(fixture_t* fixture, spn_build_event_kind_t kind, const c8* key, const c8* value) {
+  const c8* event = event_names[kind];
   sp_mem_t mem = fixture->fs.mem;
   sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
 
@@ -515,7 +522,8 @@ static u32 count_events(fixture_t* fixture, const c8* event, const c8* key, cons
   return count;
 }
 
-static void expect_event(s32* utest_result, fixture_t* fixture, const c8* event, const c8* key, const c8* value, bool expected, const c8* file, u32 line) {
+static void expect_event(s32* utest_result, fixture_t* fixture, spn_build_event_kind_t kind, const c8* key, const c8* value, bool expected, const c8* file, u32 line) {
+  const c8* event = event_names[kind];
   sp_mem_t mem = fixture->fs.mem;
   sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
 
@@ -1112,7 +1120,7 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
       }
       case ACTION_VERIFY_EVENT_COUNT: {
         u32 count = count_events(fixture, action.verify_event_count.event, action.verify_event_count.key, action.verify_event_count.value);
-        utest_kv("event", sp_str_view(action.verify_event_count.event));
+        utest_kv("event", sp_str_view(event_names[action.verify_event_count.event]));
         EXPECT_EQ(action.verify_event_count.count, count);
         break;
       }

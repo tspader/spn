@@ -45,7 +45,7 @@ UTEST_F(exports, collision_loud) {
     .project = "test/integration/fixtures/exports/collision_loud",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "link_failed" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_LINK_FAILED } },
     },
   });
 }
