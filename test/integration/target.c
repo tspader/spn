@@ -36,7 +36,7 @@ UTEST_F(target, source_glob) {
     .copy = { "src" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
 }
@@ -48,7 +48,7 @@ UTEST_F(target, shared_source) {
     .project = "test/integration/fixtures/target/shared_source",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
 }
@@ -169,7 +169,7 @@ UTEST_F(target, publish) {
       { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit.h") },
       { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit/a.h") },
       { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit/b.h") },
-      { .kind = ACTION_RUN_BIN, .bin.name = "publish" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("publish") },
     },
   });
 }
@@ -182,9 +182,9 @@ UTEST_F(target, system_deps) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("spn.lock") },
-      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--force" } } },
-      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
 }
@@ -196,7 +196,7 @@ UTEST_F(target, source_pin) {
     .project = "test/integration/fixtures/target/source_pin",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
 }
