@@ -111,7 +111,7 @@ static bool exe_name_reserved(sp_str_t name) {
   return sp_str_equal_cstr(name, "store") || sp_str_equal_cstr(name, "work") || sp_str_equal_cstr(name, "test");
 }
 
-static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* target) {
+static spn_err_union_t set_target_kind(spn_session_t* session, spn_target_unit_t* target) {
   spn_target_info_t* info = target->info;
 
   switch (info->kind) {
@@ -119,12 +119,12 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
     case SPN_TARGET_SCRIPT:
     case SPN_TARGET_TEST: {
       target->kind = SPN_CC_OUTPUT_EXE;
-      return SPN_OK;
+      return spn_result(SPN_OK);
     }
     case SPN_TARGET_CONFIGURE_METAPROGRAM:
     case SPN_TARGET_BUILD_METAPROGRAM: {
       target->kind = SPN_CC_OUTPUT_REACTOR;
-      return SPN_OK;
+      return spn_result(SPN_OK);
     }
     case SPN_TARGET_LIB: {
       // Unlinked libs don't participate in linkage selection: nothing consumes
@@ -150,7 +150,7 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
             SP_FMT_STR(requested),
             SP_FMT_STR(requester)
           );
-          return SPN_ERROR;
+          return spn_err_reported(SPN_ERROR);
         }
       }
 
@@ -163,11 +163,11 @@ static spn_err_t set_target_kind(spn_session_t* session, spn_target_unit_t* targ
         case SPN_LIB_KIND_OBJECT: target->kind = SPN_CC_OUTPUT_OBJECT; break;
         case SPN_LIB_KIND_NONE: break;
       }
-      return SPN_OK;
+      return spn_result(SPN_OK);
     }
   }
 
-  SP_UNREACHABLE_RETURN(SPN_ERROR);
+  SP_UNREACHABLE_RETURN(spn_result(SPN_ERROR));
 }
 
 static spn_pkg_unit_t* find_dep_unit(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t qualified) {
@@ -181,7 +181,7 @@ static spn_pkg_unit_t* find_dep_unit(spn_session_t* session, spn_pkg_unit_t* pkg
   return SP_NULLPTR;
 }
 
-static spn_err_t ensure_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_info_t* info, spn_target_unit_t** result) {
+static spn_err_union_t ensure_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_info_t* info, spn_target_unit_t** result) {
   spn_target_unit_t* target = spn_session_find_target_in_pkg(session, pkg, info->name);
   if (target && target->info != info) {
     spn_log_error(
@@ -189,15 +189,15 @@ static spn_err_t ensure_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_
       SP_FMT_STR(pkg->info->name),
       SP_FMT_STR(info->name)
     );
-    return SPN_ERROR;
+    return spn_err_reported(SPN_ERROR);
   }
   if (!target) {
     target = spn_session_add_target(session, pkg, info);
     sp_assert(target->pkg->build);
-    spn_try(set_target_kind(session, target));
+    try_union(set_target_kind(session, target));
   }
   *result = target;
-  return SPN_OK;
+  return spn_result(SPN_OK);
 }
 
 static void create_target_objects(spn_session_t* session, spn_target_unit_t* target) {
@@ -265,12 +265,12 @@ static void add_metaprogram_dep(spn_target_unit_t* metaprogram, spn_pkg_unit_t* 
   }
 }
 
-static spn_err_t add_metaprogram_target(spn_session_t* session, spn_pkg_unit_t* unit, spn_target_info_t* info, spn_target_unit_t** result) {
+static spn_err_union_t add_metaprogram_target(spn_session_t* session, spn_pkg_unit_t* unit, spn_target_info_t* info, spn_target_unit_t** result) {
   spn_target_unit_t* target = SP_NULLPTR;
-  spn_try(ensure_target(session, unit, info, &target));
+  try_union(ensure_target(session, unit, info, &target));
   create_target_objects(session, target);
   *result = target;
-  return SPN_OK;
+  return spn_result(SPN_OK);
 }
 
 static void init_metaprogram_runtime(spn_pkg_unit_t* unit) {
@@ -338,10 +338,10 @@ spn_err_union_t add_metaprogram_units(spn_session_t* session) {
     spn_pkg_unit_t* unit = session->units.metaprogram->packages[it];
     sp_assert(unit->metaprogram.pkg == unit);
     if (!sp_da_empty(unit->metaprogram.configure.info->source)) {
-      try_as_union(add_metaprogram_target(session, unit, unit->metaprogram.configure.info, &unit->metaprogram.configure.target));
+      try_union(add_metaprogram_target(session, unit, unit->metaprogram.configure.info, &unit->metaprogram.configure.target));
     }
     if (!sp_da_empty(unit->metaprogram.build.info->source)) {
-      try_as_union(add_metaprogram_target(session, unit, unit->metaprogram.build.info, &unit->metaprogram.build.target));
+      try_union(add_metaprogram_target(session, unit, unit->metaprogram.build.info, &unit->metaprogram.build.target));
     }
 
     sp_da_for(unit->deps, it) {
@@ -411,7 +411,7 @@ static bool target_selection_matches_name(const spn_target_selection_t* selectio
     (target_rule_requests_name(&selection->targets.script, name) && sp_str_om_has(pkg->scripts, name));
 }
 
-static spn_err_t validate_target_selection(const spn_target_selection_t* selection, const spn_pkg_info_t* pkg) {
+static spn_err_union_t validate_target_selection(const spn_target_selection_t* selection, const spn_pkg_info_t* pkg) {
   const spn_target_rule_t* rules [] = {
     &selection->targets.lib,
     &selection->targets.bin,
@@ -429,13 +429,13 @@ static spn_err_t validate_target_selection(const spn_target_selection_t* selecti
         continue;
       }
       spn_log_error("target {.yellow} is not defined for the selected target kinds", SP_FMT_STR(name));
-      return SPN_ERROR;
+      return spn_err_reported(SPN_ERROR);
     }
   }
-  return SPN_OK;
+  return spn_result(SPN_OK);
 }
 
-static spn_err_t add_plan_targets(spn_session_t* session, spn_build_plan_t* plan, spn_pkg_unit_t* pkg, spn_target_map_t targets) {
+static spn_err_union_t add_plan_targets(spn_session_t* session, spn_build_plan_t* plan, spn_pkg_unit_t* pkg, spn_target_map_t targets) {
   sp_str_om_for(targets, it) {
     spn_target_info_t* info = sp_str_om_at(targets, it);
     if (!spn_target_selection_pass(&plan->selection, info)) {
@@ -449,19 +449,19 @@ static spn_err_t add_plan_targets(spn_session_t* session, spn_build_plan_t* plan
         SP_FMT_STR(pkg->info->name),
         SP_FMT_STR(info->name)
       );
-      return SPN_ERROR;
+      return spn_err_reported(SPN_ERROR);
     }
 
     spn_target_unit_t* target = SP_NULLPTR;
-    spn_try(ensure_target(session, pkg, info, &target));
+    try_union(ensure_target(session, pkg, info, &target));
     if (!is_root_target(session, plan, target)) {
       sp_da_push(plan->roots, target->id);
     }
   }
-  return SPN_OK;
+  return spn_result(SPN_OK);
 }
 
-static spn_err_t ensure_sibling_targets(spn_session_t* session, sp_da(spn_target_unit_t*) pending) {
+static spn_err_union_t ensure_sibling_targets(spn_session_t* session, sp_da(spn_target_unit_t*) pending) {
   while (!sp_da_empty(pending)) {
     spn_target_unit_t* unit = *sp_da_back(pending);
     sp_da_pop(pending);
@@ -478,11 +478,11 @@ static spn_err_t ensure_sibling_targets(spn_session_t* session, sp_da(spn_target
         continue;
       }
       spn_target_unit_t* target = SP_NULLPTR;
-      spn_try(ensure_target(session, unit->pkg, info, &target));
+      try_union(ensure_target(session, unit->pkg, info, &target));
       sp_da_push(pending, target);
     }
   }
-  return SPN_OK;
+  return spn_result(SPN_OK);
 }
 
 static sp_da(spn_target_unit_t*) collect_plan_targets(spn_session_t* session) {
@@ -512,9 +512,7 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
       }
       sp_str_om_for(pkg->info->libs, it) {
         spn_target_unit_t* target = SP_NULLPTR;
-        if (ensure_target(session, pkg, sp_str_om_at(pkg->info->libs, it), &target)) {
-          return spn_task_fail(SPN_ERROR);
-        }
+        spn_try_step(ensure_target(session, pkg, sp_str_om_at(pkg->info->libs, it), &target));
       }
     }
   }
@@ -523,19 +521,15 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
     spn_build_plan_t* plan = &session->plan.builds[it];
     spn_pkg_unit_t* pkg = spn_session_find_pkg_unit(session, plan->build, root);
     sp_assert(pkg);
-    if (validate_target_selection(&plan->selection, pkg->info) ||
-        add_plan_targets(session, plan, pkg, pkg->info->libs) ||
-        add_plan_targets(session, plan, pkg, pkg->info->exes) ||
-        add_plan_targets(session, plan, pkg, pkg->info->scripts) ||
-        add_plan_targets(session, plan, pkg, pkg->info->tests)) {
-      return spn_task_fail(SPN_ERROR);
-    }
+    spn_try_step(validate_target_selection(&plan->selection, pkg->info));
+    spn_try_step(add_plan_targets(session, plan, pkg, pkg->info->libs));
+    spn_try_step(add_plan_targets(session, plan, pkg, pkg->info->exes));
+    spn_try_step(add_plan_targets(session, plan, pkg, pkg->info->scripts));
+    spn_try_step(add_plan_targets(session, plan, pkg, pkg->info->tests));
   }
 
   sp_da(spn_target_unit_t*) pending = collect_plan_targets(session);
-  if (ensure_sibling_targets(session, pending)) {
-    return spn_task_fail(SPN_ERROR);
-  }
+  spn_try_step(ensure_sibling_targets(session, pending));
 
   sp_da(spn_target_unit_t*) targets = collect_plan_targets(session);
   sp_da_for(targets, it) {
@@ -558,7 +552,7 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
       }
       else {
         spn_log_error("failed to find {.cyan} as a package or target", SP_FMT_STR(unit->info->deps[j]));
-        return spn_task_fail(SPN_ERROR);
+        return spn_task_fail(SPN_ERROR, .reported = true);
       }
     }
   }
@@ -579,29 +573,11 @@ spn_task_step_t spn_task_create_units(spn_app_t* app) {
       continue;
     }
 
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR,
-      .err = {
-        .kind = SPN_ERR_TOOLCHAIN_NO_CXX,
-        .toolchain = { .name = toolchain->name },
-      },
-    });
-    return spn_task_fail(SPN_ERROR);
+    return spn_task_fail(SPN_ERR_TOOLCHAIN_NO_CXX, .toolchain = { .name = toolchain->name });
   }
 
-  spn_err_union_t err = spn_result(SPN_OK);
   sp_da_for(targets, it) {
-    err = build_target_invocations(targets[it]);
-    if (err.kind) {
-      break;
-    }
-  }
-  if (err.kind) {
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR,
-      .err = err,
-    });
-    return spn_task_fail(SPN_ERROR);
+    spn_try_step(build_target_invocations(targets[it]));
   }
   spn_session_write_compile_commands(session, spn_session_compile_commands_path(session));
 

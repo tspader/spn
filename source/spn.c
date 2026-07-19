@@ -1,3 +1,4 @@
+#include "error/error.h"
 #include "error/types.h"
 #include "sp.h"
 
@@ -170,9 +171,7 @@ spn_err_t extract_runtime() {
   do { \
     spn_err_union_t __err = (expr); \
     if (__err.kind) { \
-      spn_event_buffer_push(spn.events, (spn_build_event_t) { \
-        .kind = SPN_EVENT_ERR, \
-        .err = __err }); \
+      spn.result = spn_err_emit(__err); \
       return SP_APP_ERR; \
     } \
   } while (0)
@@ -221,11 +220,17 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
   }
 
+  spn_cli_commit();
+
   if (spn.cli.ci) {
     sp->fps = 100000;
   }
 
-  spn_tui_init(&spn.tui, &app.session, SPN_OUTPUT_MODE_INTERACTIVE);
+  spn_tui_mode_t output_mode = SPN_OUTPUT_MODE_INTERACTIVE;
+  if (!sp_str_empty(spn.cli.output)) {
+    output_mode = spn_output_mode_from_str(spn.cli.output);
+  }
+  spn_tui_init(&spn.tui, &app.session, output_mode);
 
   spn.events = spn_event_buffer_new(spn.mem);
   spn_event_log_init(spn.heap);
@@ -281,19 +286,13 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     spn_toml_loader_t loader = sp_zero;
     spn_toml_loader_init(&loader, spn.mem, spn.intern);
     if (spn_codegen_load_config(&loader, spn.paths.config.toml, &spn.config)) {
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR,
-        .err = {
-          .kind = SPN_ERR_MANIFEST_ISSUES,
-          .issues = loader.issues,
-        },
+      spn.result = spn_err_emit((spn_err_union_t) {
+        .kind = SPN_ERR_MANIFEST_ISSUES,
+        .issues = loader.issues,
       });
       return SP_APP_ERR;
     }
   }
-
-
-  spn_cli_commit();
 
   if (cli->quiet) {
     spn.logger.verbosity = SPN_VERBOSITY_QUIET;
@@ -315,6 +314,10 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   bool has_manifest = sp_fs_exists(spn.paths.manifest);
   if (!has_manifest) {
     if (spn_cli_requires_manifest(parsed.cmd)) {
+      spn.result = (spn_err_union_t) {
+        .kind = SPN_ERR_NO_MANIFEST,
+        .no_manifest = { .path = spn.paths.manifest },
+      };
       spn_log_error("no manifest found at {.cyan}", SP_FMT_STR(spn.paths.manifest));
       return SP_APP_ERR;
     }
@@ -475,12 +478,7 @@ sp_app_result_t spn_update(sp_app_t* sp) {
   }
 
   if (step.err.kind) {
-    if (step.err.kind != SPN_ERROR) {
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR,
-        .err = step.err,
-      });
-    }
+    spn.result = spn_err_emit(step.err);
     spn_prompt_stop(false);
     spn_poll(sp);
     return SP_APP_ERR;
@@ -514,6 +512,24 @@ void spn_deinit(sp_app_t* sp) {
     case SPN_OUTPUT_MODE_NONE: {
       break;
     }
+    case SPN_OUTPUT_MODE_JSON: {
+      break;
+    }
+  }
+
+  if (spn.events) {
+    bool ok = sp->result != SP_APP_ERR;
+    spn_err_t kind = spn.result.kind;
+    if (!ok && !kind) {
+      kind = SPN_ERROR;
+    }
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_RESULT,
+      .result = {
+        .ok = ok,
+        .err = sp_cstr_as_str(spn_err_to_str(kind)),
+      },
+    });
   }
 
   spn_drain_events();

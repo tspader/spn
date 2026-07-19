@@ -106,7 +106,7 @@ static void run_session_test(s32* utest_result, session_test_t test) {
     }));
   }
 
-  spn_err_t err = spn_session_apply_options(&session);
+  spn_err_t err = spn_session_apply_options(&session).kind;
   EXPECT_EQ(err, test.expect.err);
   EXPECT_EQ(session.gates.resolves, test.expect.resolves);
   EXPECT_EQ(session.gates.reresolve, test.expect.reresolve);
@@ -132,7 +132,7 @@ UTEST(options_session, late_gate_resolve_cap) {
     .gated_dep = true,
     .resolves = 4,
     .expect = {
-      .err = SPN_ERROR,
+      .err = SPN_ERR_OPTION,
       .event = true,
       .option_err = SPN_OPTION_ERR_LATE_GATE,
       .pkg = "test",
@@ -147,7 +147,7 @@ UTEST(options_session, unknown_config_package) {
   run_session_test(utest_result, (session_test_t) {
     .config = "spum",
     .expect = {
-      .err = SPN_ERROR,
+      .err = SPN_ERR_OPTION,
       .event = true,
       .option_err = SPN_OPTION_ERR_UNKNOWN_PKG,
       .pkg = "spum",
@@ -160,7 +160,7 @@ UTEST(options_session, stale_loaded_unresolved_config_package) {
     .config = "spum",
     .stale_loaded = true,
     .expect = {
-      .err = SPN_ERROR,
+      .err = SPN_ERR_OPTION,
       .event = true,
       .option_err = SPN_OPTION_ERR_UNKNOWN_PKG,
       .pkg = "spum",

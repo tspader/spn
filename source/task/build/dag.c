@@ -1167,7 +1167,7 @@ spn_task_step_t spn_dag_build_init(spn_app_t* app) {
 
   if (dag_prepare(b)) {
     spn_log_error("failed to construct dag build graph");
-    return spn_task_fail(SPN_ERROR);
+    return spn_task_fail(SPN_ERROR, .reported = true);
   }
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
@@ -1211,5 +1211,5 @@ spn_task_step_t spn_dag_build_update(spn_app_t* app) {
 
   dag_emit_reports(b, elapsed);
 
-  return b->result ? spn_task_fail(SPN_ERROR) : spn_task_done();
+  return b->result ? spn_task_fail(SPN_ERROR, .reported = true) : spn_task_done();
 }

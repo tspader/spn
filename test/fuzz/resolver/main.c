@@ -248,7 +248,7 @@ static fz_result_t fz_execute(sp_mem_t mem, fz_universe_t* u, sp_intern_t* inter
     .source = SPN_PKG_SOURCE_ROOT,
   });
 
-  result.err = spn_resolve_from_solver(&resolver, &result.query);
+  result.err = spn_resolve_from_solver(&resolver, &result.query).kind;
   result.events = spn_event_buffer_drain(mem, events);
   return result;
 }

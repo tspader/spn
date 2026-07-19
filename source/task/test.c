@@ -25,13 +25,13 @@ static spn_task_step_t run_script(spn_app_t* app, spn_target_unit_t* unit) {
 
   if (unit->info->kind != SPN_TARGET_SCRIPT) {
     spn_log_error("{.yellow} is not a script", SP_FMT_STR(unit->info->name));
-    return spn_task_fail(SPN_ERROR);
+    return spn_task_fail(SPN_ERROR, .reported = true);
   }
 
   sp_str_t command = get_target_staged_path(session->mem, unit);
   if (!sp_fs_exists(command)) {
     spn_log_error("script binary {.yellow} does not exist", SP_FMT_STR(command));
-    return spn_task_fail(SPN_ERROR);
+    return spn_task_fail(SPN_ERROR, .reported = true);
   }
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
@@ -60,7 +60,7 @@ static spn_task_step_t run_script(spn_app_t* app, spn_target_unit_t* unit) {
       SP_FMT_STR(unit->info->name),
       SP_FMT_S32(status.exit_code)
     );
-    return spn_task_fail(SPN_ERROR);
+    return spn_task_fail(SPN_ERROR, .reported = true);
   }
 
   return spn_task_done();
@@ -68,7 +68,7 @@ static spn_task_step_t run_script(spn_app_t* app, spn_target_unit_t* unit) {
 
 static spn_task_step_t run_source(spn_app_t* app) {
   spn_log_error("{.yellow} cannot run native sources; build scripts are wasm", SP_FMT_STR(app->config.action.source.path));
-  return spn_task_fail(SPN_ERROR);
+  return spn_task_fail(SPN_ERROR, .reported = true);
 }
 
 static spn_task_step_t run_roots(spn_app_t* app) {
@@ -102,7 +102,7 @@ spn_task_step_t spn_task_run(spn_app_t* app) {
     }
   }
 
-  SP_UNREACHABLE_RETURN(spn_task_fail(SPN_ERROR));
+  SP_UNREACHABLE_RETURN(spn_task_fail(SPN_ERROR, .reported = true));
 }
 
 static spn_task_step_t spn_task_run_tests(spn_app_t* app) {

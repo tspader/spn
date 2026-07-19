@@ -58,7 +58,8 @@
   X(SPN_EVENT_USER_LOG,                     "user_log",                   "",            VERBOSE, INFO,  false, false, SPN_EVT(user_log)) \
   X(SPN_EVENT_ADDED,                        "added",                      "Added",       NORMAL,  INFO,  false, false, SPN_EVT(added)) \
   X(SPN_EVENT_PUBLISH,                      "publish",                    "Publishing",  NORMAL,  INFO,  false, false, SPN_EVT(publish)) \
-  X(SPN_EVENT_PUBLISH_END,                  "publish_end",                "Published",   NORMAL,  INFO,  false, false, SPN_EVT(publish))
+  X(SPN_EVENT_PUBLISH_END,                  "publish_end",                "Published",   NORMAL,  INFO,  false, false, SPN_EVT(publish)) \
+  X(SPN_EVENT_RESULT,                       "result",                     "",            DEBUG,   INFO,  false, false, SPN_EVT(result))
 
 #define SPN_EVENT_ENUM(kind, ...) kind,
 typedef enum {
@@ -177,6 +178,7 @@ typedef struct { sp_str_t path; sp_str_t error; } spn_evt_embed_failed_t;
 typedef struct { sp_str_t profile; u64 time; u32 num_errors; sp_str_t first_error; } spn_evt_build_failed_t;
 typedef struct { bool success; u32 hits; u32 misses; u32 total; u64 time; sp_str_t profile; } spn_evt_build_summary_t;
 typedef struct { u64 time; } spn_evt_package_ok_t;
+typedef struct { bool ok; sp_str_t err; } spn_evt_result_t;
 
 typedef struct spn_build_event_t spn_build_event_t;
 
@@ -234,6 +236,7 @@ struct spn_build_event_t {
     spn_evt_build_failed_t build_failed;
     spn_evt_build_summary_t build_summary;
     spn_evt_package_ok_t package_ok;
+    spn_evt_result_t result;
   };
 };
 
