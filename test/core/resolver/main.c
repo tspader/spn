@@ -495,7 +495,7 @@ static resolve_result_t execute_fixture(fixture_t* fixture, sp_intern_t* intern)
     .source = SPN_PKG_SOURCE_ROOT,
   });
 
-  result.err = spn_resolve_from_solver(&resolver, &result.query);
+  result.err = spn_resolve_from_solver(&resolver, &result.query).kind;
   result.events = spn_event_buffer_drain(mem, events);
   return result;
 }
@@ -742,7 +742,7 @@ UTEST_F(resolver, linear_missing) {
         { .name = "spn/math", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_UNKNOWN,
     .event = SPN_EVENT_ERR_UNKNOWN_PKG,
   });
 }
@@ -843,7 +843,7 @@ UTEST_F(resolver, diamond_disjoint) {
         { .name = "spn/audio", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_NO_MATCH,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
   });
 }
@@ -880,7 +880,7 @@ UTEST_F(resolver, diamond_missing_renderer) {
         { .name = "spn/audio", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_UNKNOWN,
     .event = SPN_EVENT_ERR_UNKNOWN_PKG,
   });
 }
@@ -919,7 +919,7 @@ UTEST_F(resolver, diamond_missing_math) {
         { .name = "spn/audio", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_UNKNOWN,
     .event = SPN_EVENT_ERR_UNKNOWN_PKG,
   });
 }
@@ -957,7 +957,7 @@ UTEST_F(resolver, cycle_direct) {
         { .name = "spn/audio", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_DEP_CYCLE,
     .event = SPN_EVENT_ERR_CIRCULAR_DEP,
   });
 }
@@ -1007,7 +1007,7 @@ UTEST_F(resolver, cycle_indirect) {
         { .name = "spn/audio", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_DEP_CYCLE,
     .event = SPN_EVENT_ERR_CIRCULAR_DEP,
   });
 }
@@ -1072,7 +1072,7 @@ UTEST_F(resolver, budget_exhausted_fails) {
       }
     },
     .budget = 1,
-    .err = SPN_ERROR,
+    .err = SPN_ERR_RESOLVE_TOO_COMPLEX,
     .event = SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX,
   });
 }
@@ -1201,7 +1201,7 @@ UTEST_F(resolver, root_transitive_conflict) {
         { .name = "spn/math", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_NO_MATCH,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
     .unsat = {
       .namespace = "spn",
@@ -1229,7 +1229,7 @@ UTEST_F(resolver, version_no_match) {
         { .name = "spn/math", .version = "^2.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_NO_MATCH,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
     .unsat = { .namespace = "spn", .name = "math", .requester = "test/root" },
   });
@@ -1268,7 +1268,7 @@ UTEST_F(resolver, conflict_reports_selected) {
         { .name = "spn/b", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_NO_MATCH,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
     .unsat = {
       .namespace = "spn",
@@ -1329,7 +1329,7 @@ UTEST_F(resolver, yanked_only_candidate_fails) {
         { .name = "spn/a", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_NO_MATCH,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
     .unsat = { .namespace = "spn", .name = "a", .requester = "test/root" },
   });
@@ -1365,7 +1365,7 @@ UTEST_F(resolver, index_invalid_range) {
         { .name = "spn/a", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_DEP_MANIFEST,
     .event = SPN_EVENT_ERR_MANIFEST,
   });
 }
@@ -2029,7 +2029,7 @@ UTEST_F(resolver, shared_lib_public_conflict_fails) {
         { .name = "spn/foo", .version = "^2.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_NO_MATCH,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
   });
 }
@@ -2081,7 +2081,7 @@ UTEST_F(resolver, shared_lib_transitive_conflict_fails) {
         { .name = "spn/foo", .version = "^2.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_NO_MATCH,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
   });
 }
@@ -2278,7 +2278,7 @@ UTEST_F(resolver, static_lib_conflict_fails) {
         { .name = "spn/foo", .version = "^2.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_NO_MATCH,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
   });
 }
@@ -2319,7 +2319,7 @@ UTEST_F(resolver, static_lib_private_conflict_fails) {
         { .name = "spn/foo", .version = "^2.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_NO_MATCH,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
   });
 }
@@ -2361,7 +2361,7 @@ UTEST_F(resolver, private_static_default_conflicts) {
         { .name = "spn/foo", .version = "^2.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_NO_MATCH,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
   });
 }
@@ -2524,7 +2524,7 @@ UTEST_F(resolver, shared_lib_consumer_disjoint_fails) {
         { .name = "spn/video", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_NO_MATCH,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
   });
 }
@@ -2581,7 +2581,7 @@ UTEST_F(resolver, shared_lib_private_dynamic_dup_fails) {
         { .name = "spn/video", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_DYNAMIC_DUPLICATE,
     .event = SPN_EVENT_ERR_DYNAMIC_DUPLICATE,
   });
 }
@@ -2640,7 +2640,7 @@ UTEST_F(resolver, config_shared_dynamic_dup_fails) {
     .config = {
       { .name = "gfx", .kind = SPN_LIB_KIND_SHARED },
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_DYNAMIC_DUPLICATE,
     .event = SPN_EVENT_ERR_DYNAMIC_DUPLICATE,
   });
 }
@@ -2681,7 +2681,7 @@ UTEST_F(resolver, build_dep_cycle_fails) {
         { .name = "spn/audio", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_UNIT_CYCLE,
     .event = SPN_EVENT_ERR_UNIT_CYCLE,
   });
 }
@@ -2768,7 +2768,7 @@ UTEST_F(resolver, backtrack_failure_not_sticky) {
         { .name = "spn/math", .version = "^2.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_NO_MATCH,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
   });
 }
@@ -3130,7 +3130,7 @@ UTEST_F(resolver, build_dep_missing_still_fails) {
         { .name = "spn/audio", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_UNKNOWN,
     .event = SPN_EVENT_ERR_UNKNOWN_PKG,
   });
 }
@@ -3855,7 +3855,7 @@ UTEST_F(resolver, private_inside_private_dynamic_dup_fails) {
         { .name = "spn/leaf", .version = "^2.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_DYNAMIC_DUPLICATE,
     .event = SPN_EVENT_ERR_DYNAMIC_DUPLICATE,
   });
 }
@@ -4141,7 +4141,7 @@ UTEST_F(resolver, same_version_dynamic_dup_fails) {
         { .name = "spn/video", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_DYNAMIC_DUPLICATE,
     .event = SPN_EVENT_ERR_DYNAMIC_DUPLICATE,
   });
 }
@@ -4298,7 +4298,7 @@ UTEST_F(resolver, admissible_pick_cycle_fails) {
         { .name = "spn/audio", .version = "^2.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_UNIT_CYCLE,
     .event = SPN_EVENT_ERR_UNIT_CYCLE,
   });
 }
@@ -4454,7 +4454,7 @@ UTEST_F(resolver, root_private_dep_conflict_fails) {
         { .name = "spn/gfx", .version = "^1.0.0" },
       }
     },
-    .err = SPN_ERROR,
+    .err = SPN_ERR_PKG_NO_MATCH,
     .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
   });
 }

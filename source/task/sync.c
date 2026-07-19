@@ -356,7 +356,7 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
 
   spn_bg_executor_join(session->sync.executor);
   if (!sp_da_empty(session->sync.executor->errors)) {
-    return spn_task_fail(SPN_ERROR);
+    return spn_task_fail(SPN_ERROR, .reported = true);
   }
 
   sp_da_for(app->sync.packages, it) {
@@ -366,9 +366,7 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
     sp_ht_insert(session->packages, job->pkg->id, job->loaded);
   }
 
-  if (spn_session_apply_options(session)) {
-    return spn_task_fail(SPN_ERROR);
-  }
+  spn_try_step(spn_session_apply_options(session));
 
   if (session->gates.reresolve) {
     session->gates.reresolve = false;

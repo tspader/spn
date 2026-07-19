@@ -55,13 +55,11 @@
   do { \
     spn_err_union_t __err = (__expr); \
     if (__err.kind) { \
-      spn_event_buffer_push(spn.events, (spn_build_event_t) { \
-        .kind = SPN_EVENT_ERR, \
-        .err = __err \
-      }); \
-      return spn_task_fail(SPN_ERROR); \
+      return (spn_task_step_t) { .err = spn_err_emit(__err) }; \
     } \
   } while (0)
+
+#define spn_err_reported(kind_) ((spn_err_union_t) { .kind = (kind_), .reported = true })
 
 
 #define spn_result(status) (spn_err_union_t) { .kind = (status) }
@@ -109,6 +107,7 @@ typedef struct spn_codegen_issue spn_codegen_issue_t;
 
 typedef struct {
   spn_err_t kind;
+  bool reported;
   union {
     struct {
       sp_str_t path;
@@ -173,5 +172,7 @@ typedef struct {
     sp_da(spn_codegen_issue_t) issues;
   };
 } spn_err_union_t;
+
+spn_err_union_t spn_err_emit(spn_err_union_t err);
 
 #endif

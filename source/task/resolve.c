@@ -73,7 +73,7 @@ spn_task_step_t spn_task_resolve(spn_app_t* app) {
   spn_resolve_query_init(session->mem, &query);
   add_root(session, &query);
 
-  if (spn_resolve_from_solver(&resolver, &query)) return spn_task_fail(SPN_ERROR);
+  spn_try_step(spn_resolve_from_solver(&resolver, &query));
   session->resolve = query.result;
 
   emit_resolved(session->mem, &query);

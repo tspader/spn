@@ -173,7 +173,7 @@ spn_task_step_t spn_task_configure_graph_update(spn_app_t* app) {
     if (sp_da_empty(build->executor->errors)) {
       return spn_task_done();
     }
-    return spn_task_fail(SPN_ERROR);
+    return spn_task_fail(SPN_ERROR, .reported = true);
   }
   return spn_task_continue();
 }
