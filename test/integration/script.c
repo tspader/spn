@@ -220,7 +220,7 @@ UTEST_F(script, configure_error) {
     .project = "test/integration/fixtures/script/configure_error",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = "err" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR } },
     },
   });
 }
@@ -303,7 +303,7 @@ UTEST_F(script, build_deps) {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "core/spum" },
       { .kind = ACTION_VERIFY_DIR_COUNT, .verify_dir_count = { .dir = ".home/storage/cache/store/core/spum", .count = 1 } },
-      { .kind = ACTION_VERIFY_EVENT_COUNT, .verify_event_count = { .event = "user_log", .key = "message", .value = "spum configure", .count = 1 } },
+      { .kind = ACTION_VERIFY_EVENT_COUNT, .verify_event_count = { .event = SPN_EVENT_USER_LOG, .key = "message", .value = "spum configure", .count = 1 } },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = sp_str_lit("build/debug/store/include/spum.h") },
       { .kind = ACTION_RUN_BIN, .bin.name = "build_deps" },
     },
@@ -317,11 +317,11 @@ UTEST_F(script, dual_ctx) {
     .project = "test/integration/fixtures/script/dual_ctx",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EVENT_COUNT, .verify_event_count = { .event = "user_log", .key = "message", .value = "gamma configure", .count = 2 } },
+      { .kind = ACTION_VERIFY_EVENT_COUNT, .verify_event_count = { .event = SPN_EVENT_USER_LOG, .key = "message", .value = "gamma configure", .count = 2 } },
       { .kind = ACTION_VERIFY_DIR_COUNT, .verify_dir_count = { .dir = ".home/storage/cache/store/core/gamma", .count = 2 } },
       { .kind = ACTION_RUN_BIN, .bin.name = "dual_ctx" },
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_VERIFY_EVENT_COUNT, .verify_event_count = { .event = "user_log", .key = "message", .value = "gamma configure", .count = 2 } },
+      { .kind = ACTION_VERIFY_EVENT_COUNT, .verify_event_count = { .event = SPN_EVENT_USER_LOG, .key = "message", .value = "gamma configure", .count = 2 } },
     },
   });
 }
@@ -362,6 +362,20 @@ UTEST_F(script, build_dep_static) {
       { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked.name = "core/spum" },
       { .kind = ACTION_VERIFY_DIR_COUNT, .verify_dir_count = { .dir = ".home/storage/cache/store/core/spum", .count = 1 } },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = sp_str_lit("build/debug/store/include/spum.h") },
+    },
+  });
+}
+
+UTEST_F(script, build_dep_profiles) {
+  tmpfs_init_named(&uf->fixture.fs, "script_build_dep_profiles");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/script/build_dep_static",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "-m", "release" } } },
+      { .kind = ACTION_VERIFY_DIR_COUNT, .verify_dir_count = { .dir = ".home/storage/cache/store/core/spum", .count = 1 } },
+      { .kind = ACTION_RUN_BIN, .bin.name = "build_dep_static" },
     },
   });
 }

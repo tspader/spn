@@ -15,29 +15,43 @@
 #include "toolchain/types.h"
 #include "unit/types.h"
 
-spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* build, spn_pkg_id_t id, u32 kinds) {
-  spn_resolved_pkg_t* pkg = sp_ht_getp(s->resolve, id);
+spn_pkg_unit_t* ensure_package_unit(spn_session_t* s, spn_build_unit_t* build, spn_pkg_id_t id) {
   spn_loaded_pkg_t* loaded = sp_ht_getp(s->packages, id);
-  sp_assert(pkg);
   sp_assert(loaded);
 
   spn_pkg_unit_t* unit = spn_session_find_pkg_unit(s, build, id);
   if (!unit) {
     unit = spn_session_add_pkg_unit(s, build, id, loaded);
   }
+  return unit;
+}
+
+void add_package_dep_units(spn_session_t* s, spn_pkg_unit_t* unit, u32 kinds) {
+  spn_resolved_pkg_t* pkg = sp_ht_getp(s->resolve, unit->id.pkg);
+  sp_assert(pkg);
 
   u32 missing = kinds & ~unit->materialized_dep_kinds;
   unit->materialized_dep_kinds |= missing;
   sp_da_for(pkg->edges, it) {
-    if (!(missing & spn_dep_kind_bit(pkg->edges[it].kind))) {
+    spn_dep_kind_t kind = pkg->edges[it].kind;
+    if (!(missing & spn_dep_kind_bit(kind))) {
       continue;
     }
     sp_da_push(unit->deps, ((spn_pkg_dep_t) {
-      .unit = add_package_units(s, build, pkg->edges[it].id, spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE)),
-      .kind = pkg->edges[it].kind,
+      .unit = add_package_units(s, unit->build, pkg->edges[it].id, spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE)),
+      .kind = kind == SPN_DEP_KIND_BUILD ? SPN_DEP_KIND_PACKAGE : kind,
       .private = pkg->edges[it].private,
     }));
   }
+}
+
+spn_pkg_unit_t* add_package_units(spn_session_t* s, spn_build_unit_t* build, spn_pkg_id_t id, u32 kinds) {
+  spn_pkg_unit_t* unit = ensure_package_unit(s, build, id);
+  if (!unit->member) {
+    unit->member = true;
+    sp_da_push(build->packages, unit);
+  }
+  add_package_dep_units(s, unit, kinds);
   return unit;
 }
 

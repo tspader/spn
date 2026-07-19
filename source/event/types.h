@@ -13,6 +13,7 @@
 // and the union arm carrying its payload (SPN_EVT_NONE when it has none).
 // Every consumer table derives from this list, so a new event is one row.
 #define SPN_EVENT_LIST(X) \
+  X(SPN_EVENT_NONE,                         "",                           "",            DEBUG,   INFO,  false, false, SPN_EVT_NONE) \
   X(SPN_EVENT_ERR,                          "err",                        "error",       QUIET,   ERROR, true,  true,  SPN_EVT_NONE) \
   X(SPN_EVENT_ERR_CIRCULAR_DEP,             "err_circular_dep",           "error",       QUIET,   ERROR, true,  true,  SPN_EVT(circular)) \
   X(SPN_EVENT_ERR_UNKNOWN_PKG,              "err_unknown_pkg",            "error",       QUIET,   ERROR, true,  true,  SPN_EVT(unknown)) \

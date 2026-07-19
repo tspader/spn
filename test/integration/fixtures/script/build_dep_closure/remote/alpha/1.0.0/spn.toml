@@ -7,5 +7,6 @@ beta = { version = "1.0.0", private = true }
 
 [[lib]]
 name = "alpha"
-kinds = ["source"]
+kinds = ["static"]
+source = ["alpha.c"]
 headers = ["alpha.h"]

@@ -31,6 +31,8 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app);
 spn_task_step_t spn_task_configure_graph_update(spn_app_t* app);
 spn_task_step_t spn_task_create_units(spn_app_t* app);
 spn_err_union_t add_metaprogram_units(spn_session_t* session);
+spn_pkg_unit_t* ensure_package_unit(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t id);
+void add_package_dep_units(spn_session_t* session, spn_pkg_unit_t* unit, u32 kinds);
 spn_pkg_unit_t* add_package_units(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t id, u32 kinds);
 spn_task_step_t spn_task_build_graph_init(spn_app_t* app);
 spn_task_step_t spn_task_build_graph_update(spn_app_t* app);

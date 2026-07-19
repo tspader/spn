@@ -434,6 +434,7 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
     case SPN_TARGET_BUILD_METAPROGRAM: {
       sp_assert(pkg->metaprogram.pkg == pkg);
       pkg->metaprogram.build.target = target;
+      sp_da_push(pkg->targets, target);
       break;
     }
   }
@@ -524,7 +525,6 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
       .build = { .info = &loaded->build },
     };
   }
-  sp_da_push(build->packages, unit);
   sp_da_init(session->mem, unit->deps);
   sp_da_init(session->mem, unit->libs);
   sp_da_init(session->mem, unit->targets);
