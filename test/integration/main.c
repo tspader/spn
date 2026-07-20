@@ -58,3 +58,5 @@ UTEST_F(harness, tmpfs) {
 #include "freshness.c"
 #include "platform.c"
 #include "profile.c"
+#include "offline.c"
+#include "corrupt.c"
