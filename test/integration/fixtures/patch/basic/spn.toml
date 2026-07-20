@@ -1,0 +1,13 @@
+[package]
+name = "test"
+version = "0.1.0"
+
+[deps.package]
+spum = { path = "vendor/spum" }
+
+[patch."core/spum"]
+files = ["patches/spum.patch"]
+
+[[bin]]
+name = "main"
+source = ["main.c"]

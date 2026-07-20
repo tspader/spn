@@ -1307,7 +1307,7 @@ static spn_err_union_t apply_patch_overrides(spn_resolver_t* resolver, spn_resol
     spn_pkg_info_t* info = sp_alloc_type(resolver->mem, spn_pkg_info_t);
     spn_toml_loader_t ctx = sp_zero;
     spn_toml_loader_init(&ctx, resolver->mem, resolver->intern);
-    if (spn_codegen_load_pkg(&ctx, manifest, info)) {
+    if (spn_codegen_load_pkg(&ctx, manifest, info) || spn_pkg_reject_patches(&ctx, info)) {
       spn_event_buffer_push(resolver->events, (spn_build_event_t) {
         .kind = SPN_EVENT_ERR_MANIFEST,
         .manifest_err = {

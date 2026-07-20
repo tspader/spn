@@ -14,6 +14,7 @@
     "options": { "values": { "ref": "option" } },
     "deps": { "ref": "deps" },
     "config": { "values": { "ref": "config_entry" } },
+    "patch": { "values": { "ref": "patch_entry" } },
     "publish": { "ref": "publish" }
   },
   "definitions": {
@@ -212,6 +213,12 @@
         "private": { "type": "boolean" },
         "when": { "metadata": { "extern": "when", "include": "when/types.h" } },
         "options": { "metadata": { "extern": "when", "include": "when/types.h" } }
+      }
+    },
+
+    "patch_entry": {
+      "properties": {
+        "files": { "elements": { "type": "string" } }
       }
     },
 

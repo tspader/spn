@@ -204,6 +204,7 @@ typedef struct {
   sp_hash_t commit;
   sp_hash_t options;
   sp_hash_t deps;
+  sp_hash_t patches;
   spn_semver_t version;
   spn_build_mode_t mode;
   spn_opt_level_t opt;
@@ -284,6 +285,9 @@ static sp_hash_t hash_package(spn_session_t* session, spn_build_unit_t* build, s
 
   spn_resolved_pkg_t* resolved = sp_ht_getp(session->resolve, id);
   if (resolved) {
+    if (resolved->origin.source.kind == SPN_PKG_TREE_GIT) {
+      fingerprint.patches = resolved->origin.source.git.patches.hash;
+    }
     if (!sp_da_empty(resolved->edges)) {
       sp_da(fingerprint_edge_t) edges = sp_da_new(session->mem, fingerprint_edge_t);
       sp_da_for(resolved->edges, it) {

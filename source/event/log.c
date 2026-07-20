@@ -283,6 +283,26 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_SYNC_STALE] = sp_bind_builder_end(&b);
   }
 
+  // SPN_EVENT_SYNC_PATCH
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_sync_t, name, "name", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_sync_t, url, "url", SP_BIND_STR);
+    }
+    schemas[SPN_EVENT_SYNC_PATCH] = sp_bind_builder_end(&b);
+  }
+
+  // SPN_EVENT_ERR_PATCH
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_patch_err_t, name, "name", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_patch_err_t, kind, "kind", SP_BIND_S32);
+    }
+    schemas[SPN_EVENT_ERR_PATCH] = sp_bind_builder_end(&b);
+  }
+
   // SPN_EVENT_ERR_MANIFEST
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);

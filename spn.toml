@@ -22,12 +22,15 @@ include = ["include", "source", "tools", "tools/codegen"]
 
 [deps.package]
 "spader/sp" = { path = "vendor/sp" }
-"spader/wamr" = { path = "vendor/wamr" }
+wamr = { path = "vendor/wamr" }
 toml = "1.4.0"
 yyjson = "0.13.0"
 
 [deps.test]
 utest = "1.0.0"
+
+[patch.wamr]
+files = ["tools/patches/wamr-wasi-hook.patch"]
 
 [deps.build]
 yyjson = "0.13.0"
@@ -141,6 +144,7 @@ source = [
   "source/codegen/json.c",
   "source/codegen/loader.c",
   "source/codegen/lower.c",
+  "source/git/patch.c",
   "source/codegen/options.c",
   "source/codegen/when.c",
   "source/codegen/gen/config.gen.c",
@@ -190,6 +194,7 @@ source = [
   "source/codegen/json.c",
   "source/codegen/loader.c",
   "source/codegen/lower.c",
+  "source/git/patch.c",
   "source/codegen/options.c",
   "source/codegen/when.c",
   "source/codegen/gen/config.gen.c",
@@ -256,12 +261,15 @@ name = "git"
 source = [
   "source/git/cache.c",
   "source/git/key.c",
+  "source/git/patch.c",
   "source/external/git.c",
+  "source/sp/fs.c",
   "source/sp/str.c",
   "test/core/git/main.c",
   "test/core/git/fixture.c",
   "test/core/git/cache.c",
   "test/core/git/key.c",
+  "test/core/git/patch.c",
   "test/tools/ctx.c",
   "test/tools/repo.c",
   "test/tools/tmp.c",

@@ -17,9 +17,15 @@ typedef struct {
 } spn_git_db_t;
 
 typedef struct {
+  sp_da(sp_str_t) files;
+  sp_hash_t hash;
+} spn_git_patch_set_t;
+
+typedef struct {
   sp_str_t url;
   sp_str_t rev;
   sp_str_t dir;
+  spn_git_patch_set_t patches;
 } spn_git_checkout_id_t;
 
 typedef struct {

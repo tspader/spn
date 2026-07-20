@@ -309,6 +309,28 @@ bool spn_git_rev_on_remote(sp_str_t repo, sp_str_t rev) {
   return contained;
 }
 
+spn_err_t spn_git_apply(sp_mem_t mem, sp_str_t repo, sp_str_t patch, sp_str_t* error) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
+    .command = SP_LIT("git"),
+    .args = {
+      SP_LIT("-C"), repo,
+      SP_LIT("apply"), SP_LIT("--whitespace=nowarn"),
+      patch
+    },
+    .io.err.mode = SP_PS_IO_MODE_REDIRECT,
+  });
+
+  spn_err_t err = SPN_OK;
+  if (result.status.exit_code) {
+    *error = sp_str_copy(mem, sp_str_trim_right(result.out));
+    err = SPN_ERROR;
+  }
+
+  sp_mem_end_scratch(scratch);
+  return err;
+}
+
 spn_err_t spn_git_checkout(sp_str_t repo, sp_str_t id) {
   if (sp_str_empty(id)) return SPN_ERROR;
   if (!spn_git_is_repo_root(repo)) return SPN_ERROR;

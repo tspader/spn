@@ -47,6 +47,7 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_CODEGEN_ERR_PARSE:                return "codegen_parse";
     case SPN_CODEGEN_ERR_FILE_MISSING:         return "codegen_file_missing";
     case SPN_CODEGEN_ERR_INVALID:              return "codegen_invalid";
+    case SPN_CODEGEN_ERR_ROOT_ONLY:            return "codegen_root_only";
     case SPN_ERR_WASM_INIT_FAILED:             return "wasm_init_failed";
     case SPN_ERR_WASM_REGISTER_FAILED:         return "wasm_register_failed";
     case SPN_ERR_WASM_MODULE_LOAD_FAILED:      return "wasm_module_load_failed";
