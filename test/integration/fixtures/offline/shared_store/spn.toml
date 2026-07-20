@@ -1,0 +1,13 @@
+[package]
+name = "first"
+version = "0.1.0"
+
+[deps.package]
+spum = "1.0.0"
+
+[config.spum]
+kind = "static"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
