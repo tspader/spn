@@ -7,11 +7,18 @@ include = ["include", "source/codegen/gen"]
 
 [package.configure]
 source = ["tools/spn/configure.c"]
-include = ["include", "source/codegen/gen"]
+include = ["include", "tools"]
 
 [package.build]
-source = ["tools/spn/build.c"]
-include = ["include", "source/codegen/gen"]
+source = [
+  "tools/spn/build.c",
+  "tools/jtd.c",
+  "tools/codegen/extract.c",
+  "tools/codegen/render.c",
+  "tools/codegen/abi.c",
+  "tools/codegen/run.c",
+]
+include = ["include", "source", "tools", "tools/codegen"]
 
 [deps.package]
 "spader/sp" = { path = "vendor/sp" }
@@ -21,6 +28,9 @@ yyjson = "0.13.0"
 
 [deps.test]
 utest = "1.0.0"
+
+[deps.build]
+yyjson = "0.13.0"
 
 [profile.default]
 toolchain = "zig"
@@ -48,7 +58,17 @@ target = [
 
 [[bin]]
 name = "spn"
-source = ["source/**/*.c"]
+source = [
+  "source/**/*.c",
+  "source/codegen/gen/abi.gen.c",
+  "source/codegen/gen/config.gen.c",
+  "source/codegen/gen/dag_obs.gen.c",
+  "source/codegen/gen/dag_output.gen.c",
+  "source/codegen/gen/fuzz.gen.c",
+  "source/codegen/gen/manifest.gen.c",
+  "source/codegen/gen/release.gen.c",
+  "source/codegen/gen/toolchains.gen.c",
+]
 include = ["include", "source", "source/external", "source/codegen/gen"]
 flags = []
 

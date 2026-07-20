@@ -116,6 +116,17 @@ typedef struct {
   sp_str_t err;
 } abi_t;
 
+typedef struct {
+  sp_str_t schema;
+  sp_str_t out;
+  sp_str_t templates;
+} codegen_paths_t;
+
+typedef void (*codegen_log_fn_t)(void* user, sp_str_t message);
+
+// run.c
+sp_str_t codegen_run(sp_mem_t mem, codegen_paths_t paths, codegen_log_fn_t log, void* user);
+
 // extract.c
 gen_t*  gen_new(sp_mem_t mem);
 bool    gen_extract(gen_t* g, sp_str_t name, jtd_schema_t* schema);
