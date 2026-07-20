@@ -453,3 +453,47 @@ UTEST_F(script, embed) {
     },
   });
 }
+
+UTEST_F(script, input_order) {
+  UTEST_SKIP("pending: canonicalize declared node input/output order in DAG construction");
+  tmpfs_init_named(&uf->fixture.fs, "script_input_order");
+
+  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
+    .project = "test/integration/fixtures/script/input_order",
+    .copy = { "a.txt", "b.txt", "c.txt", "inputs.txt", "inputs.reordered.txt" },
+    .first = {
+      .args = { "build" },
+      .expect = {
+        .events = { { .event = SPN_EVENT_BUILD_SCRIPT_USER_FN } },
+        .exists = { work_file("input_order/gen.h") },
+      },
+    },
+    .rebuilds = {
+      {
+        .change.moves = {
+          { .from = sp_str_lit("inputs.reordered.txt"), .to = sp_str_lit("inputs.txt") },
+        },
+        .command = {
+          .args = { "build" },
+          .expect.events = { { .event = SPN_EVENT_BUILD_SCRIPT_USER_FN, .absent = true } },
+        },
+      },
+    },
+    .watches = {
+      { .file = work_file("input_order/gen.h"), .mtime = REBUILD_MTIME_UNCHANGED },
+    },
+  });
+}
+
+UTEST_F(script, generated_source) {
+  UTEST_SKIP("pending: union declared node outputs into source-glob expansion");
+  tmpfs_init_named(&uf->fixture.fs, "script_generated_source");
+
+  run_command_test(utest_result, &uf->fixture, (command_test_t) {
+    .project = "test/integration/fixtures/script/generated_source",
+    .args = { "build" },
+    .expect = {
+      .exists = { exe("generated_source") },
+    },
+  });
+}
