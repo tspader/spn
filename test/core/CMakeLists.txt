@@ -109,6 +109,7 @@ add_executable(pkg
   ${SRC}/intern/intern.c
   ${SRC}/pkg/pkg.c
   ${SRC}/pkg/mutate.c
+  ${SRC}/pkg/patch.c
   ${SRC}/target/mutate.c
   ${SRC}/sp/str.c
   pkg.c
@@ -200,6 +201,7 @@ add_executable(manifest_lower
   ${SRC}/codegen/when.c
   ${SRC}/codegen/lower.c
   ${SRC}/enum/enum.c
+  ${SRC}/git/patch.c
   ${SRC}/when/when.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/codegen/gen/toolchains.gen.c

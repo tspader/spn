@@ -1,0 +1,5 @@
+--- a/spum.h
++++ b/spum.h
+@@ -1 +1 @@
+-#define SPUM 1
++#define SPUM 3

@@ -22,6 +22,7 @@ typedef struct {
   const c8* url;
   const c8* rev;
   const c8* dir;
+  sp_hash_t patches;
 } checkout_key_input_t;
 
 
@@ -79,9 +80,19 @@ static void run_db_key_uniqueness(s32* utest_result, uniqueness_case_t c) {
   EXPECT_FALSE(sp_str_equal(a, b));
 }
 
+static spn_git_checkout_id_t checkout_id(checkout_key_input_t c) {
+  return (spn_git_checkout_id_t) {
+    .url = sp_str_view(c.url),
+    .rev = sp_str_view(c.rev),
+    .dir = sp_str_view(c.dir),
+    .patches.hash = c.patches,
+  };
+}
+
+
 static void run_checkout_key_format(s32* utest_result, checkout_key_input_t c) {
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-  sp_str_t key = spn_git_checkout_key(mem, sp_str_view(c.url), sp_str_view(c.rev), sp_str_view(c.dir));
+  sp_str_t key = spn_git_checkout_key(mem, checkout_id(c));
   sp_str_t name = spn_git_url_name(sp_str_view(c.url));
 
   ASSERT_TRUE(key.len > name.len + 1);
@@ -94,8 +105,8 @@ static void run_checkout_key_format(s32* utest_result, checkout_key_input_t c) {
 
 static void run_checkout_key_uniqueness(s32* utest_result, checkout_key_input_t a, checkout_key_input_t b) {
   sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-  sp_str_t ka = spn_git_checkout_key(mem, sp_str_view(a.url), sp_str_view(a.rev), sp_str_view(a.dir));
-  sp_str_t kb = spn_git_checkout_key(mem, sp_str_view(b.url), sp_str_view(b.rev), sp_str_view(b.dir));
+  sp_str_t ka = spn_git_checkout_key(mem, checkout_id(a));
+  sp_str_t kb = spn_git_checkout_key(mem, checkout_id(b));
   EXPECT_FALSE(sp_str_equal(ka, kb));
 }
 
@@ -189,4 +200,41 @@ UTEST_F(git_key, checkout_key_different_url) {
     (checkout_key_input_t) { .url = "https://github.com/foo/bar.git", .rev = "aaa", .dir = "" },
     (checkout_key_input_t) { .url = "https://github.com/foo/baz.git", .rev = "aaa", .dir = "" }
   );
+}
+
+// checkout key: patched -> different key than pristine
+UTEST_F(git_key, checkout_key_patched_differs) {
+  run_checkout_key_uniqueness(utest_result,
+    (checkout_key_input_t) { .url = "https://github.com/foo/bar.git", .rev = "aaa", .dir = "" },
+    (checkout_key_input_t) { .url = "https://github.com/foo/bar.git", .rev = "aaa", .dir = "", .patches = 0xdead }
+  );
+}
+
+// checkout key: different patch sets -> different keys
+UTEST_F(git_key, checkout_key_different_patches) {
+  run_checkout_key_uniqueness(utest_result,
+    (checkout_key_input_t) { .url = "https://github.com/foo/bar.git", .rev = "aaa", .dir = "", .patches = 0xdead },
+    (checkout_key_input_t) { .url = "https://github.com/foo/bar.git", .rev = "aaa", .dir = "", .patches = 0xbeef }
+  );
+}
+
+// checkout key: golden. Existing global caches depend on unpatched keys never
+// changing; an implementation that folds a zero patch part into the hash (or
+// otherwise perturbs the formula) breaks every cache dir on disk.
+UTEST_F(git_key, checkout_key_golden) {
+  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+  sp_str_t key = spn_git_checkout_key(mem, checkout_id((checkout_key_input_t) {
+    .url = "https://github.com/foo/bar.git", .rev = "aaa", .dir = ""
+  }));
+  SP_EXPECT_STR_EQ_CSTR(key, "bar-51a9a462b5f729ea");
+}
+
+// checkout key: patched keys keep the <name>-<16 hex> format
+UTEST_F(git_key, checkout_key_patched_format) {
+  run_checkout_key_format(utest_result, (checkout_key_input_t) {
+    .url = "https://github.com/foo/sqlite.git",
+    .rev = "abc123",
+    .dir = "",
+    .patches = 0xdead,
+  });
 }

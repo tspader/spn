@@ -11,6 +11,7 @@ add_executable(publish
   ${SRC}/codegen/options.c
   ${SRC}/codegen/when.c
   ${SRC}/codegen/lower.c
+  ${SRC}/git/patch.c
   ${SRC}/when/when.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/codegen/gen/toolchains.gen.c

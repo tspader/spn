@@ -60,3 +60,4 @@ UTEST_F(harness, tmpfs) {
 #include "profile.c"
 #include "offline.c"
 #include "corrupt.c"
+#include "patch.c"

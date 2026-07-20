@@ -120,6 +120,12 @@ typedef struct {
 } issue_t;
 
 typedef struct {
+  const c8* name;
+  const c8* files [4];
+  bool hashed;
+} patch_t;
+
+typedef struct {
   const c8* manifest;
   const c8* name;
   const c8* namespace;
@@ -145,6 +151,9 @@ typedef struct {
   index_t indexes [4];
   config_t config [8];
   option_t options [4];
+  patch_t patches [4];
+  bool hash_patches;
+  bool reject_patches;
 } test_t;
 
 //////////////
@@ -234,6 +243,13 @@ static void run_case(s32* utest_result, test_t test) {
 
   spn_pkg_info_t pkg = sp_zero;
   spn_pkg_lower(&ctx, &cg, &pkg);
+
+  if (test.hash_patches) {
+    spn_pkg_lower_patch_hashes(&ctx, &pkg);
+  }
+  if (test.reject_patches) {
+    spn_pkg_reject_patches(&ctx, &pkg);
+  }
 
   // Issues
   u32 num_issues = 0;
@@ -394,6 +410,34 @@ static void run_case(s32* utest_result, test_t test) {
     if (expected.url) EXPECT_STR(idx->url, expected.url);
     if (expected.protocol) EXPECT_EQ((u32)expected.protocol, (u32)idx->protocol);
     EXPECT_EQ((u32)expected.kind, (u32)idx->kind);
+  }
+
+  // Patches
+  sp_carr_for(test.patches, it) {
+    patch_t expected = test.patches[it];
+    if (!expected.name) break;
+
+    spn_pkg_patch_t* patch = SP_NULLPTR;
+    sp_da_for(pkg.patches, jt) {
+      if (sp_str_equal(pkg.patches[jt].qualified, sp_str_view(expected.name))) {
+        patch = &pkg.patches[jt];
+        break;
+      }
+    }
+    ASSERT_TRUE(patch);
+
+    u32 num_files = 0;
+    sp_carr_for(expected.files, jt) {
+      if (!expected.files[jt]) break;
+      num_files++;
+    }
+    ASSERT_EQ(num_files, (u32)sp_da_size(patch->set.files));
+    sp_for(jt, num_files) {
+      EXPECT_TRUE(sp_fs_is_absolute(patch->set.files[jt]));
+      EXPECT_TRUE(sp_str_ends_with(patch->set.files[jt], sp_str_view(expected.files[jt])));
+    }
+
+    EXPECT_EQ(expected.hashed, patch->set.hash != 0);
   }
 
   // Config
@@ -1091,6 +1135,63 @@ UTEST(lower, validate_option_bool_values) {
     .manifest = "validate_option_bool_values",
     .issues = {
       { SPN_CODEGEN_ERR_INVALID, "options[0].values" }
+    },
+  });
+}
+
+UTEST(lower, patch_table) {
+  run_case(utest_result, (test_t) {
+    .manifest = "patch_table",
+    .patches = {
+      { .name = "ns/q", .files = { "patches/a.patch", "patches/b.patch" } },
+    },
+  });
+}
+
+UTEST(lower, patch_default_namespace) {
+  run_case(utest_result, (test_t) {
+    .manifest = "patch_default_namespace",
+    .patches = {
+      { .name = "core/q", .files = { "patches/a.patch" } },
+    },
+  });
+}
+
+UTEST(lower, patch_hashes) {
+  run_case(utest_result, (test_t) {
+    .manifest = "patch_table",
+    .hash_patches = true,
+    .patches = {
+      { .name = "ns/q", .files = { "patches/a.patch", "patches/b.patch" }, .hashed = true },
+    },
+  });
+}
+
+UTEST(lower, patch_hash_missing_file) {
+  run_case(utest_result, (test_t) {
+    .manifest = "patch_missing_file",
+    .hash_patches = true,
+    .issues = {
+      { SPN_CODEGEN_ERR_FILE_MISSING, "patch.core/q[0].files" },
+    },
+  });
+}
+
+UTEST(lower, validate_patch_files_empty) {
+  run_case(utest_result, (test_t) {
+    .manifest = "validate_patch_files_empty",
+    .issues = {
+      { SPN_CODEGEN_ERR_MISSING_KEY, "patch.q.files" },
+    },
+  });
+}
+
+UTEST(lower, patch_rejected_outside_root) {
+  run_case(utest_result, (test_t) {
+    .manifest = "patch_table",
+    .reject_patches = true,
+    .issues = {
+      { SPN_CODEGEN_ERR_ROOT_ONLY, "patch" },
     },
   });
 }

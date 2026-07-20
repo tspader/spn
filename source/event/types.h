@@ -30,7 +30,9 @@
   X(SPN_EVENT_SYNC_START,                   "sync_start",                 "Syncing",     DEBUG,   INFO,  false, false, SPN_EVT(sync_start)) \
   X(SPN_EVENT_SYNC_PACKAGE,                 "sync_package",               "Synced",      DEBUG,   INFO,  false, false, SPN_EVT(sync_pkg)) \
   X(SPN_EVENT_SYNC_FAILED,                  "sync_failed",                "error",       QUIET,   ERROR, true,  true,  SPN_EVT(sync_failed)) \
+  X(SPN_EVENT_ERR_PATCH,                    "err_patch",                  "error",       QUIET,   ERROR, true,  true,  SPN_EVT(patch_err)) \
   X(SPN_EVENT_SYNC_STALE,                   "sync_stale",                 "Stale",       NORMAL,  INFO,  false, false, SPN_EVT(sync)) \
+  X(SPN_EVENT_SYNC_PATCH,                   "sync_patch",                 "Patching",    NORMAL,  INFO,  false, false, SPN_EVT(sync)) \
   X(SPN_EVENT_SYNC_END,                     "sync_end",                   "Downloaded",  NORMAL,  INFO,  false, false, SPN_EVT(sync_end)) \
   X(SPN_EVENT_BUILD_SCRIPT_COMPILE,         "script_compile",             "Compiling",   VERBOSE, INFO,  false, false, SPN_EVT(script_compile)) \
   X(SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED,  "script_compile_failed",      "error",       QUIET,   ERROR, true,  true,  SPN_EVT(compile_failed)) \
@@ -167,6 +169,12 @@ typedef struct { u32 num_resolved; u64 time; } spn_evt_resolve_end_t;
 typedef struct { u32 num_packages; u32 num_index; u32 num_file; } spn_evt_sync_start_t;
 typedef struct { sp_str_t name; sp_str_t url; sp_str_t source_path; u64 time; bool fetched; } spn_evt_sync_pkg_t;
 typedef struct { sp_str_t name; sp_str_t url; sp_str_t error; } spn_evt_sync_failed_t;
+
+typedef enum {
+  SPN_PATCH_ERR_UNUSED,
+  SPN_PATCH_ERR_NOT_GIT,
+} spn_evt_patch_err_kind_t;
+typedef struct { sp_str_t name; spn_evt_patch_err_kind_t kind; } spn_evt_patch_err_t;
 typedef struct { sp_str_t name; sp_str_t path; sp_str_t error; sp_da(spn_codegen_issue_t) issues; } spn_evt_manifest_err_t;
 typedef struct { u32 num_synced; u64 time; } spn_evt_sync_end_t;
 typedef struct { sp_str_t fn; sp_str_t args; } spn_evt_api_call_t;
@@ -225,6 +233,7 @@ struct spn_build_event_t {
     spn_evt_sync_start_t sync_start;
     spn_evt_sync_pkg_t sync_pkg;
     spn_evt_sync_failed_t sync_failed;
+    spn_evt_patch_err_t patch_err;
     spn_evt_manifest_err_t manifest_err;
     spn_evt_sync_end_t sync_end;
     spn_evt_api_call_t api_call;

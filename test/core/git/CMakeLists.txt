@@ -1,12 +1,15 @@
 add_executable(git_index
   ${SRC}/git/cache.c
   ${SRC}/git/key.c
+  ${SRC}/git/patch.c
   ${SRC}/external/git.c
+  ${SRC}/sp/fs.c
   ${SRC}/sp/str.c
   main.c
   fixture.c
   cache.c
   key.c
+  patch.c
   ${TEST_TOOLS}/ctx.c
   ${TEST_TOOLS}/tmp.c
   ${TEST_TOOLS}/git.c

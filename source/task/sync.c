@@ -11,6 +11,7 @@
 #include "intern/intern.h"
 #include "log/lazy/lazy.h"
 #include "pkg/id.h"
+#include "pkg/patch.h"
 #include "pkg/types.h"
 #include "resolve/types.h"
 #include "session/session.h"
@@ -170,7 +171,7 @@ static spn_err_t load_manifest(spn_session_t* session, sp_str_t name, sp_str_t p
   spn_pkg_info_t* parsed = sp_alloc_type(spn.mem, spn_pkg_info_t);
   spn_toml_loader_t ctx = sp_zero;
   spn_toml_loader_init(&ctx, spn.mem, session->intern);
-  if (spn_codegen_load_pkg(&ctx, path, parsed)) {
+  if (spn_codegen_load_pkg(&ctx, path, parsed) || spn_pkg_reject_patches(&ctx, parsed)) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_ERR_MANIFEST,
       .manifest_err = {
@@ -219,12 +220,42 @@ static bool package_has_build_deps(spn_resolved_pkg_t* pkg) {
   return false;
 }
 
+static spn_err_t stamp_patches(spn_session_t* session, spn_resolved_pkg_t* pkg, sp_str_t qualified) {
+  switch (spn_pkg_patch_stamp(session->pkg->patches, qualified, &pkg->origin.source)) {
+    case SPN_PKG_PATCH_STAMP_NONE: {
+      return SPN_OK;
+    }
+    case SPN_PKG_PATCH_STAMP_APPLIED: {
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        .kind = SPN_EVENT_SYNC_PATCH,
+        .sync = {
+          .name = qualified,
+          .url = pkg->origin.source.git.url,
+        }});
+      return SPN_OK;
+    }
+    case SPN_PKG_PATCH_STAMP_NOT_GIT: {
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        .kind = SPN_EVENT_ERR_PATCH,
+        .patch_err = {
+          .name = qualified,
+          .kind = SPN_PATCH_ERR_NOT_GIT,
+        }});
+      return SPN_ERROR;
+    }
+  }
+
+  sp_unreachable_return(SPN_ERROR);
+}
+
 static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, spn_loaded_pkg_t* loaded) {
   sp_tm_timer_t timer = sp_tm_start_timer();
   bool fetched = false;
   sp_str_t qualified = spn_intern_str(pkg->id.qualified);
 
   loaded->source = pkg->source;
+
+  spn_try(stamp_patches(session, pkg, qualified));
 
   spn_try(materialize_tree(session, qualified, pkg->origin.recipe, &loaded->roots.recipe, &fetched));
 
@@ -359,6 +390,33 @@ spn_task_step_t spn_task_sync_packages_init(spn_app_t *app) {
   return spn_task_continue();
 }
 
+static spn_err_t check_unused_patches(spn_session_t* session) {
+  spn_err_t err = SPN_OK;
+  sp_da_for(session->pkg->patches, it) {
+    sp_str_t qualified = session->pkg->patches[it].qualified;
+
+    bool used = false;
+    sp_ht_for_kv(session->resolve, jt) {
+      if (sp_str_equal(spn_intern_str(jt.key->qualified), qualified)) {
+        used = true;
+        break;
+      }
+    }
+    if (used) {
+      continue;
+    }
+
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_ERR_PATCH,
+      .patch_err = {
+        .name = qualified,
+        .kind = SPN_PATCH_ERR_UNUSED,
+      }});
+    err = SPN_ERROR;
+  }
+  return err;
+}
+
 spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
   spn_session_t *session = &app->session;
 
@@ -386,6 +444,10 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
       return spn_task_fail(SPN_ERROR);
     }
     return spn_task_continue();
+  }
+
+  if (check_unused_patches(session)) {
+    return spn_task_fail(SPN_ERROR, .reported = true);
   }
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {

@@ -19,4 +19,8 @@ sp_err_t sp_fs_lock_acquire(sp_fs_lock_t* lock, sp_str_t path);
 sp_err_t sp_fs_lock_try_acquire(sp_fs_lock_t* lock, sp_str_t path, bool* acquired);
 sp_err_t sp_fs_lock_release(sp_fs_lock_t* lock);
 
+// A sibling of path that no other thread or process will pick, for building a
+// result out of sight and renaming it into place
+sp_str_t sp_fs_staging_path(sp_mem_t mem, sp_str_t path, sp_str_t extension);
+
 #endif

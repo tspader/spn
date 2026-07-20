@@ -20,6 +20,7 @@ spn_err_union_t spn_toml_load_manifest(sp_mem_t mem, sp_intern_t* intern, sp_str
   spn_toml_loader_init(&t, mem, intern);
 
   sp_try_goto(spn_codegen_load_pkg(&t, path, pkg), err, done);
+  sp_try_goto(spn_pkg_lower_patch_hashes(&t, pkg), err, done);
 
 done:
   if (err) {
