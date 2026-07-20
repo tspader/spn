@@ -10,7 +10,7 @@ else()
   target_link_libraries(embed PRIVATE m)
   add_dependencies(embed headers)
 
-  add_executable(jtd_gen codegen/main.c codegen/extract.c codegen/render.c codegen/abi.c jtd.c)
+  add_executable(jtd_gen codegen/main.c codegen/run.c codegen/extract.c codegen/render.c codegen/abi.c jtd.c)
   set_target_properties(jtd_gen PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   # @spader Rename source/sp/io.h so it doesn't shadow the CRT's io.h
   target_include_directories(jtd_gen PRIVATE
