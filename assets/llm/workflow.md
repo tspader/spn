@@ -1,0 +1,11 @@
+Work TDD style:
+- First, make all changes to types and signatures.
+  - Stub out new functions; do not implement them.
+  - Delete old functions.
+  - Migrate all call sites.
+  - @hacks.md This is important; fix things at the root here, now, in this phase
+- Then, with this stubbed out version, write all your unit tests.
+- Once you have unit tests that compile on all platforms (but fail trivially), iterate with a code review subagent on the shape, style, and coverage of your tests.
+  - This is usually the most important step; think hard
+- Once the tests are validated, write the implementation and get the unit tests passing
+- Once the tests pass, iterate with a code review subagent to check for @review.md, @test.md

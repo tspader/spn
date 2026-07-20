@@ -1,0 +1,7 @@
+[package]
+name = "input_order"
+version = "0.0.1"
+
+[[bin]]
+name = "input_order"
+source = ["main.c"]
