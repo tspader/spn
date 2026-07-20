@@ -99,3 +99,10 @@ sp_err_t sp_fs_lock_release(sp_fs_lock_t* lock) {
   sp_fs_lock_drop(lock);
   return SP_OK;
 }
+
+sp_str_t sp_fs_staging_path(sp_mem_t mem, sp_str_t path, sp_str_t extension) {
+  static sp_atomic_s32_t sequence;
+  sp_tm_epoch_t now = sp_tm_now_epoch();
+  u64 stamp = (((u64)now.s << 20) ^ (u64)now.ns) ^ ((u64)(u32)sp_atomic_s32_add(&sequence, 1) << 48);
+  return sp_fmt(mem, "{}.{}.{}", sp_fmt_str(path), sp_fmt_uint(stamp), sp_fmt_str(extension)).value;
+}

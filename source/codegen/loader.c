@@ -208,6 +208,7 @@ const c8* spn_codegen_err_name(spn_err_t code) {
     case SPN_CODEGEN_ERR_PARSE:          return "parse";
     case SPN_CODEGEN_ERR_FILE_MISSING:   return "file_missing";
     case SPN_CODEGEN_ERR_INVALID:        return "invalid";
+    case SPN_CODEGEN_ERR_ROOT_ONLY:      return "root_only";
     default:                             return "unknown";
   }
 }
@@ -251,6 +252,9 @@ void spn_codegen_issue_write(sp_io_writer_t* w, const spn_codegen_issue_t* issue
       break;
     case SPN_CODEGEN_ERR_FILE_MISSING:
       sp_io_write_str(w, sp_str_lit("file is missing"), SP_NULLPTR);
+      break;
+    case SPN_CODEGEN_ERR_ROOT_ONLY:
+      sp_fmt_io(w, "{.cyan} is only allowed in the root manifest", SP_FMT_STR(issue->path));
       break;
     default:
       sp_fmt_io(w, "invalid field at {.cyan}", SP_FMT_STR(issue->path));

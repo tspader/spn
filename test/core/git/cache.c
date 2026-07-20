@@ -3,6 +3,7 @@
 #include "test.h"
 
 #include "git/cache.h"
+#include "git/patch.h"
 
 
 /////////////////
@@ -13,13 +14,23 @@ typedef struct {
   const c8* content;
 } expect_file_t;
 
+#define CACHE_TEST_MAX_PATCHES 4
+
+typedef struct {
+  const c8* file;
+  const c8* from;
+  const c8* to;
+} patch_edit_t;
+
 typedef struct {
   const c8* rev;
   const c8* dir;
+  patch_edit_t patches [CACHE_TEST_MAX_PATCHES];
 } checkout_req_t;
 
 typedef struct {
   expect_file_t files[8];
+  bool err;
 } checkout_expect_t;
 
 typedef struct {
@@ -50,13 +61,33 @@ UTEST_F_TEARDOWN(git_cache) {
 ///////////////
 // EXECUTOR //
 //////////////
-static spn_git_checkout_id_t build_id(git_repo_result_t* repo, checkout_req_t* req) {
+static spn_git_checkout_id_t build_id(sp_mem_t mem, tmpfs_t* fs, const c8* name, git_repo_result_t* repo, checkout_req_t* req, u32 index) {
   u32 rev_idx = sp_parse_u32(sp_str_view(req->rev));
-  return (spn_git_checkout_id_t) {
+  spn_git_checkout_id_t id = {
     .url = repo->path,
     .rev = repo->commits[rev_idx],
     .dir = req->dir ? sp_str_view(req->dir) : SP_LIT(""),
   };
+
+  if (req->patches[0].file) {
+    sp_da(sp_str_t) files = sp_da_new(mem, sp_str_t);
+    sp_carr_for(req->patches, jt) {
+      patch_edit_t* edit = &req->patches[jt];
+      if (!edit->file) {
+        break;
+      }
+      sp_str_t text = sp_fmt(mem, "--- a/{}\n+++ b/{}\n@@ -1 +1 @@\n-{}+{}",
+        sp_fmt_cstr(edit->file), sp_fmt_cstr(edit->file),
+        sp_fmt_cstr(edit->from), sp_fmt_cstr(edit->to)).value;
+      sp_str_t path = tmpfs_get(fs, sp_fmt(mem, "{}_patch_{}_{}.patch", sp_fmt_cstr(name), sp_fmt_uint(index), sp_fmt_uint(jt)).value);
+      sp_fs_create_file_str(path, text);
+      sp_da_push(files, path);
+    }
+    sp_str_t missing = sp_zero;
+    spn_git_patch_set_load(mem, files, &id.patches, &missing);
+  }
+
+  return id;
 }
 
 static void run_fixture(s32* utest_result, fixture_t fixture) {
@@ -81,7 +112,11 @@ static void run_fixture(s32* utest_result, fixture_t fixture) {
       break;
     }
 
-    spn_git_checkout_id_t id = build_id(&repo, req);
+    checkout_expect_t* expect = &fixture.expect.detail[it];
+    spn_git_checkout_id_t id = build_id(mem, &harness->fs, fixture.repo.name, &repo, req, (u32)it);
+    if (req->patches[0].file) {
+      ASSERT_NE(id.patches.hash, (sp_hash_t)0);
+    }
 
     spn_git_db_t* db = SP_NULLPTR;
     spn_err_t err = spn_git_cache_ensure_db(&cache, id.url, &db);
@@ -93,8 +128,16 @@ static void run_fixture(s32* utest_result, fixture_t fixture) {
 
     spn_git_checkout_t* checkout = SP_NULLPTR;
     err = spn_git_cache_ensure_checkout(&cache, id, &checkout);
-    ASSERT_EQ(err, SPN_OK);
     ASSERT_NE(checkout, SP_NULLPTR);
+
+    if (expect->err) {
+      EXPECT_NE(err, SPN_OK);
+      EXPECT_FALSE(sp_str_empty(checkout->error));
+      EXPECT_FALSE(sp_fs_is_dir(checkout->path));
+    }
+    else {
+      ASSERT_EQ(err, SPN_OK);
+    }
   }
 
   // assert db and checkout counts
@@ -102,13 +145,16 @@ static void run_fixture(s32* utest_result, fixture_t fixture) {
   EXPECT_EQ(fixture.expect.checkouts, sp_str_om_size(cache.checkouts.entries));
 
   // verify each checkout's expected files on disk
-  sp_carr_for(fixture.expect.detail, it) {
+  sp_carr_for(fixture.checkouts, it) {
     checkout_expect_t* expect = &fixture.expect.detail[it];
-    if (!expect->files[0].file) {
+    if (!fixture.checkouts[it].rev) {
       break;
     }
+    if (expect->err || !expect->files[0].file) {
+      continue;
+    }
 
-    spn_git_checkout_id_t id = build_id(&repo, &fixture.checkouts[it]);
+    spn_git_checkout_id_t id = build_id(mem, &harness->fs, fixture.repo.name, &repo, &fixture.checkouts[it], (u32)it);
 
     spn_git_checkout_t* checkout = SP_NULLPTR;
     spn_git_cache_ensure_checkout(&cache, id, &checkout);
@@ -244,6 +290,192 @@ UTEST_F(git_cache, different_commits) {
         {
           .files = {
             { .file = "lib.h", .content = "#define VERSION 2" },
+          },
+        },
+      },
+    },
+  });
+}
+
+UTEST_F(git_cache, patched_checkout_coexists_with_pristine) {
+  run_fixture(utest_result, (fixture_t) {
+    .repo = {
+      .name = "patched",
+      .commits = {
+        {
+          .message = "initial",
+          .files = {
+            { "F", "1\n" },
+          },
+        },
+      },
+    },
+    .checkouts = {
+      { .rev = "0" },
+      {
+        .rev = "0",
+        .patches = {
+          { .file = "F", .from = "1\n", .to = "2\n" },
+        },
+      },
+    },
+    .expect = {
+      .dbs = 1,
+      .checkouts = 2,
+      .detail = {
+        {
+          .files = {
+            { .file = "F", .content = "1\n" },
+          },
+        },
+        {
+          .files = {
+            { .file = "F", .content = "2\n" },
+          },
+        },
+      },
+    },
+  });
+}
+
+UTEST_F(git_cache, patches_apply_in_order) {
+  run_fixture(utest_result, (fixture_t) {
+    .repo = {
+      .name = "ordered",
+      .commits = {
+        {
+          .message = "initial",
+          .files = {
+            { "F", "1\n" },
+          },
+        },
+      },
+    },
+    .checkouts = {
+      {
+        .rev = "0",
+        .patches = {
+          { .file = "F", .from = "1\n", .to = "2\n" },
+          { .file = "F", .from = "2\n", .to = "3\n" },
+        },
+      },
+    },
+    .expect = {
+      .dbs = 1,
+      .checkouts = 1,
+      .detail = {
+        {
+          .files = {
+            { .file = "F", .content = "3\n" },
+          },
+        },
+      },
+    },
+  });
+}
+
+UTEST_F(git_cache, patches_apply_at_repo_root_before_subdir) {
+  run_fixture(utest_result, (fixture_t) {
+    .repo = {
+      .name = "patched_monorepo",
+      .commits = {
+        {
+          .message = "initial",
+          .files = {
+            { "M/F", "1\n" },
+            { "A/F", "1\n" },
+          },
+        },
+      },
+    },
+    .checkouts = {
+      {
+        .rev = "0",
+        .dir = "M",
+        .patches = {
+          { .file = "M/F", .from = "1\n", .to = "2\n" },
+        },
+      },
+    },
+    .expect = {
+      .dbs = 1,
+      .checkouts = 1,
+      .detail = {
+        {
+          .files = {
+            { .file = "F", .content = "2\n" },
+          },
+        },
+      },
+    },
+  });
+}
+
+UTEST_F(git_cache, patch_conflict_fails_without_checkout) {
+  run_fixture(utest_result, (fixture_t) {
+    .repo = {
+      .name = "conflicted",
+      .commits = {
+        {
+          .message = "initial",
+          .files = {
+            { "F", "1\n" },
+          },
+        },
+      },
+    },
+    .checkouts = {
+      {
+        .rev = "0",
+        .patches = {
+          { .file = "F", .from = "9\n", .to = "8\n" },
+        },
+      },
+    },
+    .expect = {
+      .dbs = 1,
+      .checkouts = 1,
+      .detail = {
+        { .err = true },
+      },
+    },
+  });
+}
+
+UTEST_F(git_cache, patched_idempotent_ensure) {
+  run_fixture(utest_result, (fixture_t) {
+    .repo = {
+      .name = "patched_idempotent",
+      .commits = {
+        {
+          .message = "initial",
+          .files = {
+            { "F", "1\n" },
+          },
+        },
+      },
+    },
+    .checkouts = {
+      {
+        .rev = "0",
+        .patches = {
+          { .file = "F", .from = "1\n", .to = "2\n" },
+        },
+      },
+      {
+        .rev = "0",
+        .patches = {
+          { .file = "F", .from = "1\n", .to = "2\n" },
+        },
+      },
+    },
+    .expect = {
+      .dbs = 1,
+      .checkouts = 1,
+      .detail = {
+        {
+          .files = {
+            { .file = "F", .content = "2\n" },
           },
         },
       },

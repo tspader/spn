@@ -21,7 +21,7 @@ spn_registry_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_
   spn_pkg_info_t* info = sp_alloc_type(mem, spn_pkg_info_t);
   spn_toml_loader_t ctx = sp_zero;
   spn_toml_loader_init(&ctx, mem, intern);
-  if (spn_codegen_load_pkg(&ctx, manifest, info)) {
+  if (spn_codegen_load_pkg(&ctx, manifest, info) || spn_pkg_reject_patches(&ctx, info)) {
     err->error = spn_codegen_issues_message(mem, ctx.issues);
     err->issues = ctx.issues;
     return SP_NULLPTR;

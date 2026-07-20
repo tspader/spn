@@ -49,17 +49,9 @@ SP_PRIVATE spn_err_t spn_toolchain_provision_fetch(spn_toolchain_store_t* store,
   return store->fetch(*url, dest, store->fetch_user_data);
 }
 
-SP_PRIVATE u64 spn_toolchain_provision_stamp(void) {
-  static sp_atomic_s32_t sequence;
-  sp_tm_epoch_t now = sp_tm_now_epoch();
-  u64 stamp = ((u64)now.s << 20) ^ (u64)now.ns;
-  return stamp ^ ((u64)(u32)sp_atomic_s32_add(&sequence, 1) << 48);
-}
-
 SP_PRIVATE spn_err_union_t spn_toolchain_provision_fill(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, spn_artifact_t artifact, sp_str_t dest) {
-  u64 stamp = spn_toolchain_provision_stamp();
-  sp_str_t tarball = sp_fmt(store->mem, "{}.{}.download", sp_fmt_str(dest), sp_fmt_uint(stamp)).value;
-  sp_str_t work = sp_fmt(store->mem, "{}.{}.tmp", sp_fmt_str(dest), sp_fmt_uint(stamp)).value;
+  sp_str_t tarball = sp_fs_staging_path(store->mem, dest, sp_str_lit("download"));
+  sp_str_t work = sp_fs_staging_path(store->mem, dest, sp_str_lit("tmp"));
 
   sp_str_t url = sp_zero;
   if (spn_toolchain_provision_fetch(store, artifact, tarball, &url)) {

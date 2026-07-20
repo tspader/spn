@@ -9,6 +9,7 @@
 #include "intern/intern.h"
 #include "pkg/pkg.h"
 #include "pkg/mutate.h"
+#include "pkg/patch.h"
 #include "profile/types.h"
 #include "target/mutate.h"
 
@@ -99,5 +100,53 @@ UTEST(pkg, hash_platform) {
 
   sp_carr_for(tests, it) {
     run_hash_platform_test(utest_result, tests[it]);
+  }
+}
+
+typedef struct {
+  spn_pkg_patch_stamp_result_t result;
+  sp_hash_t hash;
+} stamp_expect_t;
+
+typedef struct {
+  const c8* patches [2];
+  const c8* qualified;
+  spn_pkg_tree_kind_t tree;
+  stamp_expect_t expect;
+} stamp_test_t;
+
+static void run_stamp_test(s32* utest_result, stamp_test_t t) {
+  sp_mem_t mem = pkg_test_init();
+
+  sp_da(spn_pkg_patch_t) patches = sp_da_new(mem, spn_pkg_patch_t);
+  sp_carr_for(t.patches, it) {
+    if (!t.patches[it]) break;
+    sp_da_push(patches, ((spn_pkg_patch_t) {
+      .qualified = sp_str_view(t.patches[it]),
+      .set.hash = (sp_hash_t)(it + 1),
+    }));
+  }
+
+  spn_pkg_tree_t source = { .kind = t.tree };
+  spn_pkg_patch_stamp_result_t result = spn_pkg_patch_stamp(patches, sp_str_view(t.qualified), &source);
+
+  EXPECT_EQ((u32)t.expect.result, (u32)result);
+  if (t.tree == SPN_PKG_TREE_GIT) {
+    EXPECT_EQ(t.expect.hash, source.git.patches.hash);
+  }
+}
+
+UTEST(pkg, patch_stamp) {
+  stamp_test_t tests [] = {
+    { .patches = { "core/a" }, .qualified = "core/a", .tree = SPN_PKG_TREE_GIT,   .expect = { SPN_PKG_PATCH_STAMP_APPLIED, 1 } },
+    { .patches = { "core/a" }, .qualified = "core/b", .tree = SPN_PKG_TREE_GIT,   .expect = { SPN_PKG_PATCH_STAMP_NONE } },
+    { .patches = { "core/a", "core/b" }, .qualified = "core/b", .tree = SPN_PKG_TREE_GIT, .expect = { SPN_PKG_PATCH_STAMP_APPLIED, 2 } },
+    { .patches = { "core/a" }, .qualified = "core/a", .tree = SPN_PKG_TREE_NONE,  .expect = { SPN_PKG_PATCH_STAMP_NOT_GIT } },
+    { .patches = { "core/a" }, .qualified = "core/a", .tree = SPN_PKG_TREE_LOCAL, .expect = { SPN_PKG_PATCH_STAMP_NOT_GIT } },
+    { .qualified = "core/a", .tree = SPN_PKG_TREE_NONE, .expect = { SPN_PKG_PATCH_STAMP_NONE } },
+  };
+
+  sp_carr_for(tests, it) {
+    run_stamp_test(utest_result, tests[it]);
   }
 }

@@ -247,7 +247,8 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
   sp_io_dyn_mem_writer_init(mem, &w);
 
   switch (event->kind) {
-    case SPN_EVENT_SYNC: {
+    case SPN_EVENT_SYNC:
+    case SPN_EVENT_SYNC_PATCH: {
       sp_fmt_io(&w.base, "{} {.gray}", sp_fmt_str(event->sync.name), sp_fmt_str(event->sync.url));
       break;
     }
@@ -598,6 +599,27 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
         sp_fmt_str(spn_tui_colored_name(mem, event->sync.name)),
         sp_fmt_str(event->sync.url)
       );
+      break;
+    }
+    case SPN_EVENT_ERR_PATCH: {
+      switch (event->patch_err.kind) {
+        case SPN_PATCH_ERR_UNUSED: {
+          sp_fmt_io(
+            &w.base,
+            "[patch.{.cyan}] does not name a package in this build",
+            sp_fmt_str(event->patch_err.name)
+          );
+          break;
+        }
+        case SPN_PATCH_ERR_NOT_GIT: {
+          sp_fmt_io(
+            &w.base,
+            "[patch.{.cyan}] names a package whose sources are not fetched from git; only git sources can be patched",
+            sp_fmt_str(event->patch_err.name)
+          );
+          break;
+        }
+      }
       break;
     }
     case SPN_EVENT_ERR: {
@@ -1130,6 +1152,7 @@ static sp_str_t spn_tui_event_subject(spn_build_event_t* event) {
   switch (event->kind) {
     case SPN_EVENT_ERR_MANIFEST:              return event->manifest_err.name;
     case SPN_EVENT_SYNC_FAILED:               return event->sync_failed.name;
+    case SPN_EVENT_ERR_PATCH:                 return event->patch_err.name;
     case SPN_EVENT_ERR_UNKNOWN_PKG:           return event->unknown.request.qualified;
     case SPN_EVENT_ERR_CIRCULAR_DEP:          return event->circular.id.name;
     case SPN_EVENT_ERR_UNSATISFIABLE_VERSION: return event->unsatisfiable.request.qualified;

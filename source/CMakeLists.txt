@@ -59,6 +59,7 @@ set(SPN_SOURCES
   filter/filter.c
   git/cache.c
   git/key.c
+  git/patch.c
   index/cache.c
   index/index.c
   index/json.c
@@ -70,6 +71,7 @@ set(SPN_SOURCES
   log/log.c
   pkg/id.c
   pkg/mutate.c
+  pkg/patch.c
   pkg/options.c
   pkg/pkg.c
   profile/profile.c

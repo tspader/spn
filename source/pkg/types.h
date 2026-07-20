@@ -91,6 +91,11 @@ typedef struct {
   sp_str_t to;
 } spn_publish_copy_t;
 
+typedef struct {
+  sp_str_t qualified;
+  spn_git_patch_set_t set;
+} spn_pkg_patch_t;
+
 typedef sp_str_om(spn_target_info_t)     spn_target_map_t;
 typedef sp_str_om(spn_profile_info_t)    spn_profile_map_t;
 typedef sp_str_om(spn_index_info_t)      spn_index_map_t;
@@ -117,6 +122,7 @@ struct spn_pkg_info {
   spn_index_map_t indexes;
   sp_da(spn_requested_dep_t) deps;
   sp_da(spn_pkg_config_entry_t) config;
+  sp_da(spn_pkg_patch_t) patches;
   spn_option_map_t options;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;

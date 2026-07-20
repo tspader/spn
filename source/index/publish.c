@@ -31,7 +31,7 @@ spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t*
   spn_pkg_info_t info = sp_zero;
   spn_toml_loader_t ctx = sp_zero;
   spn_toml_loader_init(&ctx, opts->mem, opts->intern);
-  if (spn_codegen_load_pkg(&ctx, manifest_path, &info)) {
+  if (spn_codegen_load_pkg(&ctx, manifest_path, &info) || spn_pkg_reject_patches(&ctx, &info)) {
     return spn_codegen_err(&ctx);
   }
 
