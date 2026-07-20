@@ -26,7 +26,7 @@ typedef enum {
   ACTION_CREATE_FILE,
   ACTION_REMOVE_DIR,
   ACTION_SUBPROCESS,
-  ACTION_RUN_BIN,
+  ACTION_RUN_BIN, // @spader See comment above; do not use this unless you're very confident you need to
   ACTION_RUN_TEST,
   ACTION_VERIFY_EXISTS,
   ACTION_VERIFY_NOT_EXISTS,
