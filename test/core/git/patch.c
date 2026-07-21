@@ -13,6 +13,7 @@
 typedef struct {
   spn_err_t err;
   const c8* missing;
+  u32 missing_index;
   bool hash_matches_pair;
 } patch_load_expect_t;
 
@@ -63,23 +64,23 @@ static void run_patch_load(s32* utest_result, patch_load_t t) {
     sp_da_push(files, tmpfs_get(&harness->fs, sp_str_view(t.expect.missing)));
   }
 
-  spn_git_patch_set_t set = sp_zero;
-  sp_str_t missing = sp_zero;
-  spn_err_t err = spn_git_patch_set_load(mem, files, &set, &missing);
+  spn_git_patch_set_t set = { .files = files };
+  u32 missing = 0;
+  spn_err_t err = spn_git_patch_set_hash(&set, &missing);
   EXPECT_EQ(err, t.expect.err);
 
   if (t.expect.err) {
-    EXPECT_TRUE(sp_str_ends_with(missing, sp_str_view(t.expect.missing)));
+    EXPECT_EQ(missing, t.expect.missing_index);
+    EXPECT_EQ(set.hash, (sp_hash_t)0);
     return;
   }
 
   EXPECT_NE(set.hash, (sp_hash_t)0);
-  EXPECT_EQ(sp_da_size(set.files), sp_da_size(files));
 
   if (t.pair[0]) {
     sp_da(sp_str_t) pair_files = write_patch_files(mem, &harness->fs, t.name, "b", t.pair, PATCH_TEST_MAX_FILES);
-    spn_git_patch_set_t pair = sp_zero;
-    spn_err_t pair_err = spn_git_patch_set_load(mem, pair_files, &pair, &missing);
+    spn_git_patch_set_t pair = { .files = pair_files };
+    spn_err_t pair_err = spn_git_patch_set_hash(&pair, &missing);
     EXPECT_EQ(pair_err, SPN_OK);
     EXPECT_EQ(t.expect.hash_matches_pair, set.hash == pair.hash);
   }
@@ -125,6 +126,6 @@ UTEST_F(git_patch, missing_file) {
   run_patch_load(utest_result, (patch_load_t) {
     .name = "missing",
     .files = { "A" },
-    .expect = { .err = SPN_ERROR, .missing = "missing_nonexistent.patch" },
+    .expect = { .err = SPN_ERROR, .missing = "missing_nonexistent.patch", .missing_index = 1 },
   });
 }

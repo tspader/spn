@@ -66,6 +66,7 @@ add_executable(sp_cc
   ${GEN_DIR}/dag_output.gen.c
   ${GEN_DIR}/dag_obs.gen.c
   ${CMAKE_SOURCE_DIR}/source/sha256/sha256.c
+  ${CMAKE_SOURCE_DIR}/source/sp/fs.c
   ${CMAKE_SOURCE_DIR}/source/sp/io.c)
 set_target_properties(sp_cc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${STORE}/bin)
 target_include_directories(sp_cc PRIVATE ${CMAKE_SOURCE_DIR}/source ${CMAKE_SOURCE_DIR}/include ${GEN_DIR} ${STORE}/include)
@@ -84,6 +85,7 @@ add_executable(sp_lib
   ${GEN_DIR}/dag_output.gen.c
   ${GEN_DIR}/dag_obs.gen.c
   ${CMAKE_SOURCE_DIR}/source/sha256/sha256.c
+  ${CMAKE_SOURCE_DIR}/source/sp/fs.c
   ${CMAKE_SOURCE_DIR}/source/sp/io.c)
 set_target_properties(sp_lib PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${STORE}/bin)
 target_include_directories(sp_lib PRIVATE ${CMAKE_SOURCE_DIR}/source ${CMAKE_SOURCE_DIR}/include ${GEN_DIR} ${STORE}/include)

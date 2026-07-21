@@ -20,7 +20,11 @@ sp_err_t sp_fs_lock_try_acquire(sp_fs_lock_t* lock, sp_str_t path, bool* acquire
 sp_err_t sp_fs_lock_release(sp_fs_lock_t* lock);
 
 // A sibling of path that no other thread or process will pick, for building a
-// result out of sight and renaming it into place
+// result out of sight and renaming it into place. The name alone does not
+// claim anything; use sp_fs_staging_dir when the staging target is a
+// directory so a clash surfaces as a retry instead of two writers sharing it
 sp_str_t sp_fs_staging_path(sp_mem_t mem, sp_str_t path, sp_str_t extension);
+
+sp_err_t sp_fs_staging_dir(sp_mem_t mem, sp_str_t path, sp_str_t extension, sp_str_t* dir);
 
 #endif

@@ -226,12 +226,14 @@ static spn_err_t stamp_patches(spn_session_t* session, spn_resolved_pkg_t* pkg, 
       return SPN_OK;
     }
     case SPN_PKG_PATCH_STAMP_APPLIED: {
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_SYNC_PATCH,
-        .sync = {
-          .name = qualified,
-          .url = pkg->origin.source.git.url,
-        }});
+      if (!spn_git_cache_is_checkout_cached(session->git, pkg->origin.source.git)) {
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
+          .kind = SPN_EVENT_SYNC_PATCH,
+          .sync = {
+            .name = qualified,
+            .url = pkg->origin.source.git.url,
+          }});
+      }
       return SPN_OK;
     }
     case SPN_PKG_PATCH_STAMP_NOT_GIT: {

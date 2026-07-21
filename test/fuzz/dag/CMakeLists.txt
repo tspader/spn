@@ -11,6 +11,7 @@ add_executable(fuzz_dag
   ${SRC}/codegen/gen/fuzz.gen.c
   ${SRC}/external/tom.c
   ${SRC}/sha256/sha256.c
+  ${SRC}/sp/fs.c
   ${SRC}/sp/io.c
   ${SRC}/intern/intern.c
   main.c
