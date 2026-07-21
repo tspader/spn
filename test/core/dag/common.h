@@ -45,5 +45,5 @@ spn_dag_t*       dag_test_env_graph(dag_test_env_t* env);
 void             dag_test_env_deinit(dag_test_env_t* env);
 spn_dag_digest_t dag_test_digest(const c8* data);
 u32              dag_test_obs_build(const dag_test_obs_t* specs, u32 cap, spn_dag_obs_t* out);
-s32              dag_test_exec_stamp(spn_dag_action_t* action, void* user_data);
+s32              dag_test_exec_stamp(spn_dag_t* g, spn_dag_action_t* action, void* user_data);
 void             dag_test_expect_file(s32* utest_result, sp_mem_t mem, sp_str_t path, const c8* expected);

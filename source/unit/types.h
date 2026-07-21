@@ -5,7 +5,6 @@
 #include "sp.h"
 #include "spn.h"
 
-#include "graph/types.h"
 #include "dag/types.h"
 #include "compiler/types.h"
 #include "filter/types.h"
@@ -121,12 +120,6 @@ typedef struct {
   spn_invocation_t invocation;
 
   struct {
-    spn_bg_id_t source;
-    spn_bg_id_t compile;
-    spn_bg_id_t object;
-  } nodes;
-
-  struct {
     spn_dag_id_t action;
     spn_dag_id_t object;
   } dag;
@@ -164,16 +157,6 @@ struct spn_target_unit {
     sp_da(sp_str_t) private_libs;
     sp_da(sp_str_t) frameworks;
   } link;
-
-  struct {
-    spn_bg_id_t output;
-    spn_bg_id_t link;
-    struct {
-      spn_bg_id_t run;
-      spn_bg_id_t object;
-      spn_bg_id_t header;
-    } embed;
-  } nodes;
 
   struct {
     spn_dag_id_t action;
@@ -217,10 +200,6 @@ struct spn_pkg_unit_t {
   sp_da(spn_target_unit_t*) targets;
 
   struct {
-    struct {
-      spn_bg_id_t run;
-      spn_bg_id_t stamp;
-    } configure;
     sp_da(spn_user_node_t) user;
   } nodes;
 
@@ -229,6 +208,10 @@ struct spn_pkg_unit_t {
     spn_dag_id_t package;
     spn_dag_id_t stamp;
     sp_da(spn_dag_id_t) user_outputs;
+    struct {
+      spn_dag_id_t action;
+      spn_dag_id_t stamp;
+    } configure;
   } dag;
 
   struct {

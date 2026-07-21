@@ -10,8 +10,10 @@ typedef struct {
   const c8* inputs [DAG_TEST_MAX_INPUTS];
   const c8* discovers [DAG_TEST_MAX_INPUTS];
   const c8* output;
+  const c8* writes;
   bool tree;
   bool fails;
+  bool uncacheable;
 } run_action_t;
 
 typedef struct {
@@ -36,7 +38,7 @@ typedef struct {
 
 UTEST_EMPTY_FIXTURE(run)
 
-static s32 on_exec(spn_dag_action_t* action, void* user_data) {
+static s32 on_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   run_ctx_t* ctx = (run_ctx_t*)user_data;
   if (ctx->spec->fails) {
     return 1;
@@ -49,14 +51,16 @@ static s32 on_exec(spn_dag_action_t* action, void* user_data) {
   }
   ctx->env->runs++;
   spn_dag_artifact_t* out = spn_dag_find_artifact(ctx->g, action->produces[0]);
-  sp_str_t content = sp_fmt(ctx->env->fs.mem, "{}", sp_fmt_uint(ctx->env->runs)).value;
+  sp_str_t content = ctx->spec->writes
+    ? sp_str_view(ctx->spec->writes)
+    : sp_fmt(ctx->env->fs.mem, "{}", sp_fmt_uint(ctx->env->runs)).value;
   if (out->kind == SPN_DAG_ARTIFACT_KIND_TREE) {
     return sp_fs_create_file_str(sp_fs_join_path(ctx->env->fs.mem, out->path, sp_str_lit("H")), sp_str_lit("T")) ? 1 : 0;
   }
   return sp_fs_create_file_str(out->path, content) ? 1 : 0;
 }
 
-static spn_err_t on_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t on_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   run_ctx_t* ctx = (run_ctx_t*)user_data;
   sp_carr_for(ctx->spec->discovers, it) {
     if (!ctx->spec->discovers[it]) {
@@ -86,7 +90,8 @@ static void run_dag(s32* utest_result, dag_test_env_t* env, spn_dag_t* g, run_te
       .identity = dag_test_digest(spec->identity),
       .execute = on_exec,
       .discover = spec->discovers[0] ? on_discover : SP_NULLPTR,
-      .user_data = ctx
+      .user_data = ctx,
+      .uncacheable = spec->uncacheable
     });
     sp_carr_for(spec->inputs, ii) {
       if (!spec->inputs[ii]) {
@@ -242,6 +247,34 @@ UTEST_F(run, failing_action_stops_build) {
     },
     .builds = {
       { .sources = { { "S", "A" } }, .expect_err = SPN_ERR_DAG_ACTION },
+    }
+  });
+}
+
+UTEST_F(run, uncacheable_stable_output_downstream_hits) {
+  run_test(&ur, (run_test_t) {
+    .name = "run_uncacheable_stable",
+    .actions = {
+      { .identity = "I", .inputs = { "S" }, .output = "X", .writes = "C", .uncacheable = true },
+      { .identity = "J", .inputs = { "X" }, .output = "Y" },
+    },
+    .builds = {
+      { .sources = { { "S", "A" } }, .expect_runs = 2 },
+      { .sources = { { "S", "A" } }, .expect_runs = 3 },
+    }
+  });
+}
+
+UTEST_F(run, uncacheable_changed_output_reruns_downstream) {
+  run_test(&ur, (run_test_t) {
+    .name = "run_uncacheable_changed",
+    .actions = {
+      { .identity = "I", .inputs = { "S" }, .output = "X", .uncacheable = true },
+      { .identity = "J", .inputs = { "X" }, .output = "Y" },
+    },
+    .builds = {
+      { .sources = { { "S", "A" } }, .expect_runs = 2 },
+      { .sources = { { "S", "A" } }, .expect_runs = 4 },
     }
   });
 }

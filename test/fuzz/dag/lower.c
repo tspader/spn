@@ -6,7 +6,7 @@ typedef struct {
   u64 action;
 } fz_exec_ctx_t;
 
-static s32 fz_exec(spn_dag_action_t* action, void* user_data) {
+static s32 fz_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   fz_exec_ctx_t* ctx = (fz_exec_ctx_t*)user_data;
   fz_lowered_t* low = ctx->low;
   sp_mem_t mem = low->mem;
@@ -74,7 +74,7 @@ static s32 fz_exec(spn_dag_action_t* action, void* user_data) {
   return 0;
 }
 
-static spn_err_t fz_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t fz_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   fz_exec_ctx_t* ctx = (fz_exec_ctx_t*)user_data;
   fz_lowered_t* low = ctx->low;
 

@@ -54,9 +54,3 @@ s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t d
 
   return run.result.status.exit_code;
 }
-
-s32 compile_object(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_compile_unit_t* unit = (spn_compile_unit_t*)user_data;
-  sp_fs_create_dir(sp_fs_parent_path(unit->paths.object));
-  return spn_compile_object_run(unit, unit->paths.object, sp_str_lit(""));
-}

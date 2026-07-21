@@ -5,6 +5,7 @@
 #include "spn.h"
 
 typedef struct spn_dag_action_t spn_dag_action_t;
+typedef struct spn_dag_t spn_dag_t;
 
 typedef struct {
   u8 bytes [32];
@@ -40,8 +41,8 @@ typedef struct {
   sp_str_t relative;
 } spn_dag_match_t;
 
-SP_TYPEDEF_FN(s32, spn_dag_exec_fn_t, spn_dag_action_t*, void*);
-SP_TYPEDEF_FN(spn_err_t, spn_dag_discover_fn_t, spn_dag_action_t*, void*, sp_mem_t, sp_da(spn_dag_obs_t)*);
+SP_TYPEDEF_FN(s32, spn_dag_exec_fn_t, spn_dag_t*, spn_dag_action_t*, void*);
+SP_TYPEDEF_FN(spn_err_t, spn_dag_discover_fn_t, spn_dag_t*, spn_dag_action_t*, void*, sp_mem_t, sp_da(spn_dag_obs_t)*);
 
 typedef struct {
   u32 index;
@@ -71,6 +72,7 @@ struct spn_dag_action_t {
   spn_dag_exec_fn_t execute;
   spn_dag_discover_fn_t discover;
   void* user_data;
+  bool uncacheable;
   sp_da(spn_dag_id_t) consumes;
   sp_da(spn_dag_id_t) produces;
   bool wrote;
@@ -81,15 +83,16 @@ typedef struct {
   spn_dag_exec_fn_t execute;
   spn_dag_discover_fn_t discover;
   void* user_data;
+  bool uncacheable;
 } spn_dag_action_config_t;
 
-typedef struct {
+struct spn_dag_t {
   sp_mem_arena_t* arena;
   sp_mem_t mem;
   sp_da(spn_dag_artifact_t) artifacts;
   sp_da(spn_dag_action_t) actions;
   sp_ht(sp_str_t, spn_dag_id_t) paths;
-} spn_dag_t;
+};
 
 typedef struct {
   sp_mem_arena_t* arena;

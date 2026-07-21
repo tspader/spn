@@ -242,7 +242,7 @@ typedef struct {
   const c8* pattern;
 } glob_exec_env_t;
 
-static spn_err_t glob_exec_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t glob_exec_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   glob_exec_env_t* env = (glob_exec_env_t*)user_data;
   return spn_dag_glob(mem, env->root, sp_str_view(env->pattern), out, SP_NULLPTR);
 }

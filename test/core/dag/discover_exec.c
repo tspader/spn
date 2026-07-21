@@ -33,7 +33,7 @@ typedef struct {
 
 UTEST_EMPTY_FIXTURE(discover_exec)
 
-static spn_err_t on_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t on_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   env_t* env = (env_t*)user_data;
   if (env->run->discover_fails) {
     return SPN_ERROR;

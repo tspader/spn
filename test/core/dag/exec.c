@@ -17,6 +17,7 @@ typedef struct {
   const c8* inputs [DAG_TEST_MAX_INPUTS];
   const c8* outputs [DAG_TEST_MAX_OUTPUTS];
   const c8* write [DAG_TEST_MAX_OUTPUTS];
+  bool uncacheable;
 } exec_action_t;
 
 typedef struct {
@@ -59,7 +60,7 @@ typedef struct {
 
 UTEST_EMPTY_FIXTURE(exec)
 
-static s32 exec_test_fn(spn_dag_action_t* action, void* user_data) {
+static s32 exec_test_fn(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   exec_fn_ctx_t* ctx = (exec_fn_ctx_t*)user_data;
   if (ctx->behavior == EXEC_BEHAVIOR_FAIL) {
     return 1;
@@ -121,7 +122,8 @@ static void exec_action_run(s32* utest_result, exec_env_t* env, exec_action_t sp
   spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
     .identity = dag_test_digest(spec.identity),
     .execute = exec_test_fn,
-    .user_data = &ctx
+    .user_data = &ctx,
+    .uncacheable = spec.uncacheable
   });
 
   sp_carr_for(spec.inputs, it) {
@@ -337,6 +339,17 @@ UTEST_F(exec, missing_output_not_cached) {
     .ops = {
       { .kind = EXEC_OP_RUN, .behavior = EXEC_BEHAVIOR_SKIP_LAST_OUTPUT, .expect = { .err = SPN_ERR_DAG_MISSING_OUTPUT, .runs = 1 } },
       { .kind = EXEC_OP_RUN, .expect = { .runs = 2, .contents = { "V2", "W2" } } },
+    }
+  });
+}
+
+UTEST_F(exec, uncacheable_always_executes) {
+  run_exec_test(&ur, (exec_test_t) {
+    .name = "exec_uncacheable",
+    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" }, .uncacheable = true },
+    .ops = {
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1" } } },
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 2, .contents = { "V2" } } },
     }
   });
 }

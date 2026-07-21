@@ -56,7 +56,7 @@ static sp_str_t lib_dep_path(lib_compile_t* c, sp_mem_t mem) {
   return sp_fmt(mem, "{}.d", sp_fmt_str(lib_obj_path(c))).value;
 }
 
-static s32 lib_compile_exec(spn_dag_action_t* action, void* user_data) {
+static s32 lib_compile_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   lib_compile_t* c = (lib_compile_t*)user_data;
   lib_app_t* app = c->app;
 
@@ -89,7 +89,7 @@ static spn_err_t lib_deps_parse(sp_mem_t mem, sp_str_t content, sp_da(sp_str_t)*
   return p.err ? SPN_ERROR : SPN_OK;
 }
 
-static spn_err_t lib_compile_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t lib_compile_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   lib_compile_t* c = (lib_compile_t*)user_data;
   sp_str_t content = sp_zero;
   spn_try_as(sp_io_read_file(mem, lib_dep_path(c, mem), &content), SPN_ERROR);
@@ -106,7 +106,7 @@ static spn_err_t lib_compile_discover(spn_dag_action_t* action, void* user_data,
   return SPN_OK;
 }
 
-static s32 lib_archive_exec(spn_dag_action_t* action, void* user_data) {
+static s32 lib_archive_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   lib_app_t* app = (lib_app_t*)user_data;
 
   sp_ps_config_t ps = { .command = sp_str_lit("ar") };
@@ -119,7 +119,7 @@ static s32 lib_archive_exec(spn_dag_action_t* action, void* user_data) {
   return lib_run(app, ps);
 }
 
-static s32 lib_shared_exec(spn_dag_action_t* action, void* user_data) {
+static s32 lib_shared_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   lib_app_t* app = (lib_app_t*)user_data;
 
   sp_ps_config_t ps = { .command = app->clang };
@@ -133,7 +133,7 @@ static s32 lib_shared_exec(spn_dag_action_t* action, void* user_data) {
   return lib_run(app, ps);
 }
 
-static s32 lib_exe_exec(spn_dag_action_t* action, void* user_data) {
+static s32 lib_exe_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   lib_app_t* app = (lib_app_t*)user_data;
 
   sp_ps_config_t ps = { .command = app->clang };
@@ -147,7 +147,7 @@ static s32 lib_exe_exec(spn_dag_action_t* action, void* user_data) {
   return lib_run(app, ps);
 }
 
-static s32 lib_headers_exec(spn_dag_action_t* action, void* user_data) {
+static s32 lib_headers_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   lib_headers_t* h = (lib_headers_t*)user_data;
   lib_app_t* app = h->app;
   app->executed++;
@@ -178,7 +178,7 @@ done:
   return err ? 1 : 0;
 }
 
-static spn_err_t lib_headers_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t lib_headers_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   lib_headers_t* h = (lib_headers_t*)user_data;
   sp_da_for(h->obs, it) {
     sp_da_push(*out, h->obs[it]);

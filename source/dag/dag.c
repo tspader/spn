@@ -79,6 +79,7 @@ spn_dag_id_t spn_dag_add_output(spn_dag_t* g, sp_str_t name) {
 }
 
 spn_dag_id_t spn_dag_add_action(spn_dag_t* g, spn_dag_action_config_t config) {
+  sp_assert(!(config.uncacheable && config.discover));
   spn_dag_action_t action = {
     .id = {
       .index = (u32)sp_da_size(g->actions),
@@ -88,6 +89,7 @@ spn_dag_id_t spn_dag_add_action(spn_dag_t* g, spn_dag_action_config_t config) {
     .execute = config.execute,
     .discover = config.discover,
     .user_data = config.user_data,
+    .uncacheable = config.uncacheable,
   };
   sp_da_init(g->mem, action.consumes);
   sp_da_init(g->mem, action.produces);
