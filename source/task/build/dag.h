@@ -23,6 +23,11 @@ struct spn_dag_build_t {
   sp_tm_timer_t timer;
 };
 
+spn_dag_build_t* spn_dag_build_new(spn_session_t* session);
+void             spn_dag_build_start(spn_dag_build_t* b, u32 workers);
+bool             spn_dag_build_poll(spn_dag_build_t* b);
+spn_err_t        spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target);
+
 spn_task_step_t spn_dag_build_init(spn_app_t* app);
 spn_task_step_t spn_dag_build_update(spn_app_t* app);
 

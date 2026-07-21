@@ -1,6 +1,5 @@
 #include "ctx/types.h"
 #include "error/types.h"
-#include "sp/sp_graph.h"
 #include "spn.h"
 #include "unit/types.h"
 #include "session/types.h"
@@ -113,17 +112,6 @@ spn_err_union_t spn_build_validate_target(spn_target_unit_t* target) {
     }
   }
   sp_unreachable_return(spn_result(SPN_ERROR));
-}
-
-sp_da(sp_str_t) spn_build_target_objects(sp_mem_t mem, spn_target_unit_t* target) {
-  sp_da(sp_str_t) objects = sp_da_new(mem, sp_str_t);
-  sp_da_for(target->objects, it) {
-    sp_da_push(objects, target->objects[it]->paths.object);
-  }
-  if (!sp_da_empty(target->info->embed)) {
-    sp_da_push(objects, get_embed_object_path(mem, target));
-  }
-  return objects;
 }
 
 spn_err_t emit_link_passed(spn_target_unit_t* unit, sp_str_t output, sp_str_t out, u64 elapsed) {
@@ -324,13 +312,4 @@ s32 spn_link_target_run(spn_target_unit_t* target, sp_str_t output, sp_da(sp_str
   s32 result = spn_link_target_exec(scratch.mem, target, output, objects);
   sp_mem_end_scratch(scratch);
   return result;
-}
-
-s32 link_target(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_target_unit_t* target = (spn_target_unit_t*)user_data;
-
-  if (sp_da_empty(target->objects)) return 0;
-
-  sp_str_t output = get_target_output_path(spn.mem, target);
-  return spn_link_target_run(target, output, spn_build_target_objects(spn.mem, target));
 }

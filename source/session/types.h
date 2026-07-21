@@ -110,7 +110,7 @@ struct spn_session_t {
   } paths;
 
   spn_bg_ctx_t sync;
-  spn_bg_ctx_t configure;
+  spn_dag_build_t* configure;
   spn_dag_build_t* dag;
   sp_mutex_t mutex;
 };

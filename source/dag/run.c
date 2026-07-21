@@ -446,9 +446,15 @@ typedef struct {
 static spn_err_t lookup(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env_t* env, sp_mem_t mem, spn_dag_attempt_t* attempt) {
   attempt->action = action;
   attempt->mem = mem;
-  attempt->key = spn_dag_weak_key(g, action->id);
   sp_da_init(mem, attempt->digests);
   sp_da_init(mem, attempt->obs);
+
+  if (action->uncacheable) {
+    attempt->scratch = begin_scratch(g, action, env->scratch);
+    return sp_str_empty(attempt->scratch) ? SPN_ERR_DAG_SCRATCH : SPN_OK;
+  }
+
+  attempt->key = spn_dag_weak_key(g, action->id);
   trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_KEY, .action = action->id, .key = attempt->key });
 
   if (action->discover) {
@@ -485,12 +491,12 @@ static spn_err_t execute(spn_dag_t* g, spn_dag_attempt_t* attempt, spn_dag_env_t
   trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_EXECUTE, .action = action->id, .key = attempt->key });
 
   if (action->execute) {
-    if (action->execute(action, action->user_data)) {
+    if (action->execute(g, action, action->user_data)) {
       return SPN_ERR_DAG_ACTION;
     }
   }
   if (action->discover) {
-    try(action->discover(action, action->user_data, attempt->mem, &attempt->obs));
+    try(action->discover(g, action, action->user_data, attempt->mem, &attempt->obs));
     canonicalize_observations(attempt->obs);
   }
 
@@ -517,6 +523,12 @@ static spn_err_t commit(spn_dag_t* g, spn_dag_attempt_t* attempt, spn_dag_env_t*
 
   sp_da_for(action->produces, it) {
     spn_dag_find_artifact(g, action->produces[it])->digest = attempt->digests[it];
+  }
+
+  if (action->uncacheable) {
+    try(settle(g, action, env));
+    trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_COMMIT, .action = action->id });
+    return SPN_OK;
   }
 
   spn_dag_digest_t key = attempt->key;

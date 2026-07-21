@@ -26,7 +26,7 @@ typedef struct {
 
 UTEST_EMPTY_FIXTURE(enumeration)
 
-static spn_err_t enum_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t enum_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   enum_env_t* env = (enum_env_t*)user_data;
   sp_carr_for(env->test->obs, it) {
     if (!env->test->obs[it].dir) {

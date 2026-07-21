@@ -54,7 +54,7 @@ static sp_str_t cc_dep_path(cc_compile_t* c, sp_mem_t mem) {
   return sp_fmt(mem, "{}.d", sp_fmt_str(cc_obj_path(c))).value;
 }
 
-static s32 cc_compile_exec(spn_dag_action_t* action, void* user_data) {
+static s32 cc_compile_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   cc_compile_t* c = (cc_compile_t*)user_data;
   cc_app_t* app = c->app;
   app->executed++;
@@ -111,7 +111,7 @@ static void cc_probe_shadows(cc_app_t* app, sp_str_t prereq, sp_mem_t mem, sp_da
   }
 }
 
-static spn_err_t cc_compile_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t cc_compile_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   cc_compile_t* c = (cc_compile_t*)user_data;
   sp_str_t content = sp_zero;
   spn_try_as(sp_io_read_file(mem, cc_dep_path(c, mem), &content), SPN_ERROR);
@@ -130,7 +130,7 @@ static spn_err_t cc_compile_discover(spn_dag_action_t* action, void* user_data, 
   return SPN_OK;
 }
 
-static s32 cc_link_exec(spn_dag_action_t* action, void* user_data) {
+static s32 cc_link_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   cc_link_t* l = (cc_link_t*)user_data;
   cc_app_t* app = l->app;
   app->executed++;

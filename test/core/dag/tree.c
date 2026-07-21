@@ -179,7 +179,7 @@ typedef struct {
   tree_exec_run_t* run;
 } tree_exec_env_t;
 
-static s32 tree_exec_fn(spn_dag_action_t* action, void* user_data) {
+static s32 tree_exec_fn(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   tree_exec_env_t* env = (tree_exec_env_t*)user_data;
   env->dag.runs++;
   spn_dag_artifact_t* out = spn_dag_find_artifact(env->dag.g, action->produces[0]);

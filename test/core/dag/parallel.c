@@ -42,7 +42,7 @@ typedef struct {
 
 UTEST_EMPTY_FIXTURE(parallel)
 
-static s32 par_exec(spn_dag_action_t* action, void* user_data) {
+static s32 par_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   par_ctx_t* ctx = (par_ctx_t*)user_data;
   if (ctx->spec->fails) {
     return 1;
@@ -66,7 +66,7 @@ static s32 par_exec(spn_dag_action_t* action, void* user_data) {
   return sp_fs_create_file_str(out->path, content) ? 1 : 0;
 }
 
-static spn_err_t par_discover(spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t par_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   par_ctx_t* ctx = (par_ctx_t*)user_data;
   sp_carr_for(ctx->spec->discovers, it) {
     if (!ctx->spec->discovers[it]) {

@@ -70,7 +70,7 @@ u32 dag_test_obs_build(const dag_test_obs_t* specs, u32 cap, spn_dag_obs_t* out)
   return count;
 }
 
-s32 dag_test_exec_stamp(spn_dag_action_t* action, void* user_data) {
+s32 dag_test_exec_stamp(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   dag_test_env_t* env = (dag_test_env_t*)user_data;
   env->runs++;
   spn_dag_artifact_t* out = spn_dag_find_artifact(env->g, action->produces[0]);
