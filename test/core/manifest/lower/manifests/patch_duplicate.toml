@@ -1,0 +1,9 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[patch.q]
+files = ["patches/a.patch"]
+
+[patch."core/q"]
+files = ["patches/b.patch"]

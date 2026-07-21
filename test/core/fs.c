@@ -155,6 +155,58 @@ UTEST_F(fs_lock, reacquire_same_slot) {
   });
 }
 
+struct fs_staging {
+  sp_test_file_manager_t file_manager;
+};
+
+UTEST_F_SETUP(fs_staging) {
+  sp_test_file_manager_init(&uf->file_manager);
+}
+
+UTEST_F_TEARDOWN(fs_staging) {
+  sp_test_file_manager_cleanup(&uf->file_manager);
+}
+
+UTEST_F(fs_staging, claims_distinct_dirs) {
+  sp_mem_t mem = uf->file_manager.mem;
+  sp_str_t sandbox = sp_test_file_path_c(&uf->file_manager, "claims_distinct_dirs");
+  sp_fs_create_dir(sandbox);
+  sp_str_t path = sp_fs_join_path(mem, sandbox, sp_str_lit("checkout"));
+
+  sp_str_t a = sp_zero;
+  sp_str_t b = sp_zero;
+  ASSERT_EQ(sp_fs_staging_dir(mem, path, sp_str_lit("tmp"), &a), SP_OK);
+  ASSERT_EQ(sp_fs_staging_dir(mem, path, sp_str_lit("tmp"), &b), SP_OK);
+  EXPECT_FALSE(sp_str_equal(a, b));
+  EXPECT_TRUE(sp_fs_is_dir(a));
+  EXPECT_TRUE(sp_fs_is_dir(b));
+  EXPECT_TRUE(sp_str_starts_with(a, path));
+  EXPECT_TRUE(sp_str_ends_with(a, sp_str_lit("tmp")));
+}
+
+UTEST_F(fs_staging, creates_parent) {
+  sp_mem_t mem = uf->file_manager.mem;
+  sp_str_t sandbox = sp_test_file_path_c(&uf->file_manager, "creates_parent");
+  sp_str_t path = sp_fs_join_path(mem, sp_fs_join_path(mem, sandbox, sp_str_lit("nested")), sp_str_lit("checkout"));
+
+  sp_str_t dir = sp_zero;
+  ASSERT_EQ(sp_fs_staging_dir(mem, path, sp_str_lit("tmp"), &dir), SP_OK);
+  EXPECT_TRUE(sp_fs_is_dir(dir));
+}
+
+UTEST_F(fs_staging, fails_when_parent_is_file) {
+  sp_mem_t mem = uf->file_manager.mem;
+  sp_str_t sandbox = sp_test_file_path_c(&uf->file_manager, "fails_when_parent_is_file");
+  sp_fs_create_dir(sandbox);
+  sp_str_t file = sp_fs_join_path(mem, sandbox, sp_str_lit("occupied"));
+  sp_fs_create_file_str(file, sp_str_lit("x"));
+  sp_str_t path = sp_fs_join_path(mem, file, sp_str_lit("checkout"));
+
+  sp_str_t dir = sp_zero;
+  EXPECT_NE(sp_fs_staging_dir(mem, path, sp_str_lit("tmp"), &dir), SP_OK);
+  EXPECT_TRUE(sp_str_empty(dir));
+}
+
 typedef struct {
   sp_str_t path;
   sp_atomic_s32_t acquired;

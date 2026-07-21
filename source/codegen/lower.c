@@ -362,18 +362,35 @@ static void lower_options(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
 
 static void lower_patches(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   out->patches = sp_da_new(ctx->mem, spn_pkg_patch_t);
+  sp_da(sp_str_t) seen = sp_da_new(ctx->mem, sp_str_t);
   spn_toml_loader_push_key(ctx, "patch");
   sp_da_for(cg->patch, it) {
-    spn_pkg_patch_t patch = {
-      .qualified = lower_canonicalize(ctx, cg->patch[it].key),
-      .set.files = sp_da_new(ctx->mem, sp_str_t),
-    };
+    sp_str_t qualified = lower_canonicalize(ctx, cg->patch[it].key);
+
+    bool duplicate = false;
+    sp_da_for(seen, jt) {
+      if (sp_str_equal(seen[jt], qualified)) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (duplicate) {
+      spn_toml_loader_issue_at(ctx, SPN_CODEGEN_ERR_DUPLICATE_KEY, cg->patch[it].key);
+      continue;
+    }
+    sp_da_push(seen, qualified);
+
     if (sp_da_empty(cg->patch[it].value.files)) {
       spn_toml_loader_push_key(ctx, sp_str_to_cstr(ctx->mem, cg->patch[it].key));
       spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "files");
       spn_toml_loader_pop(ctx);
       continue;
     }
+
+    spn_pkg_patch_t patch = {
+      .qualified = qualified,
+      .set.files = sp_da_new(ctx->mem, sp_str_t),
+    };
     sp_da_for(cg->patch[it].value.files, jt) {
       sp_str_t path = cg->patch[it].value.files[jt];
       if (!is_path_absolute(path)) {
@@ -387,32 +404,25 @@ static void lower_patches(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
 }
 
 spn_err_t spn_pkg_lower_patch_hashes(spn_toml_loader_t* ctx, spn_pkg_info_t* out) {
+  spn_err_t err = SPN_OK;
   spn_toml_loader_push_key(ctx, "patch");
   sp_da_for(out->patches, it) {
     spn_pkg_patch_t* patch = &out->patches[it];
-    sp_str_t missing = sp_zero;
-    if (!spn_git_patch_set_load(ctx->mem, patch->set.files, &patch->set, &missing)) {
+    u32 missing = 0;
+    if (!spn_git_patch_set_hash(&patch->set, &missing)) {
       continue;
     }
 
-    u32 index = 0;
-    sp_da_for(patch->set.files, jt) {
-      if (sp_str_equal(patch->set.files[jt], missing)) {
-        index = (u32)jt;
-        break;
-      }
-    }
-
     spn_toml_loader_push_key(ctx, sp_str_to_cstr(ctx->mem, patch->qualified));
-    spn_toml_loader_push_index(ctx, index);
+    spn_toml_loader_push_index(ctx, missing);
     spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_FILE_MISSING, "files");
     spn_toml_loader_pop(ctx);
     spn_toml_loader_pop(ctx);
-    spn_toml_loader_pop(ctx);
+    err = SPN_ERROR;
   }
   spn_toml_loader_pop(ctx);
 
-  return sp_da_empty(ctx->issues) ? SPN_OK : SPN_ERROR;
+  return err;
 }
 
 spn_err_t spn_pkg_reject_patches(spn_toml_loader_t* ctx, spn_pkg_info_t* out) {

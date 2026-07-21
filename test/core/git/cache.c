@@ -83,8 +83,9 @@ static spn_git_checkout_id_t build_id(sp_mem_t mem, tmpfs_t* fs, const c8* name,
       sp_fs_create_file_str(path, text);
       sp_da_push(files, path);
     }
-    sp_str_t missing = sp_zero;
-    spn_git_patch_set_load(mem, files, &id.patches, &missing);
+    id.patches.files = files;
+    u32 missing = 0;
+    spn_git_patch_set_hash(&id.patches, &missing);
   }
 
   return id;

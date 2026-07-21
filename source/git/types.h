@@ -16,6 +16,8 @@ typedef struct {
   sp_str_t error;
 } spn_git_db_t;
 
+// hash is the set's identity: derived from file contents in order, zero iff
+// files is empty. Checkout keys and fingerprints treat zero as unpatched.
 typedef struct {
   sp_da(sp_str_t) files;
   sp_hash_t hash;

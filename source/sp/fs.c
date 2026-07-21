@@ -106,3 +106,20 @@ sp_str_t sp_fs_staging_path(sp_mem_t mem, sp_str_t path, sp_str_t extension) {
   u64 stamp = (((u64)now.s << 20) ^ (u64)now.ns) ^ ((u64)(u32)sp_atomic_s32_add(&sequence, 1) << 48);
   return sp_fmt(mem, "{}.{}.{}", sp_fmt_str(path), sp_fmt_uint(stamp), sp_fmt_str(extension)).value;
 }
+
+sp_err_t sp_fs_staging_dir(sp_mem_t mem, sp_str_t path, sp_str_t extension, sp_str_t* dir) {
+  *dir = sp_str_lit("");
+  sp_try(sp_fs_create_dir(sp_fs_parent_path(path)));
+
+  sp_for(attempt, 16) {
+    sp_str_t candidate = sp_fs_staging_path(mem, path, extension);
+    if (sp_sys_mkdir_s(sp_sys_get_root(0), candidate, 0755) == 0) {
+      *dir = candidate;
+      return SP_OK;
+    }
+    if (!sp_fs_exists(candidate)) {
+      return SP_ERR_OS;
+    }
+  }
+  return SP_ERR_OS;
+}

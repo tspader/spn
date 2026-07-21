@@ -9,6 +9,7 @@ add_executable(dag
   ${SRC}/codegen/gen/dag_output.gen.c
   ${SRC}/codegen/gen/dag_obs.gen.c
   ${SRC}/sha256/sha256.c
+  ${SRC}/sp/fs.c
   ${SRC}/sp/io.c
   main.c
   action_cache.c

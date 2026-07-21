@@ -1177,6 +1177,39 @@ UTEST(lower, patch_hash_missing_file) {
   });
 }
 
+UTEST(lower, patch_hash_missing_files_in_two_entries) {
+  run_case(utest_result, (test_t) {
+    .manifest = "patch_missing_two",
+    .hash_patches = true,
+    .issues = {
+      { SPN_CODEGEN_ERR_FILE_MISSING, "patch.core/q[0].files" },
+      { SPN_CODEGEN_ERR_FILE_MISSING, "patch.core/r[1].files" },
+    },
+  });
+}
+
+UTEST(lower, patch_duplicate_canonical_name) {
+  run_case(utest_result, (test_t) {
+    .manifest = "patch_duplicate",
+    .issues = {
+      { SPN_CODEGEN_ERR_DUPLICATE_KEY, "patch" },
+    },
+    .patches = {
+      { .name = "core/q", .files = { "patches/a.patch" } },
+    },
+  });
+}
+
+UTEST(lower, patch_duplicate_after_empty_files) {
+  run_case(utest_result, (test_t) {
+    .manifest = "patch_duplicate_empty",
+    .issues = {
+      { SPN_CODEGEN_ERR_MISSING_KEY, "patch.q.files" },
+      { SPN_CODEGEN_ERR_DUPLICATE_KEY, "patch" },
+    },
+  });
+}
+
 UTEST(lower, validate_patch_files_empty) {
   run_case(utest_result, (test_t) {
     .manifest = "validate_patch_files_empty",
