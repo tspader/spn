@@ -5,6 +5,6 @@
 
 #include "git/types.h"
 
-spn_err_t spn_git_patch_set_load(sp_mem_t mem, sp_da(sp_str_t) files, spn_git_patch_set_t* out, sp_str_t* missing);
+spn_err_t spn_git_patch_set_hash(spn_git_patch_set_t* set, u32* missing);
 
 #endif

@@ -3,6 +3,7 @@
 #include "sha256/sha256.h"
 #include "error/types.h"
 #include "sp.h"
+#include "sp/fs.h"
 #include "sp/sp_glob.h"
 
 #define try(expr) spn_try(expr)
@@ -408,17 +409,11 @@ static void record(spn_dag_t* g, spn_dag_action_t* action, spn_dag_digest_t key,
   sp_mem_end_scratch(s);
 }
 
-static sp_atomic_s32_t spn_dag_scratch_sequence;
-
 static sp_str_t begin_scratch(spn_dag_t* g, spn_dag_action_t* action, sp_str_t root) {
   sp_assert(!sp_str_empty(root));
 
-  sp_tm_epoch_t now = sp_tm_now_epoch();
-  u64 stamp = ((u64)now.s << 20) ^ (u64)now.ns;
-  u64 sequence = (u64)(u32)sp_atomic_s32_add(&spn_dag_scratch_sequence, 1);
-  sp_str_t name = sp_fmt(g->mem, "{}.{}", sp_fmt_uint(stamp), sp_fmt_uint(sequence)).value;
-  sp_str_t dir = sp_fs_join_path(g->mem, root, name);
-  if (sp_fs_create_dir(dir)) {
+  sp_str_t dir = sp_zero;
+  if (sp_fs_staging_dir(g->mem, sp_fs_join_path(g->mem, root, sp_str_lit("scratch")), sp_str_lit("tmp"), &dir)) {
     return sp_str_lit("");
   }
 

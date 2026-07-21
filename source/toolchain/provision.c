@@ -51,7 +51,6 @@ SP_PRIVATE spn_err_t spn_toolchain_provision_fetch(spn_toolchain_store_t* store,
 
 SP_PRIVATE spn_err_union_t spn_toolchain_provision_fill(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, spn_artifact_t artifact, sp_str_t dest) {
   sp_str_t tarball = sp_fs_staging_path(store->mem, dest, sp_str_lit("download"));
-  sp_str_t work = sp_fs_staging_path(store->mem, dest, sp_str_lit("tmp"));
 
   sp_str_t url = sp_zero;
   if (spn_toolchain_provision_fetch(store, artifact, tarball, &url)) {
@@ -79,7 +78,17 @@ SP_PRIVATE spn_err_union_t spn_toolchain_provision_fill(spn_toolchain_store_t* s
     };
   }
 
-  sp_fs_create_dir(work);
+  sp_str_t work = sp_zero;
+  if (sp_fs_staging_dir(store->mem, dest, sp_str_lit("tmp"), &work)) {
+    sp_fs_remove_file(tarball);
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_TOOLCHAIN_EXTRACT,
+      .artifact = {
+        .name = toolchain->name,
+        .url = url,
+      },
+    };
+  }
 
   sp_ps_output_t extract = sp_ps_run(store->mem, (sp_ps_config_t) {
     .command = sp_str_lit("tar"),
