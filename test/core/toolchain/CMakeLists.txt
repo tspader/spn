@@ -23,7 +23,9 @@ add_executable(toolchain_test
   ${SRC}/toolchain/toolchain.c
   ${SRC}/triple/triple.c
   main.c
+  builtins.c
   catalog.c
+  parse.c
   select.c
   provision.c
   ${TEST_TOOLS}/ctx.c
@@ -33,6 +35,8 @@ add_executable(toolchain_test
 )
 spn_test_binary(toolchain_test)
 target_include_directories(toolchain_test PRIVATE ${SRC}/codegen/gen ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(toolchain_test PRIVATE
+  TOOLCHAINS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/toolchains")
 target_link_libraries(toolchain_test PRIVATE yyjson)
 add_dependencies(toolchain_test spn_codegen_gen)
 add_test(NAME toolchain COMMAND "$<TARGET_FILE:toolchain_test>")
