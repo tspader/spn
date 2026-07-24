@@ -6,10 +6,13 @@
 
 #define try(expr) spn_try(expr)
 
+static sp_atomic_s32_t spn_dag_next_id;
+
 spn_dag_t* spn_dag_new(sp_mem_t mem) {
   sp_mem_arena_t* arena = sp_mem_arena_new(mem);
   sp_mem_t a = sp_mem_arena_as_allocator(arena);
   spn_dag_t* g = sp_mem_allocator_alloc_type(a, spn_dag_t);
+  g->id = (u32)sp_atomic_s32_add(&spn_dag_next_id, 1);
   g->arena = arena;
   g->mem = a;
   sp_da_init(a, g->artifacts);
@@ -18,14 +21,20 @@ spn_dag_t* spn_dag_new(sp_mem_t mem) {
   return g;
 }
 
+bool spn_dag_owns(spn_dag_t* g, spn_dag_id_t id) {
+  return id.occupied && id.graph == g->id;
+}
+
 spn_dag_artifact_t* spn_dag_find_artifact(spn_dag_t* g, spn_dag_id_t id) {
   sp_assert(id.occupied);
+  sp_assert(id.graph == g->id);
   sp_assert(id.index < sp_da_size(g->artifacts));
   return g->artifacts + id.index;
 }
 
 spn_dag_action_t* spn_dag_find_action(spn_dag_t* g, spn_dag_id_t id) {
   sp_assert(id.occupied);
+  sp_assert(id.graph == g->id);
   sp_assert(id.index < sp_da_size(g->actions));
   return g->actions + id.index;
 }
@@ -33,6 +42,7 @@ spn_dag_action_t* spn_dag_find_action(spn_dag_t* g, spn_dag_id_t id) {
 static spn_dag_id_t add_artifact(spn_dag_t* g, spn_dag_artifact_t artifact) {
   artifact.id = (spn_dag_id_t) {
     .index = (u32)sp_da_size(g->artifacts),
+    .graph = g->id,
     .occupied = true
   };
   sp_da_init(g->mem, artifact.consumers);
@@ -83,6 +93,7 @@ spn_dag_id_t spn_dag_add_action(spn_dag_t* g, spn_dag_action_config_t config) {
   spn_dag_action_t action = {
     .id = {
       .index = (u32)sp_da_size(g->actions),
+      .graph = g->id,
       .occupied = true
     },
     .identity = config.identity,

@@ -1,0 +1,10 @@
+[package]
+name = "configure_missing_source"
+version = "0.0.1"
+
+[package.configure]
+source = ["nope.c"]
+
+[[bin]]
+name = "configure_missing_source"
+source = ["main.c"]

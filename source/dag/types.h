@@ -46,6 +46,7 @@ SP_TYPEDEF_FN(spn_err_t, spn_dag_discover_fn_t, spn_dag_t*, spn_dag_action_t*, v
 
 typedef struct {
   u32 index;
+  u32 graph;
   u32 occupied;
 } spn_dag_id_t;
 
@@ -87,6 +88,7 @@ typedef struct {
 } spn_dag_action_config_t;
 
 struct spn_dag_t {
+  u32 id;
   sp_mem_arena_t* arena;
   sp_mem_t mem;
   sp_da(spn_dag_artifact_t) artifacts;

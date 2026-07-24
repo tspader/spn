@@ -198,10 +198,7 @@ struct spn_pkg_unit_t {
   sp_da(spn_pkg_dep_t) deps;
   sp_da(spn_target_unit_t*) libs;
   sp_da(spn_target_unit_t*) targets;
-
-  struct {
-    sp_da(spn_user_node_t) user;
-  } nodes;
+  sp_da(spn_user_node_t) user_nodes;
 
   struct {
     spn_dag_id_t tree;
@@ -274,8 +271,8 @@ struct spn_toolchain_unit_t {
 };
 
 static inline spn_user_node_t* spn_find_user_node(spn_node_t* node) {
-  SP_ASSERT(node->index < sp_da_size(node->ctx->nodes.user));
-  return &node->ctx->nodes.user[node->index];
+  SP_ASSERT(node->index < sp_da_size(node->ctx->user_nodes));
+  return &node->ctx->user_nodes[node->index];
 }
 
 #endif

@@ -15,7 +15,7 @@
 #include "task/task.h"
 #include "unit/package.h"
 
-static s32 configure_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
+static s32 on_configure_package(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
   spn_wasm_script_t* configure = &unit->wasm.configure;
   if (configure->state != SPN_WASM_SCRIPT_NONE) {
@@ -29,57 +29,49 @@ static s32 configure_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_dat
   return SPN_OK;
 }
 
-static spn_err_t add_configure_package(spn_dag_build_t* b, spn_pkg_unit_t* unit, sp_da(spn_target_unit_t*)* targets) {
+static spn_target_unit_t* get_configure_target(spn_pkg_unit_t* unit) {
+  if (unit->metaprogram.pkg != unit) {
+    return SP_NULLPTR;
+  }
+  return unit->metaprogram.configure.target;
+}
+
+static spn_err_t add_configure_action(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
   spn_dag_t* g = b->graph;
   sp_assert(unit->metaprogram.pkg);
 
-  spn_target_unit_t* target = unit->metaprogram.configure.target;
-  if (target) {
-    bool fresh = !target->dag.action.occupied;
-    spn_try(spn_dag_build_add_target(b, target));
-    if (fresh && target->dag.action.occupied) {
-      sp_da_push(*targets, target);
-    }
-  }
-
   unit->dag.configure.action = spn_dag_add_action(g, (spn_dag_action_config_t) {
-    .execute = configure_exec,
+    .execute = on_configure_package,
     .user_data = unit,
     .uncacheable = true,
   });
   unit->dag.configure.stamp = spn_dag_add_file(g, unit->paths.stamp.configure);
-  spn_try(spn_dag_action_add_output(g, unit->dag.configure.action, unit->dag.configure.stamp));
-
-  if (target && target->dag.output.occupied) {
-    spn_dag_action_add_input(g, unit->dag.configure.action, target->dag.output);
-  }
-  return SPN_OK;
+  return spn_dag_action_add_output(g, unit->dag.configure.action, unit->dag.configure.stamp);
 }
 
-static void add_configure_run_edges(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
+static void add_configure_edges(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
   spn_dag_t* g = b->graph;
 
   sp_da_for(unit->deps, it) {
     spn_pkg_unit_t* dep = unit->deps[it].unit;
-    if (!dep) {
-      continue;
-    }
     sp_assert(dep->dag.configure.stamp.occupied);
     spn_dag_action_add_input(g, unit->dag.configure.action, dep->dag.configure.stamp);
   }
+
+  spn_target_unit_t* reactor = unit->metaprogram.configure.target;
+  if (reactor) {
+    spn_dag_action_add_input(g, unit->dag.configure.action, reactor->dag.output);
+  }
 }
 
-static void add_configure_target_edges(spn_dag_build_t* b, spn_target_unit_t* target) {
+static void add_reactor_edges(spn_dag_build_t* b, spn_target_unit_t* reactor) {
   spn_dag_t* g = b->graph;
 
-  sp_da_for(target->pkg->deps, it) {
-    spn_pkg_unit_t* dep = target->pkg->deps[it].unit;
-    if (!dep) {
-      continue;
-    }
+  sp_da_for(reactor->pkg->deps, it) {
+    spn_pkg_unit_t* dep = reactor->pkg->deps[it].unit;
     sp_assert(dep->dag.configure.stamp.occupied);
-    sp_da_for(target->objects, ot) {
-      spn_dag_action_add_input(g, target->objects[ot]->dag.action, dep->dag.configure.stamp);
+    sp_da_for(reactor->objects, ot) {
+      spn_dag_action_add_input(g, reactor->objects[ot]->dag.action, dep->dag.configure.stamp);
     }
   }
 }
@@ -91,18 +83,14 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
     return spn_task_fail(SPN_ERR_WASM_INIT_FAILED);
   }
 
-  spn_dag_build_t* b = spn_dag_build_new(session);
-  session->configure = b;
+  spn_dag_build_t* dag = spn_dag_build_new(session);
+  session->dag.configure = dag;
 
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  sp_da(spn_target_unit_t*) targets = sp_da_new(s.mem, spn_target_unit_t*);
-
-  sp_da_for(session->units.builds, it) {
-    spn_build_unit_t* build = session->units.builds[it];
-    sp_da_for(build->packages, jt) {
-      spn_pkg_unit_t* unit = build->packages[jt];
-      if (add_configure_package(b, unit, &targets)) {
-        sp_mem_end_scratch(s);
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    spn_target_unit_t* configure = get_configure_target(unit);
+    if (configure) {
+      if (spn_dag_build_add_target(dag, configure)) {
         return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
       }
     }
@@ -111,21 +99,33 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
   sp_da_for(session->units.builds, it) {
     spn_build_unit_t* build = session->units.builds[it];
     sp_da_for(build->packages, jt) {
-      add_configure_run_edges(b, build->packages[jt]);
+      spn_pkg_unit_t* unit = build->packages[jt];
+      if (add_configure_action(dag, unit)) {
+        return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
+      }
     }
   }
 
-  sp_da_for(targets, it) {
-    add_configure_target_edges(b, targets[it]);
+  sp_da_for(session->units.builds, it) {
+    spn_build_unit_t* build = session->units.builds[it];
+    sp_da_for(build->packages, jt) {
+      add_configure_edges(dag, build->packages[jt]);
+    }
   }
-  sp_mem_end_scratch(s);
 
-  spn_dag_build_start(b, 8);
+  sp_om_for(session->units.packages, it) {
+    spn_target_unit_t* reactor = get_configure_target(sp_om_at(session->units.packages, it));
+    if (reactor) {
+      add_reactor_edges(dag, reactor);
+    }
+  }
+
+  spn_dag_build_start(dag, 8);
   return spn_task_continue();
 }
 
 spn_task_step_t spn_task_configure_graph_update(spn_app_t* app) {
-  spn_dag_build_t* b = app->session.configure;
+  spn_dag_build_t* b = app->session.dag.configure;
   if (!spn_dag_build_poll(b)) {
     return spn_task_continue();
   }

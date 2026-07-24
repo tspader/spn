@@ -16,7 +16,7 @@ spn_node_t* spn_add_node(spn_config_t* config, const c8* tag) {
   SPN_API_LOG(unit, "spn_add_node", "{}", SP_FMT_CSTR(tag));
 
   sp_mem_t mem = spn.mem;
-  u32 index = sp_da_size(unit->nodes.user);
+  u32 index = sp_da_size(unit->user_nodes);
   spn_user_node_t node = {
     .pkg = unit,
     .tag = spn_intern_cstr(tag),
@@ -24,7 +24,7 @@ spn_node_t* spn_add_node(spn_config_t* config, const c8* tag) {
   sp_da_init(mem, node.inputs);
   sp_da_init(mem, node.outputs);
   sp_da_init(mem, node.deps);
-  sp_da_push(unit->nodes.user, node);
+  sp_da_push(unit->user_nodes, node);
 
   spn_node_t* out = sp_alloc_type(mem, spn_node_t);
   *out = (spn_node_t) {

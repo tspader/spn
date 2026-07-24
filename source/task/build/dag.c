@@ -179,8 +179,8 @@ static spn_dag_digest_t dag_tree_identity(spn_pkg_unit_t* unit) {
     spn_dag_hash_str(&ctx, copy->to);
   }
 
-  sp_da_for(unit->nodes.user, it) {
-    spn_user_node_t* node = &unit->nodes.user[it];
+  sp_da_for(unit->user_nodes, it) {
+    spn_user_node_t* node = &unit->user_nodes[it];
     sp_da_for(node->outputs, ot) {
       if (dag_path_within(node->outputs[ot], unit->paths.include)) {
         spn_dag_hash_str(&ctx, node->outputs[ot]);
@@ -402,8 +402,8 @@ static s32 dag_tree_copy_publishes(spn_dag_tree_ctx_t* ctx, sp_str_t root) {
 
 static s32 dag_tree_copy_user_outputs(spn_dag_tree_ctx_t* ctx, sp_str_t root) {
   spn_pkg_unit_t* unit = ctx->pkg;
-  sp_da_for(unit->nodes.user, it) {
-    spn_user_node_t* node = &unit->nodes.user[it];
+  sp_da_for(unit->user_nodes, it) {
+    spn_user_node_t* node = &unit->user_nodes[it];
     sp_da_for(node->outputs, ot) {
       sp_str_t path = node->outputs[ot];
       if (!dag_path_within(path, unit->paths.include)) {
@@ -550,8 +550,8 @@ static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
 
   sp_da_init(b->mem, unit->dag.user_outputs);
 
-  sp_da_for(unit->nodes.user, it) {
-    spn_user_node_t* node = &unit->nodes.user[it];
+  sp_da_for(unit->user_nodes, it) {
+    spn_user_node_t* node = &unit->user_nodes[it];
 
     spn_dag_user_ctx_t* ctx = sp_alloc_type(b->mem, spn_dag_user_ctx_t);
     ctx->node = node;
@@ -581,8 +581,8 @@ static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
     }
   }
 
-  sp_da_for(unit->nodes.user, it) {
-    spn_user_node_t* node = &unit->nodes.user[it];
+  sp_da_for(unit->user_nodes, it) {
+    spn_user_node_t* node = &unit->user_nodes[it];
     sp_da_for(node->inputs, jt) {
       spn_dag_action_add_input(g, node->dag, spn_dag_add_file(g, node->inputs[jt]));
     }
@@ -604,7 +604,7 @@ static spn_err_t dag_add_objects(spn_dag_build_t* b, spn_target_unit_t* target) 
 
   sp_da_for(target->objects, it) {
     spn_compile_unit_t* unit = target->objects[it];
-    if (unit->dag.action.occupied) {
+    if (spn_dag_owns(g, unit->dag.action)) {
       continue;
     }
 
@@ -644,7 +644,7 @@ spn_err_t spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target
     }
   }
 
-  if (target->dag.action.occupied) {
+  if (spn_dag_owns(g, target->dag.action)) {
     return SPN_OK;
   }
 
@@ -726,8 +726,8 @@ static bool dag_pkg_publishes(spn_pkg_unit_t* unit) {
     }
   }
 
-  sp_da_for(unit->nodes.user, it) {
-    spn_user_node_t* node = &unit->nodes.user[it];
+  sp_da_for(unit->user_nodes, it) {
+    spn_user_node_t* node = &unit->user_nodes[it];
     sp_da_for(node->outputs, ot) {
       if (dag_path_within(node->outputs[ot], unit->paths.include)) {
         return true;
@@ -882,9 +882,7 @@ static void dag_add_target_edges(spn_dag_build_t* b, spn_target_unit_t* target) 
 
     sp_da_for(unit->deps, dt) {
       spn_pkg_dep_t* dep = &unit->deps[dt];
-      if (!dep->unit) {
-        continue;
-      }
+      sp_assert(dep->unit);
       if (dep->kind == SPN_DEP_KIND_TEST && target->info->kind != SPN_TARGET_TEST) {
         continue;
       }
@@ -925,12 +923,11 @@ static spn_err_t dag_add_edges(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
 
   sp_da_for(unit->deps, dt) {
     spn_pkg_dep_t* dep = &unit->deps[dt];
-    if (!dep->unit || !dep->unit->dag.stamp.occupied) {
-      continue;
-    }
+    sp_assert(dep->unit);
+    sp_assert(dep->unit->dag.stamp.occupied);
     spn_dag_action_add_input(g, unit->dag.package, dep->unit->dag.stamp);
-    sp_da_for(unit->nodes.user, ut) {
-      spn_dag_action_add_input(g, unit->nodes.user[ut].dag, dep->unit->dag.stamp);
+    sp_da_for(unit->user_nodes, ut) {
+      spn_dag_action_add_input(g, unit->user_nodes[ut].dag, dep->unit->dag.stamp);
     }
   }
 
@@ -1190,7 +1187,7 @@ spn_task_step_t spn_dag_build_init(spn_app_t* app) {
   spn_session_t* session = &app->session;
 
   spn_dag_build_t* b = spn_dag_build_new(session);
-  session->dag = b;
+  session->dag.build = b;
 
   if (dag_prepare(b)) {
     spn_log_error("failed to construct dag build graph");
@@ -1211,7 +1208,7 @@ spn_task_step_t spn_dag_build_init(spn_app_t* app) {
 
 spn_task_step_t spn_dag_build_update(spn_app_t* app) {
   spn_session_t* session = &app->session;
-  spn_dag_build_t* b = session->dag;
+  spn_dag_build_t* b = session->dag.build;
 
   if (!spn_dag_build_poll(b)) {
     return spn_task_continue();

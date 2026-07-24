@@ -100,6 +100,7 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_ERR_DYNAMIC_DUPLICATE:            return "dynamic_duplicate";
     case SPN_ERR_RESOLVE_TOO_COMPLEX:          return "resolve_too_complex";
     case SPN_ERR_OPTION:                       return "option";
+    case SPN_ERR_CONFIGURE_SOURCE:             return "configure_source";
   }
   return "unknown";
 }

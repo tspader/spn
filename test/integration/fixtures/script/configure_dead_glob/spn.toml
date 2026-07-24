@@ -1,0 +1,10 @@
+[package]
+name = "configure_dead_glob"
+version = "0.0.1"
+
+[package.configure]
+source = ["tools/configure.c", "*.zig"]
+
+[[bin]]
+name = "configure_dead_glob"
+source = ["main.c"]

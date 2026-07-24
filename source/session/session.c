@@ -532,7 +532,7 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   sp_da_init(session->mem, unit->deps);
   sp_da_init(session->mem, unit->libs);
   sp_da_init(session->mem, unit->targets);
-  sp_da_init(session->mem, unit->nodes.user);
+  sp_da_init(session->mem, unit->user_nodes);
   unit->paths.manifest = loaded->paths.manifest;
   unit->paths.script = loaded->paths.script;
   unit->paths.recipe = loaded->roots.recipe;

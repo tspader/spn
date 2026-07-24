@@ -401,6 +401,7 @@ spn_err_union_t add_metaprogram_units(spn_session_t* session) {
     }
     if (unit->metaprogram.configure.target) {
       create_target_objects(session, unit->metaprogram.configure.target);
+      sp_assert(!sp_da_empty(unit->metaprogram.configure.target->objects));
     }
   }
 
