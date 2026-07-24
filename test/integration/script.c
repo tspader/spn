@@ -213,6 +213,44 @@ UTEST_F(script, configure_table) {
   });
 }
 
+UTEST_F(script, configure_glob) {
+  tmpfs_init_named(&uf->fixture.fs, "script_configure_glob");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/script/configure_glob",
+    .copy = { "tools" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EVENT_COUNT, .verify_event_count = { .event = SPN_EVENT_USER_LOG, .key = "message", .value = "G", .count = 1 } },
+    },
+  });
+}
+
+UTEST_F(script, configure_dead_glob) {
+  tmpfs_init_named(&uf->fixture.fs, "script_configure_dead_glob");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/script/configure_dead_glob",
+    .copy = { "tools" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = "configure_source" } },
+    },
+  });
+}
+
+UTEST_F(script, configure_missing_source) {
+  tmpfs_init_named(&uf->fixture.fs, "script_configure_missing_source");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .project = "test/integration/fixtures/script/configure_missing_source",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = "configure_source" } },
+    },
+  });
+}
+
 UTEST_F(script, configure_error) {
   tmpfs_init_named(&uf->fixture.fs, "script_configure_error");
 

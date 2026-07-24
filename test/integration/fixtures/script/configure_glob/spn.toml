@@ -1,0 +1,10 @@
+[package]
+name = "configure_glob"
+version = "0.0.1"
+
+[package.configure]
+source = ["tools/*.c"]
+
+[[bin]]
+name = "configure_glob"
+source = ["main.c"]

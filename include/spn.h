@@ -239,6 +239,7 @@ typedef enum {
   SPN_ERR_DYNAMIC_DUPLICATE,
   SPN_ERR_RESOLVE_TOO_COMPLEX,
   SPN_ERR_OPTION,
+  SPN_ERR_CONFIGURE_SOURCE,
 } spn_err_t;
 
 typedef struct spn              spn_t;

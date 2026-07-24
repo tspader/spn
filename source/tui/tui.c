@@ -716,6 +716,25 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
           sp_io_write_str(&w.base, sp_str_lit("failed to initialize the wasm runtime"), SP_NULLPTR);
           break;
         }
+        case SPN_ERR_CONFIGURE_SOURCE: {
+          if (sp_fs_is_glob(event->err.configure_source.source)) {
+            sp_fmt_io(
+              &w.base,
+              "{.cyan} declares a configure source {.yellow}, which matched no files",
+              sp_fmt_str(event->err.configure_source.name),
+              sp_fmt_str(event->err.configure_source.source)
+            );
+          }
+          else {
+            sp_fmt_io(
+              &w.base,
+              "{.cyan} declares a configure source {.yellow}, which is not a file",
+              sp_fmt_str(event->err.configure_source.name),
+              sp_fmt_str(event->err.configure_source.source)
+            );
+          }
+          break;
+        }
         case SPN_ERR_BUILD_GRAPH: {
           sp_fmt_io(
             &w.base,
@@ -1511,7 +1530,7 @@ void spn_prompt_pump() {
     return;
   }
 
-  spn_dag_build_t* dag = tui->session->dag;
+  spn_dag_build_t* dag = tui->session->dag.build;
   if (!dag) return;
 
   if (!tui->prompt.on) {
