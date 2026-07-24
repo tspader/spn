@@ -1,0 +1,22 @@
+{
+  "toolchain": [
+    {
+      "name": "A",
+      "version": "1.0.0",
+      "driver": "clang",
+      "compiler": { "program": "A", "args": ["cc"] },
+      "linker":   { "program": "A", "args": ["cc"] },
+      "archiver": { "program": "A", "args": ["ar"] },
+      "cxx":      { "program": "A", "args": ["c++"] },
+      "mirrors": "https://example.com/mirrors.txt",
+      "host": {
+        "x86_64-linux":  { "url": "https://example.com/linux.tar.xz",  "sha256": "aa" },
+        "aarch64-macos": { "url": "https://example.com/macos.tar.xz", "sha256": "bb" }
+      },
+      "target": [
+        { "arch": "wasm32", "os": "wasi" },
+        { "arch": "x86_64", "os": "linux", "abi": "musl" }
+      ]
+    }
+  ]
+}

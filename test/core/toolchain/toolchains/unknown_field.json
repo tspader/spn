@@ -1,0 +1,13 @@
+{
+  "B": 1,
+  "toolchain": [
+    {
+      "name": "A",
+      "driver": "gcc",
+      "compiler": { "program": "A" },
+      "linker":   { "program": "A" },
+      "archiver": { "program": "ar" },
+      "B": { "C": 1 }
+    }
+  ]
+}

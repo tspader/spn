@@ -1,0 +1,18 @@
+{
+  "toolchain": [
+    {
+      "name": "A",
+      "driver": "gcc",
+      "compiler": { "program": "A" },
+      "linker":   { "program": "A" },
+      "archiver": { "program": "ar" }
+    },
+    {
+      "name": "B",
+      "driver": "clang",
+      "compiler": { "program": "B" },
+      "linker":   { "program": "B" },
+      "archiver": { "program": "ar" }
+    }
+  ]
+}

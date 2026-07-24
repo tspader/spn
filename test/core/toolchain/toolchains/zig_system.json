@@ -1,0 +1,24 @@
+{
+  "toolchain": [
+    {
+      "name": "zig",
+      "driver": "clang",
+      "compiler": { "program": "zig", "args": ["cc"] },
+      "linker":   { "program": "zig", "args": ["cc"] },
+      "archiver": { "program": "zig", "args": ["ar"] },
+      "host": {
+        "x86_64-linux": { "url": "https://example.com/zig.tar.xz", "sha256": "aa" }
+      },
+      "target": [
+        { "arch": "wasm32", "os": "wasi" }
+      ]
+    },
+    {
+      "name": "system",
+      "driver": "gcc",
+      "compiler": { "program": "cc" },
+      "linker":   { "program": "cc" },
+      "archiver": { "program": "ar" }
+    }
+  ]
+}
