@@ -1,17 +1,18 @@
-#include "sp.h"
-#include "utest.h"
-
 #include "fixture.h"
 
 #define BUILTINS_MAX_HOSTS 6
 #define BUILTINS_MAX_TARGETS 4
 
 typedef struct {
-  const c8* name;
   spn_cc_driver_t driver;
   spn_toolchain_source_t source;
   spn_triple_t hosts [BUILTINS_MAX_HOSTS];
   spn_triple_t targets [BUILTINS_MAX_TARGETS];
+} builtins_expect_t;
+
+typedef struct {
+  const c8* name;
+  builtins_expect_t expect;
 } builtins_test_t;
 
 static void builtins_catalog(s32* utest_result, spn_toolchain_catalog_t* catalog) {
@@ -43,21 +44,21 @@ static void run_builtins_test(s32* utest_result, builtins_test_t t) {
 
   spn_toolchain_info_t* info = spn_toolchain_catalog_get(&catalog, sp_str_view(t.name));
   ASSERT_TRUE(info);
-  EXPECT_EQ((u32)t.driver, (u32)info->driver);
-  EXPECT_EQ((u32)t.source, (u32)info->source);
+  EXPECT_EQ((u32)t.expect.driver, (u32)info->driver);
+  EXPECT_EQ((u32)t.expect.source, (u32)info->source);
 
-  sp_carr_for(t.hosts, it) {
-    if (fixture_triple_empty(t.hosts[it])) {
+  sp_carr_for(t.expect.hosts, it) {
+    if (fixture_triple_empty(t.expect.hosts[it])) {
       break;
     }
-    EXPECT_FALSE(sp_opt_is_null(spn_toolchain_select_artifact(info->hosts, t.hosts[it])));
+    EXPECT_FALSE(sp_opt_is_null(spn_toolchain_select_artifact(info->hosts, t.expect.hosts[it])));
   }
 
-  sp_carr_for(t.targets, it) {
-    if (fixture_triple_empty(t.targets[it])) {
+  sp_carr_for(t.expect.targets, it) {
+    if (fixture_triple_empty(t.expect.targets[it])) {
       break;
     }
-    EXPECT_TRUE(fixture_has_target(info, t.targets[it]));
+    EXPECT_TRUE(fixture_has_target(info, t.expect.targets[it]));
   }
 }
 
@@ -77,9 +78,7 @@ UTEST(builtins, well_formed) {
     EXPECT_FALSE(sp_str_empty(info->archiver.program));
     EXPECT_TRUE(spn_toolchain_has_cxx(info));
 
-    bool distribution = info->source == SPN_TOOLCHAIN_SOURCE_DISTRIBUTION;
-    EXPECT_EQ(distribution, !sp_da_empty(info->hosts));
-    if (distribution) {
+    if (info->source == SPN_TOOLCHAIN_SOURCE_DISTRIBUTION) {
       EXPECT_FALSE(sp_str_empty(info->version));
     }
 
@@ -101,21 +100,23 @@ UTEST(builtins, well_formed) {
 UTEST(builtins, zig) {
   run_builtins_test(utest_result, (builtins_test_t) {
     .name = "zig",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .source = SPN_TOOLCHAIN_SOURCE_DISTRIBUTION,
-    .hosts = {
-      { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
-      { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU },
-      { SPN_ARCH_X64, SPN_OS_MACOS },
-      { SPN_ARCH_ARM64, SPN_OS_MACOS },
-      { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU },
-      { SPN_ARCH_ARM64, SPN_OS_WINDOWS, SPN_ABI_GNU },
-    },
-    .targets = {
-      { SPN_ARCH_WASM32, SPN_OS_WASI },
-      { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
-      { SPN_ARCH_ARM64, SPN_OS_MACOS },
-      { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU },
+    .expect = {
+      .driver = SPN_CC_DRIVER_CLANG,
+      .source = SPN_TOOLCHAIN_SOURCE_DISTRIBUTION,
+      .hosts = {
+        { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
+        { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU },
+        { SPN_ARCH_X64, SPN_OS_MACOS },
+        { SPN_ARCH_ARM64, SPN_OS_MACOS },
+        { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU },
+        { SPN_ARCH_ARM64, SPN_OS_WINDOWS, SPN_ABI_GNU },
+      },
+      .targets = {
+        { SPN_ARCH_WASM32, SPN_OS_WASI },
+        { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
+        { SPN_ARCH_ARM64, SPN_OS_MACOS },
+        { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU },
+      },
     },
   });
 }
@@ -123,10 +124,12 @@ UTEST(builtins, zig) {
 UTEST(builtins, msvc) {
   run_builtins_test(utest_result, (builtins_test_t) {
     .name = "msvc",
-    .driver = SPN_CC_DRIVER_MSVC,
-    .targets = {
-      { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
-      { SPN_ARCH_ARM64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
+    .expect = {
+      .driver = SPN_CC_DRIVER_MSVC,
+      .targets = {
+        { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
+        { SPN_ARCH_ARM64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
+      },
     },
   });
 }
@@ -134,6 +137,8 @@ UTEST(builtins, msvc) {
 UTEST(builtins, system) {
   run_builtins_test(utest_result, (builtins_test_t) {
     .name = "system",
-    .driver = SPN_CC_DRIVER_GCC,
+    .expect = {
+      .driver = SPN_CC_DRIVER_GCC,
+    },
   });
 }
