@@ -1,10 +1,7 @@
-#include "sp.h"
-#include "utest.h"
-
 #include "fixture.h"
 
 #define CATALOG_MAX_ADDS 2
-#define CATALOG_MAX_PRESENT 2
+#define CATALOG_MAX_PRESENT 4
 #define CATALOG_MAX_TOOLCHAINS 2
 
 typedef struct {
@@ -13,10 +10,15 @@ typedef struct {
 } catalog_add_t;
 
 typedef struct {
-  const c8* file;
-  catalog_add_t adds [CATALOG_MAX_ADDS];
+  u32 entries;
   const c8* present [CATALOG_MAX_PRESENT];
   fixture_toolchain_t toolchains [CATALOG_MAX_TOOLCHAINS];
+} catalog_expect_t;
+
+typedef struct {
+  const c8* file;
+  catalog_add_t adds [CATALOG_MAX_ADDS];
+  catalog_expect_t expect;
 } catalog_test_t;
 
 static void run_catalog_test(s32* utest_result, catalog_test_t t) {
@@ -30,15 +32,17 @@ static void run_catalog_test(s32* utest_result, catalog_test_t t) {
     spn_toolchain_catalog_add(&catalog, fixture_local_toolchain(t.adds[it].name, t.adds[it].compiler));
   }
 
-  sp_carr_for(t.present, it) {
-    if (!t.present[it]) {
+  ASSERT_EQ(t.expect.entries, fixture_catalog_size(&catalog));
+
+  sp_carr_for(t.expect.present, it) {
+    if (!t.expect.present[it]) {
       break;
     }
-    EXPECT_TRUE(spn_toolchain_catalog_get(&catalog, sp_str_view(t.present[it])));
+    EXPECT_TRUE(spn_toolchain_catalog_get(&catalog, sp_str_view(t.expect.present[it])));
   }
 
-  sp_carr_for(t.toolchains, it) {
-    fixture_toolchain_t toolchain = t.toolchains[it];
+  sp_carr_for(t.expect.toolchains, it) {
+    fixture_toolchain_t toolchain = t.expect.toolchains[it];
     if (!toolchain.name) {
       break;
     }
@@ -46,44 +50,38 @@ static void run_catalog_test(s32* utest_result, catalog_test_t t) {
   }
 }
 
-UTEST(catalog, add_overrides_builtin) {
+UTEST(catalog, add_overrides_by_name) {
   run_catalog_test(utest_result, (catalog_test_t) {
-    .file = "zig.json",
+    .file = "multiple.json",
     .adds = {
-      { .name = "zig", .compiler = "/opt/zig/zig" },
+      { .name = "A", .compiler = "/A" },
     },
-    .toolchains = {
-      {
-        .name = "zig",
-        .driver = SPN_CC_DRIVER_GCC,
-        .compiler = { .program = "/opt/zig/zig" },
+    .expect = {
+      .entries = 2,
+      .present = { "B" },
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_GCC,
+          .compiler = { .program = "/A" },
+        },
       },
     },
   });
 }
 
-UTEST(catalog, add_keeps_builtins) {
+UTEST(catalog, add_coexists_with_entries) {
   run_catalog_test(utest_result, (catalog_test_t) {
-    .file = "zig_system.json",
+    .file = "multiple.json",
     .adds = {
-      { .name = "mingw", .compiler = "x86_64-w64-mingw32-gcc" },
+      { .name = "C", .compiler = "C" },
     },
-    .present = { "zig", "system" },
-    .toolchains = {
-      {
-        .name = "mingw",
-        .driver = SPN_CC_DRIVER_GCC,
-        .compiler = { .program = "x86_64-w64-mingw32-gcc" },
+    .expect = {
+      .entries = 3,
+      .present = { "A", "B", "C" },
+      .toolchains = {
+        { .name = "D", .absent = true },
       },
-    },
-  });
-}
-
-UTEST(catalog, unknown_name_is_null) {
-  run_catalog_test(utest_result, (catalog_test_t) {
-    .file = "zig.json",
-    .toolchains = {
-      { .name = "gcc-13", .absent = true },
     },
   });
 }

@@ -26,8 +26,10 @@ add_executable(toolchain_test
   builtins.c
   catalog.c
   parse.c
-  select.c
   provision.c
+  select.c
+  sha256.c
+  toolchain.c
   ${TEST_TOOLS}/ctx.c
   ${TEST_TOOLS}/tmp.c
   ${TEST_TOOLS}/git.c

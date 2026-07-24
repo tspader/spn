@@ -3,6 +3,7 @@
 
 #include "sp.h"
 #include "test.h"
+#include "sha256/sha256.h"
 #include "toolchain/toolchain.h"
 
 #define EXPECT_STR(actual, cstr) EXPECT_TRUE(sp_str_equal((actual), sp_str_view(cstr)))
@@ -13,6 +14,7 @@
 
 static const spn_triple_t HOST_X64_LINUX  = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU };
 static const spn_triple_t HOST_ARM_LINUX  = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU };
+static const spn_triple_t HOST_ARM_MACOS  = { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_NONE };
 static const spn_triple_t TARGET_WIN_GNU  = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU };
 static const spn_triple_t TARGET_WASM     = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_NONE };
 
