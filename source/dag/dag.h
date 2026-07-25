@@ -7,7 +7,6 @@
 #include "sha256/sha256.h"
 
 spn_dag_t*          spn_dag_new(sp_mem_t mem);
-bool                spn_dag_owns(spn_dag_t* g, spn_dag_id_t id);
 spn_dag_artifact_t* spn_dag_find_artifact(spn_dag_t* g, spn_dag_id_t id);
 spn_dag_action_t*   spn_dag_find_action(spn_dag_t* g, spn_dag_id_t id);
 spn_dag_id_t        spn_dag_add_value(spn_dag_t* g, const void* data, u64 len);

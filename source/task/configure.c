@@ -40,27 +40,37 @@ static spn_err_t add_configure_action(spn_dag_build_t* b, spn_pkg_unit_t* unit) 
   spn_dag_t* g = b->graph;
   sp_assert(unit->metaprogram.pkg);
 
-  unit->dag.configure.action = spn_dag_add_action(g, (spn_dag_action_config_t) {
+  spn_dag_pkg_ids_t ids = sp_zero;
+  ids.action = spn_dag_add_action(g, (spn_dag_action_config_t) {
     .execute = on_configure_package,
     .user_data = unit,
     .uncacheable = true,
   });
-  unit->dag.configure.stamp = spn_dag_add_file(g, unit->paths.stamp.configure);
-  return spn_dag_action_add_output(g, unit->dag.configure.action, unit->dag.configure.stamp);
+  ids.stamp = spn_dag_add_file(g, unit->paths.stamp.configure);
+  spn_try(spn_dag_action_add_output(g, ids.action, ids.stamp));
+
+  sp_ht_insert(b->ids.packages, unit, ids);
+  return SPN_OK;
 }
 
 static void add_configure_edges(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
   spn_dag_t* g = b->graph;
 
+  spn_dag_pkg_ids_t* unit_ids = sp_ht_getp(b->ids.packages, unit);
+  sp_assert(unit_ids);
+  spn_dag_id_t action = unit_ids->action;
+
   sp_da_for(unit->deps, it) {
-    spn_pkg_unit_t* dep = unit->deps[it].unit;
-    sp_assert(dep->dag.configure.stamp.occupied);
-    spn_dag_action_add_input(g, unit->dag.configure.action, dep->dag.configure.stamp);
+    spn_dag_pkg_ids_t* dep = sp_ht_getp(b->ids.packages, unit->deps[it].unit);
+    sp_assert(dep);
+    spn_dag_action_add_input(g, action, dep->stamp);
   }
 
   spn_target_unit_t* reactor = unit->metaprogram.configure.target;
   if (reactor) {
-    spn_dag_action_add_input(g, unit->dag.configure.action, reactor->dag.output);
+    spn_dag_target_ids_t* ids = sp_ht_getp(b->ids.targets, reactor);
+    sp_assert(ids);
+    spn_dag_action_add_input(g, action, ids->output);
   }
 }
 
@@ -68,10 +78,14 @@ static void add_reactor_edges(spn_dag_build_t* b, spn_target_unit_t* reactor) {
   spn_dag_t* g = b->graph;
 
   sp_da_for(reactor->pkg->deps, it) {
-    spn_pkg_unit_t* dep = reactor->pkg->deps[it].unit;
-    sp_assert(dep->dag.configure.stamp.occupied);
+    spn_dag_pkg_ids_t* dep = sp_ht_getp(b->ids.packages, reactor->pkg->deps[it].unit);
+    sp_assert(dep);
+    spn_dag_id_t stamp = dep->stamp;
+
     sp_da_for(reactor->objects, ot) {
-      spn_dag_action_add_input(g, reactor->objects[ot]->dag.action, dep->dag.configure.stamp);
+      spn_dag_object_ids_t* object = sp_ht_getp(b->ids.objects, reactor->objects[ot]);
+      sp_assert(object);
+      spn_dag_action_add_input(g, object->action, stamp);
     }
   }
 }

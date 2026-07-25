@@ -21,10 +21,6 @@ spn_dag_t* spn_dag_new(sp_mem_t mem) {
   return g;
 }
 
-bool spn_dag_owns(spn_dag_t* g, spn_dag_id_t id) {
-  return id.occupied && id.graph == g->id;
-}
-
 spn_dag_artifact_t* spn_dag_find_artifact(spn_dag_t* g, spn_dag_id_t id) {
   sp_assert(id.occupied);
   sp_assert(id.graph == g->id);

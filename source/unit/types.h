@@ -5,7 +5,6 @@
 #include "sp.h"
 #include "spn.h"
 
-#include "dag/types.h"
 #include "compiler/types.h"
 #include "filter/types.h"
 #include "intern/types.h"
@@ -97,7 +96,6 @@ struct spn_user_node_t {
   sp_da(sp_str_t) inputs;
   sp_da(sp_str_t) outputs;
   sp_da(spn_node_t*) deps;
-  spn_dag_id_t dag;
 };
 
 
@@ -118,11 +116,6 @@ typedef struct {
   spn_target_unit_t* target;
   spn_lang_t lang;
   spn_invocation_t invocation;
-
-  struct {
-    spn_dag_id_t action;
-    spn_dag_id_t object;
-  } dag;
 
   struct {
     sp_str_t file;
@@ -158,16 +151,6 @@ struct spn_target_unit {
     sp_da(sp_str_t) frameworks;
   } link;
 
-  struct {
-    spn_dag_id_t action;
-    spn_dag_id_t output;
-    struct {
-      spn_dag_id_t action;
-      spn_dag_id_t object;
-      spn_dag_id_t header;
-    } embed;
-  } dag;
-
   spn_build_io_t logs;
 };
 
@@ -199,17 +182,6 @@ struct spn_pkg_unit_t {
   sp_da(spn_target_unit_t*) libs;
   sp_da(spn_target_unit_t*) targets;
   sp_da(spn_user_node_t) user_nodes;
-
-  struct {
-    spn_dag_id_t tree;
-    spn_dag_id_t package;
-    spn_dag_id_t stamp;
-    sp_da(spn_dag_id_t) user_outputs;
-    struct {
-      spn_dag_id_t action;
-      spn_dag_id_t stamp;
-    } configure;
-  } dag;
 
   struct {
     struct {
