@@ -200,6 +200,54 @@ UTEST_F(closure, build_edge_excluded) {
   });
 }
 
+UTEST_F(closure, dep_kind_audience) {
+  EXPECT_TRUE(spn_dep_kind_applies(SPN_DEP_KIND_PACKAGE, SPN_TARGET_LIB));
+  EXPECT_TRUE(spn_dep_kind_applies(SPN_DEP_KIND_PACKAGE, SPN_TARGET_EXE));
+  EXPECT_TRUE(spn_dep_kind_applies(SPN_DEP_KIND_PACKAGE, SPN_TARGET_SCRIPT));
+  EXPECT_TRUE(spn_dep_kind_applies(SPN_DEP_KIND_PACKAGE, SPN_TARGET_TEST));
+  EXPECT_FALSE(spn_dep_kind_applies(SPN_DEP_KIND_PACKAGE, SPN_TARGET_CONFIGURE_METAPROGRAM));
+  EXPECT_FALSE(spn_dep_kind_applies(SPN_DEP_KIND_PACKAGE, SPN_TARGET_BUILD_METAPROGRAM));
+
+  EXPECT_FALSE(spn_dep_kind_applies(SPN_DEP_KIND_TEST, SPN_TARGET_LIB));
+  EXPECT_FALSE(spn_dep_kind_applies(SPN_DEP_KIND_TEST, SPN_TARGET_EXE));
+  EXPECT_TRUE(spn_dep_kind_applies(SPN_DEP_KIND_TEST, SPN_TARGET_TEST));
+  EXPECT_FALSE(spn_dep_kind_applies(SPN_DEP_KIND_TEST, SPN_TARGET_CONFIGURE_METAPROGRAM));
+  EXPECT_FALSE(spn_dep_kind_applies(SPN_DEP_KIND_TEST, SPN_TARGET_BUILD_METAPROGRAM));
+
+  EXPECT_FALSE(spn_dep_kind_applies(SPN_DEP_KIND_BUILD, SPN_TARGET_LIB));
+  EXPECT_FALSE(spn_dep_kind_applies(SPN_DEP_KIND_BUILD, SPN_TARGET_EXE));
+  EXPECT_FALSE(spn_dep_kind_applies(SPN_DEP_KIND_BUILD, SPN_TARGET_TEST));
+  EXPECT_TRUE(spn_dep_kind_applies(SPN_DEP_KIND_BUILD, SPN_TARGET_CONFIGURE_METAPROGRAM));
+  EXPECT_TRUE(spn_dep_kind_applies(SPN_DEP_KIND_BUILD, SPN_TARGET_BUILD_METAPROGRAM));
+}
+
+UTEST_F(closure, build_metaprogram_links_only_build_edges) {
+  run_closure_test(utest_result, (closure_test_t) {
+    .root = "test",
+    .target = SPN_TARGET_BUILD_METAPROGRAM,
+    .pkgs = {
+      { .name = "test", .deps = { { "spum" }, { "tool", .kind = SPN_DEP_KIND_BUILD } } },
+      { .name = "spum", .kind = SPN_LIB_KIND_STATIC },
+      { .name = "tool", .kind = SPN_LIB_KIND_STATIC },
+    },
+    .expect = { { "tool" } },
+  });
+}
+
+UTEST_F(closure, build_edge_invisible_transitively) {
+  run_closure_test(utest_result, (closure_test_t) {
+    .root = "test",
+    .target = SPN_TARGET_BUILD_METAPROGRAM,
+    .pkgs = {
+      { .name = "test", .deps = { { "tool", .kind = SPN_DEP_KIND_BUILD } } },
+      { .name = "tool", .kind = SPN_LIB_KIND_STATIC, .deps = { { "spum" }, { "gen", .kind = SPN_DEP_KIND_BUILD } } },
+      { .name = "spum", .kind = SPN_LIB_KIND_STATIC },
+      { .name = "gen", .kind = SPN_LIB_KIND_STATIC },
+    },
+    .expect = { { "tool" }, { "spum" } },
+  });
+}
+
 // A test dep links into test executables and nothing else
 UTEST_F(closure, test_edge_only_links_tests) {
   run_closure_test(utest_result, (closure_test_t) {

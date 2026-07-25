@@ -912,7 +912,7 @@ static void dag_add_target_edges(spn_dag_build_t* b, spn_target_unit_t* target) 
 
     sp_da_for(unit->deps, dt) {
       spn_pkg_dep_t* dep = &unit->deps[dt];
-      if (dep->kind == SPN_DEP_KIND_TEST && target->info->kind != SPN_TARGET_TEST) {
+      if (!spn_dep_kind_applies(dep->kind, target->info->kind)) {
         continue;
       }
       spn_dag_pkg_ids_t* dep_ids = sp_ht_getp(b->ids.packages, dep->unit);

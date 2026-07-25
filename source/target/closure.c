@@ -23,11 +23,21 @@ static bool pkg_is_shared_boundary(spn_pkg_unit_t* pkg) {
   return false;
 }
 
-static bool edge_links(spn_pkg_dep_t* dep, bool tests) {
+bool spn_dep_kind_applies(spn_dep_kind_t dep, spn_target_kind_t target) {
+  bool metaprogram = target == SPN_TARGET_CONFIGURE_METAPROGRAM || target == SPN_TARGET_BUILD_METAPROGRAM;
+  switch (dep) {
+    case SPN_DEP_KIND_PACKAGE: return !metaprogram;
+    case SPN_DEP_KIND_TEST:    return target == SPN_TARGET_TEST;
+    case SPN_DEP_KIND_BUILD:   return metaprogram;
+  }
+  sp_unreachable_return(false);
+}
+
+static bool edge_links(spn_pkg_dep_t* dep, bool tests, bool builds) {
   switch (dep->kind) {
-    case SPN_DEP_KIND_PACKAGE: return true;
+    case SPN_DEP_KIND_PACKAGE: return !builds;
     case SPN_DEP_KIND_TEST:    return tests;
-    case SPN_DEP_KIND_BUILD:   return false;
+    case SPN_DEP_KIND_BUILD:   return builds;
   }
   sp_unreachable_return(false);
 }
@@ -38,14 +48,17 @@ static bool edge_links(spn_pkg_dep_t* dep, bool tests) {
 #define CLOSURE_SEARCH_TESTS true
 #define CLOSURE_DO_NOT_SEARCH_TESTS false
 
-static void collect(search_t* s, spn_pkg_unit_t* pkg, bool private, bool tests) {
+#define CLOSURE_SEARCH_BUILDS true
+#define CLOSURE_DO_NOT_SEARCH_BUILDS false
+
+static void collect(search_t* s, spn_pkg_unit_t* pkg, bool private, bool tests, bool builds) {
   sp_da(spn_pkg_dep_t) deps = pkg->deps;
   sp_da_for(deps, it) {
     spn_pkg_dep_t* dep = &deps[it];
-    if (!edge_links(dep, tests)) {
+    if (!edge_links(dep, tests, builds)) {
       continue;
     }
-    if (!dep->unit || dep->unit == pkg) {
+    if (dep->unit == pkg) {
       continue;
     }
     if (closure_has_pkg(s->visited, dep->unit)) {
@@ -57,7 +70,7 @@ static void collect(search_t* s, spn_pkg_unit_t* pkg, bool private, bool tests) 
     // so the consumer stops here instead of inheriting its private closure.
     if (!pkg_is_shared_boundary(dep->unit)) {
 
-      collect(s, dep->unit, private || dep->private, CLOSURE_DO_NOT_SEARCH_TESTS);
+      collect(s, dep->unit, private || dep->private, CLOSURE_DO_NOT_SEARCH_TESTS, CLOSURE_DO_NOT_SEARCH_BUILDS);
     }
 
     sp_da_push(s->closure, ((spn_closure_entry_t) {
@@ -78,7 +91,7 @@ sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit
     .visited = sp_da_new(s.mem, spn_pkg_unit_t*),
     .closure = sp_da_new(s.mem, spn_closure_entry_t),
   };
-  collect(&search, root->pkg, CLOSURE_SEARCH_PUBLIC, root->info->kind == SPN_TARGET_TEST);
+  collect(&search, root->pkg, CLOSURE_SEARCH_PUBLIC, root->info->kind == SPN_TARGET_TEST, root->info->kind == SPN_TARGET_BUILD_METAPROGRAM);
 
   // The result is in post-order. Reversing us gives us a topological sort.
   sp_da(spn_closure_entry_t) closure = sp_da_new(mem, spn_closure_entry_t);
@@ -89,14 +102,14 @@ sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit
   return closure;
 }
 
-static void collect_runtime(search_t* s, spn_pkg_unit_t* pkg, bool tests) {
+static void collect_runtime(search_t* s, spn_pkg_unit_t* pkg, bool tests, bool builds) {
   sp_da(spn_pkg_dep_t) deps = pkg->deps;
   sp_da_for(deps, it) {
     spn_pkg_dep_t* dep = &deps[it];
-    if (!edge_links(dep, tests)) {
+    if (!edge_links(dep, tests, builds)) {
       continue;
     }
-    if (!dep->unit || dep->unit == pkg) {
+    if (dep->unit == pkg) {
       continue;
     }
     if (closure_has_pkg(s->visited, dep->unit)) {
@@ -104,7 +117,7 @@ static void collect_runtime(search_t* s, spn_pkg_unit_t* pkg, bool tests) {
     }
     sp_da_push(s->visited, dep->unit);
 
-    collect_runtime(s, dep->unit, CLOSURE_DO_NOT_SEARCH_TESTS);
+    collect_runtime(s, dep->unit, CLOSURE_DO_NOT_SEARCH_TESTS, CLOSURE_DO_NOT_SEARCH_BUILDS);
 
     sp_da_push(s->closure, ((spn_closure_entry_t) {
       .pkg = dep->unit,
@@ -146,7 +159,7 @@ sp_da(spn_target_unit_t*) spn_target_runtime_libs(sp_mem_t mem, spn_target_unit_
     .visited = sp_da_new(s.mem, spn_pkg_unit_t*),
     .closure = sp_da_new(s.mem, spn_closure_entry_t),
   };
-  collect_runtime(&search, root->pkg, root->info->kind == SPN_TARGET_TEST);
+  collect_runtime(&search, root->pkg, root->info->kind == SPN_TARGET_TEST, root->info->kind == SPN_TARGET_BUILD_METAPROGRAM);
 
   sp_da(spn_target_unit_t*) libs = sp_da_new(mem, spn_target_unit_t*);
   sp_da(spn_target_unit_t*) seen = sp_da_new(s.mem, spn_target_unit_t*);
