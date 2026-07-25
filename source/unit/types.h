@@ -22,9 +22,9 @@ struct spn_build_unit_t {
   spn_build_unit_id_t id;
   spn_profile_info_t profile;
   spn_toolchain_unit_t* toolchain;
-  u32 dep_kinds;
   sp_da(sp_str_t) include;
   sp_da(spn_pkg_unit_t*) packages;
+  sp_da(spn_pkg_unit_t*) hosts;
   struct {
     sp_str_t root;
   } paths;
@@ -160,7 +160,6 @@ typedef struct {
 } spn_pkg_metaprogram_target_t;
 
 typedef struct {
-  spn_pkg_unit_t* pkg;
   spn_pkg_metaprogram_target_t configure;
   spn_pkg_metaprogram_target_t build;
 } spn_pkg_metaprogram_t;
@@ -175,8 +174,6 @@ struct spn_pkg_unit_t {
   spn_session_t* session;
   spn_pkg_info_t* info;
   spn_pkg_source_t source;
-  u32 materialized_dep_kinds;
-  bool member;
 
   sp_da(spn_pkg_dep_t) deps;
   sp_da(spn_target_unit_t*) libs;

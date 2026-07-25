@@ -853,14 +853,6 @@ static spn_err_t dag_add_package_action(spn_dag_build_t* b, spn_pkg_unit_t* unit
 }
 
 static spn_err_t dag_add_package(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
-  sp_da_for(unit->targets, it) {
-    spn_target_unit_t* target = unit->targets[it];
-    if (sp_da_empty(target->info->source)) {
-      continue;
-    }
-    spn_try(spn_dag_build_add_target(b, target));
-  }
-
   spn_dag_pkg_ids_t ids = sp_zero;
   sp_da_init(b->mem, ids.user_outputs);
   sp_da_init(b->mem, ids.user_actions);
@@ -961,10 +953,6 @@ static void dag_add_target_edges(spn_dag_build_t* b, spn_target_unit_t* target) 
 static spn_err_t dag_add_edges(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
   spn_dag_t* g = b->graph;
 
-  sp_da_for(unit->targets, it) {
-    dag_add_target_edges(b, unit->targets[it]);
-  }
-
   spn_dag_pkg_ids_t* unit_ids = sp_ht_getp(b->ids.packages, unit);
   sp_assert(unit_ids);
   spn_dag_id_t package = unit_ids->action;
@@ -984,17 +972,30 @@ static spn_err_t dag_add_edges(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
   return SPN_OK;
 }
 
+static spn_err_t dag_add_unit_targets(spn_dag_build_t* b, sp_da(spn_pkg_unit_t*) units) {
+  sp_da_for(units, it) {
+    sp_da_for(units[it]->targets, jt) {
+      spn_try(spn_dag_build_add_target(b, units[it]->targets[jt]));
+    }
+  }
+  return SPN_OK;
+}
+
+static void dag_add_unit_target_edges(spn_dag_build_t* b, sp_da(spn_pkg_unit_t*) units) {
+  sp_da_for(units, it) {
+    sp_da_for(units[it]->targets, jt) {
+      dag_add_target_edges(b, units[it]->targets[jt]);
+    }
+  }
+}
+
 static spn_err_t dag_prepare(spn_dag_build_t* b) {
   spn_session_t* session = b->session;
 
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (unit->member) { // @spader
-      continue;
-    }
-    sp_da_for(unit->targets, jt) {
-      spn_try(spn_dag_build_add_target(b, unit->targets[jt]));
-    }
+  sp_da_for(session->units.builds, it) {
+    spn_build_unit_t* build = session->units.builds[it];
+    spn_try(dag_add_unit_targets(b, build->hosts));
+    spn_try(dag_add_unit_targets(b, build->packages));
   }
 
   sp_da_for(session->units.builds, it) {
@@ -1006,18 +1007,14 @@ static spn_err_t dag_prepare(spn_dag_build_t* b) {
 
   sp_da_for(session->units.builds, it) {
     spn_build_unit_t* build = session->units.builds[it];
-    sp_da_for(build->packages, jt) {
-      spn_try(dag_add_edges(b, build->packages[jt]));
-    }
+    dag_add_unit_target_edges(b, build->hosts);
+    dag_add_unit_target_edges(b, build->packages);
   }
 
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    if (unit->member) {
-      continue;
-    }
-    sp_da_for(unit->targets, jt) {
-      dag_add_target_edges(b, unit->targets[jt]);
+  sp_da_for(session->units.builds, it) {
+    spn_build_unit_t* build = session->units.builds[it];
+    sp_da_for(build->packages, jt) {
+      spn_try(dag_add_edges(b, build->packages[jt]));
     }
   }
 

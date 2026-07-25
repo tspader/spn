@@ -11,6 +11,7 @@
 
 #include "external/wasm/wasm.h"
 #include "session/session.h"
+#include "task/build/build.h"
 #include "task/build/dag.h"
 #include "task/task.h"
 #include "unit/package.h"
@@ -29,16 +30,8 @@ static s32 on_configure_package(spn_dag_t* g, spn_dag_action_t* action, void* us
   return SPN_OK;
 }
 
-static spn_target_unit_t* get_configure_target(spn_pkg_unit_t* unit) {
-  if (unit->metaprogram.pkg != unit) {
-    return SP_NULLPTR;
-  }
-  return unit->metaprogram.configure.target;
-}
-
 static spn_err_t add_configure_action(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
   spn_dag_t* g = b->graph;
-  sp_assert(unit->metaprogram.pkg);
 
   spn_dag_pkg_ids_t ids = sp_zero;
   ids.action = spn_dag_add_action(g, (spn_dag_action_config_t) {
@@ -100,13 +93,23 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
   spn_dag_build_t* dag = spn_dag_build_new(session);
   session->dag.configure = dag;
 
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    spn_target_unit_t* configure = get_configure_target(unit);
-    if (configure) {
-      if (spn_dag_build_add_target(dag, configure)) {
-        return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
-      }
+  spn_build_unit_t* world = session->units.metaprogram;
+  sp_da(spn_pkg_unit_t*) reactors = sp_da_new(session->mem, spn_pkg_unit_t*);
+  sp_da_for(world->hosts, it) {
+    if (world->hosts[it]->metaprogram.configure.target) {
+      sp_da_push(reactors, world->hosts[it]);
+    }
+  }
+  sp_da_for(world->packages, it) {
+    if (world->packages[it]->metaprogram.configure.target) {
+      sp_da_push(reactors, world->packages[it]);
+    }
+  }
+
+  sp_da_for(reactors, it) {
+    spn_target_unit_t* configure = reactors[it]->metaprogram.configure.target;
+    if (spn_dag_build_add_target(dag, configure)) {
+      return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = get_target_output_path(session->mem, configure) });
     }
   }
 
@@ -127,11 +130,8 @@ spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
     }
   }
 
-  sp_om_for(session->units.packages, it) {
-    spn_target_unit_t* reactor = get_configure_target(sp_om_at(session->units.packages, it));
-    if (reactor) {
-      add_reactor_edges(dag, reactor);
-    }
+  sp_da_for(reactors, it) {
+    add_reactor_edges(dag, reactors[it]->metaprogram.configure.target);
   }
 
   spn_dag_build_start(dag, 8);

@@ -72,7 +72,6 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
         SPN_TASK_RESOLVE,
         SPN_TASK_SYNC_PACKAGES,
         SPN_TASK_PLAN,
-    SPN_TASK_PLAN,
         SPN_TASK_CONFIGURE_GRAPH,
         SPN_TASK_RUN
       );
