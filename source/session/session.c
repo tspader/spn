@@ -553,39 +553,17 @@ spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_
   unit->paths.object = sp_fs_join_path(session->mem, unit->paths.generated, sp_str_lit("object"));
 
   unit->logs.build = sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(unit->info->name)).value;
-  unit->logs.test = sp_fmt(session->mem, "{}.test.log", SP_FMT_STR(unit->info->name)).value;
   unit->logs.jsonl = sp_fmt(session->mem, "{}.jsonl", SP_FMT_STR(unit->info->name)).value;
 
   unit->paths.logs.build = sp_fs_join_path(session->mem, unit->paths.work, unit->logs.build);
-  unit->paths.logs.test = sp_fs_join_path(session->mem, unit->paths.work, unit->logs.test);
   unit->paths.logs.jsonl = sp_fs_join_path(session->mem, unit->paths.work, unit->logs.jsonl);
 
-  sp_fs_create_dir(unit->paths.work);
-  sp_fs_create_dir(unit->paths.generated);
-  sp_fs_create_dir(unit->paths.object);
-  sp_fs_create_dir(unit->paths.store);
-  sp_fs_create_dir(unit->paths.bin);
-  sp_fs_create_dir(unit->paths.include);
-  sp_fs_create_dir(unit->paths.lib);
-  sp_fs_create_dir(unit->paths.vendor);
   spn_lazy_log_init(&unit->logs.io.build, unit->paths.logs.build);
   spn_lazy_log_init(&unit->logs.io.jsonl, unit->paths.logs.jsonl);
 
   unit->paths.stamp.dir = sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("stamp"));
   unit->paths.stamp.configure = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("configure.stamp"));
   unit->paths.stamp.package = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("package.stamp"));
-  unit->paths.stamp.profile = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("profile.stamp"));
-
-  sp_fs_create_dir(unit->paths.stamp.dir);
-
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_str_t identity = spn_profile_identity_to_str(scratch.mem, &build->profile);
-  sp_str_t existing = sp_zero;
-  sp_io_read_file(scratch.mem, unit->paths.stamp.profile, &existing);
-  if (!sp_str_equal(existing, identity)) {
-    sp_fs_create_file_str(unit->paths.stamp.profile, identity);
-  }
-  sp_mem_end_scratch(scratch);
 
   return unit;
 }

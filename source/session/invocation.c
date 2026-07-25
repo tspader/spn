@@ -143,6 +143,8 @@ sp_str_t spn_session_compile_commands_path(spn_session_t* session) {
 }
 
 spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation) {
+  sp_fs_create_dir(invocation->cwd);
+
   sp_ps_config_t ps = {
     .command = invocation->program,
     .dyn_args = invocation->args,

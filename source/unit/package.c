@@ -17,6 +17,14 @@ sp_str_t spn_pkg_unit_get_node_stamp_file(spn_pkg_unit_t* ctx, spn_user_node_t* 
   return sp_fs_join_path(spn.mem, ctx->paths.stamp.dir, node->tag);
 }
 
+void spn_pkg_unit_create_layout(spn_pkg_unit_t* unit) {
+  sp_fs_create_dir(unit->paths.work);
+  sp_fs_create_dir(unit->paths.include);
+  sp_fs_create_dir(unit->paths.lib);
+  sp_fs_create_dir(unit->paths.bin);
+  sp_fs_create_dir(unit->paths.vendor);
+}
+
 static spn_err_t publish_target_headers(spn_pkg_unit_t* unit, spn_target_map_t targets, bool strict) {
   sp_om_for(targets, it) {
     spn_target_info_t* target = sp_str_om_at(targets, it);

@@ -4,6 +4,7 @@ static sp_err_t spn_lazy_log_write(sp_io_writer_t* w, const void* ptr, u64 size,
   spn_lazy_log_t* log = (spn_lazy_log_t*)w;
   if (!log->opened) {
     log->opened = true;
+    sp_fs_create_dir(sp_fs_parent_path(log->path));
     if (sp_io_file_writer_from_path(&log->file, log->path) != SP_OK) {
       log->failed = true;
     }

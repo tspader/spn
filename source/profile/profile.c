@@ -146,18 +146,6 @@ spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_in
   return spn_result(SPN_OK);
 }
 
-sp_str_t spn_profile_identity_to_str(sp_mem_t mem, const spn_profile_info_t* profile) {
-  spn_triple_t triple = { profile->arch, profile->os, profile->abi };
-  return sp_fmt(mem, "toolchain={} triple={} mode={} opt={} sanitize={} linkage={} standard={}",
-    sp_fmt_str(profile->toolchain),
-    sp_fmt_str(spn_triple_to_str(mem, triple)),
-    sp_fmt_str(spn_build_mode_to_str(profile->mode)),
-    sp_fmt_str(spn_opt_level_to_str(profile->opt)),
-    sp_fmt_str(spn_sanitizer_set_to_str(mem, profile->sanitizers)),
-    sp_fmt_str(spn_linkage_to_str(profile->linkage)),
-    sp_fmt_str(spn_c_standard_to_str(profile->standard))).value;
-}
-
 static spn_err_union_t spn_flag_invalid(const c8* flag, sp_str_t value, const c8* expected) {
   return (spn_err_union_t) {
     .kind = SPN_ERR_FLAG_INVALID,

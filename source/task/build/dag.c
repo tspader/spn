@@ -471,6 +471,7 @@ static s32 dag_package_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_d
   spn_dag_package_ctx_t* ctx = (spn_dag_package_ctx_t*)user_data;
   spn_pkg_unit_t* unit = ctx->pkg;
 
+  spn_pkg_unit_create_layout(unit);
   sp_da_init(spn.mem, ctx->obs);
 
   sp_da_for(unit->info->publish.copy, it) {

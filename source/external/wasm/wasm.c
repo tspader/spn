@@ -6,6 +6,7 @@
 #include "ctx/types.h"
 #include "event/types.h"
 #include "event/event.h"
+#include "unit/package.h"
 #include "unit/types.h"
 #include "wasm_export.h"
 
@@ -92,6 +93,7 @@ static spn_err_t script_open(spn_wasm_script_t* script, spn_pkg_unit_t* unit) {
     });
   }
 
+  spn_pkg_unit_create_layout(unit);
   script->preopens = (spn_wasm_preopens_t) {
     .work = preopen("/work", unit->paths.work),
     .source = preopen("/source", unit->paths.source),
