@@ -560,7 +560,6 @@ void spn_deinit(sp_app_t* sp) {
       sp_mem_end_scratch(scratch);
 
       spn_lazy_log_close(&unit->logs.io.build);
-      spn_lazy_log_close(&unit->logs.io.test);
       spn_lazy_log_close(&unit->logs.io.jsonl);
     }
   }
@@ -568,7 +567,6 @@ void spn_deinit(sp_app_t* sp) {
   sp_om_for(app.session.units.targets, it) {
     spn_target_unit_t* target = sp_om_at(app.session.units.targets, it);
     spn_lazy_log_close(&target->logs.build);
-    spn_lazy_log_close(&target->logs.test);
     spn_lazy_log_close(&target->logs.jsonl);
   }
 }

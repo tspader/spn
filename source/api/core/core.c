@@ -250,6 +250,10 @@ s32 spn_api_copy(sp_str_t from, sp_str_t to) {
   else if (!sp_fs_exists(from)) {
     err = SPN_ERROR;
   }
+  else if (sp_fs_is_dir(from)) {
+    sp_fs_create_dir(to);
+    err = sp_fs_copy(from, to);
+  }
   else {
     // @spader This bit me so I just patched it over like this, but
     // I need to think about how this should work

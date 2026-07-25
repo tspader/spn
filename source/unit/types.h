@@ -185,7 +185,6 @@ struct spn_pkg_unit_t {
       sp_str_t dir;
       sp_str_t configure;
       sp_str_t package;
-      sp_str_t profile;
     } stamp;
 
     spn_build_log_paths_t logs;
@@ -206,7 +205,6 @@ struct spn_pkg_unit_t {
 
   struct {
     sp_str_t build;
-    sp_str_t test;
     sp_str_t jsonl;
     spn_build_io_t io;
   } logs;
