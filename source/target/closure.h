@@ -4,6 +4,8 @@
 #include "sp.h"
 
 #include "forward/types.h"
+#include "pkg/types.h"
+#include "target/types.h"
 
 typedef struct {
   spn_pkg_unit_t* pkg;
@@ -13,9 +15,12 @@ typedef struct {
 // Computes the ordered, deduplicated set of packages a link unit (an exe or a
 // shared lib) must link against. Walks the transitive package dependency graph
 // rooted at the link unit's own package, so a product pulls in everything it
-// reaches, not just its direct dependencies. Only link edges are walked: build
-// deps (and test deps, unless the link unit is a test) live in other units and
-// never land on the link line.
+// reaches, not just its direct dependencies. Each dep kind has one audience:
+// package deps link into everything except metaprograms, test deps only into
+// tests, and build deps only into the declaring package's build metaprogram.
+// Test and build edges are never inherited transitively — a build dep is
+// consumed producing its package, then gone — while a linked build dep's own
+// package closure is walked normally.
 //
 // Recursion stops at shared-library boundaries: a package linked through a
 // shared lib is recorded, but its own dependencies were already resolved when
@@ -44,5 +49,7 @@ typedef struct {
 sp_da(spn_link_lib_t) spn_closure_link_libs(sp_mem_t mem, sp_da(spn_closure_entry_t) closure, spn_pkg_unit_t* self);
 
 sp_da(spn_target_unit_t*) spn_target_runtime_libs(sp_mem_t mem, spn_target_unit_t* root);
+
+bool spn_dep_kind_applies(spn_dep_kind_t dep, spn_target_kind_t target);
 
 #endif

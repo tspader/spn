@@ -7,6 +7,7 @@
 #include "external/cc.h"
 #include "session/invocation.h"
 #include "session/session.h"
+#include "target/closure.h"
 #include "task/build/build.h"
 
 static sp_str_t resolve_pkg_path(sp_mem_t mem, spn_pkg_unit_t* pkg, sp_str_t path) {
@@ -55,10 +56,7 @@ static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t*
   }
 
   sp_da_for(pkg->deps, it) {
-    if (!pkg->deps[it].unit) {
-      continue;
-    }
-    if (pkg->deps[it].kind == SPN_DEP_KIND_TEST && unit->target->info->kind != SPN_TARGET_TEST) {
+    if (!spn_dep_kind_applies(pkg->deps[it].kind, unit->target->info->kind)) {
       continue;
     }
 

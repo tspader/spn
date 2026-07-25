@@ -11,6 +11,7 @@
 
 #include "external/wasm/wasm.h"
 #include "session/session.h"
+#include "target/closure.h"
 #include "task/build/build.h"
 #include "task/build/dag.h"
 #include "task/task.h"
@@ -71,6 +72,9 @@ static void add_reactor_edges(spn_dag_build_t* b, spn_target_unit_t* reactor) {
   spn_dag_t* g = b->graph;
 
   sp_da_for(reactor->pkg->deps, it) {
+    if (!spn_dep_kind_applies(reactor->pkg->deps[it].kind, reactor->info->kind)) {
+      continue;
+    }
     spn_dag_pkg_ids_t* dep = sp_ht_getp(b->ids.packages, reactor->pkg->deps[it].unit);
     sp_assert(dep);
     spn_dag_id_t stamp = dep->stamp;

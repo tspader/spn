@@ -171,7 +171,7 @@ static spn_err_union_t set_target_kind(spn_session_t* session, spn_target_unit_t
 }
 
 static spn_pkg_unit_t* find_dep_unit(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t qualified) {
-  const spn_dep_kind_t kinds [] = { SPN_DEP_KIND_PACKAGE, SPN_DEP_KIND_TEST };
+  const spn_dep_kind_t kinds [] = { SPN_DEP_KIND_PACKAGE, SPN_DEP_KIND_TEST, SPN_DEP_KIND_BUILD };
   sp_carr_for(kinds, it) {
     spn_pkg_unit_t* unit = spn_session_find_dep(session, pkg, qualified, kinds[it]);
     if (unit) {

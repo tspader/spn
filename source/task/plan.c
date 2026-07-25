@@ -34,12 +34,7 @@ static spn_pkg_unit_t* closure_add(spn_session_t* s, spn_build_unit_t* build, sp
   return unit;
 }
 
-static void drain_closure(spn_session_t* s, spn_build_unit_t* build, sp_da(spn_closure_item_t)* pending) {
-  bool world = build == s->units.metaprogram;
-  u32 dep_kinds = world ?
-    spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE) | spn_dep_kind_bit(SPN_DEP_KIND_BUILD) :
-    spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE);
-
+static void drain_closure(spn_session_t* s, spn_build_unit_t* build, sp_da(spn_closure_item_t)* pending, u32 dep_kinds) {
   sp_for(it, sp_da_size(*pending)) {
     spn_closure_item_t item = (*pending)[it];
     spn_resolved_pkg_t* resolved = sp_ht_getp(s->resolve, item.unit->id.pkg);
@@ -52,7 +47,7 @@ static void drain_closure(spn_session_t* s, spn_build_unit_t* build, sp_da(spn_c
       }
       sp_da_push(item.unit->deps, ((spn_pkg_dep_t) {
         .unit = closure_add(s, build, edge->id, dep_kinds, pending),
-        .kind = world ? SPN_DEP_KIND_PACKAGE : edge->kind,
+        .kind = edge->kind,
         .private = edge->private,
       }));
     }
@@ -62,7 +57,7 @@ static void drain_closure(spn_session_t* s, spn_build_unit_t* build, sp_da(spn_c
 static void add_build_packages(spn_session_t* s, spn_build_unit_t* build, spn_pkg_id_t root) {
   sp_da(spn_closure_item_t) pending = sp_da_new(s->mem, spn_closure_item_t);
   closure_add(s, build, root, spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE) | spn_dep_kind_bit(SPN_DEP_KIND_TEST), &pending);
-  drain_closure(s, build, &pending);
+  drain_closure(s, build, &pending, spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE));
 }
 
 static bool pkg_has_metaprogram(spn_loaded_pkg_t* loaded) {
@@ -100,7 +95,7 @@ static void add_metaprogram_packages(spn_session_t* s) {
       }
     }
   }
-  drain_closure(s, world, &pending);
+  drain_closure(s, world, &pending, world_kinds);
 
   sp_da(spn_closure_item_t) hosts = sp_da_new(s->mem, spn_closure_item_t);
   sp_da_for(owners, it) {
@@ -111,7 +106,7 @@ static void add_metaprogram_packages(spn_session_t* s) {
     sp_da_push(world->hosts, host);
     sp_da_push(hosts, ((spn_closure_item_t) { .unit = host, .kinds = spn_dep_kind_bit(SPN_DEP_KIND_BUILD) }));
   }
-  drain_closure(s, world, &hosts);
+  drain_closure(s, world, &hosts, world_kinds);
 }
 
 static spn_err_union_t validate_build_flags(spn_session_t* s) {
