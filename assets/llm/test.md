@@ -17,6 +17,15 @@ or, equivalently, `ctest --test-dir .build/work/$TRIPLE --output-on-failure`.
 
 # notes
 
+- `test/tools/action.h` has the ops for our integration test "bytecode"; the following ops are being phased out and are banned because they are either (a) hostile to testing cross compiles, or (b) fragile, fuzzy string matching against text that we never intended to be stable:
+  - ACTION_VERIFY_FILE_CONTAINS
+  - ACTION_VERIFY_FILE_NOT_CONTAINS
+  - ACTION_VERIFY_CLI_CONTAINS
+  - ACTION_VERIFY_CLI_NOT_CONTAINS
+  - ACTION_RUN_BIN
+  - ACTION_RUN_TEST
+  - ACTION_VERIFY_DIR_COUNT
+  - ACTION_VERIFY_EVENT_COUNT
 - The resolver fuzzer only runs with SPN_FUZZ_ENABLE set; it currently finds known resolver bugs (greedy incompleteness), so it is not wired into CI. Don't treat its failures as regressions unless you changed the resolver.
 - Use literal friendly types, like `const c8*` and `T [N]` (i.e. fixed size C arrays)
 - Use `sp_carr_for()` + zero-as-sentinel (when possible) to avoid typing sentinels or lengths at the test site

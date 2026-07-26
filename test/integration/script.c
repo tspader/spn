@@ -234,7 +234,7 @@ UTEST_F(script, configure_dead_glob) {
     .copy = { "tools" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = "configure_source" } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_CONFIGURE_SOURCE } },
     },
   });
 }
@@ -246,7 +246,7 @@ UTEST_F(script, configure_missing_source) {
     .project = "test/integration/fixtures/script/configure_missing_source",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = "configure_source" } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_CONFIGURE_SOURCE } },
     },
   });
 }

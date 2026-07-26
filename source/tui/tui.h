@@ -17,6 +17,7 @@ void            sp_tui_restore(spn_tui_t* tui);
 void            sp_tui_setup_raw_mode(spn_tui_t* tui);
 void            spn_tui_init(spn_tui_t* tui, spn_session_t* session, spn_tui_mode_t mode);
 void            spn_tui_log_event(spn_build_event_t* event);
+sp_str_t        spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event);
 void            spn_tui_attach_prompt(spn_tui_t* tui, sp_prompt_ctx_t* ctx);
 void            spn_tui_detach_prompt(spn_tui_t* tui);
 void            spn_prompt_stop(bool ok);

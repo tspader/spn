@@ -3,6 +3,7 @@ add_executable(e2e
   ${SRC}/compiler/gnu.c
   ${SRC}/compiler/msvc.c
   ${SRC}/enum/enum.c
+  ${SRC}/error/str.c
   ${SRC}/external/tom.c
   ${SRC}/sp/str.c
   ${SRC}/triple/triple.c

@@ -24,7 +24,7 @@ UTEST_F(deps_file, invalid_manifest) {
     .copy = { "vendor/spum/spn.toml" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = "dep_manifest" } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_DEP_MANIFEST } },
     },
   });
 }
