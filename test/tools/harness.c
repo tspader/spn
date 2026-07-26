@@ -3,6 +3,7 @@
 #include "test.h"
 #include "action.h"
 #include "harness.h"
+#include "error/error.h"
 #include "triple/triple.h"
 #include "yyjson.h"
 
@@ -557,7 +558,7 @@ static void expect_event(s32* utest_result, fixture_t* fixture, spn_build_event_
     sp_str_view(found ? "it was logged" : "it was not"));
 }
 
-static void expect_result(s32* utest_result, fixture_t* fixture, const c8* err, const c8* file, u32 line) {
+static void expect_result(s32* utest_result, fixture_t* fixture, spn_err_t err, const c8* file, u32 line) {
   sp_mem_t mem = fixture->fs.mem;
   sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
 
@@ -581,12 +582,12 @@ static void expect_result(s32* utest_result, fixture_t* fixture, const c8* err, 
     yyjson_doc_free(doc);
   }
 
-  if (actual && sp_cstr_equal(actual, err)) return;
+  if (actual && sp_cstr_equal(actual, spn_err_to_str(err))) return;
 
   utest_kv("log", path);
   utest_fail(utest_result, file, line,
-    sp_str_view(err),
-    actual ? sp_str_view(actual) : sp_str_lit("no result event"));
+    sp_cstr_as_str(spn_err_to_str(err)),
+    actual ? sp_cstr_as_str(actual) : sp_str_lit("no result event"));
 }
 
 static void expect_cc_arg(s32* utest_result, fixture_t* fixture, const action_t* action, const c8* file, u32 line) {

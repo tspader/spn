@@ -45,6 +45,7 @@ set(SPN_SOURCES
   dag/wasi.c
   enum/enum.c
   error/error.c
+  error/str.c
   event/event.c
   event/build.c
   event/log.c

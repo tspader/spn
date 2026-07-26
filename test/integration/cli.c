@@ -45,6 +45,19 @@ UTEST_F(cli, init) {
       { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("main.c") },
       { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit(".gitignore") },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "init", .rc = 1 } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_INIT_EXISTS } },
+    },
+  });
+}
+
+UTEST_F(cli, init_existing) {
+  tmpfs_init_named(&uf->fixture.fs, "cli_init_existing");
+
+  run_test(utest_result, &uf->fixture, (test_t) {
+    .actions = {
+      { .kind = ACTION_CREATE_FILE, .create = { .file = sp_str_lit(".gitignore"), .content = sp_str_lit("A") } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "init", .rc = 1 } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_INIT_EXISTS } },
     },
   });
 }

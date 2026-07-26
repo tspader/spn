@@ -242,7 +242,7 @@ static sp_str_t spn_tui_contextual_path(sp_mem_t mem, sp_str_t path) {
   return path;
 }
 
-static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
+sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
   sp_io_dyn_mem_writer_t w = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &w);
 
@@ -1035,6 +1035,22 @@ static sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* eve
             &w.base,
             "Toolchain {} has no C++ compiler, but the build contains C++ sources",
             sp_fmt_str(spn_tui_colored_name(mem, event->err.toolchain.name))
+          );
+          break;
+        }
+        case SPN_ERR_INIT_EXISTS: {
+          sp_fmt_io(
+            &w.base,
+            "{.cyan} already exists",
+            sp_fmt_str(spn_tui_contextual_path(mem, event->err.fs.path))
+          );
+          break;
+        }
+        case SPN_ERR_INIT_NAME: {
+          sp_fmt_io(
+            &w.base,
+            "invalid name {.quote}",
+            sp_fmt_str(event->err.pkg.name)
           );
           break;
         }

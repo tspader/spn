@@ -240,6 +240,8 @@ typedef enum {
   SPN_ERR_RESOLVE_TOO_COMPLEX,
   SPN_ERR_OPTION,
   SPN_ERR_CONFIGURE_SOURCE,
+  SPN_ERR_INIT_EXISTS,
+  SPN_ERR_INIT_NAME,
 } spn_err_t;
 
 typedef struct spn              spn_t;
