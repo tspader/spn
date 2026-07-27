@@ -39,15 +39,15 @@ fz_profile_t fz_gen_profile(sp_fuzz_prng_t* prng, fz_limits_t limits) {
   fz_profile_t profile = sp_zero;
   profile.limits = limits;
 
-  u64 small = sp_min(limits.small_actions, limits.actions);
-  profile.big = limits.actions > small && sp_fuzz_chance(prng, 1, 8);
+  u64 small_actions = sp_min(limits.small_actions, limits.actions);
+  profile.big = limits.actions > small_actions && sp_fuzz_chance(prng, 1, 8);
   if (profile.big) {
-    profile.action_count = sp_fuzz_range(prng, small + 1, limits.actions);
+    profile.action_count = sp_fuzz_range(prng, small_actions + 1, limits.actions);
     profile.out_degree = sp_fuzz_range(prng, 1, 4);
     profile.source_count = sp_fuzz_range(prng, 1, limits.sources);
   }
   else {
-    profile.action_count = sp_fuzz_range(prng, 1, small);
+    profile.action_count = sp_fuzz_range(prng, 1, small_actions);
     profile.source_count = sp_fuzz_range(prng, 1, sp_min(4, limits.sources));
     profile.density = sp_fuzz_below(prng, 4);
   }
