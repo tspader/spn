@@ -6,8 +6,6 @@ add_executable(dag
   ${SRC}/dag/executor.c
   ${SRC}/dag/wasi.c
   ${SRC}/codegen/json.c
-  ${SRC}/codegen/gen/dag_output.gen.c
-  ${SRC}/codegen/gen/dag_obs.gen.c
   ${SRC}/sha256/sha256.c
   ${SRC}/sp/fs.c
   ${SRC}/sp/io.c

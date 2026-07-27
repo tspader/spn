@@ -1,7 +1,0 @@
-{
-  "metadata": { "format": "json" },
-  "properties": {
-    "name": { "type": "string" },
-    "digest": { "type": "string" }
-  }
-}

@@ -169,7 +169,7 @@ static void run_test(s32* utest_result, test_t t) {
       EXPECT_TRUE(!sp_str_empty(manifest));
       sp_sys_file_meta_t sys = sp_zero;
       ASSERT_EQ(SPN_OK, spn_dag_file_cache_stat(&env.dag.files, tmpfs_get(&env.dag.fs, sp_str_view(run->manifest_fresh)), &sys));
-      sp_str_t mtime = sp_fmt(env.dag.fs.mem, "\"mtime_ns\":\"{}\"", sp_fmt_int(sys.mtime.tv_nsec)).value;
+      sp_str_t mtime = sp_fmt(env.dag.fs.mem, " {} {} ", sp_fmt_int((s64)sys.mtime.tv_sec), sp_fmt_int((s64)sys.mtime.tv_nsec)).value;
       EXPECT_TRUE(sp_str_contains(manifest, mtime));
     }
   }

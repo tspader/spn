@@ -64,7 +64,7 @@ static void run_test(s32* utest_result, discovery_test_t t) {
 
   if (t.corrupt) {
     sp_str_t hex = spn_dag_digest_hex(fs.mem, dag_test_digest(t.corrupt));
-    sp_str_t path = sp_fs_join_path(fs.mem, dir, sp_fmt(fs.mem, "{}.jsonl", sp_fmt_str(hex)).value);
+    sp_str_t path = sp_fs_join_path(fs.mem, dir, sp_fmt(fs.mem, "{}.txt", sp_fmt_str(hex)).value);
     ASSERT_EQ(SP_OK, sp_fs_create_file_cstr(path, "not json\n"));
   }
 

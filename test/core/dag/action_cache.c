@@ -44,7 +44,7 @@ static void get_output_count(cache_op_t* op, u32* count) {
 
 static sp_str_t get_path(tmpfs_t* fs, sp_str_t dir, const c8* key) {
   sp_str_t hex = spn_dag_digest_hex(fs->mem, dag_test_digest(key));
-  return sp_fs_join_path(fs->mem, dir, sp_fmt(fs->mem, "{}.jsonl", sp_fmt_str(hex)).value);
+  return sp_fs_join_path(fs->mem, dir, sp_fmt(fs->mem, "{}.txt", sp_fmt_str(hex)).value);
 }
 
 static void run_test(s32* utest_result, cache_test_t t) {
