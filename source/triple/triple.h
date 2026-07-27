@@ -4,48 +4,16 @@
 #include "sp.h"
 #include "spn.h"
 
-// Parse a triple string like "aarch64-linux-gnu" into a spn_triple_t.
-// Components can be omitted: "aarch64-linux" or "aarch64" are valid.
-// Returns a triple with NONE for any missing components.
 spn_triple_t spn_triple_from_str(sp_str_t str);
-
-// Format a triple as "arch-os-abi". Omits trailing NONE components.
 sp_str_t spn_triple_to_str(sp_mem_t mem, spn_triple_t triple);
-
-// Detect the host platform triple.
 spn_triple_t spn_triple_host(void);
-
-// Resolve a partially specified target triple. Arch and os default from the
-// host; the abi defaults from the resolved target os and whether the build
-// explicitly links shared: windows -> gnu, linux -> gnu when shared and musl
-// otherwise, macos/wasi -> none. The host's abi is never consulted.
-spn_triple_t spn_triple_resolve_target(spn_triple_t partial, spn_triple_t host, bool shared);
-
-// Fill NONE fields in `partial` with values from `base`.
 spn_triple_t spn_triple_merge(spn_triple_t base, spn_triple_t partial);
-
-// Check if `entry` matches `target`. NONE fields in `entry` are wildcards.
 bool spn_triple_match(spn_triple_t entry, spn_triple_t target);
-
-// Format a triple for the compiler's --target flag (clang/zig).
-// Differs from spn_triple_to_str: mingw -> gnu (zig/clang convention).
 sp_str_t spn_triple_to_cc_target(sp_mem_t mem, spn_triple_t triple);
-
-// Format a triple for autoconf --host/--build flags.
-// Uses GNU convention: x86_64-unknown-linux-gnu, x86_64-w64-mingw32, etc.
 sp_str_t spn_triple_to_autoconf(sp_mem_t mem, spn_triple_t triple);
-
-// Map target OS enum to CMake's CMAKE_SYSTEM_NAME string.
 sp_str_t spn_os_to_cmake_system_name(spn_os_t os);
-
-// Render an artifact file name using the target triple's conventions, not the
-// host's: lib{}.a / {}.lib, lib{}.so / lib{}.dylib / {}.dll.
 sp_str_t spn_triple_lib_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name, sp_os_lib_kind_t kind);
-
-// Render an executable file name for the target triple: {}.exe on windows,
-// {}.wasm on wasi, bare otherwise.
 sp_str_t spn_triple_exe_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name);
-
 bool spn_os_version_present(spn_os_version_t version);
 bool spn_os_version_less(spn_os_version_t a, spn_os_version_t b);
 

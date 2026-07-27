@@ -200,6 +200,51 @@ UTEST(profile, windows_host_defaults_to_gnu) {
   });
 }
 
+UTEST(profile, windows_host_shared_demand_defaults_to_gnu) {
+  run_profile_test(utest_result, (profile_test_t) {
+    .host = PROFILE_HOST_WIN_MSVC,
+    .shared_demand = true,
+    .expect = {
+      .target = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU },
+      .linkage = SPN_LIB_KIND_SHARED,
+    },
+  });
+}
+
+UTEST(profile, macos_host_keeps_abi_empty) {
+  run_profile_test(utest_result, (profile_test_t) {
+    .host = PROFILE_HOST_ARM_MACOS,
+    .expect = {
+      .target = { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_NONE },
+      .linkage = SPN_LIB_KIND_SHARED,
+    },
+  });
+}
+
+UTEST(profile, arch_override_keeps_host_os) {
+  run_profile_test(utest_result, (profile_test_t) {
+    .overrides = { .arch = SPN_ARCH_ARM64 },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = {
+      .target = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_MUSL },
+      .linkage = SPN_LIB_KIND_STATIC,
+      .targeted = true,
+    },
+  });
+}
+
+UTEST(profile, wasi_target_keeps_abi_empty) {
+  run_profile_test(utest_result, (profile_test_t) {
+    .overrides = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = {
+      .target = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_NONE },
+      .linkage = SPN_LIB_KIND_SHARED,
+      .targeted = true,
+    },
+  });
+}
+
 UTEST(profile, macos_target_keeps_abi_empty) {
   run_profile_test(utest_result, (profile_test_t) {
     .overrides = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_MACOS },
