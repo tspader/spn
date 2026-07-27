@@ -13,7 +13,7 @@ typedef struct {
   spn_dag_store_t store;
   spn_dag_file_cache_t files;
   spn_dag_action_cache_t cache;
-  spn_dag_discovery_t discovery;
+  spn_dag_obs_table_t discovery;
   sp_str_t disco_dir;
   sp_str_t cache_dir;
   spn_dag_env_t env;
@@ -128,7 +128,7 @@ static u64 fz_action_requeues(fz_universe_t* u, fz_world_t* w, sp_mem_t mem, u64
 }
 
 static void reset_discovery(fz_world_t* w) {
-  spn_dag_discovery_init(&w->discovery, w->mem, w->disco_dir);
+  spn_dag_obs_table_init(&w->discovery, w->mem, w->disco_dir);
   if (sp_str_empty(w->disco_dir)) {
     sp_ht_clear(w->pathsets);
   }

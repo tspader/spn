@@ -251,7 +251,7 @@ bool spn_dag_action_cache_remove(spn_dag_action_cache_t* c, spn_dag_digest_t key
   return removed;
 }
 
-void spn_dag_discovery_init(spn_dag_discovery_t* d, sp_mem_t mem, sp_str_t dir) {
+void spn_dag_obs_table_init(spn_dag_obs_table_t* d, sp_mem_t mem, sp_str_t dir) {
   d->arena = sp_mem_arena_new(mem);
   d->mem = sp_mem_arena_as_allocator(d->arena);
   d->dir = sp_str_copy(d->mem, dir);
@@ -262,7 +262,7 @@ void spn_dag_discovery_init(spn_dag_discovery_t* d, sp_mem_t mem, sp_str_t dir) 
   }
 }
 
-spn_dag_pathset_t* spn_dag_discovery_get(spn_dag_discovery_t* d, spn_dag_digest_t weak) {
+spn_dag_pathset_t* spn_dag_obs_table_get(spn_dag_obs_table_t* d, spn_dag_digest_t weak) {
   spn_dag_pathset_t* cached = sp_ht_getp(d->entries, weak);
   if (cached) {
     return cached;
@@ -282,7 +282,7 @@ spn_dag_pathset_t* spn_dag_discovery_get(spn_dag_discovery_t* d, spn_dag_digest_
   return sp_ht_getp(d->entries, weak);
 }
 
-void spn_dag_discovery_put(spn_dag_discovery_t* d, spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count) {
+void spn_dag_obs_table_put(spn_dag_obs_table_t* d, spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count) {
   spn_dag_pathset_t set = sp_zero;
   sp_da_init(d->mem, set.obs);
   sp_for(it, count) {
@@ -292,10 +292,10 @@ void spn_dag_discovery_put(spn_dag_discovery_t* d, spn_dag_digest_t weak, const 
     sp_da_push(set.obs, copy);
   }
   sp_ht_insert(d->entries, weak, set);
-  spn_dag_discovery_flush(d, weak);
+  spn_dag_obs_table_flush(d, weak);
 }
 
-void spn_dag_discovery_flush(spn_dag_discovery_t* d, spn_dag_digest_t weak) {
+void spn_dag_obs_table_flush(spn_dag_obs_table_t* d, spn_dag_digest_t weak) {
   if (sp_str_empty(d->dir)) {
     return;
   }

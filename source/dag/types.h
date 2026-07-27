@@ -128,7 +128,7 @@ typedef struct {
   sp_mem_t mem;
   sp_str_t dir;
   sp_ht(spn_dag_digest_t, spn_dag_pathset_t) entries;
-} spn_dag_discovery_t;
+} spn_dag_obs_table_t;
 
 typedef enum {
   SPN_DAG_STORE_MEM,
@@ -192,7 +192,8 @@ typedef struct {
   spn_dag_file_cache_t* files;
   spn_dag_action_cache_t* cache;
   spn_dag_store_t* store;
-  spn_dag_discovery_t* discovery;
+  spn_dag_obs_table_t* discovery;
+  spn_dag_obs_table_t* memos;
   spn_dag_progress_t* progress;
   spn_dag_trace_fn_t trace;
   void* trace_data;

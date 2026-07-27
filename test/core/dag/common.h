@@ -32,7 +32,8 @@ typedef struct {
   spn_dag_store_t store;
   spn_dag_file_cache_t files;
   spn_dag_action_cache_t cache;
-  spn_dag_discovery_t discovery;
+  spn_dag_obs_table_t discovery;
+  spn_dag_obs_table_t memos;
   spn_dag_env_t env;
   u32 runs;
 } dag_test_env_t;

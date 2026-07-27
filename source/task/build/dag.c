@@ -1300,13 +1300,15 @@ spn_dag_build_t* spn_dag_build_new(spn_session_t* session) {
   });
   spn_dag_file_cache_init(&b->files, spn.mem);
   spn_dag_action_cache_init(&b->actions, spn.mem, sp_fs_join_path(session->mem, root, sp_str_lit("strong")));
-  spn_dag_discovery_init(&b->discovery, spn.mem, sp_fs_join_path(session->mem, root, sp_str_lit("weak")));
+  spn_dag_obs_table_init(&b->discovery, spn.mem, sp_fs_join_path(session->mem, root, sp_str_lit("weak")));
+  spn_dag_obs_table_init(&b->memos, spn.mem, sp_fs_join_path(session->mem, root, sp_str_lit("weak")));
 
   b->env = (spn_dag_env_t) {
     .files = &b->files,
     .cache = &b->actions,
     .store = &b->store,
     .discovery = &b->discovery,
+    .memos = &b->memos,
     .progress = &b->progress,
     .scratch = tmp,
   };
