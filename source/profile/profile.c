@@ -46,7 +46,6 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   spn_profile_info_t default_profile = {
     .name      = sp_str_lit("default"),
     .toolchain = sp_str_lit("auto"),
-    .linkage   = SPN_LIB_KIND_SHARED,
     .standard  = SPN_C11,
     .mode      = SPN_BUILD_MODE_DEBUG,
   };
@@ -91,7 +90,7 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   }
 }
 
-spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* overrides, spn_triple_t host, spn_profile_info_t* result) {
+spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* overrides, spn_triple_t host, bool shared_demand, spn_profile_info_t* result) {
   sp_str_t name = spn_profile_select_name(overrides);
 
   if (sp_str_find_c8(name, '/') >= 0 || sp_str_find_c8(name, '\\') >= 0) {
@@ -121,7 +120,12 @@ spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_in
 
   spn_triple_t target = { merged.arch, merged.os, merged.abi };
   bool targeted = target.arch || target.os || target.abi;
-  target = spn_triple_resolve_target(target, host);
+  bool shared = shared_demand || merged.linkage == SPN_LIB_KIND_SHARED;
+  target = spn_triple_resolve_target(target, host, shared);
+
+  if (!merged.linkage) {
+    merged.linkage = target.abi == SPN_ABI_MUSL ? SPN_LIB_KIND_STATIC : SPN_LIB_KIND_SHARED;
+  }
 
   if (!merged.opt) {
     merged.opt = merged.mode == SPN_BUILD_MODE_RELEASE ? SPN_OPT_LEVEL_2 : SPN_OPT_LEVEL_0;

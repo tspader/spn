@@ -2,6 +2,9 @@
 name = "options_private_versions"
 version = "0.1.0"
 
+[profile.default]
+linkage = "shared"
+
 [deps.package]
 a = "1.0.0"
 b = { version = "2.0.0", options = { x = false } }
