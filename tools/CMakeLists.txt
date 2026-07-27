@@ -63,8 +63,6 @@ add_executable(sp_cc
   ${CMAKE_SOURCE_DIR}/source/dag/executor.c
   ${CMAKE_SOURCE_DIR}/source/dag/occ.c
   ${CMAKE_SOURCE_DIR}/source/codegen/json.c
-  ${GEN_DIR}/dag_output.gen.c
-  ${GEN_DIR}/dag_obs.gen.c
   ${CMAKE_SOURCE_DIR}/source/sha256/sha256.c
   ${CMAKE_SOURCE_DIR}/source/sp/fs.c
   ${CMAKE_SOURCE_DIR}/source/sp/io.c)
@@ -82,8 +80,6 @@ add_executable(sp_lib
   ${CMAKE_SOURCE_DIR}/source/dag/executor.c
   ${CMAKE_SOURCE_DIR}/source/dag/occ.c
   ${CMAKE_SOURCE_DIR}/source/codegen/json.c
-  ${GEN_DIR}/dag_output.gen.c
-  ${GEN_DIR}/dag_obs.gen.c
   ${CMAKE_SOURCE_DIR}/source/sha256/sha256.c
   ${CMAKE_SOURCE_DIR}/source/sp/fs.c
   ${CMAKE_SOURCE_DIR}/source/sp/io.c)
@@ -113,12 +109,6 @@ set(GEN_FILES
   ${GEN_DIR}/toolchains.jtd.json
   ${GEN_DIR}/abi.gen.h
   ${GEN_DIR}/abi.gen.c
-  ${GEN_DIR}/dag_output.gen.h
-  ${GEN_DIR}/dag_output.gen.c
-  ${GEN_DIR}/dag_output.jtd.json
-  ${GEN_DIR}/dag_obs.gen.h
-  ${GEN_DIR}/dag_obs.gen.c
-  ${GEN_DIR}/dag_obs.jtd.json
   ${GEN_DIR}/fuzz.gen.h
   ${GEN_DIR}/fuzz.gen.c
   ${GEN_DIR}/fuzz.jtd.json)

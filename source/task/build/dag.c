@@ -257,9 +257,10 @@ static spn_err_t dag_compile_discover(spn_dag_t* g, spn_dag_action_t* action, vo
     if (!sp_fs_is_absolute(path)) {
       path = sp_fs_join_path(mem, unit->target->pkg->paths.work, path);
     }
+    sp_str_t canonical = sp_fs_canonicalize_path(mem, path);
     sp_da_push(*out, ((spn_dag_obs_t) {
       .kind = SPN_DAG_OBS_FILE,
-      .path = sp_fs_normalize_path(mem, path),
+      .path = sp_str_empty(canonical) ? sp_fs_normalize_path(mem, path) : canonical,
     }));
   }
 

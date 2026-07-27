@@ -6,8 +6,6 @@ add_executable(fuzz_dag
   ${SRC}/dag/executor.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/loader.c
-  ${SRC}/codegen/gen/dag_output.gen.c
-  ${SRC}/codegen/gen/dag_obs.gen.c
   ${SRC}/codegen/gen/fuzz.gen.c
   ${SRC}/external/tom.c
   ${SRC}/sha256/sha256.c

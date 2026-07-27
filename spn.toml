@@ -65,8 +65,6 @@ source = [
   "source/**/*.c",
   "source/codegen/gen/abi.gen.c",
   "source/codegen/gen/config.gen.c",
-  "source/codegen/gen/dag_obs.gen.c",
-  "source/codegen/gen/dag_output.gen.c",
   "source/codegen/gen/fuzz.gen.c",
   "source/codegen/gen/manifest.gen.c",
   "source/codegen/gen/release.gen.c",
