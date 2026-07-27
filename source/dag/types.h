@@ -183,6 +183,12 @@ typedef struct {
 SP_TYPEDEF_FN(void, spn_dag_trace_fn_t, const spn_dag_trace_event_t*, void*);
 
 typedef struct {
+  spn_err_t err;
+  spn_dag_id_t action;
+  sp_str_t path;
+} spn_dag_diag_t;
+
+typedef struct {
   spn_dag_file_cache_t* files;
   spn_dag_action_cache_t* cache;
   spn_dag_store_t* store;
@@ -191,6 +197,7 @@ typedef struct {
   spn_dag_trace_fn_t trace;
   void* trace_data;
   sp_str_t scratch;
+  spn_dag_diag_t diag;
 } spn_dag_env_t;
 
 typedef struct {

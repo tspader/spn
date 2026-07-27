@@ -160,7 +160,7 @@ static bool root_demands_shared(spn_pkg_info_t* pkg) {
   }
   sp_str_om_for(pkg->libs, it) {
     spn_linkage_set_t linkages = sp_str_om_at(pkg->libs, it)->linkages;
-    if (linkages.shared && !linkages.static_lib && !linkages.source && !linkages.object) {
+    if (linkages.shared && !linkages.static_lib && !linkages.source) {
       return true;
     }
   }

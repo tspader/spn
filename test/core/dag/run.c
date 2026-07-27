@@ -13,6 +13,7 @@ typedef struct {
   const c8* writes;
   bool tree;
   bool fails;
+  bool skips_output;
   bool uncacheable;
 } run_action_t;
 
@@ -20,6 +21,7 @@ typedef struct {
   run_source_t sources [DAG_TEST_MAX_INPUTS];
   const c8* remove_dirs [DAG_TEST_MAX_INPUTS];
   spn_err_t expect_err;
+  const c8* expect_diag_path;
   u32 expect_runs;
 } run_build_t;
 
@@ -42,6 +44,10 @@ static s32 on_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   run_ctx_t* ctx = (run_ctx_t*)user_data;
   if (ctx->spec->fails) {
     return 1;
+  }
+  if (ctx->spec->skips_output) {
+    ctx->env->runs++;
+    return 0;
   }
   sp_da_for(action->consumes, it) {
     spn_dag_artifact_t* in = spn_dag_find_artifact(ctx->g, action->consumes[it]);
@@ -138,6 +144,10 @@ static void run_test(s32* utest_result, run_test_t t) {
 
     spn_err_t err = spn_dag_run(g, &env.env);
     EXPECT_EQ(build->expect_err, err);
+    EXPECT_EQ(build->expect_err, env.env.diag.err);
+    if (build->expect_diag_path) {
+      EXPECT_TRUE(sp_str_equal(env.env.diag.path, tmpfs_get(&env.fs, sp_str_view(build->expect_diag_path))));
+    }
     EXPECT_EQ(build->expect_runs, env.runs);
   }
 
@@ -220,7 +230,19 @@ UTEST_F(run, missing_source_fails) {
       { .identity = "I", .inputs = { "S" }, .output = "X" },
     },
     .builds = {
-      { .expect_err = SPN_ERR_DAG_MISSING_INPUT },
+      { .expect_err = SPN_ERR_DAG_MISSING_INPUT, .expect_diag_path = "S" },
+    }
+  });
+}
+
+UTEST_F(run, missing_output_fails) {
+  run_test(&ur, (run_test_t) {
+    .name = "run_missing_output",
+    .actions = {
+      { .identity = "I", .inputs = { "S" }, .output = "X", .skips_output = true },
+    },
+    .builds = {
+      { .sources = { { "S", "A" } }, .expect_err = SPN_ERR_DAG_MISSING_OUTPUT, .expect_diag_path = "X", .expect_runs = 1 },
     }
   });
 }
