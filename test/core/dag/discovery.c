@@ -21,10 +21,10 @@ typedef struct {
 
 UTEST_EMPTY_FIXTURE(discovery)
 
-static void discovery_put(spn_dag_discovery_t* discovery, discovery_entry_t entry) {
+static void discovery_put(spn_dag_obs_table_t* discovery, discovery_entry_t entry) {
   spn_dag_obs_t obs [DAG_TEST_MAX_INPUTS] = sp_zero;
   u32 count = dag_test_obs_build(entry.obs, DAG_TEST_MAX_INPUTS, obs);
-  spn_dag_discovery_put(discovery, dag_test_digest(entry.key), obs, count);
+  spn_dag_obs_table_put(discovery, dag_test_digest(entry.key), obs, count);
 }
 
 static void discovery_expect_obs(s32* utest_result, const spn_dag_pathset_t* set, dag_test_obs_t* expect) {
@@ -37,8 +37,8 @@ static void discovery_expect_obs(s32* utest_result, const spn_dag_pathset_t* set
   }
 }
 
-static void discovery_expect(s32* utest_result, spn_dag_discovery_t* discovery, const c8* key, discovery_expect_t expect) {
-  const spn_dag_pathset_t* set = spn_dag_discovery_get(discovery, dag_test_digest(key));
+static void discovery_expect(s32* utest_result, spn_dag_obs_table_t* discovery, const c8* key, discovery_expect_t expect) {
+  const spn_dag_pathset_t* set = spn_dag_obs_table_get(discovery, dag_test_digest(key));
   EXPECT_EQ(expect.hit, set != SP_NULLPTR);
   if (!expect.hit || !set) {
     return;
@@ -52,8 +52,8 @@ static void run_test(s32* utest_result, discovery_test_t t) {
   tmpfs_init_named(&fs, t.name);
   sp_str_t dir = tmpfs_get(&fs, sp_str_lit("manifests"));
 
-  spn_dag_discovery_t discovery = sp_zero;
-  spn_dag_discovery_init(&discovery, fs.mem, dir);
+  spn_dag_obs_table_t discovery = sp_zero;
+  spn_dag_obs_table_init(&discovery, fs.mem, dir);
 
   sp_carr_for(t.entries, it) {
     if (!t.entries[it].key) {
@@ -69,7 +69,7 @@ static void run_test(s32* utest_result, discovery_test_t t) {
   }
 
   if (t.reload) {
-    spn_dag_discovery_init(&discovery, fs.mem, dir);
+    spn_dag_obs_table_init(&discovery, fs.mem, dir);
   }
 
   discovery_expect(utest_result, &discovery, t.key, t.expect);

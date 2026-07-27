@@ -23,7 +23,7 @@ typedef struct {
   spn_dag_store_t store;
   spn_dag_file_cache_t files;
   spn_dag_action_cache_t cache;
-  spn_dag_discovery_t discovery;
+  spn_dag_obs_table_t discovery;
   u32 actions;
   u32 executed;
 } cc_app_t;
@@ -221,7 +221,7 @@ static sp_cli_result_t cc_build(sp_cli_t* cli) {
   });
   spn_dag_file_cache_init(&app->files, app->mem);
   spn_dag_action_cache_init(&app->cache, app->mem, sp_fs_join_path(app->mem, app->root, sp_str_lit("strong")));
-  spn_dag_discovery_init(&app->discovery, app->mem, sp_fs_join_path(app->mem, app->root, sp_str_lit("weak")));
+  spn_dag_obs_table_init(&app->discovery, app->mem, sp_fs_join_path(app->mem, app->root, sp_str_lit("weak")));
 
   app->g = spn_dag_new(app->mem);
   spn_dag_id_t link = spn_dag_add_action(app->g, (spn_dag_action_config_t) {

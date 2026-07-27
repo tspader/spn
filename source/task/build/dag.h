@@ -46,7 +46,8 @@ struct spn_dag_build_t {
   } ids;
   spn_dag_file_cache_t files;
   spn_dag_action_cache_t actions;
-  spn_dag_discovery_t discovery;
+  spn_dag_obs_table_t discovery;
+  spn_dag_obs_table_t memos;
   spn_dag_store_t store;
   spn_dag_pool_t pool;
   spn_dag_env_t env;

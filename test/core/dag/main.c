@@ -19,19 +19,22 @@ void dag_test_env_init(dag_test_env_t* env, dag_test_env_config_t config) {
   });
   spn_dag_file_cache_init(&env->files, env->fs.mem);
   spn_dag_action_cache_init(&env->cache, env->fs.mem, sp_str_lit(""));
-  spn_dag_discovery_init(&env->discovery, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("manifests")));
+  spn_dag_obs_table_init(&env->discovery, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("manifests")));
+  spn_dag_obs_table_init(&env->memos, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("memos")));
   env->env = (spn_dag_env_t) {
     .files = &env->files,
     .cache = &env->cache,
     .store = &env->store,
     .discovery = config.discovery ? &env->discovery : SP_NULLPTR,
+    .memos = &env->memos,
     .scratch = tmpfs_get(&env->fs, sp_str_lit("scratch"))
   };
 }
 
 void dag_test_env_cold(dag_test_env_t* env) {
   spn_dag_file_cache_init(&env->files, env->fs.mem);
-  spn_dag_discovery_init(&env->discovery, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("manifests")));
+  spn_dag_obs_table_init(&env->discovery, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("manifests")));
+  spn_dag_obs_table_init(&env->memos, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("memos")));
 }
 
 spn_dag_t* dag_test_env_graph(dag_test_env_t* env) {

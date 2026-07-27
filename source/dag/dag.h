@@ -27,6 +27,8 @@ spn_dag_digest_t    spn_dag_hash_final(spn_sha256_ctx_t* ctx);
 
 spn_dag_digest_t    spn_dag_weak_key(spn_dag_t* g, spn_dag_id_t action);
 spn_dag_digest_t    spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count);
+spn_dag_digest_t    spn_dag_source_key(sp_str_t path);
+spn_dag_digest_t    spn_dag_settle_key(sp_str_t path);
 spn_dag_digest_t    spn_dag_digest(const void* data, u64 len);
 bool                spn_dag_digest_equal(spn_dag_digest_t a, spn_dag_digest_t b);
 bool                spn_dag_digest_valid(spn_dag_digest_t digest);
@@ -52,10 +54,10 @@ const spn_dag_action_entry_t* spn_dag_action_cache_get(spn_dag_action_cache_t* c
 void                          spn_dag_action_cache_put(spn_dag_action_cache_t* c, spn_dag_digest_t key, const spn_dag_action_output_t* outputs, u32 count);
 bool                          spn_dag_action_cache_remove(spn_dag_action_cache_t* c, spn_dag_digest_t key);
 
-void                spn_dag_discovery_init(spn_dag_discovery_t* d, sp_mem_t mem, sp_str_t dir);
-spn_dag_pathset_t*  spn_dag_discovery_get(spn_dag_discovery_t* d, spn_dag_digest_t weak);
-void                spn_dag_discovery_put(spn_dag_discovery_t* d, spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count);
-void                spn_dag_discovery_flush(spn_dag_discovery_t* d, spn_dag_digest_t weak);
+void                spn_dag_obs_table_init(spn_dag_obs_table_t* t, sp_mem_t mem, sp_str_t dir);
+spn_dag_pathset_t*  spn_dag_obs_table_get(spn_dag_obs_table_t* t, spn_dag_digest_t key);
+void                spn_dag_obs_table_put(spn_dag_obs_table_t* t, spn_dag_digest_t key, const spn_dag_obs_t* obs, u32 count);
+void                spn_dag_obs_table_flush(spn_dag_obs_table_t* t, spn_dag_digest_t key);
 
 void                spn_dag_file_cache_init(spn_dag_file_cache_t* c, sp_mem_t mem);
 void                spn_dag_file_cache_seed(spn_dag_file_cache_t* c, spn_dag_file_meta_t meta);
