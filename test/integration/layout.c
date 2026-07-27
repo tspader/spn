@@ -68,13 +68,7 @@ UTEST_F(layout, target_triple) {
   run_command_test(utest_result, &uf->fixture, (command_test_t) {
     .project = "test/integration/fixtures/layout/test_shared",
     .copy = { "check.c", "packages/*" },
-    .args = { "build", "--target", SPN_TEST_TRIPLE,
-#ifdef SP_WIN32
-      // Only zig can hit the windows-gnu triple; the system cc refuses
-      // targeted builds
-      "--toolchain", "zig",
-#endif
-    },
+    .args = { "build", "--target", SPN_TEST_TRIPLE },
     .expect = {
       .exists = { target_exe("main", SPN_TEST_TRIPLE), target_store_file("bin/main", SPN_TEST_TRIPLE) },
       .missing = { sp_str_lit("build/debug") },

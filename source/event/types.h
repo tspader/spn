@@ -52,7 +52,7 @@
   X(SPN_EVENT_EMBED_START,                  "embed_start",                "Embedding",   VERBOSE, INFO,  false, false, SPN_EVT(embed_start)) \
   X(SPN_EVENT_EMBED_PASSED,                 "embed_passed",               "Embedded",    DEBUG,   INFO,  false, false, SPN_EVT(embed_passed)) \
   X(SPN_EVENT_EMBED_FAILED,                 "embed_failed",               "error",       QUIET,   ERROR, true,  false, SPN_EVT(embed_failed)) \
-  X(SPN_EVENT_INIT_BUILD_GRAPH,             "init_build_graph",           "Planning",    DEBUG,   INFO,  false, false, SPN_EVT(graph_init)) \
+  X(SPN_EVENT_INIT_BUILD_GRAPH,             "init_build_graph",           "Building",    NORMAL,  INFO,  false, false, SPN_EVT(graph_init)) \
   X(SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED,   "prepare_build_graph_failed", "error",       QUIET,   ERROR, true,  true,  SPN_EVT(err.build_graph)) \
   X(SPN_EVENT_BUILD_PASSED,                 "build_passed",               "Finished",    NORMAL,  INFO,  false, false, SPN_EVT(build.passed)) \
   X(SPN_EVENT_BUILD_FAILED,                 "build_failed",               "error",       QUIET,   ERROR, true,  true,  SPN_EVT(build_failed)) \
@@ -147,7 +147,7 @@ typedef struct { u64 time; } spn_evt_script_package_t;
 typedef struct { sp_str_t script_path; sp_str_t error; } spn_evt_compile_failed_t;
 typedef struct { sp_str_t path; sp_str_t error; } spn_evt_script_crashed_t;
 typedef struct { sp_str_t name; sp_str_t url; } spn_evt_sync_t;
-typedef struct { sp_str_t profile; bool force; u32 packages; } spn_evt_graph_init_t;
+typedef struct { sp_str_t profile; sp_str_t target; sp_str_t toolchain; bool force; } spn_evt_graph_init_t;
 typedef struct {
   spn_target_unit_t* target;
 } spn_evt_link_start_t;

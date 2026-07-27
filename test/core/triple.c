@@ -110,6 +110,52 @@ UTEST(triple, merge) {
 
 
 typedef struct {
+  spn_triple_t partial;
+  spn_triple_t host;
+  spn_triple_t expect;
+} resolve_target_t;
+
+UTEST(triple, resolve_target) {
+  spn_triple_t linux_gnu = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU };
+
+  resolve_target_t tests [] = {
+    { .host = linux_gnu,                                       .expect = linux_gnu },
+    { .host = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },    .expect = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL } },
+    { .host = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },  .expect = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } },
+    { .host = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MINGW }, .expect = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } },
+    { .host = { SPN_ARCH_ARM64, SPN_OS_MACOS },                .expect = { SPN_ARCH_ARM64, SPN_OS_MACOS } },
+    { .partial = { SPN_ARCH_ARM64, SPN_OS_MACOS },  .host = linux_gnu, .expect = { SPN_ARCH_ARM64, SPN_OS_MACOS } },
+    { .partial = { .os = SPN_OS_WINDOWS },          .host = linux_gnu, .expect = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } },
+    { .partial = { .arch = SPN_ARCH_ARM64 },        .host = linux_gnu, .expect = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU } },
+    { .partial = { SPN_ARCH_WASM32, SPN_OS_WASI },  .host = linux_gnu, .expect = { SPN_ARCH_WASM32, SPN_OS_WASI } },
+    {
+      .partial = { .arch = SPN_ARCH_ARM64 },
+      .host = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
+      .expect = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_MUSL },
+    },
+    {
+      .partial = { .os = SPN_OS_LINUX },
+      .host = { SPN_ARCH_ARM64, SPN_OS_MACOS },
+      .expect = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU },
+    },
+    {
+      .partial = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
+      .host = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
+      .expect = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
+    },
+    { .partial = { .abi = SPN_ABI_MUSL }, .host = linux_gnu, .expect = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL } },
+  };
+
+  sp_carr_for(tests, it) {
+    spn_triple_t result = spn_triple_resolve_target(tests[it].partial, tests[it].host);
+    EXPECT_EQ(result.arch, tests[it].expect.arch);
+    EXPECT_EQ(result.os, tests[it].expect.os);
+    EXPECT_EQ(result.abi, tests[it].expect.abi);
+  }
+}
+
+
+typedef struct {
   spn_triple_t triple;
   sp_os_lib_kind_t kind;
   const c8* expected;

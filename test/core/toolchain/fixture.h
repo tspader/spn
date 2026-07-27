@@ -156,7 +156,11 @@ static void fixture_catalog(s32* utest_result, spn_toolchain_catalog_t* catalog,
 }
 
 static u32 fixture_catalog_size(spn_toolchain_catalog_t* catalog) {
-  return (u32)sp_str_ht_size(catalog->entries);
+  return (u32)sp_str_om_size(catalog->entries);
+}
+
+static spn_toolchain_info_t* fixture_catalog_at(spn_toolchain_catalog_t* catalog, u32 index) {
+  return sp_str_om_at(catalog->entries, index);
 }
 
 static spn_toolchain_info_t fixture_local_toolchain(const c8* name, const c8* compiler) {

@@ -135,8 +135,9 @@ static void build_schemas(sp_mem_t mem) {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
       SP_BIND(&b, spn_evt_graph_init_t, profile, "profile", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_graph_init_t, target, "target", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_graph_init_t, toolchain, "toolchain", SP_BIND_STR);
       SP_BIND(&b, spn_evt_graph_init_t, force, "force", SP_BIND_BOOL);
-      SP_BIND(&b, spn_evt_graph_init_t, packages, "packages", SP_BIND_U32);
     }
     schemas[SPN_EVENT_INIT_BUILD_GRAPH] = sp_bind_builder_end(&b);
   }

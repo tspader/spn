@@ -45,7 +45,7 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   // 1. Seed the default profile with hardcoded base values
   spn_profile_info_t default_profile = {
     .name      = sp_str_lit("default"),
-    .toolchain = sp_str_lit("zig"),
+    .toolchain = sp_str_lit("auto"),
     .linkage   = SPN_LIB_KIND_SHARED,
     .standard  = SPN_C11,
     .mode      = SPN_BUILD_MODE_DEBUG,
@@ -91,7 +91,7 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   }
 }
 
-spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* overrides, spn_profile_info_t* result) {
+spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* overrides, spn_triple_t host, spn_profile_info_t* result) {
   sp_str_t name = spn_profile_select_name(overrides);
 
   if (sp_str_find_c8(name, '/') >= 0 || sp_str_find_c8(name, '\\') >= 0) {
@@ -119,11 +119,9 @@ spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_in
   spn_profile_info_t merged = *info;
   spn_profile_overlay(&merged, overrides);
 
-  // Resolve the target triple: fill empty fields with host values.
-  spn_triple_t host = spn_triple_host();
   spn_triple_t target = { merged.arch, merged.os, merged.abi };
   bool targeted = target.arch || target.os || target.abi;
-  target = spn_triple_merge(host, target);
+  target = spn_triple_resolve_target(target, host);
 
   if (!merged.opt) {
     merged.opt = merged.mode == SPN_BUILD_MODE_RELEASE ? SPN_OPT_LEVEL_2 : SPN_OPT_LEVEL_0;

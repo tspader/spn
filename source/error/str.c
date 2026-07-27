@@ -13,6 +13,7 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_ERR_VERSION_EXISTS:               return "version_exists";
     case SPN_ERR_BUILD_GRAPH:                  return "build_graph";
     case SPN_ERR_TOOLCHAIN_UNKNOWN:            return "toolchain_unknown";
+    case SPN_ERR_TOOLCHAIN_NONE:               return "toolchain_none";
     case SPN_ERR_TOOLCHAIN_TARGET:             return "toolchain_target";
     case SPN_ERR_TOOLCHAIN_HOST:               return "toolchain_host";
     case SPN_ERR_TOOLCHAIN_FETCH:              return "toolchain_fetch";

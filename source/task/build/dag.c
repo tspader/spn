@@ -21,6 +21,7 @@
 #include "task/build/dag.h"
 #include "task/build/nodes/nodes.h"
 #include "task/task.h"
+#include "triple/triple.h"
 #include "unit/package.h"
 
 typedef struct {
@@ -1252,10 +1253,14 @@ spn_task_step_t spn_dag_build_init(spn_app_t* app) {
     return spn_task_fail(SPN_ERROR, .reported = true);
   }
 
+  spn_triple_t target = { session->profile.arch, session->profile.os, session->profile.abi };
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_INIT_BUILD_GRAPH,
+    .pkg = session->pkg,
     .graph_init = {
       .profile = session->profile.name,
+      .target = spn_triple_to_str(session->mem, target),
+      .toolchain = session->units.target->toolchain->info->name,
       .force = app->config.force,
     }
   });

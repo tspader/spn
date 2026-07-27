@@ -12,6 +12,7 @@ typedef struct {
 typedef struct {
   u32 entries;
   const c8* present [CATALOG_MAX_PRESENT];
+  const c8* order [CATALOG_MAX_PRESENT];
   fixture_toolchain_t toolchains [CATALOG_MAX_TOOLCHAINS];
 } catalog_expect_t;
 
@@ -41,6 +42,13 @@ static void run_catalog_test(s32* utest_result, catalog_test_t t) {
     EXPECT_TRUE(spn_toolchain_catalog_get(&catalog, sp_str_view(t.expect.present[it])));
   }
 
+  sp_carr_for(t.expect.order, it) {
+    if (!t.expect.order[it]) {
+      break;
+    }
+    EXPECT_STR(fixture_catalog_at(&catalog, it)->name, t.expect.order[it]);
+  }
+
   sp_carr_for(t.expect.toolchains, it) {
     fixture_toolchain_t toolchain = t.expect.toolchains[it];
     if (!toolchain.name) {
@@ -59,6 +67,7 @@ UTEST(catalog, add_overrides_by_name) {
     .expect = {
       .entries = 2,
       .present = { "B" },
+      .order = { "A", "B" },
       .toolchains = {
         {
           .name = "A",
@@ -79,6 +88,7 @@ UTEST(catalog, add_coexists_with_entries) {
     .expect = {
       .entries = 3,
       .present = { "A", "B", "C" },
+      .order = { "A", "B", "C" },
       .toolchains = {
         { .name = "D", .absent = true },
       },
