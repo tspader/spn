@@ -3,6 +3,7 @@
 #include "app/app.h"
 #include "app/types.h"
 #include "ctx/types.h"
+#include "error/error.h"
 #include "error/types.h"
 #include "event/types.h"
 #include "forward/types.h"
@@ -323,11 +324,27 @@ static s32 dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
       continue;
     }
     if (!sp_fs_exists(artifact->target)) {
-      spn_log_error("{.cyan} node {.yellow} declared output {.yellow}, which it did not produce",
-        SP_FMT_STR(pkg->info->name), SP_FMT_STR(node->tag), SP_FMT_STR(artifact->target));
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        .kind = SPN_EVENT_NODE_FAILED,
+        .pkg = pkg->info,
+        .io = &pkg->logs.io,
+        .node_failed = {
+          .path = artifact->target,
+          .message = sp_fmt(spn.mem, "was declared as an output of node {} but was not produced", sp_fmt_str(node->tag)).value,
+        },
+      });
       return 1;
     }
     if (sp_fs_copy(artifact->target, artifact->path)) {
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        .kind = SPN_EVENT_NODE_FAILED,
+        .pkg = pkg->info,
+        .io = &pkg->logs.io,
+        .node_failed = {
+          .path = artifact->target,
+          .message = sp_fmt(spn.mem, "output of node {} could not be copied into the build", sp_fmt_str(node->tag)).value,
+        },
+      });
       return 1;
     }
   }
@@ -348,7 +365,15 @@ static s32 dag_tree_copy_headers(spn_dag_tree_ctx_t* ctx, sp_str_t root, spn_tar
       s32 err = sp_fs_copy(from, to);
       sp_mem_end_scratch(scratch);
       if (err) {
-        spn_log_error("{.cyan} failed to publish header {.yellow}", SP_FMT_STR(unit->info->name), SP_FMT_STR(header));
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
+          .kind = SPN_EVENT_NODE_FAILED,
+          .pkg = unit->info,
+          .io = &unit->logs.io,
+          .node_failed = {
+            .path = header,
+            .message = sp_str_lit("could not be published to the package store"),
+          },
+        });
         return 1;
       }
     }
@@ -396,7 +421,15 @@ static s32 dag_tree_copy_publishes(spn_dag_tree_ctx_t* ctx, sp_str_t root) {
 
     sp_mem_end_scratch(scratch);
     if (err) {
-      spn_log_error("{.cyan} failed to publish {.yellow} to {.yellow}", SP_FMT_STR(unit->info->name), SP_FMT_STR(copy->from), SP_FMT_STR(copy->to));
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        .kind = SPN_EVENT_NODE_FAILED,
+        .pkg = unit->info,
+        .io = &unit->logs.io,
+        .node_failed = {
+          .path = copy->from,
+          .message = sp_fmt(spn.mem, "could not be published to {}", sp_fmt_str(copy->to)).value,
+        },
+      });
       return 1;
     }
   }
@@ -419,6 +452,15 @@ static s32 dag_tree_copy_user_outputs(spn_dag_tree_ctx_t* ctx, sp_str_t root) {
       s32 err = sp_fs_copy(path, to);
       sp_mem_end_scratch(scratch);
       if (err) {
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
+          .kind = SPN_EVENT_NODE_FAILED,
+          .pkg = unit->info,
+          .io = &unit->logs.io,
+          .node_failed = {
+            .path = path,
+            .message = sp_fmt(spn.mem, "output of node {} could not be published to the package store", sp_fmt_str(node->tag)).value,
+          },
+        });
         return 1;
       }
     }
@@ -490,6 +532,15 @@ static s32 dag_package_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_d
     );
     sp_mem_end_scratch(scratch);
     if (err) {
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        .kind = SPN_EVENT_NODE_FAILED,
+        .pkg = unit->info,
+        .io = &unit->logs.io,
+        .node_failed = {
+          .path = copy->from,
+          .message = sp_fmt(spn.mem, "could not be published to {}", sp_fmt_str(copy->to)).value,
+        },
+      });
       return 1;
     }
   }
@@ -1131,11 +1182,51 @@ static void dag_stage(spn_dag_build_t* b) {
   sp_mem_end_scratch(scratch);
 }
 
+static sp_str_t dag_diag_message(spn_err_t err) {
+  switch (err) {
+    case SPN_ERR_DAG_MISSING_INPUT:  return sp_str_lit("is missing, but the graph expects it as an input");
+    case SPN_ERR_DAG_MISSING_OUTPUT: return sp_str_lit("was not produced by the node that declares it as an output");
+    case SPN_ERR_DAG_STORE_READ:     return sp_str_lit("could not be read from the content store");
+    case SPN_ERR_DAG_STORE_WRITE:    return sp_str_lit("could not be written to the content store");
+    case SPN_ERR_DAG_SCRATCH:        return sp_str_lit("failed to create a scratch directory");
+    case SPN_ERR_DAG_STALLED:        return sp_str_lit("the build graph stalled before completing");
+    default:                         return sp_cstr_as_str(spn_err_to_str(err));
+  }
+}
+
+static void dag_emit_diag(spn_dag_build_t* b) {
+  spn_dag_diag_t* diag = &b->env.diag;
+  if (!diag->err || diag->err == SPN_ERR_DAG_ACTION) {
+    return;
+  }
+
+  sp_str_t path = diag->path;
+  if (sp_str_empty(path) && diag->action.occupied) {
+    spn_dag_action_t* action = spn_dag_find_action(b->graph, diag->action);
+    if (!sp_da_empty(action->produces)) {
+      spn_dag_artifact_t* artifact = spn_dag_find_artifact(b->graph, action->produces[0]);
+      path = sp_str_empty(artifact->target) ? artifact->name : artifact->target;
+    }
+  }
+
+  spn_event_buffer_push(b->session->events, (spn_build_event_t) {
+    .kind = SPN_EVENT_NODE_FAILED,
+    .node_failed = {
+      .path = path,
+      .message = dag_diag_message(diag->err),
+    },
+  });
+}
+
 static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
   spn_session_t* session = b->session;
   bool failed = b->result != SPN_OK;
   u32 hits = (u32)sp_atomic_s32_get(&b->progress.hits);
   u32 misses = (u32)sp_atomic_s32_get(&b->progress.misses);
+
+  if (failed) {
+    dag_emit_diag(b);
+  }
 
   sp_da_for(session->plan.builds, it) {
     spn_build_unit_t* build = session->plan.builds[it].build;
@@ -1153,6 +1244,7 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
           .profile = profile->name,
           .time = elapsed,
           .num_errors = 1,
+          .first_error = sp_cstr_as_str(spn_err_to_str(b->result)),
         },
       });
     }

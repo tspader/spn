@@ -416,6 +416,18 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       sp_fmt_io(&w.base, "{.cyan} failed to compile", sp_fmt_str(spn_tui_contextual_path(mem, event->target.failed.source_file)));
       break;
     }
+    case SPN_EVENT_NODE_FAILED: {
+      if (sp_str_empty(event->node_failed.path)) {
+        sp_io_write_str(&w.base, event->node_failed.message, SP_NULLPTR);
+      }
+      else {
+        sp_fmt_io(&w.base, "{.cyan} {}",
+          sp_fmt_str(spn_tui_contextual_path(mem, event->node_failed.path)),
+          sp_fmt_str(event->node_failed.message)
+        );
+      }
+      break;
+    }
     case SPN_EVENT_ERR_UNKNOWN_PKG: {
       sp_fmt_io(
         &w.base,

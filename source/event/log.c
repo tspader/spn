@@ -120,6 +120,16 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_TARGET_BUILD_FAILED] = sp_bind_builder_end(&b);
   }
 
+  // SPN_EVENT_NODE_FAILED
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_node_failed_t, path, "path", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_node_failed_t, message, "message", SP_BIND_STR);
+    }
+    schemas[SPN_EVENT_NODE_FAILED] = sp_bind_builder_end(&b);
+  }
+
   // SPN_EVENT_TARGET_RUN
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);

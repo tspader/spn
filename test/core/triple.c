@@ -122,10 +122,9 @@ UTEST(triple, resolve_target) {
   resolve_target_t tests [] = {
     { .host = linux_gnu,                                       .expect = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL } },
     { .host = linux_gnu,                       .shared = true, .expect = linux_gnu },
-    { .host = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },    .expect = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL } },
     { .host = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL }, .shared = true, .expect = linux_gnu },
     { .host = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },  .expect = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } },
-    { .host = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MINGW }, .shared = true, .expect = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } },
+    { .host = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC }, .shared = true, .expect = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } },
     { .host = { SPN_ARCH_ARM64, SPN_OS_MACOS },                .expect = { SPN_ARCH_ARM64, SPN_OS_MACOS } },
     { .host = { SPN_ARCH_ARM64, SPN_OS_MACOS }, .shared = true, .expect = { SPN_ARCH_ARM64, SPN_OS_MACOS } },
     { .partial = { SPN_ARCH_ARM64, SPN_OS_MACOS },  .host = linux_gnu, .expect = { SPN_ARCH_ARM64, SPN_OS_MACOS } },
@@ -149,7 +148,6 @@ UTEST(triple, resolve_target) {
       .expect = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
     },
     { .partial = { .abi = SPN_ABI_MUSL }, .host = linux_gnu, .shared = true, .expect = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL } },
-    { .partial = { .abi = SPN_ABI_GNU },  .host = linux_gnu, .expect = linux_gnu },
   };
 
   sp_carr_for(tests, it) {

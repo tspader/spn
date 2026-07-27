@@ -120,11 +120,11 @@ spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_in
 
   spn_triple_t target = { merged.arch, merged.os, merged.abi };
   bool targeted = target.arch || target.os || target.abi;
-  bool shared = shared_demand || merged.linkage == SPN_LIB_KIND_SHARED;
+  bool shared = merged.linkage == SPN_LIB_KIND_SHARED || (!merged.linkage && shared_demand);
   target = spn_triple_resolve_target(target, host, shared);
 
   if (!merged.linkage) {
-    merged.linkage = target.abi == SPN_ABI_MUSL ? SPN_LIB_KIND_STATIC : SPN_LIB_KIND_SHARED;
+    merged.linkage = !shared && target.abi == SPN_ABI_MUSL ? SPN_LIB_KIND_STATIC : SPN_LIB_KIND_SHARED;
   }
 
   if (!merged.opt) {

@@ -14,8 +14,6 @@ spn_ctx_t spn;
 
 UTEST_MAIN();
 
-#define PROFILE_TEST_MAX_PROFILES 2
-
 static const spn_triple_t PROFILE_HOST_LINUX_GNU  = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU };
 static const spn_triple_t PROFILE_HOST_WIN_MSVC   = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC };
 static const spn_triple_t PROFILE_HOST_ARM_MACOS  = { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_NONE };
@@ -29,7 +27,7 @@ typedef struct {
 } profile_expect_t;
 
 typedef struct {
-  spn_profile_info_t profiles [PROFILE_TEST_MAX_PROFILES];
+  spn_profile_info_t profile;
   spn_profile_info_t overrides;
   spn_triple_t host;
   bool shared_demand;
@@ -48,11 +46,8 @@ static void run_profile_test(s32* utest_result, profile_test_t t) {
   sp_mem_t mem = profile_test_init();
 
   spn_pkg_info_t pkg = sp_zero;
-  sp_carr_for(t.profiles, it) {
-    if (sp_str_empty(t.profiles[it].name)) {
-      break;
-    }
-    sp_str_om_insert(pkg.profiles, t.profiles[it].name, t.profiles[it]);
+  if (!sp_str_empty(t.profile.name)) {
+    sp_str_om_insert(pkg.profiles, t.profile.name, t.profile);
   }
 
   spn_profile_table_t table = SP_NULLPTR;
@@ -70,9 +65,7 @@ static void run_profile_test(s32* utest_result, profile_test_t t) {
   EXPECT_EQ(t.expect.target.os, result.os);
   EXPECT_EQ(t.expect.target.abi, result.abi);
   EXPECT_EQ(t.expect.targeted, result.targeted);
-  if (t.expect.linkage) {
-    EXPECT_EQ((u32)t.expect.linkage, (u32)result.linkage);
-  }
+  EXPECT_EQ((u32)t.expect.linkage, (u32)result.linkage);
   if (t.expect.toolchain) {
     EXPECT_TRUE(sp_str_equal_cstr(result.toolchain, t.expect.toolchain));
   }
@@ -91,9 +84,7 @@ UTEST(profile, default_is_musl_static) {
 
 UTEST(profile, shared_linkage_defaults_to_gnu) {
   run_profile_test(utest_result, (profile_test_t) {
-    .profiles = {
-      { .name = sp_str_lit("default"), .linkage = SPN_LIB_KIND_SHARED },
-    },
+    .profile = { .name = sp_str_lit("default"), .linkage = SPN_LIB_KIND_SHARED },
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = {
       .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
@@ -104,9 +95,7 @@ UTEST(profile, shared_linkage_defaults_to_gnu) {
 
 UTEST(profile, static_linkage_defaults_to_musl) {
   run_profile_test(utest_result, (profile_test_t) {
-    .profiles = {
-      { .name = sp_str_lit("default"), .linkage = SPN_LIB_KIND_STATIC },
-    },
+    .profile = { .name = sp_str_lit("default"), .linkage = SPN_LIB_KIND_STATIC },
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = {
       .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
@@ -122,6 +111,31 @@ UTEST(profile, shared_demand_defaults_to_gnu) {
     .expect = {
       .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
       .linkage = SPN_LIB_KIND_SHARED,
+    },
+  });
+}
+
+UTEST(profile, explicit_static_ignores_shared_demand) {
+  run_profile_test(utest_result, (profile_test_t) {
+    .profile = { .name = sp_str_lit("default"), .linkage = SPN_LIB_KIND_STATIC },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .shared_demand = true,
+    .expect = {
+      .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
+      .linkage = SPN_LIB_KIND_STATIC,
+    },
+  });
+}
+
+UTEST(profile, shared_demand_survives_pinned_abi) {
+  run_profile_test(utest_result, (profile_test_t) {
+    .overrides = { .abi = SPN_ABI_MUSL },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .shared_demand = true,
+    .expect = {
+      .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
+      .linkage = SPN_LIB_KIND_SHARED,
+      .targeted = true,
     },
   });
 }
@@ -152,9 +166,7 @@ UTEST(profile, explicit_musl_defaults_to_static) {
 
 UTEST(profile, explicit_musl_shared_is_honored) {
   run_profile_test(utest_result, (profile_test_t) {
-    .profiles = {
-      { .name = sp_str_lit("default"), .linkage = SPN_LIB_KIND_SHARED },
-    },
+    .profile = { .name = sp_str_lit("default"), .linkage = SPN_LIB_KIND_SHARED },
     .overrides = { .abi = SPN_ABI_MUSL },
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = {
@@ -167,9 +179,7 @@ UTEST(profile, explicit_musl_shared_is_honored) {
 
 UTEST(profile, explicit_gnu_static_is_honored) {
   run_profile_test(utest_result, (profile_test_t) {
-    .profiles = {
-      { .name = sp_str_lit("default"), .linkage = SPN_LIB_KIND_STATIC },
-    },
+    .profile = { .name = sp_str_lit("default"), .linkage = SPN_LIB_KIND_STATIC },
     .overrides = { .abi = SPN_ABI_GNU },
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = {
@@ -208,6 +218,7 @@ UTEST(profile, cross_windows_defaults_to_gnu) {
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = {
       .target = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU },
+      .linkage = SPN_LIB_KIND_SHARED,
       .targeted = true,
     },
   });
@@ -231,6 +242,7 @@ UTEST(profile, explicit_abi_wins) {
     .host = PROFILE_HOST_WIN_MSVC,
     .expect = {
       .target = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
+      .linkage = SPN_LIB_KIND_SHARED,
       .targeted = true,
     },
   });
@@ -238,12 +250,11 @@ UTEST(profile, explicit_abi_wins) {
 
 UTEST(profile, profile_toolchain_overrides_auto) {
   run_profile_test(utest_result, (profile_test_t) {
-    .profiles = {
-      { .name = sp_str_lit("default"), .toolchain = sp_str_lit("system") },
-    },
+    .profile = { .name = sp_str_lit("default"), .toolchain = sp_str_lit("system") },
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = {
       .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
+      .linkage = SPN_LIB_KIND_STATIC,
       .toolchain = "system",
     },
   });
@@ -251,13 +262,12 @@ UTEST(profile, profile_toolchain_overrides_auto) {
 
 UTEST(profile, override_toolchain_wins) {
   run_profile_test(utest_result, (profile_test_t) {
-    .profiles = {
-      { .name = sp_str_lit("default"), .toolchain = sp_str_lit("system") },
-    },
+    .profile = { .name = sp_str_lit("default"), .toolchain = sp_str_lit("system") },
     .overrides = { .toolchain = sp_str_lit("msvc") },
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = {
       .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
+      .linkage = SPN_LIB_KIND_STATIC,
       .toolchain = "msvc",
     },
   });

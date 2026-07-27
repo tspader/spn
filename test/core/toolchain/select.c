@@ -180,6 +180,19 @@ UTEST(select, auto_skips_distribution_without_host_artifact) {
   });
 }
 
+UTEST(select, auto_with_empty_catalog) {
+  run_select_test(utest_result, (select_test_t) {
+    .file = "empty.json",
+    .queries = {
+      {
+        .name = "auto",
+        .target = HOST_X64_LINUX,
+        .expect = { .err = SPN_ERR_TOOLCHAIN_NONE },
+      },
+    },
+  });
+}
+
 UTEST(select, auto_with_no_capable_toolchain) {
   run_select_test(utest_result, (select_test_t) {
     .file = "auto.json",
