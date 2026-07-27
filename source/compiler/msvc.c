@@ -103,6 +103,16 @@ static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_
 }
 
 void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, spn_invocation_t* invocation) {
+  if (compile->lang == SPN_LANG_ASM) {
+    // cl neither assembles nor errors on assembly sources; it warns and
+    // exits zero, so these must go to MASM directly
+    invocation->program = sp_str_lit("ml64");
+    push_arg(mem, invocation, "/nologo");
+    push_arg(mem, invocation, "/c");
+    push_arg_fmt(mem, invocation, "/Fo{}", sp_fmt_str(compile->output));
+    push_arg_str(mem, invocation, compile->source);
+    return;
+  }
   add_launcher(mem, toolchain, compile->lang, invocation);
   // cl reads sources in the system ANSI codepage by default; non-ASCII
   // string literals are mangled without this
