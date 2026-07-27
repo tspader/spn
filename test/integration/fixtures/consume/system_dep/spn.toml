@@ -6,11 +6,9 @@ version = "0.1.0"
 spum = { path = "packages/spum" }
 
 [profile.default]
-toolchain = "system"
 linkage = "static"
 
 [profile.static]
-toolchain = "system"
 linkage = "static"
 
 [[bin]]

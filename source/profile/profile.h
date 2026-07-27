@@ -8,7 +8,10 @@
 void            spn_profile_overlay(spn_profile_info_t* dst, spn_profile_info_t* src);
 void            spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg);
 spn_err_union_t spn_profile_overrides_parse(spn_profile_args_t* args, spn_profile_info_t* result);
-spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* overrides, spn_triple_t host, spn_profile_info_t* result);
+// shared_demand: the root manifest explicitly asks for a shared artifact
+// somewhere (e.g. [config.<pkg>] kind = "shared"), which rules out the
+// static-friendly abi defaults even when the profile leaves linkage unset.
+spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* overrides, spn_triple_t host, bool shared_demand, spn_profile_info_t* result);
 sp_str_t        spn_profile_build_path(sp_mem_t mem, sp_str_t build, const spn_profile_info_t* profile);
 
 #endif

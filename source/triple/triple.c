@@ -76,10 +76,10 @@ spn_triple_t spn_triple_host(void) {
   return host;
 }
 
-SP_PRIVATE spn_abi_t spn_triple_default_abi(spn_os_t os, spn_triple_t host) {
+SP_PRIVATE spn_abi_t spn_triple_default_abi(spn_os_t os, bool shared) {
   switch (os) {
     case SPN_OS_WINDOWS: return SPN_ABI_GNU;
-    case SPN_OS_LINUX:   return host.os == SPN_OS_LINUX ? host.abi : SPN_ABI_GNU;
+    case SPN_OS_LINUX:   return shared ? SPN_ABI_GNU : SPN_ABI_MUSL;
     case SPN_OS_MACOS:
     case SPN_OS_WASI:
     case SPN_OS_NONE:    return SPN_ABI_NONE;
@@ -87,11 +87,11 @@ SP_PRIVATE spn_abi_t spn_triple_default_abi(spn_os_t os, spn_triple_t host) {
   SP_UNREACHABLE_RETURN(SPN_ABI_NONE);
 }
 
-spn_triple_t spn_triple_resolve_target(spn_triple_t partial, spn_triple_t host) {
+spn_triple_t spn_triple_resolve_target(spn_triple_t partial, spn_triple_t host, bool shared) {
   spn_triple_t target = partial;
   if (!target.arch) target.arch = host.arch;
   if (!target.os)   target.os = host.os;
-  if (!target.abi)  target.abi = spn_triple_default_abi(target.os, host);
+  if (!target.abi)  target.abi = spn_triple_default_abi(target.os, shared);
   return target;
 }
 

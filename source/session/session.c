@@ -151,6 +151,22 @@ static spn_err_union_t add_metaprogram_build(spn_session_t* session, spn_build_u
   return spn_result(SPN_OK);
 }
 
+static bool root_demands_shared(spn_pkg_info_t* pkg) {
+  sp_da_for(pkg->config, it) {
+    spn_pkg_config_t* config = &pkg->config[it].value;
+    if (!sp_opt_is_null(config->kind) && config->kind.value == SPN_LIB_KIND_SHARED) {
+      return true;
+    }
+  }
+  sp_str_om_for(pkg->libs, it) {
+    spn_linkage_set_t linkages = sp_str_om_at(pkg->libs, it)->linkages;
+    if (linkages.shared && !linkages.static_lib && !linkages.source && !linkages.object) {
+      return true;
+    }
+  }
+  return false;
+}
+
 spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t* root, spn_app_config_t config) {
   s->mem = mem;
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
@@ -171,7 +187,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   sp_ht_init(s->mem, s->fingerprints);
   sp_mutex_init(&s->mutex, SP_MUTEX_PLAIN);
 
-  try_union(spn_profile_resolve(s->profiles, &config.overrides, spn_triple_host(), &s->profile));
+  try_union(spn_profile_resolve(s->profiles, &config.overrides, spn_triple_host(), root_demands_shared(root), &s->profile));
   if (s->profile.os == SPN_OS_MACOS) {
     s->profile.sysroot = resolve_macos_sdk(s->mem);
   }

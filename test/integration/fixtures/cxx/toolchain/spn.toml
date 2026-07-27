@@ -15,7 +15,7 @@ cxx = "c++"
 
 [profile.default]
 toolchain = "custom"
-linkage = "static"
+linkage = "shared"
 
 [[bin]]
 name = "main"

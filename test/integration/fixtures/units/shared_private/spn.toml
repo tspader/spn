@@ -2,6 +2,9 @@
 name = "units_shared_private"
 version = "0.1.0"
 
+[profile.default]
+linkage = "shared"
+
 [deps.package]
 gfx = "1.0.0"
 foo = "2.0.0"

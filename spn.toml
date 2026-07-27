@@ -311,6 +311,7 @@ source = [
   "source/compiler/gnu.c",
   "source/compiler/msvc.c",
   "source/enum/enum.c",
+  "source/error/str.c",
   "source/external/tom.c",
   "source/sp/str.c",
   "source/triple/triple.c",

@@ -15,11 +15,11 @@ sp_str_t spn_triple_to_str(sp_mem_t mem, spn_triple_t triple);
 // Detect the host platform triple.
 spn_triple_t spn_triple_host(void);
 
-// Resolve a partially specified target triple against the host. Arch and os
-// default from the host; the abi defaults from the resolved target os
-// (windows -> gnu, linux -> the host's abi on a linux host and gnu elsewhere,
-// macos/wasi -> none), never from the host's abi verbatim.
-spn_triple_t spn_triple_resolve_target(spn_triple_t partial, spn_triple_t host);
+// Resolve a partially specified target triple. Arch and os default from the
+// host; the abi defaults from the resolved target os and whether the build
+// explicitly links shared: windows -> gnu, linux -> gnu when shared and musl
+// otherwise, macos/wasi -> none. The host's abi is never consulted.
+spn_triple_t spn_triple_resolve_target(spn_triple_t partial, spn_triple_t host, bool shared);
 
 // Fill NONE fields in `partial` with values from `base`.
 spn_triple_t spn_triple_merge(spn_triple_t base, spn_triple_t partial);

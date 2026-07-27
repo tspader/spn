@@ -112,6 +112,7 @@ UTEST(triple, merge) {
 typedef struct {
   spn_triple_t partial;
   spn_triple_t host;
+  bool shared;
   spn_triple_t expect;
 } resolve_target_t;
 
@@ -119,23 +120,27 @@ UTEST(triple, resolve_target) {
   spn_triple_t linux_gnu = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU };
 
   resolve_target_t tests [] = {
-    { .host = linux_gnu,                                       .expect = linux_gnu },
+    { .host = linux_gnu,                                       .expect = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL } },
+    { .host = linux_gnu,                       .shared = true, .expect = linux_gnu },
     { .host = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },    .expect = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL } },
+    { .host = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL }, .shared = true, .expect = linux_gnu },
     { .host = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },  .expect = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } },
-    { .host = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MINGW }, .expect = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } },
+    { .host = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MINGW }, .shared = true, .expect = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } },
     { .host = { SPN_ARCH_ARM64, SPN_OS_MACOS },                .expect = { SPN_ARCH_ARM64, SPN_OS_MACOS } },
+    { .host = { SPN_ARCH_ARM64, SPN_OS_MACOS }, .shared = true, .expect = { SPN_ARCH_ARM64, SPN_OS_MACOS } },
     { .partial = { SPN_ARCH_ARM64, SPN_OS_MACOS },  .host = linux_gnu, .expect = { SPN_ARCH_ARM64, SPN_OS_MACOS } },
     { .partial = { .os = SPN_OS_WINDOWS },          .host = linux_gnu, .expect = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } },
-    { .partial = { .arch = SPN_ARCH_ARM64 },        .host = linux_gnu, .expect = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU } },
+    { .partial = { .arch = SPN_ARCH_ARM64 },        .host = linux_gnu, .expect = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_MUSL } },
     { .partial = { SPN_ARCH_WASM32, SPN_OS_WASI },  .host = linux_gnu, .expect = { SPN_ARCH_WASM32, SPN_OS_WASI } },
     {
-      .partial = { .arch = SPN_ARCH_ARM64 },
-      .host = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
+      .partial = { .os = SPN_OS_LINUX },
+      .host = { SPN_ARCH_ARM64, SPN_OS_MACOS },
       .expect = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_MUSL },
     },
     {
       .partial = { .os = SPN_OS_LINUX },
       .host = { SPN_ARCH_ARM64, SPN_OS_MACOS },
+      .shared = true,
       .expect = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU },
     },
     {
@@ -143,11 +148,12 @@ UTEST(triple, resolve_target) {
       .host = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
       .expect = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
     },
-    { .partial = { .abi = SPN_ABI_MUSL }, .host = linux_gnu, .expect = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL } },
+    { .partial = { .abi = SPN_ABI_MUSL }, .host = linux_gnu, .shared = true, .expect = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL } },
+    { .partial = { .abi = SPN_ABI_GNU },  .host = linux_gnu, .expect = linux_gnu },
   };
 
   sp_carr_for(tests, it) {
-    spn_triple_t result = spn_triple_resolve_target(tests[it].partial, tests[it].host);
+    spn_triple_t result = spn_triple_resolve_target(tests[it].partial, tests[it].host, tests[it].shared);
     EXPECT_EQ(result.arch, tests[it].expect.arch);
     EXPECT_EQ(result.os, tests[it].expect.os);
     EXPECT_EQ(result.abi, tests[it].expect.abi);
