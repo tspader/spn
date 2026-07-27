@@ -75,7 +75,8 @@ include = [
 source = [
   "core/iwasm/common/*.c",
   { path = "core/iwasm/common/arch/invokeNative_em64.s", when = { arch = "x86_64", os = { not = "windows" } } },
-  { path = "core/iwasm/common/arch/invokeNative_mingw_x64.s", when = { arch = "x86_64", os = "windows" } },
+  { path = "core/iwasm/common/arch/invokeNative_mingw_x64.s", when = { arch = "x86_64", os = "windows", abi = { not = "msvc" } } },
+  { path = "core/iwasm/common/arch/invokeNative_em64.asm", when = { arch = "x86_64", abi = "msvc" } },
   { path = "core/iwasm/common/arch/invokeNative_aarch64.s", when = { arch = "aarch64" } },
   "core/iwasm/interpreter/wasm_runtime.c",
   "core/iwasm/interpreter/wasm_loader.c",

@@ -565,6 +565,12 @@ spn_lang_t spn_lang_from_path(sp_str_t path) {
       return SPN_LANG_CXX;
     }
   }
+  const c8* assembly [] = { "s", "S", "asm" };
+  sp_carr_for(assembly, it) {
+    if (sp_str_equal_cstr(ext, assembly[it])) {
+      return SPN_LANG_ASM;
+    }
+  }
   return SPN_LANG_C;
 }
 

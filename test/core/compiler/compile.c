@@ -99,6 +99,26 @@ UTEST(render_compile, msvc_windows) {
   });
 }
 
+UTEST(render_compile, msvc_asm_uses_masm) {
+  run_compile_test(utest_result, (compile_test_t) {
+    .driver = SPN_CC_DRIVER_MSVC,
+    .lang = SPN_LANG_ASM,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .standard = SPN_C11,
+      .mode = SPN_BUILD_MODE_DEBUG,
+    },
+    .include = "inc",
+    .define = "SPUM=1",
+    .expect = {
+      .command = "ml64",
+      .args = { "/nologo", "/c", "/Fomain.o", "main.c" },
+    },
+  });
+}
+
 UTEST(render_compile, msvc_c99_has_no_switch) {
   run_compile_test(utest_result, (compile_test_t) {
     .driver = SPN_CC_DRIVER_MSVC,
