@@ -124,7 +124,7 @@ static spn_err_union_t add_metaprogram_build(spn_session_t* session, spn_build_u
   spn_triple_t target = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_NONE };
   spn_toolchain_unit_t* toolchain = SP_NULLPTR;
   try_union(bind_toolchain(session, (spn_toolchain_query_t) {
-    .name = sp_str_lit("zig"),
+    .name = sp_str_lit("auto"),
     .target = target,
     .host = host,
     .role = SPN_TOOLCHAIN_ROLE_SCRIPT,
@@ -171,7 +171,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   sp_ht_init(s->mem, s->fingerprints);
   sp_mutex_init(&s->mutex, SP_MUTEX_PLAIN);
 
-  try_union(spn_profile_resolve(s->profiles, &config.overrides, &s->profile));
+  try_union(spn_profile_resolve(s->profiles, &config.overrides, spn_triple_host(), &s->profile));
   if (s->profile.os == SPN_OS_MACOS) {
     s->profile.sysroot = resolve_macos_sdk(s->mem);
   }

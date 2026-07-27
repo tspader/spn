@@ -140,6 +140,59 @@ UTEST(select, supports_wildcard_target_fields) {
   });
 }
 
+UTEST(select, auto_picks_first_in_declared_order) {
+  run_select_test(utest_result, (select_test_t) {
+    .file = "auto.json",
+    .queries = {
+      {
+        .name = "auto",
+        .target = TARGET_WIN_GNU,
+        .expect = { .name = "A" },
+      },
+    },
+  });
+}
+
+UTEST(select, auto_skips_unsupported_target) {
+  run_select_test(utest_result, (select_test_t) {
+    .file = "auto.json",
+    .queries = {
+      {
+        .name = "auto",
+        .target = HOST_X64_LINUX,
+        .expect = { .name = "B", .artifact = "https://example.com/linux.tar.xz" },
+      },
+    },
+  });
+}
+
+UTEST(select, auto_skips_distribution_without_host_artifact) {
+  run_select_test(utest_result, (select_test_t) {
+    .file = "auto.json",
+    .queries = {
+      {
+        .name = "auto",
+        .target = { .os = SPN_OS_LINUX },
+        .host = HOST_ARM_LINUX,
+        .expect = { .name = "C", .no_artifact = true },
+      },
+    },
+  });
+}
+
+UTEST(select, auto_with_no_capable_toolchain) {
+  run_select_test(utest_result, (select_test_t) {
+    .file = "auto.json",
+    .queries = {
+      {
+        .name = "auto",
+        .target = TARGET_WASM,
+        .expect = { .err = SPN_ERR_TOOLCHAIN_NONE },
+      },
+    },
+  });
+}
+
 UTEST(select, unknown_name) {
   run_select_test(utest_result, (select_test_t) {
     .file = "empty.json",

@@ -1,0 +1,40 @@
+{
+  "toolchain": [
+    {
+      "name": "A",
+      "driver": "gcc",
+      "compiler": { "program": "A" },
+      "linker":   { "program": "A" },
+      "archiver": { "program": "ar" },
+      "target": [
+        { "os": "windows", "abi": "gnu" }
+      ]
+    },
+    {
+      "name": "B",
+      "version": "1.0.0",
+      "driver": "clang",
+      "compiler": { "program": "B" },
+      "linker":   { "program": "B" },
+      "archiver": { "program": "B" },
+      "mirrors": "https://example.com/mirrors.txt",
+      "host": {
+        "x86_64-linux": { "url": "https://example.com/linux.tar.xz", "sha256": "aa" }
+      },
+      "target": [
+        { "os": "linux" }
+      ]
+    },
+    {
+      "name": "C",
+      "driver": "gcc",
+      "compiler": { "program": "C" },
+      "linker":   { "program": "C" },
+      "archiver": { "program": "ar" },
+      "target": [
+        { "os": "linux" },
+        { "os": "windows", "abi": "gnu" }
+      ]
+    }
+  ]
+}

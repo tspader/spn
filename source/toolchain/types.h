@@ -5,6 +5,7 @@
 #include "spn.h"
 
 #include "forward/types.h"
+#include "sp/sp_om.h"
 
 typedef enum {
   SPN_CC_DRIVER_NONE,
@@ -49,9 +50,9 @@ typedef struct {
   sp_da(spn_triple_t) targets;
 } spn_toolchain_info_t;
 
+// Entries preserve declaration order; auto-selection takes the first match.
 struct spn_toolchain_catalog_t {
-  sp_str_ht(spn_toolchain_info_t*) entries;
-  sp_mem_t mem;
+  sp_str_om(spn_toolchain_info_t) entries;
 };
 
 typedef spn_err_t (*spn_fetch_fn)(sp_str_t url, sp_str_t dest, void* user_data);

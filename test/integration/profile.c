@@ -81,6 +81,22 @@ UTEST_F(profile, override_rebuild) {
   });
 }
 
+UTEST_F(profile, cross_target_macos) {
+  tmpfs_init_named(&uf->fixture.fs, "profile_cross_target_macos");
+
+  run_command_test(utest_result, &uf->fixture, (command_test_t) {
+    .project = "test/integration/fixtures/profile/override",
+    .args = { "build", "--target", "aarch64-macos" },
+    .expect = {
+      .exists = { target_exe("main", "aarch64-macos") },
+      .events = {
+        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = "aarch64-macos" },
+        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "toolchain", .value = "zig" },
+      },
+    },
+  });
+}
+
 UTEST_F(profile, flags) {
   tmpfs_init_named(&uf->fixture.fs, "profile_flags");
 

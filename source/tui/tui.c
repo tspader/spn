@@ -947,6 +947,15 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
           }
           break;
         }
+        case SPN_ERR_TOOLCHAIN_NONE: {
+          sp_str_t target = spn_triple_to_str(mem, event->err.toolchain.target);
+          sp_fmt_io(
+            &w.base,
+            "no toolchain in the catalog can target {.yellow}",
+            sp_fmt_str(target)
+          );
+          break;
+        }
         case SPN_ERR_TOOLCHAIN_HOST: {
           sp_str_t host = spn_triple_to_str(mem, event->err.toolchain.host);
           sp_fmt_io(
@@ -1073,10 +1082,10 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       break;
     }
     case SPN_EVENT_INIT_BUILD_GRAPH: {
-      sp_fmt_io(&w.base, "profile={} force={} packages={}",
+      sp_fmt_io(&w.base, "{}, {.yellow}, {.green}",
         sp_fmt_str(event->graph_init.profile),
-        sp_fmt_cstr(event->graph_init.force ? "true" : "false"),
-        SP_FMT_U32(event->graph_init.packages)
+        sp_fmt_str(event->graph_init.target),
+        sp_fmt_str(event->graph_init.toolchain)
       );
       break;
     }
@@ -1247,8 +1256,8 @@ static void spn_tui_render_event_extra(sp_io_writer_t* w, spn_build_event_t* eve
         }
         case SPN_ERR_TOOLCHAIN_TARGET: {
           bool first = true;
-          sp_str_ht_for_kv(event->err.toolchain.catalog->entries, it) {
-            spn_toolchain_info_t* toolchain = *it.val;
+          sp_om_for(event->err.toolchain.catalog->entries, it) {
+            spn_toolchain_info_t* toolchain = sp_om_at(event->err.toolchain.catalog->entries, it);
             if (!spn_toolchain_supports(toolchain, event->err.toolchain.target, event->err.toolchain.host)) continue;
             sp_io_write_str(w, first ? sp_str_lit("toolchains that can: ") : sp_str_lit(", "), SP_NULLPTR);
             sp_fmt_io(w, "{.green}", sp_fmt_str(toolchain->name));

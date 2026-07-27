@@ -62,15 +62,23 @@ static void run_builtins_test(s32* utest_result, builtins_test_t t) {
   }
 }
 
+UTEST(builtins, zig_is_declared_first) {
+  spn_toolchain_catalog_t catalog = sp_zero;
+  builtins_catalog(utest_result, &catalog);
+
+  ASSERT_TRUE(fixture_catalog_size(&catalog));
+  EXPECT_STR(fixture_catalog_at(&catalog, 0)->name, "zig");
+}
+
 UTEST(builtins, well_formed) {
   spn_toolchain_catalog_t catalog = sp_zero;
   builtins_catalog(utest_result, &catalog);
   ASSERT_TRUE(fixture_catalog_size(&catalog));
 
-  sp_str_ht_for_kv(catalog.entries, entry) {
-    spn_toolchain_info_t* info = *entry.val;
+  sp_om_for(catalog.entries, it) {
+    spn_toolchain_info_t* info = sp_om_at(catalog.entries, it);
 
-    EXPECT_TRUE(sp_str_equal(info->name, *entry.key));
+    EXPECT_TRUE(spn_toolchain_catalog_get(&catalog, info->name) == info);
     EXPECT_FALSE(sp_str_empty(info->name));
     EXPECT_NE((u32)SPN_CC_DRIVER_NONE, (u32)info->driver);
     EXPECT_FALSE(sp_str_empty(info->compiler.program));

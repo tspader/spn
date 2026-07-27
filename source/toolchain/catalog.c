@@ -11,8 +11,7 @@ SP_PRIVATE spn_toolchain_launcher_t spn_toolchain_catalog_load_launcher(const sp
 }
 
 spn_err_t spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, sp_str_t builtins_json, sp_mem_t mem) {
-  catalog->mem = mem;
-  sp_str_ht_init(mem, catalog->entries);
+  sp_str_om_init(catalog->entries);
 
   spn_cg_toolchains_t root = sp_zero;
   if (!spn_toolchains_read(builtins_json, &root, mem)) {
@@ -60,13 +59,16 @@ spn_err_t spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, sp_str_t 
 }
 
 void spn_toolchain_catalog_add(spn_toolchain_catalog_t* catalog, spn_toolchain_info_t toolchain) {
-  spn_toolchain_info_t* entry = sp_alloc_type(catalog->mem, spn_toolchain_info_t);
-  *entry = toolchain;
-  sp_str_ht_insert(catalog->entries, entry->name, entry);
+  spn_toolchain_info_t* existing = spn_toolchain_catalog_get(catalog, toolchain.name);
+  if (existing) {
+    *existing = toolchain;
+    return;
+  }
+  sp_str_om_insert(catalog->entries, toolchain.name, toolchain);
 }
 
 spn_toolchain_info_t* spn_toolchain_catalog_get(spn_toolchain_catalog_t* catalog, sp_str_t name) {
-  spn_toolchain_info_t** entry = sp_str_ht_get(catalog->entries, name);
+  spn_toolchain_info_t** entry = sp_str_om_getp(catalog->entries, name);
   return entry ? *entry : SP_NULLPTR;
 }
 

@@ -80,6 +80,18 @@ add_executable(triple
 spn_test_binary(triple)
 add_test(NAME triple COMMAND "$<TARGET_FILE:triple>")
 
+add_executable(profile
+  ${SRC}/ctx/ctx.c
+  ${SRC}/enum/enum.c
+  ${SRC}/intern/intern.c
+  ${SRC}/profile/profile.c
+  ${SRC}/triple/triple.c
+  ${SRC}/sp/str.c
+  profile.c
+)
+spn_test_binary(profile)
+add_test(NAME profile COMMAND "$<TARGET_FILE:profile>")
+
 add_executable(when
   ${SRC}/enum/enum.c
   ${SRC}/when/when.c
