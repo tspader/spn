@@ -1,21 +1,22 @@
 #include "sp.h"
 #include "sp/macro.h"
 #include "app/types.h"
+#include "ctx/types.h"
+#include "error/types.h"
+#include "event/types.h"
 #include "forward/types.h"
-#include "intern/intern.h"
-#include "log/log.h"
 #include "sp/sp_om.h"
 #include "session/types.h"
 #include "target/types.h"
 #include "task/types.h"
 
-#include "ctx/types.h"
+#include "compiler/driver.h"
 #include "enum/enum.h"
-#include "error/types.h"
 #include "event/event.h"
-#include "event/types.h"
 #include "external/wasm/wasm.h"
 #include "filter/filter.h"
+#include "intern/intern.h"
+#include "log/log.h"
 #include "pkg/id.h"
 #include "pkg/pkg.h"
 #include "session/invocation.h"
@@ -25,6 +26,7 @@
 #include "target/select.h"
 #include "task/build/build.h"
 #include "toolchain/toolchain.h"
+#include "triple/triple.h"
 #include "unit/types.h"
 
 static bool has_source_file(sp_da(sp_str_t) source, sp_str_t path) {
@@ -127,11 +129,6 @@ static spn_err_union_t set_target_kind(spn_session_t* session, spn_target_unit_t
       return spn_result(SPN_OK);
     }
     case SPN_TARGET_LIB: {
-      // Unlinked libs don't participate in linkage selection: nothing consumes
-      // them at link time, so the profile has no say in what they produce. A
-      // multi-kind unlinked lib resolves by spn_linkage_set_default's
-      // preference order, not the profile. Object libs are always unlinked;
-      // the manifest loader rejects object mixed with linkable kinds.
       if (spn_linkage_set_has(info->linkages, SPN_LIB_KIND_OBJECT) || info->no_link) {
         target->lib_kind = spn_linkage_set_default(info->linkages);
       }
@@ -144,6 +141,7 @@ static spn_err_union_t set_target_kind(spn_session_t* session, spn_target_unit_t
         if (spn_target_select_lib_kind(info, query, &target->lib_kind)) {
           sp_str_t requested = spn_linkage_to_str(query.config.some ? query.config.value : query.linkage);
           sp_str_t requester = query.config.some ? sp_str_lit("the root manifest") : sp_str_lit("the profile");
+          // @spader Error message rendering does not belong here
           spn_log_error(
             "{.cyan} doesn't support {.yellow} ({} requested it)",
             SP_FMT_STR(target->pkg->info->name),
@@ -157,8 +155,6 @@ static spn_err_union_t set_target_kind(spn_session_t* session, spn_target_unit_t
       switch (target->lib_kind) {
         case SPN_LIB_KIND_STATIC: target->kind = SPN_CC_OUTPUT_STATIC_LIB; break;
         case SPN_LIB_KIND_SHARED: target->kind = SPN_CC_OUTPUT_SHARED_LIB; break;
-        // Source and object libs share an output kind; anything that needs to
-        // tell them apart must branch on lib_kind, not kind
         case SPN_LIB_KIND_SOURCE:
         case SPN_LIB_KIND_OBJECT: target->kind = SPN_CC_OUTPUT_OBJECT; break;
         case SPN_LIB_KIND_NONE: break;
@@ -265,9 +261,189 @@ static void init_metaprogram_runtime(spn_pkg_unit_t* unit) {
   }
 }
 
+static bool is_os_version_lt(spn_os_version_t a, spn_os_version_t b) {
+  if (a.major != b.major) return a.major < b.major;
+  return a.minor < b.minor;
+}
+
+static spn_os_version_t max_os_version(spn_os_version_t current, spn_os_version_t candidate) {
+  return is_os_version_lt(current, candidate) ? candidate : current;
+}
+
+static bool is_any_object_cxx(sp_da(spn_compile_unit_t*) objects) {
+  sp_da_for(objects, it) {
+    if (objects[it]->lang == SPN_LANG_CXX) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool is_target_dynamic(spn_target_unit_t* target) {
+  return target->kind == SPN_CC_OUTPUT_SHARED_LIB || target->kind == SPN_CC_OUTPUT_REACTOR;
+}
+
+static sp_str_t static_archive_path(sp_mem_t mem, spn_target_unit_t* lib) {
+  spn_profile_info_t* profile = &lib->pkg->build->profile;
+  spn_triple_t triple = { profile->arch, profile->os, profile->abi };
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+  sp_str_t file_name = spn_triple_lib_file_name(s.mem, triple, lib->info->name, SP_OS_LIB_STATIC);
+  sp_str_t path = sp_fs_join_path(mem, lib->pkg->paths.lib, file_name);
+  sp_mem_end_scratch(s);
+  return path;
+}
+
+static void push_frameworks(sp_da(sp_str_t)* frameworks, sp_da(sp_str_t) values) {
+  sp_da_for(values, it) {
+    bool present = false;
+    sp_da_for(*frameworks, jt) {
+      if (sp_str_equal((*frameworks)[jt], values[it])) {
+        present = true;
+        break;
+      }
+    }
+    if (!present) {
+      sp_da_push(*frameworks, values[it]);
+    }
+  }
+}
+
 static spn_err_union_t build_target_invocations(spn_target_unit_t* target) {
-  spn_target_resolve_link(target);
-  return spn_build_validate_target(target);
+  spn_pkg_unit_t* pkg = target->pkg;
+  sp_mem_t mem = pkg->session->mem;
+
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+
+  sp_da_init(mem, target->link.lib_dirs);
+  sp_da_init(mem, target->link.system_libs);
+  sp_da_init(mem, target->link.whole_archives);
+  sp_da_init(mem, target->link.private_libs);
+  sp_da_init(mem, target->link.frameworks);
+
+  spn_os_version_t min_os = max_os_version(target->info->macos.min_os, pkg->info->macos.min_os);
+  spn_lang_t lang = is_any_object_cxx(target->objects) ? SPN_LANG_CXX : SPN_LANG_C;
+
+  push_frameworks(&target->link.frameworks, target->info->macos.frameworks);
+  push_frameworks(&target->link.frameworks, pkg->info->macos.frameworks);
+
+  sp_da_for(target->deps.target, it) {
+    spn_target_unit_t* lib = target->deps.target[it];
+    min_os = max_os_version(min_os, lib->info->macos.min_os);
+    if (lib->info->no_link) continue;
+
+    if (lib->lib_kind != SPN_LIB_KIND_SHARED) {
+      push_frameworks(&target->link.frameworks, lib->info->macos.frameworks);
+    }
+
+    switch (lib->lib_kind) {
+      case SPN_LIB_KIND_STATIC: {
+        if (is_target_dynamic(target)) {
+          sp_da_push(target->link.whole_archives, static_archive_path(mem, lib));
+          break;
+        }
+        sp_da_push(target->link.lib_dirs, lib->pkg->paths.lib);
+        sp_da_push(target->link.system_libs, lib->info->name);
+        break;
+      }
+      case SPN_LIB_KIND_SHARED: {
+        sp_da_push(target->link.lib_dirs, lib->pkg->paths.lib);
+        sp_da_push(target->link.system_libs, lib->info->name);
+        break;
+      }
+      case SPN_LIB_KIND_SOURCE:
+      case SPN_LIB_KIND_OBJECT:
+      case SPN_LIB_KIND_NONE: {
+        break;
+      }
+    }
+  }
+
+  sp_da(spn_closure_entry_t) closure = spn_target_link_closure(s.mem, target);
+
+  // Packages must precede the system libraries they need
+  target->link.libs = spn_closure_link_libs(mem, closure, pkg);
+  sp_da_for(target->link.libs, it) {
+    spn_pkg_unit_t* dep = target->link.libs[it].pkg;
+    spn_target_unit_t* lib = target->link.libs[it].lib;
+
+    if (lang != SPN_LANG_CXX && lib->lib_kind == SPN_LIB_KIND_STATIC && is_any_object_cxx(lib->objects)) {
+      lang = SPN_LANG_CXX;
+    }
+
+    sp_da_push(target->link.lib_dirs, dep->paths.lib);
+
+    if (lib->lib_kind == SPN_LIB_KIND_SHARED) {
+      sp_da_push(target->link.system_libs, lib->info->name);
+      continue;
+    }
+
+    if (!is_target_dynamic(target)) {
+      sp_da_push(target->link.system_libs, lib->info->name);
+    }
+    else if (target->link.libs[it].private) {
+      sp_da_push(target->link.private_libs, lib->info->name);
+    }
+    else {
+      sp_da_push(target->link.whole_archives, static_archive_path(mem, lib));
+    }
+  }
+
+  sp_da_for(pkg->info->system_deps, it) {
+    sp_da_push(target->link.system_libs, pkg->info->system_deps[it]);
+  }
+  sp_da_for(closure, it) {
+    spn_pkg_unit_t* dep = closure[it].pkg;
+    if (!dep || dep == pkg) continue;
+
+    min_os = max_os_version(min_os, dep->info->macos.min_os);
+
+    sp_da_for(dep->info->system_deps, st) {
+      sp_da_push(target->link.system_libs, dep->info->system_deps[st]);
+    }
+    bool static_link = false;
+    sp_da_for(dep->libs, lt) {
+      spn_target_unit_t* lib = dep->libs[lt];
+      min_os = max_os_version(min_os, lib->info->macos.min_os);
+      if (lib->info->no_link) continue;
+      if (lib->lib_kind == SPN_LIB_KIND_SHARED) continue;
+      static_link = true;
+      push_frameworks(&target->link.frameworks, lib->info->macos.frameworks);
+    }
+    if (static_link || sp_da_empty(dep->libs)) {
+      push_frameworks(&target->link.frameworks, dep->info->macos.frameworks);
+    }
+  }
+
+  target->link.min_os = min_os;
+  target->link.lang = lang;
+
+  sp_mem_end_scratch(s);
+
+  spn_profile_info_t* profile = &target->pkg->build->profile;
+  spn_cc_toolchain_t* toolchain = &target->pkg->build->toolchain->cc;
+
+  if (!sp_da_empty(target->objects)) {
+    try_union(spn_cc_validate_compile(toolchain, profile));
+  }
+
+  switch (target->kind) {
+    case SPN_CC_OUTPUT_STATIC_LIB: {
+      return spn_cc_validate_archive(toolchain, profile);
+    }
+    case SPN_CC_OUTPUT_SHARED_LIB:
+    case SPN_CC_OUTPUT_REACTOR: {
+      try_union(spn_cc_validate_archive(toolchain, profile));
+      return spn_cc_validate_link(toolchain, profile, target->kind, !sp_da_empty(target->link.frameworks));
+    }
+    case SPN_CC_OUTPUT_EXE: {
+      return spn_cc_validate_link(toolchain, profile, target->kind, !sp_da_empty(target->link.frameworks));
+    }
+    case SPN_CC_OUTPUT_OBJECT: {
+      return spn_result(SPN_OK);
+    }
+  }
+
+  sp_unreachable_return(spn_result(SPN_ERROR));
 }
 
 static void collect_unit_targets(sp_da(spn_target_unit_t*)* targets, sp_da(spn_pkg_unit_t*) units) {

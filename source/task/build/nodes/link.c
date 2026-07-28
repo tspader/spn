@@ -55,7 +55,7 @@ static spn_cc_link_t spn_build_link_desc(sp_mem_t mem, spn_target_unit_t* target
   return link;
 }
 
-spn_err_union_t spn_build_render_target(sp_mem_t mem, spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, spn_invocation_t* invocation) {
+spn_err_union_t render_linker_invocation(sp_mem_t mem, spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, spn_invocation_t* invocation) {
   spn_profile_info_t* profile = &target->pkg->build->profile;
   spn_cc_toolchain_t* toolchain = &target->pkg->build->toolchain->cc;
 
@@ -87,32 +87,6 @@ spn_err_union_t spn_build_render_target(sp_mem_t mem, spn_target_unit_t* target,
   return spn_result(SPN_OK);
 }
 
-spn_err_union_t spn_build_validate_target(spn_target_unit_t* target) {
-  spn_profile_info_t* profile = &target->pkg->build->profile;
-  spn_cc_toolchain_t* toolchain = &target->pkg->build->toolchain->cc;
-
-  if (!sp_da_empty(target->objects)) {
-    try_union(spn_cc_validate_compile(toolchain, profile));
-  }
-
-  switch (target->kind) {
-    case SPN_CC_OUTPUT_STATIC_LIB: {
-      return spn_cc_validate_archive(toolchain, profile);
-    }
-    case SPN_CC_OUTPUT_SHARED_LIB:
-    case SPN_CC_OUTPUT_REACTOR: {
-      try_union(spn_cc_validate_archive(toolchain, profile));
-      return spn_cc_validate_link(toolchain, profile, target->kind, !sp_da_empty(target->link.frameworks));
-    }
-    case SPN_CC_OUTPUT_EXE: {
-      return spn_cc_validate_link(toolchain, profile, target->kind, !sp_da_empty(target->link.frameworks));
-    }
-    case SPN_CC_OUTPUT_OBJECT: {
-      return spn_result(SPN_OK);
-    }
-  }
-  sp_unreachable_return(spn_result(SPN_ERROR));
-}
 
 spn_err_t emit_link_passed(spn_target_unit_t* unit, sp_str_t output, sp_str_t out, u64 elapsed) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
@@ -277,7 +251,7 @@ static s32 spn_link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_
     }
   }
 
-  spn_err_union_t render = spn_build_render_target(spn.mem, target, output, objects, &target->invocation);
+  spn_err_union_t render = render_linker_invocation(spn.mem, target, output, objects, &target->invocation);
   if (render.kind) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_ERR,

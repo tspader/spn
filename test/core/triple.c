@@ -155,48 +155,6 @@ UTEST(triple, exe_file_name) {
 }
 
 
-typedef struct {
-  spn_os_version_t a;
-  spn_os_version_t b;
-  struct {
-    bool less;
-  } expect;
-} os_version_less_t;
-
-UTEST(triple, os_version_less) {
-  os_version_less_t tests [] = {
-    { .a = { 12, 4 }, .b = { 13 },    .expect = { .less = true } },
-    { .a = { 13 },    .b = { 13, 1 }, .expect = { .less = true } },
-    { .a = { 13, 1 }, .b = { 13, 1 } },
-    { .a = { 13, 1 }, .b = { 12, 4 } },
-    { .b = { 1 },     .expect = { .less = true } },
-  };
-
-  sp_carr_for(tests, it) {
-    EXPECT_EQ(spn_os_version_less(tests[it].a, tests[it].b), tests[it].expect.less);
-  }
-}
-
-typedef struct {
-  spn_os_version_t version;
-  struct {
-    bool present;
-  } expect;
-} os_version_present_t;
-
-UTEST(triple, os_version_present) {
-  os_version_present_t tests [] = {
-    { .version = { 13 },   .expect = { .present = true } },
-    { .version = { 0, 4 }, .expect = { .present = true } },
-    { .version = { 0 } },
-  };
-
-  sp_carr_for(tests, it) {
-    EXPECT_EQ(spn_os_version_present(tests[it].version), tests[it].expect.present);
-  }
-}
-
-
 UTEST(triple, host) {
   spn_triple_t host = spn_triple_host();
 

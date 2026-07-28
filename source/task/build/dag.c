@@ -97,7 +97,7 @@ static spn_err_t dag_link_identity(spn_dag_build_t* b, spn_target_unit_t* target
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_invocation_t invocation = sp_zero;
   sp_da(sp_str_t) objects = sp_da_new(s.mem, sp_str_t);
-  spn_err_union_t err = spn_build_render_target(s.mem, target, sp_str_lit(""), objects, &invocation);
+  spn_err_union_t err = render_linker_invocation(s.mem, target, sp_str_lit(""), objects, &invocation);
   if (!err.kind) {
     *identity = dag_invocation_identity(sp_str_lit("spn.build.link.v2"), &b->roots, target->pkg->build->toolchain, &invocation);
   }
