@@ -55,18 +55,6 @@
     sp_ht_insert((sm)->index, (sm)->index->tmp_key, (sm)->temp);              \
   } while (0)
 
-#define sp_om_put(sm, key, val)                                           \
-  ( sp_ht_getp((sm)->index, (key)) != SP_NULLPTR                               \
-      ? ((sm)->temp = *sp_ht_get_tmp_n((sm)->index))                           \
-      : ( (sm)->temp = sp_om_alloc_entry(sm),                                  \
-          *(sm)->temp = (val),                                                 \
-          *sp_da_vp((sm)->order) = sp_da_grow((sm)->order, 1),                 \
-          (sm)->order[sp_da_head((sm)->order)->size++] = (sm)->temp,           \
-          (sm)->index->tmp_val = (sm)->temp,                                   \
-          sp_ht_insert_impl((sm)->index, &(sm)->index->tmp_key,                \
-            &(sm)->index->tmp_val, (sm)->index->info),                         \
-          (sm)->temp ) )
-
 #define sp_om_free(sm)                                                         \
   do {                                                                         \
     if ((sm)) {                                                                \

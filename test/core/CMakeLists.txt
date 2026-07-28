@@ -232,6 +232,58 @@ add_dependencies(manifest_lower spn_codegen_gen)
 target_link_libraries(manifest_lower PRIVATE yyjson)
 add_test(NAME manifest_lower COMMAND "$<TARGET_FILE:manifest_lower>")
 
+add_executable(unit
+  unit.c
+  ${SRC}/unit/build.c
+  ${SRC}/unit/fingerprint.c
+  ${SRC}/unit/graph.c
+  ${SRC}/unit/paths.c
+  ${SRC}/session/session.c
+  ${SRC}/codegen/codegen.c
+  ${SRC}/codegen/loader.c
+  ${SRC}/codegen/json.c
+  ${SRC}/codegen/options.c
+  ${SRC}/codegen/when.c
+  ${SRC}/codegen/gen/config.gen.c
+  ${SRC}/codegen/gen/manifest.gen.c
+  ${SRC}/codegen/gen/toolchains.gen.c
+  ${SRC}/compiler/driver.c
+  ${SRC}/compiler/gnu.c
+  ${SRC}/compiler/msvc.c
+  ${SRC}/enum/enum.c
+  ${SRC}/error/str.c
+  ${SRC}/external/tom.c
+  ${SRC}/intern/intern.c
+  ${SRC}/log/lazy/lazy.c
+  ${SRC}/pkg/id.c
+  ${SRC}/pkg/options.c
+  ${SRC}/pkg/pkg.c
+  ${SRC}/pkg/mutate.c
+  ${SRC}/profile/profile.c
+  ${SRC}/semver/compare.c
+  ${SRC}/semver/convert.c
+  ${SRC}/semver/parser.c
+  ${SRC}/sp/fs.c
+  ${SRC}/sp/io.c
+  ${SRC}/sp/str.c
+  ${SRC}/target/mutate.c
+  ${SRC}/toolchain/catalog.c
+  ${SRC}/toolchain/select.c
+  ${SRC}/toolchain/toolchain.c
+  ${SRC}/triple/triple.c
+  ${SRC}/when/when.c
+  ${SRC}/ctx/ctx.c
+  ${SRC}/event/event.c
+  ${TEST_TOOLS}/toml.c
+  ${EMBED_OBJ}
+)
+set_source_files_properties(${EMBED_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
+spn_test_binary(unit)
+target_include_directories(unit PRIVATE ${SRC}/codegen/gen)
+add_dependencies(unit spn_embed spn_codegen_gen)
+target_link_libraries(unit PRIVATE yyjson)
+add_test(NAME unit COMMAND "$<TARGET_FILE:unit>")
+
 add_executable(closure
   closure.c
   ${SRC}/unit/link.c
