@@ -720,7 +720,7 @@ s32 utest_main(s32 argc, const c8** argv) {
     sp_str_t jobs_flag = sp_str_lit("--jobs=");
 
     if (sp_str_equal_cstr(arg, "--help")) {
-      sp_os_print(sp_str_lit(
+      sp_io_write_str(utest_io(), sp_str_lit(
         "utest.h - the single file unit testing solution for C/C++!\n"
         "Command line Options:\n"
         "  --help              Show this message and exit.\n"
@@ -729,7 +729,7 @@ s32 utest_main(s32 argc, const c8** argv) {
         "  --list-tests        List testnames, one per line. Output "
         "names can be passed to --filter.\n"
         "  --jobs=<n>          Run tests on n threads; 0 uses one "
-        "per processor.\n"));
+        "per processor.\n"), SP_NULLPTR);
       return 0;
     } else if (sp_str_starts_with(arg, filter_flag)) {
       filter = argv[index] + filter_flag.len;

@@ -15,7 +15,11 @@ struct sp_sim_fd {
   sp_sim_inode_t* node;
   sp_str_t path;
   u64 offset;
-  s32 flags;
+  u32 flags;
+  struct {
+    u8* data;
+    u64 len;
+  } dir;
   bool open;
 };
 
@@ -223,58 +227,82 @@ static void sp_sim_sys_init(void) {
   sp_sim_unexpected("init");
 }
 
-static s64 sp_sim_sys_read(sp_sys_fd_t fd, void* buf, u64 count) {
+static sp_err_t sp_sim_sys_read(sp_sys_fd_t fd, void* buf, u64 count, u64* bytes_read) {
+  if (bytes_read) *bytes_read = 0;
   sp_sim_syscall();
   if (sp_sim_fail()) {
-    return -1;
+    return SP_ERR_OS;
   }
   sp_sim_fd_t* entry = sp_sim_fd(fd);
   s64 n = sp_sim_read_at(entry->node, buf, count, entry->offset);
-  if (n > 0) {
-    entry->offset += (u64)n;
+  if (n < 0) {
+    return SP_ERR_OS;
   }
-  return n;
+  entry->offset += (u64)n;
+  if (bytes_read) *bytes_read = (u64)n;
+  return SP_OK;
 }
 
-static s64 sp_sim_sys_write(sp_sys_fd_t fd, const void* buf, u64 count) {
+static sp_err_t sp_sim_sys_write(sp_sys_fd_t fd, const void* buf, u64 count, u64* bytes_written) {
   if (fd == sp_sys_stdout || fd == sp_sys_stderr) {
-    return sp_sys_vtable_platform.write(fd, buf, count);
+    return sp_sys_vtable_platform.write(fd, buf, count, bytes_written);
   }
+  if (bytes_written) *bytes_written = 0;
   sp_sim_syscall();
   if (sp_sim_fail()) {
-    return -1;
+    return SP_ERR_OS;
   }
   sp_sim_fd_t* entry = sp_sim_fd(fd);
-  if (entry->flags & SP_O_APPEND) {
+  if (entry->flags & SP_SYS_OPEN_APPEND) {
     entry->offset = sp_da_size(entry->node->bytes);
   }
   s64 n = sp_sim_write_at(entry->node, buf, count, entry->offset);
+  if (n < 0) {
+    return SP_ERR_OS;
+  }
   if (n > 0) {
     entry->offset += (u64)n;
     sp_sim_log(entry->path);
   }
-  return n;
+  if (bytes_written) *bytes_written = (u64)n;
+  return SP_OK;
 }
 
-static s64 sp_sim_sys_pread(sp_sys_fd_t fd, void* buf, u64 count, u64 offset) {
+static sp_err_t sp_sim_sys_pread(sp_sys_fd_t fd, void* buf, u64 count, u64 offset, u64* bytes_read) {
+  if (bytes_read) *bytes_read = 0;
   sp_sim_syscall();
   if (sp_sim_fail()) {
-    return -1;
+    return SP_ERR_OS;
   }
-  return sp_sim_read_at(sp_sim_fd(fd)->node, buf, count, offset);
+  s64 n = sp_sim_read_at(sp_sim_fd(fd)->node, buf, count, offset);
+  if (n < 0) {
+    return SP_ERR_OS;
+  }
+  if (bytes_read) *bytes_read = (u64)n;
+  return SP_OK;
 }
 
-static s64 sp_sim_sys_pwrite(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset) {
+static sp_err_t sp_sim_sys_pwrite(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset, u64* bytes_written) {
+  if (bytes_written) *bytes_written = 0;
   sp_sim_syscall();
   if (sp_sim_fail()) {
-    return -1;
+    return SP_ERR_OS;
   }
   sp_sim_fd_t* entry = sp_sim_fd(fd);
   s64 n = sp_sim_write_at(entry->node, buf, count, offset);
+  if (n < 0) {
+    return SP_ERR_OS;
+  }
   if (n > 0) {
     sp_sim_log(entry->path);
   }
-  return n;
+  if (bytes_written) *bytes_written = (u64)n;
+  return SP_OK;
+}
+
+static sp_err_t sp_sim_sys_transfer(sp_sys_fd_t in, u64* in_pos, sp_sys_fd_t out, u64* out_pos, u64 count, u64* bytes_moved) {
+  sp_sim_unexpected("transfer");
+  return SP_ERR_OS;
 }
 
 static sp_sys_fd_t sp_sim_sys_get_root(s32 it) {
@@ -304,38 +332,58 @@ static s64 sp_sim_sys_get_config_path(c8* buf, u64 size) {
   return -1;
 }
 
-static sp_sys_fd_t sp_sim_sys_open(sp_sys_fd_t fd, const c8* path, u32 len, s32 flags, s32 mode) {
+#define SP_SIM_DIRENT_HEADER (sizeof(u32) + sizeof(u8))
+
+static u64 sp_sim_dirent_write(u8* data, sp_str_t name, sp_fs_kind_t kind) {
+  u32 name_len = (u32)name.len;
+  sp_sys_memcpy(data, &name_len, sizeof(name_len));
+  data[sizeof(name_len)] = (u8)kind;
+  sp_sys_memcpy(data + SP_SIM_DIRENT_HEADER, name.data, name.len);
+  return SP_SIM_DIRENT_HEADER + name.len;
+}
+
+static u64 sp_sim_dirent_read(const u8* data, sp_sys_dir_entry_t* out) {
+  u32 name_len = 0;
+  sp_sys_memcpy(&name_len, data, sizeof(name_len));
+  out->kind = (sp_fs_kind_t)data[sizeof(name_len)];
+  out->name = (const c8*)(data + SP_SIM_DIRENT_HEADER);
+  out->len = name_len;
+  return SP_SIM_DIRENT_HEADER + name_len;
+}
+
+static sp_err_t sp_sim_sys_open(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_open_mode_t mode, u32 flags, sp_sys_fd_t* out) {
+  *out = SP_SYS_INVALID_FD;
   sp_sim_t* sim = sp_sim_syscall_at(fd);
   if (sp_sim_fail()) {
-    return SP_SYS_INVALID_FD;
+    return SP_ERR_OS;
   }
 
   c8 buf [SP_PATH_MAX];
   sp_str_t norm = sp_sim_norm(path, len, buf);
   sp_sim_inode_t* node = sp_sim_find(norm);
 
-  if (node && (flags & SP_O_CREAT) && (flags & SP_O_EXCL)) {
-    return SP_SYS_INVALID_FD;
+  if (node && (flags & SP_SYS_OPEN_CREATE) && (flags & SP_SYS_OPEN_EXCLUSIVE)) {
+    return SP_ERR_OS;
   }
 
   if (!node) {
-    if (!(flags & SP_O_CREAT)) {
-      return SP_SYS_INVALID_FD;
+    if (!(flags & SP_SYS_OPEN_CREATE)) {
+      return SP_ERR_OS;
     }
     sp_sim_inode_t* parent = sp_sim_find(sp_sim_parent(norm));
     if (!parent || parent->kind != SP_FS_KIND_DIR) {
-      return SP_SYS_INVALID_FD;
+      return SP_ERR_OS;
     }
     node = sp_sim_inode(SP_FS_KIND_FILE);
     sp_sim_insert(norm, node);
     sp_sim_log(norm);
   }
 
-  if (node->kind == SP_FS_KIND_DIR && (flags & (SP_O_WRONLY | SP_O_RDWR))) {
-    return SP_SYS_INVALID_FD;
+  if (node->kind == SP_FS_KIND_DIR && mode != SP_SYS_OPEN_MODE_RO) {
+    return SP_ERR_OS;
   }
 
-  if ((flags & SP_O_TRUNC) && node->kind == SP_FS_KIND_FILE && sp_da_size(node->bytes)) {
+  if ((flags & SP_SYS_OPEN_TRUNCATE) && node->kind == SP_FS_KIND_FILE && sp_da_size(node->bytes)) {
     sp_da_clear(node->bytes);
     sp_sim_stamp(node);
     sp_sim_log(norm);
@@ -348,88 +396,129 @@ static sp_sys_fd_t sp_sim_sys_open(sp_sys_fd_t fd, const c8* path, u32 len, s32 
     .flags = flags,
     .open = true,
   }));
-  return SP_SIM_FD_BASE + (sp_sys_fd_t)(sp_da_size(sim->fds) - 1);
+  *out = SP_SIM_FD_BASE + (sp_sys_fd_t)(sp_da_size(sim->fds) - 1);
+  return SP_OK;
 }
 
-static s32 sp_sim_sys_close(sp_sys_fd_t fd) {
+static sp_err_t sp_sim_sys_open_dir(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_fd_t* out) {
+  *out = SP_SYS_INVALID_FD;
+  sp_sim_t* sim = sp_sim_syscall_at(fd);
+  if (sp_sim_fail()) {
+    return SP_ERR_OS;
+  }
+
+  c8 norm_buf [SP_PATH_MAX];
+  sp_str_t norm = sp_sim_norm(path, len, norm_buf);
+  sp_sim_inode_t* node = sp_sim_find(norm);
+  if (!node || node->kind != SP_FS_KIND_DIR) {
+    return SP_ERR_OS;
+  }
+
+  // The listing is serialized at open, like the kernel snapshotting a readdir
+  u64 need = 0;
+  sp_ht_for_kv(sim->nodes, kv) {
+    sp_str_t name = sp_sim_child_name(*kv.key, norm);
+    if (sp_str_empty(name)) continue;
+    need += SP_SIM_DIRENT_HEADER + name.len;
+  }
+
+  u8* data = need ? sp_alloc_n(sim->mem, u8, need) : SP_NULLPTR;
+  u64 written = 0;
+  sp_ht_for_kv(sim->nodes, kv) {
+    sp_str_t name = sp_sim_child_name(*kv.key, norm);
+    if (sp_str_empty(name)) continue;
+    written += sp_sim_dirent_write(data + written, name, (*kv.val)->kind);
+  }
+
+  sp_da_push(sim->fds, ((sp_sim_fd_t) {
+    .node = node,
+    .path = sp_str_copy(sim->mem, norm),
+    .dir = { .data = data, .len = written },
+    .open = true,
+  }));
+  *out = SP_SIM_FD_BASE + (sp_sys_fd_t)(sp_da_size(sim->fds) - 1);
+  return SP_OK;
+}
+
+static sp_err_t sp_sim_sys_close(sp_sys_fd_t fd) {
   sp_sim_syscall();
   sp_sim_fd(fd)->open = false;
-  return 0;
+  return SP_OK;
 }
 
-static s32 sp_sim_sys_pipe(sp_sys_fd_t* read_end, sp_sys_fd_t* write_end) {
+static sp_err_t sp_sim_sys_pipe(sp_sys_fd_t* read_end, sp_sys_fd_t* write_end) {
   sp_sim_unexpected("pipe");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_mkdir(sp_sys_fd_t fd, const c8* path, u32 len, s32 mode) {
+static sp_err_t sp_sim_sys_mkdir(sp_sys_fd_t fd, const c8* path, u32 len, s32 mode) {
   sp_sim_syscall_at(fd);
   if (sp_sim_fail()) {
-    return -1;
+    return SP_ERR_OS;
   }
 
   c8 buf [SP_PATH_MAX];
   sp_str_t norm = sp_sim_norm(path, len, buf);
   if (sp_sim_find(norm)) {
-    return -1;
+    return SP_ERR_OS;
   }
 
   sp_sim_inode_t* parent = sp_sim_find(sp_sim_parent(norm));
   if (!parent || parent->kind != SP_FS_KIND_DIR) {
-    return -1;
+    return SP_ERR_OS;
   }
 
   sp_sim_insert(norm, sp_sim_inode(SP_FS_KIND_DIR));
-  return 0;
+  return SP_OK;
 }
 
-static s32 sp_sim_sys_rmdir(sp_sys_fd_t fd, const c8* path, u32 len) {
+static sp_err_t sp_sim_sys_rmdir(sp_sys_fd_t fd, const c8* path, u32 len) {
   sp_sim_t* sim = sp_sim_syscall_at(fd);
   if (sp_sim_fail()) {
-    return -1;
+    return SP_ERR_OS;
   }
 
   c8 buf [SP_PATH_MAX];
   sp_str_t norm = sp_sim_norm(path, len, buf);
   sp_sim_inode_t* node = sp_sim_find(norm);
   if (!node || node->kind != SP_FS_KIND_DIR || norm.len == 1) {
-    return -1;
+    return SP_ERR_OS;
   }
 
   sp_ht_for_kv(sim->nodes, it) {
     if (sp_sim_is_within(*it.key, norm)) {
-      return -1;
+      return SP_ERR_OS;
     }
   }
 
   sp_ht_erase(sim->nodes, norm);
   node->nlink--;
-  return 0;
+  return SP_OK;
 }
 
-static s32 sp_sim_sys_unlink(sp_sys_fd_t fd, const c8* path, u32 len) {
+static sp_err_t sp_sim_sys_unlink(sp_sys_fd_t fd, const c8* path, u32 len) {
   sp_sim_t* sim = sp_sim_syscall_at(fd);
   if (sp_sim_fail()) {
-    return -1;
+    return SP_ERR_OS;
   }
 
   c8 buf [SP_PATH_MAX];
   sp_str_t norm = sp_sim_norm(path, len, buf);
   sp_sim_inode_t* node = sp_sim_find(norm);
   if (!node || node->kind == SP_FS_KIND_DIR) {
-    return -1;
+    return SP_ERR_OS;
   }
 
   sp_ht_erase(sim->nodes, norm);
   node->nlink--;
-  return 0;
+  return SP_OK;
 }
 
-static s32 sp_sim_sys_rename(sp_sys_fd_t from_fd, const c8* from, u32 from_len, sp_sys_fd_t to_fd, const c8* to, u32 to_len) {
+static sp_err_t sp_sim_sys_rename(sp_sys_fd_t from_fd, const c8* from, u32 from_len, sp_sys_fd_t to_fd, const c8* to, u32 to_len) {
   SP_ASSERT(to_fd == SP_SIM_ROOT);
   sp_sim_t* sim = sp_sim_syscall_at(from_fd);
   if (sp_sim_fail()) {
-    return -1;
+    return SP_ERR_OS;
   }
 
   c8 from_buf [SP_PATH_MAX];
@@ -439,19 +528,19 @@ static s32 sp_sim_sys_rename(sp_sys_fd_t from_fd, const c8* from, u32 from_len, 
 
   sp_sim_inode_t* src = sp_sim_find(from_norm);
   if (!src) {
-    return -1;
+    return SP_ERR_OS;
   }
   if (sp_str_equal(from_norm, to_norm)) {
-    return 0;
+    return SP_OK;
   }
 
   if (src->kind == SP_FS_KIND_DIR) {
     if (sp_sim_find(to_norm) || sp_sim_is_within(to_norm, from_norm)) {
-      return -1;
+      return SP_ERR_OS;
     }
     sp_sim_inode_t* parent = sp_sim_find(sp_sim_parent(to_norm));
     if (!parent || parent->kind != SP_FS_KIND_DIR) {
-      return -1;
+      return SP_ERR_OS;
     }
 
     sp_da(sp_str_t) moved = sp_da_new(sim->mem, sp_str_t);
@@ -468,16 +557,16 @@ static s32 sp_sim_sys_rename(sp_sys_fd_t from_fd, const c8* from, u32 from_len, 
       sp_ht_erase(sim->nodes, old_key);
       sp_sim_insert(new_key, node);
     }
-    return 0;
+    return SP_OK;
   }
 
   sp_sim_inode_t* dst = sp_sim_find(to_norm);
   if (dst == src) {
-    return 0;
+    return SP_OK;
   }
   if (dst) {
     if (dst->kind == SP_FS_KIND_DIR) {
-      return -1;
+      return SP_ERR_OS;
     }
     sp_ht_erase(sim->nodes, to_norm);
     dst->nlink--;
@@ -485,21 +574,21 @@ static s32 sp_sim_sys_rename(sp_sys_fd_t from_fd, const c8* from, u32 from_len, 
   else {
     sp_sim_inode_t* parent = sp_sim_find(sp_sim_parent(to_norm));
     if (!parent || parent->kind != SP_FS_KIND_DIR) {
-      return -1;
+      return SP_ERR_OS;
     }
   }
 
   sp_ht_erase(sim->nodes, from_norm);
   sp_sim_insert(to_norm, src);
   sp_sim_log(to_norm);
-  return 0;
+  return SP_OK;
 }
 
-static s32 sp_sim_sys_link(sp_sys_fd_t from_fd, const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len) {
+static sp_err_t sp_sim_sys_link(sp_sys_fd_t from_fd, const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len) {
   SP_ASSERT(to_fd == SP_SIM_ROOT);
   sp_sim_syscall_at(from_fd);
   if (sp_sim_fail()) {
-    return -1;
+    return SP_ERR_OS;
   }
 
   c8 existing_buf [SP_PATH_MAX];
@@ -509,68 +598,68 @@ static s32 sp_sim_sys_link(sp_sys_fd_t from_fd, const c8* existing, u32 existing
 
   sp_sim_inode_t* src = sp_sim_find(existing_norm);
   if (!src || src->kind != SP_FS_KIND_FILE) {
-    return -1;
+    return SP_ERR_OS;
   }
   if (sp_sim_find(alias_norm)) {
-    return -1;
+    return SP_ERR_OS;
   }
 
   sp_sim_inode_t* parent = sp_sim_find(sp_sim_parent(alias_norm));
   if (!parent || parent->kind != SP_FS_KIND_DIR) {
-    return -1;
+    return SP_ERR_OS;
   }
 
   sp_sim_insert(alias_norm, src);
   src->nlink++;
   sp_sim_log(alias_norm);
-  return 0;
+  return SP_OK;
 }
 
-static s32 sp_sim_sys_symlink(const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len) {
+static sp_err_t sp_sim_sys_symlink(const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len) {
   sp_sim_unexpected("symlink");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_get_path_metadata(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st) {
+static sp_err_t sp_sim_sys_get_path_metadata(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st) {
   sp_sim_syscall_at(fd);
   if (sp_sim_fail()) {
-    return -1;
+    return SP_ERR_OS;
   }
 
   c8 buf [SP_PATH_MAX];
   sp_sim_inode_t* node = sp_sim_find(sp_sim_norm(path, len, buf));
   if (!node) {
-    return -1;
+    return SP_ERR_OS;
   }
   sp_sim_meta(node, st);
-  return 0;
+  return SP_OK;
 }
 
-static s32 sp_sim_sys_get_file_metadata(sp_sys_fd_t fd, sp_sys_file_meta_t* st) {
+static sp_err_t sp_sim_sys_get_file_metadata(sp_sys_fd_t fd, sp_sys_file_meta_t* st) {
   sp_sim_syscall();
   if (sp_sim_fail()) {
-    return -1;
+    return SP_ERR_OS;
   }
   sp_sim_meta(sp_sim_fd(fd)->node, st);
-  return 0;
+  return SP_OK;
 }
 
-static s32 sp_sim_sys_chmod(sp_sys_fd_t fd, const c8* path, u32 len, const sp_sys_file_meta_t* st) {
+static sp_err_t sp_sim_sys_chmod(sp_sys_fd_t fd, const c8* path, u32 len, const sp_sys_file_meta_t* st) {
   sp_sim_syscall_at(fd);
 
   c8 buf [SP_PATH_MAX];
-  return sp_sim_find(sp_sim_norm(path, len, buf)) ? 0 : -1;
+  return sp_sim_find(sp_sim_norm(path, len, buf)) ? SP_OK : SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_clock_gettime(s32 clockid, sp_sys_timespec_t* ts) {
+static sp_err_t sp_sim_sys_clock_gettime(s32 clockid, sp_sys_timespec_t* ts) {
   sp_sim_syscall();
   *ts = sp_sim_active->clock;
-  return 0;
+  return SP_OK;
 }
 
-static s32 sp_sim_sys_nanosleep(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem) {
+static sp_err_t sp_sim_sys_nanosleep(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem) {
   sp_sim_unexpected("nanosleep");
-  return -1;
+  return SP_ERR_OS;
 }
 
 static s64 sp_sim_sys_canonicalize_path(const c8* path, u32 len, c8* buf, u64 size) {
@@ -585,84 +674,114 @@ static s64 sp_sim_sys_canonicalize_path(const c8* path, u32 len, c8* buf, u64 si
   return (s64)norm.len;
 }
 
-static s32 sp_sim_sys_fd_ready(sp_sys_fd_t fd, u8* ready) {
+static sp_err_t sp_sim_sys_fd_ready(sp_sys_fd_t fd, u8* ready) {
   sp_sim_unexpected("fd_ready");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_fd_wait(sp_sys_fd_t fd) {
+static sp_err_t sp_sim_sys_fd_wait(sp_sys_fd_t fd) {
   sp_sim_unexpected("fd_wait");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_fds_wait(const sp_sys_fd_t* fds, u8* ready, u64 nfds) {
+static sp_err_t sp_sim_sys_fds_wait(const sp_sys_fd_t* fds, u8* ready, u64 nfds) {
   sp_sim_unexpected("fds_wait");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_socket_open(sp_sys_socket_t* out) {
+static sp_err_t sp_sim_sys_tty_get(sp_sys_fd_t fd, sp_sys_tty_attr_t* attr) {
+  sp_sim_unexpected("tty_get");
+  return SP_ERR_OS;
+}
+
+static sp_err_t sp_sim_sys_tty_set(sp_sys_fd_t fd, const sp_sys_tty_attr_t* attr) {
+  sp_sim_unexpected("tty_set");
+  return SP_ERR_OS;
+}
+
+static sp_err_t sp_sim_sys_tty_size(sp_sys_fd_t fd, u32* cols, u32* rows) {
+  sp_sim_unexpected("tty_size");
+  return SP_ERR_OS;
+}
+
+// Log color probes are benign; the sim is never a terminal
+static bool sp_sim_sys_is_tty(sp_sys_fd_t fd) {
+  return false;
+}
+
+static sp_err_t sp_sim_sys_tty_mode_apply(sp_sys_tty_attr_t* in, sp_sys_tty_attr_t* out, sp_sys_tty_mode_t mode) {
+  sp_sim_unexpected("tty_mode_apply");
+  return SP_ERR_OS;
+}
+
+static sp_err_t sp_sim_sys_tty_use_vt(sp_sys_fd_t fd) {
+  sp_sim_unexpected("tty_use_vt");
+  return SP_ERR_OS;
+}
+
+static sp_err_t sp_sim_sys_socket_open(sp_sys_socket_t* out) {
   sp_sim_unexpected("socket_open");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_socket_bind(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
+static sp_err_t sp_sim_sys_socket_bind(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
   sp_sim_unexpected("socket_bind");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_socket_listen(sp_sys_socket_t socket, u32 backlog) {
+static sp_err_t sp_sim_sys_socket_listen(sp_sys_socket_t socket, u32 backlog) {
   sp_sim_unexpected("socket_listen");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_socket_connect(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
+static sp_err_t sp_sim_sys_socket_connect(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
   sp_sim_unexpected("socket_connect");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_socket_error(sp_sys_socket_t socket) {
+static sp_err_t sp_sim_sys_socket_error(sp_sys_socket_t socket) {
   sp_sim_unexpected("socket_error");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_socket_accept(sp_sys_socket_t listener, sp_sys_socket_t* out) {
+static sp_err_t sp_sim_sys_socket_accept(sp_sys_socket_t listener, sp_sys_socket_t* out) {
   sp_sim_unexpected("socket_accept");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_socket_close(sp_sys_socket_t socket) {
+static sp_err_t sp_sim_sys_socket_close(sp_sys_socket_t socket) {
   sp_sim_unexpected("socket_close");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s64 sp_sim_sys_socket_recv(sp_sys_socket_t socket, void* buf, u64 count) {
+static sp_err_t sp_sim_sys_socket_recv(sp_sys_socket_t socket, void* buf, u64 count, u64* bytes_read) {
   sp_sim_unexpected("socket_recv");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s64 sp_sim_sys_socket_send(sp_sys_socket_t socket, const void* buf, u64 count) {
+static sp_err_t sp_sim_sys_socket_send(sp_sys_socket_t socket, const void* buf, u64 count, u64* bytes_written) {
   sp_sim_unexpected("socket_send");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_socket_wait(sp_sys_socket_t socket, bool readable, u32 timeout_ms) {
+static sp_err_t sp_sim_sys_socket_wait(sp_sys_socket_t socket, bool readable, u32 timeout_ms) {
   sp_sim_unexpected("socket_wait");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_socket_set_nonblocking(sp_sys_socket_t socket) {
+static sp_err_t sp_sim_sys_socket_set_nonblocking(sp_sys_socket_t socket) {
   sp_sim_unexpected("socket_set_nonblocking");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_socket_reuse_addr(sp_sys_socket_t socket) {
+static sp_err_t sp_sim_sys_socket_reuse_addr(sp_sys_socket_t socket) {
   sp_sim_unexpected("socket_reuse_addr");
-  return -1;
+  return SP_ERR_OS;
 }
 
-static s32 sp_sim_sys_socket_local_port(sp_sys_socket_t socket, u16* out) {
+static sp_err_t sp_sim_sys_socket_local_port(sp_sys_socket_t socket, u16* out) {
   sp_sim_unexpected("socket_local_port");
-  return -1;
+  return SP_ERR_OS;
 }
 
 static s64 sp_sim_sys_lseek(sp_sys_fd_t fd, s64 offset, s32 whence) {
@@ -685,75 +804,51 @@ static s64 sp_sim_sys_lseek(sp_sys_fd_t fd, s64 offset, s32 whence) {
   return next;
 }
 
-static s32 sp_sim_sys_chdir(const c8* path, u32 len) {
+static sp_err_t sp_sim_sys_chdir(const c8* path, u32 len) {
   sp_sim_unexpected("chdir");
-  return -1;
+  return SP_ERR_OS;
 }
 
-#define SP_SIM_DIRENT_HEADER (sizeof(u32) + sizeof(u8))
-
-static u64 sp_sim_dirent_write(u8* data, sp_str_t name, sp_fs_kind_t kind) {
-  u32 name_len = (u32)name.len;
-  sp_sys_memcpy(data, &name_len, sizeof(name_len));
-  data[sizeof(name_len)] = (u8)kind;
-  sp_sys_memcpy(data + SP_SIM_DIRENT_HEADER, name.data, name.len);
-  return SP_SIM_DIRENT_HEADER + name.len;
+static sp_err_t sp_sim_sys_dir_from_fd(sp_sys_fd_t fd, sp_sys_dir_t* out) {
+  sp_sim_syscall();
+  sp_sim_fd(fd);
+  *out = (sp_sys_dir_t) { .handle = (s64)fd };
+  return SP_OK;
 }
 
-static u64 sp_sim_dirent_read(const u8* data, sp_sys_fs_entry_t* out) {
-  u32 name_len = 0;
-  sp_sys_memcpy(&name_len, data, sizeof(name_len));
-  out->kind = (sp_fs_kind_t)data[sizeof(name_len)];
-  out->name = (const c8*)(data + SP_SIM_DIRENT_HEADER);
-  out->len = name_len;
-  return SP_SIM_DIRENT_HEADER + name_len;
-}
-
-static s32 sp_sim_sys_fs_it_open(sp_sys_fd_t fd, sp_sys_fs_it_t* it, const c8* path, u32 path_len, void* buf, u64 cap) {
-  sp_sim_t* sim = sp_sim_syscall_at(fd);
+static sp_err_t sp_sim_sys_dir_read(sp_sys_dir_t* dir, sp_mem_buffer_t* buf) {
+  sp_sim_syscall();
   if (sp_sim_fail()) {
-    return -1;
+    return SP_ERR_OS;
   }
 
-  c8 norm_buf [SP_PATH_MAX];
-  sp_str_t norm = sp_sim_norm(path, path_len, norm_buf);
-  sp_sim_inode_t* node = sp_sim_find(norm);
-  if (!node || node->kind != SP_FS_KIND_DIR) {
-    return -1;
-  }
+  sp_sim_fd_t* entry = sp_sim_fd((sp_sys_fd_t)dir->handle);
+  buf->len = 0;
 
-  u64 need = 0;
-  sp_ht_for_kv(sim->nodes, kv) {
-    sp_str_t name = sp_sim_child_name(*kv.key, norm);
-    if (sp_str_empty(name)) continue;
-    need += SP_SIM_DIRENT_HEADER + name.len;
+  // Copy whole records only; a parse never straddles a read boundary
+  while (dir->cookie < entry->dir.len) {
+    u32 name_len = 0;
+    sp_sys_memcpy(&name_len, entry->dir.data + dir->cookie, sizeof(name_len));
+    u64 record = SP_SIM_DIRENT_HEADER + name_len;
+    SP_ASSERT(record <= buf->capacity);
+    if (buf->len + record > buf->capacity) break;
+    sp_sys_memcpy((u8*)buf->data + buf->len, entry->dir.data + dir->cookie, record);
+    buf->len += record;
+    dir->cookie += record;
   }
-
-  u8* data = need ? sp_alloc_n(sim->mem, u8, need) : SP_NULLPTR;
-  u64 out = 0;
-  sp_ht_for_kv(sim->nodes, kv) {
-    sp_str_t name = sp_sim_child_name(*kv.key, norm);
-    if (sp_str_empty(name)) continue;
-    out += sp_sim_dirent_write(data + out, name, (*kv.val)->kind);
-  }
-
-  *it = (sp_sys_fs_it_t) {
-    .handle = (s64)(uintptr_t)data,
-    .buf = { .len = out },
-  };
-  return 0;
+  return SP_OK;
 }
 
-static s32 sp_sim_sys_fs_it_next(sp_sys_fs_it_t* it, sp_sys_fs_entry_t* out) {
-  if (it->cursor >= it->buf.len) {
-    return -1;
-  }
-  const u8* data = (const u8*)(uintptr_t)it->handle;
-  it->cursor += sp_sim_dirent_read(data + it->cursor, out);
-  return 0;
+static sp_err_t sp_sim_sys_dir_parse(sp_sys_dir_t* dir, sp_mem_buffer_t* buf, u64* cursor, sp_sys_dir_entry_t* out) {
+  const u8* data = (const u8*)buf->data;
+  *cursor += sp_sim_dirent_read(data + *cursor, out);
+  return SP_OK;
 }
 
-static void sp_sim_sys_fs_it_close(sp_sys_fs_it_t* it) {
+static sp_err_t sp_sim_sys_dir_close(sp_sys_dir_t* dir) {
+  sp_sim_syscall();
+  sp_sim_fd((sp_sys_fd_t)dir->handle)->open = false;
+  return SP_OK;
 }
 
 static const sp_sys_vtable_t sp_sim_vtable = {
@@ -762,12 +857,14 @@ static const sp_sys_vtable_t sp_sim_vtable = {
   .write                  = sp_sim_sys_write,
   .pread                  = sp_sim_sys_pread,
   .pwrite                 = sp_sim_sys_pwrite,
+  .transfer               = sp_sim_sys_transfer,
   .get_root               = sp_sim_sys_get_root,
   .get_exe_path           = sp_sim_sys_get_exe_path,
   .get_cwd_path           = sp_sim_sys_get_cwd_path,
   .get_storage_path       = sp_sim_sys_get_storage_path,
   .get_config_path        = sp_sim_sys_get_config_path,
   .open                   = sp_sim_sys_open,
+  .open_dir               = sp_sim_sys_open_dir,
   .close                  = sp_sim_sys_close,
   .pipe                   = sp_sim_sys_pipe,
   .mkdir                  = sp_sim_sys_mkdir,
@@ -786,6 +883,12 @@ static const sp_sys_vtable_t sp_sim_vtable = {
   .fd_ready               = sp_sim_sys_fd_ready,
   .fd_wait                = sp_sim_sys_fd_wait,
   .fds_wait               = sp_sim_sys_fds_wait,
+  .tty_get                = sp_sim_sys_tty_get,
+  .tty_set                = sp_sim_sys_tty_set,
+  .tty_size               = sp_sim_sys_tty_size,
+  .is_tty                 = sp_sim_sys_is_tty,
+  .tty_mode_apply         = sp_sim_sys_tty_mode_apply,
+  .tty_use_vt             = sp_sim_sys_tty_use_vt,
   .socket_open            = sp_sim_sys_socket_open,
   .socket_bind            = sp_sim_sys_socket_bind,
   .socket_listen          = sp_sim_sys_socket_listen,
@@ -810,9 +913,10 @@ static const sp_sys_vtable_t sp_sim_vtable = {
   .env                    = sp_sys_env_p,
   .lseek                  = sp_sim_sys_lseek,
   .chdir                  = sp_sim_sys_chdir,
-  .fs_it_open             = sp_sim_sys_fs_it_open,
-  .fs_it_next             = sp_sim_sys_fs_it_next,
-  .fs_it_close            = sp_sim_sys_fs_it_close,
+  .dir_from_fd            = sp_sim_sys_dir_from_fd,
+  .dir_read               = sp_sim_sys_dir_read,
+  .dir_parse              = sp_sim_sys_dir_parse,
+  .dir_close              = sp_sim_sys_dir_close,
 };
 
 void sp_sim_init(sp_sim_t* sim, sp_mem_t mem) {

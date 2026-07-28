@@ -70,8 +70,8 @@ static sp_err_t sp_fs_atomic_open_impl(sp_fs_atomic_t* af, sp_sys_fd_t dir, sp_s
   sp_fs_atomic_make_parents(dir, af->temp);
   sp_fs_atomic_make_parents(dir, af->path);
 
-  sp_sys_fd_t fd = sp_sys_open_s(dir, af->temp, SP_O_CREAT | SP_O_EXCL | SP_O_WRONLY | SP_O_BINARY, 0644);
-  if (fd == SP_SYS_INVALID_FD) {
+  sp_sys_fd_t fd = SP_SYS_INVALID_FD;
+  if (sp_sys_open_s(dir, af->temp, SP_SYS_OPEN_MODE_WO, SP_SYS_OPEN_CREATE | SP_SYS_OPEN_EXCLUSIVE, &fd)) {
     *af = sp_zero_s(sp_fs_atomic_t);
     return SP_ERR_OS;
   }

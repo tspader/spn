@@ -209,21 +209,21 @@ static sp_cli_result_t sp_fuzz_list_profiles(sp_cli_t* cli, sp_mem_t mem, sp_fuz
     return err;
   }
 
-  sp_io_stream_writer_t out = sp_io_get_std_out();
+  sp_io_writer_t* out = sp_io_get_std_out();
   if (sp_da_empty(cfg.profile)) {
-    sp_fmt_io(&out.base, "{.cyan} defines no profiles\n", sp_fmt_cstr(config->config));
+    sp_fmt_io(out, "{.cyan} defines no profiles\n", sp_fmt_cstr(config->config));
     return SP_CLI_OK;
   }
   sp_da_for(cfg.profile, it) {
     spn_cg_fuzz_profile_t* profile = &cfg.profile[it].value;
-    sp_fmt_io(&out.base, "{}", sp_fmt_str(cfg.profile[it].key));
+    sp_fmt_io(out, "{}", sp_fmt_str(cfg.profile[it].key));
     if (!sp_str_empty(profile->from)) {
-      sp_fmt_io(&out.base, " <- {}", sp_fmt_str(profile->from));
+      sp_fmt_io(out, " <- {}", sp_fmt_str(profile->from));
     }
     if (!sp_opt_is_null(profile->iterations)) {
-      sp_fmt_io(&out.base, " ({} iterations)", sp_fmt_uint(sp_opt_get(profile->iterations)));
+      sp_fmt_io(out, " ({} iterations)", sp_fmt_uint(sp_opt_get(profile->iterations)));
     }
-    sp_fmt_io(&out.base, "\n");
+    sp_fmt_io(out, "\n");
   }
   return SP_CLI_OK;
 }
@@ -250,7 +250,7 @@ static sp_str_t sp_fuzz_graph_line(sp_mem_t mem, const spn_cg_fuzz_graph_t* grap
 }
 
 static void sp_fuzz_prompt_start(sp_fuzz_prompt_t* prompt, sp_mem_t mem, const sp_fuzz_desc_t* desc, sp_str_t note) {
-  if (!sp_os_is_tty(sp_sys_stdout)) {
+  if (!sp_sys_is_tty(sp_sys_stdout)) {
     return;
   }
   prompt->ctx = sp_prompt_begin(mem);
@@ -355,10 +355,10 @@ static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
 
   sp_str_t graph_line = sp_fuzz_graph_line(mem, &profile.graph);
   if (config->dry_run) {
-    sp_io_stream_writer_t out = sp_io_get_std_out();
-    sp_fmt_io(&out.base, "{}\n", sp_fmt_str(sp_fuzz_params(mem, opts)));
+    sp_io_writer_t* out = sp_io_get_std_out();
+    sp_fmt_io(out, "{}\n", sp_fmt_str(sp_fuzz_params(mem, opts)));
     if (!sp_str_empty(graph_line)) {
-      sp_fmt_io(&out.base, "{}\n", sp_fmt_str(graph_line));
+      sp_fmt_io(out, "{}\n", sp_fmt_str(graph_line));
     }
     return SP_CLI_OK;
   }
@@ -367,7 +367,7 @@ static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
   sp_da_push(names, sp_str_view(desc->name));
   sp_fuzz_prng_t base = sp_fuzz_stream(names);
 
-  sp_io_stream_writer_t out = sp_io_get_std_out();
+  sp_io_writer_t* out = sp_io_get_std_out();
   u64* failures = sp_alloc_n(mem, u64, desc->errs);
   sp_mem_zero(failures, desc->errs * sizeof(u64));
   u64 failed = 0;
@@ -380,7 +380,7 @@ static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
   }
   sp_fuzz_prompt_start(&prompt, mem, desc, note);
   if (!prompt.on) {
-    sp_fmt_io(&out.base, "{}\n", sp_fmt_str(note));
+    sp_fmt_io(out, "{}\n", sp_fmt_str(note));
   }
 
   for (u64 iter = 0; iter < opts.iters; iter++) {
@@ -398,7 +398,7 @@ static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
       }
 
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      sp_fuzz_report(&prompt, &out.base, sp_fmt(s.mem, "fuzz: {} (repro: {})", sp_fmt_str(desc->err_str(err)), sp_fmt_str(sp_fuzz_repro_args(s.mem, iter))).value);
+      sp_fuzz_report(&prompt, out, sp_fmt(s.mem, "fuzz: {} (repro: {})", sp_fmt_str(desc->err_str(err)), sp_fmt_str(sp_fuzz_repro_args(s.mem, iter))).value);
       sp_mem_end_scratch(s);
 
       if (!keep_going) {
@@ -414,18 +414,18 @@ static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
     }
   }
 
-  bool was_tty = prompt.on || sp_os_is_tty(sp_sys_stdout);
+  bool was_tty = prompt.on || sp_sys_is_tty(sp_sys_stdout);
   sp_fuzz_prompt_stop(&prompt, !failed && !config->status);
 
   if (!was_tty && !failed && !config->status) {
-    sp_fmt_io(&out.base, "fuzz: {} iterations passed\n", sp_fmt_uint(done));
+    sp_fmt_io(out, "fuzz: {} iterations passed\n", sp_fmt_uint(done));
   }
 
   if (failed && keep_going) {
-    sp_fmt_io(&out.base, "fuzz: {} of {} iterations failed\n", sp_fmt_uint(failed), sp_fmt_uint(opts.iters));
+    sp_fmt_io(out, "fuzz: {} of {} iterations failed\n", sp_fmt_uint(failed), sp_fmt_uint(opts.iters));
     for (u32 it = 0; it < desc->errs; it++) {
       if (!failures[it]) continue;
-      sp_fmt_io(&out.base, "  {}: {}\n", sp_fmt_uint(failures[it]), sp_fmt_str(desc->err_str(it)));
+      sp_fmt_io(out, "  {}: {}\n", sp_fmt_uint(failures[it]), sp_fmt_str(desc->err_str(it)));
     }
     config->status = 1;
   }

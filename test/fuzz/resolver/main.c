@@ -445,7 +445,7 @@ static sp_cli_result_t fz_cli_run(sp_cli_t* cli) {
   sp_da_push(names, sp_str_lit("fuzz/resolver"));
   sp_fuzz_prng_t base = sp_fuzz_stream(names);
 
-  sp_io_stream_writer_t out = sp_io_get_std_out();
+  sp_io_writer_t* out = sp_io_get_std_out();
   u64 failures[FZ_ERR_COUNT] = sp_zero;
   u64 failed = 0;
 
@@ -457,7 +457,7 @@ static sp_cli_result_t fz_cli_run(sp_cli_t* cli) {
 
     failed++;
     failures[err]++;
-    sp_fmt_io(&out.base, "fuzz: {} (iter {})\n", sp_fmt_str(fz_err_to_str(err)), sp_fmt_uint(iter));
+    sp_fmt_io(out, "fuzz: {} (iter {})\n", sp_fmt_str(fz_err_to_str(err)), sp_fmt_uint(iter));
     if (!keep_going) {
       config->status = (s32)err;
       return SP_CLI_OK;
@@ -465,10 +465,10 @@ static sp_cli_result_t fz_cli_run(sp_cli_t* cli) {
   }
 
   if (failed) {
-    sp_fmt_io(&out.base, "fuzz: {} of {} iterations failed\n", sp_fmt_uint(failed), sp_fmt_uint(opts.iters));
+    sp_fmt_io(out, "fuzz: {} of {} iterations failed\n", sp_fmt_uint(failed), sp_fmt_uint(opts.iters));
     sp_carr_for(failures, it) {
       if (!failures[it]) continue;
-      sp_fmt_io(&out.base, "  {}: {}\n", sp_fmt_uint(failures[it]), sp_fmt_str(fz_err_to_str((fz_err_t)it)));
+      sp_fmt_io(out, "  {}: {}\n", sp_fmt_uint(failures[it]), sp_fmt_str(fz_err_to_str((fz_err_t)it)));
     }
     config->status = 1;
   }
