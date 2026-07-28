@@ -39,7 +39,6 @@ static void push_args(sp_mem_t mem, spn_invocation_t* invocation, sp_da(sp_str_t
   }
 }
 
-
 static sp_str_t render_define(sp_mem_t mem, sp_str_t value) {
   return sp_fmt(mem, "-D{}", sp_fmt_str(value)).value;
 }
@@ -65,7 +64,7 @@ static sp_str_t opt_switch(spn_opt_level_t level) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-static sp_str_t c_standard_switch(spn_c_standard_t standard) {
+static sp_str_t c_standard_to_flag(spn_c_standard_t standard) {
   switch (standard) {
     case SPN_C89: return sp_str_lit("-std=c89");
     case SPN_C99: return sp_str_lit("-std=c99");
@@ -75,7 +74,7 @@ static sp_str_t c_standard_switch(spn_c_standard_t standard) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-static sp_str_t cxx_standard_switch(spn_cxx_standard_t standard) {
+static sp_str_t cxx_standard_to_flag(spn_cxx_standard_t standard) {
   switch (standard) {
     case SPN_CXX11: return sp_str_lit("-std=c++11");
     case SPN_CXX14: return sp_str_lit("-std=c++14");
@@ -85,6 +84,10 @@ static sp_str_t cxx_standard_switch(spn_cxx_standard_t standard) {
     case SPN_CXX_STANDARD_NONE: return sp_str_lit("-std=c++17");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+static bool is_os_version_present(spn_os_version_t version) {
+  return version.major || version.minor;
 }
 
 spn_sanitizer_set_t spn_gcc_supported_sanitizers(spn_triple_t target) {
@@ -165,9 +168,9 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
   spn_gnu_render_flags(mem, profile, &flags);
   zig_default_sanitizer_off(toolchain, profile, &flags);
   if (compile->lang == SPN_LANG_C) {
-    push_arg_str(mem, invocation, c_standard_switch(profile->standard));
+    push_arg_str(mem, invocation, c_standard_to_flag(profile->standard));
   } else if (compile->lang == SPN_LANG_CXX) {
-    push_arg_str(mem, invocation, cxx_standard_switch(compile->cxx.standard));
+    push_arg_str(mem, invocation, cxx_standard_to_flag(compile->cxx.standard));
   }
   push_args(mem, invocation, flags.compile);
   push_arg(mem, invocation, "-c");
@@ -194,7 +197,7 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
       push_arg(mem, invocation, "-isysroot");
       push_arg_str(mem, invocation, profile->sysroot);
     }
-    if (spn_os_version_present(compile->min_os)) {
+    if (is_os_version_present(compile->min_os)) {
       push_arg_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(compile->min_os.major), sp_fmt_uint(compile->min_os.minor));
     }
   }
@@ -296,7 +299,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       push_arg(mem, invocation, "-isysroot");
       push_arg_str(mem, invocation, profile->sysroot);
     }
-    if (spn_os_version_present(link->min_os)) {
+    if (is_os_version_present(link->min_os)) {
       push_arg_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(link->min_os.major), sp_fmt_uint(link->min_os.minor));
     }
     sp_da_for(link->frameworks, it) {
