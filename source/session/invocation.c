@@ -7,7 +7,7 @@
 #include "external/cc.h"
 #include "session/invocation.h"
 #include "session/session.h"
-#include "target/closure.h"
+#include "unit/unit.h"
 #include "task/build/build.h"
 
 static sp_str_t resolve_pkg_path(sp_mem_t mem, spn_pkg_unit_t* pkg, sp_str_t path) {

@@ -1,0 +1,48 @@
+#ifndef SPN_UNIT_UNIT_H
+#define SPN_UNIT_UNIT_H
+
+#include "error/types.h"
+#include "session/types.h"
+#include "target/types.h"
+#include "unit/types.h"
+
+// build units (unit/build.c)
+spn_build_config_t spn_build_config_target(spn_triple_t host, spn_profile_info_t profile);
+spn_build_config_t spn_build_config_metaprogram(spn_triple_t host);
+spn_build_id_t     spn_build_id(const spn_build_config_t* config);
+spn_err_union_t    spn_build_add(spn_session_t* session, spn_build_config_t config, spn_build_unit_t** build);
+
+// package units (unit/graph.c): one walk creates every package unit in every
+// build; BUILD edges land in the metaprogram build
+spn_err_union_t spn_units_add_packages(spn_session_t* session);
+
+// target units (unit/target.c): same functions, called once per scope; the
+// metaprogram scope runs before the configure graph, the target scope after
+typedef enum {
+  SPN_UNIT_SCOPE_METAPROGRAM,
+  SPN_UNIT_SCOPE_TARGET,
+} spn_unit_scope_t;
+spn_err_union_t spn_units_add_targets(spn_session_t* session, spn_unit_scope_t scope);
+
+// link planning (unit/link.c)
+sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit_t* root);
+sp_da(spn_target_unit_t*)  spn_target_runtime_libs(sp_mem_t mem, spn_target_unit_t* root);
+sp_da(spn_link_lib_t)      spn_closure_link_libs(sp_mem_t mem, sp_da(spn_closure_entry_t) closure);
+bool spn_dep_kind_applies(spn_dep_kind_t dep, spn_target_kind_t target);
+
+// paths (unit/paths.c): every path a package unit owns, derived in one place
+void spn_unit_paths_init(spn_pkg_unit_t* unit, spn_loaded_pkg_t* loaded);
+
+// A script host exists in the metaprogram build only to compile its package's
+// scripts; it is not consumed as a package there, so it configures and
+// packages nothing
+static inline bool spn_pkg_unit_is_script_host(spn_pkg_unit_t* unit) {
+  return !(unit->kinds & (spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE) | spn_dep_kind_bit(SPN_DEP_KIND_TEST)));
+}
+
+// fingerprint (unit/fingerprint.c): pure function of (resolve, loaded,
+// options, build), memoized per (pkg, build)
+sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t id);
+sp_str_t  spn_unit_fingerprint_str(sp_mem_t mem, sp_hash_t fingerprint);
+
+#endif

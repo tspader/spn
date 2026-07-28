@@ -6,6 +6,7 @@
 #include "spn.h"
 
 #include "compiler/types.h"
+#include "error/types.h"
 #include "filter/types.h"
 #include "intern/types.h"
 #include "pkg/types.h"
@@ -15,16 +16,23 @@
 #include "external/wasm/types.h"
 #include "log/lazy/types.h"
 
-typedef u32 spn_build_unit_index_t;
-typedef u32 spn_toolchain_unit_index_t;
+// A build is a value: everything that determines how a translation unit is
+// compiled, independent of what is being compiled. Identical configs collapse
+// to one build unit; the id is derived from the value.
+typedef struct {
+  spn_triple_t host;
+  spn_profile_info_t profile;
+  spn_toolchain_role_t role;
+} spn_build_config_t;
 
 struct spn_build_unit_t {
-  spn_build_unit_index_t id;
+  spn_build_id_t id;
+  spn_triple_t host;
   spn_profile_info_t profile;
+  spn_toolchain_role_t role;
   spn_toolchain_unit_t* toolchain;
   sp_da(sp_str_t) include;
   sp_da(spn_pkg_unit_t*) packages;
-  sp_da(spn_pkg_unit_t*) hosts;
   struct {
     sp_str_t root;
   } paths;
@@ -35,7 +43,7 @@ struct spn_build_unit_t {
 SPN_PACK_PUSH
 typedef struct {
   spn_pkg_id_t pkg;
-  spn_build_unit_index_t ctx;
+  spn_build_id_t build;
 } spn_pkg_unit_id_t;
 
 typedef struct {
@@ -50,7 +58,7 @@ typedef struct {
 SPN_PACK_POP
 
 _Static_assert(
-  sizeof(spn_pkg_unit_id_t) == sizeof(spn_pkg_id_t) + sizeof(spn_build_unit_index_t),
+  sizeof(spn_pkg_unit_id_t) == sizeof(spn_pkg_id_t) + sizeof(spn_build_id_t),
   "spn_pkg_unit_id_t is byte-hashed as a key; it must have no padding"
 );
 _Static_assert(
@@ -74,7 +82,6 @@ typedef struct {
   bool private;
 } spn_pkg_dep_t;
 
-
 struct spn_node_t {
   spn_pkg_unit_t* ctx;
   u32 index;
@@ -94,18 +101,11 @@ struct spn_user_node_t {
   sp_da(spn_node_t*) deps;
 };
 
-
 typedef struct {
   sp_str_t build;
   sp_str_t test;
   sp_str_t jsonl;
 } spn_build_log_paths_t;
-
-typedef struct spn_build_io_t {
-  spn_lazy_log_t build;
-  spn_lazy_log_t test;
-  spn_lazy_log_t jsonl;
-} spn_build_io_t;
 
 typedef struct {
   spn_compile_unit_id_t id;
@@ -140,26 +140,22 @@ struct spn_target_unit {
   spn_build_io_t logs;
 };
 
-typedef struct {
-  spn_target_info_t* info;
-  spn_target_unit_t* target;
-} spn_pkg_metaprogram_target_t;
-
-typedef struct {
-  spn_pkg_metaprogram_target_t configure;
-  spn_pkg_metaprogram_target_t build;
-} spn_pkg_metaprogram_t;
-
-/////////////
-// PACKAGE //
-/////////////
 struct spn_pkg_unit_t {
   spn_pkg_unit_id_t id;
   spn_build_unit_t* build;
-  spn_pkg_metaprogram_t metaprogram;
   spn_session_t* session;
   spn_pkg_info_t* info;
   spn_pkg_source_t source;
+  u32 kinds;
+
+  // The unit that owns this package's metaprogram targets: the package's unit
+  // in the metaprogram build, or null if the package has no scripts. A unit in
+  // the metaprogram build points at itself.
+  spn_pkg_unit_t* metaprogram;
+  struct {
+    spn_target_unit_t* configure;
+    spn_target_unit_t* build;
+  } scripts;
 
   sp_da(spn_pkg_dep_t) deps;
   sp_da(spn_target_unit_t*) libs;
@@ -194,7 +190,6 @@ struct spn_pkg_unit_t {
     sp_str_t jsonl;
     spn_build_io_t io;
   } logs;
-
 
   struct {
     u64 compile;

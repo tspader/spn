@@ -26,17 +26,16 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
   if (specific || !sp_da_empty(names)) {
     app.config.selection.kind = SPN_TARGET_SELECTION_EXPLICIT;
     bool all_kinds = !specific;
-    spn_cli_build_set_rule(&app.config.selection..bin, all_kinds || command->only.bin, names);
-    spn_cli_build_set_rule(&app.config.selection..lib, all_kinds || command->only.lib, names);
-    spn_cli_build_set_rule(&app.config.selection..test, all_kinds || command->only.test, names);
-    spn_cli_build_set_rule(&app.config.selection..script, all_kinds || command->only.script, names);
+    spn_cli_build_set_rule(&app.config.selection.bin, all_kinds || command->only.bin, names);
+    spn_cli_build_set_rule(&app.config.selection.lib, all_kinds || command->only.lib, names);
+    spn_cli_build_set_rule(&app.config.selection.test, all_kinds || command->only.test, names);
+    spn_cli_build_set_rule(&app.config.selection.script, all_kinds || command->only.script, names);
   }
 
   return spn_plan(
     SPN_TASK_SYNC_INDEXES,
     SPN_TASK_RESOLVE,
     SPN_TASK_SYNC_PACKAGES,
-    SPN_TASK_PLAN,
     SPN_TASK_CONFIGURE_GRAPH,
     SPN_TASK_CREATE_UNITS,
     SPN_TASK_BUILD_GRAPH

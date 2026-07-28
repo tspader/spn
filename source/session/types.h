@@ -18,11 +18,6 @@
 #include "toolchain/types.h"
 #include "unit/types.h"
 
-typedef enum {
-  SPN_PACKAGE_STATE_UNLOADED,
-  SPN_PACKAGE_STATE_LOADED,
-} spn_package_state_t;
-
 typedef struct {
   spn_pkg_source_t source;
   spn_pkg_info_t* info;
@@ -38,12 +33,6 @@ typedef struct {
   spn_target_info_t build;
   u64 elapsed;
 } spn_loaded_pkg_t;
-
-typedef struct {
-  spn_build_graph_t graph;
-  spn_bg_dirty_t *dirty;
-  spn_bg_executor_t *executor;
-} spn_bg_ctx_t;
 
 typedef enum {
   SPN_ACTION_NONE,
@@ -65,7 +54,6 @@ typedef struct {
   spn_profile_info_t overrides;
 } spn_app_config_t;
 
-
 struct spn_session_t {
   sp_mem_t mem;
   sp_intern_t* intern;
@@ -76,6 +64,7 @@ struct spn_session_t {
 
   spn_profile_table_t profiles;
   spn_toolchain_catalog_t catalog;
+  spn_profile_info_t profile;
 
   spn_resolve_t resolve;
   spn_pkg_registry_t registry;
@@ -89,20 +78,15 @@ struct spn_session_t {
     bool reresolve;
   } gates;
 
-  spn_profile_info_t profile;
   sp_da(spn_build_plan_t) plans;
   struct {
-    sp_da(spn_build_unit_t*) builds;
+    sp_om(spn_build_id_t, spn_build_unit_t) builds;
     spn_build_unit_t* target;
     spn_build_unit_t* metaprogram;
-    sp_om(spn_compile_unit_id_t, spn_compile_unit_t) objects;
-    sp_om(spn_target_unit_id_t, spn_target_unit_t) targets;
-    sp_om(spn_pkg_unit_id_t, spn_pkg_unit_t) packages;
     sp_da(spn_toolchain_unit_t*) toolchains;
-
-    sp_om(spn_toolchain_unit_id_t, spn_toolchain_unit_t) chains;
-    sp_om(spn_build_unit_id_t, spn_build_unit_t) contexts;
-
+    sp_om(spn_pkg_unit_id_t, spn_pkg_unit_t) packages;
+    sp_om(spn_target_unit_id_t, spn_target_unit_t) targets;
+    sp_om(spn_compile_unit_id_t, spn_compile_unit_t) objects;
   } units;
 
   struct {

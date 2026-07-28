@@ -48,7 +48,7 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
   if (!source) {
     spn_target_names_t names = sp_da_new(spn.heap, sp_str_t);
     sp_da_push(names, command->entry);
-    app.config.selection..script = (spn_target_rule_t) {
+    app.config.selection.script = (spn_target_rule_t) {
       .kind = SPN_TARGET_RULE_NAMED,
       .names = names,
     };
@@ -71,7 +71,6 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
         SPN_TASK_SYNC_INDEXES,
         SPN_TASK_RESOLVE,
         SPN_TASK_SYNC_PACKAGES,
-        SPN_TASK_PLAN,
         SPN_TASK_CONFIGURE_GRAPH,
         SPN_TASK_RUN
       );
@@ -97,7 +96,6 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
     SPN_TASK_SYNC_INDEXES,
     SPN_TASK_RESOLVE,
     SPN_TASK_SYNC_PACKAGES,
-    SPN_TASK_PLAN,
     SPN_TASK_CONFIGURE_GRAPH,
     SPN_TASK_CREATE_UNITS,
     SPN_TASK_BUILD_GRAPH,

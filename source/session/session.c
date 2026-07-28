@@ -1,37 +1,23 @@
+#include "session/session.h"
+
+#include "sp.h"
+#include "ctx/types.h"
 #include "error/types.h"
 #include "filter/types.h"
-#include "sp.h"
-#include "sp/macro.h"
-#include "ctx/types.h"
 #include "forward/types.h"
 #include "resolve/types.h"
-#include "semver/types.h"
 #include "session/types.h"
 #include "spn.h"
-#include "toolchain/select.h"
 #include "unit/types.h"
+#include "unit/unit.h"
 
-#include "enum/enum.h"
-#include "event/event.h"
-#include "event/types.h"
-#include "external/wasm/wasm.h"
-#include "filter/filter.h"
+#include "compiler/driver.h"
 #include "intern/intern.h"
-#include "log/lazy/lazy.h"
-#include "pkg/id.h"
 #include "pkg/pkg.h"
 #include "profile/profile.h"
-#include "session/session.h"
-#include "task/build/dag.h"
-#include "when/when.h"
-#include "sp/str.h"
 #include "spn.embed.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
-
-static bool same_triple(spn_triple_t lhs, spn_triple_t rhs) {
-  return lhs.arch == rhs.arch && lhs.os == rhs.os && lhs.abi == rhs.abi;
-}
 
 static sp_str_t resolve_macos_sdk(sp_mem_t mem) {
   sp_str_t sdk = sp_env_get(spn.env, sp_str_lit("SPN_MACOS_SDK"));
@@ -58,159 +44,6 @@ static sp_str_t resolve_macos_sdk(sp_mem_t mem) {
   return sp_str_trim(result.out);
 }
 
-static spn_err_union_t bind_toolchain(spn_session_t* session, spn_toolchain_query_t query, spn_toolchain_unit_t** binding) {
-  spn_toolchain_resolution_t resolution = sp_zero;
-  try_union(spn_toolchain_select(&session->catalog, query, &resolution));
-
-  sp_da_for(session->units.toolchains, it) {
-    spn_toolchain_unit_t* unit = session->units.toolchains[it];
-    if (unit->info == resolution.info && same_triple(unit->host, query.host)) {
-      *binding = unit;
-      return spn_result(SPN_OK);
-    }
-  }
-
-  spn_toolchain_unit_t* unit = sp_alloc_type(session->mem, spn_toolchain_unit_t);
-  *unit = (spn_toolchain_unit_t) {
-    .info = resolution.info,
-    .host = query.host,
-    .artifact = resolution.artifact,
-  };
-  sp_da_push(session->units.toolchains, unit);
-  *binding = unit;
-  return spn_result(SPN_OK);
-}
-
-static spn_build_unit_t* add_build_unit(spn_session_t* session, spn_build_unit_t value) {
-  spn_build_unit_t* unit = sp_alloc_type(session->mem, spn_build_unit_t);
-  value.id = (spn_build_unit_index_t)sp_da_size(session->units.builds);
-  *unit = value;
-  sp_da_init(session->mem, unit->include);
-  sp_da_init(session->mem, unit->packages);
-  sp_da_init(session->mem, unit->hosts);
-  sp_da_push(session->units.builds, unit);
-  return unit;
-}
-
-typedef struct {
-  spn_triple_t host;
-  spn_triple_t target;
-  spn_profile_info_t profile;
-} build_unit_config_t;
-
-spn_toolchain_unit_id_t spn_toolchain_unit_id(spn_toolchain_unit_t* unit) {
-  return 0;
-}
-
-spn_toolchain_id_t spn_toolchain_id(spn_toolchain_info_t* info) {
-  return 0;
-}
-
-spn_profile_id_t spn_profile_id(spn_profile_info_t* info) {
-  return 0;
-}
-
-spn_build_unit_id_t spn_build_unit_id(spn_build_unit_t* unit) {
-  return 0;
-}
-
-static spn_err_union_t add_build(spn_session_t* s, build_unit_config_t b) {
-  spn_toolchain_resolution_t resolution = sp_zero;
-  try_union(spn_toolchain_select(&s->catalog, (spn_toolchain_query_t) {
-    .name = b.profile.toolchain,
-    .target = b.target,
-    .host = b.host,
-  }, &resolution));
-
-  spn_toolchain_unit_t* toolchain = sp_om_put(
-    s->units.chains,
-    resolution.info,
-    ((spn_toolchain_unit_t) {
-      .info = resolution.info,
-      .host = b.host,
-      .artifact = resolution.artifact,
-    })
-  );
-
-  if (!sp_om_has(s->units.contexts, bid)) {
-    spn_build_unit_t unit = {
-      .id = bid,
-      .profile = b.profile,
-      .toolchain = toolchain,
-      .paths = {
-        .root = spn_profile_build_path(s->mem, s->paths.build, &b.profile),
-      }
-    };
-    sp_da_init(s->mem, unit.include);
-    sp_da_init(s->mem, unit.packages);
-    sp_da_init(s->mem, unit.hosts);
-    sp_om_put(s->units.contexts, bid, unit);
-  }
-
-  return spn_result(SPN_OK);
-}
-
-static spn_err_union_t add_target_build(spn_session_t* s, spn_profile_info_t profile, spn_target_selection_t selection) {
-  spn_triple_t host = spn_triple_host();
-  spn_triple_t target = { profile.arch, profile.os, profile.abi };
-  spn_toolchain_unit_t* toolchain = SP_NULLPTR;
-  try_union(bind_toolchain(s, (spn_toolchain_query_t) {
-    .name = profile.toolchain,
-    .target = target,
-    .host = host,
-    .role = SPN_TOOLCHAIN_ROLE_BUILD,
-  }, &toolchain));
-
-  spn_build_unit_t* unit = add_build_unit(s, (spn_build_unit_t) {
-    .profile = profile,
-    .toolchain = toolchain,
-    .paths = {
-      .root = spn_profile_build_path(s->mem, s->paths.build, &profile),
-    },
-  });
-
-  spn_build_plan_t plan = {
-    .build = unit,
-    .selection = selection,
-  };
-  sp_da_init(s->mem, plan.roots);
-  sp_da_push(s->plans, plan);
-  s->units.target = unit;
-  return spn_result(SPN_OK);
-}
-
-static spn_err_union_t add_metaprogram_build(spn_session_t* session, spn_build_unit_t** build) {
-  spn_triple_t host = spn_triple_host();
-  spn_triple_t target = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_NONE };
-  spn_toolchain_unit_t* toolchain = SP_NULLPTR;
-  try_union(bind_toolchain(session, (spn_toolchain_query_t) {
-    .name = sp_str_lit("auto"),
-    .target = target,
-    .host = host,
-    .role = SPN_TOOLCHAIN_ROLE_SCRIPT,
-  }, &toolchain));
-
-  spn_build_unit_t* unit = add_build_unit(session, (spn_build_unit_t) {
-    .profile = {
-      .name = sp_str_lit("metaprogram"),
-      .arch = target.arch,
-      .os = target.os,
-      .abi = target.abi,
-      .mode = SPN_BUILD_MODE_DEBUG,
-      .opt = SPN_OPT_LEVEL_2,
-      .standard = SPN_C99,
-      .linkage = SPN_LIB_KIND_STATIC,
-    },
-    .toolchain = toolchain,
-    .paths = {
-      .root = sp_fs_join_path(session->mem, session->paths.build, spn_triple_to_str(session->mem, target)),
-    },
-  });
-  sp_da_push(unit->include, spn.paths.include);
-  *build = unit;
-  return spn_result(SPN_OK);
-}
-
 static bool root_demands_shared(spn_pkg_info_t* pkg) {
   sp_da_for(pkg->config, it) {
     spn_pkg_config_t* config = &pkg->config[it].value;
@@ -229,69 +62,47 @@ static bool root_demands_shared(spn_pkg_info_t* pkg) {
 
 spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t* root, spn_app_config_t config) {
   s->mem = mem;
+  s->pkg = root;
+  s->paths.build = sp_fs_join_path(s->mem, s->paths.root, sp_str_lit("build"));
+
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
   try_as_union(spn_toolchain_catalog_init(&s->catalog, builtins, s->mem));
-
   sp_str_om_for(root->toolchains, it) {
     spn_toolchain_catalog_add(&s->catalog, *sp_str_om_at(root->toolchains, it));
   }
 
-  // Build the list of available profiles
   sp_str_ht_init(s->mem, s->profiles);
   spn_profile_populate(&s->profiles, root);
 
-  s->pkg = root;
-  s->paths.build = sp_fs_join_path(s->mem, s->paths.root, sp_str_lit("build"));
   sp_ht_init(s->mem, s->registry);
   sp_ht_init(s->mem, s->packages);
+  sp_ht_init(s->mem, s->options);
   sp_ht_init(s->mem, s->fingerprints);
+  sp_da_init(s->mem, s->plans);
+  sp_da_init(s->mem, s->units.toolchains);
+  sp_om_new(s->units.builds);
+  sp_om_new(s->units.packages);
+  sp_om_new(s->units.targets);
+  sp_om_new(s->units.objects);
   sp_mutex_init(&s->mutex, SP_MUTEX_PLAIN);
 
-  try_union(spn_profile_resolve(s->profiles, &config.overrides, spn_triple_host(), root_demands_shared(root), &s->profile));
+  spn_triple_t host = spn_triple_host();
+  try_union(spn_profile_resolve(s->profiles, &config.overrides, host, root_demands_shared(root), &s->profile));
   if (s->profile.os == SPN_OS_MACOS) {
     s->profile.sysroot = resolve_macos_sdk(s->mem);
   }
 
-  sp_da_init(s->mem, s->plans);
-  sp_da_init(s->mem, s->units.builds);
-  sp_da_init(s->mem, s->units.toolchains);
-  sp_om_new(s->units.chains);
-  sp_om_new(s->units.contexts);
+  try_union(spn_build_add(s, spn_build_config_target(host, s->profile), &s->units.target));
+  try_union(spn_build_add(s, spn_build_config_metaprogram(host), &s->units.metaprogram));
+  sp_da_push(s->units.metaprogram->include, spn.paths.include);
 
-  try_union(add_build(s, (build_unit_config_t) {
-    .host = spn_triple_host(),
-    .target = { s->profile.arch, s->profile.os, s->profile.abi },
-    .profile = s->profile,
+  sp_da_push(s->plans, ((spn_build_plan_t) {
+    .build = s->units.target,
+    .selection = config.selection,
   }));
-
-  try_union(add_build(s, (build_unit_config_t) {
-    .host = spn_triple_host(),
-    .target = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_NONE },
-    .profile = {
-      .name = sp_str_lit("metaprogram"),
-      .arch = SPN_ARCH_WASM32,
-      .os = SPN_OS_WASI,
-      .abi = SPN_ABI_NONE,
-      .mode = SPN_BUILD_MODE_DEBUG,
-      .opt = SPN_OPT_LEVEL_2,
-      .standard = SPN_C99,
-      .linkage = SPN_LIB_KIND_STATIC,
-    }
-  }));
-
-  spn_build_plan_t plan = {
-    .build = unit,
-    .selection = (spn_target_selection_t) {
-      .configure = true
-    }
-  };
-  sp_da_init(s->mem, plan.roots);
-  sp_da_push(s->plans, plan);
-  s->units.target = unit;
-
-
-  try_union(add_target_build(s, s->profile, config.selection));
-  try_union(add_metaprogram_build(s, &s->units.metaprogram));
+  sp_da_for(s->plans, it) {
+    sp_da_init(s->mem, s->plans[it].roots);
+  }
 
   return spn_result(SPN_OK);
 }
@@ -308,190 +119,27 @@ sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pk
   return requested;
 }
 
-typedef struct {
-  sp_hash_t qualified;
-  sp_hash_t commit;
-  sp_hash_t options;
-  sp_hash_t deps;
-  sp_hash_t patches;
-  spn_semver_t version;
-  spn_build_mode_t mode;
-  spn_opt_level_t opt;
-  spn_sanitizer_set_t sanitizers;
-  spn_linkage_t linkage;
-  spn_c_standard_t standard;
-  spn_arch_t arch;
-  spn_os_t os;
-  spn_abi_t abi;
-  sp_hash_t platform;
-  struct {
-    sp_hash_t name;
-    sp_hash_t cc;
-    sp_hash_t cxx;
-    sp_hash_t ld;
-    sp_hash_t ar;
-    sp_hash_t url;
-    sp_hash_t identity;
-  } toolchain;
-} fingerprint_input_t;
-
-
-// The resolved non-default option set: distinct option sets get distinct
-// store paths, while default flips ride the manifest commit hash instead
-static sp_hash_t hash_options(spn_session_t* session, spn_pkg_id_t id) {
-  spn_resolved_options_t* options = sp_ht_getp(session->options, id);
-  if (!options) {
-    return 0;
+spn_err_union_t spn_session_bind_toolchains(spn_session_t* s) {
+  sp_env_init(s->mem, &s->env);
+  spn_toolchain_unit_t* toolchain = s->units.target->toolchain;
+  sp_env_insert(&s->env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(s->mem, toolchain->cc.compiler));
+  sp_env_insert(&s->env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(s->mem, toolchain->cc.archiver));
+  sp_env_insert(&s->env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(s->mem, toolchain->cc.linker));
+  if (spn_toolchain_has_cxx(toolchain->info)) {
+    sp_env_insert(&s->env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(s->mem, toolchain->cc.cxx));
   }
 
-  sp_hash_t hash = 0;
-  sp_da_for(*options, it) {
-    spn_resolved_option_t* option = &(*options)[it];
-    if (option->is_default) {
-      continue;
-    }
-    sp_hash_t parts [] = {
-      hash,
-      sp_hash_str(option->name),
-      (sp_hash_t)option->value.kind,
-      option->value.kind == SPN_OPTION_VALUE_STR ? sp_hash_str(option->value.str) : (sp_hash_t)option->value.b,
-    };
-    hash = sp_hash_combine(parts, sp_carr_len(parts));
-  }
-  return hash;
-}
-
-typedef struct {
-  sp_hash_t hash;
-  u32 kind;
-  u32 private;
-} fingerprint_edge_t;
-
-static s32 sort_fingerprint_edges(const void* a, const void* b) {
-  const fingerprint_edge_t* lhs = (const fingerprint_edge_t*)a;
-  const fingerprint_edge_t* rhs = (const fingerprint_edge_t*)b;
-  if (lhs->hash != rhs->hash) return lhs->hash < rhs->hash ? -1 : 1;
-  if (lhs->kind != rhs->kind) return lhs->kind < rhs->kind ? -1 : 1;
-  if (lhs->private != rhs->private) return lhs->private < rhs->private ? -1 : 1;
-  return 0;
-}
-
-static sp_hash_t hash_package(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t id) {
-  spn_pkg_unit_id_t uid = { .pkg = id, .ctx = build->id };
-  sp_hash_t* memo = sp_ht_getp(session->fingerprints, uid);
-  if (memo) {
-    return *memo;
-  }
-
-  spn_loaded_pkg_t* loaded = sp_ht_getp(session->packages, id);
-  spn_pkg_info_t* pkg = loaded->info;
-
-  fingerprint_input_t fingerprint = sp_zero;
-  fingerprint.qualified = sp_hash_str(pkg->qualified);
-  fingerprint.options = hash_options(session, id);
-  fingerprint.version = pkg->version;
-  fingerprint.commit = sp_hash_str(pkg->upstream.commit);
-
-  spn_resolved_pkg_t* resolved = sp_ht_getp(session->resolve, id);
-  if (resolved) {
-    if (resolved->origin.source.kind == SPN_PKG_TREE_GIT) {
-      fingerprint.patches = resolved->origin.source.git.patches.hash;
-    }
-    if (!sp_da_empty(resolved->edges)) {
-      sp_da(fingerprint_edge_t) edges = sp_da_new(session->mem, fingerprint_edge_t);
-      sp_da_for(resolved->edges, it) {
-        sp_da_push(edges, ((fingerprint_edge_t) {
-          .hash = hash_package(session, build, resolved->edges[it].id),
-          .kind = (u32)resolved->edges[it].kind,
-          .private = (u32)resolved->edges[it].private,
-        }));
-      }
-      sp_da_sort(edges, sort_fingerprint_edges);
-      fingerprint.deps = sp_hash_bytes(edges, sp_da_size(edges) * sizeof(fingerprint_edge_t), 0);
+  sp_om_for(s->units.builds, it) {
+    spn_build_unit_t* build = sp_om_at(s->units.builds, it);
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    spn_cc_flags_t flags = sp_zero;
+    spn_err_union_t err = spn_cc_render_flags(scratch.mem, &build->toolchain->cc, &build->profile, &flags);
+    sp_mem_end_scratch(scratch);
+    if (err.kind) {
+      return err;
     }
   }
-
-  spn_toolchain_info_t* toolchain = build->toolchain->info;
-  sp_opt_spn_linkage_t config = spn_session_config_kind(session, pkg->name);
-
-  fingerprint.mode = build->profile.mode;
-  fingerprint.opt = build->profile.opt;
-  fingerprint.sanitizers = build->profile.sanitizers;
-  fingerprint.linkage = config.some ? config.value : build->profile.linkage;
-  fingerprint.standard = build->profile.standard;
-  fingerprint.arch = build->profile.arch;
-  fingerprint.os = build->profile.os;
-  fingerprint.abi = build->profile.abi;
-  fingerprint.platform = spn_pkg_hash_platform(pkg, &build->profile);
-  fingerprint.toolchain.name = sp_hash_str(toolchain->name);
-  fingerprint.toolchain.cc = sp_hash_str(toolchain->compiler.program);
-  fingerprint.toolchain.ld = sp_hash_str(toolchain->linker.program);
-  fingerprint.toolchain.ar = sp_hash_str(toolchain->archiver.program);
-  fingerprint.toolchain.cxx = sp_hash_str(toolchain->cxx.program);
-  fingerprint.toolchain.identity = build->toolchain->identity;
-  if (!sp_opt_is_null(build->toolchain->artifact)) {
-    fingerprint.toolchain.url = sp_hash_str(sp_opt_get(build->toolchain->artifact).sha256);
-  }
-
-  sp_hash_t hash = sp_hash_bytes(&fingerprint, sizeof(fingerprint), 0);
-  sp_ht_insert(session->fingerprints, uid, hash);
-  return hash;
-}
-
-typedef struct {
-  sp_hash_t hash;
-  sp_str_t str;
-} fingerprint_t;
-
-fingerprint_t fingerprint_package(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t id) {
-  fingerprint_t result = sp_zero;
-  result.hash = hash_package(session, build, id);
-  result.str = sp_fmt(session->mem, "{:0>16x}", sp_fmt_uint(result.hash)).value;
-  return result;
-}
-
-spn_pkg_unit_t* spn_session_find_pkg_unit_by_id(spn_session_t* session, spn_pkg_unit_id_t id) {
-  sp_mutex_lock(&session->mutex);
-  spn_pkg_unit_t* pkg = sp_om_has(session->units.packages, id) ? sp_om_get(session->units.packages, id) : SP_NULLPTR;
-  sp_mutex_unlock(&session->mutex);
-
-  return pkg;
-}
-
-spn_pkg_unit_t* spn_session_find_pkg_unit(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t pkg_id) {
-  return spn_session_find_pkg_unit_by_id(session, (spn_pkg_unit_id_t) {
-    .pkg = pkg_id,
-    .ctx = build->id,
-  });
-}
-
-spn_pkg_unit_t* spn_session_find_dep(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t qualified, spn_dep_kind_t kind) {
-  sp_intern_id_t name = sp_intern_get_or_insert(session->intern, qualified);
-
-  sp_da(spn_pkg_dep_t) deps = pkg->deps;
-  sp_da_for(deps, it) {
-    if (deps[it].kind != kind) {
-      continue;
-    }
-    if (deps[it].unit && deps[it].unit->id.pkg.qualified == name) {
-      return deps[it].unit;
-    }
-  }
-  return SP_NULLPTR;
-}
-
-spn_target_unit_t* spn_session_find_target_in_pkg(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t name) {
-  spn_target_unit_id_t id = {
-    .pkg = pkg->id,
-    .target = sp_intern_get_or_insert(session->intern, name)
-  };
-  if (!sp_om_has(session->units.targets, id)) return SP_NULLPTR;
-  return sp_om_get(session->units.targets, id);
-}
-
-spn_target_unit_t* spn_session_get_target_unit(spn_session_t* session, spn_target_unit_id_t id) {
-  sp_assert(sp_om_has(session->units.targets, id));
-  return sp_om_get(session->units.targets, id);
+  return spn_result(SPN_OK);
 }
 
 spn_pkg_id_t spn_session_root_pkg(spn_session_t* session) {
@@ -503,176 +151,47 @@ spn_pkg_id_t spn_session_root_pkg(spn_session_t* session) {
   return SP_ZERO_STRUCT(spn_pkg_id_t);
 }
 
-spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
+spn_pkg_unit_t* spn_session_find_pkg_unit_by_id(spn_session_t* session, spn_pkg_unit_id_t id) {
+  sp_mutex_lock(&session->mutex);
+  spn_pkg_unit_t* pkg = sp_om_has(session->units.packages, id) ? sp_om_get(session->units.packages, id) : SP_NULLPTR;
+  sp_mutex_unlock(&session->mutex);
+
+  return pkg;
+}
+
+spn_pkg_unit_t* spn_session_find_pkg_unit(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t pkg) {
+  return spn_session_find_pkg_unit_by_id(session, (spn_pkg_unit_id_t) {
+    .pkg = pkg,
+    .build = build->id,
+  });
+}
+
+spn_pkg_unit_t* spn_session_find_dep(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t qualified, spn_dep_kind_t kind) {
+  sp_intern_id_t name = sp_intern_get_or_insert(session->intern, qualified);
+
+  sp_da_for(pkg->deps, it) {
+    if (pkg->deps[it].kind != kind) {
+      continue;
+    }
+    if (pkg->deps[it].unit && pkg->deps[it].unit->id.pkg.qualified == name) {
+      return pkg->deps[it].unit;
+    }
+  }
+  return SP_NULLPTR;
+}
+
+spn_target_unit_t* spn_session_find_target_in_pkg(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t name) {
   spn_target_unit_id_t id = {
     .pkg = pkg->id,
-    .target = sp_intern_get_or_insert(session->intern, info->name),
+    .target = sp_intern_get_or_insert(session->intern, name),
   };
-
-  sp_om_insert(session->units.targets, id, SP_ZERO_STRUCT(spn_target_unit_t));
-  spn_target_unit_t* target = sp_om_back(session->units.targets);
-  target->id = id;
-  target->pkg = pkg;
-  target->info = info;
-  sp_da_init(session->mem, target->objects);
-  sp_da_init(session->mem, target->deps);
-
-  switch (info->kind) {
-    case SPN_TARGET_LIB: {
-      sp_da_push(pkg->targets, target);
-      sp_da_push(pkg->libs, target);
-      break;
-    }
-    case SPN_TARGET_EXE:
-    case SPN_TARGET_SCRIPT:
-    case SPN_TARGET_TEST: {
-      sp_da_push(pkg->targets, target);
-      break;
-    }
-    case SPN_TARGET_CONFIGURE_METAPROGRAM: {
-      sp_assert(pkg->build == session->units.metaprogram);
-      pkg->metaprogram.configure.target = target;
-      break;
-    }
-    case SPN_TARGET_BUILD_METAPROGRAM: {
-      sp_assert(pkg->build == session->units.metaprogram);
-      pkg->metaprogram.build.target = target;
-      sp_da_push(pkg->targets, target);
-      break;
-    }
-  }
-
-  sp_str_t build_log = sp_fs_join_path(session->mem, pkg->paths.work, sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(info->name)).value);
-  sp_str_t jsonl_log = sp_fs_join_path(session->mem, pkg->paths.work, sp_fmt(session->mem, "{}.build.jsonl", SP_FMT_STR(info->name)).value);
-  spn_lazy_log_init(&target->logs.build, build_log);
-  spn_lazy_log_init(&target->logs.jsonl, jsonl_log);
+  sp_mutex_lock(&session->mutex);
+  spn_target_unit_t* target = sp_om_has(session->units.targets, id) ? sp_om_get(session->units.targets, id) : SP_NULLPTR;
+  sp_mutex_unlock(&session->mutex);
   return target;
 }
 
-static sp_da(sp_str_t) clone_str_list(sp_mem_t mem, sp_da(sp_str_t) source) {
-  sp_da(sp_str_t) result = sp_da_new(mem, sp_str_t);
-  sp_da_for(source, it) {
-    sp_da_push(result, source[it]);
-  }
-  return result;
-}
-
-static sp_da(spn_embed_t) clone_embed_list(sp_mem_t mem, sp_da(spn_embed_t) source) {
-  sp_da(spn_embed_t) result = sp_da_new(mem, spn_embed_t);
-  sp_da_for(source, it) {
-    sp_da_push(result, source[it]);
-  }
-  return result;
-}
-
-static spn_target_info_t clone_target_info(sp_mem_t mem, spn_target_info_t* source) {
-  spn_target_info_t target = *source;
-  target.source = clone_str_list(mem, source->source);
-  target.headers = clone_str_list(mem, source->headers);
-  target.include = clone_str_list(mem, source->include);
-  target.define = clone_str_list(mem, source->define);
-  target.flags = clone_str_list(mem, source->flags);
-  target.system_deps = clone_str_list(mem, source->system_deps);
-  target.deps = clone_str_list(mem, source->deps);
-  target.embed = clone_embed_list(mem, source->embed);
-  return target;
-}
-
-static void clone_target_map(spn_target_map_t* result, spn_target_map_t source, sp_mem_t mem) {
-  sp_str_om_init(*result);
-  sp_str_om_for(source, it) {
-    spn_target_info_t target = clone_target_info(mem, sp_str_om_at(source, it));
-    sp_str_om_insert(*result, target.name, target);
-  }
-}
-
-static spn_pkg_info_t* clone_pkg_info(spn_session_t* session, spn_pkg_id_t id, spn_build_unit_t* build, spn_pkg_info_t* source) {
-  spn_pkg_info_t* info = sp_alloc_type(session->mem, spn_pkg_info_t);
-  *info = *source;
-  info->arena = sp_mem_arena_new(session->mem);
-  info->applied = false;
-  sp_mem_t mem = sp_mem_arena_as_allocator(info->arena);
-
-  clone_target_map(&info->libs, source->libs, mem);
-  clone_target_map(&info->exes, source->exes, mem);
-  clone_target_map(&info->scripts, source->scripts, mem);
-  clone_target_map(&info->tests, source->tests, mem);
-  info->include = clone_str_list(mem, source->include);
-  info->define = clone_str_list(mem, source->define);
-  info->public_define = clone_str_list(mem, source->public_define);
-  info->system_deps = clone_str_list(mem, source->system_deps);
-
-  spn_when_env_t env;
-  spn_when_env_from_profile(mem, &build->profile, &env);
-  spn_resolved_options_t* resolved = sp_ht_getp(session->options, id);
-  if (resolved) {
-    spn_when_env_add_options(&env, resolved);
-  }
-  spn_pkg_apply_options(info, &env);
-  return info;
-}
-
-spn_pkg_unit_t* spn_session_add_pkg_unit(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t pkg_id, spn_loaded_pkg_t* loaded) {
-  spn_pkg_unit_id_t id = { .pkg = pkg_id, .ctx = build->id };
-  sp_assert(!sp_om_has(session->units.packages, id));
-  sp_om_insert(session->units.packages, id, sp_zero_struct(spn_pkg_unit_t));
-  spn_pkg_unit_t* unit = sp_om_back(session->units.packages);
-  unit->id = id;
-  unit->build = build;
-  unit->info = clone_pkg_info(session, pkg_id, build, loaded->info);
-  unit->source = loaded->source;
-  unit->session = session;
-  if (build == session->units.metaprogram) {
-    unit->metaprogram = (spn_pkg_metaprogram_t) {
-      .configure = { .info = &loaded->configure },
-      .build = { .info = &loaded->build },
-    };
-  }
-  sp_da_init(session->mem, unit->deps);
-  sp_da_init(session->mem, unit->libs);
-  sp_da_init(session->mem, unit->targets);
-  sp_da_init(session->mem, unit->user_nodes);
-  unit->paths.manifest = loaded->paths.manifest;
-  unit->paths.script = loaded->paths.script;
-  unit->paths.recipe = loaded->roots.recipe;
-  unit->paths.source = loaded->roots.source;
-
-  switch (loaded->source) {
-    case SPN_PKG_SOURCE_ROOT:
-    case SPN_PKG_SOURCE_FILE: {
-      sp_str_t work = sp_fs_join_path(session->mem, build->paths.root, sp_str_lit("work"));
-      unit->paths.work = sp_fs_join_path(session->mem, work, loaded->info->name);
-      unit->paths.store = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, build->paths.root, sp_str_lit("store")), loaded->info->name);
-      break;
-    }
-    case SPN_PKG_SOURCE_INDEX: {
-      fingerprint_t fingerprint = fingerprint_package(session, build, pkg_id);
-      unit->paths.work = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, session->paths.system.caches.build.dir, loaded->info->qualified), fingerprint.str);
-      unit->paths.store = sp_fs_join_path(session->mem, sp_fs_join_path(session->mem, session->paths.system.caches.store.dir, loaded->info->qualified), fingerprint.str);
-      break;
-    }
-  }
-
-  unit->paths.include = sp_fs_join_path(session->mem, unit->paths.store, SP_LIT("include"));
-  unit->paths.bin = sp_fs_join_path(session->mem, unit->paths.store, SP_LIT("bin"));
-  unit->paths.lib = sp_fs_join_path(session->mem, unit->paths.store, SP_LIT("lib"));
-  unit->paths.vendor = sp_fs_join_path(session->mem, unit->paths.store, SP_LIT("vendor"));
-
-  unit->paths.generated = sp_fs_join_path(session->mem, unit->paths.work, SP_LIT("spn"));
-  unit->paths.object = sp_fs_join_path(session->mem, unit->paths.generated, sp_str_lit("object"));
-
-  unit->logs.build = sp_fmt(session->mem, "{}.build.log", SP_FMT_STR(unit->info->name)).value;
-  unit->logs.jsonl = sp_fmt(session->mem, "{}.jsonl", SP_FMT_STR(unit->info->name)).value;
-
-  unit->paths.logs.build = sp_fs_join_path(session->mem, unit->paths.work, unit->logs.build);
-  unit->paths.logs.jsonl = sp_fs_join_path(session->mem, unit->paths.work, unit->logs.jsonl);
-
-  spn_lazy_log_init(&unit->logs.io.build, unit->paths.logs.build);
-  spn_lazy_log_init(&unit->logs.io.jsonl, unit->paths.logs.jsonl);
-
-  unit->paths.stamp.dir = sp_fs_join_path(session->mem, unit->paths.generated, SP_LIT("stamp"));
-  unit->paths.stamp.configure = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("configure.stamp"));
-  unit->paths.stamp.package = sp_fs_join_path(session->mem, unit->paths.stamp.dir, SP_LIT("package.stamp"));
-
-  return unit;
+spn_target_unit_t* spn_session_get_target_unit(spn_session_t* session, spn_target_unit_id_t id) {
+  sp_assert(sp_om_has(session->units.targets, id));
+  return sp_om_get(session->units.targets, id);
 }

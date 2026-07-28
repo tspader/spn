@@ -93,7 +93,6 @@ set(SPN_SOURCES
   sp/str.c
   sp/terminal.c
   spn.c
-  target/closure.c
   target/mutate.c
   target/select.c
   target/target.c
@@ -110,7 +109,6 @@ set(SPN_SOURCES
   task/graph.c
   task/index.c
   task/init.c
-  task/plan.c
   task/publish.c
   task/resolve.c
   task/sync.c
@@ -127,7 +125,13 @@ set(SPN_SOURCES
   toolchain/toolchain.c
   triple/triple.c
   tui/tui.c
+  unit/build.c
+  unit/fingerprint.c
+  unit/graph.c
+  unit/link.c
   unit/package.c
+  unit/paths.c
+  unit/target.c
   when/when.c
 )
 
