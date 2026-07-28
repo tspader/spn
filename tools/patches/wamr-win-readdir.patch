@@ -1,0 +1,59 @@
+diff --git a/core/shared/platform/windows/platform_internal.h b/core/shared/platform/windows/platform_internal.h
+index 1111111..2222222 100644
+--- a/core/shared/platform/windows/platform_internal.h
++++ b/core/shared/platform/windows/platform_internal.h
+@@ -171,5 +171,6 @@ typedef struct windows_dir_stream {
+     // An offset into info_buf to read the next entry from
+     DWORD cursor;
+     int cookie;
++    bool at_end;
+     windows_handle *handle;
+ } windows_dir_stream;
+diff --git a/core/shared/platform/windows/win_file.c b/core/shared/platform/windows/win_file.c
+index 3333333..4444444 100644
+--- a/core/shared/platform/windows/win_file.c
++++ b/core/shared/platform/windows/win_file.c
+@@ -219,4 +219,5 @@ init_dir_stream(os_dir_stream dir_stream, os_file_handle handle)
+     dir_stream->cursor = 0;
+     dir_stream->handle = handle;
+     dir_stream->cookie = 0;
++    dir_stream->at_end = false;
+ }
+@@ -227,3 +228,4 @@ reset_dir_stream(os_dir_stream dir_stream)
+     dir_stream->cursor = 0;
+     dir_stream->cookie = 0;
++    dir_stream->at_end = false;
+ }
+@@ -233,6 +235,12 @@ reset_dir_stream(os_dir_stream dir_stream)
+ static __wasi_errno_t
+ read_next_dir_entry(os_dir_stream dir_stream, FILE_ID_BOTH_DIR_INFO **out_entry)
+ {
++    if (dir_stream->at_end) {
++        if (out_entry != NULL)
++            *out_entry = NULL;
++        return __WASI_ESUCCESS;
++    }
++
+     FILE_INFO_BY_HANDLE_CLASS file_info_class;
+ 
+     if (dir_stream->cookie == 0)
+@@ -249,7 +257,7 @@ read_next_dir_entry(os_dir_stream dir_stream, FILE_ID_BOTH_DIR_INFO **out_entry)
+         DWORD win_error = GetLastError();
+         // We've reached the end of the directory - return success
+         if (win_error == ERROR_NO_MORE_FILES) {
+-            dir_stream->cookie = 0;
++            dir_stream->at_end = true;
+             dir_stream->cursor = 0;
+             return __WASI_ESUCCESS;
+         }
+@@ -1714,8 +1722,8 @@ os_seekdir(os_dir_stream dir_stream, __wasi_dircookie_t position)
+         if (error != __WASI_ESUCCESS)
+             return error;
+ 
+         // We've reached the end of the directory.
+-        if (dir_stream->cookie == 0) {
++        if (dir_stream->at_end) {
+             break;
+         }
+     }
+ 
