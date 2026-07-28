@@ -421,8 +421,7 @@ spn_target_unit_t* spn_session_add_target(spn_session_t* session, spn_pkg_unit_t
   target->pkg = pkg;
   target->info = info;
   sp_da_init(session->mem, target->objects);
-  sp_da_init(session->mem, target->deps.target);
-  sp_da_init(session->mem, target->deps.package);
+  sp_da_init(session->mem, target->deps);
 
   switch (info->kind) {
     case SPN_TARGET_LIB: {

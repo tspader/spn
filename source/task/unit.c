@@ -321,11 +321,6 @@ typedef enum {
   LINK_PLACE_PRIVATE_LIB,
 } link_placement_t;
 
-typedef struct {
-  spn_target_unit_t* lib;
-  bool private;
-} link_candidate_t;
-
 static link_placement_t link_plan_placement(spn_target_unit_t* target, spn_target_unit_t* lib, bool private) {
   if (lib->info->no_link) {
     return LINK_PLACE_NONE;
@@ -352,31 +347,12 @@ static link_placement_t link_plan_placement(spn_target_unit_t* target, spn_targe
   sp_unreachable_return(LINK_PLACE_NONE);
 }
 
-static void link_plan_candidates(spn_target_unit_t* target, sp_da(spn_link_lib_t) libs, sp_da(link_candidate_t)* candidates) {
-  sp_da_for(target->deps.target, it) {
-    sp_da_push(*candidates, ((link_candidate_t) {
-      .lib = target->deps.target[it],
-    }));
-  }
-  sp_da_for(libs, it) {
-    sp_da_push(*candidates, ((link_candidate_t) {
-      .lib = libs[it].lib,
-      .private = libs[it].private,
-    }));
-  }
-}
-
 static spn_os_version_t link_plan_min_os(spn_target_unit_t* target, sp_da(spn_closure_entry_t) closure) {
-  spn_os_version_t min_os = max_os_version(target->info->macos.min_os, target->pkg->info->macos.min_os);
-  sp_da_for(target->deps.target, it) {
-    min_os = max_os_version(min_os, target->deps.target[it]->info->macos.min_os);
-  }
+  spn_os_version_t min_os = target->info->macos.min_os;
   sp_da_for(closure, it) {
-    spn_pkg_unit_t* dep = closure[it].pkg;
-    if (dep == target->pkg) continue;
-    min_os = max_os_version(min_os, dep->info->macos.min_os);
-    sp_da_for(dep->libs, lt) {
-      min_os = max_os_version(min_os, dep->libs[lt]->info->macos.min_os);
+    min_os = max_os_version(min_os, closure[it].pkg->info->macos.min_os);
+    sp_da_for(closure[it].targets, lt) {
+      min_os = max_os_version(min_os, closure[it].targets[lt]->info->macos.min_os);
     }
   }
   return min_os;
@@ -395,44 +371,26 @@ static spn_lang_t link_plan_lang(spn_target_unit_t* target, sp_da(spn_link_lib_t
   return SPN_LANG_C;
 }
 
-static bool dep_code_links_into_target(spn_pkg_unit_t* dep) {
-  sp_da_for(dep->libs, lt) {
-    spn_target_unit_t* lib = dep->libs[lt];
-    if (lib->info->no_link) continue;
-    if (lib->lib_kind == SPN_LIB_KIND_SHARED) continue;
-    return true;
-  }
-  return sp_da_empty(dep->libs);
-}
-
 static void link_plan_frameworks(spn_target_unit_t* target, sp_da(spn_closure_entry_t) closure, sp_da(sp_str_t)* frameworks) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   link_framework_set_t seen;
   sp_str_ht_init(s.mem, seen);
 
   push_frameworks(&seen, frameworks, target->info->macos.frameworks);
-  push_frameworks(&seen, frameworks, target->pkg->info->macos.frameworks);
-
-  sp_da_for(target->deps.target, it) {
-    spn_target_unit_t* lib = target->deps.target[it];
-    if (lib->info->no_link) continue;
-    if (lib->lib_kind == SPN_LIB_KIND_SHARED) continue;
-    push_frameworks(&seen, frameworks, lib->info->macos.frameworks);
-  }
 
   sp_da_for(closure, it) {
-    spn_pkg_unit_t* dep = closure[it].pkg;
-    if (dep == target->pkg) continue;
-    sp_da_for(dep->libs, lt) {
-      spn_target_unit_t* lib = dep->libs[lt];
+    spn_closure_entry_t* entry = &closure[it];
+    if (entry->links_code) {
+      push_frameworks(&seen, frameworks, entry->pkg->info->macos.frameworks);
+    }
+    sp_da_for(entry->targets, lt) {
+      spn_target_unit_t* lib = entry->targets[lt];
       if (lib->info->no_link) continue;
       if (lib->lib_kind == SPN_LIB_KIND_SHARED) continue;
       push_frameworks(&seen, frameworks, lib->info->macos.frameworks);
     }
-    if (dep_code_links_into_target(dep)) {
-      push_frameworks(&seen, frameworks, dep->info->macos.frameworks);
-    }
   }
+  sp_mem_end_scratch(s);
 }
 
 static spn_link_plan_t link_plan(spn_target_unit_t* target) {
@@ -441,9 +399,10 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
   sp_da(spn_closure_entry_t) closure = spn_target_link_closure(s.mem, target);
+  sp_assert(closure[0].pkg == pkg);
 
   spn_link_plan_t plan = {
-    .libs = spn_closure_link_libs(mem, closure, pkg),
+    .libs = spn_closure_link_libs(mem, closure),
     .cc = {
       .kind = target->kind,
       .min_os = link_plan_min_os(target, closure),
@@ -461,40 +420,32 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
 
   link_plan_frameworks(target, closure, &plan.cc.frameworks);
 
-  sp_da(link_candidate_t) candidates = sp_da_new(s.mem, link_candidate_t);
-  link_plan_candidates(target, plan.libs, &candidates);
-
-  sp_da_for(candidates, it) {
-    link_candidate_t* candidate = &candidates[it];
-    switch (link_plan_placement(target, candidate->lib, candidate->private)) {
+  sp_da_for(plan.libs, it) {
+    spn_link_lib_t* lib = &plan.libs[it];
+    switch (link_plan_placement(target, lib->lib, lib->private)) {
       case LINK_PLACE_NONE: {
         break;
       }
       case LINK_PLACE_LIB: {
-        sp_da_push(plan.cc.lib_dirs, candidate->lib->pkg->paths.lib);
-        sp_da_push(plan.cc.libs, candidate->lib->info->name);
+        sp_da_push(plan.cc.lib_dirs, lib->lib->pkg->paths.lib);
+        sp_da_push(plan.cc.libs, lib->lib->info->name);
         break;
       }
       case LINK_PLACE_PRIVATE_LIB: {
-        sp_da_push(plan.cc.lib_dirs, candidate->lib->pkg->paths.lib);
-        sp_da_push(plan.cc.private_libs, candidate->lib->info->name);
+        sp_da_push(plan.cc.lib_dirs, lib->lib->pkg->paths.lib);
+        sp_da_push(plan.cc.private_libs, lib->lib->info->name);
         break;
       }
       case LINK_PLACE_WHOLE_ARCHIVE: {
-        sp_da_push(plan.cc.whole_archives, static_archive_path(mem, candidate->lib));
+        sp_da_push(plan.cc.whole_archives, static_archive_path(mem, lib->lib));
         break;
       }
     }
   }
 
-  sp_da_for(pkg->info->system_deps, it) {
-    sp_da_push(plan.cc.system_libs, pkg->info->system_deps[it]);
-  }
   sp_da_for(closure, it) {
-    spn_pkg_unit_t* dep = closure[it].pkg;
-    if (dep == pkg) continue;
-    sp_da_for(dep->info->system_deps, st) {
-      sp_da_push(plan.cc.system_libs, dep->info->system_deps[st]);
+    sp_da_for(closure[it].pkg->info->system_deps, st) {
+      sp_da_push(plan.cc.system_libs, closure[it].pkg->info->system_deps[st]);
     }
   }
 
@@ -571,24 +522,16 @@ static spn_err_union_t resolve_target_deps(spn_session_t* session, sp_da(spn_tar
     spn_target_unit_t* unit = targets[it];
     sp_da_for(unit->info->deps, jt) {
       sp_str_t qualified = spn_pkg_canonicalize_name(unit->info->deps[jt]);
-      struct {
-        spn_pkg_unit_t* pkg;
-        spn_target_unit_t* target;
-      } candidates = {
-        .pkg = find_dep_unit(session, unit->pkg, qualified),
-        .target = spn_session_find_target_in_pkg(session, unit->pkg, unit->info->deps[jt])
-      };
+      if (find_dep_unit(session, unit->pkg, qualified)) {
+        continue;
+      }
 
-      if (candidates.pkg) {
-        sp_da_push(unit->deps.package, candidates.pkg);
-      }
-      else if (candidates.target) {
-        sp_da_push(unit->deps.target, candidates.target);
-      }
-      else {
+      spn_target_unit_t* target = spn_session_find_target_in_pkg(session, unit->pkg, unit->info->deps[jt]);
+      if (!target) {
         spn_log_error("failed to find {.cyan} as a package or target", SP_FMT_STR(unit->info->deps[jt]));
         return spn_err_reported(SPN_ERROR);
       }
+      sp_da_push(unit->deps, target);
     }
   }
   return spn_result(SPN_OK);
