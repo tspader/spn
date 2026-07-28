@@ -37,7 +37,9 @@ typedef struct {
 
 typedef struct {
   spn_pkg_unit_t* pkg;
+  sp_da(spn_target_unit_t*) targets;
   bool private;
+  bool links_code;
 } spn_closure_entry_t;
 
 typedef struct {

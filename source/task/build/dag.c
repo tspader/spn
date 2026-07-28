@@ -1008,16 +1008,6 @@ static spn_err_t dag_add_package(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
 static void dag_add_link_deps(spn_dag_build_t* b, spn_target_unit_t* target, spn_dag_id_t action) {
   spn_dag_t* g = b->graph;
 
-  sp_da_for(target->deps.target, it) {
-    spn_target_unit_t* lib = target->deps.target[it];
-    if (lib->info->no_link) {
-      continue;
-    }
-    spn_dag_target_ids_t* dep = sp_ht_getp(b->ids.targets, lib);
-    if (dep) {
-      spn_dag_action_add_input(g, action, dep->output);
-    }
-  }
   sp_da_for(target->link.libs, it) {
     spn_dag_target_ids_t* dep = sp_ht_getp(b->ids.targets, target->link.libs[it].lib);
     if (dep) {

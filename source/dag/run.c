@@ -147,11 +147,14 @@ static void progress_total(spn_dag_env_t* env, u64 total) {
   }
 }
 
-static void progress_count(spn_dag_env_t* env, bool hit) {
+static void progress_count(spn_dag_env_t* env, const spn_dag_action_t* action, bool hit) {
+  if (action->uncacheable) sp_assert(!hit);
   if (!env->progress) {
     return;
   }
-  sp_atomic_s32_add(hit ? &env->progress->hits : &env->progress->misses, 1);
+  if (!action->uncacheable) {
+    sp_atomic_s32_add(hit ? &env->progress->hits : &env->progress->misses, 1);
+  }
   sp_atomic_s32_add(&env->progress->completed, 1);
 }
 
@@ -712,7 +715,7 @@ static spn_err_t exec_action(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env
   }
   diag_flush(env, &attempt, err);
   if (!err) {
-    progress_count(env, attempt.hit);
+    progress_count(env, action, attempt.hit);
   }
 
   sp_mem_end_scratch(s);
@@ -972,7 +975,7 @@ static void run_commit_flight(spn_dag_run_t* run, spn_dag_action_t* action, spn_
   if (run->err) {
     return;
   }
-  progress_count(run->env, false);
+  progress_count(run->env, action, false);
   finish_action(run, action);
 }
 
@@ -1021,7 +1024,7 @@ static void run_dispatch(spn_dag_run_t* run, spn_dag_id_t id) {
   }
   if (flight->attempt.hit) {
     flight_free(flight);
-    progress_count(run->env, true);
+    progress_count(run->env, action, true);
     finish_action(run, action);
     return;
   }

@@ -137,11 +137,7 @@ struct spn_target_unit {
   spn_linkage_t lib_kind;
 
   sp_da(spn_compile_unit_t*) objects;
-
-  struct {
-    sp_da(spn_target_unit_t*) target;
-    sp_da(spn_pkg_unit_t*) package;
-  } deps;
+  sp_da(spn_target_unit_t*) deps;
 
   spn_link_plan_t link;
 
