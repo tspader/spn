@@ -282,11 +282,9 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       push_arg(mem, invocation, "-Wl,--no-whole-archive");
     }
   }
-  push_args(mem, invocation, link->args);
   sp_da_for(link->lib_dirs, it) {
     push_arg_fmt(mem, invocation, "-L{}", sp_fmt_str(link->lib_dirs[it]));
   }
-  push_args(mem, invocation, link->libs);
   sp_da_for(link->private_libs, it) {
     push_arg_fmt(mem, invocation, "-l{}", sp_fmt_str(link->private_libs[it]));
     if (profile->os == SPN_OS_WINDOWS) {
@@ -294,6 +292,9 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       sp_str_t archive = spn_triple_lib_file_name(mem, triple, link->private_libs[it], SP_OS_LIB_STATIC);
       push_arg_fmt(mem, invocation, "-Wl,--exclude-libs,{}", sp_fmt_str(archive));
     }
+  }
+  sp_da_for(link->libs, it) {
+    push_arg_fmt(mem, invocation, "-l{}", sp_fmt_str(link->libs[it]));
   }
   sp_da_for(link->system_libs, it) {
     push_arg_fmt(mem, invocation, "-l{}", sp_fmt_str(link->system_libs[it]));
@@ -311,8 +312,22 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       push_arg_str(mem, invocation, link->frameworks[it]);
     }
   }
-  sp_da_for(link->rpath, it) {
-    push_arg_fmt(mem, invocation, "-Wl,-rpath,{}", sp_fmt_str(link->rpath[it]));
+  if (link->rpath) {
+    switch (profile->os) {
+      case SPN_OS_LINUX: {
+        push_arg(mem, invocation, "-Wl,-rpath,$ORIGIN");
+        break;
+      }
+      case SPN_OS_MACOS: {
+        push_arg(mem, invocation, "-Wl,-rpath,@loader_path");
+        break;
+      }
+      case SPN_OS_WINDOWS:
+      case SPN_OS_WASI:
+      case SPN_OS_NONE: {
+        break;
+      }
+    }
   }
   push_arg(mem, invocation, "-o");
   push_arg_str(mem, invocation, files->output);

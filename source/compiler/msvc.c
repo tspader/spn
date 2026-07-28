@@ -168,8 +168,6 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
       break;
     }
     case SPN_CC_OUTPUT_EXE: {
-      // Static linkage means the CRT choice at compile time on MSVC; there
-      // is nothing to render on the link line
       break;
     }
     case SPN_CC_OUTPUT_REACTOR:
@@ -179,12 +177,12 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
     }
   }
   push_args(mem, invocation, files->objects);
-  push_args(mem, invocation, link->args);
-  push_args(mem, invocation, link->libs);
-  // cl has no --exclude-libs; private libs link like any other and their
-  // archive-member dllexports cannot be demoted
+
   sp_da_for(link->private_libs, it) {
     push_arg_fmt(mem, invocation, "{}.lib", sp_fmt_str(link->private_libs[it]));
+  }
+  sp_da_for(link->libs, it) {
+    push_arg_fmt(mem, invocation, "{}.lib", sp_fmt_str(link->libs[it]));
   }
   sp_da_for(link->system_libs, it) {
     push_arg_fmt(mem, invocation, "{}.lib", sp_fmt_str(link->system_libs[it]));
@@ -208,7 +206,7 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
   if (link->kind == SPN_CC_OUTPUT_EXE && link->subsystem == SPN_WIN_SUBSYSTEM_WINDOWS) {
     sp_da_push(linker, sp_str_lit("/SUBSYSTEM:WINDOWS"));
   }
-  // rpath does not exist on Windows; DLLs resolve from the exe's directory
+
   if (!sp_da_empty(linker)) {
     push_arg(mem, invocation, "/link");
     push_args(mem, invocation, linker);

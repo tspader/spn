@@ -125,14 +125,8 @@ typedef struct {
 } spn_compile_unit_t;
 
 typedef struct {
-  spn_os_version_t min_os;
-  spn_lang_t lang;
+  spn_cc_link_t cc;
   sp_da(spn_link_lib_t) libs;
-  sp_da(sp_str_t) lib_dirs;
-  sp_da(sp_str_t) system_libs;
-  sp_da(sp_str_t) whole_archives;
-  sp_da(sp_str_t) private_libs;
-  sp_da(sp_str_t) frameworks;
 } spn_link_plan_t;
 
 struct spn_target_unit {

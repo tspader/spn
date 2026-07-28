@@ -319,7 +319,7 @@ static spn_err_union_t render_compile_bases(sp_mem_t mem, spn_target_unit_t* tar
 
 typedef enum {
   LINK_PLACE_NONE,
-  LINK_PLACE_SYSTEM_LIB,
+  LINK_PLACE_LIB,
   LINK_PLACE_WHOLE_ARCHIVE,
   LINK_PLACE_PRIVATE_LIB,
 } link_placement_t;
@@ -335,11 +335,11 @@ static link_placement_t link_plan_placement(spn_target_unit_t* target, spn_targe
   }
   switch (lib->lib_kind) {
     case SPN_LIB_KIND_SHARED: {
-      return LINK_PLACE_SYSTEM_LIB;
+      return LINK_PLACE_LIB;
     }
     case SPN_LIB_KIND_STATIC: {
       if (!is_target_dynamic(target)) {
-        return LINK_PLACE_SYSTEM_LIB;
+        return LINK_PLACE_LIB;
       }
       if (private) {
         return LINK_PLACE_PRIVATE_LIB;
@@ -434,17 +434,23 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
   sp_da(spn_closure_entry_t) closure = spn_target_link_closure(s.mem, target);
 
   spn_link_plan_t plan = {
-    .min_os = link_plan_min_os(target, closure),
     .libs = spn_closure_link_libs(mem, closure, pkg),
+    .cc = {
+      .kind = target->kind,
+      .min_os = link_plan_min_os(target, closure),
+      .subsystem = target->info->windows.subsystem,
+      .rpath = true,
+    },
   };
-  plan.lang = link_plan_lang(target, plan.libs);
-  sp_da_init(mem, plan.lib_dirs);
-  sp_da_init(mem, plan.system_libs);
-  sp_da_init(mem, plan.whole_archives);
-  sp_da_init(mem, plan.private_libs);
-  sp_da_init(mem, plan.frameworks);
+  plan.cc.lang = link_plan_lang(target, plan.libs);
+  sp_da_init(mem, plan.cc.libs);
+  sp_da_init(mem, plan.cc.lib_dirs);
+  sp_da_init(mem, plan.cc.system_libs);
+  sp_da_init(mem, plan.cc.whole_archives);
+  sp_da_init(mem, plan.cc.private_libs);
+  sp_da_init(mem, plan.cc.frameworks);
 
-  link_plan_frameworks(target, closure, &plan.frameworks);
+  link_plan_frameworks(target, closure, &plan.cc.frameworks);
 
   sp_da(link_candidate_t) candidates = sp_da_new(s.mem, link_candidate_t);
   link_plan_candidates(target, plan.libs, &candidates);
@@ -455,37 +461,36 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
       case LINK_PLACE_NONE: {
         break;
       }
-      case LINK_PLACE_SYSTEM_LIB: {
-        sp_da_push(plan.lib_dirs, candidate->lib->pkg->paths.lib);
-        sp_da_push(plan.system_libs, candidate->lib->info->name);
+      case LINK_PLACE_LIB: {
+        sp_da_push(plan.cc.lib_dirs, candidate->lib->pkg->paths.lib);
+        sp_da_push(plan.cc.libs, candidate->lib->info->name);
         break;
       }
       case LINK_PLACE_PRIVATE_LIB: {
-        sp_da_push(plan.lib_dirs, candidate->lib->pkg->paths.lib);
-        sp_da_push(plan.private_libs, candidate->lib->info->name);
+        sp_da_push(plan.cc.lib_dirs, candidate->lib->pkg->paths.lib);
+        sp_da_push(plan.cc.private_libs, candidate->lib->info->name);
         break;
       }
       case LINK_PLACE_WHOLE_ARCHIVE: {
-        sp_da_push(plan.whole_archives, static_archive_path(mem, candidate->lib));
+        sp_da_push(plan.cc.whole_archives, static_archive_path(mem, candidate->lib));
         break;
       }
     }
   }
 
-  // Packages must precede the system libraries they need
   sp_da_for(pkg->info->system_deps, it) {
-    sp_da_push(plan.system_libs, pkg->info->system_deps[it]);
+    sp_da_push(plan.cc.system_libs, pkg->info->system_deps[it]);
   }
   sp_da_for(closure, it) {
     spn_pkg_unit_t* dep = closure[it].pkg;
     if (dep == pkg) continue;
     sp_da_for(dep->info->system_deps, st) {
-      sp_da_push(plan.system_libs, dep->info->system_deps[st]);
+      sp_da_push(plan.cc.system_libs, dep->info->system_deps[st]);
     }
   }
 
-  sp_da_for(plan.whole_archives, it) {
-    sp_assert(sp_fs_is_absolute(plan.whole_archives[it]));
+  sp_da_for(plan.cc.whole_archives, it) {
+    sp_assert(sp_fs_is_absolute(plan.cc.whole_archives[it]));
   }
 
   sp_mem_end_scratch(s);
@@ -507,10 +512,10 @@ static spn_err_union_t build_target_plan(spn_target_unit_t* target) {
     case SPN_CC_OUTPUT_SHARED_LIB:
     case SPN_CC_OUTPUT_REACTOR: {
       try_union(spn_cc_validate_archive(toolchain, profile));
-      return spn_cc_validate_link(toolchain, profile, target->kind, !sp_da_empty(target->link.frameworks));
+      return spn_cc_validate_link(toolchain, profile, target->kind, !sp_da_empty(target->link.cc.frameworks));
     }
     case SPN_CC_OUTPUT_EXE: {
-      return spn_cc_validate_link(toolchain, profile, target->kind, !sp_da_empty(target->link.frameworks));
+      return spn_cc_validate_link(toolchain, profile, target->kind, !sp_da_empty(target->link.cc.frameworks));
     }
     case SPN_CC_OUTPUT_OBJECT: {
       return spn_result(SPN_OK);

@@ -6,12 +6,13 @@ typedef struct {
   spn_cc_output_kind_t kind;
   const c8* exports;
   const c8* export_symbols [2];
+  const c8* lib;
   const c8* whole_archive;
   const c8* private_lib;
   const c8* system_lib;
   const c8* framework;
   const c8* lib_dir;
-  const c8* rpath;
+  bool rpath;
   spn_os_version_t min_os;
   spn_win_subsystem_t subsystem;
   render_expect_t expect;
@@ -24,14 +25,13 @@ static void run_link_test(s32* utest_result, link_test_t test) {
     .lang = SPN_LANG_C,
     .kind = test.kind,
     .min_os = test.min_os,
+    .rpath = test.rpath,
   };
-  sp_da_init(scratch.mem, link.args);
   sp_da_init(scratch.mem, link.libs);
   sp_da_init(scratch.mem, link.whole_archives);
   sp_da_init(scratch.mem, link.private_libs);
   sp_da_init(scratch.mem, link.system_libs);
   sp_da_init(scratch.mem, link.lib_dirs);
-  sp_da_init(scratch.mem, link.rpath);
   sp_da_init(scratch.mem, link.frameworks);
 
   spn_cc_link_files_t files = {
@@ -47,6 +47,9 @@ static void run_link_test(s32* utest_result, link_test_t test) {
     if (!test.export_symbols[it]) break;
     sp_da_push(files.exports.symbols, sp_str_from_cstr(scratch.mem, test.export_symbols[it]));
   }
+  if (test.lib) {
+    sp_da_push(link.libs, sp_str_from_cstr(scratch.mem, test.lib));
+  }
   if (test.whole_archive) {
     sp_da_push(link.whole_archives, sp_str_from_cstr(scratch.mem, test.whole_archive));
   }
@@ -61,9 +64,6 @@ static void run_link_test(s32* utest_result, link_test_t test) {
   }
   if (test.lib_dir) {
     sp_da_push(link.lib_dirs, sp_str_from_cstr(scratch.mem, test.lib_dir));
-  }
-  if (test.rpath) {
-    sp_da_push(link.rpath, sp_str_from_cstr(scratch.mem, test.rpath));
   }
   link.subsystem = test.subsystem;
   spn_invocation_t invocation = sp_zero;
@@ -358,10 +358,66 @@ UTEST(render_link, lib_dirs_and_rpath) {
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .lib_dir = "deps/lib",
-    .rpath = "$ORIGIN",
+    .rpath = true,
     .expect = {
       .command = "cc",
       .args = { "main.o", "-Ldeps/lib", "-Wl,-rpath,$ORIGIN", "-o", "main" },
+    },
+  });
+}
+
+UTEST(render_link, macos_rpath) {
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_MACOS,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .rpath = true,
+    .expect = {
+      .command = "cc",
+      .args = { "--target=aarch64-macos", "main.o", "-Wl,-rpath,@loader_path", "-o", "main" },
+    },
+  });
+}
+
+UTEST(render_link, wasi_rpath_never_renders) {
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_WASM32,
+      .os = SPN_OS_WASI,
+    },
+    .kind = SPN_CC_OUTPUT_REACTOR,
+    .rpath = true,
+    .expect = {
+      .command = "cc",
+      .args = {
+        "--target=wasm32-wasi",
+        "-mexec-model=reactor",
+        "-Wl,--no-entry", "-Wl,--import-symbols",
+        "main.o", "-o", "main"
+      },
+    },
+  });
+}
+
+UTEST(render_link, libs_precede_system_libs) {
+  run_link_test(utest_result, (link_test_t) {
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .lib = "A",
+    .private_lib = "P",
+    .system_lib = "m",
+    .expect = {
+      .command = "cc",
+      .args = { "main.o", "-lP", "-lA", "-lm", "-o", "main" },
     },
   });
 }

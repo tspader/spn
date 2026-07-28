@@ -16,43 +16,6 @@
 #include "task/build/build.h"
 #include "unit/package.h"
 
-static spn_cc_link_t spn_build_link_desc(sp_mem_t mem, spn_target_unit_t* target) {
-  spn_cc_link_t link = {
-    .lang = target->link.lang,
-    .kind = target->kind,
-    .system_libs = target->link.system_libs,
-    .whole_archives = target->link.whole_archives,
-    .private_libs = target->link.private_libs,
-    .lib_dirs = target->link.lib_dirs,
-    .frameworks = target->link.frameworks,
-  };
-  sp_da_init(mem, link.args);
-  sp_da_init(mem, link.libs);
-  sp_da_init(mem, link.rpath);
-
-  switch (target->pkg->build->profile.os) {
-    case SPN_OS_LINUX: {
-      sp_da_push(link.rpath, sp_str_lit("$ORIGIN"));
-      break;
-    }
-    case SPN_OS_MACOS: {
-      sp_da_push(link.rpath, sp_str_lit("@loader_path"));
-      link.min_os = target->link.min_os;
-      break;
-    }
-    case SPN_OS_WINDOWS: {
-      link.subsystem = target->info->windows.subsystem;
-      break;
-    }
-    case SPN_OS_WASI:
-    case SPN_OS_NONE: {
-      break;
-    }
-  }
-
-  return link;
-}
-
 spn_err_union_t spn_build_link_invocation(sp_mem_t mem, spn_target_unit_t* target, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
   spn_profile_info_t* profile = &target->pkg->build->profile;
   spn_cc_toolchain_t* toolchain = &target->pkg->build->toolchain->cc;
@@ -69,8 +32,7 @@ spn_err_union_t spn_build_link_invocation(sp_mem_t mem, spn_target_unit_t* targe
     case SPN_CC_OUTPUT_EXE:
     case SPN_CC_OUTPUT_SHARED_LIB:
     case SPN_CC_OUTPUT_REACTOR: {
-      spn_cc_link_t link = spn_build_link_desc(mem, target);
-      try_union(spn_cc_render_link(mem, toolchain, profile, &link, files, invocation));
+      try_union(spn_cc_render_link(mem, toolchain, profile, &target->link.cc, files, invocation));
       break;
     }
     case SPN_CC_OUTPUT_OBJECT: {
@@ -174,8 +136,8 @@ static s32 spn_link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, sp
   sp_str_ht_init(scratch, seen);
   sp_da(sp_str_t) symbols = sp_da_new(scratch, sp_str_t);
   try_emit(read_archive_symbols(files.output, &symbols, &seen), spn.events);
-  sp_da_for(target->link.whole_archives, it) {
-    try_emit(read_archive_symbols(target->link.whole_archives[it], &symbols, &seen), spn.events);
+  sp_da_for(target->link.cc.whole_archives, it) {
+    try_emit(read_archive_symbols(target->link.cc.whole_archives[it], &symbols, &seen), spn.events);
   }
 
   sp_io_file_writer_t writer = sp_zero;
