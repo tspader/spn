@@ -33,6 +33,7 @@ utest = "1.0.0"
 files = [
   "tools/patches/wamr-wasi-hook.patch",
   "tools/patches/wamr-darwin-timeb.patch",
+  "tools/patches/wamr-win-readdir.patch",
 ]
 
 [deps.build]
