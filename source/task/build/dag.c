@@ -112,9 +112,13 @@ static spn_err_t dag_link_identity(spn_dag_build_t* b, spn_target_unit_t* target
 static spn_dag_digest_t dag_embed_identity(spn_dag_build_t* b, spn_target_unit_t* target) {
   spn_sha256_ctx_t ctx = sp_zero;
   spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.embed.v2"));
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.embed.v3"));
   spn_dag_hash_str(&ctx, target->pkg->info->qualified);
   spn_dag_hash_str(&ctx, target->info->name);
+  spn_profile_info_t* profile = &target->pkg->build->profile;
+  spn_dag_hash_u8(&ctx, (u8)profile->os);
+  spn_dag_hash_u8(&ctx, (u8)profile->arch);
+  spn_dag_hash_u8(&ctx, (u8)profile->abi);
   sp_da_for(target->info->embed, it) {
     spn_embed_t* embed = &target->info->embed[it];
     spn_dag_hash_u8(&ctx, (u8)embed->kind);

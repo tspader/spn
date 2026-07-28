@@ -1,0 +1,11 @@
+diff --git a/core/shared/platform/darwin/platform_internal.h b/core/shared/platform/darwin/platform_internal.h
+--- a/core/shared/platform/darwin/platform_internal.h
++++ b/core/shared/platform/darwin/platform_internal.h
+@@ -32,7 +32,6 @@
+ #include <sys/stat.h>
+ #include <sys/mman.h>
+ #include <sys/time.h>
+-#include <sys/timeb.h>
+ #include <sys/uio.h>
+ #include <sys/ioctl.h>
+ #include <sys/socket.h>

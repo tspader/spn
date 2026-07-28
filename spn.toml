@@ -30,7 +30,10 @@ yyjson = "0.13.0"
 utest = "1.0.0"
 
 [patch.wamr]
-files = ["tools/patches/wamr-wasi-hook.patch"]
+files = [
+  "tools/patches/wamr-wasi-hook.patch",
+  "tools/patches/wamr-darwin-timeb.patch",
+]
 
 [deps.build]
 yyjson = "0.13.0"
