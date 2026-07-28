@@ -22,7 +22,7 @@ spn_err_union_t spn_units_add_targets(spn_session_t* session, spn_unit_scope_t s
 
 sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit_t* root);
 sp_da(spn_target_unit_t*)  spn_target_runtime_libs(sp_mem_t mem, spn_target_unit_t* root);
-sp_da(spn_link_lib_t)      spn_closure_link_libs(sp_mem_t mem, sp_da(spn_closure_entry_t) closure);
+sp_da(spn_link_lib_t)      spn_closure_get_linked_libs(sp_mem_t mem, sp_da(spn_closure_entry_t) closure);
 bool spn_dep_kind_applies(spn_dep_kind_t dep, spn_target_kind_t target);
 
 void spn_unit_paths_init(spn_pkg_unit_t* unit, spn_loaded_pkg_t* loaded);

@@ -234,11 +234,21 @@ add_test(NAME manifest_lower COMMAND "$<TARGET_FILE:manifest_lower>")
 
 add_executable(unit
   unit.c
+  link_plan.c
   ${SRC}/unit/build.c
   ${SRC}/unit/fingerprint.c
   ${SRC}/unit/graph.c
+  ${SRC}/unit/link.c
   ${SRC}/unit/paths.c
+  ${SRC}/unit/target.c
+  ${SRC}/session/invocation.c
   ${SRC}/session/session.c
+  ${SRC}/task/build/build.c
+  ${SRC}/compiler/exports.c
+  ${SRC}/event/log.c
+  ${SRC}/filter/filter.c
+  ${SRC}/log/log.c
+  ${SRC}/target/select.c
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/loader.c
   ${SRC}/codegen/json.c
@@ -279,17 +289,32 @@ add_executable(unit
 )
 set_source_files_properties(${EMBED_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 spn_test_binary(unit)
-target_include_directories(unit PRIVATE ${SRC}/codegen/gen)
+target_include_directories(unit PRIVATE ${SRC}/codegen/gen ${SRC}/external ${SOURCE_ROOT}/wamr/core/iwasm/include)
 add_dependencies(unit spn_embed spn_codegen_gen)
 target_link_libraries(unit PRIVATE yyjson)
 add_test(NAME unit COMMAND "$<TARGET_FILE:unit>")
 
 add_executable(closure
-  closure.c
+  closure/main.c
+  closure/harness.c
+  closure/closure.c
+  closure/links_code.c
+  closure/runtime.c
+  closure/siblings.c
   ${SRC}/unit/link.c
 )
 spn_test_binary(closure)
 add_test(NAME closure COMMAND "$<TARGET_FILE:closure>")
+
+add_executable(link
+  closure/spit_main.c
+  closure/get_linked_libs.c
+  closure/harness.c
+  ${SRC}/unit/link.c
+)
+spn_test_binary(link)
+target_include_directories(link PRIVATE ${STORE}/include/sp)
+add_test(NAME link COMMAND "$<TARGET_FILE:link>")
 
 add_executable(target_filter
   filter.c

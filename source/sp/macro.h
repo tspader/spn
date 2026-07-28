@@ -56,4 +56,9 @@
   #define SPN_PACK_POP  _Pragma("pack(pop)")
 #endif
 
+#define sp_carr_detect_len(arr, it, expr) \
+  sp_carr_for_until(arr, __sp_iterator, (expr)) { \
+    (it)++; \
+  }
+
 #endif

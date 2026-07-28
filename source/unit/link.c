@@ -240,7 +240,7 @@ sp_da(spn_target_unit_t*) spn_target_runtime_libs(sp_mem_t mem, spn_target_unit_
   return libs;
 }
 
-sp_da(spn_link_lib_t) spn_closure_link_libs(sp_mem_t mem, sp_da(spn_closure_entry_t) closure) {
+sp_da(spn_link_lib_t) spn_closure_get_linked_libs(sp_mem_t mem, sp_da(spn_closure_entry_t) closure) {
   sp_da(spn_link_lib_t) libs = sp_da_new(mem, spn_link_lib_t);
 
   sp_da_for(closure, it) {
