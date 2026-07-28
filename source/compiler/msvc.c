@@ -155,7 +155,7 @@ void spn_msvc_render_compile_files(sp_mem_t mem, const spn_cc_compile_files_t* f
   push_arg_str(mem, invocation, files->source);
 }
 
-void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, spn_invocation_t* invocation) {
+void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
   add_launcher(mem, toolchain, link->lang, invocation);
   spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
@@ -178,7 +178,7 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
       sp_unreachable_case();
     }
   }
-  push_args(mem, invocation, link->objects);
+  push_args(mem, invocation, files->objects);
   push_args(mem, invocation, link->args);
   push_args(mem, invocation, link->libs);
   // cl has no --exclude-libs; private libs link like any other and their
@@ -189,15 +189,15 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
   sp_da_for(link->system_libs, it) {
     push_arg_fmt(mem, invocation, "{}.lib", sp_fmt_str(link->system_libs[it]));
   }
-  push_arg_fmt(mem, invocation, "/Fe{}", sp_fmt_str(link->output));
+  push_arg_fmt(mem, invocation, "/Fe{}", sp_fmt_str(files->output));
 
   // Everything past /link goes to link.exe verbatim
   sp_da(sp_str_t) linker = sp_da_new(mem, sp_str_t);
   if (profile->mode == SPN_BUILD_MODE_DEBUG) {
     sp_da_push(linker, sp_str_lit("/DEBUG"));
   }
-  if (!sp_str_empty(link->exports.path)) {
-    sp_da_push(linker, sp_fmt(mem, "/DEF:{}", sp_fmt_str(link->exports.path)).value);
+  if (!sp_str_empty(files->exports.path)) {
+    sp_da_push(linker, sp_fmt(mem, "/DEF:{}", sp_fmt_str(files->exports.path)).value);
   }
   sp_da_for(link->whole_archives, it) {
     sp_da_push(linker, sp_fmt(mem, "/WHOLEARCHIVE:{}", sp_fmt_str(link->whole_archives[it])).value);
@@ -215,11 +215,10 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
   }
 }
 
-void spn_msvc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_cc_archive_t* archive, spn_invocation_t* invocation) {
+void spn_msvc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_cc_archive_files_t* files, spn_invocation_t* invocation) {
   invocation->program = toolchain->archiver.program;
   push_args(mem, invocation, toolchain->archiver.args);
   push_arg(mem, invocation, "/nologo");
-  push_args(mem, invocation, archive->args);
-  push_arg_fmt(mem, invocation, "/OUT:{}", sp_fmt_str(archive->output));
-  push_args(mem, invocation, archive->objects);
+  push_arg_fmt(mem, invocation, "/OUT:{}", sp_fmt_str(files->output));
+  push_args(mem, invocation, files->objects);
 }

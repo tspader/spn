@@ -15,12 +15,13 @@ static void run_archive_test(s32* utest_result, archive_test_t test) {
     .os = SPN_OS_LINUX,
     .abi = SPN_ABI_GNU,
   };
-  spn_cc_archive_t archive = { .output = sp_str_lit("libmain.a") };
-  sp_da_init(scratch.mem, archive.objects);
-  sp_da_init(scratch.mem, archive.args);
-  sp_da_push(archive.objects, sp_str_lit("main.o"));
+  spn_cc_archive_files_t files = {
+    .output = sp_str_lit("libmain.a"),
+  };
+  sp_da_init(scratch.mem, files.objects);
+  sp_da_push(files.objects, sp_str_lit("main.o"));
   spn_invocation_t invocation = sp_zero;
-  spn_err_union_t err = spn_cc_render_archive(scratch.mem, &toolchain, &profile, &archive, &invocation);
+  spn_err_union_t err = spn_cc_render_archive(scratch.mem, &toolchain, &profile, &files, &invocation);
   EXPECT_EQ(err.kind, test.expect.err);
   if (test.expect.err) {
     EXPECT_EQ(err.compiler.feature, SPN_CC_FEATURE_ARCHIVE);

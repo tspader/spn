@@ -23,10 +23,8 @@ static void run_link_test(s32* utest_result, link_test_t test) {
   spn_cc_link_t link = {
     .lang = SPN_LANG_C,
     .kind = test.kind,
-    .output = sp_str_lit("main"),
     .min_os = test.min_os,
   };
-  sp_da_init(scratch.mem, link.objects);
   sp_da_init(scratch.mem, link.args);
   sp_da_init(scratch.mem, link.libs);
   sp_da_init(scratch.mem, link.whole_archives);
@@ -34,15 +32,20 @@ static void run_link_test(s32* utest_result, link_test_t test) {
   sp_da_init(scratch.mem, link.system_libs);
   sp_da_init(scratch.mem, link.lib_dirs);
   sp_da_init(scratch.mem, link.rpath);
-  sp_da_init(scratch.mem, link.exports.symbols);
   sp_da_init(scratch.mem, link.frameworks);
-  sp_da_push(link.objects, sp_str_lit("main.o"));
+
+  spn_cc_link_files_t files = {
+    .output = sp_str_lit("main"),
+  };
+  sp_da_init(scratch.mem, files.objects);
+  sp_da_init(scratch.mem, files.exports.symbols);
+  sp_da_push(files.objects, sp_str_lit("main.o"));
   if (test.exports) {
-    link.exports.path = sp_str_from_cstr(scratch.mem, test.exports);
+    files.exports.path = sp_str_from_cstr(scratch.mem, test.exports);
   }
   sp_carr_for(test.export_symbols, it) {
     if (!test.export_symbols[it]) break;
-    sp_da_push(link.exports.symbols, sp_str_from_cstr(scratch.mem, test.export_symbols[it]));
+    sp_da_push(files.exports.symbols, sp_str_from_cstr(scratch.mem, test.export_symbols[it]));
   }
   if (test.whole_archive) {
     sp_da_push(link.whole_archives, sp_str_from_cstr(scratch.mem, test.whole_archive));
@@ -64,7 +67,7 @@ static void run_link_test(s32* utest_result, link_test_t test) {
   }
   link.subsystem = test.subsystem;
   spn_invocation_t invocation = sp_zero;
-  spn_err_union_t err = spn_cc_render_link(scratch.mem, &toolchain, &test.profile, &link, &invocation);
+  spn_err_union_t err = spn_cc_render_link(scratch.mem, &toolchain, &test.profile, &link, &files, &invocation);
   EXPECT_EQ(err.kind, test.expect.err);
   if (test.expect.err) {
     EXPECT_EQ(err.compiler.feature, test.expect.feature);

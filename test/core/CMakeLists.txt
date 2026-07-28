@@ -141,6 +141,7 @@ add_executable(compiler_flags
   compiler.c
   compiler/archive.c
   compiler/compile.c
+  compiler/exports/format.c
   compiler/exports/render.c
   compiler/link.c
   compiler/toc.c

@@ -20,14 +20,12 @@ static spn_cc_link_t spn_build_link_desc(sp_mem_t mem, spn_target_unit_t* target
   spn_cc_link_t link = {
     .lang = target->link.lang,
     .kind = target->kind,
-    .exports = target->link.exports,
     .system_libs = target->link.system_libs,
     .whole_archives = target->link.whole_archives,
     .private_libs = target->link.private_libs,
     .lib_dirs = target->link.lib_dirs,
     .frameworks = target->link.frameworks,
   };
-  sp_da_init(mem, link.objects);
   sp_da_init(mem, link.args);
   sp_da_init(mem, link.libs);
   sp_da_init(mem, link.rpath);
@@ -55,27 +53,24 @@ static spn_cc_link_t spn_build_link_desc(sp_mem_t mem, spn_target_unit_t* target
   return link;
 }
 
-spn_err_union_t render_linker_invocation(sp_mem_t mem, spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, spn_invocation_t* invocation) {
+spn_err_union_t spn_build_link_invocation(sp_mem_t mem, spn_target_unit_t* target, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
   spn_profile_info_t* profile = &target->pkg->build->profile;
   spn_cc_toolchain_t* toolchain = &target->pkg->build->toolchain->cc;
 
   switch (target->kind) {
     case SPN_CC_OUTPUT_STATIC_LIB: {
-      spn_cc_archive_t archive = {
-        .output = output,
-        .objects = objects,
+      spn_cc_archive_files_t archive_files = {
+        .output = files->output,
+        .objects = files->objects,
       };
-      sp_da_init(mem, archive.args);
-      try_union(spn_cc_render_archive(mem, toolchain, profile, &archive, invocation));
+      try_union(spn_cc_render_archive(mem, toolchain, profile, &archive_files, invocation));
       break;
     }
     case SPN_CC_OUTPUT_EXE:
     case SPN_CC_OUTPUT_SHARED_LIB:
     case SPN_CC_OUTPUT_REACTOR: {
       spn_cc_link_t link = spn_build_link_desc(mem, target);
-      link.output = output;
-      link.objects = objects;
-      try_union(spn_cc_render_link(mem, toolchain, profile, &link, invocation));
+      try_union(spn_cc_render_link(mem, toolchain, profile, &link, files, invocation));
       break;
     }
     case SPN_CC_OUTPUT_OBJECT: {
@@ -88,7 +83,7 @@ spn_err_union_t render_linker_invocation(sp_mem_t mem, spn_target_unit_t* target
 }
 
 
-spn_err_t emit_link_passed(spn_target_unit_t* unit, sp_str_t output, sp_str_t out, u64 elapsed) {
+spn_err_t emit_link_passed(spn_target_unit_t* unit, spn_invocation_t* invocation, sp_str_t output, sp_str_t out, u64 elapsed) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_PASSED,
     .pkg = unit->pkg->info,
@@ -96,7 +91,7 @@ spn_err_t emit_link_passed(spn_target_unit_t* unit, sp_str_t output, sp_str_t ou
     .target.name = unit->info->name,
     .target.link_passed = {
       .output_path = output,
-      .invocation = &unit->invocation,
+      .invocation = invocation,
       .out = out,
       .time = elapsed,
     }
@@ -104,7 +99,7 @@ spn_err_t emit_link_passed(spn_target_unit_t* unit, sp_str_t output, sp_str_t ou
   return SPN_OK;
 }
 
-spn_err_t emit_link_failed(spn_target_unit_t* unit, s32 rc, sp_str_t out, sp_str_t err) {
+spn_err_t emit_link_failed(spn_target_unit_t* unit, spn_invocation_t* invocation, s32 rc, sp_str_t out, sp_str_t err) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_FAILED,
     .pkg = unit->pkg->info,
@@ -114,7 +109,7 @@ spn_err_t emit_link_failed(spn_target_unit_t* unit, s32 rc, sp_str_t out, sp_str
       .exit_code = rc,
       .out = out,
       .err = err,
-      .invocation = &unit->invocation,
+      .invocation = invocation,
     }
   });
   return SPN_ERROR;
@@ -149,26 +144,6 @@ static spn_err_union_t read_archive_symbols(sp_str_t path, sp_da(sp_str_t)* symb
   return spn_result(err);
 }
 
-static sp_str_t exports_file_name(sp_mem_t mem, spn_target_unit_t* target) {
-  const c8* extension = "map";
-  switch (target->pkg->build->profile.os) {
-    case SPN_OS_MACOS: {
-      extension = "exp";
-      break;
-    }
-    case SPN_OS_WINDOWS: {
-      extension = "def";
-      break;
-    }
-    case SPN_OS_LINUX:
-    case SPN_OS_WASI:
-    case SPN_OS_NONE: {
-      break;
-    }
-  }
-  return sp_fmt(mem, "{}.{}", SP_FMT_STR(target->info->name), sp_fmt_cstr(extension)).value;
-}
-
 static s32 exports_fail(spn_err_union_t err) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_ERR,
@@ -177,81 +152,108 @@ static s32 exports_fail(spn_err_union_t err) {
   return 1;
 }
 
-static s32 spn_build_target_exports(sp_mem_t scratch, spn_target_unit_t* target, sp_da(sp_str_t) objects) {
-  sp_mem_t mem = spn.mem;
+static s32 spn_link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_da(sp_str_t) objects, sp_str_t output) {
   spn_pkg_unit_t* pkg = target->pkg;
   spn_profile_info_t* profile = &pkg->build->profile;
   spn_cc_toolchain_t* toolchain = &pkg->build->toolchain->cc;
 
-  // @linker Can we use the DAG for this?
-  sp_str_t index_name = sp_fmt(mem, "{}.exports.a", SP_FMT_STR(target->info->name)).value;
-  sp_str_t index_path = sp_fs_join_path(mem, pkg->paths.work, index_name);
-  sp_fs_remove(index_path);
-
-  spn_cc_archive_t archive = {
-    .output = index_path,
+  spn_cc_archive_files_t files = {
+    .output = sp_fmt(spn.mem, "{}.a", SP_FMT_STR(output)).value,
     .objects = objects,
   };
-  sp_da_init(mem, archive.args);
-  try_emit(spn_cc_render_archive(mem, toolchain, profile, &archive, &target->invocation), spn.events);
+  spn_invocation_t* invocation = sp_alloc_type(spn.mem, spn_invocation_t);
+  try_emit(spn_cc_render_archive(spn.mem, toolchain, profile, &files, invocation), spn.events);
+  invocation->cwd = pkg->paths.work;
 
-  target->invocation.cwd = pkg->paths.work;
-  spn_invocation_result_t run = spn_invocation_run(&target->invocation);
+  spn_invocation_result_t run = spn_invocation_run(invocation);
   if (run.result.status.exit_code) {
-    return emit_link_failed(target, run.result.status.exit_code, run.result.out, run.result.err);
+    return emit_link_failed(target, invocation, run.result.status.exit_code, run.result.out, run.result.err);
   }
 
-  // @linker Why don't other platforms ever carry explicit symbols? Not sure if this is just what I punted on and we just couldn't punt for WASM without completely breaking it or if it's bad design
   spn_symbol_set_t seen;
   sp_str_ht_init(scratch, seen);
   sp_da(sp_str_t) symbols = sp_da_new(scratch, sp_str_t);
-  try_emit(read_archive_symbols(index_path, &symbols, &seen), spn.events);
-
+  try_emit(read_archive_symbols(files.output, &symbols, &seen), spn.events);
   sp_da_for(target->link.whole_archives, it) {
     try_emit(read_archive_symbols(target->link.whole_archives[it], &symbols, &seen), spn.events);
   }
 
-  if (target->kind == SPN_CC_OUTPUT_REACTOR) {
-    target->link.exports.symbols = symbols;
-    return 0;
-  }
-
-  sp_str_t path = sp_fs_join_path(mem, pkg->paths.work, exports_file_name(mem, target));
   sp_io_file_writer_t writer = sp_zero;
-  if (sp_io_file_writer_from_path(&writer, path) != SP_OK) {
-    return exports_fail((spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs.path = path });
+  if (sp_io_file_writer_from_path(&writer, output) != SP_OK) {
+    return exports_fail((spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs.path = output });
   }
 
-  switch (profile->os) {
-    case SPN_OS_MACOS: {
+  switch (spn_cc_exports_format(target->kind, profile->os)) {
+    case SPN_CC_EXPORTS_VERSION_SCRIPT: {
+      spn_exports_render_version_script(&writer.base, symbols);
+      break;
+    }
+    case SPN_CC_EXPORTS_SYMBOL_LIST:
+    case SPN_CC_EXPORTS_WASM: {
       spn_exports_render_symbol_list(&writer.base, symbols);
       break;
     }
-    case SPN_OS_WINDOWS: {
+    case SPN_CC_EXPORTS_DEF: {
       spn_exports_render_def(&writer.base, target->info->name, symbols);
-      break;
-    }
-    case SPN_OS_LINUX:
-    case SPN_OS_WASI:
-    case SPN_OS_NONE: {
-      spn_exports_render_version_script(&writer.base, symbols);
       break;
     }
   }
   sp_io_file_writer_close(&writer);
 
-  target->link.exports.path = path;
   return 0;
 }
 
-static s32 spn_link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects) {
-  if (target->kind == SPN_CC_OUTPUT_SHARED_LIB || target->kind == SPN_CC_OUTPUT_REACTOR) {
-    if (spn_build_target_exports(scratch, target, objects)) {
-      return 1;
+s32 spn_link_exports_run(spn_target_unit_t* target, sp_da(sp_str_t) objects, sp_str_t output) {
+  spn_pkg_unit_announce_compile(target->pkg);
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  s32 result = spn_link_exports_exec(scratch.mem, target, objects, output);
+  sp_mem_end_scratch(scratch);
+  return result;
+}
+
+static spn_err_union_t read_export_symbols(sp_mem_t mem, sp_str_t path, sp_da(sp_str_t)* symbols) {
+  sp_str_t content = sp_zero;
+  if (sp_io_read_file(mem, path, &content)) {
+    return (spn_err_union_t) { .kind = SPN_ERR_FS_READ, .fs.path = path };
+  }
+
+  sp_da(sp_str_t) lines = sp_str_split_c8(mem, content, '\n');
+  sp_da_for(lines, it) {
+    if (!sp_str_empty(lines[it])) {
+      sp_da_push(*symbols, lines[it]);
+    }
+  }
+  return spn_result(SPN_OK);
+}
+
+static s32 spn_link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, sp_str_t exports) {
+  spn_cc_link_files_t files = {
+    .output = output,
+    .objects = objects,
+  };
+  switch (target->kind) {
+    case SPN_CC_OUTPUT_REACTOR: {
+      sp_da_init(scratch, files.exports.symbols);
+      try_emit(read_export_symbols(scratch, exports, &files.exports.symbols), spn.events);
+      break;
+    }
+    case SPN_CC_OUTPUT_SHARED_LIB: {
+      files.exports.path = exports;
+      break;
+    }
+    case SPN_CC_OUTPUT_EXE:
+    case SPN_CC_OUTPUT_STATIC_LIB: {
+      sp_assert(sp_str_empty(exports));
+      break;
+    }
+    case SPN_CC_OUTPUT_OBJECT: {
+      sp_unreachable_case();
     }
   }
 
-  spn_err_union_t render = render_linker_invocation(spn.mem, target, output, objects, &target->invocation);
+  spn_invocation_t* invocation = sp_alloc_type(spn.mem, spn_invocation_t);
+  spn_err_union_t render = spn_build_link_invocation(spn.mem, target, &files, invocation);
   if (render.kind) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_ERR,
@@ -260,16 +262,16 @@ static s32 spn_link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_
     return 1;
   }
 
-  spn_invocation_result_t run = spn_invocation_run(&target->invocation);
+  spn_invocation_result_t run = spn_invocation_run(invocation);
 
   if (run.result.status.exit_code) {
-    return emit_link_failed(target, run.result.status.exit_code, run.result.out, run.result.err);
+    return emit_link_failed(target, invocation, run.result.status.exit_code, run.result.out, run.result.err);
   }
 
-  return emit_link_passed(target, get_target_output_path(spn.mem, target), run.result.out, run.elapsed);
+  return emit_link_passed(target, invocation, get_target_output_path(spn.mem, target), run.result.out, run.elapsed);
 }
 
-s32 spn_link_target_run(spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects) {
+s32 spn_link_target_run(spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, sp_str_t exports) {
   spn_pkg_unit_announce_compile(target->pkg);
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
@@ -283,7 +285,7 @@ s32 spn_link_target_run(spn_target_unit_t* target, sp_str_t output, sp_da(sp_str
   });
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  s32 result = spn_link_target_exec(scratch.mem, target, output, objects);
+  s32 result = spn_link_target_exec(scratch.mem, target, output, objects, exports);
   sp_mem_end_scratch(scratch);
   return result;
 }
