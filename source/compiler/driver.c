@@ -121,6 +121,38 @@ spn_err_union_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* to
   SP_UNREACHABLE_RETURN(spn_result(SPN_ERROR));
 }
 
+spn_invocation_t spn_cc_render_compile_command(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_invocation_t* base, const spn_cc_compile_files_t* files) {
+  sp_assert(!sp_str_empty(base->program));
+  sp_assert(!sp_str_empty(files->source));
+  sp_assert(!sp_str_empty(files->output));
+
+  spn_invocation_t invocation = {
+    .program = base->program,
+    .cwd = base->cwd,
+  };
+  sp_da_init(mem, invocation.args);
+  sp_da_reserve(invocation.args, sp_da_size(base->args));
+  sp_da_for(base->args, it) {
+    sp_da_push(invocation.args, base->args[it]);
+  }
+
+  switch (toolchain->driver) {
+    case SPN_CC_DRIVER_GCC:
+    case SPN_CC_DRIVER_CLANG: {
+      spn_gnu_render_compile_files(mem, files, &invocation);
+      break;
+    }
+    case SPN_CC_DRIVER_MSVC: {
+      spn_msvc_render_compile_files(mem, files, &invocation);
+      break;
+    }
+    case SPN_CC_DRIVER_NONE: {
+      sp_unreachable_case();
+    }
+  }
+  return invocation;
+}
+
 static spn_cc_feature_t link_feature(spn_cc_output_kind_t kind) {
   switch (kind) {
     case SPN_CC_OUTPUT_EXE: return SPN_CC_FEATURE_LINK_EXE;

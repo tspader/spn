@@ -52,9 +52,6 @@ typedef struct {
 
 typedef struct {
   spn_lang_t lang;
-  sp_str_t source;
-  sp_str_t output;
-  sp_str_t depfile;
   sp_da(sp_str_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) args;
@@ -62,6 +59,12 @@ typedef struct {
   bool pic;
   spn_os_version_t min_os;
 } spn_cc_compile_t;
+
+typedef struct {
+  sp_str_t source;
+  sp_str_t output;
+  sp_str_t depfile;
+} spn_cc_compile_files_t;
 
 typedef struct {
   sp_str_t path;
