@@ -78,27 +78,27 @@ static u32 kind_bits(spn_dep_kind_t kind) {
   return spn_dep_kind_bit(kind);
 }
 
-static spn_pkg_unit_t* add_unit(spn_session_t* s, spn_build_unit_t* build, spn_pkg_id_t pkg_id, u32 kinds, sp_da(spn_pkg_unit_t*)* pending) {
-  spn_pkg_unit_id_t id = { .pkg = pkg_id, .build = build->id };
-  if (sp_om_has(s->units.packages, id)) {
+static spn_pkg_unit_t* add_unit(spn_session_t* s, spn_build_unit_t* build, spn_pkg_id_t pid, u32 kinds, sp_da(spn_pkg_unit_t*)* pending) {
+  spn_pkg_unit_id_t uid = { .pkg = pid, .build = build->id };
+  if (sp_om_has(s->units.packages, uid)) {
     // First creation wins, so a request may never widen an existing unit's
     // kinds: members must be created before their host fallback
-    spn_pkg_unit_t* unit = sp_om_get(s->units.packages, id);
+    spn_pkg_unit_t* unit = sp_om_get(s->units.packages, uid);
     sp_assert((kinds & ~unit->kinds) == 0);
     return unit;
   }
 
-  spn_loaded_pkg_t* loaded = sp_ht_getp(s->packages, pkg_id);
+  spn_loaded_pkg_t* loaded = sp_ht_getp(s->packages, pid);
   sp_assert(loaded);
 
-  sp_om_insert(s->units.packages, id, sp_zero_struct(spn_pkg_unit_t));
+  sp_om_insert(s->units.packages, uid, sp_zero_struct(spn_pkg_unit_t));
   spn_pkg_unit_t* unit = sp_om_back(s->units.packages);
-  unit->id = id;
+  unit->id = uid;
   unit->build = build;
   unit->session = s;
   unit->source = loaded->source;
   unit->kinds = kinds;
-  unit->info = clone_pkg_info(s, pkg_id, build, loaded->info);
+  unit->info = clone_pkg_info(s, pid, build, loaded->info);
   sp_da_init(s->mem, unit->deps);
   sp_da_init(s->mem, unit->libs);
   sp_da_init(s->mem, unit->targets);
@@ -110,9 +110,6 @@ static spn_pkg_unit_t* add_unit(spn_session_t* s, spn_build_unit_t* build, spn_p
   return unit;
 }
 
-// Children land in the consumer's own build. Only metaprogram-build units
-// carry the BUILD bit, so the metaprogram build is absorbing; BUILD edges
-// enter it through the owner seeding below, never from a target build.
 static void drain(spn_session_t* s, sp_da(spn_pkg_unit_t*)* pending) {
   sp_for(it, sp_da_size(*pending)) {
     spn_pkg_unit_t* unit = (*pending)[it];
@@ -148,9 +145,6 @@ spn_err_union_t spn_units_add_packages(spn_session_t* s) {
   }
   drain(s, &pending);
 
-  // Packages with scripts need their metaprogram compiled: their BUILD dep
-  // closure first (those packages get libs in the metaprogram build), then a
-  // home for the scripts themselves
   sp_da(spn_pkg_unit_t*) owners = sp_da_new(scratch.mem, spn_pkg_unit_t*);
   sp_om_for(s->units.packages, it) {
     spn_pkg_unit_t* unit = sp_om_at(s->units.packages, it);
