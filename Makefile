@@ -9,11 +9,16 @@ ifeq ($(OS),Windows_NT)
   HOST_TRIPLE := $(HOST_ARCH)-windows-msvc
   NPROC := $(NUMBER_OF_PROCESSORS)
   HOME ?= $(USERPROFILE)
-  GENERATOR ?= Visual Studio 17 2022
-	GEN_FLAGS :=
-	ifneq ($(GENERATOR),)
-		GEN_FLAGS := -G "$(GENERATOR)"
-	endif
+  ifndef GENERATOR
+    GENERATOR := $(shell powershell -NoProfile -ExecutionPolicy Bypass -File "$(ROOT)/tools/cmake/find_vs_generator.ps1" 2>NUL)
+    ifeq ($(strip $(GENERATOR)),)
+      GENERATOR := Visual Studio 17 2022
+    endif
+  endif
+  GEN_FLAGS :=
+  ifneq ($(GENERATOR),)
+    GEN_FLAGS := -G "$(GENERATOR)"
+  endif
 else
   UNAME_M := $(shell uname -m)
   ifeq ($(UNAME_M),arm64)
