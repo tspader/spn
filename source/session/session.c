@@ -1,3 +1,5 @@
+#include "error/types.h"
+#include "filter/types.h"
 #include "sp.h"
 #include "sp/macro.h"
 #include "ctx/types.h"
@@ -6,6 +8,7 @@
 #include "semver/types.h"
 #include "session/types.h"
 #include "spn.h"
+#include "toolchain/select.h"
 #include "unit/types.h"
 
 #include "enum/enum.h"
@@ -69,7 +72,6 @@ static spn_err_union_t bind_toolchain(spn_session_t* session, spn_toolchain_quer
 
   spn_toolchain_unit_t* unit = sp_alloc_type(session->mem, spn_toolchain_unit_t);
   *unit = (spn_toolchain_unit_t) {
-    .id = (spn_toolchain_unit_id_t)sp_da_size(session->units.toolchains),
     .info = resolution.info,
     .host = query.host,
     .artifact = resolution.artifact,
@@ -81,7 +83,7 @@ static spn_err_union_t bind_toolchain(spn_session_t* session, spn_toolchain_quer
 
 static spn_build_unit_t* add_build_unit(spn_session_t* session, spn_build_unit_t value) {
   spn_build_unit_t* unit = sp_alloc_type(session->mem, spn_build_unit_t);
-  value.id = (spn_build_unit_id_t)sp_da_size(session->units.builds);
+  value.id = (spn_build_unit_index_t)sp_da_size(session->units.builds);
   *unit = value;
   sp_da_init(session->mem, unit->include);
   sp_da_init(session->mem, unit->packages);
@@ -90,32 +92,90 @@ static spn_build_unit_t* add_build_unit(spn_session_t* session, spn_build_unit_t
   return unit;
 }
 
-static spn_err_union_t add_target_build(spn_session_t* session, spn_profile_info_t profile, spn_build_unit_t** build) {
+typedef struct {
+  spn_triple_t host;
+  spn_triple_t target;
+  spn_profile_info_t profile;
+} build_unit_config_t;
+
+spn_toolchain_unit_id_t spn_toolchain_unit_id(spn_toolchain_unit_t* unit) {
+  return 0;
+}
+
+spn_toolchain_id_t spn_toolchain_id(spn_toolchain_info_t* info) {
+  return 0;
+}
+
+spn_profile_id_t spn_profile_id(spn_profile_info_t* info) {
+  return 0;
+}
+
+spn_build_unit_id_t spn_build_unit_id(spn_build_unit_t* unit) {
+  return 0;
+}
+
+static spn_err_union_t add_build(spn_session_t* s, build_unit_config_t b) {
+  spn_toolchain_resolution_t resolution = sp_zero;
+  try_union(spn_toolchain_select(&s->catalog, (spn_toolchain_query_t) {
+    .name = b.profile.toolchain,
+    .target = b.target,
+    .host = b.host,
+  }, &resolution));
+
+  spn_toolchain_unit_t* toolchain = sp_om_put(
+    s->units.chains,
+    resolution.info,
+    ((spn_toolchain_unit_t) {
+      .info = resolution.info,
+      .host = b.host,
+      .artifact = resolution.artifact,
+    })
+  );
+
+  if (!sp_om_has(s->units.contexts, bid)) {
+    spn_build_unit_t unit = {
+      .id = bid,
+      .profile = b.profile,
+      .toolchain = toolchain,
+      .paths = {
+        .root = spn_profile_build_path(s->mem, s->paths.build, &b.profile),
+      }
+    };
+    sp_da_init(s->mem, unit.include);
+    sp_da_init(s->mem, unit.packages);
+    sp_da_init(s->mem, unit.hosts);
+    sp_om_put(s->units.contexts, bid, unit);
+  }
+
+  return spn_result(SPN_OK);
+}
+
+static spn_err_union_t add_target_build(spn_session_t* s, spn_profile_info_t profile, spn_target_selection_t selection) {
   spn_triple_t host = spn_triple_host();
   spn_triple_t target = { profile.arch, profile.os, profile.abi };
   spn_toolchain_unit_t* toolchain = SP_NULLPTR;
-  try_union(bind_toolchain(session, (spn_toolchain_query_t) {
+  try_union(bind_toolchain(s, (spn_toolchain_query_t) {
     .name = profile.toolchain,
     .target = target,
     .host = host,
     .role = SPN_TOOLCHAIN_ROLE_BUILD,
   }, &toolchain));
 
-  spn_build_unit_t* unit = add_build_unit(session, (spn_build_unit_t) {
+  spn_build_unit_t* unit = add_build_unit(s, (spn_build_unit_t) {
     .profile = profile,
     .toolchain = toolchain,
     .paths = {
-      .root = spn_profile_build_path(session->mem, session->paths.build, &profile),
+      .root = spn_profile_build_path(s->mem, s->paths.build, &profile),
     },
   });
 
   spn_build_plan_t plan = {
     .build = unit,
-    .selection = session->plan.request.targets,
+    .selection = selection,
   };
-  sp_da_init(session->mem, plan.roots);
-  sp_da_push(session->plan.builds, plan);
-  *build = unit;
+  sp_da_init(s->mem, plan.roots);
+  sp_da_push(s->plans, plan);
+  s->units.target = unit;
   return spn_result(SPN_OK);
 }
 
@@ -192,11 +252,45 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
     s->profile.sysroot = resolve_macos_sdk(s->mem);
   }
 
-  s->plan.request = config.compile;
-  sp_da_init(s->mem, s->plan.builds);
+  sp_da_init(s->mem, s->plans);
   sp_da_init(s->mem, s->units.builds);
   sp_da_init(s->mem, s->units.toolchains);
-  try_union(add_target_build(s, s->profile, &s->units.target));
+  sp_om_new(s->units.chains);
+  sp_om_new(s->units.contexts);
+
+  try_union(add_build(s, (build_unit_config_t) {
+    .host = spn_triple_host(),
+    .target = { s->profile.arch, s->profile.os, s->profile.abi },
+    .profile = s->profile,
+  }));
+
+  try_union(add_build(s, (build_unit_config_t) {
+    .host = spn_triple_host(),
+    .target = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_NONE },
+    .profile = {
+      .name = sp_str_lit("metaprogram"),
+      .arch = SPN_ARCH_WASM32,
+      .os = SPN_OS_WASI,
+      .abi = SPN_ABI_NONE,
+      .mode = SPN_BUILD_MODE_DEBUG,
+      .opt = SPN_OPT_LEVEL_2,
+      .standard = SPN_C99,
+      .linkage = SPN_LIB_KIND_STATIC,
+    }
+  }));
+
+  spn_build_plan_t plan = {
+    .build = unit,
+    .selection = (spn_target_selection_t) {
+      .configure = true
+    }
+  };
+  sp_da_init(s->mem, plan.roots);
+  sp_da_push(s->plans, plan);
+  s->units.target = unit;
+
+
+  try_union(add_target_build(s, s->profile, config.selection));
   try_union(add_metaprogram_build(s, &s->units.metaprogram));
 
   return spn_result(SPN_OK);

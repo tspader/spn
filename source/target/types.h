@@ -43,6 +43,11 @@ typedef struct {
 } spn_closure_entry_t;
 
 typedef struct {
+  sp_da(spn_pkg_unit_t*) pkgs;
+  sp_da(spn_target_unit_t*) targets;
+} spn_link_closure_t;
+
+typedef struct {
   spn_pkg_unit_t* pkg;
   spn_target_unit_t* lib;
   bool private;

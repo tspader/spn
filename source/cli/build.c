@@ -24,12 +24,12 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
 
   bool specific = command->only.bin || command->only.lib || command->only.test || command->only.script;
   if (specific || !sp_da_empty(names)) {
-    app.config.compile.targets.kind = SPN_TARGET_SELECTION_EXPLICIT;
+    app.config.selection.kind = SPN_TARGET_SELECTION_EXPLICIT;
     bool all_kinds = !specific;
-    spn_cli_build_set_rule(&app.config.compile.targets.targets.bin, all_kinds || command->only.bin, names);
-    spn_cli_build_set_rule(&app.config.compile.targets.targets.lib, all_kinds || command->only.lib, names);
-    spn_cli_build_set_rule(&app.config.compile.targets.targets.test, all_kinds || command->only.test, names);
-    spn_cli_build_set_rule(&app.config.compile.targets.targets.script, all_kinds || command->only.script, names);
+    spn_cli_build_set_rule(&app.config.selection..bin, all_kinds || command->only.bin, names);
+    spn_cli_build_set_rule(&app.config.selection..lib, all_kinds || command->only.lib, names);
+    spn_cli_build_set_rule(&app.config.selection..test, all_kinds || command->only.test, names);
+    spn_cli_build_set_rule(&app.config.selection..script, all_kinds || command->only.script, names);
   }
 
   return spn_plan(

@@ -26,6 +26,12 @@ typedef struct spn_user_node_t spn_user_node_t;
 typedef struct spn_dag_build_t spn_dag_build_t;
 typedef struct sp_intern_t sp_intern_t;
 
+typedef sp_hash_t spn_profile_id_t;
+typedef sp_hash_t spn_toolchain_id_t;
+typedef sp_hash_t spn_toolchain_unit_id_t;
+typedef sp_hash_t spn_build_unit_id_t;
+
+
 typedef struct toml_table_t toml_table_t;
 
 typedef s32  (*spn_node_fn_t)(spn_t*, spn_node_ctx_t*);

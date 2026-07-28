@@ -5,6 +5,7 @@
 
 typedef sp_da(sp_str_t) spn_target_names_t;
 
+
 typedef enum {
   SPN_TARGET_RULE_NONE,
   SPN_TARGET_RULE_ALL,
@@ -21,14 +22,21 @@ typedef enum {
   SPN_TARGET_SELECTION_EXPLICIT,
 } spn_target_selection_kind_t;
 
+typedef enum {
+  SPN_TARGET_SOURCE_ROOT,
+  SPN_TARGET_SOURCE_TOOL,
+} spn_target_selection_source_t;
+
 typedef struct {
   spn_target_selection_kind_t kind;
+  spn_target_selection_source_t source;
   struct {
     spn_target_rule_t bin;
     spn_target_rule_t lib;
     spn_target_rule_t test;
     spn_target_rule_t script;
-  } targets;
+    bool configure;
+  };
 } spn_target_selection_t;
 
 #endif
