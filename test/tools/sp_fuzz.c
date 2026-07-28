@@ -110,8 +110,8 @@ static sp_err_t sp_fuzz_fmt_hex(sp_io_writer_t* io, sp_fmt_arg_t* arg) {
 
 u64 sp_fuzz_seed_init_str(sp_str_t seed) {
   sp_fuzz_seed_compute(seed);
-  sp_io_stream_writer_t out = sp_io_get_std_out();
-  sp_fmt_io(&out.base, "--seed 0x{}\n", sp_fmt_u64_custom(sp_fuzz_seed, sp_fuzz_fmt_hex));
+  sp_io_writer_t* out = sp_io_get_std_out();
+  sp_fmt_io(out, "--seed 0x{}\n", sp_fmt_u64_custom(sp_fuzz_seed, sp_fuzz_fmt_hex));
   return sp_fuzz_seed;
 }
 

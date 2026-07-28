@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 set(DEPS
-  "sp|https://github.com/tspader/sp.git|cb474f197d44a332e3a7e6fd84dff06e276f7d4a"
+  "sp|https://github.com/tspader/sp.git|a64b2fde415d49da94d02173231757a5e9d8c4ba"
   "toml|https://github.com/tspader/toml.git|2e8ffdfa215cfe184fd06f8f48b47fbd04a4a678"
   "argparse|https://github.com/tspader/argparse.git|f71ed6c7b11cdbe75ffa0b42170530cc8610cbbf"
   "yyjson|https://github.com/ibireme/yyjson.git|ad58f21bee1213a8fdd614c2a11b4453815a73e9"

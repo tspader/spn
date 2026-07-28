@@ -75,7 +75,7 @@ void fz_dump(fz_universe_t* u, u64 iter) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_mem_t mem = scratch.mem;
 
-  sp_io_stream_writer_t out = sp_io_get_std_out();
+  sp_io_writer_t* out = sp_io_get_std_out();
 
   sp_str_t mode = u->planted ? sp_str_lit("planted") : sp_str_lit("free");
   if (u->profile.features) {
@@ -89,7 +89,7 @@ void fz_dump(fz_universe_t* u, u64 iter) {
   }
 
   if (sp_da_size(u->pkgs) > 8) {
-    sp_fmt_io(&out.base, "fuzz repro: mode={} iter={}: {} pkgs exceeds the fixture's 8, replay with --iter {}\n",
+    sp_fmt_io(out, "fuzz repro: mode={} iter={}: {} pkgs exceeds the fixture's 8, replay with --iter {}\n",
       sp_fmt_str(mode), sp_fmt_uint(iter), sp_fmt_uint(sp_da_size(u->pkgs)), sp_fmt_uint(iter));
     sp_mem_end_scratch(scratch);
     return;
@@ -161,10 +161,10 @@ void fz_dump(fz_universe_t* u, u64 iter) {
 
   sp_str_t tmpl = sp_zero;
   if (fz_load_template(mem, &tmpl)) {
-    sp_template_render(&out.base, tmpl, scope, SP_NULLPTR);
+    sp_template_render(out, tmpl, scope, SP_NULLPTR);
   }
   else {
-    sp_fmt_io(&out.base, "fuzz: repro template missing; replay with --iter {}\n", sp_fmt_uint(iter));
+    sp_fmt_io(out, "fuzz: repro template missing; replay with --iter {}\n", sp_fmt_uint(iter));
   }
 
   u64 widest = 0;
@@ -176,10 +176,10 @@ void fz_dump(fz_universe_t* u, u64 iter) {
     }
   }
   if (widest > 4) {
-    sp_fmt_io(&out.base, "fuzz: a release holds {} deps; fixture_t caps deps at 4, replay with --iter {}\n", sp_fmt_uint(widest), sp_fmt_uint(iter));
+    sp_fmt_io(out, "fuzz: a release holds {} deps; fixture_t caps deps at 4, replay with --iter {}\n", sp_fmt_uint(widest), sp_fmt_uint(iter));
   }
   if (locals) {
-    sp_fmt_io(&out.base, "fuzz: universe holds local packages; the fixture renders them as index entries, replay with --iter {}\n", sp_fmt_uint(iter));
+    sp_fmt_io(out, "fuzz: universe holds local packages; the fixture renders them as index entries, replay with --iter {}\n", sp_fmt_uint(iter));
   }
 
   sp_mem_end_scratch(scratch);

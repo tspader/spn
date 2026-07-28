@@ -828,11 +828,11 @@ void spn_bg_executor_log_cmd(spn_bg_executor_t* ex, spn_bg_cmd_t* cmd) {
 
   sp_mutex_lock(&ex->mutex);
   if (!sp_str_empty(cmd->tag)) {
-    sp_os_print(sp_fmt(ex->allocator, "[exec] {}\n", sp_fmt_str(cmd->tag)).value);
+    sp_io_write_str(sp_io_get_std_out(), sp_fmt(ex->allocator, "[exec] {}\n", sp_fmt_str(cmd->tag)).value, SP_NULLPTR);
   } else if (cmd->kind == SPN_BUILD_CMD_SUBPROCESS && !sp_str_empty(cmd->ps.command)) {
-    sp_os_print(sp_fmt(ex->allocator, "[exec] {}\n", sp_fmt_str(cmd->ps.command)).value);
+    sp_io_write_str(sp_io_get_std_out(), sp_fmt(ex->allocator, "[exec] {}\n", sp_fmt_str(cmd->ps.command)).value, SP_NULLPTR);
   } else {
-    sp_os_print(sp_fmt(ex->allocator, "[exec] cmd@{}\n", sp_fmt_ptr(cmd)).value);
+    sp_io_write_str(sp_io_get_std_out(), sp_fmt(ex->allocator, "[exec] cmd@{}\n", sp_fmt_ptr(cmd)).value, SP_NULLPTR);
   }
   sp_mutex_unlock(&ex->mutex);
 }

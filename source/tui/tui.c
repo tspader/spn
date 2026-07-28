@@ -1515,7 +1515,7 @@ static void spn_prompt_start(void) {
   tui->prompt.started = true;
 
   if (tui->mode != SPN_OUTPUT_MODE_INTERACTIVE) return;
-  if (!sp_os_is_tty(sp_sys_stdout)) return;
+  if (!sp_sys_is_tty(sp_sys_stdout)) return;
 
   tui->prompt.ctx = sp_prompt_begin(spn.mem);
   if (!tui->prompt.ctx) return;

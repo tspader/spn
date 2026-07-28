@@ -194,7 +194,7 @@ static spn_err_union_t run(sp_mem_t mem, spn_cli_init_t* command, sp_str_t proje
   try_union(validate_dir(mem, command, dir));
 
   sp_str_t name = sp_fs_get_name(dir);
-  if (sp_os_is_tty(sp_sys_stdout) && sp_str_empty(command->path)) {
+  if (sp_sys_is_tty(sp_sys_stdout) && sp_str_empty(command->path)) {
     return run_prompt(mem, command, dir, name);
   }
 

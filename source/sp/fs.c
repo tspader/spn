@@ -3,6 +3,7 @@
 
 #if defined(SP_MACOS) || defined(SP_COSMO)
   #include <sys/file.h>
+  #include <errno.h>
 #endif
 
 #if defined(SP_LINUX) && !defined(SP_SYSCALL_NUM_FLOCK)
@@ -32,14 +33,13 @@ s32 sp_sys_flock(sp_sys_fd_t fd, s32 op) {
   }
 
   u32 error = GetLastError();
-  errno = (error == ERROR_LOCK_VIOLATION || error == ERROR_IO_PENDING) ? SP_EAGAIN : error;
-  return -1;
+  return (error == ERROR_LOCK_VIOLATION || error == ERROR_IO_PENDING) ? -(s32)SP_EAGAIN : -1;
 
 #elif defined(SP_LINUX)
   s32 rc;
   do {
     rc = (s32)sp_syscall(SP_SYSCALL_NUM_FLOCK, fd, op);
-  } while (rc == -1 && errno == SP_EINTR);
+  } while (rc == -SP_EINTR);
   return rc;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
@@ -47,7 +47,7 @@ s32 sp_sys_flock(sp_sys_fd_t fd, s32 op) {
   do {
     rc = flock((s32)fd, op);
   } while (rc == -1 && errno == SP_EINTR);
-  return rc;
+  return rc == -1 ? -errno : rc;
 
 #else
   #error "sp_sys_flock"
@@ -56,8 +56,10 @@ s32 sp_sys_flock(sp_sys_fd_t fd, s32 op) {
 
 static sp_err_t sp_fs_lock_open(sp_fs_lock_t* lock, sp_str_t path) {
   *lock = sp_zero_s(sp_fs_lock_t);
-  lock->fd = sp_sys_open_s(sp_sys_get_root(0), path, SP_O_CREAT | SP_O_RDWR | SP_O_BINARY, 0644);
-  return lock->fd == SP_SYS_INVALID_FD ? SP_ERR_OS : SP_OK;
+  if (sp_sys_open_s(sp_sys_get_root(0), path, SP_SYS_OPEN_MODE_RW, SP_SYS_OPEN_CREATE, &lock->fd)) {
+    return SP_ERR_OS;
+  }
+  return SP_OK;
 }
 
 static void sp_fs_lock_drop(sp_fs_lock_t* lock) {
@@ -81,8 +83,9 @@ sp_err_t sp_fs_lock_try_acquire(sp_fs_lock_t* lock, sp_str_t path, bool* acquire
   *acquired = false;
   sp_try(sp_fs_lock_open(lock, path));
 
-  if (sp_sys_flock(lock->fd, SP_LOCK_EX | SP_LOCK_NB)) {
-    sp_err_t err = errno == SP_EAGAIN ? SP_OK : SP_ERR_OS;
+  s32 rc = sp_sys_flock(lock->fd, SP_LOCK_EX | SP_LOCK_NB);
+  if (rc) {
+    sp_err_t err = rc == -(s32)SP_EAGAIN ? SP_OK : SP_ERR_OS;
     sp_fs_lock_drop(lock);
     return err;
   }
