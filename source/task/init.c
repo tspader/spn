@@ -167,7 +167,7 @@ static spn_err_union_t run_prompt(sp_mem_t mem, spn_cli_init_t* command, sp_str_
       .on_event = on_submit_prompt,
       .render = on_render_prompt,
     });
-    sp_str_t hint = sp_fmt(s.mem, "To run your program:\n\n  spn run {}", sp_fmt_str(name)).value;
+    sp_str_t hint = sp_fmt(s.mem, "To build your program:\n\n  spn build {}", sp_fmt_str(name)).value;
     sp_prompt_note(prompt, sp_str_to_cstr(s.mem, hint), "Done");
   }
 
@@ -184,7 +184,7 @@ static spn_err_union_t run_unattended(sp_mem_t mem, spn_cli_init_t* command, sp_
     spn_log_info("- {}", sp_fmt_str(it.rel));
   }
   spn_log_info("");
-  spn_log_info("To run your program:\n\n  spn run {}", sp_fmt_str(name));
+  spn_log_info("To build your program:\n\n  spn build {}", sp_fmt_str(name));
 
   return spn_result(SPN_OK);
 }
