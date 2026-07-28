@@ -294,18 +294,15 @@ static sp_str_t static_archive_path(sp_mem_t mem, spn_target_unit_t* lib) {
   return path;
 }
 
-static void push_frameworks(sp_da(sp_str_t)* frameworks, sp_da(sp_str_t) values) {
+typedef sp_str_ht(u8) link_framework_set_t;
+
+static void push_frameworks(link_framework_set_t* seen, sp_da(sp_str_t)* frameworks, sp_da(sp_str_t) values) {
   sp_da_for(values, it) {
-    bool present = false;
-    sp_da_for(*frameworks, jt) {
-      if (sp_str_equal((*frameworks)[jt], values[it])) {
-        present = true;
-        break;
-      }
+    if (sp_str_ht_exists(*seen, values[it])) {
+      continue;
     }
-    if (!present) {
-      sp_da_push(*frameworks, values[it]);
-    }
+    sp_str_ht_insert(*seen, values[it], (u8)true);
+    sp_da_push(*frameworks, values[it]);
   }
 }
 
@@ -398,30 +395,42 @@ static spn_lang_t link_plan_lang(spn_target_unit_t* target, sp_da(spn_link_lib_t
   return SPN_LANG_C;
 }
 
+static bool dep_code_links_into_target(spn_pkg_unit_t* dep) {
+  sp_da_for(dep->libs, lt) {
+    spn_target_unit_t* lib = dep->libs[lt];
+    if (lib->info->no_link) continue;
+    if (lib->lib_kind == SPN_LIB_KIND_SHARED) continue;
+    return true;
+  }
+  return sp_da_empty(dep->libs);
+}
+
 static void link_plan_frameworks(spn_target_unit_t* target, sp_da(spn_closure_entry_t) closure, sp_da(sp_str_t)* frameworks) {
-  push_frameworks(frameworks, target->info->macos.frameworks);
-  push_frameworks(frameworks, target->pkg->info->macos.frameworks);
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  link_framework_set_t seen;
+  sp_str_ht_init(s.mem, seen);
+
+  push_frameworks(&seen, frameworks, target->info->macos.frameworks);
+  push_frameworks(&seen, frameworks, target->pkg->info->macos.frameworks);
 
   sp_da_for(target->deps.target, it) {
     spn_target_unit_t* lib = target->deps.target[it];
     if (lib->info->no_link) continue;
     if (lib->lib_kind == SPN_LIB_KIND_SHARED) continue;
-    push_frameworks(frameworks, lib->info->macos.frameworks);
+    push_frameworks(&seen, frameworks, lib->info->macos.frameworks);
   }
 
   sp_da_for(closure, it) {
     spn_pkg_unit_t* dep = closure[it].pkg;
     if (dep == target->pkg) continue;
-    bool static_link = false;
     sp_da_for(dep->libs, lt) {
       spn_target_unit_t* lib = dep->libs[lt];
       if (lib->info->no_link) continue;
       if (lib->lib_kind == SPN_LIB_KIND_SHARED) continue;
-      static_link = true;
-      push_frameworks(frameworks, lib->info->macos.frameworks);
+      push_frameworks(&seen, frameworks, lib->info->macos.frameworks);
     }
-    if (static_link || sp_da_empty(dep->libs)) {
-      push_frameworks(frameworks, dep->info->macos.frameworks);
+    if (dep_code_links_into_target(dep)) {
+      push_frameworks(&seen, frameworks, dep->info->macos.frameworks);
     }
   }
 }

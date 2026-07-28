@@ -188,6 +188,7 @@ spn_err_union_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const 
 
 spn_err_union_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
   sp_assert(!sp_str_empty(files->output));
+  if (!sp_str_empty(files->exports.path)) sp_assert(sp_da_empty(files->exports.symbols));
   try_union(spn_cc_validate_link(toolchain, profile, link->kind, !sp_da_empty(link->frameworks)));
   *invocation = sp_zero_s(spn_invocation_t);
   switch (toolchain->driver) {

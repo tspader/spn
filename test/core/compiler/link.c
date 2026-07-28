@@ -26,6 +26,7 @@ static void run_link_test(s32* utest_result, link_test_t test) {
     .kind = test.kind,
     .min_os = test.min_os,
     .rpath = test.rpath,
+    .subsystem = test.subsystem,
   };
   sp_da_init(scratch.mem, link.libs);
   sp_da_init(scratch.mem, link.whole_archives);
@@ -65,7 +66,6 @@ static void run_link_test(s32* utest_result, link_test_t test) {
   if (test.lib_dir) {
     sp_da_push(link.lib_dirs, sp_str_from_cstr(scratch.mem, test.lib_dir));
   }
-  link.subsystem = test.subsystem;
   spn_invocation_t invocation = sp_zero;
   spn_err_union_t err = spn_cc_render_link(scratch.mem, &toolchain, &test.profile, &link, &files, &invocation);
   EXPECT_EQ(err.kind, test.expect.err);
