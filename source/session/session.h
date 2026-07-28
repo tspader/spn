@@ -9,7 +9,8 @@
 
 spn_err_union_t spn_session_init(spn_session_t* session, sp_mem_t mem, spn_pkg_info_t* root, spn_app_config_t config);
 spn_err_union_t spn_session_apply_options(spn_session_t* session);
-spn_err_union_t spn_session_bind_toolchains(spn_session_t* session);
+void spn_session_export_toolchain_env(spn_session_t* session);
+spn_err_union_t spn_session_validate_flags(spn_session_t* session);
 sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pkg_name);
 spn_pkg_id_t spn_session_root_pkg(spn_session_t* session);
 spn_pkg_unit_t* spn_session_find_pkg_unit_by_id(spn_session_t* session, spn_pkg_unit_id_t id);

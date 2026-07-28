@@ -80,7 +80,6 @@ void run_walk_test(s32* utest_result, walk_test_t t) {
   sp_om_new(s->units.packages);
   sp_om_new(s->units.targets);
   sp_om_new(s->units.objects);
-  sp_mutex_init(&s->mutex, SP_MUTEX_PLAIN);
 
   s->units.target = walk_build(s, 1, "/build/debug");
   s->units.metaprogram = walk_build(s, 2, "/build/wasm32-wasi");

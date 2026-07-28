@@ -81,7 +81,11 @@ static u32 kind_bits(spn_dep_kind_t kind) {
 static spn_pkg_unit_t* add_unit(spn_session_t* s, spn_build_unit_t* build, spn_pkg_id_t pkg_id, u32 kinds, sp_da(spn_pkg_unit_t*)* pending) {
   spn_pkg_unit_id_t id = { .pkg = pkg_id, .build = build->id };
   if (sp_om_has(s->units.packages, id)) {
-    return sp_om_get(s->units.packages, id);
+    // First creation wins, so a request may never widen an existing unit's
+    // kinds: members must be created before their host fallback
+    spn_pkg_unit_t* unit = sp_om_get(s->units.packages, id);
+    sp_assert((kinds & ~unit->kinds) == 0);
+    return unit;
   }
 
   spn_loaded_pkg_t* loaded = sp_ht_getp(s->packages, pkg_id);
@@ -106,26 +110,26 @@ static spn_pkg_unit_t* add_unit(spn_session_t* s, spn_build_unit_t* build, spn_p
   return unit;
 }
 
-// Every followed edge lands its target in a build: BUILD edges in the
-// metaprogram build, everything else in the consumer's own. The metaprogram
-// build is absorbing — inside it, PACKAGE and BUILD edges alike stay there.
+// Children land in the consumer's own build. Only metaprogram-build units
+// carry the BUILD bit, so the metaprogram build is absorbing; BUILD edges
+// enter it through the owner seeding below, never from a target build.
 static void drain(spn_session_t* s, sp_da(spn_pkg_unit_t*)* pending) {
-  u32 metaprogram_kinds = kind_bits(SPN_DEP_KIND_PACKAGE) | kind_bits(SPN_DEP_KIND_BUILD);
-
   sp_for(it, sp_da_size(*pending)) {
     spn_pkg_unit_t* unit = (*pending)[it];
     spn_resolved_pkg_t* resolved = sp_ht_getp(s->resolve, unit->id.pkg);
     sp_assert(resolved);
+
+    u32 kinds = unit->build == s->units.metaprogram
+      ? kind_bits(SPN_DEP_KIND_PACKAGE) | kind_bits(SPN_DEP_KIND_BUILD)
+      : kind_bits(SPN_DEP_KIND_PACKAGE);
 
     sp_da_for(resolved->edges, et) {
       spn_resolved_dep_t* edge = &resolved->edges[et];
       if (!(kind_bits(edge->kind) & unit->kinds)) {
         continue;
       }
-      spn_build_unit_t* build = edge->kind == SPN_DEP_KIND_BUILD ? s->units.metaprogram : unit->build;
-      u32 kinds = build == s->units.metaprogram ? metaprogram_kinds : kind_bits(SPN_DEP_KIND_PACKAGE);
       sp_da_push(unit->deps, ((spn_pkg_dep_t) {
-        .unit = add_unit(s, build, edge->id, kinds, pending),
+        .unit = add_unit(s, unit->build, edge->id, kinds, pending),
         .kind = edge->kind,
         .private = edge->private,
       }));

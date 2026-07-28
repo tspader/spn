@@ -506,8 +506,6 @@ static void collect_unit_targets(sp_da(spn_target_unit_t*)* targets, sp_da(spn_p
   }
 }
 
-// A target's deps name either packages or sibling targets in the same
-// package; siblings referenced only by other targets still get units
 static spn_err_union_t ensure_sibling_targets(spn_session_t* s, sp_da(spn_target_unit_t*)* targets) {
   sp_for(it, sp_da_size(*targets)) {
     spn_target_unit_t* unit = (*targets)[it];
@@ -584,7 +582,7 @@ static spn_err_union_t add_metaprogram_targets(spn_session_t* s) {
 
   sp_da_for(world->packages, it) {
     spn_pkg_unit_t* unit = world->packages[it];
-    if (!(unit->kinds & spn_dep_kind_bit(SPN_DEP_KIND_PACKAGE))) {
+    if (spn_pkg_unit_is_script_host(unit)) {
       continue;
     }
     sp_str_om_for(unit->info->libs, jt) {

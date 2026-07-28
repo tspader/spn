@@ -100,7 +100,6 @@ struct spn_session_t {
     spn_dag_build_t* configure;
     spn_dag_build_t* build;
   } dag;
-  sp_mutex_t mutex;
 };
 
 #endif

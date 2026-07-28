@@ -47,6 +47,7 @@ spn_build_id_t spn_build_id(const spn_build_config_t* config) {
     (sp_hash_t)profile->standard,
     (sp_hash_t)profile->mode,
     (sp_hash_t)profile->opt,
+    (sp_hash_t)profile->targeted,
     sp_hash_bytes(&profile->sanitizers, sizeof(profile->sanitizers), 0),
     (sp_hash_t)config->host.arch,
     (sp_hash_t)config->host.os,
@@ -114,9 +115,7 @@ spn_err_union_t spn_build_add(spn_session_t* s, spn_build_config_t config, spn_b
   sp_om_insert(s->units.builds, id, sp_zero_struct(spn_build_unit_t));
   spn_build_unit_t* build = sp_om_back(s->units.builds);
   build->id = id;
-  build->host = config.host;
   build->profile = config.profile;
-  build->role = config.role;
   build->toolchain = toolchain;
   build->paths.root = build_root(s, &config);
   sp_da_init(s->mem, build->include);
