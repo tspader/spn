@@ -96,6 +96,7 @@ sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit
   // The result is in post-order. Reversing us gives us a topological sort.
   sp_da(spn_closure_entry_t) closure = sp_da_new(mem, spn_closure_entry_t);
   sp_da_rfor(search.closure, it) {
+    sp_assert(search.closure[it].pkg);
     sp_da_push(closure, search.closure[it]);
   }
   sp_mem_end_scratch(s);
@@ -182,7 +183,7 @@ sp_da(spn_link_lib_t) spn_closure_link_libs(sp_mem_t mem, sp_da(spn_closure_entr
 
   sp_da_for(closure, it) {
     spn_pkg_unit_t* pkg = closure[it].pkg;
-    if (!pkg || pkg == self) {
+    if (pkg == self) {
       continue;
     }
 

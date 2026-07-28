@@ -11,7 +11,7 @@
 #include "pkg/types.h"
 #include "sp/macro.h"
 #include "profile/types.h"
-#include "target/closure.h"
+#include "target/types.h"
 #include "external/wasm/types.h"
 #include "log/lazy/types.h"
 
@@ -124,6 +124,17 @@ typedef struct {
   } paths;
 } spn_compile_unit_t;
 
+typedef struct {
+  spn_os_version_t min_os;
+  spn_lang_t lang;
+  sp_da(spn_link_lib_t) libs;
+  sp_da(sp_str_t) lib_dirs;
+  sp_da(sp_str_t) system_libs;
+  sp_da(sp_str_t) whole_archives;
+  sp_da(sp_str_t) private_libs;
+  sp_da(sp_str_t) frameworks;
+} spn_link_plan_t;
+
 struct spn_target_unit {
   spn_target_unit_id_t id;
   spn_pkg_unit_t* pkg;
@@ -138,16 +149,7 @@ struct spn_target_unit {
     sp_da(spn_pkg_unit_t*) package;
   } deps;
 
-  struct {
-    spn_os_version_t min_os;
-    spn_lang_t lang;
-    sp_da(spn_link_lib_t) libs;
-    sp_da(sp_str_t) lib_dirs;
-    sp_da(sp_str_t) system_libs;
-    sp_da(sp_str_t) whole_archives;
-    sp_da(sp_str_t) private_libs;
-    sp_da(sp_str_t) frameworks;
-  } link;
+  spn_link_plan_t link;
 
   spn_build_io_t logs;
 };
