@@ -1,4 +1,6 @@
 #include "profile/profile.h"
+#include "ctx/types.h"
+#include "forward/types.h"
 #include "sp/macro.h"
 #include "enum/enum.h"
 #include "intern/intern.h"
@@ -15,19 +17,37 @@ sp_str_t spn_profile_build_path(sp_mem_t mem, sp_str_t build, const spn_profile_
 }
 
 void spn_profile_overlay(spn_profile_info_t* dst, spn_profile_info_t* src) {
-  if (!sp_str_empty(src->name))      dst->name = src->name;
-  if (!sp_str_empty(src->toolchain)) dst->toolchain = src->toolchain;
-  if (src->linkage)                  dst->linkage = src->linkage;
-  if (src->standard)                 dst->standard = src->standard;
-  if (src->mode)                     dst->mode = src->mode;
-  if (src->opt)                      dst->opt = src->opt;
+  if (!sp_str_empty(src->name)) {
+    dst->name = src->name;
+  }
+  if (!sp_str_empty(src->toolchain)) {
+    dst->toolchain = src->toolchain;
+  }
+  if (src->linkage) {
+    dst->linkage = src->linkage;
+  }
+  if (src->standard) {
+    dst->standard = src->standard;
+  }
+  if (src->mode) {
+    dst->mode = src->mode;
+  }
+  if (src->opt) {
+    dst->opt = src->opt;
+  }
   if (src->sanitizers_set || src->sanitizers) {
     dst->sanitizers = src->sanitizers;
     dst->sanitizers_set = true;
   }
-  if (src->os)                       dst->os = src->os;
-  if (src->arch)                     dst->arch = src->arch;
-  if (src->abi)                      dst->abi = src->abi;
+  if (src->os) {
+    dst->os = src->os;
+  }
+  if (src->arch) {
+    dst->arch = src->arch;
+  }
+  if (src->abi) {
+    dst->abi = src->abi;
+  }
   if (!sp_da_empty(src->options.clauses)) dst->options = src->options;
 }
 
@@ -42,50 +62,55 @@ static sp_str_t spn_profile_select_name(spn_profile_info_t* overrides) {
 }
 
 void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
-  // 1. Seed the default profile with hardcoded base values
-  spn_profile_info_t default_profile = {
-    .name      = sp_str_lit("default"),
-    .toolchain = sp_str_lit("auto"),
+  struct {
+    sp_str_t name;
+    spn_profile_info_t automatic;
+    spn_profile_info_t* user;
+  } fallback = sp_zero;
+  fallback.name = spn_intern_cstr("default");
+  fallback.automatic = (spn_profile_info_t) {
+    .name      = fallback.name,
+    .toolchain = spn_intern_cstr("auto"),
     .standard  = SPN_C11,
     .mode      = SPN_BUILD_MODE_DEBUG,
   };
-  sp_str_ht_insert(*profiles, default_profile.name, default_profile);
+  sp_str_ht_insert(*profiles, fallback.name, fallback.automatic);
 
-  // 2. Apply user's [profile.default] if present
-  sp_str_t default_name = spn_intern(sp_str_lit("default"));
-  spn_profile_info_t* user_default = sp_str_om_has(pkg->profiles, default_name) ?
-    sp_str_om_get(pkg->profiles, default_name) :
-    SP_NULLPTR;
-  if (user_default) {
-    spn_profile_overlay(sp_str_ht_get(*profiles, default_name), user_default);
+  // Start with the default, if present
+  spn_profile_info_t** ptr = sp_om_getp(pkg->profiles, fallback.name);
+  fallback.user = ptr ? *ptr : SP_NULLPTR;
+  if (fallback.user) {
+    spn_profile_overlay(sp_str_ht_get(*profiles, fallback.name), fallback.user);
   }
 
-  // 3. Derive debug and release from default
-  spn_profile_info_t base = *sp_str_ht_get(*profiles, default_name);
+  // Build the base debug and release profiles
+  spn_profile_info_t base = *sp_str_ht_get(*profiles, fallback.name);
+  struct {
+    spn_profile_info_t debug;
+    spn_profile_info_t release;
+    spn_profile_info_t derived;
+  } p = { base, base, base };
 
-  spn_profile_info_t debug_profile = base;
-  debug_profile.name = sp_str_lit("debug");
-  debug_profile.mode = SPN_BUILD_MODE_DEBUG;
-  sp_str_ht_insert(*profiles, debug_profile.name, debug_profile);
+  p.debug.name = sp_str_lit("debug");
+  p.debug.mode = SPN_BUILD_MODE_DEBUG;
+  sp_str_ht_insert(*profiles, p.debug.name, p.debug);
 
-  spn_profile_info_t release_profile = base;
-  release_profile.name = sp_str_lit("release");
-  release_profile.mode = SPN_BUILD_MODE_RELEASE;
-  sp_str_ht_insert(*profiles, release_profile.name, release_profile);
+  p.release.name = sp_str_lit("release");
+  p.release.mode = SPN_BUILD_MODE_RELEASE;
+  sp_str_ht_insert(*profiles, p.release.name, p.release);
 
-  // 4. Overlay remaining user profiles; new names derive from default like
-  // debug and release do, so a profile setting one field inherits the rest
+  // Apply overlaid fields
   sp_str_om_for(pkg->profiles, it) {
     spn_profile_info_t* user = sp_str_om_at(pkg->profiles, it);
-    if (sp_str_equal(user->name, sp_str_lit("default"))) continue;
+    if (sp_str_equal(user->name, fallback.name)) continue;
+
     spn_profile_info_t* entry = sp_str_ht_get(*profiles, user->name);
     if (entry) {
       spn_profile_overlay(entry, user);
     } else {
-      spn_profile_info_t derived = base;
-      derived.name = user->name;
-      spn_profile_overlay(&derived, user);
-      sp_str_ht_insert(*profiles, derived.name, derived);
+      p.derived.name = user->name;
+      spn_profile_overlay(&p.derived, user);
+      sp_str_ht_insert(*profiles, p.derived.name, p.derived);
     }
   }
 }

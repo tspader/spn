@@ -134,7 +134,7 @@ static spn_err_union_t ensure_target(spn_session_t* s, spn_pkg_unit_t* pkg, spn_
     target = add_target(s, pkg, info);
     try_union(set_target_kind(s, target));
   }
-  *result = target;
+  if (result) *result = target;
   return spn_result(SPN_OK);
 }
 
@@ -571,12 +571,10 @@ static spn_err_union_t add_metaprogram_targets(spn_session_t* s) {
     spn_pkg_unit_t* unit = world->packages[it];
     spn_loaded_pkg_t* loaded = sp_ht_getp(s->packages, unit->id.pkg);
     if (!sp_da_empty(loaded->configure.source)) {
-      spn_target_unit_t* target = SP_NULLPTR;
-      try_union(ensure_target(s, unit, &loaded->configure, &target));
+      try_union(ensure_target(s, unit, &loaded->configure, SP_NULLPTR));
     }
     if (!sp_da_empty(loaded->build.source)) {
-      spn_target_unit_t* target = SP_NULLPTR;
-      try_union(ensure_target(s, unit, &loaded->build, &target));
+      try_union(ensure_target(s, unit, &loaded->build, SP_NULLPTR));
     }
   }
 
@@ -586,8 +584,7 @@ static spn_err_union_t add_metaprogram_targets(spn_session_t* s) {
       continue;
     }
     sp_str_om_for(unit->info->libs, jt) {
-      spn_target_unit_t* target = SP_NULLPTR;
-      try_union(ensure_target(s, unit, sp_str_om_at(unit->info->libs, jt), &target));
+      try_union(ensure_target(s, unit, sp_str_om_at(unit->info->libs, jt), SP_NULLPTR));
     }
   }
 
@@ -718,8 +715,7 @@ static spn_err_union_t add_plan_root_targets(spn_session_t* s) {
         continue;
       }
       sp_str_om_for(pkg->info->libs, kt) {
-        spn_target_unit_t* target = SP_NULLPTR;
-        try_union(ensure_target(s, pkg, sp_str_om_at(pkg->info->libs, kt), &target));
+        try_union(ensure_target(s, pkg, sp_str_om_at(pkg->info->libs, kt), SP_NULLPTR));
       }
     }
 
