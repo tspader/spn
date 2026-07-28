@@ -74,16 +74,15 @@ typedef struct {
 typedef struct {
   spn_lang_t lang;
   spn_cc_output_kind_t kind;
-  sp_da(sp_str_t) args;
   sp_da(sp_str_t) libs;
   sp_da(sp_str_t) whole_archives;
   sp_da(sp_str_t) private_libs;
   sp_da(sp_str_t) system_libs;
   sp_da(sp_str_t) lib_dirs;
-  sp_da(sp_str_t) rpath;
   sp_da(sp_str_t) frameworks;
   spn_os_version_t min_os;
   spn_win_subsystem_t subsystem;
+  bool rpath;
 } spn_cc_link_t;
 
 typedef struct {

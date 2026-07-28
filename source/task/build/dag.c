@@ -139,7 +139,7 @@ static spn_err_t dag_exports_identity(spn_dag_build_t* b, spn_dag_link_ctx_t* li
     dag_hash_invocation(&ctx, &b->roots, build->toolchain, &invocation);
     spn_dag_hash_u8(&ctx, (u8)target->kind);
     spn_dag_hash_u8(&ctx, (u8)build->profile.os);
-    spn_dag_hash_masked_strs(&ctx, &b->roots, target->link.whole_archives);
+    spn_dag_hash_masked_strs(&ctx, &b->roots, target->link.cc.whole_archives);
     *identity = spn_dag_hash_final(&ctx);
   }
   sp_mem_end_scratch(s);
@@ -765,8 +765,8 @@ static spn_err_t dag_add_exports(spn_dag_build_t* b, spn_dag_link_ctx_t* link) {
   sp_da_for(link->objects, it) {
     spn_dag_action_add_input(g, action, link->objects[it]);
   }
-  sp_da_for(target->link.whole_archives, it) {
-    spn_dag_action_add_input(g, action, spn_dag_add_file(g, target->link.whole_archives[it]));
+  sp_da_for(target->link.cc.whole_archives, it) {
+    spn_dag_action_add_input(g, action, spn_dag_add_file(g, target->link.cc.whole_archives[it]));
   }
   return SPN_OK;
 }

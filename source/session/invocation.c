@@ -27,7 +27,7 @@ static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t*
     .pic = unit->target->info->kind == SPN_TARGET_LIB,
   };
   if (build->profile.os == SPN_OS_MACOS) {
-    compile.min_os = unit->target->link.min_os;
+    compile.min_os = unit->target->link.cc.min_os;
   }
   sp_da_init(mem, compile.include);
   sp_da_init(mem, compile.define);
