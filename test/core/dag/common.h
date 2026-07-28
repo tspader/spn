@@ -21,6 +21,11 @@ typedef struct {
 } dag_test_obs_t;
 
 typedef struct {
+  const c8* project;
+  const c8* store;
+} dag_test_roots_t;
+
+typedef struct {
   const c8* name;
   spn_dag_store_kind_t store;
   bool discovery;
@@ -29,6 +34,7 @@ typedef struct {
 typedef struct {
   tmpfs_t fs;
   spn_dag_t* g;
+  spn_dag_roots_t roots;
   spn_dag_store_t store;
   spn_dag_file_cache_t files;
   spn_dag_action_cache_t cache;
@@ -45,6 +51,7 @@ void             dag_test_env_cold(dag_test_env_t* env);
 spn_dag_t*       dag_test_env_graph(dag_test_env_t* env);
 void             dag_test_env_deinit(dag_test_env_t* env);
 spn_dag_digest_t dag_test_digest(const c8* data);
+const spn_dag_roots_t* dag_test_roots_build(dag_test_roots_t spec, spn_dag_roots_t* out);
 u32              dag_test_obs_build(const dag_test_obs_t* specs, u32 cap, spn_dag_obs_t* out);
 s32              dag_test_exec_stamp(spn_dag_t* g, spn_dag_action_t* action, void* user_data);
 void             dag_test_expect_file(s32* utest_result, sp_mem_t mem, sp_str_t path, const c8* expected);

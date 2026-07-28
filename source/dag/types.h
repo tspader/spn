@@ -36,6 +36,26 @@ typedef struct {
   spn_dag_file_meta_t meta;
 } spn_dag_obs_t;
 
+typedef enum {
+  SPN_DAG_ROOT_NONE = 0,
+  SPN_DAG_ROOT_PROJECT,
+  SPN_DAG_ROOT_STORE,
+  SPN_DAG_ROOT_BUILD,
+  SPN_DAG_ROOT_CHECKOUT,
+  SPN_DAG_ROOT_TOOLCHAIN,
+  SPN_DAG_ROOT_TOOLCHAIN_SCRIPT,
+  SPN_DAG_ROOT_COUNT,
+} spn_dag_root_t;
+
+typedef struct {
+  sp_str_t dirs [SPN_DAG_ROOT_COUNT];
+} spn_dag_roots_t;
+
+typedef struct {
+  spn_dag_root_t root;
+  sp_str_t sub;
+} spn_dag_prefixed_t;
+
 typedef struct {
   sp_str_t path;
   sp_str_t relative;
@@ -127,6 +147,7 @@ typedef struct {
   sp_mem_arena_t* arena;
   sp_mem_t mem;
   sp_str_t dir;
+  const spn_dag_roots_t* roots;
   sp_ht(spn_dag_digest_t, spn_dag_pathset_t) entries;
 } spn_dag_obs_table_t;
 
@@ -194,6 +215,7 @@ typedef struct {
   spn_dag_store_t* store;
   spn_dag_obs_table_t* discovery;
   spn_dag_obs_table_t* memos;
+  const spn_dag_roots_t* roots;
   spn_dag_progress_t* progress;
   spn_dag_trace_fn_t trace;
   void* trace_data;

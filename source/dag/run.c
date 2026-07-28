@@ -36,15 +36,14 @@ static spn_dag_file_meta_t file_meta_from_sys(sp_sys_file_meta_t sys) {
 }
 
 static bool file_meta_current(spn_dag_file_meta_t meta, sp_sys_file_meta_t sys) {
-  if (meta.id.device != sys.device) return false;
+  if (meta.id.device && meta.id.device != sys.device) return false;
   if (meta.id.inode != sys.id) return false;
   if (!is_timespec_equal(meta.mtime, sys.mtime)) return false;
   return meta.size == sys.size;
 }
 
 static bool file_meta_equal(spn_dag_file_meta_t a, spn_dag_file_meta_t b) {
-  return a.id.device == b.id.device
-    && a.id.inode == b.id.inode
+  return a.id.inode == b.id.inode
     && is_timespec_equal(a.mtime, b.mtime)
     && a.size == b.size
     && spn_dag_digest_equal(a.digest, b.digest);
@@ -191,6 +190,7 @@ static bool memo_settled(spn_dag_env_t* env, sp_str_t target, spn_dag_digest_t d
   if (!file_meta_current(memo->meta, sys)) {
     return false;
   }
+  memo->meta.id.device = sys.device;
   spn_dag_file_cache_seed(env->files, memo->meta);
   return true;
 }
@@ -489,6 +489,7 @@ static spn_err_t resolve_one(spn_dag_file_cache_t* files, spn_dag_obs_t* o) {
 
   if (file_meta_current(o->meta, sys)) {
     if (spn_dag_digest_valid(o->meta.digest)) {
+      o->meta.id.device = sys.device;
       spn_dag_file_cache_seed(files, o->meta);
       return SPN_OK;
     }
@@ -599,7 +600,7 @@ static spn_err_t lookup(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env_t* e
       bool resolved = !resolve_observations(env->files, set->obs, count, &changed);
       trace_resolve(env, action->id, resolved, changed);
       if (resolved) {
-        spn_dag_digest_t strong = spn_dag_strong_key(attempt->key, set->obs, count);
+        spn_dag_digest_t strong = spn_dag_strong_key(attempt->key, env->roots, set->obs, count);
         trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_STRONG, .action = action->id, .key = strong });
         if (try_restore(g, action, strong, env)) {
           if (changed) {
@@ -683,7 +684,7 @@ static spn_err_t commit(spn_dag_t* g, spn_dag_attempt_t* attempt, spn_dag_env_t*
     trace_resolve(env, action->id, resolved, changed);
     spn_dag_obs_table_put(env->discovery, attempt->key, attempt->obs, count);
     if (resolved) {
-      key = spn_dag_strong_key(attempt->key, attempt->obs, count);
+      key = spn_dag_strong_key(attempt->key, env->roots, attempt->obs, count);
       trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_STRONG, .action = action->id, .key = key });
     }
   }

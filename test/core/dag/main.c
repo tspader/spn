@@ -12,6 +12,7 @@ const spn_dag_store_kind_t dag_test_store_kinds [2] = {
 
 void dag_test_env_init(dag_test_env_t* env, dag_test_env_config_t config) {
   tmpfs_init_named(&env->fs, config.name);
+  env->roots = (spn_dag_roots_t) sp_zero;
   spn_dag_store_init(&env->store, (spn_dag_store_config_t) {
     .kind = config.store,
     .mem = env->fs.mem,
@@ -19,22 +20,23 @@ void dag_test_env_init(dag_test_env_t* env, dag_test_env_config_t config) {
   });
   spn_dag_file_cache_init(&env->files, env->fs.mem);
   spn_dag_action_cache_init(&env->cache, env->fs.mem, sp_str_lit(""));
-  spn_dag_obs_table_init(&env->discovery, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("manifests")));
-  spn_dag_obs_table_init(&env->memos, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("memos")));
+  spn_dag_obs_table_init(&env->discovery, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("manifests")), &env->roots);
+  spn_dag_obs_table_init(&env->memos, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("memos")), &env->roots);
   env->env = (spn_dag_env_t) {
     .files = &env->files,
     .cache = &env->cache,
     .store = &env->store,
     .discovery = config.discovery ? &env->discovery : SP_NULLPTR,
     .memos = &env->memos,
+    .roots = &env->roots,
     .scratch = tmpfs_get(&env->fs, sp_str_lit("scratch"))
   };
 }
 
 void dag_test_env_cold(dag_test_env_t* env) {
   spn_dag_file_cache_init(&env->files, env->fs.mem);
-  spn_dag_obs_table_init(&env->discovery, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("manifests")));
-  spn_dag_obs_table_init(&env->memos, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("memos")));
+  spn_dag_obs_table_init(&env->discovery, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("manifests")), &env->roots);
+  spn_dag_obs_table_init(&env->memos, env->fs.mem, tmpfs_get(&env->fs, sp_str_lit("memos")), &env->roots);
 }
 
 spn_dag_t* dag_test_env_graph(dag_test_env_t* env) {
@@ -52,6 +54,17 @@ spn_dag_digest_t dag_test_digest(const c8* data) {
   }
   sp_str_t str = sp_str_view(data);
   return spn_dag_digest(str.data, str.len);
+}
+
+const spn_dag_roots_t* dag_test_roots_build(dag_test_roots_t spec, spn_dag_roots_t* out) {
+  *out = (spn_dag_roots_t) sp_zero;
+  if (spec.project) {
+    out->dirs[SPN_DAG_ROOT_PROJECT] = sp_str_view(spec.project);
+  }
+  if (spec.store) {
+    out->dirs[SPN_DAG_ROOT_STORE] = sp_str_view(spec.store);
+  }
+  return out;
 }
 
 u32 dag_test_obs_build(const dag_test_obs_t* specs, u32 cap, spn_dag_obs_t* out) {

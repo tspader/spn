@@ -25,8 +25,13 @@ void                spn_dag_hash_strs(spn_sha256_ctx_t* ctx, sp_da(sp_str_t) str
 void                spn_dag_hash_digest(spn_sha256_ctx_t* ctx, spn_dag_digest_t digest);
 spn_dag_digest_t    spn_dag_hash_final(spn_sha256_ctx_t* ctx);
 
+spn_dag_prefixed_t  spn_dag_root_collapse(const spn_dag_roots_t* roots, sp_str_t path);
+bool                spn_dag_root_expand(const spn_dag_roots_t* roots, spn_dag_prefixed_t prefixed, sp_mem_t mem, sp_str_t* out);
+void                spn_dag_hash_masked(spn_sha256_ctx_t* ctx, const spn_dag_roots_t* roots, sp_str_t str);
+void                spn_dag_hash_masked_strs(spn_sha256_ctx_t* ctx, const spn_dag_roots_t* roots, sp_da(sp_str_t) strs);
+
 spn_dag_digest_t    spn_dag_weak_key(spn_dag_t* g, spn_dag_id_t action);
-spn_dag_digest_t    spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count);
+spn_dag_digest_t    spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_roots_t* roots, const spn_dag_obs_t* obs, u32 count);
 spn_dag_digest_t    spn_dag_source_key(sp_str_t path);
 spn_dag_digest_t    spn_dag_settle_key(sp_str_t path);
 spn_dag_digest_t    spn_dag_digest(const void* data, u64 len);
@@ -54,7 +59,7 @@ const spn_dag_action_entry_t* spn_dag_action_cache_get(spn_dag_action_cache_t* c
 void                          spn_dag_action_cache_put(spn_dag_action_cache_t* c, spn_dag_digest_t key, const spn_dag_action_output_t* outputs, u32 count);
 bool                          spn_dag_action_cache_remove(spn_dag_action_cache_t* c, spn_dag_digest_t key);
 
-void                spn_dag_obs_table_init(spn_dag_obs_table_t* t, sp_mem_t mem, sp_str_t dir);
+void                spn_dag_obs_table_init(spn_dag_obs_table_t* t, sp_mem_t mem, sp_str_t dir, const spn_dag_roots_t* roots);
 spn_dag_pathset_t*  spn_dag_obs_table_get(spn_dag_obs_table_t* t, spn_dag_digest_t key);
 void                spn_dag_obs_table_put(spn_dag_obs_table_t* t, spn_dag_digest_t key, const spn_dag_obs_t* obs, u32 count);
 void                spn_dag_obs_table_flush(spn_dag_obs_table_t* t, spn_dag_digest_t key);

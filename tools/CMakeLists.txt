@@ -54,40 +54,6 @@ add_dependencies(toolchain headers)
 set(GEN_DIR ${CMAKE_SOURCE_DIR}/source/codegen/gen)
 file(MAKE_DIRECTORY ${GEN_DIR})
 
-add_executable(sp_cc
-  cc.c
-  ${CMAKE_SOURCE_DIR}/source/dag/dag.c
-  ${CMAKE_SOURCE_DIR}/source/dag/store.c
-  ${CMAKE_SOURCE_DIR}/source/dag/run.c
-  ${CMAKE_SOURCE_DIR}/source/dag/glob.c
-  ${CMAKE_SOURCE_DIR}/source/dag/executor.c
-  ${CMAKE_SOURCE_DIR}/source/dag/occ.c
-  ${CMAKE_SOURCE_DIR}/source/codegen/json.c
-  ${CMAKE_SOURCE_DIR}/source/sha256/sha256.c
-  ${CMAKE_SOURCE_DIR}/source/sp/fs.c
-  ${CMAKE_SOURCE_DIR}/source/sp/io.c)
-set_target_properties(sp_cc PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${STORE}/bin)
-target_include_directories(sp_cc PRIVATE ${CMAKE_SOURCE_DIR}/source ${CMAKE_SOURCE_DIR}/include ${GEN_DIR} ${STORE}/include)
-target_link_libraries(sp_cc PRIVATE m yyjson)
-add_dependencies(sp_cc headers spn_codegen_gen)
-
-add_executable(sp_lib
-  lib.c
-  ${CMAKE_SOURCE_DIR}/source/dag/dag.c
-  ${CMAKE_SOURCE_DIR}/source/dag/store.c
-  ${CMAKE_SOURCE_DIR}/source/dag/run.c
-  ${CMAKE_SOURCE_DIR}/source/dag/glob.c
-  ${CMAKE_SOURCE_DIR}/source/dag/executor.c
-  ${CMAKE_SOURCE_DIR}/source/dag/occ.c
-  ${CMAKE_SOURCE_DIR}/source/codegen/json.c
-  ${CMAKE_SOURCE_DIR}/source/sha256/sha256.c
-  ${CMAKE_SOURCE_DIR}/source/sp/fs.c
-  ${CMAKE_SOURCE_DIR}/source/sp/io.c)
-set_target_properties(sp_lib PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${STORE}/bin)
-target_include_directories(sp_lib PRIVATE ${CMAKE_SOURCE_DIR}/source ${CMAKE_SOURCE_DIR}/include ${GEN_DIR} ${STORE}/include)
-target_link_libraries(sp_lib PRIVATE m yyjson)
-add_dependencies(sp_lib headers spn_codegen_gen)
-
 add_executable(yyjson_stub yyjson_stub.c)
 set_target_properties(yyjson_stub PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(yyjson_stub PRIVATE yyjson)
