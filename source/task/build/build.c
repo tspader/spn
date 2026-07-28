@@ -14,7 +14,7 @@
 #include "pkg/types.h"
 #include "session/invocation.h"
 #include "session/session.h"
-#include "target/closure.h"
+#include "unit/unit.h"
 #include "task/build/build.h"
 #include "triple/triple.h"
 

@@ -11,11 +11,11 @@
 
 #include "external/wasm/wasm.h"
 #include "session/session.h"
-#include "target/closure.h"
 #include "task/build/build.h"
 #include "task/build/dag.h"
 #include "task/task.h"
 #include "unit/package.h"
+#include "unit/unit.h"
 
 static s32 on_configure_package(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
@@ -60,9 +60,8 @@ static void add_configure_edges(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
     spn_dag_action_add_input(g, action, dep->stamp);
   }
 
-  spn_target_unit_t* reactor = unit->metaprogram.configure.target;
-  if (reactor) {
-    spn_dag_target_ids_t* ids = sp_ht_getp(b->ids.targets, reactor);
+  if (unit->metaprogram && unit->metaprogram->scripts.configure) {
+    spn_dag_target_ids_t* ids = sp_ht_getp(b->ids.targets, unit->metaprogram->scripts.configure);
     sp_assert(ids);
     spn_dag_action_add_input(g, action, ids->output);
   }
@@ -88,54 +87,51 @@ static void add_reactor_edges(spn_dag_build_t* b, spn_target_unit_t* reactor) {
 }
 
 spn_task_step_t spn_task_configure_graph_init(spn_app_t* app) {
-  spn_session_t* session = &app->session;
+  spn_session_t* s = &app->session;
 
   if (spn_wasm_init()) {
     return spn_task_fail(SPN_ERR_WASM_INIT_FAILED);
   }
 
-  spn_dag_build_t* dag = spn_dag_build_new(session);
-  session->dag.configure = dag;
+  spn_try_step(spn_units_add_packages(s));
+  spn_try_step(spn_units_add_targets(s, SPN_UNIT_SCOPE_METAPROGRAM));
 
-  spn_build_unit_t* world = session->units.metaprogram;
-  sp_da(spn_pkg_unit_t*) reactors = sp_da_new(session->mem, spn_pkg_unit_t*);
-  sp_da_for(world->hosts, it) {
-    if (world->hosts[it]->metaprogram.configure.target) {
-      sp_da_push(reactors, world->hosts[it]);
-    }
-  }
-  sp_da_for(world->packages, it) {
-    if (world->packages[it]->metaprogram.configure.target) {
-      sp_da_push(reactors, world->packages[it]);
-    }
-  }
+  spn_dag_build_t* dag = spn_dag_build_new(s);
+  s->dag.configure = dag;
 
-  sp_da_for(reactors, it) {
-    spn_target_unit_t* configure = reactors[it]->metaprogram.configure.target;
+  sp_da_for(s->units.metaprogram->packages, it) {
+    spn_target_unit_t* configure = s->units.metaprogram->packages[it]->scripts.configure;
+    if (!configure) {
+      continue;
+    }
     if (spn_dag_build_add_target(dag, configure)) {
-      return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = get_target_output_path(session->mem, configure) });
+      return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = get_target_output_path(s->mem, configure) });
     }
   }
 
-  sp_da_for(session->units.builds, it) {
-    spn_build_unit_t* build = session->units.builds[it];
-    sp_da_for(build->packages, jt) {
-      spn_pkg_unit_t* unit = build->packages[jt];
-      if (add_configure_action(dag, unit)) {
-        return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
-      }
+  sp_om_for(s->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(s->units.packages, it);
+    if (spn_pkg_unit_is_script_host(unit)) {
+      continue;
+    }
+    if (add_configure_action(dag, unit)) {
+      return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
     }
   }
 
-  sp_da_for(session->units.builds, it) {
-    spn_build_unit_t* build = session->units.builds[it];
-    sp_da_for(build->packages, jt) {
-      add_configure_edges(dag, build->packages[jt]);
+  sp_om_for(s->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(s->units.packages, it);
+    if (spn_pkg_unit_is_script_host(unit)) {
+      continue;
     }
+    add_configure_edges(dag, unit);
   }
 
-  sp_da_for(reactors, it) {
-    add_reactor_edges(dag, reactors[it]->metaprogram.configure.target);
+  sp_da_for(s->units.metaprogram->packages, it) {
+    spn_target_unit_t* configure = s->units.metaprogram->packages[it]->scripts.configure;
+    if (configure) {
+      add_reactor_edges(dag, configure);
+    }
   }
 
   spn_dag_build_start(dag, 8);

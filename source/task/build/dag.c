@@ -17,7 +17,7 @@
 #include "external/wasm/wasm.h"
 #include "log/log.h"
 #include "session/session.h"
-#include "target/closure.h"
+#include "unit/unit.h"
 #include "task/build/build.h"
 #include "task/build/dag.h"
 #include "task/build/nodes/nodes.h"
@@ -648,7 +648,7 @@ static spn_err_t dag_package_discover(spn_dag_t* g, spn_dag_action_t* action, vo
 // CONSTRUCTION //
 //////////////////
 static spn_dag_id_t dag_configure_reactor(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
-  spn_target_unit_t* configure = unit->metaprogram.configure.target;
+  spn_target_unit_t* configure = unit->metaprogram ? unit->metaprogram->scripts.configure : SP_NULLPTR;
   if (!configure) {
     return (spn_dag_id_t) sp_zero;
   }
@@ -660,8 +660,8 @@ static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit, sp
   spn_dag_id_t configure = dag_configure_reactor(b, unit);
 
   spn_dag_id_t metaprogram = sp_zero;
-  if (unit->metaprogram.build.target) {
-    spn_dag_target_ids_t* ids = sp_ht_getp(b->ids.targets, unit->metaprogram.build.target);
+  if (unit->metaprogram && unit->metaprogram->scripts.build) {
+    spn_dag_target_ids_t* ids = sp_ht_getp(b->ids.targets, unit->metaprogram->scripts.build);
     if (ids) {
       metaprogram = ids->output;
     }
@@ -961,7 +961,7 @@ static spn_err_t dag_add_package_action(spn_dag_build_t* b, spn_pkg_unit_t* unit
     spn_dag_action_add_input(g, pkg->action, pkg->user_outputs[it]);
   }
 
-  spn_target_unit_t* metaprogram = unit->metaprogram.build.target;
+  spn_target_unit_t* metaprogram = unit->metaprogram ? unit->metaprogram->scripts.build : SP_NULLPTR;
   if (metaprogram && metaprogram->pkg != unit) {
     spn_dag_target_ids_t* ids = sp_ht_getp(b->ids.targets, metaprogram);
     if (ids) {
@@ -1123,28 +1123,32 @@ static void dag_add_unit_target_edges(spn_dag_build_t* b, sp_da(spn_pkg_unit_t*)
 static spn_err_t dag_prepare(spn_dag_build_t* b) {
   spn_session_t* session = b->session;
 
-  sp_da_for(session->units.builds, it) {
-    spn_build_unit_t* build = session->units.builds[it];
-    spn_try(dag_add_unit_targets(b, build->hosts));
+  sp_om_for(session->units.builds, it) {
+    spn_build_unit_t* build = sp_om_at(session->units.builds, it);
     spn_try(dag_add_unit_targets(b, build->packages));
   }
 
-  sp_da_for(session->units.builds, it) {
-    spn_build_unit_t* build = session->units.builds[it];
+  sp_om_for(session->units.builds, it) {
+    spn_build_unit_t* build = sp_om_at(session->units.builds, it);
     sp_da_for(build->packages, jt) {
+      if (spn_pkg_unit_is_script_host(build->packages[jt])) {
+        continue;
+      }
       spn_try(dag_add_package(b, build->packages[jt]));
     }
   }
 
-  sp_da_for(session->units.builds, it) {
-    spn_build_unit_t* build = session->units.builds[it];
-    dag_add_unit_target_edges(b, build->hosts);
+  sp_om_for(session->units.builds, it) {
+    spn_build_unit_t* build = sp_om_at(session->units.builds, it);
     dag_add_unit_target_edges(b, build->packages);
   }
 
-  sp_da_for(session->units.builds, it) {
-    spn_build_unit_t* build = session->units.builds[it];
+  sp_om_for(session->units.builds, it) {
+    spn_build_unit_t* build = sp_om_at(session->units.builds, it);
     sp_da_for(build->packages, jt) {
+      if (spn_pkg_unit_is_script_host(build->packages[jt])) {
+        continue;
+      }
       spn_try(dag_add_edges(b, build->packages[jt]));
     }
   }

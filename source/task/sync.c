@@ -496,6 +496,7 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
   }
 
   spn_try_step(spn_session_apply_options(session));
+  spn_try_step(spn_session_bind_toolchains(session));
 
   if (session->gates.reresolve) {
     session->gates.reresolve = false;

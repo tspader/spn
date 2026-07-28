@@ -7,7 +7,7 @@
 #include "ctx/types.h"
 #include "session/types.h"
 #include "unit/types.h"
-#include "target/closure.h"
+#include "unit/unit.h"
 
 spn_ctx_t spn;
 
@@ -40,10 +40,6 @@ typedef struct {
   closure_pkg_t pkgs [CLOSURE_TEST_MAX_PKGS];
   closure_expected_t expect [CLOSURE_TEST_MAX_NAMES];
 } closure_test_t;
-
-sp_da(spn_pkg_dep_t) spn_session_pkg_deps(spn_session_t* session, spn_pkg_unit_t* pkg) {
-  return pkg->deps;
-}
 
 UTEST_EMPTY_FIXTURE(closure)
 
@@ -131,10 +127,14 @@ void run_closure_test(s32* utest_result, closure_test_t t) {
     expected++;
   }
 
-  ASSERT_EQ(expected, sp_da_size(closure));
+  // The closure leads with the link unit's own package; the expectations
+  // describe everything linked in behind it
+  ASSERT_EQ(expected + 1, sp_da_size(closure));
+  EXPECT_TRUE(closure[0].pkg == root);
+  EXPECT_FALSE(closure[0].private);
   sp_for(it, expected) {
-    EXPECT_TRUE(sp_str_equal(closure[it].pkg->info->name, sp_str_view(t.expect[it].name)));
-    EXPECT_EQ(t.expect[it].private, closure[it].private);
+    EXPECT_TRUE(sp_str_equal(closure[it + 1].pkg->info->name, sp_str_view(t.expect[it].name)));
+    EXPECT_EQ(t.expect[it].private, closure[it + 1].private);
   }
 }
 
