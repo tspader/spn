@@ -44,11 +44,11 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
   bool has_manifest = sp_fs_exists(spn.paths.manifest);
   bool source = spn_cli_run_is_source_entry(command->entry, has_manifest);
 
-  app.config.compile.targets.kind = SPN_TARGET_SELECTION_EXPLICIT;
+  app.config.selection.kind = SPN_TARGET_SELECTION_EXPLICIT;
   if (!source) {
     spn_target_names_t names = sp_da_new(spn.heap, sp_str_t);
     sp_da_push(names, command->entry);
-    app.config.compile.targets.targets.script = (spn_target_rule_t) {
+    app.config.selection..script = (spn_target_rule_t) {
       .kind = SPN_TARGET_RULE_NAMED,
       .names = names,
     };

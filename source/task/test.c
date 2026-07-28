@@ -74,8 +74,8 @@ static spn_task_step_t run_source(spn_app_t* app) {
 static spn_task_step_t run_roots(spn_app_t* app) {
   spn_session_t* session = &app->session;
   bool tests = false;
-  sp_da_for(session->plan.builds, it) {
-    spn_build_plan_t* plan = &session->plan.builds[it];
+  sp_da_for(session->plans, it) {
+    spn_build_plan_t* plan = &session->plans[it];
     sp_da_for(plan->roots, it) {
       spn_target_unit_t* root = spn_session_get_target_unit(session, plan->roots[it]);
       if (root->info->kind == SPN_TARGET_SCRIPT) {

@@ -20,10 +20,10 @@ typedef struct {
 
 static spn_target_rule_t* target_rule(spn_target_selection_t* selection, spn_target_kind_t kind) {
   switch (kind) {
-    case SPN_TARGET_LIB: return &selection->targets.lib;
-    case SPN_TARGET_EXE: return &selection->targets.bin;
-    case SPN_TARGET_TEST: return &selection->targets.test;
-    case SPN_TARGET_SCRIPT: return &selection->targets.script;
+    case SPN_TARGET_LIB: return &selection->lib;
+    case SPN_TARGET_EXE: return &selection->bin;
+    case SPN_TARGET_TEST: return &selection->test;
+    case SPN_TARGET_SCRIPT: return &selection->script;
     case SPN_TARGET_CONFIGURE_METAPROGRAM:
     case SPN_TARGET_BUILD_METAPROGRAM: break;
   }

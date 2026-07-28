@@ -41,16 +41,16 @@ bool spn_target_selection_pass(const spn_target_selection_t* selection, const sp
 
   switch (target->kind) {
     case SPN_TARGET_EXE: {
-      return spn_target_rule_pass(&selection->targets.bin, target);
+      return spn_target_rule_pass(&selection->bin, target);
     }
     case SPN_TARGET_LIB: {
-      return spn_target_rule_pass(&selection->targets.lib, target);
+      return spn_target_rule_pass(&selection->lib, target);
     }
     case SPN_TARGET_TEST: {
-      return spn_target_rule_pass(&selection->targets.test, target);
+      return spn_target_rule_pass(&selection->test, target);
     }
     case SPN_TARGET_SCRIPT: {
-      return spn_target_rule_pass(&selection->targets.script, target);
+      return spn_target_rule_pass(&selection->script, target);
     }
     case SPN_TARGET_CONFIGURE_METAPROGRAM:
     case SPN_TARGET_BUILD_METAPROGRAM: {

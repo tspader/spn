@@ -6,6 +6,7 @@
 #include "compiler/types.h"
 #include "git/types.h"
 #include "filter/types.h"
+#include "forward/types.h"
 #include "graph/types.h"
 #include "intern/types.h"
 #include "paths/types.h"
@@ -58,7 +59,7 @@ typedef struct {
 } spn_action_t;
 
 typedef struct {
-  spn_compile_request_t compile;
+  spn_target_selection_t selection;
   bool force;
   spn_action_t action;
   spn_profile_info_t overrides;
@@ -89,10 +90,7 @@ struct spn_session_t {
   } gates;
 
   spn_profile_info_t profile;
-  struct {
-    spn_compile_request_t request;
-    sp_da(spn_build_plan_t) builds;
-  } plan;
+  sp_da(spn_build_plan_t) plans;
   struct {
     sp_da(spn_build_unit_t*) builds;
     spn_build_unit_t* target;
@@ -101,6 +99,10 @@ struct spn_session_t {
     sp_om(spn_target_unit_id_t, spn_target_unit_t) targets;
     sp_om(spn_pkg_unit_id_t, spn_pkg_unit_t) packages;
     sp_da(spn_toolchain_unit_t*) toolchains;
+
+    sp_om(spn_toolchain_unit_id_t, spn_toolchain_unit_t) chains;
+    sp_om(spn_build_unit_id_t, spn_build_unit_t) contexts;
+
   } units;
 
   struct {

@@ -536,10 +536,10 @@ void spn_deinit(sp_app_t* sp) {
 
   if (!app.session.pkg) return;
 
-  if (sp_da_empty(app.session.plan.builds)) return;
+  if (sp_da_empty(app.session.plans)) return;
 
-  sp_da_for(app.session.plan.builds, it) {
-    spn_build_unit_t* build = app.session.plan.builds[it].build;
+  sp_da_for(app.session.plans, it) {
+    spn_build_unit_t* build = app.session.plans[it].build;
     spn_pkg_unit_t* requested = spn_session_find_pkg_unit(&app.session, build, spn_session_root_pkg(&app.session));
     if (!requested) {
       continue;

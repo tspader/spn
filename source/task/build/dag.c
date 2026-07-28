@@ -1217,8 +1217,8 @@ static void dag_stage(spn_dag_build_t* b) {
   dag_staged_t staged = SP_NULLPTR;
   sp_str_ht_init(b->mem, staged);
 
-  sp_da_for(session->plan.builds, it) {
-    spn_build_plan_t* plan = &session->plan.builds[it];
+  sp_da_for(session->plans, it) {
+    spn_build_plan_t* plan = &session->plans[it];
     sp_da_for(plan->roots, jt) {
       spn_target_unit_t* target = spn_session_get_target_unit(session, plan->roots[jt]);
       if (target->kind != SPN_CC_OUTPUT_EXE) {
@@ -1248,8 +1248,8 @@ static void dag_stage(spn_dag_build_t* b) {
     }
   }
 
-  sp_da_for(session->plan.builds, it) {
-    spn_build_unit_t* build = session->plan.builds[it].build;
+  sp_da_for(session->plans, it) {
+    spn_build_unit_t* build = session->plans[it].build;
     sp_str_t root = sp_fs_join_path(scratch.mem, build->paths.root, sp_str_lit("store"));
     dag_stage_pkg_store(b, &staged, spn_session_find_pkg_unit(session, build, spn_session_root_pkg(session)), root);
     sp_da_for(build->packages, jt) {
@@ -1306,8 +1306,8 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
     dag_emit_diag(b);
   }
 
-  sp_da_for(session->plan.builds, it) {
-    spn_build_unit_t* build = session->plan.builds[it].build;
+  sp_da_for(session->plans, it) {
+    spn_build_unit_t* build = session->plans[it].build;
     spn_pkg_unit_t* root = spn_session_find_pkg_unit(session, build, spn_session_root_pkg(session));
     spn_pkg_info_t* pkg = root ? root->info : session->pkg;
     spn_build_io_t* io = root ? &root->logs.io : SP_NULLPTR;

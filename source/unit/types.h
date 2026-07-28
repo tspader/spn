@@ -15,11 +15,11 @@
 #include "external/wasm/types.h"
 #include "log/lazy/types.h"
 
-typedef u32 spn_build_unit_id_t;
-typedef u32 spn_toolchain_unit_id_t;
+typedef u32 spn_build_unit_index_t;
+typedef u32 spn_toolchain_unit_index_t;
 
 struct spn_build_unit_t {
-  spn_build_unit_id_t id;
+  spn_build_unit_index_t id;
   spn_profile_info_t profile;
   spn_toolchain_unit_t* toolchain;
   sp_da(sp_str_t) include;
@@ -32,14 +32,10 @@ struct spn_build_unit_t {
 
 #define spn_dep_kind_bit(kind) (1u << (kind))
 
-typedef struct {
-  spn_target_selection_t targets;
-} spn_compile_request_t;
-
 SPN_PACK_PUSH
 typedef struct {
   spn_pkg_id_t pkg;
-  spn_build_unit_id_t ctx;
+  spn_build_unit_index_t ctx;
 } spn_pkg_unit_id_t;
 
 typedef struct {
@@ -54,7 +50,7 @@ typedef struct {
 SPN_PACK_POP
 
 _Static_assert(
-  sizeof(spn_pkg_unit_id_t) == sizeof(spn_pkg_id_t) + sizeof(spn_build_unit_id_t),
+  sizeof(spn_pkg_unit_id_t) == sizeof(spn_pkg_id_t) + sizeof(spn_build_unit_index_t),
   "spn_pkg_unit_id_t is byte-hashed as a key; it must have no padding"
 );
 _Static_assert(
@@ -217,7 +213,6 @@ struct spn_pkg_unit_t {
 };
 
 struct spn_toolchain_unit_t {
-  spn_toolchain_unit_id_t id;
   spn_toolchain_info_t* info;
   spn_triple_t host;
   spn_opt_artifact_t artifact;

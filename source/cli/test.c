@@ -10,7 +10,7 @@ sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
   if (!sp_str_empty(command->name)) {
     sp_da_push(names, command->name);
   }
-  app.config.compile.targets = (spn_target_selection_t) {
+  app.config.selection = (spn_target_selection_t) {
     .kind = SPN_TARGET_SELECTION_EXPLICIT,
     .targets = {
       .test = {
