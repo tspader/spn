@@ -108,6 +108,7 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
     if (entry) {
       spn_profile_overlay(entry, user);
     } else {
+      p.derived = base;
       p.derived.name = user->name;
       spn_profile_overlay(&p.derived, user);
       sp_str_ht_insert(*profiles, p.derived.name, p.derived);
@@ -126,7 +127,7 @@ static spn_abi_t spn_profile_default_abi(spn_os_t os, bool shared) {
   SP_UNREACHABLE_RETURN(SPN_ABI_NONE);
 }
 
-spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* overrides, spn_triple_t host, bool shared_demand, spn_profile_info_t* result) {
+spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* overrides, spn_triple_t host, bool is_shared, spn_profile_info_t* result) {
   sp_str_t name = spn_profile_select_name(overrides);
 
   if (sp_str_find_c8(name, '/') >= 0 || sp_str_find_c8(name, '\\') >= 0) {
@@ -156,7 +157,7 @@ spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_in
 
   spn_triple_t target = { merged.arch, merged.os, merged.abi };
   bool targeted = target.arch || target.os || target.abi;
-  bool shared = merged.linkage == SPN_LIB_KIND_SHARED || (!merged.linkage && shared_demand);
+  bool shared = merged.linkage == SPN_LIB_KIND_SHARED || (!merged.linkage && is_shared);
   if (!target.arch) target.arch = host.arch;
   if (!target.os)   target.os = host.os;
   if (!target.abi)  target.abi = spn_profile_default_abi(target.os, shared);

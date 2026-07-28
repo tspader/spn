@@ -44,7 +44,7 @@ static sp_str_t resolve_macos_sdk(sp_mem_t mem) {
   return sp_str_trim(result.out);
 }
 
-static bool root_demands_shared(spn_pkg_info_t* pkg) {
+static bool is_shared_linkage(spn_pkg_info_t* pkg) {
   sp_da_for(pkg->config, it) {
     spn_pkg_config_t* config = &pkg->config[it].value;
     if (!sp_opt_is_null(config->kind) && config->kind.value == SPN_LIB_KIND_SHARED) {
@@ -86,7 +86,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   sp_om_new(s->units.objects);
 
   spn_triple_t host = spn_triple_host();
-  try_union(spn_profile_resolve(s->profiles, &config.overrides, host, root_demands_shared(root), &s->profile));
+  try_union(spn_profile_resolve(s->profiles, &config.overrides, host, is_shared_linkage(root), &s->profile));
   if (s->profile.os == SPN_OS_MACOS) {
     s->profile.sysroot = resolve_macos_sdk(s->mem);
   }
