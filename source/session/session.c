@@ -84,7 +84,6 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   sp_om_new(s->units.packages);
   sp_om_new(s->units.targets);
   sp_om_new(s->units.objects);
-  sp_mutex_init(&s->mutex, SP_MUTEX_PLAIN);
 
   spn_triple_t host = spn_triple_host();
   try_union(spn_profile_resolve(s->profiles, &config.overrides, host, root_demands_shared(root), &s->profile));
@@ -96,13 +95,12 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   try_union(spn_build_add(s, spn_build_config_metaprogram(host), &s->units.metaprogram));
   sp_da_push(s->units.metaprogram->include, spn.paths.include);
 
-  sp_da_push(s->plans, ((spn_build_plan_t) {
+  spn_build_plan_t plan = {
     .build = s->units.target,
     .selection = config.selection,
-  }));
-  sp_da_for(s->plans, it) {
-    sp_da_init(s->mem, s->plans[it].roots);
-  }
+  };
+  sp_da_init(s->mem, plan.roots);
+  sp_da_push(s->plans, plan);
 
   return spn_result(SPN_OK);
 }
@@ -119,7 +117,7 @@ sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pk
   return requested;
 }
 
-spn_err_union_t spn_session_bind_toolchains(spn_session_t* s) {
+void spn_session_export_toolchain_env(spn_session_t* s) {
   sp_env_init(s->mem, &s->env);
   spn_toolchain_unit_t* toolchain = s->units.target->toolchain;
   sp_env_insert(&s->env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(s->mem, toolchain->cc.compiler));
@@ -128,7 +126,9 @@ spn_err_union_t spn_session_bind_toolchains(spn_session_t* s) {
   if (spn_toolchain_has_cxx(toolchain->info)) {
     sp_env_insert(&s->env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(s->mem, toolchain->cc.cxx));
   }
+}
 
+spn_err_union_t spn_session_validate_flags(spn_session_t* s) {
   sp_om_for(s->units.builds, it) {
     spn_build_unit_t* build = sp_om_at(s->units.builds, it);
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
@@ -152,11 +152,7 @@ spn_pkg_id_t spn_session_root_pkg(spn_session_t* session) {
 }
 
 spn_pkg_unit_t* spn_session_find_pkg_unit_by_id(spn_session_t* session, spn_pkg_unit_id_t id) {
-  sp_mutex_lock(&session->mutex);
-  spn_pkg_unit_t* pkg = sp_om_has(session->units.packages, id) ? sp_om_get(session->units.packages, id) : SP_NULLPTR;
-  sp_mutex_unlock(&session->mutex);
-
-  return pkg;
+  return sp_om_has(session->units.packages, id) ? sp_om_get(session->units.packages, id) : SP_NULLPTR;
 }
 
 spn_pkg_unit_t* spn_session_find_pkg_unit(spn_session_t* session, spn_build_unit_t* build, spn_pkg_id_t pkg) {
@@ -185,10 +181,7 @@ spn_target_unit_t* spn_session_find_target_in_pkg(spn_session_t* session, spn_pk
     .pkg = pkg->id,
     .target = sp_intern_get_or_insert(session->intern, name),
   };
-  sp_mutex_lock(&session->mutex);
-  spn_target_unit_t* target = sp_om_has(session->units.targets, id) ? sp_om_get(session->units.targets, id) : SP_NULLPTR;
-  sp_mutex_unlock(&session->mutex);
-  return target;
+  return sp_om_has(session->units.targets, id) ? sp_om_get(session->units.targets, id) : SP_NULLPTR;
 }
 
 spn_target_unit_t* spn_session_get_target_unit(spn_session_t* session, spn_target_unit_id_t id) {

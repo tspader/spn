@@ -496,7 +496,6 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
   }
 
   spn_try_step(spn_session_apply_options(session));
-  spn_try_step(spn_session_bind_toolchains(session));
 
   if (session->gates.reresolve) {
     session->gates.reresolve = false;
@@ -505,6 +504,9 @@ spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
     }
     return spn_task_continue();
   }
+
+  spn_session_export_toolchain_env(session);
+  spn_try_step(spn_session_validate_flags(session));
 
   if (check_unused_patches(session)) {
     return spn_task_fail(SPN_ERROR, .reported = true);

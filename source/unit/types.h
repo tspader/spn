@@ -16,9 +16,6 @@
 #include "external/wasm/types.h"
 #include "log/lazy/types.h"
 
-// A build is a value: everything that determines how a translation unit is
-// compiled, independent of what is being compiled. Identical configs collapse
-// to one build unit; the id is derived from the value.
 typedef struct {
   spn_triple_t host;
   spn_profile_info_t profile;
@@ -27,9 +24,7 @@ typedef struct {
 
 struct spn_build_unit_t {
   spn_build_id_t id;
-  spn_triple_t host;
   spn_profile_info_t profile;
-  spn_toolchain_role_t role;
   spn_toolchain_unit_t* toolchain;
   sp_da(sp_str_t) include;
   sp_da(spn_pkg_unit_t*) packages;
@@ -148,9 +143,8 @@ struct spn_pkg_unit_t {
   spn_pkg_source_t source;
   u32 kinds;
 
-  // The unit that owns this package's metaprogram targets: the package's unit
-  // in the metaprogram build, or null if the package has no scripts. A unit in
-  // the metaprogram build points at itself.
+  // The unit whose scripts are this package's: its unit in the metaprogram
+  // build (itself, there), or null when the package has none
   spn_pkg_unit_t* metaprogram;
   struct {
     spn_target_unit_t* configure;
