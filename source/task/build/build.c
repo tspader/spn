@@ -105,3 +105,13 @@ sp_str_t get_target_output_path(sp_mem_t mem, spn_target_unit_t* target) {
   sp_mem_end_scratch(s);
   return path;
 }
+
+sp_str_t get_target_exports_path(sp_mem_t mem, spn_target_unit_t* target) {
+  spn_cc_exports_format_t format = spn_cc_exports_format(target->kind, target->pkg->build->profile.os);
+
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+  sp_str_t file_name = sp_fmt(s.mem, "{}.{}", SP_FMT_STR(target->info->name), sp_fmt_cstr(spn_cc_exports_extension(format))).value;
+  sp_str_t path = sp_fs_join_path(mem, target->pkg->paths.work, file_name);
+  sp_mem_end_scratch(s);
+  return path;
+}

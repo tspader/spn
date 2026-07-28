@@ -215,7 +215,7 @@ void spn_gnu_render_compile_files(sp_mem_t mem, const spn_cc_compile_files_t* fi
   push_arg_str(mem, invocation, files->output);
 }
 
-void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, spn_invocation_t* invocation) {
+void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
   add_launcher(mem, toolchain, profile, link->lang, invocation);
   spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
@@ -228,28 +228,29 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       push_arg(mem, invocation, "-mexec-model=reactor");
       push_arg(mem, invocation, "-Wl,--no-entry");
       push_arg(mem, invocation, "-Wl,--import-symbols");
-      sp_da_for(link->exports.symbols, it) {
-        push_arg_fmt(mem, invocation, "-Wl,--export={}", sp_fmt_str(link->exports.symbols[it]));
+      sp_da_for(files->exports.symbols, it) {
+        push_arg_fmt(mem, invocation, "-Wl,--export={}", sp_fmt_str(files->exports.symbols[it]));
       }
       break;
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
       push_arg(mem, invocation, "-shared");
-      if (!sp_str_empty(link->exports.path)) {
-        switch (profile->os) {
-          case SPN_OS_MACOS: {
-            push_arg_fmt(mem, invocation, "-Wl,-exported_symbols_list,{}", sp_fmt_str(link->exports.path));
+      if (!sp_str_empty(files->exports.path)) {
+        switch (spn_cc_exports_format(link->kind, profile->os)) {
+          case SPN_CC_EXPORTS_SYMBOL_LIST: {
+            push_arg_fmt(mem, invocation, "-Wl,-exported_symbols_list,{}", sp_fmt_str(files->exports.path));
             break;
           }
-          case SPN_OS_WINDOWS: {
-            push_arg_str(mem, invocation, link->exports.path);
+          case SPN_CC_EXPORTS_DEF: {
+            push_arg_str(mem, invocation, files->exports.path);
             break;
           }
-          case SPN_OS_LINUX:
-          case SPN_OS_WASI:
-          case SPN_OS_NONE: {
-            push_arg_fmt(mem, invocation, "-Wl,--version-script,{}", sp_fmt_str(link->exports.path));
+          case SPN_CC_EXPORTS_VERSION_SCRIPT: {
+            push_arg_fmt(mem, invocation, "-Wl,--version-script,{}", sp_fmt_str(files->exports.path));
             break;
+          }
+          case SPN_CC_EXPORTS_WASM: {
+            sp_unreachable_case();
           }
         }
       }
@@ -269,7 +270,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       sp_unreachable_case();
     }
   }
-  push_args(mem, invocation, link->objects);
+  push_args(mem, invocation, files->objects);
   if (!sp_da_empty(link->whole_archives)) {
     if (profile->os == SPN_OS_MACOS) {
       sp_da_for(link->whole_archives, it) {
@@ -314,14 +315,13 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
     push_arg_fmt(mem, invocation, "-Wl,-rpath,{}", sp_fmt_str(link->rpath[it]));
   }
   push_arg(mem, invocation, "-o");
-  push_arg_str(mem, invocation, link->output);
+  push_arg_str(mem, invocation, files->output);
 }
 
-void spn_gnu_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_cc_archive_t* archive, spn_invocation_t* invocation) {
+void spn_gnu_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_cc_archive_files_t* files, spn_invocation_t* invocation) {
   invocation->program = toolchain->archiver.program;
   push_args(mem, invocation, toolchain->archiver.args);
   push_arg(mem, invocation, "rcs");
-  push_args(mem, invocation, archive->args);
-  push_arg_str(mem, invocation, archive->output);
-  push_args(mem, invocation, archive->objects);
+  push_arg_str(mem, invocation, files->output);
+  push_args(mem, invocation, files->objects);
 }

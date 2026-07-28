@@ -74,9 +74,6 @@ typedef struct {
 typedef struct {
   spn_lang_t lang;
   spn_cc_output_kind_t kind;
-  sp_str_t output;
-  spn_cc_exports_t exports;
-  sp_da(sp_str_t) objects;
   sp_da(sp_str_t) args;
   sp_da(sp_str_t) libs;
   sp_da(sp_str_t) whole_archives;
@@ -92,8 +89,20 @@ typedef struct {
 typedef struct {
   sp_str_t output;
   sp_da(sp_str_t) objects;
-  sp_da(sp_str_t) args;
-} spn_cc_archive_t;
+  spn_cc_exports_t exports;
+} spn_cc_link_files_t;
+
+typedef struct {
+  sp_str_t output;
+  sp_da(sp_str_t) objects;
+} spn_cc_archive_files_t;
+
+typedef enum {
+  SPN_CC_EXPORTS_VERSION_SCRIPT,
+  SPN_CC_EXPORTS_SYMBOL_LIST,
+  SPN_CC_EXPORTS_DEF,
+  SPN_CC_EXPORTS_WASM,
+} spn_cc_exports_format_t;
 
 typedef struct {
   sp_str_t program;

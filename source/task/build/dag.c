@@ -10,6 +10,7 @@
 #include "unit/types.h"
 
 #include "api/api.h"
+#include "compiler/driver.h"
 #include "dag/occ.h"
 #include "enum/enum.h"
 #include "event/event.h"
@@ -27,6 +28,7 @@
 typedef struct {
   spn_target_unit_t* target;
   sp_da(spn_dag_id_t) objects;
+  spn_dag_id_t exports;
 } spn_dag_link_ctx_t;
 
 typedef struct {
@@ -83,16 +85,61 @@ static spn_dag_digest_t dag_compile_identity(spn_dag_build_t* b, const spn_compi
   return spn_dag_hash_final(&ctx);
 }
 
-static spn_err_t dag_link_identity(spn_dag_build_t* b, spn_target_unit_t* target, spn_dag_digest_t* identity) {
+static spn_err_t dag_link_identity(spn_dag_build_t* b, spn_dag_link_ctx_t* link, sp_str_t output, spn_dag_digest_t* identity) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+
+  spn_cc_link_files_t files = {
+    .output = output,
+  };
+  sp_da_init(s.mem, files.objects);
+  sp_da_for(link->objects, it) {
+    sp_da_push(files.objects, dag_artifact_path(b->graph, link->objects[it]));
+  }
+  if (link->exports.occupied) {
+    files.exports.path = dag_artifact_path(b->graph, link->exports);
+  }
+
   spn_invocation_t invocation = sp_zero;
-  sp_da(sp_str_t) objects = sp_da_new(s.mem, sp_str_t);
-  spn_err_union_t err = render_linker_invocation(s.mem, target, sp_str_lit(""), objects, &invocation);
+  spn_err_union_t err = spn_build_link_invocation(s.mem, link->target, &files, &invocation);
   if (!err.kind) {
     spn_sha256_ctx_t ctx = sp_zero;
     spn_sha256_init(&ctx);
-    spn_dag_hash_str(&ctx, sp_str_lit("spn.build.link.v2"));
-    dag_hash_invocation(&ctx, &b->roots, target->pkg->build->toolchain, &invocation);
+    spn_dag_hash_str(&ctx, sp_str_lit("spn.build.link.v3"));
+    dag_hash_invocation(&ctx, &b->roots, link->target->pkg->build->toolchain, &invocation);
+    *identity = spn_dag_hash_final(&ctx);
+  }
+  sp_mem_end_scratch(s);
+  if (err.kind) {
+    dag_emit_err(err);
+    return SPN_ERROR;
+  }
+  return SPN_OK;
+}
+
+static spn_err_t dag_exports_identity(spn_dag_build_t* b, spn_dag_link_ctx_t* link, sp_str_t output, spn_dag_digest_t* identity) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  spn_target_unit_t* target = link->target;
+  spn_build_unit_t* build = target->pkg->build;
+
+  spn_cc_archive_files_t files = {
+    .output = sp_fmt(s.mem, "{}.a", SP_FMT_STR(output)).value,
+  };
+  sp_da_init(s.mem, files.objects);
+  sp_da_for(link->objects, it) {
+    sp_da_push(files.objects, dag_artifact_path(b->graph, link->objects[it]));
+  }
+
+  spn_invocation_t invocation = sp_zero;
+  spn_err_union_t err = spn_cc_render_archive(s.mem, &build->toolchain->cc, &build->profile, &files, &invocation);
+  if (!err.kind) {
+    invocation.cwd = target->pkg->paths.work;
+    spn_sha256_ctx_t ctx = sp_zero;
+    spn_sha256_init(&ctx);
+    spn_dag_hash_str(&ctx, sp_str_lit("spn.build.exports.v1"));
+    dag_hash_invocation(&ctx, &b->roots, build->toolchain, &invocation);
+    spn_dag_hash_u8(&ctx, (u8)target->kind);
+    spn_dag_hash_u8(&ctx, (u8)build->profile.os);
+    spn_dag_hash_masked_strs(&ctx, &b->roots, target->link.whole_archives);
     *identity = spn_dag_hash_final(&ctx);
   }
   sp_mem_end_scratch(s);
@@ -273,7 +320,18 @@ static s32 dag_link_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
   sp_da_for(link->objects, it) {
     sp_da_push(objects, dag_artifact_path(g, link->objects[it]));
   }
-  return spn_link_target_run(target, dag_artifact_path(g, action->produces[0]), objects);
+  sp_str_t exports = link->exports.occupied ? dag_artifact_path(g, link->exports) : sp_str_lit("");
+  return spn_link_target_run(target, dag_artifact_path(g, action->produces[0]), objects, exports);
+}
+
+static s32 dag_exports_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
+  spn_dag_link_ctx_t* link = (spn_dag_link_ctx_t*)user_data;
+
+  sp_da(sp_str_t) objects = sp_da_new(spn.mem, sp_str_t);
+  sp_da_for(link->objects, it) {
+    sp_da_push(objects, dag_artifact_path(g, link->objects[it]));
+  }
+  return spn_link_exports_run(link->target, objects, dag_artifact_path(g, action->produces[0]));
 }
 
 static s32 dag_embed_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
@@ -688,6 +746,31 @@ static spn_err_t dag_add_objects(spn_dag_build_t* b, spn_target_unit_t* target) 
   return SPN_OK;
 }
 
+static spn_err_t dag_add_exports(spn_dag_build_t* b, spn_dag_link_ctx_t* link) {
+  spn_dag_t* g = b->graph;
+  spn_target_unit_t* target = link->target;
+
+  sp_str_t output = get_target_exports_path(b->mem, target);
+  spn_dag_digest_t identity = sp_zero;
+  spn_try(dag_exports_identity(b, link, output, &identity));
+
+  spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
+    .identity = identity,
+    .execute = dag_exports_exec,
+    .user_data = link,
+  });
+  link->exports = spn_dag_add_file(g, output);
+  spn_try(spn_dag_action_add_output(g, action, link->exports));
+
+  sp_da_for(link->objects, it) {
+    spn_dag_action_add_input(g, action, link->objects[it]);
+  }
+  sp_da_for(target->link.whole_archives, it) {
+    spn_dag_action_add_input(g, action, spn_dag_add_file(g, target->link.whole_archives[it]));
+  }
+  return SPN_OK;
+}
+
 spn_err_t spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target) {
   spn_dag_t* g = b->graph;
 
@@ -760,8 +843,14 @@ spn_err_t spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target
     sp_da_push(link->objects, ids.embed.object);
   }
 
+  if (target->kind == SPN_CC_OUTPUT_SHARED_LIB || target->kind == SPN_CC_OUTPUT_REACTOR) {
+    spn_try(dag_add_exports(b, link));
+  }
+
+  sp_str_t output = get_target_output_path(b->mem, target);
+
   spn_dag_digest_t identity = sp_zero;
-  spn_try(dag_link_identity(b, target, &identity));
+  spn_try(dag_link_identity(b, link, output, &identity));
 
   ids.action = spn_dag_add_action(g, (spn_dag_action_config_t) {
     .identity = identity,
@@ -771,7 +860,10 @@ spn_err_t spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target
   sp_da_for(link->objects, it) {
     spn_dag_action_add_input(g, ids.action, link->objects[it]);
   }
-  ids.output = spn_dag_add_file(g, get_target_output_path(b->mem, target));
+  if (link->exports.occupied) {
+    spn_dag_action_add_input(g, ids.action, link->exports);
+  }
+  ids.output = spn_dag_add_file(g, output);
   spn_try(spn_dag_action_add_output(g, ids.action, ids.output));
 
   sp_ht_insert(b->ids.targets, target, ids);

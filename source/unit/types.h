@@ -130,7 +130,6 @@ struct spn_target_unit {
   spn_target_info_t* info;
   spn_cc_output_kind_t kind;
   spn_linkage_t lib_kind;
-  spn_invocation_t invocation;
 
   sp_da(spn_compile_unit_t*) objects;
 
@@ -142,7 +141,6 @@ struct spn_target_unit {
   struct {
     spn_os_version_t min_os;
     spn_lang_t lang;
-    spn_cc_exports_t exports;
     sp_da(spn_link_lib_t) libs;
     sp_da(sp_str_t) lib_dirs;
     sp_da(sp_str_t) system_libs;
