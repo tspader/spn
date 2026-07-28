@@ -23,7 +23,6 @@ static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t*
 
   spn_cc_compile_t compile = {
     .lang = unit->lang,
-    .source = unit->paths.file,
     .cxx = unit->target->info->cxx,
     .pic = unit->target->info->kind == SPN_TARGET_LIB,
   };
@@ -74,18 +73,23 @@ static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t*
   return compile;
 }
 
-spn_err_union_t spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit, sp_str_t output, sp_str_t depfile, spn_invocation_t* invocation) {
+spn_err_union_t spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit, spn_invocation_t* invocation) {
   spn_pkg_unit_t* pkg = unit->target->pkg;
   spn_build_unit_t* build = pkg->build;
 
   spn_cc_compile_t compile = spn_build_compile_desc(mem, unit);
-  compile.output = output;
-  compile.depfile = depfile;
-
-  spn_cc_toolchain_t* toolchain = &build->toolchain->cc;
-  try_union(spn_cc_render_compile(mem, toolchain, &build->profile, &compile, invocation));
+  try_union(spn_cc_render_compile(mem, &build->toolchain->cc, &build->profile, &compile, invocation));
   invocation->cwd = pkg->paths.work;
   return spn_result(SPN_OK);
+}
+
+spn_invocation_t spn_build_compile_invocation(sp_mem_t mem, spn_compile_unit_t* unit, sp_str_t object, sp_str_t depfile) {
+  spn_cc_compile_files_t files = {
+    .source = unit->paths.file,
+    .output = object,
+    .depfile = depfile,
+  };
+  return spn_cc_render_compile_command(mem, &unit->target->pkg->build->toolchain->cc, &unit->base, &files);
 }
 
 spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t path) {
@@ -99,11 +103,7 @@ spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t pa
   u32 count = 0;
   sp_om_for(session->units.objects, it) {
     spn_compile_unit_t* unit = sp_om_at(session->units.objects, it);
-
-    spn_invocation_t invocation = sp_zero;
-    if (spn_build_render_compile(scratch.mem, unit, unit->paths.object, sp_str_lit(""), &invocation).kind) {
-      continue;
-    }
+    spn_invocation_t invocation = spn_build_compile_invocation(scratch.mem, unit, unit->paths.object, sp_str_lit(""));
 
     if (count++) {
       sp_io_write_c8(io, ',');

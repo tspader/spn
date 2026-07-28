@@ -16,16 +16,9 @@ s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t d
 
   spn_pkg_unit_announce_compile(pkg);
 
-  spn_err_union_t render = spn_build_render_compile(spn.mem, unit, object, depfile, &unit->invocation);
-  if (render.kind) {
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR,
-      .err = render,
-    });
-    return 1;
-  }
-
-  spn_invocation_result_t run = spn_invocation_run(&unit->invocation);
+  spn_invocation_t* invocation = sp_alloc_type(spn.mem, spn_invocation_t);
+  *invocation = spn_build_compile_invocation(spn.mem, unit, object, depfile);
+  spn_invocation_result_t run = spn_invocation_run(invocation);
 
   if (run.result.status.exit_code) {
     spn_event_buffer_push_ex(session->events, pkg->info, &unit->target->logs, (spn_build_event_t) {
@@ -35,7 +28,7 @@ s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t d
         .object_file = object,
         .rc = run.result.status.exit_code,
         .out = run.result.out,
-        .invocation = &unit->invocation,
+        .invocation = invocation,
         .time = run.elapsed,
       }
     });
@@ -45,7 +38,7 @@ s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t d
       .target.passed = {
         .source_file = unit->paths.file,
         .object_file = object,
-        .invocation = &unit->invocation,
+        .invocation = invocation,
         .out = run.result.out,
         .time = run.elapsed,
       }

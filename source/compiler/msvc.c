@@ -109,8 +109,6 @@ void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, 
     invocation->program = sp_str_lit("ml64");
     push_arg(mem, invocation, "/nologo");
     push_arg(mem, invocation, "/c");
-    push_arg_fmt(mem, invocation, "/Fo{}", sp_fmt_str(compile->output));
-    push_arg_str(mem, invocation, compile->source);
     return;
   }
   add_launcher(mem, toolchain, compile->lang, invocation);
@@ -129,7 +127,6 @@ void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, 
   }
   push_args(mem, invocation, flags.compile);
   push_arg(mem, invocation, "/c");
-  push_arg_str(mem, invocation, compile->source);
   sp_da_for(compile->include, it) {
     push_arg_fmt(mem, invocation, "/I{}", sp_fmt_str(compile->include[it]));
   }
@@ -150,7 +147,12 @@ void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, 
   // Parity with -Werror=return-type: C4715 is "not all control paths
   // return a value"
   push_arg(mem, invocation, "/we4715");
-  push_arg_fmt(mem, invocation, "/Fo{}", sp_fmt_str(compile->output));
+}
+
+void spn_msvc_render_compile_files(sp_mem_t mem, const spn_cc_compile_files_t* files, spn_invocation_t* invocation) {
+  sp_assert(sp_str_empty(files->depfile));
+  push_arg_fmt(mem, invocation, "/Fo{}", sp_fmt_str(files->output));
+  push_arg_str(mem, invocation, files->source);
 }
 
 void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, spn_invocation_t* invocation) {

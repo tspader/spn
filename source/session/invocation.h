@@ -13,7 +13,8 @@ typedef struct {
   u64 elapsed;
 } spn_invocation_result_t;
 
-spn_err_union_t         spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit, sp_str_t output, sp_str_t depfile, spn_invocation_t* invocation);
+spn_err_union_t         spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit, spn_invocation_t* invocation);
+spn_invocation_t        spn_build_compile_invocation(sp_mem_t mem, spn_compile_unit_t* unit, sp_str_t object, sp_str_t depfile);
 spn_err_t               spn_session_write_compile_commands(spn_session_t* session, sp_str_t path);
 sp_str_t                spn_session_compile_commands_path(spn_session_t* session);
 spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation);

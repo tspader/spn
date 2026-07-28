@@ -308,6 +308,14 @@ static void push_frameworks(sp_da(sp_str_t)* frameworks, sp_da(sp_str_t) values)
   }
 }
 
+static spn_err_union_t render_compile_bases(sp_mem_t mem, spn_target_unit_t* target) {
+  sp_da_for(target->objects, it) {
+    spn_compile_unit_t* unit = target->objects[it];
+    try_union(spn_build_render_compile(mem, unit, &unit->base));
+  }
+  return spn_result(SPN_OK);
+}
+
 static spn_err_union_t build_target_invocations(spn_target_unit_t* target) {
   spn_pkg_unit_t* pkg = target->pkg;
   sp_mem_t mem = pkg->session->mem;
@@ -422,9 +430,7 @@ static spn_err_union_t build_target_invocations(spn_target_unit_t* target) {
   spn_profile_info_t* profile = &target->pkg->build->profile;
   spn_cc_toolchain_t* toolchain = &target->pkg->build->toolchain->cc;
 
-  if (!sp_da_empty(target->objects)) {
-    try_union(spn_cc_validate_compile(toolchain, profile));
-  }
+  try_union(render_compile_bases(mem, target));
 
   switch (target->kind) {
     case SPN_CC_OUTPUT_STATIC_LIB: {
