@@ -414,7 +414,7 @@ spn_task_step_t spn_task_sync_packages_init(spn_app_t *app) {
       case SPN_PKG_SOURCE_FILE: num_file++; break;
     }
 
-    spn_sync_pkg_job_t *job = sp_alloc_type(spn.mem, spn_sync_pkg_job_t);
+    spn_sync_pkg_job_t* job = sp_alloc_type(spn.mem, spn_sync_pkg_job_t);
     job->session = session;
     job->pkg = pkg;
     sp_da_push(app->sync.packages, job);
