@@ -35,6 +35,19 @@ typedef struct {
 } spn_embed_t;
 
 
+typedef struct {
+  spn_pkg_unit_t* pkg;
+  bool private;
+} spn_closure_entry_t;
+
+typedef struct {
+  spn_pkg_unit_t* pkg;
+  spn_target_unit_t* lib;
+  bool private;
+} spn_link_lib_t;
+
+
+
 typedef enum {
   SPN_TARGET_LIB,
   SPN_TARGET_EXE,
