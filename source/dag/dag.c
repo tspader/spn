@@ -197,15 +197,85 @@ spn_dag_digest_t spn_dag_weak_key(spn_dag_t* g, spn_dag_id_t action_id) {
   return spn_dag_hash_final(&ctx);
 }
 
-spn_dag_digest_t spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count) {
+static bool root_match(sp_str_t dir, sp_str_t path) {
+  if (!sp_str_starts_with(path, dir)) {
+    return false;
+  }
+  return path.len == dir.len || path.data[dir.len] == '/';
+}
+
+static spn_dag_root_t root_longest(const spn_dag_roots_t* roots, sp_str_t str) {
+  spn_dag_root_t best = SPN_DAG_ROOT_NONE;
+  u32 longest = 0;
+  for (u32 it = SPN_DAG_ROOT_NONE + 1; it < SPN_DAG_ROOT_COUNT; it++) {
+    sp_str_t dir = roots->dirs[it];
+    if (dir.len > longest && root_match(dir, str)) {
+      longest = dir.len;
+      best = (spn_dag_root_t)it;
+    }
+  }
+  return best;
+}
+
+spn_dag_prefixed_t spn_dag_root_collapse(const spn_dag_roots_t* roots, sp_str_t path) {
+  spn_dag_root_t root = root_longest(roots, path);
+  if (root == SPN_DAG_ROOT_NONE) {
+    return (spn_dag_prefixed_t) { .root = SPN_DAG_ROOT_NONE, .sub = path };
+  }
+  u32 len = roots->dirs[root].len;
+  u32 skip = len < path.len ? len + 1 : len;
+  return (spn_dag_prefixed_t) { .root = root, .sub = sp_str(path.data + skip, path.len - skip) };
+}
+
+bool spn_dag_root_expand(const spn_dag_roots_t* roots, spn_dag_prefixed_t prefixed, sp_mem_t mem, sp_str_t* out) {
+  if (prefixed.root == SPN_DAG_ROOT_NONE) {
+    *out = prefixed.sub;
+    return true;
+  }
+  sp_str_t dir = roots->dirs[prefixed.root];
+  if (sp_str_empty(dir)) {
+    return false;
+  }
+  *out = sp_str_empty(prefixed.sub) ? sp_str_copy(mem, dir) : sp_fs_join_path(mem, dir, prefixed.sub);
+  return true;
+}
+
+void spn_dag_hash_masked(spn_sha256_ctx_t* ctx, const spn_dag_roots_t* roots, sp_str_t str) {
+  u32 start = 0;
+  u32 at = 0;
+  while (at < str.len) {
+    spn_dag_root_t root = root_longest(roots, sp_str(str.data + at, str.len - at));
+    if (root == SPN_DAG_ROOT_NONE) {
+      at++;
+      continue;
+    }
+    spn_dag_hash_str(ctx, sp_str(str.data + start, at - start));
+    spn_dag_hash_u8(ctx, (u8)root);
+    at += roots->dirs[root].len;
+    start = at;
+  }
+  spn_dag_hash_str(ctx, sp_str(str.data + start, str.len - start));
+  spn_dag_hash_u8(ctx, (u8)SPN_DAG_ROOT_NONE);
+}
+
+void spn_dag_hash_masked_strs(spn_sha256_ctx_t* ctx, const spn_dag_roots_t* roots, sp_da(sp_str_t) strs) {
+  spn_dag_hash_u64(ctx, sp_da_size(strs));
+  sp_da_for(strs, it) {
+    spn_dag_hash_masked(ctx, roots, strs[it]);
+  }
+}
+
+spn_dag_digest_t spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_roots_t* roots, const spn_dag_obs_t* obs, u32 count) {
   spn_sha256_ctx_t ctx = sp_zero;
   spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.strong.v3"));
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.strong.v4"));
   spn_dag_hash_digest(&ctx, weak);
   spn_dag_hash_u64(&ctx, count);
   sp_for(it, count) {
+    spn_dag_prefixed_t prefixed = spn_dag_root_collapse(roots, obs[it].path);
     spn_dag_hash_u8(&ctx, (u8)obs[it].kind);
-    spn_dag_hash_str(&ctx, obs[it].path);
+    spn_dag_hash_u8(&ctx, (u8)prefixed.root);
+    spn_dag_hash_str(&ctx, prefixed.sub);
     spn_dag_hash_str(&ctx, obs[it].filter);
     spn_dag_hash_digest(&ctx, obs[it].meta.digest);
   }

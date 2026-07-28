@@ -20,7 +20,9 @@ add_executable(dag
   glob.c
   graph.c
   key.c
+  masked.c
   parallel.c
+  roots.c
   run.c
   store.c
   strong_key.c

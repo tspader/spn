@@ -14,6 +14,8 @@ typedef struct {
   const c8* name;
   discovery_entry_t entries [DAG_TEST_MAX_OPS];
   const c8* corrupt;
+  dag_test_roots_t roots;
+  dag_test_roots_t reroots;
   bool reload;
   const c8* key;
   discovery_expect_t expect;
@@ -52,8 +54,11 @@ static void run_test(s32* utest_result, discovery_test_t t) {
   tmpfs_init_named(&fs, t.name);
   sp_str_t dir = tmpfs_get(&fs, sp_str_lit("manifests"));
 
+  spn_dag_roots_t storage = sp_zero;
+  const spn_dag_roots_t* roots = dag_test_roots_build(t.roots, &storage);
+
   spn_dag_obs_table_t discovery = sp_zero;
-  spn_dag_obs_table_init(&discovery, fs.mem, dir);
+  spn_dag_obs_table_init(&discovery, fs.mem, dir, roots);
 
   sp_carr_for(t.entries, it) {
     if (!t.entries[it].key) {
@@ -68,8 +73,9 @@ static void run_test(s32* utest_result, discovery_test_t t) {
     ASSERT_EQ(SP_OK, sp_fs_create_file_cstr(path, "not json\n"));
   }
 
+  spn_dag_roots_t restorage = sp_zero;
   if (t.reload) {
-    spn_dag_obs_table_init(&discovery, fs.mem, dir);
+    spn_dag_obs_table_init(&discovery, fs.mem, dir, dag_test_roots_build(t.reroots, &restorage));
   }
 
   discovery_expect(utest_result, &discovery, t.key, t.expect);
@@ -179,6 +185,34 @@ UTEST_F(discovery, new_pathset_replaces_existing) {
     .expect = {
       .hit = true,
       .obs = { { .path = "B" } }
+    }
+  });
+}
+
+UTEST_F(discovery, reload_relocates_paths) {
+  run_test(&ur, (discovery_test_t) {
+    .name = "discovery_relocate",
+    .entries = {
+      {
+        .key = "K",
+        .obs = {
+          { .path = "/A/D/H" },
+          { .path = "/A/S/P/H" },
+          { .path = "/X/H" }
+        }
+      }
+    },
+    .roots = { .project = "/A", .store = "/A/S" },
+    .reroots = { .project = "/B", .store = "/C" },
+    .reload = true,
+    .key = "K",
+    .expect = {
+      .hit = true,
+      .obs = {
+        { .path = "/B/D/H" },
+        { .path = "/C/P/H" },
+        { .path = "/X/H" }
+      }
     }
   });
 }

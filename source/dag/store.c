@@ -111,8 +111,16 @@ static bool row_word(sp_str_t* cursor, sp_str_t* out) {
   return row_bytes(cursor, len, out);
 }
 
+static bool row_line(sp_str_t* cursor, sp_str_t* out) {
+  u32 len = 0;
+  while (len < cursor->len && cursor->data[len] != '\n') {
+    len++;
+  }
+  return row_bytes(cursor, len, out) && row_lit(cursor, '\n');
+}
+
 static bool row_header(sp_str_t* cursor) {
-  return row_lit(cursor, '1') && row_lit(cursor, '\n');
+  return row_lit(cursor, '2') && row_lit(cursor, '\n');
 }
 
 static spn_err_t write_bytes(sp_io_writer_t* io, const void* data, u64 len) {
@@ -121,7 +129,7 @@ static spn_err_t write_bytes(sp_io_writer_t* io, const void* data, u64 len) {
 }
 
 static spn_err_t write_header(sp_io_writer_t* io) {
-  return write_bytes(io, "1\n", 2);
+  return write_bytes(io, "2\n", 2);
 }
 
 static spn_err_t write_row_str(sp_io_writer_t* io, sp_str_t str) {
@@ -170,29 +178,35 @@ static bool parse_outputs(sp_str_t content, sp_da(spn_dag_action_output_t)* outp
   return true;
 }
 
-static spn_err_t write_obs_row(sp_io_writer_t* io, sp_mem_t mem, const spn_dag_obs_t* obs) {
+static spn_err_t write_obs_row(sp_io_writer_t* io, sp_mem_t mem, const spn_dag_roots_t* roots, const spn_dag_obs_t* obs) {
+  spn_dag_prefixed_t prefixed = spn_dag_root_collapse(roots, obs->path);
+  if (sp_str_contains(prefixed.sub, sp_str_lit("\n"))) {
+    return SPN_ERR_DAG_STORE_WRITE;
+  }
   spn_try_as(sp_fmt_io(io, "{} {} {} {} {} {} {} ",
     sp_fmt_str(format_obs_kind(obs->kind)),
-    sp_fmt_uint(obs->meta.id.device),
     sp_fmt_uint(obs->meta.id.inode),
     sp_fmt_int((s64)obs->meta.mtime.tv_sec),
     sp_fmt_int((s64)obs->meta.mtime.tv_nsec),
     sp_fmt_int(obs->meta.size),
-    sp_fmt_str(spn_dag_digest_hex(mem, obs->meta.digest))
+    sp_fmt_str(spn_dag_digest_hex(mem, obs->meta.digest)),
+    sp_fmt_uint(prefixed.root)
   ), SPN_ERR_DAG_STORE_WRITE);
-  try(write_row_str(io, obs->filter));
-  try(write_bytes(io, " ", 1));
-  try(write_row_str(io, obs->path));
+  if (obs->kind == SPN_DAG_OBS_ENUMERATION) {
+    try(write_row_str(io, obs->filter));
+    try(write_bytes(io, " ", 1));
+  }
+  try(write_bytes(io, prefixed.sub.data, prefixed.sub.len));
   return write_bytes(io, "\n", 1);
 }
 
-static bool parse_obs_row(sp_str_t* cursor, spn_dag_obs_t* out) {
+static bool parse_obs_row(sp_str_t* cursor, const spn_dag_roots_t* roots, sp_mem_t mem, spn_dag_obs_t* out) {
   sp_str_t kind = sp_zero;
   s64 mtime_s = 0;
   s64 mtime_ns = 0;
+  u64 root = 0;
+  sp_str_t sub = sp_zero;
   if (!row_word(cursor, &kind) || !parse_obs_kind(kind, &out->kind)) return false;
-  if (!row_lit(cursor, ' ')) return false;
-  if (!row_u64(cursor, &out->meta.id.device)) return false;
   if (!row_lit(cursor, ' ')) return false;
   if (!row_u64(cursor, &out->meta.id.inode)) return false;
   if (!row_lit(cursor, ' ')) return false;
@@ -204,32 +218,39 @@ static bool parse_obs_row(sp_str_t* cursor, spn_dag_obs_t* out) {
   if (!row_lit(cursor, ' ')) return false;
   if (!row_digest(cursor, &out->meta.digest)) return false;
   if (!row_lit(cursor, ' ')) return false;
-  if (!row_str(cursor, &out->filter)) return false;
+  if (!row_u64(cursor, &root) || root >= SPN_DAG_ROOT_COUNT) return false;
   if (!row_lit(cursor, ' ')) return false;
-  if (!row_str(cursor, &out->path)) return false;
-  if (!row_lit(cursor, '\n')) return false;
+  if (out->kind == SPN_DAG_OBS_ENUMERATION) {
+    if (!row_str(cursor, &out->filter)) return false;
+    if (!row_lit(cursor, ' ')) return false;
+  }
+  if (!row_line(cursor, &sub)) return false;
+
+  spn_dag_prefixed_t prefixed = { .root = (spn_dag_root_t)root, .sub = sub };
+  if (!spn_dag_root_expand(roots, prefixed, mem, &out->path)) return false;
+  if (sp_str_empty(out->path)) return false;
 
   out->meta.mtime.tv_sec = mtime_s;
   out->meta.mtime.tv_nsec = mtime_ns;
   return true;
 }
 
-static spn_err_t write_obs(sp_io_writer_t* io, sp_mem_t mem, const spn_dag_obs_t* obs, u64 count) {
+static spn_err_t write_obs(sp_io_writer_t* io, sp_mem_t mem, const spn_dag_roots_t* roots, const spn_dag_obs_t* obs, u64 count) {
   try(write_header(io));
   sp_for(it, count) {
-    try(write_obs_row(io, mem, obs + it));
+    try(write_obs_row(io, mem, roots, obs + it));
   }
   return SPN_OK;
 }
 
-static bool parse_obs(sp_str_t content, sp_da(spn_dag_obs_t)* set) {
+static bool parse_obs(sp_str_t content, const spn_dag_roots_t* roots, sp_mem_t mem, sp_da(spn_dag_obs_t)* set) {
   sp_str_t cursor = content;
   if (!row_header(&cursor)) {
     return false;
   }
   while (cursor.len) {
     spn_dag_obs_t obs = sp_zero;
-    if (!parse_obs_row(&cursor, &obs)) {
+    if (!parse_obs_row(&cursor, roots, mem, &obs)) {
       return false;
     }
     sp_da_push(*set, obs);
@@ -266,14 +287,14 @@ static void save_outputs(sp_str_t dir, spn_dag_digest_t key, const spn_dag_actio
   sp_mem_end_scratch(s);
 }
 
-static bool load_obs(sp_str_t dir, spn_dag_digest_t key, sp_mem_t mem, sp_da(spn_dag_obs_t)* set) {
+static bool load_obs(spn_dag_obs_table_t* d, spn_dag_digest_t key, sp_da(spn_dag_obs_t)* set) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
-  sp_str_t path = entry_path(dir, s.mem, key);
+  sp_str_t path = entry_path(d->dir, s.mem, key);
   sp_str_t content = sp_zero;
   bool ok = false;
-  if (!sp_io_read_file(mem, path, &content)) {
-    ok = parse_obs(content, set);
+  if (!sp_io_read_file(d->mem, path, &content)) {
+    ok = parse_obs(content, d->roots, d->mem, set);
     if (!ok) {
       sp_fs_remove_file(path);
     }
@@ -283,13 +304,13 @@ static bool load_obs(sp_str_t dir, spn_dag_digest_t key, sp_mem_t mem, sp_da(spn
   return ok;
 }
 
-static void save_obs(sp_str_t dir, spn_dag_digest_t key, const spn_dag_obs_t* obs, u64 count) {
+static void save_obs(spn_dag_obs_table_t* d, spn_dag_digest_t key, const spn_dag_obs_t* obs, u64 count) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
   sp_io_dyn_mem_writer_t sink = sp_zero;
   sp_io_dyn_mem_writer_init(s.mem, &sink);
-  if (!write_obs(&sink.base, s.mem, obs, count)) {
-    sp_fs_write_atomic(entry_path(dir, s.mem, key), sp_io_dyn_mem_writer_as_str(&sink));
+  if (!write_obs(&sink.base, s.mem, d->roots, obs, count)) {
+    sp_fs_write_atomic(entry_path(d->dir, s.mem, key), sp_io_dyn_mem_writer_as_str(&sink));
   }
 
   sp_mem_end_scratch(s);
@@ -363,10 +384,11 @@ bool spn_dag_action_cache_remove(spn_dag_action_cache_t* c, spn_dag_digest_t key
   return removed;
 }
 
-void spn_dag_obs_table_init(spn_dag_obs_table_t* d, sp_mem_t mem, sp_str_t dir) {
+void spn_dag_obs_table_init(spn_dag_obs_table_t* d, sp_mem_t mem, sp_str_t dir, const spn_dag_roots_t* roots) {
   d->arena = sp_mem_arena_new(mem);
   d->mem = sp_mem_arena_as_allocator(d->arena);
   d->dir = sp_str_copy(d->mem, dir);
+  d->roots = roots;
   sp_ht_init(d->mem, d->entries);
 
   if (!sp_str_empty(d->dir)) {
@@ -386,7 +408,7 @@ spn_dag_pathset_t* spn_dag_obs_table_get(spn_dag_obs_table_t* d, spn_dag_digest_
 
   spn_dag_pathset_t set = sp_zero;
   sp_da_init(d->mem, set.obs);
-  if (!load_obs(d->dir, weak, d->mem, &set.obs)) {
+  if (!load_obs(d, weak, &set.obs)) {
     return SP_NULLPTR;
   }
 
@@ -414,7 +436,7 @@ void spn_dag_obs_table_flush(spn_dag_obs_table_t* d, spn_dag_digest_t weak) {
 
   spn_dag_pathset_t* set = sp_ht_getp(d->entries, weak);
   if (set) {
-    save_obs(d->dir, weak, set->obs, sp_da_size(set->obs));
+    save_obs(d, weak, set->obs, sp_da_size(set->obs));
   }
 }
 

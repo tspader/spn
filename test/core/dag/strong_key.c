@@ -2,6 +2,7 @@
 
 typedef struct {
   const c8* prelim;
+  dag_test_roots_t roots;
   dag_test_obs_t obs [DAG_TEST_MAX_INPUTS];
 } strong_key_action_t;
 
@@ -18,9 +19,10 @@ typedef struct {
 UTEST_EMPTY_FIXTURE(strong_key)
 
 static spn_dag_digest_t build_strong_key(strong_key_action_t spec) {
+  spn_dag_roots_t roots = sp_zero;
   spn_dag_obs_t obs [DAG_TEST_MAX_INPUTS] = sp_zero;
   u32 count = dag_test_obs_build(spec.obs, DAG_TEST_MAX_INPUTS, obs);
-  return spn_dag_strong_key(dag_test_digest(spec.prelim), obs, count);
+  return spn_dag_strong_key(dag_test_digest(spec.prelim), dag_test_roots_build(spec.roots, &roots), obs, count);
 }
 
 static void run_test(s32* utest_result, strong_key_test_t t) {
@@ -41,6 +43,14 @@ UTEST_F(strong_key, discovered_content_changes_key) {
   run_test(&ur, (strong_key_test_t) {
     .a = { .prelim = "cc main.c", .obs = { { "sp.h", "v1" } } },
     .b = { .prelim = "cc main.c", .obs = { { "sp.h", "v2" } } },
+  });
+}
+
+UTEST_F(strong_key, relocated_roots_match) {
+  run_test(&ur, (strong_key_test_t) {
+    .a = { .prelim = "cc main.c", .roots = { .project = "/A" }, .obs = { { "/A/H", "SP" } } },
+    .b = { .prelim = "cc main.c", .roots = { .project = "/B" }, .obs = { { "/B/H", "SP" } } },
+    .expect = { .equal = true }
   });
 }
 

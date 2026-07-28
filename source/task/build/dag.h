@@ -44,6 +44,7 @@ struct spn_dag_build_t {
     sp_ht(spn_target_unit_t*, spn_dag_target_ids_t) targets;
     sp_ht(spn_compile_unit_t*, spn_dag_object_ids_t) objects;
   } ids;
+  spn_dag_roots_t roots;
   spn_dag_file_cache_t files;
   spn_dag_action_cache_t actions;
   spn_dag_obs_table_t discovery;
