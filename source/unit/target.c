@@ -403,7 +403,7 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
   sp_assert(closure[0].pkg == pkg);
 
   spn_link_plan_t plan = {
-    .libs = spn_closure_link_libs(mem, closure),
+    .libs = spn_closure_get_linked_libs(mem, closure),
     .cc = {
       .kind = target->kind,
       .min_os = link_plan_min_os(target, closure),
