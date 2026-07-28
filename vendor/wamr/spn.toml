@@ -8,7 +8,8 @@ system_deps = [
   { lib = "ws2_32", when = { os = "windows" } },
   { lib = "ntdll", when = { os = "windows" } },
   { lib = "bcrypt", when = { os = "windows" } },
-  { lib = "pathcch", when = { os = "windows" } },
+  { lib = "pathcch", when = { abi = "msvc" } },
+  { lib = "api-ms-win-core-path-l1-1-0", when = { os = "windows", abi = { not = "msvc" } } },
 ]
 
 # wasm_export.h declares the runtime API __declspec(dllimport) under MSVC
