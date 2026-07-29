@@ -382,6 +382,14 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       );
       break;
     }
+    case SPN_EVENT_UPDATE_INCOMPATIBLE: {
+      sp_fmt_io(&w.base, "{.cyan} {.green} (latest {.yellow} is semver incompatible)",
+        sp_fmt_str(event->update.name),
+        sp_fmt_str(event->update.version),
+        sp_fmt_str(event->update.latest)
+      );
+      break;
+    }
     case SPN_EVENT_TARGET_RUN: {
       sp_fmt_io(&w.base, "{.gray}", sp_fmt_str(event->run.command));
       break;
@@ -1059,6 +1067,50 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
           );
           break;
         }
+        case SPN_ERR_TARGET_LINKAGE: {
+          sp_fmt_io(
+            &w.base,
+            "{.cyan} doesn't support {.yellow} ({} requested it)",
+            sp_fmt_str(event->err.target.pkg),
+            sp_fmt_str(event->err.target.requested),
+            sp_fmt_str(event->err.target.requester)
+          );
+          break;
+        }
+        case SPN_ERR_TARGET_DUPLICATE: {
+          sp_fmt_io(
+            &w.base,
+            "{.cyan} declares a target {.yellow}, which collides with another target of the same name",
+            sp_fmt_str(event->err.target.pkg),
+            sp_fmt_str(event->err.target.name)
+          );
+          break;
+        }
+        case SPN_ERR_TARGET_RESERVED: {
+          sp_fmt_io(
+            &w.base,
+            "{.cyan} names an executable {.yellow}, which collides with a build output directory (store, work, test)",
+            sp_fmt_str(event->err.target.pkg),
+            sp_fmt_str(event->err.target.name)
+          );
+          break;
+        }
+        case SPN_ERR_TARGET_DEP: {
+          sp_fmt_io(
+            &w.base,
+            "failed to find {.cyan} as a package or target",
+            sp_fmt_str(event->err.target.name)
+          );
+          break;
+        }
+        case SPN_ERR_TARGET_SELECTION: {
+          sp_fmt_io(
+            &w.base,
+            "target {.yellow} is not defined for the selected target kinds",
+            sp_fmt_str(event->err.target.name)
+          );
+          break;
+        }
         case SPN_ERR_INIT_EXISTS: {
           sp_fmt_io(
             &w.base,
@@ -1498,7 +1550,11 @@ void spn_tui_init(spn_tui_t* tui, spn_session_t* session, spn_tui_mode_t mode) {
 
 static void spn_prompt_on_event(sp_prompt_ctx_t* ctx, sp_prompt_event_t event) {
   switch (event.kind) {
-    case SP_PROMPT_EVENT_CTRL_C:
+    case SP_PROMPT_EVENT_CTRL_C: {
+      sp_atomic_s32_set(&spn.aborted, 1);
+      sp_atomic_s32_set(&spn.sp->shutdown, 1);
+      break;
+    }
     case SP_PROMPT_EVENT_ESCAPE: {
       break;
     }

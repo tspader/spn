@@ -127,7 +127,7 @@ UTEST_F(units, same_version_split) {
     .project = "test/integration/fixtures/units/same_version_split",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("Resolved 6 packages") },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_RESOLVE_END, .key = "num_resolved", .value = "6" } },
       { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
       { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
     },

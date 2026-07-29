@@ -297,8 +297,9 @@ UTEST_F(script, build_script) {
       .args = { "build" },
       .expect = {
         .bin.name = "build_script",
-        .files = {
-          { .file = sp_str_lit("compile_commands.json"), .contains = { "tools/configure.c", "tools/build.c" } },
+        .cc = {
+          { .args = { "tools/configure.c" } },
+          { .args = { "tools/build.c" } },
         },
         .exists = {
           sp_str_lit("build/wasm32-wasi/work/build_script/spn/object/build/tools/a/main.c.o"),

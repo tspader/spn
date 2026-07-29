@@ -9,6 +9,7 @@
 #define SPN_TEST_COMMAND_MAX_FILE_CONTAINS 4
 #define SPN_TEST_COMMAND_MAX_PATHS 8
 #define SPN_TEST_COMMAND_MAX_PACKAGES 4
+#define SPN_TEST_COMMAND_MAX_CC 4
 
 typedef struct {
   spn_build_event_kind_t event;
@@ -35,12 +36,18 @@ typedef struct {
 } command_bin_t;
 
 typedef struct {
+  const c8* args[SPN_TEST_COMMAND_MAX_FILE_CONTAINS];
+  bool absent;
+} command_cc_t;
+
+typedef struct {
   s32 rc;
   command_bin_t bin;
   const c8* contains[SPN_TEST_COMMAND_MAX_CONTAINS];
   const c8* excludes[SPN_TEST_COMMAND_MAX_CONTAINS];
   command_event_t events[SPN_TEST_COMMAND_MAX_EVENTS];
   command_file_t files[SPN_TEST_COMMAND_MAX_FILES];
+  command_cc_t cc[SPN_TEST_COMMAND_MAX_CC];
   sp_str_t exists[SPN_TEST_COMMAND_MAX_PATHS];
   sp_str_t missing[SPN_TEST_COMMAND_MAX_PATHS];
   bool lock;

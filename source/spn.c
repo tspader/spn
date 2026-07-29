@@ -186,6 +186,8 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   sp_io_stream_writer_from_fd(&spn.logger.out, sp_sys_stdout, SP_IO_CLOSE_MODE_NONE);
   sp_io_stream_writer_from_fd(&spn.logger.err, sp_sys_stderr, SP_IO_CLOSE_MODE_NONE);
+  if (sp_sys_is_tty(sp_sys_stdout)) sp_sys_tty_use_vt(sp_sys_stdout);
+  if (sp_sys_is_tty(sp_sys_stderr)) sp_sys_tty_use_vt(sp_sys_stderr);
   spn.logger.level = SPN_LOG_LEVEL_INFO;
   sp_str_t log_level = sp_env_get(spn.env, sp_str_lit("SPN_LOG_LEVEL"));
   if (!sp_str_empty(log_level)) {

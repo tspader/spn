@@ -2,6 +2,7 @@
 #include "ctx/types.h"
 
 #include "app/app.h"
+#include "event/event.h"
 #include "index/cache.h"
 #include "intern/intern.h"
 #include "lock/lock.h"
@@ -64,7 +65,7 @@ static u32 spn_update_report_changes(spn_app_t* app, sp_mem_t mem) {
   return num_changed;
 }
 
-static void spn_update_report_incompatible(spn_app_t* app, sp_mem_t mem) {
+static void spn_update_report_incompatible(spn_app_t* app) {
   spn_index_cache_t cache = sp_zero;
   spn_index_cache_init(&cache, spn.heap, spn.intern, &spn.indexes);
 
@@ -90,12 +91,14 @@ static void spn_update_report_incompatible(spn_app_t* app, sp_mem_t mem) {
         continue;
       }
       if (spn_semver_ge(release->version, resolved->id.version) && !spn_semver_in_range(release->version, dep->index.range)) {
-        spn_log_info(
-          "{.cyan} {.green} (latest {.yellow} is semver incompatible)",
-          SP_FMT_STR(dep->qualified),
-          SP_FMT_STR(spn_semver_to_str(mem, resolved->id.version)),
-          SP_FMT_STR(spn_semver_to_str(mem, release->version))
-        );
+        spn_event_buffer_push(spn.events, (spn_build_event_t) {
+          .kind = SPN_EVENT_UPDATE_INCOMPATIBLE,
+          .update = {
+            .name = dep->qualified,
+            .version = spn_semver_to_str(spn.heap, resolved->id.version),
+            .latest = spn_semver_to_str(spn.heap, release->version),
+          },
+        });
       }
       break;
     }
@@ -106,7 +109,7 @@ spn_task_step_t spn_task_update(spn_app_t* app) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
   u32 num_changed = spn_update_report_changes(app, scratch.mem);
-  spn_update_report_incompatible(app, scratch.mem);
+  spn_update_report_incompatible(app);
 
   if (!num_changed) {
     spn_log_info("up to date");

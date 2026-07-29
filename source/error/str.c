@@ -84,6 +84,11 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_ERR_DEP_MANIFEST:                 return "dep_manifest";
     case SPN_ERR_DEP_CYCLE:                    return "dep_cycle";
     case SPN_ERR_UNIT_CYCLE:                   return "unit_cycle";
+    case SPN_ERR_TARGET_LINKAGE:               return "target_linkage";
+    case SPN_ERR_TARGET_DUPLICATE:             return "target_duplicate";
+    case SPN_ERR_TARGET_RESERVED:              return "target_reserved";
+    case SPN_ERR_TARGET_DEP:                   return "target_dep";
+    case SPN_ERR_TARGET_SELECTION:             return "target_selection";
     case SPN_ERR_DYNAMIC_DUPLICATE:            return "dynamic_duplicate";
     case SPN_ERR_RESOLVE_TOO_COMPLEX:          return "resolve_too_complex";
     case SPN_ERR_OPTION:                       return "option";
