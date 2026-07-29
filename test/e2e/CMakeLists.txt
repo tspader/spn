@@ -9,7 +9,7 @@ add_executable(e2e
   ${SRC}/triple/triple.c
   main.c
   ${TEST_TOOLS}/caps.c
-  ${TEST_TOOLS}/harness.c
+  ${TEST_TOOLS}/utest_harness.c
   ${TEST_TOOLS}/tmp.c
   ${TEST_TOOLS}/git.c
   ${TEST_TOOLS}/toml.c

@@ -3,7 +3,7 @@
 #include "test.h"
 #include "utest.h"
 #include "action.h"
-#include "harness.h"
+#include "utest_harness.h"
 
 UTEST_MAIN()
 

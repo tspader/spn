@@ -1,11 +1,5 @@
-#include "common.h"
-
-SPN_TEST_SUITE(cxx)
-
-UTEST_F(cxx, static_lib) {
-  tmpfs_init_named(&uf->fixture.fs, "cxx_static_lib");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cxx, static_lib) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/static_lib",
     .copy = { "packages/*" },
     .actions = {
@@ -16,10 +10,8 @@ UTEST_F(cxx, static_lib) {
   });
 }
 
-UTEST_F(cxx, shared_lib) {
-  tmpfs_init_named(&uf->fixture.fs, "cxx_shared_lib");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cxx, shared_lib) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/shared_lib",
     .copy = { "packages/*" },
     .actions = {
@@ -30,10 +22,8 @@ UTEST_F(cxx, shared_lib) {
   });
 }
 
-UTEST_F(cxx, mixed_lib) {
-  tmpfs_init_named(&uf->fixture.fs, "cxx_mixed_lib");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cxx, mixed_lib) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/mixed_lib",
     .copy = { "packages/*" },
     .actions = {
@@ -43,10 +33,8 @@ UTEST_F(cxx, mixed_lib) {
   });
 }
 
-UTEST_F(cxx, standard) {
-  tmpfs_init_named(&uf->fixture.fs, "cxx_standard");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cxx, standard) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/standard",
     .copy = { "packages/*" },
     .actions = {
@@ -56,10 +44,8 @@ UTEST_F(cxx, standard) {
   });
 }
 
-UTEST_F(cxx, exceptions_off) {
-  tmpfs_init_named(&uf->fixture.fs, "cxx_exceptions_off");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cxx, exceptions_off) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/exceptions_off",
     .copy = { "packages/*" },
     .actions = {
@@ -69,10 +55,8 @@ UTEST_F(cxx, exceptions_off) {
   });
 }
 
-UTEST_F(cxx, rtti_off) {
-  tmpfs_init_named(&uf->fixture.fs, "cxx_rtti_off");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cxx, rtti_off) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/rtti_off",
     .copy = { "packages/*" },
     .actions = {
@@ -82,10 +66,8 @@ UTEST_F(cxx, rtti_off) {
   });
 }
 
-UTEST_F(cxx, static_into_shared) {
-  tmpfs_init_named(&uf->fixture.fs, "cxx_static_into_shared");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cxx, static_into_shared) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/static_into_shared",
     .copy = { "packages/*" },
     .actions = {
@@ -96,10 +78,8 @@ UTEST_F(cxx, static_into_shared) {
   });
 }
 
-UTEST_F(cxx, transitive) {
-  tmpfs_init_named(&uf->fixture.fs, "cxx_transitive");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cxx, transitive) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/transitive",
     .copy = { "packages/*" },
     .actions = {
@@ -109,10 +89,8 @@ UTEST_F(cxx, transitive) {
   });
 }
 
-UTEST_F(cxx, toolchain) {
-  tmpfs_init_named(&uf->fixture.fs, "cxx_toolchain");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cxx, toolchain) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/toolchain",
     .copy = { "packages/*" },
     .actions = {
@@ -122,10 +100,8 @@ UTEST_F(cxx, toolchain) {
   });
 }
 
-UTEST_F(cxx, bin) {
-  tmpfs_init_named(&uf->fixture.fs, "cxx_bin");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cxx, bin) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/bin",
     .copy = { "main.cpp" },
     .actions = {
@@ -135,10 +111,8 @@ UTEST_F(cxx, bin) {
   });
 }
 
-UTEST_F(cxx, script_rejected) {
-  tmpfs_init_named(&uf->fixture.fs, "cxx_script_rejected");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cxx, script_rejected) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/script_rejected",
     .copy = { "tools" },
     .actions = {
@@ -149,10 +123,8 @@ UTEST_F(cxx, script_rejected) {
   });
 }
 
-UTEST_F(cxx, toolchain_missing) {
-  tmpfs_init_named(&uf->fixture.fs, "cxx_toolchain_missing");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cxx, toolchain_missing) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/toolchain_missing",
     .copy = { "packages/*" },
     .actions = {

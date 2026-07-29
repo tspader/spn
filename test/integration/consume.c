@@ -1,11 +1,5 @@
-#include "common.h"
-
-SPN_TEST_SUITE(consume)
-
-UTEST_F(consume, static_lib) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_static");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(consume, static_lib) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/static",
     .copy = { "packages/*" },
     .actions = {
@@ -16,10 +10,8 @@ UTEST_F(consume, static_lib) {
   });
 }
 
-UTEST_F(consume, shared_lib) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_shared");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(consume, shared_lib) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/shared",
     .copy = { "packages/*" },
     .actions = {
@@ -30,10 +22,8 @@ UTEST_F(consume, shared_lib) {
   });
 }
 
-UTEST_F(consume, shared_lib_static_profile) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_shared_static_profile");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(consume, shared_lib_static_profile) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/shared",
     .copy = { "packages/*" },
     .actions = {
@@ -43,10 +33,8 @@ UTEST_F(consume, shared_lib_static_profile) {
   });
 }
 
-UTEST_F(consume, source_lib) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_source");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(consume, source_lib) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/source",
     .copy = { "packages/*" },
     .actions = {
@@ -56,10 +44,8 @@ UTEST_F(consume, source_lib) {
   });
 }
 
-UTEST_F(consume, system_dep) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_system_dep");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(consume, system_dep) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/system_dep",
     .copy = { "packages/*" },
     .actions = {
@@ -70,10 +56,8 @@ UTEST_F(consume, system_dep) {
   });
 }
 
-UTEST_F(consume, transitive) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_transitive");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(consume, transitive) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/transitive",
     .copy = { "packages/*" },
     .actions = {
@@ -85,10 +69,8 @@ UTEST_F(consume, transitive) {
   });
 }
 
-UTEST_F(consume, explicit_root_with_package_dep) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_explicit_root_with_package_dep");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(consume, explicit_root_with_package_dep) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/root_only",
     .copy = { "packages/*" },
     .actions = {
@@ -102,10 +84,8 @@ UTEST_F(consume, explicit_root_with_package_dep) {
   });
 }
 
-UTEST_F(consume, dependency_package_is_not_a_root_target) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_dependency_package_is_not_a_root_target");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(consume, dependency_package_is_not_a_root_target) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/root_only",
     .copy = { "packages/*" },
     .actions = {
@@ -116,10 +96,8 @@ UTEST_F(consume, dependency_package_is_not_a_root_target) {
   });
 }
 
-UTEST_F(consume, multi_kind_default) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_multi_kind_default");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(consume, multi_kind_default) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/multi_kind/default",
     .copy = { "packages/*" },
     .actions = {
@@ -129,10 +107,8 @@ UTEST_F(consume, multi_kind_default) {
   });
 }
 
-UTEST_F(consume, multi_kind_static) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_multi_kind_static");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(consume, multi_kind_static) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/multi_kind/static",
     .copy = { "packages/*" },
     .actions = {
@@ -143,10 +119,8 @@ UTEST_F(consume, multi_kind_static) {
   });
 }
 
-UTEST_F(consume, multi_kind_shared) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_multi_kind_shared");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(consume, multi_kind_shared) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/multi_kind/shared",
     .copy = { "packages/*" },
     .actions = {
@@ -157,10 +131,8 @@ UTEST_F(consume, multi_kind_shared) {
   });
 }
 
-UTEST_F(consume, multi_kind_source) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_multi_kind_source");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(consume, multi_kind_source) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/multi_kind/source",
     .copy = { "packages/*" },
     .actions = {
@@ -170,10 +142,8 @@ UTEST_F(consume, multi_kind_source) {
   });
 }
 
-UTEST_F(consume, kind_not_supported) {
-  tmpfs_init_named(&uf->fixture.fs, "consume_kind_not_supported");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(consume, kind_not_supported) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/kind_not_supported",
     .copy = { "packages/*" },
     .actions = {

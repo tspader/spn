@@ -1,11 +1,5 @@
-#include "common.h"
-
-SPN_TEST_SUITE(deps_file)
-
-UTEST_F(deps_file, basic) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_file_basic");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_file, basic) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/file/basic",
     .copy = { "packages/*" },
     .actions = {
@@ -16,10 +10,8 @@ UTEST_F(deps_file, basic) {
   });
 }
 
-UTEST_F(deps_file, invalid_manifest) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_file_invalid_manifest");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_file, invalid_manifest) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/file/invalid_manifest",
     .copy = { "vendor/spum/spn.toml" },
     .actions = {
@@ -29,10 +21,8 @@ UTEST_F(deps_file, invalid_manifest) {
   });
 }
 
-UTEST_F(deps_file, name_mismatch) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_file_name_mismatch");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_file, name_mismatch) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/file/name_mismatch",
     .copy = { "vendor/spum/*" },
     .actions = {
@@ -42,10 +32,8 @@ UTEST_F(deps_file, name_mismatch) {
   });
 }
 
-UTEST_F(deps_file, missing_manifest) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_file_missing_manifest");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_file, missing_manifest) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/file/missing_manifest",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
@@ -55,10 +43,8 @@ UTEST_F(deps_file, missing_manifest) {
   });
 }
 
-UTEST_F(deps_file, remote_source) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_file_remote_source");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_file, remote_source) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/file/remote_source",
     .copy = { "vendor/spum/spn.toml" },
     .actions = {
@@ -70,10 +56,8 @@ UTEST_F(deps_file, remote_source) {
   });
 }
 
-UTEST_F(deps_file, editable) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_file_editable");
-
-  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
+sp_test(deps_file, editable) {
+  return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/deps/file/editable",
     .copy = { "packages/*", "main.kram.c" },
     .first = {
@@ -103,12 +87,8 @@ UTEST_F(deps_file, editable) {
   });
 }
 
-SPN_TEST_SUITE(deps_index)
-
-UTEST_F(deps_index, basic) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_index_basic");
-
-  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
+sp_test(deps_index, basic) {
+  return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/deps/index/basic",
     .first = {
       .args = { "build" },
@@ -132,10 +112,8 @@ UTEST_F(deps_index, basic) {
   });
 }
 
-UTEST_F(deps_index, name_mismatch) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_index_name_mismatch");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_index, name_mismatch) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/name_mismatch",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
@@ -144,10 +122,8 @@ UTEST_F(deps_index, name_mismatch) {
   });
 }
 
-UTEST_F(deps_index, pinned_commit) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_index_pinned_commit");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_index, pinned_commit) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/pinned_commit",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -156,10 +132,8 @@ UTEST_F(deps_index, pinned_commit) {
   });
 }
 
-UTEST_F(deps_index, without_source) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_index_without_source");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_index, without_source) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/without_source",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -170,10 +144,8 @@ UTEST_F(deps_index, without_source) {
   });
 }
 
-UTEST_F(deps_index, binary_static) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_index_binary_static");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_index, binary_static) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/binary_static",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -184,10 +156,8 @@ UTEST_F(deps_index, binary_static) {
   });
 }
 
-UTEST_F(deps_index, binary_shared) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_index_binary_shared");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_index, binary_shared) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/binary_shared",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -198,10 +168,8 @@ UTEST_F(deps_index, binary_shared) {
   });
 }
 
-UTEST_F(deps_index, split_recipe) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_index_split_recipe");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_index, split_recipe) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/split_recipe",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -211,10 +179,8 @@ UTEST_F(deps_index, split_recipe) {
   });
 }
 
-UTEST_F(deps_index, patched) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_index_patched");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_index, patched) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/patched",
     .copy = { "patches/*" },
     .actions = {
@@ -224,10 +190,8 @@ UTEST_F(deps_index, patched) {
   });
 }
 
-UTEST_F(deps_index, fetch_fails) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_index_fetch_fails");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_index, fetch_fails) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/fetch_fails",
     .actions = {
       { .kind = ACTION_REMOVE_DIR, .rm = { .dir = "remote/spum" } },
@@ -237,10 +201,8 @@ UTEST_F(deps_index, fetch_fails) {
   });
 }
 
-UTEST_F(deps_index, invalid_manifest) {
-  tmpfs_init_named(&uf->fixture.fs, "deps_index_invalid_manifest");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(deps_index, invalid_manifest) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/invalid_manifest",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },

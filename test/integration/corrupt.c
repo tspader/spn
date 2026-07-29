@@ -1,11 +1,5 @@
-#include "common.h"
-
-SPN_TEST_SUITE(corrupt)
-
-UTEST_F(corrupt, store_entry_deleted) {
-  tmpfs_init_named(&uf->fixture.fs, "corrupt_store_entry_deleted");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(corrupt, store_entry_deleted) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/binary_static",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -18,10 +12,8 @@ UTEST_F(corrupt, store_entry_deleted) {
   });
 }
 
-UTEST_F(corrupt, profile_store_poisoned) {
-  tmpfs_init_named(&uf->fixture.fs, "corrupt_profile_store_poisoned");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(corrupt, profile_store_poisoned) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/binary_static",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -34,10 +26,8 @@ UTEST_F(corrupt, profile_store_poisoned) {
   });
 }
 
-UTEST_F(corrupt, checkout_deleted) {
-  tmpfs_init_named(&uf->fixture.fs, "corrupt_checkout_deleted");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(corrupt, checkout_deleted) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/binary_static",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -49,10 +39,8 @@ UTEST_F(corrupt, checkout_deleted) {
   });
 }
 
-UTEST_F(corrupt, build_cache_deleted) {
-  tmpfs_init_named(&uf->fixture.fs, "corrupt_build_cache_deleted");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(corrupt, build_cache_deleted) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/binary_static",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },

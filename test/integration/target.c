@@ -1,11 +1,5 @@
-#include "common.h"
-
-SPN_TEST_SUITE(target)
-
-UTEST_F(target, static_lib) {
-  tmpfs_init_named(&uf->fixture.fs, "target_static_lib");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, static_lib) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/static_lib",
     .copy = { "mylib.c" },
     .actions = {
@@ -15,10 +9,8 @@ UTEST_F(target, static_lib) {
   });
 }
 
-UTEST_F(target, shared_lib) {
-  tmpfs_init_named(&uf->fixture.fs, "target_shared_lib");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, shared_lib) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/shared_lib",
     .copy = { "spum.c" },
     .actions = {
@@ -28,10 +20,8 @@ UTEST_F(target, shared_lib) {
   });
 }
 
-UTEST_F(target, source_glob) {
-  tmpfs_init_named(&uf->fixture.fs, "target_source_glob");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, source_glob) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/source_glob",
     .copy = { "src" },
     .actions = {
@@ -41,10 +31,8 @@ UTEST_F(target, source_glob) {
   });
 }
 
-UTEST_F(target, shared_source) {
-  tmpfs_init_named(&uf->fixture.fs, "target_shared_source");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, shared_source) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/shared_source",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
@@ -53,10 +41,8 @@ UTEST_F(target, shared_source) {
   });
 }
 
-UTEST_F(target, multiple_roots) {
-  tmpfs_init_named(&uf->fixture.fs, "target_multiple_roots");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, multiple_roots) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/shared_source",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "main", "test" } } },
@@ -67,10 +53,8 @@ UTEST_F(target, multiple_roots) {
   });
 }
 
-UTEST_F(target, selection_default) {
-  tmpfs_init_named(&uf->fixture.fs, "target_selection_default");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, selection_default) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/selection",
     .copy = { "spum.c", "script.c" },
     .actions = {
@@ -83,10 +67,8 @@ UTEST_F(target, selection_default) {
   });
 }
 
-UTEST_F(target, selection_named_library) {
-  tmpfs_init_named(&uf->fixture.fs, "target_selection_named_library");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, selection_named_library) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/selection_libs",
     .copy = { "one.c", "two.c" },
     .actions = {
@@ -97,10 +79,8 @@ UTEST_F(target, selection_named_library) {
   });
 }
 
-UTEST_F(target, selection_multiple_kinds) {
-  tmpfs_init_named(&uf->fixture.fs, "target_selection_multiple_kinds");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, selection_multiple_kinds) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/selection",
     .copy = { "spum.c", "script.c" },
     .actions = {
@@ -113,10 +93,8 @@ UTEST_F(target, selection_multiple_kinds) {
   });
 }
 
-UTEST_F(target, selection_name_respects_kind) {
-  tmpfs_init_named(&uf->fixture.fs, "target_selection_name_respects_kind");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, selection_name_respects_kind) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/selection",
     .copy = { "spum.c", "script.c" },
     .actions = {
@@ -127,10 +105,8 @@ UTEST_F(target, selection_name_respects_kind) {
   });
 }
 
-UTEST_F(target, selection_test_command) {
-  tmpfs_init_named(&uf->fixture.fs, "target_selection_test_command");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, selection_test_command) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/selection",
     .copy = { "spum.c", "script.c" },
     .actions = {
@@ -143,10 +119,8 @@ UTEST_F(target, selection_test_command) {
   });
 }
 
-UTEST_F(target, selection_run_command) {
-  tmpfs_init_named(&uf->fixture.fs, "target_selection_run_command");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, selection_run_command) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/selection",
     .copy = { "spum.c", "script.c" },
     .actions = {
@@ -158,10 +132,8 @@ UTEST_F(target, selection_run_command) {
   });
 }
 
-UTEST_F(target, publish) {
-  tmpfs_init_named(&uf->fixture.fs, "target_publish");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, publish) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/publish",
     .copy = { "packages/*" },
     .actions = {
@@ -174,10 +146,8 @@ UTEST_F(target, publish) {
   });
 }
 
-UTEST_F(target, system_deps) {
-  tmpfs_init_named(&uf->fixture.fs, "target_system_deps");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, system_deps) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/system_deps",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -189,10 +159,8 @@ UTEST_F(target, system_deps) {
   });
 }
 
-UTEST_F(target, source_pin) {
-  tmpfs_init_named(&uf->fixture.fs, "target_source_pin");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(target, source_pin) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/source_pin",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },

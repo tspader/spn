@@ -1,11 +1,5 @@
-#include "common.h"
-
-SPN_TEST_SUITE(platform)
-
-UTEST_F(platform, inert) {
-  tmpfs_init_named(&uf->fixture.fs, "platform_inert");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(platform, inert) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/platform/inert",
     .copy = { "main.c" },
     .actions = {
@@ -15,10 +9,8 @@ UTEST_F(platform, inert) {
   });
 }
 
-UTEST_F(platform, dep_inert) {
-  tmpfs_init_named(&uf->fixture.fs, "platform_dep_inert");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(platform, dep_inert) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/platform/fingerprint",
     .copy = { "main.c", "packages/*" },
     .actions = {
@@ -27,10 +19,8 @@ UTEST_F(platform, dep_inert) {
   });
 }
 
-UTEST_F(platform, frameworks) {
-  tmpfs_init_named(&uf->fixture.fs, "platform_frameworks");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(platform, frameworks) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/platform/frameworks",
     .copy = { "main.c" },
     .when.os = SPN_OS_MACOS,
@@ -41,10 +31,8 @@ UTEST_F(platform, frameworks) {
   });
 }
 
-UTEST_F(platform, subsystem) {
-  tmpfs_init_named(&uf->fixture.fs, "platform_subsystem");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(platform, subsystem) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/platform/subsystem",
     .copy = { "main.c" },
     .when.os = SPN_OS_WINDOWS,

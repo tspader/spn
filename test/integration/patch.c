@@ -1,11 +1,5 @@
-#include "common.h"
-
-SPN_TEST_SUITE(patch)
-
-UTEST_F(patch, applies_to_dep_source) {
-  tmpfs_init_named(&uf->fixture.fs, "patch_applies_to_dep_source");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(patch, applies_to_dep_source) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/patch/basic",
     .copy = { "vendor/spum/spn.toml", "patches/*" },
     .actions = {
@@ -16,10 +10,8 @@ UTEST_F(patch, applies_to_dep_source) {
   });
 }
 
-UTEST_F(patch, edit_rebuilds_with_new_content) {
-  tmpfs_init_named(&uf->fixture.fs, "patch_edit_rebuilds");
-
-  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
+sp_test(patch, edit_rebuilds_with_new_content) {
+  return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/patch/edit",
     .copy = { "vendor/spum/spn.toml", "patches/*" },
     .first = {
@@ -40,10 +32,8 @@ UTEST_F(patch, edit_rebuilds_with_new_content) {
   });
 }
 
-UTEST_F(patch, unused_entry_fails) {
-  tmpfs_init_named(&uf->fixture.fs, "patch_unused_entry_fails");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(patch, unused_entry_fails) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/patch/unused",
     .copy = { "patches/*" },
     .actions = {
