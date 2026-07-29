@@ -361,9 +361,7 @@ static s32 dag_tree_copy_headers(spn_dag_tree_ctx_t* ctx, sp_str_t root, spn_tar
   return 0;
 }
 
-static s32 dag_tree_copy_publishes(spn_dag_tree_ctx_t* ctx, sp_str_t root) {
-  spn_pkg_unit_t* unit = ctx->pkg;
-
+spn_err_t spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, bool strict, sp_da(spn_dag_obs_t)* obs) {
   sp_da_for(unit->info->publish.copy, it) {
     spn_publish_copy_t* copy = &unit->info->publish.copy[it];
     sp_str_t rest = sp_zero;
@@ -378,7 +376,7 @@ static s32 dag_tree_copy_publishes(spn_dag_tree_ctx_t* ctx, sp_str_t root) {
 
     s32 err = 0;
     sp_da(spn_dag_match_t) matches = sp_da_new(scratch.mem, spn_dag_match_t);
-    if (spn_dag_glob(spn.mem, from_root, from.second, &ctx->obs, &matches)) {
+    if (spn_dag_glob(spn.mem, from_root, from.second, obs, &matches)) {
       err = 1;
     }
     else if (sp_fs_is_glob(copy->from)) {
@@ -392,7 +390,7 @@ static s32 dag_tree_copy_publishes(spn_dag_tree_ctx_t* ctx, sp_str_t root) {
       }
     }
     else if (sp_da_empty(matches)) {
-      err = 1;
+      err = strict ? 1 : 0;
     }
     else {
       sp_fs_create_dir(sp_fs_parent_path(dest));
@@ -410,10 +408,10 @@ static s32 dag_tree_copy_publishes(spn_dag_tree_ctx_t* ctx, sp_str_t root) {
           .message = sp_fmt(spn.mem, "could not be published to {}", sp_fmt_str(copy->to)).value,
         },
       });
-      return 1;
+      return SPN_ERROR;
     }
   }
-  return 0;
+  return SPN_OK;
 }
 
 static s32 dag_tree_copy_user_outputs(spn_dag_tree_ctx_t* ctx, sp_str_t root) {
@@ -464,7 +462,7 @@ static s32 dag_tree_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
     if (dag_tree_copy_headers(ctx, root, unit->info->scripts)) return 1;
     if (dag_tree_copy_headers(ctx, root, unit->info->tests)) return 1;
   }
-  if (dag_tree_copy_publishes(ctx, root)) {
+  if (spn_build_publish_copies(unit, root, true, &ctx->obs)) {
     return 1;
   }
   if (dag_tree_copy_user_outputs(ctx, root)) {

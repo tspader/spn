@@ -19,6 +19,7 @@
 
 static s32 on_configure_package(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
+  spn_pkg_unit_create_layout(unit);
   spn_wasm_script_t* configure = &unit->wasm.configure;
   if (configure->state != SPN_WASM_SCRIPT_NONE) {
     spn_try(spn_wasm_script_open(configure, unit));
@@ -27,6 +28,7 @@ static s32 on_configure_package(spn_dag_t* g, spn_dag_action_t* action, void* us
     }
   }
   spn_try(spn_pkg_unit_publish_headers(unit, false));
+  spn_try(spn_build_publish_copies(unit, unit->paths.include, false, SP_NULLPTR));
   spn_pkg_unit_write_stamp(unit, spn_dag_find_artifact(g, action->produces[0])->path);
   return SPN_OK;
 }
