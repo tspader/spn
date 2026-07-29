@@ -1,141 +1,132 @@
 #include "jtd_test.h"
 
-static void compare_ref_ok(s32* utest_result, const jtd_result_t* root, const void* expect) {
-  EXPECT_EQ((s32)JTD_FORM_REF, (s32)root->root->form);
-  jtd_expect_str(utest_result, root->root->as.ref.name, "str");
+static sp_err_t compare_ref_ok(sp_test_t* t, const jtd_result_t* root, const void* expect) {
+  (void)expect;
+  sp_expect_eq(t, (s32)JTD_FORM_REF, (s32)root->root->form);
+  sp_expect_str_eq_c(t, root->root->as.ref.name, "str");
 
   jtd_schema_t* def = jtd_definition(root, sp_str_lit("str"));
-  EXPECT_TRUE(def != SP_NULLPTR);
+  sp_expect(t, def != SP_NULLPTR);
   if (def) {
-    EXPECT_EQ((s32)JTD_FORM_TYPE, (s32)def->form);
-    EXPECT_TRUE(jtd_resolve(root, root->root) == def);
+    sp_expect_eq(t, (s32)JTD_FORM_TYPE, (s32)def->form);
+    sp_expect(t, jtd_resolve(root, root->root) == def);
   }
-  EXPECT_TRUE(jtd_resolve(root, SP_NULLPTR) == SP_NULLPTR);
-  EXPECT_TRUE(jtd_definition(root, sp_str_lit("absent")) == SP_NULLPTR);
+  sp_expect(t, jtd_resolve(root, SP_NULLPTR) == SP_NULLPTR);
+  sp_expect(t, jtd_definition(root, sp_str_lit("absent")) == SP_NULLPTR);
+  return SP_OK;
 }
 
-static void compare_ref_chain(s32* utest_result, const jtd_result_t* root, const void* expect) {
+static sp_err_t compare_ref_chain(sp_test_t* t, const jtd_result_t* root, const void* expect) {
+  (void)expect;
   jtd_schema_t* shallow = jtd_resolve(root, root->root);
-  EXPECT_TRUE(shallow != SP_NULLPTR);
+  sp_expect(t, shallow != SP_NULLPTR);
   if (shallow) {
-    EXPECT_EQ((s32)JTD_FORM_REF, (s32)shallow->form);
-    jtd_expect_str(utest_result, shallow->as.ref.name, "b");
+    sp_expect_eq(t, (s32)JTD_FORM_REF, (s32)shallow->form);
+    sp_expect_str_eq_c(t, shallow->as.ref.name, "b");
   }
 
   jtd_diagnostic_t diag = sp_zero;
-  jtd_schema_t* deep = jtd_resolve_deep(sp_mem_get_scratch(), root, root->root, &diag);
-  EXPECT_TRUE(deep != SP_NULLPTR);
+  jtd_schema_t* deep = jtd_resolve_deep(sp_test_arena(t), root, root->root, &diag);
+  sp_expect(t, deep != SP_NULLPTR);
   if (deep) {
-    EXPECT_EQ((s32)JTD_FORM_TYPE, (s32)deep->form);
-    EXPECT_EQ((s32)JTD_TYPE_STRING, (s32)deep->as.type);
+    sp_expect_eq(t, (s32)JTD_FORM_TYPE, (s32)deep->form);
+    sp_expect_eq(t, (s32)JTD_TYPE_STRING, (s32)deep->as.type);
   }
+  return SP_OK;
 }
 
-static void compare_ref_cycle(s32* utest_result, const jtd_result_t* root, const void* expect) {
+static sp_err_t compare_ref_cycle(sp_test_t* t, const jtd_result_t* root, const void* expect) {
+  (void)expect;
   jtd_diagnostic_t diag = sp_zero;
-  jtd_schema_t* deep = jtd_resolve_deep(sp_mem_get_scratch(), root, root->root, &diag);
-  EXPECT_TRUE(deep == SP_NULLPTR);
-  EXPECT_EQ((s32)JTD_ERR_REF_CYCLE, (s32)diag.code);
-  jtd_expect_str(utest_result, diag.path, "#/definitions/a");
+  jtd_schema_t* deep = jtd_resolve_deep(sp_test_arena(t), root, root->root, &diag);
+  sp_expect(t, deep == SP_NULLPTR);
+  sp_expect_eq(t, (s32)JTD_ERR_REF_CYCLE, (s32)diag.code);
+  sp_expect_str_eq_c(t, diag.path, "#/definitions/a");
+  return SP_OK;
 }
 
-static void compare_ref_recursive_properties(s32* utest_result, const jtd_result_t* root, const void* expect) {
-  jtd_schema_t* deep = jtd_resolve_deep(sp_mem_get_scratch(), root, root->root, SP_NULLPTR);
-  EXPECT_TRUE(deep != SP_NULLPTR);
+static sp_err_t compare_ref_recursive_properties(sp_test_t* t, const jtd_result_t* root, const void* expect) {
+  (void)expect;
+  jtd_schema_t* deep = jtd_resolve_deep(sp_test_arena(t), root, root->root, SP_NULLPTR);
+  sp_expect(t, deep != SP_NULLPTR);
   if (deep) {
-    EXPECT_EQ((s32)JTD_FORM_PROPERTIES, (s32)deep->form);
-    EXPECT_EQ((u64)1, (u64)sp_da_size(deep->as.properties.optional));
+    sp_expect_eq(t, (s32)JTD_FORM_PROPERTIES, (s32)deep->form);
+    sp_expect_eq(t, (u64)1, (u64)sp_da_size(deep->as.properties.optional));
 
     if (sp_da_size(deep->as.properties.optional) == 1) {
       jtd_property_t* next = &deep->as.properties.optional[0];
-      jtd_expect_str(utest_result, next->key, "next");
+      sp_expect_str_eq_c(t, next->key, "next");
 
-      jtd_schema_t* resolved = jtd_resolve_deep(sp_mem_get_scratch(), root, next->schema, SP_NULLPTR);
-      EXPECT_TRUE(resolved == deep);
+      jtd_schema_t* resolved = jtd_resolve_deep(sp_test_arena(t), root, next->schema, SP_NULLPTR);
+      sp_expect(t, resolved == deep);
     }
   }
+  return SP_OK;
 }
 
-UTEST(ref, resolves_definition) {
-  run_jtd_case(utest_result, (jtd_case_t){
+static const jtd_case_t cases [] = {
+  {
+    .name    = "resolves_definition",
     .json    = "ref.ok.json",
     .compare = compare_ref_ok,
-  });
-}
-
-UTEST(ref, resolves_ref_chain_deep) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name    = "resolves_ref_chain_deep",
     .json    = "ref.chain.json",
     .compare = compare_ref_chain,
-  });
-}
-
-UTEST(ref, detects_ref_cycle_deep) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name    = "detects_ref_cycle_deep",
     .json    = "ref.cycle.json",
     .compare = compare_ref_cycle,
-  });
-}
-
-UTEST(ref, resolves_recursive_schema_ref_deep) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name    = "resolves_recursive_schema_ref_deep",
     .json    = "ref.recursive_properties.json",
     .compare = compare_ref_recursive_properties,
-  });
-}
-
-UTEST(ref, not_string) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name       = "not_string",
     .json       = "ref.not_string.json",
     .error      = JTD_ERR_REF_NOT_STRING,
     .error_path = "#",
-  });
-}
-
-UTEST(ref, unresolved) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name       = "unresolved",
     .json       = "ref.unresolved.json",
     .error      = JTD_ERR_REF_UNRESOLVED,
     .error_path = "#",
-  });
-}
-
-UTEST(ref, unresolved_nested) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name       = "unresolved_nested",
     .json       = "ref.unresolved_nested.json",
     .error      = JTD_ERR_REF_UNRESOLVED,
     .error_path = "#/elements",
-  });
-}
-
-UTEST(ref, definitions_not_object) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name       = "definitions_not_object",
     .json       = "ref.definitions_not_object.json",
     .error      = JTD_ERR_SCHEMA_NOT_OBJECT,
     .error_path = "#/definitions",
-  });
-}
-
-UTEST(ref, definition_nested_error_path) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name       = "definition_nested_error_path",
     .json       = "ref.definition_nested_error.json",
     .error      = JTD_ERR_UNKNOWN_TYPE,
     .error_path = "#/definitions/foo",
-  });
-}
-
-UTEST(ref, definition_escaped_error_path) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name       = "definition_escaped_error_path",
     .json       = "ref.definition_escaped_error.json",
     .error      = JTD_ERR_UNKNOWN_TYPE,
     .error_path = "#/definitions/a~1b",
-  });
-}
-
-UTEST(ref, nested_definitions) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name       = "nested_definitions",
     .json       = "ref.nested_definitions.json",
     .error      = JTD_ERR_DEFINITIONS_NOT_ROOT,
     .error_path = "#/properties/x/definitions",
-  });
-}
+  },
+};
+
+sp_test_each_fn(ref, parse, jtd_case_t, cases, run_jtd_case);

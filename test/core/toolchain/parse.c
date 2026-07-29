@@ -9,35 +9,14 @@ typedef struct {
 } parse_expect_t;
 
 typedef struct {
+  const c8* name;
   const c8* file;
   parse_expect_t expect;
 } parse_test_t;
 
-static void run_parse_test(s32* utest_result, parse_test_t t) {
-  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-
-  sp_str_t json = sp_zero;
-  fixture_read_json(utest_result, t.file, &json);
-
-  spn_toolchain_catalog_t catalog = sp_zero;
-  ASSERT_EQ((u32)t.expect.err, (u32)spn_toolchain_catalog_init(&catalog, json, mem));
-  if (t.expect.err) {
-    return;
-  }
-
-  ASSERT_EQ(t.expect.entries, fixture_catalog_size(&catalog));
-
-  sp_carr_for(t.expect.toolchains, it) {
-    fixture_toolchain_t toolchain = t.expect.toolchains[it];
-    if (!toolchain.name) {
-      break;
-    }
-    fixture_check_entry(utest_result, spn_toolchain_catalog_get(&catalog, sp_str_view(toolchain.name)), toolchain);
-  }
-}
-
-UTEST(parse, distribution) {
-  run_parse_test(utest_result, (parse_test_t) {
+static const parse_test_t tests [] = {
+  {
+    .name = "distribution",
     .file = "distribution.json",
     .expect = {
       .entries = 1,
@@ -72,11 +51,9 @@ UTEST(parse, distribution) {
         },
       },
     },
-  });
-}
-
-UTEST(parse, local) {
-  run_parse_test(utest_result, (parse_test_t) {
+  },
+  {
+    .name = "local",
     .file = "local.json",
     .expect = {
       .entries = 1,
@@ -92,11 +69,9 @@ UTEST(parse, local) {
         },
       },
     },
-  });
-}
-
-UTEST(parse, multiple_toolchains) {
-  run_parse_test(utest_result, (parse_test_t) {
+  },
+  {
+    .name = "multiple_toolchains",
     .file = "multiple.json",
     .expect = {
       .entries = 2,
@@ -113,23 +88,42 @@ UTEST(parse, multiple_toolchains) {
         },
       },
     },
-  });
-}
-
-UTEST(parse, empty_document) {
-  run_parse_test(utest_result, (parse_test_t) {
+  },
+  {
+    .name = "empty_document",
     .file = "empty.json",
     .expect = {
       .toolchains = {
         { .name = "A", .absent = true },
       },
     },
-  });
-}
-
-UTEST(parse, malformed_json) {
-  run_parse_test(utest_result, (parse_test_t) {
+  },
+  {
+    .name = "malformed_json",
     .file = "malformed.json",
     .expect = { .err = SPN_ERROR },
-  });
+  },
+};
+
+sp_test_each(parse, catalog, parse_test_t, tests) {
+  sp_str_t json = sp_zero;
+  if (fixture_read_json(t, it->file, &json)) return SP_ERR;
+
+  spn_toolchain_catalog_t catalog = sp_zero;
+  sp_must_eq(t, (u32)it->expect.err, (u32)spn_toolchain_catalog_init(&catalog, json, sp_test_arena(t)));
+  if (it->expect.err) {
+    return SP_OK;
+  }
+
+  sp_must_eq(t, it->expect.entries, fixture_catalog_size(&catalog));
+
+  sp_carr_for(it->expect.toolchains, at) {
+    fixture_toolchain_t toolchain = it->expect.toolchains[at];
+    if (!toolchain.name) {
+      break;
+    }
+    if (fixture_check_entry(t, spn_toolchain_catalog_get(&catalog, sp_str_view(toolchain.name)), toolchain)) return SP_ERR;
+  }
+
+  return SP_OK;
 }

@@ -1,217 +1,76 @@
 #include "jtd_test.h"
-#include "test.h"
 
-static void run_conformance_reject(s32* utest_result, const c8* file) {
-  sp_mem_t mem = sp_mem_os_new();
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+// Each case name is the stem of a fixture in json/conformance which the
+// parser must reject
+typedef struct {
+  const c8* name;
+} conformance_case_t;
 
-  sp_str_t repo = test_repo_path(s.mem, sp_str_lit(JTD_TEST_JSON_DIR));
-  sp_str_t conformance = sp_fs_join_path(s.mem, repo, sp_str_lit("conformance"));
-  sp_str_t path = sp_fs_join_path(s.mem, conformance, sp_cstr_as_str(file));
-  sp_str_t json = sp_zero; sp_io_read_file(s.mem, path, &json);
-  utest_kv("fixture", path);
-  ASSERT_FALSE(sp_str_empty(json));
+static const conformance_case_t cases [] = {
+  { "null_schema" },
+  { "boolean_schema" },
+  { "integer_schema" },
+  { "float_schema" },
+  { "string_schema" },
+  { "array_schema" },
+  { "illegal_keyword" },
+  { "nullable_not_boolean" },
+  { "definitions_not_object" },
+  { "definition_not_object" },
+  { "non_root_definitions" },
+  { "ref_not_string" },
+  { "ref_but_no_definitions" },
+  { "ref_to_non_existent_definition" },
+  { "sub_schema_ref_to_non_existent_definition" },
+  { "type_not_string" },
+  { "type_not_valid_string_value" },
+  { "enum_not_array" },
+  { "enum_empty_array" },
+  { "enum_not_array_of_strings" },
+  { "enum_contains_duplicates" },
+  { "elements_not_object" },
+  { "elements_not_correct_schema" },
+  { "properties_not_object" },
+  { "properties_value_not_correct_schema" },
+  { "optionalproperties_not_object" },
+  { "optionalproperties_value_not_correct_schema" },
+  { "additionalproperties_not_boolean" },
+  { "properties_shares_keys_with_optionalproperties" },
+  { "values_not_object" },
+  { "values_not_correct_schema" },
+  { "discriminator_not_string" },
+  { "mapping_not_object" },
+  { "mapping_value_not_correct_schema" },
+  { "mapping_value_not_of_properties_form" },
+  { "mapping_value_has_nullable_set_to_true" },
+  { "discriminator_shares_keys_with_mapping_properties" },
+  { "discriminator_shares_keys_with_mapping_optionalproperties" },
+  { "invalid_form_ref_and_type" },
+  { "invalid_form_type_and_enum" },
+  { "invalid_form_enum_and_elements" },
+  { "invalid_form_elements_and_properties" },
+  { "invalid_form_elements_and_optionalproperties" },
+  { "invalid_form_elements_and_additionalproperties" },
+  { "invalid_form_additionalproperties_alone" },
+  { "invalid_form_properties_and_values" },
+  { "invalid_form_values_and_discriminator" },
+  { "invalid_form_discriminator_alone" },
+  { "invalid_form_mapping_alone" },
+};
+
+sp_test_each(conformance, reject, conformance_case_t, cases) {
+  sp_mem_t mem = sp_test_arena(t);
+
+  sp_str_t repo = test_repo_path(mem, sp_str_lit(JTD_TEST_JSON_DIR));
+  sp_str_t conformance = sp_fs_join_path(mem, repo, sp_str_lit("conformance"));
+  sp_str_t path = sp_fs_join_path(mem, conformance, sp_fmt(mem, "{}.json", sp_fmt_cstr(it->name)).value);
+  sp_str_t json = sp_zero; sp_io_read_file(mem, path, &json);
+  sp_test_kv(t, "fixture", path);
+  sp_must(t, !sp_str_empty(json));
 
   jtd_result_t result = jtd_parse(mem, json);
-  EXPECT_FALSE(result.ok);
+  sp_expect(t, !result.ok);
   jtd_free(&result);
 
-  sp_mem_end_scratch(s);
+  return SP_OK;
 }
-
-UTEST(conformance, null_schema) {
-  run_conformance_reject(utest_result, "null_schema.json");
-}
-
-UTEST(conformance, boolean_schema) {
-  run_conformance_reject(utest_result, "boolean_schema.json");
-}
-
-UTEST(conformance, integer_schema) {
-  run_conformance_reject(utest_result, "integer_schema.json");
-}
-
-UTEST(conformance, float_schema) {
-  run_conformance_reject(utest_result, "float_schema.json");
-}
-
-UTEST(conformance, string_schema) {
-  run_conformance_reject(utest_result, "string_schema.json");
-}
-
-UTEST(conformance, array_schema) {
-  run_conformance_reject(utest_result, "array_schema.json");
-}
-
-UTEST(conformance, illegal_keyword) {
-  run_conformance_reject(utest_result, "illegal_keyword.json");
-}
-
-UTEST(conformance, nullable_not_boolean) {
-  run_conformance_reject(utest_result, "nullable_not_boolean.json");
-}
-
-UTEST(conformance, definitions_not_object) {
-  run_conformance_reject(utest_result, "definitions_not_object.json");
-}
-
-UTEST(conformance, definition_not_object) {
-  run_conformance_reject(utest_result, "definition_not_object.json");
-}
-
-UTEST(conformance, non_root_definitions) {
-  run_conformance_reject(utest_result, "non_root_definitions.json");
-}
-
-UTEST(conformance, ref_not_string) {
-  run_conformance_reject(utest_result, "ref_not_string.json");
-}
-
-UTEST(conformance, ref_but_no_definitions) {
-  run_conformance_reject(utest_result, "ref_but_no_definitions.json");
-}
-
-UTEST(conformance, ref_to_non_existent_definition) {
-  run_conformance_reject(utest_result, "ref_to_non_existent_definition.json");
-}
-
-UTEST(conformance, sub_schema_ref_to_non_existent_definition) {
-  run_conformance_reject(utest_result, "sub_schema_ref_to_non_existent_definition.json");
-}
-
-UTEST(conformance, type_not_string) {
-  run_conformance_reject(utest_result, "type_not_string.json");
-}
-
-UTEST(conformance, type_not_valid_string_value) {
-  run_conformance_reject(utest_result, "type_not_valid_string_value.json");
-}
-
-UTEST(conformance, enum_not_array) {
-  run_conformance_reject(utest_result, "enum_not_array.json");
-}
-
-UTEST(conformance, enum_empty_array) {
-  run_conformance_reject(utest_result, "enum_empty_array.json");
-}
-
-UTEST(conformance, enum_not_array_of_strings) {
-  run_conformance_reject(utest_result, "enum_not_array_of_strings.json");
-}
-
-UTEST(conformance, enum_contains_duplicates) {
-  run_conformance_reject(utest_result, "enum_contains_duplicates.json");
-}
-
-UTEST(conformance, elements_not_object) {
-  run_conformance_reject(utest_result, "elements_not_object.json");
-}
-
-UTEST(conformance, elements_not_correct_schema) {
-  run_conformance_reject(utest_result, "elements_not_correct_schema.json");
-}
-
-UTEST(conformance, properties_not_object) {
-  run_conformance_reject(utest_result, "properties_not_object.json");
-}
-
-UTEST(conformance, properties_value_not_correct_schema) {
-  run_conformance_reject(utest_result, "properties_value_not_correct_schema.json");
-}
-
-UTEST(conformance, optionalproperties_not_object) {
-  run_conformance_reject(utest_result, "optionalproperties_not_object.json");
-}
-
-UTEST(conformance, optionalproperties_value_not_correct_schema) {
-  run_conformance_reject(utest_result, "optionalproperties_value_not_correct_schema.json");
-}
-
-UTEST(conformance, additionalproperties_not_boolean) {
-  run_conformance_reject(utest_result, "additionalproperties_not_boolean.json");
-}
-
-UTEST(conformance, properties_shares_keys_with_optionalproperties) {
-  run_conformance_reject(utest_result, "properties_shares_keys_with_optionalproperties.json");
-}
-
-UTEST(conformance, values_not_object) {
-  run_conformance_reject(utest_result, "values_not_object.json");
-}
-
-UTEST(conformance, values_not_correct_schema) {
-  run_conformance_reject(utest_result, "values_not_correct_schema.json");
-}
-
-UTEST(conformance, discriminator_not_string) {
-  run_conformance_reject(utest_result, "discriminator_not_string.json");
-}
-
-UTEST(conformance, mapping_not_object) {
-  run_conformance_reject(utest_result, "mapping_not_object.json");
-}
-
-UTEST(conformance, mapping_value_not_correct_schema) {
-  run_conformance_reject(utest_result, "mapping_value_not_correct_schema.json");
-}
-
-UTEST(conformance, mapping_value_not_of_properties_form) {
-  run_conformance_reject(utest_result, "mapping_value_not_of_properties_form.json");
-}
-
-UTEST(conformance, mapping_value_has_nullable_set_to_true) {
-  run_conformance_reject(utest_result, "mapping_value_has_nullable_set_to_true.json");
-}
-
-UTEST(conformance, discriminator_shares_keys_with_mapping_properties) {
-  run_conformance_reject(utest_result, "discriminator_shares_keys_with_mapping_properties.json");
-}
-
-UTEST(conformance, discriminator_shares_keys_with_mapping_optionalproperties) {
-  run_conformance_reject(utest_result, "discriminator_shares_keys_with_mapping_optionalproperties.json");
-}
-
-UTEST(conformance, invalid_form_ref_and_type) {
-  run_conformance_reject(utest_result, "invalid_form_ref_and_type.json");
-}
-
-UTEST(conformance, invalid_form_type_and_enum) {
-  run_conformance_reject(utest_result, "invalid_form_type_and_enum.json");
-}
-
-UTEST(conformance, invalid_form_enum_and_elements) {
-  run_conformance_reject(utest_result, "invalid_form_enum_and_elements.json");
-}
-
-UTEST(conformance, invalid_form_elements_and_properties) {
-  run_conformance_reject(utest_result, "invalid_form_elements_and_properties.json");
-}
-
-UTEST(conformance, invalid_form_elements_and_optionalproperties) {
-  run_conformance_reject(utest_result, "invalid_form_elements_and_optionalproperties.json");
-}
-
-UTEST(conformance, invalid_form_elements_and_additionalproperties) {
-  run_conformance_reject(utest_result, "invalid_form_elements_and_additionalproperties.json");
-}
-
-UTEST(conformance, invalid_form_additionalproperties_alone) {
-  run_conformance_reject(utest_result, "invalid_form_additionalproperties_alone.json");
-}
-
-UTEST(conformance, invalid_form_properties_and_values) {
-  run_conformance_reject(utest_result, "invalid_form_properties_and_values.json");
-}
-
-UTEST(conformance, invalid_form_values_and_discriminator) {
-  run_conformance_reject(utest_result, "invalid_form_values_and_discriminator.json");
-}
-
-UTEST(conformance, invalid_form_discriminator_alone) {
-  run_conformance_reject(utest_result, "invalid_form_discriminator_alone.json");
-}
-
-UTEST(conformance, invalid_form_mapping_alone) {
-  run_conformance_reject(utest_result, "invalid_form_mapping_alone.json");
-}
-

@@ -1,5 +1,4 @@
-#include "common.h"
-#include "forward/types.h"
+#include "options.h"
 
 typedef struct {
   const c8* key;
@@ -31,6 +30,7 @@ typedef struct {
 } apply_expect_t;
 
 typedef struct {
+  const c8* name;
   spn_when_facts_t facts;
   bool reapply;
   spn_when_facts_t reapply_facts;
@@ -66,6 +66,7 @@ typedef struct {
 } apply_option_expect_t;
 
 typedef struct {
+  const c8* name;
   const c8* define [4];
   const c8* public_define [4];
   apply_option_t options [4];
@@ -113,128 +114,23 @@ static void make_list(
   }
 }
 
-static void expect_list(s32* utest_result, sp_da(sp_str_t) actual, const c8** expected) {
-  sp_for(it, 4) {
-    if (!expected[it]) {
-      EXPECT_EQ(sp_da_size(actual), it);
-      return;
+static sp_err_t expect_list(sp_test_t* t, sp_da(sp_str_t) actual, const c8** expected) {
+  sp_for(et, 4) {
+    if (!expected[et]) {
+      sp_must_eq(t, sp_da_size(actual), et);
+      return SP_OK;
     }
-    utest_kv("value", sp_cstr_as_str(expected[it]));
-    EXPECT_TRUE(it < sp_da_size(actual));
-    if (it >= sp_da_size(actual)) {
-      return;
-    }
-    EXPECT_TRUE(sp_str_equal_cstr(actual[it], expected[it]));
+    sp_test_kv_c(t, "value", expected[et]);
+    sp_must(t, et < sp_da_size(actual));
+    sp_expect_str_eq_c(t, actual[et], expected[et]);
   }
-  EXPECT_EQ(sp_da_size(actual), 4);
+  sp_must_eq(t, sp_da_size(actual), 4);
+  return SP_OK;
 }
 
-static void run_apply_test(s32* utest_result, apply_test_t test) {
-  sp_mem_heap_t* heap = sp_mem_heap_new();
-  sp_mem_t mem = sp_mem_heap_as_allocator(heap);
-
-  spn_pkg_info_t info = sp_zero;
-  sp_str_om_insert(info.libs, sp_str_lit("A"), sp_zero_s(spn_target_info_t));
-  sp_str_om_insert(info.exes, sp_str_lit("main"), sp_zero_s(spn_target_info_t));
-  sp_str_om_insert(info.scripts, sp_str_lit("B"), sp_zero_s(spn_target_info_t));
-  sp_str_om_insert(info.tests, sp_str_lit("C"), sp_zero_s(spn_target_info_t));
-  spn_target_info_t* lib = sp_str_om_at(info.libs, 0);
-  spn_target_info_t* exe = sp_str_om_at(info.exes, 0);
-  spn_target_info_t empty = sp_zero;
-  spn_target_info_t* script = sp_str_om_at(info.scripts, 0);
-  spn_target_info_t* unit_test = sp_str_om_at(info.tests, 0);
-
-  struct {
-    apply_list_t test;
-    sp_da(sp_str_t)* plain;
-    spn_gated_list_t* gated;
-    const c8** expected;
-  } lists [] = {
-    { test.lib_source, &lib->source, &lib->gated.source, test.expect.lib_source },
-    { test.source, &exe->source, &exe->gated.source, test.expect.source },
-    { test.script_source, &script->source, &script->gated.source, test.expect.script_source },
-    { test.test_source, &unit_test->source, &unit_test->gated.source, test.expect.test_source },
-    { test.include, &exe->include, &exe->gated.include, test.expect.include },
-    { test.define, &exe->define, &exe->gated.define, test.expect.define },
-    { test.flags, &exe->flags, &exe->gated.flags, test.expect.flags },
-    { test.sys_target, &exe->system_deps, &exe->gated.system_deps, test.expect.sys_target, },
-    { test.deps, &exe->deps, &exe->gated.deps, test.expect.deps },
-    { test.sys, &info.system_deps, &info.gated.system_deps, test.expect.sys, },
-  };
-  sp_carr_for(lists, it) {
-    make_list(mem, lists[it].test, lists[it].plain, lists[it].gated);
-  }
-
-  spn_when_env_t env = sp_zero;
-  spn_when_env_init(mem, &env);
-  spn_when_env_set_facts(&env, test.facts);
-  spn_pkg_apply_options(&info, &env);
-  if (test.reapply) {
-    spn_when_env_t reapply = sp_zero;
-    spn_when_env_init(mem, &reapply);
-    spn_when_env_set_facts(&reapply, test.reapply_facts);
-    spn_pkg_apply_options(&info, &reapply);
-  }
-
-  EXPECT_TRUE(info.applied);
-  sp_carr_for(lists, it) {
-    expect_list(utest_result, *lists[it].plain, lists[it].expected);
-  }
-}
-
-static void run_apply_option_test(s32* utest_result, apply_option_test_t test) {
-  sp_mem_heap_t* heap = sp_mem_heap_new();
-  sp_mem_t mem = sp_mem_heap_as_allocator(heap);
-  spn_pkg_info_t info = {
-    .define = sp_da_new(mem, sp_str_t),
-    .public_define = sp_da_new(mem, sp_str_t),
-  };
-
-  sp_carr_for(test.define, it) {
-    if (!test.define[it]) {
-      break;
-    }
-    sp_da_push(info.define, sp_cstr_as_str(test.define[it]));
-  }
-  sp_carr_for(test.public_define, it) {
-    if (!test.public_define[it]) {
-      break;
-    }
-    sp_da_push(info.public_define, sp_cstr_as_str(test.public_define[it]));
-  }
-  sp_carr_for(test.options, it) {
-    if (!test.options[it].name) {
-      break;
-    }
-    spn_option_info_t option = {
-      .name = sp_cstr_as_str(test.options[it].name),
-      .public = test.options[it].public,
-      .define = sp_cstr_as_str(test.options[it].define),
-    };
-    sp_str_om_insert(info.options, option.name, option);
-  }
-
-  spn_when_env_t env = sp_zero;
-  spn_when_env_init(mem, &env);
-  sp_carr_for(test.env, it) {
-    if (!test.env[it].name) {
-      break;
-    }
-    spn_option_value_t value = test.env[it].is_bool
-      ? spn_option_value_bool(test.env[it].b)
-      : spn_option_value_str(sp_cstr_as_str(test.env[it].str));
-    spn_when_env_set(&env, sp_cstr_as_str(test.env[it].name), value);
-  }
-
-  spn_pkg_apply_options(&info, &env);
-
-  EXPECT_TRUE(info.applied);
-  expect_list(utest_result, info.define, test.expect.define);
-  expect_list(utest_result, info.public_define, test.expect.public_define);
-}
-
-UTEST(options_apply, lib_source) {
-  run_apply_test(utest_result, (apply_test_t) {
+static const apply_test_t list_tests [] = {
+  {
+    .name = "lib_source",
     .facts = { .os = SPN_OS_LINUX },
     .lib_source = {
       .values = {
@@ -247,11 +143,9 @@ UTEST(options_apply, lib_source) {
     .expect = {
       .lib_source = { "main.c", "A", "C" },
     },
-  });
-}
-
-UTEST(options_apply, exe_source) {
-  run_apply_test(utest_result, (apply_test_t) {
+  },
+  {
+    .name = "exe_source",
     .facts = { .os = SPN_OS_LINUX },
     .source = {
       .values = {
@@ -264,11 +158,9 @@ UTEST(options_apply, exe_source) {
     .expect = {
       .source = { "main.c", "A", "C" },
     },
-  });
-}
-
-UTEST(options_apply, script_source) {
-  run_apply_test(utest_result, (apply_test_t) {
+  },
+  {
+    .name = "script_source",
     .facts = { .os = SPN_OS_LINUX },
     .script_source = {
       .values = {
@@ -281,11 +173,9 @@ UTEST(options_apply, script_source) {
     .expect = {
       .script_source = { "main.c", "A", "C" },
     },
-  });
-}
-
-UTEST(options_apply, test_source) {
-  run_apply_test(utest_result, (apply_test_t) {
+  },
+  {
+    .name = "test_source",
     .facts = { .os = SPN_OS_LINUX },
     .test_source = {
       .values = {
@@ -298,11 +188,9 @@ UTEST(options_apply, test_source) {
     .expect = {
       .test_source = { "main.c", "A", "C" },
     },
-  });
-}
-
-UTEST(options_apply, include) {
-  run_apply_test(utest_result, (apply_test_t) {
+  },
+  {
+    .name = "include",
     .facts = { .os = SPN_OS_LINUX },
     .include = {
       .values = {
@@ -312,11 +200,9 @@ UTEST(options_apply, include) {
     .expect = {
       .include = { "A" },
     },
-  });
-}
-
-UTEST(options_apply, define) {
-  run_apply_test(utest_result, (apply_test_t) {
+  },
+  {
+    .name = "define",
     .facts = { .os = SPN_OS_LINUX },
     .define = {
       .values = {
@@ -326,11 +212,9 @@ UTEST(options_apply, define) {
     .expect = {
       .define = { "SPUM" },
     },
-  });
-}
-
-UTEST(options_apply, flags) {
-  run_apply_test(utest_result, (apply_test_t) {
+  },
+  {
+    .name = "flags",
     .facts = { .os = SPN_OS_LINUX },
     .flags = {
       .values = {
@@ -340,11 +224,9 @@ UTEST(options_apply, flags) {
     .expect = {
       .flags = { "A" },
     },
-  });
-}
-
-UTEST(options_apply, target_system_deps) {
-  run_apply_test(utest_result, (apply_test_t) {
+  },
+  {
+    .name = "target_system_deps",
     .facts = { .os = SPN_OS_LINUX },
     .sys_target = {
       .values = {
@@ -354,11 +236,9 @@ UTEST(options_apply, target_system_deps) {
     .expect = {
       .sys_target = { "A" },
     },
-  });
-}
-
-UTEST(options_apply, target_deps) {
-  run_apply_test(utest_result, (apply_test_t) {
+  },
+  {
+    .name = "target_deps",
     .facts = { .os = SPN_OS_LINUX },
     .deps = {
       .values = {
@@ -368,11 +248,9 @@ UTEST(options_apply, target_deps) {
     .expect = {
       .deps = { "A" },
     },
-  });
-}
-
-UTEST(options_apply, package_system_deps) {
-  run_apply_test(utest_result, (apply_test_t) {
+  },
+  {
+    .name = "package_system_deps",
     .facts = { .os = SPN_OS_LINUX },
     .sys = {
       .values = {
@@ -382,11 +260,9 @@ UTEST(options_apply, package_system_deps) {
     .expect = {
       .sys = { "A" },
     },
-  });
-}
-
-UTEST(options_apply, applies_once) {
-  run_apply_test(utest_result, (apply_test_t) {
+  },
+  {
+    .name = "applies_once",
     .facts = { .os = SPN_OS_LINUX, .mode = SPN_BUILD_MODE_DEBUG },
     .reapply = true,
     .reapply_facts = { .os = SPN_OS_WINDOWS, .mode = SPN_BUILD_MODE_DEBUG },
@@ -399,11 +275,66 @@ UTEST(options_apply, applies_once) {
     .expect = {
       .source = { "A" },
     },
-  });
+  },
+};
+
+sp_test_each(options_apply, lists, apply_test_t, list_tests) {
+  sp_mem_t mem = sp_test_arena(t);
+
+  spn_pkg_info_t info = sp_zero;
+  sp_str_om_insert(info.libs, sp_str_lit("A"), sp_zero_s(spn_target_info_t));
+  sp_str_om_insert(info.exes, sp_str_lit("main"), sp_zero_s(spn_target_info_t));
+  sp_str_om_insert(info.scripts, sp_str_lit("B"), sp_zero_s(spn_target_info_t));
+  sp_str_om_insert(info.tests, sp_str_lit("C"), sp_zero_s(spn_target_info_t));
+  spn_target_info_t* lib = sp_str_om_at(info.libs, 0);
+  spn_target_info_t* exe = sp_str_om_at(info.exes, 0);
+  spn_target_info_t* script = sp_str_om_at(info.scripts, 0);
+  spn_target_info_t* unit_test = sp_str_om_at(info.tests, 0);
+
+  struct {
+    apply_list_t test;
+    sp_da(sp_str_t)* plain;
+    spn_gated_list_t* gated;
+    const c8** expected;
+  } lists [] = {
+    { it->lib_source, &lib->source, &lib->gated.source, it->expect.lib_source },
+    { it->source, &exe->source, &exe->gated.source, it->expect.source },
+    { it->script_source, &script->source, &script->gated.source, it->expect.script_source },
+    { it->test_source, &unit_test->source, &unit_test->gated.source, it->expect.test_source },
+    { it->include, &exe->include, &exe->gated.include, it->expect.include },
+    { it->define, &exe->define, &exe->gated.define, it->expect.define },
+    { it->flags, &exe->flags, &exe->gated.flags, it->expect.flags },
+    { it->sys_target, &exe->system_deps, &exe->gated.system_deps, it->expect.sys_target, },
+    { it->deps, &exe->deps, &exe->gated.deps, it->expect.deps },
+    { it->sys, &info.system_deps, &info.gated.system_deps, it->expect.sys, },
+  };
+  sp_carr_for(lists, lt) {
+    make_list(mem, lists[lt].test, lists[lt].plain, lists[lt].gated);
+  }
+
+  spn_when_env_t env = sp_zero;
+  spn_when_env_init(mem, &env);
+  spn_when_env_set_facts(&env, it->facts);
+  spn_pkg_apply_options(&info, &env);
+  if (it->reapply) {
+    spn_when_env_t reapply = sp_zero;
+    spn_when_env_init(mem, &reapply);
+    spn_when_env_set_facts(&reapply, it->reapply_facts);
+    spn_pkg_apply_options(&info, &reapply);
+  }
+
+  sp_expect(t, info.applied);
+  sp_carr_for(lists, lt) {
+    sp_err_t err = expect_list(t, *lists[lt].plain, lists[lt].expected);
+    if (err) return err;
+  }
+
+  return SP_OK;
 }
 
-UTEST(options_apply, private_define) {
-  run_apply_option_test(utest_result, (apply_option_test_t) {
+static const apply_option_test_t option_tests [] = {
+  {
+    .name = "private_define",
     .define = { "A" },
     .options = {
       { .name = "A", .define = "SPUM" },
@@ -414,11 +345,9 @@ UTEST(options_apply, private_define) {
     .expect = {
       .define = { "A", "SPUM" },
     },
-  });
-}
-
-UTEST(options_apply, public_define) {
-  run_apply_option_test(utest_result, (apply_option_test_t) {
+  },
+  {
+    .name = "public_define",
     .options = {
       { .name = "A", .define = "SPUM", .public = true },
     },
@@ -429,11 +358,9 @@ UTEST(options_apply, public_define) {
       .define = { "SPUM" },
       .public_define = { "SPUM" },
     },
-  });
-}
-
-UTEST(options_apply, multiple_options) {
-  run_apply_option_test(utest_result, (apply_option_test_t) {
+  },
+  {
+    .name = "multiple_options",
     .options = {
       { .name = "A", .define = "A" },
       { .name = "B", .define = "SPUM" },
@@ -445,46 +372,89 @@ UTEST(options_apply, multiple_options) {
     .expect = {
       .define = { "SPUM" },
     },
-  });
-}
-
-UTEST(options_apply, empty_define) {
-  run_apply_option_test(utest_result, (apply_option_test_t) {
+  },
+  {
+    .name = "empty_define",
     .options = {
       { .name = "A", .define = "" },
     },
     .env = {
       { .name = "A", .is_bool = true, .b = true },
     },
-  });
-}
-
-UTEST(options_apply, missing_option_value) {
-  run_apply_option_test(utest_result, (apply_option_test_t) {
+  },
+  {
+    .name = "missing_option_value",
     .options = {
       { .name = "A", .define = "SPUM" },
     },
-  });
-}
-
-UTEST(options_apply, non_bool_option_value) {
-  run_apply_option_test(utest_result, (apply_option_test_t) {
+  },
+  {
+    .name = "non_bool_option_value",
     .options = {
       { .name = "A", .define = "SPUM" },
     },
     .env = {
       { .name = "A", .str = "A" },
     },
-  });
-}
-
-UTEST(options_apply, false_option_value) {
-  run_apply_option_test(utest_result, (apply_option_test_t) {
+  },
+  {
+    .name = "false_option_value",
     .options = {
       { .name = "A", .define = "SPUM" },
     },
     .env = {
       { .name = "A", .is_bool = true },
     },
-  });
+  },
+};
+
+sp_test_each(options_apply, option_defines, apply_option_test_t, option_tests) {
+  sp_mem_t mem = sp_test_arena(t);
+  spn_pkg_info_t info = {
+    .define = sp_da_new(mem, sp_str_t),
+    .public_define = sp_da_new(mem, sp_str_t),
+  };
+
+  sp_carr_for(it->define, dt) {
+    if (!it->define[dt]) {
+      break;
+    }
+    sp_da_push(info.define, sp_cstr_as_str(it->define[dt]));
+  }
+  sp_carr_for(it->public_define, pt) {
+    if (!it->public_define[pt]) {
+      break;
+    }
+    sp_da_push(info.public_define, sp_cstr_as_str(it->public_define[pt]));
+  }
+  sp_carr_for(it->options, ot) {
+    if (!it->options[ot].name) {
+      break;
+    }
+    spn_option_info_t option = {
+      .name = sp_cstr_as_str(it->options[ot].name),
+      .public = it->options[ot].public,
+      .define = sp_cstr_as_str(it->options[ot].define),
+    };
+    sp_str_om_insert(info.options, option.name, option);
+  }
+
+  spn_when_env_t env = sp_zero;
+  spn_when_env_init(mem, &env);
+  sp_carr_for(it->env, et) {
+    if (!it->env[et].name) {
+      break;
+    }
+    spn_option_value_t value = it->env[et].is_bool
+      ? spn_option_value_bool(it->env[et].b)
+      : spn_option_value_str(sp_cstr_as_str(it->env[et].str));
+    spn_when_env_set(&env, sp_cstr_as_str(it->env[et].name), value);
+  }
+
+  spn_pkg_apply_options(&info, &env);
+
+  sp_expect(t, info.applied);
+  sp_err_t err = expect_list(t, info.define, it->expect.define);
+  if (err) return err;
+  return expect_list(t, info.public_define, it->expect.public_define);
 }

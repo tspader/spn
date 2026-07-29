@@ -1,12 +1,13 @@
-#ifndef JTD_TEST_H
-#define JTD_TEST_H
+#pragma once
 
-#include "utest.h"
+#include "spn_test.h"
+
 #include "jtd.h"
 
-typedef void (*jtd_compare_fn)(s32* utest_result, const jtd_result_t* root, const void* expect);
+typedef sp_err_t (*jtd_compare_fn)(sp_test_t* t, const jtd_result_t* root, const void* expect);
 
 typedef struct {
+  const c8*      name;
   const c8*      json;
   jtd_err_t      error;
   const c8*      error_path;
@@ -14,7 +15,4 @@ typedef struct {
   jtd_compare_fn compare;
 } jtd_case_t;
 
-void run_jtd_case(s32* utest_result, jtd_case_t c);
-void jtd_expect_str(s32* utest_result, sp_str_t actual, const c8* expected);
-
-#endif
+sp_err_t run_jtd_case(sp_test_t* t, const jtd_case_t* c);

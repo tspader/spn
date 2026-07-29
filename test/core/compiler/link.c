@@ -1,6 +1,7 @@
-#include "common.h"
+#include "compiler.h"
 
 typedef struct {
+  const c8* name;
   spn_cc_driver_t driver;
   spn_profile_info_t profile;
   spn_cc_output_kind_t kind;
@@ -18,67 +19,9 @@ typedef struct {
   render_expect_t expect;
 } link_test_t;
 
-static void run_link_test(s32* utest_result, link_test_t test) {
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  spn_cc_toolchain_t toolchain = test_toolchain(test.driver);
-  spn_cc_link_t link = {
-    .lang = SPN_LANG_C,
-    .kind = test.kind,
-    .min_os = test.min_os,
-    .rpath = test.rpath,
-    .subsystem = test.subsystem,
-  };
-  sp_da_init(scratch.mem, link.libs);
-  sp_da_init(scratch.mem, link.whole_archives);
-  sp_da_init(scratch.mem, link.private_libs);
-  sp_da_init(scratch.mem, link.system_libs);
-  sp_da_init(scratch.mem, link.lib_dirs);
-  sp_da_init(scratch.mem, link.frameworks);
-
-  spn_cc_link_files_t files = {
-    .output = sp_str_lit("main"),
-  };
-  sp_da_init(scratch.mem, files.objects);
-  sp_da_init(scratch.mem, files.exports.symbols);
-  sp_da_push(files.objects, sp_str_lit("main.o"));
-  if (test.exports) {
-    files.exports.path = sp_str_from_cstr(scratch.mem, test.exports);
-  }
-  sp_carr_for(test.export_symbols, it) {
-    if (!test.export_symbols[it]) break;
-    sp_da_push(files.exports.symbols, sp_str_from_cstr(scratch.mem, test.export_symbols[it]));
-  }
-  if (test.lib) {
-    sp_da_push(link.libs, sp_str_from_cstr(scratch.mem, test.lib));
-  }
-  if (test.whole_archive) {
-    sp_da_push(link.whole_archives, sp_str_from_cstr(scratch.mem, test.whole_archive));
-  }
-  if (test.private_lib) {
-    sp_da_push(link.private_libs, sp_str_from_cstr(scratch.mem, test.private_lib));
-  }
-  if (test.system_lib) {
-    sp_da_push(link.system_libs, sp_str_from_cstr(scratch.mem, test.system_lib));
-  }
-  if (test.framework) {
-    sp_da_push(link.frameworks, sp_str_from_cstr(scratch.mem, test.framework));
-  }
-  if (test.lib_dir) {
-    sp_da_push(link.lib_dirs, sp_str_from_cstr(scratch.mem, test.lib_dir));
-  }
-  spn_invocation_t invocation = sp_zero;
-  spn_err_union_t err = spn_cc_render_link(scratch.mem, &toolchain, &test.profile, &link, &files, &invocation);
-  EXPECT_EQ(err.kind, test.expect.err);
-  if (test.expect.err) {
-    EXPECT_EQ(err.compiler.feature, test.expect.feature);
-  } else {
-    expect_args(utest_result, &invocation, test.expect);
-  }
-  sp_mem_end_scratch(scratch);
-}
-
-UTEST(render_link, gcc_linux_libs) {
-  run_link_test(utest_result, (link_test_t) {
+static const link_test_t tests [] = {
+  {
+    .name = "gcc_linux_libs",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -95,11 +38,9 @@ UTEST(render_link, gcc_linux_libs) {
         "-o", "main"
       },
     },
-  });
-}
-
-UTEST(render_link, clang_wasi_reactor) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "clang_wasi_reactor",
     .driver = SPN_CC_DRIVER_CLANG,
     .profile = {
       .arch = SPN_ARCH_WASM32,
@@ -115,11 +56,9 @@ UTEST(render_link, clang_wasi_reactor) {
         "main.o", "-o", "main"
       },
     },
-  });
-}
-
-UTEST(render_link, wasi_shared_lib_unsupported) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "wasi_shared_lib_unsupported",
     .driver = SPN_CC_DRIVER_CLANG,
     .profile = {
       .arch = SPN_ARCH_WASM32,
@@ -130,11 +69,9 @@ UTEST(render_link, wasi_shared_lib_unsupported) {
       .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
       .feature = SPN_CC_FEATURE_LINK_SHARED,
     },
-  });
-}
-
-UTEST(render_link, gcc_reactor_unsupported) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "gcc_reactor_unsupported",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -146,11 +83,9 @@ UTEST(render_link, gcc_reactor_unsupported) {
       .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
       .feature = SPN_CC_FEATURE_LINK_REACTOR,
     },
-  });
-}
-
-UTEST(render_link, msvc_exe_libs) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "msvc_exe_libs",
     .driver = SPN_CC_DRIVER_MSVC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -172,11 +107,9 @@ UTEST(render_link, msvc_exe_libs) {
         "/link", "/LIBPATH:deps/lib"
       },
     },
-  });
-}
-
-UTEST(render_link, msvc_shared_lib) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "msvc_shared_lib",
     .driver = SPN_CC_DRIVER_MSVC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -188,11 +121,9 @@ UTEST(render_link, msvc_shared_lib) {
       .command = "cc",
       .args = { "/nologo", "/LD", "main.o", "/Femain" },
     },
-  });
-}
-
-UTEST(render_link, msvc_debug_pdb) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "msvc_debug_pdb",
     .driver = SPN_CC_DRIVER_MSVC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -205,11 +136,9 @@ UTEST(render_link, msvc_debug_pdb) {
       .command = "cc",
       .args = { "/nologo", "main.o", "/Femain", "/link", "/DEBUG" },
     },
-  });
-}
-
-UTEST(render_link, msvc_subsystem) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "msvc_subsystem",
     .driver = SPN_CC_DRIVER_MSVC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -222,11 +151,9 @@ UTEST(render_link, msvc_subsystem) {
       .command = "cc",
       .args = { "/nologo", "main.o", "/Femain", "/link", "/SUBSYSTEM:WINDOWS" },
     },
-  });
-}
-
-UTEST(render_link, msvc_reactor_unsupported) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "msvc_reactor_unsupported",
     .driver = SPN_CC_DRIVER_MSVC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -238,11 +165,9 @@ UTEST(render_link, msvc_reactor_unsupported) {
       .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
       .feature = SPN_CC_FEATURE_LINK_REACTOR,
     },
-  });
-}
-
-UTEST(render_link, clang_macos_frameworks) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "clang_macos_frameworks",
     .driver = SPN_CC_DRIVER_CLANG,
     .profile = {
       .arch = SPN_ARCH_ARM64,
@@ -263,11 +188,9 @@ UTEST(render_link, clang_macos_frameworks) {
         "-o", "main"
       },
     },
-  });
-}
-
-UTEST(render_link, frameworks_require_sdk) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "frameworks_require_sdk",
     .driver = SPN_CC_DRIVER_CLANG,
     .profile = {
       .arch = SPN_ARCH_ARM64,
@@ -279,11 +202,9 @@ UTEST(render_link, frameworks_require_sdk) {
       .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
       .feature = SPN_CC_FEATURE_FRAMEWORKS,
     },
-  });
-}
-
-UTEST(render_link, mingw_subsystem) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "mingw_subsystem",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -296,11 +217,9 @@ UTEST(render_link, mingw_subsystem) {
       .command = "cc",
       .args = { "-Wl,--subsystem,windows", "main.o", "-o", "main" },
     },
-  });
-}
-
-UTEST(render_link, linux_shared_lib) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "linux_shared_lib",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -312,11 +231,9 @@ UTEST(render_link, linux_shared_lib) {
       .command = "cc",
       .args = { "-shared", "main.o", "-o", "main" },
     },
-  });
-}
-
-UTEST(render_link, static_linkage) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "static_linkage",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -329,11 +246,9 @@ UTEST(render_link, static_linkage) {
       .command = "cc",
       .args = { "-static", "main.o", "-o", "main" },
     },
-  });
-}
-
-UTEST(render_link, macos_static_linkage_suppressed) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "macos_static_linkage_suppressed",
     .driver = SPN_CC_DRIVER_CLANG,
     .profile = {
       .arch = SPN_ARCH_ARM64,
@@ -345,11 +260,9 @@ UTEST(render_link, macos_static_linkage_suppressed) {
       .command = "cc",
       .args = { "--target=aarch64-macos", "main.o", "-o", "main" },
     },
-  });
-}
-
-UTEST(render_link, lib_dirs_and_rpath) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "lib_dirs_and_rpath",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -363,11 +276,9 @@ UTEST(render_link, lib_dirs_and_rpath) {
       .command = "cc",
       .args = { "main.o", "-Ldeps/lib", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
-  });
-}
-
-UTEST(render_link, macos_rpath) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "macos_rpath",
     .driver = SPN_CC_DRIVER_CLANG,
     .profile = {
       .arch = SPN_ARCH_ARM64,
@@ -379,11 +290,9 @@ UTEST(render_link, macos_rpath) {
       .command = "cc",
       .args = { "--target=aarch64-macos", "main.o", "-Wl,-rpath,@loader_path", "-o", "main" },
     },
-  });
-}
-
-UTEST(render_link, wasi_rpath_never_renders) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "wasi_rpath_never_renders",
     .driver = SPN_CC_DRIVER_CLANG,
     .profile = {
       .arch = SPN_ARCH_WASM32,
@@ -400,11 +309,9 @@ UTEST(render_link, wasi_rpath_never_renders) {
         "main.o", "-o", "main"
       },
     },
-  });
-}
-
-UTEST(render_link, libs_precede_system_libs) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "libs_precede_system_libs",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -419,11 +326,9 @@ UTEST(render_link, libs_precede_system_libs) {
       .command = "cc",
       .args = { "main.o", "-lP", "-lA", "-lm", "-o", "main" },
     },
-  });
-}
-
-UTEST(render_link, sanitizers_on_link_line) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "sanitizers_on_link_line",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -436,11 +341,9 @@ UTEST(render_link, sanitizers_on_link_line) {
       .command = "cc",
       .args = { "-fsanitize=address", "main.o", "-o", "main" },
     },
-  });
-}
-
-UTEST(render_link, linux_shared_exports) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "linux_shared_exports",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -461,11 +364,9 @@ UTEST(render_link, linux_shared_exports) {
         "-o", "main"
       },
     },
-  });
-}
-
-UTEST(render_link, macos_shared_exports) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "macos_shared_exports",
     .driver = SPN_CC_DRIVER_CLANG,
     .profile = {
       .arch = SPN_ARCH_ARM64,
@@ -486,11 +387,9 @@ UTEST(render_link, macos_shared_exports) {
         "-o", "main"
       },
     },
-  });
-}
-
-UTEST(render_link, mingw_shared_def) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "mingw_shared_def",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -511,11 +410,9 @@ UTEST(render_link, mingw_shared_def) {
         "-o", "main"
       },
     },
-  });
-}
-
-UTEST(render_link, wasi_reactor_exports) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "wasi_reactor_exports",
     .driver = SPN_CC_DRIVER_CLANG,
     .profile = {
       .arch = SPN_ARCH_WASM32,
@@ -533,11 +430,9 @@ UTEST(render_link, wasi_reactor_exports) {
         "main.o", "-o", "main"
       },
     },
-  });
-}
-
-UTEST(render_link, foreign_platform_config_never_renders) {
-  run_link_test(utest_result, (link_test_t) {
+  },
+  {
+    .name = "foreign_platform_config_never_renders",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -553,5 +448,64 @@ UTEST(render_link, foreign_platform_config_never_renders) {
       .command = "cc",
       .args = { "main.o", "-o", "main" },
     },
-  });
+  },
+};
+
+sp_test_each(render_link, render, link_test_t, tests) {
+  sp_mem_t mem = sp_test_arena(t);
+  spn_cc_toolchain_t toolchain = test_toolchain(it->driver);
+  spn_cc_link_t link = {
+    .lang = SPN_LANG_C,
+    .kind = it->kind,
+    .min_os = it->min_os,
+    .rpath = it->rpath,
+    .subsystem = it->subsystem,
+  };
+  sp_da_init(mem, link.libs);
+  sp_da_init(mem, link.whole_archives);
+  sp_da_init(mem, link.private_libs);
+  sp_da_init(mem, link.system_libs);
+  sp_da_init(mem, link.lib_dirs);
+  sp_da_init(mem, link.frameworks);
+
+  spn_cc_link_files_t files = {
+    .output = sp_str_lit("main"),
+  };
+  sp_da_init(mem, files.objects);
+  sp_da_init(mem, files.exports.symbols);
+  sp_da_push(files.objects, sp_str_lit("main.o"));
+  if (it->exports) {
+    files.exports.path = sp_str_from_cstr(mem, it->exports);
+  }
+  sp_carr_for(it->export_symbols, s) {
+    if (!it->export_symbols[s]) break;
+    sp_da_push(files.exports.symbols, sp_str_from_cstr(mem, it->export_symbols[s]));
+  }
+  if (it->lib) {
+    sp_da_push(link.libs, sp_str_from_cstr(mem, it->lib));
+  }
+  if (it->whole_archive) {
+    sp_da_push(link.whole_archives, sp_str_from_cstr(mem, it->whole_archive));
+  }
+  if (it->private_lib) {
+    sp_da_push(link.private_libs, sp_str_from_cstr(mem, it->private_lib));
+  }
+  if (it->system_lib) {
+    sp_da_push(link.system_libs, sp_str_from_cstr(mem, it->system_lib));
+  }
+  if (it->framework) {
+    sp_da_push(link.frameworks, sp_str_from_cstr(mem, it->framework));
+  }
+  if (it->lib_dir) {
+    sp_da_push(link.lib_dirs, sp_str_from_cstr(mem, it->lib_dir));
+  }
+
+  spn_invocation_t invocation = sp_zero;
+  spn_err_union_t err = spn_cc_render_link(mem, &toolchain, &it->profile, &link, &files, &invocation);
+  sp_expect_eq(t, err.kind, it->expect.err);
+  if (it->expect.err) {
+    sp_expect_eq(t, err.compiler.feature, it->expect.feature);
+    return SP_OK;
+  }
+  return expect_args(t, &invocation, it->expect);
 }

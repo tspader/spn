@@ -1,92 +1,79 @@
+// The sp and spit implementations live alone in this TU; this binary is a
+// single TU, so it doubles as its own spit_main.c
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
-#include "test.h"
+#include "spn_test.h"
 
 #include "log/lazy/lazy.h"
 
-///////////
-// TESTS //
-///////////
-UTEST_MAIN()
+s32 main(s32 argc, const c8** argv) {
+  return sp_test_main(argc, argv, SP_NULLPTR);
+}
 
 #define LAZY_TEST_MAX_WRITES 8
 
 typedef struct {
   const c8* content;
-} lazy_log_expect_t;
+} expect_t;
 
 typedef struct {
+  const c8* name;
   const c8* seed;
   const c8* writes [LAZY_TEST_MAX_WRITES];
-  lazy_log_expect_t expect;
-} lazy_log_test_t;
+  expect_t expect;
+} test_t;
 
-struct lazy_log {
-  tmpfs_t fs;
+static const test_t tests [] = {
+  {
+    .name = "never_written_creates_nothing",
+  },
+  {
+    .name = "never_written_preserves_existing",
+    .seed = "cached diagnostics\n",
+    .expect = { .content = "cached diagnostics\n" },
+  },
+  {
+    .name = "first_write_creates",
+    .writes = { "hello" },
+    .expect = { .content = "hello" },
+  },
+  {
+    .name = "writes_accumulate",
+    .writes = { "foo", "bar", "baz" },
+    .expect = { .content = "foobarbaz" },
+  },
+  {
+    .name = "first_write_truncates_existing",
+    .seed = "stale stale stale stale",
+    .writes = { "new" },
+    .expect = { .content = "new" },
+  },
 };
 
-UTEST_F_SETUP(lazy_log) {}
-UTEST_F_TEARDOWN(lazy_log) {}
-
-void run_lazy_log_test(s32* utest_result, tmpfs_t* fs, lazy_log_test_t t) {
-  sp_str_t path = tmpfs_get(fs, sp_str_lit("x.log"));
-  if (t.seed) {
-    sp_fs_create_file_str(path, sp_str_view(t.seed));
+sp_test_each(lazy_log, write, test_t, tests) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_str_t path = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("x.log"));
+  if (it->seed) {
+    sp_fs_create_file_str(path, sp_str_view(it->seed));
   }
 
   spn_lazy_log_t log;
   spn_lazy_log_init(&log, path);
 
-  sp_carr_for(t.writes, it) {
-    if (!t.writes[it]) break;
-    sp_io_write_str(&log.writer, sp_str_view(t.writes[it]), SP_NULLPTR);
+  sp_carr_for(it->writes, w) {
+    if (!it->writes[w]) break;
+    sp_io_write_str(&log.writer, sp_str_view(it->writes[w]), SP_NULLPTR);
   }
 
   spn_lazy_log_close(&log);
 
-  if (t.expect.content) {
-    EXPECT_TRUE(sp_fs_exists(path));
-    EXPECT_TRUE(test_read_eq(fs->mem, path, t.expect.content));
+  if (it->expect.content) {
+    sp_expect(t, sp_fs_exists(path));
+    sp_expect_str_eq_c(t, test_read_file(mem, path), it->expect.content);
   } else {
-    EXPECT_FALSE(sp_fs_exists(path));
+    sp_expect(t, !sp_fs_exists(path));
   }
-}
 
-UTEST_F(lazy_log, never_written_creates_nothing) {
-  tmpfs_init_named(&uf->fs, "lazy_never_written");
-  run_lazy_log_test(utest_result, &uf->fs, (lazy_log_test_t) { 0 });
-}
-
-UTEST_F(lazy_log, never_written_preserves_existing) {
-  tmpfs_init_named(&uf->fs, "lazy_preserves_existing");
-  run_lazy_log_test(utest_result, &uf->fs, (lazy_log_test_t) {
-    .seed = "cached diagnostics\n",
-    .expect = { .content = "cached diagnostics\n" },
-  });
-}
-
-UTEST_F(lazy_log, first_write_creates) {
-  tmpfs_init_named(&uf->fs, "lazy_first_write");
-  run_lazy_log_test(utest_result, &uf->fs, (lazy_log_test_t) {
-    .writes = { "hello" },
-    .expect = { .content = "hello" },
-  });
-}
-
-UTEST_F(lazy_log, writes_accumulate) {
-  tmpfs_init_named(&uf->fs, "lazy_accumulate");
-  run_lazy_log_test(utest_result, &uf->fs, (lazy_log_test_t) {
-    .writes = { "foo", "bar", "baz" },
-    .expect = { .content = "foobarbaz" },
-  });
-}
-
-UTEST_F(lazy_log, first_write_truncates_existing) {
-  tmpfs_init_named(&uf->fs, "lazy_truncates");
-  run_lazy_log_test(utest_result, &uf->fs, (lazy_log_test_t) {
-    .seed = "stale stale stale stale",
-    .writes = { "new" },
-    .expect = { .content = "new" },
-  });
+  return SP_OK;
 }

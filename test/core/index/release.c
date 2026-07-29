@@ -1,22 +1,16 @@
-#include "sp.h"
-#include "utest.h"
-#include "test.h"
-
-#include "index/json.h"
-#include "semver/convert.h"
-#include "sp/io.h"
+#include "index.h"
 
 typedef struct {
   const c8* namespace;
   const c8* name;
   const c8* version;
   spn_index_dep_kind_t kind;
-} release_test_dep_t;
+} release_dep_t;
 
 typedef struct {
   const c8* name;
   spn_linkage_t linkages [4];
-} release_test_target_t;
+} release_target_t;
 
 typedef struct {
   const c8* namespace;
@@ -26,24 +20,242 @@ typedef struct {
   struct { const c8* url; const c8* rev; const c8* dir; } source;
   struct { const c8* url; const c8* rev; const c8* dir; } manifest;
   struct { const c8* manifest; const c8* script; } paths;
-  release_test_dep_t deps [4];
-  release_test_target_t targets [4];
-} release_test_rel_t;
+  release_dep_t deps [4];
+  release_target_t targets [4];
+} release_rel_t;
 
 typedef struct {
   spn_err_t err;
-  release_test_rel_t releases [4];
-} release_test_expect_t;
+  release_rel_t releases [4];
+} release_expect_t;
 
+// The releases/*.jsonl files play a dual role: rows with .golden render the
+// expected releases through spn_index_release_to_json and compare against the
+// file, then every row feeds the same file back through the parser.
 typedef struct {
-  const c8* file;
+  const c8* name;
   bool golden;
-  release_test_expect_t expect;
+  release_expect_t expect;
 } release_test_t;
 
-UTEST_EMPTY_FIXTURE(index_release)
+static const release_test_t tests [] = {
+  {
+    .name = "minimal",
+    .golden = true,
+    .expect = {
+      .releases = {
+        {
+          .namespace = "core",
+          .name = "spum",
+          .version = "1.0.0",
+        },
+      },
+    },
+  },
+  {
+    .name = "full",
+    .golden = true,
+    .expect = {
+      .releases = {
+        {
+          .namespace = "core",
+          .name = "spum",
+          .version = "2.1.0",
+          .yanked = true,
+          .source = { .url = "https://github.com/example/spum", .rev = "abc123", .dir = "packages/spum" },
+          .manifest = { .url = "https://github.com/example/packages", .rev = "def456", .dir = "spum" },
+          .paths = { .manifest = "spn.toml", .script = "spn.c" },
+          .deps = {
+            { .namespace = "core", .name = "curl", .version = "^1.0.0", .kind = SPN_INDEX_DEP_NORMAL },
+            { .namespace = "core", .name = "cmake", .version = "^3.0.0", .kind = SPN_INDEX_DEP_BUILD },
+            { .namespace = "core", .name = "utest", .version = "^1.0.0", .kind = SPN_INDEX_DEP_TEST },
+          },
+          .targets = {
+            { .name = "spum", .linkages = { SPN_LIB_KIND_SOURCE, SPN_LIB_KIND_STATIC, SPN_LIB_KIND_SHARED } },
+            { .name = "spum1", .linkages = { SPN_LIB_KIND_OBJECT } },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "partial",
+    .golden = true,
+    .expect = {
+      .releases = {
+        {
+          .namespace = "core",
+          .name = "spum",
+          .version = "1.0.0",
+          .source = { .url = "https://github.com/example/spum" },
+          .paths = { .manifest = "spn.toml" },
+        },
+      },
+    },
+  },
+  {
+    .name = "multiple",
+    .golden = true,
+    .expect = {
+      .releases = {
+        { .namespace = "core", .name = "spum", .version = "1.0.0" },
+        { .namespace = "core", .name = "spum", .version = "2.0.0" },
+      },
+    },
+  },
+  {
+    .name = "unknown_linkage",
+    .expect = {
+      .releases = {
+        {
+          .namespace = "core",
+          .name = "spum",
+          .version = "1.0.0",
+          .targets = {
+            { .name = "spum", .linkages = { SPN_LIB_KIND_STATIC } },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "linkage_non_string",
+    .expect = {
+      .releases = {
+        {
+          .namespace = "core",
+          .name = "spum",
+          .version = "1.0.0",
+          .targets = {
+            { .name = "spum", .linkages = { SPN_LIB_KIND_STATIC } },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "unknown_dep_kind",
+    .expect = {
+      .releases = {
+        {
+          .namespace = "core",
+          .name = "spum",
+          .version = "1.0.0",
+          .deps = {
+            { .namespace = "core", .name = "curl", .version = "^1.0.0", .kind = SPN_INDEX_DEP_NORMAL },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "deps_non_object",
+    .expect = {
+      .releases = {
+        {
+          .namespace = "core",
+          .name = "spum",
+          .version = "1.0.0",
+          .deps = {
+            { .namespace = "core", .name = "curl", .version = "^1.0.0", .kind = SPN_INDEX_DEP_NORMAL },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "dep_kind_missing",
+    .expect = {
+      .releases = {
+        {
+          .namespace = "core",
+          .name = "spum",
+          .version = "1.0.0",
+          .deps = {
+            { .namespace = "core", .name = "curl", .version = "^1.0.0", .kind = SPN_INDEX_DEP_NORMAL },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "unknown_field",
+    .expect = {
+      .releases = {
+        { .namespace = "core", .name = "spum", .version = "1.0.0" },
+      },
+    },
+  },
+  {
+    .name = "targets_not_array",
+    .expect = {
+      .releases = {
+        { .namespace = "core", .name = "spum", .version = "1.0.0" },
+      },
+    },
+  },
+  {
+    .name = "unsorted",
+    .expect = {
+      .releases = {
+        { .namespace = "core", .name = "spum", .version = "1.0.0" },
+        { .namespace = "core", .name = "spum", .version = "2.0.0" },
+        { .namespace = "core", .name = "spum", .version = "3.0.0" },
+      },
+    },
+  },
+  {
+    .name = "blank_lines",
+    .expect = {
+      .releases = {
+        { .namespace = "core", .name = "spum", .version = "1.0.0" },
+        { .namespace = "core", .name = "spum", .version = "2.0.0" },
+      },
+    },
+  },
+  {
+    .name = "duplicate_version",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "version_missing",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "version_invalid",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "version_noncanonical",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "version_non_string",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "name_mismatch",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "namespace_mismatch",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "empty",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "invalid_json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "non_object",
+    .expect = { .err = SPN_ERROR },
+  },
+};
 
-static spn_index_release_t release_test_build(sp_mem_t mem, release_test_rel_t* rel) {
+static spn_index_release_t release_build(sp_mem_t mem, const release_rel_t* rel) {
   spn_index_release_t built = {
     .id = {
       .namespace = sp_cstr_as_str(rel->namespace),
@@ -92,88 +304,71 @@ static spn_index_release_t release_test_build(sp_mem_t mem, release_test_rel_t* 
   return built;
 }
 
-static void release_test_check(s32* utest_result, sp_mem_t mem, release_test_rel_t* expected, spn_index_release_t* rel) {
-  SP_EXPECT_STR_EQ_CSTR(rel->id.namespace, expected->namespace);
-  SP_EXPECT_STR_EQ_CSTR(rel->id.name, expected->name);
-  SP_EXPECT_STR_EQ_CSTR(spn_semver_to_str(mem, rel->version), expected->version);
-  EXPECT_EQ(expected->yanked, rel->yanked);
+static sp_err_t release_check(sp_test_t* t, sp_mem_t mem, const release_rel_t* expected, spn_index_release_t* rel) {
+  sp_expect_str_eq_c(t, rel->id.namespace, expected->namespace);
+  sp_expect_str_eq_c(t, rel->id.name, expected->name);
+  sp_expect_str_eq_c(t, spn_semver_to_str(mem, rel->version), expected->version);
+  sp_expect_eq(t, expected->yanked, rel->yanked);
 
-  if (expected->source.url) { SP_EXPECT_STR_EQ_CSTR(rel->source.url, expected->source.url); }
-  if (expected->source.rev) { SP_EXPECT_STR_EQ_CSTR(rel->source.rev, expected->source.rev); }
-  if (expected->source.dir) { SP_EXPECT_STR_EQ_CSTR(rel->source.dir, expected->source.dir); }
-  if (expected->manifest.url) { SP_EXPECT_STR_EQ_CSTR(rel->manifest.url, expected->manifest.url); }
-  if (expected->manifest.rev) { SP_EXPECT_STR_EQ_CSTR(rel->manifest.rev, expected->manifest.rev); }
-  if (expected->manifest.dir) { SP_EXPECT_STR_EQ_CSTR(rel->manifest.dir, expected->manifest.dir); }
-  if (expected->paths.manifest) { SP_EXPECT_STR_EQ_CSTR(rel->paths.manifest, expected->paths.manifest); }
-  if (expected->paths.script) { SP_EXPECT_STR_EQ_CSTR(rel->paths.script, expected->paths.script); }
+  if (expected->source.url) { sp_expect_str_eq_c(t, rel->source.url, expected->source.url); }
+  if (expected->source.rev) { sp_expect_str_eq_c(t, rel->source.rev, expected->source.rev); }
+  if (expected->source.dir) { sp_expect_str_eq_c(t, rel->source.dir, expected->source.dir); }
+  if (expected->manifest.url) { sp_expect_str_eq_c(t, rel->manifest.url, expected->manifest.url); }
+  if (expected->manifest.rev) { sp_expect_str_eq_c(t, rel->manifest.rev, expected->manifest.rev); }
+  if (expected->manifest.dir) { sp_expect_str_eq_c(t, rel->manifest.dir, expected->manifest.dir); }
+  if (expected->paths.manifest) { sp_expect_str_eq_c(t, rel->paths.manifest, expected->paths.manifest); }
+  if (expected->paths.script) { sp_expect_str_eq_c(t, rel->paths.script, expected->paths.script); }
 
   u32 num_deps = 0;
-  sp_carr_for(expected->deps, it) {
-    if (!expected->deps[it].namespace) { break; }
-    num_deps++;
-  }
-  EXPECT_EQ(num_deps, sp_da_size(rel->deps));
+  sp_carr_detect_len(expected->deps, num_deps, expected->deps[num_deps].namespace);
+  sp_expect_eq(t, num_deps, sp_da_size(rel->deps));
 
   sp_for(it, num_deps) {
     if (it >= sp_da_size(rel->deps)) { break; }
-    SP_EXPECT_STR_EQ_CSTR(rel->deps[it].id.namespace, expected->deps[it].namespace);
-    SP_EXPECT_STR_EQ_CSTR(rel->deps[it].id.name, expected->deps[it].name);
-    SP_EXPECT_STR_EQ_CSTR(rel->deps[it].version, expected->deps[it].version);
-    EXPECT_EQ(expected->deps[it].kind, rel->deps[it].kind);
+    sp_expect_str_eq_c(t, rel->deps[it].id.namespace, expected->deps[it].namespace);
+    sp_expect_str_eq_c(t, rel->deps[it].id.name, expected->deps[it].name);
+    sp_expect_str_eq_c(t, rel->deps[it].version, expected->deps[it].version);
+    sp_expect_eq(t, expected->deps[it].kind, rel->deps[it].kind);
   }
 
   u32 num_targets = 0;
-  sp_carr_for(expected->targets, it) {
-    if (!expected->targets[it].name) { break; }
-    num_targets++;
-  }
-  EXPECT_EQ(num_targets, sp_da_size(rel->targets));
+  sp_carr_detect_len(expected->targets, num_targets, expected->targets[num_targets].name);
+  sp_expect_eq(t, num_targets, sp_da_size(rel->targets));
 
   sp_for(it, num_targets) {
     if (it >= sp_da_size(rel->targets)) { break; }
-    SP_EXPECT_STR_EQ_CSTR(rel->targets[it].name, expected->targets[it].name);
+    sp_expect_str_eq_c(t, rel->targets[it].name, expected->targets[it].name);
 
     u32 num_linkages = 0;
-    sp_carr_for(expected->targets[it].linkages, kind) {
-      if (expected->targets[it].linkages[kind] == SPN_LIB_KIND_NONE) { break; }
-      num_linkages++;
-    }
-    EXPECT_EQ(num_linkages, sp_da_size(rel->targets[it].linkages));
+    sp_carr_detect_len(expected->targets[it].linkages, num_linkages, expected->targets[it].linkages[num_linkages] != SPN_LIB_KIND_NONE);
+    sp_expect_eq(t, num_linkages, sp_da_size(rel->targets[it].linkages));
 
     sp_for(kind, num_linkages) {
       if (kind >= sp_da_size(rel->targets[it].linkages)) { break; }
-      EXPECT_EQ(expected->targets[it].linkages[kind], rel->targets[it].linkages[kind]);
+      sp_expect_eq(t, expected->targets[it].linkages[kind], rel->targets[it].linkages[kind]);
     }
   }
+
+  return SP_OK;
 }
 
-static void run_release_test(s32* utest_result, release_test_t t) {
-  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-  sp_str_t path = sp_fs_join_path(mem, sp_cstr_as_str(RELEASE_DIR), sp_cstr_as_str(t.file));
+sp_test_each(index_release, parse, release_test_t, tests) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_str_t file = sp_test_format(t, "releases/{}.jsonl", sp_fmt_cstr(it->name));
+  sp_str_t path = test_repo_path(mem, sp_test_format(t, "test/core/index/{}", sp_fmt_str(file)));
 
   u32 num_releases = 0;
-  sp_carr_for(t.expect.releases, it) {
-    if (!t.expect.releases[it].name) { break; }
-    num_releases++;
-  }
+  sp_carr_detect_len(it->expect.releases, num_releases, it->expect.releases[num_releases].name);
 
-  if (t.golden) {
+  if (it->golden) {
     sp_io_dyn_mem_writer_t rendered = sp_zero;
     sp_io_dyn_mem_writer_init(mem, &rendered);
-    sp_for(it, num_releases) {
-      spn_index_release_t rel = release_test_build(mem, &t.expect.releases[it]);
+    sp_for(at, num_releases) {
+      spn_index_release_t rel = release_build(mem, &it->expect.releases[at]);
       sp_io_write_line(&rendered.base, spn_index_release_to_json(mem, &rel));
     }
 
-    sp_env_t env = sp_env_capture(mem);
-    if (sp_env_contains_c(&env, "SPN_GOLDEN_REGEN")) {
-      sp_fs_create_file_str(path, sp_io_dyn_mem_writer_as_str(&rendered));
-    }
-    else {
-      sp_str_t golden = sp_zero;
-      sp_io_read_file(mem, path, &golden);
-      SP_EXPECT_STR_EQ(sp_io_dyn_mem_writer_as_str(&rendered), golden);
-    }
+    sp_expect_golden(t, file, sp_io_dyn_mem_writer_as_str(&rendered));
   }
 
   sp_str_t blob = sp_zero;
@@ -186,295 +381,14 @@ static void run_release_test(s32* utest_result, release_test_t t) {
 
   spn_index_pkg_t pkg = sp_zero;
   spn_err_t err = spn_index_parse_pkg(mem, id, blob, &pkg);
-  EXPECT_EQ(t.expect.err, err);
-  if (err != SPN_OK || t.expect.err != SPN_OK) { return; }
+  sp_expect_eq(t, it->expect.err, err);
+  if (err != SPN_OK || it->expect.err != SPN_OK) { return SP_OK; }
 
-  EXPECT_EQ(num_releases, sp_da_size(pkg.releases));
-  sp_for(it, num_releases) {
-    if (it >= sp_da_size(pkg.releases)) { break; }
-    release_test_check(utest_result, mem, &t.expect.releases[it], &pkg.releases[it]);
+  sp_expect_eq(t, num_releases, sp_da_size(pkg.releases));
+  sp_for(at, num_releases) {
+    if (at >= sp_da_size(pkg.releases)) { break; }
+    release_check(t, mem, &it->expect.releases[at], &pkg.releases[at]);
   }
-}
 
-UTEST_F(index_release, minimal) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "minimal.jsonl",
-    .golden = true,
-    .expect = {
-      .releases = {
-        {
-          .namespace = "core",
-          .name = "spum",
-          .version = "1.0.0",
-        },
-      },
-    },
-  });
-}
-
-UTEST_F(index_release, full) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "full.jsonl",
-    .golden = true,
-    .expect = {
-      .releases = {
-        {
-          .namespace = "core",
-          .name = "spum",
-          .version = "2.1.0",
-          .yanked = true,
-          .source = { .url = "https://github.com/example/spum", .rev = "abc123", .dir = "packages/spum" },
-          .manifest = { .url = "https://github.com/example/packages", .rev = "def456", .dir = "spum" },
-          .paths = { .manifest = "spn.toml", .script = "spn.c" },
-          .deps = {
-            { .namespace = "core", .name = "curl", .version = "^1.0.0", .kind = SPN_INDEX_DEP_NORMAL },
-            { .namespace = "core", .name = "cmake", .version = "^3.0.0", .kind = SPN_INDEX_DEP_BUILD },
-            { .namespace = "core", .name = "utest", .version = "^1.0.0", .kind = SPN_INDEX_DEP_TEST },
-          },
-          .targets = {
-            { .name = "spum", .linkages = { SPN_LIB_KIND_SOURCE, SPN_LIB_KIND_STATIC, SPN_LIB_KIND_SHARED } },
-            { .name = "spum1", .linkages = { SPN_LIB_KIND_OBJECT } },
-          },
-        },
-      },
-    },
-  });
-}
-
-UTEST_F(index_release, partial) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "partial.jsonl",
-    .golden = true,
-    .expect = {
-      .releases = {
-        {
-          .namespace = "core",
-          .name = "spum",
-          .version = "1.0.0",
-          .source = { .url = "https://github.com/example/spum" },
-          .paths = { .manifest = "spn.toml" },
-        },
-      },
-    },
-  });
-}
-
-UTEST_F(index_release, multiple) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "multiple.jsonl",
-    .golden = true,
-    .expect = {
-      .releases = {
-        { .namespace = "core", .name = "spum", .version = "1.0.0" },
-        { .namespace = "core", .name = "spum", .version = "2.0.0" },
-      },
-    },
-  });
-}
-
-UTEST_F(index_release, unknown_linkage) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "unknown_linkage.jsonl",
-    .expect = {
-      .releases = {
-        {
-          .namespace = "core",
-          .name = "spum",
-          .version = "1.0.0",
-          .targets = {
-            { .name = "spum", .linkages = { SPN_LIB_KIND_STATIC } },
-          },
-        },
-      },
-    },
-  });
-}
-
-UTEST_F(index_release, linkage_non_string) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "linkage_non_string.jsonl",
-    .expect = {
-      .releases = {
-        {
-          .namespace = "core",
-          .name = "spum",
-          .version = "1.0.0",
-          .targets = {
-            { .name = "spum", .linkages = { SPN_LIB_KIND_STATIC } },
-          },
-        },
-      },
-    },
-  });
-}
-
-UTEST_F(index_release, unknown_dep_kind) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "unknown_dep_kind.jsonl",
-    .expect = {
-      .releases = {
-        {
-          .namespace = "core",
-          .name = "spum",
-          .version = "1.0.0",
-          .deps = {
-            { .namespace = "core", .name = "curl", .version = "^1.0.0", .kind = SPN_INDEX_DEP_NORMAL },
-          },
-        },
-      },
-    },
-  });
-}
-
-UTEST_F(index_release, deps_non_object) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "deps_non_object.jsonl",
-    .expect = {
-      .releases = {
-        {
-          .namespace = "core",
-          .name = "spum",
-          .version = "1.0.0",
-          .deps = {
-            { .namespace = "core", .name = "curl", .version = "^1.0.0", .kind = SPN_INDEX_DEP_NORMAL },
-          },
-        },
-      },
-    },
-  });
-}
-
-UTEST_F(index_release, dep_kind_missing) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "dep_kind_missing.jsonl",
-    .expect = {
-      .releases = {
-        {
-          .namespace = "core",
-          .name = "spum",
-          .version = "1.0.0",
-          .deps = {
-            { .namespace = "core", .name = "curl", .version = "^1.0.0", .kind = SPN_INDEX_DEP_NORMAL },
-          },
-        },
-      },
-    },
-  });
-}
-
-UTEST_F(index_release, unknown_field) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "unknown_field.jsonl",
-    .expect = {
-      .releases = {
-        { .namespace = "core", .name = "spum", .version = "1.0.0" },
-      },
-    },
-  });
-}
-
-UTEST_F(index_release, targets_not_array) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "targets_not_array.jsonl",
-    .expect = {
-      .releases = {
-        { .namespace = "core", .name = "spum", .version = "1.0.0" },
-      },
-    },
-  });
-}
-
-UTEST_F(index_release, unsorted) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "unsorted.jsonl",
-    .expect = {
-      .releases = {
-        { .namespace = "core", .name = "spum", .version = "1.0.0" },
-        { .namespace = "core", .name = "spum", .version = "2.0.0" },
-        { .namespace = "core", .name = "spum", .version = "3.0.0" },
-      },
-    },
-  });
-}
-
-UTEST_F(index_release, blank_lines) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "blank_lines.jsonl",
-    .expect = {
-      .releases = {
-        { .namespace = "core", .name = "spum", .version = "1.0.0" },
-        { .namespace = "core", .name = "spum", .version = "2.0.0" },
-      },
-    },
-  });
-}
-
-UTEST_F(index_release, duplicate_version) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "duplicate_version.jsonl",
-    .expect = { .err = SPN_ERROR },
-  });
-}
-
-UTEST_F(index_release, version_missing) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "version_missing.jsonl",
-    .expect = { .err = SPN_ERROR },
-  });
-}
-
-UTEST_F(index_release, version_invalid) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "version_invalid.jsonl",
-    .expect = { .err = SPN_ERROR },
-  });
-}
-
-UTEST_F(index_release, version_noncanonical) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "version_noncanonical.jsonl",
-    .expect = { .err = SPN_ERROR },
-  });
-}
-
-UTEST_F(index_release, version_non_string) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "version_non_string.jsonl",
-    .expect = { .err = SPN_ERROR },
-  });
-}
-
-UTEST_F(index_release, name_mismatch) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "name_mismatch.jsonl",
-    .expect = { .err = SPN_ERROR },
-  });
-}
-
-UTEST_F(index_release, namespace_mismatch) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "namespace_mismatch.jsonl",
-    .expect = { .err = SPN_ERROR },
-  });
-}
-
-UTEST_F(index_release, empty) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "empty.jsonl",
-    .expect = { .err = SPN_ERROR },
-  });
-}
-
-UTEST_F(index_release, invalid_json) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "invalid_json.jsonl",
-    .expect = { .err = SPN_ERROR },
-  });
-}
-
-UTEST_F(index_release, non_object) {
-  run_release_test(utest_result, (release_test_t) {
-    .file = "non_object.jsonl",
-    .expect = { .err = SPN_ERROR },
-  });
+  return SP_OK;
 }

@@ -1,22 +1,21 @@
 #ifndef SPN_TEST_TOOLCHAIN_FIXTURE_H
 #define SPN_TEST_TOOLCHAIN_FIXTURE_H
 
-#include "sp.h"
-#include "test.h"
+#include "spn_test.h"
 #include "sha256/sha256.h"
 #include "toolchain/toolchain.h"
-
-#define EXPECT_STR(actual, cstr) EXPECT_TRUE(sp_str_equal((actual), sp_str_view(cstr)))
 
 #define FIXTURE_MAX_ARGS 2
 #define FIXTURE_MAX_HOSTS 2
 #define FIXTURE_MAX_TARGETS 4
 
-static const spn_triple_t HOST_X64_LINUX  = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU };
-static const spn_triple_t HOST_ARM_LINUX  = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU };
-static const spn_triple_t HOST_ARM_MACOS  = { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_NONE };
-static const spn_triple_t TARGET_WIN_GNU  = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU };
-static const spn_triple_t TARGET_WASM     = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_NONE };
+// Brace lists so the triples can appear in static row initializers; cast to
+// (spn_triple_t) at value use sites.
+#define HOST_X64_LINUX  { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU }
+#define HOST_ARM_LINUX  { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }
+#define HOST_ARM_MACOS  { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_NONE }
+#define TARGET_WIN_GNU  { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU }
+#define TARGET_WASM     { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_NONE }
 
 typedef struct {
   const c8* program;
@@ -61,98 +60,89 @@ static bool fixture_has_target(spn_toolchain_info_t* info, spn_triple_t target) 
   return false;
 }
 
-static void fixture_check_launcher(s32* utest_result, spn_toolchain_launcher_t launcher, fixture_launcher_t expect) {
+static sp_err_t fixture_check_launcher(sp_test_t* t, spn_toolchain_launcher_t launcher, fixture_launcher_t expect) {
   if (!expect.program) {
-    return;
+    return SP_OK;
   }
 
-  EXPECT_STR(launcher.program, expect.program);
+  sp_expect_str_eq_c(t, launcher.program, expect.program);
 
   u32 args = 0;
-  sp_carr_for(expect.args, it) {
-    if (!expect.args[it]) {
-      break;
-    }
-    args++;
+  sp_carr_detect_len(expect.args, args, expect.args[args]);
+
+  sp_must_eq(t, args, (u32)sp_da_size(launcher.args));
+  sp_for(it, args) {
+    sp_expect_str_eq_c(t, launcher.args[it], expect.args[it]);
   }
 
-  ASSERT_EQ(args, (u32)sp_da_size(launcher.args));
-  sp_for(it, args) {
-    EXPECT_STR(launcher.args[it], expect.args[it]);
-  }
+  return SP_OK;
 }
 
-static void fixture_check_host(s32* utest_result, spn_toolchain_host_t host, fixture_host_t expect) {
-  EXPECT_TRUE(fixture_triple_equal(host.triple, expect.triple));
+static sp_err_t fixture_check_host(sp_test_t* t, spn_toolchain_host_t host, fixture_host_t expect) {
+  sp_expect(t, fixture_triple_equal(host.triple, expect.triple));
 
   if (expect.url) {
-    EXPECT_STR(host.artifact.url, expect.url);
+    sp_expect_str_eq_c(t, host.artifact.url, expect.url);
   }
   if (expect.sha256) {
-    EXPECT_STR(host.artifact.sha256, expect.sha256);
+    sp_expect_str_eq_c(t, host.artifact.sha256, expect.sha256);
   }
   if (expect.mirrors) {
-    EXPECT_STR(host.artifact.mirror_list, expect.mirrors);
+    sp_expect_str_eq_c(t, host.artifact.mirror_list, expect.mirrors);
   }
+
+  return SP_OK;
 }
 
-static void fixture_check_entry(s32* utest_result, spn_toolchain_info_t* info, fixture_toolchain_t expect) {
+static sp_err_t fixture_check_entry(sp_test_t* t, spn_toolchain_info_t* info, fixture_toolchain_t expect) {
   if (expect.absent) {
-    EXPECT_FALSE(info);
-    return;
+    sp_expect(t, !info);
+    return SP_OK;
   }
-  ASSERT_TRUE(info);
+  sp_must(t, info);
 
   if (expect.version) {
-    EXPECT_STR(info->version, expect.version);
+    sp_expect_str_eq_c(t, info->version, expect.version);
   }
-  EXPECT_EQ((u32)expect.driver, (u32)info->driver);
-  EXPECT_EQ((u32)expect.source, (u32)info->source);
+  sp_expect_eq(t, (u32)expect.driver, (u32)info->driver);
+  sp_expect_eq(t, (u32)expect.source, (u32)info->source);
 
-  fixture_check_launcher(utest_result, info->compiler, expect.compiler);
-  fixture_check_launcher(utest_result, info->cxx, expect.cxx);
-  fixture_check_launcher(utest_result, info->linker, expect.linker);
-  fixture_check_launcher(utest_result, info->archiver, expect.archiver);
+  if (fixture_check_launcher(t, info->compiler, expect.compiler)) return SP_ERR;
+  if (fixture_check_launcher(t, info->cxx, expect.cxx)) return SP_ERR;
+  if (fixture_check_launcher(t, info->linker, expect.linker)) return SP_ERR;
+  if (fixture_check_launcher(t, info->archiver, expect.archiver)) return SP_ERR;
 
   u32 hosts = 0;
-  sp_carr_for(expect.hosts, it) {
-    if (!expect.hosts[it].url) {
-      break;
-    }
-    hosts++;
-  }
+  sp_carr_detect_len(expect.hosts, hosts, expect.hosts[hosts].url);
 
   u32 targets = 0;
-  sp_carr_for(expect.targets, it) {
-    if (fixture_triple_empty(expect.targets[it])) {
-      break;
-    }
-    targets++;
-  }
+  sp_carr_detect_len(expect.targets, targets, !fixture_triple_empty(expect.targets[targets]));
 
-  ASSERT_EQ(hosts, (u32)sp_da_size(info->hosts));
-  ASSERT_EQ(targets, (u32)sp_da_size(info->targets));
+  sp_must_eq(t, hosts, (u32)sp_da_size(info->hosts));
+  sp_must_eq(t, targets, (u32)sp_da_size(info->targets));
 
   sp_for(it, hosts) {
-    fixture_check_host(utest_result, info->hosts[it], expect.hosts[it]);
+    if (fixture_check_host(t, info->hosts[it], expect.hosts[it])) return SP_ERR;
   }
   sp_for(it, targets) {
-    EXPECT_TRUE(fixture_has_target(info, expect.targets[it]));
+    sp_expect(t, fixture_has_target(info, expect.targets[it]));
   }
+
+  return SP_OK;
 }
 
-static void fixture_read_json(s32* utest_result, const c8* file, sp_str_t* json) {
-  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
+static sp_err_t fixture_read_json(sp_test_t* t, const c8* file, sp_str_t* json) {
+  sp_mem_t mem = sp_test_arena(t);
   sp_str_t path = sp_fs_join_path(mem, sp_str_lit(TOOLCHAINS_DIR), sp_str_view(file));
-  ASSERT_EQ(SP_OK, sp_io_read_file(mem, path, json));
+  sp_must_ok(t, sp_io_read_file(mem, path, json));
+  return SP_OK;
 }
 
-static void fixture_catalog(s32* utest_result, spn_toolchain_catalog_t* catalog, const c8* file) {
-  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-
+static sp_err_t fixture_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog, const c8* file) {
   sp_str_t json = sp_zero;
-  fixture_read_json(utest_result, file, &json);
-  ASSERT_EQ(SPN_OK, spn_toolchain_catalog_init(catalog, json, mem));
+  if (fixture_read_json(t, file, &json)) return SP_ERR;
+  sp_must_eq(t, (u32)SPN_OK, (u32)spn_toolchain_catalog_init(catalog, json, sp_test_arena(t)));
+  return SP_OK;
 }
 
 static u32 fixture_catalog_size(spn_toolchain_catalog_t* catalog) {

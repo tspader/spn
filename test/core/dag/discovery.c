@@ -1,4 +1,4 @@
-#include "common.h"
+#include "dag_test.h"
 
 typedef struct {
   const c8* key;
@@ -21,77 +21,13 @@ typedef struct {
   discovery_expect_t expect;
 } discovery_test_t;
 
-UTEST_EMPTY_FIXTURE(discovery)
-
-static void discovery_put(spn_dag_obs_table_t* discovery, discovery_entry_t entry) {
-  spn_dag_obs_t obs [DAG_TEST_MAX_INPUTS] = sp_zero;
-  u32 count = dag_test_obs_build(entry.obs, DAG_TEST_MAX_INPUTS, obs);
-  spn_dag_obs_table_put(discovery, dag_test_digest(entry.key), obs, count);
-}
-
-static void discovery_expect_obs(s32* utest_result, const spn_dag_pathset_t* set, dag_test_obs_t* expect) {
-  spn_dag_obs_t obs [DAG_TEST_MAX_INPUTS] = sp_zero;
-  u32 count = dag_test_obs_build(expect, DAG_TEST_MAX_INPUTS, obs);
-  ASSERT_EQ(count, (u32)sp_da_size(set->obs));
-  sp_for(it, count) {
-    EXPECT_EQ(obs[it].kind, set->obs[it].kind);
-    EXPECT_TRUE(sp_str_equal(set->obs[it].path, obs[it].path));
-  }
-}
-
-static void discovery_expect(s32* utest_result, spn_dag_obs_table_t* discovery, const c8* key, discovery_expect_t expect) {
-  const spn_dag_pathset_t* set = spn_dag_obs_table_get(discovery, dag_test_digest(key));
-  EXPECT_EQ(expect.hit, set != SP_NULLPTR);
-  if (!expect.hit || !set) {
-    return;
-  }
-
-  discovery_expect_obs(utest_result, set, expect.obs);
-}
-
-static void run_test(s32* utest_result, discovery_test_t t) {
-  tmpfs_t fs = sp_zero;
-  tmpfs_init_named(&fs, t.name);
-  sp_str_t dir = tmpfs_get(&fs, sp_str_lit("manifests"));
-
-  spn_dag_roots_t storage = sp_zero;
-  const spn_dag_roots_t* roots = dag_test_roots_build(t.roots, &storage);
-
-  spn_dag_obs_table_t discovery = sp_zero;
-  spn_dag_obs_table_init(&discovery, fs.mem, dir, roots);
-
-  sp_carr_for(t.entries, it) {
-    if (!t.entries[it].key) {
-      break;
-    }
-    discovery_put(&discovery, t.entries[it]);
-  }
-
-  if (t.corrupt) {
-    sp_str_t hex = spn_dag_digest_hex(fs.mem, dag_test_digest(t.corrupt));
-    sp_str_t path = sp_fs_join_path(fs.mem, dir, sp_fmt(fs.mem, "{}.txt", sp_fmt_str(hex)).value);
-    ASSERT_EQ(SP_OK, sp_fs_create_file_cstr(path, "not json\n"));
-  }
-
-  spn_dag_roots_t restorage = sp_zero;
-  if (t.reload) {
-    spn_dag_obs_table_init(&discovery, fs.mem, dir, dag_test_roots_build(t.reroots, &restorage));
-  }
-
-  discovery_expect(utest_result, &discovery, t.key, t.expect);
-  tmpfs_deinit(&fs);
-}
-
-UTEST_F(discovery, missing_key_misses) {
-  run_test(&ur, (discovery_test_t) {
-    .name = "discovery_missing",
+static const discovery_test_t discovery_tests [] = {
+  {
+    .name = "missing_key_misses",
     .key = "K"
-  });
-}
-
-UTEST_F(discovery, stored_pathset_hits) {
-  run_test(&ur, (discovery_test_t) {
-    .name = "discovery_stored",
+  },
+  {
+    .name = "stored_pathset_hits",
     .entries = {
       {
         .key = "K",
@@ -109,23 +45,17 @@ UTEST_F(discovery, stored_pathset_hits) {
         { .kind = SPN_DAG_OBS_ABSENT, .path = "B" }
       }
     }
-  });
-}
-
-UTEST_F(discovery, empty_pathset_hits) {
-  run_test(&ur, (discovery_test_t) {
-    .name = "discovery_empty",
+  },
+  {
+    .name = "empty_pathset_hits",
     .entries = {
       { .key = "K" }
     },
     .key = "K",
     .expect = { .hit = true }
-  });
-}
-
-UTEST_F(discovery, keys_are_independent) {
-  run_test(&ur, (discovery_test_t) {
-    .name = "discovery_independent",
+  },
+  {
+    .name = "keys_are_independent",
     .entries = {
       { .key = "K", .obs = { { .path = "A" } } },
       { .key = "K2", .obs = { { .path = "B" } } }
@@ -135,12 +65,9 @@ UTEST_F(discovery, keys_are_independent) {
       .hit = true,
       .obs = { { .path = "A" } }
     }
-  });
-}
-
-UTEST_F(discovery, reload_roundtrips_manifest) {
-  run_test(&ur, (discovery_test_t) {
-    .name = "discovery_reload",
+  },
+  {
+    .name = "reload_roundtrips_manifest",
     .entries = {
       {
         .key = "K",
@@ -159,24 +86,18 @@ UTEST_F(discovery, reload_roundtrips_manifest) {
         { .kind = SPN_DAG_OBS_ABSENT, .path = "B" }
       }
     }
-  });
-}
-
-UTEST_F(discovery, corrupt_manifest_misses) {
-  run_test(&ur, (discovery_test_t) {
-    .name = "discovery_corrupt",
+  },
+  {
+    .name = "corrupt_manifest_misses",
     .entries = {
       { .key = "K", .obs = { { .path = "A" } } }
     },
     .corrupt = "K",
     .reload = true,
     .key = "K"
-  });
-}
-
-UTEST_F(discovery, new_pathset_replaces_existing) {
-  run_test(&ur, (discovery_test_t) {
-    .name = "discovery_replace",
+  },
+  {
+    .name = "new_pathset_replaces_existing",
     .entries = {
       { .key = "K", .obs = { { .path = "A" } } },
       { .key = "K", .obs = { { .path = "B" } } }
@@ -186,12 +107,9 @@ UTEST_F(discovery, new_pathset_replaces_existing) {
       .hit = true,
       .obs = { { .path = "B" } }
     }
-  });
-}
-
-UTEST_F(discovery, reload_relocates_paths) {
-  run_test(&ur, (discovery_test_t) {
-    .name = "discovery_relocate",
+  },
+  {
+    .name = "reload_relocates_paths",
     .entries = {
       {
         .key = "K",
@@ -214,5 +132,63 @@ UTEST_F(discovery, reload_relocates_paths) {
         { .path = "/X/H" }
       }
     }
-  });
+  },
+};
+
+static void discovery_put(spn_dag_obs_table_t* discovery, const discovery_entry_t* entry) {
+  spn_dag_obs_t obs [DAG_TEST_MAX_INPUTS] = sp_zero;
+  u32 count = dag_test_obs_build(entry->obs, DAG_TEST_MAX_INPUTS, obs);
+  spn_dag_obs_table_put(discovery, dag_test_digest(entry->key), obs, count);
+}
+
+static sp_err_t discovery_expect_obs(sp_test_t* t, const spn_dag_pathset_t* set, const dag_test_obs_t* expect) {
+  spn_dag_obs_t obs [DAG_TEST_MAX_INPUTS] = sp_zero;
+  u32 count = dag_test_obs_build(expect, DAG_TEST_MAX_INPUTS, obs);
+  sp_must_eq(t, count, (u32)sp_da_size(set->obs));
+  sp_for(it, count) {
+    sp_expect_eq(t, obs[it].kind, set->obs[it].kind);
+    sp_expect_str_eq(t, set->obs[it].path, obs[it].path);
+  }
+  return SP_OK;
+}
+
+static sp_err_t discovery_expect(sp_test_t* t, spn_dag_obs_table_t* discovery, const c8* key, const discovery_expect_t* expect) {
+  const spn_dag_pathset_t* set = spn_dag_obs_table_get(discovery, dag_test_digest(key));
+  sp_expect_eq(t, expect->hit, set != SP_NULLPTR);
+  if (!expect->hit || !set) {
+    return SP_OK;
+  }
+
+  return discovery_expect_obs(t, set, expect->obs);
+}
+
+sp_test_each(discovery, table, discovery_test_t, discovery_tests) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_str_t dir = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("manifests"));
+
+  spn_dag_roots_t storage = sp_zero;
+  const spn_dag_roots_t* roots = dag_test_roots_build(it->roots, &storage);
+
+  spn_dag_obs_table_t discovery = sp_zero;
+  spn_dag_obs_table_init(&discovery, mem, dir, roots);
+
+  sp_carr_for(it->entries, et) {
+    if (!it->entries[et].key) {
+      break;
+    }
+    discovery_put(&discovery, &it->entries[et]);
+  }
+
+  if (it->corrupt) {
+    sp_str_t hex = spn_dag_digest_hex(mem, dag_test_digest(it->corrupt));
+    sp_str_t path = sp_fs_join_path(mem, dir, sp_fmt(mem, "{}.txt", sp_fmt_str(hex)).value);
+    sp_must_eq(t, SP_OK, sp_fs_create_file_cstr(path, "not json\n"));
+  }
+
+  spn_dag_roots_t restorage = sp_zero;
+  if (it->reload) {
+    spn_dag_obs_table_init(&discovery, mem, dir, dag_test_roots_build(it->reroots, &restorage));
+  }
+
+  return discovery_expect(t, &discovery, it->key, &it->expect);
 }

@@ -1,5 +1,4 @@
-#include "common.h"
-#include "compiler/toc.h"
+#include "compiler.h"
 
 #define toc_syms_max 4
 #define toc_buf_max 4096
@@ -23,6 +22,7 @@ typedef struct {
 } toc_expect_t;
 
 typedef struct {
+  const c8* name;
   toc_format_t format;
   const c8* symbols [toc_syms_max];
   toc_expect_t expect;
@@ -225,11 +225,91 @@ static void build_archive(ar_buf_t* b, toc_format_t format, const c8* const* sym
   }
 }
 
-static void run_toc_test(s32* utest_result, toc_test_t t) {
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+static const toc_test_t tests [] = {
+  {
+    .name = "gnu",
+    .format = TOC_AR_GNU,
+    .symbols = { "A", "B" },
+    .expect = {
+      .symbols = { "A", "B" },
+    },
+  },
+  {
+    .name = "gnu_sym64",
+    .format = TOC_AR_GNU64,
+    .symbols = { "A", "B", "C" },
+    .expect = {
+      .symbols = { "A", "B", "C" },
+    },
+  },
+  {
+    .name = "gnu_no_symbols",
+    .format = TOC_AR_GNU,
+  },
+  {
+    .name = "thin",
+    .format = TOC_AR_THIN,
+    .symbols = { "A" },
+    .expect = {
+      .symbols = { "A" },
+    },
+  },
+  {
+    .name = "bsd",
+    .format = TOC_AR_BSD,
+    .symbols = { "A", "B" },
+    .expect = {
+      .symbols = { "A", "B" },
+    },
+  },
+  {
+    .name = "bsd_sorted_extended_name",
+    .format = TOC_AR_BSD_SORTED,
+    .symbols = { "A", "B" },
+    .expect = {
+      .symbols = { "A", "B" },
+    },
+  },
+  {
+    .name = "coff_second_linker_member_ignored",
+    .format = TOC_AR_COFF,
+    .symbols = { "A", "B" },
+    .expect = {
+      .symbols = { "A", "B" },
+    },
+  },
+  {
+    .name = "empty_archive",
+    .format = TOC_AR_EMPTY,
+  },
+  {
+    .name = "missing_symtab",
+    .format = TOC_AR_NO_SYMTAB,
+    .expect = {
+      .err = SPN_ERR_TOC_MISSING,
+    },
+  },
+  {
+    .name = "bad_magic",
+    .format = TOC_AR_BAD_MAGIC,
+    .expect = {
+      .err = SPN_ERR_TOC_MAGIC,
+    },
+  },
+  {
+    .name = "truncated_symtab",
+    .format = TOC_AR_TRUNCATED,
+    .expect = {
+      .err = SPN_ERR_TOC_TRUNCATED,
+    },
+  },
+};
+
+sp_test_each(toc, parse, toc_test_t, tests) {
+  sp_mem_t mem = sp_test_arena(t);
 
   ar_buf_t buf = sp_zero;
-  build_archive(&buf, t.format, t.symbols);
+  build_archive(&buf, it->format, it->symbols);
 
   sp_io_reader_t reader = sp_zero;
   sp_io_reader_from_mem(&reader, buf.data, buf.len);
@@ -237,123 +317,24 @@ static void run_toc_test(s32* utest_result, toc_test_t t) {
   spn_toc_parser_t toc;
   spn_err_t err = spn_toc_init(&toc, &reader);
 
-  sp_da(sp_str_t) symbols = sp_da_new(s.mem, sp_str_t);
+  sp_da(sp_str_t) symbols = sp_da_new(mem, sp_str_t);
   sp_str_t symbol = sp_zero;
   while (spn_toc_next(&toc, &symbol)) {
-    sp_da_push(symbols, sp_str_copy(s.mem, symbol));
+    sp_da_push(symbols, sp_str_copy(mem, symbol));
   }
   if (!err) {
     err = toc.err;
   }
-  EXPECT_EQ(err, t.expect.err);
+  sp_expect_eq(t, err, it->expect.err);
 
-  if (!t.expect.err) {
-    u32 count = count_symbols(t.expect.symbols);
-    ASSERT_EQ(sp_da_size(symbols), count);
-    sp_for(it, count) {
-      utest_kv("symbol", sp_str_view(t.expect.symbols[it]));
-      EXPECT_TRUE(sp_str_equal_cstr(symbols[it], t.expect.symbols[it]));
+  if (!it->expect.err) {
+    u32 count = count_symbols(it->expect.symbols);
+    sp_must_eq(t, count, sp_da_size(symbols));
+    sp_for(i, count) {
+      sp_test_kv(t, "symbol", sp_str_view(it->expect.symbols[i]));
+      sp_expect_str_eq_c(t, symbols[i], it->expect.symbols[i]);
     }
   }
 
-  sp_mem_end_scratch(s);
-}
-
-UTEST(toc, gnu) {
-  run_toc_test(utest_result, (toc_test_t) {
-    .format = TOC_AR_GNU,
-    .symbols = { "A", "B" },
-    .expect = {
-      .symbols = { "A", "B" },
-    },
-  });
-}
-
-UTEST(toc, gnu_sym64) {
-  run_toc_test(utest_result, (toc_test_t) {
-    .format = TOC_AR_GNU64,
-    .symbols = { "A", "B", "C" },
-    .expect = {
-      .symbols = { "A", "B", "C" },
-    },
-  });
-}
-
-UTEST(toc, gnu_no_symbols) {
-  run_toc_test(utest_result, (toc_test_t) {
-    .format = TOC_AR_GNU,
-  });
-}
-
-UTEST(toc, thin) {
-  run_toc_test(utest_result, (toc_test_t) {
-    .format = TOC_AR_THIN,
-    .symbols = { "A" },
-    .expect = {
-      .symbols = { "A" },
-    },
-  });
-}
-
-UTEST(toc, bsd) {
-  run_toc_test(utest_result, (toc_test_t) {
-    .format = TOC_AR_BSD,
-    .symbols = { "A", "B" },
-    .expect = {
-      .symbols = { "A", "B" },
-    },
-  });
-}
-
-UTEST(toc, bsd_sorted_extended_name) {
-  run_toc_test(utest_result, (toc_test_t) {
-    .format = TOC_AR_BSD_SORTED,
-    .symbols = { "A", "B" },
-    .expect = {
-      .symbols = { "A", "B" },
-    },
-  });
-}
-
-UTEST(toc, coff_second_linker_member_ignored) {
-  run_toc_test(utest_result, (toc_test_t) {
-    .format = TOC_AR_COFF,
-    .symbols = { "A", "B" },
-    .expect = {
-      .symbols = { "A", "B" },
-    },
-  });
-}
-
-UTEST(toc, empty_archive) {
-  run_toc_test(utest_result, (toc_test_t) {
-    .format = TOC_AR_EMPTY,
-  });
-}
-
-UTEST(toc, missing_symtab) {
-  run_toc_test(utest_result, (toc_test_t) {
-    .format = TOC_AR_NO_SYMTAB,
-    .expect = {
-      .err = SPN_ERR_TOC_MISSING,
-    },
-  });
-}
-
-UTEST(toc, bad_magic) {
-  run_toc_test(utest_result, (toc_test_t) {
-    .format = TOC_AR_BAD_MAGIC,
-    .expect = {
-      .err = SPN_ERR_TOC_MAGIC,
-    },
-  });
-}
-
-UTEST(toc, truncated_symtab) {
-  run_toc_test(utest_result, (toc_test_t) {
-    .format = TOC_AR_TRUNCATED,
-    .expect = {
-      .err = SPN_ERR_TOC_TRUNCATED,
-    },
-  });
+  return SP_OK;
 }

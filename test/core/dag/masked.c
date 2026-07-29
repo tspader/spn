@@ -1,4 +1,4 @@
-#include "common.h"
+#include "dag_test.h"
 
 typedef struct {
   dag_test_roots_t roots;
@@ -10,108 +10,89 @@ typedef struct {
 } masked_expect_t;
 
 typedef struct {
+  const c8* name;
   masked_input_t a;
   masked_input_t b;
   masked_expect_t expect;
 } masked_test_t;
 
-UTEST_EMPTY_FIXTURE(masked)
-
-static spn_dag_digest_t masked_digest(masked_input_t in) {
-  spn_dag_roots_t storage = sp_zero;
-  const spn_dag_roots_t* roots = dag_test_roots_build(in.roots, &storage);
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-  spn_dag_hash_masked(&ctx, roots, sp_str_view(in.str));
-  return spn_dag_hash_final(&ctx);
-}
-
-static void run_test(s32* utest_result, masked_test_t t) {
-  EXPECT_EQ(t.expect.equal, spn_dag_digest_equal(masked_digest(t.a), masked_digest(t.b)));
-}
-
-UTEST_F(masked, identical_inputs_match) {
-  run_test(&ur, (masked_test_t) {
+static const masked_test_t masked_tests [] = {
+  {
+    .name = "identical_inputs_match",
     .a = { .roots = { .project = "/A" }, .str = "-I/A/H" },
     .b = { .roots = { .project = "/A" }, .str = "-I/A/H" },
     .expect = { .equal = true }
-  });
-}
-
-UTEST_F(masked, relocated_root_matches) {
-  run_test(&ur, (masked_test_t) {
+  },
+  {
+    .name = "relocated_root_matches",
     .a = { .roots = { .project = "/A" }, .str = "-I/A/H" },
     .b = { .roots = { .project = "/B" }, .str = "-I/B/H" },
     .expect = { .equal = true }
-  });
-}
-
-UTEST_F(masked, mid_path_root_relocates) {
-  run_test(&ur, (masked_test_t) {
+  },
+  {
+    .name = "mid_path_root_relocates",
     .a = { .roots = { .project = "/A" }, .str = "/X/A/H" },
     .b = { .roots = { .project = "/B" }, .str = "/X/B/H" },
     .expect = { .equal = true }
-  });
-}
-
-UTEST_F(masked, every_occurrence_relocates) {
-  run_test(&ur, (masked_test_t) {
+  },
+  {
+    .name = "every_occurrence_relocates",
     .a = { .roots = { .project = "/A" }, .str = "-I/A/H -L/A/L" },
     .b = { .roots = { .project = "/B" }, .str = "-I/B/H -L/B/L" },
     .expect = { .equal = true }
-  });
-}
-
-UTEST_F(masked, root_at_end_relocates) {
-  run_test(&ur, (masked_test_t) {
+  },
+  {
+    .name = "root_at_end_relocates",
     .a = { .roots = { .project = "/A" }, .str = "-I/A" },
     .b = { .roots = { .project = "/B" }, .str = "-I/B" },
     .expect = { .equal = true }
-  });
-}
-
-UTEST_F(masked, unmatched_str_ignores_roots) {
-  run_test(&ur, (masked_test_t) {
+  },
+  {
+    .name = "unmatched_str_ignores_roots",
     .a = { .roots = { .project = "/A" }, .str = "H" },
     .b = { .str = "H" },
     .expect = { .equal = true }
-  });
-}
-
-UTEST_F(masked, longest_root_wins) {
-  run_test(&ur, (masked_test_t) {
+  },
+  {
+    .name = "longest_root_wins",
     .a = { .roots = { .project = "/A", .store = "/A/S" }, .str = "/A/S/H" },
     .b = { .roots = { .project = "/B", .store = "/C" }, .str = "/C/H" },
     .expect = { .equal = true }
-  });
-}
-
-UTEST_F(masked, literal_change_differs) {
-  run_test(&ur, (masked_test_t) {
+  },
+  {
+    .name = "literal_change_differs",
     .a = { .roots = { .project = "/A" }, .str = "-I/A/H" },
     .b = { .roots = { .project = "/A" }, .str = "-I/A/G" }
-  });
-}
-
-UTEST_F(masked, root_kind_change_differs) {
-  run_test(&ur, (masked_test_t) {
+  },
+  {
+    .name = "root_kind_change_differs",
     .a = { .roots = { .project = "/A", .store = "/B" }, .str = "-I/A/H" },
     .b = { .roots = { .project = "/A", .store = "/B" }, .str = "-I/B/H" }
-  });
-}
-
-UTEST_F(masked, boundary_violation_not_masked) {
-  run_test(&ur, (masked_test_t) {
+  },
+  {
+    .name = "boundary_violation_not_masked",
     .a = { .roots = { .project = "/A" }, .str = "/AB" },
     .b = { .roots = { .project = "/B" }, .str = "/BB" }
-  });
-}
-
-UTEST_F(masked, masked_root_differs_from_literal) {
-  run_test(&ur, (masked_test_t) {
+  },
+  {
+    .name = "masked_root_differs_from_literal",
     .a = { .roots = { .project = "/A" }, .str = "/A" },
     .b = { .str = "/A" }
-  });
+  },
+};
+
+static spn_dag_digest_t masked_digest(const masked_input_t* in) {
+  spn_dag_roots_t storage = sp_zero;
+  const spn_dag_roots_t* roots = dag_test_roots_build(in->roots, &storage);
+  spn_sha256_ctx_t ctx = sp_zero;
+  spn_sha256_init(&ctx);
+  spn_dag_hash_masked(&ctx, roots, sp_str_view(in->str));
+  return spn_dag_hash_final(&ctx);
+}
+
+sp_test_each(masked, digest, masked_test_t, masked_tests) {
+  sp_expect_eq(t, it->expect.equal, spn_dag_digest_equal(masked_digest(&it->a), masked_digest(&it->b)));
+  return SP_OK;
 }
 
 typedef struct {
@@ -119,19 +100,28 @@ typedef struct {
 } masked_strs_input_t;
 
 typedef struct {
+  const c8* name;
   masked_strs_input_t a;
   masked_strs_input_t b;
   masked_expect_t expect;
 } masked_strs_test_t;
 
-static spn_dag_digest_t masked_strs_digest(sp_mem_t mem, masked_strs_input_t in) {
+static const masked_strs_test_t masked_strs_tests [] = {
+  {
+    .name = "element_boundary_differs",
+    .a = { .strs = { "A", "B" } },
+    .b = { .strs = { "AB" } }
+  },
+};
+
+static spn_dag_digest_t masked_strs_digest(sp_mem_t mem, const masked_strs_input_t* in) {
   spn_dag_roots_t roots = sp_zero;
   sp_da(sp_str_t) strs = sp_da_new(mem, sp_str_t);
-  sp_carr_for(in.strs, it) {
-    if (!in.strs[it]) {
+  sp_carr_for(in->strs, it) {
+    if (!in->strs[it]) {
       break;
     }
-    sp_da_push(strs, sp_str_view(in.strs[it]));
+    sp_da_push(strs, sp_str_view(in->strs[it]));
   }
   spn_sha256_ctx_t ctx = sp_zero;
   spn_sha256_init(&ctx);
@@ -139,17 +129,10 @@ static spn_dag_digest_t masked_strs_digest(sp_mem_t mem, masked_strs_input_t in)
   return spn_dag_hash_final(&ctx);
 }
 
-static void run_strs_test(s32* utest_result, masked_strs_test_t t) {
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  spn_dag_digest_t a = masked_strs_digest(s.mem, t.a);
-  spn_dag_digest_t b = masked_strs_digest(s.mem, t.b);
-  EXPECT_EQ(t.expect.equal, spn_dag_digest_equal(a, b));
-  sp_mem_end_scratch(s);
-}
-
-UTEST_F(masked, element_boundary_differs) {
-  run_strs_test(&ur, (masked_strs_test_t) {
-    .a = { .strs = { "A", "B" } },
-    .b = { .strs = { "AB" } }
-  });
+sp_test_each(masked, strs, masked_strs_test_t, masked_strs_tests) {
+  sp_mem_t mem = sp_test_arena(t);
+  spn_dag_digest_t a = masked_strs_digest(mem, &it->a);
+  spn_dag_digest_t b = masked_strs_digest(mem, &it->b);
+  sp_expect_eq(t, it->expect.equal, spn_dag_digest_equal(a, b));
+  return SP_OK;
 }

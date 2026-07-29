@@ -1,4 +1,4 @@
-#include "test.h"
+#include "fixture.h"
 #if !defined(SP_WIN32)
   #include <unistd.h>
 #endif

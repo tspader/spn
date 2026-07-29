@@ -1,0 +1,131 @@
+#ifndef SPN_FIXTURE_H
+#define SPN_FIXTURE_H
+#include "sp.h"
+#include "sp/macro.h"
+
+#define r(str) str "\n"
+#define q(str) #str
+#define k(key) q(key) ": "
+#define kv(key, val) q(key) ": " #val
+
+#define ts(section) "[" q(section) "]\n"
+#define tk(key) q(key) " = "
+#define tkv(key, val) tk(key) #val
+#define tt(key, val) tk(key) #val
+
+#if defined(SP_ARM64)
+  #define SPN_TEST_ARCH "aarch64"
+#else
+  #define SPN_TEST_ARCH "x86_64"
+#endif
+
+#if defined(SP_MACOS)
+  #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-macos"
+#elif defined(SP_WIN32)
+  #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-windows-gnu"
+#else
+  #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-linux-gnu"
+#endif
+
+
+
+
+// TMPFS
+typedef struct {
+  sp_mem_t mem;
+  sp_str_t root;
+} tmpfs_t;
+
+void     tmpfs_init(tmpfs_t* fs);
+void     tmpfs_init_named(tmpfs_t* fs, const c8* test);
+void     tmpfs_set_top_level(sp_str_t root);
+sp_str_t tmpfs_get(tmpfs_t* fs, sp_str_t name);
+void     tmpfs_create(tmpfs_t* fs, sp_str_t path, sp_str_t content);
+sp_str_t tmpfs_touch(tmpfs_t* fs, sp_str_t path);
+void     tmpfs_deinit(tmpfs_t* fs);
+
+
+// REPO
+sp_str_t test_repo_root(sp_mem_t mem);
+sp_str_t test_repo_path(sp_mem_t mem, sp_str_t rel);
+
+
+// GIT
+void     git_repo_create_from_dir(sp_str_t source, sp_str_t repo);
+void     git_repo_init(sp_str_t repo);
+void     git_repo_commit_from_dir(sp_str_t source, sp_str_t repo, sp_str_t message);
+sp_str_t git_repo_head(sp_str_t repo);
+void     git_repo_stage_all(sp_str_t repo);
+void     git_repo_commit(sp_str_t repo, sp_str_t message);
+
+// GIT FIXTURE BUILDER
+//
+// Declarative helpers for creating git repos with known file content at known
+// commits. Each commit replaces the entire working tree.
+//
+// Usage:
+//   git_repo_result_t repo = git_repo_build(&fs, "my-repo", &(git_repo_fixture_t) {
+//     .commits = {
+//       { .message = "initial",  .files = { { "lib.h", "#pragma once" } } },
+//       { .message = "add impl", .files = { { "lib.h", "#pragma once" }, { "lib.c", "int x;" } } },
+//     },
+//   });
+//
+// Each commit replaces the entire working tree (like git_repo_commit_from_dir).
+// repo.commits[i] holds the short SHA for commit i.
+// repo.path is the absolute path to the created repo.
+
+typedef struct {
+  const c8* path;
+  const c8* content;
+} git_repo_file_t;
+
+typedef struct {
+  const c8* message;
+  git_repo_file_t files[8];
+} git_repo_commit_t;
+
+typedef struct {
+  const c8* file;
+  const c8* content;
+} git_repo_expect_file_t;
+
+typedef struct {
+  u32 num_commits;
+  git_repo_expect_file_t commits[8][8];
+  const c8* missing[8][8];
+} git_repo_expect_t;
+
+typedef struct {
+  const c8* name;
+  git_repo_commit_t commits[8];
+  git_repo_expect_t expect;
+} git_repo_fixture_t;
+
+typedef struct {
+  sp_str_t path;
+  sp_str_t commits[8];
+  u32 commit_count;
+} git_repo_result_t;
+
+git_repo_result_t git_repo_build(tmpfs_t* fs, const c8* name, git_repo_fixture_t* fixture);
+git_repo_result_t git_repo_build_at(sp_str_t dir, const c8* name, git_repo_fixture_t* fixture);
+sp_str_t          git_repo_file_at(sp_str_t repo, sp_str_t commit, sp_str_t path);
+
+bool str_equal(sp_str_t a, sp_str_t b);
+
+static inline sp_str_t test_read_file(sp_mem_t mem, sp_str_t path) {
+  sp_str_t content = sp_zero;
+  sp_io_read_file(mem, path, &content);
+  return content;
+}
+
+static inline bool test_read_eq(sp_mem_t mem, sp_str_t path, const c8* expect) {
+  return sp_str_equal(test_read_file(mem, path), sp_str_view(expect));
+}
+
+static inline bool test_read_empty(sp_mem_t mem, sp_str_t path) {
+  return sp_str_empty(test_read_file(mem, path));
+}
+
+#endif
