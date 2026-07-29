@@ -121,7 +121,7 @@ UTEST_F(target, selection_name_respects_kind) {
     .copy = { "spum.c", "script.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--lib", "main" }, .rc = 1 } },
-      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("is not defined for the selected target kinds") },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_TARGET_SELECTION } },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("bin/main") },
     },
   });

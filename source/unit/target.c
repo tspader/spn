@@ -94,15 +94,14 @@ static spn_err_union_t set_target_kind(spn_session_t* s, spn_target_unit_t* targ
         };
 
         if (spn_target_select_lib_kind(info, query, &target->lib_kind)) {
-          sp_str_t requested = spn_linkage_to_str(query.config.some ? query.config.value : query.linkage);
-          sp_str_t requester = query.config.some ? sp_str_lit("the root manifest") : sp_str_lit("the profile");
-          spn_log_error(
-            "{.cyan} doesn't support {.yellow} ({} requested it)",
-            SP_FMT_STR(target->pkg->info->name),
-            SP_FMT_STR(requested),
-            SP_FMT_STR(requester)
-          );
-          return spn_err_reported(SPN_ERROR);
+          return (spn_err_union_t) {
+            .kind = SPN_ERR_TARGET_LINKAGE,
+            .target = {
+              .pkg = target->pkg->info->name,
+              .requested = spn_linkage_to_str(query.config.some ? query.config.value : query.linkage),
+              .requester = query.config.some ? sp_str_lit("the root manifest") : sp_str_lit("the profile"),
+            },
+          };
         }
       }
 
@@ -123,12 +122,13 @@ static spn_err_union_t set_target_kind(spn_session_t* s, spn_target_unit_t* targ
 static spn_err_union_t ensure_target(spn_session_t* s, spn_pkg_unit_t* pkg, spn_target_info_t* info, spn_target_unit_t** result) {
   spn_target_unit_t* target = spn_session_find_target_in_pkg(s, pkg, info->name);
   if (target && target->info != info) {
-    spn_log_error(
-      "{.cyan} declares a target {.yellow}, which collides with another target of the same name",
-      SP_FMT_STR(pkg->info->name),
-      SP_FMT_STR(info->name)
-    );
-    return spn_err_reported(SPN_ERROR);
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_TARGET_DUPLICATE,
+      .target = {
+        .pkg = pkg->info->name,
+        .name = info->name,
+      },
+    };
   }
   if (!target) {
     target = add_target(s, pkg, info);
@@ -540,8 +540,10 @@ static spn_err_union_t resolve_target_deps(spn_session_t* s, sp_da(spn_target_un
 
       spn_target_unit_t* target = spn_session_find_target_in_pkg(s, unit->pkg, unit->info->deps[jt]);
       if (!target) {
-        spn_log_error("failed to find {.cyan} as a package or target", SP_FMT_STR(unit->info->deps[jt]));
-        return spn_err_reported(SPN_ERROR);
+        return (spn_err_union_t) {
+          .kind = SPN_ERR_TARGET_DEP,
+          .target = { .name = unit->info->deps[jt] },
+        };
       }
       sp_da_push(unit->deps, target);
     }
@@ -671,8 +673,10 @@ static spn_err_union_t validate_target_selection(const spn_target_selection_t* s
       if (target_selection_matches_name(selection, pkg, name)) {
         continue;
       }
-      spn_log_error("target {.yellow} is not defined for the selected target kinds", SP_FMT_STR(name));
-      return spn_err_reported(SPN_ERROR);
+      return (spn_err_union_t) {
+        .kind = SPN_ERR_TARGET_SELECTION,
+        .target = { .name = name },
+      };
     }
   }
   return spn_result(SPN_OK);
@@ -687,12 +691,13 @@ static spn_err_union_t add_plan_targets(spn_session_t* s, spn_build_plan_t* plan
 
     bool staged_at_root = info->kind == SPN_TARGET_EXE || info->kind == SPN_TARGET_SCRIPT;
     if (staged_at_root && exe_name_reserved(info->name)) {
-      spn_log_error(
-        "{.cyan} names an executable {.yellow}, which collides with a build output directory (store, work, test)",
-        SP_FMT_STR(pkg->info->name),
-        SP_FMT_STR(info->name)
-      );
-      return spn_err_reported(SPN_ERROR);
+      return (spn_err_union_t) {
+        .kind = SPN_ERR_TARGET_RESERVED,
+        .target = {
+          .pkg = pkg->info->name,
+          .name = info->name,
+        },
+      };
     }
 
     spn_target_unit_t* target = SP_NULLPTR;

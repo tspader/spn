@@ -1,8 +1,6 @@
 #include "sp.h"
-#include "utest.h"
-#include "test.h"
-#include "action.h"
-#include "harness.h"
+#include "spit.h"
+#include "spit_harness.h"
 #include "error/error.h"
 #include "triple/triple.h"
 #include "yyjson.h"
@@ -13,7 +11,10 @@ static const c8* event_names[SPN_EVENT_COUNT] = {
 };
 #undef SPN_EVENT_NAME
 
-static sp_mem_t layout_mem(void) {
+#define expect_path(t, fixture, path) expect_exists(t, fixture, path, true, __FILE__, __LINE__)
+#define expect_no_path(t, fixture, path) expect_exists(t, fixture, path, false, __FILE__, __LINE__)
+
+static sp_mem_t layout_mem() {
   return sp_mem_os_new();
 }
 
@@ -67,8 +68,6 @@ static sp_str_t exe_file_name(const c8* name, const c8* triple) {
   if (triple) {
     target = spn_triple_merge(target, spn_triple_from_str(sp_str_view(triple)));
   }
-  // Names that already carry an extension (spum.dll and friends coming
-  // through the staged-lib helpers) pass through untouched
   if (sp_str_find_c8(sp_fs_get_name(sp_str_view(name)), '.') >= 0) {
     return sp_str_view(name);
   }
@@ -79,8 +78,6 @@ sp_str_t profile_exe(const c8* profile, const c8* name) {
   return layout_path(SP_NULLPTR, profile, exe_file_name(name, SP_NULLPTR));
 }
 
-// Everything under store/bin is an executable; append the platform suffix so
-// tests can name binaries plainly
 static const c8* store_rest(const c8* rest, const c8* triple) {
   if (sp_str_starts_with(sp_str_view(rest), sp_str_lit("bin/"))) {
     return sp_str_to_cstr(layout_mem(), exe_file_name(rest, triple));
@@ -117,7 +114,7 @@ sp_str_t target_store_file(const c8* rest, const c8* triple) {
   return layout_path(triple, "debug", layout_sub("store", store_rest(rest, triple)));
 }
 
-static void fixture_write_file(sp_str_t path, sp_str_t content) {
+static void write_file(sp_str_t path, sp_str_t content) {
   sp_str_t parent = sp_fs_parent_path(path);
   if (!sp_str_empty(parent)) {
     sp_fs_create_dir(parent);
@@ -129,32 +126,55 @@ static void fixture_write_file(sp_str_t path, sp_str_t content) {
   sp_io_file_writer_close(&f);
 }
 
-void copy_project_path(s32* result, tmpfs_t* fs, sp_str_t project, sp_str_t relative) {
-  UTEST_RESULT(result);
+fixture_t fixture_new(sp_test_t* t) {
+  fixture_t fixture = {
+    .mem = sp_test_arena(t),
+    .root = sp_test_dir(t),
+  };
+  fixture_setup_paths(&fixture);
+  return fixture;
+}
 
-  sp_str_t from = sp_fs_join_path(fs->mem, project, relative);
+void fixture_setup_paths(fixture_t* fixture) {
+  sp_mem_t mem = fixture->mem;
+  fixture->paths.root = test_repo_root(mem);
+#if defined(SPN_TEST_BIN)
+  fixture->paths.spn = test_repo_path(mem, sp_str_lit(SPN_TEST_BIN));
+#else
+  fixture->paths.spn = test_repo_path(mem, exe("spn"));
+#endif
+}
 
-  // there is no reason to specify something that does not exist
+sp_str_t fixture_path(fixture_t* fixture, sp_str_t relative) {
+  return sp_fs_join_path(fixture->mem, fixture->root, relative);
+}
+
+void fixture_create(fixture_t* fixture, sp_str_t relative, sp_str_t content) {
+  write_file(fixture_path(fixture, relative), content);
+}
+
+sp_err_t copy_project_path(sp_test_t* t, fixture_t* fixture, sp_str_t project, sp_str_t relative) {
+  sp_str_t from = sp_fs_join_path(fixture->mem, project, relative);
+
   if (sp_fs_is_glob(from)) {
-    ASSERT_TRUE(sp_fs_exists(sp_fs_parent_path(from)));
+    sp_must(t, sp_fs_exists(sp_fs_parent_path(from)));
   } else {
-    ASSERT_TRUE(sp_fs_exists(from));
+    sp_must(t, sp_fs_exists(from));
   }
 
-  sp_str_t to = fs->root;
+  sp_str_t to = fixture->root;
 
-  // we never want to change paths inside the test harness; always 1:1
   sp_str_t parent = sp_fs_parent_path(relative);
   if (!sp_str_empty(parent)) {
-    to = tmpfs_get(fs, parent);
+    to = fixture_path(fixture, parent);
     sp_fs_create_dir(to);
   }
 
-  // source exists, destination exists, copy
   sp_fs_copy(from, to);
+  return SP_OK;
 }
 
-s32 sort_dirs_by_name(const void* a, const void* b) {
+static s32 sort_dirs_by_name(const void* a, const void* b) {
   const sp_fs_entry_t* lhs = (const sp_fs_entry_t*)a;
   const sp_fs_entry_t* rhs = (const sp_fs_entry_t*)b;
   return sp_str_sort_kernel_alphabetical(&lhs->name, &rhs->name);
@@ -180,12 +200,8 @@ static sp_str_t ps_command_line(sp_mem_t mem, const sp_ps_config_t* config) {
   return sp_str_join_n(mem, parts, sp_da_size(parts), sp_str_lit(" "));
 }
 
-// Publish one committed manifest checkout into the fixture's filesystem
-// index with the real spn binary, so fixture index entries are whatever
-// publish actually produces
-static void fixture_publish(s32* result, fixture_t* fixture, sp_str_t repo, sp_str_t url, sp_str_t rev) {
-  UTEST_RESULT(result);
-  sp_mem_t mem = fixture->fs.mem;
+static sp_err_t fixture_publish(sp_test_t* t, fixture_t* fixture, sp_str_t repo, sp_str_t url, sp_str_t rev) {
+  sp_mem_t mem = fixture->mem;
 
   sp_ps_config_t config = {
     .command = fixture->paths.spn,
@@ -210,23 +226,22 @@ static void fixture_publish(s32* result, fixture_t* fixture, sp_str_t repo, sp_s
   sp_ps_config_add_arg(mem, &config, rev);
 
   sp_ps_output_t output = sp_ps_run(mem, config);
-  utest_kv("command", ps_command_line(mem, &config));
-  utest_kv("cwd", repo);
-  utest_kv("output", output.out);
-  ASSERT_EQ(0, output.status.exit_code);
+  sp_test_kv(t, "command", ps_command_line(mem, &config));
+  sp_test_kv(t, "cwd", repo);
+  sp_test_kv(t, "output", output.out);
+  sp_must_eq(t, 0, output.status.exit_code);
+  return SP_OK;
 }
 
-void setup_fixture_index_from_remote(s32* result, fixture_t* fixture, sp_str_t project) {
-  UTEST_RESULT(result);
-  tmpfs_t* fs = &fixture->fs;
-  sp_mem_t mem = fs->mem;
+sp_err_t setup_fixture_index_from_remote(sp_test_t* t, fixture_t* fixture, sp_str_t project) {
+  sp_mem_t mem = fixture->mem;
 
   sp_str_t remote = sp_fs_join_path(mem, project, sp_str_lit("remote"));
   if (!sp_fs_exists(remote)) {
-    return;
+    return SP_OK;
   }
 
-  ASSERT_TRUE(sp_fs_is_dir(remote));
+  sp_must(t, sp_fs_is_dir(remote));
 
   sp_str_t raw = sp_fs_join_path(mem, project, sp_str_lit("index"));
 
@@ -241,29 +256,27 @@ void setup_fixture_index_from_remote(s32* result, fixture_t* fixture, sp_str_t p
     }
 
     sp_da(sp_fs_entry_t) versions = sp_fs_collect(mem, entry->path);
-    ASSERT_FALSE(sp_da_empty(versions));
+    sp_must(t, !sp_da_empty(versions));
     sp_da_sort(versions, sort_dirs_by_name);
 
-    sp_str_t repo = tmpfs_get(fs, sp_fs_join_path(mem, sp_str_lit("remote"), entry->name));
+    sp_str_t repo = fixture_path(fixture, sp_fs_join_path(mem, sp_str_lit("remote"), entry->name));
     git_repo_init(repo);
     sp_da_push(subs, ((fixture_sub_t) {
       .token = sp_fmt(mem, "@{}.url@", sp_fmt_str(entry->name)).value,
       .value = sp_str_replace_c8(mem, repo, '\\', '/'),
     }));
 
-    // recipes/<pkg>/<version>/ holds a separate manifest repo for packages
-    // whose recipe is published apart from their source
     sp_str_t recipe_versions = sp_fs_join_path(mem, recipes, entry->name);
     bool split = sp_fs_is_dir(recipe_versions);
     sp_str_t recipe_repo = sp_str_lit("");
     if (split) {
-      recipe_repo = tmpfs_get(fs, sp_fs_join_path(mem, sp_str_lit("recipes"), entry->name));
+      recipe_repo = fixture_path(fixture, sp_fs_join_path(mem, sp_str_lit("recipes"), entry->name));
       git_repo_init(recipe_repo);
     }
 
     sp_da_for(versions, v) {
       sp_fs_entry_t* dir = &versions[v];
-      ASSERT_TRUE(sp_fs_is_dir(dir->path));
+      sp_must(t, sp_fs_is_dir(dir->path));
 
       git_repo_commit_from_dir(dir->path, repo, dir->name);
       sp_str_t commit = git_repo_head(repo);
@@ -279,12 +292,10 @@ void setup_fixture_index_from_remote(s32* result, fixture_t* fixture, sp_str_t p
       if (split) {
         sp_str_t recipe_dir = sp_fs_join_path(mem, recipe_versions, dir->name);
         sp_str_t recipe_manifest = sp_fs_join_path(mem, recipe_dir, sp_str_lit("spn.toml"));
-        ASSERT_TRUE(sp_fs_exists(recipe_manifest));
+        sp_must(t, sp_fs_exists(recipe_manifest));
 
         git_repo_commit_from_dir(recipe_dir, recipe_repo, dir->name);
 
-        // The recipe manifest names its upstream with @<pkg>.url@ and
-        // @<pkg>.commit@ tokens, which resolve to this version's source
         sp_str_t content = test_read_file(mem, recipe_manifest);
         content = str_replace_all(mem, content,
           sp_fmt(mem, "@{}.url@", sp_fmt_str(entry->name)).value,
@@ -292,24 +303,21 @@ void setup_fixture_index_from_remote(s32* result, fixture_t* fixture, sp_str_t p
         content = str_replace_all(mem, content,
           sp_fmt(mem, "@{}.commit@", sp_fmt_str(entry->name)).value,
           commit);
-        fixture_write_file(sp_fs_join_path(mem, recipe_repo, sp_str_lit("spn.toml")), content);
+        write_file(sp_fs_join_path(mem, recipe_repo, sp_str_lit("spn.toml")), content);
         git_repo_stage_all(recipe_repo);
         git_repo_commit(recipe_repo, dir->name);
 
-        fixture_publish(result, fixture, recipe_repo, recipe_repo, git_repo_head(recipe_repo));
+        sp_try(fixture_publish(t, fixture, recipe_repo, recipe_repo, git_repo_head(recipe_repo)));
       }
       else {
         sp_str_t source_manifest = sp_fs_join_path(mem, dir->path, sp_str_lit("spn.toml"));
-        ASSERT_TRUE(sp_fs_exists(source_manifest));
+        sp_must(t, sp_fs_exists(source_manifest));
 
-        fixture_publish(result, fixture, repo, repo, commit);
+        sp_try(fixture_publish(t, fixture, repo, repo, commit));
       }
     }
   }
 
-  // A fixture with an index/ dir writes its entries verbatim (with repo
-  // tokens substituted) instead of publishing: coverage for entries that
-  // predate whatever publish currently emits
   if (sp_fs_is_dir(raw)) {
     sp_da(sp_fs_entry_t) namespaces = sp_fs_collect(mem, raw);
     sp_da_for(namespaces, nt) {
@@ -323,12 +331,13 @@ void setup_fixture_index_from_remote(s32* result, fixture_t* fixture, sp_str_t p
         sp_da_for(subs, st) {
           content = str_replace_all(mem, content, subs[st].token, subs[st].value);
         }
-        fixture_write_file(
+        write_file(
           sp_fs_join_path(mem, sp_fs_join_path(mem, fixture->paths.index, ns->name), files[ft].name),
           content);
       }
     }
   }
+  return SP_OK;
 }
 
 static sp_str_t str_replace_all(sp_mem_t mem, sp_str_t str, sp_str_t needle, sp_str_t repl) {
@@ -347,17 +356,15 @@ static sp_str_t str_replace_all(sp_mem_t mem, sp_str_t str, sp_str_t needle, sp_
   return sp_io_dyn_mem_writer_take_str(&b);
 }
 
-// @spader use sp_template.h
-void setup_fixture_source_repos(s32* result, fixture_t* fixture, sp_str_t project) {
-  UTEST_RESULT(result);
-  sp_mem_t mem = fixture->fs.mem;
+sp_err_t setup_fixture_source_repos(sp_test_t* t, fixture_t* fixture, sp_str_t project) {
+  sp_mem_t mem = fixture->mem;
 
   sp_str_t source = sp_fs_join_path(mem, project, sp_str_lit("source"));
   if (!sp_fs_exists(source)) {
-    return;
+    return SP_OK;
   }
 
-  ASSERT_TRUE(sp_fs_is_dir(source));
+  sp_must(t, sp_fs_is_dir(source));
 
   struct { sp_str_t token; sp_str_t value; } subs[16];
   s32 num_subs = 0;
@@ -369,13 +376,13 @@ void setup_fixture_source_repos(s32* result, fixture_t* fixture, sp_str_t projec
       continue;
     }
 
-    sp_str_t repo = tmpfs_get(&fixture->fs, sp_fs_join_path(mem, sp_str_lit("source"), entry->name));
+    sp_str_t repo = fixture_path(fixture, sp_fs_join_path(mem, sp_str_lit("source"), entry->name));
     git_repo_init(repo);
     git_repo_commit_from_dir(entry->path, repo, sp_str_lit("source"));
     sp_str_t commit = git_repo_head(repo);
     sp_str_t url = sp_str_replace_c8(mem, repo, '\\', '/');
 
-    ASSERT_TRUE(num_subs + 2 <= (s32)sp_carr_len(subs));
+    sp_must(t, num_subs + 2 <= (s32)sp_carr_len(subs));
     subs[num_subs].token = sp_fmt(mem, "@{}.url@", sp_fmt_str(entry->name)).value;
     subs[num_subs].value = url;
     num_subs++;
@@ -385,10 +392,10 @@ void setup_fixture_source_repos(s32* result, fixture_t* fixture, sp_str_t projec
   }
 
   if (num_subs == 0) {
-    return;
+    return SP_OK;
   }
 
-  sp_da(sp_fs_entry_t) files = sp_fs_collect_recursive(mem, fixture->fs.root);
+  sp_da(sp_fs_entry_t) files = sp_fs_collect_recursive(mem, fixture->root);
   sp_da_for(files, it) {
     sp_fs_entry_t* file = &files[it];
     if (sp_fs_is_dir(file->path)) {
@@ -407,15 +414,16 @@ void setup_fixture_source_repos(s32* result, fixture_t* fixture, sp_str_t projec
     }
 
     if (changed) {
-      fixture_write_file(file->path, content);
+      write_file(file->path, content);
     }
   }
+  return SP_OK;
 }
 
-void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t toolchain, sp_str_t config) {
-  sp_str_t path = tmpfs_get(fs, sp_str_lit(".envrc"));
+void setup_fixture_envrc(fixture_t* fixture, sp_str_t storage, sp_str_t toolchain, sp_str_t config) {
+  sp_str_t path = fixture_path(fixture, sp_str_lit(".envrc"));
   sp_str_t content = sp_fmt(
-    fs->mem,
+    fixture->mem,
     "export SPN_STORAGE_DIR={}\n"
     "export SPN_TOOLCHAIN_DIR={}\n"
     "export SPN_CONFIG_DIR={}\n",
@@ -423,11 +431,11 @@ void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t toolchain, sp_s
     sp_fmt_str(toolchain),
     sp_fmt_str(config)
   ).value;
-  fixture_write_file(path, content);
+  write_file(path, content);
 }
 
-void setup_fixture_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir) {
-  sp_mem_t mem = fs->mem;
+void setup_fixture_config(fixture_t* fixture, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir) {
+  sp_mem_t mem = fixture->mem;
   sp_str_t spn_config_dir = sp_fs_join_path(mem, config_dir, sp_str_lit("spn"));
   sp_fs_create_dir(spn_config_dir);
 
@@ -443,46 +451,28 @@ void setup_fixture_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t index_dir, 
     sp_fmt_str(sp_str_replace_c8(mem, spn_dir, '\\', '/')),
     sp_fmt_str(sp_str_replace_c8(mem, index_dir, '\\', '/'))
   ).value;
-  fixture_write_file(config_path, content);
+  write_file(config_path, content);
 }
 
-void setup_e2e_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t spn_dir, sp_str_t index_url, sp_str_t index_rev) {
-  sp_mem_t mem = fs->mem;
-  sp_str_t spn_config_dir = sp_fs_join_path(mem, config_dir, sp_str_lit("spn"));
-  sp_fs_create_dir(spn_config_dir);
-
-  sp_str_t config_path = sp_fs_join_path(mem, spn_config_dir, sp_str_lit("spn.toml"));
-  sp_str_t content = sp_fmt(
-    mem,
-    "spn = \"{}\"\n"
-    "\n"
-    "[[index]]\n"
-    "name = \"core\"\n"
-    "url = \"{}\"\n"
-    "protocol = \"git\"\n"
-    "rev = \"{}\"\n",
-    sp_fmt_str(sp_str_replace_c8(mem, spn_dir, '\\', '/')),
-    sp_fmt_str(index_url),
-    sp_fmt_str(index_rev)
-  ).value;
-  fixture_write_file(config_path, content);
-}
-
-void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, bool expected, const c8* file, u32 line) {
+sp_err_t expect_exists(sp_test_t* t, fixture_t* fixture, sp_str_t path, bool expected, const c8* file, u32 line) {
   bool exists = sp_fs_exists(path);
-  if (exists == expected) return;
+  if (exists == expected) return SP_OK;
 
-  if (fs) {
-    utest_kv("root", fs->root);
-    sp_str_t relative = sp_str_strip_left(path, fs->root);
+  if (fixture) {
+    sp_test_kv(t, "root", fixture->root);
+    sp_str_t relative = sp_str_strip_left(path, fixture->root);
     if (relative.len != path.len) {
       path = sp_str_concat(sp_mem_get_scratch(), sp_str_lit("$test"), relative);
     }
   }
-  utest_kv("path", path);
-  utest_fail(utest_result, file, line,
-    sp_str_view(expected ? "path exists" : "path does not exist"),
-    sp_str_view(exists ? "it exists" : "it does not"));
+  sp_test_kv(t, "path", path);
+  sp_test_record(t, (sp_test_failure_t) {
+    .file = sp_cstr_as_str(file),
+    .line = line,
+    .expected = sp_cstr_as_str(expected ? "path exists" : "path does not exist"),
+    .actual = sp_cstr_as_str(exists ? "it exists" : "it does not"),
+  });
+  return SP_ERR;
 }
 
 static bool event_matches(yyjson_val* line, const c8* event, const c8* key, const c8* value) {
@@ -506,7 +496,7 @@ static bool event_matches(yyjson_val* line, const c8* event, const c8* key, cons
 
 static u32 count_events(fixture_t* fixture, spn_build_event_kind_t kind, const c8* key, const c8* value) {
   const c8* event = event_names[kind];
-  sp_mem_t mem = fixture->fs.mem;
+  sp_mem_t mem = fixture->mem;
   sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
 
   sp_str_t content = sp_zero;
@@ -528,9 +518,9 @@ static u32 count_events(fixture_t* fixture, spn_build_event_kind_t kind, const c
   return count;
 }
 
-static void expect_event(s32* utest_result, fixture_t* fixture, spn_build_event_kind_t kind, const c8* key, const c8* value, bool expected, const c8* file, u32 line) {
+static sp_err_t expect_event(sp_test_t* t, fixture_t* fixture, spn_build_event_kind_t kind, const c8* key, const c8* value, bool expected, const c8* file, u32 line) {
   const c8* event = event_names[kind];
-  sp_mem_t mem = fixture->fs.mem;
+  sp_mem_t mem = fixture->mem;
   sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
 
   sp_str_t content = sp_zero;
@@ -549,22 +539,26 @@ static void expect_event(s32* utest_result, fixture_t* fixture, spn_build_event_
     if (found) break;
   }
 
-  if (found == expected) return;
+  if (found == expected) return SP_OK;
 
-  utest_kv("event", sp_str_view(event));
+  sp_test_kv(t, "event", sp_str_view(event));
   if (key) {
-    utest_kv("field", sp_fmt(mem, "{} = {}",
+    sp_test_kv(t, "field", sp_fmt(mem, "{} = {}",
       sp_fmt_cstr(key),
       sp_fmt_cstr(value)).value);
   }
-  utest_kv("log", path);
-  utest_fail(utest_result, file, line,
-    sp_str_view(expected ? "event logged" : "event not logged"),
-    sp_str_view(found ? "it was logged" : "it was not"));
+  sp_test_kv(t, "log", path);
+  sp_test_record(t, (sp_test_failure_t) {
+    .file = sp_cstr_as_str(file),
+    .line = line,
+    .expected = sp_cstr_as_str(expected ? "event logged" : "event not logged"),
+    .actual = sp_cstr_as_str(found ? "it was logged" : "it was not"),
+  });
+  return SP_ERR;
 }
 
-static void expect_result(s32* utest_result, fixture_t* fixture, spn_err_t err, const c8* file, u32 line) {
-  sp_mem_t mem = fixture->fs.mem;
+static sp_err_t expect_result(sp_test_t* t, fixture_t* fixture, spn_err_t err, const c8* file, u32 line) {
+  sp_mem_t mem = fixture->mem;
   sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
 
   sp_str_t content = sp_zero;
@@ -587,19 +581,23 @@ static void expect_result(s32* utest_result, fixture_t* fixture, spn_err_t err, 
     yyjson_doc_free(doc);
   }
 
-  if (actual && sp_cstr_equal(actual, spn_err_to_str(err))) return;
+  if (actual && sp_cstr_equal(actual, spn_err_to_str(err))) return SP_OK;
 
-  utest_kv("log", path);
-  utest_fail(utest_result, file, line,
-    sp_cstr_as_str(spn_err_to_str(err)),
-    actual ? sp_cstr_as_str(actual) : sp_str_lit("no result event"));
+  sp_test_kv(t, "log", path);
+  sp_test_record(t, (sp_test_failure_t) {
+    .file = sp_cstr_as_str(file),
+    .line = line,
+    .expected = sp_cstr_as_str(spn_err_to_str(err)),
+    .actual = actual ? sp_cstr_as_str(actual) : sp_str_lit("no result event"),
+  });
+  return SP_ERR;
 }
 
-static void expect_cc_arg(s32* utest_result, fixture_t* fixture, const action_t* action, const c8* file, u32 line) {
-  sp_mem_t mem = fixture->fs.mem;
+static sp_err_t expect_cc_arg(sp_test_t* t, fixture_t* fixture, const action_t* action, const c8* file, u32 line) {
+  sp_mem_t mem = fixture->mem;
   bool expected = action->kind == ACTION_VERIFY_CC_ARG;
 
-  sp_str_t path = tmpfs_get(&fixture->fs, sp_str_lit("compile_commands.json"));
+  sp_str_t path = fixture_path(fixture, sp_str_lit("compile_commands.json"));
   sp_str_t content = test_read_file(mem, path);
 
   sp_str_t list = sp_str_lit("");
@@ -649,22 +647,26 @@ static void expect_cc_arg(s32* utest_result, fixture_t* fixture, const action_t*
     yyjson_doc_free(doc);
   }
   if (ok) {
-    return;
+    return SP_OK;
   }
 
-  utest_kv("args", list);
-  utest_kv("path", path);
+  sp_test_kv(t, "args", list);
+  sp_test_kv(t, "path", path);
   if (offender.len) {
-    utest_kv("entry", offender);
+    sp_test_kv(t, "entry", offender);
   }
-  utest_fail(utest_result, file, line,
-    sp_str_view(expected ? "compile argument present in every entry" : "compile argument absent from every entry"),
-    sp_str_view(num ? (expected ? "an entry is missing it" : "an entry has it") : "no compile entries"));
+  sp_test_record(t, (sp_test_failure_t) {
+    .file = sp_cstr_as_str(file),
+    .line = line,
+    .expected = sp_cstr_as_str(expected ? "compile argument present in every entry" : "compile argument absent from every entry"),
+    .actual = sp_cstr_as_str(num ? (expected ? "an entry is missing it" : "an entry has it") : "no compile entries"),
+  });
+  return SP_ERR;
 }
 
-static void expect_command_cc(s32* utest_result, fixture_t* fixture, command_cc_t expected) {
-  sp_mem_t mem = fixture->fs.mem;
-  sp_str_t path = tmpfs_get(&fixture->fs, sp_str_lit("compile_commands.json"));
+static sp_err_t expect_command_cc(sp_test_t* t, fixture_t* fixture, command_cc_t expected) {
+  sp_mem_t mem = fixture->mem;
+  sp_str_t path = fixture_path(fixture, sp_str_lit("compile_commands.json"));
   sp_str_t content = test_read_file(mem, path);
 
   sp_str_t list = sp_str_lit("");
@@ -711,21 +713,25 @@ static void expect_command_cc(s32* utest_result, fixture_t* fixture, command_cc_
 
   bool ok = expected.absent ? matches == 0 : matches > 0;
   if (ok) {
-    return;
+    return SP_OK;
   }
 
-  utest_kv("args", list);
-  utest_kv("path", path);
-  utest_fail(utest_result, __FILE__, __LINE__,
-    sp_str_view(expected.absent ? "no compile entry has a matching argument" : "a compile entry has a matching argument"),
-    sp_str_view(expected.absent ? "an entry has one" : (num ? "no entry has one" : "no compile entries")));
+  sp_test_kv(t, "args", list);
+  sp_test_kv(t, "path", path);
+  sp_test_record(t, (sp_test_failure_t) {
+    .file = sp_cstr_as_str(__FILE__),
+    .line = (u32)__LINE__,
+    .expected = sp_cstr_as_str(expected.absent ? "no compile entry has a matching argument" : "a compile entry has a matching argument"),
+    .actual = sp_cstr_as_str(expected.absent ? "an entry has one" : (num ? "no entry has one" : "no compile entries")),
+  });
+  return SP_ERR;
 }
 
-static sp_ps_output_t run_spn_command(fixture_t* fixture, const c8* const* args, const c8* const* env) {
-  sp_mem_t mem = fixture->fs.mem;
+static sp_ps_output_t run_spn_command(sp_test_t* t, fixture_t* fixture, const c8* const* args, const c8* const* env) {
+  sp_mem_t mem = fixture->mem;
   sp_ps_config_t config = {
     .command = fixture->paths.spn,
-    .cwd = fixture->fs.root,
+    .cwd = fixture->root,
     .io = {
       .in.mode = SP_PS_IO_MODE_NULL,
       .err.mode = SP_PS_IO_MODE_REDIRECT,
@@ -766,18 +772,15 @@ static sp_ps_output_t run_spn_command(fixture_t* fixture, const c8* const* args,
   }
 
   sp_ps_output_t output = sp_ps_run(mem, config);
-  utest_kv("command", ps_command_line(mem, &config));
-  utest_kv("output", output.out);
+  sp_test_kv(t, "command", ps_command_line(mem, &config));
+  sp_test_kv(t, "output", output.out);
   return output;
 }
 
-// Sanitizer runtimes disagree on how an error exits the process: asan on
-// darwin aborts via SIGABRT where linux exits 1, and ubsan reports without
-// failing at all. Pin both so a fixture asserts one exit code everywhere.
 static sp_ps_output_t run_fixture_bin(fixture_t* fixture, sp_str_t path) {
-  return sp_ps_run(fixture->fs.mem, (sp_ps_config_t) {
+  return sp_ps_run(fixture->mem, (sp_ps_config_t) {
     .command = path,
-    .cwd = fixture->fs.root,
+    .cwd = fixture->root,
     .env = {
       .extra = {
         { sp_str_lit("ASAN_OPTIONS"), sp_str_lit("abort_on_error=0:exitcode=1") },
@@ -791,111 +794,112 @@ static sp_ps_output_t run_fixture_bin(fixture_t* fixture, sp_str_t path) {
   });
 }
 
-static void run_command_bin(s32* utest_result, fixture_t* fixture, command_bin_t bin) {
+static sp_err_t run_command_bin(sp_test_t* t, fixture_t* fixture, command_bin_t bin) {
   sp_str_t staged = bin.path;
   if (sp_str_empty(staged)) {
     staged = bin.profile ? profile_exe(bin.profile, bin.name) : exe(bin.name);
   }
-  sp_str_t path = tmpfs_get(&fixture->fs, staged);
-  SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+  sp_str_t path = fixture_path(fixture, staged);
+  expect_path(t, fixture, path);
 
   if (bin.build_only) {
-    return;
+    return SP_OK;
   }
 
   sp_ps_output_t output = run_fixture_bin(fixture, path);
 
-  utest_kv("command", path);
-  utest_kv("output", output.out);
-  EXPECT_EQ(bin.rc, output.status.exit_code);
+  sp_test_kv(t, "command", path);
+  sp_test_kv(t, "output", output.out);
+  sp_expect_eq(t, bin.rc, output.status.exit_code);
 
   sp_carr_for(bin.contains, it) {
     if (!bin.contains[it]) {
       break;
     }
-    utest_kv("needle", sp_str_view(bin.contains[it]));
-    EXPECT_TRUE(sp_str_contains(output.out, sp_str_view(bin.contains[it])));
+    sp_test_kv(t, "needle", sp_str_view(bin.contains[it]));
+    sp_expect(t, sp_str_contains(output.out, sp_str_view(bin.contains[it])));
   }
+  return SP_OK;
 }
 
-static void expect_command_file(s32* utest_result, fixture_t* fixture, command_file_t expected) {
-  sp_str_t path = tmpfs_get(&fixture->fs, expected.file);
-  sp_str_t content = test_read_file(fixture->fs.mem, path);
+static void expect_command_file(sp_test_t* t, fixture_t* fixture, command_file_t expected) {
+  sp_str_t path = fixture_path(fixture, expected.file);
+  sp_str_t content = test_read_file(fixture->mem, path);
   if (expected.content) {
-    utest_kv("path", path);
-    utest_kv("expected", sp_str_view(expected.content));
-    utest_kv("content", content);
-    EXPECT_TRUE(sp_str_equal(content, sp_str_view(expected.content)));
+    sp_test_kv(t, "path", path);
+    sp_test_kv(t, "expected", sp_str_view(expected.content));
+    sp_test_kv(t, "content", content);
+    sp_expect(t, sp_str_equal(content, sp_str_view(expected.content)));
   }
   sp_carr_for(expected.contains, it) {
     if (!expected.contains[it]) {
       break;
     }
-    utest_kv("path", path);
-    utest_kv("needle", sp_str_view(expected.contains[it]));
-    utest_kv("content", content);
-    EXPECT_TRUE(sp_str_contains(content, sp_str_view(expected.contains[it])));
+    sp_test_kv(t, "path", path);
+    sp_test_kv(t, "needle", sp_str_view(expected.contains[it]));
+    sp_test_kv(t, "content", content);
+    sp_expect(t, sp_str_contains(content, sp_str_view(expected.contains[it])));
   }
   sp_carr_for(expected.excludes, it) {
     if (!expected.excludes[it]) {
       break;
     }
-    utest_kv("path", path);
-    utest_kv("needle", sp_str_view(expected.excludes[it]));
-    utest_kv("content", content);
-    EXPECT_FALSE(sp_str_contains(content, sp_str_view(expected.excludes[it])));
+    sp_test_kv(t, "path", path);
+    sp_test_kv(t, "needle", sp_str_view(expected.excludes[it]));
+    sp_test_kv(t, "content", content);
+    sp_expect(t, !sp_str_contains(content, sp_str_view(expected.excludes[it])));
   }
   if (expected.json) {
     yyjson_doc* doc = yyjson_read(content.data, content.len, 0);
-    utest_kv("path", path);
-    utest_kv("content", content);
-    EXPECT_TRUE(doc != NULL);
+    sp_test_kv(t, "path", path);
+    sp_test_kv(t, "content", content);
+    sp_expect(t, doc != SP_NULLPTR);
     yyjson_doc_free(doc);
   }
 }
 
-static void expect_command_lock(s32* utest_result, fixture_t* fixture, command_expect_t expected) {
-  sp_str_t path = tmpfs_get(&fixture->fs, sp_str_lit("spn.lock"));
-  SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
-  sp_str_t lock = test_read_file(fixture->fs.mem, path);
+static void expect_command_lock(sp_test_t* t, fixture_t* fixture, command_expect_t expected) {
+  sp_str_t path = fixture_path(fixture, sp_str_lit("spn.lock"));
+  expect_path(t, fixture, path);
+  sp_str_t lock = test_read_file(fixture->mem, path);
   if (expected.lock) {
-    utest_kv("lock", lock);
-    EXPECT_TRUE(sp_str_contains(lock, sp_str_lit("[[dep]]")));
+    sp_test_kv(t, "lock", lock);
+    sp_expect(t, sp_str_contains(lock, sp_str_lit("[[dep]]")));
   }
   sp_carr_for(expected.packages, it) {
     if (!expected.packages[it]) {
       break;
     }
-    sp_str_t needle = sp_fmt(fixture->fs.mem, "name = \"{}\"", sp_fmt_cstr(expected.packages[it])).value;
-    utest_kv("needle", needle);
-    utest_kv("lock", lock);
-    EXPECT_TRUE(sp_str_contains(lock, needle));
+    sp_str_t needle = sp_fmt(fixture->mem, "name = \"{}\"", sp_fmt_cstr(expected.packages[it])).value;
+    sp_test_kv(t, "needle", needle);
+    sp_test_kv(t, "lock", lock);
+    sp_expect(t, sp_str_contains(lock, needle));
   }
 }
 
-void run_command_test(s32* utest_result, fixture_t* fixture, command_test_t test) {
+static sp_err_t command_run(sp_test_t* t, fixture_t* fixture, command_test_t test) {
   if (test.project) {
-    prepare_test(utest_result, fixture, test.project, test.copy);
+    sp_try(prepare_test(t, fixture, test.project, test.copy));
   }
-  sp_ps_output_t output = run_spn_command(fixture, test.args, test.env);
-  EXPECT_EQ(test.expect.rc, output.status.exit_code);
+  sp_ps_output_t output = run_spn_command(t, fixture, test.args, test.env);
+  sp_expect_eq(t, test.expect.rc, output.status.exit_code);
 
   sp_carr_for(test.expect.contains, it) {
     if (!test.expect.contains[it]) {
       break;
     }
-    utest_kv("needle", sp_str_view(test.expect.contains[it]));
-    utest_kv("output", output.out);
-    EXPECT_TRUE(sp_str_contains(output.out, sp_str_view(test.expect.contains[it])));
+    sp_test_kv(t, "needle", sp_str_view(test.expect.contains[it]));
+    sp_test_kv(t, "output", output.out);
+    sp_expect(t, sp_str_contains(output.out, sp_str_view(test.expect.contains[it])));
   }
 
   sp_carr_for(test.expect.excludes, it) {
     if (!test.expect.excludes[it]) {
       break;
     }
-    utest_kv("needle", sp_str_view(test.expect.excludes[it]));
-    utest_kv("output", output.out);
-    EXPECT_FALSE(sp_str_contains(output.out, sp_str_view(test.expect.excludes[it])));
+    sp_test_kv(t, "needle", sp_str_view(test.expect.excludes[it]));
+    sp_test_kv(t, "output", output.out);
+    sp_expect(t, !sp_str_contains(output.out, sp_str_view(test.expect.excludes[it])));
   }
 
   sp_carr_for(test.expect.files, it) {
@@ -903,7 +907,7 @@ void run_command_test(s32* utest_result, fixture_t* fixture, command_test_t test
     if (sp_str_empty(expected.file)) {
       break;
     }
-    expect_command_file(utest_result, fixture, expected);
+    expect_command_file(t, fixture, expected);
   }
 
   sp_carr_for(test.expect.events, it) {
@@ -911,92 +915,106 @@ void run_command_test(s32* utest_result, fixture_t* fixture, command_test_t test
     if (!expected.event) {
       break;
     }
-    expect_event(utest_result, fixture, expected.event, expected.key, expected.value, !expected.absent, __FILE__, __LINE__);
+    expect_event(t, fixture, expected.event, expected.key, expected.value, !expected.absent, __FILE__, __LINE__);
   }
 
   sp_carr_for(test.expect.cc, it) {
     if (!test.expect.cc[it].args[0]) {
       break;
     }
-    expect_command_cc(utest_result, fixture, test.expect.cc[it]);
+    expect_command_cc(t, fixture, test.expect.cc[it]);
   }
 
   sp_carr_for(test.expect.exists, it) {
     if (sp_str_empty(test.expect.exists[it])) {
       break;
     }
-    sp_str_t path = tmpfs_get(&fixture->fs, test.expect.exists[it]);
-    SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+    sp_str_t path = fixture_path(fixture, test.expect.exists[it]);
+    expect_path(t, fixture, path);
   }
 
   sp_carr_for(test.expect.missing, it) {
     if (sp_str_empty(test.expect.missing[it])) {
       break;
     }
-    sp_str_t path = tmpfs_get(&fixture->fs, test.expect.missing[it]);
-    SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
+    sp_str_t path = fixture_path(fixture, test.expect.missing[it]);
+    expect_no_path(t, fixture, path);
   }
 
   if (test.expect.lock || test.expect.packages[0]) {
-    expect_command_lock(utest_result, fixture, test.expect);
+    expect_command_lock(t, fixture, test.expect);
   }
 
   if (test.expect.bin.name || !sp_str_empty(test.expect.bin.path)) {
-    run_command_bin(utest_result, fixture, test.expect.bin);
+    sp_try(run_command_bin(t, fixture, test.expect.bin));
   }
+  return SP_OK;
 }
 
-static void apply_rebuild_change(s32* utest_result, fixture_t* fixture, rebuild_change_t change) {
+sp_err_t run_command_test(sp_test_t* t, command_test_t test) {
+  fixture_t fixture = fixture_new(t);
+  sp_must(t, sp_fs_exists(fixture.paths.spn));
+  if (!test.project) {
+    sp_try(prepare_test(t, &fixture, SP_NULLPTR, SP_NULLPTR));
+  }
+  return command_run(t, &fixture, test);
+}
+
+static sp_err_t apply_rebuild_change(sp_test_t* t, fixture_t* fixture, rebuild_change_t change) {
   sp_carr_for(change.remove_files, it) {
     if (sp_str_empty(change.remove_files[it])) {
       break;
     }
-    sp_str_t path = tmpfs_get(&fixture->fs, change.remove_files[it]);
+    sp_str_t path = fixture_path(fixture, change.remove_files[it]);
     sp_fs_remove_file(path);
-    SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
+    expect_no_path(t, fixture, path);
   }
 
   sp_carr_for(change.moves, it) {
     if (sp_str_empty(change.moves[it].from)) {
       break;
     }
-    sp_str_t from = tmpfs_get(&fixture->fs, change.moves[it].from);
-    sp_str_t to = tmpfs_get(&fixture->fs, change.moves[it].to);
-    sp_str_t content = test_read_file(fixture->fs.mem, from);
-    tmpfs_create(&fixture->fs, change.moves[it].to, content);
+    sp_str_t from = fixture_path(fixture, change.moves[it].from);
+    sp_str_t to = fixture_path(fixture, change.moves[it].to);
+    sp_str_t content = test_read_file(fixture->mem, from);
+    fixture_create(fixture, change.moves[it].to, content);
     sp_fs_remove_file(from);
-    SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, from);
-    SP_EXPECT_EXISTS_TMPFS(&fixture->fs, to);
+    expect_no_path(t, fixture, from);
+    expect_path(t, fixture, to);
   }
 
   sp_carr_for(change.writes, it) {
     if (sp_str_empty(change.writes[it].file)) {
       break;
     }
-    tmpfs_create(&fixture->fs, change.writes[it].file, change.writes[it].content);
+    fixture_create(fixture, change.writes[it].file, change.writes[it].content);
   }
 
   sp_carr_for(change.remove_dirs, it) {
     if (sp_str_empty(change.remove_dirs[it])) {
       break;
     }
-    sp_str_t path = tmpfs_get(&fixture->fs, change.remove_dirs[it]);
+    sp_str_t path = fixture_path(fixture, change.remove_dirs[it]);
     sp_fs_remove_dir(path);
-    SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
+    expect_no_path(t, fixture, path);
   }
+  return SP_OK;
 }
 
-void run_rebuild_test(s32* utest_result, fixture_t* fixture, rebuild_test_t test) {
-  prepare_test(utest_result, fixture, test.project, test.copy);
-  run_command_test(utest_result, fixture, test.first);
+sp_err_t run_rebuild_test(sp_test_t* t, rebuild_test_t test) {
+  fixture_t fixture = fixture_new(t);
+  sp_must(t, sp_fs_exists(fixture.paths.spn));
+
+  sp_try(prepare_test(t, &fixture, test.project, test.copy));
+  sp_try(command_run(t, &fixture, test.first));
 
   sp_tm_epoch_t mtimes[SPN_TEST_REBUILD_MAX_WATCHES] = sp_zero;
   sp_carr_for(test.watches, it) {
     if (sp_str_empty(test.watches[it].file)) {
       break;
     }
-    sp_str_t path = tmpfs_get(&fixture->fs, test.watches[it].file);
-    SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+    sp_str_t path = fixture_path(&fixture, test.watches[it].file);
+    expect_path(t, &fixture, path);
     mtimes[it] = sp_fs_get_mod_time(path);
   }
 
@@ -1004,8 +1022,8 @@ void run_rebuild_test(s32* utest_result, fixture_t* fixture, rebuild_test_t test
     if (!test.rebuilds[it].command.args[0]) {
       break;
     }
-    apply_rebuild_change(utest_result, fixture, test.rebuilds[it].change);
-    run_command_test(utest_result, fixture, test.rebuilds[it].command);
+    sp_try(apply_rebuild_change(t, &fixture, test.rebuilds[it].change));
+    sp_try(command_run(t, &fixture, test.rebuilds[it].command));
   }
 
   sp_carr_for(test.watches, it) {
@@ -1013,20 +1031,21 @@ void run_rebuild_test(s32* utest_result, fixture_t* fixture, rebuild_test_t test
     if (sp_str_empty(watch.file)) {
       break;
     }
-    sp_str_t path = tmpfs_get(&fixture->fs, watch.file);
+    sp_str_t path = fixture_path(&fixture, watch.file);
     sp_tm_epoch_t now = sp_fs_get_mod_time(path);
     bool unchanged = mtimes[it].s == now.s && mtimes[it].ns == now.ns;
     if (watch.mtime == REBUILD_MTIME_UNCHANGED) {
-      EXPECT_TRUE(unchanged);
+      sp_expect(t, unchanged);
     }
     if (watch.mtime == REBUILD_MTIME_CHANGED) {
-      EXPECT_FALSE(unchanged);
+      sp_expect(t, !unchanged);
     }
   }
+  return SP_OK;
 }
 
-void fixture_copy_project(s32* utest_result, fixture_t* fixture, sp_str_t project, const c8* const* copy) {
-  ASSERT_TRUE(sp_fs_exists(project));
+sp_err_t fixture_copy_project(sp_test_t* t, fixture_t* fixture, sp_str_t project, const c8* const* copy) {
+  sp_must(t, sp_fs_exists(project));
 
   const c8* defaults [] = {
     "main.c",
@@ -1037,21 +1056,22 @@ void fixture_copy_project(s32* utest_result, fixture_t* fixture, sp_str_t projec
   };
 
   sp_carr_for(defaults, it) {
-    sp_str_t from = sp_fs_join_path(fixture->fs.mem, project, sp_str_view(defaults[it]));
+    sp_str_t from = sp_fs_join_path(fixture->mem, project, sp_str_view(defaults[it]));
     if (sp_fs_exists(from)) {
-      sp_fs_copy(from, fixture->fs.root);
+      sp_fs_copy(from, fixture->root);
     }
   }
 
   if (copy) {
     for (u32 it = 0; copy[it]; it++) {
-      copy_project_path(utest_result, &fixture->fs, project, sp_str_view(copy[it]));
+      sp_try(copy_project_path(t, fixture, project, sp_str_view(copy[it])));
     }
   }
+  return SP_OK;
 }
 
-void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions) {
-  sp_mem_t mem = fixture->fs.mem;
+sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) {
+  sp_mem_t mem = fixture->mem;
 
   sp_str_t cli_output = sp_zero;
 
@@ -1061,52 +1081,54 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
       break;
     }
 
+    sp_test_kv_clear(t, SP_NULLPTR);
+
     switch (action.kind) {
       case ACTION_NONE: {
         break;
       }
       case ACTION_CREATE_FILE: {
-        tmpfs_create(&fixture->fs, action.create.file, action.create.content);
+        fixture_create(fixture, action.create.file, action.create.content);
         break;
       }
       case ACTION_SUBPROCESS: {
         sp_ps_config_t config = action.process.config;
         if (sp_str_empty(config.cwd)) {
-          config.cwd = fixture->fs.root;
+          config.cwd = fixture->root;
         }
 
         sp_ps_output_t output = sp_ps_run(mem, config);
-        utest_kv("command", ps_command_line(mem, &config));
-        utest_kv("cwd", config.cwd);
-        utest_kv("output", output.out);
-        EXPECT_EQ(action.process.rc, output.status.exit_code);
+        sp_test_kv(t, "command", ps_command_line(mem, &config));
+        sp_test_kv(t, "cwd", config.cwd);
+        sp_test_kv(t, "output", output.out);
+        sp_expect_eq(t, action.process.rc, output.status.exit_code);
         break;
       }
       case ACTION_RUN_BIN:
       case ACTION_RUN_TEST: {
         sp_str_t staged_bin = action.kind == ACTION_RUN_TEST ? test_exe(action.bin.name) : exe(action.bin.name);
-        sp_str_t bin = tmpfs_get(&fixture->fs, staged_bin);
-        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, bin);
+        sp_str_t bin = fixture_path(fixture, staged_bin);
+        expect_path(t, fixture, bin);
 
         sp_ps_output_t output = run_fixture_bin(fixture, bin);
 
-        utest_kv("command", bin);
-        utest_kv("output", output.out);
-        EXPECT_EQ(action.bin.rc, output.status.exit_code);
+        sp_test_kv(t, "command", bin);
+        sp_test_kv(t, "output", output.out);
+        sp_expect_eq(t, action.bin.rc, output.status.exit_code);
         break;
       }
       case ACTION_VERIFY_EXISTS: {
-        sp_str_t path = tmpfs_get(&fixture->fs, action.exists);
-        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+        sp_str_t path = fixture_path(fixture, action.exists);
+        expect_path(t, fixture, path);
         break;
       }
       case ACTION_VERIFY_NOT_EXISTS: {
-        sp_str_t path = tmpfs_get(&fixture->fs, action.exists);
-        SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
+        sp_str_t path = fixture_path(fixture, action.exists);
+        expect_no_path(t, fixture, path);
         break;
       }
       case ACTION_VERIFY_DIR_COUNT: {
-        sp_str_t path = tmpfs_get(&fixture->fs, sp_str_view(action.verify_dir_count.dir));
+        sp_str_t path = fixture_path(fixture, sp_str_view(action.verify_dir_count.dir));
         sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, path);
         u32 dirs = 0;
         sp_da_for(entries, et) {
@@ -1114,40 +1136,40 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
             dirs++;
           }
         }
-        utest_kv("path", path);
-        EXPECT_EQ(action.verify_dir_count.count, dirs);
+        sp_test_kv(t, "path", path);
+        sp_expect_eq(t, action.verify_dir_count.count, dirs);
         break;
       }
       case ACTION_VERIFY_INCLUDE: {
-        sp_str_t path = tmpfs_get(
-          &fixture->fs,
+        sp_str_t path = fixture_path(
+          fixture,
           sp_fs_join_path(mem, store_file("include"), action.verify_include.file)
         );
-        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+        expect_path(t, fixture, path);
         break;
       }
       case ACTION_VERIFY_FILE_CONTAINS: {
-        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_contains.file);
+        sp_str_t path = fixture_path(fixture, action.verify_file_contains.file);
         sp_str_t content = test_read_file(mem, path);
-        utest_kv("path", path);
-        utest_kv("needle", action.verify_file_contains.needle);
-        utest_kv("content", content);
-        EXPECT_TRUE(sp_str_contains(content, action.verify_file_contains.needle));
+        sp_test_kv(t, "path", path);
+        sp_test_kv(t, "needle", action.verify_file_contains.needle);
+        sp_test_kv(t, "content", content);
+        sp_expect(t, sp_str_contains(content, action.verify_file_contains.needle));
         break;
       }
       case ACTION_VERIFY_FILE_NOT_CONTAINS: {
-        sp_str_t path = tmpfs_get(&fixture->fs, action.verify_file_not_contains.file);
+        sp_str_t path = fixture_path(fixture, action.verify_file_not_contains.file);
         sp_str_t content = test_read_file(mem, path);
-        utest_kv("path", path);
-        utest_kv("needle", action.verify_file_not_contains.needle);
-        utest_kv("content", content);
-        EXPECT_FALSE(sp_str_contains(content, action.verify_file_not_contains.needle));
+        sp_test_kv(t, "path", path);
+        sp_test_kv(t, "needle", action.verify_file_not_contains.needle);
+        sp_test_kv(t, "content", content);
+        sp_expect(t, !sp_str_contains(content, action.verify_file_not_contains.needle));
         break;
       }
       case ACTION_REMOVE_DIR: {
-        sp_str_t path = tmpfs_get(&fixture->fs, sp_str_view(action.rm.dir));
+        sp_str_t path = fixture_path(fixture, sp_str_view(action.rm.dir));
         sp_fs_remove_dir(path);
-        SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, path);
+        expect_no_path(t, fixture, path);
         break;
       }
       case ACTION_RUN_CLI: {
@@ -1158,96 +1180,81 @@ void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions)
           }
           args[it + 1] = action.cli.args[it];
         }
-        sp_ps_output_t output = run_spn_command(fixture, args, action.cli.env);
-        EXPECT_EQ(action.cli.rc, output.status.exit_code);
+        sp_ps_output_t output = run_spn_command(t, fixture, args, action.cli.env);
+        sp_expect_eq(t, action.cli.rc, output.status.exit_code);
 
         cli_output = output.out;
         break;
       }
       case ACTION_VERIFY_CLI_CONTAINS: {
-        utest_kv("needle", action.verify_cli.needle);
-        utest_kv("output", cli_output);
-        EXPECT_TRUE(sp_str_contains(cli_output, action.verify_cli.needle));
+        sp_test_kv(t, "needle", action.verify_cli.needle);
+        sp_test_kv(t, "output", cli_output);
+        sp_expect(t, sp_str_contains(cli_output, action.verify_cli.needle));
         break;
       }
       case ACTION_VERIFY_CLI_NOT_CONTAINS: {
-        utest_kv("needle", action.verify_cli.needle);
-        utest_kv("output", cli_output);
-        EXPECT_FALSE(sp_str_contains(cli_output, action.verify_cli.needle));
+        sp_test_kv(t, "needle", action.verify_cli.needle);
+        sp_test_kv(t, "output", cli_output);
+        sp_expect(t, !sp_str_contains(cli_output, action.verify_cli.needle));
         break;
       }
       case ACTION_VERIFY_CC_ARG:
       case ACTION_VERIFY_NO_CC_ARG: {
-        expect_cc_arg(utest_result, fixture, &action, __FILE__, __LINE__);
+        expect_cc_arg(t, fixture, &action, __FILE__, __LINE__);
         break;
       }
       case ACTION_VERIFY_EVENT:
       case ACTION_VERIFY_NO_EVENT: {
-        expect_event(utest_result, fixture, action.verify_event.event, action.verify_event.key, action.verify_event.value, action.kind == ACTION_VERIFY_EVENT, __FILE__, __LINE__);
+        expect_event(t, fixture, action.verify_event.event, action.verify_event.key, action.verify_event.value, action.kind == ACTION_VERIFY_EVENT, __FILE__, __LINE__);
         break;
       }
       case ACTION_VERIFY_RESULT: {
-        expect_result(utest_result, fixture, action.verify_result.err, __FILE__, __LINE__);
+        expect_result(t, fixture, action.verify_result.err, __FILE__, __LINE__);
         break;
       }
       case ACTION_VERIFY_EVENT_COUNT: {
         u32 count = count_events(fixture, action.verify_event_count.event, action.verify_event_count.key, action.verify_event_count.value);
-        utest_kv("event", sp_str_view(event_names[action.verify_event_count.event]));
-        EXPECT_EQ(action.verify_event_count.count, count);
+        sp_test_kv(t, "event", sp_str_view(event_names[action.verify_event_count.event]));
+        sp_expect_eq(t, action.verify_event_count.count, count);
         break;
       }
       case ACTION_VERIFY_LOCKED: {
-        sp_str_t path = tmpfs_get(&fixture->fs, sp_str_lit("spn.lock"));
-        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+        sp_str_t path = fixture_path(fixture, sp_str_lit("spn.lock"));
+        expect_path(t, fixture, path);
 
         sp_str_t lock = test_read_file(mem, path);
-        utest_kv("lock", lock);
-        EXPECT_TRUE(sp_str_contains(lock, sp_str_lit("[[dep]]")));
+        sp_test_kv(t, "lock", lock);
+        sp_expect(t, sp_str_contains(lock, sp_str_lit("[[dep]]")));
         break;
       }
       case ACTION_VERIFY_PKG_LOCKED: {
-        sp_str_t path = tmpfs_get(&fixture->fs, sp_str_lit("spn.lock"));
-        SP_EXPECT_EXISTS_TMPFS(&fixture->fs, path);
+        sp_str_t path = fixture_path(fixture, sp_str_lit("spn.lock"));
+        expect_path(t, fixture, path);
 
         sp_str_t lock = test_read_file(mem, path);
         sp_str_t needle = sp_fmt(mem, "name = \"{}\"", sp_fmt_cstr(action.verify_locked.name)).value;
-        utest_kv("needle", needle);
-        utest_kv("lock", lock);
-        EXPECT_TRUE(sp_str_contains(lock, needle));
+        sp_test_kv(t, "needle", needle);
+        sp_test_kv(t, "lock", lock);
+        sp_expect(t, sp_str_contains(lock, needle));
         break;
       }
     }
   }
+  return SP_OK;
 }
 
-// The toolchain cache is content-addressed and immutable, so every hermetic
-// test can share one copy instead of re-downloading zig. Prefer the developer's
-// global cache when it's already populated; otherwise use a fixed repo-level dir
-// that CI can cache across runs.
 static sp_str_t pick_shared_toolchain_dir(sp_mem_t mem, sp_str_t root) {
   sp_str_t global = sp_fs_join_path(mem, sp_fs_get_storage_path(mem), sp_str_lit("spn/cache/toolchain"));
   if (sp_fs_exists(global)) return global;
   return sp_fs_join_path(mem, root, sp_str_lit(".cache/toolchain"));
 }
 
-void fixture_setup_paths(fixture_t* fixture) {
-  // CMake passes the binary as a repo-relative compile definition; under spn,
-  // fall back to its store. The root always comes from walking up the exe path
-  sp_mem_t mem = sp_mem_os_new();
-  fixture->paths.root = test_repo_root(mem);
-#if defined(SPN_TEST_BIN)
-  fixture->paths.spn = test_repo_path(mem, sp_str_lit(SPN_TEST_BIN));
-#else
-  fixture->paths.spn = test_repo_path(mem, exe("spn"));
-#endif
-}
+sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const c8* const* copy) {
+  sp_mem_t mem = fixture->mem;
 
-void prepare_test(s32* utest_result, fixture_t* fixture, const c8* project, const c8* const* copy) {
-  sp_mem_t mem = fixture->fs.mem;
-
-  fixture->paths.config = tmpfs_get(&fixture->fs, sp_str_lit(".home/config"));
-  fixture->paths.storage = tmpfs_get(&fixture->fs, sp_str_lit(".home/storage"));
-  fixture->paths.patches = tmpfs_get(&fixture->fs, sp_str_lit("patches"));
+  fixture->paths.config = fixture_path(fixture, sp_str_lit(".home/config"));
+  fixture->paths.storage = fixture_path(fixture, sp_str_lit(".home/storage"));
+  fixture->paths.patches = fixture_path(fixture, sp_str_lit("patches"));
   fixture->paths.toolchain = pick_shared_toolchain_dir(mem, fixture->paths.root);
   fixture->paths.include = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("spn/include"));
   fixture->paths.index = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("spn/packages"));
@@ -1256,24 +1263,27 @@ void prepare_test(s32* utest_result, fixture_t* fixture, const c8* project, cons
   sp_fs_create_dir(fixture->paths.toolchain);
   sp_fs_create_dir(fixture->paths.include);
   sp_fs_create_dir(fixture->paths.index);
-  setup_fixture_envrc(&fixture->fs, fixture->paths.storage, fixture->paths.toolchain, fixture->paths.config);
-  setup_fixture_config(&fixture->fs, fixture->paths.config, fixture->paths.index, fixture->paths.root);
+  setup_fixture_envrc(fixture, fixture->paths.storage, fixture->paths.toolchain, fixture->paths.config);
+  setup_fixture_config(fixture, fixture->paths.config, fixture->paths.index, fixture->paths.root);
 
   sp_fs_copy(sp_fs_join_path(mem, fixture->paths.root, sp_str_lit("include/spn.h")), fixture->paths.include);
 
   if (project) {
     sp_str_t path = sp_fs_join_path(mem, fixture->paths.root, sp_str_view(project));
-    fixture_copy_project(utest_result, fixture, path, copy);
-    setup_fixture_index_from_remote(utest_result, fixture, path);
-    setup_fixture_source_repos(utest_result, fixture, path);
+    sp_try(fixture_copy_project(t, fixture, path, copy));
+    sp_try(setup_fixture_index_from_remote(t, fixture, path));
+    sp_try(setup_fixture_source_repos(t, fixture, path));
   }
+  return SP_OK;
 }
 
-void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
+sp_err_t run_test(sp_test_t* t, test_t test) {
+  fixture_t fixture = fixture_new(t);
+  sp_must(t, sp_fs_exists(fixture.paths.spn));
+
   sp_str_t blocked = test_when_blocked(&test.when);
   if (blocked.len) {
-    utest_skip_reason(blocked);
-    UTEST_SKIP("");
+    return sp_test_skip(t, "{}", sp_fmt_str(blocked));
   }
 
   if (!test_when_runs(&test.when)) {
@@ -1290,6 +1300,6 @@ void run_test(s32* utest_result, fixture_t* fixture, test_t test) {
     }
   }
 
-  prepare_test(utest_result, fixture, test.project, test.copy);
-  run_actions(utest_result, fixture, test.actions);
+  sp_try(prepare_test(t, &fixture, test.project, test.copy));
+  return run_actions(t, &fixture, test.actions);
 }

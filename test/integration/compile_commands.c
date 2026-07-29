@@ -20,12 +20,15 @@ UTEST_F(compile_commands, module_flags) {
   run_command_test(utest_result, &uf->fixture, (command_test_t) {
     .project = "test/integration/fixtures/script/build_dep_closure",
     .args = { "build" },
-    .expect.files = {
-      { .file = sp_str_lit("compile_commands.json"), .json = true, .contains = {
-        "wasm32-wasi",
-        "store/core/alpha",
-        "store/core/beta",
-      } },
+    .expect = {
+      .files = {
+        { .file = sp_str_lit("compile_commands.json"), .json = true },
+      },
+      .cc = {
+        { .args = { "wasm32-wasi" } },
+        { .args = { "store/core/alpha" } },
+        { .args = { "store/core/beta" } },
+      },
     },
   });
 }

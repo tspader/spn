@@ -1,11 +1,5 @@
-#include "common.h"
-
-SPN_TEST_SUITE(cli)
-
-UTEST_F(cli, missing_required_package_version) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_missing_required_package_version");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, missing_required_package_version) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cli/missing_required_package_version",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
@@ -13,10 +7,8 @@ UTEST_F(cli, missing_required_package_version) {
   });
 }
 
-UTEST_F(cli, missing_required_package_name) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_missing_required_package_name");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, missing_required_package_name) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cli/missing_required_package_name",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
@@ -24,10 +16,8 @@ UTEST_F(cli, missing_required_package_name) {
   });
 }
 
-UTEST_F(cli, wrong_type_required_package_version) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_wrong_type_required_package_version");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, wrong_type_required_package_version) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cli/wrong_type_required_package_version",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
@@ -35,10 +25,8 @@ UTEST_F(cli, wrong_type_required_package_version) {
   });
 }
 
-UTEST_F(cli, init) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_init");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, init) {
+  return run_test(t, (test_t) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "init" } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("spn.toml") },
@@ -50,10 +38,8 @@ UTEST_F(cli, init) {
   });
 }
 
-UTEST_F(cli, init_existing) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_init_existing");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, init_existing) {
+  return run_test(t, (test_t) {
     .actions = {
       { .kind = ACTION_CREATE_FILE, .create = { .file = sp_str_lit(".gitignore"), .content = sp_str_lit("A") } },
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "init", .rc = 1 } },
@@ -62,10 +48,8 @@ UTEST_F(cli, init_existing) {
   });
 }
 
-UTEST_F(cli, init_path) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_init_path");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, init_path) {
+  return run_test(t, (test_t) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "init", .args = { "sub" } } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("sub/main.c") },
@@ -73,10 +57,8 @@ UTEST_F(cli, init_path) {
   });
 }
 
-UTEST_F(cli, init_bare) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_init_bare");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, init_bare) {
+  return run_test(t, (test_t) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "init", .args = { "sub", "--bare" } } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("sub/spn.toml") },
@@ -86,10 +68,8 @@ UTEST_F(cli, init_bare) {
   });
 }
 
-UTEST_F(cli, add) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_add");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, add) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cli/add",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "add", .args = { "spum" } } },
@@ -102,10 +82,8 @@ UTEST_F(cli, add) {
   });
 }
 
-UTEST_F(cli, add_test_dep) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_add_test_dep");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, add_test_dep) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cli/add",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "add", .args = { "spum", "--test" } } },
@@ -114,10 +92,8 @@ UTEST_F(cli, add_test_dep) {
   });
 }
 
-UTEST_F(cli, add_unknown_package) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_add_unknown_package");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, add_unknown_package) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cli/add",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "add", .args = { "kram" }, .rc = 1 } },
@@ -126,10 +102,8 @@ UTEST_F(cli, add_unknown_package) {
   });
 }
 
-UTEST_F(cli, update) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_update");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, update) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cli/update",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "update" } },
@@ -142,10 +116,8 @@ UTEST_F(cli, update) {
   });
 }
 
-UTEST_F(cli, clean) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_clean");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, clean) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cli/add",
     .actions = {
       { .kind = ACTION_CREATE_FILE, .create = { .file = store_file("bin/main"), .content = sp_str_lit("x") } },
@@ -161,10 +133,8 @@ UTEST_F(cli, clean) {
   });
 }
 
-UTEST_F(cli, index_path) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_index_path");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, index_path) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/basic",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "index", .args = { "path" } } },
@@ -173,10 +143,8 @@ UTEST_F(cli, index_path) {
   });
 }
 
-UTEST_F(cli, index_sync) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_index_sync");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, index_sync) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/basic",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "index", .args = { "sync" } } },
@@ -185,10 +153,8 @@ UTEST_F(cli, index_sync) {
   });
 }
 
-UTEST_F(cli, publish_dry_run) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_publish_dry_run");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, publish_dry_run) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/basic",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "publish", .args = { "--dry", "--source-url", "https://example.com/x.git", "--source-rev", "abc123" } } },
@@ -197,10 +163,8 @@ UTEST_F(cli, publish_dry_run) {
   });
 }
 
-UTEST_F(cli, workspace_index) {
-  tmpfs_init_named(&uf->fixture.fs, "cli_workspace_index");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(cli, workspace_index) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cli/workspace_index",
     .copy = { "index/*" },
     .actions = {

@@ -38,7 +38,6 @@ UTEST_F(deps_file, name_mismatch) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_MANIFEST, .key = "name", .value = "core/spum" } },
-      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("core/spork") } },
     },
   });
 }
@@ -141,7 +140,6 @@ UTEST_F(deps_index, name_mismatch) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_MANIFEST, .key = "name", .value = "core/spum" } },
-      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli = { .needle = sp_str_lit("spork") } },
     },
   });
 }

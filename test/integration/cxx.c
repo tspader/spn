@@ -143,7 +143,7 @@ UTEST_F(cxx, script_rejected) {
     .copy = { "tools" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_CLI_CONTAINS, .verify_cli.needle = sp_str_lit("package.build.source") },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_MANIFEST_ISSUES } },
       { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED } },
     },
   });

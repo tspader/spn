@@ -49,6 +49,17 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_ADDED] = sp_bind_builder_end(&b);
   }
 
+  // SPN_EVENT_UPDATE_INCOMPATIBLE
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_update_t, name, "name", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_update_t, version, "version", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_update_t, latest, "latest", SP_BIND_STR);
+    }
+    schemas[SPN_EVENT_UPDATE_INCOMPATIBLE] = sp_bind_builder_end(&b);
+  }
+
   // SPN_EVENT_PUBLISH, SPN_EVENT_PUBLISH_END
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
