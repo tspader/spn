@@ -52,7 +52,7 @@ static const executor_test_t tests [] = {
 };
 
 sp_test_each(graph, executor, executor_test_t, tests, .setup = graph_setup) {
-  built_graph_t b = build_graph(t, it->graph);
+  built_graph_t b = graph_build(t, it->graph);
   apply_touches(&b, it->touch);
 
   spn_bg_dirty_t* dirty = spn_bg_compute_dirty(b.graph);

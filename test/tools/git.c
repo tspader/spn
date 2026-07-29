@@ -1,15 +1,18 @@
 #include "fixture.h"
 
-void git_repo_run(sp_str_t repo, sp_str_t a, sp_str_t b, sp_str_t c, sp_str_t d, sp_str_t e) {
-  sp_ps_output_t output = sp_ps_run(sp_mem_os_new(), (sp_ps_config_t) {
+sp_ps_output_t git_repo_run(sp_str_t repo, const sp_str_t* args, u32 count) {
+  sp_ps_config_t config = {
     .command = sp_str_lit("git"),
-    .args = {
-      sp_str_lit("-C"), repo,
-      a, b, c, d, e,
-    },
-  });
+    .args = { sp_str_lit("-C"), repo },
+  };
+  SP_ASSERT(count <= SP_PS_MAX_ARGS - 2);
+  sp_for(it, count) {
+    config.args[2 + it] = args[it];
+  }
 
+  sp_ps_output_t output = sp_ps_run(sp_mem_os_new(), config);
   SP_ASSERT(output.status.exit_code == 0);
+  return output;
 }
 
 void git_repo_copy_dir(sp_str_t source, sp_str_t repo) {
@@ -41,33 +44,17 @@ void git_repo_init(sp_str_t repo) {
   sp_fs_create_dir(sp_fs_parent_path(repo));
   sp_fs_create_dir(repo);
 
-  git_repo_run(repo, sp_str_lit("init"), sp_str_lit("--quiet"), sp_zero_s(sp_str_t), sp_zero_s(sp_str_t), sp_zero_s(sp_str_t));
-  git_repo_run(repo, sp_str_lit("config"), sp_str_lit("user.name"), sp_str_lit("spn-test"), sp_zero_s(sp_str_t), sp_zero_s(sp_str_t));
-  git_repo_run(repo, sp_str_lit("config"), sp_str_lit("user.email"), sp_str_lit("spn-test@local"), sp_zero_s(sp_str_t), sp_zero_s(sp_str_t));
+  git_repo_git(repo, sp_str_lit("init"), sp_str_lit("--quiet"));
+  git_repo_git(repo, sp_str_lit("config"), sp_str_lit("user.name"), sp_str_lit("spn-test"));
+  git_repo_git(repo, sp_str_lit("config"), sp_str_lit("user.email"), sp_str_lit("spn-test@local"));
 }
 
 void git_repo_stage_all(sp_str_t repo) {
-  sp_ps_output_t add = sp_ps_run(sp_mem_os_new(), (sp_ps_config_t) {
-    .command = sp_str_lit("git"),
-    .args = {
-      sp_str_lit("-C"), repo,
-      sp_str_lit("add"), sp_str_lit("."),
-    },
-  });
-  sp_assert(!add.status.exit_code);
+  git_repo_git(repo, sp_str_lit("add"), sp_str_lit("."));
 }
 
 void git_repo_commit(sp_str_t repo, sp_str_t message) {
-  sp_ps_output_t add = sp_ps_run(sp_mem_os_new(), (sp_ps_config_t) {
-    .command = sp_str_lit("git"),
-    .args = {
-      sp_str_lit("-C"), repo,
-      sp_str_lit("commit"), sp_str_lit("-m"), message,
-      sp_str_lit("--quiet"),
-      sp_str_lit("--allow-empty"),
-    },
-  });
-  sp_assert(!add.status.exit_code);
+  git_repo_git(repo, sp_str_lit("commit"), sp_str_lit("-m"), message, sp_str_lit("--quiet"), sp_str_lit("--allow-empty"));
 }
 
 void git_repo_commit_from_dir(sp_str_t source, sp_str_t repo, sp_str_t message) {
@@ -76,44 +63,22 @@ void git_repo_commit_from_dir(sp_str_t source, sp_str_t repo, sp_str_t message) 
   SP_ASSERT(sp_fs_exists(repo));
   SP_ASSERT(sp_fs_is_dir(repo));
 
-  git_repo_run(repo, sp_str_lit("rm"), sp_str_lit("-r"), sp_str_lit("--quiet"), sp_str_lit("--ignore-unmatch"), sp_str_lit("."));
+  git_repo_git(repo, sp_str_lit("rm"), sp_str_lit("-r"), sp_str_lit("--quiet"), sp_str_lit("--ignore-unmatch"), sp_str_lit("."));
 
   git_repo_copy_dir(source, repo);
-  git_repo_run(repo, sp_str_lit("add"), sp_str_lit("."), sp_zero_s(sp_str_t), sp_zero_s(sp_str_t), sp_zero_s(sp_str_t));
-  git_repo_run(repo, sp_str_lit("commit"), sp_str_lit("-m"), message, sp_str_lit("--quiet"), sp_str_lit("--allow-empty"));
+  git_repo_stage_all(repo);
+  git_repo_commit(repo, message);
 }
 
 sp_str_t git_repo_head(sp_str_t repo) {
-  sp_ps_output_t output = sp_ps_run(sp_mem_os_new(), (sp_ps_config_t) {
-    .command = sp_str_lit("git"),
-    .args = {
-      sp_str_lit("-C"), repo,
-      sp_str_lit("rev-parse"),
-      sp_str_lit("--short=12"),
-      sp_str_lit("HEAD"),
-    },
-  });
-
-  SP_ASSERT(output.status.exit_code == 0);
+  sp_ps_output_t output = git_repo_git(repo, sp_str_lit("rev-parse"), sp_str_lit("--short=12"), sp_str_lit("HEAD"));
   return sp_str_trim_right(output.out);
 }
 
 static void git_repo_write_file(sp_str_t repo, const c8* path, const c8* content) {
   sp_str_t full = sp_fs_join_path(sp_mem_os_new(), repo, sp_str_view(path));
-  sp_str_t parent = sp_fs_parent_path(full);
-  if (!sp_str_empty(parent)) {
-    sp_fs_create_dir(parent);
-  }
-
-  sp_io_file_writer_t f = sp_zero;
-  sp_io_file_writer_from_path(&f, full);
-
-  sp_str_t str = sp_str_view(content);
-  if (!sp_str_empty(str)) {
-    sp_io_write_str(&f.base, str, SP_NULLPTR);
-  }
-
-  sp_io_file_writer_close(&f);
+  sp_fs_create_dir(sp_fs_parent_path(full));
+  sp_fs_create_file_str(full, content ? sp_str_view(content) : sp_str_lit(""));
 }
 
 git_repo_result_t git_repo_build(tmpfs_t* fs, const c8* name, git_repo_fixture_t* fixture) {
@@ -131,7 +96,7 @@ git_repo_result_t git_repo_build_at(sp_str_t dir, const c8* name, git_repo_fixtu
     if (!commit->message) break;
 
     // clear working tree
-    git_repo_run(result.path,
+    git_repo_git(result.path,
       sp_str_lit("rm"), sp_str_lit("-r"), sp_str_lit("--quiet"),
       sp_str_lit("--ignore-unmatch"), sp_str_lit("."));
 
@@ -140,7 +105,7 @@ git_repo_result_t git_repo_build_at(sp_str_t dir, const c8* name, git_repo_fixtu
       git_repo_file_t* file = &commit->files[f];
       if (!file->path) break;
 
-      git_repo_write_file(result.path, file->path, file->content ? file->content : "");
+      git_repo_write_file(result.path, file->path, file->content);
     }
 
     // stage and commit
@@ -155,17 +120,16 @@ git_repo_result_t git_repo_build_at(sp_str_t dir, const c8* name, git_repo_fixtu
 }
 
 sp_str_t git_repo_file_at(sp_str_t repo, sp_str_t commit, sp_str_t path) {
-  sp_mem_t mem = sp_mem_os_new();
-  sp_str_t spec = sp_fmt(mem, "{}:{}", sp_fmt_str(commit), sp_fmt_str(path)).value;
-
-  sp_ps_output_t output = sp_ps_run(mem, (sp_ps_config_t) {
-    .command = sp_str_lit("git"),
-    .args = {
-      sp_str_lit("-C"), repo,
-      sp_str_lit("show"), spec,
-    },
-  });
-
-  SP_ASSERT(output.status.exit_code == 0);
+  sp_str_t spec = sp_fmt(sp_mem_os_new(), "{}:{}", sp_fmt_str(commit), sp_fmt_str(path)).value;
+  sp_ps_output_t output = git_repo_git(repo, sp_str_lit("show"), spec);
   return output.out;
+}
+
+bool git_repo_has_file(sp_str_t repo, sp_str_t commit, sp_str_t path) {
+  sp_str_t spec = sp_fmt(sp_mem_os_new(), "{}:{}", sp_fmt_str(commit), sp_fmt_str(path)).value;
+  sp_ps_output_t output = sp_ps_run(sp_mem_os_new(), (sp_ps_config_t) {
+    .command = sp_str_lit("git"),
+    .args = { sp_str_lit("-C"), repo, sp_str_lit("cat-file"), sp_str_lit("-e"), spec },
+  });
+  return output.status.exit_code == 0;
 }

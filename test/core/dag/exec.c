@@ -326,7 +326,7 @@ static sp_err_t exec_run_ops(sp_test_t* t, spn_dag_store_kind_t kind, const exec
   return SP_OK;
 }
 
-sp_test_each(exec, ops, exec_test_t, exec_tests) {
+sp_test_each(dag_exec, ops, exec_test_t, exec_tests) {
   sp_carr_for(dag_test_store_kinds, kind) {
     sp_err_t err = exec_run_ops(t, dag_test_store_kinds[kind], it);
     if (err) {

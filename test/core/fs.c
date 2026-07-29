@@ -1,15 +1,7 @@
-// The sp and spit implementations live alone in this TU; this binary is a
-// single TU, so it doubles as its own spit_main.c
-#define SP_IMPLEMENTATION
-#include "sp.h"
-
 #include "spn_test.h"
 
 #include "sp/fs.h"
 
-s32 main(s32 argc, const c8** argv) {
-  return sp_test_main(argc, argv, SP_NULLPTR);
-}
 
 #define FS_LOCK_MAX_SLOTS 4
 #define FS_LOCK_MAX_OPS 8
@@ -103,9 +95,7 @@ sp_test_each(fs_lock, ops, fs_lock_test_t, fs_lock_tests) {
       : sp_str_lit("");
 
     switch (op.kind) {
-      case FS_LOCK_OP_NONE: {
-        break;
-      }
+      case FS_LOCK_OP_NONE: sp_unreachable_case();
       case FS_LOCK_OP_ACQUIRE: {
         sp_expect_ok(t, sp_fs_lock_acquire(lock, path));
         sp_expect(t, lock->held);

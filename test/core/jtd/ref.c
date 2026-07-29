@@ -6,11 +6,9 @@ static sp_err_t compare_ref_ok(sp_test_t* t, const jtd_result_t* root, const voi
   sp_expect_str_eq_c(t, root->root->as.ref.name, "str");
 
   jtd_schema_t* def = jtd_definition(root, sp_str_lit("str"));
-  sp_expect(t, def != SP_NULLPTR);
-  if (def) {
-    sp_expect_eq(t, (s32)JTD_FORM_TYPE, (s32)def->form);
-    sp_expect(t, jtd_resolve(root, root->root) == def);
-  }
+  sp_must(t, def != SP_NULLPTR);
+  sp_expect_eq(t, (s32)JTD_FORM_TYPE, (s32)def->form);
+  sp_expect(t, jtd_resolve(root, root->root) == def);
   sp_expect(t, jtd_resolve(root, SP_NULLPTR) == SP_NULLPTR);
   sp_expect(t, jtd_definition(root, sp_str_lit("absent")) == SP_NULLPTR);
   return SP_OK;
@@ -19,19 +17,15 @@ static sp_err_t compare_ref_ok(sp_test_t* t, const jtd_result_t* root, const voi
 static sp_err_t compare_ref_chain(sp_test_t* t, const jtd_result_t* root, const void* expect) {
   (void)expect;
   jtd_schema_t* shallow = jtd_resolve(root, root->root);
-  sp_expect(t, shallow != SP_NULLPTR);
-  if (shallow) {
-    sp_expect_eq(t, (s32)JTD_FORM_REF, (s32)shallow->form);
-    sp_expect_str_eq_c(t, shallow->as.ref.name, "b");
-  }
+  sp_must(t, shallow != SP_NULLPTR);
+  sp_expect_eq(t, (s32)JTD_FORM_REF, (s32)shallow->form);
+  sp_expect_str_eq_c(t, shallow->as.ref.name, "b");
 
   jtd_diagnostic_t diag = sp_zero;
   jtd_schema_t* deep = jtd_resolve_deep(sp_test_arena(t), root, root->root, &diag);
-  sp_expect(t, deep != SP_NULLPTR);
-  if (deep) {
-    sp_expect_eq(t, (s32)JTD_FORM_TYPE, (s32)deep->form);
-    sp_expect_eq(t, (s32)JTD_TYPE_STRING, (s32)deep->as.type);
-  }
+  sp_must(t, deep != SP_NULLPTR);
+  sp_expect_eq(t, (s32)JTD_FORM_TYPE, (s32)deep->form);
+  sp_expect_eq(t, (s32)JTD_TYPE_STRING, (s32)deep->as.type);
   return SP_OK;
 }
 
@@ -48,19 +42,15 @@ static sp_err_t compare_ref_cycle(sp_test_t* t, const jtd_result_t* root, const 
 static sp_err_t compare_ref_recursive_properties(sp_test_t* t, const jtd_result_t* root, const void* expect) {
   (void)expect;
   jtd_schema_t* deep = jtd_resolve_deep(sp_test_arena(t), root, root->root, SP_NULLPTR);
-  sp_expect(t, deep != SP_NULLPTR);
-  if (deep) {
-    sp_expect_eq(t, (s32)JTD_FORM_PROPERTIES, (s32)deep->form);
-    sp_expect_eq(t, (u64)1, (u64)sp_da_size(deep->as.properties.optional));
+  sp_must(t, deep != SP_NULLPTR);
+  sp_expect_eq(t, (s32)JTD_FORM_PROPERTIES, (s32)deep->form);
+  sp_must_eq(t, (u64)1, (u64)sp_da_size(deep->as.properties.optional));
 
-    if (sp_da_size(deep->as.properties.optional) == 1) {
-      jtd_property_t* next = &deep->as.properties.optional[0];
-      sp_expect_str_eq_c(t, next->key, "next");
+  jtd_property_t* next = &deep->as.properties.optional[0];
+  sp_expect_str_eq_c(t, next->key, "next");
 
-      jtd_schema_t* resolved = jtd_resolve_deep(sp_test_arena(t), root, next->schema, SP_NULLPTR);
-      sp_expect(t, resolved == deep);
-    }
-  }
+  jtd_schema_t* resolved = jtd_resolve_deep(sp_test_arena(t), root, next->schema, SP_NULLPTR);
+  sp_expect(t, resolved == deep);
   return SP_OK;
 }
 

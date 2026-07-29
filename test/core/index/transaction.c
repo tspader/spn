@@ -156,16 +156,6 @@ static const txn_test_t tests [] = {
   },
 };
 
-static void git_run(sp_str_t cwd, const c8* a, sp_str_t b, sp_str_t c, sp_str_t d, sp_str_t e) {
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
-    .command = SP_LIT("git"),
-    .args = { SP_LIT("-C"), cwd, sp_str_view(a), b, c, d, e },
-  });
-  sp_assert(!result.status.exit_code);
-  sp_mem_end_scratch(scratch);
-}
-
 static u32 remote_line_count(sp_mem_t mem, sp_str_t remote, const c8* path) {
   sp_ps_output_t result = sp_ps_run(mem, (sp_ps_config_t) {
     .command = SP_LIT("git"),
@@ -175,13 +165,7 @@ static u32 remote_line_count(sp_mem_t mem, sp_str_t remote, const c8* path) {
     return 0;
   }
 
-  u32 count = 0;
-  sp_str_for_line(result.out, it) {
-    if (!sp_str_empty(sp_str_trim(it.line))) {
-      count++;
-    }
-  }
-  return count;
+  return index_test_count_lines(result.out);
 }
 
 static sp_str_t remote_head_message(sp_mem_t mem, sp_str_t remote) {
@@ -211,16 +195,16 @@ sp_test_each(index_transaction, publish, txn_test_t, tests) {
   spn_index_init(&index, mem);
 
   if (it->remote.empty) {
-    git_run(tmp, "init", sp_str_lit("--quiet"), sp_str_lit("--bare"), sp_str_lit("remote.git"), sp_zero_s(sp_str_t));
+    git_repo_git(tmp, sp_str_lit("init"), sp_str_lit("--quiet"), sp_str_lit("--bare"), sp_str_lit("remote.git"));
   }
   else {
     sp_fs_create_dir(seed);
     git_repo_init(seed);
-    git_run(seed, "symbolic-ref", sp_str_lit("HEAD"), sp_str_lit("refs/heads/main"), sp_zero_s(sp_str_t), sp_zero_s(sp_str_t));
+    git_repo_git(seed, sp_str_lit("symbolic-ref"), sp_str_lit("HEAD"), sp_str_lit("refs/heads/main"));
     sp_fs_create_file_str(sp_fs_join_path(mem, seed, sp_str_lit("README.md")), sp_str_lit("index\n"));
     git_repo_stage_all(seed);
     git_repo_commit(seed, sp_str_lit("init"));
-    git_run(tmp, "clone", sp_str_lit("--quiet"), sp_str_lit("--bare"), sp_str_lit("seed"), sp_str_lit("remote.git"));
+    git_repo_git(tmp, sp_str_lit("clone"), sp_str_lit("--quiet"), sp_str_lit("--bare"), sp_str_lit("seed"), sp_str_lit("remote.git"));
   }
 
   if (it->remote.reject_push) {
@@ -265,13 +249,13 @@ sp_test_each(index_transaction, publish, txn_test_t, tests) {
         break;
       }
       case TXN_ACTION_ADVANCE_REMOTE: {
-        git_run(seed, "pull", sp_str_lit("--quiet"), remote, sp_str_lit("main"), sp_zero_s(sp_str_t));
+        git_repo_git(seed, sp_str_lit("pull"), sp_str_lit("--quiet"), remote, sp_str_lit("main"));
         sp_str_t file = sp_fs_join_path(mem, seed, sp_str_view(action.write.file));
         sp_fs_create_dir(sp_fs_parent_path(file));
         sp_fs_create_file_str(file, sp_fmt(mem, "{}\n", sp_fmt_cstr(action.write.line)).value);
         git_repo_stage_all(seed);
         git_repo_commit(seed, sp_str_lit("advance"));
-        git_run(seed, "push", sp_str_lit("--quiet"), remote, sp_str_lit("HEAD:refs/heads/main"), sp_zero_s(sp_str_t));
+        git_repo_git(seed, sp_str_lit("push"), sp_str_lit("--quiet"), remote, sp_str_lit("HEAD:refs/heads/main"));
         break;
       }
       case TXN_ACTION_APPEND_CLONE_FILE: {

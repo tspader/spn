@@ -29,9 +29,6 @@ typedef struct {
   release_rel_t releases [4];
 } release_expect_t;
 
-// The releases/*.jsonl files play a dual role: rows with .golden render the
-// expected releases through spn_index_release_to_json and compare against the
-// file, then every row feeds the same file back through the parser.
 typedef struct {
   const c8* name;
   bool golden;
@@ -321,10 +318,9 @@ static sp_err_t release_check(sp_test_t* t, sp_mem_t mem, const release_rel_t* e
 
   u32 num_deps = 0;
   sp_carr_detect_len(expected->deps, num_deps, expected->deps[num_deps].namespace);
-  sp_expect_eq(t, num_deps, sp_da_size(rel->deps));
+  sp_must_eq(t, num_deps, sp_da_size(rel->deps));
 
   sp_for(it, num_deps) {
-    if (it >= sp_da_size(rel->deps)) { break; }
     sp_expect_str_eq_c(t, rel->deps[it].id.namespace, expected->deps[it].namespace);
     sp_expect_str_eq_c(t, rel->deps[it].id.name, expected->deps[it].name);
     sp_expect_str_eq_c(t, rel->deps[it].version, expected->deps[it].version);
@@ -333,18 +329,16 @@ static sp_err_t release_check(sp_test_t* t, sp_mem_t mem, const release_rel_t* e
 
   u32 num_targets = 0;
   sp_carr_detect_len(expected->targets, num_targets, expected->targets[num_targets].name);
-  sp_expect_eq(t, num_targets, sp_da_size(rel->targets));
+  sp_must_eq(t, num_targets, sp_da_size(rel->targets));
 
   sp_for(it, num_targets) {
-    if (it >= sp_da_size(rel->targets)) { break; }
     sp_expect_str_eq_c(t, rel->targets[it].name, expected->targets[it].name);
 
     u32 num_linkages = 0;
     sp_carr_detect_len(expected->targets[it].linkages, num_linkages, expected->targets[it].linkages[num_linkages] != SPN_LIB_KIND_NONE);
-    sp_expect_eq(t, num_linkages, sp_da_size(rel->targets[it].linkages));
+    sp_must_eq(t, num_linkages, sp_da_size(rel->targets[it].linkages));
 
     sp_for(kind, num_linkages) {
-      if (kind >= sp_da_size(rel->targets[it].linkages)) { break; }
       sp_expect_eq(t, expected->targets[it].linkages[kind], rel->targets[it].linkages[kind]);
     }
   }
@@ -384,9 +378,8 @@ sp_test_each(index_release, parse, release_test_t, tests) {
   sp_expect_eq(t, it->expect.err, err);
   if (err != SPN_OK || it->expect.err != SPN_OK) { return SP_OK; }
 
-  sp_expect_eq(t, num_releases, sp_da_size(pkg.releases));
+  sp_must_eq(t, num_releases, sp_da_size(pkg.releases));
   sp_for(at, num_releases) {
-    if (at >= sp_da_size(pkg.releases)) { break; }
     release_check(t, mem, &it->expect.releases[at], &pkg.releases[at]);
   }
 

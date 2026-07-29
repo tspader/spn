@@ -19,7 +19,7 @@ static const digest_test_t digest_tests [] = {
   },
 };
 
-sp_test_each(digest, hash, digest_test_t, digest_tests) {
+sp_test_each(dag_digest, hash, digest_test_t, digest_tests) {
   sp_str_t data = sp_str_view(it->data);
   spn_dag_digest_t digest = spn_dag_digest(data.data, data.len);
   sp_expect(t, spn_dag_digest_valid(digest));
@@ -27,7 +27,7 @@ sp_test_each(digest, hash, digest_test_t, digest_tests) {
   return SP_OK;
 }
 
-sp_test(digest, zero_is_invalid) {
+sp_test(dag_digest, zero_is_invalid) {
   sp_expect(t, !spn_dag_digest_valid((spn_dag_digest_t) sp_zero));
   return SP_OK;
 }

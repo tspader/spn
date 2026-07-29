@@ -82,7 +82,7 @@ static sp_err_t build_action_key(sp_test_t* t, spn_dag_t* g, const key_action_t*
   return SP_OK;
 }
 
-sp_test_each(key, weak, key_test_t, key_tests) {
+sp_test_each(dag_key, weak, key_test_t, key_tests) {
   sp_mem_t mem = sp_test_arena(t);
   spn_dag_digest_t a = sp_zero;
   spn_dag_digest_t b = sp_zero;

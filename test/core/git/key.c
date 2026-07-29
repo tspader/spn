@@ -24,8 +24,6 @@ typedef struct {
   sp_hash_t patches;
 } checkout_key_input_t;
 
-// Rows with only .a assert the <name>-<16 hex> key format; rows with .b assert
-// that the two inputs produce different keys
 typedef struct {
   const c8* name;
   checkout_key_input_t a;
@@ -136,10 +134,7 @@ sp_test_each(git_key, db_key, db_key_t, db_keys) {
 
   sp_str_t name = spn_git_url_name(url);
   sp_str_t hash = sp_str_suffix(key, key.len - name.len - 1);
-  sp_for(i, hash.len) {
-    c8 c = hash.data[i];
-    sp_expect(t, (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
-  }
+  sp_expect(t, test_str_is_hex(hash));
 
   sp_expect_str_eq(t, key, spn_git_db_key(mem, url));
   return SP_OK;

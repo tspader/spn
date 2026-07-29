@@ -2,14 +2,7 @@
 
 sp_err_t expect_args(sp_test_t* t, spn_invocation_t* invocation, render_expect_t expect) {
   sp_expect_str_eq_c(t, invocation->program, expect.command);
-
-  u32 count = 0;
-  sp_carr_detect_len(expect.args, count, expect.args[count]);
-  sp_must_eq(t, count, sp_da_size(invocation->args));
-  sp_for(it, count) {
-    sp_expect_str_eq_c(t, invocation->args[it], expect.args[it]);
-  }
-
+  sp_must_strs_eq(t, invocation->args, sp_da_size(invocation->args), expect.args);
   return SP_OK;
 }
 

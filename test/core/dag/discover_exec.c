@@ -239,7 +239,7 @@ static sp_str_t manifest_read(discover_env_t* env) {
   return content;
 }
 
-sp_test_each(discover_exec, runs, discover_test_t, discover_tests) {
+sp_test_each(dag_discover_exec, runs, discover_test_t, discover_tests) {
   discover_env_t env = sp_zero;
   dag_test_env_init(&env.dag, t, (dag_test_env_config_t) {
     .store = SPN_DAG_STORE_MEM,

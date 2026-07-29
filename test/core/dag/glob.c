@@ -105,7 +105,7 @@ static s32 glob_match_order(const void* a, const void* b) {
   return sp_str_compare_alphabetical(((const spn_dag_match_t*)a)->relative, ((const spn_dag_match_t*)b)->relative);
 }
 
-sp_test_each(glob, observe, glob_test_t, glob_tests) {
+sp_test_each(dag_glob, observe, glob_test_t, glob_tests) {
   sp_mem_t mem = sp_test_arena(t);
   sp_str_t root = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("R"));
   sp_fs_create_dir(root);
@@ -235,7 +235,7 @@ static spn_err_t glob_exec_discover(spn_dag_t* g, spn_dag_action_t* action, void
   return spn_dag_glob(mem, env->root, sp_str_view(env->pattern), out, SP_NULLPTR);
 }
 
-sp_test_each(glob, exec, glob_exec_test_t, glob_exec_tests) {
+sp_test_each(dag_glob, exec, glob_exec_test_t, glob_exec_tests) {
   glob_exec_env_t env = sp_zero;
   dag_test_env_init(&env.dag, t, (dag_test_env_config_t) {
     .store = SPN_DAG_STORE_MEM,

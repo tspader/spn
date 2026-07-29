@@ -1,8 +1,5 @@
 #include "unit.h"
 
-// The link_plan executor points the process-global interner at its per-test
-// session interner (production code reached through spn_units_add_targets
-// reads it), so the suite cannot run in parallel
 sp_test_suite(link_plan, .serial = true);
 
 // The examined link unit; it lands on the root package as a target named "app"
@@ -197,25 +194,11 @@ static spn_target_info_t target_info(sp_mem_t mem, const plan_target_t* spec) {
   return info;
 }
 
-static sp_err_t expect_str_list(sp_test_t* t, sp_da(sp_str_t) actual, const c8* const* expect, bool suffix) {
-  u32 expected = 0;
-  sp_for(it, UNIT_TEST_MAX_STRS) {
-    if (!expect[it]) {
-      break;
-    }
-    expected++;
+static sp_err_t expect_str_suffixes(sp_test_t* t, sp_da(sp_str_t) actual, const c8* const* expect, u32 count) {
+  sp_must_eq(t, count, sp_da_size(actual));
+  sp_for(it, count) {
+    sp_expect(t, sp_str_ends_with(actual[it], sp_str_view(expect[it])));
   }
-
-  sp_must_eq(t, expected, sp_da_size(actual));
-  sp_for(it, expected) {
-    if (suffix) {
-      sp_expect(t, sp_str_ends_with(actual[it], sp_str_view(expect[it])));
-    }
-    else {
-      sp_expect_str_eq_c(t, actual[it], expect[it]);
-    }
-  }
-
   return SP_OK;
 }
 
@@ -242,11 +225,13 @@ sp_test_each(link_plan, plan, plan_test_t, tests) {
   sp_must(t, app != SP_NULLPTR);
 
   spn_link_plan_t* plan = &app->link;
-  expect_str_list(t, plan->cc.libs, it->expect.libs, false);
-  expect_str_list(t, plan->cc.whole_archives, it->expect.whole_archives, true);
-  expect_str_list(t, plan->cc.private_libs, it->expect.private_libs, false);
-  expect_str_list(t, plan->cc.system_libs, it->expect.system_libs, false);
-  expect_str_list(t, plan->cc.frameworks, it->expect.frameworks, false);
+  sp_must_strs_eq(t, plan->cc.libs, sp_da_size(plan->cc.libs), it->expect.libs);
+  u32 num_whole_archives = 0;
+  sp_carr_detect_len(it->expect.whole_archives, num_whole_archives, it->expect.whole_archives[num_whole_archives]);
+  sp_try(expect_str_suffixes(t, plan->cc.whole_archives, it->expect.whole_archives, num_whole_archives));
+  sp_must_strs_eq(t, plan->cc.private_libs, sp_da_size(plan->cc.private_libs), it->expect.private_libs);
+  sp_must_strs_eq(t, plan->cc.system_libs, sp_da_size(plan->cc.system_libs), it->expect.system_libs);
+  sp_must_strs_eq(t, plan->cc.frameworks, sp_da_size(plan->cc.frameworks), it->expect.frameworks);
   sp_expect_eq(t, it->expect.min_os.major, plan->cc.min_os.major);
   sp_expect_eq(t, it->expect.min_os.minor, plan->cc.min_os.minor);
   sp_expect_eq(t, it->expect.lang, plan->cc.lang);

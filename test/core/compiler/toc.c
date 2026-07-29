@@ -1,7 +1,6 @@
 #include "compiler.h"
 
 #define toc_syms_max 4
-#define toc_buf_max 4096
 
 typedef enum {
   TOC_AR_GNU,
@@ -28,18 +27,14 @@ typedef struct {
   toc_expect_t expect;
 } toc_test_t;
 
-typedef struct {
-  u8 data [toc_buf_max];
-  u32 len;
-} ar_buf_t;
+typedef sp_io_dyn_mem_writer_t ar_buf_t;
 
 static void ar_bytes(ar_buf_t* b, const void* ptr, u32 len) {
-  memcpy(b->data + b->len, ptr, len);
-  b->len += len;
+  sp_io_write(&b->base, ptr, len, SP_NULLPTR);
 }
 
 static void ar_cstr(ar_buf_t* b, const c8* s) {
-  ar_bytes(b, s, (u32)strlen(s));
+  sp_io_write_cstr(&b->base, s, SP_NULLPTR);
 }
 
 static void ar_u32be(ar_buf_t* b, u32 v) {
@@ -58,51 +53,42 @@ static void ar_u32le(ar_buf_t* b, u32 v) {
 }
 
 static void ar_pad_even(ar_buf_t* b) {
-  if (b->len & 1) {
+  u64 size = 0;
+  sp_io_dyn_mem_writer_size(b, &size);
+  if (size & 1) {
     ar_cstr(b, "\n");
   }
 }
 
-static void ar_field(c8* hdr, u32 offset, u32 width, const c8* value) {
-  u32 len = (u32)strlen(value);
-  memcpy(hdr + offset, value, len < width ? len : width);
+static void ar_field(c8* hdr, u32 offset, u32 width, sp_str_t value) {
+  memcpy(hdr + offset, value.data, sp_min(value.len, width));
 }
 
 static void ar_header(ar_buf_t* b, const c8* name, u32 size) {
   c8 hdr [60];
   memset(hdr, ' ', 60);
-  ar_field(hdr, 0, 16, name);
-  ar_field(hdr, 16, 12, "0");
-  ar_field(hdr, 28, 6, "0");
-  ar_field(hdr, 34, 6, "0");
-  ar_field(hdr, 40, 8, "644");
-  c8 size_str [11];
-  snprintf(size_str, sizeof(size_str), "%u", size);
-  ar_field(hdr, 48, 10, size_str);
+  ar_field(hdr, 0, 16, sp_str_view(name));
+  ar_field(hdr, 16, 12, sp_str_lit("0"));
+  ar_field(hdr, 28, 6, sp_str_lit("0"));
+  ar_field(hdr, 34, 6, sp_str_lit("0"));
+  ar_field(hdr, 40, 8, sp_str_lit("644"));
+  ar_field(hdr, 48, 10, sp_fmt(b->allocator, "{}", sp_fmt_uint(size)).value);
   hdr[58] = 0x60;
   hdr[59] = '\n';
   ar_bytes(b, hdr, 60);
 }
 
-static u32 count_symbols(const c8* const* symbols) {
-  u32 n = 0;
-  while (n < toc_syms_max && symbols[n]) {
-    n++;
-  }
-  return n;
-}
-
 static u32 names_size(const c8* const* symbols, u32 n) {
   u32 size = 0;
   sp_for(it, n) {
-    size += (u32)strlen(symbols[it]) + 1;
+    size += sp_cstr_len(symbols[it]) + 1;
   }
   return size;
 }
 
 static void ar_names(ar_buf_t* b, const c8* const* symbols, u32 n) {
   sp_for(it, n) {
-    ar_bytes(b, symbols[it], (u32)strlen(symbols[it]) + 1);
+    ar_bytes(b, symbols[it], sp_cstr_len(symbols[it]) + 1);
   }
 }
 
@@ -111,8 +97,7 @@ static void ar_object(ar_buf_t* b) {
   ar_cstr(b, "OBJ\n");
 }
 
-static void build_gnu(ar_buf_t* b, const c8* const* symbols, bool wide, bool thin) {
-  u32 n = count_symbols(symbols);
+static void build_gnu(ar_buf_t* b, const c8* const* symbols, u32 n, bool wide, bool thin) {
   u32 word = wide ? 8 : 4;
   u32 symtab_size = word + word * n + names_size(symbols, n);
   u32 object_offset = 8 + 60 + symtab_size + (symtab_size & 1);
@@ -135,8 +120,7 @@ static void build_gnu(ar_buf_t* b, const c8* const* symbols, bool wide, bool thi
   }
 }
 
-static void build_bsd(ar_buf_t* b, const c8* const* symbols, bool sorted) {
-  u32 n = count_symbols(symbols);
+static void build_bsd(ar_buf_t* b, const c8* const* symbols, u32 n, bool sorted) {
   u32 name_size = sorted ? 20 : 0;
   u32 strtab_size = names_size(symbols, n);
   u32 symdef_size = name_size + 4 + 8 * n + 4 + strtab_size;
@@ -152,7 +136,7 @@ static void build_bsd(ar_buf_t* b, const c8* const* symbols, bool sorted) {
   sp_for(it, n) {
     ar_u32le(b, strx);
     ar_u32le(b, object_offset);
-    strx += (u32)strlen(symbols[it]) + 1;
+    strx += sp_cstr_len(symbols[it]) + 1;
   }
   ar_u32le(b, strtab_size);
   ar_names(b, symbols, n);
@@ -160,8 +144,7 @@ static void build_bsd(ar_buf_t* b, const c8* const* symbols, bool sorted) {
   ar_object(b);
 }
 
-static void build_coff(ar_buf_t* b, const c8* const* symbols) {
-  u32 n = count_symbols(symbols);
+static void build_coff(ar_buf_t* b, const c8* const* symbols, u32 n) {
   u32 first_size = 4 + 4 * n + names_size(symbols, n);
   u32 first_end = 8 + 60 + first_size + (first_size & 1);
   u32 object_offset = first_end + 60 + 4;
@@ -177,30 +160,30 @@ static void build_coff(ar_buf_t* b, const c8* const* symbols) {
   ar_object(b);
 }
 
-static void build_archive(ar_buf_t* b, toc_format_t format, const c8* const* symbols) {
+static void build_archive(ar_buf_t* b, toc_format_t format, const c8* const* symbols, u32 n) {
   switch (format) {
     case TOC_AR_GNU: {
-      build_gnu(b, symbols, false, false);
+      build_gnu(b, symbols, n, false, false);
       break;
     }
     case TOC_AR_GNU64: {
-      build_gnu(b, symbols, true, false);
+      build_gnu(b, symbols, n, true, false);
       break;
     }
     case TOC_AR_THIN: {
-      build_gnu(b, symbols, false, true);
+      build_gnu(b, symbols, n, false, true);
       break;
     }
     case TOC_AR_BSD: {
-      build_bsd(b, symbols, false);
+      build_bsd(b, symbols, n, false);
       break;
     }
     case TOC_AR_BSD_SORTED: {
-      build_bsd(b, symbols, true);
+      build_bsd(b, symbols, n, true);
       break;
     }
     case TOC_AR_COFF: {
-      build_coff(b, symbols);
+      build_coff(b, symbols, n);
       break;
     }
     case TOC_AR_NO_SYMTAB: {
@@ -309,10 +292,14 @@ sp_test_each(toc, parse, toc_test_t, tests) {
   sp_mem_t mem = sp_test_arena(t);
 
   ar_buf_t buf = sp_zero;
-  build_archive(&buf, it->format, it->symbols);
+  sp_io_dyn_mem_writer_init(mem, &buf);
+  u32 n = 0;
+  sp_carr_detect_len(it->symbols, n, it->symbols[n]);
+  build_archive(&buf, it->format, it->symbols, n);
 
+  sp_str_t bytes = sp_io_dyn_mem_writer_as_str(&buf);
   sp_io_reader_t reader = sp_zero;
-  sp_io_reader_from_mem(&reader, buf.data, buf.len);
+  sp_io_reader_from_mem(&reader, bytes.data, bytes.len);
 
   spn_toc_parser_t toc;
   spn_err_t err = spn_toc_init(&toc, &reader);
@@ -328,12 +315,7 @@ sp_test_each(toc, parse, toc_test_t, tests) {
   sp_expect_eq(t, err, it->expect.err);
 
   if (!it->expect.err) {
-    u32 count = count_symbols(it->expect.symbols);
-    sp_must_eq(t, count, sp_da_size(symbols));
-    sp_for(i, count) {
-      sp_test_kv(t, "symbol", sp_str_view(it->expect.symbols[i]));
-      sp_expect_str_eq_c(t, symbols[i], it->expect.symbols[i]);
-    }
+    sp_must_strs_eq(t, symbols, sp_da_size(symbols), it->expect.symbols);
   }
 
   return SP_OK;

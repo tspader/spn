@@ -154,15 +154,15 @@ static sp_err_t discovery_expect_obs(sp_test_t* t, const spn_dag_pathset_t* set,
 
 static sp_err_t discovery_expect(sp_test_t* t, spn_dag_obs_table_t* discovery, const c8* key, const discovery_expect_t* expect) {
   const spn_dag_pathset_t* set = spn_dag_obs_table_get(discovery, dag_test_digest(key));
-  sp_expect_eq(t, expect->hit, set != SP_NULLPTR);
-  if (!expect->hit || !set) {
+  sp_must_eq(t, expect->hit, set != SP_NULLPTR);
+  if (!expect->hit) {
     return SP_OK;
   }
 
   return discovery_expect_obs(t, set, expect->obs);
 }
 
-sp_test_each(discovery, table, discovery_test_t, discovery_tests) {
+sp_test_each(dag_discovery, table, discovery_test_t, discovery_tests) {
   sp_mem_t mem = sp_test_arena(t);
   sp_str_t dir = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("manifests"));
 

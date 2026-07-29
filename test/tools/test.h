@@ -31,6 +31,8 @@ void   ctx_deinit(ctx_t* ctx);
 ctx_paths_t ctx_get_paths(ctx_t* ctx);
 
 
+bool str_equal(sp_str_t a, sp_str_t b);
+
 // UTEST
 #define SP_TEST_STREQ(a, b, sa, sb, is_assert) \
   do { \

@@ -1,19 +1,12 @@
 #include "closure.h"
 
-sp_err_t expect_target_names(sp_test_t* t, sp_da(spn_target_unit_t*) targets, const c8* const* expect, u32 max) {
-  u32 expected = 0;
-  sp_for(it, max) {
-    if (!expect[it]) {
-      break;
-    }
-    expected++;
+sp_err_t expect_target_names(sp_test_t* t, sp_da(spn_target_unit_t*) targets, const c8* const* expect) {
+  sp_da(sp_str_t) names = sp_da_new(sp_test_arena(t), sp_str_t);
+  sp_da_for(targets, it) {
+    sp_da_push(names, targets[it]->info->name);
   }
 
-  sp_must_eq(t, expected, sp_da_size(targets));
-  sp_for(it, expected) {
-    sp_expect_str_eq_c(t, targets[it]->info->name, expect[it]);
-  }
-
+  sp_must_strs_eq(t, names, sp_da_size(names), expect);
   return SP_OK;
 }
 

@@ -1,7 +1,5 @@
 #include "jtd_test.h"
 
-// Each case name is the stem of a fixture in json/conformance which the
-// parser must reject
 typedef struct {
   const c8* name;
 } conformance_case_t;

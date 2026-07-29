@@ -9,8 +9,6 @@
 #define FIXTURE_MAX_HOSTS 2
 #define FIXTURE_MAX_TARGETS 4
 
-// Brace lists so the triples can appear in static row initializers; cast to
-// (spn_triple_t) at value use sites.
 #define HOST_X64_LINUX  { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU }
 #define HOST_ARM_LINUX  { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }
 #define HOST_ARM_MACOS  { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_NONE }
@@ -66,15 +64,7 @@ static sp_err_t fixture_check_launcher(sp_test_t* t, spn_toolchain_launcher_t la
   }
 
   sp_expect_str_eq_c(t, launcher.program, expect.program);
-
-  u32 args = 0;
-  sp_carr_detect_len(expect.args, args, expect.args[args]);
-
-  sp_must_eq(t, args, (u32)sp_da_size(launcher.args));
-  sp_for(it, args) {
-    sp_expect_str_eq_c(t, launcher.args[it], expect.args[it]);
-  }
-
+  sp_must_strs_eq(t, launcher.args, sp_da_size(launcher.args), expect.args);
   return SP_OK;
 }
 

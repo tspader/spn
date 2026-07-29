@@ -1,12 +1,5 @@
 #include "unit.h"
 
-// The linked production ctx.c reads this global (spn_intern -> spn.intern);
-// the link_plan executor points it at its per-test interner, so that suite
-// runs serial
-spn_ctx_t spn;
-
-// The metaprogram runtime is out of scope here; satisfy unit/target.c's
-// reference without pulling wamr into the binary
 void spn_wasm_script_init(spn_wasm_script_t* script, sp_str_t module) {
   *script = (spn_wasm_script_t) { .path = module };
 }
@@ -156,13 +149,12 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
         break;
       }
       spn_pkg_id_t to = find_pkg_id(s, g, pkg->deps[dt].to);
-      if (to.hash) {
-        sp_da_push(resolved.edges, ((spn_resolved_dep_t) {
-          .id = to,
-          .kind = pkg->deps[dt].kind,
-          .private = pkg->deps[dt].private,
-        }));
-      }
+      SP_ASSERT(to.hash);
+      sp_da_push(resolved.edges, ((spn_resolved_dep_t) {
+        .id = to,
+        .kind = pkg->deps[dt].kind,
+        .private = pkg->deps[dt].private,
+      }));
     }
     sp_ht_insert(s->resolve, id, resolved);
   }

@@ -1,6 +1,5 @@
 #include "jtd_test.h"
 
-// The row name doubles as the expected string
 typedef struct {
   const c8* name;
   jtd_type_t type;

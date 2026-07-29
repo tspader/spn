@@ -1,16 +1,8 @@
-// The sp and spit implementations live alone in this TU; this binary is a
-// single TU, so it doubles as its own spit_main.c
-#define SP_IMPLEMENTATION
-#include "sp.h"
-
 #include "spn_test.h"
 
 #include "spn.h"
 #include "when/when.h"
 
-s32 main(s32 argc, const c8** argv) {
-  return sp_test_main(argc, argv, SP_NULLPTR);
-}
 
 typedef struct {
   const c8* str;
@@ -36,13 +28,14 @@ static spn_option_value_t make_value(value_lit_t lit) {
   return spn_option_value_none();
 }
 
-static spn_when_t make_when(sp_mem_t mem, const clause_lit_t* clauses) {
+static spn_when_t make_when(sp_mem_t mem, const clause_lit_t* clauses, u64 count) {
   spn_when_t when = { .clauses = sp_da_new(mem, spn_when_clause_t) };
-  for (const clause_lit_t* it = clauses; it->key; it++) {
+  sp_for(it, count) {
+    if (!clauses[it].key) break;
     spn_when_clause_t clause = {
-      .key = sp_str_view(it->key),
-      .negated = it->negated,
-      .value = make_value((value_lit_t) { .str = it->str, .b = it->b, .is_bool = it->is_bool }),
+      .key = sp_str_view(clauses[it].key),
+      .negated = clauses[it].negated,
+      .value = make_value((value_lit_t) { .str = clauses[it].str, .b = clauses[it].b, .is_bool = clauses[it].is_bool }),
     };
     sp_da_push(when.clauses, clause);
   }
@@ -85,11 +78,11 @@ static spn_option_info_t make_option_tls(sp_mem_t mem) {
   sp_da_push(option.values, sp_str_lit("off"));
 
   sp_da_push(option.defaults, ((spn_option_default_t) {
-    .when = make_when(mem, (clause_lit_t []) { { "os", "windows" }, sp_zero }),
+    .when = make_when(mem, (clause_lit_t []) { { "os", "windows" } }, 1),
     .value = spn_option_value_str(sp_str_lit("schannel")),
   }));
   sp_da_push(option.defaults, ((spn_option_default_t) {
-    .when = make_when(mem, (clause_lit_t []) { { .key = "os", .str = "wasi", .negated = true }, sp_zero }),
+    .when = make_when(mem, (clause_lit_t []) { { .key = "os", .str = "wasi", .negated = true } }, 1),
     .value = spn_option_value_str(sp_str_lit("openssl")),
   }));
   sp_da_push(option.defaults, ((spn_option_default_t) {
@@ -242,7 +235,7 @@ static const eval_t eval_tests [] = {
 sp_test_each(when, eval, eval_t, eval_tests) {
   sp_mem_t mem = sp_test_arena(t);
   spn_when_env_t env = make_env(mem);
-  spn_when_t when = make_when(mem, it->clauses);
+  spn_when_t when = make_when(mem, it->clauses, sp_carr_len(it->clauses));
   sp_expect_eq(t, spn_when_eval(&when, &env), it->expect.pass);
   return SP_OK;
 }
@@ -284,7 +277,7 @@ static const to_str_t to_str_tests [] = {
 
 sp_test_each(when, to_str, to_str_t, to_str_tests) {
   sp_mem_t mem = sp_test_arena(t);
-  spn_when_t when = make_when(mem, it->clauses);
+  spn_when_t when = make_when(mem, it->clauses, sp_carr_len(it->clauses));
   sp_expect_str_eq_c(t, spn_when_to_str(mem, &when), it->expect.value);
   return SP_OK;
 }

@@ -3,6 +3,7 @@
 #include "spn_test.h"
 
 #include "spn.h"
+#include "ctx/types.h"
 #include "event/event.h"
 #include "event/types.h"
 #include "forward/types.h"

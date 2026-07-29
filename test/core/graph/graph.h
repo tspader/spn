@@ -46,7 +46,7 @@ extern const graph_def_t comb_graph;
 extern const graph_def_t no_input_graph;
 
 sp_err_t graph_setup(sp_test_t* t);
-built_graph_t build_graph(sp_test_t* t, const graph_def_t* def);
+built_graph_t graph_build(sp_test_t* t, const graph_def_t* def);
 graph_ref_t* graph_ref(built_graph_t* b, const c8* id);
 void touch_file(sp_str_t path);
 void touch_node(built_graph_t* b, const c8* id);

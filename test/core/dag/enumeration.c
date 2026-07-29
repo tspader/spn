@@ -168,7 +168,7 @@ static void enum_prepare(enum_env_t* env, const enum_run_t* run) {
   }
 }
 
-sp_test_each(enumeration, runs, enum_test_t, enum_tests) {
+sp_test_each(dag_enumeration, runs, enum_test_t, enum_tests) {
   enum_env_t env = sp_zero;
   env.test = it;
   dag_test_env_init(&env.dag, t, (dag_test_env_config_t) {

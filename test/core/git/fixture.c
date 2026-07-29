@@ -132,8 +132,6 @@ static const git_repo_fixture_t tests [] = {
 };
 
 sp_test_each(git_fixture, build, git_repo_fixture_t, tests) {
-  sp_mem_t mem = sp_test_arena(t);
-
   // build repo from fixture
   git_repo_result_t repo = git_repo_build_at(sp_test_dir(t), it->name, it);
 
@@ -167,12 +165,7 @@ sp_test_each(git_fixture, build, git_repo_fixture_t, tests) {
         break;
       }
 
-      sp_str_t spec = sp_fmt(mem, "{}:{}", sp_fmt_str(repo.commits[c]), sp_fmt_cstr(path)).value;
-      sp_ps_output_t check = sp_ps_run(mem, (sp_ps_config_t) {
-        .command = sp_str_lit("git"),
-        .args = { sp_str_lit("-C"), repo.path, sp_str_lit("show"), spec },
-      });
-      sp_expect_ne(t, check.status.exit_code, 0);
+      sp_expect(t, !git_repo_has_file(repo.path, repo.commits[c], sp_str_view(path)));
     }
   }
 

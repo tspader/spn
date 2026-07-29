@@ -1,6 +1,6 @@
 #include "compiler.h"
 
-#define flags_max 5
+#define flags_max 6
 
 typedef struct {
   const c8* compile [flags_max];
@@ -172,19 +172,8 @@ sp_test_each(render_flags, resolve, flags_test_t, tests) {
 
   sp_expect_eq(t, err.kind, SPN_OK);
 
-  u32 compile = 0;
-  sp_carr_detect_len(it->expect.compile, compile, it->expect.compile[compile]);
-  u32 link = 0;
-  sp_carr_detect_len(it->expect.link, link, it->expect.link[link]);
-
-  sp_must_eq(t, compile, sp_da_size(flags.compile));
-  sp_must_eq(t, link, sp_da_size(flags.link));
-  sp_for(i, compile) {
-    sp_expect_str_eq_c(t, flags.compile[i], it->expect.compile[i]);
-  }
-  sp_for(i, link) {
-    sp_expect_str_eq_c(t, flags.link[i], it->expect.link[i]);
-  }
+  sp_must_strs_eq(t, flags.compile, sp_da_size(flags.compile), it->expect.compile);
+  sp_must_strs_eq(t, flags.link, sp_da_size(flags.link), it->expect.link);
 
   return SP_OK;
 }

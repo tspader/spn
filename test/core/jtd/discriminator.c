@@ -4,13 +4,11 @@ static sp_err_t compare_discriminator_ok(sp_test_t* t, const jtd_result_t* root,
   (void)expect;
   sp_expect_eq(t, (s32)JTD_FORM_DISCRIMINATOR, (s32)root->root->form);
   sp_expect_str_eq_c(t, root->root->as.discriminator.tag, "kind");
-  sp_expect_eq(t, (u64)2, (u64)sp_da_size(root->root->as.discriminator.mapping));
-  if (sp_da_size(root->root->as.discriminator.mapping) == 2) {
-    sp_expect_str_eq_c(t, root->root->as.discriminator.mapping[0].tag, "a");
-    sp_expect_str_eq_c(t, root->root->as.discriminator.mapping[1].tag, "b");
-    sp_expect_eq(t, (s32)JTD_FORM_PROPERTIES, (s32)root->root->as.discriminator.mapping[0].schema->form);
-    sp_expect_eq(t, (s32)JTD_FORM_PROPERTIES, (s32)root->root->as.discriminator.mapping[1].schema->form);
-  }
+  sp_must_eq(t, (u64)2, (u64)sp_da_size(root->root->as.discriminator.mapping));
+  sp_expect_str_eq_c(t, root->root->as.discriminator.mapping[0].tag, "a");
+  sp_expect_str_eq_c(t, root->root->as.discriminator.mapping[1].tag, "b");
+  sp_expect_eq(t, (s32)JTD_FORM_PROPERTIES, (s32)root->root->as.discriminator.mapping[0].schema->form);
+  sp_expect_eq(t, (s32)JTD_FORM_PROPERTIES, (s32)root->root->as.discriminator.mapping[1].schema->form);
   return SP_OK;
 }
 

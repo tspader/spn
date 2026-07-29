@@ -101,7 +101,7 @@ static const file_cache_test_t file_cache_tests [] = {
   },
 };
 
-sp_test_each(file_cache, ops, file_cache_test_t, file_cache_tests) {
+sp_test_each(dag_file_cache, ops, file_cache_test_t, file_cache_tests) {
   sp_mem_t mem = sp_test_arena(t);
   sp_str_t root = sp_test_dir(t);
 

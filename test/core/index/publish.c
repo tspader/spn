@@ -176,16 +176,8 @@ sp_test_each(index_publish, publish, publish_test_t, tests) {
       sp_fmt(mem, "{}.jsonl", sp_fmt_str(nm)).value
     );
 
-    sp_expect(t, sp_fs_exists(pkg_path));
-    if (sp_fs_exists(pkg_path)) {
-      sp_str_t content = test_read_file(mem, pkg_path);
-      u32 count = 0;
-      sp_str_for_line(content, line_it) {
-        sp_str_t line = sp_str_trim(line_it.line);
-        if (!sp_str_empty(line)) { count++; }
-      }
-      sp_expect_eq(t, it->expect.lines, count);
-    }
+    sp_must(t, sp_fs_exists(pkg_path));
+    sp_expect_eq(t, it->expect.lines, index_test_count_lines(test_read_file(mem, pkg_path)));
   }
 
   spn_index_deinit(&index);

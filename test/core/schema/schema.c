@@ -4,29 +4,24 @@
 #include "enum/enum.h"
 #include "yyjson.h"
 
-static u32 schema_arch_from(sp_str_t str) { return spn_arch_from_str(str); }
-static u32 schema_os_from(sp_str_t str) { return spn_os_from_str(str); }
-static u32 schema_abi_from(sp_str_t str) { return spn_abi_from_str(str); }
-static u32 schema_cc_driver_from(sp_str_t str) { return spn_cc_driver_from_str(str); }
-static u32 schema_linkage_from(sp_str_t str) { return spn_linkage_from_str(str); }
-static u32 schema_c_standard_from(sp_str_t str) { return spn_c_standard_from_str(str); }
-static u32 schema_cxx_standard_from(sp_str_t str) { return spn_cxx_standard_from_str(str); }
-static u32 schema_build_mode_from(sp_str_t str) { return spn_build_mode_from_str(str); }
-static u32 schema_index_protocol_from(sp_str_t str) { return spn_index_protocol_from_str(str); }
-static u32 schema_option_type_from(sp_str_t str) { return spn_option_type_from_str(str); }
-static u32 schema_index_dep_kind_from(sp_str_t str) { return spn_index_dep_kind_from_str(str); }
+#define SCHEMA_ENUMS \
+  X(arch,           "manifest.jtd.json") \
+  X(os,             "manifest.jtd.json") \
+  X(abi,            "manifest.jtd.json") \
+  X(cc_driver,      "toolchains.jtd.json") \
+  X(linkage,        "manifest.jtd.json") \
+  X(c_standard,     "manifest.jtd.json") \
+  X(cxx_standard,   "manifest.jtd.json") \
+  X(build_mode,     "manifest.jtd.json") \
+  X(option_type,    "manifest.jtd.json") \
+  X(index_protocol, "manifest.jtd.json") \
+  X(index_dep_kind, "release.jtd.json")
 
-static sp_str_t schema_arch_to(u32 value) { return spn_arch_to_str((spn_arch_t)value); }
-static sp_str_t schema_os_to(u32 value) { return spn_os_to_str((spn_os_t)value); }
-static sp_str_t schema_abi_to(u32 value) { return spn_abi_to_str((spn_abi_t)value); }
-static sp_str_t schema_cc_driver_to(u32 value) { return spn_cc_driver_to_str((spn_cc_driver_t)value); }
-static sp_str_t schema_linkage_to(u32 value) { return spn_linkage_to_str((spn_linkage_t)value); }
-static sp_str_t schema_c_standard_to(u32 value) { return spn_c_standard_to_str((spn_c_standard_t)value); }
-static sp_str_t schema_cxx_standard_to(u32 value) { return spn_cxx_standard_to_str((spn_cxx_standard_t)value); }
-static sp_str_t schema_build_mode_to(u32 value) { return spn_build_mode_to_str((spn_build_mode_t)value); }
-static sp_str_t schema_index_protocol_to(u32 value) { return spn_index_protocol_to_str((spn_index_protocol_t)value); }
-static sp_str_t schema_option_type_to(u32 value) { return spn_option_type_to_str((spn_option_type_t)value); }
-static sp_str_t schema_index_dep_kind_to(u32 value) { return spn_index_dep_kind_to_str((spn_index_dep_kind_t)value); }
+#define X(ID, FILE) \
+  static u32 schema_##ID##_from(sp_str_t str) { return spn_##ID##_from_str(str); } \
+  static sp_str_t schema_##ID##_to(u32 value) { return spn_##ID##_to_str((spn_##ID##_t)value); }
+SCHEMA_ENUMS
+#undef X
 
 typedef struct {
   const c8* name;
@@ -37,17 +32,9 @@ typedef struct {
 } test_t;
 
 static const test_t tests [] = {
-  { .name = "arch",           .file = "manifest.jtd.json",   .def = "arch",           .from = schema_arch_from,           .to = schema_arch_to },
-  { .name = "os",             .file = "manifest.jtd.json",   .def = "os",             .from = schema_os_from,             .to = schema_os_to },
-  { .name = "abi",            .file = "manifest.jtd.json",   .def = "abi",            .from = schema_abi_from,            .to = schema_abi_to },
-  { .name = "cc_driver",      .file = "toolchains.jtd.json", .def = "cc_driver",      .from = schema_cc_driver_from,      .to = schema_cc_driver_to },
-  { .name = "linkage",        .file = "manifest.jtd.json",   .def = "linkage",        .from = schema_linkage_from,        .to = schema_linkage_to },
-  { .name = "c_standard",     .file = "manifest.jtd.json",   .def = "c_standard",     .from = schema_c_standard_from,     .to = schema_c_standard_to },
-  { .name = "cxx_standard",   .file = "manifest.jtd.json",   .def = "cxx_standard",   .from = schema_cxx_standard_from,   .to = schema_cxx_standard_to },
-  { .name = "build_mode",     .file = "manifest.jtd.json",   .def = "build_mode",     .from = schema_build_mode_from,     .to = schema_build_mode_to },
-  { .name = "option_type",    .file = "manifest.jtd.json",   .def = "option_type",    .from = schema_option_type_from,    .to = schema_option_type_to },
-  { .name = "index_protocol", .file = "manifest.jtd.json",   .def = "index_protocol", .from = schema_index_protocol_from, .to = schema_index_protocol_to },
-  { .name = "index_dep_kind", .file = "release.jtd.json",    .def = "index_dep_kind", .from = schema_index_dep_kind_from, .to = schema_index_dep_kind_to },
+  #define X(ID, FILE) { .name = #ID, .file = FILE, .def = #ID, .from = schema_##ID##_from, .to = schema_##ID##_to },
+  SCHEMA_ENUMS
+  #undef X
 };
 
 sp_test_each(schema, roundtrip, test_t, tests) {

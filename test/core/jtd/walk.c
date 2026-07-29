@@ -16,13 +16,11 @@ static sp_err_t compare_walk_preorder(sp_test_t* t, const jtd_result_t* root, co
   walk_collect_t c = { .paths = sp_da_new(sp_test_arena(t), sp_str_t) };
   jtd_walk(sp_test_arena(t), root, walk_collect_visit, &c);
 
-  sp_expect_eq(t, (u64)4, (u64)sp_da_size(c.paths));
-  if (sp_da_size(c.paths) == 4) {
-    sp_expect_str_eq_c(t, c.paths[0], "#");
-    sp_expect_str_eq_c(t, c.paths[1], "#/elements");
-    sp_expect_str_eq_c(t, c.paths[2], "#/definitions/dep");
-    sp_expect_str_eq_c(t, c.paths[3], "#/definitions/dep/properties/v");
-  }
+  sp_must_eq(t, (u64)4, (u64)sp_da_size(c.paths));
+  sp_expect_str_eq_c(t, c.paths[0], "#");
+  sp_expect_str_eq_c(t, c.paths[1], "#/elements");
+  sp_expect_str_eq_c(t, c.paths[2], "#/definitions/dep");
+  sp_expect_str_eq_c(t, c.paths[3], "#/definitions/dep/properties/v");
 
   sp_expect(t, jtd_resolve(root, root->root) == root->root);
   return SP_OK;
@@ -54,12 +52,10 @@ static sp_err_t compare_walk_escaped_paths(sp_test_t* t, const jtd_result_t* roo
   walk_collect_t c = { .paths = sp_da_new(sp_test_arena(t), sp_str_t) };
   jtd_walk(sp_test_arena(t), root, walk_collect_visit, &c);
 
-  sp_expect_eq(t, (u64)3, (u64)sp_da_size(c.paths));
-  if (sp_da_size(c.paths) == 3) {
-    sp_expect_str_eq_c(t, c.paths[0], "#");
-    sp_expect_str_eq_c(t, c.paths[1], "#/properties/a~1b");
-    sp_expect_str_eq_c(t, c.paths[2], "#/optionalProperties/c~0d");
-  }
+  sp_must_eq(t, (u64)3, (u64)sp_da_size(c.paths));
+  sp_expect_str_eq_c(t, c.paths[0], "#");
+  sp_expect_str_eq_c(t, c.paths[1], "#/properties/a~1b");
+  sp_expect_str_eq_c(t, c.paths[2], "#/optionalProperties/c~0d");
   return SP_OK;
 }
 

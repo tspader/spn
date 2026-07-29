@@ -128,7 +128,6 @@ typedef struct {
   const c8* maintainer;
   spn_semver_t version;
   const c8* commit;
-  const c8* include [8];
   const c8* include_resolved;
   const c8* define [8];
   gated_t system_deps [8];
@@ -409,6 +408,7 @@ static const test_t tests [] = {
     .maintainer = "m",
     .version = spn_semver_lit(1, 2, 3),
     .commit = "abc",
+    .include_resolved = "/inc",
     .define = { "SPUM" },
     .system_deps = { { "z" } },
   },
@@ -416,6 +416,8 @@ static const test_t tests [] = {
     .name = "package_include_resolved",
     .manifest = "package",
     .include_resolved = "/inc",
+    .define = { "SPUM" },
+    .system_deps = { { "z" } },
   },
   {
     .name = "qualified_default_namespace",
@@ -784,37 +786,7 @@ static const test_t tests [] = {
 //////////////
 // EXECUTOR //
 //////////////
-static sp_err_t check_strings(sp_test_t* t, sp_da(sp_str_t) actual, const c8* const* expected, u32 cap) {
-  u32 n = 0;
-  for (u32 i = 0; i < cap; i++) {
-    if (!expected[i]) break;
-    n++;
-  }
-  if (!n) return SP_OK;
-  sp_must_eq(t, n, (u32)sp_da_size(actual));
-  sp_for(i, n) sp_expect_str_eq_c(t, actual[i], expected[i]);
-  return SP_OK;
-}
-
-static sp_err_t check_launcher_args(sp_test_t* t, spn_toolchain_launcher_t launcher, const c8* const* expected, u32 cap) {
-  u32 n = 0;
-  for (u32 i = 0; i < cap; i++) {
-    if (!expected[i]) break;
-    n++;
-  }
-  if (!n) return SP_OK;
-  sp_must_eq(t, n, (u32)sp_da_size(launcher.args));
-  sp_for(i, n) sp_expect_str_eq_c(t, launcher.args[i], expected[i]);
-  return SP_OK;
-}
-
-static sp_err_t check_gated(sp_test_t* t, spn_gated_list_t actual, const gated_t* expected, u32 cap) {
-  u32 n = 0;
-  for (u32 i = 0; i < cap; i++) {
-    if (!expected[i].value) break;
-    n++;
-  }
-  if (!n) return SP_OK;
+static sp_err_t check_gated_list(sp_test_t* t, spn_gated_list_t actual, const gated_t* expected, u32 n) {
   sp_must_eq(t, n, (u32)sp_da_size(actual));
   sp_for(i, n) {
     sp_expect_str_eq_c(t, actual[i].value, expected[i].value);
@@ -822,6 +794,12 @@ static sp_err_t check_gated(sp_test_t* t, spn_gated_list_t actual, const gated_t
   }
   return SP_OK;
 }
+
+#define check_gated(t, actual, expected) do { \
+  u32 num_gated = 0; \
+  sp_carr_detect_len(expected, num_gated, (expected)[num_gated].value); \
+  sp_try(check_gated_list(t, actual, expected, num_gated)); \
+} while (0)
 
 static sp_err_t check_targets(sp_test_t* t, spn_target_map_t om, const target_t* arr, u32 n, spn_target_kind_t kind) {
   for (u32 i = 0; i < n; i++) {
@@ -840,13 +818,13 @@ static sp_err_t check_targets(sp_test_t* t, spn_target_map_t om, const target_t*
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->flags));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->system_deps));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->deps));
-    sp_try(check_gated(t, info->gated.source, arr[i].source, SP_CARR_LEN(arr[i].source)));
-    sp_try(check_strings(t, info->headers, arr[i].headers, SP_CARR_LEN(arr[i].headers)));
-    sp_try(check_gated(t, info->gated.include, arr[i].include, SP_CARR_LEN(arr[i].include)));
-    sp_try(check_gated(t, info->gated.define, arr[i].define, SP_CARR_LEN(arr[i].define)));
-    sp_try(check_gated(t, info->gated.flags, arr[i].flags, SP_CARR_LEN(arr[i].flags)));
-    sp_try(check_gated(t, info->gated.system_deps, arr[i].system_deps, SP_CARR_LEN(arr[i].system_deps)));
-    sp_try(check_gated(t, info->gated.deps, arr[i].deps, SP_CARR_LEN(arr[i].deps)));
+    check_gated(t, info->gated.source, arr[i].source);
+    sp_must_strs_eq(t, info->headers, sp_da_size(info->headers), arr[i].headers);
+    check_gated(t, info->gated.include, arr[i].include);
+    check_gated(t, info->gated.define, arr[i].define);
+    check_gated(t, info->gated.flags, arr[i].flags);
+    check_gated(t, info->gated.system_deps, arr[i].system_deps);
+    check_gated(t, info->gated.deps, arr[i].deps);
     sp_expect_eq(t, (u32)arr[i].cxx.standard, (u32)info->cxx.standard);
     sp_expect_eq(t, arr[i].cxx.no_exceptions, info->cxx.no_exceptions);
     sp_expect_eq(t, arr[i].cxx.no_rtti, info->cxx.no_rtti);
@@ -908,9 +886,8 @@ sp_test_each(lower, cases, test_t, tests) {
   }
 
   // Package arrays
-  sp_try(check_strings(t, pkg.include, it->include, SP_CARR_LEN(it->include)));
-  sp_try(check_strings(t, pkg.define,  it->define,  SP_CARR_LEN(it->define)));
-  sp_try(check_gated(t, pkg.gated.system_deps, it->system_deps, SP_CARR_LEN(it->system_deps)));
+  sp_must_strs_eq(t, pkg.define, sp_da_size(pkg.define), it->define);
+  check_gated(t, pkg.gated.system_deps, it->system_deps);
 
   if (it->include_resolved) {
     sp_must_eq(t, (u32)1, (u32)sp_da_size(pkg.include));
@@ -959,7 +936,7 @@ sp_test_each(lower, cases, test_t, tests) {
     sp_expect_eq(t, expected.additive, option->additive);
     sp_expect_eq(t, expected.public, option->public);
     if (expected.define) sp_expect_str_eq_c(t, option->define, expected.define);
-    sp_try(check_strings(t, option->values, expected.values, SP_CARR_LEN(expected.values)));
+    sp_must_strs_eq(t, option->values, sp_da_size(option->values), expected.values);
 
     u32 num_defaults = 0;
     sp_carr_detect_len(expected.defaults, num_defaults, expected.defaults[num_defaults].value);
@@ -988,8 +965,8 @@ sp_test_each(lower, cases, test_t, tests) {
     if (expected.cxx)      sp_expect_str_eq_c(t, tc->cxx.program, expected.cxx);
     if (expected.driver)   sp_expect_eq(t, (u32)expected.driver, (u32)tc->driver);
 
-    sp_try(check_launcher_args(t, tc->compiler, expected.args, SP_CARR_LEN(expected.args)));
-    sp_try(check_launcher_args(t, tc->cxx, expected.cxx_args, SP_CARR_LEN(expected.cxx_args)));
+    sp_must_strs_eq(t, tc->compiler.args, sp_da_size(tc->compiler.args), expected.args);
+    sp_must_strs_eq(t, tc->cxx.args, sp_da_size(tc->cxx.args), expected.cxx_args);
 
     sp_carr_for(expected.targets, r) {
       spn_triple_t triple = expected.targets[r];

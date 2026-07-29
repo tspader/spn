@@ -51,6 +51,8 @@ sp_str_t test_repo_path(sp_mem_t mem, sp_str_t rel);
 
 
 // GIT
+sp_ps_output_t git_repo_run(sp_str_t repo, const sp_str_t* args, u32 count);
+#define git_repo_git(repo, ...) git_repo_run(repo, (sp_str_t[]) { __VA_ARGS__ }, sp_carr_len(((sp_str_t[]) { __VA_ARGS__ })))
 void     git_repo_create_from_dir(sp_str_t source, sp_str_t repo);
 void     git_repo_init(sp_str_t repo);
 void     git_repo_commit_from_dir(sp_str_t source, sp_str_t repo, sp_str_t message);
@@ -111,8 +113,17 @@ typedef struct {
 git_repo_result_t git_repo_build(tmpfs_t* fs, const c8* name, git_repo_fixture_t* fixture);
 git_repo_result_t git_repo_build_at(sp_str_t dir, const c8* name, git_repo_fixture_t* fixture);
 sp_str_t          git_repo_file_at(sp_str_t repo, sp_str_t commit, sp_str_t path);
+bool              git_repo_has_file(sp_str_t repo, sp_str_t commit, sp_str_t path);
 
-bool str_equal(sp_str_t a, sp_str_t b);
+static inline bool test_str_is_hex(sp_str_t str) {
+  sp_for(it, str.len) {
+    c8 c = str.data[it];
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
+      return false;
+    }
+  }
+  return str.len > 0;
+}
 
 static inline sp_str_t test_read_file(sp_mem_t mem, sp_str_t path) {
   sp_str_t content = sp_zero;

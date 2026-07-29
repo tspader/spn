@@ -3,22 +3,19 @@
 static sp_err_t compare_properties_ok(sp_test_t* t, const jtd_result_t* root, const void* expect) {
   (void)expect;
   sp_expect_eq(t, (s32)JTD_FORM_PROPERTIES, (s32)root->root->form);
-  sp_expect_eq(t, (u64)2, (u64)sp_da_size(root->root->as.properties.required));
-  sp_expect_eq(t, (u64)2, (u64)sp_da_size(root->root->as.properties.optional));
   sp_expect(t, root->root->as.properties.additional);
 
-  if (sp_da_size(root->root->as.properties.required) == 2) {
-    sp_expect_str_eq_c(t, root->root->as.properties.required[0].key, "name");
-    sp_expect_eq(t, (s32)JTD_TYPE_STRING, (s32)root->root->as.properties.required[0].schema->as.type);
-    sp_expect_str_eq_c(t, root->root->as.properties.required[1].key, "count");
-    sp_expect_eq(t, (s32)JTD_TYPE_INT32, (s32)root->root->as.properties.required[1].schema->as.type);
-  }
-  if (sp_da_size(root->root->as.properties.optional) == 2) {
-    sp_expect_str_eq_c(t, root->root->as.properties.optional[0].key, "age");
-    sp_expect_eq(t, (s32)JTD_TYPE_INT32, (s32)root->root->as.properties.optional[0].schema->as.type);
-    sp_expect_str_eq_c(t, root->root->as.properties.optional[1].key, "label");
-    sp_expect_eq(t, (s32)JTD_TYPE_STRING, (s32)root->root->as.properties.optional[1].schema->as.type);
-  }
+  sp_must_eq(t, (u64)2, (u64)sp_da_size(root->root->as.properties.required));
+  sp_expect_str_eq_c(t, root->root->as.properties.required[0].key, "name");
+  sp_expect_eq(t, (s32)JTD_TYPE_STRING, (s32)root->root->as.properties.required[0].schema->as.type);
+  sp_expect_str_eq_c(t, root->root->as.properties.required[1].key, "count");
+  sp_expect_eq(t, (s32)JTD_TYPE_INT32, (s32)root->root->as.properties.required[1].schema->as.type);
+
+  sp_must_eq(t, (u64)2, (u64)sp_da_size(root->root->as.properties.optional));
+  sp_expect_str_eq_c(t, root->root->as.properties.optional[0].key, "age");
+  sp_expect_eq(t, (s32)JTD_TYPE_INT32, (s32)root->root->as.properties.optional[0].schema->as.type);
+  sp_expect_str_eq_c(t, root->root->as.properties.optional[1].key, "label");
+  sp_expect_eq(t, (s32)JTD_TYPE_STRING, (s32)root->root->as.properties.optional[1].schema->as.type);
   return SP_OK;
 }
 

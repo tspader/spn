@@ -1,15 +1,7 @@
-// The sp and spit implementations live alone in this TU; this binary is a
-// single TU, so it doubles as its own spit_main.c
-#define SP_IMPLEMENTATION
-#include "sp.h"
-
 #include "spn_test.h"
 
 #include "log/lazy/lazy.h"
 
-s32 main(s32 argc, const c8** argv) {
-  return sp_test_main(argc, argv, SP_NULLPTR);
-}
 
 #define LAZY_TEST_MAX_WRITES 8
 
