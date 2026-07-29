@@ -1,5 +1,22 @@
 #include "closure.h"
 
+sp_err_t expect_target_names(sp_test_t* t, sp_da(spn_target_unit_t*) targets, const c8* const* expect, u32 max) {
+  u32 expected = 0;
+  sp_for(it, max) {
+    if (!expect[it]) {
+      break;
+    }
+    expected++;
+  }
+
+  sp_must_eq(t, expected, sp_da_size(targets));
+  sp_for(it, expected) {
+    sp_expect_str_eq_c(t, targets[it]->info->name, expect[it]);
+  }
+
+  return SP_OK;
+}
+
 spn_pkg_unit_t* find_pkg(spn_pkg_unit_t** pkgs, u32 count, const c8* name) {
   sp_str_t needle = sp_str_view(name);
   sp_for(it, count) {

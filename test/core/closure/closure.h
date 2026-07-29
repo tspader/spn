@@ -1,7 +1,6 @@
 #pragma once
 
-#include "sp.h"
-#include "sp/macro.h"
+#include "spn_test.h"
 
 #include "session/types.h"
 #include "unit/types.h"
@@ -48,6 +47,7 @@ typedef struct {
 
 // Shared by suites whose expectation is an ordered list of targets by name
 typedef struct {
+  const c8* name;
   closure_graph_test_t graph;
   const c8* expect [CLOSURE_TEST_MAX_NAMES];
 } target_list_test_t;
@@ -55,4 +55,4 @@ typedef struct {
 closure_graph_t build_graph(closure_graph_test_t* t);
 spn_pkg_unit_t* find_pkg(spn_pkg_unit_t** pkgs, u32 count, const c8* name);
 spn_target_unit_t* find_lib(spn_pkg_unit_t** pkgs, u32 count, const c8* name);
-void expect_target_names(s32* utest_result, sp_da(spn_target_unit_t*) targets, const c8* const* expect, u32 max);
+sp_err_t expect_target_names(sp_test_t* t, sp_da(spn_target_unit_t*) targets, const c8* const* expect, u32 max);

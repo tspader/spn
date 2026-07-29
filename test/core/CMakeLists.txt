@@ -295,26 +295,19 @@ target_link_libraries(unit PRIVATE yyjson)
 add_test(NAME unit COMMAND "$<TARGET_FILE:unit>")
 
 add_executable(closure
-  closure/main.c
+  closure/spit_main.c
   closure/harness.c
   closure/closure.c
+  closure/dep_kind.c
+  closure/get_linked_libs.c
   closure/links_code.c
   closure/runtime.c
   closure/siblings.c
   ${SRC}/unit/link.c
 )
 spn_test_binary(closure)
+target_include_directories(closure PRIVATE ${STORE}/include/sp)
 add_test(NAME closure COMMAND "$<TARGET_FILE:closure>")
-
-add_executable(link
-  closure/spit_main.c
-  closure/get_linked_libs.c
-  closure/harness.c
-  ${SRC}/unit/link.c
-)
-spn_test_binary(link)
-target_include_directories(link PRIVATE ${STORE}/include/sp)
-add_test(NAME link COMMAND "$<TARGET_FILE:link>")
 
 add_executable(target_filter
   filter.c
