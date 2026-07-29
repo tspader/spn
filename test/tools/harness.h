@@ -2,13 +2,15 @@
 #define SPN_TEST_HARNESS_H
 
 #include "sp.h"
-#include "test.h"
+#include "spit.h"
+#include "fixture.h"
 #include "action.h"
 #include "command.h"
 #include "rebuild.h"
 
 typedef struct {
-  tmpfs_t fs;
+  sp_mem_t mem;
+  sp_str_t root;
   struct {
     sp_str_t root;
     sp_str_t spn;
@@ -21,7 +23,11 @@ typedef struct {
   } paths;
 } fixture_t;
 
-void fixture_setup_paths(fixture_t* fixture);
+fixture_t fixture_new(sp_test_t* t);
+sp_err_t  fixture_init(sp_test_t* t, fixture_t* fixture);
+void      fixture_setup_paths(fixture_t* fixture);
+sp_str_t  fixture_path(fixture_t* fixture, sp_str_t relative);
+void      fixture_create(fixture_t* fixture, sp_str_t relative, sp_str_t content);
 
 sp_str_t shared_lib(const c8* name);
 sp_str_t static_lib(const c8* name);
@@ -37,36 +43,20 @@ sp_str_t profile_exe(const c8* profile, const c8* name);
 sp_str_t profile_store_file(const c8* profile, const c8* rest);
 sp_str_t target_store_file(const c8* rest, const c8* triple);
 
-#define SPN_TEST_SUITE(suite) \
-  struct suite { \
-    fixture_t fixture; \
-  }; \
-  UTEST_F_SETUP(suite) { \
-    fixture_setup_paths(&uf->fixture); \
-    ASSERT_TRUE(sp_fs_exists(uf->fixture.paths.spn)); \
-  } \
-  UTEST_F_TEARDOWN(suite) { \
-  }
+sp_err_t expect_exists(sp_test_t* t, fixture_t* fixture, sp_str_t path, bool expected, const c8* file, u32 line);
 
-void expect_exists(s32* utest_result, tmpfs_t* fs, sp_str_t path, bool expected, const c8* file, u32 line);
+sp_err_t copy_project_path(sp_test_t* t, fixture_t* fixture, sp_str_t project, sp_str_t relative);
+sp_err_t setup_fixture_index_from_remote(sp_test_t* t, fixture_t* fixture, sp_str_t project);
+sp_err_t setup_fixture_source_repos(sp_test_t* t, fixture_t* fixture, sp_str_t project);
+void     setup_fixture_envrc(fixture_t* fixture, sp_str_t storage, sp_str_t toolchain, sp_str_t config);
+void     setup_fixture_config(fixture_t* fixture, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir);
 
-#define SP_EXPECT_CONTAINS(haystack, needle)
-#define SP_EXPECT_EXISTS(path) expect_exists(utest_result, SP_NULLPTR, path, true, __FILE__, __LINE__)
-#define SP_EXPECT_EXISTS_TMPFS(fs, path) expect_exists(utest_result, fs, path, true, __FILE__, __LINE__)
-#define SP_EXPECT_NOT_EXISTS_TMPFS(fs, path) expect_exists(utest_result, fs, path, false, __FILE__, __LINE__)
-
-void copy_project_path(s32* utest_result, tmpfs_t* fs, sp_str_t project, sp_str_t relative);
-void setup_fixture_index_from_remote(s32* utest_result, fixture_t* fixture, sp_str_t project);
-void setup_fixture_source_repos(s32* utest_result, fixture_t* fixture, sp_str_t project);
-void setup_fixture_envrc(tmpfs_t* fs, sp_str_t storage, sp_str_t toolchain, sp_str_t config);
-void setup_fixture_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir);
-void setup_e2e_config(tmpfs_t* fs, sp_str_t config_dir, sp_str_t spn_dir, sp_str_t index_url, sp_str_t index_rev);
-
-void fixture_copy_project(s32* utest_result, fixture_t* fixture, sp_str_t project, const c8* const* copy);
-void prepare_test(s32* utest_result, fixture_t* fixture, const c8* project, const c8* const* copy);
-void run_command_test(s32* utest_result, fixture_t* fixture, command_test_t test);
-void run_rebuild_test(s32* utest_result, fixture_t* fixture, rebuild_test_t test);
-void run_actions(s32* utest_result, fixture_t* fixture, const action_t* actions);
-void run_test(s32* utest_result, fixture_t* fixture, test_t test);
+sp_err_t fixture_copy_project(sp_test_t* t, fixture_t* fixture, sp_str_t project, const c8* const* copy);
+sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const c8* const* copy);
+sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test);
+sp_err_t run_command_test(sp_test_t* t, command_test_t test);
+sp_err_t run_rebuild_test(sp_test_t* t, rebuild_test_t test);
+sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions);
+sp_err_t run_test(sp_test_t* t, test_t test);
 
 #endif

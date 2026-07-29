@@ -1,5 +1,3 @@
-#include "common.h"
-
 typedef struct {
   const c8* profile;
   const c8* manifest;
@@ -22,24 +20,27 @@ static bool opt_build_present(const opt_build_t* build) {
     build->alternate || build->expect.rc || build->expect.bin.name;
 }
 
-static void opt_set_manifest(s32* utest_result, fixture_t* fixture, const c8* manifest) {
-  sp_str_t from = tmpfs_get(&fixture->fs, sp_cstr_as_str(manifest));
-  sp_str_t to = tmpfs_get(&fixture->fs, sp_str_lit("spn.toml"));
-  sp_str_t content = test_read_file(fixture->fs.mem, from);
-  tmpfs_create(&fixture->fs, sp_str_lit("spn.toml"), content);
+static sp_err_t opt_set_manifest(sp_test_t* t, fixture_t* fixture, const c8* manifest) {
+  sp_str_t from = fixture_path(fixture, sp_cstr_as_str(manifest));
+  sp_str_t to = fixture_path(fixture, sp_str_lit("spn.toml"));
+  sp_str_t content = test_read_file(fixture->mem, from);
+  fixture_create(fixture, sp_str_lit("spn.toml"), content);
   sp_fs_remove_file(from);
-  SP_EXPECT_NOT_EXISTS_TMPFS(&fixture->fs, from);
-  SP_EXPECT_EXISTS_TMPFS(&fixture->fs, to);
+  sp_must(t, !sp_fs_exists(from));
+  sp_must(t, sp_fs_exists(to));
+  return SP_OK;
 }
 
-static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test) {
+static sp_err_t run_opt_test(sp_test_t* t, opt_test_t test) {
+  fixture_t fixture = sp_zero;
+  sp_try(fixture_init(t, &fixture));
+
   sp_str_t blocked = test_when_blocked(&test.when);
   if (blocked.len) {
-    utest_skip_reason(blocked);
-    UTEST_SKIP("");
+    return sp_test_skip(t, "{}", sp_fmt_str(blocked));
   }
 
-  prepare_test(utest_result, fixture, test.project, test.copy);
+  sp_try(prepare_test(t, &fixture, test.project, test.copy));
 
   const test_toolchain_t* toolchain = test_toolchain();
   u32 ran = 0;
@@ -53,7 +54,7 @@ static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test)
     if (build->alternate) {
       target = test_target_alternate();
       if (!target) {
-        blocked = sp_fmt(fixture->fs.mem, "{} has no cross target", sp_fmt_cstr(toolchain->name)).value;
+        blocked = sp_fmt(fixture.mem, "{} has no cross target", sp_fmt_cstr(toolchain->name)).value;
         continue;
       }
     }
@@ -68,7 +69,7 @@ static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test)
     }
 
     if (build->manifest) {
-      opt_set_manifest(utest_result, fixture, build->manifest);
+      sp_try(opt_set_manifest(t, &fixture, build->manifest));
     }
 
     command_test_t command = {
@@ -92,22 +93,18 @@ static void run_opt_test(s32* utest_result, fixture_t* fixture, opt_test_t test)
     if ((command.expect.bin.name || command.expect.bin.path.len) && !test_when_runs(&when)) {
       command.expect.bin.build_only = true;
     }
-    run_command_test(utest_result, fixture, command);
+    sp_try(run_command(t, &fixture, command));
     ran++;
   }
 
   if (!ran) {
-    utest_skip_reason(blocked);
-    UTEST_SKIP("");
+    return sp_test_skip(t, "{}", sp_fmt_str(blocked));
   }
+  return SP_OK;
 }
 
-SPN_TEST_SUITE(options)
-
-UTEST_F(options, when) {
-  tmpfs_init_named(&uf->fixture.fs, "when");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+sp_test(options, when) {
+  return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/options/when",
     .copy = { "src/*", "packages/*" },
     .builds = {
@@ -117,20 +114,15 @@ UTEST_F(options, when) {
   });
 }
 
-
-UTEST_F(options, public_define) {
-  tmpfs_init_named(&uf->fixture.fs, "options_public_define");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+sp_test(options, public_define) {
+  return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/options/public_define",
     .builds = { { .present = true } },
   });
 }
 
-UTEST_F(options, gates_dep) {
-  tmpfs_init_named(&uf->fixture.fs, "options_gates_dep");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+sp_test(options, gates_dep) {
+  return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/options/gates_dep",
     .builds = {
       { .present = true },
@@ -139,10 +131,8 @@ UTEST_F(options, gates_dep) {
   });
 }
 
-UTEST_F(options, additive) {
-  tmpfs_init_named(&uf->fixture.fs, "options_additive");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+sp_test(options, additive) {
+  return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/options/additive",
     .copy = { "main.off.c", "spn.off.toml" },
     .builds = {
@@ -152,48 +142,38 @@ UTEST_F(options, additive) {
   });
 }
 
-UTEST_F(options, edge_gates_dep) {
-  tmpfs_init_named(&uf->fixture.fs, "options_edge_gates_dep");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+sp_test(options, edge_gates_dep) {
+  return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/options/edge_gates_dep",
     .copy = { "vendor/*" },
     .builds = { { .present = true } },
   });
 }
 
-UTEST_F(options, index_gated_dep) {
-  tmpfs_init_named(&uf->fixture.fs, "options_index_gated_dep");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+sp_test(options, index_gated_dep) {
+  return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/options/index_gated_dep",
     .builds = { { .present = true } },
   });
 }
 
-UTEST_F(options, index_eager_gate) {
-  tmpfs_init_named(&uf->fixture.fs, "options_index_eager_gate");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+sp_test(options, index_eager_gate) {
+  return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/options/index_eager_gate",
     .builds = { { .present = true } },
   });
 }
 
-UTEST_F(options, edge_gates_build_dep) {
-  tmpfs_init_named(&uf->fixture.fs, "options_edge_gates_build_dep");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+sp_test(options, edge_gates_build_dep) {
+  return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/options/edge_gates_build_dep",
     .copy = { "vendor/*" },
     .builds = { { .present = true } },
   });
 }
 
-UTEST_F(options, dep_rebuild) {
-  tmpfs_init_named(&uf->fixture.fs, "options_dep_rebuild");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+sp_test(options, dep_rebuild) {
+  return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/options/dep_rebuild",
     .copy = { "main.on.c", "spn.on.toml", "spn.off.toml" },
     .builds = {
@@ -204,10 +184,8 @@ UTEST_F(options, dep_rebuild) {
   });
 }
 
-UTEST_F(options, fact_identity) {
-  tmpfs_init_named(&uf->fixture.fs, "options_fact_identity");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+sp_test(options, fact_identity) {
+  return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/options/fact_identity",
     .builds = {
       { .present = true },
@@ -217,10 +195,8 @@ UTEST_F(options, fact_identity) {
   });
 }
 
-UTEST_F(options, default_identity) {
-  tmpfs_init_named(&uf->fixture.fs, "options_default_identity");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+sp_test(options, default_identity) {
+  return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/options/default_identity",
     .copy = { "main.on.c", "spn.on.toml" },
     .builds = {
@@ -230,10 +206,8 @@ UTEST_F(options, default_identity) {
   });
 }
 
-UTEST_F(options, private_versions) {
-  tmpfs_init_named(&uf->fixture.fs, "options_private_versions");
-
-  run_opt_test(utest_result, &uf->fixture, (opt_test_t) {
+sp_test(options, private_versions) {
+  return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/options/private_versions",
     .builds = { { .present = true } },
   });

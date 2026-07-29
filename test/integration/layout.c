@@ -1,11 +1,5 @@
-#include "common.h"
-
-SPN_TEST_SUITE(layout)
-
-UTEST_F(layout, staged_bin) {
-  tmpfs_init_named(&uf->fixture.fs, "layout_staged_bin");
-
-  run_command_test(utest_result, &uf->fixture, (command_test_t) {
+sp_test(layout, staged_bin) {
+  return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/layout/test_shared",
     .copy = { "check.c", "packages/*" },
     .args = { "build" },
@@ -16,10 +10,8 @@ UTEST_F(layout, staged_bin) {
   });
 }
 
-UTEST_F(layout, staged_test) {
-  tmpfs_init_named(&uf->fixture.fs, "layout_staged_test");
-
-  run_command_test(utest_result, &uf->fixture, (command_test_t) {
+sp_test(layout, staged_test) {
+  return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/layout/test_shared",
     .copy = { "check.c", "packages/*" },
     .args = { "build" },
@@ -30,20 +22,16 @@ UTEST_F(layout, staged_test) {
   });
 }
 
-UTEST_F(layout, staged_script) {
-  tmpfs_init_named(&uf->fixture.fs, "layout_staged_script");
-
-  run_command_test(utest_result, &uf->fixture, (command_test_t) {
+sp_test(layout, staged_script) {
+  return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/run/manifest",
     .args = { "build", "main" },
     .expect.exists = { exe("main") },
   });
 }
 
-UTEST_F(layout, script_ctx_footprint) {
-  tmpfs_init_named(&uf->fixture.fs, "layout_script_ctx");
-
-  run_command_test(utest_result, &uf->fixture, (command_test_t) {
+sp_test(layout, script_ctx_footprint) {
+  return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/script/default_script",
     .args = { "build" },
     .expect = {
@@ -52,20 +40,16 @@ UTEST_F(layout, script_ctx_footprint) {
   });
 }
 
-UTEST_F(layout, reserved_bin_name) {
-  tmpfs_init_named(&uf->fixture.fs, "layout_reserved_bin_name");
-
-  run_command_test(utest_result, &uf->fixture, (command_test_t) {
+sp_test(layout, reserved_bin_name) {
+  return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/layout/reserved_bin",
     .args = { "build" },
     .expect.rc = 1,
   });
 }
 
-UTEST_F(layout, target_triple) {
-  tmpfs_init_named(&uf->fixture.fs, "layout_target_triple");
-
-  run_command_test(utest_result, &uf->fixture, (command_test_t) {
+sp_test(layout, target_triple) {
+  return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/layout/test_shared",
     .copy = { "check.c", "packages/*" },
     .args = { "build", "--target", SPN_TEST_TRIPLE },

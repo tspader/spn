@@ -1,11 +1,5 @@
-#include "common.h"
-
-SPN_TEST_SUITE(run)
-
-UTEST_F(run, manifest) {
-  tmpfs_init_named(&uf->fixture.fs, "run_manifest");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(run, manifest) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/run/manifest",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -16,10 +10,8 @@ UTEST_F(run, manifest) {
   });
 }
 
-UTEST_F(run, script_name_c) {
-  tmpfs_init_named(&uf->fixture.fs, "run_script_name_c");
-
-  run_command_test(utest_result, &uf->fixture, (command_test_t) {
+sp_test(run, script_name_c) {
+  return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/run/script_name_c",
     .copy = { "script.c" },
     .args = { "run", "main.c" },

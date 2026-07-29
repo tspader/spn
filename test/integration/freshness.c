@@ -1,11 +1,5 @@
-#include "common.h"
-
-SPN_TEST_SUITE(freshness)
-
-UTEST_F(freshness, noop) {
-  tmpfs_init_named(&uf->fixture.fs, "freshness_noop");
-
-  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
+sp_test(freshness, noop) {
+  return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/freshness/bin",
     .first = {
       .args = { "build" },
@@ -31,10 +25,8 @@ UTEST_F(freshness, noop) {
   });
 }
 
-UTEST_F(freshness, source_change) {
-  tmpfs_init_named(&uf->fixture.fs, "freshness_source_change");
-
-  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
+sp_test(freshness, source_change) {
+  return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/freshness/bin",
     .copy = { "main.change.c" },
     .first = {
@@ -58,10 +50,8 @@ UTEST_F(freshness, source_change) {
   });
 }
 
-UTEST_F(freshness, touch_without_change) {
-  tmpfs_init_named(&uf->fixture.fs, "freshness_touch_without_change");
-
-  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
+sp_test(freshness, touch_without_change) {
+  return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/freshness/bin",
     .copy = { "main.same.c" },
     .first = {
@@ -85,10 +75,8 @@ UTEST_F(freshness, touch_without_change) {
   });
 }
 
-UTEST_F(freshness, dep_source_change) {
-  tmpfs_init_named(&uf->fixture.fs, "freshness_dep_source_change");
-
-  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
+sp_test(freshness, dep_source_change) {
+  return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/freshness/dep",
     .copy = { "packages/*" },
     .first = {
@@ -119,10 +107,8 @@ UTEST_F(freshness, dep_source_change) {
   });
 }
 
-UTEST_F(freshness, dep_header_inert) {
-  tmpfs_init_named(&uf->fixture.fs, "freshness_dep_header_inert");
-
-  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
+sp_test(freshness, dep_header_inert) {
+  return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/freshness/dep",
     .copy = { "packages/*" },
     .first = {
@@ -146,10 +132,8 @@ UTEST_F(freshness, dep_header_inert) {
   });
 }
 
-UTEST_F(freshness, dep_header_change) {
-  tmpfs_init_named(&uf->fixture.fs, "freshness_dep_header_change");
-
-  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
+sp_test(freshness, dep_header_change) {
+  return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/freshness/dep",
     .copy = { "packages/*", "main.code.c" },
     .first = {
@@ -183,10 +167,8 @@ UTEST_F(freshness, dep_header_change) {
   });
 }
 
-UTEST_F(freshness, output_deleted) {
-  tmpfs_init_named(&uf->fixture.fs, "freshness_output_deleted");
-
-  run_rebuild_test(utest_result, &uf->fixture, (rebuild_test_t) {
+sp_test(freshness, output_deleted) {
+  return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/freshness/bin",
     .first = {
       .args = { "build" },

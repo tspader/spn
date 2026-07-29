@@ -1,11 +1,5 @@
-#include "common.h"
-
-SPN_TEST_SUITE(units)
-
-UTEST_F(units, build_dep_conflict) {
-  tmpfs_init_named(&uf->fixture.fs, "units_build_dep_conflict");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(units, build_dep_conflict) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/units/build_dep_conflict",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -14,10 +8,8 @@ UTEST_F(units, build_dep_conflict) {
   });
 }
 
-UTEST_F(units, build_dep_transitive_conflict) {
-  tmpfs_init_named(&uf->fixture.fs, "units_build_dep_transitive_conflict");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(units, build_dep_transitive_conflict) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/units/build_dep_transitive_conflict",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -27,10 +19,8 @@ UTEST_F(units, build_dep_transitive_conflict) {
   });
 }
 
-UTEST_F(units, shared_conflict) {
-  tmpfs_init_named(&uf->fixture.fs, "units_shared_conflict");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(units, shared_conflict) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/units/shared_conflict",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
@@ -39,10 +29,8 @@ UTEST_F(units, shared_conflict) {
   });
 }
 
-UTEST_F(units, shared_private) {
-  tmpfs_init_named(&uf->fixture.fs, "units_shared_private");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(units, shared_private) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/units/shared_private",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -53,10 +41,8 @@ UTEST_F(units, shared_private) {
   });
 }
 
-UTEST_F(units, static_conflict) {
-  tmpfs_init_named(&uf->fixture.fs, "units_static_conflict");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(units, static_conflict) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/units/static_conflict",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
@@ -65,10 +51,8 @@ UTEST_F(units, static_conflict) {
   });
 }
 
-UTEST_F(units, no_double_build) {
-  tmpfs_init_named(&uf->fixture.fs, "units_no_double_build");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(units, no_double_build) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/units/no_double_build",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -79,10 +63,8 @@ UTEST_F(units, no_double_build) {
   });
 }
 
-UTEST_F(units, no_downgrade) {
-  tmpfs_init_named(&uf->fixture.fs, "units_no_downgrade");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(units, no_downgrade) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/units/no_downgrade",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -93,10 +75,8 @@ UTEST_F(units, no_downgrade) {
   });
 }
 
-UTEST_F(units, build_dep_cycle) {
-  tmpfs_init_named(&uf->fixture.fs, "units_build_dep_cycle");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(units, build_dep_cycle) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/units/build_dep_cycle",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
@@ -105,10 +85,8 @@ UTEST_F(units, build_dep_cycle) {
   });
 }
 
-UTEST_F(units, build_dep_bootstrap) {
-  tmpfs_init_named(&uf->fixture.fs, "units_build_dep_bootstrap");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(units, build_dep_bootstrap) {
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/units/build_dep_bootstrap",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -119,11 +97,9 @@ UTEST_F(units, build_dep_bootstrap) {
   });
 }
 
-UTEST_F(units, same_version_split) {
-  UTEST_SKIP("");
-  tmpfs_init_named(&uf->fixture.fs, "units_same_version_split");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(units, same_version_split) {
+  return sp_test_skip(t, "disabled");
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/units/same_version_split",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
@@ -134,11 +110,9 @@ UTEST_F(units, same_version_split) {
   });
 }
 
-UTEST_F(units, sibling_order) {
-  UTEST_SKIP("");
-  tmpfs_init_named(&uf->fixture.fs, "units_sibling_order");
-
-  run_test(utest_result, &uf->fixture, (test_t) {
+sp_test(units, sibling_order) {
+  return sp_test_skip(t, "disabled");
+  return run_test(t, (test_t) {
     .project = "test/integration/fixtures/units/sibling_order",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
