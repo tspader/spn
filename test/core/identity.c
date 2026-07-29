@@ -13,7 +13,7 @@ typedef struct {
 
 typedef struct {
   const c8* qualified;
-  const c8* source;
+  const c8* rev;
   identity_copy_t copies [IDENTITY_TEST_MAX_COPIES];
 } identity_pkg_t;
 
@@ -66,9 +66,15 @@ static spn_pkg_unit_t* identity_unit(sp_mem_t mem, const identity_pkg_t* spec) {
   spn_pkg_unit_t* unit = sp_alloc_type(mem, spn_pkg_unit_t);
   unit->info = info;
   unit->source = SPN_PKG_SOURCE_INDEX;
-  unit->paths.source = sp_str_view(spec->source);
   sp_da_init(mem, unit->user_nodes);
   return unit;
+}
+
+static spn_build_source_pin_t identity_pin(const identity_pkg_t* spec) {
+  return (spn_build_source_pin_t) {
+    .kind = SPN_PKG_TREE_GIT,
+    .rev = sp_str_view(spec->rev),
+  };
 }
 
 static spn_user_node_t* identity_node(sp_mem_t mem, const identity_node_t* spec) {
@@ -101,86 +107,92 @@ static sp_err_t identity_expect_distinct(sp_test_t* t, spn_dag_digest_t a, spn_d
 static const identity_pkg_test_t tree_tests [] = {
   {
     .name = "identical_units_agree",
-    .a = { .qualified = "A", .source = "/C/A-1", .copies = { { "source/H", "include" } } },
-    .b = { .qualified = "A", .source = "/C/A-1", .copies = { { "source/H", "include" } } },
+    .a = { .qualified = "A", .rev = "1", .copies = { { "source/H", "include" } } },
+    .b = { .qualified = "A", .rev = "1", .copies = { { "source/H", "include" } } },
   },
   {
     .name = "distinct_qualified",
-    .a = { .qualified = "A", .source = "/C/A-1" },
-    .b = { .qualified = "B", .source = "/C/A-1" },
+    .a = { .qualified = "A", .rev = "1" },
+    .b = { .qualified = "B", .rev = "1" },
     .expect = { .distinct = true }
   },
   {
     .name = "distinct_publish_copy",
-    .a = { .qualified = "A", .source = "/C/A-1", .copies = { { "source/H", "include" } } },
-    .b = { .qualified = "A", .source = "/C/A-1", .copies = { { "source/I", "include" } } },
+    .a = { .qualified = "A", .rev = "1", .copies = { { "source/H", "include" } } },
+    .b = { .qualified = "A", .rev = "1", .copies = { { "source/I", "include" } } },
     .expect = { .distinct = true }
   },
   {
     .name = "distinct_pinned_source",
-    .a = { .qualified = "A", .source = "/C/A-1", .copies = { { "source/H", "include" } } },
-    .b = { .qualified = "A", .source = "/C/A-2", .copies = { { "source/H", "include" } } },
+    .a = { .qualified = "A", .rev = "1", .copies = { { "source/H", "include" } } },
+    .b = { .qualified = "A", .rev = "2", .copies = { { "source/H", "include" } } },
     .expect = { .distinct = true }
   },
 };
 
 sp_test_each(identity, tree, identity_pkg_test_t, tree_tests) {
   sp_mem_t mem = sp_test_arena(t);
-  spn_dag_digest_t a = spn_build_tree_identity(&identity_roots, identity_unit(mem, &it->a));
-  spn_dag_digest_t b = spn_build_tree_identity(&identity_roots, identity_unit(mem, &it->b));
+  spn_build_source_pin_t pin_a = identity_pin(&it->a);
+  spn_build_source_pin_t pin_b = identity_pin(&it->b);
+  spn_dag_digest_t a = spn_build_tree_identity(&identity_roots, identity_unit(mem, &it->a), &pin_a);
+  spn_dag_digest_t b = spn_build_tree_identity(&identity_roots, identity_unit(mem, &it->b), &pin_b);
   return identity_expect_distinct(t, a, b, &it->expect);
 }
 
 static const identity_pkg_test_t package_tests [] = {
   {
     .name = "identical_units_agree",
-    .a = { .qualified = "A", .source = "/C/A-1", .copies = { { "source/H", "store/H" } } },
-    .b = { .qualified = "A", .source = "/C/A-1", .copies = { { "source/H", "store/H" } } },
+    .a = { .qualified = "A", .rev = "1", .copies = { { "source/H", "store/H" } } },
+    .b = { .qualified = "A", .rev = "1", .copies = { { "source/H", "store/H" } } },
   },
   {
     .name = "distinct_publish_copy",
-    .a = { .qualified = "A", .source = "/C/A-1", .copies = { { "source/H", "store/H" } } },
-    .b = { .qualified = "A", .source = "/C/A-1", .copies = { { "source/I", "store/I" } } },
+    .a = { .qualified = "A", .rev = "1", .copies = { { "source/H", "store/H" } } },
+    .b = { .qualified = "A", .rev = "1", .copies = { { "source/I", "store/I" } } },
     .expect = { .distinct = true }
   },
   {
     .name = "distinct_pinned_source",
-    .a = { .qualified = "A", .source = "/C/A-1", .copies = { { "source/H", "store/H" } } },
-    .b = { .qualified = "A", .source = "/C/A-2", .copies = { { "source/H", "store/H" } } },
+    .a = { .qualified = "A", .rev = "1", .copies = { { "source/H", "store/H" } } },
+    .b = { .qualified = "A", .rev = "2", .copies = { { "source/H", "store/H" } } },
     .expect = { .distinct = true }
   },
 };
 
 sp_test_each(identity, package, identity_pkg_test_t, package_tests) {
   sp_mem_t mem = sp_test_arena(t);
-  spn_dag_digest_t a = spn_build_package_identity(identity_unit(mem, &it->a));
-  spn_dag_digest_t b = spn_build_package_identity(identity_unit(mem, &it->b));
+  spn_build_source_pin_t pin_a = identity_pin(&it->a);
+  spn_build_source_pin_t pin_b = identity_pin(&it->b);
+  spn_dag_digest_t a = spn_build_package_identity(identity_unit(mem, &it->a), &pin_a);
+  spn_dag_digest_t b = spn_build_package_identity(identity_unit(mem, &it->b), &pin_b);
   return identity_expect_distinct(t, a, b, &it->expect);
 }
 
 static const identity_node_test_t user_tests [] = {
   {
     .name = "identical_nodes_agree",
-    .a = { .pkg = { .qualified = "A", .source = "/C/A-1" }, .tag = "N", .fn = "F", .inputs = { "/C/A-1/H" } },
-    .b = { .pkg = { .qualified = "A", .source = "/C/A-1" }, .tag = "N", .fn = "F", .inputs = { "/C/A-1/H" } },
+    .a = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .inputs = { "/C/A-1/H" } },
+    .b = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .inputs = { "/C/A-1/H" } },
   },
   {
     .name = "distinct_inputs",
-    .a = { .pkg = { .qualified = "A", .source = "/C/A-1" }, .tag = "N", .fn = "F", .inputs = { "/C/A-1/H" } },
-    .b = { .pkg = { .qualified = "A", .source = "/C/A-1" }, .tag = "N", .fn = "F", .inputs = { "/C/A-1/I" } },
+    .a = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .inputs = { "/C/A-1/H" } },
+    .b = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .inputs = { "/C/A-1/I" } },
     .expect = { .distinct = true }
   },
   {
     .name = "distinct_pinned_source",
-    .a = { .pkg = { .qualified = "A", .source = "/C/A-1" }, .tag = "N", .fn = "F" },
-    .b = { .pkg = { .qualified = "A", .source = "/C/A-2" }, .tag = "N", .fn = "F" },
+    .a = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F" },
+    .b = { .pkg = { .qualified = "A", .rev = "2" }, .tag = "N", .fn = "F" },
     .expect = { .distinct = true }
   },
 };
 
 sp_test_each(identity, user, identity_node_test_t, user_tests) {
   sp_mem_t mem = sp_test_arena(t);
-  spn_dag_digest_t a = spn_build_user_identity(&identity_roots, identity_node(mem, &it->a));
-  spn_dag_digest_t b = spn_build_user_identity(&identity_roots, identity_node(mem, &it->b));
+  spn_build_source_pin_t pin_a = identity_pin(&it->a.pkg);
+  spn_build_source_pin_t pin_b = identity_pin(&it->b.pkg);
+  spn_dag_digest_t a = spn_build_user_identity(&identity_roots, identity_node(mem, &it->a), &pin_a);
+  spn_dag_digest_t b = spn_build_user_identity(&identity_roots, identity_node(mem, &it->b), &pin_b);
   return identity_expect_distinct(t, a, b, &it->expect);
 }

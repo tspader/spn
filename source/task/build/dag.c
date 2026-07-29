@@ -580,6 +580,7 @@ static spn_dag_id_t dag_configure_reactor(spn_dag_build_t* b, spn_pkg_unit_t* un
 static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit, spn_dag_pkg_ids_t* pkg) {
   spn_dag_t* g = b->graph;
   spn_dag_id_t configure = dag_configure_reactor(b, unit);
+  spn_build_source_pin_t pin = spn_build_source_pin(unit);
 
   spn_dag_id_t metaprogram = sp_zero;
   if (unit->metaprogram && unit->metaprogram->scripts.build) {
@@ -600,7 +601,7 @@ static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit, sp
     }
 
     spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
-      .identity = spn_build_user_identity(&b->roots, node),
+      .identity = spn_build_user_identity(&b->roots, node, &pin),
       .execute = dag_user_exec,
       .discover = dag_user_discover,
       .user_data = ctx,
@@ -832,8 +833,9 @@ static spn_err_t dag_add_tree(spn_dag_build_t* b, spn_pkg_unit_t* unit, spn_dag_
   ctx->pkg = unit;
   sp_da_init(b->mem, ctx->obs);
 
+  spn_build_source_pin_t pin = spn_build_source_pin(unit);
   spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
-    .identity = spn_build_tree_identity(&b->roots, unit),
+    .identity = spn_build_tree_identity(&b->roots, unit, &pin),
     .execute = dag_tree_exec,
     .discover = dag_tree_discover,
     .user_data = ctx,
@@ -867,8 +869,9 @@ static spn_err_t dag_add_package_action(spn_dag_build_t* b, spn_pkg_unit_t* unit
   ctx->pkg = unit;
   sp_da_init(b->mem, ctx->obs);
 
+  spn_build_source_pin_t pin = spn_build_source_pin(unit);
   pkg->action = spn_dag_add_action(g, (spn_dag_action_config_t) {
-    .identity = spn_build_package_identity(unit),
+    .identity = spn_build_package_identity(unit, &pin),
     .execute = dag_package_exec,
     .discover = dag_package_discover,
     .user_data = ctx,
