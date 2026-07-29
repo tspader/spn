@@ -24,6 +24,7 @@ typedef struct {
 } fixture_t;
 
 fixture_t fixture_new(sp_test_t* t);
+sp_err_t  fixture_init(sp_test_t* t, fixture_t* fixture);
 void      fixture_setup_paths(fixture_t* fixture);
 sp_str_t  fixture_path(fixture_t* fixture, sp_str_t relative);
 void      fixture_create(fixture_t* fixture, sp_str_t relative, sp_str_t content);
@@ -52,6 +53,7 @@ void     setup_fixture_config(fixture_t* fixture, sp_str_t config_dir, sp_str_t 
 
 sp_err_t fixture_copy_project(sp_test_t* t, fixture_t* fixture, sp_str_t project, const c8* const* copy);
 sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const c8* const* copy);
+sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test);
 sp_err_t run_command_test(sp_test_t* t, command_test_t test);
 sp_err_t run_rebuild_test(sp_test_t* t, rebuild_test_t test);
 sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions);

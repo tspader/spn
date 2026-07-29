@@ -14,12 +14,17 @@ static const c8* event_names[SPN_EVENT_COUNT] = {
 #define expect_path(t, fixture, path) expect_exists(t, fixture, path, true, __FILE__, __LINE__)
 #define expect_no_path(t, fixture, path) expect_exists(t, fixture, path, false, __FILE__, __LINE__)
 
-static sp_mem_t layout_mem() {
-  return sp_mem_os_new();
+static SP_THREAD_LOCAL sp_mem_heap_t* harness_heap;
+
+static sp_mem_t harness_mem() {
+  if (!harness_heap) {
+    harness_heap = sp_mem_heap_new();
+  }
+  return sp_mem_heap_as_allocator(harness_heap);
 }
 
 static sp_str_t layout_path(const c8* triple, const c8* profile, sp_str_t rest) {
-  sp_mem_t mem = layout_mem();
+  sp_mem_t mem = harness_mem();
   sp_str_t path = sp_str_lit("build");
   if (triple) {
     path = sp_fs_join_path(mem, path, sp_str_view(triple));
@@ -29,21 +34,21 @@ static sp_str_t layout_path(const c8* triple, const c8* profile, sp_str_t rest) 
 }
 
 static sp_str_t layout_sub(const c8* dir, const c8* rest) {
-  return sp_fs_join_path(layout_mem(), sp_str_view(dir), sp_str_view(rest));
+  return sp_fs_join_path(harness_mem(), sp_str_view(dir), sp_str_view(rest));
 }
 
 static const c8* shared_lib_file(const c8* name) {
-  sp_mem_t mem = layout_mem();
+  sp_mem_t mem = harness_mem();
   return sp_str_to_cstr(mem, spn_triple_lib_file_name(mem, test_host(), sp_str_view(name), SP_OS_LIB_SHARED));
 }
 
 sp_str_t shared_lib(const c8* name) {
-  sp_mem_t mem = layout_mem();
+  sp_mem_t mem = harness_mem();
   return store_file(sp_str_to_cstr(mem, sp_fs_join_path(mem, sp_str_lit("lib"), sp_str_view(shared_lib_file(name)))));
 }
 
 sp_str_t profile_static_lib(const c8* profile, const c8* name) {
-  sp_mem_t mem = layout_mem();
+  sp_mem_t mem = harness_mem();
   return sp_fmt(mem,
     "build/{}/store/lib/{}",
     sp_fmt_cstr(profile),
@@ -71,7 +76,7 @@ static sp_str_t exe_file_name(const c8* name, const c8* triple) {
   if (sp_str_find_c8(sp_fs_get_name(sp_str_view(name)), '.') >= 0) {
     return sp_str_view(name);
   }
-  return spn_triple_exe_file_name(layout_mem(), target, sp_str_view(name));
+  return spn_triple_exe_file_name(harness_mem(), target, sp_str_view(name));
 }
 
 sp_str_t profile_exe(const c8* profile, const c8* name) {
@@ -80,7 +85,7 @@ sp_str_t profile_exe(const c8* profile, const c8* name) {
 
 static const c8* store_rest(const c8* rest, const c8* triple) {
   if (sp_str_starts_with(sp_str_view(rest), sp_str_lit("bin/"))) {
-    return sp_str_to_cstr(layout_mem(), exe_file_name(rest, triple));
+    return sp_str_to_cstr(harness_mem(), exe_file_name(rest, triple));
   }
   return rest;
 }
@@ -95,7 +100,7 @@ sp_str_t exe(const c8* name) {
 
 sp_str_t test_exe(const c8* name) {
   sp_str_t file = exe_file_name(name, SP_NULLPTR);
-  return layout_path(SP_NULLPTR, "debug", layout_sub("test", sp_str_to_cstr(layout_mem(), file)));
+  return layout_path(SP_NULLPTR, "debug", layout_sub("test", sp_str_to_cstr(harness_mem(), file)));
 }
 
 sp_str_t target_exe(const c8* name, const c8* triple) {
@@ -133,6 +138,12 @@ fixture_t fixture_new(sp_test_t* t) {
   };
   fixture_setup_paths(&fixture);
   return fixture;
+}
+
+sp_err_t fixture_init(sp_test_t* t, fixture_t* fixture) {
+  *fixture = fixture_new(t);
+  sp_must(t, sp_fs_exists(fixture->paths.spn));
+  return SP_OK;
 }
 
 void fixture_setup_paths(fixture_t* fixture) {
@@ -462,7 +473,7 @@ sp_err_t expect_exists(sp_test_t* t, fixture_t* fixture, sp_str_t path, bool exp
     sp_test_kv(t, "root", fixture->root);
     sp_str_t relative = sp_str_strip_left(path, fixture->root);
     if (relative.len != path.len) {
-      path = sp_str_concat(sp_mem_get_scratch(), sp_str_lit("$test"), relative);
+      path = sp_str_concat(harness_mem(), sp_str_lit("$test"), relative);
     }
   }
   sp_test_kv(t, "path", path);
@@ -877,7 +888,7 @@ static void expect_command_lock(sp_test_t* t, fixture_t* fixture, command_expect
   }
 }
 
-static sp_err_t command_run(sp_test_t* t, fixture_t* fixture, command_test_t test) {
+sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test) {
   if (test.project) {
     sp_try(prepare_test(t, fixture, test.project, test.copy));
   }
@@ -952,12 +963,12 @@ static sp_err_t command_run(sp_test_t* t, fixture_t* fixture, command_test_t tes
 }
 
 sp_err_t run_command_test(sp_test_t* t, command_test_t test) {
-  fixture_t fixture = fixture_new(t);
-  sp_must(t, sp_fs_exists(fixture.paths.spn));
+  fixture_t fixture = sp_zero;
+  sp_try(fixture_init(t, &fixture));
   if (!test.project) {
     sp_try(prepare_test(t, &fixture, SP_NULLPTR, SP_NULLPTR));
   }
-  return command_run(t, &fixture, test);
+  return run_command(t, &fixture, test);
 }
 
 static sp_err_t apply_rebuild_change(sp_test_t* t, fixture_t* fixture, rebuild_change_t change) {
@@ -1002,11 +1013,11 @@ static sp_err_t apply_rebuild_change(sp_test_t* t, fixture_t* fixture, rebuild_c
 }
 
 sp_err_t run_rebuild_test(sp_test_t* t, rebuild_test_t test) {
-  fixture_t fixture = fixture_new(t);
-  sp_must(t, sp_fs_exists(fixture.paths.spn));
+  fixture_t fixture = sp_zero;
+  sp_try(fixture_init(t, &fixture));
 
   sp_try(prepare_test(t, &fixture, test.project, test.copy));
-  sp_try(command_run(t, &fixture, test.first));
+  sp_try(run_command(t, &fixture, test.first));
 
   sp_tm_epoch_t mtimes[SPN_TEST_REBUILD_MAX_WATCHES] = sp_zero;
   sp_carr_for(test.watches, it) {
@@ -1023,7 +1034,7 @@ sp_err_t run_rebuild_test(sp_test_t* t, rebuild_test_t test) {
       break;
     }
     sp_try(apply_rebuild_change(t, &fixture, test.rebuilds[it].change));
-    sp_try(command_run(t, &fixture, test.rebuilds[it].command));
+    sp_try(run_command(t, &fixture, test.rebuilds[it].command));
   }
 
   sp_carr_for(test.watches, it) {
@@ -1278,8 +1289,8 @@ sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const
 }
 
 sp_err_t run_test(sp_test_t* t, test_t test) {
-  fixture_t fixture = fixture_new(t);
-  sp_must(t, sp_fs_exists(fixture.paths.spn));
+  fixture_t fixture = sp_zero;
+  sp_try(fixture_init(t, &fixture));
 
   sp_str_t blocked = test_when_blocked(&test.when);
   if (blocked.len) {

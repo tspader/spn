@@ -6,6 +6,8 @@
 
 #include "spit_harness_test.c"
 #include "spit_cli.c"
+#include "spit_options.c"
+#include "spit_worlds.c"
 
 s32 main(s32 argc, const c8** argv) {
   bool jobs = false;
