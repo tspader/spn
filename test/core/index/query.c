@@ -1,12 +1,4 @@
-#include "sp.h"
-#include "utest.h"
-#include "test.h"
-
-#include "index/index.h"
-#include "semver/compare.h"
-#include "sp/io.h"
-
-UTEST_EMPTY_FIXTURE(index_query)
+#include "index.h"
 
 typedef struct {
   const c8* name;
@@ -20,34 +12,59 @@ typedef struct {
     bool exists;
     spn_semver_t versions [4];
   } expect;
-} query_case_t;
+} query_test_t;
+
+static const query_test_t tests [] = {
+  {
+    .name = "returns_releases",
+    .file = {
+      .lines = {
+        "{" kv("namespace", "core") "," kv("name", "spum") "," kv("version", "1.0.0") "," kv("yanked", false) "}",
+      },
+    },
+    .expect = {
+      .exists = true,
+      .versions = { { 1, 0, 0 } },
+    },
+  },
+  {
+    .name = "missing_file",
+  },
+  {
+    .name = "empty_blob",
+    .file = { .exists = true },
+  },
+  {
+    .name = "malformed_line",
+    .file = {
+      .lines = { "not json" },
+    },
+  },
+};
 
 static bool semver_is_zero(spn_semver_t version) {
   return version.major == 0 && version.minor == 0 && version.patch == 0;
 }
 
-static void run_query_case(s32* utest_result, query_case_t c) {
-  ctx_t* harness = ctx_get();
-  sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
-  sp_str_t root = tmpfs_get(&harness->fs, sp_str_view(c.name));
+sp_test_each(index_query, get_package, query_test_t, tests) {
+  sp_mem_t mem = sp_test_arena(t);
 
-  sp_str_t location = sp_fs_join_path(mem, root, sp_str_lit("index"));
+  sp_str_t location = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("index"));
   sp_fs_create_dir(location);
 
-  if (c.file.exists || c.file.lines[0]) {
+  if (it->file.exists || it->file.lines[0]) {
     sp_io_dyn_mem_writer_t builder = sp_zero;
     sp_io_dyn_mem_writer_init(mem, &builder);
-    sp_carr_for(c.file.lines, it) {
-      if (!c.file.lines[it]) {
+    sp_carr_for(it->file.lines, line) {
+      if (!it->file.lines[line]) {
         break;
       }
-      sp_io_write_line(&builder.base, sp_str_view(c.file.lines[it]));
+      sp_io_write_line(&builder.base, sp_str_view(it->file.lines[line]));
     }
-    tmpfs_create(
-      &harness->fs,
-      sp_fs_join_path(mem, sp_str_view(c.name), sp_str_lit("index/core/spum.jsonl")),
-      sp_io_dyn_mem_writer_take_str(&builder)
-    );
+
+    sp_str_t file = sp_fs_join_path(mem, location, sp_str_lit("core/spum.jsonl"));
+    sp_fs_create_dir(sp_fs_parent_path(file));
+    sp_fs_create_file_str(file, sp_io_dyn_mem_writer_take_str(&builder));
   }
 
   spn_index_info_t index = {
@@ -59,59 +76,18 @@ static void run_query_case(s32* utest_result, query_case_t c) {
     .namespace = sp_str_lit("core"),
     .name = sp_str_lit("spum"),
   });
-  EXPECT_EQ(c.expect.exists, pkg != SP_NULLPTR);
+  sp_expect_eq(t, it->expect.exists, pkg != SP_NULLPTR);
 
   if (pkg) {
     u32 expected = 0;
-    sp_carr_for(c.expect.versions, it) {
-      if (semver_is_zero(c.expect.versions[it])) {
-        break;
-      }
-      expected++;
-    }
+    sp_carr_detect_len(it->expect.versions, expected, !semver_is_zero(it->expect.versions[expected]));
 
-    EXPECT_EQ(expected, sp_da_size(pkg->releases));
-    sp_for(it, SP_MIN(expected, sp_da_size(pkg->releases))) {
-      EXPECT_TRUE(spn_semver_eq(c.expect.versions[it], pkg->releases[it].version));
+    sp_expect_eq(t, expected, sp_da_size(pkg->releases));
+    sp_for(at, SP_MIN(expected, sp_da_size(pkg->releases))) {
+      sp_expect(t, spn_semver_eq(it->expect.versions[at], pkg->releases[at].version));
     }
   }
 
   spn_index_deinit(&index);
-}
-
-UTEST_F(index_query, query_package_returns_releases) {
-  run_query_case(utest_result, (query_case_t) {
-    .name = "query_package_returns_releases",
-    .file = {
-      .lines = {
-        "{" kv("namespace", "core") "," kv("name", "spum") "," kv("version", "1.0.0") "," kv("yanked", false) "}",
-      },
-    },
-    .expect = {
-      .exists = true,
-      .versions = { spn_semver_lit(1, 0, 0) },
-    },
-  });
-}
-
-UTEST_F(index_query, query_package_missing_file_errors) {
-  run_query_case(utest_result, (query_case_t) {
-    .name = "query_package_missing_file_errors",
-  });
-}
-
-UTEST_F(index_query, query_package_empty_blob_errors) {
-  run_query_case(utest_result, (query_case_t) {
-    .name = "query_package_empty_blob_errors",
-    .file = { .exists = true },
-  });
-}
-
-UTEST_F(index_query, query_package_malformed_json_line_errors) {
-  run_query_case(utest_result, (query_case_t) {
-    .name = "query_package_malformed_json_line_errors",
-    .file = {
-      .lines = { "not json" },
-    },
-  });
+  return SP_OK;
 }

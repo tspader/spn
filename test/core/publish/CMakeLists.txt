@@ -34,15 +34,13 @@ add_executable(publish
   ${SRC}/sp/str.c
   ${SRC}/target/mutate.c
   ${SRC}/toolchain/toolchain.c
-  main.c
+  spit_main.c
   publish.c
-  ${TEST_TOOLS}/ctx.c
-  ${TEST_TOOLS}/tmp.c
   ${TEST_TOOLS}/git.c
   ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(publish)
-target_include_directories(publish PRIVATE ${SRC}/codegen/gen)
+target_include_directories(publish PRIVATE ${SRC}/codegen/gen ${STORE}/include/sp)
 target_link_libraries(publish PRIVATE yyjson)
 add_dependencies(publish spn_codegen_gen)
 add_test(NAME publish COMMAND "$<TARGET_FILE:publish>")

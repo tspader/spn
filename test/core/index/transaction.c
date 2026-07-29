@@ -1,13 +1,4 @@
-#include "sp.h"
-#include "utest.h"
-#include "test.h"
-
-#include "external/git.h"
-#include "index/index.h"
-#include "semver/types.h"
-#include "sp/str.h"
-
-UTEST_EMPTY_FIXTURE(index_transaction)
+#include "index.h"
 
 typedef enum {
   TXN_ACTION_NONE,
@@ -48,7 +39,122 @@ typedef struct {
     txn_file_t files [2];
     const c8* head;
   } expect;
-} txn_case_t;
+} txn_test_t;
+
+static const txn_test_t tests [] = {
+  {
+    .name = "publish_clones_commits_pushes",
+    .actions = {
+      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = { 1, 0, 0 } } },
+    },
+    .expect = {
+      .files = { { .file = "core/spum.jsonl", .lines = 1 } },
+      .head = "core/spum 1.0.0",
+    },
+  },
+  {
+    .name = "duplicate_rejected_after_freshen",
+    .actions = {
+      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = { 1, 0, 0 } } },
+      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = { 1, 0, 0 }, .err = SPN_ERR_VERSION_EXISTS } },
+    },
+    .expect = {
+      .files = { { .file = "core/spum.jsonl", .lines = 1 } },
+    },
+  },
+  {
+    .name = "retries_after_remote_advances",
+    .actions = {
+      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = { 1, 0, 0 } } },
+      {
+        .kind = TXN_ACTION_ADVANCE_REMOTE,
+        .write = {
+          .file = "core/other.jsonl",
+          .line = "{" kv("namespace", "core") "," kv("name", "other") "," kv("version", "1.0.0") "," kv("yanked", false) "}",
+        },
+      },
+      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = { 1, 1, 0 } } },
+    },
+    .expect = {
+      .files = {
+        { .file = "core/spum.jsonl", .lines = 2 },
+        { .file = "core/other.jsonl", .lines = 1 },
+      },
+    },
+  },
+  {
+    .name = "discards_tracked_damage",
+    .actions = {
+      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = { 1, 0, 0 } } },
+      { .kind = TXN_ACTION_APPEND_CLONE_FILE, .write = { .file = "core/spum.jsonl", .line = "not json" } },
+      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = { 1, 1, 0 } } },
+    },
+    .expect = {
+      .files = { { .file = "core/spum.jsonl", .lines = 2 } },
+    },
+  },
+  {
+    .name = "retries_rejected_push",
+    .remote = { .reject_push = true },
+    .actions = {
+      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = { 1, 0, 0 } } },
+    },
+    .expect = {
+      .files = { { .file = "core/spum.jsonl", .lines = 1 } },
+      .head = "core/spum 1.0.0",
+    },
+  },
+  {
+    .name = "bootstraps_empty_remote",
+    .remote = { .empty = true },
+    .actions = {
+      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = { 1, 0, 0 } } },
+    },
+    .expect = {
+      .files = { { .file = "core/spum.jsonl", .lines = 1 } },
+    },
+  },
+  {
+    .name = "retries_rejected_bootstrap_push",
+    .remote = { .empty = true, .reject_push = true },
+    .actions = {
+      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = { 1, 0, 0 } } },
+    },
+    .expect = {
+      .files = { { .file = "core/spum.jsonl", .lines = 1 } },
+      .head = "core/spum 1.0.0",
+    },
+  },
+  {
+    .name = "cleans_untracked_damage",
+    .actions = {
+      { .kind = TXN_ACTION_SYNC },
+      { .kind = TXN_ACTION_CREATE_CLONE_FILE, .write = { .file = "core/spum.jsonl", .line = "not json" } },
+      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = { 1, 0, 0 } } },
+    },
+    .expect = {
+      .files = { { .file = "core/spum.jsonl", .lines = 1 } },
+    },
+  },
+  {
+    .name = "pinned_rejected",
+    .remote = { .pin = "abc123" },
+    .actions = {
+      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = { 1, 0, 0 }, .err = SPN_ERR_INDEX_PINNED } },
+    },
+  },
+  {
+    .name = "reattaches_detached_head",
+    .actions = {
+      { .kind = TXN_ACTION_SYNC },
+      { .kind = TXN_ACTION_DETACH_HEAD },
+      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = { 1, 0, 0 } } },
+    },
+    .expect = {
+      .head = "core/spum 1.0.0",
+    },
+  },
+};
 
 static void git_run(sp_str_t cwd, const c8* a, sp_str_t b, sp_str_t c, sp_str_t d, sp_str_t e) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
@@ -86,11 +192,9 @@ static sp_str_t remote_head_message(sp_mem_t mem, sp_str_t remote) {
   return sp_str_trim_right(result.out);
 }
 
-static void run_txn_case(s32* utest_result, txn_case_t c) {
-  ctx_t* harness = ctx_get();
-  sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
-  sp_str_t tmp = tmpfs_get(&harness->fs, sp_str_view(c.name));
-  sp_fs_create_dir(tmp);
+sp_test_each(index_transaction, publish, txn_test_t, tests) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_str_t tmp = sp_test_dir(t);
 
   sp_str_t seed = sp_fs_join_path(mem, tmp, sp_str_lit("seed"));
   sp_str_t remote = sp_fs_join_path(mem, tmp, sp_str_lit("remote.git"));
@@ -101,12 +205,12 @@ static void run_txn_case(s32* utest_result, txn_case_t c) {
     .location = sp_fs_join_path(mem, tmp, sp_str_lit("clone")),
     .protocol = SPN_INDEX_PROTOCOL_GIT,
   };
-  if (c.remote.pin) {
-    index.rev = sp_str_view(c.remote.pin);
+  if (it->remote.pin) {
+    index.rev = sp_str_view(it->remote.pin);
   }
   spn_index_init(&index, mem);
 
-  if (c.remote.empty) {
+  if (it->remote.empty) {
     git_run(tmp, "init", sp_str_lit("--quiet"), sp_str_lit("--bare"), sp_str_lit("remote.git"), sp_zero_s(sp_str_t));
   }
   else {
@@ -119,7 +223,7 @@ static void run_txn_case(s32* utest_result, txn_case_t c) {
     git_run(tmp, "clone", sp_str_lit("--quiet"), sp_str_lit("--bare"), sp_str_lit("seed"), sp_str_lit("remote.git"));
   }
 
-  if (c.remote.reject_push) {
+  if (it->remote.reject_push) {
     sp_str_t hook = sp_fs_join_path(mem, remote, sp_str_lit("hooks/pre-receive"));
     sp_fs_create_file_str(hook, sp_str_lit(
       "#!/bin/sh\n"
@@ -132,11 +236,11 @@ static void run_txn_case(s32* utest_result, txn_case_t c) {
       .command = SP_LIT("chmod"),
       .args = { SP_LIT("+x"), hook },
     });
-    ASSERT_EQ(0, chmod.status.exit_code);
+    sp_must_eq(t, 0, chmod.status.exit_code);
   }
 
-  sp_carr_for(c.actions, it) {
-    txn_action_t action = c.actions[it];
+  sp_carr_for(it->actions, at) {
+    txn_action_t action = it->actions[at];
     if (action.kind == TXN_ACTION_NONE) {
       break;
     }
@@ -153,11 +257,11 @@ static void run_txn_case(s32* utest_result, txn_case_t c) {
         };
         sp_da_init(mem, rel.deps);
         sp_da_init(mem, rel.targets);
-        EXPECT_EQ(action.publish.err, spn_index_publish(&index, &rel).kind);
+        sp_expect_eq(t, action.publish.err, spn_index_publish(&index, &rel).kind);
         break;
       }
       case TXN_ACTION_SYNC: {
-        EXPECT_EQ(SPN_OK, spn_index_sync(&index, false));
+        sp_expect_eq(t, SPN_OK, spn_index_sync(&index, false));
         break;
       }
       case TXN_ACTION_ADVANCE_REMOTE: {
@@ -185,8 +289,8 @@ static void run_txn_case(s32* utest_result, txn_case_t c) {
       }
       case TXN_ACTION_DETACH_HEAD: {
         sp_str_t head = sp_zero;
-        EXPECT_EQ(SPN_OK, spn_git_get_commit_full(mem, index.location, sp_str_lit("HEAD"), &head));
-        EXPECT_EQ(SPN_OK, spn_git_checkout(index.location, head));
+        sp_expect_eq(t, SPN_OK, spn_git_get_commit_full(mem, index.location, sp_str_lit("HEAD"), &head));
+        sp_expect_eq(t, SPN_OK, spn_git_checkout(index.location, head));
         break;
       }
       case TXN_ACTION_NONE: {
@@ -195,159 +299,19 @@ static void run_txn_case(s32* utest_result, txn_case_t c) {
     }
   }
 
-  sp_carr_for(c.expect.files, it) {
-    txn_file_t file = c.expect.files[it];
+  sp_carr_for(it->expect.files, at) {
+    txn_file_t file = it->expect.files[at];
     if (!file.file) {
       break;
     }
-    EXPECT_EQ(file.lines, remote_line_count(mem, remote, file.file));
+    sp_expect_eq(t, file.lines, remote_line_count(mem, remote, file.file));
   }
-  if (c.expect.head) {
-    SP_EXPECT_STR_EQ(remote_head_message(mem, remote), sp_str_view(c.expect.head));
+  if (it->expect.head) {
+    sp_expect_str_eq(t, remote_head_message(mem, remote), sp_str_view(it->expect.head));
   }
   if (sp_fs_is_dir(index.location)) {
-    EXPECT_FALSE(spn_git_is_dirty(index.location, index.location));
+    sp_expect(t, !spn_git_is_dirty(index.location, index.location));
   }
-}
 
-UTEST_F(index_transaction, publish_clones_commits_pushes) {
-  run_txn_case(utest_result, (txn_case_t) {
-    .name = "txn_publish",
-    .actions = {
-      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = spn_semver_lit(1, 0, 0) } },
-    },
-    .expect = {
-      .files = { { .file = "core/spum.jsonl", .lines = 1 } },
-      .head = "core/spum 1.0.0",
-    },
-  });
-}
-
-UTEST_F(index_transaction, publish_duplicate_rejected_after_freshen) {
-  run_txn_case(utest_result, (txn_case_t) {
-    .name = "txn_duplicate",
-    .actions = {
-      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = spn_semver_lit(1, 0, 0) } },
-      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = spn_semver_lit(1, 0, 0), .err = SPN_ERR_VERSION_EXISTS } },
-    },
-    .expect = {
-      .files = { { .file = "core/spum.jsonl", .lines = 1 } },
-    },
-  });
-}
-
-UTEST_F(index_transaction, publish_retries_after_remote_advances) {
-  run_txn_case(utest_result, (txn_case_t) {
-    .name = "txn_race",
-    .actions = {
-      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = spn_semver_lit(1, 0, 0) } },
-      {
-        .kind = TXN_ACTION_ADVANCE_REMOTE,
-        .write = {
-          .file = "core/other.jsonl",
-          .line = "{" kv("namespace", "core") "," kv("name", "other") "," kv("version", "1.0.0") "," kv("yanked", false) "}",
-        },
-      },
-      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = spn_semver_lit(1, 1, 0) } },
-    },
-    .expect = {
-      .files = {
-        { .file = "core/spum.jsonl", .lines = 2 },
-        { .file = "core/other.jsonl", .lines = 1 },
-      },
-    },
-  });
-}
-
-UTEST_F(index_transaction, publish_discards_tracked_damage) {
-  run_txn_case(utest_result, (txn_case_t) {
-    .name = "txn_tracked_damage",
-    .actions = {
-      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = spn_semver_lit(1, 0, 0) } },
-      { .kind = TXN_ACTION_APPEND_CLONE_FILE, .write = { .file = "core/spum.jsonl", .line = "not json" } },
-      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = spn_semver_lit(1, 1, 0) } },
-    },
-    .expect = {
-      .files = { { .file = "core/spum.jsonl", .lines = 2 } },
-    },
-  });
-}
-
-UTEST_F(index_transaction, publish_retries_rejected_push) {
-  run_txn_case(utest_result, (txn_case_t) {
-    .name = "txn_reject_once",
-    .remote = { .reject_push = true },
-    .actions = {
-      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = spn_semver_lit(1, 0, 0) } },
-    },
-    .expect = {
-      .files = { { .file = "core/spum.jsonl", .lines = 1 } },
-      .head = "core/spum 1.0.0",
-    },
-  });
-}
-
-UTEST_F(index_transaction, publish_bootstraps_empty_remote) {
-  run_txn_case(utest_result, (txn_case_t) {
-    .name = "txn_empty",
-    .remote = { .empty = true },
-    .actions = {
-      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = spn_semver_lit(1, 0, 0) } },
-    },
-    .expect = {
-      .files = { { .file = "core/spum.jsonl", .lines = 1 } },
-    },
-  });
-}
-
-UTEST_F(index_transaction, publish_retries_rejected_bootstrap_push) {
-  run_txn_case(utest_result, (txn_case_t) {
-    .name = "txn_empty_reject",
-    .remote = { .empty = true, .reject_push = true },
-    .actions = {
-      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = spn_semver_lit(1, 0, 0) } },
-    },
-    .expect = {
-      .files = { { .file = "core/spum.jsonl", .lines = 1 } },
-      .head = "core/spum 1.0.0",
-    },
-  });
-}
-
-UTEST_F(index_transaction, publish_cleans_untracked_damage) {
-  run_txn_case(utest_result, (txn_case_t) {
-    .name = "txn_damage",
-    .actions = {
-      { .kind = TXN_ACTION_SYNC },
-      { .kind = TXN_ACTION_CREATE_CLONE_FILE, .write = { .file = "core/spum.jsonl", .line = "not json" } },
-      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = spn_semver_lit(1, 0, 0) } },
-    },
-    .expect = {
-      .files = { { .file = "core/spum.jsonl", .lines = 1 } },
-    },
-  });
-}
-
-UTEST_F(index_transaction, publish_pinned_rejected) {
-  run_txn_case(utest_result, (txn_case_t) {
-    .name = "txn_pinned",
-    .remote = { .pin = "abc123" },
-    .actions = {
-      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = spn_semver_lit(1, 0, 0), .err = SPN_ERR_INDEX_PINNED } },
-    },
-  });
-}
-
-UTEST_F(index_transaction, publish_reattaches_detached_head) {
-  run_txn_case(utest_result, (txn_case_t) {
-    .name = "txn_detached",
-    .actions = {
-      { .kind = TXN_ACTION_SYNC },
-      { .kind = TXN_ACTION_DETACH_HEAD },
-      { .kind = TXN_ACTION_PUBLISH, .publish = { .name = "spum", .version = spn_semver_lit(1, 0, 0) } },
-    },
-    .expect = {
-      .head = "core/spum 1.0.0",
-    },
-  });
+  return SP_OK;
 }

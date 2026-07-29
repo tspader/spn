@@ -17,49 +17,15 @@ typedef struct {
 } catalog_expect_t;
 
 typedef struct {
+  const c8* name;
   const c8* file;
   catalog_add_t adds [CATALOG_MAX_ADDS];
   catalog_expect_t expect;
 } catalog_test_t;
 
-static void run_catalog_test(s32* utest_result, catalog_test_t t) {
-  spn_toolchain_catalog_t catalog = sp_zero;
-  fixture_catalog(utest_result, &catalog, t.file);
-
-  sp_carr_for(t.adds, it) {
-    if (!t.adds[it].name) {
-      break;
-    }
-    spn_toolchain_catalog_add(&catalog, fixture_local_toolchain(t.adds[it].name, t.adds[it].compiler));
-  }
-
-  ASSERT_EQ(t.expect.entries, fixture_catalog_size(&catalog));
-
-  sp_carr_for(t.expect.present, it) {
-    if (!t.expect.present[it]) {
-      break;
-    }
-    EXPECT_TRUE(spn_toolchain_catalog_get(&catalog, sp_str_view(t.expect.present[it])));
-  }
-
-  sp_carr_for(t.expect.order, it) {
-    if (!t.expect.order[it]) {
-      break;
-    }
-    EXPECT_STR(fixture_catalog_at(&catalog, it)->name, t.expect.order[it]);
-  }
-
-  sp_carr_for(t.expect.toolchains, it) {
-    fixture_toolchain_t toolchain = t.expect.toolchains[it];
-    if (!toolchain.name) {
-      break;
-    }
-    fixture_check_entry(utest_result, spn_toolchain_catalog_get(&catalog, sp_str_view(toolchain.name)), toolchain);
-  }
-}
-
-UTEST(catalog, add_overrides_by_name) {
-  run_catalog_test(utest_result, (catalog_test_t) {
+static const catalog_test_t tests [] = {
+  {
+    .name = "overrides_by_name",
     .file = "multiple.json",
     .adds = {
       { .name = "A", .compiler = "/A" },
@@ -76,11 +42,9 @@ UTEST(catalog, add_overrides_by_name) {
         },
       },
     },
-  });
-}
-
-UTEST(catalog, add_coexists_with_entries) {
-  run_catalog_test(utest_result, (catalog_test_t) {
+  },
+  {
+    .name = "coexists_with_entries",
     .file = "multiple.json",
     .adds = {
       { .name = "C", .compiler = "C" },
@@ -93,5 +57,43 @@ UTEST(catalog, add_coexists_with_entries) {
         { .name = "D", .absent = true },
       },
     },
-  });
+  },
+};
+
+sp_test_each(catalog, add, catalog_test_t, tests) {
+  spn_toolchain_catalog_t catalog = sp_zero;
+  if (fixture_catalog(t, &catalog, it->file)) return SP_ERR;
+
+  sp_carr_for(it->adds, at) {
+    if (!it->adds[at].name) {
+      break;
+    }
+    spn_toolchain_catalog_add(&catalog, fixture_local_toolchain(it->adds[at].name, it->adds[at].compiler));
+  }
+
+  sp_must_eq(t, it->expect.entries, fixture_catalog_size(&catalog));
+
+  sp_carr_for(it->expect.present, at) {
+    if (!it->expect.present[at]) {
+      break;
+    }
+    sp_expect(t, spn_toolchain_catalog_get(&catalog, sp_str_view(it->expect.present[at])));
+  }
+
+  sp_carr_for(it->expect.order, at) {
+    if (!it->expect.order[at]) {
+      break;
+    }
+    sp_expect_str_eq_c(t, fixture_catalog_at(&catalog, at)->name, it->expect.order[at]);
+  }
+
+  sp_carr_for(it->expect.toolchains, at) {
+    fixture_toolchain_t toolchain = it->expect.toolchains[at];
+    if (!toolchain.name) {
+      break;
+    }
+    if (fixture_check_entry(t, spn_toolchain_catalog_get(&catalog, sp_str_view(toolchain.name)), toolchain)) return SP_ERR;
+  }
+
+  return SP_OK;
 }

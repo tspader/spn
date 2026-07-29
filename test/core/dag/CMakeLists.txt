@@ -9,7 +9,8 @@ add_executable(dag
   ${SRC}/sha256/sha256.c
   ${SRC}/sp/fs.c
   ${SRC}/sp/io.c
-  main.c
+  spit_main.c
+  harness.c
   action_cache.c
   digest.c
   discovery.c
@@ -28,12 +29,11 @@ add_executable(dag
   strong_key.c
   tree.c
   wasm.c
-  ${TEST_TOOLS}/tmp.c
   ${TEST_TOOLS}/sp_sim.c
   ${TEST_TOOLS}/wasm_emit.c
 )
 spn_test_binary(dag)
-target_include_directories(dag PRIVATE ${SRC}/codegen/gen)
+target_include_directories(dag PRIVATE ${SRC}/codegen/gen ${STORE}/include/sp)
 target_link_libraries(dag PRIVATE yyjson vmlib)
 add_dependencies(dag spn_codegen_gen)
 add_test(NAME dag COMMAND "$<TARGET_FILE:dag>")

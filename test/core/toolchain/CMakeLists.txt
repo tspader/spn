@@ -22,7 +22,7 @@ add_executable(toolchain_test
   ${SRC}/sha256/sha256.c
   ${SRC}/toolchain/toolchain.c
   ${SRC}/triple/triple.c
-  main.c
+  spit_main.c
   builtins.c
   catalog.c
   parse.c
@@ -30,13 +30,10 @@ add_executable(toolchain_test
   select.c
   sha256.c
   toolchain.c
-  ${TEST_TOOLS}/ctx.c
-  ${TEST_TOOLS}/tmp.c
-  ${TEST_TOOLS}/git.c
   ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(toolchain_test)
-target_include_directories(toolchain_test PRIVATE ${SRC}/codegen/gen ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(toolchain_test PRIVATE ${SRC}/codegen/gen ${CMAKE_CURRENT_SOURCE_DIR} ${STORE}/include/sp)
 target_compile_definitions(toolchain_test PRIVATE
   TOOLCHAINS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/toolchains")
 target_link_libraries(toolchain_test PRIVATE yyjson)

@@ -1,4 +1,4 @@
-#include "common.h"
+#include "options.h"
 
 typedef struct {
   const c8* str;
@@ -53,6 +53,8 @@ typedef struct {
 } merge_expect_t;
 
 typedef struct {
+  const c8* name;
+  const c8* skip;
   bool is_root;
   option_decl_t decls [4];
   clause_lit_t config [3];
@@ -86,15 +88,390 @@ static spn_when_t make_when(sp_mem_t mem, const clause_lit_t* clauses, u64 count
   return when;
 }
 
-void run_merge_test(s32* utest_result, merge_test_t t) {
-  sp_mem_t mem = sp_mem_os_new();
+static const merge_test_t tests [] = {
+  {
+    .name = "bool_defaults_false",
+    .decls = {
+      { .name = "x", .type = SPN_OPTION_TYPE_BOOL },
+    },
+    .expect = {
+      .options = {
+        { .name = "x", .value = { .is_bool = true }, .is_default = true },
+      },
+    },
+  },
+  {
+    .name = "additive_unions",
+    .decls = {
+      { .name = "x", .type = SPN_OPTION_TYPE_BOOL, .additive = true },
+    },
+    .requests = {
+      { .consumer = "a", .options = { { .key = "x", .is_bool = true, .b = true } } },
+      { .consumer = "b", .options = { { .key = "x", .is_bool = true } } },
+    },
+    .expect = {
+      .options = {
+        { .name = "x", .value = { .is_bool = true, .b = true } },
+      },
+    },
+  },
+  {
+    .name = "agreeing_requests",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "vk" } } } },
+    },
+    .requests = {
+      { .consumer = "a", .options = { { "e", "gl" } } },
+      { .consumer = "b", .options = { { "e", "gl" } } },
+    },
+    .expect = {
+      .options = {
+        { .name = "e", .value = { .str = "gl" } },
+      },
+    },
+  },
+  {
+    .name = "config_overrides_request",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "gl" } } } },
+    },
+    .config = { { "e", "vk" } },
+    .requests = {
+      { .consumer = "a", .options = { { "e", "gl" } } },
+    },
+    .expect = {
+      .options = {
+        { .name = "e", .value = { .str = "vk" } },
+      },
+    },
+  },
+  {
+    .name = "profile_sets_root",
+    .is_root = true,
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "gl" } } } },
+    },
+    .profile_options = { { "e", "vk" } },
+    .expect = {
+      .options = {
+        { .name = "e", .value = { .str = "vk" } },
+      },
+    },
+  },
+  {
+    .name = "request_conflict",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
+    },
+    .requests = {
+      { .consumer = "a", .options = { { "e", "gl" } } },
+      { .consumer = "b", .options = { { "e", "vk" } } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_CONFLICT,
+      .option = "e",
+      .a = { SPN_OPTION_SETTER_CONSUMER, "a" },
+      .b = { SPN_OPTION_SETTER_CONSUMER, "b" },
+    },
+  },
+  {
+    .name = "veto_contradicted",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "vk" } } } },
+    },
+    .requests = {
+      { .consumer = "a", .options = { { .key = "e", .str = "vk", .negated = true } } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_VETO,
+      .option = "e",
+      .a = { SPN_OPTION_SETTER_CONSUMER, "a" },
+      .b = { .kind = SPN_OPTION_SETTER_DEFAULT },
+    },
+  },
+  {
+    .name = "veto_respected",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "gl" } } } },
+    },
+    .requests = {
+      { .consumer = "a", .options = { { .key = "e", .str = "vk", .negated = true } } },
+    },
+    .expect = {
+      .options = {
+        { .name = "e", .value = { .str = "gl" }, .is_default = true },
+      },
+    },
+  },
+  {
+    .name = "undeclared",
+    .decls = {
+      { .name = "x", .type = SPN_OPTION_TYPE_BOOL },
+    },
+    .config = { { "nosuch", "vk" } },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_UNDECLARED,
+      .option = "nosuch",
+    },
+  },
+  {
+    .name = "bad_value_config",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
+    },
+    .config = { { "e", "dx12" } },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_BAD_VALUE,
+      .option = "e",
+    },
+  },
+  {
+    .name = "bad_value_request",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
+    },
+    .requests = {
+      { .consumer = "a", .options = { { "e", "dx12" } } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_BAD_VALUE,
+      .option = "e",
+    },
+  },
+  {
+    .name = "no_value",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_NO_VALUE,
+      .option = "e",
+    },
+  },
+  {
+    .name = "defaults_declined",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "vk" } } } },
+      { .name = "x", .type = SPN_OPTION_TYPE_BOOL, .defaults = { { .value = { .is_bool = true, .b = true } } } },
+    },
+    .defaults_declined = true,
+    .requests = {
+      { .consumer = "a", .options = { { "e", "gl" } } },
+    },
+    .expect = {
+      .options = {
+        { .name = "e", .value = { .str = "gl" } },
+        { .name = "x", .value = { .is_bool = true }, .is_default = true },
+      },
+    },
+  },
+  {
+    .name = "default_arm_facts",
+    .facts = { .os = SPN_OS_LINUX },
+    .decls = {
+      {
+        .name = "e",
+        .type = SPN_OPTION_TYPE_ENUM,
+        .values = { "gl", "vk", "off" },
+        .defaults = {
+          { .when = { { "os", "windows" } }, .value = { .str = "off" } },
+          { .when = { { "os", "linux" } },   .value = { .str = "vk" } },
+          { .value = { .str = "gl" } },
+        },
+      },
+    },
+    .expect = {
+      .options = {
+        { .name = "e", .value = { .str = "vk" }, .is_default = true },
+      },
+    },
+  },
+  {
+    .name = "default_arm_chains",
+    .decls = {
+      { .name = "r", .type = SPN_OPTION_TYPE_ENUM, .values = { "on", "off" }, .defaults = { { .value = { .str = "on" } } } },
+      {
+        .name = "e",
+        .type = SPN_OPTION_TYPE_ENUM,
+        .values = { "gl", "off" },
+        .defaults = {
+          { .when = { { "r", "on" } }, .value = { .str = "gl" } },
+          { .value = { .str = "off" } },
+        },
+      },
+    },
+    .expect = {
+      .options = {
+        { .name = "e", .value = { .str = "gl" }, .is_default = true },
+      },
+    },
+  },
+  {
+    .name = "explicit_default_is_default",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "gl" } } } },
+    },
+    .config = { { "e", "gl" } },
+    .expect = {
+      .options = {
+        { .name = "e", .value = { .str = "gl" }, .is_default = true },
+      },
+    },
+  },
+  {
+    .name = "cut0_config_contradicts_constraint",
+    .skip = "worlds cut 0",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "gl" } } } },
+    },
+    .config = { { "e", "vk" } },
+    .requests = {
+      { .consumer = "a", .options = { { "e", "gl" } } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_CONFLICT,
+      .option = "e",
+      .a = { .kind = SPN_OPTION_SETTER_ROOT_MANIFEST },
+      .b = { SPN_OPTION_SETTER_CONSUMER, "a" },
+    },
+  },
+  {
+    .name = "cut0_prohibition_vs_demand",
+    .skip = "worlds cut 0",
+    .decls = {
+      { .name = "x", .type = SPN_OPTION_TYPE_BOOL, .additive = true },
+    },
+    .config = { { .key = "x", .is_bool = true } },
+    .requests = {
+      { .consumer = "a", .options = { { .key = "x", .is_bool = true, .b = true } } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_CONFLICT,
+      .option = "x",
+      .a = { .kind = SPN_OPTION_SETTER_ROOT_MANIFEST },
+      .b = { SPN_OPTION_SETTER_CONSUMER, "a" },
+    },
+  },
+  {
+    .name = "cut0_prohibition_without_demand",
+    .skip = "worlds cut 0",
+    .decls = {
+      { .name = "x", .type = SPN_OPTION_TYPE_BOOL, .additive = true, .defaults = { { .value = { .is_bool = true, .b = true } } } },
+    },
+    .config = { { .key = "x", .is_bool = true } },
+    .expect = {
+      .options = {
+        { .name = "x", .value = { .is_bool = true } },
+      },
+    },
+  },
+  {
+    .name = "cut0_negative_constraint_selects_survivor",
+    .skip = "worlds cut 0",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "vk" } } } },
+    },
+    .requests = {
+      { .consumer = "a", .options = { { .key = "e", .str = "vk", .negated = true } } },
+    },
+    .expect = {
+      .options = {
+        { .name = "e", .value = { .str = "gl" } },
+      },
+    },
+  },
+  {
+    .name = "cut0_undetermined",
+    .skip = "worlds cut 0",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk", "dx" } },
+    },
+    .requests = {
+      { .consumer = "a", .options = { { .key = "e", .str = "dx", .negated = true } } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_NO_VALUE,
+      .option = "e",
+    },
+  },
+  {
+    .name = "cut0_negative_constraint_outside_domain",
+    .skip = "worlds cut 0",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
+    },
+    .requests = {
+      { .consumer = "a", .options = { { .key = "e", .str = "dx12", .negated = true } } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_BAD_VALUE,
+      .option = "e",
+    },
+  },
+  {
+    .name = "cut0_veto_against_config",
+    .skip = "worlds cut 0",
+    .decls = {
+      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
+    },
+    .config = { { "e", "vk" } },
+    .requests = {
+      { .consumer = "a", .options = { { .key = "e", .str = "vk", .negated = true } } },
+    },
+    .expect = {
+      .err = SPN_ERROR,
+      .option_err = SPN_OPTION_ERR_VETO,
+      .option = "e",
+      .a = { SPN_OPTION_SETTER_CONSUMER, "a" },
+      .b = { .kind = SPN_OPTION_SETTER_ROOT_MANIFEST },
+    },
+  },
+  {
+    .name = "cut0_default_arm_defers",
+    .skip = "worlds cut 0",
+    .decls = {
+      {
+        .name = "e",
+        .type = SPN_OPTION_TYPE_ENUM,
+        .values = { "gl", "off" },
+        .defaults = {
+          { .when = { { "r", "on" } }, .value = { .str = "gl" } },
+          { .value = { .str = "off" } },
+        },
+      },
+      { .name = "r", .type = SPN_OPTION_TYPE_ENUM, .values = { "on", "off" }, .defaults = { { .value = { .str = "on" } } } },
+    },
+    .expect = {
+      .options = {
+        { .name = "e", .value = { .str = "gl" }, .is_default = true },
+      },
+    },
+  },
+};
+
+sp_test_each(options_merge, merge, merge_test_t, tests) {
+  if (it->skip) {
+    return sp_test_skip(t, "{}", sp_fmt_cstr(it->skip));
+  }
+
+  sp_mem_t mem = sp_test_arena(t);
 
   spn_resolved_pkg_t pkg = {
     .name = sp_str_lit("p"),
-    .source = t.is_root ? SPN_PKG_SOURCE_ROOT : SPN_PKG_SOURCE_INDEX,
+    .source = it->is_root ? SPN_PKG_SOURCE_ROOT : SPN_PKG_SOURCE_INDEX,
   };
-  sp_carr_for(t.decls, it) {
-    option_decl_t* decl = &t.decls[it];
+  sp_carr_for(it->decls, dx) {
+    option_decl_t* decl = &it->decls[dx];
     if (!decl->name) break;
 
     spn_option_info_t option = {
@@ -120,33 +497,33 @@ void run_merge_test(s32* utest_result, merge_test_t t) {
   }
 
   spn_profile_info_t profile = {
-    .os = t.facts.os,
-    .arch = t.facts.arch,
-    .abi = t.facts.abi,
-    .mode = t.facts.mode,
-    .opt = t.facts.opt,
-    .sanitizers = t.facts.sanitizers,
-    .options = make_when(mem, t.profile_options, SP_CARR_LEN(t.profile_options)),
+    .os = it->facts.os,
+    .arch = it->facts.arch,
+    .abi = it->facts.abi,
+    .mode = it->facts.mode,
+    .opt = it->facts.opt,
+    .sanitizers = it->facts.sanitizers,
+    .options = make_when(mem, it->profile_options, SP_CARR_LEN(it->profile_options)),
   };
 
   sp_da(spn_pkg_config_entry_t) config = sp_da_new(mem, spn_pkg_config_entry_t);
-  if (t.config[0].key || t.defaults_declined) {
+  if (it->config[0].key || it->defaults_declined) {
     sp_da_push(config, ((spn_pkg_config_entry_t) {
       .key = sp_str_lit("p"),
       .value = {
-        .options = make_when(mem, t.config, SP_CARR_LEN(t.config)),
-        .defaults_declined = t.defaults_declined,
+        .options = make_when(mem, it->config, SP_CARR_LEN(it->config)),
+        .defaults_declined = it->defaults_declined,
       },
     }));
   }
 
   spn_option_requests_t requests = sp_da_new(mem, spn_option_request_t);
-  sp_carr_for(t.requests, it) {
-    if (!t.requests[it].consumer) break;
+  sp_carr_for(it->requests, rx) {
+    if (!it->requests[rx].consumer) break;
     spn_when_t* options = (spn_when_t*)sp_alloc(mem, sizeof(spn_when_t));
-    *options = make_when(mem, t.requests[it].options, SP_CARR_LEN(t.requests[it].options));
+    *options = make_when(mem, it->requests[rx].options, SP_CARR_LEN(it->requests[rx].options));
     sp_da_push(requests, ((spn_option_request_t) {
-      .consumer = sp_str_view(t.requests[it].consumer),
+      .consumer = sp_str_view(it->requests[rx].consumer),
       .options = options,
     }));
   }
@@ -154,459 +531,43 @@ void run_merge_test(s32* utest_result, merge_test_t t) {
   spn_event_buffer_t* events = spn_event_buffer_new(mem);
   spn_resolved_options_t resolved = sp_zero;
   spn_err_t err = spn_pkg_options_merge(mem, &pkg, &profile, config, requests, events, &resolved);
-  EXPECT_EQ(err, t.expect.err);
+  sp_expect_eq(t, err, it->expect.err);
 
-  if (t.expect.err) {
+  if (it->expect.err) {
     sp_da(spn_build_event_t) drained = spn_event_buffer_drain(mem, events);
 
     bool matched = false;
-    sp_da_for(drained, it) {
-      spn_evt_option_t* option = &drained[it].option;
-      if (drained[it].kind != SPN_EVENT_ERR_OPTION) continue;
-      if (option->err != t.expect.option_err) continue;
-      if (!sp_str_equal_cstr(option->option, t.expect.option)) continue;
-      if (t.expect.a.kind && option->a.kind != t.expect.a.kind) continue;
-      if (t.expect.a.name && !sp_str_equal_cstr(option->a.name, t.expect.a.name)) continue;
-      if (t.expect.b.kind && option->b.kind != t.expect.b.kind) continue;
-      if (t.expect.b.name && !sp_str_equal_cstr(option->b.name, t.expect.b.name)) continue;
+    sp_da_for(drained, ex) {
+      spn_evt_option_t* option = &drained[ex].option;
+      if (drained[ex].kind != SPN_EVENT_ERR_OPTION) continue;
+      if (option->err != it->expect.option_err) continue;
+      if (!sp_str_equal_cstr(option->option, it->expect.option)) continue;
+      if (it->expect.a.kind && option->a.kind != it->expect.a.kind) continue;
+      if (it->expect.a.name && !sp_str_equal_cstr(option->a.name, it->expect.a.name)) continue;
+      if (it->expect.b.kind && option->b.kind != it->expect.b.kind) continue;
+      if (it->expect.b.name && !sp_str_equal_cstr(option->b.name, it->expect.b.name)) continue;
       matched = true;
       break;
     }
-    EXPECT_TRUE(matched);
-    return;
+    sp_expect(t, matched);
+    return SP_OK;
   }
 
-  sp_carr_for(t.expect.options, it) {
-    expect_option_t* expected = &t.expect.options[it];
+  sp_carr_for(it->expect.options, ox) {
+    expect_option_t* expected = &it->expect.options[ox];
     if (!expected->name) break;
 
+    sp_test_kv_c(t, "option", expected->name);
     bool found = false;
     sp_da_for(resolved, rt) {
       if (!sp_str_equal_cstr(resolved[rt].name, expected->name)) continue;
-      utest_kv("option", sp_str_view(expected->name));
-      EXPECT_TRUE(spn_option_value_equal(resolved[rt].value, make_value(expected->value)));
-      utest_kv("option", sp_str_view(expected->name));
-      EXPECT_EQ(resolved[rt].is_default, expected->is_default);
+      sp_expect(t, spn_option_value_equal(resolved[rt].value, make_value(expected->value)));
+      sp_expect_eq(t, resolved[rt].is_default, expected->is_default);
       found = true;
       break;
     }
-    utest_kv("option", sp_str_view(expected->name));
-    EXPECT_TRUE(found);
+    sp_expect(t, found);
   }
-}
 
-UTEST(options_merge, bool_defaults_false) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "x", .type = SPN_OPTION_TYPE_BOOL },
-    },
-    .expect = {
-      .options = {
-        { .name = "x", .value = { .is_bool = true }, .is_default = true },
-      },
-    },
-  });
-}
-
-UTEST(options_merge, additive_unions) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "x", .type = SPN_OPTION_TYPE_BOOL, .additive = true },
-    },
-    .requests = {
-      { .consumer = "a", .options = { { .key = "x", .is_bool = true, .b = true } } },
-      { .consumer = "b", .options = { { .key = "x", .is_bool = true } } },
-    },
-    .expect = {
-      .options = {
-        { .name = "x", .value = { .is_bool = true, .b = true } },
-      },
-    },
-  });
-}
-
-UTEST(options_merge, agreeing_requests) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "vk" } } } },
-    },
-    .requests = {
-      { .consumer = "a", .options = { { "e", "gl" } } },
-      { .consumer = "b", .options = { { "e", "gl" } } },
-    },
-    .expect = {
-      .options = {
-        { .name = "e", .value = { .str = "gl" } },
-      },
-    },
-  });
-}
-
-UTEST(options_merge, config_overrides_request) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "gl" } } } },
-    },
-    .config = { { "e", "vk" } },
-    .requests = {
-      { .consumer = "a", .options = { { "e", "gl" } } },
-    },
-    .expect = {
-      .options = {
-        { .name = "e", .value = { .str = "vk" } },
-      },
-    },
-  });
-}
-
-UTEST(options_merge, profile_sets_root) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .is_root = true,
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "gl" } } } },
-    },
-    .profile_options = { { "e", "vk" } },
-    .expect = {
-      .options = {
-        { .name = "e", .value = { .str = "vk" } },
-      },
-    },
-  });
-}
-
-UTEST(options_merge, request_conflict) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
-    },
-    .requests = {
-      { .consumer = "a", .options = { { "e", "gl" } } },
-      { .consumer = "b", .options = { { "e", "vk" } } },
-    },
-    .expect = {
-      .err = SPN_ERROR,
-      .option_err = SPN_OPTION_ERR_CONFLICT,
-      .option = "e",
-      .a = { SPN_OPTION_SETTER_CONSUMER, "a" },
-      .b = { SPN_OPTION_SETTER_CONSUMER, "b" },
-    },
-  });
-}
-
-UTEST(options_merge, veto_contradicted) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "vk" } } } },
-    },
-    .requests = {
-      { .consumer = "a", .options = { { .key = "e", .str = "vk", .negated = true } } },
-    },
-    .expect = {
-      .err = SPN_ERROR,
-      .option_err = SPN_OPTION_ERR_VETO,
-      .option = "e",
-      .a = { SPN_OPTION_SETTER_CONSUMER, "a" },
-      .b = { .kind = SPN_OPTION_SETTER_DEFAULT },
-    },
-  });
-}
-
-UTEST(options_merge, veto_respected) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "gl" } } } },
-    },
-    .requests = {
-      { .consumer = "a", .options = { { .key = "e", .str = "vk", .negated = true } } },
-    },
-    .expect = {
-      .options = {
-        { .name = "e", .value = { .str = "gl" }, .is_default = true },
-      },
-    },
-  });
-}
-
-UTEST(options_merge, undeclared) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "x", .type = SPN_OPTION_TYPE_BOOL },
-    },
-    .config = { { "nosuch", "vk" } },
-    .expect = {
-      .err = SPN_ERROR,
-      .option_err = SPN_OPTION_ERR_UNDECLARED,
-      .option = "nosuch",
-    },
-  });
-}
-
-UTEST(options_merge, bad_value_config) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
-    },
-    .config = { { "e", "dx12" } },
-    .expect = {
-      .err = SPN_ERROR,
-      .option_err = SPN_OPTION_ERR_BAD_VALUE,
-      .option = "e",
-    },
-  });
-}
-
-UTEST(options_merge, bad_value_request) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
-    },
-    .requests = {
-      { .consumer = "a", .options = { { "e", "dx12" } } },
-    },
-    .expect = {
-      .err = SPN_ERROR,
-      .option_err = SPN_OPTION_ERR_BAD_VALUE,
-      .option = "e",
-    },
-  });
-}
-
-UTEST(options_merge, no_value) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
-    },
-    .expect = {
-      .err = SPN_ERROR,
-      .option_err = SPN_OPTION_ERR_NO_VALUE,
-      .option = "e",
-    },
-  });
-}
-
-UTEST(options_merge, defaults_declined) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "vk" } } } },
-      { .name = "x", .type = SPN_OPTION_TYPE_BOOL, .defaults = { { .value = { .is_bool = true, .b = true } } } },
-    },
-    .defaults_declined = true,
-    .requests = {
-      { .consumer = "a", .options = { { "e", "gl" } } },
-    },
-    .expect = {
-      .options = {
-        { .name = "e", .value = { .str = "gl" } },
-        { .name = "x", .value = { .is_bool = true }, .is_default = true },
-      },
-    },
-  });
-}
-
-UTEST(options_merge, default_arm_facts) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .facts = { .os = SPN_OS_LINUX },
-    .decls = {
-      {
-        .name = "e",
-        .type = SPN_OPTION_TYPE_ENUM,
-        .values = { "gl", "vk", "off" },
-        .defaults = {
-          { .when = { { "os", "windows" } }, .value = { .str = "off" } },
-          { .when = { { "os", "linux" } },   .value = { .str = "vk" } },
-          { .value = { .str = "gl" } },
-        },
-      },
-    },
-    .expect = {
-      .options = {
-        { .name = "e", .value = { .str = "vk" }, .is_default = true },
-      },
-    },
-  });
-}
-
-UTEST(options_merge, default_arm_chains) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "r", .type = SPN_OPTION_TYPE_ENUM, .values = { "on", "off" }, .defaults = { { .value = { .str = "on" } } } },
-      {
-        .name = "e",
-        .type = SPN_OPTION_TYPE_ENUM,
-        .values = { "gl", "off" },
-        .defaults = {
-          { .when = { { "r", "on" } }, .value = { .str = "gl" } },
-          { .value = { .str = "off" } },
-        },
-      },
-    },
-    .expect = {
-      .options = {
-        { .name = "e", .value = { .str = "gl" }, .is_default = true },
-      },
-    },
-  });
-}
-
-UTEST(options_merge, explicit_default_is_default) {
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "gl" } } } },
-    },
-    .config = { { "e", "gl" } },
-    .expect = {
-      .options = {
-        { .name = "e", .value = { .str = "gl" }, .is_default = true },
-      },
-    },
-  });
-}
-
-UTEST(options_merge, cut0_config_contradicts_constraint) {
-  UTEST_SKIP("worlds cut 0");
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "gl" } } } },
-    },
-    .config = { { "e", "vk" } },
-    .requests = {
-      { .consumer = "a", .options = { { "e", "gl" } } },
-    },
-    .expect = {
-      .err = SPN_ERROR,
-      .option_err = SPN_OPTION_ERR_CONFLICT,
-      .option = "e",
-      .a = { .kind = SPN_OPTION_SETTER_ROOT_MANIFEST },
-      .b = { SPN_OPTION_SETTER_CONSUMER, "a" },
-    },
-  });
-}
-
-UTEST(options_merge, cut0_prohibition_vs_demand) {
-  UTEST_SKIP("worlds cut 0");
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "x", .type = SPN_OPTION_TYPE_BOOL, .additive = true },
-    },
-    .config = { { .key = "x", .is_bool = true } },
-    .requests = {
-      { .consumer = "a", .options = { { .key = "x", .is_bool = true, .b = true } } },
-    },
-    .expect = {
-      .err = SPN_ERROR,
-      .option_err = SPN_OPTION_ERR_CONFLICT,
-      .option = "x",
-      .a = { .kind = SPN_OPTION_SETTER_ROOT_MANIFEST },
-      .b = { SPN_OPTION_SETTER_CONSUMER, "a" },
-    },
-  });
-}
-
-UTEST(options_merge, cut0_prohibition_without_demand) {
-  UTEST_SKIP("worlds cut 0");
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "x", .type = SPN_OPTION_TYPE_BOOL, .additive = true, .defaults = { { .value = { .is_bool = true, .b = true } } } },
-    },
-    .config = { { .key = "x", .is_bool = true } },
-    .expect = {
-      .options = {
-        { .name = "x", .value = { .is_bool = true } },
-      },
-    },
-  });
-}
-
-UTEST(options_merge, cut0_negative_constraint_selects_survivor) {
-  UTEST_SKIP("worlds cut 0");
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" }, .defaults = { { .value = { .str = "vk" } } } },
-    },
-    .requests = {
-      { .consumer = "a", .options = { { .key = "e", .str = "vk", .negated = true } } },
-    },
-    .expect = {
-      .options = {
-        { .name = "e", .value = { .str = "gl" } },
-      },
-    },
-  });
-}
-
-UTEST(options_merge, cut0_undetermined) {
-  UTEST_SKIP("worlds cut 0");
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk", "dx" } },
-    },
-    .requests = {
-      { .consumer = "a", .options = { { .key = "e", .str = "dx", .negated = true } } },
-    },
-    .expect = {
-      .err = SPN_ERROR,
-      .option_err = SPN_OPTION_ERR_NO_VALUE,
-      .option = "e",
-    },
-  });
-}
-
-UTEST(options_merge, cut0_negative_constraint_outside_domain) {
-  UTEST_SKIP("worlds cut 0");
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
-    },
-    .requests = {
-      { .consumer = "a", .options = { { .key = "e", .str = "dx12", .negated = true } } },
-    },
-    .expect = {
-      .err = SPN_ERROR,
-      .option_err = SPN_OPTION_ERR_BAD_VALUE,
-      .option = "e",
-    },
-  });
-}
-
-UTEST(options_merge, cut0_veto_against_config) {
-  UTEST_SKIP("worlds cut 0");
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
-    },
-    .config = { { "e", "vk" } },
-    .requests = {
-      { .consumer = "a", .options = { { .key = "e", .str = "vk", .negated = true } } },
-    },
-    .expect = {
-      .err = SPN_ERROR,
-      .option_err = SPN_OPTION_ERR_VETO,
-      .option = "e",
-      .a = { SPN_OPTION_SETTER_CONSUMER, "a" },
-      .b = { .kind = SPN_OPTION_SETTER_ROOT_MANIFEST },
-    },
-  });
-}
-
-UTEST(options_merge, cut0_default_arm_defers) {
-  UTEST_SKIP("worlds cut 0");
-  run_merge_test(utest_result, (merge_test_t) {
-    .decls = {
-      {
-        .name = "e",
-        .type = SPN_OPTION_TYPE_ENUM,
-        .values = { "gl", "off" },
-        .defaults = {
-          { .when = { { "r", "on" } }, .value = { .str = "gl" } },
-          { .value = { .str = "off" } },
-        },
-      },
-      { .name = "r", .type = SPN_OPTION_TYPE_ENUM, .values = { "on", "off" }, .defaults = { { .value = { .str = "on" } } } },
-    },
-    .expect = {
-      .options = {
-        { .name = "e", .value = { .str = "gl" }, .is_default = true },
-      },
-    },
-  });
+  return SP_OK;
 }

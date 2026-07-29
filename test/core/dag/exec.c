@@ -1,4 +1,4 @@
-#include "common.h"
+#include "dag_test.h"
 
 typedef enum {
   EXEC_BEHAVIOR_WRITE,
@@ -53,12 +53,103 @@ typedef struct {
 
 typedef struct {
   spn_dag_t* g;
-  exec_action_t* spec;
+  const exec_action_t* spec;
   exec_behavior_t behavior;
   exec_env_t* env;
 } exec_fn_ctx_t;
 
-UTEST_EMPTY_FIXTURE(exec)
+static const exec_test_t exec_tests [] = {
+  {
+    .name = "miss_executes_action",
+    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
+    .ops = {
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1" } } },
+    }
+  },
+  {
+    .name = "hit_restores_deleted_output",
+    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
+    .ops = {
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 1 } },
+      { .kind = EXEC_OP_REMOVE_OUTPUTS },
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1" } } },
+    }
+  },
+  {
+    .name = "input_change_reruns",
+    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
+    .ops = {
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 1 } },
+      { .kind = EXEC_OP_RUN, .change = { .inputs = { "B" } }, .expect = { .runs = 2, .contents = { "V2" } } },
+    }
+  },
+  {
+    .name = "identity_change_reruns",
+    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
+    .ops = {
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 1 } },
+      { .kind = EXEC_OP_RUN, .change = { .identity = "J" }, .expect = { .runs = 2, .contents = { "V2" } } },
+    }
+  },
+  {
+    .name = "output_path_change_reruns",
+    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
+    .ops = {
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 1 } },
+      { .kind = EXEC_OP_RUN, .change = { .outputs = { "P" } }, .expect = { .runs = 2, .contents = { "V2" } } },
+    }
+  },
+  {
+    .name = "reverted_input_hits_prior_entry",
+    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
+    .ops = {
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 1 } },
+      { .kind = EXEC_OP_RUN, .change = { .inputs = { "B" } }, .expect = { .runs = 2 } },
+      { .kind = EXEC_OP_RUN, .change = { .inputs = { "A" } }, .expect = { .runs = 2, .contents = { "V1" } } },
+    }
+  },
+  {
+    .name = "multiple_outputs_restored",
+    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O", "P" }, .write = { "V", "W" } },
+    .ops = {
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 1 } },
+      { .kind = EXEC_OP_REMOVE_OUTPUTS },
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1", "W1" } } },
+    }
+  },
+  {
+    .name = "failed_action_not_cached",
+    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
+    .ops = {
+      { .kind = EXEC_OP_RUN, .behavior = EXEC_BEHAVIOR_FAIL, .expect = { .err = SPN_ERR_DAG_ACTION } },
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1" } } },
+    }
+  },
+  {
+    .name = "missing_output_not_cached",
+    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O", "P" }, .write = { "V", "W" } },
+    .ops = {
+      { .kind = EXEC_OP_RUN, .behavior = EXEC_BEHAVIOR_SKIP_LAST_OUTPUT, .expect = { .err = SPN_ERR_DAG_MISSING_OUTPUT, .runs = 1 } },
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 2, .contents = { "V2", "W2" } } },
+    }
+  },
+  {
+    .name = "uncacheable_always_executes",
+    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" }, .uncacheable = true },
+    .ops = {
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1" } } },
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 2, .contents = { "V2" } } },
+    }
+  },
+  {
+    .name = "unavailable_cached_output_reruns_then_hits",
+    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
+    .ops = {
+      { .kind = EXEC_OP_RUN, .unavailable = { "U" }, .expect = { .runs = 1, .contents = { "V1" } } },
+      { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1" } } },
+    }
+  },
+};
 
 static s32 exec_test_fn(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   exec_fn_ctx_t* ctx = (exec_fn_ctx_t*)user_data;
@@ -73,25 +164,12 @@ static s32 exec_test_fn(spn_dag_t* g, spn_dag_action_t* action, void* user_data)
       continue;
     }
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(ctx->g, action->produces[it]);
-    sp_str_t content = sp_fmt(ctx->env->dag.fs.mem, "{}{}", sp_fmt_cstr(ctx->spec->write[it]), sp_fmt_uint(ctx->env->dag.runs)).value;
+    sp_str_t content = sp_fmt(ctx->env->dag.mem, "{}{}", sp_fmt_cstr(ctx->spec->write[it]), sp_fmt_uint(ctx->env->dag.runs)).value;
     if (sp_fs_create_file_str(artifact->path, content)) {
       return 1;
     }
   }
   return 0;
-}
-
-static void exec_store_context(exec_env_t* env) {
-  switch (env->dag.store.kind) {
-    case SPN_DAG_STORE_MEM: {
-      utest_kv("store", sp_str_lit("memory"));
-      break;
-    }
-    case SPN_DAG_STORE_FILESYSTEM: {
-      utest_kv("store", sp_str_lit("filesystem"));
-      break;
-    }
-  }
 }
 
 static void exec_action_change(exec_action_t* action, exec_change_t change) {
@@ -110,51 +188,50 @@ static void exec_action_change(exec_action_t* action, exec_change_t change) {
   }
 }
 
-static void exec_action_run(s32* utest_result, exec_env_t* env, exec_action_t spec, exec_op_t op) {
+static sp_err_t exec_action_run(sp_test_t* t, exec_env_t* env, const exec_action_t* spec, const exec_op_t* op) {
   spn_dag_t* g = dag_test_env_graph(&env->dag);
   exec_fn_ctx_t ctx = {
     .g = g,
-    .spec = &spec,
-    .behavior = op.behavior,
+    .spec = spec,
+    .behavior = op->behavior,
     .env = env
   };
 
   spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
-    .identity = dag_test_digest(spec.identity),
+    .identity = dag_test_digest(spec->identity),
     .execute = exec_test_fn,
     .user_data = &ctx,
-    .uncacheable = spec.uncacheable
+    .uncacheable = spec->uncacheable
   });
 
-  sp_carr_for(spec.inputs, it) {
-    if (!spec.inputs[it]) {
+  sp_carr_for(spec->inputs, it) {
+    if (!spec->inputs[it]) {
       break;
     }
-    sp_str_t str = sp_str_view(spec.inputs[it]);
+    sp_str_t str = sp_str_view(spec->inputs[it]);
     spn_dag_action_add_input(g, action, spn_dag_add_value(g, str.data, str.len));
   }
 
-  sp_carr_for(spec.outputs, it) {
-    if (!spec.outputs[it]) {
+  sp_carr_for(spec->outputs, it) {
+    if (!spec->outputs[it]) {
       break;
     }
-    spn_dag_id_t file = spn_dag_add_file(g, tmpfs_get(&env->dag.fs, sp_str_view(spec.outputs[it])));
-    exec_store_context(env);
-    ASSERT_EQ(SPN_OK, spn_dag_action_add_output(g, action, file));
+    spn_dag_id_t file = spn_dag_add_file(g, dag_test_env_path(&env->dag, sp_str_view(spec->outputs[it])));
+    sp_must_eq(t, SPN_OK, spn_dag_action_add_output(g, action, file));
   }
 
-  if (op.unavailable[0]) {
+  if (op->unavailable[0]) {
     spn_dag_action_output_t outputs [DAG_TEST_MAX_OUTPUTS] = sp_zero;
     spn_dag_action_t* a = spn_dag_find_action(g, action);
     u32 count = 0;
-    sp_carr_for(op.unavailable, it) {
-      if (!op.unavailable[it]) {
+    sp_carr_for(op->unavailable, it) {
+      if (!op->unavailable[it]) {
         break;
       }
       spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, a->produces[it]);
       outputs[it] = (spn_dag_action_output_t) {
         .name = artifact->name,
-        .digest = dag_test_digest(op.unavailable[it])
+        .digest = dag_test_digest(op->unavailable[it])
       };
       count++;
     }
@@ -162,205 +239,99 @@ static void exec_action_run(s32* utest_result, exec_env_t* env, exec_action_t sp
   }
 
   env->err = spn_dag_execute(g, action, &env->dag.env);
-  exec_store_context(env);
-  EXPECT_EQ(op.expect.err, env->err);
-  if (env->err != op.expect.err) {
-    return;
+  sp_expect_eq(t, op->expect.err, env->err);
+  if (env->err != op->expect.err) {
+    return SP_OK;
   }
 
-  exec_store_context(env);
-  EXPECT_EQ(op.expect.runs, env->dag.runs);
+  sp_expect_eq(t, op->expect.runs, env->dag.runs);
   if (env->err) {
-    return;
+    return SP_OK;
   }
 
-  sp_carr_for(op.expect.contents, it) {
-    if (!op.expect.contents[it]) {
+  sp_carr_for(op->expect.contents, it) {
+    if (!op->expect.contents[it]) {
       break;
     }
-    exec_store_context(env);
-    dag_test_expect_file(utest_result, env->dag.fs.mem, tmpfs_get(&env->dag.fs, sp_str_view(spec.outputs[it])), op.expect.contents[it]);
+    sp_err_t err = dag_test_expect_file(t, env->dag.mem, dag_test_env_path(&env->dag, sp_str_view(spec->outputs[it])), op->expect.contents[it]);
+    if (err) {
+      return err;
+    }
 
     spn_dag_action_t* a = spn_dag_find_action(g, action);
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, a->produces[it]);
-    exec_store_context(env);
-    ASSERT_TRUE(spn_dag_digest_valid(artifact->digest));
-    EXPECT_TRUE(spn_dag_digest_equal(artifact->digest, dag_test_digest(op.expect.contents[it])));
+    sp_must(t, spn_dag_digest_valid(artifact->digest));
+    sp_expect(t, spn_dag_digest_equal(artifact->digest, dag_test_digest(op->expect.contents[it])));
   }
+
+  return SP_OK;
 }
 
-static void exec_remove_outputs(s32* utest_result, exec_env_t* env, exec_action_t action) {
-  sp_carr_for(action.outputs, it) {
-    if (!action.outputs[it]) {
+static sp_err_t exec_remove_outputs(sp_test_t* t, exec_env_t* env, const exec_action_t* action) {
+  sp_carr_for(action->outputs, it) {
+    if (!action->outputs[it]) {
       break;
     }
-    sp_str_t path = tmpfs_get(&env->dag.fs, sp_str_view(action.outputs[it]));
+    sp_str_t path = dag_test_env_path(&env->dag, sp_str_view(action->outputs[it]));
     env->err = sp_fs_remove_file(path) ? SPN_ERROR : SPN_OK;
-    exec_store_context(env);
-    EXPECT_EQ(SPN_OK, env->err);
+    sp_expect_eq(t, SPN_OK, env->err);
     if (env->err) {
-      return;
+      return SP_OK;
     }
-    exec_store_context(env);
-    EXPECT_FALSE(sp_fs_exists(path));
+    sp_expect(t, !sp_fs_exists(path));
   }
+  return SP_OK;
 }
 
-static void run_exec_test(s32* utest_result, exec_test_t t) {
+static sp_err_t exec_run_ops(sp_test_t* t, spn_dag_store_kind_t kind, const exec_test_t* test) {
+  sp_test_kv_c(t, "store", dag_test_store_name(kind));
+
+  exec_env_t env = sp_zero;
+  dag_test_env_init(&env.dag, t, (dag_test_env_config_t) {
+    .sub = dag_test_store_name(kind),
+    .store = kind
+  });
+  exec_action_t action = test->action;
+
+  sp_carr_for(test->ops, it) {
+    exec_op_t op = test->ops[it];
+    if (op.kind == EXEC_OP_DONE) {
+      break;
+    }
+
+    sp_err_t err = SP_OK;
+    switch (op.kind) {
+      case EXEC_OP_DONE: {
+        break;
+      }
+      case EXEC_OP_RUN: {
+        exec_action_change(&action, op.change);
+        err = exec_action_run(t, &env, &action, &op);
+        break;
+      }
+      case EXEC_OP_REMOVE_OUTPUTS: {
+        err = exec_remove_outputs(t, &env, &action);
+        break;
+      }
+    }
+    if (err) {
+      return err;
+    }
+
+    if (env.err != op.expect.err) {
+      break;
+    }
+  }
+
+  return SP_OK;
+}
+
+sp_test_each(exec, ops, exec_test_t, exec_tests) {
   sp_carr_for(dag_test_store_kinds, kind) {
-    exec_env_t env = sp_zero;
-    dag_test_env_init(&env.dag, (dag_test_env_config_t) { .name = t.name, .store = dag_test_store_kinds[kind] });
-    exec_action_t action = t.action;
-
-    sp_carr_for(t.ops, it) {
-      exec_op_t op = t.ops[it];
-      if (op.kind == EXEC_OP_DONE) {
-        break;
-      }
-
-      switch (op.kind) {
-        case EXEC_OP_DONE: {
-          break;
-        }
-        case EXEC_OP_RUN: {
-          exec_action_change(&action, op.change);
-          exec_action_run(utest_result, &env, action, op);
-          break;
-        }
-        case EXEC_OP_REMOVE_OUTPUTS: {
-          exec_remove_outputs(utest_result, &env, action);
-          break;
-        }
-      }
-
-      if (env.err != op.expect.err) {
-        break;
-      }
+    sp_err_t err = exec_run_ops(t, dag_test_store_kinds[kind], it);
+    if (err) {
+      return err;
     }
-
-    dag_test_env_deinit(&env.dag);
   }
-}
-
-UTEST_F(exec, miss_executes_action) {
-  run_exec_test(&ur, (exec_test_t) {
-    .name = "exec_miss",
-    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
-    .ops = {
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1" } } },
-    }
-  });
-}
-
-UTEST_F(exec, hit_restores_deleted_output) {
-  run_exec_test(&ur, (exec_test_t) {
-    .name = "exec_hit",
-    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
-    .ops = {
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 1 } },
-      { .kind = EXEC_OP_REMOVE_OUTPUTS },
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1" } } },
-    }
-  });
-}
-
-UTEST_F(exec, input_change_reruns) {
-  run_exec_test(&ur, (exec_test_t) {
-    .name = "exec_input_change",
-    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
-    .ops = {
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 1 } },
-      { .kind = EXEC_OP_RUN, .change = { .inputs = { "B" } }, .expect = { .runs = 2, .contents = { "V2" } } },
-    }
-  });
-}
-
-UTEST_F(exec, identity_change_reruns) {
-  run_exec_test(&ur, (exec_test_t) {
-    .name = "exec_identity_change",
-    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
-    .ops = {
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 1 } },
-      { .kind = EXEC_OP_RUN, .change = { .identity = "J" }, .expect = { .runs = 2, .contents = { "V2" } } },
-    }
-  });
-}
-
-UTEST_F(exec, output_path_change_reruns) {
-  run_exec_test(&ur, (exec_test_t) {
-    .name = "exec_output_change",
-    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
-    .ops = {
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 1 } },
-      { .kind = EXEC_OP_RUN, .change = { .outputs = { "P" } }, .expect = { .runs = 2, .contents = { "V2" } } },
-    }
-  });
-}
-
-UTEST_F(exec, reverted_input_hits_prior_entry) {
-  run_exec_test(&ur, (exec_test_t) {
-    .name = "exec_revert",
-    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
-    .ops = {
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 1 } },
-      { .kind = EXEC_OP_RUN, .change = { .inputs = { "B" } }, .expect = { .runs = 2 } },
-      { .kind = EXEC_OP_RUN, .change = { .inputs = { "A" } }, .expect = { .runs = 2, .contents = { "V1" } } },
-    }
-  });
-}
-
-UTEST_F(exec, multiple_outputs_restored) {
-  run_exec_test(&ur, (exec_test_t) {
-    .name = "exec_multi_output",
-    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O", "P" }, .write = { "V", "W" } },
-    .ops = {
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 1 } },
-      { .kind = EXEC_OP_REMOVE_OUTPUTS },
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1", "W1" } } },
-    }
-  });
-}
-
-UTEST_F(exec, failed_action_not_cached) {
-  run_exec_test(&ur, (exec_test_t) {
-    .name = "exec_fail",
-    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
-    .ops = {
-      { .kind = EXEC_OP_RUN, .behavior = EXEC_BEHAVIOR_FAIL, .expect = { .err = SPN_ERR_DAG_ACTION } },
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1" } } },
-    }
-  });
-}
-
-UTEST_F(exec, missing_output_not_cached) {
-  run_exec_test(&ur, (exec_test_t) {
-    .name = "exec_missing_output",
-    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O", "P" }, .write = { "V", "W" } },
-    .ops = {
-      { .kind = EXEC_OP_RUN, .behavior = EXEC_BEHAVIOR_SKIP_LAST_OUTPUT, .expect = { .err = SPN_ERR_DAG_MISSING_OUTPUT, .runs = 1 } },
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 2, .contents = { "V2", "W2" } } },
-    }
-  });
-}
-
-UTEST_F(exec, uncacheable_always_executes) {
-  run_exec_test(&ur, (exec_test_t) {
-    .name = "exec_uncacheable",
-    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" }, .uncacheable = true },
-    .ops = {
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1" } } },
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 2, .contents = { "V2" } } },
-    }
-  });
-}
-
-UTEST_F(exec, unavailable_cached_output_reruns_then_hits) {
-  run_exec_test(&ur, (exec_test_t) {
-    .name = "exec_unavailable_output",
-    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" } },
-    .ops = {
-      { .kind = EXEC_OP_RUN, .unavailable = { "U" }, .expect = { .runs = 1, .contents = { "V1" } } },
-      { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1" } } },
-    }
-  });
+  return SP_OK;
 }

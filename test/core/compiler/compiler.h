@@ -1,8 +1,10 @@
 #pragma once
 
+#include "spn_test.h"
+
 #include "compiler/driver.h"
-#include "sp/macro.h"
-#include "utest.h"
+#include "compiler/exports.h"
+#include "compiler/toc.h"
 
 #define render_args_max 20
 
@@ -13,5 +15,5 @@ typedef struct {
   const c8* args [render_args_max];
 } render_expect_t;
 
-void               expect_args(s32* utest_result, spn_invocation_t* invocation, render_expect_t expect);
+sp_err_t           expect_args(sp_test_t* t, spn_invocation_t* invocation, render_expect_t expect);
 spn_cc_toolchain_t test_toolchain(spn_cc_driver_t driver);

@@ -461,33 +461,6 @@
 #define SP_UNIQUE_ID() SP_MACRO_CAT(__sp_unique_name__, __LINE__)
 #define sp_unique_id() SP_UNIQUE_ID()
 
-//////////////////////
-// SP_STATIC_ASSERT //
-//////////////////////
-#if defined(SP_CPP) && (__cplusplus >= 201103L)
-  #define sp_static_assert(CONDITION, MESSAGE) static_assert(CONDITION, #MESSAGE)
-#elif !defined(SP_CPP) && defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 202311L)
-  #define sp_static_assert(CONDITION, MESSAGE) static_assert(CONDITION, #MESSAGE)
-#elif !defined(SP_CPP) && defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
-  #define sp_static_assert(CONDITION, MESSAGE) _Static_assert(CONDITION, #MESSAGE)
-#else
-  #ifdef __COUNTER__
-    #define SP_STATIC_ASSERT_ID __COUNTER__
-  #else
-    #define SP_STATIC_ASSERT_ID __LINE__
-  #endif
-
-  #if SP_HAS_ATTRIBUTE(unused)
-    #define SP_STATIC_ASSERT_UNUSED SP_ATTRIBUTE(unused)
-  #else
-    #define SP_STATIC_ASSERT_UNUSED
-  #endif
-
-  #define sp_static_assert(CONDITION, MESSAGE) \
-    typedef char sp_mcat(sp_mcat(sp_static_assert_, MESSAGE), sp_mcat(_, SP_STATIC_ASSERT_ID)) \
-      [(CONDITION) ? 1 : -1] SP_STATIC_ASSERT_UNUSED
-#endif
-
 #define sp_max(a, b) (((a) > (b)) ? (a) : (b))
 #define sp_min(a, b) (((a) > (b)) ? (b) : (a))
 #define sp_clamp(v, lo, hi) (((v) < (lo)) ? (lo) : ((v) > (hi)) ? (hi) : (v))
@@ -655,6 +628,7 @@ SP_BEGIN_EXTERN_C()
   #include <sys/ioctl.h>
   #include <sys/time.h> // gettimeofday
 
+  #include <errno.h>  // errno
   #include <signal.h> // signal
   #include <unistd.h> // pipe
 
@@ -799,18 +773,6 @@ typedef enum {
   SP_ERR_IO_INVALID_WRITE = 1011,
   SP_ERR_IO_UNIMPLEMENTED = 1012,
   SP_ERR_IO_TIMEOUT      = 1013,
-  SP_ERR_IO_NOT_FOUND      = 1014,
-  SP_ERR_IO_ACCESS_DENIED  = 1015,
-  SP_ERR_IO_IS_DIR         = 1016,
-  SP_ERR_IO_NOT_DIR        = 1017,
-  SP_ERR_IO_EXISTS         = 1018,
-  SP_ERR_IO_BUSY           = 1019,
-  SP_ERR_IO_TOO_MANY_FILES = 1020,
-  SP_ERR_IO_NAME_TOO_LONG  = 1021,
-  SP_ERR_IO_BAD_FD         = 1022,
-  SP_ERR_IO_BROKEN_PIPE    = 1023,
-  SP_ERR_IO_CONN_RESET     = 1024,
-  SP_ERR_IO_WOULD_BLOCK    = 1025,
   SP_ERR_FMT_UNKNOWN_DIRECTIVE = 1102,
   SP_ERR_FMT_BAD_DIRECTIVE = 1103,
   SP_ERR_FMT_TOO_MANY_DIRECTIVES = 1104,
@@ -822,47 +784,9 @@ typedef enum {
   SP_ERR_FMT_WRONG_WIDTH_KIND = 1116,
   SP_ERR_FMT_WRONG_PRECISION_KIND = 1117,
   SP_ERR_FMT_WRONG_STYLE_KIND = 1118,
-  SP_ERR_SYS                = 1200,
-  SP_ERR_SYS_NOT_FOUND      = 1201,
-  SP_ERR_SYS_ACCESS_DENIED  = 1202,
-  SP_ERR_SYS_EXISTS         = 1203,
-  SP_ERR_SYS_IS_DIR         = 1204,
-  SP_ERR_SYS_NOT_DIR        = 1205,
-  SP_ERR_SYS_BAD_FD         = 1206,
-  SP_ERR_SYS_BUSY           = 1207,
-  SP_ERR_SYS_INVALID        = 1208,
-  SP_ERR_SYS_NO_SPACE       = 1209,
-  SP_ERR_SYS_NO_MEMORY      = 1210,
-  SP_ERR_SYS_TOO_MANY_FILES = 1211,
-  SP_ERR_SYS_NAME_TOO_LONG  = 1212,
-  SP_ERR_SYS_READ_ONLY_FS   = 1213,
-  SP_ERR_SYS_WOULD_BLOCK    = 1214,
-  SP_ERR_SYS_BROKEN_PIPE    = 1215,
-  SP_ERR_SYS_UNSUPPORTED    = 1216,
-  SP_ERR_SYS_TIMED_OUT      = 1217,
-  SP_ERR_SYS_CONN_RESET     = 1218,
-  SP_ERR_SYS_CONN_REFUSED   = 1219,
-  SP_ERR_SYS_NOT_CONNECTED  = 1220,
-  SP_ERR_SYS_CROSS_DEVICE   = 1221,
-  SP_ERR_SYS_LOOP           = 1222,
-  SP_ERR_SYS_FILE_TOO_BIG   = 1223,
-  SP_ERR_SYS_INTERRUPTED    = 1224,
-  SP_ERR_SYS_NOT_EMPTY      = 1225,
-  SP_ERR_SYS_BUG            = 1226,
-  SP_ERR_SYS_ADDR_IN_USE    = 1227,
-  SP_ERR_SYS_ADDR_UNAVAILABLE = 1228,
-  SP_ERR_SYS_UNREACHABLE    = 1229,
-  SP_ERR_SYS_IO             = 1230,
-  SP_ERR_SYS_UNSEEKABLE     = 1231,
-  SP_ERR_SYS_TOO_MANY_LINKS = 1232,
-  SP_ERR_SYS_NOT_TTY        = 1233,
   SP_ERR_LAZY,
   SP_ERR_OS,
 } sp_err_t;
-
-SP_TYPEDEF_FN(sp_str_t, sp_err_str_fn_t, sp_err_t err);
-
-SP_API sp_str_t sp_err_str(sp_err_t err);
 
 typedef enum {
   SP_OPT_NONE = 0,
@@ -901,6 +825,7 @@ typedef struct sp_io_stream_writer sp_io_stream_writer_t;
 typedef HANDLE           sp_win32_handle_t;
 typedef DWORD            sp_win32_dword_t;
 typedef OVERLAPPED       sp_win32_overlapped_t;
+typedef WIN32_FIND_DATAW sp_win32_find_data_t;
 #endif
 
 
@@ -936,59 +861,16 @@ typedef OVERLAPPED       sp_win32_overlapped_t;
 
 #if defined(SP_AMD64)
   #define SP_ARCH_SET_FS 0x1002
+  #define SP_O_DIRECTORY 0200000
+#elif defined(SP_ARM64)
+  #define SP_O_DIRECTORY          040000
 #endif
 
 #if defined(SP_LINUX)
-  #define SP_EOK                  0
-  #define SP_EPERM                1
-  #define SP_ENOENT               2
   #define SP_EINTR                4
-  #define SP_EIO                  5
-  #define SP_EBADF                9
   #define SP_EAGAIN               11
-  #define SP_ENOMEM               12
-  #define SP_EACCES               13
-  #define SP_EFAULT               14
-  #define SP_EBUSY                16
-  #define SP_EEXIST               17
-  #define SP_EXDEV                18
-  #define SP_ENOTDIR              20
-  #define SP_EISDIR               21
-  #define SP_EINVAL               22
-  #define SP_ENFILE               23
-  #define SP_EMFILE               24
-  #define SP_ENOTTY               25
-  #define SP_ETXTBSY              26
-  #define SP_EFBIG                27
-  #define SP_ENOSPC               28
-  #define SP_ESPIPE               29
-  #define SP_EROFS                30
-  #define SP_EMLINK               31
-  #define SP_EPIPE                32
-  #define SP_ENAMETOOLONG         36
-  #define SP_ENOSYS               38
-  #define SP_ENOTEMPTY            39
-  #define SP_ELOOP                40
-  #define SP_ENONET               64
-  #define SP_EPROTO               71
-  #define SP_ENOPROTOOPT          92
-  #define SP_EPROTONOSUPPORT      93
-  #define SP_EOPNOTSUPP           95
-  #define SP_EAFNOSUPPORT         97
-  #define SP_EADDRINUSE           98
-  #define SP_EADDRNOTAVAIL        99
-  #define SP_ENETDOWN             100
-  #define SP_ENETUNREACH          101
-  #define SP_ECONNABORTED         103
-  #define SP_ECONNRESET           104
-  #define SP_ENOBUFS              105
-  #define SP_ENOTCONN             107
-  #define SP_ETIMEDOUT            110
-  #define SP_ECONNREFUSED         111
-  #define SP_EHOSTDOWN            112
-  #define SP_EHOSTUNREACH         113
   #define SP_EINPROGRESS          115
-  #define SP_EDQUOT               122
+  #define SP_ECONNREFUSED         111
 
   #define SP_AT_FDCWD             (-100)
   #define SP_AT_SYMLINK_NOFOLLOW  0x100
@@ -996,6 +878,17 @@ typedef OVERLAPPED       sp_win32_overlapped_t;
   #define SP_AT_SYMLINK_FOLLOW    0x400
   #define SP_AT_EACCESS           0x200
   #define SP_AT_EMPTY_PATH        0x1000
+
+  #define SP_O_RDONLY             0
+  #define SP_O_WRONLY             1
+  #define SP_O_RDWR               2
+  #define SP_O_CREAT              0100
+  #define SP_O_EXCL               0200
+  #define SP_O_TRUNC              01000
+  #define SP_O_APPEND             02000
+  #define SP_O_NONBLOCK           04000
+  #define SP_O_CLOEXEC            02000000
+  #define SP_O_BINARY             0
 
   #define SP_SEEK_SET             0
   #define SP_SEEK_CUR             1
@@ -1068,6 +961,15 @@ typedef OVERLAPPED       sp_win32_overlapped_t;
   #define SP_TIOCGWINSZ              0x5413
 
 #elif defined(SP_WIN32)
+  #define SP_O_RDONLY             _O_RDONLY
+  #define SP_O_WRONLY             _O_WRONLY
+  #define SP_O_RDWR               _O_RDWR
+  #define SP_O_CREAT              _O_CREAT
+  #define SP_O_EXCL               _O_EXCL
+  #define SP_O_TRUNC              _O_TRUNC
+  #define SP_O_APPEND             _O_APPEND
+  #define SP_O_BINARY             _O_BINARY
+
   #define SP_SEEK_SET             SEEK_SET
   #define SP_SEEK_CUR             SEEK_CUR
   #define SP_SEEK_END             SEEK_END
@@ -1077,59 +979,24 @@ typedef OVERLAPPED       sp_win32_overlapped_t;
   #define SP_CLOCK_MONOTONIC      1
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
-  #define SP_EOK                  0
-  #define SP_EPERM                EPERM
-  #define SP_ENOENT               ENOENT
   #define SP_EINTR                EINTR
-  #define SP_EIO                  EIO
-  #define SP_EBADF                EBADF
-  #define SP_EAGAIN               EAGAIN
-  #define SP_ENOMEM               ENOMEM
-  #define SP_EACCES               EACCES
-  #define SP_EFAULT               EFAULT
-  #define SP_EBUSY                EBUSY
-  #define SP_EEXIST               EEXIST
-  #define SP_EXDEV                EXDEV
-  #define SP_ENOTDIR              ENOTDIR
-  #define SP_EISDIR               EISDIR
-  #define SP_EINVAL               EINVAL
-  #define SP_ENFILE               ENFILE
-  #define SP_EMFILE               EMFILE
-  #define SP_ENOTTY               ENOTTY
-  #define SP_ETXTBSY              ETXTBSY
-  #define SP_EFBIG                EFBIG
-  #define SP_ENOSPC               ENOSPC
-  #define SP_ESPIPE               ESPIPE
-  #define SP_EROFS                EROFS
-  #define SP_EMLINK               EMLINK
-  #define SP_EPIPE                EPIPE
-  #define SP_ENAMETOOLONG         ENAMETOOLONG
-  #define SP_ENOSYS               ENOSYS
-  #define SP_ENOTEMPTY            ENOTEMPTY
-  #define SP_ELOOP                ELOOP
-  #define SP_EPROTONOSUPPORT      EPROTONOSUPPORT
-  #define SP_EOPNOTSUPP           EOPNOTSUPP
-  #define SP_ENOTSUP              ENOTSUP
-  #define SP_EAFNOSUPPORT         EAFNOSUPPORT
-  #define SP_EADDRINUSE           EADDRINUSE
-  #define SP_EADDRNOTAVAIL        EADDRNOTAVAIL
-  #define SP_ENETDOWN             ENETDOWN
-  #define SP_ENETUNREACH          ENETUNREACH
-  #define SP_ECONNABORTED         ECONNABORTED
-  #define SP_ECONNRESET           ECONNRESET
-  #define SP_ENOBUFS              ENOBUFS
-  #define SP_ENOTCONN             ENOTCONN
-  #define SP_ETIMEDOUT            ETIMEDOUT
-  #define SP_ECONNREFUSED         ECONNREFUSED
-  #define SP_EHOSTUNREACH         EHOSTUNREACH
-  #define SP_EINPROGRESS          EINPROGRESS
-  #define SP_EDQUOT               EDQUOT
 
   #define SP_AT_FDCWD             AT_FDCWD
   #define SP_AT_SYMLINK_NOFOLLOW  AT_SYMLINK_NOFOLLOW
   #define SP_AT_REMOVEDIR         AT_REMOVEDIR
   #define SP_AT_SYMLINK_FOLLOW    AT_SYMLINK_FOLLOW
   #define SP_AT_EACCESS           AT_EACCESS
+
+  #define SP_O_RDONLY             O_RDONLY
+  #define SP_O_WRONLY             O_WRONLY
+  #define SP_O_RDWR               O_RDWR
+  #define SP_O_CREAT              O_CREAT
+  #define SP_O_EXCL               O_EXCL
+  #define SP_O_TRUNC              O_TRUNC
+  #define SP_O_APPEND             O_APPEND
+  #define SP_O_NONBLOCK           O_NONBLOCK
+  #define SP_O_CLOEXEC            O_CLOEXEC
+  #define SP_O_BINARY             0
 
   #define SP_SEEK_SET             SEEK_SET
   #define SP_SEEK_CUR             SEEK_CUR
@@ -1200,6 +1067,17 @@ typedef OVERLAPPED       sp_win32_overlapped_t;
   #define SP_TCGETS                  TCGETS
   #define SP_TCSETS                  TCSETS
   #define SP_TIOCGWINSZ              TIOCGWINSZ
+
+#elif defined(SP_WASM)
+  #define SP_O_RDONLY             0
+  #define SP_O_WRONLY             1
+  #define SP_O_RDWR               2
+  #define SP_O_CREAT              0100
+  #define SP_O_EXCL               0200
+  #define SP_O_TRUNC              01000
+  #define SP_O_APPEND             02000
+  #define SP_O_DIRECTORY          0200000
+  #define SP_O_BINARY             0
 #endif
 
 #define SP_PRINTF_U8 "%hhu"
@@ -1333,29 +1211,38 @@ typedef OVERLAPPED       sp_win32_overlapped_t;
   typedef s32 sp_sys_socket_t;
 #endif
 #define SP_SYS_INVALID_SOCKET ((sp_sys_socket_t)-1)
+#define SP_SYS_SOCKET_WOULD_BLOCK ((s64)-2)
 
 typedef struct {
   u8  octets [4];
   u16 port;
 } sp_sys_ipv4_t;
 
-#define SP_SYS_TTY_ATTR_SIZE 128
+#if defined(SP_WIN32)
+  typedef struct {
+    DWORD input_mode;
+    DWORD output_mode;
+  } sp_tty_mode_t;
+#elif defined(SP_LINUX)
+  typedef struct {
+    u32 c_iflag;
+    u32 c_oflag;
+    u32 c_cflag;
+    u32 c_lflag;
+    u8  c_cc[20];
+    u32 _c_ispeed;
+    u32 _c_ospeed;
+  } sp_sys_termios_t;
 
-typedef struct {
-  SP_ALIGNED u8 opaque [SP_SYS_TTY_ATTR_SIZE];
-  bool present;
-} sp_sys_tty_attr_t;
+  typedef sp_sys_termios_t sp_tty_mode_t;
+#elif defined(SP_MACOS) || defined(SP_COSMO)
+  typedef struct termios sp_tty_mode_t;
+#elif defined(SP_WASM)
+  typedef struct {
+    u32 dummy;
+  } sp_tty_mode_t;
 
-typedef struct {
-  sp_sys_tty_attr_t in;
-  sp_sys_tty_attr_t out;
-} sp_sys_tty_state_t;
-
-typedef enum {
-  SP_SYS_TTY_MODE_COOKED,
-  SP_SYS_TTY_MODE_RAW,
-  SP_SYS_TTY_MODE_NO_ECHO,
-} sp_sys_tty_mode_t;
+#endif
 
 typedef struct {
   s64 tv_sec;
@@ -1370,93 +1257,73 @@ typedef enum {
 } sp_fs_kind_t;
 
 typedef struct {
-  sp_fs_kind_t kind;
-  s64 size;
+  sp_fs_kind_t      kind;
+  s64               size;
   sp_sys_timespec_t atime;
   sp_sys_timespec_t mtime;
   sp_sys_timespec_t btime;
-  u64 id;
-  u64 device;
-  u64 nlink;
-  u32 raw_attrs;
+  u64               id;
+  u64               device;
+  u64               nlink;
+  u32               raw_attrs;
 } sp_sys_file_meta_t;
 
 typedef struct {
-  s64 handle;
-  u64 cookie;
-} sp_sys_dir_t;
+  s64             handle;
+  sp_mem_buffer_t buf;
+  u64             cursor;
+  u64             cookie;
+} sp_sys_fs_it_t;
 
 typedef struct {
-  const c8* name;
-  u32 len;
+  const c8*    name;
+  u32          len;
   sp_fs_kind_t kind;
-} sp_sys_dir_entry_t;
-
-#define SP_SYS_DIR_MIN_BUF 2048
-
-typedef enum {
-  SP_SYS_OPEN_MODE_RO,
-  SP_SYS_OPEN_MODE_WO,
-  SP_SYS_OPEN_MODE_RW,
-} sp_sys_open_mode_t;
-
-typedef enum {
-  SP_SYS_OPEN_CREATE    = 1 << 0,
-  SP_SYS_OPEN_EXCLUSIVE = 1 << 1,
-  SP_SYS_OPEN_TRUNCATE  = 1 << 2,
-  SP_SYS_OPEN_APPEND    = 1 << 3,
-} sp_sys_open_flags_t;
+} sp_sys_fs_entry_t;
 
 SP_TYPEDEF_FN(int, sp_qsort_fn_t, const void *, const void *);
-SP_API sp_err_t    sp_sys_read(sp_sys_fd_t fd, void* buf, u64 count, u64* bytes_read);
-SP_API sp_err_t    sp_sys_write(sp_sys_fd_t fd, const void* buf, u64 count, u64* bytes_written);
-SP_API sp_err_t    sp_sys_pread(sp_sys_fd_t fd, void* buf, u64 count, u64 offset, u64* bytes_read);
-SP_API sp_err_t    sp_sys_pwrite(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset, u64* bytes_written);
-SP_API sp_err_t    sp_sys_transfer(sp_sys_fd_t in, u64* in_pos, sp_sys_fd_t out, u64* out_pos, u64 count, u64* bytes_moved);
+SP_API void        sp_sys_init();
+SP_API s64         sp_sys_read(sp_sys_fd_t fd, void* buf, u64 count);
+SP_API s64         sp_sys_write(sp_sys_fd_t fd, const void* buf, u64 count);
+SP_API s64         sp_sys_pread(sp_sys_fd_t fd, void* buf, u64 count, u64 offset);
+SP_API s64         sp_sys_pwrite(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset);
 SP_API sp_sys_fd_t sp_sys_get_root(s32 it);
 SP_API s64         sp_sys_get_exe_path(c8* buf, u64 size);
 SP_API s64         sp_sys_get_cwd_path(c8* buf, u64 size);
 SP_API s64         sp_sys_get_storage_path(c8* buf, u64 size);
 SP_API s64         sp_sys_get_config_path(c8* buf, u64 size);
-SP_API sp_err_t    sp_sys_open(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_open_mode_t mode, u32 flags, sp_sys_fd_t* out);
-SP_API sp_err_t    sp_sys_open_dir(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_fd_t* out);
-SP_API sp_err_t    sp_sys_close(sp_sys_fd_t fd);
-SP_API sp_err_t    sp_sys_pipe(sp_sys_fd_t* read_end, sp_sys_fd_t* write_end);
-SP_API sp_err_t    sp_sys_mkdir(sp_sys_fd_t fd, const c8* path, u32 len, s32 mode);
-SP_API sp_err_t    sp_sys_rmdir(sp_sys_fd_t fd, const c8* path, u32 len);
-SP_API sp_err_t    sp_sys_unlink(sp_sys_fd_t fd, const c8* path, u32 len);
-SP_API sp_err_t    sp_sys_rename(sp_sys_fd_t from, const c8* pfrom, u32 lf, sp_sys_fd_t to, const c8* pto, u32 lt);
-SP_API sp_err_t    sp_sys_link(sp_sys_fd_t from, const c8* pfrom, u32 lf, sp_sys_fd_t to, const c8* pto, u32 lt);
-SP_API sp_err_t    sp_sys_symlink(const c8* from, u32 lf, sp_sys_fd_t to, const c8* pto, u32 lt);
-SP_API sp_err_t    sp_sys_get_path_metadata(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st);
-SP_API sp_err_t    sp_sys_get_link_metadata(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st);
-SP_API sp_err_t    sp_sys_get_file_metadata(sp_sys_fd_t fd, sp_sys_file_meta_t* st);
-SP_API sp_err_t    sp_sys_chmod(sp_sys_fd_t fd, const c8* path, u32 len, const sp_sys_file_meta_t* st);
-SP_API sp_err_t    sp_sys_clock_gettime(s32 clockid, sp_sys_timespec_t* ts);
-SP_API sp_err_t    sp_sys_nanosleep(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem);
+SP_API sp_sys_fd_t sp_sys_open(sp_sys_fd_t fd, const c8* path, u32 len, s32 flags, s32 mode);
+SP_API s32         sp_sys_close(sp_sys_fd_t fd);
+SP_API s32         sp_sys_pipe(sp_sys_fd_t* read_end, sp_sys_fd_t* write_end);
+SP_API s32         sp_sys_mkdir(sp_sys_fd_t fd, const c8* path, u32 len, s32 mode);
+SP_API s32         sp_sys_rmdir(sp_sys_fd_t fd, const c8* path, u32 len);
+SP_API s32         sp_sys_unlink(sp_sys_fd_t fd, const c8* path, u32 len);
+SP_API s32         sp_sys_rename(sp_sys_fd_t from_fd, const c8* from, u32 from_len, sp_sys_fd_t to_fd, const c8* to, u32 to_len);
+SP_API s32         sp_sys_link(sp_sys_fd_t from_fd, const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len);
+SP_API s32         sp_sys_symlink(const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len);
+SP_API s32         sp_sys_get_path_metadata(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st);
+SP_API s32         sp_sys_get_link_metadata(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st);
+SP_API s32         sp_sys_get_file_metadata(sp_sys_fd_t fd, sp_sys_file_meta_t* st);
+SP_API s32         sp_sys_chmod(sp_sys_fd_t fd, const c8* path, u32 len, const sp_sys_file_meta_t* st);
+SP_API s32         sp_sys_clock_gettime(s32 clockid, sp_sys_timespec_t* ts);
+SP_API s32         sp_sys_nanosleep(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem);
 SP_API s64         sp_sys_canonicalize_path(const c8* path, u32 len, c8* buf, u64 size);
-SP_API sp_err_t    sp_sys_fd_ready(sp_sys_fd_t fd, u8* ready);
-SP_API sp_err_t    sp_sys_fd_wait(sp_sys_fd_t fd);
-SP_API sp_err_t    sp_sys_fds_wait(const sp_sys_fd_t* fds, u8* ready, u64 nfds);
-SP_API sp_err_t    sp_sys_tty_get(sp_sys_fd_t fd, sp_sys_tty_attr_t* attr);
-SP_API sp_err_t    sp_sys_tty_set(sp_sys_fd_t fd, const sp_sys_tty_attr_t* attr);
-SP_API sp_err_t    sp_sys_tty_size(sp_sys_fd_t fd, u32* cols, u32* rows);
-SP_API bool        sp_sys_is_tty(sp_sys_fd_t fd);
-SP_API sp_err_t    sp_sys_tty_mode_apply(sp_sys_tty_attr_t* in, sp_sys_tty_attr_t* out, sp_sys_tty_mode_t mode);
-SP_API sp_err_t    sp_sys_tty_use_vt(sp_sys_fd_t fd);
-SP_API sp_err_t    sp_sys_socket_open(sp_sys_socket_t* out);
-SP_API sp_err_t    sp_sys_socket_bind(sp_sys_socket_t socket, sp_sys_ipv4_t addr);
-SP_API sp_err_t    sp_sys_socket_listen(sp_sys_socket_t socket, u32 backlog);
-SP_API sp_err_t    sp_sys_socket_connect(sp_sys_socket_t socket, sp_sys_ipv4_t addr);
-SP_API sp_err_t    sp_sys_socket_error(sp_sys_socket_t socket);
-SP_API sp_err_t    sp_sys_socket_accept(sp_sys_socket_t listener, sp_sys_socket_t* out);
-SP_API sp_err_t    sp_sys_socket_close(sp_sys_socket_t socket);
-SP_API sp_err_t    sp_sys_socket_recv(sp_sys_socket_t socket, void* buf, u64 count, u64* bytes_read);
-SP_API sp_err_t    sp_sys_socket_send(sp_sys_socket_t socket, const void* buf, u64 count, u64* bytes_written);
-SP_API sp_err_t    sp_sys_socket_wait(sp_sys_socket_t socket, bool readable, u32 timeout_ms);
-SP_API sp_err_t    sp_sys_socket_set_nonblocking(sp_sys_socket_t socket);
-SP_API sp_err_t    sp_sys_socket_reuse_addr(sp_sys_socket_t socket);
-SP_API sp_err_t    sp_sys_socket_local_port(sp_sys_socket_t socket, u16* out);
+SP_API s32         sp_sys_fd_ready(sp_sys_fd_t fd, u8* ready);
+SP_API s32         sp_sys_fd_wait(sp_sys_fd_t fd);
+SP_API s32         sp_sys_fds_wait(const sp_sys_fd_t* fds, u8* ready, u64 nfds);
+SP_API s32         sp_sys_socket_open(sp_sys_socket_t* out);
+SP_API s32         sp_sys_socket_bind(sp_sys_socket_t socket, sp_sys_ipv4_t addr);
+SP_API s32         sp_sys_socket_listen(sp_sys_socket_t socket, u32 backlog);
+SP_API s32         sp_sys_socket_connect(sp_sys_socket_t socket, sp_sys_ipv4_t addr);
+SP_API s32         sp_sys_socket_error(sp_sys_socket_t socket);
+SP_API s32         sp_sys_socket_accept(sp_sys_socket_t listener, sp_sys_socket_t* out);
+SP_API s32         sp_sys_socket_close(sp_sys_socket_t socket);
+SP_API s64         sp_sys_socket_recv(sp_sys_socket_t socket, void* buf, u64 count);
+SP_API s64         sp_sys_socket_send(sp_sys_socket_t socket, const void* buf, u64 count);
+SP_API s32         sp_sys_socket_wait(sp_sys_socket_t socket, bool readable, u32 timeout_ms);
+SP_API s32         sp_sys_socket_set_nonblocking(sp_sys_socket_t socket);
+SP_API s32         sp_sys_socket_reuse_addr(sp_sys_socket_t socket);
+SP_API s32         sp_sys_socket_local_port(sp_sys_socket_t socket, u16* out);
 SP_API void*       sp_sys_alloc(u64 size);
 SP_API void        sp_sys_free(void* ptr, u64 size);
 SP_API void*       sp_sys_memcpy(void* dest, const void* src, u64 n);
@@ -1468,81 +1335,69 @@ SP_API void        sp_sys_exit(s32 code);
 SP_API void        sp_sys_env(const c8** env, u32* len);
 
 SP_API s64         sp_sys_lseek(sp_sys_fd_t fd, s64 offset, s32 whence);
-SP_API sp_err_t    sp_sys_chdir(const c8* path, u32 len);
+SP_API s32         sp_sys_chdir(const c8* path, u32 len);
 
 
-SP_API sp_err_t    sp_sys_open_s(sp_sys_fd_t fd, sp_str_t path, sp_sys_open_mode_t mode, u32 flags, sp_sys_fd_t* out);
-SP_API sp_err_t    sp_sys_open_dir_s(sp_sys_fd_t fd, sp_str_t path, sp_sys_fd_t* out);
-SP_API sp_err_t    sp_sys_get_path_metadata_s(sp_sys_fd_t fd, sp_str_t path, sp_sys_file_meta_t* st);
-SP_API sp_err_t    sp_sys_get_link_metadata_s(sp_sys_fd_t fd, sp_str_t path, sp_sys_file_meta_t* st);
-SP_API sp_err_t    sp_sys_mkdir_s(sp_sys_fd_t fd, sp_str_t path, s32 mode);
-SP_API sp_err_t    sp_sys_rmdir_s(sp_sys_fd_t fd, sp_str_t path);
-SP_API sp_err_t    sp_sys_unlink_s(sp_sys_fd_t fd, sp_str_t path);
-SP_API sp_err_t    sp_sys_rename_s(sp_sys_fd_t from_fd, sp_str_t from, sp_sys_fd_t to_fd, sp_str_t to);
-SP_API sp_err_t    sp_sys_chdir_s(sp_str_t path);
-SP_API sp_err_t    sp_sys_link_s(sp_sys_fd_t from_fd, sp_str_t existing, sp_sys_fd_t to_fd, sp_str_t alias);
-SP_API sp_err_t    sp_sys_symlink_s(sp_str_t existing, sp_sys_fd_t to_fd, sp_str_t alias);
-SP_API sp_err_t    sp_sys_chmod_s(sp_sys_fd_t fd, sp_str_t path, const sp_sys_file_meta_t* st);
+SP_API sp_sys_fd_t sp_sys_open_s(sp_sys_fd_t fd, sp_str_t path, s32 flags, s32 mode);
+SP_API s32         sp_sys_get_path_metadata_s(sp_sys_fd_t fd, sp_str_t path, sp_sys_file_meta_t* st);
+SP_API s32         sp_sys_get_link_metadata_s(sp_sys_fd_t fd, sp_str_t path, sp_sys_file_meta_t* st);
+SP_API s32         sp_sys_mkdir_s(sp_sys_fd_t fd, sp_str_t path, s32 mode);
+SP_API s32         sp_sys_rmdir_s(sp_sys_fd_t fd, sp_str_t path);
+SP_API s32         sp_sys_unlink_s(sp_sys_fd_t fd, sp_str_t path);
+SP_API s32         sp_sys_rename_s(sp_sys_fd_t from_fd, sp_str_t from, sp_sys_fd_t to_fd, sp_str_t to);
+SP_API s32         sp_sys_chdir_s(sp_str_t path);
+SP_API s32         sp_sys_link_s(sp_sys_fd_t from_fd, sp_str_t existing, sp_sys_fd_t to_fd, sp_str_t alias);
+SP_API s32         sp_sys_symlink_s(sp_str_t existing, sp_sys_fd_t to_fd, sp_str_t alias);
+SP_API s32         sp_sys_chmod_s(sp_sys_fd_t fd, sp_str_t path, const sp_sys_file_meta_t* st);
 SP_API s64         sp_sys_canonicalize_path_s(sp_str_t path, c8* buf, u64 size);
-SP_API sp_err_t    sp_sys_dir_from_fd(sp_sys_fd_t fd, sp_sys_dir_t* out);
-SP_API sp_err_t    sp_sys_dir_read(sp_sys_dir_t* dir, sp_mem_buffer_t* buf);
-SP_API sp_err_t    sp_sys_dir_parse(sp_sys_dir_t* dir, sp_mem_buffer_t* buf, u64* cursor, sp_sys_dir_entry_t* out);
-SP_API sp_err_t    sp_sys_dir_close(sp_sys_dir_t* dir);
-
-SP_API sp_err_t    sp_tty_set_mode(sp_sys_fd_t in, sp_sys_fd_t out, sp_sys_tty_mode_t mode, sp_sys_tty_state_t* saved);
-SP_API sp_err_t    sp_tty_restore(sp_sys_fd_t in, sp_sys_fd_t out, const sp_sys_tty_state_t* saved);
+SP_API s32         sp_sys_fs_it_open(sp_sys_fd_t fd, sp_sys_fs_it_t* it, const c8* path, u32 path_len, void* buf, u64 cap);
+SP_API s32         sp_sys_fs_it_open_s(sp_sys_fd_t fd, sp_sys_fs_it_t* it, sp_str_t path, sp_mem_slice_t buf);
+SP_API s32         sp_sys_fs_it_next(sp_sys_fs_it_t* it, sp_sys_fs_entry_t* out);
+SP_API void        sp_sys_fs_it_close(sp_sys_fs_it_t* it);
 
 typedef struct {
   void        (*init)(void);
-  sp_err_t    (*read)(sp_sys_fd_t fd, void* buf, u64 count, u64* bytes_read);
-  sp_err_t    (*write)(sp_sys_fd_t fd, const void* buf, u64 count, u64* bytes_written);
-  sp_err_t    (*pread)(sp_sys_fd_t fd, void* buf, u64 count, u64 offset, u64* bytes_read);
-  sp_err_t    (*pwrite)(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset, u64* bytes_written);
-  sp_err_t    (*transfer)(sp_sys_fd_t in, u64* in_pos, sp_sys_fd_t out, u64* out_pos, u64 count, u64* bytes_moved);
+  s64         (*read)(sp_sys_fd_t fd, void* buf, u64 count);
+  s64         (*write)(sp_sys_fd_t fd, const void* buf, u64 count);
+  s64         (*pread)(sp_sys_fd_t fd, void* buf, u64 count, u64 offset);
+  s64         (*pwrite)(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset);
   sp_sys_fd_t (*get_root)(s32 it);
   s64         (*get_exe_path)(c8* buf, u64 size);
   s64         (*get_cwd_path)(c8* buf, u64 size);
   s64         (*get_storage_path)(c8* buf, u64 size);
   s64         (*get_config_path)(c8* buf, u64 size);
-  sp_err_t    (*open)(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_open_mode_t mode, u32 flags, sp_sys_fd_t* out);
-  sp_err_t    (*open_dir)(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_fd_t*);
-  sp_err_t    (*close)(sp_sys_fd_t fd);
-  sp_err_t    (*pipe)(sp_sys_fd_t* read_end, sp_sys_fd_t* write_end);
-  sp_err_t    (*mkdir)(sp_sys_fd_t fd, const c8* path, u32 len, s32 mode);
-  sp_err_t    (*rmdir)(sp_sys_fd_t fd, const c8* path, u32 len);
-  sp_err_t    (*unlink)(sp_sys_fd_t fd, const c8* path, u32 len);
-  sp_err_t    (*rename)(sp_sys_fd_t from_fd, const c8* from, u32 from_len, sp_sys_fd_t to_fd, const c8* to, u32 to_len);
-  sp_err_t    (*link)(sp_sys_fd_t from_fd, const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len);
-  sp_err_t    (*symlink)(const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len);
-  sp_err_t    (*get_path_metadata)(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st);
-  sp_err_t    (*get_link_metadata)(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st);
-  sp_err_t    (*get_file_metadata)(sp_sys_fd_t fd, sp_sys_file_meta_t* st);
-  sp_err_t    (*chmod)(sp_sys_fd_t fd, const c8* path, u32 len, const sp_sys_file_meta_t* st);
-  sp_err_t    (*clock_gettime)(s32 clockid, sp_sys_timespec_t* ts);
-  sp_err_t    (*nanosleep)(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem);
+  sp_sys_fd_t (*open)(sp_sys_fd_t fd, const c8* path, u32 len, s32 flags, s32 mode);
+  s32         (*close)(sp_sys_fd_t fd);
+  s32         (*pipe)(sp_sys_fd_t* read_end, sp_sys_fd_t* write_end);
+  s32         (*mkdir)(sp_sys_fd_t fd, const c8* path, u32 len, s32 mode);
+  s32         (*rmdir)(sp_sys_fd_t fd, const c8* path, u32 len);
+  s32         (*unlink)(sp_sys_fd_t fd, const c8* path, u32 len);
+  s32         (*rename)(sp_sys_fd_t from_fd, const c8* from, u32 from_len, sp_sys_fd_t to_fd, const c8* to, u32 to_len);
+  s32         (*link)(sp_sys_fd_t from_fd, const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len);
+  s32         (*symlink)(const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len);
+  s32         (*get_path_metadata)(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st);
+  s32         (*get_link_metadata)(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st);
+  s32         (*get_file_metadata)(sp_sys_fd_t fd, sp_sys_file_meta_t* st);
+  s32         (*chmod)(sp_sys_fd_t fd, const c8* path, u32 len, const sp_sys_file_meta_t* st);
+  s32         (*clock_gettime)(s32 clockid, sp_sys_timespec_t* ts);
+  s32         (*nanosleep)(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem);
   s64         (*canonicalize_path)(const c8* path, u32 len, c8* buf, u64 size);
-  sp_err_t    (*fd_ready)(sp_sys_fd_t fd, u8* ready);
-  sp_err_t    (*fd_wait)(sp_sys_fd_t fd);
-  sp_err_t    (*fds_wait)(const sp_sys_fd_t* fds, u8* ready, u64 nfds);
-  sp_err_t    (*tty_get)(sp_sys_fd_t fd, sp_sys_tty_attr_t* attr);
-  sp_err_t    (*tty_set)(sp_sys_fd_t fd, const sp_sys_tty_attr_t* attr);
-  sp_err_t    (*tty_size)(sp_sys_fd_t fd, u32* cols, u32* rows);
-  bool        (*is_tty)(sp_sys_fd_t fd);
-  sp_err_t    (*tty_mode_apply)(sp_sys_tty_attr_t* in, sp_sys_tty_attr_t* out, sp_sys_tty_mode_t mode);
-  sp_err_t    (*tty_use_vt)(sp_sys_fd_t fd);
-  sp_err_t    (*socket_open)(sp_sys_socket_t* out);
-  sp_err_t    (*socket_bind)(sp_sys_socket_t socket, sp_sys_ipv4_t addr);
-  sp_err_t    (*socket_listen)(sp_sys_socket_t socket, u32 backlog);
-  sp_err_t    (*socket_connect)(sp_sys_socket_t socket, sp_sys_ipv4_t addr);
-  sp_err_t    (*socket_error)(sp_sys_socket_t socket);
-  sp_err_t    (*socket_accept)(sp_sys_socket_t listener, sp_sys_socket_t* out);
-  sp_err_t    (*socket_close)(sp_sys_socket_t socket);
-  sp_err_t    (*socket_recv)(sp_sys_socket_t socket, void* buf, u64 count, u64* bytes_read);
-  sp_err_t    (*socket_send)(sp_sys_socket_t socket, const void* buf, u64 count, u64* bytes_written);
-  sp_err_t    (*socket_wait)(sp_sys_socket_t socket, bool readable, u32 timeout_ms);
-  sp_err_t    (*socket_set_nonblocking)(sp_sys_socket_t socket);
-  sp_err_t    (*socket_reuse_addr)(sp_sys_socket_t socket);
-  sp_err_t    (*socket_local_port)(sp_sys_socket_t socket, u16* out);
+  s32         (*fd_ready)(sp_sys_fd_t fd, u8* ready);
+  s32         (*fd_wait)(sp_sys_fd_t fd);
+  s32         (*fds_wait)(const sp_sys_fd_t* fds, u8* ready, u64 nfds);
+  s32         (*socket_open)(sp_sys_socket_t* out);
+  s32         (*socket_bind)(sp_sys_socket_t socket, sp_sys_ipv4_t addr);
+  s32         (*socket_listen)(sp_sys_socket_t socket, u32 backlog);
+  s32         (*socket_connect)(sp_sys_socket_t socket, sp_sys_ipv4_t addr);
+  s32         (*socket_error)(sp_sys_socket_t socket);
+  s32         (*socket_accept)(sp_sys_socket_t listener, sp_sys_socket_t* out);
+  s32         (*socket_close)(sp_sys_socket_t socket);
+  s64         (*socket_recv)(sp_sys_socket_t socket, void* buf, u64 count);
+  s64         (*socket_send)(sp_sys_socket_t socket, const void* buf, u64 count);
+  s32         (*socket_wait)(sp_sys_socket_t socket, bool readable, u32 timeout_ms);
+  s32         (*socket_set_nonblocking)(sp_sys_socket_t socket);
+  s32         (*socket_reuse_addr)(sp_sys_socket_t socket);
+  s32         (*socket_local_port)(sp_sys_socket_t socket, u16* out);
   void*       (*alloc)(u64 size);
   void        (*free)(void* ptr, u64 size);
   void*       (*memcpy)(void* dest, const void* src, u64 n);
@@ -1553,62 +1408,54 @@ typedef struct {
   void        (*exit)(s32 code);
   void        (*env)(const c8** env, u32* len);
   s64         (*lseek)(sp_sys_fd_t fd, s64 offset, s32 whence);
-  sp_err_t    (*chdir)(const c8* path, u32 len);
-  sp_err_t    (*dir_from_fd)(sp_sys_fd_t fd, sp_sys_dir_t* out);
-  sp_err_t    (*dir_read)(sp_sys_dir_t* dir, sp_mem_buffer_t* buf);
-  sp_err_t    (*dir_parse)(sp_sys_dir_t* dir, sp_mem_buffer_t* buf, u64* cursor, sp_sys_dir_entry_t* out);
-  sp_err_t    (*dir_close)(sp_sys_dir_t* dir);
+  s32         (*chdir)(const c8* path, u32 len);
+  s32         (*fs_it_open)(sp_sys_fd_t fd, sp_sys_fs_it_t* it, const c8* path, u32 path_len, void* buf, u64 cap);
+  s32         (*fs_it_next)(sp_sys_fs_it_t* it, sp_sys_fs_entry_t* out);
+  void        (*fs_it_close)(sp_sys_fs_it_t* it);
 } sp_sys_vtable_t;
 
-SP_API sp_err_t    sp_sys_read_p(sp_sys_fd_t fd, void* buf, u64 count, u64* bytes_read);
-SP_API sp_err_t    sp_sys_write_p(sp_sys_fd_t fd, const void* buf, u64 count, u64* bytes_written);
-SP_API sp_err_t    sp_sys_pread_p(sp_sys_fd_t fd, void* buf, u64 count, u64 offset, u64* bytes_read);
-SP_API sp_err_t    sp_sys_pwrite_p(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset, u64* bytes_written);
-SP_API sp_err_t    sp_sys_transfer_p(sp_sys_fd_t in, u64* in_pos, sp_sys_fd_t out, u64* out_pos, u64 count, u64* bytes_moved);
+SP_API void        sp_sys_init_p(void);
+SP_API s64         sp_sys_read_p(sp_sys_fd_t fd, void* buf, u64 count);
+SP_API s64         sp_sys_write_p(sp_sys_fd_t fd, const void* buf, u64 count);
+SP_API s64         sp_sys_pread_p(sp_sys_fd_t fd, void* buf, u64 count, u64 offset);
+SP_API s64         sp_sys_pwrite_p(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset);
 SP_API sp_sys_fd_t sp_sys_get_root_p(s32 it);
 SP_API s64         sp_sys_get_exe_path_p(c8* buf, u64 size);
 SP_API s64         sp_sys_get_cwd_path_p(c8* buf, u64 size);
 SP_API s64         sp_sys_get_storage_path_p(c8* buf, u64 size);
 SP_API s64         sp_sys_get_config_path_p(c8* buf, u64 size);
-SP_API sp_err_t    sp_sys_open_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_open_mode_t mode, u32 flags, sp_sys_fd_t* out);
-SP_API sp_err_t    sp_sys_open_dir_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_fd_t* out);
-SP_API sp_err_t    sp_sys_close_p(sp_sys_fd_t fd);
-SP_API sp_err_t    sp_sys_pipe_p(sp_sys_fd_t* read_end, sp_sys_fd_t* write_end);
-SP_API sp_err_t    sp_sys_mkdir_p(sp_sys_fd_t fd, const c8* path, u32 len, s32 mode);
-SP_API sp_err_t    sp_sys_rmdir_p(sp_sys_fd_t fd, const c8* path, u32 len);
-SP_API sp_err_t    sp_sys_unlink_p(sp_sys_fd_t fd, const c8* path, u32 len);
-SP_API sp_err_t    sp_sys_rename_p(sp_sys_fd_t from_fd, const c8* from, u32 from_len, sp_sys_fd_t to_fd, const c8* to, u32 to_len);
-SP_API sp_err_t    sp_sys_link_p(sp_sys_fd_t from_fd, const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len);
-SP_API sp_err_t    sp_sys_symlink_p(const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len);
-SP_API sp_err_t    sp_sys_get_path_metadata_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st);
-SP_API sp_err_t    sp_sys_get_link_metadata_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st);
-SP_API sp_err_t    sp_sys_get_file_metadata_p(sp_sys_fd_t fd, sp_sys_file_meta_t* st);
-SP_API sp_err_t    sp_sys_chmod_p(sp_sys_fd_t fd, const c8* path, u32 len, const sp_sys_file_meta_t* st);
-SP_API sp_err_t    sp_sys_clock_gettime_p(s32 clockid, sp_sys_timespec_t* ts);
-SP_API sp_err_t    sp_sys_nanosleep_p(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem);
+SP_API sp_sys_fd_t sp_sys_open_p(sp_sys_fd_t fd, const c8* path, u32 len, s32 flags, s32 mode);
+SP_API s32         sp_sys_close_p(sp_sys_fd_t fd);
+SP_API s32         sp_sys_pipe_p(sp_sys_fd_t* read_end, sp_sys_fd_t* write_end);
+SP_API s32         sp_sys_mkdir_p(sp_sys_fd_t fd, const c8* path, u32 len, s32 mode);
+SP_API s32         sp_sys_rmdir_p(sp_sys_fd_t fd, const c8* path, u32 len);
+SP_API s32         sp_sys_unlink_p(sp_sys_fd_t fd, const c8* path, u32 len);
+SP_API s32         sp_sys_rename_p(sp_sys_fd_t from_fd, const c8* from, u32 from_len, sp_sys_fd_t to_fd, const c8* to, u32 to_len);
+SP_API s32         sp_sys_link_p(sp_sys_fd_t from_fd, const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len);
+SP_API s32         sp_sys_symlink_p(const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len);
+SP_API s32         sp_sys_get_path_metadata_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st);
+SP_API s32         sp_sys_get_link_metadata_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st);
+SP_API s32         sp_sys_get_file_metadata_p(sp_sys_fd_t fd, sp_sys_file_meta_t* st);
+SP_API s32         sp_sys_chmod_p(sp_sys_fd_t fd, const c8* path, u32 len, const sp_sys_file_meta_t* st);
+SP_API s32         sp_sys_clock_gettime_p(s32 clockid, sp_sys_timespec_t* ts);
+SP_API s32         sp_sys_nanosleep_p(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem);
 SP_API s64         sp_sys_canonicalize_path_p(const c8* path, u32 len, c8* buf, u64 size);
-SP_API sp_err_t    sp_sys_fd_ready_p(sp_sys_fd_t fd, u8* ready);
-SP_API sp_err_t    sp_sys_fd_wait_p(sp_sys_fd_t fd);
-SP_API sp_err_t    sp_sys_fds_wait_p(const sp_sys_fd_t* fds, u8* ready, u64 nfds);
-SP_API sp_err_t    sp_sys_tty_get_p(sp_sys_fd_t fd, sp_sys_tty_attr_t* attr);
-SP_API sp_err_t    sp_sys_tty_set_p(sp_sys_fd_t fd, const sp_sys_tty_attr_t* attr);
-SP_API sp_err_t    sp_sys_tty_size_p(sp_sys_fd_t fd, u32* cols, u32* rows);
-SP_API bool        sp_sys_is_tty_p(sp_sys_fd_t fd);
-SP_API sp_err_t    sp_sys_tty_mode_apply_p(sp_sys_tty_attr_t* in, sp_sys_tty_attr_t* out, sp_sys_tty_mode_t mode);
-SP_API sp_err_t    sp_sys_tty_use_vt_p(sp_sys_fd_t fd);
-SP_API sp_err_t    sp_sys_socket_open_p(sp_sys_socket_t* out);
-SP_API sp_err_t    sp_sys_socket_bind_p(sp_sys_socket_t socket, sp_sys_ipv4_t addr);
-SP_API sp_err_t    sp_sys_socket_listen_p(sp_sys_socket_t socket, u32 backlog);
-SP_API sp_err_t    sp_sys_socket_connect_p(sp_sys_socket_t socket, sp_sys_ipv4_t addr);
-SP_API sp_err_t    sp_sys_socket_error_p(sp_sys_socket_t socket);
-SP_API sp_err_t    sp_sys_socket_accept_p(sp_sys_socket_t listener, sp_sys_socket_t* out);
-SP_API sp_err_t    sp_sys_socket_close_p(sp_sys_socket_t socket);
-SP_API sp_err_t    sp_sys_socket_recv_p(sp_sys_socket_t socket, void* buf, u64 count, u64* bytes_read);
-SP_API sp_err_t    sp_sys_socket_send_p(sp_sys_socket_t socket, const void* buf, u64 count, u64* bytes_written);
-SP_API sp_err_t    sp_sys_socket_wait_p(sp_sys_socket_t socket, bool readable, u32 timeout_ms);
-SP_API sp_err_t    sp_sys_socket_set_nonblocking_p(sp_sys_socket_t socket);
-SP_API sp_err_t    sp_sys_socket_reuse_addr_p(sp_sys_socket_t socket);
-SP_API sp_err_t    sp_sys_socket_local_port_p(sp_sys_socket_t socket, u16* out);
+SP_API s32         sp_sys_fd_ready_p(sp_sys_fd_t fd, u8* ready);
+SP_API s32         sp_sys_fd_wait_p(sp_sys_fd_t fd);
+SP_API s32         sp_sys_fds_wait_p(const sp_sys_fd_t* fds, u8* ready, u64 nfds);
+SP_API s32         sp_sys_socket_open_p(sp_sys_socket_t* out);
+SP_API s32         sp_sys_socket_bind_p(sp_sys_socket_t socket, sp_sys_ipv4_t addr);
+SP_API s32         sp_sys_socket_listen_p(sp_sys_socket_t socket, u32 backlog);
+SP_API s32         sp_sys_socket_connect_p(sp_sys_socket_t socket, sp_sys_ipv4_t addr);
+SP_API s32         sp_sys_socket_error_p(sp_sys_socket_t socket);
+SP_API s32         sp_sys_socket_accept_p(sp_sys_socket_t listener, sp_sys_socket_t* out);
+SP_API s32         sp_sys_socket_close_p(sp_sys_socket_t socket);
+SP_API s64         sp_sys_socket_recv_p(sp_sys_socket_t socket, void* buf, u64 count);
+SP_API s64         sp_sys_socket_send_p(sp_sys_socket_t socket, const void* buf, u64 count);
+SP_API s32         sp_sys_socket_wait_p(sp_sys_socket_t socket, bool readable, u32 timeout_ms);
+SP_API s32         sp_sys_socket_set_nonblocking_p(sp_sys_socket_t socket);
+SP_API s32         sp_sys_socket_reuse_addr_p(sp_sys_socket_t socket);
+SP_API s32         sp_sys_socket_local_port_p(sp_sys_socket_t socket, u16* out);
 SP_API void*       sp_sys_alloc_p(u64 size);
 SP_API void        sp_sys_free_p(void* ptr, u64 size);
 SP_API void*       sp_sys_memcpy_p(void* dest, const void* src, u64 n);
@@ -1619,11 +1466,10 @@ SP_API void        sp_sys_assert_p(bool cond);
 SP_API void        sp_sys_exit_p(s32 code);
 SP_API void        sp_sys_env_p(const c8** env, u32* len);
 SP_API s64         sp_sys_lseek_p(sp_sys_fd_t fd, s64 offset, s32 whence);
-SP_API sp_err_t    sp_sys_chdir_p(const c8* path, u32 len);
-SP_API sp_err_t    sp_sys_dir_from_fd_p(sp_sys_fd_t fd, sp_sys_dir_t* out);
-SP_API sp_err_t    sp_sys_dir_read_p(sp_sys_dir_t* dir, sp_mem_buffer_t* buf);
-SP_API sp_err_t    sp_sys_dir_parse_p(sp_sys_dir_t* dir, sp_mem_buffer_t* buf, u64* cursor, sp_sys_dir_entry_t* out);
-SP_API sp_err_t    sp_sys_dir_close_p(sp_sys_dir_t* dir);
+SP_API s32         sp_sys_chdir_p(const c8* path, u32 len);
+SP_API s32         sp_sys_fs_it_open_p(sp_sys_fd_t fd, sp_sys_fs_it_t* it, const c8* path, u32 path_len, void* buf, u64 cap);
+SP_API s32         sp_sys_fs_it_next_p(sp_sys_fs_it_t* it, sp_sys_fs_entry_t* out);
+SP_API void        sp_sys_fs_it_close_p(sp_sys_fs_it_t* it);
 
 SP_API const sp_sys_vtable_t  sp_sys_vtable_platform;
 SP_API const sp_sys_vtable_t* sp_sys_set_vtable(const sp_sys_vtable_t* vt);
@@ -1744,6 +1590,7 @@ typedef s32 (*sp_entry_fn_t)(s32, const c8**);
 
 #if defined(SP_FREESTANDING)
   extern c8** environ;
+  extern s32 errno;
 #elif defined(SP_WASM)
   extern c8** environ;
 #endif
@@ -1766,8 +1613,6 @@ typedef enum {
   SP_ALLOCATOR_MODE_ALLOC,
   SP_ALLOCATOR_MODE_FREE,
   SP_ALLOCATOR_MODE_RESIZE,
-  SP_ALLOCATOR_MODE_ALLOC_UNINITIALIZED,
-  SP_ALLOCATOR_MODE_RESIZE_UNINITIALIZED,
 } sp_mem_alloc_mode_t;
 
 SP_TYPEDEF_FN(
@@ -1782,14 +1627,10 @@ typedef struct sp_allocator_t {
 } sp_mem_t;
 
 SP_API void*    sp_mem_allocator_alloc(sp_mem_t arena, u64 size);
-SP_API void*    sp_mem_allocator_alloc_uninitialized(sp_mem_t arena, u64 size);
 SP_API void*    sp_mem_allocator_realloc(sp_mem_t arena, void* ptr, u64 old_size, u64 size);
-SP_API void*    sp_mem_allocator_realloc_uninitialized(sp_mem_t arena, void* ptr, u64 old_size, u64 size);
 SP_API void     sp_mem_allocator_free(sp_mem_t arena, void* buffer, u64 size);
 SP_API void*    sp_alloc(sp_mem_t mem, u64 size);
-SP_API void*    sp_alloc_uninitialized(sp_mem_t mem, u64 size);
 SP_API void*    sp_realloc(sp_mem_t mem, void* memory, u64 old_size, u64 size);
-SP_API void*    sp_realloc_uninitialized(sp_mem_t mem, void* memory, u64 old_size, u64 size);
 SP_API void     sp_free(sp_mem_t mem, void* memory, u64 size);
 SP_API sp_mem_t sp_mem_get_scratch();
 
@@ -1810,8 +1651,6 @@ SP_API void sp_mem_zero(void* buffer, u64 buffer_size);
 #define sp_mem_arena_alloc_type(a, T) sp_mem_arena_alloc_n(a, T, 1)
 #define sp_alloc_n(a, T, n) (T*)sp_alloc(a, (n) * sizeof(T))
 #define sp_alloc_type(a, T) sp_alloc_n(a, T, 1)
-#define sp_alloc_uninitialized_n(a, T, n) (T*)sp_alloc_uninitialized(a, (n) * sizeof(T))
-#define sp_alloc_uninitialized_type(a, T) sp_alloc_uninitialized_n(a, T, 1)
 
 /////////////////////
 // FIXED ALLOCATOR //
@@ -1876,9 +1715,7 @@ SP_API void                  sp_mem_arena_pop(sp_mem_arena_marker_t marker);
 SP_API u64                   sp_mem_arena_capacity(sp_mem_arena_t* arena);
 SP_API u64                   sp_mem_arena_bytes_used(sp_mem_arena_t* arena);
 SP_API void*                 sp_mem_arena_alloc(sp_mem_arena_t* arena, u64 size);
-SP_API void*                 sp_mem_arena_alloc_uninitialized(sp_mem_arena_t* arena, u64 size);
 SP_API void*                 sp_mem_arena_realloc(sp_mem_arena_t* arena, void* ptr, u64 old_size, u64 size);
-SP_API void*                 sp_mem_arena_realloc_uninitialized(sp_mem_arena_t* arena, void* ptr, u64 old_size, u64 size);
 SP_API void                  sp_mem_arena_free(sp_mem_arena_t* arena, void* ptr, u64 size);
 SP_API sp_mem_arena_t*       sp_mem_get_scratch_arena();
 SP_API sp_mem_arena_t*       sp_mem_get_scratch_arena_for(sp_mem_t mem);
@@ -1996,9 +1833,7 @@ SP_API void                 sp_mem_heap_destroy(sp_mem_heap_t* heap);
 SP_API sp_mem_t             sp_mem_heap_as_allocator(sp_mem_heap_t* heap);
 SP_API void*                sp_mem_heap_on_alloc(void* ud, sp_mem_alloc_mode_t mode, u64 size, void* ptr, u64 old_size);
 SP_API void*                sp_mem_heap_alloc(sp_mem_heap_t* heap, u64 size);
-SP_API void*                sp_mem_heap_alloc_uninitialized(sp_mem_heap_t* heap, u64 size);
 SP_API void*                sp_mem_heap_realloc(sp_mem_heap_t* heap, void* ptr, u64 size);
-SP_API void*                sp_mem_heap_realloc_uninitialized(sp_mem_heap_t* heap, void* ptr, u64 size);
 SP_API void                 sp_mem_heap_free(sp_mem_heap_t* heap, void* ptr);
 SP_API sp_mem_heap_span_t*  sp_mem_heap_find_span(sp_mem_heap_t* heap, void* ptr);
 
@@ -2654,6 +2489,25 @@ SP_API bool        sp_ht_on_compare_cstr_key(void* ka, void* kb, u64 size);
 
  */
 typedef struct {
+  void* user_data;
+
+  sp_io_writer_t* writer;
+  struct {
+    sp_str_t* data;
+    u32 len;
+  } elements;
+
+  sp_str_t str;
+  u32 index;
+} sp_str_reduce_context_t;
+
+typedef struct {
+  sp_mem_t mem;
+  sp_str_t str;
+  void* user_data;
+} sp_str_map_context_t;
+
+typedef struct {
   sp_str_t first;
   sp_str_t second;
 } sp_str_pair_t;
@@ -2680,6 +2534,9 @@ typedef struct {
   u8 codepoint_len;
 } sp_utf8_it_t;
 
+SP_TYPEDEF_FN(sp_str_t, sp_str_map_fn_t, sp_str_map_context_t* context);
+SP_TYPEDEF_FN(void, sp_str_reduce_fn_t, sp_str_reduce_context_t* context);
+
 #define sp_str_lit(STR)  (SP_RVAL(sp_str_t) { .data = (const c8*)(STR), .len = (u32)(sizeof(STR) - 1) })
 #define sp_str_for(str, it) for (u32 it = 0; it < str.len; it++)
 #define sp_str_for_it(str, it) for (sp_str_it_t it = sp_str_it(str); sp_str_it_valid(&it); sp_str_it_next(&it))
@@ -2694,6 +2551,8 @@ SP_API sp_str_t        sp_str_copy(sp_mem_t mem, sp_str_t str);
 SP_API sp_str_t        sp_str_concat(sp_mem_t mem, sp_str_t a, sp_str_t b);
 SP_API sp_str_t        sp_str_join(sp_mem_t mem, sp_str_t a, sp_str_t b, sp_str_t join);
 SP_API sp_str_t        sp_str_join_n(sp_mem_t mem, sp_str_t* strs, u32 n, sp_str_t joiner);
+SP_API sp_str_t        sp_str_reduce(sp_mem_t mem, sp_str_t* strs, u32 n, void* ud, sp_str_reduce_fn_t fn);
+SP_API void            sp_str_reduce_kernel_join(sp_str_reduce_context_t* context);
 SP_API c8*             sp_cstr_from_str(sp_mem_t mem, sp_str_t str);
 SP_API void            sp_str_copy_to(sp_str_t str, c8* buffer, u32 capacity);
 SP_API sp_str_t        sp_str_from_cstr(sp_mem_t mem, const c8* str);
@@ -2767,6 +2626,15 @@ SP_API sp_wide_str_t   sp_wtf8_to_wtf16(sp_mem_t mem, sp_str_t wtf8);
 SP_API sp_str_t        sp_wtf16_to_wtf8(sp_mem_t mem, sp_wide_str_t wtf16);
 SP_API c8              sp_c8_to_upper(c8 c);
 SP_API c8              sp_c8_to_lower(c8 c);
+SP_API sp_da(sp_str_t) sp_str_map(sp_mem_t mem, sp_str_t* s, u32 n, void* ud, sp_str_map_fn_t fn);
+SP_API sp_str_t        sp_str_map_kernel_prepend(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_append(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_prefix(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_trim(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_pad(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_to_upper(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_to_lower(sp_str_map_context_t* context);
+SP_API sp_str_t        sp_str_map_kernel_pascal_case(sp_str_map_context_t* context);
 SP_API s32             sp_str_sort_kernel_alphabetical(const void* a, const void* b);
 
 
@@ -2935,7 +2803,7 @@ SP_API void              sp_tm_epoch_to_iso8601_w(sp_io_writer_t* io, sp_tm_epoc
 // ░░░░░       ░░░░░ ░░░░░░░░░░░ ░░░░░░░░░░  ░░░░░░░░░     ░░░░░     ░░░░░░░░░     ░░░░░    ░░░░░░░░░░ ░░░░░     ░░░░░
 // @fs @filesystem
 #define SP_PATH_MAX 4096
-#define SP_FS_IT_BUF_SIZE SP_SYS_DIR_MIN_BUF
+#define SP_FS_IT_BUF_SIZE 2048
 
 typedef enum {
   SP_FS_LINK_HARD,
@@ -2960,20 +2828,9 @@ typedef struct {
 } sp_fs_entry_t;
 
 typedef struct {
-  sp_str_t name;
-  sp_fs_kind_t kind;
-} sp_fs_dir_entry_t;
-
-typedef struct {
-  sp_sys_dir_t dir;
-  sp_mem_buffer_t buf;
-  u64 cursor;
-} sp_fs_dir_t;
-
-typedef struct {
-  sp_fs_dir_t dir;
-  SP_ALIGNED u8 buf [SP_FS_IT_BUF_SIZE];
-  sp_str_t path;
+  sp_sys_fs_it_t sys;
+  SP_ALIGNED u8    buf [SP_FS_IT_BUF_SIZE];
+  sp_str_t         path;
 } sp_fs_it_frame_t;
 
 typedef struct {
@@ -2981,7 +2838,6 @@ typedef struct {
   sp_fs_entry_t entry;
   sp_da(sp_fs_it_frame_t) stack;
   bool recursive;
-  sp_err_t err;
 } sp_fs_it_t;
 
 #define sp_fs_for(mem, dir, it) \
@@ -3028,15 +2884,11 @@ SP_API sp_err_t             sp_fs_copy(sp_str_t from, sp_str_t to);
 SP_API void                 sp_fs_copy_file(sp_str_t from, sp_str_t to);
 SP_API void                 sp_fs_copy_dir(sp_str_t from, sp_str_t to);
 SP_API void                 sp_fs_copy_glob(sp_str_t from, sp_str_t glob, sp_str_t to);
-SP_API sp_err_t             sp_fs_dir_open(sp_fs_dir_t* it, sp_sys_fd_t fd, sp_str_t path, sp_mem_slice_t buf);
-SP_API sp_err_t             sp_fs_dir_next(sp_fs_dir_t* it, sp_fs_dir_entry_t* out);
-SP_API void                 sp_fs_dir_close(sp_fs_dir_t* it);
 SP_API sp_fs_it_t           sp_fs_it_new(sp_mem_t mem, sp_str_t path);
 SP_API sp_fs_it_t           sp_fs_it_new_recursive(sp_mem_t mem, sp_str_t path);
 SP_API void                 sp_fs_it_begin(sp_fs_it_t* it, sp_str_t path);
 SP_API void                 sp_fs_it_next(sp_fs_it_t* it);
 SP_API void                 sp_fs_it_push(sp_fs_it_t* it, sp_str_t path);
-SP_API void                 sp_fs_it_unwind(sp_fs_it_t* it);
 SP_API bool                 sp_fs_it_valid(sp_fs_it_t* it);
 SP_API void                 sp_fs_it_deinit(sp_fs_it_t* it);
 
@@ -3206,11 +3058,17 @@ SP_API sp_str_t       sp_os_lib_kind_to_extension(sp_os_lib_kind_t kind);
 SP_API sp_str_t       sp_os_lib_to_file_name(sp_mem_t mem, sp_str_t lib, sp_os_lib_kind_t kind);
 SP_API void           sp_os_sleep_ms(f64 ms);
 SP_API void           sp_os_sleep_ns(u64 ns);
+SP_API void           sp_os_print(sp_str_t message);
+SP_API void           sp_os_print_err(sp_str_t message);
 SP_API sp_str_t       sp_os_env_get(sp_str_t key);
 SP_API sp_os_env_it_t sp_os_env_it_begin();
 SP_API bool           sp_os_env_it_valid(sp_os_env_it_t* it);
 SP_API void           sp_os_env_it_next(sp_os_env_it_t* it);
 SP_API void           sp_os_register_signal_handler(sp_os_signal_t, sp_os_signal_handler_t, void* userdata);
+SP_API bool           sp_os_is_tty(sp_sys_fd_t fd);
+SP_API void           sp_os_tty_size(sp_sys_fd_t fd, u32* cols, u32* rows);
+SP_API s32            sp_os_tty_enter_raw(sp_sys_fd_t fd, sp_tty_mode_t* saved);
+SP_API s32            sp_os_tty_restore(sp_sys_fd_t fd, const sp_tty_mode_t* saved);
 SP_API void           sp_os_qsort(void* arr, u64 len, u64 stride, sp_qsort_fn_t);
 SP_API void           sp_assert_f(sp_str_t file, sp_str_t line, sp_str_t func, sp_str_t expr, bool cond);
 
@@ -3535,6 +3393,10 @@ typedef struct {
   } mem;
   sp_mem_arena_t* scratch [2];
   sp_env_t env;
+  struct {
+    sp_io_stream_writer_t* out;
+    sp_io_stream_writer_t* err;
+  } std;
 } sp_tls_rt_t;
 
 #if defined(SP_WIN32)
@@ -3565,6 +3427,7 @@ typedef struct {
   void* SecurityQualityOfService;
 } sp_nt_object_attributes_t;
 
+#define SP_NT_OBJ_INHERIT           0x00000002
 #define SP_NT_OBJ_CASE_INSENSITIVE  0x00000040
 
 typedef struct {
@@ -3575,10 +3438,7 @@ typedef struct {
   uintptr_t Information;
 } sp_nt_io_status_block_t;
 
-////////
-// NT //
-////////
-#define SP_NT_FUNCTIONS(X)                                                                                      \
+#define SP_NT_FUNCS(X)                                                                                      \
   X(sp_nt_status_t, RtlDosPathNameToNtPathName_U_WithStatus, (const u16*, sp_nt_unicode_string_t*, u16**, void*)) \
   X(s32,            RtlFreeHeap,                             (void*, u32, void*)) \
   X(sp_nt_status_t, RtlSetCurrentDirectory_U,                (sp_nt_unicode_string_t*))  \
@@ -3586,54 +3446,36 @@ typedef struct {
   X(sp_nt_status_t, NtSetInformationFile,                    (void*, sp_nt_io_status_block_t*, void*, u32, u32)) \
   X(sp_nt_status_t, NtCreateFile,                            (void**, u32, sp_nt_object_attributes_t*, sp_nt_io_status_block_t*, s64*, u32, u32, u32, u32, void*, u32)) \
   X(sp_nt_status_t, NtQueryObject,                           (void*, u32, void*, u32, u32*))      \
-  X(sp_nt_status_t, NtQueryDirectoryFile,                    (void*, void*, void*, void*, sp_nt_io_status_block_t*, void*, u32, u32, u8, sp_nt_unicode_string_t*, u8)) \
   X(sp_nt_status_t, NtFsControlFile,                         (void*, void*, void*, void*, sp_nt_io_status_block_t*, u32, void*, u32, void*, u32))
 
-#define SP_NT_DECLARE_FUNCTION(ret, name, args) \
-  ret (__stdcall *name) args;
 
-typedef struct {
-  SP_NT_FUNCTIONS(SP_NT_DECLARE_FUNCTION)
-} sp_nt_dispatch_t;
-
-/////////
-// WS2 //
-/////////
-#define SP_WS2_FUNCTIONS(X) \
-  X(int,    WSAStartup,      (WORD, WSADATA*)) \
-  X(int,    WSAGetLastError, (void)) \
-  X(int,    WSAIoctl,        (SOCKET, DWORD, void*, DWORD, void*, DWORD, DWORD*, WSAOVERLAPPED*, LPWSAOVERLAPPED_COMPLETION_ROUTINE)) \
-  X(int,    WSAPoll,         (WSAPOLLFD*, ULONG, INT)) \
-  X(SOCKET, socket,          (int, int, int)) \
-  X(int,    bind,            (SOCKET, const struct sockaddr*, int)) \
-  X(int,    listen,          (SOCKET, int)) \
-  X(int,    connect,         (SOCKET, const struct sockaddr*, int)) \
-  X(SOCKET, accept,          (SOCKET, struct sockaddr*, int*)) \
-  X(int,    closesocket,     (SOCKET)) \
-  X(int,    recv,            (SOCKET, char*, int, int)) \
-  X(int,    send,            (SOCKET, const char*, int, int)) \
-  X(int,    ioctlsocket,     (SOCKET, long, u_long*)) \
-  X(int,    setsockopt,      (SOCKET, int, int, const char*, int)) \
-  X(int,    getsockopt,      (SOCKET, int, int, char*, int*)) \
-  X(int,    getsockname,     (SOCKET, struct sockaddr*, int*))
-
-#define SP_WS2_DECLARE_FUNCTION_POINTER(ret, name, args) \
-  ret (__stdcall *name) args;
-
-typedef struct {
-  SP_WS2_FUNCTIONS(SP_WS2_DECLARE_FUNCTION_POINTER)
-} sp_ws2_dispatch_t;
+#define SP_NT_DECL(ret, name, args) ret (__stdcall *name) args;
+typedef struct { SP_NT_FUNCS(SP_NT_DECL) } sp_nt_dispatch_t;
+#undef SP_NT_DECL
 
 SP_API sp_nt_status_t sp_sys_nt_path(sp_str_t utf8, sp_sys_nt_path_t* out);
 SP_API void           sp_sys_nt_path_free(sp_sys_nt_path_t* path);
 #endif
 
-
-#define SP_SYS_SUPPORT_COPY_FILE_RANGE 0
-#define SP_SYS_SUPPORT_SENDFILE 1
+typedef struct {
+  const sp_sys_vtable_t* vt;
+  sp_os_signal_handler_t signal_handlers[3];
+  void* signal_userdata[3];
+  sp_mutex_t mutex;
+  sp_spin_lock_t locks [SP_RT_NUM_SPIN_LOCKS];
+  struct {
+    sp_tls_key_t key;
+    sp_tls_once_t once;
+  } tls;
+#if defined(SP_WIN32)
+  sp_nt_dispatch_t nt;
+#endif
+} sp_rt_t;
 
 sp_tls_rt_t*   sp_tls_rt_get();
 void           sp_sys_tls_init(sp_tls_rt_t* tls);
+
+SP_API sp_rt_t sp_rt;
 
 
 /*
@@ -3677,6 +3519,12 @@ typedef enum {
   SP_IO_SEEK_CUR,
   SP_IO_SEEK_END,
 } sp_io_whence_t;
+
+typedef enum {
+  SP_IO_MODE_READ   = 1 << 0,
+  SP_IO_MODE_WRITE  = 1 << 1,
+  SP_IO_MODE_APPEND = 1 << 2,
+} sp_io_mode_t;
 
 typedef enum {
   SP_IO_CLOSE_MODE_NONE,
@@ -3773,30 +3621,6 @@ typedef struct {
   u64 remaining;
 } sp_io_limit_reader_t;
 
-typedef struct {
-  const sp_sys_vtable_t* vt;
-  sp_os_signal_handler_t signal_handlers[3];
-  void* signal_userdata[3];
-  sp_mutex_t mutex;
-  sp_spin_lock_t locks [SP_RT_NUM_SPIN_LOCKS];
-  struct {
-    sp_tls_key_t key;
-    sp_tls_once_t once;
-  } tls;
-  struct {
-    sp_io_stream_writer_t out;
-    sp_io_stream_writer_t err;
-  } std;
-  sp_atomic_s32_t unsupported [8];
-  sp_err_str_fn_t err_str;
-#if defined(SP_WIN32)
-  sp_nt_dispatch_t nt;
-  sp_ws2_dispatch_t ws2;
-#endif
-} sp_rt_t;
-
-SP_API sp_rt_t sp_rt;
-
 SP_API sp_err_t       sp_io_copy(sp_io_writer_t* dst, sp_io_reader_t* src, u64* bytes_copied);
 SP_API sp_err_t       sp_io_copy_b(sp_io_writer_t* dst, sp_io_reader_t* src, u8* buffer, u64 n, u64* bytes_copied);
 
@@ -3865,8 +3689,8 @@ SP_API sp_str_t       sp_io_dyn_mem_writer_as_str(sp_io_dyn_mem_writer_t* w);
 SP_API sp_str_t       sp_io_dyn_mem_writer_take_str(sp_io_dyn_mem_writer_t* w);
 SP_API const c8*      sp_io_dyn_mem_writer_as_cstr(sp_io_dyn_mem_writer_t* w);
 
-SP_API sp_io_writer_t* sp_io_get_std_out();
-SP_API sp_io_writer_t* sp_io_get_std_err();
+SP_API sp_io_stream_writer_t sp_io_get_std_out();
+SP_API sp_io_stream_writer_t sp_io_get_std_err();
 
 
 //  ███████████  ███████████      ███████      █████████  ██████████  █████████   █████████
@@ -3992,7 +3816,6 @@ typedef struct {
   sp_str_t out;
   sp_str_t err;
   sp_ps_status_t status;
-  sp_err_t error;
 } sp_ps_output_t;
 
 typedef struct sp_ps_os sp_ps_os_t;
@@ -4154,10 +3977,6 @@ SP_END_EXTERN_C()
 
 SP_BEGIN_EXTERN_C()
 
-SP_API sp_err_t sp_sys_is_supported(u32 what);
-SP_API void     sp_sys_mark_supported(u32 what);
-SP_API sp_err_t sp_sys_mark_unsupported(u32 what);
-
 // @format
 typedef struct {
   sp_str_t str;
@@ -4213,6 +4032,8 @@ SP_PRIVATE void  sp_tls_new(sp_tls_key_t* key, sp_tls_deinit_fn_t fn);
 SP_PRIVATE void* sp_tls_get(sp_tls_key_t key);
 SP_PRIVATE void  sp_tls_set(sp_tls_key_t key, void* data);
 SP_PRIVATE void  sp_tls_once(sp_tls_once_t* once, sp_tls_once_fn_t);
+SP_PRIVATE sp_io_writer_t* sp_tls_std_out(sp_tls_rt_t* tls);
+SP_PRIVATE sp_io_writer_t* sp_tls_std_err(sp_tls_rt_t* tls);
 
 // @io
 SP_IMP sp_err_t sp_io_file_reader_read(sp_io_reader_t* reader, void* ptr, u64 size, u64* bytes_read);
@@ -4254,6 +4075,7 @@ SP_IMP void sp_fmon_os_push_file(sp_fmon_os_t* os, sp_str_t file);
 SP_IMP void sp_os_signal_from_native(s32 sig);
 SP_IMP s32  sp_os_signal_to_native(sp_os_signal_t signal);
 #if defined(SP_WIN32)
+SP_IMP void        sp_os_win32_write(DWORD handle_id, sp_str_t message);
 SP_IMP BOOL WINAPI sp_os_signal_console_ctrl(DWORD type);
 #endif
 
@@ -4279,6 +4101,542 @@ SP_IMP DWORD WINAPI      sp_win32_thread_launch(LPVOID args);
 #endif
 
 // @sys
+#if defined(SP_LINUX)
+// This is ripped directly from musl. The only things of note here are:
+// - We set errno the same way they do, even though we only use it for EINTR and I'm not totally sure whether
+//   we ought to be using it for that. Point being, though, we set errno on every syscall error
+// - The u64 cast in sp_syscall() is just for sign conversion warnings
+#define __scc(X) ((s64) (X))
+
+s64 __sp_syscall_ret(u64);
+s64 __sp_syscall_cp(s64, s64, s64, s64, s64, s64, s64);
+s64 sp_syscall0(s64 n);
+s64 sp_syscall1(s64 n, s64 a1);
+s64 sp_syscall2(s64 n, s64 a1, s64 a2);
+s64 sp_syscall3(s64 n, s64 a1, s64 a2, s64 a3);
+s64 sp_syscall4(s64 n, s64 a1, s64 a2, s64 a3, s64 a4);
+s64 sp_syscall5(s64 n, s64 a1, s64 a2, s64 a3, s64 a4, s64 a5);
+s64 sp_syscall6(s64 n, s64 a1, s64 a2, s64 a3, s64 a4, s64 a5, s64 a6);
+
+#define __sp_syscall1(n,a) sp_syscall1(n,__scc(a))
+#define __sp_syscall2(n,a,b) sp_syscall2(n,__scc(a),__scc(b))
+#define __sp_syscall3(n,a,b,c) sp_syscall3(n,__scc(a),__scc(b),__scc(c))
+#define __sp_syscall4(n,a,b,c,d) sp_syscall4(n,__scc(a),__scc(b),__scc(c),__scc(d))
+#define __sp_syscall5(n,a,b,c,d,e) sp_syscall5(n,__scc(a),__scc(b),__scc(c),__scc(d),__scc(e))
+#define __sp_syscall6(n,a,b,c,d,e,f) sp_syscall6(n,__scc(a),__scc(b),__scc(c),__scc(d),__scc(e),__scc(f))
+#define __sp_syscall7(n,a,b,c,d,e,f,g) sp_syscall7(n,__scc(a),__scc(b),__scc(c),__scc(d),__scc(e),__scc(f),__scc(g))
+
+#define __SP_SYSCALL_NARGS_X(a,b,c,d,e,f,g,h,n,...) n
+#define __SP_SYSCALL_NARGS(...) __SP_SYSCALL_NARGS_X(__VA_ARGS__,7,6,5,4,3,2,1,0,)
+#define __SP_SYSCALL_CONCAT_X(a,b) a##b
+#define __SP_SYSCALL_CONCAT(a,b) __SP_SYSCALL_CONCAT_X(a,b)
+#define __SP_SYSCALL_DISP(b,...) __SP_SYSCALL_CONCAT(b,__SP_SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
+
+#define __sp_syscall(...) __SP_SYSCALL_DISP(__sp_syscall,__VA_ARGS__)
+#define sp_syscall(...) __sp_syscall_ret((u64)__sp_syscall(__VA_ARGS__))
+
+// Typed wrappers for individual syscalls
+SP_IMP s32 sp_syscall_notify_init1(s32 flags);
+SP_IMP s32 sp_syscall_inotify_add_watch(s32 fd, const c8* pathname, u32 mask);
+SP_IMP s32 sp_syscall_wait4(s32 pid, s32* status, s32 options, void* rusage);
+SP_IMP s64 sp_lx_getdents64(s32 fd, void* buf, u64 count);
+
+#endif
+
+#if defined(SP_WIN32)
+SP_IMP void     sp_nt_load(void);
+SP_IMP u8*      sp_nt_peb_base(void);
+SP_IMP void*    sp_nt_process_heap(void);
+SP_IMP u8*      sp_nt_process_params(void);
+SP_IMP u32      sp_sys_nt_disposition_from_flags(s32 flags);
+SP_IMP void*    sp_sys_nt_open(sp_sys_fd_t root, sp_str_t utf8, u32 access, u32 share, u32 disposition, u32 options, u32 file_attr);
+SP_IMP u32      sp_sys_nt_access_from_flags(s32 flags);
+SP_IMP sp_str_t sp_win32_utf16_to_utf8(const u16* utf16, s32 len);
+SP_IMP u32      sp_win32_utf16_len(const u16* str);
+SP_IMP bool     sp_win32_utf16_equals_cstr(const u16* a, u32 a_len, const c8* b, u32 b_len);
+SP_IMP void     sp_win32_env_it_set_current(sp_os_env_it_t* it);
+#endif
+#if defined(SP_FREESTANDING)
+SP_IMP void* sp_sys_get_tp(void);
+SP_IMP s32   sp_sys_set_tp(void* tp);
+SP_IMP void  sp_linux_env_it_set_current(sp_os_env_it_t* it);
+#endif
+
+SP_END_EXTERN_C()
+#endif // SP_PRIVATE_HEADER or SP_IMPLEMENTATION
+#endif // SP_IMPL_H
+
+
+
+
+
+//  █████ ██████   ██████ ███████████  █████
+// ░░███ ░░██████ ██████ ░░███░░░░░███░░███
+//  ░███  ░███░█████░███  ░███    ░███ ░███
+//  ░███  ░███░░███ ░███  ░██████████  ░███
+//  ░███  ░███ ░░░  ░███  ░███░░░░░░   ░███
+//  ░███  ░███      ░███  ░███         ░███      █
+//  █████ █████     █████ █████        ███████████
+// ░░░░░ ░░░░░     ░░░░░ ░░░░░        ░░░░░░░░░░░
+// @implementation
+#ifndef SP_SP_C
+#ifdef SP_IMPLEMENTATION
+#define SP_SP_C
+
+SP_BEGIN_EXTERN_C()
+
+const sp_sys_vtable_t sp_sys_vtable_platform = {
+  .init                   = sp_sys_init_p,
+  .read                   = sp_sys_read_p,
+  .write                  = sp_sys_write_p,
+  .pread                  = sp_sys_pread_p,
+  .pwrite                 = sp_sys_pwrite_p,
+  .get_root               = sp_sys_get_root_p,
+  .get_exe_path           = sp_sys_get_exe_path_p,
+  .get_cwd_path           = sp_sys_get_cwd_path_p,
+  .get_storage_path       = sp_sys_get_storage_path_p,
+  .get_config_path        = sp_sys_get_config_path_p,
+  .open                   = sp_sys_open_p,
+  .close                  = sp_sys_close_p,
+  .pipe                   = sp_sys_pipe_p,
+  .mkdir                  = sp_sys_mkdir_p,
+  .rmdir                  = sp_sys_rmdir_p,
+  .unlink                 = sp_sys_unlink_p,
+  .rename                 = sp_sys_rename_p,
+  .link                   = sp_sys_link_p,
+  .symlink                = sp_sys_symlink_p,
+  .get_path_metadata      = sp_sys_get_path_metadata_p,
+  .get_link_metadata      = sp_sys_get_link_metadata_p,
+  .get_file_metadata      = sp_sys_get_file_metadata_p,
+  .chmod                  = sp_sys_chmod_p,
+  .clock_gettime          = sp_sys_clock_gettime_p,
+  .nanosleep              = sp_sys_nanosleep_p,
+  .canonicalize_path      = sp_sys_canonicalize_path_p,
+  .fd_ready               = sp_sys_fd_ready_p,
+  .fd_wait                = sp_sys_fd_wait_p,
+  .fds_wait               = sp_sys_fds_wait_p,
+  .socket_open            = sp_sys_socket_open_p,
+  .socket_bind            = sp_sys_socket_bind_p,
+  .socket_listen          = sp_sys_socket_listen_p,
+  .socket_connect         = sp_sys_socket_connect_p,
+  .socket_error           = sp_sys_socket_error_p,
+  .socket_accept          = sp_sys_socket_accept_p,
+  .socket_close           = sp_sys_socket_close_p,
+  .socket_recv            = sp_sys_socket_recv_p,
+  .socket_send            = sp_sys_socket_send_p,
+  .socket_wait            = sp_sys_socket_wait_p,
+  .socket_set_nonblocking = sp_sys_socket_set_nonblocking_p,
+  .socket_reuse_addr      = sp_sys_socket_reuse_addr_p,
+  .socket_local_port      = sp_sys_socket_local_port_p,
+  .alloc                  = sp_sys_alloc_p,
+  .free                   = sp_sys_free_p,
+  .memcpy                 = sp_sys_memcpy_p,
+  .memmove                = sp_sys_memmove_p,
+  .memset                 = sp_sys_memset_p,
+  .memcmp                 = sp_sys_memcmp_p,
+  .assert                 = sp_sys_assert_p,
+  .exit                   = sp_sys_exit_p,
+  .env                    = sp_sys_env_p,
+  .lseek                  = sp_sys_lseek_p,
+  .chdir                  = sp_sys_chdir_p,
+  .fs_it_open             = sp_sys_fs_it_open_p,
+  .fs_it_next             = sp_sys_fs_it_next_p,
+  .fs_it_close            = sp_sys_fs_it_close_p,
+};
+
+sp_rt_t sp_rt = {
+  .vt = &sp_sys_vtable_platform,
+};
+sp_tls_block_t sp_tls_block;
+
+void sp_sys_init() {
+  (sp_rt.vt->init)();
+}
+
+s64 sp_sys_read(sp_sys_fd_t fd, void* buf, u64 count) {
+  return (sp_rt.vt->read)(fd, buf, count);
+}
+
+s64 sp_sys_write(sp_sys_fd_t fd, const void* buf, u64 count) {
+  return (sp_rt.vt->write)(fd, buf, count);
+}
+
+s64 sp_sys_pread(sp_sys_fd_t fd, void* buf, u64 count, u64 offset) {
+  return (sp_rt.vt->pread)(fd, buf, count, offset);
+}
+
+s64 sp_sys_pwrite(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset) {
+  return (sp_rt.vt->pwrite)(fd, buf, count, offset);
+}
+
+sp_sys_fd_t sp_sys_get_root(s32 it) {
+  return (sp_rt.vt->get_root)(it);
+}
+
+s64 sp_sys_get_exe_path(c8* buf, u64 size) {
+  return (sp_rt.vt->get_exe_path)(buf, size);
+}
+
+s64 sp_sys_get_cwd_path(c8* buf, u64 size) {
+  return (sp_rt.vt->get_cwd_path)(buf, size);
+}
+
+s64 sp_sys_get_storage_path(c8* buf, u64 size) {
+  return (sp_rt.vt->get_storage_path)(buf, size);
+}
+
+s64 sp_sys_get_config_path(c8* buf, u64 size) {
+  return (sp_rt.vt->get_config_path)(buf, size);
+}
+
+sp_sys_fd_t sp_sys_open(sp_sys_fd_t fd, const c8* path, u32 len, s32 flags, s32 mode) {
+  return (sp_rt.vt->open)(fd, path, len, flags, mode);
+}
+
+s32 sp_sys_close(sp_sys_fd_t fd) {
+  return (sp_rt.vt->close)(fd);
+}
+
+s32 sp_sys_pipe(sp_sys_fd_t* read_end, sp_sys_fd_t* write_end) {
+  return (sp_rt.vt->pipe)(read_end, write_end);
+}
+
+s32 sp_sys_mkdir(sp_sys_fd_t fd, const c8* path, u32 len, s32 mode) {
+  return (sp_rt.vt->mkdir)(fd, path, len, mode);
+}
+
+s32 sp_sys_rmdir(sp_sys_fd_t fd, const c8* path, u32 len) {
+  return (sp_rt.vt->rmdir)(fd, path, len);
+}
+
+s32 sp_sys_unlink(sp_sys_fd_t fd, const c8* path, u32 len) {
+  return (sp_rt.vt->unlink)(fd, path, len);
+}
+
+s32 sp_sys_rename(sp_sys_fd_t from_fd, const c8* from, u32 from_len, sp_sys_fd_t to_fd, const c8* to, u32 to_len) {
+  return (sp_rt.vt->rename)(from_fd, from, from_len, to_fd, to, to_len);
+}
+
+s32 sp_sys_link(sp_sys_fd_t from_fd, const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len) {
+  return (sp_rt.vt->link)(from_fd, existing, existing_len, to_fd, alias, alias_len);
+}
+
+s32 sp_sys_symlink(const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len) {
+  return (sp_rt.vt->symlink)(existing, existing_len, to_fd, alias, alias_len);
+}
+
+s32 sp_sys_get_path_metadata(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st) {
+  return (sp_rt.vt->get_path_metadata)(fd, path, len, st);
+}
+
+s32 sp_sys_get_link_metadata(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st) {
+  return (sp_rt.vt->get_link_metadata)(fd, path, len, st);
+}
+
+s32 sp_sys_get_file_metadata(sp_sys_fd_t fd, sp_sys_file_meta_t* st) {
+  return (sp_rt.vt->get_file_metadata)(fd, st);
+}
+
+s32 sp_sys_chmod(sp_sys_fd_t fd, const c8* path, u32 len, const sp_sys_file_meta_t* st) {
+  return (sp_rt.vt->chmod)(fd, path, len, st);
+}
+
+s32 sp_sys_clock_gettime(s32 clockid, sp_sys_timespec_t* ts) {
+  return (sp_rt.vt->clock_gettime)(clockid, ts);
+}
+
+s32 sp_sys_nanosleep(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem) {
+  return (sp_rt.vt->nanosleep)(req, rem);
+}
+
+s64 sp_sys_canonicalize_path(const c8* path, u32 len, c8* buf, u64 size) {
+  return (sp_rt.vt->canonicalize_path)(path, len, buf, size);
+}
+
+s32 sp_sys_fd_ready(sp_sys_fd_t fd, u8* ready) {
+  return (sp_rt.vt->fd_ready)(fd, ready);
+}
+
+s32 sp_sys_fd_wait(sp_sys_fd_t fd) {
+  return (sp_rt.vt->fd_wait)(fd);
+}
+
+s32 sp_sys_fds_wait(const sp_sys_fd_t* fds, u8* ready, u64 nfds) {
+  return (sp_rt.vt->fds_wait)(fds, ready, nfds);
+}
+
+s32 sp_sys_socket_open(sp_sys_socket_t* out) {
+  return (sp_rt.vt->socket_open)(out);
+}
+
+s32 sp_sys_socket_bind(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
+  return (sp_rt.vt->socket_bind)(socket, addr);
+}
+
+s32 sp_sys_socket_listen(sp_sys_socket_t socket, u32 backlog) {
+  return (sp_rt.vt->socket_listen)(socket, backlog);
+}
+
+s32 sp_sys_socket_connect(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
+  return (sp_rt.vt->socket_connect)(socket, addr);
+}
+
+s32 sp_sys_socket_error(sp_sys_socket_t socket) {
+  return (sp_rt.vt->socket_error)(socket);
+}
+
+s32 sp_sys_socket_accept(sp_sys_socket_t listener, sp_sys_socket_t* out) {
+  return (sp_rt.vt->socket_accept)(listener, out);
+}
+
+s32 sp_sys_socket_close(sp_sys_socket_t socket) {
+  return (sp_rt.vt->socket_close)(socket);
+}
+
+s64 sp_sys_socket_recv(sp_sys_socket_t socket, void* buf, u64 count) {
+  return (sp_rt.vt->socket_recv)(socket, buf, count);
+}
+
+s64 sp_sys_socket_send(sp_sys_socket_t socket, const void* buf, u64 count) {
+  return (sp_rt.vt->socket_send)(socket, buf, count);
+}
+
+s32 sp_sys_socket_wait(sp_sys_socket_t socket, bool readable, u32 timeout_ms) {
+  return (sp_rt.vt->socket_wait)(socket, readable, timeout_ms);
+}
+
+s32 sp_sys_socket_set_nonblocking(sp_sys_socket_t socket) {
+  return (sp_rt.vt->socket_set_nonblocking)(socket);
+}
+
+s32 sp_sys_socket_reuse_addr(sp_sys_socket_t socket) {
+  return (sp_rt.vt->socket_reuse_addr)(socket);
+}
+
+s32 sp_sys_socket_local_port(sp_sys_socket_t socket, u16* out) {
+  return (sp_rt.vt->socket_local_port)(socket, out);
+}
+
+void* sp_sys_alloc(u64 size) {
+  return (sp_rt.vt->alloc)(size);
+}
+
+void sp_sys_free(void* ptr, u64 size) {
+  (sp_rt.vt->free)(ptr, size);
+}
+
+void* sp_sys_memcpy(void* dest, const void* src, u64 n) {
+  return (sp_rt.vt->memcpy)(dest, src, n);
+}
+
+void* sp_sys_memmove(void* dest, const void* src, u64 n) {
+  return (sp_rt.vt->memmove)(dest, src, n);
+}
+
+void* sp_sys_memset(void* dest, u8 fill, u64 n) {
+  return (sp_rt.vt->memset)(dest, fill, n);
+}
+
+s32 sp_sys_memcmp(const void* a, const void* b, u64 n) {
+  return (sp_rt.vt->memcmp)(a, b, n);
+}
+
+void sp_sys_assert(bool cond) {
+  (sp_rt.vt->assert)(cond);
+}
+
+void sp_sys_exit(s32 code) {
+  (sp_rt.vt->exit)(code);
+}
+
+void sp_sys_env(const c8** env, u32* len) {
+  (sp_rt.vt->env)(env, len);
+}
+
+s64 sp_sys_lseek(sp_sys_fd_t fd, s64 offset, s32 whence) {
+  return (sp_rt.vt->lseek)(fd, offset, whence);
+}
+
+s32 sp_sys_chdir(const c8* path, u32 len) {
+  return (sp_rt.vt->chdir)(path, len);
+}
+
+s32 sp_sys_fs_it_open(sp_sys_fd_t fd, sp_sys_fs_it_t* it, const c8* path, u32 path_len, void* buf, u64 cap) {
+  return (sp_rt.vt->fs_it_open)(fd, it, path, path_len, buf, cap);
+}
+
+s32 sp_sys_fs_it_next(sp_sys_fs_it_t* it, sp_sys_fs_entry_t* out) {
+  return (sp_rt.vt->fs_it_next)(it, out);
+}
+
+void sp_sys_fs_it_close(sp_sys_fs_it_t* it) {
+  (sp_rt.vt->fs_it_close)(it);
+}
+
+const sp_sys_vtable_t* sp_sys_set_vtable(const sp_sys_vtable_t* vt) {
+  const sp_sys_vtable_t* old = sp_rt.vt;
+  sp_rt.vt = vt;
+  return old;
+}
+#if defined(SP_FREESTANDING) || defined(SP_WASM_FREESTANDING)
+c8** environ;
+s32 errno;
+#endif
+
+//   █████████  █████ █████  █████████
+//  ███░░░░░███░░███ ░░███  ███░░░░░███
+// ░███    ░░░  ░░███ ███  ░███    ░░░
+// ░░█████████   ░░█████   ░░█████████
+//  ░░░░░░░░███   ░░███     ░░░░░░░░███
+//  ███    ░███    ░███     ███    ░███
+// ░░█████████     █████   ░░█████████
+//  ░░░░░░░░░     ░░░░░     ░░░░░░░░░
+// @sys
+#define SP_WNOHANG    1
+#define SP_WUNTRACED  2
+
+#define SP_WIFEXITED(s)    (((s) & 0x7f) == 0)
+#define SP_WEXITSTATUS(s)  (((s) >> 8) & 0xff)
+#define SP_WIFSIGNALED(s)  (((s) & 0x7f) != 0 && ((s) & 0x7f) != 0x7f)
+#define SP_WTERMSIG(s)     ((s) & 0x7f)
+#define SP_WIFSTOPPED(s)   (((s) & 0xff) == 0x7f)
+#define SP_WSTOPSIG(s)     SP_WEXITSTATUS(s)
+
+#define SP_S_IFMT   0170000
+#define SP_S_IFSOCK 0140000
+#define SP_S_IFLNK  0120000
+#define SP_S_IFREG  0100000
+#define SP_S_IFBLK  0060000
+#define SP_S_IFDIR  0040000
+#define SP_S_IFCHR  0020000
+#define SP_S_IFIFO  0010000
+
+#define SP_S_ISDIR(m)  (((m) & SP_S_IFMT) == SP_S_IFDIR)
+#define SP_S_ISREG(m)  (((m) & SP_S_IFMT) == SP_S_IFREG)
+#define SP_S_ISLNK(m)  (((m) & SP_S_IFMT) == SP_S_IFLNK)
+#define SP_S_ISCHR(m)  (((m) & SP_S_IFMT) == SP_S_IFCHR)
+#define SP_S_ISFIFO(m) (((m) & SP_S_IFMT) == SP_S_IFIFO)
+#define SP_S_ISBLK(m)  (((m) & SP_S_IFMT) == SP_S_IFBLK)
+#define SP_S_ISSOCK(m) (((m) & SP_S_IFMT) == SP_S_IFSOCK)
+
+#if defined(SP_WASM_WASI)
+  #include <wasi/api.h>
+#elif defined(SP_WASM_FREESTANDING)
+
+  typedef __SIZE_TYPE__ __wasi_size_t;
+  typedef uint16_t      __wasi_errno_t;
+  typedef int           __wasi_fd_t;
+  typedef int64_t       __wasi_filedelta_t;
+  typedef uint64_t      __wasi_filesize_t;
+  typedef uint64_t      __wasi_timestamp_t;
+  typedef uint32_t      __wasi_clockid_t;
+  typedef uint64_t      __wasi_userdata_t;
+  typedef uint8_t       __wasi_eventtype_t;
+  typedef uint16_t      __wasi_eventrwflags_t;
+  typedef uint16_t      __wasi_subclockflags_t;
+  typedef uint8_t       __wasi_whence_t;
+  typedef uint32_t      __wasi_exitcode_t;
+
+  typedef struct __wasi_iovec_t {
+    uint8_t*      buf;
+    __wasi_size_t buf_len;
+  } __wasi_iovec_t;
+
+  typedef struct __wasi_ciovec_t {
+    const uint8_t* buf;
+    __wasi_size_t  buf_len;
+  } __wasi_ciovec_t;
+
+  typedef struct __wasi_event_fd_readwrite_t {
+    __wasi_filesize_t     nbytes;
+    __wasi_eventrwflags_t flags;
+  } __wasi_event_fd_readwrite_t;
+
+  typedef struct __wasi_event_t {
+    __wasi_userdata_t           userdata;
+    __wasi_errno_t              error;
+    __wasi_eventtype_t          type;
+    __wasi_event_fd_readwrite_t fd_readwrite;
+  } __wasi_event_t;
+
+  typedef struct __wasi_subscription_clock_t {
+    __wasi_clockid_t       id;
+    __wasi_timestamp_t     timeout;
+    __wasi_timestamp_t     precision;
+    __wasi_subclockflags_t flags;
+  } __wasi_subscription_clock_t;
+
+  typedef struct __wasi_subscription_fd_readwrite_t {
+    __wasi_fd_t file_descriptor;
+  } __wasi_subscription_fd_readwrite_t;
+
+  typedef union __wasi_subscription_u_u_t {
+    __wasi_subscription_clock_t        clock;
+    __wasi_subscription_fd_readwrite_t fd_read;
+    __wasi_subscription_fd_readwrite_t fd_write;
+  } __wasi_subscription_u_u_t;
+
+  typedef struct __wasi_subscription_u_t {
+    uint8_t                   tag;
+    __wasi_subscription_u_u_t u;
+  } __wasi_subscription_u_t;
+
+  typedef struct __wasi_subscription_t {
+    __wasi_userdata_t       userdata;
+    __wasi_subscription_u_t u;
+  } __wasi_subscription_t;
+
+  #define __WASI_EVENTTYPE_CLOCK    ((__wasi_eventtype_t)0)
+  #define __WASI_EVENTTYPE_FD_READ  ((__wasi_eventtype_t)1)
+  #define __WASI_EVENTTYPE_FD_WRITE ((__wasi_eventtype_t)2)
+  #define __WASI_WHENCE_SET         ((__wasi_whence_t)0)
+  #define __WASI_WHENCE_CUR         ((__wasi_whence_t)1)
+  #define __WASI_WHENCE_END         ((__wasi_whence_t)2)
+
+  #define sp_wasi_import(name) \
+    __attribute__((import_module("wasi_snapshot_preview1"), import_name(name)))
+
+  sp_wasi_import("fd_read")
+  extern __wasi_errno_t __wasi_fd_read(__wasi_fd_t fd, const __wasi_iovec_t* iovs, __wasi_size_t niov, __wasi_size_t* nread);
+
+  sp_wasi_import("fd_write")
+  extern __wasi_errno_t __wasi_fd_write(__wasi_fd_t fd, const __wasi_ciovec_t* iovs, __wasi_size_t niov, __wasi_size_t* nwritten);
+
+  sp_wasi_import("fd_pread")
+  extern __wasi_errno_t __wasi_fd_pread(__wasi_fd_t fd, const __wasi_iovec_t* iovs, __wasi_size_t niov, __wasi_filesize_t offset, __wasi_size_t* nread);
+
+  sp_wasi_import("fd_pwrite")
+  extern __wasi_errno_t __wasi_fd_pwrite(__wasi_fd_t fd, const __wasi_ciovec_t* iovs, __wasi_size_t niov, __wasi_filesize_t offset, __wasi_size_t* nwritten);
+
+  sp_wasi_import("fd_close")
+  extern __wasi_errno_t __wasi_fd_close(__wasi_fd_t fd);
+
+  sp_wasi_import("fd_seek")
+  extern __wasi_errno_t __wasi_fd_seek(__wasi_fd_t fd, __wasi_filedelta_t offset, __wasi_whence_t whence, __wasi_filesize_t* newoffset);
+
+  sp_wasi_import("clock_time_get")
+  extern __wasi_errno_t __wasi_clock_time_get(__wasi_clockid_t clock_id, __wasi_timestamp_t precision, __wasi_timestamp_t* time_out);
+
+  sp_wasi_import("poll_oneoff")
+  extern __wasi_errno_t __wasi_poll_oneoff(const __wasi_subscription_t* in, __wasi_event_t* out, __wasi_size_t nsub, __wasi_size_t* nevents);
+
+  sp_wasi_import("args_sizes_get")
+  extern __wasi_errno_t __wasi_args_sizes_get(__wasi_size_t* argc, __wasi_size_t* argv_buf_size);
+
+  sp_wasi_import("args_get")
+  extern __wasi_errno_t __wasi_args_get(uint8_t** argv, uint8_t* argv_buf);
+
+  sp_wasi_import("environ_sizes_get")
+  extern __wasi_errno_t __wasi_environ_sizes_get(__wasi_size_t* count, __wasi_size_t* buf_size);
+
+  sp_wasi_import("environ_get")
+  extern __wasi_errno_t __wasi_environ_get(uint8_t** environ, uint8_t* environ_buf);
+
+  sp_wasi_import("proc_exit")
+  extern _Noreturn void __wasi_proc_exit(__wasi_exitcode_t code);
+#endif
+
+
 #if defined(SP_LINUX)
 // We vendor any constant we use on Linux to make freestanding compilation as simple as
 // possible. We also vendor types, for the same reason. Since our Linux backend never calls
@@ -4455,21 +4813,6 @@ SP_IMP DWORD WINAPI      sp_win32_thread_launch(LPVOID args);
   #define SP_SYSCALL_NUM_LINK              SP_SYSCALL_NUM_LINKAT
 #endif
 
-#define SP_SYS_LINUX_O_RDONLY   0
-#define SP_SYS_LINUX_O_WRONLY   1
-#define SP_SYS_LINUX_O_RDWR     2
-#define SP_SYS_LINUX_O_CREAT    0100
-#define SP_SYS_LINUX_O_EXCL     0200
-#define SP_SYS_LINUX_O_TRUNC    01000
-#define SP_SYS_LINUX_O_APPEND   02000
-#define SP_SYS_LINUX_O_NONBLOCK 04000
-#define SP_SYS_LINUX_O_CLOEXEC  02000000
-#if defined(SP_AMD64)
-  #define SP_SYS_LINUX_O_DIRECTORY 0200000
-#elif defined(SP_ARM64)
-  #define SP_SYS_LINUX_O_DIRECTORY 040000
-#endif
-
 ///////////
 // TYPES //
 ///////////
@@ -4495,16 +4838,6 @@ typedef struct {
   u16 ws_xpixel;
   u16 ws_ypixel;
 } sp_sys_winsize_t;
-
-typedef struct {
-  u32 c_iflag;
-  u32 c_oflag;
-  u32 c_cflag;
-  u32 c_lflag;
-  u8  c_cc[20];
-  u32 _c_ispeed;
-  u32 _c_ospeed;
-} sp_sys_termios_t;
 
 #if defined(SP_AMD64)
   typedef struct {
@@ -4566,930 +4899,15 @@ typedef struct {
 #define SP_SYS_LINUX_SO_REUSEADDR  2
 #define SP_SYS_LINUX_SO_ERROR     4
 
-//////////////////////
-// SYSCALL WRAPPERS //
-//////////////////////
-// Mostly ripped from musl, with a few convenience macros of our own
-#define __scc(X) ((s64) (X))
-
-s64 __sp_syscall_ret_r(u64);
-sp_err_t __sp_syscall_ret_e(u64);
-s64 __sp_syscall_cp(s64, s64, s64, s64, s64, s64, s64);
-s64 sp_syscall0(s64 n);
-s64 sp_syscall1(s64 n, s64 a1);
-s64 sp_syscall2(s64 n, s64 a1, s64 a2);
-s64 sp_syscall3(s64 n, s64 a1, s64 a2, s64 a3);
-s64 sp_syscall4(s64 n, s64 a1, s64 a2, s64 a3, s64 a4);
-s64 sp_syscall5(s64 n, s64 a1, s64 a2, s64 a3, s64 a4, s64 a5);
-s64 sp_syscall6(s64 n, s64 a1, s64 a2, s64 a3, s64 a4, s64 a5, s64 a6);
-s64 sp_syscall_retry1(s64 n, s64 a1);
-s64 sp_syscall_retry2(s64 n, s64 a1, s64 a2);
-s64 sp_syscall_retry3(s64 n, s64 a1, s64 a2, s64 a3);
-s64 sp_syscall_retry4(s64 n, s64 a1, s64 a2, s64 a3, s64 a4);
-s64 sp_syscall_retry5(s64 n, s64 a1, s64 a2, s64 a3, s64 a4, s64 a5);
-s64 sp_syscall_retry6(s64 n, s64 a1, s64 a2, s64 a3, s64 a4, s64 a5, s64 a6);
-
-#define __sp_syscall1(n,a) sp_syscall1(n,__scc(a))
-#define __sp_syscall2(n,a,b) sp_syscall2(n,__scc(a),__scc(b))
-#define __sp_syscall3(n,a,b,c) sp_syscall3(n,__scc(a),__scc(b),__scc(c))
-#define __sp_syscall4(n,a,b,c,d) sp_syscall4(n,__scc(a),__scc(b),__scc(c),__scc(d))
-#define __sp_syscall5(n,a,b,c,d,e) sp_syscall5(n,__scc(a),__scc(b),__scc(c),__scc(d),__scc(e))
-#define __sp_syscall6(n,a,b,c,d,e,f) sp_syscall6(n,__scc(a),__scc(b),__scc(c),__scc(d),__scc(e),__scc(f))
-#define __sp_syscall7(n,a,b,c,d,e,f,g) sp_syscall7(n,__scc(a),__scc(b),__scc(c),__scc(d),__scc(e),__scc(f),__scc(g))
-
-#define __sp_syscall_retry1(n,a) sp_syscall_retry1(n,__scc(a))
-#define __sp_syscall_retry2(n,a,b) sp_syscall_retry2(n,__scc(a),__scc(b))
-#define __sp_syscall_retry3(n,a,b,c) sp_syscall_retry3(n,__scc(a),__scc(b),__scc(c))
-#define __sp_syscall_retry4(n,a,b,c,d) sp_syscall_retry4(n,__scc(a),__scc(b),__scc(c),__scc(d))
-#define __sp_syscall_retry5(n,a,b,c,d,e) sp_syscall_retry5(n,__scc(a),__scc(b),__scc(c),__scc(d),__scc(e))
-#define __sp_syscall_retry6(n,a,b,c,d,e,f) sp_syscall_retry6(n,__scc(a),__scc(b),__scc(c),__scc(d),__scc(e),__scc(f))
-
-#define __SP_SYSCALL_NARGS_X(a,b,c,d,e,f,g,h,n,...) n
-#define __SP_SYSCALL_NARGS(...) __SP_SYSCALL_NARGS_X(__VA_ARGS__,7,6,5,4,3,2,1,0,)
-#define __SP_SYSCALL_CONCAT_X(a,b) a##b
-#define __SP_SYSCALL_CONCAT(a,b) __SP_SYSCALL_CONCAT_X(a,b)
-#define __SP_SYSCALL_DISP(b,...) __SP_SYSCALL_CONCAT(b,__SP_SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
-
-#define __sp_syscall(...) __SP_SYSCALL_DISP(__sp_syscall,__VA_ARGS__)
-#define sp_syscall(...) __sp_syscall(__VA_ARGS__)
-#define sp_syscall_r(...) __sp_syscall_ret_r((u64)__sp_syscall(__VA_ARGS__))
-#define sp_syscall_e(...) __sp_syscall_ret_e((u64)__sp_syscall(__VA_ARGS__))
-#define sp_syscall_retry(...) __SP_SYSCALL_DISP(__sp_syscall_retry,__VA_ARGS__)
-
-SP_IMP s32 sp_syscall_notify_init1(s32 flags);
-SP_IMP s32 sp_syscall_inotify_add_watch(s32 fd, const c8* pathname, u32 mask);
-SP_IMP s32 sp_syscall_wait4(s32 pid, s32* status, s32 options, void* rusage);
-SP_IMP s64 sp_lx_getdents64(s32 fd, void* buf, u64 count);
-#endif
-
-#if defined(SP_WIN32)
-SP_PRIVATE void sp_rt_init(void);
-
-#define SP_NT(fn) ((SP_UNLIKELY(!sp_rt.nt.fn) ? sp_tls_once(&sp_rt.tls.once, sp_rt_init) : (void)0), sp_rt.nt.fn)
-
-#define SP_NT_FILE_OPEN         0x00000001
-#define SP_NT_FILE_CREATE       0x00000002
-#define SP_NT_FILE_OPEN_IF      0x00000003
-#define SP_NT_FILE_OVERWRITE    0x00000004
-#define SP_NT_FILE_OVERWRITE_IF 0x00000005
-
-#define SP_NT_FILE_DIRECTORY_FILE              0x00000001
-#define SP_NT_FILE_SYNCHRONOUS_IO_NONALERT     0x00000020
-#define SP_NT_FILE_NON_DIRECTORY_FILE          0x00000040
-#define SP_NT_FILE_OPEN_FOR_BACKUP_INTENT      0x00004000
-#define SP_NT_FILE_OPEN_REPARSE_POINT          0x00200000
-
-#define SP_NT_STATUS_OBJECT_NAME_COLLISION ((sp_nt_status_t)0xC0000035)
-#define SP_NT_STATUS_OBJECT_NAME_NOT_FOUND ((sp_nt_status_t)0xC0000034)
-#define SP_NT_STATUS_OBJECT_PATH_NOT_FOUND ((sp_nt_status_t)0xC000003A)
-#define SP_NT_STATUS_ACCESS_DENIED         ((sp_nt_status_t)0xC0000022)
-#define SP_NT_STATUS_INVALID_INFO_CLASS    ((sp_nt_status_t)0xC0000003)
-#define SP_NT_STATUS_INVALID_PARAMETER     ((sp_nt_status_t)0xC000000D)
-#define SP_NT_STATUS_NOT_SUPPORTED         ((sp_nt_status_t)0xC00000BB)
-#define SP_NT_STATUS_NO_MEMORY             ((sp_nt_status_t)0xC0000017)
-#define SP_NT_STATUS_OBJECT_PATH_SYNTAX_BAD ((sp_nt_status_t)0xC000003B)
-#define SP_NT_STATUS_SHARING_VIOLATION     ((sp_nt_status_t)0xC0000043)
-#define SP_NT_STATUS_DELETE_PENDING        ((sp_nt_status_t)0xC0000056)
-#define SP_NT_STATUS_DISK_FULL             ((sp_nt_status_t)0xC000007F)
-#define SP_NT_STATUS_INSUFFICIENT_RESOURCES ((sp_nt_status_t)0xC000009A)
-#define SP_NT_STATUS_MEDIA_WRITE_PROTECTED ((sp_nt_status_t)0xC00000A2)
-#define SP_NT_STATUS_FILE_IS_A_DIRECTORY   ((sp_nt_status_t)0xC00000BA)
-#define SP_NT_STATUS_NOT_A_DIRECTORY       ((sp_nt_status_t)0xC0000103)
-#define SP_NT_STATUS_CANNOT_DELETE         ((sp_nt_status_t)0xC0000121)
-#define SP_NT_STATUS_DIRECTORY_NOT_EMPTY   ((sp_nt_status_t)0xC0000101)
-#define SP_NT_STATUS_TOO_MANY_OPENED_FILES ((sp_nt_status_t)0xC000011F)
-#define SP_NT_STATUS_INVALID_HANDLE        ((sp_nt_status_t)0xC0000008)
-#define SP_NT_STATUS_NOT_SAME_DEVICE       ((sp_nt_status_t)0xC00000D4)
-#define SP_NT_STATUS_INVALID_DEVICE_REQUEST ((sp_nt_status_t)0xC0000010)
-#define SP_NT_STATUS_NO_SUCH_FILE          ((sp_nt_status_t)0xC000000F)
-#define SP_NT_STATUS_NO_MORE_FILES         ((sp_nt_status_t)0x80000006)
-
-#define SP_NT_FILE_DIRECTORY_INFORMATION  1
-#define SP_NT_FILE_BASIC_INFORMATION      4
-#define SP_NT_FILE_RENAME_INFORMATION    10
-#define SP_NT_FILE_DISPOSITION_INFORMATION 13
-#define SP_NT_FILE_LINK_INFORMATION      11
-#define SP_NT_FILE_DISPOSITION_INFORMATION_EX 64
-#define SP_NT_FILE_RENAME_INFORMATION_EX      65
-
-#define SP_NT_FILE_DISPOSITION_DELETE                    0x00000001
-#define SP_NT_FILE_DISPOSITION_POSIX_SEMANTICS           0x00000002
-#define SP_NT_FILE_DISPOSITION_IGNORE_READONLY_ATTRIBUTE 0x00000010
-
-#define SP_NT_FILE_RENAME_REPLACE_IF_EXISTS         0x00000001
-#define SP_NT_FILE_RENAME_POSIX_SEMANTICS           0x00000002
-#define SP_NT_FILE_RENAME_IGNORE_READONLY_ATTRIBUTE 0x00000040
-
-#define SP_NT_FSCTL_SET_REPARSE_POINT 0x000900A4
-#define SP_NT_IO_REPARSE_TAG_SYMLINK  0xA000000C
-#define SP_NT_SYMLINK_FLAG_RELATIVE   0x00000001
-#define SP_NT_MAX_REPARSE_DATA        16384
-
-#define SP_NT_OBJECT_NAME_INFORMATION 1
-#define SP_NT_NO_OPTIONS 0
-
-typedef struct {
-  s64 CreationTime;
-  s64 LastAccessTime;
-  s64 LastWriteTime;
-  s64 ChangeTime;
-  u32 FileAttributes;
-  u32 Reserved;
-} sp_nt_file_basic_information_t;
-
-typedef struct {
-  u32 NextEntryOffset;
-  u32 FileIndex;
-  s64 CreationTime;
-  s64 LastAccessTime;
-  s64 LastWriteTime;
-  s64 ChangeTime;
-  s64 EndOfFile;
-  s64 AllocationSize;
-  u32 FileAttributes;
-  u32 FileNameLength;
-  u16 FileName [1];
-} sp_nt_file_directory_information_t;
-
-typedef struct {
-  u8 DeleteFile;
-} sp_nt_file_disposition_information_t;
-
-typedef struct {
-  u32 Flags;
-} sp_nt_file_disposition_information_ex_t;
-
-typedef struct {
-  u32 ReparseTag;
-  u16 ReparseDataLength;
-  u16 Reserved;
-  u16 SubstituteNameOffset;
-  u16 SubstituteNameLength;
-  u16 PrintNameOffset;
-  u16 PrintNameLength;
-  u32 Flags;
-} sp_nt_symlink_reparse_buffer_t;
-
-
-
-typedef struct {
-  union {
-    u8 ReplaceIfExists;
-    u32 Flags;
-  };
-  u8 _pad[4];
-  void* RootDirectory;
-  u32 FileNameLength;
-  u16 FileName[1];
-} sp_nt_file_rename_information_t;
-
-typedef sp_nt_file_rename_information_t sp_nt_file_link_information_t;
-
-SP_IMP void sp_nt_load(void);
-SP_IMP u8* sp_nt_peb_base(void);
-SP_IMP void* sp_nt_process_heap(void);
-SP_IMP u8* sp_nt_process_params(void);
-SP_IMP sp_str_t sp_win32_utf16_to_utf8(const u16* utf16, s32 len);
-SP_IMP u32 sp_win32_utf16_len(const u16* str);
-SP_IMP bool sp_win32_utf16_equals_cstr(const u16* a, u32 a_len, const c8* b, u32 b_len);
-SP_IMP void sp_win32_env_it_set_current(sp_os_env_it_t* it);
-SP_IMP sp_nt_status_t sp_sys_nt_open(sp_sys_fd_t root, sp_str_t utf8, u32 access, u32 share, u32 disposition, u32 options, u32 file_attr, sp_sys_fd_t* out);
-SP_IMP sp_nt_status_t sp_sys_nt_close(sp_sys_fd_t fd);
-#endif
-#if defined(SP_FREESTANDING)
-SP_IMP void* sp_sys_get_tp(void);
-SP_IMP s32   sp_sys_set_tp(void* tp);
-SP_IMP void  sp_linux_env_it_set_current(sp_os_env_it_t* it);
-#endif
-
-SP_END_EXTERN_C()
-#endif // SP_PRIVATE_HEADER or SP_IMPLEMENTATION
-#endif // SP_IMPL_H
-
-
-
-
-
-//  █████ ██████   ██████ ███████████  █████
-// ░░███ ░░██████ ██████ ░░███░░░░░███░░███
-//  ░███  ░███░█████░███  ░███    ░███ ░███
-//  ░███  ░███░░███ ░███  ░██████████  ░███
-//  ░███  ░███ ░░░  ░███  ░███░░░░░░   ░███
-//  ░███  ░███      ░███  ░███         ░███      █
-//  █████ █████     █████ █████        ███████████
-// ░░░░░ ░░░░░     ░░░░░ ░░░░░        ░░░░░░░░░░░
-// @implementation
-#ifndef SP_SP_C
-#ifdef SP_IMPLEMENTATION
-#define SP_SP_C
-
-SP_BEGIN_EXTERN_C()
-
-const sp_sys_vtable_t sp_sys_vtable_platform = {
-  .read                   = sp_sys_read_p,
-  .write                  = sp_sys_write_p,
-  .pread                  = sp_sys_pread_p,
-  .pwrite                 = sp_sys_pwrite_p,
-  .transfer               = sp_sys_transfer_p,
-  .get_root               = sp_sys_get_root_p,
-  .get_exe_path           = sp_sys_get_exe_path_p,
-  .get_cwd_path           = sp_sys_get_cwd_path_p,
-  .get_storage_path       = sp_sys_get_storage_path_p,
-  .get_config_path        = sp_sys_get_config_path_p,
-  .open                   = sp_sys_open_p,
-  .open_dir               = sp_sys_open_dir_p,
-  .close                  = sp_sys_close_p,
-  .pipe                   = sp_sys_pipe_p,
-  .mkdir                  = sp_sys_mkdir_p,
-  .rmdir                  = sp_sys_rmdir_p,
-  .unlink                 = sp_sys_unlink_p,
-  .rename                 = sp_sys_rename_p,
-  .link                   = sp_sys_link_p,
-  .symlink                = sp_sys_symlink_p,
-  .get_path_metadata      = sp_sys_get_path_metadata_p,
-  .get_link_metadata      = sp_sys_get_link_metadata_p,
-  .get_file_metadata      = sp_sys_get_file_metadata_p,
-  .chmod                  = sp_sys_chmod_p,
-  .clock_gettime          = sp_sys_clock_gettime_p,
-  .nanosleep              = sp_sys_nanosleep_p,
-  .canonicalize_path      = sp_sys_canonicalize_path_p,
-  .fd_ready               = sp_sys_fd_ready_p,
-  .fd_wait                = sp_sys_fd_wait_p,
-  .fds_wait               = sp_sys_fds_wait_p,
-  .tty_get                = sp_sys_tty_get_p,
-  .tty_set                = sp_sys_tty_set_p,
-  .tty_size               = sp_sys_tty_size_p,
-  .is_tty                 = sp_sys_is_tty_p,
-  .tty_mode_apply         = sp_sys_tty_mode_apply_p,
-  .tty_use_vt             = sp_sys_tty_use_vt_p,
-  .socket_open            = sp_sys_socket_open_p,
-  .socket_bind            = sp_sys_socket_bind_p,
-  .socket_listen          = sp_sys_socket_listen_p,
-  .socket_connect         = sp_sys_socket_connect_p,
-  .socket_error           = sp_sys_socket_error_p,
-  .socket_accept          = sp_sys_socket_accept_p,
-  .socket_close           = sp_sys_socket_close_p,
-  .socket_recv            = sp_sys_socket_recv_p,
-  .socket_send            = sp_sys_socket_send_p,
-  .socket_wait            = sp_sys_socket_wait_p,
-  .socket_set_nonblocking = sp_sys_socket_set_nonblocking_p,
-  .socket_reuse_addr      = sp_sys_socket_reuse_addr_p,
-  .socket_local_port      = sp_sys_socket_local_port_p,
-  .alloc                  = sp_sys_alloc_p,
-  .free                   = sp_sys_free_p,
-  .memcpy                 = sp_sys_memcpy_p,
-  .memmove                = sp_sys_memmove_p,
-  .memset                 = sp_sys_memset_p,
-  .memcmp                 = sp_sys_memcmp_p,
-  .assert                 = sp_sys_assert_p,
-  .exit                   = sp_sys_exit_p,
-  .env                    = sp_sys_env_p,
-  .lseek                  = sp_sys_lseek_p,
-  .chdir                  = sp_sys_chdir_p,
-  .dir_from_fd            = sp_sys_dir_from_fd_p,
-  .dir_read               = sp_sys_dir_read_p,
-  .dir_parse              = sp_sys_dir_parse_p,
-  .dir_close              = sp_sys_dir_close_p,
-};
-
-sp_rt_t sp_rt = {
-  .vt = &sp_sys_vtable_platform,
-  .err_str = sp_err_str,
-};
-
-sp_str_t sp_err_str(sp_err_t err) {
-  switch (err) {
-    case SP_OK:                              return sp_str_lit("SP_OK");
-    case SP_ERR:                             return sp_str_lit("SP_ERR");
-    case SP_ERR_IO:                          return sp_str_lit("SP_ERR_IO");
-    case SP_ERR_IO_OPEN_FAILED:              return sp_str_lit("SP_ERR_IO_OPEN_FAILED");
-    case SP_ERR_IO_SEEK_INVALID:             return sp_str_lit("SP_ERR_IO_SEEK_INVALID");
-    case SP_ERR_IO_SEEK_FAILED:              return sp_str_lit("SP_ERR_IO_SEEK_FAILED");
-    case SP_ERR_IO_WRITE_FAILED:             return sp_str_lit("SP_ERR_IO_WRITE_FAILED");
-    case SP_ERR_IO_CLOSE_FAILED:             return sp_str_lit("SP_ERR_IO_CLOSE_FAILED");
-    case SP_ERR_IO_READ_FAILED:              return sp_str_lit("SP_ERR_IO_READ_FAILED");
-    case SP_ERR_IO_READ_ONLY:                return sp_str_lit("SP_ERR_IO_READ_ONLY");
-    case SP_ERR_IO_NO_SPACE:                 return sp_str_lit("SP_ERR_IO_NO_SPACE");
-    case SP_ERR_IO_EOF:                      return sp_str_lit("SP_ERR_IO_EOF");
-    case SP_ERR_IO_INVALID_WRITE:            return sp_str_lit("SP_ERR_IO_INVALID_WRITE");
-    case SP_ERR_IO_UNIMPLEMENTED:            return sp_str_lit("SP_ERR_IO_UNIMPLEMENTED");
-    case SP_ERR_IO_TIMEOUT:                  return sp_str_lit("SP_ERR_IO_TIMEOUT");
-    case SP_ERR_IO_NOT_FOUND:                return sp_str_lit("SP_ERR_IO_NOT_FOUND");
-    case SP_ERR_IO_ACCESS_DENIED:            return sp_str_lit("SP_ERR_IO_ACCESS_DENIED");
-    case SP_ERR_IO_IS_DIR:                   return sp_str_lit("SP_ERR_IO_IS_DIR");
-    case SP_ERR_IO_NOT_DIR:                  return sp_str_lit("SP_ERR_IO_NOT_DIR");
-    case SP_ERR_IO_EXISTS:                   return sp_str_lit("SP_ERR_IO_EXISTS");
-    case SP_ERR_IO_BUSY:                     return sp_str_lit("SP_ERR_IO_BUSY");
-    case SP_ERR_IO_TOO_MANY_FILES:           return sp_str_lit("SP_ERR_IO_TOO_MANY_FILES");
-    case SP_ERR_IO_NAME_TOO_LONG:            return sp_str_lit("SP_ERR_IO_NAME_TOO_LONG");
-    case SP_ERR_IO_BAD_FD:                   return sp_str_lit("SP_ERR_IO_BAD_FD");
-    case SP_ERR_IO_BROKEN_PIPE:              return sp_str_lit("SP_ERR_IO_BROKEN_PIPE");
-    case SP_ERR_IO_CONN_RESET:               return sp_str_lit("SP_ERR_IO_CONN_RESET");
-    case SP_ERR_IO_WOULD_BLOCK:              return sp_str_lit("SP_ERR_IO_WOULD_BLOCK");
-    case SP_ERR_FMT_UNKNOWN_DIRECTIVE:       return sp_str_lit("SP_ERR_FMT_UNKNOWN_DIRECTIVE");
-    case SP_ERR_FMT_BAD_DIRECTIVE:           return sp_str_lit("SP_ERR_FMT_BAD_DIRECTIVE");
-    case SP_ERR_FMT_TOO_MANY_DIRECTIVES:     return sp_str_lit("SP_ERR_FMT_TOO_MANY_DIRECTIVES");
-    case SP_ERR_FMT_BAD_PRECISION:           return sp_str_lit("SP_ERR_FMT_BAD_PRECISION");
-    case SP_ERR_FMT_BAD_PLACEHOLDER:         return sp_str_lit("SP_ERR_FMT_BAD_PLACEHOLDER");
-    case SP_ERR_FMT_UNTERMINATED_PLACEHOLDER: return sp_str_lit("SP_ERR_FMT_UNTERMINATED_PLACEHOLDER");
-    case SP_ERR_FMT_BAD_ARG:                 return sp_str_lit("SP_ERR_FMT_BAD_ARG");
-    case SP_ERR_FMT_WRONG_FILL_KIND:         return sp_str_lit("SP_ERR_FMT_WRONG_FILL_KIND");
-    case SP_ERR_FMT_WRONG_WIDTH_KIND:        return sp_str_lit("SP_ERR_FMT_WRONG_WIDTH_KIND");
-    case SP_ERR_FMT_WRONG_PRECISION_KIND:    return sp_str_lit("SP_ERR_FMT_WRONG_PRECISION_KIND");
-    case SP_ERR_FMT_WRONG_STYLE_KIND:        return sp_str_lit("SP_ERR_FMT_WRONG_STYLE_KIND");
-    case SP_ERR_SYS:                         return sp_str_lit("SP_ERR_SYS");
-    case SP_ERR_SYS_NOT_FOUND:               return sp_str_lit("SP_ERR_SYS_NOT_FOUND");
-    case SP_ERR_SYS_ACCESS_DENIED:           return sp_str_lit("SP_ERR_SYS_ACCESS_DENIED");
-    case SP_ERR_SYS_EXISTS:                  return sp_str_lit("SP_ERR_SYS_EXISTS");
-    case SP_ERR_SYS_IS_DIR:                  return sp_str_lit("SP_ERR_SYS_IS_DIR");
-    case SP_ERR_SYS_NOT_DIR:                 return sp_str_lit("SP_ERR_SYS_NOT_DIR");
-    case SP_ERR_SYS_BAD_FD:                  return sp_str_lit("SP_ERR_SYS_BAD_FD");
-    case SP_ERR_SYS_BUSY:                    return sp_str_lit("SP_ERR_SYS_BUSY");
-    case SP_ERR_SYS_INVALID:                 return sp_str_lit("SP_ERR_SYS_INVALID");
-    case SP_ERR_SYS_NO_SPACE:                return sp_str_lit("SP_ERR_SYS_NO_SPACE");
-    case SP_ERR_SYS_NO_MEMORY:               return sp_str_lit("SP_ERR_SYS_NO_MEMORY");
-    case SP_ERR_SYS_TOO_MANY_FILES:          return sp_str_lit("SP_ERR_SYS_TOO_MANY_FILES");
-    case SP_ERR_SYS_NAME_TOO_LONG:           return sp_str_lit("SP_ERR_SYS_NAME_TOO_LONG");
-    case SP_ERR_SYS_READ_ONLY_FS:            return sp_str_lit("SP_ERR_SYS_READ_ONLY_FS");
-    case SP_ERR_SYS_WOULD_BLOCK:             return sp_str_lit("SP_ERR_SYS_WOULD_BLOCK");
-    case SP_ERR_SYS_BROKEN_PIPE:             return sp_str_lit("SP_ERR_SYS_BROKEN_PIPE");
-    case SP_ERR_SYS_UNSUPPORTED:             return sp_str_lit("SP_ERR_SYS_UNSUPPORTED");
-    case SP_ERR_SYS_TIMED_OUT:               return sp_str_lit("SP_ERR_SYS_TIMED_OUT");
-    case SP_ERR_SYS_CONN_RESET:              return sp_str_lit("SP_ERR_SYS_CONN_RESET");
-    case SP_ERR_SYS_CONN_REFUSED:            return sp_str_lit("SP_ERR_SYS_CONN_REFUSED");
-    case SP_ERR_SYS_NOT_CONNECTED:           return sp_str_lit("SP_ERR_SYS_NOT_CONNECTED");
-    case SP_ERR_SYS_CROSS_DEVICE:            return sp_str_lit("SP_ERR_SYS_CROSS_DEVICE");
-    case SP_ERR_SYS_LOOP:                    return sp_str_lit("SP_ERR_SYS_LOOP");
-    case SP_ERR_SYS_FILE_TOO_BIG:            return sp_str_lit("SP_ERR_SYS_FILE_TOO_BIG");
-    case SP_ERR_SYS_INTERRUPTED:             return sp_str_lit("SP_ERR_SYS_INTERRUPTED");
-    case SP_ERR_SYS_NOT_EMPTY:               return sp_str_lit("SP_ERR_SYS_NOT_EMPTY");
-    case SP_ERR_SYS_BUG:                     return sp_str_lit("SP_ERR_SYS_BUG");
-    case SP_ERR_SYS_ADDR_IN_USE:             return sp_str_lit("SP_ERR_SYS_ADDR_IN_USE");
-    case SP_ERR_SYS_ADDR_UNAVAILABLE:        return sp_str_lit("SP_ERR_SYS_ADDR_UNAVAILABLE");
-    case SP_ERR_SYS_UNREACHABLE:             return sp_str_lit("SP_ERR_SYS_UNREACHABLE");
-    case SP_ERR_SYS_IO:                      return sp_str_lit("SP_ERR_SYS_IO");
-    case SP_ERR_SYS_UNSEEKABLE:              return sp_str_lit("SP_ERR_SYS_UNSEEKABLE");
-    case SP_ERR_SYS_TOO_MANY_LINKS:          return sp_str_lit("SP_ERR_SYS_TOO_MANY_LINKS");
-    case SP_ERR_SYS_NOT_TTY:                 return sp_str_lit("SP_ERR_SYS_NOT_TTY");
-    case SP_ERR_LAZY:                        return sp_str_lit("SP_ERR_LAZY");
-    case SP_ERR_OS:                          return sp_str_lit("SP_ERR_OS");
-  }
-  return sp_str_lit("");
-}
-sp_tls_block_t sp_tls_block;
-
-sp_err_t sp_sys_is_supported(u32 what) {
-  return sp_rt.unsupported[what] ? SP_ERR_SYS_UNSUPPORTED : SP_OK;
-}
-
-void sp_sys_mark_supported(u32 what) {
-  sp_atomic_s32_set(&sp_rt.unsupported[what], 0);
-}
-
-sp_err_t sp_sys_mark_unsupported(u32 what) {
-  sp_atomic_s32_set(&sp_rt.unsupported[what], 1);
-  return SP_ERR_SYS_UNSUPPORTED;
-}
-
-sp_err_t sp_sys_read(sp_sys_fd_t fd, void* buf, u64 count, u64* bytes_read) {
-  return (sp_rt.vt->read)(fd, buf, count, bytes_read);
-}
-
-sp_err_t sp_sys_write(sp_sys_fd_t fd, const void* buf, u64 count, u64* bytes_written) {
-  return (sp_rt.vt->write)(fd, buf, count, bytes_written);
-}
-
-sp_err_t sp_sys_pread(sp_sys_fd_t fd, void* buf, u64 count, u64 offset, u64* bytes_read) {
-  return (sp_rt.vt->pread)(fd, buf, count, offset, bytes_read);
-}
-
-sp_err_t sp_sys_pwrite(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset, u64* bytes_written) {
-  return (sp_rt.vt->pwrite)(fd, buf, count, offset, bytes_written);
-}
-
-sp_err_t sp_sys_transfer(sp_sys_fd_t in, u64* in_pos, sp_sys_fd_t out, u64* out_pos, u64 count, u64* bytes_moved) {
-  return (sp_rt.vt->transfer)(in, in_pos, out, out_pos, count, bytes_moved);
-}
-
-sp_sys_fd_t sp_sys_get_root(s32 it) {
-  return (sp_rt.vt->get_root)(it);
-}
-
-s64 sp_sys_get_exe_path(c8* buf, u64 size) {
-  return (sp_rt.vt->get_exe_path)(buf, size);
-}
-
-s64 sp_sys_get_cwd_path(c8* buf, u64 size) {
-  return (sp_rt.vt->get_cwd_path)(buf, size);
-}
-
-s64 sp_sys_get_storage_path(c8* buf, u64 size) {
-  return (sp_rt.vt->get_storage_path)(buf, size);
-}
-
-s64 sp_sys_get_config_path(c8* buf, u64 size) {
-  return (sp_rt.vt->get_config_path)(buf, size);
-}
-
-sp_err_t sp_sys_open(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_open_mode_t mode, u32 flags, sp_sys_fd_t* out) {
-  return (sp_rt.vt->open)(fd, path, len, mode, flags, out);
-}
-
-sp_err_t sp_sys_open_dir(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_fd_t* out) {
-  return (sp_rt.vt->open_dir)(fd, path, len, out);
-}
-
-sp_err_t sp_sys_close(sp_sys_fd_t fd) {
-  return (sp_rt.vt->close)(fd);
-}
-
-sp_err_t sp_sys_pipe(sp_sys_fd_t* read_end, sp_sys_fd_t* write_end) {
-  return (sp_rt.vt->pipe)(read_end, write_end);
-}
-
-sp_err_t sp_sys_mkdir(sp_sys_fd_t fd, const c8* path, u32 len, s32 mode) {
-  return (sp_rt.vt->mkdir)(fd, path, len, mode);
-}
-
-sp_err_t sp_sys_rmdir(sp_sys_fd_t fd, const c8* path, u32 len) {
-  return (sp_rt.vt->rmdir)(fd, path, len);
-}
-
-sp_err_t sp_sys_unlink(sp_sys_fd_t fd, const c8* path, u32 len) {
-  return (sp_rt.vt->unlink)(fd, path, len);
-}
-
-sp_err_t sp_sys_rename(sp_sys_fd_t from_fd, const c8* from, u32 from_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len) {
-  return (sp_rt.vt->rename)(from_fd, from, from_len, to_fd, alias, alias_len);
-}
-
-sp_err_t sp_sys_link(sp_sys_fd_t from, const c8* existing, u32 existing_len, sp_sys_fd_t to, const c8* alias, u32 alias_len) {
-  return (sp_rt.vt->link)(from, existing, existing_len, to, alias, alias_len);
-}
-
-sp_err_t sp_sys_symlink(const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len) {
-  return (sp_rt.vt->symlink)(existing, existing_len, to_fd, alias, alias_len);
-}
-
-sp_err_t sp_sys_get_path_metadata(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st) {
-  return (sp_rt.vt->get_path_metadata)(fd, path, len, st);
-}
-
-sp_err_t sp_sys_get_link_metadata(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st) {
-  return (sp_rt.vt->get_link_metadata)(fd, path, len, st);
-}
-
-sp_err_t sp_sys_get_file_metadata(sp_sys_fd_t fd, sp_sys_file_meta_t* st) {
-  return (sp_rt.vt->get_file_metadata)(fd, st);
-}
-
-sp_err_t sp_sys_chmod(sp_sys_fd_t fd, const c8* path, u32 len, const sp_sys_file_meta_t* st) {
-  return (sp_rt.vt->chmod)(fd, path, len, st);
-}
-
-sp_err_t sp_sys_clock_gettime(s32 clockid, sp_sys_timespec_t* ts) {
-  return (sp_rt.vt->clock_gettime)(clockid, ts);
-}
-
-sp_err_t sp_sys_nanosleep(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem) {
-  return (sp_rt.vt->nanosleep)(req, rem);
-}
-
-s64 sp_sys_canonicalize_path(const c8* path, u32 len, c8* buf, u64 size) {
-  return (sp_rt.vt->canonicalize_path)(path, len, buf, size);
-}
-
-sp_err_t sp_sys_fd_ready(sp_sys_fd_t fd, u8* ready) {
-  return (sp_rt.vt->fd_ready)(fd, ready);
-}
-
-sp_err_t sp_sys_fd_wait(sp_sys_fd_t fd) {
-  return (sp_rt.vt->fd_wait)(fd);
-}
-
-sp_err_t sp_sys_fds_wait(const sp_sys_fd_t* fds, u8* ready, u64 nfds) {
-  return (sp_rt.vt->fds_wait)(fds, ready, nfds);
-}
-
-sp_err_t sp_sys_tty_get(sp_sys_fd_t fd, sp_sys_tty_attr_t* attr) {
-  return (sp_rt.vt->tty_get)(fd, attr);
-}
-
-sp_err_t sp_sys_tty_set(sp_sys_fd_t fd, const sp_sys_tty_attr_t* attr) {
-  return (sp_rt.vt->tty_set)(fd, attr);
-}
-
-sp_err_t sp_sys_tty_size(sp_sys_fd_t fd, u32* cols, u32* rows) {
-  return (sp_rt.vt->tty_size)(fd, cols, rows);
-}
-
-bool sp_sys_is_tty(sp_sys_fd_t fd) {
-  return (sp_rt.vt->is_tty)(fd);
-}
-
-sp_err_t sp_sys_tty_mode_apply(sp_sys_tty_attr_t* in, sp_sys_tty_attr_t* out, sp_sys_tty_mode_t mode) {
-  return (sp_rt.vt->tty_mode_apply)(in, out, mode);
-}
-
-sp_err_t sp_sys_tty_use_vt(sp_sys_fd_t fd) {
-  return (sp_rt.vt->tty_use_vt)(fd);
-}
-
-sp_err_t sp_tty_set_mode(sp_sys_fd_t in, sp_sys_fd_t out, sp_sys_tty_mode_t mode, sp_sys_tty_state_t* saved) {
-  sp_sys_tty_state_t state = sp_zero;
-
-  sp_err_t err = sp_sys_tty_get(in, &state.in);
-  if (err) return err;
-  sp_sys_tty_get(out, &state.out);
-
-  sp_sys_tty_state_t next = state;
-  err = sp_sys_tty_mode_apply(&next.in, &next.out, mode);
-  if (err) return err;
-
-  err = sp_sys_tty_set(in, &next.in);
-  if (err) return err;
-  sp_sys_tty_set(out, &next.out);
-
-  if (saved) *saved = state;
-  return SP_OK;
-}
-
-sp_err_t sp_tty_restore(sp_sys_fd_t in, sp_sys_fd_t out, const sp_sys_tty_state_t* saved) {
-  sp_err_t err = sp_sys_tty_set(out, &saved->out);
-
-  sp_err_t in_err = sp_sys_tty_set(in, &saved->in);
-  if (!err) err = in_err;
-
-  return err;
-}
-
-sp_err_t sp_sys_socket_open(sp_sys_socket_t* out) {
-  return (sp_rt.vt->socket_open)(out);
-}
-
-sp_err_t sp_sys_socket_bind(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
-  return (sp_rt.vt->socket_bind)(socket, addr);
-}
-
-sp_err_t sp_sys_socket_listen(sp_sys_socket_t socket, u32 backlog) {
-  return (sp_rt.vt->socket_listen)(socket, backlog);
-}
-
-sp_err_t sp_sys_socket_connect(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
-  return (sp_rt.vt->socket_connect)(socket, addr);
-}
-
-sp_err_t sp_sys_socket_error(sp_sys_socket_t socket) {
-  return (sp_rt.vt->socket_error)(socket);
-}
-
-sp_err_t sp_sys_socket_accept(sp_sys_socket_t listener, sp_sys_socket_t* out) {
-  return (sp_rt.vt->socket_accept)(listener, out);
-}
-
-sp_err_t sp_sys_socket_close(sp_sys_socket_t socket) {
-  return (sp_rt.vt->socket_close)(socket);
-}
-
-sp_err_t sp_sys_socket_recv(sp_sys_socket_t socket, void* buf, u64 count, u64* bytes_read) {
-  return (sp_rt.vt->socket_recv)(socket, buf, count, bytes_read);
-}
-
-sp_err_t sp_sys_socket_send(sp_sys_socket_t socket, const void* buf, u64 count, u64* bytes_written) {
-  return (sp_rt.vt->socket_send)(socket, buf, count, bytes_written);
-}
-
-sp_err_t sp_sys_socket_wait(sp_sys_socket_t socket, bool readable, u32 timeout_ms) {
-  return (sp_rt.vt->socket_wait)(socket, readable, timeout_ms);
-}
-
-sp_err_t sp_sys_socket_set_nonblocking(sp_sys_socket_t socket) {
-  return (sp_rt.vt->socket_set_nonblocking)(socket);
-}
-
-sp_err_t sp_sys_socket_reuse_addr(sp_sys_socket_t socket) {
-  return (sp_rt.vt->socket_reuse_addr)(socket);
-}
-
-sp_err_t sp_sys_socket_local_port(sp_sys_socket_t socket, u16* out) {
-  return (sp_rt.vt->socket_local_port)(socket, out);
-}
-
-void* sp_sys_alloc(u64 size) {
-  return (sp_rt.vt->alloc)(size);
-}
-
-void sp_sys_free(void* ptr, u64 size) {
-  (sp_rt.vt->free)(ptr, size);
-}
-
-void* sp_sys_memcpy(void* dest, const void* src, u64 n) {
-  return (sp_rt.vt->memcpy)(dest, src, n);
-}
-
-void* sp_sys_memmove(void* dest, const void* src, u64 n) {
-  return (sp_rt.vt->memmove)(dest, src, n);
-}
-
-void* sp_sys_memset(void* dest, u8 fill, u64 n) {
-  return (sp_rt.vt->memset)(dest, fill, n);
-}
-
-s32 sp_sys_memcmp(const void* a, const void* b, u64 n) {
-  return (sp_rt.vt->memcmp)(a, b, n);
-}
-
-void sp_sys_assert(bool cond) {
-  (sp_rt.vt->assert)(cond);
-}
-
-void sp_sys_exit(s32 code) {
-  (sp_rt.vt->exit)(code);
-}
-
-void sp_sys_env(const c8** env, u32* len) {
-  (sp_rt.vt->env)(env, len);
-}
-
-s64 sp_sys_lseek(sp_sys_fd_t fd, s64 offset, s32 whence) {
-  return (sp_rt.vt->lseek)(fd, offset, whence);
-}
-
-sp_err_t sp_sys_chdir(const c8* path, u32 len) {
-  return (sp_rt.vt->chdir)(path, len);
-}
-
-sp_err_t sp_sys_dir_from_fd(sp_sys_fd_t fd, sp_sys_dir_t* out) {
-  return (sp_rt.vt->dir_from_fd)(fd, out);
-}
-
-sp_err_t sp_sys_dir_read(sp_sys_dir_t* dir, sp_mem_buffer_t* buf) {
-  return (sp_rt.vt->dir_read)(dir, buf);
-}
-
-sp_err_t sp_sys_dir_parse(sp_sys_dir_t* dir, sp_mem_buffer_t* buf, u64* cursor, sp_sys_dir_entry_t* out) {
-  return (sp_rt.vt->dir_parse)(dir, buf, cursor, out);
-}
-
-sp_err_t sp_sys_dir_close(sp_sys_dir_t* dir) {
-  return (sp_rt.vt->dir_close)(dir);
-}
-
-const sp_sys_vtable_t* sp_sys_set_vtable(const sp_sys_vtable_t* vt) {
-  const sp_sys_vtable_t* old = sp_rt.vt;
-  sp_rt.vt = vt;
-  return old;
-}
-#if defined(SP_FREESTANDING) || defined(SP_WASM_FREESTANDING)
-c8** environ;
-#endif
-
-//   █████████  █████ █████  █████████
-//  ███░░░░░███░░███ ░░███  ███░░░░░███
-// ░███    ░░░  ░░███ ███  ░███    ░░░
-// ░░█████████   ░░█████   ░░█████████
-//  ░░░░░░░░███   ░░███     ░░░░░░░░███
-//  ███    ░███    ░███     ███    ░███
-// ░░█████████     █████   ░░█████████
-//  ░░░░░░░░░     ░░░░░     ░░░░░░░░░
-// @sys
-#define SP_WNOHANG    1
-#define SP_WUNTRACED  2
-
-#define SP_WIFEXITED(s)    (((s) & 0x7f) == 0)
-#define SP_WEXITSTATUS(s)  (((s) >> 8) & 0xff)
-#define SP_WIFSIGNALED(s)  (((s) & 0x7f) != 0 && ((s) & 0x7f) != 0x7f)
-#define SP_WTERMSIG(s)     ((s) & 0x7f)
-#define SP_WIFSTOPPED(s)   (((s) & 0xff) == 0x7f)
-#define SP_WSTOPSIG(s)     SP_WEXITSTATUS(s)
-
-#define SP_S_IFMT   0170000
-#define SP_S_IFSOCK 0140000
-#define SP_S_IFLNK  0120000
-#define SP_S_IFREG  0100000
-#define SP_S_IFBLK  0060000
-#define SP_S_IFDIR  0040000
-#define SP_S_IFCHR  0020000
-#define SP_S_IFIFO  0010000
-
-#define SP_S_ISDIR(m)  (((m) & SP_S_IFMT) == SP_S_IFDIR)
-#define SP_S_ISREG(m)  (((m) & SP_S_IFMT) == SP_S_IFREG)
-#define SP_S_ISLNK(m)  (((m) & SP_S_IFMT) == SP_S_IFLNK)
-#define SP_S_ISCHR(m)  (((m) & SP_S_IFMT) == SP_S_IFCHR)
-#define SP_S_ISFIFO(m) (((m) & SP_S_IFMT) == SP_S_IFIFO)
-#define SP_S_ISBLK(m)  (((m) & SP_S_IFMT) == SP_S_IFBLK)
-#define SP_S_ISSOCK(m) (((m) & SP_S_IFMT) == SP_S_IFSOCK)
-
-#if defined(SP_WASM_WASI)
-  #include <wasi/api.h>
-#elif defined(SP_WASM_FREESTANDING)
-
-  typedef __SIZE_TYPE__ __wasi_size_t;
-  typedef uint16_t      __wasi_errno_t;
-  typedef int           __wasi_fd_t;
-  typedef int64_t       __wasi_filedelta_t;
-  typedef uint64_t      __wasi_filesize_t;
-  typedef uint64_t      __wasi_timestamp_t;
-  typedef uint32_t      __wasi_clockid_t;
-  typedef uint64_t      __wasi_userdata_t;
-  typedef uint8_t       __wasi_eventtype_t;
-  typedef uint16_t      __wasi_eventrwflags_t;
-  typedef uint16_t      __wasi_subclockflags_t;
-  typedef uint8_t       __wasi_whence_t;
-  typedef uint32_t      __wasi_exitcode_t;
-
-  typedef struct __wasi_iovec_t {
-    uint8_t*      buf;
-    __wasi_size_t buf_len;
-  } __wasi_iovec_t;
-
-  typedef struct __wasi_ciovec_t {
-    const uint8_t* buf;
-    __wasi_size_t  buf_len;
-  } __wasi_ciovec_t;
-
-  typedef struct __wasi_event_fd_readwrite_t {
-    __wasi_filesize_t     nbytes;
-    __wasi_eventrwflags_t flags;
-  } __wasi_event_fd_readwrite_t;
-
-  typedef struct __wasi_event_t {
-    __wasi_userdata_t           userdata;
-    __wasi_errno_t              error;
-    __wasi_eventtype_t          type;
-    __wasi_event_fd_readwrite_t fd_readwrite;
-  } __wasi_event_t;
-
-  typedef struct __wasi_subscription_clock_t {
-    __wasi_clockid_t       id;
-    __wasi_timestamp_t     timeout;
-    __wasi_timestamp_t     precision;
-    __wasi_subclockflags_t flags;
-  } __wasi_subscription_clock_t;
-
-  typedef struct __wasi_subscription_fd_readwrite_t {
-    __wasi_fd_t file_descriptor;
-  } __wasi_subscription_fd_readwrite_t;
-
-  typedef union __wasi_subscription_u_u_t {
-    __wasi_subscription_clock_t        clock;
-    __wasi_subscription_fd_readwrite_t fd_read;
-    __wasi_subscription_fd_readwrite_t fd_write;
-  } __wasi_subscription_u_u_t;
-
-  typedef struct __wasi_subscription_u_t {
-    uint8_t                   tag;
-    __wasi_subscription_u_u_t u;
-  } __wasi_subscription_u_t;
-
-  typedef struct __wasi_subscription_t {
-    __wasi_userdata_t       userdata;
-    __wasi_subscription_u_t u;
-  } __wasi_subscription_t;
-
-  #define __WASI_EVENTTYPE_CLOCK    ((__wasi_eventtype_t)0)
-  #define __WASI_EVENTTYPE_FD_READ  ((__wasi_eventtype_t)1)
-  #define __WASI_EVENTTYPE_FD_WRITE ((__wasi_eventtype_t)2)
-  #define __WASI_WHENCE_SET         ((__wasi_whence_t)0)
-  #define __WASI_WHENCE_CUR         ((__wasi_whence_t)1)
-  #define __WASI_WHENCE_END         ((__wasi_whence_t)2)
-
-  #define sp_wasi_import(name) \
-    __attribute__((import_module("wasi_snapshot_preview1"), import_name(name)))
-
-  sp_wasi_import("fd_read")
-  extern __wasi_errno_t __wasi_fd_read(__wasi_fd_t fd, const __wasi_iovec_t* iovs, __wasi_size_t niov, __wasi_size_t* nread);
-
-  sp_wasi_import("fd_write")
-  extern __wasi_errno_t __wasi_fd_write(__wasi_fd_t fd, const __wasi_ciovec_t* iovs, __wasi_size_t niov, __wasi_size_t* nwritten);
-
-  sp_wasi_import("fd_pread")
-  extern __wasi_errno_t __wasi_fd_pread(__wasi_fd_t fd, const __wasi_iovec_t* iovs, __wasi_size_t niov, __wasi_filesize_t offset, __wasi_size_t* nread);
-
-  sp_wasi_import("fd_pwrite")
-  extern __wasi_errno_t __wasi_fd_pwrite(__wasi_fd_t fd, const __wasi_ciovec_t* iovs, __wasi_size_t niov, __wasi_filesize_t offset, __wasi_size_t* nwritten);
-
-  sp_wasi_import("fd_close")
-  extern __wasi_errno_t __wasi_fd_close(__wasi_fd_t fd);
-
-  sp_wasi_import("fd_seek")
-  extern __wasi_errno_t __wasi_fd_seek(__wasi_fd_t fd, __wasi_filedelta_t offset, __wasi_whence_t whence, __wasi_filesize_t* newoffset);
-
-  sp_wasi_import("clock_time_get")
-  extern __wasi_errno_t __wasi_clock_time_get(__wasi_clockid_t clock_id, __wasi_timestamp_t precision, __wasi_timestamp_t* time_out);
-
-  sp_wasi_import("poll_oneoff")
-  extern __wasi_errno_t __wasi_poll_oneoff(const __wasi_subscription_t* in, __wasi_event_t* out, __wasi_size_t nsub, __wasi_size_t* nevents);
-
-  sp_wasi_import("args_sizes_get")
-  extern __wasi_errno_t __wasi_args_sizes_get(__wasi_size_t* argc, __wasi_size_t* argv_buf_size);
-
-  sp_wasi_import("args_get")
-  extern __wasi_errno_t __wasi_args_get(uint8_t** argv, uint8_t* argv_buf);
-
-  sp_wasi_import("environ_sizes_get")
-  extern __wasi_errno_t __wasi_environ_sizes_get(__wasi_size_t* count, __wasi_size_t* buf_size);
-
-  sp_wasi_import("environ_get")
-  extern __wasi_errno_t __wasi_environ_get(uint8_t** environ, uint8_t* environ_buf);
-
-  sp_wasi_import("proc_exit")
-  extern _Noreturn void __wasi_proc_exit(__wasi_exitcode_t code);
-#endif
-
-#if defined(SP_WASM)
-#define SP_WASI_ESUCCESS      0
-#define SP_WASI_EACCES        2
-#define SP_WASI_EAGAIN        6
-#define SP_WASI_EBADF         8
-#define SP_WASI_EBUSY         10
-#define SP_WASI_ECONNREFUSED  14
-#define SP_WASI_ECONNRESET    15
-#define SP_WASI_EDQUOT        19
-#define SP_WASI_EEXIST        20
-#define SP_WASI_EFBIG         22
-#define SP_WASI_EINTR         27
-#define SP_WASI_EINVAL        28
-#define SP_WASI_EIO           29
-#define SP_WASI_EISDIR        31
-#define SP_WASI_ELOOP         32
-#define SP_WASI_EMFILE        33
-#define SP_WASI_EMLINK        34
-#define SP_WASI_ENAMETOOLONG  37
-#define SP_WASI_ENFILE        41
-#define SP_WASI_ENOENT        44
-#define SP_WASI_ENOMEM        48
-#define SP_WASI_ENOSPC        51
-#define SP_WASI_ENOSYS        52
-#define SP_WASI_ENOTCONN      53
-#define SP_WASI_ENOTDIR       54
-#define SP_WASI_ENOTEMPTY     55
-#define SP_WASI_ENOTSUP       58
-#define SP_WASI_EPERM         63
-#define SP_WASI_EPIPE         64
-#define SP_WASI_EROFS         69
-#define SP_WASI_ESPIPE        70
-#define SP_WASI_ETIMEDOUT     73
-#define SP_WASI_ETXTBSY       74
-#define SP_WASI_EXDEV         75
-#define SP_WASI_ENOTCAPABLE   76
-
-SP_PRIVATE sp_err_t sp_sys_err_from_wasi(__wasi_errno_t e) {
-  switch (e) {
-    case SP_WASI_ESUCCESS:     return SP_OK;
-    case SP_WASI_ENOENT:       return SP_ERR_SYS_NOT_FOUND;
-    case SP_WASI_EPERM:
-    case SP_WASI_EACCES:
-    case SP_WASI_ENOTCAPABLE:  return SP_ERR_SYS_ACCESS_DENIED;
-    case SP_WASI_EEXIST:       return SP_ERR_SYS_EXISTS;
-    case SP_WASI_EISDIR:       return SP_ERR_SYS_IS_DIR;
-    case SP_WASI_ENOTDIR:      return SP_ERR_SYS_NOT_DIR;
-    case SP_WASI_EBADF:        return SP_ERR_SYS_BAD_FD;
-    case SP_WASI_EBUSY:
-    case SP_WASI_ETXTBSY:      return SP_ERR_SYS_BUSY;
-    case SP_WASI_EINVAL:       return SP_ERR_SYS_INVALID;
-    case SP_WASI_ENOSPC:
-    case SP_WASI_EDQUOT:       return SP_ERR_SYS_NO_SPACE;
-    case SP_WASI_ENOMEM:       return SP_ERR_SYS_NO_MEMORY;
-    case SP_WASI_EMFILE:
-    case SP_WASI_ENFILE:       return SP_ERR_SYS_TOO_MANY_FILES;
-    case SP_WASI_ENAMETOOLONG: return SP_ERR_SYS_NAME_TOO_LONG;
-    case SP_WASI_EROFS:        return SP_ERR_SYS_READ_ONLY_FS;
-    case SP_WASI_EAGAIN:       return SP_ERR_SYS_WOULD_BLOCK;
-    case SP_WASI_EPIPE:        return SP_ERR_SYS_BROKEN_PIPE;
-    case SP_WASI_ENOSYS:
-    case SP_WASI_ENOTSUP:      return SP_ERR_SYS_UNSUPPORTED;
-    case SP_WASI_ETIMEDOUT:    return SP_ERR_SYS_TIMED_OUT;
-    case SP_WASI_ECONNRESET:   return SP_ERR_SYS_CONN_RESET;
-    case SP_WASI_ECONNREFUSED: return SP_ERR_SYS_CONN_REFUSED;
-    case SP_WASI_ENOTCONN:     return SP_ERR_SYS_NOT_CONNECTED;
-    case SP_WASI_EXDEV:        return SP_ERR_SYS_CROSS_DEVICE;
-    case SP_WASI_ELOOP:        return SP_ERR_SYS_LOOP;
-    case SP_WASI_EFBIG:        return SP_ERR_SYS_FILE_TOO_BIG;
-    case SP_WASI_EINTR:        return SP_ERR_SYS_INTERRUPTED;
-    case SP_WASI_ENOTEMPTY:    return SP_ERR_SYS_NOT_EMPTY;
-    case SP_WASI_EIO:          return SP_ERR_SYS_IO;
-    case SP_WASI_ESPIPE:       return SP_ERR_SYS_UNSEEKABLE;
-    case SP_WASI_EMLINK:       return SP_ERR_SYS_TOO_MANY_LINKS;
-    default:                   return SP_ERR_SYS;
-  }
-}
-#endif
-
-
-#if defined(SP_LINUX)
 /////////////////////
 // SYSCALL HELPERS //
 /////////////////////
-s64 __sp_syscall_ret_r(u64 r) {
-	if (r > -4096UL) return (s64)-r;
+s64 __sp_syscall_ret(u64 r) {
+	if (r > -4096UL) {
+		errno = (s32)-r;
+		return -1;
+	}
 	return (s64)r;
-}
-
-SP_PRIVATE sp_err_t sp_sys_err_from_errno(s64 e);
-
-sp_err_t __sp_syscall_ret_e(u64 r) {
-  return sp_sys_err_from_errno(__sp_syscall_ret_r(r));
 }
 
 s64 sp_syscall0(s64 n) {
@@ -5604,54 +5022,6 @@ s64 sp_syscall6(s64 n, s64 a1, s64 a2, s64 a3, s64 a4, s64 a5, s64 a6) {
   return ret;
 }
 
-s64 sp_syscall_retry1(s64 n, s64 a1) {
-  s64 rc;
-  do {
-    rc = sp_syscall1(n, a1);
-  } while (rc == -SP_EINTR);
-  return rc;
-}
-
-s64 sp_syscall_retry2(s64 n, s64 a1, s64 a2) {
-  s64 rc;
-  do {
-    rc = sp_syscall2(n, a1, a2);
-  } while (rc == -SP_EINTR);
-  return rc;
-}
-
-s64 sp_syscall_retry3(s64 n, s64 a1, s64 a2, s64 a3) {
-  s64 rc;
-  do {
-    rc = sp_syscall3(n, a1, a2, a3);
-  } while (rc == -SP_EINTR);
-  return rc;
-}
-
-s64 sp_syscall_retry4(s64 n, s64 a1, s64 a2, s64 a3, s64 a4) {
-  s64 rc;
-  do {
-    rc = sp_syscall4(n, a1, a2, a3, a4);
-  } while (rc == -SP_EINTR);
-  return rc;
-}
-
-s64 sp_syscall_retry5(s64 n, s64 a1, s64 a2, s64 a3, s64 a4, s64 a5) {
-  s64 rc;
-  do {
-    rc = sp_syscall5(n, a1, a2, a3, a4, a5);
-  } while (rc == -SP_EINTR);
-  return rc;
-}
-
-s64 sp_syscall_retry6(s64 n, s64 a1, s64 a2, s64 a3, s64 a4, s64 a5, s64 a6) {
-  s64 rc;
-  do {
-    rc = sp_syscall6(n, a1, a2, a3, a4, a5, a6);
-  } while (rc == -SP_EINTR);
-  return rc;
-}
-
 s32 sp_syscall_notify_init1(s32 flags) {
   return (s32)sp_syscall(SP_SYSCALL_NUM_INOTIFY_INIT1, flags);
 }
@@ -5684,17 +5054,8 @@ static void sp_sys_file_meta_from_linux(const sp_sys_linux_stat_t* raw, sp_sys_f
 }
 
 s64 sp_lx_getdents64(s32 fd, void* buf, u64 count) {
-  return sp_syscall_retry(SP_SYSCALL_NUM_GETDENTS64, fd, buf, count);
+  return sp_syscall(SP_SYSCALL_NUM_GETDENTS64, fd, buf, count);
 }
-
-bool sp_sys_is_err(s64 rc) {
-  return rc < 0;
-}
-
-bool sp_sys_match(s64 rc, s32 err) {
-  return -rc == err;
-}
-
 #endif
 
 #if defined(SP_MACOS) || defined(SP_COSMO)
@@ -5724,78 +5085,33 @@ static void sp_sys_file_meta_from_libc(const struct stat* src, sp_sys_file_meta_
   out->btime         = out->mtime;
 #endif
 }
-
-#endif
-
-#if defined(SP_LINUX) || defined(SP_MACOS) || defined(SP_COSMO)
-SP_PRIVATE sp_err_t sp_sys_err_from_errno(s64 e) {
-  switch (e) {
-    case SP_EOK:          return SP_OK;
-    case SP_ENOENT:       return SP_ERR_SYS_NOT_FOUND;
-    case SP_EPERM:
-    case SP_EACCES:       return SP_ERR_SYS_ACCESS_DENIED;
-    case SP_EEXIST:       return SP_ERR_SYS_EXISTS;
-    case SP_EISDIR:       return SP_ERR_SYS_IS_DIR;
-    case SP_ENOTDIR:      return SP_ERR_SYS_NOT_DIR;
-    case SP_EBADF:        return SP_ERR_SYS_BAD_FD;
-    case SP_EBUSY:
-    case SP_ETXTBSY:      return SP_ERR_SYS_BUSY;
-    case SP_EINVAL:       return SP_ERR_SYS_INVALID;
-    case SP_ENOSPC:
-    case SP_EDQUOT:       return SP_ERR_SYS_NO_SPACE;
-    case SP_ENOMEM:
-    case SP_ENOBUFS:      return SP_ERR_SYS_NO_MEMORY;
-    case SP_EMFILE:
-    case SP_ENFILE:       return SP_ERR_SYS_TOO_MANY_FILES;
-    case SP_ENAMETOOLONG: return SP_ERR_SYS_NAME_TOO_LONG;
-    case SP_EROFS:        return SP_ERR_SYS_READ_ONLY_FS;
-    case SP_EAGAIN:       return SP_ERR_SYS_WOULD_BLOCK;
-    case SP_EPIPE:        return SP_ERR_SYS_BROKEN_PIPE;
-    case SP_ENOSYS:
-    case SP_EOPNOTSUPP:
-    case SP_EAFNOSUPPORT:
-    case SP_EPROTONOSUPPORT: return SP_ERR_SYS_UNSUPPORTED;
-#if defined(SP_ENOTSUP) && SP_ENOTSUP != SP_EOPNOTSUPP
-    case SP_ENOTSUP:      return SP_ERR_SYS_UNSUPPORTED;
-#endif
-    case SP_ETIMEDOUT:    return SP_ERR_SYS_TIMED_OUT;
-    case SP_ECONNRESET:
-    case SP_ECONNABORTED: return SP_ERR_SYS_CONN_RESET;
-    case SP_ECONNREFUSED: return SP_ERR_SYS_CONN_REFUSED;
-    case SP_ENOTCONN:     return SP_ERR_SYS_NOT_CONNECTED;
-    case SP_EADDRINUSE:   return SP_ERR_SYS_ADDR_IN_USE;
-    case SP_EADDRNOTAVAIL: return SP_ERR_SYS_ADDR_UNAVAILABLE;
-    case SP_ENETDOWN:
-    case SP_ENETUNREACH:
-    case SP_EHOSTUNREACH: return SP_ERR_SYS_UNREACHABLE;
-    case SP_EXDEV:        return SP_ERR_SYS_CROSS_DEVICE;
-    case SP_ELOOP:        return SP_ERR_SYS_LOOP;
-    case SP_EFBIG:        return SP_ERR_SYS_FILE_TOO_BIG;
-    case SP_EINTR:        return SP_ERR_SYS_INTERRUPTED;
-    case SP_ENOTEMPTY:    return SP_ERR_SYS_NOT_EMPTY;
-    case SP_EIO:          return SP_ERR_SYS_IO;
-    case SP_ESPIPE:       return SP_ERR_SYS_UNSEEKABLE;
-    case SP_EMLINK:       return SP_ERR_SYS_TOO_MANY_LINKS;
-    case SP_ENOTTY:       return SP_ERR_SYS_NOT_TTY;
-    default:              return SP_ERR_SYS;
-  }
-}
-#endif
-
-#if defined(SP_MACOS) || defined(SP_COSMO)
-SP_PRIVATE sp_err_t sp_sys_err_from_libc(s32 rc) {
-  return rc ? sp_sys_err_from_errno(errno) : SP_OK;
-}
 #endif
 
 
 #if defined(SP_WIN32)
+SP_PRIVATE void sp_rt_init(void);
+
+#define SP_NT(fn) ((SP_UNLIKELY(!sp_rt.nt.fn) ? sp_tls_once(&sp_rt.tls.once, sp_rt_init) : (void)0), sp_rt.nt.fn)
+
+typedef struct {
+  union {
+    u8 ReplaceIfExists;
+    u32 Flags;
+  };
+  u8 _pad[4];
+  void* RootDirectory;
+  u32 FileNameLength;
+  u16 FileName[1];
+} sp_nt_file_rename_information_t;
+
+typedef sp_nt_file_rename_information_t sp_nt_file_link_information_t;
+
 SP_PRIVATE void sp_nt_load(void) {
   HMODULE h = GetModuleHandleW(L"ntdll.dll");
   if (!h) return;
   #define SP_NT_RESOLVE(ret, name, args) \
     sp_rt.nt.name = (ret (__stdcall*) args)(void(*)(void))GetProcAddress(h, #name);
-  SP_NT_FUNCTIONS(SP_NT_RESOLVE)
+  SP_NT_FUNCS(SP_NT_RESOLVE)
   #undef SP_NT_RESOLVE
 }
 
@@ -5828,6 +5144,8 @@ SP_PRIVATE void* sp_nt_process_heap(void) {
 SP_PRIVATE u8* sp_nt_process_params(void) {
   return *(u8**)(sp_nt_peb_base() + 0x20);
 }
+
+#define SP_NT_OBJECT_NAME_INFORMATION 1
 
 SP_PRIVATE u32 sp_sys_normalize_relative_wtf16(u16* p, u32 len, bool* saw_dotdot) {
   u32 w = 0;
@@ -5973,103 +5291,44 @@ void sp_sys_nt_path_free(sp_sys_nt_path_t* path) {
   path->name = sp_zero_s(sp_nt_unicode_string_t);
 }
 
-SP_PRIVATE sp_err_t sp_sys_err_from_win32(DWORD e) {
-  switch (e) {
-    case ERROR_FILE_NOT_FOUND:
-    case ERROR_PATH_NOT_FOUND:      return SP_ERR_SYS_NOT_FOUND;
-    case ERROR_ACCESS_DENIED:
-    case ERROR_WRITE_PROTECT:       return SP_ERR_SYS_ACCESS_DENIED;
-    case ERROR_FILE_EXISTS:
-    case ERROR_ALREADY_EXISTS:      return SP_ERR_SYS_EXISTS;
-    case ERROR_INVALID_HANDLE:      return SP_ERR_SYS_BAD_FD;
-    case ERROR_SHARING_VIOLATION:   return SP_ERR_SYS_BUSY;
-    case ERROR_INVALID_PARAMETER:   return SP_ERR_SYS_INVALID;
-    case ERROR_DISK_FULL:
-    case ERROR_HANDLE_DISK_FULL:    return SP_ERR_SYS_NO_SPACE;
-    case ERROR_NOT_ENOUGH_MEMORY:
-    case ERROR_OUTOFMEMORY:         return SP_ERR_SYS_NO_MEMORY;
-    case ERROR_TOO_MANY_OPEN_FILES: return SP_ERR_SYS_TOO_MANY_FILES;
-    case ERROR_BUFFER_OVERFLOW:
-    case ERROR_FILENAME_EXCED_RANGE: return SP_ERR_SYS_NAME_TOO_LONG;
-    case ERROR_BROKEN_PIPE:         return SP_ERR_SYS_BROKEN_PIPE;
-    case ERROR_IO_DEVICE:
-    case ERROR_SEEK:                return SP_ERR_SYS_IO;
-    case ERROR_NOT_SUPPORTED:
-    case ERROR_CALL_NOT_IMPLEMENTED: return SP_ERR_SYS_UNSUPPORTED;
-    case ERROR_DIR_NOT_EMPTY:       return SP_ERR_SYS_NOT_EMPTY;
-    case ERROR_DIRECTORY:           return SP_ERR_SYS_NOT_DIR;
-    case ERROR_NOT_SAME_DEVICE:     return SP_ERR_SYS_CROSS_DEVICE;
-    default:                        return SP_ERR_SYS;
-  }
+#define SP_NT_FILE_SUPERSEDE    0x00000000
+#define SP_NT_FILE_OPEN         0x00000001
+#define SP_NT_FILE_CREATE       0x00000002
+#define SP_NT_FILE_OPEN_IF      0x00000003
+#define SP_NT_FILE_OVERWRITE    0x00000004
+#define SP_NT_FILE_OVERWRITE_IF 0x00000005
+
+#define SP_NT_FILE_DIRECTORY_FILE              0x00000001
+#define SP_NT_FILE_WRITE_THROUGH               0x00000002
+#define SP_NT_FILE_SEQUENTIAL_ONLY             0x00000004
+#define SP_NT_FILE_NO_INTERMEDIATE_BUFFERING   0x00000008
+#define SP_NT_FILE_SYNCHRONOUS_IO_ALERT        0x00000010
+#define SP_NT_FILE_SYNCHRONOUS_IO_NONALERT     0x00000020
+#define SP_NT_FILE_NON_DIRECTORY_FILE          0x00000040
+#define SP_NT_FILE_OPEN_FOR_BACKUP_INTENT      0x00004000
+#define SP_NT_FILE_DELETE_ON_CLOSE             0x00001000
+#define SP_NT_FILE_OPEN_REPARSE_POINT          0x00200000
+
+#define SP_NT_STATUS_OBJECT_NAME_COLLISION ((sp_nt_status_t)0xC0000035)
+#define SP_NT_STATUS_OBJECT_NAME_NOT_FOUND ((sp_nt_status_t)0xC0000034)
+#define SP_NT_STATUS_OBJECT_PATH_NOT_FOUND ((sp_nt_status_t)0xC000003A)
+#define SP_NT_STATUS_ACCESS_DENIED         ((sp_nt_status_t)0xC0000022)
+#define SP_NT_STATUS_INVALID_INFO_CLASS    ((sp_nt_status_t)0xC0000003)
+#define SP_NT_STATUS_INVALID_PARAMETER     ((sp_nt_status_t)0xC000000D)
+#define SP_NT_STATUS_NOT_SUPPORTED         ((sp_nt_status_t)0xC00000BB)
+
+SP_PRIVATE u32 sp_sys_nt_disposition_from_flags(s32 flags) {
+  if ((flags & SP_O_CREAT) && (flags & SP_O_EXCL))  return SP_NT_FILE_CREATE;
+  if ((flags & SP_O_CREAT) && (flags & SP_O_TRUNC)) return SP_NT_FILE_OVERWRITE_IF;
+  if (flags & SP_O_CREAT)                            return SP_NT_FILE_OPEN_IF;
+  if (flags & SP_O_TRUNC)                            return SP_NT_FILE_OVERWRITE;
+  return SP_NT_FILE_OPEN;
 }
 
-SP_PRIVATE sp_err_t sp_sys_err_from_wsa(s32 e) {
-  switch (e) {
-    case 0:               return SP_OK;
-    case WSAEWOULDBLOCK:  return SP_ERR_SYS_WOULD_BLOCK;
-    case WSAECONNRESET:
-    case WSAECONNABORTED: return SP_ERR_SYS_CONN_RESET;
-    case WSAECONNREFUSED: return SP_ERR_SYS_CONN_REFUSED;
-    case WSAETIMEDOUT:    return SP_ERR_SYS_TIMED_OUT;
-    case WSAENOTCONN:     return SP_ERR_SYS_NOT_CONNECTED;
-    case WSAEADDRINUSE:   return SP_ERR_SYS_ADDR_IN_USE;
-    case WSAEADDRNOTAVAIL: return SP_ERR_SYS_ADDR_UNAVAILABLE;
-    case WSAENETDOWN:
-    case WSAENETUNREACH:
-    case WSAEHOSTUNREACH: return SP_ERR_SYS_UNREACHABLE;
-    case WSAESHUTDOWN:    return SP_ERR_SYS_BROKEN_PIPE;
-    case WSAENOTSOCK:
-    case WSAEBADF:        return SP_ERR_SYS_BAD_FD;
-    case WSAEACCES:       return SP_ERR_SYS_ACCESS_DENIED;
-    case WSAEINVAL:       return SP_ERR_SYS_INVALID;
-    case WSAEMFILE:       return SP_ERR_SYS_TOO_MANY_FILES;
-    case WSAENOBUFS:      return SP_ERR_SYS_NO_MEMORY;
-    case WSAEOPNOTSUPP:
-    case WSAEAFNOSUPPORT: return SP_ERR_SYS_UNSUPPORTED;
-    default:              return SP_ERR_SYS;
-  }
-}
-
-SP_PRIVATE sp_err_t sp_sys_err_from_nt(sp_nt_status_t status) {
-  if (SP_NT_SUCCESS(status)) return SP_OK;
-  switch (status) {
-    case SP_NT_STATUS_OBJECT_NAME_NOT_FOUND:
-    case SP_NT_STATUS_OBJECT_PATH_NOT_FOUND:  return SP_ERR_SYS_NOT_FOUND;
-    case SP_NT_STATUS_OBJECT_NAME_INVALID:    return SP_ERR_SYS_INVALID;
-    case SP_NT_STATUS_NOT_A_DIRECTORY:        return SP_ERR_SYS_NOT_DIR;
-    case SP_NT_STATUS_FILE_IS_A_DIRECTORY:    return SP_ERR_SYS_IS_DIR;
-    case SP_NT_STATUS_OBJECT_NAME_COLLISION:  return SP_ERR_SYS_EXISTS;
-    case SP_NT_STATUS_CANNOT_DELETE:
-    case SP_NT_STATUS_ACCESS_DENIED:          return SP_ERR_SYS_ACCESS_DENIED;
-    case SP_NT_STATUS_SHARING_VIOLATION:
-    case SP_NT_STATUS_DELETE_PENDING:         return SP_ERR_SYS_BUSY;
-    case SP_NT_STATUS_NAME_TOO_LONG:          return SP_ERR_SYS_NAME_TOO_LONG;
-    case SP_NT_STATUS_MEDIA_WRITE_PROTECTED:  return SP_ERR_SYS_READ_ONLY_FS;
-    case SP_NT_STATUS_DISK_FULL:              return SP_ERR_SYS_NO_SPACE;
-    case SP_NT_STATUS_NO_MEMORY:
-    case SP_NT_STATUS_INSUFFICIENT_RESOURCES: return SP_ERR_SYS_NO_MEMORY;
-    case SP_NT_STATUS_TOO_MANY_OPENED_FILES:  return SP_ERR_SYS_TOO_MANY_FILES;
-    case SP_NT_STATUS_DIRECTORY_NOT_EMPTY:    return SP_ERR_SYS_NOT_EMPTY;
-    case SP_NT_STATUS_NOT_SAME_DEVICE:        return SP_ERR_SYS_CROSS_DEVICE;
-    case SP_NT_STATUS_NOT_SUPPORTED:          return SP_ERR_SYS_UNSUPPORTED;
-    case SP_NT_STATUS_INVALID_PARAMETER:
-    case SP_NT_STATUS_OBJECT_PATH_SYNTAX_BAD:
-    case SP_NT_STATUS_INVALID_HANDLE:         sp_unreachable_return(SP_ERR_SYS_BUG);
-    default:                                  return SP_ERR_SYS;
-  }
-}
-
-sp_nt_status_t sp_sys_nt_close(sp_sys_fd_t fd) {
-  return SP_NT(NtClose)(sp_ptr_cast(void*, fd));
-}
-
-sp_nt_status_t sp_sys_nt_open(sp_sys_fd_t root, sp_str_t utf8, u32 access, u32 share, u32 disposition, u32 options, u32 file_attr, sp_sys_fd_t* out) {
-  *out = SP_SYS_INVALID_FD;
-
+SP_PRIVATE void* sp_sys_nt_open(sp_sys_fd_t root, sp_str_t utf8, u32 access, u32 share, u32 disposition, u32 options, u32 file_attr) {
   SP_ALIGNED u16 path_buf[SP_PATH_MAX + 1];
   sp_sys_nt_target_t t;
-  sp_nt_status_t status = sp_sys_nt_target(root, utf8, path_buf, SP_PATH_MAX + 1, &t);
-  if (!SP_NT_SUCCESS(status)) return status;
+  if (!SP_NT_SUCCESS(sp_sys_nt_target(root, utf8, path_buf, SP_PATH_MAX + 1, &t))) return SP_NULLPTR;
 
   sp_nt_object_attributes_t attr = {
     .Length = sizeof(sp_nt_object_attributes_t),
@@ -6080,15 +5339,73 @@ sp_nt_status_t sp_sys_nt_open(sp_sys_fd_t root, sp_str_t utf8, u32 access, u32 s
 
   void* handle = SP_NULLPTR;
   sp_nt_io_status_block_t iosb = sp_zero;
-  status = SP_NT(NtCreateFile)(
+  sp_nt_status_t status = SP_NT(NtCreateFile)(
     &handle, access, &attr, &iosb, SP_NULLPTR,
     file_attr, share, disposition, options, SP_NULLPTR, 0
   );
 
   sp_sys_nt_target_free(&t);
 
-  if (SP_NT_SUCCESS(status)) *out = (sp_sys_fd_t)handle;
-  return status;
+  if (!SP_NT_SUCCESS(status)) return SP_NULLPTR;
+  return handle;
+}
+
+#define SP_NT_FILE_BASIC_INFORMATION      4
+#define SP_NT_FILE_RENAME_INFORMATION    10
+#define SP_NT_FILE_DISPOSITION_INFORMATION 13
+#define SP_NT_FILE_LINK_INFORMATION      11
+#define SP_NT_FILE_DISPOSITION_INFORMATION_EX 64
+#define SP_NT_FILE_RENAME_INFORMATION_EX      65
+
+#define SP_NT_FILE_DISPOSITION_DELETE                    0x00000001
+#define SP_NT_FILE_DISPOSITION_POSIX_SEMANTICS           0x00000002
+#define SP_NT_FILE_DISPOSITION_IGNORE_READONLY_ATTRIBUTE 0x00000010
+
+#define SP_NT_FILE_RENAME_REPLACE_IF_EXISTS         0x00000001
+#define SP_NT_FILE_RENAME_POSIX_SEMANTICS           0x00000002
+#define SP_NT_FILE_RENAME_IGNORE_READONLY_ATTRIBUTE 0x00000040
+
+#define SP_NT_FSCTL_SET_REPARSE_POINT 0x000900A4
+#define SP_NT_IO_REPARSE_TAG_SYMLINK  0xA000000C
+#define SP_NT_SYMLINK_FLAG_RELATIVE   0x00000001
+#define SP_NT_MAX_REPARSE_DATA        16384
+
+typedef struct {
+  s64 CreationTime;
+  s64 LastAccessTime;
+  s64 LastWriteTime;
+  s64 ChangeTime;
+  u32 FileAttributes;
+  u32 Reserved;
+} sp_nt_file_basic_information_t;
+
+typedef struct {
+  u8 DeleteFile;
+} sp_nt_file_disposition_information_t;
+
+typedef struct {
+  u32 Flags;
+} sp_nt_file_disposition_information_ex_t;
+
+typedef struct {
+  u32 ReparseTag;
+  u16 ReparseDataLength;
+  u16 Reserved;
+  u16 SubstituteNameOffset;
+  u16 SubstituteNameLength;
+  u16 PrintNameOffset;
+  u16 PrintNameLength;
+  u32 Flags;
+} sp_nt_symlink_reparse_buffer_t;
+
+SP_PRIVATE void* sp_sys_nt_open_delete_access(sp_sys_fd_t fd, sp_str_t path, u32 options) {
+  return sp_sys_nt_open(fd, path,
+    DELETE | SYNCHRONIZE,
+    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+    SP_NT_FILE_OPEN,
+    SP_NT_FILE_SYNCHRONOUS_IO_NONALERT | SP_NT_FILE_OPEN_REPARSE_POINT | options,
+    0
+  );
 }
 
 SP_PRIVATE bool sp_sys_nt_needs_legacy_info(sp_nt_status_t status) {
@@ -6098,17 +5415,9 @@ SP_PRIVATE bool sp_sys_nt_needs_legacy_info(sp_nt_status_t status) {
     status == SP_NT_STATUS_NOT_SUPPORTED;
 }
 
-SP_PRIVATE sp_err_t sp_sys_nt_delete(sp_sys_fd_t fd, sp_str_t path, u32 options) {
-  sp_sys_fd_t handle = SP_SYS_INVALID_FD;
-  sp_nt_status_t status = sp_sys_nt_open(fd, path,
-    DELETE | SYNCHRONIZE,
-    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-    SP_NT_FILE_OPEN,
-    SP_NT_FILE_SYNCHRONOUS_IO_NONALERT | SP_NT_FILE_OPEN_REPARSE_POINT | options,
-    0,
-    &handle
-  );
-  if (!SP_NT_SUCCESS(status)) return sp_sys_err_from_nt(status);
+SP_PRIVATE s32 sp_sys_nt_delete(sp_sys_fd_t fd, sp_str_t path, u32 options) {
+  void* handle = sp_sys_nt_open_delete_access(fd, path, options);
+  if (!handle) return -1;
 
   // IGNORE_READONLY_ATTRIBUTE is needed because NT refuses to set the delete
   // disposition on a read-only file; this comes from DOS? Either way, this
@@ -6123,77 +5432,25 @@ SP_PRIVATE sp_err_t sp_sys_nt_delete(sp_sys_fd_t fd, sp_str_t path, u32 options)
       SP_NT_FILE_DISPOSITION_IGNORE_READONLY_ATTRIBUTE,
   };
   sp_nt_io_status_block_t iosb = sp_zero;
-  status = SP_NT(NtSetInformationFile)((void*)handle, &iosb, &ex, sizeof(ex), SP_NT_FILE_DISPOSITION_INFORMATION_EX);
+  sp_nt_status_t status = SP_NT(NtSetInformationFile)(handle, &iosb, &ex, sizeof(ex), SP_NT_FILE_DISPOSITION_INFORMATION_EX);
 
   // If the disposition fails, we can retry with a simpler call that's
   // supported everywhere but won't delete through a read-only bit:
   //
-  //   INVALID_PARAMETER means that the filesystem doesn't support information
-  //   class 64 (i.e. the flags word that we just filled in), or more simply it
-  //   doesn't support FileDispositionInformationEx. So like FAT32.
+  // INVALID_PARAMETER means that the filesystem doesn't support information
+  // class 64 (i.e. the flags word that we just filled in), or more simply it
+  // doesn't support FileDispositionInformationEx. So like FAT32.
   //
-  //   INFO_CLASS means that the OS itself doesn't support it (too old)
+  // INFO_CLASS means that the OS itself doesn't support it (too old)
   //
-  //   NOT_SUPPORTED means that the IGNORE_READONLY flag isn't supported
+  // NOT_SUPPORTED means that the IGNORE_READONLY flag isn't supported
   if (sp_sys_nt_needs_legacy_info(status)) {
     sp_nt_file_disposition_information_t info = { .DeleteFile = 1 };
-    status = SP_NT(NtSetInformationFile)((void*)handle, &iosb, &info, sizeof(info), SP_NT_FILE_DISPOSITION_INFORMATION);
+    status = SP_NT(NtSetInformationFile)(handle, &iosb, &info, sizeof(info), SP_NT_FILE_DISPOSITION_INFORMATION);
   }
 
-  sp_sys_nt_close(handle);
-  return sp_sys_err_from_nt(status);
-}
-
-SP_PRIVATE sp_err_t sp_sys_nt_set_name_info(sp_sys_fd_t from_fd, sp_str_t from, sp_sys_fd_t to_fd, sp_str_t to, u32 access, u32 flags, u32 info_class, u32 legacy_info_class) {
-  SP_ALIGNED u16 path_buf [SP_PATH_MAX + 1];
-  SP_ALIGNED u8 info_buf [sizeof(sp_nt_file_rename_information_t) + SP_PATH_MAX * sizeof(u16)];
-
-  sp_sys_fd_t handle = SP_SYS_INVALID_FD;
-  sp_nt_status_t status = sp_sys_nt_open(from_fd, from,
-    access,
-    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-    SP_NT_FILE_OPEN,
-    SP_NT_FILE_SYNCHRONOUS_IO_NONALERT | SP_NT_FILE_OPEN_REPARSE_POINT,
-    SP_NT_NO_OPTIONS,
-    &handle
-  );
-  if (!SP_NT_SUCCESS(status)) return sp_sys_err_from_nt(status);
-
-  sp_sys_nt_target_t t;
-  status = sp_sys_nt_target(to_fd, to, path_buf, SP_PATH_MAX + 1, &t);
-  if (!SP_NT_SUCCESS(status)) {
-    sp_sys_nt_close(handle);
-    return sp_sys_err_from_nt(status);
-  }
-
-  u32 name_bytes = t.name.Length;
-  u32 info_bytes = sizeof(sp_nt_file_rename_information_t) + name_bytes - sizeof(u16);
-  if (info_bytes > sizeof(info_buf)) {
-    sp_sys_nt_target_free(&t);
-    sp_sys_nt_close(handle);
-    return SP_ERR_SYS_NAME_TOO_LONG;
-  }
-
-  sp_nt_file_rename_information_t* info = (sp_nt_file_rename_information_t*)info_buf;
-  *info = sp_zero_s(sp_nt_file_rename_information_t);
-  info->Flags = flags;
-  info->RootDirectory = t.root;
-  info->FileNameLength = name_bytes;
-  sp_mem_copy(info->FileName, t.name.Buffer, name_bytes);
-
-  sp_nt_io_status_block_t iosb = sp_zero;
-  status = SP_NT(NtSetInformationFile)((void*)handle, &iosb, info, info_bytes, info_class);
-
-  if (legacy_info_class && sp_sys_nt_needs_legacy_info(status)) {
-    info->Flags = 0;
-    info->ReplaceIfExists = 1;
-    status = SP_NT(NtSetInformationFile)((void*)handle, &iosb, info, info_bytes, legacy_info_class);
-  }
-
-  sp_sys_nt_target_free(&t);
-  sp_sys_nt_close(handle);
-
-  return sp_sys_err_from_nt(status);
+  SP_NT(NtClose)(handle);
+  return SP_NT_SUCCESS(status) ? 0 : -1;
 }
 
 static void sp_sys_timespec_from_filetime(FILETIME ft, sp_sys_timespec_t* out) {
@@ -6208,20 +5465,47 @@ static void sp_sys_timespec_from_filetime(FILETIME ft, sp_sys_timespec_t* out) {
   }
 }
 
-static sp_err_t sp_sys_file_meta_from_nt_path(sp_sys_fd_t dir, sp_str_t path, sp_sys_file_meta_t* out, bool follow_symlinks) {
+static s32 sp_sys_file_meta_from_nt_handle(HANDLE handle, sp_sys_file_meta_t* out) {
+  BY_HANDLE_FILE_INFORMATION info;
+  if (!GetFileInformationByHandle(handle, &info)) return -1;
+
+  sp_sys_file_meta_t st = sp_zero;
+
+  if (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+    st.kind = SP_FS_KIND_SYMLINK;
+  } else if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+    st.kind = SP_FS_KIND_DIR;
+  } else {
+    st.kind = SP_FS_KIND_FILE;
+  }
+
+  st.size      = (s64)(((u64)info.nFileSizeHigh << 32) | (u64)info.nFileSizeLow);
+  st.id        = ((u64)info.nFileIndexHigh << 32) | (u64)info.nFileIndexLow;
+  st.device    = info.dwVolumeSerialNumber;
+  st.nlink     = info.nNumberOfLinks;
+  st.raw_attrs = info.dwFileAttributes;
+
+  sp_sys_timespec_from_filetime(info.ftLastAccessTime, &st.atime);
+  sp_sys_timespec_from_filetime(info.ftLastWriteTime,  &st.mtime);
+  sp_sys_timespec_from_filetime(info.ftCreationTime,   &st.btime);
+
+  *out = st;
+  return 0;
+}
+
+static s32 sp_sys_file_meta_from_nt_path(sp_sys_fd_t root, sp_str_t path, sp_sys_file_meta_t* out, bool follow_symlinks) {
   u32 options = SP_NT_FILE_SYNCHRONOUS_IO_NONALERT | SP_NT_FILE_OPEN_FOR_BACKUP_INTENT;
   if (!follow_symlinks) options |= SP_NT_FILE_OPEN_REPARSE_POINT;
-  sp_sys_fd_t fd = SP_SYS_INVALID_FD;
-  sp_nt_status_t status = sp_sys_nt_open(
-    dir,
+  void* h = sp_sys_nt_open(
+    root,
     path,
     FILE_READ_ATTRIBUTES | SYNCHRONIZE,
     FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-    SP_NT_FILE_OPEN, options, 0, &fd
+    SP_NT_FILE_OPEN, options, 0
   );
-  if (!SP_NT_SUCCESS(status)) return sp_sys_err_from_nt(status);
-  sp_err_t rc = sp_sys_get_file_metadata_p(fd, out);
-  sp_sys_nt_close(fd);
+  if (!h) return -1;
+  s32 rc = sp_sys_file_meta_from_nt_handle((HANDLE)h, out);
+  SP_NT(NtClose)(h);
   return rc;
 }
 
@@ -6230,19 +5514,96 @@ static sp_err_t sp_sys_file_meta_from_nt_path(sp_sys_fd_t dir, sp_str_t path, sp
 SP_PRIVATE DWORD sp_sys_win32_io_count(u64 count) {
   return count > SP_SYS_WIN32_IO_MAX ? SP_SYS_WIN32_IO_MAX : (DWORD)count;
 }
-
-SP_PRIVATE sp_err_t sp_sys_tty_err_from_win32(DWORD err) {
-  if (err == ERROR_INVALID_HANDLE) return SP_ERR_SYS_NOT_TTY;
-  return sp_sys_err_from_win32(err);
-}
 #endif
 
-#if defined(SP_MACOS) || defined(SP_COSMO)
-// Linux clamps automatically, but macOS just errors with EINVAL if we pass more than INT_MAX
-#define SP_SYS_POSIX_IO_MAX 0x7ffff000u
+#if defined(SP_WASM_WASI)
+typedef struct {
+  __wasi_fd_t fd;
+  u32 len;
+  c8 prefix [SP_PATH_MAX];
+} sp_wasi_preopen_t;
 
-SP_PRIVATE size_t sp_sys_posix_io_count(u64 count) {
-  return count > SP_SYS_POSIX_IO_MAX ? SP_SYS_POSIX_IO_MAX : (size_t)count;
+typedef struct {
+  sp_wasi_preopen_t entries [16];
+  u32 count;
+  bool scanned;
+} sp_wasi_preopens_t;
+
+SP_PRIVATE sp_wasi_preopens_t sp_wasi_preopens;
+
+SP_PRIVATE void sp_wasi_scan_preopens() {
+  if (sp_wasi_preopens.scanned) return;
+  sp_wasi_preopens.scanned = true;
+
+  for (__wasi_fd_t fd = 3; sp_wasi_preopens.count < sp_carr_len(sp_wasi_preopens.entries); fd++) {
+    __wasi_prestat_t prestat;
+    __wasi_errno_t err = __wasi_fd_prestat_get(fd, &prestat);
+    if (err == __WASI_ERRNO_BADF) break;
+    if (err || prestat.tag != __WASI_PREOPENTYPE_DIR) continue;
+
+    sp_wasi_preopen_t* preopen = &sp_wasi_preopens.entries[sp_wasi_preopens.count];
+    u32 len = prestat.u.dir.pr_name_len;
+    if (len >= sizeof(preopen->prefix)) continue;
+    if (__wasi_fd_prestat_dir_name(fd, (uint8_t*)preopen->prefix, len)) continue;
+    while (len && preopen->prefix[len - 1] == '/') len--;
+    preopen->fd = fd;
+    preopen->len = len;
+    sp_wasi_preopens.count++;
+  }
+}
+
+// WASI path syscalls take a path relative to a directory fd and there is no
+// notion of an absolute path. An absolute path is resolved against the longest
+// matching preopen prefix, exactly like wasi-libc
+SP_PRIVATE bool sp_wasi_resolve(sp_sys_fd_t fd, const c8* path, u32 len, c8 buf [SP_PATH_MAX], __wasi_fd_t* out) {
+  __wasi_fd_t at = (__wasi_fd_t)fd;
+  u32 skip = 0;
+
+  if (len && path[0] == '/') {
+    sp_wasi_scan_preopens();
+    bool found = false;
+    for (u32 it = 0; it < sp_wasi_preopens.count; it++) {
+      sp_wasi_preopen_t* preopen = &sp_wasi_preopens.entries[it];
+      if ((found && preopen->len < skip) || len < preopen->len) continue;
+      if (__builtin_memcmp(path, preopen->prefix, preopen->len)) continue;
+      if (len > preopen->len && path[preopen->len] != '/') continue;
+      found = true;
+      at = preopen->fd;
+      skip = preopen->len;
+    }
+    if (!found) return false;
+    while (skip < len && path[skip] == '/') skip++;
+  }
+
+  if (skip == len) {
+    buf[0] = '.';
+    buf[1] = 0;
+  }
+  else {
+    sp_cstr_copy_to_n(path + skip, len - skip, buf, SP_PATH_MAX);
+  }
+  *out = at;
+  return true;
+}
+
+SP_PRIVATE sp_fs_kind_t sp_sys_file_kind_from_wasi(__wasi_filetype_t filetype) {
+  switch (filetype) {
+    case __WASI_FILETYPE_REGULAR_FILE:  return SP_FS_KIND_FILE;
+    case __WASI_FILETYPE_DIRECTORY:     return SP_FS_KIND_DIR;
+    case __WASI_FILETYPE_SYMBOLIC_LINK: return SP_FS_KIND_SYMLINK;
+    default:                            return SP_FS_KIND_NONE;
+  }
+}
+
+SP_PRIVATE void sp_sys_file_meta_from_wasi(const __wasi_filestat_t* src, sp_sys_file_meta_t* out) {
+  *out = sp_zero_s(sp_sys_file_meta_t);
+  out->kind = sp_sys_file_kind_from_wasi(src->filetype);
+  out->size = (s64)src->size;
+  out->atime = (sp_sys_timespec_t) { .tv_sec = (s64)(src->atim / SP_TM_S_TO_NS), .tv_nsec = (s64)(src->atim % SP_TM_S_TO_NS) };
+  out->mtime = (sp_sys_timespec_t) { .tv_sec = (s64)(src->mtim / SP_TM_S_TO_NS), .tv_nsec = (s64)(src->mtim % SP_TM_S_TO_NS) };
+  out->id = src->ino;
+  out->device = src->dev;
+  out->nlink = src->nlink;
 }
 #endif
 
@@ -6250,82 +5611,32 @@ SP_PRIVATE size_t sp_sys_posix_io_count(u64 count) {
 //////////////////////////////
 // SP_SYS_GET_FILE_METADATA //
 //////////////////////////////
-sp_err_t sp_sys_get_file_metadata_p(sp_sys_fd_t fd, sp_sys_file_meta_t* meta) {
+s32 sp_sys_get_file_metadata_p(sp_sys_fd_t fd, sp_sys_file_meta_t* st) {
 #if defined(SP_WIN32)
-  BY_HANDLE_FILE_INFORMATION info;
-  if (!GetFileInformationByHandle(sp_ptr_cast(HANDLE, fd), &info)) {
-    switch (GetLastError()) {
-      case ERROR_ACCESS_DENIED: return SP_ERR_SYS_ACCESS_DENIED;
-      case ERROR_INVALID_HANDLE:
-      case ERROR_INVALID_PARAMETER: sp_unreachable_return(SP_ERR_SYS_BUG);
-      default: return SP_ERR_SYS;
-    }
-  }
-
-  if (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
-    // @spader This is very wrong but just right enough to be usable. The right
-    // thing to do is call GetFileInformationByHandleEx(), which returns the
-    // reparse kind (unlike the existing call) and handle the different cases
-    // (e.g. OneDrive links), of which symlinks are one.
-    meta->kind = SP_FS_KIND_SYMLINK;
-  } else if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-    meta->kind = SP_FS_KIND_DIR;
-  } else {
-    meta->kind = SP_FS_KIND_FILE;
-  }
-
-  struct { u64 high; u64 low; } size = {
-    sp_cast(u64, info.nFileSizeHigh) << 32,
-    info.nFileSizeLow,
-  };
-  meta->size = sp_cast(s64, (size.high | size.low));
-
-  struct { u64 high; u64 low; } id = {
-    sp_cast(u64, info.nFileIndexHigh) << 32,
-    info.nFileIndexLow,
-  };
-  meta->id = sp_cast(s64, (id.high | id.low));
-  meta->device = info.dwVolumeSerialNumber;
-  meta->nlink = info.nNumberOfLinks;
-  meta->raw_attrs = info.dwFileAttributes;
-
-  sp_sys_timespec_from_filetime(info.ftLastAccessTime, &meta->atime);
-  sp_sys_timespec_from_filetime(info.ftLastWriteTime, &meta->mtime);
-  sp_sys_timespec_from_filetime(info.ftCreationTime, &meta->btime);
-
-  return SP_OK;
+  if (fd == SP_SYS_INVALID_FD) return -1;
+  return sp_sys_file_meta_from_nt_handle((HANDLE)fd, st);
 
 #elif defined(SP_LINUX)
-  sp_sys_linux_stat_t st = sp_zero;
-  switch (sp_syscall_r(SP_SYSCALL_NUM_FSTAT, fd, &st)) {
-    case SP_EOK: break;
-    case SP_ENOMEM: return SP_ERR_SYS_NO_MEMORY;
-    case SP_EBADF:
-    case SP_EFAULT:
-    case SP_EINVAL: sp_unreachable_return(SP_ERR_SYS_BUG);
-    default: return SP_ERR_SYS;
-  }
-
-  sp_sys_file_meta_from_linux(&st, meta);
-  return SP_OK;
+  sp_sys_linux_stat_t raw = sp_zero;
+  s32 rc = (s32)sp_syscall(SP_SYSCALL_NUM_FSTAT, fd, &raw);
+  if (rc == 0) sp_sys_file_meta_from_linux(&raw, st);
+  return rc;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   struct stat native;
-  if (fstat(fd, &native)) {
-    switch (errno) {
-      case ENOMEM: return SP_ERR_SYS_NO_MEMORY;
-      case EBADF:
-      case EFAULT:
-      case EINVAL: sp_unreachable_return(SP_ERR_SYS_BUG);
-      default:     return SP_ERR_SYS;
-    }
-  }
-  sp_sys_file_meta_from_libc(&native, meta);
-  return SP_OK;
+  s32 rc = fstat(fd, &native);
+  if (rc == 0) sp_sys_file_meta_from_libc(&native, st);
+  return rc;
+
+#elif defined(SP_WASM_WASI)
+  __wasi_filestat_t native;
+  if (__wasi_fd_filestat_get((__wasi_fd_t)fd, &native)) return -1;
+  sp_sys_file_meta_from_wasi(&native, st);
+  return 0;
 
 #elif defined(SP_WASM)
-  (void)fd; (void)meta;
-  return SP_ERR_SYS_UNSUPPORTED;
+  (void)fd; (void)st;
+  return -1;
 
 #else
   #error "sp_sys_get_file_metadata"
@@ -6336,17 +5647,49 @@ sp_err_t sp_sys_get_file_metadata_p(sp_sys_fd_t fd, sp_sys_file_meta_t* meta) {
 ///////////////////
 // SP_SYS_RENAME //
 ///////////////////
-sp_err_t sp_sys_rename_p(sp_sys_fd_t from_fd, const c8* from, u32 from_len, sp_sys_fd_t to_fd, const c8* to, u32 to_len) {
+s32 sp_sys_rename_p(sp_sys_fd_t from_fd, const c8* from, u32 from_len, sp_sys_fd_t to_fd, const c8* to, u32 to_len) {
 #if defined(SP_WIN32)
-  return sp_sys_nt_set_name_info(
-    from_fd, sp_str(from, from_len),
-    to_fd, sp_str(to, to_len),
-    DELETE | SYNCHRONIZE,
-    SP_NT_FILE_RENAME_REPLACE_IF_EXISTS | SP_NT_FILE_RENAME_POSIX_SEMANTICS |
-    SP_NT_FILE_RENAME_IGNORE_READONLY_ATTRIBUTE,
-    SP_NT_FILE_RENAME_INFORMATION_EX,
-    SP_NT_FILE_RENAME_INFORMATION
-  );
+  void* handle = sp_sys_nt_open_delete_access(from_fd, sp_str(from, from_len), 0);
+  if (!handle) return -1;
+
+  SP_ALIGNED u16 path_buf[SP_PATH_MAX + 1];
+  sp_sys_nt_target_t t;
+  if (!SP_NT_SUCCESS(sp_sys_nt_target(to_fd, sp_str(to, to_len), path_buf, SP_PATH_MAX + 1, &t))) {
+    SP_NT(NtClose)(handle);
+    return -1;
+  }
+
+  u32 name_bytes = t.name.Length;
+  u32 info_bytes = sizeof(sp_nt_file_rename_information_t) + name_bytes - sizeof(u16);
+  SP_ALIGNED u8 info_buf[sizeof(sp_nt_file_rename_information_t) + SP_PATH_MAX * sizeof(u16)];
+  if (info_bytes > sizeof(info_buf)) {
+    sp_sys_nt_target_free(&t);
+    SP_NT(NtClose)(handle);
+    return -1;
+  }
+  sp_nt_file_rename_information_t* info = (sp_nt_file_rename_information_t*)info_buf;
+  *info = sp_zero_s(sp_nt_file_rename_information_t);
+  info->Flags =
+    SP_NT_FILE_RENAME_REPLACE_IF_EXISTS |
+    SP_NT_FILE_RENAME_POSIX_SEMANTICS |
+    SP_NT_FILE_RENAME_IGNORE_READONLY_ATTRIBUTE;
+  info->RootDirectory = t.root;
+  info->FileNameLength = name_bytes;
+  sp_mem_copy(info->FileName, t.name.Buffer, name_bytes);
+
+  sp_nt_io_status_block_t iosb = sp_zero;
+  sp_nt_status_t status = SP_NT(NtSetInformationFile)(handle, &iosb, info, info_bytes, SP_NT_FILE_RENAME_INFORMATION_EX);
+
+  if (sp_sys_nt_needs_legacy_info(status)) {
+    info->Flags = 0;
+    info->ReplaceIfExists = 1;
+    status = SP_NT(NtSetInformationFile)(handle, &iosb, info, info_bytes, SP_NT_FILE_RENAME_INFORMATION);
+  }
+
+  sp_sys_nt_target_free(&t);
+  SP_NT(NtClose)(handle);
+
+  return SP_NT_SUCCESS(status) ? 0 : -1;
 
 #elif defined(SP_LINUX)
   struct {
@@ -6355,7 +5698,7 @@ sp_err_t sp_sys_rename_p(sp_sys_fd_t from_fd, const c8* from, u32 from_len, sp_s
   } buffers = sp_zero;
   sp_cstr_copy_to_n(from, from_len, buffers.from, SP_PATH_MAX);
   sp_cstr_copy_to_n(to, to_len, buffers.to, SP_PATH_MAX);
-  return sp_syscall_e(SP_SYSCALL_NUM_RENAMEAT, from_fd, buffers.from, to_fd, buffers.to);
+  return (s32)sp_syscall(SP_SYSCALL_NUM_RENAMEAT, from_fd, buffers.from, to_fd, buffers.to);
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   struct {
@@ -6364,50 +5707,47 @@ sp_err_t sp_sys_rename_p(sp_sys_fd_t from_fd, const c8* from, u32 from_len, sp_s
   } buffers = sp_zero;
   sp_cstr_copy_to_n(from, from_len, buffers.from, SP_PATH_MAX);
   sp_cstr_copy_to_n(to, to_len, buffers.to, SP_PATH_MAX);
-  return sp_sys_err_from_libc(renameat(from_fd, buffers.from, to_fd, buffers.to));
+  return renameat((int)from_fd, buffers.from, (int)to_fd, buffers.to);
+
+#elif defined(SP_WASM_WASI)
+  struct {
+    c8 from [SP_PATH_MAX];
+    c8 to [SP_PATH_MAX];
+  } buffers = sp_zero;
+  __wasi_fd_t from_at, to_at;
+  if (!sp_wasi_resolve(from_fd, from, from_len, buffers.from, &from_at)) return -1;
+  if (!sp_wasi_resolve(to_fd, to, to_len, buffers.to, &to_at)) return -1;
+  return __wasi_path_rename(from_at, buffers.from, to_at, buffers.to) ? -1 : 0;
 
 #elif defined(SP_WASM)
   (void)from_fd; (void)from; (void)from_len; (void)to_fd; (void)to; (void)to_len;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 
 #else
   #error "sp_sys_rename"
 #endif
 }
 
-sp_err_t sp_sys_rename_s(sp_sys_fd_t from_fd, sp_str_t from, sp_sys_fd_t to_fd, sp_str_t to) {
+s32 sp_sys_rename_s(sp_sys_fd_t from_fd, sp_str_t from, sp_sys_fd_t to_fd, sp_str_t to) {
   return sp_sys_rename(from_fd, from.data, from.len, to_fd, to.data, to.len);
 }
 
 //////////////////
 // SP_SYS_CLOSE //
 //////////////////
-sp_err_t sp_sys_close_p(sp_sys_fd_t fd) {
+s32 sp_sys_close_p(sp_sys_fd_t fd) {
 #if defined(SP_WIN32)
-  if (fd == SP_SYS_INVALID_FD) return SP_ERR_SYS_BAD_FD;
-  if (!CloseHandle((HANDLE)fd)) return sp_sys_err_from_win32(GetLastError());
-  return SP_OK;
+  if (fd == SP_SYS_INVALID_FD) return -1;
+  return CloseHandle((HANDLE)fd) ? 0 : -1;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
-  if (close(fd)) {
-    switch (errno) {
-      case SP_EINTR:
-      case SP_EINPROGRESS: return SP_OK;
-      default:             return sp_sys_err_from_errno(errno);
-    }
-  }
-  return SP_OK;
+  return close(fd);
 
 #elif defined(SP_LINUX)
-  s64 rc = sp_syscall_r(SP_SYSCALL_NUM_CLOSE, fd);
-  switch (rc) {
-    case SP_EINTR:
-    case SP_EINPROGRESS: return SP_OK;
-    default:             return sp_sys_err_from_errno(rc);
-  }
+  return (s32)sp_syscall(SP_SYSCALL_NUM_CLOSE, fd);
 
 #elif defined(SP_WASM)
-  return sp_sys_err_from_wasi(__wasi_fd_close(fd));
+  return __wasi_fd_close(fd) ? -1 : 0;
 
 #else
   #error "sp_sys_close"
@@ -6417,45 +5757,44 @@ sp_err_t sp_sys_close_p(sp_sys_fd_t fd) {
 /////////////////
 // SP_SYS_PIPE //
 /////////////////
-sp_err_t sp_sys_pipe_p(sp_sys_fd_t* read_end, sp_sys_fd_t* write_end) {
+s32 sp_sys_pipe_p(sp_sys_fd_t* read_end, sp_sys_fd_t* write_end) {
 #if defined(SP_WIN32)
   HANDLE r = SP_NULLPTR;
   HANDLE w = SP_NULLPTR;
   SECURITY_ATTRIBUTES sa = { sizeof(SECURITY_ATTRIBUTES), SP_NULLPTR, FALSE };
-  if (!CreatePipe(&r, &w, &sa, 0)) return sp_sys_err_from_win32(GetLastError());
+  if (!CreatePipe(&r, &w, &sa, 0)) return -1;
   DWORD mode = PIPE_NOWAIT;
   if (!SetNamedPipeHandleState(r, &mode, SP_NULLPTR, SP_NULLPTR)) {
-    sp_err_t err = sp_sys_err_from_win32(GetLastError());
     CloseHandle(r);
     CloseHandle(w);
-    return err;
+    return -1;
   }
   *read_end = (sp_sys_fd_t)r;
   *write_end = (sp_sys_fd_t)w;
-  return SP_OK;
+  return 0;
 
 #elif defined(SP_LINUX)
   s32 fds[2];
-  s64 r = sp_syscall(SP_SYSCALL_NUM_PIPE2, fds, SP_SYS_LINUX_O_NONBLOCK | SP_SYS_LINUX_O_CLOEXEC, 0, 0, 0);
-  if (r < 0) return sp_sys_err_from_errno(-r);
+  s32 r = (s32)sp_syscall(SP_SYSCALL_NUM_PIPE2, fds, SP_O_NONBLOCK | SP_O_CLOEXEC, 0, 0, 0);
+  if (r < 0) return -1;
   *read_end = fds[0];
   *write_end = fds[1];
-  return SP_OK;
+  return 0;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   s32 fds[2];
-  if (pipe(fds) < 0) return sp_sys_err_from_errno(errno);
+  if (pipe(fds) < 0) return -1;
   fcntl(fds[0], F_SETFL, fcntl(fds[0], F_GETFL) | O_NONBLOCK);
   fcntl(fds[0], F_SETFD, fcntl(fds[0], F_GETFD) | FD_CLOEXEC);
   fcntl(fds[1], F_SETFD, fcntl(fds[1], F_GETFD) | FD_CLOEXEC);
   *read_end = fds[0];
   *write_end = fds[1];
-  return SP_OK;
+  return 0;
 
 #elif defined(SP_WASM)
   *read_end = SP_SYS_INVALID_FD;
   *write_end = SP_SYS_INVALID_FD;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 
 #else
   #error "sp_sys_pipe"
@@ -6465,49 +5804,34 @@ sp_err_t sp_sys_pipe_p(sp_sys_fd_t* read_end, sp_sys_fd_t* write_end) {
 //////////////////
 // SP_SYS_READ //
 //////////////////
-sp_err_t sp_sys_read_p(sp_sys_fd_t fd, void* buf, u64 count, u64* bytes_read) {
-  if (bytes_read) *bytes_read = 0;
-
+s64 sp_sys_read_p(sp_sys_fd_t fd, void* buf, u64 count) {
 #if defined(SP_WIN32)
   DWORD n = 0;
   if (!ReadFile((HANDLE)fd, buf, sp_sys_win32_io_count(count), &n, SP_NULLPTR)) {
-    DWORD err = GetLastError();
-    if (err == ERROR_BROKEN_PIPE) return SP_OK;
-    if (err == ERROR_NO_DATA) return SP_ERR_SYS_WOULD_BLOCK;
-    return sp_sys_err_from_win32(err);
+    if (GetLastError() == ERROR_BROKEN_PIPE) return 0;
+    return -1;
   }
-  if (bytes_read) *bytes_read = (u64)n;
-  return SP_OK;
+  return (s64)n;
 
 #elif defined(SP_LINUX)
-  s64 rc = sp_syscall_retry(SP_SYSCALL_NUM_READ, fd, buf, count);
-  if (sp_sys_is_err(rc)) {
-    s64 err = -rc;
-    switch (err) {
-      case SP_EBADF: return SP_ERR_SYS_ACCESS_DENIED;
-      default: return sp_sys_err_from_errno(err);
-    }
-  }
-
-  if (bytes_read) *bytes_read = (u64)rc;
-  return SP_OK;
+  s64 rc;
+  do {
+    rc = sp_syscall(SP_SYSCALL_NUM_READ, fd, buf, count);
+  } while (rc == -1 && errno == SP_EINTR);
+  return rc;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   s64 rc;
   do {
-    rc = read(fd, buf, sp_sys_posix_io_count(count));
+    rc = read(fd, buf, count);
   } while (rc == -1 && errno == SP_EINTR);
-  if (rc < 0) return sp_sys_err_from_errno(errno);
-  if (bytes_read) *bytes_read = (u64)rc;
-  return SP_OK;
+  return rc;
 
 #elif defined(SP_WASM)
   __wasi_iovec_t iov = { (uint8_t*)buf, (__wasi_size_t)count };
   __wasi_size_t n = 0;
   __wasi_errno_t err = __wasi_fd_read((__wasi_fd_t)fd, &iov, 1, &n);
-  if (err) return sp_sys_err_from_wasi(err);
-  if (bytes_read) *bytes_read = (u64)n;
-  return SP_OK;
+  return err ? -1 : (s64)n;
 
 #else
   #error "sp_sys_read"
@@ -6517,47 +5841,31 @@ sp_err_t sp_sys_read_p(sp_sys_fd_t fd, void* buf, u64 count, u64* bytes_read) {
 ///////////////////
 // SP_SYS_WRITE //
 ///////////////////
-sp_err_t sp_sys_write_p(sp_sys_fd_t fd, const void* buf, u64 count, u64* bytes_written) {
-  if (bytes_written) *bytes_written = 0;
-
+s64 sp_sys_write_p(sp_sys_fd_t fd, const void* buf, u64 count) {
 #if defined(SP_WIN32)
   DWORD n = 0;
-  if (!WriteFile((HANDLE)fd, buf, sp_sys_win32_io_count(count), &n, SP_NULLPTR)) {
-    DWORD err = GetLastError();
-    if (err == ERROR_NO_DATA) return SP_ERR_SYS_BROKEN_PIPE;
-    return sp_sys_err_from_win32(err);
-  }
-  if (bytes_written) *bytes_written = (u64)n;
-  return SP_OK;
+  if (!WriteFile((HANDLE)fd, buf, sp_sys_win32_io_count(count), &n, SP_NULLPTR)) return -1;
+  return (s64)n;
 
 #elif defined(SP_LINUX)
-  s64 rc = sp_syscall_retry(SP_SYSCALL_NUM_WRITE, fd, buf, count);
-  if (sp_sys_is_err(rc)) {
-    s64 err = -rc;
-    switch (err) {
-      case SP_EBADF: return SP_ERR_SYS_ACCESS_DENIED;
-      default: return sp_sys_err_from_errno(err);
-    }
-  }
-  if (bytes_written) *bytes_written = (u64)rc;
-  return SP_OK;
+  s64 rc;
+  do {
+    rc = sp_syscall(SP_SYSCALL_NUM_WRITE, fd, buf, count);
+  } while (rc == -1 && errno == SP_EINTR);
+  return rc;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   s64 rc;
   do {
-    rc = write(fd, buf, sp_sys_posix_io_count(count));
+    rc = write(fd, buf, count);
   } while (rc == -1 && errno == SP_EINTR);
-  if (rc < 0) return sp_sys_err_from_errno(errno);
-  if (bytes_written) *bytes_written = (u64)rc;
-  return SP_OK;
+  return rc;
 
 #elif defined(SP_WASM)
   __wasi_ciovec_t iov = { (const uint8_t*)buf, (__wasi_size_t)count };
   __wasi_size_t n = 0;
   __wasi_errno_t err = __wasi_fd_write((__wasi_fd_t)fd, &iov, 1, &n);
-  if (err) return sp_sys_err_from_wasi(err);
-  if (bytes_written) *bytes_written = (u64)n;
-  return SP_OK;
+  return err ? -1 : (s64)n;
 
 #else
   #error "sp_sys_write"
@@ -6567,9 +5875,7 @@ sp_err_t sp_sys_write_p(sp_sys_fd_t fd, const void* buf, u64 count, u64* bytes_w
 ///////////////////
 // SP_SYS_PREAD //
 ///////////////////
-sp_err_t sp_sys_pread_p(sp_sys_fd_t fd, void* buf, u64 count, u64 offset, u64* bytes_read) {
-  if (bytes_read) *bytes_read = 0;
-
+s64 sp_sys_pread_p(sp_sys_fd_t fd, void* buf, u64 count, u64 offset) {
 #if defined(SP_WIN32)
   OVERLAPPED ov = sp_zero;
   ov.Offset = (DWORD)(offset & 0xFFFFFFFFu);
@@ -6586,40 +5892,30 @@ sp_err_t sp_sys_pread_p(sp_sys_fd_t fd, void* buf, u64 count, u64 offset, u64* b
   if (restore) SetFilePointerEx((HANDLE)fd, saved, SP_NULLPTR, FILE_BEGIN);
 
   if (!ok) {
-    if (err == ERROR_BROKEN_PIPE || err == ERROR_HANDLE_EOF) return SP_OK;
-    return sp_sys_err_from_win32(err);
+    if (err == ERROR_BROKEN_PIPE || err == ERROR_HANDLE_EOF) return 0;
+    return -1;
   }
-  if (bytes_read) *bytes_read = (u64)n;
-  return SP_OK;
+  return (s64)n;
 
 #elif defined(SP_LINUX)
-  s64 rc = sp_syscall_retry(SP_SYSCALL_NUM_PREAD64, fd, buf, count, offset);
-  if (sp_sys_is_err(rc)) {
-    s64 err = -rc;
-    switch (err) {
-      case SP_EBADF: return SP_ERR_SYS_ACCESS_DENIED;
-      default: return sp_sys_err_from_errno(err);
-    }
-  }
-  if (bytes_read) *bytes_read = (u64)rc;
-  return SP_OK;
+  s64 rc;
+  do {
+    rc = sp_syscall(SP_SYSCALL_NUM_PREAD64, fd, buf, count, offset);
+  } while (rc == -1 && errno == SP_EINTR);
+  return rc;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   s64 rc;
   do {
-    rc = pread(fd, buf, sp_sys_posix_io_count(count), (off_t)offset);
+    rc = pread(fd, buf, count, (off_t)offset);
   } while (rc == -1 && errno == SP_EINTR);
-  if (rc < 0) return sp_sys_err_from_errno(errno);
-  if (bytes_read) *bytes_read = (u64)rc;
-  return SP_OK;
+  return rc;
 
 #elif defined(SP_WASM)
   __wasi_iovec_t iov = { (uint8_t*)buf, (__wasi_size_t)count };
   __wasi_size_t n = 0;
   __wasi_errno_t err = __wasi_fd_pread((__wasi_fd_t)fd, &iov, 1, (__wasi_filesize_t)offset, &n);
-  if (err) return sp_sys_err_from_wasi(err);
-  if (bytes_read) *bytes_read = (u64)n;
-  return SP_OK;
+  return err ? -1 : (s64)n;
 
 #else
   #error "sp_sys_pread"
@@ -6629,9 +5925,7 @@ sp_err_t sp_sys_pread_p(sp_sys_fd_t fd, void* buf, u64 count, u64 offset, u64* b
 ////////////////////
 // SP_SYS_PWRITE //
 ////////////////////
-sp_err_t sp_sys_pwrite_p(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset, u64* bytes_written) {
-  if (bytes_written) *bytes_written = 0;
-
+s64 sp_sys_pwrite_p(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset) {
 #if defined(SP_WIN32)
   OVERLAPPED ov = sp_zero;
   ov.Offset = (DWORD)(offset & 0xFFFFFFFFu);
@@ -6643,106 +5937,34 @@ sp_err_t sp_sys_pwrite_p(sp_sys_fd_t fd, const void* buf, u64 count, u64 offset,
 
   DWORD n = 0;
   BOOL ok = WriteFile((HANDLE)fd, buf, sp_sys_win32_io_count(count), &n, &ov);
-  DWORD err = ok ? 0 : GetLastError();
 
   if (restore) SetFilePointerEx((HANDLE)fd, saved, SP_NULLPTR, FILE_BEGIN);
 
-  if (!ok) return sp_sys_err_from_win32(err);
-  if (bytes_written) *bytes_written = (u64)n;
-  return SP_OK;
+  if (!ok) return -1;
+  return (s64)n;
 
 #elif defined(SP_LINUX)
-  s64 rc = sp_syscall_retry(SP_SYSCALL_NUM_PWRITE64, fd, buf, count, offset);
-  if (sp_sys_is_err(rc)) {
-    s64 err = -rc;
-    switch (err) {
-      case SP_EBADF: return SP_ERR_SYS_ACCESS_DENIED;
-      default: return sp_sys_err_from_errno(err);
-    }
-  }
-  if (bytes_written) *bytes_written = (u64)rc;
-  return SP_OK;
+  s64 rc;
+  do {
+    rc = sp_syscall(SP_SYSCALL_NUM_PWRITE64, fd, buf, count, offset);
+  } while (rc == -1 && errno == SP_EINTR);
+  return rc;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   s64 rc;
   do {
-    rc = pwrite(fd, buf, sp_sys_posix_io_count(count), (off_t)offset);
+    rc = pwrite(fd, buf, count, (off_t)offset);
   } while (rc == -1 && errno == SP_EINTR);
-  if (rc < 0) return sp_sys_err_from_errno(errno);
-  if (bytes_written) *bytes_written = (u64)rc;
-  return SP_OK;
+  return rc;
 
 #elif defined(SP_WASM)
   __wasi_ciovec_t iov = { (const uint8_t*)buf, (__wasi_size_t)count };
   __wasi_size_t n = 0;
   __wasi_errno_t err = __wasi_fd_pwrite((__wasi_fd_t)fd, &iov, 1, (__wasi_filesize_t)offset, &n);
-  if (err) return sp_sys_err_from_wasi(err);
-  if (bytes_written) *bytes_written = (u64)n;
-  return SP_OK;
+  return err ? -1 : (s64)n;
 
 #else
   #error "sp_sys_pwrite"
-#endif
-}
-
-sp_err_t sp_sys_transfer_p(sp_sys_fd_t in, u64* in_pos, sp_sys_fd_t out, u64* out_pos, u64 count, u64* bytes_moved) {
-  if (bytes_moved) *bytes_moved = 0;
-
-#if defined(SP_LINUX)
-  s64 rc;
-  if (out_pos) {
-    sp_try(sp_sys_is_supported(SP_SYS_SUPPORT_COPY_FILE_RANGE));
-    rc = sp_syscall_retry(SP_SYSCALL_NUM_COPY_FILE_RANGE, in, in_pos, out, out_pos, count, 0);
-    if (rc < 0) {
-      switch (-rc) {
-        // If the OS literally does not have the fast path syscall, stop
-        // wasting time trying to call it, ever. Different runtime handle this
-        // differently:
-        // - Go used to cache ENOSYS, but then tried to get rid of this per-call
-        // checking in favor of just gating on the kernel version. But they
-        // found that that's not really possible, because ENOSYS can arise
-        // even on supported kernels thanks to seccomp / containers.
-        // - Rust caches ENOSYS but also EPERM (kind of). When they get EPERM,
-        // they probe by calling copy_file_range with a deliberately invalid
-        // handle. And the ordering of the kernel's checks tells them whether
-        // that EPERM was from seccomp (cache it) or not (don't)
-        // - Zig is weird. ENOSYS, EINVAL, and EOPNOTSUPP all globally kill
-        // the syscall.
-        case SP_ENOSYS: return sp_sys_mark_unsupported(SP_SYS_SUPPORT_COPY_FILE_RANGE);
-        // Otherwise, it just means that the fast path is unsupported *for
-        // this set of handles*, so we return UNSUPPORTED but do not globally
-        // flag this syscall as unsupported
-        case SP_EINVAL:
-        case SP_EXDEV:
-        case SP_EOPNOTSUPP:
-        case SP_EPERM:
-        case SP_EIO:
-        case SP_EBADF: return SP_ERR_SYS_UNSUPPORTED;
-        default: return sp_sys_err_from_errno(-rc);
-      }
-    }
-  }
-  else {
-    sp_try(sp_sys_is_supported(SP_SYS_SUPPORT_SENDFILE));
-    s64 off = in_pos ? (s64)*in_pos : 0;
-    rc = sp_syscall_retry(SP_SYSCALL_NUM_SENDFILE, out, in, in_pos ? &off : SP_NULLPTR, count);
-    if (rc < 0) {
-      switch (-rc) {
-        case SP_ENOSYS: return sp_sys_mark_unsupported(SP_SYS_SUPPORT_SENDFILE);
-        case SP_EINVAL:
-        case SP_EOPNOTSUPP:
-        case SP_EPERM: return SP_ERR_SYS_UNSUPPORTED;
-        default: return sp_sys_err_from_errno(-rc);
-      }
-    }
-    if (in_pos) *in_pos = (u64)off;
-  }
-  if (bytes_moved) *bytes_moved = (u64)rc;
-  return SP_OK;
-
-#else
-  (void)in; (void)in_pos; (void)out; (void)out_pos; (void)count;
-  return SP_ERR_SYS_UNSUPPORTED;
 #endif
 }
 
@@ -6771,8 +5993,7 @@ s64 sp_sys_lseek_p(sp_sys_fd_t fd, s64 offset, s32 whence) {
     case SP_IO_SEEK_END: native = 2; break;
     default: return -1;
   }
-  s64 rc = sp_syscall(SP_SYSCALL_NUM_LSEEK, fd, offset, native);
-  return rc < 0 ? -1 : rc;
+  return sp_syscall(SP_SYSCALL_NUM_LSEEK, fd, offset, native);
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   s32 native;
@@ -6811,7 +6032,7 @@ s64 sp_sys_lseek_p(sp_sys_fd_t fd, s64 offset, s32 whence) {
 #define SP_CLOCK_MONOTONIC 1
 #endif
 
-sp_err_t sp_sys_clock_gettime_p(s32 clockid, sp_sys_timespec_t* ts) {
+s32 sp_sys_clock_gettime_p(s32 clockid, sp_sys_timespec_t* ts) {
 #if defined(SP_WIN32)
   if (clockid == SP_CLOCK_MONOTONIC) {
     LARGE_INTEGER freq, counter;
@@ -6821,7 +6042,7 @@ sp_err_t sp_sys_clock_gettime_p(s32 clockid, sp_sys_timespec_t* ts) {
     u64 remainder = (u64)(counter.QuadPart % freq.QuadPart);
     ts->tv_sec  = (s64)seconds;
     ts->tv_nsec = (s64)((remainder * 1000000000ULL) / (u64)freq.QuadPart);
-    return SP_OK;
+    return 0;
   }
   if (clockid == SP_CLOCK_REALTIME) {
     FILETIME ft;
@@ -6830,28 +6051,29 @@ sp_err_t sp_sys_clock_gettime_p(s32 clockid, sp_sys_timespec_t* ts) {
     u64 unix_100ns    = windows_100ns - 116444736000000000ULL;
     ts->tv_sec  = (s64)(unix_100ns / 10000000ULL);
     ts->tv_nsec = (s64)((unix_100ns % 10000000ULL) * 100);
-    return SP_OK;
+    return 0;
   }
-  return SP_ERR_SYS_INVALID;
+  return -1;
 
 #elif defined(SP_LINUX)
-  return sp_syscall_e(SP_SYSCALL_NUM_CLOCK_GETTIME, clockid, ts);
+  return (s32)sp_syscall(SP_SYSCALL_NUM_CLOCK_GETTIME, clockid, ts);
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   struct timespec native;
-  sp_err_t err = sp_sys_err_from_libc(clock_gettime((clockid_t)clockid, &native));
-  if (err != SP_OK) return err;
-  ts->tv_sec  = (s64)native.tv_sec;
-  ts->tv_nsec = (s64)native.tv_nsec;
-  return SP_OK;
+  s32 rc = clock_gettime((clockid_t)clockid, &native);
+  if (rc == 0) {
+    ts->tv_sec  = (s64)native.tv_sec;
+    ts->tv_nsec = (s64)native.tv_nsec;
+  }
+  return rc;
 
 #elif defined(SP_WASM)
   __wasi_timestamp_t ns = 0;
   __wasi_errno_t err = __wasi_clock_time_get((__wasi_clockid_t)clockid, 1000, &ns);
-  if (err) return sp_sys_err_from_wasi(err);
+  if (err) return -1;
   ts->tv_sec  = (s64)(ns / 1000000000ULL);
   ts->tv_nsec = (s64)(ns % 1000000000ULL);
-  return SP_OK;
+  return 0;
 
 #else
   #error "sp_sys_clock_gettime"
@@ -6862,159 +6084,97 @@ sp_err_t sp_sys_clock_gettime_p(s32 clockid, sp_sys_timespec_t* ts) {
 // SP_SYS_OPEN //
 /////////////////
 #if defined(SP_WIN32)
-SP_PRIVATE u32 sp_sys_nt_access_from_mode(sp_sys_open_mode_t mode, u32 flags) {
-  u32 read = FILE_READ_DATA | FILE_READ_EA;
-  u32 write = FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
-  if ((flags & SP_SYS_OPEN_APPEND) && !(flags & SP_SYS_OPEN_TRUNCATE)) write &= ~(u32)FILE_WRITE_DATA;
-
+SP_PRIVATE u32 sp_sys_nt_access_from_flags(s32 flags) {
   u32 access = SYNCHRONIZE | FILE_READ_ATTRIBUTES;
-  switch (mode) {
-    case SP_SYS_OPEN_MODE_RO: { access |= read; break; }
-    case SP_SYS_OPEN_MODE_WO: { access |= write; break; }
-    case SP_SYS_OPEN_MODE_RW: { access |= read | write; break; }
+  s32 rw = flags & (SP_O_RDONLY | SP_O_WRONLY | SP_O_RDWR);
+  if (rw == SP_O_WRONLY) {
+    access |= FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
+  }
+  else if (rw == SP_O_RDWR) {
+    access |= FILE_READ_DATA | FILE_READ_EA | FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA | FILE_APPEND_DATA;
+  }
+  else {
+    access |= FILE_READ_DATA | FILE_READ_EA;
+  }
+  if (flags & SP_O_APPEND) {
+    access |= FILE_APPEND_DATA;
+    if (!(flags & SP_O_TRUNC)) access &= ~(u32)FILE_WRITE_DATA;
   }
   return access;
 }
 
-SP_PRIVATE u32 sp_sys_nt_disposition_from_flags(u32 flags) {
-  if (flags & SP_SYS_OPEN_EXCLUSIVE)                                  return SP_NT_FILE_CREATE;
-  if ((flags & SP_SYS_OPEN_CREATE) && (flags & SP_SYS_OPEN_TRUNCATE)) return SP_NT_FILE_OVERWRITE_IF;
-  if (flags & SP_SYS_OPEN_CREATE)                                     return SP_NT_FILE_OPEN_IF;
-  if (flags & SP_SYS_OPEN_TRUNCATE)                                   return SP_NT_FILE_OVERWRITE;
-  return SP_NT_FILE_OPEN;
-}
-
-#elif defined(SP_LINUX)
-SP_PRIVATE u32 sp_sys_linux_open_flags(sp_sys_open_mode_t mode, u32 flags) {
-  u32 o = SP_SYS_LINUX_O_CLOEXEC;
-  switch (mode) {
-    case SP_SYS_OPEN_MODE_RO: { o |= SP_SYS_LINUX_O_RDONLY; break; }
-    case SP_SYS_OPEN_MODE_WO: { o |= SP_SYS_LINUX_O_WRONLY; break; }
-    case SP_SYS_OPEN_MODE_RW: { o |= SP_SYS_LINUX_O_RDWR; break; }
-  }
-  if (flags & (SP_SYS_OPEN_CREATE | SP_SYS_OPEN_EXCLUSIVE)) o |= SP_SYS_LINUX_O_CREAT;
-  if (flags & SP_SYS_OPEN_EXCLUSIVE) o |= SP_SYS_LINUX_O_EXCL;
-  if (flags & SP_SYS_OPEN_TRUNCATE)  o |= SP_SYS_LINUX_O_TRUNC;
-  if (flags & SP_SYS_OPEN_APPEND)    o |= SP_SYS_LINUX_O_APPEND;
-  return o;
-}
-
-#elif defined(SP_MACOS) || defined(SP_COSMO)
-SP_PRIVATE s32 sp_sys_posix_open_flags(sp_sys_open_mode_t mode, u32 flags) {
-  s32 o = O_CLOEXEC;
-  switch (mode) {
-    case SP_SYS_OPEN_MODE_RO: { o |= O_RDONLY; break; }
-    case SP_SYS_OPEN_MODE_WO: { o |= O_WRONLY; break; }
-    case SP_SYS_OPEN_MODE_RW: { o |= O_RDWR; break; }
-  }
-  if (flags & (SP_SYS_OPEN_CREATE | SP_SYS_OPEN_EXCLUSIVE)) o |= O_CREAT;
-  if (flags & SP_SYS_OPEN_EXCLUSIVE) o |= O_EXCL;
-  if (flags & SP_SYS_OPEN_TRUNCATE)  o |= O_TRUNC;
-  if (flags & SP_SYS_OPEN_APPEND)    o |= O_APPEND;
-  return o;
-}
 
 #endif
 
-sp_err_t sp_sys_open_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_open_mode_t mode, u32 flags, sp_sys_fd_t* out) {
-  *out = SP_SYS_INVALID_FD;
-
+sp_sys_fd_t sp_sys_open_p(sp_sys_fd_t fd, const c8* path, u32 len, s32 flags, s32 mode) {
 #if defined(SP_WIN32)
-  u32 access = sp_sys_nt_access_from_mode(mode, flags);
+  (void)mode;
+  u32 access = sp_sys_nt_access_from_flags(flags);
   u32 share = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
   u32 disposition = sp_sys_nt_disposition_from_flags(flags);
-  u32 options = SP_NT_FILE_SYNCHRONOUS_IO_NONALERT | SP_NT_FILE_OPEN_FOR_BACKUP_INTENT | SP_NT_FILE_NON_DIRECTORY_FILE;
-  if (flags & SP_SYS_OPEN_EXCLUSIVE) options |= SP_NT_FILE_OPEN_REPARSE_POINT;
+  u32 options = SP_NT_FILE_SYNCHRONOUS_IO_NONALERT | SP_NT_FILE_OPEN_FOR_BACKUP_INTENT;
+  options |= (flags & SP_O_DIRECTORY) ? SP_NT_FILE_DIRECTORY_FILE : SP_NT_FILE_NON_DIRECTORY_FILE;
+  if ((flags & SP_O_CREAT) && (flags & SP_O_EXCL)) options |= SP_NT_FILE_OPEN_REPARSE_POINT;
 
-  sp_sys_fd_t handle = SP_SYS_INVALID_FD;
-  sp_nt_status_t status = sp_sys_nt_open(fd, sp_str(path, len), access, share, disposition, options, FILE_ATTRIBUTE_NORMAL, &handle);
-  if (!SP_NT_SUCCESS(status)) return sp_sys_err_from_nt(status);
+  void* handle = sp_sys_nt_open(fd, sp_str(path, len), access, share, disposition, options, FILE_ATTRIBUTE_NORMAL);
+  if (!handle) return SP_SYS_INVALID_FD;
 
-  *out = handle;
-  return SP_OK;
+  return (sp_sys_fd_t)handle;
 
 #elif defined(SP_LINUX)
-  c8 buffer [SP_PATH_MAX] = sp_zero;
-  sp_cstr_copy_to_n(path, len, buffer, SP_PATH_MAX);
-
-  s64 rc = sp_syscall(SP_SYSCALL_NUM_OPENAT, fd, buffer, sp_sys_linux_open_flags(mode, flags), 0644);
-  if (sp_sys_is_err(rc)) {
-    s64 err = -rc;
-    switch (err) {
-      case SP_EBADF: return SP_ERR_SYS_ACCESS_DENIED;
-      default: return sp_sys_err_from_errno(err);
-    }
-  }
-
-  *out = (sp_sys_fd_t)rc;
-  return SP_OK;
+  c8 buf [SP_PATH_MAX] = sp_zero;
+  sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
+  return (sp_sys_fd_t)sp_syscall(SP_SYSCALL_NUM_OPENAT, fd, buf, flags, mode);
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
-  s32 rc = openat((int)fd, buf, sp_sys_posix_open_flags(mode, flags), 0644);
-  if (rc < 0) return sp_sys_err_from_errno(errno);
-  *out = (sp_sys_fd_t)rc;
-  return SP_OK;
+  return (sp_sys_fd_t)openat((int)fd, buf, flags, mode);
+
+#elif defined(SP_WASM_WASI)
+  (void)mode;
+  c8 buf [SP_PATH_MAX] = sp_zero;
+  __wasi_fd_t at;
+  if (!sp_wasi_resolve(fd, path, len, buf, &at)) return SP_SYS_INVALID_FD;
+
+  __wasi_oflags_t oflags = 0;
+  if (flags & SP_O_CREAT)     oflags |= __WASI_OFLAGS_CREAT;
+  if (flags & SP_O_EXCL)      oflags |= __WASI_OFLAGS_EXCL;
+  if (flags & SP_O_TRUNC)     oflags |= __WASI_OFLAGS_TRUNC;
+  if (flags & SP_O_DIRECTORY) oflags |= __WASI_OFLAGS_DIRECTORY;
+
+  __wasi_rights_t rights =
+    __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_SEEK | __WASI_RIGHTS_FD_TELL |
+    __WASI_RIGHTS_FD_ADVISE | __WASI_RIGHTS_FD_FILESTAT_GET;
+  if (flags & (SP_O_WRONLY | SP_O_RDWR | SP_O_CREAT | SP_O_TRUNC | SP_O_APPEND)) {
+    rights |=
+      __WASI_RIGHTS_FD_WRITE | __WASI_RIGHTS_FD_DATASYNC | __WASI_RIGHTS_FD_SYNC |
+      __WASI_RIGHTS_FD_ALLOCATE | __WASI_RIGHTS_FD_FILESTAT_SET_SIZE | __WASI_RIGHTS_FD_FILESTAT_SET_TIMES;
+  }
+  if (flags & SP_O_DIRECTORY) {
+    rights |= __WASI_RIGHTS_FD_READDIR | __WASI_RIGHTS_PATH_OPEN | __WASI_RIGHTS_PATH_FILESTAT_GET;
+  }
+
+  __wasi_fdflags_t fdflags = 0;
+  if (flags & SP_O_APPEND) fdflags |= __WASI_FDFLAGS_APPEND;
+
+  __wasi_fd_t out = -1;
+  if (__wasi_path_open(at, __WASI_LOOKUPFLAGS_SYMLINK_FOLLOW, buf, oflags, rights, rights, fdflags, &out)) {
+    return SP_SYS_INVALID_FD;
+  }
+  return (sp_sys_fd_t)out;
 
 #elif defined(SP_WASM)
-  (void)fd; (void)path; (void)len; (void)mode; (void)flags;
-  return SP_ERR_SYS_UNSUPPORTED;
+  (void)fd; (void)path; (void)len; (void)flags; (void)mode;
+  return -1;
 
 #else
   #error "sp_sys_open"
 #endif
 }
 
-sp_err_t sp_sys_open_dir_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_fd_t* out) {
-  *out = SP_SYS_INVALID_FD;
-
-#if defined(SP_WIN32)
-  u32 access = SYNCHRONIZE | FILE_READ_ATTRIBUTES | FILE_READ_DATA | FILE_READ_EA;
-  u32 share = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
-  u32 options = SP_NT_FILE_SYNCHRONOUS_IO_NONALERT | SP_NT_FILE_OPEN_FOR_BACKUP_INTENT | SP_NT_FILE_DIRECTORY_FILE;
-
-  sp_sys_fd_t handle = SP_SYS_INVALID_FD;
-  sp_nt_status_t status = sp_sys_nt_open(fd, sp_str(path, len), access, share, SP_NT_FILE_OPEN, options, FILE_ATTRIBUTE_NORMAL, &handle);
-  if (!SP_NT_SUCCESS(status)) return sp_sys_err_from_nt(status);
-
-  *out = handle;
-  return SP_OK;
-
-#elif defined(SP_LINUX)
-  c8 buf [SP_PATH_MAX] = sp_zero;
-  sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
-  s64 rc = sp_syscall(SP_SYSCALL_NUM_OPENAT, fd, buf, SP_SYS_LINUX_O_RDONLY | SP_SYS_LINUX_O_DIRECTORY | SP_SYS_LINUX_O_CLOEXEC, 0);
-  if (rc < 0) return sp_sys_err_from_errno(-rc);
-
-  *out = (sp_sys_fd_t)rc;
-  return SP_OK;
-
-#elif defined(SP_MACOS) || defined(SP_COSMO)
-  c8 buf [SP_PATH_MAX] = sp_zero;
-  sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
-  s32 rc = openat((int)fd, buf, O_RDONLY | O_DIRECTORY | O_CLOEXEC, 0);
-  if (rc < 0) return sp_sys_err_from_errno(errno);
-
-  *out = (sp_sys_fd_t)rc;
-  return SP_OK;
-
-#elif defined(SP_WASM)
-  (void)fd; (void)path; (void)len;
-  return SP_ERR_SYS_UNSUPPORTED;
-
-#else
-  #error "sp_sys_open_dir"
-#endif
-
-}
-
-sp_err_t sp_sys_open_s(sp_sys_fd_t fd, sp_str_t path, sp_sys_open_mode_t mode, u32 flags, sp_sys_fd_t* out) {
-  return sp_sys_open(fd, path.data, path.len, mode, flags, out);
-}
-
-sp_err_t sp_sys_open_dir_s(sp_sys_fd_t fd, sp_str_t path, sp_sys_fd_t* out) {
-  return sp_sys_open_dir(fd, path.data, path.len, out);
+sp_sys_fd_t sp_sys_open_s(sp_sys_fd_t fd, sp_str_t path, s32 flags, s32 mode) {
+  return sp_sys_open(fd, path.data, path.len, flags, mode);
 }
 
 /////////////////////
@@ -7042,20 +6202,19 @@ sp_sys_fd_t sp_sys_get_root_p(s32 it) {
 //////////////////////
 // SP_SYS_NANOSLEEP //
 //////////////////////
-sp_err_t sp_sys_nanosleep_p(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem) {
+s32 sp_sys_nanosleep_p(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem) {
 #if defined(SP_WIN32)
   (void)rem;
-  u64 ns = (u64)req->tv_sec * SP_TM_S_TO_NS + (u64)req->tv_nsec;
-  Sleep((DWORD)(ns / SP_TM_MS_TO_NS));
-  return SP_OK;
+  u64 ns = (u64)req->tv_sec * 1000000000ULL + (u64)req->tv_nsec;
+  Sleep((DWORD)(ns / 1000000ULL));
+  return 0;
 
 #elif defined(SP_LINUX)
-  s64 rc = sp_syscall(SP_SYSCALL_NUM_NANOSLEEP, req, rem);
-  while (rc == -SP_EINTR) {
-    rc = sp_syscall(SP_SYSCALL_NUM_NANOSLEEP, rem, rem);
+  s32 rc = (s32)sp_syscall(SP_SYSCALL_NUM_NANOSLEEP, req, rem);
+  while (rc == -1 && errno == SP_EINTR) {
+    rc = (s32)sp_syscall(SP_SYSCALL_NUM_NANOSLEEP, rem, rem);
   }
-  if (rc < 0) { sp_unreachable_return(SP_ERR_SYS_BUG); }
-  return SP_OK;
+  return rc;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   struct timespec r_native   = { .tv_sec = (time_t)req->tv_sec, .tv_nsec = (long)req->tv_nsec };
@@ -7069,8 +6228,7 @@ sp_err_t sp_sys_nanosleep_p(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem
     rem->tv_sec  = (s64)rem_native.tv_sec;
     rem->tv_nsec = (s64)rem_native.tv_nsec;
   }
-  if (rc != 0) { sp_unreachable_return(SP_ERR_SYS_BUG); }
-  return SP_OK;
+  return rc;
 
 #elif defined(SP_WASM)
   __wasi_timestamp_t ns = (__wasi_timestamp_t)(req->tv_sec * SP_TM_S_TO_NS + req->tv_nsec);
@@ -7094,7 +6252,7 @@ sp_err_t sp_sys_nanosleep_p(const sp_sys_timespec_t* req, sp_sys_timespec_t* rem
     rem->tv_sec = 0;
     rem->tv_nsec = 0;
   }
-  return SP_OK;
+  return 0;
 
 #else
   #error "sp_sys_nanosleep"
@@ -7153,77 +6311,77 @@ s64 sp_sys_get_config_path_p(c8* buf, u64 size) {
 #define SP_SYS_FDS_WAIT_CAP 64
 
 #if defined(SP_WIN32)
-static void sp_sys_fd_ready_handle(HANDLE h, u8* out_ready) {
+static s32 sp_sys_fd_ready_handle(HANDLE h, u8* out_ready) {
   *out_ready = 0;
-  if (h == SP_NULLPTR || h == INVALID_HANDLE_VALUE) return;
+  if (h == SP_NULLPTR || h == INVALID_HANDLE_VALUE) return 0;
 
   DWORD type = GetFileType(h);
   if (type == FILE_TYPE_PIPE) {
     DWORD avail = 0;
     if (!PeekNamedPipe(h, SP_NULLPTR, 0, SP_NULLPTR, &avail, SP_NULLPTR)) {
       *out_ready = 1;
-      return;
+      return 0;
     }
     *out_ready = avail > 0 ? 1 : 0;
-    return;
+    return 0;
   }
   if (type == FILE_TYPE_CHAR) {
     DWORD console_mode = 0;
     if (GetConsoleMode(h, &console_mode)) {
       for (;;) {
         DWORD num_events = 0;
-        if (!GetNumberOfConsoleInputEvents(h, &num_events) || num_events == 0) return;
+        if (!GetNumberOfConsoleInputEvents(h, &num_events) || num_events == 0) return 0;
 
         INPUT_RECORD rec;
         DWORD peeked = 0;
-        if (!PeekConsoleInputW(h, &rec, 1, &peeked) || peeked == 0) return;
+        if (!PeekConsoleInputW(h, &rec, 1, &peeked) || peeked == 0) return 0;
         if (rec.EventType == KEY_EVENT && rec.Event.KeyEvent.bKeyDown) {
           *out_ready = 1;
-          return;
+          return 0;
         }
 
         DWORD consumed = 0;
-        if (!ReadConsoleInputW(h, &rec, 1, &consumed) || consumed == 0) return;
+        if (!ReadConsoleInputW(h, &rec, 1, &consumed) || consumed == 0) return 0;
       }
     }
     *out_ready = (WaitForSingleObject(h, 0) == WAIT_OBJECT_0) ? 1 : 0;
-    return;
+    return 0;
   }
   if (type == FILE_TYPE_DISK) {
     *out_ready = 1;
-    return;
+    return 0;
   }
   if (type == FILE_TYPE_UNKNOWN) {
-    return;
+    return 0;
   }
   *out_ready = (WaitForSingleObject(h, 0) == WAIT_OBJECT_0) ? 1 : 0;
+  return 0;
 }
 
-sp_err_t sp_sys_fd_ready_p(sp_sys_fd_t fd, u8* ready) {
-  sp_sys_fd_ready_handle((HANDLE)fd, ready);
-  return SP_OK;
+s32 sp_sys_fd_ready_p(sp_sys_fd_t fd, u8* ready) {
+  return sp_sys_fd_ready_handle((HANDLE)fd, ready);
 }
 
-sp_err_t sp_sys_fd_wait_p(sp_sys_fd_t fd) {
+s32 sp_sys_fd_wait_p(sp_sys_fd_t fd) {
   for (;;) {
     u8 ready = 0;
-    sp_sys_fd_ready_handle((HANDLE)fd, &ready);
-    if (ready) return SP_OK;
+    if (sp_sys_fd_ready_handle((HANDLE)fd, &ready) != 0) return -1;
+    if (ready) return 0;
     Sleep(1);
   }
 }
 
-sp_err_t sp_sys_fds_wait_p(const sp_sys_fd_t* fds, u8* ready, u64 nfds) {
-  if (nfds == 0) return SP_OK;
-  if (nfds > SP_SYS_FDS_WAIT_CAP) { sp_unreachable_return(SP_ERR_SYS_BUG); }
+s32 sp_sys_fds_wait_p(const sp_sys_fd_t* fds, u8* ready, u64 nfds) {
+  if (nfds == 0) return 0;
+  if (nfds > SP_SYS_FDS_WAIT_CAP) return -1;
   for (;;) {
-    u32 n = 0;
+    s32 count = 0;
     for (u64 i = 0; i < nfds; i++) {
       ready[i] = 0;
-      sp_sys_fd_ready_handle((HANDLE)fds[i], &ready[i]);
-      if (ready[i]) n++;
+      if (sp_sys_fd_ready_handle((HANDLE)fds[i], &ready[i]) != 0) return -1;
+      if (ready[i]) count++;
     }
-    if (n > 0) return SP_OK;
+    if (count > 0) return count;
     Sleep(1);
   }
 }
@@ -7235,51 +6393,51 @@ typedef struct {
   s16 revents;
 } sp_sys_linux_pollfd_t;
 
-#define SP_SYS_LINUX_POLLIN   0x0001
-#define SP_SYS_LINUX_POLLOUT  0x0004
-#define SP_SYS_LINUX_POLLERR  0x0008
-#define SP_SYS_LINUX_POLLHUP  0x0010
-#define SP_SYS_LINUX_POLLNVAL 0x0020
+#define SP_SYS_LINUX_POLLIN  0x0001
+#define SP_SYS_LINUX_POLLOUT 0x0004
+#define SP_SYS_LINUX_POLLERR 0x0008
+#define SP_SYS_LINUX_POLLHUP 0x0010
 
 #define SP_SYS_LINUX_MSG_NOSIGNAL 0x4000
 
-sp_err_t sp_sys_fd_ready_p(sp_sys_fd_t fd, u8* ready) {
+s32 sp_sys_fd_ready_p(sp_sys_fd_t fd, u8* ready) {
   *ready = 0;
   sp_sys_linux_pollfd_t pfd = { .fd = fd, .events = SP_SYS_LINUX_POLLIN };
   sp_sys_timespec_t ts = { 0, 0 };
-  s64 r = sp_syscall_retry(SP_SYSCALL_NUM_PPOLL, &pfd, 1, &ts, 0, 0);
-  if (r < 0) return sp_sys_err_from_errno(-r);
-  if (r > 0 && (pfd.revents & (SP_SYS_LINUX_POLLIN | SP_SYS_LINUX_POLLHUP | SP_SYS_LINUX_POLLERR | SP_SYS_LINUX_POLLNVAL))) *ready = 1;
-  return SP_OK;
+  s32 r = (s32)sp_syscall(SP_SYSCALL_NUM_PPOLL, &pfd, 1, &ts, 0, 0);
+  if (r < 0) return -1;
+  if (r > 0 && (pfd.revents & (SP_SYS_LINUX_POLLIN | SP_SYS_LINUX_POLLHUP | SP_SYS_LINUX_POLLERR))) *ready = 1;
+  return 0;
 }
 
-sp_err_t sp_sys_fd_wait_p(sp_sys_fd_t fd) {
+s32 sp_sys_fd_wait_p(sp_sys_fd_t fd) {
   sp_sys_linux_pollfd_t pfd = { .fd = fd, .events = SP_SYS_LINUX_POLLIN };
-  s64 r = sp_syscall_retry(SP_SYSCALL_NUM_PPOLL, &pfd, 1, SP_NULLPTR, 0, 0);
-  if (r < 0) return sp_sys_err_from_errno(-r);
-  return SP_OK;
+  s32 r = (s32)sp_syscall(SP_SYSCALL_NUM_PPOLL, &pfd, 1, SP_NULLPTR, 0, 0);
+  return r < 0 ? -1 : 0;
 }
 
-sp_err_t sp_sys_fds_wait_p(const sp_sys_fd_t* fds, u8* ready, u64 nfds) {
-  if (nfds == 0) return SP_OK;
-  if (nfds > SP_SYS_FDS_WAIT_CAP) { sp_unreachable_return(SP_ERR_SYS_BUG); }
+s32 sp_sys_fds_wait_p(const sp_sys_fd_t* fds, u8* ready, u64 nfds) {
+  if (nfds == 0) return 0;
+  if (nfds > SP_SYS_FDS_WAIT_CAP) return -1;
   sp_sys_linux_pollfd_t pfds[SP_SYS_FDS_WAIT_CAP];
   for (u64 i = 0; i < nfds; i++) {
     pfds[i] = (sp_sys_linux_pollfd_t){ .fd = fds[i], .events = SP_SYS_LINUX_POLLIN };
     ready[i] = 0;
   }
-  s64 r = sp_syscall_retry(SP_SYSCALL_NUM_PPOLL, pfds, nfds, SP_NULLPTR, 0, 0);
-  if (r < 0) return sp_sys_err_from_errno(-r);
+  s32 r = (s32)sp_syscall(SP_SYSCALL_NUM_PPOLL, pfds, nfds, SP_NULLPTR, 0, 0);
+  if (r < 0) return -1;
+  s32 count = 0;
   for (u64 i = 0; i < nfds; i++) {
-    if (pfds[i].revents & (SP_SYS_LINUX_POLLIN | SP_SYS_LINUX_POLLHUP | SP_SYS_LINUX_POLLERR | SP_SYS_LINUX_POLLNVAL)) {
+    if (pfds[i].revents & (SP_SYS_LINUX_POLLIN | SP_SYS_LINUX_POLLHUP | SP_SYS_LINUX_POLLERR)) {
       ready[i] = 1;
+      count++;
     }
   }
-  return SP_OK;
+  return count;
 }
 
 #elif defined(SP_WASM)
-static sp_err_t sp_sys_fd_wasi_ready(sp_sys_fd_t fd, u8* out_ready) {
+static s32 sp_sys_fd_wasi_ready(sp_sys_fd_t fd, u8* out_ready) {
   *out_ready = 0;
   __wasi_subscription_t subs[2] = {
     {
@@ -7299,22 +6457,21 @@ static sp_err_t sp_sys_fd_wasi_ready(sp_sys_fd_t fd, u8* out_ready) {
   };
   __wasi_event_t events[2];
   __wasi_size_t nev = 0;
-  __wasi_errno_t err = __wasi_poll_oneoff(subs, events, 2, &nev);
-  if (err) return sp_sys_err_from_wasi(err);
+  if (__wasi_poll_oneoff(subs, events, 2, &nev)) return -1;
   for (__wasi_size_t i = 0; i < nev; i++) {
     if (events[i].userdata == 0) {
       *out_ready = 1;
-      return SP_OK;
+      return 0;
     }
   }
-  return SP_OK;
+  return 0;
 }
 
-sp_err_t sp_sys_fd_ready_p(sp_sys_fd_t fd, u8* ready) {
+s32 sp_sys_fd_ready_p(sp_sys_fd_t fd, u8* ready) {
   return sp_sys_fd_wasi_ready(fd, ready);
 }
 
-sp_err_t sp_sys_fd_wait_p(sp_sys_fd_t fd) {
+s32 sp_sys_fd_wait_p(sp_sys_fd_t fd) {
   __wasi_subscription_t sub = {
     .userdata = 0,
     .u = {
@@ -7324,14 +6481,13 @@ sp_err_t sp_sys_fd_wait_p(sp_sys_fd_t fd) {
   };
   __wasi_event_t event;
   __wasi_size_t nev = 0;
-  __wasi_errno_t err = __wasi_poll_oneoff(&sub, &event, 1, &nev);
-  if (err) return sp_sys_err_from_wasi(err);
-  return SP_OK;
+  if (__wasi_poll_oneoff(&sub, &event, 1, &nev)) return -1;
+  return 0;
 }
 
-sp_err_t sp_sys_fds_wait_p(const sp_sys_fd_t* fds, u8* ready, u64 nfds) {
-  if (nfds == 0) return SP_OK;
-  if (nfds > SP_SYS_FDS_WAIT_CAP) { sp_unreachable_return(SP_ERR_SYS_BUG); }
+s32 sp_sys_fds_wait_p(const sp_sys_fd_t* fds, u8* ready, u64 nfds) {
+  if (nfds == 0) return 0;
+  if (nfds > SP_SYS_FDS_WAIT_CAP) return -1;
   __wasi_subscription_t subs[SP_SYS_FDS_WAIT_CAP];
   __wasi_event_t        events[SP_SYS_FDS_WAIT_CAP];
   for (u64 i = 0; i < nfds; i++) {
@@ -7345,391 +6501,66 @@ sp_err_t sp_sys_fds_wait_p(const sp_sys_fd_t* fds, u8* ready, u64 nfds) {
     ready[i] = 0;
   }
   __wasi_size_t nev = 0;
-  __wasi_errno_t err = __wasi_poll_oneoff(subs, events, (__wasi_size_t)nfds, &nev);
-  if (err) return sp_sys_err_from_wasi(err);
+  if (__wasi_poll_oneoff(subs, events, (__wasi_size_t)nfds, &nev)) return -1;
+  s32 count = 0;
   for (__wasi_size_t i = 0; i < nev; i++) {
     u64 idx = (u64)events[i].userdata;
-    if (idx < nfds) ready[idx] = 1;
+    if (idx < nfds && !ready[idx]) {
+      ready[idx] = 1;
+      count++;
+    }
   }
-  return SP_OK;
+  return count;
 }
 
 #else
-sp_err_t sp_sys_fd_ready_p(sp_sys_fd_t fd, u8* ready) {
+s32 sp_sys_fd_ready_p(sp_sys_fd_t fd, u8* ready) {
   *ready = 0;
   struct pollfd pfd = { .fd = fd, .events = POLLIN };
-  s32 r;
-  do {
-    r = (s32)poll(&pfd, 1, 0);
-  } while (r < 0 && errno == EINTR);
-  if (r < 0) return sp_sys_err_from_errno(errno);
-  if (r > 0 && (pfd.revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL))) *ready = 1;
-  return SP_OK;
+  s32 r = (s32)poll(&pfd, 1, 0);
+  if (r < 0) return -1;
+  if (r > 0 && (pfd.revents & (POLLIN | POLLHUP | POLLERR))) *ready = 1;
+  return 0;
 }
 
-sp_err_t sp_sys_fd_wait_p(sp_sys_fd_t fd) {
+s32 sp_sys_fd_wait_p(sp_sys_fd_t fd) {
   struct pollfd pfd = { .fd = fd, .events = POLLIN };
-  s32 r;
-  do {
-    r = (s32)poll(&pfd, 1, -1);
-  } while (r < 0 && errno == EINTR);
-  if (r < 0) return sp_sys_err_from_errno(errno);
-  return SP_OK;
+  s32 r = (s32)poll(&pfd, 1, -1);
+  return r < 0 ? -1 : 0;
 }
 
-sp_err_t sp_sys_fds_wait_p(const sp_sys_fd_t* fds, u8* ready, u64 nfds) {
-  if (nfds == 0) return SP_OK;
-  if (nfds > SP_SYS_FDS_WAIT_CAP) { sp_unreachable_return(SP_ERR_SYS_BUG); }
+s32 sp_sys_fds_wait_p(const sp_sys_fd_t* fds, u8* ready, u64 nfds) {
+  if (nfds == 0) return 0;
+  if (nfds > SP_SYS_FDS_WAIT_CAP) return -1;
   struct pollfd pfds[SP_SYS_FDS_WAIT_CAP];
   for (u64 i = 0; i < nfds; i++) {
     pfds[i] = (struct pollfd){ .fd = fds[i], .events = POLLIN };
     ready[i] = 0;
   }
-  s32 r;
-  do {
-    r = (s32)poll(pfds, (nfds_t)nfds, -1);
-  } while (r < 0 && errno == EINTR);
-  if (r < 0) return sp_sys_err_from_errno(errno);
+  s32 r = (s32)poll(pfds, (nfds_t)nfds, -1);
+  if (r < 0) return -1;
+  s32 count = 0;
   for (u64 i = 0; i < nfds; i++) {
-    if (pfds[i].revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL)) {
+    if (pfds[i].revents & (POLLIN | POLLHUP | POLLERR)) {
       ready[i] = 1;
+      count++;
     }
   }
-  return SP_OK;
+  return count;
 }
 
 #endif
-
-////////////
-// SP_TTY //
-////////////
-#if defined(SP_WIN32)
-  typedef struct {
-    u32 mode;
-    u32 input_cp;
-    u32 output_cp;
-  } sp_console_t;
-
-  sp_static_assert(sizeof(sp_console_t) <= SP_SYS_TTY_ATTR_SIZE, tty_attr_fits);
-#elif defined(SP_LINUX)
-  typedef sp_sys_termios_t sp_termios_t;
-
-  sp_static_assert(sizeof(sp_termios_t) <= SP_SYS_TTY_ATTR_SIZE, tty_attr_fits);
-#elif defined(SP_MACOS) || defined(SP_COSMO)
-  typedef struct termios sp_termios_t;
-
-  sp_static_assert(sizeof(sp_termios_t) <= SP_SYS_TTY_ATTR_SIZE, tty_attr_fits);
-#endif
-
-////////////////////
-// SP_SYS_TTY_GET //
-////////////////////
-sp_err_t sp_sys_tty_get_p(sp_sys_fd_t fd, sp_sys_tty_attr_t* attr) {
-  *attr = sp_zero_s(sp_sys_tty_attr_t);
-
-#if defined(SP_WIN32)
-  HANDLE handle = (HANDLE)fd;
-  if (handle == INVALID_HANDLE_VALUE || handle == SP_NULLPTR) return SP_ERR_SYS_BAD_FD;
-  DWORD mode = 0;
-  if (!GetConsoleMode(handle, &mode)) return sp_sys_tty_err_from_win32(GetLastError());
-  UINT input_cp = GetConsoleCP();
-  if (!input_cp) return sp_sys_tty_err_from_win32(GetLastError());
-  UINT output_cp = GetConsoleOutputCP();
-  if (!output_cp) return sp_sys_tty_err_from_win32(GetLastError());
-
-  sp_console_t* console = (sp_console_t*)(void*)attr->opaque;
-  console->mode = (u32)mode;
-  console->input_cp = (u32)input_cp;
-  console->output_cp = (u32)output_cp;
-  attr->present = true;
-  return SP_OK;
-
-#elif defined(SP_LINUX)
-  s64 rc = sp_syscall_retry(SP_SYSCALL_NUM_IOCTL, fd, SP_TCGETS, attr->opaque);
-  if (rc < 0) return sp_sys_err_from_errno(-rc);
-  attr->present = true;
-  return SP_OK;
-
-#elif defined(SP_MACOS) || defined(SP_COSMO)
-  s32 rc;
-  do {
-    rc = tcgetattr(fd, (sp_termios_t*)(void*)attr->opaque);
-  } while (rc == -1 && errno == SP_EINTR);
-  if (rc < 0) return sp_sys_err_from_errno(errno);
-  attr->present = true;
-  return SP_OK;
-
-#elif defined(SP_WASM)
-  return SP_ERR_SYS_UNSUPPORTED;
-
-#else
-  #error "sp_sys_tty_get"
-#endif
-}
-
-////////////////////
-// SP_SYS_TTY_SET //
-////////////////////
-sp_err_t sp_sys_tty_set_p(sp_sys_fd_t fd, const sp_sys_tty_attr_t* attr) {
-  if (!attr->present) return SP_OK;
-
-#if defined(SP_WIN32)
-  HANDLE handle = (HANDLE)fd;
-  if (handle == INVALID_HANDLE_VALUE || handle == SP_NULLPTR) return SP_ERR_SYS_BAD_FD;
-  const sp_console_t* console = (const sp_console_t*)(const void*)attr->opaque;
-  if (!SetConsoleMode(handle, (DWORD)console->mode)) return sp_sys_tty_err_from_win32(GetLastError());
-  if (!SetConsoleCP((UINT)console->input_cp)) return sp_sys_tty_err_from_win32(GetLastError());
-  if (!SetConsoleOutputCP((UINT)console->output_cp)) return sp_sys_tty_err_from_win32(GetLastError());
-  return SP_OK;
-
-#elif defined(SP_LINUX)
-  s64 rc = sp_syscall_retry(SP_SYSCALL_NUM_IOCTL, fd, SP_TCSETS + (u64)SP_TCSAFLUSH, attr->opaque);
-  if (rc < 0) return sp_sys_err_from_errno(-rc);
-  return SP_OK;
-
-#elif defined(SP_MACOS) || defined(SP_COSMO)
-  s32 rc;
-  do {
-    rc = tcsetattr(fd, SP_TCSAFLUSH, (const sp_termios_t*)(const void*)attr->opaque);
-  } while (rc == -1 && errno == SP_EINTR);
-  if (rc < 0) return sp_sys_err_from_errno(errno);
-  return SP_OK;
-
-#elif defined(SP_WASM)
-  return SP_ERR_SYS_UNSUPPORTED;
-
-#else
-  #error "sp_sys_tty_set"
-#endif
-}
-
-/////////////////////
-// SP_SYS_TTY_SIZE //
-/////////////////////
-sp_err_t sp_sys_tty_size_p(sp_sys_fd_t fd, u32* cols, u32* rows) {
-  if (cols) *cols = 0;
-  if (rows) *rows = 0;
-
-#if defined(SP_WIN32)
-  HANDLE handle = (HANDLE)fd;
-  if (handle == INVALID_HANDLE_VALUE || handle == SP_NULLPTR) return SP_ERR_SYS_BAD_FD;
-  CONSOLE_SCREEN_BUFFER_INFO csbi;
-  if (!GetConsoleScreenBufferInfo(handle, &csbi)) return sp_sys_tty_err_from_win32(GetLastError());
-  if (cols) *cols = (u32)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
-  if (rows) *rows = (u32)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
-  return SP_OK;
-
-#elif defined(SP_LINUX)
-  sp_sys_winsize_t ws = sp_zero;
-  s64 rc = sp_syscall_retry(SP_SYSCALL_NUM_IOCTL, fd, SP_TIOCGWINSZ, &ws);
-  if (rc < 0) return sp_sys_err_from_errno(-rc);
-  if (cols) *cols = (u32)ws.ws_col;
-  if (rows) *rows = (u32)ws.ws_row;
-  return SP_OK;
-
-#elif defined(SP_MACOS) || defined(SP_COSMO)
-  struct winsize ws = sp_zero;
-  s32 rc;
-  do {
-    rc = ioctl(fd, SP_TIOCGWINSZ, &ws);
-  } while (rc == -1 && errno == SP_EINTR);
-  if (rc < 0) return sp_sys_err_from_errno(errno);
-  if (cols) *cols = (u32)ws.ws_col;
-  if (rows) *rows = (u32)ws.ws_row;
-  return SP_OK;
-
-#elif defined(SP_WASM)
-  return SP_ERR_SYS_UNSUPPORTED;
-
-#else
-  #error "sp_sys_tty_size"
-#endif
-}
-
-///////////////////
-// SP_SYS_IS_TTY //
-///////////////////
-#if defined(SP_WIN32)
-SP_PRIVATE bool sp_sys_tty_win32_is_pty(HANDLE handle) {
-  if (GetFileType(handle) != FILE_TYPE_PIPE) return false;
-
-  struct {
-    FILE_NAME_INFO info;
-    WCHAR tail [SP_PATH_MAX];
-  } raw = sp_zero;
-  if (!GetFileInformationByHandleEx(handle, FileNameInfo, &raw, sizeof(raw))) return false;
-
-  const u16* wide = (const u16*)(const void*)raw.info.FileName;
-  u32 wide_len = (u32)(raw.info.FileNameLength / sizeof(WCHAR));
-  if (wide_len > SP_PATH_MAX) wide_len = SP_PATH_MAX;
-
-  c8 buf [SP_PATH_MAX];
-  sp_for(it, wide_len) {
-    buf[it] = wide[it] < 128 ? (c8)wide[it] : '?';
-  }
-
-  sp_str_t name = (sp_str_t) { .data = buf, .len = wide_len };
-  sp_for(it, wide_len) {
-    u32 index = wide_len - 1 - it;
-    if (buf[index] == '\\' || buf[index] == '/') {
-      name = sp_str_sub(name, (s32)index + 1, (s32)(wide_len - index - 1));
-      break;
-    }
-  }
-
-  bool named = sp_str_starts_with(name, sp_str_lit("msys-")) || sp_str_starts_with(name, sp_str_lit("cygwin-"));
-  return named && sp_str_contains(name, sp_str_lit("-pty"));
-}
-#endif
-
-bool sp_sys_is_tty_p(sp_sys_fd_t fd) {
-#if defined(SP_WIN32)
-  HANDLE handle = (HANDLE)fd;
-  if (handle == INVALID_HANDLE_VALUE || handle == SP_NULLPTR) return false;
-
-  DWORD mode = 0;
-  if (GetConsoleMode(handle, &mode)) return true;
-  return sp_sys_tty_win32_is_pty(handle);
-
-#elif defined(SP_LINUX)
-  sp_termios_t t = sp_zero;
-  return sp_syscall_retry(SP_SYSCALL_NUM_IOCTL, fd, SP_TCGETS, &t) >= 0;
-
-#elif defined(SP_MACOS) || defined(SP_COSMO)
-  sp_termios_t t = sp_zero;
-  s32 rc;
-  do {
-    rc = tcgetattr(fd, &t);
-  } while (rc == -1 && errno == SP_EINTR);
-  return rc == 0;
-
-#elif defined(SP_WASM)
-  return false;
-
-#else
-  #error "sp_sys_is_tty"
-#endif
-}
-
-///////////////////////////
-// SP_SYS_TTY_MODE_APPLY //
-///////////////////////////
-#if defined(SP_LINUX) || defined(SP_MACOS) || defined(SP_COSMO)
-SP_PRIVATE void sp_sys_tty_mode_apply_termios(sp_termios_t* t, sp_sys_tty_mode_t mode) {
-  switch (mode) {
-    case SP_SYS_TTY_MODE_COOKED: {
-      t->c_iflag |= (u32)(SP_BRKINT | SP_ICRNL | SP_IXON);
-      t->c_oflag |= (u32)SP_OPOST;
-      t->c_lflag |= (u32)(SP_ECHO | SP_ICANON | SP_IEXTEN | SP_ISIG);
-      break;
-    }
-    case SP_SYS_TTY_MODE_RAW: {
-      t->c_iflag &= (u32)~(SP_BRKINT | SP_ICRNL | SP_INPCK | SP_ISTRIP | SP_IXON);
-      t->c_oflag &= (u32)~(SP_OPOST);
-      t->c_cflag |= (u32)SP_CS8;
-      t->c_lflag &= (u32)~(SP_ECHO | SP_ICANON | SP_IEXTEN | SP_ISIG);
-      t->c_cc[SP_VMIN] = 1;
-      t->c_cc[SP_VTIME] = 0;
-      break;
-    }
-    case SP_SYS_TTY_MODE_NO_ECHO: {
-      t->c_lflag &= (u32)~(SP_ECHO);
-      t->c_lflag |= (u32)(SP_ICANON | SP_ISIG);
-      break;
-    }
-  }
-}
-#endif
-
-sp_err_t sp_sys_tty_mode_apply_p(sp_sys_tty_attr_t* in, sp_sys_tty_attr_t* out, sp_sys_tty_mode_t mode) {
-  if (!in->present) return SP_ERR_SYS_NOT_TTY;
-
-#if defined(SP_WIN32)
-  sp_console_t* console_in = (sp_console_t*)(void*)in->opaque;
-  sp_console_t* console_out = (sp_console_t*)(void*)out->opaque;
-
-  switch (mode) {
-    case SP_SYS_TTY_MODE_COOKED: {
-      console_in->mode |= (u32)(ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT);
-      break;
-    }
-    case SP_SYS_TTY_MODE_RAW: {
-      console_in->mode = (u32)ENABLE_VIRTUAL_TERMINAL_INPUT;
-      console_in->input_cp = (u32)CP_UTF8;
-      console_in->output_cp = (u32)CP_UTF8;
-      if (out->present) {
-        console_out->mode |= (u32)(ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
-        console_out->input_cp = (u32)CP_UTF8;
-        console_out->output_cp = (u32)CP_UTF8;
-      }
-      break;
-    }
-    case SP_SYS_TTY_MODE_NO_ECHO: {
-      console_in->mode &= (u32)~(ENABLE_ECHO_INPUT);
-      console_in->mode |= (u32)(ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT);
-      break;
-    }
-  }
-  return SP_OK;
-
-#elif defined(SP_LINUX) || defined(SP_MACOS) || defined(SP_COSMO)
-  sp_sys_tty_mode_apply_termios((sp_termios_t*)(void*)in->opaque, mode);
-  if (out->present) sp_sys_tty_mode_apply_termios((sp_termios_t*)(void*)out->opaque, mode);
-  return SP_OK;
-
-#elif defined(SP_WASM)
-  return SP_ERR_SYS_UNSUPPORTED;
-
-#else
-  #error "sp_sys_tty_mode_apply"
-#endif
-}
-
-///////////////////////
-// SP_SYS_TTY_USE_VT //
-///////////////////////
-sp_err_t sp_sys_tty_use_vt_p(sp_sys_fd_t fd) {
-#if defined(SP_WIN32)
-  HANDLE handle = (HANDLE)fd;
-  if (handle == INVALID_HANDLE_VALUE || handle == SP_NULLPTR) return SP_ERR_SYS_BAD_FD;
-  DWORD mode = 0;
-  if (!GetConsoleMode(handle, &mode)) return sp_sys_tty_err_from_win32(GetLastError());
-  if (mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) return SP_OK;
-  if (!SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING)) {
-    return sp_sys_tty_err_from_win32(GetLastError());
-  }
-  return SP_OK;
-
-#elif defined(SP_LINUX) || defined(SP_MACOS) || defined(SP_COSMO) || defined(SP_WASM)
-  (void)fd;
-  return SP_OK;
-
-#else
-  #error "sp_sys_tty_use_vt"
-#endif
-}
 
 ///////////////////////
 // SP_SYS_SOCKET_WIN32 //
 ///////////////////////
 #if defined(SP_WIN32)
-#define SP_WS2_LOAD_FUNCTION(ret, name, args) \
-    ws2->name = (ret (__stdcall*) args)(void(*)(void))GetProcAddress(h, #name);
-
-SP_PRIVATE bool sp_sys_win32_ws2_ensure(void) {
-  static bool ready = false;
-  if (ready) return true;
-
-  HMODULE h = LoadLibraryW(L"ws2_32.dll");
-  if (!h) return false;
-
-  sp_ws2_dispatch_t* ws2 = &sp_rt.ws2;
-  SP_WS2_FUNCTIONS(SP_WS2_LOAD_FUNCTION)
-
+SP_PRIVATE void sp_sys_win32_wsa_ensure(void) {
+  static bool wsa_init = false;
+  if (wsa_init) return;
   WSADATA wsa = sp_zero;
-  ws2->WSAStartup(MAKEWORD(2, 2), &wsa);
-  ready = true;
-  return true;
+  WSAStartup(MAKEWORD(2, 2), &wsa);
+  wsa_init = true;
 }
 
 #define SP_SYS_WIN32_SIO_TCP_INITIAL_RTO                          0x98000011
@@ -7765,220 +6596,153 @@ SP_PRIVATE void sp_sys_win32_speed_up_loopback_connect(SOCKET fd) {
   params.rtt = SP_SYS_WIN32_TCP_INITIAL_RTO_UNSPECIFIED_RTT;
   params.max_syn_retransmissions = sp_sys_win32_supports_tcp_fail_fast() ? SP_SYS_WIN32_TCP_INITIAL_RTO_NO_SYN_RETRANSMISSIONS : 1;
   DWORD bytes = 0;
-  sp_rt.ws2.WSAIoctl(fd, SP_SYS_WIN32_SIO_TCP_INITIAL_RTO, &params, sizeof(params), SP_NULLPTR, 0, &bytes, SP_NULLPTR, SP_NULLPTR);
+  WSAIoctl(fd, SP_SYS_WIN32_SIO_TCP_INITIAL_RTO, &params, sizeof(params), SP_NULLPTR, 0, &bytes, SP_NULLPTR, SP_NULLPTR);
 }
 #endif
 
 //////////////////////
 // SP_SYS_SOCKET_WAIT //
 //////////////////////
-#if defined(SP_LINUX) || defined(SP_MACOS) || defined(SP_COSMO)
-SP_PRIVATE u64 sp_sys_ns_from_timespec(s64 sec, s64 nsec) {
-  return (u64)sec * SP_TM_S_TO_NS + (u64)nsec;
-}
-#endif
-
-sp_err_t sp_sys_socket_wait_p(sp_sys_socket_t socket, bool readable, u32 timeout_ms) {
+s32 sp_sys_socket_wait_p(sp_sys_socket_t socket, bool readable, u32 timeout_ms) {
 #if defined(SP_WIN32)
-  if (!sp_sys_win32_ws2_ensure()) return SP_ERR_SYS_UNSUPPORTED;
   WSAPOLLFD pfd = sp_zero;
   pfd.fd = (SOCKET)socket;
   pfd.events = readable ? POLLRDNORM : POLLWRNORM;
-  s32 rc = sp_rt.ws2.WSAPoll(&pfd, 1, timeout_ms ? (INT)sp_min(timeout_ms, (u32)SP_LIMIT_S32_MAX) : -1);
-  if (rc < 0) return sp_sys_err_from_wsa(sp_rt.ws2.WSAGetLastError());
-  return rc > 0 ? SP_OK : SP_ERR_SYS_TIMED_OUT;
+  s32 rc = WSAPoll(&pfd, 1, timeout_ms ? (INT)sp_min(timeout_ms, (u32)SP_LIMIT_S32_MAX) : -1);
+  if (rc < 0) return -1;
+  return rc > 0 ? 0 : 1;
 
 #elif defined(SP_LINUX)
-  u64 deadline_ns = 0;
-  u64 remaining_ns = (u64)timeout_ms * SP_TM_MS_TO_NS;
-  if (timeout_ms) {
-    sp_sys_timespec_t now = sp_zero;
-    sp_syscall(SP_SYSCALL_NUM_CLOCK_GETTIME, SP_CLOCK_MONOTONIC, &now);
-    deadline_ns = sp_sys_ns_from_timespec(now.tv_sec, now.tv_nsec) + remaining_ns;
-  }
   while (true) {
     sp_sys_linux_pollfd_t pfd = {
       .fd = socket,
       .events = (s16)(readable ? SP_SYS_LINUX_POLLIN : SP_SYS_LINUX_POLLOUT),
     };
-    sp_sys_timespec_t ts = {
-      .tv_sec = (s64)(remaining_ns / SP_TM_S_TO_NS),
-      .tv_nsec = (s64)(remaining_ns % SP_TM_S_TO_NS),
-    };
+    sp_sys_timespec_t ts = { (s64)(timeout_ms / 1000), (s64)(timeout_ms % 1000) * 1000000 };
     s64 rc = sp_syscall(SP_SYSCALL_NUM_PPOLL, &pfd, 1, timeout_ms ? &ts : SP_NULLPTR, 0, 0);
-    if (rc == -SP_EINTR) {
-      if (timeout_ms) {
-        sp_sys_timespec_t now = sp_zero;
-        sp_syscall(SP_SYSCALL_NUM_CLOCK_GETTIME, SP_CLOCK_MONOTONIC, &now);
-        u64 now_ns = sp_sys_ns_from_timespec(now.tv_sec, now.tv_nsec);
-        if (now_ns >= deadline_ns) return SP_ERR_SYS_TIMED_OUT;
-        remaining_ns = deadline_ns - now_ns;
-      }
-      continue;
-    }
-    if (rc < 0) return sp_sys_err_from_errno(-rc);
-    return rc > 0 ? SP_OK : SP_ERR_SYS_TIMED_OUT;
+    if (rc == -1 && errno == SP_EINTR) continue;
+    if (rc < 0) return -1;
+    return rc > 0 ? 0 : 1;
   }
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
-  u64 deadline_ns = 0;
-  s32 remaining_ms = timeout_ms ? (s32)sp_min(timeout_ms, (u32)SP_LIMIT_S32_MAX) : -1;
-  if (timeout_ms) {
-    struct timespec now = sp_zero;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    deadline_ns = sp_sys_ns_from_timespec((s64)now.tv_sec, (s64)now.tv_nsec) + (u64)timeout_ms * SP_TM_MS_TO_NS;
-  }
   while (true) {
     struct pollfd pfd = { .fd = socket, .events = (s16)(readable ? POLLIN : POLLOUT) };
-    s32 rc = poll(&pfd, 1, remaining_ms);
-    if (rc < 0 && errno == EINTR) {
-      if (timeout_ms) {
-        struct timespec now = sp_zero;
-        clock_gettime(CLOCK_MONOTONIC, &now);
-        u64 now_ns = sp_sys_ns_from_timespec((s64)now.tv_sec, (s64)now.tv_nsec);
-        if (now_ns >= deadline_ns) return SP_ERR_SYS_TIMED_OUT;
-        remaining_ms = (s32)sp_min((deadline_ns - now_ns) / SP_TM_MS_TO_NS + 1, (u64)SP_LIMIT_S32_MAX);
-      }
-      continue;
-    }
-    if (rc < 0) return sp_sys_err_from_errno(errno);
-    return rc > 0 ? SP_OK : SP_ERR_SYS_TIMED_OUT;
+    s32 rc = poll(&pfd, 1, timeout_ms ? (s32)sp_min(timeout_ms, (u32)SP_LIMIT_S32_MAX) : -1);
+    if (rc < 0 && errno == EINTR) continue;
+    if (rc < 0) return -1;
+    return rc > 0 ? 0 : 1;
   }
 
 #else
   (void)socket; (void)readable; (void)timeout_ms;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 #endif
 }
 
 /////////////////////////////////
 // SP_SYS_SOCKET_SET_NONBLOCKING //
 /////////////////////////////////
-sp_err_t sp_sys_socket_set_nonblocking_p(sp_sys_socket_t socket) {
+s32 sp_sys_socket_set_nonblocking_p(sp_sys_socket_t socket) {
 #if defined(SP_WIN32)
-  if (!sp_sys_win32_ws2_ensure()) return SP_ERR_SYS_UNSUPPORTED;
   u_long nonblock = 1;
-  if (sp_rt.ws2.ioctlsocket((SOCKET)socket, FIONBIO, &nonblock) != 0) {
-    return sp_sys_err_from_wsa(sp_rt.ws2.WSAGetLastError());
-  }
-  return SP_OK;
+  return ioctlsocket((SOCKET)socket, FIONBIO, &nonblock) == 0 ? 0 : -1;
 
 #elif defined(SP_LINUX)
   s64 flags = sp_syscall(SP_SYSCALL_NUM_FCNTL, socket, SP_F_GETFL, 0);
-  if (flags < 0) return sp_sys_err_from_errno(-flags);
-  s64 rc = sp_syscall(SP_SYSCALL_NUM_FCNTL, socket, SP_F_SETFL, flags | SP_SYS_LINUX_O_NONBLOCK);
-  if (rc < 0) return sp_sys_err_from_errno(-rc);
-  return SP_OK;
+  if (flags < 0) return -1;
+  return sp_syscall(SP_SYSCALL_NUM_FCNTL, socket, SP_F_SETFL, flags | SP_O_NONBLOCK) < 0 ? -1 : 0;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   int flags = fcntl(socket, F_GETFL, 0);
-  if (flags < 0) return sp_sys_err_from_errno(errno);
-  if (fcntl(socket, F_SETFL, flags | O_NONBLOCK) < 0) {
-    return sp_sys_err_from_errno(errno);
-  }
-  return SP_OK;
+  if (flags < 0) return -1;
+  return fcntl(socket, F_SETFL, flags | O_NONBLOCK) < 0 ? -1 : 0;
 
 #else
   (void)socket;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 #endif
 }
 
 //////////////////////////////
 // SP_SYS_SOCKET_REUSE_ADDR //
 //////////////////////////////
-sp_err_t sp_sys_socket_reuse_addr_p(sp_sys_socket_t socket) {
+s32 sp_sys_socket_reuse_addr_p(sp_sys_socket_t socket) {
 #if defined(SP_WIN32)
-  if (!sp_sys_win32_ws2_ensure()) return SP_ERR_SYS_UNSUPPORTED;
   BOOL reuse = TRUE;
-  if (sp_rt.ws2.setsockopt((SOCKET)socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) != 0) {
-    return sp_sys_err_from_wsa(sp_rt.ws2.WSAGetLastError());
-  }
-  return SP_OK;
+  return setsockopt((SOCKET)socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) == 0 ? 0 : -1;
 
 #elif defined(SP_LINUX)
   s32 reuse = 1;
-  s64 rc = sp_syscall(SP_SYSCALL_NUM_SETSOCKOPT, socket, SP_SYS_LINUX_SOL_SOCKET, SP_SYS_LINUX_SO_REUSEADDR, &reuse, sizeof(reuse));
-  if (rc < 0) return sp_sys_err_from_errno(-rc);
-  return SP_OK;
+  return sp_syscall(SP_SYSCALL_NUM_SETSOCKOPT, socket, SP_SYS_LINUX_SOL_SOCKET, SP_SYS_LINUX_SO_REUSEADDR, &reuse, sizeof(reuse)) == 0 ? 0 : -1;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   int reuse = 1;
-  if (setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) != 0) {
-    return sp_sys_err_from_errno(errno);
-  }
-  return SP_OK;
+  return setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == 0 ? 0 : -1;
 
 #else
   (void)socket;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 #endif
 }
 
 //////////////////////
 // SP_SYS_SOCKET_OPEN //
 //////////////////////
-sp_err_t sp_sys_socket_open_p(sp_sys_socket_t* out) {
+s32 sp_sys_socket_open_p(sp_sys_socket_t* out) {
   *out = SP_SYS_INVALID_SOCKET;
 
 #if defined(SP_WIN32)
-  if (!sp_sys_win32_ws2_ensure()) return SP_ERR_SYS_UNSUPPORTED;
-  SOCKET fd = sp_rt.ws2.socket(AF_INET, SOCK_STREAM, 0);
-  if (fd == INVALID_SOCKET) return sp_sys_err_from_wsa(sp_rt.ws2.WSAGetLastError());
-  sp_err_t err = sp_sys_socket_set_nonblocking((sp_sys_socket_t)fd);
-  if (err != SP_OK) {
-    sp_rt.ws2.closesocket(fd);
-    return err;
+  sp_sys_win32_wsa_ensure();
+  SOCKET fd = socket(AF_INET, SOCK_STREAM, 0);
+  if (fd == INVALID_SOCKET) return -1;
+  if (sp_sys_socket_set_nonblocking((sp_sys_socket_t)fd) != 0) {
+    closesocket(fd);
+    return -1;
   }
   *out = (sp_sys_socket_t)fd;
-  return SP_OK;
+  return 0;
 
 #elif defined(SP_LINUX)
   s64 fd = sp_syscall(SP_SYSCALL_NUM_SOCKET, SP_SYS_LINUX_AF_INET, SP_SYS_LINUX_SOCK_STREAM, 0);
-  if (fd < 0) return sp_sys_err_from_errno(-fd);
-  sp_err_t err = sp_sys_socket_set_nonblocking((sp_sys_socket_t)fd);
-  if (err != SP_OK) {
+  if (fd < 0) return -1;
+  if (sp_sys_socket_set_nonblocking((sp_sys_socket_t)fd) != 0) {
     sp_syscall(SP_SYSCALL_NUM_CLOSE, fd);
-    return err;
+    return -1;
   }
   *out = (sp_sys_socket_t)fd;
-  return SP_OK;
+  return 0;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   int fd = socket(AF_INET, SOCK_STREAM, 0);
-  if (fd < 0) return sp_sys_err_from_errno(errno);
+  if (fd < 0) return -1;
 #if defined(SP_MACOS)
   int nosigpipe = 1;
   setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &nosigpipe, sizeof(nosigpipe));
 #endif
-  sp_err_t err = sp_sys_socket_set_nonblocking((sp_sys_socket_t)fd);
-  if (err != SP_OK) {
+  if (sp_sys_socket_set_nonblocking((sp_sys_socket_t)fd) != 0) {
     close(fd);
-    return err;
+    return -1;
   }
   *out = (sp_sys_socket_t)fd;
-  return SP_OK;
+  return 0;
 
 #else
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 #endif
 }
 
 //////////////////////
 // SP_SYS_SOCKET_BIND //
 //////////////////////
-sp_err_t sp_sys_socket_bind_p(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
+s32 sp_sys_socket_bind_p(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
 #if defined(SP_WIN32)
-  if (!sp_sys_win32_ws2_ensure()) return SP_ERR_SYS_UNSUPPORTED;
   struct sockaddr_in sa = sp_zero;
   sa.sin_family = AF_INET;
   ((u8*)&sa.sin_port)[0] = (u8)(addr.port >> 8);
   ((u8*)&sa.sin_port)[1] = (u8)(addr.port & 0xFF);
   sp_mem_copy(&sa.sin_addr, addr.octets, 4);
-  if (sp_rt.ws2.bind((SOCKET)socket, (struct sockaddr*)&sa, sizeof(sa)) != 0) {
-    return sp_sys_err_from_wsa(sp_rt.ws2.WSAGetLastError());
-  }
-  return SP_OK;
+  return bind((SOCKET)socket, (struct sockaddr*)&sa, sizeof(sa)) == 0 ? 0 : -1;
 
 #elif defined(SP_LINUX)
   sp_sys_linux_sockaddr_in_t sa = sp_zero;
@@ -7986,9 +6750,7 @@ sp_err_t sp_sys_socket_bind_p(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
   sa.port[0] = (u8)(addr.port >> 8);
   sa.port[1] = (u8)(addr.port & 0xFF);
   sp_mem_copy(sa.addr, addr.octets, 4);
-  s64 rc = sp_syscall(SP_SYSCALL_NUM_BIND, socket, &sa, sizeof(sa));
-  if (rc < 0) return sp_sys_err_from_errno(-rc);
-  return SP_OK;
+  return sp_syscall(SP_SYSCALL_NUM_BIND, socket, &sa, sizeof(sa)) == 0 ? 0 : -1;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   struct sockaddr_in sa = sp_zero;
@@ -7996,47 +6758,38 @@ sp_err_t sp_sys_socket_bind_p(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
   ((u8*)&sa.sin_port)[0] = (u8)(addr.port >> 8);
   ((u8*)&sa.sin_port)[1] = (u8)(addr.port & 0xFF);
   sp_mem_copy(&sa.sin_addr, addr.octets, 4);
-  if (bind(socket, (struct sockaddr*)&sa, sizeof(sa)) != 0) {
-    return sp_sys_err_from_errno(errno);
-  }
-  return SP_OK;
+  return bind(socket, (struct sockaddr*)&sa, sizeof(sa)) == 0 ? 0 : -1;
 
 #else
   (void)socket; (void)addr;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 #endif
 }
 
 ////////////////////////
 // SP_SYS_SOCKET_LISTEN //
 ////////////////////////
-sp_err_t sp_sys_socket_listen_p(sp_sys_socket_t socket, u32 backlog) {
+s32 sp_sys_socket_listen_p(sp_sys_socket_t socket, u32 backlog) {
 #if defined(SP_WIN32)
-  if (!sp_sys_win32_ws2_ensure()) return SP_ERR_SYS_UNSUPPORTED;
-  if (sp_rt.ws2.listen((SOCKET)socket, (int)backlog) != 0) return sp_sys_err_from_wsa(sp_rt.ws2.WSAGetLastError());
-  return SP_OK;
+  return listen((SOCKET)socket, (int)backlog) == 0 ? 0 : -1;
 
 #elif defined(SP_LINUX)
-  s64 rc = sp_syscall(SP_SYSCALL_NUM_LISTEN, socket, backlog);
-  if (rc < 0) return sp_sys_err_from_errno(-rc);
-  return SP_OK;
+  return sp_syscall(SP_SYSCALL_NUM_LISTEN, socket, backlog) == 0 ? 0 : -1;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
-  if (listen(socket, (int)backlog) != 0) return sp_sys_err_from_errno(errno);
-  return SP_OK;
+  return listen(socket, (int)backlog) == 0 ? 0 : -1;
 
 #else
   (void)socket; (void)backlog;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 #endif
 }
 
 /////////////////////////
 // SP_SYS_SOCKET_CONNECT //
 /////////////////////////
-sp_err_t sp_sys_socket_connect_p(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
+s32 sp_sys_socket_connect_p(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
 #if defined(SP_WIN32)
-  if (!sp_sys_win32_ws2_ensure()) return SP_ERR_SYS_UNSUPPORTED;
   if (addr.octets[0] == 127) sp_sys_win32_speed_up_loopback_connect((SOCKET)socket);
 
   struct sockaddr_in sa = sp_zero;
@@ -8045,8 +6798,8 @@ sp_err_t sp_sys_socket_connect_p(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
   ((u8*)&sa.sin_port)[1] = (u8)(addr.port & 0xFF);
   sp_mem_copy(&sa.sin_addr, addr.octets, 4);
 
-  if (sp_rt.ws2.connect((SOCKET)socket, (struct sockaddr*)&sa, sizeof(sa)) == 0) return SP_OK;
-  return sp_sys_err_from_wsa(sp_rt.ws2.WSAGetLastError());
+  if (connect((SOCKET)socket, (struct sockaddr*)&sa, sizeof(sa)) == 0) return 0;
+  return WSAGetLastError() == WSAEWOULDBLOCK ? 1 : -1;
 
 #elif defined(SP_LINUX)
   sp_sys_linux_sockaddr_in_t sa = sp_zero;
@@ -8055,12 +6808,10 @@ sp_err_t sp_sys_socket_connect_p(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
   sa.port[1] = (u8)(addr.port & 0xFF);
   sp_mem_copy(sa.addr, addr.octets, 4);
 
-  s64 rc = sp_syscall(SP_SYSCALL_NUM_CONNECT, socket, &sa, sizeof(sa));
-  if (rc == 0) return SP_OK;
+  if (sp_syscall(SP_SYSCALL_NUM_CONNECT, socket, &sa, sizeof(sa)) == 0) return 0;
   // EINTR: the attempt proceeds asynchronously; poll for completion as if
   // EINPROGRESS
-  if (rc == -SP_EINPROGRESS || rc == -SP_EINTR) return SP_ERR_SYS_WOULD_BLOCK;
-  return sp_sys_err_from_errno(-rc);
+  return (errno == SP_EINPROGRESS || errno == SP_EINTR) ? 1 : -1;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   struct sockaddr_in sa = sp_zero;
@@ -8069,108 +6820,70 @@ sp_err_t sp_sys_socket_connect_p(sp_sys_socket_t socket, sp_sys_ipv4_t addr) {
   ((u8*)&sa.sin_port)[1] = (u8)(addr.port & 0xFF);
   sp_mem_copy(&sa.sin_addr, addr.octets, 4);
 
-  if (connect(socket, (struct sockaddr*)&sa, sizeof(sa)) == 0) return SP_OK;
-  if (errno == EINPROGRESS || errno == EINTR) return SP_ERR_SYS_WOULD_BLOCK;
-  return sp_sys_err_from_errno(errno);
+  if (connect(socket, (struct sockaddr*)&sa, sizeof(sa)) == 0) return 0;
+  return (errno == EINPROGRESS || errno == EINTR) ? 1 : -1;
 
 #else
   (void)socket; (void)addr;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 #endif
 }
 
 ///////////////////////
 // SP_SYS_SOCKET_ERROR //
 ///////////////////////
-sp_err_t sp_sys_socket_error_p(sp_sys_socket_t socket) {
+s32 sp_sys_socket_error_p(sp_sys_socket_t socket) {
 #if defined(SP_WIN32)
-  if (!sp_sys_win32_ws2_ensure()) return SP_ERR_SYS_UNSUPPORTED;
   int err = 0;
   int err_len = sizeof(err);
-  if (sp_rt.ws2.getsockopt((SOCKET)socket, SOL_SOCKET, SO_ERROR, (char*)&err, &err_len) != 0) {
-    return sp_sys_err_from_wsa(sp_rt.ws2.WSAGetLastError());
-  }
-  return sp_sys_err_from_wsa(err);
+  if (getsockopt((SOCKET)socket, SOL_SOCKET, SO_ERROR, (char*)&err, &err_len) != 0) return -1;
+  return err == 0 ? 0 : -1;
 
 #elif defined(SP_LINUX)
   s32 err = 0;
   u32 err_len = sizeof(err);
-  s64 rc = sp_syscall(SP_SYSCALL_NUM_GETSOCKOPT, socket, SP_SYS_LINUX_SOL_SOCKET, SP_SYS_LINUX_SO_ERROR, &err, &err_len);
-  if (rc < 0) return sp_sys_err_from_errno(-rc);
-  return sp_sys_err_from_errno(err);
+  if (sp_syscall(SP_SYSCALL_NUM_GETSOCKOPT, socket, SP_SYS_LINUX_SOL_SOCKET, SP_SYS_LINUX_SO_ERROR, &err, &err_len) != 0) return -1;
+  return err == 0 ? 0 : -1;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   int err = 0;
   socklen_t err_len = sizeof(err);
-  if (getsockopt(socket, SOL_SOCKET, SO_ERROR, &err, &err_len) != 0) {
-    return sp_sys_err_from_errno(errno);
-  }
-  return sp_sys_err_from_errno(err);
+  if (getsockopt(socket, SOL_SOCKET, SO_ERROR, &err, &err_len) != 0) return -1;
+  return err == 0 ? 0 : -1;
 
 #else
   (void)socket;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 #endif
 }
 
 ////////////////////////
 // SP_SYS_SOCKET_ACCEPT //
 ////////////////////////
-sp_err_t sp_sys_socket_accept_p(sp_sys_socket_t listener, sp_sys_socket_t* out) {
+s32 sp_sys_socket_accept_p(sp_sys_socket_t listener, sp_sys_socket_t* out) {
   *out = SP_SYS_INVALID_SOCKET;
 
 #if defined(SP_WIN32)
-  if (!sp_sys_win32_ws2_ensure()) return SP_ERR_SYS_UNSUPPORTED;
-  while (true) {
-    SOCKET fd = sp_rt.ws2.accept((SOCKET)listener, SP_NULLPTR, SP_NULLPTR);
-    if (fd == INVALID_SOCKET) {
-      s32 e = sp_rt.ws2.WSAGetLastError();
-      if (e == WSAECONNRESET) continue;
-      return sp_sys_err_from_wsa(e);
-    }
-    sp_err_t err = sp_sys_socket_set_nonblocking((sp_sys_socket_t)fd);
-    if (err != SP_OK) {
-      sp_rt.ws2.closesocket(fd);
-      return err;
-    }
-    *out = (sp_sys_socket_t)fd;
-    return SP_OK;
+  SOCKET fd = accept((SOCKET)listener, SP_NULLPTR, SP_NULLPTR);
+  if (fd == INVALID_SOCKET) {
+    return WSAGetLastError() == WSAEWOULDBLOCK ? 1 : -1;
   }
+  if (sp_sys_socket_set_nonblocking((sp_sys_socket_t)fd) != 0) {
+    closesocket(fd);
+    return -1;
+  }
+  *out = (sp_sys_socket_t)fd;
+  return 0;
 
 #elif defined(SP_LINUX)
   while (true) {
     s64 fd = sp_syscall(SP_SYSCALL_NUM_ACCEPT4, listener, 0, 0, SP_SYS_LINUX_SOCK_NONBLOCK);
     if (fd >= 0) {
       *out = (sp_sys_socket_t)fd;
-      return SP_OK;
+      return 0;
     }
-    switch (-fd) {
-      case SP_EINTR:
-      // We got RST while parked in the accept queue, so the only things to do
-      // are (a) retry or (b) return ABORTED to the caller and let them retry.
-      // We don't want to force every caller to encode "ABORTED? Retry", so
-      // we do it.
-      //
-      // I don't think there's a valid response besides retry, caller or callee,
-      // so all you lose is tracking aborted connections. But if you're digging
-      // around in here, this is the only reason sp.h absorbs this error.
-      case SP_ECONNABORTED:
-      // If your socket already has a pending error, Linux just returns it as
-      // accept()'s own. If that happens, you should treat it like EAGAIN,
-      // because it's not the result of the syscall you just tried.
-      //
-      // The set of errors which this case yields on the protocol, but the
-      // following is what the man page says for TCP/IP.
-      case SP_EPROTO:
-      case SP_ENOPROTOOPT:
-      case SP_ENONET:
-      case SP_ENETDOWN:
-      case SP_ENETUNREACH:
-      case SP_EHOSTDOWN:
-      case SP_EHOSTUNREACH:
-      case SP_EOPNOTSUPP: continue;
-      default: return sp_sys_err_from_errno(-fd);
-    }
+    if (errno == SP_EINTR) continue;
+    return errno == SP_EAGAIN ? 1 : -1;
   }
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
@@ -8181,161 +6894,134 @@ sp_err_t sp_sys_socket_accept_p(sp_sys_socket_t listener, sp_sys_socket_t* out) 
       int nosigpipe = 1;
       setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &nosigpipe, sizeof(nosigpipe));
 #endif
-      sp_err_t err = sp_sys_socket_set_nonblocking((sp_sys_socket_t)fd);
-      if (err != SP_OK) {
+      if (sp_sys_socket_set_nonblocking((sp_sys_socket_t)fd) != 0) {
         close(fd);
-        return err;
+        return -1;
       }
       *out = (sp_sys_socket_t)fd;
-      return SP_OK;
+      return 0;
     }
-    if (errno == EINTR || errno == ECONNABORTED) continue;
-    return sp_sys_err_from_errno(errno);
+    if (errno == EINTR) continue;
+    return (errno == EAGAIN || errno == EWOULDBLOCK) ? 1 : -1;
   }
 
 #else
   (void)listener;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 #endif
 }
 
 ///////////////////////
 // SP_SYS_SOCKET_CLOSE //
 ///////////////////////
-sp_err_t sp_sys_socket_close_p(sp_sys_socket_t socket) {
+s32 sp_sys_socket_close_p(sp_sys_socket_t socket) {
 #if defined(SP_WIN32)
-  if (!sp_sys_win32_ws2_ensure()) return SP_ERR_SYS_UNSUPPORTED;
-  if (sp_rt.ws2.closesocket((SOCKET)socket) != 0) return sp_sys_err_from_wsa(sp_rt.ws2.WSAGetLastError());
-  return SP_OK;
+  return closesocket((SOCKET)socket) == 0 ? 0 : -1;
 
 #elif defined(SP_LINUX)
-  s64 rc = sp_syscall_r(SP_SYSCALL_NUM_CLOSE, socket);
-  switch (rc) {
-    case SP_EINTR:
-    case SP_EINPROGRESS: return SP_OK;
-    default:             return sp_sys_err_from_errno(rc);
-  }
+  return (s32)sp_syscall(SP_SYSCALL_NUM_CLOSE, socket);
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
-  if (close(socket)) {
-    switch (errno) {
-      case SP_EINTR:
-      case SP_EINPROGRESS: return SP_OK;
-      default:             return sp_sys_err_from_errno(errno);
-    }
-  }
-  return SP_OK;
+  return close(socket);
 
 #else
   (void)socket;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 #endif
 }
 
 //////////////////////
 // SP_SYS_SOCKET_RECV //
 //////////////////////
-sp_err_t sp_sys_socket_recv_p(sp_sys_socket_t socket, void* ptr, u64 size, u64* bytes_read) {
-  if (bytes_read) *bytes_read = 0;
-
+s64 sp_sys_socket_recv_p(sp_sys_socket_t socket, void* ptr, u64 size) {
 #if defined(SP_WIN32)
-  if (!sp_sys_win32_ws2_ensure()) return SP_ERR_SYS_UNSUPPORTED;
-  s64 rc = sp_rt.ws2.recv((SOCKET)socket, (char*)ptr, (int)sp_min(size, (u64)INT32_MAX), 0);
-  if (rc < 0) return sp_sys_err_from_wsa(sp_rt.ws2.WSAGetLastError());
-  if (bytes_read) *bytes_read = (u64)rc;
-  return SP_OK;
+  s64 rc = recv((SOCKET)socket, (char*)ptr, (int)sp_min(size, (u64)INT32_MAX), 0);
+  if (rc >= 0) return rc;
+  return WSAGetLastError() == WSAEWOULDBLOCK ? SP_SYS_SOCKET_WOULD_BLOCK : -1;
 
 #elif defined(SP_LINUX)
-  s64 rc = sp_syscall_retry(SP_SYSCALL_NUM_RECVFROM, socket, ptr, size, 0, 0, 0);
-  if (rc < 0) return sp_sys_err_from_errno(-rc);
-  if (bytes_read) *bytes_read = (u64)rc;
-  return SP_OK;
+  s64 rc;
+  do {
+    rc = sp_syscall(SP_SYSCALL_NUM_RECVFROM, socket, ptr, size, 0, 0, 0);
+  } while (rc == -1 && errno == SP_EINTR);
+  if (rc >= 0) return rc;
+  return errno == SP_EAGAIN ? SP_SYS_SOCKET_WOULD_BLOCK : -1;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   s64 rc;
   do {
     rc = (s64)recv(socket, ptr, (size_t)size, 0);
   } while (rc < 0 && errno == EINTR);
-  if (rc < 0) return sp_sys_err_from_errno(errno);
-  if (bytes_read) *bytes_read = (u64)rc;
-  return SP_OK;
+  if (rc >= 0) return rc;
+  return (errno == EAGAIN || errno == EWOULDBLOCK) ? SP_SYS_SOCKET_WOULD_BLOCK : -1;
 
 #else
   (void)socket; (void)ptr; (void)size;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 #endif
 }
 
 //////////////////////
 // SP_SYS_SOCKET_SEND //
 //////////////////////
-sp_err_t sp_sys_socket_send_p(sp_sys_socket_t socket, const void* ptr, u64 size, u64* bytes_written) {
-  if (bytes_written) *bytes_written = 0;
-
+s64 sp_sys_socket_send_p(sp_sys_socket_t socket, const void* ptr, u64 size) {
 #if defined(SP_WIN32)
-  if (!sp_sys_win32_ws2_ensure()) return SP_ERR_SYS_UNSUPPORTED;
-  s64 rc = sp_rt.ws2.send((SOCKET)socket, (const char*)ptr, (int)sp_min(size, (u64)INT32_MAX), 0);
-  if (rc < 0) return sp_sys_err_from_wsa(sp_rt.ws2.WSAGetLastError());
-  if (bytes_written) *bytes_written = (u64)rc;
-  return SP_OK;
+  s64 rc = send((SOCKET)socket, (const char*)ptr, (int)sp_min(size, (u64)INT32_MAX), 0);
+  if (rc >= 0) return rc;
+  return WSAGetLastError() == WSAEWOULDBLOCK ? SP_SYS_SOCKET_WOULD_BLOCK : -1;
 
 #elif defined(SP_LINUX)
-  s64 rc = sp_syscall_retry(SP_SYSCALL_NUM_SENDTO, socket, ptr, size, SP_SYS_LINUX_MSG_NOSIGNAL, 0, 0);
-  if (rc < 0) return sp_sys_err_from_errno(-rc);
-  if (bytes_written) *bytes_written = (u64)rc;
-  return SP_OK;
+  s64 rc;
+  do {
+    rc = sp_syscall(SP_SYSCALL_NUM_SENDTO, socket, ptr, size, SP_SYS_LINUX_MSG_NOSIGNAL, 0, 0);
+  } while (rc == -1 && errno == SP_EINTR);
+  if (rc >= 0) return rc;
+  return errno == SP_EAGAIN ? SP_SYS_SOCKET_WOULD_BLOCK : -1;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   s64 rc;
   do {
     rc = (s64)send(socket, ptr, (size_t)size, 0);
   } while (rc < 0 && errno == EINTR);
-  if (rc < 0) return sp_sys_err_from_errno(errno);
-  if (bytes_written) *bytes_written = (u64)rc;
-  return SP_OK;
+  if (rc >= 0) return rc;
+  return (errno == EAGAIN || errno == EWOULDBLOCK) ? SP_SYS_SOCKET_WOULD_BLOCK : -1;
 
 #else
   (void)socket; (void)ptr; (void)size;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 #endif
 }
 
 /////////////////////////////
 // SP_SYS_SOCKET_LOCAL_PORT //
 /////////////////////////////
-sp_err_t sp_sys_socket_local_port_p(sp_sys_socket_t socket, u16* out) {
+s32 sp_sys_socket_local_port_p(sp_sys_socket_t socket, u16* out) {
   *out = 0;
 
 #if defined(SP_WIN32)
-  if (!sp_sys_win32_ws2_ensure()) return SP_ERR_SYS_UNSUPPORTED;
   struct sockaddr_in sa = sp_zero;
   int len = sizeof(sa);
-  if (sp_rt.ws2.getsockname((SOCKET)socket, (struct sockaddr*)&sa, &len) != 0) {
-    return sp_sys_err_from_wsa(sp_rt.ws2.WSAGetLastError());
-  }
+  if (getsockname((SOCKET)socket, (struct sockaddr*)&sa, &len) != 0) return -1;
   *out = (u16)((((u8*)&sa.sin_port)[0] << 8) | ((u8*)&sa.sin_port)[1]);
-  return SP_OK;
+  return 0;
 
 #elif defined(SP_LINUX)
   sp_sys_linux_sockaddr_in_t sa = sp_zero;
   u32 len = sizeof(sa);
-  s64 rc = sp_syscall(SP_SYSCALL_NUM_GETSOCKNAME, socket, &sa, &len);
-  if (rc < 0) return sp_sys_err_from_errno(-rc);
+  if (sp_syscall(SP_SYSCALL_NUM_GETSOCKNAME, socket, &sa, &len) != 0) return -1;
   *out = (u16)((sa.port[0] << 8) | sa.port[1]);
-  return SP_OK;
+  return 0;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   struct sockaddr_in sa = sp_zero;
   socklen_t len = sizeof(sa);
-  if (getsockname(socket, (struct sockaddr*)&sa, &len) != 0) {
-    return sp_sys_err_from_errno(errno);
-  }
+  if (getsockname(socket, (struct sockaddr*)&sa, &len) != 0) return -1;
   *out = (u16)((((u8*)&sa.sin_port)[0] << 8) | ((u8*)&sa.sin_port)[1]);
-  return SP_OK;
+  return 0;
 
 #else
   (void)socket;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 #endif
 }
 
@@ -8622,8 +7308,8 @@ void sp_sys_free_p(void* ptr, u64 size) {
 
 #elif defined(SP_LINUX)
 void* sp_sys_alloc_p(u64 size) {
-  s64 p = sp_syscall(SP_SYSCALL_NUM_MMAP, 0, size, SP_PROT_READ | SP_PROT_WRITE, SP_MAP_PRIVATE | SP_MAP_ANONYMOUS, -1, 0);
-  return (u64)p > -4096UL ? SP_NULLPTR : (void*)p;
+  void* p = (void*)sp_syscall(SP_SYSCALL_NUM_MMAP, 0, size, SP_PROT_READ | SP_PROT_WRITE, SP_MAP_PRIVATE | SP_MAP_ANONYMOUS, -1, 0);
+  return p == SP_MAP_FAILED ? 0 : p;
 }
 
 void sp_sys_free_p(void* ptr, u64 size) {
@@ -8745,9 +7431,19 @@ void sp_sys_tls_init(sp_tls_rt_t* tls) {
 #endif
 
 /////////////////
+// SP_SYS_INIT //
+/////////////////
+void sp_sys_init_p() {
+#if defined(SP_WASM)
+
+#else
+#endif
+}
+
+/////////////////
 // SP_SYS_STAT //
 /////////////////
-sp_err_t sp_sys_get_path_metadata_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st) {
+s32 sp_sys_get_path_metadata_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st) {
 #if defined(SP_WIN32)
   return sp_sys_file_meta_from_nt_path(fd, sp_str(path, len), st, true);
 
@@ -8755,37 +7451,44 @@ sp_err_t sp_sys_get_path_metadata_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
   sp_sys_linux_stat_t raw = sp_zero;
-  sp_err_t err = sp_syscall_e(SP_SYSCALL_NUM_NEWFSTATAT, fd, buf, &raw, 0);
-  if (err != SP_OK) return err;
-  sp_sys_file_meta_from_linux(&raw, st);
-  return SP_OK;
+  s32 rc = (s32)sp_syscall(SP_SYSCALL_NUM_NEWFSTATAT, fd, buf, &raw, 0);
+  if (rc == 0) sp_sys_file_meta_from_linux(&raw, st);
+  return rc;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
   struct stat native;
-  sp_err_t err = sp_sys_err_from_libc(fstatat(fd, buf, &native, 0));
-  if (err != SP_OK) return err;
-  sp_sys_file_meta_from_libc(&native, st);
-  return SP_OK;
+  s32 rc = fstatat((int)fd, buf, &native, 0);
+  if (rc == 0) sp_sys_file_meta_from_libc(&native, st);
+  return rc;
+
+#elif defined(SP_WASM_WASI)
+  c8 buf [SP_PATH_MAX] = sp_zero;
+  __wasi_fd_t at;
+  if (!sp_wasi_resolve(fd, path, len, buf, &at)) return -1;
+  __wasi_filestat_t native;
+  if (__wasi_path_filestat_get(at, __WASI_LOOKUPFLAGS_SYMLINK_FOLLOW, buf, &native)) return -1;
+  sp_sys_file_meta_from_wasi(&native, st);
+  return 0;
 
 #elif defined(SP_WASM)
   (void)fd; (void)path; (void)len; (void)st;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 
 #else
   #error "sp_sys_get_path_metadata"
 #endif
 }
 
-sp_err_t sp_sys_get_path_metadata_s(sp_sys_fd_t fd, sp_str_t path, sp_sys_file_meta_t* st) {
+s32 sp_sys_get_path_metadata_s(sp_sys_fd_t fd, sp_str_t path, sp_sys_file_meta_t* st) {
   return sp_sys_get_path_metadata(fd, path.data, path.len, st);
 }
 
 //////////////////
 // SP_SYS_LSTAT //
 //////////////////
-sp_err_t sp_sys_get_link_metadata_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st) {
+s32 sp_sys_get_link_metadata_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st) {
 #if defined(SP_WIN32)
   return sp_sys_file_meta_from_nt_path(fd, sp_str(path, len), st, false);
 
@@ -8793,189 +7496,245 @@ sp_err_t sp_sys_get_link_metadata_p(sp_sys_fd_t fd, const c8* path, u32 len, sp_
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
   sp_sys_linux_stat_t raw = sp_zero;
-  sp_err_t err = sp_syscall_e(SP_SYSCALL_NUM_NEWFSTATAT, fd, buf, &raw, SP_AT_SYMLINK_NOFOLLOW);
-  if (err != SP_OK) return err;
-  sp_sys_file_meta_from_linux(&raw, st);
-  return SP_OK;
+  s32 rc = (s32)sp_syscall(SP_SYSCALL_NUM_NEWFSTATAT, fd, buf, &raw, SP_AT_SYMLINK_NOFOLLOW);
+  if (rc == 0) sp_sys_file_meta_from_linux(&raw, st);
+  return rc;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
   struct stat native;
-  sp_err_t err = sp_sys_err_from_libc(fstatat(fd, buf, &native, AT_SYMLINK_NOFOLLOW));
-  if (err != SP_OK) return err;
-  sp_sys_file_meta_from_libc(&native, st);
-  return SP_OK;
+  s32 rc = fstatat((int)fd, buf, &native, AT_SYMLINK_NOFOLLOW);
+  if (rc == 0) sp_sys_file_meta_from_libc(&native, st);
+  return rc;
+
+#elif defined(SP_WASM_WASI)
+  c8 buf [SP_PATH_MAX] = sp_zero;
+  __wasi_fd_t at;
+  if (!sp_wasi_resolve(fd, path, len, buf, &at)) return -1;
+  __wasi_filestat_t native;
+  if (__wasi_path_filestat_get(at, 0, buf, &native)) return -1;
+  sp_sys_file_meta_from_wasi(&native, st);
+  return 0;
 
 #elif defined(SP_WASM)
   (void)fd; (void)path; (void)len; (void)st;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 
 #else
   #error "sp_sys_get_link_metadata"
 #endif
 }
 
-sp_err_t sp_sys_get_link_metadata_s(sp_sys_fd_t fd, sp_str_t path, sp_sys_file_meta_t* st) {
+s32 sp_sys_get_link_metadata_s(sp_sys_fd_t fd, sp_str_t path, sp_sys_file_meta_t* st) {
   return sp_sys_get_link_metadata(fd, path.data, path.len, st);
 }
 
 //////////////////
 // SP_SYS_MKDIR //
 //////////////////
-sp_err_t sp_sys_mkdir_p(sp_sys_fd_t fd, const c8* path, u32 len, s32 mode) {
+s32 sp_sys_mkdir_p(sp_sys_fd_t fd, const c8* path, u32 len, s32 mode) {
 #if defined(SP_WIN32)
   (void)mode;
-  sp_sys_fd_t handle = SP_SYS_INVALID_FD;
-  sp_nt_status_t status = sp_sys_nt_open(
+  void* handle = sp_sys_nt_open(
     fd,
     sp_str(path, len),
     FILE_LIST_DIRECTORY | SYNCHRONIZE,
     FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
     SP_NT_FILE_CREATE,
     SP_NT_FILE_DIRECTORY_FILE | SP_NT_FILE_SYNCHRONOUS_IO_NONALERT | SP_NT_FILE_OPEN_FOR_BACKUP_INTENT,
-    FILE_ATTRIBUTE_DIRECTORY,
-    &handle
+    FILE_ATTRIBUTE_DIRECTORY
   );
-  if (!SP_NT_SUCCESS(status)) return sp_sys_err_from_nt(status);
-  sp_sys_nt_close(handle);
-  return SP_OK;
+  if (!handle) return -1;
+  SP_NT(NtClose)(handle);
+  return 0;
 
 #elif defined(SP_LINUX)
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
-  return sp_syscall_e(SP_SYSCALL_NUM_MKDIRAT, fd, buf, mode);
+  return (s32)sp_syscall(SP_SYSCALL_NUM_MKDIRAT, fd, buf, mode);
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
-  return sp_sys_err_from_libc(mkdirat(fd, buf, (mode_t)mode));
+  return mkdirat((int)fd, buf, (mode_t)mode);
+
+#elif defined(SP_WASM_WASI)
+  (void)mode;
+  c8 buf [SP_PATH_MAX] = sp_zero;
+  __wasi_fd_t at;
+  if (!sp_wasi_resolve(fd, path, len, buf, &at)) return -1;
+  return __wasi_path_create_directory(at, buf) ? -1 : 0;
 
 #elif defined(SP_WASM)
   (void)fd; (void)path; (void)len; (void)mode;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 
 #else
   #error "sp_sys_mkdir"
 #endif
 }
 
-sp_err_t sp_sys_mkdir_s(sp_sys_fd_t fd, sp_str_t path, s32 mode) {
+s32 sp_sys_mkdir_s(sp_sys_fd_t fd, sp_str_t path, s32 mode) {
   return sp_sys_mkdir(fd, path.data, path.len, mode);
 }
 
 //////////////////
 // SP_SYS_RMDIR //
 //////////////////
-sp_err_t sp_sys_rmdir_p(sp_sys_fd_t fd, const c8* path, u32 len) {
+s32 sp_sys_rmdir_p(sp_sys_fd_t fd, const c8* path, u32 len) {
 #if defined(SP_WIN32)
   return sp_sys_nt_delete(fd, sp_str(path, len), SP_NT_FILE_DIRECTORY_FILE);
 
 #elif defined(SP_LINUX)
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
-  return sp_syscall_e(SP_SYSCALL_NUM_UNLINKAT, fd, buf, SP_AT_REMOVEDIR);
+  return (s32)sp_syscall(SP_SYSCALL_NUM_UNLINKAT, fd, buf, SP_AT_REMOVEDIR);
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
-  return sp_sys_err_from_libc(unlinkat(fd, buf, AT_REMOVEDIR));
+  return unlinkat((int)fd, buf, AT_REMOVEDIR);
+
+#elif defined(SP_WASM_WASI)
+  c8 buf [SP_PATH_MAX] = sp_zero;
+  __wasi_fd_t at;
+  if (!sp_wasi_resolve(fd, path, len, buf, &at)) return -1;
+  return __wasi_path_remove_directory(at, buf) ? -1 : 0;
 
 #elif defined(SP_WASM)
   (void)fd; (void)path; (void)len;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 
 #else
   #error "sp_sys_rmdir"
 #endif
 }
 
-sp_err_t sp_sys_rmdir_s(sp_sys_fd_t fd, sp_str_t path) {
+s32 sp_sys_rmdir_s(sp_sys_fd_t fd, sp_str_t path) {
   return sp_sys_rmdir(fd, path.data, path.len);
 }
 
 ///////////////////
 // SP_SYS_UNLINK //
 ///////////////////
-sp_err_t sp_sys_unlink_p(sp_sys_fd_t fd, const c8* path, u32 len) {
+s32 sp_sys_unlink_p(sp_sys_fd_t fd, const c8* path, u32 len) {
 #if defined(SP_WIN32)
   return sp_sys_nt_delete(fd, sp_str(path, len), SP_NT_FILE_NON_DIRECTORY_FILE);
 
 #elif defined(SP_LINUX)
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
-  return sp_syscall_e(SP_SYSCALL_NUM_UNLINKAT, fd, buf, 0);
+  return (s32)sp_syscall(SP_SYSCALL_NUM_UNLINKAT, fd, buf, 0);
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
-  return sp_sys_err_from_libc(unlinkat(fd, buf, 0));
+  return unlinkat((int)fd, buf, 0);
+
+#elif defined(SP_WASM_WASI)
+  c8 buf [SP_PATH_MAX] = sp_zero;
+  __wasi_fd_t at;
+  if (!sp_wasi_resolve(fd, path, len, buf, &at)) return -1;
+  return __wasi_path_unlink_file(at, buf) ? -1 : 0;
 
 #elif defined(SP_WASM)
   (void)fd; (void)path; (void)len;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 
 #else
   #error "sp_sys_unlink"
 #endif
 }
 
-sp_err_t sp_sys_unlink_s(sp_sys_fd_t fd, sp_str_t path) {
+s32 sp_sys_unlink_s(sp_sys_fd_t fd, sp_str_t path) {
   return sp_sys_unlink(fd, path.data, path.len);
 }
 
 //////////////////
 // SP_SYS_CHDIR //
 //////////////////
-sp_err_t sp_sys_chdir_p(const c8* path, u32 len) {
+s32 sp_sys_chdir_p(const c8* path, u32 len) {
 #if defined(SP_WIN32)
   SP_ALIGNED u16 wbuf[SP_PATH_MAX + 1];
   sp_mem_fixed_t fixed = sp_mem_fixed(wbuf, sizeof(wbuf));
   sp_wide_str_t w = sp_wtf8_to_wtf16(sp_mem_fixed_as_allocator(&fixed), sp_str(path, len));
-  if (!w.data) return SP_ERR_SYS_INVALID;
+  if (!w.data) return -1;
   sp_nt_unicode_string_t us = {
     .Length = sp_cast(u16, w.len * sizeof(u16)),
     .MaximumLength = sp_cast(u16, (w.len + 1) * sizeof(u16)),
     .Buffer = sp_ptr_cast(u16*, sp_const_cast(u16*, w.data)),
   };
-  return sp_sys_err_from_nt(SP_NT(RtlSetCurrentDirectory_U)(&us));
+  return SP_NT_SUCCESS(SP_NT(RtlSetCurrentDirectory_U)(&us)) ? 0 : -1;
 
 #elif defined(SP_LINUX)
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
-  return sp_syscall_e(SP_SYSCALL_NUM_CHDIR, buf);
+  return (s32)sp_syscall(SP_SYSCALL_NUM_CHDIR, buf);
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
-  return sp_sys_err_from_libc(chdir(buf));
+  return chdir(buf);
 
 #elif defined(SP_WASM)
   (void)path; (void)len;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 
 #else
   #error "sp_sys_chdir"
 #endif
 }
 
-sp_err_t sp_sys_chdir_s(sp_str_t path) {
+s32 sp_sys_chdir_s(sp_str_t path) {
   return sp_sys_chdir(path.data, path.len);
 }
 
 /////////////////
 // SP_SYS_LINK //
 /////////////////
-sp_err_t sp_sys_link_p(sp_sys_fd_t from_fd, const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len) {
+s32 sp_sys_link_p(sp_sys_fd_t from_fd, const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len) {
 #if defined(SP_WIN32)
-  return sp_sys_nt_set_name_info(
-    from_fd, sp_str(existing, existing_len),
-    to_fd, sp_str(alias, alias_len),
+  void* handle = sp_sys_nt_open(
+    from_fd,
+    sp_str(existing, existing_len),
     FILE_READ_ATTRIBUTES | SYNCHRONIZE,
-    0,
-    SP_NT_FILE_LINK_INFORMATION,
+    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+    SP_NT_FILE_OPEN,
+    SP_NT_FILE_SYNCHRONOUS_IO_NONALERT | SP_NT_FILE_OPEN_REPARSE_POINT,
     0
   );
+  if (!handle) return -1;
+
+  SP_ALIGNED u16 path_buf[SP_PATH_MAX + 1];
+  sp_sys_nt_target_t t;
+  if (!SP_NT_SUCCESS(sp_sys_nt_target(to_fd, sp_str(alias, alias_len), path_buf, SP_PATH_MAX + 1, &t))) {
+    SP_NT(NtClose)(handle);
+    return -1;
+  }
+
+  u32 name_bytes = t.name.Length;
+  u32 info_bytes = sizeof(sp_nt_file_link_information_t) + name_bytes - sizeof(u16);
+  SP_ALIGNED u8 info_buf[sizeof(sp_nt_file_link_information_t) + SP_PATH_MAX * sizeof(u16)];
+  if (info_bytes > sizeof(info_buf)) {
+    sp_sys_nt_target_free(&t);
+    SP_NT(NtClose)(handle);
+    return -1;
+  }
+  sp_nt_file_link_information_t* info = (sp_nt_file_link_information_t*)info_buf;
+  *info = sp_zero_s(sp_nt_file_link_information_t);
+  info->ReplaceIfExists = 0;
+  info->RootDirectory = t.root;
+  info->FileNameLength = name_bytes;
+  sp_mem_copy(info->FileName, t.name.Buffer, name_bytes);
+
+  sp_nt_io_status_block_t iosb = sp_zero;
+  sp_nt_status_t status = SP_NT(NtSetInformationFile)(handle, &iosb, info, info_bytes, SP_NT_FILE_LINK_INFORMATION);
+
+  sp_sys_nt_target_free(&t);
+  SP_NT(NtClose)(handle);
+
+  return SP_NT_SUCCESS(status) ? 0 : -1;
 
 #elif defined(SP_LINUX)
   struct {
@@ -8984,7 +7743,7 @@ sp_err_t sp_sys_link_p(sp_sys_fd_t from_fd, const c8* existing, u32 existing_len
   } buffers = sp_zero;
   sp_cstr_copy_to_n(existing, existing_len, buffers.existing, SP_PATH_MAX);
   sp_cstr_copy_to_n(alias, alias_len, buffers.alias, SP_PATH_MAX);
-  return sp_syscall_e(SP_SYSCALL_NUM_LINKAT, from_fd, buffers.existing, to_fd, buffers.alias, 0);
+  return (s32)sp_syscall(SP_SYSCALL_NUM_LINKAT, from_fd, buffers.existing, to_fd, buffers.alias, 0);
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   struct {
@@ -8993,25 +7752,25 @@ sp_err_t sp_sys_link_p(sp_sys_fd_t from_fd, const c8* existing, u32 existing_len
   } buffers = sp_zero;
   sp_cstr_copy_to_n(existing, existing_len, buffers.existing, SP_PATH_MAX);
   sp_cstr_copy_to_n(alias, alias_len, buffers.alias, SP_PATH_MAX);
-  return sp_sys_err_from_libc(linkat(from_fd, buffers.existing, to_fd, buffers.alias, 0));
+  return linkat((int)from_fd, buffers.existing, (int)to_fd, buffers.alias, 0);
 
 #elif defined(SP_WASM)
   (void)from_fd; (void)existing; (void)existing_len; (void)to_fd; (void)alias; (void)alias_len;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 
 #else
   #error "sp_sys_link"
 #endif
 }
 
-sp_err_t sp_sys_link_s(sp_sys_fd_t from_fd, sp_str_t existing, sp_sys_fd_t to_fd, sp_str_t alias) {
+s32 sp_sys_link_s(sp_sys_fd_t from_fd, sp_str_t existing, sp_sys_fd_t to_fd, sp_str_t alias) {
   return sp_sys_link(from_fd, existing.data, existing.len, to_fd, alias.data, alias.len);
 }
 
 ////////////////////
 // SP_SYS_SYMLINK //
 ////////////////////
-sp_err_t sp_sys_symlink_p(const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len) {
+s32 sp_sys_symlink_p(const c8* existing, u32 existing_len, sp_sys_fd_t to_fd, const c8* alias, u32 alias_len) {
 #if defined(SP_WIN32)
   sp_str_t target = sp_str(existing, existing_len);
   sp_str_t link = sp_str(alias, alias_len);
@@ -9019,7 +7778,7 @@ sp_err_t sp_sys_symlink_p(const c8* existing, u32 existing_len, sp_sys_fd_t to_f
   SP_ALIGNED u16 wtarget_buf [SP_PATH_MAX + 1];
   sp_mem_fixed_t target_fixed = sp_mem_fixed(wtarget_buf, sizeof(wtarget_buf));
   sp_wide_str_t wtarget = sp_wtf8_to_wtf16(sp_mem_fixed_as_allocator(&target_fixed), target);
-  if (!wtarget.data) return SP_ERR_SYS_INVALID;
+  if (!wtarget.data) return -1;
 
   u16* wt = (u16*)wtarget.data;
   sp_for(it, wtarget.len) {
@@ -9054,8 +7813,7 @@ sp_err_t sp_sys_symlink_p(const c8* existing, u32 existing_len, sp_sys_fd_t to_f
   sp_wide_str_t stored = wtarget;
   sp_sys_nt_path_t nt_path = sp_zero;
   if (absolute) {
-    sp_nt_status_t pstatus = sp_sys_nt_path(target, &nt_path);
-    if (!SP_NT_SUCCESS(pstatus)) return sp_sys_err_from_nt(pstatus);
+    if (!SP_NT_SUCCESS(sp_sys_nt_path(target, &nt_path))) return -1;
     stored.data = nt_path.name.Buffer;
     stored.len = nt_path.name.Length / (u32)sizeof(u16);
   }
@@ -9065,7 +7823,7 @@ sp_err_t sp_sys_symlink_p(const c8* existing, u32 existing_len, sp_sys_fd_t to_f
   SP_ALIGNED u8 rdb_buf [SP_NT_MAX_REPARSE_DATA];
   if (rdb_len > sizeof(rdb_buf)) {
     sp_sys_nt_path_free(&nt_path);
-    return SP_ERR_SYS_NAME_TOO_LONG;
+    return -1;
   }
 
   sp_nt_symlink_reparse_buffer_t* rdb = (sp_nt_symlink_reparse_buffer_t*)rdb_buf;
@@ -9081,35 +7839,29 @@ sp_err_t sp_sys_symlink_p(const c8* existing, u32 existing_len, sp_sys_fd_t to_f
   sp_mem_copy(rdb_buf + sizeof(sp_nt_symlink_reparse_buffer_t) + name_bytes, stored.data, name_bytes);
   sp_sys_nt_path_free(&nt_path);
 
-  sp_sys_fd_t handle = SP_SYS_INVALID_FD;
-  sp_nt_status_t status = sp_sys_nt_open(to_fd, link,
+  void* handle = sp_sys_nt_open(to_fd, link,
     DELETE | FILE_WRITE_ATTRIBUTES | SYNCHRONIZE,
     0,
     SP_NT_FILE_CREATE,
     SP_NT_FILE_SYNCHRONOUS_IO_NONALERT | SP_NT_FILE_OPEN_REPARSE_POINT | SP_NT_FILE_OPEN_FOR_BACKUP_INTENT | dir_option,
-    FILE_ATTRIBUTE_NORMAL,
-    &handle
+    FILE_ATTRIBUTE_NORMAL
   );
-  if (!SP_NT_SUCCESS(status)) return sp_sys_err_from_nt(status);
+  if (!handle) return -1;
 
   sp_nt_io_status_block_t iosb = sp_zero;
-  status = SP_NT(NtFsControlFile)(
-    (void*)handle, SP_NULLPTR, SP_NULLPTR, SP_NULLPTR, &iosb,
+  sp_nt_status_t status = SP_NT(NtFsControlFile)(
+    handle, SP_NULLPTR, SP_NULLPTR, SP_NULLPTR, &iosb,
     SP_NT_FSCTL_SET_REPARSE_POINT, rdb_buf, rdb_len, SP_NULLPTR, 0
   );
 
   if (!SP_NT_SUCCESS(status)) {
     sp_nt_file_disposition_information_t info = { .DeleteFile = 1 };
     sp_nt_io_status_block_t diosb = sp_zero;
-    SP_NT(NtSetInformationFile)((void*)handle, &diosb, &info, sizeof(info), SP_NT_FILE_DISPOSITION_INFORMATION);
+    SP_NT(NtSetInformationFile)(handle, &diosb, &info, sizeof(info), SP_NT_FILE_DISPOSITION_INFORMATION);
   }
 
-  sp_sys_nt_close(handle);
-
-  switch (status) {
-    case SP_NT_STATUS_INVALID_DEVICE_REQUEST: return SP_ERR_SYS_UNSUPPORTED;
-    default:                                  return sp_sys_err_from_nt(status);
-  }
+  SP_NT(NtClose)(handle);
+  return SP_NT_SUCCESS(status) ? 0 : -1;
 
 #elif defined(SP_LINUX)
   struct {
@@ -9118,7 +7870,7 @@ sp_err_t sp_sys_symlink_p(const c8* existing, u32 existing_len, sp_sys_fd_t to_f
   } buffers = sp_zero;
   sp_cstr_copy_to_n(existing, existing_len, buffers.existing, SP_PATH_MAX);
   sp_cstr_copy_to_n(alias, alias_len, buffers.alias, SP_PATH_MAX);
-  return sp_syscall_e(SP_SYSCALL_NUM_SYMLINKAT, buffers.existing, to_fd, buffers.alias);
+  return (s32)sp_syscall(SP_SYSCALL_NUM_SYMLINKAT, buffers.existing, to_fd, buffers.alias);
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   struct {
@@ -9127,69 +7879,67 @@ sp_err_t sp_sys_symlink_p(const c8* existing, u32 existing_len, sp_sys_fd_t to_f
   } buffers = sp_zero;
   sp_cstr_copy_to_n(existing, existing_len, buffers.existing, SP_PATH_MAX);
   sp_cstr_copy_to_n(alias, alias_len, buffers.alias, SP_PATH_MAX);
-  return sp_sys_err_from_libc(symlinkat(buffers.existing, to_fd, buffers.alias));
+  return symlinkat(buffers.existing, (int)to_fd, buffers.alias);
 
 #elif defined(SP_WASM)
   (void)existing; (void)existing_len; (void)to_fd; (void)alias; (void)alias_len;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 
 #else
   #error "sp_sys_symlink"
 #endif
 }
 
-sp_err_t sp_sys_symlink_s(sp_str_t existing, sp_sys_fd_t to_fd, sp_str_t alias) {
+s32 sp_sys_symlink_s(sp_str_t existing, sp_sys_fd_t to_fd, sp_str_t alias) {
   return sp_sys_symlink(existing.data, existing.len, to_fd, alias.data, alias.len);
 }
 
 //////////////////
 // SP_SYS_CHMOD //
 //////////////////
-sp_err_t sp_sys_chmod_p(sp_sys_fd_t fd, const c8* path, u32 len, const sp_sys_file_meta_t* st) {
+s32 sp_sys_chmod_p(sp_sys_fd_t fd, const c8* path, u32 len, const sp_sys_file_meta_t* st) {
 #if defined(SP_WIN32)
-  sp_sys_fd_t handle = SP_SYS_INVALID_FD;
-  sp_nt_status_t status = sp_sys_nt_open(
+  void* handle = sp_sys_nt_open(
     fd,
     sp_str(path, len),
     FILE_WRITE_ATTRIBUTES | SYNCHRONIZE,
     FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
     SP_NT_FILE_OPEN,
     SP_NT_FILE_SYNCHRONOUS_IO_NONALERT | SP_NT_FILE_OPEN_REPARSE_POINT,
-    0,
-    &handle
+    0
   );
-  if (!SP_NT_SUCCESS(status)) return sp_sys_err_from_nt(status);
+  if (!handle) return -1;
 
   sp_nt_file_basic_information_t info = sp_zero;
   info.FileAttributes = st->raw_attrs ? st->raw_attrs : FILE_ATTRIBUTE_NORMAL;
 
   sp_nt_io_status_block_t iosb = sp_zero;
-  status = SP_NT(NtSetInformationFile)((void*)handle, &iosb, &info, sizeof(info), SP_NT_FILE_BASIC_INFORMATION);
+  sp_nt_status_t status = SP_NT(NtSetInformationFile)(handle, &iosb, &info, sizeof(info), SP_NT_FILE_BASIC_INFORMATION);
 
-  sp_sys_nt_close(handle);
-  return sp_sys_err_from_nt(status);
+  SP_NT(NtClose)(handle);
+  return SP_NT_SUCCESS(status) ? 0 : -1;
 
 #elif defined(SP_LINUX)
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
   s32 mode = (s32)(st->raw_attrs & 07777);
-  return sp_syscall_e(SP_SYSCALL_NUM_FCHMODAT, fd, buf, mode, 0);
+  return (s32)sp_syscall(SP_SYSCALL_NUM_FCHMODAT, fd, buf, mode, 0);
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   c8 buf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, buf, SP_PATH_MAX);
-  return sp_sys_err_from_libc(fchmodat(fd, buf, (mode_t)(st->raw_attrs & 07777), 0));
+  return fchmodat((int)fd, buf, (mode_t)(st->raw_attrs & 07777), 0);
 
 #elif defined(SP_WASM)
   (void)fd; (void)path; (void)len; (void)st;
-  return SP_ERR_SYS_UNSUPPORTED;
+  return -1;
 
 #else
   #error "sp_sys_chmod"
 #endif
 }
 
-sp_err_t sp_sys_chmod_s(sp_sys_fd_t fd, sp_str_t path, const sp_sys_file_meta_t* st) {
+s32 sp_sys_chmod_s(sp_sys_fd_t fd, sp_str_t path, const sp_sys_file_meta_t* st) {
   return sp_sys_chmod(fd, path.data, path.len, st);
 }
 
@@ -9200,23 +7950,20 @@ s64 sp_sys_canonicalize_path_p(const c8* path, u32 len, c8* buf, u64 size) {
 #if defined(SP_WIN32)
   if (!buf) return -1;
 
-  sp_sys_fd_t handle = SP_SYS_INVALID_FD;
-  if (!SP_NT_SUCCESS(sp_sys_nt_open(
+  void* h = sp_sys_nt_open(
     sp_sys_get_root(0),
     sp_str(path, len),
     FILE_READ_ATTRIBUTES | SYNCHRONIZE,
     FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
     SP_NT_FILE_OPEN,
     SP_NT_FILE_SYNCHRONOUS_IO_NONALERT | SP_NT_FILE_OPEN_FOR_BACKUP_INTENT,
-    0,
-    &handle
-  ))) {
-    return -1;
-  }
+    0
+  );
+  if (!h) return -1;
 
   u16 wbuf[SP_PATH_MAX];
-  DWORD wlen = GetFinalPathNameByHandleW((HANDLE)handle, (LPWSTR)wbuf, SP_PATH_MAX, 0);
-  sp_sys_nt_close(handle);
+  DWORD wlen = GetFinalPathNameByHandleW((HANDLE)h, (LPWSTR)wbuf, SP_PATH_MAX, 0);
+  SP_NT(NtClose)(h);
   if (wlen == 0 || wlen >= SP_PATH_MAX) return -1;
 
   u32 skip = 0;
@@ -9232,15 +7979,15 @@ s64 sp_sys_canonicalize_path_p(const c8* path, u32 len, c8* buf, u64 size) {
 #elif defined(SP_LINUX)
   c8 pbuf [SP_PATH_MAX] = sp_zero;
   sp_cstr_copy_to_n(path, len, pbuf, SP_PATH_MAX);
-  s64 fd = sp_syscall(SP_SYSCALL_NUM_OPENAT, SP_AT_FDCWD, pbuf, SP_SYS_LINUX_O_RDONLY | SP_SYS_LINUX_O_CLOEXEC, 0);
-  if (fd < 0) return -1;
+  s64 fd = sp_syscall(SP_SYSCALL_NUM_OPENAT, SP_AT_FDCWD, pbuf, SP_O_RDONLY | SP_O_CLOEXEC, 0);
+  if (fd < 0) return fd;
 
   c8 proc [64] = sp_zero;
   __sp_fmt_buf(proc, 64, "/proc/self/fd/{}", sp_fmt_int(fd));
 
   s64 n = sp_syscall(SP_SYSCALL_NUM_READLINKAT, SP_AT_FDCWD, proc, buf, size);
   sp_sys_close(fd);
-  return n < 0 ? -1 : n;
+  return n;
 
 #elif defined(SP_MACOS) || defined(SP_COSMO)
   if (!path || !buf || size == 0) return -1;
@@ -9287,8 +8034,7 @@ s64 sp_sys_get_exe_path_p(c8* buf, u64 size) {
   return (s64)utf8.len;
 
 #elif defined(SP_LINUX)
-  s64 n = sp_syscall(SP_SYSCALL_NUM_READLINKAT, SP_AT_FDCWD, "/proc/self/exe", buf, size);
-  return n < 0 ? -1 : n;
+  return sp_syscall(SP_SYSCALL_NUM_READLINKAT, SP_AT_FDCWD, "/proc/self/exe", buf, size);
 
 #elif defined(SP_MACOS)
   if (!buf || size == 0) return -1;
@@ -9662,7 +8408,7 @@ void* sp_da_resize(void* arr, u32 stride, u64 cap) {
   cap = sp_max(cap, 4);
   sp_da_header_t* header = sp_da_head(arr);
   u64 old_size = header->capacity * stride + sizeof(sp_da_header_t);
-  header = sp_cast(sp_da_header_t*, sp_realloc_uninitialized(header->allocator, header, old_size, cap * stride + sizeof(sp_da_header_t)));
+  header = sp_cast(sp_da_header_t*, sp_realloc(header->allocator, header, old_size, cap * stride + sizeof(sp_da_header_t)));
 
   if (!header) return SP_NULLPTR;
 
@@ -9691,7 +8437,7 @@ void sp_da_push_ex(void** arr, void* val, u32 stride) {
 
 void* sp_da_init_ex(sp_mem_t mem, u32 stride) {
   u32 cap = 4;
-  sp_da_header_t* head = (sp_da_header_t*)sp_alloc_uninitialized(mem, cap * stride + sizeof(sp_da_header_t));
+  sp_da_header_t* head = (sp_da_header_t*)sp_alloc(mem, cap * stride + sizeof(sp_da_header_t));
   *head = (sp_da_header_t) {
     .size = 0,
     .capacity = cap,
@@ -10435,6 +9181,17 @@ sp_hash_t sp_parse_hash(sp_str_t str) {
 }
 
 
+//  █████          ███████      █████████
+// ░░███         ███░░░░░███   ███░░░░░███
+//  ░███        ███     ░░███ ███     ░░░
+//  ░███       ░███      ░███░███
+//  ░███       ░███      ░███░███    █████
+//  ░███      █░░███     ███ ░░███  ░░███
+//  ███████████ ░░░███████░   ░░█████████
+// ░░░░░░░░░░░    ░░░░░░░      ░░░░░░░░░
+// @log
+
+
 //  ██████╗ ██████╗ ███╗   ██╗████████╗███████╗██╗  ██╗████████╗
 // ██╔════╝██╔═══██╗████╗  ██║╚══██╔══╝██╔════╝╚██╗██╔╝╚══██╔══╝
 // ██║     ██║   ██║██╔██╗ ██║   ██║   █████╗   ╚███╔╝    ██║
@@ -10472,6 +9229,8 @@ void sp_rt_init() {
 void sp_tls_rt_deinit(void* ptr) {
   if (!ptr) return;
   sp_tls_rt_t* tls = (sp_tls_rt_t*)ptr;
+  if (tls->std.out) sp_mem_allocator_free(tls->mem.heap, tls->std.out, sizeof(sp_io_stream_writer_t));
+  if (tls->std.err) sp_mem_allocator_free(tls->mem.heap, tls->std.err, sizeof(sp_io_stream_writer_t));
   sp_carr_for(tls->scratch, it) {
     sp_mem_arena_destroy(tls->scratch[it]);
   }
@@ -10496,9 +9255,28 @@ sp_tls_rt_t* sp_tls_rt_get() {
     sp_carr_for(tls->scratch, it) {
       tls->scratch[it] = sp_mem_arena_new(tls->mem.page);
     }
+    // std.out/std.err are wired lazily (see sp_tls_std_out/_err). Wiring them here
+    // would take the address of sp_io_stream_writer_write in code that sp_main always
+    // reaches, which on WASM forces a fd_write import even for programs that never write.
     sp_sys_tls_init(tls);
   }
   return tls;
+}
+
+sp_io_writer_t* sp_tls_std_out(sp_tls_rt_t* tls) {
+  if (!tls->std.out) {
+    tls->std.out = sp_alloc_type(tls->mem.heap, sp_io_stream_writer_t);
+    sp_io_stream_writer_from_fd(tls->std.out, sp_sys_stdout, SP_IO_CLOSE_MODE_NONE);
+  }
+  return &tls->std.out->base;
+}
+
+sp_io_writer_t* sp_tls_std_err(sp_tls_rt_t* tls) {
+  if (!tls->std.err) {
+    tls->std.err = sp_alloc_type(tls->mem.heap, sp_io_stream_writer_t);
+    sp_io_stream_writer_from_fd(tls->std.err, sp_sys_stderr, SP_IO_CLOSE_MODE_NONE);
+  }
+  return &tls->std.err->base;
 }
 
 #if defined(SP_FREESTANDING)
@@ -10619,16 +9397,8 @@ void* sp_mem_allocator_alloc(sp_mem_t allocator, u64 size) {
   return allocator.on_alloc(allocator.user_data, SP_ALLOCATOR_MODE_ALLOC, size, NULL, 0);
 }
 
-void* sp_mem_allocator_alloc_uninitialized(sp_mem_t allocator, u64 size) {
-  return allocator.on_alloc(allocator.user_data, SP_ALLOCATOR_MODE_ALLOC_UNINITIALIZED, size, NULL, 0);
-}
-
 void* sp_mem_allocator_realloc(sp_mem_t allocator, void* memory, u64 old_size, u64 size) {
   return allocator.on_alloc(allocator.user_data, SP_ALLOCATOR_MODE_RESIZE, size, memory, old_size);
-}
-
-void* sp_mem_allocator_realloc_uninitialized(sp_mem_t allocator, void* memory, u64 old_size, u64 size) {
-  return allocator.on_alloc(allocator.user_data, SP_ALLOCATOR_MODE_RESIZE_UNINITIALIZED, size, memory, old_size);
 }
 
 void sp_mem_allocator_free(sp_mem_t allocator, void* buffer, u64 size) {
@@ -10754,7 +9524,7 @@ sp_mem_arena_block_t* sp_mem_arena_get_block(sp_mem_arena_t* arena, u64 size) {
   return new_block;
 }
 
-void* sp_mem_arena_alloc_size_uninitialized(sp_mem_arena_t* arena, u64 size) {
+void* sp_mem_arena_alloc_size(sp_mem_arena_t* arena, u64 size) {
   if (size > ((u64)-1) - SP_MEM_ARENA_MAX_BLOCK_SIZE) return SP_NULLPTR;
 
   sp_mem_arena_block_t* block = sp_mem_arena_get_block(arena, size);
@@ -10762,12 +9532,7 @@ void* sp_mem_arena_alloc_size_uninitialized(sp_mem_arena_t* arena, u64 size) {
 
   void* ptr = sp_mem_arena_block_buffer(block) + block->bytes_used;
   block->bytes_used += size;
-  return ptr;
-}
-
-void* sp_mem_arena_alloc_size(sp_mem_arena_t* arena, u64 size) {
-  void* ptr = sp_mem_arena_alloc_size_uninitialized(arena, size);
-  if (ptr) sp_mem_zero(ptr, size);
+  sp_mem_zero(ptr, size);
   return ptr;
 }
 
@@ -10784,13 +9549,8 @@ void* sp_mem_arena_on_alloc(void* user_data, sp_mem_alloc_mode_t mode, u64 size,
     case SP_ALLOCATOR_MODE_ALLOC: {
       return sp_mem_arena_alloc_size(arena, size);
     }
-    case SP_ALLOCATOR_MODE_ALLOC_UNINITIALIZED: {
-      return sp_mem_arena_alloc_size_uninitialized(arena, size);
-    }
-    case SP_ALLOCATOR_MODE_RESIZE:
-    case SP_ALLOCATOR_MODE_RESIZE_UNINITIALIZED: {
-      bool uninitialized = mode == SP_ALLOCATOR_MODE_RESIZE_UNINITIALIZED;
-      if (!old_memory) return uninitialized ? sp_mem_arena_alloc_size_uninitialized(arena, size) : sp_mem_arena_alloc_size(arena, size);
+    case SP_ALLOCATOR_MODE_RESIZE: {
+      if (!old_memory) return sp_mem_arena_alloc_size(arena, size);
 
       sp_mem_arena_block_t* block = arena->current;
       if (sp_mem_arena_is_top(arena, old_memory, old_size)) {
@@ -10800,7 +9560,7 @@ void* sp_mem_arena_on_alloc(void* user_data, sp_mem_alloc_mode_t mode, u64 size,
         }
         u64 grow = size - old_size;
         if (grow <= block->capacity - block->bytes_used) {
-          if (!uninitialized) sp_mem_zero(sp_mem_arena_block_buffer(block) + block->bytes_used, grow);
+          sp_mem_zero(sp_mem_arena_block_buffer(block) + block->bytes_used, grow);
           block->bytes_used += grow;
           return old_memory;
         }
@@ -10808,10 +9568,9 @@ void* sp_mem_arena_on_alloc(void* user_data, sp_mem_alloc_mode_t mode, u64 size,
 
       if (size <= old_size) return old_memory;
 
-      void* fresh = sp_mem_arena_alloc_size_uninitialized(arena, size);
+      void* fresh = sp_mem_arena_alloc_size(arena, size);
       if (!fresh) return SP_NULLPTR;
       sp_mem_move(fresh, old_memory, old_size);
-      if (!uninitialized) sp_mem_zero((u8*)fresh + old_size, size - old_size);
       return fresh;
     }
     case SP_ALLOCATOR_MODE_FREE: {
@@ -10829,16 +9588,8 @@ void* sp_mem_arena_alloc(sp_mem_arena_t* arena, u64 size) {
   return sp_mem_arena_on_alloc(arena, SP_ALLOCATOR_MODE_ALLOC, size, SP_NULLPTR, 0);
 }
 
-void* sp_mem_arena_alloc_uninitialized(sp_mem_arena_t* arena, u64 size) {
-  return sp_mem_arena_on_alloc(arena, SP_ALLOCATOR_MODE_ALLOC_UNINITIALIZED, size, SP_NULLPTR, 0);
-}
-
 void* sp_mem_arena_realloc(sp_mem_arena_t* arena, void* ptr, u64 old_size, u64 size) {
   return sp_mem_arena_on_alloc(arena, SP_ALLOCATOR_MODE_RESIZE, size, ptr, old_size);
-}
-
-void* sp_mem_arena_realloc_uninitialized(sp_mem_arena_t* arena, void* ptr, u64 old_size, u64 size) {
-  return sp_mem_arena_on_alloc(arena, SP_ALLOCATOR_MODE_RESIZE_UNINITIALIZED, size, ptr, old_size);
 }
 
 void sp_mem_arena_free(sp_mem_arena_t* arena, void* ptr, u64 size) {
@@ -10877,25 +9628,22 @@ void* sp_mem_fixed_on_alloc(void* user_data, sp_mem_alloc_mode_t mode, u64 size,
   sp_mem_fixed_t* fixed = (sp_mem_fixed_t*)user_data;
 
   switch (mode) {
-    case SP_ALLOCATOR_MODE_ALLOC:
-    case SP_ALLOCATOR_MODE_ALLOC_UNINITIALIZED: {
+    case SP_ALLOCATOR_MODE_ALLOC: {
       u8* ptr = (u8*)sp_align_up(fixed->buffer + fixed->bytes_used, fixed->alignment);
       u64 offset = (u64)(ptr - fixed->buffer);
       if (offset > fixed->capacity || size > fixed->capacity - offset) return SP_NULLPTR;
       fixed->bytes_used = offset + size;
-      if (mode == SP_ALLOCATOR_MODE_ALLOC) sp_mem_zero(ptr, size);
+      sp_mem_zero(ptr, size);
       return ptr;
     }
-    case SP_ALLOCATOR_MODE_RESIZE:
-    case SP_ALLOCATOR_MODE_RESIZE_UNINITIALIZED: {
-      bool uninitialized = mode == SP_ALLOCATOR_MODE_RESIZE_UNINITIALIZED;
-      if (!old_memory) return sp_mem_fixed_on_alloc(user_data, uninitialized ? SP_ALLOCATOR_MODE_ALLOC_UNINITIALIZED : SP_ALLOCATOR_MODE_ALLOC, size, SP_NULLPTR, 0);
+    case SP_ALLOCATOR_MODE_RESIZE: {
+      if (!old_memory) return sp_mem_fixed_on_alloc(user_data, SP_ALLOCATOR_MODE_ALLOC, size, SP_NULLPTR, 0);
 
       bool is_top = (u8*)old_memory + old_size == fixed->buffer + fixed->bytes_used;
       if (is_top) {
         u64 offset = (u64)((u8*)old_memory - fixed->buffer);
         if (size <= fixed->capacity - offset) {
-          if (size > old_size && !uninitialized) sp_mem_zero((u8*)old_memory + old_size, size - old_size);
+          if (size > old_size) sp_mem_zero((u8*)old_memory + old_size, size - old_size);
           fixed->bytes_used = offset + size;
           return old_memory;
         }
@@ -10903,10 +9651,9 @@ void* sp_mem_fixed_on_alloc(void* user_data, sp_mem_alloc_mode_t mode, u64 size,
 
       if (size <= old_size) return old_memory;
 
-      void* fresh = sp_mem_fixed_on_alloc(user_data, SP_ALLOCATOR_MODE_ALLOC_UNINITIALIZED, size, SP_NULLPTR, 0);
+      void* fresh = sp_mem_fixed_on_alloc(user_data, SP_ALLOCATOR_MODE_ALLOC, size, SP_NULLPTR, 0);
       if (!fresh) return SP_NULLPTR;
       sp_mem_move(fresh, old_memory, old_size);
-      if (!uninitialized) sp_mem_zero((u8*)fresh + old_size, size - old_size);
       return fresh;
     }
     case SP_ALLOCATOR_MODE_FREE: {
@@ -11855,17 +10602,66 @@ sp_str_t sp_str_truncate(sp_mem_t mem, sp_str_t str, u32 max_len, sp_str_t trail
   return sp_str_concat(mem, sp_str_prefix(str, max_len - trailer.len), trailer);
 }
 
+sp_da(sp_str_t) sp_str_map(sp_mem_t mem, sp_str_t* strs, u32 num_strs, void* user_data, sp_str_map_fn_t fn) {
+  sp_da(sp_str_t) results = sp_da_new(mem, sp_str_t);
+
+  sp_for(it, num_strs) {
+    sp_str_map_context_t context = {
+      .mem = mem,
+      .str = strs[it],
+      .user_data = user_data
+    };
+    sp_str_t result = fn(&context);
+    sp_da_push(results, result);
+  }
+
+  return results;
+}
+
+sp_str_t sp_str_map_kernel_prepend(sp_str_map_context_t* context) {
+  sp_str_t prefix = *(sp_str_t*)context->user_data;
+  return sp_str_concat(context->mem, prefix, context->str);
+}
+
+sp_str_t sp_str_map_kernel_append(sp_str_map_context_t* context) {
+  sp_str_t suffix = *(sp_str_t*)context->user_data;
+  return sp_str_concat(context->mem, context->str, suffix);
+}
+
+sp_str_t sp_str_map_kernel_prefix(sp_str_map_context_t* context) {
+  u32 len;
+  sp_mem_copy(&len, context->user_data, sizeof(len));
+  return sp_str_sub(context->str, 0, len);
+}
+
+sp_str_t sp_str_map_kernel_pad(sp_str_map_context_t* context) {
+  u32 len;
+  sp_mem_copy(&len, context->user_data, sizeof(len));
+  return sp_str_pad(context->mem, context->str, len);
+}
+
+sp_str_t sp_str_map_kernel_trim(sp_str_map_context_t* context) {
+  return sp_str_trim(context->str);
+}
+
+sp_str_t sp_str_map_kernel_to_upper(sp_str_map_context_t* context) {
+  return sp_str_to_upper(context->mem, context->str);
+}
+
+sp_str_t sp_str_map_kernel_to_lower(sp_str_map_context_t* context) {
+  return sp_str_to_lower(context->mem, context->str);
+}
+
+sp_str_t sp_str_map_kernel_pascal_case(sp_str_map_context_t* context) {
+  return sp_str_to_pascal_case(context->mem, context->str);
+}
+
 sp_da(sp_str_t) sp_str_pad_to_longest(sp_mem_t mem, sp_str_t* strs, u32 n) {
   u32 max_len = 0;
   sp_for(i, n) {
     if (strs[i].len > max_len) max_len = strs[i].len;
   }
-
-  sp_da(sp_str_t) results = sp_da_new(mem, sp_str_t);
-  sp_for(i, n) {
-    sp_da_push(results, sp_str_pad(mem, strs[i], max_len));
-  }
-  return results;
+  return sp_str_map(mem, strs, n, &max_len, sp_str_map_kernel_pad);
 }
 
 
@@ -11882,152 +10678,277 @@ sp_da(sp_str_t) sp_str_pad_to_longest(sp_mem_t mem, sp_str_t* strs, u32 n) {
 //////////////
 // ITERATOR //
 //////////////
-#ifdef SP_WIN32
-#define SP_SYS_DIR_WIN32_SCRATCH (255 * 3 + 1 + SP_MEM_ALIGNMENT - 1)
-sp_static_assert(SP_SYS_DIR_MIN_BUF >= SP_SYS_DIR_WIN32_SCRATCH + sizeof(sp_nt_file_directory_information_t) + 255 * sizeof(u16), sp_sys_dir_min_buf);
+SP_PRIVATE bool sp_sys_diriter_is_dot(const c8* name) {
+  return name[0] == '.' && (name[1] == 0 || (name[1] == '.' && name[2] == 0));
+}
 
-SP_PRIVATE sp_fs_kind_t sp_sys_dir_win32_attrs(sp_win32_dword_t attrs) {
+s32 sp_sys_fs_it_open_s(sp_sys_fd_t fd, sp_sys_fs_it_t* it, sp_str_t path, sp_mem_slice_t buf) {
+  return sp_sys_fs_it_open(fd, it, path.data, path.len, buf.data, buf.len);
+}
+
+#if defined(SP_WIN32)
+SP_PRIVATE sp_fs_kind_t sp_sys_diriter_win32_attrs(sp_win32_dword_t attrs) {
   if (attrs & FILE_ATTRIBUTE_REPARSE_POINT) return SP_FS_KIND_SYMLINK;
   if (attrs & FILE_ATTRIBUTE_DIRECTORY) return SP_FS_KIND_DIR;
   return SP_FS_KIND_FILE;
 }
 
-#elif defined(SP_LINUX)
-sp_static_assert(SP_SYS_DIR_MIN_BUF >= sizeof(sp_sys_dirent64_t) + 255 + 1, sp_sys_dir_min_buf);
-
-SP_PRIVATE sp_fs_kind_t sp_sys_dir_dtype_to_kind(u8 d_type) {
-  switch (d_type) {
-    case SP_DT_REG: { return SP_FS_KIND_FILE; }
-    case SP_DT_DIR: { return SP_FS_KIND_DIR; }
-    case SP_DT_LNK: { return SP_FS_KIND_SYMLINK; }
-  }
-  return SP_FS_KIND_NONE;
+SP_PRIVATE bool sp_sys_diriter_win32_is_dot(const u16* name) {
+  if (name[0] == '.' && name[1] == 0) return true;
+  if (name[0] == '.' && name[1] == '.' && name[2] == 0) return true;
+  return false;
 }
 
-#elif defined(SP_MACOS) || defined(SP_COSMO)
-sp_static_assert(SP_SYS_DIR_MIN_BUF >= sizeof(struct dirent), sp_sys_dir_min_buf);
-
-SP_PRIVATE sp_fs_kind_t sp_sys_dir_dtype_to_kind(u8 d_type) {
-  switch (d_type) {
-    case SP_DT_REG: { return SP_FS_KIND_FILE; }
-    case SP_DT_DIR: { return SP_FS_KIND_DIR; }
-    case SP_DT_LNK: { return SP_FS_KIND_SYMLINK; }
-  }
-  return SP_FS_KIND_NONE;
+SP_PRIVATE u32 sp_sys_diriter_win32_name_len(const u16* name) {
+  u32 n = 0;
+  while (name[n]) n++;
+  return n;
 }
-#endif
 
-sp_err_t sp_sys_dir_from_fd_p(sp_sys_fd_t fd, sp_sys_dir_t* out) {
-  *out = sp_zero_s(sp_sys_dir_t);
-
-#if defined(SP_WIN32) || defined(SP_LINUX)
-  out->handle = (s64)fd;
-  return SP_OK;
-#elif defined(SP_MACOS) || defined(SP_COSMO)
-  DIR* dir = fdopendir((int)fd);
-  if (!dir) return sp_sys_err_from_errno(errno);
-
-  out->handle = (s64)(intptr_t)dir;
-  return SP_OK;
-#elif defined(SP_WASM)
+s32 sp_sys_fs_it_open_p(sp_sys_fd_t fd, sp_sys_fs_it_t* it, const c8* path, u32 path_len, void* buf, u64 cap) {
   (void)fd;
-  return SP_ERR_SYS_UNSUPPORTED;
-#else
-  #error "sp_sys_dir_from_fd"
-#endif
+  *it = sp_zero_s(sp_sys_fs_it_t);
+  if (cap < sizeof(sp_win32_find_data_t) + (MAX_PATH * 3 + 1)) return -1;
+
+  SP_ALIGNED u8 pattern_storage [SP_PATH_MAX];
+  sp_mem_fixed_t pattern_fixed = sp_mem_fixed(pattern_storage, sizeof(pattern_storage));
+  sp_mem_t pattern_mem = sp_mem_fixed_as_allocator(&pattern_fixed);
+  sp_str_t pattern = sp_fs_join_path(pattern_mem, sp_str(path, path_len), sp_str_lit("*"));
+
+  sp_sys_nt_path_t nt = sp_zero;
+  if (!SP_NT_SUCCESS(sp_sys_nt_path(pattern, &nt))) {
+    return -1;
+  }
+
+  u32 w_off = 0;
+  if (nt.name.Length >= 8 && nt.name.Buffer[0] == '\\' && nt.name.Buffer[1] == '?' && nt.name.Buffer[2] == '?' && nt.name.Buffer[3] == '\\') {
+    w_off = 4;
+  }
+  u32 prefixed_len = 4 + (nt.name.Length / sizeof(u16)) - w_off;
+  u16 wpat [SP_PATH_MAX + 8];
+  wpat[0] = '\\'; wpat[1] = '\\'; wpat[2] = '?'; wpat[3] = '\\';
+  sp_mem_copy(wpat + 4, nt.name.Buffer + w_off, nt.name.Length - w_off * sizeof(u16));
+  wpat[prefixed_len] = 0;
+  sp_sys_nt_path_free(&nt);
+
+  sp_win32_find_data_t* find = (sp_win32_find_data_t*)buf;
+  HANDLE h = FindFirstFileW((LPCWSTR)wpat, find);
+  if (h == INVALID_HANDLE_VALUE) return -1;
+
+  it->handle = (s64)(intptr_t)h;
+  it->buf.data = (u8*)buf;
+  it->buf.capacity = cap;
+  it->buf.len = sizeof(sp_win32_find_data_t);
+  it->cursor = 0;
+  return 0;
 }
 
-sp_err_t sp_sys_dir_read_p(sp_sys_dir_t* dir, sp_mem_buffer_t* buf) {
-  buf->len = 0;
-#if defined(SP_WIN32)
-  sp_nt_io_status_block_t iosb = sp_zero;
-  sp_nt_status_t status = SP_NT(NtQueryDirectoryFile)(
-    (void*)(intptr_t)dir->handle,
-    SP_NULLPTR, SP_NULLPTR, SP_NULLPTR,
-    &iosb,
-    buf->data, (u32)(buf->capacity - SP_SYS_DIR_WIN32_SCRATCH),
-    SP_NT_FILE_DIRECTORY_INFORMATION,
-    0, SP_NULLPTR, 0);
-  if (status == SP_NT_STATUS_NO_MORE_FILES) return SP_OK;
-  if (status == SP_NT_STATUS_NO_SUCH_FILE) return SP_OK;
-  if (!SP_NT_SUCCESS(status)) return sp_sys_err_from_nt(status);
-  buf->len = (u64)iosb.Information;
-  return SP_OK;
+void sp_sys_fs_it_close_p(sp_sys_fs_it_t* it) {
+  FindClose((HANDLE)(intptr_t)it->handle);
+}
+
+s32 sp_sys_fs_it_next_p(sp_sys_fs_it_t* it, sp_sys_fs_entry_t* out) {
+  sp_win32_find_data_t* fd = (sp_win32_find_data_t*)it->buf.data;
+  while (true) {
+    if (it->buf.len == 0) {
+      if (!FindNextFileW((HANDLE)(intptr_t)it->handle, fd)) {
+        return -1;
+      }
+    }
+    it->buf.len = 0;
+
+    u16* name = (u16*)fd->cFileName;
+    if (sp_sys_diriter_win32_is_dot(name)) {
+      continue;
+    }
+
+    u8* scratch_data = it->buf.data + sizeof(sp_win32_find_data_t);
+    u64 scratch_cap = it->buf.capacity - sizeof(sp_win32_find_data_t);
+    sp_mem_fixed_t allocator = sp_mem_fixed(scratch_data, scratch_cap);
+    sp_mem_t mem = sp_mem_fixed_as_allocator(&allocator);
+
+    u32 wlen = sp_sys_diriter_win32_name_len(name);
+    sp_str_t utf8 = sp_wtf16_to_wtf8(mem, sp_wide_str(name, wlen));
+    out->kind = sp_sys_diriter_win32_attrs(fd->dwFileAttributes);
+    out->name = utf8.data;
+    out->len = utf8.len;
+    return SP_OK;
+  }
+}
+
 #elif defined(SP_LINUX)
-  s64 n = sp_lx_getdents64((sp_sys_fd_t)dir->handle, buf->data, buf->capacity);
-  if (n == -SP_ENOENT) return SP_OK;
-  if (n < 0) return sp_sys_err_from_errno(-n);
-  buf->len = (u64)n;
-  return SP_OK;
-#elif defined(SP_MACOS) || defined(SP_COSMO)
-  errno = 0;
-  struct dirent* d = readdir((DIR*)(intptr_t)dir->handle);
-  if (!d) return errno ? sp_sys_err_from_errno(errno) : SP_OK;
-  sp_mem_copy(buf->data, d, d->d_reclen);
-  buf->len = d->d_reclen;
-  return SP_OK;
-#elif defined(SP_WASM)
-  (void)dir;
-  return SP_ERR_SYS_UNSUPPORTED;
-#else
-  #error "sp_sys_dir_read"
-#endif
+SP_PRIVATE sp_fs_kind_t sp_sys_diriter_dtype_to_kind(u8 d_type) {
+  switch (d_type) {
+    case SP_DT_REG: { return SP_FS_KIND_FILE; }
+    case SP_DT_DIR: { return SP_FS_KIND_DIR; }
+    case SP_DT_LNK: { return SP_FS_KIND_SYMLINK; }
+  }
+  return SP_FS_KIND_NONE;
 }
 
-sp_err_t sp_sys_dir_parse_p(sp_sys_dir_t* dir, sp_mem_buffer_t* buf, u64* cursor, sp_sys_dir_entry_t* out) {
-  *out = sp_zero_s(sp_sys_dir_entry_t);
-#if defined(SP_WIN32)
-  (void)dir;
-  sp_nt_file_directory_information_t* d = sp_ptr_cast(sp_nt_file_directory_information_t*, buf->data + *cursor);
-  *cursor = d->NextEntryOffset ? *cursor + d->NextEntryOffset : buf->len;
-
-  sp_mem_fixed_t allocator = sp_mem_fixed(buf->data + buf->capacity - SP_SYS_DIR_WIN32_SCRATCH, SP_SYS_DIR_WIN32_SCRATCH);
-  sp_mem_t mem = sp_mem_fixed_as_allocator(&allocator);
-
-  sp_str_t utf8 = sp_wtf16_to_wtf8(mem, sp_wide_str(d->FileName, d->FileNameLength / sizeof(u16)));
-  out->name = utf8.data;
-  out->len = utf8.len;
-  out->kind = sp_sys_dir_win32_attrs(d->FileAttributes);
-  return SP_OK;
-#elif defined(SP_LINUX)
-  (void)dir;
-  sp_sys_dirent64_t* d = sp_ptr_cast(sp_sys_dirent64_t*, buf->data + *cursor);
-  *cursor += d->d_reclen;
-
-  out->name = d->d_name;
-  out->len = sp_cstr_len(d->d_name);
-  out->kind = sp_sys_dir_dtype_to_kind(d->d_type);
-  return SP_OK;
-#elif defined(SP_MACOS) || defined(SP_COSMO)
-  (void)dir;
-  struct dirent* d = sp_ptr_cast(struct dirent*, buf->data + *cursor);
-  *cursor += d->d_reclen;
-
-  out->name = d->d_name;
-  out->len = sp_cstr_len(d->d_name);
-  out->kind = sp_sys_dir_dtype_to_kind(d->d_type);
-  return SP_OK;
-#elif defined(SP_WASM)
-  (void)dir; (void)buf; (void)cursor;
-  return SP_ERR_SYS_UNSUPPORTED;
-#else
-  #error "sp_sys_dir_parse"
-#endif
+s32 sp_sys_fs_it_open_p(sp_sys_fd_t root, sp_sys_fs_it_t* it, const c8* path, u32 path_len, void* buf, u64 cap) {
+  *it = sp_zero_s(sp_sys_fs_it_t);
+  sp_sys_fd_t fd = sp_sys_open(root, path, path_len, SP_O_RDONLY | SP_O_DIRECTORY, 0);
+  if (fd < 0) return -1;
+  it->handle = (s64)fd;
+  it->buf.data = (u8*)buf;
+  it->buf.capacity = cap;
+  it->buf.len = 0;
+  it->cursor = 0;
+  return 0;
 }
 
-sp_err_t sp_sys_dir_close_p(sp_sys_dir_t* dir) {
-#if defined(SP_WIN32) || defined(SP_LINUX)
-  return sp_sys_close((sp_sys_fd_t)dir->handle);
-#elif defined(SP_MACOS) || defined(SP_COSMO)
-  if (closedir((DIR*)(intptr_t)dir->handle)) return sp_sys_err_from_errno(errno);
-  return SP_OK;
-#elif defined(SP_WASM)
-  (void)dir;
-  return SP_ERR_SYS_UNSUPPORTED;
-#else
-  #error "sp_sys_dir_close"
-#endif
+void sp_sys_fs_it_close_p(sp_sys_fs_it_t* it) {
+  sp_sys_close((sp_sys_fd_t)it->handle);
 }
+
+s32 sp_sys_fs_it_next_p(sp_sys_fs_it_t* it, sp_sys_fs_entry_t* out) {
+  while (true) {
+    // Pull another chunk from the kernel and advance the cursor
+    if (it->cursor >= it->buf.len) {
+      s64 n = sp_lx_getdents64((sp_sys_fd_t)it->handle, it->buf.data, it->buf.capacity);
+      if (n <= 0) return -1;
+      it->cursor = 0;
+      it->buf.len = (u64)n;
+    }
+
+    sp_sys_dirent64_t* d = sp_ptr_cast(sp_sys_dirent64_t*, it->buf.data + it->cursor);
+    it->cursor += d->d_reclen;
+
+    // If it's an absolute path, that's the one
+    if (!sp_sys_diriter_is_dot(d->d_name)) {
+      out->kind = sp_sys_diriter_dtype_to_kind(d->d_type);
+      out->name = d->d_name;
+      out->len = sp_cstr_len(d->d_name);
+      return SP_OK;
+    }
+  }
+}
+
+#elif defined(SP_MACOS) || defined(SP_COSMO)
+SP_PRIVATE sp_fs_kind_t sp_sys_diriter_dtype_to_kind(u8 d_type) {
+  switch (d_type) {
+    case SP_DT_REG: { return SP_FS_KIND_FILE; }
+    case SP_DT_DIR: { return SP_FS_KIND_DIR; }
+    case SP_DT_LNK: { return SP_FS_KIND_SYMLINK; }
+  }
+  return SP_FS_KIND_NONE;
+}
+
+s32 sp_sys_fs_it_open_p(sp_sys_fd_t fd, sp_sys_fs_it_t* it, const c8* path, u32 path_len, void* buf, u64 cap) {
+  (void)fd;
+  *it = sp_zero_s(sp_sys_fs_it_t);
+  c8 cstr [SP_PATH_MAX] = sp_zero;
+  sp_cstr_copy_to_n(path, path_len, cstr, SP_PATH_MAX);
+  DIR* dir = opendir(cstr);
+  if (!dir) return -1;
+  it->handle = (s64)(intptr_t)dir;
+  it->buf.data = (u8*)buf;
+  it->buf.capacity = cap;
+  it->buf.len = 0;
+  it->cursor = 0;
+  return 0;
+}
+
+void sp_sys_fs_it_close_p(sp_sys_fs_it_t* it) {
+  closedir((DIR*)(intptr_t)it->handle);
+}
+
+s32 sp_sys_fs_it_next_p(sp_sys_fs_it_t* it, sp_sys_fs_entry_t* out) {
+  while (true) {
+    struct dirent* d = readdir((DIR*)(intptr_t)it->handle);
+    if (!d) return -1;
+    if (sp_sys_diriter_is_dot(d->d_name)) continue;
+    out->name = d->d_name;
+    out->len = sp_cstr_len(d->d_name);
+    out->kind = sp_sys_diriter_dtype_to_kind(d->d_type);
+    return 0;
+  }
+}
+
+#elif defined(SP_WASM_WASI)
+s32 sp_sys_fs_it_open_p(sp_sys_fd_t root, sp_sys_fs_it_t* it, const c8* path, u32 path_len, void* buf, u64 cap) {
+  *it = sp_zero_s(sp_sys_fs_it_t);
+  sp_sys_fd_t fd = sp_sys_open(root, path, path_len, SP_O_RDONLY | SP_O_DIRECTORY, 0);
+  if (fd < 0) return -1;
+  it->handle = (s64)fd;
+  it->buf.data = (u8*)buf;
+  it->buf.capacity = cap;
+  return 0;
+}
+
+void sp_sys_fs_it_close_p(sp_sys_fs_it_t* it) {
+  sp_sys_close((sp_sys_fd_t)it->handle);
+}
+
+s32 sp_sys_fs_it_next_p(sp_sys_fs_it_t* it, sp_sys_fs_entry_t* out) {
+  while (true) {
+    if (it->cursor >= it->buf.len) {
+      __wasi_size_t used = 0;
+      if (__wasi_fd_readdir((__wasi_fd_t)it->handle, it->buf.data, (__wasi_size_t)it->buf.capacity, it->cookie, &used)) {
+        return -1;
+      }
+      if (!used) return -1;
+      it->cursor = 0;
+      it->buf.len = used;
+    }
+
+    // The tail of the buffer may hold a truncated entry; refill from the last
+    // fully consumed entry's cookie. A batch that yields nothing means the
+    // buffer can't even hold one entry
+    __wasi_dirent_t d;
+    bool truncated = it->cursor + sizeof(d) > it->buf.len;
+    if (!truncated) {
+      __builtin_memcpy(&d, it->buf.data + it->cursor, sizeof(d));
+      truncated = it->cursor + sizeof(d) + d.d_namlen > it->buf.len;
+    }
+    if (truncated) {
+      if (!it->cursor) return -1;
+      it->buf.len = 0;
+      continue;
+    }
+
+    const c8* name = (const c8*)(it->buf.data + it->cursor + sizeof(d));
+    it->cookie = d.d_next;
+    it->cursor += sizeof(d) + d.d_namlen;
+
+    bool dot = d.d_namlen == 1 && name[0] == '.';
+    bool dotdot = d.d_namlen == 2 && name[0] == '.' && name[1] == '.';
+    if (dot || dotdot) continue;
+
+    out->name = name;
+    out->len = d.d_namlen;
+    out->kind = sp_sys_file_kind_from_wasi(d.d_type);
+    if (out->kind == SP_FS_KIND_NONE) {
+      c8 cstr [SP_PATH_MAX] = sp_zero;
+      sp_cstr_copy_to_n(name, d.d_namlen, cstr, SP_PATH_MAX);
+      __wasi_filestat_t st;
+      if (!__wasi_path_filestat_get((__wasi_fd_t)it->handle, 0, cstr, &st)) {
+        out->kind = sp_sys_file_kind_from_wasi(st.filetype);
+      }
+    }
+    return 0;
+  }
+}
+
+#elif defined(SP_WASM)
+s32 sp_sys_fs_it_open_p(sp_sys_fd_t fd, sp_sys_fs_it_t* it, const c8* path, u32 path_len, void* buf, u64 cap) {
+  sp_unreachable_return(-1);
+}
+
+void sp_sys_fs_it_close_p(sp_sys_fs_it_t* it) {
+  sp_unreachable();
+}
+
+s32 sp_sys_fs_it_next_p(sp_sys_fs_it_t* it, sp_sys_fs_entry_t* out) {
+  sp_unreachable_return(-1);
+}
+
+#else
+#error "sp_sys_fs_it_open"
+#error "sp_sys_fs_it_close"
+#error "sp_sys_fs_it_next"
+#endif
 
 
 //     ███████     █████████
@@ -12046,9 +10967,9 @@ void sp_assert_f(sp_str_t file, sp_str_t line, sp_str_t func, sp_str_t expr, boo
   if (cond) return;
 
 #if SP_ASSERT_ENABLED(SP_ASSERT_LOG)
-  sp_io_writer_t* io = sp_io_get_std_err();
+  sp_io_stream_writer_t io = sp_io_get_std_err();
   sp_fmt_io(
-    io,
+    &io.base,
     "{.red} {}:{.gray}:{.yellow}{.yellow} {}",
     sp_fmt_cstr("assert"),
     sp_fmt_str(file),
@@ -12057,7 +10978,7 @@ void sp_assert_f(sp_str_t file, sp_str_t line, sp_str_t func, sp_str_t expr, boo
     sp_fmt_cstr("()"),
     sp_fmt_str(expr)
   );
-  sp_io_write_cstr(io, "\n", SP_NULLPTR);
+  sp_io_write_cstr(&io.base, "\n", SP_NULLPTR);
 #endif
 
 #if SP_ASSERT_ENABLED(SP_ASSERT_TRAP)
@@ -12075,6 +10996,9 @@ void sp_os_sleep_ns(u64 ns) {
   };
   sp_sys_timespec_t rem = sp_zero;
   sp_sys_nanosleep(&req, &rem);
+  // while (sp_sys_nanosleep(&req, &rem) == -1 && errno == SP_EINTR) {
+  //   req = rem;
+  // }
 }
 
 void sp_os_sleep_ms(f64 ms) {
@@ -12117,6 +11041,156 @@ void sp_sleep_ns(u64 target) {
 void sp_sleep_ms(f64 ms) {
   sp_sleep_ns((u64)sp_tm_ms_to_ns_f(ms));
 }
+
+
+//////////////////
+// SP_OS_PRINT //
+/////////////////
+#if defined(SP_WIN32)
+SP_PRIVATE void sp_os_win32_write(DWORD handle_id, sp_str_t message) {
+  HANDLE handle = GetStdHandle(handle_id);
+  DWORD written;
+  DWORD mode;
+  if (GetConsoleMode(handle, &mode)) {
+    WriteConsoleA(handle, message.data, message.len, &written, NULL);
+  } else {
+    WriteFile(handle, message.data, message.len, &written, NULL);
+  }
+}
+
+void sp_os_print(sp_str_t message) {
+  sp_os_win32_write(STD_OUTPUT_HANDLE, message);
+}
+
+void sp_os_print_err(sp_str_t message) {
+  sp_os_win32_write(STD_ERROR_HANDLE, message);
+}
+
+#else
+void sp_os_print(sp_str_t message) {
+  sp_sys_write(sp_sys_stdout, message.data, message.len);
+}
+
+void sp_os_print_err(sp_str_t message) {
+  sp_sys_write(sp_sys_stderr, message.data, message.len);
+}
+#endif
+
+
+/////////
+// TTY //
+/////////
+#if defined(SP_WIN32)
+bool sp_os_is_tty(sp_sys_fd_t fd) {
+  HANDLE handle = (HANDLE)fd;
+  if (handle == INVALID_HANDLE_VALUE || handle == SP_NULLPTR) return false;
+  DWORD mode;
+  return GetConsoleMode(handle, &mode) != 0;
+}
+
+void sp_os_tty_size(sp_sys_fd_t fd, u32* cols, u32* rows) {
+  if (cols) *cols = 0;
+  if (rows) *rows = 0;
+  HANDLE handle = (HANDLE)fd;
+  if (handle == INVALID_HANDLE_VALUE || handle == SP_NULLPTR) return;
+  CONSOLE_SCREEN_BUFFER_INFO csbi;
+  if (!GetConsoleScreenBufferInfo(handle, &csbi)) return;
+  if (cols) *cols = (u32)(csbi.srWindow.Right - csbi.srWindow.Left + 1);
+  if (rows) *rows = (u32)(csbi.srWindow.Bottom - csbi.srWindow.Top + 1);
+}
+
+s32 sp_os_tty_enter_raw(sp_sys_fd_t fd, sp_tty_mode_t* saved) {
+  HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
+  HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
+  (void)fd;
+  if (!GetConsoleMode(hin, &saved->input_mode)) return -1;
+  if (!GetConsoleMode(hout, &saved->output_mode)) return -1;
+  SetConsoleOutputCP(CP_UTF8);
+  DWORD raw_in = ENABLE_VIRTUAL_TERMINAL_INPUT;
+  DWORD raw_out = saved->output_mode | ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+  if (!SetConsoleMode(hin, raw_in)) return -1;
+  if (!SetConsoleMode(hout, raw_out)) return -1;
+  return 0;
+}
+
+s32 sp_os_tty_restore(sp_sys_fd_t fd, const sp_tty_mode_t* saved) {
+  (void)fd;
+  if (!SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), saved->input_mode)) return -1;
+  if (!SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), saved->output_mode)) return -1;
+  return 0;
+}
+
+#elif defined(SP_MACOS) || defined(SP_COSMO) || defined(SP_LINUX)
+#if defined(SP_LINUX)
+  typedef sp_sys_termios_t sp_termios_t;
+  typedef sp_sys_winsize_t sp_winsize_t;
+  #define sp_tcgetattr(f, t) sp_sys_tcgetattr(f, t)
+  #define sp_tcsetattr(f, o, t) sp_sys_tcsetattr(f, o, t)
+  #define sp_ioctl(f, r, a) sp_sys_ioctl(f, r, a)
+
+  s32 sp_sys_ioctl(s32 fd, u64 request, void* argp) {
+    return (s32)sp_syscall(SP_SYSCALL_NUM_IOCTL, fd, request, argp);
+  }
+
+  s32 sp_sys_tcgetattr(s32 fd, sp_sys_termios_t* termios) {
+    s32 result = sp_sys_ioctl(fd, SP_TCGETS, termios);
+    return result < 0 ? -1 : result;
+  }
+
+  s32 sp_sys_tcsetattr(s32 fd, s32 opt, const sp_sys_termios_t* termios) {
+    s32 result = sp_sys_ioctl(fd, SP_TCSETS + (u64)opt, (void*)termios);
+    return result < 0 ? -1 : result;
+  }
+#else
+  typedef struct termios sp_termios_t;
+  typedef struct winsize sp_winsize_t;
+  #define sp_tcgetattr(f, t) tcgetattr(f, t)
+  #define sp_tcsetattr(f, o, t) tcsetattr(f, o, t)
+  #define sp_ioctl(f, r, a) ioctl(f, r, a)
+#endif
+
+bool sp_os_is_tty(sp_sys_fd_t fd) {
+  sp_termios_t t = sp_zero;
+  return sp_tcgetattr(fd, &t) == 0;
+}
+
+void sp_os_tty_size(sp_sys_fd_t fd, u32* cols, u32* rows) {
+  if (cols) *cols = 0;
+  if (rows) *rows = 0;
+  sp_winsize_t ws = sp_zero;
+  if (sp_ioctl(fd, SP_TIOCGWINSZ, &ws) < 0) return;
+  if (cols) *cols = (u32)ws.ws_col;
+  if (rows) *rows = (u32)ws.ws_row;
+}
+
+s32 sp_os_tty_enter_raw(sp_sys_fd_t fd, sp_tty_mode_t* saved) {
+  if (sp_tcgetattr(fd, saved) == -1) return -1;
+  sp_termios_t raw = *saved;
+  raw.c_iflag &= (u32)~(SP_BRKINT | SP_ICRNL | SP_INPCK | SP_ISTRIP | SP_IXON);
+  raw.c_oflag &= (u32)~(SP_OPOST);
+  raw.c_cflag |= (u32)SP_CS8;
+  raw.c_lflag &= (u32)~(SP_ECHO | SP_ICANON | SP_IEXTEN | SP_ISIG);
+  raw.c_cc[SP_VMIN] = 1;
+  raw.c_cc[SP_VTIME] = 0;
+  return sp_tcsetattr(fd, SP_TCSAFLUSH, &raw);
+}
+
+s32 sp_os_tty_restore(sp_sys_fd_t fd, const sp_tty_mode_t* saved) {
+  return sp_tcsetattr(fd, SP_TCSAFLUSH, saved);
+}
+
+#elif defined(SP_WASM)
+bool sp_os_is_tty(sp_sys_fd_t fd)                                  { return false; }
+void sp_os_tty_size(sp_sys_fd_t fd, u32* cols, u32* rows)          { *cols = 0; *rows = 0; }
+s32  sp_os_tty_enter_raw(sp_sys_fd_t fd, sp_tty_mode_t* saved)     { return 0; }
+s32  sp_os_tty_restore(sp_sys_fd_t fd, const sp_tty_mode_t* saved) { return 0; }
+
+#else
+#error "sp_os_is_tty"
+#error "sp_os_tty_size"
+#error "sp_os_tty_enter_raw"
+#error "sp_os_tty_restore"
+#endif
 
 
 ///////////
@@ -13840,10 +12914,6 @@ sp_ps_t sp_ps_create(sp_mem_t mem, sp_ps_config_t config) {
   proc.os = sp_alloc_type(mem, sp_ps_os_t);
   proc.os->pid = pid;
 
-  proc.io.in.fd = 0;
-  proc.io.out.fd = 0;
-  proc.io.err.fd = 0;
-
   if (io.in.pipes.read >= 0) {
     sp_sys_close(io.in.pipes.read);
 
@@ -13965,11 +13035,7 @@ sp_io_reader_t* sp_ps_io_err(sp_ps_t* ps) {
 #if defined(SP_LINUX)
   #define sp_wait4(p, s, o, r)              sp_syscall_wait4(p, s, o, r)
 #else
-SP_PRIVATE s32 sp_ps_wait4(s32 pid, s32* status, s32 options, void* rusage) {
-  s32 rc = (s32)wait4(pid, status, options, (struct rusage*)rusage);
-  return rc < 0 ? -errno : rc;
-}
-  #define sp_wait4(p, s, o, r)              sp_ps_wait4(p, s, o, r)
+  #define sp_wait4(p, s, o, r)              wait4(p, s, o, r)
 #endif
 
 sp_ps_status_t sp_ps_poll(sp_ps_t* ps, u32 timeout_ms) {
@@ -14005,7 +13071,7 @@ sp_ps_status_t sp_ps_poll(sp_ps_t* ps, u32 timeout_ms) {
 
       return result;
     }
-    else if (wait_result == -SP_EINTR) {
+    else if (wait_result < 0 && errno == SP_EINTR) {
       continue;
     }
     else if (wait_result < 0) {
@@ -14039,7 +13105,7 @@ sp_ps_status_t sp_ps_wait(sp_ps_t* ps) {
 
   do {
     wait_result = sp_wait4(ps->os->pid, &wait_status, SP_POSIX_WAITPID_BLOCK, SP_NULLPTR);
-  } while (wait_result == -SP_EINTR);
+  } while (wait_result == -1 && errno == SP_EINTR);
 
   if (wait_result < 0) {
     result.state = SP_PS_STATE_DONE;
@@ -14103,11 +13169,8 @@ sp_ps_output_t sp_ps_output(sp_ps_t* ps) {
   }
 
   while (nfds > 0) {
-    sp_err_t wait_err = sp_sys_fds_wait(fds, ready, (u64)nfds);
-    if (wait_err != SP_OK) {
-      if (result.error == SP_OK) result.error = wait_err;
-      break;
-    }
+    s32 ret = sp_sys_fds_wait(fds, ready, (u64)nfds);
+    if (ret < 0) break;
 
     sp_for(i, (u32)nfds) {
       if (!ready[i]) {
@@ -14115,22 +13178,17 @@ sp_ps_output_t sp_ps_output(sp_ps_t* ps) {
       }
 
       u64 n = 0;
-      sp_err_t read_err = sp_io_read(readers[i], buffer, sizeof(buffer), &n);
+      sp_io_read(readers[i], buffer, sizeof(buffer), &n);
       if (n > 0) {
         sp_io_write_str(writers[i], sp_str((c8*)buffer, n), SP_NULLPTR);
+      } else {
+        fds[i] = fds[nfds - 1];
+        ready[i] = ready[nfds - 1];
+        readers[i] = readers[nfds - 1];
+        writers[i] = writers[nfds - 1];
+        nfds--;
+        i--;
       }
-      if (read_err == SP_OK && n > 0) continue;
-      if (read_err == SP_ERR_IO_WOULD_BLOCK) continue;
-
-      if (read_err != SP_OK && read_err != SP_ERR_IO_EOF && result.error == SP_OK) {
-        result.error = read_err;
-      }
-      fds[i] = fds[nfds - 1];
-      ready[i] = ready[nfds - 1];
-      readers[i] = readers[nfds - 1];
-      writers[i] = writers[nfds - 1];
-      nfds--;
-      i--;
     }
   }
 
@@ -14584,9 +13642,15 @@ sp_ps_t sp_ps_create(sp_mem_t mem, sp_ps_config_t config) {
   proc.os = sp_alloc_type(mem, sp_ps_os_t);
   proc.os->pid = process_info.hProcess;
 
-  proc.io.in.fd = io.in.parent_fd;
-  proc.io.out.fd = io.out.parent_fd;
-  proc.io.err.fd = io.err.parent_fd;
+  if (io.in.parent_fd != SP_SYS_INVALID_FD) {
+    proc.io.in.fd = io.in.parent_fd;
+  }
+  if (io.out.parent_fd != SP_SYS_INVALID_FD) {
+    proc.io.out.fd = io.out.parent_fd;
+  }
+  if (io.err.parent_fd != SP_SYS_INVALID_FD) {
+    proc.io.err.fd = io.err.parent_fd;
+  }
 
   return proc;
 
@@ -14725,14 +13789,14 @@ u64 sp_ps_win32_read_available(sp_sys_fd_t fd, sp_io_writer_t* builder, bool* op
     }
 
     u32 chunk = sp_min((u32)sizeof(buffer), (u32)available);
-    u64 num_read = 0;
-    if (sp_sys_read(fd, buffer, chunk, &num_read) != SP_OK || !num_read) {
+    s64 num_read = sp_sys_read(fd, buffer, chunk);
+    if (num_read <= 0) {
       *open = false;
       return total;
     }
 
     sp_io_write_str(builder, sp_str((c8*)buffer, (u32)num_read), SP_NULLPTR);
-    total += num_read;
+    total += (u64)num_read;
   }
 }
 
@@ -15109,24 +14173,24 @@ void sp_fmon_os_add_dir(sp_fmon_t* monitor, sp_str_t path) {
   sp_win32_handle_t event = CreateEventW(NULL, false, false, NULL);
   if (!event) return;
 
-  sp_sys_fd_t handle = SP_SYS_INVALID_FD;
-  if (!SP_NT_SUCCESS(sp_sys_nt_open(
+  sp_win32_handle_t handle = sp_sys_nt_open(
     sp_sys_get_root(0),
     path,
     FILE_LIST_DIRECTORY,
     FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
     SP_NT_FILE_OPEN,
     SP_NT_FILE_DIRECTORY_FILE | SP_NT_FILE_OPEN_FOR_BACKUP_INTENT,
-    0,
-    &handle
-  ))) {
+    0
+  );
+
+  if (handle == INVALID_HANDLE_VALUE) {
     CloseHandle(event);
     return;
   }
 
   sp_fmon_dir_t dir = sp_zero;
   dir.overlapped.hEvent = event;
-  dir.handle = (sp_win32_handle_t)handle;
+  dir.handle = handle;
   dir.path = sp_fs_canonicalize_path(monitor->mem, path);
   dir.notify_information = sp_alloc(monitor->mem, SP_FILE_MONITOR_BUFFER_SIZE);
   sp_mem_zero(dir.notify_information, SP_FILE_MONITOR_BUFFER_SIZE);
@@ -15270,7 +14334,7 @@ void sp_fmon_os_init(sp_fmon_t* monitor) {
   sp_fmon_os_t* linux_monitor = sp_alloc_type(monitor->mem, sp_fmon_os_t);
 
   linux_monitor->fd = sp_syscall_notify_init1(SP_IN_NONBLOCK | SP_IN_CLOEXEC);
-  if (linux_monitor->fd < 0) {
+  if (linux_monitor->fd == -1) {
     // Handle error but don't crash
     linux_monitor->fd = 0;
   }
@@ -15304,7 +14368,7 @@ void sp_fmon_os_add_dir(sp_fmon_t* monitor, sp_str_t path) {
 
   s32 wd = sp_syscall_inotify_add_watch(os->fd, path_cstr, mask);
 
-  if (wd >= 0) {
+  if (wd != -1) {
     sp_da_push(os->fds, wd);
     sp_da_push(os->paths, sp_str_copy(monitor->mem, path));
   }
@@ -15342,8 +14406,8 @@ void sp_fmon_os_process_changes(sp_fmon_t* monitor) {
   sp_fmon_os_t* os = (sp_fmon_os_t*)monitor->os;
   if (os->fd <= 0) return;
 
-  u64 len = 0;
-  if (sp_sys_read(os->fd, os->buffer, sizeof(os->buffer), &len) != SP_OK || !len) return;
+  s64 len = sp_sys_read(os->fd, os->buffer, sizeof(os->buffer));
+  if (len <= 0) return;
 
   u8* buffer = (u8*)os->buffer;
   u8* ptr = buffer;
@@ -15807,11 +14871,11 @@ void sp_fmon_os_process_changes(sp_fmon_t* monitor) {
 // @io
 sp_err_t sp_io_file_reader_read(sp_io_reader_t* reader, void* ptr, u64 size, u64* bytes_read) {
   sp_io_file_reader_t* r = (sp_io_file_reader_t*)reader;
-  u64 num_bytes = 0;
-  sp_err_t err = sp_sys_pread(r->file, ptr, size, r->pos, &num_bytes);
+  s64 rc = sp_sys_pread(r->file, ptr, size, r->pos);
+  u64 num_bytes = rc < 0 ? 0 : (u64)rc;
 
   sp_err_t result = SP_OK;
-  if (err) {
+  if (rc < 0) {
     result = SP_ERR_IO_READ_FAILED;
   }
   else if (size && !num_bytes) {
@@ -15827,14 +14891,11 @@ sp_err_t sp_io_file_reader_read(sp_io_reader_t* reader, void* ptr, u64 size, u64
 
 sp_err_t sp_io_stream_reader_read(sp_io_reader_t* reader, void* ptr, u64 size, u64* bytes_read) {
   sp_io_stream_reader_t* pr = (sp_io_stream_reader_t*)reader;
-  u64 num_bytes = 0;
-  sp_err_t err = sp_sys_read(pr->fd, ptr, size, &num_bytes);
+  s64 rc = sp_sys_read(pr->fd, ptr, size);
+  u64 num_bytes = rc < 0 ? 0 : (u64)rc;
 
   sp_err_t result = SP_OK;
-  if (err == SP_ERR_SYS_WOULD_BLOCK) {
-    result = SP_ERR_IO_WOULD_BLOCK;
-  }
-  else if (err) {
+  if (rc < 0) {
     result = SP_ERR_IO_READ_FAILED;
   }
   else if (size && !num_bytes) {
@@ -15888,8 +14949,8 @@ sp_err_t sp_io_file_reader_from_file(sp_io_file_reader_t* r, sp_sys_fd_t file, s
 }
 
 sp_err_t sp_io_file_reader_from_path(sp_io_file_reader_t* r, sp_str_t path) {
-  sp_sys_fd_t fd = SP_SYS_INVALID_FD;
-  if (sp_sys_open_s(sp_sys_get_root(0), path, SP_SYS_OPEN_MODE_RO, 0, &fd) != SP_OK) {
+  sp_sys_fd_t fd = sp_sys_open_s(sp_sys_get_root(0), path, SP_O_RDONLY | SP_O_BINARY, 0);
+  if (fd == SP_SYS_INVALID_FD) {
     *r = sp_zero_s(sp_io_file_reader_t);
     return SP_ERR_IO_OPEN_FAILED;
   }
@@ -15935,7 +14996,7 @@ sp_err_t sp_io_file_reader_size(sp_io_file_reader_t* r, u64* size) {
 
 sp_err_t sp_io_file_reader_size_force(sp_io_file_reader_t* r, u64* size) {
   sp_sys_file_meta_t st = sp_zero;
-  if (sp_sys_get_file_metadata(r->file, &st) != SP_OK) {
+  if (sp_sys_get_file_metadata(r->file, &st) < 0) {
     if (size) *size = 0;
     return SP_ERR_IO;
   }
@@ -15946,7 +15007,7 @@ sp_err_t sp_io_file_reader_size_force(sp_io_file_reader_t* r, u64* size) {
 
 sp_err_t sp_io_file_reader_close(sp_io_file_reader_t* r) {
   if (r->close_mode == SP_IO_CLOSE_MODE_AUTO) {
-    if (sp_sys_close(r->file) != SP_OK) {
+    if (sp_sys_close(r->file) < 0) {
       return SP_ERR_IO_CLOSE_FAILED;
     }
   }
@@ -15974,7 +15035,7 @@ void sp_io_stream_reader_from_fd(sp_io_stream_reader_t* r, sp_sys_fd_t fd, sp_io
 
 sp_err_t sp_io_stream_reader_close(sp_io_stream_reader_t* r) {
   if (r->close_mode == SP_IO_CLOSE_MODE_AUTO) {
-    if (sp_sys_close(r->fd) != SP_OK) {
+    if (sp_sys_close(r->fd) < 0) {
       return SP_ERR_IO_CLOSE_FAILED;
     }
   }
@@ -15983,11 +15044,11 @@ sp_err_t sp_io_stream_reader_close(sp_io_stream_reader_t* r) {
 
 sp_err_t sp_io_stream_writer_write(sp_io_writer_t* writer, const void* ptr, u64 size, u64* bytes_written) {
   sp_io_stream_writer_t* w = (sp_io_stream_writer_t*)writer;
-  u64 num_bytes = 0;
-  sp_err_t err = sp_sys_write(w->fd, ptr, size, &num_bytes);
+  s64 rc = sp_sys_write(w->fd, ptr, size);
+  u64 num_bytes = rc < 0 ? 0 : (u64)rc;
 
   sp_err_t result = SP_OK;
-  if (err) {
+  if (rc < 0) {
     result = SP_ERR_IO_WRITE_FAILED;
   }
   else if (size && !num_bytes) {
@@ -16020,7 +15081,10 @@ sp_err_t sp_io_stream_writer_read_from(sp_io_writer_t* writer, sp_io_reader_t* r
 
   while (true) {
     s64 off = (s64)*in_pos;
-    s64 rc = sp_syscall_retry(SP_SYSCALL_NUM_SENDFILE, w->fd, in_fd, &off, chunk);
+    s64 rc;
+    do {
+      rc = sp_syscall(SP_SYSCALL_NUM_SENDFILE, w->fd, in_fd, &off, chunk);
+    } while (rc == -1 && errno == SP_EINTR);
 
     if (rc < 0) {
       if (total == 0) {
@@ -16056,7 +15120,7 @@ void sp_io_stream_writer_from_fd(sp_io_stream_writer_t* w, sp_sys_fd_t fd, sp_io
 sp_err_t sp_io_stream_writer_close(sp_io_stream_writer_t* w) {
   sp_io_flush(&w->base);
   if (w->close_mode != SP_IO_CLOSE_MODE_AUTO) return SP_OK;
-  if (sp_sys_close(w->fd) != SP_OK) return SP_ERR_IO_CLOSE_FAILED;
+  if (sp_sys_close(w->fd) < 0) return SP_ERR_IO_CLOSE_FAILED;
   return SP_OK;
 }
 
@@ -16107,12 +15171,12 @@ SP_PRIVATE bool sp_io_socket_remaining(u64 deadline, u32* remaining) {
 
 // Poll slices are clamped to S32_MAX ms; the loop re-checks the deadline so
 // an expired slice of a longer wait is not reported as a timeout.
-SP_PRIVATE sp_err_t sp_io_socket_wait_deadline(sp_sys_socket_t socket, bool readable, u64 deadline) {
+SP_PRIVATE s32 sp_io_socket_wait_deadline(sp_sys_socket_t socket, bool readable, u64 deadline) {
   while (true) {
     u32 remaining = 0;
-    if (!sp_io_socket_remaining(deadline, &remaining)) return SP_ERR_SYS_TIMED_OUT;
-    sp_err_t err = sp_sys_socket_wait(socket, readable, remaining);
-    if (err != SP_ERR_SYS_TIMED_OUT) return err;
+    if (!sp_io_socket_remaining(deadline, &remaining)) return 1;
+    s32 rc = sp_sys_socket_wait(socket, readable, remaining);
+    if (rc != 1) return rc;
   }
 }
 
@@ -16121,17 +15185,16 @@ SP_PRIVATE sp_err_t sp_io_socket_reader_read(sp_io_reader_t* reader, void* ptr, 
   if (bytes_read) *bytes_read = 0;
   u64 deadline = sp_io_socket_deadline(r->timeout_ms);
   while (true) {
-    u64 n = 0;
-    sp_err_t err = sp_sys_socket_recv(r->socket, ptr, size, &n);
-    if (err == SP_OK) {
-      if (!n) return SP_ERR_IO_EOF;
-      if (bytes_read) *bytes_read = n;
+    s64 n = sp_sys_socket_recv(r->socket, ptr, size);
+    if (n == 0) return SP_ERR_IO_EOF;
+    if (n > 0) {
+      if (bytes_read) *bytes_read = (u64)n;
       return SP_OK;
     }
-    if (err != SP_ERR_SYS_WOULD_BLOCK) return SP_ERR_IO_READ_FAILED;
-    sp_err_t wait = sp_io_socket_wait_deadline(r->socket, true, deadline);
-    if (wait == SP_ERR_SYS_TIMED_OUT) return SP_ERR_IO_TIMEOUT;
-    if (wait != SP_OK) return SP_ERR_IO_READ_FAILED;
+    if (n != SP_SYS_SOCKET_WOULD_BLOCK) return SP_ERR_IO_READ_FAILED;
+    s32 wait = sp_io_socket_wait_deadline(r->socket, true, deadline);
+    if (wait == 1) return SP_ERR_IO_TIMEOUT;
+    if (wait != 0) return SP_ERR_IO_READ_FAILED;
   }
 }
 
@@ -16142,16 +15205,15 @@ SP_PRIVATE sp_err_t sp_io_socket_writer_write(sp_io_writer_t* writer, const void
   if (bytes_written) *bytes_written = 0;
   u64 deadline = sp_io_socket_deadline(w->timeout_ms);
   while (true) {
-    u64 n = 0;
-    sp_err_t err = sp_sys_socket_send(w->socket, ptr, size, &n);
-    if (err == SP_OK && n) {
-      if (bytes_written) *bytes_written = n;
+    s64 n = sp_sys_socket_send(w->socket, ptr, size);
+    if (n > 0) {
+      if (bytes_written) *bytes_written = (u64)n;
       return SP_OK;
     }
-    if (err != SP_ERR_SYS_WOULD_BLOCK) return SP_ERR_IO_WRITE_FAILED;
-    sp_err_t wait = sp_io_socket_wait_deadline(w->socket, false, deadline);
-    if (wait == SP_ERR_SYS_TIMED_OUT) return SP_ERR_IO_TIMEOUT;
-    if (wait != SP_OK) return SP_ERR_IO_WRITE_FAILED;
+    if (n != SP_SYS_SOCKET_WOULD_BLOCK) return SP_ERR_IO_WRITE_FAILED;
+    s32 wait = sp_io_socket_wait_deadline(w->socket, false, deadline);
+    if (wait == 1) return SP_ERR_IO_TIMEOUT;
+    if (wait != 0) return SP_ERR_IO_WRITE_FAILED;
   }
 }
 
@@ -16475,13 +15537,13 @@ void sp_io_seeking_reader_from_file_reader(sp_io_seeking_reader_t* sr, sp_io_fil
 
 sp_err_t sp_io_file_writer_write(sp_io_writer_t* writer, const void* ptr, u64 size, u64* bytes_written) {
   sp_io_file_writer_t* w = (sp_io_file_writer_t*)writer;
-  u64 num_bytes = 0;
-  sp_err_t err = sp_sys_pwrite(w->fd, ptr, size, w->pos, &num_bytes);
+  s64 rc = sp_sys_pwrite(w->fd, ptr, size, w->pos);
+  u64 num_bytes = rc < 0 ? 0 : (u64)rc;
   w->pos += num_bytes;
   if (w->pos > w->size) w->size = w->pos;
 
   sp_err_t result = SP_OK;
-  if (err) {
+  if (rc < 0) {
     result = SP_ERR_IO_WRITE_FAILED;
   }
   else if (size && !num_bytes) {
@@ -16521,7 +15583,10 @@ sp_err_t sp_io_file_writer_read_from(sp_io_writer_t* writer, sp_io_reader_t* r, 
   const u64 chunk = (u64)1 << 30;
 
   while (true) {
-    s64 rc = sp_syscall_retry(SP_SYSCALL_NUM_COPY_FILE_RANGE, in_fd, in_pos, w->fd, &w->pos, chunk, 0);
+    s64 rc;
+    do {
+      rc = sp_syscall(SP_SYSCALL_NUM_COPY_FILE_RANGE, in_fd, in_pos, w->fd, &w->pos, chunk, 0);
+    } while (rc == -1 && errno == SP_EINTR);
 
     if (rc < 0) {
       if (total == 0) {
@@ -16574,7 +15639,7 @@ sp_err_t sp_io_file_writer_size(sp_io_file_writer_t* w, u64* size) {
 
 sp_err_t sp_io_file_writer_size_force(sp_io_file_writer_t* w, u64* size) {
   sp_sys_file_meta_t st = sp_zero;
-  if (sp_sys_get_file_metadata(w->fd, &st) != SP_OK) {
+  if (sp_sys_get_file_metadata(w->fd, &st) < 0) {
     if (size) *size = 0;
     return SP_ERR_IO;
   }
@@ -16591,7 +15656,7 @@ sp_err_t sp_io_file_writer_close(sp_io_file_writer_t* w) {
 
   if (w->close_mode != SP_IO_CLOSE_MODE_AUTO) return SP_OK;
 
-  if (sp_sys_close(w->fd) != SP_OK) {
+  if (sp_sys_close(w->fd) < 0) {
     return SP_ERR_IO_CLOSE_FAILED;
   }
   return SP_OK;
@@ -16618,9 +15683,10 @@ sp_err_t sp_io_file_writer_from_fd(sp_io_file_writer_t* w, sp_sys_fd_t fd, sp_io
 }
 
 sp_err_t sp_io_file_writer_from_path(sp_io_file_writer_t* w, sp_str_t path) {
-  u32 flags = SP_SYS_OPEN_CREATE | SP_SYS_OPEN_TRUNCATE;
-  sp_sys_fd_t fd = SP_SYS_INVALID_FD;
-  if (sp_sys_open_s(sp_sys_get_root(0), path, SP_SYS_OPEN_MODE_WO, flags, &fd) != SP_OK) {
+  s32 flags = SP_O_WRONLY | SP_O_CREAT | SP_O_TRUNC | SP_O_BINARY;
+  sp_sys_fd_t fd = sp_sys_open_s(sp_sys_get_root(0), path, flags, 0644);
+
+  if (fd == SP_SYS_INVALID_FD) {
     *w = sp_zero_s(sp_io_file_writer_t);
     return SP_ERR_IO_OPEN_FAILED;
   }
@@ -16768,23 +15834,16 @@ done:
   return result;
 }
 
-// sp_rt.std.out/.err are wired lazily, on first use. Wiring them in sp_main would take
-// the address of sp_io_stream_writer_write in code that sp_main always reaches, which on
-// WASM forces a fd_write import even for programs that never write.
-sp_io_writer_t* sp_io_get_std_out() {
-  if (!sp_rt.std.out.base.write) {
-    sp_io_stream_writer_from_fd(&sp_rt.std.out, sp_sys_stdout, SP_IO_CLOSE_MODE_NONE);
-    if (sp_sys_is_tty(sp_sys_stdout)) sp_sys_tty_use_vt(sp_sys_stdout);
-  }
-  return &sp_rt.std.out.base;
+sp_io_stream_writer_t sp_io_get_std_out() {
+  sp_io_stream_writer_t io = sp_zero;
+  sp_io_stream_writer_from_fd(&io, sp_sys_stdout, SP_IO_CLOSE_MODE_NONE);
+  return io;
 }
 
-sp_io_writer_t* sp_io_get_std_err() {
-  if (!sp_rt.std.err.base.write) {
-    sp_io_stream_writer_from_fd(&sp_rt.std.err, sp_sys_stderr, SP_IO_CLOSE_MODE_NONE);
-    if (sp_sys_is_tty(sp_sys_stderr)) sp_sys_tty_use_vt(sp_sys_stderr);
-  }
-  return &sp_rt.std.err.base;
+sp_io_stream_writer_t sp_io_get_std_err() {
+  sp_io_stream_writer_t io = sp_zero;
+  sp_io_stream_writer_from_fd(&io, sp_sys_stderr, SP_IO_CLOSE_MODE_NONE);
+  return io;
 }
 
 /////////
@@ -16917,13 +15976,11 @@ SP_API s32 sp_app_run(sp_app_config_t config) {
 void* sp_mem_os_on_alloc(void* user_data, sp_mem_alloc_mode_t mode, u64 size, void* ptr, u64 old_size) {
   (void)user_data;
   switch (mode) {
-    case SP_ALLOCATOR_MODE_ALLOC:
-    case SP_ALLOCATOR_MODE_ALLOC_UNINITIALIZED:  return sp_mem_os_alloc(size);
-    case SP_ALLOCATOR_MODE_RESIZE:
-    case SP_ALLOCATOR_MODE_RESIZE_UNINITIALIZED: return sp_mem_os_realloc(ptr, old_size, size);
-    case SP_ALLOCATOR_MODE_FREE:       sp_mem_os_free(ptr, old_size); return SP_NULLPTR;
+    case SP_ALLOCATOR_MODE_ALLOC:  return sp_mem_os_alloc(size);
+    case SP_ALLOCATOR_MODE_RESIZE: return sp_mem_os_realloc(ptr, old_size, size);
+    case SP_ALLOCATOR_MODE_FREE:   sp_mem_os_free(ptr, old_size); return SP_NULLPTR;
+    default:                       return SP_NULLPTR;
   }
-  return SP_NULLPTR;
 }
 
 sp_mem_t sp_mem_os_new() {
@@ -17055,24 +16112,29 @@ void sp_mem_heap_span_release(sp_mem_heap_t* heap, sp_mem_heap_span_t* span) {
   sp_mem_heap_list_push(&heap->recycled, span);
 }
 
-void* sp_mem_heap_alloc_chunk(sp_mem_heap_t* heap, u32 bucket) {
-  sp_mem_heap_span_t* span = heap->buckets[bucket].partial;
-  if (!span) span = sp_mem_heap_span_new(heap, bucket);
-  if (!span) return SP_NULLPTR;
+void* sp_mem_heap_alloc(sp_mem_heap_t* heap, u64 size) {
+  if (!heap) return SP_NULLPTR;
 
-  void* chunk = span->free_head;
-  span->free_head = *(void**)chunk;
-  span->in_use++;
-  if (!span->free_head) {
-    sp_mem_heap_list_unlink(&heap->buckets[bucket].partial, span);
-    sp_mem_heap_list_push(&heap->buckets[bucket].full, span);
+  u32 bucket = sp_mem_heap_bucket_of(size);
+  if (bucket < SP_MEM_HEAP_NUM_BUCKETS) {
+    sp_mem_heap_span_t* span = heap->buckets[bucket].partial;
+    if (!span) span = sp_mem_heap_span_new(heap, bucket);
+    if (!span) return SP_NULLPTR;
+
+    void* chunk = span->free_head;
+    span->free_head = *(void**)chunk;
+    span->in_use++;
+    if (!span->free_head) {
+      sp_mem_heap_list_unlink(&heap->buckets[bucket].partial, span);
+      sp_mem_heap_list_push(&heap->buckets[bucket].full, span);
+    }
+
+    u64 bucket_size = sp_mem_heap_bucket_size(bucket);
+    heap->bytes_used += bucket_size;
+    sp_mem_zero(chunk, bucket_size);
+    return chunk;
   }
 
-  heap->bytes_used += sp_mem_heap_bucket_size(bucket);
-  return chunk;
-}
-
-void* sp_mem_heap_alloc_large(sp_mem_heap_t* heap, u64 size) {
   u64 capacity = sp_align_offset(size + sizeof(sp_mem_heap_large_t), SP_MEM_HEAP_SPAN_SIZE);
   if (capacity <= size) return SP_NULLPTR;
   sp_mem_heap_large_t* large = (sp_mem_heap_large_t*)sp_sys_alloc(capacity);
@@ -17085,28 +16147,6 @@ void* sp_mem_heap_alloc_large(sp_mem_heap_t* heap, u64 size) {
   sp_mem_heap_track_reserve(heap, capacity);
   heap->bytes_used += size;
   return large + 1;
-}
-
-void* sp_mem_heap_alloc(sp_mem_heap_t* heap, u64 size) {
-  if (!heap) return SP_NULLPTR;
-
-  u32 bucket = sp_mem_heap_bucket_of(size);
-  if (bucket >= SP_MEM_HEAP_NUM_BUCKETS) return sp_mem_heap_alloc_large(heap, size);
-
-  void* chunk = sp_mem_heap_alloc_chunk(heap, bucket);
-  if (chunk) sp_mem_zero(chunk, sp_mem_heap_bucket_size(bucket));
-  return chunk;
-}
-
-void* sp_mem_heap_alloc_uninitialized(sp_mem_heap_t* heap, u64 size) {
-  if (!heap) return SP_NULLPTR;
-
-  u32 bucket = sp_mem_heap_bucket_of(size);
-  if (bucket >= SP_MEM_HEAP_NUM_BUCKETS) return sp_mem_heap_alloc_large(heap, size);
-
-  void* chunk = sp_mem_heap_alloc_chunk(heap, bucket);
-  if (chunk) sp_mem_zero((u8*)chunk + size, sp_mem_heap_bucket_size(bucket) - size);
-  return chunk;
 }
 
 void sp_mem_heap_free(sp_mem_heap_t* heap, void* ptr) {
@@ -17141,60 +16181,51 @@ void sp_mem_heap_free(sp_mem_heap_t* heap, void* ptr) {
 }
 
 void* sp_mem_heap_realloc(sp_mem_heap_t* heap, void* ptr, u64 size) {
-  return sp_mem_heap_on_alloc(heap, SP_ALLOCATOR_MODE_RESIZE, size, ptr, 0);
-}
+  if (!heap) return SP_NULLPTR;
+  if (!ptr) return sp_mem_heap_alloc(heap, size);
+  if (!size) {
+    sp_mem_heap_free(heap, ptr);
+    return SP_NULLPTR;
+  }
 
-void* sp_mem_heap_realloc_uninitialized(sp_mem_heap_t* heap, void* ptr, u64 size) {
-  return sp_mem_heap_on_alloc(heap, SP_ALLOCATOR_MODE_RESIZE_UNINITIALIZED, size, ptr, 0);
+  u64 old_size = 0;
+  sp_mem_heap_span_t* span = sp_mem_heap_find_span(heap, ptr);
+  if (span) {
+    u64 bucket_size = sp_mem_heap_bucket_size(span->bucket);
+    if (sp_mem_heap_bucket_of(size) == span->bucket) {
+      sp_mem_zero((u8*)ptr + size, bucket_size - size);
+      return ptr;
+    }
+    old_size = bucket_size;
+  }
+  else {
+    sp_mem_heap_large_t* large = ((sp_mem_heap_large_t*)ptr) - 1;
+    sp_assert(large->magic == SP_MEM_HEAP_LARGE_MAGIC);
+    sp_assert(large->heap == heap);
+    if (size > SP_MEM_HEAP_MAX_SMALL && size <= large->capacity - sizeof(sp_mem_heap_large_t)) {
+      if (size < large->size) sp_mem_zero((u8*)ptr + size, large->size - size);
+      heap->bytes_used -= large->size;
+      heap->bytes_used += size;
+      large->size = size;
+      return ptr;
+    }
+    old_size = large->size;
+  }
+
+  void* fresh = sp_mem_heap_alloc(heap, size);
+  if (!fresh) return SP_NULLPTR;
+  sp_mem_copy(fresh, ptr, sp_min(old_size, size));
+  sp_mem_heap_free(heap, ptr);
+  return fresh;
 }
 
 void* sp_mem_heap_on_alloc(void* user_data, sp_mem_alloc_mode_t mode, u64 size, void* ptr, u64 old_size) {
   sp_unused(old_size);
   sp_mem_heap_t* heap = (sp_mem_heap_t*)user_data;
   switch (mode) {
-    case SP_ALLOCATOR_MODE_ALLOC:     return sp_mem_heap_alloc(heap, size);
-    case SP_ALLOCATOR_MODE_ALLOC_UNINITIALIZED: return sp_mem_heap_alloc_uninitialized(heap, size);
-    case SP_ALLOCATOR_MODE_RESIZE:
-    case SP_ALLOCATOR_MODE_RESIZE_UNINITIALIZED: {
-      bool uninitialized = mode == SP_ALLOCATOR_MODE_RESIZE_UNINITIALIZED;
-      if (!heap) return SP_NULLPTR;
-      if (!ptr) return uninitialized ? sp_mem_heap_alloc_uninitialized(heap, size) : sp_mem_heap_alloc(heap, size);
-      if (!size) {
-        sp_mem_heap_free(heap, ptr);
-        return SP_NULLPTR;
-      }
-
-      u64 chunk_size = 0;
-      sp_mem_heap_span_t* span = sp_mem_heap_find_span(heap, ptr);
-      if (span) {
-        u64 bucket_size = sp_mem_heap_bucket_size(span->bucket);
-        if (sp_mem_heap_bucket_of(size) == span->bucket) {
-          sp_mem_zero((u8*)ptr + size, bucket_size - size);
-          return ptr;
-        }
-        chunk_size = bucket_size;
-      }
-      else {
-        sp_mem_heap_large_t* large = ((sp_mem_heap_large_t*)ptr) - 1;
-        sp_assert(large->magic == SP_MEM_HEAP_LARGE_MAGIC);
-        sp_assert(large->heap == heap);
-        if (size > SP_MEM_HEAP_MAX_SMALL && size <= large->capacity - sizeof(sp_mem_heap_large_t)) {
-          if (size < large->size) sp_mem_zero((u8*)ptr + size, large->size - size);
-          heap->bytes_used -= large->size;
-          heap->bytes_used += size;
-          large->size = size;
-          return ptr;
-        }
-        chunk_size = large->size;
-      }
-
-      void* fresh = uninitialized ? sp_mem_heap_alloc_uninitialized(heap, size) : sp_mem_heap_alloc(heap, size);
-      if (!fresh) return SP_NULLPTR;
-      sp_mem_copy(fresh, ptr, sp_min(chunk_size, size));
-      sp_mem_heap_free(heap, ptr);
-      return fresh;
-    }
-    case SP_ALLOCATOR_MODE_FREE: sp_mem_heap_free(heap, ptr); return SP_NULLPTR;
+    case SP_ALLOCATOR_MODE_ALLOC:  return sp_mem_heap_alloc(heap, size);
+    case SP_ALLOCATOR_MODE_RESIZE: return sp_mem_heap_realloc(heap, ptr, size);
+    case SP_ALLOCATOR_MODE_FREE:   sp_mem_heap_free(heap, ptr); return SP_NULLPTR;
   }
   return SP_NULLPTR;
 }
@@ -17210,16 +16241,8 @@ void* sp_alloc(sp_mem_t allocator, u64 size) {
   return sp_mem_allocator_alloc(allocator, size);
 }
 
-void* sp_alloc_uninitialized(sp_mem_t allocator, u64 size) {
-  return sp_mem_allocator_alloc_uninitialized(allocator, size);
-}
-
 void* sp_realloc(sp_mem_t allocator, void* memory, u64 old_size, u64 size) {
   return sp_mem_allocator_realloc(allocator, memory, old_size, size);
-}
-
-void* sp_realloc_uninitialized(sp_mem_t allocator, void* memory, u64 old_size, u64 size) {
-  return sp_mem_allocator_realloc_uninitialized(allocator, memory, old_size, size);
 }
 
 void sp_free(sp_mem_t allocator, void* memory, u64 size) {
@@ -17422,7 +16445,8 @@ sp_err_t sp_fmt_io(sp_io_writer_t* io, const c8* fmt, ...) {
 sp_err_t sp_fmt_std_out(const c8* fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  sp_err_t result = sp_fmt_io_v(sp_io_get_std_out(), sp_cstr_as_str(fmt), args);
+  sp_io_stream_writer_t io = sp_io_get_std_out();
+  sp_err_t result = sp_fmt_io_v(&io.base, sp_cstr_as_str(fmt), args);
   va_end(args);
   return result;
 }
@@ -17430,7 +16454,8 @@ sp_err_t sp_fmt_std_out(const c8* fmt, ...) {
 sp_err_t sp_fmt_std_err(const c8* fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  sp_err_t result = sp_fmt_io_v(sp_io_get_std_err(), sp_cstr_as_str(fmt), args);
+  sp_io_stream_writer_t io = sp_io_get_std_err();
+  sp_err_t result = sp_fmt_io_v(&io.base, sp_cstr_as_str(fmt), args);
   va_end(args);
   return result;
 }
@@ -17582,47 +16607,53 @@ sp_fmt_styled_r sp_fmt_styled(sp_mem_t mem, const c8* fmt, ...) {
 }
 
 void sp_log(const c8* fmt, ...) {
+  sp_tls_rt_t* tls = sp_tls_rt_get();
   va_list args;
   va_start(args, fmt);
-  sp_fmt_io_v(sp_io_get_std_out(), sp_str_view(fmt), args);
+  sp_fmt_io_v(sp_tls_std_out(tls), sp_str_view(fmt), args);
   va_end(args);
-  sp_io_write_cstr(sp_io_get_std_out(), "\n", SP_NULLPTR);
+  sp_io_write_cstr(sp_tls_std_out(tls), "\n", SP_NULLPTR);
 }
 
 void sp_log_str(sp_str_t fmt, ...) {
+  sp_tls_rt_t* tls = sp_tls_rt_get();
   va_list args;
   va_start(args, fmt);
-  sp_fmt_io_v(sp_io_get_std_out(), fmt, args);
+  sp_fmt_io_v(sp_tls_std_out(tls), fmt, args);
   va_end(args);
-  sp_io_write_cstr(sp_io_get_std_out(), "\n", SP_NULLPTR);
+  sp_io_write_cstr(sp_tls_std_out(tls), "\n", SP_NULLPTR);
 }
 
 void sp_log_err(const c8* fmt, ...) {
+  sp_tls_rt_t* tls = sp_tls_rt_get();
   va_list args;
   va_start(args, fmt);
-  sp_fmt_io_v(sp_io_get_std_err(), sp_str_view(fmt), args);
+  sp_fmt_io_v(sp_tls_std_out(tls), sp_str_view(fmt), args);
   va_end(args);
-  sp_io_write_cstr(sp_io_get_std_err(), "\n", SP_NULLPTR);
+  sp_io_write_cstr(sp_tls_std_out(tls), "\n", SP_NULLPTR);
 }
 
 void sp_print(const c8* fmt, ...) {
+  sp_tls_rt_t* tls = sp_tls_rt_get();
   va_list args;
   va_start(args, fmt);
-  sp_fmt_io_v(sp_io_get_std_out(), sp_str_view(fmt), args);
+  sp_fmt_io_v(sp_tls_std_out(tls), sp_str_view(fmt), args);
   va_end(args);
 }
 
 void sp_print_str(sp_str_t fmt, ...) {
+  sp_tls_rt_t* tls = sp_tls_rt_get();
   va_list args;
   va_start(args, fmt);
-  sp_fmt_io_v(sp_io_get_std_out(), fmt, args);
+  sp_fmt_io_v(sp_tls_std_out(tls), fmt, args);
   va_end(args);
 }
 
 void sp_print_err(const c8* fmt, ...) {
+  sp_tls_rt_t* tls = sp_tls_rt_get();
   va_list args;
   va_start(args, fmt);
-  sp_fmt_io_v(sp_io_get_std_err(), sp_str_view(fmt), args);
+  sp_fmt_io_v(sp_tls_std_err(tls), sp_str_view(fmt), args);
   va_end(args);
 }
 
@@ -18509,12 +17540,12 @@ cleanup:
 }
 
 sp_err_t sp_fs_create_file(sp_str_t path) {
-  sp_sys_fd_t fd = SP_SYS_INVALID_FD;
-  if (sp_sys_open_s(sp_sys_get_root(0), path, SP_SYS_OPEN_MODE_WO, SP_SYS_OPEN_CREATE | SP_SYS_OPEN_TRUNCATE, &fd) != SP_OK) {
-    return SP_ERR_OS;
+  sp_sys_fd_t fd = sp_sys_open_s(sp_sys_get_root(0), path, SP_O_CREAT | SP_O_WRONLY | SP_O_TRUNC, 0644);
+  if (fd != SP_SYS_INVALID_FD) {
+    sp_sys_close(fd);
   }
-  sp_sys_close(fd);
-  return SP_OK;
+
+  return fd != SP_SYS_INVALID_FD ? SP_OK : SP_ERR_OS;
 }
 
 sp_err_t sp_fs_create_file_slice(sp_str_t path, sp_mem_slice_t slice) {
@@ -18566,109 +17597,48 @@ sp_err_t sp_fs_remove_file(sp_str_t path) {
   return sp_sys_unlink_s(sp_sys_get_root(0), path) ? SP_ERR_OS : SP_OK;
 }
 
-sp_err_t sp_fs_dir_open(sp_fs_dir_t* it, sp_sys_fd_t fd, sp_str_t path, sp_mem_slice_t buf) {
-  *it = sp_zero_s(sp_fs_dir_t);
-  if (buf.len < SP_SYS_DIR_MIN_BUF) return SP_ERR_SYS_BUG;
-
-  sp_sys_fd_t dir_fd = SP_SYS_INVALID_FD;
-  sp_try(sp_sys_open_dir_s(fd, path, &dir_fd));
-
-  sp_err_t err = sp_sys_dir_from_fd(dir_fd, &it->dir);
-  if (err) {
-    sp_sys_close(dir_fd);
-    return err;
-  }
-
-  it->buf.data = buf.data;
-  it->buf.capacity = buf.len;
-  return SP_OK;
-}
-
-sp_err_t sp_fs_dir_next(sp_fs_dir_t* it, sp_fs_dir_entry_t* out) {
-  *out = sp_zero_s(sp_fs_dir_entry_t);
-
-  while (true) {
-    // Pull another chunk from the kernel and advance the cursor
-    if (it->cursor >= it->buf.len) {
-      sp_try(sp_sys_dir_read(&it->dir, &it->buf));
-      if (!it->buf.len) return SP_OK;
-      it->cursor = 0;
-    }
-
-    sp_sys_dir_entry_t entry = sp_zero;
-    sp_try(sp_sys_dir_parse(&it->dir, &it->buf, &it->cursor, &entry));
-    if (!entry.name) continue;
-
-    sp_str_t name = sp_str(entry.name, entry.len);
-    if (sp_str_equal(name, sp_str_lit(".")) || sp_str_equal(name, sp_str_lit(".."))) continue;
-
-    out->name = name;
-    out->kind = entry.kind;
-    return SP_OK;
-  }
-}
-
-void sp_fs_dir_close(sp_fs_dir_t* it) {
-  sp_sys_dir_close(&it->dir);
-}
-
-void sp_fs_it_unwind(sp_fs_it_t* it) {
-  sp_da_for(it->stack, i) {
-    sp_fs_dir_close(&it->stack[i].dir);
-  }
-  sp_da_clear(it->stack);
-}
-
 void sp_fs_it_push(sp_fs_it_t* it, sp_str_t path) {
   sp_fs_it_frame_t frame = sp_zero;
-  it->err = sp_fs_dir_open(&frame.dir, sp_sys_get_root(0), path, sp_mem_slice(frame.buf, SP_FS_IT_BUF_SIZE));
-  if (it->err) return;
+  if (sp_sys_fs_it_open_s(sp_sys_get_root(0), &frame.sys, path, sp_mem_slice(frame.buf, SP_FS_IT_BUF_SIZE)) < 0) return;
   frame.path = sp_str_copy(it->mem, path);
   sp_da_push(it->stack, frame);
 }
 
 void sp_fs_it_begin(sp_fs_it_t* it, sp_str_t path) {
+  if (sp_str_empty(path) || !sp_fs_is_dir(path)) return;
   sp_fs_it_push(it, path);
-  if (it->err) return;
   sp_fs_it_next(it);
 }
 
 void sp_fs_it_next(sp_fs_it_t* it) {
   while (!sp_da_empty(it->stack)) {
     sp_fs_it_frame_t* top = sp_da_back(it->stack);
-    top->dir.buf.data = top->buf;
+    top->sys.buf.data = top->buf;
 
-    sp_fs_dir_entry_t d = sp_zero;
-    it->err = sp_fs_dir_next(&top->dir, &d);
-    if (it->err) {
-      sp_fs_it_unwind(it);
-      return;
-    }
-
-    if (d.name.data) {
-      it->entry.path = sp_fs_join_path(it->mem, top->path, d.name);
-      it->entry.name = sp_str_sub(it->entry.path, it->entry.path.len - d.name.len, d.name.len);
+    sp_sys_fs_entry_t d;
+    if (sp_sys_fs_it_next(&top->sys, &d) == 0) {
+      it->entry.path = sp_fs_join_path(it->mem, top->path, sp_str(d.name, d.len));
+      it->entry.name = sp_str_sub(it->entry.path, it->entry.path.len - d.len, d.len);
       it->entry.kind = d.kind;
 
       if (it->recursive && it->entry.kind == SP_FS_KIND_DIR) {
         sp_fs_it_push(it, it->entry.path);
-        if (it->err) sp_fs_it_unwind(it);
       }
       return;
     }
 
-    sp_fs_dir_close(&top->dir);
+    sp_sys_fs_it_close(&top->sys);
     sp_da_pop(it->stack);
   }
 }
 
 bool sp_fs_it_valid(sp_fs_it_t* it) {
-  return !it->err && !sp_da_empty(it->stack);
+  return !sp_da_empty(it->stack);
 }
 
 void sp_fs_it_deinit(sp_fs_it_t* it) {
   sp_da_for(it->stack, i) {
-    sp_fs_dir_close(&it->stack[i].dir);
+    sp_sys_fs_it_close(&it->stack[i].sys);
   }
   sp_da_free(it->stack);
 }
@@ -18850,21 +17820,41 @@ sp_str_t sp_tm_epoch_to_iso8601(sp_mem_t mem, sp_tm_epoch_t time) {
   return sp_str(buf, 24);
 }
 
-sp_str_t sp_str_join_n(sp_mem_t mem, sp_str_t* strings, u32 num_strings, sp_str_t joiner) {
+sp_str_t sp_str_reduce(sp_mem_t mem, sp_str_t* strings, u32 num_strings, void* user_data, sp_str_reduce_fn_t fn) {
   sp_io_dyn_mem_writer_t io = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &io);
 
+  sp_str_reduce_context_t context = {
+    .user_data = user_data,
+    .writer = &io.base,
+    .elements = {
+      .data = strings,
+      .len = num_strings,
+    },
+  };
+
   sp_for(index, num_strings) {
-    if (sp_str_empty(strings[index])) continue;
-
-    sp_io_write_str(&io.base, strings[index], SP_NULLPTR);
-
-    if (index != (num_strings - 1)) {
-      sp_io_write_str(&io.base, joiner, SP_NULLPTR);
-    }
+    context.str = strings[index];
+    context.index = index;
+    fn(&context);
   }
 
   return sp_io_dyn_mem_writer_as_str(&io);
+}
+
+void sp_str_reduce_kernel_join(sp_str_reduce_context_t* context) {
+  if (sp_str_empty(context->str)) return;
+
+  sp_io_write_str(context->writer, context->str, SP_NULLPTR);
+
+  if (context->index != (context->elements.len - 1)) {
+    sp_str_t joiner = *(sp_str_t*)context->user_data;
+    sp_io_write_str(context->writer, joiner, SP_NULLPTR);
+  }
+}
+
+sp_str_t sp_str_join_n(sp_mem_t mem, sp_str_t* strings, u32 num_strings, sp_str_t joiner) {
+  return sp_str_reduce(mem, strings, num_strings, &joiner, sp_str_reduce_kernel_join);
 }
 
 

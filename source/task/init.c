@@ -3,7 +3,7 @@
 
 #include "error/types.h"
 #include "log/log.h"
-#include "sp/prompt.h"
+#include "sp/sp_prompt.h"
 #include "sp/sp_template.h"
 #include "spn.embed.h"
 #include "task/task.h"
@@ -123,7 +123,7 @@ static void on_submit_prompt(sp_prompt_ctx_t* ctx, sp_prompt_event_t event) {
 }
 
 static void on_render_prompt(sp_prompt_ctx_t* ctx) {
-  bool bare = *(bool*)sp_prompt_user_data(ctx);
+  bool bare = *(bool*)sp_prompt_get_user_data(ctx);
   sp_prompt_style_t green = {
     .tag = SP_PROMPT_STYLE_ANSI,
     .ansi = SP_ANSI_FG_GREEN_U8,

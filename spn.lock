@@ -29,6 +29,12 @@ manifest_file = "spn.toml"
 script_file = "spn.c"
 
 [[dep]]
+name = "core/wamr"
+version = "2.4.1"
+commit = ""
+kind = "file"
+
+[[dep]]
 name = "core/yyjson"
 version = "0.13.0"
 commit = "92ae1e2216548eb1dee78c09145a9a9bd067e9e9"
@@ -43,20 +49,7 @@ script_file = "spn.c"
 
 [[dep]]
 name = "spader/sp"
-version = "3.2.0"
-commit = "7445c2ad28f988406c349ed466a2ecdb87ac8e28"
-kind = "index"
-source_url = "https://github.com/tspader/sp.git"
-source_rev = "7445c2ad28f988406c349ed466a2ecdb87ac8e28"
-manifest_url = "git@github.com:tspader/spam.git"
-manifest_rev = "e400e4f4fff3155b47972ca567f2e084c6f8dc4c"
-manifest_dir = "sp"
-manifest_file = "spn.toml"
-script_file = "spn.c"
-
-[[dep]]
-name = "spader/wamr"
-version = "2.4.1"
+version = "3.5.0"
 commit = ""
 kind = "file"
 

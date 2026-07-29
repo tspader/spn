@@ -1,4 +1,4 @@
-#include "test.h"
+#include "fixture.h"
 
 void git_repo_run(sp_str_t repo, sp_str_t a, sp_str_t b, sp_str_t c, sp_str_t d, sp_str_t e) {
   sp_ps_output_t output = sp_ps_run(sp_mem_os_new(), (sp_ps_config_t) {
@@ -117,8 +117,12 @@ static void git_repo_write_file(sp_str_t repo, const c8* path, const c8* content
 }
 
 git_repo_result_t git_repo_build(tmpfs_t* fs, const c8* name, git_repo_fixture_t* fixture) {
+  return git_repo_build_at(fs->root, name, fixture);
+}
+
+git_repo_result_t git_repo_build_at(sp_str_t dir, const c8* name, git_repo_fixture_t* fixture) {
   git_repo_result_t result = sp_zero;
-  result.path = tmpfs_get(fs, sp_str_view(name));
+  result.path = sp_fs_join_path(sp_mem_os_new(), dir, sp_str_view(name));
 
   git_repo_init(result.path);
 

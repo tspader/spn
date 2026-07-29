@@ -1,4 +1,4 @@
-#include "common.h"
+#include "dag_test.h"
 
 typedef struct {
   const c8* path;
@@ -37,10 +37,123 @@ typedef struct {
 typedef struct {
   par_env_t* env;
   spn_dag_t* g;
-  par_action_t* spec;
+  const par_action_t* spec;
 } par_ctx_t;
 
-UTEST_EMPTY_FIXTURE(parallel)
+// The suite spawns real spn_dag_pool_t worker pools; keep it off the
+// multi-threaded runner path
+sp_test_suite(parallel, .serial = true);
+
+static const par_test_t par_tests [] = {
+  {
+    .name = "independent_actions_all_run",
+    .actions = {
+      { .identity = "A", .inputs = { "S" }, .output = "OA" },
+      { .identity = "B", .inputs = { "S" }, .output = "OB" },
+      { .identity = "C", .inputs = { "S" }, .output = "OC" },
+      { .identity = "D", .inputs = { "S" }, .output = "OD" },
+      { .identity = "E", .inputs = { "S" }, .output = "OE" },
+      { .identity = "F", .inputs = { "S" }, .output = "OF" },
+      { .identity = "G", .inputs = { "S" }, .output = "OG" },
+    },
+    .builds = {
+      { .sources = { { "S", "1" } }, .expect_runs = 7 },
+      { .sources = { { "S", "1" } }, .expect_runs = 7 },
+    }
+  },
+  {
+    .name = "chain_runs_in_dependency_order",
+    .actions = {
+      { .identity = "A", .inputs = { "S" }, .output = "X" },
+      { .identity = "B", .inputs = { "X" }, .output = "Y" },
+      { .identity = "C", .inputs = { "Y" }, .output = "Z" },
+    },
+    .builds = {
+      { .sources = { { "S", "1" } }, .expect_runs = 3 },
+      { .sources = { { "S", "1" } }, .expect_runs = 3 },
+    }
+  },
+  {
+    .name = "diamond_selective_rebuild",
+    .actions = {
+      { .identity = "A", .inputs = { "S" }, .output = "X" },
+      { .identity = "B", .inputs = { "T" }, .output = "Y" },
+      { .identity = "C", .inputs = { "X", "Y" }, .output = "Z" },
+    },
+    .builds = {
+      { .sources = { { "S", "1" }, { "T", "1" } }, .expect_runs = 3 },
+      { .sources = { { "S", "2" }, { "T", "1" } }, .expect_runs = 4 },
+    }
+  },
+  {
+    .name = "single_worker_completes",
+    .workers = 1,
+    .actions = {
+      { .identity = "A", .inputs = { "S" }, .output = "X" },
+      { .identity = "B", .inputs = { "X" }, .output = "Y" },
+      { .identity = "C", .inputs = { "S" }, .output = "Z" },
+    },
+    .builds = {
+      { .sources = { { "S", "1" } }, .expect_runs = 3 },
+    }
+  },
+  {
+    .name = "failing_action_stops_build",
+    .actions = {
+      { .identity = "A", .inputs = { "S" }, .output = "X", .fails = true },
+      { .identity = "B", .inputs = { "X" }, .output = "Y" },
+    },
+    .builds = {
+      { .sources = { { "S", "1" } }, .expect_err = SPN_ERR_DAG_ACTION },
+    }
+  },
+  {
+    .name = "cycle_fails",
+    .actions = {
+      { .identity = "A", .inputs = { "Y" }, .output = "X" },
+      { .identity = "B", .inputs = { "X" }, .output = "Y" },
+    },
+    .builds = {
+      { .expect_err = SPN_ERR_DAG_STALLED },
+    }
+  },
+  {
+    .name = "discovered_generated_header_waits_for_producer",
+    .discovery = true,
+    .actions = {
+      { .identity = "A", .inputs = { "S" }, .output = "H" },
+      { .identity = "B", .inputs = { "M" }, .discovers = { "H" }, .output = "O" },
+    },
+    .builds = {
+      { .sources = { { "S", "1" }, { "M", "1" } }, .expect_runs = 3 },
+      { .sources = { { "S", "1" }, { "M", "1" } }, .expect_runs = 3 },
+      { .sources = { { "S", "2" }, { "M", "1" } }, .expect_runs = 4 },
+    }
+  },
+  {
+    .name = "discovered_tree_member_waits_for_producer",
+    .discovery = true,
+    .actions = {
+      { .identity = "A", .inputs = { "S" }, .output = "D", .tree = true },
+      { .identity = "B", .inputs = { "M" }, .discovers = { "D/H" }, .output = "O" },
+    },
+    .builds = {
+      { .sources = { { "S", "1" }, { "M", "1" } }, .expect_runs = 3 },
+      { .sources = { { "S", "1" }, { "M", "1" } }, .remove_dirs = { "D" }, .expect_runs = 3 },
+    }
+  },
+  {
+    .name = "tree_restored_after_delete",
+    .actions = {
+      { .identity = "A", .inputs = { "S" }, .output = "D", .tree = true },
+      { .identity = "B", .inputs = { "S" }, .output = "O" },
+    },
+    .builds = {
+      { .sources = { { "S", "1" } }, .expect_runs = 2 },
+      { .sources = { { "S", "1" } }, .remove_dirs = { "D" }, .expect_runs = 2 },
+    }
+  },
+};
 
 static s32 par_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   par_ctx_t* ctx = (par_ctx_t*)user_data;
@@ -74,20 +187,20 @@ static spn_err_t par_discover(spn_dag_t* g, spn_dag_action_t* action, void* user
     }
     sp_da_push(*out, ((spn_dag_obs_t) {
       .kind = SPN_DAG_OBS_FILE,
-      .path = sp_fs_join_path(mem, ctx->env->dag.fs.root, sp_str_view(ctx->spec->discovers[it]))
+      .path = sp_fs_join_path(mem, ctx->env->dag.root, sp_str_view(ctx->spec->discovers[it]))
     }));
   }
   return SPN_OK;
 }
 
-static void par_build_graph(s32* utest_result, par_env_t* env, spn_dag_t* g, par_test_t* t) {
-  sp_carr_for(t->actions, ai) {
-    par_action_t* spec = &t->actions[ai];
+static sp_err_t par_build_graph(sp_test_t* t, par_env_t* env, spn_dag_t* g, const par_test_t* test) {
+  sp_carr_for(test->actions, ai) {
+    const par_action_t* spec = &test->actions[ai];
     if (!spec->identity) {
       break;
     }
 
-    par_ctx_t* ctx = sp_alloc_type(env->dag.fs.mem, par_ctx_t);
+    par_ctx_t* ctx = sp_alloc_type(env->dag.mem, par_ctx_t);
     ctx->env = env;
     ctx->g = g;
     ctx->spec = spec;
@@ -102,214 +215,102 @@ static void par_build_graph(s32* utest_result, par_env_t* env, spn_dag_t* g, par
       if (!spec->inputs[ii]) {
         break;
       }
-      spn_dag_action_add_input(g, action, spn_dag_add_file(g, tmpfs_get(&env->dag.fs, sp_str_view(spec->inputs[ii]))));
+      spn_dag_action_add_input(g, action, spn_dag_add_file(g, dag_test_env_path(&env->dag, sp_str_view(spec->inputs[ii]))));
     }
-    sp_str_t output = tmpfs_get(&env->dag.fs, sp_str_view(spec->output));
+    sp_str_t output = dag_test_env_path(&env->dag, sp_str_view(spec->output));
     spn_dag_id_t out = spec->tree ? spn_dag_add_tree(g, output) : spn_dag_add_file(g, output);
-    ASSERT_EQ(SPN_OK, spn_dag_action_add_output(g, action, out));
+    sp_must_eq(t, SPN_OK, spn_dag_action_add_output(g, action, out));
   }
+
+  return SP_OK;
 }
 
-static void par_expect_outputs(s32* utest_result, par_env_t* env, par_test_t* t) {
-  sp_carr_for(t->actions, ai) {
-    par_action_t* spec = &t->actions[ai];
+static sp_err_t par_expect_outputs(sp_test_t* t, par_env_t* env, const par_test_t* test) {
+  sp_carr_for(test->actions, ai) {
+    const par_action_t* spec = &test->actions[ai];
     if (!spec->identity) {
       break;
     }
-    sp_str_t path = tmpfs_get(&env->dag.fs, sp_str_view(spec->output));
+    sp_str_t path = dag_test_env_path(&env->dag, sp_str_view(spec->output));
     if (spec->tree) {
-      path = sp_fs_join_path(env->dag.fs.mem, path, sp_str_lit("H"));
+      path = sp_fs_join_path(env->dag.mem, path, sp_str_lit("H"));
     }
-    dag_test_expect_file(utest_result, env->dag.fs.mem, path, spec->identity);
+    sp_err_t err = dag_test_expect_file(t, env->dag.mem, path, spec->identity);
+    if (err) {
+      return err;
+    }
   }
+  return SP_OK;
 }
 
-static void run_test(s32* utest_result, par_test_t t) {
+static sp_err_t par_run_builds(sp_test_t* t, spn_dag_store_kind_t kind, const par_test_t* test) {
+  sp_test_kv_c(t, "store", dag_test_store_name(kind));
+
+  par_env_t env = sp_zero;
+  dag_test_env_init(&env.dag, t, (dag_test_env_config_t) {
+    .sub = dag_test_store_name(kind),
+    .store = kind,
+    .discovery = test->discovery
+  });
+
+  spn_dag_pool_t pool = sp_zero;
+  spn_dag_pool_init(&pool, env.dag.mem, (spn_dag_pool_config_t) {
+    .workers = test->workers ? test->workers : 4,
+  });
+
+  sp_err_t result = SP_OK;
+  sp_carr_for(test->builds, b) {
+    const par_build_t* build = &test->builds[b];
+    if (!build->expect_runs && !build->expect_err) {
+      break;
+    }
+
+    spn_dag_file_cache_invalidate_all(&env.dag.files);
+    sp_carr_for(build->sources, si) {
+      if (!build->sources[si].path) {
+        break;
+      }
+      dag_test_env_create(&env.dag, sp_str_view(build->sources[si].path), sp_str_view(build->sources[si].content));
+    }
+    sp_carr_for(build->remove_dirs, si) {
+      if (!build->remove_dirs[si]) {
+        break;
+      }
+      sp_fs_remove_dir(dag_test_env_path(&env.dag, sp_str_view(build->remove_dirs[si])));
+    }
+
+    spn_dag_t* g = dag_test_env_graph(&env.dag);
+    result = par_build_graph(t, &env, g, test);
+    if (result) {
+      break;
+    }
+
+    spn_err_t err = spn_dag_run_executor(g, &env.dag.env, &pool.executor);
+    sp_expect_eq(t, build->expect_err, err);
+    sp_expect_eq(t, (s32)build->expect_runs, sp_atomic_s32_get(&env.runs));
+
+    if (!err && !build->expect_err) {
+      result = par_expect_outputs(t, &env, test);
+      if (result) {
+        break;
+      }
+    }
+  }
+
+  spn_dag_pool_deinit(&pool);
+  return result;
+}
+
+sp_test_each(parallel, builds, par_test_t, par_tests) {
   if (!sp_str_empty(sp_os_env_get(sp_str_lit("SPN_TEST_SIM")))) {
-    UTEST_SKIP("threaded executor is incompatible with the single-threaded sim");
+    return sp_test_skip(t, "threaded executor is incompatible with the single-threaded sim");
   }
 
   sp_carr_for(dag_test_store_kinds, kind) {
-    par_env_t env = sp_zero;
-    dag_test_env_init(&env.dag, (dag_test_env_config_t) {
-      .name = t.name,
-      .store = dag_test_store_kinds[kind],
-      .discovery = t.discovery
-    });
-
-    spn_dag_pool_t pool = sp_zero;
-    spn_dag_pool_init(&pool, env.dag.fs.mem, (spn_dag_pool_config_t) {
-      .workers = t.workers ? t.workers : 4,
-    });
-
-    sp_carr_for(t.builds, b) {
-      par_build_t* build = &t.builds[b];
-      if (!build->expect_runs && !build->expect_err) {
-        break;
-      }
-
-      spn_dag_file_cache_invalidate_all(&env.dag.files);
-      sp_carr_for(build->sources, si) {
-        if (!build->sources[si].path) {
-          break;
-        }
-        tmpfs_create(&env.dag.fs, sp_str_view(build->sources[si].path), sp_str_view(build->sources[si].content));
-      }
-      sp_carr_for(build->remove_dirs, si) {
-        if (!build->remove_dirs[si]) {
-          break;
-        }
-        sp_fs_remove_dir(tmpfs_get(&env.dag.fs, sp_str_view(build->remove_dirs[si])));
-      }
-
-      spn_dag_t* g = dag_test_env_graph(&env.dag);
-      par_build_graph(utest_result, &env, g, &t);
-
-      spn_err_t err = spn_dag_run_executor(g, &env.dag.env, &pool.executor);
-      EXPECT_EQ(build->expect_err, err);
-      EXPECT_EQ((s32)build->expect_runs, sp_atomic_s32_get(&env.runs));
-
-      if (!err && !build->expect_err) {
-        par_expect_outputs(utest_result, &env, &t);
-      }
+    sp_err_t err = par_run_builds(t, dag_test_store_kinds[kind], it);
+    if (err) {
+      return err;
     }
-
-    spn_dag_pool_deinit(&pool);
-    dag_test_env_deinit(&env.dag);
   }
-}
-
-UTEST_F(parallel, independent_actions_all_run) {
-  run_test(&ur, (par_test_t) {
-    .name = "parallel_independent",
-    .actions = {
-      { .identity = "A", .inputs = { "S" }, .output = "OA" },
-      { .identity = "B", .inputs = { "S" }, .output = "OB" },
-      { .identity = "C", .inputs = { "S" }, .output = "OC" },
-      { .identity = "D", .inputs = { "S" }, .output = "OD" },
-      { .identity = "E", .inputs = { "S" }, .output = "OE" },
-      { .identity = "F", .inputs = { "S" }, .output = "OF" },
-      { .identity = "G", .inputs = { "S" }, .output = "OG" },
-    },
-    .builds = {
-      { .sources = { { "S", "1" } }, .expect_runs = 7 },
-      { .sources = { { "S", "1" } }, .expect_runs = 7 },
-    }
-  });
-}
-
-UTEST_F(parallel, chain_runs_in_dependency_order) {
-  run_test(&ur, (par_test_t) {
-    .name = "parallel_chain",
-    .actions = {
-      { .identity = "A", .inputs = { "S" }, .output = "X" },
-      { .identity = "B", .inputs = { "X" }, .output = "Y" },
-      { .identity = "C", .inputs = { "Y" }, .output = "Z" },
-    },
-    .builds = {
-      { .sources = { { "S", "1" } }, .expect_runs = 3 },
-      { .sources = { { "S", "1" } }, .expect_runs = 3 },
-    }
-  });
-}
-
-UTEST_F(parallel, diamond_selective_rebuild) {
-  run_test(&ur, (par_test_t) {
-    .name = "parallel_diamond",
-    .actions = {
-      { .identity = "A", .inputs = { "S" }, .output = "X" },
-      { .identity = "B", .inputs = { "T" }, .output = "Y" },
-      { .identity = "C", .inputs = { "X", "Y" }, .output = "Z" },
-    },
-    .builds = {
-      { .sources = { { "S", "1" }, { "T", "1" } }, .expect_runs = 3 },
-      { .sources = { { "S", "2" }, { "T", "1" } }, .expect_runs = 4 },
-    }
-  });
-}
-
-UTEST_F(parallel, single_worker_completes) {
-  run_test(&ur, (par_test_t) {
-    .name = "parallel_single_worker",
-    .workers = 1,
-    .actions = {
-      { .identity = "A", .inputs = { "S" }, .output = "X" },
-      { .identity = "B", .inputs = { "X" }, .output = "Y" },
-      { .identity = "C", .inputs = { "S" }, .output = "Z" },
-    },
-    .builds = {
-      { .sources = { { "S", "1" } }, .expect_runs = 3 },
-    }
-  });
-}
-
-UTEST_F(parallel, failing_action_stops_build) {
-  run_test(&ur, (par_test_t) {
-    .name = "parallel_fail",
-    .actions = {
-      { .identity = "A", .inputs = { "S" }, .output = "X", .fails = true },
-      { .identity = "B", .inputs = { "X" }, .output = "Y" },
-    },
-    .builds = {
-      { .sources = { { "S", "1" } }, .expect_err = SPN_ERR_DAG_ACTION },
-    }
-  });
-}
-
-UTEST_F(parallel, cycle_fails) {
-  run_test(&ur, (par_test_t) {
-    .name = "parallel_cycle",
-    .actions = {
-      { .identity = "A", .inputs = { "Y" }, .output = "X" },
-      { .identity = "B", .inputs = { "X" }, .output = "Y" },
-    },
-    .builds = {
-      { .expect_err = SPN_ERR_DAG_STALLED },
-    }
-  });
-}
-
-UTEST_F(parallel, discovered_generated_header_waits_for_producer) {
-  run_test(&ur, (par_test_t) {
-    .name = "parallel_generated_header",
-    .discovery = true,
-    .actions = {
-      { .identity = "A", .inputs = { "S" }, .output = "H" },
-      { .identity = "B", .inputs = { "M" }, .discovers = { "H" }, .output = "O" },
-    },
-    .builds = {
-      { .sources = { { "S", "1" }, { "M", "1" } }, .expect_runs = 3 },
-      { .sources = { { "S", "1" }, { "M", "1" } }, .expect_runs = 3 },
-      { .sources = { { "S", "2" }, { "M", "1" } }, .expect_runs = 4 },
-    }
-  });
-}
-
-UTEST_F(parallel, discovered_tree_member_waits_for_producer) {
-  run_test(&ur, (par_test_t) {
-    .name = "parallel_tree_member",
-    .discovery = true,
-    .actions = {
-      { .identity = "A", .inputs = { "S" }, .output = "D", .tree = true },
-      { .identity = "B", .inputs = { "M" }, .discovers = { "D/H" }, .output = "O" },
-    },
-    .builds = {
-      { .sources = { { "S", "1" }, { "M", "1" } }, .expect_runs = 3 },
-      { .sources = { { "S", "1" }, { "M", "1" } }, .remove_dirs = { "D" }, .expect_runs = 3 },
-    }
-  });
-}
-
-UTEST_F(parallel, tree_restored_after_delete) {
-  run_test(&ur, (par_test_t) {
-    .name = "parallel_tree_restore",
-    .actions = {
-      { .identity = "A", .inputs = { "S" }, .output = "D", .tree = true },
-      { .identity = "B", .inputs = { "S" }, .output = "O" },
-    },
-    .builds = {
-      { .sources = { { "S", "1" } }, .expect_runs = 2 },
-      { .sources = { { "S", "1" } }, .remove_dirs = { "D" }, .expect_runs = 2 },
-    }
-  });
+  return SP_OK;
 }

@@ -1,4 +1,4 @@
-#include "common.h"
+#include "dag_test.h"
 
 typedef struct {
   const c8* name;
@@ -30,9 +30,97 @@ typedef struct {
   cache_op_t ops [DAG_TEST_MAX_OPS];
 } cache_test_t;
 
-UTEST_EMPTY_FIXTURE(action_cache)
+static const cache_test_t cache_tests [] = {
+  {
+    .name = "get_missing",
+    .ops = {
+      { .kind = CACHE_OP_GET, .key = "cc main.c" },
+    }
+  },
+  {
+    .name = "put_then_get",
+    .ops = {
+      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" }, { "main.d", "deps" } } },
+      { .kind = CACHE_OP_GET, .key = "cc main.c", .outputs = { { "main.o", "obj" }, { "main.d", "deps" } }, .expect = { .hit = true } },
+    }
+  },
+  {
+    .name = "remove_existing",
+    .ops = {
+      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" } } },
+      { .kind = CACHE_OP_REMOVE, .key = "cc main.c", .expect = { .hit = true } },
+      { .kind = CACHE_OP_GET, .key = "cc main.c" },
+    }
+  },
+  {
+    .name = "put_overwrites_existing_entry",
+    .ops = {
+      { .kind = CACHE_OP_PUT, .key = "K", .outputs = { { "O", "A" } } },
+      { .kind = CACHE_OP_PUT, .key = "K", .outputs = { { "O", "B" } } },
+      { .kind = CACHE_OP_GET, .key = "K", .outputs = { { "O", "B" } }, .expect = { .hit = true } },
+    }
+  },
+  {
+    .name = "remove_missing",
+    .ops = {
+      { .kind = CACHE_OP_REMOVE, .key = "K" },
+    }
+  },
+  {
+    .name = "distinct_keys",
+    .ops = {
+      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" } } },
+      { .kind = CACHE_OP_PUT, .key = "cc spum.c", .outputs = { { "spum.o", "spum" } } },
+      { .kind = CACHE_OP_GET, .key = "cc main.c", .outputs = { { "main.o", "obj" } }, .expect = { .hit = true } },
+      { .kind = CACHE_OP_GET, .key = "cc spum.c", .outputs = { { "spum.o", "spum" } }, .expect = { .hit = true } },
+    }
+  },
+  {
+    .name = "empty_outputs",
+    .ops = {
+      { .kind = CACHE_OP_PUT, .key = "cc main.c" },
+      { .kind = CACHE_OP_GET, .key = "cc main.c", .expect = { .hit = true } },
+    }
+  },
+  {
+    .name = "reload_roundtrip",
+    .ops = {
+      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" }, { "main.d", "deps" } } },
+      { .kind = CACHE_OP_PUT, .key = "cc spum.c", .outputs = { { "spum.o", "spum" } } },
+      { .kind = CACHE_OP_RELOAD },
+      { .kind = CACHE_OP_GET, .key = "cc main.c", .outputs = { { "main.o", "obj" }, { "main.d", "deps" } }, .expect = { .hit = true } },
+      { .kind = CACHE_OP_GET, .key = "cc spum.c", .outputs = { { "spum.o", "spum" } }, .expect = { .hit = true } },
+    }
+  },
+  {
+    .name = "reload_empty_dir",
+    .ops = {
+      { .kind = CACHE_OP_RELOAD },
+      { .kind = CACHE_OP_GET, .key = "cc main.c" },
+    }
+  },
+  {
+    .name = "remove_unlinks_entry",
+    .ops = {
+      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" } } },
+      { .kind = CACHE_OP_REMOVE, .key = "cc main.c", .expect = { .hit = true } },
+      { .kind = CACHE_OP_RELOAD },
+      { .kind = CACHE_OP_GET, .key = "cc main.c" },
+    }
+  },
+  {
+    .name = "corrupt_entry_misses",
+    .ops = {
+      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" } } },
+      { .kind = CACHE_OP_CORRUPT, .key = "cc main.c" },
+      { .kind = CACHE_OP_RELOAD },
+      { .kind = CACHE_OP_GET, .key = "cc main.c" },
+      { .kind = CACHE_OP_GET, .key = "cc main.c" },
+    }
+  },
+};
 
-static void get_output_count(cache_op_t* op, u32* count) {
+static void get_output_count(const cache_op_t* op, u32* count) {
   *count = 0;
   sp_carr_for(op->outputs, it) {
     if (!op->outputs[it].name) {
@@ -42,21 +130,20 @@ static void get_output_count(cache_op_t* op, u32* count) {
   }
 }
 
-static sp_str_t get_path(tmpfs_t* fs, sp_str_t dir, const c8* key) {
-  sp_str_t hex = spn_dag_digest_hex(fs->mem, dag_test_digest(key));
-  return sp_fs_join_path(fs->mem, dir, sp_fmt(fs->mem, "{}.txt", sp_fmt_str(hex)).value);
+static sp_str_t get_path(sp_mem_t mem, sp_str_t dir, const c8* key) {
+  sp_str_t hex = spn_dag_digest_hex(mem, dag_test_digest(key));
+  return sp_fs_join_path(mem, dir, sp_fmt(mem, "{}.txt", sp_fmt_str(hex)).value);
 }
 
-static void run_test(s32* utest_result, cache_test_t t) {
-  tmpfs_t fs = sp_zero;
-  tmpfs_init_named(&fs, t.name);
-  sp_str_t dir = tmpfs_get(&fs, sp_str_lit("strong"));
+sp_test_each(action_cache, ops, cache_test_t, cache_tests) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_str_t dir = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("strong"));
 
   spn_dag_action_cache_t c = sp_zero;
-  spn_dag_action_cache_init(&c, fs.mem, dir);
+  spn_dag_action_cache_init(&c, mem, dir);
 
-  sp_carr_for(t.ops, it) {
-    cache_op_t op = t.ops[it];
+  sp_carr_for(it->ops, ot) {
+    cache_op_t op = it->ops[ot];
     if (op.kind == CACHE_OP_DONE) {
       break;
     }
@@ -70,12 +157,12 @@ static void run_test(s32* utest_result, cache_test_t t) {
         c8 names [DAG_TEST_MAX_OUTPUTS][SP_PATH_MAX] = sp_zero;
         u32 count = 0;
         get_output_count(&op, &count);
-        sp_for(it, count) {
-          u32 len = sp_cstr_len(op.outputs[it].name);
-          sp_cstr_copy_to_n(op.outputs[it].name, len, names[it], sizeof(names[it]));
-          outputs[it] = (spn_dag_action_output_t) {
-            .name = sp_str(names[it], len),
-            .digest = dag_test_digest(op.outputs[it].blob)
+        sp_for(oi, count) {
+          u32 len = sp_cstr_len(op.outputs[oi].name);
+          sp_cstr_copy_to_n(op.outputs[oi].name, len, names[oi], sizeof(names[oi]));
+          outputs[oi] = (spn_dag_action_output_t) {
+            .name = sp_str(names[oi], len),
+            .digest = dag_test_digest(op.outputs[oi].blob)
           };
         }
         spn_dag_action_cache_put(&c, dag_test_digest(op.key), outputs, count);
@@ -85,152 +172,32 @@ static void run_test(s32* utest_result, cache_test_t t) {
       }
       case CACHE_OP_GET: {
         const spn_dag_action_entry_t* entry = spn_dag_action_cache_get(&c, dag_test_digest(op.key));
-        EXPECT_EQ(op.expect.hit, entry != SP_NULLPTR);
+        sp_expect_eq(t, op.expect.hit, entry != SP_NULLPTR);
         if (op.expect.hit && entry) {
           u32 count = 0;
           get_output_count(&op, &count);
-          ASSERT_EQ(count, (u32)sp_da_size(entry->outputs));
-          sp_for(it, count) {
-            EXPECT_STR(entry->outputs[it].name, op.outputs[it].name);
-            EXPECT_TRUE(spn_dag_digest_equal(entry->outputs[it].digest, dag_test_digest(op.outputs[it].blob)));
+          sp_must_eq(t, count, (u32)sp_da_size(entry->outputs));
+          sp_for(oi, count) {
+            sp_expect_str_eq_c(t, entry->outputs[oi].name, op.outputs[oi].name);
+            sp_expect(t, spn_dag_digest_equal(entry->outputs[oi].digest, dag_test_digest(op.outputs[oi].blob)));
           }
         }
         break;
       }
       case CACHE_OP_REMOVE: {
-        EXPECT_EQ(op.expect.hit, spn_dag_action_cache_remove(&c, dag_test_digest(op.key)));
+        sp_expect_eq(t, op.expect.hit, spn_dag_action_cache_remove(&c, dag_test_digest(op.key)));
         break;
       }
       case CACHE_OP_RELOAD: {
-        spn_dag_action_cache_init(&c, fs.mem, dir);
+        spn_dag_action_cache_init(&c, mem, dir);
         break;
       }
       case CACHE_OP_CORRUPT: {
-        ASSERT_EQ(SP_OK, sp_fs_create_file_cstr(get_path(&fs, dir, op.key), "not json\n"));
+        sp_must_eq(t, SP_OK, sp_fs_create_file_cstr(get_path(mem, dir, op.key), "not json\n"));
         break;
       }
     }
   }
 
-  tmpfs_deinit(&fs);
-}
-
-UTEST_F(action_cache, get_missing) {
-  run_test(&ur, (cache_test_t) {
-    .name = "action_cache_missing",
-    .ops = {
-      { .kind = CACHE_OP_GET, .key = "cc main.c" },
-    }
-  });
-}
-
-UTEST_F(action_cache, put_then_get) {
-  run_test(&ur, (cache_test_t) {
-    .name = "action_cache_put_get",
-    .ops = {
-      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" }, { "main.d", "deps" } } },
-      { .kind = CACHE_OP_GET, .key = "cc main.c", .outputs = { { "main.o", "obj" }, { "main.d", "deps" } }, .expect = { .hit = true } },
-    }
-  });
-}
-
-UTEST_F(action_cache, remove_existing) {
-  run_test(&ur, (cache_test_t) {
-    .name = "action_cache_remove",
-    .ops = {
-      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" } } },
-      { .kind = CACHE_OP_REMOVE, .key = "cc main.c", .expect = { .hit = true } },
-      { .kind = CACHE_OP_GET, .key = "cc main.c" },
-    }
-  });
-}
-
-UTEST_F(action_cache, put_overwrites_existing_entry) {
-  run_test(&ur, (cache_test_t) {
-    .name = "action_cache_overwrite",
-    .ops = {
-      { .kind = CACHE_OP_PUT, .key = "K", .outputs = { { "O", "A" } } },
-      { .kind = CACHE_OP_PUT, .key = "K", .outputs = { { "O", "B" } } },
-      { .kind = CACHE_OP_GET, .key = "K", .outputs = { { "O", "B" } }, .expect = { .hit = true } },
-    }
-  });
-}
-
-UTEST_F(action_cache, remove_missing) {
-  run_test(&ur, (cache_test_t) {
-    .name = "action_cache_remove_missing",
-    .ops = {
-      { .kind = CACHE_OP_REMOVE, .key = "K" },
-    }
-  });
-}
-
-UTEST_F(action_cache, distinct_keys) {
-  run_test(&ur, (cache_test_t) {
-    .name = "action_cache_distinct",
-    .ops = {
-      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" } } },
-      { .kind = CACHE_OP_PUT, .key = "cc spum.c", .outputs = { { "spum.o", "spum" } } },
-      { .kind = CACHE_OP_GET, .key = "cc main.c", .outputs = { { "main.o", "obj" } }, .expect = { .hit = true } },
-      { .kind = CACHE_OP_GET, .key = "cc spum.c", .outputs = { { "spum.o", "spum" } }, .expect = { .hit = true } },
-    }
-  });
-}
-
-UTEST_F(action_cache, empty_outputs) {
-  run_test(&ur, (cache_test_t) {
-    .name = "action_cache_empty",
-    .ops = {
-      { .kind = CACHE_OP_PUT, .key = "cc main.c" },
-      { .kind = CACHE_OP_GET, .key = "cc main.c", .expect = { .hit = true } },
-    }
-  });
-}
-
-UTEST_F(action_cache, reload_roundtrip) {
-  run_test(&ur, (cache_test_t) {
-    .name = "action_cache_roundtrip",
-    .ops = {
-      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" }, { "main.d", "deps" } } },
-      { .kind = CACHE_OP_PUT, .key = "cc spum.c", .outputs = { { "spum.o", "spum" } } },
-      { .kind = CACHE_OP_RELOAD },
-      { .kind = CACHE_OP_GET, .key = "cc main.c", .outputs = { { "main.o", "obj" }, { "main.d", "deps" } }, .expect = { .hit = true } },
-      { .kind = CACHE_OP_GET, .key = "cc spum.c", .outputs = { { "spum.o", "spum" } }, .expect = { .hit = true } },
-    }
-  });
-}
-
-UTEST_F(action_cache, reload_empty_dir) {
-  run_test(&ur, (cache_test_t) {
-    .name = "action_cache_reload_empty",
-    .ops = {
-      { .kind = CACHE_OP_RELOAD },
-      { .kind = CACHE_OP_GET, .key = "cc main.c" },
-    }
-  });
-}
-
-UTEST_F(action_cache, remove_unlinks_entry) {
-  run_test(&ur, (cache_test_t) {
-    .name = "action_cache_remove_unlinks",
-    .ops = {
-      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" } } },
-      { .kind = CACHE_OP_REMOVE, .key = "cc main.c", .expect = { .hit = true } },
-      { .kind = CACHE_OP_RELOAD },
-      { .kind = CACHE_OP_GET, .key = "cc main.c" },
-    }
-  });
-}
-
-UTEST_F(action_cache, corrupt_entry_misses) {
-  run_test(&ur, (cache_test_t) {
-    .name = "action_cache_corrupt",
-    .ops = {
-      { .kind = CACHE_OP_PUT, .key = "cc main.c", .outputs = { { "main.o", "obj" } } },
-      { .kind = CACHE_OP_CORRUPT, .key = "cc main.c" },
-      { .kind = CACHE_OP_RELOAD },
-      { .kind = CACHE_OP_GET, .key = "cc main.c" },
-      { .kind = CACHE_OP_GET, .key = "cc main.c" },
-    }
-  });
+  return SP_OK;
 }

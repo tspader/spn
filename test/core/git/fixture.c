@@ -1,78 +1,7 @@
-#include "sp.h"
-#include "utest.h"
-#include "test.h"
+#include "git.h"
 
-
-///////////
-// STATE //
-///////////
-struct git_fixture {
-  u32 dummy;
-};
-
-UTEST_F_SETUP(git_fixture) {
-}
-
-UTEST_F_TEARDOWN(git_fixture) {
-}
-
-
-///////////////
-// EXECUTOR //
-//////////////
-static void run_fixture(s32* utest_result, git_repo_fixture_t fixture) {
-  ctx_t* harness = ctx_get();
-  sp_mem_t mem = sp_mem_arena_as_allocator(harness->arena);
-
-  // build repo from fixture
-  git_repo_result_t repo = git_repo_build(&harness->fs, fixture.name, &fixture);
-
-  // assert commit count
-  ASSERT_EQ(repo.commit_count, fixture.expect.num_commits);
-
-  // all SHAs non-empty and distinct
-  sp_for(it, repo.commit_count) {
-    ASSERT_FALSE(sp_str_empty(repo.commits[it]));
-    sp_for(j, it) {
-      ASSERT_FALSE(sp_str_equal(repo.commits[it], repo.commits[j]));
-    }
-  }
-
-  sp_for(c, repo.commit_count) {
-    // verify expected file content per commit
-    sp_carr_for(fixture.expect.commits[c], f) {
-      git_repo_expect_file_t* expect = &fixture.expect.commits[c][f];
-      if (!expect->file) {
-        break;
-      }
-
-      sp_str_t actual = git_repo_file_at(repo.path, repo.commits[c], sp_str_view(expect->file));
-      SP_EXPECT_STR_EQ_CSTR(actual, expect->content);
-    }
-
-    // verify expected missing files per commit
-    sp_carr_for(fixture.expect.missing[c], f) {
-      const c8* path = fixture.expect.missing[c][f];
-      if (!path) {
-        break;
-      }
-
-      sp_str_t spec = sp_fmt(mem, "{}:{}", sp_fmt_str(repo.commits[c]), sp_fmt_cstr(path)).value;
-      sp_ps_output_t check = sp_ps_run(mem, (sp_ps_config_t) {
-        .command = sp_str_lit("git"),
-        .args = { sp_str_lit("-C"), repo.path, sp_str_lit("show"), spec },
-      });
-      EXPECT_NE(check.status.exit_code, 0);
-    }
-  }
-}
-
-
-////////////
-// CASES //
-///////////
-UTEST_F(git_fixture, multiple_commits) {
-  run_fixture(utest_result, (git_repo_fixture_t) {
+static const git_repo_fixture_t tests [] = {
+  {
     .name = "multiple_commits",
     .commits = {
       {
@@ -112,12 +41,9 @@ UTEST_F(git_fixture, multiple_commits) {
         },
       },
     },
-  });
-}
-
-UTEST_F(git_fixture, file_content_at_commit) {
-  run_fixture(utest_result, (git_repo_fixture_t) {
-    .name = "file_content",
+  },
+  {
+    .name = "file_content_at_commit",
     .commits = {
       {
         .message = "v1",
@@ -145,12 +71,9 @@ UTEST_F(git_fixture, file_content_at_commit) {
         },
       },
     },
-  });
-}
-
-UTEST_F(git_fixture, subdirectory_files) {
-  run_fixture(utest_result, (git_repo_fixture_t) {
-    .name = "subdir_files",
+  },
+  {
+    .name = "subdirectory_files",
     .commits = {
       {
         .message = "nested",
@@ -169,12 +92,9 @@ UTEST_F(git_fixture, subdirectory_files) {
         },
       },
     },
-  });
-}
-
-UTEST_F(git_fixture, commit_replaces_tree) {
-  run_fixture(utest_result, (git_repo_fixture_t) {
-    .name = "replaces_tree",
+  },
+  {
+    .name = "commit_replaces_tree",
     .commits = {
       {
         .message = "has old file",
@@ -208,5 +128,53 @@ UTEST_F(git_fixture, commit_replaces_tree) {
         { "old.txt" },
       },
     },
-  });
+  },
+};
+
+sp_test_each(git_fixture, build, git_repo_fixture_t, tests) {
+  sp_mem_t mem = sp_test_arena(t);
+
+  // build repo from fixture
+  git_repo_result_t repo = git_repo_build_at(sp_test_dir(t), it->name, it);
+
+  // assert commit count
+  sp_must_eq(t, repo.commit_count, it->expect.num_commits);
+
+  // all SHAs non-empty and distinct
+  sp_for(c, repo.commit_count) {
+    sp_must(t, !sp_str_empty(repo.commits[c]));
+    sp_for(j, c) {
+      sp_must(t, !sp_str_equal(repo.commits[c], repo.commits[j]));
+    }
+  }
+
+  sp_for(c, repo.commit_count) {
+    // verify expected file content per commit
+    sp_carr_for(it->expect.commits[c], f) {
+      git_repo_expect_file_t* expect = &it->expect.commits[c][f];
+      if (!expect->file) {
+        break;
+      }
+
+      sp_str_t actual = git_repo_file_at(repo.path, repo.commits[c], sp_str_view(expect->file));
+      sp_expect_str_eq_c(t, actual, expect->content);
+    }
+
+    // verify expected missing files per commit
+    sp_carr_for(it->expect.missing[c], f) {
+      const c8* path = it->expect.missing[c][f];
+      if (!path) {
+        break;
+      }
+
+      sp_str_t spec = sp_fmt(mem, "{}:{}", sp_fmt_str(repo.commits[c]), sp_fmt_cstr(path)).value;
+      sp_ps_output_t check = sp_ps_run(mem, (sp_ps_config_t) {
+        .command = sp_str_lit("git"),
+        .args = { sp_str_lit("-C"), repo.path, sp_str_lit("show"), spec },
+      });
+      sp_expect_ne(t, check.status.exit_code, 0);
+    }
+  }
+
+  return SP_OK;
 }

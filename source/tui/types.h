@@ -5,7 +5,7 @@
 
 #include "sp.h"
 #include "sp/sp_math.h"
-#include "sp/prompt.h"
+#include "sp/sp_prompt.h"
 #include "forward/types.h"
 
 #if defined(SP_POSIX)

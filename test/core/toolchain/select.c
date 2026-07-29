@@ -20,6 +20,7 @@ typedef struct {
 } select_query_t;
 
 typedef struct {
+  const c8* name;
   const c8* file;
   select_query_t queries [SELECT_MAX_QUERIES];
   struct { bool same_definition; } expect;
@@ -31,104 +32,30 @@ typedef struct {
 } supports_check_t;
 
 typedef struct {
+  const c8* name;
   spn_triple_t targets [SELECT_MAX_TARGETS];
   supports_check_t checks [SELECT_MAX_CHECKS];
 } supports_test_t;
 
-static void run_select_test(s32* utest_result, select_test_t t) {
-  spn_toolchain_catalog_t catalog = sp_zero;
-  fixture_catalog(utest_result, &catalog, t.file);
-
-  spn_toolchain_resolution_t resolutions [SELECT_MAX_QUERIES] = sp_zero;
-
-  sp_carr_for(t.queries, it) {
-    select_query_t query = t.queries[it];
-    if (!query.name) {
-      break;
-    }
-
-    spn_triple_t host = fixture_triple_empty(query.host) ? HOST_X64_LINUX : query.host;
-    spn_err_union_t err = spn_toolchain_select(&catalog, (spn_toolchain_query_t) {
-      .name = sp_str_view(query.name),
-      .target = query.target,
-      .host = host,
-      .role = query.role,
-    }, &resolutions[it]);
-
-    ASSERT_EQ((u32)query.expect.err, (u32)err.kind);
-
-    if (query.expect.err) {
-      EXPECT_STR(err.toolchain.name, query.name);
-      EXPECT_EQ((u32)query.role, (u32)err.toolchain.role);
-      EXPECT_TRUE(err.toolchain.catalog == &catalog);
-      EXPECT_TRUE(fixture_triple_equal(err.toolchain.host, host));
-      if (query.expect.err != SPN_ERR_TOOLCHAIN_UNKNOWN) {
-        EXPECT_TRUE(fixture_triple_equal(err.toolchain.target, query.target));
-      }
-    } else {
-      ASSERT_TRUE(resolutions[it].info);
-      EXPECT_STR(resolutions[it].info->name, query.expect.name);
-    }
-
-    if (query.expect.artifact) {
-      ASSERT_FALSE(sp_opt_is_null(resolutions[it].artifact));
-      EXPECT_STR(sp_opt_get(resolutions[it].artifact).url, query.expect.artifact);
-    }
-    if (query.expect.no_artifact) {
-      EXPECT_TRUE(sp_opt_is_null(resolutions[it].artifact));
-    }
-  }
-
-  if (t.expect.same_definition) {
-    EXPECT_TRUE(resolutions[0].info == resolutions[1].info);
-  }
-}
-
-static void run_supports_test(s32* utest_result, supports_test_t t) {
-  sp_mem_t mem = sp_mem_arena_as_allocator(ctx_get()->arena);
-
-  spn_toolchain_info_t toolchain = fixture_local_toolchain("A", "cc");
-  sp_carr_for(t.targets, it) {
-    if (fixture_triple_empty(t.targets[it])) {
-      break;
-    }
-    if (!toolchain.targets) {
-      toolchain.targets = sp_da_new(mem, spn_triple_t);
-    }
-    sp_da_push(toolchain.targets, t.targets[it]);
-  }
-
-  sp_carr_for(t.checks, it) {
-    supports_check_t check = t.checks[it];
-    if (fixture_triple_empty(check.target)) {
-      break;
-    }
-    EXPECT_EQ(check.supported, spn_toolchain_supports(&toolchain, check.target, HOST_X64_LINUX));
-  }
-}
-
-UTEST(select, supports_empty_targets_match_host_only) {
-  run_supports_test(utest_result, (supports_test_t) {
+static const supports_test_t supports_tests [] = {
+  {
+    .name = "empty_targets_match_host_only",
     .checks = {
       { .target = HOST_X64_LINUX, .supported = true },
       { .target = { SPN_ARCH_X64, SPN_OS_LINUX } },
       { .target = TARGET_WIN_GNU },
     },
-  });
-}
-
-UTEST(select, supports_declared_targets_replace_host) {
-  run_supports_test(utest_result, (supports_test_t) {
+  },
+  {
+    .name = "declared_targets_replace_host",
     .targets = { TARGET_WIN_GNU },
     .checks = {
       { .target = TARGET_WIN_GNU, .supported = true },
       { .target = HOST_X64_LINUX },
     },
-  });
-}
-
-UTEST(select, supports_wildcard_target_fields) {
-  run_supports_test(utest_result, (supports_test_t) {
+  },
+  {
+    .name = "wildcard_target_fields",
     .targets = {
       { .os = SPN_OS_LINUX },
     },
@@ -137,11 +64,12 @@ UTEST(select, supports_wildcard_target_fields) {
       { .target = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }, .supported = true },
       { .target = TARGET_WIN_GNU },
     },
-  });
-}
+  },
+};
 
-UTEST(select, auto_picks_first_in_declared_order) {
-  run_select_test(utest_result, (select_test_t) {
+static const select_test_t select_tests [] = {
+  {
+    .name = "auto_picks_first_in_declared_order",
     .file = "auto.json",
     .queries = {
       {
@@ -150,11 +78,9 @@ UTEST(select, auto_picks_first_in_declared_order) {
         .expect = { .name = "A" },
       },
     },
-  });
-}
-
-UTEST(select, auto_skips_unsupported_target) {
-  run_select_test(utest_result, (select_test_t) {
+  },
+  {
+    .name = "auto_skips_unsupported_target",
     .file = "auto.json",
     .queries = {
       {
@@ -163,11 +89,9 @@ UTEST(select, auto_skips_unsupported_target) {
         .expect = { .name = "B", .artifact = "https://example.com/linux.tar.xz" },
       },
     },
-  });
-}
-
-UTEST(select, auto_skips_distribution_without_host_artifact) {
-  run_select_test(utest_result, (select_test_t) {
+  },
+  {
+    .name = "auto_skips_distribution_without_host_artifact",
     .file = "auto.json",
     .queries = {
       {
@@ -177,11 +101,9 @@ UTEST(select, auto_skips_distribution_without_host_artifact) {
         .expect = { .name = "C", .no_artifact = true },
       },
     },
-  });
-}
-
-UTEST(select, auto_with_empty_catalog) {
-  run_select_test(utest_result, (select_test_t) {
+  },
+  {
+    .name = "auto_with_empty_catalog",
     .file = "empty.json",
     .queries = {
       {
@@ -190,11 +112,9 @@ UTEST(select, auto_with_empty_catalog) {
         .expect = { .err = SPN_ERR_TOOLCHAIN_NONE },
       },
     },
-  });
-}
-
-UTEST(select, auto_with_no_capable_toolchain) {
-  run_select_test(utest_result, (select_test_t) {
+  },
+  {
+    .name = "auto_with_no_capable_toolchain",
     .file = "auto.json",
     .queries = {
       {
@@ -203,11 +123,9 @@ UTEST(select, auto_with_no_capable_toolchain) {
         .expect = { .err = SPN_ERR_TOOLCHAIN_NONE },
       },
     },
-  });
-}
-
-UTEST(select, unknown_name) {
-  run_select_test(utest_result, (select_test_t) {
+  },
+  {
+    .name = "unknown_name",
     .file = "empty.json",
     .queries = {
       {
@@ -216,11 +134,9 @@ UTEST(select, unknown_name) {
         .expect = { .err = SPN_ERR_TOOLCHAIN_UNKNOWN },
       },
     },
-  });
-}
-
-UTEST(select, unsupported_target) {
-  run_select_test(utest_result, (select_test_t) {
+  },
+  {
+    .name = "unsupported_target",
     .file = "local.json",
     .queries = {
       {
@@ -230,11 +146,9 @@ UTEST(select, unsupported_target) {
         .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET },
       },
     },
-  });
-}
-
-UTEST(select, local_resolves_without_artifact) {
-  run_select_test(utest_result, (select_test_t) {
+  },
+  {
+    .name = "local_resolves_without_artifact",
     .file = "local.json",
     .queries = {
       {
@@ -243,11 +157,9 @@ UTEST(select, local_resolves_without_artifact) {
         .expect = { .name = "A", .no_artifact = true },
       },
     },
-  });
-}
-
-UTEST(select, distribution_artifact_matches_host) {
-  run_select_test(utest_result, (select_test_t) {
+  },
+  {
+    .name = "distribution_artifact_matches_host",
     .file = "distribution.json",
     .queries = {
       {
@@ -263,11 +175,9 @@ UTEST(select, distribution_artifact_matches_host) {
       },
     },
     .expect = { .same_definition = true },
-  });
-}
-
-UTEST(select, distribution_rejects_unsupported_host) {
-  run_select_test(utest_result, (select_test_t) {
+  },
+  {
+    .name = "distribution_rejects_unsupported_host",
     .file = "distribution.json",
     .queries = {
       {
@@ -277,11 +187,9 @@ UTEST(select, distribution_rejects_unsupported_host) {
         .expect = { .err = SPN_ERR_TOOLCHAIN_HOST, .no_artifact = true },
       },
     },
-  });
-}
-
-UTEST(select, target_error_precedes_host_error) {
-  run_select_test(utest_result, (select_test_t) {
+  },
+  {
+    .name = "target_error_precedes_host_error",
     .file = "distribution.json",
     .queries = {
       {
@@ -291,5 +199,81 @@ UTEST(select, target_error_precedes_host_error) {
         .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .no_artifact = true },
       },
     },
-  });
+  },
+};
+
+sp_test_each(select, supports, supports_test_t, supports_tests) {
+  sp_mem_t mem = sp_test_arena(t);
+
+  spn_toolchain_info_t toolchain = fixture_local_toolchain("A", "cc");
+  sp_carr_for(it->targets, at) {
+    if (fixture_triple_empty(it->targets[at])) {
+      break;
+    }
+    if (!toolchain.targets) {
+      toolchain.targets = sp_da_new(mem, spn_triple_t);
+    }
+    sp_da_push(toolchain.targets, it->targets[at]);
+  }
+
+  sp_carr_for(it->checks, at) {
+    supports_check_t check = it->checks[at];
+    if (fixture_triple_empty(check.target)) {
+      break;
+    }
+    sp_expect_eq(t, check.supported, spn_toolchain_supports(&toolchain, check.target, (spn_triple_t) HOST_X64_LINUX));
+  }
+
+  return SP_OK;
+}
+
+sp_test_each(select, resolve, select_test_t, select_tests) {
+  spn_toolchain_catalog_t catalog = sp_zero;
+  if (fixture_catalog(t, &catalog, it->file)) return SP_ERR;
+
+  spn_toolchain_resolution_t resolutions [SELECT_MAX_QUERIES] = sp_zero;
+
+  sp_carr_for(it->queries, at) {
+    select_query_t query = it->queries[at];
+    if (!query.name) {
+      break;
+    }
+
+    spn_triple_t host = fixture_triple_empty(query.host) ? (spn_triple_t) HOST_X64_LINUX : query.host;
+    spn_err_union_t err = spn_toolchain_select(&catalog, (spn_toolchain_query_t) {
+      .name = sp_str_view(query.name),
+      .target = query.target,
+      .host = host,
+      .role = query.role,
+    }, &resolutions[at]);
+
+    sp_must_eq(t, (u32)query.expect.err, (u32)err.kind);
+
+    if (query.expect.err) {
+      sp_expect_str_eq_c(t, err.toolchain.name, query.name);
+      sp_expect_eq(t, (u32)query.role, (u32)err.toolchain.role);
+      sp_expect(t, err.toolchain.catalog == &catalog);
+      sp_expect(t, fixture_triple_equal(err.toolchain.host, host));
+      if (query.expect.err != SPN_ERR_TOOLCHAIN_UNKNOWN) {
+        sp_expect(t, fixture_triple_equal(err.toolchain.target, query.target));
+      }
+    } else {
+      sp_must(t, resolutions[at].info);
+      sp_expect_str_eq_c(t, resolutions[at].info->name, query.expect.name);
+    }
+
+    if (query.expect.artifact) {
+      sp_must(t, !sp_opt_is_null(resolutions[at].artifact));
+      sp_expect_str_eq_c(t, sp_opt_get(resolutions[at].artifact).url, query.expect.artifact);
+    }
+    if (query.expect.no_artifact) {
+      sp_expect(t, sp_opt_is_null(resolutions[at].artifact));
+    }
+  }
+
+  if (it->expect.same_definition) {
+    sp_expect(t, resolutions[0].info == resolutions[1].info);
+  }
+
+  return SP_OK;
 }

@@ -1,51 +1,47 @@
 #include "jtd_test.h"
 
-static void compare_type_primitives(s32* utest_result, const jtd_result_t* root, const void* expect) {
+static sp_err_t compare_type_primitives(sp_test_t* t, const jtd_result_t* root, const void* expect) {
   (void)expect;
-  EXPECT_EQ((s32)JTD_FORM_PROPERTIES, (s32)root->root->form);
-  EXPECT_EQ((u64)13, (u64)sp_da_size(root->root->as.properties.required));
+  sp_expect_eq(t, (s32)JTD_FORM_PROPERTIES, (s32)root->root->form);
+  sp_expect_eq(t, (u64)13, (u64)sp_da_size(root->root->as.properties.required));
   sp_da_for(root->root->as.properties.required, i) {
     const jtd_property_t* p = &root->root->as.properties.required[i];
-    EXPECT_EQ((s32)JTD_FORM_TYPE, (s32)p->schema->form);
-    jtd_expect_str(utest_result, p->key, jtd_type_name(p->schema->as.type));
+    sp_expect_eq(t, (s32)JTD_FORM_TYPE, (s32)p->schema->form);
+    sp_expect_str_eq_c(t, p->key, jtd_type_name(p->schema->as.type));
   }
+  return SP_OK;
 }
 
-UTEST(type, primitives) {
-  run_jtd_case(utest_result, (jtd_case_t){
+static const jtd_case_t cases [] = {
+  {
+    .name    = "primitives",
     .json    = "type.primitives.json",
     .compare = compare_type_primitives,
-  });
-}
-
-UTEST(type, value_not_string) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name       = "value_not_string",
     .json       = "type.value_not_string.json",
     .error      = JTD_ERR_TYPE_NOT_STRING,
     .error_path = "#",
-  });
-}
-
-UTEST(type, unknown) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name       = "unknown",
     .json       = "type.unknown.json",
     .error      = JTD_ERR_UNKNOWN_TYPE,
     .error_path = "#",
-  });
-}
-
-UTEST(type, metadata_not_object) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name       = "metadata_not_object",
     .json       = "type.metadata_not_object.json",
     .error      = JTD_ERR_METADATA_NOT_OBJECT,
     .error_path = "#/metadata",
-  });
-}
-
-UTEST(type, unknown_key) {
-  run_jtd_case(utest_result, (jtd_case_t){
+  },
+  {
+    .name       = "unknown_key",
     .json       = "type.unknown_key.json",
     .error      = JTD_ERR_UNKNOWN_MEMBER,
     .error_path = "#/foo",
-  });
-}
+  },
+};
+
+sp_test_each_fn(type, parse, jtd_case_t, cases, run_jtd_case);

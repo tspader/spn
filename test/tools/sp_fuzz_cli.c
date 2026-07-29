@@ -1,5 +1,5 @@
 #include "sp_fuzz.h"
-#include "sp/prompt.h"
+#include "sp/sp_prompt.h"
 
 #include "codegen/codegen.h"
 #include "external/tom.h"

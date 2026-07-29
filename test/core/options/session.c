@@ -1,8 +1,4 @@
-#include "common.h"
-#include "intern/intern.h"
-#include "pkg/id.h"
-#include "session/session.h"
-#include "session/types.h"
+#include "options.h"
 
 typedef struct {
   spn_err_t err;
@@ -16,6 +12,7 @@ typedef struct {
 } session_expect_t;
 
 typedef struct {
+  const c8* name;
   const c8* config;
   bool stale_loaded;
   bool direct_dep;
@@ -38,8 +35,51 @@ static spn_pkg_id_t make_id(sp_intern_t* intern, const c8* qualified) {
   };
 }
 
-static void run_session_test(s32* utest_result, session_test_t test) {
-  sp_mem_t mem = sp_mem_os_new();
+static const session_test_t tests [] = {
+  {
+    .name = "late_gate_resolve_cap",
+    .gated_dep = true,
+    .resolves = 4,
+    .expect = {
+      .err = SPN_ERR_OPTION,
+      .event = true,
+      .option_err = SPN_OPTION_ERR_LATE_GATE,
+      .pkg = "test",
+      .setter = SPN_OPTION_SETTER_CONSUMER,
+      .setter_name = "spum",
+      .resolves = 4,
+    },
+  },
+  {
+    .name = "unknown_config_package",
+    .config = "spum",
+    .expect = {
+      .err = SPN_ERR_OPTION,
+      .event = true,
+      .option_err = SPN_OPTION_ERR_UNKNOWN_PKG,
+      .pkg = "spum",
+    },
+  },
+  {
+    .name = "stale_loaded_unresolved_config_package",
+    .config = "spum",
+    .stale_loaded = true,
+    .expect = {
+      .err = SPN_ERR_OPTION,
+      .event = true,
+      .option_err = SPN_OPTION_ERR_UNKNOWN_PKG,
+      .pkg = "spum",
+    },
+  },
+  {
+    .name = "absent_direct_dependency_config_package",
+    .config = "spum",
+    .direct_dep = true,
+  },
+};
+
+sp_test_each(options_session, apply, session_test_t, tests) {
+  sp_mem_t mem = sp_test_arena(t);
   sp_intern_t* intern = sp_intern_new(mem);
 
   spn_pkg_info_t root = {
@@ -48,17 +88,17 @@ static void run_session_test(s32* utest_result, session_test_t test) {
     .deps = sp_da_new(mem, spn_requested_dep_t),
     .config = sp_da_new(mem, spn_pkg_config_entry_t),
   };
-  if (test.config) {
+  if (it->config) {
     sp_da_push(root.config, ((spn_pkg_config_entry_t) {
-      .key = sp_cstr_as_str(test.config),
+      .key = sp_cstr_as_str(it->config),
     }));
   }
-  if (test.direct_dep || test.gated_dep) {
+  if (it->direct_dep || it->gated_dep) {
     spn_requested_dep_t dep = {
       .qualified = sp_str_lit("core/spum"),
       .kind = SPN_DEP_KIND_PACKAGE,
     };
-    if (test.gated_dep) {
+    if (it->gated_dep) {
       dep.when.clauses = sp_da_new(mem, spn_when_clause_t);
       sp_da_push(dep.when.clauses, ((spn_when_clause_t) {
         .key = sp_str_lit("os"),
@@ -85,7 +125,7 @@ static void run_session_test(s32* utest_result, session_test_t test) {
     .intern = intern,
     .pkg = &root,
     .events = spn_event_buffer_new(mem),
-    .gates = { .resolves = test.resolves },
+    .gates = { .resolves = it->resolves },
     .profile = { .os = SPN_OS_LINUX },
   };
   sp_ht_init(mem, session.resolve);
@@ -98,7 +138,7 @@ static void run_session_test(s32* utest_result, session_test_t test) {
     .qualified = sp_str_lit("core/spum"),
     .deps = sp_da_new(mem, spn_requested_dep_t),
   };
-  if (test.stale_loaded) {
+  if (it->stale_loaded) {
     spn_pkg_id_t stale_id = make_id(intern, "core/spum");
     sp_ht_insert(session.packages, stale_id, ((spn_loaded_pkg_t) {
       .source = SPN_PKG_SOURCE_INDEX,
@@ -107,70 +147,24 @@ static void run_session_test(s32* utest_result, session_test_t test) {
   }
 
   spn_err_t err = spn_session_apply_options(&session).kind;
-  EXPECT_EQ(err, test.expect.err);
-  EXPECT_EQ(session.gates.resolves, test.expect.resolves);
-  EXPECT_EQ(session.gates.reresolve, test.expect.reresolve);
+  sp_expect_eq(t, err, it->expect.err);
+  sp_expect_eq(t, session.gates.resolves, it->expect.resolves);
+  sp_expect_eq(t, session.gates.reresolve, it->expect.reresolve);
 
   sp_da(spn_build_event_t) events = spn_event_buffer_drain(mem, session.events);
-  EXPECT_EQ(sp_da_size(events), test.expect.event ? 1 : 0);
-  if (!test.expect.event || sp_da_empty(events)) {
-    return;
+  sp_expect_eq(t, sp_da_size(events), it->expect.event ? 1 : 0);
+  if (!it->expect.event || sp_da_empty(events)) {
+    return SP_OK;
   }
 
   spn_build_event_t* event = &events[0];
-  EXPECT_EQ(event->kind, SPN_EVENT_ERR_OPTION);
-  EXPECT_EQ(event->option.err, test.expect.option_err);
-  EXPECT_TRUE(sp_str_equal_cstr(event->option.pkg, test.expect.pkg));
-  EXPECT_EQ(event->option.a.kind, test.expect.setter);
-  if (test.expect.setter_name) {
-    EXPECT_TRUE(sp_str_equal_cstr(event->option.a.name, test.expect.setter_name));
+  sp_expect_eq(t, event->kind, SPN_EVENT_ERR_OPTION);
+  sp_expect_eq(t, event->option.err, it->expect.option_err);
+  sp_expect(t, sp_str_equal_cstr(event->option.pkg, it->expect.pkg));
+  sp_expect_eq(t, event->option.a.kind, it->expect.setter);
+  if (it->expect.setter_name) {
+    sp_expect(t, sp_str_equal_cstr(event->option.a.name, it->expect.setter_name));
   }
-}
 
-UTEST(options_session, late_gate_resolve_cap) {
-  run_session_test(utest_result, (session_test_t) {
-    .gated_dep = true,
-    .resolves = 4,
-    .expect = {
-      .err = SPN_ERR_OPTION,
-      .event = true,
-      .option_err = SPN_OPTION_ERR_LATE_GATE,
-      .pkg = "test",
-      .setter = SPN_OPTION_SETTER_CONSUMER,
-      .setter_name = "spum",
-      .resolves = 4,
-    },
-  });
-}
-
-UTEST(options_session, unknown_config_package) {
-  run_session_test(utest_result, (session_test_t) {
-    .config = "spum",
-    .expect = {
-      .err = SPN_ERR_OPTION,
-      .event = true,
-      .option_err = SPN_OPTION_ERR_UNKNOWN_PKG,
-      .pkg = "spum",
-    },
-  });
-}
-
-UTEST(options_session, stale_loaded_unresolved_config_package) {
-  run_session_test(utest_result, (session_test_t) {
-    .config = "spum",
-    .stale_loaded = true,
-    .expect = {
-      .err = SPN_ERR_OPTION,
-      .event = true,
-      .option_err = SPN_OPTION_ERR_UNKNOWN_PKG,
-      .pkg = "spum",
-    },
-  });
-}
-
-UTEST(options_session, absent_direct_dependency_config_package) {
-  run_session_test(utest_result, (session_test_t) {
-    .config = "spum",
-    .direct_dep = true,
-  });
+  return SP_OK;
 }

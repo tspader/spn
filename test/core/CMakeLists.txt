@@ -6,13 +6,12 @@ add_executable(lock
   ${SRC}/semver/convert.c
   ${SRC}/semver/parser.c
   ${SRC}/sp/str.c
-  lock.c
-  ${TEST_TOOLS}/ctx.c
-  ${TEST_TOOLS}/tmp.c
-  ${TEST_TOOLS}/git.c
+  lock/spit_main.c
+  lock/lock.c
   ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(lock)
+target_include_directories(lock PRIVATE ${STORE}/include/sp)
 add_test(NAME lock COMMAND "$<TARGET_FILE:lock>")
 
 add_executable(fs
@@ -20,13 +19,19 @@ add_executable(fs
   fs.c
 )
 spn_test_binary(fs)
+target_include_directories(fs PRIVATE ${STORE}/include/sp)
 add_test(NAME fs COMMAND "$<TARGET_FILE:fs>")
 
 add_executable(graph
-  graph/main.c
+  graph/spit_main.c
+  graph/harness.c
+  graph/dirty.c
+  graph/executor.c
+  graph/output.c
+  graph/traversal.c
 )
 spn_test_binary(graph)
-set_source_files_properties(graph/main.c PROPERTIES COMPILE_DEFINITIONS "SP_IMPLEMENTATION;SP_TEST_IMPLEMENTATION;SP_GRAPH_IMPLEMENTATION")
+target_include_directories(graph PRIVATE ${STORE}/include/sp)
 add_test(NAME graph COMMAND "$<TARGET_FILE:graph>")
 
 add_executable(lazy
@@ -34,9 +39,9 @@ add_executable(lazy
   ${SRC}/sp/io.c
   ${SRC}/sp/str.c
   lazy.c
-  ${TEST_TOOLS}/tmp.c
 )
 spn_test_binary(lazy)
+target_include_directories(lazy PRIVATE ${STORE}/include/sp)
 add_test(NAME lazy COMMAND "$<TARGET_FILE:lazy>")
 
 add_executable(transcript
@@ -46,24 +51,27 @@ add_executable(transcript
   transcript.c
 )
 spn_test_binary(transcript)
+target_include_directories(transcript PRIVATE ${STORE}/include/sp)
 add_test(NAME transcript COMMAND "$<TARGET_FILE:transcript>")
 
 add_executable(stable_map
   stable_map.c
 )
 spn_test_binary(stable_map)
+target_include_directories(stable_map PRIVATE ${STORE}/include/sp)
 add_test(NAME stable_map COMMAND "$<TARGET_FILE:stable_map>")
 
 add_executable(toml
   ${SRC}/toml/edit.c
-  toml/main.c
-  ${TEST_TOOLS}/ctx.c
-  ${TEST_TOOLS}/tmp.c
+  toml/spit_main.c
+  toml/harness.c
+  toml/roundtrip.c
+  toml/parse.c
+  toml/find.c
+  toml/set.c
 )
 spn_test_binary(toml)
-target_compile_definitions(toml PRIVATE
-  TOML_MANIFEST_DIR="test/core/toml/manifests"
-  TOML_GOLDEN_DIR="test/core/toml/golden")
+target_include_directories(toml PRIVATE ${STORE}/include/sp)
 add_test(NAME toml COMMAND "$<TARGET_FILE:toml>")
 
 add_executable(triple
@@ -72,6 +80,7 @@ add_executable(triple
   triple.c
 )
 spn_test_binary(triple)
+target_include_directories(triple PRIVATE ${STORE}/include/sp)
 add_test(NAME triple COMMAND "$<TARGET_FILE:triple>")
 
 add_executable(profile
@@ -81,9 +90,11 @@ add_executable(profile
   ${SRC}/profile/profile.c
   ${SRC}/triple/triple.c
   ${SRC}/sp/str.c
-  profile.c
+  profile/spit_main.c
+  profile/profile.c
 )
 spn_test_binary(profile)
+target_include_directories(profile PRIVATE ${STORE}/include/sp)
 add_test(NAME profile COMMAND "$<TARGET_FILE:profile>")
 
 add_executable(when
@@ -92,6 +103,7 @@ add_executable(when
   when.c
 )
 spn_test_binary(when)
+target_include_directories(when PRIVATE ${STORE}/include/sp)
 add_test(NAME when COMMAND "$<TARGET_FILE:when>")
 
 add_executable(options
@@ -101,12 +113,13 @@ add_executable(options
   ${SRC}/pkg/options.c
   ${SRC}/session/options.c
   ${SRC}/when/when.c
-  options/main.c
+  options/spit_main.c
   options/merge.c
   options/apply.c
   options/session.c
 )
 spn_test_binary(options)
+target_include_directories(options PRIVATE ${STORE}/include/sp)
 add_test(NAME options COMMAND "$<TARGET_FILE:options>")
 
 add_executable(pkg
@@ -118,9 +131,11 @@ add_executable(pkg
   ${SRC}/pkg/patch.c
   ${SRC}/target/mutate.c
   ${SRC}/sp/str.c
-  pkg.c
+  pkg/spit_main.c
+  pkg/pkg.c
 )
 spn_test_binary(pkg)
+target_include_directories(pkg PRIVATE ${STORE}/include/sp)
 add_test(NAME pkg COMMAND "$<TARGET_FILE:pkg>")
 
 add_executable(compiler_flags
@@ -132,24 +147,28 @@ add_executable(compiler_flags
   ${SRC}/enum/enum.c
   ${SRC}/sp/io.c
   ${SRC}/triple/triple.c
-  compiler.c
+  compiler/spit_main.c
+  compiler/harness.c
   compiler/archive.c
   compiler/compile.c
   compiler/exports/format.c
   compiler/exports/render.c
+  compiler/flags.c
   compiler/link.c
   compiler/toc.c
 )
 spn_test_binary(compiler_flags)
+target_include_directories(compiler_flags PRIVATE ${STORE}/include/sp)
 add_test(NAME compiler_flags COMMAND "$<TARGET_FILE:compiler_flags>")
 
 add_executable(schema
   ${CMAKE_SOURCE_DIR}/tools/jtd.c
   ${SRC}/enum/enum.c
-  schema.c
+  schema/spit_main.c
+  schema/schema.c
 )
 spn_test_binary(schema)
-target_include_directories(schema PRIVATE ${CMAKE_SOURCE_DIR}/tools)
+target_include_directories(schema PRIVATE ${CMAKE_SOURCE_DIR}/tools ${STORE}/include/sp)
 target_compile_definitions(schema PRIVATE
   SCHEMA_GEN_DIR="source/codegen/gen"
   SCHEMA_DIR="source/codegen/schema")
@@ -159,10 +178,23 @@ add_test(NAME schema COMMAND "$<TARGET_FILE:schema>")
 
 add_executable(jtd
   ${CMAKE_SOURCE_DIR}/tools/jtd.c
-  jtd/main.c
+  jtd/spit_main.c
+  jtd/harness.c
+  jtd/names.c
+  jtd/type.c
+  jtd/enums.c
+  jtd/elements.c
+  jtd/properties.c
+  jtd/values.c
+  jtd/discriminator.c
+  jtd/ref.c
+  jtd/document.c
+  jtd/metadata.c
+  jtd/walk.c
+  jtd/conformance.c
 )
 spn_test_binary(jtd)
-target_include_directories(jtd PRIVATE ${CMAKE_SOURCE_DIR}/tools ${CMAKE_CURRENT_SOURCE_DIR}/jtd)
+target_include_directories(jtd PRIVATE ${CMAKE_SOURCE_DIR}/tools ${CMAKE_CURRENT_SOURCE_DIR}/jtd ${STORE}/include/sp)
 target_compile_definitions(jtd PRIVATE JTD_TEST_JSON_DIR="test/core/jtd/json")
 target_link_libraries(jtd PRIVATE yyjson)
 add_test(NAME jtd COMMAND "$<TARGET_FILE:jtd>")
@@ -198,7 +230,8 @@ target_link_libraries(manifest_gen PRIVATE yyjson)
 add_test(NAME manifest_gen COMMAND "$<TARGET_FILE:manifest_gen>")
 
 add_executable(manifest_lower
-  manifest/lower/main.c
+  manifest/lower/spit_main.c
+  manifest/lower/lower.c
   ${SRC}/codegen/gen/config.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/codegen.c
@@ -225,7 +258,8 @@ add_executable(manifest_lower
 spn_test_binary(manifest_lower)
 target_include_directories(manifest_lower PRIVATE
   ${SRC}/codegen/gen
-  ${CMAKE_CURRENT_SOURCE_DIR}/manifest/lower)
+  ${CMAKE_CURRENT_SOURCE_DIR}/manifest/lower
+  ${STORE}/include/sp)
 target_compile_definitions(manifest_lower PRIVATE
   MANIFEST_DIR="test/core/manifest/lower/manifests")
 add_dependencies(manifest_lower spn_codegen_gen)
@@ -233,8 +267,10 @@ target_link_libraries(manifest_lower PRIVATE yyjson)
 add_test(NAME manifest_lower COMMAND "$<TARGET_FILE:manifest_lower>")
 
 add_executable(unit
-  unit.c
-  link_plan.c
+  unit/spit_main.c
+  unit/harness.c
+  unit/walk.c
+  unit/link_plan.c
   ${SRC}/unit/build.c
   ${SRC}/unit/fingerprint.c
   ${SRC}/unit/graph.c
@@ -289,7 +325,7 @@ add_executable(unit
 )
 set_source_files_properties(${EMBED_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 spn_test_binary(unit)
-target_include_directories(unit PRIVATE ${SRC}/codegen/gen ${SRC}/external ${SOURCE_ROOT}/wamr/core/iwasm/include)
+target_include_directories(unit PRIVATE ${SRC}/codegen/gen ${SRC}/external ${SOURCE_ROOT}/wamr/core/iwasm/include ${STORE}/include/sp)
 add_dependencies(unit spn_embed spn_codegen_gen)
 target_link_libraries(unit PRIVATE yyjson)
 add_test(NAME unit COMMAND "$<TARGET_FILE:unit>")
@@ -314,6 +350,7 @@ add_executable(target_filter
   ${SRC}/filter/filter.c
 )
 spn_test_binary(target_filter)
+target_include_directories(target_filter PRIVATE ${STORE}/include/sp)
 add_test(NAME target_filter COMMAND "$<TARGET_FILE:target_filter>")
 
 add_subdirectory(dag)

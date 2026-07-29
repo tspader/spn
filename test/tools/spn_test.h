@@ -4,5 +4,6 @@
 #include "sp.h"
 #include "sp/macro.h"
 #include "spit.h"
+#include "fixture.h"
 
 #endif
