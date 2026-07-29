@@ -70,9 +70,6 @@
 #include "sp/sp_elf.h"
 #include "sp/macho.h"
 
-#define SP_GRAPH_IMPLEMENTATION
-#include "sp/sp_graph.h"
-
 #define SP_MATH_IMPLEMENTATION
 #include "sp/sp_math.h"
 

@@ -6,12 +6,13 @@ repo = "tspader/spn"
 include = ["include", "source/codegen/gen"]
 
 [package.configure]
-source = ["tools/spn/configure.c"]
+source = ["tools/spn/configure.c", "tools/spn/wasi.c"]
 include = ["include", "tools"]
 
 [package.build]
 source = [
   "tools/spn/build.c",
+  "tools/spn/wasi.c",
   "tools/jtd.c",
   "tools/codegen/extract.c",
   "tools/codegen/render.c",
@@ -29,15 +30,16 @@ yyjson = "0.13.0"
 [deps.test]
 utest = "1.0.0"
 
+[deps.build]
+"spader/sp" = { path = "vendor/sp" }
+yyjson = "0.13.0"
+
 [patch.wamr]
 files = [
   "tools/patches/wamr-wasi-hook.patch",
   "tools/patches/wamr-darwin-timeb.patch",
   "tools/patches/wamr-win-readdir.patch",
 ]
-
-[deps.build]
-yyjson = "0.13.0"
 
 [profile.default]
 toolchain = "zig"
@@ -78,63 +80,118 @@ include = ["include", "source", "source/external", "source/codegen/gen"]
 flags = []
 
 [[test]]
-name = "stable_map"
-source = ["test/core/stable_map.c"]
-include = ["include", "source"]
-flags = []
-
-[[test]]
-name = "intern"
+name = "core"
 source = [
-  "source/intern/intern.c",
-  "source/ctx/ctx.c",
-  "source/event/event.c",
-  "test/core/intern.c"
-]
-include = ["include", "source"]
-flags = []
-
-[[test]]
-name = "graph"
-source = ["test/core/graph/main.c"]
-include = ["include", "source", "test/tools"]
-flags = ["-DSP_IMPLEMENTATION", "-DSP_TEST_IMPLEMENTATION", "-DSP_GRAPH_IMPLEMENTATION"]
-
-[[test]]
-name = "index"
-source = [
-  "source/codegen/loader.c",
+  "test/core/*.c",
+  "test/core/closure/*.c",
+  "test/core/compiler/*.c",
+  "test/core/compiler/exports/*.c",
+  "test/core/dag/*.c",
+  "test/core/git/*.c",
+  "test/core/index/*.c",
+  "test/core/jtd/*.c",
+  "test/core/lock/*.c",
+  "test/core/manifest/gen/gen.c",
+  "test/core/manifest/lower/lower.c",
+  "test/core/options/*.c",
+  "test/core/pkg/pkg.c",
+  "test/core/profile/profile.c",
+  "test/core/publish/publish.c",
+  "test/core/schema/schema.c",
+  "test/core/toml/*.c",
+  "test/core/thread_pool/*.c",
+  "test/core/toolchain/*.c",
+  "test/core/unit/*.c",
+  "tools/jtd.c",
   "source/codegen/codegen.c",
+  "source/codegen/loader.c",
   "source/codegen/json.c",
+  "source/codegen/lower.c",
   "source/codegen/options.c",
   "source/codegen/when.c",
+  "source/codegen/gen/config.gen.c",
   "source/codegen/gen/manifest.gen.c",
   "source/codegen/gen/release.gen.c",
-  "source/codegen/gen/config.gen.c",
+  "source/codegen/gen/toolchains.gen.c",
+  "source/compiler/driver.c",
+  "source/compiler/exports.c",
+  "source/compiler/gnu.c",
+  "source/compiler/msvc.c",
+  "source/compiler/toc.c",
+  "source/ctx/ctx.c",
+  "source/dag/dag.c",
+  "source/dag/glob.c",
+  "source/dag/run.c",
+  "source/dag/store.c",
+  "source/dag/wasi.c",
   "source/enum/enum.c",
+  "source/error/str.c",
+  "source/event/build.c",
+  "source/event/event.c",
+  "source/event/log.c",
   "source/external/cJSON.c",
   "source/external/git.c",
   "source/external/tom.c",
+  "source/filter/filter.c",
+  "source/git/cache.c",
+  "source/git/key.c",
+  "source/git/patch.c",
   "source/index/index.c",
   "source/index/json.c",
+  "source/index/publish.c",
+  "source/intern/context.c",
   "source/intern/intern.c",
-  "source/sp/io.c",
-  "source/sp/str.c",
+  "source/thread_pool/thread_pool.c",
+  "source/lock/lock.c",
+  "source/log/log.c",
+  "source/log/lazy/lazy.c",
+  "source/pkg/id.c",
+  "source/pkg/mutate.c",
+  "source/pkg/options.c",
+  "source/pkg/patch.c",
+  "source/pkg/pkg.c",
+  "source/profile/profile.c",
   "source/semver/compare.c",
   "source/semver/convert.c",
   "source/semver/parser.c",
-  "test/core/index/main.c",
-  "test/core/index/query.c",
-  "test/core/index/publish.c",
-  "test/core/index/sync.c",
+  "source/session/invocation.c",
+  "source/session/options.c",
+  "source/session/session.c",
+  "source/sha256/sha256.c",
+  "source/sp/fs.c",
+  "source/sp/io.c",
+  "source/sp/str.c",
+  "source/target/mutate.c",
+  "source/target/select.c",
+  "source/task/build/build.c",
+  "source/task/build/identity.c",
+  "source/toml/edit.c",
+  "source/toolchain/catalog.c",
+  "source/toolchain/provision.c",
+  "source/toolchain/select.c",
+  "source/toolchain/toolchain.c",
+  "source/triple/triple.c",
+  "source/unit/build.c",
+  "source/unit/fingerprint.c",
+  "source/unit/graph.c",
+  "source/unit/link.c",
+  "source/unit/paths.c",
+  "source/unit/target.c",
+  "source/when/when.c",
   "test/tools/repo.c",
-  "test/tools/ctx.c",
-  "test/tools/tmp.c",
   "test/tools/git.c",
+  "test/tools/sp_sim.c",
   "test/tools/toml.c",
+  "test/tools/wasm_emit.c",
 ]
-include = ["include", "source", "test/tools"]
-flags = []
+include = ["include", "source", "source/codegen/gen", "source/external", "test/tools", "tools"]
+flags = [
+  '-DSCHEMA_GEN_DIR="source/codegen/gen"',
+  '-DSCHEMA_DIR="source/codegen/schema"',
+  '-DJTD_TEST_JSON_DIR="test/core/jtd/json"',
+  '-DMANIFEST_DIR="test/core/manifest/lower/manifests"',
+  '-DTOOLCHAINS_DIR="test/core/toolchain/toolchains"',
+]
 
 [[test]]
 name = "resolver"
@@ -142,22 +199,24 @@ source = [
   "source/ctx/ctx.c",
   "source/intern/context.c",
   "source/intern/intern.c",
-  "source/codegen/codegen.c",
-  "source/codegen/json.c",
-  "source/codegen/loader.c",
-  "source/codegen/lower.c",
-  "source/git/patch.c",
-  "source/codegen/options.c",
-  "source/codegen/when.c",
-  "source/codegen/gen/config.gen.c",
-  "source/codegen/gen/manifest.gen.c",
-  "source/codegen/gen/release.gen.c",
-  "source/codegen/gen/toolchains.gen.c",
   "source/enum/enum.c",
   "source/event/event.c",
   "source/external/cJSON.c",
   "source/external/git.c",
   "source/external/tom.c",
+  "source/codegen/codegen.c",
+  "source/codegen/loader.c",
+  "source/codegen/json.c",
+  "source/codegen/options.c",
+  "source/codegen/when.c",
+  "source/codegen/lower.c",
+  "source/git/patch.c",
+  "source/when/when.c",
+  "source/toolchain/catalog.c",
+  "source/codegen/gen/toolchains.gen.c",
+  "source/codegen/gen/config.gen.c",
+  "source/codegen/gen/manifest.gen.c",
+  "source/codegen/gen/release.gen.c",
   "source/index/index.c",
   "source/index/json.c",
   "source/sp/io.c",
@@ -165,145 +224,25 @@ source = [
   "source/pkg/mutate.c",
   "source/pkg/options.c",
   "source/profile/profile.c",
-  "source/toolchain/catalog.c",
-  "source/toolchain/toolchain.c",
+  "source/session/registry/registry.c",
   "source/triple/triple.c",
   "source/resolve/resolve.c",
-  "source/session/registry/registry.c",
   "source/sp/str.c",
   "source/semver/compare.c",
   "source/semver/convert.c",
   "source/semver/parser.c",
   "source/target/mutate.c",
   "source/target/select.c",
-  "source/when/when.c",
+  "source/toolchain/toolchain.c",
   "test/core/resolver/main.c",
-  "test/tools/ctx.c",
   "test/tools/repo.c",
+  "test/tools/ctx.c",
   "test/tools/sp_fuzz.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
   "test/tools/toml.c",
 ]
-include = ["include", "source", "test/tools"]
-flags = []
-
-[[test]]
-name = "publish"
-source = [
-  "source/ctx/ctx.c",
-  "source/codegen/codegen.c",
-  "source/codegen/json.c",
-  "source/codegen/loader.c",
-  "source/codegen/lower.c",
-  "source/git/patch.c",
-  "source/codegen/options.c",
-  "source/codegen/when.c",
-  "source/codegen/gen/config.gen.c",
-  "source/codegen/gen/manifest.gen.c",
-  "source/codegen/gen/release.gen.c",
-  "source/codegen/gen/toolchains.gen.c",
-  "source/enum/enum.c",
-  "source/event/event.c",
-  "source/external/cJSON.c",
-  "source/external/git.c",
-  "source/external/tom.c",
-  "source/index/index.c",
-  "source/index/json.c",
-  "source/index/publish.c",
-  "source/intern/context.c",
-  "source/intern/intern.c",
-  "source/pkg/id.c",
-  "source/pkg/mutate.c",
-  "source/profile/profile.c",
-  "source/toolchain/catalog.c",
-  "source/toolchain/toolchain.c",
-  "source/triple/triple.c",
-  "source/semver/compare.c",
-  "source/semver/convert.c",
-  "source/semver/parser.c",
-  "source/sp/io.c",
-  "source/sp/str.c",
-  "source/target/mutate.c",
-  "source/when/when.c",
-  "test/core/publish/main.c",
-  "test/core/publish/publish.c",
-  "test/tools/ctx.c",
-  "test/tools/repo.c",
-  "test/tools/tmp.c",
-  "test/tools/git.c",
-  "test/tools/toml.c",
-]
-include = ["include", "source", "test/tools"]
-flags = []
-
-[[test]]
-name = "lock"
-source = [
-  "source/lock/lock.c",
-  "source/external/tom.c",
-  "source/intern/context.c",
-  "source/intern/intern.c",
-  "source/enum/enum.c",
-  "source/semver/convert.c",
-  "source/semver/parser.c",
-  "source/sp/str.c",
-  "test/core/lock.c",
-  "test/tools/ctx.c",
-  "test/tools/repo.c",
-  "test/tools/tmp.c",
-  "test/tools/git.c",
-  "test/tools/toml.c",
-]
-include = ["include", "source", "test/tools"]
-flags = []
-
-[[test]]
-name = "git"
-source = [
-  "source/git/cache.c",
-  "source/git/key.c",
-  "source/git/patch.c",
-  "source/external/git.c",
-  "source/sp/fs.c",
-  "source/sp/str.c",
-  "test/core/git/main.c",
-  "test/core/git/fixture.c",
-  "test/core/git/cache.c",
-  "test/core/git/key.c",
-  "test/core/git/patch.c",
-  "test/tools/ctx.c",
-  "test/tools/repo.c",
-  "test/tools/tmp.c",
-  "test/tools/git.c",
-  "test/tools/toml.c",
-]
-include = ["include", "source", "test/tools"]
-flags = []
-
-[[test]]
-name = "toml"
-source = [
-  "source/toml/edit.c",
-  "test/core/toml/main.c",
-  "test/tools/ctx.c",
-  "test/tools/repo.c",
-  "test/tools/tmp.c",
-  "test/tools/git.c",
-  "test/tools/toml.c",
-]
-include = ["include", "source", "test/tools"]
-flags = ['-DTOML_MANIFEST_DIR="test/core/toml/manifests"', '-DTOML_GOLDEN_DIR="test/core/toml/golden"']
-
-[[test]]
-name = "triple"
-source = [
-  "source/enum/enum.c",
-  "source/triple/triple.c",
-  "source/sp/str.c",
-  "test/core/triple.c",
-]
-include = ["include", "source", "test/tools"]
+include = ["include", "source", "source/codegen/gen", "test/tools"]
 flags = []
 
 [[test]]
@@ -318,12 +257,120 @@ source = [
   "source/sp/str.c",
   "source/triple/triple.c",
   "test/integration/main.c",
+  "test/tools/repo.c",
   "test/tools/caps.c",
   "test/tools/harness.c",
-  "test/tools/repo.c",
   "test/tools/tmp.c",
   "test/tools/git.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source", "source/external", "test/integration", "test/tools"]
+flags = []
+
+[[test]]
+name = "e2e"
+source = [
+  "source/compiler/driver.c",
+  "source/compiler/gnu.c",
+  "source/compiler/msvc.c",
+  "source/enum/enum.c",
+  "source/error/str.c",
+  "source/external/tom.c",
+  "source/sp/str.c",
+  "source/triple/triple.c",
+  "test/e2e/main.c",
+  "test/tools/repo.c",
+  "test/tools/caps.c",
+  "test/tools/harness.c",
+  "test/tools/tmp.c",
+  "test/tools/git.c",
+  "test/tools/toml.c",
+]
+include = ["include", "source", "source/external", "test/e2e", "test/tools"]
+flags = []
+
+[[test]]
+name = "fuzz_dag"
+source = [
+  "source/dag/dag.c",
+  "source/dag/store.c",
+  "source/dag/run.c",
+  "source/dag/glob.c",
+  "source/thread_pool/thread_pool.c",
+  "source/codegen/json.c",
+  "source/codegen/loader.c",
+  "source/codegen/gen/fuzz.gen.c",
+  "source/external/tom.c",
+  "source/sha256/sha256.c",
+  "source/sp/fs.c",
+  "source/sp/io.c",
+  "source/intern/intern.c",
+  "test/fuzz/dag/main.c",
+  "test/fuzz/dag/generator.c",
+  "test/fuzz/dag/journal.c",
+  "test/fuzz/dag/lower.c",
+  "test/fuzz/dag/model.c",
+  "test/fuzz/dag/render.c",
+  "test/fuzz/dag/trace.c",
+  "test/tools/repo.c",
+  "test/tools/sp_sim.c",
+  "test/tools/sp_fuzz.c",
+  "test/tools/sp_fuzz_cli.c",
+  "test/tools/toml.c",
+]
+include = ["include", "source", "source/codegen/gen", "test/fuzz/dag", "test/tools"]
+flags = []
+
+[[test]]
+name = "fuzz_resolver"
+source = [
+  "source/ctx/ctx.c",
+  "source/intern/context.c",
+  "source/intern/intern.c",
+  "source/enum/enum.c",
+  "source/event/event.c",
+  "source/external/cJSON.c",
+  "source/external/git.c",
+  "source/external/tom.c",
+  "source/codegen/codegen.c",
+  "source/codegen/loader.c",
+  "source/codegen/json.c",
+  "source/codegen/options.c",
+  "source/codegen/when.c",
+  "source/codegen/lower.c",
+  "source/git/patch.c",
+  "source/when/when.c",
+  "source/toolchain/catalog.c",
+  "source/codegen/gen/toolchains.gen.c",
+  "source/codegen/gen/config.gen.c",
+  "source/codegen/gen/manifest.gen.c",
+  "source/codegen/gen/release.gen.c",
+  "source/index/index.c",
+  "source/index/json.c",
+  "source/sp/io.c",
+  "source/pkg/id.c",
+  "source/pkg/mutate.c",
+  "source/pkg/options.c",
+  "source/profile/profile.c",
+  "source/session/registry/registry.c",
+  "source/triple/triple.c",
+  "source/resolve/resolve.c",
+  "source/sp/str.c",
+  "source/semver/compare.c",
+  "source/semver/convert.c",
+  "source/semver/parser.c",
+  "source/target/mutate.c",
+  "source/target/select.c",
+  "source/toolchain/toolchain.c",
+  "test/fuzz/resolver/main.c",
+  "test/fuzz/resolver/generator.c",
+  "test/fuzz/resolver/oracles/exhaustive.c",
+  "test/fuzz/resolver/checkers/solve.c",
+  "test/fuzz/resolver/checkers/units.c",
+  "test/fuzz/resolver/dump.c",
+  "test/tools/repo.c",
+  "test/tools/sp_fuzz.c",
+  "test/tools/toml.c",
+]
+include = ["include", "source", "source/codegen/gen", "test/fuzz/resolver", "test/tools"]
 flags = []

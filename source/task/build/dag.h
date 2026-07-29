@@ -3,6 +3,7 @@
 
 #include "dag/dag.h"
 #include "forward/types.h"
+#include "thread_pool/types.h"
 #include "task/types.h"
 #include "unit/types.h"
 
@@ -50,7 +51,7 @@ struct spn_dag_build_t {
   spn_dag_obs_table_t discovery;
   spn_dag_obs_table_t memos;
   spn_dag_store_t store;
-  spn_dag_pool_t pool;
+  spn_thread_pool_t pool;
   spn_dag_env_t env;
   spn_dag_progress_t progress;
   sp_thread_t runner;

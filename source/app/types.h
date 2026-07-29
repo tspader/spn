@@ -8,6 +8,7 @@
 #include "resolve/types.h"
 #include "session/types.h"
 #include "task/task.h"
+#include "thread_pool/types.h"
 
 
 // @spader @nuke
@@ -20,11 +21,13 @@ typedef struct {
   spn_session_t* session;
   spn_resolved_pkg_t* pkg;
   spn_loaded_pkg_t loaded;
+  spn_err_t err;
 } spn_sync_pkg_job_t;
 
 typedef struct {
   spn_toolchain_store_t* store;
   spn_toolchain_unit_t* unit;
+  spn_err_t err;
 } spn_sync_toolchain_job_t;
 
 typedef struct {
@@ -61,13 +64,15 @@ struct spn_app_t {
   } request;
 
   struct {
+    spn_thread_pool_t pool;
     spn_toolchain_store_t store;
     sp_da(spn_sync_pkg_job_t*) packages;
     sp_da(spn_sync_toolchain_job_t*) toolchains;
+    sp_tm_timer_t timer;
   } sync;
 
   struct {
-    spn_bg_ctx_t bg;
+    spn_thread_pool_t pool;
     sp_da(spn_sync_index_job_t*) jobs;
   } index_sync;
 

@@ -29,18 +29,18 @@ typedef struct {
   fz_world_state_t world;
 } fz_world_t;
 
-static void fz_executor_submit(spn_dag_executor_t* base, spn_dag_job_t job) {
+static void fz_executor_submit(spn_thread_pool_executor_t* base, spn_thread_pool_job_t job) {
   fz_executor_t* ex = (fz_executor_t*)base;
   sp_da_push(ex->jobs, job);
   sp_da_push(ex->submitted, ex->sim->syscalls);
 }
 
-static spn_dag_job_t fz_executor_poll(spn_dag_executor_t* base) {
+static spn_thread_pool_job_t fz_executor_poll(spn_thread_pool_executor_t* base) {
   fz_executor_t* ex = (fz_executor_t*)base;
   sp_assert(!sp_da_empty(ex->jobs));
 
   u64 pick = sp_fuzz_below(&ex->prng, sp_da_size(ex->jobs));
-  spn_dag_job_t job = ex->jobs[pick];
+  spn_thread_pool_job_t job = ex->jobs[pick];
   u64 submitted = ex->submitted[pick];
   ex->jobs[pick] = *sp_da_back(ex->jobs);
   ex->submitted[pick] = *sp_da_back(ex->submitted);
@@ -55,13 +55,13 @@ static spn_dag_job_t fz_executor_poll(spn_dag_executor_t* base) {
   return job;
 }
 
-static spn_dag_job_t fz_executor_try_poll(spn_dag_executor_t* base) {
+static spn_thread_pool_job_t fz_executor_try_poll(spn_thread_pool_executor_t* base) {
   fz_executor_t* ex = (fz_executor_t*)base;
   if (sp_da_empty(ex->jobs)) {
-    return (spn_dag_job_t) sp_zero;
+    return (spn_thread_pool_job_t) sp_zero;
   }
   if (sp_fuzz_below(&ex->prng, 2)) {
-    return (spn_dag_job_t) sp_zero;
+    return (spn_thread_pool_job_t) sp_zero;
   }
   return fz_executor_poll(base);
 }

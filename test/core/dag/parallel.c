@@ -1,4 +1,5 @@
 #include "dag_test.h"
+#include "thread_pool/thread_pool.h"
 
 typedef struct {
   const c8* path;
@@ -251,8 +252,8 @@ static sp_err_t par_run_builds(sp_test_t* t, spn_dag_store_kind_t kind, const pa
     .discovery = test->discovery
   });
 
-  spn_dag_pool_t pool = sp_zero;
-  spn_dag_pool_init(&pool, env.dag.mem, (spn_dag_pool_config_t) {
+  spn_thread_pool_t pool = sp_zero;
+  spn_thread_pool_init(&pool, env.dag.mem, (spn_thread_pool_config_t) {
     .workers = test->workers ? test->workers : 4,
   });
 
@@ -295,7 +296,7 @@ static sp_err_t par_run_builds(sp_test_t* t, spn_dag_store_kind_t kind, const pa
     }
   }
 
-  spn_dag_pool_deinit(&pool);
+  spn_thread_pool_deinit(&pool);
   return result;
 }
 

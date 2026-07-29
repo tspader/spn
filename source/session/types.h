@@ -7,7 +7,6 @@
 #include "git/types.h"
 #include "filter/types.h"
 #include "forward/types.h"
-#include "graph/types.h"
 #include "intern/types.h"
 #include "paths/types.h"
 #include "pkg/options.h"
@@ -95,7 +94,6 @@ struct spn_session_t {
     spn_system_paths_t system;
   } paths;
 
-  spn_bg_ctx_t sync;
   struct {
     spn_dag_build_t* configure;
     spn_dag_build_t* build;

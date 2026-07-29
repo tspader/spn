@@ -17,6 +17,7 @@
 #include "external/wasm/wasm.h"
 #include "log/log.h"
 #include "session/session.h"
+#include "thread_pool/thread_pool.h"
 #include "unit/unit.h"
 #include "task/build/build.h"
 #include "task/build/dag.h"
@@ -1339,7 +1340,7 @@ spn_dag_build_t* spn_dag_build_new(spn_session_t* session) {
 }
 
 void spn_dag_build_start(spn_dag_build_t* b, u32 workers) {
-  spn_dag_pool_init(&b->pool, spn.mem, (spn_dag_pool_config_t) {
+  spn_thread_pool_init(&b->pool, spn.mem, (spn_thread_pool_config_t) {
     .workers = workers,
     .on_worker_exit = spn_wasm_thread_exit,
   });
@@ -1354,7 +1355,7 @@ bool spn_dag_build_poll(spn_dag_build_t* b) {
   }
 
   sp_thread_join(&b->runner);
-  spn_dag_pool_deinit(&b->pool);
+  spn_thread_pool_deinit(&b->pool);
   return true;
 }
 

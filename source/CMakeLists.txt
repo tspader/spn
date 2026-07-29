@@ -40,7 +40,6 @@ set(SPN_SOURCES
   dag/store.c
   dag/run.c
   dag/glob.c
-  dag/executor.c
   dag/occ.c
   dag/wasi.c
   enum/enum.c
@@ -118,6 +117,7 @@ set(SPN_SOURCES
   task/unit.c
   task/update.c
   task/which.c
+  thread_pool/thread_pool.c
   toml/edit.c
   toml/loader.c
   toolchain/catalog.c

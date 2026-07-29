@@ -1,5 +1,6 @@
 #include "dag/dag.h"
 #include "dag/types.h"
+#include "thread_pool/thread_pool.h"
 #include "sha256/sha256.h"
 #include "error/types.h"
 #include "sp.h"
@@ -795,7 +796,7 @@ struct spn_dag_flight_t {
 typedef struct {
   spn_dag_t* g;
   spn_dag_env_t* env;
-  spn_dag_executor_t* ex;
+  spn_thread_pool_executor_t* ex;
   spn_dag_targets_t targets;
   spn_dag_run_state_t* states;
   sp_da(spn_dag_id_t) ready;
@@ -1029,7 +1030,7 @@ static void run_dispatch(spn_dag_run_t* run, spn_dag_id_t id) {
     return;
   }
 
-  run->ex->submit(run->ex, (spn_dag_job_t) { .fn = flight_run, .data = flight });
+  spn_thread_pool_submit(run->ex, (spn_thread_pool_job_t) { .fn = flight_run, .data = flight });
   run->in_flight++;
 }
 
@@ -1059,7 +1060,7 @@ static void run_complete(spn_dag_run_t* run, spn_dag_flight_t* flight) {
   run_commit_flight(run, action, flight);
 }
 
-spn_err_t spn_dag_run_executor(spn_dag_t* g, spn_dag_env_t* env, spn_dag_executor_t* ex) {
+spn_err_t spn_dag_run_executor(spn_dag_t* g, spn_dag_env_t* env, spn_thread_pool_executor_t* ex) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   env->diag = (spn_dag_diag_t) sp_zero;
 
@@ -1085,7 +1086,7 @@ spn_err_t spn_dag_run_executor(spn_dag_t* g, spn_dag_env_t* env, spn_dag_executo
       turns++;
       sp_assert(turns <= turns_max);
 
-      spn_dag_job_t job = ex->try_poll(ex);
+      spn_thread_pool_job_t job = spn_thread_pool_try_poll(ex);
       if (job.fn) {
         run.in_flight--;
         run_complete(&run, (spn_dag_flight_t*)job.data);
@@ -1098,7 +1099,7 @@ spn_err_t spn_dag_run_executor(spn_dag_t* g, spn_dag_env_t* env, spn_dag_executo
         continue;
       }
       if (run.in_flight) {
-        job = ex->poll(ex);
+        job = spn_thread_pool_poll(ex);
         run.in_flight--;
         run_complete(&run, (spn_dag_flight_t*)job.data);
         continue;
@@ -1119,4 +1120,12 @@ spn_err_t spn_dag_run_executor(spn_dag_t* g, spn_dag_env_t* env, spn_dag_executo
 
   sp_mem_end_scratch(s);
   return run.err;
+}
+
+spn_err_t spn_dag_run(spn_dag_t* g, spn_dag_env_t* env) {
+  spn_thread_pool_t pool = sp_zero;
+  spn_thread_pool_init(&pool, g->mem, (spn_thread_pool_config_t) sp_zero);
+  spn_err_t err = spn_dag_run_executor(g, env, &pool.executor);
+  spn_thread_pool_deinit(&pool);
+  return err;
 }

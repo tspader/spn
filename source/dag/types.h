@@ -223,35 +223,4 @@ typedef struct {
   spn_dag_diag_t diag;
 } spn_dag_env_t;
 
-typedef struct {
-  void (*fn)(void* data);
-  void* data;
-} spn_dag_job_t;
-
-typedef struct spn_dag_executor_t spn_dag_executor_t;
-struct spn_dag_executor_t {
-  void (*submit)(spn_dag_executor_t* ex, spn_dag_job_t job);
-  spn_dag_job_t (*poll)(spn_dag_executor_t* ex);
-  spn_dag_job_t (*try_poll)(spn_dag_executor_t* ex);
-};
-
-typedef struct {
-  u32 workers;
-  void (*on_worker_exit)(void);
-} spn_dag_pool_config_t;
-
-typedef struct {
-  spn_dag_executor_t executor;
-  sp_mem_arena_t* arena;
-  sp_mem_t mem;
-  sp_mutex_t mutex;
-  sp_cv_t submitted;
-  sp_cv_t completed;
-  sp_da(spn_dag_job_t) queue;
-  sp_da(spn_dag_job_t) done;
-  sp_da(sp_thread_t) workers;
-  void (*on_worker_exit)(void);
-  bool shutdown;
-} spn_dag_pool_t;
-
 #endif
