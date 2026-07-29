@@ -175,7 +175,7 @@ static sp_err_t store_run_ops(sp_test_t* t, spn_dag_store_kind_t kind, const sto
   return SP_OK;
 }
 
-sp_test_each(store, ops, store_test_t, store_tests) {
+sp_test_each(dag_store, ops, store_test_t, store_tests) {
   sp_carr_for(dag_test_store_kinds, kind) {
     sp_err_t err = store_run_ops(t, dag_test_store_kinds[kind], it);
     if (err) {

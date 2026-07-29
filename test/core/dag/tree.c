@@ -148,7 +148,7 @@ static sp_err_t tree_run_store_ops(sp_test_t* t, spn_dag_store_kind_t kind, cons
   return SP_OK;
 }
 
-sp_test_each(tree, store, tree_store_test_t, tree_store_tests) {
+sp_test_each(dag_tree, store, tree_store_test_t, tree_store_tests) {
   sp_carr_for(dag_test_store_kinds, kind) {
     sp_err_t err = tree_run_store_ops(t, dag_test_store_kinds[kind], it);
     if (err) {
@@ -225,7 +225,7 @@ static s32 tree_exec_fn(spn_dag_t* g, spn_dag_action_t* action, void* user_data)
   return 0;
 }
 
-sp_test_each(tree, exec, tree_exec_test_t, tree_exec_tests) {
+sp_test_each(dag_tree, exec, tree_exec_test_t, tree_exec_tests) {
   tree_exec_env_t env = sp_zero;
   dag_test_env_init(&env.dag, t, (dag_test_env_config_t) { .store = SPN_DAG_STORE_FILESYSTEM });
   sp_str_t target = dag_test_env_path(&env.dag, sp_str_lit("install"));

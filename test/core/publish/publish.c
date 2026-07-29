@@ -7,33 +7,17 @@
 #include "intern/intern.h"
 #include "semver/convert.h"
 
-// The linked production ctx.c reads this global (spn_intern -> spn.intern),
-// so the suite keeps it, brings it up once, and runs serial
-spn_ctx_t spn;
-
 sp_test_suite(cmd_publish, .serial = true);
-
-static sp_test_once_t spn_init_once;
-
-static sp_err_t init_spn(void* user) {
-  spn.mem = sp_mem_os_new();
-  spn.intern = sp_intern_new(spn.mem);
-  spn.events = spn_event_buffer_new(spn.mem);
-  return SP_OK;
-}
-
-static sp_err_t setup_spn(sp_test_t* t) {
-  return sp_test_once(&spn_init_once, init_spn, SP_NULLPTR);
-}
 
 typedef struct {
   const c8* name;
   git_repo_fixture_t repo;
   git_repo_fixture_t source_repo;
+  const c8* generated_manifest;
 
   struct {
     const c8* subdir;
-    const c8* source_rev;
+    u32 source_commit;
   } opts;
 
   struct {
@@ -41,10 +25,10 @@ typedef struct {
     const c8* namespace;
     const c8* name;
     spn_semver_t version;
-    const c8* source_rev;
+    u32 source_commit;
     const c8* source_dir;
     const c8* manifest_url;
-    const c8* manifest_rev;
+    u32 manifest_commit;
     const c8* manifest_dir;
     struct {
       const c8* name;
@@ -78,7 +62,7 @@ static const case_t cases [] = {
       .namespace = "core",
       .name = "spum",
       .version = { .major = 1 },
-      .source_rev = "0",
+      .source_commit = 1,
       .source_dir = "",
     },
   },
@@ -112,7 +96,7 @@ static const case_t cases [] = {
       .namespace = "core",
       .name = "spum",
       .version = { .major = 1 },
-      .source_rev = "0",
+      .source_commit = 1,
       .source_dir = "",
       .targets = {
         { .name = "spum", .linkages = { SPN_LIB_KIND_STATIC, SPN_LIB_KIND_SHARED } },
@@ -146,7 +130,7 @@ static const case_t cases [] = {
       .namespace = "core",
       .name = "spum",
       .version = { .major = 2 },
-      .source_rev = "0",
+      .source_commit = 1,
       .source_dir = "packages/spum",
     },
   },
@@ -182,14 +166,14 @@ static const case_t cases [] = {
       },
     },
     .opts = {
-      .source_rev = "1",
+      .source_commit = 2,
     },
     .expect = {
       .kind = SPN_OK,
       .namespace = "core",
       .name = "spum",
       .version = { .major = 2 },
-      .source_rev = "1",
+      .source_commit = 2,
       .source_dir = "",
     },
   },
@@ -213,12 +197,13 @@ static const case_t cases [] = {
         {
           .message = "add toml wrapper",
           .files = {
-            { "toml/spn.toml", "PLACEHOLDER" },
+            { "toml/spn.toml" },
             { "toml/spn.c", "void package() {}" },
           },
         },
       },
     },
+    .generated_manifest = "toml/spn.toml",
     .opts = {
       .subdir = "toml",
     },
@@ -227,10 +212,10 @@ static const case_t cases [] = {
       .namespace = "core",
       .name = "toml",
       .version = { .major = 1, .minor = 2, .patch = 1 },
-      .source_rev = "0",
+      .source_commit = 1,
       .source_dir = "",
       .manifest_url = "spam",
-      .manifest_rev = "0",
+      .manifest_commit = 1,
       .manifest_dir = "toml",
     },
   },
@@ -253,60 +238,65 @@ static const case_t cases [] = {
         {
           .message = "add wrapper",
           .files = {
-            { "spn.toml", "PLACEHOLDER" },
+            { "spn.toml" },
             { "spn.c", "void package() {}" },
           },
         },
       },
     },
+    .generated_manifest = "spn.toml",
     .expect = {
       .kind = SPN_OK,
       .namespace = "core",
       .name = "spum",
       .version = { .major = 1 },
-      .source_rev = "0",
+      .source_commit = 1,
       .source_dir = "",
       .manifest_url = "wrapper",
-      .manifest_rev = "0",
+      .manifest_commit = 1,
       .manifest_dir = "",
     },
   },
 };
 
-sp_test_each(cmd_publish, publish, case_t, cases, .setup = setup_spn) {
+sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   case_t c = *it;
 
   git_repo_result_t source_repo = sp_zero;
   if (c.source_repo.name) {
     source_repo = git_repo_build_at(sp_test_dir(t), c.source_repo.name, &c.source_repo);
+  }
 
-    // An out-of-tree manifest can't know the source repo's url or commit until
-    // that repo exists; PLACEHOLDER manifests are rewritten with the real
-    // values once it has been built
+  if (c.generated_manifest) {
+    SP_ASSERT(source_repo.commit_count);
+
+    git_repo_file_t* manifest = SP_NULLPTR;
     sp_carr_for(c.repo.commits, ci) {
       if (!c.repo.commits[ci].message) break;
       sp_carr_for(c.repo.commits[ci].files, fi) {
         git_repo_file_t* file = &c.repo.commits[ci].files[fi];
         if (!file->path) break;
-        if (!sp_str_ends_with(sp_str_view(file->path), SP_LIT("spn.toml"))) continue;
-        if (!sp_str_contains(sp_str_view(file->content), SP_LIT("PLACEHOLDER"))) continue;
-
-        sp_str_t content = sp_fmt(
-          mem,
-          ts(package)
-          "name = \"{}\"\n"
-          "version = \"{}\"\n"
-          "url = \"{}\"\n"
-          "commit = \"{}\"\n",
-          sp_fmt_cstr(c.expect.name),
-          sp_fmt_str(spn_semver_to_str(mem, c.expect.version)),
-          sp_fmt_str(source_repo.path),
-          sp_fmt_str(source_repo.commits[0])
-        ).value;
-        file->content = sp_str_to_cstr(mem, content);
+        if (sp_str_equal_cstr(sp_str_view(c.generated_manifest), file->path)) {
+          manifest = file;
+        }
       }
     }
+    SP_ASSERT(manifest);
+
+    sp_str_t content = sp_fmt(
+      mem,
+      ts(package)
+      "name = \"{}\"\n"
+      "version = \"{}\"\n"
+      "url = \"{}\"\n"
+      "commit = \"{}\"\n",
+      sp_fmt_cstr(c.expect.name),
+      sp_fmt_str(spn_semver_to_str(mem, c.expect.version)),
+      sp_fmt_str(source_repo.path),
+      sp_fmt_str(source_repo.commits[0])
+    ).value;
+    manifest->content = sp_str_to_cstr(mem, content);
   }
 
   git_repo_result_t repo = git_repo_build_at(sp_test_dir(t), c.repo.name, &c.repo);
@@ -325,7 +315,8 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = setup_spn) {
     cwd = sp_fs_join_path(mem, repo.path, sp_str_view(c.opts.subdir));
   }
 
-  u32 rev_idx = c.opts.source_rev ? sp_parse_u32(sp_str_view(c.opts.source_rev)) : 0;
+  u32 rev_idx = c.opts.source_commit ? c.opts.source_commit - 1 : 0;
+  SP_ASSERT(rev_idx < repo.commit_count);
 
   spn_publish_opts_t opts = {
     .mem = mem,
@@ -348,67 +339,58 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = setup_spn) {
       .name = sp_str_view(c.expect.name),
     });
 
-    sp_expect(t, pkg != SP_NULLPTR);
-    if (pkg && sp_da_size(pkg->releases) > 0) {
-      spn_index_release_t* rel = &pkg->releases[0];
+    sp_must(t, pkg);
+    sp_must(t, sp_da_size(pkg->releases));
+    spn_index_release_t* rel = &pkg->releases[0];
 
-      sp_expect_eq(t, c.expect.version.major, rel->version.major);
-      sp_expect_eq(t, c.expect.version.minor, rel->version.minor);
-      sp_expect_eq(t, c.expect.version.patch, rel->version.patch);
+    sp_expect_eq(t, c.expect.version.major, rel->version.major);
+    sp_expect_eq(t, c.expect.version.minor, rel->version.minor);
+    sp_expect_eq(t, c.expect.version.patch, rel->version.patch);
 
-      if (source_repo.path.len) {
-        sp_expect_str_eq(t, rel->source.url, source_repo.path);
-      } else {
-        sp_expect_str_eq(t, rel->source.url, repo.path);
+    if (source_repo.path.len) {
+      sp_expect_str_eq(t, rel->source.url, source_repo.path);
+    } else {
+      sp_expect_str_eq(t, rel->source.url, repo.path);
+    }
+
+    if (c.expect.source_commit) {
+      git_repo_result_t* rev_repo = source_repo.path.len ? &source_repo : &repo;
+      SP_ASSERT(c.expect.source_commit <= rev_repo->commit_count);
+      sp_expect_str_eq(t, rel->source.rev, rev_repo->commits[c.expect.source_commit - 1]);
+    }
+
+    if (c.expect.source_dir) {
+      sp_expect_str_eq_c(t, rel->source.dir, c.expect.source_dir);
+    }
+
+    if (c.expect.manifest_url) {
+      sp_expect_str_eq(t, rel->manifest.url, repo.path);
+
+      if (c.expect.manifest_commit) {
+        SP_ASSERT(c.expect.manifest_commit <= repo.commit_count);
+        sp_expect_str_eq(t, rel->manifest.rev, repo.commits[c.expect.manifest_commit - 1]);
       }
 
-      if (c.expect.source_rev) {
-        git_repo_result_t* rev_repo = source_repo.path.len ? &source_repo : &repo;
-        u32 expect_rev_idx = sp_parse_u32(sp_str_view(c.expect.source_rev));
-        sp_expect_str_eq(t, rel->source.rev, rev_repo->commits[expect_rev_idx]);
+      if (c.expect.manifest_dir) {
+        sp_expect_str_eq_c(t, rel->manifest.dir, c.expect.manifest_dir);
       }
+    } else {
+      sp_expect_str_eq(t, rel->manifest.url, sp_str_lit(""));
+    }
 
-      if (c.expect.source_dir) {
-        sp_expect_str_eq_c(t, rel->source.dir, c.expect.source_dir);
-      }
+    u32 expected_targets = 0;
+    sp_carr_detect_len(c.expect.targets, expected_targets, c.expect.targets[expected_targets].name);
+    sp_must_eq(t, expected_targets, sp_da_size(rel->targets));
 
-      if (c.expect.manifest_url) {
-        sp_expect_str_eq(t, rel->manifest.url, repo.path);
+    sp_for(ti, expected_targets) {
+      sp_expect_str_eq_c(t, rel->targets[ti].name, c.expect.targets[ti].name);
 
-        if (c.expect.manifest_rev) {
-          u32 expect_rev_idx = sp_parse_u32(sp_str_view(c.expect.manifest_rev));
-          sp_expect_str_eq(t, rel->manifest.rev, repo.commits[expect_rev_idx]);
-        }
+      u32 expected_linkages = 0;
+      sp_carr_detect_len(c.expect.targets[ti].linkages, expected_linkages, c.expect.targets[ti].linkages[expected_linkages] != SPN_LIB_KIND_NONE);
+      sp_must_eq(t, expected_linkages, sp_da_size(rel->targets[ti].linkages));
 
-        if (c.expect.manifest_dir) {
-          sp_expect_str_eq_c(t, rel->manifest.dir, c.expect.manifest_dir);
-        }
-      } else {
-        sp_expect_str_eq(t, rel->manifest.url, sp_str_lit(""));
-      }
-
-      u32 expected_targets = 0;
-      sp_carr_for(c.expect.targets, ti) {
-        if (!c.expect.targets[ti].name) break;
-        expected_targets++;
-      }
-      sp_expect_eq(t, expected_targets, sp_da_size(rel->targets));
-
-      sp_for(ti, expected_targets) {
-        if (ti >= sp_da_size(rel->targets)) break;
-        sp_expect_str_eq_c(t, rel->targets[ti].name, c.expect.targets[ti].name);
-
-        u32 expected_linkages = 0;
-        sp_carr_for(c.expect.targets[ti].linkages, li) {
-          if (c.expect.targets[ti].linkages[li] == SPN_LIB_KIND_NONE) break;
-          expected_linkages++;
-        }
-        sp_expect_eq(t, expected_linkages, sp_da_size(rel->targets[ti].linkages));
-
-        sp_for(li, expected_linkages) {
-          if (li >= sp_da_size(rel->targets[ti].linkages)) break;
-          sp_expect_eq(t, c.expect.targets[ti].linkages[li], rel->targets[ti].linkages[li]);
-        }
+      sp_for(li, expected_linkages) {
+        sp_expect_eq(t, c.expect.targets[ti].linkages[li], rel->targets[ti].linkages[li]);
       }
     }
   }

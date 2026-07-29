@@ -14,7 +14,6 @@ typedef struct {
   const c8* to;
 } patch_edit_t;
 
-// .rev indexes the fixture's commits ("0" is the first commit)
 typedef struct {
   const c8* rev;
   const c8* dir;
@@ -386,7 +385,6 @@ sp_test_each(git_cache, ensure, cache_test_t, tests) {
   // build git repo fixture as "remote"
   git_repo_result_t repo = git_repo_build_at(sp_test_dir(t), "R", &it->repo);
 
-  // init cache next to it
   sp_str_t cache_root = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("cache"));
   sp_fs_create_dir(cache_root);
 
@@ -453,12 +451,8 @@ sp_test_each(git_cache, ensure, cache_test_t, tests) {
       }
 
       sp_str_t path = sp_fs_join_path(mem, checkout->path, sp_str_view(file->file));
-      sp_expect(t, sp_fs_exists(path));
-
-      if (sp_fs_exists(path)) {
-        sp_str_t content = test_read_file(mem, path);
-        sp_expect_str_eq_c(t, content, file->content);
-      }
+      sp_must(t, sp_fs_exists(path));
+      sp_expect_str_eq_c(t, test_read_file(mem, path), file->content);
     }
   }
 

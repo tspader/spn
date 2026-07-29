@@ -11,3 +11,13 @@
 #include "semver/types.h"
 #include "sp/io.h"
 #include "sp/str.h"
+
+static inline u32 index_test_count_lines(sp_str_t content) {
+  u32 count = 0;
+  sp_str_for_line(content, it) {
+    if (!sp_str_empty(sp_str_trim(it.line))) {
+      count++;
+    }
+  }
+  return count;
+}

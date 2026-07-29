@@ -90,7 +90,7 @@ static spn_dag_digest_t masked_digest(const masked_input_t* in) {
   return spn_dag_hash_final(&ctx);
 }
 
-sp_test_each(masked, digest, masked_test_t, masked_tests) {
+sp_test_each(dag_masked, digest, masked_test_t, masked_tests) {
   sp_expect_eq(t, it->expect.equal, spn_dag_digest_equal(masked_digest(&it->a), masked_digest(&it->b)));
   return SP_OK;
 }
@@ -129,7 +129,7 @@ static spn_dag_digest_t masked_strs_digest(sp_mem_t mem, const masked_strs_input
   return spn_dag_hash_final(&ctx);
 }
 
-sp_test_each(masked, strs, masked_strs_test_t, masked_strs_tests) {
+sp_test_each(dag_masked, strs, masked_strs_test_t, masked_strs_tests) {
   sp_mem_t mem = sp_test_arena(t);
   spn_dag_digest_t a = masked_strs_digest(mem, &it->a);
   spn_dag_digest_t b = masked_strs_digest(mem, &it->b);

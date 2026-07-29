@@ -55,4 +55,4 @@ typedef struct {
 closure_graph_t build_graph(closure_graph_test_t* t);
 spn_pkg_unit_t* find_pkg(spn_pkg_unit_t** pkgs, u32 count, const c8* name);
 spn_target_unit_t* find_lib(spn_pkg_unit_t** pkgs, u32 count, const c8* name);
-sp_err_t expect_target_names(sp_test_t* t, sp_da(spn_target_unit_t*) targets, const c8* const* expect, u32 max);
+sp_err_t expect_target_names(sp_test_t* t, sp_da(spn_target_unit_t*) targets, const c8* const* expect);

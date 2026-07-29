@@ -1,15 +1,7 @@
-// The sp and spit implementations live alone in this TU; this binary is a
-// single TU, so it doubles as its own spit_main.c
-#define SP_IMPLEMENTATION
-#include "sp.h"
-
 #include "spn_test.h"
 
 #include "sp/sp_om.h"
 
-s32 main(s32 argc, const c8** argv) {
-  return sp_test_main(argc, argv, SP_NULLPTR);
-}
 
 // ---- s32 key tests (flat scalar key, default hash/compare) ----
 
@@ -319,9 +311,9 @@ typedef struct {
 static sp_hash_t pkg_key_hash(void* key, u64 size) {
   (void)size;
   pkg_key_t* k = (pkg_key_t*)key;
-  sp_hash_t h = sp_hash_str(k->name);
+  sp_hash_t h = sp_hash_bytes(k->name.data, k->name.len, 0);
   h ^= sp_hash_bytes(&k->version, sizeof(k->version), 0);
-  h ^= sp_hash_str(k->triple);
+  h ^= sp_hash_bytes(k->triple.data, k->triple.len, 0);
   return h;
 }
 

@@ -135,7 +135,7 @@ static sp_str_t get_path(sp_mem_t mem, sp_str_t dir, const c8* key) {
   return sp_fs_join_path(mem, dir, sp_fmt(mem, "{}.txt", sp_fmt_str(hex)).value);
 }
 
-sp_test_each(action_cache, ops, cache_test_t, cache_tests) {
+sp_test_each(dag_action_cache, ops, cache_test_t, cache_tests) {
   sp_mem_t mem = sp_test_arena(t);
   sp_str_t dir = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("strong"));
 

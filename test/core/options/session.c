@@ -21,13 +21,7 @@ typedef struct {
   session_expect_t expect;
 } session_test_t;
 
-spn_pkg_name_t spn_pkg_name_from_qualified(sp_str_t qualified) {
-  sp_str_pair_t pair = sp_str_cleave_c8(qualified, '/');
-  return (spn_pkg_name_t) {
-    .namespace = pair.first,
-    .name = sp_str_empty(pair.second) ? pair.first : pair.second,
-  };
-}
+sp_test_suite(options_session, .serial = true);
 
 static spn_pkg_id_t make_id(sp_intern_t* intern, const c8* qualified) {
   return (spn_pkg_id_t) {
@@ -81,6 +75,7 @@ static const session_test_t tests [] = {
 sp_test_each(options_session, apply, session_test_t, tests) {
   sp_mem_t mem = sp_test_arena(t);
   sp_intern_t* intern = sp_intern_new(mem);
+  spn.intern = intern;
 
   spn_pkg_info_t root = {
     .name = sp_str_lit("test"),
@@ -152,8 +147,8 @@ sp_test_each(options_session, apply, session_test_t, tests) {
   sp_expect_eq(t, session.gates.reresolve, it->expect.reresolve);
 
   sp_da(spn_build_event_t) events = spn_event_buffer_drain(mem, session.events);
-  sp_expect_eq(t, sp_da_size(events), it->expect.event ? 1 : 0);
-  if (!it->expect.event || sp_da_empty(events)) {
+  sp_must_eq(t, sp_da_size(events), it->expect.event ? 1 : 0);
+  if (!it->expect.event) {
     return SP_OK;
   }
 

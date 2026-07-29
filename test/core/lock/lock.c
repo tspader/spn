@@ -1,21 +1,14 @@
 #include "spn_test.h"
 
-#include "enum/enum.h"
 #include "event/event.h"
 #include "lock/lock.h"
 #include "semver/convert.h"
-
-///////////
-// MOCKS //
-///////////
-void spn_event_buffer_push(spn_event_buffer_t* evs, spn_build_event_t e) {}
 
 typedef struct {
   const c8* name;
   const c8* version;
   const c8* commit;
-  const c8* kind;
-  const c8* visibility;
+  spn_pkg_source_t kind;
   const c8* source_url;
   const c8* source_rev;
   const c8* source_dir;
@@ -42,8 +35,7 @@ static const test_t tests [] = {
         .name = "A",
         .version = "1.0.0",
         .commit = "abc123",
-        .kind = "index",
-        .visibility = "public",
+        .kind = SPN_PKG_SOURCE_INDEX,
       },
     },
   },
@@ -54,23 +46,20 @@ static const test_t tests [] = {
         .name = "A",
         .version = "2.1.0",
         .commit = "aaa111",
-        .kind = "index",
-        .visibility = "public",
+        .kind = SPN_PKG_SOURCE_INDEX,
         .deps = { "B" },
       },
       {
         .name = "B",
         .version = "1.5.0",
         .commit = "bbb222",
-        .kind = "index",
-        .visibility = "public",
+        .kind = SPN_PKG_SOURCE_INDEX,
       },
       {
         .name = "C",
         .version = "3.0.0",
         .commit = "ccc333",
-        .kind = "index",
-        .visibility = "public",
+        .kind = SPN_PKG_SOURCE_INDEX,
         .deps = { "B" },
       },
     },
@@ -83,34 +72,7 @@ static const test_t tests [] = {
         .name = "A",
         .version = "1.0.0",
         .commit = "def456",
-        .kind = "index",
-        .visibility = "public",
-      },
-    },
-  },
-  {
-    .name = "visibility_kinds",
-    .deps = {
-      {
-        .name = "A",
-        .version = "1.0.0",
-        .commit = "aaa111",
-        .kind = "index",
-        .visibility = "public",
-      },
-      {
-        .name = "B",
-        .version = "2.0.0",
-        .commit = "bbb222",
-        .kind = "index",
-        .visibility = "build",
-      },
-      {
-        .name = "C",
-        .version = "3.0.0",
-        .commit = "ccc333",
-        .kind = "index",
-        .visibility = "test",
+        .kind = SPN_PKG_SOURCE_INDEX,
       },
     },
   },
@@ -121,15 +83,13 @@ static const test_t tests [] = {
         .name = "A",
         .version = "1.0.0",
         .commit = "aaa111",
-        .kind = "index",
-        .visibility = "public",
+        .kind = SPN_PKG_SOURCE_INDEX,
       },
       {
         .name = "B",
         .version = "2.0.0",
         .commit = "bbb222",
-        .kind = "file",
-        .visibility = "public",
+        .kind = SPN_PKG_SOURCE_FILE,
       },
     },
   },
@@ -140,24 +100,21 @@ static const test_t tests [] = {
         .name = "A",
         .version = "1.0.0",
         .commit = "aaa111",
-        .kind = "index",
-        .visibility = "public",
+        .kind = SPN_PKG_SOURCE_INDEX,
         .deps = { "B", "C" },
       },
       {
         .name = "B",
         .version = "1.0.0",
         .commit = "bbb222",
-        .kind = "index",
-        .visibility = "public",
+        .kind = SPN_PKG_SOURCE_INDEX,
         .deps = { "C" },
       },
       {
         .name = "C",
         .version = "1.0.0",
         .commit = "ccc333",
-        .kind = "index",
-        .visibility = "public",
+        .kind = SPN_PKG_SOURCE_INDEX,
       },
     },
   },
@@ -169,8 +126,7 @@ static const test_t tests [] = {
         .name = "spum",
         .version = "1.0.0",
         .commit = "abc123",
-        .kind = "index",
-        .visibility = "public",
+        .kind = SPN_PKG_SOURCE_INDEX,
         .source_url = "https://github.com/foo/spum.git",
         .source_rev = "abc123",
         .source_dir = "packages/spum",
@@ -185,8 +141,7 @@ static const test_t tests [] = {
         .name = "sqlite",
         .version = "3.45.0",
         .commit = "def456",
-        .kind = "index",
-        .visibility = "public",
+        .kind = SPN_PKG_SOURCE_INDEX,
         .source_url = "https://github.com/sqlite/sqlite.git",
         .source_rev = "def456",
         .manifest_url = "https://github.com/tspader/spn-packages.git",
@@ -203,8 +158,7 @@ static const test_t tests [] = {
         .name = "spum",
         .version = "2.0.0",
         .commit = "aaa111",
-        .kind = "index",
-        .visibility = "public",
+        .kind = SPN_PKG_SOURCE_INDEX,
         .source_url = "https://github.com/foo/spum.git",
         .source_rev = "aaa111",
       },
@@ -228,7 +182,7 @@ static void build_lock(sp_mem_t mem, const test_t* fixture, spn_lock_file_t* loc
       .name = sp_str_view(d->name),
       .version = spn_semver_from_str(sp_str_view(d->version)),
       .commit = sp_str_view(d->commit),
-      .kind = spn_pkg_source_from_str(sp_str_view(d->kind)),
+      .kind = d->kind,
       .source = {
         .url = d->source_url ? sp_str_view(d->source_url) : SP_LIT(""),
         .rev = d->source_rev ? sp_str_view(d->source_rev) : SP_LIT(""),

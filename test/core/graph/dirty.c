@@ -137,17 +137,15 @@ static sp_err_t expect_node_dirty(sp_test_t* t, built_graph_t* b, spn_bg_dirty_t
 }
 
 sp_test_each(graph, dirty, dirty_test_t, tests, .setup = graph_setup) {
-  built_graph_t b = build_graph(t, it->graph);
+  built_graph_t b = graph_build(t, it->graph);
   apply_touches(&b, it->touch);
 
   spn_bg_dirty_t* dirty = spn_bg_compute_dirty(b.graph);
 
   sp_carr_for(it->errors, i) {
     if (it->errors[i] == SPN_BG_OK) break;
-    sp_expect(t, sp_da_size(dirty->errors) > i);
-    if (sp_da_size(dirty->errors) > i) {
-      sp_expect_eq(t, it->errors[i], dirty->errors[i].kind);
-    }
+    sp_must(t, sp_da_size(dirty->errors) > i);
+    sp_expect_eq(t, it->errors[i], dirty->errors[i].kind);
   }
 
   sp_carr_for(it->dirty, i) {

@@ -74,7 +74,7 @@ sp_test_each(toml_edit, find, test_t, tests) {
   sp_must_eq(t, SPN_OK, spn_toml_edit_init(&edit, mem, source));
 
   sp_str_t path [TOML_TEST_MAX_PATH] = sp_zero;
-  u32 num_segments = toml_collect_path(it->expect.path, path);
+  u32 num_segments = toml_collect_path(&it->expect.path, path);
   spn_toml_edit_entry_t* entry = spn_toml_edit_find(&edit, path, num_segments);
   if (it->expect.missing) {
     sp_expect(t, entry == SP_NULLPTR);

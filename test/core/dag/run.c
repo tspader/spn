@@ -265,7 +265,7 @@ static sp_err_t run_build_dag(sp_test_t* t, dag_test_env_t* env, spn_dag_t* g, c
   return SP_OK;
 }
 
-sp_test_each(run, builds, run_test_t, run_tests) {
+sp_test_each(dag_run, builds, run_test_t, run_tests) {
   dag_test_env_t env;
   dag_test_env_init(&env, t, (dag_test_env_config_t) {
     .store = SPN_DAG_STORE_MEM,

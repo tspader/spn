@@ -66,17 +66,7 @@ static sp_err_t builtins_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog)
 }
 
 static bool builtins_is_sha256(sp_str_t str) {
-  if (str.len != 64) {
-    return false;
-  }
-  sp_for(it, str.len) {
-    c8 c = str.data[it];
-    bool hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
-    if (!hex) {
-      return false;
-    }
-  }
-  return true;
+  return str.len == 64 && test_str_is_hex(str);
 }
 
 sp_test_each(builtins, entries, builtins_test_t, tests) {

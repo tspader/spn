@@ -38,8 +38,7 @@ typedef struct {
   wasm_call_t calls [DAG_WASM_MAX_CALLS];
 } wasm_test_t;
 
-// wasm_runtime_init and spn_dag_wasi_install are process-global
-sp_test_suite(wasm, .serial = true);
+sp_test_suite(dag_wasm, .serial = true);
 
 static const wasm_test_t wasm_tests [] = {
   {
@@ -177,13 +176,9 @@ static sp_err_t wasm_runtime_bring_up(void* user) {
 
 static void expect_obs(sp_test_t* t, sp_mem_t mem, sp_str_t root, const wasm_expect_t* expect, sp_da(spn_dag_obs_t) obs) {
   u32 expected = 0;
-  sp_carr_for(expect->obs, it) {
+  sp_carr_detect_len(expect->obs, expected, expect->obs[expected].path);
+  sp_for(it, expected) {
     const wasm_obs_t* e = &expect->obs[it];
-    if (!e->path) {
-      break;
-    }
-    expected++;
-
     sp_str_t host = sp_fs_join_path(mem, root, sp_str_view(e->path));
     bool found = false;
     sp_da_for(obs, ot) {
@@ -197,7 +192,7 @@ static void expect_obs(sp_test_t* t, sp_mem_t mem, sp_str_t root, const wasm_exp
   sp_expect_eq(t, expected, (u32)sp_da_size(obs));
 }
 
-sp_test_each(wasm, wasi, wasm_test_t, wasm_tests) {
+sp_test_each(dag_wasm, wasi, wasm_test_t, wasm_tests) {
   if (!sp_str_empty(sp_os_env_get(sp_str_lit("SPN_TEST_SIM")))) {
     return sp_test_skip(t, "wamr syscalls bypass the sim filesystem");
   }

@@ -5,23 +5,7 @@
 #include "profile/profile.h"
 #include "pkg/types.h"
 
-// The linked production ctx.c reads this global (spn_intern -> spn.intern),
-// so the suite keeps it, brings it up once, and runs serial
-spn_ctx_t spn;
-
 sp_test_suite(profile, .serial = true);
-
-static sp_test_once_t spn_init_once;
-
-static sp_err_t init_spn(void* user) {
-  spn.mem = sp_mem_os_new();
-  spn.intern = sp_intern_new(spn.mem);
-  return SP_OK;
-}
-
-static sp_err_t setup_spn(sp_test_t* t) {
-  return sp_test_once(&spn_init_once, init_spn, SP_NULLPTR);
-}
 
 #define PROFILE_HOST_LINUX_GNU { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU }
 #define PROFILE_HOST_WIN_MSVC  { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC }
@@ -278,7 +262,7 @@ static spn_profile_info_t desc_to_info(const profile_desc_t* d) {
   };
 }
 
-sp_test_each(profile, resolve, test_t, tests, .setup = setup_spn) {
+sp_test_each(profile, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = spn.mem;
 
   spn_profile_info_t profile = desc_to_info(&it->profile);

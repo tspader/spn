@@ -13,7 +13,7 @@ static const outputs_test_t tests [] = {
 };
 
 sp_test_each(graph, find_outputs, outputs_test_t, tests, .setup = graph_setup) {
-  built_graph_t b = build_graph(t, it->graph);
+  built_graph_t b = graph_build(t, it->graph);
   sp_expect_eq(t, (u32)sp_da_size(spn_bg_find_outputs(b.graph)), it->expect);
   return SP_OK;
 }

@@ -42,5 +42,5 @@ sp_test_each(runtime_libs, collect, target_list_test_t, tests) {
 
   sp_da(spn_target_unit_t*) libs = spn_target_runtime_libs(g.mem, g.root);
 
-  return expect_target_names(t, libs, it->expect, CLOSURE_TEST_MAX_NAMES);
+  return expect_target_names(t, libs, it->expect);
 }

@@ -82,8 +82,8 @@ sp_test_each(index_query, get_package, query_test_t, tests) {
     u32 expected = 0;
     sp_carr_detect_len(it->expect.versions, expected, !semver_is_zero(it->expect.versions[expected]));
 
-    sp_expect_eq(t, expected, sp_da_size(pkg->releases));
-    sp_for(at, SP_MIN(expected, sp_da_size(pkg->releases))) {
+    sp_must_eq(t, expected, sp_da_size(pkg->releases));
+    sp_for(at, expected) {
       sp_expect(t, spn_semver_eq(it->expect.versions[at], pkg->releases[at].version));
     }
   }

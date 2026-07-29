@@ -50,7 +50,7 @@ static const roots_test_t roots_tests [] = {
   },
 };
 
-sp_test_each(roots, collapse_expand, roots_test_t, roots_tests) {
+sp_test_each(dag_roots, collapse_expand, roots_test_t, roots_tests) {
   sp_mem_t mem = sp_test_arena(t);
   spn_dag_roots_t storage = sp_zero;
   const spn_dag_roots_t* roots = dag_test_roots_build(it->roots, &storage);
@@ -66,7 +66,7 @@ sp_test_each(roots, collapse_expand, roots_test_t, roots_tests) {
   return SP_OK;
 }
 
-sp_test(roots, expand_unknown_root_fails) {
+sp_test(dag_roots, expand_unknown_root_fails) {
   spn_dag_roots_t storage = sp_zero;
   const spn_dag_roots_t* roots = dag_test_roots_build((dag_test_roots_t) { .project = "/A" }, &storage);
   spn_dag_prefixed_t prefixed = { .root = SPN_DAG_ROOT_STORE, .sub = sp_str_lit("H") };

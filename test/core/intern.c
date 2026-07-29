@@ -1,68 +1,69 @@
-#define SP_IMPLEMENTATION
-#include "sp.h"
-#include "sp/macro.h"
-
-#include "utest.h"
+#include "spn_test.h"
 
 #include "intern/intern.h"
-#include "ctx/types.h"
 
-spn_ctx_t spn;
+#define INTERN_TEST_ENTRIES 4096
 
-UTEST_MAIN()
-
-#define uf utest_fixture
-#define ur (*utest_result)
-
-struct intern { u8 unused; };
-UTEST_F_SETUP(intern) {}
-UTEST_F_TEARDOWN(intern) {}
-
-sp_str_t intern_and_mark(sp_intern_t* intern, const c8* str, u64* marker) {
-  sp_str_t interned = sp_intern_get_or_insert_str(intern, sp_str_view(str));
-  *marker = sp_intern_bytes_used(intern);
-  return interned;
-}
-
-UTEST_F(intern, hello) {
-  struct {
-    u64 before;
-    u64 a;
-    u64 b;
-    u64 c;
-    u64 d;
-    u64 e;
-    u64 f;
-  } markers = sp_zero;
-
-  sp_mem_t mem = sp_mem_os_new();
+static sp_intern_t* intern_new(sp_mem_t mem) {
   sp_intern_t* intern = sp_alloc_type(mem, sp_intern_t);
   sp_intern_init(intern, mem);
-  EXPECT_EQ(sp_intern_size(intern), 1);
+  return intern;
+}
 
-  sp_str_t a = intern_and_mark(intern, "a", &markers.a);
-  sp_str_t b = intern_and_mark(intern, "a", &markers.b);
-  EXPECT_EQ(sp_intern_size(intern), 2);
-  EXPECT_EQ(a.data, b.data);
-  EXPECT_EQ(a.len, b.len);
-  EXPECT_EQ(markers.a, markers.b);
+sp_test(intern, dedupe) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_intern_t* intern = intern_new(mem);
+  sp_must_eq(t, 1, sp_intern_size(intern));
 
-  sp_str_t c = intern_and_mark(intern, "c", &markers.c);
-  sp_str_t d = intern_and_mark(intern, "d", &markers.d);
-  sp_str_t e = intern_and_mark(intern, "e", &markers.e);
-  sp_str_t f = intern_and_mark(intern, "f", &markers.f);
-  EXPECT_EQ(sp_intern_size(intern), 6);
-  EXPECT_NE(c.data, d.data);
-  EXPECT_NE(c.data, e.data);
-  EXPECT_NE(c.data, f.data);
-  EXPECT_NE(d.data, e.data);
-  EXPECT_NE(d.data, f.data);
-  EXPECT_NE(e.data, f.data);
+  sp_str_t a = sp_intern_get_or_insert_str(intern, sp_str_lit("A"));
+  u64 bytes = sp_intern_bytes_used(intern);
+  sp_str_t b = sp_intern_get_or_insert_str(intern, sp_str_lit("A"));
 
-  u64 bytes_used = sp_intern_bytes_used(intern);
-  sp_for(it, 4096) {
-    sp_str_t str = sp_fmt(mem, "entry_{}", sp_fmt_uint(it)).value;
-    sp_intern_get_or_insert(intern, str);
-    bytes_used = sp_intern_bytes_used(intern);
+  sp_expect_eq(t, 2, sp_intern_size(intern));
+  sp_expect_eq(t, (void*)a.data, (void*)b.data);
+  sp_expect_eq(t, a.len, b.len);
+  sp_expect_eq(t, bytes, sp_intern_bytes_used(intern));
+
+  return SP_OK;
+}
+
+sp_test(intern, distinct) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_intern_t* intern = intern_new(mem);
+
+  const c8* strs [] = { "A", "B", "C", "D" };
+  sp_str_t interned [sp_carr_len(strs)];
+  sp_carr_for(strs, it) {
+    interned[it] = sp_intern_get_or_insert_str(intern, sp_str_view(strs[it]));
   }
+
+  sp_must_eq(t, 1 + sp_carr_len(strs), sp_intern_size(intern));
+  sp_carr_for(strs, a) {
+    sp_for(b, a) {
+      sp_expect(t, interned[a].data != interned[b].data);
+    }
+  }
+
+  return SP_OK;
+}
+
+sp_test(intern, stable_under_growth) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_intern_t* intern = intern_new(mem);
+
+  sp_str_t* first = sp_alloc_n(mem, sp_str_t, INTERN_TEST_ENTRIES);
+  sp_for(it, INTERN_TEST_ENTRIES) {
+    first[it] = sp_intern_get_or_insert_str(intern, sp_fmt(mem, "E{}", sp_fmt_uint(it)).value);
+  }
+  sp_must_eq(t, 1 + INTERN_TEST_ENTRIES, sp_intern_size(intern));
+
+  u64 bytes = sp_intern_bytes_used(intern);
+  sp_for(it, INTERN_TEST_ENTRIES) {
+    sp_str_t again = sp_intern_get_or_insert_str(intern, sp_fmt(mem, "E{}", sp_fmt_uint(it)).value);
+    sp_must_eq(t, (void*)first[it].data, (void*)again.data);
+  }
+  sp_expect_eq(t, 1 + INTERN_TEST_ENTRIES, sp_intern_size(intern));
+  sp_expect_eq(t, bytes, sp_intern_bytes_used(intern));
+
+  return SP_OK;
 }

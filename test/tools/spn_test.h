@@ -6,4 +6,6 @@
 #include "spit.h"
 #include "fixture.h"
 
+sp_err_t spn_test_ctx_setup(sp_test_t* t);
+
 #endif

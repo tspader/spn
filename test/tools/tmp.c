@@ -55,12 +55,7 @@ void tmpfs_init_named(tmpfs_t* fs, const c8* test) {
     tmpfs_set_top_level(tmpfs_default_top_level());
   }
 
-  sp_str_t test_name = sp_str_view(test);
-  if (sp_str_empty(test_name)) {
-    test_name = sp_str_lit("tmpfs");
-  }
-
-  sp_str_t root = sp_fs_join_path(fs->mem, tmpfs_top_level, test_name);
+  sp_str_t root = sp_fs_join_path(fs->mem, tmpfs_top_level, sp_str_view(test));
 
   SP_ASSERT(!sp_fs_exists(root));
   sp_fs_create_dir(root);
@@ -78,15 +73,7 @@ sp_str_t tmpfs_get(tmpfs_t* fs, sp_str_t name) {
 void tmpfs_create(tmpfs_t* fs, sp_str_t relative, sp_str_t content) {
   sp_str_t path = tmpfs_get(fs, relative);
   sp_fs_create_dir(sp_fs_parent_path(path));
-
-  sp_fs_remove_file(path);
-
-  sp_io_file_writer_t f = sp_zero;
-  sp_io_file_writer_from_path(&f, path);
-  if (!sp_str_empty(content)) {
-    sp_io_write(&f.base, content.data, content.len, SP_NULLPTR);
-  }
-  sp_io_file_writer_close(&f);
+  sp_fs_create_file_str(path, content);
 }
 
 sp_str_t tmpfs_touch(tmpfs_t* fs, sp_str_t relative) {
@@ -97,9 +84,5 @@ sp_str_t tmpfs_touch(tmpfs_t* fs, sp_str_t relative) {
 }
 
 void tmpfs_deinit(tmpfs_t* fs) {
-  if (sp_str_empty(fs->root)) {
-    return;
-  }
-
   sp_fs_remove_dir(fs->root);
 }

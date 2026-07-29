@@ -1,8 +1,5 @@
 #include "graph.h"
 
-// The executor spawns its own thread pool, and dirty tracking depends on the
-// mtime sequencing that touch_file's sleep enforces; neither tolerates
-// parallel filesystem churn from sibling tests.
 sp_test_suite(graph, .serial = true);
 
 sp_err_t graph_setup(sp_test_t* t) {
@@ -26,7 +23,7 @@ graph_ref_t* graph_ref(built_graph_t* b, const c8* id) {
   return ref;
 }
 
-built_graph_t build_graph(sp_test_t* t, const graph_def_t* def) {
+built_graph_t graph_build(sp_test_t* t, const graph_def_t* def) {
   sp_mem_t mem = sp_test_arena(t);
 
   built_graph_t b = sp_zero;

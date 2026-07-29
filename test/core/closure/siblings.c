@@ -64,5 +64,5 @@ sp_test_each(siblings, collect, target_list_test_t, tests) {
   sp_must_le(t, 1u, sp_da_size(closure));
   sp_expect(t, closure[0].pkg == g.root->pkg);
 
-  return expect_target_names(t, closure[0].targets, it->expect, CLOSURE_TEST_MAX_NAMES);
+  return expect_target_names(t, closure[0].targets, it->expect);
 }

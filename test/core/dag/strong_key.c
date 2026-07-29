@@ -89,7 +89,7 @@ static spn_dag_digest_t build_strong_key(const strong_key_action_t* spec) {
   return spn_dag_strong_key(dag_test_digest(spec->prelim), dag_test_roots_build(spec->roots, &roots), obs, count);
 }
 
-sp_test_each(strong_key, fold, strong_key_test_t, strong_key_tests) {
+sp_test_each(dag_strong_key, fold, strong_key_test_t, strong_key_tests) {
   spn_dag_digest_t a = build_strong_key(&it->a);
   spn_dag_digest_t b = build_strong_key(&it->b);
   sp_expect_eq(t, it->expect.equal, spn_dag_digest_equal(a, b));

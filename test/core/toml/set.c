@@ -6,8 +6,6 @@ typedef struct {
   spn_err_t err;
 } set_t;
 
-// Exactly one of golden/output, or neither: neither means the edit must
-// render back to the source unchanged
 typedef struct {
   const c8* golden;
   const c8* output;
@@ -32,7 +30,7 @@ static sp_err_t run_set_test(sp_test_t* t, test_t* it) {
   sp_carr_for(it->set, at) {
     if (!it->set[at].value) break;
     sp_str_t path [TOML_TEST_MAX_PATH] = sp_zero;
-    u32 num_segments = toml_collect_path(it->set[at].path, path);
+    u32 num_segments = toml_collect_path(&it->set[at].path, path);
     sp_expect_eq(t, it->set[at].err, spn_toml_edit_set_str(&edit, path, num_segments, sp_str_view(it->set[at].value)));
   }
 

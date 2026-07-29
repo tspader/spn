@@ -50,7 +50,7 @@ static const traversal_test_t tests [] = {
 };
 
 sp_test_each(graph, visit_once, traversal_test_t, tests, .setup = graph_setup) {
-  built_graph_t b = build_graph(t, it->graph);
+  built_graph_t b = graph_build(t, it->graph);
   visit_count_t counter = sp_zero;
 
   spn_bg_it_config_t config = {

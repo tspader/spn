@@ -40,9 +40,7 @@ typedef struct {
   const par_action_t* spec;
 } par_ctx_t;
 
-// The suite spawns real spn_dag_pool_t worker pools; keep it off the
-// multi-threaded runner path
-sp_test_suite(parallel, .serial = true);
+sp_test_suite(dag_parallel, .serial = true);
 
 static const par_test_t par_tests [] = {
   {
@@ -301,7 +299,7 @@ static sp_err_t par_run_builds(sp_test_t* t, spn_dag_store_kind_t kind, const pa
   return result;
 }
 
-sp_test_each(parallel, builds, par_test_t, par_tests) {
+sp_test_each(dag_parallel, builds, par_test_t, par_tests) {
   if (!sp_str_empty(sp_os_env_get(sp_str_lit("SPN_TEST_SIM")))) {
     return sp_test_skip(t, "threaded executor is incompatible with the single-threaded sim");
   }

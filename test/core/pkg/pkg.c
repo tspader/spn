@@ -8,23 +8,7 @@
 #include "profile/types.h"
 #include "target/mutate.h"
 
-// The linked production ctx.c reads this global (spn_intern -> spn.intern),
-// so the suite keeps it, brings it up once, and runs serial
-spn_ctx_t spn;
-
 sp_test_suite(pkg, .serial = true);
-
-static sp_test_once_t spn_init_once;
-
-static sp_err_t init_spn(void* user) {
-  spn.mem = sp_mem_os_new();
-  spn.intern = sp_intern_new(spn.mem);
-  return SP_OK;
-}
-
-static sp_err_t setup_spn(sp_test_t* t) {
-  return sp_test_once(&spn_init_once, init_spn, SP_NULLPTR);
-}
 
 static spn_pkg_info_t make_pkg(sp_mem_t mem) {
   spn_pkg_info_t pkg = spn_pkg_new(mem, sp_str_lit("A"));
@@ -73,7 +57,7 @@ static const hash_platform_test_t hash_platform_tests [] = {
   { .name = "track_profile_sysroot",          .profile = { .os = SPN_OS_MACOS },   .edit = PKG_EDIT_PROFILE_SYSROOT,  .expect = { .hashed = true, .changed = true } },
 };
 
-sp_test_each(pkg, hash_platform, hash_platform_test_t, hash_platform_tests, .setup = setup_spn) {
+sp_test_each(pkg, hash_platform, hash_platform_test_t, hash_platform_tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = spn.mem;
   spn_pkg_info_t pkg = make_pkg(mem);
 
