@@ -66,6 +66,9 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
   spn_target_embed_file_ex(target, "source/toolchain/toolchains.json", "toolchains_json", "u8", "u64");
   spn_target_embed_dir_ex(target, "assets/init", "init", "u8", "u64");
 
+  spn_target_t* core = spn_get_target(spn, "core");
+  spn_target_embed_file_ex(core, "source/toolchain/toolchains.json", "toolchains_json", "u8", "u64");
+
   add_codegen(spn, config);
   return SPN_OK;
 }

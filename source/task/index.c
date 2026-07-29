@@ -12,18 +12,16 @@
 
 #include "event/event.h"
 #include "index/index.h"
+#include "thread_pool/thread_pool.h"
 #include "task/task.h"
 #include "external/wasm/wasm.h"
 
-static s32 sync_index_node(spn_bg_cmd_t* cmd, void* user_data) {
-  spn_sync_index_job_t* job = (spn_sync_index_job_t*)user_data;
+static void sync_index_node(void* data) {
+  spn_sync_index_job_t* job = (spn_sync_index_job_t*)data;
   job->err = spn_index_sync(job->index, job->force);
-  return job->err;
 }
 
 spn_task_step_t spn_task_sync_indexes_init(spn_app_t* app) {
-  spn_build_graph_t* graph = &app->index_sync.bg.graph;
-  spn_bg_init(graph, spn.mem);
   sp_da_init(spn.mem, app->index_sync.jobs);
 
   bool force = spn.cli.index.force;
@@ -49,28 +47,27 @@ spn_task_step_t spn_task_sync_indexes_init(spn_app_t* app) {
     job->index = index;
     job->force = force;
     sp_da_push(app->index_sync.jobs, job);
-
-    spn_bg_add_fn(graph, sync_index_node, job);
   }
 
-  app->index_sync.bg.dirty = spn_bg_compute_forced_dirty(graph);
-  app->index_sync.bg.executor = spn_bg_executor_new(graph, app->index_sync.bg.dirty, (spn_bg_executor_config_t) {
-    .num_threads = 8,
+  spn_thread_pool_t* pool = &app->index_sync.pool;
+  spn_thread_pool_init(pool, spn.mem, (spn_thread_pool_config_t) {
+    .workers = (u32)sp_min(8, sp_da_size(app->index_sync.jobs)),
     .on_worker_exit = spn_wasm_thread_exit,
   });
-  spn_bg_executor_run(app->index_sync.bg.executor);
+
+  sp_da_for(app->index_sync.jobs, it) {
+    spn_thread_pool_submit(&pool->executor, (spn_thread_pool_job_t) { .fn = sync_index_node, .data = app->index_sync.jobs[it] });
+  }
 
   return spn_task_continue();
 }
 
 spn_task_step_t spn_task_sync_indexes_update(spn_app_t* app) {
-  spn_bg_ctx_t* sync = &app->index_sync.bg;
-
-  if (!sp_atomic_s32_get(&sync->executor->shutdown)) {
+  if (spn_thread_pool_pending(&app->index_sync.pool)) {
     return spn_task_continue();
   }
 
-  spn_bg_executor_join(sync->executor);
+  spn_thread_pool_deinit(&app->index_sync.pool);
 
   sp_da_for(app->index_sync.jobs, it) {
     spn_sync_index_job_t* job = app->index_sync.jobs[it];

@@ -144,10 +144,10 @@ typedef struct {
 } fz_flight_t;
 
 typedef struct {
-  spn_dag_executor_t base;
+  spn_thread_pool_executor_t base;
   sp_fuzz_prng_t prng;
   sp_sim_t* sim;
-  sp_da(spn_dag_job_t) jobs;
+  sp_da(spn_thread_pool_job_t) jobs;
   sp_da(u64) submitted;
   sp_da(fz_flight_t) log;
   s64 ran;

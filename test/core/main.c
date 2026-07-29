@@ -2,9 +2,6 @@
 #include "sp.h"
 #include "sp/atomic_file.h"
 
-#define SP_GRAPH_IMPLEMENTATION
-#include "sp/sp_graph.h"
-
 #include "spn_test.h"
 #include "sp_sim.h"
 

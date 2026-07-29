@@ -47,11 +47,6 @@ add_executable(core
   git/cache.c
   git/key.c
   git/patch.c
-  graph/harness.c
-  graph/dirty.c
-  graph/executor.c
-  graph/output.c
-  graph/traversal.c
   index/query.c
   index/publish.c
   index/release.c
@@ -80,6 +75,8 @@ add_executable(core
   profile/profile.c
   publish/publish.c
   schema/schema.c
+  thread_pool/ops.c
+  thread_pool/smoke.c
   toml/harness.c
   toml/roundtrip.c
   toml/parse.c
@@ -113,7 +110,6 @@ add_executable(core
   ${SRC}/compiler/toc.c
   ${SRC}/ctx/ctx.c
   ${SRC}/dag/dag.c
-  ${SRC}/dag/executor.c
   ${SRC}/dag/glob.c
   ${SRC}/dag/run.c
   ${SRC}/dag/store.c
@@ -158,6 +154,7 @@ add_executable(core
   ${SRC}/target/select.c
   ${SRC}/task/build/build.c
   ${SRC}/task/build/identity.c
+  ${SRC}/thread_pool/thread_pool.c
   ${SRC}/toml/edit.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/toolchain/provision.c

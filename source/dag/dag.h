@@ -4,6 +4,7 @@
 #include "sp.h"
 #include "spn.h"
 #include "dag/types.h"
+#include "thread_pool/types.h"
 #include "sha256/sha256.h"
 
 spn_dag_t*          spn_dag_new(sp_mem_t mem);
@@ -75,9 +76,6 @@ spn_err_t           spn_dag_file_cache_digest(spn_dag_file_cache_t* c, sp_str_t 
 spn_err_t           spn_dag_execute(spn_dag_t* g, spn_dag_id_t action, spn_dag_env_t* env);
 spn_err_t           spn_dag_execute_discovered(spn_dag_t* g, spn_dag_id_t action, spn_dag_env_t* env);
 spn_err_t           spn_dag_run(spn_dag_t* g, spn_dag_env_t* env);
-spn_err_t           spn_dag_run_executor(spn_dag_t* g, spn_dag_env_t* env, spn_dag_executor_t* executor);
-
-void                spn_dag_pool_init(spn_dag_pool_t* pool, sp_mem_t mem, spn_dag_pool_config_t config);
-void                spn_dag_pool_deinit(spn_dag_pool_t* pool);
+spn_err_t           spn_dag_run_executor(spn_dag_t* g, spn_dag_env_t* env, spn_thread_pool_executor_t* executor);
 
 #endif
