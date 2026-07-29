@@ -1,5 +1,3 @@
-#include "spn_test.h"
-
 #include "closure.h"
 
 typedef struct {

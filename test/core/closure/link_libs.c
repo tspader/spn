@@ -1,2 +1,0 @@
-
-spn_closure_get_linked_libs
