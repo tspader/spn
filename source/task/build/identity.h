@@ -1,0 +1,14 @@
+#ifndef SPN_TASK_BUILD_IDENTITY_H
+#define SPN_TASK_BUILD_IDENTITY_H
+
+#include "dag/types.h"
+#include "pkg/types.h"
+#include "unit/types.h"
+
+bool             spn_build_copy_to_include(spn_publish_copy_t* copy, sp_str_t* rest);
+bool             spn_build_path_within(sp_str_t path, sp_str_t dir);
+spn_dag_digest_t spn_build_tree_identity(const spn_dag_roots_t* roots, spn_pkg_unit_t* unit);
+spn_dag_digest_t spn_build_package_identity(spn_pkg_unit_t* unit);
+spn_dag_digest_t spn_build_user_identity(const spn_dag_roots_t* roots, spn_user_node_t* node);
+
+#endif
