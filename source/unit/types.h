@@ -106,7 +106,7 @@ typedef struct {
   spn_compile_unit_id_t id;
   spn_target_unit_t* target;
   spn_lang_t lang;
-  spn_invocation_t base;
+  spn_invocation_t invocation;
 
   struct {
     sp_str_t file;
