@@ -1,31 +1,31 @@
+#include "ctx/types.h"
+#include "error/types.h"
 #include "git/types.h"
 #include "index/types.h"
+#include "pkg/types.h"
+#include "resolve/types.h"
+#include "semver/types.h"
+#include "session/registry/types.h"
 #include "sp.h"
-#include "sp/macro.h"
-#include "error/types.h"
-#include "event/event.h"
+#include "spn.h"
+
 #include "index/cache.h"
 #include "intern/intern.h"
 #include "codegen/lower.h"
-#include "ctx/types.h"
 #include "pkg/id.h"
-#include "pkg/types.h"
 #include "resolve/resolve.h"
-#include "resolve/types.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
 #include "semver/parser.h"
+#include "sp/macro.h"
 #include "sp/str.h"
-#include "semver/types.h"
 #include "pkg/options.h"
 #include "session/registry/registry.h"
-#include "session/registry/types.h"
 #include "target/mutate.h"
 #include "target/select.h"
 #include "toml/issue.h"
 #include "toml/loader.h"
 #include "when/when.h"
-#include "spn.h"
 
 typedef struct {
   spn_pkg_id_t from;
@@ -64,9 +64,6 @@ typedef struct {
   u64 picks;
   u64 budget;
   bool fatal;
-  bool failed;
-  spn_build_event_t failure;
-  spn_err_t err;
   spn_pin_t forced;
   bool has_forced;
   spn_pin_t retry[2];
@@ -102,8 +99,15 @@ typedef struct {
   bool private;
 } spn_node_edge_t;
 
-static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node, spn_requested_dep_t* dep);
-static spn_err_t resolve_deps(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node);
+#define resolve_ok() sp_zero_s(spn_resolve_err_t)
+#define resolve_try(expr) \
+  do { \
+    spn_resolve_err_t __err = (expr); \
+    if (__err.kind) return __err; \
+  } while (0)
+
+static spn_resolve_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node, spn_requested_dep_t* dep);
+static spn_resolve_err_t resolve_deps(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node);
 
 static spn_pkg_tree_t tree_git(spn_index_rel_source_t source) {
   return (spn_pkg_tree_t){
@@ -112,12 +116,11 @@ static spn_pkg_tree_t tree_git(spn_index_rel_source_t source) {
   };
 }
 
-void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn_index_cache_t* index, spn_pkg_registry_t* registry, spn_event_buffer_t* events, spn_profile_info_t profile, sp_da(spn_pkg_config_entry_t) config, u64 budget) {
+void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn_index_cache_t* index, spn_pkg_registry_t* registry, spn_profile_info_t profile, sp_da(spn_pkg_config_entry_t) config, u64 budget) {
   *r = (spn_resolver_t){
     .mem = mem,
     .intern = intern,
     .index = index,
-    .events = events,
     .registry = registry,
     .profile = profile,
     .config = config,
@@ -128,6 +131,7 @@ void spn_resolver_init(spn_resolver_t* r, sp_mem_t mem, sp_intern_t* intern, spn
 void spn_resolve_query_init(sp_mem_t mem, spn_resolve_query_t* query) {
   *query = (spn_resolve_query_t) sp_zero_initialize();
   sp_da_init(mem, query->reqs);
+  sp_da_init(mem, query->errors);
   sp_ht_init(mem, query->result);
 }
 
@@ -144,28 +148,6 @@ static spn_dep_kind_t dep_kind_from_index(spn_index_dep_kind_t kind) {
   sp_unreachable_return(SPN_DEP_KIND_PACKAGE);
 }
 
-static spn_err_t resolve_err_kind(spn_build_event_kind_t kind) {
-  switch (kind) {
-    case SPN_EVENT_ERR_CIRCULAR_DEP:           return SPN_ERR_DEP_CYCLE;
-    case SPN_EVENT_ERR_MANIFEST:               return SPN_ERR_DEP_MANIFEST;
-    case SPN_EVENT_ERR_UNKNOWN_PKG:            return SPN_ERR_PKG_UNKNOWN;
-    case SPN_EVENT_ERR_UNSATISFIABLE_VERSION:  return SPN_ERR_PKG_NO_MATCH;
-    case SPN_EVENT_ERR_UNIT_CYCLE:             return SPN_ERR_UNIT_CYCLE;
-    case SPN_EVENT_ERR_DYNAMIC_DUPLICATE:      return SPN_ERR_DYNAMIC_DUPLICATE;
-    case SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX: return SPN_ERR_RESOLVE_TOO_COMPLEX;
-    default:                                   return SPN_ERROR;
-  }
-}
-
-static void record_failure(spn_resolve_run_t* run, spn_build_event_t event) {
-  if (run->failed) {
-    return;
-  }
-  run->failed = true;
-  run->failure = event;
-  run->err = resolve_err_kind(event.kind);
-}
-
 static spn_pkg_tree_t upstream_tree(spn_pkg_info_t* info) {
   if (sp_str_empty(info->upstream.url)) {
     return (spn_pkg_tree_t) { .kind = SPN_PKG_TREE_NONE };
@@ -176,9 +158,9 @@ static spn_pkg_tree_t upstream_tree(spn_pkg_info_t* info) {
   };
 }
 
-static spn_build_event_t unsatisfiable_event(spn_resolver_t* resolver, spn_resolved_pkg_t* from, spn_requested_dep_t* request, bool conflict, spn_semver_t selected) {
-  return (spn_build_event_t) {
-    .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,
+static spn_resolve_err_t unsatisfiable_err(spn_resolver_t* resolver, spn_resolved_pkg_t* from, spn_requested_dep_t* request, bool conflict, spn_semver_t selected) {
+  return (spn_resolve_err_t) {
+    .kind = SPN_ERR_PKG_NO_MATCH,
     .unsatisfiable = {
       .request = *request,
       .requester = from ? sp_intern_str_from_id(resolver->intern, from->id.qualified) : sp_str_lit(""),
@@ -393,20 +375,19 @@ static u32 find_or_create_scope(spn_resolver_t* resolver, spn_resolve_run_t* run
   return (u32)(sp_da_size(run->scopes) - 1);
 }
 
-static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* from, spn_requested_dep_t* request) {
+static spn_resolve_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* from, spn_requested_dep_t* request) {
   spn_scope_t* scope = &run->scopes[run->scope];
   sp_intern_id_t name = sp_intern_get_or_insert(resolver->intern, request->qualified);
 
   if (sp_ht_getp(run->visited, name)) {
-    record_failure(run, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR_CIRCULAR_DEP,
+    return (spn_resolve_err_t) {
+      .kind = SPN_ERR_DEP_CYCLE,
       .circular.id = spn_pkg_name_from_qualified(request->qualified),
-    });
-    return SPN_ERROR;
+    };
   }
 
   if (sp_ht_getp(scope->named, name)) {
-    return SPN_OK;
+    return resolve_ok();
   }
 
   spn_registry_pkg_t* pkg = sp_ht_getp(*resolver->registry, ((spn_pkg_id_t) { .qualified = name }));
@@ -416,25 +397,23 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
     spn_registry_err_t err = sp_zero;
     pkg = spn_registry_load_file_pkg(resolver->registry, resolver->mem, resolver->intern, request->qualified, request->file.path, &err);
     if (!pkg) {
-      record_failure(run, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR_MANIFEST,
-        .manifest_err = {
+      return (spn_resolve_err_t) {
+        .kind = SPN_ERR_DEP_MANIFEST,
+        .manifest = {
           .name = request->qualified,
           .path = err.manifest,
           .error = err.error,
           .issues = err.issues,
         }
-      });
-      return SPN_ERROR;
+      };
     }
   }
 
   if (!pkg) {
-    record_failure(run, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR_UNKNOWN_PKG,
+    return (spn_resolve_err_t) {
+      .kind = SPN_ERR_PKG_UNKNOWN,
       .unknown.request = *request
-    });
-    return SPN_ERROR;
+    };
   }
 
   spn_semver_t pinned = sp_zero;
@@ -442,8 +421,7 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
   bool held = find_forced(run, name, &pinned) || find_pin(scope, name, &pinned, &contradiction);
   if (held) {
     if (contradiction || !spn_semver_eq(pkg->info->version, pinned)) {
-      record_failure(run, unsatisfiable_event(resolver, from, request, true, pinned));
-      return SPN_ERROR;
+      return unsatisfiable_err(resolver, from, request, true, pinned);
     }
   }
 
@@ -491,29 +469,25 @@ static spn_err_t resolve_local_package(spn_resolver_t* resolver, spn_resolve_run
   u64 boundaries = sp_da_size(run->boundaries);
   sp_ht_insert(scope->named, name, node);
 
-  if (!resolve_deps(resolver, run, &node)) {
+  spn_resolve_err_t err = resolve_deps(resolver, run, &node);
+  if (!err.kind) {
     sp_mem_end_scratch(scratch);
-    return SPN_OK;
+    return err;
   }
 
   restore_named(scratch.mem, scope, snapshot);
   sp_da_head(run->boundaries)->size = boundaries;
   sp_mem_end_scratch(scratch);
-  return SPN_ERROR;
+  return err;
 }
 
-static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_index_release_t* release) {
-  if (run->fatal) {
-    return SPN_ERROR;
-  }
-  if (!run->budget) {
+static spn_resolve_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_index_release_t* release) {
+  if (run->fatal || !run->budget) {
     run->fatal = true;
-    run->failed = false;
-    record_failure(run, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX,
+    return (spn_resolve_err_t) {
+      .kind = SPN_ERR_RESOLVE_TOO_COMPLEX,
       .too_complex.id = release->id,
-    });
-    return SPN_ERROR;
+    };
   }
   run->budget--;
 
@@ -558,9 +532,9 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
 
     spn_semver_range_t range = sp_zero;
     if (spn_semver_parse_range(release->deps[it].version, &range)) {
-      record_failure(run, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR_MANIFEST,
-        .manifest_err = {
+      return (spn_resolve_err_t) {
+        .kind = SPN_ERR_DEP_MANIFEST,
+        .manifest = {
           .name = qualified,
           .error = sp_fmt(resolver->mem, "index entry for {} {} has invalid version range {} for dep {}",
             sp_fmt_str(qualified),
@@ -568,8 +542,7 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
             sp_fmt_str(release->deps[it].version),
             sp_fmt_str(release->deps[it].id.name)).value,
         },
-      });
-      return SPN_ERROR;
+      };
     }
 
     sp_da_push(node.deps, ((spn_requested_dep_t) {
@@ -593,28 +566,27 @@ static spn_err_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t* run,
   u64 boundaries = sp_da_size(run->boundaries);
   sp_ht_insert(scope->named, name, node);
 
-  if (!resolve_deps(resolver, run, &node)) {
-    run->failed = false;
+  spn_resolve_err_t err = resolve_deps(resolver, run, &node);
+  if (!err.kind) {
     sp_mem_end_scratch(scratch);
-    return SPN_OK;
+    return err;
   }
 
   restore_named(scratch.mem, scope, snapshot);
   sp_da_head(run->boundaries)->size = boundaries;
   sp_mem_end_scratch(scratch);
-  return SPN_ERROR;
+  return err;
 }
 
-static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* from, spn_requested_dep_t* request) {
+static spn_resolve_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* from, spn_requested_dep_t* request) {
   spn_scope_t* scope = &run->scopes[run->scope];
   sp_intern_id_t name = sp_intern_get_or_insert(resolver->intern, request->qualified);
 
   if (sp_ht_getp(run->visited, name)) {
-    record_failure(run, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR_CIRCULAR_DEP,
+    return (spn_resolve_err_t) {
+      .kind = SPN_ERR_DEP_CYCLE,
       .circular.id = spn_pkg_name_from_qualified(request->qualified),
-    });
-    return SPN_ERROR;
+    };
   }
 
   // If this scope already resolved a version for this package, check if that version satisfies
@@ -622,20 +594,18 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
   spn_resolved_pkg_t* existing = sp_ht_getp(scope->named, name);
   if (existing) {
     if (spn_semver_in_range(existing->id.version, request->index.range)) {
-      return SPN_OK;
+      return resolve_ok();
     }
 
-    record_failure(run, unsatisfiable_event(resolver, from, request, true, existing->id.version));
-    return SPN_ERROR;
+    return unsatisfiable_err(resolver, from, request, true, existing->id.version);
   }
 
   spn_index_pkg_t* pkg = spn_index_cache_get_package(resolver->index, spn_pkg_name_from_qualified(request->qualified));
   if (!pkg) {
-    record_failure(run, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR_UNKNOWN_PKG,
+    return (spn_resolve_err_t) {
+      .kind = SPN_ERR_PKG_UNKNOWN,
       .unknown.request = *request
-    });
-    return SPN_ERROR;
+    };
   }
 
   // By definition, if a name is pinned and a candidatae version doesn't satisfy
@@ -645,26 +615,21 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
   bool held = find_forced(run, name, &pinned) || find_pin(scope, name, &pinned, &contradiction);
   if (held) {
     if (contradiction || !spn_semver_in_range(pinned, request->index.range)) {
-      record_failure(run, unsatisfiable_event(resolver, from, request, true, pinned));
-      return SPN_ERROR;
+      return unsatisfiable_err(resolver, from, request, true, pinned);
     }
 
     sp_da_for(pkg->releases, it) {
       if (spn_semver_eq(pkg->releases[it].version, pinned)) {
-        if (!try_candidate(resolver, run, &pkg->releases[it])) {
-          return SPN_OK;
-        }
-        break;
+        return try_candidate(resolver, run, &pkg->releases[it]);
       }
     }
 
-    record_failure(run, unsatisfiable_event(resolver, from, request, true, pinned));
-    return SPN_ERROR;
+    return unsatisfiable_err(resolver, from, request, true, pinned);
   }
 
   // If the name is totally free, just pick the newest legal version. This
   // is just a simple, greedy heuristic, not for correctness.
-  spn_err_t result = SPN_ERROR;
+  spn_resolve_err_t first = sp_zero;
   sp_da_rfor(pkg->releases, it) {
     spn_index_release_t* release = &pkg->releases[it];
     if (release->yanked) {
@@ -673,28 +638,27 @@ static spn_err_t resolve_index_package(spn_resolver_t* resolver, spn_resolve_run
     if (!spn_semver_in_range(release->version, request->index.range)) {
       continue;
     }
-    if (!try_candidate(resolver, run, release)) {
-      result = SPN_OK;
-      break;
+
+    spn_resolve_err_t err = try_candidate(resolver, run, release);
+    if (!err.kind || run->fatal) {
+      return err;
     }
-    if (run->fatal) {
-      break;
+    if (!first.kind) {
+      first = err;
     }
   }
 
-  if (!result) {
-    return SPN_OK;
+  if (first.kind) {
+    return first;
   }
-
-  record_failure(run, unsatisfiable_event(resolver, from, request, false, sp_zero_s(spn_semver_t)));
-  return SPN_ERROR;
+  return unsatisfiable_err(resolver, from, request, false, sp_zero_s(spn_semver_t));
 }
 
-static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node, spn_requested_dep_t* dep) {
+static spn_resolve_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node, spn_requested_dep_t* dep) {
   spn_dep_edge_t edge = classify_dep(resolver, node, dep);
   switch (edge) {
     case SPN_DEP_EDGE_PRUNED: {
-      return SPN_OK;
+      return resolve_ok();
     }
     case SPN_DEP_EDGE_PROCESS:
     case SPN_DEP_EDGE_PRIVATE: {
@@ -703,7 +667,7 @@ static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, s
         .edge = edge,
         .req = *dep,
       }));
-      return SPN_OK;
+      return resolve_ok();
     }
     case SPN_DEP_EDGE_SCOPE: {
       break;
@@ -716,23 +680,23 @@ static spn_err_t resolve_dep(spn_resolver_t* resolver, spn_resolve_run_t* run, s
     case SPN_PKG_SOURCE_FILE:  return resolve_local_package(resolver, run, node, dep);
   }
 
-  sp_unreachable_return(SPN_ERROR);
+  sp_unreachable_return(resolve_ok());
 }
 
-static spn_err_t resolve_deps(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node) {
+static spn_resolve_err_t resolve_deps(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_resolved_pkg_t* node) {
   sp_ht_insert(run->visited, node->id.qualified, (u8)true);
 
-  spn_err_t result = SPN_OK;
+  spn_resolve_err_t err = sp_zero;
   sp_da_for(node->deps, it) {
-    result = resolve_dep(resolver, run, node, &node->deps[it]);
-    if (result) break;
+    err = resolve_dep(resolver, run, node, &node->deps[it]);
+    if (err.kind) break;
   }
 
   sp_ht_erase(run->visited, node->id.qualified);
-  return result;
+  return err;
 }
 
-static spn_err_t solve_reqs(spn_resolver_t* resolver, spn_resolve_run_t* run, u64 from, u64 to) {
+static spn_resolve_err_t solve_reqs(spn_resolver_t* resolver, spn_resolve_run_t* run, u64 from, u64 to) {
   spn_resolved_pkg_t root = {
     .id = spn_pkg_id(resolver->intern, sp_str_lit("")),
     .source = SPN_PKG_SOURCE_ROOT,
@@ -740,10 +704,10 @@ static spn_err_t solve_reqs(spn_resolver_t* resolver, spn_resolve_run_t* run, u6
 
   for (u64 it = from; it < to; it++) {
     spn_requested_dep_t req = run->scopes[run->scope].reqs[it];
-    spn_try(resolve_dep(resolver, run, &root, &req));
+    resolve_try(resolve_dep(resolver, run, &root, &req));
   }
 
-  return SPN_OK;
+  return resolve_ok();
 }
 
 // The full assignment for some feasibility check.
@@ -780,27 +744,27 @@ static void capture_witness(sp_mem_t mem, spn_resolve_run_t* run, spn_scope_t* s
   witness->held = true;
 }
 
-static spn_err_t attempt_reqs(spn_resolver_t* resolver, spn_resolve_run_t* run, u64 from, u64 to, bool keep, spn_witness_t* witness) {
+static spn_resolve_err_t attempt_reqs(spn_resolver_t* resolver, spn_resolve_run_t* run, u64 from, u64 to, bool keep, spn_witness_t* witness) {
   spn_scope_t* scope = &run->scopes[run->scope];
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_da(sp_intern_id_t) snapshot = snapshot_named(scratch.mem, scope);
   u64 boundaries = sp_da_size(run->boundaries);
 
-  spn_err_t result = solve_reqs(resolver, run, from, to);
-  if (!result && witness) {
+  spn_resolve_err_t err = solve_reqs(resolver, run, from, to);
+  if (!err.kind && witness) {
     capture_witness(resolver->mem, run, scope, snapshot, boundaries, witness);
   }
-  if (result || !keep) {
+  if (err.kind || !keep) {
     restore_named(scratch.mem, scope, snapshot);
     sp_da_head(run->boundaries)->size = boundaries;
   }
 
   sp_mem_end_scratch(scratch);
-  return result;
+  return err;
 }
 
-static spn_err_t resolve_scope(spn_resolver_t* resolver, spn_resolve_run_t* run) {
+static spn_resolve_err_t resolve_scope(spn_resolver_t* resolver, spn_resolve_run_t* run) {
   spn_scope_t* scope = &run->scopes[run->scope];
   u64 from = scope->cursor;
   u64 to = sp_da_size(scope->reqs);
@@ -869,16 +833,12 @@ static spn_err_t resolve_scope(spn_resolver_t* resolver, spn_resolve_run_t* run)
   sp_da_for(pins, it) {
     sp_da_push(scope->pins, pins[it]);
   }
-  if (!attempt_reqs(resolver, run, from, to, true, SP_NULLPTR)) {
+  spn_resolve_err_t err = attempt_reqs(resolver, run, from, to, true, SP_NULLPTR);
+  if (!err.kind || run->fatal) {
     sp_mem_end_scratch(scratch);
-    return SPN_OK;
+    return err;
   }
   sp_da_clear(scope->pins);
-
-  if (run->fatal) {
-    sp_mem_end_scratch(scratch);
-    return SPN_ERROR;
-  }
 
   // At this point, we know that this set of pins can't work, but we don't
   // know which pin is guilty.
@@ -897,12 +857,12 @@ static spn_err_t resolve_scope(spn_resolver_t* resolver, spn_resolve_run_t* run)
   // - C's check succeeds. C is kept, and the witness is now an assignment for {A, C}
   spn_witness_t witness = sp_zero;
   sp_da_for(pins, it) {
-    run->failed = false;
     sp_da_push(scope->pins, pins[it]);
-    if (attempt_reqs(resolver, run, from, to, false, &witness)) {
+    spn_resolve_err_t attempt = attempt_reqs(resolver, run, from, to, false, &witness);
+    if (attempt.kind) {
       if (run->fatal) {
         sp_mem_end_scratch(scratch);
-        return SPN_ERROR;
+        return attempt;
       }
       sp_da_head(scope->pins)->size -= 1;
     }
@@ -919,12 +879,10 @@ static spn_err_t resolve_scope(spn_resolver_t* resolver, spn_resolve_run_t* run)
       sp_da_push(run->boundaries, witness.boundaries[it]);
     }
     sp_mem_end_scratch(scratch);
-    run->failed = false;
-    return SPN_OK;
+    return resolve_ok();
   }
 
   sp_mem_end_scratch(scratch);
-  run->failed = false;
   return solve_reqs(resolver, run, from, to);
 }
 
@@ -1057,28 +1015,27 @@ static sp_da(spn_node_edge_t) collect_node_edges(spn_resolver_t* resolver, spn_r
   return edges;
 }
 
-static spn_err_t check_group_cycle(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_group_states_t states, u32 scope_index, sp_intern_id_t name) {
+static spn_resolve_err_t check_group_cycle(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_group_states_t states, u32 scope_index, sp_intern_id_t name) {
   spn_group_node_t key = { .scope = scope_index, .name = name };
   u8* state = sp_ht_getp(states, key);
   if (state && *state == 2) {
-    return SPN_OK;
+    return resolve_ok();
   }
 
   spn_scope_t* scope = &run->scopes[scope_index];
   spn_resolved_pkg_t* node = sp_ht_getp(scope->named, name);
   if (!node) {
-    return SPN_OK;
+    return resolve_ok();
   }
 
   if (state && *state == 1) {
-    record_failure(run, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR_UNIT_CYCLE,
+    return (spn_resolve_err_t) {
+      .kind = SPN_ERR_UNIT_CYCLE,
       .unit_cycle = {
         .id = spn_pkg_name_from_qualified(sp_intern_str_from_id(resolver->intern, node->id.qualified)),
         .version = node->id.version,
       }
-    });
-    return SPN_ERROR;
+    };
   }
 
   sp_ht_insert(states, key, (u8)1);
@@ -1086,36 +1043,36 @@ static spn_err_t check_group_cycle(spn_resolver_t* resolver, spn_resolve_run_t* 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_da(spn_node_edge_t) edges = collect_node_edges(resolver, run, scratch.mem, scope_index, node);
 
-  spn_err_t result = SPN_OK;
+  spn_resolve_err_t err = sp_zero;
   sp_da_for(edges, it) {
-    result = check_group_cycle(resolver, run, states, edges[it].scope, edges[it].name);
-    if (result) break;
+    err = check_group_cycle(resolver, run, states, edges[it].scope, edges[it].name);
+    if (err.kind) break;
   }
 
   sp_mem_end_scratch(scratch);
-  spn_try(result);
+  resolve_try(err);
 
   *sp_ht_getp(states, key) = 2;
-  return SPN_OK;
+  return resolve_ok();
 }
 
-static spn_err_t check_group_cycles(spn_resolver_t* resolver, spn_resolve_run_t* run) {
+static spn_resolve_err_t check_group_cycles(spn_resolver_t* resolver, spn_resolve_run_t* run) {
   // The walk opens scratch frames per node, so the states table must not
   // grow from the scratch arena
   spn_group_states_t states = SP_NULLPTR;
   sp_ht_init(resolver->mem, states);
 
-  spn_err_t result = SPN_OK;
+  spn_resolve_err_t err = sp_zero;
   sp_da_for(run->scopes, it) {
     spn_scope_t* scope = &run->scopes[it];
     sp_ht_for_kv(scope->named, jt) {
-      result = check_group_cycle(resolver, run, states, (u32)it, *jt.key);
-      if (result) break;
+      err = check_group_cycle(resolver, run, states, (u32)it, *jt.key);
+      if (err.kind) break;
     }
-    if (result) break;
+    if (err.kind) break;
   }
 
-  return result;
+  return err;
 }
 
 static sp_hash_t leaf_hash(spn_resolver_t* resolver, spn_resolved_pkg_t* instance) {
@@ -1214,9 +1171,9 @@ typedef struct {
   sp_hash_t hash;
 } spn_shared_seen_t;
 
-static spn_err_t check_dynamic_duplicates(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_group_hash_t memo) {
+static spn_resolve_err_t check_dynamic_duplicates(spn_resolver_t* resolver, spn_resolve_run_t* run, spn_group_hash_t memo) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  spn_err_t result = SPN_OK;
+  spn_resolve_err_t result = sp_zero;
 
   sp_da_for(run->scopes, process) {
     sp_ht(sp_intern_id_t, spn_shared_seen_t) shared = SP_NULLPTR;
@@ -1248,14 +1205,14 @@ static spn_err_t check_dynamic_duplicates(spn_resolver_t* resolver, spn_resolve_
         bool ordered = spn_semver_le(prior->node->id.version, node->id.version);
         spn_semver_t low = ordered ? prior->node->id.version : node->id.version;
         spn_semver_t high = ordered ? node->id.version : prior->node->id.version;
-        record_failure(run, (spn_build_event_t) {
-          .kind = SPN_EVENT_ERR_DYNAMIC_DUPLICATE,
+        result = (spn_resolve_err_t) {
+          .kind = SPN_ERR_DYNAMIC_DUPLICATE,
           .dynamic_dup = {
             .id = spn_pkg_name_from_qualified(sp_intern_str_from_id(resolver->intern, node->id.qualified)),
             .low = low,
             .high = high,
           }
-        });
+        };
 
         // A duplicate between two different versions may be an artifact of a
         // greedy pick: some assignment holding the name to one of the duped
@@ -1266,7 +1223,6 @@ static spn_err_t check_dynamic_duplicates(spn_resolver_t* resolver, spn_resolve_
           run->retry[1] = (spn_pin_t) { .name = node->id.qualified, .version = high };
           run->retries = 2;
         }
-        result = SPN_ERROR;
         goto done;
       }
     }
@@ -1289,9 +1245,7 @@ static sp_str_t patch_dir(spn_resolver_t* resolver, spn_index_release_t* release
   return dir;
 }
 
-static spn_err_union_t apply_patch_overrides(spn_resolver_t* resolver, spn_resolve_query_t* query) {
-  spn_err_union_t result = sp_zero;
-
+static void apply_patch_overrides(spn_resolver_t* resolver, spn_resolve_query_t* query) {
   sp_ht_for_kv(query->result, it) {
     spn_resolved_pkg_t* pkg = it.val;
     if (pkg->source != SPN_PKG_SOURCE_INDEX) {
@@ -1308,15 +1262,15 @@ static spn_err_union_t apply_patch_overrides(spn_resolver_t* resolver, spn_resol
     spn_toml_loader_t ctx = sp_zero;
     spn_toml_loader_init(&ctx, resolver->mem, resolver->intern);
     if (spn_codegen_load_pkg(&ctx, manifest, info) || spn_pkg_reject_patches(&ctx, info)) {
-      spn_event_buffer_push(resolver->events, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR_MANIFEST,
-        .manifest_err = {
+      sp_da_push(query->errors, ((spn_resolve_err_t) {
+        .kind = SPN_ERR_DEP_MANIFEST,
+        .manifest = {
           .name = sp_intern_str_from_id(resolver->intern, pkg->id.qualified),
           .path = manifest,
           .error = spn_codegen_issues_message(resolver->mem, ctx.issues),
           .issues = ctx.issues,
-        }});
-      result = spn_err_reported(SPN_ERR_DEP_MANIFEST);
+        }
+      }));
       continue;
     }
 
@@ -1329,15 +1283,13 @@ static spn_err_union_t apply_patch_overrides(spn_resolver_t* resolver, spn_resol
     pkg->name = info->name;
     pkg->options = info->options;
   }
-
-  return result;
 }
 
 spn_err_t spn_resolve_from_lock_file(spn_resolver_t* resolver, spn_lock_file_t* lock) {
   return SPN_OK;
 }
 
-static spn_err_t solve_once(spn_resolver_t* resolver, spn_resolve_query_t* query, spn_pin_t* forced, spn_resolve_run_t* run) {
+static spn_resolve_err_t solve_once(spn_resolver_t* resolver, spn_resolve_query_t* query, spn_pin_t* forced, spn_resolve_run_t* run) {
   *run = (spn_resolve_run_t) {
     .query = query,
   };
@@ -1368,16 +1320,15 @@ static spn_err_t solve_once(spn_resolver_t* resolver, spn_resolve_query_t* query
       progress = true;
       run->scope = (u32)it;
 
-      spn_try(resolve_scope(resolver, run));
+      resolve_try(resolve_scope(resolver, run));
 
       commit_scope(resolver, run);
       process_boundaries(resolver, run);
-      run->failed = false;
     }
   }
 
   compute_processes(run);
-  spn_try(check_group_cycles(resolver, run));
+  resolve_try(check_group_cycles(resolver, run));
 
   spn_group_hash_t memo = SP_NULLPTR;
   sp_ht_init(resolver->mem, memo);
@@ -1392,34 +1343,29 @@ static spn_err_t solve_once(spn_resolver_t* resolver, spn_resolve_query_t* query
   return check_dynamic_duplicates(resolver, run, memo);
 }
 
-spn_err_union_t spn_resolve_from_solver(spn_resolver_t* resolver, spn_resolve_query_t* query) {
+spn_err_t spn_resolve_from_solver(spn_resolver_t* resolver, spn_resolve_query_t* query) {
   sp_tm_timer_t timer = sp_tm_start_timer();
 
   spn_resolve_run_t run = sp_zero;
-  spn_err_t err = solve_once(resolver, query, SP_NULLPTR, &run);
+  spn_resolve_err_t err = solve_once(resolver, query, SP_NULLPTR, &run);
 
-  for (u32 it = 0; err && it < run.retries; it++) {
+  for (u32 it = 0; err.kind && it < run.retries; it++) {
     query->result = SP_NULLPTR;
     sp_ht_init(resolver->mem, query->result);
 
     spn_resolve_run_t retry = sp_zero;
-    if (!solve_once(resolver, query, &run.retry[it], &retry)) {
-      err = SPN_OK;
+    if (!solve_once(resolver, query, &run.retry[it], &retry).kind) {
+      err = resolve_ok();
     }
   }
 
-  spn_err_union_t result = sp_zero;
-  if (err && run.failed) {
-    spn_event_buffer_push(resolver->events, run.failure);
-    result = spn_err_reported(run.err);
-  }
-  else if (err) {
-    result = (spn_err_union_t) { .kind = err };
+  if (err.kind) {
+    sp_da_push(query->errors, err);
   }
   else {
-    result = apply_patch_overrides(resolver, query);
+    apply_patch_overrides(resolver, query);
   }
 
   query->time = sp_tm_read_timer(&timer);
-  return result;
+  return sp_da_empty(query->errors) ? SPN_OK : query->errors[0].kind;
 }

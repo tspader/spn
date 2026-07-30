@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [],
+  "errors": [
+    {
+      "kind": "dep_cycle",
+      "namespace": "spn",
+      "name": "audio"
+    }
+  ]
+}

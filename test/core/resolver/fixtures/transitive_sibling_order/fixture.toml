@@ -1,0 +1,1 @@
+skip = "greedy sibling ordering; pins a known resolver bug"

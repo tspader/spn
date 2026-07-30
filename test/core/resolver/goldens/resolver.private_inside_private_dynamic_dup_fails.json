@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [],
+  "errors": [
+    {
+      "kind": "dynamic_duplicate",
+      "namespace": "spn",
+      "name": "leaf",
+      "versions": [
+        "1.0.0",
+        "2.0.0"
+      ]
+    }
+  ]
+}

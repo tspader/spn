@@ -26,17 +26,6 @@ static sp_str_t fz_root_attrs(fz_dep_t dep) {
   return dep.private ? sp_str_lit(", private = true") : sp_str_lit("");
 }
 
-static sp_str_t fz_linkage_name(spn_linkage_t kind) {
-  switch (kind) {
-    case SPN_LIB_KIND_NONE:   return sp_str_lit("SPN_LIB_KIND_NONE");
-    case SPN_LIB_KIND_SHARED: return sp_str_lit("SPN_LIB_KIND_SHARED");
-    case SPN_LIB_KIND_STATIC: return sp_str_lit("SPN_LIB_KIND_STATIC");
-    case SPN_LIB_KIND_SOURCE: return sp_str_lit("SPN_LIB_KIND_SOURCE");
-    case SPN_LIB_KIND_OBJECT: return sp_str_lit("SPN_LIB_KIND_OBJECT");
-  }
-  sp_unreachable_return(sp_str_lit("SPN_LIB_KIND_NONE"));
-}
-
 static const c8* fz_linkage_json(spn_linkage_t kind) {
   switch (kind) {
     case SPN_LIB_KIND_NONE:   return "none";
@@ -125,14 +114,14 @@ void fz_dump(fz_universe_t* u, u64 iter) {
 
   sp_str_t verdict = sp_str_lit("<unchecked>");
   if (!u->profile.features && !u->profile.big) {
-    verdict = fz_oracle_sat(u) ? sp_str_lit("SPN_OK") : sp_str_lit("SPN_ERR_PKG_NO_MATCH");
+    verdict = fz_oracle_sat(u) ? sp_str_lit("ok") : sp_str_lit("pkg_no_match");
   }
 
   sp_template_scope_t* scope = sp_template_scope_create(mem);
   sp_template_set(scope, sp_str_lit("mode"), mode);
   sp_template_set(scope, sp_str_lit("iter"), sp_fmt(mem, "{}", sp_fmt_uint(iter)).value);
   sp_template_set(scope, sp_str_lit("err"), verdict);
-  sp_template_set(scope, sp_str_lit("linkage"), fz_linkage_name(u->profile.linkage));
+  sp_template_set(scope, sp_str_lit("linkage"), sp_cstr_as_str(fz_linkage_json(u->profile.linkage)));
 
   sp_template_list(scope, sp_str_lit("with_budget"));
   if (u->profile.budget) {

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [],
+  "errors": [
+    {
+      "kind": "unit_cycle",
+      "namespace": "spn",
+      "name": "tool",
+      "version": "1.0.0"
+    }
+  ]
+}

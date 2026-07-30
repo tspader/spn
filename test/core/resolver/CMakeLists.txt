@@ -3,6 +3,7 @@ add_executable(resolver
   ${SRC}/intern/context.c
   ${SRC}/intern/intern.c
   ${SRC}/enum/enum.c
+  ${SRC}/error/str.c
   ${SRC}/event/event.c
   ${SRC}/external/cJSON.c
   ${SRC}/external/git.c

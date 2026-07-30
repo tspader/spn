@@ -5,7 +5,24 @@
     "requests": { "elements": { "ref": "resolve_request" } },
     "packages": { "elements": { "ref": "resolve_pkg" } }
   },
+  "optionalProperties": {
+    "errors": { "elements": { "ref": "resolve_error" } }
+  },
   "definitions": {
+    "resolve_error": {
+      "optionalProperties": {
+        "kind": { "type": "string" },
+        "namespace": { "type": "string" },
+        "name": { "type": "string" },
+        "range": { "type": "string" },
+        "requester": { "type": "string" },
+        "selected": { "type": "string" },
+        "version": { "type": "string" },
+        "versions": { "elements": { "type": "string" } },
+        "detail": { "type": "string" }
+      }
+    },
+
     "dep_kind": { "enum": ["package", "build", "test"], "metadata": { "include": "pkg/types.h" } },
     "dep_edge": { "enum": ["scope", "process", "private", "pruned"], "metadata": { "include": "resolve/types.h" } },
 

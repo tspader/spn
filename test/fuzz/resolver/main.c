@@ -5,7 +5,6 @@
 #include "fuzz.h"
 
 #include "ctx/types.h"
-#include "event/event.h"
 #include "index/cache.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
@@ -28,7 +27,7 @@ sp_str_t fz_err_to_str(fz_err_t err) {
     case FZ_ERR_ROOT_OUT_OF_RANGE:        return sp_str_lit("root request resolved out of range");
     case FZ_ERR_DEP_UNRESOLVED:           return sp_str_lit("resolved package's dep not resolved");
     case FZ_ERR_DEP_OUT_OF_RANGE:         return sp_str_lit("resolved package's dep resolved out of range");
-    case FZ_ERR_EVENT_MISSING:            return sp_str_lit("error without a failure event");
+    case FZ_ERR_CAUSE_MISSING:            return sp_str_lit("error without a recorded cause");
     case FZ_ERR_BUDGET_EXHAUSTED:         return sp_str_lit("resolver burned the default budget; the search blew up");
     case FZ_ERR_PLANTED_REJECTED:         return sp_str_lit("resolver rejected a universe that is satisfiable by construction");
     case FZ_ERR_INCOMPLETE:               return sp_str_lit("resolver claims unsatisfiable; the oracle found an assignment");
@@ -80,7 +79,6 @@ spn_index_release_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_p
 typedef struct {
   spn_resolve_query_t query;
   sp_intern_t* intern;
-  sp_da(spn_build_event_t) events;
   spn_err_t err;
 } fz_result_t;
 
@@ -224,7 +222,6 @@ static fz_result_t fz_execute(sp_mem_t mem, fz_universe_t* u, sp_intern_t* inter
     .info = root,
   }));
 
-  spn_event_buffer_t* events = spn_event_buffer_new(mem);
   spn_index_cache_t cache = sp_zero;
 
   sp_da(spn_pkg_config_entry_t) config = sp_da_new(mem, spn_pkg_config_entry_t);
@@ -238,7 +235,7 @@ static fz_result_t fz_execute(sp_mem_t mem, fz_universe_t* u, sp_intern_t* inter
   }
 
   spn_resolver_t resolver = sp_zero;
-  spn_resolver_init(&resolver, mem, intern, &cache, &registry, events, (spn_profile_info_t) { .linkage = u->profile.linkage }, config, u->profile.budget);
+  spn_resolver_init(&resolver, mem, intern, &cache, &registry, (spn_profile_info_t) { .linkage = u->profile.linkage }, config, u->profile.budget);
 
   fz_result_t result = sp_zero_s(fz_result_t);
   result.intern = intern;
@@ -248,14 +245,13 @@ static fz_result_t fz_execute(sp_mem_t mem, fz_universe_t* u, sp_intern_t* inter
     .source = SPN_PKG_SOURCE_ROOT,
   });
 
-  result.err = spn_resolve_from_solver(&resolver, &result.query).kind;
-  result.events = spn_event_buffer_drain(mem, events);
+  result.err = spn_resolve_from_solver(&resolver, &result.query);
   return result;
 }
 
-static bool fz_pushed_event(fz_result_t* result, spn_build_event_kind_t kind) {
-  sp_da_for(result->events, it) {
-    if (result->events[it].kind == kind) {
+static bool fz_failed_with(fz_result_t* result, spn_err_t kind) {
+  sp_da_for(result->query.errors, it) {
+    if (result->query.errors[it].kind == kind) {
       return true;
     }
   }
@@ -285,16 +281,16 @@ static fz_err_t fz_check_result(sp_mem_t mem, fz_universe_t* u, fz_result_t* res
     return fz_check_units(mem, u, result->intern, &result->query);
   }
 
-  if (sp_da_empty(result->events)) {
-    return FZ_ERR_EVENT_MISSING;
+  if (sp_da_empty(result->query.errors)) {
+    return FZ_ERR_CAUSE_MISSING;
   }
-  if (fz_pushed_event(result, SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX)) {
+  if (fz_failed_with(result, SPN_ERR_RESOLVE_TOO_COMPLEX)) {
     return u->profile.budget ? FZ_OK : FZ_ERR_BUDGET_EXHAUSTED;
   }
   if (u->planted) {
     return FZ_ERR_PLANTED_REJECTED;
   }
-  if (u->profile.features && fz_pushed_event(result, SPN_EVENT_ERR_DYNAMIC_DUPLICATE)) {
+  if (u->profile.features && fz_failed_with(result, SPN_ERR_DYNAMIC_DUPLICATE)) {
     return FZ_OK;
   }
   if (!u->profile.big && fz_oracle_sat(u)) {
@@ -337,7 +333,7 @@ static fz_err_t fz_run_iteration(sp_fuzz_prng_t base, u64 iter) {
   // so its fixture reproduces where the original's would pass. Intern
   // failures keep the original; the fixture runner perturbs interns itself
   fz_universe_t dumped = universe;
-  bool stable = !err && !profile.budget && !fz_pushed_event(&result, SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX);
+  bool stable = !err && !profile.budget && !fz_failed_with(&result, SPN_ERR_RESOLVE_TOO_COMPLEX);
   if (stable) {
     fz_solution_t solution = sp_zero;
     if (!result.err) {
@@ -397,7 +393,7 @@ static fz_err_t fz_run_iteration(sp_fuzz_prng_t base, u64 iter) {
     if (!err && !result.err) {
       fz_universe_t extended = fz_extend_universe(mem, &prng, &universe);
       fz_result_t extended_result = fz_execute(mem, &extended, SP_NULLPTR);
-      if (extended_result.err && !fz_pushed_event(&extended_result, SPN_EVENT_ERR_DYNAMIC_DUPLICATE)) {
+      if (extended_result.err && !fz_failed_with(&extended_result, SPN_ERR_DYNAMIC_DUPLICATE)) {
         err = FZ_ERR_EXTEND_VERDICT;
         dumped = extended;
       }
