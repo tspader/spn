@@ -1,0 +1,4 @@
+[package]
+namespace = "test"
+name = "root"
+version = "0.0.1"

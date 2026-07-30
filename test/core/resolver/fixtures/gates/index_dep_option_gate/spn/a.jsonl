@@ -1,0 +1,1 @@
+{"namespace":"spn","name":"a","version":"1.0.0","yanked":false,"deps":[{"namespace":"spn","name":"b","version":"^1.0.0","kind":"normal","when":{"x":true}},{"namespace":"spn","name":"w","version":"^1.0.0","kind":"normal","when":{"y":true}}],"options":{"x":{"type":"bool","default":[{"value":true}]},"y":{"type":"bool"}}}

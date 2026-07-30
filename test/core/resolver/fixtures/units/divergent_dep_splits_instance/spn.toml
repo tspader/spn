@@ -1,0 +1,11 @@
+[package]
+namespace = "test"
+name = "root"
+version = "0.0.1"
+
+[deps.package]
+'spn/a' = { version = "^1.9.0" }
+'spn/b' = { version = "^1.0.0" }
+
+[deps.build]
+'spn/c' = { version = "^1.0.0" }

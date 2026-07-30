@@ -40,12 +40,6 @@ add_executable(resolver
   ${SRC}/target/select.c
   ${SRC}/toolchain/toolchain.c
   main.c
-  graph.c
-  metadata.c
-  gates.c
-  units.c
-  convergence.c
-  worlds.c
   ${TEST_TOOLS}/ctx.c
   ${TEST_TOOLS}/sp_fuzz.c
   ${TEST_TOOLS}/tmp.c
