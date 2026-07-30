@@ -27,9 +27,6 @@ wamr = { path = "vendor/wamr" }
 toml = "1.4.0"
 yyjson = "0.13.0"
 
-[deps.test]
-utest = "1.0.0"
-
 [deps.build]
 "spader/sp" = { path = "vendor/sp" }
 yyjson = "0.13.0"
@@ -266,28 +263,6 @@ source = [
   "test/tools/toml.c",
 ]
 include = ["include", "source", "source/external", "test/integration", "test/tools"]
-flags = []
-
-[[test]]
-name = "e2e"
-source = [
-  "source/compiler/driver.c",
-  "source/compiler/gnu.c",
-  "source/compiler/msvc.c",
-  "source/enum/enum.c",
-  "source/error/str.c",
-  "source/external/tom.c",
-  "source/sp/str.c",
-  "source/triple/triple.c",
-  "test/e2e/main.c",
-  "test/tools/repo.c",
-  "test/tools/caps.c",
-  "test/tools/utest_harness.c",
-  "test/tools/tmp.c",
-  "test/tools/git.c",
-  "test/tools/toml.c",
-]
-include = ["include", "source", "source/external", "test/e2e", "test/tools"]
 flags = []
 
 [[test]]

@@ -1,4 +1,4 @@
-- Always use EXPECT_* from utest.h as your verifier in unit tests. EXPECT_* requires that utest_result is in scope; this is an s32* provided by utest.h and passed into every unit test, or stored and passed manually by us in helper functions
-- Always return void from unit test helpers; otherwise, utest.h macros break
-- Failures are collected, not printed mid-test; the runner prints them after the test finishes. To attach context to a potential failure, stage it immediately before the assertion with utest_kv("key", value) or utest_note(value); the next assertion attaches staged context to its failure record or discards it if it passes
-- Helper functions that detect failure without an EXPECT_*/ASSERT_* macro should call utest_fail(utest_result, file, line, expected, actual) directly after staging context
+- Always assert with sp_expect_* (record and continue) or sp_must_* (record and stop) from spit.h; both take the sp_test_t* t passed into every test
+- Test helpers take t, return sp_err_t, and are propagated with sp_try
+- Failures are collected, not printed mid-test; the runner prints them after the test finishes. To attach context to a potential failure, stage it before the assertion with sp_test_kv(t, "key", value); every staged kv is snapshotted onto a failure record when an assertion fails. Clear stale context with sp_test_kv_clear(t, SP_NULLPTR)
+- Helpers that detect failure without an sp_expect_*/sp_must_* macro should call sp_test_record directly after staging context

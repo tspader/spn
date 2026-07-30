@@ -1,9 +1,3 @@
-# note
-
-We're porting our tests from a modified utest.h to a proper spiritual successor thereof. It's upstream in sp.h, and it's called sp_test.h. It's not compatible with utest.h, so we're temporarily going to have a split test setup.
-
-Do not write new tests for utest.h. Do not update utest.h tests. You touch it, you port it. Unit tests only.
-
 # overview
 
 Tests must be written declaratively, by expressing test cases as pure data which are run through a test executor. The executor does setup, execution, expectation, and teardown according to the data in the test case. Imperative logic lives in the executor.
