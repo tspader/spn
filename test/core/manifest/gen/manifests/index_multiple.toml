@@ -10,4 +10,4 @@ protocol = "http"
 [[index]]
 name = "local"
 url = "/srv/packages"
-protocol = "filesystem"
+protocol = "http"

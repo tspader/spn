@@ -146,12 +146,17 @@ sp_test_each(index_publish, publish, publish_test_t, tests) {
 
   sp_str_t index_root = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("index"));
   sp_fs_create_dir(index_root);
+  git_repo_init(index_root);
+  git_repo_git(index_root, sp_str_lit("symbolic-ref"), sp_str_lit("HEAD"), sp_str_lit("refs/heads/main"));
+  git_repo_git(index_root, sp_str_lit("config"), sp_str_lit("receive.denyCurrentBranch"), sp_str_lit("updateInstead"));
 
   write_publish_fixtures(mem, index_root, it->fixture.files);
+  git_repo_stage_all(index_root);
+  git_repo_commit(index_root, sp_str_lit("seed"));
 
   spn_index_info_t index = {
-    .location = index_root,
-    .protocol = SPN_INDEX_PROTOCOL_FILESYSTEM,
+    .url = index_root,
+    .location = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("clone")),
   };
   spn_index_init(&index, mem);
 

@@ -108,9 +108,6 @@ spn_err_t spn_index_sync(spn_index_info_t* index, bool force) {
     case SPN_INDEX_PROTOCOL_HTTP: {
       return SPN_ERROR;
     }
-    case SPN_INDEX_PROTOCOL_FILESYSTEM: {
-      return sp_fs_is_dir(index->location) ? SPN_OK : SPN_ERROR;
-    }
   }
   return SPN_ERROR;
 }
@@ -130,9 +127,6 @@ bool spn_index_needs_fetch(spn_index_info_t* index) {
       return git_index_stale(index);
     }
     case SPN_INDEX_PROTOCOL_HTTP: {
-      return false;
-    }
-    case SPN_INDEX_PROTOCOL_FILESYSTEM: {
       return false;
     }
   }
@@ -218,20 +212,6 @@ static spn_err_union_t version_exists(spn_index_info_t* index, spn_index_release
 
 spn_err_union_t spn_index_publish(spn_index_info_t* index, spn_index_release_t* rel) {
   switch (index->protocol) {
-    case SPN_INDEX_PROTOCOL_FILESYSTEM: {
-      if (!sp_fs_is_dir(index->location)) {
-        return (spn_err_union_t) {
-          .kind = SPN_ERR_INDEX_SYNC,
-          .index = { .name = index->name, .url = index->url },
-        };
-      }
-      if (index_release_exists(index, rel)) {
-        return version_exists(index, rel);
-      }
-      index_append_release(index, rel);
-      return spn_result(SPN_OK);
-    }
-
     case SPN_INDEX_PROTOCOL_GIT: {
       if (!sp_str_empty(index->rev)) {
         return (spn_err_union_t) {

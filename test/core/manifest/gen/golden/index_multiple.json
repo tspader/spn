@@ -12,7 +12,7 @@
     "local": {
       "name": "local",
       "url": "/srv/packages",
-      "protocol": "filesystem"
+      "protocol": "http"
     }
   }
 }

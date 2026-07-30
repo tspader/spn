@@ -345,6 +345,8 @@ static sp_err_t setup_fixture_index_from_remote(sp_test_t* t, fixture_t* fixture
           content);
       }
     }
+    git_repo_stage_all(fixture->paths.index);
+    git_repo_commit(fixture->paths.index, sp_str_lit("seed"));
   }
   return SP_OK;
 }
@@ -377,6 +379,10 @@ static sp_err_t setup_fixture_source_repos(sp_test_t* t, fixture_t* fixture, sp_
 
   struct { sp_str_t token; sp_str_t value; } subs[16];
   s32 num_subs = 0;
+
+  subs[num_subs].token = sp_str_lit("@fixture.dir@");
+  subs[num_subs].value = sp_str_replace_c8(mem, fixture->root, '\\', '/');
+  num_subs++;
 
   sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, source);
   sp_da_for(entries, it) {
@@ -456,7 +462,7 @@ static void setup_fixture_config(fixture_t* fixture, sp_str_t config_dir, sp_str
     "[[index]]\n"
     "name = \"core\"\n"
     "url = \"{}\"\n"
-    "protocol = \"filesystem\"\n",
+    "protocol = \"git\"\n",
     sp_fmt_str(sp_str_replace_c8(mem, spn_dir, '\\', '/')),
     sp_fmt_str(sp_str_replace_c8(mem, index_dir, '\\', '/'))
   ).value;
@@ -1243,6 +1249,10 @@ sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const
   sp_fs_create_dir(fixture->paths.toolchain);
   sp_fs_create_dir(fixture->paths.include);
   sp_fs_create_dir(fixture->paths.index);
+  git_repo_init(fixture->paths.index);
+  git_repo_git(fixture->paths.index, sp_str_lit("symbolic-ref"), sp_str_lit("HEAD"), sp_str_lit("refs/heads/main"));
+  git_repo_git(fixture->paths.index, sp_str_lit("config"), sp_str_lit("receive.denyCurrentBranch"), sp_str_lit("updateInstead"));
+  git_repo_commit(fixture->paths.index, sp_str_lit("init"));
   setup_fixture_envrc(fixture, fixture->paths.storage, fixture->paths.toolchain, fixture->paths.config);
   setup_fixture_config(fixture, fixture->paths.config, fixture->paths.index, fixture->paths.root);
 
@@ -1253,6 +1263,13 @@ sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const
     sp_try(fixture_copy_project(t, fixture, path, copy));
     sp_try(setup_fixture_index_from_remote(t, fixture, path));
     sp_try(setup_fixture_source_repos(t, fixture, path));
+
+    sp_str_t workspace_index = fixture_path(fixture, sp_str_lit("index"));
+    if (sp_fs_is_dir(workspace_index)) {
+      git_repo_init(workspace_index);
+      git_repo_stage_all(workspace_index);
+      git_repo_commit(workspace_index, sp_str_lit("seed"));
+    }
   }
   return SP_OK;
 }

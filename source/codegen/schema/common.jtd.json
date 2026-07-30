@@ -5,7 +5,7 @@
     "abi": { "enum": ["gnu", "musl", "msvc", "mingw"] },
     "linkage": { "enum": ["shared", "static", "source", "object"] },
     "cc_driver": { "enum": ["gcc", "clang", "msvc"], "metadata": { "include": "toolchain/types.h" } },
-    "index_protocol": { "enum": ["git", "http", "filesystem"], "metadata": { "include": "index/types.h" } },
+    "index_protocol": { "enum": ["git", "http"], "metadata": { "include": "index/types.h" } },
     "option_type": { "enum": ["bool", "enum"], "metadata": { "include": "when/types.h" } },
     "pkg_source": { "enum": ["root", "file", "index"], "metadata": { "include": "pkg/types.h" } },
 

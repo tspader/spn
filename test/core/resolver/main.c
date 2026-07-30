@@ -79,16 +79,16 @@ static resolve_result_t execute_fixture(const fx_config_t* config, const spn_pkg
 }
 
 
-static sp_str_t fx_dir(sp_test_t* t, sp_mem_t mem) {
+static sp_str_t get_fixture_dir(sp_test_t* t, sp_mem_t mem) {
   sp_str_t name = sp_str_strip_left(sp_test_get_name(t), sp_str_lit("resolver."));
   return test_repo_path(mem, sp_fs_join_path(mem, sp_str_lit("test/core/resolver/fixtures"), name));
 }
 
-static s32 fx_sort_entries(const void* a, const void* b) {
+static s32 sort_dir_entries(const void* a, const void* b) {
   return sp_str_compare_alphabetical(((const sp_fs_entry_t*)a)->name, ((const sp_fs_entry_t*)b)->name);
 }
 
-static sp_err_t fx_load_config(sp_test_t* t, sp_mem_t mem, sp_str_t dir, fx_config_t* config) {
+static sp_err_t load_config(sp_test_t* t, sp_mem_t mem, sp_str_t dir, fx_config_t* config) {
   sp_str_t path = sp_fs_join_path(mem, dir, sp_str_lit("fixture.toml"));
   if (!sp_fs_is_target_file(path)) {
     return SP_OK;
@@ -109,7 +109,7 @@ static sp_err_t fx_load_config(sp_test_t* t, sp_mem_t mem, sp_str_t dir, fx_conf
   return SP_OK;
 }
 
-static sp_err_t fx_load_root(sp_test_t* t, sp_mem_t mem, sp_str_t dir, spn_pkg_info_t* root) {
+static sp_err_t load_manifest(sp_test_t* t, sp_mem_t mem, sp_str_t dir, spn_pkg_info_t* root) {
   sp_str_t manifest = sp_fs_join_path(mem, dir, sp_str_lit("spn.toml"));
   sp_must(t, sp_fs_is_target_file(manifest));
 
@@ -128,16 +128,16 @@ static sp_str_t dump_query(sp_mem_t mem, resolve_result_t* result) {
 static sp_err_t run_fixture(sp_test_t* t) {
   sp_mem_t mem = sp_mem_arena_as_allocator(arena);
 
-  sp_str_t dir = fx_dir(t, mem);
+  sp_str_t dir = get_fixture_dir(t, mem);
 
   fx_config_t config = sp_zero;
-  sp_try(fx_load_config(t, mem, dir, &config));
+  sp_try(load_config(t, mem, dir, &config));
   if (!sp_str_empty(config.skip)) {
     return sp_test_skip(t, "{}", sp_fmt_str(config.skip));
   }
 
   spn_pkg_info_t root = sp_zero;
-  sp_try(fx_load_root(t, mem, dir, &root));
+  sp_try(load_manifest(t, mem, dir, &root));
 
   resolve_result_t result = execute_fixture(&config, &root, dir, spn.intern);
   sp_str_t dump = dump_query(mem, &result);
@@ -154,7 +154,7 @@ s32 main(s32 argc, const c8** argv) {
   spn.intern = sp_intern_new(sp_mem_os_new());
 
   sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, test_repo_path(mem, sp_str_lit("test/core/resolver/fixtures")));
-  sp_da_sort(entries, fx_sort_entries);
+  sp_da_sort(entries, sort_dir_entries);
 
   sp_da(sp_test_decl_t) decls = sp_da_new(mem, sp_test_decl_t);
   sp_da_for(entries, it) {

@@ -4,8 +4,8 @@ version = "0.1.0"
 
 [[index]]
 name = "local"
-url = "./index"
-protocol = "filesystem"
+url = "@fixture.dir@/index"
+protocol = "git"
 
 [deps.package]
 spum = "1.0.0"
