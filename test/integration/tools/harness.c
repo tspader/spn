@@ -1,5 +1,3 @@
-#include "sp.h"
-#include "spit.h"
 #include "harness.h"
 #include "error/error.h"
 #include "triple/triple.h"

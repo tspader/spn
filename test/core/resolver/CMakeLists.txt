@@ -40,10 +40,8 @@ add_executable(resolver
   ${SRC}/target/select.c
   ${SRC}/toolchain/toolchain.c
   main.c
-  ${TEST_TOOLS}/ctx.c
+  ${TEST_TOOLS}/fixture.c
   ${TEST_TOOLS}/sp_fuzz.c
-  ${TEST_TOOLS}/tmp.c
-  ${TEST_TOOLS}/git.c
   ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(resolver)

@@ -1,4 +1,4 @@
-- Always assert with sp_expect_* (record and continue) or sp_must_* (record and stop) from spit.h; both take the sp_test_t* t passed into every test
+- Always assert with sp_expect_* (record and continue) or sp_must_* (record and stop) from sp/sp_test.h; both take the sp_test_t* t passed into every test
 - Test helpers take t, return sp_err_t, and are propagated with sp_try
 - Failures are collected, not printed mid-test; the runner prints them after the test finishes. To attach context to a potential failure, stage it before the assertion with sp_test_kv(t, "key", value); every staged kv is snapshotted onto a failure record when an assertion fails. Clear stale context with sp_test_kv_clear(t, SP_NULLPTR)
 - Helpers that detect failure without an sp_expect_*/sp_must_* macro should call sp_test_record directly after staging context

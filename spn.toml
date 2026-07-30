@@ -175,13 +175,12 @@ source = [
   "source/unit/paths.c",
   "source/unit/target.c",
   "source/when/when.c",
-  "test/tools/repo.c",
-  "test/tools/git.c",
+  "test/core/tools/wasm_emit.c",
+  "test/tools/fixture.c",
   "test/tools/sp_sim.c",
   "test/tools/toml.c",
-  "test/tools/wasm_emit.c",
 ]
-include = ["include", "source", "source/codegen/gen", "source/external", "test/tools", "tools"]
+include = ["include", "source", "source/codegen/gen", "source/external", "test/core/tools", "test/tools", "tools"]
 flags = [
   '-DSCHEMA_GEN_DIR="source/codegen/gen"',
   '-DSCHEMA_DIR="source/codegen/schema"',
@@ -234,11 +233,8 @@ source = [
   "source/target/select.c",
   "source/toolchain/toolchain.c",
   "test/core/resolver/main.c",
-  "test/tools/repo.c",
-  "test/tools/ctx.c",
+  "test/tools/fixture.c",
   "test/tools/sp_fuzz.c",
-  "test/tools/tmp.c",
-  "test/tools/git.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source", "source/codegen/gen", "test/tools"]
@@ -256,13 +252,12 @@ source = [
   "source/sp/str.c",
   "source/triple/triple.c",
   "test/integration/main.c",
-  "test/tools/repo.c",
-  "test/tools/caps.c",
-  "test/tools/harness.c",
-  "test/tools/git.c",
+  "test/integration/tools/caps.c",
+  "test/integration/tools/harness.c",
+  "test/tools/fixture.c",
   "test/tools/toml.c",
 ]
-include = ["include", "source", "source/external", "test/integration", "test/tools"]
+include = ["include", "source", "source/external", "test/integration/tools", "test/tools"]
 flags = []
 
 [[test]]
@@ -282,16 +277,15 @@ source = [
   "source/sp/io.c",
   "source/intern/intern.c",
   "test/fuzz/dag/main.c",
+  "test/fuzz/dag/cli.c",
   "test/fuzz/dag/generator.c",
   "test/fuzz/dag/journal.c",
   "test/fuzz/dag/lower.c",
   "test/fuzz/dag/model.c",
   "test/fuzz/dag/render.c",
   "test/fuzz/dag/trace.c",
-  "test/tools/repo.c",
   "test/tools/sp_sim.c",
   "test/tools/sp_fuzz.c",
-  "test/tools/sp_fuzz_cli.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source", "source/codegen/gen", "test/fuzz/dag", "test/tools"]
@@ -344,7 +338,6 @@ source = [
   "test/fuzz/resolver/checkers/solve.c",
   "test/fuzz/resolver/checkers/units.c",
   "test/fuzz/resolver/dump.c",
-  "test/tools/repo.c",
   "test/tools/sp_fuzz.c",
   "test/tools/toml.c",
 ]

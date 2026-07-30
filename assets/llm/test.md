@@ -19,7 +19,7 @@ or, equivalently, `ctest --test-dir .build/work/$TRIPLE --output-on-failure`.
 
 # notes
 
-- `test/tools/action.h` has the ops for our integration test "bytecode"; the following ops are being phased out and are banned because they are either (a) hostile to testing cross compiles, or (b) fragile, fuzzy string matching against text that we never intended to be stable:
+- `test/integration/tools/harness.h` has the ops for our integration test "bytecode"; the following ops are being phased out and are banned because they are either (a) hostile to testing cross compiles, or (b) fragile, fuzzy string matching against text that we never intended to be stable:
   - ACTION_VERIFY_FILE_CONTAINS
   - ACTION_VERIFY_FILE_NOT_CONTAINS
   - ACTION_VERIFY_CLI_CONTAINS

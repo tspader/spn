@@ -2,37 +2,20 @@
 #define SP_FUZZ_H
 
 #include "sp.h"
-#include "sp/sp_cli.h"
 
 #include "intern/types.h"
-
-typedef struct spn_cg_fuzz_graph spn_cg_fuzz_graph_t;
 
 typedef struct {
   u64 state;
 } sp_fuzz_prng_t;
 
 typedef struct {
-  const c8* name;
-  const c8* summary;
-  u64 iters;
-  u32 errs;
-  sp_str_t (*err_str)(u32 err);
-  u32 (*run)(sp_mem_t mem, sp_fuzz_prng_t prng, u64 iter);
-} sp_fuzz_desc_t;
-
-s32      sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc);
-u64      sp_fuzz_seed_get(void);
-void     sp_fuzz_seed_set(u64 seed);
-sp_str_t sp_fuzz_render_path(void);
-sp_str_t sp_fuzz_repro_args(sp_mem_t mem, u64 iter);
-
-const spn_cg_fuzz_graph_t* sp_fuzz_graph(void);
-
-typedef struct {
   u64 iters;
   s64 only;
 } sp_fuzz_opts_t;
+
+u64  sp_fuzz_seed_get();
+void sp_fuzz_seed_set(u64 seed);
 
 u64  sp_fuzz_next(sp_fuzz_prng_t* prng);
 u64  sp_fuzz_below(sp_fuzz_prng_t* prng, u64 bound);
@@ -44,7 +27,7 @@ void sp_fuzz_swarm(sp_fuzz_prng_t* prng, u64* weights, u32 count);
 
 u64            sp_fuzz_parse_seed(sp_str_t str);
 u64            sp_fuzz_seed_compute(sp_str_t seed);
-u64            sp_fuzz_seed_init(void);
+u64            sp_fuzz_seed_init();
 u64            sp_fuzz_seed_init_str(sp_str_t seed);
 sp_fuzz_prng_t sp_fuzz_stream(sp_da(sp_str_t) names);
 sp_fuzz_prng_t sp_fuzz_iter(sp_fuzz_prng_t base, u64 iter);

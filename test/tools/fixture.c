@@ -1,5 +1,20 @@
 #include "fixture.h"
 
+sp_str_t test_repo_root(sp_mem_t mem) {
+  sp_str_t path = sp_fs_get_exe_path(mem);
+  while (true) {
+    sp_assert(!sp_str_empty(path));
+    if (sp_fs_exists(sp_fs_join_path(mem, path, strl("spn.toml")))) {
+      return path;
+    }
+    path = sp_fs_parent_path(path);
+  }
+}
+
+sp_str_t test_repo_path(sp_mem_t mem, sp_str_t rel) {
+  return sp_fs_join_path(mem, test_repo_root(mem), rel);
+}
+
 sp_ps_output_t git_repo_run(sp_str_t repo, const sp_str_t* args, u32 count) {
   sp_ps_config_t config = {
     .command = sp_str_lit("git"),
@@ -15,7 +30,7 @@ sp_ps_output_t git_repo_run(sp_str_t repo, const sp_str_t* args, u32 count) {
   return output;
 }
 
-void git_repo_copy_dir(sp_str_t source, sp_str_t repo) {
+static void git_repo_copy_dir(sp_str_t source, sp_str_t repo) {
   sp_mem_t mem = sp_mem_os_new();
   sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(mem, source);
   sp_da_for(entries, it) {
@@ -30,14 +45,6 @@ void git_repo_copy_dir(sp_str_t source, sp_str_t repo) {
     sp_fs_create_dir(sp_fs_parent_path(target));
     sp_fs_copy_file(entry->path, target);
   }
-}
-
-void git_repo_create_from_dir(sp_str_t source, sp_str_t repo) {
-  SP_ASSERT(sp_fs_exists(source));
-  SP_ASSERT(sp_fs_is_dir(source));
-
-  git_repo_init(repo);
-  git_repo_commit_from_dir(source, repo, sp_str_lit("fixture"));
 }
 
 void git_repo_init(sp_str_t repo) {
@@ -81,10 +88,6 @@ static void git_repo_write_file(sp_str_t repo, const c8* path, const c8* content
   sp_fs_create_file_str(full, content ? sp_str_view(content) : sp_str_lit(""));
 }
 
-git_repo_result_t git_repo_build(tmpfs_t* fs, const c8* name, git_repo_fixture_t* fixture) {
-  return git_repo_build_at(fs->root, name, fixture);
-}
-
 git_repo_result_t git_repo_build_at(sp_str_t dir, const c8* name, git_repo_fixture_t* fixture) {
   git_repo_result_t result = sp_zero;
   result.path = sp_fs_join_path(sp_mem_os_new(), dir, sp_str_view(name));
@@ -95,12 +98,10 @@ git_repo_result_t git_repo_build_at(sp_str_t dir, const c8* name, git_repo_fixtu
     git_repo_commit_t* commit = &fixture->commits[c];
     if (!commit->message) break;
 
-    // clear working tree
     git_repo_git(result.path,
       sp_str_lit("rm"), sp_str_lit("-r"), sp_str_lit("--quiet"),
       sp_str_lit("--ignore-unmatch"), sp_str_lit("."));
 
-    // write files
     sp_carr_for(commit->files, f) {
       git_repo_file_t* file = &commit->files[f];
       if (!file->path) break;
@@ -108,7 +109,6 @@ git_repo_result_t git_repo_build_at(sp_str_t dir, const c8* name, git_repo_fixtu
       git_repo_write_file(result.path, file->path, file->content);
     }
 
-    // stage and commit
     git_repo_stage_all(result.path);
     git_repo_commit(result.path, sp_str_view(commit->message));
 
