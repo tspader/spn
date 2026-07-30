@@ -1,0 +1,2 @@
+{"namespace":"spn","name":"audio","version":"1.0.0","yanked":false}
+{"namespace":"spn","name":"audio","version":"1.1.0","yanked":false,"deps":[{"namespace":"spn","name":"math","version":"^1.0.0","kind":"normal"},{"namespace":"spn","name":"physics","version":"^1.0.0","kind":"normal"}]}

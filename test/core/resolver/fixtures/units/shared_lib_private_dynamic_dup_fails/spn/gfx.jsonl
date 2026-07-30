@@ -1,0 +1,2 @@
+{"namespace":"spn","name":"gfx","version":"1.9.0","yanked":false,"targets":[{"name":"gfx","linkages":["shared"]}]}
+{"namespace":"spn","name":"gfx","version":"2.0.0","yanked":false,"targets":[{"name":"gfx","linkages":["shared"]}]}

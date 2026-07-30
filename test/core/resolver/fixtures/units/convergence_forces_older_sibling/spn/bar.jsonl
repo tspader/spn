@@ -1,0 +1,2 @@
+{"namespace":"spn","name":"bar","version":"1.0.0","yanked":false,"deps":[{"namespace":"spn","name":"foo","version":"^1.0.0","kind":"normal"}]}
+{"namespace":"spn","name":"bar","version":"1.1.0","yanked":false,"deps":[{"namespace":"spn","name":"foo","version":"^2.0.0","kind":"normal"}]}

@@ -1,0 +1,8 @@
+[package]
+namespace = "test"
+name = "root"
+version = "0.0.1"
+
+[deps.package]
+'spn/a' = { version = "^1.0.0", when = { os = "linux" } }
+'spn/w' = { version = "^1.0.0", when = { os = "windows" } }

@@ -1,0 +1,10 @@
+[package]
+namespace = "test"
+name = "root"
+version = "0.0.1"
+
+[deps.package]
+'spn/lib' = { version = "^1.0.0" }
+
+[deps.build]
+'spn/wrap' = { version = "^1.0.0" }

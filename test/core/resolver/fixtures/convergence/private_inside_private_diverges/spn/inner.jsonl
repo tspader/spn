@@ -1,0 +1,1 @@
+{"namespace":"spn","name":"inner","version":"1.0.0","yanked":false,"deps":[{"namespace":"spn","name":"leaf","version":"^1.0.0","kind":"normal","private":true}],"targets":[{"name":"inner","linkages":["shared"]}]}
