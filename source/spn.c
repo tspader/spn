@@ -339,8 +339,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   // INDEXES
   //
   // Search order is array order: the root manifest's indexes shadow the
-  // user config's, which shadow the builtin core. Relative filesystem urls
-  // resolve against whoever declared them.
+  // user config's, which shadow the builtin core.
   sp_da_init(spn.heap, spn.indexes);
 
   if (has_manifest) {
@@ -375,17 +374,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   sp_da_for(spn.indexes, i) {
     spn_index_info_t* index = &spn.indexes[i];
-    if (index->protocol == SPN_INDEX_PROTOCOL_FILESYSTEM) {
-      sp_str_t base = index->kind == SPN_INDEX_WORKSPACE ? spn.paths.project : spn.paths.config.dir;
-      index->location = index->url;
-      if (!sp_fs_is_absolute(index->url)) {
-        sp_str_t joined = sp_fs_join_path(spn.heap, base, index->url);
-        sp_str_t canonical = sp_fs_canonicalize_path(spn.heap, joined);
-        index->location = sp_str_empty(canonical) ? joined : canonical;
-      }
-    } else {
-      index->location = sp_fs_join_path(spn.heap, spn.paths.index, spn_git_db_key(spn.heap, index->url));
-    }
+    index->location = sp_fs_join_path(spn.heap, spn.paths.index, spn_git_db_key(spn.heap, index->url));
     if (!index->refresh) {
       index->refresh = spn.cli.refresh ? spn.cli.refresh : 600;
     }

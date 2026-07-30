@@ -55,7 +55,7 @@ protocol = "http"
 [[index]]
 name = "local"
 url = "/srv/pkgs"
-protocol = "filesystem"
+protocol = "http"
 
 [profile.debug]
 mode = "debug"

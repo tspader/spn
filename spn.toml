@@ -214,6 +214,7 @@ source = [
   "source/codegen/gen/config.gen.c",
   "source/codegen/gen/manifest.gen.c",
   "source/codegen/gen/release.gen.c",
+  "source/index/cache.c",
   "source/index/index.c",
   "source/index/json.c",
   "source/sp/io.c",
@@ -235,7 +236,6 @@ source = [
   "source/toolchain/toolchain.c",
   "test/core/resolver/main.c",
   "test/tools/fixture.c",
-  "test/tools/sp_fuzz.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source", "source/codegen/gen", "test/tools"]

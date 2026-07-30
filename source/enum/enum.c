@@ -755,9 +755,6 @@ sp_str_t spn_index_protocol_to_str(spn_index_protocol_t protocol) {
     case SPN_INDEX_PROTOCOL_HTTP: {
       return sp_str_lit("http");
     }
-    case SPN_INDEX_PROTOCOL_FILESYSTEM: {
-      return sp_str_lit("filesystem");
-    }
   }
 
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
@@ -769,9 +766,6 @@ spn_index_protocol_t spn_index_protocol_from_str(sp_str_t str) {
   }
   if (sp_str_equal_cstr(str, "http")) {
     return SPN_INDEX_PROTOCOL_HTTP;
-  }
-  if (sp_str_equal_cstr(str, "filesystem")) {
-    return SPN_INDEX_PROTOCOL_FILESYSTEM;
   }
 
   SP_UNREACHABLE_RETURN(SPN_INDEX_PROTOCOL_GIT);

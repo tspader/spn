@@ -17,7 +17,6 @@ typedef enum {
 typedef enum {
   SPN_INDEX_PROTOCOL_GIT,
   SPN_INDEX_PROTOCOL_HTTP,
-  SPN_INDEX_PROTOCOL_FILESYSTEM,
 } spn_index_protocol_t;
 
 typedef enum {
