@@ -41,12 +41,13 @@ void spn_profile_overlay(spn_profile_info_t* dst, spn_profile_info_t* src) {
   }
   if (src->os) {
     dst->os = src->os;
+    dst->abi = src->abi;
+  }
+  else if (src->abi) {
+    dst->abi = src->abi;
   }
   if (src->arch) {
     dst->arch = src->arch;
-  }
-  if (src->abi) {
-    dst->abi = src->abi;
   }
   if (!sp_da_empty(src->options.clauses)) dst->options = src->options;
 }
