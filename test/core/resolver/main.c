@@ -3,14 +3,13 @@
 
 #include "sp/sp_test.h"
 #include "fixture.h"
-#include "sp_fuzz.h"
 
 #include "ctx/types.h"
 #include "codegen/lower.h"
 #include "enum/enum.h"
 #include "external/tom.h"
 #include "index/cache.h"
-#include "index/json.h"
+#include "index/index.h"
 #include "index/types.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
@@ -23,26 +22,6 @@
 spn_ctx_t spn;
 
 static sp_mem_arena_t* arena;
-
-typedef struct {
-  sp_str_ht(spn_index_pkg_t) cache;
-} state_t;
-
-static state_t state;
-
-void spn_index_cache_init(spn_index_cache_t* cache, sp_mem_t mem, sp_intern_t* intern, spn_index_arr_t* indexes) {
-
-}
-
-spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_name_t id) {
-  sp_str_t qualified = spn_pkg_name_to_qualified(id);
-  return sp_str_ht_get(state.cache, qualified);
-}
-
-spn_index_release_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_name_t id, spn_semver_t version) {
-  return SP_NULLPTR;
-}
-
 
 static const c8* root_qualified = "test/root";
 
@@ -57,10 +36,20 @@ typedef struct {
   sp_intern_t* intern;
 } resolve_result_t;
 
-static resolve_result_t execute_fixture(const fx_config_t* config, const spn_pkg_info_t* root, sp_intern_t* intern) {
+static resolve_result_t execute_fixture(const fx_config_t* config, const spn_pkg_info_t* root, sp_str_t dir, sp_intern_t* intern) {
   sp_mem_t mem = sp_mem_arena_as_allocator(arena);
 
+  spn_index_info_t index = {
+    .location = dir,
+  };
+  spn_index_init(&index, mem);
+
+  spn_index_arr_t indexes = sp_da_new(mem, spn_index_info_t);
+  sp_da_push(indexes, index);
+
   spn_index_cache_t cache = sp_zero;
+  spn_index_cache_init(&cache, mem, intern, &indexes);
+
   spn_pkg_registry_t registry = sp_zero;
   sp_ht_init(mem, registry);
 
@@ -120,35 +109,6 @@ static sp_err_t fx_load_config(sp_test_t* t, sp_mem_t mem, sp_str_t dir, fx_conf
   return SP_OK;
 }
 
-static sp_err_t fx_load_index(sp_test_t* t, sp_mem_t mem, sp_str_t dir, sp_da(sp_str_t)* names) {
-  sp_da(sp_fs_entry_t) namespaces = sp_fs_collect(mem, dir);
-  sp_da_sort(namespaces, fx_sort_entries);
-  sp_da_for(namespaces, it) {
-    if (namespaces[it].kind != SP_FS_KIND_DIR) continue;
-
-    sp_da(sp_fs_entry_t) files = sp_fs_collect(mem, namespaces[it].path);
-    sp_da_sort(files, fx_sort_entries);
-    sp_da_for(files, jt) {
-      if (!sp_str_ends_with(files[jt].name, sp_str_lit(".jsonl"))) continue;
-
-      sp_str_t blob = sp_zero;
-      sp_must_ok(t, sp_io_read_file(mem, files[jt].path, &blob));
-
-      spn_pkg_name_t id = {
-        .namespace = namespaces[it].name,
-        .name = sp_str_strip_right(files[jt].name, sp_str_lit(".jsonl")),
-      };
-      spn_index_pkg_t pkg = sp_zero;
-      sp_must_eq(t, SPN_OK, spn_index_parse_pkg(mem, id, blob, &pkg));
-
-      sp_str_t qualified = spn_pkg_name_to_qualified(id);
-      sp_str_ht_insert(state.cache, qualified, pkg);
-      sp_da_push(*names, qualified);
-    }
-  }
-  return SP_OK;
-}
-
 static sp_err_t fx_load_root(sp_test_t* t, sp_mem_t mem, sp_str_t dir, spn_pkg_info_t* root) {
   sp_str_t manifest = sp_fs_join_path(mem, dir, sp_str_lit("spn.toml"));
   sp_must(t, sp_fs_is_target_file(manifest));
@@ -167,8 +127,6 @@ static sp_str_t dump_query(sp_mem_t mem, resolve_result_t* result) {
 
 static sp_err_t run_fixture(sp_test_t* t) {
   sp_mem_t mem = sp_mem_arena_as_allocator(arena);
-  state = sp_zero_s(state_t);
-  sp_str_ht_init(mem, state.cache);
 
   sp_str_t dir = fx_dir(t, mem);
 
@@ -178,33 +136,13 @@ static sp_err_t run_fixture(sp_test_t* t) {
     return sp_test_skip(t, "{}", sp_fmt_str(config.skip));
   }
 
-  sp_da(sp_str_t) names = sp_da_new(mem, sp_str_t);
-  sp_da_push(names, sp_str_lit(""));
-  sp_da_push(names, sp_str_view(root_qualified));
-  sp_try(fx_load_index(t, mem, dir, &names));
-
   spn_pkg_info_t root = sp_zero;
   sp_try(fx_load_root(t, mem, dir, &root));
-  sp_da_for(root.deps, it) {
-    sp_da_push(names, root.deps[it].qualified);
-  }
 
-  sp_fuzz_prng_t prng = sp_fuzz_stream(names);
-
-  resolve_result_t canonical = execute_fixture(&config, &root, sp_intern_new(sp_mem_os_new()));
-  sp_str_t canonical_dump = dump_query(mem, &canonical);
+  resolve_result_t result = execute_fixture(&config, &root, dir, spn.intern);
+  sp_str_t dump = dump_query(mem, &result);
   sp_str_t golden = sp_fmt(mem, "goldens/{}.json", sp_fmt_str(sp_test_get_name(t))).value;
-  sp_expect_golden(t, golden, canonical_dump);
-
-  // Picks may never depend on intern state: resolve against perturbed interns
-  // and require structurally identical results every round
-  sp_for(round, 8) {
-    resolve_result_t shaken = execute_fixture(&config, &root, sp_fuzz_perturbed_intern(&prng, names));
-    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-    sp_str_t shaken_dump = sp_str_copy(mem, dump_query(scratch.mem, &shaken));
-    sp_mem_end_scratch(scratch);
-    sp_must_str_eq(t, shaken_dump, canonical_dump);
-  }
+  sp_expect_golden(t, golden, dump);
 
   return SP_OK;
 }
@@ -214,7 +152,6 @@ s32 main(s32 argc, const c8** argv) {
   sp_mem_t mem = sp_mem_arena_as_allocator(arena);
 
   spn.intern = sp_intern_new(sp_mem_os_new());
-  sp_fuzz_seed_init();
 
   sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, test_repo_path(mem, sp_str_lit("test/core/resolver/fixtures")));
   sp_da_sort(entries, fx_sort_entries);

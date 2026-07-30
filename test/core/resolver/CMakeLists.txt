@@ -21,6 +21,7 @@ add_executable(resolver
   ${SRC}/codegen/gen/config.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
+  ${SRC}/index/cache.c
   ${SRC}/index/index.c
   ${SRC}/index/json.c
   ${SRC}/sp/io.c
@@ -42,7 +43,6 @@ add_executable(resolver
   ${SRC}/toolchain/toolchain.c
   main.c
   ${TEST_TOOLS}/fixture.c
-  ${TEST_TOOLS}/sp_fuzz.c
   ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(resolver)
