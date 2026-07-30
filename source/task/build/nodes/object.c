@@ -4,6 +4,7 @@
 #include "sp/macro.h"
 #include "unit/types.h"
 
+#include "compiler/driver.h"
 #include "session/invocation.h"
 #include "session/session.h"
 #include "task/build/build.h"
@@ -16,8 +17,13 @@ s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t d
 
   spn_pkg_unit_announce_compile(pkg);
 
+  spn_cc_compile_files_t files = {
+    .source = unit->paths.file,
+    .output = object,
+    .depfile = depfile,
+  };
   spn_invocation_t* invocation = sp_alloc_type(spn.mem, spn_invocation_t);
-  *invocation = spn_build_compile_invocation(spn.mem, unit, object, depfile);
+  *invocation = spn_cc_render_compile_command(spn.mem, &pkg->build->toolchain->cc, &unit->invocation, &files);
   spn_invocation_result_t run = spn_invocation_run(invocation);
 
   if (run.result.status.exit_code) {

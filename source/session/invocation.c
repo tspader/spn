@@ -83,15 +83,6 @@ spn_err_union_t spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit,
   return spn_result(SPN_OK);
 }
 
-spn_invocation_t spn_build_compile_invocation(sp_mem_t mem, spn_compile_unit_t* unit, sp_str_t object, sp_str_t depfile) {
-  spn_cc_compile_files_t files = {
-    .source = unit->paths.file,
-    .output = object,
-    .depfile = depfile,
-  };
-  return spn_cc_render_compile_command(mem, &unit->target->pkg->build->toolchain->cc, &unit->base, &files);
-}
-
 spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t path) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
@@ -103,7 +94,12 @@ spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t pa
   u32 count = 0;
   sp_om_for(session->units.objects, it) {
     spn_compile_unit_t* unit = sp_om_at(session->units.objects, it);
-    spn_invocation_t invocation = spn_build_compile_invocation(scratch.mem, unit, unit->paths.object, sp_str_lit(""));
+    spn_cc_compile_files_t files = {
+      .source = unit->paths.file,
+      .output = unit->paths.object,
+      .depfile = sp_str_lit(""),
+    };
+    spn_invocation_t invocation = spn_cc_render_compile_command(scratch.mem, &unit->target->pkg->build->toolchain->cc, &unit->invocation, &files);
 
     if (count++) {
       sp_io_write_c8(io, ',');

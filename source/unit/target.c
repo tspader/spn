@@ -310,7 +310,7 @@ static void push_frameworks(link_framework_set_t* seen, sp_da(sp_str_t)* framewo
 static spn_err_union_t render_compile_bases(sp_mem_t mem, spn_target_unit_t* target) {
   sp_da_for(target->objects, it) {
     spn_compile_unit_t* unit = target->objects[it];
-    try_union(spn_build_render_compile(mem, unit, &unit->base));
+    try_union(spn_build_render_compile(mem, unit, &unit->invocation));
   }
   return spn_result(SPN_OK);
 }
