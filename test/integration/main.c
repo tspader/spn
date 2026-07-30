@@ -1,7 +1,6 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 
-#include "spn_test.h"
 #include "harness.h"
 
 #include "harness_test.c"

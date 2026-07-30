@@ -7,6 +7,23 @@
 #include "dag/dag.h"
 #include "sp_sim.h"
 
+typedef struct spn_cg_fuzz_graph spn_cg_fuzz_graph_t;
+
+typedef struct {
+  const c8* name;
+  const c8* summary;
+  u64 iters;
+  u32 errs;
+  sp_str_t (*err_str)(u32 err);
+  u32 (*run)(sp_mem_t mem, sp_fuzz_prng_t prng, u64 iter);
+} sp_fuzz_desc_t;
+
+s32      sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc);
+sp_str_t sp_fuzz_render_path();
+sp_str_t sp_fuzz_repro_args(sp_mem_t mem, u64 iter);
+
+const spn_cg_fuzz_graph_t* sp_fuzz_graph();
+
 typedef struct {
   u64 actions;
   u64 small_actions;

@@ -13,6 +13,7 @@ add_executable(fuzz_dag
   ${SRC}/sp/io.c
   ${SRC}/intern/intern.c
   main.c
+  cli.c
   generator.c
   journal.c
   lower.c
@@ -21,7 +22,6 @@ add_executable(fuzz_dag
   trace.c
   ${TEST_TOOLS}/sp_sim.c
   ${TEST_TOOLS}/sp_fuzz.c
-  ${TEST_TOOLS}/sp_fuzz_cli.c
   ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(fuzz_dag)

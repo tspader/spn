@@ -1,6 +1,6 @@
 #pragma once
 
-#include "spn_test.h"
+#include "sp/sp_test.h"
 
 #include "spn.h"
 #include "event/types.h"

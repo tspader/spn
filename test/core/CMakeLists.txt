@@ -168,15 +168,16 @@ add_executable(core
   ${SRC}/unit/paths.c
   ${SRC}/unit/target.c
   ${SRC}/when/when.c
-  ${TEST_TOOLS}/git.c
+  ${TEST_TOOLS}/fixture.c
   ${TEST_TOOLS}/sp_sim.c
   ${TEST_TOOLS}/toml.c
-  ${TEST_TOOLS}/wasm_emit.c
+  tools/wasm_emit.c
   ${EMBED_OBJ}
 )
 set_source_files_properties(${EMBED_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 spn_test_binary(core)
 target_include_directories(core PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools
   ${SRC}/codegen/gen
   ${SRC}/external
   ${SOURCE_ROOT}/wamr/core/iwasm/include

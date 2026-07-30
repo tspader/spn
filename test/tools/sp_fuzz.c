@@ -4,7 +4,7 @@
 
 static u64 sp_fuzz_seed;
 
-u64 sp_fuzz_seed_get(void) {
+u64 sp_fuzz_seed_get() {
   return sp_fuzz_seed;
 }
 
@@ -115,7 +115,7 @@ u64 sp_fuzz_seed_init_str(sp_str_t seed) {
   return sp_fuzz_seed;
 }
 
-u64 sp_fuzz_seed_init(void) {
+u64 sp_fuzz_seed_init() {
   return sp_fuzz_seed_init_str(sp_str_lit(""));
 }
 

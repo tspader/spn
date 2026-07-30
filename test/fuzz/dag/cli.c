@@ -1,4 +1,5 @@
-#include "sp_fuzz.h"
+#include "fuzz.h"
+#include "sp/sp_cli.h"
 #include "sp/sp_prompt.h"
 
 #include "codegen/codegen.h"
@@ -40,11 +41,11 @@ static struct {
   spn_cg_fuzz_graph_t graph;
 } sp_fuzz_cli_state;
 
-sp_str_t sp_fuzz_render_path(void) {
+sp_str_t sp_fuzz_render_path() {
   return sp_fuzz_cli_state.render;
 }
 
-const spn_cg_fuzz_graph_t* sp_fuzz_graph(void) {
+const spn_cg_fuzz_graph_t* sp_fuzz_graph() {
   return &sp_fuzz_cli_state.graph;
 }
 

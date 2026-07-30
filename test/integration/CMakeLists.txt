@@ -8,15 +8,15 @@ add_executable(integration
   ${SRC}/sp/str.c
   ${SRC}/triple/triple.c
   main.c
-  ${TEST_TOOLS}/caps.c
-  ${TEST_TOOLS}/harness.c
-  ${TEST_TOOLS}/git.c
+  tools/caps.c
+  tools/harness.c
+  ${TEST_TOOLS}/fixture.c
   ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(integration)
 target_include_directories(integration PRIVATE
   ${SRC}/external
-  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tools
 )
 target_compile_definitions(integration PRIVATE
   SPN_TEST_BIN=".build/store/${TRIPLE}/bin/spn${CMAKE_EXECUTABLE_SUFFIX}"

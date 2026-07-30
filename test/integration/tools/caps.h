@@ -4,6 +4,20 @@
 #include "sp.h"
 #include "compiler/driver.h"
 
+#if defined(SP_ARM64)
+  #define SPN_TEST_ARCH "aarch64"
+#else
+  #define SPN_TEST_ARCH "x86_64"
+#endif
+
+#if defined(SP_MACOS)
+  #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-macos"
+#elif defined(SP_WIN32)
+  #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-windows-gnu"
+#else
+  #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-linux-gnu"
+#endif
+
 typedef struct {
   spn_sanitizer_set_t sanitize;
   spn_os_t os;
