@@ -196,6 +196,7 @@ source = [
   "source/intern/context.c",
   "source/intern/intern.c",
   "source/enum/enum.c",
+  "source/error/str.c",
   "source/event/event.c",
   "source/external/cJSON.c",
   "source/external/git.c",

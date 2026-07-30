@@ -4,6 +4,7 @@
 #include "sp.h"
 #include "spn.h"
 
+#include "event/types.h"
 #include "forward/types.h"
 #include "index/types.h"
 #include "intern/types.h"
@@ -46,8 +47,22 @@ struct spn_resolved_pkg {
 typedef sp_ht(spn_pkg_id_t, spn_resolved_pkg_t) spn_resolve_t;
 
 typedef struct {
+  spn_err_t kind;
+  union {
+    spn_evt_circular_t circular;
+    spn_evt_unknown_t unknown;
+    spn_evt_unsatisfiable_t unsatisfiable;
+    spn_evt_manifest_err_t manifest;
+    spn_evt_unit_cycle_t unit_cycle;
+    spn_evt_dynamic_dup_t dynamic_dup;
+    spn_evt_too_complex_t too_complex;
+  };
+} spn_resolve_err_t;
+
+typedef struct {
   sp_da(spn_requested_dep_t) reqs;
   spn_resolve_t result;
+  sp_da(spn_resolve_err_t) errors;
   u64 time;
 } spn_resolve_query_t;
 
@@ -56,7 +71,6 @@ typedef struct spn_resolver_t {
   sp_intern_t* intern;
   spn_index_cache_t* index;
   spn_pkg_registry_t* registry;
-  spn_event_buffer_t* events;
   spn_profile_info_t profile;
   sp_da(spn_pkg_config_entry_t) config;
   spn_option_seeds_t seeds;

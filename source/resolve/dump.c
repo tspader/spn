@@ -1,6 +1,8 @@
 #include "resolve/dump.h"
 
+#include "error/error.h"
 #include "intern/intern.h"
+#include "toml/issue.h"
 #include "pkg/id.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
@@ -87,6 +89,72 @@ static spn_cg_resolve_ref_t dump_ref(sp_mem_t mem, const spn_dump_key_t* key) {
   };
 }
 
+static void dump_error_pkg(spn_cg_resolve_error_t* error, spn_pkg_name_t id) {
+  error->namespace = id.namespace;
+  error->name = id.name;
+}
+
+static void dump_error_request(sp_mem_t mem, spn_cg_resolve_error_t* error, const spn_requested_dep_t* request) {
+  dump_error_pkg(error, spn_pkg_name_from_qualified(request->qualified));
+  if (request->source == SPN_PKG_SOURCE_INDEX) {
+    error->range = spn_semver_range_to_str(mem, request->index.range);
+  }
+}
+
+static spn_cg_resolve_error_t dump_error(sp_mem_t mem, const spn_resolve_err_t* err) {
+  spn_cg_resolve_error_t error = {
+    .kind = sp_cstr_as_str(spn_err_to_str(err->kind)),
+  };
+
+  switch (err->kind) {
+    case SPN_ERR_PKG_UNKNOWN: {
+      dump_error_request(mem, &error, &err->unknown.request);
+      break;
+    }
+    case SPN_ERR_PKG_NO_MATCH: {
+      dump_error_request(mem, &error, &err->unsatisfiable.request);
+      error.requester = err->unsatisfiable.requester;
+      if (err->unsatisfiable.conflict) {
+        error.selected = spn_semver_to_str(mem, err->unsatisfiable.selected);
+      }
+      break;
+    }
+    case SPN_ERR_DEP_CYCLE: {
+      dump_error_pkg(&error, err->circular.id);
+      break;
+    }
+    case SPN_ERR_UNIT_CYCLE: {
+      dump_error_pkg(&error, err->unit_cycle.id);
+      error.version = spn_semver_to_str(mem, err->unit_cycle.version);
+      break;
+    }
+    case SPN_ERR_DYNAMIC_DUPLICATE: {
+      dump_error_pkg(&error, err->dynamic_dup.id);
+      error.versions = sp_da_new(mem, sp_str_t);
+      sp_da_push(error.versions, spn_semver_to_str(mem, err->dynamic_dup.low));
+      sp_da_push(error.versions, spn_semver_to_str(mem, err->dynamic_dup.high));
+      break;
+    }
+    case SPN_ERR_RESOLVE_TOO_COMPLEX: {
+      dump_error_pkg(&error, err->too_complex.id);
+      break;
+    }
+    case SPN_ERR_DEP_MANIFEST: {
+      dump_error_pkg(&error, spn_pkg_name_from_qualified(err->manifest.name));
+      error.detail = err->manifest.error;
+      if (sp_str_empty(error.detail)) {
+        error.detail = spn_codegen_issues_message(mem, err->manifest.issues);
+      }
+      break;
+    }
+    default: {
+      break;
+    }
+  }
+
+  return error;
+}
+
 spn_cg_resolve_t spn_resolve_dump(sp_mem_t mem, sp_intern_t* intern, const spn_resolve_query_t* query) {
   spn_cg_resolve_t out = {
     .version = SPN_RESOLVE_DUMP_VERSION,
@@ -109,6 +177,14 @@ spn_cg_resolve_t spn_resolve_dump(sp_mem_t mem, sp_intern_t* intern, const spn_r
     sp_da_push(out.requests, request);
   }
   sp_da_sort(out.requests, sort_request);
+
+  if (!sp_da_empty(query->errors)) {
+    out.errors = sp_da_new(mem, spn_cg_resolve_error_t);
+    sp_da_for(query->errors, it) {
+      sp_da_push(out.errors, dump_error(mem, &query->errors[it]));
+    }
+    return out;
+  }
 
   sp_da(spn_dump_pkg_t) pkgs = sp_da_new(mem, spn_dump_pkg_t);
   sp_ht_for_kv(query->result, it) {

@@ -1,14 +1,12 @@
-fuzz repro: mode={{.mode}} iter={{.iter}} (replay: --iter {{.iter}}, seed printed above)
-  {
-    .name = "repro_{{.iter}}",
-    .linkage = {{.linkage}},
-{{for .with_budget}}
-    .budget = {{.budget}},
-{{end}}
-    .err = {{.err}},
-  },
+fuzz repro: mode={{.mode}} iter={{.iter}} verdict={{.err}} (replay: --iter {{.iter}}, seed printed above)
 
---- fixtures/<suite>/repro_{{.iter}}/spn.toml
+--- fixtures/repro_{{.iter}}/fixture.toml
+linkage = "{{.linkage}}"
+{{for .with_budget}}
+budget = {{.budget}}
+{{end}}
+
+--- fixtures/repro_{{.iter}}/spn.toml
 [package]
 namespace = "test"
 name = "root"
@@ -27,7 +25,7 @@ kind = "{{.kind}}"
 {{end}}
 {{for .pkgs}}
 
---- fixtures/<suite>/repro_{{.iter}}/spn/{{.name}}.jsonl
+--- fixtures/repro_{{.iter}}/spn/{{.name}}.jsonl
 {{for .releases}}
 {{.line}}
 {{end}}

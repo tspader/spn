@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [],
+  "errors": [
+    {
+      "kind": "pkg_unknown",
+      "namespace": "spn",
+      "name": "renderer",
+      "range": "^1.0.0"
+    }
+  ]
+}

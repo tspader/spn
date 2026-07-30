@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [],
+  "errors": [
+    {
+      "kind": "dynamic_duplicate",
+      "namespace": "spn",
+      "name": "gfx",
+      "versions": [
+        "1.9.0",
+        "2.0.0"
+      ]
+    }
+  ]
+}

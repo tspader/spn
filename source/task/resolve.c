@@ -16,6 +16,19 @@
 #include "task/task.h"
 #include "unit/types.h"
 
+static spn_build_event_t resolve_err_event(spn_resolve_err_t* err) {
+  switch (err->kind) {
+    case SPN_ERR_DEP_CYCLE:           return (spn_build_event_t) { .kind = SPN_EVENT_ERR_CIRCULAR_DEP,           .circular = err->circular };
+    case SPN_ERR_PKG_UNKNOWN:         return (spn_build_event_t) { .kind = SPN_EVENT_ERR_UNKNOWN_PKG,            .unknown = err->unknown };
+    case SPN_ERR_PKG_NO_MATCH:        return (spn_build_event_t) { .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,  .unsatisfiable = err->unsatisfiable };
+    case SPN_ERR_DEP_MANIFEST:        return (spn_build_event_t) { .kind = SPN_EVENT_ERR_MANIFEST,               .manifest_err = err->manifest };
+    case SPN_ERR_UNIT_CYCLE:          return (spn_build_event_t) { .kind = SPN_EVENT_ERR_UNIT_CYCLE,             .unit_cycle = err->unit_cycle };
+    case SPN_ERR_DYNAMIC_DUPLICATE:   return (spn_build_event_t) { .kind = SPN_EVENT_ERR_DYNAMIC_DUPLICATE,      .dynamic_dup = err->dynamic_dup };
+    case SPN_ERR_RESOLVE_TOO_COMPLEX: return (spn_build_event_t) { .kind = SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX, .too_complex = err->too_complex };
+    default:                          return (spn_build_event_t) { .kind = SPN_EVENT_ERR, .err = { .kind = err->kind } };
+  }
+}
+
 void add_root(spn_session_t* session, spn_resolve_query_t* query) {
   spn_resolve_query_add(query, (spn_requested_dep_t) {
     .qualified = session->pkg->qualified,
@@ -66,14 +79,19 @@ spn_task_step_t spn_task_resolve(spn_app_t* app) {
   spn_index_cache_init(&index, session->mem, session->intern, &spn.indexes);
 
   spn_resolver_t resolver = sp_zero;
-  spn_resolver_init(&resolver, spn.mem, session->intern, &index, &session->registry, spn.events, session->profile, session->pkg->config, 0);
+  spn_resolver_init(&resolver, spn.mem, session->intern, &index, &session->registry, session->profile, session->pkg->config, 0);
   resolver.seeds = session->gates.seeds;
 
   spn_resolve_query_t query = sp_zero_initialize();
   spn_resolve_query_init(session->mem, &query);
   add_root(session, &query);
 
-  spn_try_step(spn_resolve_from_solver(&resolver, &query));
+  if (spn_resolve_from_solver(&resolver, &query)) {
+    sp_da_for(query.errors, it) {
+      spn_event_buffer_push(spn.events, resolve_err_event(&query.errors[it]));
+    }
+    return spn_task_fail(query.errors[0].kind, .reported = true);
+  }
   session->resolve = query.result;
 
   emit_resolved(session->mem, &query);
