@@ -14,6 +14,7 @@
 #include "compiler/driver.h"
 #include "intern/intern.h"
 #include "pkg/pkg.h"
+#include "pkg/options.h"
 #include "profile/profile.h"
 #include "spn.embed.h"
 #include "toolchain/toolchain.h"

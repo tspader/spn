@@ -5,6 +5,7 @@
 #include "spn.h"
 #include "event/types.h"
 #include "index/types.h"
+#include "resolve/types.h"
 #include "pkg/types.h"
 #include "target/types.h"
 #include "toolchain/types.h"
@@ -52,6 +53,12 @@ spn_lang_t spn_lang_from_path(sp_str_t path);
 
 sp_str_t spn_pkg_source_to_str(spn_pkg_source_t kind);
 spn_pkg_source_t spn_pkg_source_from_str(sp_str_t str);
+
+sp_str_t spn_dep_kind_to_str(spn_dep_kind_t kind);
+spn_dep_kind_t spn_dep_kind_from_str(sp_str_t str);
+
+sp_str_t spn_dep_edge_to_str(spn_dep_edge_t edge);
+spn_dep_edge_t spn_dep_edge_from_str(sp_str_t str);
 
 sp_str_t spn_index_protocol_to_str(spn_index_protocol_t protocol);
 spn_index_protocol_t spn_index_protocol_from_str(sp_str_t str);

@@ -1,0 +1,57 @@
+{
+  "metadata": { "format": "json" },
+  "properties": {
+    "version": { "type": "uint64" },
+    "requests": { "elements": { "ref": "resolve_request" } },
+    "packages": { "elements": { "ref": "resolve_pkg" } }
+  },
+  "definitions": {
+    "dep_kind": { "enum": ["package", "build", "test"], "metadata": { "include": "pkg/types.h" } },
+    "dep_edge": { "enum": ["scope", "process", "private", "pruned"], "metadata": { "include": "resolve/types.h" } },
+
+    "resolve_request": {
+      "properties": {
+        "namespace": { "type": "string" },
+        "name": { "type": "string" },
+        "kind": { "ref": "dep_kind" },
+        "source": { "ref": "pkg_source" }
+      },
+      "optionalProperties": {
+        "version": { "type": "string" }
+      }
+    },
+
+    "resolve_ref": {
+      "properties": {
+        "namespace": { "type": "string" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "hash": { "type": "string" }
+      }
+    },
+
+    "resolve_edge": {
+      "properties": {
+        "to": { "ref": "resolve_ref" },
+        "kind": { "ref": "dep_kind" },
+        "edge": { "ref": "dep_edge" }
+      },
+      "optionalProperties": {
+        "private": { "type": "boolean" }
+      }
+    },
+
+    "resolve_pkg": {
+      "properties": {
+        "namespace": { "type": "string" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "hash": { "type": "string" },
+        "source": { "ref": "pkg_source" }
+      },
+      "optionalProperties": {
+        "edges": { "elements": { "ref": "resolve_edge" } }
+      }
+    }
+  }
+}

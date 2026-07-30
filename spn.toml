@@ -227,6 +227,8 @@ source = [
   "source/session/registry/registry.c",
   "source/triple/triple.c",
   "source/resolve/resolve.c",
+  "source/resolve/dump.c",
+  "source/codegen/gen/resolve.gen.c",
   "source/sp/str.c",
   "source/semver/compare.c",
   "source/semver/convert.c",
