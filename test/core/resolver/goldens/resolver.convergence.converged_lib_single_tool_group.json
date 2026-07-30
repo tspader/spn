@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "foo",
+      "version": "1.9.0",
+      "hash": "83fd4a8d0a1afc44",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "gen",
+      "version": "1.0.0",
+      "hash": "744e32cac55b1442",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "foo",
+            "version": "1.9.0",
+            "hash": "83fd4a8d0a1afc44"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "lib",
+      "version": "1.0.0",
+      "hash": "f24dc13239c927cd",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "gen",
+            "version": "1.0.0",
+            "hash": "744e32cac55b1442"
+          },
+          "kind": "build",
+          "edge": "process"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "wrap",
+      "version": "1.0.0",
+      "hash": "ba026dabccbeeabe",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "lib",
+            "version": "1.0.0",
+            "hash": "f24dc13239c927cd"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "5c621c3d38d4e928",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "lib",
+            "version": "1.0.0",
+            "hash": "f24dc13239c927cd"
+          },
+          "kind": "package",
+          "edge": "scope"
+        },
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "wrap",
+            "version": "1.0.0",
+            "hash": "ba026dabccbeeabe"
+          },
+          "kind": "build",
+          "edge": "process"
+        }
+      ]
+    }
+  ]
+}

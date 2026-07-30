@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "a",
+      "version": "1.0.0",
+      "hash": "562c91c3798b35d1",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "b",
+            "version": "1.0.0",
+            "hash": "bb27749d1df94393"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "b",
+      "version": "1.0.0",
+      "hash": "bb27749d1df94393",
+      "source": "index"
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "27ff758b0230188e",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "a",
+            "version": "1.0.0",
+            "hash": "562c91c3798b35d1"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    }
+  ]
+}

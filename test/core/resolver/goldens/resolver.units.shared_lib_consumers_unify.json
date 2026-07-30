@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "audio",
+      "version": "1.0.0",
+      "hash": "99fc8b6fc5773424",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "gfx",
+            "version": "1.9.0",
+            "hash": "51c38523af8d61ee"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "gfx",
+      "version": "1.9.0",
+      "hash": "51c38523af8d61ee",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "video",
+      "version": "1.0.0",
+      "hash": "630f8bdbf1e6e886",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "gfx",
+            "version": "1.9.0",
+            "hash": "51c38523af8d61ee"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "5924fe79c1a8b584",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "audio",
+            "version": "1.0.0",
+            "hash": "99fc8b6fc5773424"
+          },
+          "kind": "package",
+          "edge": "scope"
+        },
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "video",
+            "version": "1.0.0",
+            "hash": "630f8bdbf1e6e886"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    }
+  ]
+}

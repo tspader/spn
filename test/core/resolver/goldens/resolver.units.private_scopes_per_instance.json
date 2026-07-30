@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "foo",
+      "version": "1.0.0",
+      "hash": "cbcf4d04c9913a95",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "foo",
+      "version": "2.0.0",
+      "hash": "bb758326baa38ee8",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "gfx",
+      "version": "1.0.0",
+      "hash": "3ea7b8fe0cebd014",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "foo",
+            "version": "1.0.0",
+            "hash": "cbcf4d04c9913a95"
+          },
+          "kind": "package",
+          "edge": "private",
+          "private": true
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "gfx",
+      "version": "2.0.0",
+      "hash": "3472706fd2ec7705",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "foo",
+            "version": "2.0.0",
+            "hash": "bb758326baa38ee8"
+          },
+          "kind": "package",
+          "edge": "private",
+          "private": true
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "tool",
+      "version": "1.0.0",
+      "hash": "ae6750fa8d3262ae",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "gfx",
+            "version": "1.0.0",
+            "hash": "3ea7b8fe0cebd014"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "1c539011cdc6fa1e",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "gfx",
+            "version": "2.0.0",
+            "hash": "3472706fd2ec7705"
+          },
+          "kind": "package",
+          "edge": "scope"
+        },
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "tool",
+            "version": "1.0.0",
+            "hash": "ae6750fa8d3262ae"
+          },
+          "kind": "build",
+          "edge": "process"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "audio",
+      "version": "1.0.0",
+      "hash": "2b8bcab26497c85a",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "zed",
+            "version": "1.5.0",
+            "hash": "0ede4e7c6d5da62e"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "audio",
+      "version": "2.0.0",
+      "hash": "47d969b929d9973c",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "tool",
+            "version": "1.0.0",
+            "hash": "3811cc4763f7a0c8"
+          },
+          "kind": "build",
+          "edge": "process"
+        },
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "zed",
+            "version": "2.0.0",
+            "hash": "f7ca79695e6331ce"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "tool",
+      "version": "1.0.0",
+      "hash": "3811cc4763f7a0c8",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "audio",
+            "version": "1.0.0",
+            "hash": "2b8bcab26497c85a"
+          },
+          "kind": "package",
+          "edge": "scope"
+        },
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "zed",
+            "version": "1.5.0",
+            "hash": "0ede4e7c6d5da62e"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "zed",
+      "version": "1.5.0",
+      "hash": "0ede4e7c6d5da62e",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "zed",
+      "version": "2.0.0",
+      "hash": "f7ca79695e6331ce",
+      "source": "index"
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "746a239c35c6027b",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "audio",
+            "version": "2.0.0",
+            "hash": "47d969b929d9973c"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    }
+  ]
+}

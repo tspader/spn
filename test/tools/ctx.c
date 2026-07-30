@@ -1,4 +1,4 @@
-#include "test.h"
+#include "ctx.h"
 #if !defined(SP_WIN32)
   #include <unistd.h>
 #endif
@@ -61,9 +61,4 @@ void ctx_init(ctx_t* ctx) {
 void ctx_deinit(ctx_t* harness) {
   sp_mem_arena_destroy(harness->arena);
   *harness = sp_zero_s(ctx_t);
-}
-
-bool str_equal(sp_str_t a, sp_str_t b) {
-  if (!a.len && !b.len) return true;
-  return sp_str_equal(a, b);
 }
