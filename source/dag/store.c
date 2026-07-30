@@ -461,11 +461,23 @@ static spn_err_t copy_blob(sp_str_t source, sp_str_t target, sp_str_t staging) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_err_t err = SPN_OK;
 
+  sp_sys_file_meta_t meta = sp_zero;
   sp_mem_slice_t bytes = sp_zero;
-  if (sp_io_read_file_slice(s.mem, source, &bytes)) {
+  sp_fs_atomic_t af = sp_zero;
+  if (sp_sys_get_path_metadata_s(sp_sys_get_root(0), source, &meta)) {
     err = SPN_ERR_DAG_STORE_READ;
-  } else if (sp_fs_write_atomic_slice_staged(target, staging, bytes)) {
+  } else if (sp_io_read_file_slice(s.mem, source, &bytes)) {
+    err = SPN_ERR_DAG_STORE_READ;
+  } else if (sp_fs_atomic_open_staged(&af, target, staging)) {
     err = SPN_ERR_DAG_STORE_WRITE;
+  } else if (sp_io_write_all(sp_fs_atomic_writer(&af), bytes.data, bytes.len, SP_NULLPTR)) {
+    sp_fs_atomic_abort(&af);
+    err = SPN_ERR_DAG_STORE_WRITE;
+  } else {
+    sp_sys_chmod_s(af.dir, af.temp, &meta);
+    if (sp_fs_atomic_commit(&af, SP_FS_ATOMIC_REPLACE)) {
+      err = SPN_ERR_DAG_STORE_WRITE;
+    }
   }
 
   sp_mem_end_scratch(s);
