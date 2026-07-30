@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "gfx",
+      "version": "1.0.0",
+      "hash": "d3bc570163d34814",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "inner",
+            "version": "1.0.0",
+            "hash": "1bd29444f7465bc8"
+          },
+          "kind": "package",
+          "edge": "private",
+          "private": true
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "inner",
+      "version": "1.0.0",
+      "hash": "1bd29444f7465bc8",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "leaf",
+            "version": "1.0.0",
+            "hash": "998176e43ea0a2ed"
+          },
+          "kind": "package",
+          "edge": "private",
+          "private": true
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "leaf",
+      "version": "1.0.0",
+      "hash": "998176e43ea0a2ed",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "leaf",
+      "version": "2.0.0",
+      "hash": "667725a8d0228c2d",
+      "source": "index"
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "df299a5f0e24d974",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "gfx",
+            "version": "1.0.0",
+            "hash": "d3bc570163d34814"
+          },
+          "kind": "package",
+          "edge": "scope"
+        },
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "leaf",
+            "version": "2.0.0",
+            "hash": "667725a8d0228c2d"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    }
+  ]
+}

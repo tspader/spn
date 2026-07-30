@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "foo",
+      "version": "1.0.0",
+      "hash": "cbcf4d04c9913a95",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "foo",
+      "version": "2.0.0",
+      "hash": "bb758326baa38ee8",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "harness",
+      "version": "1.0.0",
+      "hash": "7ca506b2814fe850",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "foo",
+            "version": "2.0.0",
+            "hash": "bb758326baa38ee8"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "d82565b78b1bc56f",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "foo",
+            "version": "1.0.0",
+            "hash": "cbcf4d04c9913a95"
+          },
+          "kind": "package",
+          "edge": "scope"
+        },
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "harness",
+            "version": "1.0.0",
+            "hash": "7ca506b2814fe850"
+          },
+          "kind": "test",
+          "edge": "process"
+        }
+      ]
+    }
+  ]
+}

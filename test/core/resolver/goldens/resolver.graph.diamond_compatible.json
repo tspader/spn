@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "audio",
+      "version": "1.0.0",
+      "hash": "7c9a7909bca546c7",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "math",
+            "version": "1.9.0",
+            "hash": "40bf15d2ed99d89b"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "math",
+      "version": "1.9.0",
+      "hash": "40bf15d2ed99d89b",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "renderer",
+      "version": "1.0.0",
+      "hash": "63c66336da3920ba",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "math",
+            "version": "1.9.0",
+            "hash": "40bf15d2ed99d89b"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "31b4edced56e4390",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "audio",
+            "version": "1.0.0",
+            "hash": "7c9a7909bca546c7"
+          },
+          "kind": "package",
+          "edge": "scope"
+        },
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "renderer",
+            "version": "1.0.0",
+            "hash": "63c66336da3920ba"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    }
+  ]
+}

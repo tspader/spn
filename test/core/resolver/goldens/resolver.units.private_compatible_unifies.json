@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "foo",
+      "version": "1.9.0",
+      "hash": "83fd4a8d0a1afc44",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "gfx",
+      "version": "1.0.0",
+      "hash": "d35a1cb165d74701",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "foo",
+            "version": "1.9.0",
+            "hash": "83fd4a8d0a1afc44"
+          },
+          "kind": "package",
+          "edge": "private",
+          "private": true
+        }
+      ]
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "ea07e551b15676c6",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "foo",
+            "version": "1.9.0",
+            "hash": "83fd4a8d0a1afc44"
+          },
+          "kind": "package",
+          "edge": "scope"
+        },
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "gfx",
+            "version": "1.0.0",
+            "hash": "d35a1cb165d74701"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    }
+  ]
+}

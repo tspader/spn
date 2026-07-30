@@ -13,6 +13,11 @@ static const c8* event_names[SPN_EVENT_COUNT] = {
 };
 #undef SPN_EVENT_NAME
 
+bool str_equal(sp_str_t a, sp_str_t b) {
+  if (!a.len && !b.len) return true;
+  return sp_str_equal(a, b);
+}
+
 static sp_mem_t layout_mem(void) {
   return sp_mem_os_new();
 }

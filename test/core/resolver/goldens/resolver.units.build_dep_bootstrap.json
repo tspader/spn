@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "audio",
+      "version": "1.0.0",
+      "hash": "4214aa67b9bf9490",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "audio",
+      "version": "2.0.0",
+      "hash": "ab50e81e9756068e",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "tool",
+            "version": "1.0.0",
+            "hash": "861811e41fcec66a"
+          },
+          "kind": "build",
+          "edge": "process"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "tool",
+      "version": "1.0.0",
+      "hash": "861811e41fcec66a",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "audio",
+            "version": "1.0.0",
+            "hash": "4214aa67b9bf9490"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "c48c2086d4dd7e79",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "audio",
+            "version": "2.0.0",
+            "hash": "ab50e81e9756068e"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    }
+  ]
+}

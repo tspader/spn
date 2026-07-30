@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "bar",
+      "version": "1.0.0",
+      "hash": "31343f48b1375fd1",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "baz",
+            "version": "1.0.0",
+            "hash": "73e12353e7e5b9e4"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "baz",
+      "version": "1.0.0",
+      "hash": "73e12353e7e5b9e4",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "baz",
+      "version": "2.0.0",
+      "hash": "034bb0c46a9eb3a2",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "gfx",
+      "version": "1.0.0",
+      "hash": "74b7e943d463bda3",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "bar",
+            "version": "1.0.0",
+            "hash": "31343f48b1375fd1"
+          },
+          "kind": "package",
+          "edge": "private",
+          "private": true
+        }
+      ]
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "be59ab25b5800613",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "baz",
+            "version": "2.0.0",
+            "hash": "034bb0c46a9eb3a2"
+          },
+          "kind": "package",
+          "edge": "scope"
+        },
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "gfx",
+            "version": "1.0.0",
+            "hash": "74b7e943d463bda3"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    }
+  ]
+}

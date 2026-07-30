@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "a",
+      "version": "1.0.0",
+      "hash": "96f9799d76d18b98",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "a",
+      "version": "1.9.0",
+      "hash": "8c3b65f65ad5e032",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "b",
+      "version": "1.0.0",
+      "hash": "af81f74b28e22b3b",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "a",
+            "version": "1.0.0",
+            "hash": "96f9799d76d18b98"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "b",
+      "version": "1.0.0",
+      "hash": "c488095de05d2bc6",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "a",
+            "version": "1.9.0",
+            "hash": "8c3b65f65ad5e032"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "c",
+      "version": "1.0.0",
+      "hash": "48ee1bdef4a5ad2b",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "b",
+            "version": "1.0.0",
+            "hash": "c488095de05d2bc6"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "c",
+      "version": "1.0.0",
+      "hash": "fb44ca4cde38a7a8",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "b",
+            "version": "1.0.0",
+            "hash": "af81f74b28e22b3b"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "tool",
+      "version": "1.0.0",
+      "hash": "02839f7c8d196966",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "a",
+            "version": "1.0.0",
+            "hash": "96f9799d76d18b98"
+          },
+          "kind": "package",
+          "edge": "scope"
+        },
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "c",
+            "version": "1.0.0",
+            "hash": "fb44ca4cde38a7a8"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "927b84a62a402bb8",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "c",
+            "version": "1.0.0",
+            "hash": "48ee1bdef4a5ad2b"
+          },
+          "kind": "package",
+          "edge": "scope"
+        },
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "tool",
+            "version": "1.0.0",
+            "hash": "02839f7c8d196966"
+          },
+          "kind": "build",
+          "edge": "process"
+        }
+      ]
+    }
+  ]
+}

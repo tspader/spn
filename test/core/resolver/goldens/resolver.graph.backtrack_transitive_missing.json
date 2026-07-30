@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "audio",
+      "version": "1.0.0",
+      "hash": "f9c3eba8b0570139",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "math",
+            "version": "1.0.0",
+            "hash": "f9c75a0451757a0f"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "spn",
+      "name": "math",
+      "version": "1.0.0",
+      "hash": "f9c75a0451757a0f",
+      "source": "index"
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "a29557c5d0282acc",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "audio",
+            "version": "1.0.0",
+            "hash": "f9c3eba8b0570139"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "spn",
+      "name": "math",
+      "version": "1.0.0",
+      "hash": "f9c75a0451757a0f",
+      "source": "index"
+    },
+    {
+      "namespace": "spn",
+      "name": "renderer",
+      "version": "1.0.0",
+      "hash": "2a8302d0574bb571",
+      "source": "index",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "math",
+            "version": "1.0.0",
+            "hash": "f9c75a0451757a0f"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "daebc961910dd8fe",
+      "source": "root",
+      "edges": [
+        {
+          "to": {
+            "namespace": "spn",
+            "name": "renderer",
+            "version": "1.0.0",
+            "hash": "2a8302d0574bb571"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    }
+  ]
+}
