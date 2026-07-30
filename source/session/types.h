@@ -9,7 +9,6 @@
 #include "forward/types.h"
 #include "intern/types.h"
 #include "paths/types.h"
-#include "pkg/options.h"
 #include "profile/types.h"
 #include "resolve/types.h"
 #include "session/registry/types.h"

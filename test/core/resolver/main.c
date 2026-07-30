@@ -16,6 +16,7 @@
 #include "index/cache.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
+#include "resolve/dump.h"
 #include "resolve/resolve.h"
 #include "resolve/types.h"
 #include "semver/compare.h"
@@ -643,6 +644,20 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
     if (*utest_result) return;
   }
 
+  sp_str_t canonical_dump = sp_zero;
+  if (canonical.err == SPN_OK) {
+    spn_cg_resolve_t dump = spn_resolve_dump(mem, canonical.intern, &canonical.query);
+    canonical_dump = spn_resolve_write(mem, &dump);
+
+    sp_str_t dump_dir = sp_os_env_get(sp_str_lit("SPN_TEST_DUMP_RESOLVE"));
+    if (!sp_str_empty(dump_dir)) {
+      static u32 dump_counter = 0;
+      sp_fs_create_dir(dump_dir);
+      sp_str_t path = sp_fs_join_path(mem, dump_dir, sp_fmt(mem, "{}.json", sp_fmt_uint(dump_counter++)).value);
+      sp_fs_create_file_str(path, canonical_dump);
+    }
+  }
+
   // Picks may never depend on intern state: resolve against perturbed interns
   // and require structurally identical results every round
   for (u32 round = 0; round < 8; round++) {
@@ -658,6 +673,15 @@ void run_fixture(s32* utest_result, fixture_t fixture) {
     if (canonical.err == SPN_OK) {
       assert_resolves_equal(utest_result, &canonical, &shaken);
       if (*utest_result) return;
+
+      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+      spn_cg_resolve_t dump = spn_resolve_dump(scratch.mem, shaken.intern, &shaken.query);
+      sp_str_t shaken_dump = spn_resolve_write(scratch.mem, &dump);
+      if (!sp_str_equal(canonical_dump, shaken_dump)) {
+        shaken_dump = sp_str_copy(mem, shaken_dump);
+      }
+      sp_mem_end_scratch(scratch);
+      SP_TEST_STREQ(canonical_dump, shaken_dump, "canonical_dump", "shaken_dump", true);
     }
   }
 

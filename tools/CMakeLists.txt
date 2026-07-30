@@ -70,6 +70,9 @@ set(GEN_FILES
   ${GEN_DIR}/release.gen.h
   ${GEN_DIR}/release.gen.c
   ${GEN_DIR}/release.jtd.json
+  ${GEN_DIR}/resolve.gen.h
+  ${GEN_DIR}/resolve.gen.c
+  ${GEN_DIR}/resolve.jtd.json
   ${GEN_DIR}/toolchains.gen.h
   ${GEN_DIR}/toolchains.gen.c
   ${GEN_DIR}/toolchains.jtd.json

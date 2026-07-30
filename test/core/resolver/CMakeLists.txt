@@ -30,6 +30,8 @@ add_executable(resolver
   ${SRC}/session/registry/registry.c
   ${SRC}/triple/triple.c
   ${SRC}/resolve/resolve.c
+  ${SRC}/resolve/dump.c
+  ${SRC}/codegen/gen/resolve.gen.c
   ${SRC}/sp/str.c
   ${SRC}/semver/compare.c
   ${SRC}/semver/convert.c

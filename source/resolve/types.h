@@ -7,7 +7,6 @@
 #include "forward/types.h"
 #include "index/types.h"
 #include "intern/types.h"
-#include "pkg/options.h"
 #include "pkg/types.h"
 #include "profile/types.h"
 #include "semver/types.h"
