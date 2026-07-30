@@ -16,19 +16,6 @@ manifest_file = "spn.toml"
 script_file = "spn.c"
 
 [[dep]]
-name = "core/utest"
-version = "1.2.0"
-commit = "fb622dc480a5"
-kind = "index"
-source_url = "https://github.com/sheredom/utest.h.git"
-source_rev = "fb622dc480a5"
-manifest_url = "git@github.com:tspader/spam.git"
-manifest_rev = "07ec098418"
-manifest_dir = "utest"
-manifest_file = "spn.toml"
-script_file = "spn.c"
-
-[[dep]]
 name = "core/wamr"
 version = "2.4.1"
 commit = ""

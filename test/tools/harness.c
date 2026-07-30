@@ -79,7 +79,7 @@ static sp_str_t exe_file_name(const c8* name, const c8* triple) {
   return spn_triple_exe_file_name(harness_mem(), target, sp_str_view(name));
 }
 
-sp_str_t profile_exe(const c8* profile, const c8* name) {
+static sp_str_t profile_exe(const c8* profile, const c8* name) {
   return layout_path(SP_NULLPTR, profile, exe_file_name(name, SP_NULLPTR));
 }
 
@@ -131,6 +131,16 @@ static void write_file(sp_str_t path, sp_str_t content) {
   sp_io_file_writer_close(&f);
 }
 
+static void fixture_setup_paths(fixture_t* fixture) {
+  sp_mem_t mem = fixture->mem;
+  fixture->paths.root = test_repo_root(mem);
+#if defined(SPN_TEST_BIN)
+  fixture->paths.spn = test_repo_path(mem, sp_str_lit(SPN_TEST_BIN));
+#else
+  fixture->paths.spn = test_repo_path(mem, exe("spn"));
+#endif
+}
+
 fixture_t fixture_new(sp_test_t* t) {
   fixture_t fixture = {
     .mem = sp_test_arena(t),
@@ -146,16 +156,6 @@ sp_err_t fixture_init(sp_test_t* t, fixture_t* fixture) {
   return SP_OK;
 }
 
-void fixture_setup_paths(fixture_t* fixture) {
-  sp_mem_t mem = fixture->mem;
-  fixture->paths.root = test_repo_root(mem);
-#if defined(SPN_TEST_BIN)
-  fixture->paths.spn = test_repo_path(mem, sp_str_lit(SPN_TEST_BIN));
-#else
-  fixture->paths.spn = test_repo_path(mem, exe("spn"));
-#endif
-}
-
 sp_str_t fixture_path(fixture_t* fixture, sp_str_t relative) {
   return sp_fs_join_path(fixture->mem, fixture->root, relative);
 }
@@ -164,7 +164,7 @@ void fixture_create(fixture_t* fixture, sp_str_t relative, sp_str_t content) {
   write_file(fixture_path(fixture, relative), content);
 }
 
-sp_err_t copy_project_path(sp_test_t* t, fixture_t* fixture, sp_str_t project, sp_str_t relative) {
+static sp_err_t copy_project_path(sp_test_t* t, fixture_t* fixture, sp_str_t project, sp_str_t relative) {
   sp_str_t from = sp_fs_join_path(fixture->mem, project, relative);
 
   if (sp_fs_is_glob(from)) {
@@ -244,7 +244,7 @@ static sp_err_t fixture_publish(sp_test_t* t, fixture_t* fixture, sp_str_t repo,
   return SP_OK;
 }
 
-sp_err_t setup_fixture_index_from_remote(sp_test_t* t, fixture_t* fixture, sp_str_t project) {
+static sp_err_t setup_fixture_index_from_remote(sp_test_t* t, fixture_t* fixture, sp_str_t project) {
   sp_mem_t mem = fixture->mem;
 
   sp_str_t remote = sp_fs_join_path(mem, project, sp_str_lit("remote"));
@@ -367,7 +367,7 @@ static sp_str_t str_replace_all(sp_mem_t mem, sp_str_t str, sp_str_t needle, sp_
   return sp_io_dyn_mem_writer_take_str(&b);
 }
 
-sp_err_t setup_fixture_source_repos(sp_test_t* t, fixture_t* fixture, sp_str_t project) {
+static sp_err_t setup_fixture_source_repos(sp_test_t* t, fixture_t* fixture, sp_str_t project) {
   sp_mem_t mem = fixture->mem;
 
   sp_str_t source = sp_fs_join_path(mem, project, sp_str_lit("source"));
@@ -431,7 +431,7 @@ sp_err_t setup_fixture_source_repos(sp_test_t* t, fixture_t* fixture, sp_str_t p
   return SP_OK;
 }
 
-void setup_fixture_envrc(fixture_t* fixture, sp_str_t storage, sp_str_t toolchain, sp_str_t config) {
+static void setup_fixture_envrc(fixture_t* fixture, sp_str_t storage, sp_str_t toolchain, sp_str_t config) {
   sp_str_t path = fixture_path(fixture, sp_str_lit(".envrc"));
   sp_str_t content = sp_fmt(
     fixture->mem,
@@ -445,7 +445,7 @@ void setup_fixture_envrc(fixture_t* fixture, sp_str_t storage, sp_str_t toolchai
   write_file(path, content);
 }
 
-void setup_fixture_config(fixture_t* fixture, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir) {
+static void setup_fixture_config(fixture_t* fixture, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir) {
   sp_mem_t mem = fixture->mem;
   sp_str_t spn_config_dir = sp_fs_join_path(mem, config_dir, sp_str_lit("spn"));
   sp_fs_create_dir(spn_config_dir);
@@ -1055,7 +1055,7 @@ sp_err_t run_rebuild_test(sp_test_t* t, rebuild_test_t test) {
   return SP_OK;
 }
 
-sp_err_t fixture_copy_project(sp_test_t* t, fixture_t* fixture, sp_str_t project, const c8* const* copy) {
+static sp_err_t fixture_copy_project(sp_test_t* t, fixture_t* fixture, sp_str_t project, const c8* const* copy) {
   sp_must(t, sp_fs_exists(project));
 
   const c8* defaults [] = {
@@ -1084,8 +1084,6 @@ sp_err_t fixture_copy_project(sp_test_t* t, fixture_t* fixture, sp_str_t project
 sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) {
   sp_mem_t mem = fixture->mem;
 
-  sp_str_t cli_output = sp_zero;
-
   sp_for(it, SPN_TEST_MAX_ACTIONS) {
     action_t action = actions[it];
     if (action.kind == ACTION_NONE) {
@@ -1100,19 +1098,6 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
       }
       case ACTION_CREATE_FILE: {
         fixture_create(fixture, action.create.file, action.create.content);
-        break;
-      }
-      case ACTION_SUBPROCESS: {
-        sp_ps_config_t config = action.process.config;
-        if (sp_str_empty(config.cwd)) {
-          config.cwd = fixture->root;
-        }
-
-        sp_ps_output_t output = sp_ps_run(mem, config);
-        sp_test_kv(t, "command", ps_command_line(mem, &config));
-        sp_test_kv(t, "cwd", config.cwd);
-        sp_test_kv(t, "output", output.out);
-        sp_expect_eq(t, action.process.rc, output.status.exit_code);
         break;
       }
       case ACTION_RUN_BIN:
@@ -1193,20 +1178,6 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
         }
         sp_ps_output_t output = run_spn_command(t, fixture, args, action.cli.env);
         sp_expect_eq(t, action.cli.rc, output.status.exit_code);
-
-        cli_output = output.out;
-        break;
-      }
-      case ACTION_VERIFY_CLI_CONTAINS: {
-        sp_test_kv(t, "needle", action.verify_cli.needle);
-        sp_test_kv(t, "output", cli_output);
-        sp_expect(t, sp_str_contains(cli_output, action.verify_cli.needle));
-        break;
-      }
-      case ACTION_VERIFY_CLI_NOT_CONTAINS: {
-        sp_test_kv(t, "needle", action.verify_cli.needle);
-        sp_test_kv(t, "output", cli_output);
-        sp_expect(t, !sp_str_contains(cli_output, action.verify_cli.needle));
         break;
       }
       case ACTION_VERIFY_CC_ARG:

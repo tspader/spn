@@ -1,44 +1,34 @@
 fuzz repro: mode={{.mode}} iter={{.iter}} (replay: --iter {{.iter}}, seed printed above)
-  run_fixture(utest_result, (fixture_t) {
-    .index = {
-{{for .pkgs}}
-      {
-        .namespace = "spn",
-        .name = "{{.name}}",
-        .releases = {
-{{for .releases}}
-          {
-            .version = spn_semver_lit({{.version}}),
-{{for .with_deps}}
-            .deps = {
-{{for .deps}}
-              { .namespace = "spn", .name = "{{.name}}", .version = "{{.range}}"{{.attrs}} },
-{{end}}
-            },
-{{end}}
-{{for .with_targets}}
-            .targets = {
-              { .name = "{{.target}}", .linkages = { {{.linkages}} } },
-            },
-{{end}}
-          },
-{{end}}
-        }
-      },
-{{end}}
-    },
-    .manifest = {
-      .deps.package = {
-{{for .roots}}
-        { .name = "spn/{{.name}}", .version = "{{.range}}"{{.attrs}} },
-{{end}}
-      }
-    },
+  {
+    .name = "repro_{{.iter}}",
     .linkage = {{.linkage}},
-    .config = {
-{{for .config}}
-      { .name = "{{.name}}", .kind = {{.kind}} },
+{{for .with_budget}}
+    .budget = {{.budget}},
 {{end}}
-    },
     .err = {{.err}},
-  });
+  },
+
+--- fixtures/<suite>/repro_{{.iter}}/spn.toml
+[package]
+namespace = "test"
+name = "root"
+version = "0.0.1"
+{{for .root_kinds}}
+
+[deps.{{.table}}]
+{{for .deps}}
+'spn/{{.name}}' = { version = "{{.range}}"{{.attrs}} }
+{{end}}
+{{end}}
+{{for .config}}
+
+[config.'{{.name}}']
+kind = "{{.kind}}"
+{{end}}
+{{for .pkgs}}
+
+--- fixtures/<suite>/repro_{{.iter}}/spn/{{.name}}.jsonl
+{{for .releases}}
+{{.line}}
+{{end}}
+{{end}}

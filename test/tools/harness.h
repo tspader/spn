@@ -25,7 +25,6 @@ typedef struct {
 
 fixture_t fixture_new(sp_test_t* t);
 sp_err_t  fixture_init(sp_test_t* t, fixture_t* fixture);
-void      fixture_setup_paths(fixture_t* fixture);
 sp_str_t  fixture_path(fixture_t* fixture, sp_str_t relative);
 void      fixture_create(fixture_t* fixture, sp_str_t relative, sp_str_t content);
 
@@ -39,19 +38,11 @@ sp_str_t test_exe(const c8* name);
 sp_str_t target_exe(const c8* name, const c8* triple);
 sp_str_t store_file(const c8* rest);
 sp_str_t work_file(const c8* rest);
-sp_str_t profile_exe(const c8* profile, const c8* name);
 sp_str_t profile_store_file(const c8* profile, const c8* rest);
 sp_str_t target_store_file(const c8* rest, const c8* triple);
 
 sp_err_t expect_exists(sp_test_t* t, fixture_t* fixture, sp_str_t path, bool expected, const c8* file, u32 line);
 
-sp_err_t copy_project_path(sp_test_t* t, fixture_t* fixture, sp_str_t project, sp_str_t relative);
-sp_err_t setup_fixture_index_from_remote(sp_test_t* t, fixture_t* fixture, sp_str_t project);
-sp_err_t setup_fixture_source_repos(sp_test_t* t, fixture_t* fixture, sp_str_t project);
-void     setup_fixture_envrc(fixture_t* fixture, sp_str_t storage, sp_str_t toolchain, sp_str_t config);
-void     setup_fixture_config(fixture_t* fixture, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir);
-
-sp_err_t fixture_copy_project(sp_test_t* t, fixture_t* fixture, sp_str_t project, const c8* const* copy);
 sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const c8* const* copy);
 sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test);
 sp_err_t run_command_test(sp_test_t* t, command_test_t test);
