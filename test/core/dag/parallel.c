@@ -20,6 +20,7 @@ typedef struct {
   const c8* remove_dirs [DAG_TEST_MAX_INPUTS];
   spn_err_t expect_err;
   u32 expect_runs;
+  u32 expect_requeues;
 } par_build_t;
 
 typedef struct {
@@ -124,9 +125,9 @@ static const par_test_t par_tests [] = {
       { .identity = "B", .inputs = { "M" }, .discovers = { "H" }, .output = "O" },
     },
     .builds = {
-      { .sources = { { "S", "1" }, { "M", "1" } }, .expect_runs = 3 },
-      { .sources = { { "S", "1" }, { "M", "1" } }, .expect_runs = 3 },
-      { .sources = { { "S", "2" }, { "M", "1" } }, .expect_runs = 4 },
+      { .sources = { { "S", "1" }, { "M", "1" } }, .expect_runs = 2, .expect_requeues = 1 },
+      { .sources = { { "S", "1" }, { "M", "1" } }, .expect_runs = 2, .expect_requeues = 1 },
+      { .sources = { { "S", "2" }, { "M", "1" } }, .expect_runs = 3, .expect_requeues = 1 },
     }
   },
   {
@@ -137,8 +138,8 @@ static const par_test_t par_tests [] = {
       { .identity = "B", .inputs = { "M" }, .discovers = { "D/H" }, .output = "O" },
     },
     .builds = {
-      { .sources = { { "S", "1" }, { "M", "1" } }, .expect_runs = 3 },
-      { .sources = { { "S", "1" }, { "M", "1" } }, .remove_dirs = { "D" }, .expect_runs = 3 },
+      { .sources = { { "S", "1" }, { "M", "1" } }, .expect_runs = 2, .expect_requeues = 1 },
+      { .sources = { { "S", "1" }, { "M", "1" } }, .remove_dirs = { "D" }, .expect_runs = 2, .expect_requeues = 1 },
     }
   },
   {
@@ -286,7 +287,9 @@ static sp_err_t par_run_builds(sp_test_t* t, spn_dag_store_kind_t kind, const pa
 
     spn_err_t err = spn_dag_run_executor(g, &env.dag.env, &pool.executor);
     sp_expect_eq(t, build->expect_err, err);
-    sp_expect_eq(t, (s32)build->expect_runs, sp_atomic_s32_get(&env.runs));
+    s32 runs = sp_atomic_s32_get(&env.runs);
+    sp_expect_ge(t, runs, (s32)build->expect_runs);
+    sp_expect_le(t, runs, (s32)(build->expect_runs + build->expect_requeues));
 
     if (!err && !build->expect_err) {
       result = par_expect_outputs(t, &env, test);

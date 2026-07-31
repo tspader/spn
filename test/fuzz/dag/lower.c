@@ -14,7 +14,6 @@ static s32 fz_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   low->execs[ctx->action]++;
   fz_journal_exec(low->journal, ctx->action);
   if (low->ex) {
-    low->ex->ran = (s64)ctx->action;
     sp_da_push(low->ex->log, ((fz_flight_t) {
       .action = ctx->action,
       .started = low->ex->sim->syscalls,

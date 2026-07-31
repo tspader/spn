@@ -32,7 +32,6 @@ typedef struct {
 static void fz_executor_submit(spn_thread_pool_executor_t* base, spn_thread_pool_job_t job) {
   fz_executor_t* ex = (fz_executor_t*)base;
   sp_da_push(ex->jobs, job);
-  sp_da_push(ex->submitted, ex->sim->syscalls);
 }
 
 static spn_thread_pool_job_t fz_executor_poll(spn_thread_pool_executor_t* base) {
@@ -41,17 +40,10 @@ static spn_thread_pool_job_t fz_executor_poll(spn_thread_pool_executor_t* base) 
 
   u64 pick = sp_fuzz_below(&ex->prng, sp_da_size(ex->jobs));
   spn_thread_pool_job_t job = ex->jobs[pick];
-  u64 submitted = ex->submitted[pick];
   ex->jobs[pick] = *sp_da_back(ex->jobs);
-  ex->submitted[pick] = *sp_da_back(ex->submitted);
   sp_da_pop(ex->jobs);
-  sp_da_pop(ex->submitted);
 
-  ex->ran = -1;
   job.fn(job.data);
-  if (ex->ran >= 0) {
-    sp_da_back(ex->log)->submitted = submitted;
-  }
   return job;
 }
 
@@ -75,10 +67,8 @@ void fz_executor_init(fz_executor_t* ex, sp_mem_t mem, sp_sim_t* sim, sp_fuzz_pr
     },
     .prng = prng,
     .sim = sim,
-    .ran = -1,
   };
   sp_da_init(mem, ex->jobs);
-  sp_da_init(mem, ex->submitted);
   sp_da_init(mem, ex->log);
 }
 
@@ -118,8 +108,7 @@ static u64 fz_action_requeues(fz_universe_t* u, fz_world_t* w, sp_mem_t mem, u64
       continue;
     }
     if (prev >= 0) {
-      u64 lo = u->profile.run_ex ? ex->log[prev].submitted : ex->log[prev].started;
-      if (fz_covered_write(u, w, mem, at, lo, ex->log[it].started)) {
+      if (fz_covered_write(u, w, mem, at, ex->log[prev].started, ex->log[it].started)) {
         requeues++;
       }
     }
