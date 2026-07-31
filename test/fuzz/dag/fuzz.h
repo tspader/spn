@@ -156,7 +156,6 @@ typedef struct {
 
 typedef struct {
   u64 action;
-  u64 submitted;
   u64 started;
 } fz_flight_t;
 
@@ -165,9 +164,7 @@ typedef struct {
   sp_fuzz_prng_t prng;
   sp_sim_t* sim;
   sp_da(spn_thread_pool_job_t) jobs;
-  sp_da(u64) submitted;
   sp_da(fz_flight_t) log;
-  s64 ran;
 } fz_executor_t;
 
 typedef struct {

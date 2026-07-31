@@ -161,9 +161,9 @@ static const run_test_t run_tests [] = {
       { .identity = "J", .inputs = { "M" }, .discovers = { "H" }, .output = "O" },
     },
     .builds = {
-      { .sources = { { "S", "A" }, { "M", "B" } }, .expect_runs = 3 },
-      { .sources = { { "S", "A" }, { "M", "B" } }, .expect_runs = 3 },
-      { .sources = { { "S", "C" }, { "M", "B" } }, .expect_runs = 5 },
+      { .sources = { { "S", "A" }, { "M", "B" } }, .expect_runs = 2 },
+      { .sources = { { "S", "A" }, { "M", "B" } }, .expect_runs = 2 },
+      { .sources = { { "S", "C" }, { "M", "B" } }, .expect_runs = 4 },
     }
   },
   {
@@ -174,8 +174,8 @@ static const run_test_t run_tests [] = {
       { .identity = "J", .inputs = { "M" }, .discovers = { "D/H" }, .output = "O" },
     },
     .builds = {
-      { .sources = { { "S", "A" }, { "M", "B" } }, .expect_runs = 3 },
-      { .sources = { { "S", "A" }, { "M", "B" } }, .remove_dirs = { "D" }, .expect_runs = 3 },
+      { .sources = { { "S", "A" }, { "M", "B" } }, .expect_runs = 2 },
+      { .sources = { { "S", "A" }, { "M", "B" } }, .remove_dirs = { "D" }, .expect_runs = 2 },
     }
   },
   {

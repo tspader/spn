@@ -788,6 +788,7 @@ struct spn_dag_flight_t {
   spn_dag_t* g;
   spn_dag_env_t* env;
   sp_mem_arena_t* arena;
+  sp_atomic_s32_t* completed;
   u64 epoch;
   spn_err_t err;
   spn_dag_attempt_t attempt;
@@ -800,7 +801,7 @@ typedef struct {
   spn_dag_targets_t targets;
   spn_dag_run_state_t* states;
   sp_da(spn_dag_id_t) ready;
-  u64 completed;
+  sp_atomic_s32_t completed;
   u32 in_flight;
   spn_err_t err;
 } spn_dag_run_t;
@@ -932,7 +933,7 @@ static void seed_ready(spn_dag_run_t* run, sp_mem_t mem) {
 static void finish_action(spn_dag_run_t* run, spn_dag_action_t* action) {
   spn_dag_run_state_t* state = &run->states[action->id.index];
   state->done = true;
-  state->done_epoch = ++run->completed;
+  state->done_epoch = (u64)(sp_atomic_s32_add(&run->completed, 1) + 1);
 
   sp_da_for(action->produces, pi) {
     spn_dag_artifact_t* produced = spn_dag_find_artifact(run->g, action->produces[pi]);
@@ -961,6 +962,7 @@ static void finish_action(spn_dag_run_t* run, spn_dag_action_t* action) {
 
 static void flight_run(void* data) {
   spn_dag_flight_t* flight = (spn_dag_flight_t*)data;
+  flight->epoch = (u64)sp_atomic_s32_get(flight->completed);
   flight->err = execute(flight->g, &flight->attempt, flight->env);
 }
 
@@ -1001,7 +1003,7 @@ static void run_dispatch(spn_dag_run_t* run, spn_dag_id_t id) {
   if (action->discover) {
     sp_assert(run->env->discovery);
     bool requeue = false;
-    if (defer_pathset(run, action, spn_dag_weak_key(run->g, action->id), run->completed, &requeue)) {
+    if (defer_pathset(run, action, spn_dag_weak_key(run->g, action->id), (u64)sp_atomic_s32_get(&run->completed), &requeue)) {
       return;
     }
     sp_assert(!requeue);
@@ -1014,7 +1016,7 @@ static void run_dispatch(spn_dag_run_t* run, spn_dag_id_t id) {
     .g = run->g,
     .env = run->env,
     .arena = arena,
-    .epoch = run->completed,
+    .completed = &run->completed,
   };
 
   run->err = lookup(run->g, action, run->env, mem, &flight->attempt);
@@ -1112,7 +1114,7 @@ spn_err_t spn_dag_run_executor(spn_dag_t* g, spn_dag_env_t* env, spn_thread_pool
         flight_free(run.states[it].parked);
       }
     }
-    if (!run.err && run.completed != n) {
+    if (!run.err && (u64)sp_atomic_s32_get(&run.completed) != n) {
       run.err = SPN_ERR_DAG_STALLED;
       diag_set(&env->diag, SPN_ERR_DAG_STALLED, (spn_dag_id_t) sp_zero, sp_str_lit(""));
     }
