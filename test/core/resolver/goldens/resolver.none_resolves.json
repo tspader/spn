@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "requests": [
     {
       "namespace": "test",
@@ -14,7 +14,8 @@
       "name": "root",
       "version": "0.0.1",
       "hash": "09f7a6c070a9a523",
-      "source": "root"
+      "source": "root",
+      "recipe": "local"
     }
   ]
 }

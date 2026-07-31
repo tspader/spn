@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [],
+  "errors": [
+    {
+      "kind": "index_path_dep",
+      "namespace": "core",
+      "name": "A",
+      "detail": "core/B"
+    }
+  ]
+}

@@ -3,6 +3,7 @@
 #include "ctx/ctx.h"
 #include "ctx/types.h"
 #include "enum/enum.h"
+#include "index/index.h"
 #include "task/task.h"
 
 sp_cli_result_t spn_cli_index(sp_cli_t* cli) {
@@ -12,30 +13,36 @@ sp_cli_result_t spn_cli_index(sp_cli_t* cli) {
 sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
-  struct { u32 name; u32 protocol; } width = sp_zero;
+  struct { u32 name; u32 kind; u32 protocol; } width = sp_zero;
   sp_da_for(spn.indexes, it) {
     width.name = SP_MAX(width.name, spn.indexes[it].name.len);
+    width.kind = SP_MAX(width.kind, spn_index_kind_to_str(spn.indexes[it].kind).len);
     width.protocol = SP_MAX(width.protocol, spn_index_protocol_to_str(spn.indexes[it].protocol).len);
   }
-  const c8* headers [] = { "name", "protocol", "url" };
+  const c8* headers [] = { "name", "kind", "protocol", "source" };
   width.name = SP_MAX(width.name, sp_cstr_len(headers[0]));
-  width.protocol = SP_MAX(width.name, sp_cstr_len(headers[1]));
+  width.kind = SP_MAX(width.kind, sp_cstr_len(headers[1]));
+  width.protocol = SP_MAX(width.protocol, sp_cstr_len(headers[2]));
 
-  sp_fmt_io(&spn.logger.out.base, "{:<$ .gray} {:<$ .gray} {.gray}\n",
+  sp_fmt_io(&spn.logger.out.base, "{:<$ .gray} {:<$ .gray} {:<$ .gray} {.gray}\n",
     sp_fmt_uint(width.name),
     sp_fmt_cstr(headers[0]),
-    sp_fmt_uint(width.protocol),
+    sp_fmt_uint(width.kind),
     sp_fmt_cstr(headers[1]),
-    sp_fmt_cstr(headers[2]));
+    sp_fmt_uint(width.protocol),
+    sp_fmt_cstr(headers[2]),
+    sp_fmt_cstr(headers[3]));
 
   sp_da_for(spn.indexes, it) {
     spn_index_info_t* index = &spn.indexes[it];
-    sp_fmt_io(&spn.logger.out.base, "{:>$} {:>$} {}\n",
+    sp_fmt_io(&spn.logger.out.base, "{:>$} {:>$} {:>$} {}\n",
       sp_fmt_uint(width.name),
       sp_fmt_str(index->name),
+      sp_fmt_uint(width.kind),
+      sp_fmt_str(spn_index_kind_to_str(index->kind)),
       sp_fmt_uint(width.protocol),
       sp_fmt_str(spn_index_protocol_to_str(index->protocol)),
-      sp_fmt_str(index->url));
+      sp_fmt_str(spn_index_source(index)));
   }
 
   sp_mem_end_scratch(scratch);

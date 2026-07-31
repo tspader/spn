@@ -80,8 +80,8 @@ static void spn_update_report_incompatible(spn_app_t* app) {
       continue;
     }
 
-    spn_index_pkg_t* pkg = spn_index_cache_get_package(&cache, spn_pkg_name_from_qualified(dep->qualified));
-    if (!pkg) {
+    spn_index_pkg_t* pkg = SP_NULLPTR;
+    if (spn_index_cache_get_package(&cache, spn_pkg_name_from_qualified(dep->qualified), &pkg).kind || !pkg) {
       continue;
     }
 

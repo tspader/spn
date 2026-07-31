@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "requests": [
     {
       "namespace": "test",
@@ -15,6 +15,7 @@
       "version": "1.0.0",
       "hash": "562c91c3798b35d1",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -33,7 +34,8 @@
       "name": "b",
       "version": "1.0.0",
       "hash": "bb27749d1df94393",
-      "source": "index"
+      "source": "index",
+      "recipe": "none"
     },
     {
       "namespace": "test",
@@ -41,6 +43,7 @@
       "version": "0.0.1",
       "hash": "27ff758b0230188e",
       "source": "root",
+      "recipe": "local",
       "edges": [
         {
           "to": {

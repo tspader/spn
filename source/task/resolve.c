@@ -9,6 +9,7 @@
 #include "index/cache.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
+#include "pkg/load.h"
 #include "pkg/pkg.h"
 #include "resolve/resolve.h"
 #include "semver/convert.h"
@@ -16,17 +17,49 @@
 #include "task/task.h"
 #include "unit/types.h"
 
-static spn_build_event_t resolve_err_event(spn_resolve_err_t* err) {
-  switch (err->kind) {
-    case SPN_ERR_DEP_CYCLE:           return (spn_build_event_t) { .kind = SPN_EVENT_ERR_CIRCULAR_DEP,           .circular = err->circular };
-    case SPN_ERR_PKG_UNKNOWN:         return (spn_build_event_t) { .kind = SPN_EVENT_ERR_UNKNOWN_PKG,            .unknown = err->unknown };
-    case SPN_ERR_PKG_NO_MATCH:        return (spn_build_event_t) { .kind = SPN_EVENT_ERR_UNSATISFIABLE_VERSION,  .unsatisfiable = err->unsatisfiable };
-    case SPN_ERR_DEP_MANIFEST:        return (spn_build_event_t) { .kind = SPN_EVENT_ERR_MANIFEST,               .manifest_err = err->manifest };
-    case SPN_ERR_UNIT_CYCLE:          return (spn_build_event_t) { .kind = SPN_EVENT_ERR_UNIT_CYCLE,             .unit_cycle = err->unit_cycle };
-    case SPN_ERR_DYNAMIC_DUPLICATE:   return (spn_build_event_t) { .kind = SPN_EVENT_ERR_DYNAMIC_DUPLICATE,      .dynamic_dup = err->dynamic_dup };
-    case SPN_ERR_RESOLVE_TOO_COMPLEX: return (spn_build_event_t) { .kind = SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX, .too_complex = err->too_complex };
-    default:                          return (spn_build_event_t) { .kind = SPN_EVENT_ERR, .err = { .kind = err->kind } };
+static sp_str_t patch_dir(sp_mem_t mem, spn_index_release_t* release) {
+  if (sp_str_empty(spn.paths.patches)) {
+    return sp_str_lit("");
   }
+
+  sp_str_t dir = sp_fs_join_path(mem, spn.paths.patches, release->id.name);
+  sp_str_t manifest = sp_fs_join_path(mem, dir, release->paths.manifest);
+  if (!sp_fs_exists(manifest)) {
+    return sp_str_lit("");
+  }
+
+  return dir;
+}
+
+static spn_err_t apply_patch_overrides(spn_session_t* session, spn_resolve_query_t* query) {
+  spn_err_t result = SPN_OK;
+  sp_ht_for_kv(query->result, it) {
+    spn_resolved_pkg_t* pkg = it.val;
+    if (pkg->source != SPN_PKG_SOURCE_INDEX) {
+      continue;
+    }
+
+    sp_str_t patch = patch_dir(spn.mem, pkg->origin.release);
+    if (sp_str_empty(patch)) {
+      continue;
+    }
+
+    sp_str_t manifest = sp_fs_join_path(spn.mem, patch, pkg->origin.paths.manifest);
+    sp_str_t name = sp_intern_str_from_id(session->intern, pkg->id.qualified);
+    spn_pkg_info_t* info = sp_alloc_type(spn.mem, spn_pkg_info_t);
+    spn_err_union_t loaded = spn_pkg_load(spn.mem, session->intern, manifest, SPN_MANIFEST_DEP, name, info);
+    if (loaded.kind) {
+      result = spn_err_emit(loaded).kind;
+      continue;
+    }
+
+    pkg->origin.recipe = (spn_pkg_tree_t) { .kind = SPN_PKG_TREE_LOCAL, .local = patch };
+    pkg->origin.source = spn_pkg_upstream(info);
+    pkg->origin.info = info;
+    pkg->name = info->name;
+    pkg->options = info->options;
+  }
+  return result;
 }
 
 void add_root(spn_session_t* session, spn_resolve_query_t* query) {
@@ -88,9 +121,14 @@ spn_task_step_t spn_task_resolve(spn_app_t* app) {
 
   if (spn_resolve_from_solver(&resolver, &query)) {
     sp_da_for(query.errors, it) {
-      spn_event_buffer_push(spn.events, resolve_err_event(&query.errors[it]));
+      spn_err_emit(query.errors[it]);
     }
     return spn_task_fail(query.errors[0].kind, .reported = true);
+  }
+
+  spn_err_t patched = apply_patch_overrides(session, &query);
+  if (patched) {
+    return spn_task_fail(patched, .reported = true);
   }
   session->resolve = query.result;
 

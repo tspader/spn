@@ -61,7 +61,10 @@ set(SPN_SOURCES
   git/key.c
   git/patch.c
   index/cache.c
+  index/dir.c
+  index/release.c
   index/index.c
+  index/jsonl.c
   index/json.c
   index/publish.c
   intern/context.c
@@ -119,7 +122,7 @@ set(SPN_SOURCES
   task/which.c
   thread_pool/thread_pool.c
   toml/edit.c
-  toml/loader.c
+  pkg/load.c
   toolchain/catalog.c
   toolchain/provision.c
   toolchain/select.c

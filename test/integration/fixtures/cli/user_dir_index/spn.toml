@@ -1,0 +1,10 @@
+[package]
+name = "user_dir_index"
+version = "0.1.0"
+
+[deps.package]
+A = "1.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

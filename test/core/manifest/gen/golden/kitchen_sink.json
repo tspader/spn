@@ -91,18 +91,18 @@
       ]
     }
   ],
-  "index": {
-    "core": {
+  "index": [
+    {
       "name": "core",
       "url": "https://packages.example.com",
       "protocol": "http"
     },
-    "local": {
+    {
       "name": "local",
       "url": "/srv/pkgs",
       "protocol": "http"
     }
-  },
+  ],
   "profile": {
     "debug": {
       "standard": "c11",

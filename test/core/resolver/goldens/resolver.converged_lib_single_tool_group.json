@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "requests": [
     {
       "namespace": "test",
@@ -14,7 +14,8 @@
       "name": "foo",
       "version": "1.9.0",
       "hash": "83fd4a8d0a1afc44",
-      "source": "index"
+      "source": "index",
+      "recipe": "none"
     },
     {
       "namespace": "spn",
@@ -22,6 +23,7 @@
       "version": "1.0.0",
       "hash": "744e32cac55b1442",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -41,6 +43,7 @@
       "version": "1.0.0",
       "hash": "f24dc13239c927cd",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -60,6 +63,7 @@
       "version": "1.0.0",
       "hash": "ba026dabccbeeabe",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -79,6 +83,7 @@
       "version": "0.0.1",
       "hash": "5c621c3d38d4e928",
       "source": "root",
+      "recipe": "local",
       "edges": [
         {
           "to": {

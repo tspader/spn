@@ -4,25 +4,9 @@
 #include "release.gen.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
+#include "semver/parser.h"
 #include "sp.h"
 #include "sp/str.h"
-
-static spn_err_t spn_index_parse_semver(sp_str_t version, spn_semver_t* out) {
-  if (sp_str_empty(version)) {
-    return SPN_ERROR;
-  }
-
-  spn_semver_t semver = spn_semver_from_str(version);
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  bool round_trips = sp_str_equal(version, spn_semver_to_str(scratch.mem, semver));
-  sp_mem_end_scratch(scratch);
-  if (!round_trips) {
-    return SPN_ERROR;
-  }
-
-  *out = semver;
-  return SPN_OK;
-}
 
 static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t json, spn_index_release_t* release) {
   spn_cg_release_t rel = sp_zero;
@@ -36,28 +20,39 @@ static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t j
   if (!sp_str_equal(rel.name, id.name)) {
     return SPN_ERROR;
   }
-  spn_try(spn_index_parse_semver(rel.version, &release->version));
+  spn_try(spn_semver_parse(rel.version, &release->version));
 
   release->id.namespace = rel.namespace;
   release->id.name = rel.name;
   release->yanked = rel.yanked;
-  release->source = (spn_index_rel_source_t) { .url = rel.source.url, .rev = rel.source.rev, .dir = rel.source.dir };
-  release->manifest = (spn_index_rel_source_t) { .url = rel.manifest.url, .rev = rel.manifest.rev, .dir = rel.manifest.dir };
+  if (!sp_str_empty(rel.source.url)) {
+    release->source = (spn_pkg_tree_t) {
+      .kind = SPN_PKG_TREE_GIT,
+      .git = { .url = rel.source.url, .rev = rel.source.rev, .dir = rel.source.dir },
+    };
+  }
+  if (!sp_str_empty(rel.manifest.url)) {
+    release->manifest = (spn_pkg_tree_t) {
+      .kind = SPN_PKG_TREE_GIT,
+      .git = { .url = rel.manifest.url, .rev = rel.manifest.rev, .dir = rel.manifest.dir },
+    };
+  }
   release->paths = (spn_index_rel_paths_t) { .manifest = rel.paths.manifest, .script = rel.paths.script };
 
   sp_da_init(mem, release->deps);
   sp_da_for(rel.deps, it) {
-    sp_da_push(release->deps, ((spn_index_dep_t) {
+    spn_index_dep_t dep = {
       .kind = rel.deps[it].kind,
       .private = !sp_opt_is_null(rel.deps[it].private) && sp_opt_get(rel.deps[it].private),
       .id = {
         .namespace = rel.deps[it].namespace,
         .name = rel.deps[it].name,
       },
-      .version = rel.deps[it].version,
       .when = rel.deps[it].when,
       .options = rel.deps[it].options,
-    }));
+    };
+    spn_try(spn_semver_parse_range(rel.deps[it].version, &dep.range));
+    sp_da_push(release->deps, dep);
   }
 
   sp_da_init(mem, release->targets);
@@ -99,19 +94,24 @@ sp_str_t spn_index_release_to_json(sp_mem_t mem, spn_index_release_t* rel) {
     .name = rel->id.name,
     .version = spn_semver_to_str(mem, rel->version),
     .yanked = rel->yanked,
-    .source = { .url = rel->source.url, .rev = rel->source.rev, .dir = rel->source.dir },
-    .manifest = { .url = rel->manifest.url, .rev = rel->manifest.rev, .dir = rel->manifest.dir },
     .paths = { .manifest = rel->paths.manifest, .script = rel->paths.script },
     .deps = sp_da_new(mem, spn_cg_release_dep_t),
     .targets = sp_da_new(mem, spn_cg_release_target_t),
     .options = sp_da_new(mem, spn_cg_release_options_entry_t),
   };
 
+  if (rel->source.kind == SPN_PKG_TREE_GIT) {
+    release.source = (spn_cg_release_source_t) { .url = rel->source.git.url, .rev = rel->source.git.rev, .dir = rel->source.git.dir };
+  }
+  if (rel->manifest.kind == SPN_PKG_TREE_GIT) {
+    release.manifest = (spn_cg_release_source_t) { .url = rel->manifest.git.url, .rev = rel->manifest.git.rev, .dir = rel->manifest.git.dir };
+  }
+
   sp_da_for(rel->deps, it) {
     spn_cg_release_dep_t dep = {
       .namespace = rel->deps[it].id.namespace,
       .name = rel->deps[it].id.name,
-      .version = rel->deps[it].version,
+      .version = spn_semver_range_to_str(mem, rel->deps[it].range),
       .kind = rel->deps[it].kind,
       .when = rel->deps[it].when,
       .options = rel->deps[it].options,

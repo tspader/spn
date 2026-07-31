@@ -13,6 +13,7 @@
 #include "thread_pool/thread_pool.h"
 #include "log/lazy/lazy.h"
 #include "pkg/id.h"
+#include "pkg/load.h"
 #include "pkg/patch.h"
 #include "pkg/types.h"
 #include "resolve/types.h"
@@ -215,17 +216,9 @@ static sp_da(sp_str_t) detect_configure_source(spn_loaded_pkg_t* loaded) {
 
 static spn_err_t load_manifest(spn_session_t* session, sp_str_t name, sp_str_t path, spn_pkg_info_t** info) {
   spn_pkg_info_t* parsed = sp_alloc_type(spn.mem, spn_pkg_info_t);
-  spn_toml_loader_t ctx = sp_zero;
-  spn_toml_loader_init(&ctx, spn.mem, session->intern);
-  if (spn_codegen_load_pkg(&ctx, path, parsed) || spn_pkg_reject_patches(&ctx, parsed)) {
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR_MANIFEST,
-      .manifest_err = {
-        .name = name,
-        .path = path,
-        .error = spn_codegen_issues_message(spn.mem, ctx.issues),
-        .issues = ctx.issues,
-      }});
+  spn_err_union_t err = spn_pkg_load(spn.mem, session->intern, path, SPN_MANIFEST_DEP, name, parsed);
+  if (err.kind) {
+    spn_err_emit(err);
     return SPN_ERROR;
   }
 
@@ -233,13 +226,10 @@ static spn_err_t load_manifest(spn_session_t* session, sp_str_t name, sp_str_t p
   // index assigns, but config keys and consumer routing use the name
   sp_str_t requested = spn_pkg_name_from_qualified(name).name;
   if (!sp_str_equal(parsed->name, requested)) {
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR_MANIFEST,
-      .manifest_err = {
-        .name = name,
-        .path = path,
-        .error = sp_fmt(spn.mem, "the manifest declares {} but the release is {}", sp_fmt_str(parsed->name), sp_fmt_str(requested)).value,
-      }});
+    spn_err_emit((spn_err_union_t) {
+      .kind = SPN_ERR_PKG_MISMATCH,
+      .mismatch = { .path = path, .declared = parsed->name, .requested = name },
+    });
     return SPN_ERROR;
   }
 

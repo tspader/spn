@@ -2,6 +2,8 @@
 #include "sp/macro.h"
 #include "event/log.h"
 
+#include "error/error.h"
+
 #include "event/event.h"
 
 #include "log/types.h"
@@ -18,6 +20,122 @@ static const c8* level_name(s32 level) {
 }
 
 static sp_bind_t* schemas[SPN_EVENT_COUNT] = {0};
+static sp_bind_t* err_schemas[SPN_ERR_COUNT] = {0};
+
+static void build_err_schemas(sp_mem_t mem) {
+  // SPN_ERR_MANIFEST_ISSUES
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_err_manifest_t, name, "name", SP_BIND_STR);
+      SP_BIND(&b, spn_err_manifest_t, path, "path", SP_BIND_STR);
+    }
+    err_schemas[SPN_ERR_MANIFEST_ISSUES] = sp_bind_builder_end(&b);
+  }
+
+  // SPN_ERR_PKG_MISMATCH
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_err_mismatch_t, path, "path", SP_BIND_STR);
+      SP_BIND(&b, spn_err_mismatch_t, declared, "declared", SP_BIND_STR);
+      SP_BIND(&b, spn_err_mismatch_t, requested, "requested", SP_BIND_STR);
+    }
+    err_schemas[SPN_ERR_PKG_MISMATCH] = sp_bind_builder_end(&b);
+  }
+
+  // SPN_ERR_DEP_CYCLE
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND_OBJECT(&b, spn_err_circular_t, id, "id") {
+        SP_BIND(&b, spn_pkg_name_t, namespace, "namespace", SP_BIND_STR);
+        SP_BIND(&b, spn_pkg_name_t, name, "name", SP_BIND_STR);
+      }
+    }
+    err_schemas[SPN_ERR_DEP_CYCLE] = sp_bind_builder_end(&b);
+  }
+
+  // SPN_ERR_PKG_UNKNOWN
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND_OBJECT(&b, spn_err_unknown_t, request, "request") {
+        SP_BIND(&b, spn_requested_dep_t, qualified, "qualified", SP_BIND_STR);
+      }
+    }
+    err_schemas[SPN_ERR_PKG_UNKNOWN] = sp_bind_builder_end(&b);
+  }
+
+  // SPN_ERR_UNIT_CYCLE
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND_OBJECT(&b, spn_err_unit_cycle_t, id, "id") {
+        SP_BIND(&b, spn_pkg_name_t, namespace, "namespace", SP_BIND_STR);
+        SP_BIND(&b, spn_pkg_name_t, name, "name", SP_BIND_STR);
+      }
+      SP_BIND_OBJECT(&b, spn_err_unit_cycle_t, version, "version") {
+        SP_BIND(&b, spn_semver_t, major, "major", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, minor, "minor", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, patch, "patch", SP_BIND_U32);
+      }
+    }
+    err_schemas[SPN_ERR_UNIT_CYCLE] = sp_bind_builder_end(&b);
+  }
+
+  // SPN_ERR_DYNAMIC_DUPLICATE
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND_OBJECT(&b, spn_err_dynamic_dup_t, id, "id") {
+        SP_BIND(&b, spn_pkg_name_t, namespace, "namespace", SP_BIND_STR);
+        SP_BIND(&b, spn_pkg_name_t, name, "name", SP_BIND_STR);
+      }
+      SP_BIND_OBJECT(&b, spn_err_dynamic_dup_t, low, "low") {
+        SP_BIND(&b, spn_semver_t, major, "major", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, minor, "minor", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, patch, "patch", SP_BIND_U32);
+      }
+      SP_BIND_OBJECT(&b, spn_err_dynamic_dup_t, high, "high") {
+        SP_BIND(&b, spn_semver_t, major, "major", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, minor, "minor", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, patch, "patch", SP_BIND_U32);
+      }
+    }
+    err_schemas[SPN_ERR_DYNAMIC_DUPLICATE] = sp_bind_builder_end(&b);
+  }
+
+  // SPN_ERR_RESOLVE_TOO_COMPLEX
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND_OBJECT(&b, spn_err_too_complex_t, id, "id") {
+        SP_BIND(&b, spn_pkg_name_t, namespace, "namespace", SP_BIND_STR);
+        SP_BIND(&b, spn_pkg_name_t, name, "name", SP_BIND_STR);
+      }
+    }
+    err_schemas[SPN_ERR_RESOLVE_TOO_COMPLEX] = sp_bind_builder_end(&b);
+  }
+
+  // SPN_ERR_PKG_NO_MATCH
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND_OBJECT(&b, spn_err_unsatisfiable_t, request, "request") {
+        SP_BIND(&b, spn_requested_dep_t, qualified, "qualified", SP_BIND_STR);
+      }
+      SP_BIND(&b, spn_err_unsatisfiable_t, requester, "requester", SP_BIND_STR);
+      SP_BIND(&b, spn_err_unsatisfiable_t, conflict, "conflict", SP_BIND_BOOL);
+      SP_BIND_OBJECT(&b, spn_err_unsatisfiable_t, selected, "selected") {
+        SP_BIND(&b, spn_semver_t, major, "major", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, minor, "minor", SP_BIND_U32);
+        SP_BIND(&b, spn_semver_t, patch, "patch", SP_BIND_U32);
+      }
+    }
+    err_schemas[SPN_ERR_PKG_NO_MATCH] = sp_bind_builder_end(&b);
+  }
+}
 
 static void build_schemas(sp_mem_t mem) {
   // SPN_EVENT_SYNC
@@ -325,16 +443,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_ERR_PATCH] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_ERR_MANIFEST
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_manifest_err_t, name, "name", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_manifest_err_t, path, "path", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_manifest_err_t, error, "error", SP_BIND_STR);
-    }
-    schemas[SPN_EVENT_ERR_MANIFEST] = sp_bind_builder_end(&b);
-  }
 
   // SPN_EVENT_SYNC_END
   {
@@ -346,97 +454,11 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_SYNC_END] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_CIRCULAR_DEP
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND_OBJECT(&b, spn_evt_circular_t, id, "id") {
-        SP_BIND(&b, spn_pkg_name_t, namespace, "namespace", SP_BIND_STR);
-        SP_BIND(&b, spn_pkg_name_t, name, "name", SP_BIND_STR);
-      }
-    }
-    schemas[SPN_EVENT_ERR_CIRCULAR_DEP] = sp_bind_builder_end(&b);
-  }
 
-  // SPN_EVENT_ERR_UNKNOWN_PKG
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND_OBJECT(&b, spn_evt_unknown_t, request, "request") {
-        SP_BIND(&b, spn_requested_dep_t, qualified, "qualified", SP_BIND_STR);
-      }
-    }
-    schemas[SPN_EVENT_ERR_UNKNOWN_PKG] = sp_bind_builder_end(&b);
-  }
 
-  // SPN_EVENT_ERR_UNIT_CYCLE
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND_OBJECT(&b, spn_evt_unit_cycle_t, id, "id") {
-        SP_BIND(&b, spn_pkg_name_t, namespace, "namespace", SP_BIND_STR);
-        SP_BIND(&b, spn_pkg_name_t, name, "name", SP_BIND_STR);
-      }
-      SP_BIND_OBJECT(&b, spn_evt_unit_cycle_t, version, "version") {
-        SP_BIND(&b, spn_semver_t, major, "major", SP_BIND_U32);
-        SP_BIND(&b, spn_semver_t, minor, "minor", SP_BIND_U32);
-        SP_BIND(&b, spn_semver_t, patch, "patch", SP_BIND_U32);
-      }
-    }
-    schemas[SPN_EVENT_ERR_UNIT_CYCLE] = sp_bind_builder_end(&b);
-  }
 
-  // SPN_EVENT_ERR_DYNAMIC_DUPLICATE
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND_OBJECT(&b, spn_evt_dynamic_dup_t, id, "id") {
-        SP_BIND(&b, spn_pkg_name_t, namespace, "namespace", SP_BIND_STR);
-        SP_BIND(&b, spn_pkg_name_t, name, "name", SP_BIND_STR);
-      }
-      SP_BIND_OBJECT(&b, spn_evt_dynamic_dup_t, low, "low") {
-        SP_BIND(&b, spn_semver_t, major, "major", SP_BIND_U32);
-        SP_BIND(&b, spn_semver_t, minor, "minor", SP_BIND_U32);
-        SP_BIND(&b, spn_semver_t, patch, "patch", SP_BIND_U32);
-      }
-      SP_BIND_OBJECT(&b, spn_evt_dynamic_dup_t, high, "high") {
-        SP_BIND(&b, spn_semver_t, major, "major", SP_BIND_U32);
-        SP_BIND(&b, spn_semver_t, minor, "minor", SP_BIND_U32);
-        SP_BIND(&b, spn_semver_t, patch, "patch", SP_BIND_U32);
-      }
-    }
-    schemas[SPN_EVENT_ERR_DYNAMIC_DUPLICATE] = sp_bind_builder_end(&b);
-  }
 
-  // SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND_OBJECT(&b, spn_evt_too_complex_t, id, "id") {
-        SP_BIND(&b, spn_pkg_name_t, namespace, "namespace", SP_BIND_STR);
-        SP_BIND(&b, spn_pkg_name_t, name, "name", SP_BIND_STR);
-      }
-    }
-    schemas[SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX] = sp_bind_builder_end(&b);
-  }
 
-  // SPN_EVENT_ERR_UNSATISFIABLE_VERSION
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND_OBJECT(&b, spn_evt_unsatisfiable_t, request, "request") {
-        SP_BIND(&b, spn_requested_dep_t, qualified, "qualified", SP_BIND_STR);
-      }
-      SP_BIND(&b, spn_evt_unsatisfiable_t, requester, "requester", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_unsatisfiable_t, conflict, "conflict", SP_BIND_BOOL);
-      SP_BIND_OBJECT(&b, spn_evt_unsatisfiable_t, selected, "selected") {
-        SP_BIND(&b, spn_semver_t, major, "major", SP_BIND_U32);
-        SP_BIND(&b, spn_semver_t, minor, "minor", SP_BIND_U32);
-        SP_BIND(&b, spn_semver_t, patch, "patch", SP_BIND_U32);
-      }
-    }
-    schemas[SPN_EVENT_ERR_UNSATISFIABLE_VERSION] = sp_bind_builder_end(&b);
-  }
 
   // SPN_EVENT_EMBED_START
   {
@@ -609,10 +631,14 @@ static void json_write_value(sp_io_writer_t* out, sp_bind_field_t* field, void* 
 
 void spn_event_log_init(sp_mem_t mem) {
   build_schemas(mem);
+  build_err_schemas(mem);
 }
 
 void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
   sp_bind_t* schema = schemas[event->kind];
+  if (event->kind == SPN_EVENT_ERR) {
+    schema = err_schemas[event->err.kind];
+  }
 
   sp_tm_epoch_t now = sp_tm_now_epoch();
 
@@ -651,7 +677,16 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
     default: break;
   }
 
-  if (schema) {
+  if (event->kind == SPN_EVENT_ERR) {
+    sp_io_write_cstr(out, ", \"kind\": \"", SP_NULLPTR);
+    sp_io_write_cstr(out, spn_err_to_str(event->err.kind), SP_NULLPTR);
+    sp_io_write_cstr(out, "\"", SP_NULLPTR);
+    if (schema) {
+      sp_io_write_cstr(out, ", \"data\": ", SP_NULLPTR);
+      json_write_object(out, schema, (void*)&event->err.manifest);
+    }
+  }
+  else if (schema) {
     void* data = spn_event_payload(event);
     if (data) {
       sp_io_write_cstr(out, ", \"data\": ", SP_NULLPTR);

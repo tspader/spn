@@ -3,37 +3,15 @@
 #include "error/types.h"
 #include "codegen/lower.h"
 #include "external/git.h"
+#include "index/release.h"
 #include "index/publish.h"
-#include "pkg/id.h"
-#include "semver/convert.h"
-#include "target/mutate.h"
-#include "toml/loader.h"
-
-static spn_index_dep_kind_t dep_kind_to_index(spn_dep_kind_t kind) {
-  switch (kind) {
-    case SPN_DEP_KIND_PACKAGE: return SPN_INDEX_DEP_NORMAL;
-    case SPN_DEP_KIND_BUILD:   return SPN_INDEX_DEP_BUILD;
-    case SPN_DEP_KIND_TEST:    return SPN_INDEX_DEP_TEST;
-  }
-  sp_unreachable_return(SPN_INDEX_DEP_NORMAL);
-}
+#include "pkg/load.h"
 
 spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t* out) {
   sp_str_t manifest_path = sp_fs_join_path(opts->mem, opts->cwd, sp_str_lit("spn.toml"));
 
-  if (!sp_fs_exists(manifest_path)) {
-    return (spn_err_union_t) {
-      .kind = SPN_ERR_NO_MANIFEST,
-      .no_manifest.path = manifest_path,
-    };
-  }
-
   spn_pkg_info_t info = sp_zero;
-  spn_toml_loader_t ctx = sp_zero;
-  spn_toml_loader_init(&ctx, opts->mem, opts->intern);
-  if (spn_codegen_load_pkg(&ctx, manifest_path, &info) || spn_pkg_reject_patches(&ctx, &info)) {
-    return spn_codegen_err(&ctx);
-  }
+  try_union(spn_pkg_load(opts->mem, opts->intern, manifest_path, SPN_MANIFEST_DEP, sp_str_lit(""), &info));
 
   sp_str_t repo = sp_zero;
   if (spn_git_get_root(opts->mem, opts->cwd, &repo)) {
@@ -80,57 +58,17 @@ spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t*
     subdir = sp_str_suffix(opts->cwd, opts->cwd.len - repo.len - 1);
   }
 
-  spn_index_release_t release = {
-    .id = {
-      .namespace = sp_str_empty(info.namespace) ? sp_str_lit("core") : info.namespace,
-      .name = info.name,
-    },
-    .version = info.version,
-    .source = { .url = url, .rev = revision, .dir = subdir },
-    .paths = {
-      .manifest = sp_str_lit("spn.toml"),
-      .script = sp_str_lit("spn.c"),
-    },
+  spn_index_release_t release = sp_zero;
+  try_union(spn_index_release_from_pkg(opts->mem, &info, &release));
+
+  spn_pkg_tree_t published = {
+    .kind = SPN_PKG_TREE_GIT,
+    .git = { .url = url, .rev = revision, .dir = subdir },
   };
-
-  sp_da_init(opts->mem, release.deps);
-  sp_da_init(opts->mem, release.targets);
-  release.options = info.options;
-
-  if (!sp_str_empty(info.upstream.url)) {
-    release.source = (spn_index_rel_source_t) { .url = info.upstream.url, .rev = info.upstream.commit };
-    release.manifest = (spn_index_rel_source_t) { .url = url, .rev = revision, .dir = subdir };
-  }
-
-  sp_da_for(info.deps, it) {
-    spn_requested_dep_t* req = &info.deps[it];
-    if (req->source != SPN_PKG_SOURCE_INDEX) {
-      continue;
-    }
-
-    sp_da_push(release.deps, ((spn_index_dep_t) {
-      .kind = dep_kind_to_index(req->kind),
-      .private = req->private,
-      .id = spn_pkg_name_from_qualified(req->qualified),
-      .version = spn_semver_range_to_str(opts->mem, req->index.range),
-      .when = req->when,
-      .options = req->options,
-    }));
-  }
-
-  sp_str_om_for(info.libs, it) {
-    spn_target_info_t* lib = sp_str_om_at(info.libs, it);
-    spn_index_target_t target = { .name = lib->name };
-    sp_da_init(opts->mem, target.linkages);
-
-    const spn_linkage_t kinds [] = { SPN_LIB_KIND_SOURCE, SPN_LIB_KIND_STATIC, SPN_LIB_KIND_SHARED, SPN_LIB_KIND_OBJECT };
-    sp_for(kind, sp_carr_len(kinds)) {
-      if (spn_linkage_set_has(lib->linkages, kinds[kind])) {
-        sp_da_push(target.linkages, kinds[kind]);
-      }
-    }
-
-    sp_da_push(release.targets, target);
+  if (release.source.kind == SPN_PKG_TREE_NONE) {
+    release.source = published;
+  } else {
+    release.manifest = published;
   }
 
   *out = release;

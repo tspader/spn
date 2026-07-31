@@ -5,9 +5,10 @@
     "abi": { "enum": ["gnu", "musl", "msvc", "mingw"] },
     "linkage": { "enum": ["shared", "static", "source", "object"] },
     "cc_driver": { "enum": ["gcc", "clang", "msvc"], "metadata": { "include": "toolchain/types.h" } },
-    "index_protocol": { "enum": ["git", "http"], "metadata": { "include": "index/types.h" } },
+    "index_protocol": { "enum": ["git", "http", "dir"], "metadata": { "include": "index/types.h" } },
     "option_type": { "enum": ["bool", "enum"], "metadata": { "include": "when/types.h" } },
     "pkg_source": { "enum": ["root", "file", "index"], "metadata": { "include": "pkg/types.h" } },
+    "pkg_tree_kind": { "enum": ["none", "local", "git"], "metadata": { "include": "pkg/types.h" } },
 
     "triple": {
       "optionalProperties": {
@@ -23,6 +24,19 @@
       },
       "optionalProperties": {
         "sha256": { "type": "string" }
+      }
+    },
+
+    "index": {
+      "properties": {
+        "name": { "type": "string" }
+      },
+      "optionalProperties": {
+        "url": { "type": "string" },
+        "path": { "type": "string" },
+        "protocol": { "ref": "index_protocol" },
+        "rev": { "type": "string" },
+        "publish_url": { "type": "string" }
       }
     }
   }

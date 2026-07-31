@@ -621,6 +621,36 @@ spn_pkg_source_t spn_pkg_source_from_str(sp_str_t str) {
   SP_UNREACHABLE_RETURN(SPN_PKG_SOURCE_INDEX);
 }
 
+sp_str_t spn_pkg_tree_kind_to_str(spn_pkg_tree_kind_t kind) {
+  switch (kind) {
+    case SPN_PKG_TREE_NONE: {
+      return sp_str_lit("none");
+    }
+    case SPN_PKG_TREE_LOCAL: {
+      return sp_str_lit("local");
+    }
+    case SPN_PKG_TREE_GIT: {
+      return sp_str_lit("git");
+    }
+  }
+
+  sp_unreachable_return(sp_str_lit(""));
+}
+
+spn_pkg_tree_kind_t spn_pkg_tree_kind_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "none")) {
+    return SPN_PKG_TREE_NONE;
+  }
+  if (sp_str_equal_cstr(str, "local")) {
+    return SPN_PKG_TREE_LOCAL;
+  }
+  if (sp_str_equal_cstr(str, "git")) {
+    return SPN_PKG_TREE_GIT;
+  }
+
+  sp_unreachable_return(SPN_PKG_TREE_NONE);
+}
+
 sp_str_t spn_dep_kind_to_str(spn_dep_kind_t kind) {
   switch (kind) {
     case SPN_DEP_KIND_PACKAGE: {
@@ -755,6 +785,9 @@ sp_str_t spn_index_protocol_to_str(spn_index_protocol_t protocol) {
     case SPN_INDEX_PROTOCOL_HTTP: {
       return sp_str_lit("http");
     }
+    case SPN_INDEX_PROTOCOL_DIR: {
+      return sp_str_lit("dir");
+    }
   }
 
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
@@ -766,6 +799,9 @@ spn_index_protocol_t spn_index_protocol_from_str(sp_str_t str) {
   }
   if (sp_str_equal_cstr(str, "http")) {
     return SPN_INDEX_PROTOCOL_HTTP;
+  }
+  if (sp_str_equal_cstr(str, "dir")) {
+    return SPN_INDEX_PROTOCOL_DIR;
   }
 
   SP_UNREACHABLE_RETURN(SPN_INDEX_PROTOCOL_GIT);

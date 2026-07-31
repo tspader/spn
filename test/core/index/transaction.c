@@ -176,7 +176,7 @@ static sp_str_t remote_head_message(sp_mem_t mem, sp_str_t remote) {
   return sp_str_trim_right(result.out);
 }
 
-sp_test_each(index_transaction, publish, txn_test_t, tests) {
+sp_test_each(index_transaction, publish, txn_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   sp_str_t tmp = sp_test_dir(t);
 
@@ -185,14 +185,13 @@ sp_test_each(index_transaction, publish, txn_test_t, tests) {
 
   spn_index_info_t index = {
     .name = sp_str_lit("test"),
-    .url = remote,
-    .location = sp_fs_join_path(mem, tmp, sp_str_lit("clone")),
     .protocol = SPN_INDEX_PROTOCOL_GIT,
+    .git = { .url = remote },
+    .location = sp_fs_join_path(mem, tmp, sp_str_lit("clone")),
   };
   if (it->remote.pin) {
-    index.rev = sp_str_view(it->remote.pin);
+    index.git.rev = sp_str_view(it->remote.pin);
   }
-  spn_index_init(&index, mem);
 
   if (it->remote.empty) {
     git_repo_git(tmp, sp_str_lit("init"), sp_str_lit("--quiet"), sp_str_lit("--bare"), sp_str_lit("remote.git"));
@@ -237,11 +236,14 @@ sp_test_each(index_transaction, publish, txn_test_t, tests) {
             .name = sp_str_view(action.publish.name),
           },
           .version = action.publish.version,
-          .source = { .url = sp_str_lit("https://example.com/pkg.git"), .rev = sp_str_lit("abc123") },
+          .source = {
+            .kind = SPN_PKG_TREE_GIT,
+            .git = { .url = sp_str_lit("https://example.com/pkg.git"), .rev = sp_str_lit("abc123") },
+          },
         };
         sp_da_init(mem, rel.deps);
         sp_da_init(mem, rel.targets);
-        sp_expect_eq(t, action.publish.err, spn_index_publish(&index, &rel).kind);
+        sp_expect_eq(t, action.publish.err, spn_index_publish(&index, mem, &rel).kind);
         break;
       }
       case TXN_ACTION_SYNC: {

@@ -45,6 +45,49 @@ static void commit_seed(sp_mem_t mem, sp_str_t repo, const c8* name, u32 seq) {
   git_repo_commit(repo, sp_str_lit("seed"));
 }
 
+typedef struct {
+  const c8* name;
+  bool exists;
+
+  struct {
+    spn_err_t result;
+  } expect;
+} dir_sync_test_t;
+
+static const dir_sync_test_t dir_tests [] = {
+  {
+    .name = "present",
+    .exists = true,
+  },
+  {
+    .name = "missing",
+    .expect = {
+      .result = SPN_ERROR,
+    },
+  },
+};
+
+sp_test_each(index_sync, dir, dir_sync_test_t, dir_tests) {
+  sp_mem_t mem = sp_test_arena(t);
+
+  sp_str_t location = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("index"));
+  if (it->exists) {
+    sp_fs_create_dir(location);
+  }
+
+  spn_index_info_t index = {
+    .location = location,
+    .protocol = SPN_INDEX_PROTOCOL_DIR,
+  };
+
+  sp_expect_eq(t, it->expect.result, spn_index_sync(&index, false));
+  if (it->exists) {
+    sp_expect_eq(t, false, spn_index_needs_fetch(&index));
+  }
+
+  return SP_OK;
+}
+
 sp_test_each(index_sync, sync, sync_test_t, tests) {
   sp_mem_t mem = sp_test_arena(t);
   sp_str_t tmp = sp_test_dir(t);
@@ -58,9 +101,9 @@ sp_test_each(index_sync, sync, sync_test_t, tests) {
 
   spn_index_info_t index = {
     .name = sp_str_lit("test"),
-    .url = remote,
-    .location = cache,
     .protocol = it->protocol,
+    .git = { .url = remote },
+    .location = cache,
   };
 
   if (it->cloned) {

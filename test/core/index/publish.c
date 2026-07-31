@@ -141,7 +141,7 @@ static void write_publish_fixtures(sp_mem_t mem, sp_str_t index_root, const publ
   }
 }
 
-sp_test_each(index_publish, publish, publish_test_t, tests) {
+sp_test_each(index_publish, publish, publish_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
 
   sp_str_t index_root = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("index"));
@@ -155,10 +155,9 @@ sp_test_each(index_publish, publish, publish_test_t, tests) {
   git_repo_commit(index_root, sp_str_lit("seed"));
 
   spn_index_info_t index = {
-    .url = index_root,
+    .git = { .url = index_root },
     .location = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("clone")),
   };
-  spn_index_init(&index, mem);
 
   spn_index_release_t rel = {
     .id = {
@@ -167,10 +166,17 @@ sp_test_each(index_publish, publish, publish_test_t, tests) {
     },
     .version = it->release.version,
   };
-  if (it->release.source.url) { rel.source.url = sp_str_view(it->release.source.url); }
-  if (it->release.source.rev) { rel.source.rev = sp_str_view(it->release.source.rev); }
+  if (it->release.source.url) {
+    rel.source = (spn_pkg_tree_t) {
+      .kind = SPN_PKG_TREE_GIT,
+      .git = {
+        .url = sp_cstr_as_str(it->release.source.url),
+        .rev = sp_cstr_as_str(it->release.source.rev ? it->release.source.rev : ""),
+      },
+    };
+  }
 
-  spn_err_t result = spn_index_publish(&index, &rel).kind;
+  spn_err_t result = spn_index_publish(&index, mem, &rel).kind;
   sp_expect_eq(t, it->expect.result, result);
 
   if (it->expect.lines > 0) {
@@ -185,6 +191,52 @@ sp_test_each(index_publish, publish, publish_test_t, tests) {
     sp_expect_eq(t, it->expect.lines, index_test_count_lines(test_read_file(mem, pkg_path)));
   }
 
-  spn_index_deinit(&index);
+  return SP_OK;
+}
+
+typedef struct {
+  const c8* name;
+  spn_index_protocol_t protocol;
+
+  struct {
+    spn_err_t result;
+  } expect;
+} protocol_test_t;
+
+static const protocol_test_t protocol_tests [] = {
+  {
+    .name = "http",
+    .protocol = SPN_INDEX_PROTOCOL_HTTP,
+    .expect = {
+      .result = SPN_ERR_INDEX_PUBLISH_PROTOCOL,
+    },
+  },
+  {
+    .name = "dir",
+    .protocol = SPN_INDEX_PROTOCOL_DIR,
+    .expect = {
+      .result = SPN_ERR_INDEX_PUBLISH_PROTOCOL,
+    },
+  },
+};
+
+sp_test_each(index_publish, protocol, protocol_test_t, protocol_tests, .setup = spn_test_ctx_setup) {
+  sp_mem_t mem = sp_test_arena(t);
+
+  sp_str_t location = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("index"));
+  sp_fs_create_dir(location);
+
+  spn_index_info_t index = {
+    .location = location,
+    .protocol = it->protocol,
+  };
+
+  spn_index_release_t rel = {
+    .id = { .namespace = sp_str_lit("core"), .name = sp_str_lit("A") },
+    .version = { 1, 0, 0 },
+  };
+
+  sp_expect_eq(t, it->expect.result, spn_index_publish(&index, mem, &rel).kind);
+
   return SP_OK;
 }

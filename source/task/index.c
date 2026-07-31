@@ -39,7 +39,7 @@ spn_task_step_t spn_task_sync_indexes_init(spn_app_t* app) {
         .kind = SPN_EVENT_SYNC,
         .sync = {
           .name = index->name,
-          .url = index->url,
+          .url = spn_index_source(index),
         }});
     }
 
@@ -80,14 +80,14 @@ spn_task_step_t spn_task_sync_indexes_update(spn_app_t* app) {
         .kind = SPN_EVENT_SYNC_STALE,
         .sync = {
           .name = job->index->name,
-          .url = job->index->url,
+          .url = spn_index_source(job->index),
         }});
       continue;
     }
 
     return spn_task_fail(SPN_ERR_INDEX_SYNC, .index = {
       .name = job->index->name,
-      .url = job->index->url,
+      .url = spn_index_source(job->index),
     });
   }
 

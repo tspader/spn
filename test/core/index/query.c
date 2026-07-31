@@ -2,14 +2,11 @@
 
 typedef struct {
   const c8* name;
+  const c8* fixture;
 
   struct {
     bool exists;
-    const c8* lines [4];
-  } file;
-
-  struct {
-    bool exists;
+    spn_err_t err;
     spn_semver_t versions [4];
   } expect;
 } query_test_t;
@@ -17,11 +14,7 @@ typedef struct {
 static const query_test_t tests [] = {
   {
     .name = "returns_releases",
-    .file = {
-      .lines = {
-        "{" kv("namespace", "core") "," kv("name", "spum") "," kv("version", "1.0.0") "," kv("yanked", false) "}",
-      },
-    },
+    .fixture = "minimal",
     .expect = {
       .exists = true,
       .versions = { { 1, 0, 0 } },
@@ -32,12 +25,16 @@ static const query_test_t tests [] = {
   },
   {
     .name = "empty_blob",
-    .file = { .exists = true },
+    .fixture = "empty",
+    .expect = {
+      .err = SPN_ERR_INDEX_CORRUPT,
+    },
   },
   {
     .name = "malformed_line",
-    .file = {
-      .lines = { "not json" },
+    .fixture = "invalid_json",
+    .expect = {
+      .err = SPN_ERR_INDEX_CORRUPT,
     },
   },
 };
@@ -46,37 +43,35 @@ static bool semver_is_zero(spn_semver_t version) {
   return version.major == 0 && version.minor == 0 && version.patch == 0;
 }
 
-sp_test_each(index_query, get_package, query_test_t, tests) {
+sp_test_each(index_query, get_package, query_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
 
   sp_str_t location = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("index"));
   sp_fs_create_dir(location);
 
-  if (it->file.exists || it->file.lines[0]) {
-    sp_io_dyn_mem_writer_t builder = sp_zero;
-    sp_io_dyn_mem_writer_init(mem, &builder);
-    sp_carr_for(it->file.lines, line) {
-      if (!it->file.lines[line]) {
-        break;
-      }
-      sp_io_write_line(&builder.base, sp_str_view(it->file.lines[line]));
-    }
-
-    sp_str_t file = sp_fs_join_path(mem, location, sp_str_lit("core/spum.jsonl"));
+  sp_str_t file = sp_fs_join_path(mem, location, sp_str_lit("core/spum.jsonl"));
+  if (it->fixture) {
+    sp_str_t fixture = test_repo_path(mem, sp_test_format(t, "test/core/index/releases/{}.jsonl", sp_fmt_cstr(it->fixture)));
+    sp_str_t blob = sp_zero;
+    sp_io_read_file(mem, fixture, &blob);
     sp_fs_create_dir(sp_fs_parent_path(file));
-    sp_fs_create_file_str(file, sp_io_dyn_mem_writer_take_str(&builder));
+    sp_fs_create_file_str(file, blob);
   }
 
   spn_index_info_t index = {
     .location = location,
   };
-  spn_index_init(&index, mem);
 
-  spn_index_pkg_t* pkg = spn_index_get_package(&index, (spn_pkg_name_t) {
+  spn_index_pkg_t* pkg = SP_NULLPTR;
+  spn_err_union_t err = spn_index_get_package(&index, mem, spn.intern, (spn_pkg_name_t) {
     .namespace = sp_str_lit("core"),
     .name = sp_str_lit("spum"),
-  });
+  }, &pkg);
   sp_expect_eq(t, it->expect.exists, pkg != SP_NULLPTR);
+  sp_expect_eq(t, it->expect.err, err.kind);
+  if (err.kind == SPN_ERR_INDEX_CORRUPT) {
+    sp_expect_str_eq(t, err.index_corrupt.path, file);
+  }
 
   if (pkg) {
     u32 expected = 0;
@@ -88,6 +83,5 @@ sp_test_each(index_query, get_package, query_test_t, tests) {
     }
   }
 
-  spn_index_deinit(&index);
   return SP_OK;
 }

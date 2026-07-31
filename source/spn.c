@@ -31,6 +31,7 @@
 #include "app/app.h"
 #include "codegen/codegen.h"
 #include "codegen/lower.h"
+#include "enum/enum.h"
 #include "codegen/gen/config.gen.h"
 #include "codegen/gen/manifest.gen.h"
 #include "cli/cli.h"
@@ -38,13 +39,13 @@
 #include "event/event.h"
 #include "event/log.h"
 #include "external/tom.h"
-#include "git/key.h"
 #include "index/index.h"
 #include "intern/intern.h"
 #include "lock/lock.h"
 #include "log/lazy/lazy.h"
 #include "log/log.h"
 #include "sp/sp_om.h"
+#include "pkg/load.h"
 #include "profile/profile.h"
 #include "session/session.h"
 #include "spn.embed.h"
@@ -287,13 +288,20 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   extract_runtime();
 
   // CONFIG
+  sp_da(spn_index_info_t) config_indexes = sp_da_new(spn.heap, spn_index_info_t);
   if (sp_fs_exists(spn.paths.config.toml)) {
     spn_toml_loader_t loader = sp_zero;
     spn_toml_loader_init(&loader, spn.mem, spn.intern);
-    if (spn_codegen_load_config(&loader, spn.paths.config.toml, &spn.config)) {
+    spn_err_t loaded = spn_codegen_load_config(&loader, spn.paths.config.toml, &spn.config);
+    if (!loaded) {
+      sp_da_for(spn.config.index, it) {
+        sp_da_push(config_indexes, spn_index_lower(&loader, it, SPN_INDEX_USER, &spn.config.index[it]));
+      }
+    }
+    if (loaded || !sp_da_empty(loader.issues)) {
       spn.result = spn_err_emit((spn_err_union_t) {
         .kind = SPN_ERR_MANIFEST_ISSUES,
-        .issues = loader.issues,
+        .manifest = { .path = spn.paths.config.toml, .issues = loader.issues },
       });
       return SP_APP_ERR;
     }
@@ -328,8 +336,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
   }
   else {
-    try(spn_toml_load_manifest(spn.mem, spn.intern, spn.paths.manifest, &app.package));
-
+    try(spn_pkg_load(spn.mem, spn.intern, spn.paths.manifest, SPN_MANIFEST_ROOT, sp_str_lit(""), &app.package));
 
     if (sp_fs_exists(app.paths.lock)) {
       sp_opt_set(app.lock, spn_lock_file_load(spn.heap, app.paths.lock, spn.events));
@@ -340,45 +347,14 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   //
   // Search order is array order: the root manifest's indexes shadow the
   // user config's, which shadow the builtin core.
-  sp_da_init(spn.heap, spn.indexes);
-
-  if (has_manifest) {
-    sp_str_om_for(app.package.indexes, it) {
-      spn_index_info_t* index = sp_str_om_at(app.package.indexes, it);
-      sp_da_push(spn.indexes, *index);
-    }
-  }
-
-  sp_da_for(spn.config.index, it) {
-    if (spn_find_index(spn.config.index[it].name)) {
-      continue;
-    }
-    sp_da_push(spn.indexes, ((spn_index_info_t) {
-      .name = spn.config.index[it].name,
-      .url =  spn.config.index[it].url,
-      .rev =  spn.config.index[it].rev,
-      .publish_url = spn.config.index[it].publish_url,
-      .protocol = spn.config.index[it].protocol,
-      .kind = SPN_INDEX_USER,
-    }));
-  }
-
-  if (!spn_find_index(sp_str_lit("core"))) {
-    sp_da_push(spn.indexes, ((spn_index_info_t) {
-      .name = sp_str_lit("core"),
-      .url = sp_str_lit("https://github.com/tspader/spandex.git"),
-      .protocol = SPN_INDEX_PROTOCOL_GIT,
-      .kind = SPN_INDEX_BUILTIN,
-    }));
-  }
+  spn_index_assemble(spn.heap, has_manifest ? &app.package.indexes : SP_NULLPTR, config_indexes, &spn.indexes);
 
   sp_da_for(spn.indexes, i) {
     spn_index_info_t* index = &spn.indexes[i];
-    index->location = sp_fs_join_path(spn.heap, spn.paths.index, spn_git_db_key(spn.heap, index->url));
+    index->location = spn_index_location(index, spn.heap, spn.paths.index);
     if (!index->refresh) {
-      index->refresh = spn.cli.refresh ? spn.cli.refresh : 600;
+      index->refresh = spn.cli.refresh ? spn.cli.refresh : SPN_INDEX_DEFAULT_REFRESH;
     }
-    spn_index_init(index, spn.mem);
   }
 
   try(spn_profile_overrides_parse(&spn.cli.profile, &app.config.overrides));

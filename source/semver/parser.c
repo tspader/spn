@@ -173,3 +173,15 @@ spn_err_t spn_semver_parse_range(sp_str_t str, spn_semver_range_t* range) {
   spn_semver_parser_eat_whitespace(&parser);
   return spn_semver_parser_is_done(&parser) ? SPN_OK : SPN_ERROR;
 }
+
+spn_err_t spn_semver_parse(sp_str_t str, spn_semver_t* version) {
+  *version = spn_semver_from_str(str);
+  if (sp_str_empty(str)) {
+    return SPN_ERROR;
+  }
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  bool canonical = sp_str_equal(str, spn_semver_to_str(scratch.mem, *version));
+  sp_mem_end_scratch(scratch);
+  return canonical ? SPN_OK : SPN_ERROR;
+}

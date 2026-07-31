@@ -5,7 +5,6 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_OK:                               return "ok";
     case SPN_ERROR:                            return "error";
     case SPN_ERR_MANIFEST_PARSE:               return "manifest_parse";
-    case SPN_ERR_MANIFEST_FIELD:               return "manifest_field";
     case SPN_ERR_MANIFEST_ISSUES:              return "manifest_issues";
     case SPN_ERR_NO_MANIFEST:                  return "no_manifest";
     case SPN_ERR_NOT_GIT_REPO:                 return "not_git_repo";
@@ -21,8 +20,6 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_ERR_TOOLCHAIN_SHA:                return "toolchain_sha";
     case SPN_ERR_TOOLCHAIN_EXTRACT:            return "toolchain_extract";
     case SPN_ERR_TOOLCHAIN_NO_CXX:             return "toolchain_no_cxx";
-    case SPN_ERR_TOML_MISSING:                 return "toml_missing";
-    case SPN_ERR_TOML_TYPE:                    return "toml_type";
     case SPN_ERR_TOML_PARSE:                   return "toml_parse";
     case SPN_CODEGEN_ERR_EXPECTED_BOOL:        return "codegen_expected_bool";
     case SPN_CODEGEN_ERR_EXPECTED_STR:         return "codegen_expected_str";
@@ -60,13 +57,16 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_ERR_FS_WRITE:                     return "fs_write";
     case SPN_ERR_INDEX_UNKNOWN:                return "index_unknown";
     case SPN_ERR_INDEX_SYNC:                   return "index_sync";
+    case SPN_ERR_INDEX_CORRUPT:                return "index_corrupt";
     case SPN_ERR_INDEX_PINNED:                 return "index_pinned";
     case SPN_ERR_INDEX_PUBLISH_PROTOCOL:       return "index_publish_protocol";
     case SPN_ERR_PUBLISH_PUSH:                 return "publish_push";
     case SPN_ERR_PUBLISH_DIRTY:                return "publish_dirty";
     case SPN_ERR_PUBLISH_UNPUSHED:             return "publish_unpushed";
+    case SPN_ERR_INDEX_PATH_DEP:               return "index_path_dep";
     case SPN_ERR_PKG_UNKNOWN:                  return "pkg_unknown";
     case SPN_ERR_PKG_NO_MATCH:                 return "pkg_no_match";
+    case SPN_ERR_PKG_MISMATCH:                 return "pkg_mismatch";
     case SPN_ERR_MANIFEST_EDIT:                return "manifest_edit";
     case SPN_ERR_DAG_GLOB:                     return "dag_glob";
     case SPN_ERR_DAG_OUTPUT_NAME:              return "dag_output_name";
@@ -81,7 +81,6 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_ERR_DAG_STORE_MISSING:            return "dag_store_missing";
     case SPN_ERR_DAG_TREE:                     return "dag_tree";
     case SPN_ERR_DAG_STALLED:                  return "dag_stalled";
-    case SPN_ERR_DEP_MANIFEST:                 return "dep_manifest";
     case SPN_ERR_DEP_CYCLE:                    return "dep_cycle";
     case SPN_ERR_UNIT_CYCLE:                   return "unit_cycle";
     case SPN_ERR_TARGET_LINKAGE:               return "target_linkage";
@@ -95,6 +94,7 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_ERR_CONFIGURE_SOURCE:             return "configure_source";
     case SPN_ERR_INIT_EXISTS:                  return "init_exists";
     case SPN_ERR_INIT_NAME:                    return "init_name";
+    case SPN_ERR_COUNT:                        break;
   }
   return "unknown";
 }

@@ -57,21 +57,11 @@ spn_err_t spn_codegen_load(spn_toml_loader_t* ctx, sp_str_t path, spn_cg_manifes
 }
 
 spn_err_t spn_codegen_load_config(spn_toml_loader_t* ctx, sp_str_t path, spn_cg_config_t* out) {
+  ctx->dir = sp_fs_parent_path(path);
   toml_table_t* table = spn_codegen_parse(ctx, path);
   if (table) {
     spn_config_read(ctx, table, out);
     toml_free(table);
   }
   return (sp_da_empty(ctx->issues)) ? SPN_OK : SPN_ERROR;
-}
-
-spn_err_union_t spn_codegen_err(spn_toml_loader_t* ctx) {
-  if (sp_da_empty(ctx->issues)) {
-    return spn_result(SPN_OK);
-  }
-
-  return (spn_err_union_t) {
-    .kind = SPN_ERR_MANIFEST_ISSUES,
-    .issues = ctx->issues,
-  };
 }

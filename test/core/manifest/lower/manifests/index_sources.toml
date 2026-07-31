@@ -1,0 +1,22 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[index]]
+name = "A"
+url = "https://x"
+path = "index"
+
+[[index]]
+name = "B"
+
+[[index]]
+name = "C"
+protocol = "git"
+path = "index"
+
+[[index]]
+name = "D"
+protocol = "dir"
+url = "https://x"
+rev = "abc"

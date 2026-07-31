@@ -50,9 +50,13 @@ spn_task_step_t spn_task_add(spn_app_t* app) {
   spn_index_cache_t cache = sp_zero;
   spn_index_cache_init(&cache, spn.heap, spn.intern, &spn.indexes);
 
-  spn_index_pkg_t* pkg = spn_index_cache_get_package(&cache, req->name);
+  spn_index_pkg_t* pkg = SP_NULLPTR;
+  spn_err_union_t err = spn_index_cache_get_package(&cache, req->name, &pkg);
+  if (err.kind) {
+    return spn_task_fail_with(err);
+  }
   if (!pkg || sp_da_empty(pkg->releases)) {
-    return spn_task_fail(SPN_ERR_PKG_UNKNOWN, .pkg = { .name = spn_pkg_name_to_qualified(req->name) });
+    return spn_task_fail(SPN_ERR_PKG_UNKNOWN, .unknown = { .request = { .qualified = spn_pkg_name_to_qualified(req->name) } });
   }
 
   spn_index_release_t* release = SP_NULLPTR;
@@ -69,9 +73,12 @@ spn_task_step_t spn_task_add(spn_app_t* app) {
   }
 
   if (!release) {
-    return spn_task_fail(SPN_ERR_PKG_NO_MATCH, .pkg = {
-      .name = spn_pkg_name_to_qualified(req->name),
-      .requested = req->requested,
+    return spn_task_fail(SPN_ERR_PKG_NO_MATCH, .unsatisfiable = {
+      .request = {
+        .qualified = spn_pkg_name_to_qualified(req->name),
+        .source = SPN_PKG_SOURCE_INDEX,
+        .index = { .range = req->range },
+      },
     });
   }
 

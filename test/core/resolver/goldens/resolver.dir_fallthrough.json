@@ -1,0 +1,61 @@
+{
+  "version": 2,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [
+    {
+      "namespace": "core",
+      "name": "A",
+      "version": "1.0.0",
+      "hash": "1e247beefb24c7b2",
+      "source": "index",
+      "recipe": "local",
+      "edges": [
+        {
+          "to": {
+            "namespace": "core",
+            "name": "C",
+            "version": "1.0.0",
+            "hash": "907c9fda83641051"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    },
+    {
+      "namespace": "core",
+      "name": "C",
+      "version": "1.0.0",
+      "hash": "907c9fda83641051",
+      "source": "index",
+      "recipe": "none"
+    },
+    {
+      "namespace": "test",
+      "name": "root",
+      "version": "0.0.1",
+      "hash": "f8f295a75f2839c3",
+      "source": "root",
+      "recipe": "local",
+      "edges": [
+        {
+          "to": {
+            "namespace": "core",
+            "name": "A",
+            "version": "1.0.0",
+            "hash": "1e247beefb24c7b2"
+          },
+          "kind": "package",
+          "edge": "scope"
+        }
+      ]
+    }
+  ]
+}

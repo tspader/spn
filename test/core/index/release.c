@@ -215,6 +215,10 @@ static const release_test_t tests [] = {
     .expect = { .err = SPN_ERROR },
   },
   {
+    .name = "dep_range_invalid",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
     .name = "version_missing",
     .expect = { .err = SPN_ERROR },
   },
@@ -262,26 +266,41 @@ static spn_index_release_t release_build(sp_mem_t mem, const release_rel_t* rel)
     .yanked = rel->yanked,
   };
 
-  if (rel->source.url) { built.source.url = sp_cstr_as_str(rel->source.url); }
-  if (rel->source.rev) { built.source.rev = sp_cstr_as_str(rel->source.rev); }
-  if (rel->source.dir) { built.source.dir = sp_cstr_as_str(rel->source.dir); }
-  if (rel->manifest.url) { built.manifest.url = sp_cstr_as_str(rel->manifest.url); }
-  if (rel->manifest.rev) { built.manifest.rev = sp_cstr_as_str(rel->manifest.rev); }
-  if (rel->manifest.dir) { built.manifest.dir = sp_cstr_as_str(rel->manifest.dir); }
+  if (rel->source.url) {
+    built.source = (spn_pkg_tree_t) {
+      .kind = SPN_PKG_TREE_GIT,
+      .git = {
+        .url = sp_cstr_as_str(rel->source.url),
+        .rev = sp_cstr_as_str(rel->source.rev ? rel->source.rev : ""),
+        .dir = sp_cstr_as_str(rel->source.dir ? rel->source.dir : ""),
+      },
+    };
+  }
+  if (rel->manifest.url) {
+    built.manifest = (spn_pkg_tree_t) {
+      .kind = SPN_PKG_TREE_GIT,
+      .git = {
+        .url = sp_cstr_as_str(rel->manifest.url),
+        .rev = sp_cstr_as_str(rel->manifest.rev ? rel->manifest.rev : ""),
+        .dir = sp_cstr_as_str(rel->manifest.dir ? rel->manifest.dir : ""),
+      },
+    };
+  }
   if (rel->paths.manifest) { built.paths.manifest = sp_cstr_as_str(rel->paths.manifest); }
   if (rel->paths.script) { built.paths.script = sp_cstr_as_str(rel->paths.script); }
 
   sp_da_init(mem, built.deps);
   sp_carr_for(rel->deps, it) {
     if (!rel->deps[it].namespace) { break; }
-    sp_da_push(built.deps, ((spn_index_dep_t) {
+    spn_index_dep_t dep = {
       .kind = rel->deps[it].kind,
       .id = {
         .namespace = sp_cstr_as_str(rel->deps[it].namespace),
         .name = sp_cstr_as_str(rel->deps[it].name),
       },
-      .version = sp_cstr_as_str(rel->deps[it].version),
-    }));
+    };
+    sp_assert(!spn_semver_parse_range(sp_cstr_as_str(rel->deps[it].version), &dep.range));
+    sp_da_push(built.deps, dep);
   }
 
   sp_da_init(mem, built.targets);
@@ -307,12 +326,22 @@ static sp_err_t release_check(sp_test_t* t, sp_mem_t mem, const release_rel_t* e
   sp_expect_str_eq_c(t, spn_semver_to_str(mem, rel->version), expected->version);
   sp_expect_eq(t, expected->yanked, rel->yanked);
 
-  if (expected->source.url) { sp_expect_str_eq_c(t, rel->source.url, expected->source.url); }
-  if (expected->source.rev) { sp_expect_str_eq_c(t, rel->source.rev, expected->source.rev); }
-  if (expected->source.dir) { sp_expect_str_eq_c(t, rel->source.dir, expected->source.dir); }
-  if (expected->manifest.url) { sp_expect_str_eq_c(t, rel->manifest.url, expected->manifest.url); }
-  if (expected->manifest.rev) { sp_expect_str_eq_c(t, rel->manifest.rev, expected->manifest.rev); }
-  if (expected->manifest.dir) { sp_expect_str_eq_c(t, rel->manifest.dir, expected->manifest.dir); }
+  if (expected->source.url) {
+    sp_must_eq(t, SPN_PKG_TREE_GIT, rel->source.kind);
+    sp_expect_str_eq_c(t, rel->source.git.url, expected->source.url);
+    if (expected->source.rev) { sp_expect_str_eq_c(t, rel->source.git.rev, expected->source.rev); }
+    if (expected->source.dir) { sp_expect_str_eq_c(t, rel->source.git.dir, expected->source.dir); }
+  } else {
+    sp_expect_eq(t, SPN_PKG_TREE_NONE, rel->source.kind);
+  }
+  if (expected->manifest.url) {
+    sp_must_eq(t, SPN_PKG_TREE_GIT, rel->manifest.kind);
+    sp_expect_str_eq_c(t, rel->manifest.git.url, expected->manifest.url);
+    if (expected->manifest.rev) { sp_expect_str_eq_c(t, rel->manifest.git.rev, expected->manifest.rev); }
+    if (expected->manifest.dir) { sp_expect_str_eq_c(t, rel->manifest.git.dir, expected->manifest.dir); }
+  } else {
+    sp_expect_eq(t, SPN_PKG_TREE_NONE, rel->manifest.kind);
+  }
   if (expected->paths.manifest) { sp_expect_str_eq_c(t, rel->paths.manifest, expected->paths.manifest); }
   if (expected->paths.script) { sp_expect_str_eq_c(t, rel->paths.script, expected->paths.script); }
 
@@ -323,7 +352,7 @@ static sp_err_t release_check(sp_test_t* t, sp_mem_t mem, const release_rel_t* e
   sp_for(it, num_deps) {
     sp_expect_str_eq_c(t, rel->deps[it].id.namespace, expected->deps[it].namespace);
     sp_expect_str_eq_c(t, rel->deps[it].id.name, expected->deps[it].name);
-    sp_expect_str_eq_c(t, rel->deps[it].version, expected->deps[it].version);
+    sp_expect_str_eq_c(t, spn_semver_range_to_str(mem, rel->deps[it].range), expected->deps[it].version);
     sp_expect_eq(t, expected->deps[it].kind, rel->deps[it].kind);
   }
 

@@ -45,7 +45,7 @@ spn_task_step_t spn_task_publish(spn_app_t* app) {
     .name = spn_pkg_name_to_qualified(release.id),
     .version = spn_semver_to_str(spn.mem, release.version),
     .index = index->name,
-    .url = sp_str_empty(index->publish_url) ? index->url : index->publish_url,
+    .url = spn_index_publish_target(index),
   };
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
@@ -53,7 +53,7 @@ spn_task_step_t spn_task_publish(spn_app_t* app) {
     .publish = evt,
   });
 
-  spn_try_step(spn_index_publish(index, &release));
+  spn_try_step(spn_index_publish(index, spn.mem, &release));
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_PUBLISH_END,

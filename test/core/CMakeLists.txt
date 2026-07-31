@@ -47,6 +47,8 @@ add_executable(core
   git/cache.c
   git/key.c
   git/patch.c
+  index/cache.c
+  index/dir.c
   index/query.c
   index/publish.c
   index/release.c
@@ -126,7 +128,11 @@ add_executable(core
   ${SRC}/git/cache.c
   ${SRC}/git/key.c
   ${SRC}/git/patch.c
+  ${SRC}/index/cache.c
+  ${SRC}/index/dir.c
+  ${SRC}/index/release.c
   ${SRC}/index/index.c
+  ${SRC}/index/jsonl.c
   ${SRC}/index/json.c
   ${SRC}/index/publish.c
   ${SRC}/intern/context.c
@@ -156,6 +162,7 @@ add_executable(core
   ${SRC}/task/build/identity.c
   ${SRC}/thread_pool/thread_pool.c
   ${SRC}/toml/edit.c
+  ${SRC}/pkg/load.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/toolchain/provision.c
   ${SRC}/toolchain/select.c

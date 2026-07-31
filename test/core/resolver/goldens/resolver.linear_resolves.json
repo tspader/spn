@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "requests": [
     {
       "namespace": "test",
@@ -14,7 +14,8 @@
       "name": "math",
       "version": "1.1.0",
       "hash": "7a73725929ef71bc",
-      "source": "index"
+      "source": "index",
+      "recipe": "none"
     },
     {
       "namespace": "test",
@@ -22,6 +23,7 @@
       "version": "0.0.1",
       "hash": "2633a9abb8bbc157",
       "source": "root",
+      "recipe": "local",
       "edges": [
         {
           "to": {

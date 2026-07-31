@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "requests": [
     {
       "namespace": "test",
@@ -14,7 +14,8 @@
       "name": "audio",
       "version": "1.1.0",
       "hash": "c2af36a7fa86a2e0",
-      "source": "index"
+      "source": "index",
+      "recipe": "none"
     },
     {
       "namespace": "test",
@@ -22,6 +23,7 @@
       "version": "0.0.1",
       "hash": "70e9001009068f93",
       "source": "root",
+      "recipe": "local",
       "edges": [
         {
           "to": {

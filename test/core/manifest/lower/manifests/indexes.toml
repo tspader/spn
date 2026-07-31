@@ -6,3 +6,11 @@ version = "1.0.0"
 name = "main"
 url = "https://x"
 protocol = "http"
+
+[[index]]
+name = "mirror"
+url = "https://y"
+
+[[index]]
+name = "local"
+path = "index"

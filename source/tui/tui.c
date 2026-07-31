@@ -436,77 +436,6 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       }
       break;
     }
-    case SPN_EVENT_ERR_UNKNOWN_PKG: {
-      sp_fmt_io(
-        &w.base,
-        "{} could not be located",
-        sp_fmt_str(spn_tui_colored_name(mem, event->unknown.request.qualified))
-      );
-      break;
-    }
-    case SPN_EVENT_ERR_UNSATISFIABLE_VERSION: {
-      spn_evt_unsatisfiable_t* evt = &event->unsatisfiable;
-      sp_str_t requester = sp_str_empty(evt->requester) ?
-        sp_str_lit("the project") :
-        sp_fmt(mem, "{} {}", sp_fmt_str(spn_tui_colored_name(mem, evt->requester)), sp_fmt_str(spn_semver_to_str(mem, evt->requester_version))).value;
-
-      if (evt->conflict && evt->request.source == SPN_PKG_SOURCE_INDEX) {
-        sp_fmt_io(
-          &w.base,
-          "{} is already selected at {.yellow}, but {} requires {.yellow}",
-          sp_fmt_str(spn_tui_colored_name(mem, evt->request.qualified)),
-          sp_fmt_str(spn_semver_to_str(mem, evt->selected)),
-          sp_fmt_str(requester),
-          sp_fmt_str(spn_semver_range_to_str(mem, evt->request.index.range))
-        );
-      }
-      else if (evt->conflict) {
-        sp_fmt_io(
-          &w.base,
-          "{} is already selected at {.yellow}, which conflicts with the version required by {}",
-          sp_fmt_str(spn_tui_colored_name(mem, evt->request.qualified)),
-          sp_fmt_str(spn_semver_to_str(mem, evt->selected)),
-          sp_fmt_str(requester)
-        );
-      }
-      else {
-        sp_fmt_io(
-          &w.base,
-          "no version of {} satisfies {.yellow}, required by {}",
-          sp_fmt_str(spn_tui_colored_name(mem, evt->request.qualified)),
-          sp_fmt_str(spn_semver_range_to_str(mem, evt->request.index.range)),
-          sp_fmt_str(requester)
-        );
-      }
-      break;
-    }
-    case SPN_EVENT_ERR_CIRCULAR_DEP: {
-      sp_fmt_io(
-        &w.base,
-        "{} transitively includes itself",
-        sp_fmt_str(spn_tui_colored_name(mem, event->circular.id.name))
-      );
-      break;
-    }
-    case SPN_EVENT_ERR_UNIT_CYCLE: {
-      sp_fmt_io(
-        &w.base,
-        "{} {.yellow} can't build: its build depends on a tool that links this same instance",
-        sp_fmt_str(spn_tui_colored_name(mem, event->unit_cycle.id.name)),
-        sp_fmt_str(spn_semver_to_str(mem, event->unit_cycle.version))
-      );
-      break;
-    }
-    case SPN_EVENT_ERR_DYNAMIC_DUPLICATE: {
-      sp_fmt_io(
-        &w.base,
-        "{} {.yellow} and {.yellow} would both load into one process as shared libraries",
-        sp_fmt_str(spn_tui_colored_name(mem, event->dynamic_dup.id.name)),
-        sp_fmt_str(spn_semver_to_str(mem, event->dynamic_dup.low)),
-        sp_fmt_str(spn_semver_to_str(mem, event->dynamic_dup.high))
-      );
-      break;
-    }
     case SPN_EVENT_ERR_OPTION: {
       switch (event->option.err) {
         case SPN_OPTION_ERR_UNDECLARED: {
@@ -582,26 +511,6 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       }
       break;
     }
-    case SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX: {
-      sp_fmt_io(
-        &w.base,
-        "resolving {} is too complex; pin a version to reduce the search",
-        sp_fmt_str(spn_tui_colored_name(mem, event->too_complex.id.name))
-      );
-      break;
-    }
-    case SPN_EVENT_ERR_MANIFEST: {
-      sp_fmt_io(
-        &w.base,
-        "{} has an invalid manifest ({.gray})",
-        sp_fmt_str(spn_tui_colored_name(mem, event->manifest_err.name)),
-        sp_fmt_str(spn_tui_contextual_path(mem, event->manifest_err.path))
-      );
-      if (sp_da_empty(event->manifest_err.issues)) {
-        sp_fmt_io(&w.base, ": {}", sp_fmt_str(event->manifest_err.error));
-      }
-      break;
-    }
     case SPN_EVENT_SYNC_FAILED: {
       sp_fmt_io(
         &w.base,
@@ -644,9 +553,6 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
     }
     case SPN_EVENT_ERR: {
       switch (event->err.kind) {
-        // case SPN_ERR_OK: {
-        //   break;
-        // }
         case SPN_ERR_MANIFEST_PARSE: {
           sp_fmt_io(
             &w.base,
@@ -655,18 +561,111 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
           );
           break;
         }
-        case SPN_ERR_MANIFEST_FIELD: {
+        case SPN_ERR_MANIFEST_ISSUES: {
+          if (sp_str_empty(event->err.manifest.name)) {
+            sp_fmt_io(
+              &w.base,
+              "invalid manifest ({.gray})",
+              sp_fmt_str(spn_tui_contextual_path(mem, event->err.manifest.path))
+            );
+          }
+          else {
+            sp_fmt_io(
+              &w.base,
+              "{} has an invalid manifest ({.gray})",
+              sp_fmt_str(spn_tui_colored_name(mem, event->err.manifest.name)),
+              sp_fmt_str(spn_tui_contextual_path(mem, event->err.manifest.path))
+            );
+          }
+          break;
+        }
+        case SPN_ERR_PKG_MISMATCH: {
           sp_fmt_io(
             &w.base,
-            "invalid manifest field {.cyan}: expected {.yellow}, got {.red}",
-            sp_fmt_str(event->err.manifest_field.path),
-            sp_fmt_str(event->err.manifest_field.expected),
-            sp_fmt_str(event->err.manifest_field.actual)
+            "the manifest at {.cyan} declares {}, but it was requested as {}",
+            sp_fmt_str(spn_tui_contextual_path(mem, event->err.mismatch.path)),
+            sp_fmt_str(spn_tui_colored_name(mem, event->err.mismatch.declared)),
+            sp_fmt_str(spn_tui_colored_name(mem, event->err.mismatch.requested))
           );
           break;
         }
-        case SPN_ERR_MANIFEST_ISSUES: {
-          sp_io_write_str(&w.base, sp_str_lit("invalid manifest"), SP_NULLPTR);
+        case SPN_ERR_PKG_UNKNOWN: {
+          sp_fmt_io(
+            &w.base,
+            "{} could not be located",
+            sp_fmt_str(spn_tui_colored_name(mem, event->err.unknown.request.qualified))
+          );
+          break;
+        }
+        case SPN_ERR_PKG_NO_MATCH: {
+          spn_err_unsatisfiable_t* err = &event->err.unsatisfiable;
+          sp_str_t requester = sp_str_empty(err->requester) ?
+            sp_str_lit("the project") :
+            sp_fmt(mem, "{} {}", sp_fmt_str(spn_tui_colored_name(mem, err->requester)), sp_fmt_str(spn_semver_to_str(mem, err->requester_version))).value;
+
+          if (err->conflict && err->request.source == SPN_PKG_SOURCE_INDEX) {
+            sp_fmt_io(
+              &w.base,
+              "{} is already selected at {.yellow}, but {} requires {.yellow}",
+              sp_fmt_str(spn_tui_colored_name(mem, err->request.qualified)),
+              sp_fmt_str(spn_semver_to_str(mem, err->selected)),
+              sp_fmt_str(requester),
+              sp_fmt_str(spn_semver_range_to_str(mem, err->request.index.range))
+            );
+          }
+          else if (err->conflict) {
+            sp_fmt_io(
+              &w.base,
+              "{} is already selected at {.yellow}, which conflicts with the version required by {}",
+              sp_fmt_str(spn_tui_colored_name(mem, err->request.qualified)),
+              sp_fmt_str(spn_semver_to_str(mem, err->selected)),
+              sp_fmt_str(requester)
+            );
+          }
+          else {
+            sp_fmt_io(
+              &w.base,
+              "no version of {} satisfies {.yellow}, required by {}",
+              sp_fmt_str(spn_tui_colored_name(mem, err->request.qualified)),
+              sp_fmt_str(spn_semver_range_to_str(mem, err->request.index.range)),
+              sp_fmt_str(requester)
+            );
+          }
+          break;
+        }
+        case SPN_ERR_DEP_CYCLE: {
+          sp_fmt_io(
+            &w.base,
+            "{} transitively includes itself",
+            sp_fmt_str(spn_tui_colored_name(mem, event->err.circular.id.name))
+          );
+          break;
+        }
+        case SPN_ERR_UNIT_CYCLE: {
+          sp_fmt_io(
+            &w.base,
+            "{} {.yellow} can't build: its build depends on a tool that links this same instance",
+            sp_fmt_str(spn_tui_colored_name(mem, event->err.unit_cycle.id.name)),
+            sp_fmt_str(spn_semver_to_str(mem, event->err.unit_cycle.version))
+          );
+          break;
+        }
+        case SPN_ERR_DYNAMIC_DUPLICATE: {
+          sp_fmt_io(
+            &w.base,
+            "{} {.yellow} and {.yellow} would both load into one process as shared libraries",
+            sp_fmt_str(spn_tui_colored_name(mem, event->err.dynamic_dup.id.name)),
+            sp_fmt_str(spn_semver_to_str(mem, event->err.dynamic_dup.low)),
+            sp_fmt_str(spn_semver_to_str(mem, event->err.dynamic_dup.high))
+          );
+          break;
+        }
+        case SPN_ERR_RESOLVE_TOO_COMPLEX: {
+          sp_fmt_io(
+            &w.base,
+            "resolving {} is too complex; pin a version to reduce the search",
+            sp_fmt_str(spn_tui_colored_name(mem, event->err.too_complex.id.name))
+          );
           break;
         }
         case SPN_ERR_PROFILE_INVALID: {
@@ -796,23 +795,6 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
           );
           break;
         }
-        case SPN_ERR_PKG_UNKNOWN: {
-          sp_fmt_io(
-            &w.base,
-            "package {.cyan} not found in any index",
-            sp_fmt_str(event->err.pkg.name)
-          );
-          break;
-        }
-        case SPN_ERR_PKG_NO_MATCH: {
-          sp_fmt_io(
-            &w.base,
-            "no version of {.cyan} matches {.red}",
-            sp_fmt_str(event->err.pkg.name),
-            sp_fmt_str(sp_str_empty(event->err.pkg.requested) ? sp_str_lit("*") : event->err.pkg.requested)
-          );
-          break;
-        }
         case SPN_ERR_MANIFEST_EDIT: {
           sp_fmt_io(
             &w.base,
@@ -870,6 +852,15 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
           );
           break;
         }
+        case SPN_ERR_INDEX_CORRUPT: {
+          sp_fmt_io(
+            &w.base,
+            "index entry for {.cyan} at {.cyan} is corrupt",
+            sp_fmt_str(event->err.index_corrupt.name),
+            sp_fmt_str(spn_tui_contextual_path(mem, event->err.index_corrupt.path))
+          );
+          break;
+        }
         case SPN_ERR_PUBLISH_PUSH: {
           sp_fmt_io(
             &w.base,
@@ -894,6 +885,15 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
             "commit {.yellow} is not on any branch of {.gray}; push it first",
             sp_fmt_str(event->err.publish.rev),
             sp_fmt_str(event->err.publish.url)
+          );
+          break;
+        }
+        case SPN_ERR_INDEX_PATH_DEP: {
+          sp_fmt_io(
+            &w.base,
+            "{.cyan} depends on {.cyan} by path; index packages must depend on versions",
+            sp_fmt_str(event->err.pkg.name),
+            sp_fmt_str(event->err.pkg.requested)
           );
           break;
         }
@@ -1258,15 +1258,21 @@ static void spn_tui_write_terminal_error_line(sp_io_writer_t* w, sp_mem_t mem, s
 
 static sp_str_t spn_tui_event_subject(spn_build_event_t* event) {
   switch (event->kind) {
-    case SPN_EVENT_ERR_MANIFEST:              return event->manifest_err.name;
     case SPN_EVENT_SYNC_FAILED:               return event->sync_failed.name;
     case SPN_EVENT_ERR_PATCH:                 return event->patch_err.name;
-    case SPN_EVENT_ERR_UNKNOWN_PKG:           return event->unknown.request.qualified;
-    case SPN_EVENT_ERR_CIRCULAR_DEP:          return event->circular.id.name;
-    case SPN_EVENT_ERR_UNSATISFIABLE_VERSION: return event->unsatisfiable.request.qualified;
-    case SPN_EVENT_ERR_UNIT_CYCLE:            return event->unit_cycle.id.name;
-    case SPN_EVENT_ERR_DYNAMIC_DUPLICATE:     return event->dynamic_dup.id.name;
-    case SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX: return event->too_complex.id.name;
+    case SPN_EVENT_ERR: {
+      switch (event->err.kind) {
+        case SPN_ERR_MANIFEST_ISSUES:  return event->err.manifest.name;
+        case SPN_ERR_PKG_UNKNOWN:      return event->err.unknown.request.qualified;
+        case SPN_ERR_PKG_NO_MATCH:     return event->err.unsatisfiable.request.qualified;
+        case SPN_ERR_DEP_CYCLE:        return event->err.circular.id.name;
+        case SPN_ERR_UNIT_CYCLE:       return event->err.unit_cycle.id.name;
+        case SPN_ERR_DYNAMIC_DUPLICATE: return event->err.dynamic_dup.id.name;
+        case SPN_ERR_RESOLVE_TOO_COMPLEX: return event->err.too_complex.id.name;
+        default:                       break;
+      }
+      return event->pkg ? event->pkg->name : sp_str_lit("");
+    }
     default:                                  return event->pkg ? event->pkg->name : sp_str_lit("");
   }
 }
@@ -1287,14 +1293,6 @@ static void spn_tui_render_event_extra(sp_io_writer_t* w, spn_build_event_t* eve
       sp_io_write_str(w, event->compile_failed.error, SP_NULLPTR);
       break;
     }
-    case SPN_EVENT_ERR_MANIFEST: {
-      sp_da_for(event->manifest_err.issues, it) {
-        sp_io_write_str(w, sp_str_lit("  - "), SP_NULLPTR);
-        spn_codegen_issue_write(w, &event->manifest_err.issues[it]);
-        sp_io_write_c8(w, '\n');
-      }
-      break;
-    }
     case SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED: {
       if (event->err.build_graph.kind == SPN_BUILD_GRAPH_ERR_DUPLICATE_OUTPUT) {
         if (sp_str_valid(event->err.build_graph.command_a)) {
@@ -1311,9 +1309,9 @@ static void spn_tui_render_event_extra(sp_io_writer_t* w, spn_build_event_t* eve
     case SPN_EVENT_ERR: {
       switch (event->err.kind) {
         case SPN_ERR_MANIFEST_ISSUES: {
-          sp_da_for(event->err.issues, it) {
+          sp_da_for(event->err.manifest.issues, it) {
             sp_io_write_str(w, sp_str_lit("  - "), SP_NULLPTR);
-            spn_codegen_issue_write(w, &event->err.issues[it]);
+            spn_codegen_issue_write(w, &event->err.manifest.issues[it]);
             sp_io_write_c8(w, '\n');
           }
           break;

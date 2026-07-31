@@ -9,7 +9,7 @@
     "script": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
     "test": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
     "toolchain": { "elements": { "ref": "manifest_toolchain" } },
-    "index": { "elements": { "ref": "index" }, "metadata": { "key": "name" } },
+    "index": { "elements": { "ref": "index" } },
     "profile": { "values": { "ref": "profile" } },
     "options": { "values": { "ref": "option" } },
     "deps": { "ref": "deps" },
@@ -184,17 +184,6 @@
         "arch": { "ref": "arch" },
         "abi": { "ref": "abi" },
         "options": { "metadata": { "extern": "when", "include": "when/types.h" } }
-      }
-    },
-
-    "index": {
-      "properties": {
-        "name": { "type": "string" },
-        "url": { "type": "string" },
-        "protocol": { "ref": "index_protocol" }
-      },
-      "optionalProperties": {
-        "rev": { "type": "string" }
       }
     },
 
