@@ -67,13 +67,10 @@ void spn_index_cache_init(spn_index_cache_t* cache, sp_mem_t mem, sp_intern_t* i
 
 }
 
-spn_index_pkg_t* spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_name_t id) {
+spn_err_union_t spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_name_t id, spn_index_pkg_t** pkg) {
   sp_str_t qualified = spn_pkg_name_to_qualified(id);
-  return sp_str_ht_get(fz_state.cache, qualified);
-}
-
-spn_index_release_t* spn_index_cache_get_release(spn_index_cache_t* cache, spn_pkg_name_t id, spn_semver_t version) {
-  return SP_NULLPTR;
+  *pkg = sp_str_ht_get(fz_state.cache, qualified);
+  return spn_result(SPN_OK);
 }
 
 typedef struct {
@@ -139,15 +136,16 @@ static fz_result_t fz_execute(sp_mem_t mem, fz_universe_t* u, sp_intern_t* inter
       sp_da_init(mem, release.targets);
 
       sp_da_for(source->deps, dt) {
-        sp_da_push(release.deps, ((spn_index_dep_t) {
+        spn_index_dep_t dep = {
           .kind = source->deps[dt].kind,
           .private = source->deps[dt].private,
           .id = {
             .namespace = sp_str_lit("spn"),
             .name = fz_pkg_name(source->deps[dt].pkg),
           },
-          .version = fz_range_render(mem, source->deps[dt]),
-        }));
+        };
+        sp_assert(!spn_semver_parse_range(fz_range_render(mem, source->deps[dt]), &dep.range));
+        sp_da_push(release.deps, dep);
       }
 
       if (fz_pkg_linked(&u->pkgs[it])) {

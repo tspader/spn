@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "requests": [
     {
       "namespace": "test",
@@ -15,6 +15,7 @@
       "version": "1.0.0",
       "hash": "2b8bcab26497c85a",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -34,6 +35,7 @@
       "version": "2.0.0",
       "hash": "47d969b929d9973c",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -63,6 +65,7 @@
       "version": "1.0.0",
       "hash": "3811cc4763f7a0c8",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -91,14 +94,16 @@
       "name": "zed",
       "version": "1.5.0",
       "hash": "0ede4e7c6d5da62e",
-      "source": "index"
+      "source": "index",
+      "recipe": "none"
     },
     {
       "namespace": "spn",
       "name": "zed",
       "version": "2.0.0",
       "hash": "f7ca79695e6331ce",
-      "source": "index"
+      "source": "index",
+      "recipe": "none"
     },
     {
       "namespace": "test",
@@ -106,6 +111,7 @@
       "version": "0.0.1",
       "hash": "746a239c35c6027b",
       "source": "root",
+      "recipe": "local",
       "edges": [
         {
           "to": {

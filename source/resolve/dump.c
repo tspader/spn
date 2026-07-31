@@ -101,7 +101,7 @@ static void dump_error_request(sp_mem_t mem, spn_cg_resolve_error_t* error, cons
   }
 }
 
-static spn_cg_resolve_error_t dump_error(sp_mem_t mem, const spn_resolve_err_t* err) {
+static spn_cg_resolve_error_t dump_error(sp_mem_t mem, const spn_err_union_t* err) {
   spn_cg_resolve_error_t error = {
     .kind = sp_cstr_as_str(spn_err_to_str(err->kind)),
   };
@@ -139,12 +139,27 @@ static spn_cg_resolve_error_t dump_error(sp_mem_t mem, const spn_resolve_err_t* 
       dump_error_pkg(&error, err->too_complex.id);
       break;
     }
-    case SPN_ERR_DEP_MANIFEST: {
+    case SPN_ERR_MANIFEST_ISSUES: {
       dump_error_pkg(&error, spn_pkg_name_from_qualified(err->manifest.name));
-      error.detail = err->manifest.error;
-      if (sp_str_empty(error.detail)) {
-        error.detail = spn_codegen_issues_message(mem, err->manifest.issues);
-      }
+      error.detail = spn_codegen_issues_message(mem, err->manifest.issues);
+      break;
+    }
+    case SPN_ERR_NO_MANIFEST: {
+      error.detail = err->no_manifest.path;
+      break;
+    }
+    case SPN_ERR_PKG_MISMATCH: {
+      dump_error_pkg(&error, spn_pkg_name_from_qualified(err->mismatch.requested));
+      error.detail = err->mismatch.declared;
+      break;
+    }
+    case SPN_ERR_INDEX_CORRUPT: {
+      dump_error_pkg(&error, spn_pkg_name_from_qualified(err->index_corrupt.name));
+      break;
+    }
+    case SPN_ERR_INDEX_PATH_DEP: {
+      dump_error_pkg(&error, spn_pkg_name_from_qualified(err->pkg.name));
+      error.detail = err->pkg.requested;
       break;
     }
     default: {
@@ -216,6 +231,7 @@ spn_cg_resolve_t spn_resolve_dump(sp_mem_t mem, sp_intern_t* intern, const spn_r
       .version = spn_semver_to_str(mem, pkgs[it].key.version),
       .hash = dump_hash_str(mem, pkgs[it].key.hash),
       .source = node->source,
+      .recipe = node->origin.recipe.kind,
       .edges = sp_da_new(mem, spn_cg_resolve_edge_t),
     };
 

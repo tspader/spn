@@ -1,0 +1,14 @@
+[package]
+name = "workspace_dir_index"
+version = "0.1.0"
+
+[[index]]
+name = "local"
+path = "index"
+
+[deps.package]
+A = "1.0.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]

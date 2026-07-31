@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "requests": [
     {
       "namespace": "test",
@@ -15,6 +15,7 @@
       "version": "1.0.0",
       "hash": "99fc8b6fc5773424",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -33,7 +34,8 @@
       "name": "gfx",
       "version": "1.9.0",
       "hash": "51c38523af8d61ee",
-      "source": "index"
+      "source": "index",
+      "recipe": "none"
     },
     {
       "namespace": "spn",
@@ -41,6 +43,7 @@
       "version": "1.0.0",
       "hash": "630f8bdbf1e6e886",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -60,6 +63,7 @@
       "version": "0.0.1",
       "hash": "5924fe79c1a8b584",
       "source": "root",
+      "recipe": "local",
       "edges": [
         {
           "to": {

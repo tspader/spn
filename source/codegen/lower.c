@@ -197,7 +197,11 @@ static void lower_package(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
   info->author = p->author;
   info->maintainer = p->maintainer;
   info->qualified = lower_qualify(ctx, p->namespace, p->name);
-  info->version = spn_semver_from_str(p->version);
+  if (spn_semver_parse(p->version, &info->version)) {
+    spn_toml_loader_push_key(ctx, "package");
+    spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, "version");
+    spn_toml_loader_pop(ctx);
+  }
   info->include = sp_da_new(ctx->mem, sp_str_t);
   sp_da_for(p->include, it) {
     sp_da_push(info->include, sp_fs_join_path(ctx->mem, ctx->dir, p->include[it]));
@@ -315,17 +319,76 @@ static void lower_profiles(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   }
 }
 
-static void lower_indexes(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
+spn_index_info_t spn_index_lower(spn_toml_loader_t* ctx, u32 at, spn_index_kind_t kind, const spn_cg_index_t* decl) {
+  bool has_url = !sp_str_empty(decl->url);
+  bool has_path = !sp_str_empty(decl->path);
+  bool has_rev = !sp_str_empty(decl->rev);
+
+  spn_index_protocol_t protocol = SPN_INDEX_PROTOCOL_GIT;
+  if (!sp_opt_is_null(decl->protocol)) {
+    protocol = sp_opt_get(decl->protocol);
+  } else if (has_path) {
+    protocol = SPN_INDEX_PROTOCOL_DIR;
+  }
+
+  spn_index_info_t info = {
+    .name = decl->name,
+    .kind = kind,
+    .protocol = protocol,
+  };
+
+  spn_toml_loader_push_key(ctx, "index");
+  spn_toml_loader_push_index(ctx, at);
+  switch (protocol) {
+    case SPN_INDEX_PROTOCOL_GIT: {
+      if (has_path) {
+        spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, "path");
+      }
+      if (!has_url) {
+        spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "url");
+      }
+      info.git.url = decl->url;
+      info.git.rev = decl->rev;
+      info.git.publish_url = decl->publish_url;
+      break;
+    }
+    case SPN_INDEX_PROTOCOL_HTTP: {
+      if (has_path) {
+        spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, "path");
+      }
+      if (!has_url) {
+        spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "url");
+      }
+      info.http.url = decl->url;
+      break;
+    }
+    case SPN_INDEX_PROTOCOL_DIR: {
+      if (has_url) {
+        spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, "url");
+      }
+      if (has_rev) {
+        spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, "rev");
+      }
+      if (!has_path) {
+        spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "path");
+      } else {
+        sp_str_t joined = sp_fs_is_absolute(decl->path) ? decl->path : sp_fs_join_path(ctx->mem, ctx->dir, decl->path);
+        sp_str_t canonical = sp_fs_canonicalize_path(ctx->mem, joined);
+        info.dir.path = sp_str_empty(canonical) ? joined : canonical;
+      }
+      break;
+    }
+  }
+  spn_toml_loader_pop(ctx);
+  spn_toml_loader_pop(ctx);
+
+  return info;
+}
+
+static void lower_indexes(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   sp_str_om_init(out->indexes);
-  sp_om_for(cg->index, it) {
-    const spn_cg_index_t* idx = sp_str_om_at(cg->index, it);
-    spn_index_info_t info = {
-      .name = idx->name,
-      .url = idx->url,
-      .rev = idx->rev,
-      .protocol = idx->protocol,
-      .kind = SPN_INDEX_WORKSPACE,
-    };
+  sp_da_for(cg->index, it) {
+    spn_index_info_t info = spn_index_lower(ctx, it, SPN_INDEX_WORKSPACE, &cg->index[it]);
     sp_str_om_insert(out->indexes, info.name, info);
   }
 }
@@ -865,7 +928,7 @@ spn_err_t spn_pkg_lower(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn
   lower_targets(ctx, cg, out);
   lower_toolchains(ctx, cg, out);
   lower_profiles(cg, out);
-  lower_indexes(cg, out);
+  lower_indexes(ctx, cg, out);
   lower_deps(ctx, cg, out);
   lower_options(ctx, cg, out);
   lower_config(ctx, cg, out);

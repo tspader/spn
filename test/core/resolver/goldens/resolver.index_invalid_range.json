@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "requests": [
     {
       "namespace": "test",
@@ -11,10 +11,9 @@
   "packages": [],
   "errors": [
     {
-      "kind": "dep_manifest",
+      "kind": "index_corrupt",
       "namespace": "spn",
-      "name": "a",
-      "detail": "index entry for spn/a 1.0.0 has invalid version range kram for dep b"
+      "name": "a"
     }
   ]
 }

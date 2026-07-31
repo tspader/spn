@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "requests": [
     {
       "namespace": "test",
@@ -14,21 +14,24 @@
       "name": "foo",
       "version": "1.0.0",
       "hash": "cbcf4d04c9913a95",
-      "source": "index"
+      "source": "index",
+      "recipe": "none"
     },
     {
       "namespace": "spn",
       "name": "foo",
       "version": "1.5.0",
       "hash": "ea6fb7502a818515",
-      "source": "index"
+      "source": "index",
+      "recipe": "none"
     },
     {
       "namespace": "spn",
       "name": "foo",
       "version": "1.9.0",
       "hash": "83fd4a8d0a1afc44",
-      "source": "index"
+      "source": "index",
+      "recipe": "none"
     },
     {
       "namespace": "spn",
@@ -36,6 +39,7 @@
       "version": "1.0.0",
       "hash": "3ea7b8fe0cebd014",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -56,6 +60,7 @@
       "version": "1.0.0",
       "hash": "6b4b4e3fa1b704f5",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -75,6 +80,7 @@
       "version": "0.0.1",
       "hash": "684f3938fc53a916",
       "source": "root",
+      "recipe": "local",
       "edges": [
         {
           "to": {

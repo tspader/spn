@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "requests": [
+    {
+      "namespace": "test",
+      "name": "root",
+      "kind": "package",
+      "source": "root"
+    }
+  ],
+  "packages": [],
+  "errors": [
+    {
+      "kind": "pkg_no_match",
+      "namespace": "core",
+      "name": "A",
+      "range": "^2.0.0",
+      "requester": "test/root"
+    }
+  ]
+}

@@ -24,7 +24,7 @@ static const test_t tests [] = {
   { "escape_special" },
   { "escape_unicode" },
   { "field_order_normalized" },
-  { "index_missing_required" },
+  { "index_optional_source" },
   { "index_multiple" },
   { "index_single" },
   { "kitchen_sink" },

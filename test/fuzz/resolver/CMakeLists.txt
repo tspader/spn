@@ -13,6 +13,7 @@ add_executable(fuzz_resolver
   ${SRC}/codegen/options.c
   ${SRC}/codegen/when.c
   ${SRC}/codegen/lower.c
+  ${SRC}/git/key.c
   ${SRC}/git/patch.c
   ${SRC}/when/when.c
   ${SRC}/toolchain/catalog.c
@@ -20,14 +21,19 @@ add_executable(fuzz_resolver
   ${SRC}/codegen/gen/config.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
+  ${SRC}/index/dir.c
+  ${SRC}/index/release.c
   ${SRC}/index/index.c
+  ${SRC}/index/jsonl.c
   ${SRC}/index/json.c
   ${SRC}/sp/io.c
   ${SRC}/pkg/id.c
+  ${SRC}/pkg/pkg.c
   ${SRC}/pkg/mutate.c
   ${SRC}/pkg/options.c
   ${SRC}/profile/profile.c
   ${SRC}/session/registry/registry.c
+  ${SRC}/pkg/load.c
   ${SRC}/triple/triple.c
   ${SRC}/resolve/resolve.c
   ${SRC}/sp/str.c

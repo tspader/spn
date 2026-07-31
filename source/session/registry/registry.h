@@ -4,9 +4,10 @@
 #include "sp.h"
 #include "spn.h"
 
+#include "error/types.h"
 #include "intern/types.h"
 #include "session/registry/types.h"
 
-spn_registry_pkg_t* spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_mem_t mem, sp_intern_t* intern, sp_str_t qualified, sp_str_t manifest, spn_registry_err_t* err);
+spn_err_union_t spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_mem_t mem, sp_intern_t* intern, sp_str_t qualified, sp_str_t manifest, spn_registry_pkg_t** pkg);
 
 #endif

@@ -1,0 +1,7 @@
+[package]
+name = "A"
+version = "1.0.0"
+
+[deps.package]
+B = { version = "^1.0.0", when = { os = "linux" } }
+C = { version = "^1.0.0", when = { os = "windows" } }

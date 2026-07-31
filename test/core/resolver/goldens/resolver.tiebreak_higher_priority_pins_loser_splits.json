@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "requests": [
     {
       "namespace": "test",
@@ -14,7 +14,8 @@
       "name": "b",
       "version": "1.0.0",
       "hash": "bb27749d1df94393",
-      "source": "index"
+      "source": "index",
+      "recipe": "none"
     },
     {
       "namespace": "spn",
@@ -22,6 +23,7 @@
       "version": "2.0.0",
       "hash": "2960ebae0babaf98",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -40,14 +42,16 @@
       "name": "c",
       "version": "1.0.0",
       "hash": "2c3a2d9d5bdabf1d",
-      "source": "index"
+      "source": "index",
+      "recipe": "none"
     },
     {
       "namespace": "spn",
       "name": "c",
       "version": "2.0.0",
       "hash": "3358ae7ca4de8cd4",
-      "source": "index"
+      "source": "index",
+      "recipe": "none"
     },
     {
       "namespace": "spn",
@@ -55,6 +59,7 @@
       "version": "1.0.0",
       "hash": "28240a957f3c882f",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -74,6 +79,7 @@
       "version": "1.0.0",
       "hash": "3c3b7ca984715906",
       "source": "index",
+      "recipe": "none",
       "edges": [
         {
           "to": {
@@ -103,6 +109,7 @@
       "version": "0.0.1",
       "hash": "716b1a89a72b12b8",
       "source": "root",
+      "recipe": "local",
       "edges": [
         {
           "to": {

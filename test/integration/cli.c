@@ -173,3 +173,45 @@ sp_test(cli, workspace_index) {
     },
   });
 }
+
+sp_test(cli, workspace_dir_index) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/cli/workspace_dir_index",
+    .copy = { "index/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
+    },
+  });
+}
+
+sp_test(cli, user_dir_index) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/cli/user_dir_index",
+    .actions = {
+      {
+        .kind = ACTION_CREATE_FILE,
+        .create = {
+          .file = sp_str_lit(".home/config/spn/spn.toml"),
+          .content = sp_str_lit("[[index]]\nname = \"local\"\npath = \"index\"\n"),
+        },
+      },
+      {
+        .kind = ACTION_CREATE_FILE,
+        .create = {
+          .file = sp_str_lit(".home/config/spn/index/A/spn.toml"),
+          .content = sp_str_lit("[package]\nname = \"A\"\nversion = \"1.0.0\"\n\n[[lib]]\nname = \"A\"\nkinds = [\"source\"]\nheaders = [\"A.h\"]\n"),
+        },
+      },
+      {
+        .kind = ACTION_CREATE_FILE,
+        .create = {
+          .file = sp_str_lit(".home/config/spn/index/A/A.h"),
+          .content = sp_str_lit("#pragma once\n\nstatic inline int A(void) {\n  return 0;\n}\n"),
+        },
+      },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
+    },
+  });
+}

@@ -6,6 +6,8 @@
 
 #include "compiler/types.h"
 #include "forward/types.h"
+#include "pkg/types.h"
+#include "semver/types.h"
 
 #define spn_try(expr) \
   do { \
@@ -51,13 +53,6 @@
     } \
   } while (0)
 
-#define try_task(__expr) \
-  do { \
-    spn_err_union_t __err = (__expr); \
-    if (__err.kind) { \
-      return (spn_task_step_t) { .err = spn_err_emit(__err) }; \
-    } \
-  } while (0)
 
 #define spn_err_reported(kind_) ((spn_err_union_t) { .kind = (kind_), .reported = true })
 
@@ -106,17 +101,67 @@ typedef struct {
 typedef struct spn_codegen_issue spn_codegen_issue_t;
 
 typedef struct {
+  sp_str_t name;
+  sp_str_t path;
+  sp_da(spn_codegen_issue_t) issues;
+} spn_err_manifest_t;
+
+typedef struct {
+  spn_pkg_name_t id;
+} spn_err_circular_t;
+
+typedef struct {
+  spn_requested_dep_t request;
+} spn_err_unknown_t;
+
+typedef struct {
+  spn_requested_dep_t request;
+  sp_str_t requester;
+  spn_semver_t requester_version;
+  bool conflict;
+  spn_semver_t selected;
+} spn_err_unsatisfiable_t;
+
+typedef struct {
+  spn_pkg_name_t id;
+  spn_semver_t version;
+} spn_err_unit_cycle_t;
+
+typedef struct {
+  spn_pkg_name_t id;
+  spn_semver_t low;
+  spn_semver_t high;
+} spn_err_dynamic_dup_t;
+
+typedef struct {
+  spn_pkg_name_t id;
+} spn_err_too_complex_t;
+
+typedef struct {
+  sp_str_t path;
+  sp_str_t declared;
+  sp_str_t requested;
+} spn_err_mismatch_t;
+
+typedef struct {
   spn_err_t kind;
   bool reported;
   union {
     struct {
       sp_str_t path;
     } manifest_parse;
+    spn_err_manifest_t manifest;
+    spn_err_circular_t circular;
+    spn_err_unknown_t unknown;
+    spn_err_unsatisfiable_t unsatisfiable;
+    spn_err_unit_cycle_t unit_cycle;
+    spn_err_dynamic_dup_t dynamic_dup;
+    spn_err_too_complex_t too_complex;
+    spn_err_mismatch_t mismatch;
     struct {
+      sp_str_t name;
       sp_str_t path;
-      sp_str_t expected;
-      sp_str_t actual;
-    } manifest_field;
+    } index_corrupt;
     struct {
       sp_str_t path;
     } no_manifest;
@@ -179,7 +224,6 @@ typedef struct {
     spn_err_build_graph_t build_graph;
     spn_err_toolchain_t toolchain;
     spn_err_artifact_t artifact;
-    sp_da(spn_codegen_issue_t) issues;
   };
 } spn_err_union_t;
 

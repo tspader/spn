@@ -94,6 +94,7 @@ typedef struct {
 typedef struct {
   const c8* name;
   const c8* url;
+  const c8* path;
   spn_index_protocol_t protocol;
   spn_index_kind_t kind;
 } index_t;
@@ -131,7 +132,7 @@ typedef struct {
   const c8* include_resolved;
   const c8* define [8];
   gated_t system_deps [8];
-  issue_t issues [4];
+  issue_t issues [7];
   target_t libs [8];
   target_t exes [8];
   target_t scripts [8];
@@ -476,7 +477,38 @@ static const test_t tests [] = {
         .protocol = SPN_INDEX_PROTOCOL_HTTP,
         .kind = SPN_INDEX_WORKSPACE,
       },
+      {
+        .name = "mirror",
+        .url = "https://y",
+        .kind = SPN_INDEX_WORKSPACE,
+      },
+      {
+        .name = "local",
+        .path = "index",
+        .protocol = SPN_INDEX_PROTOCOL_DIR,
+        .kind = SPN_INDEX_WORKSPACE,
+      },
     },
+  },
+  {
+    .name = "validate_index_sources",
+    .manifest = "index_sources",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "index[0].url" },
+      { SPN_CODEGEN_ERR_MISSING_KEY, "index[1].url" },
+      { SPN_CODEGEN_ERR_INVALID, "index[2].path" },
+      { SPN_CODEGEN_ERR_MISSING_KEY, "index[2].url" },
+      { SPN_CODEGEN_ERR_INVALID, "index[3].url" },
+      { SPN_CODEGEN_ERR_INVALID, "index[3].rev" },
+      { SPN_CODEGEN_ERR_MISSING_KEY, "index[3].path" },
+    }
+  },
+  {
+    .name = "validate_package_bad_version",
+    .manifest = "package_bad_version",
+    .issues = {
+      { SPN_CODEGEN_ERR_INVALID, "package.version" }
+    }
   },
   {
     .name = "config",
@@ -1006,8 +1038,9 @@ sp_test_each(lower, cases, test_t, tests) {
 
     spn_index_info_t* idx = sp_str_om_get(pkg.indexes, sp_str_view(expected.name));
     sp_must(t, idx);
-    if (expected.url) sp_expect_str_eq_c(t, idx->url, expected.url);
-    if (expected.protocol) sp_expect_eq(t, (u32)expected.protocol, (u32)idx->protocol);
+    if (expected.url) sp_expect_str_eq_c(t, idx->protocol == SPN_INDEX_PROTOCOL_HTTP ? idx->http.url : idx->git.url, expected.url);
+    if (expected.path) sp_expect_str_eq(t, idx->dir.path, sp_fs_join_path(mem, ctx.dir, sp_cstr_as_str(expected.path)));
+    sp_expect_eq(t, (u32)expected.protocol, (u32)idx->protocol);
     sp_expect_eq(t, (u32)expected.kind, (u32)idx->kind);
   }
 

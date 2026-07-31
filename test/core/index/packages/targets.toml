@@ -1,0 +1,8 @@
+[package]
+name = "A"
+version = "1.0.0"
+
+[[lib]]
+name = "A"
+kinds = ["static", "shared"]
+source = ["A.c"]

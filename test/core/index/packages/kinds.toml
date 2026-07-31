@@ -1,0 +1,12 @@
+[package]
+name = "A"
+version = "1.0.0"
+
+[deps.package]
+B = { version = "^1.0.0" }
+
+[deps.build]
+C = { version = "^1.0.0" }
+
+[deps.test]
+D = { version = "^1.0.0" }

@@ -1,0 +1,7 @@
+[package]
+name = "A"
+version = "1.0.0"
+
+[deps.package]
+B = { version = "^1.0.0", private = true, when = { os = "linux" }, options = { O = true } }
+C = { version = "^2.0.0" }

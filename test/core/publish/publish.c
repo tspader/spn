@@ -34,6 +34,10 @@ typedef struct {
       const c8* name;
       spn_linkage_t linkages [4];
     } targets [2];
+    struct {
+      const c8* name;
+      const c8* dep;
+    } path_dep;
   } expect;
 } case_t;
 
@@ -257,6 +261,32 @@ static const case_t cases [] = {
       .manifest_dir = "",
     },
   },
+  {
+    .name = "path_dep_rejected",
+    .repo = {
+      .name = "A",
+      .commits = {
+        {
+          .message = "v1",
+          .files = {
+            { "spn.toml",
+              ts(package) "\n"
+              tkv(name, "A") "\n"
+              tkv(version, "1.0.0") "\n"
+              "\n"
+              ts(deps.package) "\n"
+              "B = { path = \"../B\" }\n"
+            },
+            { "spn.c", "void build() {}" },
+          },
+        },
+      },
+    },
+    .expect = {
+      .kind = SPN_ERR_INDEX_PATH_DEP,
+      .path_dep = { .name = "core/A", .dep = "core/B" },
+    },
+  },
 };
 
 sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
@@ -309,10 +339,9 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
   git_repo_commit(index_root, sp_str_lit("seed"));
 
   spn_index_info_t index = {
-    .url = index_root,
+    .git = { .url = index_root },
     .location = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("index_clone")),
   };
-  spn_index_init(&index, mem);
 
   sp_str_t cwd = repo.path;
   if (c.opts.subdir) {
@@ -333,15 +362,21 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
   spn_index_release_t release = sp_zero;
   spn_err_union_t result = spn_publish_build(&opts, &release);
   if (!result.kind) {
-    result = spn_index_publish(&index, &release);
+    result = spn_index_publish(&index, mem, &release);
   }
   sp_expect_eq(t, c.expect.kind, result.kind);
 
+  if (c.expect.path_dep.name) {
+    sp_expect_str_eq_c(t, result.pkg.name, c.expect.path_dep.name);
+    sp_expect_str_eq_c(t, result.pkg.requested, c.expect.path_dep.dep);
+  }
+
   if (c.expect.namespace && result.kind == SPN_OK) {
-    spn_index_pkg_t* pkg = spn_index_get_package(&index, (spn_pkg_name_t) {
+    spn_index_pkg_t* pkg = SP_NULLPTR;
+    spn_index_get_package(&index, mem, spn.intern, (spn_pkg_name_t) {
       .namespace = sp_str_view(c.expect.namespace),
       .name = sp_str_view(c.expect.name),
-    });
+    }, &pkg);
 
     sp_must(t, pkg);
     sp_must(t, sp_da_size(pkg->releases));
@@ -351,35 +386,37 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
     sp_expect_eq(t, c.expect.version.minor, rel->version.minor);
     sp_expect_eq(t, c.expect.version.patch, rel->version.patch);
 
+    sp_must_eq(t, SPN_PKG_TREE_GIT, rel->source.kind);
     if (source_repo.path.len) {
-      sp_expect_str_eq(t, rel->source.url, source_repo.path);
+      sp_expect_str_eq(t, rel->source.git.url, source_repo.path);
     } else {
-      sp_expect_str_eq(t, rel->source.url, repo.path);
+      sp_expect_str_eq(t, rel->source.git.url, repo.path);
     }
 
     if (c.expect.source_commit) {
       git_repo_result_t* rev_repo = source_repo.path.len ? &source_repo : &repo;
       SP_ASSERT(c.expect.source_commit <= rev_repo->commit_count);
-      sp_expect_str_eq(t, rel->source.rev, rev_repo->commits[c.expect.source_commit - 1]);
+      sp_expect_str_eq(t, rel->source.git.rev, rev_repo->commits[c.expect.source_commit - 1]);
     }
 
     if (c.expect.source_dir) {
-      sp_expect_str_eq_c(t, rel->source.dir, c.expect.source_dir);
+      sp_expect_str_eq_c(t, rel->source.git.dir, c.expect.source_dir);
     }
 
     if (c.expect.manifest_url) {
-      sp_expect_str_eq(t, rel->manifest.url, repo.path);
+      sp_must_eq(t, SPN_PKG_TREE_GIT, rel->manifest.kind);
+      sp_expect_str_eq(t, rel->manifest.git.url, repo.path);
 
       if (c.expect.manifest_commit) {
         SP_ASSERT(c.expect.manifest_commit <= repo.commit_count);
-        sp_expect_str_eq(t, rel->manifest.rev, repo.commits[c.expect.manifest_commit - 1]);
+        sp_expect_str_eq(t, rel->manifest.git.rev, repo.commits[c.expect.manifest_commit - 1]);
       }
 
       if (c.expect.manifest_dir) {
-        sp_expect_str_eq_c(t, rel->manifest.dir, c.expect.manifest_dir);
+        sp_expect_str_eq_c(t, rel->manifest.git.dir, c.expect.manifest_dir);
       }
     } else {
-      sp_expect_str_eq(t, rel->manifest.url, sp_str_lit(""));
+      sp_expect_eq(t, SPN_PKG_TREE_NONE, rel->manifest.kind);
     }
 
     u32 expected_targets = 0;
@@ -399,6 +436,5 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
     }
   }
 
-  spn_index_deinit(&index);
   return SP_OK;
 }

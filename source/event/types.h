@@ -8,20 +8,9 @@
 #include "pkg/types.h"
 #include "unit/types.h"
 
-// One row per event kind: enum, jsonl name, TUI verb, TUI verbosity, jsonl
-// log level, whether it renders as an error, whether that error is terminal,
-// and the union arm carrying its payload (SPN_EVT_NONE when it has none).
-// Every consumer table derives from this list, so a new event is one row.
 #define SPN_EVENT_LIST(X) \
   X(SPN_EVENT_NONE,                         "",                           "",            DEBUG,   INFO,  false, false, SPN_EVT_NONE) \
   X(SPN_EVENT_ERR,                          "err",                        "error",       QUIET,   ERROR, true,  true,  SPN_EVT_NONE) \
-  X(SPN_EVENT_ERR_CIRCULAR_DEP,             "err_circular_dep",           "error",       QUIET,   ERROR, true,  true,  SPN_EVT(circular)) \
-  X(SPN_EVENT_ERR_UNKNOWN_PKG,              "err_unknown_pkg",            "error",       QUIET,   ERROR, true,  true,  SPN_EVT(unknown)) \
-  X(SPN_EVENT_ERR_UNSATISFIABLE_VERSION,    "err_unsatisfiable_version",  "error",       QUIET,   ERROR, true,  true,  SPN_EVT(unsatisfiable)) \
-  X(SPN_EVENT_ERR_MANIFEST,                 "err_manifest",               "error",       QUIET,   ERROR, true,  true,  SPN_EVT(manifest_err)) \
-  X(SPN_EVENT_ERR_UNIT_CYCLE,               "err_unit_cycle",             "error",       QUIET,   ERROR, true,  true,  SPN_EVT(unit_cycle)) \
-  X(SPN_EVENT_ERR_DYNAMIC_DUPLICATE,        "err_dynamic_duplicate",      "error",       QUIET,   ERROR, true,  true,  SPN_EVT(dynamic_dup)) \
-  X(SPN_EVENT_ERR_RESOLUTION_TOO_COMPLEX,   "err_resolution_too_complex", "error",       QUIET,   ERROR, true,  true,  SPN_EVT(too_complex)) \
   X(SPN_EVENT_ERR_OPTION,                   "err_option",                 "error",       QUIET,   ERROR, true,  true,  SPN_EVT(option)) \
   X(SPN_EVENT_RESOLVE_START,                "resolve_start",              "Resolving",   NORMAL,  INFO,  false, false, SPN_EVT_NONE) \
   X(SPN_EVENT_RESOLVE_PACKAGE,              "resolve_package",            "Resolving",   DEBUG,   INFO,  false, false, SPN_EVT(resolve_pkg)) \
@@ -99,17 +88,6 @@ typedef struct {
 typedef struct { spn_profile_info_t* profile; u64 time; u32 hits; u32 misses; } spn_evt_build_passed_t;
 
 typedef struct { sp_str_t name; sp_str_t command; } spn_evt_run_t;
-typedef struct {
-  spn_requested_dep_t request;
-  sp_str_t requester;
-  spn_semver_t requester_version;
-  bool conflict;
-  spn_semver_t selected;
-} spn_evt_unsatisfiable_t;
-typedef struct { spn_pkg_name_t id; } spn_evt_circular_t;
-typedef struct { spn_pkg_name_t id; spn_semver_t version; } spn_evt_unit_cycle_t;
-typedef struct { spn_pkg_name_t id; spn_semver_t low; spn_semver_t high; } spn_evt_dynamic_dup_t;
-typedef struct { spn_pkg_name_t id; } spn_evt_too_complex_t;
 
 typedef enum {
   SPN_OPTION_ERR_UNDECLARED,
@@ -143,7 +121,6 @@ typedef struct {
   spn_option_setter_t a;
   spn_option_setter_t b;
 } spn_evt_option_t;
-typedef struct { spn_requested_dep_t request; } spn_evt_unknown_t;
 typedef struct { sp_str_t script_path; u64 time; bool has_configure; bool has_package; } spn_evt_script_compile_t;
 typedef struct { u64 time; } spn_evt_script_package_t;
 typedef struct { sp_str_t script_path; sp_str_t error; } spn_evt_compile_failed_t;
@@ -177,7 +154,6 @@ typedef enum {
   SPN_PATCH_ERR_NOT_GIT,
 } spn_evt_patch_err_kind_t;
 typedef struct { sp_str_t name; spn_evt_patch_err_kind_t kind; } spn_evt_patch_err_t;
-typedef struct { sp_str_t name; sp_str_t path; sp_str_t error; sp_da(spn_codegen_issue_t) issues; } spn_evt_manifest_err_t;
 typedef struct { u32 num_synced; u64 time; } spn_evt_sync_end_t;
 typedef struct { sp_str_t fn; sp_str_t args; } spn_evt_api_call_t;
 typedef struct { sp_str_t message; } spn_evt_user_log_t;
@@ -218,13 +194,7 @@ struct spn_build_event_t {
       spn_evt_build_passed_t passed;
     } build;
     spn_evt_run_t run;
-    spn_evt_circular_t circular;
-    spn_evt_unit_cycle_t unit_cycle;
-    spn_evt_dynamic_dup_t dynamic_dup;
-    spn_evt_too_complex_t too_complex;
     spn_evt_option_t option;
-    spn_evt_unsatisfiable_t unsatisfiable;
-    spn_evt_unknown_t unknown;
     spn_evt_script_compile_t script_compile;
     spn_evt_compile_failed_t compile_failed;
     spn_evt_script_crashed_t crashed;
@@ -238,7 +208,6 @@ struct spn_build_event_t {
     spn_evt_sync_pkg_t sync_pkg;
     spn_evt_sync_failed_t sync_failed;
     spn_evt_patch_err_t patch_err;
-    spn_evt_manifest_err_t manifest_err;
     spn_evt_sync_end_t sync_end;
     spn_evt_api_call_t api_call;
     spn_evt_user_log_t user_log;

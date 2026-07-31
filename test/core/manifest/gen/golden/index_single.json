@@ -3,11 +3,11 @@
     "name": "withindex",
     "version": "1.0.0"
   },
-  "index": {
-    "core": {
+  "index": [
+    {
       "name": "core",
       "url": "https://packages.example.com",
       "protocol": "http"
     }
-  }
+  ]
 }

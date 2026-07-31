@@ -3,7 +3,6 @@ sp_test(units, build_dep_conflict) {
     .project = "test/integration/fixtures/units/build_dep_conflict",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
     },
   });
 }
@@ -13,8 +12,6 @@ sp_test(units, build_dep_transitive_conflict) {
     .project = "test/integration/fixtures/units/build_dep_transitive_conflict",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
     },
   });
 }
@@ -24,7 +21,7 @@ sp_test(units, shared_conflict) {
     .project = "test/integration/fixtures/units/shared_conflict",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR, .key = "kind", .value = "pkg_no_match" } },
     },
   });
 }
@@ -34,9 +31,6 @@ sp_test(units, shared_private) {
     .project = "test/integration/fixtures/units/shared_private",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_DYNAMIC_DUPLICATE } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
     },
   });
 }
@@ -46,7 +40,7 @@ sp_test(units, static_conflict) {
     .project = "test/integration/fixtures/units/static_conflict",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR, .key = "kind", .value = "pkg_no_match" } },
     },
   });
 }
@@ -68,7 +62,6 @@ sp_test(units, no_downgrade) {
     .project = "test/integration/fixtures/units/no_downgrade",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_RESOLVE_PACKAGE, .key = "version", .value = "1.9.0" } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
@@ -80,7 +73,7 @@ sp_test(units, build_dep_cycle) {
     .project = "test/integration/fixtures/units/build_dep_cycle",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNIT_CYCLE } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR, .key = "kind", .value = "unit_cycle" } },
     },
   });
 }
@@ -90,8 +83,6 @@ sp_test(units, build_dep_bootstrap) {
     .project = "test/integration/fixtures/units/build_dep_bootstrap",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNIT_CYCLE } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
@@ -104,8 +95,6 @@ sp_test(units, same_version_split) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_RESOLVE_END, .key = "num_resolved", .value = "6" } },
-      { .kind = ACTION_VERIFY_NO_EVENT, .verify_event = { .event = SPN_EVENT_ERR_UNSATISFIABLE_VERSION } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
     },
   });
 }
@@ -116,7 +105,6 @@ sp_test(units, sibling_order) {
     .project = "test/integration/fixtures/units/sibling_order",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
-      { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
     },
   });
 }

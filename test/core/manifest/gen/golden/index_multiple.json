@@ -3,16 +3,16 @@
     "name": "multiindex",
     "version": "1.0.0"
   },
-  "index": {
-    "core": {
+  "index": [
+    {
       "name": "core",
       "url": "https://a.example.com",
       "protocol": "http"
     },
-    "local": {
+    {
       "name": "local",
       "url": "/srv/packages",
       "protocol": "http"
     }
-  }
+  ]
 }
