@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(freshness, noop) {
   return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/freshness/bin",

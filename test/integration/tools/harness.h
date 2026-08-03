@@ -182,6 +182,23 @@ typedef struct {
 } rebuild_test_t;
 
 typedef struct {
+  const c8* profile;
+  const c8* manifest;
+  const c8* target;
+  bool alternate;
+  bool present;
+  test_when_t when;
+  command_expect_t expect;
+} opt_build_t;
+
+typedef struct {
+  const c8* project;
+  const c8* copy [4];
+  test_when_t when;
+  opt_build_t builds [3];
+} opt_test_t;
+
+typedef struct {
   sp_mem_t mem;
   sp_str_t root;
   struct {
@@ -222,5 +239,6 @@ sp_err_t run_command_test(sp_test_t* t, command_test_t test);
 sp_err_t run_rebuild_test(sp_test_t* t, rebuild_test_t test);
 sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions);
 sp_err_t run_test(sp_test_t* t, test_t test);
+sp_err_t run_opt_test(sp_test_t* t, opt_test_t test);
 
 #endif

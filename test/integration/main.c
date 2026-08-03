@@ -3,29 +3,6 @@
 
 #include "harness.h"
 
-#include "harness_test.c"
-#include "target.c"
-#include "consume.c"
-#include "deps.c"
-#include "units.c"
-#include "reexport.c"
-#include "exports.c"
-#include "script.c"
-#include "cxx.c"
-#include "options.c"
-#include "worlds.c"
-#include "run.c"
-#include "layout.c"
-#include "log.c"
-#include "cli.c"
-#include "compile_commands.c"
-#include "freshness.c"
-#include "platform.c"
-#include "profile.c"
-#include "offline.c"
-#include "corrupt.c"
-#include "patch.c"
-
 s32 main(s32 argc, const c8** argv) {
   bool jobs = false;
   sp_for(it, (u32)argc) {

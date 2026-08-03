@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(script, basic_node) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/script/basic_node",

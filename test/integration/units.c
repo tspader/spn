@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(units, build_dep_conflict) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/units/build_dep_conflict",

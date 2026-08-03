@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(exports, own_exported) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/exports/own_exported",

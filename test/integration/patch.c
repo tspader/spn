@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(patch, applies_to_dep_source) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/patch/basic",

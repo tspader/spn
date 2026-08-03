@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(deps_file, basic) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/file/basic",

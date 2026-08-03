@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(compile_commands, written_on_build) {
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/compile_commands/simple",

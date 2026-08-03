@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(reexport, transitive) {
   return sp_test_skip(t, "disabled");
   return run_test(t, (test_t) {

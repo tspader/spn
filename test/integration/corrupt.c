@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(corrupt, store_entry_deleted) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/binary_static",
