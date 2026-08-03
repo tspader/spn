@@ -62,10 +62,6 @@ typedef enum {
 } spn_build_event_kind_t;
 #undef SPN_EVENT_ENUM
 
-// ============================================================================
-// Named event variant types (used in the union and for bind schemas)
-// ============================================================================
-
 typedef struct { spn_user_node_t* info; } spn_evt_node_t;
 
 typedef struct {
