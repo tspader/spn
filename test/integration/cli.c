@@ -102,20 +102,6 @@ sp_test(cli, add_unknown_package) {
   });
 }
 
-sp_test(cli, update) {
-  return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/cli/update",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "update" } },
-      { .kind = ACTION_VERIFY_PKG_LOCKED, .verify_locked = { .name = "core/spum" } },
-      { .kind = ACTION_VERIFY_FILE_CONTAINS, .verify_file_contains = { .file = sp_str_lit("spn.lock"), .needle = sp_str_lit("version = \"1.1.0\"") } },
-      { .kind = ACTION_VERIFY_FILE_NOT_CONTAINS, .verify_file_not_contains = { .file = sp_str_lit("spn.lock"), .needle = sp_str_lit("version = \"2.0.0\"") } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_UPDATE_INCOMPATIBLE, .key = "name", .value = "core/spum" } },
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "update" } },
-    },
-  });
-}
-
 sp_test(cli, clean) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cli/add",

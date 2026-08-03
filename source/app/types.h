@@ -75,8 +75,6 @@ struct spn_app_t {
     spn_thread_pool_t pool;
     sp_da(spn_sync_index_job_t*) jobs;
   } index_sync;
-
-  sp_da(sp_str_t) search;
 };
 
 typedef enum {
