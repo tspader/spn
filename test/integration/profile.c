@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(profile, sanitize_trigger) {
   return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/profile/sanitize",

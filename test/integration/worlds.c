@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(worlds, cut0_string_option_rejected) {
   return sp_test_skip(t, "worlds cut 0");
 }

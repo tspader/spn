@@ -8,6 +8,28 @@ add_executable(integration
   ${SRC}/sp/str.c
   ${SRC}/triple/triple.c
   main.c
+  cli.c
+  compile_commands.c
+  consume.c
+  corrupt.c
+  cxx.c
+  deps.c
+  exports.c
+  freshness.c
+  harness_test.c
+  layout.c
+  log.c
+  offline.c
+  options.c
+  patch.c
+  platform.c
+  profile.c
+  reexport.c
+  run.c
+  script.c
+  target.c
+  units.c
+  worlds.c
   tools/caps.c
   tools/harness.c
   ${TEST_TOOLS}/fixture.c

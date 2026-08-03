@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(platform, inert) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/platform/inert",

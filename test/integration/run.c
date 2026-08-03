@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(run, manifest) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/run/manifest",

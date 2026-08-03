@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(cli, missing_required_package_version) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cli/missing_required_package_version",

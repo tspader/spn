@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(harness, dir) {
   sp_str_t dir = sp_test_dir(t);
   sp_must(t, sp_fs_exists(dir));

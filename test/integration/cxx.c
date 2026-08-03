@@ -1,3 +1,5 @@
+#include "harness.h"
+
 sp_test(cxx, static_lib) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/static_lib",
