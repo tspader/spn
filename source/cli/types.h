@@ -17,7 +17,6 @@ typedef struct spn_cli spn_cli_t;
   X(SPN_CLI_CLEAN, "clean") \
   X(SPN_CLI_GENERATE, "generate") \
   X(SPN_CLI_COPY, "copy") \
-  X(SPN_CLI_UPDATE, "update") \
   X(SPN_CLI_LIST, "list") \
   X(SPN_CLI_WHICH, "which") \
   X(SPN_CLI_LS, "ls") \
@@ -46,10 +45,6 @@ typedef struct {
   bool test;
   bool build;
 } spn_cli_add_t;
-
-typedef struct {
-  sp_str_t package;
-} spn_cli_update_t;
 
 typedef struct {
   union {
@@ -152,7 +147,6 @@ struct spn_cli {
   spn_profile_args_t profile;
 
   spn_cli_add_t add;
-  spn_cli_update_t update;
   spn_cli_tool_t tool;
   spn_cli_init_t init;
   spn_cli_generate_t generate;

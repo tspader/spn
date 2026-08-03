@@ -22,7 +22,6 @@ sp_cli_result_t spn_cli_list(sp_cli_t* cli);
 sp_cli_result_t spn_cli_ls(sp_cli_t* cli);
 sp_cli_result_t spn_cli_manifest(sp_cli_t* cli);
 sp_cli_result_t spn_cli_which(sp_cli_t* cli);
-sp_cli_result_t spn_cli_update(sp_cli_t* cli);
 sp_cli_result_t spn_cli_tool(sp_cli_t* cli);
 sp_cli_result_t spn_cli_tool_install(sp_cli_t* cli);
 sp_cli_result_t spn_cli_tool_uninstall(sp_cli_t* cli);

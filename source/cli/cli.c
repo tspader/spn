@@ -54,12 +54,6 @@ static sp_cli_cmd_t cmd_add = {
   .handler = spn_cli_add,
 };
 
-static sp_cli_cmd_t cmd_update = {
-  .name = "update",
-  .summary = "Update dependencies to the latest compatible versions",
-  .handler = spn_cli_update,
-};
-
 static sp_cli_cmd_t cmd_clean = {
   .name = "clean",
   .summary = "Remove the project build directory",
@@ -517,7 +511,6 @@ static sp_cli_cmd_t cmd_root = {
   .commands = {
     &cmd_init,
     &cmd_add,
-    &cmd_update,
     &cmd_clean,
     &cmd_build,
     &cmd_run,

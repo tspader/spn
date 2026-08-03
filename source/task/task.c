@@ -12,7 +12,6 @@ static spn_task_desc_t spn_tasks[SPN_TASK_COUNT] = {
   [SPN_TASK_RUN]             = { "run",           SP_NULLPTR,                    spn_task_run                    },
   [SPN_TASK_GENERATE]        = { "generate",      SP_NULLPTR,                    spn_task_generate               },
   [SPN_TASK_WHICH]           = { "which",         SP_NULLPTR,                    spn_task_which                  },
-  [SPN_TASK_UPDATE]          = { "update",        SP_NULLPTR,                    spn_task_update                 },
   [SPN_TASK_INIT]            = { "init",          SP_NULLPTR,                    spn_task_init                   },
   [SPN_TASK_ADD]             = { "add",           SP_NULLPTR,                    spn_task_add                    },
   [SPN_TASK_CLEAN]           = { "clean",         SP_NULLPTR,                    spn_task_clean                  },

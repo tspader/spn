@@ -22,7 +22,6 @@ set(SPN_SOURCES
   cli/run.c
   cli/test.c
   cli/tool.c
-  cli/update.c
   cli/which.c
   codegen/codegen.c
   codegen/loader.c
@@ -118,7 +117,6 @@ set(SPN_SOURCES
   task/task.c
   task/test.c
   task/unit.c
-  task/update.c
   task/which.c
   thread_pool/thread_pool.c
   toml/edit.c
