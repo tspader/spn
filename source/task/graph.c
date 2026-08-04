@@ -6,6 +6,6 @@
 #include "sp/macro.h"
 #include "sp/str.h"
 
-spn_task_step_t spn_task_render_graph(spn_ctx_t* ctx) {
+spn_task_step_t spn_task_render_graph(spn_ctx_t* ctx, spn_task_t* task) {
   return spn_task_done();
 }

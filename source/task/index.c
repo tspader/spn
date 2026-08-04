@@ -15,13 +15,26 @@
 #include "task/task.h"
 #include "external/wasm/wasm.h"
 
+typedef struct {
+  spn_index_info_t* index;
+  bool force;
+  spn_err_t err;
+} spn_sync_index_job_t;
+
+struct spn_index_sync_op_t {
+  spn_thread_pool_t pool;
+  sp_da(spn_sync_index_job_t*) jobs;
+};
+
 static void sync_index_node(void* data) {
   spn_sync_index_job_t* job = (spn_sync_index_job_t*)data;
   job->err = spn_index_sync(job->index, job->force);
 }
 
-spn_task_step_t spn_task_sync_indexes_init(spn_ctx_t* ctx) {
-  sp_da_init(spn.mem, ctx->index_sync.jobs);
+spn_task_step_t spn_task_sync_indexes_init(spn_ctx_t* ctx, spn_task_t* task) {
+  spn_index_sync_op_t* op = sp_alloc_type(spn.mem, spn_index_sync_op_t);
+  task->index_sync = op;
+  sp_da_init(spn.mem, op->jobs);
 
   bool force = spn.cli.index.force;
   sp_str_t only = spn.cli.index.name;
@@ -45,31 +58,32 @@ spn_task_step_t spn_task_sync_indexes_init(spn_ctx_t* ctx) {
     spn_sync_index_job_t* job = sp_alloc_type(spn.mem, spn_sync_index_job_t);
     job->index = index;
     job->force = force;
-    sp_da_push(ctx->index_sync.jobs, job);
+    sp_da_push(op->jobs, job);
   }
 
-  spn_thread_pool_t* pool = &ctx->index_sync.pool;
-  spn_thread_pool_init(pool, spn.mem, (spn_thread_pool_config_t) {
-    .workers = (u32)sp_min(8, sp_da_size(ctx->index_sync.jobs)),
+  spn_thread_pool_init(&op->pool, spn.mem, (spn_thread_pool_config_t) {
+    .workers = (u32)sp_min(8, sp_da_size(op->jobs)),
     .on_worker_exit = spn_wasm_thread_exit,
   });
 
-  sp_da_for(ctx->index_sync.jobs, it) {
-    spn_thread_pool_submit(&pool->executor, (spn_thread_pool_job_t) { .fn = sync_index_node, .data = ctx->index_sync.jobs[it] });
+  sp_da_for(op->jobs, it) {
+    spn_thread_pool_submit(&op->pool.executor, (spn_thread_pool_job_t) { .fn = sync_index_node, .data = op->jobs[it] });
   }
 
   return spn_task_continue();
 }
 
-spn_task_step_t spn_task_sync_indexes_update(spn_ctx_t* ctx) {
-  if (spn_thread_pool_pending(&ctx->index_sync.pool)) {
+spn_task_step_t spn_task_sync_indexes_update(spn_ctx_t* ctx, spn_task_t* task) {
+  spn_index_sync_op_t* op = task->index_sync;
+
+  if (spn_thread_pool_pending(&op->pool)) {
     return spn_task_continue();
   }
 
-  spn_thread_pool_deinit(&ctx->index_sync.pool);
+  spn_thread_pool_deinit(&op->pool);
 
-  sp_da_for(ctx->index_sync.jobs, it) {
-    spn_sync_index_job_t* job = ctx->index_sync.jobs[it];
+  sp_da_for(op->jobs, it) {
+    spn_sync_index_job_t* job = op->jobs[it];
     if (job->err == SPN_OK) {
       continue;
     }

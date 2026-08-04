@@ -19,6 +19,10 @@ static spn_task_desc_t spn_tasks[SPN_TASK_COUNT] = {
   [SPN_TASK_PUBLISH]         = { "publish",       SP_NULLPTR,                    spn_task_publish                },
 };
 
+spn_task_executor_t* spn_task_executor() {
+  return &spn.tasks;
+}
+
 spn_task_desc_t* spn_task_get(spn_task_kind_t kind) {
   sp_assert(kind > SPN_TASK_NONE && kind < SPN_TASK_COUNT);
   spn_task_desc_t* task = &spn_tasks[kind];
@@ -26,14 +30,14 @@ spn_task_desc_t* spn_task_get(spn_task_kind_t kind) {
   return task;
 }
 
-void spn_task_enqueue(spn_task_executor_t* ex, spn_task_kind_t kind) {
+void spn_task_enqueue(spn_task_executor_t* ex, spn_task_t task) {
   sp_assert(ex->len < SPN_TASK_MAX_QUEUE);
-  ex->data[ex->len++] = kind;
+  ex->data[ex->len++] = task;
 }
 
 bool spn_task_rewind(spn_task_executor_t* ex, spn_task_kind_t kind) {
   for (s32 it = (s32)ex->index; it >= 0; it--) {
-    if (ex->data[it] == kind) {
+    if (ex->data[it].kind == kind) {
       ex->index = (u32)it;
       ex->initted = false;
       return true;
@@ -42,9 +46,9 @@ bool spn_task_rewind(spn_task_executor_t* ex, spn_task_kind_t kind) {
   return false;
 }
 
-sp_cli_result_t spn_task_plan_kinds(const spn_task_kind_t* kinds, u32 len) {
+sp_cli_result_t spn_task_plan(spn_task_executor_t* ex, const spn_task_t* tasks, u32 len) {
   sp_for(it, len) {
-    spn_task_enqueue(&spn.tasks, kinds[it]);
+    spn_task_enqueue(ex, tasks[it]);
   }
   return SP_CLI_CONTINUE;
 }

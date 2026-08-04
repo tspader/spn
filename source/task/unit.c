@@ -6,7 +6,7 @@
 #include "task/task.h"
 #include "unit/unit.h"
 
-spn_task_step_t spn_task_create_units(spn_ctx_t* ctx) {
+spn_task_step_t spn_task_create_units(spn_ctx_t* ctx, spn_task_t* task) {
   spn_app_t* app = ctx->app;
   spn_session_t* session = &app->session;
 

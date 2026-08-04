@@ -201,7 +201,7 @@ static spn_err_union_t run(sp_mem_t mem, spn_cli_init_t* command, sp_str_t proje
   return run_unattended(mem, command, dir, name);
 }
 
-spn_task_step_t spn_task_init(spn_ctx_t* ctx) {
+spn_task_step_t spn_task_init(spn_ctx_t* ctx, spn_task_t* task) {
   spn_err_union_t err = run(spn.mem, &spn.cli.init, spn.paths.project);
   if (err.kind) return spn_task_fail_with(err);
   return spn_task_done();

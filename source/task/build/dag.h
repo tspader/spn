@@ -66,7 +66,7 @@ bool             spn_dag_build_poll(spn_dag_build_t* b);
 spn_err_t        spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target);
 spn_err_t        spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, bool strict, sp_da(spn_dag_obs_t)* obs);
 
-spn_task_step_t spn_dag_build_init(spn_ctx_t* ctx);
-spn_task_step_t spn_dag_build_update(spn_ctx_t* ctx);
+spn_task_step_t spn_dag_build_init(spn_ctx_t* ctx, spn_task_t* task);
+spn_task_step_t spn_dag_build_update(spn_ctx_t* ctx, spn_task_t* task);
 
 #endif

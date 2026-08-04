@@ -88,7 +88,7 @@ static void add_reactor_edges(spn_dag_build_t* b, spn_target_unit_t* reactor) {
   }
 }
 
-spn_task_step_t spn_task_configure_graph_init(spn_ctx_t* ctx) {
+spn_task_step_t spn_task_configure_graph_init(spn_ctx_t* ctx, spn_task_t* task) {
   spn_app_t* app = ctx->app;
   spn_session_t* s = &app->session;
 
@@ -141,7 +141,7 @@ spn_task_step_t spn_task_configure_graph_init(spn_ctx_t* ctx) {
   return spn_task_continue();
 }
 
-spn_task_step_t spn_task_configure_graph_update(spn_ctx_t* ctx) {
+spn_task_step_t spn_task_configure_graph_update(spn_ctx_t* ctx, spn_task_t* task) {
   spn_app_t* app = ctx->app;
   spn_dag_build_t* b = app->session.dag.configure;
   if (!spn_dag_build_poll(b)) {

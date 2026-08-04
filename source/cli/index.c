@@ -66,5 +66,5 @@ sp_cli_result_t spn_cli_index_sync(sp_cli_t* cli) {
   }
 
   spn.cli.index.force = true;
-  return spn_plan(SPN_TASK_SYNC_INDEXES);
+  return spn_plan({ SPN_TASK_SYNC_INDEXES });
 }
