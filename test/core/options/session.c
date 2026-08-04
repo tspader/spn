@@ -72,10 +72,9 @@ static const session_test_t tests [] = {
   },
 };
 
-sp_test_each(options_session, apply, session_test_t, tests) {
+sp_test_each(options_session, apply, session_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
-  sp_intern_t* intern = sp_intern_new(mem);
-  spn.intern = intern;
+  sp_intern_t* intern = spn.intern;
 
   spn_pkg_info_t root = {
     .name = sp_str_lit("test"),
@@ -116,10 +115,9 @@ sp_test_each(options_session, apply, session_test_t, tests) {
   };
 
   spn_session_t session = {
+    .ctx = &spn,
     .mem = mem,
-    .intern = intern,
     .pkg = &root,
-    .events = spn_event_buffer_new(mem),
     .gates = { .resolves = it->resolves },
     .profile = { .os = SPN_OS_LINUX },
   };
@@ -146,7 +144,7 @@ sp_test_each(options_session, apply, session_test_t, tests) {
   sp_expect_eq(t, session.gates.resolves, it->expect.resolves);
   sp_expect_eq(t, session.gates.reresolve, it->expect.reresolve);
 
-  sp_da(spn_build_event_t) events = spn_event_buffer_drain(mem, session.events);
+  sp_da(spn_build_event_t) events = spn_event_buffer_drain(mem, spn.events);
   sp_must_eq(t, sp_da_size(events), it->expect.event ? 1 : 0);
   if (!it->expect.event) {
     return SP_OK;

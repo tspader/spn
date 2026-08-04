@@ -4,7 +4,7 @@
 #include "task/task.h"
 
 sp_cli_result_t spn_cli_graph(sp_cli_t* cli) {
-  app.config.selection = (spn_target_selection_t) {
+  spn.config.selection = (spn_target_selection_t) {
     .kind = SPN_TARGET_SELECTION_EXPLICIT,
     .bin = { .kind = SPN_TARGET_RULE_ALL },
     .lib = { .kind = SPN_TARGET_RULE_ALL },

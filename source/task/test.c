@@ -66,8 +66,8 @@ static spn_task_step_t run_script(spn_app_t* app, spn_target_unit_t* unit) {
   return spn_task_done();
 }
 
-static spn_task_step_t run_source(spn_app_t* app) {
-  spn_log_error("{.yellow} cannot run native sources; build scripts are wasm", SP_FMT_STR(app->config.action.source.path));
+static spn_task_step_t run_source(spn_ctx_t* ctx) {
+  spn_log_error("{.yellow} cannot run native sources; build scripts are wasm", SP_FMT_STR(ctx->config.action.source.path));
   return spn_task_fail(SPN_ERROR, .reported = true);
 }
 
@@ -90,16 +90,15 @@ static spn_task_step_t run_roots(spn_app_t* app) {
 }
 
 spn_task_step_t spn_task_run(spn_ctx_t* ctx) {
-  spn_app_t* app = ctx->app;
-  switch (app->config.action.kind) {
+  switch (ctx->config.action.kind) {
     case SPN_ACTION_NONE: {
       return spn_task_done();
     }
     case SPN_ACTION_RUN_ROOTS: {
-      return run_roots(app);
+      return run_roots(ctx->app);
     }
     case SPN_ACTION_RUN_SOURCE: {
-      return run_source(app);
+      return run_source(ctx);
     }
   }
 

@@ -13,19 +13,17 @@ spn_ctx_t spn;
 
 static sp_test_once_t spn_ctx_once;
 static sp_intern_t* spn_ctx_intern;
-static spn_event_buffer_t* spn_ctx_events;
 
 static sp_err_t spn_ctx_init(void* user) {
   spn.mem = sp_mem_os_new();
   spn_ctx_intern = sp_intern_new(spn.mem);
-  spn_ctx_events = spn_event_buffer_new(spn.mem);
   return SP_OK;
 }
 
 sp_err_t spn_test_ctx_setup(sp_test_t* t) {
   sp_err_t err = sp_test_once(&spn_ctx_once, spn_ctx_init, SP_NULLPTR);
   spn.intern = spn_ctx_intern;
-  spn.events = spn_ctx_events;
+  spn.events = spn_event_buffer_new(spn.mem);
   return err;
 }
 

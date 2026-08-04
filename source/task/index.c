@@ -1,7 +1,6 @@
 #include "sp.h"
 #include "sp/macro.h"
 
-#include "app/types.h"
 #include "ctx/types.h"
 #include "error/types.h"
 #include "event/types.h"
@@ -22,8 +21,7 @@ static void sync_index_node(void* data) {
 }
 
 spn_task_step_t spn_task_sync_indexes_init(spn_ctx_t* ctx) {
-  spn_app_t* app = ctx->app;
-  sp_da_init(spn.mem, app->index_sync.jobs);
+  sp_da_init(spn.mem, ctx->index_sync.jobs);
 
   bool force = spn.cli.index.force;
   sp_str_t only = spn.cli.index.name;
@@ -47,32 +45,31 @@ spn_task_step_t spn_task_sync_indexes_init(spn_ctx_t* ctx) {
     spn_sync_index_job_t* job = sp_alloc_type(spn.mem, spn_sync_index_job_t);
     job->index = index;
     job->force = force;
-    sp_da_push(app->index_sync.jobs, job);
+    sp_da_push(ctx->index_sync.jobs, job);
   }
 
-  spn_thread_pool_t* pool = &app->index_sync.pool;
+  spn_thread_pool_t* pool = &ctx->index_sync.pool;
   spn_thread_pool_init(pool, spn.mem, (spn_thread_pool_config_t) {
-    .workers = (u32)sp_min(8, sp_da_size(app->index_sync.jobs)),
+    .workers = (u32)sp_min(8, sp_da_size(ctx->index_sync.jobs)),
     .on_worker_exit = spn_wasm_thread_exit,
   });
 
-  sp_da_for(app->index_sync.jobs, it) {
-    spn_thread_pool_submit(&pool->executor, (spn_thread_pool_job_t) { .fn = sync_index_node, .data = app->index_sync.jobs[it] });
+  sp_da_for(ctx->index_sync.jobs, it) {
+    spn_thread_pool_submit(&pool->executor, (spn_thread_pool_job_t) { .fn = sync_index_node, .data = ctx->index_sync.jobs[it] });
   }
 
   return spn_task_continue();
 }
 
 spn_task_step_t spn_task_sync_indexes_update(spn_ctx_t* ctx) {
-  spn_app_t* app = ctx->app;
-  if (spn_thread_pool_pending(&app->index_sync.pool)) {
+  if (spn_thread_pool_pending(&ctx->index_sync.pool)) {
     return spn_task_continue();
   }
 
-  spn_thread_pool_deinit(&app->index_sync.pool);
+  spn_thread_pool_deinit(&ctx->index_sync.pool);
 
-  sp_da_for(app->index_sync.jobs, it) {
-    spn_sync_index_job_t* job = app->index_sync.jobs[it];
+  sp_da_for(ctx->index_sync.jobs, it) {
+    spn_sync_index_job_t* job = ctx->index_sync.jobs[it];
     if (job->err == SPN_OK) {
       continue;
     }

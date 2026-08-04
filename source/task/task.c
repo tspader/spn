@@ -1,4 +1,5 @@
-#include "app/types.h"
+#include "ctx/types.h"
+#include "task/build/dag.h"
 #include "task/task.h"
 
 static spn_task_desc_t spn_tasks[SPN_TASK_COUNT] = {
@@ -7,7 +8,7 @@ static spn_task_desc_t spn_tasks[SPN_TASK_COUNT] = {
   [SPN_TASK_SYNC_PACKAGES]   = { "sync-packages", spn_task_sync_packages_init,   spn_task_sync_packages_update   },
   [SPN_TASK_CONFIGURE_GRAPH] = { "configure",     spn_task_configure_graph_init, spn_task_configure_graph_update },
   [SPN_TASK_CREATE_UNITS]    = { "create-units",  SP_NULLPTR,                    spn_task_create_units           },
-  [SPN_TASK_BUILD_GRAPH]     = { "build",         spn_task_build_graph_init,     spn_task_build_graph_update     },
+  [SPN_TASK_BUILD_GRAPH]     = { "build",         spn_dag_build_init,            spn_dag_build_update            },
   [SPN_TASK_RENDER_GRAPH]    = { "render-graph",  SP_NULLPTR,                    spn_task_render_graph           },
   [SPN_TASK_RUN]             = { "run",           SP_NULLPTR,                    spn_task_run                    },
   [SPN_TASK_GENERATE]        = { "generate",      SP_NULLPTR,                    spn_task_generate               },
@@ -43,7 +44,7 @@ bool spn_task_rewind(spn_task_executor_t* ex, spn_task_kind_t kind) {
 
 sp_cli_result_t spn_task_plan_kinds(const spn_task_kind_t* kinds, u32 len) {
   sp_for(it, len) {
-    spn_task_enqueue(&app.tasks, kinds[it]);
+    spn_task_enqueue(&spn.tasks, kinds[it]);
   }
   return SP_CLI_CONTINUE;
 }

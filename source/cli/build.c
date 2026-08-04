@@ -16,7 +16,7 @@ static void spn_cli_build_set_rule(spn_target_rule_t* rule, bool selected, spn_t
 sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
   spn_cli_build_t* command = &spn.cli.build;
 
-  app.config.force = command->force;
+  spn.config.force = command->force;
   spn_target_names_t names = sp_da_new(spn.heap, sp_str_t);
   sp_for(it, cli->num_rest) {
     sp_da_push(names, sp_cstr_as_str(cli->rest[it]));
@@ -24,12 +24,12 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
 
   bool specific = command->only.bin || command->only.lib || command->only.test || command->only.script;
   if (specific || !sp_da_empty(names)) {
-    app.config.selection.kind = SPN_TARGET_SELECTION_EXPLICIT;
+    spn.config.selection.kind = SPN_TARGET_SELECTION_EXPLICIT;
     bool all_kinds = !specific;
-    spn_cli_build_set_rule(&app.config.selection.bin, all_kinds || command->only.bin, names);
-    spn_cli_build_set_rule(&app.config.selection.lib, all_kinds || command->only.lib, names);
-    spn_cli_build_set_rule(&app.config.selection.test, all_kinds || command->only.test, names);
-    spn_cli_build_set_rule(&app.config.selection.script, all_kinds || command->only.script, names);
+    spn_cli_build_set_rule(&spn.config.selection.bin, all_kinds || command->only.bin, names);
+    spn_cli_build_set_rule(&spn.config.selection.lib, all_kinds || command->only.lib, names);
+    spn_cli_build_set_rule(&spn.config.selection.test, all_kinds || command->only.test, names);
+    spn_cli_build_set_rule(&spn.config.selection.script, all_kinds || command->only.script, names);
   }
 
   return spn_plan(

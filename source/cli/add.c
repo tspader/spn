@@ -1,4 +1,3 @@
-#include "app/types.h"
 #include "cli/cli.h"
 
 #include "cli/types.h"
@@ -24,7 +23,7 @@ sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
     return spn_cli_errf(cli, "invalid version {.red}", sp_fmt_str(request.second));
   }
 
-  app.request.add = (spn_add_request_t) {
+  spn.add = (spn_add_request_t) {
     .name = spn_pkg_name_from_qualified(request.first),
     .key = sp_str_copy(spn.heap, request.first),
     .requested = sp_str_copy(spn.heap, request.second),

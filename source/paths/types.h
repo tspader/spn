@@ -17,7 +17,6 @@ typedef struct {
 
 typedef struct {
   sp_str_t dir;
-  sp_str_t dbs;
   sp_str_t checkouts;
 } spn_git_cache_paths_t;
 

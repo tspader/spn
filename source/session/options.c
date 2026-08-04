@@ -1,4 +1,5 @@
 #include "sp.h"
+#include "ctx/types.h"
 #include "intern/types.h"
 #include "pkg/types.h"
 #include "resolve/types.h"
@@ -96,7 +97,7 @@ static spn_err_union_t validate_config_keys(spn_session_t* session) {
     }
 
     if (!known) {
-      spn_event_buffer_push(session->events, (spn_build_event_t) {
+      spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
         .kind = SPN_EVENT_ERR_OPTION,
         .option = {
           .err = SPN_OPTION_ERR_UNKNOWN_PKG,
@@ -131,7 +132,7 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session) {
         if (sp_da_empty(dep->options.clauses)) {
           continue;
         }
-        spn_resolved_dep_t* edge = node_find_edge(node, sp_intern_get_or_insert(session->intern, dep->qualified), dep->kind);
+        spn_resolved_dep_t* edge = node_find_edge(node, sp_intern_get_or_insert(session->ctx->intern, dep->qualified), dep->kind);
         if (!edge) {
           continue;
         }
@@ -147,7 +148,7 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session) {
         sp_da_push(*sp_ht_getp(requests, edge->id), request);
 
         spn_resolved_pkg_t* target = sp_ht_getp(session->resolve, edge->id);
-        sp_intern_id_t seed_key = target ? target->id.qualified : sp_intern_get_or_insert(session->intern, dep->qualified);
+        sp_intern_id_t seed_key = target ? target->id.qualified : sp_intern_get_or_insert(session->ctx->intern, dep->qualified);
         if (!sp_ht_getp(session->gates.seeds, seed_key)) {
           sp_ht_insert(session->gates.seeds, seed_key, sp_da_new(mem, spn_option_request_t));
         }
@@ -166,7 +167,7 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session) {
         &session->profile,
         session->pkg->config,
         asked ? *asked : SP_NULLPTR,
-        session->events,
+        session->ctx->events,
         &resolved), spn_err_reported(SPN_ERR_OPTION));
 
       sp_ht_insert(session->options, node->id, resolved);
@@ -189,7 +190,7 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session) {
         if (sp_da_empty(dep->when.clauses)) {
           continue;
         }
-        spn_resolved_dep_t* edge = node_find_edge(node, sp_intern_get_or_insert(session->intern, dep->qualified), dep->kind);
+        spn_resolved_dep_t* edge = node_find_edge(node, sp_intern_get_or_insert(session->ctx->intern, dep->qualified), dep->kind);
         bool expected = spn_when_eval(&dep->when, &env);
         if (expected && !edge) {
           missing = true;
@@ -215,7 +216,7 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session) {
         session->gates.reresolve = true;
         return spn_result(SPN_OK);
       }
-      spn_event_buffer_push(session->events, (spn_build_event_t) {
+      spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
         .kind = SPN_EVENT_ERR_OPTION,
         .option = {
           .err = SPN_OPTION_ERR_LATE_GATE,

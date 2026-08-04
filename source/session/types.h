@@ -4,11 +4,8 @@
 #include "sp.h"
 
 #include "compiler/types.h"
-#include "git/types.h"
 #include "filter/types.h"
 #include "forward/types.h"
-#include "intern/types.h"
-#include "paths/types.h"
 #include "profile/types.h"
 #include "resolve/types.h"
 #include "session/registry/types.h"
@@ -53,11 +50,9 @@ typedef struct {
 } spn_app_config_t;
 
 struct spn_session_t {
+  spn_ctx_t* ctx;
   sp_mem_t mem;
-  sp_intern_t* intern;
   spn_pkg_info_t* pkg;
-  spn_event_buffer_t* events;
-  spn_git_cache_t* git;
   sp_env_t env;
 
   spn_profile_table_t profiles;
@@ -90,7 +85,6 @@ struct spn_session_t {
   struct {
     sp_str_t root;
     sp_str_t build;
-    spn_system_paths_t system;
   } paths;
 
   struct {

@@ -45,9 +45,9 @@ static spn_err_t apply_patch_overrides(spn_session_t* session, spn_resolve_query
     }
 
     sp_str_t manifest = sp_fs_join_path(spn.mem, patch, pkg->origin.paths.manifest);
-    sp_str_t name = sp_intern_str_from_id(session->intern, pkg->id.qualified);
+    sp_str_t name = sp_intern_str_from_id(session->ctx->intern, pkg->id.qualified);
     spn_pkg_info_t* info = sp_alloc_type(spn.mem, spn_pkg_info_t);
-    spn_err_union_t loaded = spn_pkg_load(spn.mem, session->intern, manifest, SPN_MANIFEST_DEP, name, info);
+    spn_err_union_t loaded = spn_pkg_load(spn.mem, session->ctx->intern, manifest, SPN_MANIFEST_DEP, name, info);
     if (loaded.kind) {
       result = spn_err_emit(loaded).kind;
       continue;
@@ -103,17 +103,17 @@ spn_task_step_t spn_task_resolve(spn_ctx_t* ctx) {
 
   // The solver reads local packages' deps from the registry, so the root must
   // be registered before we resolve.
-  sp_ht_insert(session->registry, spn_pkg_id(session->intern, session->pkg->qualified), ((spn_registry_pkg_t) {
+  sp_ht_insert(session->registry, spn_pkg_id(session->ctx->intern, session->pkg->qualified), ((spn_registry_pkg_t) {
     .source = SPN_PKG_SOURCE_ROOT,
     .info = session->pkg,
     .manifest = spn.paths.manifest,
   }));
 
   spn_index_cache_t index = sp_zero;
-  spn_index_cache_init(&index, session->mem, session->intern, &spn.indexes);
+  spn_index_cache_init(&index, session->mem, session->ctx->intern, &spn.indexes);
 
   spn_resolver_t resolver = sp_zero;
-  spn_resolver_init(&resolver, spn.mem, session->intern, &index, &session->registry, session->profile, session->pkg->config, 0);
+  spn_resolver_init(&resolver, spn.mem, session->ctx->intern, &index, &session->registry, session->profile, session->pkg->config, 0);
   resolver.seeds = session->gates.seeds;
 
   spn_resolve_query_t query = sp_zero_initialize();
