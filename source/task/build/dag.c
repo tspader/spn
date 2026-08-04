@@ -1215,7 +1215,7 @@ static void dag_emit_diag(spn_dag_build_t* b) {
     }
   }
 
-  spn_event_buffer_push(b->session->events, (spn_build_event_t) {
+  spn_event_buffer_push(b->session->ctx->events, (spn_build_event_t) {
     .kind = SPN_EVENT_NODE_FAILED,
     .node_failed = {
       .path = path,
@@ -1242,7 +1242,7 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
     spn_profile_info_t* profile = &build->profile;
 
     if (failed) {
-      spn_event_buffer_push(session->events, (spn_build_event_t) {
+      spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
         .kind = SPN_EVENT_BUILD_FAILED,
         .pkg = pkg,
         .io = io,
@@ -1255,7 +1255,7 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
       });
     }
     else {
-      spn_event_buffer_push(session->events, (spn_build_event_t) {
+      spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
         .kind = SPN_EVENT_BUILD_PASSED,
         .pkg = pkg,
         .io = io,
@@ -1268,7 +1268,7 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
       });
     }
 
-    spn_event_buffer_push(session->events, (spn_build_event_t) {
+    spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
       .kind = SPN_EVENT_BUILD_SUMMARY,
       .pkg = pkg,
       .io = io,
@@ -1357,8 +1357,8 @@ bool spn_dag_build_poll(spn_dag_build_t* b) {
   return true;
 }
 
-spn_task_step_t spn_dag_build_init(spn_app_t* app) {
-  spn_session_t* session = &app->session;
+spn_task_step_t spn_dag_build_init(spn_ctx_t* ctx) {
+  spn_session_t* session = &ctx->app->session;
 
   spn_dag_build_t* b = spn_dag_build_new(session);
   session->dag.build = b;
@@ -1376,7 +1376,7 @@ spn_task_step_t spn_dag_build_init(spn_app_t* app) {
       .profile = session->profile.name,
       .target = spn_triple_to_str(session->mem, target),
       .toolchain = session->units.target->toolchain->info->name,
-      .force = app->config.force,
+      .force = ctx->config.force,
     }
   });
 
@@ -1384,7 +1384,8 @@ spn_task_step_t spn_dag_build_init(spn_app_t* app) {
   return spn_task_continue();
 }
 
-spn_task_step_t spn_dag_build_update(spn_app_t* app) {
+spn_task_step_t spn_dag_build_update(spn_ctx_t* ctx) {
+  spn_app_t* app = ctx->app;
   spn_session_t* session = &app->session;
   spn_dag_build_t* b = session->dag.build;
 

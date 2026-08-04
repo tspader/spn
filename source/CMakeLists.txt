@@ -104,7 +104,6 @@ set(SPN_SOURCES
   task/build/nodes/link.c
   task/build/nodes/object.c
   task/add.c
-  task/build.c
   task/clean.c
   task/configure.c
   task/generate.c

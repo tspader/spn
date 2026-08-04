@@ -113,7 +113,7 @@ static spn_err_t materialize_tree(spn_session_t* session, sp_str_t name, spn_pkg
       return SPN_OK;
     }
     case SPN_PKG_TREE_GIT: {
-      if (!spn_git_cache_is_checkout_cached(session->git, tree.git)) {
+      if (!spn_git_cache_is_checkout_cached(&session->ctx->caches.git, tree.git)) {
         spn_event_buffer_push(spn.events, (spn_build_event_t){
           .kind = SPN_EVENT_SYNC,
             .sync = {
@@ -124,7 +124,7 @@ static spn_err_t materialize_tree(spn_session_t* session, sp_str_t name, spn_pkg
       }
 
       spn_git_checkout_t* checkout = SP_NULLPTR;
-      if (spn_git_cache_ensure_checkout(session->git, tree.git, &checkout)) {
+      if (spn_git_cache_ensure_checkout(&session->ctx->caches.git, tree.git, &checkout)) {
         sp_str_t error = sp_str_lit("failed to fetch repository");
         if (checkout && !sp_str_empty(checkout->error)) {
           error = checkout->error;
@@ -216,7 +216,7 @@ static sp_da(sp_str_t) detect_configure_source(spn_loaded_pkg_t* loaded) {
 
 static spn_err_t load_manifest(spn_session_t* session, sp_str_t name, sp_str_t path, spn_pkg_info_t** info) {
   spn_pkg_info_t* parsed = sp_alloc_type(spn.mem, spn_pkg_info_t);
-  spn_err_union_t err = spn_pkg_load(spn.mem, session->intern, path, SPN_MANIFEST_DEP, name, parsed);
+  spn_err_union_t err = spn_pkg_load(spn.mem, session->ctx->intern, path, SPN_MANIFEST_DEP, name, parsed);
   if (err.kind) {
     spn_err_emit(err);
     return SPN_ERROR;
@@ -262,7 +262,7 @@ static spn_err_t stamp_patches(spn_session_t* session, spn_resolved_pkg_t* pkg, 
       return SPN_OK;
     }
     case SPN_PKG_PATCH_STAMP_APPLIED: {
-      if (!spn_git_cache_is_checkout_cached(session->git, pkg->origin.source.git)) {
+      if (!spn_git_cache_is_checkout_cached(&session->ctx->caches.git, pkg->origin.source.git)) {
         spn_event_buffer_push(spn.events, (spn_build_event_t) {
           .kind = SPN_EVENT_SYNC_PATCH,
           .sync = {
@@ -384,28 +384,17 @@ static void sync_toolchain_node(void* data) {
   if (sp_atomic_s32_get(&sync_failed)) {
     return;
   }
-  job->err = setup_toolchain_unit(job->store, job->unit);
+  job->err = setup_toolchain_unit(&spn.caches.toolchains, job->unit);
   if (job->err) {
     sp_atomic_s32_set(&sync_failed, (s32)job->err);
   }
 }
 
 spn_task_step_t spn_task_sync_packages_init(spn_ctx_t* ctx) {
-  spn_app_t* app = ctx->app;
-  spn_session_t *session = &app->session;
+  spn_session_t *session = &ctx->app->session;
 
-  session->git = sp_alloc_type(spn.mem, spn_git_cache_t);
-  spn_git_cache_init(session->git, spn.mem, session->intern, spn.paths.caches.git.dir);
-
-  app->sync.store = (spn_toolchain_store_t){
-    .mem = spn.mem,
-    .dir = spn.paths.toolchain,
-    .mirror = sp_env_get(spn.env, sp_str_lit("SPN_MIRROR")),
-    .fetch = spn_fetch_curl,
-  };
-
-  sp_da_init(spn.mem, app->sync.packages);
-  sp_da_init(spn.mem, app->sync.toolchains);
+  sp_da_init(spn.mem, ctx->sync.packages);
+  sp_da_init(spn.mem, ctx->sync.toolchains);
 
   u32 num_index = 0;
   u32 num_file = 0;
@@ -420,41 +409,40 @@ spn_task_step_t spn_task_sync_packages_init(spn_ctx_t* ctx) {
     spn_sync_pkg_job_t* job = sp_alloc_type(spn.mem, spn_sync_pkg_job_t);
     job->session = session;
     job->pkg = pkg;
-    sp_da_push(app->sync.packages, job);
+    sp_da_push(ctx->sync.packages, job);
   }
 
   sp_da_for(session->units.toolchains, it) {
     spn_sync_toolchain_job_t *job = sp_alloc_type(spn.mem, spn_sync_toolchain_job_t);
-    job->store = &app->sync.store;
     job->unit = session->units.toolchains[it];
-    sp_da_push(app->sync.toolchains, job);
+    sp_da_push(ctx->sync.toolchains, job);
   }
 
   spn_event_buffer_push( spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_SYNC_START,
     .sync_start = {
-      .num_packages = sp_da_size(app->sync.packages),
+      .num_packages = sp_da_size(ctx->sync.packages),
       .num_index = num_index,
       .num_file = num_file,
     }});
 
   sp_atomic_s32_set(&sync_failed, 0);
 
-  u32 num_jobs = (u32)(sp_da_size(app->sync.packages) + sp_da_size(app->sync.toolchains));
-  spn_thread_pool_t *pool = &app->sync.pool;
+  u32 num_jobs = (u32)(sp_da_size(ctx->sync.packages) + sp_da_size(ctx->sync.toolchains));
+  spn_thread_pool_t *pool = &ctx->sync.pool;
   spn_thread_pool_init(pool, spn.mem, (spn_thread_pool_config_t) {
     .workers = sp_min(8, num_jobs),
     .on_worker_exit = spn_wasm_thread_exit,
   });
 
-  app->sync.timer = sp_tm_start_timer();
+  ctx->sync.timer = sp_tm_start_timer();
 
-  sp_da_for(app->sync.packages, it) {
-    spn_thread_pool_submit(&pool->executor, (spn_thread_pool_job_t) { .fn = sync_package_node, .data = app->sync.packages[it] });
+  sp_da_for(ctx->sync.packages, it) {
+    spn_thread_pool_submit(&pool->executor, (spn_thread_pool_job_t) { .fn = sync_package_node, .data = ctx->sync.packages[it] });
   }
 
-  sp_da_for(app->sync.toolchains, it) {
-    spn_thread_pool_submit(&pool->executor, (spn_thread_pool_job_t) { .fn = sync_toolchain_node, .data = app->sync.toolchains[it] });
+  sp_da_for(ctx->sync.toolchains, it) {
+    spn_thread_pool_submit(&pool->executor, (spn_thread_pool_job_t) { .fn = sync_toolchain_node, .data = ctx->sync.toolchains[it] });
   }
 
   return spn_task_continue();
@@ -488,29 +476,28 @@ static spn_err_t check_unused_patches(spn_session_t* session) {
 }
 
 spn_task_step_t spn_task_sync_packages_update(spn_ctx_t* ctx) {
-  spn_app_t* app = ctx->app;
-  spn_session_t *session = &app->session;
+  spn_session_t *session = &ctx->app->session;
 
-  if (spn_thread_pool_pending(&app->sync.pool)) {
+  if (spn_thread_pool_pending(&ctx->sync.pool)) {
     return spn_task_continue();
   }
 
-  spn_thread_pool_deinit(&app->sync.pool);
-  u64 elapsed = sp_tm_read_timer(&app->sync.timer);
+  spn_thread_pool_deinit(&ctx->sync.pool);
+  u64 elapsed = sp_tm_read_timer(&ctx->sync.timer);
 
-  sp_da_for(app->sync.packages, it) {
-    if (app->sync.packages[it]->err) {
-      return spn_task_fail(app->sync.packages[it]->err, .reported = true);
+  sp_da_for(ctx->sync.packages, it) {
+    if (ctx->sync.packages[it]->err) {
+      return spn_task_fail(ctx->sync.packages[it]->err, .reported = true);
     }
   }
-  sp_da_for(app->sync.toolchains, it) {
-    if (app->sync.toolchains[it]->err) {
-      return spn_task_fail(app->sync.toolchains[it]->err, .reported = true);
+  sp_da_for(ctx->sync.toolchains, it) {
+    if (ctx->sync.toolchains[it]->err) {
+      return spn_task_fail(ctx->sync.toolchains[it]->err, .reported = true);
     }
   }
 
-  sp_da_for(app->sync.packages, it) {
-    spn_sync_pkg_job_t *job = app->sync.packages[it];
+  sp_da_for(ctx->sync.packages, it) {
+    spn_sync_pkg_job_t *job = ctx->sync.packages[it];
     job->pkg->name = job->loaded.info->name;
     job->pkg->options = job->loaded.info->options;
     sp_ht_insert(session->packages, job->pkg->id, job->loaded);
@@ -520,7 +507,7 @@ spn_task_step_t spn_task_sync_packages_update(spn_ctx_t* ctx) {
 
   if (session->gates.reresolve) {
     session->gates.reresolve = false;
-    if (!spn_task_rewind(&app->tasks, SPN_TASK_RESOLVE)) {
+    if (!spn_task_rewind(&ctx->tasks, SPN_TASK_RESOLVE)) {
       return spn_task_fail(SPN_ERROR);
     }
     return spn_task_continue();
@@ -536,7 +523,7 @@ spn_task_step_t spn_task_sync_packages_update(spn_ctx_t* ctx) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_SYNC_END,
     .sync_end = {
-      .num_synced = sp_da_size(app->sync.packages),
+      .num_synced = sp_da_size(ctx->sync.packages),
       .time = elapsed,
     }});
 

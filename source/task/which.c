@@ -1,9 +1,4 @@
-#include "app/types.h"
-#include "cli/types.h"
-
-#include "enum/enum.h"
-#include "session/session.h"
-#include "log/log.h"
+#include "task/task.h"
 
 spn_task_step_t spn_task_which(spn_ctx_t* ctx) {
   return spn_task_done();

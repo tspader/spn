@@ -5,6 +5,8 @@
 #include "sp/sp_glob.h"
 #include "sp/str.h"
 
+#include "ctx/types.h"
+
 #include "compiler/driver.h"
 #include "enum/enum.h"
 #include "external/wasm/wasm.h"
@@ -25,7 +27,7 @@
 static spn_target_unit_t* add_target(spn_session_t* s, spn_pkg_unit_t* pkg, spn_target_info_t* info) {
   spn_target_unit_id_t id = {
     .pkg = pkg->id,
-    .target = sp_intern_get_or_insert(s->intern, info->name),
+    .target = sp_intern_get_or_insert(s->ctx->intern, info->name),
   };
 
   sp_om_insert(s->units.targets, id, SP_ZERO_STRUCT(spn_target_unit_t));
@@ -242,7 +244,7 @@ static void create_target_objects(spn_session_t* s, spn_target_unit_t* target) {
     sp_str_t object_path = sp_fs_join_path(s->mem, object_dir, sp_fmt(scratch.mem, "{}.o", SP_FMT_STR(relative)).value);
     spn_compile_unit_id_t id = {
       .target = target->id,
-      .source = sp_intern_get_or_insert(s->intern, file),
+      .source = sp_intern_get_or_insert(s->ctx->intern, file),
     };
 
     if (!sp_om_has(s->units.objects, id)) {

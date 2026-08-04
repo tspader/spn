@@ -39,6 +39,7 @@
 #include "event/event.h"
 #include "event/log.h"
 #include "external/tom.h"
+#include "git/cache.h"
 #include "index/index.h"
 #include "intern/intern.h"
 #include "lock/lock.h"
@@ -241,8 +242,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.events = spn_event_buffer_new(spn.mem);
   spn_event_log_init(spn.heap);
 
-  sp_atomic_s32_set(&spn.control, 0);
-
   spn.paths.cwd = sp_fs_get_cwd(spn.heap);
   spn.paths.bin = sp_fs_get_bin_path(spn.heap);
   spn.paths.patches = sp_env_get(spn.env, sp_str_lit("SPN_PATCH_DIR"));
@@ -251,7 +250,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.paths.storage = env_or("SPN_STORAGE_DIR", join_path(sp_fs_get_storage_path(spn.heap), "spn"));
     spn.paths.caches.dir = join_path(spn.paths.storage, "cache");
       spn.paths.caches.git.dir = join_path(spn.paths.caches.dir, "source");
-        spn.paths.caches.git.dbs = join_path(spn.paths.caches.git.dir, "dbs");
         spn.paths.caches.git.checkouts = join_path(spn.paths.caches.git.dir, "checkouts");
       spn.paths.caches.store.dir = join_path(spn.paths.caches.dir, "store");
       spn.paths.caches.build.dir = join_path(spn.paths.caches.dir, "build");
@@ -276,8 +274,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
   sp_fs_create_dir(spn.paths.caches.dir);
   sp_fs_create_dir(spn.paths.caches.git.dir);
-  sp_fs_create_dir(spn.paths.caches.git.dbs);
-  sp_fs_create_dir(spn.paths.caches.git.checkouts);
   sp_fs_create_dir(spn.paths.caches.build.dir);
   sp_fs_create_dir(spn.paths.caches.store.dir);
   sp_fs_create_dir(spn.paths.index);
@@ -287,15 +283,23 @@ sp_app_result_t spn_init(sp_app_t* sp) {
 
   extract_runtime();
 
+  spn_git_cache_init(&spn.caches.git, spn.mem, spn.intern, spn.paths.caches.git.dir);
+  spn.caches.toolchains = (spn_toolchain_store_t) {
+    .mem = spn.mem,
+    .dir = spn.paths.toolchain,
+    .mirror = sp_env_get(spn.env, sp_str_lit("SPN_MIRROR")),
+    .fetch = spn_fetch_curl,
+  };
+
   // CONFIG
   sp_da(spn_index_info_t) config_indexes = sp_da_new(spn.heap, spn_index_info_t);
   if (sp_fs_exists(spn.paths.config.toml)) {
     spn_toml_loader_t loader = sp_zero;
     spn_toml_loader_init(&loader, spn.mem, spn.intern);
-    spn_err_t loaded = spn_codegen_load_config(&loader, spn.paths.config.toml, &spn.config);
+    spn_err_t loaded = spn_codegen_load_config(&loader, spn.paths.config.toml, &spn.config_file);
     if (!loaded) {
-      sp_da_for(spn.config.index, it) {
-        sp_da_push(config_indexes, spn_index_lower(&loader, it, SPN_INDEX_USER, &spn.config.index[it]));
+      sp_da_for(spn.config_file.index, it) {
+        sp_da_push(config_indexes, spn_index_lower(&loader, it, SPN_INDEX_USER, &spn.config_file.index[it]));
       }
     }
     if (loaded || !sp_da_empty(loader.issues)) {
@@ -357,7 +361,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
   }
 
-  try(spn_profile_overrides_parse(&spn.cli.profile, &app.config.overrides));
+  try(spn_profile_overrides_parse(&spn.cli.profile, &spn.config.overrides));
 
   switch (sp_cli_dispatch(&parsed)) {
     case SP_CLI_CONTINUE: break;
@@ -372,12 +376,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   if (has_manifest) {
-    app.session.intern = spn.intern;
-    app.session.events = spn.events;
-    app.session.paths.root = spn.paths.project;
-    app.session.paths.system = spn.paths;
-
-    try(spn_session_init(&app.session, spn.heap, &app.package, app.config));
+    try(spn_session_init(&app.session, &spn, spn.heap, &app.package, spn.config));
   }
 
   return SP_APP_CONTINUE;
@@ -432,7 +431,7 @@ sp_app_result_t spn_update(sp_app_t* sp) {
     return SP_APP_QUIT;
   }
 
-  spn_task_executor_t* ex = &app.tasks;
+  spn_task_executor_t* ex = &spn.tasks;
   if (ex->index >= ex->len) {
     return SP_APP_QUIT;
   }

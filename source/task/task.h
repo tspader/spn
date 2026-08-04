@@ -29,8 +29,6 @@ spn_task_step_t spn_task_sync_packages_update(spn_ctx_t* ctx);
 spn_task_step_t spn_task_configure_graph_init(spn_ctx_t* ctx);
 spn_task_step_t spn_task_configure_graph_update(spn_ctx_t* ctx);
 spn_task_step_t spn_task_create_units(spn_ctx_t* ctx);
-spn_task_step_t spn_task_build_graph_init(spn_ctx_t* ctx);
-spn_task_step_t spn_task_build_graph_update(spn_ctx_t* ctx);
 spn_task_step_t spn_task_render_graph(spn_ctx_t* ctx);
 spn_task_step_t spn_task_run(spn_ctx_t* ctx);
 spn_task_step_t spn_task_generate(spn_ctx_t* ctx);

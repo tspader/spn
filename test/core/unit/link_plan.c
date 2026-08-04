@@ -202,10 +202,9 @@ static sp_err_t expect_str_suffixes(sp_test_t* t, sp_da(sp_str_t) actual, const 
   return SP_OK;
 }
 
-sp_test_each(link_plan, plan, plan_test_t, tests) {
+sp_test_each(link_plan, plan, plan_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   spn_session_t* s = build_session(mem, &it->graph);
-  spn.intern = s->intern;
 
   spn_target_info_t target = target_info(mem, &it->target);
   switch (it->target.kind) {

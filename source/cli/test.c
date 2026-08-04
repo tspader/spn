@@ -10,14 +10,14 @@ sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
   if (!sp_str_empty(command->name)) {
     sp_da_push(names, command->name);
   }
-  app.config.selection = (spn_target_selection_t) {
+  spn.config.selection = (spn_target_selection_t) {
     .kind = SPN_TARGET_SELECTION_EXPLICIT,
     .test = {
       .kind = sp_da_empty(names) ? SPN_TARGET_RULE_ALL : SPN_TARGET_RULE_NAMED,
       .names = names,
     },
   };
-  app.config.action = (spn_action_t) {
+  spn.config.action = (spn_action_t) {
     .kind = SPN_ACTION_RUN_ROOTS,
   };
 

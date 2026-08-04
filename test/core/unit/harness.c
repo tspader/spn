@@ -22,7 +22,7 @@ spn_pkg_id_t find_pkg_id(spn_session_t* s, unit_graph_test_t* g, const c8* name)
     }
     if (sp_str_equal_cstr(sp_str_view(g->pkgs[it].name), name)) {
       return (spn_pkg_id_t) {
-        .qualified = sp_intern_get_or_insert(s->intern, sp_str_view(g->pkgs[it].name)),
+        .qualified = sp_intern_get_or_insert(s->ctx->intern, sp_str_view(g->pkgs[it].name)),
         .hash = it + 1,
       };
     }
@@ -77,8 +77,8 @@ static spn_build_unit_t* add_build(spn_session_t* s, spn_build_id_t id, const c8
 
 spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
   spn_session_t* s = sp_alloc_type(mem, spn_session_t);
+  s->ctx = &spn;
   s->mem = mem;
-  s->intern = sp_intern_new(mem);
   sp_ht_init(mem, s->resolve);
   sp_ht_init(mem, s->packages);
   sp_ht_init(mem, s->options);

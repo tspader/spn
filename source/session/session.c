@@ -20,8 +20,8 @@
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
-static sp_str_t resolve_macos_sdk(sp_mem_t mem) {
-  sp_str_t sdk = sp_env_get(spn.env, sp_str_lit("SPN_MACOS_SDK"));
+static sp_str_t resolve_macos_sdk(sp_mem_t mem, sp_env_t* env) {
+  sp_str_t sdk = sp_env_get(env, sp_str_lit("SPN_MACOS_SDK"));
   if (!sp_str_empty(sdk)) {
     return sdk;
   }
@@ -61,9 +61,11 @@ static bool is_shared_linkage(spn_pkg_info_t* pkg) {
   return false;
 }
 
-spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t* root, spn_app_config_t config) {
+spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_pkg_info_t* root, spn_app_config_t config) {
+  s->ctx = ctx;
   s->mem = mem;
   s->pkg = root;
+  s->paths.root = ctx->paths.project;
   s->paths.build = sp_fs_join_path(s->mem, s->paths.root, sp_str_lit("build"));
 
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
@@ -89,12 +91,12 @@ spn_err_union_t spn_session_init(spn_session_t* s, sp_mem_t mem, spn_pkg_info_t*
   spn_triple_t host = spn_triple_host();
   try_union(spn_profile_resolve(s->profiles, &config.overrides, host, is_shared_linkage(root), &s->profile));
   if (s->profile.os == SPN_OS_MACOS) {
-    s->profile.sysroot = resolve_macos_sdk(s->mem);
+    s->profile.sysroot = resolve_macos_sdk(s->mem, ctx->env);
   }
 
   try_union(spn_build_add(s, spn_build_config_target(host, s->profile), &s->units.target));
   try_union(spn_build_add(s, spn_build_config_metaprogram(host), &s->units.metaprogram));
-  sp_da_push(s->units.metaprogram->include, spn.paths.include);
+  sp_da_push(s->units.metaprogram->include, ctx->paths.include);
 
   spn_build_plan_t plan = {
     .build = s->units.target,
@@ -164,7 +166,7 @@ spn_pkg_unit_t* spn_session_find_pkg_unit(spn_session_t* session, spn_build_unit
 }
 
 spn_pkg_unit_t* spn_session_find_dep(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t qualified, spn_dep_kind_t kind) {
-  sp_intern_id_t name = sp_intern_get_or_insert(session->intern, qualified);
+  sp_intern_id_t name = sp_intern_get_or_insert(session->ctx->intern, qualified);
 
   sp_da_for(pkg->deps, it) {
     if (pkg->deps[it].kind != kind) {
@@ -180,7 +182,7 @@ spn_pkg_unit_t* spn_session_find_dep(spn_session_t* session, spn_pkg_unit_t* pkg
 spn_target_unit_t* spn_session_find_target_in_pkg(spn_session_t* session, spn_pkg_unit_t* pkg, sp_str_t name) {
   spn_target_unit_id_t id = {
     .pkg = pkg->id,
-    .target = sp_intern_get_or_insert(session->intern, name),
+    .target = sp_intern_get_or_insert(session->ctx->intern, name),
   };
   return sp_om_has(session->units.targets, id) ? sp_om_get(session->units.targets, id) : SP_NULLPTR;
 }

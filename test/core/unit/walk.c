@@ -141,7 +141,7 @@ static const walk_test_t tests [] = {
   },
 };
 
-sp_test_each(unit, walk, walk_test_t, tests) {
+sp_test_each(unit, walk, walk_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   spn_session_t* s = build_session(mem, &it->graph);
 

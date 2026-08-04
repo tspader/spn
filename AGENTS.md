@@ -5,21 +5,16 @@
 - `spn` is written in C using `sp.h` as its custom standard library
 
 # building
-The top-level Makefile wraps CMake (fetch pinned deps, configure, build with `zig cc`):
+We keep two builds; a CMake-based build for building from scratch, and a self hosted build. The CMake build is wrapped with a tiny Makefile, just for coordination rather than build logic:
+
 ```
 make
 ```
 
-Layout: deps are pinned by SHA in `tools/cmake/fetch.cmake` and checked out into `.build/source`; the CMake work dir is `.build/work/$TRIPLE`; final artifacts go to `.build/store/$TRIPLE/{bin,lib,include,test}`. `bootstrap` is a symlink to the host store, so the binary is at `./bootstrap/bin/spn`.
+The self hosted build is a normal `spn` invocation:
 
-The bootstrapped binary can then build itself:
 ```
-./bootstrap/bin/spn build -t spn -p debug
-```
-
-It is sometimes useful to run the binary thus produced:
-```
-./build/debug/store/bin/spn build -t spn -p debug
+spn build
 ```
 
 # references
