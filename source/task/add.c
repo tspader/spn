@@ -44,7 +44,8 @@ static spn_add_site_t spn_add_find_site(spn_toml_edit_t* edit, sp_mem_t mem, sp_
   };
 }
 
-spn_task_step_t spn_task_add(spn_app_t* app) {
+spn_task_step_t spn_task_add(spn_ctx_t* ctx) {
+  spn_app_t* app = ctx->app;
   spn_add_request_t* req = &app->request.add;
 
   spn_index_cache_t cache = sp_zero;

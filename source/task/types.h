@@ -50,7 +50,7 @@ typedef struct {
   if (_spn_step_err.kind) return spn_task_fail_with(_spn_step_err); \
 } while (0)
 
-typedef spn_task_step_t (*spn_task_fn_t)(spn_app_t*);
+typedef spn_task_step_t (*spn_task_fn_t)(spn_ctx_t*);
 
 typedef struct {
   const c8* name;

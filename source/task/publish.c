@@ -12,7 +12,7 @@
 #include "semver/convert.h"
 #include "task/task.h"
 
-spn_task_step_t spn_task_publish(spn_app_t* app) {
+spn_task_step_t spn_task_publish(spn_ctx_t* ctx) {
   spn_cli_publish_t* cmd = &spn.cli.publish;
 
   sp_str_t index_name = sp_str_empty(cmd->index) ? sp_str_lit("core") : cmd->index;

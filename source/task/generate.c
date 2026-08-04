@@ -1,7 +1,6 @@
 #include "app/app.h"
 #include "task/task.h"
 
-spn_task_step_t spn_task_generate(spn_app_t* app) {
-  (void)app;
+spn_task_step_t spn_task_generate(spn_ctx_t* ctx) {
   return spn_task_done();
 }
