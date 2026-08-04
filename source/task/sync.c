@@ -390,7 +390,8 @@ static void sync_toolchain_node(void* data) {
   }
 }
 
-spn_task_step_t spn_task_sync_packages_init(spn_app_t *app) {
+spn_task_step_t spn_task_sync_packages_init(spn_ctx_t* ctx) {
+  spn_app_t* app = ctx->app;
   spn_session_t *session = &app->session;
 
   session->git = sp_alloc_type(spn.mem, spn_git_cache_t);
@@ -486,7 +487,8 @@ static spn_err_t check_unused_patches(spn_session_t* session) {
   return err;
 }
 
-spn_task_step_t spn_task_sync_packages_update(spn_app_t *app) {
+spn_task_step_t spn_task_sync_packages_update(spn_ctx_t* ctx) {
+  spn_app_t* app = ctx->app;
   spn_session_t *session = &app->session;
 
   if (spn_thread_pool_pending(&app->sync.pool)) {

@@ -89,7 +89,8 @@ static spn_task_step_t run_roots(spn_app_t* app) {
   return tests ? spn_task_run_tests(app) : spn_task_done();
 }
 
-spn_task_step_t spn_task_run(spn_app_t* app) {
+spn_task_step_t spn_task_run(spn_ctx_t* ctx) {
+  spn_app_t* app = ctx->app;
   switch (app->config.action.kind) {
     case SPN_ACTION_NONE: {
       return spn_task_done();

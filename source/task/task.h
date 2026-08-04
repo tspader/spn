@@ -21,24 +21,24 @@ sp_cli_result_t  spn_task_plan_kinds(const spn_task_kind_t* kinds, u32 len);
 ///////////
 // TASKS //
 ///////////
-spn_task_step_t spn_task_sync_indexes_init(spn_app_t* app);
-spn_task_step_t spn_task_sync_indexes_update(spn_app_t* app);
-spn_task_step_t spn_task_resolve(spn_app_t* app);
-spn_task_step_t spn_task_sync_packages_init(spn_app_t* app);
-spn_task_step_t spn_task_sync_packages_update(spn_app_t* app);
-spn_task_step_t spn_task_configure_graph_init(spn_app_t* app);
-spn_task_step_t spn_task_configure_graph_update(spn_app_t* app);
-spn_task_step_t spn_task_create_units(spn_app_t* app);
-spn_task_step_t spn_task_build_graph_init(spn_app_t* app);
-spn_task_step_t spn_task_build_graph_update(spn_app_t* app);
-spn_task_step_t spn_task_render_graph(spn_app_t* app);
-spn_task_step_t spn_task_run(spn_app_t* app);
-spn_task_step_t spn_task_generate(spn_app_t* app);
-spn_task_step_t spn_task_which(spn_app_t* app);
-spn_task_step_t spn_task_update(spn_app_t* app);
-spn_task_step_t spn_task_init(spn_app_t* app);
-spn_task_step_t spn_task_add(spn_app_t* app);
-spn_task_step_t spn_task_clean(spn_app_t* app);
-spn_task_step_t spn_task_publish(spn_app_t* app);
+spn_task_step_t spn_task_sync_indexes_init(spn_ctx_t* ctx);
+spn_task_step_t spn_task_sync_indexes_update(spn_ctx_t* ctx);
+spn_task_step_t spn_task_resolve(spn_ctx_t* ctx);
+spn_task_step_t spn_task_sync_packages_init(spn_ctx_t* ctx);
+spn_task_step_t spn_task_sync_packages_update(spn_ctx_t* ctx);
+spn_task_step_t spn_task_configure_graph_init(spn_ctx_t* ctx);
+spn_task_step_t spn_task_configure_graph_update(spn_ctx_t* ctx);
+spn_task_step_t spn_task_create_units(spn_ctx_t* ctx);
+spn_task_step_t spn_task_build_graph_init(spn_ctx_t* ctx);
+spn_task_step_t spn_task_build_graph_update(spn_ctx_t* ctx);
+spn_task_step_t spn_task_render_graph(spn_ctx_t* ctx);
+spn_task_step_t spn_task_run(spn_ctx_t* ctx);
+spn_task_step_t spn_task_generate(spn_ctx_t* ctx);
+spn_task_step_t spn_task_which(spn_ctx_t* ctx);
+spn_task_step_t spn_task_update(spn_ctx_t* ctx);
+spn_task_step_t spn_task_init(spn_ctx_t* ctx);
+spn_task_step_t spn_task_add(spn_ctx_t* ctx);
+spn_task_step_t spn_task_clean(spn_ctx_t* ctx);
+spn_task_step_t spn_task_publish(spn_ctx_t* ctx);
 
 #endif

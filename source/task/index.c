@@ -21,7 +21,8 @@ static void sync_index_node(void* data) {
   job->err = spn_index_sync(job->index, job->force);
 }
 
-spn_task_step_t spn_task_sync_indexes_init(spn_app_t* app) {
+spn_task_step_t spn_task_sync_indexes_init(spn_ctx_t* ctx) {
+  spn_app_t* app = ctx->app;
   sp_da_init(spn.mem, app->index_sync.jobs);
 
   bool force = spn.cli.index.force;
@@ -62,7 +63,8 @@ spn_task_step_t spn_task_sync_indexes_init(spn_app_t* app) {
   return spn_task_continue();
 }
 
-spn_task_step_t spn_task_sync_indexes_update(spn_app_t* app) {
+spn_task_step_t spn_task_sync_indexes_update(spn_ctx_t* ctx) {
+  spn_app_t* app = ctx->app;
   if (spn_thread_pool_pending(&app->index_sync.pool)) {
     return spn_task_continue();
   }

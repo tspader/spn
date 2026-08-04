@@ -5,6 +5,6 @@
 #include "session/session.h"
 #include "log/log.h"
 
-spn_task_step_t spn_task_which(spn_app_t* app) {
+spn_task_step_t spn_task_which(spn_ctx_t* ctx) {
   return spn_task_done();
 }

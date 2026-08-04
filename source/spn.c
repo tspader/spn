@@ -441,10 +441,10 @@ sp_app_result_t spn_update(sp_app_t* sp) {
   spn_task_step_t step = sp_zero;
   if (!ex->initted) {
     ex->initted = true;
-    step = task->init ? task->init(&app) : task->update(&app);
+    step = task->init ? task->init(&spn) : task->update(&spn);
   }
   else {
-    step = task->update(&app);
+    step = task->update(&spn);
   }
 
   if (step.err.kind) {
@@ -542,11 +542,12 @@ void spn_deinit(sp_app_t* sp) {
 }
 
 sp_app_config_t spn_main(s32 num_args, const c8** args) {
+  app = SP_ZERO_STRUCT(spn_app_t);
   spn = (spn_ctx_t) {
+    .app = &app,
     .num_args = num_args,
     .args = args
   };
-  app = SP_ZERO_STRUCT(spn_app_t);
 
   return (sp_app_config_t) {
     .user_data = &app,

@@ -7,6 +7,7 @@
 #include "codegen/gen/config.gen.h"
 #include "cli/types.h"
 #include "event/types.h"
+#include "forward/types.h"
 #include "index/types.h"
 #include "intern/types.h"
 #include "paths/types.h"
@@ -17,7 +18,8 @@
 
 typedef spn_cg_config_t spn_config_file_t;
 
-typedef struct {
+struct spn_ctx_t {
+  spn_app_t* app;
   spn_cli_t cli;
   spn_tui_t tui;
   sp_atomic_s32_t control;
@@ -43,7 +45,7 @@ typedef struct {
     spn_log_level_t level;
     spn_verbosity_t verbosity;
   } logger;
-} spn_ctx_t;
+};
 
 extern spn_ctx_t spn;
 
