@@ -1357,7 +1357,7 @@ bool spn_dag_build_poll(spn_dag_build_t* b) {
   return true;
 }
 
-spn_task_step_t spn_dag_build_init(spn_ctx_t* ctx) {
+spn_task_step_t spn_dag_build_init(spn_ctx_t* ctx, spn_task_t* task) {
   spn_session_t* session = &ctx->app->session;
 
   spn_dag_build_t* b = spn_dag_build_new(session);
@@ -1384,7 +1384,7 @@ spn_task_step_t spn_dag_build_init(spn_ctx_t* ctx) {
   return spn_task_continue();
 }
 
-spn_task_step_t spn_dag_build_update(spn_ctx_t* ctx) {
+spn_task_step_t spn_dag_build_update(spn_ctx_t* ctx, spn_task_t* task) {
   spn_app_t* app = ctx->app;
   spn_session_t* session = &app->session;
   spn_dag_build_t* b = session->dag.build;

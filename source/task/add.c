@@ -43,19 +43,20 @@ static spn_add_site_t spn_add_find_site(spn_toml_edit_t* edit, sp_mem_t mem, sp_
   };
 }
 
-spn_task_step_t spn_task_add(spn_ctx_t* ctx) {
-  spn_add_request_t* req = &ctx->add;
+spn_task_step_t spn_task_add(spn_ctx_t* ctx, spn_task_t* task) {
+  spn_add_request_t* req = &task->add;
+  spn_pkg_name_t name = spn_pkg_name_from_qualified(req->key);
 
   spn_index_cache_t cache = sp_zero;
   spn_index_cache_init(&cache, spn.heap, spn.intern, &spn.indexes);
 
   spn_index_pkg_t* pkg = SP_NULLPTR;
-  spn_err_union_t err = spn_index_cache_get_package(&cache, req->name, &pkg);
+  spn_err_union_t err = spn_index_cache_get_package(&cache, name, &pkg);
   if (err.kind) {
     return spn_task_fail_with(err);
   }
   if (!pkg || sp_da_empty(pkg->releases)) {
-    return spn_task_fail(SPN_ERR_PKG_UNKNOWN, .unknown = { .request = { .qualified = spn_pkg_name_to_qualified(req->name) } });
+    return spn_task_fail(SPN_ERR_PKG_UNKNOWN, .unknown = { .request = { .qualified = spn_pkg_name_to_qualified(name) } });
   }
 
   spn_index_release_t* release = SP_NULLPTR;
@@ -74,7 +75,7 @@ spn_task_step_t spn_task_add(spn_ctx_t* ctx) {
   if (!release) {
     return spn_task_fail(SPN_ERR_PKG_NO_MATCH, .unsatisfiable = {
       .request = {
-        .qualified = spn_pkg_name_to_qualified(req->name),
+        .qualified = spn_pkg_name_to_qualified(name),
         .source = SPN_PKG_SOURCE_INDEX,
         .index = { .range = req->range },
       },
@@ -109,7 +110,7 @@ spn_task_step_t spn_task_add(spn_ctx_t* ctx) {
     default:                table = "package"; break;
   }
 
-  spn_add_site_t site = spn_add_find_site(&edit, s.mem, sp_cstr_as_str(table), req->key, spn_pkg_name_to_qualified(req->name));
+  spn_add_site_t site = spn_add_find_site(&edit, s.mem, sp_cstr_as_str(table), req->key, spn_pkg_name_to_qualified(name));
   if (spn_toml_edit_set_str(&edit, site.path, site.num_segments, version)) {
     result = spn_task_fail(SPN_ERR_MANIFEST_EDIT, .manifest_parse = { .path = spn.paths.manifest });
     goto cleanup;

@@ -91,7 +91,7 @@ void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
 
 }
 
-spn_task_step_t spn_task_resolve(spn_ctx_t* ctx) {
+spn_task_step_t spn_task_resolve(spn_ctx_t* ctx, spn_task_t* task) {
   spn_app_t* app = ctx->app;
   spn_session_t* session = &app->session;
   spn_pkg_info_t* pkg = &app->package;

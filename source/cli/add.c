@@ -2,7 +2,6 @@
 
 #include "cli/types.h"
 #include "ctx/types.h"
-#include "pkg/id.h"
 #include "semver/parser.h"
 #include "sp/sp_cli.h"
 #include "task/task.h"
@@ -23,13 +22,13 @@ sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
     return spn_cli_errf(cli, "invalid version {.red}", sp_fmt_str(request.second));
   }
 
-  spn.add = (spn_add_request_t) {
-    .name = spn_pkg_name_from_qualified(request.first),
-    .key = sp_str_copy(spn.heap, request.first),
-    .requested = sp_str_copy(spn.heap, request.second),
-    .range = range,
-    .dep = cmd->test ? SPN_ADD_DEP_TEST : cmd->build ? SPN_ADD_DEP_BUILD : SPN_ADD_DEP_PACKAGE,
-  };
-
-  return spn_plan(SPN_TASK_SYNC_INDEXES, SPN_TASK_ADD);
+  return spn_plan(
+    { SPN_TASK_SYNC_INDEXES },
+    { SPN_TASK_ADD, .add = {
+      .key = request.first,
+      .requested = request.second,
+      .range = range,
+      .dep = cmd->test ? SPN_ADD_DEP_TEST : cmd->build ? SPN_ADD_DEP_BUILD : SPN_ADD_DEP_PACKAGE,
+    }}
+  );
 }

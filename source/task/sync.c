@@ -29,6 +29,25 @@
 #include "unit/types.h"
 #include "external/wasm/wasm.h"
 
+typedef struct {
+  spn_session_t* session;
+  spn_resolved_pkg_t* pkg;
+  spn_loaded_pkg_t loaded;
+  spn_err_t err;
+} spn_sync_pkg_job_t;
+
+typedef struct {
+  spn_toolchain_unit_t* unit;
+  spn_err_t err;
+} spn_sync_toolchain_job_t;
+
+struct spn_sync_op_t {
+  spn_thread_pool_t pool;
+  sp_da(spn_sync_pkg_job_t*) packages;
+  sp_da(spn_sync_toolchain_job_t*) toolchains;
+  sp_tm_timer_t timer;
+};
+
 SP_PRIVATE spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchain_unit_t* unit) {
   spn_toolchain_info_t* toolchain = unit->info;
   sp_str_t name = toolchain->name;
@@ -390,11 +409,13 @@ static void sync_toolchain_node(void* data) {
   }
 }
 
-spn_task_step_t spn_task_sync_packages_init(spn_ctx_t* ctx) {
+spn_task_step_t spn_task_sync_packages_init(spn_ctx_t* ctx, spn_task_t* task) {
   spn_session_t *session = &ctx->app->session;
 
-  sp_da_init(spn.mem, ctx->sync.packages);
-  sp_da_init(spn.mem, ctx->sync.toolchains);
+  spn_sync_op_t* op = sp_alloc_type(spn.mem, spn_sync_op_t);
+  task->sync = op;
+  sp_da_init(spn.mem, op->packages);
+  sp_da_init(spn.mem, op->toolchains);
 
   u32 num_index = 0;
   u32 num_file = 0;
@@ -409,40 +430,39 @@ spn_task_step_t spn_task_sync_packages_init(spn_ctx_t* ctx) {
     spn_sync_pkg_job_t* job = sp_alloc_type(spn.mem, spn_sync_pkg_job_t);
     job->session = session;
     job->pkg = pkg;
-    sp_da_push(ctx->sync.packages, job);
+    sp_da_push(op->packages, job);
   }
 
   sp_da_for(session->units.toolchains, it) {
     spn_sync_toolchain_job_t *job = sp_alloc_type(spn.mem, spn_sync_toolchain_job_t);
     job->unit = session->units.toolchains[it];
-    sp_da_push(ctx->sync.toolchains, job);
+    sp_da_push(op->toolchains, job);
   }
 
   spn_event_buffer_push( spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_SYNC_START,
     .sync_start = {
-      .num_packages = sp_da_size(ctx->sync.packages),
+      .num_packages = sp_da_size(op->packages),
       .num_index = num_index,
       .num_file = num_file,
     }});
 
   sp_atomic_s32_set(&sync_failed, 0);
 
-  u32 num_jobs = (u32)(sp_da_size(ctx->sync.packages) + sp_da_size(ctx->sync.toolchains));
-  spn_thread_pool_t *pool = &ctx->sync.pool;
-  spn_thread_pool_init(pool, spn.mem, (spn_thread_pool_config_t) {
+  u32 num_jobs = (u32)(sp_da_size(op->packages) + sp_da_size(op->toolchains));
+  spn_thread_pool_init(&op->pool, spn.mem, (spn_thread_pool_config_t) {
     .workers = sp_min(8, num_jobs),
     .on_worker_exit = spn_wasm_thread_exit,
   });
 
-  ctx->sync.timer = sp_tm_start_timer();
+  op->timer = sp_tm_start_timer();
 
-  sp_da_for(ctx->sync.packages, it) {
-    spn_thread_pool_submit(&pool->executor, (spn_thread_pool_job_t) { .fn = sync_package_node, .data = ctx->sync.packages[it] });
+  sp_da_for(op->packages, it) {
+    spn_thread_pool_submit(&op->pool.executor, (spn_thread_pool_job_t) { .fn = sync_package_node, .data = op->packages[it] });
   }
 
-  sp_da_for(ctx->sync.toolchains, it) {
-    spn_thread_pool_submit(&pool->executor, (spn_thread_pool_job_t) { .fn = sync_toolchain_node, .data = ctx->sync.toolchains[it] });
+  sp_da_for(op->toolchains, it) {
+    spn_thread_pool_submit(&op->pool.executor, (spn_thread_pool_job_t) { .fn = sync_toolchain_node, .data = op->toolchains[it] });
   }
 
   return spn_task_continue();
@@ -475,29 +495,30 @@ static spn_err_t check_unused_patches(spn_session_t* session) {
   return err;
 }
 
-spn_task_step_t spn_task_sync_packages_update(spn_ctx_t* ctx) {
+spn_task_step_t spn_task_sync_packages_update(spn_ctx_t* ctx, spn_task_t* task) {
   spn_session_t *session = &ctx->app->session;
+  spn_sync_op_t* op = task->sync;
 
-  if (spn_thread_pool_pending(&ctx->sync.pool)) {
+  if (spn_thread_pool_pending(&op->pool)) {
     return spn_task_continue();
   }
 
-  spn_thread_pool_deinit(&ctx->sync.pool);
-  u64 elapsed = sp_tm_read_timer(&ctx->sync.timer);
+  spn_thread_pool_deinit(&op->pool);
+  u64 elapsed = sp_tm_read_timer(&op->timer);
 
-  sp_da_for(ctx->sync.packages, it) {
-    if (ctx->sync.packages[it]->err) {
-      return spn_task_fail(ctx->sync.packages[it]->err, .reported = true);
+  sp_da_for(op->packages, it) {
+    if (op->packages[it]->err) {
+      return spn_task_fail(op->packages[it]->err, .reported = true);
     }
   }
-  sp_da_for(ctx->sync.toolchains, it) {
-    if (ctx->sync.toolchains[it]->err) {
-      return spn_task_fail(ctx->sync.toolchains[it]->err, .reported = true);
+  sp_da_for(op->toolchains, it) {
+    if (op->toolchains[it]->err) {
+      return spn_task_fail(op->toolchains[it]->err, .reported = true);
     }
   }
 
-  sp_da_for(ctx->sync.packages, it) {
-    spn_sync_pkg_job_t *job = ctx->sync.packages[it];
+  sp_da_for(op->packages, it) {
+    spn_sync_pkg_job_t *job = op->packages[it];
     job->pkg->name = job->loaded.info->name;
     job->pkg->options = job->loaded.info->options;
     sp_ht_insert(session->packages, job->pkg->id, job->loaded);
@@ -523,7 +544,7 @@ spn_task_step_t spn_task_sync_packages_update(spn_ctx_t* ctx) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_SYNC_END,
     .sync_end = {
-      .num_synced = sp_da_size(ctx->sync.packages),
+      .num_synced = sp_da_size(op->packages),
       .time = elapsed,
     }});
 

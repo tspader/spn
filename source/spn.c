@@ -436,14 +436,15 @@ sp_app_result_t spn_update(sp_app_t* sp) {
     return SP_APP_QUIT;
   }
 
-  spn_task_desc_t* task = spn_task_get(ex->data[ex->index]);
+  spn_task_t* current = &ex->data[ex->index];
+  spn_task_desc_t* task = spn_task_get(current->kind);
   spn_task_step_t step = sp_zero;
   if (!ex->initted) {
     ex->initted = true;
-    step = task->init ? task->init(&spn) : task->update(&spn);
+    step = task->init ? task->init(&spn, current) : task->update(&spn, current);
   }
   else {
-    step = task->update(&spn);
+    step = task->update(&spn, current);
   }
 
   if (step.err.kind) {

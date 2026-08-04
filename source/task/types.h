@@ -3,6 +3,7 @@
 
 #include "error/types.h"
 #include "forward/types.h"
+#include "semver/types.h"
 
 typedef enum {
   SPN_TASK_NONE,
@@ -16,7 +17,6 @@ typedef enum {
   SPN_TASK_RUN,
   SPN_TASK_GENERATE,
   SPN_TASK_WHICH,
-  SPN_TASK_UPDATE,
   SPN_TASK_INIT,
   SPN_TASK_ADD,
   SPN_TASK_CLEAN,
@@ -50,7 +50,29 @@ typedef struct {
   if (_spn_step_err.kind) return spn_task_fail_with(_spn_step_err); \
 } while (0)
 
-typedef spn_task_step_t (*spn_task_fn_t)(spn_ctx_t*);
+typedef enum {
+  SPN_ADD_DEP_PACKAGE,
+  SPN_ADD_DEP_TEST,
+  SPN_ADD_DEP_BUILD,
+} spn_add_dep_t;
+
+typedef struct {
+  sp_str_t key;
+  sp_str_t requested;
+  spn_semver_range_t range;
+  spn_add_dep_t dep;
+} spn_add_request_t;
+
+typedef struct {
+  spn_task_kind_t kind;
+  union {
+    spn_add_request_t add;
+    spn_sync_op_t* sync;
+    spn_index_sync_op_t* index_sync;
+  };
+} spn_task_t;
+
+typedef spn_task_step_t (*spn_task_fn_t)(spn_ctx_t*, spn_task_t*);
 
 typedef struct {
   const c8* name;
@@ -61,7 +83,7 @@ typedef struct {
 #define SPN_TASK_MAX_QUEUE 32
 
 typedef struct {
-  spn_task_kind_t data[SPN_TASK_MAX_QUEUE];
+  spn_task_t data[SPN_TASK_MAX_QUEUE];
   u32 len;
   u32 index;
   bool initted;

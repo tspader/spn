@@ -68,15 +68,15 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
   if (source) {
     if (has_manifest) {
       return spn_plan(
-        SPN_TASK_SYNC_INDEXES,
-        SPN_TASK_RESOLVE,
-        SPN_TASK_SYNC_PACKAGES,
-        SPN_TASK_CONFIGURE_GRAPH,
-        SPN_TASK_RUN
+        { SPN_TASK_SYNC_INDEXES },
+        { SPN_TASK_RESOLVE },
+        { SPN_TASK_SYNC_PACKAGES },
+        { SPN_TASK_CONFIGURE_GRAPH },
+        { SPN_TASK_RUN }
       );
     }
 
-    return spn_plan(SPN_TASK_RUN);
+    return spn_plan({ SPN_TASK_RUN });
   }
 
   if (!has_manifest) {
@@ -93,12 +93,12 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
   }
 
   return spn_plan(
-    SPN_TASK_SYNC_INDEXES,
-    SPN_TASK_RESOLVE,
-    SPN_TASK_SYNC_PACKAGES,
-    SPN_TASK_CONFIGURE_GRAPH,
-    SPN_TASK_CREATE_UNITS,
-    SPN_TASK_BUILD_GRAPH,
-    SPN_TASK_RUN
+    { SPN_TASK_SYNC_INDEXES },
+    { SPN_TASK_RESOLVE },
+    { SPN_TASK_SYNC_PACKAGES },
+    { SPN_TASK_CONFIGURE_GRAPH },
+    { SPN_TASK_CREATE_UNITS },
+    { SPN_TASK_BUILD_GRAPH },
+    { SPN_TASK_RUN }
   );
 }
