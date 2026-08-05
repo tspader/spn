@@ -40,6 +40,7 @@ set(SPN_SOURCES
   error/str.c
   event/event.c
   event/build.c
+  event/flush.c
   event/log.c
   external/cc.c
   external/git.c
