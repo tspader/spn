@@ -96,7 +96,6 @@ set(SPN_SOURCES
   sp/color.c
   sp/fs.c
   sp/io.c
-  sp/it.c
   sp/os.c
   sp/str.c
   sp/terminal.c
