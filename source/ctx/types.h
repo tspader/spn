@@ -13,6 +13,13 @@
 #include "session/types.h"
 #include "toolchain/types.h"
 
+typedef struct {
+  u32 total;
+  u32 completed;
+  u32 hits;
+  u32 misses;
+} spn_progress_t;
+
 struct spn_ctx_t {
   spn_project_t* project;
   spn_session_t* session;

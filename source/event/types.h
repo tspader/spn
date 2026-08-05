@@ -177,7 +177,7 @@ typedef struct { sp_str_t path; sp_str_t message; } spn_evt_node_failed_t;
 typedef struct { sp_str_t profile; u64 time; u32 num_errors; sp_str_t first_error; } spn_evt_build_failed_t;
 typedef struct { bool success; u32 hits; u32 misses; u32 total; u64 time; sp_str_t profile; } spn_evt_build_summary_t;
 typedef struct { u64 time; } spn_evt_package_ok_t;
-typedef struct { bool ok; sp_str_t err; } spn_evt_result_t;
+typedef struct { bool ok; spn_err_t err; } spn_evt_result_t;
 
 typedef struct spn_build_event_t spn_build_event_t;
 

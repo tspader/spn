@@ -1,7 +1,8 @@
 #include "cli/cli.h"
 
+#include "spn/host.h"
+
 #include "cli/types.h"
-#include "ctx/types.h"
 
 spn_cli_t args;
 
@@ -461,17 +462,5 @@ sp_cli_result_t spn_cli_error(sp_cli_t* cli, const c8* fmt, ...) {
   sp_str_t message = sp_fmt_mem_v(spn.heap, sp_cstr_as_str(fmt), args).value;
   va_end(args);
   return sp_cli_set_error(cli, message);
-}
-
-bool spn_cli_requires_manifest(sp_cli_cmd_t* cmd) {
-  if (cmd == &cmd_init || cmd == &cmd_run) {
-    return false;
-  }
-  sp_carr_for(cmd_index.commands, it) {
-    if (cmd == cmd_index.commands[it]) {
-      return false;
-    }
-  }
-  return cmd != &cmd_index;
 }
 

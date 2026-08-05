@@ -7,6 +7,7 @@
 #include "compiler/types.h"
 #include "forward/types.h"
 #include "pkg/types.h"
+#include "profile/types.h"
 #include "semver/types.h"
 
 #define spn_try(expr) \
@@ -179,9 +180,8 @@ typedef struct {
       sp_str_t name;
     } profile;
     struct {
-      sp_str_t name;
+      spn_profile_field_t field;
       sp_str_t value;
-      sp_str_t expected;
     } flag;
     struct {
       sp_str_t toolchain;

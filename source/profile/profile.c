@@ -187,3 +187,82 @@ spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_in
   };
   return spn_result(SPN_OK);
 }
+
+static spn_err_union_t invalid_field(spn_profile_field_t field, sp_str_t value) {
+  return (spn_err_union_t) {
+    .kind = SPN_ERR_FLAG_INVALID,
+    .flag = {
+      .field = field,
+      .value = value,
+    },
+  };
+}
+
+spn_err_union_t spn_profile_parse(spn_profile_args_t* args, spn_profile_info_t* result) {
+  spn_triple_t target = sp_zero;
+  if (!sp_str_empty(args->target) && spn_triple_parse(args->target, &target)) {
+    return invalid_field(SPN_PROFILE_FIELD_TARGET, args->target);
+  }
+
+  spn_triple_t parts = {
+    .arch = spn_arch_from_str(args->arch),
+    .os = spn_os_from_str(args->os),
+    .abi = spn_abi_from_str(args->abi),
+  };
+  if (!sp_str_empty(args->arch) && !parts.arch) {
+    return invalid_field(SPN_PROFILE_FIELD_ARCH, args->arch);
+  }
+  if (!sp_str_empty(args->os) && !parts.os) {
+    return invalid_field(SPN_PROFILE_FIELD_OS, args->os);
+  }
+  if (!sp_str_empty(args->abi) && !parts.abi) {
+    return invalid_field(SPN_PROFILE_FIELD_ABI, args->abi);
+  }
+
+  spn_build_mode_t mode = spn_build_mode_from_str(args->mode);
+  if (!sp_str_empty(args->mode) && !mode) {
+    return invalid_field(SPN_PROFILE_FIELD_MODE, args->mode);
+  }
+
+  spn_opt_level_t opt = spn_opt_level_from_str(args->opt);
+  if (!sp_str_empty(args->opt) && !opt) {
+    return invalid_field(SPN_PROFILE_FIELD_OPT, args->opt);
+  }
+
+  spn_sanitizer_set_t sanitizers = 0;
+  bool sanitizers_set = false;
+  if (sp_str_equal_cstr(args->sanitize, "none")) {
+    sanitizers_set = true;
+  }
+  else if (!sp_str_empty(args->sanitize)) {
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    sp_da(sp_str_t) names = sp_str_split_c8(scratch.mem, args->sanitize, ',');
+    sp_da_for(names, it) {
+      spn_sanitizer_t sanitizer = spn_sanitizer_from_str(names[it]);
+      if (!sanitizer) {
+        sp_mem_end_scratch(scratch);
+        return invalid_field(SPN_PROFILE_FIELD_SANITIZE, args->sanitize);
+      }
+      sanitizers |= sanitizer;
+    }
+    sp_mem_end_scratch(scratch);
+    if (spn_sanitizer_set_conflicting(sanitizers)) {
+      return invalid_field(SPN_PROFILE_FIELD_SANITIZE_CONFLICT, args->sanitize);
+    }
+  }
+
+  target = spn_triple_merge(target, parts);
+
+  *result = (spn_profile_info_t) {
+    .name = args->name,
+    .toolchain = args->toolchain,
+    .mode = mode,
+    .opt = opt,
+    .sanitizers = sanitizers,
+    .sanitizers_set = sanitizers_set,
+    .os = target.os,
+    .arch = target.arch,
+    .abi = target.abi,
+  };
+  return spn_result(SPN_OK);
+}

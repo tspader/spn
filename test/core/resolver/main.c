@@ -19,8 +19,6 @@
 #include "spn.h"
 #include "toml/loader.h"
 
-spn_ctx_t spn;
-
 static sp_mem_arena_t* arena;
 
 static const c8* root_qualified = "test/root";

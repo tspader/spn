@@ -12,8 +12,6 @@
 #include "semver/parser.h"
 #include "spn.h"
 
-spn_ctx_t spn;
-
 const c8* fz_root_qualified = "test/root";
 
 sp_str_t fz_err_to_str(fz_err_t err) {

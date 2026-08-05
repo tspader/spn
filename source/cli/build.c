@@ -1,4 +1,4 @@
-#include "ctx/types.h"
+#include "spn/host.h"
 
 #include "cli/cli.h"
 
@@ -33,5 +33,6 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
   }
 
   command->op = (spn_op_desc_t) { .kind = SPN_OP_BUILD };
+  command->project = true;
   return SP_CLI_CONTINUE;
 }

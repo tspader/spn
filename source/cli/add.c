@@ -1,7 +1,7 @@
 #include "cli/cli.h"
 
-#include "ctx/types.h"
-#include "semver/parser.h"
+#include "spn/host.h"
+
 #include "sp/sp_cli.h"
 
 sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
@@ -20,7 +20,8 @@ sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
     return spn_cli_error(cli, "invalid version {.red}", sp_fmt_str(request.second));
   }
 
-  spn_command_t* command = (spn_command_t*)cli->user_data;
+  spn_command_t* command = spn_cli_command(cli);
+  command->project = true;
   command->op = (spn_op_desc_t) {
     .kind = SPN_OP_ADD,
     .add = {

@@ -19,11 +19,12 @@ spn build
 
 # references
 - `source/`
-  - `spn.c` is the entry point
-  - `op/` is the library operations: the build pipeline (resolve, sync, configure, build), plus action verbs (add, clean, publish, index sync)
+  - `cli/` and `tui/` are the CLI: a consumer of the spn library like any other. `cli/main.c` is the entry point. Their `.c` files only include `spn/host.h` for library functions; their `types.h` headers may include library `types.h` headers directly, per the types.h rule below.
+  - `op/` is the library operations: the build pipeline (resolve, sync, configure, build), plus action verbs (add, clean, publish, index sync, run)
     - `build/` is all the code that sets up and runs inside the build graph
 - `include/`
-  - `spn/spn.h` for public API used in downstream packages
+  - `spn.h` is the guest API included by build scripts in downstream packages
+  - `spn/host.h` is the single public header for host consumers embedding spn as a library; it is the curated library surface. If the CLI needs a library function that `spn/host.h` does not expose, that is an API gap to fix in the library, never a reason to include internal headers from cli/ or tui/.
 - `spn.toml` is the package for spn itself; it's example of how a real downstream project would use spn
 - `test/integration/fixtures/` contains small, hermetic spn projects used in integration tests.
   - `script/build_script` is an excellent example
