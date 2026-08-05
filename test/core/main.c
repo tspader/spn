@@ -9,8 +9,6 @@
 #include "event/event.h"
 #include "intern/intern.h"
 
-spn_ctx_t spn;
-
 static sp_test_once_t spn_ctx_once;
 static sp_intern_t* spn_ctx_intern;
 

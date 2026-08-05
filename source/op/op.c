@@ -45,8 +45,8 @@ static s32 op_main(void* data) {
   return 0;
 }
 
-spn_op_t* spn_op_start(sp_mem_t mem, spn_ctx_t* ctx, spn_op_desc_t desc) {
-  spn_op_t* op = sp_alloc_type(mem, spn_op_t);
+spn_op_t* spn_op_start(spn_ctx_t* ctx, spn_op_desc_t desc) {
+  spn_op_t* op = sp_alloc_type(ctx->heap, spn_op_t);
   op->ctx = ctx;
   op->desc = desc;
   sp_thread_init(&op->thread, op_main, op);

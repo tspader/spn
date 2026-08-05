@@ -1,5 +1,6 @@
 #include "project/project.h"
 
+#include "intern/intern.h"
 #include "lock/lock.h"
 #include "pkg/load.h"
 #include "sp/atomic_file.h"
@@ -47,4 +48,8 @@ spn_err_union_t spn_project_update_lock(spn_project_t* project, sp_intern_t* int
     return (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = project->paths.lock } };
   }
   return spn_result(SPN_OK);
+}
+
+bool spn_project_has_script(spn_project_t* project, sp_intern_t* intern, sp_str_t name) {
+  return sp_str_om_has(project->package.scripts, sp_intern_get_or_insert_str(intern, name));
 }

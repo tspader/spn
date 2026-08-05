@@ -16,6 +16,7 @@ typedef struct {
   spn_op_desc_t op;
   spn_session_config_t config;
   spn_err_union_t (*finish)();
+  bool project; // @spader This is just a workaround for now
 } spn_command_t;
 
 typedef struct {

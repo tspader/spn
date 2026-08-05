@@ -35,6 +35,17 @@ typedef struct {
   sp_str_t abi;
 } spn_profile_args_t;
 
+typedef enum {
+  SPN_PROFILE_FIELD_TARGET,
+  SPN_PROFILE_FIELD_ARCH,
+  SPN_PROFILE_FIELD_OS,
+  SPN_PROFILE_FIELD_ABI,
+  SPN_PROFILE_FIELD_MODE,
+  SPN_PROFILE_FIELD_OPT,
+  SPN_PROFILE_FIELD_SANITIZE,
+  SPN_PROFILE_FIELD_SANITIZE_CONFLICT,
+} spn_profile_field_t;
+
 typedef sp_str_ht(spn_profile_info_t) spn_profile_table_t;
 
 #endif

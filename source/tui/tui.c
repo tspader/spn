@@ -1,22 +1,10 @@
-#include "profile/types.h"
+#include "spn/host.h"
 
-#include "toml/issue.h"
-#include "compiler/driver.h"
-#include "ctx/ctx.h"
-#include "dag/types.h"
-#include "enum/enum.h"
-#include "event/event.h"
-#include "event/log.h"
-#include "event/flush.h"
-#include "semver/convert.h"
 #include "sp/color.h"
 #include "sp/io.h"
 #include "sp/macro.h"
 #include "sp/sp_prompt.h"
 #include "sp/str.h"
-#include "spn.h"
-#include "toolchain/select.h"
-#include "triple/triple.h"
 #include "tui/tui.h"
 
 
@@ -591,12 +579,56 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
           break;
         }
         case SPN_ERR_FLAG_INVALID: {
+          const c8* flag = sp_zero;
+          const c8* expected = sp_zero;
+          switch (event->err.flag.field) {
+            case SPN_PROFILE_FIELD_TARGET: {
+              flag = "--target";
+              expected = "an <arch>-<os>-<abi> triple like x86_64-linux-gnu";
+              break;
+            }
+            case SPN_PROFILE_FIELD_ARCH: {
+              flag = "--arch";
+              expected = "x86_64, aarch64, wasm32";
+              break;
+            }
+            case SPN_PROFILE_FIELD_OS: {
+              flag = "--os";
+              expected = "linux, macos, windows, wasi";
+              break;
+            }
+            case SPN_PROFILE_FIELD_ABI: {
+              flag = "--abi";
+              expected = "gnu, musl, msvc, mingw";
+              break;
+            }
+            case SPN_PROFILE_FIELD_MODE: {
+              flag = "--mode";
+              expected = "debug, release";
+              break;
+            }
+            case SPN_PROFILE_FIELD_OPT: {
+              flag = "--opt";
+              expected = "0, 1, 2, 3, s, z";
+              break;
+            }
+            case SPN_PROFILE_FIELD_SANITIZE: {
+              flag = "--sanitize";
+              expected = "a comma-separated list of address, thread, undefined, memory, leak, or none";
+              break;
+            }
+            case SPN_PROFILE_FIELD_SANITIZE_CONFLICT: {
+              flag = "--sanitize";
+              expected = "a compatible set (thread and memory don't combine with each other, address, or leak)";
+              break;
+            }
+          }
           sp_fmt_io(
             &w.base,
             "invalid value {.red} for {.yellow}; expected {}",
             sp_fmt_str(event->err.flag.value),
-            sp_fmt_str(event->err.flag.name),
-            sp_fmt_str(event->err.flag.expected)
+            sp_fmt_cstr(flag),
+            sp_fmt_cstr(expected)
           );
           break;
         }
@@ -1646,24 +1678,22 @@ void spn_prompt_pump(spn_tui_t* tui) {
     return;
   }
 
-  spn_dag_progress_t* progress = (spn_dag_progress_t*)sp_atomic_ptr_get(&spn.progress);
-  if (!progress) {
+  spn_progress_t progress = sp_zero;
+  if (!spn_ctx_progress(&spn, &progress)) {
     return;
   }
 
   if (!tui->prompt.on) {
-    if (!sp_atomic_s32_get(&progress->misses)) return;
+    if (!progress.misses) return;
     prompt_start(tui);
     if (!tui->prompt.on) return;
   }
-  u32 total = (u32)sp_atomic_s32_get(&progress->total);
-  u32 done = (u32)sp_atomic_s32_get(&progress->completed);
 
-  f32 value = total ? (f32)done / (f32)total : 0.f;
+  f32 value = progress.total ? (f32)progress.completed / (f32)progress.total : 0.f;
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   sp_prompt_send_status_str(tui->prompt.ctx, sp_fmt(s.mem,
-    "{}/{} units", sp_fmt_uint(done), sp_fmt_uint(total)).value);
+    "{}/{} units", sp_fmt_uint(progress.completed), sp_fmt_uint(progress.total)).value);
   sp_mem_end_scratch(s);
 
   sp_prompt_send_progress_f32(tui->prompt.ctx, value);

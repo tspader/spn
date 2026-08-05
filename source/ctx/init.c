@@ -185,3 +185,18 @@ spn_err_union_t spn_ctx_open_session(spn_ctx_t* ctx, spn_session_config_t config
   ctx->session = sp_alloc_type(ctx->heap, spn_session_t);
   return spn_session_init(ctx->session, ctx, ctx->heap, ctx->project, config);
 }
+
+void spn_ctx_close(spn_ctx_t* ctx, spn_err_t result) {
+  spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+    .kind = SPN_EVENT_RESULT,
+    .result = {
+      .ok = result == SPN_OK,
+      .err = result,
+    },
+  });
+
+  if (ctx->session) {
+    spn_session_finalize(ctx->session);
+    ctx->session = SP_NULLPTR;
+  }
+}

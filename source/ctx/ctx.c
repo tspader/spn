@@ -1,5 +1,8 @@
 #include "ctx/ctx.h"
+#include "dag/types.h"
 #include "intern/intern.h"
+
+spn_ctx_t spn;
 
 sp_intern_t* spn_ctx_get_intern() {
   return spn.intern;
@@ -11,6 +14,21 @@ void spn_ctx_cancel(spn_ctx_t* ctx) {
 
 bool spn_ctx_cancelled(spn_ctx_t* ctx) {
   return sp_atomic_s32_get(&ctx->aborted) != 0;
+}
+
+bool spn_ctx_progress(spn_ctx_t* ctx, spn_progress_t* progress) {
+  spn_dag_progress_t* dag = (spn_dag_progress_t*)sp_atomic_ptr_get(&ctx->progress);
+  if (!dag) {
+    return false;
+  }
+
+  *progress = (spn_progress_t) {
+    .total = (u32)sp_atomic_s32_get(&dag->total),
+    .completed = (u32)sp_atomic_s32_get(&dag->completed),
+    .hits = (u32)sp_atomic_s32_get(&dag->hits),
+    .misses = (u32)sp_atomic_s32_get(&dag->misses),
+  };
+  return true;
 }
 
 spn_index_info_t* spn_find_index(sp_str_t name) {

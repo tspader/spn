@@ -6,13 +6,14 @@ set(SPN_SOURCES
   api/make/make.c
   api/node/node.c
   project/project.c
+  project/scaffold.c
   cli/add.c
   cli/build.c
   cli/clean.c
   cli/cli.c
   cli/init.c
   cli/index.c
-  cli/profile.c
+  cli/main.c
   cli/publish.c
   cli/run.c
   cli/test.c
@@ -75,6 +76,7 @@ set(SPN_SOURCES
   op/configure.c
   op/index.c
   op/op.c
+  op/run.c
   op/publish.c
   op/resolve.c
   op/sync.c
@@ -99,7 +101,6 @@ set(SPN_SOURCES
   sp/os.c
   sp/str.c
   sp/terminal.c
-  spn.c
   target/mutate.c
   target/select.c
   target/target.c

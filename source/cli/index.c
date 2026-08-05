@@ -1,10 +1,7 @@
 #include "cli/cli.h"
 
-#include "ctx/ctx.h"
-#include "ctx/types.h"
-#include "enum/enum.h"
-#include "index/index.h"
-#include "op/op.h"
+#include "spn/host.h"
+
 #include "tui/tui.h"
 
 sp_cli_result_t spn_cli_index(sp_cli_t* cli) {

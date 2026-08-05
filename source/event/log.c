@@ -524,15 +524,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_RESULT
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_result_t, ok, "ok", SP_BIND_BOOL);
-      SP_BIND(&b, spn_evt_result_t, err, "err", SP_BIND_STR);
-    }
-    schemas[SPN_EVENT_RESULT] = sp_bind_builder_end(&b);
-  }
 }
 
 // ============================================================================
@@ -684,6 +675,13 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
       sp_io_write_cstr(out, ", \"data\": ", SP_NULLPTR);
       json_write_object(out, schema, (void*)&event->err.manifest);
     }
+  }
+  else if (event->kind == SPN_EVENT_RESULT) {
+    sp_io_write_cstr(out, ", \"data\": {\"ok\": ", SP_NULLPTR);
+    sp_io_write_cstr(out, event->result.ok ? "true" : "false", SP_NULLPTR);
+    sp_io_write_cstr(out, ", \"err\": ", SP_NULLPTR);
+    spn_json_write_str(out, sp_cstr_as_str(spn_err_to_str(event->result.err)));
+    sp_io_write_cstr(out, "}", SP_NULLPTR);
   }
   else if (schema) {
     void* data = spn_event_payload(event);

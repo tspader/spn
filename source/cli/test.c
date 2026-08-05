@@ -1,6 +1,6 @@
 #include "cli/cli.h"
 
-#include "ctx/types.h"
+#include "spn/host.h"
 
 sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
   spn_cli_test_t* cmd = &args.test;
@@ -20,5 +20,6 @@ sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
 
   command->op = (spn_op_desc_t) { .kind = SPN_OP_BUILD };
   command->finish = spn_cli_run_roots;
+  command->project = true;
   return SP_CLI_CONTINUE;
 }
