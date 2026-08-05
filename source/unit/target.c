@@ -559,10 +559,10 @@ static void init_wasm_scripts(spn_session_t* s) {
       continue;
     }
     if (unit->metaprogram->scripts.configure) {
-      spn_wasm_script_init(&unit->wasm.configure, get_target_output_path(s->mem, unit->metaprogram->scripts.configure));
+      spn_wasm_script_init(&unit->wasm.configure, spn_target_output_path(s->mem, unit->metaprogram->scripts.configure));
     }
     if (unit->metaprogram->scripts.build) {
-      spn_wasm_script_init(&unit->wasm.build, get_target_output_path(s->mem, unit->metaprogram->scripts.build));
+      spn_wasm_script_init(&unit->wasm.build, spn_target_output_path(s->mem, unit->metaprogram->scripts.build));
     }
   }
 }

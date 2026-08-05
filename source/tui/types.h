@@ -36,14 +36,19 @@ typedef struct {
 } spn_tui_line_writer_t;
 
 typedef struct {
+  sp_str_t pkg;
+  sp_str_t message;
+} spn_tui_buffered_log_t;
+
+typedef struct {
   spn_tui_mode_t mode;
   sp_mem_t mem;
   spn_logger_t* logger;
-  u32 num_deps;
-  u32 width;
-  sp_ht(sp_str_t, s32) state;
   sp_io_writer_t* out;
   spn_tui_line_writer_t line_writer;
+  sp_str_ht(bool) seen_url;
+  sp_da(spn_tui_buffered_log_t) buffered_logs;
+  u32 num_downloads;
 
   struct {
     sp_prompt_ctx_t* ctx;
@@ -52,11 +57,6 @@ typedef struct {
     bool started;
     bool on;
   } prompt;
-
-  struct {
-    sp_tm_timer_t timer;
-    u64 accumulated;
-  } frame;
 } spn_tui_t;
 
 #endif

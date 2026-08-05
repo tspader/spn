@@ -230,7 +230,7 @@ static s32 spn_link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_
     return emit_link_failed(target, invocation, run.result.status.exit_code, run.result.out, run.result.err);
   }
 
-  return emit_link_passed(target, invocation, get_target_output_path(spn.mem, target), run.result.out, run.elapsed);
+  return emit_link_passed(target, invocation, spn_target_output_path(spn.mem, target), run.result.out, run.elapsed);
 }
 
 s32 spn_link_target_run(spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, sp_str_t exports) {

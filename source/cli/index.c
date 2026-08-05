@@ -16,14 +16,14 @@ sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
 
   struct { u32 name; u32 kind; u32 protocol; } width = sp_zero;
   sp_da_for(spn.indexes, it) {
-    width.name = SP_MAX(width.name, spn.indexes[it].name.len);
-    width.kind = SP_MAX(width.kind, spn_index_kind_to_str(spn.indexes[it].kind).len);
-    width.protocol = SP_MAX(width.protocol, spn_index_protocol_to_str(spn.indexes[it].protocol).len);
+    width.name = sp_max(width.name, spn.indexes[it].name.len);
+    width.kind = sp_max(width.kind, spn_index_kind_to_str(spn.indexes[it].kind).len);
+    width.protocol = sp_max(width.protocol, spn_index_protocol_to_str(spn.indexes[it].protocol).len);
   }
   const c8* headers [] = { "name", "kind", "protocol", "source" };
-  width.name = SP_MAX(width.name, sp_cstr_len(headers[0]));
-  width.kind = SP_MAX(width.kind, sp_cstr_len(headers[1]));
-  width.protocol = SP_MAX(width.protocol, sp_cstr_len(headers[2]));
+  width.name = sp_max(width.name, sp_cstr_len(headers[0]));
+  width.kind = sp_max(width.kind, sp_cstr_len(headers[1]));
+  width.protocol = sp_max(width.protocol, sp_cstr_len(headers[2]));
 
   spn_print("{:<$ .gray} {:<$ .gray} {:<$ .gray} {.gray}",
     sp_fmt_uint(width.name),
@@ -54,7 +54,7 @@ sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
   sp_str_t name = sp_str_empty(shell.cli.index.name) ? sp_str_lit("core") : shell.cli.index.name;
   spn_index_info_t* index = spn_find_index(name);
   if (!index) {
-    return cli_error(cli, "unknown index: {.cyan}", SP_FMT_STR(name));
+    return spn_cli_error(cli, "unknown index: {.cyan}", sp_fmt_str(name));
   }
 
   spn_print("{}", sp_fmt_str(index->location));
@@ -63,7 +63,7 @@ sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
 
 sp_cli_result_t spn_cli_index_sync(sp_cli_t* cli) {
   if (!sp_str_empty(shell.cli.index.name) && !spn_find_index(shell.cli.index.name)) {
-    return cli_error(cli, "unknown index '{}'", SP_FMT_STR(shell.cli.index.name));
+    return spn_cli_error(cli, "unknown index '{}'", sp_fmt_str(shell.cli.index.name));
   }
 
   spn_cli_command(cli)->op = (spn_op_desc_t) {

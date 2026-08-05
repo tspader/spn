@@ -84,7 +84,9 @@ static u32 short_thread_id(u64 thread_id) {
   static sp_ht(u64, u32) thread_map = SP_NULLPTR;
   static u32 id = 0;
 
-  if (!thread_map) sp_ht_init(shell.mem, thread_map);
+  if (!thread_map) {
+    sp_ht_init(shell.mem, thread_map);
+  }
   if (!sp_ht_key_exists(thread_map, thread_id)) {
     sp_ht_insert(thread_map, thread_id, id++);
   }
@@ -92,7 +94,9 @@ static u32 short_thread_id(u64 thread_id) {
 }
 
 void spn_shell_flush() {
-  if (!spn.events) return;
+  if (!spn.events) {
+    return;
+  }
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   sp_da(spn_build_event_t) events = spn_event_flush(s.mem, spn.events);

@@ -643,7 +643,7 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
 
   const spn_event_info_t* info = &spn_event_info[event->kind];
   sp_io_write_cstr(out, "{\"event\": \"", SP_NULLPTR);
-  sp_io_write_cstr(out, info->name ? info->name : "unknown", SP_NULLPTR);
+  sp_io_write_cstr(out, info->name, SP_NULLPTR);
   sp_io_write_cstr(out, "\"", SP_NULLPTR);
 
   s32 level = info->level;

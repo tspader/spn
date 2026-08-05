@@ -5,6 +5,7 @@
 #include "project/types.h"
 #include "resolve/types.h"
 
+#include "error/error.h"
 #include "event/event.h"
 #include "index/cache.h"
 #include "intern/intern.h"

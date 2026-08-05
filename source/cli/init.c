@@ -21,11 +21,17 @@ static void it_next(iterator_t* it) {
   while (it->index < sp_carr_len(spn_embed_manifest)) {
     spn_embed_entry_t entry = spn_embed_manifest[it->index++];
     sp_str_t path = sp_cstr_as_str(entry.path);
-    if (!sp_str_starts_with(path, sp_str_lit("init/"))) continue;
+    if (!sp_str_starts_with(path, sp_str_lit("init/"))) {
+      continue;
+    }
 
     sp_str_t rel = sp_str_strip_left(path, sp_str_lit("init/"));
-    if (it->bare && !sp_str_equal_cstr(rel, "spn.toml")) continue;
-    if (sp_str_equal_cstr(rel, "gitignore")) rel = sp_str_lit(".gitignore");
+    if (it->bare && !sp_str_equal_cstr(rel, "spn.toml")) {
+      continue;
+    }
+    if (sp_str_equal_cstr(rel, "gitignore")) {
+      rel = sp_str_lit(".gitignore");
+    }
 
     it->rel = rel;
     it->tpl = sp_str((const c8*)entry.data, entry.size);
@@ -42,10 +48,14 @@ static iterator_t it_new(bool bare) {
 }
 
 static bool is_name_valid(sp_str_t name) {
-  if (sp_str_empty(name)) return false;
+  if (sp_str_empty(name)) {
+    return false;
+  }
   sp_str_for(name, it) {
     c8 c = name.data[it];
-    if (c == '"' || c == '\\' || c == '\n' || c == '\r' || c == '\t' || c == ' ') return false;
+    if (c == '"' || c == '\\' || c == '\n' || c == '\r' || c == '\t' || c == ' ') {
+      return false;
+    }
   }
   return true;
 }
@@ -194,7 +204,7 @@ static spn_err_union_t run(sp_mem_t mem, spn_cli_init_t* command, sp_str_t proje
   try_union(validate_dir(mem, command, dir));
 
   sp_str_t name = sp_fs_get_name(dir);
-  if (sp_sys_is_tty(sp_sys_stdout) && sp_str_empty(command->path)) {
+  if (shell.tui.mode == SPN_OUTPUT_MODE_INTERACTIVE && sp_sys_is_tty(sp_sys_stdout) && sp_str_empty(command->path)) {
     return run_prompt(mem, command, dir, name);
   }
 
