@@ -220,6 +220,11 @@ typedef struct {
       sp_str_t requested;
       sp_str_t requester;
     } target;
+    struct {
+      sp_str_t name;
+      sp_str_t path;
+      s32 code;
+    } script;
     spn_err_wasm_t wasm;
     spn_err_build_graph_t build_graph;
     spn_err_toolchain_t toolchain;

@@ -69,6 +69,8 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_ERR_PKG_MISMATCH:                 return "pkg_mismatch";
     case SPN_ERR_MANIFEST_EDIT:                return "manifest_edit";
     case SPN_ERR_DAG_GLOB:                     return "dag_glob";
+    case SPN_ERR_SCRIPT_MISSING:               return "script_missing";
+    case SPN_ERR_SCRIPT_FAILED:                return "script_failed";
     case SPN_ERR_DAG_OUTPUT_NAME:              return "dag_output_name";
     case SPN_ERR_DAG_DUPLICATE_OUTPUT:         return "dag_duplicate_output";
     case SPN_ERR_DAG_STAT:                     return "dag_stat";

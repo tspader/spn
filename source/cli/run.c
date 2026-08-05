@@ -6,7 +6,6 @@
 #include "ctx/types.h"
 #include "event/event.h"
 #include "intern/intern.h"
-#include "log/log.h"
 #include "op/build/build.h"
 #include "op/op.h"
 #include "project/types.h"
@@ -29,8 +28,10 @@ static spn_err_union_t run_script(spn_session_t* session, spn_target_unit_t* uni
 
   sp_str_t command = get_target_staged_path(session->mem, unit);
   if (!sp_fs_exists(command)) {
-    spn_log_error("script binary {.yellow} does not exist", SP_FMT_STR(command));
-    return spn_err_reported(SPN_ERROR);
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_SCRIPT_MISSING,
+      .script = { .name = unit->info->name, .path = command },
+    };
   }
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
@@ -55,11 +56,10 @@ static spn_err_union_t run_script(spn_session_t* session, spn_target_unit_t* uni
   sp_ps_status_t status = sp_ps_wait(&ps);
 
   if (status.exit_code) {
-    spn_log_error("script {.yellow} failed with exit code {}",
-      SP_FMT_STR(unit->info->name),
-      SP_FMT_S32(status.exit_code)
-    );
-    return spn_err_reported(SPN_ERROR);
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_SCRIPT_FAILED,
+      .script = { .name = unit->info->name, .code = status.exit_code },
+    };
   }
 
   return spn_result(SPN_OK);
