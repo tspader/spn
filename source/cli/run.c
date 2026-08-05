@@ -10,7 +10,7 @@
 #include "op/op.h"
 #include "project/types.h"
 #include "session/session.h"
-#include "shell/shell.h"
+#include "tui/tui.h"
 #include "unit/types.h"
 
 static bool is_source_entry(sp_str_t entry, spn_project_t* project) {
@@ -42,7 +42,7 @@ static spn_err_union_t run_script(spn_session_t* session, spn_target_unit_t* uni
       .command = command,
     }
   });
-  spn_shell_flush();
+  spn_tui_flush(&tui);
 
   sp_ps_t ps = sp_ps_create(session->mem, (sp_ps_config_t) {
     .command = command,
@@ -65,7 +65,7 @@ static spn_err_union_t run_script(spn_session_t* session, spn_target_unit_t* uni
   return spn_result(SPN_OK);
 }
 
-spn_err_union_t spn_cli_run_roots(spn_shell_t* shell) {
+spn_err_union_t spn_cli_run_roots() {
   spn_session_t* session = spn.session;
   sp_da_for(session->plans, it) {
     spn_build_plan_t* plan = &session->plans[it];
@@ -80,7 +80,7 @@ spn_err_union_t spn_cli_run_roots(spn_shell_t* shell) {
 }
 
 sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
-  spn_cli_run_t* cmd = &shell.cli.run;
+  spn_cli_run_t* cmd = &args.run;
   spn_command_t* command = spn_cli_command(cli);
 
   if (is_source_entry(cmd->entry, spn.project)) {

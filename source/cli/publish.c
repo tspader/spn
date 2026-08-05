@@ -5,7 +5,6 @@
 #include "index/json.h"
 #include "index/publish.h"
 #include "project/types.h"
-#include "shell/shell.h"
 #include "tui/tui.h"
 
 static sp_cli_result_t publish_dry(sp_cli_t* cli, spn_cli_publish_t* cmd) {
@@ -39,7 +38,7 @@ static sp_cli_result_t publish_dry(sp_cli_t* cli, spn_cli_publish_t* cmd) {
 }
 
 sp_cli_result_t spn_cli_publish(sp_cli_t* cli) {
-  spn_cli_publish_t* cmd = &shell.cli.publish;
+  spn_cli_publish_t* cmd = &args.publish;
 
   if (cmd->dry) {
     return publish_dry(cli, cmd);

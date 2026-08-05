@@ -5,7 +5,7 @@
 #include "sp/sp_cli.h"
 
 sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
-  spn_cli_add_t* cmd = &shell.cli.add;
+  spn_cli_add_t* cmd = &args.add;
   if (cmd->test && cmd->build) {
     return spn_cli_error(cli, "pass at most one of {.cyan} and {.cyan}", sp_fmt_cstr("--test"), sp_fmt_cstr("--build"));
   }

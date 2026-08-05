@@ -43,12 +43,14 @@ typedef struct {
 typedef struct {
   spn_tui_mode_t mode;
   sp_mem_t mem;
-  spn_logger_t* logger;
+  spn_logger_t logger;
   sp_io_writer_t* out;
   spn_tui_line_writer_t line_writer;
   sp_str_ht(bool) seen_url;
   sp_da(spn_tui_buffered_log_t) buffered_logs;
   u32 num_downloads;
+  sp_ht(u64, u32) thread_ids;
+  u32 next_thread_id;
 
   struct {
     sp_prompt_ctx_t* ctx;
@@ -58,5 +60,7 @@ typedef struct {
     bool on;
   } prompt;
 } spn_tui_t;
+
+extern spn_tui_t tui;
 
 #endif

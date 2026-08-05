@@ -3,7 +3,7 @@
 #include "ctx/types.h"
 
 sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
-  spn_cli_test_t* cmd = &shell.cli.test;
+  spn_cli_test_t* cmd = &args.test;
   spn_command_t* command = spn_cli_command(cli);
 
   spn_target_names_t names = sp_da_new(spn.heap, sp_str_t);

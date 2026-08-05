@@ -93,7 +93,6 @@ set(SPN_SOURCES
   session/registry/registry.c
   session/session.c
   sha256/sha256.c
-  shell/shell.c
   sp/color.c
   sp/fs.c
   sp/io.c

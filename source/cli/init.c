@@ -3,7 +3,6 @@
 #include "cli/types.h"
 #include "ctx/types.h"
 #include "error/types.h"
-#include "shell/shell.h"
 #include "sp/sp_prompt.h"
 #include "sp/sp_template.h"
 #include "spn.embed.h"
@@ -204,15 +203,15 @@ static spn_err_union_t run(sp_mem_t mem, spn_cli_init_t* command, sp_str_t proje
   try_union(validate_dir(mem, command, dir));
 
   sp_str_t name = sp_fs_get_name(dir);
-  if (shell.tui.mode == SPN_OUTPUT_MODE_INTERACTIVE && sp_sys_is_tty(sp_sys_stdout) && sp_str_empty(command->path)) {
+  if (tui.mode == SPN_OUTPUT_MODE_INTERACTIVE && sp_sys_is_tty(sp_sys_stdout) && sp_str_empty(command->path)) {
     return run_prompt(mem, command, dir, name);
   }
 
   return run_unattended(mem, command, dir, name);
 }
 
-static spn_err_union_t finish_init(spn_shell_t* shell) {
-  return run(spn.mem, &shell->cli.init, spn.paths.project);
+static spn_err_union_t finish_init() {
+  return run(spn.mem, &args.init, spn.paths.project);
 }
 
 sp_cli_result_t spn_cli_init(sp_cli_t* cli) {
