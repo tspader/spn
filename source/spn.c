@@ -339,8 +339,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
   }
 
-  spn_cli_commit();
-
   if (spn.cli.ci) {
     sp->fps = 100000;
   }

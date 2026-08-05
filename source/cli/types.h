@@ -95,41 +95,4 @@ struct spn_cli {
   spn_cli_index_t index;
 };
 
-typedef struct {
-  const c8* project_dir;
-  const c8* project_file;
-  const c8* output;
-  struct {
-    const c8* name;
-    const c8* toolchain;
-    const c8* mode;
-    const c8* opt;
-    const c8* sanitize;
-    const c8* target;
-    const c8* os;
-    const c8* arch;
-    const c8* abi;
-  } profile;
-  struct {
-    const c8* path;
-  } init;
-  struct {
-    const c8* package;
-  } add;
-  struct {
-    const c8* entry;
-  } run;
-  struct {
-    const c8* name;
-  } test;
-  struct {
-    const c8* index;
-    const c8* source_url;
-    const c8* source_rev;
-  } publish;
-  struct {
-    const c8* name;
-  } index;
-} spn_cli_raw_t;
-
 #endif
