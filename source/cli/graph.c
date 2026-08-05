@@ -1,7 +1,6 @@
 #include "cli/cli.h"
 
 #include "ctx/types.h"
-#include "task/task.h"
 
 sp_cli_result_t spn_cli_graph(sp_cli_t* cli) {
   spn.config.selection = (spn_target_selection_t) {
@@ -12,12 +11,6 @@ sp_cli_result_t spn_cli_graph(sp_cli_t* cli) {
     .script = { .kind = SPN_TARGET_RULE_ALL },
   };
 
-  return spn_plan(
-    { SPN_TASK_SYNC_INDEXES },
-    { SPN_TASK_RESOLVE },
-    { SPN_TASK_SYNC_PACKAGES },
-    { SPN_TASK_CONFIGURE_GRAPH },
-    { SPN_TASK_CREATE_UNITS },
-    { SPN_TASK_RENDER_GRAPH }
-  );
+  spn.exec.desc = (spn_op_desc_t) { .kind = SPN_OP_REACH, .reach = SPN_PHASE_UNITS };
+  return SP_CLI_CONTINUE;
 }

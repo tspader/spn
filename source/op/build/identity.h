@@ -1,5 +1,5 @@
-#ifndef SPN_TASK_BUILD_IDENTITY_H
-#define SPN_TASK_BUILD_IDENTITY_H
+#ifndef SPN_OP_BUILD_IDENTITY_H
+#define SPN_OP_BUILD_IDENTITY_H
 
 #include "dag/types.h"
 #include "pkg/types.h"

@@ -56,7 +56,7 @@
 #include "sp/macro.h"
 #include "sp/os.h"
 #include "sp/sp_glob.h"
-#include "task/task.h"
+#include "op/op.h"
 #include "toml/loader.h"
 #include "tui/tui.h"
 #include "version.h"
@@ -166,6 +166,118 @@ spn_err_t extract_runtime() {
   return err;
 }
 
+static spn_err_union_t invalid_flag(const c8* flag, sp_str_t value, const c8* expected) {
+  return (spn_err_union_t) {
+    .kind = SPN_ERR_FLAG_INVALID,
+    .flag = {
+      .name = sp_str_view(flag),
+      .value = value,
+      .expected = sp_str_view(expected),
+    },
+  };
+}
+
+static spn_err_union_t parse_profile_overrides(spn_profile_args_t* args, spn_profile_info_t* result) {
+  spn_triple_t target = sp_zero;
+  if (!sp_str_empty(args->target)) {
+    const c8* expected = "an <arch>-<os>-<abi> triple like x86_64-linux-gnu";
+
+    sp_str_t segments [3] = sp_zero;
+    u32 num_segments = 0;
+    sp_str_t remaining = args->target;
+    while (true) {
+      s32 separator = sp_str_find_c8(remaining, '-');
+      sp_str_t segment = separator < 0 ? remaining : sp_str_prefix(remaining, separator);
+      if (sp_str_empty(segment) || num_segments == sp_carr_len(segments)) {
+        return invalid_flag("--target", args->target, expected);
+      }
+      segments[num_segments++] = segment;
+      if (separator < 0) break;
+      remaining = sp_str_suffix(remaining, remaining.len - separator - 1);
+    }
+
+    target.arch = spn_arch_from_str(segments[0]);
+    if (!target.arch) {
+      return invalid_flag("--target", args->target, expected);
+    }
+    if (num_segments > 1) {
+      target.os = spn_os_from_str(segments[1]);
+      if (!target.os) {
+        return invalid_flag("--target", args->target, expected);
+      }
+    }
+    if (num_segments > 2) {
+      target.abi = spn_abi_from_str(segments[2]);
+      if (!target.abi) {
+        return invalid_flag("--target", args->target, expected);
+      }
+    }
+  }
+
+  spn_triple_t parts = {
+    .arch = spn_arch_from_str(args->arch),
+    .os = spn_os_from_str(args->os),
+    .abi = spn_abi_from_str(args->abi),
+  };
+  if (!sp_str_empty(args->arch) && !parts.arch) {
+    return invalid_flag("--arch", args->arch, "x86_64, aarch64, wasm32");
+  }
+  if (!sp_str_empty(args->os) && !parts.os) {
+    return invalid_flag("--os", args->os, "linux, macos, windows, wasi");
+  }
+  if (!sp_str_empty(args->abi) && !parts.abi) {
+    return invalid_flag("--abi", args->abi, "gnu, musl, msvc, mingw");
+  }
+
+  spn_build_mode_t mode = spn_build_mode_from_str(args->mode);
+  if (!sp_str_empty(args->mode) && !mode) {
+    return invalid_flag("--mode", args->mode, "debug, release");
+  }
+
+  spn_opt_level_t opt = spn_opt_level_from_str(args->opt);
+  if (!sp_str_empty(args->opt) && !opt) {
+    return invalid_flag("--opt", args->opt, "0, 1, 2, 3, s, z");
+  }
+
+  spn_sanitizer_set_t sanitizers = 0;
+  bool sanitizers_set = false;
+  if (sp_str_equal_cstr(args->sanitize, "none")) {
+    sanitizers_set = true;
+  }
+  else if (!sp_str_empty(args->sanitize)) {
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    sp_da(sp_str_t) names = sp_str_split_c8(scratch.mem, args->sanitize, ',');
+    sp_da_for(names, it) {
+      spn_sanitizer_t sanitizer = spn_sanitizer_from_str(names[it]);
+      if (!sanitizer) {
+        sp_mem_end_scratch(scratch);
+        return invalid_flag("--sanitize", args->sanitize, "a comma-separated list of address, thread, undefined, memory, leak, or none");
+      }
+      sanitizers |= sanitizer;
+    }
+    sp_mem_end_scratch(scratch);
+    if (spn_sanitizer_set_conflicting(sanitizers)) {
+      return invalid_flag("--sanitize", args->sanitize, "a compatible set (thread and memory don't combine with each other, address, or leak)");
+    }
+  }
+
+  target = spn_triple_merge(target, parts);
+
+  *result = (spn_profile_info_t) {
+    .name = args->name,
+    .toolchain = args->toolchain,
+    .mode = mode,
+    .opt = opt,
+    .sanitizers = sanitizers,
+    .sanitizers_set = sanitizers_set,
+    .os = target.os,
+    .arch = target.arch,
+    .abi = target.abi,
+  };
+  return spn_result(SPN_OK);
+}
+
+
 #define try(expr) \
   do { \
     spn_err_union_t __err = (expr); \
@@ -237,7 +349,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   if (!sp_str_empty(spn.cli.output)) {
     output_mode = spn_output_mode_from_str(spn.cli.output);
   }
-  spn_tui_init(&spn.tui, &app.session, output_mode);
+  spn_tui_init(&spn.tui, output_mode);
 
   spn.events = spn_event_buffer_new(spn.mem);
   spn_event_log_init(spn.heap);
@@ -361,7 +473,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
   }
 
-  try(spn_profile_overrides_parse(&spn.cli.profile, &spn.config.overrides));
+  try(parse_profile_overrides(&spn.cli.profile, &spn.config.overrides));
 
   switch (sp_cli_dispatch(&parsed)) {
     case SP_CLI_CONTINUE: break;
@@ -379,6 +491,10 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     try(spn_session_init(&app.session, &spn, spn.heap, &app.package, spn.config));
   }
 
+  if (spn.exec.desc.kind) {
+    spn.exec.op = spn_op_start(spn.heap, &spn, spn.exec.desc);
+  }
+
   return SP_APP_CONTINUE;
 }
 
@@ -388,7 +504,7 @@ SP_PRIVATE u32 get_short_thread_id(u64 thread_id) {
   static sp_ht(u64, u32) thread_map = SP_NULLPTR;
   static u32 id = 0;
 
-  if (!thread_map) sp_ht_init(spn.heap, thread_map);
+  if (!thread_map) sp_ht_init(spn.tui.mem, thread_map);
   if (!sp_ht_key_exists(thread_map, thread_id)) {
     sp_ht_insert(thread_map, thread_id, id++);
   }
@@ -428,42 +544,42 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
 
 sp_app_result_t spn_update(sp_app_t* sp) {
   if (sp_atomic_s32_get(&sp->shutdown)) {
+    if (spn.exec.op) {
+      spn_op_result(spn.exec.op);
+      spn.exec.op = SP_NULLPTR;
+    }
     return SP_APP_QUIT;
   }
 
-  spn_task_executor_t* ex = &spn.tasks;
-  if (ex->index >= ex->len) {
-    return SP_APP_QUIT;
-  }
-
-  spn_task_t* current = &ex->data[ex->index];
-  spn_task_desc_t* task = spn_task_get(current->kind);
-  spn_task_step_t step = sp_zero;
-  if (!ex->initted) {
-    ex->initted = true;
-    step = task->init ? task->init(&spn, current) : task->update(&spn, current);
-  }
-  else {
-    step = task->update(&spn, current);
-  }
-
-  if (step.err.kind) {
-    spn.result = spn_err_emit(step.err);
-    spn_prompt_stop(false);
-    spn_poll(sp);
-    return SP_APP_ERR;
-  }
-
-  switch (step.status) {
-    case SPN_TASK_CONTINUE: return SP_APP_CONTINUE;
-    case SPN_TASK_DONE: {
-      ex->index++;
-      ex->initted = false;
+  if (spn.exec.op) {
+    if (!spn_op_poll(spn.exec.op)) {
       return SP_APP_CONTINUE;
+    }
+
+    spn_err_union_t result = spn_op_result(spn.exec.op);
+    spn.exec.op = SP_NULLPTR;
+
+    if (result.kind) {
+      spn.result = spn_err_emit(result);
+      spn_prompt_stop(false);
+      spn_poll(sp);
+      return SP_APP_ERR;
+    }
+
+    spn_prompt_stop(true);
+    spn_poll(sp);
+  }
+
+  if (spn.exec.finish) {
+    spn_err_union_t err = spn.exec.finish(&spn);
+    spn.exec.finish = SP_NULLPTR;
+    if (err.kind) {
+      spn.result = spn_err_emit(err);
+      return SP_APP_ERR;
     }
   }
 
-  sp_unreachable_return(SP_APP_ERR);
+  return SP_APP_QUIT;
 }
 
 void spn_deinit(sp_app_t* sp) {

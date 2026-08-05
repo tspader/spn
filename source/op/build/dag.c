@@ -19,11 +19,10 @@
 #include "session/session.h"
 #include "thread_pool/thread_pool.h"
 #include "unit/unit.h"
-#include "task/build/build.h"
-#include "task/build/dag.h"
-#include "task/build/identity.h"
-#include "task/build/nodes/nodes.h"
-#include "task/task.h"
+#include "op/build/build.h"
+#include "op/build/dag.h"
+#include "op/build/identity.h"
+#include "op/build/nodes/nodes.h"
 #include "triple/triple.h"
 #include "unit/package.h"
 
@@ -1044,7 +1043,7 @@ static void dag_add_unit_target_edges(spn_dag_build_t* b, sp_da(spn_pkg_unit_t*)
   }
 }
 
-static spn_err_t dag_prepare(spn_dag_build_t* b) {
+static spn_err_t prepare_graph(spn_dag_build_t* b) {
   spn_session_t* session = b->session;
 
   sp_om_for(session->units.builds, it) {
@@ -1083,13 +1082,6 @@ static spn_err_t dag_prepare(spn_dag_build_t* b) {
 /////////
 // RUN //
 /////////
-static s32 dag_run_thread(void* data) {
-  spn_dag_build_t* b = (spn_dag_build_t*)data;
-  b->result = spn_dag_run_executor(b->graph, &b->env, &b->pool.executor);
-  sp_atomic_s32_set(&b->done, 1);
-  return 0;
-}
-
 typedef sp_str_ht(u8) dag_staged_t;
 
 static void dag_stage_link(spn_dag_build_t* b, dag_staged_t* staged, sp_str_t from, sp_str_t to) {
@@ -1331,41 +1323,34 @@ spn_dag_build_t* spn_dag_build_new(spn_session_t* session) {
     .memos = &b->memos,
     .roots = &b->roots,
     .progress = &b->progress,
+    .cancel = &session->ctx->aborted,
     .scratch = tmp,
   };
 
   return b;
 }
 
-void spn_dag_build_start(spn_dag_build_t* b, u32 workers) {
+spn_err_t spn_dag_build_run(spn_dag_build_t* b, u32 workers) {
   spn_thread_pool_init(&b->pool, spn.mem, (spn_thread_pool_config_t) {
     .workers = workers,
     .on_worker_exit = spn_wasm_thread_exit,
   });
 
   b->timer = sp_tm_start_timer();
-  sp_thread_init(&b->runner, dag_run_thread, b);
-}
-
-bool spn_dag_build_poll(spn_dag_build_t* b) {
-  if (!sp_atomic_s32_get(&b->done)) {
-    return false;
-  }
-
-  sp_thread_join(&b->runner);
+  b->result = spn_dag_run_executor(b->graph, &b->env, &b->pool.executor);
   spn_thread_pool_deinit(&b->pool);
-  return true;
+  return b->result;
 }
 
-spn_task_step_t spn_dag_build_init(spn_ctx_t* ctx, spn_task_t* task) {
-  spn_session_t* session = &ctx->app->session;
+spn_err_union_t spn_phase_build(spn_session_t* session) {
+  spn_app_t* app = session->ctx->app;
 
   spn_dag_build_t* b = spn_dag_build_new(session);
   session->dag.build = b;
 
-  if (dag_prepare(b)) {
+  if (prepare_graph(b)) {
     spn_log_error("failed to construct dag build graph");
-    return spn_task_fail(SPN_ERROR, .reported = true);
+    return spn_err_reported(SPN_ERROR);
   }
 
   spn_triple_t target = { session->profile.arch, session->profile.os, session->profile.abi };
@@ -1376,26 +1361,20 @@ spn_task_step_t spn_dag_build_init(spn_ctx_t* ctx, spn_task_t* task) {
       .profile = session->profile.name,
       .target = spn_triple_to_str(session->mem, target),
       .toolchain = session->units.target->toolchain->info->name,
-      .force = ctx->config.force,
+      .force = session->ctx->config.force,
     }
   });
 
-  spn_dag_build_start(b, 16);
-  return spn_task_continue();
-}
-
-spn_task_step_t spn_dag_build_update(spn_ctx_t* ctx, spn_task_t* task) {
-  spn_app_t* app = ctx->app;
-  spn_session_t* session = &app->session;
-  spn_dag_build_t* b = session->dag.build;
-
-  if (!spn_dag_build_poll(b)) {
-    return spn_task_continue();
-  }
-
+  sp_atomic_ptr_set(&session->ctx->progress, &b->progress);
+  spn_err_t result = spn_dag_build_run(b, 16);
+  sp_atomic_ptr_set(&session->ctx->progress, SP_NULLPTR);
   u64 elapsed = sp_tm_read_timer(&b->timer);
 
-  if (!b->result) {
+  if (result == SPN_ERR_DAG_CANCELLED) {
+    return spn_err_reported(SPN_ERROR);
+  }
+
+  if (!result) {
     if (!app->lock.some) {
       spn_app_update_lock_file(app);
     }
@@ -1404,5 +1383,5 @@ spn_task_step_t spn_dag_build_update(spn_ctx_t* ctx, spn_task_t* task) {
 
   dag_emit_reports(b, elapsed);
 
-  return b->result ? spn_task_fail(SPN_ERROR, .reported = true) : spn_task_done();
+  return result ? spn_err_reported(SPN_ERROR) : spn_result(SPN_OK);
 }

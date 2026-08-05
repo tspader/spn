@@ -81,6 +81,7 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_ERR_DAG_STORE_MISSING:            return "dag_store_missing";
     case SPN_ERR_DAG_TREE:                     return "dag_tree";
     case SPN_ERR_DAG_STALLED:                  return "dag_stalled";
+    case SPN_ERR_DAG_CANCELLED:                return "dag_cancelled";
     case SPN_ERR_DEP_CYCLE:                    return "dep_cycle";
     case SPN_ERR_UNIT_CYCLE:                   return "unit_cycle";
     case SPN_ERR_TARGET_LINKAGE:               return "target_linkage";

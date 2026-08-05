@@ -30,22 +30,16 @@ typedef struct {
 } spn_loaded_pkg_t;
 
 typedef enum {
-  SPN_ACTION_NONE,
-  SPN_ACTION_RUN_ROOTS,
-  SPN_ACTION_RUN_SOURCE,
-} spn_action_kind_t;
-
-typedef struct {
-  spn_action_kind_t kind;
-  struct {
-    sp_str_t path;
-  } source;
-} spn_action_t;
+  SPN_PHASE_NONE,
+  SPN_PHASE_PACKAGES,
+  SPN_PHASE_CONFIGURED,
+  SPN_PHASE_UNITS,
+  SPN_PHASE_BUILT,
+} spn_phase_t;
 
 typedef struct {
   spn_target_selection_t selection;
   bool force;
-  spn_action_t action;
   spn_profile_info_t overrides;
 } spn_app_config_t;
 
@@ -54,6 +48,7 @@ struct spn_session_t {
   sp_mem_t mem;
   spn_pkg_info_t* pkg;
   sp_env_t env;
+  spn_phase_t phase;
 
   spn_profile_table_t profiles;
   spn_toolchain_catalog_t catalog;

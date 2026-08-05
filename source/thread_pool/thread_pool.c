@@ -139,6 +139,14 @@ void spn_thread_pool_deinit(spn_thread_pool_t* pool) {
   sp_mem_arena_destroy(pool->arena);
 }
 
+void spn_thread_pool_wait(spn_thread_pool_t* pool) {
+  sp_mutex_lock(&pool->mutex);
+  while (pool->count.completed != pool->count.submitted) {
+    sp_cv_wait(&pool->signal.completed, &pool->mutex);
+  }
+  sp_mutex_unlock(&pool->mutex);
+}
+
 u32 spn_thread_pool_pending(spn_thread_pool_t* pool) {
   sp_mutex_lock(&pool->mutex);
   u32 pending = pool->count.submitted - pool->count.completed;

@@ -1,5 +1,5 @@
-#ifndef SPN_BUILD_NODES_H
-#define SPN_BUILD_NODES_H
+#ifndef SPN_OP_BUILD_NODES_H
+#define SPN_OP_BUILD_NODES_H
 
 #include "dag/types.h"
 #include "forward/types.h"

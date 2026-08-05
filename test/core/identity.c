@@ -1,7 +1,7 @@
 #include "spn_test.h"
 
 #include "dag/dag.h"
-#include "task/build/identity.h"
+#include "op/build/identity.h"
 
 #define IDENTITY_TEST_MAX_COPIES 2
 #define IDENTITY_TEST_MAX_STRS 2

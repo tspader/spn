@@ -71,6 +71,20 @@ set(SPN_SOURCES
   lock/lock.c
   log/lazy/lazy.c
   log/log.c
+  op/add.c
+  op/build/build.c
+  op/build/dag.c
+  op/build/identity.c
+  op/build/nodes/embed.c
+  op/build/nodes/link.c
+  op/build/nodes/object.c
+  op/clean.c
+  op/configure.c
+  op/index.c
+  op/op.c
+  op/publish.c
+  op/resolve.c
+  op/sync.c
   pkg/id.c
   pkg/mutate.c
   pkg/patch.c
@@ -97,26 +111,6 @@ set(SPN_SOURCES
   target/mutate.c
   target/select.c
   target/target.c
-  task/build/build.c
-  task/build/dag.c
-  task/build/identity.c
-  task/build/nodes/embed.c
-  task/build/nodes/link.c
-  task/build/nodes/object.c
-  task/add.c
-  task/clean.c
-  task/configure.c
-  task/generate.c
-  task/graph.c
-  task/index.c
-  task/init.c
-  task/publish.c
-  task/resolve.c
-  task/sync.c
-  task/task.c
-  task/test.c
-  task/unit.c
-  task/which.c
   thread_pool/thread_pool.c
   toml/edit.c
   pkg/load.c

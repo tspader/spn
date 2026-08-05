@@ -3,20 +3,20 @@
 #include "event/event.h"
 #include "index/cache.h"
 #include "index/types.h"
+#include "op/op.h"
 #include "pkg/id.h"
 #include "pkg/types.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
 #include "sp/atomic_file.h"
-#include "task/task.h"
 #include "toml/edit.h"
 
 typedef struct {
   sp_str_t path [4];
   u32 num_segments;
-} spn_add_site_t;
+} site_t;
 
-static spn_add_site_t spn_add_find_site(spn_toml_edit_t* edit, sp_mem_t mem, sp_str_t table, sp_str_t name, sp_str_t qualified) {
+static site_t find_site(spn_toml_edit_t* edit, sp_mem_t mem, sp_str_t table, sp_str_t name, sp_str_t qualified) {
   sp_str_t deps [2] = { sp_str_lit("deps"), table };
   sp_da(sp_str_t) keys = spn_toml_edit_keys(edit, mem, deps, 2);
 
@@ -25,7 +25,7 @@ static spn_add_site_t spn_add_find_site(spn_toml_edit_t* edit, sp_mem_t mem, sp_
       continue;
     }
 
-    spn_add_site_t site = {
+    site_t site = {
       .path = { sp_str_lit("deps"), table, keys[it], sp_str_lit("version") },
       .num_segments = 4,
     };
@@ -37,26 +37,24 @@ static spn_add_site_t spn_add_find_site(spn_toml_edit_t* edit, sp_mem_t mem, sp_
     return site;
   }
 
-  return (spn_add_site_t) {
+  return (site_t) {
     .path = { sp_str_lit("deps"), table, name },
     .num_segments = 3,
   };
 }
 
-spn_task_step_t spn_task_add(spn_ctx_t* ctx, spn_task_t* task) {
-  spn_add_request_t* req = &task->add;
-  spn_pkg_name_t name = spn_pkg_name_from_qualified(req->key);
+spn_err_union_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t* request) {
+  try_union(spn_op_sync_indexes(ctx, (spn_index_refresh_t) sp_zero));
+
+  spn_pkg_name_t name = spn_pkg_name_from_qualified(request->key);
 
   spn_index_cache_t cache = sp_zero;
-  spn_index_cache_init(&cache, spn.heap, spn.intern, &spn.indexes);
+  spn_index_cache_init(&cache, ctx->heap, ctx->intern, &ctx->indexes);
 
   spn_index_pkg_t* pkg = SP_NULLPTR;
-  spn_err_union_t err = spn_index_cache_get_package(&cache, name, &pkg);
-  if (err.kind) {
-    return spn_task_fail_with(err);
-  }
+  try_union(spn_index_cache_get_package(&cache, name, &pkg));
   if (!pkg || sp_da_empty(pkg->releases)) {
-    return spn_task_fail(SPN_ERR_PKG_UNKNOWN, .unknown = { .request = { .qualified = spn_pkg_name_to_qualified(name) } });
+    return (spn_err_union_t) { .kind = SPN_ERR_PKG_UNKNOWN, .unknown = { .request = { .qualified = spn_pkg_name_to_qualified(name) } } };
   }
 
   spn_index_release_t* release = SP_NULLPTR;
@@ -65,7 +63,7 @@ spn_task_step_t spn_task_add(spn_ctx_t* ctx, spn_task_t* task) {
     if (candidate->yanked) {
       continue;
     }
-    if (!spn_semver_in_range(candidate->version, req->range)) {
+    if (!spn_semver_in_range(candidate->version, request->range)) {
       continue;
     }
     release = candidate;
@@ -73,59 +71,59 @@ spn_task_step_t spn_task_add(spn_ctx_t* ctx, spn_task_t* task) {
   }
 
   if (!release) {
-    return spn_task_fail(SPN_ERR_PKG_NO_MATCH, .unsatisfiable = {
+    return (spn_err_union_t) { .kind = SPN_ERR_PKG_NO_MATCH, .unsatisfiable = {
       .request = {
         .qualified = spn_pkg_name_to_qualified(name),
         .source = SPN_PKG_SOURCE_INDEX,
-        .index = { .range = req->range },
+        .index = { .range = request->range },
       },
-    });
+    }};
   }
 
-  sp_str_t version = req->requested;
+  sp_str_t version = request->requested;
   if (sp_str_empty(version)) {
-    version = spn_semver_to_str(spn.heap, release->version);
+    version = spn_semver_to_str(ctx->heap, release->version);
   }
 
-  spn_task_step_t result = spn_task_done();
+  spn_err_union_t result = spn_result(SPN_OK);
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
   sp_str_t source = sp_zero;
-  if (sp_io_read_file(s.mem, spn.paths.manifest, &source) != SP_OK) {
-    result = spn_task_fail(SPN_ERR_FS_READ, .fs = { .path = spn.paths.manifest });
+  if (sp_io_read_file(s.mem, ctx->paths.manifest, &source) != SP_OK) {
+    result = (spn_err_union_t) { .kind = SPN_ERR_FS_READ, .fs = { .path = ctx->paths.manifest } };
     goto cleanup;
   }
 
   spn_toml_edit_t edit = sp_zero;
   if (spn_toml_edit_init(&edit, s.mem, source)) {
-    result = spn_task_fail(SPN_ERR_MANIFEST_PARSE, .manifest_parse = { .path = spn.paths.manifest });
+    result = (spn_err_union_t) { .kind = SPN_ERR_MANIFEST_PARSE, .manifest_parse = { .path = ctx->paths.manifest } };
     goto cleanup;
   }
 
   const c8* table = SP_NULLPTR;
-  switch (req->dep) {
+  switch (request->dep) {
     case SPN_ADD_DEP_TEST:  table = "test";    break;
     case SPN_ADD_DEP_BUILD: table = "build";   break;
     default:                table = "package"; break;
   }
 
-  spn_add_site_t site = spn_add_find_site(&edit, s.mem, sp_cstr_as_str(table), req->key, spn_pkg_name_to_qualified(name));
+  site_t site = find_site(&edit, s.mem, sp_cstr_as_str(table), request->key, spn_pkg_name_to_qualified(name));
   if (spn_toml_edit_set_str(&edit, site.path, site.num_segments, version)) {
-    result = spn_task_fail(SPN_ERR_MANIFEST_EDIT, .manifest_parse = { .path = spn.paths.manifest });
+    result = (spn_err_union_t) { .kind = SPN_ERR_MANIFEST_EDIT, .manifest_parse = { .path = ctx->paths.manifest } };
     goto cleanup;
   }
 
   sp_str_t updated = spn_toml_edit_render(&edit, s.mem);
-  if (sp_fs_write_atomic(spn.paths.manifest, updated) != SP_OK) {
-    result = spn_task_fail(SPN_ERR_FS_WRITE, .fs = { .path = spn.paths.manifest });
+  if (sp_fs_write_atomic(ctx->paths.manifest, updated) != SP_OK) {
+    result = (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = ctx->paths.manifest } };
     goto cleanup;
   }
 
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(ctx->events, (spn_build_event_t) {
     .kind = SPN_EVENT_ADDED,
     .added = {
-      .name = sp_str_copy(spn.heap, site.path[2]),
+      .name = sp_str_copy(ctx->heap, site.path[2]),
       .version = version,
     },
   });

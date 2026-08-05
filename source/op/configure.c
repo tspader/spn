@@ -10,10 +10,9 @@
 #include "unit/types.h"
 
 #include "external/wasm/wasm.h"
+#include "op/build/build.h"
+#include "op/build/dag.h"
 #include "session/session.h"
-#include "task/build/build.h"
-#include "task/build/dag.h"
-#include "task/task.h"
 #include "unit/package.h"
 #include "unit/unit.h"
 
@@ -88,16 +87,13 @@ static void add_reactor_edges(spn_dag_build_t* b, spn_target_unit_t* reactor) {
   }
 }
 
-spn_task_step_t spn_task_configure_graph_init(spn_ctx_t* ctx, spn_task_t* task) {
-  spn_app_t* app = ctx->app;
-  spn_session_t* s = &app->session;
-
+spn_err_union_t spn_phase_configure(spn_session_t* s) {
   if (spn_wasm_init()) {
-    return spn_task_fail(SPN_ERR_WASM_INIT_FAILED);
+    return (spn_err_union_t) { .kind = SPN_ERR_WASM_INIT_FAILED };
   }
 
-  spn_try_step(spn_units_add_packages(s));
-  spn_try_step(spn_units_add_targets(s, SPN_UNIT_SCOPE_METAPROGRAM));
+  try_union(spn_units_add_packages(s));
+  try_union(spn_units_add_targets(s, SPN_UNIT_SCOPE_METAPROGRAM));
 
   spn_dag_build_t* dag = spn_dag_build_new(s);
   s->dag.configure = dag;
@@ -108,7 +104,7 @@ spn_task_step_t spn_task_configure_graph_init(spn_ctx_t* ctx, spn_task_t* task) 
       continue;
     }
     if (spn_dag_build_add_target(dag, configure)) {
-      return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = get_target_output_path(s->mem, configure) });
+      return (spn_err_union_t) { .kind = SPN_ERR_BUILD_GRAPH, .build_graph = { .file = get_target_output_path(s->mem, configure) } };
     }
   }
 
@@ -118,7 +114,7 @@ spn_task_step_t spn_task_configure_graph_init(spn_ctx_t* ctx, spn_task_t* task) 
       continue;
     }
     if (add_configure_action(dag, unit)) {
-      return spn_task_fail(SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure });
+      return (spn_err_union_t) { .kind = SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure } };
     }
   }
 
@@ -137,18 +133,8 @@ spn_task_step_t spn_task_configure_graph_init(spn_ctx_t* ctx, spn_task_t* task) 
     }
   }
 
-  spn_dag_build_start(dag, 8);
-  return spn_task_continue();
-}
-
-spn_task_step_t spn_task_configure_graph_update(spn_ctx_t* ctx, spn_task_t* task) {
-  spn_app_t* app = ctx->app;
-  spn_dag_build_t* b = app->session.dag.configure;
-  if (!spn_dag_build_poll(b)) {
-    return spn_task_continue();
+  if (spn_dag_build_run(dag, 8)) {
+    return spn_err_reported(SPN_ERROR);
   }
-  if (b->result) {
-    return spn_task_fail(SPN_ERROR, .reported = true);
-  }
-  return spn_task_done();
+  return spn_result(SPN_OK);
 }
