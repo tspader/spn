@@ -2,25 +2,25 @@
 #include "sp/macro.h"
 #include "cli/cli.h"
 
-#include "app/app.h"
-#include "app/types.h"
+#include "ctx/ctx.h"
 #include "ctx/types.h"
 #include "event/event.h"
 #include "intern/intern.h"
 #include "log/log.h"
 #include "op/build/build.h"
 #include "op/op.h"
+#include "project/types.h"
 #include "session/session.h"
 #include "unit/types.h"
 
-static bool is_source_entry(sp_str_t entry, bool has_manifest) {
+static bool is_source_entry(sp_str_t entry, spn_project_t* project) {
   if (!sp_str_equal(sp_fs_get_ext(entry), sp_str_lit("c"))) {
     return false;
   }
-  if (!has_manifest) {
+  if (!project) {
     return true;
   }
-  return !sp_str_om_has(app.package.scripts, spn_intern(entry));
+  return !sp_str_om_has(project->package.scripts, spn_intern(entry));
 }
 
 static spn_err_union_t run_script(spn_session_t* session, spn_target_unit_t* unit) {
@@ -65,7 +65,7 @@ static spn_err_union_t run_script(spn_session_t* session, spn_target_unit_t* uni
 }
 
 spn_err_union_t spn_cli_run_roots(spn_ctx_t* ctx) {
-  spn_session_t* session = &ctx->app->session;
+  spn_session_t* session = ctx->session;
   sp_da_for(session->plans, it) {
     spn_build_plan_t* plan = &session->plans[it];
     sp_da_for(plan->roots, jt) {
@@ -81,20 +81,19 @@ spn_err_union_t spn_cli_run_roots(spn_ctx_t* ctx) {
 sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
   spn_cli_run_t* cmd = &spn.cli.run;
   spn_command_t* command = spn_cli_command(cli);
-  bool has_manifest = sp_fs_exists(spn.paths.manifest);
 
-  if (is_source_entry(cmd->entry, has_manifest)) {
+  if (is_source_entry(cmd->entry, spn.project)) {
     return cli_error(cli, "{.yellow} cannot run native sources; build scripts are wasm", sp_fmt_str(cmd->entry));
   }
 
-  if (!has_manifest) {
+  if (!spn.project) {
     return cli_error(cli, "no manifest found in {.cyan}; pass a relative {.yellow} file instead",
       sp_fmt_str(spn.paths.project),
       sp_fmt_cstr(".c")
     );
   }
 
-  if (!sp_str_om_has(app.package.scripts, spn_intern(cmd->entry))) {
+  if (!sp_str_om_has(spn.project->package.scripts, spn_intern(cmd->entry))) {
     return cli_error(cli, "script target {.yellow} is not defined",
       sp_fmt_str(cmd->entry)
     );

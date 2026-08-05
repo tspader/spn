@@ -28,7 +28,7 @@
 #include "forward/types.h"
 #include "unit/types.h"
 
-#include "app/app.h"
+#include "project/project.h"
 #include "codegen/codegen.h"
 #include "codegen/lower.h"
 #include "enum/enum.h"
@@ -81,7 +81,6 @@
 #define TOML_IMPLEMENTATION
 #include "toml.h"
 
-spn_app_t app;
 spn_ctx_t spn;
 
 void on_signal(sp_os_signal_t signal, void* userdata) {
@@ -374,8 +373,6 @@ sp_app_result_t spn_init(sp_app_t* sp) {
       spn.paths.include = join_path(spn.paths.runtime, "include");
       spn.paths.version = join_path(spn.paths.runtime, "version.stamp");
     spn.paths.tools.dir = sp_fs_join_path(spn.heap, spn.paths.storage, sp_str_lit("tools"));
-      spn.paths.tools.manifest = sp_fs_join_path(spn.heap, spn.paths.tools.dir, sp_str_lit("spn.toml"));
-      spn.paths.tools.lock = sp_fs_join_path(spn.heap, spn.paths.storage, sp_str_lit("spn.lock"));
 
   sp_fs_create_dir(spn.paths.log);
   {
@@ -438,33 +435,18 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   else {
     spn.paths.project = sp_str_copy(spn.heap, spn.paths.cwd);
   }
-  spn.paths.manifest = sp_fs_join_path(spn.heap, spn.paths.project, sp_str_lit("spn.toml"));
-  app.paths.lock = sp_fs_join_path(spn.heap, spn.paths.project, SP_LIT("spn.lock"));
-
-  bool has_manifest = sp_fs_exists(spn.paths.manifest);
-  if (!has_manifest) {
-    if (spn_cli_requires_manifest(parsed.cmd)) {
-      spn.result = (spn_err_union_t) {
+  try(spn_project_load(spn.heap, spn.intern, spn.events, spn.paths.project, &spn.project));
+  if (spn_cli_requires_manifest(parsed.cmd)) {
+    if (!spn.project) {
+      spn.result = spn_err_emit((spn_err_union_t) {
         .kind = SPN_ERR_NO_MANIFEST,
-        .no_manifest = { .path = spn.paths.manifest },
-      };
-      spn_log_error("no manifest found at {.cyan}", SP_FMT_STR(spn.paths.manifest));
+        .no_manifest = { .path = spn.paths.project },
+      });
       return SP_APP_ERR;
     }
   }
-  else {
-    try(spn_pkg_load(spn.mem, spn.intern, spn.paths.manifest, SPN_MANIFEST_ROOT, sp_str_lit(""), &app.package));
 
-    if (sp_fs_exists(app.paths.lock)) {
-      sp_opt_set(app.lock, spn_lock_file_load(spn.heap, app.paths.lock, spn.events));
-    }
-  }
-
-  // INDEXES
-  //
-  // Search order is array order: the root manifest's indexes shadow the
-  // user config's, which shadow the builtin core.
-  spn_index_assemble(spn.heap, has_manifest ? &app.package.indexes : SP_NULLPTR, config_indexes, &spn.indexes);
+  spn_index_assemble(spn.heap, spn.project ? &spn.project->package.indexes : SP_NULLPTR, config_indexes, &spn.indexes);
 
   sp_da_for(spn.indexes, i) {
     spn_index_info_t* index = &spn.indexes[i];
@@ -488,8 +470,9 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
   }
 
-  if (has_manifest) {
-    try(spn_session_init(&app.session, &spn, spn.heap, &app.package, command.config));
+  if (spn.project) {
+    spn.session = sp_alloc_type(spn.heap, spn_session_t);
+    try(spn_session_init(spn.session, &spn, spn.heap, spn.project, command.config));
   }
 
   spn.exec.finish = command.finish;
@@ -622,13 +605,13 @@ void spn_deinit(sp_app_t* sp) {
 
   spn_drain_events();
 
-  if (!app.session.pkg) return;
+  if (!spn.session) return;
 
-  if (sp_da_empty(app.session.plans)) return;
+  if (sp_da_empty(spn.session->plans)) return;
 
-  sp_da_for(app.session.plans, it) {
-    spn_build_unit_t* build = app.session.plans[it].build;
-    spn_pkg_unit_t* requested = spn_session_find_pkg_unit(&app.session, build, spn_session_root_pkg(&app.session));
+  sp_da_for(spn.session->plans, it) {
+    spn_build_unit_t* build = spn.session->plans[it].build;
+    spn_pkg_unit_t* requested = spn_session_find_pkg_unit(spn.session, build, spn_session_root_pkg(spn.session));
     if (!requested) {
       continue;
     }
@@ -652,23 +635,20 @@ void spn_deinit(sp_app_t* sp) {
     }
   }
 
-  sp_om_for(app.session.units.targets, it) {
-    spn_target_unit_t* target = sp_om_at(app.session.units.targets, it);
+  sp_om_for(spn.session->units.targets, it) {
+    spn_target_unit_t* target = sp_om_at(spn.session->units.targets, it);
     spn_lazy_log_close(&target->logs.build);
     spn_lazy_log_close(&target->logs.jsonl);
   }
 }
 
 sp_app_config_t spn_main(s32 num_args, const c8** args) {
-  app = SP_ZERO_STRUCT(spn_app_t);
   spn = (spn_ctx_t) {
-    .app = &app,
     .num_args = num_args,
     .args = args
   };
 
   return (sp_app_config_t) {
-    .user_data = &app,
     .on_init = spn_init,
     .on_poll = spn_poll,
     .on_update = spn_update,

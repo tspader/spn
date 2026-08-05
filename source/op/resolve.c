@@ -1,8 +1,8 @@
 #include "sp.h"
 #include "sp/macro.h"
-#include "app/types.h"
 #include "ctx/types.h"
 #include "intern/types.h"
+#include "project/types.h"
 #include "resolve/types.h"
 
 #include "event/event.h"
@@ -97,7 +97,7 @@ spn_err_union_t spn_op_resolve(spn_session_t* session) {
   sp_ht_insert(session->registry, spn_pkg_id(session->ctx->intern, session->pkg->qualified), ((spn_registry_pkg_t) {
     .source = SPN_PKG_SOURCE_ROOT,
     .info = session->pkg,
-    .manifest = spn.paths.manifest,
+    .manifest = session->project->paths.manifest,
   }));
 
   spn_index_cache_t index = sp_zero;

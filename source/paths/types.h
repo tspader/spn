@@ -5,8 +5,6 @@
 
 typedef struct {
   sp_str_t dir;
-  sp_str_t manifest;
-  sp_str_t lock;
 } spn_tools_paths_t;
 
 typedef struct {
@@ -39,7 +37,6 @@ typedef struct {
   spn_tools_paths_t tools;
   sp_str_t cwd;
   sp_str_t project;
-  sp_str_t manifest;
   sp_str_t executable;
   sp_str_t bin;
   sp_str_t storage;

@@ -6,6 +6,7 @@
 #include "op/op.h"
 #include "pkg/id.h"
 #include "pkg/types.h"
+#include "project/types.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
 #include "sp/atomic_file.h"
@@ -90,14 +91,15 @@ spn_err_union_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t* request) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
   sp_str_t source = sp_zero;
-  if (sp_io_read_file(s.mem, ctx->paths.manifest, &source) != SP_OK) {
-    result = (spn_err_union_t) { .kind = SPN_ERR_FS_READ, .fs = { .path = ctx->paths.manifest } };
+  sp_str_t manifest = ctx->project->paths.manifest;
+  if (sp_io_read_file(s.mem, manifest, &source) != SP_OK) {
+    result = (spn_err_union_t) { .kind = SPN_ERR_FS_READ, .fs = { .path = manifest } };
     goto cleanup;
   }
 
   spn_toml_edit_t edit = sp_zero;
   if (spn_toml_edit_init(&edit, s.mem, source)) {
-    result = (spn_err_union_t) { .kind = SPN_ERR_MANIFEST_PARSE, .manifest_parse = { .path = ctx->paths.manifest } };
+    result = (spn_err_union_t) { .kind = SPN_ERR_MANIFEST_PARSE, .manifest_parse = { .path = manifest } };
     goto cleanup;
   }
 
@@ -110,13 +112,13 @@ spn_err_union_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t* request) {
 
   site_t site = find_site(&edit, s.mem, sp_cstr_as_str(table), request->key, spn_pkg_name_to_qualified(name));
   if (spn_toml_edit_set_str(&edit, site.path, site.num_segments, version)) {
-    result = (spn_err_union_t) { .kind = SPN_ERR_MANIFEST_EDIT, .manifest_parse = { .path = ctx->paths.manifest } };
+    result = (spn_err_union_t) { .kind = SPN_ERR_MANIFEST_EDIT, .manifest_parse = { .path = manifest } };
     goto cleanup;
   }
 
   sp_str_t updated = spn_toml_edit_render(&edit, s.mem);
-  if (sp_fs_write_atomic(ctx->paths.manifest, updated) != SP_OK) {
-    result = (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = ctx->paths.manifest } };
+  if (sp_fs_write_atomic(manifest, updated) != SP_OK) {
+    result = (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = manifest } };
     goto cleanup;
   }
 

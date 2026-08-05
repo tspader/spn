@@ -1,6 +1,5 @@
 #include "sp.h"
 #include "sp/str.h"
-#include "app/types.h"
 #include "ctx/types.h"
 #include "dag/dag.h"
 #include "error/types.h"

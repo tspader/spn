@@ -1,6 +1,5 @@
 #include "sp.h"
 #include "sp/macro.h"
-#include "app/types.h"
 #include "ctx/types.h"
 #include "error/types.h"
 #include "forward/types.h"

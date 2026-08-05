@@ -5,7 +5,7 @@ set(SPN_SOURCES
   api/core/core.c
   api/make/make.c
   api/node/node.c
-  app/app.c
+  project/project.c
   cli/add.c
   cli/build.c
   cli/clean.c

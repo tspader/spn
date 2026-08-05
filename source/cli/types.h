@@ -14,7 +14,7 @@ typedef struct spn_cli spn_cli_t;
 
 typedef struct {
   spn_op_desc_t op;
-  spn_app_config_t config;
+  spn_session_config_t config;
   spn_err_union_t (*finish)(spn_ctx_t*);
 } spn_command_t;
 

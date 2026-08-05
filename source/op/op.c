@@ -1,6 +1,5 @@
 #include "op/op.h"
 
-#include "app/types.h"
 #include "ctx/types.h"
 #include "session/invocation.h"
 #include "session/types.h"
@@ -12,8 +11,6 @@ spn_err_union_t spn_op_configure(spn_session_t* session);
 spn_err_union_t spn_op_build(spn_session_t* session);
 
 static spn_err_union_t prepare(spn_session_t* session) {
-  sp_assert(session->pkg);
-
   try_union(spn_op_sync_indexes(session->ctx, sp_zero_s(spn_index_refresh_t)));
   bool reresolve = sp_zero;
   do {
@@ -29,11 +26,11 @@ static spn_err_union_t prepare(spn_session_t* session) {
 spn_err_union_t spn_op_exec(spn_ctx_t* ctx, spn_op_desc_t* desc) {
   switch (desc->kind) {
     case SPN_OP_BUILD: {
-      try_union(prepare(&ctx->app->session));
-      return spn_op_build(&ctx->app->session);
+      try_union(prepare(ctx->session));
+      return spn_op_build(ctx->session);
     }
     case SPN_OP_ADD:          return spn_op_add(ctx, &desc->add);
-    case SPN_OP_CLEAN:        return spn_op_clean(&ctx->app->session, desc->clean.whole);
+    case SPN_OP_CLEAN:        return spn_op_clean(ctx->session, desc->clean.whole);
     case SPN_OP_PUBLISH:      return spn_op_publish(ctx, &desc->publish);
     case SPN_OP_SYNC_INDEXES: return spn_op_sync_indexes(ctx, desc->refresh);
     case SPN_OP_NONE:         break;
