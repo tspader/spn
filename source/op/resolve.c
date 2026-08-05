@@ -88,7 +88,7 @@ static void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
   });
 }
 
-spn_err_union_t spn_phase_resolve(spn_session_t* session) {
+spn_err_union_t spn_op_resolve(spn_session_t* session) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_RESOLVE_START,
     .pkg = session->pkg,

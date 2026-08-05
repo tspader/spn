@@ -286,85 +286,6 @@ static sp_cli_cmd_t cmd_test = {
   .handler = spn_cli_test,
 };
 
-static sp_cli_cmd_t cmd_generate = {
-  .name = "generate",
-  .summary = "Generate build system files with dependency flags",
-  .opts = {
-    {
-      .brief = "g",
-      .name = "generator",
-      .kind = SP_CLI_OPT_CSTR,
-      .summary = "Generator type (raw, shell, make)",
-      .placeholder = "TYPE",
-      .ptr = &spn_cli_raw.generate.generator,
-    },
-    {
-      .brief = "c",
-      .name = "compiler",
-      .kind = SP_CLI_OPT_CSTR,
-      .summary = "Compiler to format flags for (gcc, clang, tcc)",
-      .placeholder = "COMPILER",
-      .ptr = &spn_cli_raw.generate.compiler,
-    },
-    {
-      .brief = "p",
-      .name = "path",
-      .kind = SP_CLI_OPT_CSTR,
-      .summary = "Output directory for generated file",
-      .placeholder = "PATH",
-      .ptr = &spn_cli_raw.generate.path,
-    },
-  },
-  .handler = spn_cli_generate,
-};
-
-static sp_cli_cmd_t cmd_which = {
-  .name = "which",
-  .summary = "Print the absolute path of a cache dir for a package",
-  .opts = {
-    {
-      .brief = "d",
-      .name = "dir",
-      .kind = SP_CLI_OPT_CSTR,
-      .summary = "Which directory to show (store, include, lib, source, work, vendor)",
-      .placeholder = "DIR",
-      .ptr = &spn_cli_raw.which.dir,
-    },
-  },
-  .args = {
-    {
-      .name = "package",
-      .arity = SP_CLI_ARG_OPTIONAL,
-      .summary = "The package to show path for",
-      .ptr = &spn_cli_raw.which.package,
-    },
-  },
-  .handler = spn_cli_which,
-};
-
-static sp_cli_cmd_t cmd_graph = {
-  .name = "graph",
-  .summary = "Output the build graph as mermaid",
-  .opts = {
-    {
-      .brief = "o",
-      .name = "output",
-      .kind = SP_CLI_OPT_CSTR,
-      .summary = "Output file path (stdout if not specified)",
-      .placeholder = "FILE",
-      .ptr = &spn_cli_raw.graph.output,
-    },
-    {
-      .brief = "d",
-      .name = "dirty",
-      .summary = "Color nodes by dirtiness instead of type",
-      .kind = SP_CLI_OPT_BOOLEAN,
-      .ptr = &spn.cli.graph.dirty,
-    },
-  },
-  .handler = spn_cli_graph,
-};
-
 static sp_cli_cmd_t cmd_publish = {
   .name = "publish",
   .summary = "Publish a release to an index",
@@ -524,6 +445,10 @@ sp_cli_cmd_t* spn_cli(void) {
   return &cmd_root;
 }
 
+spn_command_t* spn_cli_command(sp_cli_t* cli) {
+  return (spn_command_t*)cli->user_data;
+}
+
 sp_cli_result_t cli_error(sp_cli_t* cli, const c8* fmt, ...) {
   va_list args;
   va_start(args, fmt);
@@ -564,15 +489,6 @@ void spn_cli_commit(void) {
 
   spn.cli.run.entry = sp_cstr_as_str(spn_cli_raw.run.entry);
   spn.cli.test.name = sp_cstr_as_str(spn_cli_raw.test.name);
-
-  spn.cli.generate.generator = sp_cstr_as_str(spn_cli_raw.generate.generator);
-  spn.cli.generate.compiler = sp_cstr_as_str(spn_cli_raw.generate.compiler);
-  spn.cli.generate.path = sp_cstr_as_str(spn_cli_raw.generate.path);
-
-  spn.cli.which.dir = sp_cstr_as_str(spn_cli_raw.which.dir);
-  spn.cli.which.package = sp_cstr_as_str(spn_cli_raw.which.package);
-
-  spn.cli.graph.output = sp_cstr_as_str(spn_cli_raw.graph.output);
 
   spn.cli.publish.index = sp_cstr_as_str(spn_cli_raw.publish.index);
   spn.cli.publish.source_url = sp_cstr_as_str(spn_cli_raw.publish.source_url);

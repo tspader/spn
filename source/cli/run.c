@@ -79,11 +79,12 @@ spn_err_union_t spn_cli_run_roots(spn_ctx_t* ctx) {
 }
 
 sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
-  spn_cli_run_t* command = &spn.cli.run;
+  spn_cli_run_t* cmd = &spn.cli.run;
+  spn_command_t* command = spn_cli_command(cli);
   bool has_manifest = sp_fs_exists(spn.paths.manifest);
 
-  if (is_source_entry(command->entry, has_manifest)) {
-    return cli_error(cli, "{.yellow} cannot run native sources; build scripts are wasm", sp_fmt_str(command->entry));
+  if (is_source_entry(cmd->entry, has_manifest)) {
+    return cli_error(cli, "{.yellow} cannot run native sources; build scripts are wasm", sp_fmt_str(cmd->entry));
   }
 
   if (!has_manifest) {
@@ -93,21 +94,21 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
     );
   }
 
-  if (!sp_str_om_has(app.package.scripts, spn_intern(command->entry))) {
+  if (!sp_str_om_has(app.package.scripts, spn_intern(cmd->entry))) {
     return cli_error(cli, "script target {.yellow} is not defined",
-      sp_fmt_str(command->entry)
+      sp_fmt_str(cmd->entry)
     );
   }
 
   spn_target_names_t names = sp_da_new(spn.heap, sp_str_t);
-  sp_da_push(names, command->entry);
-  spn.config.selection.kind = SPN_TARGET_SELECTION_EXPLICIT;
-  spn.config.selection.script = (spn_target_rule_t) {
+  sp_da_push(names, cmd->entry);
+  command->config.selection.kind = SPN_TARGET_SELECTION_EXPLICIT;
+  command->config.selection.script = (spn_target_rule_t) {
     .kind = SPN_TARGET_RULE_NAMED,
     .names = names,
   };
 
-  spn.exec.desc = (spn_op_desc_t) { .kind = SPN_OP_REACH, .reach = SPN_PHASE_BUILT };
-  spn.exec.finish = spn_cli_run_roots;
+  command->op = (spn_op_desc_t) { .kind = SPN_OP_BUILD };
+  command->finish = spn_cli_run_roots;
   return SP_CLI_CONTINUE;
 }

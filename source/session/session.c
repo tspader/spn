@@ -65,6 +65,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
   s->ctx = ctx;
   s->mem = mem;
   s->pkg = root;
+  s->config = config;
   s->paths.root = ctx->paths.project;
   s->paths.build = sp_fs_join_path(s->mem, s->paths.root, sp_str_lit("build"));
   spn_triple_t host = spn_triple_host();

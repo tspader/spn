@@ -315,11 +315,12 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   spn_cli_t* cli = &spn.cli;
+  spn_command_t command = sp_zero;
   sp_cli_t parsed = sp_cli_parse((sp_cli_desc_t) {
     .root = spn_cli(),
     .args = spn.args,
     .num_args = spn.num_args,
-    .user_data = &spn.cli,
+    .user_data = &command,
   });
 
   switch (parsed.status) {
@@ -473,7 +474,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
   }
 
-  try(parse_profile_overrides(&spn.cli.profile, &spn.config.overrides));
+  try(parse_profile_overrides(&spn.cli.profile, &command.config.overrides));
 
   switch (sp_cli_dispatch(&parsed)) {
     case SP_CLI_CONTINUE: break;
@@ -488,11 +489,12 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   if (has_manifest) {
-    try(spn_session_init(&app.session, &spn, spn.heap, &app.package, spn.config));
+    try(spn_session_init(&app.session, &spn, spn.heap, &app.package, command.config));
   }
 
-  if (spn.exec.desc.kind) {
-    spn.exec.op = spn_op_start(spn.heap, &spn, spn.exec.desc);
+  spn.exec.finish = command.finish;
+  if (command.op.kind) {
+    spn.exec.op = spn_op_start(spn.heap, &spn, command.op);
   }
 
   return SP_APP_CONTINUE;

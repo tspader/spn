@@ -20,7 +20,7 @@ spn build
 # references
 - `source/`
   - `spn.c` is the entry point
-  - `op/` is the library operations: session phases (resolve, sync, configure, build) behind `spn_op_reach`, plus action verbs (add, clean, publish, index sync)
+  - `op/` is the library operations: the build pipeline (resolve, sync, configure, build), plus action verbs (add, clean, publish, index sync)
     - `build/` is all the code that sets up and runs inside the build graph
 - `include/`
   - `spn/spn.h` for public API used in downstream packages

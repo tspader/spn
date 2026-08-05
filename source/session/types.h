@@ -29,14 +29,6 @@ typedef struct {
   u64 elapsed;
 } spn_loaded_pkg_t;
 
-typedef enum {
-  SPN_PHASE_NONE,
-  SPN_PHASE_PACKAGES,
-  SPN_PHASE_CONFIGURED,
-  SPN_PHASE_UNITS,
-  SPN_PHASE_BUILT,
-} spn_phase_t;
-
 typedef struct {
   spn_target_selection_t selection;
   bool force;
@@ -48,8 +40,8 @@ struct spn_session_t {
   sp_mem_t mem;
   spn_pkg_info_t* pkg;
   sp_env_t env;
-  spn_phase_t phase;
 
+  spn_app_config_t config;
   spn_profile_table_t profiles;
   spn_toolchain_catalog_t catalog;
   spn_profile_info_t profile;
@@ -63,7 +55,6 @@ struct spn_session_t {
   struct {
     spn_option_seeds_t seeds;
     u32 resolves;
-    bool reresolve;
   } gates;
 
   sp_da(spn_build_plan_t) plans;

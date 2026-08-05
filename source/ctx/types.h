@@ -48,11 +48,9 @@ struct spn_ctx_t {
   } caches;
 
   struct {
-    spn_op_desc_t desc;
     spn_err_union_t (*finish)(spn_ctx_t*);
     spn_op_t* op;
   } exec;
-  spn_app_config_t config;
 
   struct {
     sp_io_stream_writer_t out;

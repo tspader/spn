@@ -65,7 +65,7 @@ sp_cli_result_t spn_cli_index_sync(sp_cli_t* cli) {
     return cli_error(cli, "unknown index '{}'", SP_FMT_STR(spn.cli.index.name));
   }
 
-  spn.exec.desc = (spn_op_desc_t) {
+  spn_cli_command(cli)->op = (spn_op_desc_t) {
     .kind = SPN_OP_SYNC_INDEXES,
     .refresh = {
       .force = true,

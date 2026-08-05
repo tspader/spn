@@ -5,9 +5,8 @@
 #include "cli/types.h"
 #include "error/types.h"
 
-#define SPN_CLI_UNIMPLEMENTED() return sp_cli_set_error_c(cli, "unimplemented")
-
 sp_cli_result_t cli_error(sp_cli_t* cli, const c8* fmt, ...);
+spn_command_t* spn_cli_command(sp_cli_t* cli);
 spn_err_union_t spn_cli_run_roots(spn_ctx_t* ctx);
 
 sp_cli_result_t spn_cli_init(sp_cli_t* cli);
@@ -16,17 +15,6 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli);
 sp_cli_result_t spn_cli_run(sp_cli_t* cli);
 sp_cli_result_t spn_cli_test(sp_cli_t* cli);
 sp_cli_result_t spn_cli_clean(sp_cli_t* cli);
-sp_cli_result_t spn_cli_copy(sp_cli_t* cli);
-sp_cli_result_t spn_cli_generate(sp_cli_t* cli);
-sp_cli_result_t spn_cli_graph(sp_cli_t* cli);
-sp_cli_result_t spn_cli_list(sp_cli_t* cli);
-sp_cli_result_t spn_cli_ls(sp_cli_t* cli);
-sp_cli_result_t spn_cli_manifest(sp_cli_t* cli);
-sp_cli_result_t spn_cli_which(sp_cli_t* cli);
-sp_cli_result_t spn_cli_tool(sp_cli_t* cli);
-sp_cli_result_t spn_cli_tool_install(sp_cli_t* cli);
-sp_cli_result_t spn_cli_tool_uninstall(sp_cli_t* cli);
-sp_cli_result_t spn_cli_tool_run(sp_cli_t* cli);
 sp_cli_result_t spn_cli_publish(sp_cli_t* cli);
 sp_cli_result_t spn_cli_index(sp_cli_t* cli);
 sp_cli_result_t spn_cli_index_list(sp_cli_t* cli);

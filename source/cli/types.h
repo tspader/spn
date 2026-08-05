@@ -4,9 +4,19 @@
 #include "sp.h"
 #include "sp/sp_cli.h"
 
+#include "error/types.h"
+#include "forward/types.h"
+#include "op/types.h"
 #include "profile/types.h"
+#include "session/types.h"
 
 typedef struct spn_cli spn_cli_t;
+
+typedef struct {
+  spn_op_desc_t op;
+  spn_app_config_t config;
+  spn_err_union_t (*finish)(spn_ctx_t*);
+} spn_command_t;
 
 #define SPN_CLI_COMMAND(X) \
   X(SPN_CLI_INIT, "init") \
@@ -15,13 +25,6 @@ typedef struct spn_cli spn_cli_t;
   X(SPN_CLI_RUN, "run") \
   X(SPN_CLI_TEST, "test") \
   X(SPN_CLI_CLEAN, "clean") \
-  X(SPN_CLI_GENERATE, "generate") \
-  X(SPN_CLI_COPY, "copy") \
-  X(SPN_CLI_LIST, "list") \
-  X(SPN_CLI_WHICH, "which") \
-  X(SPN_CLI_LS, "ls") \
-  X(SPN_CLI_MANIFEST, "manifest") \
-  X(SPN_CLI_TOOL, "tool") \
   X(SPN_CLI_PUBLISH, "publish") \
   X(SPN_CLI_INDEX, "index")
 
@@ -29,44 +32,11 @@ typedef enum {
   SPN_CLI_COMMAND(SP_X_NAMED_ENUM_DEFINE)
 } spn_cli_cmd_t;
 
-#define SPN_TOOL_SUBCOMMAND(X) \
-  X(SPN_TOOL_INSTALL, "install") \
-  X(SPN_TOOL_UNINSTALL, "uninstall") \
-  X(SPN_TOOL_RUN, "run") \
-  X(SPN_TOOL_LIST, "list") \
-  X(SPN_TOOL_UPDATE, "update")
-
-typedef enum {
-  SPN_TOOL_SUBCOMMAND(SP_X_NAMED_ENUM_DEFINE)
-} spn_tool_cmd_t;
-
 typedef struct {
   sp_str_t package;
   bool test;
   bool build;
 } spn_cli_add_t;
-
-typedef struct {
-  union {
-    sp_str_t package;
-    sp_str_t dir;
-  };
-  bool force;
-  sp_str_t version;
-} spn_cli_tool_install_t;
-
-typedef struct {
-  sp_str_t package;
-  sp_str_t command;
-} spn_cli_tool_run_t;
-
-typedef struct {
-  spn_tool_cmd_t subcommand;
-  union {
-    spn_cli_tool_install_t install;
-    spn_cli_tool_run_t run;
-  };
-} spn_cli_tool_t;
 
 typedef struct {
   bool bare;
@@ -90,35 +60,6 @@ typedef struct {
 typedef struct {
   sp_str_t name;
 } spn_cli_test_t;
-
-typedef struct {
-  sp_str_t generator;
-  sp_str_t compiler;
-  sp_str_t path;
-} spn_cli_generate_t;
-
-typedef struct {
-  sp_str_t dir;
-  sp_str_t package;
-} spn_cli_which_t;
-
-typedef struct {
-  sp_str_t dir;
-  sp_str_t package;
-} spn_cli_ls_t;
-
-typedef struct {
-  sp_str_t package;
-} spn_cli_manifest_t;
-
-typedef struct {
-  sp_str_t directory;
-} spn_cli_copy_t;
-
-typedef struct {
-  sp_str_t output;
-  bool dirty;
-} spn_cli_graph_t;
 
 typedef struct {
   sp_str_t index;
@@ -146,17 +87,10 @@ struct spn_cli {
   spn_profile_args_t profile;
 
   spn_cli_add_t add;
-  spn_cli_tool_t tool;
   spn_cli_init_t init;
-  spn_cli_generate_t generate;
   spn_cli_build_t build;
   spn_cli_run_t run;
   spn_cli_test_t test;
-  spn_cli_ls_t ls;
-  spn_cli_which_t which;
-  spn_cli_manifest_t manifest;
-  spn_cli_copy_t copy;
-  spn_cli_graph_t graph;
   spn_cli_publish_t publish;
   spn_cli_index_t index;
 };
@@ -183,44 +117,11 @@ typedef struct {
     const c8* package;
   } add;
   struct {
-    const c8* package;
-  } update;
-  struct {
-    const c8* package;
-    const c8* version;
-  } tool_install;
-  struct {
-    const c8* package;
-    const c8* command;
-  } tool_run;
-  struct {
     const c8* entry;
   } run;
   struct {
     const c8* name;
   } test;
-  struct {
-    const c8* generator;
-    const c8* compiler;
-    const c8* path;
-  } generate;
-  struct {
-    const c8* dir;
-    const c8* package;
-  } which;
-  struct {
-    const c8* dir;
-    const c8* package;
-  } ls;
-  struct {
-    const c8* package;
-  } manifest;
-  struct {
-    const c8* directory;
-  } copy;
-  struct {
-    const c8* output;
-  } graph;
   struct {
     const c8* index;
     const c8* source_url;

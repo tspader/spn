@@ -10,19 +10,11 @@ set(SPN_SOURCES
   cli/build.c
   cli/clean.c
   cli/cli.c
-  cli/copy.c
-  cli/generate.c
-  cli/graph.c
   cli/init.c
-  cli/list.c
-  cli/ls.c
-  cli/manifest.c
   cli/index.c
   cli/publish.c
   cli/run.c
   cli/test.c
-  cli/tool.c
-  cli/which.c
   codegen/codegen.c
   codegen/loader.c
   codegen/json.c
