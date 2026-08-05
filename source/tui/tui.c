@@ -45,8 +45,6 @@ sp_prompt_widget_t sp_prompt_progress_widget(sp_prompt_ctx_t* ctx, sp_prompt_pro
   #include <unistd.h>
 #endif
 
-#define SP_TUI_PRINT(command) sp_tui_print(sp_str_view(command))
-
 static sp_str_t spn_tui_name_to_color(sp_mem_t mem, sp_str_t str);
 static sp_str_t spn_tui_decorate_name(sp_mem_t mem, sp_str_t name, u32 padded_len, c8 pad);
 static void     spn_tui_line_writer_flush(spn_tui_line_writer_t* writer);
@@ -75,89 +73,9 @@ sp_str_t spn_output_mode_to_str(spn_tui_mode_t mode) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-void sp_tui_print(sp_str_t str) {
-  sp_io_write_str(&shell.logger.err.base, str, SP_NULLPTR);
-}
-
-void sp_tui_up(u32 n) {
-  sp_fmt_io(&shell.logger.err.base, "\033[{}A", sp_fmt_uint(n));
-}
-
-void sp_tui_down(u32 n) {
-  sp_fmt_io(&shell.logger.err.base, "\033[{}B", sp_fmt_uint(n));
-}
-
-void sp_tui_clear_line(void) {
-  SP_TUI_PRINT("\033[K");
-}
-
-void sp_tui_show_cursor(void) {
-  SP_TUI_PRINT("\033[?25h");
-}
-
-void sp_tui_hide_cursor(void) {
-  SP_TUI_PRINT("\033[?25l");
-}
-
-void sp_tui_home(void) {
-  SP_TUI_PRINT("\033[0G");
-}
-
 void sp_tui_flush(void) {
   fflush(stderr);
 }
-
-#ifdef SP_WIN32
-void sp_tui_checkpoint(spn_tui_t* tui) {
-  tui->terminal.input_handle = GetStdHandle(STD_INPUT_HANDLE);
-  tui->terminal.output_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-
-  GetConsoleMode(tui->terminal.input_handle, (DWORD*)&tui->terminal.original_input_mode);
-  GetConsoleMode(tui->terminal.output_handle, (DWORD*)&tui->terminal.original_output_mode);
-  tui->terminal.modified = true;
-}
-
-void sp_tui_restore(spn_tui_t* tui) {
-  if (tui->terminal.modified) {
-    SetConsoleMode(tui->terminal.input_handle, (DWORD)tui->terminal.original_input_mode);
-    SetConsoleMode(tui->terminal.output_handle, (DWORD)tui->terminal.original_output_mode);
-  }
-}
-
-void sp_tui_setup_raw_mode(spn_tui_t* tui) {
-  sp_win32_dword_t output_mode = tui->terminal.original_output_mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-  SetConsoleMode(tui->terminal.output_handle, (DWORD)output_mode);
-
-  sp_win32_dword_t input_mode = tui->terminal.original_input_mode & ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT);
-  SetConsoleMode(tui->terminal.input_handle, (DWORD)input_mode);
-
-  CONSOLE_CURSOR_INFO info;
-  GetConsoleCursorInfo(tui->terminal.output_handle, &info);
-  info.bVisible = FALSE;
-  info.dwSize = 25;
-  SetConsoleCursorInfo(tui->terminal.output_handle, &info);
-}
-#endif
-
-#if defined(SP_POSIX)
-void sp_tui_checkpoint(spn_tui_t* tui) {
-  tcgetattr(STDIN_FILENO, &tui->terminal.ios);
-  tui->terminal.modified = true;
-}
-
-void sp_tui_restore(spn_tui_t* tui) {
-  if (tui->terminal.modified) {
-    tcsetattr(STDIN_FILENO, TCSANOW, &tui->terminal.ios);
-  }
-}
-
-void sp_tui_setup_raw_mode(spn_tui_t* tui) {
-  struct termios ios = tui->terminal.ios;
-  ios.c_lflag &= ~(ICANON | ECHO);
-  tcsetattr(STDIN_FILENO, TCSANOW, &ios);
-  fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
-}
-#endif
 
 static sp_str_t spn_tui_decorate_name(sp_mem_t mem, sp_str_t name, u32 padded_len, c8 pad) {
   sp_io_dyn_mem_writer_t w = sp_zero;
@@ -181,7 +99,7 @@ static sp_str_t spn_tui_name_to_color(sp_mem_t mem, sp_str_t str) {
 
   static sp_ht(u32, sp_hash_t) buckets = SP_NULLPTR;
   if (!buckets) {
-    sp_ht_init(shell.tui.mem, buckets);
+    sp_ht_init(sp_mem_os_new(), buckets);
   }
 
   sp_hash_t hash = sp_hash_str(str);
@@ -1383,9 +1301,9 @@ typedef struct {
   sp_str_t message;
 } spn_tui_buffered_log_t;
 
-void spn_tui_log_event(spn_build_event_t* event) {
-  if (shell.tui.mode == SPN_OUTPUT_MODE_JSON) {
-    spn_event_log_jsonl(&shell.logger.out.base, event);
+void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
+  if (tui->mode == SPN_OUTPUT_MODE_JSON) {
+    spn_event_log_jsonl(&tui->logger->out.base, event);
     return;
   }
 
@@ -1393,16 +1311,16 @@ void spn_tui_log_event(spn_build_event_t* event) {
   static sp_da(spn_tui_buffered_log_t) buffered_logs = SP_NULLPTR;
   static u32 num_downloads = 0;
   if (!seen_url) {
-    sp_str_ht_init(shell.tui.mem, seen_url);
-    sp_da_init(shell.tui.mem, buffered_logs);
+    sp_str_ht_init(tui->mem, seen_url);
+    sp_da_init(tui->mem, buffered_logs);
   }
 
   const spn_event_info_t* display = &spn_event_info[event->kind];
-  if (display->verbosity > shell.logger.verbosity) {
+  if (display->verbosity > tui->logger->verbosity) {
     if (event->kind == SPN_EVENT_USER_LOG) {
       sp_da_push(buffered_logs, ((spn_tui_buffered_log_t) {
-        .pkg = event->pkg ? sp_str_copy(shell.tui.mem, event->pkg->name) : sp_str_lit(""),
-        .message = sp_str_copy(shell.tui.mem, event->user_log.message),
+        .pkg = event->pkg ? sp_str_copy(tui->mem, event->pkg->name) : sp_str_lit(""),
+        .message = sp_str_copy(tui->mem, event->user_log.message),
       }));
     }
     return;
@@ -1410,7 +1328,7 @@ void spn_tui_log_event(spn_build_event_t* event) {
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_mem_t mem = scratch.mem;
-  sp_io_writer_t* w = shell.tui.out;
+  sp_io_writer_t* w = tui->out;
   sp_str_t verb = sp_str_view(display->display);
 
   if (display->error) {
@@ -1430,7 +1348,7 @@ void spn_tui_log_event(spn_build_event_t* event) {
       spn_tui_write_event_line(w, mem, verb, true, name, detail);
     }
     spn_tui_render_event_extra(w, event);
-    spn_tui_line_writer_flush(&shell.tui.line_writer);
+    spn_tui_line_writer_flush(&tui->line_writer);
     sp_mem_end_scratch(scratch);
     return;
   }
@@ -1438,7 +1356,7 @@ void spn_tui_log_event(spn_build_event_t* event) {
   switch (event->kind) {
     case SPN_EVENT_SYNC: {
       if (!sp_str_ht_get(seen_url, event->sync.url)) {
-        sp_str_ht_insert(seen_url, sp_str_copy(shell.tui.mem, event->sync.url), true);
+        sp_str_ht_insert(seen_url, sp_str_copy(tui->mem, event->sync.url), true);
         num_downloads++;
         spn_tui_write_event_line(
           w, mem, verb, false,
@@ -1494,7 +1412,7 @@ void spn_tui_log_event(spn_build_event_t* event) {
     }
   }
 
-  spn_tui_line_writer_flush(&shell.tui.line_writer);
+  spn_tui_line_writer_flush(&tui->line_writer);
   sp_mem_end_scratch(scratch);
 }
 
@@ -1559,12 +1477,13 @@ void spn_tui_detach_prompt(spn_tui_t* tui) {
   spn_tui_line_writer_flush(&tui->line_writer);
 }
 
-void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode) {
+void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode, spn_logger_t* logger) {
   tui->mode = mode;
   tui->mem = sp_mem_arena_as_allocator(sp_mem_arena_new(spn.mem));
+  tui->logger = logger;
   tui->line_writer = (spn_tui_line_writer_t) {
     .base.write = spn_tui_line_writer_write,
-    .downstream = &shell.logger.err.base,
+    .downstream = &logger->err.base,
   };
   sp_da_init(tui->mem, tui->line_writer.partial);
   tui->out = &tui->line_writer.base;
@@ -1582,25 +1501,25 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode) {
   }
 }
 
-static void spn_prompt_on_event(sp_prompt_ctx_t* ctx, sp_prompt_event_t event) {
+static spn_tui_t* prompt_tui;
+
+static void on_prompt_event(sp_prompt_ctx_t* ctx, sp_prompt_event_t event) {
   switch (event.kind) {
     case SP_PROMPT_EVENT_CTRL_C: {
       sp_atomic_s32_set(&spn.aborted, 1);
-      sp_atomic_s32_set(&shell.sp->shutdown, 1);
       break;
     }
     case SP_PROMPT_EVENT_ESCAPE: {
       break;
     }
     default: {
-      shell.tui.prompt.widget.on_event(ctx, event);
+      prompt_tui->prompt.widget.on_event(ctx, event);
       break;
     }
   }
 }
 
-static void spn_prompt_start(void) {
-  spn_tui_t* tui = &shell.tui;
+static void prompt_start(spn_tui_t* tui) {
   if (tui->prompt.started) return;
   tui->prompt.started = true;
 
@@ -1610,12 +1529,13 @@ static void spn_prompt_start(void) {
   tui->prompt.ctx = sp_prompt_begin(spn.mem);
   if (!tui->prompt.ctx) return;
 
+  prompt_tui = tui;
   tui->prompt.widget = sp_prompt_progress_widget(tui->prompt.ctx, (sp_prompt_progress_t) {
     .prompt = "Building",
     .color = { .rgb = { .r = 99, .g = 160, .b = 136 } },
   });
   sp_prompt_widget_t widget = tui->prompt.widget;
-  widget.on_event = spn_prompt_on_event;
+  widget.on_event = on_prompt_event;
   sp_prompt_app(tui->prompt.ctx, widget);
   tui->prompt.app = (sp_app_t) { .user_data = tui->prompt.ctx };
   sp_prompt_app_on_init(&tui->prompt.app);
@@ -1631,8 +1551,7 @@ static void spn_prompt_start(void) {
 // - deinit(), unconditionally in interactive mode?
 //
 //
-void spn_prompt_stop(bool ok) {
-  spn_tui_t* tui = &shell.tui;
+void spn_prompt_stop(spn_tui_t* tui, bool ok) {
   if (!tui->prompt.on) return;
 
   sp_prompt_state_t state = ok ? SP_PROMPT_STATE_SUBMIT : SP_PROMPT_STATE_ERROR;
@@ -1649,11 +1568,9 @@ void spn_prompt_stop(bool ok) {
 
 // @spader
 //
-void spn_prompt_pump() {
-  spn_tui_t* tui = &shell.tui;
-
+void spn_prompt_pump(spn_tui_t* tui) {
   if (sp_atomic_s32_get(&spn.aborted)) {
-    spn_prompt_stop(false);
+    spn_prompt_stop(tui, false);
     return;
   }
 
@@ -1664,7 +1581,7 @@ void spn_prompt_pump() {
 
   if (!tui->prompt.on) {
     if (!sp_atomic_s32_get(&progress->misses)) return;
-    spn_prompt_start();
+    prompt_start(tui);
     if (!tui->prompt.on) return;
   }
   u32 total = (u32)sp_atomic_s32_get(&progress->total);

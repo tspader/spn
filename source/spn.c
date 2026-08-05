@@ -85,12 +85,24 @@
 spn_ctx_t spn;
 spn_shell_t shell;
 
-void on_signal(sp_os_signal_t signal, void* userdata) {
+static struct {
+  s32 num_args;
+  const c8** args;
+  sp_app_t* sp;
+  spn_cg_config_t config;
+  spn_err_union_t result;
+  struct {
+    spn_err_union_t (*finish)(spn_shell_t*);
+    spn_op_t* op;
+  } exec;
+} entry;
+
+static void on_signal(sp_os_signal_t signal, void* userdata) {
   (void)userdata;
   switch (signal) {
     case SP_OS_SIGNAL_INTERRUPT: {
       sp_atomic_s32_set(&spn.aborted, 1);
-      sp_atomic_s32_set(&shell.sp->shutdown, 1);
+      sp_atomic_s32_set(&entry.sp->shutdown, 1);
       break;
     }
     case SP_OS_SIGNAL_ABORT:
@@ -171,15 +183,15 @@ spn_err_t extract_runtime() {
   do { \
     spn_err_union_t __err = (expr); \
     if (__err.kind) { \
-      shell.result = spn_err_emit(__err); \
+      entry.result = spn_err_emit(__err); \
       return SP_APP_ERR; \
     } \
   } while (0)
 
-sp_app_result_t spn_init(sp_app_t* sp) {
+static sp_app_result_t on_init(sp_app_t* sp) {
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
-  shell.sp = sp;
+  entry.sp = sp;
   spn.mem = sp_mem_os_new();
   spn.arena = sp_mem_arena_new(spn.mem);
   spn.heap = sp_mem_arena_as_allocator(spn.arena);
@@ -207,8 +219,8 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn_command_t command = sp_zero;
   sp_cli_t parsed = sp_cli_parse((sp_cli_desc_t) {
     .root = spn_cli(),
-    .args = shell.args,
-    .num_args = shell.num_args,
+    .args = entry.args,
+    .num_args = entry.num_args,
     .user_data = &command,
   });
 
@@ -237,7 +249,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   if (!sp_str_empty(shell.cli.output)) {
     output_mode = spn_output_mode_from_str(shell.cli.output);
   }
-  spn_tui_init(&shell.tui, output_mode);
+  spn_tui_init(&shell.tui, output_mode, &shell.logger);
 
   spn.events = spn_event_buffer_new(spn.mem);
   spn_event_log_init(spn.heap);
@@ -294,14 +306,14 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   if (sp_fs_exists(spn.paths.config.toml)) {
     spn_toml_loader_t loader = sp_zero;
     spn_toml_loader_init(&loader, spn.mem, spn.intern);
-    spn_err_t loaded = spn_codegen_load_config(&loader, spn.paths.config.toml, &shell.config_file);
+    spn_err_t loaded = spn_codegen_load_config(&loader, spn.paths.config.toml, &entry.config);
     if (!loaded) {
-      sp_da_for(shell.config_file.index, it) {
-        sp_da_push(config_indexes, spn_index_lower(&loader, it, SPN_INDEX_USER, &shell.config_file.index[it]));
+      sp_da_for(entry.config.index, it) {
+        sp_da_push(config_indexes, spn_index_lower(&loader, it, SPN_INDEX_USER, &entry.config.index[it]));
       }
     }
     if (loaded || !sp_da_empty(loader.issues)) {
-      shell.result = spn_err_emit((spn_err_union_t) {
+      entry.result = spn_err_emit((spn_err_union_t) {
         .kind = SPN_ERR_MANIFEST_ISSUES,
         .manifest = { .path = spn.paths.config.toml, .issues = loader.issues },
       });
@@ -326,7 +338,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   try(spn_project_load(spn.heap, spn.intern, spn.events, spn.paths.project, &spn.project));
   if (spn_cli_requires_manifest(parsed.cmd)) {
     if (!spn.project) {
-      shell.result = spn_err_emit((spn_err_union_t) {
+      entry.result = spn_err_emit((spn_err_union_t) {
         .kind = SPN_ERR_NO_MANIFEST,
         .no_manifest = { .path = spn.paths.project },
       });
@@ -363,91 +375,58 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     try(spn_session_init(spn.session, &spn, spn.heap, spn.project, command.config));
   }
 
-  shell.exec.finish = command.finish;
+  entry.exec.finish = command.finish;
   if (command.op.kind) {
-    shell.exec.op = spn_op_start(spn.heap, &spn, command.op);
+    entry.exec.op = spn_op_start(spn.heap, &spn, command.op);
   }
 
   return SP_APP_CONTINUE;
 }
 
-SP_PRIVATE u32 get_short_thread_id(u64 thread_id) {
-  // Give each unique OS thread ID a small, monotonic ID so it's easier
-  // to track when reading logs
-  static sp_ht(u64, u32) thread_map = SP_NULLPTR;
-  static u32 id = 0;
-
-  if (!thread_map) sp_ht_init(shell.tui.mem, thread_map);
-  if (!sp_ht_key_exists(thread_map, thread_id)) {
-    sp_ht_insert(thread_map, thread_id, id++);
-  }
-  return *sp_ht_getp(thread_map, thread_id);
-}
-
-static void spn_drain_events(void) {
-  if (!spn.events) return;
-
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  sp_da(spn_build_event_t) events = spn_event_buffer_drain(s.mem, spn.events);
-
-  sp_da_for(events, it) {
-    spn_build_event_t* event = &events[it];
-    event->thread_id = get_short_thread_id(event->thread_id);
-
-    if (shell.logger.jsonl.fd) {
-      spn_event_log_jsonl(&shell.logger.jsonl.base, event);
-    }
-    if (event->io) {
-      spn_event_log_jsonl(&event->io->jsonl.writer, event);
-      spn_event_log_build(&event->io->build.writer, event);
-    }
-
-    spn_tui_log_event(event);
+static sp_app_result_t on_poll(sp_app_t* sp) {
+  if (sp_atomic_s32_get(&spn.aborted)) {
+    sp_atomic_s32_set(&sp->shutdown, 1);
   }
 
-  sp_mem_end_scratch(s);
-}
-
-sp_app_result_t spn_poll(sp_app_t* sp) {
-  spn_drain_events();
-  spn_prompt_pump();
+  spn_shell_flush();
+  spn_prompt_pump(&shell.tui);
 
   return SP_APP_CONTINUE;
 }
 
-sp_app_result_t spn_update(sp_app_t* sp) {
+static sp_app_result_t on_update(sp_app_t* sp) {
   if (sp_atomic_s32_get(&sp->shutdown)) {
-    if (shell.exec.op) {
-      spn_op_result(shell.exec.op);
-      shell.exec.op = SP_NULLPTR;
+    if (entry.exec.op) {
+      spn_op_result(entry.exec.op);
+      entry.exec.op = SP_NULLPTR;
     }
     return SP_APP_QUIT;
   }
 
-  if (shell.exec.op) {
-    if (!spn_op_poll(shell.exec.op)) {
+  if (entry.exec.op) {
+    if (!spn_op_poll(entry.exec.op)) {
       return SP_APP_CONTINUE;
     }
 
-    spn_err_union_t result = spn_op_result(shell.exec.op);
-    shell.exec.op = SP_NULLPTR;
+    spn_err_union_t result = spn_op_result(entry.exec.op);
+    entry.exec.op = SP_NULLPTR;
 
     if (result.kind) {
-      shell.result = spn_err_emit(result);
-      spn_prompt_stop(false);
-      spn_poll(sp);
+      entry.result = spn_err_emit(result);
+      spn_prompt_stop(&shell.tui, false);
+      on_poll(sp);
       return SP_APP_ERR;
     }
 
-    spn_prompt_stop(true);
-    spn_poll(sp);
+    spn_prompt_stop(&shell.tui, true);
+    on_poll(sp);
   }
 
-  if (shell.exec.finish) {
-    spn_err_union_t err = shell.exec.finish(&shell);
-    shell.exec.finish = SP_NULLPTR;
+  if (entry.exec.finish) {
+    spn_err_union_t err = entry.exec.finish(&shell);
+    entry.exec.finish = SP_NULLPTR;
     if (err.kind) {
-      shell.result = spn_err_emit(err);
+      entry.result = spn_err_emit(err);
       return SP_APP_ERR;
     }
   }
@@ -455,10 +434,10 @@ sp_app_result_t spn_update(sp_app_t* sp) {
   return SP_APP_QUIT;
 }
 
-void spn_deinit(sp_app_t* sp) {
+static void on_deinit(sp_app_t* sp) {
   switch (shell.tui.mode) {
     case SPN_OUTPUT_MODE_INTERACTIVE: {
-      spn_prompt_stop(true);
+      spn_prompt_stop(&shell.tui, true);
       sp_tui_flush();
       break;
     }
@@ -478,7 +457,7 @@ void spn_deinit(sp_app_t* sp) {
 
   if (spn.events) {
     bool ok = sp->result != SP_APP_ERR;
-    spn_err_t kind = shell.result.kind;
+    spn_err_t kind = entry.result.kind;
     if (!ok && !kind) {
       kind = SPN_ERROR;
     }
@@ -491,7 +470,7 @@ void spn_deinit(sp_app_t* sp) {
     });
   }
 
-  spn_drain_events();
+  spn_shell_flush();
 
   if (!spn.session) return;
 
@@ -531,16 +510,14 @@ void spn_deinit(sp_app_t* sp) {
 }
 
 sp_app_config_t spn_main(s32 num_args, const c8** args) {
-  shell = (spn_shell_t) {
-    .num_args = num_args,
-    .args = args,
-  };
+  entry.num_args = num_args;
+  entry.args = args;
 
   return (sp_app_config_t) {
-    .on_init = spn_init,
-    .on_poll = spn_poll,
-    .on_update = spn_update,
-    .on_deinit = spn_deinit,
+    .on_init = on_init,
+    .on_poll = on_poll,
+    .on_update = on_update,
+    .on_deinit = on_deinit,
     .fps = 144,
   };
 }

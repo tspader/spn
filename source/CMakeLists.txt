@@ -41,7 +41,6 @@ set(SPN_SOURCES
   event/build.c
   event/log.c
   external/cc.c
-  external/cJSON.c
   external/git.c
   external/obj.c
   external/tom.c
@@ -93,6 +92,7 @@ set(SPN_SOURCES
   session/registry/registry.c
   session/session.c
   sha256/sha256.c
+  shell/shell.c
   sp/color.c
   sp/fs.c
   sp/io.c

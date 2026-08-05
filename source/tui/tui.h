@@ -4,24 +4,14 @@
 #include "tui/types.h"
 #include "event/types.h"
 
-void            sp_tui_print(sp_str_t str);
-void            sp_tui_up(u32 n);
-void            sp_tui_down(u32 n);
-void            sp_tui_clear_line(void);
-void            sp_tui_show_cursor(void);
-void            sp_tui_hide_cursor(void);
-void            sp_tui_home(void);
 void            sp_tui_flush(void);
-void            sp_tui_checkpoint(spn_tui_t* tui);
-void            sp_tui_restore(spn_tui_t* tui);
-void            sp_tui_setup_raw_mode(spn_tui_t* tui);
-void            spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode);
-void            spn_tui_log_event(spn_build_event_t* event);
+void            spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode, spn_logger_t* logger);
+void            spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event);
 sp_str_t        spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event);
 void            spn_tui_attach_prompt(spn_tui_t* tui, sp_prompt_ctx_t* ctx);
 void            spn_tui_detach_prompt(spn_tui_t* tui);
-void            spn_prompt_stop(bool ok);
-void            spn_prompt_pump();
+void            spn_prompt_stop(spn_tui_t* tui, bool ok);
+void            spn_prompt_pump(spn_tui_t* tui);
 spn_tui_mode_t  spn_output_mode_from_str(sp_str_t str);
 sp_str_t        spn_output_mode_to_str(spn_tui_mode_t mode);
 

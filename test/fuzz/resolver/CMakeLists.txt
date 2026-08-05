@@ -4,7 +4,6 @@ add_executable(fuzz_resolver
   ${SRC}/intern/intern.c
   ${SRC}/enum/enum.c
   ${SRC}/event/event.c
-  ${SRC}/external/cJSON.c
   ${SRC}/external/git.c
   ${SRC}/external/tom.c
   ${SRC}/codegen/codegen.c
