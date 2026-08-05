@@ -201,8 +201,8 @@ static spn_err_union_t run(sp_mem_t mem, spn_cli_init_t* command, sp_str_t proje
   return run_unattended(mem, command, dir, name);
 }
 
-static spn_err_union_t finish_init(spn_ctx_t* ctx) {
-  return run(ctx->mem, &ctx->cli.init, ctx->paths.project);
+static spn_err_union_t finish_init(spn_shell_t* shell) {
+  return run(spn.mem, &shell->cli.init, spn.paths.project);
 }
 
 sp_cli_result_t spn_cli_init(sp_cli_t* cli) {

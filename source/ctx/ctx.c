@@ -5,18 +5,6 @@ sp_intern_t* spn_ctx_get_intern(void) {
   return spn.intern;
 }
 
-spn_log_level_t spn_ctx_get_log_level(void) {
-  return spn.logger.level;
-}
-
-sp_io_writer_t* spn_ctx_get_log_out(void) {
-  return &spn.logger.out.base;
-}
-
-sp_io_writer_t* spn_ctx_get_log_err(void) {
-  return &spn.logger.err.base;
-}
-
 spn_index_info_t* spn_find_index(sp_str_t name) {
   sp_da_for(spn.indexes, it) {
     if (sp_str_equal(spn.indexes[it].name, name)) {

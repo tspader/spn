@@ -4,6 +4,7 @@
 #include "ctx/types.h"
 #include "enum/enum.h"
 #include "index/index.h"
+#include "log/log.h"
 #include "op/op.h"
 
 sp_cli_result_t spn_cli_index(sp_cli_t* cli) {
@@ -24,7 +25,7 @@ sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
   width.kind = SP_MAX(width.kind, sp_cstr_len(headers[1]));
   width.protocol = SP_MAX(width.protocol, sp_cstr_len(headers[2]));
 
-  sp_fmt_io(&spn.logger.out.base, "{:<$ .gray} {:<$ .gray} {:<$ .gray} {.gray}\n",
+  spn_print("{:<$ .gray} {:<$ .gray} {:<$ .gray} {.gray}",
     sp_fmt_uint(width.name),
     sp_fmt_cstr(headers[0]),
     sp_fmt_uint(width.kind),
@@ -35,7 +36,7 @@ sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
 
   sp_da_for(spn.indexes, it) {
     spn_index_info_t* index = &spn.indexes[it];
-    sp_fmt_io(&spn.logger.out.base, "{:>$} {:>$} {:>$} {}\n",
+    spn_print("{:>$} {:>$} {:>$} {}",
       sp_fmt_uint(width.name),
       sp_fmt_str(index->name),
       sp_fmt_uint(width.kind),
@@ -50,26 +51,26 @@ sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
 }
 
 sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
-  sp_str_t name = sp_str_empty(spn.cli.index.name) ? sp_str_lit("core") : spn.cli.index.name;
+  sp_str_t name = sp_str_empty(shell.cli.index.name) ? sp_str_lit("core") : shell.cli.index.name;
   spn_index_info_t* index = spn_find_index(name);
   if (!index) {
     return cli_error(cli, "unknown index: {.cyan}", SP_FMT_STR(name));
   }
 
-  sp_fmt_io(&spn.logger.out.base, "{}\n", sp_fmt_str(index->location));
+  spn_print("{}", sp_fmt_str(index->location));
   return SP_CLI_OK;
 }
 
 sp_cli_result_t spn_cli_index_sync(sp_cli_t* cli) {
-  if (!sp_str_empty(spn.cli.index.name) && !spn_find_index(spn.cli.index.name)) {
-    return cli_error(cli, "unknown index '{}'", SP_FMT_STR(spn.cli.index.name));
+  if (!sp_str_empty(shell.cli.index.name) && !spn_find_index(shell.cli.index.name)) {
+    return cli_error(cli, "unknown index '{}'", SP_FMT_STR(shell.cli.index.name));
   }
 
   spn_cli_command(cli)->op = (spn_op_desc_t) {
     .kind = SPN_OP_SYNC_INDEXES,
     .refresh = {
       .force = true,
-      .only = spn.cli.index.name,
+      .only = shell.cli.index.name,
     },
   };
   return SP_CLI_CONTINUE;
