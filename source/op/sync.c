@@ -1,5 +1,6 @@
 #include "sp.h"
 #include "sp/str.h"
+#include "ctx/ctx.h"
 #include "ctx/types.h"
 #include "dag/dag.h"
 #include "error/types.h"
@@ -377,7 +378,7 @@ static sp_atomic_s32_t sync_failed;
 
 static void sync_package_node(void *data) {
   pkg_job_t* job = (pkg_job_t*)data;
-  if (sp_atomic_s32_get(&sync_failed) || sp_atomic_s32_get(&spn.aborted)) {
+  if (sp_atomic_s32_get(&sync_failed) || spn_ctx_cancelled(&spn)) {
     return;
   }
   job->err = load_package(job->session, job->pkg, &job->loaded);
@@ -388,7 +389,7 @@ static void sync_package_node(void *data) {
 
 static void sync_toolchain_node(void* data) {
   toolchain_job_t* job = (toolchain_job_t*)data;
-  if (sp_atomic_s32_get(&sync_failed) || sp_atomic_s32_get(&spn.aborted)) {
+  if (sp_atomic_s32_get(&sync_failed) || spn_ctx_cancelled(&spn)) {
     return;
   }
   job->err = setup_toolchain_unit(&spn.caches.toolchains, job->unit);
@@ -480,7 +481,7 @@ spn_err_union_t spn_op_sync(spn_session_t* session, bool* reresolve) {
   spn_thread_pool_deinit(&pool);
   u64 elapsed = sp_tm_read_timer(&timer);
 
-  if (sp_atomic_s32_get(&spn.aborted)) {
+  if (spn_ctx_cancelled(&spn)) {
     return spn_err_reported(SPN_ERROR);
   }
 

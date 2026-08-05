@@ -1529,7 +1529,7 @@ static spn_tui_t* prompt_tui;
 static void on_prompt_event(sp_prompt_ctx_t* ctx, sp_prompt_event_t event) {
   switch (event.kind) {
     case SP_PROMPT_EVENT_CTRL_C: {
-      sp_atomic_s32_set(&spn.aborted, 1);
+      spn_ctx_cancel(&spn);
       break;
     }
     case SP_PROMPT_EVENT_ESCAPE: {
@@ -1578,7 +1578,7 @@ void spn_prompt_stop(spn_tui_t* tui, bool ok) {
   if (!tui->prompt.on) return;
 
   sp_prompt_state_t state = ok ? SP_PROMPT_STATE_SUBMIT : SP_PROMPT_STATE_ERROR;
-  if (sp_atomic_s32_get(&spn.aborted)) {
+  if (spn_ctx_cancelled(&spn)) {
     state = SP_PROMPT_STATE_CANCEL;
   }
 
@@ -1592,7 +1592,7 @@ void spn_prompt_stop(spn_tui_t* tui, bool ok) {
 // @spader
 //
 void spn_prompt_pump(spn_tui_t* tui) {
-  if (sp_atomic_s32_get(&spn.aborted)) {
+  if (spn_ctx_cancelled(&spn)) {
     spn_prompt_stop(tui, false);
     return;
   }
