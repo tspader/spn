@@ -6,9 +6,7 @@
 #include "event/event.h"
 #include "event/types.h"
 #include "index/index.h"
-#include "index/json.h"
 #include "index/publish.h"
-#include "log/log.h"
 #include "op/op.h"
 #include "pkg/id.h"
 #include "project/types.h"
@@ -33,13 +31,6 @@ spn_err_union_t spn_op_publish(spn_ctx_t* ctx, spn_publish_request_t* request) {
 
   spn_index_release_t release = sp_zero;
   try_union(spn_publish_build(&opts, &release));
-
-  if (request->dry) {
-    sp_str_t json = spn_index_release_to_json(ctx->mem, &release);
-    spn_print("{}", sp_fmt_str(json));
-    spn_print_err("{.cyan}: dry run, nothing published", sp_fmt_cstr("note"));
-    return spn_result(SPN_OK);
-  }
 
   spn_evt_publish_t evt = {
     .name = spn_pkg_name_to_qualified(release.id),

@@ -32,6 +32,42 @@ spn_triple_t spn_triple_from_str(sp_str_t str) {
   return result;
 }
 
+spn_err_t spn_triple_parse(sp_str_t str, spn_triple_t* triple) {
+  *triple = sp_zero_s(spn_triple_t);
+
+  sp_str_t segments [3] = sp_zero;
+  u32 num_segments = 0;
+  sp_str_t remaining = str;
+  while (true) {
+    s32 sep = sp_str_find_c8(remaining, '-');
+    sp_str_t segment = sep < 0 ? remaining : sp_str_prefix(remaining, sep);
+    if (sp_str_empty(segment) || num_segments == sp_carr_len(segments)) {
+      return SPN_ERR_TRIPLE_INVALID;
+    }
+    segments[num_segments++] = segment;
+    if (sep < 0) break;
+    remaining = sp_str_suffix(remaining, remaining.len - sep - 1);
+  }
+
+  triple->arch = spn_arch_from_str(segments[0]);
+  if (!triple->arch) {
+    return SPN_ERR_TRIPLE_INVALID;
+  }
+  if (num_segments > 1) {
+    triple->os = spn_os_from_str(segments[1]);
+    if (!triple->os) {
+      return SPN_ERR_TRIPLE_INVALID;
+    }
+  }
+  if (num_segments > 2) {
+    triple->abi = spn_abi_from_str(segments[2]);
+    if (!triple->abi) {
+      return SPN_ERR_TRIPLE_INVALID;
+    }
+  }
+  return SPN_OK;
+}
+
 sp_str_t spn_triple_to_str(sp_mem_t mem, spn_triple_t triple) {
   sp_str_t arch = spn_arch_to_str(triple.arch);
   sp_str_t os = spn_os_to_str(triple.os);
