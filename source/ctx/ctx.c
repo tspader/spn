@@ -1,7 +1,7 @@
 #include "ctx/ctx.h"
 #include "intern/intern.h"
 
-sp_intern_t* spn_ctx_get_intern(void) {
+sp_intern_t* spn_ctx_get_intern() {
   return spn.intern;
 }
 
@@ -27,7 +27,7 @@ sp_str_t spn_intern(sp_str_t str) {
 }
 
 sp_str_t spn_intern_cstr(const c8* cstr) {
-  return sp_intern_get_or_insert_str(spn_ctx_get_intern(), sp_str_view(cstr));
+  return sp_intern_get_or_insert_str(spn_ctx_get_intern(), sp_cstr_as_str(cstr));
 }
 
 sp_str_t spn_intern_str(sp_intern_id_t id) {
@@ -39,6 +39,6 @@ bool spn_intern_is_equal(sp_str_t a, sp_str_t b) {
 }
 
 bool spn_intern_is_equal_cstr(sp_str_t str, const c8* cstr) {
-  return sp_intern_is_equal_str(spn_ctx_get_intern(), str, sp_str_view(cstr));
+  return sp_intern_is_equal_str(spn_ctx_get_intern(), str, sp_cstr_as_str(cstr));
 }
 

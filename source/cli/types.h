@@ -18,20 +18,6 @@ typedef struct {
   spn_err_union_t (*finish)(spn_shell_t*);
 } spn_command_t;
 
-#define SPN_CLI_COMMAND(X) \
-  X(SPN_CLI_INIT, "init") \
-  X(SPN_CLI_ADD, "add") \
-  X(SPN_CLI_BUILD, "build") \
-  X(SPN_CLI_RUN, "run") \
-  X(SPN_CLI_TEST, "test") \
-  X(SPN_CLI_CLEAN, "clean") \
-  X(SPN_CLI_PUBLISH, "publish") \
-  X(SPN_CLI_INDEX, "index")
-
-typedef enum {
-  SPN_CLI_COMMAND(SP_X_NAMED_ENUM_DEFINE)
-} spn_cli_cmd_t;
-
 typedef struct {
   sp_str_t package;
   bool test;

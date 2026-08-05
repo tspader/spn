@@ -26,7 +26,7 @@ static bool is_source_entry(sp_str_t entry, spn_project_t* project) {
 static spn_err_union_t run_script(spn_session_t* session, spn_target_unit_t* unit) {
   spn_pkg_unit_t* root = unit->pkg;
 
-  sp_str_t command = get_target_staged_path(session->mem, unit);
+  sp_str_t command = spn_target_staged_path(session->mem, unit);
   if (!sp_fs_exists(command)) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_SCRIPT_MISSING,
@@ -84,18 +84,18 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
   spn_command_t* command = spn_cli_command(cli);
 
   if (is_source_entry(cmd->entry, spn.project)) {
-    return cli_error(cli, "{.yellow} cannot run native sources; build scripts are wasm", sp_fmt_str(cmd->entry));
+    return spn_cli_error(cli, "{.yellow} cannot run native sources; build scripts are wasm", sp_fmt_str(cmd->entry));
   }
 
   if (!spn.project) {
-    return cli_error(cli, "no manifest found in {.cyan}; pass a relative {.yellow} file instead",
+    return spn_cli_error(cli, "no manifest found in {.cyan}; pass a relative {.yellow} file instead",
       sp_fmt_str(spn.paths.project),
       sp_fmt_cstr(".c")
     );
   }
 
   if (!sp_str_om_has(spn.project->package.scripts, spn_intern(cmd->entry))) {
-    return cli_error(cli, "script target {.yellow} is not defined",
+    return spn_cli_error(cli, "script target {.yellow} is not defined",
       sp_fmt_str(cmd->entry)
     );
   }

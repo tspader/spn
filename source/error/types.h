@@ -235,6 +235,4 @@ typedef struct {
   };
 } spn_err_union_t;
 
-spn_err_union_t spn_err_emit(spn_err_union_t err);
-
 #endif

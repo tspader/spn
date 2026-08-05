@@ -3,6 +3,7 @@
 #include "ctx/ctx.h"
 #include "ctx/types.h"
 #include "dag/dag.h"
+#include "error/error.h"
 #include "error/types.h"
 #include "event/event.h"
 #include "forward/types.h"
@@ -37,7 +38,7 @@ typedef struct {
   spn_err_t err;
 } toolchain_job_t;
 
-SP_PRIVATE spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchain_unit_t* unit) {
+static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchain_unit_t* unit) {
   spn_toolchain_info_t* toolchain = unit->info;
   sp_str_t name = toolchain->name;
 
@@ -134,7 +135,7 @@ static spn_err_t materialize_tree(spn_session_t* session, sp_str_t name, spn_pkg
       spn_git_checkout_t* checkout = SP_NULLPTR;
       if (spn_git_cache_ensure_checkout(&session->ctx->caches.git, tree.git, &checkout)) {
         sp_str_t error = sp_str_lit("failed to fetch repository");
-        if (checkout && !sp_str_empty(checkout->error)) {
+        if (!sp_str_empty(checkout->error)) {
           error = checkout->error;
         }
         spn_event_buffer_push(spn.events, (spn_build_event_t) {

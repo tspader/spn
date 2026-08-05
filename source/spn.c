@@ -61,7 +61,6 @@ spn_shell_t shell;
 static struct {
   s32 num_args;
   const c8** args;
-  sp_app_t* sp;
   spn_err_union_t result;
   struct {
     spn_err_union_t (*finish)(spn_shell_t*);
@@ -70,11 +69,11 @@ static struct {
 } entry;
 
 static void on_signal(sp_os_signal_t signal, void* userdata) {
-  (void)userdata;
   switch (signal) {
     case SP_OS_SIGNAL_INTERRUPT: {
+      sp_app_t* sp = (sp_app_t*)userdata;
       spn_ctx_cancel(&spn);
-      sp_atomic_s32_set(&entry.sp->shutdown, 1);
+      sp_atomic_s32_set(&sp->shutdown, 1);
       break;
     }
     case SP_OS_SIGNAL_ABORT:
@@ -94,7 +93,6 @@ static void on_signal(sp_os_signal_t signal, void* userdata) {
   } while (0)
 
 static sp_app_result_t on_init(sp_app_t* sp) {
-  entry.sp = sp;
   spn_shell_init(&shell);
 
   spn_cli_t* cli = &shell.cli;
@@ -123,14 +121,14 @@ static sp_app_result_t on_init(sp_app_t* sp) {
     }
   }
 
-  if (shell.cli.ci) {
+  if (cli->ci) {
     sp->fps = 100000;
   }
 
   spn_shell_open(&shell);
 
   spn_ctx_init(&spn);
-  sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
+  sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, sp);
 
   try(spn_ctx_mount(&spn));
   spn_shell_open_log(&shell, spn.paths.log);
@@ -146,7 +144,7 @@ static sp_app_result_t on_init(sp_app_t* sp) {
     }
   }
 
-  try(spn_cli_parse_profile(&shell.cli.profile, &command.config.overrides));
+  try(spn_cli_parse_profile(&cli->profile, &command.config.overrides));
 
   switch (sp_cli_dispatch(&parsed)) {
     case SP_CLI_CONTINUE: break;
@@ -186,8 +184,12 @@ static sp_app_result_t on_poll(sp_app_t* sp) {
 static sp_app_result_t on_update(sp_app_t* sp) {
   if (sp_atomic_s32_get(&sp->shutdown)) {
     if (entry.exec.op) {
-      spn_op_result(entry.exec.op);
+      spn_err_union_t result = spn_op_result(entry.exec.op);
       entry.exec.op = SP_NULLPTR;
+      if (result.kind) {
+        entry.result = spn_err_emit(result);
+        return SP_APP_ERR;
+      }
     }
     return SP_APP_QUIT;
   }
@@ -203,12 +205,12 @@ static sp_app_result_t on_update(sp_app_t* sp) {
     if (result.kind) {
       entry.result = spn_err_emit(result);
       spn_prompt_stop(&shell.tui, false);
-      on_poll(sp);
+      spn_shell_flush();
       return SP_APP_ERR;
     }
 
     spn_prompt_stop(&shell.tui, true);
-    on_poll(sp);
+    spn_shell_flush();
   }
 
   if (entry.exec.finish) {
@@ -224,24 +226,9 @@ static sp_app_result_t on_update(sp_app_t* sp) {
 }
 
 static void on_deinit(sp_app_t* sp) {
-  switch (shell.tui.mode) {
-    case SPN_OUTPUT_MODE_INTERACTIVE: {
-      spn_prompt_stop(&shell.tui, true);
-      sp_tui_flush();
-      break;
-    }
-    case SPN_OUTPUT_MODE_NONINTERACTIVE: {
-      break;
-    }
-    case SPN_OUTPUT_MODE_QUIET: {
-      break;
-    }
-    case SPN_OUTPUT_MODE_NONE: {
-      break;
-    }
-    case SPN_OUTPUT_MODE_JSON: {
-      break;
-    }
+  if (shell.tui.mode == SPN_OUTPUT_MODE_INTERACTIVE) {
+    spn_prompt_stop(&shell.tui, true);
+    sp_io_flush(&shell.logger.err.base);
   }
 
   if (spn.events) {

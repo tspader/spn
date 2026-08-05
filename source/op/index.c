@@ -16,6 +16,7 @@
 #include "thread_pool/thread_pool.h"
 
 typedef struct {
+  spn_ctx_t* ctx;
   spn_index_info_t* index;
   bool force;
   spn_err_t err;
@@ -23,7 +24,7 @@ typedef struct {
 
 static void sync_index_node(void* data) {
   job_t* job = (job_t*)data;
-  if (spn_ctx_cancelled(&spn)) {
+  if (spn_ctx_cancelled(job->ctx)) {
     return;
   }
   job->err = spn_index_sync(job->index, job->force);
@@ -50,6 +51,7 @@ spn_err_union_t spn_op_sync_indexes(spn_ctx_t* ctx, spn_index_refresh_t refresh)
 
     job_t* job = sp_alloc_type(ctx->mem, job_t);
     *job = (job_t) {
+      .ctx = ctx,
       .index = index,
       .force = refresh.force,
     };

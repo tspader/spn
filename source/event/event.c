@@ -32,7 +32,7 @@ void* spn_event_payload(spn_build_event_t* event) {
   return offset ? (u8*)event + offset : SP_NULLPTR;
 }
 
-static u64 spn_current_thread_id(void) {
+static u64 current_thread_id() {
 #if defined(SP_WIN32)
   return (u64)GetCurrentThreadId();
 #elif defined(SP_LINUX)
@@ -61,7 +61,7 @@ void spn_event_buffer_push_ex(spn_event_buffer_t* events, spn_pkg_info_t* pkg, s
 }
 
 void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event) {
-  event.thread_id = spn_current_thread_id();
+  event.thread_id = current_thread_id();
 
   sp_mutex_lock(&events->mutex);
   sp_rb_push(events->buffer, event);

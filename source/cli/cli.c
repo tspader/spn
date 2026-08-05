@@ -445,7 +445,7 @@ static sp_cli_cmd_t cmd_root = {
   },
 };
 
-sp_cli_cmd_t* spn_cli(void) {
+sp_cli_cmd_t* spn_cli() {
   return &cmd_root;
 }
 
@@ -453,10 +453,10 @@ spn_command_t* spn_cli_command(sp_cli_t* cli) {
   return (spn_command_t*)cli->user_data;
 }
 
-sp_cli_result_t cli_error(sp_cli_t* cli, const c8* fmt, ...) {
+sp_cli_result_t spn_cli_error(sp_cli_t* cli, const c8* fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  sp_str_t message = sp_fmt_mem_v(spn.heap, sp_str_view(fmt), args).value;
+  sp_str_t message = sp_fmt_mem_v(spn.heap, sp_cstr_as_str(fmt), args).value;
   va_end(args);
   return sp_cli_set_error(cli, message);
 }

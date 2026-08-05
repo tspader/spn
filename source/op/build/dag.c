@@ -555,7 +555,7 @@ static spn_dag_id_t dag_configure_reactor(spn_dag_build_t* b, spn_pkg_unit_t* un
   if (!configure) {
     return (spn_dag_id_t) sp_zero;
   }
-  return spn_dag_add_file(b->graph, get_target_output_path(b->mem, configure));
+  return spn_dag_add_file(b->graph, spn_target_output_path(b->mem, configure));
 }
 
 static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit, spn_dag_pkg_ids_t* pkg) {
@@ -654,7 +654,7 @@ static spn_err_union_t dag_add_exports(spn_dag_build_t* b, spn_dag_link_ctx_t* l
   spn_dag_t* g = b->graph;
   spn_target_unit_t* target = link->target;
 
-  sp_str_t output = get_target_exports_path(b->mem, target);
+  sp_str_t output = spn_target_exports_path(b->mem, target);
   spn_dag_digest_t identity = sp_zero;
   try_union(dag_exports_identity(b, link, output, &identity));
 
@@ -715,8 +715,8 @@ spn_err_union_t spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* 
       .discover = dag_embed_discover,
       .user_data = embed,
     });
-    ids.embed.object = spn_dag_add_file(g, get_embed_object_path(b->mem, target));
-    ids.embed.header = spn_dag_add_file(g, get_embed_header_path(b->mem, target));
+    ids.embed.object = spn_dag_add_file(g, spn_embed_object_path(b->mem, target));
+    ids.embed.header = spn_dag_add_file(g, spn_embed_header_path(b->mem, target));
     embed->object = ids.embed.object;
     embed->header = ids.embed.header;
     try_as_union(spn_dag_action_add_output(g, ids.embed.action, ids.embed.object));
@@ -752,7 +752,7 @@ spn_err_union_t spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* 
     try_union(dag_add_exports(b, link));
   }
 
-  sp_str_t output = get_target_output_path(b->mem, target);
+  sp_str_t output = spn_target_output_path(b->mem, target);
 
   spn_dag_digest_t identity = sp_zero;
   try_union(dag_link_identity(b, link, output, &identity));
@@ -1134,7 +1134,7 @@ static void dag_stage(spn_dag_build_t* b) {
       }
       spn_dag_id_t output = ids->output;
 
-      sp_str_t staged_path = get_target_staged_path(scratch.mem, target);
+      sp_str_t staged_path = spn_target_staged_path(scratch.mem, target);
       dag_stage_file(b, &staged, output, staged_path);
 
       sp_str_t dir = sp_fs_parent_path(staged_path);
@@ -1146,7 +1146,7 @@ static void dag_stage(spn_dag_build_t* b) {
           continue;
         }
         spn_dag_id_t lib_output = lib_ids->output;
-        sp_str_t from = get_target_output_path(scratch.mem, lib);
+        sp_str_t from = spn_target_output_path(scratch.mem, lib);
         dag_stage_file(b, &staged, lib_output, sp_fs_join_path(scratch.mem, dir, sp_fs_get_name(from)));
       }
     }
