@@ -8,6 +8,7 @@
 #include "error/error.h"
 #include "event/event.h"
 #include "index/cache.h"
+#include "op/stage.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
 #include "pkg/load.h"

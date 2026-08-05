@@ -46,10 +46,13 @@ static struct {
   const c8** args;
   bool booted;
   spn_err_union_t result;
+  sp_cli_t cli;
+  spn_cli_exec_t exec;
   struct {
-    spn_err_union_t (*finish)();
-    spn_op_t* op;
-  } exec;
+    sp_thread_t thread;
+    sp_atomic_s32_t done;
+    sp_cli_result_t status;
+  } dispatch;
 } entry;
 
 static void on_signal(sp_os_signal_t signal, void* userdata) {
@@ -74,26 +77,35 @@ static void on_signal(sp_os_signal_t signal, void* userdata) {
     } \
   } while (0)
 
+static void print_error(sp_cli_err_t err) {
+  sp_fmt_io(&tui.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
+  sp_cli_err_print(&tui.logger.err.base, err);
+  sp_fmt_io(&tui.logger.err.base, "\n");
+}
+
+static s32 on_thread(void* userdata) {
+  entry.dispatch.status = sp_cli_dispatch(&entry.cli);
+  sp_atomic_s32_set(&entry.dispatch.done, 1);
+  return 0;
+}
+
 static sp_app_result_t on_init(sp_app_t* sp) {
   spn_tui_init(&tui);
 
-  spn_command_t command = sp_zero;
-  sp_cli_t parsed = sp_cli_parse((sp_cli_desc_t) {
+  entry.cli = sp_cli_parse((sp_cli_desc_t) {
     .root = spn_cli(),
     .args = entry.args,
     .num_args = entry.num_args,
-    .user_data = &command,
+    .user_data = &entry.exec,
   });
 
-  switch (parsed.status) {
+  switch (entry.cli.status) {
     case SP_CLI_HELP: {
-      sp_cli_write_help(&tui.logger.out.base, &parsed);
+      sp_cli_write_help(&tui.logger.out.base, &entry.cli);
       return SP_APP_QUIT;
     }
     case SP_CLI_ERR: {
-      sp_fmt_io(&tui.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
-      sp_cli_err_print(&tui.logger.err.base, parsed.err);
-      sp_fmt_io(&tui.logger.err.base, "\n");
+      print_error(entry.cli.err);
       return SP_APP_ERR;
     }
     case SP_CLI_OK:
@@ -127,43 +139,9 @@ static sp_app_result_t on_init(sp_app_t* sp) {
   spn_tui_open_log(&tui, spn.paths.log);
 
   try(spn_ctx_load_project(&spn, args.project_dir, args.refresh));
-  try(spn_profile_parse(&args.profile, &command.config.overrides));
+  spn_tui_flush(&tui);
 
-  switch (sp_cli_dispatch(&parsed)) {
-    case SP_CLI_CONTINUE: {
-      break;
-    }
-    case SP_CLI_OK: {
-      return SP_APP_QUIT;
-    }
-    case SP_CLI_HELP: {
-      sp_cli_write_help(&tui.logger.out.base, &parsed);
-      return SP_APP_QUIT;
-    }
-    case SP_CLI_ERR: {
-      sp_fmt_io(&tui.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
-      sp_cli_err_print(&tui.logger.err.base, parsed.err);
-      sp_fmt_io(&tui.logger.err.base, "\n");
-      return SP_APP_ERR;
-    }
-  }
-
-  if (command.project && !spn.project) {
-    entry.result = spn_err_emit((spn_err_union_t) {
-      .kind = SPN_ERR_NO_MANIFEST,
-      .no_manifest = { .path = spn.paths.project },
-    });
-    return SP_APP_ERR;
-  }
-
-  if (spn.project) {
-    try(spn_ctx_open_session(&spn, command.config));
-  }
-
-  entry.exec.finish = command.finish;
-  if (command.op.kind) {
-    entry.exec.op = spn_op_start(&spn, command.op);
-  }
+  sp_thread_init(&entry.dispatch.thread, on_thread, SP_NULLPTR);
 
   return SP_APP_CONTINUE;
 }
@@ -180,40 +158,42 @@ static sp_app_result_t on_poll(sp_app_t* sp) {
 }
 
 static sp_app_result_t on_update(sp_app_t* sp) {
-  if (sp_atomic_s32_get(&sp->shutdown)) {
-    if (entry.exec.op) {
-      spn_err_union_t result = spn_op_result(entry.exec.op);
-      entry.exec.op = SP_NULLPTR;
-      if (result.kind) {
-        entry.result = spn_err_emit(result);
-        return SP_APP_ERR;
-      }
-    }
-    return SP_APP_QUIT;
+  bool shutdown = sp_atomic_s32_get(&sp->shutdown) != 0;
+  if (!shutdown && !sp_atomic_s32_get(&entry.dispatch.done)) {
+    return SP_APP_CONTINUE;
   }
 
-  if (entry.exec.op) {
-    if (!spn_op_poll(entry.exec.op)) {
-      return SP_APP_CONTINUE;
+  sp_thread_join(&entry.dispatch.thread);
+
+  if (entry.exec.result.kind) {
+    entry.result = spn_err_emit(entry.exec.result);
+  }
+  spn_prompt_stop(&tui, !entry.result.kind);
+  spn_tui_flush(&tui);
+
+  switch (entry.dispatch.status) {
+    case SP_CLI_HELP: {
+      sp_cli_write_help(&tui.logger.out.base, &entry.cli);
+      return SP_APP_QUIT;
     }
-
-    spn_err_union_t result = spn_op_result(entry.exec.op);
-    entry.exec.op = SP_NULLPTR;
-
-    if (result.kind) {
-      entry.result = spn_err_emit(result);
-      spn_prompt_stop(&tui, false);
-      spn_tui_flush(&tui);
+    case SP_CLI_ERR: {
+      if (!entry.exec.result.kind) {
+        print_error(entry.cli.err);
+      }
       return SP_APP_ERR;
     }
+    case SP_CLI_OK:
+    case SP_CLI_CONTINUE: {
+      break;
+    }
+  }
 
-    spn_prompt_stop(&tui, true);
-    spn_tui_flush(&tui);
+  if (spn_ctx_cancelled(&spn)) {
+    return SP_APP_QUIT;
   }
 
   if (entry.exec.finish) {
     spn_err_union_t err = entry.exec.finish();
-    entry.exec.finish = SP_NULLPTR;
     if (err.kind) {
       entry.result = spn_err_emit(err);
       return SP_APP_ERR;

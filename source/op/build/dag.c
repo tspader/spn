@@ -1343,7 +1343,7 @@ spn_err_union_t spn_dag_build_run(spn_dag_build_t* b, u32 workers) {
   return dag_result(b);
 }
 
-spn_err_union_t spn_op_build(spn_session_t* session) {
+spn_err_union_t spn_dag_build_session(spn_session_t* session) {
   spn_project_t* project = session->project;
 
   spn_dag_build_t* b = spn_dag_build_new(session);

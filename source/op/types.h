@@ -3,10 +3,7 @@
 
 #include "sp.h"
 
-#include "error/types.h"
-#include "forward/types.h"
 #include "semver/types.h"
-#include "session/types.h"
 
 typedef enum {
   SPN_ADD_DEP_PACKAGE,
@@ -32,34 +29,5 @@ typedef struct {
   sp_str_t revision;
   bool allow_dirty;
 } spn_publish_request_t;
-
-typedef enum {
-  SPN_OP_NONE,
-  SPN_OP_BUILD,
-  SPN_OP_ADD,
-  SPN_OP_CLEAN,
-  SPN_OP_PUBLISH,
-  SPN_OP_SYNC_INDEXES,
-} spn_op_kind_t;
-
-typedef struct {
-  spn_op_kind_t kind;
-  union {
-    spn_add_request_t add;
-    spn_publish_request_t publish;
-    spn_index_refresh_t refresh;
-    struct {
-      bool whole;
-    } clean;
-  };
-} spn_op_desc_t;
-
-struct spn_op_t {
-  spn_ctx_t* ctx;
-  spn_op_desc_t desc;
-  sp_thread_t thread;
-  sp_atomic_s32_t done;
-  spn_err_union_t result;
-};
 
 #endif

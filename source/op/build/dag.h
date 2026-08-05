@@ -57,6 +57,7 @@ struct spn_dag_build_t {
   sp_tm_timer_t timer;
 };
 
+spn_err_union_t  spn_dag_build_session(spn_session_t* session);
 spn_dag_build_t* spn_dag_build_new(spn_session_t* session);
 spn_err_union_t  spn_dag_build_run(spn_dag_build_t* b, u32 workers);
 spn_err_union_t  spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target);

@@ -12,8 +12,8 @@
 #include "project/types.h"
 #include "semver/convert.h"
 
-spn_err_union_t spn_op_publish(spn_ctx_t* ctx, spn_publish_request_t* request) {
-  sp_str_t index_name = sp_str_empty(request->index) ? sp_str_lit("core") : request->index;
+spn_err_union_t spn_op_publish(spn_ctx_t* ctx, spn_publish_request_t request) {
+  sp_str_t index_name = sp_str_empty(request.index) ? sp_str_lit("core") : request.index;
 
   spn_index_info_t* index = spn_find_index(index_name);
   if (!index) {
@@ -24,9 +24,9 @@ spn_err_union_t spn_op_publish(spn_ctx_t* ctx, spn_publish_request_t* request) {
     .mem = ctx->mem,
     .intern = ctx->intern,
     .cwd = ctx->project->paths.root,
-    .url = request->url,
-    .revision = request->revision,
-    .allow_dirty = request->allow_dirty,
+    .url = request.url,
+    .revision = request.revision,
+    .allow_dirty = request.allow_dirty,
   };
 
   spn_index_release_t release = sp_zero;

@@ -127,6 +127,6 @@ static spn_err_union_t finish_init() {
 }
 
 sp_cli_result_t spn_cli_init(sp_cli_t* cli) {
-  spn_cli_command(cli)->finish = finish_init;
-  return SP_CLI_CONTINUE;
+  spn_cli_exec(cli)->finish = finish_init;
+  return SP_CLI_OK;
 }

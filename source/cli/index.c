@@ -8,7 +8,7 @@ sp_cli_result_t spn_cli_index(sp_cli_t* cli) {
   return SP_CLI_HELP;
 }
 
-sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
+static spn_err_union_t index_list() {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
   struct { u32 name; u32 kind; u32 protocol; } width = sp_zero;
@@ -44,17 +44,30 @@ sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
   }
 
   sp_mem_end_scratch(scratch);
+  return spn_result(SPN_OK);
+}
+
+sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
+  spn_cli_exec(cli)->finish = index_list;
   return SP_CLI_OK;
 }
 
+static sp_str_t index_path_name() {
+  return sp_str_empty(args.index.name) ? sp_str_lit("core") : args.index.name;
+}
+
+static spn_err_union_t index_path() {
+  spn_print("{}", sp_fmt_str(spn_find_index(index_path_name())->location));
+  return spn_result(SPN_OK);
+}
+
 sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
-  sp_str_t name = sp_str_empty(args.index.name) ? sp_str_lit("core") : args.index.name;
-  spn_index_info_t* index = spn_find_index(name);
-  if (!index) {
+  sp_str_t name = index_path_name();
+  if (!spn_find_index(name)) {
     return spn_cli_error(cli, "unknown index: {.cyan}", sp_fmt_str(name));
   }
 
-  spn_print("{}", sp_fmt_str(index->location));
+  spn_cli_exec(cli)->finish = index_path;
   return SP_CLI_OK;
 }
 
@@ -63,12 +76,8 @@ sp_cli_result_t spn_cli_index_sync(sp_cli_t* cli) {
     return spn_cli_error(cli, "unknown index '{}'", sp_fmt_str(args.index.name));
   }
 
-  spn_cli_command(cli)->op = (spn_op_desc_t) {
-    .kind = SPN_OP_SYNC_INDEXES,
-    .refresh = {
-      .force = true,
-      .only = args.index.name,
-    },
-  };
-  return SP_CLI_CONTINUE;
+  return spn_cli_result(cli, spn_op_sync_indexes(&spn, (spn_index_refresh_t) {
+    .force = true,
+    .only = args.index.name,
+  }));
 }
