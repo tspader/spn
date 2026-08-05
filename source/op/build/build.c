@@ -19,22 +19,6 @@
 #include "triple/triple.h"
 
 
-sp_str_t spn_embed_object_path(sp_mem_t mem, spn_target_unit_t* unit) {
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
-  sp_str_t name = sp_fmt(s.mem, "{}.embed.o", sp_fmt_str(unit->info->name)).value;
-  sp_str_t path = sp_fs_join_path(mem, unit->pkg->paths.generated, name);
-  sp_mem_end_scratch(s);
-  return path;
-}
-
-sp_str_t spn_embed_header_path(sp_mem_t mem, spn_target_unit_t* unit) {
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
-  sp_str_t name = sp_fmt(s.mem, "{}.embed.h", sp_fmt_str(unit->info->name)).value;
-  sp_str_t path = sp_fs_join_path(mem, unit->pkg->paths.generated, name);
-  sp_mem_end_scratch(s);
-  return path;
-}
-
 static spn_triple_t get_target_triple(spn_target_unit_t* target) {
   spn_profile_info_t* profile = &target->pkg->build->profile;
   return (spn_triple_t) { profile->arch, profile->os, profile->abi };
@@ -102,16 +86,6 @@ sp_str_t spn_target_output_path(sp_mem_t mem, spn_target_unit_t* target) {
     }
   }
 
-  sp_mem_end_scratch(s);
-  return path;
-}
-
-sp_str_t spn_target_exports_path(sp_mem_t mem, spn_target_unit_t* target) {
-  spn_cc_exports_format_t format = spn_cc_exports_format(target->kind, target->pkg->build->profile.os);
-
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
-  sp_str_t file_name = sp_fmt(s.mem, "{}.{}", sp_fmt_str(target->info->name), sp_fmt_cstr(spn_cc_exports_extension(format))).value;
-  sp_str_t path = sp_fs_join_path(mem, target->pkg->paths.work, file_name);
   sp_mem_end_scratch(s);
   return path;
 }
