@@ -9,6 +9,7 @@
 #include "event/log.h"
 #include "log/log.h"
 #include "semver/convert.h"
+#include "shell/types.h"
 #include "sp/color.h"
 #include "sp/io.h"
 #include "sp/macro.h"
@@ -75,15 +76,15 @@ sp_str_t spn_output_mode_to_str(spn_tui_mode_t mode) {
 }
 
 void sp_tui_print(sp_str_t str) {
-  sp_io_write_str(spn_ctx_get_log_err(), str, SP_NULLPTR);
+  sp_io_write_str(&shell.logger.err.base, str, SP_NULLPTR);
 }
 
 void sp_tui_up(u32 n) {
-  sp_fmt_io(spn_ctx_get_log_err(), "\033[{}A", sp_fmt_uint(n));
+  sp_fmt_io(&shell.logger.err.base, "\033[{}A", sp_fmt_uint(n));
 }
 
 void sp_tui_down(u32 n) {
-  sp_fmt_io(spn_ctx_get_log_err(), "\033[{}B", sp_fmt_uint(n));
+  sp_fmt_io(&shell.logger.err.base, "\033[{}B", sp_fmt_uint(n));
 }
 
 void sp_tui_clear_line(void) {
@@ -180,7 +181,7 @@ static sp_str_t spn_tui_name_to_color(sp_mem_t mem, sp_str_t str) {
 
   static sp_ht(u32, sp_hash_t) buckets = SP_NULLPTR;
   if (!buckets) {
-    sp_ht_init(spn.tui.mem, buckets);
+    sp_ht_init(shell.tui.mem, buckets);
   }
 
   sp_hash_t hash = sp_hash_str(str);
@@ -1357,8 +1358,8 @@ typedef struct {
 } spn_tui_buffered_log_t;
 
 void spn_tui_log_event(spn_build_event_t* event) {
-  if (spn.tui.mode == SPN_OUTPUT_MODE_JSON) {
-    spn_event_log_jsonl(&spn.logger.out.base, event);
+  if (shell.tui.mode == SPN_OUTPUT_MODE_JSON) {
+    spn_event_log_jsonl(&shell.logger.out.base, event);
     return;
   }
 
@@ -1366,16 +1367,16 @@ void spn_tui_log_event(spn_build_event_t* event) {
   static sp_da(spn_tui_buffered_log_t) buffered_logs = SP_NULLPTR;
   static u32 num_downloads = 0;
   if (!seen_url) {
-    sp_str_ht_init(spn.tui.mem, seen_url);
-    sp_da_init(spn.tui.mem, buffered_logs);
+    sp_str_ht_init(shell.tui.mem, seen_url);
+    sp_da_init(shell.tui.mem, buffered_logs);
   }
 
   const spn_event_info_t* display = &spn_event_info[event->kind];
-  if (display->verbosity > spn.logger.verbosity) {
+  if (display->verbosity > shell.logger.verbosity) {
     if (event->kind == SPN_EVENT_USER_LOG) {
       sp_da_push(buffered_logs, ((spn_tui_buffered_log_t) {
-        .pkg = event->pkg ? sp_str_copy(spn.tui.mem, event->pkg->name) : sp_str_lit(""),
-        .message = sp_str_copy(spn.tui.mem, event->user_log.message),
+        .pkg = event->pkg ? sp_str_copy(shell.tui.mem, event->pkg->name) : sp_str_lit(""),
+        .message = sp_str_copy(shell.tui.mem, event->user_log.message),
       }));
     }
     return;
@@ -1383,7 +1384,7 @@ void spn_tui_log_event(spn_build_event_t* event) {
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_mem_t mem = scratch.mem;
-  sp_io_writer_t* w = spn.tui.out;
+  sp_io_writer_t* w = shell.tui.out;
   sp_str_t verb = sp_str_view(display->display);
 
   if (display->error) {
@@ -1403,7 +1404,7 @@ void spn_tui_log_event(spn_build_event_t* event) {
       spn_tui_write_event_line(w, mem, verb, true, name, detail);
     }
     spn_tui_render_event_extra(w, event);
-    spn_tui_line_writer_flush(&spn.tui.line_writer);
+    spn_tui_line_writer_flush(&shell.tui.line_writer);
     sp_mem_end_scratch(scratch);
     return;
   }
@@ -1411,7 +1412,7 @@ void spn_tui_log_event(spn_build_event_t* event) {
   switch (event->kind) {
     case SPN_EVENT_SYNC: {
       if (!sp_str_ht_get(seen_url, event->sync.url)) {
-        sp_str_ht_insert(seen_url, sp_str_copy(spn.tui.mem, event->sync.url), true);
+        sp_str_ht_insert(seen_url, sp_str_copy(shell.tui.mem, event->sync.url), true);
         num_downloads++;
         spn_tui_write_event_line(
           w, mem, verb, false,
@@ -1467,7 +1468,7 @@ void spn_tui_log_event(spn_build_event_t* event) {
     }
   }
 
-  spn_tui_line_writer_flush(&spn.tui.line_writer);
+  spn_tui_line_writer_flush(&shell.tui.line_writer);
   sp_mem_end_scratch(scratch);
 }
 
@@ -1537,7 +1538,7 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode) {
   tui->mem = sp_mem_arena_as_allocator(sp_mem_arena_new(spn.mem));
   tui->line_writer = (spn_tui_line_writer_t) {
     .base.write = spn_tui_line_writer_write,
-    .downstream = &spn.logger.err.base,
+    .downstream = &shell.logger.err.base,
   };
   sp_da_init(tui->mem, tui->line_writer.partial);
   tui->out = &tui->line_writer.base;
@@ -1559,21 +1560,21 @@ static void spn_prompt_on_event(sp_prompt_ctx_t* ctx, sp_prompt_event_t event) {
   switch (event.kind) {
     case SP_PROMPT_EVENT_CTRL_C: {
       sp_atomic_s32_set(&spn.aborted, 1);
-      sp_atomic_s32_set(&spn.sp->shutdown, 1);
+      sp_atomic_s32_set(&shell.sp->shutdown, 1);
       break;
     }
     case SP_PROMPT_EVENT_ESCAPE: {
       break;
     }
     default: {
-      spn.tui.prompt.widget.on_event(ctx, event);
+      shell.tui.prompt.widget.on_event(ctx, event);
       break;
     }
   }
 }
 
 static void spn_prompt_start(void) {
-  spn_tui_t* tui = &spn.tui;
+  spn_tui_t* tui = &shell.tui;
   if (tui->prompt.started) return;
   tui->prompt.started = true;
 
@@ -1605,7 +1606,7 @@ static void spn_prompt_start(void) {
 //
 //
 void spn_prompt_stop(bool ok) {
-  spn_tui_t* tui = &spn.tui;
+  spn_tui_t* tui = &shell.tui;
   if (!tui->prompt.on) return;
 
   sp_prompt_state_t state = ok ? SP_PROMPT_STATE_SUBMIT : SP_PROMPT_STATE_ERROR;
@@ -1623,7 +1624,7 @@ void spn_prompt_stop(bool ok) {
 // @spader
 //
 void spn_prompt_pump() {
-  spn_tui_t* tui = &spn.tui;
+  spn_tui_t* tui = &shell.tui;
 
   if (sp_atomic_s32_get(&spn.aborted)) {
     spn_prompt_stop(false);

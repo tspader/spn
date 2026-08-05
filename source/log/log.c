@@ -2,7 +2,7 @@
 #include "sp/macro.h"
 #include "log/log.h"
 
-#include "ctx/ctx.h"
+#include "shell/types.h"
 
 #include "sp/io.h"
 
@@ -35,50 +35,65 @@ sp_str_t spn_log_level_to_str(spn_log_level_t level) {
 }
 
 
+static void write_line(sp_io_writer_t* io, const c8* fmt, va_list args) {
+  sp_fmt_io_v(io, sp_cstr_as_str(fmt), args);
+  sp_io_write_new_line(io);
+}
+
+void spn_print(const c8* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  write_line(&shell.logger.out.base, fmt, args);
+  va_end(args);
+}
+
+void spn_print_err(const c8* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  write_line(&shell.logger.err.base, fmt, args);
+  va_end(args);
+}
+
 void spn_log_info(const c8* fmt, ...) {
-  if (spn_ctx_get_log_level() < SPN_LOG_LEVEL_INFO) {
+  if (shell.logger.level < SPN_LOG_LEVEL_INFO) {
     return;
   }
 
   va_list args;
   va_start(args, fmt);
-  sp_fmt_io_v(spn_ctx_get_log_out(), sp_str_view(fmt), args);
+  write_line(&shell.logger.out.base, fmt, args);
   va_end(args);
-  sp_io_write_new_line(spn_ctx_get_log_out());
 }
 
 void spn_log_warn(const c8* fmt, ...) {
-  if (spn_ctx_get_log_level() < SPN_LOG_LEVEL_WARN) {
+  if (shell.logger.level < SPN_LOG_LEVEL_WARN) {
     return;
   }
 
   va_list args;
   va_start(args, fmt);
-  sp_fmt_io_v(spn_ctx_get_log_err(), sp_str_view(fmt), args);
+  write_line(&shell.logger.err.base, fmt, args);
   va_end(args);
-  sp_io_write_new_line(spn_ctx_get_log_err());
 }
 
 void spn_log_error(const c8* fmt, ...) {
-  if (spn_ctx_get_log_level() < SPN_LOG_LEVEL_ERROR) {
+  if (shell.logger.level < SPN_LOG_LEVEL_ERROR) {
     return;
   }
 
   va_list args;
   va_start(args, fmt);
-  sp_fmt_io_v(spn_ctx_get_log_err(), sp_str_view(fmt), args);
+  write_line(&shell.logger.err.base, fmt, args);
   va_end(args);
-  sp_io_write_new_line(spn_ctx_get_log_err());
 }
 
 void spn_log_debug(const c8* fmt, ...) {
-  if (spn_ctx_get_log_level() < SPN_LOG_LEVEL_DEBUG) {
+  if (shell.logger.level < SPN_LOG_LEVEL_DEBUG) {
     return;
   }
 
   va_list args;
   va_start(args, fmt);
-  sp_fmt_io_v(spn_ctx_get_log_err(), sp_str_view(fmt), args);
+  write_line(&shell.logger.err.base, fmt, args);
   va_end(args);
-  sp_io_write_new_line(spn_ctx_get_log_err());
 }

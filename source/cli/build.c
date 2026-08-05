@@ -13,7 +13,7 @@ static void set_rule(spn_target_rule_t* rule, bool selected, spn_target_names_t 
 }
 
 sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
-  spn_cli_build_t* cmd = &spn.cli.build;
+  spn_cli_build_t* cmd = &shell.cli.build;
   spn_command_t* command = spn_cli_command(cli);
 
   command->config.force = cmd->force;

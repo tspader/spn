@@ -8,6 +8,7 @@
 #include "index/index.h"
 #include "index/json.h"
 #include "index/publish.h"
+#include "log/log.h"
 #include "op/op.h"
 #include "pkg/id.h"
 #include "project/types.h"
@@ -35,8 +36,8 @@ spn_err_union_t spn_op_publish(spn_ctx_t* ctx, spn_publish_request_t* request) {
 
   if (request->dry) {
     sp_str_t json = spn_index_release_to_json(ctx->mem, &release);
-    sp_fmt_io(&ctx->logger.out.base, "{}\n", sp_fmt_str(json));
-    sp_fmt_io(&ctx->logger.err.base, "{.cyan}: dry run, nothing published\n", sp_fmt_cstr("note"));
+    spn_print("{}", sp_fmt_str(json));
+    spn_print_err("{.cyan}: dry run, nothing published", sp_fmt_cstr("note"));
     return spn_result(SPN_OK);
   }
 

@@ -57,6 +57,7 @@
 #include "sp/os.h"
 #include "sp/sp_glob.h"
 #include "op/op.h"
+#include "shell/shell.h"
 #include "toml/loader.h"
 #include "tui/tui.h"
 #include "version.h"
@@ -82,13 +83,14 @@
 #include "toml.h"
 
 spn_ctx_t spn;
+spn_shell_t shell;
 
 void on_signal(sp_os_signal_t signal, void* userdata) {
   (void)userdata;
   switch (signal) {
     case SP_OS_SIGNAL_INTERRUPT: {
       sp_atomic_s32_set(&spn.aborted, 1);
-      sp_atomic_s32_set(&spn.sp->shutdown, 1);
+      sp_atomic_s32_set(&shell.sp->shutdown, 1);
       break;
     }
     case SP_OS_SIGNAL_ABORT:
@@ -165,123 +167,11 @@ spn_err_t extract_runtime() {
   return err;
 }
 
-static spn_err_union_t invalid_flag(const c8* flag, sp_str_t value, const c8* expected) {
-  return (spn_err_union_t) {
-    .kind = SPN_ERR_FLAG_INVALID,
-    .flag = {
-      .name = sp_str_view(flag),
-      .value = value,
-      .expected = sp_str_view(expected),
-    },
-  };
-}
-
-static spn_err_union_t parse_profile_overrides(spn_profile_args_t* args, spn_profile_info_t* result) {
-  spn_triple_t target = sp_zero;
-  if (!sp_str_empty(args->target)) {
-    const c8* expected = "an <arch>-<os>-<abi> triple like x86_64-linux-gnu";
-
-    sp_str_t segments [3] = sp_zero;
-    u32 num_segments = 0;
-    sp_str_t remaining = args->target;
-    while (true) {
-      s32 separator = sp_str_find_c8(remaining, '-');
-      sp_str_t segment = separator < 0 ? remaining : sp_str_prefix(remaining, separator);
-      if (sp_str_empty(segment) || num_segments == sp_carr_len(segments)) {
-        return invalid_flag("--target", args->target, expected);
-      }
-      segments[num_segments++] = segment;
-      if (separator < 0) break;
-      remaining = sp_str_suffix(remaining, remaining.len - separator - 1);
-    }
-
-    target.arch = spn_arch_from_str(segments[0]);
-    if (!target.arch) {
-      return invalid_flag("--target", args->target, expected);
-    }
-    if (num_segments > 1) {
-      target.os = spn_os_from_str(segments[1]);
-      if (!target.os) {
-        return invalid_flag("--target", args->target, expected);
-      }
-    }
-    if (num_segments > 2) {
-      target.abi = spn_abi_from_str(segments[2]);
-      if (!target.abi) {
-        return invalid_flag("--target", args->target, expected);
-      }
-    }
-  }
-
-  spn_triple_t parts = {
-    .arch = spn_arch_from_str(args->arch),
-    .os = spn_os_from_str(args->os),
-    .abi = spn_abi_from_str(args->abi),
-  };
-  if (!sp_str_empty(args->arch) && !parts.arch) {
-    return invalid_flag("--arch", args->arch, "x86_64, aarch64, wasm32");
-  }
-  if (!sp_str_empty(args->os) && !parts.os) {
-    return invalid_flag("--os", args->os, "linux, macos, windows, wasi");
-  }
-  if (!sp_str_empty(args->abi) && !parts.abi) {
-    return invalid_flag("--abi", args->abi, "gnu, musl, msvc, mingw");
-  }
-
-  spn_build_mode_t mode = spn_build_mode_from_str(args->mode);
-  if (!sp_str_empty(args->mode) && !mode) {
-    return invalid_flag("--mode", args->mode, "debug, release");
-  }
-
-  spn_opt_level_t opt = spn_opt_level_from_str(args->opt);
-  if (!sp_str_empty(args->opt) && !opt) {
-    return invalid_flag("--opt", args->opt, "0, 1, 2, 3, s, z");
-  }
-
-  spn_sanitizer_set_t sanitizers = 0;
-  bool sanitizers_set = false;
-  if (sp_str_equal_cstr(args->sanitize, "none")) {
-    sanitizers_set = true;
-  }
-  else if (!sp_str_empty(args->sanitize)) {
-    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-    sp_da(sp_str_t) names = sp_str_split_c8(scratch.mem, args->sanitize, ',');
-    sp_da_for(names, it) {
-      spn_sanitizer_t sanitizer = spn_sanitizer_from_str(names[it]);
-      if (!sanitizer) {
-        sp_mem_end_scratch(scratch);
-        return invalid_flag("--sanitize", args->sanitize, "a comma-separated list of address, thread, undefined, memory, leak, or none");
-      }
-      sanitizers |= sanitizer;
-    }
-    sp_mem_end_scratch(scratch);
-    if (spn_sanitizer_set_conflicting(sanitizers)) {
-      return invalid_flag("--sanitize", args->sanitize, "a compatible set (thread and memory don't combine with each other, address, or leak)");
-    }
-  }
-
-  target = spn_triple_merge(target, parts);
-
-  *result = (spn_profile_info_t) {
-    .name = args->name,
-    .toolchain = args->toolchain,
-    .mode = mode,
-    .opt = opt,
-    .sanitizers = sanitizers,
-    .sanitizers_set = sanitizers_set,
-    .os = target.os,
-    .arch = target.arch,
-    .abi = target.abi,
-  };
-  return spn_result(SPN_OK);
-}
-
-
 #define try(expr) \
   do { \
     spn_err_union_t __err = (expr); \
     if (__err.kind) { \
-      spn.result = spn_err_emit(__err); \
+      shell.result = spn_err_emit(__err); \
       return SP_APP_ERR; \
     } \
   } while (0)
@@ -289,7 +179,7 @@ static spn_err_union_t parse_profile_overrides(spn_profile_args_t* args, spn_pro
 sp_app_result_t spn_init(sp_app_t* sp) {
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
-  spn.sp = sp;
+  shell.sp = sp;
   spn.mem = sp_mem_os_new();
   spn.arena = sp_mem_arena_new(spn.mem);
   spn.heap = sp_mem_arena_as_allocator(spn.arena);
@@ -297,8 +187,8 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   spn.env = sp_alloc_type(spn.heap, sp_env_t);
   *spn.env = sp_env_capture(spn.heap);
 
-  sp_io_stream_writer_from_fd(&spn.logger.out, sp_sys_stdout, SP_IO_CLOSE_MODE_NONE);
-  sp_io_stream_writer_from_fd(&spn.logger.err, sp_sys_stderr, SP_IO_CLOSE_MODE_NONE);
+  sp_io_stream_writer_from_fd(&shell.logger.out, sp_sys_stdout, SP_IO_CLOSE_MODE_NONE);
+  sp_io_stream_writer_from_fd(&shell.logger.err, sp_sys_stderr, SP_IO_CLOSE_MODE_NONE);
   if (sp_sys_is_tty(sp_sys_stdout)) sp_sys_tty_use_vt(sp_sys_stdout);
   if (sp_sys_is_tty(sp_sys_stderr)) sp_sys_tty_use_vt(sp_sys_stderr);
 #ifdef SP_WIN32
@@ -307,30 +197,30 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     SetConsoleOutputCP(CP_UTF8);
   }
 #endif
-  spn.logger.level = SPN_LOG_LEVEL_INFO;
+  shell.logger.level = SPN_LOG_LEVEL_INFO;
   sp_str_t log_level = sp_env_get(spn.env, sp_str_lit("SPN_LOG_LEVEL"));
   if (!sp_str_empty(log_level)) {
-    spn.logger.level = spn_log_level_from_str(log_level);
+    shell.logger.level = spn_log_level_from_str(log_level);
   }
 
-  spn_cli_t* cli = &spn.cli;
+  spn_cli_t* cli = &shell.cli;
   spn_command_t command = sp_zero;
   sp_cli_t parsed = sp_cli_parse((sp_cli_desc_t) {
     .root = spn_cli(),
-    .args = spn.args,
-    .num_args = spn.num_args,
+    .args = shell.args,
+    .num_args = shell.num_args,
     .user_data = &command,
   });
 
   switch (parsed.status) {
     case SP_CLI_HELP: {
-      sp_cli_write_help(&spn.logger.out.base, &parsed);
+      sp_cli_write_help(&shell.logger.out.base, &parsed);
       return SP_APP_QUIT;
     }
     case SP_CLI_ERR: {
-      sp_fmt_io(&spn.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
-      sp_cli_err_print(&spn.logger.err.base, parsed.err);
-      sp_fmt_io(&spn.logger.err.base, "\n");
+      sp_fmt_io(&shell.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
+      sp_cli_err_print(&shell.logger.err.base, parsed.err);
+      sp_fmt_io(&shell.logger.err.base, "\n");
       return SP_APP_ERR;
     }
     case SP_CLI_OK:
@@ -339,15 +229,15 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     }
   }
 
-  if (spn.cli.ci) {
+  if (shell.cli.ci) {
     sp->fps = 100000;
   }
 
   spn_tui_mode_t output_mode = SPN_OUTPUT_MODE_INTERACTIVE;
-  if (!sp_str_empty(spn.cli.output)) {
-    output_mode = spn_output_mode_from_str(spn.cli.output);
+  if (!sp_str_empty(shell.cli.output)) {
+    output_mode = spn_output_mode_from_str(shell.cli.output);
   }
-  spn_tui_init(&spn.tui, output_mode);
+  spn_tui_init(&shell.tui, output_mode);
 
   spn.events = spn_event_buffer_new(spn.mem);
   spn_event_log_init(spn.heap);
@@ -377,7 +267,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
     sp_str_t jsonl_path = sp_fs_join_path(scratch.mem, spn.paths.log, sp_str_lit("build.jsonl"));
     sp_fs_create_file(jsonl_path);
-    sp_io_file_writer_from_path(&spn.logger.jsonl, jsonl_path);
+    sp_io_file_writer_from_path(&shell.logger.jsonl, jsonl_path);
     sp_mem_end_scratch(scratch);
   }
   sp_fs_create_dir(spn.paths.caches.dir);
@@ -404,14 +294,14 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   if (sp_fs_exists(spn.paths.config.toml)) {
     spn_toml_loader_t loader = sp_zero;
     spn_toml_loader_init(&loader, spn.mem, spn.intern);
-    spn_err_t loaded = spn_codegen_load_config(&loader, spn.paths.config.toml, &spn.config_file);
+    spn_err_t loaded = spn_codegen_load_config(&loader, spn.paths.config.toml, &shell.config_file);
     if (!loaded) {
-      sp_da_for(spn.config_file.index, it) {
-        sp_da_push(config_indexes, spn_index_lower(&loader, it, SPN_INDEX_USER, &spn.config_file.index[it]));
+      sp_da_for(shell.config_file.index, it) {
+        sp_da_push(config_indexes, spn_index_lower(&loader, it, SPN_INDEX_USER, &shell.config_file.index[it]));
       }
     }
     if (loaded || !sp_da_empty(loader.issues)) {
-      spn.result = spn_err_emit((spn_err_union_t) {
+      shell.result = spn_err_emit((spn_err_union_t) {
         .kind = SPN_ERR_MANIFEST_ISSUES,
         .manifest = { .path = spn.paths.config.toml, .issues = loader.issues },
       });
@@ -420,11 +310,11 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   }
 
   if (cli->quiet) {
-    spn.logger.verbosity = SPN_VERBOSITY_QUIET;
+    shell.logger.verbosity = SPN_VERBOSITY_QUIET;
   } else if (cli->verbose) {
-    spn.logger.verbosity = SPN_VERBOSITY_VERBOSE;
+    shell.logger.verbosity = SPN_VERBOSITY_VERBOSE;
   } else {
-    spn.logger.verbosity = SPN_VERBOSITY_NORMAL;
+    shell.logger.verbosity = SPN_VERBOSITY_NORMAL;
   }
 
   if (sp_str_valid(cli->project_dir)) {
@@ -436,7 +326,7 @@ sp_app_result_t spn_init(sp_app_t* sp) {
   try(spn_project_load(spn.heap, spn.intern, spn.events, spn.paths.project, &spn.project));
   if (spn_cli_requires_manifest(parsed.cmd)) {
     if (!spn.project) {
-      spn.result = spn_err_emit((spn_err_union_t) {
+      shell.result = spn_err_emit((spn_err_union_t) {
         .kind = SPN_ERR_NO_MANIFEST,
         .no_manifest = { .path = spn.paths.project },
       });
@@ -450,20 +340,20 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     spn_index_info_t* index = &spn.indexes[i];
     index->location = spn_index_location(index, spn.heap, spn.paths.index);
     if (!index->refresh) {
-      index->refresh = spn.cli.refresh ? spn.cli.refresh : SPN_INDEX_DEFAULT_REFRESH;
+      index->refresh = shell.cli.refresh ? shell.cli.refresh : SPN_INDEX_DEFAULT_REFRESH;
     }
   }
 
-  try(parse_profile_overrides(&spn.cli.profile, &command.config.overrides));
+  try(spn_cli_parse_profile(&shell.cli.profile, &command.config.overrides));
 
   switch (sp_cli_dispatch(&parsed)) {
     case SP_CLI_CONTINUE: break;
     case SP_CLI_OK: return SP_APP_QUIT;
-    case SP_CLI_HELP: sp_cli_write_help(&spn.logger.out.base, &parsed); return SP_APP_QUIT;
+    case SP_CLI_HELP: sp_cli_write_help(&shell.logger.out.base, &parsed); return SP_APP_QUIT;
     case SP_CLI_ERR: {
-      sp_fmt_io(&spn.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
-      sp_cli_err_print(&spn.logger.err.base, parsed.err);
-      sp_fmt_io(&spn.logger.err.base, "\n");
+      sp_fmt_io(&shell.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
+      sp_cli_err_print(&shell.logger.err.base, parsed.err);
+      sp_fmt_io(&shell.logger.err.base, "\n");
       return SP_APP_ERR;
     }
   }
@@ -473,9 +363,9 @@ sp_app_result_t spn_init(sp_app_t* sp) {
     try(spn_session_init(spn.session, &spn, spn.heap, spn.project, command.config));
   }
 
-  spn.exec.finish = command.finish;
+  shell.exec.finish = command.finish;
   if (command.op.kind) {
-    spn.exec.op = spn_op_start(spn.heap, &spn, command.op);
+    shell.exec.op = spn_op_start(spn.heap, &spn, command.op);
   }
 
   return SP_APP_CONTINUE;
@@ -487,7 +377,7 @@ SP_PRIVATE u32 get_short_thread_id(u64 thread_id) {
   static sp_ht(u64, u32) thread_map = SP_NULLPTR;
   static u32 id = 0;
 
-  if (!thread_map) sp_ht_init(spn.tui.mem, thread_map);
+  if (!thread_map) sp_ht_init(shell.tui.mem, thread_map);
   if (!sp_ht_key_exists(thread_map, thread_id)) {
     sp_ht_insert(thread_map, thread_id, id++);
   }
@@ -504,8 +394,8 @@ static void spn_drain_events(void) {
     spn_build_event_t* event = &events[it];
     event->thread_id = get_short_thread_id(event->thread_id);
 
-    if (spn.logger.jsonl.fd) {
-      spn_event_log_jsonl(&spn.logger.jsonl.base, event);
+    if (shell.logger.jsonl.fd) {
+      spn_event_log_jsonl(&shell.logger.jsonl.base, event);
     }
     if (event->io) {
       spn_event_log_jsonl(&event->io->jsonl.writer, event);
@@ -527,23 +417,23 @@ sp_app_result_t spn_poll(sp_app_t* sp) {
 
 sp_app_result_t spn_update(sp_app_t* sp) {
   if (sp_atomic_s32_get(&sp->shutdown)) {
-    if (spn.exec.op) {
-      spn_op_result(spn.exec.op);
-      spn.exec.op = SP_NULLPTR;
+    if (shell.exec.op) {
+      spn_op_result(shell.exec.op);
+      shell.exec.op = SP_NULLPTR;
     }
     return SP_APP_QUIT;
   }
 
-  if (spn.exec.op) {
-    if (!spn_op_poll(spn.exec.op)) {
+  if (shell.exec.op) {
+    if (!spn_op_poll(shell.exec.op)) {
       return SP_APP_CONTINUE;
     }
 
-    spn_err_union_t result = spn_op_result(spn.exec.op);
-    spn.exec.op = SP_NULLPTR;
+    spn_err_union_t result = spn_op_result(shell.exec.op);
+    shell.exec.op = SP_NULLPTR;
 
     if (result.kind) {
-      spn.result = spn_err_emit(result);
+      shell.result = spn_err_emit(result);
       spn_prompt_stop(false);
       spn_poll(sp);
       return SP_APP_ERR;
@@ -553,11 +443,11 @@ sp_app_result_t spn_update(sp_app_t* sp) {
     spn_poll(sp);
   }
 
-  if (spn.exec.finish) {
-    spn_err_union_t err = spn.exec.finish(&spn);
-    spn.exec.finish = SP_NULLPTR;
+  if (shell.exec.finish) {
+    spn_err_union_t err = shell.exec.finish(&shell);
+    shell.exec.finish = SP_NULLPTR;
     if (err.kind) {
-      spn.result = spn_err_emit(err);
+      shell.result = spn_err_emit(err);
       return SP_APP_ERR;
     }
   }
@@ -566,7 +456,7 @@ sp_app_result_t spn_update(sp_app_t* sp) {
 }
 
 void spn_deinit(sp_app_t* sp) {
-  switch (spn.tui.mode) {
+  switch (shell.tui.mode) {
     case SPN_OUTPUT_MODE_INTERACTIVE: {
       spn_prompt_stop(true);
       sp_tui_flush();
@@ -588,7 +478,7 @@ void spn_deinit(sp_app_t* sp) {
 
   if (spn.events) {
     bool ok = sp->result != SP_APP_ERR;
-    spn_err_t kind = spn.result.kind;
+    spn_err_t kind = shell.result.kind;
     if (!ok && !kind) {
       kind = SPN_ERROR;
     }
@@ -641,9 +531,9 @@ void spn_deinit(sp_app_t* sp) {
 }
 
 sp_app_config_t spn_main(s32 num_args, const c8** args) {
-  spn = (spn_ctx_t) {
+  shell = (spn_shell_t) {
     .num_args = num_args,
-    .args = args
+    .args = args,
   };
 
   return (sp_app_config_t) {

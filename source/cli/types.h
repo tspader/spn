@@ -15,7 +15,7 @@ typedef struct spn_cli spn_cli_t;
 typedef struct {
   spn_op_desc_t op;
   spn_session_config_t config;
-  spn_err_union_t (*finish)(spn_ctx_t*);
+  spn_err_union_t (*finish)(spn_shell_t*);
 } spn_command_t;
 
 #define SPN_CLI_COMMAND(X) \
@@ -74,8 +74,6 @@ typedef struct {
 } spn_cli_index_t;
 
 struct spn_cli {
-  u32 num_args;
-  const c8** args;
   sp_str_t project_dir;
   sp_str_t project_file;
   sp_str_t output;
