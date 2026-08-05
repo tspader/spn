@@ -5,6 +5,14 @@ sp_intern_t* spn_ctx_get_intern(void) {
   return spn.intern;
 }
 
+void spn_ctx_cancel(spn_ctx_t* ctx) {
+  sp_atomic_s32_set(&ctx->aborted, 1);
+}
+
+bool spn_ctx_cancelled(spn_ctx_t* ctx) {
+  return sp_atomic_s32_get(&ctx->aborted) != 0;
+}
+
 spn_index_info_t* spn_find_index(sp_str_t name) {
   sp_da_for(spn.indexes, it) {
     if (sp_str_equal(spn.indexes[it].name, name)) {

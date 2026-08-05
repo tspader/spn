@@ -1,6 +1,7 @@
 #include "sp.h"
 #include "sp/macro.h"
 
+#include "ctx/ctx.h"
 #include "ctx/types.h"
 #include "error/types.h"
 #include "event/types.h"
@@ -22,7 +23,7 @@ typedef struct {
 
 static void sync_index_node(void* data) {
   job_t* job = (job_t*)data;
-  if (sp_atomic_s32_get(&spn.aborted)) {
+  if (spn_ctx_cancelled(&spn)) {
     return;
   }
   job->err = spn_index_sync(job->index, job->force);
@@ -68,7 +69,7 @@ spn_err_union_t spn_op_sync_indexes(spn_ctx_t* ctx, spn_index_refresh_t refresh)
   spn_thread_pool_wait(&pool);
   spn_thread_pool_deinit(&pool);
 
-  if (sp_atomic_s32_get(&ctx->aborted)) {
+  if (spn_ctx_cancelled(ctx)) {
     return spn_err_reported(SPN_ERROR);
   }
 

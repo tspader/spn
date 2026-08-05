@@ -23,6 +23,7 @@
 // SPN
 #include "spn.h"
 
+#include "ctx/ctx.h"
 #include "ctx/init.h"
 #include "ctx/types.h"
 #include "forward/types.h"
@@ -72,7 +73,7 @@ static void on_signal(sp_os_signal_t signal, void* userdata) {
   (void)userdata;
   switch (signal) {
     case SP_OS_SIGNAL_INTERRUPT: {
-      sp_atomic_s32_set(&spn.aborted, 1);
+      spn_ctx_cancel(&spn);
       sp_atomic_s32_set(&entry.sp->shutdown, 1);
       break;
     }
@@ -172,7 +173,7 @@ static sp_app_result_t on_init(sp_app_t* sp) {
 }
 
 static sp_app_result_t on_poll(sp_app_t* sp) {
-  if (sp_atomic_s32_get(&spn.aborted)) {
+  if (spn_ctx_cancelled(&spn)) {
     sp_atomic_s32_set(&sp->shutdown, 1);
   }
 
