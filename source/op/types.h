@@ -30,7 +30,6 @@ typedef struct {
   sp_str_t index;
   sp_str_t url;
   sp_str_t revision;
-  bool dry;
   bool allow_dirty;
 } spn_publish_request_t;
 

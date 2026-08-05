@@ -5,6 +5,7 @@
 #include "spn.h"
 
 spn_triple_t spn_triple_from_str(sp_str_t str);
+spn_err_t spn_triple_parse(sp_str_t str, spn_triple_t* triple);
 sp_str_t spn_triple_to_str(sp_mem_t mem, spn_triple_t triple);
 spn_triple_t spn_triple_host(void);
 spn_triple_t spn_triple_merge(spn_triple_t base, spn_triple_t partial);
