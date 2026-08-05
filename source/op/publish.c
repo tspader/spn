@@ -10,6 +10,7 @@
 #include "index/publish.h"
 #include "op/op.h"
 #include "pkg/id.h"
+#include "project/types.h"
 #include "semver/convert.h"
 
 spn_err_union_t spn_op_publish(spn_ctx_t* ctx, spn_publish_request_t* request) {
@@ -23,7 +24,7 @@ spn_err_union_t spn_op_publish(spn_ctx_t* ctx, spn_publish_request_t* request) {
   spn_publish_opts_t opts = {
     .mem = ctx->mem,
     .intern = ctx->intern,
-    .cwd = ctx->paths.project,
+    .cwd = ctx->project->paths.root,
     .url = request->url,
     .revision = request->revision,
     .allow_dirty = request->allow_dirty,

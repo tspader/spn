@@ -33,15 +33,16 @@ typedef struct {
   spn_target_selection_t selection;
   bool force;
   spn_profile_info_t overrides;
-} spn_app_config_t;
+} spn_session_config_t;
 
 struct spn_session_t {
   spn_ctx_t* ctx;
+  spn_project_t* project;
   sp_mem_t mem;
   spn_pkg_info_t* pkg;
   sp_env_t env;
 
-  spn_app_config_t config;
+  spn_session_config_t config;
   spn_profile_table_t profiles;
   spn_toolchain_catalog_t catalog;
   spn_profile_info_t profile;

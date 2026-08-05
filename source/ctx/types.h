@@ -23,7 +23,8 @@
 typedef spn_cg_config_t spn_config_file_t;
 
 struct spn_ctx_t {
-  spn_app_t* app;
+  spn_project_t* project;
+  spn_session_t* session;
   spn_cli_t cli;
   spn_tui_t tui;
   sp_atomic_s32_t aborted;

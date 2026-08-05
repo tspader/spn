@@ -13,6 +13,7 @@
 
 #include "compiler/driver.h"
 #include "intern/intern.h"
+#include "project/types.h"
 #include "pkg/pkg.h"
 #include "pkg/options.h"
 #include "profile/profile.h"
@@ -61,12 +62,14 @@ static bool is_shared_linkage(spn_pkg_info_t* pkg) {
   return false;
 }
 
-spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_pkg_info_t* root, spn_app_config_t config) {
+spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_project_t* project, spn_session_config_t config) {
+  spn_pkg_info_t* root = &project->package;
   s->ctx = ctx;
+  s->project = project;
   s->mem = mem;
   s->pkg = root;
   s->config = config;
-  s->paths.root = ctx->paths.project;
+  s->paths.root = project->paths.root;
   s->paths.build = sp_fs_join_path(s->mem, s->paths.root, sp_str_lit("build"));
   spn_triple_t host = spn_triple_host();
 
@@ -116,7 +119,6 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
   return spn_result(SPN_OK);
 }
 
-// The root manifest can pin the lib kind of any package in the build with [config.<pkg>] kind
 sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pkg_name) {
   sp_opt_spn_linkage_t requested = sp_zero;
 

@@ -4,7 +4,7 @@
 #include "sp.h"
 
 typedef struct spn spn_t;
-typedef struct spn_app_t spn_app_t;
+typedef struct spn_project_t spn_project_t;
 typedef struct spn_ctx_t spn_ctx_t;
 typedef struct spn_event_buffer_t spn_event_buffer_t;
 typedef struct spn_index_info spn_index_info_t;

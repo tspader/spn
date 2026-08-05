@@ -1,7 +1,6 @@
 #include "sp.h"
 #include "sp/macro.h"
-#include "app/app.h"
-#include "app/types.h"
+#include "project/project.h"
 #include "ctx/types.h"
 #include "error/error.h"
 #include "error/types.h"
@@ -1343,7 +1342,7 @@ spn_err_t spn_dag_build_run(spn_dag_build_t* b, u32 workers) {
 }
 
 spn_err_union_t spn_op_build(spn_session_t* session) {
-  spn_app_t* app = session->ctx->app;
+  spn_project_t* project = session->project;
 
   spn_dag_build_t* b = spn_dag_build_new(session);
   session->dag.build = b;
@@ -1375,8 +1374,11 @@ spn_err_union_t spn_op_build(spn_session_t* session) {
   }
 
   if (!result) {
-    if (!app->lock.some) {
-      spn_app_update_lock_file(app);
+    if (!project->lock.some) {
+      spn_err_union_t updated = spn_project_update_lock(project, session->ctx->intern, session->resolve);
+      if (updated.kind) {
+        return spn_err_emit(updated);
+      }
     }
     dag_stage(b);
   }

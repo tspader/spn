@@ -1,6 +1,5 @@
 #include "unit/package.h"
 
-#include "app/app.h"
 #include "ctx/ctx.h"
 #include "error/types.h"
 #include "event/event.h"

@@ -1,7 +1,6 @@
 #ifndef SPN_CLI_CLI_H
 #define SPN_CLI_CLI_H
 
-#include "app/types.h"
 #include "cli/types.h"
 #include "error/types.h"
 
