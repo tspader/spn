@@ -1,75 +1,45 @@
 #include "compiler/driver.h"
+#include "compiler/types.h"
 
-static spn_err_union_t unsupported(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_feature_t feature) {
-  return (spn_err_union_t) {
-    .kind = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
-    .compiler = {
-      .toolchain = toolchain->name,
-      .target = { profile->arch, profile->os, profile->abi },
-      .feature = feature,
-    },
-  };
-}
-
-sp_str_t spn_cc_feature_to_str(spn_cc_feature_t feature) {
-  switch (feature) {
-    case SPN_CC_FEATURE_COMPILE: return sp_str_lit("direct compilation");
-    case SPN_CC_FEATURE_LINK_EXE: return sp_str_lit("executable linking");
-    case SPN_CC_FEATURE_LINK_SHARED: return sp_str_lit("shared library linking");
-    case SPN_CC_FEATURE_LINK_REACTOR: return sp_str_lit("reactor module linking");
-    case SPN_CC_FEATURE_ARCHIVE: return sp_str_lit("static archiving");
-    case SPN_CC_FEATURE_FRAMEWORKS: return sp_str_lit("framework linking without a macOS SDK");
+spn_sanitizer_set_t get_supported_sanitizers(const spn_cc_toolchain_t* toolchain, spn_triple_t target) {
+  spn_sanitizer_set_t set = sp_zero;
+  switch (toolchain->driver) {
+    case SPN_CC_DRIVER_GCC: set = spn_gcc_supported_sanitizers(target); break;
+    case SPN_CC_DRIVER_CLANG: set = spn_clang_supported_sanitizers(target); break;
+    case SPN_CC_DRIVER_MSVC: set = spn_msvc_supported_sanitizers(target); break;
+    case SPN_CC_DRIVER_NONE: sp_unreachable_case();
   }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
 
-spn_sanitizer_set_t spn_cc_supported_sanitizers(spn_cc_driver_t driver, spn_triple_t target) {
-  switch (driver) {
-    case SPN_CC_DRIVER_GCC: return spn_gcc_supported_sanitizers(target);
-    case SPN_CC_DRIVER_CLANG: return spn_clang_supported_sanitizers(target);
-    case SPN_CC_DRIVER_MSVC: return spn_msvc_supported_sanitizers(target);
-    case SPN_CC_DRIVER_NONE: {
-      sp_unreachable_case();
-    }
-  }
-  SP_UNREACHABLE_RETURN(0);
-}
-
-// Zig compiles every sanitizer clang does, but only bundles the UBSan
-// runtime; anything else dies at link with undefined __asan/__tsan symbols
-spn_sanitizer_set_t spn_toolchain_supported_sanitizers(const spn_cc_toolchain_t* toolchain, spn_triple_t target) {
-  spn_sanitizer_set_t set = spn_cc_supported_sanitizers(toolchain->driver, target);
-  if (sp_str_equal_cstr(toolchain->name, "zig")) {
+  if (sp_str_equal_cstr(toolchain->name, "zig")) { // @spader Give zig its own driver
     set &= SPN_SANITIZER_UNDEFINED;
   }
   return set;
 }
 
-static spn_err_union_t validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
+spn_err_union_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
-  spn_sanitizer_set_t unsupported_set = profile->sanitizers & ~spn_toolchain_supported_sanitizers(toolchain, target);
-  if (unsupported_set) {
+  spn_sanitizer_set_t unsupported = profile->sanitizers & ~get_supported_sanitizers(toolchain, target);
+  if (unsupported) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_SANITIZER_UNSUPPORTED,
       .sanitizer = {
         .toolchain = toolchain->name,
         .target = target,
-        .unsupported = unsupported_set,
+        .unsupported = unsupported,
       },
     };
   }
 
-  // The runtime-backed sanitizers need a dynamic executable; -static links
-  // fail with undefined _DYNAMIC. UBSan's runtime is the exception.
-  spn_sanitizer_set_t static_set = profile->sanitizers & ~SPN_SANITIZER_UNDEFINED;
+  // @spader Not totally sure about this
+  spn_sanitizer_set_t ubsan = profile->sanitizers & ~SPN_SANITIZER_UNDEFINED;
   bool renders_static = profile->linkage == SPN_LIB_KIND_STATIC && profile->os != SPN_OS_MACOS && toolchain->driver != SPN_CC_DRIVER_MSVC;
-  if (static_set && renders_static) {
+  if (ubsan && renders_static) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_SANITIZER_STATIC,
       .sanitizer = {
         .toolchain = toolchain->name,
         .target = target,
-        .unsupported = static_set,
+        .unsupported = ubsan,
       },
     };
   }
@@ -79,7 +49,7 @@ static spn_err_union_t validate_profile(const spn_cc_toolchain_t* toolchain, con
 spn_err_union_t spn_cc_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
   sp_da_init(mem, flags->compile);
   sp_da_init(mem, flags->link);
-  try_union(validate_profile(toolchain, profile));
+  try_union(spn_cc_validate_profile(toolchain, profile));
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
     case SPN_CC_DRIVER_CLANG: {
@@ -97,12 +67,8 @@ spn_err_union_t spn_cc_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* tool
   return spn_result(SPN_OK);
 }
 
-spn_err_union_t spn_cc_validate_compile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
-  return validate_profile(toolchain, profile);
-}
-
 spn_err_union_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, spn_invocation_t* invocation) {
-  try_union(spn_cc_validate_compile(toolchain, profile));
+  try_union(spn_cc_validate_profile(toolchain, profile));
   *invocation = sp_zero_s(spn_invocation_t);
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
@@ -167,20 +133,30 @@ static spn_cc_feature_t link_feature(spn_cc_output_kind_t kind) {
 }
 
 spn_err_union_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_output_kind_t kind, bool frameworks) {
-  try_union(validate_profile(toolchain, profile));
+  try_union(spn_cc_validate_profile(toolchain, profile));
   spn_cc_feature_t feature = link_feature(kind);
+
+  spn_err_union_t err = {
+    .kind = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
+    .compiler = {
+      .toolchain = toolchain->name,
+      .target = { profile->arch, profile->os, profile->abi },
+      .feature = feature,
+    },
+  };
   if (kind == SPN_CC_OUTPUT_REACTOR && profile->os != SPN_OS_WASI) {
-    return unsupported(toolchain, profile, feature);
+    return err;
   }
   if (kind == SPN_CC_OUTPUT_SHARED_LIB && profile->os == SPN_OS_WASI) {
-    return unsupported(toolchain, profile, feature);
+    return err;
   }
   if (profile->os == SPN_OS_MACOS && frameworks && sp_str_empty(profile->sysroot)) {
-    return unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
+    err.compiler.feature = SPN_CC_FEATURE_FRAMEWORKS;
+    return err;
   }
   if (toolchain->driver == SPN_CC_DRIVER_MSVC) {
     if (kind == SPN_CC_OUTPUT_REACTOR) {
-      return unsupported(toolchain, profile, feature);
+      return err;
     }
   }
   return spn_result(SPN_OK);

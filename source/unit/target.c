@@ -20,7 +20,7 @@
 #include "session/invocation.h"
 #include "session/session.h"
 #include "target/select.h"
-#include "task/build/build.h"
+#include "op/build/build.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 

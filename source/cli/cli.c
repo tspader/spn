@@ -524,7 +524,7 @@ sp_cli_cmd_t* spn_cli(void) {
   return &cmd_root;
 }
 
-sp_cli_result_t spn_cli_errf(sp_cli_t* cli, const c8* fmt, ...) {
+sp_cli_result_t cli_error(sp_cli_t* cli, const c8* fmt, ...) {
   va_list args;
   va_start(args, fmt);
   sp_str_t message = sp_fmt_mem_v(spn.heap, sp_str_view(fmt), args).value;

@@ -140,6 +140,8 @@ add_executable(core
   ${SRC}/lock/lock.c
   ${SRC}/log/log.c
   ${SRC}/log/lazy/lazy.c
+  ${SRC}/op/build/build.c
+  ${SRC}/op/build/identity.c
   ${SRC}/pkg/id.c
   ${SRC}/pkg/mutate.c
   ${SRC}/pkg/options.c
@@ -158,8 +160,6 @@ add_executable(core
   ${SRC}/sp/str.c
   ${SRC}/target/mutate.c
   ${SRC}/target/select.c
-  ${SRC}/task/build/build.c
-  ${SRC}/task/build/identity.c
   ${SRC}/thread_pool/thread_pool.c
   ${SRC}/toml/edit.c
   ${SRC}/pkg/load.c

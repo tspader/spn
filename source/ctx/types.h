@@ -12,9 +12,9 @@
 #include "git/types.h"
 #include "index/types.h"
 #include "intern/types.h"
+#include "op/types.h"
 #include "paths/types.h"
 #include "session/types.h"
-#include "task/types.h"
 #include "toolchain/types.h"
 #include "tui/types.h"
 
@@ -27,6 +27,7 @@ struct spn_ctx_t {
   spn_cli_t cli;
   spn_tui_t tui;
   sp_atomic_s32_t aborted;
+  sp_atomic_ptr_t progress;
   spn_index_arr_t indexes;
   spn_event_buffer_t* events;
   sp_app_t* sp;
@@ -46,7 +47,11 @@ struct spn_ctx_t {
     spn_toolchain_store_t toolchains;
   } caches;
 
-  spn_task_executor_t tasks;
+  struct {
+    spn_op_desc_t desc;
+    spn_err_union_t (*finish)(spn_ctx_t*);
+    spn_op_t* op;
+  } exec;
   spn_app_config_t config;
 
   struct {

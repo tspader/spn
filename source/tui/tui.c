@@ -1,9 +1,9 @@
 #include "profile/types.h"
-#include "session/types.h"
 
 #include "toml/issue.h"
 #include "compiler/driver.h"
 #include "ctx/ctx.h"
+#include "dag/types.h"
 #include "enum/enum.h"
 #include "event/event.h"
 #include "event/log.h"
@@ -15,7 +15,6 @@
 #include "sp/sp_prompt.h"
 #include "sp/str.h"
 #include "spn.h"
-#include "task/build/dag.h"
 #include "toolchain/select.h"
 #include "triple/triple.h"
 #include "tui/tui.h"
@@ -181,7 +180,7 @@ static sp_str_t spn_tui_name_to_color(sp_mem_t mem, sp_str_t str) {
 
   static sp_ht(u32, sp_hash_t) buckets = SP_NULLPTR;
   if (!buckets) {
-    sp_ht_init(spn.heap, buckets);
+    sp_ht_init(spn.tui.mem, buckets);
   }
 
   sp_hash_t hash = sp_hash_str(str);
@@ -714,12 +713,22 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
           break;
         }
         case SPN_ERR_COMPILER_FEATURE_UNSUPPORTED: {
+          const c8* feature = "";
+          switch (event->err.compiler.feature) {
+            case SPN_CC_FEATURE_COMPILE: feature = "direct compilation";
+            case SPN_CC_FEATURE_LINK_EXE: feature = "executable linking";
+            case SPN_CC_FEATURE_LINK_SHARED: feature = "shared library linking";
+            case SPN_CC_FEATURE_LINK_REACTOR: feature = "reactor module linking";
+            case SPN_CC_FEATURE_ARCHIVE: feature = "static archiving";
+            case SPN_CC_FEATURE_FRAMEWORKS: feature = "framework linking without a macOS SDK";
+          }
+
           sp_fmt_io(
             &w.base,
             "toolchain {.cyan} targeting {.yellow} doesn't support {.red}",
             sp_fmt_str(event->err.compiler.toolchain),
             sp_fmt_str(spn_triple_to_str(mem, event->err.compiler.target)),
-            sp_fmt_str(spn_cc_feature_to_str(event->err.compiler.feature))
+            sp_fmt_cstr(feature)
           );
           break;
         }
@@ -1357,16 +1366,16 @@ void spn_tui_log_event(spn_build_event_t* event) {
   static sp_da(spn_tui_buffered_log_t) buffered_logs = SP_NULLPTR;
   static u32 num_downloads = 0;
   if (!seen_url) {
-    sp_str_ht_init(spn.heap, seen_url);
-    sp_da_init(spn.heap, buffered_logs);
+    sp_str_ht_init(spn.tui.mem, seen_url);
+    sp_da_init(spn.tui.mem, buffered_logs);
   }
 
   const spn_event_info_t* display = &spn_event_info[event->kind];
   if (display->verbosity > spn.logger.verbosity) {
     if (event->kind == SPN_EVENT_USER_LOG) {
       sp_da_push(buffered_logs, ((spn_tui_buffered_log_t) {
-        .pkg = event->pkg ? sp_str_copy(spn.heap, event->pkg->name) : sp_str_lit(""),
-        .message = sp_str_copy(spn.heap, event->user_log.message),
+        .pkg = event->pkg ? sp_str_copy(spn.tui.mem, event->pkg->name) : sp_str_lit(""),
+        .message = sp_str_copy(spn.tui.mem, event->user_log.message),
       }));
     }
     return;
@@ -1402,7 +1411,7 @@ void spn_tui_log_event(spn_build_event_t* event) {
   switch (event->kind) {
     case SPN_EVENT_SYNC: {
       if (!sp_str_ht_get(seen_url, event->sync.url)) {
-        sp_str_ht_insert(seen_url, sp_str_copy(spn.heap, event->sync.url), true);
+        sp_str_ht_insert(seen_url, sp_str_copy(spn.tui.mem, event->sync.url), true);
         num_downloads++;
         spn_tui_write_event_line(
           w, mem, verb, false,
@@ -1523,14 +1532,14 @@ void spn_tui_detach_prompt(spn_tui_t* tui) {
   spn_tui_line_writer_flush(&tui->line_writer);
 }
 
-void spn_tui_init(spn_tui_t* tui, spn_session_t* session, spn_tui_mode_t mode) {
+void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode) {
   tui->mode = mode;
-  tui->session = session;
+  tui->mem = sp_mem_arena_as_allocator(sp_mem_arena_new(spn.mem));
   tui->line_writer = (spn_tui_line_writer_t) {
     .base.write = spn_tui_line_writer_write,
     .downstream = &spn.logger.err.base,
   };
-  sp_da_init(spn.heap, tui->line_writer.partial);
+  sp_da_init(tui->mem, tui->line_writer.partial);
   tui->out = &tui->line_writer.base;
 
   switch (tui->mode) {
@@ -1621,16 +1630,18 @@ void spn_prompt_pump() {
     return;
   }
 
-  spn_dag_build_t* dag = tui->session->dag.build;
-  if (!dag) return;
+  spn_dag_progress_t* progress = (spn_dag_progress_t*)sp_atomic_ptr_get(&spn.progress);
+  if (!progress) {
+    return;
+  }
 
   if (!tui->prompt.on) {
-    if (!sp_atomic_s32_get(&dag->progress.misses)) return;
+    if (!sp_atomic_s32_get(&progress->misses)) return;
     spn_prompt_start();
     if (!tui->prompt.on) return;
   }
-  u32 total = (u32)sp_atomic_s32_get(&dag->progress.total);
-  u32 done = (u32)sp_atomic_s32_get(&dag->progress.completed);
+  u32 total = (u32)sp_atomic_s32_get(&progress->total);
+  u32 done = (u32)sp_atomic_s32_get(&progress->completed);
 
   f32 value = total ? (f32)done / (f32)total : 0.f;
 

@@ -142,7 +142,7 @@ sp_str_t test_when_blocked(const test_when_t* when) {
       .linkage = SPN_LIB_KIND_SHARED,
       .sanitizers = when->sanitize,
     };
-    if (spn_cc_validate_compile(&cc, &profile).kind) {
+    if (spn_cc_validate_profile(&cc, &profile).kind) {
       return sp_fmt(mem, "{} targeting {} can't build sanitize={}",
         sp_fmt_cstr(toolchain->name),
         sp_fmt_str(spn_triple_to_str(mem, target)),

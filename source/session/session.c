@@ -67,6 +67,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
   s->pkg = root;
   s->paths.root = ctx->paths.project;
   s->paths.build = sp_fs_join_path(s->mem, s->paths.root, sp_str_lit("build"));
+  spn_triple_t host = spn_triple_host();
 
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
   try_as_union(spn_toolchain_catalog_init(&s->catalog, builtins, s->mem));
@@ -88,10 +89,16 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
   sp_om_new(s->units.targets);
   sp_om_new(s->units.objects);
 
-  spn_triple_t host = spn_triple_host();
   try_union(spn_profile_resolve(s->profiles, &config.overrides, host, is_shared_linkage(root), &s->profile));
-  if (s->profile.os == SPN_OS_MACOS) {
-    s->profile.sysroot = resolve_macos_sdk(s->mem, ctx->env);
+
+  switch (s->profile.os) {
+    case SPN_OS_MACOS: {
+      s->profile.sysroot = resolve_macos_sdk(s->mem, ctx->env);
+      break;
+    }
+    default: {
+      break;
+    }
   }
 
   try_union(spn_build_add(s, spn_build_config_target(host, s->profile), &s->units.target));

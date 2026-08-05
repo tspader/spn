@@ -130,7 +130,6 @@ typedef struct {
 
 typedef struct {
   sp_str_t name;
-  bool force;
 } spn_cli_index_t;
 
 struct spn_cli {

@@ -40,11 +40,10 @@ typedef struct {
 
 typedef struct {
   spn_tui_mode_t mode;
-  spn_session_t* session;
+  sp_mem_t mem;
   u32 num_deps;
   u32 width;
   sp_ht(sp_str_t, s32) state;
-  void* build;
   sp_io_writer_t* out;
   spn_tui_line_writer_t line_writer;
 

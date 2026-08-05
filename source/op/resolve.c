@@ -14,7 +14,6 @@
 #include "resolve/resolve.h"
 #include "semver/convert.h"
 #include "session/session.h"
-#include "task/task.h"
 #include "unit/types.h"
 
 static sp_str_t patch_dir(sp_mem_t mem, spn_index_release_t* release) {
@@ -62,15 +61,14 @@ static spn_err_t apply_patch_overrides(spn_session_t* session, spn_resolve_query
   return result;
 }
 
-void add_root(spn_session_t* session, spn_resolve_query_t* query) {
+static void add_root(spn_session_t* session, spn_resolve_query_t* query) {
   spn_resolve_query_add(query, (spn_requested_dep_t) {
     .qualified = session->pkg->qualified,
     .source = SPN_PKG_SOURCE_ROOT,
   });
-
 }
 
-void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
+static void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
   sp_ht_for_kv(query->result, it) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_RESOLVE_PACKAGE,
@@ -88,21 +86,14 @@ void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
       .time = query->time,
     }
   });
-
 }
 
-spn_task_step_t spn_task_resolve(spn_ctx_t* ctx, spn_task_t* task) {
-  spn_app_t* app = ctx->app;
-  spn_session_t* session = &app->session;
-  spn_pkg_info_t* pkg = &app->package;
-
+spn_err_union_t spn_phase_resolve(spn_session_t* session) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_RESOLVE_START,
-    .pkg = pkg,
+    .pkg = session->pkg,
   });
 
-  // The solver reads local packages' deps from the registry, so the root must
-  // be registered before we resolve.
   sp_ht_insert(session->registry, spn_pkg_id(session->ctx->intern, session->pkg->qualified), ((spn_registry_pkg_t) {
     .source = SPN_PKG_SOURCE_ROOT,
     .info = session->pkg,
@@ -124,16 +115,16 @@ spn_task_step_t spn_task_resolve(spn_ctx_t* ctx, spn_task_t* task) {
     sp_da_for(query.errors, it) {
       spn_err_emit(query.errors[it]);
     }
-    return spn_task_fail(query.errors[0].kind, .reported = true);
+    return spn_err_reported(query.errors[0].kind);
   }
 
   spn_err_t patched = apply_patch_overrides(session, &query);
   if (patched) {
-    return spn_task_fail(patched, .reported = true);
+    return spn_err_reported(patched);
   }
   session->resolve = query.result;
 
   emit_resolved(session->mem, &query);
 
-  return spn_task_done();
+  return spn_result(SPN_OK);
 }

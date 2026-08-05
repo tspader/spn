@@ -1,5 +1,5 @@
-#ifndef SPN_BUILD_BUILD_H
-#define SPN_BUILD_BUILD_H
+#ifndef SPN_OP_BUILD_BUILD_H
+#define SPN_OP_BUILD_BUILD_H
 
 #include "compiler/types.h"
 #include "error/types.h"

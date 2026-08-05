@@ -1,9 +1,8 @@
 #include "ctx/types.h"
 
 #include "cli/cli.h"
-#include "task/task.h"
 
-static void spn_cli_build_set_rule(spn_target_rule_t* rule, bool selected, spn_target_names_t names) {
+static void set_rule(spn_target_rule_t* rule, bool selected, spn_target_names_t names) {
   if (!selected) {
     rule->kind = SPN_TARGET_RULE_NONE;
     return;
@@ -26,18 +25,12 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
   if (specific || !sp_da_empty(names)) {
     spn.config.selection.kind = SPN_TARGET_SELECTION_EXPLICIT;
     bool all_kinds = !specific;
-    spn_cli_build_set_rule(&spn.config.selection.bin, all_kinds || command->only.bin, names);
-    spn_cli_build_set_rule(&spn.config.selection.lib, all_kinds || command->only.lib, names);
-    spn_cli_build_set_rule(&spn.config.selection.test, all_kinds || command->only.test, names);
-    spn_cli_build_set_rule(&spn.config.selection.script, all_kinds || command->only.script, names);
+    set_rule(&spn.config.selection.bin, all_kinds || command->only.bin, names);
+    set_rule(&spn.config.selection.lib, all_kinds || command->only.lib, names);
+    set_rule(&spn.config.selection.test, all_kinds || command->only.test, names);
+    set_rule(&spn.config.selection.script, all_kinds || command->only.script, names);
   }
 
-  return spn_plan(
-    { SPN_TASK_SYNC_INDEXES },
-    { SPN_TASK_RESOLVE },
-    { SPN_TASK_SYNC_PACKAGES },
-    { SPN_TASK_CONFIGURE_GRAPH },
-    { SPN_TASK_CREATE_UNITS },
-    { SPN_TASK_BUILD_GRAPH }
-  );
+  spn.exec.desc = (spn_op_desc_t) { .kind = SPN_OP_REACH, .reach = SPN_PHASE_BUILT };
+  return SP_CLI_CONTINUE;
 }

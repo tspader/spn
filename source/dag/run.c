@@ -1088,6 +1088,10 @@ spn_err_t spn_dag_run_executor(spn_dag_t* g, spn_dag_env_t* env, spn_thread_pool
       turns++;
       sp_assert(turns <= turns_max);
 
+      if (!run.err && env->cancel && sp_atomic_s32_get(env->cancel)) {
+        run.err = SPN_ERR_DAG_CANCELLED;
+      }
+
       spn_thread_pool_job_t job = spn_thread_pool_try_poll(ex);
       if (job.fn) {
         run.in_flight--;

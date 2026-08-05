@@ -4,7 +4,7 @@
 #include "ctx/types.h"
 #include "enum/enum.h"
 #include "index/index.h"
-#include "task/task.h"
+#include "op/op.h"
 
 sp_cli_result_t spn_cli_index(sp_cli_t* cli) {
   return SP_CLI_HELP;
@@ -53,7 +53,7 @@ sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
   sp_str_t name = sp_str_empty(spn.cli.index.name) ? sp_str_lit("core") : spn.cli.index.name;
   spn_index_info_t* index = spn_find_index(name);
   if (!index) {
-    return spn_cli_errf(cli, "unknown index: {.cyan}", SP_FMT_STR(name));
+    return cli_error(cli, "unknown index: {.cyan}", SP_FMT_STR(name));
   }
 
   sp_fmt_io(&spn.logger.out.base, "{}\n", sp_fmt_str(index->location));
@@ -62,9 +62,15 @@ sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
 
 sp_cli_result_t spn_cli_index_sync(sp_cli_t* cli) {
   if (!sp_str_empty(spn.cli.index.name) && !spn_find_index(spn.cli.index.name)) {
-    return spn_cli_errf(cli, "unknown index '{}'", SP_FMT_STR(spn.cli.index.name));
+    return cli_error(cli, "unknown index '{}'", SP_FMT_STR(spn.cli.index.name));
   }
 
-  spn.cli.index.force = true;
-  return spn_plan({ SPN_TASK_SYNC_INDEXES });
+  spn.exec.desc = (spn_op_desc_t) {
+    .kind = SPN_OP_SYNC_INDEXES,
+    .refresh = {
+      .force = true,
+      .only = spn.cli.index.name,
+    },
+  };
+  return SP_CLI_CONTINUE;
 }

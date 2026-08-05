@@ -1,7 +1,11 @@
 #include "cli/cli.h"
 
-#include "task/task.h"
+#include "ctx/types.h"
 
 sp_cli_result_t spn_cli_clean(sp_cli_t* cli) {
-  return spn_plan({ SPN_TASK_CLEAN });
+  spn.exec.desc = (spn_op_desc_t) {
+    .kind = SPN_OP_CLEAN,
+    .clean = { .whole = sp_str_empty(spn.cli.profile.name) },
+  };
+  return SP_CLI_CONTINUE;
 }

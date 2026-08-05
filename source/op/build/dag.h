@@ -1,10 +1,9 @@
-#ifndef SPN_TASK_BUILD_DAG_H
-#define SPN_TASK_BUILD_DAG_H
+#ifndef SPN_OP_BUILD_DAG_H
+#define SPN_OP_BUILD_DAG_H
 
 #include "dag/dag.h"
 #include "forward/types.h"
 #include "thread_pool/types.h"
-#include "task/types.h"
 #include "unit/types.h"
 
 typedef struct {
@@ -54,19 +53,13 @@ struct spn_dag_build_t {
   spn_thread_pool_t pool;
   spn_dag_env_t env;
   spn_dag_progress_t progress;
-  sp_thread_t runner;
-  sp_atomic_s32_t done;
   spn_err_t result;
   sp_tm_timer_t timer;
 };
 
 spn_dag_build_t* spn_dag_build_new(spn_session_t* session);
-void             spn_dag_build_start(spn_dag_build_t* b, u32 workers);
-bool             spn_dag_build_poll(spn_dag_build_t* b);
+spn_err_t        spn_dag_build_run(spn_dag_build_t* b, u32 workers);
 spn_err_t        spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target);
 spn_err_t        spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, bool strict, sp_da(spn_dag_obs_t)* obs);
-
-spn_task_step_t spn_dag_build_init(spn_ctx_t* ctx, spn_task_t* task);
-spn_task_step_t spn_dag_build_update(spn_ctx_t* ctx, spn_task_t* task);
 
 #endif
