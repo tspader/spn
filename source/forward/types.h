@@ -25,7 +25,6 @@ typedef struct spn_target_unit spn_target_unit_t;
 typedef struct spn_session_t spn_session_t;
 typedef struct spn_user_node_t spn_user_node_t;
 typedef struct spn_dag_build_t spn_dag_build_t;
-typedef struct spn_op_t spn_op_t;
 typedef struct sp_intern_t sp_intern_t;
 
 typedef sp_hash_t spn_build_id_t;

@@ -16,40 +16,40 @@ sp_str_t spn_profile_build_path(sp_mem_t mem, sp_str_t build, const spn_profile_
   return sp_fs_join_path(mem, build, profile->name);
 }
 
-void spn_profile_overlay(spn_profile_info_t* dst, spn_profile_info_t* src) {
-  if (!sp_str_empty(src->name)) {
-    dst->name = src->name;
+void overlay_profile(spn_profile_info_t* to, spn_profile_info_t* from) {
+  if (!sp_str_empty(from->name)) {
+    to->name = from->name;
   }
-  if (!sp_str_empty(src->toolchain)) {
-    dst->toolchain = src->toolchain;
+  if (!sp_str_empty(from->toolchain)) {
+    to->toolchain = from->toolchain;
   }
-  if (src->linkage) {
-    dst->linkage = src->linkage;
+  if (from->linkage) {
+    to->linkage = from->linkage;
   }
-  if (src->standard) {
-    dst->standard = src->standard;
+  if (from->standard) {
+    to->standard = from->standard;
   }
-  if (src->mode) {
-    dst->mode = src->mode;
+  if (from->mode) {
+    to->mode = from->mode;
   }
-  if (src->opt) {
-    dst->opt = src->opt;
+  if (from->opt) {
+    to->opt = from->opt;
   }
-  if (src->sanitizers_set || src->sanitizers) {
-    dst->sanitizers = src->sanitizers;
-    dst->sanitizers_set = true;
+  if (from->sanitizers_set || from->sanitizers) {
+    to->sanitizers = from->sanitizers;
+    to->sanitizers_set = true;
   }
-  if (src->os) {
-    dst->os = src->os;
-    dst->abi = src->abi;
+  if (from->os) {
+    to->os = from->os;
+    to->abi = from->abi;
   }
-  else if (src->abi) {
-    dst->abi = src->abi;
+  else if (from->abi) {
+    to->abi = from->abi;
   }
-  if (src->arch) {
-    dst->arch = src->arch;
+  if (from->arch) {
+    to->arch = from->arch;
   }
-  if (!sp_da_empty(src->options.clauses)) dst->options = src->options;
+  if (!sp_da_empty(from->options.clauses)) to->options = from->options;
 }
 
 static sp_str_t spn_profile_select_name(spn_profile_info_t* overrides) {
@@ -81,7 +81,7 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   spn_profile_info_t** ptr = sp_om_getp(pkg->profiles, fallback.name);
   fallback.user = ptr ? *ptr : SP_NULLPTR;
   if (fallback.user) {
-    spn_profile_overlay(sp_str_ht_get(*profiles, fallback.name), fallback.user);
+    overlay_profile(sp_str_ht_get(*profiles, fallback.name), fallback.user);
   }
 
   // Build the base debug and release profiles
@@ -107,11 +107,11 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
 
     spn_profile_info_t* entry = sp_str_ht_get(*profiles, user->name);
     if (entry) {
-      spn_profile_overlay(entry, user);
+      overlay_profile(entry, user);
     } else {
       p.derived = base;
       p.derived.name = user->name;
-      spn_profile_overlay(&p.derived, user);
+      overlay_profile(&p.derived, user);
       sp_str_ht_insert(*profiles, p.derived.name, p.derived);
     }
   }
@@ -154,7 +154,7 @@ spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_in
   }
 
   spn_profile_info_t merged = *info;
-  spn_profile_overlay(&merged, overrides);
+  overlay_profile(&merged, overrides);
 
   spn_triple_t target = { merged.arch, merged.os, merged.abi };
   bool targeted = target.arch || target.os || target.abi;

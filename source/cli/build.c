@@ -14,9 +14,8 @@ static void set_rule(spn_target_rule_t* rule, bool selected, spn_target_names_t 
 
 sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
   spn_cli_build_t* cmd = &args.build;
-  spn_command_t* command = spn_cli_command(cli);
 
-  command->config.force = cmd->force;
+  spn_session_config_t config = { .force = cmd->force };
   spn_target_names_t names = sp_da_new(spn.heap, sp_str_t);
   sp_for(it, cli->num_rest) {
     sp_da_push(names, sp_cstr_as_str(cli->rest[it]));
@@ -24,15 +23,14 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
 
   bool specific = cmd->only.bin || cmd->only.lib || cmd->only.test || cmd->only.script;
   if (specific || !sp_da_empty(names)) {
-    command->config.selection.kind = SPN_TARGET_SELECTION_EXPLICIT;
+    config.selection.kind = SPN_TARGET_SELECTION_EXPLICIT;
     bool all_kinds = !specific;
-    set_rule(&command->config.selection.bin, all_kinds || cmd->only.bin, names);
-    set_rule(&command->config.selection.lib, all_kinds || cmd->only.lib, names);
-    set_rule(&command->config.selection.test, all_kinds || cmd->only.test, names);
-    set_rule(&command->config.selection.script, all_kinds || cmd->only.script, names);
+    set_rule(&config.selection.bin, all_kinds || cmd->only.bin, names);
+    set_rule(&config.selection.lib, all_kinds || cmd->only.lib, names);
+    set_rule(&config.selection.test, all_kinds || cmd->only.test, names);
+    set_rule(&config.selection.script, all_kinds || cmd->only.script, names);
   }
 
-  command->op = (spn_op_desc_t) { .kind = SPN_OP_BUILD };
-  command->project = true;
-  return SP_CLI_CONTINUE;
+  try_cli(spn_cli_open_session(config));
+  return spn_cli_result(cli, spn_op_build(spn.session));
 }

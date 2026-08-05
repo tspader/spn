@@ -5,19 +5,14 @@
 #include "sp/sp_cli.h"
 
 #include "error/types.h"
-#include "forward/types.h"
-#include "op/types.h"
 #include "profile/types.h"
-#include "session/types.h"
 
 typedef struct spn_cli spn_cli_t;
 
 typedef struct {
-  spn_op_desc_t op;
-  spn_session_config_t config;
+  spn_err_union_t result;
   spn_err_union_t (*finish)();
-  bool project; // @spader This is just a workaround for now
-} spn_command_t;
+} spn_cli_exec_t;
 
 typedef struct {
   sp_str_t package;

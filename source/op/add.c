@@ -44,10 +44,10 @@ static site_t find_site(spn_toml_edit_t* edit, sp_mem_t mem, sp_str_t table, sp_
   };
 }
 
-spn_err_union_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t* request) {
+spn_err_union_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t request) {
   try_union(spn_op_sync_indexes(ctx, (spn_index_refresh_t) sp_zero));
 
-  spn_pkg_name_t name = spn_pkg_name_from_qualified(request->key);
+  spn_pkg_name_t name = spn_pkg_name_from_qualified(request.key);
 
   spn_index_cache_t cache = sp_zero;
   spn_index_cache_init(&cache, ctx->heap, ctx->intern, &ctx->indexes);
@@ -64,7 +64,7 @@ spn_err_union_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t* request) {
     if (candidate->yanked) {
       continue;
     }
-    if (!spn_semver_in_range(candidate->version, request->range)) {
+    if (!spn_semver_in_range(candidate->version, request.range)) {
       continue;
     }
     release = candidate;
@@ -76,12 +76,12 @@ spn_err_union_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t* request) {
       .request = {
         .qualified = spn_pkg_name_to_qualified(name),
         .source = SPN_PKG_SOURCE_INDEX,
-        .index = { .range = request->range },
+        .index = { .range = request.range },
       },
     }};
   }
 
-  sp_str_t version = request->requested;
+  sp_str_t version = request.requested;
   if (sp_str_empty(version)) {
     version = spn_semver_to_str(ctx->heap, release->version);
   }
@@ -104,13 +104,13 @@ spn_err_union_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t* request) {
   }
 
   const c8* table = SP_NULLPTR;
-  switch (request->dep) {
+  switch (request.dep) {
     case SPN_ADD_DEP_TEST:  table = "test";    break;
     case SPN_ADD_DEP_BUILD: table = "build";   break;
     default:                table = "package"; break;
   }
 
-  site_t site = find_site(&edit, s.mem, sp_cstr_as_str(table), request->key, spn_pkg_name_to_qualified(name));
+  site_t site = find_site(&edit, s.mem, sp_cstr_as_str(table), request.key, spn_pkg_name_to_qualified(name));
   if (spn_toml_edit_set_str(&edit, site.path, site.num_segments, version)) {
     result = (spn_err_union_t) { .kind = SPN_ERR_MANIFEST_EDIT, .manifest_parse = { .path = manifest } };
     goto cleanup;

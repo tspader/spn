@@ -11,6 +11,7 @@
 #include "external/wasm/wasm.h"
 #include "op/build/build.h"
 #include "op/build/dag.h"
+#include "op/stage.h"
 #include "session/session.h"
 #include "unit/package.h"
 #include "unit/unit.h"
