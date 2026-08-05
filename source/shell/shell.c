@@ -4,7 +4,27 @@
 #include "event/build.h"
 #include "event/event.h"
 #include "event/log.h"
+#include "sp/io.h"
 #include "tui/tui.h"
+
+static void write_line(sp_io_writer_t* io, const c8* fmt, va_list args) {
+  sp_fmt_io_v(io, sp_cstr_as_str(fmt), args);
+  sp_io_write_new_line(io);
+}
+
+void spn_print(const c8* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  write_line(&shell.logger.out.base, fmt, args);
+  va_end(args);
+}
+
+void spn_print_err(const c8* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  write_line(&shell.logger.err.base, fmt, args);
+  va_end(args);
+}
 
 static u32 short_thread_id(u64 thread_id) {
   static sp_ht(u64, u32) thread_map = SP_NULLPTR;

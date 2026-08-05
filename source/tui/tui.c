@@ -7,7 +7,6 @@
 #include "enum/enum.h"
 #include "event/event.h"
 #include "event/log.h"
-#include "log/log.h"
 #include "semver/convert.h"
 #include "shell/types.h"
 #include "sp/color.h"
@@ -1079,6 +1078,30 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
         }
         case SPN_ERR_DAG_OUTPUT_NAME: {
           sp_io_write_str(&w.base, sp_str_lit("a build action output has no file name"), SP_NULLPTR);
+          break;
+        }
+        case SPN_ERR_DAG_MISSING_INPUT: {
+          sp_fmt_io(&w.base, "{.cyan} doesn't exist, but is listed as an input", sp_fmt_str(spn_tui_contextual_path(mem, event->err.dag.path)));
+          break;
+        }
+        case SPN_ERR_DAG_MISSING_OUTPUT: {
+          sp_fmt_io(&w.base, "{.cyan} was not produced by the action that declares it as an output", sp_fmt_str(spn_tui_contextual_path(mem, event->err.dag.path)));
+          break;
+        }
+        case SPN_ERR_DAG_STORE_READ: {
+          sp_fmt_io(&w.base, "{.cyan} could not be read from the content store", sp_fmt_str(spn_tui_contextual_path(mem, event->err.dag.path)));
+          break;
+        }
+        case SPN_ERR_DAG_STORE_WRITE: {
+          sp_fmt_io(&w.base, "{.cyan} could not be written to the content store", sp_fmt_str(spn_tui_contextual_path(mem, event->err.dag.path)));
+          break;
+        }
+        case SPN_ERR_DAG_SCRATCH: {
+          sp_io_write_str(&w.base, sp_str_lit("failed to create a scratch directory for the build"), SP_NULLPTR);
+          break;
+        }
+        case SPN_ERR_DAG_STALLED: {
+          sp_io_write_str(&w.base, sp_str_lit("the build graph stalled before completing"), SP_NULLPTR);
           break;
         }
         default: {

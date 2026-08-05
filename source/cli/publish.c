@@ -4,8 +4,8 @@
 #include "ctx/types.h"
 #include "index/json.h"
 #include "index/publish.h"
-#include "log/log.h"
 #include "project/types.h"
+#include "shell/shell.h"
 #include "tui/tui.h"
 
 static sp_cli_result_t publish_dry(sp_cli_t* cli, spn_cli_publish_t* cmd) {

@@ -6,8 +6,8 @@
 #include "sp.h"
 #include "sp/sp_math.h"
 #include "sp/sp_prompt.h"
+#include "event/types.h"
 #include "forward/types.h"
-#include "log/types.h"
 
 #define SPN_OUTPUT_MODE(X) \
   X(SPN_OUTPUT_MODE_INTERACTIVE) \
@@ -19,6 +19,13 @@
 typedef enum {
   SPN_OUTPUT_MODE(SP_X_ENUM_DEFINE)
 } spn_tui_mode_t;
+
+typedef struct {
+  sp_io_stream_writer_t out;
+  sp_io_stream_writer_t err;
+  sp_io_file_writer_t jsonl;
+  spn_verbosity_t verbosity;
+} spn_logger_t;
 
 typedef struct {
   sp_io_writer_t base;

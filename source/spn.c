@@ -44,7 +44,6 @@
 #include "intern/intern.h"
 #include "lock/lock.h"
 #include "log/lazy/lazy.h"
-#include "log/log.h"
 #include "sp/sp_om.h"
 #include "pkg/load.h"
 #include "profile/profile.h"
@@ -209,12 +208,6 @@ static sp_app_result_t on_init(sp_app_t* sp) {
     SetConsoleOutputCP(CP_UTF8);
   }
 #endif
-  shell.logger.level = SPN_LOG_LEVEL_INFO;
-  sp_str_t log_level = sp_env_get(spn.env, sp_str_lit("SPN_LOG_LEVEL"));
-  if (!sp_str_empty(log_level)) {
-    shell.logger.level = spn_log_level_from_str(log_level);
-  }
-
   spn_cli_t* cli = &shell.cli;
   spn_command_t command = sp_zero;
   sp_cli_t parsed = sp_cli_parse((sp_cli_desc_t) {

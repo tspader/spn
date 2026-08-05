@@ -3,7 +3,7 @@
 #include "cli/types.h"
 #include "ctx/types.h"
 #include "error/types.h"
-#include "log/log.h"
+#include "shell/shell.h"
 #include "sp/sp_prompt.h"
 #include "sp/sp_template.h"
 #include "spn.embed.h"
@@ -181,10 +181,10 @@ static spn_err_union_t run_unattended(sp_mem_t mem, spn_cli_init_t* command, sp_
   try_union(render(mem, dir, name, command->bare));
 
   for (iterator_t it = it_new(command->bare); !it.done; it_next(&it)) {
-    spn_log_info("- {}", sp_fmt_str(it.rel));
+    spn_print("- {}", sp_fmt_str(it.rel));
   }
-  spn_log_info("");
-  spn_log_info("To build your program:\n\n  spn build {}", sp_fmt_str(name));
+  spn_print("");
+  spn_print("To build your program:\n\n  spn build {}", sp_fmt_str(name));
 
   return spn_result(SPN_OK);
 }

@@ -137,7 +137,6 @@ add_executable(core
   ${SRC}/intern/context.c
   ${SRC}/intern/intern.c
   ${SRC}/lock/lock.c
-  ${SRC}/log/log.c
   ${SRC}/log/lazy/lazy.c
   ${SRC}/op/build/build.c
   ${SRC}/op/build/identity.c

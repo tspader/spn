@@ -5,7 +5,6 @@
 
 #include "cli/types.h"
 #include "forward/types.h"
-#include "log/types.h"
 #include "tui/types.h"
 
 struct spn_shell_t {

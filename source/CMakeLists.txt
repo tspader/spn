@@ -62,7 +62,6 @@ set(SPN_SOURCES
   intern/intern.c
   lock/lock.c
   log/lazy/lazy.c
-  log/log.c
   op/add.c
   op/build/build.c
   op/build/dag.c

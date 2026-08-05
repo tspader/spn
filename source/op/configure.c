@@ -130,8 +130,6 @@ spn_err_union_t spn_op_configure(spn_session_t* s) {
     }
   }
 
-  if (spn_dag_build_run(dag, 8)) {
-    return spn_err_reported(SPN_ERROR);
-  }
+  try_union(spn_dag_build_run(dag, 8));
   return spn_result(SPN_OK);
 }
