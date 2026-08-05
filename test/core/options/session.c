@@ -139,10 +139,11 @@ sp_test_each(options_session, apply, session_test_t, tests, .setup = spn_test_ct
     }));
   }
 
-  spn_err_t err = spn_session_apply_options(&session).kind;
+  bool reresolve = sp_zero;
+  spn_err_t err = spn_session_apply_options(&session, &reresolve).kind;
   sp_expect_eq(t, err, it->expect.err);
   sp_expect_eq(t, session.gates.resolves, it->expect.resolves);
-  sp_expect_eq(t, session.gates.reresolve, it->expect.reresolve);
+  sp_expect_eq(t, reresolve, it->expect.reresolve);
 
   sp_da(spn_build_event_t) events = spn_event_buffer_drain(mem, spn.events);
   sp_must_eq(t, sp_da_size(events), it->expect.event ? 1 : 0);

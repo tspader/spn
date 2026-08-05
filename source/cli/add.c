@@ -20,7 +20,8 @@ sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
     return cli_error(cli, "invalid version {.red}", sp_fmt_str(request.second));
   }
 
-  spn.exec.desc = (spn_op_desc_t) {
+  spn_command_t* command = (spn_command_t*)cli->user_data;
+  command->op = (spn_op_desc_t) {
     .kind = SPN_OP_ADD,
     .add = {
       .key = request.first,

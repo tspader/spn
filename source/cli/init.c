@@ -206,6 +206,6 @@ static spn_err_union_t finish_init(spn_ctx_t* ctx) {
 }
 
 sp_cli_result_t spn_cli_init(sp_cli_t* cli) {
-  spn.exec.finish = finish_init;
+  spn_cli_command(cli)->finish = finish_init;
   return SP_CLI_CONTINUE;
 }

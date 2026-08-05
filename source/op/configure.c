@@ -87,7 +87,7 @@ static void add_reactor_edges(spn_dag_build_t* b, spn_target_unit_t* reactor) {
   }
 }
 
-spn_err_union_t spn_phase_configure(spn_session_t* s) {
+spn_err_union_t spn_op_configure(spn_session_t* s) {
   if (spn_wasm_init()) {
     return (spn_err_union_t) { .kind = SPN_ERR_WASM_INIT_FAILED };
   }

@@ -3,7 +3,7 @@
 #include "ctx/types.h"
 
 sp_cli_result_t spn_cli_clean(sp_cli_t* cli) {
-  spn.exec.desc = (spn_op_desc_t) {
+  spn_cli_command(cli)->op = (spn_op_desc_t) {
     .kind = SPN_OP_CLEAN,
     .clean = { .whole = sp_str_empty(spn.cli.profile.name) },
   };

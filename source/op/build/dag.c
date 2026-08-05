@@ -1342,7 +1342,7 @@ spn_err_t spn_dag_build_run(spn_dag_build_t* b, u32 workers) {
   return b->result;
 }
 
-spn_err_union_t spn_phase_build(spn_session_t* session) {
+spn_err_union_t spn_op_build(spn_session_t* session) {
   spn_app_t* app = session->ctx->app;
 
   spn_dag_build_t* b = spn_dag_build_new(session);
@@ -1361,7 +1361,7 @@ spn_err_union_t spn_phase_build(spn_session_t* session) {
       .profile = session->profile.name,
       .target = spn_triple_to_str(session->mem, target),
       .toolchain = session->units.target->toolchain->info->name,
-      .force = session->ctx->config.force,
+      .force = session->config.force,
     }
   });
 

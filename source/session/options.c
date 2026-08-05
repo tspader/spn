@@ -110,10 +110,11 @@ static spn_err_union_t validate_config_keys(spn_session_t* session) {
   return spn_result(SPN_OK);
 }
 
-spn_err_union_t spn_session_apply_options(spn_session_t* session) {
+spn_err_union_t spn_session_apply_options(spn_session_t* session, bool* reresolve) {
   sp_mem_t mem = session->mem;
   sp_str_t missing_pkg = sp_zero;
   sp_str_t missing_dep = sp_zero;
+  *reresolve = false;
 
   for (;;) {
     sp_ht_init(mem, session->options);
@@ -213,7 +214,7 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session) {
     if (missing) {
       if (session->gates.resolves < SPN_GATE_MAX_RESOLVES) {
         session->gates.resolves++;
-        session->gates.reresolve = true;
+        *reresolve = true;
         return spn_result(SPN_OK);
       }
       spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {

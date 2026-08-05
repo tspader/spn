@@ -36,7 +36,7 @@ typedef struct {
 
 typedef enum {
   SPN_OP_NONE,
-  SPN_OP_REACH,
+  SPN_OP_BUILD,
   SPN_OP_ADD,
   SPN_OP_CLEAN,
   SPN_OP_PUBLISH,
@@ -46,7 +46,6 @@ typedef enum {
 typedef struct {
   spn_op_kind_t kind;
   union {
-    spn_phase_t reach;
     spn_add_request_t add;
     spn_publish_request_t publish;
     spn_index_refresh_t refresh;
